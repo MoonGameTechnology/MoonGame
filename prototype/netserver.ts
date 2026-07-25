@@ -224,6 +224,41 @@ if (AUTH && !authCfg.allowedOrigins) {
       'Set ALLOWED_ORIGINS before exposing this beyond a trusted network.\n',
   );
 }
+// MP-1 fail-secure (audit S1, 2026-07-25): when PROD=1, refuse to boot unless the
+// release-posture switches are all on — same contract as packages/server/src/main.ts.
+// Mirrors checkProductionReadiness() from serverConfig.ts (kept inlined here so the
+// throwaway netserver doesn't grow a new import path into packages/server). `PROD`
+// unset = the existing dev harness, untouched.
+const PROD_FLAG = process.env.PROD === '1' || process.env.PROD === 'true';
+if (PROD_FLAG) {
+  const missing: string[] = [];
+  if (!process.env.AUTH_JWT_SECRET) missing.push('AUTH_JWT_SECRET');
+  if (!(process.env.GATE === '1' || process.env.GATE === 'true')) missing.push('GATE=1');
+  const tlsNative = Boolean(process.env.TLS_KEY_FILE && process.env.TLS_CERT_FILE);
+  const tlsProxy = process.env.TRUST_PROXY === '1';
+  if (!tlsNative && !tlsProxy) {
+    missing.push('TLS (TLS_KEY_FILE+TLS_CERT_FILE for native TLS, or TRUST_PROXY=1 behind a TLS-terminating proxy)');
+  }
+  if (!(process.env.SEAT_LOCK === '1' || process.env.SEAT_LOCK === 'true')) missing.push('SEAT_LOCK=1');
+  if (missing.length) {
+    process.stderr.write(
+      `PROD=1 refuses to start: missing ${missing.join(', ')}. ` +
+        'Set every release-posture switch, or unset PROD for the dev harness.\n',
+    );
+    process.exit(1);
+  }
+}
+// Public-bind + no-auth warning (audit S1): even without PROD=1, a public bind with
+// no AUTH_JWT_SECRET is the open `?nick=` playtest path — surface it loudly so an
+// operator doesn't accidentally expose a public unauthenticated server.
+const HOST_BIND = process.env.HOST ?? '127.0.0.1';
+if (!AUTH && HOST_BIND === '0.0.0.0' && !PROD_FLAG) {
+  process.stderr.write(
+    'warning: HOST=0.0.0.0 with no AUTH_JWT_SECRET — public unauthenticated playtest mode. ' +
+      'Anyone who knows a nick can take a seat. Set AUTH_JWT_SECRET (and ideally PROD=1) ' +
+      'before exposing this beyond a trusted network.\n',
+  );
+}
 // The prototype host defaults to a ten-chair FFA. `TEAMS=5v5` keeps all ten chairs and
 // seeds two allied flanks; `TEAMS=2v2` preserves the smaller four-chair playtest. Every
 // chair is claimable by a human, while the server AI stands in after the reconnect grace.
@@ -600,6 +635,51 @@ const server = createMultiplayerServer({
     // PII — public like `/metrics` and `/health`, so a playtest host is one `curl` away
     // from "is anything going wrong right now?".
     app.get('/metrics/summary', async () => metrics.summary());
+    // NETA2-mon operator view: a one-glance "is anything going wrong right now?"
+    // derived from the live MetricsAggregator. Returns a compact status with
+    // thresholds so a playtest host can `curl /metrics/health` and read a single
+    // line. `ok: false` + `alerts` lists every threshold breach. Public (no
+    // match ids, no PII), same exposure as `/metrics` and `/metrics/summary`.
+    app.get('/metrics/health', async () => {
+      const s = metrics.summary();
+      const alerts: string[] = [];
+      // Hard failures — these should ALWAYS be zero in a healthy match.
+      if (s.desyncs > 0) alerts.push(`desyncs: ${s.desyncs} (client/server state divergence — should be 0)`);
+      if (s.deadLetters > 0) alerts.push(`deadLetters: ${s.deadLetters} (scheduled events that failed to apply — should be 0)`);
+      if (s.advanceOverflows > 0) alerts.push(`advanceOverflows: ${s.advanceOverflows} (advanceTo hit MAX_ADVANCE_STEPS — catch-up is starving)`);
+      // Reject rate — >10% rejections means players are sending bad actions (bug or cheat).
+      const rejectRate = s.actions.total > 0 ? s.actions.rejected / s.actions.total : 0;
+      if (rejectRate > 0.1) alerts.push(`rejectRate: ${(rejectRate * 100).toFixed(1)}% (${s.actions.rejected}/${s.actions.total} — players sending invalid actions)`);
+      // Latency — >200ms submit means the server is struggling under load.
+      if (s.submitMs.count > 0 && s.submitMs.max > 200) alerts.push(`submitMs.max: ${s.submitMs.max}ms (server is slow under load)`);
+      if (s.broadcastMs.count > 0 && s.broadcastMs.max > 200) alerts.push(`broadcastMs.max: ${s.broadcastMs.max}ms (fan-out is slow)`);
+      // Client FPS — min < 30 means at least one player is seeing jank.
+      if (s.clientFps && s.clientFps.count > 0 && s.clientFps.min < 30) alerts.push(`clientFps.min: ${s.clientFps.min} (a player is seeing lag)`);
+      return {
+        ok: alerts.length === 0,
+        alerts,
+        // Headline KPIs for a quick glance:
+        players: { joins: s.joins, leaves: s.leaves, connected: s.joins - s.leaves },
+        actions: { total: s.actions.total, ok: s.actions.ok, rejected: s.actions.rejected },
+        domain: { battles: s.battles, captures: s.captures },
+        latency: {
+          submitMs: s.submitMs.count ? { avg: Math.round(s.submitMs.avg), max: s.submitMs.max } : null,
+          broadcastMs: s.broadcastMs.count ? { avg: Math.round(s.broadcastMs.avg), max: s.broadcastMs.max } : null,
+        },
+      };
+    });
+    // NETA2-mon tail: the last N anomalous events from the JSONL log (rejects,
+    // desyncs, slow submits, fat deltas). `?n=20` defaults to the last 20. Same
+    // public exposure as the other /metrics/* endpoints (process-wide, no PII).
+    app.get('/metrics/recent', async (req) => {
+      const n = Math.min(Number((req.query as { n?: string }).n ?? '20') || 20, 200);
+      try {
+        const lines = readFileSync(logFile, 'utf8').trimEnd().split('\n');
+        return { file: logFile, total: lines.length, recent: lines.slice(-n).map((l) => JSON.parse(l)) };
+      } catch {
+        return { file: logFile, total: 0, recent: [] };
+      }
+    });
     // The client self-configures: accounts mode shows the password field + goes
     // через register/login+join-token; nick mode keeps the old handshake.
     app.get('/auth/status', async () => ({ enabled: AUTH }));

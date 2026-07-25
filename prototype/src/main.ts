@@ -10627,7 +10627,16 @@ async function welcomeSignIn(nick: string): Promise<void> {
     localStorage.setItem('void.nick', nick);
     wPassInput.value = ''; // the session JWT is stored instead — a password never lingers
     statusEl.textContent = '';
-    openHub();
+    // If we arrived via `?join=<id>` (or the join button opened the welcome card
+    // because no session was cached), resume the join now that we have a JWT.
+    const pendingId = pendingJoinAfterAuth;
+    pendingJoinAfterAuth = null;
+    if (pendingId) {
+      showStage('browse'); // hide the welcome card
+      connectToMatch(pendingId);
+    } else {
+      openHub();
+    }
   } finally {
     signingIn = false;
   }
@@ -11071,19 +11080,75 @@ settingsEl.addEventListener('click', (e) => {
 const bootParams = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
 const bootReset = (bootParams?.get('reset') ?? '').trim();
 const bootJoinId = (bootParams?.get('join') ?? '').trim();
+console.log('[boot] location.search=', location.search, 'bootJoinId=', bootJoinId, 'bootReset=', bootReset);
 if (bootReset) {
   openReset(bootReset);
 } else if (bootJoinId) {
+  // Direct deep-link into a match. Two paths:
+  //  (a) cached session JWT → connectToMatch immediately (no welcome card)
+  //  (b) no session → show welcome card, welcomeSignIn auto-resumes the join
+  console.log('[boot] ?join path — showing connect, awaiting probeAuthMode');
+  showConnect(false);
+  showHub(false);
+  void (async () => {
+    const srv = resolveServer();
+    console.log('[boot] resolveServer=', srv ? { base: srv.base, nick: srv.nick } : 'null');
+    if (srv) await probeAuthMode(srv.base);
+    console.log('[boot] authMode=', authMode);
+    // If auth-off LAN, just dial in (no login needed).
+    if (!authMode) {
+      console.log('[boot] auth-off — connectToMatch directly');
+      showStage('browse');
+      connectToMatch(bootJoinId);
+      return;
+    }
+    // Auth-on: if we have a cached session JWT, go straight to the match.
+    const cached = srv ? sessionRecord(srv.base) : null;
+    console.log('[boot] cached session=', cached ? { login: cached.login, token: cached.token.slice(0, 20) + '...' } : 'null');
+    if (cached) {
+      console.log('[boot] cached session — connectToMatch');
+      showStage('browse');
+      connectToMatch(bootJoinId);
+      return;
+    }
+    // No session — show the welcome card so the player can register/login,
+    // then welcomeSignIn auto-resumes the join via pendingJoinAfterAuth.
+    console.log('[boot] no session — showing welcome card, pendingJoinAfterAuth=', bootJoinId);
+    pendingJoinAfterAuth = bootJoinId;
+    showStage('welcome');
+    const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
+    wNickInput.value = savedNick || suggestCallsign();
+    wPassRowEl.style.display = 'flex';
+    wPassInput.focus();
+  })();
+} else {
+  console.log('[boot] no ?join — auth gate at boot');
+  // Auth gate at boot (UX fix): show the welcome/login card FIRST, before the
+  // hub — like every game's login screen. Previously a cached `void.nick` in
+  // localStorage skipped straight to `openHub()`, but that left the player in
+  // the hub with no valid session, so every Join silently failed (the session
+  // JWT was missing or stale). Now the welcome card is the boot screen; a
+  // returning player types their password once, gets a fresh JWT, and lands
+  // on the hub with a live session — exactly the standard game-login flow.
   showConnect(true);
   showHub(false);
-  statusEl.textContent = t('Подключение к сессии…');
+  showStage('welcome');
   void (async () => {
     const srv = resolveServer();
     if (srv) await probeAuthMode(srv.base);
-    connectToMatch(bootJoinId);
+    const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
+    if (savedNick) {
+      wNickInput.value = savedNick;
+    } else {
+      wNickInput.value = suggestCallsign();
+    }
+    if (authMode) {
+      wPassRowEl.style.display = 'flex';
+      wPassInput.focus();
+    } else {
+      wPassRowEl.style.display = 'none';
+    }
   })();
-} else if ((localStorage.getItem('void.nick') ?? '').trim()) {
-  openHub();
 }
 
 // --- single-player setup overlay --------------------------------------------
@@ -12084,6 +12149,10 @@ async function fetchJoinToken(
 
 /** The join token for the CURRENT dial attempt (auth mode) — consumed by connect(). */
 let pendingJoinToken: string | null = null;
+/** When `?join=<id>` arrives without a stored session, we show the welcome card;
+ *  this holds the id so `welcomeSignIn` can auto-resume the join after login.
+ *  Cleared on successful `connectToMatch`, never leaks across sessions. */
+let pendingJoinAfterAuth: string | null = null;
 
 interface MatchRow {
   matchId: string;
@@ -12125,7 +12194,13 @@ function ruleSummary(r: MatchRow['rules']): string {
 
 /** Join a chosen match: set it as the (re)connect target, then dial via `connect()`.
  *  Accounts mode (SES-2.5) first exchanges the session for a join token (register/
- *  login happens lazily inside `ensureSession` on the first join). */
+ *  login happens lazily inside `ensureSession` on the first join).
+ *
+ *  If `?join=<id>` arrives without a stored session (no cached JWT in localStorage),
+ *  `ensureSession` would silently return — the password row is on the welcome card,
+ *  which isn't shown by default. Fix: stash the id in `pendingJoinAfterAuth`, show
+ *  the welcome card so the player can register/login, and `welcomeSignIn` resumes
+ *  the join automatically on success. */
 function connectToMatch(id: string): void {
   currentMatchId = id;
   reconnecting = false;
@@ -12141,11 +12216,49 @@ function connectToMatch(id: string): void {
   }
   void (async () => {
     const srv = resolveServer();
-    if (!srv) return;
-    const session = await ensureSession(srv.base, srv.nick);
-    if (!session) return; // status line already explains (password / refused)
-    const join = await fetchJoinToken(srv.base, id, session);
-    if (!join) return;
+    if (!srv) {
+      // No server + no nick — show the welcome card so the player can sign in,
+      // then auto-resume the join after `welcomeSignIn` succeeds.
+      pendingJoinAfterAuth = id;
+      showConnect(false);
+      showHub(false);
+      showStage('welcome');
+      return;
+    }
+    // Use the cached session JWT if present. Previously this checked that the
+    // session's login matched `srv.nick` (read from `nickInput.value`), but
+    // that input could be stale or empty after a fresh login — the check
+    // silently fell through to the welcome card even with a valid JWT cached.
+    // The token is already scoped to the authenticated account; if it's
+    // invalid the join route returns 401 and we re-prompt for password.
+    const cached = sessionRecord(srv.base);
+    if (!cached) {
+      pendingJoinAfterAuth = id;
+      showConnect(false);
+      showHub(false);
+      showStage('welcome');
+      wNickInput.value = srv.nick || suggestCallsign();
+      wPassRowEl.style.display = 'flex';
+      wPassInput.focus();
+      return;
+    }
+    const join = await fetchJoinToken(srv.base, id, cached.token);
+    if (!join) {
+      // fetchJoinToken returned null — either 401 (session expired, it cleared
+      // the cache) or 403/409 (entry closed / full). For 401, show the welcome
+      // card so the player can re-login; welcomeSignIn auto-resumes the join.
+      // The session was already removed from localStorage by fetchJoinToken.
+      if (!sessionRecord(srv.base)) {
+        pendingJoinAfterAuth = id;
+        showConnect(false);
+        showHub(false);
+        showStage('welcome');
+        wNickInput.value = srv.nick || suggestCallsign();
+        wPassRowEl.style.display = 'flex';
+        wPassInput.focus();
+      }
+      return;
+    }
     pendingJoinToken = join.token;
     connect();
   })();
@@ -12153,12 +12266,16 @@ function connectToMatch(id: string): void {
 
 // Open a session in its OWN browser tab (deep-link «?join=<id>»): the hub/browser stays in
 // THIS tab while the match runs in a fresh one, which boots straight into it from the shared
-// same-origin localStorage identity (nick / session JWT). Popup blocked → join in this tab so
-// the player is never left stuck. (On the APK / a file:// page window.open may hand off to the
-// system browser; the deployed https origin is the intended path.)
+// same-origin localStorage identity (nick / session JWT).
+//
+// Audit (2026-07-25): `window.open(..., '_blank')` is silently blocked by most browsers
+// for non-direct user-gestures, and the fallback `connectToMatch` then ran with a stale
+// `nickInput.value` that didn't match the cached session login — so the welcome card
+// re-opened instead of joining. Switch to `location.href` (same-tab navigation): the hub
+// is replaced by the game view, no popup, no silent fallback. The hub is one tab-close away
+// (the match itself is durable on the server). This matches the APK path (one window).
 function openSessionTab(id: string): void {
-  const w = window.open(`${location.pathname}?join=${encodeURIComponent(id)}`, '_blank');
-  if (!w) connectToMatch(id);
+  location.href = `${location.pathname}?join=${encodeURIComponent(id)}`;
 }
 
 async function refreshMatches(quiet = false): Promise<void> {

@@ -178,6 +178,25 @@ export function createMultiplayerServer(
     void reply.code(500).send({ error: 'E_INTERNAL' });
   });
 
+  // CORS (audit fix, 2026-07-25): the client's fetch() to /auth/status, /matches,
+  // /matches/:id/join is blocked by the browser without Access-Control-Allow-Origin.
+  // Fastify doesn't add CORS headers by default, so probeAuthMode's fetch fails →
+  // authMode stays false → the client dials ?nick= instead of ?token= → WS handshake
+  // fails. Add a permissive CORS header on ALL HTTP routes (playtest server; the
+  // production path is behind a proxy with an explicit Origin allowlist).
+  app.addHook('onRequest', async (req, reply) => {
+    void reply.header('access-control-allow-origin', '*');
+    void reply.header('access-control-allow-methods', 'GET, POST, OPTIONS');
+    void reply.header('access-control-allow-headers', 'authorization, content-type');
+    // Handle CORS preflight (OPTIONS) inline — Fastify 404s unknown methods by
+    // default, and a preflight is an OPTIONS request the browser sends BEFORE the
+    // real fetch (when Authorization header is present). Without a 2xx on OPTIONS,
+    // the browser blocks the actual request. Reply 204 with the CORS headers.
+    if (req.method === 'OPTIONS') {
+      void reply.code(204).send('');
+    }
+  });
+
   // Liveness: cheap, unauthenticated, and DELIBERATELY contentless — it must not leak
   // match ids/seqs (audit F-13, which the old node:http `/health` did). Readiness is a
   // SEPARATE signal: NOT-ready while a hard dependency is down or the server is draining,

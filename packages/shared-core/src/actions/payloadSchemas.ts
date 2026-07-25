@@ -85,14 +85,17 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
       message: "kind 'planet' needs a planetId",
     }),
   // market.ts — amounts are plain positive numbers (resources accrue continuously,
-  // so fractional amounts are legal); price is a non-negative unit price.
+  // so fractional amounts are legal); price is a positive unit price (≥ 1) — the
+  // anti-wash-trade guard (SEC-A06-5): a `price: 0` listing is a free resource
+  // transfer, the documented vehicle once alts exist. `.min(1)` rejects both 0
+  // and negatives (the old `.nonnegative()` allowed 0, which the audit flagged).
   'market.list': z.object({
     // `side` is the prototype's two-sided order book (sell lot / buy bid); the core
     // marketModule ignores it (sell-only) — optional so ONE schema serves both hosts.
     side: z.enum(['sell', 'buy']).optional(),
     resource: id,
     amount: z.number().finite().positive(),
-    price: z.number().finite().nonnegative(),
+    price: z.number().finite().min(1),
   }),
   'market.buy': z.object({ orderId: id, amount: z.number().finite().positive() }),
   // The prototype's fill action (take up to `amount` from an open lot).

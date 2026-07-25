@@ -8,6 +8,7 @@ export {
 } from './matchRoom';
 export {
   createMultiplayerServer,
+  tlsFromEnv,
   type MultiplayerServerHandle,
   type MultiplayerServerOptions,
 } from './wsServer';

@@ -439,7 +439,13 @@ export class MatchRoom {
       this.lobbyAccrued = options.initialState.time;
       this.lobbyRunningSince = this.now();
     }
-    this.emitStateHash = options.emitStateHash ?? false;
+    // Desync detector (audit S5, 2026-07-25): default ON in production so the
+    // `hashState` cross-engine divergence check is enforced, not opt-in. The
+    // architecture doc (§8) calls this the "residual risk catcher" for the
+    // bit-exact-IEEE-754 `Math.sqrt` determinism claim — leaving it off by
+    // default in prod defeated the claim. Tests and dev harnesses override
+    // explicitly when they need deterministic-off (e.g. snapshot replay).
+    this.emitStateHash = options.emitStateHash ?? (process.env.NODE_ENV === 'production');
     this.singlePeerPerPlayer = options.singlePeerPerPlayer ?? false;
     // Enforce the metrics invariant (docs/metrics-roadmap): an observer is PURE
     // telemetry and must NEVER feed back into the room. Wrap it once here so a

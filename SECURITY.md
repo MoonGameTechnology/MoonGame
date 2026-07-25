@@ -68,7 +68,9 @@ Security is a first-class track in this repository, not an afterthought:
   [`.github/workflows/security.yml`](.github/workflows/security.yml) and
   [`docs/security/pipeline.md`](docs/security/pipeline.md).
 - **Supply-chain integrity** — GitHub Actions are SHA-pinned and scanner Docker
-  images are digest-pinned; see [`docs/security/image-pinning.md`](docs/security/image-pinning.md).
+  images are pinned (4 of 7 digest-pinned by `@sha256:`, 3 tag-pinned — see
+  [`docs/security/image-pinning.md`](docs/security/image-pinning.md) for the
+  current matrix and the open work to digest-pin the rest).
 - **Program & roadmaps** — [`docs/security/`](docs/security/),
   [`docs/secure-sdlc-roadmap.md`](docs/secure-sdlc-roadmap.md),
   [`docs/secure-environment-roadmap.md`](docs/secure-environment-roadmap.md),

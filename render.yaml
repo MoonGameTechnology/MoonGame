@@ -2,8 +2,14 @@
 # Render → New → Blueprint → point at this repo. It builds the Dockerfile and gives
 # a permanent https URL; share it — both players open it, pick Azure / Crimson, play.
 # Free web services sleep when idle (cold start on first hit) and state is in-memory
-# (a restart loses the match) — fine for testing. Don't leave it public long-term
-# (the handshake is unauthenticated — auth is brick F7 / SE-0.1).
+# (a restart loses the match) — fine for testing.
+#
+# SECURITY (SEC-1 / MP-1): this is a PUBLIC deploy (HOST=0.0.0.0, Render gives a
+# public https URL). Defaults below enforce the release posture: PROD=1 refuses
+# to boot without AUTH_JWT_SECRET, GATE=1, SEAT_LOCK=1 — so a one-click deploy is
+# safe-by-default, not the open `?nick=` playtest path. Set AUTH_JWT_SECRET to a
+# stable random string in Render's env vars (e.g. `openssl rand -hex 32`); unset
+# PROD=0 for an explicit dev/playtest instance.
 services:
   - type: web
     name: void-dominion
@@ -14,3 +20,16 @@ services:
     envVars:
       - key: HOST
         value: 0.0.0.0
+      - key: PROD
+        value: '1'
+      - key: GATE
+        value: '1'
+      - key: SEAT_LOCK
+        value: '1'
+      - key: AUTH_JWT_SECRET
+        # REQUIRED for a public Render deploy — set this in the Render dashboard
+        # to a stable random string (e.g. `openssl rand -hex 32`). Empty = the
+        # server logs a warning and refuses to boot (PROD=1 fail-secure).
+        value: ''
+      - key: TIME_SCALE
+        value: '24'

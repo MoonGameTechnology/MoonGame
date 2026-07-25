@@ -46,7 +46,16 @@ services:
       # register/login (session JWT + join tokens; nick/ticket handshakes refused).
       # Unset ⇒ the nick+ticket flow (zero-setup LAN playtests). Keep the secret
       # STABLE across restarts or every player must log in again.
+      # SECURITY: if you bind to a public interface (default 0.0.0.0), set a real
+      # secret here. An empty secret + public bind = unauthenticated playtest mode
+      # (anyone who knows a nick can take a seat). The server logs a stderr warning
+      # if HOST=0.0.0.0 and AUTH_JWT_SECRET is empty.
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-}
+      # Production posture (SEC-1 / MP-1): fail-secure — refuses to boot if any of
+      # GATE/SEAT_LOCK/AUTH_JWT_SECRET is unset on a public bind. Defaults ON so a
+      # plain `docker compose up` against the public interface is safe. Override
+      # with PROD=0 for explicit dev-mode (loopback / LAN playtest).
+      PROD: ${PROD:-1}
       # How many independent sessions this ONE process hosts (proto, proto-2, …):
       # all appear in the in-game match browser; each is durable in Postgres.
       MATCHES: ${MATCHES:-1}
