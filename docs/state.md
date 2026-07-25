@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1823 зелёных** (54 skip, 171 файл).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1830 зелёных** (54 skip, 171 файл).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -1144,14 +1144,20 @@ botDiplomacy, market, division, capital, standingOrders, effects])` (27 моду
   «🛰» в окне сводок. RU/EN. Проверено вживую (headless-бут): дайджест открывается из окна
   сводок, ловит события матча, закрывается. _Пуш-уведомления и серверный дайджест-хук — за
   зависимостью (PWA push); `buildRecap` уже server-ready для этого шва._
-- **Just-in-time интро механик (ONB-3)** — при **первом** открытии продвинутой панели
-  (технологии/рынок/Хранитель/верфь/дипломатия) — разовая интро-карточка, потом никогда:
-  чистый `src/intros.ts` (`INTROS` — 5 карточек `{id,title,body,trigger}` из готовой копии;
+- **Just-in-time интро механик (ONB-3)** — при **первом** контакте с продвинутой механикой —
+  разовая интро-карточка, потом никогда: чистый `src/intros.ts` (`INTROS` — 10 карточек
+  `{id,title,body,trigger}`: 5 панельных из готовой копии технологии/рынок/Хранитель/верфь/
+  дипломатия + `corp`/`ava` (ONB-8) + `asyncDelay`/`retreat`/`artillery` — три `firstAvailable`/
+  `firstFail`-триггера на РЕАЛЬНОМ игровом действии, не открытии панели: первый `fleet.move`
+  (мир идёт офлайн), первый `fleet.retreat` (копия — существующий боевой `.hint` про −40%
+  корпуса/щита, вынесена из мид-боя в спокойный момент), первый `fleet.barrage` (обстрел);
   fail-secure `parseSeenIntros`, идемпотентные `markIntroSeen`/`hasSeenIntro`; `resolveIntro(seen,
-  id,{veteran})→{card,seen}` — показывает ровно раз, ветерану suppress-но-помечено) — 9 тестов.
+  id,{veteran})→{card,seen}` — показывает ровно раз, ветерану suppress-но-помечено) — 11 тестов.
   Хранится per-nick `vd.seenIntros.<ник>`. main.ts: `maybeIntro(id)` в хуках рельс-панелей
-  (`rail-tech`/`-steward`/`-market`/`-constructor` + `openDiplo`), оверлей `#intro` (z-58 —
-  поверх панели, ниже настроек 59), «Понятно» закрывает; ветеран = завершил матч (`meta.xp>0`)
+  (`rail-tech`/`-steward`/`-market`/`-constructor` + `openDiplo`) и в `playerOrder` на успешном
+  `fleet.move`/`fleet.retreat`/`fleet.barrage` (не во время гайд-тура — тур сам владеет экраном),
+  оверлей `#intro` (z-58 — поверх панели, ниже настроек 59), «Понятно» закрывает; ветеран =
+  завершил матч (`meta.xp>0`)
   → карточки помечаются молча (не спамим). RU/EN. Прогрессивное раскрытие: обучение
   разнесено по сессиям, не фронт-лоадом. Проверено вживую (headless-бут): первое открытие →
   карточка, повторное → нет, другой панель → своя, ветеран → подавлено-но-помечено. _Триггеры
