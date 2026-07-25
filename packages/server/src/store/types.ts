@@ -42,11 +42,13 @@ export interface SeatAssignment {
  *  in docs/persistence-accounts-roadmap.md; this is the prototype-grade first step. */
 export interface AccountStore {
   /** Resolve a nick to a seat in a room: the SAME seat on return, a free seat from
-   *  `seats` on first join, or null when every seat is taken by another nick. */
+   *  `seats` on first join (or the `preferred` slot if given and free), or null when
+   *  every seat is taken by another nick. */
   resolveSeat(
     room: string,
     nick: string,
     seats: readonly PlayerId[],
+    preferred?: PlayerId,
   ): Promise<SeatAssignment | null>;
   /** Read-only: the seat this nick already holds in a room, or null if it holds none.
    *  Unlike `resolveSeat` this never assigns — it answers "is this nick a participant

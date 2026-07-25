@@ -83,6 +83,7 @@ export class MemoryAccountStore implements AccountStore {
     room: string,
     nick: string,
     seats: readonly PlayerId[],
+    preferred?: PlayerId,
   ): Promise<SeatAssignment | null> {
     let byNick = this.rooms.get(room);
     if (!byNick) {
@@ -92,6 +93,11 @@ export class MemoryAccountStore implements AccountStore {
     const existing = byNick.get(nick);
     if (existing) return Promise.resolve({ playerId: existing, isNew: false });
     const taken = new Set(byNick.values());
+    // Preferred slot: use it if it exists and is free (REL-7 seat selection).
+    if (preferred && seats.includes(preferred) && !taken.has(preferred)) {
+      byNick.set(nick, preferred);
+      return Promise.resolve({ playerId: preferred, isNew: true });
+    }
     const free = seats.find((s) => !taken.has(s));
     if (!free) return Promise.resolve(null); // room full
     byNick.set(nick, free);

@@ -361,6 +361,7 @@ export class PostgresAccountStore implements AccountStore {
     room: string,
     nick: string,
     seats: readonly PlayerId[],
+    preferred?: PlayerId,
   ): Promise<SeatAssignment | null> {
     const existing = await this.pool.query<{ player_id: string }>(
       `SELECT player_id FROM seats WHERE room = $1 AND nick = $2`,
@@ -377,7 +378,11 @@ export class PostgresAccountStore implements AccountStore {
       [room],
     );
     const taken = new Set(takenR.rows.map((r) => r.player_id));
-    for (const candidate of seats) {
+    // Preferred slot first (REL-7 seat selection): try it before the default order.
+    const order = preferred && seats.includes(preferred) && !taken.has(preferred)
+      ? [preferred, ...seats.filter((s) => s !== preferred)]
+      : seats;
+    for (const candidate of order) {
       if (taken.has(candidate)) continue;
       try {
         await this.pool.query(`INSERT INTO seats (room, nick, player_id) VALUES ($1, $2, $3)`, [

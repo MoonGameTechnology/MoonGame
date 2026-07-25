@@ -48,8 +48,10 @@ export interface MatchApiDeps {
   createMatch?(): Promise<CreatedMatch>;
   /** Resolve `nick` to a seat in `matchId` and mint its join token, or a stable failure:
    *  the match does not exist, every seat is taken, or token auth is not configured.
-   *  `accountId` is stamped into the join token when the caller is authenticated. */
-  join(matchId: string, nick: string, accountId?: string): Promise<JoinResult | JoinFailure>;
+   *  `accountId` is stamped into the join token when the caller is authenticated.
+   *  `preferredSlot` (REL-7): the player's chosen slot id (e.g. "p3"); the server
+   *  reserves it if free, falls back to any free slot if not. */
+  join(matchId: string, nick: string, accountId?: string, preferredSlot?: string): Promise<JoinResult | JoinFailure>;
   /** Resolve the caller's identity from the request (session token), or null when the
    *  request carries no valid session. Wired ⇒ create/join REQUIRE identity (401 E_AUTH)
    *  and the session's login IS the nick. Absent ⇒ legacy `?nick=` dev behaviour. */
@@ -119,7 +121,8 @@ export function registerMatchApi(app: FastifyInstance, deps: MatchApiDeps): void
         void reply.code(401);
         return { error: 'E_AUTH' as const };
       }
-      const result = await deps.join(id, who.login, who.accountId);
+      const slot = (request.query as { slot?: string }).slot;
+      const result = await deps.join(id, who.login, who.accountId, slot);
       if ('error' in result) void reply.code(STATUS[result.error]);
       return result;
     }

@@ -680,6 +680,30 @@ const server = createMultiplayerServer({
         return { file: logFile, total: 0, recent: [] };
       }
     });
+    // REL-7: seat selection — list the match's slots (faction, name, start planet,
+    // taken) so the client can render a faction picker BEFORE joining. The player
+    // chooses a slot, then POST /matches/:id/join with {slotId} reserves it.
+    app.get('/matches/:id/seats', async (request, reply) => {
+      const { id } = request.params as { id: string };
+      const room = registry.get(id) ?? (await registry.resolve?.(id));
+      if (!room) {
+        void reply.code(404);
+        return { error: 'E_NO_MATCH' as const };
+      }
+      const taken = new Set((await accountStore.seatedNicks(id)).map((s) => s.playerId));
+      const seats = Object.values(room.state.players).map((p) => {
+        // Find the start planet (owner === playerId, the homeworld).
+        const startPlanet = Object.values(room.state.planets).find((pl) => pl.owner === p.id);
+        return {
+          playerId: p.id,
+          name: p.name,
+          faction: p.faction,
+          start: startPlanet?.id ?? null,
+          taken: taken.has(p.id),
+        };
+      });
+      return { seats };
+    });
     // The client self-configures: accounts mode shows the password field + goes
     // через register/login+join-token; nick mode keeps the old handshake.
     app.get('/auth/status', async () => ({ enabled: AUTH }));
@@ -721,14 +745,15 @@ const server = createMultiplayerServer({
         // window (SES-2.3): a login that does NOT already hold a seat is a first-time claim —
         // refuse it once the window closed, BEFORE resolveSeat assigns a chair (a refused
         // newcomer never burns a chair); a seated login reconnects any time.
-        join: async (id, login, accountId) => {
+        // REL-7: `preferredSlot` lets the player choose a faction/start before joining.
+        join: async (id, login, accountId, preferredSlot) => {
           const room = registry.get(id);
           if (!room) return { error: 'E_NO_MATCH' as const };
           const held = await accountStore.seatOf(id, login);
           if (!held && !registry.entryOpen(id)) return { error: 'E_ENTRY_CLOSED' as const };
           const seat = held
             ? { playerId: held }
-            : await accountStore.resolveSeat(id, login, Object.keys(room.state.players));
+            : await accountStore.resolveSeat(id, login, Object.keys(room.state.players), preferredSlot as PlayerId | undefined);
           if (!seat) return { error: 'E_MATCH_FULL' as const };
           return {
             playerId: seat.playerId,
