@@ -411,16 +411,16 @@ const DEV_UI = ((): boolean => {
 // The ten possible commanders, in stable seat order. Seat 1 is always you (human);
 // seats 2-10 are AI or off in the setup screen. Four faction passives cycle across seats.
 const SEAT_META: ReadonlyArray<{ id: string; name: string; faction: string; color: string }> = [
-  { id: 'p1', name: 'Azure Compact', faction: 'blue', color: COLOR.p1! },
-  { id: 'p2', name: 'Crimson Hegemony', faction: 'red', color: COLOR.p2! },
+  { id: 'p1', name: 'Azure Compact', faction: 'azure', color: COLOR.p1! },
+  { id: 'p2', name: 'Crimson Hegemony', faction: 'crimson', color: COLOR.p2! },
   { id: 'p3', name: 'Amber Concord', faction: 'amber', color: COLOR.p3! },
   { id: 'p4', name: 'Violet Ascendancy', faction: 'violet', color: COLOR.p4! },
-  { id: 'p5', name: 'Azure Compact II', faction: 'blue', color: COLOR.p5! },
-  { id: 'p6', name: 'Crimson Hegemony II', faction: 'red', color: COLOR.p6! },
+  { id: 'p5', name: 'Azure Compact II', faction: 'azure', color: COLOR.p5! },
+  { id: 'p6', name: 'Crimson Hegemony II', faction: 'crimson', color: COLOR.p6! },
   { id: 'p7', name: 'Amber Concord II', faction: 'amber', color: COLOR.p7! },
   { id: 'p8', name: 'Violet Ascendancy II', faction: 'violet', color: COLOR.p8! },
-  { id: 'p9', name: 'Azure Compact III', faction: 'blue', color: COLOR.p9! },
-  { id: 'p10', name: 'Crimson Hegemony III', faction: 'red', color: COLOR.p10! },
+  { id: 'p9', name: 'Azure Compact III', faction: 'azure', color: COLOR.p9! },
+  { id: 'p10', name: 'Crimson Hegemony III', faction: 'crimson', color: COLOR.p10! },
 ];
 const GRID = 'rgba(46,150,160,0.07)';
 const LOCK = '#7df0d0'; // selection / targeting reticle accent
@@ -799,7 +799,7 @@ const DEFAULT_TEAM_SIDES: ReadonlyArray<'A' | 'B'> = [
 let setupSeatTeam: Array<'A' | 'B'> = [...DEFAULT_TEAM_SIDES];
 let setupStart: string = START_CANDIDATES[0] ?? MAP[0]!.id;
 let setupScientists: string[] = []; // the human's chosen research-leader council (≤2), picked at setup
-let setupFaction = 'blue'; // H3: the house the HUMAN plays; AI seats take the remaining ones
+let setupFaction = 'azure'; // H3: the house the HUMAN plays; AI seats take the remaining ones
 // SANDBOX — the home world of the local player (immortal-home target), captured at
 // launch. `sandboxConfig.enabled`/toggles live in ./sandbox; this is the only host var.
 let sandboxHomeId: string | null = null;
@@ -12396,39 +12396,70 @@ async function openSeatPicker(matchId: string): Promise<void> {
     const data = (await res.json()) as { seats: Array<{ playerId: string; name: string; faction: string; start: string | null; taken: boolean }> };
     if (seatpickListEl) {
       seatpickListEl.innerHTML = '';
-      const factionColors: Record<string, string> = { blue: '#35d6e6', red: '#ff5a4d', amber: '#ffb43a', violet: '#b366ff' };
+      // Group seats by faction — show 4 faction cards, each with free/taken count.
+      // The player picks a FACTION (azure/crimson/amber/violet), not a specific seat.
+      // The server assigns the first free seat of that faction.
+      const factionColors: Record<string, string> = { azure: '#35d6e6', crimson: '#ff5a4d', amber: '#ffb43a', violet: '#b366ff' };
+      const factionPassives: Record<string, string> = {
+        azure: '+12% экономика',
+        crimson: '+10% урон',
+        amber: '+15% скорость флотов',
+        violet: '+5% экономика и +5% урон',
+      };
+      const factionNames: Record<string, string> = {
+        azure: 'Azure Compact',
+        crimson: 'Crimson Hegemony',
+        amber: 'Amber Concord',
+        violet: 'Violet Ascendancy',
+      };
+      const byFaction: Record<string, typeof data.seats> = {};
       for (const seat of data.seats) {
+        const f = seat.faction;
+        if (!byFaction[f]) byFaction[f] = [];
+        byFaction[f].push(seat);
+      }
+      const factions = Object.keys(byFaction);
+      for (const faction of factions) {
+        const seats = byFaction[faction]!;
+        const freeCount = seats.filter((s) => !s.taken).length;
+        const isFull = freeCount === 0;
         const row = document.createElement('div');
-        row.className = 'seat-row' + (seat.taken ? ' taken' : '');
-        row.dataset.slotId = seat.playerId;
+        row.className = 'seat-row' + (isFull ? ' taken' : '');
+        row.dataset.faction = faction;
         const dot = document.createElement('div');
         dot.className = 'seat-dot';
-        dot.style.background = factionColors[seat.faction] ?? 'var(--cyan)';
+        dot.style.background = factionColors[faction] ?? 'var(--cyan)';
         const info = document.createElement('div');
         info.className = 'seat-info';
         const name = document.createElement('div');
         name.className = 'seat-name';
-        name.textContent = seat.name;
-        const faction = document.createElement('div');
-        faction.className = 'seat-faction';
-        faction.textContent = t('фракция') + ': ' + seat.faction + (seat.start ? ' · ' + t('старт') + ': ' + seat.start : '');
+        name.textContent = factionNames[faction] ?? faction;
+        const passive = document.createElement('div');
+        passive.className = 'seat-faction';
+        passive.textContent = factionPassives[faction] ?? '';
+        const slots = document.createElement('div');
+        slots.className = 'seat-faction';
+        slots.style.fontSize = '10px';
+        slots.textContent = t('слотов') + ': ' + freeCount + '/' + seats.length;
         info.appendChild(name);
-        info.appendChild(faction);
+        info.appendChild(passive);
+        if (slots.textContent) info.appendChild(slots);
         const status = document.createElement('div');
-        status.className = 'seat-status' + (seat.taken ? '' : ' free');
-        status.textContent = seat.taken ? t('занято') : t('свободно');
+        status.className = 'seat-status' + (isFull ? '' : ' free');
+        status.textContent = isFull ? t('занято') : t('свободно');
         row.appendChild(dot);
         row.appendChild(info);
         row.appendChild(status);
-        if (!seat.taken) {
+        if (!isFull) {
           row.addEventListener('click', () => {
-            // Deselect previous
             for (const r of seatpickListEl.querySelectorAll('.seat-row.selected')) {
               r.classList.remove('selected');
             }
             row.classList.add('selected');
-            seatpickSelected = seat.playerId;
-            if (seatpickGoEl) seatpickGoEl.disabled = false;
+            // Store the first free seat of this faction as the chosen slot.
+            const firstFree = seats.find((s) => !s.taken);
+            seatpickSelected = firstFree?.playerId ?? null;
+            if (seatpickGoEl) seatpickGoEl.disabled = !seatpickSelected;
           });
         }
         seatpickListEl.appendChild(row);

@@ -15,8 +15,9 @@ describe('faction data (B1 / CR-1.1)', () => {
   const resourceIds = new Set(readJson('resources.json') as unknown as string[]);
   const ids = Object.keys(factions);
 
-  it('ships exactly the two factions', () => {
-    expect(ids.sort()).toEqual(['swarm', 'vanguard']);
+  it('ships the four playable factions plus the legacy pair', () => {
+    // The four multiplayer houses (azure/crimson/amber/violet) + legacy vanguard/swarm.
+    expect(ids.sort()).toEqual(['amber', 'azure', 'crimson', 'swarm', 'vanguard', 'violet']);
   });
 
   it('each faction validates and carries a loadout, unique units and passives', () => {
@@ -25,7 +26,13 @@ describe('faction data (B1 / CR-1.1)', () => {
       expect(f.name).toBeTruthy();
       expect(Array.isArray(f.uniqueUnits)).toBe(true);
       expect(f.startingLoadout.fleet.length).toBeGreaterThan(0); // a starting fleet
-      expect(typeof f.passives.productionBonus).toBe('number'); // mirrors tech effects
+      // At least one passive bonus (production / combat / speed).
+      const p = f.passives;
+      expect(
+        typeof p.productionBonus === 'number' ||
+        typeof p.combatDamageBonus === 'number' ||
+        typeof p.fleetSpeedBonus === 'number',
+      ).toBe(true);
     }
   });
 

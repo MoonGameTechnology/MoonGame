@@ -1,4 +1,72 @@
 {
+  "azure": {
+    "name": "Azure Compact",
+    "description": "Дисциплинированный ремнант человечества, держит строй закалёнными флотами и жёсткой доктриной.",
+    "traits": ["disciplined"],
+    "abilities": [],
+    "uniqueUnits": [],
+    "startingLoadout": {
+      "resources": { "credits": 300, "metal": 300 },
+      "fleet": [
+        { "unit": "cruiser", "count": 2 },
+        { "unit": "scout_drone", "count": 1 }
+      ],
+      "garrison": [{ "unit": "militia", "count": 2 }],
+      "homeBuildings": ["mine_t1"]
+    },
+    "passives": { "productionBonus": 0.12 }
+  },
+  "crimson": {
+    "name": "Crimson Hegemony",
+    "description": "Воинственная гегемония, сокрушающая соперников мощью огня и решительными атаками.",
+    "traits": ["aggressive"],
+    "abilities": [],
+    "uniqueUnits": [],
+    "startingLoadout": {
+      "resources": { "credits": 300, "metal": 300 },
+      "fleet": [
+        { "unit": "cruiser", "count": 2 },
+        { "unit": "scout_drone", "count": 1 }
+      ],
+      "garrison": [{ "unit": "militia", "count": 2 }],
+      "homeBuildings": ["mine_t1"]
+    },
+    "passives": { "combatDamageBonus": 0.1 }
+  },
+  "amber": {
+    "name": "Amber Concord",
+    "description": "Конкорд торговцев и первопроходцев — быстрые флоты, широкие коридоры, молниеносные рейды.",
+    "traits": ["swift"],
+    "abilities": [],
+    "uniqueUnits": [],
+    "startingLoadout": {
+      "resources": { "credits": 300, "metal": 300 },
+      "fleet": [
+        { "unit": "cruiser", "count": 2 },
+        { "unit": "scout_drone", "count": 1 }
+      ],
+      "garrison": [{ "unit": "militia", "count": 2 }],
+      "homeBuildings": ["mine_t1"]
+    },
+    "passives": { "fleetSpeedBonus": 0.15 }
+  },
+  "violet": {
+    "name": "Violet Ascendancy",
+    "description": "Восходящая династия учёных и стратегов — сбалансированный подход: крепкая экономика и точный удар.",
+    "traits": ["balanced"],
+    "abilities": [],
+    "uniqueUnits": [],
+    "startingLoadout": {
+      "resources": { "credits": 300, "metal": 300 },
+      "fleet": [
+        { "unit": "cruiser", "count": 2 },
+        { "unit": "scout_drone", "count": 1 }
+      ],
+      "garrison": [{ "unit": "militia", "count": 2 }],
+      "homeBuildings": ["mine_t1"]
+    },
+    "passives": { "productionBonus": 0.05, "combatDamageBonus": 0.05 }
+  },
   "vanguard": {
     "name": "Vanguard Coalition",
     "description": "The last organized remnant of humanity, holding the line with disciplined fleets and hardened doctrine.",

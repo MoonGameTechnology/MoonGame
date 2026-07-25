@@ -1654,4 +1654,12 @@ export const en: Record<string, string> = {
     'the squadron automatically hits enemies within range',
   // --- admin-gated developer settings -------------------------------------------
   'только админ': 'admin only',
+  // --- REL-7 seat/faction picker ------------------------------------------------
+  'занято': 'taken',
+  'свободно': 'free',
+  'слотов': 'slots',
+  'ВЫБРАТЬ': 'CHOOSE',
+  'Выбор фракции': 'Choose Faction',
+  'Выберите фракцию и стартовую позицию. Занятые места отмечены серым.':
+    'Choose your faction and starting position. Taken seats are marked grey.',
 };
