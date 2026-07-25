@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1559 зелёных** (42 skip, 143 файла).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1821 зелёных** (53 skip, 171 файл).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -44,6 +44,14 @@ Void Dominion — мобильная/браузерная **real-time** (неп�
   eligible-карте), seeded-выбор — `pickAvaMap` (`packages/server/src/avaMapPool.ts`).
   `docs/` — дизайн. `prototype/` — играбельный
   single-file HTML на реальном ядре (для «пощупать»).
+  **Песочница (dev-only, `prototype/src/sandbox.ts`):** галочка «🧪 Песочница» в
+  сетапе одиночной игры включает панель тренировочных читов (как demo-режим в
+  Dota 2 / LoL) — держащиеся тумблеры (туман войны выкл · бесплатная прокачка ·
+  бессмертный дом · заморозка очередей у всех · мгновенная перезарядка скиллов
+  командиров) и разовые команды (+2000 любого ресурса · прекратить все войны →
+  нейтралитет). Самодостаточна как `testmode.ts` (fenced-хуки в `main.ts`/`build.mjs`,
+  strip'ается из player-сборки); трогает только ЛОКАЛЬНЫЙ solo-стейт, в NET не
+  работает (сервер авторитетен). Тесты — `sandbox.test.ts` (7).
 
 ## 2. Архитектура ядра
 

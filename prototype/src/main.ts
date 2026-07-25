@@ -239,6 +239,18 @@ import {
 // (The player build already does: the only uses sit under `!__PLAYER_BUILD__`, so
 // esbuild tree-shakes the whole module out of that bundle.)
 import { initTestMode, openTestMode } from './testmode';
+// SANDBOX — self-contained dev-only single-player "practice tools"; remove this
+// import + the fenced hooks below (setup checkbox, frame enforce/fog, free-build
+// snapshot, initSandbox call) + the #sandbox HTML/CSS to cut it cleanly.
+import {
+  sandboxConfig,
+  resetSandboxConfig,
+  resetSandboxRuntime,
+  enforceSandbox,
+  isBuildAction,
+  initSandbox,
+  setSandboxButton,
+} from './sandbox';
 // ONB-1 — the reusable guide-mark (spotlight) engine + its browser adapter.
 // `playerOrder` feeds it real actions so `action` steps advance; ONB-2 builds
 // the full guided first match on the same `startTour` primitive.
@@ -788,6 +800,9 @@ let setupSeatTeam: Array<'A' | 'B'> = [...DEFAULT_TEAM_SIDES];
 let setupStart: string = START_CANDIDATES[0] ?? MAP[0]!.id;
 let setupScientists: string[] = []; // the human's chosen research-leader council (≤2), picked at setup
 let setupFaction = 'blue'; // H3: the house the HUMAN plays; AI seats take the remaining ones
+// SANDBOX — the home world of the local player (immortal-home target), captured at
+// launch. `sandboxConfig.enabled`/toggles live in ./sandbox; this is the only host var.
+let sandboxHomeId: string | null = null;
 // Chosen time-flow multiplier for the launched match (×1/×2/×5/×10/×50/×100). ×1 = today's
 // normal play pace; the launch maps it onto the speedbar (applyTimeSpeed). ×100 is a
 // single-player-only sandbox pace — in net mode the server owns the clock, so this list
@@ -1576,8 +1591,10 @@ function submitQueued(planetId: string, queued: QueuedBuild): StepOut {
       : queued.kind === 'upgrade'
         ? upgradeBuilding(ME, planetId, queued.id)
         : buildBuilding(ME, planetId, queued.id);
+  const before = sandboxBuildSnapshot(action.type);
   const out = order(s, action, s.time);
   apply(out);
+  sandboxBuildRestore(before, !out.error);
   return out;
 }
 // A rally fleet keeps swallowing freshly-built ships only while its world still has
@@ -2255,6 +2272,20 @@ function drawSignatureAt(
   cx.fillText('◆' + cls, 0, r + 12);
   cx.restore();
 }
+// SANDBOX — fenced hook. In a sandboxed solo match with "free build" on, a build
+// order's resource spend is refunded. `order()` advances to `s.time` first (a no-op,
+// so no production/upkeep runs), leaving the paid cost as the only resource change —
+// snapshotting the treasury before and restoring it after makes the build free.
+// Leading `__PLAYER_BUILD__` guard keeps the sandbox tree-shaken from the player bundle.
+function sandboxBuildSnapshot(type: string): Record<string, number> | null {
+  if (__PLAYER_BUILD__) return null;
+  if (!sandboxConfig.enabled || !sandboxConfig.freeBuild || !isBuildAction(type)) return null;
+  return { ...(s.players[ME]?.resources ?? {}) };
+}
+function sandboxBuildRestore(snap: Record<string, number> | null, ok: boolean): void {
+  if (snap && ok && s.players[ME]) s.players[ME].resources = snap;
+}
+
 function apply(out: StepOut) {
   s = out.state;
   if (selFleet && !s.fleets[selFleet]) selFleet = null;
@@ -2353,8 +2384,10 @@ function playerOrder(action: Action) {
     note('⟳ ' + t('переподключение — приказ не отправлен, повтори через миг'));
     return;
   }
+  const before = sandboxBuildSnapshot(action.type);
   const out = order(s, action, s.time);
   apply(out);
+  sandboxBuildRestore(before, !out.error);
   if (out.error) note('✖ ' + errText(out.error));
   else {
     activeTour?.notifyAction(action.type); // an accepted intent advances `action` steps
@@ -10221,6 +10254,14 @@ if (!__PLAYER_BUILD__) {
     showConnect(false);
     openTestMode();
   });
+  // SANDBOX — fenced hook. Wire the single-player practice-tools panel; the floating
+  // opener stays hidden until a match launches with the setup checkbox ticked.
+  initSandbox({
+    getState: () => s,
+    me: () => ME,
+    homeId: () => sandboxHomeId,
+    note: (msg) => note(msg),
+  });
   initTestMode({
     startScenario: (state, resumeSpeed) => {
       installMatch(state, new Set()); // scenarios drive themselves — no AI
@@ -11347,6 +11388,12 @@ function openSetup(from: 'welcome' | 'hub' = 'welcome'): void {
   showConnect(false);
   setupEl.style.display = 'flex';
   $('setup-start').style.display = '';
+  // SANDBOX — fenced hook. Each setup opens with the practice tools reset + unticked.
+  if (!__PLAYER_BUILD__) {
+    resetSandboxConfig();
+    const sbx = $('setupsandbox') as HTMLInputElement | null;
+    if (sbx) sbx.checked = false;
+  }
   renderSetup();
   openSciPick(); // consecrate your 2 research leaders before picking the start point
 }
@@ -11495,12 +11542,26 @@ function installMatch(state: GameState, aiPlayers: Set<string>): void {
   for (const k of Object.keys(buildQueues)) delete buildQueues[k];
   defaultView(); // phone: zoom onto home; desktop: whole-map fit
   setupEl.style.display = 'none';
+  // SANDBOX — fenced hook. A fresh match starts with no frozen-queue carryover and the
+  // practice tools off; startMatch() re-arms them if the setup checkbox was ticked.
+  if (!__PLAYER_BUILD__) {
+    resetSandboxRuntime();
+    sandboxConfig.enabled = false;
+    setSandboxButton(false);
+  }
   maybeStartPendingTour(); // ONB-0: run a queued onboarding guide over the fresh HUD
 }
 function startMatch(setup: SetupConfig): void {
   const st = newGame(setup);
   installMatch(st, new Set(setup.seats.filter((x) => x.ai).map((x) => x.id)));
   applyTimeSpeed(setupSpeed); // launch running at the chosen time-flow multiplier
+  // SANDBOX — fenced hook. Arm the practice tools for this match from the setup
+  // checkbox; remember the home world for the immortal-home toggle and show the opener.
+  if (!__PLAYER_BUILD__) {
+    sandboxConfig.enabled = ($('setupsandbox') as HTMLInputElement | null)?.checked ?? false;
+    sandboxHomeId = setup.seats[0]?.start ?? null;
+    setSandboxButton(sandboxConfig.enabled);
+  }
 }
 
 setupMapEl.addEventListener('click', (ev) => {
@@ -12597,7 +12658,16 @@ function frame(nowReal: number) {
   pumpPendingLoads(); // fire ~1h cargo loads whose hour has elapsed (both modes)
   resolvePendingMerges(); // complete fleet merges whose movers have arrived
   checkEnd(); // terminal banner from `match` — runs in BOTH modes (net snapshots carry it)
-  vision = computeVision(); // fog projection for this frame (always on)
+  // SANDBOX — fenced hook. Hold the "immortal home" + "frozen queues" toggles every
+  // solo frame (paused or not); the whole feature no-ops outside a sandboxed solo match.
+  // Leading `!__PLAYER_BUILD__` lets esbuild tree-shake the sandbox out of the player bundle.
+  if (!__PLAYER_BUILD__ && !NET && sandboxConfig.enabled) enforceSandbox(s, ME, sandboxHomeId);
+  // SANDBOX — fenced hook. The "fog of war off" toggle drops the fog projection (null
+  // vision ⇒ everything is `known`, mirroring the always-off dev reveal).
+  vision =
+    !__PLAYER_BUILD__ && !NET && sandboxConfig.enabled && sandboxConfig.fogOff
+      ? null
+      : computeVision(); // fog projection for this frame
   if (vision) updateMemory(vision.identify); // variant B: remember what we see
   render(nowReal);
   renderPanel();
