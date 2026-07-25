@@ -1038,6 +1038,24 @@ function setDevSpeedControl(v: boolean): void {
     /* private-mode / storage-full: keep the in-memory value, just don't persist */
   }
 }
+// Admin gate (STUB). The prototype has no account/identity system yet, so real "admin
+// rights" don't exist — this placeholder decides whether the admin-only developer
+// tools (the «Для разработчиков» block in Settings) are shown. Until server-side
+// identity + roles land it grants admin to the dev client, and to anyone who opts in
+// per-device (`?admin=1` in the URL or localStorage 'void.admin'='1'); the shipped
+// player build stays admin-less. When accounts arrive, replace the body with a read of
+// the authenticated account's admin role — the call sites don't change.
+function isAdmin(): boolean {
+  try {
+    if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('admin'))
+      return true;
+    if (typeof localStorage !== 'undefined' && localStorage.getItem('void.admin') === '1')
+      return true;
+  } catch {
+    /* storage/URL unavailable — fall through to the build default */
+  }
+  return !__PLAYER_BUILD__;
+}
 // The compact-mode CSS is gated on the PC media query — JS-side string shortening
 // (ping button, conveyor idle line, upgrade buttons) must follow the same gate, or
 // a phone with the pref on would get PC-compact wording under phone styling.
@@ -1401,6 +1419,17 @@ function afford(bag: Record<string, number> | undefined): boolean {
 }
 function unitIcon(unit: string): string {
   return UNIT_ICON[unit] ?? (isGround(unit) ? '◆' : '▲');
+}
+/** Ship/unit icon for MENUS (build menu, garrison composition, codex, constructor,
+ *  split, asset lists…): the current poster silhouette (`unitGlyphs` — «силуэт = что,
+ *  цвет = чей») for ships, so every menu speaks the same shape language as the map
+ *  markers and the fleet card; ground units keep the text glyph (the silhouette family
+ *  is space-only). `px` fits the SVG box to the icon slot; `color` is the side tint
+ *  (defaults to your side — menus are about your own roster). */
+function unitIconHtml(unit: string, px = 22, color: string = youColor): string {
+  const def = data.units[unit];
+  if (def && def.domain !== 'ground') return unitGlyphSvg(def, { color, px });
+  return unitIcon(unit);
 }
 // Path2D-кэш силуэтов постера для канвы — панель берёт те же пути через SVG,
 // так что карта и карточка не могут разъехаться по форме.
@@ -5116,7 +5145,7 @@ function unitRows(stacks: Array<{ unit: string; count: number }>): string {
   return stacks
     .map(
       (st) =>
-        `<div class="asset-row" data-desc="u:${esc(st.unit)}"><span class="bicon">${unitIcon(st.unit)}</span><b>${st.count}× ${displayUnit(st.unit)}</b><span class="dim">${isGround(st.unit) ? t('земля') : t('космос')}</span></div>`,
+        `<div class="asset-row" data-desc="u:${esc(st.unit)}"><span class="bicon">${unitIconHtml(st.unit, 18)}</span><b>${st.count}× ${displayUnit(st.unit)}</b><span class="dim">${isGround(st.unit) ? t('земля') : t('космос')}</span></div>`,
     )
     .join('');
 }
@@ -6395,7 +6424,7 @@ function codexHtml(kind: string, id: string): string {
   if (tags) rows.push(cxRow(t('Класс'), tags));
   const dos = unitDossier(id);
   return (
-    `<div class="cx-head"><span class="cx-ic">${unitIcon(id)}</span><b>${esc(dos?.name ?? displayUnit(id))}</b><span class="cx-tag">${def.domain === 'ground' ? t('наземный юнит') : t('корабль')}</span></div>` +
+    `<div class="cx-head"><span class="cx-ic">${unitIconHtml(id, 24)}</span><b>${esc(dos?.name ?? displayUnit(id))}</b><span class="cx-tag">${def.domain === 'ground' ? t('наземный юнит') : t('корабль')}</span></div>` +
     `<div class="cx-stats">${rows.join('')}</div><div class="cx-desc">${dos?.body ?? ''}</div>`
   );
 }
@@ -6985,7 +7014,7 @@ function buildingLocked(planetId: string, id: string): 'built' | 'queued' | null
 }
 function codexTile(kind: 'b' | 'u', id: string, label: string, orderable = false, lockedFor?: string): string {
   if (!(kind === 'b' ? data.buildings[id] : data.units[id])) return '';
-  const icon = kind === 'b' ? (BUILD_ICON[id] ?? '▣') : unitIcon(id);
+  const icon = kind === 'b' ? (BUILD_ICON[id] ?? '▣') : unitIconHtml(id);
   const name = kind === 'b' ? buildingName(id) : (unitDossier(id)?.name ?? displayUnit(id));
   if (lockedFor) {
     // Committed already — a dim, non-ordering tile. Keeps data-desc (hover dossier),
@@ -7037,7 +7066,7 @@ function codexBuildBtn(kind: string, id: string): string {
     return `<button class="cx-build" data-build="building:${id}">▣ ${t('Построить здесь')} · ${cost(data.buildings[id]?.cost)}</button>`;
   }
   if (kind === 'u' && data.units[id]) {
-    return `<button class="cx-build" data-build="unit:${id}">${unitIcon(id)} ${t('Построить здесь')} · ${cost(data.units[id]?.cost)}</button>`;
+    return `<button class="cx-build" data-build="unit:${id}">${unitIconHtml(id, 16)} ${t('Построить здесь')} · ${cost(data.units[id]?.cost)}</button>`;
   }
   return '';
 }
@@ -7062,7 +7091,7 @@ function codexEntryLabel(e: CodexEntry): string {
 }
 function codexEntryIcon(e: CodexEntry): string {
   const id = e.key.slice(2);
-  if (e.category === 'unit') return unitIcon(id);
+  if (e.category === 'unit') return unitIconHtml(id, 20);
   if (e.category === 'building') return BUILD_ICON[id] ?? '▣';
   return '?';
 }
@@ -7323,8 +7352,20 @@ function updatePanelLive(): void {
   }
 }
 
-function cmdBtn(cmd: string, icon: string, label: string, cls: string, disabled: boolean): string {
-  return `<button data-cmd="${cmd}" class="${cls}" title="${esc(label)}" aria-label="${esc(label)}" ${disabled ? 'disabled' : ''}><span class="ci">${icon}</span><span class="cl">${esc(label)}</span></button>`;
+// A fleet-command button. `desc` (optional) is the hover tooltip — a one-line
+// description of what the command does; without it the tooltip is just the label.
+// The visible caption stays the short label; aria-label carries label + desc so the
+// screen-reader hears the same explanation a mouse user reads on hover.
+function cmdBtn(
+  cmd: string,
+  icon: string,
+  label: string,
+  cls: string,
+  disabled: boolean,
+  desc?: string,
+): string {
+  const tip = desc ? `${label} — ${desc}` : label;
+  return `<button data-cmd="${cmd}" class="${cls}" title="${esc(tip)}" aria-label="${esc(tip)}" ${disabled ? 'disabled' : ''}><span class="ci">${icon}</span><span class="cl">${esc(label)}</span></button>`;
 }
 
 /** Horizontal fleet command bar — Move (arm) / Stop / Attack / orbit change —
@@ -7395,25 +7436,28 @@ function renderCmdBar() {
   if (!castHero) castMenu = false;
   const html =
     `<span class="cmdlabel">${ids.length > 1 ? t('{n} ФЛОТОВ', { n: ids.length }) : t('ФЛОТ')}</span>` +
-    cmdBtn('move', '⤳', t('Курс'), aiming ? 'on' : '', false) +
-    cmdBtn('stop', '■', t('Стоп'), 'danger', !anyMoving) +
-    cmdBtn('attack', '⚔', t('Штурм'), assaultAim ? 'on' : '', !canAssault) +
-    cmdBtn('target', '◎', t('Цель'), targetAim ? 'on' : '', false) +
-    (castHero ? cmdBtn('cast', '✨', t('Каст'), castMenu ? 'on' : '', false) : '') +
-    (anyArtillery ? cmdBtn('barrage', '🎯', t('Обстрел'), barrageAim ? 'on' : '', false) : '') +
-    (artFleets.length > 0 ? cmdBtn('firemode', '🔥', fmLabel, fireMenu ? 'on' : '', false) : '') +
+    cmdBtn('move', '⤳', t('Курс'), aiming ? 'on' : '', false, t('выберите планету — флот пойдёт к ней по звёздным трассам')) +
+    cmdBtn('stop', '■', t('Стоп'), 'danger', !anyMoving, t('отменить текущее движение флота')) +
+    cmdBtn('attack', '⚔', t('Штурм'), assaultAim ? 'on' : '', !canAssault, t('лететь к чужому миру и высадить десант при подходе')) +
+    cmdBtn('target', '◎', t('Цель'), targetAim ? 'on' : '', false, t('тап по карте — собрать приказ: ждать · курс · штурм · обстрел')) +
+    (castHero ? cmdBtn('cast', '✨', t('Каст'), castMenu ? 'on' : '', false, t('применить способность героя из состава флота')) : '') +
+    (anyArtillery ? cmdBtn('barrage', '🎯', t('Обстрел'), barrageAim ? 'on' : '', false, t('сосредоточить огонь артиллерии по вражескому флоту с дистанции')) : '') +
+    (artFleets.length > 0 ? cmdBtn('firemode', '🔥', fmLabel, fireMenu ? 'on' : '', false, t('когда артиллерия стреляет сама: пассив · ответ · станд · агрес')) : '') +
     cmdBtn(
       'merge',
       '⛬',
       ids.length > 1 ? t('Слить') : t('Слить…'),
       merging ? 'on' : '',
       !canMerge,
+      t('объединить выбранные флоты в один'),
     ) +
-    cmdBtn('split', '⊟', t('Делить'), splitState ? 'on' : '', !canSplit) +
+    cmdBtn('split', '⊟', t('Делить'), splitState ? 'on' : '', !canSplit, t('отделить часть кораблей пришвартованного флота в новый')) +
     // ☰ — the extras row (hamburger, NOT «...» — референс не копируем дословно):
     // «Выбрать+» и будущие Ускорить/Задержка живут здесь, базовый ряд не пухнет.
-    cmdBtn('more', '☰', t('Ещё'), cmdMore ? 'on' : '', false) +
-    (cmdMore || pickMode ? cmdBtn('pick', '⊕', t('Выбрать+'), pickMode ? 'on' : '', false) : '') +
+    cmdBtn('more', '☰', t('Ещё'), cmdMore ? 'on' : '', false, t('дополнительные приказы')) +
+    (cmdMore || pickMode
+      ? cmdBtn('pick', '⊕', t('Выбрать+'), pickMode ? 'on' : '', false, t('добавлять флоты в группу по одному тапу'))
+      : '') +
     (cmdMore
       ? cmdBtn(
           'boost',
@@ -7421,6 +7465,7 @@ function renderCmdBar() {
           t('Ускорить'),
           ids.length > 0 && ids.every((id) => marchFlagged(id)) ? 'on' : '',
           ids.length === 0,
+          t('форс-марш: +50% скорости ценой −5% прочности за час хода'),
         ) +
         // SO-UI: standing orders live here now — the bottom sheet keeps only info.
         cmdBtn(
@@ -7429,6 +7474,7 @@ function renderCmdBar() {
           t('Авто-штурм'),
           ids.length > 0 && ids.every((id) => isAutoAssault(id)) ? 'on' : '',
           ids.length === 0,
+          t('флот сам штурмует вражеский мир по прибытии'),
         ) +
         (fleets.some(fleetHasSquadron)
           ? cmdBtn(
@@ -7437,6 +7483,7 @@ function renderCmdBar() {
               t('Деж. вылет'),
               fleets.filter(fleetHasSquadron).every((fl) => patrolOf(fl.id)) ? 'on' : '',
               false,
+              t('эскадрилья автоматически бьёт врага в радиусе'),
             )
           : '')
       : '') +
@@ -7507,7 +7554,7 @@ function renderSplitDialog() {
     splitState.take[unit] = tk;
     takeTotal += tk;
     rows += `<div class="srow">
-      <span class="sname"><span class="bicon">${unitIcon(unit)}</span>${esc(displayUnit(unit))}</span>
+      <span class="sname"><span class="bicon">${unitIconHtml(unit, 18)}</span>${esc(displayUnit(unit))}</span>
       <b class="scur">${have - tk}</b>
       <span class="sbtns">
         <button data-sx="dec" data-unit="${esc(unit)}" data-n="1" ${tk <= 0 ? 'disabled' : ''}>−1</button>
@@ -9802,12 +9849,12 @@ function conLoadoutPane(hullList: string[]): string {
   const hulls = ownedHulls
     .map(
       (h) =>
-        `<button class="cn-hbtn${h === conHull ? ' on' : ''}" data-cnhull="${h}">${UNIT_ICON[h] ?? '▲'} ${esc(displayUnit(h))}</button>`,
+        `<button class="cn-hbtn${h === conHull ? ' on' : ''}" data-cnhull="${h}">${unitIconHtml(h, 18)} ${esc(displayUnit(h))}</button>`,
     )
     .join('');
   const freeTypes = [...new Set(m.slots.filter((sl) => !sl.moduleId).map((sl) => sl.type))];
   const hullCard =
-    `<div class="cn-hull"><div class="cn-hic">${UNIT_ICON[conHull] ?? '▲'}</div><div><div class="cn-hn">${esc(displayUnit(conHull))}</div>` +
+    `<div class="cn-hull"><div class="cn-hic">${unitIconHtml(conHull, 40)}</div><div><div class="cn-hn">${esc(displayUnit(conHull))}</div>` +
     `<div class="cn-hm">${t('{n} слота под модули (по размеру корпуса)', { n: String(m.slots.length) })}</div></div></div>`;
   const bays = m.slots
     .map((sl) => {
@@ -10867,9 +10914,12 @@ function renderSettings(): void {
     `<div class="set-lbl">${t('Звёздный фон')}<span class="set-sub">${t('дрейфующие туманности и звёзды на фоне — выключите для плоского фона')}</span></div>` +
     `<div class="set-ctl"><label class="set-switch"><input id="set-starfield" type="checkbox"${starfield ? ' checked' : ''} aria-label="${t('Звёздный фон')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-starfield-val" class="set-val">${starfield ? t('вкл') : t('выкл')}</span></div>` +
     `</div>` +
-    // Developer section (PC only) — tools a normal player doesn't need.
-    (pcUi()
-      ? `<div class="pc-sec">${t('Для разработчиков')}</div>` +
+    // Developer section — admin-only tools a normal player never sees. The gate is the
+    // `isAdmin()` stub: today it's the dev client (or an explicit per-device opt-in),
+    // and it becomes a real account-role check once identity lands — the block simply
+    // starts appearing for admins then, unchanged.
+    (isAdmin()
+      ? `<div class="pc-sec">${t('Для разработчиков')}<span class="pc-adm">${t('только админ')}</span></div>` +
         `<div class="set-row">` +
         `<div class="set-lbl">${t('Управление скоростью')}<span class="set-sub">${t('панель времени в матче — пауза и множители ускорения (1× — реальное время)')}</span></div>` +
         `<div class="set-ctl"><label class="set-switch"><input id="set-devspeed" type="checkbox"${devSpeedControl ? ' checked' : ''} aria-label="${t('Управление скоростью')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-devspeed-val" class="set-val">${devSpeedControl ? t('вкл') : t('выкл')}</span></div>` +
