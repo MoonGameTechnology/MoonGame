@@ -10586,7 +10586,16 @@ async function welcomeSignIn(nick: string): Promise<void> {
     localStorage.setItem('void.nick', nick);
     wPassInput.value = ''; // the session JWT is stored instead — a password never lingers
     statusEl.textContent = '';
-    openHub();
+    // If we arrived via `?join=<id>` (or the join button opened the welcome card
+    // because no session was cached), resume the join now that we have a JWT.
+    const pendingId = pendingJoinAfterAuth;
+    pendingJoinAfterAuth = null;
+    if (pendingId) {
+      showStage('browse'); // hide the welcome card
+      connectToMatch(pendingId);
+    } else {
+      openHub();
+    }
   } finally {
     signingIn = false;
   }
@@ -11033,16 +11042,64 @@ const bootJoinId = (bootParams?.get('join') ?? '').trim();
 if (bootReset) {
   openReset(bootReset);
 } else if (bootJoinId) {
-  showConnect(true);
+  // Direct deep-link into a match — show the welcome card so the player can
+  // register/login, then `welcomeSignIn` auto-resumes the join via
+  // `pendingJoinAfterAuth`. Previously this called `connectToMatch` directly,
+  // which silently returned when no session was cached (the password field
+  // lives on the welcome card, not on the connect overlay).
+  pendingJoinAfterAuth = bootJoinId;
+  showConnect(false);
   showHub(false);
-  statusEl.textContent = t('Подключение к сессии…');
+  showStage('welcome');
+  // Pre-fill the suggested callsign + show the password row so the player
+  // doesn't have to click through the welcome card first.
+  const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
+  wNickInput.value = savedNick || suggestCallsign();
+  wPassRowEl.style.display = 'flex';
   void (async () => {
     const srv = resolveServer();
     if (srv) await probeAuthMode(srv.base);
-    connectToMatch(bootJoinId);
+    // If the server has auth off (a LAN playtest), skip the form and dial in.
+    if (!authMode) {
+      showStage('browse');
+      connectToMatch(bootJoinId);
+    } else {
+      wPassInput.focus();
+    }
   })();
-} else if ((localStorage.getItem('void.nick') ?? '').trim()) {
-  openHub();
+} else {
+  // Auth gate at boot (UX fix): show the welcome/login card FIRST, before the
+  // hub — like every game's login screen. Previously a cached `void.nick` in
+  // localStorage skipped straight to `openHub()`, but that left the player in
+  // the hub with no valid session, so every Join silently failed (the session
+  // JWT was missing or stale). Now the welcome card is the boot screen; a
+  // returning player types their password once, gets a fresh JWT, and lands
+  // on the hub with a live session — exactly the standard game-login flow.
+  showConnect(true);
+  showHub(false);
+  showStage('welcome');
+  void (async () => {
+    const srv = resolveServer();
+    if (srv) await probeAuthMode(srv.base);
+    // Pre-fill the suggested callsign so a returning player just types a password.
+    const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
+    if (savedNick) {
+      wNickInput.value = savedNick;
+      wPassRowEl.style.display = 'flex';
+      wPassInput.focus();
+    } else {
+      wNickInput.value = suggestCallsign();
+      wNickInput.focus();
+    }
+    // If the server has auth off (a LAN playtest), the welcome card is just a
+    // callsign gate — confirm and land on the hub.
+    if (!authMode) {
+      // No password needed; the welcome card's "Войти" button handles the
+      // guest-callsign flow and opens the hub. Don't bypass it — let the
+      // player confirm their callsign.
+      wPassRowEl.style.display = 'none';
+    }
+  })();
 }
 
 // --- single-player setup overlay --------------------------------------------
@@ -12023,6 +12080,10 @@ async function fetchJoinToken(
 
 /** The join token for the CURRENT dial attempt (auth mode) — consumed by connect(). */
 let pendingJoinToken: string | null = null;
+/** When `?join=<id>` arrives without a stored session, we show the welcome card;
+ *  this holds the id so `welcomeSignIn` can auto-resume the join after login.
+ *  Cleared on successful `connectToMatch`, never leaks across sessions. */
+let pendingJoinAfterAuth: string | null = null;
 
 interface MatchRow {
   matchId: string;
@@ -12064,7 +12125,13 @@ function ruleSummary(r: MatchRow['rules']): string {
 
 /** Join a chosen match: set it as the (re)connect target, then dial via `connect()`.
  *  Accounts mode (SES-2.5) first exchanges the session for a join token (register/
- *  login happens lazily inside `ensureSession` on the first join). */
+ *  login happens lazily inside `ensureSession` on the first join).
+ *
+ *  If `?join=<id>` arrives without a stored session (no cached JWT in localStorage),
+ *  `ensureSession` would silently return — the password row is on the welcome card,
+ *  which isn't shown by default. Fix: stash the id in `pendingJoinAfterAuth`, show
+ *  the welcome card so the player can register/login, and `welcomeSignIn` resumes
+ *  the join automatically on success. */
 function connectToMatch(id: string): void {
   currentMatchId = id;
   reconnecting = false;
@@ -12080,11 +12147,32 @@ function connectToMatch(id: string): void {
   }
   void (async () => {
     const srv = resolveServer();
-    if (!srv) return;
-    const session = await ensureSession(srv.base, srv.nick);
-    if (!session) return; // status line already explains (password / refused)
-    const join = await fetchJoinToken(srv.base, id, session);
-    if (!join) return;
+    if (!srv) {
+      // No server + no nick — show the welcome card so the player can sign in,
+      // then auto-resume the join after `welcomeSignIn` succeeds.
+      pendingJoinAfterAuth = id;
+      showConnect(false);
+      showHub(false);
+      showStage('welcome');
+      return;
+    }
+    // If we already have a cached session for THIS nick, use it. Otherwise show
+    // the welcome card (the password field lives there); `welcomeSignIn` will
+    // resume the join. This closes the silent-fail path where `?join=proto`
+    // arrives with no stored identity.
+    const cached = sessionRecord(srv.base);
+    if (!cached || cached.login.toLowerCase() !== srv.nick.toLowerCase()) {
+      pendingJoinAfterAuth = id;
+      showConnect(false);
+      showHub(false);
+      showStage('welcome');
+      wNickInput.value = srv.nick || suggestCallsign();
+      wPassRowEl.style.display = 'flex';
+      wPassInput.focus();
+      return;
+    }
+    const join = await fetchJoinToken(srv.base, id, cached.token);
+    if (!join) return; // status line already explains (refused / entry closed / full)
     pendingJoinToken = join.token;
     connect();
   })();
