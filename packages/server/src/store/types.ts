@@ -61,6 +61,15 @@ export interface AccountStore {
   /** The bound ticket hash for (room, nick), or null when none was ever bound
    *  (first join, or a seat claimed before the lock existed). */
   seatTicket(room: string, nick: string): Promise<string | null>;
+  /** NETA2-10: clear a bound ticket hash so the seat's next join re-mints fresh —
+   *  the recovery path for a lost ticket (site-data wipe / new device). No self-
+   *  service network route calls this (nick+ticket is the SOLE identity on the
+   *  lock's dev/LAN path — anyone could name any nick, so an unauthenticated
+   *  "reset my ticket" endpoint would let an attacker steal any seat, defeating
+   *  the lock). It is an operator action instead — see `deploy/README.md`'s seat-
+   *  lock recovery runbook. A nick holding no seat, or already unbound, is a
+   *  no-op (idempotent; nothing to fail on twice). */
+  resetSeatTicket(room: string, nick: string): Promise<void>;
   /** Read-only: how many seats are currently claimed in a room (occupied count), for
    *  the browser's "players X/Y" status line. */
   occupiedSeats(room: string): Promise<number>;

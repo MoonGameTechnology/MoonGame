@@ -432,6 +432,13 @@ export class PostgresAccountStore implements AccountStore {
     return r.rows[0]?.ticket_hash ?? null;
   }
 
+  async resetSeatTicket(room: string, nick: string): Promise<void> {
+    await this.pool.query(`UPDATE seats SET ticket_hash = NULL WHERE room = $1 AND nick = $2`, [
+      room,
+      nick,
+    ]);
+  }
+
   async occupiedSeats(room: string): Promise<number> {
     const r = await this.pool.query<{ n: string }>(
       `SELECT count(*) AS n FROM seats WHERE room = $1`,

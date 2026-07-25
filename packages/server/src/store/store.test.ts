@@ -143,6 +143,22 @@ function accountStoreContract(name: string, make: () => AccountStore, uniq: (p: 
       expect(await store.bindSeatTicket(uniq('r4'), 'alice', 'x')).toBeNull(); // no seat there
     });
 
+    it('resetSeatTicket (NETA2-10) clears a bound ticket so the seat re-mints fresh', async () => {
+      const store = make();
+      await store.resolveSeat(uniq('r6'), 'alice', seats);
+      await store.bindSeatTicket(uniq('r6'), 'alice', 'hash-lost');
+      expect(await store.seatTicket(uniq('r6'), 'alice')).toBe('hash-lost');
+      await store.resetSeatTicket(uniq('r6'), 'alice');
+      expect(await store.seatTicket(uniq('r6'), 'alice')).toBeNull(); // unbound again
+      // the seat itself (nick → playerId) is untouched — only the ticket is cleared
+      expect((await store.resolveSeat(uniq('r6'), 'alice', seats))?.playerId).toBe('p1');
+      // next bind wins fresh, as if it were the seat's first-ever ticket
+      expect(await store.bindSeatTicket(uniq('r6'), 'alice', 'hash-new')).toBe('hash-new');
+      // idempotent: resetting an unbound/nonexistent (room, nick) is a harmless no-op
+      await store.resetSeatTicket(uniq('r6'), 'bob');
+      await store.resetSeatTicket(uniq('r7'), 'nobody');
+    });
+
     it('seatedNicks lists every claimed (playerId, nick) — the match-end credit read', async () => {
       const store = make();
       expect(await store.seatedNicks(uniq('r5'))).toEqual([]);

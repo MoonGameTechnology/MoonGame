@@ -119,6 +119,11 @@ export class MemoryAccountStore implements AccountStore {
     return Promise.resolve(this.tickets.get(room)?.get(nick) ?? null);
   }
 
+  resetSeatTicket(room: string, nick: string): Promise<void> {
+    this.tickets.get(room)?.delete(nick);
+    return Promise.resolve();
+  }
+
   occupiedSeats(room: string): Promise<number> {
     return Promise.resolve(this.rooms.get(room)?.size ?? 0);
   }
