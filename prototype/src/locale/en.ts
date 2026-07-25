@@ -1161,6 +1161,8 @@ export const en: Record<string, string> = {
   'Сезон ещё не начат': 'The season has not started',
   Сервер: 'Server',
   'Скорость времени': 'Time speed',
+  '🧪 Песочница — тестовые команды (туман, ресурсы, бессмертный дом…)':
+    '🧪 Sandbox — practice commands (fog, resources, immortal home…)',
   'Сменить командира': 'Switch commander',
   Сообщество: 'Community',
   'Тапните светящийся мир, чтобы выбрать старт': 'Tap a glowing world to choose your start',

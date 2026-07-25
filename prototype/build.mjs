@@ -1644,6 +1644,43 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #testmode .tm-fight:disabled{opacity:.4;cursor:not-allowed;border-color:var(--line);color:var(--dim);background:transparent;}
 @media (max-width:520px){#testmode .tm-sides{grid-template-columns:1fr;}}
 /* === /DEV TEST MODE === */
+/* === SANDBOX — self-contained; delete this whole block to cut the styles === */
+.sbx-check{display:flex;align-items:center;gap:9px;margin-top:12px;padding:10px 12px;border:1px solid var(--line-hi);
+  border-radius:9px;background:rgba(255,255,255,.02);cursor:pointer;color:var(--ink);font-size:12px;line-height:1.4;}
+.sbx-check input{width:16px;height:16px;flex:none;accent-color:var(--amber);cursor:pointer;}
+#sandboxbtn{position:fixed;right:14px;bottom:96px;z-index:58;width:46px;height:46px;border-radius:50%;
+  border:1px solid var(--amber);background:var(--glass);color:var(--amber);font-size:20px;cursor:pointer;
+  box-shadow:0 0 14px rgba(0,0,0,.4);backdrop-filter:blur(6px);}
+#sandboxbtn:active{background:rgba(255,190,60,.16);}
+#sandbox{position:fixed;inset:0;z-index:59;display:none;align-items:center;justify-content:center;padding:18px;
+  background:rgba(3,10,14,.72);backdrop-filter:blur(3px);}
+#sandbox .sbx-box-w{width:min(460px,96vw);max-height:92vh;overflow:auto;background:var(--glass);border:1px solid var(--amber);
+  border-radius:14px;padding:18px 18px 16px;box-shadow:0 0 40px rgba(0,0,0,.5);}
+#sandbox .sbx-title{display:flex;align-items:center;gap:10px;font-size:16px;letter-spacing:2px;color:var(--amber);}
+#sandbox .sbx-title .dia{width:11px;height:11px;transform:rotate(45deg);background:var(--amber);box-shadow:0 0 10px var(--amber);}
+#sandbox .sbx-dev{margin-left:auto;font-size:9px;letter-spacing:2px;color:#0a0f12;background:var(--amber);padding:2px 7px;border-radius:3px;}
+#sandbox .sbx-sub{margin:8px 0 14px;color:var(--dim);font-size:11.5px;line-height:1.5;}
+#sandbox .sbx-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--grn-dim);margin:14px 0 8px;}
+#sandbox .sbx-togs{display:grid;gap:7px;}
+#sandbox .sbx-tog{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 12px;border-radius:9px;
+  border:1px solid var(--line-hi);background:rgba(255,255,255,.02);color:var(--ink);cursor:pointer;}
+#sandbox .sbx-tog.on{border-color:var(--amber);background:rgba(255,190,60,.1);}
+#sandbox .sbx-box{width:20px;height:20px;flex:none;display:grid;place-items:center;border:1px solid var(--line-hi);
+  border-radius:5px;font-size:13px;color:var(--amber);}
+#sandbox .sbx-tog.on .sbx-box{border-color:var(--amber);background:rgba(255,190,60,.18);}
+#sandbox .sbx-tl{display:flex;flex-direction:column;gap:2px;}
+#sandbox .sbx-tl b{font-size:13px;letter-spacing:.4px;color:#eafffb;}
+#sandbox .sbx-tl span{font-size:10.5px;color:var(--dim);}
+#sandbox .sbx-cmd{width:100%;margin-top:7px;padding:11px 12px;border-radius:9px;border:1px solid var(--line-hi);
+  background:transparent;color:var(--ink);font-size:12px;letter-spacing:.4px;cursor:pointer;text-align:left;}
+#sandbox .sbx-cmd:hover{border-color:var(--amber);background:rgba(255,190,60,.08);}
+#sandbox .sbx-cmd i{display:inline-block;width:20px;color:var(--amber);font-style:normal;}
+#sandbox .sbx-cmds{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:7px;}
+#sandbox .sbx-cmds .sbx-cmd{margin-top:0;}
+#sandbox .sbx-close{width:100%;margin-top:14px;padding:11px;border-radius:9px;border:1px solid var(--amber);
+  background:rgba(255,190,60,.12);color:var(--amber);font-size:13px;letter-spacing:1px;cursor:pointer;}
+@media (max-width:520px){#sandbox .sbx-cmds{grid-template-columns:1fr;}}
+/* === /SANDBOX === */
 /* --- wide landscape (tablets / large landscape): the build/asset panel docks to the
    RIGHT as a full-height side panel instead of a short bottom sheet, so it uses the
    width and keeps the map tall. Phones in landscape are too narrow/short → they keep
@@ -1912,7 +1949,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#scipick,
   #divdesign,#market,#constructor,#codex,#codexhub,#intro,#recap,#goals,#playercard,
   #settings,#warprompt,#diplo,#splitdlg,#pingmenu,#banner,#endscreen,#connect,#updbar,
-  #hub,#emblempick,#corp,#setup,#testmode{zoom:1.5;}
+  #hub,#emblempick,#corp,#setup,#testmode,#sandbox{zoom:1.5;}
   /* vw/vh compensations (base values ÷ 1.5 — see the note above) */
   #toasts{max-width:min(61vw,520px);}
   /* rail tool list: cap at ~7 items and scroll; the sticky ▲/▾ ticks (not buttons)
@@ -2347,6 +2384,8 @@ const page = (js) => `<!doctype html>
           <button class="spdchip" type="button" data-spd="50">×50</button>
           <button class="spdchip" type="button" data-spd="100">×100</button>
         </div>
+        <!-- SANDBOX — setup checkbox; delete this fenced block + the #sandbox markup to cut it -->
+        <!--dev-only--><label class="sbx-check"><input id="setupsandbox" type="checkbox"><span data-i18n>🧪 Песочница — тестовые команды (туман, ресурсы, бессмертный дом…)</span></label><!--/dev-only-->
       </div>
     </div>
     <button id="setupgo" class="sgo" disabled data-i18n>ЗАПУСК</button>
@@ -2356,6 +2395,8 @@ const page = (js) => `<!doctype html>
 <!-- hero fitting: the module "on the cursor" — follows the pointer (heroes setup tab) -->
 <!-- DEV TEST MODE — content rendered by testmode.ts; delete this one line to cut the markup -->
 <!--dev-only--><div id="testmode"></div><!--/dev-only-->
+<!-- SANDBOX — floating opener + overlay (content rendered by sandbox.ts); delete to cut the markup -->
+<!--dev-only--><button id="sandboxbtn" title="Песочница" style="display:none">🧪</button><div id="sandbox"></div><!--/dev-only-->
 <script>${js}</script>
 </body></html>`;
 
