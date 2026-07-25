@@ -10735,7 +10735,18 @@ async function submitRegister(): Promise<void> {
     crPassInput.value = '';
     crPass2Input.value = '';
     statusEl.textContent = '';
-    openHub();
+    // Same resume as welcomeSignIn: a `?join=<id>` deep-link (or a «Войти» press with
+    // no session yet) routes a BRAND-NEW player through the full registration page —
+    // this path used to drop straight into the empty hub, silently abandoning the
+    // match they were trying to join (the seat never got claimed).
+    const pendingId = pendingJoinAfterAuth;
+    pendingJoinAfterAuth = null;
+    if (pendingId) {
+      showStage('browse');
+      connectToMatch(pendingId);
+    } else {
+      openHub();
+    }
   } finally {
     signingIn = false;
   }
@@ -11974,6 +11985,14 @@ function resolveServer(): { base: string; nick: string } | null {
   return { base, nick };
 }
 
+// MUST stay a hoisted function declaration — NOT a `const` arrow. The boot block
+// (~900 lines above) does `await probeAuthMode(...)` during module evaluation, and an
+// async body runs synchronously up to its first `await` — so httpBase is CALLED long
+// before a `const` on this line would be initialized. esbuild's minifier lowers a
+// top-level `const` to `var`, so instead of a loud TDZ error this surfaced in the
+// deployed bundle as `TypeError: Kn is not a function`, which rejected the whole boot
+// chain: the welcome card never revealed its password field and a `?join=<id>` deep-link
+// never reached connectToMatch (the seat was never claimed).
 function httpBase(wsBase: string): string {
   return wsBase.replace(/^ws/, 'http');
 }
