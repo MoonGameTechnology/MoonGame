@@ -152,8 +152,8 @@ body.sheet-open #speedbar{bottom:calc(34vh + 12px);}
 #cmdbar.show{display:flex;}
 #cmdbar .cmdlabel{color:var(--cyan-dim);font-size:9px;letter-spacing:1.5px;padding-right:4px;white-space:nowrap;}
 #cmdbar button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-  min-width:50px;height:46px;padding:4px 8px;cursor:pointer;font:700 11px ui-monospace,monospace;
-  letter-spacing:.5px;background:transparent;color:var(--cyan);border:1px solid var(--cyan-dim);border-radius:2px;}
+  min-width:48px;height:44px;padding:4px 7px;cursor:pointer;font:700 11px ui-monospace,monospace;
+  letter-spacing:.5px;background:transparent;color:var(--cyan);border:1px solid var(--cyan-dim);border-radius:9px;}
 #cmdbar button .ci{font-size:17px;line-height:1;}
 #cmdbar button .cl{font-size:8px;letter-spacing:.6px;opacity:.82;text-transform:uppercase;}
 #cmdbar button:hover:not(:disabled){background:rgba(53,214,230,.14);box-shadow:0 0 10px rgba(53,214,230,.35);}
@@ -670,7 +670,7 @@ body.sheet-open #cmdbar{bottom:calc(34vh + 12px);}
 .ptitle{flex:1 1 auto;min-width:0;}
 .ptitle b{display:block;color:#eafffb;font-size:15px;font-weight:700;letter-spacing:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .ptitle span{color:var(--cyan-dim);font-size:10px;letter-spacing:1px;}
-.pclose{flex:0 0 auto;width:26px;height:26px;cursor:pointer;font-size:11px;border-radius:2px;
+.pclose{flex:0 0 auto;width:24px;height:24px;cursor:pointer;font-size:11px;border-radius:7px;
   background:transparent;border:1px solid #7a221c;color:var(--red);}
 .pstats{display:flex;gap:7px;flex-wrap:wrap;margin:2px 0 4px;}
 .pstats span{background:rgba(53,214,230,.06);border:1px solid var(--line);padding:4px 9px;font-size:11px;color:var(--ink);}
@@ -1320,7 +1320,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   #railtoggle{width:50px;height:50px;font-size:22px;}
   .spd button{min-width:42px;height:44px;font-size:12px;}
   .spd .spdmini{min-width:38px;}
-  .pclose{width:44px;height:44px;font-size:14px;}
+  .pclose{width:38px;height:38px;font-size:13px;border-radius:8px;}
   .ptab{min-height:42px;}
   /* market listing form: label+input pairs lock together on a grid, the segment
      switch and the submit span the full width — no orphaned inputs on wrap */
@@ -1352,10 +1352,10 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   #speedbar{bottom:calc(12px + env(safe-area-inset-bottom));}
   #cmdbar{bottom:calc(10px + env(safe-area-inset-bottom));gap:5px;
     left:8px;right:8px;transform:none;justify-content:center;flex-wrap:wrap;row-gap:5px;}
-  #cmdbar button .cl{font-size:10px;}
+  #cmdbar button .cl{font-size:9px;}
   #cmdbar .cmdlabel{display:none;}
-  #cmdbar button{min-width:56px;height:52px;}
-  #cmdbar button .ci{font-size:20px;}
+  #cmdbar button{min-width:50px;height:46px;border-radius:10px;}
+  #cmdbar button .ci{font-size:18px;}
   body.sheet-open #cmdbar{bottom:calc(50vh + 8px);}
 }
 /* connect overlay — entry screen (single-player vs join a live session) */
