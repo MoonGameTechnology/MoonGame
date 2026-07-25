@@ -11135,17 +11135,22 @@ if (bootReset) {
   showStage('welcome');
   void (async () => {
     const srv = resolveServer();
+    console.log('[boot] no-join resolveServer=', srv ? { base: srv.base, nick: srv.nick } : 'null');
     if (srv) await probeAuthMode(srv.base);
+    console.log('[boot] no-join after probeAuthMode, authMode=', authMode);
     const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
+    console.log('[boot] no-join savedNick=', savedNick);
     if (savedNick) {
       wNickInput.value = savedNick;
     } else {
       wNickInput.value = suggestCallsign();
     }
     if (authMode) {
+      console.log('[boot] no-join showing password row');
       wPassRowEl.style.display = 'flex';
       wPassInput.focus();
     } else {
+      console.log('[boot] no-join hiding password row (authMode false)');
       wPassRowEl.style.display = 'none';
     }
   })();
@@ -12014,10 +12019,17 @@ function sessionToken(base: string): string | null {
  *  failure ⇒ assume nick mode (the old handshake) — the join itself will surface
  *  a real error if the server actually wants accounts. */
 async function probeAuthMode(base: string): Promise<void> {
+  const url = `${httpBase(base)}/auth/status`;
+  console.log('[probeAuthMode] fetching', url);
   try {
-    const res = await fetch(`${httpBase(base)}/auth/status`);
-    authMode = res.ok && ((await res.json()) as { enabled?: boolean }).enabled === true;
-  } catch {
+    const res = await fetch(url);
+    console.log('[probeAuthMode] response status=', res.status, 'ok=', res.ok);
+    const body = await res.json();
+    console.log('[probeAuthMode] body=', body);
+    authMode = res.ok && body.enabled === true;
+    console.log('[probeAuthMode] authMode=', authMode);
+  } catch (e) {
+    console.error('[probeAuthMode] fetch FAILED:', e);
     authMode = false;
   }
   if (passRow) passRow.style.display = authMode ? '' : 'none';
