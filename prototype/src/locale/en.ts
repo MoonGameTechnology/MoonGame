@@ -36,6 +36,10 @@ export const en: Record<string, string> = {
   Изучить: 'Learn',
   'Ставится навсегда — рефита нет': 'Installed for good — no refit',
   'Необратимо — установить': 'Irreversible — install',
+  Каст: 'Cast',
+  Делить: 'Split',
+  'цель на карте': 'target on map',
+  'на месте': 'in place',
   // --- TT-3.1 technology tree screen --------------------------------------------
   'Ветку курирует': 'Branch curated by',
   'Без лидера ветки — узлы с условием «учёный» закрыты':
