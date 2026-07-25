@@ -611,6 +611,7 @@ let tgtHits: Array<{ target: string; fleetIds: string[]; x: number; y: number }>
 let pickMode = false;
 let cmdMore = false; // ☰ — the second row of the command bar (extras live there)
 let fireMenu = false; // 🔥 — режим огня артиллерии: поповер-меню над командным рядом
+let castMenu = false; // ✨ — способности героя-флагмана: поповер-меню каста над рядом
 let merging = false; // "Merge" armed → next tap on a friendly fleet picks the anchor
 // Fleets ordered to merge but not yet co-located: each flies to its anchor and the
 // fusion fires once they share a docked sector (see resolvePendingMerges()).
@@ -5431,24 +5432,7 @@ function fleetPanelHtml(f: Fleet): string {
         ? `${Math.round(spd)} ⚡×${FORCED_MARCH_MULT}`
         : String(Math.round(spd))
       : '—';
-  const flavor: string[] = [];
-  if (f.units.some((u) => u.count > 0 && data.units[u.unit]?.traits.includes('hero')))
-    flavor.push(t('с героем-флагманом'));
-  if (f.units.some((u) => u.count > 0 && data.units[u.unit]?.traits.includes('artillery')))
-    flavor.push(t('с осадной артиллерией'));
-  if (f.units.some((u) => u.count > 0 && (data.units[u.unit]?.radarRange ?? 0) > 0))
-    flavor.push(t('со своим радарным дозором'));
-  // PC drops the intro blurb (the header + stat chips already say it); phones keep it.
-  if (!pcUi()) {
-    const blurb =
-      nShips === 0
-        ? t('Пустая группа корпусов — кораблей на борту нет.')
-        : t(
-            'Эскадра из {n} корабл.{fl} Суммарный вес ниже; идёт со скоростью самого медленного корпуса.',
-            { n: nShips, fl: flavor.length ? ' — ' + flavor.join(', ') + '.' : '.' },
-          );
-    h += `<div class="row dim">${blurb}</div>`;
-  }
+  // Fleet-card blurb removed (feedback: compact panel) — the header + stat chips carry it.
   h += `<div class="pstats"><span data-desc="stat:atk">⚔ ${t('АТК')} ${atk}</span><span data-desc="stat:def">🛡 ${t('ЗАЩ')} ${def}</span><span data-desc="stat:cap">Ⅹ ${Math.min(nShips, COMBAT_UNIT_CAP)}/${COMBAT_UNIT_CAP}</span><span data-desc="stat:spd">⚡ ${t('СКР')} ${spdTxt}</span></div>`;
   h += nShips
     ? `<div class="sec">${t('Корабли — тап для характеристик')}</div>` + fleetTilesHtml(f, f.units)
@@ -7405,12 +7389,25 @@ function renderCmdBar() {
     !!lone && !!lone.location && !lone.movement && !lone.battleId && sumUnits(lone.units) >= 2;
   // Artillery in the selection → offer the standoff-fire focus order.
   const anyArtillery = fleets.some(fleetHasArtillery);
+  // Hero-flagship aboard a selected fleet → its castable abilities become a ✨ popover
+  // (the map-tap targeting reuses the same heroAim flow as the hero window).
+  const castHero = Object.values(s.heroes ?? {}).find(
+    (hh) =>
+      hh.alive !== false &&
+      hh.fleetId !== undefined &&
+      ids.includes(hh.fleetId) &&
+      (hh.abilities ?? []).some(
+        (a) => a !== null && HERO_CASTABLE.has(data.heroAbilities[a]?.type ?? ''),
+      ),
+  );
+  if (!castHero) castMenu = false;
   const html =
     `<span class="cmdlabel">${ids.length > 1 ? t('{n} ФЛОТОВ', { n: ids.length }) : t('ФЛОТ')}</span>` +
     cmdBtn('move', '⤳', t('Курс'), aiming ? 'on' : '', false) +
     cmdBtn('stop', '■', t('Стоп'), 'danger', !anyMoving) +
     cmdBtn('attack', '⚔', t('Штурм'), assaultAim ? 'on' : '', !canAssault) +
     cmdBtn('target', '◎', t('Цель'), targetAim ? 'on' : '', false) +
+    (castHero ? cmdBtn('cast', '✨', t('Каст'), castMenu ? 'on' : '', false) : '') +
     (anyArtillery ? cmdBtn('barrage', '🎯', t('Обстрел'), barrageAim ? 'on' : '', false) : '') +
     (artFleets.length > 0 ? cmdBtn('firemode', '🔥', fmLabel, fireMenu ? 'on' : '', false) : '') +
     cmdBtn(
@@ -7420,7 +7417,7 @@ function renderCmdBar() {
       merging ? 'on' : '',
       !canMerge,
     ) +
-    cmdBtn('split', '⊟', t('Разделить'), splitState ? 'on' : '', !canSplit) +
+    cmdBtn('split', '⊟', t('Делить'), splitState ? 'on' : '', !canSplit) +
     // ☰ — the extras row (hamburger, NOT «...» — референс не копируем дословно):
     // «Выбрать+» и будущие Ускорить/Задержка живут здесь, базовый ряд не пухнет.
     cmdBtn('more', '☰', t('Ещё'), cmdMore ? 'on' : '', false) +
@@ -7458,6 +7455,27 @@ function renderCmdBar() {
           (x) =>
             `<button data-cmd="fmset" data-mode="${x.m}"${uniMode === x.m ? ' class="on"' : ''}><b>${uniMode === x.m ? '● ' : ''}${x.lbl}</b><span>${x.sub}</span></button>`,
         ).join('') +
+        `</div>`
+      : '') +
+    // ✨ поповер: способности героя-флагмана — каст прямо с ряда (дальняя → цель на карте).
+    (castMenu && castHero
+      ? `<div class="cmdpop">` +
+        (castHero.abilities ?? [])
+          .filter(
+            (a): a is string => a !== null && HERO_CASTABLE.has(data.heroAbilities[a]?.type ?? ''),
+          )
+          .map((ab) => {
+            const ad = data.heroAbilities[ab]!;
+            const cdLeft = Math.max(0, (castHero.cooldowns?.[heroCdKey(ad.type)] ?? 0) - s.time);
+            const sub =
+              cdLeft > 0
+                ? t('КД {h}', { h: fmtHrs(cdLeft / HOUR) })
+                : (ad.range ?? 0) > 0
+                  ? t('цель на карте')
+                  : t('на месте');
+            return `<button data-cmd="castdo" data-ab="${ab}" data-hero="${castHero.id}"${cdLeft > 0 ? ' disabled' : ''}><b>${esc(t(ad.name))}</b><span>${sub}</span></button>`;
+          })
+          .join('') +
         `</div>`
       : '');
   if (html !== lastCmdHtml) {
@@ -7859,6 +7877,7 @@ cmdbar.addEventListener('click', (ev) => {
   if (cmd !== 'merge') merging = false; // any other command disarms merge-targeting
   if (cmd !== 'barrage') barrageAim = false; // any other command disarms barrage-targeting
   if (cmd !== 'firemode' && cmd !== 'fmset') fireMenu = false; // другой приказ закрывает 🔥-меню
+  if (cmd !== 'cast' && cmd !== 'castdo') castMenu = false; // другой приказ закрывает ✨-меню
   if (cmd !== 'attack') assaultAim = false; // any other command disarms assault-targeting
   if (cmd !== 'target') targetAim = false; // any other command disarms order-targeting
   // A real order leaves «Выбрать+» (the group stays selected and takes it);
@@ -7910,6 +7929,22 @@ cmdbar.addEventListener('click', (ev) => {
     if (targetAim) note(t('◎ тапните цель на карте — соберём приказ'));
   } else if (cmd === 'more') {
     cmdMore = !cmdMore; // ☰ — show/hide the extras row
+  } else if (cmd === 'cast') {
+    castMenu = !castMenu; // ✨ — открыть/закрыть меню способностей героя-флагмана
+    fireMenu = false;
+    aiming = false;
+  } else if (cmd === 'castdo') {
+    // Cast a hero ability from the row: ranged → arm the map (next world tap = target,
+    // via the shared heroAim flow); self/aura → fire in place immediately.
+    const heroId = bEl.dataset.hero ?? '';
+    const abilityId = bEl.dataset.ab ?? '';
+    castMenu = false;
+    if ((data.heroAbilities[abilityId]?.range ?? 0) > 0) {
+      heroAim = { heroId, abilityId };
+      note(t('✨ выберите мир-цель на карте'));
+    } else {
+      playerOrder(castHeroAbility(ME, heroId, abilityId));
+    }
   } else if (cmd === 'firemode') {
     fireMenu = !fireMenu; // 🔥 — открыть/закрыть меню выбора режима огня
     aiming = false;
