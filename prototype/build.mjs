@@ -378,7 +378,6 @@ body.sheet-open #cmdbar{bottom:calc(34vh + 12px);}
 .pc-head .pc-tag{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--cyan-dim);border:1px solid var(--line);padding:2px 6px;border-radius:2px;}
 .pc-stats{display:flex;flex-direction:column;gap:3px;margin-bottom:10px;}
 .pc-sec{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan-dim);margin:4px 0 6px;}
-.pc-sec .pc-adm{margin-left:8px;padding:1px 5px;border:1px solid #7a5a22;border-radius:2px;color:var(--amber,#e0a84a);letter-spacing:1px;}
 .pc-row{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:3px 0;border-bottom:1px solid rgba(14,59,64,.4);}
 .pc-row .pc-k{color:var(--dim);}
 .pc-row .pc-v{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums;text-align:right;}
@@ -1701,16 +1700,9 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #sandbox .sbx-title .dia{width:11px;height:11px;transform:rotate(45deg);background:var(--amber);box-shadow:0 0 10px var(--amber);}
 #sandbox .sbx-dev{margin-left:auto;font-size:9px;letter-spacing:2px;color:#0a0f12;background:var(--amber);padding:2px 7px;border-radius:3px;}
 #sandbox .sbx-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--grn-dim);margin:12px 0 6px;}
-#sandbox .sbx-togs{display:grid;gap:6px;}
-#sandbox .sbx-tog{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:8px 11px;border-radius:9px;
-  border:1px solid var(--line-hi);background:rgba(255,255,255,.02);color:var(--ink);cursor:pointer;}
-#sandbox .sbx-tog.on{border-color:var(--amber);background:rgba(255,190,60,.1);}
-#sandbox .sbx-box{width:20px;height:20px;flex:none;display:grid;place-items:center;border:1px solid var(--line-hi);
-  border-radius:5px;font-size:13px;color:var(--amber);}
-#sandbox .sbx-tog.on .sbx-box{border-color:var(--amber);background:rgba(255,190,60,.18);}
-#sandbox .sbx-tl{display:flex;flex-direction:column;gap:2px;}
-#sandbox .sbx-tl b{font-size:13px;letter-spacing:.4px;color:#eafffb;}
-#sandbox .sbx-tl span{font-size:10.5px;color:var(--dim);}
+/* Toggles reuse the «Настройки» switch look (.set-row / .set-switch, defined above);
+   the grid just stacks the rows. */
+#sandbox .sbx-togs{display:grid;gap:2px;}
 #sandbox .sbx-cmd{width:100%;margin-top:7px;padding:11px 12px;border-radius:9px;border:1px solid var(--line-hi);
   background:transparent;color:var(--ink);font-size:12px;letter-spacing:.4px;cursor:pointer;text-align:left;}
 #sandbox .sbx-cmd:hover{border-color:var(--amber);background:rgba(255,190,60,.08);}

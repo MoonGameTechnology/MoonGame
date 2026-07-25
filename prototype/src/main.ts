@@ -1061,24 +1061,6 @@ function setDevSpeedControl(v: boolean): void {
     /* private-mode / storage-full: keep the in-memory value, just don't persist */
   }
 }
-// Admin gate (STUB). The prototype has no account/identity system yet, so real "admin
-// rights" don't exist — this placeholder decides whether the admin-only developer
-// tools (the «Для разработчиков» block in Settings) are shown. Until server-side
-// identity + roles land it grants admin to the dev client, and to anyone who opts in
-// per-device (`?admin=1` in the URL or localStorage 'void.admin'='1'); the shipped
-// player build stays admin-less. When accounts arrive, replace the body with a read of
-// the authenticated account's admin role — the call sites don't change.
-function isAdmin(): boolean {
-  try {
-    if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('admin'))
-      return true;
-    if (typeof localStorage !== 'undefined' && localStorage.getItem('void.admin') === '1')
-      return true;
-  } catch {
-    /* storage/URL unavailable — fall through to the build default */
-  }
-  return !__PLAYER_BUILD__;
-}
 // The compact-mode CSS is gated on the PC media query — JS-side string shortening
 // (ping button, conveyor idle line, upgrade buttons) must follow the same gate, or
 // a phone with the pref on would get PC-compact wording under phone styling.
@@ -10326,6 +10308,8 @@ if (!__PLAYER_BUILD__) {
     me: () => ME,
     homeId: () => sandboxHomeId,
     note: (msg) => note(msg),
+    getSpeedControl: () => devSpeedControl,
+    setSpeedControl: (on) => setDevSpeedControl(on),
   });
   initTestMode({
     startScenario: (state, resumeSpeed) => {
@@ -11052,17 +11036,8 @@ function renderSettings(): void {
     `<div class="set-lbl">${t('Счётчик FPS')}<span class="set-sub">${t('показывать кадры в секунду в углу — для проверки производительности')}</span></div>` +
     `<div class="set-ctl"><label class="set-switch"><input id="set-fps" type="checkbox"${showFps ? ' checked' : ''} aria-label="${t('Счётчик FPS')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-fps-val" class="set-val">${showFps ? t('вкл') : t('выкл')}</span></div>` +
     `</div>` +
-    // Developer section — admin-only tools a normal player never sees. The gate is the
-    // `isAdmin()` stub: today it's the dev client (or an explicit per-device opt-in),
-    // and it becomes a real account-role check once identity lands — the block simply
-    // starts appearing for admins then, unchanged.
-    (isAdmin()
-      ? `<div class="pc-sec">${t('Для разработчиков')}<span class="pc-adm">${t('только админ')}</span></div>` +
-        `<div class="set-row">` +
-        `<div class="set-lbl">${t('Управление скоростью')}<span class="set-sub">${t('панель времени в матче — пауза и множители ускорения (1× — реальное время)')}</span></div>` +
-        `<div class="set-ctl"><label class="set-switch"><input id="set-devspeed" type="checkbox"${devSpeedControl ? ' checked' : ''} aria-label="${t('Управление скоростью')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-devspeed-val" class="set-val">${devSpeedControl ? t('вкл') : t('выкл')}</span></div>` +
-        `</div>`
-      : '') +
+    // The «управление скоростью» control moved to the sandbox panel (a dev-only corner),
+    // so Settings no longer carries a developer section.
     `<button class="pc-close" id="set-close" type="button">${t('ГОТОВО')}</button>` +
     `</div>`;
   const slider = document.getElementById('set-sweep') as HTMLInputElement | null;
@@ -11100,12 +11075,6 @@ function renderSettings(): void {
   fps?.addEventListener('change', () => {
     setShowFps(fps.checked);
     if (fpsVal) fpsVal.textContent = fps.checked ? t('вкл') : t('выкл');
-  });
-  const devspd = document.getElementById('set-devspeed') as HTMLInputElement | null;
-  const devspdVal = document.getElementById('set-devspeed-val');
-  devspd?.addEventListener('change', () => {
-    setDevSpeedControl(devspd.checked);
-    if (devspdVal) devspdVal.textContent = devspd.checked ? t('вкл') : t('выкл');
   });
   // Цвета сторон: живые инпуты + пресеты палитры соперников. Карта красится на
   // следующем кадре сама (ownerColor читается при отрисовке), панель — при
@@ -13001,10 +12970,10 @@ function frame(nowReal: number) {
   // solo frame (paused or not); the whole feature no-ops outside a sandboxed solo match.
   // Leading `!__PLAYER_BUILD__` lets esbuild tree-shake the sandbox out of the player bundle.
   if (!__PLAYER_BUILD__ && !NET && sandboxConfig.enabled) enforceSandbox(s, ME, sandboxHomeId);
-  // SANDBOX — fenced hook. The "fog of war off" toggle drops the fog projection (null
-  // vision ⇒ everything is `known`, mirroring the always-off dev reveal).
+  // SANDBOX — fenced hook. The "fog of war" toggle defaults ON; turning it OFF drops the
+  // fog projection (null vision ⇒ everything is `known`, mirroring the dev reveal).
   vision =
-    !__PLAYER_BUILD__ && !NET && sandboxConfig.enabled && sandboxConfig.fogOff
+    !__PLAYER_BUILD__ && !NET && sandboxConfig.enabled && !sandboxConfig.fog
       ? null
       : computeVision(); // fog projection for this frame
   if (vision) updateMemory(vision.identify); // variant B: remember what we see

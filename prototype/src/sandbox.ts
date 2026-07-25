@@ -17,8 +17,9 @@
  *  net match the server is authoritative and none of this runs.
  *
  *  Cheats:
- *    - toggles (held every frame): fog of war off · free construction ·
- *      immortal home world · frozen build queues (everyone);
+ *    - toggles (held every frame): fog of war (on by default — turn it OFF to reveal
+ *      the whole map) · instant construction · free construction · immortal home world ·
+ *      frozen build queues (everyone) · time-speed controls (the in-match speedbar);
  *    - one-shot commands: instant commander cooldowns · +2000 of a resource ·
  *      end every war (back to neutral).
  */
@@ -30,8 +31,12 @@ import { t } from './i18n';
 export interface SandboxConfig {
   /** The match was launched with the sandbox checkbox on. */
   enabled: boolean;
-  /** Reveal the whole map — the client renders the true state, no fog. */
-  fogOff: boolean;
+  /** Fog of war. ON by default (the normal projection); turn it OFF to reveal the
+   *  whole map — the client then renders the true state with no fog. */
+  fog: boolean;
+  /** Every pending `construction.complete` event is pulled due at once — builds finish
+   *  the instant they are queued. */
+  instantBuild: boolean;
   /** Construction/upgrades/unit builds cost 0 (the spend is refunded). */
   freeBuild: boolean;
   /** The player's home world can never change owner. */
@@ -44,7 +49,8 @@ export interface SandboxConfig {
 
 const DEFAULTS: SandboxConfig = {
   enabled: false,
-  fogOff: false,
+  fog: true,
+  instantBuild: false,
   freeBuild: false,
   immortalHome: false,
   freezeQueues: false,
@@ -163,6 +169,14 @@ export function enforceSandbox(s: GameState, me: string, homeId: string | null):
   } else if (frozenRemaining.size > 0) {
     frozenRemaining.clear(); // freeze lifted → let the captured events elapse normally
   }
+  if (sandboxConfig.instantBuild) {
+    // Pull every pending build to `now` so the next `advanceTo` fires it — construction
+    // finishes the instant it is queued. (Contradicts "freeze queues"; if both are on,
+    // instant-build wins because it runs last.)
+    for (const ev of s.scheduled) {
+      if (ev.type === 'construction.complete' && ev.at > s.time) ev.at = s.time;
+    }
+  }
   if (sandboxConfig.instantCooldown) sbReadyCommanders(s, me); // hold abilities ready
 }
 
@@ -174,10 +188,15 @@ export interface SandboxHooks {
   me: () => string;
   homeId: () => string | null;
   note: (msg: string) => void;
+  /** Read/write the host's «управление скоростью» flag (the in-match speedbar). Lives
+   *  outside `sandboxConfig` because it persists across matches (localStorage). */
+  getSpeedControl: () => boolean;
+  setSpeedControl: (on: boolean) => void;
 }
 
 const TOGGLES: Array<{ key: keyof SandboxConfig; label: string; hint: string }> = [
-  { key: 'fogOff', label: 'Туман войны', hint: 'Открыть всю карту' },
+  { key: 'fog', label: 'Туман войны', hint: 'Выключите, чтобы открыть всю карту' },
+  { key: 'instantBuild', label: 'Моментальная постройка', hint: 'Стройка завершается мгновенно' },
   { key: 'freeBuild', label: 'Бесплатная прокачка', hint: 'Постройки не тратят ресурсы' },
   { key: 'immortalHome', label: 'Бессмертный дом', hint: 'Домашний мир нельзя захватить' },
   { key: 'freezeQueues', label: 'Заморозить очередь', hint: 'Стройка стоит у всех' },
@@ -196,14 +215,13 @@ export function initSandbox(hooks: SandboxHooks): void {
     if (on) render();
   };
 
-  const toggleRow = (tg: (typeof TOGGLES)[number]): string => {
-    const on = sandboxConfig[tg.key];
-    return (
-      `<button class="sbx-tog ${on ? 'on' : ''}" data-sbx="tog" data-k="${tg.key}">` +
-      `<span class="sbx-box">${on ? '✓' : ''}</span>` +
-      `<span class="sbx-tl"><b>${t(tg.label)}</b><span>${t(tg.hint)}</span></span></button>`
-    );
-  };
+  // A toggle styled exactly like the ones in «Настройки»: a label + sub-line on the
+  // left, a sliding switch + вкл/выкл readout on the right.
+  const switchRow = (attrs: string, label: string, hint: string, on: boolean): string =>
+    `<div class="set-row"><div class="set-lbl">${t(label)}<span class="set-sub">${t(hint)}</span></div>` +
+    `<div class="set-ctl"><label class="set-switch"><input type="checkbox" ${attrs}${on ? ' checked' : ''}>` +
+    `<span class="sw-track"></span><span class="sw-knob"></span></label>` +
+    `<span class="set-val">${on ? t('вкл') : t('выкл')}</span></div></div>`;
 
   const resBtns = RESOURCES.map(
     (r) =>
@@ -212,10 +230,19 @@ export function initSandbox(hooks: SandboxHooks): void {
 
   function render(): void {
     if (!el) return;
+    const togs = TOGGLES.map((tg) =>
+      switchRow(`data-sbx="tog" data-k="${tg.key}"`, tg.label, tg.hint, sandboxConfig[tg.key]),
+    ).join('');
+    const speedRow = switchRow(
+      'data-sbx="speed"',
+      'Управление скоростью',
+      'панель времени в матче — пауза и множители ускорения (1× — реальное время)',
+      hooks.getSpeedControl(),
+    );
     el.innerHTML = `<div class="sbx-box-w">
       <div class="sbx-title"><span class="dia"></span><b>${t('ПЕСОЧНИЦА')}</b><span class="sbx-dev">DEV</span></div>
       <div class="sbx-label">${t('Переключатели')}</div>
-      <div class="sbx-togs">${TOGGLES.map(toggleRow).join('')}</div>
+      <div class="sbx-togs">${togs}${speedRow}</div>
       <div class="sbx-label">${t('Команды')}</div>
       <div class="sbx-cmds">${resBtns}</div>
       <button class="sbx-cmd" data-sbx="peace">${t('Прекратить войну со всеми фракциями')}</button>
@@ -223,22 +250,33 @@ export function initSandbox(hooks: SandboxHooks): void {
     </div>`;
   }
 
+  // The switches are real checkboxes → drive them off `change` (fires once), leaving
+  // `click` for the command buttons and the tap-outside-to-close backdrop.
+  el.addEventListener('change', (ev) => {
+    const inp = (ev.target as Element).closest('[data-sbx]') as HTMLInputElement | null;
+    if (!inp) return;
+    if (inp.dataset.sbx === 'tog') {
+      (sandboxConfig[inp.dataset.k as keyof SandboxConfig] as boolean) = inp.checked;
+      render();
+    } else if (inp.dataset.sbx === 'speed') {
+      hooks.setSpeedControl(inp.checked);
+      render();
+    }
+  });
+
   el.addEventListener('click', (ev) => {
     const tgt = (ev.target as Element).closest('[data-sbx]') as HTMLElement | null;
-    if (!tgt) return;
+    if (!tgt) {
+      if (ev.target === el) show(false); // click on the backdrop (outside the box) → close
+      return;
+    }
     const act = tgt.dataset.sbx;
-    const s = hooks.getState();
-    const me = hooks.me();
     if (act === 'close') {
       show(false);
-    } else if (act === 'tog') {
-      const k = tgt.dataset.k as keyof SandboxConfig;
-      (sandboxConfig[k] as boolean) = !sandboxConfig[k];
-      render();
     } else if (act === 'res') {
-      hooks.note('🧪 ' + sbAddResource(s, me, tgt.dataset.k ?? ''));
+      hooks.note('🧪 ' + sbAddResource(hooks.getState(), hooks.me(), tgt.dataset.k ?? ''));
     } else if (act === 'peace') {
-      hooks.note('🧪 ' + sbEndWars(s, me));
+      hooks.note('🧪 ' + sbEndWars(hooks.getState(), hooks.me()));
     }
   });
 
