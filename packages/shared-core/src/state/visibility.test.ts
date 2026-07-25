@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { parseGameData, type GameData } from '../data/schemas';
+import { pairKey } from './diplomacy';
 import {
   createInitialState,
   type Fleet,
@@ -657,5 +658,97 @@ describe('radar — two concentric ranges (inner full-reveal, outer signatures)'
     // beyond reach (> 100): FAR at 200 → no fleet, no signature
     expect(view.fleets.fFar).toBeUndefined();
     expect(view.signatures.map((s) => s.location)).not.toContain('FAR');
+  });
+});
+
+describe('shared vision — allies pool their reconnaissance (союз / коалиция)', () => {
+  /** Three separate neighbourhoods, far enough apart that nobody's radar bleeds into
+   *  another's (no radar buildings at all here — coverage is pure identify-by-jumps,
+   *  so each assertion isolates the sharing rule itself).
+   *
+   *    p1 home H1 (alone)   ·   p3 home H3 —— X (unowned, garrisoned)
+   *                             p2 home Z  —— Y (unowned, garrisoned)
+   *
+   *  p1 sees only H1 on their own. Everything else must arrive — or not — purely
+   *  through the diplomatic stance. */
+  function blocState(): GameState {
+    const base = createInitialState({ seed: 'bloc', version: { data: '0.1.0', manifest: '1' } });
+    const at = (x: number): Partial<Planet> => ({ position: { x, y: 0 } });
+    return {
+      ...base,
+      players: {
+        p1: player('p1'),
+        p2: { ...player('p2'), technologies: { completed: ['long_scan'] } },
+        p3: { ...player('p3'), technologies: { completed: ['long_scan'] } },
+      },
+      planets: {
+        H1: planet('H1', 'p1', [], at(0)),
+        H3: planet('H3', 'p3', ['X'], at(10_000)),
+        X: planet('X', null, ['H3'], {
+          ...at(10_050),
+          garrison: [{ unit: 'cruiser', count: 3 }],
+        }),
+        Z: planet('Z', 'p2', ['Y'], at(20_000)),
+        Y: planet('Y', null, ['Z'], { ...at(20_050), garrison: [{ unit: 'cruiser', count: 7 }] }),
+      },
+      fleets: { 'ally-fleet': fleet('ally-fleet', 'p3', 'X', [['cruiser', 2]]) },
+      scheduled: [],
+    };
+  }
+  const ally = (s: GameState, a: string, b: string): GameState => ({
+    ...s,
+    diplomacy: { ...s.diplomacy, [pairKey(a, b)]: 'alliance' },
+  });
+
+  it('without an alliance a player sees only their own neighbourhood', () => {
+    const seen = identifiedNodes(blocState(), 'p1', data);
+    expect([...seen].sort()).toEqual(['H1']);
+    const view = visibleState(blocState(), 'p1', data);
+    expect(view.planets.X?.garrison).toEqual([]); // never identified → contents stripped
+    expect(view.planets.H3?.owner).toBeNull(); // even the ownership is unknown
+    expect(view.fleets['ally-fleet']).toBeUndefined();
+  });
+
+  it('an alliance pools the ally’s sight: their worlds, contents and fleets arrive', () => {
+    const s = ally(blocState(), 'p1', 'p3');
+    expect([...identifiedNodes(s, 'p1', data)].sort()).toEqual(['H1', 'H3', 'X']);
+    const view = visibleState(s, 'p1', data);
+    expect(view.planets.H3?.owner).toBe('p3');
+    expect(view.planets.X?.garrison).toEqual([{ unit: 'cruiser', count: 3 }]);
+    expect(view.fleets['ally-fleet']).toBeDefined();
+  });
+
+  it('is mutual — the ally gains the viewer’s sight by the same stance', () => {
+    const s = ally(blocState(), 'p1', 'p3');
+    expect([...identifiedNodes(s, 'p3', data)].sort()).toEqual(['H1', 'H3', 'X']);
+  });
+
+  it('pact and peace do NOT share intel (a non-aggression treaty is not an intel treaty)', () => {
+    for (const stance of ['pact', 'peace'] as const) {
+      const s: GameState = {
+        ...blocState(),
+        diplomacy: { [pairKey('p1', 'p3')]: stance },
+      };
+      expect([...identifiedNodes(s, 'p1', data)].sort()).toEqual(['H1']);
+    }
+  });
+
+  it('does not chain through a shared ally: A–B, B–C allied, A–C at war stays split', () => {
+    // p3 is allied to BOTH p1 and p2; p1 and p2 never agreed to anything (war by default).
+    const s = ally(ally(blocState(), 'p1', 'p3'), 'p2', 'p3');
+    // p3 sits in both blocs and sees everything…
+    expect([...identifiedNodes(s, 'p3', data)].sort()).toEqual(['H1', 'H3', 'X', 'Y', 'Z']);
+    // …but p1 must NOT inherit their enemy's map through the mutual friend.
+    expect([...identifiedNodes(s, 'p1', data)].sort()).toEqual(['H1', 'H3', 'X']);
+    const view = visibleState(s, 'p1', data);
+    expect(view.planets.Z?.owner).toBeNull();
+    expect(view.planets.Y?.garrison).toEqual([]);
+  });
+
+  it('shares the MAP only — an ally’s treasury and research stay private', () => {
+    const view = visibleState(ally(blocState(), 'p1', 'p3'), 'p1', data);
+    expect(view.planets.H3?.owner).toBe('p3'); // vision shared…
+    expect(view.players.p3?.resources).toEqual({}); // …economy is not
+    expect(view.players.p3?.technologies).toBeUndefined();
   });
 });

@@ -103,7 +103,7 @@ Void Dominion — мобильная/браузерная **real-time** (неп�
 packages/shared-core/src/
 packages/action-layer/src/
   kernel/        kernel.ts (createKernel/applyAction/advanceTo, шина/хуки/расписание), module.ts (контракт)
-  state/         gameState.ts (типы GameState), orbit.ts (isBombarded, bombardedPlanets), visibility.ts (visibleState — туман войны), previewBattle.ts (ONB-6 — чистый прогноз боя + hullPool/damageFraction), threat.ts (ST-3.1 — fog-honest скан угроз узлу)
+  state/         gameState.ts (типы GameState), orbit.ts (isBombarded, bombardedPlanets), visibility.ts (visibleState — туман войны + общая видимость союза), previewBattle.ts (ONB-6 — чистый прогноз боя + hullPool/damageFraction), threat.ts (ST-3.1 — fog-honest скан угроз узлу)
   action/        types.ts (Action, Context, MatchConfig.timeScale/victory, ApplyResult/AdvanceResult, Rejection, timeScaleOf)
   data/          schemas.ts (zod-схемы + parseGameData, buildingLevel/buildingMaxLevel)
   rng/           rng.ts (sfc32)
@@ -176,7 +176,17 @@ prototype/       src/game.ts, src/main.ts (UI), src/smoke.ts, build.mjs, uitest.
   утечка никого не винит). +4 core-теста + 1 proto favour-e2e.
 - `diplomacy?: Record<pairKey, DiplomaticStance>` — попарные дип-отношения (`war`/`peace`/
   `pact`/`alliance`), симметрично и **публично** (туман не режет). Дефолт пары без записи —
-  `war` (= FFA). Примитивы в `state/diplomacy.ts`. **Посев при сборке с карты (AVA-1):**
+  `war` (= FFA). Примитивы в `state/diplomacy.ts`. **Общая видимость союза/коалиции:**
+  `alliance` (в этой модели коалиция = именно эта стойка, ср. `victory.ts`) ещё и ПУЛИТ
+  разведку — `coverageFor` объединяет покрытие по «блоку зрения» (сам зритель + все, с кем
+  у него `alliance`), поэтому союзник видит миры/контент/флоты/бои глазами союзника. Это
+  ПРЯМОЕ соседство, а не клика победы и не связная компонента: делёжка попарная, так что
+  при A–B и B–C (A–C война) B видит обе стороны, а A и C — ничего друг о друге (компонента
+  утекла бы картой A её врагу через B). `pact`/`peace` разведку НЕ делят. Делится только
+  КАРТА: казна/техи/герои/приказы союзника остаются приватными (`project` по-прежнему
+  режет по `viewerId`). Одна точка — `coverageFor`, поэтому общая видимость одинаково
+  работает в проекции, памяти тумана (`visibilityModule`), фильтре событий broadcast'а
+  (`matchRoom`) и скане угроз; сервер не менялся. **Посев при сборке с карты (AVA-1):**
   `buildStateFromMap` сеет стойки из `slot.team` (хелпер `seedTeamDiplomacy`, тот же посев,
   что прото-`newGame`): карта без команд → peace-FFA; та же сторона → `alliance` (seeded —
   минует `E_BOT_ALLIANCE`); между сторонами — `BuildFromMapOptions.crossTeamStart`
