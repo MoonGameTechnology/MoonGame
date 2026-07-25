@@ -1,6 +1,6 @@
 import { buildingLevel, type GameData } from '../data/schemas';
 import { deepClone } from '../util/clone';
-import { offerInvolves } from './diplomacy';
+import { getStance, offerInvolves } from './diplomacy';
 import { fleetNodeAt, fleetPositionAt } from './fleetPosition';
 import type { Fleet, GameState, PlanetId, PlayerId, ScheduledEvent } from './gameState';
 
@@ -170,14 +170,44 @@ interface Coverage {
   identify: Set<PlanetId>;
   radar: Set<PlanetId>;
 }
-/** What `viewerId` can sense this instant: an identify range (full detail) and a
- *  wider radar range (signatures only), driven by world/fleet radar reach. */
-function coverageFor(state: GameState, viewerId: PlayerId, data: GameData): Coverage {
-  const identify = new Set<PlanetId>();
-  const radar = new Set<PlanetId>();
-  const mult = radarMultiplier(state, viewerId, data);
+
+/** The players whose sensors feed `viewerId`'s screen: the viewer plus everyone they
+ *  hold the `alliance` stance with — «общая видимость» for a союз / коалиция (in this
+ *  model a coalition IS the alliance stance, see `victory.ts`). `pact`/`peace` do NOT
+ *  share intel: a non-aggression treaty is not an intelligence treaty.
+ *
+ *  Deliberately the DIRECT neighbourhood, not victory's mutually-allied clique and not
+ *  a connected component: sharing is pairwise. With A–B and B–C allied but A–C at war,
+ *  B sees both sides' intel while A and C — who never agreed to anything — share
+ *  nothing. A component would silently leak A's map to their enemy through B.
+ *
+ *  The viewer is always first, and the rest follow `state.players` order, so the union
+ *  below is built in a fixed order (invariant #1: no order-dependent behaviour). Both
+ *  ends of an `alliance` see each other (`getStance` is symmetric), so the sharing is
+ *  mutual by construction. */
+function visionBloc(state: GameState, viewerId: PlayerId): PlayerId[] {
+  const bloc: PlayerId[] = [viewerId];
+  for (const id of Object.keys(state.players)) {
+    if (id !== viewerId && getStance(state, viewerId, id) === 'alliance') bloc.push(id);
+  }
+  return bloc;
+}
+
+/** What ONE player's own assets sense, accumulated into the shared sets: worlds
+ *  (identify hops + radar buildings), fleets (own node + ship radar) and live hero
+ *  reveals. Each member is measured with their OWN `radarMultiplier`, so an ally's
+ *  radar tech extends the ally's sensors — and an ally in energy `arrears` contributes
+ *  a dimmed picture (ECON-2), exactly as it would on their own screen. */
+function accumulateCoverage(
+  state: GameState,
+  ownerId: PlayerId,
+  data: GameData,
+  identify: Set<PlanetId>,
+  radar: Set<PlanetId>,
+): void {
+  const mult = radarMultiplier(state, ownerId, data);
   for (const planet of Object.values(state.planets)) {
-    if (planet.owner !== viewerId) continue;
+    if (planet.owner !== ownerId) continue;
     flood(state, planet.id, IDENTIFY_HOPS, identify);
     let reach = 0;
     for (const b of planet.buildings) {
@@ -191,7 +221,7 @@ function coverageFor(state: GameState, viewerId: PlayerId, data: GameData): Cove
     }
   }
   for (const fleet of Object.values(state.fleets)) {
-    if (fleet.owner !== viewerId) continue;
+    if (fleet.owner !== ownerId) continue;
     const node = fleetNode(state, fleet);
     if (node === null) continue;
     flood(state, node, FLEET_IDENTIFY_HOPS, identify); // own node only — ships are near-blind
@@ -208,17 +238,33 @@ function coverageFor(state: GameState, viewerId: PlayerId, data: GameData): Cove
   }
   // HERO-FX3 `reveal` (scan): the viewer's OWN living heroes' active time-boxed reveals
   // light a full-identify zone around their target node until it expires. Read per-viewer
-  // (this coverage is already scoped to `viewerId`), so a scan never leaks to a rival.
+  // (this coverage is scoped to one `ownerId`), so a scan never leaks to a rival.
   const heroes = state.heroes;
   if (heroes) {
     for (const hero of Object.values(heroes)) {
-      if (hero.owner !== viewerId || hero.alive !== true) continue; // deployed only (BF-24)
+      if (hero.owner !== ownerId || hero.alive !== true) continue; // deployed only (BF-24)
       const reveals = hero.activeReveals;
       if (reveals === undefined) continue;
       for (const r of reveals) {
         if (r.until > state.time) withinRadius(state, r.center, r.radius, identify);
       }
     }
+  }
+}
+
+/** What `viewerId` can sense this instant: an identify range (full detail) and a
+ *  wider radar range (signatures only), driven by world/fleet radar reach — UNIONED
+ *  over the viewer's vision bloc, so allies pool their reconnaissance.
+ *
+ *  This is the single point the whole fog boundary reads: the per-player projection
+ *  (`project`), the remembered-fog writer (`visibilityModule`), the broadcast event
+ *  filter (`matchRoom`) and threat scanning all route through here, so shared vision
+ *  stays consistent across every surface instead of being re-derived per caller. */
+function coverageFor(state: GameState, viewerId: PlayerId, data: GameData): Coverage {
+  const identify = new Set<PlanetId>();
+  const radar = new Set<PlanetId>();
+  for (const memberId of visionBloc(state, viewerId)) {
+    accumulateCoverage(state, memberId, data, identify, radar);
   }
   for (const id of identify) radar.add(id); // identify implies radar
   return { identify, radar };
