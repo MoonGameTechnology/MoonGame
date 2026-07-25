@@ -6509,8 +6509,52 @@ function playerCardHtml(): string {
 function openPlayerCard(): void {
   const el = document.getElementById('playercard');
   if (!el) return;
+  delete el.dataset.seat; // your own dossier — the seat-card handler must stay dormant
   el.innerHTML = `<div class="pcbox">${playerCardHtml()}</div>`;
   el.classList.add('show');
+}
+/** Another player's card, opened by tapping their name in a chat line: their stance,
+ *  worlds, a bot's favour meter, and the same diplomacy actions as the roster row.
+ *  Reuses the #playercard overlay; `dataset.seat` tells its click handler which seat
+ *  the stance/spy/message buttons target. */
+function seatCardHtml(id: string): string {
+  const bdg = seatBadge(id);
+  const col = ownerColor(id);
+  const st = getStance(s, ME, id);
+  const favBar = isAiSeat(id) ? favourBarHtml(id) : '';
+  const row = (k: string, v: string) =>
+    `<div class="pc-row"><span class="pc-k">${k}</span><span class="pc-v">${v}</span></div>`;
+  return (
+    `<div class="pc-head"><span class="pc-dia" style="background:${col};box-shadow:0 0 10px ${col}"></span>` +
+    `<b>${esc(NAME[id] ?? id)}</b><span class="pc-tag">${esc(bdg.tag)}</span></div>` +
+    `<div class="pc-stats">` +
+    row(
+      t('Отношения'),
+      `<span class="dp-stance" style="color:${STANCE_COLOR[st]};border-color:${STANCE_COLOR[st]}">${stanceRu(st)}</span>`,
+    ) +
+    row(t('Миров под контролем'), String(worldsOf(id))) +
+    `</div>` +
+    (favBar ? `<div class="pc-stats">${favBar}</div>` : '') +
+    `<div class="pc-sec">${t('Дипломатия')}</div>` +
+    seatDiploActionsHtml(id) +
+    `<button class="pc-close">${t('ЗАКРЫТЬ')}</button>`
+  );
+}
+function openSeatCard(id: string): void {
+  if (id === ME || !s.players[id]) return void openPlayerCard();
+  const el = document.getElementById('playercard');
+  if (!el) return;
+  el.dataset.seat = id;
+  el.innerHTML = `<div class="pcbox">${seatCardHtml(id)}</div>`;
+  el.classList.add('show');
+}
+/** Repaint the open seat card after a diplomacy action, plus any other surface that
+ *  shows the same stance (the roster / the floating chat feed). */
+function refreshSeatCard(id: string): void {
+  const el = document.getElementById('playercard');
+  if (el && el.dataset.seat === id) el.innerHTML = `<div class="pcbox">${seatCardHtml(id)}</div>`;
+  if (diploOpen) renderDiplo();
+  if (chatOpen && !chatMin) renderChatFeed();
 }
 
 // --- session diplomacy & comms menu ------------------------------------------
@@ -6756,6 +6800,37 @@ function intelRowHtml(target: string): string {
   if (!bits.length) return '';
   return `<div class="dp-intel">🕵 ${bits.join(' · ')}</div>`;
 }
+/** The diplomacy affordances for one other seat `id`: stance proposals (with the
+ *  consent state — их предложение ✓ / наше ⏳), the two spy buttons, and the DM
+ *  button, followed by the live intel row. Shared by the roster's expanded row and
+ *  the player card opened from a chat nick, so both stay in lockstep. */
+function seatDiploActionsHtml(id: string): string {
+  const st = getStance(s, ME, id);
+  return (
+    `<div class="dp-actions">` +
+    STANCES.map((sk) => {
+      const barred = sk === 'alliance' && isAiSeat(id); // боты не вступают в коалиции
+      // Consent affordances: THEIR pending offer of this stance → tapping accepts
+      // (✓, pulsing); MY pending offer → sent, waiting on them (⏳, disabled).
+      const theirs = !barred && getOffer(s, id, ME) === sk;
+      const mine = !barred && !theirs && getOffer(s, ME, id) === sk;
+      const cls = `dp-act${sk === st ? ' on' : ''}${theirs ? ' offer' : ''}${mine ? ' pend' : ''}`;
+      const label = theirs ? `✓ ${stanceRu(sk)}` : mine ? `⏳ ${stanceRu(sk)}` : stanceRu(sk);
+      const title = barred
+        ? t('Боты не вступают в коалиции')
+        : theirs
+          ? t('{who} предлагает — нажмите, чтобы принять', { who: NAME[id] ?? id })
+          : mine
+            ? t('предложение уже отправлено')
+            : '';
+      return `<button class="${cls}" data-stance="${sk}" data-seat="${id}" style="--sc:${STANCE_COLOR[sk]}"${barred || mine ? ' disabled' : ''}${title ? ` title="${esc(title)}"` : ''}>${label}</button>`;
+    }).join('') +
+    `<button class="dp-spy" data-spy="treasury" data-seat="${id}" title="${t('Украсть данные казны · {c}¤ · шанс ~60% · окно 24ч (плата сгорает и при провале)', { c: SPY_COST })}">🕵 ${t('казна')}</button>` +
+    `<button class="dp-spy" data-spy="fleets" data-seat="${id}" title="${t('Украсть данные о флотах · {c}¤ · шанс ~60% · окно 24ч (плата сгорает и при провале)', { c: SPY_COST })}">🕵 ${t('флоты')}</button>` +
+    `<button class="dp-msg" data-msgseat="${id}">✉</button></div>` +
+    intelRowHtml(id)
+  );
+}
 function diploRowsHtml(): string {
   const others = diploSeats().filter((id) => id !== ME);
   const byName = (a: string, b: string) => (NAME[a] ?? a).localeCompare(NAME[b] ?? b);
@@ -6784,30 +6859,7 @@ function diploRowsHtml(): string {
       // Bots (AI seats) carry a favour meter toward you; humans/you don't.
       const favBar = !isMe && isAiSeat(id) ? favourBarHtml(id) : '';
       const expanded = diploExpanded === id && !isMe;
-      const actions = expanded
-        ? `<div class="dp-actions">` +
-          STANCES.map((sk) => {
-            const barred = sk === 'alliance' && isAiSeat(id); // боты не вступают в коалиции
-            // Consent affordances: THEIR pending offer of this stance → tapping accepts
-            // (✓, pulsing); MY pending offer → sent, waiting on them (⏳, disabled).
-            const theirs = !barred && getOffer(s, id, ME) === sk;
-            const mine = !barred && !theirs && getOffer(s, ME, id) === sk;
-            const cls = `dp-act${sk === st ? ' on' : ''}${theirs ? ' offer' : ''}${mine ? ' pend' : ''}`;
-            const label = theirs ? `✓ ${stanceRu(sk)}` : mine ? `⏳ ${stanceRu(sk)}` : stanceRu(sk);
-            const title = barred
-              ? t('Боты не вступают в коалиции')
-              : theirs
-                ? t('{who} предлагает — нажмите, чтобы принять', { who: NAME[id] ?? id })
-                : mine
-                  ? t('предложение уже отправлено')
-                  : '';
-            return `<button class="${cls}" data-stance="${sk}" data-seat="${id}" style="--sc:${STANCE_COLOR[sk]}"${barred || mine ? ' disabled' : ''}${title ? ` title="${esc(title)}"` : ''}>${label}</button>`;
-          }).join('') +
-          `<button class="dp-spy" data-spy="treasury" data-seat="${id}" title="${t('Украсть данные казны · {c}¤ · шанс ~60% · окно 24ч (плата сгорает и при провале)', { c: SPY_COST })}">🕵 ${t('казна')}</button>` +
-          `<button class="dp-spy" data-spy="fleets" data-seat="${id}" title="${t('Украсть данные о флотах · {c}¤ · шанс ~60% · окно 24ч (плата сгорает и при провале)', { c: SPY_COST })}">🕵 ${t('флоты')}</button>` +
-          `<button class="dp-msg" data-msgseat="${id}">✉</button></div>` +
-          intelRowHtml(id)
-        : '';
+      const actions = expanded ? seatDiploActionsHtml(id) : '';
       return (
         `<div class="dp-row${expanded ? ' open' : ''}${isMe ? ' me' : ''}"${isMe ? '' : ` data-seat="${id}"`}>` +
         `<span class="dp-ic" style="color:${col}">${bdg.icon}</span>` +
@@ -6844,6 +6896,14 @@ function convoLast(key: string): SessionMsg | undefined {
 function fromName(id: string): string {
   return id === ME ? t('Вы') : (NAME[id] ?? id);
 }
+/** A chat sender's name. Another live seat's name is clickable — it opens that
+ *  player's card (with the diplomacy actions); your own name and system senders
+ *  stay plain. */
+function nickHtml(id: string): string {
+  const name = esc(fromName(id));
+  if (id === ME || !s.players[id]) return `<b>${name}</b>`;
+  return `<b class="dp-nick" data-nickseat="${esc(id)}" title="${t('Открыть карточку игрока')}">${name}</b>`;
+}
 /** One message line. A ping renders as a clickable marker that flies the camera.
  *  `stamp` overrides which time fields show (the chat passes its cached toggles);
  *  omitted → the default `Day N · HH:MM` used by the diplomacy feed. */
@@ -6852,12 +6912,12 @@ function convoLineHtml(m: SessionMsg, stamp?: StampOpts): string {
   if (m.ping) {
     return (
       `<div class="dp-line ping" data-ping="${esc(m.ping)}"><span class="dp-when">${stampTxt}</span>` +
-      `📍 <b>${esc(fromName(m.from))}</b> ${esc(m.ping)}: ${esc(m.text)}<span class="dp-jump">${t('↪ камера')}</span></div>`
+      `📍 ${nickHtml(m.from)} ${esc(m.ping)}: ${esc(m.text)}<span class="dp-jump">${t('↪ камера')}</span></div>`
     );
   }
   if (m.sys)
     return `<div class="dp-line sys"><span class="dp-when">${stampTxt}</span>${esc(m.text)}</div>`;
-  return `<div class="dp-line${m.from === ME ? ' me' : ''}"><span class="dp-when">${stampTxt}</span><b>${esc(fromName(m.from))}:</b> ${esc(m.text)}</div>`;
+  return `<div class="dp-line${m.from === ME ? ' me' : ''}"><span class="dp-when">${stampTxt}</span>${nickHtml(m.from)}<b>:</b> ${esc(m.text)}</div>`;
 }
 function convoFeedInnerHtml(key: string): string {
   const msgs = convoMessages(key);
@@ -13053,8 +13113,36 @@ const playerCardEl = document.getElementById('playercard');
 if (playerCardEl) {
   playerCardEl.addEventListener('click', (e) => {
     const tg = e.target as HTMLElement;
-    if (tg.id === 'playercard' || tg.classList.contains('pc-close'))
+    if (tg.id === 'playercard' || tg.closest('.pc-close')) {
       playerCardEl.classList.remove('show');
+      delete playerCardEl.dataset.seat;
+      return;
+    }
+    // Diplomacy actions on a seat card (opened from a chat nick). They run through the
+    // same intents as the roster; we repaint the card (and the roster / chat feed) after.
+    const seat = playerCardEl.dataset.seat;
+    if (!seat) return;
+    const actBtn = tg.closest('.dp-act') as HTMLElement | null;
+    if (actBtn) {
+      proposeStance(actBtn.dataset.seat!, actBtn.dataset.stance as DiplomaticStance);
+      refreshSeatCard(seat);
+      return;
+    }
+    const spyBtn = tg.closest('.dp-spy') as HTMLElement | null;
+    if (spyBtn) {
+      playerOrder(spyOn(ME, spyBtn.dataset.seat!, spyBtn.dataset.spy as 'treasury' | 'fleets'));
+      refreshSeatCard(seat);
+      return;
+    }
+    const msgseat = (tg.closest('.dp-msg') as HTMLElement | null)?.dataset.msgseat;
+    if (msgseat) {
+      playerCardEl.classList.remove('show');
+      delete playerCardEl.dataset.seat;
+      openDiplo('msgs'); // hand off to the full message thread
+      convoOpen = msgseat;
+      renderDiplo();
+      document.getElementById('dp-text')?.focus();
+    }
   });
 }
 
@@ -13359,6 +13447,8 @@ if (chatwinEl) {
   // Tabs / head buttons / send.
   chatwinEl.addEventListener('click', (e) => {
     const t = e.target as HTMLElement;
+    const nick = (t.closest('[data-nickseat]') as HTMLElement | null)?.dataset.nickseat;
+    if (nick) return openSeatCard(nick);
     const tab = (t.closest('[data-cwtab]') as HTMLElement | null)?.dataset.cwtab;
     if (tab) {
       chatTab = tab;
@@ -14120,6 +14210,8 @@ if (diploEl) {
       return;
     }
     if (tg.closest('.dp-ping')) return pingSelected();
+    const nick = (tg.closest('[data-nickseat]') as HTMLElement | null)?.dataset.nickseat;
+    if (nick) return openSeatCard(nick);
     const ping = (tg.closest('.dp-line.ping') as HTMLElement | null)?.dataset.ping;
     if (ping) return jumpToPing(ping);
     if (tg.closest('.dp-send')) return sendDiploMsg();

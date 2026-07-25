@@ -349,6 +349,8 @@ export const en: Record<string, string> = {
   'Дивизия строится по шаблону из меню. На своём мире +1 HP/юнит/день; полностью выбитая исчезает.':
     'A division is mobilized from a template. On your own world it heals +1 HP/unit/day; wiped out, it disappears.',
   Дипломатия: 'Diplomacy',
+  Отношения: 'Relations',
+  'Открыть карточку игрока': 'Open player card',
   'Добывающая платформа, вгрызается в спёкшуюся кору мёртвого мира. Там, где аннигиляция выжгла всё живое, обнажилась чистая металлическая руда — станция качает {m}⬢ в час. Улучшение увеличивает добычу.':
     "A mining rig gnawing into a dead world's scorched crust. Where annihilation burned away all life, raw metal ore lies exposed — the station pumps {m}⬢ per hour. Upgrades raise the yield.",
   'Ещё раз «Назад» — выход': 'Press Back again to exit',

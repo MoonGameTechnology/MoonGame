@@ -358,7 +358,7 @@ body.sheet-open #cmdbar{bottom:calc(34vh + 12px);}
 @media (max-width:640px){#goals{top:auto;bottom:70px;right:8px;}}
 
 /* player card — tap the top-left crest for your session dossier */
-#playercard{position:fixed;inset:0;z-index:47;display:none;align-items:center;justify-content:center;padding:18px;
+#playercard{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;padding:18px;
   background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
 #playercard.show{display:flex;}
 #playercard .pcbox{width:min(380px,92vw);max-height:86vh;overflow:auto;background:var(--glass);border:1px solid var(--cyan);
@@ -505,7 +505,13 @@ body.sheet-open #cmdbar{bottom:calc(34vh + 12px);}
 .dp-empty{margin:auto;text-align:center;color:var(--dim);font-size:12px;line-height:1.8;}
 .dp-line{font-size:12px;line-height:1.5;color:#cfe7e3;}
 .dp-line b{color:#eafffb;}
+.dp-nick{cursor:pointer;}
+.dp-nick:hover{text-decoration:underline;}
 .dp-line.sys{color:var(--amber);font-size:11px;}
+/* diplomacy actions reused inside the player card (opened from a chat nick) — drop the
+   roster's icon-column indent so the buttons align to the card's edges */
+#playercard .dp-actions{padding:0;}
+#playercard .dp-intel{padding:6px 0 0;}
 .dp-when{display:inline-block;min-width:60px;color:var(--cyan-dim);font-size:9px;
   font-variant-numeric:tabular-nums;margin-right:6px;}
 .dp-compose{display:flex;gap:6px;padding:9px 10px;border-top:1px solid var(--line-hi);}
