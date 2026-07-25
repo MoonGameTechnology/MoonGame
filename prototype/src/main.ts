@@ -11042,23 +11042,33 @@ const bootJoinId = (bootParams?.get('join') ?? '').trim();
 if (bootReset) {
   openReset(bootReset);
 } else if (bootJoinId) {
-  // Direct deep-link into a match — show the welcome card so the player can
-  // register/login, then `welcomeSignIn` auto-resumes the join via
-  // `pendingJoinAfterAuth`. Previously this called `connectToMatch` directly,
-  // which silently returned when no session was cached (the password field
-  // lives on the welcome card, not on the connect overlay).
-  pendingJoinAfterAuth = bootJoinId;
+  // Direct deep-link into a match. Two paths:
+  //  (a) cached session JWT → connectToMatch immediately (no welcome card)
+  //  (b) no session → show welcome card, welcomeSignIn auto-resumes the join
   showConnect(false);
   showHub(false);
-  showStage('welcome');
-  const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
-  wNickInput.value = savedNick || suggestCallsign();
   void (async () => {
     const srv = resolveServer();
     if (srv) await probeAuthMode(srv.base);
-    // Always show the password row on the welcome card (auth-mode check happens
-    // inside probeAuthMode — if the server is auth-off LAN, probeAuthMode hides
-    // it). For auth-on, the player must type a password to register/login.
+    // If auth-off LAN, just dial in (no login needed).
+    if (!authMode) {
+      showStage('browse');
+      connectToMatch(bootJoinId);
+      return;
+    }
+    // Auth-on: if we have a cached session JWT, go straight to the match.
+    const cached = srv ? sessionRecord(srv.base) : null;
+    if (cached) {
+      showStage('browse');
+      connectToMatch(bootJoinId);
+      return;
+    }
+    // No session — show the welcome card so the player can register/login,
+    // then welcomeSignIn auto-resumes the join via pendingJoinAfterAuth.
+    pendingJoinAfterAuth = bootJoinId;
+    showStage('welcome');
+    const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
+    wNickInput.value = savedNick || suggestCallsign();
     wPassRowEl.style.display = 'flex';
     wPassInput.focus();
   })();
@@ -11076,17 +11086,12 @@ if (bootReset) {
   void (async () => {
     const srv = resolveServer();
     if (srv) await probeAuthMode(srv.base);
-    // Pre-fill the saved callsign so a returning player just types a password.
     const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
     if (savedNick) {
       wNickInput.value = savedNick;
     } else {
       wNickInput.value = suggestCallsign();
     }
-    // Always show the password row on the welcome card — the player must type
-    // a password to register/login. probeAuthMode already set authMode; if the
-    // server is auth-off LAN, probeAuthMode hid the row (correct). For auth-on
-    // (the deployed VPS), we keep it visible.
     if (authMode) {
       wPassRowEl.style.display = 'flex';
       wPassInput.focus();
@@ -12168,7 +12173,22 @@ function connectToMatch(id: string): void {
       return;
     }
     const join = await fetchJoinToken(srv.base, id, cached.token);
-    if (!join) return; // status line already explains (refused / entry closed / full / 401)
+    if (!join) {
+      // fetchJoinToken returned null — either 401 (session expired, it cleared
+      // the cache) or 403/409 (entry closed / full). For 401, show the welcome
+      // card so the player can re-login; welcomeSignIn auto-resumes the join.
+      // The session was already removed from localStorage by fetchJoinToken.
+      if (!sessionRecord(srv.base)) {
+        pendingJoinAfterAuth = id;
+        showConnect(false);
+        showHub(false);
+        showStage('welcome');
+        wNickInput.value = srv.nick || suggestCallsign();
+        wPassRowEl.style.display = 'flex';
+        wPassInput.focus();
+      }
+      return;
+    }
     pendingJoinToken = join.token;
     connect();
   })();
