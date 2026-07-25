@@ -11974,7 +11974,9 @@ function resolveServer(): { base: string; nick: string } | null {
   return { base, nick };
 }
 
-const httpBase = (wsBase: string): string => wsBase.replace(/^ws/, 'http');
+function httpBase(wsBase: string): string {
+  return wsBase.replace(/^ws/, 'http');
+}
 
 // --- accounts (SES-2.5) -------------------------------------------------------
 // With AUTH on the server, the playable path runs the full account flow: the nick
