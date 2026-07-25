@@ -1654,15 +1654,14 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #sandboxbtn:active{background:rgba(255,190,60,.16);}
 #sandbox{position:fixed;inset:0;z-index:59;display:none;align-items:center;justify-content:center;padding:18px;
   background:rgba(3,10,14,.72);backdrop-filter:blur(3px);}
-#sandbox .sbx-box-w{width:min(460px,96vw);max-height:92vh;overflow:auto;background:var(--glass);border:1px solid var(--amber);
-  border-radius:14px;padding:18px 18px 16px;box-shadow:0 0 40px rgba(0,0,0,.5);}
-#sandbox .sbx-title{display:flex;align-items:center;gap:10px;font-size:16px;letter-spacing:2px;color:var(--amber);}
+#sandbox .sbx-box-w{width:min(440px,96vw);max-height:92vh;overflow:auto;background:var(--glass);border:1px solid var(--amber);
+  border-radius:14px;padding:15px 16px 13px;box-shadow:0 0 40px rgba(0,0,0,.5);}
+#sandbox .sbx-title{display:flex;align-items:center;gap:10px;font-size:15px;letter-spacing:2px;color:var(--amber);}
 #sandbox .sbx-title .dia{width:11px;height:11px;transform:rotate(45deg);background:var(--amber);box-shadow:0 0 10px var(--amber);}
 #sandbox .sbx-dev{margin-left:auto;font-size:9px;letter-spacing:2px;color:#0a0f12;background:var(--amber);padding:2px 7px;border-radius:3px;}
-#sandbox .sbx-sub{margin:8px 0 14px;color:var(--dim);font-size:11.5px;line-height:1.5;}
-#sandbox .sbx-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--grn-dim);margin:14px 0 8px;}
-#sandbox .sbx-togs{display:grid;gap:7px;}
-#sandbox .sbx-tog{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 12px;border-radius:9px;
+#sandbox .sbx-label{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--grn-dim);margin:12px 0 6px;}
+#sandbox .sbx-togs{display:grid;gap:6px;}
+#sandbox .sbx-tog{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:8px 11px;border-radius:9px;
   border:1px solid var(--line-hi);background:rgba(255,255,255,.02);color:var(--ink);cursor:pointer;}
 #sandbox .sbx-tog.on{border-color:var(--amber);background:rgba(255,190,60,.1);}
 #sandbox .sbx-box{width:20px;height:20px;flex:none;display:grid;place-items:center;border:1px solid var(--line-hi);
@@ -1999,6 +1998,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   #setup .sgo,#setup .scancel{flex:0 0 auto;}
   #updbar{width:min(440px,calc(66.7vw - 20px));}
   #testmode .tmbox{width:min(620px,64vw);max-height:61vh;}
+  #sandbox .sbx-box-w{width:min(460px,44vw);max-height:61vh;}
   #emblempick .ep-box{width:min(340px,61vw);}
   #corp .corpbox{width:53.4vw;max-height:61vh;}
   #railtools #rail-settings,#railtools #rail-exit{display:grid;}
@@ -2385,7 +2385,7 @@ const page = (js) => `<!doctype html>
           <button class="spdchip" type="button" data-spd="100">×100</button>
         </div>
         <!-- SANDBOX — setup checkbox; delete this fenced block + the #sandbox markup to cut it -->
-        <!--dev-only--><label class="sbx-check"><input id="setupsandbox" type="checkbox"><span data-i18n>🧪 Песочница — тестовые команды (туман, ресурсы, бессмертный дом…)</span></label><!--/dev-only-->
+        <!--dev-only--><label class="sbx-check"><input id="setupsandbox" type="checkbox"><span data-i18n>🧪 Песочница</span></label><!--/dev-only-->
       </div>
     </div>
     <button id="setupgo" class="sgo" disabled data-i18n>ЗАПУСК</button>

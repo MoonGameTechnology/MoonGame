@@ -6,7 +6,7 @@ import {
   resetSandboxConfig,
   resetSandboxRuntime,
   sbAddResource,
-  sbResetCooldowns,
+  sbReadyCommanders,
   sbEndWars,
   enforceSandbox,
   isBuildAction,
@@ -42,13 +42,13 @@ describe('sandbox — one-shot commands', () => {
     expect(s.players.p1!.resources.credits).toBe(2100); // added to the existing 100
   });
 
-  it('sbResetCooldowns readies my commanders but keeps a death timer', () => {
+  it('sbReadyCommanders readies my commanders but keeps a death timer', () => {
     const s = base();
     s.heroes = {
       h1: { id: 'h1', owner: 'p1', location: 'A', cooldowns: { strike: 5000, respawn: 9000 } },
       h2: { id: 'h2', owner: 'p2', location: 'B', cooldowns: { strike: 5000 } },
     } as Record<string, Hero>;
-    sbResetCooldowns(s, 'p1');
+    expect(sbReadyCommanders(s, 'p1')).toBe(true); // cleared a pending ability
     expect(s.heroes.h1!.cooldowns).toEqual({ respawn: 9000 }); // ability cleared, death timer kept
     expect(s.heroes.h2!.cooldowns).toEqual({ strike: 5000 }); // the rival's hero is untouched
   });
@@ -89,6 +89,19 @@ describe('sandbox — held toggles', () => {
     s.planets.home!.owner = 'p2';
     enforceSandbox(s, 'p1', 'home');
     expect(s.planets.home!.owner).toBe('p2');
+  });
+
+  it('instantCooldown readies my commanders every frame while held', () => {
+    const s = base();
+    s.heroes = {
+      h1: { id: 'h1', owner: 'p1', location: 'A', cooldowns: { strike: 5000 } },
+    } as Record<string, Hero>;
+    sandboxConfig.enabled = true;
+    enforceSandbox(s, 'p1', null); // toggle off → untouched
+    expect(s.heroes.h1!.cooldowns).toEqual({ strike: 5000 });
+    sandboxConfig.instantCooldown = true;
+    enforceSandbox(s, 'p1', null);
+    expect(s.heroes.h1!.cooldowns).toEqual({}); // held ready
   });
 
   it('freezeQueues holds construction.complete events forward, then releases them', () => {

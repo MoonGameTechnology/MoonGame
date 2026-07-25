@@ -38,6 +38,8 @@ export interface SandboxConfig {
   immortalHome: boolean;
   /** No `construction.complete` event ever elapses — every queue is paused. */
   freezeQueues: boolean;
+  /** The player's commanders keep every ability off cooldown (readied each frame). */
+  instantCooldown: boolean;
 }
 
 const DEFAULTS: SandboxConfig = {
@@ -46,6 +48,7 @@ const DEFAULTS: SandboxConfig = {
   freeBuild: false,
   immortalHome: false,
   freezeQueues: false,
+  instantCooldown: false,
 };
 
 /** The live config (mutated in place so the host can read it each frame). */
@@ -88,20 +91,20 @@ export function sbAddResource(s: GameState, me: string, key: string): string {
   return t('+{n} {res}', { n: GRANT, res: r ? t(r.name) : key });
 }
 
-/** Instantly ready every ability of the player's commanders (keep any death timer,
- *  so a fallen hero is not left "ready but dead"). */
-export function sbResetCooldowns(s: GameState, me: string): string {
-  let n = 0;
+/** Ready every ability of the player's commanders (keep any death timer, so a fallen
+ *  hero is not left "ready but dead"). Driven each frame by the `instantCooldown`
+ *  toggle. Returns true if it actually cleared a pending cooldown. */
+export function sbReadyCommanders(s: GameState, me: string): boolean {
+  let changed = false;
   for (const h of Object.values(s.heroes ?? {})) {
     if (h.owner !== me) continue;
     const respawn = h.cooldowns.respawn;
-    const had = Object.keys(h.cooldowns).some((k) => k !== 'respawn' && h.cooldowns[k]! > s.time);
+    if (Object.keys(h.cooldowns).some((k) => k !== 'respawn' && h.cooldowns[k]! > s.time)) {
+      changed = true;
+    }
     h.cooldowns = respawn !== undefined ? { respawn } : {};
-    if (had) n++;
   }
-  return n > 0
-    ? t('Перезарядка сброшена — умения командиров готовы')
-    : t('Умения командиров уже готовы');
+  return changed;
 }
 
 /** End every war the player is in — pairs at `war` return to `peace` (neutral). */
@@ -160,6 +163,7 @@ export function enforceSandbox(s: GameState, me: string, homeId: string | null):
   } else if (frozenRemaining.size > 0) {
     frozenRemaining.clear(); // freeze lifted → let the captured events elapse normally
   }
+  if (sandboxConfig.instantCooldown) sbReadyCommanders(s, me); // hold abilities ready
 }
 
 // --- in-match panel (DOM) ----------------------------------------------------
@@ -177,6 +181,7 @@ const TOGGLES: Array<{ key: keyof SandboxConfig; label: string; hint: string }> 
   { key: 'freeBuild', label: 'Бесплатная прокачка', hint: 'Постройки не тратят ресурсы' },
   { key: 'immortalHome', label: 'Бессмертный дом', hint: 'Домашний мир нельзя захватить' },
   { key: 'freezeQueues', label: 'Заморозить очередь', hint: 'Стройка стоит у всех' },
+  { key: 'instantCooldown', label: 'Перезарядка скиллов', hint: 'Умения командиров всегда готовы' },
 ];
 
 /** Wire the `#sandbox` overlay + its floating opener. No-op if the markup is
@@ -209,13 +214,10 @@ export function initSandbox(hooks: SandboxHooks): void {
     if (!el) return;
     el.innerHTML = `<div class="sbx-box-w">
       <div class="sbx-title"><span class="dia"></span><b>${t('ПЕСОЧНИЦА')}</b><span class="sbx-dev">DEV</span></div>
-      <p class="sbx-sub">${t('Тестовые команды для одиночной игры — как режим тренировки в MOBA. Переключатели держатся постоянно, кнопки срабатывают разом.')}</p>
       <div class="sbx-label">${t('Переключатели')}</div>
       <div class="sbx-togs">${TOGGLES.map(toggleRow).join('')}</div>
       <div class="sbx-label">${t('Команды')}</div>
-      <button class="sbx-cmd" data-sbx="cd">${t('Перезарядка скиллов')}</button>
       <div class="sbx-cmds">${resBtns}</div>
-      <button class="sbx-cmd" data-sbx="freeze">${t('Заморозить очередь постройки у всех')}</button>
       <button class="sbx-cmd" data-sbx="peace">${t('Прекратить войну со всеми фракциями')}</button>
       <button class="sbx-close" data-sbx="close">${t('Закрыть')}</button>
     </div>`;
@@ -233,13 +235,6 @@ export function initSandbox(hooks: SandboxHooks): void {
       const k = tgt.dataset.k as keyof SandboxConfig;
       (sandboxConfig[k] as boolean) = !sandboxConfig[k];
       render();
-    } else if (act === 'freeze') {
-      // The dedicated "freeze the queue for everyone" command just arms the toggle.
-      sandboxConfig.freezeQueues = true;
-      hooks.note('🧪 ' + t('Очередь постройки заморожена у всех'));
-      render();
-    } else if (act === 'cd') {
-      hooks.note('🧪 ' + sbResetCooldowns(s, me));
     } else if (act === 'res') {
       hooks.note('🧪 ' + sbAddResource(s, me, tgt.dataset.k ?? ''));
     } else if (act === 'peace') {
