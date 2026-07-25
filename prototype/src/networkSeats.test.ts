@@ -41,16 +41,16 @@ describe('prototype network seats', () => {
   it('cycles the four factions without duplicating chair names', () => {
     const seats = networkSeats();
     expect(seats.map((seat) => seat.faction)).toEqual([
-      'blue',
-      'red',
+      'azure',
+      'crimson',
       'amber',
       'violet',
-      'blue',
-      'red',
+      'azure',
+      'crimson',
       'amber',
       'violet',
-      'blue',
-      'red',
+      'azure',
+      'crimson',
     ]);
     expect(new Set(seats.map((seat) => seat.name)).size).toBe(10);
   });

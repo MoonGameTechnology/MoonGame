@@ -2196,16 +2196,16 @@ export function botEmbargoes(state: GameState, bot: string, player: string): boo
 /** Default solo skirmish: you (p1) vs one AI (p2), at two of the start candidates. */
 export const DEFAULT_SETUP: SetupConfig = {
   seats: [
-    { id: 'p1', name: 'Azure Compact', faction: 'blue', start: START_CANDIDATES[0]!, ai: false },
-    { id: 'p2', name: 'Crimson Hegemony', faction: 'red', start: START_CANDIDATES[1]!, ai: true },
+    { id: 'p1', name: 'Azure Compact', faction: 'azure', start: START_CANDIDATES[0]!, ai: false },
+    { id: 'p2', name: 'Crimson Hegemony', faction: 'crimson', start: START_CANDIDATES[1]!, ai: true },
   ],
 };
 
 export type NetworkMatchMode = 'ffa' | '2v2' | '5v5';
 
 const NETWORK_HOUSES = [
-  { name: 'Azure Compact', faction: 'blue' },
-  { name: 'Crimson Hegemony', faction: 'red' },
+  { name: 'Azure Compact', faction: 'azure' },
+  { name: 'Crimson Hegemony', faction: 'crimson' },
   { name: 'Amber Concord', faction: 'amber' },
   { name: 'Violet Ascendancy', faction: 'violet' },
 ] as const;
