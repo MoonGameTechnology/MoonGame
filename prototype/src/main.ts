@@ -11051,21 +11051,16 @@ if (bootReset) {
   showConnect(false);
   showHub(false);
   showStage('welcome');
-  // Pre-fill the suggested callsign + show the password row so the player
-  // doesn't have to click through the welcome card first.
   const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
   wNickInput.value = savedNick || suggestCallsign();
-  wPassRowEl.style.display = 'flex';
   void (async () => {
     const srv = resolveServer();
     if (srv) await probeAuthMode(srv.base);
-    // If the server has auth off (a LAN playtest), skip the form and dial in.
-    if (!authMode) {
-      showStage('browse');
-      connectToMatch(bootJoinId);
-    } else {
-      wPassInput.focus();
-    }
+    // Always show the password row on the welcome card (auth-mode check happens
+    // inside probeAuthMode — if the server is auth-off LAN, probeAuthMode hides
+    // it). For auth-on, the player must type a password to register/login.
+    wPassRowEl.style.display = 'flex';
+    wPassInput.focus();
   })();
 } else {
   // Auth gate at boot (UX fix): show the welcome/login card FIRST, before the
@@ -11081,22 +11076,21 @@ if (bootReset) {
   void (async () => {
     const srv = resolveServer();
     if (srv) await probeAuthMode(srv.base);
-    // Pre-fill the suggested callsign so a returning player just types a password.
+    // Pre-fill the saved callsign so a returning player just types a password.
     const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
     if (savedNick) {
       wNickInput.value = savedNick;
+    } else {
+      wNickInput.value = suggestCallsign();
+    }
+    // Always show the password row on the welcome card — the player must type
+    // a password to register/login. probeAuthMode already set authMode; if the
+    // server is auth-off LAN, probeAuthMode hid the row (correct). For auth-on
+    // (the deployed VPS), we keep it visible.
+    if (authMode) {
       wPassRowEl.style.display = 'flex';
       wPassInput.focus();
     } else {
-      wNickInput.value = suggestCallsign();
-      wNickInput.focus();
-    }
-    // If the server has auth off (a LAN playtest), the welcome card is just a
-    // callsign gate — confirm and land on the hub.
-    if (!authMode) {
-      // No password needed; the welcome card's "Войти" button handles the
-      // guest-callsign flow and opens the hub. Don't bypass it — let the
-      // player confirm their callsign.
       wPassRowEl.style.display = 'none';
     }
   })();
