@@ -11039,32 +11039,40 @@ settingsEl.addEventListener('click', (e) => {
 const bootParams = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
 const bootReset = (bootParams?.get('reset') ?? '').trim();
 const bootJoinId = (bootParams?.get('join') ?? '').trim();
+console.log('[boot] location.search=', location.search, 'bootJoinId=', bootJoinId, 'bootReset=', bootReset);
 if (bootReset) {
   openReset(bootReset);
 } else if (bootJoinId) {
   // Direct deep-link into a match. Two paths:
   //  (a) cached session JWT → connectToMatch immediately (no welcome card)
   //  (b) no session → show welcome card, welcomeSignIn auto-resumes the join
+  console.log('[boot] ?join path — showing connect, awaiting probeAuthMode');
   showConnect(false);
   showHub(false);
   void (async () => {
     const srv = resolveServer();
+    console.log('[boot] resolveServer=', srv ? { base: srv.base, nick: srv.nick } : 'null');
     if (srv) await probeAuthMode(srv.base);
+    console.log('[boot] authMode=', authMode);
     // If auth-off LAN, just dial in (no login needed).
     if (!authMode) {
+      console.log('[boot] auth-off — connectToMatch directly');
       showStage('browse');
       connectToMatch(bootJoinId);
       return;
     }
     // Auth-on: if we have a cached session JWT, go straight to the match.
     const cached = srv ? sessionRecord(srv.base) : null;
+    console.log('[boot] cached session=', cached ? { login: cached.login, token: cached.token.slice(0, 20) + '...' } : 'null');
     if (cached) {
+      console.log('[boot] cached session — connectToMatch');
       showStage('browse');
       connectToMatch(bootJoinId);
       return;
     }
     // No session — show the welcome card so the player can register/login,
     // then welcomeSignIn auto-resumes the join via pendingJoinAfterAuth.
+    console.log('[boot] no session — showing welcome card, pendingJoinAfterAuth=', bootJoinId);
     pendingJoinAfterAuth = bootJoinId;
     showStage('welcome');
     const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
@@ -11073,6 +11081,7 @@ if (bootReset) {
     wPassInput.focus();
   })();
 } else {
+  console.log('[boot] no ?join — auth gate at boot');
   // Auth gate at boot (UX fix): show the welcome/login card FIRST, before the
   // hub — like every game's login screen. Previously a cached `void.nick` in
   // localStorage skipped straight to `openHub()`, but that left the player in
