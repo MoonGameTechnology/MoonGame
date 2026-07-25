@@ -40,7 +40,10 @@ export const marketModule: GameModule = {
       if (typeof resource !== 'string' || typeof amount !== 'number' || typeof price !== 'number') {
         return h.reject('E_BAD_PAYLOAD');
       }
-      if (!(amount > 0) || !(price >= 0)) return h.reject('E_BAD_PAYLOAD');
+      // SEC-A06-5: price 0 is a literally-free listing — a wash-trade / resource-
+      // transfer vehicle once alts exist. Checked here too (not just the wire
+      // schema, payloadSchemas.ts) — this handler doesn't assume the gate ran.
+      if (!(amount > 0) || !(price > 0)) return h.reject('E_BAD_PAYLOAD');
       if (!h.ctx.data.resources.includes(resource)) return h.reject('E_UNKNOWN_RESOURCE');
       const seller = h.state.players[action.playerId];
       if (!seller) return h.reject('E_FORBIDDEN');
