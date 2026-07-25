@@ -1477,6 +1477,9 @@ export const en: Record<string, string> = {
   'Звёздный фон': 'Star backdrop',
   'дрейфующие туманности и звёзды на фоне — выключите для плоского фона':
     'drifting nebulae and stars in the background — turn off for a flat backdrop',
+  'Счётчик FPS': 'FPS counter',
+  'показывать кадры в секунду в углу — для проверки производительности':
+    'show frames per second in the corner — to check performance',
   вкл: 'on',
   выкл: 'off',
   ГОТОВО: 'DONE',

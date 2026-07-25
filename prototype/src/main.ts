@@ -301,52 +301,25 @@ const COLOR: Record<string, string> = {
   p8: '#e58b4a',
   p9: '#6f9cff',
   p10: '#d8cf5a',
-  ally: '#4a8cff', // ally — blue (latent: no allied player in the skirmish yet)
-  null: '#6f8a93', // neutral — gray
+  ally: '#4a8cff', // friendly bloc (pact / alliance) — blue
+  null: '#6f8a93', // unowned territory — gray
 };
-// Distinct hues for the OTHER commanders (you are always green), assigned in a stable
-// order so each rival keeps its colour across the match (up to 9 rivals).
-const RIVAL_COLORS = [
-  COLOR.p2!,
-  COLOR.p3!,
-  COLOR.p4!,
-  COLOR.p5!,
-  COLOR.p6!,
-  COLOR.p7!,
-  COLOR.p8!,
-  COLOR.p9!,
-  COLOR.p10!,
-];
-const SEAT_IDS = Array.from({ length: 10 }, (_, i) => `p${i + 1}`);
 const VOID_COLOR = '#46606e'; // empty-space provinces — uncapturable void
-// --- side-colour preferences (client-only, localStorage) ---------------------
-// Постер «цвет = принадлежность»: свой/нейтральный цвет настраиваются, палитра
-// соперников выбирается пресетом (включая дальтоник-безопасный, Okabe–Ito-подобные
-// оттенки). Чистая косметика поверх ownerColor — механика сторон не трогается.
-const RIVAL_PALETTES: Record<string, readonly string[]> = {
-  classic: RIVAL_COLORS,
-  warm: [
-    '#ff4d3d',
-    '#ff9d2e',
-    '#ffd23d',
-    '#ff6fa0',
-    '#e8703a',
-    '#d94f6c',
-    '#ffb073',
-    '#c9522f',
-    '#ff8355',
-  ],
-  cvd: [
-    '#e69f00',
-    '#56b4e9',
-    '#f0e442',
-    '#0072b2',
-    '#d55e00',
-    '#cc79a7',
-    '#999999',
-    '#a6761d',
-    '#8da0cb',
-  ],
+// --- side-colour SCHEMES (client-only, localStorage) --------------------------
+// «Цвет = отношение»: другие командиры красятся по ТВОЕЙ стойке к ним (враг /
+// дружественный блок / мир), а не по личному цвету. `cvd` — оттенки, различимые
+// при цветослепоте (Okabe–Ito): красный враг против зелёного «тебя» — классическая
+// красно-зелёная ловушка, поэтому там вермилион + синий + серый. Свой цвет
+// (`youColor`) и ничейное пространство (`neutralColor`) настраиваются отдельно.
+interface SideScheme {
+  enemy: string; // at WAR — red
+  ally: string; // pact / alliance (friendly bloc) — blue
+  neutral: string; // at PEACE — a distinct grey, ≠ unowned void
+}
+const RELATION_SCHEMES: Record<string, SideScheme> = {
+  classic: { enemy: '#ff5a4d', ally: COLOR.ally!, neutral: '#9fb0b6' },
+  warm: { enemy: '#ff6a3a', ally: '#2fb5c9', neutral: '#a8a29a' },
+  cvd: { enemy: '#d55e00', ally: '#0072b2', neutral: '#9a9a9a' }, // Okabe–Ito, CVD-safe
 };
 const readPref = (k: string): string | null =>
   typeof localStorage !== 'undefined' ? localStorage.getItem(k) : null;
@@ -367,27 +340,38 @@ function safeHexColor(c: string | null | undefined, fallback: string): string {
 let youColor = safeHexColor(readPref('void.colorYou'), COLOR.p1!);
 let neutralColor = safeHexColor(readPref('void.colorNeutral'), COLOR.null!);
 let rivalPaletteId = readPref('void.rivalPalette') ?? 'classic';
-if (!RIVAL_PALETTES[rivalPaletteId]) rivalPaletteId = 'classic';
+if (!RELATION_SCHEMES[rivalPaletteId]) rivalPaletteId = 'classic';
 function setSideColors(you: string, neutral: string, palette: string): void {
   youColor = safeHexColor(you, COLOR.p1!);
   neutralColor = safeHexColor(neutral, COLOR.null!);
-  rivalPaletteId = RIVAL_PALETTES[palette] ? palette : 'classic';
+  rivalPaletteId = RELATION_SCHEMES[palette] ? palette : 'classic';
   if (typeof localStorage !== 'undefined') {
     localStorage.setItem('void.colorYou', youColor);
     localStorage.setItem('void.colorNeutral', neutralColor);
     localStorage.setItem('void.rivalPalette', rivalPaletteId);
   }
 }
-// Political colour is relative to the local commander: YOU are always green (or
-// your configured hue), neutral gray, each rival its own palette hue. Works for
-// solo (you = p1) and net (you may be any seat).
+// Political colour is relative to the local commander: YOU are your configured hue,
+// unowned space grey, and every other commander is coloured by your STANCE toward them
+// (enemy red / friendly blue / neutral grey — see ownerColor). Works for solo (you = p1)
+// and net (you may be any seat).
 function ownerColor(owner: string | null | undefined): string {
-  if (!owner) return neutralColor;
-  if (owner === ME) return youColor;
-  const rivals = SEAT_IDS.filter((id) => id !== ME);
-  const i = rivals.indexOf(owner);
-  const pal = RIVAL_PALETTES[rivalPaletteId] ?? RIVAL_COLORS;
-  return i >= 0 ? pal[i % pal.length]! : pal[0]!;
+  if (!owner) return neutralColor; // unowned territory (void / no-man's land)
+  if (owner === ME) return youColor; // you
+  // POLITICAL colour, relative to the local commander — mark by RELATION, not a fixed
+  // per-rival hue: war → red, pact/alliance → friendly blue, peace → a distinct
+  // neutral-player grey (lighter than empty void, so an at-peace world still reads as
+  // "owned"). Stance is public (never fogged), so the client always has the true value.
+  const scheme = RELATION_SCHEMES[rivalPaletteId] ?? RELATION_SCHEMES.classic!;
+  switch (getStance(s, ME, owner)) {
+    case 'war':
+      return scheme.enemy;
+    case 'pact':
+    case 'alliance':
+      return scheme.ally;
+    default: // peace (the war-by-default fallback maps to `war` above, not here)
+      return scheme.neutral;
+  }
 }
 // Build profile. `__PLAYER_BUILD__` is an esbuild define — REQUIRED by every bundler
 // of this file (build.mjs sets it for both artifacts, uitest.mjs pins `false`); a
@@ -889,7 +873,11 @@ let MOBILE = false;
 function resize() {
   VW = viewW();
   VH = viewH();
-  DPR = (typeof window !== 'undefined' ? window.devicePixelRatio : 1) || 1;
+  // Cap the device-pixel-ratio at 2. A 2D canvas is fill-rate bound, and cost scales
+  // with DPR²: a 3× phone (common on Android) would render 9× the pixels for no visible
+  // gain at arm's length — the #1 reason the APK's FPS tanks. 2× stays crisp on retina.
+  const rawDpr = (typeof window !== 'undefined' ? window.devicePixelRatio : 1) || 1;
+  DPR = Math.min(rawDpr, 2);
   // Width alone misses a LANDSCAPE phone (wide but short, finger-driven): treat a
   // coarse-pointer device with a short viewport as mobile too, so it never falls
   // into the hover-dependent desktop layout (audit: ландшафт проваливался в десктоп).
@@ -991,6 +979,14 @@ function setGlowFx(v: boolean): void {
     /* private-mode / storage-full: keep the in-memory value, just don't persist */
   }
 }
+// shadowBlur gate: a per-draw gaussian blur is one of the priciest canvas ops on
+// mobile GPUs. `blitGlow` already honours glowFx, but the ~20 `cx.shadowBlur = n`
+// halos on nodes / fleets / projectiles / HUD did not — so "Свечение и ореолы: выкл"
+// only removed the bloom discs, not the real per-frame cost. Route them through this
+// so the toggle now flattens ALL glow (crisp + fast) on weaker devices.
+function fxBlur(n: number): number {
+  return glowFx ? n : 0;
+}
 // Deep-space backdrop: the drifting nebulae + faint star ticks baked into the
 // static layer. Off leaves the flat fill + plotting grid. Toggling rebuilds the
 // bake (starfield flag rides the static-layer cache signature in buildStaticLayer).
@@ -1018,6 +1014,18 @@ function setCompactPanel(v: boolean): void {
   applyCompactPanel();
   try {
     localStorage.setItem('void.compactPanel', v ? '1' : '0');
+  } catch {
+    /* private-mode / storage-full: keep the in-memory value, just don't persist */
+  }
+}
+// FPS counter: the little frames-per-second readout in the corner. A diagnostics
+// knob for players checking performance on their device — default OFF so the HUD
+// stays clean, opt-in from Settings. (DEV_UI / net-desync still force it on.)
+let showFps = typeof localStorage !== 'undefined' && localStorage.getItem('void.showFps') === '1';
+function setShowFps(v: boolean): void {
+  showFps = v;
+  try {
+    localStorage.setItem('void.showFps', v ? '1' : '0');
   } catch {
     /* private-mode / storage-full: keep the in-memory value, just don't persist */
   }
@@ -3557,7 +3565,7 @@ function targetBrackets(x: number, y: number, r: number, t: number) {
   cx.strokeStyle = LOCK;
   cx.lineWidth = 1.6;
   cx.shadowColor = LOCK;
-  cx.shadowBlur = 8;
+  cx.shadowBlur = fxBlur(8);
   const len = 6;
   for (const [sx, sy] of [
     [1, 1],
@@ -3586,7 +3594,7 @@ function drawBattlePulse(
   const col = phase === 'ground' ? '#f0b429' : '#ff5a4d';
   cx.save();
   cx.shadowColor = col;
-  cx.shadowBlur = 12;
+  cx.shadowBlur = fxBlur(12);
   for (let i = 0; i < 3; i++) {
     const k = (pulse + i / 3) % 1;
     cx.strokeStyle = rgba(col, 0.55 * (1 - k));
@@ -3776,7 +3784,7 @@ function drawFleetRoutes() {
     cx.strokeStyle = rgba(LOCK, sel ? 0.85 : 0.32);
     cx.lineWidth = sel ? 1.8 : 1.1;
     cx.shadowColor = LOCK;
-    cx.shadowBlur = sel ? 8 : 2;
+    cx.shadowBlur = fxBlur(sel ? 8 : 2);
     cx.beginPath();
     cx.moveTo(pts[0]!.x, pts[0]!.y);
     for (let i = 1; i < pts.length; i++) cx.lineTo(pts[i]!.x, pts[i]!.y);
@@ -3799,7 +3807,7 @@ function drawAssaultTargets() {
   cx.lineWidth = 1.6;
   cx.setLineDash([4, 4]);
   cx.shadowColor = '#ff5a4d';
-  cx.shadowBlur = 8;
+  cx.shadowBlur = fxBlur(8);
   for (const n of MAP) {
     const p = s.planets[n.id];
     if (!p || p.owner == null || p.owner === ME) continue;
@@ -3842,7 +3850,7 @@ function drawAimPreview() {
   cx.lineWidth = 1.4;
   cx.setLineDash([3, 5]);
   cx.shadowColor = LOCK;
-  cx.shadowBlur = 6;
+  cx.shadowBlur = fxBlur(6);
   for (const id of ids) {
     const f = s.fleets[id];
     if (!f) continue;
@@ -4095,7 +4103,7 @@ function drawRadarRange(now: number): void {
   cx.lineDashOffset = -now / 60;
   cx.strokeStyle = rgba('#5ff0c0', 0.34 + 0.18 * pulse);
   cx.lineWidth = 1.3;
-  cx.shadowBlur = 6;
+  cx.shadowBlur = fxBlur(6);
   cx.stroke();
   cx.fillStyle = rgba('#aef6e6', 0.85);
   cx.fillText(`◌ SIGNATURE ${reach}`, c.x + o.rx + 7, c.y + 3);
@@ -4110,7 +4118,7 @@ function drawRadarRange(now: number): void {
   cx.setLineDash([]);
   cx.strokeStyle = rgba('#7df0d0', 0.6 + 0.2 * pulse);
   cx.lineWidth = 1.4;
-  cx.shadowBlur = 7;
+  cx.shadowBlur = fxBlur(7);
   cx.stroke();
   cx.fillStyle = rgba('#aef6e6', 0.9);
   cx.fillText(`● REVEAL ${Math.round(inner)}`, c.x + i.rx + 7, c.y - 7);
@@ -4186,7 +4194,7 @@ function render(now: number) {
       cx.setLineDash(shot.close ? [2, 4] : [3, 5]);
       cx.lineDashOffset = -age / 12; // the tracer visibly climbs from the surface
       cx.shadowColor = col;
-      cx.shadowBlur = shot.close ? 5 : 8;
+      cx.shadowBlur = fxBlur(shot.close ? 5 : 8);
       cx.beginPath();
       cx.moveTo(a.x, a.y);
       cx.lineTo(b.x, b.y);
@@ -4260,7 +4268,7 @@ function render(now: number) {
         const tail = q(Math.max(0, t - 0.06));
         cx.strokeStyle = rgba('#ffd29b', 0.85);
         cx.lineWidth = 1.6;
-        cx.shadowBlur = 7;
+        cx.shadowBlur = fxBlur(7);
         cx.beginPath();
         cx.moveTo(tail.x, tail.y);
         cx.lineTo(pt.x, pt.y);
@@ -4282,7 +4290,7 @@ function render(now: number) {
         if (k < 0.45) {
           cx.fillStyle = rgba('#fff1dc', 0.9 * (1 - k / 0.45));
           cx.shadowColor = '#ff8a3d';
-          cx.shadowBlur = 10;
+          cx.shadowBlur = fxBlur(10);
           cx.beginPath();
           cx.arc(b.x, b.y, (3.2 - k * 3) * sk, 0, TAU);
           cx.fill();
@@ -4424,7 +4432,7 @@ function render(now: number) {
       cx.textAlign = 'center';
       cx.textBaseline = 'middle';
       cx.shadowColor = kc;
-      cx.shadowBlur = 5;
+      cx.shadowBlur = fxBlur(5);
       cx.fillStyle = rgba(kc, 0.95);
       cx.fillText(KIND_ICON[n.sector]!, bx, by + 0.5);
       cx.restore();
@@ -4476,7 +4484,7 @@ function render(now: number) {
         cx.strokeStyle = col;
         cx.lineWidth = 1.6;
         cx.shadowColor = col;
-        cx.shadowBlur = 8;
+        cx.shadowBlur = fxBlur(8);
         poly(c.x, c.y, 12, 6, Math.PI / 6);
         cx.stroke();
         poly(c.x, c.y, 7, 6, Math.PI / 6);
@@ -4491,7 +4499,7 @@ function render(now: number) {
       if (selPlanet === n.id) targetBrackets(c.x, c.y, fort ? 18 : 15, now);
       cx.save();
       cx.shadowColor = 'rgba(0,0,0,0.85)';
-      cx.shadowBlur = 3;
+      cx.shadowBlur = fxBlur(3);
       if (fort) {
         // a fortress stays a prominent, special designation (unchanged)
         cx.fillStyle = p.owner ? col : '#9fc9c4';
@@ -4739,7 +4747,7 @@ function render(now: number) {
     cx.save();
     cx.globalAlpha = mineWorld ? Math.max(detail, 0.9) : detail;
     cx.shadowColor = 'rgba(0,0,0,0.85)';
-    cx.shadowBlur = 3;
+    cx.shadowBlur = fxBlur(3);
     if (isWorld) {
       cx.fillStyle = kn ? (p.owner ? col : '#9fc9c4') : 'rgba(120,140,150,0.55)';
       cx.font = '700 12px ui-monospace,Menlo,monospace';
@@ -4842,7 +4850,7 @@ function render(now: number) {
         cx.strokeStyle = rgba('#ffb15f', 0.3 + 0.3 * spark);
         cx.lineWidth = 1.2 + spark;
         cx.shadowColor = '#ffb15f';
-        cx.shadowBlur = 12;
+        cx.shadowBlur = fxBlur(12);
         cx.beginPath();
         cx.moveTo(A.x, A.y);
         cx.lineTo(pc.x, pc.y);
@@ -4875,7 +4883,7 @@ function render(now: number) {
       cx.translate(A.x, A.y);
       cx.rotate(A.ang + Math.PI / 2);
       cx.shadowColor = col;
-      cx.shadowBlur = 5 + 4 * engine;
+      cx.shadowBlur = fxBlur(5 + 4 * engine);
       cx.fillStyle = rgba(col, 0.92);
       cx.strokeStyle = 'rgba(4,10,12,.8)';
       cx.lineWidth = 1;
@@ -4911,7 +4919,7 @@ function render(now: number) {
     cx.translate(A.x, A.y);
     cx.rotate(A.ang + Math.PI / 2);
     cx.shadowColor = col;
-    cx.shadowBlur = 6 + 6 * engine;
+    cx.shadowBlur = fxBlur(6 + 6 * engine);
     if (domShield || arch === 'flagship') {
       // модификатор «есть щит»: пунктирная орбита вокруг силуэта
       cx.strokeStyle = rgba(col, 0.7);
@@ -4975,7 +4983,7 @@ function render(now: number) {
       let lx = -rowW / 2 + CELL / 2; // local x of the first cell centre
       cx.save();
       cx.shadowColor = col;
-      cx.shadowBlur = 3;
+      cx.shadowBlur = fxBlur(3);
       cx.lineWidth = 1;
       for (let i = 0; i < n; i++) {
         const pip = row[i]!;
@@ -10914,6 +10922,10 @@ function renderSettings(): void {
     `<div class="set-lbl">${t('Звёздный фон')}<span class="set-sub">${t('дрейфующие туманности и звёзды на фоне — выключите для плоского фона')}</span></div>` +
     `<div class="set-ctl"><label class="set-switch"><input id="set-starfield" type="checkbox"${starfield ? ' checked' : ''} aria-label="${t('Звёздный фон')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-starfield-val" class="set-val">${starfield ? t('вкл') : t('выкл')}</span></div>` +
     `</div>` +
+    `<div class="set-row">` +
+    `<div class="set-lbl">${t('Счётчик FPS')}<span class="set-sub">${t('показывать кадры в секунду в углу — для проверки производительности')}</span></div>` +
+    `<div class="set-ctl"><label class="set-switch"><input id="set-fps" type="checkbox"${showFps ? ' checked' : ''} aria-label="${t('Счётчик FPS')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-fps-val" class="set-val">${showFps ? t('вкл') : t('выкл')}</span></div>` +
+    `</div>` +
     // Developer section — admin-only tools a normal player never sees. The gate is the
     // `isAdmin()` stub: today it's the dev client (or an explicit per-device opt-in),
     // and it becomes a real account-role check once identity lands — the block simply
@@ -10956,6 +10968,12 @@ function renderSettings(): void {
   star?.addEventListener('change', () => {
     setStarfield(star.checked);
     if (starVal) starVal.textContent = star.checked ? t('вкл') : t('выкл');
+  });
+  const fps = document.getElementById('set-fps') as HTMLInputElement | null;
+  const fpsVal = document.getElementById('set-fps-val');
+  fps?.addEventListener('change', () => {
+    setShowFps(fps.checked);
+    if (fpsVal) fpsVal.textContent = fps.checked ? t('вкл') : t('выкл');
   });
   const devspd = document.getElementById('set-devspeed') as HTMLInputElement | null;
   const devspdVal = document.getElementById('set-devspeed-val');
@@ -12603,11 +12621,11 @@ function frame(nowReal: number) {
     lastClockText = statusHtml;
   }
 
-  // Dev net overlay (M0): FPS; when connected, append round-trip latency and a
+  // FPS + net overlay: FPS; when connected, append round-trip latency and a
   // desync flag (✓ in sync with the server, ✗ + running mismatch count if not).
-  // Hidden from players (dev chrome) — EXCEPT on a live desync, which everyone
-  // must be able to see and report.
-  if (DEV_UI || (NET && netDesync)) {
+  // Shown when the player opts in (Settings → FPS), forced on for dev chrome
+  // (DEV_UI) and on a live desync — which everyone must be able to see and report.
+  if (showFps || DEV_UI || (NET && netDesync)) {
     let fpsText = `${Math.round(fpsEma)} FPS`;
     if (NET) {
       const rtt = rttEma === null ? '· · ms' : `${Math.round(rttEma)} ms`;
@@ -13588,7 +13606,7 @@ function drawPings(now: number): void {
         cx.arc(c.x, c.y, rr, 0, TAU);
         cx.fill();
       }
-      cx.shadowBlur = 6 * (1 - k);
+      cx.shadowBlur = fxBlur(6 * (1 - k));
       cx.strokeStyle = rgba(col, (1 - k) * 0.8);
       cx.lineWidth = 3.2 - k * 2.2;
       cx.beginPath();
@@ -13597,7 +13615,7 @@ function drawPings(now: number): void {
     }
     // the pin itself, breathing an owner-coloured glow (the dark stroke keeps contrast)
     cx.shadowColor = rgba(col, 0.85);
-    cx.shadowBlur = 4 + 8 * pulse;
+    cx.shadowBlur = fxBlur(4 + 8 * pulse);
     cx.fillStyle = rgba(col, pulse);
     cx.strokeStyle = 'rgba(4,10,12,.85)';
     cx.lineWidth = 1.4;
@@ -13666,7 +13684,7 @@ function drawTargetMarkers(now: number): void {
     const bx = c.x;
     const by = c.y - rr - 14;
     cx.shadowColor = rgba(col, 0.8);
-    cx.shadowBlur = 3 + 6 * pulse;
+    cx.shadowBlur = fxBlur(3 + 6 * pulse);
     cx.fillStyle = 'rgba(6,18,22,.92)';
     cx.strokeStyle = rgba(col, 0.9);
     cx.lineWidth = 1.4;
@@ -13787,7 +13805,7 @@ function drawCaptureFlashes(now: number): void {
     cx.strokeStyle = rgba(col, 0.85 * fade);
     cx.lineWidth = 3 + 5 * fade;
     cx.shadowColor = col;
-    cx.shadowBlur = 12 * fade;
+    cx.shadowBlur = fxBlur(12 * fade);
     cx.beginPath();
     cx.arc(c.x, c.y, rr, 0, TAU);
     cx.stroke();
@@ -13798,7 +13816,7 @@ function drawCaptureFlashes(now: number): void {
     cx.strokeStyle = rgba(col, 0.9 * fade);
     cx.lineWidth = 1.5 + 2.5 * fade;
     cx.shadowColor = col;
-    cx.shadowBlur = 8 * fade;
+    cx.shadowBlur = fxBlur(8 * fade);
     cx.stroke();
     cx.restore();
   }
