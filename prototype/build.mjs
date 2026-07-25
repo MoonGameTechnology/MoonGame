@@ -187,6 +187,10 @@ body.sheet-open #cmdbar{bottom:calc(34vh + 12px);}
 .ptile .pt-c{font-size:9px;color:var(--dim);letter-spacing:.3px;white-space:nowrap;}
 /* Bytro-карточка: SVG-силуэт в тайле + мини-бар корпуса стека */
 .ptile .pt-ic .uglyph{display:block;}
+/* Силуэт-глиф корабля, встроенный в текстовые/inline-слоты меню (кнопки корпусов,
+   строки состава, шапка досье, «построить здесь») — центрируем по строке. */
+.uglyph{vertical-align:middle;}
+.bicon .uglyph,.cx-ic .uglyph,.cn-hic .uglyph,.ch-ic .uglyph{display:block;}
 .ptile .pt-hp{width:36px;height:3px;background:rgba(255,255,255,.12);border-radius:2px;overflow:hidden;}
 .ptile .pt-hp i{display:block;height:100%;background:#3ad17a;}
 .ptile .pt-hp.low i{background:#ff5a4d;}
@@ -365,6 +369,7 @@ body.sheet-open #cmdbar{bottom:calc(34vh + 12px);}
 .pc-head .pc-tag{font-size:9px;letter-spacing:1.5px;text-transform:uppercase;color:var(--cyan-dim);border:1px solid var(--line);padding:2px 6px;border-radius:2px;}
 .pc-stats{display:flex;flex-direction:column;gap:3px;margin-bottom:10px;}
 .pc-sec{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan-dim);margin:4px 0 6px;}
+.pc-sec .pc-adm{margin-left:8px;padding:1px 5px;border:1px solid #7a5a22;border-radius:2px;color:var(--amber,#e0a84a);letter-spacing:1px;}
 .pc-row{display:flex;justify-content:space-between;gap:10px;font-size:12px;padding:3px 0;border-bottom:1px solid rgba(14,59,64,.4);}
 .pc-row .pc-k{color:var(--dim);}
 .pc-row .pc-v{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums;text-align:right;}

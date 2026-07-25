@@ -85,15 +85,36 @@ globalThis.document = {
   querySelectorAll: () => [],
   createElement: () => mkEl('canvas'),
   body: mkEl('body'),
+  // Document-level listeners (contextmenu, key handling, …) are registered at import
+  // time. The harness drives input by calling handlers directly (see `fire` below),
+  // so these only need to exist — but they DO need to exist, or the bundle throws
+  // before the first frame is ever measured.
+  addEventListener() {},
+  removeEventListener() {},
 };
 // The game clock the render loop reads — advances a fixed 16 ms per call so every
 // run walks the same simulated timeline (measurement uses hrtime, below).
 let t = 0;
-globalThis.performance = { now: () => (t += 16) };
+// Only `now` is faked (so every run walks the same simulated timeline). Everything else
+// delegates to the real `performance` — Node's own fetch internals call
+// `performance.markResourceTiming`, and a bare `{ now }` stub made the process die on the
+// async tail AFTER the report had already printed.
+const realPerformance = globalThis.performance;
+globalThis.performance = new Proxy(realPerformance, {
+  get(target, prop) {
+    if (prop === 'now') return () => (t += 16);
+    const value = Reflect.get(target, prop, target);
+    return typeof value === 'function' ? value.bind(target) : value;
+  },
+});
 globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
 globalThis.matchMedia = () => ({ matches: false });
 // The pan path (clampCam → panelSlack) probes panel visibility via computed style.
 globalThis.getComputedStyle = () => ({ display: 'block' });
+// Ship archetypes are drawn from cached Path2D objects. The canvas context here is a
+// swallow-everything proxy, so the path only has to be constructible — but it does have
+// to exist, since the cache builds one on the very first rendered frame.
+globalThis.Path2D = class Path2D {};
 globalThis.window = {
   innerWidth: 900,
   innerHeight: 600,
@@ -118,6 +139,10 @@ const res = await build({
   format: 'cjs',
   target: 'es2020',
   write: false,
+  // The build profile is a REQUIRED define (see main.ts) — without it the bundle
+  // keeps a bare `__PLAYER_BUILD__` and dies with a ReferenceError on first read.
+  // Profile the full dev client, same as uitest.mjs and dist/void-dominion.html.
+  define: { __PLAYER_BUILD__: 'false' },
 });
 
 const mod = { exports: {} };
