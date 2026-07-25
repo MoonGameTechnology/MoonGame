@@ -224,6 +224,41 @@ if (AUTH && !authCfg.allowedOrigins) {
       'Set ALLOWED_ORIGINS before exposing this beyond a trusted network.\n',
   );
 }
+// MP-1 fail-secure (audit S1, 2026-07-25): when PROD=1, refuse to boot unless the
+// release-posture switches are all on — same contract as packages/server/src/main.ts.
+// Mirrors checkProductionReadiness() from serverConfig.ts (kept inlined here so the
+// throwaway netserver doesn't grow a new import path into packages/server). `PROD`
+// unset = the existing dev harness, untouched.
+const PROD_FLAG = process.env.PROD === '1' || process.env.PROD === 'true';
+if (PROD_FLAG) {
+  const missing: string[] = [];
+  if (!process.env.AUTH_JWT_SECRET) missing.push('AUTH_JWT_SECRET');
+  if (!(process.env.GATE === '1' || process.env.GATE === 'true')) missing.push('GATE=1');
+  const tlsNative = Boolean(process.env.TLS_KEY_FILE && process.env.TLS_CERT_FILE);
+  const tlsProxy = process.env.TRUST_PROXY === '1';
+  if (!tlsNative && !tlsProxy) {
+    missing.push('TLS (TLS_KEY_FILE+TLS_CERT_FILE for native TLS, or TRUST_PROXY=1 behind a TLS-terminating proxy)');
+  }
+  if (!(process.env.SEAT_LOCK === '1' || process.env.SEAT_LOCK === 'true')) missing.push('SEAT_LOCK=1');
+  if (missing.length) {
+    process.stderr.write(
+      `PROD=1 refuses to start: missing ${missing.join(', ')}. ` +
+        'Set every release-posture switch, or unset PROD for the dev harness.\n',
+    );
+    process.exit(1);
+  }
+}
+// Public-bind + no-auth warning (audit S1): even without PROD=1, a public bind with
+// no AUTH_JWT_SECRET is the open `?nick=` playtest path — surface it loudly so an
+// operator doesn't accidentally expose a public unauthenticated server.
+const HOST_BIND = process.env.HOST ?? '127.0.0.1';
+if (!AUTH && HOST_BIND === '0.0.0.0' && !PROD_FLAG) {
+  process.stderr.write(
+    'warning: HOST=0.0.0.0 with no AUTH_JWT_SECRET — public unauthenticated playtest mode. ' +
+      'Anyone who knows a nick can take a seat. Set AUTH_JWT_SECRET (and ideally PROD=1) ' +
+      'before exposing this beyond a trusted network.\n',
+  );
+}
 // The prototype host defaults to a ten-chair FFA. `TEAMS=5v5` keeps all ten chairs and
 // seeds two allied flanks; `TEAMS=2v2` preserves the smaller four-chair playtest. Every
 // chair is claimable by a human, while the server AI stands in after the reconnect grace.

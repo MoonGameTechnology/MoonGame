@@ -172,6 +172,7 @@ describe('SV-1.2 · action payload schemas', () => {
       ['chain.stamp', { fleetId: 'f1', steps: [] }], // driver-only stamp must stay off the wire
       ['market.list', { resource: 'metal', amount: 0, price: 3 }], // nothing to sell
       ['market.list', { resource: 'metal', amount: 5, price: -1 }], // negative price
+      ['market.list', { resource: 'metal', amount: 5, price: 0 }], // SEC-A06-5: zero price = free transfer (wash-trade vector)
       ['market.list', { resource: 'metal', amount: Infinity, price: 3 }], // not finite
       ['market.buy', { orderId: 'market:1', amount: -2 }], // negative amount
       ['market.buy', { orderId: 'market:1' }], // missing amount
