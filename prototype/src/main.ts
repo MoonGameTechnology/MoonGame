@@ -12156,12 +12156,14 @@ function connectToMatch(id: string): void {
       showStage('welcome');
       return;
     }
-    // If we already have a cached session for THIS nick, use it. Otherwise show
-    // the welcome card (the password field lives there); `welcomeSignIn` will
-    // resume the join. This closes the silent-fail path where `?join=proto`
-    // arrives with no stored identity.
+    // Use the cached session JWT if present. Previously this checked that the
+    // session's login matched `srv.nick` (read from `nickInput.value`), but
+    // that input could be stale or empty after a fresh login — the check
+    // silently fell through to the welcome card even with a valid JWT cached.
+    // The token is already scoped to the authenticated account; if it's
+    // invalid the join route returns 401 and we re-prompt for password.
     const cached = sessionRecord(srv.base);
-    if (!cached || cached.login.toLowerCase() !== srv.nick.toLowerCase()) {
+    if (!cached) {
       pendingJoinAfterAuth = id;
       showConnect(false);
       showHub(false);
@@ -12172,7 +12174,7 @@ function connectToMatch(id: string): void {
       return;
     }
     const join = await fetchJoinToken(srv.base, id, cached.token);
-    if (!join) return; // status line already explains (refused / entry closed / full)
+    if (!join) return; // status line already explains (refused / entry closed / full / 401)
     pendingJoinToken = join.token;
     connect();
   })();
@@ -12180,12 +12182,16 @@ function connectToMatch(id: string): void {
 
 // Open a session in its OWN browser tab (deep-link «?join=<id>»): the hub/browser stays in
 // THIS tab while the match runs in a fresh one, which boots straight into it from the shared
-// same-origin localStorage identity (nick / session JWT). Popup blocked → join in this tab so
-// the player is never left stuck. (On the APK / a file:// page window.open may hand off to the
-// system browser; the deployed https origin is the intended path.)
+// same-origin localStorage identity (nick / session JWT).
+//
+// Audit (2026-07-25): `window.open(..., '_blank')` is silently blocked by most browsers
+// for non-direct user-gestures, and the fallback `connectToMatch` then ran with a stale
+// `nickInput.value` that didn't match the cached session login — so the welcome card
+// re-opened instead of joining. Switch to `location.href` (same-tab navigation): the hub
+// is replaced by the game view, no popup, no silent fallback. The hub is one tab-close away
+// (the match itself is durable on the server). This matches the APK path (one window).
 function openSessionTab(id: string): void {
-  const w = window.open(`${location.pathname}?join=${encodeURIComponent(id)}`, '_blank');
-  if (!w) connectToMatch(id);
+  location.href = `${location.pathname}?join=${encodeURIComponent(id)}`;
 }
 
 async function refreshMatches(quiet = false): Promise<void> {
