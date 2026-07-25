@@ -95,6 +95,16 @@ For React Native, keep `shared-core` preview work off the UI thread where possib
 
 ## 11. Action latency and optimistic UI
 
+> Not implemented yet (client — Stage 4); this section records the decision, not shipped
+> behaviour. **Not the same thing** as `architecture.md`'s "Чего НЕ делаем" table entry
+> "Client-prediction + rollback reconciliation" — that entry forbids predicting the
+> *continuous, per-frame* movement of the world (fleets fly real hours; there is no
+> frame-by-frame position to predict). This section is about optimistically applying the
+> *reducer effect of the player's own just-submitted action* for instant UI feedback, then
+> reconciling on ack — a one-shot local replay, not a per-frame prediction loop, and the
+> world clock is explicitly never predicted (guardrail below). See `architecture.md:499`
+> for the cross-reference (2026-07-25 audit, C4).
+
 **Risk:** every player action round-trips to the server before visual feedback. On a mobile
 4G connection (RTT 100–300 ms) moving a fleet or starting construction feels sluggish and
 unresponsive — a hard UX problem for a genre where instant feedback is the norm.

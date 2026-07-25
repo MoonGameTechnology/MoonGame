@@ -99,6 +99,9 @@ describe('market module — list / buy (15% burn) / cancel', () => {
     expect(err(kernel.applyAction(st, act('market.list', 'seller', { resource: 'metal', amount: 999, price: 1 }), ctx))).toBe('E_INSUFFICIENT');
     expect(err(kernel.applyAction(st, act('market.list', 'seller', { resource: 'gold', amount: 1, price: 1 }), ctx))).toBe('E_UNKNOWN_RESOURCE');
     expect(err(kernel.applyAction(st, act('market.list', 'seller', { resource: 'metal', amount: -1, price: 1 }), ctx))).toBe('E_BAD_PAYLOAD');
+    // SEC-A06-5: a literally-free listing (price 0) is rejected by the module itself,
+    // not just the wire schema — this handler doesn't assume the gate ran.
+    expect(err(kernel.applyAction(st, act('market.list', 'seller', { resource: 'metal', amount: 1, price: 0 }), ctx))).toBe('E_BAD_PAYLOAD');
     expect(err(kernel.applyAction(st, act('market.buy', 'buyer', { orderId: 'market:999', amount: 1 }), ctx))).toBe('E_NO_ORDER');
 
     const listed = ok(kernel.applyAction(st, list(), ctx));
