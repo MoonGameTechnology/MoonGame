@@ -10735,7 +10735,18 @@ async function submitRegister(): Promise<void> {
     crPassInput.value = '';
     crPass2Input.value = '';
     statusEl.textContent = '';
-    openHub();
+    // Same resume as welcomeSignIn: a `?join=<id>` deep-link (or a «Войти» press with
+    // no session yet) routes a BRAND-NEW player through the full registration page —
+    // this path used to drop straight into the empty hub, silently abandoning the
+    // match they were trying to join (the seat never got claimed).
+    const pendingId = pendingJoinAfterAuth;
+    pendingJoinAfterAuth = null;
+    if (pendingId) {
+      showStage('browse');
+      connectToMatch(pendingId);
+    } else {
+      openHub();
+    }
   } finally {
     signingIn = false;
   }
