@@ -184,10 +184,17 @@ export function createMultiplayerServer(
   // authMode stays false → the client dials ?nick= instead of ?token= → WS handshake
   // fails. Add a permissive CORS header on ALL HTTP routes (playtest server; the
   // production path is behind a proxy with an explicit Origin allowlist).
-  app.addHook('onRequest', async (_req, reply) => {
+  app.addHook('onRequest', async (req, reply) => {
     void reply.header('access-control-allow-origin', '*');
     void reply.header('access-control-allow-methods', 'GET, POST, OPTIONS');
     void reply.header('access-control-allow-headers', 'authorization, content-type');
+    // Handle CORS preflight (OPTIONS) inline — Fastify 404s unknown methods by
+    // default, and a preflight is an OPTIONS request the browser sends BEFORE the
+    // real fetch (when Authorization header is present). Without a 2xx on OPTIONS,
+    // the browser blocks the actual request. Reply 204 with the CORS headers.
+    if (req.method === 'OPTIONS') {
+      void reply.code(204).send('');
+    }
   });
 
   // Liveness: cheap, unauthenticated, and DELIBERATELY contentless — it must not leak
