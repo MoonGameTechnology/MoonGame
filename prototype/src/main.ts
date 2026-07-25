@@ -11151,7 +11151,8 @@ settingsEl.addEventListener('click', (e) => {
 const bootParams = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
 const bootReset = (bootParams?.get('reset') ?? '').trim();
 const bootJoinId = (bootParams?.get('join') ?? '').trim();
-console.log('[boot] location.search=', location.search, 'bootJoinId=', bootJoinId, 'bootReset=', bootReset);
+const bootSlot = (bootParams?.get('slot') ?? '').trim();
+console.log('[boot] location.search=', location.search, 'bootJoinId=', bootJoinId, 'bootReset=', bootReset, 'bootSlot=', bootSlot);
 if (bootReset) {
   openReset(bootReset);
 } else if (bootJoinId) {
@@ -11170,7 +11171,7 @@ if (bootReset) {
     if (!authMode) {
       console.log('[boot] auth-off — connectToMatch directly');
       showStage('browse');
-      connectToMatch(bootJoinId);
+      connectToMatch(bootJoinId, bootSlot || undefined);
       return;
     }
     // Auth-on: if we have a cached session JWT, go straight to the match.
@@ -11179,7 +11180,7 @@ if (bootReset) {
     if (cached) {
       console.log('[boot] cached session — connectToMatch');
       showStage('browse');
-      connectToMatch(bootJoinId);
+      connectToMatch(bootJoinId, bootSlot || undefined);
       return;
     }
     // No session — show the welcome card so the player can register/login,
@@ -12209,13 +12210,16 @@ async function ensureSession(
 /** Exchange the session for a seat + join token. Клиент запоминает токен для
  *  немедленного коннекта; протухший (15 мин TTL) реконнект просто запрашивает
  *  новый — сессия живёт днями. 401 ⇒ сессия истекла: чистим её и просим пароль. */
-async function fetchJoinToken(
-  base: string,
-  matchId: string,
-  session: string,
-): Promise<{ token: string; playerId: string } | null> {
-  try {
-    const res = await fetch(`${httpBase(base)}/matches/${encodeURIComponent(matchId)}/join`, {
+ async function fetchJoinToken(
+   base: string,
+   matchId: string,
+   session: string,
+   slot?: string,
+ ): Promise<{ token: string; playerId: string } | null> {
+   try {
+    // REL-7: pass ?slot= to request a specific seat (faction/start choice).
+    const slotParam = slot ? `?slot=${encodeURIComponent(slot)}` : '';
+    const res = await fetch(`${httpBase(base)}/matches/${encodeURIComponent(matchId)}/join${slotParam}`, {
       headers: { authorization: `Bearer ${session}` },
     });
     if (res.status === 401) {
@@ -12294,7 +12298,7 @@ function ruleSummary(r: MatchRow['rules']): string {
  *  which isn't shown by default. Fix: stash the id in `pendingJoinAfterAuth`, show
  *  the welcome card so the player can register/login, and `welcomeSignIn` resumes
  *  the join automatically on success. */
-function connectToMatch(id: string): void {
+function connectToMatch(id: string, slot?: string): void {
   currentMatchId = id;
   reconnecting = false;
   reconnectAttempts = 0;
@@ -12335,7 +12339,7 @@ function connectToMatch(id: string): void {
       wPassInput.focus();
       return;
     }
-    const join = await fetchJoinToken(srv.base, id, cached.token);
+    const join = await fetchJoinToken(srv.base, id, cached.token, slot);
     if (!join) {
       // fetchJoinToken returned null — either 401 (session expired, it cleared
       // the cache) or 403/409 (entry closed / full). For 401, show the welcome
@@ -12367,8 +12371,97 @@ function connectToMatch(id: string): void {
 // re-opened instead of joining. Switch to `location.href` (same-tab navigation): the hub
 // is replaced by the game view, no popup, no silent fallback. The hub is one tab-close away
 // (the match itself is durable on the server). This matches the APK path (one window).
+// REL-7: seat/faction picker — before joining, fetch the match's available seats
+// and show a picker. The player chooses a faction/start, then we navigate to
+// ?join=<id>&slot=<slotId>. Previously openSessionTab went straight to ?join=
+// and the server auto-assigned the first free seat (no choice).
+const seatpickEl = $('seatpick') as HTMLElement | null;
+const seatpickListEl = $('seatpick-list') as HTMLElement | null;
+const seatpickGoEl = $('seatpick-go') as HTMLButtonElement | null;
+const seatpickCancelEl = $('seatpick-cancel') as HTMLButtonElement | null;
+let seatpickMatchId: string | null = null;
+let seatpickSelected: string | null = null;
+
+async function openSeatPicker(matchId: string): Promise<void> {
+  const srv = resolveServer();
+  if (!srv) return;
+  seatpickMatchId = matchId;
+  seatpickSelected = null;
+  if (seatpickGoEl) seatpickGoEl.disabled = true;
+  if (seatpickListEl) seatpickListEl.innerHTML = '<p style="color:var(--dim);text-align:center">Загрузка…</p>';
+  if (seatpickEl) seatpickEl.style.display = 'flex';
+  try {
+    const res = await fetch(`${httpBase(srv.base)}/matches/${encodeURIComponent(matchId)}/seats`);
+    if (!res.ok) throw new Error('http ' + res.status);
+    const data = (await res.json()) as { seats: Array<{ playerId: string; name: string; faction: string; start: string | null; taken: boolean }> };
+    if (seatpickListEl) {
+      seatpickListEl.innerHTML = '';
+      const factionColors: Record<string, string> = { blue: '#35d6e6', red: '#ff5a4d', amber: '#ffb43a', violet: '#b366ff' };
+      for (const seat of data.seats) {
+        const row = document.createElement('div');
+        row.className = 'seat-row' + (seat.taken ? ' taken' : '');
+        row.dataset.slotId = seat.playerId;
+        const dot = document.createElement('div');
+        dot.className = 'seat-dot';
+        dot.style.background = factionColors[seat.faction] ?? 'var(--cyan)';
+        const info = document.createElement('div');
+        info.className = 'seat-info';
+        const name = document.createElement('div');
+        name.className = 'seat-name';
+        name.textContent = seat.name;
+        const faction = document.createElement('div');
+        faction.className = 'seat-faction';
+        faction.textContent = t('фракция') + ': ' + seat.faction + (seat.start ? ' · ' + t('старт') + ': ' + seat.start : '');
+        info.appendChild(name);
+        info.appendChild(faction);
+        const status = document.createElement('div');
+        status.className = 'seat-status' + (seat.taken ? '' : ' free');
+        status.textContent = seat.taken ? t('занято') : t('свободно');
+        row.appendChild(dot);
+        row.appendChild(info);
+        row.appendChild(status);
+        if (!seat.taken) {
+          row.addEventListener('click', () => {
+            // Deselect previous
+            for (const r of seatpickListEl.querySelectorAll('.seat-row.selected')) {
+              r.classList.remove('selected');
+            }
+            row.classList.add('selected');
+            seatpickSelected = seat.playerId;
+            if (seatpickGoEl) seatpickGoEl.disabled = false;
+          });
+        }
+        seatpickListEl.appendChild(row);
+      }
+    }
+  } catch {
+    if (seatpickListEl) seatpickListEl.innerHTML = '<p style="color:var(--red)">Не удалось загрузить слоты</p>';
+  }
+}
+
+if (seatpickCancelEl) {
+  seatpickCancelEl.addEventListener('click', () => {
+    if (seatpickEl) seatpickEl.style.display = 'none';
+    seatpickMatchId = null;
+  });
+}
+if (seatpickGoEl) {
+  seatpickGoEl.addEventListener('click', () => {
+    if (!seatpickMatchId || !seatpickSelected) return;
+    const id = seatpickMatchId;
+    const slot = seatpickSelected;
+    if (seatpickEl) seatpickEl.style.display = 'none';
+    seatpickMatchId = null;
+    // Navigate to ?join=<id>&slot=<slotId> — the boot block picks up ?join and
+    // connectToMatch fetches the join token with ?slot= to reserve the chosen seat.
+    location.href = `${location.pathname}?join=${encodeURIComponent(id)}&slot=${encodeURIComponent(slot)}`;
+  });
+}
+
 function openSessionTab(id: string): void {
-  location.href = `${location.pathname}?join=${encodeURIComponent(id)}`;
+  // REL-7: show the seat/faction picker first (if the server supports it),
+  // otherwise fall back to the direct join (no slot).
+  void openSeatPicker(id);
 }
 
 async function refreshMatches(quiet = false): Promise<void> {

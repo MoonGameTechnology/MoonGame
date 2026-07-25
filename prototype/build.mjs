@@ -1507,6 +1507,32 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #setup .sgo:disabled{opacity:.4;cursor:not-allowed;}
 #setup .scancel{width:100%;margin-top:8px;padding:10px;border-radius:8px;border:1px solid var(--line-hi);
   background:transparent;color:var(--dim);font:12px ui-monospace,monospace;letter-spacing:1px;cursor:pointer;}
+/* REL-7: seat/faction picker for multiplayer — reuses #setup styles */
+#seatpick{position:fixed;inset:0;z-index:58;display:none;align-items:center;justify-content:center;
+  background:rgba(2,8,12,.86);backdrop-filter:blur(6px);}
+#seatpick .sbox{width:min(520px,95vw);max-height:92vh;overflow:auto;background:var(--glass);
+  border:1px solid var(--line-hi);border-radius:14px;padding:22px;}
+#seatpick .stitle{display:flex;align-items:center;gap:10px;font-size:18px;letter-spacing:3px;color:var(--cyan);}
+#seatpick .stitle .dia{width:12px;height:12px;transform:rotate(45deg);background:var(--cyan);box-shadow:0 0 10px var(--cyan);border:none;}
+#seatpick .ssub{margin:8px 0 14px;color:var(--dim);font-size:12px;line-height:1.5;}
+#seatpick .sgo{width:100%;padding:13px 10px;border-radius:8px;border:1px solid var(--cyan);
+  background:linear-gradient(180deg,rgba(53,214,230,.22),rgba(53,214,230,.08));color:var(--cyan);
+  font:700 13px ui-monospace,monospace;letter-spacing:2px;cursor:pointer;}
+#seatpick .sgo:disabled{opacity:.4;cursor:not-allowed;}
+#seatpick .scancel{width:100%;margin-top:8px;padding:10px;border-radius:8px;border:1px solid var(--line-hi);
+  background:transparent;color:var(--dim);font:12px ui-monospace,monospace;letter-spacing:1px;cursor:pointer;}
+#seatpick-list{display:flex;flex-direction:column;gap:8px;margin-bottom:16px;}
+.seat-row{display:flex;align-items:center;gap:12px;padding:10px 14px;border:1px solid var(--line-hi);
+  border-radius:8px;background:rgba(2,9,13,.5);cursor:pointer;transition:border-color .15s,background .15s;}
+.seat-row:hover:not(.taken){border-color:var(--cyan);background:rgba(53,214,230,.06);}
+.seat-row.selected{border-color:var(--cyan);background:rgba(53,214,230,.12);}
+.seat-row.taken{opacity:.35;cursor:not-allowed;}
+.seat-dot{width:14px;height:14px;border-radius:50%;flex:0 0 auto;border:2px solid rgba(255,255,255,.2);}
+.seat-info{flex:1 1 auto;}
+.seat-name{font:700 13px ui-monospace,monospace;color:#eafffb;}
+.seat-faction{font:11px ui-monospace,monospace;color:var(--dim);}
+.seat-status{font:10px ui-monospace,monospace;color:var(--red);}
+.seat-status.free{color:var(--grn);}
 /* setup tabs (Старт / Дивизии) + division designer */
 #setup .stabs{display:flex;gap:6px;margin:12px 0 14px;}
 #setup .stabs button{flex:1;padding:9px;border:1px solid var(--line-hi);border-radius:8px;background:transparent;
@@ -2396,6 +2422,20 @@ const page = (js) => `<!doctype html>
     </div>
     <button id="setupgo" class="sgo" disabled data-i18n>ЗАПУСК</button>
     <button id="setupcancel" class="scancel" data-i18n>Назад</button>
+  </div>
+</div>
+<!-- REL-7: multiplayer seat/faction picker — shown before joining a match -->
+<div id="seatpick" style="display:none">
+  <div class="sbox">
+    <div class="stitle"><span class="dia"></span><b data-i18n>Выбор фракции</b></div>
+    <div class="spane">
+      <div class="scol">
+        <p class="ssub" data-i18n>Выберите фракцию и стартовую позицию. Занятые места отмечены серым.</p>
+        <div id="seatpick-list"></div>
+      </div>
+    </div>
+    <button id="seatpick-go" class="sgo" disabled data-i18n>ВЫБРАТЬ</button>
+    <button id="seatpick-cancel" class="scancel" data-i18n>Назад</button>
   </div>
 </div>
 <!-- hero fitting: the module "on the cursor" — follows the pointer (heroes setup tab) -->
