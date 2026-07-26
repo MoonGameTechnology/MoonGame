@@ -1517,8 +1517,11 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
 - **REFP-6** ✅ `[proto]` **`botFavour.ts`** — `FAVOUR_*`, `botFavour`,
   `botEmbargoes` вынесены в `prototype/src/botFavour.ts`. `game.ts` импортирует и
   реэкспортирует. Гейт зелёный.
-- **REFP-7** ⏳ `[proto]` **`squadron.ts`** — squadron fuel/rearm/strike (4087–4206).
-  Тест: `squadron.test.ts`.
+- **REFP-7** ✅ `[proto]` **`squadron.ts`** — `squadronTake`, `SortieState`,
+  `sortieSpec`, `freshSortie`, `canSortie`, `spendSortie`, `tickRearm`,
+  `fleetHasSquadron`, `squadronStrikeRange`, `withinRange`, `squadronReaches`
+  вынесены в `prototype/src/squadron.ts`. `game.ts` импортирует и реэкспортирует.
+  Гейт зелёный.
 - **REFP-8** ⏳ `[proto]` **`chain.ts`** — `ChainStep`, `FleetChain`, `MAX_CHAIN_*`,
   `validateChainSteps` (3987–4086). Тест: `orderchain.test.ts`.
 - **REFP-9** ⏳ `[proto]` **`hunger.ts`** — `HUNGER_MULT`, `hungerModule` (1600–1630).
