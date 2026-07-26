@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1861 зелёных** (54 skip, 173 файла).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1871 зелёных** (54 skip, 174 файла).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -103,7 +103,7 @@ Void Dominion — мобильная/браузерная **real-time** (неп�
 packages/shared-core/src/
 packages/action-layer/src/
   kernel/        kernel.ts (createKernel/applyAction/advanceTo, шина/хуки/расписание), module.ts (контракт)
-  state/         gameState.ts (типы GameState), orbit.ts (isBombarded, bombardedPlanets), visibility.ts (visibleState — туман войны + общая видимость союза), previewBattle.ts (ONB-6 — чистый прогноз боя + hullPool/damageFraction), threat.ts (ST-3.1 — fog-honest скан угроз узлу)
+  state/         gameState.ts (типы GameState), orbit.ts (isBombarded, bombardedPlanets), visibility.ts (visibleState — туман войны + общая видимость союза), previewBattle.ts (ONB-6 — чистый прогноз боя + hullPool/damageFraction), threat.ts (ST-3.1 — fog-honest скан угроз узлу), groundCombat.ts (FND-4 движок — тип-матрица наземного боя, порт прототипа, ПОКА не подключён к живому combat.ts)
   action/        types.ts (Action, Context, MatchConfig.timeScale/victory, ApplyResult/AdvanceResult, Rejection, timeScaleOf)
   data/          schemas.ts (zod-схемы + parseGameData, buildingLevel/buildingMaxLevel)
   rng/           rng.ts (sfc32)
@@ -475,7 +475,15 @@ INSTEAD-of-фокус — opportunity-cost (лидер-«+слот» branchless)
   `previewBattle` считает с тем же капом (паритет закреплён тестом). Линии
   `front/mid/rear/artillery`
   (артиллерия — трейт `artillery`, в ближнем бою бьёт `attack` и получает урон
-  последней; вне боя бьёт **на расстоянии** — см. `runArtillery` ниже). Пул HP стека с переносом, `unit.died`. Интервал раунда =
+  последней; вне боя бьёт **на расстоянии** — см. `runArtillery` ниже). Пул HP стека с переносом, `unit.died`. **Это же — сейчас — и наземная фаза** (десант/гарнизон),
+  плоской моделью, той же, что флот/орбита. `state/groundCombat.ts` (FND-4,
+  game-vision-roadmap.md) — готовый, протестированный тип-матричный движок
+  (`GROUND_ROSTER` militia/heavy_infantry/special_forces/tank, пер-цель atk/def,
+  `COMBAT_WIDTH`=12 — порт прототипа 1:1) ЛЕЖИТ РЯДОМ как самостоятельный чистый
+  модуль (как `previewBattle.ts`), но **ещё не подключён** — наземная фаза здесь
+  резолвится через тот же общий путь, что ниже. Замена флага `battle.phase ===
+  'ground'` на матричный движок — отдельный, более рискованный шаг (детерминизм/
+  replay/RNG golden-тесты), сознательно отделён. Интервал раунда =
   `MS_PER_HOUR / timeScale`; `battle.nextRoundAt` несёт время следующего раунда
   (таймер боя). Урон через хук **`combat.damage`** (args: battleId, phase, location,
   attacker, defender). Исход → `battle.resolved`.
