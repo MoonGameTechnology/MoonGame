@@ -1539,8 +1539,9 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
   `capitalOf`, `regenDivision`, `divisionCargo`, `fleetCargoFree`, `divisionModule`
   (2866–3431). Тест: `division.test.ts`. Крупнейший — кандидат на под-дробление
   `division.ts` + `groundBattle.ts`.
-- **REFP-14** ⏳ `[proto]` **`capital.ts`** — `capitalModule` (3432–3458).
-  Тест: `capital.test.ts`.
+- **REFP-14** ✅ `[proto]` **`capital.ts`** — `capitalsOf`, `capitalOf`,
+  `capitalModule` вынесены в `prototype/src/capital.ts`. `game.ts` импортирует и
+  реэкспортирует. Гейт зелёный.
 - **REFP-15** ⏳ `[proto]` **`standingOrders.ts`** — `standingOrdersModule` (3459–3615).
   Тест: `standingorders.test.ts`.
 - **REFP-16** ⏳ `[proto]` **`forcedMarch.ts`** — `FORCED_MARCH_*`, `forcedMarchModule`
