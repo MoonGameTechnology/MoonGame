@@ -1507,8 +1507,9 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
 - **REFP-3** ✅ `[proto]` **`fleetStacks.ts`** — `loadoutKey`, `takeFromStacks`,
   `mergeStacks` (чистые хелперы над `UnitStack[]`) вынесены в
   `prototype/src/fleetStacks.ts`. `game.ts` импортирует. Гейт зелёный.
-- **REFP-4** ⏳ `[proto]` **`tax.ts`** — `TAX_*`, `isInhabited`, `civicTax`,
-  `inhabitedWorldCount`, `taxModule` (1537–1599). Тест: `tax.test.ts`.
+- **REFP-4** ✅ `[proto]` **`tax.ts`** — `TAX_*`, `isInhabited`, `civicTax`,
+  `inhabitedWorldCount`, `taxModule` вынесены в `prototype/src/tax.ts`.
+  `game.ts` импортирует `taxModule` для `MODULES` и реэкспортирует. Гейт зелёный.
 - **REFP-5** ⏳ `[proto]` **`formations.ts`** — `FORMATION_*`, `FormationTemplate`,
   `OfficerTemplate`, `formationStats` (1998–2170). Тест: `formation.test.ts`.
 - **REFP-6** ⏳ `[proto]` **`botFavour.ts`** — `FAVOUR_*`, `botFavour`, `botEmbargoes`
