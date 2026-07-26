@@ -1525,8 +1525,8 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
 - **REFP-8** ✅ `[proto]` **`chain.ts`** — `fleetIdle`, `ChainStep`, `FleetChain`,
   `MAX_CHAIN_*`, `validateChainSteps` вынесены в `prototype/src/chain.ts`.
   `game.ts` импортирует и реэкспортирует. Гейт зелёный. **Фаза 1 завершена.**
-- **REFP-9** ⏳ `[proto]` **`hunger.ts`** — `HUNGER_MULT`, `hungerModule` (1600–1630).
-  Тест: `hunger.test.ts`.
+- **REFP-9** ✅ `[proto]` **`hunger.ts`** — `HUNGER_MULT`, `hungerModule` вынесены
+  в `prototype/src/hunger.ts`. `game.ts` импортирует и реэкспортирует. Гейт зелёный.
 - **REFP-10** ⏳ `[proto]` **`fleetLaunch.ts`** — `fleetLaunchModule`, fleet-id counter,
   launch/merge/split (1631–1957).
 - **REFP-11** ⏳ `[proto]` **`botDiplomacy.ts`** — `botDiplomacyModule` (2622–2725).

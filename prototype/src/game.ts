@@ -173,24 +173,10 @@ import {
 } from './tax';
 export { TAX_PER_HOUR, TAX_OFFICE_BONUS, TAX_DIMINISH, isInhabited, civicTax, inhabitedWorldCount };
 
-// --- ECON-1: голодная армия ---------------------------------------------------
-// Food in the owner's `arrears` (the economy module's unpaid-bill marker) → their
-// GROUND damage ×HUNGER_MULT. Ships run on credits, not rations — the orbital
-// phase is untouched. Pure read of state the economy already settles spanwise, so
-// determinism/replays are intact; the multiplier is a one-line balance knob.
-export const HUNGER_MULT = 0.75;
-export const hungerModule: GameModule = {
-  id: 'hunger',
-  version: '0.1.0',
-  setup(api) {
-    api.hook<number>('combat.damage', (damage, args, h) => {
-      const a = args as { phase?: string; attacker?: string | null };
-      if (a.phase !== 'ground' || typeof a.attacker !== 'string') return damage;
-      const striker = h.state.players[a.attacker];
-      return striker?.arrears?.includes('food') ? damage * HUNGER_MULT : damage;
-    });
-  },
-};
+// REFP-9: hunger module (HUNGER_MULT + hungerModule) moved to `hunger.ts` — a single
+// combat.damage hook, no other game.ts deps. Imported here for MODULES and re-exported.
+import { HUNGER_MULT, hungerModule } from './hunger';
+export { HUNGER_MULT, hungerModule };
 
 // --- fleet.launch / fleet.merge: form and consolidate mobile fleets ----------
 // The core builds units into a planet's garrison; this small module lets a
