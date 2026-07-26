@@ -1532,8 +1532,9 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
 - **REFP-11** ✅ `[proto]` **`botDiplomacy.ts`** — `botDiplomacyModule` вынесен в
   `prototype/src/botDiplomacy.ts` (зависит от `botFavour` + core diplomacy helpers).
   `game.ts` импортирует для `MODULES`. Гейт зелёный.
-- **REFP-12** ⏳ `[proto]` **`sessionMarket.ts`** — `MARKET_*`, `MarketLot`, `marketLots`,
-  `marketModule` (2726–2865). Тест: `market.test.ts`.
+- **REFP-12** ✅ `[proto]` **`sessionMarket.ts`** — `MARKET_*`, `MarketLot`,
+  `marketLots`, `marketModule` вынесены в `prototype/src/sessionMarket.ts`.
+  `game.ts` импортирует и реэкспортирует. Гейт зелёный.
 - **REFP-13** ⏳ `[proto]` **`division.ts`** — `Division`, `divisionsOf`, `templatesOf`,
   `capitalOf`, `regenDivision`, `divisionCargo`, `fleetCargoFree`, `divisionModule`
   (2866–3431). Тест: `division.test.ts`. Крупнейший — кандидат на под-дробление
