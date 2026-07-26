@@ -1514,8 +1514,9 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
   `OfficerTemplate`, `DEFAULT_TEMPLATES`, `OFFICER_TEMPLATES`, `formationStats`
   вынесены в `prototype/src/formations.ts`. `game.ts` импортирует и реэкспортирует.
   Гейт зелёный.
-- **REFP-6** ⏳ `[proto]` **`botFavour.ts`** — `FAVOUR_*`, `botFavour`, `botEmbargoes`
-  (2165–2195).
+- **REFP-6** ✅ `[proto]` **`botFavour.ts`** — `FAVOUR_*`, `botFavour`,
+  `botEmbargoes` вынесены в `prototype/src/botFavour.ts`. `game.ts` импортирует и
+  реэкспортирует. Гейт зелёный.
 - **REFP-7** ⏳ `[proto]` **`squadron.ts`** — squadron fuel/rearm/strike (4087–4206).
   Тест: `squadron.test.ts`.
 - **REFP-8** ⏳ `[proto]` **`chain.ts`** — `ChainStep`, `FleetChain`, `MAX_CHAIN_*`,
