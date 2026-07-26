@@ -36,7 +36,8 @@ const ALLOW = new Set([
   'data-schemas.md', // запланированный док артиллерийной уязвимости — GDD §11 зовёт его «уточняется при наполнении» · 2026-07 (аудит BR1/BR4)
   'SECURITY.md', // политика раскрытия уязвимостей — подзадача SEC-8 secure-sdlc-roadmap, файла ещё нет · 2026-07
   'playtest-logs/2026-06-26-notes.md', // пример имени файла, который СОЗДАЁТ автор плейтеста по шаблону · 2026-07
-  'scanner-coverage-2026-07-26.md', // security-отчёт из параллельного PR #357 — ссылка из pipeline-architecture-2026-07-26.md · 2026-07
+  'scanner-coverage-2026-07-26.md', // security-отчёт из PR #357 · 2026-07
+  'pipeline-architecture-2026-07-26.md', // security-отчёт из PR #358 · 2026-07
 ]);
 
 /** Словарь зон backlog'а — зеркалит легенду «## Зоны» в docs/backlog.md. */
