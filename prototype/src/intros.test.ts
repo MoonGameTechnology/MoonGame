@@ -57,6 +57,16 @@ describe('resolveIntro — shown once', () => {
     expect(second.seen).toEqual(['market']);
   });
 
+  it('ONB-3 remainder: retreat/artillery follow the same first-contact pattern', () => {
+    const first = resolveIntro([], 'retreat');
+    expect(first.card?.id).toBe('retreat');
+    expect(resolveIntro(first.seen, 'retreat').card).toBeNull(); // shown once
+
+    const second = resolveIntro([], 'artillery');
+    expect(second.card?.id).toBe('artillery');
+    expect(resolveIntro(second.seen, 'artillery').card).toBeNull();
+  });
+
   it('is a no-op for an unknown panel id', () => {
     const r = resolveIntro([], 'nonesuch');
     expect(r.card).toBeNull();

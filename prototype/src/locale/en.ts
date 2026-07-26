@@ -477,6 +477,9 @@ export const en: Record<string, string> = {
   Оборона: 'Defense',
   'Оборона гарнизона': 'Garrison defense',
   Обстрел: 'Barrage',
+  'Обстрел — огонь с дистанции': 'Barrage — firing from range',
+  'Флоты с артиллерией бьют по врагу издалека, ещё до сближения — сосредоточь огонь на одной цели или дай флоту выбирать её самому. Толстая броня артиллерии слабая, её место позади линии, а не на передовой.':
+    'Artillery fleets fire on the enemy from afar, before closing the distance — focus fire on one target, or let the fleet pick one itself. Artillery has thin armor, so keep it behind the line, not on the front.',
   'Объявить AvA (−12 000 ⟡)': 'Declare AvA (−12,000 ⟡)',
   'Описание метки (необязательно)…': 'Marker description (optional)…',
   'Осадная платформа': 'Siege Platform',
@@ -497,6 +500,7 @@ export const en: Record<string, string> = {
   'Отметьте провинцию и отправьте — метка станет кликабельной (↪ камера).':
     'Mark a province and send — the marker becomes clickable (↪ jump the camera).',
   Отношение: 'Stance',
+  'Отступление — не бесплатно': 'Retreat is not free',
   Отправить: 'Send',
   'Отправьте флот к этой системе (или расширьте радар), чтобы обнаружить её.':
     'Send a fleet toward this system (or extend radar) to detect it.',

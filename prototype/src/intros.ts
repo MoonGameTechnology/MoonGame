@@ -75,6 +75,23 @@ export const INTROS: IntroCard[] = [
     title: 'Мир идёт без тебя',
     body: 'Этот флот прибудет через часы реального времени — мир Void Dominion идёт непрерывно, даже когда ты офлайн. Можешь закрыть игру: приказы выполнятся сами, а к возвращению мы пришлём уведомление и покажем сводку «пока тебя не было».',
   },
+  {
+    // ONB-3 remainder (docs/onboarding-roadmap.md): fired on the FIRST `fleet.retreat`
+    // order — teaches the mechanic's real gotcha BEFORE it costs the player a fleet,
+    // instead of leaving it buried in the mid-battle `.hint` (same copy, calmer moment).
+    id: 'retreat',
+    trigger: 'firstFail',
+    title: 'Отступление — не бесплатно',
+    body: 'Отход стоит −40% ТЕКУЩЕГО корпуса и щита (израненный флот теряет 40% остатка — отход не добивает) и даёт рывок скорости для бегства. Десант в высадке отступить не может; с орбиты вне боя корабль уходит свободно.',
+  },
+  {
+    // ONB-3 remainder: fired on the FIRST `fleet.barrage` order — the moment standoff
+    // fire becomes tangible, mirroring asyncDelay's "teach on first real use" pattern.
+    id: 'artillery',
+    trigger: 'firstAvailable',
+    title: 'Обстрел — огонь с дистанции',
+    body: 'Флоты с артиллерией бьют по врагу издалека, ещё до сближения — сосредоточь огонь на одной цели или дай флоту выбирать её самому. Толстая броня артиллерии слабая, её место позади линии, а не на передовой.',
+  },
 ];
 
 /** Fast lookup by id. */
