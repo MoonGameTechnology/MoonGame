@@ -1487,4 +1487,82 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
 
 ---
 
+## Блок REFP · Рефактор `prototype/src/game.ts` — вынос секций в отдельные файлы `[proto]`
+
+> `game.ts` = 5289 строк, 167 экспортов, 34 секции — god-file. Блок дробит его на
+> каталог файлов по зонам (данные/модули/оркестрация/AI), сохраняя public API через
+> re-export из `game.ts` (потребители `main.ts`/`netserver.ts`/тесты не меняются).
+> Финальный кирпич (REFP-28) убирает re-export'ы и переводит импорты прямо.
+> Порядок фаз — от листьев (чистые функции/данные) к корню (сборка/оркестрация).
+> Принцип: 1 кирпич = 1 PR = 1 сессия, `pnpm run check` зелёный, ✅ + `state.md` в том же PR.
+
+- **REFP-1** ✅ `[proto]` **`prototypeData.ts`** — инлайн `parseGameData({...})` каталог
+  контента (технологии/учёные/юниты/модули/фракции/здания/события/секторы/типы планет/
+  герои/способности/пассивки/деревья/фиттинги) вынесен в `prototype/src/prototypeData.ts`.
+  Блок не имел внутренних зависимостей от rest-of-game.ts; `game.ts` импортирует `data`
+  и реэкспортирует. `game.ts`: −1070 строк. Гейт зелёный (1830 тестов).
+- **REFP-2** ⏳ `[proto]` **`map.ts`** — `SectorType`, `SECTOR_TYPES`, `MapNode`,
+  `START_CANDIDATES`, `MAP` (строки 1182–1471).
+- **REFP-3** ⏳ `[proto]` **`fleetStacks.ts`** — loadout signature, `moveStacks`,
+  `foldStacks` (1472–1536). Тест: `stacks.test.ts`.
+- **REFP-4** ⏳ `[proto]` **`tax.ts`** — `TAX_*`, `isInhabited`, `civicTax`,
+  `inhabitedWorldCount`, `taxModule` (1537–1599). Тест: `tax.test.ts`.
+- **REFP-5** ⏳ `[proto]` **`formations.ts`** — `FORMATION_*`, `FormationTemplate`,
+  `OfficerTemplate`, `formationStats` (1998–2170). Тест: `formation.test.ts`.
+- **REFP-6** ⏳ `[proto]` **`botFavour.ts`** — `FAVOUR_*`, `botFavour`, `botEmbargoes`
+  (2165–2195).
+- **REFP-7** ⏳ `[proto]` **`squadron.ts`** — squadron fuel/rearm/strike (4087–4206).
+  Тест: `squadron.test.ts`.
+- **REFP-8** ⏳ `[proto]` **`chain.ts`** — `ChainStep`, `FleetChain`, `MAX_CHAIN_*`,
+  `validateChainSteps` (3987–4086). Тест: `orderchain.test.ts`.
+- **REFP-9** ⏳ `[proto]` **`hunger.ts`** — `HUNGER_MULT`, `hungerModule` (1600–1630).
+  Тест: `hunger.test.ts`.
+- **REFP-10** ⏳ `[proto]` **`fleetLaunch.ts`** — `fleetLaunchModule`, fleet-id counter,
+  launch/merge/split (1631–1957).
+- **REFP-11** ⏳ `[proto]` **`botDiplomacy.ts`** — `botDiplomacyModule` (2622–2725).
+  Тест: `botdiplomacy.test.ts`.
+- **REFP-12** ⏳ `[proto]` **`sessionMarket.ts`** — `MARKET_*`, `MarketLot`, `marketLots`,
+  `marketModule` (2726–2865). Тест: `market.test.ts`.
+- **REFP-13** ⏳ `[proto]` **`division.ts`** — `Division`, `divisionsOf`, `templatesOf`,
+  `capitalOf`, `regenDivision`, `divisionCargo`, `fleetCargoFree`, `divisionModule`
+  (2866–3431). Тест: `division.test.ts`. Крупнейший — кандидат на под-дробление
+  `division.ts` + `groundBattle.ts`.
+- **REFP-14** ⏳ `[proto]` **`capital.ts`** — `capitalModule` (3432–3458).
+  Тест: `capital.test.ts`.
+- **REFP-15** ⏳ `[proto]` **`standingOrders.ts`** — `standingOrdersModule` (3459–3615).
+  Тест: `standingorders.test.ts`.
+- **REFP-16** ⏳ `[proto]` **`forcedMarch.ts`** — `FORCED_MARCH_*`, `forcedMarchModule`
+  (3616–3692). Тест: `forcedmarch.test.ts`.
+- **REFP-17** ⏳ `[proto]` **`instantRepair.ts`** — `INSTANT_REPAIR_*`, `missingHull`,
+  `instantRepairCost`, `instantRepairModule` (3693–3743). Тест: `instantrepair.test.ts`.
+- **REFP-18** ⏳ `[proto]` **`econScrews.ts`** — `REPAIR_HP_PER_METAL`, `dockRepairCost`,
+  `fleetAtOwnDock`, `econScrewsModule` (3744–3790). Тест: `econscrews.test.ts`.
+- **REFP-19** ⏳ `[proto]` **`economy.ts`** — `economySnapshot`, `netIncome`, `hpOfLevel`
+  (2426–2614). Тесты: `econmetrics.test.ts`, `buildingeconomy.test.ts`.
+- **REFP-20** ⏳ `[proto]` **`matchSetup.ts`** — `SeatConfig`, `SetupConfig`,
+  `DEFAULT_SETUP`, `NetworkMatchMode`, `parseNetworkMatchMode`, `networkSeats`, `newGame`
+  (1958–2425). Тест: `networkSeats.test.ts`.
+- **REFP-21** 🔒(REFP-9..18) `[proto]` **`protoKernel.ts`** — `MODULES`, `kernel`,
+  `SCORE_LIMIT`, `ctx`, `advance`, `order`, `StepOut` (3791–3886) — точка сборки, после
+  фазы 2.
+- **REFP-22** ⏳ `[proto]` **`actions.ts`** — action builders (3887–3986, 4503–4614).
+- **REFP-23** ⏳ `[proto]` **`patrol.ts`** — `Patrol`, `patrolTarget`, `scrambleOrder`
+  (4207–4257).
+- **REFP-24** ⏳ `[proto]` **`serverDrivers.ts`** — `serverAutoAssaultActions`,
+  `serverChainActions`, `serverPatrolActions` (4258–4502).
+- **REFP-25** ⏳ `[proto]` **`stewardGuard.ts`** — `stewardGuardOrders` (4623–4994).
+  Тест: `stewardGuard.test.ts`.
+- **REFP-26** ⏳ `[proto]` **`ai.ts`** — `SeatAiKind`, `SeatAiDecision`, `seatAiDecision`,
+  `aiOrders` (4995–5289).
+- **REFP-27** ⏳ `[proto]` **`canTraverse.ts`** — `canTraverse` (4615–4654).
+- **REFP-28** 🔒(REFP-1..27) `[proto]` **Финальная очистка** — убрать re-export'ы из
+  `game.ts`, перевести `main.ts`/`netserver.ts`/тесты на прямые импорты. `game.ts`
+  схлопывается в index-фасад или удаляется.
+
+> **Порядок исполнения** (ценность×простота): фаза 1 (REFP-1..8) → фаза 2 (9..18) →
+> REFP-21 → фаза 3 (19,20,22..27) → REFP-28. Фаза 1 — низкий риск, можно параллельно с
+> другими зонами.
+
+---
+
 > Документ живой: добавляйте и дробите кирпичики обычным PR'ом.

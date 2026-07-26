@@ -113,7 +113,7 @@ packages/action-layer/src/
   index.ts       баррель (экспорт публичного API)
 data/            manifest, resources, units, buildings, factions, events, sectors, planetTypes, technologies (.json)
 docs/            architecture, modulesystem, roadmap, deep-technical-roadmap, multiplayer, engineering-risks, gdd, metagame, state(этот)
-prototype/       src/game.ts, src/main.ts (UI), src/smoke.ts, build.mjs, uitest.mjs, dist/ (артефакт, в .gitignore)
+prototype/       src/game.ts (оркестрация, реэкспорты), src/prototypeData.ts (инлайн-каталог контента — REFP-1), src/main.ts (UI), src/smoke.ts, build.mjs, uitest.mjs, dist/ (артефакт, в .gitignore)
 ```
 
 ## 4. Модель состояния (`GameState`)
