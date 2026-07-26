@@ -24,6 +24,7 @@ import {
   scientistModule,
   sectorModule,
   stationModule,
+  taxModule,
   technologyModule,
   victoryModule,
   visibilityModule,
@@ -98,6 +99,7 @@ export function loadAvaMaps(): MatchMap[] {
 export const DEV_MODULES: GameModule[] = [
   sectorModule,
   planetTypeModule,
+  taxModule, // FND-2: civic tax on inhabited worlds (hooks economy.production, after planetType)
   economyModule,
   movementModule,
   heroModule, // per-player hero: redeploy, temp public lanes, planet annihilation

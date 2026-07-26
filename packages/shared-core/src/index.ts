@@ -303,6 +303,15 @@ export { interceptModule } from './modules/intercept';
 export { captureOnArrivalModule } from './modules/captureOnArrival';
 export { sectorModule } from './modules/sector';
 export { planetTypeModule } from './modules/planetType';
+export {
+  taxModule,
+  civicTax,
+  isInhabited,
+  inhabitedWorldCount,
+  TAX_PER_HOUR,
+  TAX_OFFICE_BONUS,
+  TAX_DIMINISH,
+} from './modules/tax';
 export { constructionModule } from './modules/construction';
 export { arsenalSyncModule } from './modules/arsenalSync';
 export { stationModule } from './modules/station';

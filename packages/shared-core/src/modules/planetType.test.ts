@@ -1,8 +1,12 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import { createKernel } from '../kernel/kernel';
 import { economyModule } from './economy';
 import { combatModule } from './combat';
 import { planetTypeModule } from './planetType';
+import { loadGameData } from '../data/loadGameData';
 import {
   createInitialState,
   type Battle,
@@ -149,5 +153,53 @@ describe('planet-type module — ground defense', () => {
     const kernel = createKernel([combatModule, planetTypeModule]);
     const volcanic = okAdvance(kernel.advanceTo(groundBattle('volcanic'), ctx(HOUR)));
     expect(dmgToDefender(volcanic)).toBeCloseTo(20 / 0.95); // ÷ (1 − 0.05)
+  });
+});
+
+describe('planet-type module — ECON-7 passive base output (FND-1, real shipped data)', () => {
+  // FND-1 (game-vision-roadmap.md): every canonical planetType now carries a
+  // baseOutput ported from the prototype's tuned ECON-7 constants — the
+  // hook already read `def.baseOutput` (this file, above) but the shipped
+  // bundle had none, so a building-free world had zero passive income. This
+  // is the acceptance test the brick names: load the REAL data/*.json (not a
+  // synthetic fixture), verify a terran world with no buildings still yields
+  // credits, food and energy every span.
+  const dataDir = path.resolve(
+    path.dirname(fileURLToPath(import.meta.url)),
+    '../../../../data',
+  );
+  const readJson = (name: string): unknown =>
+    JSON.parse(readFileSync(path.join(dataDir, name), 'utf8'));
+  const shipped: GameData = loadGameData(readJson);
+  const shippedCtx = (now: number): Context => ({ now, data: shipped });
+
+  function bareWorld(planetType: string): GameState {
+    const s = createInitialState({ seed: 'fnd1', version: { data: '0.1.0', manifest: '1' } });
+    const a: Planet = {
+      id: 'A',
+      owner: 'p1',
+      position: { x: 0, y: 0 },
+      planetType,
+      resources: {},
+      buildings: [], // no buildings — the ONLY income is the type's passive baseOutput
+      garrison: [],
+      traits: [],
+    };
+    return { ...s, players: { p1: player('p1') }, planets: { A: a } };
+  }
+
+  it('a terran world with no buildings still yields >0 credits, food and energy per span', () => {
+    const kernel = createKernel([economyModule, planetTypeModule]);
+    const r = okAdvance(kernel.advanceTo(bareWorld('terran'), shippedCtx(HOUR)));
+    const res = r.state.players.p1?.resources ?? {};
+    expect(res.credits ?? 0).toBeGreaterThan(0);
+    expect(res.food ?? 0).toBeGreaterThan(0);
+    expect(res.energy ?? 0).toBeGreaterThan(0);
+  });
+
+  it('every shipped planetType carries a non-empty baseOutput (no silently-dead type)', () => {
+    for (const [id, def] of Object.entries(shipped.planetTypes)) {
+      expect(Object.keys(def.baseOutput).length, `${id} has no baseOutput`).toBeGreaterThan(0);
+    }
   });
 });
