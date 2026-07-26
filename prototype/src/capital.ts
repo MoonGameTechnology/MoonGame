@@ -8,7 +8,7 @@ import type { GameModule, GameState } from '../../packages/shared-core/src/index
 import { isInhabited } from './tax';
 
 /** Minimal view of the prototype's state extension for the capital map. */
-interface CapitalState {
+interface CapitalState extends GameState {
   capital?: Record<string, string>;
 }
 

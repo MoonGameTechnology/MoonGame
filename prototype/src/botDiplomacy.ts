@@ -28,7 +28,7 @@ import {
 } from './botFavour';
 
 /** Minimal view of the prototype's state extension for the approval meter. */
-interface ApprovalState {
+interface ApprovalState extends GameState {
   approval?: Record<string, Record<string, number>>;
 }
 

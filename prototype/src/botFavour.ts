@@ -5,9 +5,10 @@
  * re-exports the constants and functions for `main.ts` / `botdiplomacy.test.ts`.
  */
 
-/** Minimal view of the prototype's state extension for the approval meter. The full
- *  `DivState` lives with the division module; botFavour only reads `approval`. */
-interface ApprovalState {
+import type { GameState } from '../../packages/shared-core/src/index';
+
+/** Minimal view of the prototype's state extension for the approval meter. */
+interface ApprovalState extends GameState {
   approval?: Record<string, Record<string, number>>;
 }
 
@@ -25,11 +26,11 @@ export const FAVOUR_WAR_DECAY_PER_DAY = 5; // sustained war keeps eroding favour
 export const FAVOUR_HEAL_PER_DAY = 6; // peace slowly mends it back toward FAVOUR_BASE
 
 /** A bot's favour toward `player` (FAVOUR_BASE if untracked / not a bot). */
-export function botFavour(state: { approval?: Record<string, Record<string, number>> }, bot: string, player: string): number {
+export function botFavour(state: GameState, bot: string, player: string): number {
   return (state as ApprovalState).approval?.[bot]?.[player] ?? FAVOUR_BASE;
 }
 /** Does `bot` embargo `player` on the market (favour below the embargo line)? */
-export function botEmbargoes(state: { approval?: Record<string, Record<string, number>> }, bot: string, player: string): boolean {
+export function botEmbargoes(state: GameState, bot: string, player: string): boolean {
   return (
     (state as ApprovalState).approval?.[bot] !== undefined &&
     botFavour(state, bot, player) < FAVOUR_EMBARGO

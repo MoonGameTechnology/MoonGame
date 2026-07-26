@@ -9,7 +9,7 @@ import { canAfford, payCost } from '../../packages/shared-core/src/util/treasury
 import { botEmbargoes } from './botFavour';
 
 /** Minimal view of the prototype's state extension for the session market. */
-interface MarketState {
+interface MarketState extends GameState {
   sessionMarket?: MarketLot[];
   sessionMarketSeq?: number;
 }
