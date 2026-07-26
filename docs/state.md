@@ -1145,16 +1145,19 @@ botDiplomacy, market, division, capital, standingOrders, effects])` (27 моду
   сводок, ловит события матча, закрывается. _Пуш-уведомления и серверный дайджест-хук — за
   зависимостью (PWA push); `buildRecap` уже server-ready для этого шва._
 - **Just-in-time интро механик (ONB-3)** — при **первом** контакте с продвинутой механикой —
-  разовая интро-карточка, потом никогда: чистый `src/intros.ts` (`INTROS` — 10 карточек
+  разовая интро-карточка, потом никогда: чистый `src/intros.ts` (`INTROS` — 11 карточек
   `{id,title,body,trigger}`: 5 панельных из готовой копии технологии/рынок/Хранитель/верфь/
-  дипломатия + `corp`/`ava` (ONB-8) + `asyncDelay`/`retreat`/`artillery` — три `firstAvailable`/
-  `firstFail`-триггера на РЕАЛЬНОМ игровом действии, не открытии панели: первый `fleet.move`
-  (мир идёт офлайн), первый `fleet.retreat` (копия — существующий боевой `.hint` про −40%
-  корпуса/щита, вынесена из мид-боя в спокойный момент), первый `fleet.barrage` (обстрел);
-  fail-secure `parseSeenIntros`, идемпотентные `markIntroSeen`/`hasSeenIntro`; `resolveIntro(seen,
-  id,{veteran})→{card,seen}` — показывает ровно раз, ветерану suppress-но-помечено) — 11 тестов.
-  Хранится per-nick `vd.seenIntros.<ник>`. main.ts: `maybeIntro(id)` в хуках рельс-панелей
-  (`rail-tech`/`-steward`/`-market`/`-constructor` + `openDiplo`) и в `playerOrder` на успешном
+  дипломатия + `corp`/`ava` (ONB-8) + `hero` (вкладка «Герои» внутри Верфи — по запросу
+  владельца, героев/навыки push-обучение раньше не касалось совсем) + `asyncDelay`/
+  `retreat`/`artillery` — три `firstAvailable`/`firstFail`-триггера на РЕАЛЬНОМ игровом
+  действии, не открытии панели: первый `fleet.move` (мир идёт офлайн), первый
+  `fleet.retreat` (копия — существующий боевой `.hint` про −40% корпуса/щита, вынесена из
+  мид-боя в спокойный момент), первый `fleet.barrage` (обстрел); fail-secure
+  `parseSeenIntros`, идемпотентные `markIntroSeen`/`hasSeenIntro`; `resolveIntro(seen,
+  id,{veteran})→{card,seen}` — показывает ровно раз, ветерану suppress-но-помечено) — 10
+  тестов. Хранится per-nick `vd.seenIntros.<ник>`. main.ts: `maybeIntro(id)` в хуках
+  рельс-панелей (`rail-tech`/`-steward`/`-market`/`-constructor` + `openDiplo`), в
+  обработчике вкладок конструктора (`conTab === 'heroes'`) и в `playerOrder` на успешном
   `fleet.move`/`fleet.retreat`/`fleet.barrage` (не во время гайд-тура — тур сам владеет экраном),
   оверлей `#intro` (z-58 — поверх панели, ниже настроек 59), «Понятно» закрывает; ветеран =
   завершил матч (`meta.xp>0`)

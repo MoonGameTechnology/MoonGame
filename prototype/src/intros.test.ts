@@ -65,6 +65,10 @@ describe('resolveIntro — shown once', () => {
     const second = resolveIntro([], 'artillery');
     expect(second.card?.id).toBe('artillery');
     expect(resolveIntro(second.seen, 'artillery').card).toBeNull();
+
+    const third = resolveIntro([], 'hero');
+    expect(third.card?.id).toBe('hero');
+    expect(resolveIntro(third.seen, 'hero').card).toBeNull();
   });
 
   it('is a no-op for an unknown panel id', () => {
