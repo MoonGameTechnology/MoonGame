@@ -145,9 +145,16 @@ brand-new / returning; хуки воронки (докуда дошёл), что
 > (реальный приказ через `playerOrder`→`activeTour.notifyAction`) / `state`-предикату
 > (пуллится на rAF-`refresh`, который же re-query'ит селектор → highlight переживает
 > перерисовку панели). Отсутствующий target → optional-скип или безопасный стоп.
-> `tap`-шаги ловят клики, `action`/`state` — click-through к живому HUD. Локаль RU/EN.
+> `tap`-шаги ловят клики, `action`/`state` — click-through к живому HUD. **Баг найден
+> живьём (реальный игрок + независимо headless-тач-репро) и исправлен:** click-through
+> был неполным — `#spotlight` сам обычный `position:fixed;inset:0`-div (дефолт
+> `pointer-events:auto`), и хотя `.sl-dim`-панели уходили в `pointer-events:none` под
+> `.sl-passthrough`, корень продолжал глотать тап в зазоре между ними — на любом
+> action/state-шаге тур не пропускал ничего к реальному HUD. Фикс: `#spotlight.sl-
+> passthrough{pointer-events:none}` тоже на корне (`build.mjs`; пузырь остаётся
+> кликабельным явным `pointer-events:auto` на потомке). Локаль RU/EN.
 > Запуск — шов `window.__vdTour` (авто-предложение/«Ещё → Обучение» — за ONB-0/ONB-2).
-> Тесты: `spotlight.test.ts` (20). DoD закрыт.
+> Тесты: `spotlight.test.ts` (22, +2 CSS-регрессии на этот баг). DoD закрыт.
 
 **Цель.** Переиспользуемый примитив: затемняющий оверлей + подсветка целевого элемента +
 пузырь-подсказка + «Далее/Понятно» + **последовательность шагов из данных**. Продвижение

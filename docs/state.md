@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1830 зелёных** (54 skip, 171 файл).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1832 зелёных** (54 skip, 171 файл).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -1215,10 +1215,18 @@ botDiplomacy, market, division, capital, standingOrders, effects])` (27 моду
   на `refresh`). Устойчив к перерисовке панели (re-query по селектору каждый кадр);
   отсутствующий target → optional-скип или безопасный стоп (не крашится). z-50: поверх
   HUD, ниже критичных модалок; `tap`-шаги ловят клики (только «Далее» ведёт вперёд),
-  `action`/`state`-шаги — click-through к живому HUD. Локаль RU/EN. Запуск — шов
+  `action`/`state`-шаги — click-through к живому HUD. **Баг найден живьём (реальный
+  игрок + независимо headless-тач-репро) и исправлен:** click-through был неполным —
+  `#spotlight{position:fixed;inset:0}` сам обычный div (дефолт `pointer-events:auto`), и
+  хотя все 4 `.sl-dim`-панели уходили в `pointer-events:none` под `.sl-passthrough`,
+  корень продолжал глотать тап в зазоре между панелями (ровно там, где игрок должен
+  тапнуть HUD) — на любом action/state-шаге («построй Шахту» и далее) тур не пропускал
+  ничего. Исправлено добавлением `#spotlight.sl-passthrough{pointer-events:none}`
+  (`build.mjs`; пузырь остаётся кликабельным — явный `pointer-events:auto` на потомке
+  перебивает `:none` предка). Локаль RU/EN. Запуск — шов
   `window.__vdTour` (авто-предложение и «Ещё → Обучение» — за ONB-0/ONB-2, они строятся
-  на этом движке). Тесты: `spotlight.test.ts` (19 — tap/action/state, скип, optional-скип
-  vs safe-stop, счётчик, re-query-устойчивость, геометрия).
+  на этом движке). Тесты: `spotlight.test.ts` (22 — tap/action/state, скип, optional-скип
+  vs safe-stop, счётчик, re-query-устойчивость, геометрия, + 2 CSS-регрессии на сам баг).
 - Валидаторы: `src/smoke.ts` (Node-сценарий ядра) и `uitest.mjs` (headless-DOM
   прогон UI-бандла).
 - **UI-прототип экрана корпорации (mock)** — межсессионный альянс из `metagame.md`:
