@@ -1504,8 +1504,9 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
 - **REFP-2** ✅ `[proto]` **`map.ts`** — `SectorType`, `SECTOR_TYPES`, `MapNode`,
   `START_CANDIDATES`, `MAP` (сектор-типы + генерация 11×11 карты) вынесены в
   `prototype/src/map.ts`. `game.ts` импортирует и реэкспортирует. Гейт зелёный.
-- **REFP-3** ⏳ `[proto]` **`fleetStacks.ts`** — loadout signature, `moveStacks`,
-  `foldStacks` (1472–1536). Тест: `stacks.test.ts`.
+- **REFP-3** ✅ `[proto]` **`fleetStacks.ts`** — `loadoutKey`, `takeFromStacks`,
+  `mergeStacks` (чистые хелперы над `UnitStack[]`) вынесены в
+  `prototype/src/fleetStacks.ts`. `game.ts` импортирует. Гейт зелёный.
 - **REFP-4** ⏳ `[proto]` **`tax.ts`** — `TAX_*`, `isInhabited`, `civicTax`,
   `inhabitedWorldCount`, `taxModule` (1537–1599). Тест: `tax.test.ts`.
 - **REFP-5** ⏳ `[proto]` **`formations.ts`** — `FORMATION_*`, `FormationTemplate`,
