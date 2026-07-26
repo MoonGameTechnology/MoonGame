@@ -72,7 +72,7 @@
     "description": "The last organized remnant of humanity, holding the line with disciplined fleets and hardened doctrine.",
     "traits": ["disciplined"],
     "abilities": [],
-    "uniqueUnits": ["siege_lance"],
+    "uniqueUnits": [],
     "startingLoadout": {
       "resources": { "credits": 300, "metal": 300 },
       "fleet": [

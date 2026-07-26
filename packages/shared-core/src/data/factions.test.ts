@@ -87,11 +87,23 @@ describe('faction data (B1 / CR-1.1)', () => {
     expect(stranded).toEqual([]);
   });
 
-  it('the factions are genuinely distinct (own passive + own unique unit)', () => {
+  it('the factions are genuinely distinct — by passive, not by roster (FND-5, anchor 6)', () => {
+    // game-vision-roadmap.md anchor 6: factions are symmetric (same units, same
+    // gameplay) — distinctness is cosmetics + a small flat passive, never a
+    // unique unit/building. All six ship an EMPTY uniqueUnits (see the schema
+    // coverage test above); this checks the one axis that's actually allowed
+    // to differ.
     const v = FactionDefSchema.parse(factions.vanguard);
     const s = FactionDefSchema.parse(factions.swarm);
     expect(v.passives.combatDamageBonus).toBeGreaterThan(0);
     expect(s.passives.productionBonus).toBeGreaterThan(0);
-    expect(new Set([v.uniqueUnits[0], s.uniqueUnits[0]]).size).toBe(2);
+    expect(v.uniqueUnits).toEqual([]);
+    expect(s.uniqueUnits).toEqual([]);
+  });
+
+  it('no faction has a unique unit (FND-5: symmetric roster, anchor 6)', () => {
+    for (const id of ids) {
+      expect(FactionDefSchema.parse(factions[id]).uniqueUnits, id).toEqual([]);
+    }
   });
 });
