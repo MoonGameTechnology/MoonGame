@@ -1501,8 +1501,9 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
   герои/способности/пассивки/деревья/фиттинги) вынесен в `prototype/src/prototypeData.ts`.
   Блок не имел внутренних зависимостей от rest-of-game.ts; `game.ts` импортирует `data`
   и реэкспортирует. `game.ts`: −1070 строк. Гейт зелёный (1830 тестов).
-- **REFP-2** ⏳ `[proto]` **`map.ts`** — `SectorType`, `SECTOR_TYPES`, `MapNode`,
-  `START_CANDIDATES`, `MAP` (строки 1182–1471).
+- **REFP-2** ✅ `[proto]` **`map.ts`** — `SectorType`, `SECTOR_TYPES`, `MapNode`,
+  `START_CANDIDATES`, `MAP` (сектор-типы + генерация 11×11 карты) вынесены в
+  `prototype/src/map.ts`. `game.ts` импортирует и реэкспортирует. Гейт зелёный.
 - **REFP-3** ⏳ `[proto]` **`fleetStacks.ts`** — loadout signature, `moveStacks`,
   `foldStacks` (1472–1536). Тест: `stacks.test.ts`.
 - **REFP-4** ⏳ `[proto]` **`tax.ts`** — `TAX_*`, `isInhabited`, `civicTax`,
