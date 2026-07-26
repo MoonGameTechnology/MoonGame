@@ -1510,8 +1510,10 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
 - **REFP-4** ✅ `[proto]` **`tax.ts`** — `TAX_*`, `isInhabited`, `civicTax`,
   `inhabitedWorldCount`, `taxModule` вынесены в `prototype/src/tax.ts`.
   `game.ts` импортирует `taxModule` для `MODULES` и реэкспортирует. Гейт зелёный.
-- **REFP-5** ⏳ `[proto]` **`formations.ts`** — `FORMATION_*`, `FormationTemplate`,
-  `OfficerTemplate`, `formationStats` (1998–2170). Тест: `formation.test.ts`.
+- **REFP-5** ✅ `[proto]` **`formations.ts`** — `FORMATION_*`, `FormationTemplate`,
+  `OfficerTemplate`, `DEFAULT_TEMPLATES`, `OFFICER_TEMPLATES`, `formationStats`
+  вынесены в `prototype/src/formations.ts`. `game.ts` импортирует и реэкспортирует.
+  Гейт зелёный.
 - **REFP-6** ⏳ `[proto]` **`botFavour.ts`** — `FAVOUR_*`, `botFavour`, `botEmbargoes`
   (2165–2195).
 - **REFP-7** ⏳ `[proto]` **`squadron.ts`** — squadron fuel/rearm/strike (4087–4206).
