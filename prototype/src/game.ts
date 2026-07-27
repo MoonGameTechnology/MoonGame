@@ -1296,342 +1296,39 @@ export const divisionModule: GameModule = {
 import { capitalsOf, capitalOf, capitalModule } from './capital';
 export { capitalOf };
 
-// --- CC-server: standing orders (CC-2 auto-storm / CC-4 дежурный вылет) -------------
-// Promoted from client-only Set/Map to AUTHORITATIVE state so the server drives them —
-// they run in NET and while the owner is offline. The module only STORES the standing
-// order; the host driver (netserver.runServerStanding) reads the pure decision cores
-// below and issues the orders through the same authoritative room. Single-player keeps
-// its local frame-loop drivers.
-export const standingOrdersModule: GameModule = {
-  id: 'standing-orders',
-  version: '0.1.0',
-  setup(api) {
-    const ownedFleet = (h: HandlerContext, playerId: string, fleetId: unknown): Fleet | string => {
-      if (typeof fleetId !== 'string') return 'E_BAD_PAYLOAD';
-      const f = h.state.fleets[fleetId];
-      if (!f) return 'E_NO_FLEET';
-      if (f.owner !== playerId) return 'E_FORBIDDEN';
-      return f;
-    };
-    api.onAction('order.auto', (action, h) => {
-      // CC-2: toggle the auto-storm stance on an owned fleet. Pure flag — the driver
-      // decides WHEN it fires (parked over a capturable enemy world, orbit clear).
-      const p = action.payload as { fleetId?: unknown; on?: unknown };
-      const f = ownedFleet(h, action.playerId, p?.fleetId);
-      if (typeof f === 'string') return h.reject(f);
-      if (typeof p.on !== 'boolean') return h.reject('E_BAD_PAYLOAD');
-      const st = h.state as DivState;
-      if (p.on) (st.autoAssault ??= {})[f.id] = true;
-      else if (st.autoAssault) {
-        delete st.autoAssault[f.id];
-        if (Object.keys(st.autoAssault).length === 0) delete st.autoAssault;
-      }
-    });
-    api.onAction('order.scramble', (action, h) => {
-      // CC-4: stand (or stand down) a reactive patrol on an owned squadron fleet. The
-      // SERVER computes the patrol — center from the fleet's node, radius from its wing,
-      // a fresh sortie budget — nothing about it is client-supplied.
-      const p = action.payload as { fleetId?: unknown; on?: unknown };
-      const f = ownedFleet(h, action.playerId, p?.fleetId);
-      if (typeof f === 'string') return h.reject(f);
-      if (typeof p.on !== 'boolean') return h.reject('E_BAD_PAYLOAD');
-      const st = h.state as DivState;
-      if (!p.on) {
-        if (st.patrols?.[f.id]) {
-          // The wing's fuel/rearm survive the toggle (BF-26): stash the sortie so
-          // OFF→ON resumes where it left off instead of handing back a full tank.
-          (st.wingSorties ??= {})[f.id] = st.patrols[f.id]!.sortie;
-          delete st.patrols[f.id];
-          if (Object.keys(st.patrols).length === 0) delete st.patrols;
-        }
-        return;
-      }
-      if (!fleetHasSquadron(f)) return h.reject('E_NO_SHIPS');
-      const pos = f.location !== null ? h.state.planets[f.location]?.position : undefined;
-      if (!pos || !fleetIdle(f)) return h.reject('E_CONDITIONS_UNMET'); // patrols stand from a parked node
-      const spec = sortieSpec(f);
-      const stashed = st.wingSorties?.[f.id];
-      (st.patrols ??= {})[f.id] = {
-        center: { x: pos.x, y: pos.y },
-        radius: squadronStrikeRange(f),
-        // Resume the stashed sortie (clamped to the CURRENT wing's spec — the
-        // composition may have changed); only a never-flown wing starts fresh.
-        sortie: stashed
-          ? {
-              fuel: Math.min(stashed.fuel, spec.maxFuel),
-              rearming: Math.min(stashed.rearming, spec.rearmRounds),
-            }
-          : freshSortie(spec.maxFuel),
-        rearmAt: h.ctx.now + HOUR, // rearm cadence: one round per game-hour from now
-      };
-      if (st.wingSorties) {
-        delete st.wingSorties[f.id];
-        if (Object.keys(st.wingSorties).length === 0) delete st.wingSorties;
-      }
-    });
-    api.onAction('patrol.stamp', (action, h) => {
-      // The DRIVER's runtime stamp (burned fuel / ticked rearm / next cadence mark) —
-      // same trust shape as order.hold. Bounds-checked against the wing's own spec so
-      // a forged stamp can't mint fuel or park a patrol in an impossible state.
-      const p = action.payload as { fleetId?: unknown; sortie?: unknown; rearmAt?: unknown };
-      const f = ownedFleet(h, action.playerId, p?.fleetId);
-      if (typeof f === 'string') return h.reject(f);
-      const patrol = (h.state as DivState).patrols?.[f.id];
-      if (!patrol) return h.reject('E_NO_TARGET');
-      const s = p.sortie as { fuel?: unknown; rearming?: unknown } | undefined;
-      const spec = sortieSpec(f);
-      if (
-        typeof s?.fuel !== 'number' ||
-        !Number.isInteger(s.fuel) ||
-        s.fuel < 0 ||
-        s.fuel > spec.maxFuel ||
-        typeof s.rearming !== 'number' ||
-        !Number.isInteger(s.rearming) ||
-        s.rearming < 0 ||
-        s.rearming > spec.rearmRounds
-      ) {
-        return h.reject('E_BAD_PAYLOAD');
-      }
-      if (
-        p.rearmAt !== undefined &&
-        (typeof p.rearmAt !== 'number' || !Number.isFinite(p.rearmAt) || p.rearmAt < 0)
-      ) {
-        return h.reject('E_BAD_PAYLOAD');
-      }
-      patrol.sortie = { fuel: s.fuel, rearming: s.rearming };
-      if (p.rearmAt !== undefined) patrol.rearmAt = p.rearmAt;
-    });
-    api.onAction('order.chain', (action, h) => {
-      // CC-1: replace the fleet's WHOLE order chain atomically ([] = cancel). The
-      // client only ever sets the plan; advancing it is the driver's job (chain.stamp).
-      const p = action.payload as { fleetId?: unknown; steps?: unknown };
-      const f = ownedFleet(h, action.playerId, p?.fleetId);
-      if (typeof f === 'string') return h.reject(f);
-      const steps = validateChainSteps(p?.steps, h.state);
-      if (steps === null) return h.reject('E_BAD_PAYLOAD');
-      const st = h.state as DivState;
-      if (steps.length === 0) {
-        if (st.orders) {
-          delete st.orders[f.id];
-          if (Object.keys(st.orders).length === 0) delete st.orders;
-        }
-        return;
-      }
-      (st.orders ??= {})[f.id] = { steps }; // a fresh plan drops any armed wait
-    });
-    api.onAction('chain.stamp', (action, h) => {
-      // The DRIVER's runtime stamp (consumed head / armed wait deadline) — same trust
-      // shape as patrol.stamp: bounds-checked, so a forged stamp can't plant garbage.
-      const p = action.payload as { fleetId?: unknown; steps?: unknown; waitUntil?: unknown };
-      const f = ownedFleet(h, action.playerId, p?.fleetId);
-      if (typeof f === 'string') return h.reject(f);
-      const st = h.state as DivState;
-      if (!st.orders?.[f.id]) return h.reject('E_NO_TARGET'); // nothing to advance
-      const steps = validateChainSteps(p?.steps, h.state);
-      if (steps === null) return h.reject('E_BAD_PAYLOAD');
-      const w = p?.waitUntil;
-      if (w !== undefined && (typeof w !== 'number' || !Number.isFinite(w) || w < 0)) {
-        return h.reject('E_BAD_PAYLOAD');
-      }
-      if (steps.length === 0) {
-        delete st.orders[f.id];
-        if (Object.keys(st.orders).length === 0) delete st.orders;
-        return;
-      }
-      st.orders[f.id] = w === undefined ? { steps } : { steps, waitUntil: w };
-    });
-    // Housekeeping: standing orders of dead fleets must not live in state (and every
-    // snapshot) forever. Same deterministic sweep as the order chains'.
-    api.on('time.advanced', (_ev, h) => {
-      const st = h.state as DivState;
-      for (const key of ['autoAssault', 'patrols', 'wingSorties', 'orders'] as const) {
-        const map = st[key];
-        if (!map) continue;
-        for (const fid of Object.keys(map)) if (!h.state.fleets[fid]) delete map[fid];
-        if (Object.keys(map).length === 0) delete st[key];
-      }
-    });
-  },
-};
+// REFP-15: standing orders module (CC-2/CC-4 + chain/patrol stamps) moved to
+// `standingOrders.ts`. Imported here for MODULES.
+import { standingOrdersModule } from './standingOrders';
+export { standingOrdersModule };
 
-// --- BOOST-1: форс-марш («Ускорить») -----------------------------------------
-// +50% to fleet speed at the cost of 5% max-HP wear per hour IN TRANSIT — the
-// Bytro-style forced march. The wear cripples but never kills: the pool floors
-// one hull above loss, so a march can't erase a fleet by itself. One march only:
-// the flag drops on arrival (re-arm for the next leg deliberately).
-export const FORCED_MARCH_MULT = 1.5;
-export const FORCED_MARCH_WEAR = 0.05; // share of max HP per game-hour
-export const forcedMarchModule: GameModule = {
-  id: 'forced-march',
-  version: '0.1.0',
-  setup(api) {
-    api.onAction('fleet.forcemarch', (action, h) => {
-      const p = action.payload as { fleetId?: unknown; on?: unknown };
-      if (typeof p?.fleetId !== 'string' || typeof p?.on !== 'boolean') {
-        return h.reject('E_BAD_PAYLOAD');
-      }
-      const f = h.state.fleets[p.fleetId];
-      // Absent OR not-yours → one opaque code (A06 — no fleet-existence probing).
-      if (!f || f.owner !== action.playerId) return h.reject('E_NO_FLEET');
-      const st = h.state as DivState;
-      if (p.on) {
-        (st.forcedMarch ??= {})[f.id] = true;
-      } else if (st.forcedMarch) {
-        delete st.forcedMarch[f.id];
-        if (Object.keys(st.forcedMarch).length === 0) delete st.forcedMarch;
-      }
-    });
-    // The speed pipeline contribution — same contract as retreat-haste / faction
-    // passives: multiply and pass on (order commutes, invariant #6 intact).
-    api.hook<number>('fleet.speed', (speed, args, h) => {
-      const fleetId = (args as { fleetId?: string }).fleetId;
-      return fleetId && (h.state as DivState).forcedMarch?.[fleetId]
-        ? speed * FORCED_MARCH_MULT
-        : speed;
-    });
-    // Wear accrues over continuous time while the fleet is actually marching.
-    api.on('time.advanced', (event, h) => {
-      const { from, to } = event.payload as { from: number; to: number };
-      const span = to - from;
-      if (span <= 0) return;
-      const st = h.state as DivState;
-      if (!st.forcedMarch) return;
-      const hours = (span / HOUR) * timeScaleOf(h.ctx);
-      for (const fid of Object.keys(st.forcedMarch)) {
-        const f = h.state.fleets[fid];
-        if (!f) {
-          delete st.forcedMarch[fid]; // dead fleet — sweep the flag with it
-          continue;
-        }
-        if (!f.movement) continue; // parked = no wear (the march is the cost)
-        for (const stack of f.units) {
-          if (stack.count <= 0) continue;
-          const def = h.ctx.data.units[stack.unit];
-          if (!def) continue;
-          const per = effectiveStats(def, stack, h.ctx.data).hp ?? 0;
-          if (per <= 0) continue;
-          const full = stack.count * per;
-          const pool = Math.min(stack.hp ?? full, full);
-          const minPool = (stack.count - 1) * per + 1; // last hull stays alive
-          stack.hp = Math.max(Math.min(minPool, pool), pool - full * FORCED_MARCH_WEAR * hours);
-        }
-      }
-      if (Object.keys(st.forcedMarch).length === 0) delete st.forcedMarch;
-    });
-    // One march per arm: reaching the destination drops the flag.
-    api.on('fleet.arrived', (event, h) => {
-      const fid = (event.payload as { fleetId?: string })?.fleetId;
-      const st = h.state as DivState;
-      if (typeof fid === 'string' && st.forcedMarch?.[fid]) {
-        delete st.forcedMarch[fid];
-        if (Object.keys(st.forcedMarch).length === 0) delete st.forcedMarch;
-      }
-    });
-  },
-};
+// REFP-16: forced march module (FORCED_MARCH_* + forcedMarchModule) moved to
+// `forcedMarch.ts`. Imported here for MODULES and re-exported.
+import { FORCED_MARCH_MULT, FORCED_MARCH_WEAR, forcedMarchModule } from './forcedMarch';
+export { FORCED_MARCH_MULT, FORCED_MARCH_WEAR, forcedMarchModule };
 
-// --- платное мгновенное восстановление («золотой ремонт») ---------------------
-// Донатная кнопка Bytro-стиля, ненавязчивая: маленький чип в карточке флота.
-// Кредиты играют роль премиум-валюты до монетизации (как шпионаж 150c). Мгновенный
-// топ-ап КОРПУСА всех стеков (корабли + десант) где угодно — кроме боя; щит регенит
-// бесплатно сам, медленный портовый ремонт (shipRepair) и план ECON-3 (metal в
-// доке) остаются как были.
-export const INSTANT_REPAIR_CREDITS_PER_HP = 1;
-
-/** Недостающий корпус флота (корабли + десант), по эффективному hp с фитингами. */
-export function missingHull(f: Fleet, data: GameData): number {
-  let missing = 0;
-  for (const stack of [...f.units, ...(f.landing ?? [])]) {
-    if (stack.count <= 0 || stack.hp === undefined) continue;
-    const def = data.units[stack.unit];
-    if (!def) continue;
-    const per = effectiveStats(def, stack, data).hp ?? 0;
-    const full = stack.count * per;
-    missing += Math.max(0, full - Math.min(stack.hp, full));
-  }
-  return missing;
-}
-
-/** Цена мгновенного ремонта в кредитах (0 — чинить нечего) — одна формула на
- *  сервер и кнопку клиента, чтобы ценник в UI не расходился с гейтом. */
-export function instantRepairCost(f: Fleet, data: GameData): number {
-  return Math.ceil(missingHull(f, data) * INSTANT_REPAIR_CREDITS_PER_HP);
-}
-
-export const instantRepairModule: GameModule = {
-  id: 'instant-repair',
-  version: '0.1.0',
-  setup(api) {
-    api.onAction('fleet.instantRepair', (action, h) => {
-      const p = action.payload as { fleetId?: unknown };
-      if (typeof p?.fleetId !== 'string') return h.reject('E_BAD_PAYLOAD');
-      const f = h.state.fleets[p.fleetId];
-      // Absent OR not-yours → one opaque code (A06 — no fleet-existence probing).
-      if (!f || f.owner !== action.playerId) return h.reject('E_NO_FLEET');
-      if (f.battleId) return h.reject('E_IN_BATTLE');
-      const player = h.state.players[action.playerId];
-      if (!player) return h.reject('E_NO_PLAYER');
-      const hull = missingHull(f, h.ctx.data);
-      if (hull <= 0) return h.reject('E_NOTHING_TO_REPAIR');
-      const credits = Math.ceil(hull * INSTANT_REPAIR_CREDITS_PER_HP);
-      if (!canAfford(player.resources, { credits })) return h.reject('E_NO_FUNDS');
-      payCost(player.resources, { credits });
-      for (const stack of [...f.units, ...(f.landing ?? [])]) delete stack.hp;
-      h.emit('fleet.instantRepaired', { fleetId: f.id, owner: f.owner, credits, hull });
-    });
-  },
-};
-
-// --- ECON-3: экспресс-ремонт за металл ----------------------------------------
-// Сток металла в духе Bytro: экспресс-ремонт за METAL у своего дока — дешёвая
-// альтернатива платному мгновенному ремонту (за кредиты) и быстрая — бесплатному
-// портовому (shipRepair 5–10%/ч остаётся). Металл тратится на латание корпуса,
-// а не копится мёртвым грузом.
-export const REPAIR_HP_PER_METAL = 2;
-
-/** Цена экспресс-ремонта в metal (0 — чинить нечего) — одна формула на сервер и
- *  кнопку клиента. */
-export function dockRepairCost(f: Fleet, data: GameData): number {
-  return Math.ceil(missingHull(f, data) / REPAIR_HP_PER_METAL);
-}
-
-/** Есть ли у флота свой док: стоит (не летит) над СВОИМ миром с живым зданием,
- *  дающим `shipRepair > 0` (spaceport/shipyard). Та же проверка — в кнопке UI. */
-export function fleetAtOwnDock(f: Fleet, state: GameState, data: GameData): boolean {
-  if (f.movement || !f.location) return false;
-  const planet = state.planets[f.location];
-  if (!planet || planet.owner !== f.owner) return false;
-  return planet.buildings.some((b) => {
-    if (b.hp <= 0) return false;
-    const def = data.buildings[b.type];
-    return !!def && buildingLevel(def, b.level).shipRepair > 0;
-  });
-}
-
-export const econScrewsModule: GameModule = {
-  id: 'econ-screws',
-  version: '0.1.0',
-  setup(api) {
-    // Экспресс-ремонт: мгновенный топ-ап корпуса за metal у своего дока.
-    api.onAction('fleet.repair', (action, h) => {
-      const p = action.payload as { fleetId?: unknown };
-      if (typeof p?.fleetId !== 'string') return h.reject('E_BAD_PAYLOAD');
-      const f = h.state.fleets[p.fleetId];
-      // Absent OR not-yours → one opaque code (A06 — no fleet-existence probing).
-      if (!f || f.owner !== action.playerId) return h.reject('E_NO_FLEET');
-      if (f.battleId) return h.reject('E_IN_BATTLE');
-      if (!fleetAtOwnDock(f, h.state, h.ctx.data)) return h.reject('E_NO_DOCK');
-      const player = h.state.players[action.playerId];
-      if (!player) return h.reject('E_NO_PLAYER');
-      const hull = missingHull(f, h.ctx.data);
-      if (hull <= 0) return h.reject('E_NOTHING_TO_REPAIR');
-      const metal = Math.ceil(hull / REPAIR_HP_PER_METAL);
-      if (!canAfford(player.resources, { metal })) return h.reject('E_NO_FUNDS');
-      payCost(player.resources, { metal });
-      for (const stack of [...f.units, ...(f.landing ?? [])]) delete stack.hp;
-      h.emit('fleet.repaired', { fleetId: f.id, owner: f.owner, metal, hull });
-    });
-  },
+// REFP-17/18: instant repair + econ screws (express dock repair) moved to their
+// own files. Imported here for MODULES and re-exported for main.ts / tests.
+import {
+  INSTANT_REPAIR_CREDITS_PER_HP,
+  missingHull,
+  instantRepairCost,
+  instantRepairModule,
+} from './instantRepair';
+import {
+  REPAIR_HP_PER_METAL,
+  dockRepairCost,
+  fleetAtOwnDock,
+  econScrewsModule,
+} from './econScrews';
+export {
+  INSTANT_REPAIR_CREDITS_PER_HP,
+  missingHull,
+  instantRepairCost,
+  instantRepairModule,
+  REPAIR_HP_PER_METAL,
+  dockRepairCost,
+  fleetAtOwnDock,
+  econScrewsModule,
 };
 
 export const MODULES: GameModule[] = [
