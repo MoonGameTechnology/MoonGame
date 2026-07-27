@@ -120,4 +120,26 @@ describe('sandbox — held toggles', () => {
     enforceSandbox(s, 'p1', null);
     expect(s.scheduled[0]!.at).toBe(180);
   });
+
+  it('fog is on by default — turning it off is what reveals the map', () => {
+    expect(sandboxConfig.fog).toBe(true);
+  });
+
+  it('instantBuild pulls every pending construction.complete due at once', () => {
+    const s = base();
+    s.time = 50;
+    s.scheduled = [
+      { id: 'evt:1', at: 100, type: 'construction.complete', payload: {}, seq: 1 },
+      { id: 'evt:2', at: 30, type: 'construction.complete', payload: {}, seq: 2 }, // already due
+      { id: 'evt:3', at: 200, type: 'unit.build', payload: {}, seq: 3 }, // unrelated event
+    ];
+    sandboxConfig.enabled = true;
+    enforceSandbox(s, 'p1', null); // toggle off → untouched
+    expect(s.scheduled[0]!.at).toBe(100);
+    sandboxConfig.instantBuild = true;
+    enforceSandbox(s, 'p1', null);
+    expect(s.scheduled[0]!.at).toBe(50); // pulled to now → fires next advance
+    expect(s.scheduled[1]!.at).toBe(30); // already past `now` → left alone
+    expect(s.scheduled[2]!.at).toBe(200); // not a construction event → untouched
+  });
 });

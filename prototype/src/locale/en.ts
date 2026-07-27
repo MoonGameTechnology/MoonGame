@@ -462,7 +462,6 @@ export const en: Record<string, string> = {
   'Ждёт ресурсы: {c}': 'Waiting for resources: {c}',
   'уже построено': 'already built',
   'уже в очереди': 'already queued',
-  'Для разработчиков': 'For developers',
   'Управление скоростью': 'Speed control',
   'панель времени в матче — пауза и множители ускорения (1× — реальное время)':
     'the in-match time bar — pause and speed multipliers (1× is real time)',
@@ -1659,8 +1658,6 @@ export const en: Record<string, string> = {
     'the fleet storms an enemy world by itself on arrival',
   'эскадрилья автоматически бьёт врага в радиусе':
     'the squadron automatically hits enemies within range',
-  // --- admin-gated developer settings -------------------------------------------
-  'только админ': 'admin only',
   // --- REL-7 seat/faction picker ------------------------------------------------
   'занято': 'taken',
   'свободно': 'free',
