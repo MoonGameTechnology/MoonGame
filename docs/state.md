@@ -117,7 +117,7 @@ packages/action-layer/src/
   index.ts       баррель (экспорт публичного API)
 data/            manifest, resources, units, buildings, factions, events, sectors, planetTypes, technologies (.json)
 docs/            architecture, modulesystem, roadmap, deep-technical-roadmap, multiplayer, engineering-risks, gdd, metagame, state(этот)
-prototype/       src/game.ts (оркестрация, реэкспорты — REFP-рефактор: 5289→3311 строк), src/prototypeData.ts, src/map.ts, src/fleetStacks.ts, src/tax.ts, src/formations.ts, src/botFavour.ts, src/squadron.ts, src/chain.ts, src/hunger.ts, src/botDiplomacy.ts, src/sessionMarket.ts, src/capital.ts (вынесены из game.ts, Block REFP), src/main.ts (UI), src/smoke.ts, build.mjs, uitest.mjs, dist/ (артефакт, в .gitignore)
+prototype/       src/game.ts (оркестрация, реэкспорты — REFP-рефактор: 5289→2974 строк), src/prototypeData.ts, src/map.ts, src/fleetStacks.ts, src/tax.ts, src/formations.ts, src/botFavour.ts, src/squadron.ts, src/chain.ts, src/hunger.ts, src/botDiplomacy.ts, src/sessionMarket.ts, src/capital.ts, src/fleetLaunch.ts (вынесены из game.ts, Block REFP), src/main.ts (UI), src/smoke.ts, build.mjs, uitest.mjs, dist/ (артефакт, в .gitignore)
 ```
 
 ## 4. Модель состояния (`GameState`)
@@ -1059,8 +1059,8 @@ botDiplomacy, market, division, capital, standingOrders, effects])` (27 моду
   (заполняет ширину, панится по вертикали). Победа по очкам — **1100**
   (`SCORE_LIMIT`, прототип переопределяет дефолт ядра 600). Джиттер-решётка, RNG-линки и границы канваса выводятся из констант
   `FIELD`/`*_CELLS` — карта переформировывается правкой списков клеток.
-- **Прототип-модуль `fleet.launch {planetId}`** (`game.ts`, не в ядре) — поднимает
-  флот из гарнизона (корабли→`units`, наземные→`landing`). Кандидат в ядро.
+- **Прототип-модуль `fleet.launch {planetId}`** (`fleetLaunch.ts`, REFP-10, не в ядре) —
+  поднимает флот из гарнизона (корабли→`units`, наземные→`landing`). Кандидат в ядро.
 - **UI — тактический пульт (DEFCON-вайб):** векторно-каркасный стиль на чёрном.
   - **Карта = радарный планшет:** панорамируемая координатная сетка (двигается/
     масштабируется с камерой), редкие звёзды-тики, лёгкие скан-линии (CSS). Фон усилен мягкими туманностями и twinkle-звёздами; jump lanes
