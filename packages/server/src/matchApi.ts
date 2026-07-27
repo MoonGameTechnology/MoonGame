@@ -51,7 +51,7 @@ export interface MatchApiDeps {
    *  `accountId` is stamped into the join token when the caller is authenticated.
    *  `preferredSlot` (REL-7): the player's chosen slot id (e.g. "p3"); the server
    *  reserves it if free, falls back to any free slot if not. */
-  join(matchId: string, nick: string, accountId?: string, preferredSlot?: string): Promise<JoinResult | JoinFailure>;
+  join(matchId: string, nick: string, accountId?: string, preferredSlot?: string, preferredFaction?: string): Promise<JoinResult | JoinFailure>;
   /** Resolve the caller's identity from the request (session token), or null when the
    *  request carries no valid session. Wired ⇒ create/join REQUIRE identity (401 E_AUTH)
    *  and the session's login IS the nick. Absent ⇒ legacy `?nick=` dev behaviour. */
@@ -122,7 +122,8 @@ export function registerMatchApi(app: FastifyInstance, deps: MatchApiDeps): void
         return { error: 'E_AUTH' as const };
       }
       const slot = (request.query as { slot?: string }).slot;
-      const result = await deps.join(id, who.login, who.accountId, slot);
+      const faction = (request.query as { faction?: string }).faction;
+      const result = await deps.join(id, who.login, who.accountId, slot, faction);
       if ('error' in result) void reply.code(STATUS[result.error]);
       return result;
     }
