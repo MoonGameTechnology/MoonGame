@@ -123,6 +123,21 @@ export {
   type BattlePreview,
   type BattlePreviewSide,
 } from './state/previewBattle';
+export {
+  COMBAT_WIDTH as GROUND_COMBAT_WIDTH,
+  GROUND_ROSTER,
+  makeSide as makeGroundSide,
+  activeUnits as groundActiveUnits,
+  damageBuckets as groundDamageBuckets,
+  groundTick,
+  resolveGround,
+  type DamageTable as GroundDamageTable,
+  type GroundProfile,
+  type GroundRoster,
+  type GroundStack,
+  type GroundTick,
+  type GroundOutcome,
+} from './state/groundCombat';
 export { scanNodeThreats, type NodeThreat } from './state/threat';
 
 // Action contract
@@ -303,6 +318,15 @@ export { interceptModule } from './modules/intercept';
 export { captureOnArrivalModule } from './modules/captureOnArrival';
 export { sectorModule } from './modules/sector';
 export { planetTypeModule } from './modules/planetType';
+export {
+  taxModule,
+  civicTax,
+  isInhabited,
+  inhabitedWorldCount,
+  TAX_PER_HOUR,
+  TAX_OFFICE_BONUS,
+  TAX_DIMINISH,
+} from './modules/tax';
 export { constructionModule } from './modules/construction';
 export { arsenalSyncModule } from './modules/arsenalSync';
 export { stationModule } from './modules/station';

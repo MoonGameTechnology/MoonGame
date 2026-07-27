@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1832 зелёных** (54 skip, 171 файл).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1872 зелёных** (54 skip, 174 файла).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -103,7 +103,7 @@ Void Dominion — мобильная/браузерная **real-time** (неп�
 packages/shared-core/src/
 packages/action-layer/src/
   kernel/        kernel.ts (createKernel/applyAction/advanceTo, шина/хуки/расписание), module.ts (контракт)
-  state/         gameState.ts (типы GameState), orbit.ts (isBombarded, bombardedPlanets), visibility.ts (visibleState — туман войны + общая видимость союза), previewBattle.ts (ONB-6 — чистый прогноз боя + hullPool/damageFraction), threat.ts (ST-3.1 — fog-honest скан угроз узлу)
+  state/         gameState.ts (типы GameState), orbit.ts (isBombarded, bombardedPlanets), visibility.ts (visibleState — туман войны + общая видимость союза), previewBattle.ts (ONB-6 — чистый прогноз боя + hullPool/damageFraction), threat.ts (ST-3.1 — fog-honest скан угроз узлу), groundCombat.ts (FND-4 движок — тип-матрица наземного боя, порт прототипа, ПОКА не подключён к живому combat.ts)
   action/        types.ts (Action, Context, MatchConfig.timeScale/victory, ApplyResult/AdvanceResult, Rejection, timeScaleOf)
   data/          schemas.ts (zod-схемы + parseGameData, buildingLevel/buildingMaxLevel)
   rng/           rng.ts (sfc32)
@@ -358,12 +358,44 @@ E_SAME_LOCATION, E_NO_DESTINATION, E_NO_ROUTE, E_NOT_A_LANE, E_FLEET_IMMOBILE`.
 
 ### planet-type (`planet-type`)
 
-Тип планеты (`planetType`, данные `data/planetTypes.json`) даёт модификаторы через
-хуки — как сектор, но про сам мир. `economy.production` (×(1+productionBonus)
-производства мира); `combat.damage` (наземная фаза: урон по гарнизону владельца
-÷(1+defenseBonus); знак учитывается — защищённый мир делит, открытый усиливает),
-складывается со зданиями. Типы: terran/barren/oceanic/volcanic/gas_giant. Без
-модуля — без эффекта (мягкая деградация). Действий нет.
+Тип планеты (`planetType`, данные `data/planetTypes.json`, 11 типов — полный список
+только в данных, не хардкодить здесь) даёт модификаторы через хуки — как сектор, но
+про сам мир. `economy.production`: сначала прибавляется `baseOutput` (FND-1,
+game-vision-roadmap.md — пассивный почасовой доход мира БЕЗ зданий, порт ECON-7-
+констант прототипа: terran ~6 credits/3 energy/5 food/4 metal и т.д.; 10 типов
+портированы 1:1, `energy_nexus` — канон-эксклюзивный, значения подобраны отдельно),
+потом весь бакет (produces зданий + baseOutput) множится на ×(1+productionBonus) и
+по-ресурсно на `productionByResource`; `combat.damage` (наземная фаза: урон по
+гарнизону владельца ÷(1+defenseBonus); знак учитывается — защищённый мир делит,
+открытый усиливает), складывается со зданиями. Без модуля — без эффекта (мягкая
+деградация). Действий нет. Тесты: `planetType.test.ts` — синтетическая фикстура +
+блок на РЕАЛЬНОМ шипнутом бандле (FND-1: terran без зданий → >0 credits/food/energy;
+ни один шипнутый тип не «мёртв» — пустой baseOutput).
+
+### tax (`tax`)
+
+Гражданский налог (FND-2, game-vision-roadmap.md) — второй источник credits,
+которого канону не хватало рядом с пассивным `baseOutput`. Каждый **обитаемый**
+мир игрока (`isInhabited` — есть орбита И роспись построек не сужена явным
+`allowedBuildings`, т.е. не астероид/мёртвый мир) добавляет `civicTax(n)` credits/ч
+через хук `economy.production`, где `n` — число обитаемых миров владельца; ставка
+**TAX_PER_HOUR=20** делится на `(1 + 0.06·(n−1))` — налог с одного мира падает по
+мере роста империи, но суммарный доход всё равно растёт (сублинейно, не даёт снежному
+кому). Здание `tax_office` умножает ВЕСЬ кредитный доход мира (produces+baseOutput+
+налог) на ×1.25. Регистрация в `DEV_MODULES` (`scenario.ts`) — сразу после
+`planetTypeModule`, до `economyModule` (тот же относительный порядок, что в
+прототипном `MODULES`). Порт прототипной `taxModule`/`civicTax` (`prototype/src/
+game.ts`) — переиспользует уже общие `hasOrbit`/`allowedBuildings`
+(`state/sectorKind.ts`), поэтому это не форк формулы, а её включение в канон.
+Тесты: `tax.test.ts` — 12 (чистая математика диминишинга, `isInhabited`/
+`inhabitedWorldCount`, kernel-интеграция: голый обитаемый мир/астероид/два мира/
+tax_office/без модуля).
+
+`economy-parity.test.ts` (`packages/server/src`, FND-7) — постоянный гейт против
+повторного дрейфа прототип↔канон: на ШИПНУТОМ бандле через полный `DEV_MODULES`
+проверяет окупаемость `mine_t1` (3–8ч по `resource-economy.md` §4 — реально ~5ч) и
+что каждый из 11 canonical `planetType` (+ мир без типа) даёт >0 credits/ч. 15
+тестов.
 
 ### technology (`technology`) — сессионное дерево технологий
 
@@ -443,7 +475,15 @@ INSTEAD-of-фокус — opportunity-cost (лидер-«+слот» branchless)
   `previewBattle` считает с тем же капом (паритет закреплён тестом). Линии
   `front/mid/rear/artillery`
   (артиллерия — трейт `artillery`, в ближнем бою бьёт `attack` и получает урон
-  последней; вне боя бьёт **на расстоянии** — см. `runArtillery` ниже). Пул HP стека с переносом, `unit.died`. Интервал раунда =
+  последней; вне боя бьёт **на расстоянии** — см. `runArtillery` ниже). Пул HP стека с переносом, `unit.died`. **Это же — сейчас — и наземная фаза** (десант/гарнизон),
+  плоской моделью, той же, что флот/орбита. `state/groundCombat.ts` (FND-4,
+  game-vision-roadmap.md) — готовый, протестированный тип-матричный движок
+  (`GROUND_ROSTER` militia/heavy_infantry/special_forces/tank, пер-цель atk/def,
+  `COMBAT_WIDTH`=12 — порт прототипа 1:1) ЛЕЖИТ РЯДОМ как самостоятельный чистый
+  модуль (как `previewBattle.ts`), но **ещё не подключён** — наземная фаза здесь
+  резолвится через тот же общий путь, что ниже. Замена флага `battle.phase ===
+  'ground'` на матричный движок — отдельный, более рискованный шаг (детерминизм/
+  replay/RNG golden-тесты), сознательно отделён. Интервал раунда =
   `MS_PER_HOUR / timeScale`; `battle.nextRoundAt` несёт время следующего раунда
   (таймер боя). Урон через хук **`combat.damage`** (args: battleId, phase, location,
   attacker, defender). Исход → `battle.resolved`.
