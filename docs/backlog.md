@@ -1540,8 +1540,13 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
   `game.ts` импортирует и реэкспортирует. Гейт зелёный. **Фаза 1 завершена.**
 - **REFP-9** ✅ `[proto]` **`hunger.ts`** — `HUNGER_MULT`, `hungerModule` вынесены
   в `prototype/src/hunger.ts`. `game.ts` импортирует и реэкспортирует. Гейт зелёный.
-- **REFP-10** ⏳ `[proto]` **`fleetLaunch.ts`** — `fleetLaunchModule`, fleet-id counter,
-  launch/merge/split (1631–1957).
+- **REFP-10** ✅ `[proto]` **`fleetLaunch.ts`** — `fleetLaunchModule` (`fleet.launch`/
+  `unit.built` auto-rally/`fleet.merge`/`fleet.split`/`fleet.engage`) + monotonic
+  fleet-id counter вынесены в `prototype/src/fleetLaunch.ts`. `divisionsOf` остаётся
+  импортом ИЗ `game.ts` (division-состояние ещё не вынесено, REFP-13) — обратное ребро
+  безопасно: читается только внутри тела хендлера, не на модульной инициализации.
+  `game.ts` импортирует `fleetLaunchModule` для `MODULES` и реэкспортирует. Гейт зелёный
+  (175 файлов, 1894 теста — число не изменилось, чистый перенос без нового поведения).
 - **REFP-11** ✅ `[proto]` **`botDiplomacy.ts`** — `botDiplomacyModule` вынесен в
   `prototype/src/botDiplomacy.ts` (зависит от `botFavour` + core diplomacy helpers).
   `game.ts` импортирует для `MODULES`. Гейт зелёный.
