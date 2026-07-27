@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
   SpotlightTour,
   frameRects,
@@ -324,5 +327,32 @@ describe('geometry — placeBubble', () => {
     expect(p.left).toBeGreaterThanOrEqual(0);
     expect(p.left + bubble.width).toBeLessThanOrEqual(vp.width);
     expect(p.top).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('spotlightDom overlay CSS — passthrough must cover the ROOT, not just .sl-dim', () => {
+  // Found live (a real player + a headless touch-emulated repro agreed): on an
+  // action/state step (e.g. ONB-2's "build a mine", advance on fleet.barrage's
+  // sibling `building.construct`), the tutorial let NOTHING through — the player
+  // could not tap their own homeworld at all. `#spotlight{position:fixed;inset:0}`
+  // is a plain div covering the full viewport; a plain div defaults to
+  // pointer-events:auto, so even with all four `.sl-dim` panels set to
+  // pointer-events:none in `.sl-passthrough` mode, the ROOT itself kept
+  // swallowing every tap that landed in the gap BETWEEN the dim panels — i.e.
+  // exactly over the real HUD the player was supposed to operate. Only the root
+  // going passthrough too (children can still opt back in with their own
+  // explicit pointer-events:auto, e.g. `.sl-bubble`) actually lets touches reach
+  // the map. Pin the CSS text so this exact regression can't silently return.
+  const src = readFileSync(
+    path.join(path.dirname(fileURLToPath(import.meta.url)), '../build.mjs'),
+    'utf8',
+  );
+
+  it('#spotlight.sl-passthrough itself is pointer-events:none (not just its .sl-dim children)', () => {
+    expect(src).toMatch(/#spotlight\.sl-passthrough\s*\{\s*pointer-events\s*:\s*none\s*;?\s*\}/);
+  });
+
+  it('the bubble stays clickable (child pointer-events:auto overrides the ancestor)', () => {
+    expect(src).toMatch(/#spotlight \.sl-bubble\{[^}]*pointer-events:auto/);
   });
 });

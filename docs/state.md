@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1830 зелёных** (54 skip, 171 файл).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1832 зелёных** (54 skip, 171 файл).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -1145,16 +1145,19 @@ botDiplomacy, market, division, capital, standingOrders, effects])` (27 моду
   сводок, ловит события матча, закрывается. _Пуш-уведомления и серверный дайджест-хук — за
   зависимостью (PWA push); `buildRecap` уже server-ready для этого шва._
 - **Just-in-time интро механик (ONB-3)** — при **первом** контакте с продвинутой механикой —
-  разовая интро-карточка, потом никогда: чистый `src/intros.ts` (`INTROS` — 10 карточек
+  разовая интро-карточка, потом никогда: чистый `src/intros.ts` (`INTROS` — 11 карточек
   `{id,title,body,trigger}`: 5 панельных из готовой копии технологии/рынок/Хранитель/верфь/
-  дипломатия + `corp`/`ava` (ONB-8) + `asyncDelay`/`retreat`/`artillery` — три `firstAvailable`/
-  `firstFail`-триггера на РЕАЛЬНОМ игровом действии, не открытии панели: первый `fleet.move`
-  (мир идёт офлайн), первый `fleet.retreat` (копия — существующий боевой `.hint` про −40%
-  корпуса/щита, вынесена из мид-боя в спокойный момент), первый `fleet.barrage` (обстрел);
-  fail-secure `parseSeenIntros`, идемпотентные `markIntroSeen`/`hasSeenIntro`; `resolveIntro(seen,
-  id,{veteran})→{card,seen}` — показывает ровно раз, ветерану suppress-но-помечено) — 11 тестов.
-  Хранится per-nick `vd.seenIntros.<ник>`. main.ts: `maybeIntro(id)` в хуках рельс-панелей
-  (`rail-tech`/`-steward`/`-market`/`-constructor` + `openDiplo`) и в `playerOrder` на успешном
+  дипломатия + `corp`/`ava` (ONB-8) + `hero` (вкладка «Герои» внутри Верфи — по запросу
+  владельца, героев/навыки push-обучение раньше не касалось совсем) + `asyncDelay`/
+  `retreat`/`artillery` — три `firstAvailable`/`firstFail`-триггера на РЕАЛЬНОМ игровом
+  действии, не открытии панели: первый `fleet.move` (мир идёт офлайн), первый
+  `fleet.retreat` (копия — существующий боевой `.hint` про −40% корпуса/щита, вынесена из
+  мид-боя в спокойный момент), первый `fleet.barrage` (обстрел); fail-secure
+  `parseSeenIntros`, идемпотентные `markIntroSeen`/`hasSeenIntro`; `resolveIntro(seen,
+  id,{veteran})→{card,seen}` — показывает ровно раз, ветерану suppress-но-помечено) — 10
+  тестов. Хранится per-nick `vd.seenIntros.<ник>`. main.ts: `maybeIntro(id)` в хуках
+  рельс-панелей (`rail-tech`/`-steward`/`-market`/`-constructor` + `openDiplo`), в
+  обработчике вкладок конструктора (`conTab === 'heroes'`) и в `playerOrder` на успешном
   `fleet.move`/`fleet.retreat`/`fleet.barrage` (не во время гайд-тура — тур сам владеет экраном),
   оверлей `#intro` (z-58 — поверх панели, ниже настроек 59), «Понятно» закрывает; ветеран =
   завершил матч (`meta.xp>0`)
@@ -1215,10 +1218,18 @@ botDiplomacy, market, division, capital, standingOrders, effects])` (27 моду
   на `refresh`). Устойчив к перерисовке панели (re-query по селектору каждый кадр);
   отсутствующий target → optional-скип или безопасный стоп (не крашится). z-50: поверх
   HUD, ниже критичных модалок; `tap`-шаги ловят клики (только «Далее» ведёт вперёд),
-  `action`/`state`-шаги — click-through к живому HUD. Локаль RU/EN. Запуск — шов
+  `action`/`state`-шаги — click-through к живому HUD. **Баг найден живьём (реальный
+  игрок + независимо headless-тач-репро) и исправлен:** click-through был неполным —
+  `#spotlight{position:fixed;inset:0}` сам обычный div (дефолт `pointer-events:auto`), и
+  хотя все 4 `.sl-dim`-панели уходили в `pointer-events:none` под `.sl-passthrough`,
+  корень продолжал глотать тап в зазоре между панелями (ровно там, где игрок должен
+  тапнуть HUD) — на любом action/state-шаге («построй Шахту» и далее) тур не пропускал
+  ничего. Исправлено добавлением `#spotlight.sl-passthrough{pointer-events:none}`
+  (`build.mjs`; пузырь остаётся кликабельным — явный `pointer-events:auto` на потомке
+  перебивает `:none` предка). Локаль RU/EN. Запуск — шов
   `window.__vdTour` (авто-предложение и «Ещё → Обучение» — за ONB-0/ONB-2, они строятся
-  на этом движке). Тесты: `spotlight.test.ts` (19 — tap/action/state, скип, optional-скип
-  vs safe-stop, счётчик, re-query-устойчивость, геометрия).
+  на этом движке). Тесты: `spotlight.test.ts` (22 — tap/action/state, скип, optional-скип
+  vs safe-stop, счётчик, re-query-устойчивость, геометрия, + 2 CSS-регрессии на сам баг).
 - Валидаторы: `src/smoke.ts` (Node-сценарий ядра) и `uitest.mjs` (headless-DOM
   прогон UI-бандла).
 - **UI-прототип экрана корпорации (mock)** — межсессионный альянс из `metagame.md`:

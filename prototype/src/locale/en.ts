@@ -375,6 +375,9 @@ export const en: Record<string, string> = {
   Исследовать: 'Research',
   История: 'History',
   Герои: 'Heroes',
+  'Герои — командиры флота': 'Heroes — fleet commanders',
+  'У каждого героя своё дерево навыков — тапни узел, чтобы увидеть, что он открывает, и изучи по требованиям и стоимости. Открытые узлы дают способности (активные, с дальностью и перезарядкой) или пассивки. Погибший герой возрождается на столице.':
+    "Each hero has its own skill tree — tap a node to see what it unlocks, then learn it once its requirements and cost are met. Unlocked nodes grant abilities (active, with range and a cooldown) or passives. A fallen hero respawns at your capital.",
   'Истребительная эскадрилья': 'Fighter squadron',
   'Канал «{ch}» пуст.': 'Channel "{ch}" is empty.',
   Класс: 'Class',

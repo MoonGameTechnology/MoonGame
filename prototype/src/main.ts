@@ -10138,6 +10138,7 @@ constructorWin.addEventListener('click', (e) => {
   if (tab) {
     conTab = tab as ConTab;
     renderConstructor();
+    if (conTab === 'heroes') maybeIntro('hero'); // ONB-3 remainder
     return;
   }
   const hull = (tg.closest('.cn-hbtn') as HTMLElement | null)?.dataset.cnhull;

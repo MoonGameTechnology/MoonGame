@@ -1010,9 +1010,18 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
 - **ONB-1** ✅ `[proto]` ★ **Движок гайд-марок (spotlight).** Переиспользуемый примитив:
   оверлей + подсветка узла (дыра из 4 dim-панелей по bounding-box) + пузырь со счётчиком
   «шаг k из n» + шаги из данных; продвижение по `tap`/`action:<type>`/`state`-предикату.
-  Чистый движок `spotlight.ts` (DOM-free, 19 юнит-тестов: advance, скип, optional-скип vs
-  safe-stop, re-query-устойчивость, геометрия) + браузерный адаптер `spotlightDom.ts` +
-  data-цепочка `onboardingTour.ts` над реальным HUD; `playerOrder`→`notifyAction`, RU/EN,
+  Чистый движок `spotlight.ts` (DOM-free, 22 юнит-теста: advance, скип, optional-скип vs
+  safe-stop, re-query-устойчивость, геометрия, + CSS-регрессия ниже) + браузерный адаптер
+  `spotlightDom.ts` + data-цепочка `onboardingTour.ts` над реальным HUD;
+  `playerOrder`→`notifyAction`, RU/EN, **баг найден живьём (реальный игрок + независимо
+  headless-тач-репро): на action/state-шаге («построй Шахту» и далее) тур не пропускал
+  НИЧЕГО** — `#spotlight{position:fixed;inset:0}` сам по себе обычный div (дефолт
+  `pointer-events:auto`), и хотя все 4 `.sl-dim`-панели уходили в `pointer-events:none`
+  под `.sl-passthrough`, сам корень продолжал глотать тап в ЗАЗОРЕ между панелями — то
+  есть ровно там, где игрок должен был тапнуть реальный HUD. Исправлено: `#spotlight.sl-
+  passthrough` тоже `pointer-events:none` (пузырь остаётся кликабельным — явный
+  `pointer-events:auto` на потомке перебивает `:none` предка, `build.mjs`). +2 теста,
+  пинящих CSS-текст, чтобы регрессия не вернулась молча.
   запуск через шов `window.__vdTour`. На нём строятся ONB-2/3.
 - **ONB-2** ✅ `[proto]` ★ **Гайдовый первый матч.** Скрипт по соло-песочнице без ботов
   (`startGuidedMatch` → `firstMatchTour.ts`): домашний мир → шахта (`action:building.construct`)
@@ -1023,14 +1032,18 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
   доводка за ONB-3._
 - **ONB-3** ✅ `[proto]` **Just-in-time интро механик.** Разовая карточка при первом открытии
   панели (технологии/рынок/Хранитель/верфь/дипломатия) — чистый `intros.ts` (`resolveIntro`,
-  per-nick `vd.seenIntros`, 11 тестов) + оверлей `#intro`; ветеран (`meta.xp>0`) — помечено молча.
+  per-nick `vd.seenIntros`, 10 тестов) + оверлей `#intro`; ветеран (`meta.xp>0`) — помечено молча.
   Прогрессивное раскрытие. **Доводка закрыта:** триггеры ретрит/артиллерия подключены тем же
   «учим на первом реальном использовании» паттерном, что `asyncDelay` (ONB-5) — `retreat`
   (`firstFail`) на первом `fleet.retreat`, копия — существующий боевой `.hint` про −40% корпуса
   (не выдумана заново, только вынесена из мид-боя в спокойный момент); `artillery`
   (`firstAvailable`) на первом `fleet.barrage`, новая короткая копия (готового текста под
   обстрел не было). Оба хука в `playerOrder` (main.ts) рядом с `asyncDelay`, той же гвардой
-  «не во время гайд-тура». RU/EN.
+  «не во время гайд-тура». **Плюс `hero`** (`panelOpen`) на первом открытии вкладки «Герои»
+  внутри Верфи (по запросу владельца — героев/навыки push-обучение раньше вообще не
+  касалось, только pull-досье узла дерева навыков) — новая копия про дерево навыков/
+  способности/возрождение на столице; хук рядом с `corp`/`ava` (ONB-8) в обработчике
+  вкладок конструктора. RU/EN.
 - **ONB-4** ✅ `[proto]` **Help/кодекс-хаб («?» везде).** Существующий кодекс — в поисковый
   справочник + глоссарий (7 терминов): чистый `codexIndex.ts` (`buildCodexIndex`/`searchCodex`,
   9 тестов) + оверлей `#codexhub` (поиск + категории), deep-link в `openCodex`; входы — хаб

@@ -237,7 +237,16 @@ body.sheet-open #cmdbar{bottom:calc(34vh + 12px);}
 #spotlight{position:fixed;inset:0;z-index:50;display:none;}
 #spotlight .sl-dim{position:fixed;background:rgba(2,8,11,.72);pointer-events:auto;}
 /* action/state steps: the player must operate the real HUD — let clicks through AND
-   drop the dimming so the map stays fully legible (only the ring marks the target). */
+   drop the dimming so the map stays fully legible (only the ring marks the target).
+   BUG (found live: "built the mine window, nothing lets me build"): the four .sl-dim
+   panels going pointer-events:none was not enough — #spotlight ITSELF is a
+   position:fixed;inset:0 box at z-index 50 covering the full viewport, and a plain
+   div defaults to pointer-events:auto, so it kept swallowing every tap in the GAP
+   between the dim panels too (i.e. exactly over the real HUD the player was supposed
+   to operate) on every non-tap step. The root must go passthrough too; .sl-bubble
+   (skip/next) stays clickable because a child's explicit pointer-events:auto
+   overrides an ancestor's :none. */
+#spotlight.sl-passthrough{pointer-events:none;}
 #spotlight.sl-passthrough .sl-dim{pointer-events:none;background:transparent;}
 #spotlight .sl-ring{position:fixed;border:2px solid var(--cyan);border-radius:8px;pointer-events:none;
   box-shadow:0 0 0 2px rgba(53,214,230,.25),0 0 18px rgba(53,214,230,.45);animation:sl-pulse 1.6s ease-in-out infinite;}
