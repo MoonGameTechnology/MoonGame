@@ -706,6 +706,10 @@ let pingHits: Array<{ loc: string; x: number; y: number }> = [];
 // When connected, the server is authoritative: snapshots replace `s`, orders are
 // sent (not applied locally), and the local sim/AI is suspended (see frame()).
 let NET = false;
+// BF-30: true once the server's welcome snapshot has been received and ME is set to
+// the correct playerId. Until then, the map must NOT render — the default `ME = 'p1'`
+// would paint a spawn at p1's start before the server assigns the real seat.
+let netAdmitted = false;
 /** The match this client is in / will (re)connect to. Set when joining from the menu;
  *  `connect()` (and auto-reconnect) dial `/matches/<currentMatchId>`. */
 let currentMatchId = 'proto';
@@ -8604,6 +8608,17 @@ let lastEndHtml = '';
  *  solo match and a net one. Hidden while no match is over or the player dismissed it
  *  to look at the board. */
 function renderEndScreen(): void {
+  // BF-29: don't paint the end-screen overlay while the hub is visible — the player
+  // left the match to the menu (net: the server keeps ticking, the match may end, but
+  // "Victory!" over the hub is a confusing false positive). The overlay reappears when
+  // the player returns to the match (hub hidden).
+  if (hubEl && hubEl.style.display !== 'none') {
+    if (endscreenEl.style.display !== 'none') {
+      endscreenEl.style.display = 'none';
+      lastEndHtml = '';
+    }
+    return;
+  }
   if (!endScreen || endScreen.dismissed) {
     if (endscreenEl.style.display !== 'none') {
       endscreenEl.style.display = 'none';
@@ -8678,7 +8693,7 @@ endscreenEl.addEventListener('click', (ev) => {
   const wasNet = NET;
   if (NET) {
     userClosed = true;
-    NET = false;
+    NET = false; netAdmitted = false;
     if (netSock) netSock.close();
   }
   endScreen = null; // leaving the finished match — the overlay must not linger over the hub
@@ -8700,11 +8715,18 @@ endscreenEl.addEventListener('click', (ev) => {
 // Speedbar "⌂ В меню": leave the current match back to the hub from anywhere in-game.
 // In net mode this is an intentional disconnect (userClosed → no auto-reconnect). The
 // sim keeps ticking underneath as the menu's live backdrop, same as the other overlays.
+// BF-29: in solo, STOP the sim on exit — otherwise the world keeps ticking, the AI
+// loses, elimination fires, and "Victory!" paints over the hub. In net the server is
+// authoritative (it keeps ticking regardless), but the end-screen overlay is suppressed
+// while the hub is visible (see renderEndScreen guard).
 $('tomenu').addEventListener('click', () => {
   if (NET) {
     userClosed = true;
-    NET = false;
+    NET = false; netAdmitted = false;
+    netAdmitted = false; // BF-30: no longer in a server-assigned seat
     if (netSock) netSock.close();
+  } else {
+    speed = 0; // BF-29: freeze the solo sim so the AI can't "win" while you're in the hub
   }
   stopFirstGoals(); // ONB-7: leaving the match ends the onboarding checklist
   openHub();
@@ -10286,7 +10308,7 @@ nickInput.value = localStorage.getItem('void.nick') ?? '';
 if (!__PLAYER_BUILD__) {
   $('csolo').addEventListener('click', () => {
     userClosed = true; // intentional leave → don't auto-reconnect
-    NET = false;
+    NET = false; netAdmitted = false;
     openSetup(); // pick start + rivals before the skirmish begins
   });
 
@@ -10297,7 +10319,7 @@ if (!__PLAYER_BUILD__) {
   if (!DEV_UI) $('ctest').style.display = 'none';
   $('ctest')?.addEventListener('click', () => {
     userClosed = true;
-    NET = false;
+    NET = false; netAdmitted = false;
     showConnect(false);
     openTestMode();
   });
@@ -10945,7 +10967,7 @@ $('hub-play').addEventListener('click', () => hubTab('games'));
 // Single-player entry from the hub home — offline skirmish vs bots (both builds).
 $('hub-solo').addEventListener('click', () => {
   userClosed = true; // intentional leave → don't auto-reconnect to a server
-  NET = false;
+  NET = false; netAdmitted = false;
   showHub(false);
   openSetup('hub');
 });
@@ -11799,6 +11821,7 @@ function connect(): void {
         if (!admitted) {
           // Server accepted us — NOW we're really in the match.
           admitted = true;
+          netAdmitted = true; // BF-30: ME is now the server-assigned seat — safe to render
           reconnecting = false; // a fresh welcome ends any reconnect cycle
           reconnectAttempts = 0;
           if (banner && banner.startsWith('⟳')) banner = null;
@@ -11959,7 +11982,7 @@ function connect(): void {
     }
     rttEma = null;
     if (NET) {
-      NET = false;
+      NET = false; netAdmitted = false;
       if (userClosed) {
         statusEl.textContent = 'disconnected';
         note(t('● отключён от сервера'));
@@ -12533,7 +12556,7 @@ function renderMatches(): void {
       `<div class="msolo-sub">${t('Сервер не нужен — свободные места займут боты.')}</div></div>`;
     document.getElementById('msolo-go')?.addEventListener('click', () => {
       userClosed = true;
-      NET = false;
+      NET = false; netAdmitted = false;
       openSetup('hub');
     });
   };
@@ -12977,10 +13000,17 @@ function frame(nowReal: number) {
       ? null
       : computeVision(); // fog projection for this frame
   if (vision) updateMemory(vision.identify); // variant B: remember what we see
-  render(nowReal);
-  renderPanel();
-  renderCmdBar();
-  renderSplitDialog();
+  // BF-30: in net mode, don't render the map until the server's welcome snapshot
+  // has arrived and ME is set to the correct seat — otherwise the default `ME = 'p1'`
+  // paints a spawn at p1's start before the server assigns the real seat.
+  if (NET && !netAdmitted) {
+    // show a blank canvas + the connect overlay (already shown by showConnect(true))
+  } else {
+    render(nowReal);
+    renderPanel();
+    renderCmdBar();
+    renderSplitDialog();
+  }
   // Status strip below the top bar: day/time + victory progress, plus the donate currency
   // (Суверены ◆) pushed to the right end — it sits one level down, directly under the
   // resource bar, instead of crowding the six session-resource chips. (World/fleet counts
