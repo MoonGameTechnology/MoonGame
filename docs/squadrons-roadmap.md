@@ -39,6 +39,20 @@
 Дальше по фазам ниже: SQ-1.3 (ремонтные дроны), SQ-2.2 (политика восстановления), SQ-4.2
 (рендер зоны патруля), Фазы 5–7 (постройка/крепость, модули/оружие, десантная эскадрилья).
 
+**Каноническое ядро (`packages/shared-core`) — отдельный статус.** Все ✅-пункты выше
+про ПРОТОТИП (`prototype/src/squadron.ts`); в каноне этой механики не было вовсе — как
+и с экономикой (FND-1/2), обнаружено при разведке `docs/game-vision-roadmap.md`'s CA-1.
+Портирован (без изменения чисел/семантики) чистый математический слой:
+`packages/shared-core/src/state/squadron.ts` — `squadronTake`/`sortieSpec`/`freshSortie`/
+`canSortie`/`spendSortie`/`tickRearm`/`fleetHasSquadron`/`squadronStrikeRange`/
+`withinRange`/`squadronReaches`, 20 тестов на РЕАЛЬНОМ шипованном `fighter_squadron`
+(поля `strikeRange`/`fuel`/`rearmRounds` в данных и схеме уже были). **Не портировано:**
+экшен `fleet.launch`/kernel-модуль/место в `GameState` под `SortieState` живого крыла,
+удар+ПВО-counter (SQ-1.2), патруль-драйвер `patrolTarget`/`scrambleOrder` (живут в
+`game.ts`, не в чистом `squadron.ts`) — подключение к живому action/reducer пайплайну
+это отдельный, более рискованный заход (детерминизм/реплей), по аналогии с тем, как
+FND-4 оставил `groundCombat.ts` неподключённым к `combat.ts`.
+
 ---
 
 ## 0. Перевод в дискретную детерминированную модель (read first)

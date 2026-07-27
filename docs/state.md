@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1872 зелёных** (54 skip, 174 файла).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1894 зелёных** (54 skip, 175 файлов).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -107,7 +107,7 @@ Void Dominion — мобильная/браузерная **real-time** (неп�
 packages/shared-core/src/
 packages/action-layer/src/
   kernel/        kernel.ts (createKernel/applyAction/advanceTo, шина/хуки/расписание), module.ts (контракт)
-  state/         gameState.ts (типы GameState), orbit.ts (isBombarded, bombardedPlanets), visibility.ts (visibleState — туман войны + общая видимость союза), previewBattle.ts (ONB-6 — чистый прогноз боя + hullPool/damageFraction), threat.ts (ST-3.1 — fog-honest скан угроз узлу), groundCombat.ts (FND-4 движок — тип-матрица наземного боя, порт прототипа, ПОКА не подключён к живому combat.ts)
+  state/         gameState.ts (типы GameState), orbit.ts (isBombarded, bombardedPlanets), visibility.ts (visibleState — туман войны + общая видимость союза), previewBattle.ts (ONB-6 — чистый прогноз боя + hullPool/damageFraction), threat.ts (ST-3.1 — fog-honest скан угроз узлу), groundCombat.ts (FND-4 движок — тип-матрица наземного боя, порт прототипа, ПОКА не подключён к живому combat.ts), squadron.ts (CA-1 чистая математика — sortie/rearm/strikeRange, порт прототипа, ПОКА не подключён к action/reducer)
   action/        types.ts (Action, Context, MatchConfig.timeScale/victory, ApplyResult/AdvanceResult, Rejection, timeScaleOf)
   data/          schemas.ts (zod-схемы + parseGameData, buildingLevel/buildingMaxLevel)
   rng/           rng.ts (sfc32)
