@@ -746,7 +746,10 @@ const server = createMultiplayerServer({
         // refuse it once the window closed, BEFORE resolveSeat assigns a chair (a refused
         // newcomer never burns a chair); a seated login reconnects any time.
         // REL-7: `preferredSlot` lets the player choose a faction/start before joining.
-        join: async (id, login, accountId, preferredSlot) => {
+        // BF-30: `preferredFaction` decouples faction from the slot's start point —
+        // the player picks a faction independently; the server overrides the seat's
+        // default faction after assigning it.
+        join: async (id, login, accountId, preferredSlot, preferredFaction) => {
           const room = registry.get(id);
           if (!room) return { error: 'E_NO_MATCH' as const };
           const held = await accountStore.seatOf(id, login);
@@ -755,6 +758,12 @@ const server = createMultiplayerServer({
             ? { playerId: held }
             : await accountStore.resolveSeat(id, login, Object.keys(room.state.players), preferredSlot as PlayerId | undefined);
           if (!seat) return { error: 'E_MATCH_FULL' as const };
+          // BF-30: override the seat's faction with the player's choice — faction is
+          // no longer bound to the start point. Only on a NEW claim (not reconnect).
+          if (preferredFaction && !held) {
+            const player = room.state.players[seat.playerId];
+            if (player) player.faction = preferredFaction;
+          }
           return {
             playerId: seat.playerId,
             token: await authCfg.signToken!(id, seat.playerId, accountId),

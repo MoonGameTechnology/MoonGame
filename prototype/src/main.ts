@@ -10701,10 +10701,10 @@ async function welcomeSignIn(nick: string): Promise<void> {
     // If we arrived via `?join=<id>` (or the join button opened the welcome card
     // because no session was cached), resume the join now that we have a JWT.
     const pendingId = pendingJoinAfterAuth;
-    pendingJoinAfterAuth = null;
+    pendingJoinAfterAuth = null; pendingSlotAfterAuth = null; pendingFactionAfterAuth = null;
     if (pendingId) {
       showStage('browse'); // hide the welcome card
-      connectToMatch(pendingId);
+      connectToMatch(pendingId, pendingSlotAfterAuth ?? undefined, pendingFactionAfterAuth ?? undefined);
     } else {
       openHub();
     }
@@ -10811,10 +10811,10 @@ async function submitRegister(): Promise<void> {
     // this path used to drop straight into the empty hub, silently abandoning the
     // match they were trying to join (the seat never got claimed).
     const pendingId = pendingJoinAfterAuth;
-    pendingJoinAfterAuth = null;
+    pendingJoinAfterAuth = null; pendingSlotAfterAuth = null; pendingFactionAfterAuth = null;
     if (pendingId) {
       showStage('browse');
-      connectToMatch(pendingId);
+      connectToMatch(pendingId, pendingSlotAfterAuth ?? undefined, pendingFactionAfterAuth ?? undefined);
     } else {
       openHub();
     }
@@ -11148,6 +11148,7 @@ const bootParams = typeof location !== 'undefined' ? new URLSearchParams(locatio
 const bootReset = (bootParams?.get('reset') ?? '').trim();
 const bootJoinId = (bootParams?.get('join') ?? '').trim();
 const bootSlot = (bootParams?.get('slot') ?? '').trim();
+const bootFaction = (bootParams?.get('faction') ?? '').trim();
 console.log('[boot] location.search=', location.search, 'bootJoinId=', bootJoinId, 'bootReset=', bootReset, 'bootSlot=', bootSlot);
 if (bootReset) {
   openReset(bootReset);
@@ -11167,7 +11168,7 @@ if (bootReset) {
     if (!authMode) {
       console.log('[boot] auth-off — connectToMatch directly');
       showStage('browse');
-      connectToMatch(bootJoinId, bootSlot || undefined);
+      connectToMatch(bootJoinId, bootSlot || undefined, bootFaction || undefined);
       return;
     }
     // Auth-on: if we have a cached session JWT, go straight to the match.
@@ -11176,13 +11177,15 @@ if (bootReset) {
     if (cached) {
       console.log('[boot] cached session — connectToMatch');
       showStage('browse');
-      connectToMatch(bootJoinId, bootSlot || undefined);
+      connectToMatch(bootJoinId, bootSlot || undefined, bootFaction || undefined);
       return;
     }
     // No session — show the welcome card so the player can register/login,
     // then welcomeSignIn auto-resumes the join via pendingJoinAfterAuth.
     console.log('[boot] no session — showing welcome card, pendingJoinAfterAuth=', bootJoinId);
     pendingJoinAfterAuth = bootJoinId;
+    pendingSlotAfterAuth = bootSlot || null;
+    pendingFactionAfterAuth = bootFaction || null;
     showStage('welcome');
     const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
     wNickInput.value = savedNick || suggestCallsign();
@@ -12212,11 +12215,16 @@ async function ensureSession(
    matchId: string,
    session: string,
    slot?: string,
+   faction?: string,
  ): Promise<{ token: string; playerId: string } | null> {
    try {
-    // REL-7: pass ?slot= to request a specific seat (faction/start choice).
-    const slotParam = slot ? `?slot=${encodeURIComponent(slot)}` : '';
-    const res = await fetch(`${httpBase(base)}/matches/${encodeURIComponent(matchId)}/join${slotParam}`, {
+    // REL-7: pass ?slot= to request a specific seat; ?faction= to override the
+    // seat's default faction (BF-30: faction decoupled from start point).
+    const params = new URLSearchParams();
+    if (slot) params.set('slot', slot);
+    if (faction) params.set('faction', faction);
+    const queryStr = params.toString() ? `?${params.toString()}` : '';
+    const res = await fetch(`${httpBase(base)}/matches/${encodeURIComponent(matchId)}/join${queryStr}`, {
       headers: { authorization: `Bearer ${session}` },
     });
     if (res.status === 401) {
@@ -12247,6 +12255,8 @@ let pendingJoinToken: string | null = null;
  *  this holds the id so `welcomeSignIn` can auto-resume the join after login.
  *  Cleared on successful `connectToMatch`, never leaks across sessions. */
 let pendingJoinAfterAuth: string | null = null;
+let pendingSlotAfterAuth: string | null = null;
+let pendingFactionAfterAuth: string | null = null;
 
 interface MatchRow {
   matchId: string;
@@ -12295,7 +12305,7 @@ function ruleSummary(r: MatchRow['rules']): string {
  *  which isn't shown by default. Fix: stash the id in `pendingJoinAfterAuth`, show
  *  the welcome card so the player can register/login, and `welcomeSignIn` resumes
  *  the join automatically on success. */
-function connectToMatch(id: string, slot?: string): void {
+function connectToMatch(id: string, slot?: string, faction?: string): void {
   currentMatchId = id;
   reconnecting = false;
   reconnectAttempts = 0;
@@ -12336,7 +12346,7 @@ function connectToMatch(id: string, slot?: string): void {
       wPassInput.focus();
       return;
     }
-    const join = await fetchJoinToken(srv.base, id, cached.token, slot);
+    const join = await fetchJoinToken(srv.base, id, cached.token, slot, faction);
     if (!join) {
       // fetchJoinToken returned null — either 401 (session expired, it cleared
       // the cache) or 403/409 (entry closed / full). For 401, show the welcome
@@ -12378,12 +12388,14 @@ const seatpickGoEl = $('seatpick-go') as HTMLButtonElement | null;
 const seatpickCancelEl = $('seatpick-cancel') as HTMLButtonElement | null;
 let seatpickMatchId: string | null = null;
 let seatpickSelected: string | null = null;
+let seatpickFaction: string | null = null; // BF-30: chosen faction (decoupled from slot)
 
 async function openSeatPicker(matchId: string): Promise<void> {
   const srv = resolveServer();
   if (!srv) return;
   seatpickMatchId = matchId;
   seatpickSelected = null;
+  seatpickFaction = null;
   if (seatpickGoEl) seatpickGoEl.disabled = true;
   if (seatpickListEl) seatpickListEl.innerHTML = '<p style="color:var(--dim);text-align:center">Загрузка…</p>';
   if (seatpickEl) seatpickEl.style.display = 'flex';
@@ -12456,6 +12468,7 @@ async function openSeatPicker(matchId: string): Promise<void> {
             // Store the first free seat of this faction as the chosen slot.
             const firstFree = seats.find((s) => !s.taken);
             seatpickSelected = firstFree?.playerId ?? null;
+            seatpickFaction = faction; // BF-30: faction chosen independently of start
             if (seatpickGoEl) seatpickGoEl.disabled = !seatpickSelected;
           });
         }
@@ -12478,11 +12491,14 @@ if (seatpickGoEl) {
     if (!seatpickMatchId || !seatpickSelected) return;
     const id = seatpickMatchId;
     const slot = seatpickSelected;
+    const faction = seatpickFaction;
     if (seatpickEl) seatpickEl.style.display = 'none';
     seatpickMatchId = null;
-    // Navigate to ?join=<id>&slot=<slotId> — the boot block picks up ?join and
-    // connectToMatch fetches the join token with ?slot= to reserve the chosen seat.
-    location.href = `${location.pathname}?join=${encodeURIComponent(id)}&slot=${encodeURIComponent(slot)}`;
+    // Navigate to ?join=<id>&slot=<slotId>&faction=<faction> — the boot block picks
+    // up ?join and connectToMatch fetches the join token with ?slot=&faction= to
+    // reserve the chosen seat AND override its faction (BF-30: decoupled from start).
+    const factionParam = faction ? `&faction=${encodeURIComponent(faction)}` : '';
+    location.href = `${location.pathname}?join=${encodeURIComponent(id)}&slot=${encodeURIComponent(slot)}${factionParam}`;
   });
 }
 
