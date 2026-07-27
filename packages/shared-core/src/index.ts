@@ -139,6 +139,19 @@ export {
   type GroundOutcome,
 } from './state/groundCombat';
 export { scanNodeThreats, type NodeThreat } from './state/threat';
+export {
+  squadronTake,
+  sortieSpec,
+  freshSortie,
+  canSortie,
+  spendSortie,
+  tickRearm,
+  fleetHasSquadron,
+  squadronStrikeRange,
+  withinRange,
+  squadronReaches,
+  type SortieState,
+} from './state/squadron';
 
 // Action contract
 export {
