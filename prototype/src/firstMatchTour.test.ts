@@ -11,7 +11,11 @@ function anyHost(): SpotlightHost {
 
 describe('buildFirstMatchTour — shape', () => {
   it('walks produce → build → move → capture → score → done', () => {
-    const tour = buildFirstMatchTour({ capturedWorld: () => false, scoreRose: () => false });
+    const tour = buildFirstMatchTour({
+      hasFleet: () => false,
+      capturedWorld: () => false,
+      scoreRose: () => false,
+    });
     expect(tour.map((s) => s.id)).toEqual([
       'welcome',
       'home',
@@ -22,19 +26,16 @@ describe('buildFirstMatchTour — shape', () => {
       'score',
       'done',
     ]);
-    // the "do X" beats advance on real actions; capture/score on live state
+    // the "do X" beats advance on real actions; capture/score/fleet on live state
     expect(tour.find((s) => s.id === 'mine')?.advance).toMatchObject({
       on: 'action',
       type: 'building.construct',
-    });
-    expect(tour.find((s) => s.id === 'fleet')?.advance).toMatchObject({
-      on: 'action',
-      type: 'fleet.launch',
     });
     expect(tour.find((s) => s.id === 'course')?.advance).toMatchObject({
       on: 'action',
       type: 'fleet.move',
     });
+    expect(tour.find((s) => s.id === 'fleet')?.advance.on).toBe('state');
     expect(tour.find((s) => s.id === 'capture')?.advance.on).toBe('state');
     expect(tour.find((s) => s.id === 'score')?.advance.on).toBe('state');
   });
@@ -42,9 +43,14 @@ describe('buildFirstMatchTour — shape', () => {
 
 describe('buildFirstMatchTour — capture is gated on real state', () => {
   it('does not pass the capture step until a world is actually taken', () => {
+    let fleetRaised = false;
     let captured = false;
     let scored = false;
-    const tour = buildFirstMatchTour({ capturedWorld: () => captured, scoreRose: () => scored });
+    const tour = buildFirstMatchTour({
+      hasFleet: () => fleetRaised,
+      capturedWorld: () => captured,
+      scoreRose: () => scored,
+    });
     let result: TourResult | null = null;
     const t = new SpotlightTour(tour, anyHost(), (r) => (result = r));
     t.start();
@@ -52,7 +58,13 @@ describe('buildFirstMatchTour — capture is gated on real state', () => {
     t.tap(); // welcome → home
     t.tap(); // home → mine
     t.notifyAction('building.construct'); // mine → fleet
-    t.notifyAction('fleet.launch'); // fleet → course
+    expect(t.index).toBe(3); // parked on the fleet step — a ship must actually auto-rally
+
+    for (let f = 0; f < 30; f++) t.refresh(); // no fleet yet — stays put
+    expect(t.index).toBe(3);
+
+    fleetRaised = true;
+    t.refresh(); // a built ship auto-rallied → fleet advances to course
     t.notifyAction('fleet.move'); // course → capture
     expect(t.index).toBe(5); // parked on the capture step
 
@@ -75,7 +87,11 @@ describe('buildFirstMatchTour — capture is gated on real state', () => {
 
 describe('buildFirstMatchTour — skippable', () => {
   it('a skip mid-guide ends the whole chain as skipped', () => {
-    const tour = buildFirstMatchTour({ capturedWorld: () => false, scoreRose: () => false });
+    const tour = buildFirstMatchTour({
+      hasFleet: () => false,
+      capturedWorld: () => false,
+      scoreRose: () => false,
+    });
     let result: TourResult | null = null;
     const t = new SpotlightTour(tour, anyHost(), (r) => (result = r));
     t.start();

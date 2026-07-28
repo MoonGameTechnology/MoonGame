@@ -18,6 +18,8 @@
 import type { SpotlightStep } from './spotlight';
 
 export interface FirstMatchDeps {
+  /** True once the player has raised a mobile fleet (a built ship auto-rallies to orbit). */
+  hasFleet: () => boolean;
   /** True once the player owns a world beyond their start (a neutral was taken). */
   capturedWorld: () => boolean;
   /** True once the player's score has risen above its starting value. */
@@ -43,17 +45,16 @@ export function buildFirstMatchTour(deps: FirstMatchDeps): SpotlightStep[] {
     },
     {
       id: 'mine',
-      target: '#side',
+      target: '[data-buildorder="building:mine"]',
       copy: 'Начни с экономики: построй Шахту — она даёт ресурсы, на них строится всё остальное.',
       advance: { on: 'action', type: 'building.construct' },
       placement: 'top',
     },
     {
       id: 'fleet',
-      target: '#side',
-      copy: 'Теперь подними флот из гарнизона родного мира — кнопка «Поднять флот». Так корабли становятся подвижной силой.',
-      advance: { on: 'action', type: 'fleet.launch' },
-      placement: 'top',
+      target: null,
+      copy: 'Теперь построй боевой корабль — вкладка «Корабли» той же панели. Готовый корабль сам прилетит на орбиту и соберётся во флот — жди, пока рядом с твоим миром не появится «▲».',
+      advance: { on: 'state', when: deps.hasFleet },
     },
     {
       id: 'course',
