@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1894 зелёных** (54 skip, 175 файлов).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1898 зелёных** (54 skip, 175 файлов).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -116,6 +116,7 @@ packages/action-layer/src/
   examples/      skirmish.test.ts (демо-сценарий + SVG)
   index.ts       баррель (экспорт публичного API)
 data/            manifest, resources, units, buildings, factions, events, sectors, planetTypes, technologies (.json)
+localization/    ВЕСЬ текст для игрока: index.ts (LOCALES/DEFAULT_LOCALE/dataKey), ru.ts, en.ts (плоские карты ключ→текст), legacy/en.ts (мост старых msgid, сокращается — LOC-2)
 docs/            architecture, modulesystem, roadmap, deep-technical-roadmap, multiplayer, engineering-risks, gdd, metagame, state(этот)
 prototype/       src/game.ts (оркестрация, реэкспорты — REFP-рефактор: 5289→2476 строк), src/prototypeData.ts, src/map.ts, src/fleetStacks.ts, src/tax.ts, src/formations.ts, src/botFavour.ts, src/squadron.ts, src/chain.ts, src/hunger.ts, src/botDiplomacy.ts, src/sessionMarket.ts, src/capital.ts, src/fleetLaunch.ts, src/standingOrders.ts, src/forcedMarch.ts, src/instantRepair.ts, src/econScrews.ts, src/economy.ts (вынесены из game.ts, Block REFP), src/main.ts (UI), src/smoke.ts, build.mjs, uitest.mjs, dist/ (артефакт, в .gitignore)
 ```
@@ -942,6 +943,23 @@ grants}`), `heroFittings.json` (`{statMods, grants, cost}`). Движок ПОЛ
   тесты связывают все каталоги; загрузчик собирает 5 фрагментов.
 
 ## 7. Прототип (`prototype/`)
+
+**Локализация (LOC-1, этап 1 из 2).** Текста для игрока в коде НЕТ — есть ключ:
+`t('err.no-capacity')`, `tData('Metal Mine')`. Сам текст живёт в корневой
+`/localization` (одна локаль = один файл, плоская карта `ключ → текст`); формат ключа
+— `домен.сущность.аспект` (точки — иерархия, kebab-case внутри сегмента). Полное
+правило — в корневом `CLAUDE.md` §«Локализация». Порядок поиска в `prototype/src/i18n.ts`:
+выбранная локаль → **русский как источник** (непереведённый ключ виден по-русски, а не
+как голый ключ) → сам ключ (заметная опечатка). `tData()` строит ключ детерминированным
+слагом `dataKey()`, поэтому таблицы «имя данных → ключ» нет; `localizeStaticDom()` берёт
+ключ из ЗНАЧЕНИЯ атрибута (`data-i18n="hub.play"`). На ключи переведены словарные домены,
+где ключ выводится из идентификатора кода — `err.*` (таблица `ERR_RU` УДАЛЕНА: ключ
+считается из кода отказа), `data.*`, `hero.*`, `ship.*`, `diplo.*`, `market.*`,
+`tech.branch.*`, `hud.resource.*`, **169 ключей**. Остальные ~1100 вызовов ещё держит
+**мост** `/localization/legacy/en.ts` (старый msgid = русская строка); мост только
+сокращается, добавлять в него нельзя — домиграция это кирпич `LOC-2`. Гейт —
+`prototype/src/i18n.test.ts` (7 тестов: паритет ru/en, ключ из кода заведён, ключ локали
+не осиротел, в EN нет кириллицы, у каждого юнита есть имя, мост не растёт).
 
 `pnpm run prototype` → esbuild собирает всё (ядро + zod + UI) в **два** self-contained
 HTML (открываются с диска, без сервера): `dist/void-dominion.html` — дев-клиент

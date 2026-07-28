@@ -19,10 +19,10 @@ export interface HeroGradeDef {
   icon: string;
 }
 export const HERO_GRADES: Record<HeroGrade, HeroGradeDef> = {
-  common: { name: 'Обычный', slots: 1, icon: '◦' },
-  rare: { name: 'Редкий', slots: 2, icon: '◈' },
-  legendary: { name: 'Легендарный', slots: 3, icon: '★' },
-  main: { name: 'Главный', slots: 4, icon: '♛' },
+  common: { name: 'hero.grade.common', slots: 1, icon: '◦' },
+  rare: { name: 'hero.grade.rare', slots: 2, icon: '◈' },
+  legendary: { name: 'hero.grade.legendary', slots: 3, icon: '★' },
+  main: { name: 'hero.grade.main', slots: 4, icon: '♛' },
 };
 /** Module slots a grade grants (degrades to 1 on an unknown grade). */
 export function heroSlots(grade: HeroGrade): number {
@@ -52,49 +52,49 @@ export interface HeroAbility {
 export const HERO_ABILITIES: Record<string, HeroAbility> = {
   corridor: {
     id: 'corridor',
-    name: 'Коридор',
+    name: 'hero.ability.corridor.name',
     icon: '〜',
-    desc: 'Открывает временный коридор-лейн до близкого мира; свои флоты идут по нему быстрее.',
+    desc: 'hero.ability.corridor.desc',
     cooldownHours: 12,
     live: true,
   },
   annihilate: {
     id: 'annihilate',
-    name: 'Аннигиляция',
+    name: 'hero.ability.annihilate.name',
     icon: '☢',
-    desc: 'Уничтожает планету в радиусе — она становится мёртвым миром.',
+    desc: 'hero.ability.annihilate.desc',
     cooldownHours: 48,
     live: true,
   },
   rally: {
     id: 'rally',
-    name: 'Сбор',
+    name: 'hero.ability.rally.name',
     icon: '⚑',
-    desc: 'Боевой клич: временный доп. бонус к ауре для своих флотов рядом с героем.',
+    desc: 'hero.ability.rally.desc',
     cooldownHours: 18,
     live: true,
   },
   scan: {
     id: 'scan',
-    name: 'Разведка',
+    name: 'hero.ability.scan.name',
     icon: '◎',
-    desc: 'Раскрывает зону вокруг цели сквозь туман на время.',
+    desc: 'hero.ability.scan.desc',
     cooldownHours: 10,
     live: true,
   },
   recall: {
     id: 'recall',
-    name: 'Отзыв',
+    name: 'hero.ability.recall.name',
     icon: '⟲',
-    desc: 'Мгновенно отзывает корабль-героя в столицу.',
+    desc: 'hero.ability.recall.desc',
     cooldownHours: 24,
     live: true,
   },
   bulwark: {
     id: 'bulwark',
-    name: 'Бастион',
+    name: 'hero.ability.bulwark.name',
     icon: '⛨',
-    desc: 'Временный щит: +оборона своим флотам рядом с героем.',
+    desc: 'hero.ability.bulwark.desc',
     cooldownHours: 20,
     live: true,
   },

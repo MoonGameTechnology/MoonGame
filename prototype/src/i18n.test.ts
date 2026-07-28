@@ -1,29 +1,52 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { en } from './locale/en';
+import { ru } from '../../localization/ru';
+import { en } from '../../localization/en';
+import { en as legacyEn } from '../../localization/legacy/en';
+import { dataKey } from '../../localization';
 
-// Locale-coverage guard (BF: EN leak). The canonical language is Russian — every
-// `t('…')` msgid and every static `[data-i18n]` header is a Russian source string,
-// and en.ts translates it. A missing entry silently shows Russian on the English
-// locale (an honest fallback, but a bug in shipped UI). These tests pin the full
-// coverage so a NEW untranslated string fails CI instead of leaking to playtesters.
+// Гейт локализации. Текст живёт в /localization, в коде — только ключи
+// (`t('err.no-capacity')`). Эти тесты держат три инварианта:
+//   1. локали не расходятся — у ru.ts и en.ts один и тот же набор ключей;
+//   2. ключ из кода существует, а ключ из локали не осиротел;
+//   3. МОСТ на время миграции (старый msgid = русская строка) только сокращается.
+// Без них непереведённая строка молча уезжает в прод по-русски, а опечатка в ключе
+// показывается игроку как `err.no-capaciti`.
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const read = (p: string): string => readFileSync(path.join(repoRoot, p), 'utf8');
+/** Читаем исходник БЕЗ строк-комментариев: doc-шапки показывают примеры вызовов
+ *  (`t('fleet.eta', { n: 3 })`), и без этого они попали бы в разбор как настоящие. */
+const read = (p: string): string =>
+  readFileSync(path.join(repoRoot, p), 'utf8')
+    .split('\n')
+    .filter((ln) => !/^\s*(\/\/|\*|\/\*)/.test(ln))
+    .join('\n');
 const hasCyrillic = (s: string): boolean => /[А-Яа-яЁё]/.test(s);
 
-/** Extract the first string-literal argument of every `t(…)` call. Walks char by
- *  char (no regex fragility on `{placeholders}` / apostrophes / newlines): on a `t`
- *  that opens a call, read the quoted literal, honoring backslash escapes. */
-function extractTMsgids(src: string): Set<string> {
+/** Ключ = строчные сегменты через точку, минимум два: `err.no-capacity`. Старый
+ *  msgid под это не подходит (кириллица, пробелы, заглавные), поэтому по одному
+ *  виду литерала однозначно понятно, ключ это или мост. */
+const KEY_RE = /^[a-z][a-z0-9-]*(?:\.[a-z0-9-]+)+$/;
+
+const srcFiles = (): string[] =>
+  readdirSync(path.join(repoRoot, 'prototype/src'))
+    .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+    .map((f) => `prototype/src/${f}`);
+
+/** Первый строковый аргумент каждого `t(…)` / `tData(…)`. Идём посимвольно (regex
+ *  ломается на `{placeholders}` / апострофах / переносах): на вызове читаем литерал,
+ *  уважая экранирование. Вызов с переменной или шаблоном пропускается — такие ключи
+ *  собираются в рантайме и покрыты списком DYNAMIC ниже. */
+function extractCallArgs(src: string, fn: 't' | 'tData'): Set<string> {
   const out = new Set<string>();
   for (let i = 0; i < src.length - 1; i++) {
-    if (src[i] !== 't' || src[i + 1] !== '(') continue;
-    const prev = i > 0 ? src[i - 1] : ' ';
-    if (/[A-Za-z0-9_$.]/.test(prev)) continue; // part of a longer identifier / member
-    let j = i + 2;
+    if (fn === 'tData' ? !src.startsWith('tData(', i) : !(src[i] === 't' && src[i + 1] === '('))
+      continue;
+    const prev = i > 0 ? src[i - 1]! : ' ';
+    if (/[A-Za-z0-9_$.]/.test(prev)) continue; // часть более длинного идентификатора
+    let j = i + (fn === 'tData' ? 6 : 2);
     while (j < src.length && /\s/.test(src[j]!)) j++;
     const q = src[j];
     if (q !== "'" && q !== '"' && q !== '`') continue;
@@ -40,6 +63,7 @@ function extractTMsgids(src: string): Set<string> {
       lit += c;
       j++;
     }
+    if (q === '`' && lit.includes('${')) continue; // шаблон — ключ собирается в рантайме
     out.add(
       lit
         .replace(/\\'/g, "'")
@@ -52,50 +76,74 @@ function extractTMsgids(src: string): Set<string> {
   return out;
 }
 
-/** Static markup msgids in build.mjs: [data-i18n] element TEXT (canonical Russian),
- *  plus title/placeholder/aria-label VALUES flagged by the -title/-ph/-aria variants. */
-function extractDomMsgids(src: string): Set<string> {
-  const out = new Set<string>();
-  const pairs: Array<[RegExp]> = [
-    [/data-i18n-title[^>]*?\btitle="([^"]+)"/g],
-    [/\btitle="([^"]+)"[^>]*?data-i18n-title/g],
-    [/data-i18n-ph[^>]*?\bplaceholder="([^"]+)"/g],
-    [/\bplaceholder="([^"]+)"[^>]*?data-i18n-ph/g],
-    [/data-i18n-aria[^>]*?\baria-label="([^"]+)"/g],
-    [/\baria-label="([^"]+)"[^>]*?data-i18n-aria/g],
-    [/<[^>]*\bdata-i18n\b[^>]*>([^<]+)</g],
-  ];
-  for (const [re] of pairs) {
-    for (const m of src.matchAll(re)) {
-      const txt = m[1]!.trim();
-      if (txt) out.add(txt);
-    }
-  }
-  return out;
-}
+/** Ключи, которых НЕТ в коде литералом — они собираются из идентификатора в рантайме.
+ *  Каждая запись объясняет, кто их строит; иначе тест на сирот снесёт живой перевод. */
+const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
+  { prefix: 'err.', built_by: 'errText() — из кода отказа ядра: E_NO_CAPACITY → err.no-capacity' },
+  { prefix: 'data.', built_by: 'tData() через dataKey() — из имени в data/*.json' },
+  { prefix: 'hud.resource.', built_by: 'renderHud() — из id ресурса в chip()' },
+];
+const isDynamic = (k: string): boolean => DYNAMIC.some((d) => k.startsWith(d.prefix));
 
-describe('i18n — the English locale covers every UI string (no Russian leak)', () => {
-  it('every t() msgid in main.ts / game.ts has an English entry', () => {
-    const src = read('prototype/src/main.ts') + '\n' + read('prototype/src/game.ts');
-    const missing = [...extractTMsgids(src)].filter((m) => !(m in en)).sort();
-    expect(missing, `untranslated t() msgids: ${JSON.stringify(missing, null, 2)}`).toEqual([]);
+describe('локализация — ключи', () => {
+  it('ru.ts и en.ts описывают ровно один и тот же набор ключей', () => {
+    const onlyRu = Object.keys(ru).filter((k) => !(k in en)).sort();
+    const onlyEn = Object.keys(en).filter((k) => !(k in ru)).sort();
+    expect({ onlyRu, onlyEn }).toEqual({ onlyRu: [], onlyEn: [] });
   });
 
-  it('every static [data-i18n] header in build.mjs has an English entry', () => {
-    const src = read('prototype/build.mjs');
-    const missing = [...extractDomMsgids(src)]
-      .filter((m) => hasCyrillic(m) && !(m in en))
+  it('каждый ключ из кода заведён в локали', () => {
+    const missing: string[] = [];
+    for (const f of srcFiles())
+      for (const lit of extractCallArgs(read(f), 't'))
+        if (KEY_RE.test(lit) && !(lit in ru)) missing.push(`${f}: ${lit}`);
+    expect(missing.sort()).toEqual([]);
+  });
+
+  it('каждый ключ локали используется (нет осиротевших переводов)', () => {
+    const hay = srcFiles()
+      .map(read)
+      .join('\n');
+    const orphans = Object.keys(ru)
+      .filter((k) => !isDynamic(k) && !hay.includes(k))
       .sort();
-    expect(missing, `untranslated [data-i18n]: ${JSON.stringify(missing, null, 2)}`).toEqual([]);
+    expect(orphans).toEqual([]);
   });
 
-  it('no reverse-leak: an English value never stays Russian (nor copies a Russian source)', () => {
-    // A language-NEUTRAL msgid (no Cyrillic, e.g. '{got}/{need} XP') legitimately maps
-    // to itself — flag only a value that still carries Russian, or a Russian source
-    // copied verbatim into its own translation.
+  it('в английских значениях не осталось русского', () => {
     const leaks = Object.entries(en)
-      .filter(([k, v]) => !k.startsWith('data:') && (hasCyrillic(v) || (k === v && hasCyrillic(k))))
+      .filter(([, v]) => hasCyrillic(v))
       .map(([k]) => k);
-    expect(leaks, `Russian left in EN values: ${JSON.stringify(leaks, null, 2)}`).toEqual([]);
+    expect(leaks).toEqual([]);
+  });
+
+  it('у каждого юнита прототипа есть переведённое имя', () => {
+    // displayUnit() показывает юнита как tData(id с пробелами) → data.<слаг>.
+    // dataKey() — единственный мост между таблицей юнитов и локалью, поэтому
+    // переименование id здесь всплывает как потерянный перевод, а не как
+    // английское имя, тихо просочившееся в русский интерфейс.
+    const table = /units:\s*\{(.*?)\n {2}\}/s.exec(read('prototype/src/prototypeData.ts'))?.[1];
+    const ids = [...(table ?? '').matchAll(/^ {4}(\w+):/gm)].map((m) => m[1]!);
+    expect(ids.length).toBeGreaterThan(5); // разбор таблицы не должен молча опустеть
+    const missing = ids.map((id) => dataKey(id.replace(/_/g, ' '))).filter((k) => !(k in ru));
+    expect(missing).toEqual([]);
+  });
+});
+
+describe('локализация — мост совместимости (сокращается до нуля)', () => {
+  it('у каждого старого msgid из кода есть английский перевод', () => {
+    const missing: string[] = [];
+    for (const f of srcFiles())
+      for (const lit of extractCallArgs(read(f), 't'))
+        if (!KEY_RE.test(lit) && hasCyrillic(lit) && !(lit in legacyEn)) missing.push(lit);
+    expect([...new Set(missing)].sort()).toEqual([]);
+  });
+
+  it('в мосте нет записей, которые уже никто не зовёт', () => {
+    const hay = [...srcFiles().map(read), read('prototype/build.mjs')].join('\n');
+    const orphans = Object.keys(legacyEn)
+      .filter((k) => !hay.includes(k))
+      .sort();
+    expect(orphans).toEqual([]);
   });
 });

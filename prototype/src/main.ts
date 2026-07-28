@@ -186,7 +186,7 @@ import {
 // Localization: one locale = one file (src/locale/*). Msgid = the canonical
 // Russian source string; `t()` wraps every user-visible literal, `tData()` maps
 // English data/*.json names, the static HTML is localized by a boot pass.
-import { t, tData, LOCALE, LOCALE_LABEL, setLocale, localizeStaticDom } from './i18n';
+import { t, tData, hasKey, LOCALE, LOCALE_LABEL, setLocale, localizeStaticDom } from './i18n';
 import {
   META_TREE,
   META_BRANCH_RU,
@@ -2293,69 +2293,14 @@ function installFortressAA(planetId: string) {
 
 /** Apply a player-issued order and surface a rejection in the log (so a denied
  *  click — wrong orbit, no capacity, can't afford — isn't silently swallowed). */
-// Kernel rejection codes → a human phrase (canonical Russian msgid → the locale
-// translates). Unlisted codes fall back to the de-mangled code itself.
-const ERR_RU: Record<string, string> = {
-  E_INSUFFICIENT: 'не хватает ресурсов',
-  E_NO_FUNDS: 'не хватает средств',
-  E_BAD_TARGET: 'недопустимая цель',
-  E_NO_TARGET: 'нет цели',
-  E_FORBIDDEN: 'действие запрещено',
-  E_NO_PLAYER: 'игрок не найден',
-  E_NO_PLANET: 'мир не найден',
-  E_NO_FLEET: 'флот не найден',
-  E_BAD_PAYLOAD: 'некорректный приказ',
-  E_FLEET_BUSY: 'флот занят',
-  E_LIMIT: 'достигнут предел',
-  E_CONDITIONS_UNMET: 'условия не выполнены',
-  E_BOMBARDED: 'стройка под бомбардировкой',
-  E_NO_SHIPYARD: 'нужна верфь/космопорт',
-  E_WRONG_SECTOR: 'недопустимый тип сектора',
-  E_WRONG_ORBIT: 'недопустимая орбита',
-  E_SAME_LOCATION: 'флот уже здесь',
-  E_OWN_PLANET: 'это ваш собственный мир',
-  E_OUT_OF_RANGE: 'вне радиуса действия',
-  E_NO_SHIPS: 'нет кораблей',
-  E_NO_CAPACITY: 'трюм полон',
-  E_NO_ARTILLERY: 'нет артиллерии',
-  E_UNKNOWN_UNIT: 'неизвестный юнит',
-  E_UNKNOWN_BUILDING: 'неизвестное здание',
-  E_UNKNOWN_TECHNOLOGY: 'неизвестная технология',
-  E_RESEARCH_SLOTS_FULL: 'все исследовательские слоты заняты',
-  E_TOO_EARLY: 'слишком рано',
-  E_BOT_ALLIANCE: 'боты не вступают в коалиции',
-  E_CONSENT_REQUIRED: 'требуется согласие второй стороны',
-  E_ALREADY_OFFERED: 'предложение уже отправлено',
-  E_ALREADY: 'уже действует',
-  E_CHAT_RATE: 'подождите пару секунд',
-  E_CHAT_TARGET: 'адресат не найден',
-  E_CHAT_TEXT: 'пустое сообщение',
-  E_NO_HERO: 'герой не найден',
-  E_HERO_NOT_DEPLOYED: 'герой не развёрнут — сначала поднимите корабль',
-  E_NO_CAPITAL: 'нет столицы для отзыва',
-  E_BAD_EFFECT: 'способность настроена некорректно',
-  E_HERO_DEAD: 'герой погиб — дождитесь возрождения',
-  E_HERO_ALIVE: 'герой уже командует кораблём',
-  E_HERO_CAP: 'достигнут предел развёрнутых героев',
-  E_BAD_SPAWN: 'здесь нельзя развернуть героя',
-  E_RESPAWN_COOLDOWN: 'герой ещё восстанавливается',
-  E_NO_ABILITY: 'неизвестная способность',
-  E_NOT_EQUIPPED: 'у героя нет этой способности',
-  E_NO_EFFECT: 'эффект ещё не реализован',
-  E_COOLDOWN: 'способность перезаряжается',
-  E_NO_NODE: 'неизвестный узел дерева',
-  E_ALREADY_UNLOCKED: 'узел уже изучен',
-  E_WRONG_BRANCH: 'узел чужой ветви',
-  E_REQUIRES: 'сначала изучите предыдущий узел',
-  E_NO_FITTING: 'неизвестный фиттинг',
-  E_ALREADY_FITTED: 'фиттинг уже установлен',
-  E_NO_SLOTS: 'слоты фиттингов заняты',
-  E_NOT_DESTRUCTIBLE: 'этот мир нельзя уничтожить',
-  E_NO_TROOPS: 'мир защищён — для штурма нужен десант на борту',
-  E_INTERNAL: 'внутренняя ошибка',
-};
+// Kernel rejection codes → a human phrase. The key is DERIVED from the code
+// (E_NO_CAPACITY → err.no-capacity), so a new code needs only an entry in
+// /localization — there is no table here to forget to update. An unlisted code
+// degrades to the de-mangled code itself rather than showing a raw key.
 function errText(code: string): string {
-  return t(ERR_RU[code] ?? code.replace(/^E_/, '').toLowerCase().replace(/_/g, ' '));
+  const bare = code.replace(/^E_/, '').toLowerCase();
+  const key = `err.${bare.replace(/_/g, '-')}`;
+  return hasKey(key) ? t(key) : bare.replace(/_/g, ' ');
 }
 function playerOrder(action: Action) {
   if (NET && netClient) {
@@ -6556,10 +6501,10 @@ function refreshSeatCard(id: string): void {
 // actions) and the session message log. Stances run through the core's
 // `diplomacy.declare`; messages are a client-side session log (SessionMsg).
 const STANCE_RU: Record<DiplomaticStance, string> = {
-  war: 'Война',
-  peace: 'Мир',
-  pact: 'Пакт',
-  alliance: 'Союз',
+  war: 'diplo.stance.war',
+  peace: 'diplo.stance.peace',
+  pact: 'diplo.stance.pact',
+  alliance: 'diplo.stance.alliance',
 };
 /** Localized stance label (canonical Russian msgid → the locale translates). */
 function stanceRu(st: DiplomaticStance): string {
@@ -8855,11 +8800,11 @@ const TECH_CUR: Record<string, string> = {
   microelectronics: '▦',
 };
 const TECH_BRANCHES: Array<{ key: string; label: string }> = [
-  { key: 'space', label: 'Космос' },
-  { key: 'ground', label: 'Земля' },
-  { key: 'squadron', label: 'Эскадрильи' },
-  { key: 'missile', label: 'Ракеты' },
-  { key: 'command', label: 'Командование' }, // automation / C2 — «Хранитель» lives here
+  { key: 'space', label: 'tech.branch.space' },
+  { key: 'ground', label: 'tech.branch.ground' },
+  { key: 'squadron', label: 'tech.branch.squadron' },
+  { key: 'missile', label: 'tech.branch.missile' },
+  { key: 'command', label: 'tech.branch.command' }, // automation / C2 — «Хранитель» lives here
 ];
 const branchLabel = (key: string): string =>
   t(TECH_BRANCHES.find((b) => b.key === key)?.label ?? key);
@@ -9722,10 +9667,10 @@ function heroDossierHtml(hero: HeroInst): string {
 // The whole box is rendered from JS (like #diplo) so each tab re-renders in place.
 type MarketGood = 'metal' | 'food' | 'energy' | 'microelectronics';
 const MARKET_RES: Array<{ key: MarketGood; label: string }> = [
-  { key: 'metal', label: 'Металл' },
-  { key: 'food', label: 'Пища' },
-  { key: 'energy', label: 'Энергия' },
-  { key: 'microelectronics', label: 'Микро' },
+  { key: 'metal', label: 'market.res.metal' },
+  { key: 'food', label: 'market.res.food' },
+  { key: 'energy', label: 'market.res.energy' },
+  { key: 'microelectronics', label: 'market.res.microelectronics' },
 ];
 let marketTab: MarketGood = 'metal';
 let marketFormSide: 'sell' | 'buy' = 'sell';
@@ -13079,7 +13024,7 @@ function frame(nowReal: number) {
   // it plays no part in the current match yet.
   const inc = netIncome(s, ME);
   const myArrears = s.players[ME]?.arrears ?? [];
-  const chip = (icon: string, key: string, name: string) => {
+  const chip = (icon: string, key: string) => {
     const stock = r[key] ?? 0;
     const raw = inc[key] ?? 0;
     // Building/army upkeep makes sub-1/h drains common — one decimal keeps a slow
@@ -13096,14 +13041,14 @@ function frame(nowReal: number) {
     // Unpaid upkeep on this resource → the chip flags the brownout (tap it for words).
     const short = myArrears.includes(key) ? ' short' : '';
     const bleed = MOBILE && flow < 0 ? ' class="neg"' : '';
-    return `<span class="res${dead}${short}" title="${tData(name)}" data-res="${key}"><i>${icon}</i><span class="rv"><b${bleed}>${kfmt(stock)}</b>${short ? '<em class="dn">⚠</em>' : flowTxt}</span></span>`;
+    return `<span class="res${dead}${short}" title="${t(`hud.resource.${key}`)}" data-res="${key}"><i>${icon}</i><span class="rv"><b${bleed}>${kfmt(stock)}</b>${short ? '<em class="dn">⚠</em>' : flowTxt}</span></span>`;
   };
   const hudHtml =
-    chip('¤', 'credits', 'Credits') +
-    chip('❖', 'food', 'Food') +
-    chip('⬢', 'metal', 'Metal') +
-    chip('↯', 'energy', 'Energy') +
-    chip('▦', 'microelectronics', 'Microelectronics');
+    chip('¤', 'credits') +
+    chip('❖', 'food') +
+    chip('⬢', 'metal') +
+    chip('↯', 'energy') +
+    chip('▦', 'microelectronics');
   if (hudHtml !== lastHudHtml) {
     purse.innerHTML = hudHtml;
     lastHudHtml = hudHtml;
