@@ -1581,6 +1581,7 @@ function submitQueued(planetId: string, queued: QueuedBuild): StepOut {
   const out = order(s, action, s.time);
   apply(out);
   sandboxBuildRestore(before, !out.error);
+  if (!out.error) activeTour?.notifyAction(action.type); // local build queue bypasses playerOrder
   return out;
 }
 // A rally fleet keeps swallowing freshly-built ships only while its world still has
@@ -2452,9 +2453,11 @@ function startGuidedMatch(): void {
   pendingGuide = () => {
     const startScore = myScore();
     const startWorlds = myWorldCount(); // baseline: home only
+    const startFleets = myFleetCount(); // baseline: none yet
     startFirstGoals(); // ONB-7: the first-session checklist rides alongside the guide
     launchTour(
       buildFirstMatchTour({
+        hasFleet: () => myFleetCount() > startFleets,
         capturedWorld: () => myWorldCount() > startWorlds,
         scoreRose: () => myScore() > startScore + 1,
       }),

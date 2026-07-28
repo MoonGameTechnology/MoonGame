@@ -20,7 +20,7 @@ export const SCORE_GOAL = 100;
 /** The four first-match goals, in the order the guided match teaches them. */
 export const FIRST_GOALS: Goal[] = [
   { id: 'mine', label: 'Построй шахту' },
-  { id: 'fleet', label: 'Подними флот' },
+  { id: 'fleet', label: 'Построй корабль' },
   { id: 'capture', label: 'Захвати мир' },
   { id: 'score', label: 'Набери 100 очков' },
 ];
