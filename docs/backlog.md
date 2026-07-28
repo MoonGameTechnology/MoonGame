@@ -1560,16 +1560,24 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
 - **REFP-14** ✅ `[proto]` **`capital.ts`** — `capitalsOf`, `capitalOf`,
   `capitalModule` вынесены в `prototype/src/capital.ts`. `game.ts` импортирует и
   реэкспортирует. Гейт зелёный.
-- **REFP-15** ⏳ `[proto]` **`standingOrders.ts`** — `standingOrdersModule` (3459–3615).
-  Тест: `standingorders.test.ts`.
-- **REFP-16** ⏳ `[proto]` **`forcedMarch.ts`** — `FORCED_MARCH_*`, `forcedMarchModule`
-  (3616–3692). Тест: `forcedmarch.test.ts`.
-- **REFP-17** ⏳ `[proto]` **`instantRepair.ts`** — `INSTANT_REPAIR_*`, `missingHull`,
-  `instantRepairCost`, `instantRepairModule` (3693–3743). Тест: `instantrepair.test.ts`.
-- **REFP-18** ⏳ `[proto]` **`econScrews.ts`** — `REPAIR_HP_PER_METAL`, `dockRepairCost`,
-  `fleetAtOwnDock`, `econScrewsModule` (3744–3790). Тест: `econscrews.test.ts`.
-- **REFP-19** ⏳ `[proto]` **`economy.ts`** — `economySnapshot`, `netIncome`, `hpOfLevel`
-  (2426–2614). Тесты: `econmetrics.test.ts`, `buildingeconomy.test.ts`.
+- **REFP-15** ✅ `[proto]` **`standingOrders.ts`** — `standingOrdersModule` вынесен в
+  `prototype/src/standingOrders.ts`. `game.ts` импортирует и реэкспортирует. Гейт
+  зелёный (PR #368, `standingorders.test.ts`).
+- **REFP-16** ✅ `[proto]` **`forcedMarch.ts`** — `FORCED_MARCH_*`, `forcedMarchModule`
+  вынесены в `prototype/src/forcedMarch.ts`. `game.ts` импортирует и реэкспортирует.
+  Гейт зелёный (PR #368, `forcedmarch.test.ts`).
+- **REFP-17** ✅ `[proto]` **`instantRepair.ts`** — `INSTANT_REPAIR_*`, `missingHull`,
+  `instantRepairCost`, `instantRepairModule` вынесены в `prototype/src/instantRepair.ts`.
+  `game.ts` импортирует и реэкспортирует. Гейт зелёный (PR #368, `instantrepair.test.ts`).
+- **REFP-18** ✅ `[proto]` **`econScrews.ts`** — `REPAIR_HP_PER_METAL`, `dockRepairCost`,
+  `fleetAtOwnDock`, `econScrewsModule` вынесены в `prototype/src/econScrews.ts`.
+  `game.ts` импортирует и реэкспортирует. Гейт зелёный (PR #368, `econscrews.test.ts`).
+- **REFP-19** ✅ `[proto]` **`economy.ts`** — `economySnapshot`/`netIncome`/`hpOfLevel`
+  вынесены в `prototype/src/economy.ts` (зависели только от `data` + shared-core утилит +
+  `tax.ts`, REFP-4). `HOUR` остаётся импортом ИЗ `game.ts` (плейн реэкспортнутая
+  константа, читается только внутри тела функции — обратное ребро безопасно). `game.ts`
+  импортирует все три для `newGame`/AI и реэкспортирует для `main.ts`/`netserver.ts`/
+  тестов. Гейт зелёный (175 файлов, 1894 теста — число не изменилось, чистый перенос).
 - **REFP-20** ⏳ `[proto]` **`matchSetup.ts`** — `SeatConfig`, `SetupConfig`,
   `DEFAULT_SETUP`, `NetworkMatchMode`, `parseNetworkMatchMode`, `networkSeats`, `newGame`
   (1958–2425). Тест: `networkSeats.test.ts`.
