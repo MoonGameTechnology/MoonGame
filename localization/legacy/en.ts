@@ -107,7 +107,6 @@ export const en: Record<string, string> = {
   'Мир идёт без тебя': 'The world runs without you',
   'Этот флот прибудет через часы реального времени — мир Void Dominion идёт непрерывно, даже когда ты офлайн. Можешь закрыть игру: приказы выполнятся сами, а к возвращению мы пришлём уведомление и покажем сводку «пока тебя не было».':
     'This fleet will arrive in real hours — the world of Void Dominion runs continuously, even while you are offline. You can close the game: your orders carry out on their own, and on your return we will send a notification and show a "while you were away" digest.',
-  'Сводка возвращения': 'Return digest',
   'СВОДКА ВОЗВРАЩЕНИЯ': 'RETURN DIGEST',
   'Требуют внимания · {n}': 'Needs attention · {n}',
   'Пока тебя не было': 'While you were away',
@@ -134,8 +133,6 @@ export const en: Record<string, string> = {
   'Здесь корпорации бросают друг другу вызов на организованную войну. Отметь готовность корпорации и свою личную — когда обе стороны готовы, можно принять вызов. Дальше — набор состава и сама война по расписанию.':
     'Here corporations challenge each other to an organised war. Mark your corporation ready and yourself ready — once both sides are ready, a challenge can be accepted. Next comes roster sign-up and the scheduled war itself.',
   // --- ONB-4 codex/help hub (chrome + glossary) --------------------------------
-  Справочник: 'Codex',
-  Справка: 'Help',
   СПРАВОЧНИК: 'CODEX',
   'Поиск: юнит, здание, термин…': 'Search: unit, building, term…',
   'Поиск по справочнику': 'Search the codex',
@@ -163,10 +160,6 @@ export const en: Record<string, string> = {
   'Дипломатия позволяет заключать пакты и союзы, но коалиция ограничена порогом совокупной силы — нельзя собрать всех против одного. Порог держит баланс сил и не даёт «снежному кому» задавить партию.':
     'Diplomacy lets you sign pacts and alliances, but a coalition is capped by combined strength — you cannot gang everyone up on one player. The cap keeps the balance of power and stops a snowball from crushing the game.',
   // --- ONB-0 first-run offer (hub) + «Ещё → Обучение» --------------------------
-  'Впервые в Void Dominion?': 'New to Void Dominion?',
-  'Короткое обучение покажет интерфейс и первый ход — пара минут.':
-    'A short tutorial walks you through the interface and your first move — a couple of minutes.',
-  'Начать обучение': 'Start tutorial',
   Пропустить: 'Skip',
   Обучение: 'Tutorial',
   // --- ONB-2 guided first match (firstMatchTour) -------------------------------
@@ -291,13 +284,10 @@ export const en: Record<string, string> = {
   Время: 'Time',
   'Время постройки': 'Build time',
   Все: 'All',
-  'Войти через Apple': 'Sign in with Apple',
-  'Войти через Google': 'Sign in with Google',
   'Вход через Apple — скоро · ты вошёл гостем':
     'Sign in with Apple — coming soon · you entered as a guest',
   'Вход через Google — скоро · ты вошёл гостем':
     'Sign in with Google — coming soon · you entered as a guest',
-  'Выход в меню': 'Exit to menu',
   Вы: 'You',
   'Выбрать →': 'Select →',
   Выставить: 'List',
@@ -313,7 +303,6 @@ export const en: Record<string, string> = {
   'вход ещё {dur}': 'joinable {dur}',
   'вход закрыт': 'entry closed',
   Пароль: 'Password',
-  'пароль (аккаунт создастся сам)': 'password (account auto-creates)',
   'Введите пароль (мин. 8 символов)': 'Enter a password (min 8 chars)',
   'Аккаунт создан': 'Account created',
   'Неверный пароль': 'Wrong password',
@@ -346,7 +335,6 @@ export const en: Record<string, string> = {
   Заявиться: 'Sign up',
   Здания: 'Buildings',
   Земля: 'Ground',
-  'ИГРАТЬ СЕЙЧАС': 'PLAY NOW',
   ИИ: 'AI',
   Имя: 'Name',
   Исследовать: 'Research',
@@ -392,11 +380,9 @@ export const en: Record<string, string> = {
   'Мобильное оперативное соединение кораблей. Выберите его, чтобы отдавать приказы на манёвр, орбиту и удар по врагу.':
     'A mobile task force of ships. Select it to give maneuver, orbit and strike orders.',
   Модули: 'Modules',
-  'НАСТРОЙКА СХВАТКИ': 'SKIRMISH SETUP',
   НАСТРОЙКИ: 'SETTINGS',
   'НЕТ ТЕЛЕМЕТРИИ': 'NO TELEMETRY',
   Назад: 'Back',
-  МАТЧИ: 'MATCHES',
   'Нажмите «Курс» и тапните цель — все выбранные флоты пойдут туда (проложат маршрут и встанут). «Слить» сплавляет группу в один флот (дальние сначала подлетят). Shift- или Ctrl/⌘-клик по флоту добавляет его в группу; Shift-рамка по пустому месту выделяет несколько.':
     'Press "Move" and tap a destination — every selected fleet routes there and stops. "Merge" fuses the group into one fleet (distant ones fly in first). Shift- or Ctrl/⌘-click a fleet to add it to the group; Shift-drag empty space to box-select several.',
   'Наземная армия ⇄ гарнизон': 'Ground army ⇄ garrison',
@@ -431,9 +417,6 @@ export const en: Record<string, string> = {
   'Управление скоростью': 'Speed control',
   'панель времени в матче — пауза и множители ускорения (1× — реальное время)':
     'the in-match time bar — pause and speed multipliers (1× is real time)',
-  'полчаса в секунду': 'half an hour per second',
-  'час в секунду': 'an hour per second',
-  'два часа в секунду': 'two hours per second',
   '⚔ штурмовать можно только чужой мир': "⚔ only someone else's world can be stormed",
   'Корабли: {s} · Десант: {tr}': 'Ships: {s} · Landing: {tr}',
   'Авто-штурм': 'Auto-storm',
@@ -460,7 +443,6 @@ export const en: Record<string, string> = {
   'Убрать из очереди': 'Remove from the queue',
   'Приостановлено {n}%': 'Paused {n}%',
   'Возобновить — доплатить остаток': 'Resume — pay the remainder',
-  'Перезапуск — к выбору ботов': 'Restart — back to bot selection',
   'Отметить выбранную провинцию пингом': 'Mark the selected province with a ping',
   'Отметьте провинцию и отправьте — метка станет кликабельной (↪ камера).':
     'Mark a province and send — the marker becomes clickable (↪ jump the camera).',
@@ -488,7 +470,6 @@ export const en: Record<string, string> = {
   'Планетарное сооружение.': 'A planetary structure.',
   'Под фильтр никто не подходит.': 'Nobody matches the filter.',
   Подтвердить: 'Confirm',
-  'Покинуть сессию': 'Leave session',
   Покупка: 'Buy',
   'Флот -ваше оружие и защита. Здесь вы можете заказывать корабли для пополнения флота.':
     'The fleet is your weapon and shield. Order ships here to reinforce it.',
@@ -518,11 +499,9 @@ export const en: Record<string, string> = {
   'Реальное время': 'Real time',
   'С орбиты можно бомбардировать (изнашивает здания и замораживает их выпуск), но ПВО гарнизона достаёт до вас. Штурм высаживает десант против гарнизона.':
     "In orbit you can bombard (wears buildings and freezes their output), but the garrison's AA reaches you. Assault lands your troops against the garrison.",
-  СВОДКИ: 'DISPATCHES',
   СЕЙЧАС: 'NOW',
   СКР: 'SPD',
   Сброс: 'Clear',
-  Сводки: 'Dispatches',
   Свернуть: 'Collapse',
   'Сервер не нужен — свободные места займут боты.': 'No server needed — bots fill the open seats.',
   Сессия: 'Session',
@@ -558,8 +537,6 @@ export const en: Record<string, string> = {
   Удар: 'Strike',
   'Ударный носитель': 'Strike Carrier',
   Уровней: 'Tiers',
-  ТЕХНОЛОГИИ: 'TECHNOLOGIES',
-  Технологии: 'Technologies',
   ФЛОТ: 'FLEET',
   Фильтр: 'Filter',
   Флагман: 'Flagship',
@@ -585,7 +562,6 @@ export const en: Record<string, string> = {
   'по тем, с кем война': 'at declared enemies',
   'по любому, кроме пакта/союза': 'at anyone except pact/alliance',
   'Флоты на орбите': 'Fleets in orbit',
-  Обновления: 'Updates',
   Фракция: 'Faction',
   // H3 — setup faction picker (pure passive house bonuses)
   'Фракция — пассивный бонус дома': 'Faction — the house passive bonus',
@@ -938,49 +914,15 @@ export const en: Record<string, string> = {
   '🛩 эскадрилья запущена — ведите её на цель': '🛩 squadron launched — steer it onto the target',
 
   // --- static markup (build.mjs, data-i18n) -------------------------------------
-  '×1 — реальное время (час пути = час жизни, мир живёт и офлайн). Для быстрой партии выбери ×10–×100.':
-    '×1 — real time (an hour of travel = an hour of life, the world runs offline too). For a quick game pick ×10–×100.',
   Аккаунт: 'Account',
-  Активные: 'Active',
-  Альянсы: 'Alliances',
-  Архив: 'Archive',
   Верфь: 'Shipyard',
-  'Войди в матч на вкладке «Игры» — здесь появятся ходы, требующие внимания.':
-    'Join a match on the "Games" tab — moves needing your attention will show up here.',
-  'Вход по позывному': 'Sign in by callsign',
-  'Выбери матч из списка и войди, или обнови список.':
-    'Pick a match from the list and join, or refresh it.',
-  'Выберите свой домашний мир на карте, задайте число соперников-ботов и запускайте. Пустые места займут боты — выключите место, чтобы командовать меньшим сектором, или выключите все ради мирной одиночной песочницы для знакомства с интерфейсом.':
-    'Pick your homeworld on the map, choose how many AI rivals join, then launch. Empty slots are taken by the AI — switch a slot OFF to command a smaller sector, or switch them all off for a peaceful solo sandbox to explore the interface.',
-  'Выходные данные': 'Imprint',
-  'Грань пустоты': 'Edge of the Void',
   Домой: 'Home',
-  'Доступна новая сборка': 'A new build is available',
   Доступные: 'Available',
   Ещё: 'More',
-  Игры: 'Games',
   'Кабинет корпорации': 'Corporation cabinet',
-  'Нет матчей, ждущих приказа': 'No matches waiting on an order',
-  'Новый командир': 'New Commander',
-  'Добро пожаловать, командир. Флот ждёт приказа.': 'Welcome, commander. The fleet awaits your orders.',
-  'Придумай позывной и пароль — так создаётся аккаунт.':
-    'Choose a callsign and password — that creates your account.',
-  'Имя командира': 'Commander name',
-  'Повтор пароля': 'Repeat password',
-  'Создать командира': 'Create commander',
-  'Восстановить доступ': 'Recover access',
-  'минимум 8 символов': 'at least 8 characters',
   'ещё раз': 'once more',
   'Введи имя командира': 'Enter a commander name',
   'Пароли не совпадают': 'Passwords do not match',
-  'Почта (для восстановления)': 'Email (for recovery)',
-  'Восстановление доступа': 'Account recovery',
-  'Укажи почту аккаунта — пришлём ссылку для сброса пароля.':
-    'Enter your account email — we will send a password-reset link.',
-  'Отправить ссылку': 'Send link',
-  'Новый пароль': 'New password',
-  'Придумай новый пароль для входа.': 'Choose a new password to sign in.',
-  'Сменить пароль': 'Change password',
   'Эта почта уже занята': 'That email is already in use',
   'Введите почту': 'Enter an email',
   'Если такая почта есть — прислали ссылку для сброса':
@@ -996,36 +938,17 @@ export const en: Record<string, string> = {
     'Account callsign: 3–24 chars — letters, digits, _ or -',
   Обновить: 'Update',
   'Обновить список': 'Refresh list',
-  'Одиночная игра': 'Solo game',
   'Одиночный режим': 'Solo mode',
   'Ожидание заказов': 'Awaiting orders',
-  Выйти: 'Exit',
   Поддержка: 'Support',
-  Позже: 'Later',
   Позывной: 'Callsign',
-  'Политика конфиденциальности': 'Privacy Policy',
-  'Проверить обновления': 'Check for updates',
-  Рейтинг: 'Rank',
-  'Рейтинги и альянсы откроются со стартом мета-слоя.':
-    'Rankings and alliances unlock once the meta-layer launches.',
-  'Рейтинги — скоро': 'Rankings — coming soon',
   Сводка: 'Summary',
-  'Сезон ещё не начат': 'The season has not started',
   Сервер: 'Server',
-  'Скорость времени': 'Time speed',
-  '🧪 Песочница': '🧪 Sandbox',
-  'Сменить командира': 'Switch commander',
   Сообщество: 'Community',
-  'Тапните светящийся мир, чтобы выбрать старт': 'Tap a glowing world to choose your start',
   Уведомления: 'Notifications',
-  Условия: 'Terms',
   Чат: 'Chat',
-  'в сети': 'online',
   позывной: 'callsign',
   'реальное время': 'real time',
-  'войти через': 'or sign in with',
-  'корпорации · общие AvA-битвы · влияние': 'corporations · shared AvA battles · influence',
-  'сезонный рейтинг по местам в матчах': 'a seasonal rank from match placements',
   '{ic} {name}: {stock} в казне · {flow}/ч (производство минус содержание войск и зданий)':
     '{ic} {name}: {stock} in the treasury · {flow}/h (production minus army and building upkeep)',
   '⚠ ДЕФИЦИТ — здания-потребители работают на 50%': '⚠ SHORTAGE — consuming buildings run at 50%',
@@ -1144,8 +1067,6 @@ export const en: Record<string, string> = {
   'Число построек на мире.': 'The number of buildings on the world.',
   'Тап по слоту меняет род войск: ополчение → тяжёлая пехота → спецназ → танк. Танки бьют любую пехоту; спецназ — единственная пехота, опасная танкам; тяжёлая пехота держит оборону.':
     'Tap a slot to cycle the unit type: militia → heavy infantry → special forces → tank. Tanks shred any infantry; special forces are the one infantry that threatens armour; heavy infantry holds the line.',
-  '‹ назад': '‹ back',
-  '🧪 Тесты · режим разработчика': '🧪 Tests · developer mode',
 
   // --- command chains (order queue / plan builder, CC-*) -----------------------
   '⚒ десант': '⚒ ground',
@@ -1172,8 +1093,6 @@ export const en: Record<string, string> = {
   'Введи позывной': 'Enter a callsign',
 
   // --- science council (pre-match scientist pick + tech-window header) -------------
-  'СОВЕТ УЧЁНЫХ': 'SCIENCE COUNCIL',
-  '↩ В меню': '↩ Menu',
   'Выбрать учёного': 'Pick a scientist',
   '⚠ Совет закрепляется на весь матч. Рекомендованная пара уже выбрана — замените по вкусу.':
     '⚠ The council locks in for the whole match. A recommended pair is pre-selected — swap to taste.',
@@ -1192,7 +1111,6 @@ export const en: Record<string, string> = {
     'Home: {home} — tap another glowing world to change',
   // --- rail icon labels + window headers -------------------------------------------
   Дипло: 'Diplo',
-  Почта: 'Mail',
   Сон: 'Sleep',
   Корп: 'Corp',
   ДИПЛОМАТИЯ: 'DIPLOMACY',
@@ -1288,8 +1206,6 @@ export const en: Record<string, string> = {
   Квазар: 'Quasar',
   // --- constructor («Верфь») — the unified loadout tab ------------------------
   КОНСТРУКТОР: 'CONSTRUCTOR',
-  'Конструктор — оснащение кораблей, эскадрилий, армии и героев':
-    'Constructor — outfit ships, squadrons, army and heroes',
   Корабли: 'Ships',
   Армия: 'Army',
   '{n} слота под модули (по размеру корпуса)': '{n} module slots (by hull size)',
@@ -1361,9 +1277,6 @@ export const en: Record<string, string> = {
   изучено: 'researched',
   'Ещё раз «Назад» — выход из матча': 'Press Back again to leave the match',
   // --- static H4 headers / steward toggle (build.mjs [data-i18n]) --------------
-  'КОНСТРУКТОР ДИВИЗИЙ': 'DIVISION BUILDER',
-  'ХРАНИТЕЛЬ · ИИ НА СОН': 'STEWARD · AI WHILE ASLEEP',
-  'Хранитель — передать ИИ на сон': 'Steward — hand to the AI while asleep',
   // --- Bytro-карточка армии: ХП-бар, сводка, платный ремонт, кап линии огня ----
   'Мгновенный ремонт всего корпуса за кредиты': 'Instant full-hull repair for credits',
   Состав: 'Composition',
@@ -1439,10 +1352,6 @@ export const en: Record<string, string> = {
   'занято': 'taken',
   'свободно': 'free',
   'слотов': 'slots',
-  'ВЫБРАТЬ': 'CHOOSE',
-  'Выбор фракции': 'Choose Faction',
-  'Выберите фракцию и стартовую позицию. Занятые места отмечены серым.':
-    'Choose your faction and starting position. Taken seats are marked grey.',
 
   // --- sandbox panel (dev-only build, prototype/src/sandbox.ts) ----------------
   'ПЕСОЧНИЦА': 'SANDBOX',

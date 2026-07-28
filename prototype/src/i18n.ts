@@ -76,24 +76,21 @@ export function tData(name: string): string {
 }
 
 /** Проход по статической разметке на старте. Ключ берётся из ЗНАЧЕНИЯ атрибута
- *  (`data-i18n="hub.play"`); если значения нет — из текста узла, как в старой схеме
- *  (мост на время миграции). Также проставляет <html lang>, чтобы браузер и
- *  скринридер согласились с языком интерфейса. */
+ *  (`data-i18n="hub.play"`), а сам узел в разметке пуст — текст приходит ТОЛЬКО
+ *  отсюда, поэтому русская формулировка не может разъехаться с /localization.
+ *  Также проставляет <html lang>, чтобы браузер и скринридер согласились с языком
+ *  интерфейса. */
 export function localizeStaticDom(): void {
   if (typeof document === 'undefined' || !document.querySelectorAll) return;
   if (document.documentElement) document.documentElement.lang = LOCALE;
   for (const el of Array.from(document.querySelectorAll<HTMLElement>('[data-i18n]'))) {
     const key = el.getAttribute('data-i18n')?.trim();
-    const cur = el.textContent?.trim();
     if (key) el.textContent = t(key);
-    else if (cur) el.textContent = t(cur);
   }
   const attr = (suffix: string, name: string) => {
     for (const el of Array.from(document.querySelectorAll<HTMLElement>(`[data-i18n-${suffix}]`))) {
       const key = el.getAttribute(`data-i18n-${suffix}`)?.trim();
-      const cur = el.getAttribute(name);
       if (key) el.setAttribute(name, t(key));
-      else if (cur) el.setAttribute(name, t(cur));
     }
   };
   attr('title', 'title');

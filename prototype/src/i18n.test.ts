@@ -78,6 +78,20 @@ function extractCallArgs(src: string, fn: 't' | 'tData'): Set<string> {
 
 /** Ключи, которых НЕТ в коде литералом — они собираются из идентификатора в рантайме.
  *  Каждая запись объясняет, кто их строит; иначе тест на сирот снесёт живой перевод. */
+/** Ключи статичной разметки (`prototype/build.mjs`): `data-i18n="hub.play"` и
+ *  атрибутные близнецы `-title` / `-ph` / `-aria`. Возвращает ЗНАЧЕНИЕ атрибута, а
+ *  `null` — для старой формы без значения (ключ брался из текста узла): такой слот
+ *  localizeStaticDom больше не переводит, поэтому он обязан всплыть как провал. */
+function staticMarkupKeys(): Array<string | null> {
+  const src = readFileSync(path.join(repoRoot, 'prototype/build.mjs'), 'utf8');
+  const out: Array<string | null> = [];
+  for (const tag of src.match(/<[a-z]+\b[^>]*>/g) ?? [])
+    for (const marker of ['data-i18n', 'data-i18n-title', 'data-i18n-ph', 'data-i18n-aria'])
+      if (new RegExp(`${marker}(?![-\\w])`).test(tag))
+        out.push(new RegExp(`${marker}="([^"]*)"`).exec(tag)?.[1] ?? null);
+  return out;
+}
+
 const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
   { prefix: 'err.', built_by: 'errText() — из кода отказа ядра: E_NO_CAPACITY → err.no-capacity' },
   { prefix: 'data.', built_by: 'tData() через dataKey() — из имени в data/*.json' },
@@ -100,10 +114,17 @@ describe('локализация — ключи', () => {
     expect(missing.sort()).toEqual([]);
   });
 
+  it('статичная разметка переведена ключами, старой формы не осталось', () => {
+    const keys = staticMarkupKeys();
+    expect(keys.length).toBeGreaterThan(100); // разбор разметки не должен молча опустеть
+    // `null` = `data-i18n` без значения: старая форма, где ключом был текст узла.
+    expect(keys.filter((k) => k === null)).toEqual([]);
+    const bad = keys.filter((k): k is string => k !== null).filter((k) => !(k in ru));
+    expect([...new Set(bad)].sort()).toEqual([]);
+  });
+
   it('каждый ключ локали используется (нет осиротевших переводов)', () => {
-    const hay = srcFiles()
-      .map(read)
-      .join('\n');
+    const hay = [...srcFiles().map(read), read('prototype/build.mjs')].join('\n');
     const orphans = Object.keys(ru)
       .filter((k) => !isDynamic(k) && !hay.includes(k))
       .sort();
