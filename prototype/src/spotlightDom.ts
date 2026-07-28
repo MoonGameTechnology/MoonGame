@@ -84,6 +84,17 @@ function paint(o: Overlay, view: SpotlightView | null): void {
     o.root.style.display = 'none';
     return;
   }
+  // The build/ship dossier (#codex) sits BELOW the spotlight (z46 < z50) so its own
+  // "Построить здесь" button stays reachable through a tap-through step — but that
+  // also means the tour's ring + bubble would otherwise float on top of the open
+  // dossier, two windows visually stacked with neither fully readable (worse on a
+  // small phone screen). Hide the spotlight's chrome for as long as the dossier is
+  // up; the tour's step/state machine keeps polling underneath untouched, and the
+  // very next frame after the dossier closes repaints normally.
+  if (document.getElementById('codex')?.classList.contains('show')) {
+    o.root.style.display = 'none';
+    return;
+  }
   o.root.style.display = 'block';
   const vp = { width: window.innerWidth, height: window.innerHeight };
   const interactive = view.step.advance.on !== 'tap'; // action/state → let the HUD through
