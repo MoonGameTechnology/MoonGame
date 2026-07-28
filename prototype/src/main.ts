@@ -1771,7 +1771,7 @@ function divisionsHtml(planetId: string): string {
   h += `</div>`;
   // PC dropped this hint (its content lives in hover dossiers); mobile keeps it.
   if (!pcUi()) {
-    h += `<div class="hint">${t('Дивизия — снапшот шаблона: правка шаблона в конструкторе не меняет уже собранные. На своём мире +1 HP/юнит/день; выбитая исчезает.')}</div>`;
+    h += `<div class="hint">${t('Дивизия — снапшот шаблона: правка шаблона в конструкторе не меняет уже собранные. На своём мире +1 HP/юнит/день.')}</div>`;
   }
   return h;
 }
@@ -1807,7 +1807,7 @@ function fleetDivisionsHtml(f: Fleet, here: Planet): string {
     }
     g += `</div>`;
   }
-  g += `<div class="hint">${t('Загрузка — дивизия должна влезть в трюм; выгрузка высаживает её на этот мир (на чужом — захват, если не обороняется).')}</div>`;
+  g += `<div class="hint">${t('Загрузка погружает дивизию в трюм. Выгрузка высаживает её на этот мир.')}</div>`;
   return g;
 }
 
@@ -2310,13 +2310,13 @@ const ERR_RU: Record<string, string> = {
   E_CONDITIONS_UNMET: 'условия не выполнены',
   E_BOMBARDED: 'стройка под бомбардировкой',
   E_NO_SHIPYARD: 'нужна верфь/космопорт',
-  E_WRONG_SECTOR: 'не тот тип сектора',
-  E_WRONG_ORBIT: 'не та орбита',
+  E_WRONG_SECTOR: 'недопустимый тип сектора',
+  E_WRONG_ORBIT: 'недопустимая орбита',
   E_SAME_LOCATION: 'флот уже здесь',
   E_OWN_PLANET: 'это ваш собственный мир',
   E_OUT_OF_RANGE: 'вне радиуса действия',
   E_NO_SHIPS: 'нет кораблей',
-  E_NO_CAPACITY: 'нет места в трюме',
+  E_NO_CAPACITY: 'трюм полон',
   E_NO_ARTILLERY: 'нет артиллерии',
   E_UNKNOWN_UNIT: 'неизвестный юнит',
   E_UNKNOWN_BUILDING: 'неизвестное здание',
@@ -2324,10 +2324,10 @@ const ERR_RU: Record<string, string> = {
   E_RESEARCH_SLOTS_FULL: 'все исследовательские слоты заняты',
   E_TOO_EARLY: 'слишком рано',
   E_BOT_ALLIANCE: 'боты не вступают в коалиции',
-  E_CONSENT_REQUIRED: 'нужно согласие второй стороны',
+  E_CONSENT_REQUIRED: 'требуется согласие второй стороны',
   E_ALREADY_OFFERED: 'предложение уже отправлено',
   E_ALREADY: 'уже действует',
-  E_CHAT_RATE: 'не так быстро — подождите пару секунд',
+  E_CHAT_RATE: 'подождите пару секунд',
   E_CHAT_TARGET: 'адресат не найден',
   E_CHAT_TEXT: 'пустое сообщение',
   E_NO_HERO: 'герой не найден',
@@ -2368,7 +2368,7 @@ function playerOrder(action: Action) {
   // reconnect `welcome` overwrites state (the server never saw it). Refuse with feedback
   // instead of silently losing it. (Solo/skirmish has `reconnecting === false`.)
   if (reconnecting) {
-    note('⟳ ' + t('переподключение — приказ не отправлен, повтори через миг'));
+    note('⟳ ' + t('переподключение — приказ не отправлен, повторите позже'));
     return;
   }
   const before = sandboxBuildSnapshot(action.type);
@@ -2620,7 +2620,7 @@ function beginLoad(fleetId: string, unit: string): void {
   if (!f || f.movement || f.battleId || !f.location) return;
   const need = data.units[unit]?.stats.cargoSize ?? 1;
   if (need > fleetCargoFree(s, f) - pendingLoadCargo(fleetId)) {
-    note('✖ ' + t('нет места в трюме')); // hold full once the loads already in progress land
+    note('✖ ' + t('трюм полон')); // hold full once the loads already in progress land
     return;
   }
   // Match the core's acceptance: only a healthy, default-loadout garrison stack embarks.
