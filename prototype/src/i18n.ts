@@ -1,33 +1,39 @@
-// Tiny prototype i18n. ONE LOCALE = ONE FILE (see ./locale/*): the msgid is the
-// CANONICAL RUSSIAN source string (so call sites stay readable), and a locale file
-// is a flat msgid→translation map. A missing entry falls back to the msgid itself —
-// an untranslated string shows up in Russian instead of as a broken key, which is
-// honest and immediately visible during playtests.
+// Тонкий рантайм локализации прототипа. Сами тексты живут в /localization —
+// здесь только выбор языка, поиск ключа и подстановка значений.
 //
-//   t('Сообщение…')                       → per-locale button/label text
-//   t('ещё {n}ч', { n: 3 })               → '{x}' placeholders for live values
-//   tData('Metal Mine')                   → game-DATA names (data/*.json is authored
-//                                           in English → ru.ts translates them; the
-//                                           EN locale shows them as-is)
+//   t('err.no-capacity')                  → текст по ключу
+//   t('fleet.eta', { n: 3 })              → '{x}' подставляет живые значения
+//   tData('Metal Mine')                   → имя игровых ДАННЫХ (→ data.metal-mine)
 //
-// The choice persists in localStorage ('vd.locale'); switching reloads the page —
-// every renderer rebuilds from scratch, so no stale-language DOM can survive.
-import { ru } from './locale/ru';
-import { en } from './locale/en';
+// ПЕРЕХОДНЫЙ ПЕРИОД (этап 2 миграции). Исторически msgid'ом была сама русская
+// строка (`t('трюм полон')`), и большая часть вызовов ещё такая. Пока они живы,
+// работает мост: если аргумент — не ключ, он трактуется как старый русский msgid и
+// ищется в /localization/legacy. Мост уйдёт вместе с последним немигрированным
+// вызовом; ключи и старые msgid'ы не пересекаются (в ключе нет кириллицы).
+//
+// Выбор языка хранится в localStorage ('vd.locale'); переключение перезагружает
+// страницу — каждый рендерер строится заново, поэтому DOM на старом языке не выживает.
+import { LOCALES, DEFAULT_LOCALE, LOCALE_LABEL, dataKey, isLocaleId } from '../../localization';
+import type { LocaleId } from '../../localization';
+import { en as legacyEn } from '../../localization/legacy/en';
 
-export type LocaleId = 'ru' | 'en';
-const LOCALES: Record<LocaleId, Record<string, string>> = { ru, en };
-export const LOCALE_LABEL: Record<LocaleId, string> = { ru: 'РУССКИЙ', en: 'ENGLISH' };
+export type { LocaleId };
+export { LOCALE_LABEL };
+
+/** Старые msgid-карты (msgid = русская строка). Для РУССКОГО она пуста: msgid и есть
+ *  текст, поэтому запись не нужна — строка показывается как написана. */
+const LEGACY: Record<LocaleId, Record<string, string>> = { ru: {}, en: legacyEn };
+
 const STORE_KEY = 'vd.locale';
 
 function detect(): LocaleId {
   try {
     const saved = typeof localStorage !== 'undefined' ? localStorage.getItem(STORE_KEY) : null;
-    if (saved === 'ru' || saved === 'en') return saved;
+    if (isLocaleId(saved)) return saved;
   } catch {
     /* storage disabled — fall through to the browser language */
   }
-  const nav = typeof navigator !== 'undefined' ? navigator.language : 'ru';
+  const nav = typeof navigator !== 'undefined' ? navigator.language : DEFAULT_LOCALE;
   return nav?.toLowerCase().startsWith('ru') ? 'ru' : 'en';
 }
 
@@ -43,40 +49,54 @@ export function setLocale(id: LocaleId): void {
   }
 }
 
+/** Текст по ключу: выбранная локаль → русский источник. `undefined`, если ключа нет
+ *  нигде — вызывающий решает, что делать (показать ключ или свой запасной текст). */
+export function lookup(key: string): string | undefined {
+  return LOCALES[LOCALE][key] ?? LOCALES[DEFAULT_LOCALE][key];
+}
+
+/** Есть ли у ключа перевод. Нужен там, где при промахе положен НЕ ключ, а
+ *  осмысленный запасной текст (например, разбор незнакомого кода ошибки). */
+export const hasKey = (key: string): boolean => lookup(key) !== undefined;
+
 function interpolate(s: string, vars?: Record<string, string | number>): string {
   if (!vars) return s;
   return s.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m));
 }
 
-/** UI string: msgid is the canonical Russian source; falls back to it untranslated. */
-export function t(msg: string, vars?: Record<string, string | number>): string {
-  return interpolate(LOCALES[LOCALE][msg] ?? msg, vars);
+/** Текст интерфейса по ключу. Промах → старый русский msgid (мост), иначе — сам ключ. */
+export function t(key: string, vars?: Record<string, string | number>): string {
+  return interpolate(lookup(key) ?? LEGACY[LOCALE][key] ?? key, vars);
 }
 
-/** Game-DATA name (units/buildings/techs/sectors… from data/*.json, authored in
- *  English): the RU locale translates it, EN (and a miss) shows the source name. */
+/** Имя игровых ДАННЫХ. Промах → исходное английское имя из data/*.json: новый юнит
+ *  виден под своим именем, а не как `data.new-unit`. */
 export function tData(name: string): string {
-  return LOCALES[LOCALE][`data:${name}`] ?? name;
+  return lookup(dataKey(name)) ?? LEGACY[LOCALE][`data:${name}`] ?? name;
 }
 
-/** Boot pass over static HTML: every [data-i18n] element's text (and the title /
- *  placeholder / aria-label attributes via data-i18n-title / -ph / -aria) is treated
- *  as a msgid and replaced with its translation. Static markup stays canonical-Russian.
- *  Also stamps <html lang> so assistive tech and the browser agree with the UI language. */
+/** Проход по статической разметке на старте. Ключ берётся из ЗНАЧЕНИЯ атрибута
+ *  (`data-i18n="hub.play"`); если значения нет — из текста узла, как в старой схеме
+ *  (мост на время миграции). Также проставляет <html lang>, чтобы браузер и
+ *  скринридер согласились с языком интерфейса. */
 export function localizeStaticDom(): void {
   if (typeof document === 'undefined' || !document.querySelectorAll) return;
   if (document.documentElement) document.documentElement.lang = LOCALE;
   for (const el of Array.from(document.querySelectorAll<HTMLElement>('[data-i18n]'))) {
+    const key = el.getAttribute('data-i18n')?.trim();
     const cur = el.textContent?.trim();
-    if (cur) el.textContent = t(cur);
+    if (key) el.textContent = t(key);
+    else if (cur) el.textContent = t(cur);
   }
-  const attr = (sel: string, name: string) => {
-    for (const el of Array.from(document.querySelectorAll<HTMLElement>(sel))) {
+  const attr = (suffix: string, name: string) => {
+    for (const el of Array.from(document.querySelectorAll<HTMLElement>(`[data-i18n-${suffix}]`))) {
+      const key = el.getAttribute(`data-i18n-${suffix}`)?.trim();
       const cur = el.getAttribute(name);
-      if (cur) el.setAttribute(name, t(cur));
+      if (key) el.setAttribute(name, t(key));
+      else if (cur) el.setAttribute(name, t(cur));
     }
   };
-  attr('[data-i18n-title]', 'title');
-  attr('[data-i18n-ph]', 'placeholder');
-  attr('[data-i18n-aria]', 'aria-label');
+  attr('title', 'title');
+  attr('ph', 'placeholder');
+  attr('aria', 'aria-label');
 }

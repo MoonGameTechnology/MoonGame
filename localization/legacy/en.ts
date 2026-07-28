@@ -306,7 +306,6 @@ export const en: Record<string, string> = {
     'Barracks defend your world from invaders. Home to your valiant defenders.',
   Глобальный: 'Global',
   Дальность: 'Range',
-  'Дежурный режим': 'Standing order',
   День: 'Day',
   'День {n}': 'Day {n}',
   '{h}ч': '{h}h',
@@ -374,7 +373,6 @@ export const en: Record<string, string> = {
   Крылья: 'Wings',
   Купить: 'Buy',
   Курс: 'Move',
-  Лента: 'Feed',
   'Лёгкий разведывательный корпус. Быстрый (ход {sp}) и почти неслышный (сигнатура {sig}) — чертит карту пустоты там, куда боится соваться линейный флот.':
     'A light recon hull. Fast (speed {sp}) and almost silent (signature {sig}) — it maps the void where a battle fleet fears to go.',
   'Маршрут проходит через миры <b>{names}</b>, с кем у вас <b>мир</b>. Мирного прохода нет — движение сюда объявит <b>войну</b>.':
@@ -429,9 +427,7 @@ export const en: Record<string, string> = {
     '⚔ assault impossible: no landing force aboard and the world is defended — load troops',
   '⚔ внимание: на борту нет десанта — защищённый мир штурмом не взять':
     '⚔ warning: no landing force aboard — a defended world cannot be stormed',
-  'мир защищён — для штурма нужен десант на борту': 'the world is defended — an assault needs troops aboard',
   'Ждёт ресурсы: {c}': 'Waiting for resources: {c}',
-  'уже построено': 'already built',
   'Управление скоростью': 'Speed control',
   'панель времени в матче — пауза и множители ускорения (1× — реальное время)':
     'the in-match time bar — pause and speed multipliers (1× is real time)',
@@ -475,7 +471,6 @@ export const en: Record<string, string> = {
     'Send a fleet toward this system (or extend radar) to detect it.',
   'Отход стоит −40% ТЕКУЩЕГО корпуса и щита (израненный флот теряет 40% остатка — отход не добивает) и даёт рывок скорости для бегства. Десант в высадке отступить не может; с орбиты вне боя корабль уходит свободно.':
     "Retreat costs −40% of CURRENT hull and shield (a wounded fleet loses 40% of what remains — retreat never finishes it off) and grants a speed burst to flee. Troops mid-landing can't retreat; a ship in orbit outside battle leaves freely.",
-  'Очередь приказов': 'Order queue',
   Очки: 'Score',
   'Очки победы': 'Victory points',
   ПВО: 'AA',
@@ -519,7 +514,6 @@ export const en: Record<string, string> = {
   'Радиус радара': 'Radar reach',
   Разведчик: 'Scout',
   Развернуть: 'Expand',
-  Разделить: 'Split',
   'Размер h,w': 'Size h,w',
   'Реальное время': 'Real time',
   'С орбиты можно бомбардировать (изнашивает здания и замораживает их выпуск), но ПВО гарнизона достаёт до вас. Штурм высаживает десант против гарнизона.':
@@ -538,7 +532,6 @@ export const en: Record<string, string> = {
   Скорость: 'Speed',
   Слить: 'Merge',
   'Слить…': 'Merge…',
-  Старт: 'Start',
   Снять: 'Detach',
   'Снять выделение': 'Deselect',
   'Снять выделение группы': 'Deselect group',
@@ -623,55 +616,22 @@ export const en: Record<string, string> = {
   // --- diplomatic stance (STANCE_RU, via stanceRu()) ---------------------------
   Война: 'War',
   Мир: 'Peace',
-  Пакт: 'Pact',
   Союз: 'Alliance',
 
   // --- kernel rejection codes (ERR_RU, via errText()) --------------------------
-  'не хватает ресурсов': 'insufficient resources',
-  'не хватает средств': 'insufficient funds',
-  'недопустимая цель': 'invalid target',
-  'нет цели': 'no target',
-  'действие запрещено': 'action forbidden',
-  'игрок не найден': 'player not found',
-  'мир не найден': 'world not found',
-  'флот не найден': 'fleet not found',
-  'некорректный приказ': 'malformed order',
-  'флот занят': 'fleet busy',
-  'достигнут предел': 'limit reached',
-  'условия не выполнены': 'conditions not met',
-  'стройка под бомбардировкой': 'construction under bombardment',
-  'нужна верфь/космопорт': 'needs a shipyard/spaceport',
-  'недопустимый тип сектора': 'invalid sector type',
-  'недопустимая орбита': 'invalid orbit',
-  'флот уже здесь': 'fleet is already here',
-  'это ваш собственный мир': 'this is your own world',
-  'вне радиуса действия': 'out of range',
-  'нет кораблей': 'no ships',
-  'нет артиллерии': 'no artillery',
-  'неизвестный юнит': 'unknown unit',
-  'неизвестное здание': 'unknown building',
-  'неизвестная технология': 'unknown technology',
-  'все исследовательские слоты заняты': 'all research slots are full',
-  'слишком рано': 'too early',
-  'требуется согласие второй стороны': 'the other side must consent',
   'предложение уже отправлено': 'a proposal is already pending',
-  'герой не найден': 'hero not found',
-  'внутренняя ошибка': 'internal error',
   'боты не вступают в коалиции': 'bots do not join coalitions',
 
   // --- corp mock panel (role/presence dictionaries, CORP_TABS) ------------------
   Глава: 'Leader',
   Офицер: 'Officer',
   Участник: 'Member',
-  онлайн: 'online',
   'в матче': 'in a match',
-  оффлайн: 'offline',
   Обзор: 'Overview',
   Участники: 'Members',
   Казна: 'Treasury',
   Владения: 'Holdings',
   Войны: 'Wars',
-  'Чат / Лог': 'Chat / Log',
   Заявка: 'Applicant',
 
   // --- corporation cabinet (AVA-C1/C2, live) ------------------------------------
@@ -763,46 +723,24 @@ export const en: Record<string, string> = {
   Кулак: 'Fist',
 
   // --- hero grades (HERO_GRADES, heroes.ts) --------------------------------------
-  Обычный: 'Common',
-  Редкий: 'Rare',
-  Легендарный: 'Legendary',
   Главный: 'Main',
   '{n} слота под модули': '{n} module slots',
 
   // --- hero abilities (HERO_ABILITIES, heroes.ts) --------------------------------
   Коридор: 'Corridor',
-  'Открывает временный коридор-лейн до близкого мира; свои флоты идут по нему быстрее.':
-    'Opens a temporary corridor lane to a nearby world; your fleets travel it faster.',
   Аннигиляция: 'Annihilate',
-  'Уничтожает планету в радиусе — она становится мёртвым миром.':
-    'Destroys a planet in range — it becomes a dead world.',
   Сбор: 'Rally',
-  'Боевой клич: временный доп. бонус к ауре для своих флотов рядом с героем.':
-    'A battle cry: a temporary extra aura bonus for your fleets near the hero.',
   Разведка: 'Scan',
   'Раскрывает зону вокруг цели сквозь туман на время.':
     'Reveals an area around the target through the fog for a while.',
   Отзыв: 'Recall',
   'Мгновенно отзывает корабль-героя в столицу.': 'Instantly recalls the hero ship to the capital.',
   Бастион: 'Bulwark',
-  'Временный щит: +оборона своим флотам рядом с героем.':
-    'A temporary shield: +defense to your fleets near the hero.',
 
   // --- ship modules (SHIP_MODULES, ships.ts) -------------------------------------
-  Батарея: 'Battery',
-  '+30% к атаке.': '+30% to attack.',
-  Броня: 'Plating',
-  '+25% HP корпуса.': '+25% hull HP.',
   Щит: 'Shield',
-  '+30% к обороне.': '+30% to defense.',
-  Двигатель: 'Thruster',
-  '+20% к скорости.': '+20% to speed.',
-  Наведение: 'Targeting',
-  '+15% к атаке и обороне.': '+15% to attack and defense.',
 
   // --- ship hull names (SHIP_HULLS, ships.ts) -------------------------------------
-  'Осадная ланса': 'Siege Lance',
-  'Скаут-дрон': 'Scout Drone',
   Носитель: 'Carrier',
 
   // --- lowercase fragments -------------------------------------------------------
@@ -863,12 +801,8 @@ export const en: Record<string, string> = {
   'ошибка архива': 'archive error',
   'перезарядка {n}': 'rearming {n}',
   'победа: {who}': '{who} won',
-  'под ударом': 'under attack',
   подписка: 'subscription',
   покупка: 'buy',
-  'адресат не найден': 'recipient not found',
-  'подождите пару секунд': 'give it a couple of seconds',
-  'пустое сообщение': 'empty message',
   'глобальный канал появится вместе с глобальным сервером':
     'the global channel arrives with the global server',
   построек: 'buildings',
@@ -879,7 +813,6 @@ export const en: Record<string, string> = {
   'произв. {p}': 'prod {p}',
   пусто: 'empty',
   'радиус {r}': 'radius {r}',
-  ранг: 'rank',
   роль: 'role',
   'сборка {b}': 'build {b}',
   секторов: 'sectors',
@@ -887,13 +820,10 @@ export const en: Record<string, string> = {
   'сервер недоступен — укажи адрес сервера': 'server unreachable — enter the server address',
   скоро: 'soon',
   'следующий раунд через': 'next round in',
-  снабжение: 'supply',
   спокойно: 'quiet',
   'Строительная телеметрия врага недоступна': 'Enemy construction telemetry unavailable',
   'топливо {n}': 'fuel {n}',
   убрать: 'remove',
-  угроза: 'threatened',
-  'уже действует': 'already in effect',
   'уничтожением соперников': 'by eliminating rivals',
   участников: 'members',
   вы: 'you',
@@ -947,7 +877,6 @@ export const en: Record<string, string> = {
   '⛬ выберите флот для объединения': '⛬ pick a fleet to merge with',
   '⛬ флоты объединены у {at}': '⛬ fleets merged at {at}',
   '✓ актуально · локально {l} · сервер {r}': '✓ up to date · local {l} · server {r}',
-  '✕ очистить': '✕ clear',
   '✖ {who} отклонил: {stance}': '✖ {who} declined: {stance}',
   '🕊 {who} предлагает: {stance} — ответьте тем же в Дипломатии':
     '🕊 {who} offers {stance} — answer in kind in Diplomacy',
@@ -957,7 +886,6 @@ export const en: Record<string, string> = {
   '✗ ответ получен, но версия не распознана': "✗ got a response, but couldn't parse the version",
   '✦ {score}/{limit}: мир — 50, прочий сектор — 10, здания добавляют по уровню (у вас {w} миров, {s} секторов). Победа: ✦ {limit}, уничтожение соперников или доминирование.':
     '✦ {score}/{limit}: a world — 50, any other province — 10, buildings add per level (you hold {w} worlds, {s} provinces). Win at ✦ {limit}, by eliminating rivals, or by domination.',
-  '➕ строить': '➕ build',
   '⟜ стоит на трассе {lane} · {p}% пути': '⟜ holding on the {lane} lane · {p}% across',
   '⟳ переподключение…': '⟳ reconnecting…',
   '⤺ Отступить': '⤺ Retreat',
@@ -1220,8 +1148,6 @@ export const en: Record<string, string> = {
   '🧪 Тесты · режим разработчика': '🧪 Tests · developer mode',
 
   // --- command chains (order queue / plan builder, CC-*) -----------------------
-  '▶ пробовать снова': '▶ try again',
-  '↩ последний': '↩ last',
   '⚒ десант': '⚒ ground',
   '⚔ орбита': '⚔ orbital',
   '⚔ {who} объявил вам войну!': '⚔ {who} declared war on you!',
@@ -1258,16 +1184,8 @@ export const en: Record<string, string> = {
     '+1 research slot (a generalist, no branch focus)',
   'Открывает ветку «{br}»: {list}': 'Opens the {br} branch: {list}',
   'Фокус ветки «{br}»': '{br} branch focus',
-  'data:Куратор': 'Overseer',
-  'data:Космоадмирал': 'Space Admiral',
-  'data:Наземный маршал': 'Ground Marshal',
-  'data:Командир крыла': 'Wing Commander',
-  'data:Ракетный шеф': 'Missile Chief',
-  'data:Полимат': 'Polymath',
   // --- tech-branch labels (tabs / chips / section heads) ---------------------------
-  Космос: 'Space',
   Эскадрильи: 'Squadrons',
-  Ракеты: 'Missiles',
   'Дом: {home} — одиночная песочница, без соперников · тапните светящийся мир, чтобы сменить':
     'Home: {home} — a solo sandbox, no rivals · tap another glowing world to change',
   'Дом: {home} — тапните другой светящийся мир, чтобы сменить':
@@ -1525,4 +1443,13 @@ export const en: Record<string, string> = {
   'Выбор фракции': 'Choose Faction',
   'Выберите фракцию и стартовую позицию. Занятые места отмечены серым.':
     'Choose your faction and starting position. Taken seats are marked grey.',
+
+  // --- sandbox panel (dev-only build, prototype/src/sandbox.ts) ----------------
+  'ПЕСОЧНИЦА': 'SANDBOX',
+  'Переключатели': 'Toggles',
+  'Команды': 'Commands',
+  'Прекратить войну со всеми фракциями': 'End the war with every faction',
+  'Войны прекращены: {n} — отношения нейтральные': 'Wars ended: {n} — relations are neutral',
+  'Вы ни с кем не воюете': 'You are not at war with anyone',
+  'нет игрока': 'no player',
 };

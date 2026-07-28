@@ -29,10 +29,10 @@ export interface ShipHull {
 }
 
 export const SHIP_HULLS: Record<string, ShipHull> = {
-  cruiser: { name: 'Крейсер', icon: '▲', slots: 3, base: 'cruiser' },
-  siege_lance: { name: 'Осадная ланса', icon: '✦', slots: 2, base: 'siege' },
-  scout_drone: { name: 'Скаут-дрон', icon: '◌', slots: 1, base: 'scout' },
-  dropship: { name: 'Носитель', icon: '⊟', slots: 2, base: 'dropship' },
+  cruiser: { name: 'ship.hull.cruiser', icon: '▲', slots: 3, base: 'cruiser' },
+  siege_lance: { name: 'ship.hull.siege_lance', icon: '✦', slots: 2, base: 'siege' },
+  scout_drone: { name: 'ship.hull.scout_drone', icon: '◌', slots: 1, base: 'scout' },
+  dropship: { name: 'ship.hull.dropship', icon: '⊟', slots: 2, base: 'dropship' },
 };
 
 export const SHIP_HULL_IDS: string[] = Object.keys(SHIP_HULLS);
@@ -54,11 +54,11 @@ export interface ShipModule {
 }
 
 export const SHIP_MODULES: Record<string, ShipModule> = {
-  battery: { id: 'battery', name: 'Батарея', icon: '≡', desc: '+30% к атаке.', mods: { attack: 0.3 }, live: false },
-  plating: { id: 'plating', name: 'Броня', icon: '▮', desc: '+25% HP корпуса.', mods: { hp: 0.25 }, live: false },
-  shield: { id: 'shield', name: 'Щит', icon: '◊', desc: '+30% к обороне.', mods: { defense: 0.3 }, live: false },
-  thruster: { id: 'thruster', name: 'Двигатель', icon: '»', desc: '+20% к скорости.', mods: { speed: 0.2 }, live: false },
-  targeting: { id: 'targeting', name: 'Наведение', icon: '⊹', desc: '+15% к атаке и обороне.', mods: { attack: 0.15, defense: 0.15 }, live: false },
+  battery: { id: 'battery', name: 'ship.module.battery.name', icon: '≡', desc: 'ship.module.battery.desc', mods: { attack: 0.3 }, live: false },
+  plating: { id: 'plating', name: 'ship.module.plating.name', icon: '▮', desc: 'ship.module.plating.desc', mods: { hp: 0.25 }, live: false },
+  shield: { id: 'shield', name: 'ship.module.shield.name', icon: '◊', desc: 'ship.module.shield.desc', mods: { defense: 0.3 }, live: false },
+  thruster: { id: 'thruster', name: 'ship.module.thruster.name', icon: '»', desc: 'ship.module.thruster.desc', mods: { speed: 0.2 }, live: false },
+  targeting: { id: 'targeting', name: 'ship.module.targeting.name', icon: '⊹', desc: 'ship.module.targeting.desc', mods: { attack: 0.15, defense: 0.15 }, live: false },
 };
 
 export const SHIP_MODULE_IDS: string[] = Object.keys(SHIP_MODULES);
