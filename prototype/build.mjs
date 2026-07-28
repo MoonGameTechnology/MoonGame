@@ -2126,33 +2126,33 @@ const page = (js) => `<!doctype html>
      features get wired. -->
 <nav id="rail">
   <div id="railtools">
-    <button id="rail-diplo" title="Дипломатия" data-i18n-title>⬡<span class="rlbl" data-i18n>Дипло</span></button>
-    <button id="rail-msgs" title="Сообщения" data-i18n-title>✉<span class="rlbl" data-i18n>Почта</span><b id="msgbadge" class="railbadge" style="display:none"></b></button>
-    <button id="rail-tech" title="Технологии" data-i18n-title>⚛<span class="rlbl" data-i18n>Наука</span></button>
-    <button id="rail-constructor" title="Конструктор — оснащение кораблей, эскадрилий, армии и героев" data-i18n-title>⚒<span class="rlbl" data-i18n>Верфь</span></button>
-    <button id="rail-steward" title="Хранитель — передать ИИ на сон" data-i18n-title>😴<span class="rlbl" data-i18n>Сон</span></button>
-    <button id="rail-market" title="Рынок" data-i18n-title>⇄<span class="rlbl" data-i18n>Рынок</span></button>
-    <button id="railcorp" title="Корпорация" data-i18n-title>⬢<span class="rlbl" data-i18n>Корп</span></button>
-    <button id="rail-chat" title="Чат" data-i18n-title class="desk-only">🗨<span class="rlbl" data-i18n>Чат</span></button>
-    <button id="rail-log" title="Сводки" data-i18n-title>≡<span class="rlbl" data-i18n>Сводки</span><span class="badge" id="alertbadge" style="display:none">0</span></button>
-    <button id="rail-help" title="Справочник" data-i18n-title>?<span class="rlbl" data-i18n>Справка</span></button>
-    <button id="rail-settings" title="Настройки" data-i18n-title>⚙<span class="rlbl" data-i18n>Настройки</span></button>
-    <button id="rail-exit" title="Покинуть сессию" data-i18n-title>⌂<span class="rlbl" data-i18n>Выйти</span></button>
+    <button id="rail-diplo" data-i18n-title="rail.diplo.title">⬡<span class="rlbl" data-i18n="rail.diplo.label"></span></button>
+    <button id="rail-msgs" data-i18n-title="rail.msgs.title">✉<span class="rlbl" data-i18n="rail.msgs.label"></span><b id="msgbadge" class="railbadge" style="display:none"></b></button>
+    <button id="rail-tech" data-i18n-title="rail.tech.title">⚛<span class="rlbl" data-i18n="rail.tech.label"></span></button>
+    <button id="rail-constructor" data-i18n-title="rail.constructor.title">⚒<span class="rlbl" data-i18n="rail.constructor.label"></span></button>
+    <button id="rail-steward" data-i18n-title="rail.steward.title">😴<span class="rlbl" data-i18n="rail.steward.label"></span></button>
+    <button id="rail-market" data-i18n-title="rail.market.title">⇄<span class="rlbl" data-i18n="rail.market.label"></span></button>
+    <button id="railcorp" data-i18n-title="rail.corp.title">⬢<span class="rlbl" data-i18n="rail.corp.label"></span></button>
+    <button id="rail-chat" data-i18n-title="rail.chat.title" class="desk-only">🗨<span class="rlbl" data-i18n="rail.chat.label"></span></button>
+    <button id="rail-log" data-i18n-title="rail.log.title">≡<span class="rlbl" data-i18n="rail.log.label"></span><span class="badge" id="alertbadge" style="display:none">0</span></button>
+    <button id="rail-help" data-i18n-title="rail.help.title">?<span class="rlbl" data-i18n="rail.help.label"></span></button>
+    <button id="rail-settings" data-i18n-title="rail.settings.title">⚙<span class="rlbl" data-i18n="rail.settings.label"></span></button>
+    <button id="rail-exit" data-i18n-title="rail.exit.title">⌂<span class="rlbl" data-i18n="rail.exit.label"></span></button>
   </div>
   <button id="railtoggle" title="Инструменты" type="button" aria-expanded="false"><span id="railglyph">☰</span><span class="badge" id="railalert" style="display:none">0</span></button>
 </nav>
 <!-- floating chat window (desktop only) — content rendered by renderChat() in main.ts -->
 <div id="chatwin" class="desk-only"></div>
-<div id="logwin"><div class="lwbox"><div class="lw-head"><b data-i18n>СВОДКИ</b><button class="lw-recap" id="lw-recap" type="button" title="Сводка возвращения" data-i18n-title>🛰</button><button class="lw-close">✕</button></div><div id="log"></div></div></div>
+<div id="logwin"><div class="lwbox"><div class="lw-head"><b data-i18n="win.log.title"></b><button class="lw-recap" id="lw-recap" type="button" data-i18n-title="win.log.recap">🛰</button><button class="lw-close">✕</button></div><div id="log"></div></div></div>
 <!-- technologies window — content rendered by renderTech() in main.ts -->
-<div id="tech"><div class="twbox"><div class="lw-head"><b data-i18n>ТЕХНОЛОГИИ</b><button class="tw-close">✕</button></div><div id="techbody"></div></div></div>
+<div id="tech"><div class="twbox"><div class="lw-head"><b data-i18n="win.tech.title"></b><button class="tw-close">✕</button></div><div id="techbody"></div></div></div>
 <!-- steward («Хранитель») window — content rendered by renderSteward() in main.ts -->
-<div id="steward"><div class="twbox"><div class="lw-head"><b data-i18n>ХРАНИТЕЛЬ · ИИ НА СОН</b><button class="tw-close">✕</button></div><div id="stewardbody"></div></div></div>
+<div id="steward"><div class="twbox"><div class="lw-head"><b data-i18n="win.steward.title"></b><button class="tw-close">✕</button></div><div id="stewardbody"></div></div></div>
 <!-- heroes: the roster/штаб now lives INSIDE the constructor «Верфь» tab (Герои pane) -->
 <!-- scientist council picker (setup-time, before the start-point) — rendered by renderSciPick() -->
-<div id="scipick"><div class="twbox"><div class="lw-head"><b data-i18n>СОВЕТ УЧЁНЫХ</b><button class="sp-cancel" type="button" data-i18n>↩ В меню</button></div><div id="scipickbody"></div></div></div>
+<div id="scipick"><div class="twbox"><div class="lw-head"><b data-i18n="win.scipick.title"></b><button class="sp-cancel" type="button" data-i18n="win.scipick.back"></button></div><div id="scipickbody"></div></div></div>
 <!-- division template designer (H4, Stellaris-style) — rendered by renderDivDesign() -->
-<div id="divdesign"><div class="twbox"><div class="lw-head"><b data-i18n>КОНСТРУКТОР ДИВИЗИЙ</b><button class="tw-close">✕</button></div><div id="divdesignbody"></div></div></div>
+<div id="divdesign"><div class="twbox"><div class="lw-head"><b data-i18n="win.divdesign.title"></b><button class="tw-close">✕</button></div><div id="divdesignbody"></div></div></div>
 <!-- session market — whole box rendered by renderMarket() in main.ts -->
 <div id="market"></div>
 <!-- constructor («Верфь») — unified loadout tab; whole box rendered by renderConstructor() -->
@@ -2164,8 +2164,8 @@ const page = (js) => `<!doctype html>
        bar hidden otherwise); ⌂/▶▶ are PC-hidden (exit lives in the rail). Mobile is
        frozen: keeps ⌂/▶▶ and the legacy ×1/×10/×50/×100 chips; PC swaps in 1/30/60/120
        (data-mult = real wall-clock multiplier: 1800=½h·s, 3600=1h·s, 7200=2h·s). -->
-  <span id="spd-ctl"><button id="spd-pause" data-speed="0">‖</button><button id="spd-play" data-speed="1" class="on">▶</button><button id="spd-fast" class="spd-pc-hide" data-speed="3">▶▶</button><span class="spddiv"></span><span class="spd-mult-legacy"><button class="spdmini" data-mult="1" title="реальное время" data-i18n-title>×1</button><button class="spdmini" data-mult="10">×10</button><button class="spdmini" data-mult="50">×50</button><button class="spdmini" data-mult="100">×100</button></span><span class="spd-mult-pc"><button class="spdmini" data-mult="1" title="реальное время" data-i18n-title>1×</button><button class="spdmini" data-mult="1800" title="полчаса в секунду" data-i18n-title>30×</button><button class="spdmini" data-mult="3600" title="час в секунду" data-i18n-title>60×</button><button class="spdmini" data-mult="7200" title="два часа в секунду" data-i18n-title>120×</button></span><span class="sep"></span></span>
-  <!--dev-only--><span class="sep" id="restart-sep" style="display:none"></span><button id="restart" title="Перезапуск — к выбору ботов" data-i18n-title style="display:none">⟳</button><span class="sep"></span><!--/dev-only--><button id="tomenu" class="spd-pc-hide" title="Выход в меню" data-i18n-title>⌂</button>
+  <span id="spd-ctl"><button id="spd-pause" data-speed="0">‖</button><button id="spd-play" data-speed="1" class="on">▶</button><button id="spd-fast" class="spd-pc-hide" data-speed="3">▶▶</button><span class="spddiv"></span><span class="spd-mult-legacy"><button class="spdmini" data-mult="1" data-i18n-title="speed.mult.real">×1</button><button class="spdmini" data-mult="10">×10</button><button class="spdmini" data-mult="50">×50</button><button class="spdmini" data-mult="100">×100</button></span><span class="spd-mult-pc"><button class="spdmini" data-mult="1" data-i18n-title="speed.mult.real">1×</button><button class="spdmini" data-mult="1800" data-i18n-title="speed.mult.half-hour">30×</button><button class="spdmini" data-mult="3600" data-i18n-title="speed.mult.hour">60×</button><button class="spdmini" data-mult="7200" data-i18n-title="speed.mult.two-hours">120×</button></span><span class="sep"></span></span>
+  <!--dev-only--><span class="sep" id="restart-sep" style="display:none"></span><button id="restart" data-i18n-title="speed.restart" style="display:none">⟳</button><span class="sep"></span><!--/dev-only--><button id="tomenu" class="spd-pc-hide" data-i18n-title="speed.exit">⌂</button>
 </div>
 <div id="cmdbar"></div>
 <div id="codex"></div>
@@ -2193,107 +2193,107 @@ const page = (js) => `<!doctype html>
         <div class="ccrest">
           <div class="ring"><span class="dia"></span></div>
           <div class="wm">VOID DOMINION</div>
-          <div class="wtag" data-i18n>Грань пустоты</div>
+          <div class="wtag" data-i18n="welcome.tagline"></div>
         </div>
-        <p class="csub" data-i18n>Добро пожаловать, командир. Флот ждёт приказа.</p>
-        <button id="cnew" class="cnew" type="button" data-i18n>Новый командир</button>
-        <div class="cdiv" data-i18n>войти через</div>
+        <p class="csub" data-i18n="welcome.sub"></p>
+        <button id="cnew" class="cnew" type="button" data-i18n="welcome.new"></button>
+        <div class="cdiv" data-i18n="welcome.divider"></div>
         <div class="csocial">
-          <button id="cgoogle" class="csoc" type="button" aria-label="Войти через Google" title="Войти через Google" data-i18n-title data-i18n-aria>G</button>
-          <button id="capple" class="csoc" type="button" aria-label="Войти через Apple" title="Войти через Apple" data-i18n-title data-i18n-aria><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M16.4 12.9c0-2.3 1.9-3.4 2-3.4-1.1-1.6-2.8-1.8-3.4-1.8-1.5-.1-2.8.8-3.5.8s-1.8-.8-3-.8c-1.5 0-2.9.9-3.7 2.3-1.6 2.7-.4 6.8 1.1 9 .7 1.1 1.6 2.3 2.8 2.2 1.1 0 1.5-.7 2.9-.7s1.7.7 2.9.7c1.2 0 2-1.1 2.7-2.1.8-1.2 1.2-2.4 1.2-2.4s-2.3-.9-2.3-3zM14.3 6.3c.6-.8 1-1.8.9-2.9-.9 0-2 .6-2.6 1.3-.6.7-1.1 1.7-.9 2.7 1 .1 2-.5 2.6-1.1z"/></svg></button>
+          <button id="cgoogle" class="csoc" type="button" data-i18n-title="welcome.google" data-i18n-aria="welcome.google">G</button>
+          <button id="capple" class="csoc" type="button" data-i18n-title="welcome.apple" data-i18n-aria="welcome.apple"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M16.4 12.9c0-2.3 1.9-3.4 2-3.4-1.1-1.6-2.8-1.8-3.4-1.8-1.5-.1-2.8.8-3.5.8s-1.8-.8-3-.8c-1.5 0-2.9.9-3.7 2.3-1.6 2.7-.4 6.8 1.1 9 .7 1.1 1.6 2.3 2.8 2.2 1.1 0 1.5-.7 2.9-.7s1.7.7 2.9.7c1.2 0 2-1.1 2.7-2.1.8-1.2 1.2-2.4 1.2-2.4s-2.3-.9-2.3-3zM14.3 6.3c.6-.8 1-1.8.9-2.9-.9 0-2 .6-2.6 1.3-.6.7-1.1 1.7-.9 2.7 1 .1 2-.5 2.6-1.1z"/></svg></button>
         </div>
         <div class="cstack">
-          <button id="clogin" class="cbtn ghost" type="button" data-i18n>Вход по позывному</button>
-          <!--dev-only--><button id="csolo" class="cbtn ghost" type="button" data-i18n>Одиночная игра</button><!--/dev-only-->
+          <button id="clogin" class="cbtn ghost" type="button" data-i18n="welcome.login"></button>
+          <!--dev-only--><button id="csolo" class="cbtn ghost" type="button" data-i18n="welcome.solo"></button><!--/dev-only-->
         </div>
         <div id="cwlogin" class="cwlogin" style="display:none">
-          <input id="cwnick" type="text" autocapitalize="off" autocomplete="off" spellcheck="false" maxlength="24" placeholder="позывной" data-i18n-ph>
-          <button id="cwgo" class="cbtn" type="button" data-i18n>Войти</button>
+          <input id="cwnick" type="text" autocapitalize="off" autocomplete="off" spellcheck="false" maxlength="24" data-i18n-ph="welcome.nick.ph">
+          <button id="cwgo" class="cbtn" type="button" data-i18n="welcome.go"></button>
         </div>
         <div id="cwpassrow" class="cwlogin" style="display:none">
-          <input id="cwpass" type="password" autocomplete="new-password" maxlength="128" placeholder="пароль (аккаунт создастся сам)" data-i18n-ph>
+          <input id="cwpass" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.ph">
         </div>
       </div>
       <div id="cregister" style="display:none">
-        <button id="crback" class="cback" type="button" data-i18n>‹ назад</button>
-        <div class="ctitle"><span class="dia"></span><b data-i18n>Новый командир</b></div>
-        <p class="csub" data-i18n>Придумай позывной и пароль — так создаётся аккаунт.</p>
-        <label class="cfield"><span data-i18n>Имя командира</span>
-          <input id="crnick" type="text" autocapitalize="off" autocomplete="username" spellcheck="false" maxlength="24" placeholder="позывной" data-i18n-ph>
+        <button id="crback" class="cback" type="button" data-i18n="welcome.back"></button>
+        <div class="ctitle"><span class="dia"></span><b data-i18n="welcome.register.title"></b></div>
+        <p class="csub" data-i18n="welcome.register.sub"></p>
+        <label class="cfield"><span data-i18n="welcome.register.nick"></span>
+          <input id="crnick" type="text" autocapitalize="off" autocomplete="username" spellcheck="false" maxlength="24" data-i18n-ph="welcome.nick.ph">
         </label>
-        <label class="cfield"><span data-i18n>Почта (для восстановления)</span>
+        <label class="cfield"><span data-i18n="welcome.register.mail"></span>
           <input id="crmail" type="email" autocapitalize="off" autocomplete="email" spellcheck="false" maxlength="254" placeholder="you@mail.com">
         </label>
-        <label class="cfield"><span data-i18n>Пароль</span>
-          <input id="crpass" type="password" autocomplete="new-password" maxlength="128" placeholder="минимум 8 символов" data-i18n-ph>
+        <label class="cfield"><span data-i18n="welcome.register.pass"></span>
+          <input id="crpass" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.min.ph">
         </label>
-        <label class="cfield"><span data-i18n>Повтор пароля</span>
-          <input id="crpass2" type="password" autocomplete="new-password" maxlength="128" placeholder="ещё раз" data-i18n-ph>
+        <label class="cfield"><span data-i18n="welcome.register.pass2"></span>
+          <input id="crpass2" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.again.ph">
         </label>
         <div class="crow">
-          <button id="crgo" class="cbtn" type="button" data-i18n>Создать командира</button>
+          <button id="crgo" class="cbtn" type="button" data-i18n="welcome.register.go"></button>
         </div>
-        <button id="crrecover" class="clink" type="button" data-i18n>Восстановить доступ</button>
+        <button id="crrecover" class="clink" type="button" data-i18n="welcome.register.recover"></button>
       </div>
       <div id="crecover" style="display:none">
-        <button id="crecback" class="cback" type="button" data-i18n>‹ назад</button>
-        <div class="ctitle"><span class="dia"></span><b data-i18n>Восстановление доступа</b></div>
-        <p class="csub" data-i18n>Укажи почту аккаунта — пришлём ссылку для сброса пароля.</p>
-        <label class="cfield"><span data-i18n>Почта</span>
+        <button id="crecback" class="cback" type="button" data-i18n="welcome.back"></button>
+        <div class="ctitle"><span class="dia"></span><b data-i18n="welcome.recover.title"></b></div>
+        <p class="csub" data-i18n="welcome.recover.sub"></p>
+        <label class="cfield"><span data-i18n="welcome.recover.mail"></span>
           <input id="crecmail" type="email" autocapitalize="off" autocomplete="email" spellcheck="false" maxlength="254" placeholder="you@mail.com">
         </label>
         <div class="crow">
-          <button id="crecgo" class="cbtn" type="button" data-i18n>Отправить ссылку</button>
+          <button id="crecgo" class="cbtn" type="button" data-i18n="welcome.recover.go"></button>
         </div>
       </div>
       <div id="creset" style="display:none">
-        <div class="ctitle"><span class="dia"></span><b data-i18n>Новый пароль</b></div>
-        <p class="csub" data-i18n>Придумай новый пароль для входа.</p>
-        <label class="cfield"><span data-i18n>Пароль</span>
-          <input id="cresetpass" type="password" autocomplete="new-password" maxlength="128" placeholder="минимум 8 символов" data-i18n-ph>
+        <div class="ctitle"><span class="dia"></span><b data-i18n="welcome.reset.title"></b></div>
+        <p class="csub" data-i18n="welcome.reset.sub"></p>
+        <label class="cfield"><span data-i18n="welcome.reset.pass"></span>
+          <input id="cresetpass" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.min.ph">
         </label>
-        <label class="cfield"><span data-i18n>Повтор пароля</span>
-          <input id="cresetpass2" type="password" autocomplete="new-password" maxlength="128" placeholder="ещё раз" data-i18n-ph>
+        <label class="cfield"><span data-i18n="welcome.reset.pass2"></span>
+          <input id="cresetpass2" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.again.ph">
         </label>
         <div class="crow">
-          <button id="cresetgo" class="cbtn" type="button" data-i18n>Сменить пароль</button>
+          <button id="cresetgo" class="cbtn" type="button" data-i18n="welcome.reset.go"></button>
         </div>
       </div>
       <div id="cbrowse" style="display:none">
-        <button id="cback" class="cback" type="button" data-i18n>‹ назад</button>
-        <div class="ctitle"><span class="dia"></span><b data-i18n>МАТЧИ</b></div>
-        <p class="csub" data-i18n>Выбери матч из списка и войди, или обнови список.</p>
-        <label class="cfield"><span data-i18n>Сервер</span>
+        <button id="cback" class="cback" type="button" data-i18n="welcome.back"></button>
+        <div class="ctitle"><span class="dia"></span><b data-i18n="welcome.browse.title"></b></div>
+        <p class="csub" data-i18n="welcome.browse.sub"></p>
+        <label class="cfield"><span data-i18n="welcome.browse.server"></span>
           <input id="csrv" type="text" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="wss://… or ws://host:8788">
         </label>
-        <label class="cfield"><span data-i18n>Позывной</span>
-          <input id="cnick" type="text" autocapitalize="off" autocomplete="off" spellcheck="false" maxlength="24" placeholder="позывной" data-i18n-ph>
+        <label class="cfield"><span data-i18n="welcome.browse.nick"></span>
+          <input id="cnick" type="text" autocapitalize="off" autocomplete="off" spellcheck="false" maxlength="24" data-i18n-ph="welcome.nick.ph">
         </label>
-        <label class="cfield" id="cpassrow" style="display:none"><span data-i18n>Пароль</span>
-          <input id="cpass" type="password" autocomplete="current-password" maxlength="128" placeholder="пароль (аккаунт создастся сам)" data-i18n-ph>
+        <label class="cfield" id="cpassrow" style="display:none"><span data-i18n="welcome.browse.pass"></span>
+          <input id="cpass" type="password" autocomplete="current-password" maxlength="128" data-i18n-ph="welcome.pass.ph">
         </label>
         <div class="crow">
-          <button id="cgo" class="cbtn" type="button" data-i18n>Обновить список</button>
+          <button id="cgo" class="cbtn" type="button" data-i18n="welcome.browse.go"></button>
         </div>
         <div class="mtabs">
-          <button class="mtab active" data-tab="available" data-i18n>Доступные</button>
-          <button class="mtab" data-tab="active" data-i18n>Активные</button>
-          <button class="mtab" data-tab="archived" data-i18n>Архив</button>
+          <button class="mtab active" data-tab="available" data-i18n="welcome.browse.tab.available"></button>
+          <button class="mtab" data-tab="active" data-i18n="welcome.browse.tab.active"></button>
+          <button class="mtab" data-tab="archived" data-i18n="welcome.browse.tab.archived"></button>
         </div>
         <div id="mlist" class="mlist"></div>
       </div>
       <div id="cstatus" class="cstat"></div>
     </div>
-    <button id="cupd" class="cupd" type="button" style="display:none" data-i18n>Проверить обновления</button>
+    <button id="cupd" class="cupd" type="button" style="display:none" data-i18n="welcome.update-check"></button>
     <div id="cver" class="cver"></div>
     <!-- DEV TEST MODE — remove this button (and the #testmode block + CSS + main.ts hook) to cut the feature -->
-    <!--dev-only--><button id="ctest" class="cbtn ghost tm-open" data-i18n>🧪 Тесты · режим разработчика</button><!--/dev-only-->
+    <!--dev-only--><button id="ctest" class="cbtn ghost tm-open" data-i18n="welcome.testmode"></button><!--/dev-only-->
     <!-- /DEV TEST MODE -->
     <div class="cfoot">
-      <a id="cl-imprint" data-i18n>Выходные данные</a>
-      <a id="cl-terms" data-i18n>Условия</a>
-      <a id="cl-privacy" data-i18n>Политика конфиденциальности</a>
-      <a id="cl-support" data-i18n>Поддержка</a>
+      <a id="cl-imprint" data-i18n="welcome.imprint"></a>
+      <a id="cl-terms" data-i18n="welcome.terms"></a>
+      <a id="cl-privacy" data-i18n="welcome.privacy"></a>
+      <a id="cl-support" data-i18n="welcome.support"></a>
     </div>
   </div>
 </div>
@@ -2302,10 +2302,10 @@ const page = (js) => `<!doctype html>
      the returning-player path lands in the hub and never visits #connect, which is
      where this used to live (and why players never saw their updates). -->
 <div id="updbar">
-  <div class="ub-t"><span data-i18n>Доступна новая сборка</span> <b id="ub-ver"></b></div>
+  <div class="ub-t"><span data-i18n="upd.available"></span> <b id="ub-ver"></b></div>
   <div class="ub-row">
-    <a id="ub-go" class="ub-go" href="#" rel="noopener" data-i18n>Обновить</a>
-    <button id="ub-later" class="ub-later" type="button" data-i18n>Позже</button>
+    <a id="ub-go" class="ub-go" href="#" rel="noopener" data-i18n="upd.go"></a>
+    <button id="ub-later" class="ub-later" type="button" data-i18n="upd.later"></button>
   </div>
 </div>
 <div id="hub">
@@ -2317,69 +2317,69 @@ const page = (js) => `<!doctype html>
     <div class="hub-av" id="hubav" title="Сменить эмблему">◆</div>
     <div class="hub-who">
       <div class="hub-name" id="hub-name">Командир</div>
-      <div class="hub-st" data-i18n>в сети</div>
+      <div class="hub-st" data-i18n="hub.status.online"></div>
     </div>
-    <button class="hub-msg" id="hub-msg" type="button" aria-label="Сообщения" data-i18n-aria>✉</button>
+    <button class="hub-msg" id="hub-msg" type="button" data-i18n-aria="hub.msgs.aria">✉</button>
   </div>
   <div class="hub-body">
     <div class="hub-panel" id="hp-home">
-      <button id="hub-play" class="hub-play" type="button" data-i18n>ИГРАТЬ СЕЙЧАС</button>
-      <button id="hub-solo" class="hub-solo" type="button" data-i18n>Одиночная игра</button>
+      <button id="hub-play" class="hub-play" type="button" data-i18n="hub.play"></button>
+      <button id="hub-solo" class="hub-solo" type="button" data-i18n="hub.solo"></button>
       <!-- ONB-0 first-run offer: shown only to a not-yet-onboarded commander -->
       <div class="hub-card ob-nudge" id="onboard-nudge" style="display:none">
         <div class="hc-ic">◎</div>
         <div class="ob-body">
-          <div class="hc-t" data-i18n>Впервые в Void Dominion?</div>
-          <div class="hc-s" data-i18n>Короткое обучение покажет интерфейс и первый ход — пара минут.</div>
+          <div class="hc-t" data-i18n="hub.onboard.title"></div>
+          <div class="hc-s" data-i18n="hub.onboard.sub"></div>
           <div class="ob-btns">
-            <button id="ob-start" class="ob-go" type="button" data-i18n>Начать обучение</button>
-            <button id="ob-skip" class="ob-later" type="button" data-i18n>Пропустить</button>
+            <button id="ob-start" class="ob-go" type="button" data-i18n="hub.onboard.start"></button>
+            <button id="ob-skip" class="ob-later" type="button" data-i18n="hub.onboard.skip"></button>
           </div>
         </div>
       </div>
-      <div class="hub-sec" data-i18n>Сводка</div>
+      <div class="hub-sec" data-i18n="hub.digest.section"></div>
       <div class="hub-card">
         <div class="hc-ic">◷</div>
-        <div><div class="hc-t" data-i18n>Нет матчей, ждущих приказа</div><div class="hc-s" data-i18n>Войди в матч на вкладке «Игры» — здесь появятся ходы, требующие внимания.</div></div>
+        <div><div class="hc-t" data-i18n="hub.digest.empty.title"></div><div class="hc-s" data-i18n="hub.digest.empty.sub"></div></div>
       </div>
       <div class="hub-card">
         <div class="hc-ic">✦</div>
-        <div><div class="hc-t" data-i18n>Сезон ещё не начат</div><div class="hc-s" data-i18n>Рейтинги и альянсы откроются со стартом мета-слоя.</div></div>
+        <div><div class="hc-t" data-i18n="hub.season.title"></div><div class="hc-s" data-i18n="hub.season.sub"></div></div>
       </div>
     </div>
     <div class="hub-panel" id="hp-meta" style="display:none"></div>
     <div class="hub-panel" id="hp-arsenal" style="display:none"></div>
     <div class="hub-panel" id="hp-rank" style="display:none">
-      <div class="hub-empty"><span class="he-ic">▤</span><span data-i18n>Рейтинги — скоро</span><br><span style="font-size:11px;color:var(--cyan-dim)" data-i18n>сезонный рейтинг по местам в матчах</span></div>
+      <div class="hub-empty"><span class="he-ic">▤</span><span data-i18n="hub.rank.empty.title"></span><br><span style="font-size:11px;color:var(--cyan-dim)" data-i18n="hub.rank.empty.sub"></span></div>
     </div>
     <div class="hub-panel" id="hp-ally" style="display:none">
-      <div class="hub-empty"><span class="he-ic">⚑</span><span data-i18n>Альянсы</span><br><span style="font-size:11px;color:var(--cyan-dim)" data-i18n>корпорации · общие AvA-битвы · влияние</span></div>
-      <button id="ccorp" class="hub-solo" type="button">⬢ <span data-i18n>Кабинет корпорации</span></button>
+      <div class="hub-empty"><span class="he-ic">⚑</span><span data-i18n="hub.ally.empty.title"></span><br><span style="font-size:11px;color:var(--cyan-dim)" data-i18n="hub.ally.empty.sub"></span></div>
+      <button id="ccorp" class="hub-solo" type="button">⬢ <span data-i18n="hub.ally.corp"></span></button>
     </div>
     <div class="hub-panel" id="hp-more" style="display:none">
       <div class="hub-grid">
-        <button class="hub-tile" id="hub-tutorial" type="button"><span class="ht-ic">◎</span><span data-i18n>Обучение</span></button>
-        <button class="hub-tile" id="hub-help" type="button"><span class="ht-ic">?</span><span data-i18n>Справочник</span></button>
-        <button class="hub-tile" id="hub-settings" type="button"><span class="ht-ic">⚙</span><span data-i18n>Настройки</span></button>
-        <button class="hub-tile" id="hub-upd" type="button" style="display:none"><span class="ht-ic">⟳</span><span data-i18n>Обновления</span></button>
-        <button class="hub-tile" data-more="Аккаунт" type="button"><span class="ht-ic">◉</span><span data-i18n>Аккаунт</span></button>
-        <button class="hub-tile" data-more="Сообщество" type="button"><span class="ht-ic">◍</span><span data-i18n>Сообщество</span></button>
-        <button class="hub-tile" data-more="Поддержка" type="button"><span class="ht-ic">⚠</span><span data-i18n>Поддержка</span></button>
-        <button class="hub-tile" data-more="Уведомления" type="button"><span class="ht-ic">◔</span><span data-i18n>Уведомления</span></button>
-        <button class="hub-tile" data-more="Чат" type="button"><span class="ht-ic">▭</span><span data-i18n>Чат</span></button>
-        <button class="hub-tile wide" id="hub-logout" type="button"><span class="ht-ic">↩</span><span data-i18n>Сменить командира</span></button>
+        <button class="hub-tile" id="hub-tutorial" type="button"><span class="ht-ic">◎</span><span data-i18n="hub.tile.tutorial"></span></button>
+        <button class="hub-tile" id="hub-help" type="button"><span class="ht-ic">?</span><span data-i18n="hub.tile.help"></span></button>
+        <button class="hub-tile" id="hub-settings" type="button"><span class="ht-ic">⚙</span><span data-i18n="hub.tile.settings"></span></button>
+        <button class="hub-tile" id="hub-upd" type="button" style="display:none"><span class="ht-ic">⟳</span><span data-i18n="hub.tile.updates"></span></button>
+        <button class="hub-tile" data-more="Аккаунт" type="button"><span class="ht-ic">◉</span><span data-i18n="hub.tile.account"></span></button>
+        <button class="hub-tile" data-more="Сообщество" type="button"><span class="ht-ic">◍</span><span data-i18n="hub.tile.community"></span></button>
+        <button class="hub-tile" data-more="Поддержка" type="button"><span class="ht-ic">⚠</span><span data-i18n="hub.tile.support"></span></button>
+        <button class="hub-tile" data-more="Уведомления" type="button"><span class="ht-ic">◔</span><span data-i18n="hub.tile.notifications"></span></button>
+        <button class="hub-tile" data-more="Чат" type="button"><span class="ht-ic">▭</span><span data-i18n="hub.tile.chat"></span></button>
+        <button class="hub-tile wide" id="hub-logout" type="button"><span class="ht-ic">↩</span><span data-i18n="hub.tile.logout"></span></button>
       </div>
     </div>
   </div>
   <div class="hub-note" id="hub-note"></div>
   <nav class="hub-nav">
-    <button class="hub-tab active" data-hub="home" type="button"><span class="hn-ic">⌂</span><span data-i18n>Домой</span></button>
-    <button class="hub-tab" data-hub="games" type="button"><span class="hn-ic">▶</span><span data-i18n>Игры</span></button>
-    <button class="hub-tab" data-hub="rank" type="button"><span class="hn-ic">▤</span><span data-i18n>Рейтинг</span></button>
-    <button class="hub-tab" data-hub="meta" type="button"><span class="hn-ic">★</span><span data-i18n>Прокачка</span></button>
-    <button class="hub-tab" data-hub="arsenal" type="button"><span class="hn-ic">⚔</span><span data-i18n>Арсенал</span></button>
-    <button class="hub-tab" data-hub="ally" type="button"><span class="hn-ic">⚑</span><span data-i18n>Альянсы</span></button>
-    <button class="hub-tab" data-hub="more" type="button"><span class="hn-ic">≡</span><span data-i18n>Ещё</span></button>
+    <button class="hub-tab active" data-hub="home" type="button"><span class="hn-ic">⌂</span><span data-i18n="hub.nav.home"></span></button>
+    <button class="hub-tab" data-hub="games" type="button"><span class="hn-ic">▶</span><span data-i18n="hub.nav.games"></span></button>
+    <button class="hub-tab" data-hub="rank" type="button"><span class="hn-ic">▤</span><span data-i18n="hub.nav.rank"></span></button>
+    <button class="hub-tab" data-hub="meta" type="button"><span class="hn-ic">★</span><span data-i18n="hub.nav.meta"></span></button>
+    <button class="hub-tab" data-hub="arsenal" type="button"><span class="hn-ic">⚔</span><span data-i18n="hub.nav.arsenal"></span></button>
+    <button class="hub-tab" data-hub="ally" type="button"><span class="hn-ic">⚑</span><span data-i18n="hub.nav.ally"></span></button>
+    <button class="hub-tab" data-hub="more" type="button"><span class="hn-ic">≡</span><span data-i18n="hub.nav.more"></span></button>
   </nav>
 </div>
 <div id="emblempick">
@@ -2397,18 +2397,18 @@ const page = (js) => `<!doctype html>
 </div>
 <div id="setup">
   <div class="sbox">
-    <div class="stitle"><span class="dia"></span><b data-i18n>НАСТРОЙКА СХВАТКИ</b></div>
+    <div class="stitle"><span class="dia"></span><b data-i18n="setup.title"></b></div>
     <div id="setup-start" class="spane">
       <div class="scol">
-        <p class="ssub" data-i18n>Выберите свой домашний мир на карте, задайте число соперников-ботов и запускайте. Пустые места займут боты — выключите место, чтобы командовать меньшим сектором, или выключите все ради мирной одиночной песочницы для знакомства с интерфейсом.</p>
+        <p class="ssub" data-i18n="setup.sub"></p>
         <svg id="setupmap" class="smap" preserveAspectRatio="xMidYMid meet"></svg>
-        <p class="smaphint" id="setuphint" data-i18n>Тапните светящийся мир, чтобы выбрать старт</p>
+        <p class="smaphint" id="setuphint" data-i18n="setup.map-hint"></p>
         <div id="setupfactions"></div>
       </div>
       <div class="scol">
         <div id="setupslots" class="sslots"></div>
-        <div class="sspeedlabel" data-i18n>Скорость времени</div>
-        <p class="sspeedhint" data-i18n>×1 — реальное время (час пути = час жизни, мир живёт и офлайн). Для быстрой партии выбери ×10–×100.</p>
+        <div class="sspeedlabel" data-i18n="setup.speed.label"></div>
+        <p class="sspeedhint" data-i18n="setup.speed.hint"></p>
         <div id="setupspeed" class="sspeed">
           <button class="spdchip" type="button" data-spd="1">×1</button>
           <button class="spdchip" type="button" data-spd="2">×2</button>
@@ -2418,25 +2418,25 @@ const page = (js) => `<!doctype html>
           <button class="spdchip" type="button" data-spd="100">×100</button>
         </div>
         <!-- SANDBOX — setup checkbox; delete this fenced block + the #sandbox markup to cut it -->
-        <!--dev-only--><label class="sbx-check"><input id="setupsandbox" type="checkbox"><span data-i18n>🧪 Песочница</span></label><!--/dev-only-->
+        <!--dev-only--><label class="sbx-check"><input id="setupsandbox" type="checkbox"><span data-i18n="setup.sandbox"></span></label><!--/dev-only-->
       </div>
     </div>
-    <button id="setupgo" class="sgo" disabled data-i18n>ЗАПУСК</button>
-    <button id="setupcancel" class="scancel" data-i18n>Назад</button>
+    <button id="setupgo" class="sgo" disabled data-i18n="setup.go"></button>
+    <button id="setupcancel" class="scancel" data-i18n="setup.cancel"></button>
   </div>
 </div>
 <!-- REL-7: multiplayer seat/faction picker — shown before joining a match -->
 <div id="seatpick" style="display:none">
   <div class="sbox">
-    <div class="stitle"><span class="dia"></span><b data-i18n>Выбор фракции</b></div>
+    <div class="stitle"><span class="dia"></span><b data-i18n="seatpick.title"></b></div>
     <div class="spane">
       <div class="scol">
-        <p class="ssub" data-i18n>Выберите фракцию и стартовую позицию. Занятые места отмечены серым.</p>
+        <p class="ssub" data-i18n="seatpick.sub"></p>
         <div id="seatpick-list"></div>
       </div>
     </div>
-    <button id="seatpick-go" class="sgo" disabled data-i18n>ВЫБРАТЬ</button>
-    <button id="seatpick-cancel" class="scancel" data-i18n>Назад</button>
+    <button id="seatpick-go" class="sgo" disabled data-i18n="seatpick.go"></button>
+    <button id="seatpick-cancel" class="scancel" data-i18n="seatpick.cancel"></button>
   </div>
 </div>
 <!-- hero fitting: the module "on the cursor" — follows the pointer (heroes setup tab) -->
