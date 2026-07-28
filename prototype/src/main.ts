@@ -5119,12 +5119,12 @@ function tabButton(tab: PlanetTab, label: string, count: number, desc?: string):
 }
 function unitRows(stacks: Array<{ unit: string; count: number }>): string {
   if (!stacks.length) {
-    return `<div class="row dim">${t('нет')}</div>`;
+    return `<div class="row dim">${t('side.none')}</div>`;
   }
   return stacks
     .map(
       (st) =>
-        `<div class="asset-row" data-desc="u:${esc(st.unit)}"><span class="bicon">${unitIconHtml(st.unit, 18)}</span><b>${st.count}× ${displayUnit(st.unit)}</b><span class="dim">${isGround(st.unit) ? t('земля') : t('космос')}</span></div>`,
+        `<div class="asset-row" data-desc="u:${esc(st.unit)}"><span class="bicon">${unitIconHtml(st.unit, 18)}</span><b>${st.count}× ${displayUnit(st.unit)}</b><span class="dim">${isGround(st.unit) ? t('side.unit.ground') : t('side.unit.space')}</span></div>`,
     )
     .join('');
 }
@@ -5147,36 +5147,36 @@ function conveyorHtml(planetId: string, lane: BuildLane): string {
     // build buttons) would be rebuilt 60×/s, and a click whose down/up straddle a rebuild
     // is dropped (the bug where rapid build orders only queued one ship in real time).
     const dur = buildDurationHours(active.payload) * HOUR;
-    html += `<div class="current" data-desc="c:${planetId}:${lane}:active:${active.seq}"><span>${t('СЕЙЧАС')}</span><b>${constructionLabel(active.payload)}</b><em class="conv-time" data-at="${active.at}">—</em>`;
-    html += `<button class="conv-cancel" data-act="cancelbuild" data-arg="${active.seq}" title="${t('Отменить — вернёт часть ресурсов и поставит на паузу')}">✕</button></div>`;
+    html += `<div class="current" data-desc="c:${planetId}:${lane}:active:${active.seq}"><span>${t('side.conveyor.now')}</span><b>${constructionLabel(active.payload)}</b><em class="conv-time" data-at="${active.at}">—</em>`;
+    html += `<button class="conv-cancel" data-act="cancelbuild" data-arg="${active.seq}" title="${t('side.conveyor.cancel.title')}">✕</button></div>`;
     html += `<div class="bar"><i class="conv-fill" data-at="${active.at}" data-dur="${dur}" style="width:0%"></i></div>`;
   } else if (pcUi() && queued[0] && !canStartQueued(planetId, queued[0])) {
     // The queue is NOT stuck — its head simply can't be paid yet. Say so, with the
     // price, instead of an idle line that reads like a broken conveyor.
-    html += `<div class="current idle"><b>⏳ ${t('Ждёт ресурсы: {c}', { c: cost(buildCost(planetId, queued[0])) })}</b></div>`;
+    html += `<div class="current idle"><b>⏳ ${t('side.conveyor.waiting', { c: cost(buildCost(planetId, queued[0])) })}</b></div>`;
     html += `<div class="bar"><i style="width:0%"></i></div>`;
   } else if (compactUi()) {
-    html += `<div class="current idle"><b>${t('Ожидание заказов')}</b></div>`;
+    html += `<div class="current idle"><b>${t('side.conveyor.idle')}</b></div>`;
     html += `<div class="bar"><i style="width:0%"></i></div>`;
   } else {
-    html += `<div class="current idle"><span>${t('ПРОСТОЙ')}</span><b>${t('готов к следующему заказу')}</b><em>—</em></div>`;
+    html += `<div class="current idle"><span>${t('side.conveyor.idle.tag')}</span><b>${t('side.conveyor.idle.sub')}</b><em>—</em></div>`;
     html += `<div class="bar"><i style="width:0%"></i></div>`;
   }
   if (queued.length) {
     html += `<div class="queue">${queued
       .map(
         (q, i) =>
-          `<span data-desc="c:${planetId}:${lane}:queued:${i}"><em>${i + 1}</em>${queuedLabel(q)}<button class="q-x" data-act="dequeue" data-arg="${lane}:${i}" title="${t('Убрать из очереди')}">✕</button></span>`,
+          `<span data-desc="c:${planetId}:${lane}:queued:${i}"><em>${i + 1}</em>${queuedLabel(q)}<button class="q-x" data-act="dequeue" data-arg="${lane}:${i}" title="${t('side.conveyor.dequeue.title')}">✕</button></span>`,
       )
       .join('')}</div>`;
   } else if (!compactUi()) {
-    html += `<div class="queue empty">${t('очередь пуста')}</div>`;
+    html += `<div class="queue empty">${t('side.conveyor.queue-empty')}</div>`;
   }
   if (paused.length) {
     html += `<div class="paused">${paused
       .map(
         (p) =>
-          `<span data-desc="c:${planetId}:${lane}:paused:${p.id}"><em>${t('Приостановлено {n}%', { n: Math.round(p.progress * 100) })}</em>${pausedLabel(p)}<button class="p-go" data-act="resumebuild" data-arg="${p.id}" title="${t('Возобновить — доплатить остаток')}">▶</button></span>`,
+          `<span data-desc="c:${planetId}:${lane}:paused:${p.id}"><em>${t('side.conveyor.paused', { n: Math.round(p.progress * 100) })}</em>${pausedLabel(p)}<button class="p-go" data-act="resumebuild" data-arg="${p.id}" title="${t('side.conveyor.resume.title')}">▶</button></span>`,
       )
       .join('')}</div>`;
   }
@@ -5210,10 +5210,10 @@ function taskGroupPanelHtml(group: Fleet[]): string {
   const troops = group.reduce((a, f) => a + sumUnits(f.landing ?? []), 0);
   let h = cardHeader(
     ownerColor(ME),
-    t('ОПЕРАТИВНАЯ ГРУППА'),
-    t('{f} флот(ов) · {s} кораблей · {tr} десанта', { f: group.length, s: ships, tr: troops }),
+    t('side.group.title'),
+    t('side.group.sub', { f: group.length, s: ships, tr: troops }),
   );
-  h += `<div class="hint">${t('Нажмите «Курс» и тапните цель — все выбранные флоты пойдут туда (проложат маршрут и встанут). «Слить» сплавляет группу в один флот (дальние сначала подлетят). Shift- или Ctrl/⌘-клик по флоту добавляет его в группу; Shift-рамка по пустому месту выделяет несколько.')}</div>`;
+  h += `<div class="hint">${t('side.group.hint')}</div>`;
   for (const f of group) {
     const loc =
       f.location ??
@@ -5226,7 +5226,7 @@ function taskGroupPanelHtml(group: Fleet[]): string {
     const nTr = sumUnits(f.landing ?? []);
     h += `<div class="row" style="color:${ownerColor(f.owner)}">▲ ${f.id} <span class="dim">${loc}</span> · ${nShips}${nTr ? '+' + nTr : ''}</div>`;
   }
-  h += btn('cancel', '', t('Снять выделение группы'), true);
+  h += btn('cancel', '', t('side.group.clear'), true);
   return h;
 }
 
@@ -5247,7 +5247,7 @@ function fleetTilesHtml(f: Fleet, stacks: UnitStack[]): string {
         def.domain === 'ground'
           ? `<span class="pt-ic">${unitIcon(u.unit)}</span>`
           : `<span class="pt-ic">${unitGlyphSvg(def, { color: ownerColor(f.owner), shield: (eff.shield ?? 0) > 0 })}</span>`;
-      return `<button class="ptile" data-codex="u:${esc(u.unit)}" data-desc="u:${esc(u.unit)}" data-name="${esc(name)}" title="${esc(name)} — ${t('тап — полное досье')}">${icon}<span class="pt-c">×${u.count}</span><span class="pt-hp${pct < 30 ? ' low' : ''}"><i style="width:${pct}%"></i></span></button>`;
+      return `<button class="ptile" data-codex="u:${esc(u.unit)}" data-desc="u:${esc(u.unit)}" data-name="${esc(name)}" title="${esc(name)} — ${t('side.fleet.tile.hint')}">${icon}<span class="pt-c">×${u.count}</span><span class="pt-hp${pct < 30 ? ' low' : ''}"><i style="width:${pct}%"></i></span></button>`;
     })
     .join('');
   return tiles ? `<div class="ptiles">${tiles}</div>` : '';
@@ -5267,26 +5267,26 @@ function fleetSummaryHtml(f: Fleet): string {
     byArch.set(a, (byArch.get(a) ?? 0) + st.count);
   }
   const ARCH_LABEL: Record<string, string> = {
-    scout: t('скауты'),
-    combat: t('боевые'),
-    artillery: t('артиллерия'),
-    transport: t('транспорты'),
-    flagship: t('флагман'),
-    swarm: t('рой'),
+    scout: t('side.arch.scout'),
+    combat: t('side.arch.combat'),
+    artillery: t('side.arch.artillery'),
+    transport: t('side.arch.transport'),
+    flagship: t('side.arch.flagship'),
+    swarm: t('side.arch.swarm'),
   };
   const comp = [...byArch.entries()].map(([a, n]) => `${ARCH_LABEL[a] ?? a} ×${n}`).join(' · ');
   const nTr = sumUnits(f.landing ?? []);
   rows.push(
-    `<div class="row">${t('Состав')}: <b>${comp || t('нет')}</b>${nTr ? ` · ${t('десант')} ×${nTr}` : ''}</div>`,
+    `<div class="row">${t('side.summary.composition')}: <b>${comp || t('side.none')}</b>${nTr ? ` · ${t('side.summary.troops')} ×${nTr}` : ''}</div>`,
   );
   // боевой вес: кап против полной суммы — видно, сколько стволов «за линией»
   const atkCap = Math.round(cappedUnitStat(f.units, data, 'attack'));
   const atkAll = Math.round(sumUnitStat(f.units, data, 'attack'));
   const defCap = Math.round(cappedUnitStat(f.units, data, 'defense'));
   rows.push(
-    `<div class="row">⚔ ${t('Атака')}: <b>${atkCap}</b>${atkAll > atkCap ? ` <span class="dim">(${t('всего')} ${atkAll} — ${t('бьют {n} юнитов', { n: COMBAT_UNIT_CAP })})</span>` : ''}</div>`,
+    `<div class="row">⚔ ${t('side.summary.attack')}: <b>${atkCap}</b>${atkAll > atkCap ? ` <span class="dim">(${t('side.summary.total')} ${atkAll} — ${t('side.summary.firing-cap', { n: COMBAT_UNIT_CAP })})</span>` : ''}</div>`,
   );
-  rows.push(`<div class="row">🛡 ${t('Защита')}: <b>${defCap}</b></div>`);
+  rows.push(`<div class="row">🛡 ${t('side.summary.defense')}: <b>${defCap}</b></div>`);
   // пулы
   let curHull = 0,
     maxHull = 0,
@@ -5304,19 +5304,19 @@ function fleetSummaryHtml(f: Fleet): string {
     curSh += Math.min(st.shieldHp ?? ms, ms);
   }
   rows.push(
-    `<div class="row">♥ ${t('Корпус')}: <b>${kfmt(Math.round(curHull))}/${kfmt(maxHull)}</b>${maxSh > 0 ? ` · ◈ ${t('Щит')}: <b>${kfmt(Math.round(curSh))}/${kfmt(maxSh)}</b>` : ''}</div>`,
+    `<div class="row">♥ ${t('side.summary.hull')}: <b>${kfmt(Math.round(curHull))}/${kfmt(maxHull)}</b>${maxSh > 0 ? ` · ◈ ${t('side.summary.shield')}: <b>${kfmt(Math.round(curSh))}/${kfmt(maxSh)}</b>` : ''}</div>`,
   );
   // скорость: база (мин по корпусам, лимп учтён) + активные множители
   const spd = fleetBaseSpeed(f, data);
   const mults: string[] = [];
-  if (marchFlagged(f.id)) mults.push(`⚡ ${t('форс-марш')} ×${FORCED_MARCH_MULT}`);
+  if (marchFlagged(f.id)) mults.push(`⚡ ${t('side.summary.forced-march')} ×${FORCED_MARCH_MULT}`);
   if (
     (f as { retreatHasteUntil?: number }).retreatHasteUntil != null &&
     s.time < (f as { retreatHasteUntil?: number }).retreatHasteUntil!
   )
-    mults.push(`⤺ ${t('рывок отхода')} ×1.5`);
+    mults.push(`⤺ ${t('side.summary.retreat-haste')} ×1.5`);
   rows.push(
-    `<div class="row">⚡ ${t('Скорость')}: <b>${spd > 0 ? Math.round(spd) : '—'}</b>${mults.length ? ` <span class="dim">${mults.join(' · ')}</span>` : ''} <span class="dim">· ${t('по самому медленному; техи/фракция/местность — на переходе')}</span></div>`,
+    `<div class="row">⚡ ${t('side.summary.speed')}: <b>${spd > 0 ? Math.round(spd) : '—'}</b>${mults.length ? ` <span class="dim">${mults.join(' · ')}</span>` : ''} <span class="dim">· ${t('side.summary.speed.note')}</span></div>`,
   );
   // трюм и радар
   const cargoCap = sumUnitStat(f.units, data, 'cargoCapacity');
@@ -5326,13 +5326,13 @@ function fleetSummaryHtml(f: Fleet): string {
   }, 0);
   if (cargoCap > 0)
     rows.push(
-      `<div class="row">📦 ${t('Трюм')}: <b>${cargoUsed}/${Math.round(cargoCap)}</b></div>`,
+      `<div class="row">📦 ${t('side.summary.cargo')}: <b>${cargoUsed}/${Math.round(cargoCap)}</b></div>`,
     );
   const radar = Math.max(
     0,
     ...f.units.filter((u) => u.count > 0).map((u) => data.units[u.unit]?.radarRange ?? 0),
   );
-  if (radar > 0) rows.push(`<div class="row">📡 ${t('Радар')}: <b>${radar}</b></div>`);
+  if (radar > 0) rows.push(`<div class="row">📡 ${t('side.summary.radar')}: <b>${radar}</b></div>`);
   // содержание
   const upkeep: Record<string, number> = {};
   for (const st of f.units) {
@@ -5345,11 +5345,11 @@ function fleetSummaryHtml(f: Fleet): string {
     .filter(([, n]) => n > 0)
     .map(([r, n]) => `${n} ${tData(r)}`)
     .join(', ');
-  if (up) rows.push(`<div class="row dim">${t('Содержание')}: ${up}/${t('день')}</div>`);
+  if (up) rows.push(`<div class="row dim">${t('side.summary.upkeep')}: ${up}/${t('side.summary.day')}</div>`);
   return (
-    `<div class="sec">${t('Сводка армии')}</div>` +
+    `<div class="sec">${t('side.summary.title')}</div>` +
     rows.join('') +
-    `<div class="row">${btn('fleetinfo', '', t('‹ Назад к карточке'), true)}</div>`
+    `<div class="row">${btn('fleetinfo', '', t('side.summary.back'), true)}</div>`
   );
 }
 
@@ -5377,11 +5377,11 @@ function fleetPanelHtml(f: Fleet): string {
     curSh += Math.min(st.shieldHp ?? ms, ms);
   }
   const hullPct = maxHull > 0 ? Math.round((curHull / maxHull) * 100) : 100;
-  const hullTag = hullPct < 30 ? ` · ⚠ ${t('корпус {p}%', { p: hullPct })}` : '';
+  const hullTag = hullPct < 30 ? ` · ⚠ ${t('side.fleet.hull-tag', { p: hullPct })}` : '';
   // ECON-1: голодный десант — владелец в food-arrears бьёт на земле на −25%.
   const hungry =
     nTr > 0 && f.owner === ME && (s.players[ME]?.arrears ?? []).includes('food')
-      ? ` · 🍽 ${t('голод: −25% на земле')}`
+      ? ` · 🍽 ${t('side.fleet.hunger')}`
       : '';
   // Bytro-стиль: авто-имя соединения (тип по размеру + позывной), тап → сводка.
   const fleetTitle = `${t(fleetKindKey(nShips))} «${fleetCallsign(f.id)}»`;
@@ -5389,12 +5389,12 @@ function fleetPanelHtml(f: Fleet): string {
     ownerColor(f.owner),
     fleetTitle,
     (pcUi()
-      ? t('Корабли: {s} · Десант: {tr}', { s: nShips, tr: nTr })
-      : t('{s} кораблей · {tr} десанта', { s: nShips, tr: nTr })) +
+      ? t('side.fleet.sub.pc', { s: nShips, tr: nTr })
+      : t('side.fleet.sub', { s: nShips, tr: nTr })) +
       hullTag +
       hungry +
-      (inOrbit ? ' · ' + t('на орбите') : '') +
-      (f.bombarding ? ' · ⊗ ' + t('бомбардирует') : ''),
+      (inOrbit ? ' · ' + t('side.fleet.in-orbit') : '') +
+      (f.bombarding ? ' · ⊗ ' + t('side.fleet.bombarding') : ''),
     'fleetinfo',
   );
   // Тап по имени открыл сводку армии — карточка целиком уступает ей место.
@@ -5408,11 +5408,11 @@ function fleetPanelHtml(f: Fleet): string {
   if (maxHull > 0) {
     h += `<div class="row hullrow" data-desc="stat:hull"><span class="hico">♥</span><span class="hbar${hullPct < 30 ? ' low' : ''}"><i style="width:${hullPct}%"></i></span><b>${kfmt(Math.round(curHull))}/${kfmt(maxHull)}</b>${
       atDock
-        ? `<button class="chip-metal" data-act="dockrepair" data-arg="${f.id}" title="${t('Экспресс-ремонт у своего дока за металл')}">🔧 ${dockRepairCost(f, data)}⬢</button>`
+        ? `<button class="chip-metal" data-act="dockrepair" data-arg="${f.id}" title="${t('side.fleet.repair.dock.title')}">🔧 ${dockRepairCost(f, data)}⬢</button>`
         : ''
     }${
       canRepair
-        ? `<button class="chip-gold" data-act="instantrepair" data-arg="${f.id}" title="${t('Мгновенный ремонт всего корпуса за кредиты')}">🔧 ${repairCost}💰</button>`
+        ? `<button class="chip-gold" data-act="instantrepair" data-arg="${f.id}" title="${t('side.fleet.repair.instant.title')}">🔧 ${repairCost}💰</button>`
         : ''
     }</div>`;
     if (maxSh > 0)
@@ -5433,12 +5433,12 @@ function fleetPanelHtml(f: Fleet): string {
         : String(Math.round(spd))
       : '—';
   // Fleet-card blurb removed (feedback: compact panel) — the header + stat chips carry it.
-  h += `<div class="pstats"><span data-desc="stat:atk">⚔ ${t('АТК')} ${atk}</span><span data-desc="stat:def">🛡 ${t('ЗАЩ')} ${def}</span><span data-desc="stat:cap">Ⅹ ${Math.min(nShips, COMBAT_UNIT_CAP)}/${COMBAT_UNIT_CAP}</span><span data-desc="stat:spd">⚡ ${t('СКР')} ${spdTxt}</span></div>`;
+  h += `<div class="pstats"><span data-desc="stat:atk">⚔ ${t('side.stat.atk')} ${atk}</span><span data-desc="stat:def">🛡 ${t('side.stat.def')} ${def}</span><span data-desc="stat:cap">Ⅹ ${Math.min(nShips, COMBAT_UNIT_CAP)}/${COMBAT_UNIT_CAP}</span><span data-desc="stat:spd">⚡ ${t('side.stat.spd')} ${spdTxt}</span></div>`;
   h += nShips
-    ? `<div class="sec">${t('Корабли — тап для характеристик')}</div>` + fleetTilesHtml(f, f.units)
+    ? `<div class="sec">${t('side.fleet.ships')}</div>` + fleetTilesHtml(f, f.units)
     : '';
   if (nTr > 0)
-    h += `<div class="sec">${t('Десант на борту')}</div>` + fleetTilesHtml(f, f.landing ?? []);
+    h += `<div class="sec">${t('side.fleet.troops')}</div>` + fleetTilesHtml(f, f.landing ?? []);
 
   // Artillery rules of engagement moved to the ☰ command bar («🔥 Режим огня»
   // button + popover menu) — the bottom sheet keeps information, not controls.
@@ -5448,15 +5448,15 @@ function fleetPanelHtml(f: Fleet): string {
   // refuses to take the whole stack), so an all-fighter fleet just flies itself.
   if (f.owner === ME && fleetHasSquadron(f)) {
     const wing = squadronTake(f).reduce((n, u) => n + u.count, 0);
-    h += `<div class="sec">${t('Авиагруппа')}</div><div class="row">`;
+    h += `<div class="sec">${t('side.wing.title')}</div><div class="row">`;
     h += btn(
       'launchsquad',
       '',
-      t('🛩 Запустить эскадрилью ({n})', { n: wing }),
+      t('side.wing.launch', { n: wing }),
       fleetCanLaunchSquadron(f),
     );
     h += `</div>`;
-    h += `<div class="hint">${t('Отделяет эскадрильи в отдельный быстрый флот — уводите его на удар, а носитель остаётся в строю. Нужен хотя бы один не-эскадрильный корабль. Контрится орбитальным ПВО.')}</div>`;
+    h += `<div class="hint">${t('side.wing.hint')}</div>`;
 
     // CC-4 status only — the «🛩 Деж. вылет» TOGGLE moved to the ☰ command row
     // (SO-UI: the panel keeps information, the bar keeps controls).
@@ -5464,9 +5464,9 @@ function fleetPanelHtml(f: Fleet): string {
     if (pt) {
       const status =
         pt.sortie.rearming > 0
-          ? t('перезарядка {n}', { n: pt.sortie.rearming })
-          : t('топливо {n}', { n: pt.sortie.fuel });
-      h += `<div class="row dim">${t('🛩 дежурный вылет: ВКЛ')} · ${t('радиус {r}', { r: Math.round(pt.radius) })} · ${status}</div>`;
+          ? t('side.wing.rearming', { n: pt.sortie.rearming })
+          : t('side.wing.fuel', { n: pt.sortie.fuel });
+      h += `<div class="row dim">${t('side.wing.patrol-on')} · ${t('side.wing.radius', { r: Math.round(pt.radius) })} · ${status}</div>`;
     }
   }
 
@@ -5474,7 +5474,7 @@ function fleetPanelHtml(f: Fleet): string {
   if (f.units.some((u) => u.count > 0 && data.units[u.unit]?.traits.includes('hero'))) {
     const hero = Object.values(s.heroes ?? {}).find((x) => x.owner === f.owner);
     const heroName = hero?.name ?? s.players[f.owner]?.name ?? f.owner;
-    h += `<div class="row"><b>♔ ${esc(heroName)}</b> <span class="dim">${t('— проекция · +5% атаки/обороны этому флоту')}</span></div>`;
+    h += `<div class="row"><b>♔ ${esc(heroName)}</b> <span class="dim">${t('side.fleet.hero-aura')}</span></div>`;
   }
 
   // CC-2 auto-storm: the whole «Дежурный режим» section moved to the ☰ command
@@ -5492,10 +5492,10 @@ function fleetPanelHtml(f: Fleet): string {
     const rawRestH =
       dest !== f.movement.to ? (estimateTravelHours(s, data, f.movement.to, dest, f) ?? 0) : 0;
     const restH = boosted ? rawRestH / FORCED_MARCH_MULT : rawRestH;
-    h += `<div class="row">${t('↗ идёт к {dest} · прибытие через', { dest: `<b>${esc(dest)}</b>` })} <b class="pn-eta" data-arrive="${f.movement.arrivesAt}" data-rest="${restH}">…</b>${boosted ? ' <span class="dim">⚡</span>' : ''}</div>`;
+    h += `<div class="row">${t('side.fleet.enroute', { dest: `<b>${esc(dest)}</b>` })} <b class="pn-eta" data-arrive="${f.movement.arrivesAt}" data-rest="${restH}">…</b>${boosted ? ' <span class="dim">⚡</span>' : ''}</div>`;
   } else if (f.edge) {
     const pct = Math.round(f.edge.t * 100);
-    h += `<div class="row">${t('⟜ стоит на трассе {lane} · {p}% пути', { lane: `<b>${esc(f.edge.from)}–${esc(f.edge.to)}</b>`, p: pct })}</div>`;
+    h += `<div class="row">${t('side.fleet.on-lane', { lane: `<b>${esc(f.edge.from)}–${esc(f.edge.to)}</b>`, p: pct })}</div>`;
   }
 
   const here = planet(f.location);
@@ -5510,15 +5510,15 @@ function fleetPanelHtml(f: Fleet): string {
       const sideRow = (sv: BattleSideView, tag: string): string => {
         const troops = sv.units.map((u) => `${u.count}× ${u.unit}`).join(', ') || '—';
         return `<div class="row${sv.mine ? '' : ' dim'}">${sv.mine ? '▶' : '·'} <b>${esc(sv.ownerName)}</b> (${tag}, ${
-          sv.kind === 'garrison' ? t('гарнизон') : sv.kind === 'landing' ? t('десант') : t('флот')
+          sv.kind === 'garrison' ? t('side.battle.side.garrison') : sv.kind === 'landing' ? t('side.battle.side.landing') : t('side.battle.side.fleet')
         }): ${esc(troops)}${bar(sv.hull, '♥')}${bar(sv.shield, '◈')}</div>`;
       };
-      h += `<div class="sec">${t('⚔ Бой — {phase} · раунд {r}', { phase: bm.phase === 'ground' ? t('высадка') : t('орбита'), r: bm.round })}</div>`;
-      h += sideRow(bm.attacker, t('атака')) + sideRow(bm.defender, t('оборона'));
+      h += `<div class="sec">${t('side.battle.title', { phase: bm.phase === 'ground' ? t('side.battle.phase.ground') : t('side.battle.phase.orbit'), r: bm.round })}</div>`;
+      h += sideRow(bm.attacker, t('side.battle.attacker')) + sideRow(bm.defender, t('side.battle.defender'));
       if (bm.nextRoundAt != null)
-        h += `<div class="row">${t('следующий раунд через')} <span class="pn-timer" data-at="${bm.nextRoundAt}">…</span></div>`;
-      h += `<div class="row">${btn('retreat', '', t('⤺ Отступить'), bm.retreatFleetId === f.id)}</div>`;
-      h += `<div class="hint">${t('Отход стоит −40% ТЕКУЩЕГО корпуса и щита (израненный флот теряет 40% остатка — отход не добивает) и даёт рывок скорости для бегства. Десант в высадке отступить не может; с орбиты вне боя корабль уходит свободно.')}</div>`;
+        h += `<div class="row">${t('side.battle.next-round')} <span class="pn-timer" data-at="${bm.nextRoundAt}">…</span></div>`;
+      h += `<div class="row">${btn('retreat', '', t('side.battle.retreat'), bm.retreatFleetId === f.id)}</div>`;
+      h += `<div class="hint">${t('side.battle.retreat.hint')}</div>`;
     }
   }
   if (docked) {
@@ -5527,16 +5527,16 @@ function fleetPanelHtml(f: Fleet): string {
       here!.owner !== f.owner && (SECTOR_TYPES[SECTOR_OF[here!.id]]?.capturable ?? false);
     const cols: string[] = [];
     if (hostile) {
-      let at = `<div class="sec">${t('Удар')}</div><div class="row">`;
+      let at = `<div class="sec">${t('side.strike.title')}</div><div class="row">`;
       at += btn(
         'bombard',
         f.bombarding ? 'off' : 'on',
-        f.bombarding ? t('⊗ Прекратить бомбардировку') : t('⊗ Бомбардировать'),
+        f.bombarding ? t('side.strike.bombard.stop') : t('side.strike.bombard'),
         inOrbit && nShips > 0,
       );
-      at += btn('assault', '', t('⚔ Штурм'), inOrbit);
+      at += btn('assault', '', t('side.strike.assault'), inOrbit);
       at += `</div>`;
-      at += `<div class="hint">${t('С орбиты можно бомбардировать (изнашивает здания и замораживает их выпуск), но ПВО гарнизона достаёт до вас. Штурм высаживает десант против гарнизона.')}</div>`;
+      at += `<div class="hint">${t('side.strike.hint')}</div>`;
       // Combat forecast (ONB-6): «если атакую — что будет?» — the pure base-model
       // sim over the landing force vs the garrison the viewer SEES (the fleet is
       // docked here, so the world is identified — no fog leak). A forecast, not an
@@ -5548,28 +5548,25 @@ function fleetPanelHtml(f: Fleet): string {
         const pv = previewBattle(landing, garrison, data);
         const verdict =
           pv.outcome === 'attacker'
-            ? t('десант возьмёт мир')
+            ? t('side.strike.forecast.attacker')
             : pv.outcome === 'defender'
-              ? t('гарнизон устоит')
-              : t('затяжной пат');
-        at += `<div class="row dim">${t(
-          'Прогноз штурма: {v} · ~{r} р. · потери {a} дес. ({pa}%) / {d} гарн. ({pd}%)',
-          {
-            v: `<b>${verdict}</b>`,
-            r: pv.roundsEst,
-            a: previewLossCount(pv.attacker),
-            pa: Math.round(pv.attacker.damageFraction * 100),
-            d: previewLossCount(pv.defender),
-            pd: Math.round(pv.defender.damageFraction * 100),
-          },
-        )}</div>`;
-        at += `<div class="hint">${t('Прогноз по видимым составам, без бонусов местности, укреплений и технологий — реальный бой может отличаться.')}</div>`;
+              ? t('side.strike.forecast.defender')
+              : t('side.strike.forecast.draw');
+        at += `<div class="row dim">${t('side.strike.forecast', {
+          v: `<b>${verdict}</b>`,
+          r: pv.roundsEst,
+          a: previewLossCount(pv.attacker),
+          pa: Math.round(pv.attacker.damageFraction * 100),
+          d: previewLossCount(pv.defender),
+          pd: Math.round(pv.defender.damageFraction * 100),
+        })}</div>`;
+        at += `<div class="hint">${t('side.strike.forecast.hint')}</div>`;
       }
       cols.push(at);
     }
     // load / unload ground army at your own world
     if (here!.owner === ME) {
-      let ga = `<div class="sec">${t('Наземная армия ⇄ гарнизон')}</div>`;
+      let ga = `<div class="sec">${t('side.ground.title')}</div>`;
       const groundHere = here!.garrison.filter((st) => isGround(st.unit));
       const carried = f.landing ?? [];
       const loadingN = pendingLoads.filter((p) => p.fleetId === f.id).length;
@@ -5581,7 +5578,7 @@ function fleetPanelHtml(f: Fleet): string {
           ga += btn(
             'load',
             st.unit,
-            t('▲ Погрузить {u}', { u: displayUnit(st.unit) }),
+            t('side.ground.load', { u: displayUnit(st.unit) }),
             sz <= freeHold,
           );
         }
@@ -5590,13 +5587,13 @@ function fleetPanelHtml(f: Fleet): string {
       if (carried.length) {
         ga += `<div class="row">`;
         for (const st of carried)
-          ga += btn('unload', st.unit, t('▼ Выгрузить {u}', { u: displayUnit(st.unit) }), true);
+          ga += btn('unload', st.unit, t('side.ground.unload', { u: displayUnit(st.unit) }), true);
         ga += `</div>`;
       }
       if (loadingN)
-        ga += `<div class="hint">${t('⏳ погрузка: {n} (≈1ч на единицу)', { n: loadingN })}</div>`;
+        ga += `<div class="hint">${t('side.ground.loading', { n: loadingN })}</div>`;
       if (!groundHere.length && !carried.length && !loadingN)
-        ga += `<div class="row dim">${t('наземной армии здесь нет')}</div>`;
+        ga += `<div class="row dim">${t('side.ground.empty')}</div>`;
       cols.push(ga);
     }
     const dh = fleetDivisionsHtml(f, here!); // load/unload divisions (landing on a hostile world)
@@ -5613,30 +5610,30 @@ function unknownPlanetHtml(p: Planet): string {
     const icons =
       mem.buildings
         .map((b) => `${BUILD_ICON[b.type] ?? '▪'} ${buildingName(b.type)} L${b.level}`)
-        .join(', ') || t('построек не видели');
+        .join(', ') || t('side.scan.no-buildings');
     // Espionage from memory: you know WHOSE world this was — an agent can reveal
     // its live contents without flying there. Wrong/stale owner → the kernel
     // rejects the attempt (bad target), which is honest: intel decays.
     const spyRow =
       mem.owner && mem.owner !== ME
-        ? `<div class="row">${btn('spyplanet', mem.owner, t('🕵 Разведать мир · {c}¤', { c: SPY_COST }), afford({ credits: SPY_COST }))}</div>`
+        ? `<div class="row">${btn('spyplanet', mem.owner, t('side.scan.spy', { c: SPY_COST }), afford({ credits: SPY_COST }))}</div>`
         : '';
     return (
-      cardHeader(ownerColor(mem.owner), p.id, t('ПОСЛЕДНИЕ ДАННЫЕ ✦')) +
-      `<div class="row dim">${t('Вне сенсорного охвата — последний скан (мог устареть).')}</div>` +
-      `<div class="row">${t('Владелец')}: <b>${mem.owner ? NAME[mem.owner] : t('Нейтрал')}</b></div>` +
-      `<div class="row">${t('Гарнизон на момент скана')}: <b>${mem.garrison}</b></div>` +
-      `<div class="row">${t('Постройки')}: ${icons}</div>` +
+      cardHeader(ownerColor(mem.owner), p.id, t('side.scan.title')) +
+      `<div class="row dim">${t('side.scan.stale')}</div>` +
+      `<div class="row">${t('side.scan.owner')}: <b>${mem.owner ? NAME[mem.owner] : t('side.neutral')}</b></div>` +
+      `<div class="row">${t('side.scan.garrison')}: <b>${mem.garrison}</b></div>` +
+      `<div class="row">${t('side.scan.buildings')}: ${icons}</div>` +
       spyRow +
-      `<div class="hint">${t('Обновите данные флотом или радаром.')}</div>`
+      `<div class="hint">${t('side.scan.hint')}</div>`
     );
   }
   // No «Снять выделение» on planet cards: it only clears FLEET selection (selPlanet
   // stays, the card would not even close) — the ✕ in the corner is the real close.
   return (
-    cardHeader('#5f8f8c', p.id, t('НЕТ ТЕЛЕМЕТРИИ')) +
-    `<div class="row dim">${t('Не исследовано — вне сенсоров и радаров. Содержимое неизвестно.')}</div>` +
-    `<div class="hint">${t('Отправьте флот к этой системе (или расширьте радар), чтобы обнаружить её.')}</div>`
+    cardHeader('#5f8f8c', p.id, t('side.notelemetry.title')) +
+    `<div class="row dim">${t('side.notelemetry.sub')}</div>` +
+    `<div class="hint">${t('side.notelemetry.hint')}</div>`
   );
 }
 
@@ -5653,12 +5650,12 @@ function planetSummaryHtml(p: Planet): string {
   const ground = p.garrison.filter((st) => isGround(st.unit));
   const ships = p.garrison.filter((st) => isShip(st.unit));
   const wing = p.garrison.filter((st) => isSquadron(st.unit));
-  rows.push(`<div class="row">${t('Обозначение')}: <b>${esc(p.id)}</b></div>`);
+  rows.push(`<div class="row">${t('side.world.designation')}: <b>${esc(p.id)}</b></div>`);
   rows.push(
-    `<div class="row">${t('Владелец')}: <b style="color:${ownerColor(p.owner)}">${p.owner ? esc(NAME[p.owner] ?? p.owner) : t('Нейтрал')}</b></div>`,
+    `<div class="row">${t('side.world.owner')}: <b style="color:${ownerColor(p.owner)}">${p.owner ? esc(NAME[p.owner] ?? p.owner) : t('side.neutral')}</b></div>`,
   );
   rows.push(
-    `<div class="row">${t('Вид / тип / местность')}: <b>${esc(kindName)}</b> · ${esc(ptName)} · ${esc(sec)}</div>`,
+    `<div class="row">${t('side.world.kind')}: <b>${esc(kindName)}</b> · ${esc(ptName)} · ${esc(sec)}</div>`,
   );
   // ECON-7: пассивный базовый выход мира по ресурсам — перекос типа планеты.
   const base = (pt?.baseOutput ?? {}) as Record<string, number>;
@@ -5668,17 +5665,17 @@ function planetSummaryHtml(p: Planet): string {
     .join(' · ');
   if (baseStr)
     rows.push(
-      `<div class="row">${t('Базовый выход/ч')}: <b>${baseStr}</b> <span class="dim">${t('— перекос типа мира')}</span></div>`,
+      `<div class="row">${t('side.world.output')}: <b>${baseStr}</b> <span class="dim">${t('side.world.output.note')}</span></div>`,
     );
   const pctf = (n: number) => (n >= 0 ? '+' : '') + Math.round(n * 100) + '%';
   const bonus: string[] = [];
-  if (pt && pt.productionBonus !== 0) bonus.push(`${t('произв.')} ${pctf(pt.productionBonus)}`);
+  if (pt && pt.productionBonus !== 0) bonus.push(`${t('side.world.bonus.production')} ${pctf(pt.productionBonus)}`);
   if (pt && (pt.defenseBonus ?? 0) !== 0)
-    bonus.push(`${t('оборона')} ${pctf(pt.defenseBonus ?? 0)}`);
+    bonus.push(`${t('side.world.bonus.defense')} ${pctf(pt.defenseBonus ?? 0)}`);
   if (bonus.length)
-    rows.push(`<div class="row">${t('Бонусы типа')}: <b>${bonus.join(' · ')}</b></div>`);
+    rows.push(`<div class="row">${t('side.world.type-bonuses')}: <b>${bonus.join(' · ')}</b></div>`);
   rows.push(
-    `<div class="row">⚔ ${t('Гарнизон')}: <b>${sumUnits(ground)}</b> ${t('наземных')} · <b>${sumUnits(ships)}</b> ${t('кораблей')}${sumUnits(wing) ? ` · <b>${sumUnits(wing)}</b> ${t('эскадрилий')}` : ''}</div>`,
+    `<div class="row">⚔ ${t('side.world.garrison')}: <b>${sumUnits(ground)}</b> ${t('side.world.count.ground')} · <b>${sumUnits(ships)}</b> ${t('side.world.count.ships')}${sumUnits(wing) ? ` · <b>${sumUnits(wing)}</b> ${t('side.world.count.squadrons')}` : ''}</div>`,
   );
   const blist =
     p.buildings
@@ -5686,24 +5683,24 @@ function planetSummaryHtml(p: Planet): string {
         (b) =>
           `${BUILD_ICON[b.type] ?? '▣'} ${buildingName(b.type)}${b.level > 1 ? ' L' + b.level : ''}`,
       )
-      .join(', ') || t('нет');
-  rows.push(`<div class="row">▣ ${t('Постройки')} (${p.buildings.length}): <b>${blist}</b></div>`);
+      .join(', ') || t('side.none');
+  rows.push(`<div class="row">▣ ${t('side.world.buildings')} (${p.buildings.length}): <b>${blist}</b></div>`);
   rows.push(
-    `<div class="row">✦ ${t('Очки победы')}: <b>${Math.round(provinceScore(data, p))}</b></div>`,
+    `<div class="row">✦ ${t('side.world.vp')}: <b>${Math.round(provinceScore(data, p))}</b></div>`,
   );
   const here = Object.values(s.fleets).filter((f) => f.location === p.id);
   if (here.length) {
     const fShips = here.reduce((n, f) => n + sumUnits(f.units), 0);
     rows.push(
-      `<div class="row">▲ ${t('Флоты на орбите')}: <b>${here.length}</b> <span class="dim">(${t('{n} кораблей', { n: fShips })})</span></div>`,
+      `<div class="row">▲ ${t('side.world.fleets')}: <b>${here.length}</b> <span class="dim">(${t('side.world.fleet-ships', { n: fShips })})</span></div>`,
     );
   }
   if (p.owner === ME && capitalOf(s, ME) === p.id)
-    rows.push(`<div class="row"><b style="color:var(--grn)">★ ${t('Столица')}</b></div>`);
+    rows.push(`<div class="row"><b style="color:var(--grn)">★ ${t('side.world.capital')}</b></div>`);
   return (
-    `<div class="sec">${t('Сводка мира')}</div>` +
+    `<div class="sec">${t('side.world.summary')}</div>` +
     rows.join('') +
-    `<div class="row">${btn('planetinfo', '', t('‹ Назад к карточке'), true)}</div>`
+    `<div class="row">${btn('planetinfo', '', t('side.summary.back'), true)}</div>`
   );
 }
 
@@ -5724,32 +5721,32 @@ function planetPanelHtml(p: Planet): string {
   const header = cardHeader(
     ownerColor(p.owner),
     planetName(p.id),
-    `${esc(p.id)} · ${p.owner ? NAME[p.owner] : t('Нейтрал')} · ${kindName} · ${ptName} · ${sec}`,
+    `${esc(p.id)} · ${p.owner ? NAME[p.owner] : t('side.neutral')} · ${kindName} · ${ptName} · ${sec}`,
     'planetinfo',
   );
   // Тап по имени открыл сводку мира — панель целиком уступает ей место.
   if (planetInfoFor === p.id) return header + planetSummaryHtml(p);
   let h =
     header +
-    `<div class="pstats"><span data-desc="stat:garrison">⚔ ${gcount} <span class="pl">${t('гарнизон')}</span></span><span data-desc="stat:ground">${unitIcon('heavy_infantry')} ${sumUnits(ground)} <span class="pl">${t('наземных')}</span></span><span data-desc="stat:gships">${unitIcon('cruiser')} ${sumUnits(ships)} <span class="pl">${t('кораблей')}</span></span><span data-desc="stat:pbuild">▣ ${p.buildings.length} <span class="pl">${t('построек')}</span></span></div>`;
+    `<div class="pstats"><span data-desc="stat:garrison">⚔ ${gcount} <span class="pl">${t('side.world.stat.garrison')}</span></span><span data-desc="stat:ground">${unitIcon('heavy_infantry')} ${sumUnits(ground)} <span class="pl">${t('side.world.count.ground')}</span></span><span data-desc="stat:gships">${unitIcon('cruiser')} ${sumUnits(ships)} <span class="pl">${t('side.world.count.ships')}</span></span><span data-desc="stat:pbuild">▣ ${p.buildings.length} <span class="pl">${t('side.world.count.buildings')}</span></span></div>`;
   // ECON-2: блэкаут — неоплаченная энергия глушит радары и ПВО этого владельца вдвое.
   if (mine && (s.players[ME]?.arrears ?? []).includes('energy')) {
-    h += `<div class="row" style="color:var(--red)">⚡ ${t('блэкаут: радары и ПВО −50%')}</div>`;
+    h += `<div class="row" style="color:var(--red)">⚡ ${t('side.world.blackout')}</div>`;
   }
   if (pt && (pt.productionBonus !== 0 || pt.defenseBonus !== 0)) {
     const pct = (n: number) => (n >= 0 ? '+' : '') + Math.round(n * 100) + '%';
     const parts: string[] = [];
-    if (pt.productionBonus !== 0) parts.push(t('произв. {p}', { p: pct(pt.productionBonus) }));
-    if (pt.defenseBonus !== 0) parts.push(t('оборона {p}', { p: pct(pt.defenseBonus) }));
-    h += `<div class="row dim">${pcUi() ? t('Тип: «{pt}» — {mods}', { pt: esc(ptName), mods: parts.join(' · ') }) : t('Мир типа «{pt}» — {mods}', { pt: esc(ptName), mods: parts.join(' · ') })}</div>`;
+    if (pt.productionBonus !== 0) parts.push(t('side.world.production', { p: pct(pt.productionBonus) }));
+    if (pt.defenseBonus !== 0) parts.push(t('side.world.defense', { p: pct(pt.defenseBonus) }));
+    h += `<div class="row dim">${pcUi() ? t('side.world.type', { pt: esc(ptName), mods: parts.join(' · ') }) : t('side.world.type.long', { pt: esc(ptName), mods: parts.join(' · ') })}</div>`;
   }
 
   // Capital marker / designate — heroes respawn here (and re-fit modules, Phase C).
   if (mine) {
     if (capitalOf(s, ME) === p.id) {
-      h += `<div class="row"><b style="color:var(--grn)">★ ${t('Столица')}</b>${compactUi() ? '' : ` <span class="dim">${t('— здесь возродятся и сменят модули герои')}</span>`}</div>`;
+      h += `<div class="row"><b style="color:var(--grn)">★ ${t('side.world.capital')}</b>${compactUi() ? '' : ` <span class="dim">${t('side.world.capital.note')}</span>`}</div>`;
     } else if (isInhabited(p)) {
-      h += `<div class="row">${btn('capital', '', t('★ Сделать столицей'), true)}</div>`;
+      h += `<div class="row">${btn('capital', '', t('side.world.make-capital'), true)}</div>`;
     }
     // Hold point (ST-2.1): a standing order for the Steward — the anchor is never
     // auto-evacuated and gets reinforced under threat. Same tech gate as delegation.
@@ -5757,11 +5754,11 @@ function planetPanelHtml(p: Planet): string {
       const points = s.players[ME]?.stewardHoldPoints ?? [];
       h += `<div class="row">${
         points.includes(p.id)
-          ? `<b style="color:var(--cyan)">🚩 ${t('Точка удержания')}</b> ${btn('holdpoint', 'off', t('Снять точку'), true)}`
+          ? `<b style="color:var(--cyan)">🚩 ${t('side.world.hold.title')}</b> ${btn('holdpoint', 'off', t('side.world.hold.clear'), true)}`
           : btn(
               'holdpoint',
               'on',
-              compactUi() ? t('🚩 Держать') : t('🚩 Назначить точкой удержания'),
+              compactUi() ? t('side.world.hold') : t('side.world.hold.set'),
               points.length < MAX_STEWARD_HOLD_POINTS,
             )
       }</div>`;
@@ -5769,7 +5766,7 @@ function planetPanelHtml(p: Planet): string {
   }
 
   // Tactical ping — mark this province and share it (coalition chat, or a player's DM).
-  h += `<div class="row">${btn('ping', '', compactUi() ? t('📍 Пинг') : t('📍 Пинг — отметить и отправить…'), true)}</div>`;
+  h += `<div class="row">${btn('ping', '', compactUi() ? t('side.world.ping') : t('side.world.ping.long'), true)}</div>`;
 
   // Espionage: steal a 24h intel window on this enemy world (SPY-1). While a
   // window lives its countdown replaces the button — the node stays identified.
@@ -5777,22 +5774,22 @@ function planetPanelHtml(p: Planet): string {
     const live = myIntel().find((g) => g.kind === 'planet' && g.target === p.id);
     h += `<div class="row">${
       live
-        ? `<b style="color:var(--cyan)">${t('🕵 Окно разведки')}</b> <span class="dim">${t('ещё {left}', { left: fmtEta(Math.max(0, live.until - s.time) / HOUR) })}</span>`
+        ? `<b style="color:var(--cyan)">${t('side.world.spy-window')}</b> <span class="dim">${t('side.world.spy-window.left', { left: fmtEta(Math.max(0, live.until - s.time) / HOUR) })}</span>`
         : btn(
             'spyplanet',
             p.owner,
-            t('🕵 Разведать мир · {c}¤', { c: SPY_COST }),
+            t('side.scan.spy', { c: SPY_COST }),
             afford({ credits: SPY_COST }),
           )
     }</div>`;
   }
 
-  h += `<div class="ptabs">${tabButton('ground', t('Земля'), ground.length, 'tab:ground')}${tabButton(
+  h += `<div class="ptabs">${tabButton('ground', t('side.tab.ground'), ground.length, 'tab:ground')}${tabButton(
     'ships',
-    t('Флот'),
+    t('side.tab.fleet'),
     ships.length + here.length,
     'tab:ships',
-  )}${tabButton('squadron', t('Крылья'), wing.length, 'tab:squadron')}${tabButton('buildings', t('Здания'), p.buildings.length, 'tab:buildings')}</div>`;
+  )}${tabButton('squadron', t('side.tab.wings'), wing.length, 'tab:squadron')}${tabButton('buildings', t('side.tab.buildings'), p.buildings.length, 'tab:buildings')}</div>`;
 
   // Tab content is split into self-contained blocks; on desktop they flow into
   // side-by-side columns (filling the wide panel), on phones they stack vertically.
@@ -5804,10 +5801,10 @@ function planetPanelHtml(p: Planet): string {
     // ECON-1: голодный гарнизон — владелец мира в food-arrears теряет 25% на земле.
     const starving =
       p.owner === ME && ground.length > 0 && (s.players[ME]?.arrears ?? []).includes('food')
-        ? `<div class="row" style="color:var(--red)">🍽 ${t('голод: −25% на земле')}</div>`
+        ? `<div class="row" style="color:var(--red)">🍽 ${t('side.fleet.hunger')}</div>`
         : '';
     cols.push(
-      `<div class="sec">${t('Наземные части')}</div>` +
+      `<div class="sec">${t('side.ground.units')}</div>` +
         starving +
         (pcUi() ? garrisonTilesHtml(ground) : unitRows(ground)),
     );
@@ -5815,36 +5812,36 @@ function planetPanelHtml(p: Planet): string {
       cols.push(divisionsHtml(p.id));
       const groundBuilds = BUILD_UNITS.filter((u) => isGround(u));
       cols.push(
-        `<div class="sec">${t('Наземный конвейер')}</div>` +
+        `<div class="sec">${t('side.ground.conveyor')}</div>` +
           conveyorHtml(p.id, 'units') +
           buildButtons(p.id, groundBuilds, 'unit'),
       );
     }
     if (!pcUi()) {
       cols.push(
-        `<div class="hint">${t('Наземные части обороняют ваши миры. Их можно погрузить на флот для захвата вражеских миров.')}</div>`,
+        `<div class="hint">${t('side.ground.hint')}</div>`,
       );
     }
   } else if (planetTab === 'ships') {
     // Built ships now auto-rally to orbit (see fleetLaunchModule), so the garrison
     // normally holds no spacecraft — only surface the section if some linger.
     if (ships.length) {
-      cols.push(`<div class="sec">${t('Корабли в гарнизоне')}</div>` + unitRows(ships));
+      cols.push(`<div class="sec">${t('side.garrison.ships')}</div>` + unitRows(ships));
     }
     if (here.length) {
-      let orbit = `<div class="sec">${t('Флоты на орбите')}</div>`;
+      let orbit = `<div class="sec">${t('side.world.fleets')}</div>`;
       for (const f of here) {
         const fShips = sumUnits(f.units);
         const tr = sumUnits(f.landing ?? []);
-        const sel = f.owner === ME ? btn('selfleet', f.id, t('Выбрать →'), true) : '';
-        orbit += `<div class="asset-row" data-desc="fleet" style="color:${ownerColor(f.owner)}"><span class="bicon">▲</span><b>${t('{n} кораблей', { n: fShips })}${tr ? ' ' + t('+{n} десанта', { n: tr }) : ''}</b>${sel}</div>`;
+        const sel = f.owner === ME ? btn('selfleet', f.id, t('side.garrison.select'), true) : '';
+        orbit += `<div class="asset-row" data-desc="fleet" style="color:${ownerColor(f.owner)}"><span class="bicon">▲</span><b>${t('side.world.fleet-ships', { n: fShips })}${tr ? ' ' + t('side.garrison.plus-troops', { n: tr }) : ''}</b>${sel}</div>`;
       }
       cols.push(orbit);
     }
     if (mine) {
       const shipBuilds = BUILD_UNITS.filter((u) => isShip(u));
       cols.push(
-        `<div class="sec">${t('Конвейер верфи')}</div>` +
+        `<div class="sec">${t('side.shipyard.conveyor')}</div>` +
           conveyorHtml(p.id, 'units') +
           buildButtons(p.id, shipBuilds, 'unit'),
       );
@@ -5852,17 +5849,17 @@ function planetPanelHtml(p: Planet): string {
     if (!pcUi()) {
       // PC carries this in the ФЛОТ tab's hover dossier ('tab:ships')
       cols.push(
-        `<div class="hint">${t('Флот -ваше оружие и защита. Здесь вы можете заказывать корабли для пополнения флота.')}</div>`,
+        `<div class="hint">${t('side.shipyard.hint')}</div>`,
       );
     }
   } else if (planetTab === 'squadron') {
     if (wing.length) {
-      cols.push(`<div class="sec">${t('Авиагруппа в гарнизоне')}</div>` + unitRows(wing));
+      cols.push(`<div class="sec">${t('side.garrison.wing')}</div>` + unitRows(wing));
     }
     if (mine) {
       const wingBuilds = BUILD_UNITS.filter((u) => isSquadron(u));
       cols.push(
-        `<div class="sec">${t('Верфь авиагруппы')}</div>` +
+        `<div class="sec">${t('side.wing.conveyor')}</div>` +
           conveyorHtml(p.id, 'units') +
           buildButtons(p.id, wingBuilds, 'unit'),
       );
@@ -5870,30 +5867,30 @@ function planetPanelHtml(p: Planet): string {
     if (!pcUi()) {
       // PC carries this in the КРЫЛЬЯ tab's hover dossier ('tab:squadron')
       cols.push(
-        `<div class="hint">${t('Носитель (◈) несёт эскадрильи (△). Запускайте авиагруппу из панели выбранного флота кнопкой «🛩 Запустить эскадрилью».')}</div>`,
+        `<div class="hint">${t('side.wing.garrison.hint')}</div>`,
       );
     }
   } else {
     cols.push(
-      `<div class="sec">${t('Строительный конвейер')}</div>` +
+      `<div class="sec">${t('side.build.conveyor')}</div>` +
         (mine
           ? conveyorHtml(p.id, 'buildings')
-          : `<div class="row dim">${t('Строительная телеметрия врага недоступна')}</div>`),
+          : `<div class="row dim">${t('side.build.enemy-hidden')}</div>`),
     );
-    let blds = `<div class="sec">${t('Здания')}</div>`;
-    if (p.buildings.length === 0) blds += `<div class="row dim">${t('нет')}</div>`;
+    let blds = `<div class="sec">${t('side.tab.buildings')}</div>`;
+    if (p.buildings.length === 0) blds += `<div class="row dim">${t('side.none')}</div>`;
     for (const b of p.buildings) {
       const def = data.buildings[b.type];
       const max = def ? buildingMaxLevel(def) : 1;
       const prod = def ? producesLine(buildingLevel(def, b.level).produces) : '';
-      blds += `<div class="asset-row" data-desc="b:${b.type}:${b.level}"><span class="bicon">${BUILD_ICON[b.type] ?? '▪'}</span><b>${buildingName(b.type)}</b><span class="dim">L${b.level}/${max} · ${t('оз')} ${floor(b.hp)}/${hpOfLevel(b.type, b.level)}${prod ? ` · <span class="prod">${prod}</span>` : ''}</span>`;
+      blds += `<div class="asset-row" data-desc="b:${b.type}:${b.level}"><span class="bicon">${BUILD_ICON[b.type] ?? '▪'}</span><b>${buildingName(b.type)}</b><span class="dim">L${b.level}/${max} · ${t('side.build.hp')} ${floor(b.hp)}/${hpOfLevel(b.type, b.level)}${prod ? ` · <span class="prod">${prod}</span>` : ''}</span>`;
       if (mine && b.level < max) {
         const c = def?.upgrades[b.level - 1]?.cost;
         // hovering Upgrade previews the NEXT level's dossier (output it will unlock)
         blds += btn(
           'upgrade',
           b.type,
-          compactUi() ? `▲ ${cost(c)}` : t('▲ Улучшить {c}', { c: cost(c) }),
+          compactUi() ? `▲ ${cost(c)}` : t('side.build.upgrade', { c: cost(c) }),
           afford(c),
           `b:${b.type}:${b.level + 1}`,
         );
@@ -5921,7 +5918,7 @@ function panelHtml(): string {
     if (f) return fleetPanelHtml(f); // a stale selection falls through to the planet
   }
   const p = planet(selPlanet);
-  if (!p) return `<div class="hint">${t('Тапните мир.')}</div>`;
+  if (!p) return `<div class="hint">${t('side.empty')}</div>`;
   if (!known(p.id) && p.owner !== ME) return unknownPlanetHtml(p);
   return planetPanelHtml(p);
 }
