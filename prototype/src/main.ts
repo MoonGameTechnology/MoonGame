@@ -2620,7 +2620,7 @@ function beginLoad(fleetId: string, unit: string): void {
   if (!f || f.movement || f.battleId || !f.location) return;
   const need = data.units[unit]?.stats.cargoSize ?? 1;
   if (need > fleetCargoFree(s, f) - pendingLoadCargo(fleetId)) {
-    note('✖ ' + t('нет места в трюме')); // hold full once the loads already in progress land
+    note('✖ ' + t('трюм полон')); // hold full once the loads already in progress land
     return;
   }
   // Match the core's acceptance: only a healthy, default-loadout garrison stack embarks.

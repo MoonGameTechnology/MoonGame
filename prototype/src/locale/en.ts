@@ -359,8 +359,8 @@ export const en: Record<string, string> = {
   ЗАПУСК: 'LAUNCH',
   'ЗАПУСК В ОДИНОЧКУ': 'LAUNCH SOLO',
   ЗАЩ: 'DEF',
-  'Загрузка — дивизия должна влезть в трюм; выгрузка высаживает её на этот мир (на чужом — захват, если не обороняется).':
-    "Loading — the division must fit the hold; unloading lands it on this world (an enemy's, if undefended, is captured).",
+  'Загрузка погружает дивизию в трюм. Выгрузка высаживает её на этот мир.':
+    'Loading takes a division into the hold. Unloading lands it on this world.',
   'Задача: ✦ {n} (мир — 50, сектор — 10) или уничтожение соперников.':
     'Goal: ✦ {n} (a world — 50, a province — 10) or eliminate your rivals.',
   'Закрепить размер и положение': 'Lock size and position',
@@ -693,8 +693,8 @@ export const en: Record<string, string> = {
   'условия не выполнены': 'conditions not met',
   'стройка под бомбардировкой': 'construction under bombardment',
   'нужна верфь/космопорт': 'needs a shipyard/spaceport',
-  'не тот тип сектора': 'wrong sector type',
-  'не та орбита': 'wrong orbit',
+  'недопустимый тип сектора': 'invalid sector type',
+  'недопустимая орбита': 'invalid orbit',
   'флот уже здесь': 'fleet is already here',
   'это ваш собственный мир': 'this is your own world',
   'вне радиуса действия': 'out of range',
@@ -705,7 +705,7 @@ export const en: Record<string, string> = {
   'неизвестная технология': 'unknown technology',
   'все исследовательские слоты заняты': 'all research slots are full',
   'слишком рано': 'too early',
-  'нужно согласие второй стороны': 'the other side must consent',
+  'требуется согласие второй стороны': 'the other side must consent',
   'предложение уже отправлено': 'a proposal is already pending',
   'герой не найден': 'hero not found',
   'внутренняя ошибка': 'internal error',
@@ -907,7 +907,7 @@ export const en: Record<string, string> = {
   'неизвестный заказ': 'unknown order',
   'в гарнизоне не осталось': 'none left in the garrison',
   нет: 'none',
-  'нет места в трюме': 'no cargo room',
+  'трюм полон': 'the hold is full',
   ничья: 'a stalemate',
   'новый флот: {a} кораблей · у исходного останется {b}':
     'new fleet: {a} ships · original keeps {b}',
@@ -923,7 +923,7 @@ export const en: Record<string, string> = {
   подписка: 'subscription',
   покупка: 'buy',
   'адресат не найден': 'recipient not found',
-  'не так быстро — подождите пару секунд': 'not so fast — give it a couple of seconds',
+  'подождите пару секунд': 'give it a couple of seconds',
   'пустое сообщение': 'empty message',
   'глобальный канал появится вместе с глобальным сервером':
     'the global channel arrives with the global server',
@@ -1143,8 +1143,8 @@ export const en: Record<string, string> = {
     'If that email exists, a reset link is on its way',
   'Ссылка недействительна или устарела': 'The link is invalid or expired',
   'Пароль изменён': 'Password changed',
-  'переподключение — приказ не отправлен, повтори через миг':
-    'reconnecting — order not sent, try again in a moment',
+  'переподключение — приказ не отправлен, повторите позже':
+    'reconnecting — order not sent, try again shortly',
   'матч заполнен — все места заняты': 'match is full — every seat is taken',
   'вход в этот матч закрыт (окно приёма новых игроков истекло)':
     'this match is closed to new players (the entry window has elapsed)',
@@ -1284,8 +1284,8 @@ export const en: Record<string, string> = {
   '≥4 ополчения — берут числом': '≥4 militia — winning by numbers',
   'Именной шаблон офицера: состав закреплён, редактировать нельзя.':
     "An officer's named template: composition locked, no editing.",
-  'Дивизия — снапшот шаблона: правка шаблона в конструкторе не меняет уже собранные. На своём мире +1 HP/юнит/день; выбитая исчезает.':
-    'A division is a snapshot of its template: editing a design never touches armies already fielded. On your own world it heals +1 HP/unit/day; wiped out, it disappears.',
+  'Дивизия — снапшот шаблона: правка шаблона в конструкторе не меняет уже собранные. На своём мире +1 HP/юнит/день.':
+    'A division is a snapshot of its template: editing a design never touches armies already fielded. On your own world it heals +1 HP/unit/day.',
   'Постройки мира и строительный конвейер: состояние, уровни и улучшения.':
     "The world's buildings and its construction conveyor: condition, levels, upgrades.",
   Дивизия: 'Division',
