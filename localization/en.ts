@@ -46,6 +46,20 @@ export const en: Record<string, string> = {
   'browser.solo.hint': 'No server needed — bots fill the open seats.',
   'browser.taken': 'taken',
 
+  // --- card — Карточка игрока (тап по гербу): фракция, владения, боевой счёт.
+  'card.close': 'CLOSE',
+  'card.combat': 'War record',
+  'card.commander': 'commander',
+  'card.diplomacy': 'Diplomacy',
+  'card.faction': 'Faction',
+  'card.kills': '⚔ Enemy units destroyed',
+  'card.losses': '☠ Own units lost',
+  'card.score': 'Score',
+  'card.score.goal': 'WIN',
+  'card.stances': 'Relations',
+  'card.units': 'Units',
+  'card.worlds': 'Worlds held',
+
   // --- chat / spy — Переписка (сессия и коалиция) и вкладка шпионажа.
   'chat.coalition.empty':
     'The coalition chat is empty.<br>Mark a province with a ping 📍 or write something.',
@@ -71,6 +85,31 @@ export const en: Record<string, string> = {
   'spy.ops.title': 'OPERATIONS',
   'spy.windows.empty': 'no active windows — steal intel with an operation below',
   'spy.windows.title': 'ACTIVE INTEL WINDOWS',
+
+  // --- chat.win — Плавающее окно чата (десктоп): каналы, настройки окна, штамп.
+  'chat.ping.mark': 'marker {node}',
+  'chat.ping.need-province': 'Select a province on the map first',
+  'chat.ping.need-province.short': 'Select a province first',
+  'chat.tab.global': 'Global',
+  'chat.win.censor': 'Censorship',
+  'chat.win.collapse': 'Collapse',
+  'chat.win.color': 'Font color',
+  'chat.win.color.premium': 'subscription',
+  'chat.win.drag': 'Drag the title bar to move',
+  'chat.win.empty': 'Channel "{ch}" is empty.',
+  'chat.win.empty.hint': 'Write the first message.',
+  'chat.win.expand': 'Expand',
+  'chat.win.font': 'Font, pt',
+  'chat.win.opacity': 'Transparency',
+  'chat.win.pin': 'Lock size and position',
+  'chat.win.send': 'Send',
+  'chat.win.settings': 'Settings',
+  'chat.win.size': 'Size h,w',
+  'chat.win.stamp': 'Message stamp',
+  'chat.win.stamp.day': 'Day',
+  'chat.win.stamp.real': 'Real time',
+  'chat.win.stamp.time': 'Time',
+  'chat.win.title': 'CHAT — {ch}',
 
   // --- cmd — Командная панель флота: приказы, режим огня артиллерии, способности героя.
   'cmd.assault': 'Assault',
@@ -175,6 +214,30 @@ export const en: Record<string, string> = {
   'codex.value.per-day': '{n} {r}/day',
   'codex.value.per-hour': '{n} {r}/h',
   'codex.value.per-level': '{n} / level',
+
+  // --- comms — Меню связи: ростер сессии, одобрение ботов, окна интела, предложения.
+  'comms.bots-no-coalition': 'Bots do not join coalitions',
+  'comms.favour.brink': 'on the brink of war',
+  'comms.favour.embargo': 'embargo',
+  'comms.favour.friendly': 'friendly',
+  'comms.favour.note':
+    'Bot approval: {f}/{base} — {label}. Below {emb} the bot embargoes the market, below {war} it declares war.',
+  'comms.filter.empty': 'Nobody matches the filter.',
+  'comms.global.soon': 'the global channel arrives with the global server',
+  'comms.intel.fleets': 'fleets visible on the map <em>{left}</em>',
+  'comms.intel.treasury': 'treasury: <b>{bag}</b> <em>{left}</em>',
+  'comms.intel.world': 'world <b>{id}</b> revealed <em>{left}</em>',
+  'comms.offer.incoming': '{who} is offering — tap to accept',
+  'comms.offer.sent': 'a proposal is already pending',
+  'comms.provinces': 'provinces',
+  'comms.spy.fleets':
+    'Steal fleet data · {c}¤ · ~60% chance · 24h window (the fee is lost on failure too)',
+  'comms.spy.treasury':
+    'Steal treasury data · {c}¤ · ~60% chance · 24h window (the fee is lost on failure too)',
+  'comms.stance-changed': '🕊 {who}: relations → {stance}',
+  'comms.stance-changed.short': 'Stance changed: {stance}',
+  'comms.war-declared': '⚔ {who} declared war on you!',
+  'comms.you': 'YOU',
 
   // --- corp — Кабинет корпорации и войны альянсов (AvA): состав, заявки, готовность, вызовы.
   'corp.apply': 'Sign up',
@@ -476,6 +539,24 @@ export const en: Record<string, string> = {
   'yard.soon': '«{what}» moves into the constructor in the next brick.',
   'yard.title': 'CONSTRUCTOR',
 
+  // --- end — Экран конца матча: исход, опыт, итоговая таблица, реванш.
+  'end.board': 'View the board',
+  'end.draw': '⚖️ DRAW',
+  'end.duration': 'Duration',
+  'end.fleets': 'Fleets',
+  'end.level-up': '★ Level up to {lvl} — a progression point awaits in the Progression menu',
+  'end.loss': '💀 DEFEAT',
+  'end.new-match': '⟳ New match',
+  'end.place': '{p} of {n}',
+  'end.play-again': '⟳ Play again',
+  'end.provinces': 'Provinces',
+  'end.score': 'Final score',
+  'end.to-menu': 'Menu',
+  'end.units': 'Units',
+  'end.win': '🏆 VICTORY',
+  'end.win.coalition': '🏆 COALITION VICTORY',
+  'end.xp': '★ Commander XP: +{n}',
+
   // --- err — Отказы ядра (kernel rejection codes). Ключ выводится из кода: E_NO_CAPACITY → err.no-capacity.
   'err.already': 'already in effect',
   'err.already-fitted': 'that fitting is already installed',
@@ -716,11 +797,26 @@ export const en: Record<string, string> = {
     'This route crosses worlds held by <b>{names}</b>, with whom you are at <b>peace</b>. There is no peaceful passage — advancing here declares <b>war</b>.',
   'war.confirm.yes': 'YES',
 
-  // --- market — Биржа: вкладки ресурсов.
+  // --- market — Сессионная биржа: вкладки ресурсов, книга заявок, лот, комиссия.
+  'market.buy': 'Buy',
+  'market.cancel': 'Cancel',
+  'market.escrow-note': 'escrow: {n} ¤ · the {p}% fee is paid by whoever receives the credits',
+  'market.in-treasury': 'In the treasury',
+  'market.net-after-fee': 'you receive after the {p}% fee: {n} ¤',
+  'market.no-asks': 'No sell orders',
+  'market.no-bids': 'No buy orders',
+  'market.own-lot': 'your lot',
+  'market.place': 'List',
+  'market.price': 'price',
+  'market.qty': 'amount',
   'market.res.energy': 'Energy',
   'market.res.food': 'Food',
   'market.res.metal': 'Metal',
   'market.res.microelectronics': 'Micro',
+  'market.sell': 'Sell',
+  'market.side.buy': 'Buy',
+  'market.side.sell': 'Sell',
+  'market.title': 'MARKET',
 
   // --- onb — Онбординг: туры-подсказки, карточки первого контакта, цели первой сессии, сводка возвращения.
   'onb.goal.capture': 'Capture a world',
@@ -799,6 +895,19 @@ export const en: Record<string, string> = {
   'onb.tour.next': 'Next',
   'onb.tour.skip': 'Skip tutorial',
   'onb.tour.step': 'step {k} of {n}',
+
+  // --- ping — Композер меток провинции: адресат, описание, отправка.
+  'ping.cancel': 'Cancel',
+  'ping.desc.ph': 'Marker description (optional)…',
+  'ping.mark': 'marker {loc}',
+  'ping.no-desc': 'no description',
+  'ping.note': 'Mark a province and send — the marker becomes clickable (↪ jump the camera).',
+  'ping.remove': 'remove',
+  'ping.sent.coalition': '📍 Ping → Coalition',
+  'ping.sent.player': '📍 Ping → {who}',
+  'ping.title': 'Ping',
+  'ping.to.coalition': 'To the coalition chat',
+  'ping.to.player': "To a player's DM",
 
   // --- rail — Рельса инструментов в матче: подпись кнопки (.label) + подсказка (.title).
   'rail.chat.label': 'Chat',
@@ -1074,6 +1183,42 @@ export const en: Record<string, string> = {
   'speed.mult.real': 'real time',
   'speed.mult.two-hours': 'two hours per second',
   'speed.restart': 'Restart — back to bot selection',
+
+  // --- steward — «Хранитель»: передача места ИИ на сон, позы, журнал вахты.
+  'steward.duration': 'Delegate for',
+  'steward.duration.hours': '{h} h',
+  'steward.locked': 'The “Steward Protocol” is not researched yet.',
+  'steward.locked.go': 'Open technologies',
+  'steward.locked.how':
+    'Research it in the technology window — then you can hand your seat to the AI while you sleep.',
+  'steward.locked.where':
+    'The <b>Command</b> branch, opens on <b>Day 16</b> for the <b>Overseer</b> scientist (now day {day}).',
+  'steward.log.ago': '{dur} ago',
+  'steward.log.counter': '⚔ Counterstrike at {node}: loss forecast {pct}%',
+  'steward.log.held': '🛡 The {node} line held: loss forecast {pct}%',
+  'steward.log.reinforce': '🚩 Reinforcement sent to {node}: loss forecast {pct}%',
+  'steward.log.sortie': '🛫 A standing patrol raised at {node}',
+  'steward.log.title': "Steward's journal",
+  'steward.on.active': 'The Steward runs an active defense.',
+  'steward.on.active.note':
+    'While you sleep: holds the borders, stands squadron patrols and counterstrikes at your own worlds when the loss forecast is acceptable.',
+  'steward.on.defense': 'The Steward holds the line.',
+  'steward.on.defense.note':
+    'While you sleep: holds the borders and repels attacks, keeps building and trading — no offensives.',
+  'steward.on.returns': 'Control returns in <b>{dur}</b>.',
+  'steward.on.warning':
+    '“Autopilot keeps you alive — active play wins.” The defensive posture never attacks and never negotiates.',
+  'steward.ready': 'The Steward is ready.',
+  'steward.ready.note':
+    'Hand your seat to a trusted AI while you are offline — it holds the line and returns control on time.',
+  'steward.stance': 'Posture',
+  'steward.stance.active': 'Active defense',
+  'steward.stance.active.note':
+    'Active defense: everything above, plus a counterstrike at your own worlds when the loss forecast is acceptable (under 35%) and standing squadron patrols. It never leaves your territory.',
+  'steward.stance.defense': 'Defense',
+  'steward.stance.defense.note':
+    'The “Defend” posture: holds and repels, keeps building and trading — no offensives, no diplomacy. Control returns automatically, with a morning report.',
+  'steward.take-back': 'Take back control',
 
   // --- tech — Дерево технологий: названия веток.
   'tech.branch.command': 'Command',

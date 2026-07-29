@@ -49,6 +49,20 @@ export const ru: Record<string, string> = {
   'browser.solo.hint': 'Сервер не нужен — свободные места займут боты.',
   'browser.taken': 'занято',
 
+  // --- card — Карточка игрока (тап по гербу): фракция, владения, боевой счёт.
+  'card.close': 'ЗАКРЫТЬ',
+  'card.combat': 'Боевой счёт',
+  'card.commander': 'командующий',
+  'card.diplomacy': 'Дипломатия',
+  'card.faction': 'Фракция',
+  'card.kills': '⚔ Уничтожено юнитов врага',
+  'card.losses': '☠ Потеряно своих',
+  'card.score': 'Очки',
+  'card.score.goal': 'ПОБЕДА',
+  'card.stances': 'Отношения',
+  'card.units': 'Юнитов',
+  'card.worlds': 'Миров под контролем',
+
   // --- chat / spy — Переписка (сессия и коалиция) и вкладка шпионажа.
   'chat.coalition.empty': 'Чат коалиции пуст.<br>Отметьте провинцию пингом 📍 или напишите.',
   'chat.empty': 'Сообщений пока нет.',
@@ -73,6 +87,31 @@ export const ru: Record<string, string> = {
   'spy.ops.title': 'ОПЕРАЦИИ',
   'spy.windows.empty': 'нет активных окон — добудьте интел операцией ниже',
   'spy.windows.title': 'АКТИВНЫЕ ОКНА ИНТЕЛА',
+
+  // --- chat.win — Плавающее окно чата (десктоп): каналы, настройки окна, штамп.
+  'chat.ping.mark': 'метка {node}',
+  'chat.ping.need-province': 'Сначала выберите провинцию на карте',
+  'chat.ping.need-province.short': 'Сначала выберите провинцию',
+  'chat.tab.global': 'Глобальный',
+  'chat.win.censor': 'Цензура',
+  'chat.win.collapse': 'Свернуть',
+  'chat.win.color': 'Цвет шрифта',
+  'chat.win.color.premium': 'подписка',
+  'chat.win.drag': 'Тащите за шапку, чтобы переместить',
+  'chat.win.empty': 'Канал «{ch}» пуст.',
+  'chat.win.empty.hint': 'Напишите первое сообщение.',
+  'chat.win.expand': 'Развернуть',
+  'chat.win.font': 'Шрифт, пт',
+  'chat.win.opacity': 'Прозрачность',
+  'chat.win.pin': 'Закрепить размер и положение',
+  'chat.win.send': 'Отправить',
+  'chat.win.settings': 'Настройки',
+  'chat.win.size': 'Размер h,w',
+  'chat.win.stamp': 'Штамп сообщений',
+  'chat.win.stamp.day': 'День',
+  'chat.win.stamp.real': 'Реальное время',
+  'chat.win.stamp.time': 'Время',
+  'chat.win.title': 'ЧАТ — {ch}',
 
   // --- cmd — Командная панель флота: приказы, режим огня артиллерии, способности героя.
   'cmd.assault': 'Штурм',
@@ -177,6 +216,30 @@ export const ru: Record<string, string> = {
   'codex.value.per-day': '{n} {r}/день',
   'codex.value.per-hour': '{n} {r}/ч',
   'codex.value.per-level': '{n} / уровень',
+
+  // --- comms — Меню связи: ростер сессии, одобрение ботов, окна интела, предложения.
+  'comms.bots-no-coalition': 'Боты не вступают в коалиции',
+  'comms.favour.brink': 'на грани войны',
+  'comms.favour.embargo': 'эмбарго',
+  'comms.favour.friendly': 'дружелюбно',
+  'comms.favour.note':
+    'Одобрение бота: {f}/{base} — {label}. Ниже {emb} бот вводит эмбарго на рынке, ниже {war} — объявляет войну.',
+  'comms.filter.empty': 'Под фильтр никто не подходит.',
+  'comms.global.soon': 'глобальный канал появится вместе с глобальным сервером',
+  'comms.intel.fleets': 'флоты видны на карте <em>{left}</em>',
+  'comms.intel.treasury': 'казна: <b>{bag}</b> <em>{left}</em>',
+  'comms.intel.world': 'мир <b>{id}</b> раскрыт <em>{left}</em>',
+  'comms.offer.incoming': '{who} предлагает — нажмите, чтобы принять',
+  'comms.offer.sent': 'предложение уже отправлено',
+  'comms.provinces': 'провинций',
+  'comms.spy.fleets':
+    'Украсть данные о флотах · {c}¤ · шанс ~60% · окно 24ч (плата сгорает и при провале)',
+  'comms.spy.treasury':
+    'Украсть данные казны · {c}¤ · шанс ~60% · окно 24ч (плата сгорает и при провале)',
+  'comms.stance-changed': '🕊 {who}: отношения → {stance}',
+  'comms.stance-changed.short': 'Стойка изменена: {stance}',
+  'comms.war-declared': '⚔ {who} объявил вам войну!',
+  'comms.you': 'ВЫ',
 
   // --- corp — Кабинет корпорации и войны альянсов (AvA): состав, заявки, готовность, вызовы.
   'corp.apply': 'Заявиться',
@@ -479,6 +542,24 @@ export const ru: Record<string, string> = {
   'yard.soon': '«{what}» переезжает в конструктор следующим кирпичом.',
   'yard.title': 'КОНСТРУКТОР',
 
+  // --- end — Экран конца матча: исход, опыт, итоговая таблица, реванш.
+  'end.board': 'Смотреть доску',
+  'end.draw': '⚖️ НИЧЬЯ',
+  'end.duration': 'Длительность',
+  'end.fleets': 'Флоты',
+  'end.level-up': '★ Новый уровень {lvl} — очко прокачки ждёт в меню «Прокачка»',
+  'end.loss': '💀 ПОРАЖЕНИЕ',
+  'end.new-match': '⟳ Новый матч',
+  'end.place': '{p}-е место из {n}',
+  'end.play-again': '⟳ Играть ещё',
+  'end.provinces': 'Провинции',
+  'end.score': 'Итоговый счёт',
+  'end.to-menu': 'В меню',
+  'end.units': 'Юниты',
+  'end.win': '🏆 ПОБЕДА',
+  'end.win.coalition': '🏆 ПОБЕДА КОАЛИЦИИ',
+  'end.xp': '★ Опыт командующего: +{n}',
+
   // --- err — Отказы ядра (kernel rejection codes). Ключ выводится из кода: E_NO_CAPACITY → err.no-capacity.
   'err.already': 'уже действует',
   'err.already-fitted': 'фиттинг уже установлен',
@@ -716,11 +797,26 @@ export const ru: Record<string, string> = {
     'Маршрут проходит через миры <b>{names}</b>, с кем у вас <b>мир</b>. Мирного прохода нет — движение сюда объявит <b>войну</b>.',
   'war.confirm.yes': 'ДА',
 
-  // --- market — Биржа: вкладки ресурсов.
+  // --- market — Сессионная биржа: вкладки ресурсов, книга заявок, лот, комиссия.
+  'market.buy': 'Купить',
+  'market.cancel': 'Отменить',
+  'market.escrow-note': 'в эскроу уйдёт {n} ¤ · комиссию {p}% платит получатель кредитов',
+  'market.in-treasury': 'В казне',
+  'market.net-after-fee': 'к получению после комиссии {p}%: {n} ¤',
+  'market.no-asks': 'Нет лотов на продажу',
+  'market.no-bids': 'Нет лотов на покупку',
+  'market.own-lot': 'ваш лот',
+  'market.place': 'Выставить',
+  'market.price': 'цена',
+  'market.qty': 'кол-во',
   'market.res.energy': 'Энергия',
   'market.res.food': 'Пища',
   'market.res.metal': 'Металл',
   'market.res.microelectronics': 'Микро',
+  'market.sell': 'Продать',
+  'market.side.buy': 'Покупка',
+  'market.side.sell': 'Продажа',
+  'market.title': 'РЫНОК',
 
   // --- onb — Онбординг: туры-подсказки, карточки первого контакта, цели первой сессии, сводка возвращения.
   'onb.goal.capture': 'Захвати мир',
@@ -799,6 +895,19 @@ export const ru: Record<string, string> = {
   'onb.tour.next': 'Далее',
   'onb.tour.skip': 'Пропустить обучение',
   'onb.tour.step': 'шаг {k} из {n}',
+
+  // --- ping — Композер меток провинции: адресат, описание, отправка.
+  'ping.cancel': 'Отмена',
+  'ping.desc.ph': 'Описание метки (необязательно)…',
+  'ping.mark': 'метка {loc}',
+  'ping.no-desc': 'без описания',
+  'ping.note': 'Отметьте провинцию и отправьте — метка станет кликабельной (↪ камера).',
+  'ping.remove': 'убрать',
+  'ping.sent.coalition': '📍 Пинг → Коалиция',
+  'ping.sent.player': '📍 Пинг → {who}',
+  'ping.title': 'Пинг',
+  'ping.to.coalition': 'В чат коалиции',
+  'ping.to.player': 'В ЛС игроку',
 
   // --- rail — Рельса инструментов в матче: подпись кнопки (.label) + подсказка (.title).
   'rail.chat.label': 'Чат',
@@ -1074,6 +1183,42 @@ export const ru: Record<string, string> = {
   'speed.mult.real': 'реальное время',
   'speed.mult.two-hours': 'два часа в секунду',
   'speed.restart': 'Перезапуск — к выбору ботов',
+
+  // --- steward — «Хранитель»: передача места ИИ на сон, позы, журнал вахты.
+  'steward.duration': 'Передать на',
+  'steward.duration.hours': '{h} ч',
+  'steward.locked': '«Протокол Хранитель» ещё не изучен.',
+  'steward.locked.go': 'Открыть технологии',
+  'steward.locked.how':
+    'Изучите его в окне технологий — затем сможете передать место ИИ на время сна.',
+  'steward.locked.where':
+    'Ветка <b>Командование</b>, открывается в <b>День 16</b> учёному <b>Куратор</b> (сейчас день {day}).',
+  'steward.log.ago': '{dur} назад',
+  'steward.log.counter': '⚔ Контрудар у {node}: прогноз потерь {pct}%',
+  'steward.log.held': '🛡 Рубеж {node} удержан: прогноз потерь {pct}%',
+  'steward.log.reinforce': '🚩 Подкрепление выслано к {node}: прогноз потерь {pct}%',
+  'steward.log.sortie': '🛫 Дежурный вылет поднят у {node}',
+  'steward.log.title': 'Журнал Хранителя',
+  'steward.on.active': 'Хранитель ведёт активную оборону.',
+  'steward.on.active.note':
+    'Пока вы спите: держит рубежи, поднимает дежурные эскадрильи и контратакует у своих миров, когда прогноз потерь приемлем.',
+  'steward.on.defense': 'Хранитель ведёт оборону.',
+  'steward.on.defense.note':
+    'Пока вы спите: держит рубежи и отбивает атаки, застраивает очередь и торгует — без наступлений.',
+  'steward.on.returns': 'Управление вернётся через <b>{dur}</b>.',
+  'steward.on.warning':
+    '«Автопилот держит вас в игре — побеждает активная игра.» Оборонительная поза не ходит в атаку и не ведёт дипломатию.',
+  'steward.ready': 'Хранитель готов.',
+  'steward.ready.note':
+    'Передайте место доверенному ИИ, пока вы офлайн — он удержит рубежи и вернёт управление к сроку.',
+  'steward.stance': 'Поза',
+  'steward.stance.active': 'Активная оборона',
+  'steward.stance.active.note':
+    'Активная оборона: всё то же, плюс контрудар по врагу у своих миров при приемлемом прогнозе потерь (до 35%) и дежурные вылеты эскадрилий. Свою территорию не покидает.',
+  'steward.stance.defense': 'Оборона',
+  'steward.stance.defense.note':
+    'Поза «Оборона»: держит и отбивает, застраивает очередь, торгует — без наступлений и дипломатии. Управление вернётся автоматически, с утренней сводкой.',
+  'steward.take-back': 'Вернуть управление',
 
   // --- tech — Дерево технологий: названия веток.
   'tech.branch.command': 'Командование',
