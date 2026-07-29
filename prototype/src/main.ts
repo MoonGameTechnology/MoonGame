@@ -6814,7 +6814,7 @@ function convoLast(key: string): SessionMsg | undefined {
   return ms[ms.length - 1];
 }
 function fromName(id: string): string {
-  return id === ME ? t('Вы') : (NAME[id] ?? id);
+  return id === ME ? t('chat.you') : (NAME[id] ?? id);
 }
 /** A chat sender's name. Another live seat's name is clickable — it opens that
  *  player's card (with the diplomacy actions); your own name and system senders
@@ -6822,7 +6822,7 @@ function fromName(id: string): string {
 function nickHtml(id: string): string {
   const name = esc(fromName(id));
   if (id === ME || !s.players[id]) return `<b>${name}</b>`;
-  return `<b class="dp-nick" data-nickseat="${esc(id)}" title="${t('Открыть карточку игрока')}">${name}</b>`;
+  return `<b class="dp-nick" data-nickseat="${esc(id)}" title="${t('chat.open-card')}">${name}</b>`;
 }
 /** One message line. A ping renders as a clickable marker that flies the camera.
  *  `stamp` overrides which time fields show (the chat passes its cached toggles);
@@ -6832,7 +6832,7 @@ function convoLineHtml(m: SessionMsg, stamp?: StampOpts): string {
   if (m.ping) {
     return (
       `<div class="dp-line ping" data-ping="${esc(m.ping)}"><span class="dp-when">${stampTxt}</span>` +
-      `📍 ${nickHtml(m.from)} ${esc(m.ping)}: ${esc(m.text)}<span class="dp-jump">${t('↪ камера')}</span></div>`
+      `📍 ${nickHtml(m.from)} ${esc(m.ping)}: ${esc(m.text)}<span class="dp-jump">${t('chat.jump')}</span></div>`
     );
   }
   if (m.sys)
@@ -6844,10 +6844,10 @@ function convoFeedInnerHtml(key: string): string {
   if (msgs.length) return msgs.map((m) => convoLineHtml(m)).join('');
   const hint =
     key === COALITION
-      ? t('Чат коалиции пуст.<br>Отметьте провинцию пингом 📍 или напишите.')
+      ? t('chat.coalition.empty')
       : key === CH_SESSION
-        ? t('Общий канал матча — вас слышат все участники.')
-        : t('Сообщений пока нет.');
+        ? t('chat.session.note')
+        : t('chat.empty');
   return `<div class="dp-empty">${hint}</div>`;
 }
 /** Left column: the match-wide session channel + the coalition channel pinned on
@@ -6864,22 +6864,23 @@ function convoListHtml(): string {
     );
   const sessLast = convoLast(CH_SESSION);
   const sessPrev = sessLast
-    ? esc((sessLast.from === ME ? t('Вы') + ': ' : '') + sessLast.text)
-    : t('{n} уч.', { n: Object.keys(s.players).length });
+    ? esc((sessLast.from === ME ? t('chat.you') + ': ' : '') + sessLast.text)
+    : t('chat.members', { n: Object.keys(s.players).length });
   const sess =
     `<button class="dp-cv coal${convoOpen === CH_SESSION ? ' on' : ''}" data-convo="${CH_SESSION}">` +
     `<span class="dp-cv-ic" style="color:var(--cyan)">△</span>` +
-    `<span class="dp-cv-nm">${t('Сессия')}<em>${sessPrev}</em></span></button>`;
+    `<span class="dp-cv-nm">${t('chat.tab.session')}<em>${sessPrev}</em></span></button>`;
   const coal =
     `<button class="dp-cv coal${convoOpen === COALITION ? ' on' : ''}" data-convo="${COALITION}">` +
     `<span class="dp-cv-ic" style="color:var(--amber)">⚡</span>` +
-    `<span class="dp-cv-nm">${t('Коалиция')}<em>${t('{n} уч.', { n: coalitionMembers().length })}</em></span></button>`;
+    `<span class="dp-cv-nm">${t('chat.tab.coalition')}<em>${t('chat.members', { n: coalitionMembers().length })}</em></span></button>`;
   const items = dms
     .map((id) => {
       const last = convoLast(id);
       const prev = last
         ? esc(
-            (last.from === ME ? t('Вы') + ': ' : '') + (last.ping ? '📍 ' + last.ping : last.text),
+            (last.from === ME ? t('chat.you') + ': ' : '') +
+              (last.ping ? '📍 ' + last.ping : last.text),
           )
         : '—';
       return (
@@ -6897,16 +6898,14 @@ function convoThreadHtml(): string {
   const isCoal = convoOpen === COALITION;
   const title =
     convoOpen === CH_SESSION
-      ? t('△ Сессия · {n} в матче', { n: Object.keys(s.players).length })
+      ? t('chat.head.session', { n: Object.keys(s.players).length })
       : isCoal
-        ? t('⚡ Коалиция · {n} уч.', { n: coalitionMembers().length })
+        ? t('chat.head.coalition', { n: coalitionMembers().length })
         : `${seatBadge(convoOpen).icon} ${esc(NAME[convoOpen] ?? convoOpen)}`;
-  const pingBtn = isCoal
-    ? `<button class="dp-ping" title="${t('Отметить выбранную провинцию пингом')}">📍</button>`
-    : '';
+  const pingBtn = isCoal ? `<button class="dp-ping" title="${t('chat.ping')}">📍</button>` : '';
   // The composer is networked (chat.send relay): dispatchChat routes it — NET sends
   // to the server (rendered from the echo), solo appends locally.
-  const compose = `<div class="dp-compose">${pingBtn}<input id="dp-text" maxlength="160" placeholder="${t('Сообщение…')}" autocomplete="off"><button class="dp-send">▶</button></div>`;
+  const compose = `<div class="dp-compose">${pingBtn}<input id="dp-text" maxlength="160" placeholder="${t('chat.input.ph')}" autocomplete="off"><button class="dp-send">▶</button></div>`;
   return (
     `<div class="dp-thread">` +
     `<div class="dp-thhead">${title}</div>` +
@@ -6923,10 +6922,10 @@ function convoThreadHtml(): string {
 function intelTabHtml(): string {
   const grantLabel = (g: IntelGrant): string =>
     g.kind === 'treasury'
-      ? t('казна {who}', { who: NAME[g.target] ?? g.target })
+      ? t('log.spy.what.treasury', { who: NAME[g.target] ?? g.target })
       : g.kind === 'fleets'
-        ? t('флоты {who}', { who: NAME[g.target] ?? g.target })
-        : t('мир {at}', { at: g.target });
+        ? t('log.spy.what.fleets', { who: NAME[g.target] ?? g.target })
+        : t('log.spy.what.world', { at: g.target });
   const rows = myIntel()
     .sort((a, b) => a.until - b.until)
     .map((g) => {
@@ -6934,7 +6933,7 @@ function intelTabHtml(): string {
       const jump = g.kind === 'planet' ? ` data-iw="${esc(g.target)}"` : '';
       return (
         `<div class="in-row"${jump}><span class="in-k">🗝</span><b>${esc(grantLabel(g))}</b>` +
-        `<span class="in-t">⏳ ${t('{n}ч', { n: left })}</span>${g.kind === 'planet' ? '<span class="in-go">↪</span>' : ''}</div>`
+        `<span class="in-t">⏳ ${t('spy.hours-left', { n: left })}</span>${g.kind === 'planet' ? '<span class="in-go">↪</span>' : ''}</div>`
       );
     })
     .join('');
@@ -6943,8 +6942,8 @@ function intelTabHtml(): string {
     .map(
       (id) =>
         `<div class="in-row"><b>${esc(NAME[id] ?? id)}</b>` +
-        `<button class="dp-spy" data-spy="treasury" data-seat="${id}">🕵 ${t('казна')}</button>` +
-        `<button class="dp-spy" data-spy="fleets" data-seat="${id}">🕵 ${t('флоты')}</button></div>`,
+        `<button class="dp-spy" data-spy="treasury" data-seat="${id}">🕵 ${t('log.spy.kind.treasury')}</button>` +
+        `<button class="dp-spy" data-spy="fleets" data-seat="${id}">🕵 ${t('spy.op.fleets')}</button></div>`,
     )
     .join('');
   const log = [...spyLog]
@@ -6957,14 +6956,13 @@ function intelTabHtml(): string {
     .join('');
   return (
     `<div class="dp-list in-list">` +
-    `<div class="in-hint">${t('Попытка: {c}¤ · шанс ~60% · окно интела 24ч · провал сжигает плату. Разведка мира — кнопка 🕵 на карточке вражеской планеты.', { c: SPY_COST })}</div>` +
-    `<div class="in-sec">${t('АКТИВНЫЕ ОКНА ИНТЕЛА')}</div>` +
-    (rows ||
-      `<div class="in-empty">${t('нет активных окон — добудьте интел операцией ниже')}</div>`) +
-    `<div class="in-sec">${t('ОПЕРАЦИИ')}</div>` +
-    (ops || `<div class="in-empty">${t('противников нет')}</div>`) +
-    `<div class="in-sec">${t('ЖУРНАЛ')}</div>` +
-    (log || `<div class="in-empty">${t('попыток ещё не было')}</div>`) +
+    `<div class="in-hint">${t('spy.note', { c: SPY_COST })}</div>` +
+    `<div class="in-sec">${t('spy.windows.title')}</div>` +
+    (rows || `<div class="in-empty">${t('spy.windows.empty')}</div>`) +
+    `<div class="in-sec">${t('spy.ops.title')}</div>` +
+    (ops || `<div class="in-empty">${t('spy.ops.empty')}</div>`) +
+    `<div class="in-sec">${t('spy.log.title')}</div>` +
+    (log || `<div class="in-empty">${t('spy.log.empty')}</div>`) +
     `</div>`
   );
 }
@@ -6981,14 +6979,16 @@ function renderDiplo(): void {
     `<button class="dp-fchip ty${diploTypeFilter.has(k) ? ' on' : ''}" data-ftype="${k}">${label}</button>`;
   const anyFilter = diploStanceFilter.size || diploTypeFilter.size;
   const filterRow =
-    `<div class="dp-filters"><span>${t('Фильтр')}:</span>` +
+    `<div class="dp-filters"><span>${t('diplo.filter')}:</span>` +
     STANCES.map(stChip).join('') +
-    `<span class="dp-fsep"></span>${tyChip('human', '☻ ' + t('Человек'))}${tyChip('ai', '⌬ ' + t('ИИ'))}` +
-    (anyFilter ? `<button class="dp-fclear" data-fclear="1">${t('Сброс')}</button>` : '') +
+    `<span class="dp-fsep"></span>${tyChip('human', '☻ ' + t('diplo.filter.human'))}${tyChip('ai', '⌬ ' + t('diplo.filter.ai'))}` +
+    (anyFilter
+      ? `<button class="dp-fclear" data-fclear="1">${t('diplo.filter.reset')}</button>`
+      : '') +
     `</div>`;
   const body =
     diploTab === 'diplo'
-      ? `<div class="dp-sorts"><span>${t('Сорт.')}:</span>${sortBtn('name', t('Имя'))}${sortBtn('worlds', t('Провинции'))}${sortBtn('stance', t('Отношение'))}</div>` +
+      ? `<div class="dp-sorts"><span>${t('diplo.sort')}:</span>${sortBtn('name', t('diplo.sort.name'))}${sortBtn('worlds', t('diplo.sort.provinces'))}${sortBtn('stance', t('diplo.sort.stance'))}</div>` +
         filterRow +
         `<div class="dp-list">${diploRowsHtml()}</div>`
       : diploTab === 'intel'
@@ -6996,7 +6996,7 @@ function renderDiplo(): void {
         : `<div class="dp-convo">${convoListHtml()}${convoThreadHtml()}</div>`;
   el.innerHTML =
     `<div class="dpbox">` +
-    `<div class="dp-head"><b>${t('ДИПЛОМАТИЯ')}</b>${tabBtn('diplo', t('Дипломатия'))}${tabBtn('msgs', t('Сообщения'))}${tabBtn('intel', t('Шпионаж'))}<button class="dp-close">✕</button></div>` +
+    `<div class="dp-head"><b>${t('diplo.win.title')}</b>${tabBtn('diplo', t('diplo.tab.diplomacy'))}${tabBtn('msgs', t('diplo.tab.messages'))}${tabBtn('intel', t('diplo.tab.espionage'))}<button class="dp-close">✕</button></div>` +
     body +
     `</div>`;
   if (diploTab === 'msgs') scrollFeedToEnd();
@@ -7066,7 +7066,9 @@ function garrisonTilesHtml(stacks: Array<{ unit: string; count: number }>): stri
       return `<button class="ptile mini" data-codex="u:${esc(u.unit)}" data-desc="u:${esc(u.unit)}" data-name="${esc(name)}"><span class="pt-ic">${unitIcon(u.unit)}</span><span class="pt-c">${u.count}</span></button>`;
     })
     .join('');
-  return tiles ? `<div class="ptiles">${tiles}</div>` : `<div class="row dim">${t('нет')}</div>`;
+  return tiles
+    ? `<div class="ptiles">${tiles}</div>`
+    : `<div class="row dim">${t('side.tiles.empty')}</div>`;
 }
 /** A row of ship/troop tiles for a fleet's composition — tap one for its full specs. */
 function unitTilesHtml(stacks: Array<{ unit: string; count: number }>): string {
@@ -7080,7 +7082,7 @@ function openCodex(key: string): void {
   const [kind, id] = key.split(':');
   const el = document.getElementById('codex');
   if (!el || !kind || !id) return;
-  el.innerHTML = `<div class="cxbox">${codexHtml(kind, id)}${codexBuildBtn(kind, id)}<button class="cx-close">${t('ЗАКРЫТЬ')}</button></div>`;
+  el.innerHTML = `<div class="cxbox">${codexHtml(kind, id)}${codexBuildBtn(kind, id)}<button class="cx-close">${t('codex.close')}</button></div>`;
   el.classList.add('show');
 }
 /** A "Build here" action inside the codex when the selected province can raise this
@@ -7092,10 +7094,10 @@ function codexBuildBtn(kind: string, id: string): string {
     const buildable = (SECTOR_TYPES[SECTOR_OF[p.id]]?.allowedBuildings ?? BUILDABLE).includes(id);
     const built = p.buildings.some((b) => b.type === id);
     if (!buildable || built) return '';
-    return `<button class="cx-build" data-build="building:${id}">▣ ${t('Построить здесь')} · ${cost(data.buildings[id]?.cost)}</button>`;
+    return `<button class="cx-build" data-build="building:${id}">▣ ${t('codex.build-here')} · ${cost(data.buildings[id]?.cost)}</button>`;
   }
   if (kind === 'u' && data.units[id]) {
-    return `<button class="cx-build" data-build="unit:${id}">${unitIconHtml(id, 16)} ${t('Построить здесь')} · ${cost(data.units[id]?.cost)}</button>`;
+    return `<button class="cx-build" data-build="unit:${id}">${unitIconHtml(id, 16)} ${t('codex.build-here')} · ${cost(data.units[id]?.cost)}</button>`;
   }
   return '';
 }
@@ -8888,20 +8890,22 @@ type TechCond = TechDefLike['conditions'][number];
 function techCondText(c: TechCond): string {
   switch (c.type) {
     case 'has_scientist':
-      return t('нужен учёный: {b}', { b: c.branch ? branchLabel(c.branch) : t('любой ветки') });
+      return t('tech.req.scientist', {
+        b: c.branch ? branchLabel(c.branch) : t('tech.req.scientist.any'),
+      });
     case 'own_sectors':
-      return t('своих секторов: {n}', { n: c.min });
+      return t('tech.req.sectors', { n: c.min });
     case 'has_building':
-      return t('здание: {b} ×{n}', {
+      return t('tech.req.building', {
         b: tData(data.buildings[c.building]?.name ?? c.building),
         n: c.min,
       });
     case 'controls_planet_type':
-      return t('мир типа {p} ×{n}', { p: tData(c.planetType), n: c.min });
+      return t('tech.req.planet', { p: tData(c.planetType), n: c.min });
     case 'has_unit':
-      return t('юнит: {u} ×{n}', { u: tData(data.units[c.unit]?.name ?? c.unit), n: c.min });
+      return t('tech.req.unit', { u: tData(data.units[c.unit]?.name ?? c.unit), n: c.min });
     default:
-      return t('особое условие');
+      return t('tech.req.special');
   }
 }
 // Клиентская проверка — только для подсветки узла; финальную правду говорит ядро
@@ -8929,11 +8933,11 @@ function techFx(td: TechDefLike): string {
     .filter(([, v]) => (v as number) !== 0)
     .map(([k, v]) => `+${Math.round((v as number) * 100)}% ${t(TECH_FX_LABEL[k] ?? k)}`);
   for (const u of td.unlocks?.units ?? [])
-    fx.push(t('открывает: {x}', { x: esc(tData(data.units[u]?.name ?? u)) }));
+    fx.push(t('tech.grants', { x: esc(tData(data.units[u]?.name ?? u)) }));
   for (const b of td.unlocks?.buildings ?? [])
-    fx.push(t('открывает: {x}', { x: esc(tData(data.buildings[b]?.name ?? b)) }));
+    fx.push(t('tech.grants', { x: esc(tData(data.buildings[b]?.name ?? b)) }));
   for (const a of td.unlocks?.abilities ?? [])
-    fx.push(t('способность: {x}', { x: a === 'steward' ? t('Хранитель') : esc(a) }));
+    fx.push(t('tech.grants.ability', { x: a === 'steward' ? t('tech.grants.steward') : esc(a) }));
   return fx.join(' · ');
 }
 function renderTech(): void {
@@ -8996,8 +9000,8 @@ function renderTech(): void {
     .map((c) => data.scientists[c.id])
     .find((d) => d?.branch === techTab);
   const leadHtml = lead
-    ? `🧪 ${t('Ветку курирует')} <b>${esc(tData(lead.name))}</b>`
-    : `🔭 ${t('Без лидера ветки — узлы с условием «учёный» закрыты')}`;
+    ? `🧪 ${t('tech.curator')} <b>${esc(tData(lead.name))}</b>`
+    : `🔭 ${t('tech.curator.none')}`;
   // Колонки вкладки: из карты раскладки; техи вне карты — в автоколонку в конце.
   const colsDef = TECH_COLS[techTab] ?? [];
   const branchIds = Object.keys(techs).filter((id) => (techs[id]!.branch ?? 'space') === techTab);
@@ -9010,10 +9014,10 @@ function renderTech(): void {
     ...(extras.length ? [{ label: '—', ids: extras }] : []),
   ].filter((c) => c.ids.length);
   const wide = cols.length <= 2 ? ' w2' : '';
-  let rail = `<div class="tt-rail"><div class="tt-dhead">${t('ДЕНЬ')}</div>`;
+  let rail = `<div class="tt-rail"><div class="tt-dhead">${t('tech.rail.day')}</div>`;
   for (const g of gates) {
     const cls = g === nowGate ? ' now' : g + 1 > hudDay ? ' future' : '';
-    rail += `<div class="tt-drow${cls}"><b>${g + 1}</b><small>${g === 0 ? t('старт') : t('день')}</small></div>`;
+    rail += `<div class="tt-drow${cls}"><b>${g + 1}</b><small>${g === 0 ? t('tech.rail.start') : t('tech.rail.day-short')}</small></div>`;
   }
   rail += `</div>`;
   let colsHtml = '';
@@ -9066,24 +9070,24 @@ function renderTech(): void {
     const affordable = Object.entries(td.cost).every(([k, v]) => (res[k] ?? 0) >= (v as number));
     const tag =
       st.st === 'done'
-        ? `<span class="tt-tag">${t('ИЗУЧЕНО')}</span>`
+        ? `<span class="tt-tag">${t('tech.state.done')}</span>`
         : st.st === 'res'
-          ? `<span class="tt-tag amb">${t('ИССЛЕДУЕТСЯ')}</span>`
+          ? `<span class="tt-tag amb">${t('tech.state.running')}</span>`
           : st.st === 'avail'
-            ? `<span class="tt-tag">${t('ДОСТУПНО')}</span>`
-            : `<span class="tt-tag dim">${t('ЗАКРЫТО')}</span>`;
+            ? `<span class="tt-tag">${t('tech.state.open')}</span>`
+            : `<span class="tt-tag dim">${t('tech.state.locked')}</span>`;
     const btn =
       st.st === 'avail'
-        ? `<button class="tt-mbtn" data-go="${id}"${affordable ? '' : ' disabled'}>🔬 ${affordable ? t('Исследовать') : t('Не хватает ресурсов')}</button>`
+        ? `<button class="tt-mbtn" data-go="${id}"${affordable ? '' : ' disabled'}>🔬 ${affordable ? t('tech.action.research') : t('tech.action.no-resources')}</button>`
         : st.st === 'done'
-          ? `<button class="tt-mbtn wait" disabled>✓ ${t('Изучено')}</button>`
+          ? `<button class="tt-mbtn wait" disabled>✓ ${t('tech.action.done')}</button>`
           : st.st === 'res'
-            ? `<button class="tt-mbtn wait" disabled>⏳ ${t('Идёт — ≈ {n} ч', { n: st.eta })}</button>`
+            ? `<button class="tt-mbtn wait" disabled>⏳ ${t('tech.action.running', { n: st.eta })}</button>`
             : st.st === 'gate'
-              ? `<button class="tt-mbtn wait" disabled>🔒 ${t('Откроется в День {n}', { n: gate + 1 })}</button>`
+              ? `<button class="tt-mbtn wait" disabled>🔒 ${t('tech.action.opens-day', { n: gate + 1 })}</button>`
               : st.st === 'chain'
-                ? `<button class="tt-mbtn wait" disabled>🔒 ${t('Сначала изучите узел выше')}</button>`
-                : `<button class="tt-mbtn wait" disabled>⚗ ${t('Условие не выполнено')}</button>`;
+                ? `<button class="tt-mbtn wait" disabled>🔒 ${t('tech.action.needs-parent')}</button>`
+                : `<button class="tt-mbtn wait" disabled>⚗ ${t('tech.action.unmet')}</button>`;
     modal =
       `<div class="tt-modal"><div class="tt-mback" data-mclose="1"></div><div class="tt-mwin">` +
       `<button class="tt-mx" data-mclose="1">✕</button>` +
@@ -9092,16 +9096,16 @@ function renderTech(): void {
       `<div class="tt-mtags">${tag}</div></div></div>` +
       (td.description ? `<div class="tt-mdesc">${esc(t(td.description))}</div>` : '') +
       `<div class="tt-mstats">` +
-      `<span>💰 <b>${techCost(td.cost)} · ${t('{n}ч', { n: td.researchTimeHours })}</b></span>` +
+      `<span>💰 <b>${techCost(td.cost)} · ${t('tech.hours', { n: td.researchTimeHours })}</b></span>` +
       (techFx(td) ? `<span>✦ <b>${techFx(td)}</b></span>` : '') +
-      (gate > 0 ? `<span>📅 <b>${t('с дня {n}', { n: gate + 1 })}</b></span>` : '') +
-      (prereqNames ? `<span>🔗 <b>${t('Требует:')} ${prereqNames}</b></span>` : '') +
+      (gate > 0 ? `<span>📅 <b>${t('tech.from-day', { n: gate + 1 })}</b></span>` : '') +
+      (prereqNames ? `<span>🔗 <b>${t('tech.req.title')} ${prereqNames}</b></span>` : '') +
       condRows +
       `</div>${btn}</div></div>`;
   }
   const html =
-    `<div class="tt-top"><span class="tt-day">📅 ${t('День {n}', { n: hudDay })}</span>` +
-    `<span class="tt-slots">⚛ ${t('слоты {a}/{b}', { a: activeList.length, b: slots })}</span></div>` +
+    `<div class="tt-top"><span class="tt-day">📅 ${t('tech.day', { n: hudDay })}</span>` +
+    `<span class="tt-slots">⚛ ${t('tech.slots', { a: activeList.length, b: slots })}</span></div>` +
     `<div class="tt-tabs">${tabs}</div>` +
     `<div class="tt-lead${lead ? '' : ' closed'}">${leadHtml}</div>` +
     `<div class="tt-scroll"><div class="tt-grid">${rail}${colsHtml}</div></div>` +
@@ -9882,7 +9886,7 @@ function bagRu(bag: Record<string, number>): string {
   const parts = Object.entries(bag)
     .filter(([, n]) => n)
     .map(([r, n]) => `${Math.round(n)} ${t(RES_RU[r] ?? r)}`);
-  return parts.length ? parts.join(' · ') : t('бесплатно');
+  return parts.length ? parts.join(' · ') : t('yard.free');
 }
 function myRes(): Record<string, number> {
   return (s.players[ME]?.resources ?? {}) as Record<string, number>;
@@ -9923,8 +9927,7 @@ function conLoadoutPane(hullList: string[]): string {
   const snap = s.players[ME]?.arsenal;
   const ownedHulls = snap ? hullList.filter((h) => snap.hulls.includes(h)) : hullList;
   const ownedModules = snap ? new Set(snap.modules) : undefined;
-  if (!ownedHulls.length)
-    return `<div class="cn-soon">${t('В арсенале нет корпусов этого класса.')}</div>`;
+  if (!ownedHulls.length) return `<div class="cn-soon">${t('yard.hull.none')}</div>`;
   if (!ownedHulls.includes(conHull)) {
     conHull = ownedHulls[0]!;
     conModules = [];
@@ -9934,7 +9937,7 @@ function conLoadoutPane(hullList: string[]): string {
     count: conCount,
     ownedModules,
   });
-  if (!ed.ok) return `<div class="cn-soon">${t('Корпус недоступен.')}</div>`;
+  if (!ed.ok) return `<div class="cn-soon">${t('yard.hull.unavailable')}</div>`;
   const m: LoadoutModel = ed;
   const hulls = ownedHulls
     .map(
@@ -9945,7 +9948,7 @@ function conLoadoutPane(hullList: string[]): string {
   const freeTypes = [...new Set(m.slots.filter((sl) => !sl.moduleId).map((sl) => sl.type))];
   const hullCard =
     `<div class="cn-hull"><div class="cn-hic">${unitIconHtml(conHull, 40)}</div><div><div class="cn-hn">${esc(displayUnit(conHull))}</div>` +
-    `<div class="cn-hm">${t('{n} слота под модули (по размеру корпуса)', { n: String(m.slots.length) })}</div></div></div>`;
+    `<div class="cn-hm">${t('yard.slots.count', { n: String(m.slots.length) })}</div></div></div>`;
   const bays = m.slots
     .map((sl) => {
       if (sl.moduleId) {
@@ -9956,13 +9959,13 @@ function conLoadoutPane(hullList: string[]): string {
               .join(' ')
           : '';
         return (
-          `<div class="cn-bay filled" data-cnun="${sl.moduleId}" title="${t('снять модуль')}"><div class="cn-bic">${MODULE_ICON[sl.moduleId] ?? '▪'}</div>` +
+          `<div class="cn-bay filled" data-cnun="${sl.moduleId}" title="${t('yard.module.remove')}"><div class="cn-bic">${MODULE_ICON[sl.moduleId] ?? '▪'}</div>` +
           `<div><div class="cn-bt">${t(SLOT_RU[sl.type])}</div><div class="cn-bn">${esc(tData(sl.moduleName ?? sl.moduleId))}${conOriginTag(sl.moduleId)}</div></div><div class="cn-bd">${eff}</div></div>`
         );
       }
       return (
         `<div class="cn-bay empty"><div class="cn-bic">${SLOT_ICON[sl.type] ?? '＋'}</div>` +
-        `<div><div class="cn-bt">${t(SLOT_RU[sl.type])}</div><div class="cn-bn">${t('пусто — выбери модуль')}</div></div></div>`
+        `<div><div class="cn-bt">${t(SLOT_RU[sl.type])}</div><div class="cn-bn">${t('yard.slot.empty')}</div></div></div>`
       );
     })
     .join('');
@@ -9979,25 +9982,23 @@ function conLoadoutPane(hullList: string[]): string {
       }
       return (
         `<div class="cn-mod locked"><span class="cn-mic">${MODULE_ICON[o.id] ?? '▪'}</span>` +
-        `<span class="cn-mn">${esc(tData(o.name))}</span><span class="cn-me">${t('слот «{s}»', { s: t(SLOT_RU[o.slot]) })}</span><span class="cn-mc">${bagRu(o.cost)}</span></div>`
+        `<span class="cn-mn">${esc(tData(o.name))}</span><span class="cn-me">${t('yard.slot.named', { s: t(SLOT_RU[o.slot]) })}</span><span class="cn-mc">${bagRu(o.cost)}</span></div>`
       );
     })
     .join('');
   const palHead = freeTypes.length
-    ? t('Доступные модули — для слота «{s}»', {
+    ? t('yard.modules.for-slot', {
         s: freeTypes.map((ty) => t(SLOT_RU[ty])).join(' / '),
       })
-    : t('Доступные модули — все слоты заняты');
+    : t('yard.modules.all-taken');
   // LARS-4: the palette above already reads the LIVE arsenal snapshot (a module
   // bought mid-match shows up here without a new match) — this note is the only
   // thing that needed adding: make the timing honest (built, not instant).
-  const liveNote = snap
-    ? `<div class="cn-note">${t('⚡ Арсенал живой: докупленное в матче видно здесь сразу, но начинает работать только когда ты это ПОСТРОИШЬ — постройка и логистика, не мгновенно.')}</div>`
-    : '';
+  const liveNote = snap ? `<div class="cn-note">${t('yard.arsenal.note')}</div>` : '';
   const left =
     `<div class="cn-fit"><div class="cn-hulls">${hulls}</div>${hullCard}${bays}` +
     `<div class="cn-ph">${palHead}</div><div class="cn-pal">${palette}</div>` +
-    `<div class="cn-note">${t('Типизированные слоты: модуль встаёт только в свой тип. <b>Серые</b> — не для свободного слота или уже стоят.')}</div>${liveNote}</div>`;
+    `<div class="cn-note">${t('yard.slots.note')}</div>${liveNote}</div>`;
   // right: live preview + cost + build
   const maxStat = Math.max(1, ...m.preview.map((p) => p.effective));
   const bars = m.preview.map((p) => conBar(p, maxStat)).join('');
@@ -10013,28 +10014,28 @@ function conLoadoutPane(hullList: string[]): string {
     .join('');
   const cost =
     `<div class="cn-cost">` +
-    `<div class="cn-crow"><span class="cn-cl">${t('Корпус ×{n}', { n: String(m.count) })}</span><span class="cn-cv">${bagRu(m.hullCost)}</span></div>` +
+    `<div class="cn-crow"><span class="cn-cl">${t('yard.cost.hull', { n: String(m.count) })}</span><span class="cn-cv">${bagRu(m.hullCost)}</span></div>` +
     (conModules.length
-      ? `<div class="cn-crow"><span class="cn-cl">${t('Модули ×{n}', { n: String(m.count) })}</span><span class="cn-cv">${bagRu(m.modulesCost)}</span></div>`
+      ? `<div class="cn-crow"><span class="cn-cl">${t('yard.cost.modules', { n: String(m.count) })}</span><span class="cn-cv">${bagRu(m.modulesCost)}</span></div>`
       : '') +
-    `<div class="cn-crow total"><span class="cn-cl">${t('Итого')}</span><span class="cn-cv">${bagRu(m.totalCost)}</span></div></div>`;
+    `<div class="cn-crow total"><span class="cn-cl">${t('yard.cost.total')}</span><span class="cn-cv">${bagRu(m.totalCost)}</span></div></div>`;
   const canBuild = m.affordable && conPlanet !== '';
   const right =
-    `<div class="cn-side"><div class="cn-ph">${t('Итог с модулями')} — <em>${t('пересчёт вживую')}</em></div>${bars}${cost}` +
+    `<div class="cn-side"><div class="cn-ph">${t('yard.cost.with-modules')} — <em>${t('yard.cost.live')}</em></div>${bars}${cost}` +
     `<div class="cn-row2"><div class="cn-step"><button data-cncount="-" ${conCount <= 1 ? 'disabled' : ''}>−</button><span class="cn-sv">${conCount}</span><button data-cncount="+" ${conCount >= 20 ? 'disabled' : ''}>+</button></div>` +
-    `<select class="cn-plan" id="cn-planet"${owned.length ? '' : ' disabled'}>${planOpts || `<option>${t('нет своих миров')}</option>`}</select></div>` +
-    `<button class="cn-build" data-cnbuild ${canBuild ? '' : 'disabled'}>${t('Построить ×{n} →', { n: String(conCount) })}</button>` +
-    `<div class="cn-lock">🔒 <span>${t('Лоадаут фиксируется при постройке. Готовый корабль не переоснастить — только построить новый с другим набором.')}</span></div></div>`;
+    `<select class="cn-plan" id="cn-planet"${owned.length ? '' : ' disabled'}>${planOpts || `<option>${t('yard.no-worlds')}</option>`}</select></div>` +
+    `<button class="cn-build" data-cnbuild ${canBuild ? '' : 'disabled'}>${t('yard.build', { n: String(conCount) })}</button>` +
+    `<div class="cn-lock">🔒 <span>${t('yard.loadout.note')}</span></div></div>`;
   return `<div class="cn-grid">${left}${right}</div>`;
 }
 function conSoonPane(what: string): string {
-  return `<div class="cn-soon"><div class="cn-si">🚧</div>${t('«{what}» переезжает в конструктор следующим кирпичом.', { what })}</div>`;
+  return `<div class="cn-soon"><div class="cn-si">🚧</div>${t('yard.soon', { what })}</div>`;
 }
 /** The «Армия» pane: edit a division template's 6 slots (per-player, global). Live
  *  aggregate stats + synergies; mobilisation stays in the planet panel. */
 function conArmyPane(): string {
   const tpls = templatesOf(s, ME);
-  if (!tpls.length) return `<div class="cn-soon">${t('Нет шаблонов.')}</div>`;
+  if (!tpls.length) return `<div class="cn-soon">${t('yard.div.empty')}</div>`;
   const idx = Math.max(0, Math.min(conTplIdx, tpls.length - 1));
   const tpl = tpls[idx]!;
   const tabs = tpls
@@ -10048,30 +10049,30 @@ function conArmyPane(): string {
     .map((u, i) => {
       const inner = u
         ? `<span class="cn-fic">${formIcon(u)}</span><span class="cn-fn">${esc(FORM_RU[u] ?? u)}</span>`
-        : `<span class="cn-fic dim">＋</span><span class="cn-fn dim">${t('пусто')}</span>`;
+        : `<span class="cn-fic dim">＋</span><span class="cn-fn dim">${t('yard.div.slot-empty')}</span>`;
       return `<button class="cn-fslot${u ? ' filled' : ''}" data-confslot="${idx}|${i}">${inner}</button>`;
     })
     .join('');
   const card =
     `<div class="cn-hull"><div class="cn-hic">⚔</div><div><div class="cn-hn">${esc(tpl.name)}</div>` +
-    `<div class="cn-hm">${t('{n}/{s} юнитов · тапни слот, чтобы менять род войск', { n: String(f.count), s: String(FORMATION_SLOTS) })}</div></div></div>`;
+    `<div class="cn-hm">${t('yard.div.slots', { n: String(f.count), s: String(FORMATION_SLOTS) })}</div></div></div>`;
   const left =
     `<div class="cn-fit"><div class="cn-hulls">${tabs}</div>${card}<div class="cn-fgrid">${slots}</div>` +
-    `<div class="cn-note">${t('Тап по слоту: пусто → пехота → танк. Мобилизация дивизии — в панели своего мира (вкладка «Дивизии»).')}</div></div>`;
+    `<div class="cn-note">${t('yard.div.note')}</div></div>`;
   const max = Math.max(1, f.attack, f.defense, f.hp);
   const bars = [
-    conBar({ label: t('Атака'), base: f.attack, effective: f.attack, delta: 0 }, max),
-    conBar({ label: t('Оборона'), base: f.defense, effective: f.defense, delta: 0 }, max),
-    conBar({ label: t('Корпус'), base: f.hp, effective: f.hp, delta: 0 }, max),
+    conBar({ label: t('yard.div.attack'), base: f.attack, effective: f.attack, delta: 0 }, max),
+    conBar({ label: t('yard.div.defense'), base: f.defense, effective: f.defense, delta: 0 }, max),
+    conBar({ label: t('yard.div.hull'), base: f.hp, effective: f.hp, delta: 0 }, max),
   ].join('');
   const syn = f.synergies.length
-    ? `<div class="cn-ph" style="margin-top:14px">${t('Доктрина состава')}</div>` +
+    ? `<div class="cn-ph" style="margin-top:14px">${t('yard.div.doctrine')}</div>` +
       f.synergies.map((x) => `<div class="cn-syn">✦ ${esc(t(x.name))}</div>`).join('')
-    : `<div class="cn-note" style="margin-top:12px">${t('Смешай рода войск — состав задаёт доктрину.')}</div>`;
+    : `<div class="cn-note" style="margin-top:12px">${t('yard.div.doctrine.note')}</div>`;
   const cost =
-    `<div class="cn-cost"><div class="cn-crow total"><span class="cn-cl">${t('Стоимость мобилизации')}</span>` +
+    `<div class="cn-cost"><div class="cn-crow total"><span class="cn-cl">${t('yard.div.cost')}</span>` +
     `<span class="cn-cv">${bagRu(f.cost)}</span></div></div>`;
-  const right = `<div class="cn-side"><div class="cn-ph">${t('Итог по формации')} — <em>${t('пересчёт вживую')}</em></div>${bars}${syn}${cost}</div>`;
+  const right = `<div class="cn-side"><div class="cn-ph">${t('yard.div.total')} — <em>${t('yard.cost.live')}</em></div>${bars}${syn}${cost}</div>`;
   return `<div class="cn-grid">${left}${right}</div>`;
 }
 /** The «Герои» pane: the hero roster/штаб (folded from the old #hero window). The
@@ -10091,7 +10092,7 @@ function renderConstructor(): void {
           ? conArmyPane()
           : conHeroPane();
   constructorWin.innerHTML =
-    `<div class="cnbox"><div class="cn-head"><b>${t('КОНСТРУКТОР')}</b><button class="cn-close">✕</button></div>` +
+    `<div class="cnbox"><div class="cn-head"><b>${t('yard.title')}</b><button class="cn-close">✕</button></div>` +
     `<div class="cn-tabs">${CON_TABS.map(([k, l]) => tabBtn(k, l)).join('')}</div>` +
     `<div id="constructorbody">${body}</div></div>`;
 }
@@ -10207,7 +10208,7 @@ constructorWin.addEventListener('click', (e) => {
     if ((data.heroAbilities[abilityId]?.range ?? 0) > 0) {
       heroAim = { heroId, abilityId }; // ranged cast → arm the map (next world tap is the target)
       constructorWin.classList.remove('show');
-      note(t('✨ выберите мир-цель на карте'));
+      note(t('yard.pick.target'));
     } else {
       playerOrder(castHeroAbility(ME, heroId, abilityId));
       renderConstructor();
@@ -10223,9 +10224,9 @@ constructorWin.addEventListener('click', (e) => {
       a !== null ? data.heroAbilities[a]?.type : undefined,
     );
     note(
-      t('⚓ выберите свой мир{fl}{al} — там поднимется корабль героя', {
-        fl: perks.includes('spawn_fleet') ? t(' / свой флот') : '',
-        al: perks.includes('spawn_allied') ? t(' / мир союзника') : '',
+      t('yard.pick.hero-world', {
+        fl: perks.includes('spawn_fleet') ? t('yard.pick.own-fleet') : '',
+        al: perks.includes('spawn_allied') ? t('yard.pick.ally-world') : '',
       }),
     );
     return;
@@ -10247,7 +10248,7 @@ constructorWin.addEventListener('click', (e) => {
   if (tg.closest('[data-cnbuild]')) {
     if (conPlanet) {
       playerOrder(buildShip(ME, conPlanet, conHull, conCount, conModules));
-      note(t('⚒ заказано: {n}× {hull}', { n: String(conCount), hull: displayUnit(conHull) }));
+      note(t('yard.ordered', { n: String(conCount), hull: displayUnit(conHull) }));
     }
     return;
   }

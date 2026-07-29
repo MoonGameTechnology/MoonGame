@@ -7,7 +7,6 @@ export const en: Record<string, string> = {
   // --- STAFF-1 «Штаб героев» redesign -------------------------------------------
   резерв: 'reserve',
   Общие: 'Common',
-  способность: 'ability',
   способностей: 'abilities',
   актив: 'active',
   Требует: 'Requires',
@@ -15,11 +14,6 @@ export const en: Record<string, string> = {
   // — a second entry here would be silently shadowed by it.
   'цель на карте': 'target on map',
   // --- TT-3.1 technology tree screen --------------------------------------------
-  'Ветку курирует': 'Branch curated by',
-  'Без лидера ветки — узлы с условием «учёный» закрыты':
-    'No branch leader — “scientist”-gated nodes stay locked',
-  'слоты {a}/{b}': 'slots {a}/{b}',
-  ДЕНЬ: 'DAY',
   старт: 'start',
   день: 'day',
   Индустрия: 'Industry',
@@ -34,39 +28,9 @@ export const en: Record<string, string> = {
   'скорость флотов': 'fleet speed',
   урон: 'damage',
   'радиус радаров': 'radar range',
-  'открывает: {x}': 'unlocks: {x}',
-  'способность: {x}': 'ability: {x}',
-  'нужен учёный: {b}': 'needs a scientist: {b}',
-  'любой ветки': 'any branch',
-  'своих секторов: {n}': 'own sectors: {n}',
-  'здание: {b} ×{n}': 'building: {b} ×{n}',
-  'мир типа {p} ×{n}': '{p} world ×{n}',
-  'юнит: {u} ×{n}': 'unit: {u} ×{n}',
-  'особое условие': 'special condition',
-  ИЗУЧЕНО: 'RESEARCHED',
-  ИССЛЕДУЕТСЯ: 'RESEARCHING',
-  ДОСТУПНО: 'AVAILABLE',
-  ЗАКРЫТО: 'LOCKED',
-  'Не хватает ресурсов': 'Not enough resources',
-  Изучено: 'Researched',
-  'Идёт — ≈ {n} ч': 'In progress — ≈ {n}h',
-  'Откроется в День {n}': 'Opens on Day {n}',
-  'Сначала изучите узел выше': 'Research the node above first',
-  'Условие не выполнено': 'Condition not met',
-  'с дня {n}': 'from day {n}',
-  'Требует:': 'Requires:',
   Хранитель: 'Steward',
   // --- SPY-UX intel tab in diplomacy --------------------------------------------
   Шпионаж: 'Espionage',
-  'Попытка: {c}¤ · шанс ~60% · окно интела 24ч · провал сжигает плату. Разведка мира — кнопка 🕵 на карточке вражеской планеты.':
-    'Attempt: {c}¤ · ~60% chance · 24h intel window · a failure burns the fee. World recon — the 🕵 button on an enemy planet card.',
-  'АКТИВНЫЕ ОКНА ИНТЕЛА': 'ACTIVE INTEL WINDOWS',
-  'нет активных окон — добудьте интел операцией ниже':
-    'no active windows — steal intel with an operation below',
-  ОПЕРАЦИИ: 'OPERATIONS',
-  'противников нет': 'no opponents',
-  ЖУРНАЛ: 'JOURNAL',
-  'попыток ещё не было': 'no attempts yet',
   // --- ONB-7 first-session goals checklist -------------------------------------
   // --- ONB-5 async intro + return digest ---------------------------------------
   // --- ONB-3 just-in-time mechanic intros --------------------------------------
@@ -102,7 +66,6 @@ export const en: Record<string, string> = {
   '{n} флотов': '{n} fleets',
   '◎ приказ поставлен — флот исполнит план сам': '◎ order set — the fleet will run the plan itself',
   '{n} уч.': '{n} members',
-  '{n} ч': '{n} h',
   '{n}м': '{n}m',
   '{n}ч': '{n}h',
   '{d}д {h}ч': '{d}d {h}h',
@@ -138,7 +101,6 @@ export const en: Record<string, string> = {
   'Дивизии ⇄ трюм (своб. {n})': 'Divisions ⇄ hold (free {n})',
   Дипломатия: 'Diplomacy',
   Отношения: 'Relations',
-  'Открыть карточку игрока': 'Open player card',
   'Ещё раз «Назад» — выход': 'Press Back again to exit',
   'Ждём, пока хост начнёт…': 'Waiting for the host to start…',
   ЗАКРЫТЬ: 'CLOSE',
@@ -151,8 +113,6 @@ export const en: Record<string, string> = {
   'Закрепить размер и положение': 'Lock size and position',
   Закрыть: 'Close',
   ИИ: 'AI',
-  Имя: 'Name',
-  Исследовать: 'Research',
   Герои: 'Heroes',
   'Канал «{ch}» пуст.': 'Channel "{ch}" is empty.',
   Коалиция: 'Coalition',
@@ -186,10 +146,8 @@ export const en: Record<string, string> = {
     'Peel ships into a new fleet — it stays in the same sector. At least one ship stays behind; carried troops stay with the original.',
   Отмена: 'Cancel',
   Отменить: 'Cancel',
-  'Отметить выбранную провинцию пингом': 'Mark the selected province with a ping',
   'Отметьте провинцию и отправьте — метка станет кликабельной (↪ камера).':
     'Mark a province and send — the marker becomes clickable (↪ jump the camera).',
-  Отношение: 'Stance',
   Отправить: 'Send',
   Очки: 'Score',
   ПВО: 'AA',
@@ -199,7 +157,6 @@ export const en: Record<string, string> = {
   'Под фильтр никто не подходит.': 'Nobody matches the filter.',
   Подтвердить: 'Confirm',
   Покупка: 'Buy',
-  'Построить здесь': 'Build here',
   'Наведи на объект слева — здесь появится его досье.':
     'Hover an object on the left — its dossier appears here.',
   Постройки: 'Structures',
@@ -214,24 +171,19 @@ export const en: Record<string, string> = {
   Развернуть: 'Expand',
   'Размер h,w': 'Size h,w',
   'Реальное время': 'Real time',
-  Сброс: 'Clear',
   Свернуть: 'Collapse',
   Сессия: 'Session',
   Скор: 'Spd',
   Скорость: 'Speed',
   'Сообщение…': 'Message…',
-  'Сообщений пока нет.': 'No messages yet.',
   Сообщения: 'Messages',
   'Сообщения — скоро': 'Messages — coming soon',
-  'Сорт.': 'Sort',
   Станд: 'Std',
-  Стоимость: 'Cost',
   'Предложение: {stance}': 'Proposal: {stance}',
   'Стойка изменена: {stance}': 'Stance changed: {stance}',
   'Тащите за шапку, чтобы переместить': 'Drag the title bar to move',
   Удар: 'Strike',
   ФЛОТ: 'FLEET',
-  Фильтр: 'Filter',
   Флот: 'Fleet',
   // Авто-имена флотов (Bytro-стиль): тип соединения по размеру
   Звено: 'Wing',
@@ -251,9 +203,6 @@ export const en: Record<string, string> = {
   'Цвет шрифта': 'Font color',
   Цензура: 'Censorship',
   'ЧАТ — {ch}': 'CHAT — {ch}',
-  'Чат коалиции пуст.<br>Отметьте провинцию пингом 📍 или напишите.':
-    'The coalition chat is empty.<br>Mark a province with a ping 📍 or write something.',
-  Человек: 'Human',
   'Шрифт, пт': 'Font, pt',
   'Штамп сообщений': 'Message stamp',
   Штурм: 'Assault',
@@ -330,7 +279,6 @@ export const en: Record<string, string> = {
 
   // --- hero grades (HERO_GRADES, heroes.ts) --------------------------------------
   Главный: 'Main',
-  '{n} слота под модули': '{n} module slots',
 
   // --- hero abilities (HERO_ABILITIES, heroes.ts) --------------------------------
   Коридор: 'Corridor',
@@ -359,18 +307,15 @@ export const en: Record<string, string> = {
   'доминированием в галактике': 'by galactic domination',
   'достижением лимита очков': 'by score limit',
   завершён: 'ended',
-  здание: 'building',
   идёт: 'active',
   'истечением времени': 'on the clock',
   казна: 'treasury',
-  'казна {who}': "{who}'s treasury",
   'кол-во': 'amount',
   командующий: 'commander',
   кораблей: 'ships',
   корабль: 'ship',
   'матч завершён': 'the match has ended',
   'метка {loc}': 'marker {loc}',
-  'мир {at}': 'world {at}',
   'на орбите': 'in orbit',
   'неизвестный заказ': 'unknown order',
   'в гарнизоне не осталось': 'none left in the garrison',
@@ -396,7 +341,6 @@ export const en: Record<string, string> = {
   вы: 'you',
   флот: 'fleet',
   флоты: 'fleets',
-  'флоты {who}': "{who}'s fleets",
   оз: 'hp',
   цена: 'price',
   '↪ камера': '↪ camera',
@@ -411,10 +355,6 @@ export const en: Record<string, string> = {
   '⚠ Враг у {node}!': '⚠ An enemy at {node}!',
   '⚔ Уничтожено юнитов врага': '⚔ Enemy units destroyed',
   '⚔ штурм': '⚔ assault',
-  '⚡ Коалиция · {n} уч.': '⚡ Coalition · {n} members',
-  '△ Сессия · {n} в матче': '△ Session · {n} in match',
-  'Общий канал матча — вас слышат все участники.':
-    'The match-wide channel — everyone in the match hears you.',
   '⛬ выберите флот для объединения': '⛬ pick a fleet to merge with',
   '✓ актуально · локально {l} · сервер {r}': '✓ up to date · local {l} · server {r}',
   '🕊 {who} предлагает: {stance} — ответьте тем же в Дипломатии':
@@ -462,7 +402,6 @@ export const en: Record<string, string> = {
   Аккаунт: 'Account',
   Верфь: 'Shipyard',
   Домой: 'Home',
-  Доступные: 'Available',
   Ещё: 'More',
   'Введи имя командира': 'Enter a commander name',
   'Пароли не совпадают': 'Passwords do not match',
@@ -517,9 +456,6 @@ export const en: Record<string, string> = {
   лутбокс: 'lootbox',
   аренда: 'rent',
   модуль: 'module',
-  'В арсенале нет корпусов этого класса.': 'The arsenal has no hulls of this class.',
-  '⚡ Арсенал живой: докупленное в матче видно здесь сразу, но начинает работать только когда ты это ПОСТРОИШЬ — постройка и логистика, не мгновенно.':
-    '⚡ Live arsenal: anything bought during the match shows up here right away, but it only starts working once you BUILD it — construction and logistics, not instant.',
   'Ходовые школы': 'Helm Schools',
   '+5% к скорости всех флотов с первой секунды матча.':
     '+5% fleet speed from the first second of a match.',
@@ -680,34 +616,12 @@ export const en: Record<string, string> = {
   Титан: 'Titan',
   Квазар: 'Quasar',
   // --- constructor («Верфь») — the unified loadout tab ------------------------
-  КОНСТРУКТОР: 'CONSTRUCTOR',
   Корабли: 'Ships',
   Армия: 'Army',
-  '{n} слота под модули (по размеру корпуса)': '{n} module slots (by hull size)',
-  'пусто — выбери модуль': 'empty — pick a module',
-  'снять модуль': 'remove module',
   Оружие: 'Weapon',
   Защита: 'Defense',
   Система: 'System',
-  'Доступные модули — для слота «{s}»': 'Available modules — for the «{s}» slot',
-  'Доступные модули — все слоты заняты': 'Available modules — all slots full',
-  'слот «{s}»': '«{s}» slot',
-  'Типизированные слоты: модуль встаёт только в свой тип. <b>Серые</b> — не для свободного слота или уже стоят.':
-    'Typed slots: a module fits only its own type. <b>Greyed</b> — not for a free slot, or already installed.',
-  'Итог с модулями': 'Total with modules',
-  'пересчёт вживую': 'live recalc',
-  'Корпус ×{n}': 'Hull ×{n}',
-  'Модули ×{n}': 'Modules ×{n}',
   Итого: 'Total',
-  'Построить ×{n} →': 'Build ×{n} →',
-  'Лоадаут фиксируется при постройке. Готовый корабль не переоснастить — только построить новый с другим набором.':
-    "Loadout locks in on build. A finished ship can't be refitted — build a new one with a different set.",
-  'нет своих миров': 'no worlds of yours',
-  '«{what}» переезжает в конструктор следующим кирпичом.':
-    '«{what}» moves into the constructor in the next brick.',
-  '⚒ заказано: {n}× {hull}': '⚒ ordered: {n}× {hull}',
-  'Корпус недоступен.': 'Hull unavailable.',
-  бесплатно: 'free',
   // stat / resource words used by the module-effect chips and cost lines
   корпус: 'hull',
   щит: 'shield',
@@ -721,24 +635,10 @@ export const en: Record<string, string> = {
   микроэлектроники: 'microelectronics',
   // --- hero window / deploy flow (окно героя, развёртывание) --------------------
   'КД {h}': 'CD {h}',
-  '⚓ выберите свой мир{fl}{al} — там поднимется корабль героя':
-    "⚓ pick your world{fl}{al} — the hero's ship rises there",
-  ' / свой флот': ' / own fleet',
-  ' / мир союзника': " / ally's world",
   '✨ выберите мир-цель на карте': '✨ pick a target world on the map',
   '✖ каст отменён': '✖ cast cancelled',
   '✖ развёртывание отменено': '✖ deploy cancelled',
   // --- division / formation builder (конструктор дивизий) ----------------------
-  'Итог по формации': 'Formation summary',
-  'Доктрина состава': 'Composition doctrine',
-  'Стоимость мобилизации': 'Mobilization cost',
-  'Нет шаблонов.': 'No templates.',
-  'Смешай рода войск — состав задаёт доктрину.':
-    'Mix troop types — the composition sets a doctrine.',
-  '{n}/{s} юнитов · тапни слот, чтобы менять род войск':
-    '{n}/{s} units · tap a slot to change the troop type',
-  'Тап по слоту: пусто → пехота → танк. Мобилизация дивизии — в панели своего мира (вкладка «Дивизии»).':
-    "Tap a slot: empty → infantry → tank. Mobilize the division in your world's panel (the «Divisions» tab).",
   // --- build ETA / misc --------------------------------------------------------
   Стройка: 'Building',
   'Ещё раз «Назад» — выход из матча': 'Press Back again to leave the match',
@@ -758,7 +658,6 @@ export const en: Record<string, string> = {
   'флот сам штурмует вражеский мир по прибытии':
     'the fleet storms an enemy world by itself on arrival',
   // --- REL-7 seat/faction picker ------------------------------------------------
-  свободно: 'free',
 
   // --- sandbox panel (dev-only build, prototype/src/sandbox.ts) ----------------
   ПЕСОЧНИЦА: 'SANDBOX',
