@@ -118,7 +118,7 @@ packages/action-layer/src/
 data/            manifest, resources, units, buildings, factions, events, sectors, planetTypes, technologies (.json)
 localization/    ВЕСЬ текст для игрока: index.ts (LOCALES/DEFAULT_LOCALE/dataKey), ru.ts, en.ts (плоские карты ключ→текст), legacy/en.ts (мост старых msgid, сокращается — LOC-2)
 docs/            architecture, modulesystem, roadmap, deep-technical-roadmap, multiplayer, engineering-risks, gdd, metagame, state(этот)
-prototype/       src/game.ts (оркестрация, реэкспорты — REFP-рефактор: 5289→2194 строк), src/prototypeData.ts, src/map.ts, src/fleetStacks.ts, src/tax.ts, src/formations.ts, src/botFavour.ts, src/squadron.ts, src/chain.ts, src/hunger.ts, src/botDiplomacy.ts, src/sessionMarket.ts, src/capital.ts, src/fleetLaunch.ts, src/standingOrders.ts, src/forcedMarch.ts, src/instantRepair.ts, src/econScrews.ts, src/economy.ts, src/matchSetup.ts (вынесены из game.ts, Block REFP), src/main.ts (UI), src/smoke.ts, build.mjs, uitest.mjs, dist/ (артефакт, в .gitignore)
+prototype/       src/game.ts (оркестрация, реэкспорты — REFP-рефактор: 5289→2146 строк), src/prototypeData.ts, src/map.ts, src/fleetStacks.ts, src/tax.ts, src/formations.ts, src/botFavour.ts, src/squadron.ts, src/chain.ts, src/hunger.ts, src/botDiplomacy.ts, src/sessionMarket.ts, src/capital.ts, src/fleetLaunch.ts, src/standingOrders.ts, src/forcedMarch.ts, src/instantRepair.ts, src/econScrews.ts, src/economy.ts, src/matchSetup.ts, src/actions.ts (вынесены из game.ts, Block REFP), src/main.ts (UI), src/smoke.ts, build.mjs, uitest.mjs, dist/ (артефакт, в .gitignore)
 ```
 
 ## 4. Модель состояния (`GameState`)
