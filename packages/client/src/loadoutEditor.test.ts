@@ -6,6 +6,7 @@ import {
   resolveLoadoutBuild,
   type LoadoutModel,
 } from './loadoutEditor';
+import { t } from './i18n';
 
 const data: GameData = parseGameData({
   version: '0.1.0',
@@ -54,11 +55,17 @@ describe('loadout editor — model', () => {
   it('previews base stats with no modules', () => {
     const m = ok(createLoadoutEditor('cruiser', data, rich));
     const attack = m.preview.find((p) => p.stat === 'attack');
-    expect(attack).toEqual({ stat: 'attack', label: 'Урон в атаке', base: 10, effective: 10, delta: 0 });
+    expect(attack).toEqual({
+      stat: 'attack',
+      label: t('loadout.stat.attack'),
+      base: 10,
+      effective: 10,
+      delta: 0,
+    });
     // both combat numbers show: damage when ATTACKING and when DEFENDING.
     expect(m.preview.find((p) => p.stat === 'defense')).toEqual({
       stat: 'defense',
-      label: 'Урон в защите',
+      label: t('loadout.stat.defense'),
       base: 8,
       effective: 8,
       delta: 0,
@@ -78,7 +85,7 @@ describe('loadout editor — equip / unequip', () => {
     expect(m1.slots.find((s) => s.type === 'weapon')?.moduleId).toBe('targeting');
     expect(m1.preview.find((p) => p.stat === 'attack')).toEqual({
       stat: 'attack',
-      label: 'Урон в атаке',
+      label: t('loadout.stat.attack'),
       base: 10,
       effective: 14,
       delta: 4,

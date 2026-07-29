@@ -15,6 +15,7 @@
  * outputs are JSON-serialisable, and validation is **fail-secure** — a bad action
  * yields `{ ok: false, code }` with a stable code only, never a thrown detail.
  */
+import { t } from './i18n';
 
 /** External sign-in providers we plan to support (docs/accounts-roadmap.md AC-1.1:
  *  Google / Apple via OIDC). Facebook from the genre reference is intentionally
@@ -42,7 +43,8 @@ export type LanguageCode = 'ru';
 
 /** Localised text for the welcome screen. Keeping strings in a bundle (not hardcoded
  *  in the model) honours the i18n seam (docs/main-menu.md §5.4 — "не хардкодить
- *  строки"); `ruStrings` is the shipping default. */
+ *  строки"); `defaultStrings` (built from `/localization` via `t()`, LOC-3) is the
+ *  shipping default. */
 export interface WelcomeStrings {
   title: string;
   tagline: string;
@@ -54,19 +56,21 @@ export interface WelcomeStrings {
   legal: LegalLink[];
 }
 
-export const ruStrings: WelcomeStrings = {
-  title: 'VOID DOMINION',
-  tagline: 'Грань пустоты',
-  newPlayer: 'Новый командир',
-  signInWith: 'войти через',
-  login: 'Вход по позывному',
-  singlePlayer: 'Одиночная игра',
-  providerLabels: { google: 'Google', apple: 'Apple' },
+/** The shipping strings bundle — every value is a `/localization` key lookup
+ *  (`t()`), never a literal: the code carries no human-readable text (LOC-3). */
+export const defaultStrings: WelcomeStrings = {
+  title: t('welcome.title'),
+  tagline: t('welcome.tagline'),
+  newPlayer: t('welcome.new'),
+  signInWith: t('welcome.divider'),
+  login: t('welcome.login'),
+  singlePlayer: t('welcome.solo'),
+  providerLabels: { google: t('welcome.google'), apple: t('welcome.apple') },
   legal: [
-    { id: 'imprint', label: 'Выходные данные' },
-    { id: 'terms', label: 'Условия' },
-    { id: 'privacy', label: 'Политика конфиденциальности' },
-    { id: 'support', label: 'Поддержка' },
+    { id: 'imprint', label: t('welcome.imprint') },
+    { id: 'terms', label: t('welcome.terms') },
+    { id: 'privacy', label: t('welcome.privacy') },
+    { id: 'support', label: t('welcome.support') },
   ],
 };
 
@@ -84,9 +88,10 @@ export interface WelcomeModel {
   legal: LegalLink[];
 }
 
-/** Build the welcome model from a strings bundle (Russian by default). Social
- *  providers are stubs (`available: false`) until OIDC lands. */
-export function createWelcomeModel(strings: WelcomeStrings = ruStrings): WelcomeModel {
+/** Build the welcome model from a strings bundle (the localized default unless the
+ *  caller passes another). Social providers are stubs (`available: false`) until
+ *  OIDC lands. */
+export function createWelcomeModel(strings: WelcomeStrings = defaultStrings): WelcomeModel {
   return {
     title: strings.title,
     tagline: strings.tagline,
@@ -156,17 +161,17 @@ export function resolveWelcomeAction(action: WelcomeAction, model: WelcomeModel)
 }
 
 /** Callsign suggestions for a brand-new commander. The host persists the sequence
- *  number; the wordlist is shared with the prototype so both surfaces suggest the
- *  same names. */
+ *  number; the wordlist (`callsign.*` in `/localization`) is shared with the
+ *  prototype so both surfaces suggest the same names. */
 export const CALLSIGNS = [
-  'Носорог',
-  'Комета',
-  'Гадюка',
-  'Орион',
-  'Вектор',
-  'Сокол',
-  'Титан',
-  'Квазар',
+  t('callsign.rhino'),
+  t('callsign.comet'),
+  t('callsign.viper'),
+  t('callsign.orion'),
+  t('callsign.vector'),
+  t('callsign.falcon'),
+  t('callsign.titan'),
+  t('callsign.quasar'),
 ] as const;
 
 /** Deterministic callsign for a 0-based sequence number (no random/time): the

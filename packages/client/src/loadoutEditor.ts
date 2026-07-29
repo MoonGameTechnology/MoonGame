@@ -12,6 +12,7 @@
  */
 import type { GameData, ResourceBag, ShipSlotType, UnitDef } from '@void/shared-core';
 import { canEquip, effectiveStats, hullSlotTypes, loadoutCost } from '@void/shared-core';
+import { t } from './i18n';
 
 /** One capacity slot on the hull — its category and the module in it (if any). */
 export interface LoadoutSlotView {
@@ -91,16 +92,17 @@ const PREVIEW_STATS = [
   'radarRange',
 ] as const;
 
-/** Russian display labels. `attack` and `defense` are the ship's two combat
- *  numbers — its damage when ATTACKING and its return-fire when DEFENDING. */
+/** Display labels, from `/localization` (LOC-3). `attack` and `defense` are the
+ *  ship's two combat numbers — its damage when ATTACKING and its return-fire when
+ *  DEFENDING. */
 const STAT_LABELS: Record<string, string> = {
-  attack: 'Урон в атаке',
-  defense: 'Урон в защите',
-  hp: 'Корпус',
-  shield: 'Щит',
-  speed: 'Скорость',
-  cargoCapacity: 'Трюм',
-  radarRange: 'Радар',
+  attack: t('loadout.stat.attack'),
+  defense: t('loadout.stat.defense'),
+  hp: t('loadout.stat.hp'),
+  shield: t('loadout.stat.shield'),
+  speed: t('loadout.stat.speed'),
+  cargoCapacity: t('loadout.stat.cargo'),
+  radarRange: t('loadout.stat.radar'),
 };
 
 /** Always shown, even at 0 — a ship's attack and defence are its combat identity. */
