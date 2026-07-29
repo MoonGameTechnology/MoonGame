@@ -1075,6 +1075,42 @@ export const en: Record<string, string> = {
   'speed.mult.two-hours': 'two hours per second',
   'speed.restart': 'Restart — back to bot selection',
 
+  // --- steward — «Хранитель»: передача места ИИ на сон, позы, журнал вахты.
+  'steward.duration': 'Delegate for',
+  'steward.duration.hours': '{h} h',
+  'steward.locked': 'The “Steward Protocol” is not researched yet.',
+  'steward.locked.go': 'Open technologies',
+  'steward.locked.how':
+    'Research it in the technology window — then you can hand your seat to the AI while you sleep.',
+  'steward.locked.where':
+    'The <b>Command</b> branch, opens on <b>Day 16</b> for the <b>Overseer</b> scientist (now day {day}).',
+  'steward.log.ago': '{dur} ago',
+  'steward.log.counter': '⚔ Counterstrike at {node}: loss forecast {pct}%',
+  'steward.log.held': '🛡 The {node} line held: loss forecast {pct}%',
+  'steward.log.reinforce': '🚩 Reinforcement sent to {node}: loss forecast {pct}%',
+  'steward.log.sortie': '🛫 A standing patrol raised at {node}',
+  'steward.log.title': "Steward's journal",
+  'steward.on.active': 'The Steward runs an active defense.',
+  'steward.on.active.note':
+    'While you sleep: holds the borders, stands squadron patrols and counterstrikes at your own worlds when the loss forecast is acceptable.',
+  'steward.on.defense': 'The Steward holds the line.',
+  'steward.on.defense.note':
+    'While you sleep: holds the borders and repels attacks, keeps building and trading — no offensives.',
+  'steward.on.returns': 'Control returns in <b>{dur}</b>.',
+  'steward.on.warning':
+    '“Autopilot keeps you alive — active play wins.” The defensive posture never attacks and never negotiates.',
+  'steward.ready': 'The Steward is ready.',
+  'steward.ready.note':
+    'Hand your seat to a trusted AI while you are offline — it holds the line and returns control on time.',
+  'steward.stance': 'Posture',
+  'steward.stance.active': 'Active defense',
+  'steward.stance.active.note':
+    'Active defense: everything above, plus a counterstrike at your own worlds when the loss forecast is acceptable (under 35%) and standing squadron patrols. It never leaves your territory.',
+  'steward.stance.defense': 'Defense',
+  'steward.stance.defense.note':
+    'The “Defend” posture: holds and repels, keeps building and trading — no offensives, no diplomacy. Control returns automatically, with a morning report.',
+  'steward.take-back': 'Take back control',
+
   // --- tech — Дерево технологий: названия веток.
   'tech.branch.command': 'Command',
   'tech.branch.ground': 'Ground',

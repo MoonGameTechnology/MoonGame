@@ -249,7 +249,6 @@ export const en: Record<string, string> = {
   'выдала предмет в аренду': 'rented out an item',
   'вернула арендованный предмет': 'returned a rented item',
   AvA: 'AvA',
-  Журнал: 'Log',
   готов: 'ready',
   назначен: 'scheduled',
   отменён: 'cancelled',
@@ -562,45 +561,11 @@ export const en: Record<string, string> = {
   ДИПЛОМАТИЯ: 'DIPLOMACY',
 
   // --- steward window («Хранитель») + settings + end-of-match ---------------------
-  'Хранитель ведёт оборону.': 'The Steward holds the line.',
-  'Хранитель ведёт активную оборону.': 'The Steward runs an active defense.',
-  'Пока вы спите: держит рубежи, поднимает дежурные эскадрильи и контратакует у своих миров, когда прогноз потерь приемлем.':
-    'While you sleep: holds the borders, stands squadron patrols and counterstrikes at your own worlds when the loss forecast is acceptable.',
-  'Управление вернётся через <b>{dur}</b>.': 'Control returns in <b>{dur}</b>.',
-  'Пока вы спите: держит рубежи и отбивает атаки, застраивает очередь и торгует — без наступлений.':
-    'While you sleep: holds the borders and repels attacks, keeps building and trading — no offensives.',
-  'Вернуть управление': 'Take back control',
-  '«Автопилот держит вас в игре — побеждает активная игра.» Оборонительная поза не ходит в атаку и не ведёт дипломатию.':
-    '“Autopilot keeps you alive — active play wins.” The defensive posture never attacks and never negotiates.',
-  '«Протокол Хранитель» ещё не изучен.': 'The “Steward Protocol” is not researched yet.',
-  'Ветка <b>Командование</b>, открывается в <b>День 16</b> учёному <b>Куратор</b> (сейчас день {day}).':
-    'The <b>Command</b> branch, opens on <b>Day 16</b> for the <b>Overseer</b> scientist (now day {day}).',
-  'Изучите его в окне технологий — затем сможете передать место ИИ на время сна.':
-    'Research it in the technology window — then you can hand your seat to the AI while you sleep.',
-  'Открыть технологии': 'Open technologies',
-  'Хранитель готов.': 'The Steward is ready.',
-  'Передайте место доверенному ИИ, пока вы офлайн — он удержит рубежи и вернёт управление к сроку.':
-    'Hand your seat to a trusted AI while you are offline — it holds the line and returns control on time.',
-  Поза: 'Posture',
-  'Активная оборона': 'Active defense',
-  'Активная оборона: всё то же, плюс контрудар по врагу у своих миров при приемлемом прогнозе потерь (до 35%) и дежурные вылеты эскадрилий. Свою территорию не покидает.':
-    'Active defense: everything above, plus a counterstrike at your own worlds when the loss forecast is acceptable (under 35%) and standing squadron patrols. It never leaves your territory.',
-  'Передать на': 'Delegate for',
-  '{h} ч': '{h} h',
-  'Поза «Оборона»: держит и отбивает, застраивает очередь, торгует — без наступлений и дипломатии. Управление вернётся автоматически, с утренней сводкой.':
-    'The “Defend” posture: holds and repels, keeps building and trading — no offensives, no diplomacy. Control returns automatically, with a morning report.',
-  'Журнал Хранителя': "Steward's journal",
-  '{dur} назад': '{dur} ago',
   '🏃 Эвакуация с {node} → {to}: прогноз потерь {pct}%, крыльев уведено: {n}':
     '🏃 Evacuation from {node} → {to}: loss forecast {pct}%, wings withdrawn: {n}',
   '🚚 Паром выслан к {node} за гарнизоном': '🚚 A ferry dispatched to {node} for the garrison',
   '⚠ Гарнизон {node} не эвакуировать: транспорт не успевает (прогноз потерь {pct}%)':
     '⚠ The {node} garrison cannot be evacuated: no transport arrives in time (loss forecast {pct}%)',
-  '⚔ Контрудар у {node}: прогноз потерь {pct}%': '⚔ Counterstrike at {node}: loss forecast {pct}%',
-  '🛫 Дежурный вылет поднят у {node}': '🛫 A standing patrol raised at {node}',
-  '🛡 Рубеж {node} удержан: прогноз потерь {pct}%': '🛡 The {node} line held: loss forecast {pct}%',
-  '🚩 Подкрепление выслано к {node}: прогноз потерь {pct}%':
-    '🚩 Reinforcement sent to {node}: loss forecast {pct}%',
   интерфейс: 'interface',
   вкл: 'on',
   выкл: 'off',

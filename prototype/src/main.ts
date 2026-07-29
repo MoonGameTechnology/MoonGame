@@ -9215,13 +9215,13 @@ function stewLogLine(e: {
         pct,
       });
     case 'strike':
-      return t('⚔ Контрудар у {node}: прогноз потерь {pct}%', { node, pct });
+      return t('steward.log.counter', { node, pct });
     case 'watch':
-      return t('🛫 Дежурный вылет поднят у {node}', { node });
+      return t('steward.log.sortie', { node });
     case 'hold':
-      return t('🛡 Рубеж {node} удержан: прогноз потерь {pct}%', { node, pct });
+      return t('steward.log.held', { node, pct });
     case 'reinforce':
-      return t('🚩 Подкрепление выслано к {node}: прогноз потерь {pct}%', { node, pct });
+      return t('steward.log.reinforce', { node, pct });
     default:
       return `${e.kind}: ${node}`;
   }
@@ -9237,10 +9237,10 @@ function stewLogHtml(): string {
     .slice(0, 12)
     .map(
       (e) =>
-        `<div class="st-log-line"><span class="st-log-when">${t('{dur} назад', { dur: stewFmtDur(Math.max(0, s.time - e.at)) })}</span> ${stewLogLine(e)}</div>`,
+        `<div class="st-log-line"><span class="st-log-when">${t('steward.log.ago', { dur: stewFmtDur(Math.max(0, s.time - e.at)) })}</span> ${stewLogLine(e)}</div>`,
     )
     .join('');
-  return `<div class="st-h">${t('Журнал Хранителя')}</div><div class="st-log">${lines}</div>`;
+  return `<div class="st-h">${t('steward.log.title')}</div><div class="st-log">${lines}</div>`;
 }
 function renderSteward(): void {
   const body = $('stewardbody');
@@ -9249,49 +9249,42 @@ function renderSteward(): void {
   let html = '';
   if (posture && cur) {
     html +=
-      `<div class="st-status on">🤖 <b>${posture === 'active_defend' ? t('Хранитель ведёт активную оборону.') : t('Хранитель ведёт оборону.')}</b><br>` +
-      t('Управление вернётся через <b>{dur}</b>.', { dur: stewFmtDur(cur.until - s.time) }) +
+      `<div class="st-status on">🤖 <b>${posture === 'active_defend' ? t('steward.on.active') : t('steward.on.defense')}</b><br>` +
+      t('steward.on.returns', { dur: stewFmtDur(cur.until - s.time) }) +
       `<br>` +
-      `${posture === 'active_defend' ? t('Пока вы спите: держит рубежи, поднимает дежурные эскадрильи и контратакует у своих миров, когда прогноз потерь приемлем.') : t('Пока вы спите: держит рубежи и отбивает атаки, застраивает очередь и торгует — без наступлений.')}</div>` +
-      `<div class="st-row"><button class="st-btn warn" data-stew="recall">${t('Вернуть управление')}</button></div>` +
-      `<div class="st-note">${t('«Автопилот держит вас в игре — побеждает активная игра.» Оборонительная поза не ходит в атаку и не ведёт дипломатию.')}</div>`;
+      `${posture === 'active_defend' ? t('steward.on.active.note') : t('steward.on.defense.note')}</div>` +
+      `<div class="st-row"><button class="st-btn warn" data-stew="recall">${t('steward.take-back')}</button></div>` +
+      `<div class="st-note">${t('steward.on.warning')}</div>`;
   } else if (!stewardTechDone()) {
     const day = Math.floor((s.time - (s.startedAt ?? 0)) / DAY) + 1; // счёт статус-бара: день 1 — первый
     html +=
-      `<div class="st-status locked">🔒 <b>${t('«Протокол Хранитель» ещё не изучен.')}</b><br>` +
-      t(
-        'Ветка <b>Командование</b>, открывается в <b>День 16</b> учёному <b>Куратор</b> (сейчас день {day}).',
-        { day: String(day) },
-      ) +
+      `<div class="st-status locked">🔒 <b>${t('steward.locked')}</b><br>` +
+      t('steward.locked.where', { day: String(day) }) +
       `<br>` +
-      `${t('Изучите его в окне технологий — затем сможете передать место ИИ на время сна.')}</div>` +
-      `<div class="st-row"><button class="st-btn" data-stew="tech">${t('Открыть технологии')}</button></div>`;
+      `${t('steward.locked.how')}</div>` +
+      `<div class="st-row"><button class="st-btn" data-stew="tech">${t('steward.locked.go')}</button></div>`;
   } else {
     html +=
-      `<div class="st-status">😴 <b>${t('Хранитель готов.')}</b><br>` +
-      `${t('Передайте место доверенному ИИ, пока вы офлайн — он удержит рубежи и вернёт управление к сроку.')}</div>` +
-      `<div class="st-h">${t('Поза')}</div><div class="st-row">` +
+      `<div class="st-status">😴 <b>${t('steward.ready')}</b><br>` +
+      `${t('steward.ready.note')}</div>` +
+      `<div class="st-h">${t('steward.stance')}</div><div class="st-row">` +
       (['defend', 'active_defend'] as const)
         .map(
           (p) =>
-            `<button class="st-btn${stewPosture === p ? ' sel' : ''}" data-stew="posture" data-p="${p}">${p === 'defend' ? t('Оборона') : t('Активная оборона')}</button>`,
+            `<button class="st-btn${stewPosture === p ? ' sel' : ''}" data-stew="posture" data-p="${p}">${p === 'defend' ? t('steward.stance.defense') : t('steward.stance.active')}</button>`,
         )
         .join('') +
       `</div>` +
-      `<div class="st-h">${t('Передать на')}</div><div class="st-row">` +
+      `<div class="st-h">${t('steward.duration')}</div><div class="st-row">` +
       STEW_DURATIONS.map(
         (h) =>
-          `<button class="st-btn" data-stew="go" data-h="${h}">${t('{h} ч', { h: String(h) })}</button>`,
+          `<button class="st-btn" data-stew="go" data-h="${h}">${t('steward.duration.hours', { h: String(h) })}</button>`,
       ).join('') +
       `</div>` +
       `<div class="st-note">${
         stewPosture === 'active_defend'
-          ? t(
-              'Активная оборона: всё то же, плюс контрудар по врагу у своих миров при приемлемом прогнозе потерь (до 35%) и дежурные вылеты эскадрилий. Свою территорию не покидает.',
-            )
-          : t(
-              'Поза «Оборона»: держит и отбивает, застраивает очередь, торгует — без наступлений и дипломатии. Управление вернётся автоматически, с утренней сводкой.',
-            )
+          ? t('steward.stance.active.note')
+          : t('steward.stance.defense.note')
       }</div>`;
   }
   html += stewLogHtml();
