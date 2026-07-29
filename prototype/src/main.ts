@@ -9367,7 +9367,7 @@ function heroBodyHtml(): string {
     .sort()
     .map((id) => s.heroes![id]!)
     .filter((h) => h.owner === ME);
-  if (!mine.length) return `<div class="hx-note">${t('У вас пока нет героев.')}</div>`;
+  if (!mine.length) return `<div class="hx-note">${t('hero.hq.empty')}</div>`;
   const active = mine.filter((h) => h.alive !== false && h.fleetId && s.fleets[h.fleetId]).length;
   let hero = mine.find((h) => h.id === heroSel);
   if (!hero) {
@@ -9383,20 +9383,21 @@ function heroBodyHtml(): string {
   for (const h of mine) {
     const d = h.archetype !== undefined ? data.heroes[h.archetype] : undefined;
     const dep = h.alive !== false && h.fleetId && s.fleets[h.fleetId];
-    const st = h.alive === false ? t('погиб') : dep ? t('⚓ развёрнут') : t('резерв');
+    const st =
+      h.alive === false ? t('hero.hq.dead') : dep ? t('hero.hq.deployed') : t('hero.hq.reserve');
     chips +=
       `<button class="hx-chip${h.id === hero.id ? ' sel' : ''}${d?.branch === 'psionic' ? ' ps' : ''}" data-hsel="${h.id}">` +
       `<span class="hx-cr">♔</span>${esc(t(d?.name ?? h.archetype ?? h.id))}` +
       `<span class="hx-cst${dep ? ' on' : ''}">${st}</span></button>`;
   }
-  chips += `<span class="hx-cap">${t('развёрнуто {a}/{c}', { a: active, c: HERO_ACTIVE_CAP })}</span></div>`;
+  chips += `<span class="hx-cap">${t('hero.hq.deployed-count', { a: active, c: HERO_ACTIVE_CAP })}</span></div>`;
 
   // identity header — name, branch, deploy state, aggregated build bonuses
   const deploy = dead
-    ? `<span class="hx-dead">${t('погиб')}</span>`
+    ? `<span class="hx-dead">${t('hero.hq.dead')}</span>`
     : fleet
-      ? `<span class="hx-dep">⚓ ${esc(typeof fleet.location === 'string' ? fleet.location : t('в пути'))}</span>`
-      : `<button class="hx-btn" data-hspawn="${hero.id}" ${active >= HERO_ACTIVE_CAP ? 'disabled' : ''}>${t('Развернуть')}</button>`;
+      ? `<span class="hx-dep">⚓ ${esc(typeof fleet.location === 'string' ? fleet.location : t('hero.hq.enroute'))}</span>`
+      : `<button class="hx-btn" data-hspawn="${hero.id}" ${active >= HERO_ACTIVE_CAP ? 'disabled' : ''}>${t('hero.hq.deploy')}</button>`;
   const bonuses = (hero.passives ?? [])
     .map((p) => `<span class="hx-trait">${esc(heroPassiveLine(p))}</span>`)
     .join('');
@@ -9404,7 +9405,7 @@ function heroBodyHtml(): string {
   const used = (hero.fittings ?? []).length;
   const fitPips =
     slots > 0
-      ? `<span class="hx-trait">${t('Фиттинги')} <span class="hx-pips">${'●'.repeat(used)}${'○'.repeat(Math.max(0, slots - used))}</span></span>`
+      ? `<span class="hx-trait">${t('hero.hq.fittings')} <span class="hx-pips">${'●'.repeat(used)}${'○'.repeat(Math.max(0, slots - used))}</span></span>`
       : '';
   const ident =
     `<div class="hx-ident${def?.branch === 'psionic' ? ' ps' : ''}">` +
@@ -9418,10 +9419,10 @@ function heroBodyHtml(): string {
 
   // tabs
   const TABS: [HeroTab, string][] = [
-    ['overview', 'Обзор'],
-    ['tree', 'Дерево'],
-    ['abilities', 'Способности'],
-    ['fittings', 'Фиттинги'],
+    ['overview', 'hero.hq.tab.overview'],
+    ['tree', 'hero.hq.tab.tree'],
+    ['abilities', 'hero.hq.tab.abilities'],
+    ['fittings', 'hero.hq.tab.fittings'],
   ];
   const tabs =
     `<div class="hx-tabs">` +
@@ -9480,7 +9481,7 @@ function heroTreeHtml(hero: HeroInst): string {
       nodes: entries.filter(([, n]) => n.branch === br),
     });
   }
-  if (!rails.length) return `<div class="hx-note">${t('Дерево пусто.')}</div>`;
+  if (!rails.length) return `<div class="hx-note">${t('hero.tree.empty')}</div>`;
   let html = `<div class="hx-tree">`;
   for (const rail of rails) {
     const rn = rail.nodes
@@ -9489,7 +9490,7 @@ function heroTreeHtml(hero: HeroInst): string {
     html +=
       `<div class="hx-rail${rail.own ? '' : ' foreign'}${rail.ps ? ' ps' : ''}">` +
       `<div class="hx-rhd"><span class="hx-dot"></span>${esc(t(rail.label))}` +
-      (rail.own ? '' : `<span class="hx-ftag">${t('не ваша ветвь')}</span>`) +
+      (rail.own ? '' : `<span class="hx-ftag">${t('hero.tree.not-your-branch')}</span>`) +
       `</div>`;
     for (const [nid, nd] of rn) {
       const owned = skills.includes(nid);
@@ -9500,16 +9501,16 @@ function heroTreeHtml(hero: HeroInst): string {
       if (!rail.own) {
         cls += ' foreignn';
         crest = '·';
-        foot = `<span class="hx-st">${t('чужая ветвь')}</span>`;
+        foot = `<span class="hx-st">${t('hero.tree.other-branch')}</span>`;
       } else if (owned) {
         cls += ' owned';
         crest = '✓';
-        foot = `<span class="hx-st on">✓ ${t('изучено')}</span>`;
+        foot = `<span class="hx-st on">✓ ${t('hero.tree.unlocked')}</span>`;
       } else if (!reqMet) {
         cls += ' locked';
         crest = '🔒';
         const need = esc(nd.requires.map((r) => t(data.heroSkillTrees[r]?.name ?? r)).join(', '));
-        foot = `<span class="hx-st">${t('нужен: {n}', { n: need })}</span>`;
+        foot = `<span class="hx-st">${t('hero.tree.needs', { n: need })}</span>`;
       } else {
         cls += ' avail';
         crest = '◆';
@@ -9519,9 +9520,9 @@ function heroTreeHtml(hero: HeroInst): string {
         ? `<span class="hx-conn${rail.own && reqMet ? ' lit' : ''}"></span>`
         : '';
       const grant = nd.grants.ability
-        ? `<span class="hx-g ab">${t('способность')}</span>`
+        ? `<span class="hx-g ab">${t('hero.tree.ability')}</span>`
         : nd.grants.passive
-          ? `<span class="hx-g pa">${t('пассивка')}</span>`
+          ? `<span class="hx-g pa">${t('hero.tree.passive')}</span>`
           : '';
       const tap = rail.own && !owned ? ` data-hnode="${nid}"` : '';
       html +=
@@ -9541,18 +9542,18 @@ function heroAbilitiesHtml(hero: HeroInst): string {
   const abilities = (hero.abilities ?? []).filter(
     (a): a is string => a !== null && !!data.heroAbilities[a],
   );
-  if (!abilities.length) return `<div class="hx-note">${t('Нет способностей.')}</div>`;
+  if (!abilities.length) return `<div class="hx-note">${t('hero.abil.empty')}</div>`;
   let html = '';
   for (const ab of abilities) {
     const ad = data.heroAbilities[ab]!;
     const cdLeft = Math.max(0, (hero.cooldowns?.[heroCdKey(ad.type)] ?? 0) - s.time);
     const action = ad.type.startsWith('spawn_')
-      ? `<span class="hx-badge">${t('перк развёртывания')}</span>`
+      ? `<span class="hx-badge">${t('hero.abil.deploy-perk')}</span>`
       : cdLeft > 0
-        ? `<span class="hx-badge cd">${t('КД {h}', { h: fmtHrs(cdLeft / HOUR) })}</span>`
+        ? `<span class="hx-badge cd">${t('hero.abil.cooldown', { h: fmtHrs(cdLeft / HOUR) })}</span>`
         : HERO_CASTABLE.has(ad.type)
-          ? `<button class="hx-btn" data-hcast="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${(ad.range ?? 0) > 0 ? t('Цель…') : t('Активировать')}</button>`
-          : `<span class="hx-badge">${t('скоро')}</span>`;
+          ? `<button class="hx-btn" data-hcast="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${(ad.range ?? 0) > 0 ? t('hero.abil.pick-target') : t('hero.abil.activate')}</button>`
+          : `<span class="hx-badge">${t('hero.abil.soon')}</span>`;
     html +=
       `<div class="hx-row"><div class="hx-grow"><span class="hx-an">${esc(t(ad.name))}</span>` +
       `<div class="hx-note">${esc(t(ad.description ?? ''))}</div></div>${action}</div>`;
@@ -9565,24 +9566,24 @@ function heroAbilitiesHtml(hero: HeroInst): string {
 function heroFittingsHtml(hero: HeroInst): string {
   const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
   const slots = def?.slots ?? 0;
-  if (slots <= 0) return `<div class="hx-note">${t('У этого героя нет слотов фиттингов.')}</div>`;
+  if (slots <= 0) return `<div class="hx-note">${t('hero.fit.none')}</div>`;
   const fitted = hero.fittings ?? [];
-  let html = `<div class="hx-h">${t('Слоты · {u}/{n}', { u: fitted.length, n: slots })}</div>`;
+  let html = `<div class="hx-h">${t('hero.fit.slots', { u: fitted.length, n: slots })}</div>`;
   for (const [fid, fd] of Object.entries(data.heroFittings)) {
     const installed = fitted.includes(fid);
     const grant = fd.grants.ability
-      ? `<span class="hx-g ab">${t('способность')}</span>`
+      ? `<span class="hx-g ab">${t('hero.tree.ability')}</span>`
       : fd.grants.passive
-        ? `<span class="hx-g pa">${t('пассивка')}</span>`
+        ? `<span class="hx-g pa">${t('hero.tree.passive')}</span>`
         : fd.statMods
-          ? `<span class="hx-g pa">${t('корпус')}</span>`
+          ? `<span class="hx-g pa">${t('hero.fit.hull')}</span>`
           : '';
     const canFit = !installed && fitted.length < slots;
     const action = installed
-      ? `<span class="hx-badge on">✓ ${t('установлен')}</span>`
+      ? `<span class="hx-badge on">✓ ${t('hero.fit.installed')}</span>`
       : canFit
         ? `<span class="hx-cost">${esc(cost(fd.cost))}</span>`
-        : `<span class="hx-badge">${t('нет слотов')}</span>`;
+        : `<span class="hx-badge">${t('hero.fit.no-slots')}</span>`;
     const tap = canFit ? ` data-hfitd="${fid}"` : '';
     html +=
       `<div class="hx-row"${tap}><div class="hx-grow"><span class="hx-an">${esc(t(fd.name))}</span>` +
@@ -9603,17 +9604,17 @@ function heroOverviewHtml(hero: HeroInst): string {
   let html =
     `<div class="hx-note" style="margin-bottom:10px;">${esc(t(def?.description ?? ''))}</div>` +
     `<div class="hx-ov">` +
-    `<div class="hx-ovc"><b>${abil}</b><span>${t('способностей')}</span></div>` +
-    `<div class="hx-ovc"><b>${learned}/${treeTotal}</b><span>${t('узлов дерева')}</span></div>` +
-    `<div class="hx-ovc"><b>${(hero.fittings ?? []).length}/${def?.slots ?? 0}</b><span>${t('фиттингов')}</span></div>` +
+    `<div class="hx-ovc"><b>${abil}</b><span>${t('hero.stat.abilities')}</span></div>` +
+    `<div class="hx-ovc"><b>${learned}/${treeTotal}</b><span>${t('hero.stat.tree-nodes')}</span></div>` +
+    `<div class="hx-ovc"><b>${(hero.fittings ?? []).length}/${def?.slots ?? 0}</b><span>${t('hero.stat.fittings')}</span></div>` +
     `</div>`;
   const bonuses = (hero.passives ?? [])
     .map(
       (p) =>
-        `<div class="hx-row"><span class="hx-grow hx-an">${esc(heroPassiveLine(p))}</span><span class="hx-badge on">${t('актив')}</span></div>`,
+        `<div class="hx-row"><span class="hx-grow hx-an">${esc(heroPassiveLine(p))}</span><span class="hx-badge on">${t('hero.stat.active')}</span></div>`,
     )
     .join('');
-  if (bonuses) html += `<div class="hx-h">${t('Текущие бонусы')}</div>${bonuses}`;
+  if (bonuses) html += `<div class="hx-h">${t('hero.stat.bonuses')}</div>${bonuses}`;
   return html;
 }
 
@@ -9632,9 +9633,9 @@ function heroDossierHtml(hero: HeroInst): string {
     const skills = hero.skills ?? [];
     const gAb = nd.grants.ability ? data.heroAbilities[nd.grants.ability] : undefined;
     const give = gAb
-      ? `<div class="hx-dgl">${t('Открывает способность')}</div><div class="hx-dgv">${esc(t(gAb.name))}${(gAb.range ?? 0) > 0 ? ` · ${t('дальность {r}', { r: gAb.range })}` : ''}${gAb.cooldownHours ? ` · ${t('КД {h}ч', { h: gAb.cooldownHours })}` : ''}</div><div class="hx-note">${esc(t(gAb.description ?? ''))}</div>`
+      ? `<div class="hx-dgl">${t('hero.tree.grants-ability')}</div><div class="hx-dgv">${esc(t(gAb.name))}${(gAb.range ?? 0) > 0 ? ` · ${t('hero.tree.range', { r: gAb.range })}` : ''}${gAb.cooldownHours ? ` · ${t('hero.tree.cooldown', { h: gAb.cooldownHours })}` : ''}</div><div class="hx-note">${esc(t(gAb.description ?? ''))}</div>`
       : nd.grants.passive
-        ? `<div class="hx-dgl">${t('Даёт пассивку')}</div><div class="hx-dgv">${esc(heroPassiveLine(nd.grants.passive))}</div>`
+        ? `<div class="hx-dgl">${t('hero.tree.grants-passive')}</div><div class="hx-dgv">${esc(heroPassiveLine(nd.grants.passive))}</div>`
         : '';
     const branchOk = nd.branch === undefined || nd.branch === def?.branch;
     const reqMet = nd.requires.every((r) => skills.includes(r));
@@ -9647,18 +9648,18 @@ function heroDossierHtml(hero: HeroInst): string {
       .join(' ');
     const canBuy = branchOk && reqMet && !owned && afford(nd.cost) && !dead;
     const btn = owned
-      ? `<div class="hx-drow"><span class="hx-ok">✓ ${t('изучено')}</span></div>`
+      ? `<div class="hx-drow"><span class="hx-ok">✓ ${t('hero.tree.unlocked')}</span></div>`
       : !branchOk
-        ? `<div class="hx-drow"><span class="hx-no">${t('чужая ветвь')}</span></div>`
-        : `<button class="hx-dbtn" data-hskill="${hero.id}" data-node="${id}" ${canBuy ? '' : 'disabled'}>${t('Изучить')} · ${esc(cost(nd.cost))}</button>`;
+        ? `<div class="hx-drow"><span class="hx-no">${t('hero.tree.other-branch')}</span></div>`
+        : `<button class="hx-dbtn" data-hskill="${hero.id}" data-node="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.tree.unlock')} · ${esc(cost(nd.cost))}</button>`;
     return (
       `<div class="hx-dossier">` +
       `<div class="hx-dh">${def?.branch ? `<span class="hx-tag">${esc(t(HERO_BRANCH_RU[def.branch] ?? def.branch))}</span>` : ''}<span class="hx-dnm">${esc(t(nd.name))}</span>${close}</div>` +
       (give ? `<div class="hx-give">${give}</div>` : '') +
       (reqHtml
-        ? `<div class="hx-drow"><span class="hx-dk">${t('Требует')}</span><span class="hx-dv">${reqHtml}</span></div>`
+        ? `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.requires')}</span><span class="hx-dv">${reqHtml}</span></div>`
         : '') +
-      `<div class="hx-drow"><span class="hx-dk">${t('Цена')}</span><span class="hx-cost">${esc(cost(nd.cost))}</span></div>` +
+      `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.cost')}</span><span class="hx-cost">${esc(cost(nd.cost))}</span></div>` +
       btn +
       `</div>`
     );
@@ -9670,11 +9671,11 @@ function heroDossierHtml(hero: HeroInst): string {
     const slots = def?.slots ?? 0;
     const gAb = fd.grants.ability ? data.heroAbilities[fd.grants.ability] : undefined;
     const give = gAb
-      ? `<div class="hx-dgl">${t('Открывает способность')}</div><div class="hx-dgv">${esc(t(gAb.name))}</div><div class="hx-note">${esc(t(gAb.description ?? ''))}</div>`
+      ? `<div class="hx-dgl">${t('hero.tree.grants-ability')}</div><div class="hx-dgv">${esc(t(gAb.name))}</div><div class="hx-note">${esc(t(gAb.description ?? ''))}</div>`
       : fd.grants.passive
-        ? `<div class="hx-dgl">${t('Даёт пассивку')}</div><div class="hx-dgv">${esc(heroPassiveLine(fd.grants.passive))}</div>`
+        ? `<div class="hx-dgl">${t('hero.tree.grants-passive')}</div><div class="hx-dgv">${esc(heroPassiveLine(fd.grants.passive))}</div>`
         : fd.statMods
-          ? `<div class="hx-dgl">${t('Модификатор корпуса')}</div><div class="hx-dgv">${esc(
+          ? `<div class="hx-dgl">${t('hero.fit.hull-mod')}</div><div class="hx-dgv">${esc(
               Object.entries(fd.statMods)
                 .map(([k, v]) => `${k} +${v}`)
                 .join(', '),
@@ -9685,9 +9686,9 @@ function heroDossierHtml(hero: HeroInst): string {
       `<div class="hx-dossier">` +
       `<div class="hx-dh"><span class="hx-dnm">${esc(t(fd.name))}</span>${close}</div>` +
       (give ? `<div class="hx-give">${give}</div>` : '') +
-      `<div class="hx-drow"><span class="hx-dk">${t('Цена')}</span><span class="hx-cost">${esc(cost(fd.cost))}</span></div>` +
-      `<div class="hx-warn">${t('Ставится навсегда — рефита нет')}</div>` +
-      `<button class="hx-dbtn danger" data-hfit="${hero.id}" data-fit="${id}" ${canBuy ? '' : 'disabled'}>${t('Необратимо — установить')} · ${esc(cost(fd.cost))}</button>` +
+      `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.cost')}</span><span class="hx-cost">${esc(cost(fd.cost))}</span></div>` +
+      `<div class="hx-warn">${t('hero.fit.permanent')}</div>` +
+      `<button class="hx-dbtn danger" data-hfit="${hero.id}" data-fit="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.fit.install')} · ${esc(cost(fd.cost))}</button>` +
       `</div>`
     );
   }

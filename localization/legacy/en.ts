@@ -5,38 +5,14 @@
 // One language = one file.
 export const en: Record<string, string> = {
   // --- STAFF-1 «Штаб героев» redesign -------------------------------------------
-  'У вас пока нет героев.': 'You have no heroes yet.',
-  'развёрнуто {a}/{c}': 'deployed {a}/{c}',
-  '⚓ развёрнут': '⚓ deployed',
   резерв: 'reserve',
-  'не ваша ветвь': 'not your branch',
-  'чужая ветвь': 'other branch',
-  'нужен: {n}': 'needs: {n}',
-  Дерево: 'Tree',
-  'Дерево пусто.': 'The tree is empty.',
   Общие: 'Common',
   способность: 'ability',
-  пассивка: 'passive',
-  'Нет способностей.': 'No abilities.',
-  Фиттинги: 'Fittings',
-  'Слоты · {u}/{n}': 'Slots · {u}/{n}',
-  'У этого героя нет слотов фиттингов.': 'This hero has no fitting slots.',
   способностей: 'abilities',
-  'узлов дерева': 'tree nodes',
-  фиттингов: 'fittings',
-  'Текущие бонусы': 'Current bonuses',
   актив: 'active',
-  'Открывает способность': 'Unlocks an ability',
-  'Даёт пассивку': 'Grants a passive',
-  'Модификатор корпуса': 'Hull modifier',
-  'дальность {r}': 'range {r}',
-  'КД {h}ч': 'CD {h}h',
   Требует: 'Requires',
-  Цена: 'Cost',
   // NB: `Изучить` is translated once, in the meta-progression block below ('Unlock')
   // — a second entry here would be silently shadowed by it.
-  'Ставится навсегда — рефита нет': 'Installed for good — no refit',
-  'Необратимо — установить': 'Irreversible — install',
   'цель на карте': 'target on map',
   // --- TT-3.1 technology tree screen --------------------------------------------
   'Ветку курирует': 'Branch curated by',
@@ -106,7 +82,6 @@ export const en: Record<string, string> = {
   // --- placeholders / small fragments ------------------------------------------
   '{b} — улучшение': '{b} — upgrade',
   // TGT-1: target-order composer
-  Цель: 'Target',
   '◎ тапните цель на карте — соберём приказ': '◎ tap a target on the map — compose the order',
   '◎ цель не выбрана': '◎ no target picked',
   ПРИКАЗ: 'ORDER',
@@ -578,7 +553,6 @@ export const en: Record<string, string> = {
   аукцион: 'auction',
   лутбокс: 'lootbox',
   аренда: 'rent',
-  Слот: 'Slot',
   модуль: 'module',
   'В арсенале нет корпусов этого класса.': 'The arsenal has no hulls of this class.',
   '⚡ Арсенал живой: докупленное в матче видно здесь сразу, но начинает работать только когда ты это ПОСТРОИШЬ — постройка и логистика, не мгновенно.':
@@ -783,14 +757,7 @@ export const en: Record<string, string> = {
   еды: 'food',
   микроэлектроники: 'microelectronics',
   // --- hero window / deploy flow (окно героя, развёртывание) --------------------
-  Способности: 'Abilities',
-  Активировать: 'Activate',
   'КД {h}': 'CD {h}',
-  'нет слотов': 'no slots',
-  установлен: 'installed',
-  погиб: 'lost',
-  'в пути': 'in transit',
-  'перк развёртывания': 'deploy perk',
   '⚓ выберите свой мир{fl}{al} — там поднимется корабль героя':
     "⚓ pick your world{fl}{al} — the hero's ship rises there",
   ' / свой флот': ' / own fleet',
@@ -798,7 +765,6 @@ export const en: Record<string, string> = {
   '✨ выберите мир-цель на карте': '✨ pick a target world on the map',
   '✖ каст отменён': '✖ cast cancelled',
   '✖ развёртывание отменено': '✖ deploy cancelled',
-  'Цель…': 'Target…',
   // --- division / formation builder (конструктор дивизий) ----------------------
   'Итог по формации': 'Formation summary',
   'Доктрина состава': 'Composition doctrine',
@@ -812,7 +778,6 @@ export const en: Record<string, string> = {
     "Tap a slot: empty → infantry → tank. Mobilize the division in your world's panel (the «Divisions» tab).",
   // --- build ETA / misc --------------------------------------------------------
   Стройка: 'Building',
-  изучено: 'researched',
   'Ещё раз «Назад» — выход из матча': 'Press Back again to leave the match',
   // --- static H4 headers / steward toggle (build.mjs [data-i18n]) --------------
   // --- Bytro-карточка армии: ХП-бар, сводка, платный ремонт, кап линии огня ----
