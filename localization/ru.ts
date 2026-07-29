@@ -74,6 +74,31 @@ export const ru: Record<string, string> = {
   'spy.windows.empty': 'нет активных окон — добудьте интел операцией ниже',
   'spy.windows.title': 'АКТИВНЫЕ ОКНА ИНТЕЛА',
 
+  // --- chat.win — Плавающее окно чата (десктоп): каналы, настройки окна, штамп.
+  'chat.ping.mark': 'метка {node}',
+  'chat.ping.need-province': 'Сначала выберите провинцию на карте',
+  'chat.ping.need-province.short': 'Сначала выберите провинцию',
+  'chat.tab.global': 'Глобальный',
+  'chat.win.censor': 'Цензура',
+  'chat.win.collapse': 'Свернуть',
+  'chat.win.color': 'Цвет шрифта',
+  'chat.win.color.premium': 'подписка',
+  'chat.win.drag': 'Тащите за шапку, чтобы переместить',
+  'chat.win.empty': 'Канал «{ch}» пуст.',
+  'chat.win.empty.hint': 'Напишите первое сообщение.',
+  'chat.win.expand': 'Развернуть',
+  'chat.win.font': 'Шрифт, пт',
+  'chat.win.opacity': 'Прозрачность',
+  'chat.win.pin': 'Закрепить размер и положение',
+  'chat.win.send': 'Отправить',
+  'chat.win.settings': 'Настройки',
+  'chat.win.size': 'Размер h,w',
+  'chat.win.stamp': 'Штамп сообщений',
+  'chat.win.stamp.day': 'День',
+  'chat.win.stamp.real': 'Реальное время',
+  'chat.win.stamp.time': 'Время',
+  'chat.win.title': 'ЧАТ — {ch}',
+
   // --- cmd — Командная панель флота: приказы, режим огня артиллерии, способности героя.
   'cmd.assault': 'Штурм',
   'cmd.assault.hint': 'лететь к чужому миру и высадить десант при подходе',
@@ -177,6 +202,30 @@ export const ru: Record<string, string> = {
   'codex.value.per-day': '{n} {r}/день',
   'codex.value.per-hour': '{n} {r}/ч',
   'codex.value.per-level': '{n} / уровень',
+
+  // --- comms — Меню связи: ростер сессии, одобрение ботов, окна интела, предложения.
+  'comms.bots-no-coalition': 'Боты не вступают в коалиции',
+  'comms.favour.brink': 'на грани войны',
+  'comms.favour.embargo': 'эмбарго',
+  'comms.favour.friendly': 'дружелюбно',
+  'comms.favour.note':
+    'Одобрение бота: {f}/{base} — {label}. Ниже {emb} бот вводит эмбарго на рынке, ниже {war} — объявляет войну.',
+  'comms.filter.empty': 'Под фильтр никто не подходит.',
+  'comms.global.soon': 'глобальный канал появится вместе с глобальным сервером',
+  'comms.intel.fleets': 'флоты видны на карте <em>{left}</em>',
+  'comms.intel.treasury': 'казна: <b>{bag}</b> <em>{left}</em>',
+  'comms.intel.world': 'мир <b>{id}</b> раскрыт <em>{left}</em>',
+  'comms.offer.incoming': '{who} предлагает — нажмите, чтобы принять',
+  'comms.offer.sent': 'предложение уже отправлено',
+  'comms.provinces': 'провинций',
+  'comms.spy.fleets':
+    'Украсть данные о флотах · {c}¤ · шанс ~60% · окно 24ч (плата сгорает и при провале)',
+  'comms.spy.treasury':
+    'Украсть данные казны · {c}¤ · шанс ~60% · окно 24ч (плата сгорает и при провале)',
+  'comms.stance-changed': '🕊 {who}: отношения → {stance}',
+  'comms.stance-changed.short': 'Стойка изменена: {stance}',
+  'comms.war-declared': '⚔ {who} объявил вам войну!',
+  'comms.you': 'ВЫ',
 
   // --- corp — Кабинет корпорации и войны альянсов (AvA): состав, заявки, готовность, вызовы.
   'corp.apply': 'Заявиться',
@@ -799,6 +848,19 @@ export const ru: Record<string, string> = {
   'onb.tour.next': 'Далее',
   'onb.tour.skip': 'Пропустить обучение',
   'onb.tour.step': 'шаг {k} из {n}',
+
+  // --- ping — Композер меток провинции: адресат, описание, отправка.
+  'ping.cancel': 'Отмена',
+  'ping.desc.ph': 'Описание метки (необязательно)…',
+  'ping.mark': 'метка {loc}',
+  'ping.no-desc': 'без описания',
+  'ping.note': 'Отметьте провинцию и отправьте — метка станет кликабельной (↪ камера).',
+  'ping.remove': 'убрать',
+  'ping.sent.coalition': '📍 Пинг → Коалиция',
+  'ping.sent.player': '📍 Пинг → {who}',
+  'ping.title': 'Пинг',
+  'ping.to.coalition': 'В чат коалиции',
+  'ping.to.player': 'В ЛС игроку',
 
   // --- rail — Рельса инструментов в матче: подпись кнопки (.label) + подсказка (.title).
   'rail.chat.label': 'Чат',

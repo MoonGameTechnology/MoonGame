@@ -6559,9 +6559,9 @@ function diffNetDiplomacy(prev: GameState, next: GameState): boolean {
     const [a, b] = key.split('|');
     const other = a === ME ? b! : a!;
     const who = NAME[other] ?? other;
-    if (after === 'war') note(t('⚔ {who} объявил вам войну!', { who }));
-    else note(t('🕊 {who}: отношения → {stance}', { who, stance: stanceRu(after) }));
-    pushMsg(other, t('Стойка изменена: {stance}', { stance: stanceRu(after) }), true, other);
+    if (after === 'war') note(t('comms.war-declared', { who }));
+    else note(t('comms.stance-changed', { who, stance: stanceRu(after) }));
+    pushMsg(other, t('comms.stance-changed.short', { stance: stanceRu(after) }), true, other);
     unreadMsgs++;
     shifted = true;
   }
@@ -6577,17 +6577,17 @@ function diffNetDiplomacy(prev: GameState, next: GameState): boolean {
     if (to === ME) {
       const who = NAME[from!] ?? from!;
       note(
-        t('🕊 {who} предлагает: {stance} — ответьте тем же в Дипломатии', {
+        t('log.diplo.offer', {
           who,
           stance: stanceRu(after),
         }),
       );
-      pushMsg(from!, t('Предложение: {stance}', { stance: stanceRu(after) }), true, from!);
+      pushMsg(from!, t('log.diplo.offer.short', { stance: stanceRu(after) }), true, from!);
       unreadMsgs++;
       shifted = true;
     } else if (from === ME) {
       note(
-        t('⏳ {who}: предложение отправлено — {stance}', {
+        t('log.diplo.sent', {
           who: NAME[to!] ?? to!,
           stance: stanceRu(after),
         }),
@@ -6612,7 +6612,7 @@ function pushMsg(to: string, text: string, sys: boolean, from = ME, ping?: strin
 function dispatchChat(key: string, text: string): void {
   if (NET && netClient) {
     if (key === CH_GLOBAL) {
-      note(t('глобальный канал появится вместе с глобальным сервером'));
+      note(t('comms.global.soon'));
       return;
     }
     if (key === CH_SESSION) netClient.sendChat('session', text);
@@ -6632,7 +6632,7 @@ function proposeStance(target: string, to: DiplomaticStance): void {
   if (target === ME || !s.players[target]) return;
   if (getStance(s, ME, target) === to) return;
   if (to === 'alliance' && isAiSeat(target)) {
-    note(t('Боты не вступают в коалиции'));
+    note(t('comms.bots-no-coalition'));
     return;
   }
   // diplomacy.declare escalates / files the offer / commits a matching counter-offer;
@@ -6653,7 +6653,7 @@ function closeDiplo(): void {
 
 /** Roster icon + tag for a seat: a human commander vs a synthetic (AI) one. */
 function seatBadge(id: string): { icon: string; tag: string } {
-  if (id === ME) return { icon: '☻', tag: 'ВЫ' };
+  if (id === ME) return { icon: '☻', tag: 'comms.you' };
   if (isAiSeat(id)) return { icon: '⌬', tag: 'ИИ' };
   return { icon: '☻', tag: 'ИГРОК' };
 }
@@ -6678,17 +6678,18 @@ function favourBarHtml(bot: string): string {
   const warPct = (FAVOUR_WAR / FAVOUR_BASE) * 100;
   const tier = f < FAVOUR_WAR ? 'war' : f < FAVOUR_EMBARGO ? 'embargo' : 'ok';
   const label =
-    tier === 'war' ? t('на грани войны') : tier === 'embargo' ? t('эмбарго') : t('дружелюбно');
-  const title = t(
-    'Одобрение бота: {f}/{base} — {label}. Ниже {emb} бот вводит эмбарго на рынке, ниже {war} — объявляет войну.',
-    {
-      f: Math.round(f),
-      base: FAVOUR_BASE,
-      label,
-      emb: FAVOUR_EMBARGO,
-      war: FAVOUR_WAR,
-    },
-  );
+    tier === 'war'
+      ? t('comms.favour.brink')
+      : tier === 'embargo'
+        ? t('comms.favour.embargo')
+        : t('comms.favour.friendly');
+  const title = t('comms.favour.note', {
+    f: Math.round(f),
+    base: FAVOUR_BASE,
+    label,
+    emb: FAVOUR_EMBARGO,
+    war: FAVOUR_WAR,
+  });
   return (
     `<div class="dp-fav ${tier}" title="${esc(title)}">` +
     `<span class="dp-fav-cap">☺</span>` +
@@ -6710,11 +6711,11 @@ function intelRowHtml(target: string): string {
       const bag = Object.entries(r)
         .map(([k, v]) => `${TECH_CUR[k] ?? k}${Math.floor(v as number)}`)
         .join(' ');
-      bits.push(t('казна: <b>{bag}</b> <em>{left}</em>', { bag: bag || '—', left }));
+      bits.push(t('comms.intel.treasury', { bag: bag || '—', left }));
     } else if (g.kind === 'fleets' && g.target === target) {
-      bits.push(t('флоты видны на карте <em>{left}</em>', { left }));
+      bits.push(t('comms.intel.fleets', { left }));
     } else if (g.kind === 'planet' && s.planets[g.target]?.owner === target) {
-      bits.push(t('мир <b>{id}</b> раскрыт <em>{left}</em>', { id: esc(g.target), left }));
+      bits.push(t('comms.intel.world', { id: esc(g.target), left }));
     }
   }
   if (!bits.length) return '';
@@ -6737,16 +6738,16 @@ function seatDiploActionsHtml(id: string): string {
       const cls = `dp-act${sk === st ? ' on' : ''}${theirs ? ' offer' : ''}${mine ? ' pend' : ''}`;
       const label = theirs ? `✓ ${stanceRu(sk)}` : mine ? `⏳ ${stanceRu(sk)}` : stanceRu(sk);
       const title = barred
-        ? t('Боты не вступают в коалиции')
+        ? t('comms.bots-no-coalition')
         : theirs
-          ? t('{who} предлагает — нажмите, чтобы принять', { who: NAME[id] ?? id })
+          ? t('comms.offer.incoming', { who: NAME[id] ?? id })
           : mine
-            ? t('предложение уже отправлено')
+            ? t('comms.offer.sent')
             : '';
       return `<button class="${cls}" data-stance="${sk}" data-seat="${id}" style="--sc:${STANCE_COLOR[sk]}"${barred || mine ? ' disabled' : ''}${title ? ` title="${esc(title)}"` : ''}>${label}</button>`;
     }).join('') +
-    `<button class="dp-spy" data-spy="treasury" data-seat="${id}" title="${t('Украсть данные казны · {c}¤ · шанс ~60% · окно 24ч (плата сгорает и при провале)', { c: SPY_COST })}">🕵 ${t('казна')}</button>` +
-    `<button class="dp-spy" data-spy="fleets" data-seat="${id}" title="${t('Украсть данные о флотах · {c}¤ · шанс ~60% · окно 24ч (плата сгорает и при провале)', { c: SPY_COST })}">🕵 ${t('флоты')}</button>` +
+    `<button class="dp-spy" data-spy="treasury" data-seat="${id}" title="${t('comms.spy.treasury', { c: SPY_COST })}">🕵 ${t('log.spy.kind.treasury')}</button>` +
+    `<button class="dp-spy" data-spy="fleets" data-seat="${id}" title="${t('comms.spy.fleets', { c: SPY_COST })}">🕵 ${t('spy.op.fleets')}</button>` +
     `<button class="dp-msg" data-msgseat="${id}">✉</button></div>` +
     intelRowHtml(id)
   );
@@ -6765,7 +6766,7 @@ function diploRowsHtml(): string {
   // that re-renders) hides the expanded seat, drop the expansion — otherwise the row
   // re-opens itself when that seat later re-enters the list.
   if (diploExpanded && !ordered.includes(diploExpanded)) diploExpanded = null;
-  if (!ordered.length) return `<div class="dp-empty">${t('Под фильтр никто не подходит.')}</div>`;
+  if (!ordered.length) return `<div class="dp-empty">${t('comms.filter.empty')}</div>`;
   return ordered
     .map((id) => {
       const bdg = seatBadge(id);
@@ -6774,7 +6775,7 @@ function diploRowsHtml(): string {
       const isMe = id === ME;
       const st = isMe ? null : getStance(s, ME, id);
       const stanceTag = isMe
-        ? `<span class="dp-tag">${t('ВЫ')}</span>`
+        ? `<span class="dp-tag">${t('comms.you')}</span>`
         : `<span class="dp-stance" style="color:${STANCE_COLOR[st!]};border-color:${STANCE_COLOR[st!]}">${stanceRu(st!)}</span>`;
       // Bots (AI seats) carry a favour meter toward you; humans/you don't.
       const favBar = !isMe && isAiSeat(id) ? favourBarHtml(id) : '';
@@ -6784,7 +6785,7 @@ function diploRowsHtml(): string {
         `<div class="dp-row${expanded ? ' open' : ''}${isMe ? ' me' : ''}"${isMe ? '' : ` data-seat="${id}"`}>` +
         `<span class="dp-ic" style="color:${col}">${bdg.icon}</span>` +
         `<span class="dp-name">${esc(NAME[id] ?? id)} <em>${bdg.tag}</em></span>` +
-        `<span class="dp-w" title="${t('провинций')}">⬣ ${w}</span>` +
+        `<span class="dp-w" title="${t('comms.provinces')}">⬣ ${w}</span>` +
         stanceTag +
         favBar +
         `</div>` +
@@ -13366,9 +13367,9 @@ function censorText(text: string): string {
  *  the open one). Other rooms (e.g. a coalition-to-coalition line) join here later. */
 function chatChannels(): Array<{ key: string; label: string; icon: string }> {
   const base = [
-    { key: CH_SESSION, label: t('Сессия'), icon: '△' },
-    { key: CH_GLOBAL, label: t('Глобальный'), icon: '🌐' },
-    { key: COALITION, label: t('Коалиция'), icon: '⬡' },
+    { key: CH_SESSION, label: t('chat.tab.session'), icon: '△' },
+    { key: CH_GLOBAL, label: t('chat.tab.global'), icon: '🌐' },
+    { key: COALITION, label: t('chat.tab.coalition'), icon: '⬡' },
   ];
   const dm = new Set<string>();
   for (const m of sessionMessages) {
@@ -13413,7 +13414,7 @@ function applyChatGeom(): void {
 function chatFeedInnerHtml(key: string): string {
   const msgs = convoMessages(key);
   if (!msgs.length)
-    return `<div class="cw-empty">${t('Канал «{ch}» пуст.', { ch: esc(chatChannelLabel(key)) })}<br>${t('Напишите первое сообщение.')}</div>`;
+    return `<div class="cw-empty">${t('chat.win.empty', { ch: esc(chatChannelLabel(key)) })}<br>${t('chat.win.empty.hint')}</div>`;
   const stamp: StampOpts = { day: chatCfg.showDay, time: chatCfg.showTime, real: chatCfg.showReal };
   return msgs
     .map((m) => convoLineHtml(chatCfg.censor ? { ...m, text: censorText(m.text) } : m, stamp))
@@ -13434,18 +13435,18 @@ function chatSettingsHtml(): string {
   const chk = (on: boolean) => (on ? ' checked' : '');
   return (
     `<div class="cw-set">` +
-    `<h4>${t('НАСТРОЙКИ')}</h4>` +
-    `<div class="cw-srow"><label>${t('Размер h,w')}</label>` +
+    `<h4>${t('settings.title')}</h4>` +
+    `<div class="cw-srow"><label>${t('chat.win.size')}</label>` +
     `<input type="number" data-cset="h" min="150" max="${maxH}" value="${chatGeom.h}">` +
     `<input type="number" data-cset="w" min="220" max="${maxW}" value="${chatGeom.w}"></div>` +
-    `<div class="cw-srow"><label>${t('Шрифт, пт')}</label><input type="number" data-cset="font" min="8" max="42" value="${chatCfg.fontPx}"></div>` +
-    `<div class="cw-srow"><label>${t('Цвет шрифта')}</label><input type="color" data-cset="color" value="#7fe7ff" disabled><span class="cw-sub">🔒 ${t('подписка')}</span></div>` +
-    `<div class="cw-srow"><label>${t('Цензура')}</label><input type="checkbox" data-cset="censor"${chk(chatCfg.censor)}></div>` +
-    `<div class="cw-srow"><label>${t('Прозрачность')}</label><input type="range" data-cset="opacity" min="0" max="100" value="${chatCfg.transparency}"><span class="cw-opval">${chatCfg.transparency}%</span></div>` +
-    `<div class="cw-shdr">${t('Штамп сообщений')}</div>` +
-    `<div class="cw-srow"><label>${t('День')}</label><input type="checkbox" data-cset="showDay"${chk(chatCfg.showDay)}></div>` +
-    `<div class="cw-srow"><label>${t('Время')}</label><input type="checkbox" data-cset="showTime"${chk(chatCfg.showTime)}></div>` +
-    `<div class="cw-srow"><label>${t('Реальное время')}</label><input type="checkbox" data-cset="showReal"${chk(chatCfg.showReal)}></div>` +
+    `<div class="cw-srow"><label>${t('chat.win.font')}</label><input type="number" data-cset="font" min="8" max="42" value="${chatCfg.fontPx}"></div>` +
+    `<div class="cw-srow"><label>${t('chat.win.color')}</label><input type="color" data-cset="color" value="#7fe7ff" disabled><span class="cw-sub">🔒 ${t('chat.win.color.premium')}</span></div>` +
+    `<div class="cw-srow"><label>${t('chat.win.censor')}</label><input type="checkbox" data-cset="censor"${chk(chatCfg.censor)}></div>` +
+    `<div class="cw-srow"><label>${t('chat.win.opacity')}</label><input type="range" data-cset="opacity" min="0" max="100" value="${chatCfg.transparency}"><span class="cw-opval">${chatCfg.transparency}%</span></div>` +
+    `<div class="cw-shdr">${t('chat.win.stamp')}</div>` +
+    `<div class="cw-srow"><label>${t('chat.win.stamp.day')}</label><input type="checkbox" data-cset="showDay"${chk(chatCfg.showDay)}></div>` +
+    `<div class="cw-srow"><label>${t('chat.win.stamp.time')}</label><input type="checkbox" data-cset="showTime"${chk(chatCfg.showTime)}></div>` +
+    `<div class="cw-srow"><label>${t('chat.win.stamp.real')}</label><input type="checkbox" data-cset="showReal"${chk(chatCfg.showReal)}></div>` +
     `</div>`
   );
 }
@@ -13468,15 +13469,15 @@ function renderChat(): void {
     )
     .join('');
   win.innerHTML =
-    `<div class="cw-head" data-cwhead title="${chatPinned ? '' : t('Тащите за шапку, чтобы переместить')}">` +
-    `<span class="cw-title">${t('ЧАТ — {ch}', { ch: esc(chatChannelLabel(chatTab)) })}</span>` +
-    `<button class="cw-btn${chatPinned ? ' on' : ''}" data-cwact="pin" title="${t('Закрепить размер и положение')}">📎</button>` +
-    `<button class="cw-btn${chatSettingsOpen ? ' on' : ''}" data-cwact="settings" title="${t('Настройки')}">⚙</button>` +
-    `<button class="cw-btn" data-cwact="min" title="${chatMin ? t('Развернуть') : t('Свернуть')}">${chatMin ? '▢' : '—'}</button>` +
+    `<div class="cw-head" data-cwhead title="${chatPinned ? '' : t('chat.win.drag')}">` +
+    `<span class="cw-title">${t('chat.win.title', { ch: esc(chatChannelLabel(chatTab)) })}</span>` +
+    `<button class="cw-btn${chatPinned ? ' on' : ''}" data-cwact="pin" title="${t('chat.win.pin')}">📎</button>` +
+    `<button class="cw-btn${chatSettingsOpen ? ' on' : ''}" data-cwact="settings" title="${t('chat.win.settings')}">⚙</button>` +
+    `<button class="cw-btn" data-cwact="min" title="${chatMin ? t('chat.win.expand') : t('chat.win.collapse')}">${chatMin ? '▢' : '—'}</button>` +
     `</div>` +
     `<div class="cw-tabs">${tabs}</div>` +
     `<div class="cw-feed" id="cw-feed">${chatFeedInnerHtml(chatTab)}</div>` +
-    `<div class="cw-compose"><input id="cw-text" type="text" maxlength="240" placeholder="${t('Сообщение…')}" autocomplete="off"><button class="cw-send" data-cwact="send" title="${t('Отправить')}">▶</button></div>` +
+    `<div class="cw-compose"><input id="cw-text" type="text" maxlength="240" placeholder="${t('chat.input.ph')}" autocomplete="off"><button class="cw-send" data-cwact="send" title="${t('chat.win.send')}">▶</button></div>` +
     (chatSettingsOpen ? chatSettingsHtml() : '');
   applyChatGeom();
   const feed = document.getElementById('cw-feed') as HTMLElement | null;
@@ -13741,7 +13742,7 @@ function sendDiploMsg(): void {
  *  marker. The composer text becomes the marker's short description. */
 function pingSelected(): void {
   if (!selPlanet || !s.planets[selPlanet]) {
-    note(t('Сначала выберите провинцию на карте'));
+    note(t('chat.ping.need-province'));
     return;
   }
   const input = document.getElementById('dp-text') as HTMLInputElement | null;
@@ -13751,7 +13752,7 @@ function pingSelected(): void {
     // `ping.added` back to us + allies — that echo is what adds it (see onPingAdded).
     netClient.placePing({ kind: 'mark', target: { node: selPlanet }, label: desc });
   } else {
-    pushMsg(COALITION, desc || t('метка {node}', { node: selPlanet }), false, ME, selPlanet);
+    pushMsg(COALITION, desc || t('chat.ping.mark', { node: selPlanet }), false, ME, selPlanet);
   }
   if (input) {
     input.value = '';
@@ -13765,7 +13766,7 @@ function pingSelected(): void {
 // pointer in that thread). Opened from the province panel's 📍 button.
 function openPingMenu(): void {
   if (!selPlanet || !s.planets[selPlanet]) {
-    note(t('Сначала выберите провинцию'));
+    note(t('chat.ping.need-province.short'));
     return;
   }
   pingMenuLoc = selPlanet;
@@ -13797,8 +13798,8 @@ function renderPingMenu(): void {
     COALITION,
     'var(--amber)',
     '⚡',
-    t('Коалиция'),
-    t('{n} уч.', { n: coalitionMembers().length }),
+    t('chat.tab.coalition'),
+    t('chat.members', { n: coalitionMembers().length }),
     ' coal',
   );
   const dms = diploSeats()
@@ -13807,12 +13808,12 @@ function renderPingMenu(): void {
     .join('');
   el.innerHTML =
     `<div class="pm-box">` +
-    `<div class="pm-head">📍 ${t('Пинг')} · <b>${esc(loc)}</b></div>` +
-    `<div class="pm-sub">${t('Отметьте провинцию и отправьте — метка станет кликабельной (↪ камера).')}</div>` +
-    `<input id="pm-text" class="pm-text" maxlength="80" placeholder="${t('Описание метки (необязательно)…')}" autocomplete="off">` +
-    `<div class="pm-lbl">${t('В чат коалиции')}</div>${coal}` +
-    (dms ? `<div class="pm-lbl">${t('В ЛС игроку')}</div>${dms}` : '') +
-    `<button class="pm-cancel" data-pmcancel>${t('Отмена')}</button>` +
+    `<div class="pm-head">📍 ${t('ping.title')} · <b>${esc(loc)}</b></div>` +
+    `<div class="pm-sub">${t('ping.note')}</div>` +
+    `<input id="pm-text" class="pm-text" maxlength="80" placeholder="${t('ping.desc.ph')}" autocomplete="off">` +
+    `<div class="pm-lbl">${t('ping.to.coalition')}</div>${coal}` +
+    (dms ? `<div class="pm-lbl">${t('ping.to.player')}</div>${dms}` : '') +
+    `<button class="pm-cancel" data-pmcancel>${t('ping.cancel')}</button>` +
     `</div>`;
 }
 /** Place the pending province ping toward `dest`: the coalition channel (shared on-map
@@ -13828,11 +13829,11 @@ function createPingTo(dest: string): void {
   if (dest === COALITION) {
     // Same path as the coalition composer's 📍: net → server-stamped marker; solo → local line.
     if (NET && netClient) netClient.placePing({ kind: 'mark', target: { node: loc }, label: desc });
-    else pushMsg(COALITION, desc || t('метка {loc}', { loc }), false, ME, loc);
-    note(t('📍 Пинг → Коалиция'));
+    else pushMsg(COALITION, desc || t('ping.mark', { loc }), false, ME, loc);
+    note(t('ping.sent.coalition'));
   } else {
-    pushMsg(dest, desc || t('метка {loc}', { loc }), false, ME, loc);
-    note(t('📍 Пинг → {who}', { who: NAME[dest] ?? dest }));
+    pushMsg(dest, desc || t('ping.mark', { loc }), false, ME, loc);
+    note(t('ping.sent.player', { who: NAME[dest] ?? dest }));
   }
   closePingMenu();
 }
@@ -13865,13 +13866,13 @@ function openPingPop(loc: string): void {
   if (!m || !pl || !el) return;
   const c = world(pl.position);
   const r = canvas.getBoundingClientRect();
-  const who = m.from === ME ? t('Вы') : (NAME[m.from] ?? m.from);
+  const who = m.from === ME ? t('chat.you') : (NAME[m.from] ?? m.from);
   const mine = m.from === ME;
   el.innerHTML =
     `<div class="pp-top"><b style="color:${ownerColor(m.from)}">📍 ${esc(who)}</b><span>${esc(loc)}</span></div>` +
-    `<div class="pp-desc">${m.text ? esc(m.text) : `<i>${t('без описания')}</i>`}</div>` +
-    `<div class="pp-act"><button class="pp-jump" data-loc="${esc(loc)}">${t('↪ камера')}</button>` +
-    (mine ? `<button class="pp-del" data-loc="${esc(loc)}">${t('убрать')}</button>` : '') +
+    `<div class="pp-desc">${m.text ? esc(m.text) : `<i>${t('ping.no-desc')}</i>`}</div>` +
+    `<div class="pp-act"><button class="pp-jump" data-loc="${esc(loc)}">${t('chat.jump')}</button>` +
+    (mine ? `<button class="pp-del" data-loc="${esc(loc)}">${t('ping.remove')}</button>` : '') +
     `</div>`;
   el.style.left = `${Math.round(r.left + (c.x / VW) * r.width)}px`;
   el.style.top = `${Math.round(r.top + (c.y / VH) * r.height)}px`;

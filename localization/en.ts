@@ -72,6 +72,31 @@ export const en: Record<string, string> = {
   'spy.windows.empty': 'no active windows — steal intel with an operation below',
   'spy.windows.title': 'ACTIVE INTEL WINDOWS',
 
+  // --- chat.win — Плавающее окно чата (десктоп): каналы, настройки окна, штамп.
+  'chat.ping.mark': 'marker {node}',
+  'chat.ping.need-province': 'Select a province on the map first',
+  'chat.ping.need-province.short': 'Select a province first',
+  'chat.tab.global': 'Global',
+  'chat.win.censor': 'Censorship',
+  'chat.win.collapse': 'Collapse',
+  'chat.win.color': 'Font color',
+  'chat.win.color.premium': 'subscription',
+  'chat.win.drag': 'Drag the title bar to move',
+  'chat.win.empty': 'Channel "{ch}" is empty.',
+  'chat.win.empty.hint': 'Write the first message.',
+  'chat.win.expand': 'Expand',
+  'chat.win.font': 'Font, pt',
+  'chat.win.opacity': 'Transparency',
+  'chat.win.pin': 'Lock size and position',
+  'chat.win.send': 'Send',
+  'chat.win.settings': 'Settings',
+  'chat.win.size': 'Size h,w',
+  'chat.win.stamp': 'Message stamp',
+  'chat.win.stamp.day': 'Day',
+  'chat.win.stamp.real': 'Real time',
+  'chat.win.stamp.time': 'Time',
+  'chat.win.title': 'CHAT — {ch}',
+
   // --- cmd — Командная панель флота: приказы, режим огня артиллерии, способности героя.
   'cmd.assault': 'Assault',
   'cmd.assault.hint': 'fly to an enemy world and land troops on arrival',
@@ -175,6 +200,30 @@ export const en: Record<string, string> = {
   'codex.value.per-day': '{n} {r}/day',
   'codex.value.per-hour': '{n} {r}/h',
   'codex.value.per-level': '{n} / level',
+
+  // --- comms — Меню связи: ростер сессии, одобрение ботов, окна интела, предложения.
+  'comms.bots-no-coalition': 'Bots do not join coalitions',
+  'comms.favour.brink': 'on the brink of war',
+  'comms.favour.embargo': 'embargo',
+  'comms.favour.friendly': 'friendly',
+  'comms.favour.note':
+    'Bot approval: {f}/{base} — {label}. Below {emb} the bot embargoes the market, below {war} it declares war.',
+  'comms.filter.empty': 'Nobody matches the filter.',
+  'comms.global.soon': 'the global channel arrives with the global server',
+  'comms.intel.fleets': 'fleets visible on the map <em>{left}</em>',
+  'comms.intel.treasury': 'treasury: <b>{bag}</b> <em>{left}</em>',
+  'comms.intel.world': 'world <b>{id}</b> revealed <em>{left}</em>',
+  'comms.offer.incoming': '{who} is offering — tap to accept',
+  'comms.offer.sent': 'a proposal is already pending',
+  'comms.provinces': 'provinces',
+  'comms.spy.fleets':
+    'Steal fleet data · {c}¤ · ~60% chance · 24h window (the fee is lost on failure too)',
+  'comms.spy.treasury':
+    'Steal treasury data · {c}¤ · ~60% chance · 24h window (the fee is lost on failure too)',
+  'comms.stance-changed': '🕊 {who}: relations → {stance}',
+  'comms.stance-changed.short': 'Stance changed: {stance}',
+  'comms.war-declared': '⚔ {who} declared war on you!',
+  'comms.you': 'YOU',
 
   // --- corp — Кабинет корпорации и войны альянсов (AvA): состав, заявки, готовность, вызовы.
   'corp.apply': 'Sign up',
@@ -799,6 +848,19 @@ export const en: Record<string, string> = {
   'onb.tour.next': 'Next',
   'onb.tour.skip': 'Skip tutorial',
   'onb.tour.step': 'step {k} of {n}',
+
+  // --- ping — Композер меток провинции: адресат, описание, отправка.
+  'ping.cancel': 'Cancel',
+  'ping.desc.ph': 'Marker description (optional)…',
+  'ping.mark': 'marker {loc}',
+  'ping.no-desc': 'no description',
+  'ping.note': 'Mark a province and send — the marker becomes clickable (↪ jump the camera).',
+  'ping.remove': 'remove',
+  'ping.sent.coalition': '📍 Ping → Coalition',
+  'ping.sent.player': '📍 Ping → {who}',
+  'ping.title': 'Ping',
+  'ping.to.coalition': 'To the coalition chat',
+  'ping.to.player': "To a player's DM",
 
   // --- rail — Рельса инструментов в матче: подпись кнопки (.label) + подсказка (.title).
   'rail.chat.label': 'Chat',
