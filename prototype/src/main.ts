@@ -12165,14 +12165,14 @@ async function ensureSession(
   // Mirror the server's LOGIN_RE (authApi.ts) so a bad callsign gets a human
   // explanation here instead of the server's uniform rejection.
   if (!/^[\p{L}\p{N}_-]{3,24}$/u.test(login)) {
-    statusEl.textContent = t('Позывной для аккаунта: 3–24 символа — буквы, цифры, _ или -');
+    statusEl.textContent = t('acc.nick.rule');
     return null;
   }
   // The password may come from the welcome card (Bytro-style sign-up) or the match
   // browser's field (custom-server joins) — whichever the player actually filled.
   const password = passwordArg ?? (wPassInput.value || (passInput?.value ?? ''));
   if (password.length < 8) {
-    statusEl.textContent = t('Введите пароль (мин. 8 символов)');
+    statusEl.textContent = t('acc.pass.rule');
     return null;
   }
   const call = async (
@@ -12198,24 +12198,23 @@ async function ensureSession(
       const reg = await call('/auth/register', emailArg ? { email: emailArg } : {});
       if (reg.token) {
         localStorage.setItem(sessionKey(base), JSON.stringify({ login, token: reg.token }));
-        note('✔ ' + t('Аккаунт создан'));
+        note('✔ ' + t('acc.created'));
         return reg.token;
       }
       statusEl.textContent =
         reg.error === 'E_EMAIL_TAKEN'
-          ? t('Эта почта уже занята')
+          ? t('acc.mail-taken')
           : reg.status === 409
-            ? t('Неверный пароль') // login 401 + register 409 (E_LOGIN_TAKEN) ⇒ wrong password
+            ? t('acc.bad-pass') // login 401 + register 409 (E_LOGIN_TAKEN) ⇒ wrong password
             : reg.status === 429
-              ? t('Слишком часто — подождите')
-              : t('Регистрация отклонена');
+              ? t('acc.rate-limited')
+              : t('acc.register-refused');
       return null;
     }
-    statusEl.textContent =
-      login1.status === 429 ? t('Слишком часто — подождите') : t('Вход отклонён');
+    statusEl.textContent = login1.status === 429 ? t('acc.rate-limited') : t('acc.login-refused');
     return null;
   } catch {
-    statusEl.textContent = t('сервер недоступен');
+    statusEl.textContent = t('acc.server-down');
     return null;
   }
 }
@@ -12245,22 +12244,22 @@ async function fetchJoinToken(
     );
     if (res.status === 401) {
       localStorage.removeItem(sessionKey(base)); // session expired/revoked — re-login
-      statusEl.textContent = t('Сессия истекла — введите пароль ещё раз');
+      statusEl.textContent = t('acc.session-expired');
       return null;
     }
     if (res.status === 403) {
-      statusEl.textContent = t('вход закрыт'); // entry window shut (SES-2.3)
+      statusEl.textContent = t('acc.join-closed'); // entry window shut (SES-2.3)
       return null;
     }
     if (!res.ok) {
-      statusEl.textContent = res.status === 409 ? t('все места заняты') : t('не удалось войти');
+      statusEl.textContent = res.status === 409 ? t('acc.seats-full') : t('acc.join-failed');
       return null;
     }
     const body = (await res.json()) as { token?: string; playerId?: string };
     if (!body.token || !body.playerId) return null;
     return { token: body.token, playerId: body.playerId };
   } catch {
-    statusEl.textContent = t('сервер недоступен');
+    statusEl.textContent = t('acc.server-down');
     return null;
   }
 }
@@ -12296,9 +12295,9 @@ function fmtJoinWindow(ms: number): string {
   const hours = Math.max(0, Math.floor(ms / 3_600_000));
   const d = Math.floor(hours / 24);
   const h = hours % 24;
-  if (d > 0) return t('{d}д {h}ч', { d, h });
-  if (hours > 0) return t('{h}ч', { h: hours });
-  return t('<1ч');
+  if (d > 0) return t('browser.left.days', { d, h });
+  if (hours > 0) return t('browser.left.hours', { h: hours });
+  return t('browser.left.soon');
 }
 type MatchTab = 'available' | 'active' | 'archived';
 let matchLists: Record<MatchTab, MatchRow[]> | null = null;
@@ -12306,9 +12305,9 @@ let activeTab: MatchTab = 'available';
 
 function ruleSummary(r: MatchRow['rules']): string {
   const parts = [`×${r.timeScale ?? 1}`];
-  if (r.victory?.scoreLimit) parts.push(t('до {n} очк.', { n: r.victory.scoreLimit }));
+  if (r.victory?.scoreLimit) parts.push(t('browser.goal.score', { n: r.victory.scoreLimit }));
   if (r.victory?.dominationPercent)
-    parts.push(t('{p}% карты', { p: Math.round(r.victory.dominationPercent * 100) }));
+    parts.push(t('browser.goal.map', { p: Math.round(r.victory.dominationPercent * 100) }));
   return parts.join(' · ');
 }
 
@@ -12479,13 +12478,13 @@ async function openSeatPicker(matchId: string): Promise<void> {
         const slots = document.createElement('div');
         slots.className = 'seat-faction';
         slots.style.fontSize = '10px';
-        slots.textContent = t('слотов') + ': ' + freeCount + '/' + seats.length;
+        slots.textContent = t('browser.slots') + ': ' + freeCount + '/' + seats.length;
         info.appendChild(name);
         info.appendChild(passive);
         if (slots.textContent) info.appendChild(slots);
         const status = document.createElement('div');
         status.className = 'seat-status' + (isFull ? '' : ' free');
-        status.textContent = isFull ? t('занято') : t('свободно');
+        status.textContent = isFull ? t('browser.taken') : t('browser.free');
         row.appendChild(dot);
         row.appendChild(info);
         row.appendChild(status);
@@ -12544,7 +12543,7 @@ async function refreshMatches(quiet = false): Promise<void> {
   if (!srv) return;
   // quiet = a background re-poll (player build): don't flash «загрузка…» over a
   // list that is already on screen — only a real state change repaints.
-  if (!quiet) statusEl.textContent = t('загрузка матчей…');
+  if (!quiet) statusEl.textContent = t('browser.loading');
   // Identity mode first (SES-2.5): accounts servers get the password row shown
   // BEFORE the player clicks «Войти» on a row — no surprise prompt mid-join.
   await probeAuthMode(srv.base);
@@ -12557,7 +12556,7 @@ async function refreshMatches(quiet = false): Promise<void> {
     statusEl.textContent = '';
   } catch {
     matchLists = null;
-    statusEl.textContent = t('сервер недоступен');
+    statusEl.textContent = t('acc.server-down');
   }
   renderMatches();
 }
@@ -12572,18 +12571,18 @@ async function toggleArchive(id: string, restore: boolean): Promise<void> {
       { method: 'POST' },
     );
     if (!res.ok) {
-      statusEl.textContent = restore ? t('не удалось восстановить') : t('не удалось в архив');
+      statusEl.textContent = restore ? t('browser.restore-failed') : t('browser.archive-failed');
       return;
     }
     await refreshMatches();
   } catch {
-    statusEl.textContent = t('ошибка архива');
+    statusEl.textContent = t('browser.archive-error');
   }
 }
 
 function renderMatches(): void {
   const el = $('mlist');
-  const failed = statusEl.textContent === t('сервер недоступен');
+  const failed = statusEl.textContent === t('acc.server-down');
   if (__PLAYER_BUILD__) {
     // The player screen is ONLY the three tabs + the list. The hidden server row
     // resurfaces exactly while the list can't be loaded (an APK has no useful page
@@ -12599,8 +12598,8 @@ function renderMatches(): void {
   const soloCard = (msg: string): void => {
     el.innerHTML =
       `<div class="mempty">${msg}</div>` +
-      `<div class="msolo"><button class="mbtn" id="msolo-go">▶ ${t('Одиночный режим')}</button>` +
-      `<div class="msolo-sub">${t('Сервер не нужен — свободные места займут боты.')}</div></div>`;
+      `<div class="msolo"><button class="mbtn" id="msolo-go">▶ ${t('browser.solo')}</button>` +
+      `<div class="msolo-sub">${t('browser.solo.hint')}</div></div>`;
     document.getElementById('msolo-go')?.addEventListener('click', () => {
       userClosed = true;
       NET = false;
@@ -12612,17 +12611,17 @@ function renderMatches(): void {
     soloCard(
       failed
         ? __PLAYER_BUILD__
-          ? t('сервер недоступен — укажи адрес сервера')
-          : t('сервер недоступен')
+          ? t('browser.server-down')
+          : t('acc.server-down')
         : __PLAYER_BUILD__
-          ? t('загрузка матчей…')
-          : t('нажмите «Обновить список»'),
+          ? t('browser.loading')
+          : t('browser.refresh-hint'),
     );
     return;
   }
   const rows = matchLists[activeTab] ?? [];
   if (rows.length === 0) {
-    soloCard(t('здесь пусто'));
+    soloCard(t('browser.empty'));
     return;
   }
   el.textContent = '';
@@ -12639,29 +12638,29 @@ function renderMatches(): void {
     let windowLine = '';
     if (activeTab === 'available' && m.entryClosesInMs !== undefined) {
       if (m.entryOpen === false) {
-        windowLine = ` · <span class="mwin shut">${t('вход закрыт')}</span>`;
+        windowLine = ` · <span class="mwin shut">${t('acc.join-closed')}</span>`;
       } else if (m.entryClosesInMs < ENTRY_UNBOUNDED_MS) {
         const soon = m.entryClosesInMs < 24 * 60 * 60 * 1000; // under a real day left
-        windowLine = ` · <span class="mwin${soon ? ' soon' : ''}">${t('вход ещё {dur}', { dur: fmtJoinWindow(m.entryClosesInMs) })}</span>`;
+        windowLine = ` · <span class="mwin${soon ? ' soon' : ''}">${t('browser.join-window', { dur: fmtJoinWindow(m.entryClosesInMs) })}</span>`;
       }
     }
     info.innerHTML =
       `<div class="mname">${esc(m.mapId)} <span class="mid">${esc(m.matchId)}</span></div>` +
-      `<div class="mmeta">${t('День {n}', { n: m.days })} · ${t('{s}/{c} игроков', { s: m.players.seated, c: m.players.capacity })} · ` +
-      `${esc(ruleSummary(m.rules))} · ${m.status === 'ended' ? t('завершён') : t('идёт')}${windowLine}</div>`;
+      `<div class="mmeta">${t('browser.day', { n: m.days })} · ${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
+      `${esc(ruleSummary(m.rules))} · ${m.status === 'ended' ? t('browser.finished') : t('browser.running')}${windowLine}</div>`;
     row.appendChild(info);
     const btns = document.createElement('div');
     btns.className = 'mbtns';
     const join = document.createElement('button');
     join.className = 'mbtn';
-    join.textContent = t('Войти');
+    join.textContent = t('browser.join');
     join.addEventListener('click', () => openSessionTab(m.matchId));
     btns.appendChild(join);
     if (activeTab !== 'available') {
       const restore = activeTab === 'archived';
       const arch = document.createElement('button');
       arch.className = 'mbtn ghost';
-      arch.textContent = restore ? t('Восстановить') : t('В архив');
+      arch.textContent = restore ? t('browser.restore') : t('browser.archive');
       arch.addEventListener('click', () => void toggleArchive(m.matchId, restore));
       btns.appendChild(arch);
     }
@@ -12723,11 +12722,11 @@ function scheduleReconnect(): void {
     reconnecting = false;
     reconnectAttempts = 0;
     banner = null;
-    statusEl.textContent = t('Переподключение не удалось — войди заново');
+    statusEl.textContent = t('acc.reconnect-failed');
     showConnect(true);
     return;
   }
-  banner = t('⟳ переподключение…');
+  banner = t('acc.reconnecting');
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
     if (!authMode) {
