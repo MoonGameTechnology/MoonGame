@@ -117,12 +117,12 @@ function paint(o: Overlay, view: SpotlightView | null): void {
     o.ring.style.display = 'none';
   }
 
-  o.count.textContent = t('шаг {k} из {n}', { k: view.index + 1, n: view.count });
+  o.count.textContent = t('onb.tour.step', { k: view.index + 1, n: view.count });
   o.copy.textContent = t(view.step.copy);
   // Action/state steps have no «Далее» — the player advances by doing the thing.
   o.next.style.display = view.step.advance.on === 'tap' ? 'inline-block' : 'none';
-  o.next.textContent = view.index + 1 >= view.count ? t('Понятно') : t('Далее');
-  o.skip.textContent = t('Пропустить обучение');
+  o.next.textContent = view.index + 1 >= view.count ? t('onb.tour.got-it') : t('onb.tour.next');
+  o.skip.textContent = t('onb.tour.skip');
 
   // Measure the bubble, then position it (and its arrow) next to the target.
   const b = o.bubble.getBoundingClientRect();

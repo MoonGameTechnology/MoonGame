@@ -15,13 +15,13 @@ export const HUD_ORIENTATION_TOUR: SpotlightStep[] = [
   {
     id: 'welcome',
     target: null,
-    copy: 'Короткий тур по интерфейсу — на нём держится весь мир. «Пропустить обучение» доступно всегда.',
+    copy: 'onb.tour.hud.welcome',
     advance: { on: 'tap' },
   },
   {
     id: 'clock',
     target: '#speedbar',
-    copy: 'Мир идёт в реальном времени и продолжается, даже когда ты офлайн. Здесь — пауза и ускорение.',
+    copy: 'onb.tour.hud.clock',
     advance: { on: 'tap' },
     placement: 'top',
     optional: true,
@@ -29,7 +29,7 @@ export const HUD_ORIENTATION_TOUR: SpotlightStep[] = [
   {
     id: 'purse',
     target: '#purse',
-    copy: 'Твоя казна: доход от шахт минус содержание флота. Следи, чтобы не уйти в минус.',
+    copy: 'onb.tour.hud.purse',
     advance: { on: 'tap' },
     placement: 'bottom',
     optional: true,
@@ -37,7 +37,7 @@ export const HUD_ORIENTATION_TOUR: SpotlightStep[] = [
   {
     id: 'tools',
     target: '#rail',
-    copy: 'Инструменты командира: дипломатия, наука, верфь, рынок и сводки событий.',
+    copy: 'onb.tour.hud.tools',
     advance: { on: 'tap' },
     placement: 'right',
     optional: true,
@@ -45,7 +45,7 @@ export const HUD_ORIENTATION_TOUR: SpotlightStep[] = [
   {
     id: 'done',
     target: null,
-    copy: 'Готово! Пора действовать: построй шахту, подними флот, отдай курс. Удачи, командир.',
+    copy: 'onb.tour.hud.done',
     advance: { on: 'tap' },
   },
 ];

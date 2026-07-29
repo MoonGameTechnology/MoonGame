@@ -88,8 +88,8 @@ describe('resolveIntro — shown once', () => {
     expect(new Set(ids).size).toBe(ids.length);
     for (const c of INTROS) {
       expect(INTRO_BY_ID[c.id]).toBe(c);
-      expect(c.title.length).toBeGreaterThan(0);
-      expect(c.body.length).toBeGreaterThan(0);
+      expect(c.titleKey.length).toBeGreaterThan(0);
+      expect(c.bodyKey.length).toBeGreaterThan(0);
     }
   });
 });
