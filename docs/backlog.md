@@ -1629,9 +1629,17 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
   константа, читается только внутри тела функции — обратное ребро безопасно). `game.ts`
   импортирует все три для `newGame`/AI и реэкспортирует для `main.ts`/`netserver.ts`/
   тестов. Гейт зелёный (175 файлов, 1894 теста — число не изменилось, чистый перенос).
-- **REFP-20** ⏳ `[proto]` **`matchSetup.ts`** — `SeatConfig`, `SetupConfig`,
-  `DEFAULT_SETUP`, `NetworkMatchMode`, `parseNetworkMatchMode`, `networkSeats`, `newGame`
-  (1958–2425). Тест: `networkSeats.test.ts`.
+- **REFP-20** ✅ `[proto]` **`matchSetup.ts`** — `SeatConfig`/`SetupConfig`/
+  `DEFAULT_SETUP`/`NetworkMatchMode`/`parseNetworkMatchMode`/`networkSeats`/`newGame`
+  вынесены в `prototype/src/matchSetup.ts` вместе с приватными хелперами `player`/
+  `fleet`/`ARCHETYPE_OF_GRADE` (использовались только внутри `newGame`, экспортировать
+  из `game.ts` смысла не было — уехали с вызывающим кодом). Зависел только от уже
+  вынесенных файлов (map/formations/botFavour/heroes/ships/economy) + prototypeData +
+  shared-core. `game.ts` импортирует для внутреннего использования и реэкспортирует
+  для `main.ts`/`netserver.ts`/тестов. Заодно исправлен недочёт REFP-19: `buildProgress`/
+  `thresholdRamp` остались неиспользуемым импортом после переноса `netIncome` в
+  `economy.ts` — убраны. Гейт зелёный (175 файлов, 1899 тестов — прирост от параллельно
+  смерженной LOC-2, не от этого кирпича).
 - **REFP-21** 🔒(REFP-9..18) `[proto]` **`protoKernel.ts`** — `MODULES`, `kernel`,
   `SCORE_LIMIT`, `ctx`, `advance`, `order`, `StepOut` (3791–3886) — точка сборки, после
   фазы 2.
