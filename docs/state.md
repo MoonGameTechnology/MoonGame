@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1932 зелёных** (54 skip, 177 файлов).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1946 зелёных** (54 skip, 178 файлов).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -112,7 +112,7 @@ packages/action-layer/src/
   data/          schemas.ts (zod-схемы + parseGameData, buildingLevel/buildingMaxLevel)
   rng/           rng.ts (sfc32)
   util/          clone.ts (deepClone/deepFreeze), treasury.ts (canAfford/payCost — shared by construction & technology), fitting.ts (генерик-гейт «слоты+предметы», SHIP-4) + loadout.ts (ship-обёртка над ним)
-  modules/       army, arsenalSync, artillery, capital, captureOnArrival, combat, construction, diplomacy, economy, effects, espionage, faction, fleetOps, hero, heroEffects, intercept, market, movement, orbital, planetType, scientist, sector, station, steward, tax, technology, victory, visibility  (28 модулей, + *.test.ts)
+  modules/       army, arsenalSync, artillery, capital, captureOnArrival, combat, construction, diplomacy, economy, effects, espionage, faction, fleetOps, hero, heroEffects, intercept, market, movement, orbital, planetType, scientist, sector, standingOrders, station, steward, tax, technology, victory, visibility  (29 модулей, + *.test.ts)
   examples/      skirmish.test.ts (демо-сценарий + SVG)
   index.ts       баррель (экспорт публичного API)
 data/            manifest, resources, units, buildings, factions, events, sectors, planetTypes, technologies (.json)
@@ -684,6 +684,48 @@ UX-удобность — только что построенный кораб�
   E_FORBIDDEN, E_NOT_INHABITED, E_BAD_PAYLOAD`. Событие `capital.designated`.
 - `GameState.capital?: Record<PlayerId, PlanetId>` — новое опциональное поле (тот же
   паттерн, что `market`/`intel`/`diplomacy`); `capitalsOf`/`capitalOf` — чтение.
+
+### standingOrders (`standing-orders`) — стоячие приказы + очередь приказов (CC-1/CC-2/CC-4)
+
+Порт прототипного `standingOrdersModule` (`prototype/src/standingOrders.ts`, REFP-15) —
+модуль хранит и валидирует ТОЛЬКО намерение игрока и подчищает его для мёртвых флотов
+(`time.advanced`). Реальный драйвер (авто-штурм при простое рядом с врагом, скрэмбл
+дежурного крыла на замеченную цель, потребление головы цепочки) — серверный оркестрационный
+цикл, много раз вызывающий `applyAction` СНАРУЖИ одного прохода событий (у прототипа —
+`serverChainActions`/`serverPatrolActions` в `game.ts`); это НЕ функция ядра и осознанно
+не портирован в этот заход — как и остальной код модуля, ни один драйвер не завязан на
+ИИ/бота, это чистый CRUD над явным состоянием.
+
+- **`order.auto {fleetId, on}`** — взводит/снимает флаг `state.autoAssault[fleetId]`
+  (авто-штурм при простое у враждебного мира). Коды: `E_NO_FLEET, E_BAD_PAYLOAD`.
+- **`order.scramble {fleetId, on}`** — взводит/снимает дежурный вылет
+  `state.patrols[fleetId]` (центр = текущая позиция, радиус = `squadronStrikeRange`,
+  запас вылетов — свежий или подхваченный из `wingSorties`, если снимали и взводят
+  заново). Требует крыло (`fleetHasSquadron`) и простой (`fleetIdle`). Коды:
+  `E_NO_FLEET, E_NO_SHIPS, E_CONDITIONS_UNMET, E_BAD_PAYLOAD`.
+- **`patrol.stamp {fleetId, sortie, rearmAt?}`** — рантайм-штамп СЕРВЕРНОГО драйвера
+  (тратит/восстанавливает запас вылетов дежурного крыла); гейт-схемы намеренно НЕТ
+  (`actions/payloadSchemas.ts`) — с провода недостижим, штамп своего крыла заправил бы
+  топливо бесплатно. Коды: `E_NO_FLEET, E_NO_TARGET, E_BAD_PAYLOAD`.
+- **`order.chain {fleetId, steps[]}`** — атомарно ставит/снимает (`steps: []`) весь план
+  флота `state.orders[fleetId]={steps}`; шаги валидируются `validateChainSteps`
+  (`state/chain.ts`, порт `prototype/src/chain.ts`) — только известные виды
+  (`move`/`wait`/`assault`/`barrage`/`strike`, ровно набор гейт-схемы; прототипный
+  `ability`-шаг не портирован — под него нет гейт-схемы), только известные миры, кап
+  8 шагов. Коды: `E_NO_FLEET, E_BAD_PAYLOAD`.
+- **`chain.stamp {fleetId, steps[], waitUntil?}`** — рантайм-штамп СЕРВЕРНОГО драйвера
+  (потреблённая голова / взведённый дедлайн ожидания); гейт-схемы тоже намеренно нет.
+  Коды: `E_NO_FLEET, E_NO_TARGET, E_BAD_PAYLOAD`.
+- Подчистка на `time.advanced`: любая запись в `autoAssault`/`patrols`/`wingSorties`/
+  `orders`, чей `fleetId` больше не существует, удаляется; опустевшая карта убирается
+  целиком (та же гигиена дельт, что у `diplomacyOffers`).
+- Новые поля `GameState`: `autoAssault?/patrols?/wingSorties?/orders?` (тот же паттерн
+  опциональных карт, что `market`/`capital`); `PatrolEntry` — форма записи дежурства.
+  `state/visibility.ts` уже заранее (до этого модуля) знала стричь `orders`/`autoAssault`/
+  `patrols` как приватное намерение владельца флота — при порте добавлен `wingSorties` в
+  тот же список (тот же принцип: чужой запас топлива дежурного крыла не публичен).
+  `state/delta.ts` не требует правки — новые ключи верхнего уровня уже покрыты его
+  общим механизмом HOST-EXTENSION (`extensionKeys`), как и `capital` до них.
 
 ### victory (`victory`) — победа и счёт
 

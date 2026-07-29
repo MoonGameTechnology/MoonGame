@@ -405,11 +405,11 @@ function project(
       if (view.heroes[id]?.owner !== viewerId) delete view.heroes[id];
     }
   }
-  // Order chains and standing orders (host extensions like the prototype's `orders` /
-  // `autoAssault` / `patrols` / `forcedMarch`) are future intent — exactly what
-  // `scheduled` is stripped for below. Keep only the entries of the viewer's OWN
-  // fleets; a map left empty is removed (same delta hygiene as offers).
-  for (const key of ['orders', 'autoAssault', 'patrols', 'forcedMarch'] as const) {
+  // Order chains and standing orders (`standingOrdersModule`'s `orders` / `autoAssault`
+  // / `patrols` / `wingSorties`, and the prototype-style `forcedMarch`) are future
+  // intent — exactly what `scheduled` is stripped for below. Keep only the entries of
+  // the viewer's OWN fleets; a map left empty is removed (same delta hygiene as offers).
+  for (const key of ['orders', 'autoAssault', 'patrols', 'wingSorties', 'forcedMarch'] as const) {
     const host = view as unknown as Record<string, Record<string, unknown> | undefined>;
     const map = host[key];
     if (!map) continue;

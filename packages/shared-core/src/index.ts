@@ -54,6 +54,7 @@ export {
   type PlayerReward,
   type DiplomaticStance,
   type IntelGrant,
+  type PatrolEntry,
 } from './state/gameState';
 export {
   buildStateFromMap,
@@ -152,6 +153,14 @@ export {
   squadronReaches,
   type SortieState,
 } from './state/squadron';
+export {
+  fleetIdle,
+  validateChainSteps,
+  MAX_CHAIN_STEPS,
+  MAX_CHAIN_WAIT_HOURS,
+  type ChainStep,
+  type FleetChain,
+} from './state/chain';
 
 // Action contract
 export {
@@ -352,6 +361,7 @@ export { factionModule } from './modules/faction';
 export { armyModule } from './modules/army';
 export { fleetOpsModule } from './modules/fleetOps';
 export { capitalModule, capitalsOf, capitalOf } from './modules/capital';
+export { standingOrdersModule } from './modules/standingOrders';
 export { victoryModule } from './modules/victory';
 export { visibilityModule } from './modules/visibility';
 export { heroModule } from './modules/hero';

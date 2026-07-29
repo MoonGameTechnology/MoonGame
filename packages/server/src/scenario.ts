@@ -25,6 +25,7 @@ import {
   planetTypeModule,
   scientistModule,
   sectorModule,
+  standingOrdersModule,
   stationModule,
   taxModule,
   technologyModule,
@@ -125,6 +126,7 @@ export const DEV_MODULES: GameModule[] = [
   armyModule,
   fleetOpsModule, // fleet.launch/merge/split: garrison → mobile fleet, the missing link
   capitalModule, // capital.designate: re-point the hero respawn anchor
+  standingOrdersModule, // order.auto/order.scramble/order.chain: standing-order intent storage
   victoryModule,
   visibilityModule, // fog-of-war memory (variant B): records last-seen worlds
 ];

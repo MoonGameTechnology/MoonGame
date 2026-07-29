@@ -127,50 +127,47 @@ describe('visibleState — diplomatic offers are private to the two parties', ()
 
 describe('visibleState — order chains are the owner’s secret (future intent)', () => {
   it('keeps only the viewer’s own fleets’ chains, drops the key when none remain', () => {
-    const state = scenario() as GameState & { orders?: Record<string, unknown> };
+    const state = scenario();
     state.orders = {
-      'mine-1': [{ kind: 'move', to: 'B' }], // viewer's plan
-      'enemy-near': [{ kind: 'assault' }], // the enemy's plan — must not leak
-      ghost: [{ kind: 'orbit' }], // a dead fleet's stale entry — nobody's
+      'mine-1': { steps: [{ kind: 'move', to: 'B' }] }, // viewer's plan
+      'enemy-near': { steps: [{ kind: 'assault' }] }, // the enemy's plan — must not leak
+      ghost: { steps: [{ kind: 'assault' }] }, // a dead fleet's stale entry — nobody's
     };
-    const view = visibleState(state, 'p1', data) as VisibleState & {
-      orders?: Record<string, unknown>;
-    };
-    expect(view.orders).toEqual({ 'mine-1': [{ kind: 'move', to: 'B' }] });
+    const view = visibleState(state, 'p1', data) as VisibleState & GameState;
+    expect(view.orders).toEqual({ 'mine-1': { steps: [{ kind: 'move', to: 'B' }] } });
     // The enemy (p2) in turn sees only its own chain — and never the viewer's.
-    const enemy = visibleState(state, 'p2', data) as VisibleState & {
-      orders?: Record<string, unknown>;
-    };
-    expect(enemy.orders).toEqual({ 'enemy-near': [{ kind: 'assault' }] });
+    const enemy = visibleState(state, 'p2', data) as VisibleState & GameState;
+    expect(enemy.orders).toEqual({ 'enemy-near': { steps: [{ kind: 'assault' }] } });
     // A player with no chains gets no key at all (no empty-map blip in deltas).
-    state.orders = { 'enemy-near': [{ kind: 'assault' }] };
+    state.orders = { 'enemy-near': { steps: [{ kind: 'assault' }] } };
     expect('orders' in visibleState(state, 'p1', data)).toBe(false);
   });
 
-  it('standing orders (autoAssault / patrols) are stripped by the same rule', () => {
-    const state = scenario() as GameState & {
-      autoAssault?: Record<string, unknown>;
-      patrols?: Record<string, unknown>;
-    };
+  it('standing orders (autoAssault / patrols / wingSorties) are stripped by the same rule', () => {
+    const state = scenario();
     state.autoAssault = { 'mine-1': true, 'enemy-near': true };
     state.patrols = {
       'mine-1': { center: { x: 0, y: 0 }, radius: 5, sortie: { fuel: 2, rearming: 0 } },
       'enemy-near': { center: { x: 9, y: 9 }, radius: 7, sortie: { fuel: 1, rearming: 0 } },
     };
-    const view = visibleState(state, 'p1', data) as VisibleState & {
-      autoAssault?: Record<string, unknown>;
-      patrols?: Record<string, unknown>;
+    state.wingSorties = {
+      'mine-1': { fuel: 1, rearming: 2 },
+      'enemy-near': { fuel: 0, rearming: 1 },
     };
+    const view = visibleState(state, 'p1', data) as VisibleState & GameState;
     expect(view.autoAssault).toEqual({ 'mine-1': true });
     expect(Object.keys(view.patrols ?? {})).toEqual(['mine-1']);
+    expect(view.wingSorties).toEqual({ 'mine-1': { fuel: 1, rearming: 2 } });
     // With nothing of the viewer's left, the keys vanish entirely (delta hygiene).
     state.autoAssault = { 'enemy-near': true };
     state.patrols = {
       'enemy-near': { center: { x: 9, y: 9 }, radius: 7, sortie: { fuel: 1, rearming: 0 } },
     };
+    state.wingSorties = { 'enemy-near': { fuel: 0, rearming: 1 } };
     const bare = visibleState(state, 'p1', data);
     expect('autoAssault' in bare).toBe(false);
     expect('patrols' in bare).toBe(false);
+    expect('wingSorties' in bare).toBe(false);
   });
 
   it('forced-march flags (BOOST-1) are stripped by the same rule', () => {
