@@ -1,10 +1,11 @@
+import { t } from '../../../localization/runtime';
 import { describe, expect, it } from 'vitest';
 import {
   createWelcomeModel,
   resolveWelcomeAction,
   nextCallsign,
-  ruStrings,
-  CALLSIGNS,
+  localeStrings,
+  CALLSIGN_KEYS,
   type AuthProviderId,
 } from './welcomeScreen';
 
@@ -12,7 +13,7 @@ describe('createWelcomeModel', () => {
   it('describes the screen from the default (RU) strings', () => {
     const m = createWelcomeModel();
     expect(m.title).toBe('VOID DOMINION');
-    expect(m.tagline).toBe(ruStrings.tagline);
+    expect(m.tagline).toBe(localeStrings.tagline);
     expect(m.language).toBe('ru');
     expect(m.legal.map((l) => l.id)).toEqual(['imprint', 'terms', 'privacy', 'support']);
   });
@@ -25,7 +26,7 @@ describe('createWelcomeModel', () => {
 
   it('is i18n-driven — a custom strings bundle flows through', () => {
     const m = createWelcomeModel({
-      ...ruStrings,
+      ...localeStrings,
       title: 'VD',
       newPlayer: 'New',
       providerLabels: { google: 'G', apple: 'A' },
@@ -72,9 +73,7 @@ describe('resolveWelcomeAction', () => {
 
   it('routes an available provider as a returning sign-in', () => {
     const live = createWelcomeModel();
-    live.providers = live.providers.map((p) =>
-      p.id === 'apple' ? { ...p, available: true } : p,
-    );
+    live.providers = live.providers.map((p) => (p.id === 'apple' ? { ...p, available: true } : p));
     expect(resolveWelcomeAction({ kind: 'signIn', provider: 'apple' }, live)).toEqual({
       ok: true,
       route: 'browse',
@@ -114,9 +113,11 @@ describe('resolveWelcomeAction', () => {
 
 describe('nextCallsign', () => {
   it('is deterministic: word cycles, suffix counts up from 1', () => {
-    expect(nextCallsign(0)).toBe('Носорог-1');
-    expect(nextCallsign(1)).toBe('Комета-2');
-    expect(nextCallsign(CALLSIGNS.length)).toBe('Носорог-9');
+    // Подпись берётся из локали, поэтому сверяем с t(), а не с русским текстом:
+    // тест не должен зависеть от языка окружения, в котором его запустили.
+    expect(nextCallsign(0)).toBe(`${t('callsign.rhino')}-1`);
+    expect(nextCallsign(1)).toBe(`${t('callsign.comet')}-2`);
+    expect(nextCallsign(CALLSIGN_KEYS.length)).toBe(`${t('callsign.rhino')}-9`);
   });
 
   it('stays in range for any sequence number', () => {

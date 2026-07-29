@@ -19,6 +19,9 @@
 /** External sign-in providers we plan to support (docs/accounts-roadmap.md AC-1.1:
  *  Google / Apple via OIDC). Facebook from the genre reference is intentionally
  *  dropped — it is not in our identity plan. */
+import { t } from '../../../localization/runtime';
+import type { LocaleId } from '../../../localization';
+
 export type AuthProviderId = 'google' | 'apple';
 
 export interface AuthProvider {
@@ -38,11 +41,11 @@ export interface LegalLink {
 
 /** Languages the menu offers. Only Russian ships today; the field exists so the
  *  language chip is data-driven (docs/main-menu.md §5.4). */
-export type LanguageCode = 'ru';
+export type LanguageCode = LocaleId;
 
 /** Localised text for the welcome screen. Keeping strings in a bundle (not hardcoded
  *  in the model) honours the i18n seam (docs/main-menu.md §5.4 — "не хардкодить
- *  строки"); `ruStrings` is the shipping default. */
+ *  строки"); `localeStrings` is the shipping default. */
 export interface WelcomeStrings {
   title: string;
   tagline: string;
@@ -54,19 +57,23 @@ export interface WelcomeStrings {
   legal: LegalLink[];
 }
 
-export const ruStrings: WelcomeStrings = {
-  title: 'VOID DOMINION',
-  tagline: 'Грань пустоты',
-  newPlayer: 'Новый командир',
-  signInWith: 'войти через',
-  login: 'Вход по позывному',
-  singlePlayer: 'Одиночная игра',
+/** Подписи ТЕКУЩЕЙ локали — проекция общей папки `/localization` на форму бандла.
+ *  Модель по-прежнему принимает любой бандл (шов i18n сохраняется и тестируется),
+ *  но по умолчанию текст берётся из тех же ключей, что и в прототипе — чтобы у
+ *  клиента не завелась вторая схема (кирпич LOC-3). */
+export const localeStrings: WelcomeStrings = {
+  title: 'VOID DOMINION', // вордмарк бренда — не переводится (в прототипе так же)
+  tagline: t('welcome.tagline'),
+  newPlayer: t('welcome.register.title'),
+  signInWith: t('cli.welcome.sign-in-with'),
+  login: t('cli.welcome.login'),
+  singlePlayer: t('welcome.solo'),
   providerLabels: { google: 'Google', apple: 'Apple' },
   legal: [
-    { id: 'imprint', label: 'Выходные данные' },
-    { id: 'terms', label: 'Условия' },
-    { id: 'privacy', label: 'Политика конфиденциальности' },
-    { id: 'support', label: 'Поддержка' },
+    { id: 'imprint', label: t('cli.welcome.imprint') },
+    { id: 'terms', label: t('welcome.terms') },
+    { id: 'privacy', label: t('cli.welcome.privacy') },
+    { id: 'support', label: t('welcome.support') },
   ],
 };
 
@@ -86,7 +93,7 @@ export interface WelcomeModel {
 
 /** Build the welcome model from a strings bundle (Russian by default). Social
  *  providers are stubs (`available: false`) until OIDC lands. */
-export function createWelcomeModel(strings: WelcomeStrings = ruStrings): WelcomeModel {
+export function createWelcomeModel(strings: WelcomeStrings = localeStrings): WelcomeModel {
   return {
     title: strings.title,
     tagline: strings.tagline,
@@ -143,7 +150,13 @@ export function resolveWelcomeAction(action: WelcomeAction, model: WelcomeModel)
       // "скоро" notice. When OIDC lands, an available provider routes as returning.
       return provider.available
         ? { ok: true, route: 'browse', mode: 'returning', provider: provider.id }
-        : { ok: true, route: 'browse', mode: 'new', noticeKey: 'guest_stub', provider: provider.id };
+        : {
+            ok: true,
+            route: 'browse',
+            mode: 'new',
+            noticeKey: 'guest_stub',
+            provider: provider.id,
+          };
     }
     case 'login': {
       const nick = action.nick.trim();
@@ -155,23 +168,23 @@ export function resolveWelcomeAction(action: WelcomeAction, model: WelcomeModel)
   }
 }
 
-/** Callsign suggestions for a brand-new commander. The host persists the sequence
- *  number; the wordlist is shared with the prototype so both surfaces suggest the
- *  same names. */
-export const CALLSIGNS = [
-  'Носорог',
-  'Комета',
-  'Гадюка',
-  'Орион',
-  'Вектор',
-  'Сокол',
-  'Титан',
-  'Квазар',
+/** Позывные для нового командира — КЛЮЧАМИ: список тот же, что у прототипа
+ *  (`callsign.*`), поэтому обе поверхности предлагают одинаковые имена и правятся
+ *  в одном месте. Хост хранит только номер в последовательности. */
+export const CALLSIGN_KEYS = [
+  'callsign.rhino',
+  'callsign.comet',
+  'callsign.viper',
+  'callsign.orion',
+  'callsign.vector',
+  'callsign.falcon',
+  'callsign.titan',
+  'callsign.quasar',
 ] as const;
 
 /** Deterministic callsign for a 0-based sequence number (no random/time): the
  *  wordlist cycles, the suffix counts up. `nextCallsign(0)` → `Носорог-1`. */
 export function nextCallsign(seq: number): string {
-  const i = ((seq % CALLSIGNS.length) + CALLSIGNS.length) % CALLSIGNS.length;
-  return `${CALLSIGNS[i]}-${seq + 1}`;
+  const i = ((seq % CALLSIGN_KEYS.length) + CALLSIGN_KEYS.length) % CALLSIGN_KEYS.length;
+  return `${t(CALLSIGN_KEYS[i]!)}-${seq + 1}`;
 }

@@ -9,6 +9,7 @@
  * This is intentionally thin: map rendering, the network transport and the PWA install
  * layer are later bricks (CP0.2 / CP1.x). No forked copy of the core or its data.
  */
+import { t } from '../../../localization/runtime';
 import { createInitialState, type GameState } from '@void/shared-core';
 import { theme } from './theme';
 import { createWelcomeModel, resolveWelcomeAction, nextCallsign } from './welcomeScreen';
@@ -50,22 +51,27 @@ const esc = (v: string): string => v.replace(/[&<>"']/g, (c) => ENTITIES[c] ?? c
 let callsignSeq = 0;
 
 const REJECTIONS: Record<string, string> = {
-  E_NO_NICK: 'Введите позывной.',
-  E_UNKNOWN_PROVIDER: 'Неизвестный провайдер.',
+  E_NO_NICK: 'cli.err.no-nick',
+  E_UNKNOWN_PROVIDER: 'cli.err.unknown-provider',
 };
 
 /** Turn a routing outcome into a human status line. Routes are stubbed until the
  *  match browser (CP) and single-player sandbox land — this proves the wiring. */
 function statusText(outcome: WelcomeOutcome): string {
-  if (!outcome.ok) return `✖ ${REJECTIONS[outcome.code] ?? outcome.code}`;
-  if (outcome.route === 'single') return '▶ Одиночная игра — запуск песочницы… (движок в браузере)';
+  if (!outcome.ok) {
+    const key = REJECTIONS[outcome.code];
+    return `✖ ${key ? t(key) : outcome.code}`;
+  }
+  if (outcome.route === 'single') return `▶ ${t('cli.route.single')}`;
   if (outcome.mode === 'new') {
     const nick = nextCallsign(callsignSeq++);
     const notice =
-      outcome.noticeKey === 'guest_stub' ? ` · вход через ${outcome.provider ?? '—'} скоро — пока гость` : '';
-    return `→ Обзор матчей · новый командир «${nick}»${notice}`;
+      outcome.noticeKey === 'guest_stub'
+        ? ` · ${t('cli.route.guest-stub', { p: outcome.provider ?? '—' })}`
+        : '';
+    return `→ ${t('cli.route.browse.new', { nick })}${notice}`;
   }
-  return `→ Обзор матчей · ${outcome.nick ?? 'возвращение'}`;
+  return `→ ${t('cli.route.browse.back', { nick: outcome.nick ?? t('cli.route.returning') })}`;
 }
 
 function render(model: WelcomeModel): void {
@@ -85,7 +91,7 @@ function render(model: WelcomeModel): void {
     model.providers
       .map(
         (p) =>
-          `<button class="btn stub" data-act="signIn" data-provider="${p.id}" title="${p.available ? '' : 'скоро'}">${esc(p.label)}</button>`,
+          `<button class="btn stub" data-act="signIn" data-provider="${p.id}" title="${p.available ? '' : esc(t('cli.soon'))}">${esc(p.label)}</button>`,
       )
       .join('') +
     `</div>` +
@@ -126,7 +132,11 @@ function wire(model: WelcomeModel): void {
       case 'signIn': {
         const provider = target.dataset.provider;
         if (provider) {
-          setStatus(statusText(resolveWelcomeAction({ kind: 'signIn', provider: provider as AuthProviderId }, model)));
+          setStatus(
+            statusText(
+              resolveWelcomeAction({ kind: 'signIn', provider: provider as AuthProviderId }, model),
+            ),
+          );
         }
         break;
       }
@@ -150,7 +160,7 @@ function showEngine(): void {
   const el = document.getElementById('engine');
   if (!el) return;
   const state = createInitialState({ seed: 'welcome', version: { data: '0.1.0', manifest: '1' } });
-  el.textContent = `движок готов · t=${state.time}`;
+  el.textContent = t('cli.engine-ready', { t: state.time });
 }
 
 let matchStarted = false;
@@ -214,7 +224,14 @@ function runMatch(getState: () => GameState, bounds: Bounds, interact?: MatchInt
     (e) => {
       e.preventDefault();
       const r = canvas.getBoundingClientRect();
-      cam = zoomAt(cam, e.clientX - r.left, e.clientY - r.top, e.deltaY < 0 ? 1.12 : 1 / 1.12, vp, bounds);
+      cam = zoomAt(
+        cam,
+        e.clientX - r.left,
+        e.clientY - r.top,
+        e.deltaY < 0 ? 1.12 : 1 / 1.12,
+        vp,
+        bounds,
+      );
     },
     { passive: false },
   );
@@ -232,7 +249,11 @@ function runMatch(getState: () => GameState, bounds: Bounds, interact?: MatchInt
   canvas.addEventListener('pointermove', (e) => {
     if (!drag) return;
     movedPx += Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y);
-    cam = clampCam({ scale: cam.scale, x: cam.x + (e.clientX - drag.x), y: cam.y + (e.clientY - drag.y) }, vp, bounds);
+    cam = clampCam(
+      { scale: cam.scale, x: cam.x + (e.clientX - drag.x), y: cam.y + (e.clientY - drag.y) },
+      vp,
+      bounds,
+    );
     drag = { x: e.clientX, y: e.clientY };
   });
   canvas.addEventListener('pointerup', () => {
@@ -300,13 +321,19 @@ function connectLive(url: string): void {
   let selectedFleet: string | null = null;
   let seq = 1;
   const hint = (): void => {
-    if (me) setNetStatus(`● Онлайн · вы ${me} · ${selectedFleet ? 'тапните цель' : 'тапните свой флот'}`);
+    if (me)
+      setNetStatus(
+        t('cli.net.online', {
+          me,
+          hint: selectedFleet ? t('cli.net.tap-target') : t('cli.net.tap-fleet'),
+        }),
+      );
   };
-  setNetStatus('⇄ Подключение к матчу…');
+  setNetStatus(t('cli.net.connecting'));
   const { client } = openLiveMatch(url, {
     onStatus: (s) => {
-      if (s === 'connecting') setNetStatus('⇄ Подключение к матчу…');
-      else if (s === 'closed') setNetStatus('✖ Соединение закрыто');
+      if (s === 'connecting') setNetStatus(t('cli.net.connecting'));
+      else if (s === 'closed') setNetStatus(t('cli.net.closed'));
     },
     onError: (code) => setNetStatus(`✖ ${code}`),
     onSnapshot: (snap) => {
@@ -317,7 +344,8 @@ function connectLive(url: string): void {
         client.start(); // host of an unstarted lobby → run the world
       }
       const waiting = snap.lobby ? !snap.lobby.started : !!snap.waiting;
-      if (waiting) setNetStatus(`⏳ Ожидание игроков…${me ? ` · вы ${me}` : ''}`);
+      if (waiting)
+        setNetStatus(t('cli.net.waiting') + (me ? ` · ${t('cli.net.you', { me })}` : ''));
       else hint();
       if (!running) {
         running = true;
@@ -337,7 +365,7 @@ function connectLive(url: string): void {
               const f = live.fleets[selectedFleet];
               if (f && f.location && f.location !== planetId) {
                 client.sendAction(moveAction(me, seq++, selectedFleet, planetId));
-                setNetStatus(`▸ Приказ: ${selectedFleet} → ${planetId}`);
+                setNetStatus(`▸ ${t('cli.net.order', { fleet: selectedFleet, to: planetId })}`);
                 selectedFleet = null;
                 return;
               }

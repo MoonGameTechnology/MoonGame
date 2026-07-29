@@ -41,10 +41,16 @@ const hasCyrillic = (s: string): boolean => /[А-Яа-яЁё]/.test(s);
  *  виду литерала однозначно понятно, ключ это или мост. */
 const KEY_RE = /^[a-z][a-z0-9-]*(?:\.[a-z0-9-]+)+$/;
 
+/** Обе поверхности, которые говорят с игроком: прототип и PWA-клиент. Клиент попал
+ *  сюда с LOC-3 — до него у него была своя схема строк, и гейт её не видел. */
+const SRC_DIRS = ['prototype/src', 'packages/client/src'];
+
 const srcFiles = (): string[] =>
-  readdirSync(path.join(repoRoot, 'prototype/src'))
-    .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
-    .map((f) => `prototype/src/${f}`);
+  SRC_DIRS.flatMap((d) =>
+    readdirSync(path.join(repoRoot, d))
+      .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+      .map((f) => `${d}/${f}`),
+  );
 
 /** Первый строковый аргумент каждого `t(…)` / `tData(…)`. Идём посимвольно (regex
  *  ломается на `{placeholders}` / апострофах / переносах): на вызове читаем литерал,
@@ -120,6 +126,24 @@ describe('локализация — ключи', () => {
       .filter((k) => !(k in ru))
       .sort();
     expect({ onlyRu, onlyEn }).toEqual({ onlyRu: [], onlyEn: [] });
+  });
+
+  it('в файлах локалей нет дублирующихся ключей', () => {
+    // В объектном литерале побеждает ПОСЛЕДНЕЕ вхождение, поэтому дубль не падает,
+    // а тихо съедает соседнюю запись. Типизацией это не ловилось: `localization/*.ts`
+    // никто не типизировал, пока клиент не начал их импортировать (LOC-3).
+    const KEY_LINE = /^ {2}'((?:[^'\\]|\\.)*)':/;
+    for (const p of ['localization/ru.ts', 'localization/en.ts']) {
+      const seen = new Set<string>();
+      const dups: string[] = [];
+      for (const ln of readFileSync(path.join(repoRoot, p), 'utf8').split('\n')) {
+        const m = KEY_LINE.exec(ln);
+        if (!m) continue;
+        if (seen.has(m[1]!)) dups.push(m[1]!);
+        else seen.add(m[1]!);
+      }
+      expect([...new Set(dups)].sort(), `${p}: дубли ключей`).toEqual([]);
+    }
   });
 
   it('каждый ключ из кода заведён в локали', () => {

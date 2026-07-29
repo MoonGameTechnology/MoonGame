@@ -10,6 +10,7 @@
  * a stable code only, never a throw. All stat maths route through the core's
  * `effectiveStats` so the preview matches what the built ship will actually carry.
  */
+import { t } from '../../../localization/runtime';
 import type { GameData, ResourceBag, ShipSlotType, UnitDef } from '@void/shared-core';
 import { canEquip, effectiveStats, hullSlotTypes, loadoutCost } from '@void/shared-core';
 
@@ -38,7 +39,7 @@ export interface LoadoutOption {
 export interface LoadoutStatLine {
   /** Canonical stat key (e.g. `attack`, `defense`). */
   stat: string;
-  /** Localised display label (e.g. "Урон в атаке" / "Урон в защите"). */
+  /** Локализованная подпись — уже переведённый текст, не ключ. */
   label: string;
   base: number;
   effective: number;
@@ -91,16 +92,16 @@ const PREVIEW_STATS = [
   'radarRange',
 ] as const;
 
-/** Russian display labels. `attack` and `defense` are the ship's two combat
- *  numbers — its damage when ATTACKING and its return-fire when DEFENDING. */
+/** Ключи подписей характеристик. `attack` и `defense` — две боевые цифры корабля:
+ *  урон в АТАКЕ и ответный огонь в ОБОРОНЕ. Текст живёт в /localization. */
 const STAT_LABELS: Record<string, string> = {
-  attack: 'Урон в атаке',
-  defense: 'Урон в защите',
-  hp: 'Корпус',
-  shield: 'Щит',
-  speed: 'Скорость',
-  cargoCapacity: 'Трюм',
-  radarRange: 'Радар',
+  attack: 'loadout.stat.attack',
+  defense: 'loadout.stat.defense',
+  hp: 'loadout.stat.hp',
+  shield: 'loadout.stat.shield',
+  speed: 'loadout.stat.speed',
+  cargoCapacity: 'loadout.stat.cargo',
+  radarRange: 'loadout.stat.radar',
 };
 
 /** Always shown, even at 0 — a ship's attack and defence are its combat identity. */
@@ -175,7 +176,8 @@ function buildModel(
     const b = base[stat] ?? 0;
     const e = eff[stat] ?? 0;
     if (ALWAYS_SHOWN.has(stat) || b !== 0 || e !== b) {
-      preview.push({ stat, label: STAT_LABELS[stat] ?? stat, base: b, effective: e, delta: e - b });
+      const label = STAT_LABELS[stat];
+      preview.push({ stat, label: label ? t(label) : stat, base: b, effective: e, delta: e - b });
     }
   }
 
@@ -207,7 +209,14 @@ export function createLoadoutEditor(
   resources: ResourceBag,
   opts?: { modules?: string[]; count?: number; ownedModules?: ReadonlySet<string> },
 ): LoadoutEditorResult {
-  const model = buildModel(unit, opts?.modules ?? [], opts?.count ?? 1, data, resources, opts?.ownedModules);
+  const model = buildModel(
+    unit,
+    opts?.modules ?? [],
+    opts?.count ?? 1,
+    data,
+    resources,
+    opts?.ownedModules,
+  );
   if (!model) return { ok: false, code: 'E_UNKNOWN_UNIT' };
   return { ok: true, ...model };
 }

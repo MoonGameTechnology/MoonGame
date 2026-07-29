@@ -1,3 +1,4 @@
+import { t } from '../../../localization/runtime';
 import { describe, it, expect } from 'vitest';
 import { parseGameData, type GameData, type ResourceBag } from '@void/shared-core';
 import {
@@ -22,10 +23,34 @@ const data: GameData = parseGameData({
   buildings: {},
   events: {},
   modules: {
-    targeting: { name: 'Наведение', slot: 'weapon', tag: 'vertical', effects: { stats: { attack: 4 } }, cost: { metal: 60 } },
-    targeting2: { name: 'Наведение II', slot: 'weapon', tag: 'vertical', effects: { stats: { attack: 6 } }, cost: { metal: 90 } },
-    shield: { name: 'Щит', slot: 'defense', tag: 'vertical', effects: { stats: { shield: 15 } }, cost: { metal: 80 } },
-    cargo: { name: 'Отсек', slot: 'utility', tag: 'horizontal', effects: { stats: { cargoCapacity: 6 } }, cost: { metal: 45 } },
+    targeting: {
+      name: 'Наведение',
+      slot: 'weapon',
+      tag: 'vertical',
+      effects: { stats: { attack: 4 } },
+      cost: { metal: 60 },
+    },
+    targeting2: {
+      name: 'Наведение II',
+      slot: 'weapon',
+      tag: 'vertical',
+      effects: { stats: { attack: 6 } },
+      cost: { metal: 90 },
+    },
+    shield: {
+      name: 'Щит',
+      slot: 'defense',
+      tag: 'vertical',
+      effects: { stats: { shield: 15 } },
+      cost: { metal: 80 },
+    },
+    cargo: {
+      name: 'Отсек',
+      slot: 'utility',
+      tag: 'horizontal',
+      effects: { stats: { cargoCapacity: 6 } },
+      cost: { metal: 45 },
+    },
   },
 });
 const rich: ResourceBag = { metal: 10_000 };
@@ -54,11 +79,17 @@ describe('loadout editor — model', () => {
   it('previews base stats with no modules', () => {
     const m = ok(createLoadoutEditor('cruiser', data, rich));
     const attack = m.preview.find((p) => p.stat === 'attack');
-    expect(attack).toEqual({ stat: 'attack', label: 'Урон в атаке', base: 10, effective: 10, delta: 0 });
+    expect(attack).toEqual({
+      stat: 'attack',
+      label: t('loadout.stat.attack'),
+      base: 10,
+      effective: 10,
+      delta: 0,
+    });
     // both combat numbers show: damage when ATTACKING and when DEFENDING.
     expect(m.preview.find((p) => p.stat === 'defense')).toEqual({
       stat: 'defense',
-      label: 'Урон в защите',
+      label: t('loadout.stat.defense'),
       base: 8,
       effective: 8,
       delta: 0,
@@ -78,7 +109,7 @@ describe('loadout editor — equip / unequip', () => {
     expect(m1.slots.find((s) => s.type === 'weapon')?.moduleId).toBe('targeting');
     expect(m1.preview.find((p) => p.stat === 'attack')).toEqual({
       stat: 'attack',
-      label: 'Урон в атаке',
+      label: t('loadout.stat.attack'),
       base: 10,
       effective: 14,
       delta: 4,
@@ -153,18 +184,28 @@ describe('loadout editor — arsenal ownership filter (ARS-5)', () => {
   });
 
   it('narrows the palette to owned defIds — unowned modules are absent, not just disabled', () => {
-    const m = ok(createLoadoutEditor('cruiser', data, rich, { ownedModules: new Set(['targeting', 'cargo']) }));
+    const m = ok(
+      createLoadoutEditor('cruiser', data, rich, { ownedModules: new Set(['targeting', 'cargo']) }),
+    );
     expect(m.palette.map((p) => p.id).sort()).toEqual(['cargo', 'targeting']);
   });
 
   it('the filter survives the reducer round-trip', () => {
-    const m0 = ok(createLoadoutEditor('cruiser', data, rich, { ownedModules: new Set(['targeting', 'shield']) }));
+    const m0 = ok(
+      createLoadoutEditor('cruiser', data, rich, {
+        ownedModules: new Set(['targeting', 'shield']),
+      }),
+    );
     const m1 = ok(applyLoadoutAction({ kind: 'equip', moduleId: 'targeting' }, m0, data, rich));
     expect(m1.palette.map((p) => p.id).sort()).toEqual(['shield', 'targeting']);
   });
 
   it('equipping an unowned module is rejected even off-palette (defense in depth; the server gate is authoritative)', () => {
-    const m0 = ok(createLoadoutEditor('cruiser', data, rich, { ownedModules: new Set(['targeting']) }));
-    expect(err(applyLoadoutAction({ kind: 'equip', moduleId: 'shield' }, m0, data, rich))).toBe('E_NOT_OWNED');
+    const m0 = ok(
+      createLoadoutEditor('cruiser', data, rich, { ownedModules: new Set(['targeting']) }),
+    );
+    expect(err(applyLoadoutAction({ kind: 'equip', moduleId: 'shield' }, m0, data, rich))).toBe(
+      'E_NOT_OWNED',
+    );
   });
 });

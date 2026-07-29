@@ -73,7 +73,6 @@ export const en: Record<string, string> = {
   // --- auth — Вход и регистрация: позывной, сторонние провайдеры.
   'auth.apple.soon': 'Sign in with Apple — coming soon · you entered as a guest',
   'auth.commander': 'Commander',
-  'auth.google.soon': 'Sign in with Apple — coming soon · you entered as a guest',
   'auth.google.soon': 'Sign in with Google — coming soon · you entered as a guest',
   'auth.need-mail': 'Enter an email',
   'auth.need-name': 'Enter a commander name',
@@ -164,6 +163,29 @@ export const en: Record<string, string> = {
   'chat.win.stamp.real': 'Real time',
   'chat.win.stamp.time': 'Time',
   'chat.win.title': 'CHAT — {ch}',
+
+  // --- cli — PWA-клиент (packages/client): экран приветствия, статусы сети, отказы.
+  'cli.engine-ready': 'engine ready · t={t}',
+  'cli.err.no-nick': 'Enter a callsign.',
+  'cli.err.unknown-provider': 'Unknown provider.',
+  'cli.net.closed': '✖ Connection closed',
+  'cli.net.connecting': '⇄ Connecting to the match…',
+  'cli.net.online': '● Online · you are {me} · {hint}',
+  'cli.net.order': 'Order: {fleet} → {to}',
+  'cli.net.tap-fleet': 'tap one of your fleets',
+  'cli.net.tap-target': 'tap a target',
+  'cli.net.waiting': '⏳ Waiting for players…',
+  'cli.net.you': 'you are {me}',
+  'cli.route.browse.back': 'Match browser · {nick}',
+  'cli.route.browse.new': 'Match browser · new commander «{nick}»',
+  'cli.route.guest-stub': 'sign-in via {p} is coming — a guest for now',
+  'cli.route.returning': 'returning',
+  'cli.route.single': 'Single player — launching the sandbox… (engine in the browser)',
+  'cli.soon': 'soon',
+  'cli.welcome.imprint': 'Imprint',
+  'cli.welcome.login': 'Sign in with a callsign',
+  'cli.welcome.privacy': 'Privacy policy',
+  'cli.welcome.sign-in-with': 'sign in with',
 
   // --- cmd — Командная панель флота: приказы, режим огня артиллерии, способности героя.
   'cmd.assault': 'Assault',
@@ -498,8 +520,6 @@ export const en: Record<string, string> = {
   'div.roster': 'composition {n}/{s} · {rest}',
   'div.slot.note':
     'Tap a slot to cycle the unit type: militia → heavy infantry → special forces → tank. Tanks shred any infantry; special forces are the one infantry that threatens armour; heavy infantry holds the line.',
-  'div.stat.attack': 'toughness',
-  'div.stat.attack': 'defense',
   'div.stat.attack': 'attack',
   'div.stat.defense': 'defense',
   'div.stat.hp': 'toughness',
@@ -623,7 +643,6 @@ export const en: Record<string, string> = {
   'fleet.size.squadron-heavy': 'Squadron',
 
   // --- fmt — Форматирование величин: длительности.
-  'fmt.hours': '{n}m',
   'fmt.hours': '{n}h',
   'fmt.minutes': '{n}m',
 
@@ -660,7 +679,6 @@ export const en: Record<string, string> = {
   'hint.auto-assault':
     '⚔ auto-storm on — the fleet storms the hostile world it arrives at by itself',
   'hint.barrage-auto': '🎯 auto-target',
-  'hint.barrage-set': '🎯 auto-target',
   'hint.barrage-set': '🎯 focus fire set',
   'hint.cast-cancelled': '✖ cast cancelled',
   'hint.deploy-cancelled': '✖ deploy cancelled',
@@ -673,6 +691,15 @@ export const en: Record<string, string> = {
   'hint.pick-order': '◎ tap a target on the map — compose the order',
   'hint.squadron-launched': '🛩 squadron launched — steer it onto the target',
   'hint.standing-sortie': '🛩 standing patrol on — the wing strikes any enemy in range',
+
+  // --- loadout — Редактор оснащения клиента: подписи характеристик.
+  'loadout.stat.attack': 'Attack damage',
+  'loadout.stat.cargo': 'Hold',
+  'loadout.stat.defense': 'Defence damage',
+  'loadout.stat.hp': 'Hull',
+  'loadout.stat.radar': 'Radar',
+  'loadout.stat.shield': 'Shield',
+  'loadout.stat.speed': 'Speed',
 
   // --- map — Значки на карте: фазы боя.
   'map.badge.landing': '⚒ ground',
@@ -741,7 +768,6 @@ export const en: Record<string, string> = {
 
   // --- sandbox — Песочница (дев-инструмент): переключатели и команды.
   'sandbox.commands': 'Commands',
-  'sandbox.end-wars': 'Close',
   'sandbox.end-wars': 'End the war with every faction',
   'sandbox.no-player': 'no player',
   'sandbox.no-wars': 'You are not at war with anyone',
@@ -750,7 +776,6 @@ export const en: Record<string, string> = {
   'sandbox.res.food': 'Food',
   'sandbox.res.metal': 'Metal',
   'sandbox.res.microelectronics': 'Microelectronics',
-  'sandbox.title': 'Toggles',
   'sandbox.title': 'SANDBOX',
   'sandbox.tog.fog': 'Fog of war',
   'sandbox.tog.fog.hint': 'Turn off to reveal the whole map',
@@ -767,7 +792,6 @@ export const en: Record<string, string> = {
   'sandbox.tog.speed': 'Speed control',
   'sandbox.tog.speed.hint': 'the in-match time bar — pause and speed multipliers (1× is real time)',
   'sandbox.toggles': 'Toggles',
-  'sandbox.wars-ended': 'You are not at war with anyone',
   'sandbox.wars-ended': 'Wars ended: {n} — relations are neutral',
 
   // --- sci — Учёные совета: имя и что даёт ветка.
@@ -791,10 +815,8 @@ export const en: Record<string, string> = {
   'scipick.focus': '{br} branch focus',
   'scipick.generalist': '+1 research slot (a generalist, no branch focus)',
   'scipick.need-two': 'Pick two scientists',
-  'scipick.note': 'Candidates · tap to fill a slot',
   'scipick.note':
     '⚠ The council locks in for the whole match. A recommended pair is pre-selected — swap to taste.',
-  'scipick.opens': '{br} branch focus',
   'scipick.opens': 'Opens the {br} branch: {list}',
   'scipick.pick': 'Pick a scientist',
 
@@ -803,13 +825,10 @@ export const en: Record<string, string> = {
 
   // --- split — Разделение флота: диалог и предпросмотр.
   'split.all': 'All',
-  'split.confirm': 'Cancel',
   'split.confirm': 'Confirm',
   'split.note':
     'Peel ships into a new fleet — it stays in the same sector. At least one ship stays behind; carried troops stay with the original.',
   'split.preview': 'new fleet: {a} ships · original keeps {b}',
-  'split.title':
-    'Peel ships into a new fleet — it stays in the same sector. At least one ship stays behind; carried troops stay with the original.',
   'split.title': 'SPLIT FLEET',
 
   // --- stat — Характеристики юнита в компактных подписях.
@@ -820,23 +839,17 @@ export const en: Record<string, string> = {
   'stat.speed': 'speed',
 
   // --- tgt — Композер приказов (TGT-1): шаги плана, отправка.
-  'tgt.add-wait': 'Home',
-  'tgt.add-wait': 'Fire',
-  'tgt.add-wait': 'Assault',
-  'tgt.add-wait': 'Go here',
   'tgt.add-wait': '⏱ +1h',
   'tgt.at': '🎯{n}h',
   'tgt.clear': 'clear the order',
   'tgt.empty': 'plan is empty — add steps',
   'tgt.fleets': '{n} fleets',
   'tgt.placed': '◎ order set — the fleet will run the plan itself',
-  'tgt.send': 'clear the order',
   'tgt.send': 'Send',
   'tgt.step.fire': 'Fire',
   'tgt.step.here': 'Go here',
   'tgt.step.home': 'Home',
   'tgt.step.remove': 'remove step',
-  'tgt.title': '{n} fleets',
   'tgt.title': 'ORDER',
   'tgt.wait': '⏱{n}h',
 
@@ -1363,7 +1376,6 @@ export const en: Record<string, string> = {
   'setup.bonus.damage': '+{n}% damage',
   'setup.bonus.economy': '+{n}% economy',
   'setup.bonus.radar': '+{n}% radar',
-  'setup.bonus.speed': '+{n}% radar',
   'setup.bonus.speed': '+{n}% fleet speed',
   'setup.cancel': 'Back',
   'setup.faction.note': 'Faction — the house passive bonus',
@@ -1383,7 +1395,6 @@ export const en: Record<string, string> = {
     'Pick your homeworld on the map, choose how many AI rivals join, then launch. Empty slots are taken by the AI — switch a slot OFF to command a smaller sector, or switch them all off for a peaceful solo sandbox to explore the interface.',
   'setup.teams.note': 'one side = allies',
   'setup.teams.off': 'Team battle: off',
-  'setup.teams.on': 'one side = allies',
   'setup.teams.on': 'Team battle: ON',
   'setup.title': 'SKIRMISH SETUP',
 
