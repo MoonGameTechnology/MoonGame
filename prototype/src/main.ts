@@ -10413,7 +10413,7 @@ function renderMetaPanel(): void {
   const pts = metaPoints(st);
   let h =
     `<div class="mp-head"><b>${t('meta.level', { n: lvl })}</b>` +
-    `<span class="mp-xp">${t('{got}/{need} XP', { got, need })}</span>` +
+    `<span class="mp-xp">${t('meta.xp', { got, need })}</span>` +
     `<span class="mp-pts">${t('meta.points', { n: pts })}</span></div>`;
   h += `<div class="mp-track"><div class="mp-fill" style="width:${Math.round((got / need) * 100)}%"></div></div>`;
   for (const branch of ['command', 'economy', 'science'] as MetaBranch[]) {
@@ -14770,7 +14770,7 @@ function corpOverviewHtml(): string {
     : `<p class="chint">${t('corp.log.private')}</p>`;
   const nextWar = avaChallenges.find((w) => w.status === 'accepted' || w.status === 'pending');
   const nextWarHtml = nextWar
-    ? `<div class="cwarn">⚔ ${t('AvA')} vs ${esc(corpNameOf(nextWar.challengerCorp === corpMine.membership.corpId ? nextWar.targetCorp : nextWar.challengerCorp))} — ${t(nextWar.status === 'accepted' ? 'corp.war.roster-open' : 'corp.war.pending')}</div>`
+    ? `<div class="cwarn">⚔ ${t('corp.war.ava')} vs ${esc(corpNameOf(nextWar.challengerCorp === corpMine.membership.corpId ? nextWar.targetCorp : nextWar.challengerCorp))} — ${t(nextWar.status === 'accepted' ? 'corp.war.roster-open' : 'corp.war.pending')}</div>`
     : '';
   return (
     `${nextWarHtml}` +

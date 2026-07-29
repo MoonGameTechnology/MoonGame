@@ -361,6 +361,7 @@ export const ru: Record<string, string> = {
   'corp.tab.wars': 'Войны',
   'corp.transfer-lead': 'передать главенство',
   'corp.war.accept': 'Принять',
+  'corp.war.ava': 'AvA',
   'corp.war.by-us': 'вызов от нас',
   'corp.war.cancelled': 'отменён',
   'corp.war.challenge': 'Вызвать',
@@ -696,6 +697,7 @@ export const ru: Record<string, string> = {
   'meta.note':
     'Опыт даётся за завершённые матчи: участие + счёт + победа. Прокачка не продаётся — только игра.',
   'meta.points': 'Очков: {n}',
+  'meta.xp': '{got}/{need} XP',
 
   // --- net — Сеть: подключение, разрывы, адрес сервера.
   'net.bad-address': 'Неверный адрес сервера',

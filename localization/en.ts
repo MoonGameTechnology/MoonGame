@@ -360,6 +360,7 @@ export const en: Record<string, string> = {
   'corp.tab.wars': 'Wars',
   'corp.transfer-lead': 'transfer headship',
   'corp.war.accept': 'Accept',
+  'corp.war.ava': 'AvA',
   'corp.war.by-us': 'challenge from us',
   'corp.war.cancelled': 'cancelled',
   'corp.war.challenge': 'Challenge',
@@ -695,6 +696,7 @@ export const en: Record<string, string> = {
   'meta.note':
     'XP comes from finished matches: participation + score + victory. Progression is never sold — play only.',
   'meta.points': 'Points: {n}',
+  'meta.xp': '{got}/{need} XP',
 
   // --- net — Сеть: подключение, разрывы, адрес сервера.
   'net.bad-address': 'Invalid server address',

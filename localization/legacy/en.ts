@@ -68,7 +68,6 @@ export const en: Record<string, string> = {
   // --- corp mock panel (role/presence dictionaries, CORP_TABS) ------------------
 
   // --- corporation cabinet (AVA-C1/C2, live) ------------------------------------
-  AvA: 'AvA',
   победа: 'victory',
   состав: 'roster',
   '—': '—',
@@ -132,7 +131,6 @@ export const en: Record<string, string> = {
   Чат: 'Chat',
   'реальное время': 'real time',
   // --- meta-progression («Прокачка», hub tab) -----------------------------------
-  '{got}/{need} XP': '{got}/{need} XP',
   // --- arsenal witryna («Арсенал», hub tab, ARS-5) --------------------------------
   модуль: 'module',
   // --- H4: ground-army designer (3 infantry lines + tank, officer premades) -------
