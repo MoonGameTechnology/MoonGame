@@ -9884,7 +9884,7 @@ function bagRu(bag: Record<string, number>): string {
   const parts = Object.entries(bag)
     .filter(([, n]) => n)
     .map(([r, n]) => `${Math.round(n)} ${t(RES_RU[r] ?? r)}`);
-  return parts.length ? parts.join(' · ') : t('бесплатно');
+  return parts.length ? parts.join(' · ') : t('yard.free');
 }
 function myRes(): Record<string, number> {
   return (s.players[ME]?.resources ?? {}) as Record<string, number>;
@@ -9925,8 +9925,7 @@ function conLoadoutPane(hullList: string[]): string {
   const snap = s.players[ME]?.arsenal;
   const ownedHulls = snap ? hullList.filter((h) => snap.hulls.includes(h)) : hullList;
   const ownedModules = snap ? new Set(snap.modules) : undefined;
-  if (!ownedHulls.length)
-    return `<div class="cn-soon">${t('В арсенале нет корпусов этого класса.')}</div>`;
+  if (!ownedHulls.length) return `<div class="cn-soon">${t('yard.hull.none')}</div>`;
   if (!ownedHulls.includes(conHull)) {
     conHull = ownedHulls[0]!;
     conModules = [];
@@ -9936,7 +9935,7 @@ function conLoadoutPane(hullList: string[]): string {
     count: conCount,
     ownedModules,
   });
-  if (!ed.ok) return `<div class="cn-soon">${t('Корпус недоступен.')}</div>`;
+  if (!ed.ok) return `<div class="cn-soon">${t('yard.hull.unavailable')}</div>`;
   const m: LoadoutModel = ed;
   const hulls = ownedHulls
     .map(
@@ -9947,7 +9946,7 @@ function conLoadoutPane(hullList: string[]): string {
   const freeTypes = [...new Set(m.slots.filter((sl) => !sl.moduleId).map((sl) => sl.type))];
   const hullCard =
     `<div class="cn-hull"><div class="cn-hic">${unitIconHtml(conHull, 40)}</div><div><div class="cn-hn">${esc(displayUnit(conHull))}</div>` +
-    `<div class="cn-hm">${t('{n} слота под модули (по размеру корпуса)', { n: String(m.slots.length) })}</div></div></div>`;
+    `<div class="cn-hm">${t('yard.slots.count', { n: String(m.slots.length) })}</div></div></div>`;
   const bays = m.slots
     .map((sl) => {
       if (sl.moduleId) {
@@ -9958,13 +9957,13 @@ function conLoadoutPane(hullList: string[]): string {
               .join(' ')
           : '';
         return (
-          `<div class="cn-bay filled" data-cnun="${sl.moduleId}" title="${t('снять модуль')}"><div class="cn-bic">${MODULE_ICON[sl.moduleId] ?? '▪'}</div>` +
+          `<div class="cn-bay filled" data-cnun="${sl.moduleId}" title="${t('yard.module.remove')}"><div class="cn-bic">${MODULE_ICON[sl.moduleId] ?? '▪'}</div>` +
           `<div><div class="cn-bt">${t(SLOT_RU[sl.type])}</div><div class="cn-bn">${esc(tData(sl.moduleName ?? sl.moduleId))}${conOriginTag(sl.moduleId)}</div></div><div class="cn-bd">${eff}</div></div>`
         );
       }
       return (
         `<div class="cn-bay empty"><div class="cn-bic">${SLOT_ICON[sl.type] ?? '＋'}</div>` +
-        `<div><div class="cn-bt">${t(SLOT_RU[sl.type])}</div><div class="cn-bn">${t('пусто — выбери модуль')}</div></div></div>`
+        `<div><div class="cn-bt">${t(SLOT_RU[sl.type])}</div><div class="cn-bn">${t('yard.slot.empty')}</div></div></div>`
       );
     })
     .join('');
@@ -9981,25 +9980,23 @@ function conLoadoutPane(hullList: string[]): string {
       }
       return (
         `<div class="cn-mod locked"><span class="cn-mic">${MODULE_ICON[o.id] ?? '▪'}</span>` +
-        `<span class="cn-mn">${esc(tData(o.name))}</span><span class="cn-me">${t('слот «{s}»', { s: t(SLOT_RU[o.slot]) })}</span><span class="cn-mc">${bagRu(o.cost)}</span></div>`
+        `<span class="cn-mn">${esc(tData(o.name))}</span><span class="cn-me">${t('yard.slot.named', { s: t(SLOT_RU[o.slot]) })}</span><span class="cn-mc">${bagRu(o.cost)}</span></div>`
       );
     })
     .join('');
   const palHead = freeTypes.length
-    ? t('Доступные модули — для слота «{s}»', {
+    ? t('yard.modules.for-slot', {
         s: freeTypes.map((ty) => t(SLOT_RU[ty])).join(' / '),
       })
-    : t('Доступные модули — все слоты заняты');
+    : t('yard.modules.all-taken');
   // LARS-4: the palette above already reads the LIVE arsenal snapshot (a module
   // bought mid-match shows up here without a new match) — this note is the only
   // thing that needed adding: make the timing honest (built, not instant).
-  const liveNote = snap
-    ? `<div class="cn-note">${t('⚡ Арсенал живой: докупленное в матче видно здесь сразу, но начинает работать только когда ты это ПОСТРОИШЬ — постройка и логистика, не мгновенно.')}</div>`
-    : '';
+  const liveNote = snap ? `<div class="cn-note">${t('yard.arsenal.note')}</div>` : '';
   const left =
     `<div class="cn-fit"><div class="cn-hulls">${hulls}</div>${hullCard}${bays}` +
     `<div class="cn-ph">${palHead}</div><div class="cn-pal">${palette}</div>` +
-    `<div class="cn-note">${t('Типизированные слоты: модуль встаёт только в свой тип. <b>Серые</b> — не для свободного слота или уже стоят.')}</div>${liveNote}</div>`;
+    `<div class="cn-note">${t('yard.slots.note')}</div>${liveNote}</div>`;
   // right: live preview + cost + build
   const maxStat = Math.max(1, ...m.preview.map((p) => p.effective));
   const bars = m.preview.map((p) => conBar(p, maxStat)).join('');
@@ -10015,28 +10012,28 @@ function conLoadoutPane(hullList: string[]): string {
     .join('');
   const cost =
     `<div class="cn-cost">` +
-    `<div class="cn-crow"><span class="cn-cl">${t('Корпус ×{n}', { n: String(m.count) })}</span><span class="cn-cv">${bagRu(m.hullCost)}</span></div>` +
+    `<div class="cn-crow"><span class="cn-cl">${t('yard.cost.hull', { n: String(m.count) })}</span><span class="cn-cv">${bagRu(m.hullCost)}</span></div>` +
     (conModules.length
-      ? `<div class="cn-crow"><span class="cn-cl">${t('Модули ×{n}', { n: String(m.count) })}</span><span class="cn-cv">${bagRu(m.modulesCost)}</span></div>`
+      ? `<div class="cn-crow"><span class="cn-cl">${t('yard.cost.modules', { n: String(m.count) })}</span><span class="cn-cv">${bagRu(m.modulesCost)}</span></div>`
       : '') +
-    `<div class="cn-crow total"><span class="cn-cl">${t('Итого')}</span><span class="cn-cv">${bagRu(m.totalCost)}</span></div></div>`;
+    `<div class="cn-crow total"><span class="cn-cl">${t('yard.cost.total')}</span><span class="cn-cv">${bagRu(m.totalCost)}</span></div></div>`;
   const canBuild = m.affordable && conPlanet !== '';
   const right =
-    `<div class="cn-side"><div class="cn-ph">${t('Итог с модулями')} — <em>${t('пересчёт вживую')}</em></div>${bars}${cost}` +
+    `<div class="cn-side"><div class="cn-ph">${t('yard.cost.with-modules')} — <em>${t('yard.cost.live')}</em></div>${bars}${cost}` +
     `<div class="cn-row2"><div class="cn-step"><button data-cncount="-" ${conCount <= 1 ? 'disabled' : ''}>−</button><span class="cn-sv">${conCount}</span><button data-cncount="+" ${conCount >= 20 ? 'disabled' : ''}>+</button></div>` +
-    `<select class="cn-plan" id="cn-planet"${owned.length ? '' : ' disabled'}>${planOpts || `<option>${t('нет своих миров')}</option>`}</select></div>` +
-    `<button class="cn-build" data-cnbuild ${canBuild ? '' : 'disabled'}>${t('Построить ×{n} →', { n: String(conCount) })}</button>` +
-    `<div class="cn-lock">🔒 <span>${t('Лоадаут фиксируется при постройке. Готовый корабль не переоснастить — только построить новый с другим набором.')}</span></div></div>`;
+    `<select class="cn-plan" id="cn-planet"${owned.length ? '' : ' disabled'}>${planOpts || `<option>${t('yard.no-worlds')}</option>`}</select></div>` +
+    `<button class="cn-build" data-cnbuild ${canBuild ? '' : 'disabled'}>${t('yard.build', { n: String(conCount) })}</button>` +
+    `<div class="cn-lock">🔒 <span>${t('yard.loadout.note')}</span></div></div>`;
   return `<div class="cn-grid">${left}${right}</div>`;
 }
 function conSoonPane(what: string): string {
-  return `<div class="cn-soon"><div class="cn-si">🚧</div>${t('«{what}» переезжает в конструктор следующим кирпичом.', { what })}</div>`;
+  return `<div class="cn-soon"><div class="cn-si">🚧</div>${t('yard.soon', { what })}</div>`;
 }
 /** The «Армия» pane: edit a division template's 6 slots (per-player, global). Live
  *  aggregate stats + synergies; mobilisation stays in the planet panel. */
 function conArmyPane(): string {
   const tpls = templatesOf(s, ME);
-  if (!tpls.length) return `<div class="cn-soon">${t('Нет шаблонов.')}</div>`;
+  if (!tpls.length) return `<div class="cn-soon">${t('yard.div.empty')}</div>`;
   const idx = Math.max(0, Math.min(conTplIdx, tpls.length - 1));
   const tpl = tpls[idx]!;
   const tabs = tpls
@@ -10050,30 +10047,30 @@ function conArmyPane(): string {
     .map((u, i) => {
       const inner = u
         ? `<span class="cn-fic">${formIcon(u)}</span><span class="cn-fn">${esc(FORM_RU[u] ?? u)}</span>`
-        : `<span class="cn-fic dim">＋</span><span class="cn-fn dim">${t('пусто')}</span>`;
+        : `<span class="cn-fic dim">＋</span><span class="cn-fn dim">${t('yard.div.slot-empty')}</span>`;
       return `<button class="cn-fslot${u ? ' filled' : ''}" data-confslot="${idx}|${i}">${inner}</button>`;
     })
     .join('');
   const card =
     `<div class="cn-hull"><div class="cn-hic">⚔</div><div><div class="cn-hn">${esc(tpl.name)}</div>` +
-    `<div class="cn-hm">${t('{n}/{s} юнитов · тапни слот, чтобы менять род войск', { n: String(f.count), s: String(FORMATION_SLOTS) })}</div></div></div>`;
+    `<div class="cn-hm">${t('yard.div.slots', { n: String(f.count), s: String(FORMATION_SLOTS) })}</div></div></div>`;
   const left =
     `<div class="cn-fit"><div class="cn-hulls">${tabs}</div>${card}<div class="cn-fgrid">${slots}</div>` +
-    `<div class="cn-note">${t('Тап по слоту: пусто → пехота → танк. Мобилизация дивизии — в панели своего мира (вкладка «Дивизии»).')}</div></div>`;
+    `<div class="cn-note">${t('yard.div.note')}</div></div>`;
   const max = Math.max(1, f.attack, f.defense, f.hp);
   const bars = [
-    conBar({ label: t('Атака'), base: f.attack, effective: f.attack, delta: 0 }, max),
-    conBar({ label: t('Оборона'), base: f.defense, effective: f.defense, delta: 0 }, max),
-    conBar({ label: t('Корпус'), base: f.hp, effective: f.hp, delta: 0 }, max),
+    conBar({ label: t('yard.div.attack'), base: f.attack, effective: f.attack, delta: 0 }, max),
+    conBar({ label: t('yard.div.defense'), base: f.defense, effective: f.defense, delta: 0 }, max),
+    conBar({ label: t('yard.div.hull'), base: f.hp, effective: f.hp, delta: 0 }, max),
   ].join('');
   const syn = f.synergies.length
-    ? `<div class="cn-ph" style="margin-top:14px">${t('Доктрина состава')}</div>` +
+    ? `<div class="cn-ph" style="margin-top:14px">${t('yard.div.doctrine')}</div>` +
       f.synergies.map((x) => `<div class="cn-syn">✦ ${esc(t(x.name))}</div>`).join('')
-    : `<div class="cn-note" style="margin-top:12px">${t('Смешай рода войск — состав задаёт доктрину.')}</div>`;
+    : `<div class="cn-note" style="margin-top:12px">${t('yard.div.doctrine.note')}</div>`;
   const cost =
-    `<div class="cn-cost"><div class="cn-crow total"><span class="cn-cl">${t('Стоимость мобилизации')}</span>` +
+    `<div class="cn-cost"><div class="cn-crow total"><span class="cn-cl">${t('yard.div.cost')}</span>` +
     `<span class="cn-cv">${bagRu(f.cost)}</span></div></div>`;
-  const right = `<div class="cn-side"><div class="cn-ph">${t('Итог по формации')} — <em>${t('пересчёт вживую')}</em></div>${bars}${syn}${cost}</div>`;
+  const right = `<div class="cn-side"><div class="cn-ph">${t('yard.div.total')} — <em>${t('yard.cost.live')}</em></div>${bars}${syn}${cost}</div>`;
   return `<div class="cn-grid">${left}${right}</div>`;
 }
 /** The «Герои» pane: the hero roster/штаб (folded from the old #hero window). The
@@ -10093,7 +10090,7 @@ function renderConstructor(): void {
           ? conArmyPane()
           : conHeroPane();
   constructorWin.innerHTML =
-    `<div class="cnbox"><div class="cn-head"><b>${t('КОНСТРУКТОР')}</b><button class="cn-close">✕</button></div>` +
+    `<div class="cnbox"><div class="cn-head"><b>${t('yard.title')}</b><button class="cn-close">✕</button></div>` +
     `<div class="cn-tabs">${CON_TABS.map(([k, l]) => tabBtn(k, l)).join('')}</div>` +
     `<div id="constructorbody">${body}</div></div>`;
 }
@@ -10209,7 +10206,7 @@ constructorWin.addEventListener('click', (e) => {
     if ((data.heroAbilities[abilityId]?.range ?? 0) > 0) {
       heroAim = { heroId, abilityId }; // ranged cast → arm the map (next world tap is the target)
       constructorWin.classList.remove('show');
-      note(t('✨ выберите мир-цель на карте'));
+      note(t('yard.pick.target'));
     } else {
       playerOrder(castHeroAbility(ME, heroId, abilityId));
       renderConstructor();
@@ -10225,9 +10222,9 @@ constructorWin.addEventListener('click', (e) => {
       a !== null ? data.heroAbilities[a]?.type : undefined,
     );
     note(
-      t('⚓ выберите свой мир{fl}{al} — там поднимется корабль героя', {
-        fl: perks.includes('spawn_fleet') ? t(' / свой флот') : '',
-        al: perks.includes('spawn_allied') ? t(' / мир союзника') : '',
+      t('yard.pick.hero-world', {
+        fl: perks.includes('spawn_fleet') ? t('yard.pick.own-fleet') : '',
+        al: perks.includes('spawn_allied') ? t('yard.pick.ally-world') : '',
       }),
     );
     return;
@@ -10249,7 +10246,7 @@ constructorWin.addEventListener('click', (e) => {
   if (tg.closest('[data-cnbuild]')) {
     if (conPlanet) {
       playerOrder(buildShip(ME, conPlanet, conHull, conCount, conModules));
-      note(t('⚒ заказано: {n}× {hull}', { n: String(conCount), hull: displayUnit(conHull) }));
+      note(t('yard.ordered', { n: String(conCount), hull: displayUnit(conHull) }));
     }
     return;
   }

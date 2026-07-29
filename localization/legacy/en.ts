@@ -208,7 +208,6 @@ export const en: Record<string, string> = {
   Сообщения: 'Messages',
   'Сообщения — скоро': 'Messages — coming soon',
   Станд: 'Std',
-  Стоимость: 'Cost',
   'Предложение: {stance}': 'Proposal: {stance}',
   'Стойка изменена: {stance}': 'Stance changed: {stance}',
   'Тащите за шапку, чтобы переместить': 'Drag the title bar to move',
@@ -309,7 +308,6 @@ export const en: Record<string, string> = {
 
   // --- hero grades (HERO_GRADES, heroes.ts) --------------------------------------
   Главный: 'Main',
-  '{n} слота под модули': '{n} module slots',
 
   // --- hero abilities (HERO_ABILITIES, heroes.ts) --------------------------------
   Коридор: 'Corridor',
@@ -434,7 +432,6 @@ export const en: Record<string, string> = {
   Аккаунт: 'Account',
   Верфь: 'Shipyard',
   Домой: 'Home',
-  Доступные: 'Available',
   Ещё: 'More',
   'Введи имя командира': 'Enter a commander name',
   'Пароли не совпадают': 'Passwords do not match',
@@ -489,9 +486,6 @@ export const en: Record<string, string> = {
   лутбокс: 'lootbox',
   аренда: 'rent',
   модуль: 'module',
-  'В арсенале нет корпусов этого класса.': 'The arsenal has no hulls of this class.',
-  '⚡ Арсенал живой: докупленное в матче видно здесь сразу, но начинает работать только когда ты это ПОСТРОИШЬ — постройка и логистика, не мгновенно.':
-    '⚡ Live arsenal: anything bought during the match shows up here right away, but it only starts working once you BUILD it — construction and logistics, not instant.',
   'Ходовые школы': 'Helm Schools',
   '+5% к скорости всех флотов с первой секунды матча.':
     '+5% fleet speed from the first second of a match.',
@@ -652,34 +646,12 @@ export const en: Record<string, string> = {
   Титан: 'Titan',
   Квазар: 'Quasar',
   // --- constructor («Верфь») — the unified loadout tab ------------------------
-  КОНСТРУКТОР: 'CONSTRUCTOR',
   Корабли: 'Ships',
   Армия: 'Army',
-  '{n} слота под модули (по размеру корпуса)': '{n} module slots (by hull size)',
-  'пусто — выбери модуль': 'empty — pick a module',
-  'снять модуль': 'remove module',
   Оружие: 'Weapon',
   Защита: 'Defense',
   Система: 'System',
-  'Доступные модули — для слота «{s}»': 'Available modules — for the «{s}» slot',
-  'Доступные модули — все слоты заняты': 'Available modules — all slots full',
-  'слот «{s}»': '«{s}» slot',
-  'Типизированные слоты: модуль встаёт только в свой тип. <b>Серые</b> — не для свободного слота или уже стоят.':
-    'Typed slots: a module fits only its own type. <b>Greyed</b> — not for a free slot, or already installed.',
-  'Итог с модулями': 'Total with modules',
-  'пересчёт вживую': 'live recalc',
-  'Корпус ×{n}': 'Hull ×{n}',
-  'Модули ×{n}': 'Modules ×{n}',
   Итого: 'Total',
-  'Построить ×{n} →': 'Build ×{n} →',
-  'Лоадаут фиксируется при постройке. Готовый корабль не переоснастить — только построить новый с другим набором.':
-    "Loadout locks in on build. A finished ship can't be refitted — build a new one with a different set.",
-  'нет своих миров': 'no worlds of yours',
-  '«{what}» переезжает в конструктор следующим кирпичом.':
-    '«{what}» moves into the constructor in the next brick.',
-  '⚒ заказано: {n}× {hull}': '⚒ ordered: {n}× {hull}',
-  'Корпус недоступен.': 'Hull unavailable.',
-  бесплатно: 'free',
   // stat / resource words used by the module-effect chips and cost lines
   корпус: 'hull',
   щит: 'shield',
@@ -693,24 +665,10 @@ export const en: Record<string, string> = {
   микроэлектроники: 'microelectronics',
   // --- hero window / deploy flow (окно героя, развёртывание) --------------------
   'КД {h}': 'CD {h}',
-  '⚓ выберите свой мир{fl}{al} — там поднимется корабль героя':
-    "⚓ pick your world{fl}{al} — the hero's ship rises there",
-  ' / свой флот': ' / own fleet',
-  ' / мир союзника': " / ally's world",
   '✨ выберите мир-цель на карте': '✨ pick a target world on the map',
   '✖ каст отменён': '✖ cast cancelled',
   '✖ развёртывание отменено': '✖ deploy cancelled',
   // --- division / formation builder (конструктор дивизий) ----------------------
-  'Итог по формации': 'Formation summary',
-  'Доктрина состава': 'Composition doctrine',
-  'Стоимость мобилизации': 'Mobilization cost',
-  'Нет шаблонов.': 'No templates.',
-  'Смешай рода войск — состав задаёт доктрину.':
-    'Mix troop types — the composition sets a doctrine.',
-  '{n}/{s} юнитов · тапни слот, чтобы менять род войск':
-    '{n}/{s} units · tap a slot to change the troop type',
-  'Тап по слоту: пусто → пехота → танк. Мобилизация дивизии — в панели своего мира (вкладка «Дивизии»).':
-    "Tap a slot: empty → infantry → tank. Mobilize the division in your world's panel (the «Divisions» tab).",
   // --- build ETA / misc --------------------------------------------------------
   Стройка: 'Building',
   'Ещё раз «Назад» — выход из матча': 'Press Back again to leave the match',
@@ -730,7 +688,6 @@ export const en: Record<string, string> = {
   'флот сам штурмует вражеский мир по прибытии':
     'the fleet storms an enemy world by itself on arrival',
   // --- REL-7 seat/faction picker ------------------------------------------------
-  свободно: 'free',
 
   // --- sandbox panel (dev-only build, prototype/src/sandbox.ts) ----------------
   ПЕСОЧНИЦА: 'SANDBOX',
