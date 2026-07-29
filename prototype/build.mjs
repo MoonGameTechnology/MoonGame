@@ -2116,7 +2116,7 @@ const page = (js) => `<!doctype html>
 <canvas id="map"></canvas>
 <header id="top">
   <div class="crest">
-    <button id="crestmark" title="Ваш профиль" type="button">◆</button>
+    <button id="crestmark" data-i18n-title="hud.crest.title" type="button">◆</button>
     <div class="who"><b>VOID DOMINION</b><span>SECTOR COMMAND</span></div>
   </div>
   <div id="purse"></div>
@@ -2139,7 +2139,7 @@ const page = (js) => `<!doctype html>
     <button id="rail-settings" data-i18n-title="rail.settings.title">⚙<span class="rlbl" data-i18n="rail.settings.label"></span></button>
     <button id="rail-exit" data-i18n-title="rail.exit.title">⌂<span class="rlbl" data-i18n="rail.exit.label"></span></button>
   </div>
-  <button id="railtoggle" title="Инструменты" type="button" aria-expanded="false"><span id="railglyph">☰</span><span class="badge" id="railalert" style="display:none">0</span></button>
+  <button id="railtoggle" data-i18n-title="rail.toggle.title" type="button" aria-expanded="false"><span id="railglyph">☰</span><span class="badge" id="railalert" style="display:none">0</span></button>
 </nav>
 <!-- floating chat window (desktop only) — content rendered by renderChat() in main.ts -->
 <div id="chatwin" class="desk-only"></div>
@@ -2314,7 +2314,7 @@ const page = (js) => `<!doctype html>
     <div class="hub-bt">VOID DOMINION</div>
   </div>
   <div class="hub-id">
-    <div class="hub-av" id="hubav" title="Сменить эмблему">◆</div>
+    <div class="hub-av" id="hubav" data-i18n-title="hub.avatar.title">◆</div>
     <div class="hub-who">
       <div class="hub-name" id="hub-name">Командир</div>
       <div class="hub-st" data-i18n="hub.status.online"></div>
@@ -2384,7 +2384,7 @@ const page = (js) => `<!doctype html>
 </div>
 <div id="emblempick">
   <div class="ep-box">
-    <div class="ep-head"><b>ВЫБОР ЭМБЛЕМЫ</b><button id="ep-close" type="button" aria-label="Закрыть">✕</button></div>
+    <div class="ep-head"><b data-i18n="hub.emblem.title"></b><button id="ep-close" type="button" data-i18n-aria="hub.emblem.close">✕</button></div>
     <div class="ep-grid" id="ep-grid"></div>
   </div>
 </div>
@@ -2443,7 +2443,7 @@ const page = (js) => `<!doctype html>
 <!-- DEV TEST MODE — content rendered by testmode.ts; delete this one line to cut the markup -->
 <!--dev-only--><div id="testmode"></div><!--/dev-only-->
 <!-- SANDBOX — floating opener + overlay (content rendered by sandbox.ts); delete to cut the markup -->
-<!--dev-only--><button id="sandboxbtn" title="Песочница" style="display:none">🧪</button><div id="sandbox"></div><!--/dev-only-->
+<!--dev-only--><button id="sandboxbtn" data-i18n-title="hub.sandbox.title" style="display:none">🧪</button><div id="sandbox"></div><!--/dev-only-->
 <script>${js}</script>
 </body></html>`;
 

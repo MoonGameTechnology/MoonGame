@@ -4,6 +4,66 @@
 // untranslated string shows up in Russian rather than as a raw key. The locale
 // guard in prototype/src/i18n.test.ts fails on any key present in ru.ts but not here.
 export const en: Record<string, string> = {
+  // --- codex — Кодекс: карточка здания/юнита/модуля (строки характеристик) и статьи-термины.
+  'codex.hub.close': 'CLOSE',
+  'codex.hub.empty': 'Nothing found',
+  'codex.hub.search.aria': 'Search the codex',
+  'codex.hub.search.ph': 'Search: unit, building, term…',
+  'codex.hub.sec.building': 'Buildings',
+  'codex.hub.sec.mechanic': 'Mechanics',
+  'codex.hub.sec.unit': 'Units',
+  'codex.hub.title': 'CODEX',
+  'codex.row.aa': 'AA',
+  'codex.row.atk-def': 'Attack / Defense',
+  'codex.row.build-time': 'Build time',
+  'codex.row.cargo': 'Cargo capacity',
+  'codex.row.class': 'Class',
+  'codex.row.cost': 'Cost',
+  'codex.row.garrison-defense': 'Garrison defense',
+  'codex.row.hp': 'Structure HP',
+  'codex.row.hull': 'Hull',
+  'codex.row.levels': 'Tiers',
+  'codex.row.produces': 'Produces',
+  'codex.row.radar': 'Radar reach',
+  'codex.row.range': 'Range',
+  'codex.row.score': 'Victory points',
+  'codex.row.signature': 'Radar signature',
+  'codex.row.slot': 'Slot',
+  'codex.row.speed': 'Speed',
+  'codex.row.upkeep': 'Upkeep',
+  'codex.tag.building': 'building',
+  'codex.tag.fitting': 'fitting',
+  'codex.tag.ground-unit': 'ground unit',
+  'codex.tag.mechanic': 'mechanic',
+  'codex.tag.module': 'module',
+  'codex.tag.ship': 'ship',
+  'codex.term.async.body':
+    'The world runs in real time and keeps going 24/7 — even after you leave. Orders take real hours: set a course, close the game, come back to the result. This is not turn-based — drop in, issue orders, drop out.',
+  'codex.term.async.title': 'Asynchronous world',
+  'codex.term.capture.body':
+    'Capturing a world is two-phase. First enter orbit and beat the defenders in space; if the world holds a garrison, land troops (a ground division from the hold). Sky first, then ground.',
+  'codex.term.capture.title': 'Orbit and landing',
+  'codex.term.coalition.body':
+    'Diplomacy lets you sign pacts and alliances, but a coalition is capped by combined strength — you cannot gang everyone up on one player. The cap keeps the balance of power and stops a snowball from crushing the game.',
+  'codex.term.coalition.title': 'Coalition cap',
+  'codex.term.fog.body':
+    'You see only what is near your forces and radars; the rest is hidden by fog or shown from memory (the last thing you saw there). Scouts and radar widen your view — keep your eyes open.',
+  'codex.term.fog.title': 'Fog of war',
+  'codex.term.lanes.body':
+    'Fleets travel not in straight lines but along star lanes between worlds — the route is built automatically. Lane nodes can be intercepted: an enemy met on the way is a battle.',
+  'codex.term.lanes.title': 'Star lanes',
+  'codex.term.score.body':
+    'Points accrue from what you hold: a world — 50, any other sector — 10, buildings add per level. Reach the score threshold to win. Other paths to victory: eliminating rivals or domination.',
+  'codex.term.score.title': 'Victory points',
+  'codex.term.upkeep.body':
+    'Fleets and buildings cost a daily fee. Mine income minus upkeep = your net balance; go negative and the treasury drains. Build economy before army.',
+  'codex.term.upkeep.title': 'Upkeep',
+  'codex.value.hours': '{n} h',
+  'codex.value.levels-upgradable': '{n} (upgradeable)',
+  'codex.value.per-day': '{n} {r}/day',
+  'codex.value.per-hour': '{n} {r}/h',
+  'codex.value.per-level': '{n} / level',
+
   // --- data — Имена игровых ДАННЫХ (data/*.json + таблицы прототипа), через tData().
   'data.aa': 'aa',
   'data.artillery': 'artillery',
@@ -75,6 +135,108 @@ export const en: Record<string, string> = {
   'diplo.stance.pact': 'Pact',
   'diplo.stance.peace': 'Peace',
   'diplo.stance.war': 'War',
+
+  // --- dossier — Досье объектов: здания, корабли, стройка в очереди, вкладки и характеристики.
+  'dossier.building.barracks':
+    'Barracks defend your world from invaders. Home to your valiant defenders.',
+  'dossier.building.default': 'A planetary structure.',
+  'dossier.building.fabricator':
+    'Clean lithography halls print {m}▦ per hour. Hungry for power and people, but its output guides strike wings and unlocks siege doctrines. Upgrades pay for themselves in their own product.',
+  'dossier.building.farm':
+    'Tiers of hydroponic greenhouses under spectral lamps feed those in your care — hunger is merciless. Grows {f}❖ per hour. Your workers and soldiers eat every day; it would be foolish to lose a battle to a hungry faint.',
+  'dossier.building.fort':
+    'A layered planetary bastion. Raises garrison defense by {d} and holds {hp} structure HP under orbital fire. The last line of a besieged world.',
+  'dossier.building.metal-station':
+    "A mining rig gnawing into a dead world's scorched crust. Where annihilation burned away all life, raw metal ore lies exposed — the station pumps {m}⬢ per hour. Upgrades raise the yield.",
+  'dossier.building.mine':
+    'A drilling rig gnaws into the planet, mining {m}⬢ per hour. Upgrades dig deeper to reach the richest veins. The foundation for building your fleet.',
+  'dossier.building.orbital-aa':
+    "A stationary anti-air battery guards your world's airspace, dealing {dmg} damage per hour to ships in orbit. A nightmare for bombers hanging over the world and for raiding squadrons. Doesn't block capture (that's ground defense's job) — it just mows down the fleet overhead.",
+  'dossier.building.power-plant':
+    "A fusion reactor powers your worlds, producing {e}↯ per hour. Energy is the lifeblood of your buildings — they don't run on magic. When it runs short, everything browns out to half output.",
+  'dossier.building.radar':
+    'A radar complex sees through the space around your world and catches enemy signatures long before they dare attack. Upgrades widen the coverage.',
+  'dossier.building.refinery':
+    'A refining complex turning ore and logistics into liquid credits — {c}¤ per hour. Fuel for imperial bureaucracy, shipyards and mercenary squadrons.',
+  'dossier.building.starfort':
+    'A standalone fortress raised in an asteroid field: {d} to defense and {hp} structure HP. Turns a faceless crossroads into a fortified node with orbit and AA.',
+  'dossier.building.tax-office':
+    "An imperial-style tax office: produces nothing itself, but registers the world's population and lifts its credit take by {b}.",
+  'dossier.divdesign.desc': 'The template editor: slot composition and division doctrine.',
+  'dossier.divdesign.name': 'Division builder',
+  'dossier.division.desc':
+    'A ground formation mobilized from a template. Defends the world; loads onto a fleet from the fleet panel.',
+  'dossier.division.name': 'Division',
+  'dossier.fleet.desc':
+    'A mobile task force of ships. Select it to give maneuver, orbit and strike orders.',
+  'dossier.fleet.name': 'Fleet',
+  'dossier.stat.atk.desc': "The fleet's total ship attack.",
+  'dossier.stat.atk.name': 'Attack',
+  'dossier.stat.cap.desc':
+    'At most {n} units fire per volley — the strongest first; everyone beyond the cap only soaks damage.',
+  'dossier.stat.cap.name': 'Firing line',
+  'dossier.stat.datk.desc': "The division's total attack.",
+  'dossier.stat.datk.name': 'Attack',
+  'dossier.stat.ddef.desc': "The division's total defense.",
+  'dossier.stat.ddef.name': 'Defense',
+  'dossier.stat.def.desc': "The fleet's total ship defense.",
+  'dossier.stat.def.name': 'Defense',
+  'dossier.stat.dhp.desc': "The division's total hit points.",
+  'dossier.stat.dhp.name': 'HP',
+  'dossier.stat.garrison.desc': 'The ground troops defending the world.',
+  'dossier.stat.garrison.name': 'Garrison',
+  'dossier.stat.ground.desc': "Infantry and armour on the world's surface.",
+  'dossier.stat.ground.name': 'Ground units',
+  'dossier.stat.gships.desc': "Ships parked in the world's garrison (not in orbit).",
+  'dossier.stat.gships.name': 'Ships in garrison',
+  'dossier.stat.hp.desc': "The fleet's total hull strength.",
+  'dossier.stat.hp.name': 'Hit points',
+  'dossier.stat.hull.desc':
+    'Current/full army hull. Mends over your world with a repair yard — or instantly for credits.',
+  'dossier.stat.hull.name': 'Hull',
+  'dossier.stat.pbuild.desc': 'The number of buildings on the world.',
+  'dossier.stat.pbuild.name': 'Structures',
+  'dossier.stat.shield.desc':
+    'Ablative shield: takes damage first and recharges for free out of combat.',
+  'dossier.stat.shield.name': 'Shield',
+  'dossier.stat.spd.desc': 'Travel speed — the fleet moves at its slowest ship.',
+  'dossier.stat.spd.name': 'Speed',
+  'dossier.tab.buildings.desc':
+    "The world's buildings and its construction conveyor: condition, levels, upgrades.",
+  'dossier.tab.buildings.name': 'Buildings',
+  'dossier.tab.ground.desc':
+    'Ground units defend your worlds. Load them onto a fleet to capture enemy worlds.',
+  'dossier.tab.ground.name': 'Ground',
+  'dossier.tab.ships.desc':
+    'The fleet is your weapon and shield. Order ships here to reinforce it.',
+  'dossier.tab.ships.name': 'Fleet',
+  'dossier.tab.squadron.desc':
+    'A carrier (◈) holds squadrons (△). Launch the wing from the selected fleet\'s panel with "🛩 Launch squadron".',
+  'dossier.tab.squadron.name': 'Wings',
+  'dossier.task.eta': 'Remaining: {r}',
+  'dossier.task.output': '{r}: {now}/h now → {final}/h once finished',
+  'dossier.task.queued': 'Queued — not started yet.',
+  'dossier.task.title': 'Building',
+  'dossier.task.unit-ready': "Joins the planet's garrison/fleet once finished.",
+  'dossier.unit.cruiser.desc':
+    "The battle line's workhorse: {a} attack, {hp} hull and a hold for {c}. A general-purpose warship, equally solid on offense and defense.",
+  'dossier.unit.cruiser.name': 'Cruiser',
+  'dossier.unit.default': 'A combat unit.',
+  'dossier.unit.fighter-squadron.desc':
+    "A carrier-borne wing: fast (speed {sp}) and hits hard ({a} attack), but almost no armor ({hp} hull). Splits off the carrier into its own fast fleet and strikes from range {r}. Countered by orbital AA — don't send it against an AA-covered world.",
+  'dossier.unit.fighter-squadron.name': 'Fighter squadron',
+  'dossier.unit.hero.desc':
+    "The commander's own combat projection — a flagship leading the home fleet: {a} attack and {hp} hull. But that's not what matters: its presence holds the squadron together, granting {b} attack/defense to every ship nearby. If it falls, the commander loses their projection until it's rebuilt at the home world.",
+  'dossier.unit.hero.name': 'Flagship',
+  'dossier.unit.scout.desc':
+    'A light recon hull. Fast (speed {sp}) and almost silent (signature {sig}) — it maps the void where a battle fleet fears to go.',
+  'dossier.unit.scout.name': 'Scout',
+  'dossier.unit.siege.desc':
+    'A heavy siege platform: {a} damage from range {r}, but thin armor ({d} defense). Its place is behind the cruisers, from where it smashes fortifications and shipyards.',
+  'dossier.unit.siege.name': 'Siege Platform',
+  'dossier.unit.strike-carrier.desc':
+    'A slow armored carrier ({hp} hull, hold for {c}) — almost no guns of its own, all its strength is in the wing it carries. Keep it behind and launch the wing at a target with "🛩 Launch squadron".',
+  'dossier.unit.strike-carrier.name': 'Strike Carrier',
 
   // --- err — Отказы ядра (kernel rejection codes). Ключ выводится из кода: E_NO_CAPACITY → err.no-capacity.
   'err.already': 'already in effect',
@@ -159,10 +321,13 @@ export const en: Record<string, string> = {
   'hub.ally.corp': 'Corporation cabinet',
   'hub.ally.empty.sub': 'corporations · shared AvA battles · influence',
   'hub.ally.empty.title': 'Alliances',
+  'hub.avatar.title': 'Change emblem',
   'hub.digest.empty.sub':
     'Join a match on the "Games" tab — moves needing your attention will show up here.',
   'hub.digest.empty.title': 'No matches waiting on an order',
   'hub.digest.section': 'Summary',
+  'hub.emblem.close': 'Close',
+  'hub.emblem.title': 'CHOOSE AN EMBLEM',
   'hub.msgs.aria': 'Messages',
   'hub.nav.ally': 'Alliances',
   'hub.nav.arsenal': 'Arsenal',
@@ -179,6 +344,7 @@ export const en: Record<string, string> = {
   'hub.play': 'PLAY NOW',
   'hub.rank.empty.sub': 'a seasonal rank from match placements',
   'hub.rank.empty.title': 'Rankings — coming soon',
+  'hub.sandbox.title': 'Sandbox',
   'hub.season.sub': 'Rankings and alliances unlock once the meta-layer launches.',
   'hub.season.title': 'The season has not started',
   'hub.solo': 'Solo game',
@@ -195,6 +361,7 @@ export const en: Record<string, string> = {
   'hub.tile.updates': 'Updates',
 
   // --- hud — Постоянный интерфейс матча: верхняя панель ресурсов.
+  'hud.crest.title': 'Your profile',
   'hud.resource.credits': 'Credits',
   'hud.resource.energy': 'Energy',
   'hud.resource.food': 'Food',
@@ -232,6 +399,7 @@ export const en: Record<string, string> = {
   'rail.steward.title': 'Steward — hand to the AI while asleep',
   'rail.tech.label': 'Science',
   'rail.tech.title': 'Technologies',
+  'rail.toggle.title': 'Tools',
 
   // --- seatpick — Выбор фракции и места перед входом в сетевой матч.
   'seatpick.cancel': 'Back',

@@ -133,32 +133,7 @@ export const en: Record<string, string> = {
   'Здесь корпорации бросают друг другу вызов на организованную войну. Отметь готовность корпорации и свою личную — когда обе стороны готовы, можно принять вызов. Дальше — набор состава и сама война по расписанию.':
     'Here corporations challenge each other to an organised war. Mark your corporation ready and yourself ready — once both sides are ready, a challenge can be accepted. Next comes roster sign-up and the scheduled war itself.',
   // --- ONB-4 codex/help hub (chrome + glossary) --------------------------------
-  СПРАВОЧНИК: 'CODEX',
-  'Поиск: юнит, здание, термин…': 'Search: unit, building, term…',
-  'Поиск по справочнику': 'Search the codex',
-  'Ничего не найдено': 'Nothing found',
-  механика: 'mechanic',
-  Механики: 'Mechanics',
-  'Асинхронный мир': 'Asynchronous world',
-  'Мир идёт в реальном времени и продолжается 24/7 — даже когда ты вышел. Приказы занимают реальные часы: отдал курс, закрыл игру, вернулся к результату. Это не пошаговая игра — заходи, отдавай приказы, выходи.':
-    'The world runs in real time and keeps going 24/7 — even after you leave. Orders take real hours: set a course, close the game, come back to the result. This is not turn-based — drop in, issue orders, drop out.',
   'Туман войны': 'Fog of war',
-  'Ты видишь только то, что рядом с твоими силами и радарами; остальное скрыто туманом или показано по памяти (последнее, что ты там видел). Разведчики и радары раздвигают обзор — держи глаза открытыми.':
-    'You see only what is near your forces and radars; the rest is hidden by fog or shown from memory (the last thing you saw there). Scouts and radar widen your view — keep your eyes open.',
-  'Содержание (upkeep)': 'Upkeep',
-  'Флоты и здания требуют ежедневной платы. Доход от шахт минус содержание = чистый баланс; уйдёшь в минус — казна опустеет. Строй экономику раньше армии.':
-    'Fleets and buildings cost a daily fee. Mine income minus upkeep = your net balance; go negative and the treasury drains. Build economy before army.',
-  'Орбита и высадка': 'Orbit and landing',
-  'Захват мира — двухфазный. Сначала выйди на орбиту и подави оборону в космосе; если мир защищён гарнизоном — высади десант (наземную дивизию из трюма). Небо, потом земля.':
-    'Capturing a world is two-phase. First enter orbit and beat the defenders in space; if the world holds a garrison, land troops (a ground division from the hold). Sky first, then ground.',
-  'Звёздные трассы': 'Star lanes',
-  'Флоты ходят не напрямую, а по звёздным трассам (лэйнам) между мирами — маршрут строится автоматически. Узлы на трассах можно перехватывать: встречный враг на пути — это бой.':
-    'Fleets travel not in straight lines but along star lanes between worlds — the route is built automatically. Lane nodes can be intercepted: an enemy met on the way is a battle.',
-  'Очки капают за то, чем ты владеешь: мир — 50, прочий сектор — 10, здания добавляют по уровню. Набери порог очков — победа. Другой путь к победе — уничтожение соперников или доминирование.':
-    'Points accrue from what you hold: a world — 50, any other sector — 10, buildings add per level. Reach the score threshold to win. Other paths to victory: eliminating rivals or domination.',
-  'Коалиционный порог': 'Coalition cap',
-  'Дипломатия позволяет заключать пакты и союзы, но коалиция ограничена порогом совокупной силы — нельзя собрать всех против одного. Порог держит баланс сил и не даёт «снежному кому» задавить партию.':
-    'Diplomacy lets you sign pacts and alliances, but a coalition is capped by combined strength — you cannot gang everyone up on one player. The cap keeps the balance of power and stops a snowball from crushing the game.',
   // --- ONB-0 first-run offer (hub) + «Ещё → Обучение» --------------------------
   Пропустить: 'Skip',
   Обучение: 'Tutorial',
@@ -199,10 +174,6 @@ export const en: Record<string, string> = {
   '{a} и {b}: {stance}': '{a} and {b}: {stance}',
   '{a} объявил войну {b}': '{a} declared war on {b}',
   '{b} — улучшение': '{b} — upgrade',
-  '{n} (улучшаемо)': '{n} (upgradeable)',
-  '{n} / уровень': '{n} / level',
-  '{n} {r}/день': '{n} {r}/day',
-  '{n} {r}/ч': '{n} {r}/h',
   '{n} ФЛОТОВ': '{n} FLEETS',
   // TGT-1: target-order composer
   Цель: 'Target',
@@ -228,11 +199,6 @@ export const en: Record<string, string> = {
   'снять приказ': 'clear the order',
   '{n} флотов': '{n} fleets',
   '◎ приказ поставлен — флот исполнит план сам': '◎ order set — the fleet will run the plan itself',
-  'Осталось: {r}': 'Remaining: {r}',
-  'В очереди — ещё не начато.': 'Queued — not started yet.',
-  'По готовности пополнит гарнизон/флот планеты.':
-    "Joins the planet's garrison/fleet once finished.",
-  '{r}: {now}/ч сейчас → {final}/ч по готовности': '{r}: {now}/h now → {final}/h once finished',
   '{n} уч.': '{n} members',
   '{n} ч': '{n} h',
   '{n}м': '{n}m',
@@ -246,18 +212,10 @@ export const en: Record<string, string> = {
   '{who} предлагает — нажмите, чтобы принять': '{who} is offering — tap to accept',
 
   // --- fleet panel / command bar ------------------------------------------------
-  'Автономная крепость, возведённая в астероидное поле: {d} к обороне и {hp} прочности. Превращает безликий перекрёсток в укреплённый узел с орбитой и ПКО':
-    'A standalone fortress raised in an asteroid field: {d} to defense and {hp} structure HP. Turns a faceless crossroads into a fortified node with orbit and AA.',
   Агрес: 'Aggr',
   Атака: 'Attack',
-  'Атака / Оборона': 'Attack / Defense',
-  'Боевая единица.': 'A combat unit.',
-  'Боевая проекция самого командующего — флагман во главе родного флота: {a} атаки и {hp} корпуса. Но решает не это: его присутствие держит эскадру в кулаке, давая {b} к атаке и обороне всем кораблям рядом. Падёт — командующий лишается проекции, пока та не отстроится заново на родном мире.':
-    "The commander's own combat projection — a flagship leading the home fleet: {a} attack and {hp} hull. But that's not what matters: its presence holds the squadron together, granting {b} attack/defense to every ship nearby. If it falls, the commander loses their projection until it's rebuilt at the home world.",
   'Боевой счёт': 'War record',
   'Боты не вступают в коалиции': 'Bots do not join coalitions',
-  'Буровая платформа вгрызается в планету и добывает {m}⬢ в час. Улучшение позволяет копать глубже, чтобы добраться до самых богатых жил. Основа для строительства флота.':
-    'A drilling rig gnaws into the planet, mining {m}⬢ per hour. Upgrades dig deeper to reach the richest veins. The foundation for building your fleet.',
   'В ЛС игроку': "To a player's DM",
   'В архив': 'Archive',
   'В казне': 'In the treasury',
@@ -265,11 +223,9 @@ export const en: Record<string, string> = {
   ВЫ: 'YOU',
   ВЫКЛ: 'OFF',
   Влияние: 'Influence',
-  'Вместимость трюма': 'Cargo capacity',
   Войти: 'Join',
   Восстановить: 'Restore',
   Время: 'Time',
-  'Время постройки': 'Build time',
   Все: 'All',
   'Вход через Apple — скоро · ты вошёл гостем':
     'Sign in with Apple — coming soon · you entered as a guest',
@@ -277,10 +233,7 @@ export const en: Record<string, string> = {
     'Sign in with Google — coming soon · you entered as a guest',
   Вы: 'You',
   Выставить: 'List',
-  'Казармы нужны для защиты вашего мира от захватчиков. Тут живут ваши доблестные защитники.':
-    'Barracks defend your world from invaders. Home to your valiant defenders.',
   Глобальный: 'Global',
-  Дальность: 'Range',
   День: 'Day',
   'День {n}': 'Day {n}',
   '{h}ч': '{h}h',
@@ -302,8 +255,6 @@ export const en: Record<string, string> = {
   Дипломатия: 'Diplomacy',
   Отношения: 'Relations',
   'Открыть карточку игрока': 'Open player card',
-  'Добывающая платформа, вгрызается в спёкшуюся кору мёртвого мира. Там, где аннигиляция выжгла всё живое, обнажилась чистая металлическая руда — станция качает {m}⬢ в час. Улучшение увеличивает добычу.':
-    "A mining rig gnawing into a dead world's scorched crust. Where annihilation burned away all life, raw metal ore lies exposed — the station pumps {m}⬢ per hour. Upgrades raise the yield.",
   'Ещё раз «Назад» — выход': 'Press Back again to exit',
   'Ждём, пока хост начнёт…': 'Waiting for the host to start…',
   ЗАКРЫТЬ: 'CLOSE',
@@ -316,8 +267,6 @@ export const en: Record<string, string> = {
   'Закрепить размер и положение': 'Lock size and position',
   Закрыть: 'Close',
   Заявиться: 'Sign up',
-  Здания: 'Buildings',
-  Земля: 'Ground',
   ИИ: 'AI',
   Имя: 'Name',
   Исследовать: 'Research',
@@ -325,10 +274,8 @@ export const en: Record<string, string> = {
   Герои: 'Heroes',
   'Герои — командиры флота': 'Heroes — fleet commanders',
   'У каждого героя своё дерево навыков — тапни узел, чтобы увидеть, что он открывает, и изучи по требованиям и стоимости. Открытые узлы дают способности (активные, с дальностью и перезарядкой) или пассивки. Погибший герой возрождается на столице.':
-    "Each hero has its own skill tree — tap a node to see what it unlocks, then learn it once its requirements and cost are met. Unlocked nodes grant abilities (active, with range and a cooldown) or passives. A fallen hero respawns at your capital.",
-  'Истребительная эскадрилья': 'Fighter squadron',
+    'Each hero has its own skill tree — tap a node to see what it unlocks, then learn it once its requirements and cost are met. Unlocked nodes grant abilities (active, with range and a cooldown) or passives. A fallen hero respawns at your capital.',
   'Канал «{ch}» пуст.': 'Channel "{ch}" is empty.',
-  Класс: 'Class',
   Коалиция: 'Coalition',
   'Командный бой: ВКЛ': 'Team battle: ON',
   'Командный бой: выкл': 'Team battle: off',
@@ -336,44 +283,23 @@ export const en: Record<string, string> = {
   'одна сторона — союзники': 'one side = allies',
   Командир: 'Commander',
   Корпорация: 'Corporation',
-  'Корабли в гарнизоне': 'Ships in garrison',
   Корпус: 'Hull',
   Крейсер: 'Cruiser',
-  Крылья: 'Wings',
   Купить: 'Buy',
   Курс: 'Move',
-  'Лёгкий разведывательный корпус. Быстрый (ход {sp}) и почти неслышный (сигнатура {sig}) — чертит карту пустоты там, куда боится соваться линейный флот.':
-    'A light recon hull. Fast (speed {sp}) and almost silent (signature {sig}) — it maps the void where a battle fleet fears to go.',
   'Маршрут проходит через миры <b>{names}</b>, с кем у вас <b>мир</b>. Мирного прохода нет — движение сюда объявит <b>войну</b>.':
     'This route crosses worlds held by <b>{names}</b>, with whom you are at <b>peace</b>. There is no peaceful passage — advancing here declares <b>war</b>.',
-  'Медленный бронированный носитель ({hp} корпуса, трюм на {c}) — своих пушек почти нет, вся его сила в эскадрильях, что он несёт. Держите его позади и запускайте авиагруппу по цели кнопкой «🛩 Запустить эскадрилью».':
-    'A slow armored carrier ({hp} hull, hold for {c}) — almost no guns of its own, all its strength is in the wing it carries. Keep it behind and launch the wing at a target with "🛩 Launch squadron".',
   'Нет дивизий.': 'No divisions.',
-  'Суммарная атака дивизии.': "The division's total attack.",
-  'Суммарная защита дивизии.': "The division's total defense.",
-  'Суммарные очки здоровья дивизии.': "The division's total hit points.",
-  'Конструктор дивизий': 'Division builder',
-  'Редактор шаблонов: состав слотов и доктрина дивизий.':
-    'The template editor: slot composition and division doctrine.',
   'Миров под контролем': 'Worlds held',
-  'Мобильное оперативное соединение кораблей. Выберите его, чтобы отдавать приказы на манёвр, орбиту и удар по врагу.':
-    'A mobile task force of ships. Select it to give maneuver, orbit and strike orders.',
   Модули: 'Modules',
   НАСТРОЙКИ: 'SETTINGS',
   Назад: 'Back',
-  'Наземные части': 'Ground units',
-  'Наземные части обороняют ваши миры. Их можно погрузить на флот для захвата вражеских миров.':
-    'Ground units defend your worlds. Load them onto a fleet to capture enemy worlds.',
-  'Налоговая управа имперского образца: сама ничего не добывает, но ставит на учёт население мира и поднимает его кредитный сбор на {b}.':
-    "An imperial-style tax office: produces nothing itself, but registers the world's population and lifts its credit take by {b}.",
   'Напишите первое сообщение.': 'Write the first message.',
   Настройки: 'Settings',
   Нейтрал: 'Neutral',
   'Нет дивизий — мобилизуй по шаблону ниже.': 'No divisions — mobilize from a template below.',
   'Нет лотов на покупку': 'No buy orders',
   'Нет лотов на продажу': 'No sell orders',
-  'Носитель (◈) несёт эскадрильи (△). Запускайте авиагруппу из панели выбранного флота кнопкой «🛩 Запустить эскадрилью».':
-    'A carrier (◈) holds squadrons (△). Launch the wing from the selected fleet\'s panel with "🛩 Launch squadron".',
   'ОБЪЯВИТЬ ВОЙНУ': 'DECLARE WAR',
   'ОБЪЯВИТЬ ВОЙНУ?': 'DECLARE WAR?',
   'Это мир дружественной фракции. Вы хотите объявить войну <b>{names}</b>?':
@@ -392,13 +318,11 @@ export const en: Record<string, string> = {
   'Авто-штурм': 'Auto-storm',
   ОТМЕНА: 'CANCEL',
   Оборона: 'Defense',
-  'Оборона гарнизона': 'Garrison defense',
   Обстрел: 'Barrage',
   'Обстрел — огонь с дистанции': 'Barrage — firing from range',
   'Флоты с артиллерией бьют по врагу издалека, ещё до сближения — сосредоточь огонь на одной цели или дай флоту выбирать её самому. Толстая броня артиллерии слабая, её место позади линии, а не на передовой.':
     'Artillery fleets fire on the enemy from afar, before closing the distance — focus fire on one target, or let the fleet pick one itself. Artillery has thin armor, so keep it behind the line, not on the front.',
   'Описание метки (необязательно)…': 'Marker description (optional)…',
-  'Осадная платформа': 'Siege Platform',
   Ответ: 'Return',
   'Отделите корабли в новый флот — он останется в том же секторе. Хотя бы один корабль остаётся; десант в трюме остаётся с исходным флотом.':
     'Peel ships into a new fleet — it stays in the same sector. At least one ship stays behind; carried troops stay with the original.',
@@ -413,23 +337,15 @@ export const en: Record<string, string> = {
   'Отход стоит −40% ТЕКУЩЕГО корпуса и щита (израненный флот теряет 40% остатка — отход не добивает) и даёт рывок скорости для бегства. Десант в высадке отступить не может; с орбиты вне боя корабль уходит свободно.':
     "Retreat costs −40% of CURRENT hull and shield (a wounded fleet loses 40% of what remains — retreat never finishes it off) and grants a speed burst to flee. Troops mid-landing can't retreat; a ship in orbit outside battle leaves freely.",
   Очки: 'Score',
-  'Очки победы': 'Victory points',
   ПВО: 'AA',
   ПОБЕДА: 'WIN',
-  'Палубная эскадрилья: стремительная (ход {sp}) и больно бьёт ({a} атаки), но брони почти нет ({hp} корпуса). Отделяется от носителя в отдельный быстрый флот и наносит удар с дистанции {r}. Контрится орбитальным ПВО — не гоните её на прикрытую ПВО планету.':
-    "A carrier-borne wing: fast (speed {sp}) and hits hard ({a} attack), but almost no armor ({hp} hull). Splits off the carrier into its own fast fleet and strikes from range {r}. Countered by orbital AA — don't send it against an AA-covered world.",
   Пассив: 'Passive',
   'Пассивные бонусы': 'Passive bonuses',
   'Переподключение не удалось — войди заново': 'Reconnect failed — sign in again',
-  'Перерабатывающий комплекс, превращающий руду и логистику в ликвидные кредиты — {c}¤ в час. Топливо для имперской бюрократии, верфей и наёмных эскадр.':
-    'A refining complex turning ore and logistics into liquid credits — {c}¤ per hour. Fuel for imperial bureaucracy, shipyards and mercenary squadrons.',
   Пинг: 'Ping',
-  'Планетарное сооружение.': 'A planetary structure.',
   'Под фильтр никто не подходит.': 'Nobody matches the filter.',
   Подтвердить: 'Confirm',
   Покупка: 'Buy',
-  'Флот -ваше оружие и защита. Здесь вы можете заказывать корабли для пополнения флота.':
-    'The fleet is your weapon and shield. Order ships here to reinforce it.',
   'Построить здесь': 'Build here',
   'Наведи на объект слева — здесь появится его досье.':
     'Hover an object on the left — its dossier appears here.',
@@ -441,16 +357,9 @@ export const en: Record<string, string> = {
   Продажа: 'Sell',
   Продать: 'Sell',
   Прозрачность: 'Transparency',
-  Производит: 'Produces',
-  Прочность: 'Structure HP',
   'РАЗДЕЛЕНИЕ ФЛОТА': 'SPLIT FLEET',
   РЫНОК: 'MARKET',
   Рынок: 'Market',
-  'Рабочая лошадь линейного флота: {a} атаки, {hp} корпуса и трюм на {c}. Универсальный боевой корабль, одинаково уверенный в обороне и в наступлении.':
-    "The battle line's workhorse: {a} attack, {hp} hull and a hold for {c}. A general-purpose warship, equally solid on offense and defense.",
-  'Радарная сигнатура': 'Radar signature',
-  'Радиус радара': 'Radar reach',
-  Разведчик: 'Scout',
   Развернуть: 'Expand',
   'Размер h,w': 'Size h,w',
   'Реальное время': 'Real time',
@@ -458,34 +367,24 @@ export const en: Record<string, string> = {
   Свернуть: 'Collapse',
   'Сервер не нужен — свободные места займут боты.': 'No server needed — bots fill the open seats.',
   Сессия: 'Session',
-  'Комплекс радаров просвечивает пространство вокруг вашего мира и ловит вражеские сигнатуры задолго до того, как они посмеют на вас напасть. Улучшения обеспечивают большее покрытие.':
-    'A radar complex sees through the space around your world and catches enemy signatures long before they dare attack. Upgrades widen the coverage.',
   Скор: 'Spd',
   Скорость: 'Speed',
   Слить: 'Merge',
   'Слить…': 'Merge…',
-  Содержание: 'Upkeep',
   'Сообщение…': 'Message…',
   'Сообщений пока нет.': 'No messages yet.',
   Сообщения: 'Messages',
   'Сообщения — скоро': 'Messages — coming soon',
   'Сорт.': 'Sort',
   Станд: 'Std',
-  'Стационарная зенитная батарея защищает воздушное пространство вашего мира и наносит {dmg} урона в час по кораблям на орбите. Кошмар для бомбардировщиков, повисших над планетой, и для налетающих эскадрилий. Захват мира не блокирует — это дело наземной обороны; батарея лишь выкашивает флот над головой.':
-    "A stationary anti-air battery guards your world's airspace, dealing {dmg} damage per hour to ships in orbit. A nightmare for bombers hanging over the world and for raiding squadrons. Doesn't block capture (that's ground defense's job) — it just mows down the fleet overhead.",
   Стоимость: 'Cost',
   'Предложение: {stance}': 'Proposal: {stance}',
   'Стойка изменена: {stance}': 'Stance changed: {stance}',
   Стоп: 'Stop',
   'Тащите за шапку, чтобы переместить': 'Drag the title bar to move',
-  'Тяжёлая осадная платформа: {a} урона с дистанции {r}, но тонкая броня ({d} защиты). Её место за спинами крейсеров, откуда она крушит укрепления и верфи.':
-    'A heavy siege platform: {a} damage from range {r}, but thin armor ({d} defense). Its place is behind the cruisers, from where it smashes fortifications and shipyards.',
   Удар: 'Strike',
-  'Ударный носитель': 'Strike Carrier',
-  Уровней: 'Tiers',
   ФЛОТ: 'FLEET',
   Фильтр: 'Filter',
-  Флагман: 'Flagship',
   Флот: 'Fleet',
   // Авто-имена флотов (Bytro-стиль): тип соединения по размеру
   Звено: 'Wing',
@@ -517,8 +416,6 @@ export const en: Record<string, string> = {
   'Шрифт, пт': 'Font, pt',
   'Штамп сообщений': 'Message stamp',
   Штурм: 'Assault',
-  'Эшелонированный планетарный бастион. Поднимает оборону гарнизона на {d} и держит {hp} структурной прочности под орбитальным огнём. Последний рубеж осаждённого мира.':
-    'A layered planetary bastion. Raises garrison defense by {d} and holds {hp} structure HP under orbital fire. The last line of a besieged world.',
   Юнитов: 'Units',
 
   // --- market resource tabs (MARKET_RES) -----------------------------------------
@@ -652,10 +549,8 @@ export const en: Record<string, string> = {
   Бастион: 'Bulwark',
 
   // --- ship modules (SHIP_MODULES, ships.ts) -------------------------------------
-  Щит: 'Shield',
 
   // --- ship hull names (SHIP_HULLS, ships.ts) -------------------------------------
-  Носитель: 'Carrier',
 
   // --- lowercase fragments -------------------------------------------------------
   атака: 'attack',
@@ -685,14 +580,11 @@ export const en: Record<string, string> = {
   командующий: 'commander',
   кораблей: 'ships',
   корабль: 'ship',
-  космос: 'space',
   'матч завершён': 'the match has ended',
   'метка {loc}': 'marker {loc}',
   'мир {at}': 'world {at}',
   'на орбите': 'in orbit',
   'нажмите «Обновить список»': 'press "Refresh list"',
-  'наземный юнит': 'ground unit',
-  наземных: 'ground',
   'не удалось в архив': 'archiving failed',
   'не удалось восстановить': 'restore failed',
   'неизвестный заказ': 'unknown order',
@@ -711,7 +603,6 @@ export const en: Record<string, string> = {
   покупка: 'buy',
   'глобальный канал появится вместе с глобальным сервером':
     'the global channel arrives with the global server',
-  построек: 'buildings',
   'прицеливание отменено': 'aiming cancelled',
   'проверка: {msg}': 'check: {msg}',
   продажа: 'sell',
@@ -808,7 +699,8 @@ export const en: Record<string, string> = {
   '🛩 дежурный вылет включён — эскадрилья бьёт врага в радиусе':
     '🛩 standing patrol on — the wing strikes any enemy in range',
   '🛩 дежурный вылет — только со стоянки в узле': '🛩 standing patrol — only from a parked node',
-  '🛩 дежурный вылет — только когда флот свободен': '🛩 standing patrol — only when the fleet is free',
+  '🛩 дежурный вылет — только когда флот свободен':
+    '🛩 standing patrol — only when the fleet is free',
   '🛩 эскадрилья запущена — ведите её на цель': '🛩 squadron launched — steer it onto the target',
 
   // --- static markup (build.mjs, data-i18n) -------------------------------------
@@ -848,12 +740,6 @@ export const en: Record<string, string> = {
   '{ic} {name}: {stock} в казне · {flow}/ч (производство минус содержание войск и зданий)':
     '{ic} {name}: {stock} in the treasury · {flow}/h (production minus army and building upkeep)',
   '⚠ ДЕФИЦИТ — здания-потребители работают на 50%': '⚠ SHORTAGE — consuming buildings run at 50%',
-  'Ярусы гидропонных оранжерей под спектральными лампами позволяют вашим подопечным питаться, ведь голод беспощаден. Выращивает {f}❖ в час. Ваши рабочие и воины едят каждый день, было бы глупо проиграть сражение из-за голодного обморока.':
-    'Tiers of hydroponic greenhouses under spectral lamps feed those in your care — hunger is merciless. Grows {f}❖ per hour. Your workers and soldiers eat every day; it would be foolish to lose a battle to a hungry faint.',
-  'Термоядерный реактор питает энергией ваши миры, он производит {e}↯ в час. Энергия — кровь ваших построек, ведь они работают не на волшебстве. При дефиците всё проседает до половины мощности.':
-    "A fusion reactor powers your worlds, producing {e}↯ per hour. Energy is the lifeblood of your buildings — they don't run on magic. When it runs short, everything browns out to half output.",
-  'Чистые цеха литографии печатают {m}▦ в час. Прожорлива к энергии и людям, зато её продукция ведёт эскадрильи и открывает осадные доктрины. Апгрейды окупаются собственной продукцией.':
-    'Clean lithography halls print {m}▦ per hour. Hungry for power and people, but its output guides strike wings and unlocks siege doctrines. Upgrades pay for themselves in their own product.',
   'состав {n}/{s} · {rest}': 'composition {n}/{s} · {rest}',
   'Мобилизовать «{name}»': 'Mobilize "{name}"',
   // --- meta-progression («Прокачка», hub tab) -----------------------------------
@@ -887,7 +773,6 @@ export const en: Record<string, string> = {
   аренда: 'rent',
   Слот: 'Slot',
   модуль: 'module',
-  фитинг: 'fitting',
   'В арсенале нет корпусов этого класса.': 'The arsenal has no hulls of this class.',
   '⚡ Арсенал живой: докупленное в матче видно здесь сразу, но начинает работать только когда ты это ПОСТРОИШЬ — постройка и логистика, не мгновенно.':
     '⚡ Live arsenal: anything bought during the match shows up here right away, but it only starts working once you BUILD it — construction and logistics, not instant.',
@@ -944,23 +829,8 @@ export const en: Record<string, string> = {
     "An officer's named template: composition locked, no editing.",
   'Дивизия — снапшот шаблона: правка шаблона в конструкторе не меняет уже собранные. На своём мире +1 HP/юнит/день.':
     'A division is a snapshot of its template: editing a design never touches armies already fielded. On your own world it heals +1 HP/unit/day.',
-  'Постройки мира и строительный конвейер: состояние, уровни и улучшения.':
-    "The world's buildings and its construction conveyor: condition, levels, upgrades.",
   Дивизия: 'Division',
-  'Наземное соединение, собранное по шаблону. Обороняет мир; грузится на флот из панели флота.':
-    'A ground formation mobilized from a template. Defends the world; loads onto a fleet from the fleet panel.',
-  'Суммарная атака кораблей флота.': "The fleet's total ship attack.",
-  'Суммарная защита кораблей флота.': "The fleet's total ship defense.",
-  'Очки здоровья': 'Hit points',
-  'Суммарная прочность кораблей флота.': "The fleet's total hull strength.",
-  'Скорость перелёта — флот движется со скоростью самого медленного корабля.':
-    'Travel speed — the fleet moves at its slowest ship.',
   Гарнизон: 'Garrison',
-  'Численность наземных войск, обороняющих мир.': 'The ground troops defending the world.',
-  'Пехота и техника на поверхности мира.': "Infantry and armour on the world's surface.",
-  'Корабли, стоящие в гарнизоне мира (не на орбите).':
-    "Ships parked in the world's garrison (not in orbit).",
-  'Число построек на мире.': 'The number of buildings on the world.',
   'Тап по слоту меняет род войск: ополчение → тяжёлая пехота → спецназ → танк. Танки бьют любую пехоту; спецназ — единственная пехота, опасная танкам; тяжёлая пехота держит оборону.':
     'Tap a slot to cycle the unit type: militia → heavy infantry → special forces → tank. Tanks shred any infantry; special forces are the one infantry that threatens armour; heavy infantry holds the line.',
 
@@ -1175,13 +1045,6 @@ export const en: Record<string, string> = {
   рой: 'swarm',
   'форс-марш': 'forced march',
   Радар: 'Radar',
-  'Линия огня': 'Firing line',
-  'В залпе бьют максимум {n} юнитов — сильнейшие первыми; все сверх капа только впитывают урон.':
-    'At most {n} units fire per volley — the strongest first; everyone beyond the cap only soaks damage.',
-  'Текущая/полная прочность армии. Чинится у своего мира с верфью — или мгновенно за кредиты.':
-    'Current/full army hull. Mends over your world with a repair yard — or instantly for credits.',
-  'Аблятивный щит: принимает урон первым и бесплатно восстанавливается вне боя.':
-    'Ablative shield: takes damage first and recharges for free out of combat.',
   // --- настройки: цвета сторон -------------------------------------------------
   'Цвета сторон': 'Side colours',
   'Свой цвет': 'Your colour',
@@ -1209,8 +1072,7 @@ export const en: Record<string, string> = {
     'fly to an enemy world and land troops on arrival',
   'тап по карте — собрать приказ: ждать · курс · штурм · обстрел':
     'tap the map to compose an order: wait · move · assault · barrage',
-  'применить способность героя из состава флота':
-    "use a hero ability from the fleet's roster",
+  'применить способность героя из состава флота': "use a hero ability from the fleet's roster",
   'сосредоточить огонь артиллерии по вражескому флоту с дистанции':
     'focus artillery fire on an enemy fleet from standoff range',
   'когда артиллерия стреляет сама: пассив · ответ · станд · агрес':
@@ -1227,14 +1089,14 @@ export const en: Record<string, string> = {
   'эскадрилья автоматически бьёт врага в радиусе':
     'the squadron automatically hits enemies within range',
   // --- REL-7 seat/faction picker ------------------------------------------------
-  'занято': 'taken',
-  'свободно': 'free',
-  'слотов': 'slots',
+  занято: 'taken',
+  свободно: 'free',
+  слотов: 'slots',
 
   // --- sandbox panel (dev-only build, prototype/src/sandbox.ts) ----------------
-  'ПЕСОЧНИЦА': 'SANDBOX',
-  'Переключатели': 'Toggles',
-  'Команды': 'Commands',
+  ПЕСОЧНИЦА: 'SANDBOX',
+  Переключатели: 'Toggles',
+  Команды: 'Commands',
   'Прекратить войну со всеми фракциями': 'End the war with every faction',
   'Войны прекращены: {n} — отношения нейтральные': 'Wars ended: {n} — relations are neutral',
   'Вы ни с кем не воюете': 'You are not at war with anyone',
