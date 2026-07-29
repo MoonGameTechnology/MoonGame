@@ -46,29 +46,29 @@ export interface MetaState {
 }
 
 export const META_BRANCH_RU: Record<MetaBranch, string> = {
-  command: 'Командование',
-  economy: 'Экономика',
-  science: 'Наука',
+  command: 'meta.branch.command',
+  economy: 'meta.branch.economy',
+  science: 'meta.branch.science',
 };
 
 /** The three progression tracks. Costs total 1+2+3+4 = 10 points per branch —
  *  a full tree is a long campaign, the first nodes land within a few matches. */
 export const META_TREE: MetaNode[] = [
   // --- Командование: флотоводец растёт от манёвра к удару ------------------------
-  { id: 'cmd1', branch: 'command', tier: 1, name: 'Ходовые школы', desc: '+5% к скорости всех флотов с первой секунды матча.', tech: ['meta_drill_speed'] },
-  { id: 'cmd2', branch: 'command', tier: 2, name: 'Слаженные экипажи', desc: '+5% к урону флотов и гарнизонов.', tech: ['meta_drill_combat'] },
-  { id: 'cmd3', branch: 'command', tier: 3, name: 'Дальняя разведка', desc: '+15% к радиусу всех радаров.', tech: ['meta_drill_radar'] },
-  { id: 'cmd4', branch: 'command', tier: 4, name: 'Ветеран кампаний', desc: 'Ещё +5% к скорости и урону — рефлексы старой гвардии.', tech: ['meta_drill_veteran'] },
+  { id: 'cmd1', branch: 'command', tier: 1, name: 'meta.node.cmd1.name', desc: 'meta.node.cmd1.desc', tech: ['meta_drill_speed'] },
+  { id: 'cmd2', branch: 'command', tier: 2, name: 'meta.node.cmd2.name', desc: 'meta.node.cmd2.desc', tech: ['meta_drill_combat'] },
+  { id: 'cmd3', branch: 'command', tier: 3, name: 'meta.node.cmd3.name', desc: 'meta.node.cmd3.desc', tech: ['meta_drill_radar'] },
+  { id: 'cmd4', branch: 'command', tier: 4, name: 'meta.node.cmd4.name', desc: 'meta.node.cmd4.desc', tech: ['meta_drill_veteran'] },
   // --- Экономика: тыл решает --------------------------------------------------------
-  { id: 'eco1', branch: 'economy', tier: 1, name: 'Хозяйственник', desc: '+10% к стартовой казне каждого матча.', startResources: 0.1 },
-  { id: 'eco2', branch: 'economy', tier: 2, name: 'Индустриализация', desc: '+5% к производству всех миров.', tech: ['meta_industry'] },
-  { id: 'eco3', branch: 'economy', tier: 3, name: 'Госрезерв', desc: 'Ещё +20% к стартовой казне.', startResources: 0.2 },
-  { id: 'eco4', branch: 'economy', tier: 4, name: 'Магнат', desc: 'Ещё +5% к производству — империя работает на вас.', tech: ['meta_industry_2'] },
+  { id: 'eco1', branch: 'economy', tier: 1, name: 'meta.node.eco1.name', desc: 'meta.node.eco1.desc', startResources: 0.1 },
+  { id: 'eco2', branch: 'economy', tier: 2, name: 'meta.node.eco2.name', desc: 'meta.node.eco2.desc', tech: ['meta_industry'] },
+  { id: 'eco3', branch: 'economy', tier: 3, name: 'meta.node.eco3.name', desc: 'meta.node.eco3.desc', startResources: 0.2 },
+  { id: 'eco4', branch: 'economy', tier: 4, name: 'meta.node.eco4.name', desc: 'meta.node.eco4.desc', tech: ['meta_industry_2'] },
   // --- Наука: совет учёных набирает вес ---------------------------------------------
-  { id: 'sci1', branch: 'science', tier: 1, name: 'Аспирантура', desc: 'Учёные совета начинают матч на +1 уровень.', scientistLevel: 1 },
-  { id: 'sci2', branch: 'science', tier: 2, name: 'Открытый архив', desc: '«Промышленная автоматизация» изучена с первой секунды.', tech: ['industrial_automation'] },
-  { id: 'sci3', branch: 'science', tier: 3, name: 'Сеть институтов', desc: 'Учёные совета — ещё +1 уровень.', scientistLevel: 1 },
-  { id: 'sci4', branch: 'science', tier: 4, name: 'Орбитальная кафедра', desc: '«Орбитальная логистика» изучена с первой секунды.', tech: ['orbital_logistics'] },
+  { id: 'sci1', branch: 'science', tier: 1, name: 'meta.node.sci1.name', desc: 'meta.node.sci1.desc', scientistLevel: 1 },
+  { id: 'sci2', branch: 'science', tier: 2, name: 'meta.node.sci2.name', desc: 'meta.node.sci2.desc', tech: ['industrial_automation'] },
+  { id: 'sci3', branch: 'science', tier: 3, name: 'meta.node.sci3.name', desc: 'meta.node.sci3.desc', scientistLevel: 1 },
+  { id: 'sci4', branch: 'science', tier: 4, name: 'meta.node.sci4.name', desc: 'meta.node.sci4.desc', tech: ['orbital_logistics'] },
 ];
 
 const byId = new Map(META_TREE.map((n) => [n.id, n]));

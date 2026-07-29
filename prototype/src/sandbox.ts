@@ -67,11 +67,11 @@ export function resetSandboxConfig(): void {
 
 /** The five session resources, in HUD order (icon + canonical Russian name). */
 const RESOURCES: Array<{ key: string; icon: string; name: string }> = [
-  { key: 'credits', icon: '¤', name: 'Кредиты' },
-  { key: 'food', icon: '❖', name: 'Пища' },
-  { key: 'metal', icon: '⬢', name: 'Металл' },
-  { key: 'energy', icon: '↯', name: 'Энергия' },
-  { key: 'microelectronics', icon: '▦', name: 'Микроэлектроника' },
+  { key: 'credits', icon: '¤', name: 'sandbox.res.credits' },
+  { key: 'food', icon: '❖', name: 'sandbox.res.food' },
+  { key: 'metal', icon: '⬢', name: 'sandbox.res.metal' },
+  { key: 'energy', icon: '↯', name: 'sandbox.res.energy' },
+  { key: 'microelectronics', icon: '▦', name: 'sandbox.res.microelectronics' },
 ];
 const GRANT = 2000;
 
@@ -193,12 +193,12 @@ export interface SandboxHooks {
 }
 
 const TOGGLES: Array<{ key: keyof SandboxConfig; label: string; hint: string }> = [
-  { key: 'fog', label: 'Туман войны', hint: 'Выключите, чтобы открыть всю карту' },
-  { key: 'instantBuild', label: 'Моментальная постройка', hint: 'Стройка завершается мгновенно' },
-  { key: 'freeBuild', label: 'Бесплатная прокачка', hint: 'Постройки не тратят ресурсы' },
-  { key: 'immortalHome', label: 'Бессмертный дом', hint: 'Домашний мир нельзя захватить' },
-  { key: 'freezeQueues', label: 'Заморозить очередь', hint: 'Стройка стоит у всех' },
-  { key: 'instantCooldown', label: 'Перезарядка скиллов', hint: 'Умения командиров всегда готовы' },
+  { key: 'fog', label: 'sandbox.tog.fog', hint: 'sandbox.tog.fog.hint' },
+  { key: 'instantBuild', label: 'sandbox.tog.instant-build', hint: 'sandbox.tog.instant-build.hint' },
+  { key: 'freeBuild', label: 'sandbox.tog.free-build', hint: 'sandbox.tog.free-build.hint' },
+  { key: 'immortalHome', label: 'sandbox.tog.immortal-home', hint: 'sandbox.tog.immortal-home.hint' },
+  { key: 'freezeQueues', label: 'sandbox.tog.freeze-queues', hint: 'sandbox.tog.freeze-queues.hint' },
+  { key: 'instantCooldown', label: 'sandbox.tog.instant-cooldown', hint: 'sandbox.tog.instant-cooldown.hint' },
 ];
 
 /** Wire the `#sandbox` overlay + its floating opener. No-op if the markup is
@@ -233,8 +233,8 @@ export function initSandbox(hooks: SandboxHooks): void {
     ).join('');
     const speedRow = switchRow(
       'data-sbx="speed"',
-      'Управление скоростью',
-      'панель времени в матче — пауза и множители ускорения (1× — реальное время)',
+      'sandbox.tog.speed',
+      'sandbox.tog.speed.hint',
       hooks.getSpeedControl(),
     );
     el.innerHTML = `<div class="sbx-box-w">
