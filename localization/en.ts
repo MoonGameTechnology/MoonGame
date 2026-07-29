@@ -375,9 +375,11 @@ export const en: Record<string, string> = {
   'market.res.microelectronics': 'Micro',
 
   // --- onb — Первый управляемый матч (гид ONB-2 по интерфейсу и первому ходу).
+  'onb.goal.mine': 'Grow metal mining',
   'onb.tour.home':
     'Down here is your homeworld panel: buildings, garrison and construction. Tap your world to open it.',
-  'onb.tour.mine': 'Start with economy: upgrade your Mine — its output funds everything else you build.',
+  'onb.tour.mine':
+    'Start with economy: upgrade your Metal Mine — its output funds everything else you build.',
 
   // --- rail — Рельса инструментов в матче: подпись кнопки (.label) + подсказка (.title).
   'rail.chat.label': 'Chat',

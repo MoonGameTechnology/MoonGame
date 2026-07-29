@@ -98,7 +98,6 @@ export const en: Record<string, string> = {
   '✖ Провал против {who} — плата сгорела': '✖ Failed against {who} — the fee burned',
   // --- ONB-7 first-session goals checklist -------------------------------------
   'Цели первой сессии': 'First-session goals',
-  'Построй шахту': 'Build a mine',
   'Захвати мир': 'Capture a world',
   'Набери 100 очков': 'Reach 100 points',
   '🏅 Все цели первой сессии выполнены! +{n} XP — ты готов к настоящему матчу.':

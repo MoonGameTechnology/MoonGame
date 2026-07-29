@@ -2439,22 +2439,28 @@ let goalsActive = false;
 let goalsCollapsed = false;
 let goalsRewarded = false;
 let goalsDone: string[] = [];
-let goalBase = { worlds: 0, mines: 0, fleets: 0 };
-const myMineCount = (): number =>
+let goalBase = { worlds: 0, mineLevel: 0, fleets: 0 };
+// Sum of mine LEVELS (not a count of buildings) — the homeworld's Mine starts
+// already built, so "progress" is its level growing via upgrade, and this also
+// keeps working if a captured world adds a second mine somewhere down the line.
+const myMineLevel = (): number =>
   Object.values(s.planets)
     .filter((p) => p.owner === ME)
-    .reduce((n, p) => n + p.buildings.filter((b) => b.type === 'mine').length, 0);
+    .reduce(
+      (n, p) => n + p.buildings.filter((b) => b.type === 'mine').reduce((m, b) => m + b.level, 0),
+      0,
+    );
 const myFleetCount = (): number => Object.values(s.fleets).filter((f) => f.owner === ME).length;
 function goalSignals(): GoalSignals {
   return {
-    builtMine: myMineCount() > goalBase.mines,
+    builtMine: myMineLevel() > goalBase.mineLevel,
     launchedFleet: myFleetCount() > goalBase.fleets,
     capturedWorld: myWorldCount() > goalBase.worlds,
     score: myScore(),
   };
 }
 function startFirstGoals(): void {
-  goalBase = { worlds: myWorldCount(), mines: myMineCount(), fleets: myFleetCount() };
+  goalBase = { worlds: myWorldCount(), mineLevel: myMineLevel(), fleets: myFleetCount() };
   goalsDone = [];
   goalsRewarded = false;
   goalsCollapsed = false;
