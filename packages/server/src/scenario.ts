@@ -10,6 +10,7 @@ import {
   createInitialState,
   createKernel,
   diplomacyModule,
+  capitalModule,
   economyModule,
   factionModule,
   fleetOpsModule,
@@ -123,6 +124,7 @@ export const DEV_MODULES: GameModule[] = [
   marketModule, // session resource bourse: list / buy (15% burn) / cancel
   armyModule,
   fleetOpsModule, // fleet.launch/merge/split: garrison → mobile fleet, the missing link
+  capitalModule, // capital.designate: re-point the hero respawn anchor
   victoryModule,
   visibilityModule, // fog-of-war memory (variant B): records last-seen worlds
 ];

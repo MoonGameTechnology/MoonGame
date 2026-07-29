@@ -526,6 +526,12 @@ export interface GameState {
   market?: MarketOrder[];
   /** Monotonic counter handing each market order its id. */
   marketSeq?: number;
+  /** A player's designated capital world (`capitalModule`, `capital.designate`) — the
+   *  hero respawn anchor (`heroModule` falls back to `[hero.home, hero.location]`).
+   *  Absent for a player who never (re-)designated ⇒ their heroes' `home` is whatever
+   *  was seeded at match start (usually the homeworld); designating updates both this
+   *  map AND every owned hero's `home` in one action. */
+  capital?: Record<PlayerId, PlanetId>;
 }
 
 /** A standing sell order on the session market: the `seller` has escrowed `amount`
