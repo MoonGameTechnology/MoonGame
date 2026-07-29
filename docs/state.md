@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1899 зелёных** (54 skip, 175 файлов).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1928 зелёных** (54 skip, 176 файлов).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -112,7 +112,7 @@ packages/action-layer/src/
   data/          schemas.ts (zod-схемы + parseGameData, buildingLevel/buildingMaxLevel)
   rng/           rng.ts (sfc32)
   util/          clone.ts (deepClone/deepFreeze), treasury.ts (canAfford/payCost — shared by construction & technology), fitting.ts (генерик-гейт «слоты+предметы», SHIP-4) + loadout.ts (ship-обёртка над ним)
-  modules/       army, artillery, captureOnArrival, combat, construction, diplomacy, economy, effects, espionage, faction, hero, heroEffects, intercept, market, movement, orbital, planetType, scientist, sector, station, steward, technology, victory, visibility  (24 модуля, + *.test.ts)
+  modules/       army, arsenalSync, artillery, captureOnArrival, combat, construction, diplomacy, economy, effects, espionage, faction, fleetOps, hero, heroEffects, intercept, market, movement, orbital, planetType, scientist, sector, station, steward, tax, technology, victory, visibility  (27 модулей, + *.test.ts)
   examples/      skirmish.test.ts (демо-сценарий + SVG)
   index.ts       баррель (экспорт публичного API)
 data/            manifest, resources, units, buildings, factions, events, sectors, planetTypes, technologies (.json)
@@ -626,6 +626,48 @@ E_IMMOBILE, E_FLEET_BUSY, E_FORBIDDEN, E_NO_PLANET, E_UNKNOWN_UNIT, E_BAD_PAYLOA
 есть ли враждебный бомбящий флот на near; используют economy и construction.
 **Оптимизация:** `bombardedPlanets(state)` строит `Set<PlanetId>` за один проход O(fleets),
 затем O(1) на проверку; economy вызывает один раз на `time.advanced` вместо O(fleets) на планету.
+
+### fleetOps (`fleet-ops`) — формирование флота из гарнизона
+
+Закрывает разрыв между «построено» (`constructionModule` кладёт готовый корабль в
+гарнизон) и «играбельно» (до этого модуля ничего не выводило построенный корабль ИЗ
+гарнизона — на живом мультиплеерном сервере поднять флот было нельзя вообще). Порт
+прототипного `fleetLaunchModule` (`prototype/src/fleetLaunch.ts`, REFP-10).
+
+- **`fleet.launch {planetId}`** — поднимает гарнизон в новый флот: корабли (`domain:
+  space`) → `units`, поднимаемые наземные (`domain: ground`, не `immobile`) → `landing`
+  в пределах `Σ cargoCapacity`; `immobile`-установки (орбитальное ПВО) остаются.
+  Заблокирован, пока гарнизон держит бой (`garrisonUnderAssault`). Коды: `E_NO_PLANET,
+  E_FORBIDDEN, E_EMPTY_GARRISON, E_UNDER_ASSAULT, E_NO_SHIPS, E_BAD_PAYLOAD`.
+- **`fleet.merge {from, into}`** — сливает два стоящих на месте флота (`mergeStacks` —
+  коалесцирует только одинаковый юнит+лоадаут+полное здоровье, повреждённые/разно
+  оснащённые стеки остаются раздельными); герой на поглощённом флоте перевязывается
+  на `into.fleetId`, чтобы не осиротеть. Коды: `E_SAME_FLEET, E_NO_FLEET, E_FORBIDDEN,
+  E_IN_BATTLE, E_NOT_COLOCATED, E_BAD_PAYLOAD`.
+- **`fleet.split {fleetId, take[]}`** — отделяет выбранные корабли в новый флот на том
+  же месте (`takeFromStacks` — апорционирует пул `hp`/`shieldHp` пропорционально, не
+  дублирует корпус); héro-юнит нельзя отделить отдельно от сущности героя. Коды:
+  `E_NO_FLEET, E_FORBIDDEN, E_IN_BATTLE, E_IN_TRANSIT, E_HERO_UNIT, E_NOT_ENOUGH,
+  E_SPLIT_EMPTY, E_SPLIT_ALL, E_BAD_PAYLOAD`.
+- **`fleet.engage {fleetId, targetId}`** — намеренная атака на совместно стоящий
+  враждебный флот (прибытие уже авто-резолвит столкновение через `combatModule`'s
+  `fleet.arrived`; это путь для двух флотов, УЖЕ делящих узел без боя — например один
+  прибыл в мирное время, войну объявили после). Самодостаточная сборка боя (не
+  переиспользует приватный `startBattle` из `combat.ts` — «модули не импортируют друг
+  друга», инвариант #3), но раунд той же каденции (`hoursToMs`). Коды: `E_SAME_FLEET,
+  E_NO_FLEET, E_FORBIDDEN, E_NOT_HOSTILE, E_IN_BATTLE, E_NOT_COLOCATED, E_BAD_PAYLOAD`.
+
+Портирован С АДАПТАЦИЕЙ (не 1:1, в отличие от чистых REFP-переносов): прототип
+проверяет наземный домен трейтом `'ground'`, канон — полем `domain: 'ground'`
+(`UnitDefSchema`); поиск флота по id из недоверенного payload — `ownFleet` (own-key,
+A06/A08 — отравленный id вроде `__proto__` читается как отсутствие флота); перевязка
+carrier-дивизий при merge из прототипа НЕ портирована — у канона нет концепции дивизий
+(прототип-only состояние, REFP-13). Новые переиспользуемые утилиты — `loadoutKey`/
+`takeFromStacks`/`mergeStacks` в `util/stacks.ts` (были только в прототипном
+`fleetStacks.ts`, REFP-3). Не портирован авто-рэлли на `unit.built` (прототипная
+UX-удобность — только что построенный корабль сам летит в общий флот на орбите) —
+сознательно отложено: `fleet.launch` уже даёт игроку способ вывести весь гарнизон
+одним действием, авто-рэлли не блокер, а полировка.
 
 ### victory (`victory`) — победа и счёт
 
@@ -1150,8 +1192,12 @@ botDiplomacy, market, division, capital, standingOrders, effects])` (27 моду
   (заполняет ширину, панится по вертикали). Победа по очкам — **1100**
   (`SCORE_LIMIT`, прототип переопределяет дефолт ядра 600). Джиттер-решётка, RNG-линки и границы канваса выводятся из констант
   `FIELD`/`*_CELLS` — карта переформировывается правкой списков клеток.
-- **Прототип-модуль `fleet.launch {planetId}`** (`fleetLaunch.ts`, REFP-10, не в ядре) —
-  поднимает флот из гарнизона (корабли→`units`, наземные→`landing`). Кандидат в ядро.
+- **`fleet.launch {planetId}`** (прототип: `fleetLaunch.ts`, REFP-10) — поднимает флот из
+  гарнизона (корабли→`units`, наземные→`landing`). **В ядре тоже есть** —
+  `packages/shared-core/src/modules/fleetOps.ts` (`fleetOpsModule`), закрывает разрыв
+  между «построено» (`constructionModule` кладёт в гарнизон) и «играбельно» (ничего не
+  выводило корабль из гарнизона). Два независимых, но идентичных по поведению
+  реализации (прото исторически впереди, порт в ядро — этим заходом).
 - **UI — тактический пульт (DEFCON-вайб):** векторно-каркасный стиль на чёрном.
   - **Карта = радарный планшет:** панорамируемая координатная сетка (двигается/
     масштабируется с камерой), редкие звёзды-тики, лёгкие скан-линии (CSS). Фон усилен мягкими туманностями и twinkle-звёздами; jump lanes
@@ -1202,7 +1248,8 @@ botDiplomacy, market, division, capital, standingOrders, effects])` (27 моду
   кратко логируются (`✖ code`).
 - **Стопгап (сужен):** авто-штурм (`autoEngage`) остался **только для ИИ**
   (вражеские флоты), чтобы давление сохранялось; флоты игрока теперь полностью
-  ручные. `fleet.launch` — пока прототип-модуль.
+  ручные. `fleet.launch`/`merge`/`split`/`engage` — есть и в ядре (`fleetOpsModule`), и
+  в прототипе (`fleetLaunch.ts`).
 - **Эскадрильи-авианосцы** (squadrons-roadmap SQ-1.1→4.1): `fighter_squadron` +
   `strike_carrier` строятся; носитель отделяет крыло в отдельный быстрый флот через
   `fleet.split` (кнопка «Запустить эскадрилью»); дерётся обычным боем, `orbital_aa`
@@ -1520,8 +1567,11 @@ ONB-1/ONB-2, следующие кирпичи (`docs/onboarding-roadmap.md`).
 
 - Прототип: орбитальные контролы (bombard, assault, load/unload) теперь в
   UI игрока; орбита одна (флот встаёт на неё по прибытии); `autoEngage` остался
-  только для ИИ; ПВО считается в ядре, но отдельной индикации в UI пока нет;
-  `fleet.launch` — пока прототип-модуль.
+  только для ИИ; ПВО считается в ядре, но отдельной индикации в UI пока нет.
+- ✅ ~~`fleet.launch` — пока прототип-модуль~~ — **портирован**: `fleet.launch`/
+  `merge`/`split`/`engage` теперь есть и в ядре (`packages/shared-core/src/modules/
+  fleetOps.ts`, `fleetOpsModule`, в `DEV_MODULES`), закрывая разрыв между «построено»
+  и «играбельно» на живом мультиплеерном сервере.
 - ✅ ~~Бой: флот-только-десант (без кораблей) выигрывает наземный бой, но не
   захватывает~~ — **исправлено**: `capturePlanet` вызывается до `releaseOrDestroyFleet`,
   десант депонируется в гарнизон; fleet без кораблей уничтожается после захвата.

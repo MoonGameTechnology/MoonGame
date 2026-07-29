@@ -301,6 +301,9 @@ export {
   sumUnitStat,
   cappedUnitStat,
   COMBAT_UNIT_CAP,
+  loadoutKey,
+  takeFromStacks,
+  mergeStacks,
 } from './util/stacks';
 export {
   effectiveStats,
@@ -347,6 +350,7 @@ export { technologyModule, technologyLock } from './modules/technology';
 export { scientistModule } from './modules/scientist';
 export { factionModule } from './modules/faction';
 export { armyModule } from './modules/army';
+export { fleetOpsModule } from './modules/fleetOps';
 export { victoryModule } from './modules/victory';
 export { visibilityModule } from './modules/visibility';
 export { heroModule } from './modules/hero';

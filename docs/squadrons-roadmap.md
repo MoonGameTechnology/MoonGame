@@ -46,12 +46,19 @@
 `packages/shared-core/src/state/squadron.ts` — `squadronTake`/`sortieSpec`/`freshSortie`/
 `canSortie`/`spendSortie`/`tickRearm`/`fleetHasSquadron`/`squadronStrikeRange`/
 `withinRange`/`squadronReaches`, 20 тестов на РЕАЛЬНОМ шипованном `fighter_squadron`
-(поля `strikeRange`/`fuel`/`rearmRounds` в данных и схеме уже были). **Не портировано:**
-экшен `fleet.launch`/kernel-модуль/место в `GameState` под `SortieState` живого крыла,
-удар+ПВО-counter (SQ-1.2), патруль-драйвер `patrolTarget`/`scrambleOrder` (живут в
-`game.ts`, не в чистом `squadron.ts`) — подключение к живому action/reducer пайплайну
-это отдельный, более рискованный заход (детерминизм/реплей), по аналогии с тем, как
-FND-4 оставил `groundCombat.ts` неподключённым к `combat.ts`.
+(поля `strikeRange`/`fuel`/`rearmRounds` в данных и схеме уже были). **Отдельным
+заходом портирован и `fleet.launch`/`merge`/`split`/`engage`** (`modules/fleetOps.ts`,
+`fleetOpsModule`, в `DEV_MODULES`) — прототип запускает эскадрилью именно через
+`fleet.split(squadronTake(f))` (см. §0 выше: «вылет юнитом» переиспользует
+`fleet.split`, отдельного squadron-специфичного экшена нет и не было нужно), так что
+это закрывает и SQ-1.1 для канона. **Всё ещё не портировано:** место в `GameState` под
+живой `SortieState` КОНКРЕТНОГО запущенного крыла (счётчик топлива/перезарядки —
+SQ-2.1 per-инстанс, не путать с уже портированным чистым `SortieState`-типом/функциями),
+удар+ПВО-counter трекинг (SQ-1.2 как петля, не только «бой уже умеет драться»),
+патруль-драйвер `patrolTarget`/`scrambleOrder` (живут в `game.ts`, не в чистом
+`squadron.ts`) — это отдельный, более рискованный заход (детерминизм/реплей: где именно
+живёт `wingSorties`-подобное состояние и как оно переживает `deepClone`/JSONB), по
+аналогии с тем, как FND-4 оставил `groundCombat.ts` неподключённым к `combat.ts`.
 
 ---
 
@@ -101,9 +108,13 @@ FND-4 оставил `groundCombat.ts` неподключённым к `combat.t
 
 ## Фаза 1 · Запуск и участие в бою `[core]`
 
-### SQ-1.1 · `fleet.launch` — выпустить эскадрилью `[core]` 🔒(SQ-0.1) — M
+### SQ-1.1 ✅ · `fleet.launch` — выпустить эскадрилью `[core]` 🔒(SQ-0.1) — M
 **Подзадачи:** выпуск = эскадрилья выходит из трюма носителя **отдельным короткодальним флотом** в узле носителя (вылет юнитом); дальше — обычное движение/бой; server-authority/fail-secure коды.
 **Готово, когда:** носитель выпускает эскадрилью как флот; пустой трюм → отказ; тест.
+**Сделано:** генерический `fleet.split(squadronTake(f))` (не отдельный squadron-специфичный
+экшен — прототип и так строит выпуск именно так, §0 выше). `fleet.split` есть в каноне
+(`modules/fleetOps.ts`) — носитель выпускает крыло тем же путём. Тест на пустой трюм — общий
+`E_SPLIT_EMPTY`/`E_NOT_ENOUGH` в `fleetOps.test.ts`, не squadron-специфичный.
 
 ### SQ-1.2 · Удар эскадрилий + ПВО-counter `[core]` 🔒(SQ-1.1) — M
 **Подзадачи:** вылетевшая эскадрилья дерётся **обычным боем** (`combat`) у цели; ПВО (`aaDamage`) бьёт по ней как по любому флоту у орбиты. (Реализует зафиксированную модель «вылет юнитом».)

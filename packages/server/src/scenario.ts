@@ -12,6 +12,7 @@ import {
   diplomacyModule,
   economyModule,
   factionModule,
+  fleetOpsModule,
   hashGameDataBundle,
   heroModule,
   interceptModule,
@@ -121,6 +122,7 @@ export const DEV_MODULES: GameModule[] = [
   factionModule, // always-on faction passives (production / speed / combat) via hooks
   marketModule, // session resource bourse: list / buy (15% burn) / cancel
   armyModule,
+  fleetOpsModule, // fleet.launch/merge/split: garrison → mobile fleet, the missing link
   victoryModule,
   visibilityModule, // fog-of-war memory (variant B): records last-seen worlds
 ];
