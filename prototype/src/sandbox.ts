@@ -91,7 +91,7 @@ export function isBuildAction(type: string): boolean {
 /** +`GRANT` of one resource to the player's treasury. */
 export function sbAddResource(s: GameState, me: string, key: string): string {
   const p = s.players[me];
-  if (!p) return t('нет игрока');
+  if (!p) return t('sandbox.no-player');
   p.resources[key] = (p.resources[key] ?? 0) + GRANT;
   const r = RESOURCES.find((x) => x.key === key);
   return t('+{n} {res}', { n: GRANT, res: r ? t(r.name) : key });
@@ -123,9 +123,7 @@ export function sbEndWars(s: GameState, me: string): string {
       ended++;
     }
   }
-  return ended > 0
-    ? t('Войны прекращены: {n} — отношения нейтральные', { n: ended })
-    : t('Вы ни с кем не воюете');
+  return ended > 0 ? t('sandbox.wars-ended', { n: ended }) : t('sandbox.no-wars');
 }
 
 // --- per-frame enforcement for the "held" toggles ----------------------------
@@ -221,7 +219,7 @@ export function initSandbox(hooks: SandboxHooks): void {
     `<div class="set-row"><div class="set-lbl">${t(label)}<span class="set-sub">${t(hint)}</span></div>` +
     `<div class="set-ctl"><label class="set-switch"><input type="checkbox" ${attrs}${on ? ' checked' : ''}>` +
     `<span class="sw-track"></span><span class="sw-knob"></span></label>` +
-    `<span class="set-val">${on ? t('вкл') : t('выкл')}</span></div></div>`;
+    `<span class="set-val">${on ? t('settings.on') : t('settings.off')}</span></div></div>`;
 
   const resBtns = RESOURCES.map(
     (r) =>
@@ -240,13 +238,13 @@ export function initSandbox(hooks: SandboxHooks): void {
       hooks.getSpeedControl(),
     );
     el.innerHTML = `<div class="sbx-box-w">
-      <div class="sbx-title"><span class="dia"></span><b>${t('ПЕСОЧНИЦА')}</b><span class="sbx-dev">DEV</span></div>
-      <div class="sbx-label">${t('Переключатели')}</div>
+      <div class="sbx-title"><span class="dia"></span><b>${t('sandbox.title')}</b><span class="sbx-dev">DEV</span></div>
+      <div class="sbx-label">${t('sandbox.toggles')}</div>
       <div class="sbx-togs">${togs}${speedRow}</div>
-      <div class="sbx-label">${t('Команды')}</div>
+      <div class="sbx-label">${t('sandbox.commands')}</div>
       <div class="sbx-cmds">${resBtns}</div>
-      <button class="sbx-cmd" data-sbx="peace">${t('Прекратить войну со всеми фракциями')}</button>
-      <button class="sbx-close" data-sbx="close">${t('Закрыть')}</button>
+      <button class="sbx-cmd" data-sbx="peace">${t('sandbox.end-wars')}</button>
+      <button class="sbx-close" data-sbx="close">${t('hub.emblem.close')}</button>
     </div>`;
   }
 

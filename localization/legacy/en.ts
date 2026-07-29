@@ -12,7 +12,6 @@ export const en: Record<string, string> = {
   Требует: 'Requires',
   // NB: `Изучить` is translated once, in the meta-progression block below ('Unlock')
   // — a second entry here would be silently shadowed by it.
-  'цель на карте': 'target on map',
   // --- TT-3.1 technology tree screen --------------------------------------------
   старт: 'start',
   день: 'day',
@@ -44,101 +43,32 @@ export const en: Record<string, string> = {
   Далее: 'Next',
   Понятно: 'Got it',
   // --- placeholders / small fragments ------------------------------------------
-  '{b} — улучшение': '{b} — upgrade',
   // TGT-1: target-order composer
-  '◎ тапните цель на карте — соберём приказ': '◎ tap a target on the map — compose the order',
-  '◎ цель не выбрана': '◎ no target picked',
-  ПРИКАЗ: 'ORDER',
-  'убрать шаг': 'remove step',
-  'план пуст — добавь шаги': 'plan is empty — add steps',
-  '⏱{n}ч': '⏱{n}h',
-  '⏱ +1ч': '⏱ +1h',
-  '🎯{n}ч': '🎯{n}h',
-  '⚔ авто-штурм включён — флот сам штурмует вражеский мир по прибытии':
-    '⚔ auto-storm on — the fleet storms the hostile world it arrives at by itself',
-  '⚡ форс-марш: +50% скорости, −5% прочности за час хода':
-    '⚡ forced march: +50% speed, −5% hull per hour underway',
-  '⊕ тапайте свои флоты — соберите группу и отдайте общий приказ':
-    '⊕ tap your fleets — build the group, then give a common order',
-  Сюда: 'Go here',
-  Огонь: 'Fire',
-  'снять приказ': 'clear the order',
-  '{n} флотов': '{n} fleets',
-  '◎ приказ поставлен — флот исполнит план сам': '◎ order set — the fleet will run the plan itself',
-  '{n}м': '{n}m',
-  '{n}ч': '{n}h',
-  '{d}д {h}ч': '{d}d {h}h',
-  '{what} — не вышло: {err}': '{what} — failed: {err}',
-  '{what} — скоро': '{what} — coming soon',
 
   // --- fleet panel / command bar ------------------------------------------------
   Атака: 'Attack',
-  ВЫ: 'YOU',
-  ВЫКЛ: 'OFF',
   Все: 'All',
-  'Вход через Apple — скоро · ты вошёл гостем':
-    'Sign in with Apple — coming soon · you entered as a guest',
-  'Вход через Google — скоро · ты вошёл гостем':
-    'Sign in with Google — coming soon · you entered as a guest',
   Вы: 'You',
-  День: 'Day',
-  'День {n}': 'Day {n}',
   '{h}ч': '{h}h',
-  Пароль: 'Password',
-  'Введите пароль (мин. 8 символов)': 'Enter a password (min 8 chars)',
-  'все места заняты': 'all seats taken',
-  Дивизии: 'Divisions',
-  'Дивизии ⇄ трюм (своб. {n})': 'Divisions ⇄ hold (free {n})',
-  'Ещё раз «Назад» — выход': 'Press Back again to exit',
-  'Ждём, пока хост начнёт…': 'Waiting for the host to start…',
-  ЗАКРЫТЬ: 'CLOSE',
-  ЗАПУСК: 'LAUNCH',
-  'ЗАПУСК В ОДИНОЧКУ': 'LAUNCH SOLO',
-  'Загрузка погружает дивизию в трюм. Выгрузка высаживает её на этот мир.':
-    'Loading takes a division into the hold. Unloading lands it on this world.',
-  'Задача: ✦ {n} (мир — 50, сектор — 10) или уничтожение соперников.':
-    'Goal: ✦ {n} (a world — 50, a province — 10) or eliminate your rivals.',
-  Закрыть: 'Close',
   ИИ: 'AI',
   Герои: 'Heroes',
-  'Командный бой: ВКЛ': 'Team battle: ON',
-  'Командный бой: выкл': 'Team battle: off',
-  'одна сторона — союзники': 'one side = allies',
   Командир: 'Commander',
   Корпус: 'Hull',
   Крейсер: 'Cruiser',
-  'Нет дивизий.': 'No divisions.',
   Модули: 'Modules',
   Назад: 'Back',
-  'Нет дивизий — мобилизуй по шаблону ниже.': 'No divisions — mobilize from a template below.',
-  ДА: 'YES',
-  '⚔ выберите чужой мир для штурма': "⚔ pick someone else's world to storm",
   'Управление скоростью': 'Speed control',
   'панель времени в матче — пауза и множители ускорения (1× — реальное время)':
     'the in-match time bar — pause and speed multipliers (1× is real time)',
-  '⚔ штурмовать можно только чужой мир': "⚔ only someone else's world can be stormed",
   Оборона: 'Defense',
   Обстрел: 'Barrage',
-  'Отделите корабли в новый флот — он останется в том же секторе. Хотя бы один корабль остаётся; десант в трюме остаётся с исходным флотом.':
-    'Peel ships into a new fleet — it stays in the same sector. At least one ship stays behind; carried troops stay with the original.',
-  Отмена: 'Cancel',
-  Отправить: 'Send',
   ПВО: 'AA',
-  ПОБЕДА: 'WIN',
   Пассив: 'Passive',
-  Подтвердить: 'Confirm',
-  'Наведи на объект слева — здесь появится его досье.':
-    'Hover an object on the left — its dossier appears here.',
   Постройки: 'Structures',
-  'Суверены — донат-валюта': 'Sovereigns — the donate currency',
-  'РАЗДЕЛЕНИЕ ФЛОТА': 'SPLIT FLEET',
   Скор: 'Spd',
   Скорость: 'Speed',
-  Сообщения: 'Messages',
-  'Сообщения — скоро': 'Messages — coming soon',
   Станд: 'Std',
   Удар: 'Strike',
-  ФЛОТ: 'FLEET',
   Флот: 'Fleet',
   // Авто-имена флотов (Bytro-стиль): тип соединения по размеру
   Звено: 'Wing',
@@ -148,13 +78,7 @@ export const en: Record<string, string> = {
   // Карточка статистики мира (тап по имени планеты)
   эскадрилий: 'squadrons',
   // 🔥 режим огня артиллерии — кнопка в командном ряду + пункты меню
-  Фракция: 'Faction',
   // H3 — setup faction picker (pure passive house bonuses)
-  'Фракция — пассивный бонус дома': 'Faction — the house passive bonus',
-  '+{n}% экономика': '+{n}% economy',
-  '+{n}% урон': '+{n}% damage',
-  '+{n}% скорость флотов': '+{n}% fleet speed',
-  '+{n}% радар': '+{n}% radar',
   Штурм: 'Assault',
 
   // --- market resource tabs (MARKET_RES) -----------------------------------------
@@ -197,10 +121,7 @@ export const en: Record<string, string> = {
   'вернула арендованный предмет': 'returned a rented item',
   AvA: 'AvA',
   готов: 'ready',
-  назначен: 'scheduled',
-  отменён: 'cancelled',
   победа: 'victory',
-  снять: 'clear',
   состав: 'roster',
   '—': '—',
 
@@ -241,120 +162,44 @@ export const en: Record<string, string> = {
   // --- ship hull names (SHIP_HULLS, ships.ts) -------------------------------------
 
   // --- lowercase fragments -------------------------------------------------------
-  атака: 'attack',
-  'в очередь: {what} на {at}': 'queued: {what} at {at}',
   высадка: 'landing',
   гарнизон: 'garrison',
   десант: 'landing',
-  'доминированием в галактике': 'by galactic domination',
-  'достижением лимита очков': 'by score limit',
-  завершён: 'ended',
-  идёт: 'active',
-  'истечением времени': 'on the clock',
   казна: 'treasury',
   кораблей: 'ships',
   корабль: 'ship',
-  'матч завершён': 'the match has ended',
   'на орбите': 'in orbit',
-  'неизвестный заказ': 'unknown order',
-  'в гарнизоне не осталось': 'none left in the garrison',
   нет: 'none',
-  'трюм полон': 'the hold is full',
-  'новый флот: {a} кораблей · у исходного останется {b}':
-    'new fleet: {a} ships · original keeps {b}',
-  'обновления доступны только в APK': 'updates are only available in the APK',
   оборона: 'defense',
   орбита: 'orbit',
-  'прицеливание отменено': 'aiming cancelled',
-  'проверка: {msg}': 'check: {msg}',
   пусто: 'empty',
   роль: 'role',
-  'сборка {b}': 'build {b}',
   секторов: 'sectors',
   скоро: 'soon',
-  убрать: 'remove',
-  'уничтожением соперников': 'by eliminating rivals',
   вы: 'you',
   флот: 'fleet',
   флоты: 'fleets',
   оз: 'hp',
   цена: 'price',
-  '◆ новый радарный контакт ({size}) у {at}': '◆ new radar contact ({size}) at {at}',
-  '● отключён от сервера': '● disconnected from server',
-  '● подключён как {who}': '● connected as {who}',
-  '● связь потеряна — переподключение…': '● connection lost — reconnecting…',
   // combat forecast (ONB-6, fleet panel strike section)
-  '⚠ Враг идёт к {node}: прибытие через {dur}':
-    '⚠ An enemy is heading for {node}: arrival in {dur}',
-  '⚠ Враг у {node}!': '⚠ An enemy at {node}!',
-  '⚔ штурм': '⚔ assault',
-  '⛬ выберите флот для объединения': '⛬ pick a fleet to merge with',
-  '✓ актуально · локально {l} · сервер {r}': '✓ up to date · local {l} · server {r}',
-  '✗ GitHub ответил {s}': '✗ GitHub answered {s}',
-  '✗ нет связи с GitHub (сеть / VPN?)': "✗ can't reach GitHub (network / VPN?)",
-  '✗ ответ получен, но версия не распознана': "✗ got a response, but couldn't parse the version",
-  '✦ {score}/{limit}: мир — 50, прочий сектор — 10, здания добавляют по уровню (у вас {w} миров, {s} секторов). Победа: ✦ {limit}, уничтожение соперников или доминирование.':
-    '✦ {score}/{limit}: a world — 50, any other province — 10, buildings add per level (you hold {w} worlds, {s} provinces). Win at ✦ {limit}, by eliminating rivals, or by domination.',
-  '⬇ есть обновление → сборка {v}': '⬇ update available → build {v}',
-  '🎯 автоприцел': '🎯 auto-target',
-  '🎯 сосредоточенный огонь назначен': '🎯 focus fire set',
-  '🎯 тапните вражеский флот для сосредоточенного огня · пустота = авто':
-    '🎯 tap an enemy fleet to focus fire · empty space = auto',
   Флоты: 'Fleets',
   'В меню': 'Menu',
-  '🛩 дежурный вылет включён — эскадрилья бьёт врага в радиусе':
-    '🛩 standing patrol on — the wing strikes any enemy in range',
-  '🛩 дежурный вылет — только со стоянки в узле': '🛩 standing patrol — only from a parked node',
-  '🛩 дежурный вылет — только когда флот свободен':
-    '🛩 standing patrol — only when the fleet is free',
-  '🛩 эскадрилья запущена — ведите её на цель': '🛩 squadron launched — steer it onto the target',
 
   // --- static markup (build.mjs, data-i18n) -------------------------------------
   Аккаунт: 'Account',
   Верфь: 'Shipyard',
-  Домой: 'Home',
   Ещё: 'More',
-  'Введи имя командира': 'Enter a commander name',
-  'Пароли не совпадают': 'Passwords do not match',
-  'Введите почту': 'Enter an email',
-  'Если такая почта есть — прислали ссылку для сброса':
-    'If that email exists, a reset link is on its way',
-  'Ссылка недействительна или устарела': 'The link is invalid or expired',
-  'Пароль изменён': 'Password changed',
-  'переподключение — приказ не отправлен, повторите позже':
-    'reconnecting — order not sent, try again shortly',
-  'матч заполнен — все места заняты': 'match is full — every seat is taken',
-  'вход в этот матч закрыт (окно приёма новых игроков истекло)':
-    'this match is closed to new players (the entry window has elapsed)',
   Поддержка: 'Support',
   Сообщество: 'Community',
   Уведомления: 'Notifications',
   Чат: 'Chat',
-  позывной: 'callsign',
   'реальное время': 'real time',
-  '{ic} {name}: {stock} в казне · {flow}/ч (производство минус содержание войск и зданий)':
-    '{ic} {name}: {stock} in the treasury · {flow}/h (production minus army and building upkeep)',
-  '⚠ ДЕФИЦИТ — здания-потребители работают на 50%': '⚠ SHORTAGE — consuming buildings run at 50%',
-  'состав {n}/{s} · {rest}': 'composition {n}/{s} · {rest}',
-  'Мобилизовать «{name}»': 'Mobilize "{name}"',
   // --- meta-progression («Прокачка», hub tab) -----------------------------------
-  Прокачка: 'Progression',
-  'Уровень {n}': 'Level {n}',
   '{got}/{need} XP': '{got}/{need} XP',
-  'Очков: {n}': 'Points: {n}',
-  '{n} очк.': '{n} pt.',
-  Изучить: 'Unlock',
-  Закрыто: 'Locked',
-  'Опыт даётся за завершённые матчи: участие + счёт + победа. Прокачка не продаётся — только игра.':
-    'XP comes from finished matches: participation + score + victory. Progression is never sold — play only.',
   Командование: 'Command',
   Экономика: 'Economy',
   Наука: 'Science',
   // --- arsenal witryna («Арсенал», hub tab, ARS-5) --------------------------------
-  'Арсенал пуст': 'Arsenal empty',
-  'войдите под аккаунтом на сервере с накоплением, чтобы увидеть коллекцию':
-    'sign in with an account on a server with persistence to see your collection',
-  Всё: 'All',
   Корпуса: 'Hulls',
   Фитинги: 'Fittings',
   стартовый: 'starter',
@@ -394,11 +239,6 @@ export const en: Record<string, string> = {
   '«Орбитальная логистика» изучена с первой секунды.':
     '"Orbital Logistics" is researched from the first second.',
   // --- H4: ground-army designer (3 infantry lines + tank, officer premades) -------
-  Мобилизация: 'Mobilization',
-  '⚙ Конструктор': '⚙ Designer',
-  Переименовать: 'Rename',
-  'Урон по:': 'Damage vs:',
-  живучесть: 'toughness',
   Ополчение: 'Militia',
   'Тяжёлая пехота': 'Heavy Infantry',
   Спецназ: 'Special Forces',
@@ -413,39 +253,15 @@ export const en: Record<string, string> = {
   '≥2 спецназа без ополчения': '≥2 special forces, no militia',
   'Людская волна': 'Human Wave',
   '≥4 ополчения — берут числом': '≥4 militia — winning by numbers',
-  'Именной шаблон офицера: состав закреплён, редактировать нельзя.':
-    "An officer's named template: composition locked, no editing.",
-  'Дивизия — снапшот шаблона: правка шаблона в конструкторе не меняет уже собранные. На своём мире +1 HP/юнит/день.':
-    'A division is a snapshot of its template: editing a design never touches armies already fielded. On your own world it heals +1 HP/unit/day.',
-  Дивизия: 'Division',
   Гарнизон: 'Garrison',
-  'Тап по слоту меняет род войск: ополчение → тяжёлая пехота → спецназ → танк. Танки бьют любую пехоту; спецназ — единственная пехота, опасная танкам; тяжёлая пехота держит оборону.':
-    'Tap a slot to cycle the unit type: militia → heavy infantry → special forces → tank. Tanks shred any infantry; special forces are the one infantry that threatens armour; heavy infantry holds the line.',
 
   // --- command chains (order queue / plan builder, CC-*) -----------------------
-  '⚒ десант': '⚒ ground',
-  '⚔ орбита': '⚔ orbital',
 
   // --- bot favour meter / stolen intel readout ----------------------------------
 
   // --- province pings / connect screen status -----------------------------------
-  'метка {node}': 'marker {node}',
-  'Подключение: {nick}…': 'Connecting: {nick}…',
-  'Укажи адрес сервера': 'Enter the server address',
-  'Неверный адрес сервера': 'Invalid server address',
-  'Введи позывной': 'Enter a callsign',
 
   // --- science council (pre-match scientist pick + tech-window header) -------------
-  'Выбрать учёного': 'Pick a scientist',
-  '⚠ Совет закрепляется на весь матч. Рекомендованная пара уже выбрана — замените по вкусу.':
-    '⚠ The council locks in for the whole match. A recommended pair is pre-selected — swap to taste.',
-  'Кандидаты · нажмите, чтобы занять слот': 'Candidates · tap to fill a slot',
-  'Закрепить и продолжить к выбору места →': 'Lock in and continue to start pick →',
-  'Выберите двух учёных': 'Pick two scientists',
-  '+1 слот исследования (генералист, без фокуса ветки)':
-    '+1 research slot (a generalist, no branch focus)',
-  'Открывает ветку «{br}»: {list}': 'Opens the {br} branch: {list}',
-  'Фокус ветки «{br}»': '{br} branch focus',
   // --- tech-branch labels (tabs / chips / section heads) ---------------------------
   Эскадрильи: 'Squadrons',
   'Дом: {home} — одиночная песочница, без соперников · тапните светящийся мир, чтобы сменить':
@@ -459,15 +275,8 @@ export const en: Record<string, string> = {
   ДИПЛОМАТИЯ: 'DIPLOMACY',
 
   // --- steward window («Хранитель») + settings + end-of-match ---------------------
-  '🏃 Эвакуация с {node} → {to}: прогноз потерь {pct}%, крыльев уведено: {n}':
-    '🏃 Evacuation from {node} → {to}: loss forecast {pct}%, wings withdrawn: {n}',
-  '🚚 Паром выслан к {node} за гарнизоном': '🚚 A ferry dispatched to {node} for the garrison',
-  '⚠ Гарнизон {node} не эвакуировать: транспорт не успевает (прогноз потерь {pct}%)':
-    '⚠ The {node} garrison cannot be evacuated: no transport arrives in time (loss forecast {pct}%)',
   интерфейс: 'interface',
   вкл: 'on',
-  выкл: 'off',
-  '⟳ К выбору ботов': '⟳ Back to setup',
 
   // --- suggested-callsign wordlist -----------------------------------------------
   Носорог: 'Rhino',
@@ -496,14 +305,9 @@ export const en: Record<string, string> = {
   еды: 'food',
   микроэлектроники: 'microelectronics',
   // --- hero window / deploy flow (окно героя, развёртывание) --------------------
-  'КД {h}': 'CD {h}',
-  '✨ выберите мир-цель на карте': '✨ pick a target world on the map',
-  '✖ каст отменён': '✖ cast cancelled',
-  '✖ развёртывание отменено': '✖ deploy cancelled',
   // --- division / formation builder (конструктор дивизий) ----------------------
   // --- build ETA / misc --------------------------------------------------------
   Стройка: 'Building',
-  'Ещё раз «Назад» — выход из матча': 'Press Back again to leave the match',
   // --- static H4 headers / steward toggle (build.mjs [data-i18n]) --------------
   // --- Bytro-карточка армии: ХП-бар, сводка, платный ремонт, кап линии огня ----
   флагман: 'flagship',
@@ -514,16 +318,7 @@ export const en: Record<string, string> = {
   // --- ECON-3: экспресс-ремонт за металл ---------------------------------------
   // --- ECON-4: рыночная комиссия ------------------------------------------------
   // --- fleet-command hover tooltips (what each command button does) -------------
-  'флот сам штурмует вражеский мир по прибытии':
-    'the fleet storms an enemy world by itself on arrival',
   // --- REL-7 seat/faction picker ------------------------------------------------
 
   // --- sandbox panel (dev-only build, prototype/src/sandbox.ts) ----------------
-  ПЕСОЧНИЦА: 'SANDBOX',
-  Переключатели: 'Toggles',
-  Команды: 'Commands',
-  'Прекратить войну со всеми фракциями': 'End the war with every faction',
-  'Войны прекращены: {n} — отношения нейтральные': 'Wars ended: {n} — relations are neutral',
-  'Вы ни с кем не воюете': 'You are not at war with anyone',
-  'нет игрока': 'no player',
 };

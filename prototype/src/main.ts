@@ -1203,11 +1203,11 @@ function updateThreatAlerts(): void {
       threatMemory.add(key);
       note(
         th.kind === 'inbound' && th.eta > s.time
-          ? t('⚠ Враг идёт к {node}: прибытие через {dur}', {
+          ? t('threat.incoming', {
               node: p.id,
               dur: stewFmtDur(th.eta - s.time),
             })
-          : t('⚠ Враг у {node}!', { node: p.id }),
+          : t('threat.here', { node: p.id }),
         p.id,
       );
     }
@@ -1259,7 +1259,7 @@ function updateRadarContacts(now: number): void {
       });
       if (painted) {
         if (!radarMemory.has(c.key))
-          note(t('◆ новый радарный контакт ({size}) у {at}', { size: c.size, at: c.node }), c.node);
+          note(t('threat.contact', { size: c.size, at: c.node }), c.node);
         radarMemory.set(c.key, { node: c.node, size: c.size, at: now });
       }
     }
@@ -1509,7 +1509,7 @@ function constructionLabel(p: ConstructionPayload): string {
   if (p.building) {
     return `${BUILD_ICON[p.building] ?? '▣'} ${tData(data.buildings[p.building]?.name ?? p.building)}`;
   }
-  return t('неизвестный заказ');
+  return t('queue.unknown');
 }
 function buildDurationHours(p: ConstructionPayload): number {
   if (p.kind === 'unit' && p.unit) {
@@ -1529,8 +1529,8 @@ function timeLeft(at: number): string {
 /** Format a travel-time-remaining in hours as `1.4ч` / `35м` (localized suffixes). */
 function fmtEta(totalH: number): string {
   return totalH >= 1
-    ? t('{n}ч', { n: totalH.toFixed(1) })
-    : t('{n}м', { n: Math.ceil(totalH * 60) });
+    ? t('fmt.hours', { n: totalH.toFixed(1) })
+    : t('fmt.minutes', { n: Math.ceil(totalH * 60) });
 }
 function progressPct(active: ActiveBuild): number {
   const duration = buildDurationHours(active.payload) * HOUR;
@@ -1547,7 +1547,7 @@ function queuedLabel(q: QueuedBuild): string {
     return `${q.count}× ${unitIcon(q.id)} ${displayUnit(q.id)}`;
   }
   if (q.kind === 'upgrade') {
-    return t('{b} — улучшение', {
+    return t('queue.upgrade', {
       b: `${BUILD_ICON[q.id] ?? '▣'} ${tData(data.buildings[q.id]?.name ?? q.id)}`,
     });
   }
@@ -1567,7 +1567,7 @@ function enqueueBuild(planetId: string, order: QueuedBuild): void {
     return;
   }
   queueOf(planetId)[laneOf(order.kind)].push(order);
-  note(t('в очередь: {what} на {at}', { what: queuedLabel(order), at: planetId }));
+  note(t('queue.added', { what: queuedLabel(order), at: planetId }));
   pumpBuildQueues();
 }
 function submitQueued(planetId: string, queued: QueuedBuild): StepOut {
@@ -1612,7 +1612,7 @@ function pumpBuildQueues(): void {
       q[lane].shift();
       const r = submitQueued(planetId, next);
       if (r.error) {
-        note(t('{what} — не вышло: {err}', { what: queuedLabel(next), err: errText(r.error) }));
+        note(t('queue.failed', { what: queuedLabel(next), err: errText(r.error) }));
       }
     }
   }
@@ -1706,7 +1706,7 @@ function divisionsHtml(planetId: string): string {
   const here = Object.values(divisionsOf(s)).filter(
     (d) => d.owner === ME && d.location === planetId,
   );
-  let h = `<div class="sec">${t('Дивизии')}</div>`;
+  let h = `<div class="sec">${t('div.title')}</div>`;
   if (here.length) {
     for (const d of here) {
       const comp = d.units.map((u) => `${formIcon(u.type)}${u.count}`).join(' ') || '—';
@@ -1716,7 +1716,7 @@ function divisionsHtml(planetId: string): string {
       h += `<div class="asset-row" data-desc="division"><span class="bicon">⊞</span><b>${esc(t(d.name))}</b><span class="dim">${comp} · ❤${hp}${off ? ' · ★' + esc(off) : ''}</span></div>`;
     }
   } else {
-    h += `<div class="row dim">${pcUi() ? t('Нет дивизий.') : t('Нет дивизий — мобилизуй по шаблону ниже.')}</div>`;
+    h += `<div class="row dim">${pcUi() ? t('div.empty') : t('div.empty.hint')}</div>`;
   }
   const tpls = templatesOf(s, ME);
   const res = s.players[ME]?.resources ?? {};
@@ -1730,7 +1730,7 @@ function divisionsHtml(planetId: string): string {
   ];
   const idx = Math.max(0, Math.min(mobTplIdx, all.length - 1));
   const pick = all[idx]!;
-  h += `<div class="sec">${t('Мобилизация')}</div>`;
+  h += `<div class="sec">${t('div.mobilize')}</div>`;
   h += `<div class="row">`;
   for (let i = 0; i < all.length; i++) {
     const star = all[i]!.officer ? '★ ' : '';
@@ -1763,15 +1763,15 @@ function divisionsHtml(planetId: string): string {
   h += btn(
     'mobilize',
     pick.officer ? `o${idx - officerBase}` : String(idx),
-    t('Мобилизовать «{name}»', { name: esc(t(pick.tpl.name)) }),
+    t('div.mobilize.named', { name: esc(t(pick.tpl.name)) }),
     afford && f.count > 0,
     pcUi() ? 'division' : undefined,
   );
-  h += btn('divdesign', '', t('⚙ Конструктор'), true, pcUi() ? 'act:divdesign' : undefined);
+  h += btn('divdesign', '', t('div.designer'), true, pcUi() ? 'act:divdesign' : undefined);
   h += `</div>`;
   // PC dropped this hint (its content lives in hover dossiers); mobile keeps it.
   if (!pcUi()) {
-    h += `<div class="hint">${t('Дивизия — снапшот шаблона: правка шаблона в конструкторе не меняет уже собранные. На своём мире +1 HP/юнит/день.')}</div>`;
+    h += `<div class="hint">${t('div.note')}</div>`;
   }
   return h;
 }
@@ -1790,7 +1790,7 @@ function fleetDivisionsHtml(f: Fleet, here: Planet): string {
   // than its remaining capacity (carried footprint is reserved at load time, not
   // re-validated against later losses), so raw free can go negative.
   const free = Math.max(0, fleetCargoFree(s, f));
-  let g = `<div class="sec">${t('Дивизии ⇄ трюм (своб. {n})', { n: free })}</div>`;
+  let g = `<div class="sec">${t('div.hold', { n: free })}</div>`;
   if (loadable.length) {
     g += `<div class="row">`;
     for (const d of loadable) {
@@ -1807,7 +1807,7 @@ function fleetDivisionsHtml(f: Fleet, here: Planet): string {
     }
     g += `</div>`;
   }
-  g += `<div class="hint">${t('Загрузка погружает дивизию в трюм. Выгрузка высаживает её на этот мир.')}</div>`;
+  g += `<div class="hint">${t('div.hold.note')}</div>`;
   return g;
 }
 
@@ -2313,7 +2313,7 @@ function playerOrder(action: Action) {
   // reconnect `welcome` overwrites state (the server never saw it). Refuse with feedback
   // instead of silently losing it. (Solo/skirmish has `reconnecting === false`.)
   if (reconnecting) {
-    note('⟳ ' + t('переподключение — приказ не отправлен, повторите позже'));
+    note('⟳ ' + t('net.reconnecting-order'));
     return;
   }
   const before = sandboxBuildSnapshot(action.type);
@@ -2565,13 +2565,13 @@ function beginLoad(fleetId: string, unit: string): void {
   if (!f || f.movement || f.battleId || !f.location) return;
   const need = data.units[unit]?.stats.cargoSize ?? 1;
   if (need > fleetCargoFree(s, f) - pendingLoadCargo(fleetId)) {
-    note('✖ ' + t('трюм полон')); // hold full once the loads already in progress land
+    note('✖ ' + t('cargo.hold-full')); // hold full once the loads already in progress land
     return;
   }
   // Match the core's acceptance: only a healthy, default-loadout garrison stack embarks.
   const stock = findHealthyStack(s.planets[f.location]!.garrison, unit)?.count ?? 0;
   if (pendingLoadUnits(f.location, unit) >= stock) {
-    note('✖ ' + t('в гарнизоне не осталось')); // nothing left once the queued loads lift
+    note('✖ ' + t('cargo.garrison-empty')); // nothing left once the queued loads lift
     return;
   }
   pendingLoads.push({ fleetId, unit, startAt: s.time, doneAt: s.time + LOAD_TIME });
@@ -3321,14 +3321,14 @@ function setScramble(ids: string[], on: boolean): void {
     }
     const pos = f.location ? s.planets[f.location]?.position : undefined;
     if (!pos) {
-      note(t('🛩 дежурный вылет — только со стоянки в узле'));
+      note(t('ai.sortie.docked-only'));
       continue;
     }
     // Mirror the reducer's order.scramble gate (game.ts): a patrol only stands from a
     // parked, out-of-combat wing. Without this, solo would arm a patrol the net path
     // rejects (E_CONDITIONS_UNMET), and the UI would offer an action the server refuses.
     if (!fleetIdle(f)) {
-      note(t('🛩 дежурный вылет — только когда флот свободен'));
+      note(t('ai.sortie.idle-only'));
       continue;
     }
     if (NET) {
@@ -3356,7 +3356,9 @@ function setScramble(ids: string[], on: boolean): void {
 /** «≈14ч» / «≈2д 3ч» — plan durations are game-hours, like every duration in the UI. */
 function fmtHrs(h: number): string {
   const r = Math.max(0, Math.round(h));
-  return r >= 48 ? t('{d}д {h}ч', { d: Math.floor(r / 24), h: r % 24 }) : t('{n}ч', { n: r });
+  return r >= 48
+    ? t('browser.left.days', { d: Math.floor(r / 24), h: r % 24 })
+    : t('fmt.hours', { n: r });
 }
 
 // CC-4 reactive auto-scramble driver: each frame, a squadron fleet on "дежурный вылет"
@@ -3411,15 +3413,15 @@ function drivePatrols(): void {
 function endReasonText(reason: string | undefined): string {
   switch (reason) {
     case 'domination':
-      return t('доминированием в галактике');
+      return t('ai.end.domination');
     case 'elimination':
-      return t('уничтожением соперников');
+      return t('ai.end.elimination');
     case 'score':
-      return t('достижением лимита очков');
+      return t('ai.end.score');
     case 'timeout':
-      return t('истечением времени');
+      return t('ai.end.timeout');
     default:
-      return t('матч завершён');
+      return t('ai.end.over');
   }
 }
 
@@ -4127,7 +4129,7 @@ function render(now: number) {
       cx.textAlign = 'center';
       cx.fillStyle = b.phase === 'ground' ? '#f5cf6b' : '#ff8a7d';
       cx.fillText(
-        `${b.phase === 'ground' ? t('⚒ десант') : t('⚔ орбита')} · ${timeLeft(b.nextRoundAt)}`,
+        `${b.phase === 'ground' ? t('map.badge.landing') : t('map.badge.orbit')} · ${timeLeft(b.nextRoundAt)}`,
         c.x,
         c.y - 28,
       );
@@ -6657,7 +6659,7 @@ function closeDiplo(): void {
 /** Roster icon + tag for a seat: a human commander vs a synthetic (AI) one. */
 function seatBadge(id: string): { icon: string; tag: string } {
   if (id === ME) return { icon: '☻', tag: 'comms.you' };
-  if (isAiSeat(id)) return { icon: '⌬', tag: 'ИИ' };
+  if (isAiSeat(id)) return { icon: '⌬', tag: 'diplo.filter.ai' };
   return { icon: '☻', tag: 'ИГРОК' };
 }
 
@@ -6937,7 +6939,7 @@ function intelTabHtml(): string {
       const jump = g.kind === 'planet' ? ` data-iw="${esc(g.target)}"` : '';
       return (
         `<div class="in-row"${jump}><span class="in-k">🗝</span><b>${esc(grantLabel(g))}</b>` +
-        `<span class="in-t">⏳ ${t('spy.hours-left', { n: left })}</span>${g.kind === 'planet' ? '<span class="in-go">↪</span>' : ''}</div>`
+        `<span class="in-t">⏳ ${t('fmt.hours', { n: left })}</span>${g.kind === 'planet' ? '<span class="in-go">↪</span>' : ''}</div>`
       );
     })
     .join('');
@@ -7289,7 +7291,7 @@ function dossierTitleHtml(key: string, d: Dossier): string {
 function objDescHtml(): string {
   const d = hoverObj ? objDossier(hoverObj) : null;
   if (!d) {
-    return `<div class="pd-empty">${t('Наведи на объект слева — здесь появится его досье.')}</div>`;
+    return `<div class="pd-empty">${t('dossier.hint')}</div>`;
   }
   return `<div class="pd-title">${dossierTitleHtml(hoverObj!, d)}</div><div class="pd-body">${d.body}</div>`;
 }
@@ -7300,7 +7302,7 @@ function openDossier(key: string): void {
   const d = objDossier(key);
   const el = document.getElementById('codex');
   if (!el || !d) return;
-  el.innerHTML = `<div class="cxbox"><div class="cx-head"><b>${dossierTitleHtml(key, d)}</b></div><div class="cx-desc">${d.body}</div><button class="cx-close">${t('ЗАКРЫТЬ')}</button></div>`;
+  el.innerHTML = `<div class="cxbox"><div class="cx-head"><b>${dossierTitleHtml(key, d)}</b></div><div class="cx-desc">${d.body}</div><button class="cx-close">${t('codex.close')}</button></div>`;
   el.classList.add('show');
 }
 
@@ -7622,20 +7624,20 @@ function renderSplitDialog() {
         <button data-sx="dec" data-unit="${esc(unit)}" data-n="1" ${tk <= 0 ? 'disabled' : ''}>−1</button>
         <button data-sx="inc" data-unit="${esc(unit)}" data-n="1" ${tk >= have ? 'disabled' : ''}>+1</button>
         <button data-sx="inc" data-unit="${esc(unit)}" data-n="10" ${tk >= have ? 'disabled' : ''}>+10</button>
-        <button data-sx="all" data-unit="${esc(unit)}" ${tk >= have ? 'disabled' : ''}>${t('Все')}</button>
+        <button data-sx="all" data-unit="${esc(unit)}" ${tk >= have ? 'disabled' : ''}>${t('split.all')}</button>
       </span>
       <b class="snew">→ ${tk}</b>
     </div>`;
   }
   const valid = takeTotal > 0 && takeTotal < total;
   const html = `<div class="sbox">
-    <div class="shead">${t('РАЗДЕЛЕНИЕ ФЛОТА')} <b>${esc(splitState.fleetId)}</b></div>
-    <div class="ssub">${t('Отделите корабли в новый флот — он останется в том же секторе. Хотя бы один корабль остаётся; десант в трюме остаётся с исходным флотом.')}</div>
+    <div class="shead">${t('split.title')} <b>${esc(splitState.fleetId)}</b></div>
+    <div class="ssub">${t('split.note')}</div>
     <div class="srows">${rows}</div>
-    <div class="sfoot">${t('новый флот: {a} кораблей · у исходного останется {b}', { a: `<b>${takeTotal}</b>`, b: `<b>${total - takeTotal}</b>` })}</div>
+    <div class="sfoot">${t('split.preview', { a: `<b>${takeTotal}</b>`, b: `<b>${total - takeTotal}</b>` })}</div>
     <div class="sactions">
-      <button data-sx="confirm" class="cbtn" ${valid ? '' : 'disabled'}>${t('Подтвердить')}</button>
-      <button data-sx="cancel" class="cbtn ghost">${t('Отмена')}</button>
+      <button data-sx="confirm" class="cbtn" ${valid ? '' : 'disabled'}>${t('split.confirm')}</button>
+      <button data-sx="cancel" class="cbtn ghost">${t('ping.cancel')}</button>
     </div>
   </div>`;
   if (html !== lastSplitHtml) {
@@ -7793,7 +7795,7 @@ side.addEventListener('click', (ev) => {
     const f = selFleet ? s.fleets[selFleet] : undefined;
     if (fleetCanLaunchSquadron(f)) {
       playerOrder(splitFleet(ME, f!.id, squadronTake(f!)));
-      note(t('🛩 эскадрилья запущена — ведите её на цель'));
+      note(t('hint.squadron-launched'));
     }
   } else if (act === 'load') {
     beginLoad(selFleet!, arg); // ~1h timed load (animated in the marker)
@@ -7994,7 +7996,7 @@ cmdbar.addEventListener('click', (ev) => {
     else {
       merging = !merging; // lone fleet → arm: next friendly-fleet tap is the anchor
       aiming = false;
-      if (merging) note(t('⛬ выберите флот для объединения'));
+      if (merging) note(t('hint.pick-merge'));
     }
   } else if (cmd === 'stop') {
     for (const id of ids) if (s.fleets[id]?.movement) playerOrder(stopFleet(ME, id));
@@ -8004,7 +8006,7 @@ cmdbar.addEventListener('click', (ev) => {
       // the fleet there and it storms on arrival (valid targets ring up on the map).
       assaultAim = !assaultAim;
       aiming = false;
-      if (assaultAim) note(t('⚔ выберите чужой мир для штурма'));
+      if (assaultAim) note(t('hint.pick-assault'));
     } else {
       for (const id of ids) if (s.fleets[id]?.orbit === 'near') playerOrder(assaultFleet(ME, id));
       aiming = false;
@@ -8021,13 +8023,13 @@ cmdbar.addEventListener('click', (ev) => {
     // at it; a tap on empty space clears back to auto-targeting the nearest.
     barrageAim = !barrageAim;
     aiming = false;
-    if (barrageAim) note(t('🎯 тапните вражеский флот для сосредоточенного огня · пустота = авто'));
+    if (barrageAim) note(t('hint.pick-barrage'));
   } else if (cmd === 'target') {
     // TGT-1: arm order-targeting — the next world tap opens the plan composer
     // beside the target (CC-1 chain: wait/move/assault/barrage, editable later).
     targetAim = !targetAim;
     aiming = false;
-    if (targetAim) note(t('◎ тапните цель на карте — соберём приказ'));
+    if (targetAim) note(t('hint.pick-order'));
   } else if (cmd === 'more') {
     cmdMore = !cmdMore; // ☰ — show/hide the extras row
   } else if (cmd === 'cast') {
@@ -8042,7 +8044,7 @@ cmdbar.addEventListener('click', (ev) => {
     castMenu = false;
     if ((data.heroAbilities[abilityId]?.range ?? 0) > 0) {
       heroAim = { heroId, abilityId };
-      note(t('✨ выберите мир-цель на карте'));
+      note(t('yard.pick.target'));
     } else {
       playerOrder(castHeroAbility(ME, heroId, abilityId));
     }
@@ -8064,23 +8066,23 @@ cmdbar.addEventListener('click', (ev) => {
     // already marches. Wear only bites while actually flying.
     const on = !ids.every((id) => marchFlagged(id));
     for (const id of ids) if (marchFlagged(id) !== on) playerOrder(forceMarchFleet(ME, id, on));
-    if (on) note(t('⚡ форс-марш: +50% скорости, −5% прочности за час хода'));
+    if (on) note(t('hint.forced-march'));
   } else if (cmd === 'qauto') {
     // SO-UI: the CC-2 auto-storm stance, group-uniform (moved off the bottom sheet).
     const on = !ids.every((id) => isAutoAssault(id));
     setAutoAssault(ids, on);
-    if (on) note(t('⚔ авто-штурм включён — флот сам штурмует вражеский мир по прибытии'));
+    if (on) note(t('hint.auto-assault'));
   } else if (cmd === 'qscramble') {
     // SO-UI: the CC-4 «дежурный вылет», group-uniform over the squadron fleets.
     const wings = ids.filter((id) => fleetHasSquadron(s.fleets[id]));
     const on = !wings.every((id) => patrolOf(id));
     setScramble(wings, on);
-    if (on) note(t('🛩 дежурный вылет включён — эскадрилья бьёт врага в радиусе'));
+    if (on) note(t('hint.standing-sortie'));
   } else if (cmd === 'pick') {
     // SEL-1: touch multi-select — the sheet collapses, taps toggle own fleets.
     pickMode = !pickMode;
     aiming = false;
-    if (pickMode) note(t('⊕ тапайте свои флоты — соберите группу и отдайте общий приказ'));
+    if (pickMode) note(t('hint.multiselect'));
   }
   lastCmdHtml = '';
   lastPanelHtml = '';
@@ -8131,8 +8133,8 @@ function selectAt(mx: number, my: number) {
     for (const id of selectedFleetIds()) {
       if (fleetHasArtillery(s.fleets[id])) playerOrder(barrageFleet(ME, id, targetId));
     }
-    if (targetId) note(t('🎯 сосредоточенный огонь назначен'));
-    else note(t('🎯 автоприцел'));
+    if (targetId) note(t('hint.barrage-set'));
+    else note(t('hint.barrage-auto'));
     barrageAim = false;
     lastPanelHtml = '';
     return;
@@ -8144,7 +8146,7 @@ function selectAt(mx: number, my: number) {
     heroAim = null;
     const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
     if (n) playerOrder(castHeroAbility(ME, cast.heroId, cast.abilityId, n.id));
-    else note(t('✖ каст отменён'));
+    else note(t('hint.cast-cancelled'));
     lastPanelHtml = '';
     return;
   }
@@ -8171,7 +8173,7 @@ function selectAt(mx: number, my: number) {
     const n = host ? null : nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
     if (host) playerOrder(spawnHero(ME, heroId, host.id));
     else if (n) playerOrder(spawnHero(ME, heroId, n.id));
-    else note(t('✖ развёртывание отменено'));
+    else note(t('hint.deploy-cancelled'));
     lastPanelHtml = '';
     return;
   }
@@ -8188,7 +8190,7 @@ function selectAt(mx: number, my: number) {
     const target = s.planets[n.id];
     const capturable = SECTOR_TYPES[SECTOR_OF[n.id]]?.capturable ?? false;
     if (!target || !capturable || target.owner == null || target.owner === ME) {
-      note(t('⚔ штурмовать можно только чужой мир'));
+      note(t('hint.assault-enemy-only'));
       return; // stay armed — pick another target
     }
     tryAssaultGroup(selectedFleetIds(), n.id);
@@ -8216,7 +8218,7 @@ function selectAt(mx: number, my: number) {
     targetAim = false;
     lastCmdHtml = '';
     if (n) openTgtEditor(n.id, selectedFleetIds());
-    else note(t('◎ цель не выбрана'));
+    else note(t('hint.no-target'));
     return;
   }
   // A standing order marker: tap re-opens the composer with the live plan.
@@ -8424,7 +8426,7 @@ canvas.addEventListener('pointerdown', (ev) => {
       // Second finger = cancel the armed move (the audit's escape hatch).
       aiming = false;
       lastPanelHtml = '';
-      note(t('прицеливание отменено'));
+      note(t('hint.aim-cancelled'));
     }
     const [a, b] = [...pointers.values()];
     pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
@@ -8745,16 +8747,16 @@ function renderDivDesign(): void {
   if (locked) {
     const off = OFFICERS[pick.officer!];
     const bonus = [
-      off?.atk ? `+${Math.round(off.atk * 100)}% ${t('атака')}` : '',
-      off?.def ? `+${Math.round(off.def * 100)}% ${t('оборона')}` : '',
-      off?.hp ? `+${Math.round(off.hp * 100)}% ${t('живучесть')}` : '',
+      off?.atk ? `+${Math.round(off.atk * 100)}% ${t('div.stat.attack')}` : '',
+      off?.def ? `+${Math.round(off.def * 100)}% ${t('div.stat.defense')}` : '',
+      off?.hp ? `+${Math.round(off.hp * 100)}% ${t('div.stat.hp')}` : '',
     ]
       .filter(Boolean)
       .join(' · ');
     h += `<div class="dd-lock">★ ${esc(t(off?.name ?? ''))} — ${bonus}</div>`;
-    h += `<div class="dd-lock">${t('Именной шаблон офицера: состав закреплён, редактировать нельзя.')}</div>`;
+    h += `<div class="dd-lock">${t('div.officer-locked')}</div>`;
   } else {
-    h += `<div class="dd-name"><input id="dd-name" maxlength="24" value="${esc(pick.tpl.name)}"><button class="b" data-ddrename>${t('Переименовать')}</button></div>`;
+    h += `<div class="dd-name"><input id="dd-name" maxlength="24" value="${esc(pick.tpl.name)}"><button class="b" data-ddrename>${t('div.rename')}</button></div>`;
   }
   h += `<div class="dd-slots">`;
   for (let i = 0; i < FORMATION_SLOTS; i++) {
@@ -8773,7 +8775,7 @@ function renderDivDesign(): void {
   h += `<div class="dd-vs">`;
   for (const tgt of FORMATION_UNITS) {
     const v = vs(tgt);
-    h += `<div class="vrow"><span class="vnm">${t('Урон по:')} ${formIcon(tgt)} ${esc(t(FORM_RU[tgt] ?? tgt))}</span><div class="vtrack"><div class="vbar" style="width:${Math.min(100, Math.round((v / 90) * 100))}%"></div></div><span>${v}</span></div>`;
+    h += `<div class="vrow"><span class="vnm">${t('div.damage-vs')} ${formIcon(tgt)} ${esc(t(FORM_RU[tgt] ?? tgt))}</span><div class="vtrack"><div class="vbar" style="width:${Math.min(100, Math.round((v / 90) * 100))}%"></div></div><span>${v}</span></div>`;
   }
   h += `</div>`;
   const cost =
@@ -8781,9 +8783,9 @@ function renderDivDesign(): void {
       .map(([r, a]) => `${a}${TECH_CUR[r] ?? r[0]}`)
       .join(' ') || '—';
   const syn = f.synergies.map((x) => `${esc(t(x.name))} — ${esc(t(x.desc))}`).join('<br>');
-  h += `<div class="row dim">⚔${f.attack} 🛡${f.defense} ❤${f.hp} · ${t('состав {n}/{s} · {rest}', { n: f.count, s: FORMATION_SLOTS, rest: cost })}</div>`;
+  h += `<div class="row dim">⚔${f.attack} 🛡${f.defense} ❤${f.hp} · ${t('div.roster', { n: f.count, s: FORMATION_SLOTS, rest: cost })}</div>`;
   if (syn) h += `<div class="hint2">${syn}</div>`;
-  h += `<div class="hint2">${t('Тап по слоту меняет род войск: ополчение → тяжёлая пехота → спецназ → танк. Танки бьют любую пехоту; спецназ — единственная пехота, опасная танкам; тяжёлая пехота держит оборону.')}</div>`;
+  h += `<div class="hint2">${t('div.slot.note')}</div>`;
   $('divdesignbody').innerHTML = h;
 }
 divDesignWin.addEventListener('click', (e) => {
@@ -9100,7 +9102,7 @@ function renderTech(): void {
       `<div class="tt-mtags">${tag}</div></div></div>` +
       (td.description ? `<div class="tt-mdesc">${esc(t(td.description))}</div>` : '') +
       `<div class="tt-mstats">` +
-      `<span>💰 <b>${techCost(td.cost)} · ${t('tech.hours', { n: td.researchTimeHours })}</b></span>` +
+      `<span>💰 <b>${techCost(td.cost)} · ${t('fmt.hours', { n: td.researchTimeHours })}</b></span>` +
       (techFx(td) ? `<span>✦ <b>${techFx(td)}</b></span>` : '') +
       (gate > 0 ? `<span>📅 <b>${t('tech.from-day', { n: gate + 1 })}</b></span>` : '') +
       (prereqNames ? `<span>🔗 <b>${t('tech.req.title')} ${prereqNames}</b></span>` : '') +
@@ -9205,16 +9207,16 @@ function stewLogLine(e: {
   const node = e.node ?? '?';
   switch (e.kind) {
     case 'evac':
-      return t('🏃 Эвакуация с {node} → {to}: прогноз потерь {pct}%, крыльев уведено: {n}', {
+      return t('steward.log.evac', {
         node,
         to: e.to ?? '?',
         pct,
         n: String(e.count ?? 0),
       });
     case 'ferry':
-      return t('🚚 Паром выслан к {node} за гарнизоном', { node });
+      return t('steward.log.ferry', { node });
     case 'stranded':
-      return t('⚠ Гарнизон {node} не эвакуировать: транспорт не успевает (прогноз потерь {pct}%)', {
+      return t('steward.log.evac-failed', {
         node,
         pct,
       });
@@ -9871,8 +9873,8 @@ const RES_RU: Record<string, string> = {
 };
 // Short stat labels for module-effect chips («+4 атака», «+15 щит»).
 const STAT_RU: Record<string, string> = {
-  attack: 'атака',
-  defense: 'оборона',
+  attack: 'div.stat.attack',
+  defense: 'div.stat.defense',
   hp: 'корпус',
   shield: 'щит',
   speed: 'скорость',
@@ -10410,9 +10412,9 @@ function renderMetaPanel(): void {
   const [got, need] = metaLevelProgress(st.xp);
   const pts = metaPoints(st);
   let h =
-    `<div class="mp-head"><b>${t('Уровень {n}', { n: lvl })}</b>` +
+    `<div class="mp-head"><b>${t('meta.level', { n: lvl })}</b>` +
     `<span class="mp-xp">${t('{got}/{need} XP', { got, need })}</span>` +
-    `<span class="mp-pts">${t('Очков: {n}', { n: pts })}</span></div>`;
+    `<span class="mp-pts">${t('meta.points', { n: pts })}</span></div>`;
   h += `<div class="mp-track"><div class="mp-fill" style="width:${Math.round((got / need) * 100)}%"></div></div>`;
   for (const branch of ['command', 'economy', 'science'] as MetaBranch[]) {
     h += `<div class="mp-branch"><div class="mp-bt">${t(META_BRANCH_RU[branch])}</div>`;
@@ -10421,16 +10423,16 @@ function renderMetaPanel(): void {
       const can = canUnlock(st, node.id);
       h +=
         `<div class="mp-node ${owned ? 'own' : can ? 'can' : 'lock'}">` +
-        `<div class="mp-nm">${owned ? '✓ ' : ''}${esc(t(node.name))} <em>· ${t('{n} очк.', { n: node.tier })}</em></div>` +
+        `<div class="mp-nm">${owned ? '✓ ' : ''}${esc(t(node.name))} <em>· ${t('meta.cost', { n: node.tier })}</em></div>` +
         `<div class="mp-ds">${esc(t(node.desc))}</div>` +
         (owned
           ? ''
-          : `<button class="mp-buy" data-meta="${node.id}" ${can ? '' : 'disabled'}>${can ? t('Изучить') : t('Закрыто')}</button>`) +
+          : `<button class="mp-buy" data-meta="${node.id}" ${can ? '' : 'disabled'}>${can ? t('hero.tree.unlock') : t('meta.locked')}</button>`) +
         `</div>`;
     }
     h += `</div>`;
   }
-  h += `<p class="mp-note">${t('Опыт даётся за завершённые матчи: участие + счёт + победа. Прокачка не продаётся — только игра.')}</p>`;
+  h += `<p class="mp-note">${t('meta.note')}</p>`;
   el.innerHTML = h;
 }
 $('hp-meta').addEventListener('click', (ev) => {
@@ -10510,11 +10512,11 @@ function arsenalCardHtml(item: ArsenalItem): string {
 function renderArsenalPanel(): void {
   const el = $('hp-arsenal');
   if (arsenalItems.length === 0) {
-    el.innerHTML = `<div class="hub-empty"><span class="he-ic">⚔</span>${t('Арсенал пуст')}<br><span style="font-size:11px;color:var(--cyan-dim)">${t('войдите под аккаунтом на сервере с накоплением, чтобы увидеть коллекцию')}</span></div>`;
+    el.innerHTML = `<div class="hub-empty"><span class="he-ic">⚔</span>${t('arsenal.empty')}<br><span style="font-size:11px;color:var(--cyan-dim)">${t('arsenal.empty.hint')}</span></div>`;
     return;
   }
   const kinds: Array<ArsenalItem['kind']> = ['hull', 'module', 'hero_fitting'];
-  let chips = `<button class="ar-fchip${arsenalFilter.kind ? '' : ' on'}" data-ar-kind="">${t('Всё')}</button>`;
+  let chips = `<button class="ar-fchip${arsenalFilter.kind ? '' : ' on'}" data-ar-kind="">${t('arsenal.filter.all')}</button>`;
   for (const k of kinds)
     chips += `<button class="ar-fchip${arsenalFilter.kind === k ? ' on' : ''}" data-ar-kind="${k}">${t(ARSENAL_KIND_RU[k])}</button>`;
   const grades = gradesOf(arsenalItems);
@@ -10608,7 +10610,7 @@ async function syncCommanderFromServer(): Promise<void> {
 function openHub(note = ''): void {
   if (!nickInput.value.trim()) nickInput.value = suggestCallsign();
   const nick = nickInput.value.trim();
-  $('hub-name').textContent = nick || t('Командир');
+  $('hub-name').textContent = nick || t('auth.commander');
   showConnect(false);
   showHub(true);
   hubTab('home');
@@ -10643,7 +10645,7 @@ const wPassInput = $('cwpass') as HTMLInputElement;
 function signInByCallsign(): void {
   const nick = wNickInput.value.trim();
   if (!nick) {
-    statusEl.textContent = t('Введи позывной');
+    statusEl.textContent = t('auth.need-nick');
     wNickInput.focus();
     return;
   }
@@ -10715,12 +10717,8 @@ $('cwgo').addEventListener('click', signInByCallsign);
 wNickInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') signInByCallsign();
 });
-$('cgoogle').addEventListener('click', () =>
-  openHub(t('Вход через Google — скоро · ты вошёл гостем')),
-);
-$('capple').addEventListener('click', () =>
-  openHub(t('Вход через Apple — скоро · ты вошёл гостем')),
-);
+$('cgoogle').addEventListener('click', () => openHub(t('auth.google.soon')));
+$('capple').addEventListener('click', () => openHub(t('auth.apple.soon')));
 $('cback').addEventListener('click', () => {
   showStage('welcome'); // reset #connect's inner stage for next time
   statusEl.textContent = '';
@@ -10736,7 +10734,7 @@ $('clang').addEventListener('click', () => {
 localizeStaticDom(); // static markup is canonical-Russian; translate it in place
 for (const a of Array.from(document.querySelectorAll('.cfoot a'))) {
   a.addEventListener('click', () => {
-    statusEl.textContent = t('{what} — скоро', { what: (a.textContent ?? '').trim() });
+    statusEl.textContent = t('soon.generic', { what: (a.textContent ?? '').trim() });
   });
 }
 
@@ -10762,17 +10760,17 @@ async function submitRegister(): Promise<void> {
   const pass = crPassInput.value;
   const email = crMailInput.value.trim();
   if (!nick) {
-    statusEl.textContent = t('Введи имя командира');
+    statusEl.textContent = t('auth.need-name');
     crNickInput.focus();
     return;
   }
   if (pass.length < 8) {
-    statusEl.textContent = t('Введите пароль (мин. 8 символов)');
+    statusEl.textContent = t('acc.pass.rule');
     crPassInput.focus();
     return;
   }
   if (pass !== crPass2Input.value) {
-    statusEl.textContent = t('Пароли не совпадают');
+    statusEl.textContent = t('auth.pass-mismatch');
     crPass2Input.focus();
     return;
   }
@@ -10840,7 +10838,7 @@ const crecMailInput = $('crecmail') as HTMLInputElement;
 async function submitRecover(): Promise<void> {
   const email = crecMailInput.value.trim();
   if (!email) {
-    statusEl.textContent = t('Введите почту');
+    statusEl.textContent = t('auth.need-mail');
     crecMailInput.focus();
     return;
   }
@@ -10855,7 +10853,7 @@ async function submitRecover(): Promise<void> {
   } catch {
     /* swallow — never reveal a delivery/lookup outcome */
   }
-  statusEl.textContent = t('Если такая почта есть — прислали ссылку для сброса');
+  statusEl.textContent = t('auth.recover.sent');
 }
 $('crrecover').addEventListener('click', () => {
   showStage('recover');
@@ -10881,12 +10879,12 @@ let resetToken = ''; // the token carried by the ?reset= deep-link
 async function submitReset(): Promise<void> {
   const pass = cresetPassInput.value;
   if (pass.length < 8) {
-    statusEl.textContent = t('Введите пароль (мин. 8 символов)');
+    statusEl.textContent = t('acc.pass.rule');
     cresetPassInput.focus();
     return;
   }
   if (pass !== cresetPass2Input.value) {
-    statusEl.textContent = t('Пароли не совпадают');
+    statusEl.textContent = t('auth.pass-mismatch');
     cresetPass2Input.focus();
     return;
   }
@@ -10905,7 +10903,7 @@ async function submitReset(): Promise<void> {
       token?: string;
     };
     if (!res || !res.ok || !body.token || !body.login) {
-      statusEl.textContent = t('Ссылка недействительна или устарела');
+      statusEl.textContent = t('auth.reset.bad-link');
       return;
     }
     localStorage.setItem(
@@ -10918,7 +10916,7 @@ async function submitReset(): Promise<void> {
     cresetPassInput.value = '';
     cresetPass2Input.value = '';
     statusEl.textContent = '';
-    note('✔ ' + t('Пароль изменён'));
+    note('✔ ' + t('auth.reset.done'));
     openHub();
   } finally {
     signingIn = false;
@@ -10966,7 +10964,7 @@ $('hub-solo').addEventListener('click', () => {
   openSetup('hub');
 });
 $('hub-msg').addEventListener('click', () => {
-  hubNote.textContent = t('Сообщения — скоро');
+  hubNote.textContent = t('hub.messages.soon');
 });
 $('hub-logout').addEventListener('click', () => {
   // «Сменить командира» must really switch identity: drop this server's session so
@@ -10987,7 +10985,7 @@ for (const tile of Array.from(document.querySelectorAll('#hp-more .hub-tile[data
     // read IT, not the Russian-only data-more attribute, so the toast matches the UI language.
     const label =
       tile.querySelector('[data-i18n]')?.textContent ?? (tile as HTMLElement).dataset.more ?? '';
-    hubNote.textContent = t('{what} — скоро', { what: label });
+    hubNote.textContent = t('soon.generic', { what: label });
   });
 }
 
@@ -11356,12 +11354,13 @@ function factionBonusLine(fid: string): string {
   if (!p) return '';
   const parts: string[] = [];
   if (p.productionBonus)
-    parts.push(t('+{n}% экономика', { n: Math.round(p.productionBonus * 100) }));
+    parts.push(t('setup.bonus.economy', { n: Math.round(p.productionBonus * 100) }));
   if (p.combatDamageBonus)
-    parts.push(t('+{n}% урон', { n: Math.round(p.combatDamageBonus * 100) }));
+    parts.push(t('setup.bonus.damage', { n: Math.round(p.combatDamageBonus * 100) }));
   if (p.fleetSpeedBonus)
-    parts.push(t('+{n}% скорость флотов', { n: Math.round(p.fleetSpeedBonus * 100) }));
-  if (p.radarRangeBonus) parts.push(t('+{n}% радар', { n: Math.round(p.radarRangeBonus * 100) }));
+    parts.push(t('setup.bonus.speed', { n: Math.round(p.fleetSpeedBonus * 100) }));
+  if (p.radarRangeBonus)
+    parts.push(t('setup.bonus.radar', { n: Math.round(p.radarRangeBonus * 100) }));
   return parts.join(' · ');
 }
 
@@ -11369,7 +11368,7 @@ function renderSetupSlots(): void {
   // The faction picker (H3): four houses, each a pure passive bonus — pick yours.
   // Lives in its own container (#setupfactions, the left setup column); the team
   // toggle + seat rows fill #setupslots (the right column).
-  let f2 = `<div class="fph">${t('Фракция — пассивный бонус дома')}</div><div class="fpick">`;
+  let f2 = `<div class="fph">${t('setup.faction.note')}</div><div class="fpick">`;
   for (const fid of Object.keys(data.factions)) {
     const f = data.factions[fid];
     if (!f) continue;
@@ -11384,8 +11383,8 @@ function renderSetupSlots(): void {
   // needs three AI seats on); shown always so the player can arm it before adding them.
   let h =
     `<div class="tmrow"><button class="tmtog${setupTeams ? ' on' : ''}" data-teamtog="1">` +
-    `${setupTeams ? '⚔ ' + t('Командный бой: ВКЛ') : t('Командный бой: выкл')}</button>` +
-    (setupTeams ? `<span class="tmhint">${t('одна сторона — союзники')}</span>` : '') +
+    `${setupTeams ? '⚔ ' + t('setup.teams.on') : t('setup.teams.off')}</button>` +
+    (setupTeams ? `<span class="tmhint">${t('setup.teams.note')}</span>` : '') +
     `</div>`;
   const fids = seatFactionIds();
   // A/B side chip for a seat (you are locked to A; AI seats toggle side).
@@ -11402,14 +11401,14 @@ function renderSetupSlots(): void {
         `<div class="srow"><span class="dot" style="background:${m.color};color:${m.color}"></span>` +
         `<span class="nm">${house}</span>` +
         (setupTeams ? teamChip(0, true) : '') +
-        `<span class="you">${t('ВЫ')}</span></div>`;
+        `<span class="you">${t('comms.you')}</span></div>`;
     } else {
       const aiOn = role === 'ai';
       h +=
         `<div class="srow ${aiOn ? '' : 'off'}"><span class="dot" style="background:${m.color};color:${m.color}"></span>` +
         `<span class="nm">${house}</span>` +
         (setupTeams && aiOn ? teamChip(i, false) : '') +
-        `<button class="stog ${aiOn ? 'ai' : ''}" data-slot="${i}">${aiOn ? t('ИИ') : t('ВЫКЛ')}</button></div>`;
+        `<button class="stog ${aiOn ? 'ai' : ''}" data-slot="${i}">${aiOn ? t('diplo.filter.ai') : t('setup.off')}</button></div>`;
     }
   }
   setupSlotsEl.innerHTML = h;
@@ -11423,7 +11422,7 @@ function renderSetup(): void {
   // (the core never ends a one-player match — victory needs ≥2 active sides).
   const rivals = setupSlots.slice(1).filter((r) => r === 'ai').length;
   setupGoEl.disabled = false;
-  setupGoEl.textContent = rivals === 0 ? t('ЗАПУСК В ОДИНОЧКУ') : t('ЗАПУСК');
+  setupGoEl.textContent = rivals === 0 ? t('setup.start.solo') : t('setup.start');
   setupHintEl.textContent = t(
     rivals === 0
       ? 'Дом: {home} — одиночная песочница, без соперников · тапните светящийся мир, чтобы сменить'
@@ -11445,7 +11444,7 @@ const sciWin = $('scipick');
 function sciInfluence(id: string): string {
   const def = data.scientists[id];
   if (!def) return '';
-  if (!def.branch) return t('+1 слот исследования (генералист, без фокуса ветки)');
+  if (!def.branch) return t('scipick.generalist');
   const opens = Object.values(data.technologies)
     .filter(
       (td) =>
@@ -11454,8 +11453,8 @@ function sciInfluence(id: string): string {
     .map((td) => tData(td.name));
   const br = branchLabel(def.branch);
   return opens.length
-    ? t('Открывает ветку «{br}»: {list}', { br, list: opens.join(', ') })
-    : t('Фокус ветки «{br}»', { br });
+    ? t('scipick.opens', { br, list: opens.join(', ') })
+    : t('scipick.focus', { br });
 }
 function renderSciPick(): void {
   const chosen = setupScientists;
@@ -11463,11 +11462,11 @@ function renderSciPick(): void {
     .map((i) => {
       const id = chosen[i];
       if (!id) {
-        return `<div class="sp-slot empty"><div class="sp-plus">＋</div><div class="sp-hint">${t('Выбрать учёного')}</div></div>`;
+        return `<div class="sp-slot empty"><div class="sp-plus">＋</div><div class="sp-hint">${t('scipick.pick')}</div></div>`;
       }
       const def = data.scientists[id];
       return (
-        `<div class="sp-slot filled"><button class="sp-rm" data-sprm="${i}" title="${t('убрать')}">✕</button>` +
+        `<div class="sp-slot filled"><button class="sp-rm" data-sprm="${i}" title="${t('ping.remove')}">✕</button>` +
         `<div class="sp-sn">${esc(tData(def?.name ?? id))}</div>` +
         `<div class="sp-inf">${esc(sciInfluence(id))}</div></div>`
       );
@@ -11488,10 +11487,10 @@ function renderSciPick(): void {
   const ready = chosen.length >= 2;
   $('scipickbody').innerHTML =
     `<div class="sp-slots">${slots}</div>` +
-    `<div class="sp-warn">${t('⚠ Совет закрепляется на весь матч. Рекомендованная пара уже выбрана — замените по вкусу.')}</div>` +
-    `<div class="sp-h">${t('Кандидаты · нажмите, чтобы занять слот')}</div>` +
+    `<div class="sp-warn">${t('scipick.note')}</div>` +
+    `<div class="sp-h">${t('scipick.candidates')}</div>` +
     `<div class="sp-roster">${roster}</div>` +
-    `<button class="sp-go" id="sp-go"${ready ? '' : ' disabled'}>${ready ? t('Закрепить и продолжить к выбору места →') : t('Выберите двух учёных')}</button>`;
+    `<button class="sp-go" id="sp-go"${ready ? '' : ' disabled'}>${ready ? t('scipick.confirm') : t('scipick.need-two')}</button>`;
 }
 function openSciPick(): void {
   sciWin.classList.add('show');
@@ -11625,12 +11624,12 @@ purse.addEventListener('click', (ev) => {
   const flow = Math.abs(raw) >= 1 ? Math.round(raw) : Math.round(raw * 10) / 10;
   const short = (s.players[ME]?.arrears ?? []).includes(key);
   note(
-    t('{ic} {name}: {stock} в казне · {flow}/ч (производство минус содержание войск и зданий)', {
+    t('hud.resource.tip', {
       ic: TECH_CUR[key] ?? '',
       name: el.title,
       stock: kfmt(stock),
       flow: (flow >= 0 ? '+' : '') + (Math.abs(flow) >= 1 ? kfmt(flow) : String(flow)),
-    }) + (short ? ' ' + t('⚠ ДЕФИЦИТ — здания-потребители работают на 50%') : ''),
+    }) + (short ? ' ' + t('hud.deficit') : ''),
   );
 });
 
@@ -11642,15 +11641,12 @@ devlineEl.addEventListener('click', (ev) => {
   const worlds = mine.filter((p) => (p.kind ?? 'planet') === 'planet').length;
   const score = Math.round(s.match?.scores?.[ME]?.total ?? 0);
   note(
-    t(
-      '✦ {score}/{limit}: мир — 50, прочий сектор — 10, здания добавляют по уровню (у вас {w} миров, {s} секторов). Победа: ✦ {limit}, уничтожение соперников или доминирование.',
-      {
-        score,
-        limit: SCORE_LIMIT,
-        w: worlds,
-        s: mine.length - worlds,
-      },
-    ),
+    t('hud.score.tip', {
+      score,
+      limit: SCORE_LIMIT,
+      w: worlds,
+      s: mine.length - worlds,
+    }),
   );
 });
 
@@ -11689,7 +11685,7 @@ function installMatch(state: GameState, aiPlayers: Set<string>): void {
   // The match goal, written AFTER the wipe so it is the first line a player can read.
   // Kept honest against the kernel: victoryModule ends on score (SCORE_LIMIT), on
   // elimination, or on domination — no "capital capture" victory exists.
-  note(t('Задача: ✦ {n} (мир — 50, сектор — 10) или уничтожение соперников.', { n: SCORE_LIMIT }));
+  note(t('hud.goal', { n: SCORE_LIMIT }));
   for (const k of Object.keys(buildQueues)) delete buildQueues[k];
   defaultView(); // phone: zoom onto home; desktop: whole-map fit
   setupEl.style.display = 'none';
@@ -11802,7 +11798,7 @@ function connect(): void {
       : `${base}/matches/${encodeURIComponent(currentMatchId)}?nick=${encodeURIComponent(nick)}` +
         (seatTicket ? `&ticket=${encodeURIComponent(seatTicket)}` : '');
   pendingJoinToken = null; // one dial per token fetch — a reconnect mints a fresh one
-  statusEl.textContent = t('Подключение: {nick}…', { nick });
+  statusEl.textContent = t('net.connecting', { nick });
   localStorage.setItem('void.server', base);
   localStorage.setItem('void.nick', nick); // resume this seat next visit
 
@@ -11845,7 +11841,7 @@ function connect(): void {
           xpAwarded = false;
           pendingLoads = []; // drop any queued loads from a prior/local session
           showConnect(false);
-          note(t('● подключён как {who}', { who: NAME[ME] ?? ME }));
+          note(t('net.connected', { who: NAME[ME] ?? ME }));
           // Latency probe: ping every 2s with a client timestamp the pong echoes.
           if (pingTimer) clearInterval(pingTimer);
           pingTimer = setInterval(() => client.ping(performance.now()), 2000);
@@ -11888,7 +11884,7 @@ function connect(): void {
         // world. `waiting` survives only for the transport's waitForPlayers mode
         // (unused by our hosts) — show the banner, clear it once the clock runs.
         if (snap.waiting) {
-          banner = '⏳ ' + t('Ждём, пока хост начнёт…');
+          banner = '⏳ ' + t('net.waiting-host');
         } else if (banner && banner.startsWith('⏳')) {
           banner = null;
         }
@@ -11913,7 +11909,7 @@ function connect(): void {
           at: ping.createdAt,
           from: ping.owner,
           to: COALITION,
-          text: ping.label ?? t('метка {node}', { node }),
+          text: ping.label ?? t('chat.ping.mark', { node }),
           sys: false,
           ping: node,
           pingId: ping.id,
@@ -11969,9 +11965,9 @@ function connect(): void {
         } else if (!admitted && code === 'E_MATCH_FULL') {
           // NETA2-1: the server COMPLETED the handshake just to tell us why — a real
           // refusal, not "server down". Say it plainly instead of a generic error.
-          statusEl.textContent = t('матч заполнен — все места заняты');
+          statusEl.textContent = t('net.match-full');
         } else if (!admitted && code === 'E_ENTRY_CLOSED') {
-          statusEl.textContent = t('вход в этот матч закрыт (окно приёма новых игроков истекло)');
+          statusEl.textContent = t('net.join-closed');
         } else {
           statusEl.textContent = 'error: ' + code;
         }
@@ -11999,11 +11995,11 @@ function connect(): void {
       netAdmitted = false;
       if (userClosed) {
         statusEl.textContent = 'disconnected';
-        note(t('● отключён от сервера'));
+        note(t('net.disconnected'));
         showConnect(true);
       } else {
         // unexpected drop → auto-rejoin our seat (the match keeps running server-side)
-        note(t('● связь потеряна — переподключение…'));
+        note(t('net.reconnecting'));
         reconnecting = true;
         scheduleReconnect();
       }
@@ -12029,7 +12025,7 @@ function connect(): void {
 function resolveServer(): { base: string; nick: string } | null {
   let raw = srvInput.value.trim();
   if (!raw) {
-    statusEl.textContent = t('Укажи адрес сервера');
+    statusEl.textContent = t('net.need-address');
     return null;
   }
   // Accept http(s)://, ws(s)://, or a bare host:port and normalize. Kills three
@@ -12046,12 +12042,12 @@ function resolveServer(): { base: string; nick: string } | null {
   try {
     base = `${new URL(raw).protocol}//${new URL(raw).host}`; // drop any path/query
   } catch {
-    statusEl.textContent = t('Неверный адрес сервера');
+    statusEl.textContent = t('net.bad-address');
     return null;
   }
   const nick = nickInput.value.trim();
   if (!nick) {
-    statusEl.textContent = t('Введи позывной');
+    statusEl.textContent = t('auth.need-nick');
     return null;
   }
   return { base, nick };
@@ -12976,10 +12972,10 @@ window.addEventListener('popstate', () => {
     // Show the hint and DON'T re-arm; during the exit window `frame()` won't re-arm
     // either, so a second Back within it is the system's (leaves the match).
     backHintAt = performance.now();
-    note(t('Ещё раз «Назад» — выход из матча'));
+    note(t('back.confirm.match'));
     return;
   }
-  note(t('Ещё раз «Назад» — выход')); // at the hub/welcome — the next Back exits
+  note(t('back.confirm')); // at the hub/welcome — the next Back exits
 });
 function armBack(): void {
   if (backArmed) return;
@@ -13066,9 +13062,9 @@ function frame(nowReal: number) {
   const score = Math.round(s.match?.scores?.[ME]?.total ?? 0);
   const need = Math.max(0, SCORE_LIMIT - score);
   const statusHtml =
-    `<span id="clock">${t('День {n}', { n: d })} · ${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}</span>` +
-    `<span class="dstat${need === 0 ? ' win' : ''}">✦ ${score}/${SCORE_LIMIT}${need === 0 ? ' · ★ ' + t('ПОБЕДА') : ''}</span>` +
-    `<span class="dl-donate" title="${t('Суверены — донат-валюта')}"><i>◆</i>${kfmt(SOVEREIGNS)}</span>`;
+    `<span id="clock">${t('browser.day', { n: d })} · ${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}</span>` +
+    `<span class="dstat${need === 0 ? ' win' : ''}">✦ ${score}/${SCORE_LIMIT}${need === 0 ? ' · ★ ' + t('card.score.goal') : ''}</span>` +
+    `<span class="dl-donate" title="${t('hub.sovereigns')}"><i>◆</i>${kfmt(SOVEREIGNS)}</span>`;
   if (statusHtml !== lastClockText) {
     devlineEl.innerHTML = statusHtml;
     lastClockText = statusHtml;
@@ -13167,7 +13163,7 @@ function frame(nowReal: number) {
     // (back to bot selection). Net-status banners (reconnecting / waiting) get no button.
     const ended = !NET && s.match?.status === 'ended';
     const html = ended
-      ? `<div class="bn-text">${esc(banner)}</div><button class="bn-btn" data-restart>${t('⟳ К выбору ботов')}</button>`
+      ? `<div class="bn-text">${esc(banner)}</div><button class="bn-btn" data-restart>${t('hub.back-to-bots')}</button>`
       : `<div class="bn-text">${esc(banner)}</div>`;
     if (html !== lastBannerHtml) {
       bannerEl.innerHTML = html;
@@ -13912,10 +13908,10 @@ function nearestOwnWorld(fromId: string): string | null {
   return best;
 }
 function tgStepLabel(st: ChainStep, target: string): string {
-  if (st.kind === 'wait') return t('⏱{n}ч', { n: st.hours });
+  if (st.kind === 'wait') return t('tgt.wait', { n: st.hours });
   if (st.kind === 'move') return st.to === target ? '✈' : `✈ ${st.to}`;
   if (st.kind === 'assault') return '⚔';
-  if (st.kind === 'strike') return t('🎯{n}ч', { n: st.hours });
+  if (st.kind === 'strike') return t('tgt.at', { n: st.hours });
   if (st.kind === 'ability') {
     const nm = tData(data.heroAbilities[st.abilityId]?.name ?? st.abilityId);
     return st.target && st.target !== target ? `★ ${nm} → ${st.target}` : `★ ${nm}`;
@@ -13936,7 +13932,7 @@ function tgHeroAbilityButtons(fleetIds: string[], full: boolean): string {
     const ad = ab !== null ? data.heroAbilities[ab] : undefined;
     if (!ad || !HERO_CASTABLE.has(ad.type)) continue;
     const cdLeft = Math.max(0, (hero.cooldowns?.[heroCdKey(ad.type)] ?? 0) - s.time);
-    const badge = cdLeft > 0 ? ` ${t('КД {h}', { h: fmtHrs(cdLeft / HOUR) })}` : '';
+    const badge = cdLeft > 0 ? ` ${t('hero.abil.cooldown', { h: fmtHrs(cdLeft / HOUR) })}` : '';
     html += `<button data-tgab="${ab}" ${full || cdLeft > 0 ? 'disabled' : ''}>★ ${esc(tData(ad.name))}${badge}</button>`;
   }
   return html;
@@ -13973,26 +13969,26 @@ function renderTgtEditor(reposition = false): void {
     ? st
         .map(
           (x, i) =>
-            `<button data-step="${i}" title="${t('убрать шаг')}">${esc(tgStepLabel(x, tgtEditor!.target))}</button>`,
+            `<button data-step="${i}" title="${t('tgt.step.remove')}">${esc(tgStepLabel(x, tgtEditor!.target))}</button>`,
         )
         .join('<i>→</i>')
-    : `<i>${t('план пуст — добавь шаги')}</i>`;
+    : `<i>${t('tgt.empty')}</i>`;
   el.innerHTML =
-    `<div class="tg-top"><b>◎ ${t('ПРИКАЗ')}</b><span>${esc(tgtEditor.target)}${
-      alive.length > 1 ? ` · ${t('{n} флотов', { n: alive.length })}` : ''
+    `<div class="tg-top"><b>◎ ${t('tgt.title')}</b><span>${esc(tgtEditor.target)}${
+      alive.length > 1 ? ` · ${t('tgt.fleets', { n: alive.length })}` : ''
     }</span></div>` +
     `<div class="tg-plan">${plan}</div>` +
     `<div class="tg-add">` +
-    `<button data-tg="wait" ${full ? 'disabled' : ''}>${t('⏱ +1ч')}</button>` +
-    `<button data-tg="move" ${full ? 'disabled' : ''}>✈ ${t('Сюда')}</button>` +
-    `<button data-tg="assault" ${full ? 'disabled' : ''}>⚔ ${t('Штурм')}</button>` +
-    `<button data-tg="barrage" ${full ? 'disabled' : ''}>🎯 ${t('Огонь')}</button>` +
-    `<button data-tg="home" ${full || !nearestOwnWorld(tgtEditor.target) ? 'disabled' : ''}>⌂ ${t('Домой')}</button>` +
+    `<button data-tg="wait" ${full ? 'disabled' : ''}>${t('tgt.add-wait')}</button>` +
+    `<button data-tg="move" ${full ? 'disabled' : ''}>✈ ${t('tgt.step.here')}</button>` +
+    `<button data-tg="assault" ${full ? 'disabled' : ''}>⚔ ${t('cmd.assault')}</button>` +
+    `<button data-tg="barrage" ${full ? 'disabled' : ''}>🎯 ${t('tgt.step.fire')}</button>` +
+    `<button data-tg="home" ${full || !nearestOwnWorld(tgtEditor.target) ? 'disabled' : ''}>⌂ ${t('tgt.step.home')}</button>` +
     tgHeroAbilityButtons(tgtEditor.fleetIds, full) +
     `</div>` +
     `<div class="tg-act">` +
-    `<button data-tg="send" ${st.length ? '' : 'disabled'}>✓ ${t('Отправить')}</button>` +
-    `<button data-tg="drop" class="tg-drop" title="${t('снять приказ')}">✕</button>` +
+    `<button data-tg="send" ${st.length ? '' : 'disabled'}>✓ ${t('tgt.send')}</button>` +
+    `<button data-tg="drop" class="tg-drop" title="${t('tgt.clear')}">✕</button>` +
     `</div>`;
   el.classList.add('show');
   if (reposition) {
@@ -14045,7 +14041,7 @@ document.getElementById('tgted')?.addEventListener('click', (ev) => {
     if (home) st.push({ kind: 'move', to: home });
   } else if (act === 'send') {
     for (const id of tgtEditor.fleetIds) playerOrder(orderChain(ME, id, st));
-    note(t('◎ приказ поставлен — флот исполнит план сам'));
+    note(t('tgt.placed'));
     closeTgtEditor();
     return;
   } else if (act === 'drop') {
@@ -14438,7 +14434,7 @@ requestAnimationFrame(frame);
   const myBuild = currentBuild();
   if (myBuild) {
     const cver = $('cver');
-    if (cver) cver.textContent = t('сборка {b}', { b: buildLabel(myBuild) });
+    if (cver) cver.textContent = t('upd.build', { b: buildLabel(myBuild) });
     const cupd = $('cupd');
     if (cupd) cupd.style.display = '';
 
@@ -14455,17 +14451,17 @@ requestAnimationFrame(frame);
     const diagMsg = (r: UpdateCheck): string => {
       switch (r.kind) {
         case 'update':
-          return t('⬇ есть обновление → сборка {v}', { v: r.info.versionCode });
+          return t('upd.available', { v: r.info.versionCode });
         case 'current':
-          return t('✓ актуально · локально {l} · сервер {r}', { l: r.local, r: r.remote });
+          return t('upd.current', { l: r.local, r: r.remote });
         case 'offline':
-          return t('✗ нет связи с GitHub (сеть / VPN?)');
+          return t('upd.no-network');
         case 'http':
-          return t('✗ GitHub ответил {s}', { s: r.status });
+          return t('upd.http-error', { s: r.status });
         case 'unparsable':
-          return t('✗ ответ получен, но версия не распознана');
+          return t('upd.bad-version');
         case 'dormant':
-          return t('обновления доступны только в APK');
+          return t('upd.apk-only');
       }
     };
     let checking = false;
@@ -14477,7 +14473,7 @@ requestAnimationFrame(frame);
         if (r.kind === 'update') showUpdate(r.info);
         if (manual && out) {
           const prev = out.textContent;
-          out.textContent = t('проверка: {msg}', { msg: diagMsg(r) });
+          out.textContent = t('upd.checking', { msg: diagMsg(r) });
           out.style.color = r.kind === 'offline' || r.kind === 'http' ? 'var(--amber)' : '';
           window.setTimeout(() => {
             out.textContent = prev;

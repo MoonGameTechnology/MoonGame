@@ -46,6 +46,38 @@ export const en: Record<string, string> = {
   'browser.solo.hint': 'No server needed — bots fill the open seats.',
   'browser.taken': 'taken',
 
+  // --- ai — Красный ИИ: условия конца матча и отказы дежурного вылета.
+  'ai.end.domination': 'by galactic domination',
+  'ai.end.elimination': 'by eliminating rivals',
+  'ai.end.over': 'the match has ended',
+  'ai.end.score': 'by score limit',
+  'ai.end.timeout': 'on the clock',
+  'ai.sortie.docked-only': '🛩 standing patrol — only from a parked node',
+  'ai.sortie.idle-only': '🛩 standing patrol — only when the fleet is free',
+
+  // --- arsenal — «Арсенал»: коллекция аккаунта, фильтр, пустое состояние.
+  'arsenal.empty': 'Arsenal empty',
+  'arsenal.empty.hint':
+    'sign in with an account on a server with persistence to see your collection',
+  'arsenal.filter.all': 'All',
+
+  // --- auth — Вход и регистрация: позывной, сторонние провайдеры.
+  'auth.apple.soon': 'Sign in with Apple — coming soon · you entered as a guest',
+  'auth.commander': 'Commander',
+  'auth.google.soon': 'Sign in with Apple — coming soon · you entered as a guest',
+  'auth.google.soon': 'Sign in with Google — coming soon · you entered as a guest',
+  'auth.need-mail': 'Enter an email',
+  'auth.need-name': 'Enter a commander name',
+  'auth.need-nick': 'Enter a callsign',
+  'auth.pass-mismatch': 'Passwords do not match',
+  'auth.recover.sent': 'If that email exists, a reset link is on its way',
+  'auth.reset.bad-link': 'The link is invalid or expired',
+  'auth.reset.done': 'Password changed',
+
+  // --- back — Кнопка «Назад» (APK/десктоп): подтверждение выхода.
+  'back.confirm': 'Press Back again to exit',
+  'back.confirm.match': 'Press Back again to leave the match',
+
   // --- card — Карточка игрока (тап по гербу): фракция, владения, боевой счёт.
   'card.close': 'CLOSE',
   'card.combat': 'War record',
@@ -59,6 +91,10 @@ export const en: Record<string, string> = {
   'card.stances': 'Relations',
   'card.units': 'Units',
   'card.worlds': 'Worlds held',
+
+  // --- cargo — Погрузка десанта: отказы трюма и гарнизона.
+  'cargo.garrison-empty': 'none left in the garrison',
+  'cargo.hold-full': 'the hold is full',
 
   // --- chat / spy — Переписка (сессия и коалиция) и вкладка шпионажа.
   'chat.coalition.empty':
@@ -75,7 +111,6 @@ export const en: Record<string, string> = {
   'chat.tab.coalition': 'Coalition',
   'chat.tab.session': 'Session',
   'chat.you': 'You',
-  'spy.hours-left': '{n}h',
   'spy.log.empty': 'no attempts yet',
   'spy.log.title': 'JOURNAL',
   'spy.note':
@@ -394,6 +429,29 @@ export const en: Record<string, string> = {
   'diplo.tab.messages': 'Messages',
   'diplo.win.title': 'DIPLOMACY',
 
+  // --- div — Дивизии: список, мобилизация, конструктор, трюм.
+  'div.damage-vs': 'Damage vs:',
+  'div.designer': '⚙ Designer',
+  'div.empty': 'No divisions.',
+  'div.empty.hint': 'No divisions — mobilize from a template below.',
+  'div.hold': 'Divisions ⇄ hold (free {n})',
+  'div.hold.note': 'Loading takes a division into the hold. Unloading lands it on this world.',
+  'div.mobilize': 'Mobilization',
+  'div.mobilize.named': 'Mobilize "{name}"',
+  'div.note':
+    'A division is a snapshot of its template: editing a design never touches armies already fielded. On your own world it heals +1 HP/unit/day.',
+  'div.officer-locked': "An officer's named template: composition locked, no editing.",
+  'div.rename': 'Rename',
+  'div.roster': 'composition {n}/{s} · {rest}',
+  'div.slot.note':
+    'Tap a slot to cycle the unit type: militia → heavy infantry → special forces → tank. Tanks shred any infantry; special forces are the one infantry that threatens armour; heavy infantry holds the line.',
+  'div.stat.attack': 'toughness',
+  'div.stat.attack': 'defense',
+  'div.stat.attack': 'attack',
+  'div.stat.defense': 'defense',
+  'div.stat.hp': 'toughness',
+  'div.title': 'Divisions',
+
   // --- dossier — Досье объектов: здания, корабли, стройка в очереди, вкладки и характеристики.
   'dossier.building.barracks':
     'Barracks defend your world from invaders. Home to your valiant defenders.',
@@ -428,6 +486,7 @@ export const en: Record<string, string> = {
   'dossier.fleet.desc':
     'A mobile task force of ships. Select it to give maneuver, orbit and strike orders.',
   'dossier.fleet.name': 'Fleet',
+  'dossier.hint': 'Hover an object on the left — its dossier appears here.',
   'dossier.stat.atk.desc': "The fleet's total ship attack.",
   'dossier.stat.atk.name': 'Attack',
   'dossier.stat.cap.desc':
@@ -495,6 +554,126 @@ export const en: Record<string, string> = {
   'dossier.unit.strike-carrier.desc':
     'A slow armored carrier ({hp} hull, hold for {c}) — almost no guns of its own, all its strength is in the wing it carries. Keep it behind and launch the wing at a target with "🛩 Launch squadron".',
   'dossier.unit.strike-carrier.name': 'Strike Carrier',
+
+  // --- fmt — Форматирование величин: длительности.
+  'fmt.hours': '{n}m',
+  'fmt.hours': '{n}h',
+  'fmt.minutes': '{n}m',
+
+  // --- hint — Подсказки режима прицеливания на карте.
+  'hint.aim-cancelled': 'aiming cancelled',
+  'hint.assault-enemy-only': "⚔ only someone else's world can be stormed",
+  'hint.auto-assault':
+    '⚔ auto-storm on — the fleet storms the hostile world it arrives at by itself',
+  'hint.barrage-auto': '🎯 auto-target',
+  'hint.barrage-set': '🎯 auto-target',
+  'hint.barrage-set': '🎯 focus fire set',
+  'hint.cast-cancelled': '✖ cast cancelled',
+  'hint.deploy-cancelled': '✖ deploy cancelled',
+  'hint.forced-march': '⚡ forced march: +50% speed, −5% hull per hour underway',
+  'hint.multiselect': '⊕ tap your fleets — build the group, then give a common order',
+  'hint.no-target': '◎ no target picked',
+  'hint.pick-assault': "⚔ pick someone else's world to storm",
+  'hint.pick-barrage': '🎯 tap an enemy fleet to focus fire · empty space = auto',
+  'hint.pick-merge': '⛬ pick a fleet to merge with',
+  'hint.pick-order': '◎ tap a target on the map — compose the order',
+  'hint.squadron-launched': '🛩 squadron launched — steer it onto the target',
+  'hint.standing-sortie': '🛩 standing patrol on — the wing strikes any enemy in range',
+
+  // --- map — Значки на карте: фазы боя.
+  'map.badge.landing': '⚒ ground',
+  'map.badge.orbit': '⚔ orbital',
+
+  // --- meta — Прокачка командующего: уровень, очки, узлы.
+  'meta.cost': '{n} pt.',
+  'meta.level': 'Level {n}',
+  'meta.locked': 'Locked',
+  'meta.note':
+    'XP comes from finished matches: participation + score + victory. Progression is never sold — play only.',
+  'meta.points': 'Points: {n}',
+
+  // --- net — Сеть: подключение, разрывы, адрес сервера.
+  'net.bad-address': 'Invalid server address',
+  'net.connected': '● connected as {who}',
+  'net.connecting': 'Connecting: {nick}…',
+  'net.disconnected': '● disconnected from server',
+  'net.join-closed': 'this match is closed to new players (the entry window has elapsed)',
+  'net.match-full': 'match is full — every seat is taken',
+  'net.need-address': 'Enter the server address',
+  'net.reconnecting': '● connection lost — reconnecting…',
+  'net.reconnecting-order': 'reconnecting — order not sent, try again shortly',
+  'net.waiting-host': 'Waiting for the host to start…',
+
+  // --- queue — Очередь стройки: постановка, улучшение, отказы.
+  'queue.added': 'queued: {what} at {at}',
+  'queue.failed': '{what} — failed: {err}',
+  'queue.unknown': 'unknown order',
+  'queue.upgrade': '{b} — upgrade',
+
+  // --- sandbox — Песочница (дев-инструмент): переключатели и команды.
+  'sandbox.commands': 'Commands',
+  'sandbox.end-wars': 'Close',
+  'sandbox.end-wars': 'End the war with every faction',
+  'sandbox.no-player': 'no player',
+  'sandbox.no-wars': 'You are not at war with anyone',
+  'sandbox.title': 'Toggles',
+  'sandbox.title': 'SANDBOX',
+  'sandbox.toggles': 'Toggles',
+  'sandbox.wars-ended': 'You are not at war with anyone',
+  'sandbox.wars-ended': 'Wars ended: {n} — relations are neutral',
+
+  // --- scipick — Совет учёных: кандидаты, фокус ветки, закрепление.
+  'scipick.candidates': 'Candidates · tap to fill a slot',
+  'scipick.confirm': 'Lock in and continue to start pick →',
+  'scipick.focus': '{br} branch focus',
+  'scipick.generalist': '+1 research slot (a generalist, no branch focus)',
+  'scipick.need-two': 'Pick two scientists',
+  'scipick.note': 'Candidates · tap to fill a slot',
+  'scipick.note':
+    '⚠ The council locks in for the whole match. A recommended pair is pre-selected — swap to taste.',
+  'scipick.opens': '{br} branch focus',
+  'scipick.opens': 'Opens the {br} branch: {list}',
+  'scipick.pick': 'Pick a scientist',
+
+  // --- soon — Заглушки «скоро» для ещё не готовых экранов.
+  'soon.generic': '{what} — coming soon',
+
+  // --- split — Разделение флота: диалог и предпросмотр.
+  'split.all': 'All',
+  'split.confirm': 'Cancel',
+  'split.confirm': 'Confirm',
+  'split.note':
+    'Peel ships into a new fleet — it stays in the same sector. At least one ship stays behind; carried troops stay with the original.',
+  'split.preview': 'new fleet: {a} ships · original keeps {b}',
+  'split.title':
+    'Peel ships into a new fleet — it stays in the same sector. At least one ship stays behind; carried troops stay with the original.',
+  'split.title': 'SPLIT FLEET',
+
+  // --- tgt — Композер приказов (TGT-1): шаги плана, отправка.
+  'tgt.add-wait': 'Home',
+  'tgt.add-wait': 'Fire',
+  'tgt.add-wait': 'Assault',
+  'tgt.add-wait': 'Go here',
+  'tgt.add-wait': '⏱ +1h',
+  'tgt.at': '🎯{n}h',
+  'tgt.clear': 'clear the order',
+  'tgt.empty': 'plan is empty — add steps',
+  'tgt.fleets': '{n} fleets',
+  'tgt.placed': '◎ order set — the fleet will run the plan itself',
+  'tgt.send': 'clear the order',
+  'tgt.send': 'Send',
+  'tgt.step.fire': 'Fire',
+  'tgt.step.here': 'Go here',
+  'tgt.step.home': 'Home',
+  'tgt.step.remove': 'remove step',
+  'tgt.title': '{n} fleets',
+  'tgt.title': 'ORDER',
+  'tgt.wait': '⏱{n}h',
+
+  // --- threat — Оповещение об угрозе: подход врага, радарный контакт.
+  'threat.contact': '◆ new radar contact ({size}) at {at}',
+  'threat.here': '⚠ An enemy at {node}!',
+  'threat.incoming': '⚠ An enemy is heading for {node}: arrival in {dur}',
 
   // --- yard — «Верфь»: корпус и модули, конструктор дивизий, стоимость и заказ.
   'yard.arsenal.note':
@@ -688,12 +867,14 @@ export const en: Record<string, string> = {
   'hub.ally.empty.sub': 'corporations · shared AvA battles · influence',
   'hub.ally.empty.title': 'Alliances',
   'hub.avatar.title': 'Change emblem',
+  'hub.back-to-bots': '⟳ Back to setup',
   'hub.digest.empty.sub':
     'Join a match on the "Games" tab — moves needing your attention will show up here.',
   'hub.digest.empty.title': 'No matches waiting on an order',
   'hub.digest.section': 'Summary',
   'hub.emblem.close': 'Close',
   'hub.emblem.title': 'CHOOSE AN EMBLEM',
+  'hub.messages.soon': 'Messages — coming soon',
   'hub.msgs.aria': 'Messages',
   'hub.nav.ally': 'Alliances',
   'hub.nav.arsenal': 'Arsenal',
@@ -714,6 +895,7 @@ export const en: Record<string, string> = {
   'hub.season.sub': 'Rankings and alliances unlock once the meta-layer launches.',
   'hub.season.title': 'The season has not started',
   'hub.solo': 'Solo game',
+  'hub.sovereigns': 'Sovereigns — the donate currency',
   'hub.status.online': 'online',
   'hub.tile.account': 'Account',
   'hub.tile.chat': 'Chat',
@@ -728,11 +910,17 @@ export const en: Record<string, string> = {
 
   // --- hud — Постоянный интерфейс матча: верхняя панель ресурсов.
   'hud.crest.title': 'Your profile',
+  'hud.deficit': '⚠ SHORTAGE — consuming buildings run at 50%',
+  'hud.goal': 'Goal: ✦ {n} (a world — 50, a province — 10) or eliminate your rivals.',
   'hud.resource.credits': 'Credits',
   'hud.resource.energy': 'Energy',
   'hud.resource.food': 'Food',
   'hud.resource.metal': 'Metal',
   'hud.resource.microelectronics': 'Microelectronics',
+  'hud.resource.tip':
+    '{ic} {name}: {stock} in the treasury · {flow}/h (production minus army and building upkeep)',
+  'hud.score.tip':
+    '✦ {score}/{limit}: a world — 50, any other province — 10, buildings add per level (you hold {w} worlds, {s} provinces). Win at ✦ {limit}, by eliminating rivals, or by domination.',
 
   // --- log — Журнал событий матча (сводки) и гейт объявления войны.
   'log.assault.no-troops':
@@ -943,15 +1131,28 @@ export const en: Record<string, string> = {
   'seatpick.title': 'Choose Faction',
 
   // --- setup — Экран «Настройка схватки»: домашний мир, боты, скорость времени.
+  'setup.bonus.damage': '+{n}% damage',
+  'setup.bonus.economy': '+{n}% economy',
+  'setup.bonus.radar': '+{n}% radar',
+  'setup.bonus.speed': '+{n}% radar',
+  'setup.bonus.speed': '+{n}% fleet speed',
   'setup.cancel': 'Back',
+  'setup.faction.note': 'Faction — the house passive bonus',
   'setup.go': 'LAUNCH',
   'setup.map-hint': 'Tap a glowing world to choose your start',
+  'setup.off': 'OFF',
   'setup.sandbox': '🧪 Sandbox',
   'setup.speed.hint':
     '×1 — real time (an hour of travel = an hour of life, the world runs offline too). For a quick game pick ×10–×100.',
   'setup.speed.label': 'Time speed',
+  'setup.start': 'LAUNCH',
+  'setup.start.solo': 'LAUNCH SOLO',
   'setup.sub':
     'Pick your homeworld on the map, choose how many AI rivals join, then launch. Empty slots are taken by the AI — switch a slot OFF to command a smaller sector, or switch them all off for a peaceful solo sandbox to explore the interface.',
+  'setup.teams.note': 'one side = allies',
+  'setup.teams.off': 'Team battle: off',
+  'setup.teams.on': 'one side = allies',
+  'setup.teams.on': 'Team battle: ON',
   'setup.title': 'SKIRMISH SETUP',
 
   // --- settings — Экран настроек: интерфейс, цвета сторон, графика.
@@ -1195,6 +1396,11 @@ export const en: Record<string, string> = {
     'The <b>Command</b> branch, opens on <b>Day 16</b> for the <b>Overseer</b> scientist (now day {day}).',
   'steward.log.ago': '{dur} ago',
   'steward.log.counter': '⚔ Counterstrike at {node}: loss forecast {pct}%',
+  'steward.log.evac':
+    '🏃 Evacuation from {node} → {to}: loss forecast {pct}%, wings withdrawn: {n}',
+  'steward.log.evac-failed':
+    '⚠ The {node} garrison cannot be evacuated: no transport arrives in time (loss forecast {pct}%)',
+  'steward.log.ferry': '🚚 A ferry dispatched to {node} for the garrison',
   'steward.log.held': '🛡 The {node} line held: loss forecast {pct}%',
   'steward.log.reinforce': '🚩 Reinforcement sent to {node}: loss forecast {pct}%',
   'steward.log.sortie': '🛫 A standing patrol raised at {node}',
@@ -1242,7 +1448,6 @@ export const en: Record<string, string> = {
   'tech.grants': 'unlocks: {x}',
   'tech.grants.ability': 'ability: {x}',
   'tech.grants.steward': 'Steward',
-  'tech.hours': '{n}h',
   'tech.rail.day': 'DAY',
   'tech.rail.day-short': 'day',
   'tech.rail.start': 'start',
@@ -1261,9 +1466,16 @@ export const en: Record<string, string> = {
   'tech.state.running': 'RESEARCHING',
 
   // --- upd — Баннер обновления сборки (APK; в браузере не показывается).
+  'upd.apk-only': 'updates are only available in the APK',
   'upd.available': 'A new build is available',
+  'upd.bad-version': "✗ got a response, but couldn't parse the version",
+  'upd.build': 'build {b}',
+  'upd.checking': 'check: {msg}',
+  'upd.current': '✓ up to date · local {l} · server {r}',
   'upd.go': 'Update',
+  'upd.http-error': '✗ GitHub answered {s}',
   'upd.later': 'Later',
+  'upd.no-network': "✗ can't reach GitHub (network / VPN?)",
 
   // --- welcome — Экран приветствия: вход, регистрация, восстановление, список матчей, подвал.
   'welcome.apple': 'Sign in with Apple',
