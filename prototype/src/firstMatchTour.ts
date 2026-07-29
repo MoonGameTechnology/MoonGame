@@ -2,22 +2,26 @@
  * ONB-2 · The guided first match — a data-described chain (ONB-1 engine) that
  * walks a brand-new commander through the core loop in a bot-free solo sandbox:
  *
- *   produce (build a mine) → build (raise a fleet) → move (set a course, fog
+ *   produce (grow the mine) → build (raise a fleet) → move (set a course, fog
  *   opens) → capture a neutral world (two-phase) → the score moves → first win.
  *
  * The "do X" beats advance on the REAL game action (`action:<type>`, fed from
- * `playerOrder`) and the capture/score beats on live GAME STATE (`state`,
- * predicates over `s`) — so the guide tracks what the player actually does, not
- * a scripted click path. The narration steers even where a precise highlight is
- * unavailable: HUD highlights are `optional`, so a missing/renamed selector
- * degrades to copy-only guidance instead of stopping the tour (spotlight.ts).
+ * `playerOrder`) and the home/fleet/capture/score beats on live GAME STATE
+ * (`state`, predicates over `s`) — so the guide tracks what the player actually
+ * does, not a scripted click path. `home` gates on the panel actually being open
+ * (never `optional`+`tap`: the target is guaranteed absent on arrival, which
+ * would silently skip a `tap` step past the very instruction it exists to show).
  *
- * `copy` is a locale key (canonical-Russian msgid; en.ts translates). Predicates
- * come from the host so this stays pure and unit-testable.
+ * `copy` is a `/localization` key (`onb.tour.*`) or, for the not-yet-migrated
+ * steps, the legacy canonical-Russian msgid bridged via `/localization/legacy`
+ * — `t()` (i18n.ts) resolves either. Predicates come from the host so this
+ * stays pure and unit-testable.
  */
 import type { SpotlightStep } from './spotlight';
 
 export interface FirstMatchDeps {
+  /** True once the player has tapped their homeworld and its panel is open. */
+  homeOpened: () => boolean;
   /** True once the player has raised a mobile fleet (a built ship auto-rallies to orbit). */
   hasFleet: () => boolean;
   /** True once the player owns a world beyond their start (a neutral was taken). */
@@ -38,16 +42,19 @@ export function buildFirstMatchTour(deps: FirstMatchDeps): SpotlightStep[] {
     {
       id: 'home',
       target: '#side',
-      copy: 'Внизу — панель твоего домашнего мира: здания, гарнизон и стройка. Тапни свой мир, если панель пуста.',
-      advance: { on: 'tap' },
+      copy: 'onb.tour.home',
+      advance: { on: 'state', when: deps.homeOpened },
       placement: 'top',
-      optional: true,
     },
     {
+      // The homeworld starts with a level-1 Mine already built (matchSetup.ts) — a
+      // fresh `building.construct` order for it is never possible, so the first
+      // economy beat is its upgrade instead (still `mine`, still the first thing
+      // worth spending on): a distinct `building.upgrade` order (construction.ts).
       id: 'mine',
-      target: '[data-buildorder="building:mine"]',
-      copy: 'Начни с экономики: построй Шахту — она даёт ресурсы, на них строится всё остальное.',
-      advance: { on: 'action', type: 'building.construct' },
+      target: '[data-act="upgrade"][data-arg="mine"]',
+      copy: 'onb.tour.mine',
+      advance: { on: 'action', type: 'building.upgrade' },
       placement: 'top',
     },
     {

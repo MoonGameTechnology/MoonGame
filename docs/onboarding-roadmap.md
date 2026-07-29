@@ -189,11 +189,15 @@ target → optional-скип или безопасный стоп); e2e: под�
 
 > **Сделано.** `startGuidedMatch` (main.ts) поднимает безопасную соло-песочницу **без
 > ботов** (`setupSlots` all-off → `buildSetupConfig` → `startMatch`) и запускает над её
-> живым HUD data-цепочку `prototype/src/firstMatchTour.ts` (движок ONB-1): добыча
-> (`action:building.construct`) → флот (`action:fleet.launch`) → курс (`action:fleet.move`,
-> туман) → двухфазный захват (`state`: игрок владеет миром сверх стартового) → счёт пошёл
-> (`state`: счёт вырос) → «первая схватка выиграна». «Do X»-беты ждут **реального** приказа
-> (`playerOrder`→`activeTour.notifyAction`), захват/счёт — предикаты по живому `s`;
+> живым HUD data-цепочку `prototype/src/firstMatchTour.ts` (движок ONB-1): домашний мир
+> открыт (`state`: панель мира тапнута — гейт, не `tap`+`optional`, иначе шаг тихо
+> скипается, потому что панель заведомо закрыта в момент входа) → добыча (`action:
+> building.upgrade` на Шахту — стартовый мир уже несёт Шахту L1 из `matchSetup.ts`, так
+> что «построй» недостижим: `building.construct` для неё никогда не выпустится) → флот
+> (`action:fleet.launch`) → курс (`action:fleet.move`, туман) → двухфазный захват
+> (`state`: игрок владеет миром сверх стартового) → счёт пошёл (`state`: счёт вырос) →
+> «первая схватка выиграна». «Do X»-беты ждут **реального** приказа (`playerOrder`→
+> `activeTour.notifyAction`), захват/счёт/домашний-мир — предикаты по живому `s`/DOM;
 > скипаемо на любом шаге. Успех (первое прохождение) → `onboarded`=completed + XP-пакет
 > (`matchXp`, ровно раз, через чистый `applyTourOutcome`) + нудж «сыграй настоящий матч».
 > Запуск — шов `pendingGuide` из `installMatch` (кадр на прорисовку HUD). Движок ONB-1

@@ -140,10 +140,6 @@ export const en: Record<string, string> = {
   // --- ONB-2 guided first match (firstMatchTour) -------------------------------
   'Это твой первый мир, командир. Проведу тебя по главному циклу — пара минут, спокойно, без соперников.':
     'This is your first world, commander. I will walk you through the core loop — a couple of minutes, calm, no rivals.',
-  'Внизу — панель твоего домашнего мира: здания, гарнизон и стройка. Тапни свой мир, если панель пуста.':
-    'Down here is your homeworld panel: buildings, garrison and construction. Tap your world if the panel is empty.',
-  'Начни с экономики: построй Шахту — она даёт ресурсы, на них строится всё остальное.':
-    'Start with economy: build a Mine — it produces the resources everything else is built from.',
   'Выбери свой флот (▲) и тапни соседний мир — задай курс. Флот пойдёт по звёздным трассам, и туман начнёт открываться.':
     'Select your fleet (▲) and tap a neighbouring world to set a course. It routes along the star lanes and the fog opens.',
   'Захвати нейтральный мир: выйди на орбиту, а если он защищён — высади десант. Захват двухфазный: сначала небо, потом земля.':

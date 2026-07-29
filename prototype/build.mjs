@@ -364,7 +364,11 @@ body.sheet-open #cmdbar{bottom:calc(34vh + 12px);}
 #goals .gl-item .gl-ck{color:var(--cyan-dim);flex:0 0 auto;font-size:13px;}
 #goals .gl-item.done{color:#dfeef2;}
 #goals .gl-item.done .gl-ck{color:var(--grn);text-shadow:0 0 8px rgba(95,240,192,.5);}
-@media (max-width:640px){#goals{top:auto;bottom:70px;right:8px;}}
+/* phones: the speed control (⏸▶▶▶ + ×1/×10/×50/×100) wraps onto two ~44px rows
+   above its own bottom:12px anchor — a fixed bottom:70px here used to sit the
+   goals box's lower half right on top of it. Clear the whole stack instead of
+   guessing one row's height. */
+@media (max-width:640px){#goals{top:auto;bottom:calc(120px + env(safe-area-inset-bottom,0px));right:8px;}}
 
 /* player card — tap the top-left crest for your session dossier */
 #playercard{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;padding:18px;
@@ -1331,6 +1335,10 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
      selection opens the sheet, so it never collides with the command bar */
   #speedbar{right:10px;bottom:12px;top:auto;padding:4px 6px;}
   body.sheet-open #speedbar{display:none;}
+  /* the first-session goals checklist sits bottom-right too (below the sheet's own
+     50vh) — hide it the same way while the sheet is open, or its box floats on top
+     of the world/fleet panel the player is actually using. */
+  body.sheet-open #goals{display:none;}
 
   #banner{font-size:16px;padding:14px 20px;letter-spacing:2px;}
   /* finger-first targets: everything tappable grows to the 44px rule (hud-inmatch.md) */
