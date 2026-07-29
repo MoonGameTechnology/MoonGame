@@ -551,6 +551,9 @@ export interface GameState {
    *  sets/replaces it; `chain.stamp` is the server driver's own runtime update of
    *  the consumed head / armed wait deadline — never client-issuable). */
   orders?: Record<FleetId, FleetChain>;
+  /** BOOST-1 форс-марш: fleet ids currently marching at +50% speed for 5% max-hp
+   *  wear per game-hour in transit (`forcedMarchModule`, `fleet.forcemarch`). */
+  forcedMarch?: Record<FleetId, true>;
 }
 
 /** A standing patrol's launch anchor + reach + current sortie budget (CC-4). */

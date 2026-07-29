@@ -14,8 +14,11 @@ import {
   economyModule,
   factionModule,
   fleetOpsModule,
+  fleetRepairModule,
+  forcedMarchModule,
   hashGameDataBundle,
   heroModule,
+  instantRepairModule,
   interceptModule,
   marketModule,
   movementModule,
@@ -127,6 +130,9 @@ export const DEV_MODULES: GameModule[] = [
   fleetOpsModule, // fleet.launch/merge/split: garrison → mobile fleet, the missing link
   capitalModule, // capital.designate: re-point the hero respawn anchor
   standingOrdersModule, // order.auto/order.scramble/order.chain: standing-order intent storage
+  instantRepairModule, // fleet.instantRepair: paid-in-credits hull top-up, anywhere
+  fleetRepairModule, // fleet.repair: paid-in-metal hull top-up, at an owned dock
+  forcedMarchModule, // fleet.forcemarch: +50% speed for hull wear while in transit
   victoryModule,
   visibilityModule, // fog-of-war memory (variant B): records last-seen worlds
 ];
