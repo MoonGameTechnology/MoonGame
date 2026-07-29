@@ -8890,20 +8890,22 @@ type TechCond = TechDefLike['conditions'][number];
 function techCondText(c: TechCond): string {
   switch (c.type) {
     case 'has_scientist':
-      return t('нужен учёный: {b}', { b: c.branch ? branchLabel(c.branch) : t('любой ветки') });
+      return t('tech.req.scientist', {
+        b: c.branch ? branchLabel(c.branch) : t('tech.req.scientist.any'),
+      });
     case 'own_sectors':
-      return t('своих секторов: {n}', { n: c.min });
+      return t('tech.req.sectors', { n: c.min });
     case 'has_building':
-      return t('здание: {b} ×{n}', {
+      return t('tech.req.building', {
         b: tData(data.buildings[c.building]?.name ?? c.building),
         n: c.min,
       });
     case 'controls_planet_type':
-      return t('мир типа {p} ×{n}', { p: tData(c.planetType), n: c.min });
+      return t('tech.req.planet', { p: tData(c.planetType), n: c.min });
     case 'has_unit':
-      return t('юнит: {u} ×{n}', { u: tData(data.units[c.unit]?.name ?? c.unit), n: c.min });
+      return t('tech.req.unit', { u: tData(data.units[c.unit]?.name ?? c.unit), n: c.min });
     default:
-      return t('особое условие');
+      return t('tech.req.special');
   }
 }
 // Клиентская проверка — только для подсветки узла; финальную правду говорит ядро
@@ -8931,11 +8933,11 @@ function techFx(td: TechDefLike): string {
     .filter(([, v]) => (v as number) !== 0)
     .map(([k, v]) => `+${Math.round((v as number) * 100)}% ${t(TECH_FX_LABEL[k] ?? k)}`);
   for (const u of td.unlocks?.units ?? [])
-    fx.push(t('открывает: {x}', { x: esc(tData(data.units[u]?.name ?? u)) }));
+    fx.push(t('tech.grants', { x: esc(tData(data.units[u]?.name ?? u)) }));
   for (const b of td.unlocks?.buildings ?? [])
-    fx.push(t('открывает: {x}', { x: esc(tData(data.buildings[b]?.name ?? b)) }));
+    fx.push(t('tech.grants', { x: esc(tData(data.buildings[b]?.name ?? b)) }));
   for (const a of td.unlocks?.abilities ?? [])
-    fx.push(t('способность: {x}', { x: a === 'steward' ? t('Хранитель') : esc(a) }));
+    fx.push(t('tech.grants.ability', { x: a === 'steward' ? t('tech.grants.steward') : esc(a) }));
   return fx.join(' · ');
 }
 function renderTech(): void {
@@ -8998,8 +9000,8 @@ function renderTech(): void {
     .map((c) => data.scientists[c.id])
     .find((d) => d?.branch === techTab);
   const leadHtml = lead
-    ? `🧪 ${t('Ветку курирует')} <b>${esc(tData(lead.name))}</b>`
-    : `🔭 ${t('Без лидера ветки — узлы с условием «учёный» закрыты')}`;
+    ? `🧪 ${t('tech.curator')} <b>${esc(tData(lead.name))}</b>`
+    : `🔭 ${t('tech.curator.none')}`;
   // Колонки вкладки: из карты раскладки; техи вне карты — в автоколонку в конце.
   const colsDef = TECH_COLS[techTab] ?? [];
   const branchIds = Object.keys(techs).filter((id) => (techs[id]!.branch ?? 'space') === techTab);
@@ -9012,10 +9014,10 @@ function renderTech(): void {
     ...(extras.length ? [{ label: '—', ids: extras }] : []),
   ].filter((c) => c.ids.length);
   const wide = cols.length <= 2 ? ' w2' : '';
-  let rail = `<div class="tt-rail"><div class="tt-dhead">${t('ДЕНЬ')}</div>`;
+  let rail = `<div class="tt-rail"><div class="tt-dhead">${t('tech.rail.day')}</div>`;
   for (const g of gates) {
     const cls = g === nowGate ? ' now' : g + 1 > hudDay ? ' future' : '';
-    rail += `<div class="tt-drow${cls}"><b>${g + 1}</b><small>${g === 0 ? t('старт') : t('день')}</small></div>`;
+    rail += `<div class="tt-drow${cls}"><b>${g + 1}</b><small>${g === 0 ? t('tech.rail.start') : t('tech.rail.day-short')}</small></div>`;
   }
   rail += `</div>`;
   let colsHtml = '';
@@ -9068,24 +9070,24 @@ function renderTech(): void {
     const affordable = Object.entries(td.cost).every(([k, v]) => (res[k] ?? 0) >= (v as number));
     const tag =
       st.st === 'done'
-        ? `<span class="tt-tag">${t('ИЗУЧЕНО')}</span>`
+        ? `<span class="tt-tag">${t('tech.state.done')}</span>`
         : st.st === 'res'
-          ? `<span class="tt-tag amb">${t('ИССЛЕДУЕТСЯ')}</span>`
+          ? `<span class="tt-tag amb">${t('tech.state.running')}</span>`
           : st.st === 'avail'
-            ? `<span class="tt-tag">${t('ДОСТУПНО')}</span>`
-            : `<span class="tt-tag dim">${t('ЗАКРЫТО')}</span>`;
+            ? `<span class="tt-tag">${t('tech.state.open')}</span>`
+            : `<span class="tt-tag dim">${t('tech.state.locked')}</span>`;
     const btn =
       st.st === 'avail'
-        ? `<button class="tt-mbtn" data-go="${id}"${affordable ? '' : ' disabled'}>🔬 ${affordable ? t('Исследовать') : t('Не хватает ресурсов')}</button>`
+        ? `<button class="tt-mbtn" data-go="${id}"${affordable ? '' : ' disabled'}>🔬 ${affordable ? t('tech.action.research') : t('tech.action.no-resources')}</button>`
         : st.st === 'done'
-          ? `<button class="tt-mbtn wait" disabled>✓ ${t('Изучено')}</button>`
+          ? `<button class="tt-mbtn wait" disabled>✓ ${t('tech.action.done')}</button>`
           : st.st === 'res'
-            ? `<button class="tt-mbtn wait" disabled>⏳ ${t('Идёт — ≈ {n} ч', { n: st.eta })}</button>`
+            ? `<button class="tt-mbtn wait" disabled>⏳ ${t('tech.action.running', { n: st.eta })}</button>`
             : st.st === 'gate'
-              ? `<button class="tt-mbtn wait" disabled>🔒 ${t('Откроется в День {n}', { n: gate + 1 })}</button>`
+              ? `<button class="tt-mbtn wait" disabled>🔒 ${t('tech.action.opens-day', { n: gate + 1 })}</button>`
               : st.st === 'chain'
-                ? `<button class="tt-mbtn wait" disabled>🔒 ${t('Сначала изучите узел выше')}</button>`
-                : `<button class="tt-mbtn wait" disabled>⚗ ${t('Условие не выполнено')}</button>`;
+                ? `<button class="tt-mbtn wait" disabled>🔒 ${t('tech.action.needs-parent')}</button>`
+                : `<button class="tt-mbtn wait" disabled>⚗ ${t('tech.action.unmet')}</button>`;
     modal =
       `<div class="tt-modal"><div class="tt-mback" data-mclose="1"></div><div class="tt-mwin">` +
       `<button class="tt-mx" data-mclose="1">✕</button>` +
@@ -9094,16 +9096,16 @@ function renderTech(): void {
       `<div class="tt-mtags">${tag}</div></div></div>` +
       (td.description ? `<div class="tt-mdesc">${esc(t(td.description))}</div>` : '') +
       `<div class="tt-mstats">` +
-      `<span>💰 <b>${techCost(td.cost)} · ${t('{n}ч', { n: td.researchTimeHours })}</b></span>` +
+      `<span>💰 <b>${techCost(td.cost)} · ${t('tech.hours', { n: td.researchTimeHours })}</b></span>` +
       (techFx(td) ? `<span>✦ <b>${techFx(td)}</b></span>` : '') +
-      (gate > 0 ? `<span>📅 <b>${t('с дня {n}', { n: gate + 1 })}</b></span>` : '') +
-      (prereqNames ? `<span>🔗 <b>${t('Требует:')} ${prereqNames}</b></span>` : '') +
+      (gate > 0 ? `<span>📅 <b>${t('tech.from-day', { n: gate + 1 })}</b></span>` : '') +
+      (prereqNames ? `<span>🔗 <b>${t('tech.req.title')} ${prereqNames}</b></span>` : '') +
       condRows +
       `</div>${btn}</div></div>`;
   }
   const html =
-    `<div class="tt-top"><span class="tt-day">📅 ${t('День {n}', { n: hudDay })}</span>` +
-    `<span class="tt-slots">⚛ ${t('слоты {a}/{b}', { a: activeList.length, b: slots })}</span></div>` +
+    `<div class="tt-top"><span class="tt-day">📅 ${t('tech.day', { n: hudDay })}</span>` +
+    `<span class="tt-slots">⚛ ${t('tech.slots', { a: activeList.length, b: slots })}</span></div>` +
     `<div class="tt-tabs">${tabs}</div>` +
     `<div class="tt-lead${lead ? '' : ' closed'}">${leadHtml}</div>` +
     `<div class="tt-scroll"><div class="tt-grid">${rail}${colsHtml}</div></div>` +
