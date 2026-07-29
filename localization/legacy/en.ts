@@ -5,8 +5,6 @@
 // One language = one file.
 export const en: Record<string, string> = {
   // --- STAFF-1 «Штаб героев» redesign -------------------------------------------
-  резерв: 'reserve',
-  Общие: 'Common',
   способностей: 'abilities',
   актив: 'active',
   Требует: 'Requires',
@@ -15,18 +13,8 @@ export const en: Record<string, string> = {
   // --- TT-3.1 technology tree screen --------------------------------------------
   старт: 'start',
   день: 'day',
-  Индустрия: 'Industry',
-  Сенсоры: 'Sensors',
-  Доктрины: 'Doctrines',
-  Укрепления: 'Fortifications',
-  Авиакрыло: 'Air wing',
-  Арсенал: 'Arsenal',
-  Связь: 'Signals',
   Автоматизация: 'Automation',
-  производство: 'production',
-  'скорость флотов': 'fleet speed',
   урон: 'damage',
-  'радиус радаров': 'radar range',
   Хранитель: 'Steward',
   // --- SPY-UX intel tab in diplomacy --------------------------------------------
   Шпионаж: 'Espionage',
@@ -35,7 +23,6 @@ export const en: Record<string, string> = {
   // --- ONB-3 just-in-time mechanic intros --------------------------------------
   // --- ONB-8 social/meta-layer intros (corp cabinet + AvA wars tab) ------------
   // --- ONB-4 codex/help hub (chrome + glossary) --------------------------------
-  'Туман войны': 'Fog of war',
   // --- ONB-0 first-run offer (hub) + «Ещё → Обучение» --------------------------
   Пропустить: 'Skip',
   // --- ONB-2 guided first match (firstMatchTour) -------------------------------
@@ -53,39 +40,24 @@ export const en: Record<string, string> = {
   ИИ: 'AI',
   Герои: 'Heroes',
   Командир: 'Commander',
-  Корпус: 'Hull',
   Крейсер: 'Cruiser',
-  Модули: 'Modules',
   Назад: 'Back',
-  'Управление скоростью': 'Speed control',
-  'панель времени в матче — пауза и множители ускорения (1× — реальное время)':
-    'the in-match time bar — pause and speed multipliers (1× is real time)',
   Оборона: 'Defense',
   Обстрел: 'Barrage',
   ПВО: 'AA',
   Пассив: 'Passive',
-  Постройки: 'Structures',
   Скор: 'Spd',
   Скорость: 'Speed',
   Станд: 'Std',
   Удар: 'Strike',
   Флот: 'Fleet',
   // Авто-имена флотов (Bytro-стиль): тип соединения по размеру
-  Звено: 'Wing',
-  Эскадрилья: 'Flight',
-  Эскадра: 'Squadron',
-  Армада: 'Armada',
   // Карточка статистики мира (тап по имени планеты)
   эскадрилий: 'squadrons',
   // 🔥 режим огня артиллерии — кнопка в командном ряду + пункты меню
   // H3 — setup faction picker (pure passive house bonuses)
-  Штурм: 'Assault',
 
   // --- market resource tabs (MARKET_RES) -----------------------------------------
-  Металл: 'Metal',
-  Пища: 'Food',
-  Энергия: 'Energy',
-  Микро: 'Micro',
 
   // --- diplomatic stance (STANCE_RU, via stanceRu()) ---------------------------
   Союз: 'Alliance',
@@ -94,33 +66,8 @@ export const en: Record<string, string> = {
   'боты не вступают в коалиции': 'bots do not join coalitions',
 
   // --- corp mock panel (role/presence dictionaries, CORP_TABS) ------------------
-  Глава: 'Leader',
-  Офицер: 'Officer',
-  Участник: 'Member',
-  'в матче': 'in a match',
-  Обзор: 'Overview',
-  Участники: 'Members',
-  Казна: 'Treasury',
-  Владения: 'Holdings',
-  Войны: 'Wars',
-  Заявка: 'Applicant',
 
   // --- corporation cabinet (AVA-C1/C2, live) ------------------------------------
-  'создала корпорацию': 'created the corporation',
-  'приняла заявку': 'accepted the application',
-  'отклонила заявку': 'declined the application',
-  исключила: 'kicked',
-  'сменила роль': 'changed a role',
-  'передала главенство': 'transferred headship',
-  'покинула корпорацию': 'left the corporation',
-  'расформировала корпорацию': 'disbanded the corporation',
-  'движение влияния': 'influence movement',
-  'флаг готовности': 'readiness flag',
-  'выдала медаль': 'granted a medal',
-  'выдала предмет в аренду': 'rented out an item',
-  'вернула арендованный предмет': 'returned a rented item',
-  AvA: 'AvA',
-  готов: 'ready',
   победа: 'victory',
   состав: 'roster',
   '—': '—',
@@ -130,18 +77,9 @@ export const en: Record<string, string> = {
   Авангард: 'Vanguard',
   Страж: 'Sentinel',
 
-  Пехота: 'Infantry',
   Танк: 'Tank',
   // formation doctrines (formationStats, game.ts) — organisational labels, no combat bonus (BF-23)
-  'Комбинированные войска': 'Combined arms',
-  'Пехота и танки в одном строю': 'Infantry and tanks in one line',
-  Окопались: 'Entrenched',
-  '≥3 тяжёлой пехоты держат рубеж': '≥3 heavy infantry hold the line',
-  'Танковый кулак': 'Armored fist',
-  '≥3 танков — ударный клин': '≥3 tanks — a breakthrough wedge',
   // preset division template names (setupTemplates, game.ts)
-  Линия: 'Line',
-  Кулак: 'Fist',
 
   // --- hero grades (HERO_GRADES, heroes.ts) --------------------------------------
   Главный: 'Main',
@@ -173,7 +111,6 @@ export const en: Record<string, string> = {
   оборона: 'defense',
   орбита: 'orbit',
   пусто: 'empty',
-  роль: 'role',
   секторов: 'sectors',
   скоро: 'soon',
   вы: 'you',
@@ -188,71 +125,18 @@ export const en: Record<string, string> = {
   // --- static markup (build.mjs, data-i18n) -------------------------------------
   Аккаунт: 'Account',
   Верфь: 'Shipyard',
-  Ещё: 'More',
   Поддержка: 'Support',
   Сообщество: 'Community',
   Уведомления: 'Notifications',
   Чат: 'Chat',
   'реальное время': 'real time',
   // --- meta-progression («Прокачка», hub tab) -----------------------------------
-  '{got}/{need} XP': '{got}/{need} XP',
-  Командование: 'Command',
-  Экономика: 'Economy',
-  Наука: 'Science',
   // --- arsenal witryna («Арсенал», hub tab, ARS-5) --------------------------------
-  Корпуса: 'Hulls',
-  Фитинги: 'Fittings',
-  стартовый: 'starter',
-  дроп: 'drop',
-  крафт: 'craft',
-  аукцион: 'auction',
-  лутбокс: 'lootbox',
-  аренда: 'rent',
   модуль: 'module',
-  'Ходовые школы': 'Helm Schools',
-  '+5% к скорости всех флотов с первой секунды матча.':
-    '+5% fleet speed from the first second of a match.',
-  'Слаженные экипажи': 'Drilled Crews',
-  '+5% к урону флотов и гарнизонов.': '+5% damage for fleets and garrisons.',
-  'Дальняя разведка': 'Deep Recon',
-  '+15% к радиусу всех радаров.': '+15% to every radar radius.',
-  'Ветеран кампаний': 'Campaign Veteran',
-  'Ещё +5% к скорости и урону — рефлексы старой гвардии.':
-    "Another +5% speed and damage — the old guard's reflexes.",
-  Хозяйственник: 'Quartermaster',
-  '+10% к стартовой казне каждого матча.': '+10% starting treasury every match.',
-  Индустриализация: 'Industrialization',
-  '+5% к производству всех миров.': '+5% production on all worlds.',
-  Госрезерв: 'State Reserve',
-  'Ещё +20% к стартовой казне.': 'Another +20% starting treasury.',
-  Магнат: 'Magnate',
-  'Ещё +5% к производству — империя работает на вас.':
-    'Another +5% production — the empire works for you.',
-  Аспирантура: 'Postgraduate School',
-  'Учёные совета начинают матч на +1 уровень.': 'Council scientists start the match +1 level.',
-  'Открытый архив': 'Open Archive',
-  '«Промышленная автоматизация» изучена с первой секунды.':
-    '"Industrial Automation" is researched from the first second.',
-  'Сеть институтов': 'Institute Network',
-  'Учёные совета — ещё +1 уровень.': 'Council scientists — another +1 level.',
-  'Орбитальная кафедра': 'Orbital Faculty',
-  '«Орбитальная логистика» изучена с первой секунды.':
-    '"Orbital Logistics" is researched from the first second.',
   // --- H4: ground-army designer (3 infantry lines + tank, officer premades) -------
   Ополчение: 'Militia',
   'Тяжёлая пехота': 'Heavy Infantry',
   Спецназ: 'Special Forces',
-  Рейд: 'Raid',
-  'Гвардия прорыва': 'Breakthrough Guard',
-  'Железный рубеж': 'Iron Line',
-  'Колонна снабжения': 'Supply Column',
-  Штурмовик: 'Assault Leader',
-  'Командир обороны': 'Defense Commander',
-  Снабженец: 'Quartermaster',
-  'Рейдовая доктрина': 'Raid Doctrine',
-  '≥2 спецназа без ополчения': '≥2 special forces, no militia',
-  'Людская волна': 'Human Wave',
-  '≥4 ополчения — берут числом': '≥4 militia — winning by numbers',
   Гарнизон: 'Garrison',
 
   // --- command chains (order queue / plan builder, CC-*) -----------------------
@@ -263,15 +147,9 @@ export const en: Record<string, string> = {
 
   // --- science council (pre-match scientist pick + tech-window header) -------------
   // --- tech-branch labels (tabs / chips / section heads) ---------------------------
-  Эскадрильи: 'Squadrons',
-  'Дом: {home} — одиночная песочница, без соперников · тапните светящийся мир, чтобы сменить':
-    'Home: {home} — a solo sandbox, no rivals · tap another glowing world to change',
-  'Дом: {home} — тапните другой светящийся мир, чтобы сменить':
-    'Home: {home} — tap another glowing world to change',
   // --- rail icon labels + window headers -------------------------------------------
   Дипло: 'Diplo',
   Сон: 'Sleep',
-  Корп: 'Corp',
   ДИПЛОМАТИЯ: 'DIPLOMACY',
 
   // --- steward window («Хранитель») + settings + end-of-match ---------------------
@@ -279,35 +157,17 @@ export const en: Record<string, string> = {
   вкл: 'on',
 
   // --- suggested-callsign wordlist -----------------------------------------------
-  Носорог: 'Rhino',
-  Комета: 'Comet',
-  Гадюка: 'Viper',
-  Орион: 'Orion',
-  Вектор: 'Vector',
-  Сокол: 'Falcon',
-  Титан: 'Titan',
-  Квазар: 'Quasar',
   // --- constructor («Верфь») — the unified loadout tab ------------------------
-  Корабли: 'Ships',
   Армия: 'Army',
-  Оружие: 'Weapon',
-  Защита: 'Defense',
   Система: 'System',
   // stat / resource words used by the module-effect chips and cost lines
   корпус: 'hull',
   щит: 'shield',
-  скорость: 'speed',
   трюм: 'cargo',
   радар: 'radar',
-  металла: 'metal',
-  кредитов: 'credits',
-  энергии: 'energy',
-  еды: 'food',
-  микроэлектроники: 'microelectronics',
   // --- hero window / deploy flow (окно героя, развёртывание) --------------------
   // --- division / formation builder (конструктор дивизий) ----------------------
   // --- build ETA / misc --------------------------------------------------------
-  Стройка: 'Building',
   // --- static H4 headers / steward toggle (build.mjs [data-i18n]) --------------
   // --- Bytro-карточка армии: ХП-бар, сводка, платный ремонт, кап линии огня ----
   флагман: 'flagship',

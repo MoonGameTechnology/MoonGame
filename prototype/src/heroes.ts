@@ -114,10 +114,10 @@ export interface HeroLoadout {
 /** The default roster: the main hero (renamed to the player's callsign) + one of each
  *  other grade, so all four rarities are represented until hero acquisition lands. */
 export const DEFAULT_HEROES: HeroLoadout[] = [
-  { name: 'Командир', grade: 'main', abilities: ['corridor', 'rally', 'scan', 'bulwark'] },
-  { name: 'Разрушитель', grade: 'legendary', abilities: ['annihilate', 'scan', 'recall'] },
-  { name: 'Авангард', grade: 'rare', abilities: ['corridor', 'rally'] },
-  { name: 'Страж', grade: 'common', abilities: ['bulwark'] },
+  { name: 'hero.arch.commander', grade: 'main', abilities: ['corridor', 'rally', 'scan', 'bulwark'] },
+  { name: 'hero.arch.destroyer', grade: 'legendary', abilities: ['annihilate', 'scan', 'recall'] },
+  { name: 'hero.arch.vanguard', grade: 'rare', abilities: ['corridor', 'rally'] },
+  { name: 'hero.arch.warden', grade: 'common', abilities: ['bulwark'] },
 ];
 
 /** Aggregate readout of a loadout for the designer preview. */

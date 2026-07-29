@@ -6660,7 +6660,7 @@ function closeDiplo(): void {
 function seatBadge(id: string): { icon: string; tag: string } {
   if (id === ME) return { icon: '☻', tag: 'comms.you' };
   if (isAiSeat(id)) return { icon: '⌬', tag: 'diplo.filter.ai' };
-  return { icon: '☻', tag: 'ИГРОК' };
+  return { icon: '☻', tag: 'comms.tag.player' };
 }
 
 /** Does a seat pass the active roster filters? Stance filter never matches ME (no
@@ -8845,21 +8845,21 @@ const techCost = (c: Record<string, number>): string =>
 // auto-column appended at the end, so fresh data never breaks the screen.
 const TECH_COLS: Record<string, Array<{ label: string; ids: string[] }>> = {
   space: [
-    { label: 'Индустрия', ids: ['industrial_automation', 'microelectronics_fabrication'] },
-    { label: 'Флот', ids: ['orbital_logistics', 'siege_doctrine', 'void_armadas'] },
-    { label: 'Сенсоры', ids: ['deep_survey'] },
+    { label: 'tech.group.industry', ids: ['industrial_automation', 'microelectronics_fabrication'] },
+    { label: 'tech.group.fleet', ids: ['orbital_logistics', 'siege_doctrine', 'void_armadas'] },
+    { label: 'tech.group.sensors', ids: ['deep_survey'] },
   ],
   ground: [
-    { label: 'Доктрины', ids: ['combined_arms', 'garrison_networks'] },
-    { label: 'Укрепления', ids: ['fortified_infrastructure', 'planetary_bastions'] },
+    { label: 'tech.group.doctrines', ids: ['combined_arms', 'garrison_networks'] },
+    { label: 'tech.group.fortifications', ids: ['fortified_infrastructure', 'planetary_bastions'] },
   ],
-  squadron: [{ label: 'Авиакрыло', ids: ['flight_decks', 'strike_vectors', 'ace_programs'] }],
+  squadron: [{ label: 'tech.group.airwing', ids: ['flight_decks', 'strike_vectors', 'ace_programs'] }],
   missile: [
-    { label: 'Арсенал', ids: ['guidance_arrays', 'warhead_miniaturization', 'saturation_barrage'] },
+    { label: 'tech.group.arsenal', ids: ['guidance_arrays', 'warhead_miniaturization', 'saturation_barrage'] },
   ],
   command: [
-    { label: 'Связь', ids: ['signal_corps', 'logistics_command'] },
-    { label: 'Автоматизация', ids: ['ai_stewardship'] },
+    { label: 'tech.group.comms', ids: ['signal_corps', 'logistics_command'] },
+    { label: 'tech.group.automation', ids: ['ai_stewardship'] },
   ],
 };
 const TECH_ICONS: Record<string, string> = {
@@ -8884,10 +8884,10 @@ const TECH_ICONS: Record<string, string> = {
   ai_stewardship: '😴',
 };
 const TECH_FX_LABEL: Record<string, string> = {
-  productionBonus: 'производство',
-  fleetSpeedBonus: 'скорость флотов',
-  combatDamageBonus: 'урон',
-  radarRangeBonus: 'радиус радаров',
+  productionBonus: 'tech.fx.production',
+  fleetSpeedBonus: 'tech.fx.fleet-speed',
+  combatDamageBonus: 'tech.fx.damage',
+  radarRangeBonus: 'tech.fx.radar',
 };
 let techTab = 'space'; // активная вкладка-ветка
 let techModalId: string | null = null; // открытое досье узла
@@ -9332,7 +9332,7 @@ stewWin.addEventListener('click', (e) => {
 // skill tree (`hero.skill.unlock`) and install fittings (`hero.fit`). All gates
 // (range/cooldown/cost/slots/branch) are the core's — the window only shows them.
 const HERO_ACTIVE_CAP = 3; // mirrors the core heroModule's active cap (not exported)
-const HERO_BRANCH_RU: Record<string, string> = { transhuman: 'трансгуман', psionic: 'псионик' };
+const HERO_BRANCH_RU: Record<string, string> = { transhuman: 'hero.branch.transhuman', psionic: 'hero.branch.psionic' };
 /** The cooldown slot an ability occupies — mirrors the core's `cooldownKey`. */
 const heroCdKey = (type: string): string =>
   type === 'temp_lane' ? 'path' : type === 'annihilate' ? 'annihilate' : `fx:${type}`;
@@ -9352,8 +9352,8 @@ let heroDossier: string | null = null; // "node:<id>" | "fit:<id>" — the inspe
 
 /** Human short labels for a passive's hook (what the bonus actually does). */
 const HERO_HOOK_RU: Record<string, string> = {
-  'fleet.speed': 'скорость флота',
-  'combat.damage': 'урон флотам рядом',
+  'fleet.speed': 'hero.hook.fleet-speed',
+  'combat.damage': 'hero.hook.combat-damage',
 };
 /** A passive rendered as a one-line bonus, e.g. «+10% скорость флота» / «+8% урон · r300». */
 function heroPassiveLine(pid: string): string {
@@ -9470,7 +9470,7 @@ function heroTreeHtml(hero: HeroInst): string {
   const rails: Array<{ label: string; own: boolean; ps: boolean; nodes: typeof entries }> = [];
   if (ownNodes.length) {
     rails.push({
-      label: ownBranch ? (HERO_BRANCH_RU[ownBranch] ?? ownBranch) : 'Общие',
+      label: ownBranch ? (HERO_BRANCH_RU[ownBranch] ?? ownBranch) : 'hero.branch.common',
       own: true,
       ps: ownBranch === 'psionic',
       nodes: ownNodes,
@@ -9841,10 +9841,10 @@ const constructorWin = $('constructor');
 type ConTab = 'ships' | 'squads' | 'army' | 'heroes';
 let conTab: ConTab = 'ships';
 const CON_TABS: [ConTab, string][] = [
-  ['ships', 'Корабли'],
-  ['squads', 'Эскадрильи'],
-  ['army', 'Армия'],
-  ['heroes', 'Герои'],
+  ['ships', 'yard.tab.ships'],
+  ['squads', 'yard.tab.squads'],
+  ['army', 'yard.tab.army'],
+  ['heroes', 'yard.tab.heroes'],
 ];
 // Buildable space hulls the «Корабли» pane fits; squadron/carrier hulls → the «Эскадрильи» pane.
 const CON_HULLS = ['cruiser', 'siege', 'scout', 'dropship'];
@@ -9854,7 +9854,7 @@ let conTplIdx = 0; // which division template the «Армия» pane is editing
 let conModules: string[] = [];
 let conCount = 1;
 let conPlanet = '';
-const SLOT_RU: Record<string, string> = { weapon: 'Оружие', defense: 'Защита', utility: 'Система' };
+const SLOT_RU: Record<string, string> = { weapon: 'yard.slot.weapon', defense: 'yard.slot.defense', utility: 'yard.slot.utility' };
 const SLOT_ICON: Record<string, string> = { weapon: '🎯', defense: '🛡', utility: '⊞' };
 const MODULE_ICON: Record<string, string> = {
   targeting_array: '🎯',
@@ -9865,21 +9865,21 @@ const MODULE_ICON: Record<string, string> = {
   cargo_bay: '📦',
 };
 const RES_RU: Record<string, string> = {
-  metal: 'металла',
-  credits: 'кредитов',
-  energy: 'энергии',
-  food: 'еды',
-  microelectronics: 'микроэлектроники',
+  metal: 'res.of.metal',
+  credits: 'res.of.credits',
+  energy: 'res.of.energy',
+  food: 'res.of.food',
+  microelectronics: 'res.of.microelectronics',
 };
 // Short stat labels for module-effect chips («+4 атака», «+15 щит»).
 const STAT_RU: Record<string, string> = {
   attack: 'div.stat.attack',
   defense: 'div.stat.defense',
-  hp: 'корпус',
-  shield: 'щит',
-  speed: 'скорость',
-  cargoCapacity: 'трюм',
-  radarRange: 'радар',
+  hp: 'stat.hp',
+  shield: 'stat.shield',
+  speed: 'stat.speed',
+  cargoCapacity: 'stat.cargo',
+  radarRange: 'stat.radar',
 };
 function bagRu(bag: Record<string, number>): string {
   const parts = Object.entries(bag)
@@ -10354,7 +10354,7 @@ function showStage(stage: 'welcome' | 'register' | 'recover' | 'reset' | 'browse
 
 // A fresh callsign for a brand-new commander. Deterministic on purpose (no random/
 // time even in UI glue): a persisted counter walks a fixed wordlist.
-const CALLSIGNS = ['Носорог', 'Комета', 'Гадюка', 'Орион', 'Вектор', 'Сокол', 'Титан', 'Квазар'];
+const CALLSIGNS = ['callsign.rhino', 'callsign.comet', 'callsign.viper', 'callsign.orion', 'callsign.vector', 'callsign.falcon', 'callsign.titan', 'callsign.quasar'];
 function suggestCallsign(): string {
   const n = (Number(localStorage.getItem('void.newcount') ?? '0') || 0) + 1;
   localStorage.setItem('void.newcount', String(n));
@@ -10413,7 +10413,7 @@ function renderMetaPanel(): void {
   const pts = metaPoints(st);
   let h =
     `<div class="mp-head"><b>${t('meta.level', { n: lvl })}</b>` +
-    `<span class="mp-xp">${t('{got}/{need} XP', { got, need })}</span>` +
+    `<span class="mp-xp">${t('meta.xp', { got, need })}</span>` +
     `<span class="mp-pts">${t('meta.points', { n: pts })}</span></div>`;
   h += `<div class="mp-track"><div class="mp-fill" style="width:${Math.round((got / need) * 100)}%"></div></div>`;
   for (const branch of ['command', 'economy', 'science'] as MetaBranch[]) {
@@ -10463,17 +10463,17 @@ const ARSENAL_CODEX_KIND: Record<ArsenalItem['kind'], string> = {
   hero_fitting: 'hf',
 };
 const ARSENAL_KIND_RU: Record<ArsenalItem['kind'], string> = {
-  hull: 'Корпуса',
-  module: 'Модули',
-  hero_fitting: 'Фитинги',
+  hull: 'arsenal.kind.hull',
+  module: 'arsenal.kind.module',
+  hero_fitting: 'arsenal.kind.fitting',
 };
 const ARSENAL_ORIGIN_RU: Record<ArsenalItem['origin'], string> = {
-  starter: 'стартовый',
-  drop: 'дроп',
-  craft: 'крафт',
-  auction: 'аукцион',
-  lootbox: 'лутбокс',
-  rent: 'аренда',
+  starter: 'arsenal.origin.starter',
+  drop: 'arsenal.origin.drop',
+  craft: 'arsenal.origin.craft',
+  auction: 'arsenal.origin.auction',
+  lootbox: 'arsenal.origin.lootbox',
+  rent: 'arsenal.origin.rent',
 };
 function arsenalKey(): string {
   return 'vd.arsenal.' + (nickInput.value.trim() || 'guest');
@@ -11276,10 +11276,10 @@ function formIcon(type: string): string {
   return (pcUi() ? FORM_ICON_TEXT[type] : FORM_ICON_EMOJI[type]) ?? '▪';
 }
 const FORM_RU: Record<string, string> = {
-  militia: 'Ополчение',
-  heavy_infantry: 'Тяжёлая пехота',
-  special_forces: 'Спецназ',
-  tank: 'Танк',
+  militia: 'form.militia',
+  heavy_infantry: 'form.heavy-infantry',
+  special_forces: 'form.special-forces',
+  tank: 'form.tank',
 };
 const setupHeroes: HeroLoadout[] = DEFAULT_HEROES.map((h) => ({
   name: h.name,
@@ -11425,8 +11425,8 @@ function renderSetup(): void {
   setupGoEl.textContent = rivals === 0 ? t('setup.start.solo') : t('setup.start');
   setupHintEl.textContent = t(
     rivals === 0
-      ? 'Дом: {home} — одиночная песочница, без соперников · тапните светящийся мир, чтобы сменить'
-      : 'Дом: {home} — тапните другой светящийся мир, чтобы сменить',
+      ? 'setup.home.solo'
+      : 'setup.home.pick',
     { home: setupStart },
   );
   for (const c of Array.from(setupSpeedEl.querySelectorAll('[data-spd]')))
@@ -12433,10 +12433,10 @@ async function openSeatPicker(matchId: string): Promise<void> {
         violet: '#b366ff',
       };
       const factionPassives: Record<string, string> = {
-        azure: '+12% экономика',
-        crimson: '+10% урон',
-        amber: '+15% скорость флотов',
-        violet: '+5% экономика и +5% урон',
+        azure: 'seatpick.bonus.azure',
+        crimson: 'seatpick.bonus.crimson',
+        amber: 'seatpick.bonus.amber',
+        violet: 'seatpick.bonus.violet',
       };
       const factionNames: Record<string, string> = {
         azure: 'Azure Compact',
@@ -14539,18 +14539,18 @@ requestAnimationFrame(frame);
 // server counterpart at all (no meta-layer Контур 2 yet) and stay honest "скоро"
 // stubs rather than simulated data.
 const CORP_TABS: { id: string; label: string }[] = [
-  { id: 'overview', label: 'Обзор' },
-  { id: 'members', label: 'Участники' },
-  { id: 'wars', label: 'Войны' },
-  { id: 'treasury', label: 'Казна' },
-  { id: 'holdings', label: 'Владения' },
-  { id: 'comms', label: 'Чат' },
+  { id: 'overview', label: 'corp.tab.overview' },
+  { id: 'members', label: 'corp.tab.members' },
+  { id: 'wars', label: 'corp.tab.wars' },
+  { id: 'treasury', label: 'corp.tab.treasury' },
+  { id: 'holdings', label: 'corp.tab.holdings' },
+  { id: 'comms', label: 'corp.tab.comms' },
 ];
 const CORP_ROLE_LABEL: Record<CorpRole, string> = {
-  head: 'Глава',
-  officer: 'Офицер',
-  member: 'Участник',
-  recruit: 'Заявка',
+  head: 'corp.role.head',
+  officer: 'corp.role.officer',
+  member: 'corp.role.member',
+  recruit: 'corp.role.recruit',
 };
 const corpRoleLabel = (r: CorpRole): string => t(CORP_ROLE_LABEL[r]);
 const CORP_ROLE_DOT: Record<CorpRole, string> = {
@@ -14560,19 +14560,19 @@ const CORP_ROLE_DOT: Record<CorpRole, string> = {
   recruit: 'var(--red)',
 };
 const CORP_AUDIT_RU: Record<string, string> = {
-  create: 'создала корпорацию',
-  accept: 'приняла заявку',
-  decline: 'отклонила заявку',
-  kick: 'исключила',
-  role: 'сменила роль',
-  transfer: 'передала главенство',
-  leave: 'покинула корпорацию',
-  disband: 'расформировала корпорацию',
-  influence: 'движение влияния',
-  ready: 'флаг готовности',
-  medal: 'выдала медаль',
-  rent: 'выдала предмет в аренду',
-  rent_return: 'вернула арендованный предмет',
+  create: 'corp.audit.create',
+  accept: 'corp.audit.accept',
+  decline: 'corp.audit.decline',
+  kick: 'corp.audit.kick',
+  role: 'corp.audit.role',
+  transfer: 'corp.audit.transfer',
+  leave: 'corp.audit.leave',
+  disband: 'corp.audit.disband',
+  influence: 'corp.audit.influence',
+  ready: 'corp.audit.ready',
+  medal: 'corp.audit.medal',
+  rent: 'corp.audit.rent',
+  rent_return: 'corp.audit.rent-return',
 };
 
 const corpEl = $('corp');
@@ -14770,7 +14770,7 @@ function corpOverviewHtml(): string {
     : `<p class="chint">${t('corp.log.private')}</p>`;
   const nextWar = avaChallenges.find((w) => w.status === 'accepted' || w.status === 'pending');
   const nextWarHtml = nextWar
-    ? `<div class="cwarn">⚔ ${t('AvA')} vs ${esc(corpNameOf(nextWar.challengerCorp === corpMine.membership.corpId ? nextWar.targetCorp : nextWar.challengerCorp))} — ${t(nextWar.status === 'accepted' ? 'corp.war.roster-open' : 'corp.war.pending')}</div>`
+    ? `<div class="cwarn">⚔ ${t('corp.war.ava')} vs ${esc(corpNameOf(nextWar.challengerCorp === corpMine.membership.corpId ? nextWar.targetCorp : nextWar.challengerCorp))} — ${t(nextWar.status === 'accepted' ? 'corp.war.roster-open' : 'corp.war.pending')}</div>`
     : '';
   return (
     `${nextWarHtml}` +
