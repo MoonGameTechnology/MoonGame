@@ -2662,10 +2662,7 @@ function dispatchAssault(fleetIds: string[], destId: string): void {
       if (assaultNeedsTroops(f, destId)) {
         if (!warnedNoTroops) {
           warnedNoTroops = true;
-          note(
-            t('⚔ штурм невозможен: на борту нет десанта, а мир защищён — погрузите войска'),
-            destId,
-          );
+          note(t('log.assault.no-troops'), destId);
         }
         continue;
       }
@@ -2675,7 +2672,7 @@ function dispatchAssault(fleetIds: string[], destId: string): void {
     } else {
       if (!warnedNoTroops && assaultNeedsTroops(f, destId)) {
         warnedNoTroops = true;
-        note(t('⚔ внимание: на борту нет десанта — защищённый мир штурмом не взять'), destId);
+        note(t('log.assault.warn-no-troops'), destId);
       }
       playerOrder(moveFleet(ME, id, destId));
       assaultOnArrival.set(id, destId);
@@ -2708,7 +2705,7 @@ function pumpAssaultOrders(): void {
     }
     if (assaultNeedsTroops(f, destId)) {
       // one clear message instead of an E_NO_TROOPS rejection loop
-      note(t('⚔ штурм невозможен: на борту нет десанта, а мир защищён — погрузите войска'), destId);
+      note(t('log.assault.no-troops'), destId);
       assaultOnArrival.delete(id);
       continue;
     }
@@ -2750,7 +2747,7 @@ function confirmWarPrompt(): void {
       else playerOrder(moveFleet(ME, id, wp.destId));
     }
   }
-  note(t('⚔ Война объявлена — флоты выдвигаются'));
+  note(t('log.war.declared'));
 }
 function cancelWarPrompt(): void {
   warPrompt = null;
@@ -2761,17 +2758,14 @@ function renderWarPrompt(): void {
   if (!el || !warPrompt) return;
   const names = warPrompt.blockers.map((b) => esc(blockerName(b))).join(', ');
   const body = warPrompt.assault
-    ? t('Это мир дружественной фракции. Вы хотите объявить войну <b>{names}</b>?', { names })
-    : t(
-        'Маршрут проходит через миры <b>{names}</b>, с кем у вас <b>мир</b>. Мирного прохода нет — движение сюда объявит <b>войну</b>.',
-        { names },
-      );
+    ? t('war.confirm.friendly', { names })
+    : t('war.confirm.transit', { names });
   el.innerHTML =
     `<div class="wpbox">` +
-    `<div class="wp-head">⚔ ${t('ОБЪЯВИТЬ ВОЙНУ?')}</div>` +
+    `<div class="wp-head">⚔ ${t('war.confirm.title')}</div>` +
     `<div class="wp-body">${body}</div>` +
-    `<div class="wp-actions"><button class="wp-no">${warPrompt.assault ? t('НЕТ') : t('ОТМЕНА')}</button>` +
-    `<button class="wp-yes">${warPrompt.assault ? t('ДА') : t('ОБЪЯВИТЬ ВОЙНУ')}</button></div>` +
+    `<div class="wp-actions"><button class="wp-no">${warPrompt.assault ? t('war.confirm.no') : t('war.confirm.cancel')}</button>` +
+    `<button class="wp-yes">${warPrompt.assault ? t('war.confirm.yes') : t('war.confirm.go')}</button></div>` +
     `</div>`;
   el.classList.add('show');
 }
@@ -2872,9 +2866,10 @@ function handleEvents(events: DomainEvent[]) {
         // events server-side; this matches it for the local sim).
         if (p.attacker === ME || p.defender === ME || known(p.location as string))
           note(
-            t('⚔️ бой у {at} ({phase})', {
+            t('log.battle.start', {
               at: p.location as string,
-              phase: p.phase === 'ground' ? t('десант') : t('орбита'),
+              phase:
+                p.phase === 'ground' ? t('log.battle.phase.ground') : t('log.battle.phase.orbit'),
             }),
             p.location as string,
           );
@@ -2893,12 +2888,12 @@ function handleEvents(events: DomainEvent[]) {
                 .join(', ')
             : '';
           note(
-            t('⚔ бой у {at} завершён — {res}', {
+            t('log.battle.end', {
               at: loc,
               res: p.winner
-                ? t('победа: {who}', { who: NAME[p.winner as string] ?? (p.winner as string) })
-                : t('ничья'),
-            }) + (tally ? t(' · потери: {tally}', { tally }) : ''),
+                ? t('log.battle.win', { who: NAME[p.winner as string] ?? (p.winner as string) })
+                : t('log.battle.draw'),
+            }) + (tally ? t('log.battle.losses', { tally }) : ''),
             loc,
           );
         }
@@ -2909,7 +2904,7 @@ function handleEvents(events: DomainEvent[]) {
       case 'technology.researched':
         if (p.playerId === ME)
           note(
-            t('⚛ изучено: {tech}', {
+            t('log.tech.done', {
               tech: tData(
                 data.technologies[p.technology as string]?.name ?? (p.technology as string),
               ),
@@ -2923,10 +2918,8 @@ function handleEvents(events: DomainEvent[]) {
           stewSnapshot = stewMetrics();
           note(
             (p as { posture?: string }).posture === 'active_defend'
-              ? t(
-                  '😴 Хранитель принял командование (Активная оборона) — держит рубежи и контратакует у своих миров.',
-                )
-              : t('😴 Хранитель принял командование (Оборона) — держит рубежи, пока вы спите.'),
+              ? t('log.steward.on.active')
+              : t('log.steward.on.defense'),
           );
           if (stewWin.classList.contains('show')) renderSteward();
         }
@@ -2934,7 +2927,7 @@ function handleEvents(events: DomainEvent[]) {
       case 'steward.recalled':
         if (p.playerId === ME) {
           stewSnapshot = null;
-          note(t('🎮 Вы вернули командование себе.'));
+          note(t('log.steward.off'));
           if (stewWin.classList.contains('show')) renderSteward();
         }
         break;
@@ -2948,14 +2941,11 @@ function handleEvents(events: DomainEvent[]) {
             ? ` Пока вы спали: планет ${base.planets}→${now.planets}, металл ${sign(now.metal - base.metal)}, кредиты ${sign(now.credits - base.credits)}.`
             : '';
           const logged = s.players[ME]?.stewardLog?.length ?? 0;
-          const sitrep =
-            logged > 0
-              ? ' ' + t('Решений за вахту: {n} — журнал в окне Хранителя.', { n: String(logged) })
-              : '';
+          const sitrep = logged > 0 ? ' ' + t('log.steward.decisions', { n: String(logged) }) : '';
           note(
             ((p as { posture?: string }).posture === 'active_defend'
-              ? t('🌅 Хранитель вернул вам управление (была «Активная оборона»).')
-              : t('🌅 Хранитель вернул вам управление (была «Оборона»).')) +
+              ? t('log.steward.handback.active')
+              : t('log.steward.handback.defense')) +
               diff +
               sitrep,
           );
@@ -2969,20 +2959,20 @@ function handleEvents(events: DomainEvent[]) {
         const whoT = NAME[p.target as string] ?? (p.target as string);
         const what =
           p.kind === 'treasury'
-            ? t('казна {who}', { who: whoT })
+            ? t('log.spy.what.treasury', { who: whoT })
             : p.kind === 'fleets'
-              ? t('флоты {who}', { who: whoT })
-              : t('мир {at}', { at: String(p.intelPlanet ?? p.target) });
-        note(t('🕵 Агент добыл разведданные: {what} — окно 24ч', { what }));
-        pushSpyLog(t('🗝 Успех: {what}', { what }));
+              ? t('log.spy.what.fleets', { who: whoT })
+              : t('log.spy.what.world', { at: String(p.intelPlanet ?? p.target) });
+        note(t('log.spy.success', { what }));
+        pushSpyLog(t('log.spy.success.short', { what }));
         if (diploOpen && diploTab === 'diplo') renderDiplo(); // the intel row appeared
         break;
       }
       case 'espionage.failed':
         if (p.owner === ME) {
           const whoF = NAME[p.target as string] ?? (p.target as string);
-          note(t('🕵 Агент провалился ({who}) — плата сгорела', { who: whoF }));
-          pushSpyLog(t('✖ Провал против {who} — плата сгорела', { who: whoF }));
+          note(t('log.spy.fail', { who: whoF }));
+          pushSpyLog(t('log.spy.fail.short', { who: whoF }));
         }
         break;
       // Counter-intel (SPY-2): addressed to the VICTIM. A failed attempt names the
@@ -2993,17 +2983,17 @@ function handleEvents(events: DomainEvent[]) {
         if (p.owner !== ME) break;
         const what =
           p.kind === 'treasury'
-            ? t('казна')
+            ? t('log.spy.kind.treasury')
             : p.kind === 'fleets'
-              ? t('данные о флотах')
-              : t('данные мира');
+              ? t('log.spy.kind.fleets')
+              : t('log.spy.kind.world');
         {
           const line = p.spy
-            ? t('🛡 Контрразведка: агент {who} пойман при попытке кражи ({what})!', {
+            ? t('log.spy.caught', {
                 who: NAME[p.spy as string] ?? (p.spy as string),
                 what,
               })
-            : t('🛡 Контрразведка: утечка разведданных ({what}) — вор не установлен', { what });
+            : t('log.spy.leak', { what });
           note(line);
           pushSpyLog(line);
         }
@@ -3012,7 +3002,7 @@ function handleEvents(events: DomainEvent[]) {
       case 'planet.captured':
         if (p.owner === ME || known(p.planetId as string)) {
           note(
-            t('🚩 {who} захватил {at}', {
+            t('log.capture', {
               who: NAME[p.owner as string] ?? (p.owner as string),
               at: p.planetId as string,
             }),
@@ -3039,8 +3029,8 @@ function handleEvents(events: DomainEvent[]) {
           pushMsg(
             b,
             st === 'war'
-              ? t('{a} объявил войну {b}', { a: na, b: nb })
-              : t('{a} и {b}: {stance}', { a: na, b: nb, stance: stanceRu(st).toLowerCase() }),
+              ? t('log.diplo.war', { a: na, b: nb })
+              : t('log.diplo.stance', { a: na, b: nb, stance: stanceRu(st).toLowerCase() }),
             true,
             a,
           );
@@ -3055,18 +3045,18 @@ function handleEvents(events: DomainEvent[]) {
         const st = p.stance as DiplomaticStance;
         if (to === ME) {
           note(
-            t('🕊 {who} предлагает: {stance} — ответьте тем же в Дипломатии', {
+            t('log.diplo.offer', {
               who: NAME[from] ?? from,
               stance: stanceRu(st),
             }),
           );
-          pushMsg(from, t('Предложение: {stance}', { stance: stanceRu(st) }), true, from);
+          pushMsg(from, t('log.diplo.offer.short', { stance: stanceRu(st) }), true, from);
           unreadMsgs++;
         } else if (from === ME && !isAiSeat(to)) {
           // A bot answers inside the same order (accept/decline follows in this very
           // batch) — the "sent" line is only worth showing when a human must reply.
           note(
-            t('⏳ {who}: предложение отправлено — {stance}', {
+            t('log.diplo.sent', {
               who: NAME[to] ?? to,
               stance: stanceRu(st),
             }),
@@ -3082,21 +3072,21 @@ function handleEvents(events: DomainEvent[]) {
         if (from === ME) {
           pushMsg(
             to,
-            t('{who} отклонил предложение: {stance}', {
+            t('log.diplo.rejected', {
               who: NAME[to] ?? to,
               stance: stanceRu(st),
             }),
             true,
             to,
           );
-          note(t('✖ {who} отклонил: {stance}', { who: NAME[to] ?? to, stance: stanceRu(st) }));
+          note(t('log.diplo.rejected.short', { who: NAME[to] ?? to, stance: stanceRu(st) }));
         }
         if (diploOpen && diploTab === 'diplo') renderDiplo();
         break;
       }
       case 'building.constructed':
         note(
-          t('🏗️ {b}: построено на {at}', {
+          t('log.build.done', {
             b: buildingName(p.building as string),
             at: p.planetId as string,
           }),
@@ -3105,7 +3095,7 @@ function handleEvents(events: DomainEvent[]) {
         break;
       case 'building.upgraded':
         note(
-          t('⬆️ {b} → L{lvl} на {at}', {
+          t('log.build.upgraded', {
             b: buildingName(p.building as string),
             lvl: String(p.level),
             at: p.planetId as string,
@@ -3114,7 +3104,7 @@ function handleEvents(events: DomainEvent[]) {
         break;
       case 'building.destroyed':
         note(
-          t('💥 {b}: разрушено на {at}', {
+          t('log.build.destroyed', {
             b: buildingName(p.building as string),
             at: p.planetId as string,
           }),
@@ -3126,7 +3116,7 @@ function handleEvents(events: DomainEvent[]) {
         break;
       case 'fleet.launched':
         note(
-          t('🚀 {who} поднял флот с {at}', {
+          t('log.fleet.launched', {
             who: NAME[p.owner as string] ?? (p.owner as string),
             at: p.planetId as string,
           }),
@@ -3177,22 +3167,22 @@ function handleEvents(events: DomainEvent[]) {
       case 'market.bought':
         if (p.seller === ME || p.buyer === ME)
           note(
-            t('⇄ биржа: {n} {res} за {paid} ¤ ({side})', {
+            t('log.market.trade', {
               n: String(p.amount),
               res: TECH_CUR[p.resource as string] ?? tData(p.resource as string),
               paid: String(p.paid ?? '?'),
-              side: p.buyer === ME ? t('покупка') : t('продажа'),
+              side: p.buyer === ME ? t('log.market.buy') : t('log.market.sell'),
             }),
           );
         break;
       case 'fleet.merged':
-        if (p.owner === ME) note(t('⛬ флоты объединены у {at}', { at: p.at as string }));
+        if (p.owner === ME) note(t('log.fleet.merged', { at: p.at as string }));
         break;
       case 'fleet.split':
-        if (p.owner === ME) note(t('⊟ флот разделён у {at}', { at: p.at as string }));
+        if (p.owner === ME) note(t('log.fleet.split', { at: p.at as string }));
         break;
       case 'fleet.destroyed':
-        note(t('☠️ флот {who} уничтожен', { who: NAME[p.owner as string] ?? (p.owner as string) }));
+        note(t('log.fleet.destroyed', { who: NAME[p.owner as string] ?? (p.owner as string) }));
         break;
       case 'unit.died': {
         // War record — only count casualties in battles you're part of, so the AI's
@@ -9377,7 +9367,7 @@ function heroBodyHtml(): string {
     .sort()
     .map((id) => s.heroes![id]!)
     .filter((h) => h.owner === ME);
-  if (!mine.length) return `<div class="hx-note">${t('У вас пока нет героев.')}</div>`;
+  if (!mine.length) return `<div class="hx-note">${t('hero.hq.empty')}</div>`;
   const active = mine.filter((h) => h.alive !== false && h.fleetId && s.fleets[h.fleetId]).length;
   let hero = mine.find((h) => h.id === heroSel);
   if (!hero) {
@@ -9393,20 +9383,21 @@ function heroBodyHtml(): string {
   for (const h of mine) {
     const d = h.archetype !== undefined ? data.heroes[h.archetype] : undefined;
     const dep = h.alive !== false && h.fleetId && s.fleets[h.fleetId];
-    const st = h.alive === false ? t('погиб') : dep ? t('⚓ развёрнут') : t('резерв');
+    const st =
+      h.alive === false ? t('hero.hq.dead') : dep ? t('hero.hq.deployed') : t('hero.hq.reserve');
     chips +=
       `<button class="hx-chip${h.id === hero.id ? ' sel' : ''}${d?.branch === 'psionic' ? ' ps' : ''}" data-hsel="${h.id}">` +
       `<span class="hx-cr">♔</span>${esc(t(d?.name ?? h.archetype ?? h.id))}` +
       `<span class="hx-cst${dep ? ' on' : ''}">${st}</span></button>`;
   }
-  chips += `<span class="hx-cap">${t('развёрнуто {a}/{c}', { a: active, c: HERO_ACTIVE_CAP })}</span></div>`;
+  chips += `<span class="hx-cap">${t('hero.hq.deployed-count', { a: active, c: HERO_ACTIVE_CAP })}</span></div>`;
 
   // identity header — name, branch, deploy state, aggregated build bonuses
   const deploy = dead
-    ? `<span class="hx-dead">${t('погиб')}</span>`
+    ? `<span class="hx-dead">${t('hero.hq.dead')}</span>`
     : fleet
-      ? `<span class="hx-dep">⚓ ${esc(typeof fleet.location === 'string' ? fleet.location : t('в пути'))}</span>`
-      : `<button class="hx-btn" data-hspawn="${hero.id}" ${active >= HERO_ACTIVE_CAP ? 'disabled' : ''}>${t('Развернуть')}</button>`;
+      ? `<span class="hx-dep">⚓ ${esc(typeof fleet.location === 'string' ? fleet.location : t('hero.hq.enroute'))}</span>`
+      : `<button class="hx-btn" data-hspawn="${hero.id}" ${active >= HERO_ACTIVE_CAP ? 'disabled' : ''}>${t('hero.hq.deploy')}</button>`;
   const bonuses = (hero.passives ?? [])
     .map((p) => `<span class="hx-trait">${esc(heroPassiveLine(p))}</span>`)
     .join('');
@@ -9414,7 +9405,7 @@ function heroBodyHtml(): string {
   const used = (hero.fittings ?? []).length;
   const fitPips =
     slots > 0
-      ? `<span class="hx-trait">${t('Фиттинги')} <span class="hx-pips">${'●'.repeat(used)}${'○'.repeat(Math.max(0, slots - used))}</span></span>`
+      ? `<span class="hx-trait">${t('hero.hq.fittings')} <span class="hx-pips">${'●'.repeat(used)}${'○'.repeat(Math.max(0, slots - used))}</span></span>`
       : '';
   const ident =
     `<div class="hx-ident${def?.branch === 'psionic' ? ' ps' : ''}">` +
@@ -9428,10 +9419,10 @@ function heroBodyHtml(): string {
 
   // tabs
   const TABS: [HeroTab, string][] = [
-    ['overview', 'Обзор'],
-    ['tree', 'Дерево'],
-    ['abilities', 'Способности'],
-    ['fittings', 'Фиттинги'],
+    ['overview', 'hero.hq.tab.overview'],
+    ['tree', 'hero.hq.tab.tree'],
+    ['abilities', 'hero.hq.tab.abilities'],
+    ['fittings', 'hero.hq.tab.fittings'],
   ];
   const tabs =
     `<div class="hx-tabs">` +
@@ -9490,7 +9481,7 @@ function heroTreeHtml(hero: HeroInst): string {
       nodes: entries.filter(([, n]) => n.branch === br),
     });
   }
-  if (!rails.length) return `<div class="hx-note">${t('Дерево пусто.')}</div>`;
+  if (!rails.length) return `<div class="hx-note">${t('hero.tree.empty')}</div>`;
   let html = `<div class="hx-tree">`;
   for (const rail of rails) {
     const rn = rail.nodes
@@ -9499,7 +9490,7 @@ function heroTreeHtml(hero: HeroInst): string {
     html +=
       `<div class="hx-rail${rail.own ? '' : ' foreign'}${rail.ps ? ' ps' : ''}">` +
       `<div class="hx-rhd"><span class="hx-dot"></span>${esc(t(rail.label))}` +
-      (rail.own ? '' : `<span class="hx-ftag">${t('не ваша ветвь')}</span>`) +
+      (rail.own ? '' : `<span class="hx-ftag">${t('hero.tree.not-your-branch')}</span>`) +
       `</div>`;
     for (const [nid, nd] of rn) {
       const owned = skills.includes(nid);
@@ -9510,16 +9501,16 @@ function heroTreeHtml(hero: HeroInst): string {
       if (!rail.own) {
         cls += ' foreignn';
         crest = '·';
-        foot = `<span class="hx-st">${t('чужая ветвь')}</span>`;
+        foot = `<span class="hx-st">${t('hero.tree.other-branch')}</span>`;
       } else if (owned) {
         cls += ' owned';
         crest = '✓';
-        foot = `<span class="hx-st on">✓ ${t('изучено')}</span>`;
+        foot = `<span class="hx-st on">✓ ${t('hero.tree.unlocked')}</span>`;
       } else if (!reqMet) {
         cls += ' locked';
         crest = '🔒';
         const need = esc(nd.requires.map((r) => t(data.heroSkillTrees[r]?.name ?? r)).join(', '));
-        foot = `<span class="hx-st">${t('нужен: {n}', { n: need })}</span>`;
+        foot = `<span class="hx-st">${t('hero.tree.needs', { n: need })}</span>`;
       } else {
         cls += ' avail';
         crest = '◆';
@@ -9529,9 +9520,9 @@ function heroTreeHtml(hero: HeroInst): string {
         ? `<span class="hx-conn${rail.own && reqMet ? ' lit' : ''}"></span>`
         : '';
       const grant = nd.grants.ability
-        ? `<span class="hx-g ab">${t('способность')}</span>`
+        ? `<span class="hx-g ab">${t('hero.tree.ability')}</span>`
         : nd.grants.passive
-          ? `<span class="hx-g pa">${t('пассивка')}</span>`
+          ? `<span class="hx-g pa">${t('hero.tree.passive')}</span>`
           : '';
       const tap = rail.own && !owned ? ` data-hnode="${nid}"` : '';
       html +=
@@ -9551,18 +9542,18 @@ function heroAbilitiesHtml(hero: HeroInst): string {
   const abilities = (hero.abilities ?? []).filter(
     (a): a is string => a !== null && !!data.heroAbilities[a],
   );
-  if (!abilities.length) return `<div class="hx-note">${t('Нет способностей.')}</div>`;
+  if (!abilities.length) return `<div class="hx-note">${t('hero.abil.empty')}</div>`;
   let html = '';
   for (const ab of abilities) {
     const ad = data.heroAbilities[ab]!;
     const cdLeft = Math.max(0, (hero.cooldowns?.[heroCdKey(ad.type)] ?? 0) - s.time);
     const action = ad.type.startsWith('spawn_')
-      ? `<span class="hx-badge">${t('перк развёртывания')}</span>`
+      ? `<span class="hx-badge">${t('hero.abil.deploy-perk')}</span>`
       : cdLeft > 0
-        ? `<span class="hx-badge cd">${t('КД {h}', { h: fmtHrs(cdLeft / HOUR) })}</span>`
+        ? `<span class="hx-badge cd">${t('hero.abil.cooldown', { h: fmtHrs(cdLeft / HOUR) })}</span>`
         : HERO_CASTABLE.has(ad.type)
-          ? `<button class="hx-btn" data-hcast="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${(ad.range ?? 0) > 0 ? t('Цель…') : t('Активировать')}</button>`
-          : `<span class="hx-badge">${t('скоро')}</span>`;
+          ? `<button class="hx-btn" data-hcast="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${(ad.range ?? 0) > 0 ? t('hero.abil.pick-target') : t('hero.abil.activate')}</button>`
+          : `<span class="hx-badge">${t('hero.abil.soon')}</span>`;
     html +=
       `<div class="hx-row"><div class="hx-grow"><span class="hx-an">${esc(t(ad.name))}</span>` +
       `<div class="hx-note">${esc(t(ad.description ?? ''))}</div></div>${action}</div>`;
@@ -9575,24 +9566,24 @@ function heroAbilitiesHtml(hero: HeroInst): string {
 function heroFittingsHtml(hero: HeroInst): string {
   const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
   const slots = def?.slots ?? 0;
-  if (slots <= 0) return `<div class="hx-note">${t('У этого героя нет слотов фиттингов.')}</div>`;
+  if (slots <= 0) return `<div class="hx-note">${t('hero.fit.none')}</div>`;
   const fitted = hero.fittings ?? [];
-  let html = `<div class="hx-h">${t('Слоты · {u}/{n}', { u: fitted.length, n: slots })}</div>`;
+  let html = `<div class="hx-h">${t('hero.fit.slots', { u: fitted.length, n: slots })}</div>`;
   for (const [fid, fd] of Object.entries(data.heroFittings)) {
     const installed = fitted.includes(fid);
     const grant = fd.grants.ability
-      ? `<span class="hx-g ab">${t('способность')}</span>`
+      ? `<span class="hx-g ab">${t('hero.tree.ability')}</span>`
       : fd.grants.passive
-        ? `<span class="hx-g pa">${t('пассивка')}</span>`
+        ? `<span class="hx-g pa">${t('hero.tree.passive')}</span>`
         : fd.statMods
-          ? `<span class="hx-g pa">${t('корпус')}</span>`
+          ? `<span class="hx-g pa">${t('hero.fit.hull')}</span>`
           : '';
     const canFit = !installed && fitted.length < slots;
     const action = installed
-      ? `<span class="hx-badge on">✓ ${t('установлен')}</span>`
+      ? `<span class="hx-badge on">✓ ${t('hero.fit.installed')}</span>`
       : canFit
         ? `<span class="hx-cost">${esc(cost(fd.cost))}</span>`
-        : `<span class="hx-badge">${t('нет слотов')}</span>`;
+        : `<span class="hx-badge">${t('hero.fit.no-slots')}</span>`;
     const tap = canFit ? ` data-hfitd="${fid}"` : '';
     html +=
       `<div class="hx-row"${tap}><div class="hx-grow"><span class="hx-an">${esc(t(fd.name))}</span>` +
@@ -9613,17 +9604,17 @@ function heroOverviewHtml(hero: HeroInst): string {
   let html =
     `<div class="hx-note" style="margin-bottom:10px;">${esc(t(def?.description ?? ''))}</div>` +
     `<div class="hx-ov">` +
-    `<div class="hx-ovc"><b>${abil}</b><span>${t('способностей')}</span></div>` +
-    `<div class="hx-ovc"><b>${learned}/${treeTotal}</b><span>${t('узлов дерева')}</span></div>` +
-    `<div class="hx-ovc"><b>${(hero.fittings ?? []).length}/${def?.slots ?? 0}</b><span>${t('фиттингов')}</span></div>` +
+    `<div class="hx-ovc"><b>${abil}</b><span>${t('hero.stat.abilities')}</span></div>` +
+    `<div class="hx-ovc"><b>${learned}/${treeTotal}</b><span>${t('hero.stat.tree-nodes')}</span></div>` +
+    `<div class="hx-ovc"><b>${(hero.fittings ?? []).length}/${def?.slots ?? 0}</b><span>${t('hero.stat.fittings')}</span></div>` +
     `</div>`;
   const bonuses = (hero.passives ?? [])
     .map(
       (p) =>
-        `<div class="hx-row"><span class="hx-grow hx-an">${esc(heroPassiveLine(p))}</span><span class="hx-badge on">${t('актив')}</span></div>`,
+        `<div class="hx-row"><span class="hx-grow hx-an">${esc(heroPassiveLine(p))}</span><span class="hx-badge on">${t('hero.stat.active')}</span></div>`,
     )
     .join('');
-  if (bonuses) html += `<div class="hx-h">${t('Текущие бонусы')}</div>${bonuses}`;
+  if (bonuses) html += `<div class="hx-h">${t('hero.stat.bonuses')}</div>${bonuses}`;
   return html;
 }
 
@@ -9642,9 +9633,9 @@ function heroDossierHtml(hero: HeroInst): string {
     const skills = hero.skills ?? [];
     const gAb = nd.grants.ability ? data.heroAbilities[nd.grants.ability] : undefined;
     const give = gAb
-      ? `<div class="hx-dgl">${t('Открывает способность')}</div><div class="hx-dgv">${esc(t(gAb.name))}${(gAb.range ?? 0) > 0 ? ` · ${t('дальность {r}', { r: gAb.range })}` : ''}${gAb.cooldownHours ? ` · ${t('КД {h}ч', { h: gAb.cooldownHours })}` : ''}</div><div class="hx-note">${esc(t(gAb.description ?? ''))}</div>`
+      ? `<div class="hx-dgl">${t('hero.tree.grants-ability')}</div><div class="hx-dgv">${esc(t(gAb.name))}${(gAb.range ?? 0) > 0 ? ` · ${t('hero.tree.range', { r: gAb.range })}` : ''}${gAb.cooldownHours ? ` · ${t('hero.tree.cooldown', { h: gAb.cooldownHours })}` : ''}</div><div class="hx-note">${esc(t(gAb.description ?? ''))}</div>`
       : nd.grants.passive
-        ? `<div class="hx-dgl">${t('Даёт пассивку')}</div><div class="hx-dgv">${esc(heroPassiveLine(nd.grants.passive))}</div>`
+        ? `<div class="hx-dgl">${t('hero.tree.grants-passive')}</div><div class="hx-dgv">${esc(heroPassiveLine(nd.grants.passive))}</div>`
         : '';
     const branchOk = nd.branch === undefined || nd.branch === def?.branch;
     const reqMet = nd.requires.every((r) => skills.includes(r));
@@ -9657,18 +9648,18 @@ function heroDossierHtml(hero: HeroInst): string {
       .join(' ');
     const canBuy = branchOk && reqMet && !owned && afford(nd.cost) && !dead;
     const btn = owned
-      ? `<div class="hx-drow"><span class="hx-ok">✓ ${t('изучено')}</span></div>`
+      ? `<div class="hx-drow"><span class="hx-ok">✓ ${t('hero.tree.unlocked')}</span></div>`
       : !branchOk
-        ? `<div class="hx-drow"><span class="hx-no">${t('чужая ветвь')}</span></div>`
-        : `<button class="hx-dbtn" data-hskill="${hero.id}" data-node="${id}" ${canBuy ? '' : 'disabled'}>${t('Изучить')} · ${esc(cost(nd.cost))}</button>`;
+        ? `<div class="hx-drow"><span class="hx-no">${t('hero.tree.other-branch')}</span></div>`
+        : `<button class="hx-dbtn" data-hskill="${hero.id}" data-node="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.tree.unlock')} · ${esc(cost(nd.cost))}</button>`;
     return (
       `<div class="hx-dossier">` +
       `<div class="hx-dh">${def?.branch ? `<span class="hx-tag">${esc(t(HERO_BRANCH_RU[def.branch] ?? def.branch))}</span>` : ''}<span class="hx-dnm">${esc(t(nd.name))}</span>${close}</div>` +
       (give ? `<div class="hx-give">${give}</div>` : '') +
       (reqHtml
-        ? `<div class="hx-drow"><span class="hx-dk">${t('Требует')}</span><span class="hx-dv">${reqHtml}</span></div>`
+        ? `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.requires')}</span><span class="hx-dv">${reqHtml}</span></div>`
         : '') +
-      `<div class="hx-drow"><span class="hx-dk">${t('Цена')}</span><span class="hx-cost">${esc(cost(nd.cost))}</span></div>` +
+      `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.cost')}</span><span class="hx-cost">${esc(cost(nd.cost))}</span></div>` +
       btn +
       `</div>`
     );
@@ -9680,11 +9671,11 @@ function heroDossierHtml(hero: HeroInst): string {
     const slots = def?.slots ?? 0;
     const gAb = fd.grants.ability ? data.heroAbilities[fd.grants.ability] : undefined;
     const give = gAb
-      ? `<div class="hx-dgl">${t('Открывает способность')}</div><div class="hx-dgv">${esc(t(gAb.name))}</div><div class="hx-note">${esc(t(gAb.description ?? ''))}</div>`
+      ? `<div class="hx-dgl">${t('hero.tree.grants-ability')}</div><div class="hx-dgv">${esc(t(gAb.name))}</div><div class="hx-note">${esc(t(gAb.description ?? ''))}</div>`
       : fd.grants.passive
-        ? `<div class="hx-dgl">${t('Даёт пассивку')}</div><div class="hx-dgv">${esc(heroPassiveLine(fd.grants.passive))}</div>`
+        ? `<div class="hx-dgl">${t('hero.tree.grants-passive')}</div><div class="hx-dgv">${esc(heroPassiveLine(fd.grants.passive))}</div>`
         : fd.statMods
-          ? `<div class="hx-dgl">${t('Модификатор корпуса')}</div><div class="hx-dgv">${esc(
+          ? `<div class="hx-dgl">${t('hero.fit.hull-mod')}</div><div class="hx-dgv">${esc(
               Object.entries(fd.statMods)
                 .map(([k, v]) => `${k} +${v}`)
                 .join(', '),
@@ -9695,9 +9686,9 @@ function heroDossierHtml(hero: HeroInst): string {
       `<div class="hx-dossier">` +
       `<div class="hx-dh"><span class="hx-dnm">${esc(t(fd.name))}</span>${close}</div>` +
       (give ? `<div class="hx-give">${give}</div>` : '') +
-      `<div class="hx-drow"><span class="hx-dk">${t('Цена')}</span><span class="hx-cost">${esc(cost(fd.cost))}</span></div>` +
-      `<div class="hx-warn">${t('Ставится навсегда — рефита нет')}</div>` +
-      `<button class="hx-dbtn danger" data-hfit="${hero.id}" data-fit="${id}" ${canBuy ? '' : 'disabled'}>${t('Необратимо — установить')} · ${esc(cost(fd.cost))}</button>` +
+      `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.cost')}</span><span class="hx-cost">${esc(cost(fd.cost))}</span></div>` +
+      `<div class="hx-warn">${t('hero.fit.permanent')}</div>` +
+      `<button class="hx-dbtn danger" data-hfit="${hero.id}" data-fit="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.fit.install')} · ${esc(cost(fd.cost))}</button>` +
       `</div>`
     );
   }
@@ -12174,14 +12165,14 @@ async function ensureSession(
   // Mirror the server's LOGIN_RE (authApi.ts) so a bad callsign gets a human
   // explanation here instead of the server's uniform rejection.
   if (!/^[\p{L}\p{N}_-]{3,24}$/u.test(login)) {
-    statusEl.textContent = t('Позывной для аккаунта: 3–24 символа — буквы, цифры, _ или -');
+    statusEl.textContent = t('acc.nick.rule');
     return null;
   }
   // The password may come from the welcome card (Bytro-style sign-up) or the match
   // browser's field (custom-server joins) — whichever the player actually filled.
   const password = passwordArg ?? (wPassInput.value || (passInput?.value ?? ''));
   if (password.length < 8) {
-    statusEl.textContent = t('Введите пароль (мин. 8 символов)');
+    statusEl.textContent = t('acc.pass.rule');
     return null;
   }
   const call = async (
@@ -12207,24 +12198,23 @@ async function ensureSession(
       const reg = await call('/auth/register', emailArg ? { email: emailArg } : {});
       if (reg.token) {
         localStorage.setItem(sessionKey(base), JSON.stringify({ login, token: reg.token }));
-        note('✔ ' + t('Аккаунт создан'));
+        note('✔ ' + t('acc.created'));
         return reg.token;
       }
       statusEl.textContent =
         reg.error === 'E_EMAIL_TAKEN'
-          ? t('Эта почта уже занята')
+          ? t('acc.mail-taken')
           : reg.status === 409
-            ? t('Неверный пароль') // login 401 + register 409 (E_LOGIN_TAKEN) ⇒ wrong password
+            ? t('acc.bad-pass') // login 401 + register 409 (E_LOGIN_TAKEN) ⇒ wrong password
             : reg.status === 429
-              ? t('Слишком часто — подождите')
-              : t('Регистрация отклонена');
+              ? t('acc.rate-limited')
+              : t('acc.register-refused');
       return null;
     }
-    statusEl.textContent =
-      login1.status === 429 ? t('Слишком часто — подождите') : t('Вход отклонён');
+    statusEl.textContent = login1.status === 429 ? t('acc.rate-limited') : t('acc.login-refused');
     return null;
   } catch {
-    statusEl.textContent = t('сервер недоступен');
+    statusEl.textContent = t('acc.server-down');
     return null;
   }
 }
@@ -12254,22 +12244,22 @@ async function fetchJoinToken(
     );
     if (res.status === 401) {
       localStorage.removeItem(sessionKey(base)); // session expired/revoked — re-login
-      statusEl.textContent = t('Сессия истекла — введите пароль ещё раз');
+      statusEl.textContent = t('acc.session-expired');
       return null;
     }
     if (res.status === 403) {
-      statusEl.textContent = t('вход закрыт'); // entry window shut (SES-2.3)
+      statusEl.textContent = t('acc.join-closed'); // entry window shut (SES-2.3)
       return null;
     }
     if (!res.ok) {
-      statusEl.textContent = res.status === 409 ? t('все места заняты') : t('не удалось войти');
+      statusEl.textContent = res.status === 409 ? t('acc.seats-full') : t('acc.join-failed');
       return null;
     }
     const body = (await res.json()) as { token?: string; playerId?: string };
     if (!body.token || !body.playerId) return null;
     return { token: body.token, playerId: body.playerId };
   } catch {
-    statusEl.textContent = t('сервер недоступен');
+    statusEl.textContent = t('acc.server-down');
     return null;
   }
 }
@@ -12305,9 +12295,9 @@ function fmtJoinWindow(ms: number): string {
   const hours = Math.max(0, Math.floor(ms / 3_600_000));
   const d = Math.floor(hours / 24);
   const h = hours % 24;
-  if (d > 0) return t('{d}д {h}ч', { d, h });
-  if (hours > 0) return t('{h}ч', { h: hours });
-  return t('<1ч');
+  if (d > 0) return t('browser.left.days', { d, h });
+  if (hours > 0) return t('browser.left.hours', { h: hours });
+  return t('browser.left.soon');
 }
 type MatchTab = 'available' | 'active' | 'archived';
 let matchLists: Record<MatchTab, MatchRow[]> | null = null;
@@ -12315,9 +12305,9 @@ let activeTab: MatchTab = 'available';
 
 function ruleSummary(r: MatchRow['rules']): string {
   const parts = [`×${r.timeScale ?? 1}`];
-  if (r.victory?.scoreLimit) parts.push(t('до {n} очк.', { n: r.victory.scoreLimit }));
+  if (r.victory?.scoreLimit) parts.push(t('browser.goal.score', { n: r.victory.scoreLimit }));
   if (r.victory?.dominationPercent)
-    parts.push(t('{p}% карты', { p: Math.round(r.victory.dominationPercent * 100) }));
+    parts.push(t('browser.goal.map', { p: Math.round(r.victory.dominationPercent * 100) }));
   return parts.join(' · ');
 }
 
@@ -12488,13 +12478,13 @@ async function openSeatPicker(matchId: string): Promise<void> {
         const slots = document.createElement('div');
         slots.className = 'seat-faction';
         slots.style.fontSize = '10px';
-        slots.textContent = t('слотов') + ': ' + freeCount + '/' + seats.length;
+        slots.textContent = t('browser.slots') + ': ' + freeCount + '/' + seats.length;
         info.appendChild(name);
         info.appendChild(passive);
         if (slots.textContent) info.appendChild(slots);
         const status = document.createElement('div');
         status.className = 'seat-status' + (isFull ? '' : ' free');
-        status.textContent = isFull ? t('занято') : t('свободно');
+        status.textContent = isFull ? t('browser.taken') : t('browser.free');
         row.appendChild(dot);
         row.appendChild(info);
         row.appendChild(status);
@@ -12553,7 +12543,7 @@ async function refreshMatches(quiet = false): Promise<void> {
   if (!srv) return;
   // quiet = a background re-poll (player build): don't flash «загрузка…» over a
   // list that is already on screen — only a real state change repaints.
-  if (!quiet) statusEl.textContent = t('загрузка матчей…');
+  if (!quiet) statusEl.textContent = t('browser.loading');
   // Identity mode first (SES-2.5): accounts servers get the password row shown
   // BEFORE the player clicks «Войти» on a row — no surprise prompt mid-join.
   await probeAuthMode(srv.base);
@@ -12566,7 +12556,7 @@ async function refreshMatches(quiet = false): Promise<void> {
     statusEl.textContent = '';
   } catch {
     matchLists = null;
-    statusEl.textContent = t('сервер недоступен');
+    statusEl.textContent = t('acc.server-down');
   }
   renderMatches();
 }
@@ -12581,18 +12571,18 @@ async function toggleArchive(id: string, restore: boolean): Promise<void> {
       { method: 'POST' },
     );
     if (!res.ok) {
-      statusEl.textContent = restore ? t('не удалось восстановить') : t('не удалось в архив');
+      statusEl.textContent = restore ? t('browser.restore-failed') : t('browser.archive-failed');
       return;
     }
     await refreshMatches();
   } catch {
-    statusEl.textContent = t('ошибка архива');
+    statusEl.textContent = t('browser.archive-error');
   }
 }
 
 function renderMatches(): void {
   const el = $('mlist');
-  const failed = statusEl.textContent === t('сервер недоступен');
+  const failed = statusEl.textContent === t('acc.server-down');
   if (__PLAYER_BUILD__) {
     // The player screen is ONLY the three tabs + the list. The hidden server row
     // resurfaces exactly while the list can't be loaded (an APK has no useful page
@@ -12608,8 +12598,8 @@ function renderMatches(): void {
   const soloCard = (msg: string): void => {
     el.innerHTML =
       `<div class="mempty">${msg}</div>` +
-      `<div class="msolo"><button class="mbtn" id="msolo-go">▶ ${t('Одиночный режим')}</button>` +
-      `<div class="msolo-sub">${t('Сервер не нужен — свободные места займут боты.')}</div></div>`;
+      `<div class="msolo"><button class="mbtn" id="msolo-go">▶ ${t('browser.solo')}</button>` +
+      `<div class="msolo-sub">${t('browser.solo.hint')}</div></div>`;
     document.getElementById('msolo-go')?.addEventListener('click', () => {
       userClosed = true;
       NET = false;
@@ -12621,17 +12611,17 @@ function renderMatches(): void {
     soloCard(
       failed
         ? __PLAYER_BUILD__
-          ? t('сервер недоступен — укажи адрес сервера')
-          : t('сервер недоступен')
+          ? t('browser.server-down')
+          : t('acc.server-down')
         : __PLAYER_BUILD__
-          ? t('загрузка матчей…')
-          : t('нажмите «Обновить список»'),
+          ? t('browser.loading')
+          : t('browser.refresh-hint'),
     );
     return;
   }
   const rows = matchLists[activeTab] ?? [];
   if (rows.length === 0) {
-    soloCard(t('здесь пусто'));
+    soloCard(t('browser.empty'));
     return;
   }
   el.textContent = '';
@@ -12648,29 +12638,29 @@ function renderMatches(): void {
     let windowLine = '';
     if (activeTab === 'available' && m.entryClosesInMs !== undefined) {
       if (m.entryOpen === false) {
-        windowLine = ` · <span class="mwin shut">${t('вход закрыт')}</span>`;
+        windowLine = ` · <span class="mwin shut">${t('acc.join-closed')}</span>`;
       } else if (m.entryClosesInMs < ENTRY_UNBOUNDED_MS) {
         const soon = m.entryClosesInMs < 24 * 60 * 60 * 1000; // under a real day left
-        windowLine = ` · <span class="mwin${soon ? ' soon' : ''}">${t('вход ещё {dur}', { dur: fmtJoinWindow(m.entryClosesInMs) })}</span>`;
+        windowLine = ` · <span class="mwin${soon ? ' soon' : ''}">${t('browser.join-window', { dur: fmtJoinWindow(m.entryClosesInMs) })}</span>`;
       }
     }
     info.innerHTML =
       `<div class="mname">${esc(m.mapId)} <span class="mid">${esc(m.matchId)}</span></div>` +
-      `<div class="mmeta">${t('День {n}', { n: m.days })} · ${t('{s}/{c} игроков', { s: m.players.seated, c: m.players.capacity })} · ` +
-      `${esc(ruleSummary(m.rules))} · ${m.status === 'ended' ? t('завершён') : t('идёт')}${windowLine}</div>`;
+      `<div class="mmeta">${t('browser.day', { n: m.days })} · ${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
+      `${esc(ruleSummary(m.rules))} · ${m.status === 'ended' ? t('browser.finished') : t('browser.running')}${windowLine}</div>`;
     row.appendChild(info);
     const btns = document.createElement('div');
     btns.className = 'mbtns';
     const join = document.createElement('button');
     join.className = 'mbtn';
-    join.textContent = t('Войти');
+    join.textContent = t('browser.join');
     join.addEventListener('click', () => openSessionTab(m.matchId));
     btns.appendChild(join);
     if (activeTab !== 'available') {
       const restore = activeTab === 'archived';
       const arch = document.createElement('button');
       arch.className = 'mbtn ghost';
-      arch.textContent = restore ? t('Восстановить') : t('В архив');
+      arch.textContent = restore ? t('browser.restore') : t('browser.archive');
       arch.addEventListener('click', () => void toggleArchive(m.matchId, restore));
       btns.appendChild(arch);
     }
@@ -12732,11 +12722,11 @@ function scheduleReconnect(): void {
     reconnecting = false;
     reconnectAttempts = 0;
     banner = null;
-    statusEl.textContent = t('Переподключение не удалось — войди заново');
+    statusEl.textContent = t('acc.reconnect-failed');
     showConnect(true);
     return;
   }
-  banner = t('⟳ переподключение…');
+  banner = t('acc.reconnecting');
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
     if (!authMode) {
