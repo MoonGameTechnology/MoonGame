@@ -14755,17 +14755,17 @@ function corpNoneHtml(): string {
       (c) =>
         `<div class="crow2"><span class="cnm">${esc(c.name)}</span>` +
         `<span class="cinf">${nfmt(c.influence)} ⟡</span>` +
-        `<span class="cpres">${t('{n} участников', { n: String(c.members) })}</span>` +
-        `<span class="cman"><button class="cbtn2" data-corpact="apply" data-corparg="${esc(c.corpId)}">${t('Заявиться')}</button></span></div>`,
+        `<span class="cpres">${t('corp.members.count', { n: String(c.members) })}</span>` +
+        `<span class="cman"><button class="cbtn2" data-corpact="apply" data-corparg="${esc(c.corpId)}">${t('corp.apply')}</button></span></div>`,
     )
     .join('');
   return (
     `<div class="ccols">` +
-    `<section class="ccard"><h4>${t('Создать корпорацию')}</h4>` +
-    `<div class="cinput"><input id="corpnewname" placeholder="${t('Название (3–24 символа)')}" maxlength="24">` +
-    `<button class="cbtn2" data-corpact="create">${t('Создать')}</button></div></section>` +
-    `<section class="ccard"><h4>${t('Найти и подать заявку')}</h4>` +
-    `<div class="ctable">${rows || `<p class="chint">${t('Пока нет других корпораций.')}</p>`}</div></section>` +
+    `<section class="ccard"><h4>${t('corp.create.title')}</h4>` +
+    `<div class="cinput"><input id="corpnewname" placeholder="${t('corp.create.name-ph')}" maxlength="24">` +
+    `<button class="cbtn2" data-corpact="create">${t('corp.create.go')}</button></div></section>` +
+    `<section class="ccard"><h4>${t('corp.browse.title')}</h4>` +
+    `<div class="ctable">${rows || `<p class="chint">${t('corp.browse.empty')}</p>`}</div></section>` +
     `</div>`
   );
 }
@@ -14782,20 +14782,20 @@ function corpOverviewHtml(): string {
     )
     .join('');
   const feedHtml = canManage(corpMine.membership.role)
-    ? feed || `<p class="chint">${t('Пока пусто.')}</p>`
-    : `<p class="chint">${t('Журнал виден главе и офицерам.')}</p>`;
+    ? feed || `<p class="chint">${t('corp.empty')}</p>`
+    : `<p class="chint">${t('corp.log.private')}</p>`;
   const nextWar = avaChallenges.find((w) => w.status === 'accepted' || w.status === 'pending');
   const nextWarHtml = nextWar
-    ? `<div class="cwarn">⚔ ${t('AvA')} vs ${esc(corpNameOf(nextWar.challengerCorp === corpMine.membership.corpId ? nextWar.targetCorp : nextWar.challengerCorp))} — ${t(nextWar.status === 'accepted' ? 'идёт набор ростера' : 'ждёт ответа')}</div>`
+    ? `<div class="cwarn">⚔ ${t('AvA')} vs ${esc(corpNameOf(nextWar.challengerCorp === corpMine.membership.corpId ? nextWar.targetCorp : nextWar.challengerCorp))} — ${t(nextWar.status === 'accepted' ? 'corp.war.roster-open' : 'corp.war.pending')}</div>`
     : '';
   return (
     `${nextWarHtml}` +
     `<div class="ccols">` +
-    `<section class="ccard"><h4>${t('Корпорация')}</h4>` +
-    `<div class="cline"><span>${t('Влияние')}</span><em>${nfmt(c.influence)} ⟡</em></div>` +
-    `<div class="cline"><span>${t('Моя роль')}</span><em>${corpRoleLabel(corpMine.membership.role)}</em></div>` +
-    `<p class="chint">${t('Пассивные бонусы владений придут вместе с мета-слоем секторов — пока их нет.')}</p></section>` +
-    `<section class="ccard"><h4>${t('Журнал')}</h4>${feedHtml}</section>` +
+    `<section class="ccard"><h4>${t('corp.overview.name')}</h4>` +
+    `<div class="cline"><span>${t('corp.influence')}</span><em>${nfmt(c.influence)} ⟡</em></div>` +
+    `<div class="cline"><span>${t('corp.my-role')}</span><em>${corpRoleLabel(corpMine.membership.role)}</em></div>` +
+    `<p class="chint">${t('corp.holdings.note')}</p></section>` +
+    `<section class="ccard"><h4>${t('corp.log')}</h4>${feedHtml}</section>` +
     `</div>`
   );
 }
@@ -14810,8 +14810,8 @@ function corpMembersHtml(): string {
       let manage = '';
       if (m.role === 'recruit' && canManage(myRole)) {
         manage =
-          `<button class="cbtn2" data-corpact="accept" data-corparg="${esc(m.accountId)}">✓ ${t('принять')}</button>` +
-          `<button class="cbtn2 danger" data-corpact="decline" data-corparg="${esc(m.accountId)}">✖ ${t('отклонить')}</button>`;
+          `<button class="cbtn2" data-corpact="accept" data-corparg="${esc(m.accountId)}">✓ ${t('corp.request.accept')}</button>` +
+          `<button class="cbtn2 danger" data-corpact="decline" data-corparg="${esc(m.accountId)}">✖ ${t('corp.request.reject')}</button>`;
       } else if (!isMe && m.role !== 'head') {
         const bits: string[] = [];
         if (myRole === 'head') {
@@ -14820,7 +14820,7 @@ function corpMembersHtml(): string {
             `<button class="cbtn2" data-corpact="role" data-corparg="${esc(m.accountId)}" data-corprole="${toRole}">↑ ${corpRoleLabel(toRole)}</button>`,
           );
           bits.push(
-            `<button class="cbtn2" data-corpact="transfer" data-corparg="${esc(m.accountId)}">⬆ ${t('передать главенство')}</button>`,
+            `<button class="cbtn2" data-corpact="transfer" data-corparg="${esc(m.accountId)}">⬆ ${t('corp.transfer-lead')}</button>`,
           );
         }
         if (canManage(myRole) && !(myRole === 'officer' && m.role === 'officer')) {
@@ -14833,7 +14833,7 @@ function corpMembersHtml(): string {
       return (
         `<div class="crow2${isMe ? ' me' : ''}">` +
         `<span class="cdot" style="color:${CORP_ROLE_DOT[m.role]}"></span>` +
-        `<span class="cnm">${esc(m.login)}${isMe ? ` <i>(${t('вы')})</i>` : ''}</span>` +
+        `<span class="cnm">${esc(m.login)}${isMe ? ` <i>(${t('corp.you')})</i>` : ''}</span>` +
         `<span class="crole">${corpRoleLabel(m.role)}</span>` +
         `<span class="cman">${manage}</span>` +
         `</div>`
@@ -14843,8 +14843,8 @@ function corpMembersHtml(): string {
   const mine = corpMine.membership;
   const leave =
     mine.role === 'head'
-      ? `<button class="cbtn2 danger wide" data-corpact="disband">${t('Расформировать корпорацию')}</button>`
-      : `<button class="cbtn2 wide" data-corpact="leave">${t('Покинуть корпорацию')}</button>`;
+      ? `<button class="cbtn2 danger wide" data-corpact="disband">${t('corp.disband')}</button>`
+      : `<button class="cbtn2 wide" data-corpact="leave">${t('corp.leave')}</button>`;
   return `<div class="ctable">${rows}</div>${leave}`;
 }
 
@@ -14855,14 +14855,14 @@ function corpWarsHtml(): string {
   const corpReady = corpReadyOptimistic ?? avaPool.some((p) => p.corpId === myCorpId);
   const flags =
     `<div class="cbig">` +
-    `<div><span>${t('Готовность корпорации')}</span><b>${corpReady ? t('да ✓') : t('нет')}</b>` +
+    `<div><span>${t('corp.ready.corp')}</span><b>${corpReady ? t('corp.ready.yes') : t('corp.ready.no')}</b>` +
     (iAmHead
-      ? `<button class="cbtn2" data-corpact="${corpReady ? 'ready-corp-clear' : 'ready-corp'}">${corpReady ? t('снять') : t('в пул')}</button>`
-      : `<span class="chint">${t('только глава')}</span>`) +
+      ? `<button class="cbtn2" data-corpact="${corpReady ? 'ready-corp-clear' : 'ready-corp'}">${corpReady ? t('corp.ready.clear') : t('corp.ready.to-pool')}</button>`
+      : `<span class="chint">${t('corp.ready.lead-only')}</span>`) +
     `</div>` +
-    `<div><span>${t('Моя готовность')}</span><b>${playerReadyOptimistic ? t('да ✓') : t('—')}</b>` +
+    `<div><span>${t('corp.ready.mine')}</span><b>${playerReadyOptimistic ? t('corp.ready.yes') : t('—')}</b>` +
     (iCanFlag
-      ? `<button class="cbtn2" data-corpact="${playerReadyOptimistic ? 'ready-player-clear' : 'ready-player'}">${playerReadyOptimistic ? t('снять') : t('готов')}</button>`
+      ? `<button class="cbtn2" data-corpact="${playerReadyOptimistic ? 'ready-player-clear' : 'ready-player'}">${playerReadyOptimistic ? t('corp.ready.clear') : t('corp.ready.set')}</button>`
       : '') +
     `</div></div>`;
 
@@ -14871,27 +14871,27 @@ function corpWarsHtml(): string {
       const iAmChallenger = w.challengerCorp === myCorpId;
       const foe = corpNameOf(iAmChallenger ? w.targetCorp : w.challengerCorp);
       const st: Record<AvaChallengeStatus, string> = {
-        pending: iAmChallenger ? t('ждёт ответа') : t('входящий вызов'),
-        accepted: t('набор ростера'),
-        declined: t('отклонён'),
-        expired: t('истёк'),
-        locked: t('заперт — скоро бой'),
-        cancelled: t('отменён'),
-        ended: t('завершён'),
+        pending: iAmChallenger ? t('corp.war.pending') : t('corp.war.incoming'),
+        accepted: t('corp.war.roster'),
+        declined: t('corp.war.declined'),
+        expired: t('corp.war.expired'),
+        locked: t('corp.war.locked'),
+        cancelled: t('corp.war.cancelled'),
+        ended: t('corp.war.finished'),
       };
       const canRespond = w.status === 'pending' && !iAmChallenger && iAmHead;
       const act = canRespond
-        ? `<button class="cbtn2" data-corpact="ava-accept" data-corparg="${esc(w.id)}">${t('Принять')}</button>` +
-          `<button class="cbtn2 danger" data-corpact="ava-decline" data-corparg="${esc(w.id)}">${t('Отклонить')}</button>`
+        ? `<button class="cbtn2" data-corpact="ava-accept" data-corparg="${esc(w.id)}">${t('corp.war.accept')}</button>` +
+          `<button class="cbtn2 danger" data-corpact="ava-decline" data-corparg="${esc(w.id)}">${t('corp.war.decline')}</button>`
         : w.status === 'accepted' &&
             corpMine.membership &&
             corpMine.membership.role !== 'recruit' &&
             !avaRoster?.mine.some((r) => r.accountId === corpMine.membership!.accountId)
-          ? `<button class="cbtn2" data-corpact="ava-join" data-corparg="${esc(w.id)}">${t('Заявиться в состав')}</button>`
+          ? `<button class="cbtn2" data-corpact="ava-join" data-corparg="${esc(w.id)}">${t('corp.war.join-roster')}</button>`
           : '';
       const rosterOpen = w.status === 'accepted' && avaRoster && avaRoster.matchupId === w.id;
       const rosterLine = rosterOpen
-        ? `<div class="cwmid">${t('состав')}: ${avaRoster!.counts.challenger}/${avaRoster!.counts.target}</div>`
+        ? `<div class="cwmid">${t('corp.war.roster-label')}: ${avaRoster!.counts.challenger}/${avaRoster!.counts.target}</div>`
         : '';
       // AVA-6 setRoster — head/officer curates from the flagged pool wholesale;
       // everyone else still only has self-enroll `join` (rendered in `act` above).
@@ -14913,7 +14913,7 @@ function corpWarsHtml(): string {
           : '';
       return (
         `<div class="cwar"><div class="cwtop"><b>⚔ ${esc(foe)}</b><span class="cst st-${w.status}">${st[w.status]}</span></div>` +
-        `<div class="cwmid">${iAmChallenger ? t('вызов от нас') : t('вызов нам')} · ${nfmt(w.cost)} ⟡</div>${rosterLine}${curate}` +
+        `<div class="cwmid">${iAmChallenger ? t('corp.war.by-us') : t('corp.war.to-us')} · ${nfmt(w.cost)} ⟡</div>${rosterLine}${curate}` +
         (act ? `<div class="cwact">${act}</div>` : '') +
         `</div>`
       );
@@ -14926,7 +14926,7 @@ function corpWarsHtml(): string {
       (p) =>
         `<div class="crow2"><span class="cnm">${esc(p.name)}</span><span class="cinf">${nfmt(p.influence)} ⟡</span>` +
         (iAmHead
-          ? `<span class="cman"><button class="cbtn2" data-corpact="ava-challenge" data-corparg="${esc(p.corpId)}">⚔ ${t('Вызвать')}</button></span>`
+          ? `<span class="cman"><button class="cbtn2" data-corpact="ava-challenge" data-corparg="${esc(p.corpId)}">⚔ ${t('corp.war.challenge')}</button></span>`
           : '') +
         `</div>`,
     )
@@ -14937,15 +14937,15 @@ function corpWarsHtml(): string {
     .map(
       (f) =>
         `<div class="cline"><span>${esc(f.challengerName)} vs ${esc(f.targetName)}</span>` +
-        `<em class="cwhen">${f.kind === 'result' ? (f.winnerCorp ? t('победа') : t('ничья')) : t('назначен')}</em></div>`,
+        `<em class="cwhen">${f.kind === 'result' ? (f.winnerCorp ? t('corp.war.win') : t('corp.war.draw')) : t('corp.war.scheduled')}</em></div>`,
     )
     .join('');
 
   return (
     flags +
-    `<h4>${t('Мои вызовы')}</h4><div class="cwars">${wars || `<p class="chint">${t('Пока нет вызовов.')}</p>`}</div>` +
-    `<h4>${t('Готовые к войне')}</h4><div class="ctable">${pool || `<p class="chint">${t('Пул пуст.')}</p>`}</div>` +
-    `<h4>${t('Публичная лента AvA')}</h4><div class="cledger">${feed || `<p class="chint">${t('Пока пусто.')}</p>`}</div>`
+    `<h4>${t('corp.war.mine')}</h4><div class="cwars">${wars || `<p class="chint">${t('corp.war.none')}</p>`}</div>` +
+    `<h4>${t('corp.war.pool')}</h4><div class="ctable">${pool || `<p class="chint">${t('corp.war.pool-empty')}</p>`}</div>` +
+    `<h4>${t('corp.war.feed')}</h4><div class="cledger">${feed || `<p class="chint">${t('corp.empty')}</p>`}</div>`
   );
 }
 
@@ -14959,21 +14959,21 @@ function corpTreasuryHtml(): string {
     )
     .join('');
   const ledgerHtml = canManage(corpMine.membership.role)
-    ? rows || `<p class="chint">${t('Пока пусто.')}</p>`
-    : `<p class="chint">${t('История видна главе и офицерам.')}</p>`;
+    ? rows || `<p class="chint">${t('corp.empty')}</p>`
+    : `<p class="chint">${t('corp.history.private')}</p>`;
   return (
-    `<div class="cbig"><div><span>${t('Влияние')}</span><b>${nfmt(corpMine.corp.influence)} ⟡</b></div></div>` +
-    `<h4>${t('История')}</h4><div class="cledger">${ledgerHtml}</div>` +
-    `<p class="chint">${t('Тратится на вызов AvA (100 ⟡ по умолчанию) — кнопка «Вызвать» во вкладке «Войны».')}</p>`
+    `<div class="cbig"><div><span>${t('corp.influence')}</span><b>${nfmt(corpMine.corp.influence)} ⟡</b></div></div>` +
+    `<h4>${t('corp.history')}</h4><div class="cledger">${ledgerHtml}</div>` +
+    `<p class="chint">${t('corp.influence.hint')}</p>`
   );
 }
 
 function corpHoldingsHtml(): string {
-  return `<div class="hub-empty"><span class="he-ic">▦</span>${t('Владения — скоро')}<br><span style="font-size:11px;color:var(--cyan-dim)">${t('мета-карта секторов появится вместе со вторым контуром метагейма')}</span></div>`;
+  return `<div class="hub-empty"><span class="he-ic">▦</span>${t('corp.holdings.soon')}<br><span style="font-size:11px;color:var(--cyan-dim)">${t('corp.holdings.soon.hint')}</span></div>`;
 }
 
 function corpCommsHtml(): string {
-  return `<div class="hub-empty"><span class="he-ic">▭</span>${t('Чат — скоро')}<br><span style="font-size:11px;color:var(--cyan-dim)">${t('постоянный корп-чат ждёт мета-слой; журнал действий — во вкладке «Обзор»')}</span></div>`;
+  return `<div class="hub-empty"><span class="he-ic">▭</span>${t('corp.chat.soon')}<br><span style="font-size:11px;color:var(--cyan-dim)">${t('corp.chat.soon.hint')}</span></div>`;
 }
 
 function renderCorp(): void {
@@ -14982,15 +14982,15 @@ function renderCorp(): void {
   corpHdEl.innerHTML = c
     ? `<div class="chrow"><span class="cemblem">⬢</span>` +
       `<div class="cident"><b>${esc(c.name)}</b></div>` +
-      `<button id="corpclose" class="cx" title="${t('Закрыть')}">✕</button></div>` +
+      `<button id="corpclose" class="cx" title="${t('corp.close')}">✕</button></div>` +
       `<div class="cmetrics">` +
-      `<span>${t('влияние')} <b>${nfmt(c.influence)} ⟡</b></span>` +
-      `<span>${t('участников')} <b>${corpDetail?.members.filter((m) => m.role !== 'recruit').length ?? '—'}</b></span>` +
-      `<span>${t('роль')} <b>${mem ? corpRoleLabel(mem.role) : '—'}</b></span>` +
+      `<span>${t('corp.card.influence')} <b>${nfmt(c.influence)} ⟡</b></span>` +
+      `<span>${t('corp.card.members')} <b>${corpDetail?.members.filter((m) => m.role !== 'recruit').length ?? '—'}</b></span>` +
+      `<span>${t('corp.card.role')} <b>${mem ? corpRoleLabel(mem.role) : '—'}</b></span>` +
       `</div>`
     : `<div class="chrow"><span class="cemblem">⬢</span>` +
-      `<div class="cident"><b>${t('Без корпорации')}</b></div>` +
-      `<button id="corpclose" class="cx" title="${t('Закрыть')}">✕</button></div>`;
+      `<div class="cident"><b>${t('corp.card.none')}</b></div>` +
+      `<button id="corpclose" class="cx" title="${t('corp.close')}">✕</button></div>`;
   corpTabsEl.innerHTML = CORP_TABS.map(
     (ct) =>
       `<button class="ctab${ct.id === corpTab ? ' on' : ''}" data-corptab="${ct.id}">${t(ct.label)}</button>`,
