@@ -1661,7 +1661,16 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
 - **REFP-21** 🔒(REFP-9..18) `[proto]` **`protoKernel.ts`** — `MODULES`, `kernel`,
   `SCORE_LIMIT`, `ctx`, `advance`, `order`, `StepOut` (3791–3886) — точка сборки, после
   фазы 2.
-- **REFP-22** ⏳ `[proto]` **`actions.ts`** — action builders (3887–3986, 4503–4614).
+- **REFP-22** 🔶 `[proto]` **`actions.ts`** — первый, полностью самодостаточный
+  кластер экшен-билдеров (`moveFleet`…`spyOn`, 28 функций) вынесен в
+  `prototype/src/actions.ts` вместе с приватным хелпером `act`/`seqCounter`
+  (реэкспортирован из `actions.ts` для оставшихся, ещё не вынесенных билдеров
+  `game.ts`, чтобы не форкать общую последовательность id). Зависел только от
+  shared-core типов + `getStance`. **Остаток кирпича:** второй, разбросанный
+  кластер (market/division/hero/chain-заказы — `marketTake`/`loadDivision`/
+  `spawnHero`/`orderChain`/…) переплетён с состоянием, которое сам `game.ts` ещё
+  держит (Patrol-драйвер REFP-23, дивизии REFP-13) — не в этом заходе. Гейт
+  зелёный (175 файлов, 1900 тестов).
 - **REFP-23** ⏳ `[proto]` **`patrol.ts`** — `Patrol`, `patrolTarget`, `scrambleOrder`
   (4207–4257).
 - **REFP-24** ⏳ `[proto]` **`serverDrivers.ts`** — `serverAutoAssaultActions`,
@@ -1670,7 +1679,10 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
   Тест: `stewardGuard.test.ts`.
 - **REFP-26** ⏳ `[proto]` **`ai.ts`** — `SeatAiKind`, `SeatAiDecision`, `seatAiDecision`,
   `aiOrders` (4995–5289).
-- **REFP-27** ⏳ `[proto]` **`canTraverse.ts`** — `canTraverse` (4615–4654).
+- **REFP-27** ✅ `[proto]` **`canTraverse`** — вынесен вместе с REFP-22 в
+  `prototype/src/actions.ts` (соседний, тоже чисто shared-core+`getStance`
+  код — отдельный файл под 4 строки не оправдан). `game.ts` импортирует и
+  реэкспортирует.
 - **REFP-28** 🔒(REFP-1..27) `[proto]` **Финальная очистка** — убрать re-export'ы из
   `game.ts`, перевести `main.ts`/`netserver.ts`/тесты на прямые импорты. `game.ts`
   схлопывается в index-фасад или удаляется.
