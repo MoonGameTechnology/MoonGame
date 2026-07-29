@@ -49,6 +49,20 @@ export const ru: Record<string, string> = {
   'browser.solo.hint': 'Сервер не нужен — свободные места займут боты.',
   'browser.taken': 'занято',
 
+  // --- card — Карточка игрока (тап по гербу): фракция, владения, боевой счёт.
+  'card.close': 'ЗАКРЫТЬ',
+  'card.combat': 'Боевой счёт',
+  'card.commander': 'командующий',
+  'card.diplomacy': 'Дипломатия',
+  'card.faction': 'Фракция',
+  'card.kills': '⚔ Уничтожено юнитов врага',
+  'card.losses': '☠ Потеряно своих',
+  'card.score': 'Очки',
+  'card.score.goal': 'ПОБЕДА',
+  'card.stances': 'Отношения',
+  'card.units': 'Юнитов',
+  'card.worlds': 'Миров под контролем',
+
   // --- chat / spy — Переписка (сессия и коалиция) и вкладка шпионажа.
   'chat.coalition.empty': 'Чат коалиции пуст.<br>Отметьте провинцию пингом 📍 или напишите.',
   'chat.empty': 'Сообщений пока нет.',
@@ -528,6 +542,24 @@ export const ru: Record<string, string> = {
   'yard.soon': '«{what}» переезжает в конструктор следующим кирпичом.',
   'yard.title': 'КОНСТРУКТОР',
 
+  // --- end — Экран конца матча: исход, опыт, итоговая таблица, реванш.
+  'end.board': 'Смотреть доску',
+  'end.draw': '⚖️ НИЧЬЯ',
+  'end.duration': 'Длительность',
+  'end.fleets': 'Флоты',
+  'end.level-up': '★ Новый уровень {lvl} — очко прокачки ждёт в меню «Прокачка»',
+  'end.loss': '💀 ПОРАЖЕНИЕ',
+  'end.new-match': '⟳ Новый матч',
+  'end.place': '{p}-е место из {n}',
+  'end.play-again': '⟳ Играть ещё',
+  'end.provinces': 'Провинции',
+  'end.score': 'Итоговый счёт',
+  'end.to-menu': 'В меню',
+  'end.units': 'Юниты',
+  'end.win': '🏆 ПОБЕДА',
+  'end.win.coalition': '🏆 ПОБЕДА КОАЛИЦИИ',
+  'end.xp': '★ Опыт командующего: +{n}',
+
   // --- err — Отказы ядра (kernel rejection codes). Ключ выводится из кода: E_NO_CAPACITY → err.no-capacity.
   'err.already': 'уже действует',
   'err.already-fitted': 'фиттинг уже установлен',
@@ -765,11 +797,26 @@ export const ru: Record<string, string> = {
     'Маршрут проходит через миры <b>{names}</b>, с кем у вас <b>мир</b>. Мирного прохода нет — движение сюда объявит <b>войну</b>.',
   'war.confirm.yes': 'ДА',
 
-  // --- market — Биржа: вкладки ресурсов.
+  // --- market — Сессионная биржа: вкладки ресурсов, книга заявок, лот, комиссия.
+  'market.buy': 'Купить',
+  'market.cancel': 'Отменить',
+  'market.escrow-note': 'в эскроу уйдёт {n} ¤ · комиссию {p}% платит получатель кредитов',
+  'market.in-treasury': 'В казне',
+  'market.net-after-fee': 'к получению после комиссии {p}%: {n} ¤',
+  'market.no-asks': 'Нет лотов на продажу',
+  'market.no-bids': 'Нет лотов на покупку',
+  'market.own-lot': 'ваш лот',
+  'market.place': 'Выставить',
+  'market.price': 'цена',
+  'market.qty': 'кол-во',
   'market.res.energy': 'Энергия',
   'market.res.food': 'Пища',
   'market.res.metal': 'Металл',
   'market.res.microelectronics': 'Микро',
+  'market.sell': 'Продать',
+  'market.side.buy': 'Покупка',
+  'market.side.sell': 'Продажа',
+  'market.title': 'РЫНОК',
 
   // --- onb — Онбординг: туры-подсказки, карточки первого контакта, цели первой сессии, сводка возвращения.
   'onb.goal.capture': 'Захвати мир',

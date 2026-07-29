@@ -6414,16 +6414,19 @@ function playerCardHtml(): string {
     `<div class="pc-row"><span class="pc-k">${k}</span><span class="pc-v">${v}</span></div>`;
   return (
     `<div class="pc-head"><span class="pc-dia" style="background:${col};box-shadow:0 0 10px ${col}"></span>` +
-    `<b>${esc(name)}</b><span class="pc-tag">${t('командующий')}</span></div>` +
+    `<b>${esc(name)}</b><span class="pc-tag">${t('card.commander')}</span></div>` +
     `<div class="pc-stats">` +
-    row(t('Фракция'), esc(faction)) +
-    row(t('Миров под контролем'), String(worlds)) +
-    row(t('Юнитов'), String(units)) +
-    row(t('Очки'), `${score} / ${SCORE_LIMIT}${need === 0 ? ' · ★ ' + t('ПОБЕДА') : ''}`) +
-    `</div><div class="pc-sec">${t('Боевой счёт')}</div><div class="pc-stats">` +
-    row(t('⚔ Уничтожено юнитов врага'), kfmt(killStats.destroyed)) +
-    row(t('☠ Потеряно своих'), kfmt(killStats.lost)) +
-    `</div><button class="pc-close">${t('ЗАКРЫТЬ')}</button>`
+    row(t('card.faction'), esc(faction)) +
+    row(t('card.worlds'), String(worlds)) +
+    row(t('card.units'), String(units)) +
+    row(
+      t('card.score'),
+      `${score} / ${SCORE_LIMIT}${need === 0 ? ' · ★ ' + t('card.score.goal') : ''}`,
+    ) +
+    `</div><div class="pc-sec">${t('card.combat')}</div><div class="pc-stats">` +
+    row(t('card.kills'), kfmt(killStats.destroyed)) +
+    row(t('card.losses'), kfmt(killStats.lost)) +
+    `</div><button class="pc-close">${t('card.close')}</button>`
   );
 }
 function openPlayerCard(): void {
@@ -6449,15 +6452,15 @@ function seatCardHtml(id: string): string {
     `<b>${esc(NAME[id] ?? id)}</b><span class="pc-tag">${esc(bdg.tag)}</span></div>` +
     `<div class="pc-stats">` +
     row(
-      t('Отношения'),
+      t('card.stances'),
       `<span class="dp-stance" style="color:${STANCE_COLOR[st]};border-color:${STANCE_COLOR[st]}">${stanceRu(st)}</span>`,
     ) +
-    row(t('Миров под контролем'), String(worldsOf(id))) +
+    row(t('card.worlds'), String(worldsOf(id))) +
     `</div>` +
     (favBar ? `<div class="pc-stats">${favBar}</div>` : '') +
-    `<div class="pc-sec">${t('Дипломатия')}</div>` +
+    `<div class="pc-sec">${t('card.diplomacy')}</div>` +
     seatDiploActionsHtml(id) +
-    `<button class="pc-close">${t('ЗАКРЫТЬ')}</button>`
+    `<button class="pc-close">${t('card.close')}</button>`
   );
 }
 function openSeatCard(id: string): void {
@@ -8608,40 +8611,40 @@ function renderEndScreen(): void {
   const cls = endScreen.won ? 'win' : endScreen.draw ? 'draw' : 'lose';
   const head = endScreen.won
     ? s.match?.winners && s.match.winners.length > 1
-      ? t('🏆 ПОБЕДА КОАЛИЦИИ')
-      : t('🏆 ПОБЕДА')
+      ? t('end.win.coalition')
+      : t('end.win')
     : endScreen.draw
-      ? t('⚖️ НИЧЬЯ')
-      : t('💀 ПОРАЖЕНИЕ');
+      ? t('end.draw')
+      : t('end.loss');
   const cell = (k: string, v: string) =>
     `<div class="es-cell"><span class="es-k">${k}</span><span class="es-v">${v}</span></div>`;
   const xpLine =
     endScreen.xp > 0
-      ? `<div class="es-xp">${t('★ Опыт командующего: +{n}', { n: endScreen.xp })}` +
+      ? `<div class="es-xp">${t('end.xp', { n: endScreen.xp })}` +
         (endScreen.levelUp !== null
-          ? `<span class="lvl">${t('★ Новый уровень {lvl} — очко прокачки ждёт в меню «Прокачка»', { lvl: endScreen.levelUp })}</span>`
+          ? `<span class="lvl">${t('end.level-up', { lvl: endScreen.levelUp })}</span>`
           : '') +
         `</div>`
       : '';
   // Rematch wording is honest per mode: solo restarts a skirmish; a NET match can't
   // re-seat the same table client-side (server brick), so "again" opens the browser.
-  const againLabel = NET ? t('⟳ Новый матч') : t('⟳ Играть ещё');
+  const againLabel = NET ? t('end.new-match') : t('end.play-again');
   const html =
     `<div class="es-box">` +
     `<div class="es-head ${cls}">${head}</div>` +
     `<div class="es-why">${esc(endScreen.why)}</div>` +
     `<div class="es-grid">` +
-    `<div class="es-cell wide"><span class="es-k">${t('Итоговый счёт')}</span><span class="es-v">✦ ${total} <small>· ${t('{p}-е место из {n}', { p: place, n: ranked.length })}</small></span></div>` +
-    cell(t('Провинции'), `⬣ ${provinces}`) +
-    cell(t('Флоты'), `⛴ ${fleets}`) +
-    cell(t('Юниты'), `⚔ ${units}`) +
-    cell(t('Длительность'), dur) +
+    `<div class="es-cell wide"><span class="es-k">${t('end.score')}</span><span class="es-v">✦ ${total} <small>· ${t('end.place', { p: place, n: ranked.length })}</small></span></div>` +
+    cell(t('end.provinces'), `⬣ ${provinces}`) +
+    cell(t('end.fleets'), `⛴ ${fleets}`) +
+    cell(t('end.units'), `⚔ ${units}`) +
+    cell(t('end.duration'), dur) +
     `</div>` +
     xpLine +
     `<div class="es-acts">` +
     `<button class="es-btn primary" data-es="again">${againLabel}</button>` +
-    `<button class="es-btn" data-es="menu">⌂ ${t('В меню')}</button>` +
-    `<button class="es-btn ghost" data-es="board">${t('Смотреть доску')}</button>` +
+    `<button class="es-btn" data-es="menu">⌂ ${t('end.to-menu')}</button>` +
+    `<button class="es-btn ghost" data-es="board">${t('end.board')}</button>` +
     `</div></div>`;
   if (html !== lastEndHtml) {
     endscreenEl.innerHTML = html;
@@ -9725,13 +9728,13 @@ function renderMarket(): void {
     const qp = `<span class="mk-qp"><b>${l.amount}</b> ${TECH_CUR[l.resource] ?? ''} @ ${l.price} ¤${
       bid && !mine ? ` <span class="mk-net">→ ${takerNet} ¤</span>` : ''
     }</span>`;
-    const who = `<span class="mk-who">${mine ? t('ваш лот') : nameOf(l.owner)}</span>`;
+    const who = `<span class="mk-who">${mine ? t('market.own-lot') : nameOf(l.owner)}</span>`;
     let btn: string;
     if (mine) {
-      btn = `<button class="mk-btn cancel" data-mkcancel="${l.id}">${t('Отменить')}</button>`;
+      btn = `<button class="mk-btn cancel" data-mkcancel="${l.id}">${t('market.cancel')}</button>`;
     } else {
       const can = l.side === 'sell' ? (res.credits ?? 0) >= l.price : (res[l.resource] ?? 0) >= 1;
-      btn = `<button class="mk-btn" data-mktake="${l.id}"${can ? '' : ' disabled'}>${l.side === 'sell' ? t('Купить') : t('Продать')}</button>`;
+      btn = `<button class="mk-btn" data-mktake="${l.id}"${can ? '' : ' disabled'}>${l.side === 'sell' ? t('market.buy') : t('market.sell')}</button>`;
     }
     return `<div class="mk-row ${bid ? 'buy' : ''}">${qp}${who}${btn}</div>`;
   };
@@ -9740,26 +9743,26 @@ function renderMarket(): void {
   const tabBtn = (k: string, label: string): string =>
     `<button class="mk-tab${marketTab === k ? ' on' : ''}" data-mtab="${k}">${label}</button>`;
   const stock =
-    `<div class="mk-lbl" style="margin-bottom:8px">${t('В казне')}: ${glyph} <b style="color:var(--ink)">${Math.round(res[good] ?? 0)}</b>` +
+    `<div class="mk-lbl" style="margin-bottom:8px">${t('market.in-treasury')}: ${glyph} <b style="color:var(--ink)">${Math.round(res[good] ?? 0)}</b>` +
     ` · ¤ <b style="color:var(--ink)">${Math.round(res.credits ?? 0)}</b></div>`;
   const form =
-    `<div class="mk-form"><div class="mk-seg">${seg('sell', t('Продать'))}${seg('buy', t('Купить'))}</div>` +
-    `<span class="mk-lbl">${t('кол-во')}</span><input class="mk-in" id="mk-amt" type="number" min="1" value="10">` +
-    `<span class="mk-lbl">${t('цена')}</span><input class="mk-in" id="mk-price" type="number" min="0" value="3">` +
-    `<button class="mk-go" data-mkgo>${t('Выставить')}</button></div>` +
+    `<div class="mk-form"><div class="mk-seg">${seg('sell', t('market.sell'))}${seg('buy', t('market.buy'))}</div>` +
+    `<span class="mk-lbl">${t('market.qty')}</span><input class="mk-in" id="mk-amt" type="number" min="1" value="10">` +
+    `<span class="mk-lbl">${t('market.price')}</span><input class="mk-in" id="mk-price" type="number" min="0" value="3">` +
+    `<button class="mk-go" data-mkgo>${t('market.place')}</button></div>` +
     `<div class="mk-lbl" id="mk-net"></div>`;
   const askList = asks.length
     ? asks.map((l) => lotRow(l, false)).join('')
-    : `<div class="mk-empty">${t('Нет лотов на продажу')}</div>`;
+    : `<div class="mk-empty">${t('market.no-asks')}</div>`;
   const bidList = bids.length
     ? bids.map((l) => lotRow(l, true)).join('')
-    : `<div class="mk-empty">${t('Нет лотов на покупку')}</div>`;
+    : `<div class="mk-empty">${t('market.no-bids')}</div>`;
   marketWin.innerHTML =
-    `<div class="mkbox"><div class="lw-head"><b>${t('РЫНОК')}</b><button class="mk-close" style="margin-left:auto">✕</button></div>` +
+    `<div class="mkbox"><div class="lw-head"><b>${t('market.title')}</b><button class="mk-close" style="margin-left:auto">✕</button></div>` +
     `<div class="mk-tabs">${MARKET_RES.map((r) => tabBtn(r.key, t(r.label))).join('')}</div>` +
     `<div id="marketbody">${stock}${form}` +
-    `<div class="mk-sec">${t('Продажа')} · ${asks.length}</div>${askList}` +
-    `<div class="mk-sec buy">${t('Покупка')} · ${bids.length}</div>${bidList}</div></div>`;
+    `<div class="mk-sec">${t('market.side.sell')} · ${asks.length}</div>${askList}` +
+    `<div class="mk-sec buy">${t('market.side.buy')} · ${bids.length}</div>${bidList}</div></div>`;
   // ECON-4: живой «к получению» под формой — net после комиссии для стороны,
   // которая получит кредиты (sell-лот: вы, когда его исполнят; buy-бид: эскроу).
   const updNet = (): void => {
@@ -9771,11 +9774,11 @@ function renderMarket(): void {
     const gross = amt * price;
     el.textContent =
       marketFormSide === 'sell'
-        ? t('к получению после комиссии {p}%: {n} ¤', {
+        ? t('market.net-after-fee', {
             p: Math.round(MARKET_FEE * 100),
             n: Math.floor(gross * (1 - MARKET_FEE)),
           })
-        : t('в эскроу уйдёт {n} ¤ · комиссию {p}% платит получатель кредитов', {
+        : t('market.escrow-note', {
             n: Math.ceil(gross),
             p: Math.round(MARKET_FEE * 100),
           });

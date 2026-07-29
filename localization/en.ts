@@ -46,6 +46,20 @@ export const en: Record<string, string> = {
   'browser.solo.hint': 'No server needed — bots fill the open seats.',
   'browser.taken': 'taken',
 
+  // --- card — Карточка игрока (тап по гербу): фракция, владения, боевой счёт.
+  'card.close': 'CLOSE',
+  'card.combat': 'War record',
+  'card.commander': 'commander',
+  'card.diplomacy': 'Diplomacy',
+  'card.faction': 'Faction',
+  'card.kills': '⚔ Enemy units destroyed',
+  'card.losses': '☠ Own units lost',
+  'card.score': 'Score',
+  'card.score.goal': 'WIN',
+  'card.stances': 'Relations',
+  'card.units': 'Units',
+  'card.worlds': 'Worlds held',
+
   // --- chat / spy — Переписка (сессия и коалиция) и вкладка шпионажа.
   'chat.coalition.empty':
     'The coalition chat is empty.<br>Mark a province with a ping 📍 or write something.',
@@ -525,6 +539,24 @@ export const en: Record<string, string> = {
   'yard.soon': '«{what}» moves into the constructor in the next brick.',
   'yard.title': 'CONSTRUCTOR',
 
+  // --- end — Экран конца матча: исход, опыт, итоговая таблица, реванш.
+  'end.board': 'View the board',
+  'end.draw': '⚖️ DRAW',
+  'end.duration': 'Duration',
+  'end.fleets': 'Fleets',
+  'end.level-up': '★ Level up to {lvl} — a progression point awaits in the Progression menu',
+  'end.loss': '💀 DEFEAT',
+  'end.new-match': '⟳ New match',
+  'end.place': '{p} of {n}',
+  'end.play-again': '⟳ Play again',
+  'end.provinces': 'Provinces',
+  'end.score': 'Final score',
+  'end.to-menu': 'Menu',
+  'end.units': 'Units',
+  'end.win': '🏆 VICTORY',
+  'end.win.coalition': '🏆 COALITION VICTORY',
+  'end.xp': '★ Commander XP: +{n}',
+
   // --- err — Отказы ядра (kernel rejection codes). Ключ выводится из кода: E_NO_CAPACITY → err.no-capacity.
   'err.already': 'already in effect',
   'err.already-fitted': 'that fitting is already installed',
@@ -765,11 +797,26 @@ export const en: Record<string, string> = {
     'This route crosses worlds held by <b>{names}</b>, with whom you are at <b>peace</b>. There is no peaceful passage — advancing here declares <b>war</b>.',
   'war.confirm.yes': 'YES',
 
-  // --- market — Биржа: вкладки ресурсов.
+  // --- market — Сессионная биржа: вкладки ресурсов, книга заявок, лот, комиссия.
+  'market.buy': 'Buy',
+  'market.cancel': 'Cancel',
+  'market.escrow-note': 'escrow: {n} ¤ · the {p}% fee is paid by whoever receives the credits',
+  'market.in-treasury': 'In the treasury',
+  'market.net-after-fee': 'you receive after the {p}% fee: {n} ¤',
+  'market.no-asks': 'No sell orders',
+  'market.no-bids': 'No buy orders',
+  'market.own-lot': 'your lot',
+  'market.place': 'List',
+  'market.price': 'price',
+  'market.qty': 'amount',
   'market.res.energy': 'Energy',
   'market.res.food': 'Food',
   'market.res.metal': 'Metal',
   'market.res.microelectronics': 'Micro',
+  'market.sell': 'Sell',
+  'market.side.buy': 'Buy',
+  'market.side.sell': 'Sell',
+  'market.title': 'MARKET',
 
   // --- onb — Онбординг: туры-подсказки, карточки первого контакта, цели первой сессии, сводка возвращения.
   'onb.goal.capture': 'Capture a world',
