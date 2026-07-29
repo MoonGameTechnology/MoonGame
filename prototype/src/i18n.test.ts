@@ -6,6 +6,7 @@ import { ru } from '../../localization/ru';
 import { en } from '../../localization/en';
 import { en as legacyEn } from '../../localization/legacy/en';
 import { dataKey } from '../../localization';
+import { GLOSSARY } from './codexIndex';
 
 // Гейт локализации. Текст живёт в /localization, в коде — только ключи
 // (`t('err.no-capacity')`). Эти тесты держат три инварианта:
@@ -136,6 +137,17 @@ describe('локализация — ключи', () => {
       .filter(([, v]) => hasCyrillic(v))
       .map(([k]) => k);
     expect(leaks).toEqual([]);
+  });
+
+  it('статьи глоссария кодекса заведены ключами, а не текстом', () => {
+    // GLOSSARY отдаёт `titleKey`/`bodyKey` в `t()` переменной, поэтому разбор
+    // литералов их не видит: опечатка в ключе доехала бы до игрока как
+    // `codex.term.fog.bodi`. Проверяем состав напрямую.
+    expect(GLOSSARY.length).toBeGreaterThan(3); // глоссарий не должен молча опустеть
+    const bad = GLOSSARY.flatMap((g) => [g.titleKey, g.bodyKey]).filter(
+      (k) => !KEY_RE.test(k) || !(k in ru),
+    );
+    expect(bad.sort()).toEqual([]);
   });
 
   it('у каждого юнита прототипа есть переведённое имя', () => {

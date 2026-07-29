@@ -2662,7 +2662,10 @@ function dispatchAssault(fleetIds: string[], destId: string): void {
       if (assaultNeedsTroops(f, destId)) {
         if (!warnedNoTroops) {
           warnedNoTroops = true;
-          note(t('⚔ штурм невозможен: на борту нет десанта, а мир защищён — погрузите войска'), destId);
+          note(
+            t('⚔ штурм невозможен: на борту нет десанта, а мир защищён — погрузите войска'),
+            destId,
+          );
         }
         continue;
       }
@@ -3256,7 +3259,8 @@ function autoEngage() {
     if (enemyHere) continue; // let the auto orbital battle settle first
     // A defended world + no landing troops = the assault can only be rejected
     // (E_NO_TROOPS) — skip instead of re-pressing it every frame (toast spam).
-    if (here.garrison.some((u) => u.count > 0) && !(f.landing ?? []).some((u) => u.count > 0)) continue;
+    if (here.garrison.some((u) => u.count > 0) && !(f.landing ?? []).some((u) => u.count > 0))
+      continue;
     // Player fleets go through playerOrder (server-authoritative in net play); AI applies locally.
     const issue = (a: Action) => (mine ? playerOrder(a) : apply(order(s, a, s.time)));
     if (f.orbit !== 'near') issue(orbitFleet(f.owner, f.id, 'near'));
@@ -5197,7 +5201,9 @@ function buildButtons(_planetId: string, ids: string[], kind: 'building' | 'unit
         // Buildings are one-per-planet — grey out a committed (queued/building/paused)
         // one so a second order can't be placed. PC only (the mobile build UI is frozen
         // in this chat); units stack freely so they're never locked.
-        kind === 'building' && pcUi() && !NET ? (buildingLocked(_planetId, id) ?? undefined) : undefined,
+        kind === 'building' && pcUi() && !NET
+          ? (buildingLocked(_planetId, id) ?? undefined)
+          : undefined,
       ),
     )
     .join('');
@@ -5345,7 +5351,10 @@ function fleetSummaryHtml(f: Fleet): string {
     .filter(([, n]) => n > 0)
     .map(([r, n]) => `${n} ${tData(r)}`)
     .join(', ');
-  if (up) rows.push(`<div class="row dim">${t('side.summary.upkeep')}: ${up}/${t('side.summary.day')}</div>`);
+  if (up)
+    rows.push(
+      `<div class="row dim">${t('side.summary.upkeep')}: ${up}/${t('side.summary.day')}</div>`,
+    );
   return (
     `<div class="sec">${t('side.summary.title')}</div>` +
     rows.join('') +
@@ -5434,9 +5443,7 @@ function fleetPanelHtml(f: Fleet): string {
       : '—';
   // Fleet-card blurb removed (feedback: compact panel) — the header + stat chips carry it.
   h += `<div class="pstats"><span data-desc="stat:atk">⚔ ${t('side.stat.atk')} ${atk}</span><span data-desc="stat:def">🛡 ${t('side.stat.def')} ${def}</span><span data-desc="stat:cap">Ⅹ ${Math.min(nShips, COMBAT_UNIT_CAP)}/${COMBAT_UNIT_CAP}</span><span data-desc="stat:spd">⚡ ${t('side.stat.spd')} ${spdTxt}</span></div>`;
-  h += nShips
-    ? `<div class="sec">${t('side.fleet.ships')}</div>` + fleetTilesHtml(f, f.units)
-    : '';
+  h += nShips ? `<div class="sec">${t('side.fleet.ships')}</div>` + fleetTilesHtml(f, f.units) : '';
   if (nTr > 0)
     h += `<div class="sec">${t('side.fleet.troops')}</div>` + fleetTilesHtml(f, f.landing ?? []);
 
@@ -5449,12 +5456,7 @@ function fleetPanelHtml(f: Fleet): string {
   if (f.owner === ME && fleetHasSquadron(f)) {
     const wing = squadronTake(f).reduce((n, u) => n + u.count, 0);
     h += `<div class="sec">${t('side.wing.title')}</div><div class="row">`;
-    h += btn(
-      'launchsquad',
-      '',
-      t('side.wing.launch', { n: wing }),
-      fleetCanLaunchSquadron(f),
-    );
+    h += btn('launchsquad', '', t('side.wing.launch', { n: wing }), fleetCanLaunchSquadron(f));
     h += `</div>`;
     h += `<div class="hint">${t('side.wing.hint')}</div>`;
 
@@ -5510,11 +5512,17 @@ function fleetPanelHtml(f: Fleet): string {
       const sideRow = (sv: BattleSideView, tag: string): string => {
         const troops = sv.units.map((u) => `${u.count}× ${u.unit}`).join(', ') || '—';
         return `<div class="row${sv.mine ? '' : ' dim'}">${sv.mine ? '▶' : '·'} <b>${esc(sv.ownerName)}</b> (${tag}, ${
-          sv.kind === 'garrison' ? t('side.battle.side.garrison') : sv.kind === 'landing' ? t('side.battle.side.landing') : t('side.battle.side.fleet')
+          sv.kind === 'garrison'
+            ? t('side.battle.side.garrison')
+            : sv.kind === 'landing'
+              ? t('side.battle.side.landing')
+              : t('side.battle.side.fleet')
         }): ${esc(troops)}${bar(sv.hull, '♥')}${bar(sv.shield, '◈')}</div>`;
       };
       h += `<div class="sec">${t('side.battle.title', { phase: bm.phase === 'ground' ? t('side.battle.phase.ground') : t('side.battle.phase.orbit'), r: bm.round })}</div>`;
-      h += sideRow(bm.attacker, t('side.battle.attacker')) + sideRow(bm.defender, t('side.battle.defender'));
+      h +=
+        sideRow(bm.attacker, t('side.battle.attacker')) +
+        sideRow(bm.defender, t('side.battle.defender'));
       if (bm.nextRoundAt != null)
         h += `<div class="row">${t('side.battle.next-round')} <span class="pn-timer" data-at="${bm.nextRoundAt}">…</span></div>`;
       h += `<div class="row">${btn('retreat', '', t('side.battle.retreat'), bm.retreatFleetId === f.id)}</div>`;
@@ -5590,8 +5598,7 @@ function fleetPanelHtml(f: Fleet): string {
           ga += btn('unload', st.unit, t('side.ground.unload', { u: displayUnit(st.unit) }), true);
         ga += `</div>`;
       }
-      if (loadingN)
-        ga += `<div class="hint">${t('side.ground.loading', { n: loadingN })}</div>`;
+      if (loadingN) ga += `<div class="hint">${t('side.ground.loading', { n: loadingN })}</div>`;
       if (!groundHere.length && !carried.length && !loadingN)
         ga += `<div class="row dim">${t('side.ground.empty')}</div>`;
       cols.push(ga);
@@ -5669,11 +5676,14 @@ function planetSummaryHtml(p: Planet): string {
     );
   const pctf = (n: number) => (n >= 0 ? '+' : '') + Math.round(n * 100) + '%';
   const bonus: string[] = [];
-  if (pt && pt.productionBonus !== 0) bonus.push(`${t('side.world.bonus.production')} ${pctf(pt.productionBonus)}`);
+  if (pt && pt.productionBonus !== 0)
+    bonus.push(`${t('side.world.bonus.production')} ${pctf(pt.productionBonus)}`);
   if (pt && (pt.defenseBonus ?? 0) !== 0)
     bonus.push(`${t('side.world.bonus.defense')} ${pctf(pt.defenseBonus ?? 0)}`);
   if (bonus.length)
-    rows.push(`<div class="row">${t('side.world.type-bonuses')}: <b>${bonus.join(' · ')}</b></div>`);
+    rows.push(
+      `<div class="row">${t('side.world.type-bonuses')}: <b>${bonus.join(' · ')}</b></div>`,
+    );
   rows.push(
     `<div class="row">⚔ ${t('side.world.garrison')}: <b>${sumUnits(ground)}</b> ${t('side.world.count.ground')} · <b>${sumUnits(ships)}</b> ${t('side.world.count.ships')}${sumUnits(wing) ? ` · <b>${sumUnits(wing)}</b> ${t('side.world.count.squadrons')}` : ''}</div>`,
   );
@@ -5684,7 +5694,9 @@ function planetSummaryHtml(p: Planet): string {
           `${BUILD_ICON[b.type] ?? '▣'} ${buildingName(b.type)}${b.level > 1 ? ' L' + b.level : ''}`,
       )
       .join(', ') || t('side.none');
-  rows.push(`<div class="row">▣ ${t('side.world.buildings')} (${p.buildings.length}): <b>${blist}</b></div>`);
+  rows.push(
+    `<div class="row">▣ ${t('side.world.buildings')} (${p.buildings.length}): <b>${blist}</b></div>`,
+  );
   rows.push(
     `<div class="row">✦ ${t('side.world.vp')}: <b>${Math.round(provinceScore(data, p))}</b></div>`,
   );
@@ -5696,7 +5708,9 @@ function planetSummaryHtml(p: Planet): string {
     );
   }
   if (p.owner === ME && capitalOf(s, ME) === p.id)
-    rows.push(`<div class="row"><b style="color:var(--grn)">★ ${t('side.world.capital')}</b></div>`);
+    rows.push(
+      `<div class="row"><b style="color:var(--grn)">★ ${t('side.world.capital')}</b></div>`,
+    );
   return (
     `<div class="sec">${t('side.world.summary')}</div>` +
     rows.join('') +
@@ -5736,7 +5750,8 @@ function planetPanelHtml(p: Planet): string {
   if (pt && (pt.productionBonus !== 0 || pt.defenseBonus !== 0)) {
     const pct = (n: number) => (n >= 0 ? '+' : '') + Math.round(n * 100) + '%';
     const parts: string[] = [];
-    if (pt.productionBonus !== 0) parts.push(t('side.world.production', { p: pct(pt.productionBonus) }));
+    if (pt.productionBonus !== 0)
+      parts.push(t('side.world.production', { p: pct(pt.productionBonus) }));
     if (pt.defenseBonus !== 0) parts.push(t('side.world.defense', { p: pct(pt.defenseBonus) }));
     h += `<div class="row dim">${pcUi() ? t('side.world.type', { pt: esc(ptName), mods: parts.join(' · ') }) : t('side.world.type.long', { pt: esc(ptName), mods: parts.join(' · ') })}</div>`;
   }
@@ -5818,9 +5833,7 @@ function planetPanelHtml(p: Planet): string {
       );
     }
     if (!pcUi()) {
-      cols.push(
-        `<div class="hint">${t('side.ground.hint')}</div>`,
-      );
+      cols.push(`<div class="hint">${t('side.ground.hint')}</div>`);
     }
   } else if (planetTab === 'ships') {
     // Built ships now auto-rally to orbit (see fleetLaunchModule), so the garrison
@@ -5848,9 +5861,7 @@ function planetPanelHtml(p: Planet): string {
     }
     if (!pcUi()) {
       // PC carries this in the ФЛОТ tab's hover dossier ('tab:ships')
-      cols.push(
-        `<div class="hint">${t('side.shipyard.hint')}</div>`,
-      );
+      cols.push(`<div class="hint">${t('side.shipyard.hint')}</div>`);
     }
   } else if (planetTab === 'squadron') {
     if (wing.length) {
@@ -5866,9 +5877,7 @@ function planetPanelHtml(p: Planet): string {
     }
     if (!pcUi()) {
       // PC carries this in the КРЫЛЬЯ tab's hover dossier ('tab:squadron')
-      cols.push(
-        `<div class="hint">${t('side.wing.garrison.hint')}</div>`,
-      );
+      cols.push(`<div class="hint">${t('side.wing.garrison.hint')}</div>`);
     }
   } else {
     cols.push(
@@ -5947,68 +5956,65 @@ function buildingDossier(id: string, level: number): Dossier | null {
     case 'mine':
       return {
         name,
-        body: t('Буровая платформа вгрызается в планету и добывает {m}⬢ в час. Улучшение позволяет копать глубже, чтобы добраться до самых богатых жил. Основа для строительства флота.', { m: hl(metal) }),
+        body: t('dossier.building.mine', { m: hl(metal) }),
       };
     case 'refinery':
       return {
         name,
-        body: t('Перерабатывающий комплекс, превращающий руду и логистику в ликвидные кредиты — {c}¤ в час. Топливо для имперской бюрократии, верфей и наёмных эскадр.', { c: hl(credits) }),
+        body: t('dossier.building.refinery', { c: hl(credits) }),
       };
     case 'barracks':
       return {
         name,
-        body: t('Казармы нужны для защиты вашего мира от захватчиков. Тут живут ваши доблестные защитники.'),
+        body: t('dossier.building.barracks'),
       };
     case 'radar':
       return {
         name,
-        body: t('Комплекс радаров просвечивает пространство вокруг вашего мира и ловит вражеские сигнатуры задолго до того, как они посмеют на вас напасть. Улучшения обеспечивают большее покрытие.', { r: hl(lv.radarRange ?? 0) }),
+        body: t('dossier.building.radar', { r: hl(lv.radarRange ?? 0) }),
       };
     case 'fort':
       return {
         name,
-        body: t(
-          'Эшелонированный планетарный бастион. Поднимает оборону гарнизона на {d} и держит {hp} структурной прочности под орбитальным огнём. Последний рубеж осаждённого мира.',
-          { d: hl(pct(lv.defenseBonus ?? 0)), hp: hl(lv.hp) },
-        ),
+        body: t('dossier.building.fort', { d: hl(pct(lv.defenseBonus ?? 0)), hp: hl(lv.hp) }),
       };
     case 'starfort':
       return {
         name,
-        body: t('Автономная крепость, возведённая в астероидное поле: {d} к обороне и {hp} прочности. Превращает безликий перекрёсток в укреплённый узел с орбитой и ПКО', { d: hl(pct(lv.defenseBonus ?? 0)), hp: hl(lv.hp) }),
+        body: t('dossier.building.starfort', { d: hl(pct(lv.defenseBonus ?? 0)), hp: hl(lv.hp) }),
       };
     case 'orbital_aa':
       return {
         name,
-        body: t('Стационарная зенитная батарея защищает воздушное пространство вашего мира и наносит {dmg} урона в час по кораблям на орбите. Кошмар для бомбардировщиков, повисших над планетой, и для налетающих эскадрилий. Захват мира не блокирует — это дело наземной обороны; батарея лишь выкашивает флот над головой.', { dmg: hl(lv.aaDamage ?? 0) }),
+        body: t('dossier.building.orbital-aa', { dmg: hl(lv.aaDamage ?? 0) }),
       };
     case 'metal_station':
       return {
         name,
-        body: t('Добывающая платформа, вгрызается в спёкшуюся кору мёртвого мира. Там, где аннигиляция выжгла всё живое, обнажилась чистая металлическая руда — станция качает {m}⬢ в час. Улучшение увеличивает добычу.', { m: hl(metal) }),
+        body: t('dossier.building.metal-station', { m: hl(metal) }),
       };
     case 'tax_office':
       return {
         name,
-        body: t('Налоговая управа имперского образца: сама ничего не добывает, но ставит на учёт население мира и поднимает его кредитный сбор на {b}.', { b: hl(pct(TAX_OFFICE_BONUS)) }),
+        body: t('dossier.building.tax-office', { b: hl(pct(TAX_OFFICE_BONUS)) }),
       };
     case 'farm':
       return {
         name,
-        body: t('Ярусы гидропонных оранжерей под спектральными лампами позволяют вашим подопечным питаться, ведь голод беспощаден. Выращивает {f}❖ в час. Ваши рабочие и воины едят каждый день, было бы глупо проиграть сражение из-за голодного обморока.', { f: hl(lv.produces.food ?? 0) }),
+        body: t('dossier.building.farm', { f: hl(lv.produces.food ?? 0) }),
       };
     case 'power_plant':
       return {
         name,
-        body: t('Термоядерный реактор питает энергией ваши миры, он производит {e}↯ в час. Энергия — кровь ваших построек, ведь они работают не на волшебстве. При дефиците всё проседает до половины мощности.', { e: hl(lv.produces.energy ?? 0) }),
+        body: t('dossier.building.power-plant', { e: hl(lv.produces.energy ?? 0) }),
       };
     case 'fabricator':
       return {
         name,
-        body: t('Чистые цеха литографии печатают {m}▦ в час. Прожорлива к энергии и людям, зато её продукция ведёт эскадрильи и открывает осадные доктрины. Апгрейды окупаются собственной продукцией.', { m: hl(lv.produces.microelectronics ?? 0) }),
+        body: t('dossier.building.fabricator', { m: hl(lv.produces.microelectronics ?? 0) }),
       };
     default:
-      return { name, body: t('Планетарное сооружение.') };
+      return { name, body: t('dossier.building.default') };
   }
 }
 
@@ -6019,56 +6025,54 @@ function unitDossier(id: string): Dossier | null {
   switch (id) {
     case 'scout':
       return {
-        name: t('Разведчик'),
-        body: t(
-          'Лёгкий разведывательный корпус. Быстрый (ход {sp}) и почти неслышный (сигнатура {sig}) — чертит карту пустоты там, куда боится соваться линейный флот.',
-          { sp: hl(st.speed), sig: hl(def.signature ?? 1) },
-        ),
+        name: t('dossier.unit.scout.name'),
+        body: t('dossier.unit.scout.desc', { sp: hl(st.speed), sig: hl(def.signature ?? 1) }),
       };
     case 'cruiser':
       return {
-        name: t('Крейсер'),
-        body: t(
-          'Рабочая лошадь линейного флота: {a} атаки, {hp} корпуса и трюм на {c}. Универсальный боевой корабль, одинаково уверенный в обороне и в наступлении.',
-          { a: hl(st.attack), hp: hl(st.hp), c: hl(st.cargoCapacity ?? 0) },
-        ),
+        name: t('dossier.unit.cruiser.name'),
+        body: t('dossier.unit.cruiser.desc', {
+          a: hl(st.attack),
+          hp: hl(st.hp),
+          c: hl(st.cargoCapacity ?? 0),
+        }),
       };
     case 'siege':
       return {
-        name: t('Осадная платформа'),
-        body: t(
-          'Тяжёлая осадная платформа: {a} урона с дистанции {r}, но тонкая броня ({d} защиты). Её место за спинами крейсеров, откуда она крушит укрепления и верфи.',
-          { a: hl(st.attack), r: hl(st.range ?? 0), d: hl(st.defense) },
-        ),
+        name: t('dossier.unit.siege.name'),
+        body: t('dossier.unit.siege.desc', {
+          a: hl(st.attack),
+          r: hl(st.range ?? 0),
+          d: hl(st.defense),
+        }),
       };
     case 'strike_carrier':
       return {
-        name: t('Ударный носитель'),
-        body: t(
-          'Медленный бронированный носитель ({hp} корпуса, трюм на {c}) — своих пушек почти нет, вся его сила в эскадрильях, что он несёт. Держите его позади и запускайте авиагруппу по цели кнопкой «🛩 Запустить эскадрилью».',
-          { hp: hl(st.hp), c: hl(st.cargoCapacity ?? 0) },
-        ),
+        name: t('dossier.unit.strike-carrier.name'),
+        body: t('dossier.unit.strike-carrier.desc', {
+          hp: hl(st.hp),
+          c: hl(st.cargoCapacity ?? 0),
+        }),
       };
     case 'fighter_squadron':
       return {
-        name: t('Истребительная эскадрилья'),
-        body: t(
-          'Палубная эскадрилья: стремительная (ход {sp}) и больно бьёт ({a} атаки), но брони почти нет ({hp} корпуса). Отделяется от носителя в отдельный быстрый флот и наносит удар с дистанции {r}. Контрится орбитальным ПВО — не гоните её на прикрытую ПВО планету.',
-          { sp: hl(st.speed), a: hl(st.attack), hp: hl(st.hp), r: hl(st.strikeRange ?? 0) },
-        ),
+        name: t('dossier.unit.fighter-squadron.name'),
+        body: t('dossier.unit.fighter-squadron.desc', {
+          sp: hl(st.speed),
+          a: hl(st.attack),
+          hp: hl(st.hp),
+          r: hl(st.strikeRange ?? 0),
+        }),
       };
     case 'hero':
       return {
-        name: t('Флагман'),
-        body: t(
-          'Боевая проекция самого командующего — флагман во главе родного флота: {a} атаки и {hp} корпуса. Но решает не это: его присутствие держит эскадру в кулаке, давая {b} к атаке и обороне всем кораблям рядом. Падёт — командующий лишается проекции, пока та не отстроится заново на родном мире.',
-          { a: hl(st.attack), hp: hl(st.hp), b: hl('+5%') },
-        ),
+        name: t('dossier.unit.hero.name'),
+        body: t('dossier.unit.hero.desc', { a: hl(st.attack), hp: hl(st.hp), b: hl('+5%') }),
       };
     default:
       // PC hover tooltip: the name alone is enough (an empty body is skipped by the
       // tooltip); the mobile tap-modal keeps the old filler line.
-      return { name: displayUnit(id), body: pcUi() ? '' : t('Боевая единица.') };
+      return { name: displayUnit(id), body: pcUi() ? '' : t('dossier.unit.default') };
   }
 }
 
@@ -6104,15 +6108,15 @@ function taskDossier(
 ): Dossier {
   const eta =
     remainingH !== null
-      ? t('Осталось: {r}', { r: hl(fmtEta(remainingH)) })
-      : t('В очереди — ещё не начато.');
+      ? t('dossier.task.eta', { r: hl(fmtEta(remainingH)) })
+      : t('dossier.task.queued');
   if (kind === 'unit' && unit) {
     return {
       name: `${count ?? 1}× ${unitIcon(unit)} ${displayUnit(unit)}`,
-      body: [eta, t('По готовности пополнит гарнизон/флот планеты.')].join('<br>'),
+      body: [eta, t('dossier.task.unit-ready')].join('<br>'),
     };
   }
-  if (!building) return { name: t('Стройка'), body: eta };
+  if (!building) return { name: t('dossier.task.title'), body: eta };
   const def = data.buildings[building];
   if (!def) return { name: building, body: eta };
   const name =
@@ -6136,7 +6140,7 @@ function taskDossier(
     if (b === 0 && f === 0) continue;
     const now = b + (f - b) * ramp;
     lines.push(
-      t('{r}: {now}/ч сейчас → {final}/ч по готовности', {
+      t('dossier.task.output', {
         r: tData(res),
         now: hl(round1(now)),
         final: hl(round1(f)),
@@ -6202,82 +6206,62 @@ function constructionDossier(key: string): Dossier | null {
 function objDossier(key: string): Dossier | null {
   if (key === 'fleet') {
     return {
-      name: t('Флот'),
-      body: t(
-        'Мобильное оперативное соединение кораблей. Выберите его, чтобы отдавать приказы на манёвр, орбиту и удар по врагу.',
-      ),
+      name: t('dossier.fleet.name'),
+      body: t('dossier.fleet.desc'),
     };
   }
   if (key === 'tab:ground') {
     // The ЗЕМЛЯ tab's hover dossier — carries what used to be the tab's bottom hint.
     return {
-      name: t('Земля'),
-      body: t('Наземные части обороняют ваши миры. Их можно погрузить на флот для захвата вражеских миров.'),
+      name: t('dossier.tab.ground.name'),
+      body: t('dossier.tab.ground.desc'),
     };
   }
   if (key === 'tab:ships') {
     return {
-      name: t('Флот'),
-      body: t('Флот -ваше оружие и защита. Здесь вы можете заказывать корабли для пополнения флота.'),
+      name: t('dossier.tab.ships.name'),
+      body: t('dossier.tab.ships.desc'),
     };
   }
   if (key === 'tab:squadron') {
     return {
-      name: t('Крылья'),
-      body: t(
-        'Носитель (◈) несёт эскадрильи (△). Запускайте авиагруппу из панели выбранного флота кнопкой «🛩 Запустить эскадрилью».',
-      ),
+      name: t('dossier.tab.squadron.name'),
+      body: t('dossier.tab.squadron.desc'),
     };
   }
   if (key === 'tab:buildings') {
     return {
-      name: t('Здания'),
-      body: t('Постройки мира и строительный конвейер: состояние, уровни и улучшения.'),
+      name: t('dossier.tab.buildings.name'),
+      body: t('dossier.tab.buildings.desc'),
     };
   }
   if (key === 'division') {
     return {
-      name: t('Дивизия'),
-      body: t(
-        'Наземное соединение, собранное по шаблону. Обороняет мир; грузится на флот из панели флота.',
-      ),
+      name: t('dossier.division.name'),
+      body: t('dossier.division.desc'),
     };
   }
   if (key.startsWith('stat:')) {
     const STAT_DOSSIER: Record<string, [string, string]> = {
-      atk: [t('Атака'), t('Суммарная атака кораблей флота.')],
-      def: [t('Защита'), t('Суммарная защита кораблей флота.')],
-      hp: [t('Очки здоровья'), t('Суммарная прочность кораблей флота.')],
+      atk: [t('dossier.stat.atk.name'), t('dossier.stat.atk.desc')],
+      def: [t('dossier.stat.def.name'), t('dossier.stat.def.desc')],
+      hp: [t('dossier.stat.hp.name'), t('dossier.stat.hp.desc')],
       cap: [
-        t('Линия огня'),
-        t(
-          'В залпе бьют максимум {n} юнитов — сильнейшие первыми; все сверх капа только впитывают урон.',
-          {
-            n: COMBAT_UNIT_CAP,
-          },
-        ),
+        t('dossier.stat.cap.name'),
+        t('dossier.stat.cap.desc', {
+          n: COMBAT_UNIT_CAP,
+        }),
       ],
-      hull: [
-        t('Корпус'),
-        t(
-          'Текущая/полная прочность армии. Чинится у своего мира с верфью — или мгновенно за кредиты.',
-        ),
-      ],
-      shield: [
-        t('Щит'),
-        t('Аблятивный щит: принимает урон первым и бесплатно восстанавливается вне боя.'),
-      ],
-      spd: [
-        t('Скорость'),
-        t('Скорость перелёта — флот движется со скоростью самого медленного корабля.'),
-      ],
-      garrison: [t('Гарнизон'), t('Численность наземных войск, обороняющих мир.')],
-      ground: [t('Наземные части'), t('Пехота и техника на поверхности мира.')],
-      gships: [t('Корабли в гарнизоне'), t('Корабли, стоящие в гарнизоне мира (не на орбите).')],
-      pbuild: [t('Постройки'), t('Число построек на мире.')],
-      datk: [t('Атака'), t('Суммарная атака дивизии.')],
-      ddef: [t('Защита'), t('Суммарная защита дивизии.')],
-      dhp: [t('ОЗ'), t('Суммарные очки здоровья дивизии.')],
+      hull: [t('dossier.stat.hull.name'), t('dossier.stat.hull.desc')],
+      shield: [t('dossier.stat.shield.name'), t('dossier.stat.shield.desc')],
+      spd: [t('dossier.stat.spd.name'), t('dossier.stat.spd.desc')],
+      garrison: [t('dossier.stat.garrison.name'), t('dossier.stat.garrison.desc')],
+      ground: [t('dossier.stat.ground.name'), t('dossier.stat.ground.desc')],
+      gships: [t('dossier.stat.gships.name'), t('dossier.stat.gships.desc')],
+      pbuild: [t('dossier.stat.pbuild.name'), t('dossier.stat.pbuild.desc')],
+      datk: [t('dossier.stat.datk.name'), t('dossier.stat.datk.desc')],
+      ddef: [t('dossier.stat.ddef.name'), t('dossier.stat.ddef.desc')],
+      dhp: [t('dossier.stat.dhp.name'), t('dossier.stat.dhp.desc')],
     };
     const d = STAT_DOSSIER[key.slice(5)];
     return d ? { name: d[0], body: d[1] } : null;
@@ -6289,8 +6273,8 @@ function objDossier(key: string): Dossier | null {
   }
   if (key === 'act:divdesign') {
     return {
-      name: t('Конструктор дивизий'),
-      body: t('Редактор шаблонов: состав слотов и доктрина дивизий.'),
+      name: t('dossier.divdesign.name'),
+      body: t('dossier.divdesign.desc'),
     };
   }
   if (key.startsWith('c:')) return constructionDossier(key);
@@ -6312,8 +6296,8 @@ function codexHtml(kind: string, id: string): string {
     const g = GLOSSARY.find((x) => x.id === id);
     if (!g) return '';
     return (
-      `<div class="cx-head"><span class="cx-ic">?</span><b>${esc(t(g.title))}</b><span class="cx-tag">${t('механика')}</span></div>` +
-      `<div class="cx-desc">${esc(t(g.body))}</div>`
+      `<div class="cx-head"><span class="cx-ic">?</span><b>${esc(t(g.titleKey))}</b><span class="cx-tag">${t('codex.tag.mechanic')}</span></div>` +
+      `<div class="cx-desc">${esc(t(g.bodyKey))}</div>`
     );
   }
   if (kind === 'b') {
@@ -6322,30 +6306,39 @@ function codexHtml(kind: string, id: string): string {
     const lv = buildingLevel(def, 1);
     const maxLvl = 1 + (def.upgrades?.length ?? 0);
     const rows = [
-      cxRow(t('Стоимость'), cost(def.cost)),
-      cxRow(t('Время постройки'), t('{n} ч', { n: def.buildTimeHours ?? 0 })),
-      cxRow(t('Прочность'), String(def.hp ?? 0)),
+      cxRow(t('codex.row.cost'), cost(def.cost)),
+      cxRow(t('codex.row.build-time'), t('codex.value.hours', { n: def.buildTimeHours ?? 0 })),
+      cxRow(t('codex.row.hp'), String(def.hp ?? 0)),
     ];
     const prod = Object.entries(lv.produces ?? {})
       .filter(([, n]) => (n ?? 0) > 0)
-      .map(([r, n]) => t('{n} {r}/ч', { n: n ?? 0, r: tData(r) }))
+      .map(([r, n]) => t('codex.value.per-hour', { n: n ?? 0, r: tData(r) }))
       .join(', ');
-    if (prod) rows.push(cxRow(t('Производит'), prod));
+    if (prod) rows.push(cxRow(t('codex.row.produces'), prod));
     const keep = Object.entries(lv.upkeep ?? {})
       .filter(([, n]) => (n ?? 0) > 0)
-      .map(([r, n]) => t('{n} {r}/день', { n: n ?? 0, r: tData(r) }))
+      .map(([r, n]) => t('codex.value.per-day', { n: n ?? 0, r: tData(r) }))
       .join(', ');
-    if (keep) rows.push(cxRow(t('Содержание'), keep));
+    if (keep) rows.push(cxRow(t('codex.row.upkeep'), keep));
     if ((lv.defenseBonus ?? 0) > 0.01)
-      rows.push(cxRow(t('Оборона гарнизона'), `+${Math.round((lv.defenseBonus ?? 0) * 100)}%`));
-    if ((lv.aaDamage ?? 0) > 0) rows.push(cxRow(t('ПВО'), String(lv.aaDamage)));
-    if ((lv.radarRange ?? 0) > 0) rows.push(cxRow(t('Радиус радара'), String(lv.radarRange)));
+      rows.push(
+        cxRow(t('codex.row.garrison-defense'), `+${Math.round((lv.defenseBonus ?? 0) * 100)}%`),
+      );
+    if ((lv.aaDamage ?? 0) > 0) rows.push(cxRow(t('codex.row.aa'), String(lv.aaDamage)));
+    if ((lv.radarRange ?? 0) > 0) rows.push(cxRow(t('codex.row.radar'), String(lv.radarRange)));
     if ((def.scoreValue ?? 0) > 0)
-      rows.push(cxRow(t('Очки победы'), t('{n} / уровень', { n: def.scoreValue ?? 0 })));
-    rows.push(cxRow(t('Уровней'), maxLvl > 1 ? t('{n} (улучшаемо)', { n: maxLvl }) : '1'));
+      rows.push(
+        cxRow(t('codex.row.score'), t('codex.value.per-level', { n: def.scoreValue ?? 0 })),
+      );
+    rows.push(
+      cxRow(
+        t('codex.row.levels'),
+        maxLvl > 1 ? t('codex.value.levels-upgradable', { n: maxLvl }) : '1',
+      ),
+    );
     const dos = buildingDossier(id, 1);
     return (
-      `<div class="cx-head"><span class="cx-ic">${BUILD_ICON[id] ?? '▣'}</span><b>${esc(tData(def.name))}</b><span class="cx-tag">${t('здание')}</span></div>` +
+      `<div class="cx-head"><span class="cx-ic">${BUILD_ICON[id] ?? '▣'}</span><b>${esc(tData(def.name))}</b><span class="cx-tag">${t('codex.tag.building')}</span></div>` +
       `<div class="cx-stats">${rows.join('')}</div><div class="cx-desc">${dos?.body ?? ''}</div>`
     );
   }
@@ -6354,22 +6347,25 @@ function codexHtml(kind: string, id: string): string {
   if (kind === 'md') {
     const def = data.modules[id];
     if (!def) return '';
-    const rows = [cxRow(t('Слот'), tData(def.slot)), cxRow(t('Стоимость'), cost(def.cost))];
+    const rows = [
+      cxRow(t('codex.row.slot'), tData(def.slot)),
+      cxRow(t('codex.row.cost'), cost(def.cost)),
+    ];
     for (const [k, v] of Object.entries(def.effects?.stats ?? {}))
       rows.push(cxRow(tData(k), String(v)));
     return (
-      `<div class="cx-head"><span class="cx-ic">◆</span><b>${esc(tData(def.name))}</b><span class="cx-tag">${t('модуль')}</span></div>` +
+      `<div class="cx-head"><span class="cx-ic">◆</span><b>${esc(tData(def.name))}</b><span class="cx-tag">${t('codex.tag.module')}</span></div>` +
       `<div class="cx-stats">${rows.join('')}</div>`
     );
   }
   if (kind === 'hf') {
     const def = data.heroFittings[id];
     if (!def) return '';
-    const rows = [cxRow(t('Стоимость'), cost(def.cost))];
+    const rows = [cxRow(t('codex.row.cost'), cost(def.cost))];
     for (const [k, v] of Object.entries(def.statMods ?? {}))
       rows.push(cxRow(tData(k), (v > 0 ? '+' : '') + String(v)));
     return (
-      `<div class="cx-head"><span class="cx-ic">◆</span><b>${esc(tData(def.name))}</b><span class="cx-tag">${t('фитинг')}</span></div>` +
+      `<div class="cx-head"><span class="cx-ic">◆</span><b>${esc(tData(def.name))}</b><span class="cx-tag">${t('codex.tag.fitting')}</span></div>` +
       `<div class="cx-stats">${rows.join('')}</div><div class="cx-desc">${esc(tData(def.description ?? ''))}</div>`
     );
   }
@@ -6377,30 +6373,29 @@ function codexHtml(kind: string, id: string): string {
   if (!def) return '';
   const st = def.stats;
   const rows = [
-    cxRow(t('Стоимость'), cost(def.cost)),
-    cxRow(t('Время постройки'), t('{n} ч', { n: def.buildTimeHours ?? 0 })),
-    cxRow(t('Атака / Оборона'), `${st.attack ?? 0} / ${st.defense ?? 0}`),
-    cxRow(t('Корпус'), String(st.hp ?? 0)),
+    cxRow(t('codex.row.cost'), cost(def.cost)),
+    cxRow(t('codex.row.build-time'), t('codex.value.hours', { n: def.buildTimeHours ?? 0 })),
+    cxRow(t('codex.row.atk-def'), `${st.attack ?? 0} / ${st.defense ?? 0}`),
+    cxRow(t('codex.row.hull'), String(st.hp ?? 0)),
   ];
-  if ((st.speed ?? 0) > 0) rows.push(cxRow(t('Скорость'), String(st.speed)));
-  if ((st.range ?? 0) > 0) rows.push(cxRow(t('Дальность'), String(st.range)));
-  if ((st.cargoCapacity ?? 0) > 0)
-    rows.push(cxRow(t('Вместимость трюма'), String(st.cargoCapacity)));
-  if ((st.aaDamage ?? 0) > 0) rows.push(cxRow(t('ПВО'), String(st.aaDamage)));
-  rows.push(cxRow(t('Радарная сигнатура'), String(def.signature ?? 1)));
-  if ((def.radarRange ?? 0) > 0) rows.push(cxRow(t('Радиус радара'), String(def.radarRange)));
+  if ((st.speed ?? 0) > 0) rows.push(cxRow(t('codex.row.speed'), String(st.speed)));
+  if ((st.range ?? 0) > 0) rows.push(cxRow(t('codex.row.range'), String(st.range)));
+  if ((st.cargoCapacity ?? 0) > 0) rows.push(cxRow(t('codex.row.cargo'), String(st.cargoCapacity)));
+  if ((st.aaDamage ?? 0) > 0) rows.push(cxRow(t('codex.row.aa'), String(st.aaDamage)));
+  rows.push(cxRow(t('codex.row.signature'), String(def.signature ?? 1)));
+  if ((def.radarRange ?? 0) > 0) rows.push(cxRow(t('codex.row.radar'), String(def.radarRange)));
   const upkeep = Object.entries(def.upkeep ?? {})
-    .map(([r, n]) => t('{n} {r}/день', { n: n ?? 0, r: tData(r) }))
+    .map(([r, n]) => t('codex.value.per-day', { n: n ?? 0, r: tData(r) }))
     .join(', ');
-  if (upkeep) rows.push(cxRow(t('Содержание'), upkeep));
+  if (upkeep) rows.push(cxRow(t('codex.row.upkeep'), upkeep));
   const tags = [def.domain ?? 'space', def.line, ...(def.traits ?? [])]
     .filter((x): x is string => !!x)
     .map((x) => tData(x))
     .join(', ');
-  if (tags) rows.push(cxRow(t('Класс'), tags));
+  if (tags) rows.push(cxRow(t('codex.row.class'), tags));
   const dos = unitDossier(id);
   return (
-    `<div class="cx-head"><span class="cx-ic">${unitIconHtml(id, 24)}</span><b>${esc(dos?.name ?? displayUnit(id))}</b><span class="cx-tag">${def.domain === 'ground' ? t('наземный юнит') : t('корабль')}</span></div>` +
+    `<div class="cx-head"><span class="cx-ic">${unitIconHtml(id, 24)}</span><b>${esc(dos?.name ?? displayUnit(id))}</b><span class="cx-tag">${def.domain === 'ground' ? t('codex.tag.ground-unit') : t('codex.tag.ship')}</span></div>` +
     `<div class="cx-stats">${rows.join('')}</div><div class="cx-desc">${dos?.body ?? ''}</div>`
   );
 }
@@ -7042,13 +7037,21 @@ function buildingLocked(planetId: string, id: string): 'built' | 'queued' | null
   const p = s.planets[planetId];
   if (!p) return null;
   if (p.buildings.some((b) => b.type === id)) return 'built';
-  if (queueOf(planetId).buildings.some((q) => q.kind === 'building' && q.id === id)) return 'queued';
+  if (queueOf(planetId).buildings.some((q) => q.kind === 'building' && q.id === id))
+    return 'queued';
   const act = activeConstruction(planetId, 'buildings');
   if (act && act.payload.kind === 'building' && act.payload.building === id) return 'queued';
-  if (p.pausedConstruction?.some((s) => s.kind === 'building' && s.building === id)) return 'queued';
+  if (p.pausedConstruction?.some((s) => s.kind === 'building' && s.building === id))
+    return 'queued';
   return null;
 }
-function codexTile(kind: 'b' | 'u', id: string, label: string, orderable = false, lockedFor?: string): string {
+function codexTile(
+  kind: 'b' | 'u',
+  id: string,
+  label: string,
+  orderable = false,
+  lockedFor?: string,
+): string {
   if (!(kind === 'b' ? data.buildings[id] : data.units[id])) return '';
   const icon = kind === 'b' ? (BUILD_ICON[id] ?? '▣') : unitIconHtml(id);
   const name = kind === 'b' ? buildingName(id) : (unitDossier(id)?.name ?? displayUnit(id));
@@ -7115,15 +7118,15 @@ function codexBuildBtn(kind: string, id: string): string {
 // in-match rail «?».
 const CODEX_INDEX = buildCodexIndex(data, GLOSSARY);
 const CODEX_SECTIONS: Array<[CodexCategory, string]> = [
-  ['unit', 'Юниты'],
-  ['building', 'Здания'],
-  ['mechanic', 'Механики'],
+  ['unit', 'codex.hub.sec.unit'],
+  ['building', 'codex.hub.sec.building'],
+  ['mechanic', 'codex.hub.sec.mechanic'],
 ];
 function codexEntryLabel(e: CodexEntry): string {
   const id = e.key.slice(2);
   if (e.category === 'unit') return unitDossier(id)?.name ?? displayUnit(id);
   if (e.category === 'building') return buildingName(id);
-  return t(e.title); // mechanic: title is the canonical-Russian msgid
+  return t(e.titleKey ?? e.title); // mechanic: the heading lives in the locale
 }
 function codexEntryIcon(e: CodexEntry): string {
   const id = e.key.slice(2);
@@ -7153,16 +7156,16 @@ function renderCodexResults(query: string): void {
   }
   host.innerHTML = hits.length
     ? `<div class="ch-grid">${hits.map(codexItemHtml).join('')}</div>`
-    : `<div class="ch-empty">${t('Ничего не найдено')}</div>`;
+    : `<div class="ch-empty">${t('codex.hub.empty')}</div>`;
 }
 function openCodexHub(): void {
   const box = document.getElementById('codexhub');
   if (!box) return;
   box.innerHTML =
-    `<div class="chbox"><div class="ch-head"><span class="cx-ic">?</span><b>${t('СПРАВОЧНИК')}</b></div>` +
-    `<input id="ch-search" class="ch-search" type="text" placeholder="${t('Поиск: юнит, здание, термин…')}" aria-label="${t('Поиск по справочнику')}">` +
+    `<div class="chbox"><div class="ch-head"><span class="cx-ic">?</span><b>${t('codex.hub.title')}</b></div>` +
+    `<input id="ch-search" class="ch-search" type="text" placeholder="${t('codex.hub.search.ph')}" aria-label="${t('codex.hub.search.aria')}">` +
     `<div class="ch-body" id="ch-results"></div>` +
-    `<button class="cx-close" id="ch-close">${t('ЗАКРЫТЬ')}</button></div>`;
+    `<button class="cx-close" id="ch-close">${t('codex.hub.close')}</button></div>`;
   const input = document.getElementById('ch-search') as HTMLInputElement | null;
   if (input) input.oninput = () => renderCodexResults(input.value);
   renderCodexResults('');
@@ -7472,13 +7475,61 @@ function renderCmdBar() {
   if (!castHero) castMenu = false;
   const html =
     `<span class="cmdlabel">${ids.length > 1 ? t('{n} ФЛОТОВ', { n: ids.length }) : t('ФЛОТ')}</span>` +
-    cmdBtn('move', '⤳', t('Курс'), aiming ? 'on' : '', false, t('выберите планету — флот пойдёт к ней по звёздным трассам')) +
+    cmdBtn(
+      'move',
+      '⤳',
+      t('Курс'),
+      aiming ? 'on' : '',
+      false,
+      t('выберите планету — флот пойдёт к ней по звёздным трассам'),
+    ) +
     cmdBtn('stop', '■', t('Стоп'), 'danger', !anyMoving, t('отменить текущее движение флота')) +
-    cmdBtn('attack', '⚔', t('Штурм'), assaultAim ? 'on' : '', !canAssault, t('лететь к чужому миру и высадить десант при подходе')) +
-    cmdBtn('target', '◎', t('Цель'), targetAim ? 'on' : '', false, t('тап по карте — собрать приказ: ждать · курс · штурм · обстрел')) +
-    (castHero ? cmdBtn('cast', '✨', t('Каст'), castMenu ? 'on' : '', false, t('применить способность героя из состава флота')) : '') +
-    (anyArtillery ? cmdBtn('barrage', '🎯', t('Обстрел'), barrageAim ? 'on' : '', false, t('сосредоточить огонь артиллерии по вражескому флоту с дистанции')) : '') +
-    (artFleets.length > 0 ? cmdBtn('firemode', '🔥', fmLabel, fireMenu ? 'on' : '', false, t('когда артиллерия стреляет сама: пассив · ответ · станд · агрес')) : '') +
+    cmdBtn(
+      'attack',
+      '⚔',
+      t('Штурм'),
+      assaultAim ? 'on' : '',
+      !canAssault,
+      t('лететь к чужому миру и высадить десант при подходе'),
+    ) +
+    cmdBtn(
+      'target',
+      '◎',
+      t('Цель'),
+      targetAim ? 'on' : '',
+      false,
+      t('тап по карте — собрать приказ: ждать · курс · штурм · обстрел'),
+    ) +
+    (castHero
+      ? cmdBtn(
+          'cast',
+          '✨',
+          t('Каст'),
+          castMenu ? 'on' : '',
+          false,
+          t('применить способность героя из состава флота'),
+        )
+      : '') +
+    (anyArtillery
+      ? cmdBtn(
+          'barrage',
+          '🎯',
+          t('Обстрел'),
+          barrageAim ? 'on' : '',
+          false,
+          t('сосредоточить огонь артиллерии по вражескому флоту с дистанции'),
+        )
+      : '') +
+    (artFleets.length > 0
+      ? cmdBtn(
+          'firemode',
+          '🔥',
+          fmLabel,
+          fireMenu ? 'on' : '',
+          false,
+          t('когда артиллерия стреляет сама: пассив · ответ · станд · агрес'),
+        )
+      : '') +
     cmdBtn(
       'merge',
       '⛬',
@@ -7487,12 +7538,26 @@ function renderCmdBar() {
       !canMerge,
       t('объединить выбранные флоты в один'),
     ) +
-    cmdBtn('split', '⊟', t('Делить'), splitState ? 'on' : '', !canSplit, t('отделить часть кораблей пришвартованного флота в новый')) +
+    cmdBtn(
+      'split',
+      '⊟',
+      t('Делить'),
+      splitState ? 'on' : '',
+      !canSplit,
+      t('отделить часть кораблей пришвартованного флота в новый'),
+    ) +
     // ☰ — the extras row (hamburger, NOT «...» — референс не копируем дословно):
     // «Выбрать+» и будущие Ускорить/Задержка живут здесь, базовый ряд не пухнет.
     cmdBtn('more', '☰', t('Ещё'), cmdMore ? 'on' : '', false, t('дополнительные приказы')) +
     (cmdMore || pickMode
-      ? cmdBtn('pick', '⊕', t('Выбрать+'), pickMode ? 'on' : '', false, t('добавлять флоты в группу по одному тапу'))
+      ? cmdBtn(
+          'pick',
+          '⊕',
+          t('Выбрать+'),
+          pickMode ? 'on' : '',
+          false,
+          t('добавлять флоты в группу по одному тапу'),
+        )
       : '') +
     (cmdMore
       ? cmdBtn(
@@ -8638,7 +8703,8 @@ endscreenEl.addEventListener('click', (ev) => {
   const wasNet = NET;
   if (NET) {
     userClosed = true;
-    NET = false; netAdmitted = false;
+    NET = false;
+    netAdmitted = false;
     if (netSock) netSock.close();
   }
   endScreen = null; // leaving the finished match — the overlay must not linger over the hub
@@ -8667,7 +8733,8 @@ endscreenEl.addEventListener('click', (ev) => {
 $('tomenu').addEventListener('click', () => {
   if (NET) {
     userClosed = true;
-    NET = false; netAdmitted = false;
+    NET = false;
+    netAdmitted = false;
     netAdmitted = false; // BF-30: no longer in a server-assigned seat
     if (netSock) netSock.close();
   } else {
@@ -9387,7 +9454,9 @@ function heroBodyHtml(): string {
   const ident =
     `<div class="hx-ident${def?.branch === 'psionic' ? ' ps' : ''}">` +
     `<div class="hx-irow"><span class="hx-name">♔ ${esc(hero.name ?? hero.id)}</span>` +
-    (def?.branch ? `<span class="hx-tag">${esc(t(HERO_BRANCH_RU[def.branch] ?? def.branch))}</span>` : '') +
+    (def?.branch
+      ? `<span class="hx-tag">${esc(t(HERO_BRANCH_RU[def.branch] ?? def.branch))}</span>`
+      : '') +
     `<span class="hx-dstat">${deploy}</span></div>` +
     (bonuses || fitPips ? `<div class="hx-traits">${bonuses}${fitPips}</div>` : '') +
     `</div>`;
@@ -9401,7 +9470,10 @@ function heroBodyHtml(): string {
   ];
   const tabs =
     `<div class="hx-tabs">` +
-    TABS.map(([k, l]) => `<button class="hx-tab${heroTab === k ? ' on' : ''}" data-htab="${k}">${t(l)}</button>`).join('') +
+    TABS.map(
+      ([k, l]) =>
+        `<button class="hx-tab${heroTab === k ? ' on' : ''}" data-htab="${k}">${t(l)}</button>`,
+    ).join('') +
     `</div>`;
 
   const body =
@@ -9431,7 +9503,9 @@ function heroTreeHtml(hero: HeroInst): string {
   const ownNodes = entries.filter(([, n]) => n.branch === ownBranch || n.branch === undefined);
   const foreignBranches = Array.from(
     new Set(
-      entries.map(([, n]) => n.branch).filter((b): b is string => b !== undefined && b !== ownBranch),
+      entries
+        .map(([, n]) => n.branch)
+        .filter((b): b is string => b !== undefined && b !== ownBranch),
     ),
   ).sort();
   const rails: Array<{ label: string; own: boolean; ps: boolean; nodes: typeof entries }> = [];
@@ -9626,7 +9700,9 @@ function heroDossierHtml(hero: HeroInst): string {
       `<div class="hx-dossier">` +
       `<div class="hx-dh">${def?.branch ? `<span class="hx-tag">${esc(t(HERO_BRANCH_RU[def.branch] ?? def.branch))}</span>` : ''}<span class="hx-dnm">${esc(t(nd.name))}</span>${close}</div>` +
       (give ? `<div class="hx-give">${give}</div>` : '') +
-      (reqHtml ? `<div class="hx-drow"><span class="hx-dk">${t('Требует')}</span><span class="hx-dv">${reqHtml}</span></div>` : '') +
+      (reqHtml
+        ? `<div class="hx-drow"><span class="hx-dk">${t('Требует')}</span><span class="hx-dv">${reqHtml}</span></div>`
+        : '') +
       `<div class="hx-drow"><span class="hx-dk">${t('Цена')}</span><span class="hx-cost">${esc(cost(nd.cost))}</span></div>` +
       btn +
       `</div>`
@@ -9643,7 +9719,11 @@ function heroDossierHtml(hero: HeroInst): string {
       : fd.grants.passive
         ? `<div class="hx-dgl">${t('Даёт пассивку')}</div><div class="hx-dgv">${esc(heroPassiveLine(fd.grants.passive))}</div>`
         : fd.statMods
-          ? `<div class="hx-dgl">${t('Модификатор корпуса')}</div><div class="hx-dgv">${esc(Object.entries(fd.statMods).map(([k, v]) => `${k} +${v}`).join(', '))}</div>`
+          ? `<div class="hx-dgl">${t('Модификатор корпуса')}</div><div class="hx-dgv">${esc(
+              Object.entries(fd.statMods)
+                .map(([k, v]) => `${k} +${v}`)
+                .join(', '),
+            )}</div>`
           : '';
     const canBuy = !fitted.includes(id) && fitted.length < slots && afford(fd.cost) && !dead;
     return (
@@ -10253,7 +10333,8 @@ nickInput.value = localStorage.getItem('void.nick') ?? '';
 if (!__PLAYER_BUILD__) {
   $('csolo').addEventListener('click', () => {
     userClosed = true; // intentional leave → don't auto-reconnect
-    NET = false; netAdmitted = false;
+    NET = false;
+    netAdmitted = false;
     openSetup(); // pick start + rivals before the skirmish begins
   });
 
@@ -10264,7 +10345,8 @@ if (!__PLAYER_BUILD__) {
   if (!DEV_UI) $('ctest').style.display = 'none';
   $('ctest')?.addEventListener('click', () => {
     userClosed = true;
-    NET = false; netAdmitted = false;
+    NET = false;
+    netAdmitted = false;
     showConnect(false);
     openTestMode();
   });
@@ -10646,10 +10728,16 @@ async function welcomeSignIn(nick: string): Promise<void> {
     // If we arrived via `?join=<id>` (or the join button opened the welcome card
     // because no session was cached), resume the join now that we have a JWT.
     const pendingId = pendingJoinAfterAuth;
-    pendingJoinAfterAuth = null; pendingSlotAfterAuth = null; pendingFactionAfterAuth = null;
+    pendingJoinAfterAuth = null;
+    pendingSlotAfterAuth = null;
+    pendingFactionAfterAuth = null;
     if (pendingId) {
       showStage('browse'); // hide the welcome card
-      connectToMatch(pendingId, pendingSlotAfterAuth ?? undefined, pendingFactionAfterAuth ?? undefined);
+      connectToMatch(
+        pendingId,
+        pendingSlotAfterAuth ?? undefined,
+        pendingFactionAfterAuth ?? undefined,
+      );
     } else {
       openHub();
     }
@@ -10756,10 +10844,16 @@ async function submitRegister(): Promise<void> {
     // this path used to drop straight into the empty hub, silently abandoning the
     // match they were trying to join (the seat never got claimed).
     const pendingId = pendingJoinAfterAuth;
-    pendingJoinAfterAuth = null; pendingSlotAfterAuth = null; pendingFactionAfterAuth = null;
+    pendingJoinAfterAuth = null;
+    pendingSlotAfterAuth = null;
+    pendingFactionAfterAuth = null;
     if (pendingId) {
       showStage('browse');
-      connectToMatch(pendingId, pendingSlotAfterAuth ?? undefined, pendingFactionAfterAuth ?? undefined);
+      connectToMatch(
+        pendingId,
+        pendingSlotAfterAuth ?? undefined,
+        pendingFactionAfterAuth ?? undefined,
+      );
     } else {
       openHub();
     }
@@ -10912,7 +11006,8 @@ $('hub-play').addEventListener('click', () => hubTab('games'));
 // Single-player entry from the hub home — offline skirmish vs bots (both builds).
 $('hub-solo').addEventListener('click', () => {
   userClosed = true; // intentional leave → don't auto-reconnect to a server
-  NET = false; netAdmitted = false;
+  NET = false;
+  netAdmitted = false;
   showHub(false);
   openSetup('hub');
 });
@@ -11094,7 +11189,16 @@ const bootReset = (bootParams?.get('reset') ?? '').trim();
 const bootJoinId = (bootParams?.get('join') ?? '').trim();
 const bootSlot = (bootParams?.get('slot') ?? '').trim();
 const bootFaction = (bootParams?.get('faction') ?? '').trim();
-console.log('[boot] location.search=', location.search, 'bootJoinId=', bootJoinId, 'bootReset=', bootReset, 'bootSlot=', bootSlot);
+console.log(
+  '[boot] location.search=',
+  location.search,
+  'bootJoinId=',
+  bootJoinId,
+  'bootReset=',
+  bootReset,
+  'bootSlot=',
+  bootSlot,
+);
 if (bootReset) {
   openReset(bootReset);
 } else if (bootJoinId) {
@@ -11118,7 +11222,10 @@ if (bootReset) {
     }
     // Auth-on: if we have a cached session JWT, go straight to the match.
     const cached = srv ? sessionRecord(srv.base) : null;
-    console.log('[boot] cached session=', cached ? { login: cached.login, token: cached.token.slice(0, 20) + '...' } : 'null');
+    console.log(
+      '[boot] cached session=',
+      cached ? { login: cached.login, token: cached.token.slice(0, 20) + '...' } : 'null',
+    );
     if (cached) {
       console.log('[boot] cached session — connectToMatch');
       showStage('browse');
@@ -11930,7 +12037,8 @@ function connect(): void {
     }
     rttEma = null;
     if (NET) {
-      NET = false; netAdmitted = false;
+      NET = false;
+      netAdmitted = false;
       if (userClosed) {
         statusEl.textContent = 'disconnected';
         note(t('● отключён от сервера'));
@@ -12155,23 +12263,26 @@ async function ensureSession(
 /** Exchange the session for a seat + join token. Клиент запоминает токен для
  *  немедленного коннекта; протухший (15 мин TTL) реконнект просто запрашивает
  *  новый — сессия живёт днями. 401 ⇒ сессия истекла: чистим её и просим пароль. */
- async function fetchJoinToken(
-   base: string,
-   matchId: string,
-   session: string,
-   slot?: string,
-   faction?: string,
- ): Promise<{ token: string; playerId: string } | null> {
-   try {
+async function fetchJoinToken(
+  base: string,
+  matchId: string,
+  session: string,
+  slot?: string,
+  faction?: string,
+): Promise<{ token: string; playerId: string } | null> {
+  try {
     // REL-7: pass ?slot= to request a specific seat; ?faction= to override the
     // seat's default faction (BF-30: faction decoupled from start point).
     const params = new URLSearchParams();
     if (slot) params.set('slot', slot);
     if (faction) params.set('faction', faction);
     const queryStr = params.toString() ? `?${params.toString()}` : '';
-    const res = await fetch(`${httpBase(base)}/matches/${encodeURIComponent(matchId)}/join${queryStr}`, {
-      headers: { authorization: `Bearer ${session}` },
-    });
+    const res = await fetch(
+      `${httpBase(base)}/matches/${encodeURIComponent(matchId)}/join${queryStr}`,
+      {
+        headers: { authorization: `Bearer ${session}` },
+      },
+    );
     if (res.status === 401) {
       localStorage.removeItem(sessionKey(base)); // session expired/revoked — re-login
       statusEl.textContent = t('Сессия истекла — введите пароль ещё раз');
@@ -12342,18 +12453,32 @@ async function openSeatPicker(matchId: string): Promise<void> {
   seatpickSelected = null;
   seatpickFaction = null;
   if (seatpickGoEl) seatpickGoEl.disabled = true;
-  if (seatpickListEl) seatpickListEl.innerHTML = '<p style="color:var(--dim);text-align:center">Загрузка…</p>';
+  if (seatpickListEl)
+    seatpickListEl.innerHTML = '<p style="color:var(--dim);text-align:center">Загрузка…</p>';
   if (seatpickEl) seatpickEl.style.display = 'flex';
   try {
     const res = await fetch(`${httpBase(srv.base)}/matches/${encodeURIComponent(matchId)}/seats`);
     if (!res.ok) throw new Error('http ' + res.status);
-    const data = (await res.json()) as { seats: Array<{ playerId: string; name: string; faction: string; start: string | null; taken: boolean }> };
+    const data = (await res.json()) as {
+      seats: Array<{
+        playerId: string;
+        name: string;
+        faction: string;
+        start: string | null;
+        taken: boolean;
+      }>;
+    };
     if (seatpickListEl) {
       seatpickListEl.innerHTML = '';
       // Group seats by faction — show 4 faction cards, each with free/taken count.
       // The player picks a FACTION (azure/crimson/amber/violet), not a specific seat.
       // The server assigns the first free seat of that faction.
-      const factionColors: Record<string, string> = { azure: '#35d6e6', crimson: '#ff5a4d', amber: '#ffb43a', violet: '#b366ff' };
+      const factionColors: Record<string, string> = {
+        azure: '#35d6e6',
+        crimson: '#ff5a4d',
+        amber: '#ffb43a',
+        violet: '#b366ff',
+      };
       const factionPassives: Record<string, string> = {
         azure: '+12% экономика',
         crimson: '+10% урон',
@@ -12421,7 +12546,8 @@ async function openSeatPicker(matchId: string): Promise<void> {
       }
     }
   } catch {
-    if (seatpickListEl) seatpickListEl.innerHTML = '<p style="color:var(--red)">Не удалось загрузить слоты</p>';
+    if (seatpickListEl)
+      seatpickListEl.innerHTML = '<p style="color:var(--red)">Не удалось загрузить слоты</p>';
   }
 }
 
@@ -12517,7 +12643,8 @@ function renderMatches(): void {
       `<div class="msolo-sub">${t('Сервер не нужен — свободные места займут боты.')}</div></div>`;
     document.getElementById('msolo-go')?.addEventListener('click', () => {
       userClosed = true;
-      NET = false; netAdmitted = false;
+      NET = false;
+      netAdmitted = false;
       openSetup('hub');
     });
   };

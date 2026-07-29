@@ -17,18 +17,23 @@ export type CodexCategory = 'unit' | 'building' | 'mechanic';
 /** One findable entry. `key` deep-links into `openCodex` ('u:'/'b:'/'m:'+id). */
 export interface CodexEntry {
   key: string;
-  /** Base (English) label — the search haystack + a render fallback. */
+  /** Base (English) label — the search haystack + a render fallback. Empty for a
+   *  mechanic: its heading is a locale key (`titleKey`), and putting that key in
+   *  the haystack would make «co…» match every article. Mechanics stay findable
+   *  through their two-language `tags` and the localised label the UI folds in. */
   title: string;
+  /** Locale key for the heading — mechanics only (units/buildings render `title`). */
+  titleKey?: string;
   category: CodexCategory;
   /** Extra lowercased search terms (domain/line/traits/resource keys/aliases). */
   tags: string[];
 }
 
-/** A short mechanic/term article (copy is a locale msgid, rendered through `t()`). */
+/** A short mechanic/term article. Copy lives in /localization; here are its keys. */
 export interface GlossaryArticle {
   id: string;
-  title: string; // canonical-Russian msgid
-  body: string; // canonical-Russian msgid
+  titleKey: string;
+  bodyKey: string;
   /** Search aliases (both languages) so «fog» and «туман» both find it. */
   tags: string[];
 }
@@ -37,26 +42,26 @@ export interface GlossaryArticle {
 export const GLOSSARY: GlossaryArticle[] = [
   {
     id: 'async',
-    title: 'Асинхронный мир',
-    body: 'Мир идёт в реальном времени и продолжается 24/7 — даже когда ты вышел. Приказы занимают реальные часы: отдал курс, закрыл игру, вернулся к результату. Это не пошаговая игра — заходи, отдавай приказы, выходи.',
+    titleKey: 'codex.term.async.title',
+    bodyKey: 'codex.term.async.body',
     tags: ['async', 'асинхрон', 'offline', 'офлайн', 'realtime', 'реальное время', 'время'],
   },
   {
     id: 'fog',
-    title: 'Туман войны',
-    body: 'Ты видишь только то, что рядом с твоими силами и радарами; остальное скрыто туманом или показано по памяти (последнее, что ты там видел). Разведчики и радары раздвигают обзор — держи глаза открытыми.',
+    titleKey: 'codex.term.fog.title',
+    bodyKey: 'codex.term.fog.body',
     tags: ['fog', 'туман', 'radar', 'радар', 'разведка', 'видимость', 'scout'],
   },
   {
     id: 'upkeep',
-    title: 'Содержание (upkeep)',
-    body: 'Флоты и здания требуют ежедневной платы. Доход от шахт минус содержание = чистый баланс; уйдёшь в минус — казна опустеет. Строй экономику раньше армии.',
+    titleKey: 'codex.term.upkeep.title',
+    bodyKey: 'codex.term.upkeep.body',
     tags: ['upkeep', 'содержание', 'экономика', 'казна', 'баланс', 'доход'],
   },
   {
     id: 'capture',
-    title: 'Орбита и высадка',
-    body: 'Захват мира — двухфазный. Сначала выйди на орбиту и подави оборону в космосе; если мир защищён гарнизоном — высади десант (наземную дивизию из трюма). Небо, потом земля.',
+    titleKey: 'codex.term.capture.title',
+    bodyKey: 'codex.term.capture.body',
     tags: [
       'orbit',
       'орбита',
@@ -71,20 +76,20 @@ export const GLOSSARY: GlossaryArticle[] = [
   },
   {
     id: 'lanes',
-    title: 'Звёздные трассы',
-    body: 'Флоты ходят не напрямую, а по звёздным трассам (лэйнам) между мирами — маршрут строится автоматически. Узлы на трассах можно перехватывать: встречный враг на пути — это бой.',
+    titleKey: 'codex.term.lanes.title',
+    bodyKey: 'codex.term.lanes.body',
     tags: ['lanes', 'трассы', 'лэйны', 'movement', 'курс', 'маршрут', 'перехват'],
   },
   {
     id: 'score',
-    title: 'Очки победы',
-    body: 'Очки капают за то, чем ты владеешь: мир — 50, прочий сектор — 10, здания добавляют по уровню. Набери порог очков — победа. Другой путь к победе — уничтожение соперников или доминирование.',
+    titleKey: 'codex.term.score.title',
+    bodyKey: 'codex.term.score.body',
     tags: ['score', 'очки', 'victory', 'победа', 'счёт'],
   },
   {
     id: 'coalition',
-    title: 'Коалиционный порог',
-    body: 'Дипломатия позволяет заключать пакты и союзы, но коалиция ограничена порогом совокупной силы — нельзя собрать всех против одного. Порог держит баланс сил и не даёт «снежному кому» задавить партию.',
+    titleKey: 'codex.term.coalition.title',
+    bodyKey: 'codex.term.coalition.body',
     tags: ['coalition', 'коалиция', 'alliance', 'союз', 'пакт', 'диплом', 'diplomacy', 'порог'],
   },
 ];
@@ -130,7 +135,8 @@ export function buildCodexIndex(
   for (const g of glossary) {
     entries.push({
       key: 'm:' + g.id,
-      title: g.title,
+      title: '', // ищется по tags + локализованной подписи из UI
+      titleKey: g.titleKey,
       category: 'mechanic',
       tags: g.tags.map((s) => s.toLowerCase()),
     });
