@@ -7429,16 +7429,16 @@ function renderCmdBar() {
   // выделения, при разнобое — нейтральная подпись.
   const artFleets = fleets.filter((f) => f.owner === ME && fleetHasArtillery(f));
   const FIRE_MODES: Array<{ m: string; lbl: string; sub: string }> = [
-    { m: 'passive', lbl: t('Пассив'), sub: t('не стреляет') },
-    { m: 'return', lbl: t('Ответ'), sub: t('только после урона по флоту') },
-    { m: 'standard', lbl: t('Станд'), sub: t('по тем, с кем война') },
-    { m: 'aggressive', lbl: t('Агрес'), sub: t('по любому, кроме пакта/союза') },
+    { m: 'passive', lbl: t('cmd.fire.passive'), sub: t('cmd.fire.passive.hint') },
+    { m: 'return', lbl: t('cmd.fire.return'), sub: t('cmd.fire.return.hint') },
+    { m: 'standard', lbl: t('cmd.fire.standard'), sub: t('cmd.fire.standard.hint') },
+    { m: 'aggressive', lbl: t('cmd.fire.aggressive'), sub: t('cmd.fire.aggressive.hint') },
   ];
   const artModes = new Set(artFleets.map((f) => f.barrageMode ?? 'standard'));
   const uniMode = artModes.size === 1 ? [...artModes][0] : null;
   const fmLabel = uniMode
-    ? (FIRE_MODES.find((x) => x.m === uniMode)?.lbl ?? t('Режим огня'))
-    : t('Режим огня');
+    ? (FIRE_MODES.find((x) => x.m === uniMode)?.lbl ?? t('cmd.fire.title'))
+    : t('cmd.fire.title');
   if (artFleets.length === 0) fireMenu = false; // выделение без артиллерии — меню гаснет
   const docked = fleets.filter((f) => f.location && !f.movement && !f.battleId);
   // PC: ШТУРМ is a targeting command (fly there + storm on arrival) — armable
@@ -7474,117 +7474,82 @@ function renderCmdBar() {
   );
   if (!castHero) castMenu = false;
   const html =
-    `<span class="cmdlabel">${ids.length > 1 ? t('{n} ФЛОТОВ', { n: ids.length }) : t('ФЛОТ')}</span>` +
-    cmdBtn(
-      'move',
-      '⤳',
-      t('Курс'),
-      aiming ? 'on' : '',
-      false,
-      t('выберите планету — флот пойдёт к ней по звёздным трассам'),
-    ) +
-    cmdBtn('stop', '■', t('Стоп'), 'danger', !anyMoving, t('отменить текущее движение флота')) +
+    `<span class="cmdlabel">${ids.length > 1 ? t('cmd.selection.many', { n: ids.length }) : t('cmd.selection.one')}</span>` +
+    cmdBtn('move', '⤳', t('cmd.move'), aiming ? 'on' : '', false, t('cmd.move.hint')) +
+    cmdBtn('stop', '■', t('cmd.stop'), 'danger', !anyMoving, t('cmd.stop.hint')) +
     cmdBtn(
       'attack',
       '⚔',
-      t('Штурм'),
+      t('cmd.assault'),
       assaultAim ? 'on' : '',
       !canAssault,
-      t('лететь к чужому миру и высадить десант при подходе'),
+      t('cmd.assault.hint'),
     ) +
-    cmdBtn(
-      'target',
-      '◎',
-      t('Цель'),
-      targetAim ? 'on' : '',
-      false,
-      t('тап по карте — собрать приказ: ждать · курс · штурм · обстрел'),
-    ) +
+    cmdBtn('target', '◎', t('cmd.target'), targetAim ? 'on' : '', false, t('cmd.target.hint')) +
     (castHero
-      ? cmdBtn(
-          'cast',
-          '✨',
-          t('Каст'),
-          castMenu ? 'on' : '',
-          false,
-          t('применить способность героя из состава флота'),
-        )
+      ? cmdBtn('cast', '✨', t('cmd.cast'), castMenu ? 'on' : '', false, t('cmd.cast.hint'))
       : '') +
     (anyArtillery
       ? cmdBtn(
           'barrage',
           '🎯',
-          t('Обстрел'),
+          t('cmd.barrage'),
           barrageAim ? 'on' : '',
           false,
-          t('сосредоточить огонь артиллерии по вражескому флоту с дистанции'),
+          t('cmd.barrage.hint'),
         )
       : '') +
     (artFleets.length > 0
-      ? cmdBtn(
-          'firemode',
-          '🔥',
-          fmLabel,
-          fireMenu ? 'on' : '',
-          false,
-          t('когда артиллерия стреляет сама: пассив · ответ · станд · агрес'),
-        )
+      ? cmdBtn('firemode', '🔥', fmLabel, fireMenu ? 'on' : '', false, t('cmd.fire.hint'))
       : '') +
     cmdBtn(
       'merge',
       '⛬',
-      ids.length > 1 ? t('Слить') : t('Слить…'),
+      ids.length > 1 ? t('cmd.merge') : t('cmd.merge.pick'),
       merging ? 'on' : '',
       !canMerge,
-      t('объединить выбранные флоты в один'),
+      t('cmd.merge.hint'),
     ) +
-    cmdBtn(
-      'split',
-      '⊟',
-      t('Делить'),
-      splitState ? 'on' : '',
-      !canSplit,
-      t('отделить часть кораблей пришвартованного флота в новый'),
-    ) +
+    cmdBtn('split', '⊟', t('cmd.split'), splitState ? 'on' : '', !canSplit, t('cmd.split.hint')) +
     // ☰ — the extras row (hamburger, NOT «...» — референс не копируем дословно):
     // «Выбрать+» и будущие Ускорить/Задержка живут здесь, базовый ряд не пухнет.
-    cmdBtn('more', '☰', t('Ещё'), cmdMore ? 'on' : '', false, t('дополнительные приказы')) +
+    cmdBtn('more', '☰', t('cmd.more'), cmdMore ? 'on' : '', false, t('cmd.more.hint')) +
     (cmdMore || pickMode
       ? cmdBtn(
           'pick',
           '⊕',
-          t('Выбрать+'),
+          t('cmd.multiselect'),
           pickMode ? 'on' : '',
           false,
-          t('добавлять флоты в группу по одному тапу'),
+          t('cmd.multiselect.hint'),
         )
       : '') +
     (cmdMore
       ? cmdBtn(
           'boost',
           '⚡',
-          t('Ускорить'),
+          t('cmd.forced-march'),
           ids.length > 0 && ids.every((id) => marchFlagged(id)) ? 'on' : '',
           ids.length === 0,
-          t('форс-марш: +50% скорости ценой −5% прочности за час хода'),
+          t('cmd.forced-march.hint'),
         ) +
         // SO-UI: standing orders live here now — the bottom sheet keeps only info.
         cmdBtn(
           'qauto',
           '⚔',
-          t('Авто-штурм'),
+          t('cmd.auto-assault'),
           ids.length > 0 && ids.every((id) => isAutoAssault(id)) ? 'on' : '',
           ids.length === 0,
-          t('флот сам штурмует вражеский мир по прибытии'),
+          t('cmd.auto-assault.hint'),
         ) +
         (fleets.some(fleetHasSquadron)
           ? cmdBtn(
               'qscramble',
               '🛩',
-              t('Деж. вылет'),
+              t('cmd.standing-sortie'),
               fleets.filter(fleetHasSquadron).every((fl) => patrolOf(fl.id)) ? 'on' : '',
               false,
-              t('эскадрилья автоматически бьёт врага в радиусе'),
+              t('cmd.standing-sortie.hint'),
             )
           : '')
       : '') +
@@ -7609,10 +7574,10 @@ function renderCmdBar() {
             const cdLeft = Math.max(0, (castHero.cooldowns?.[heroCdKey(ad.type)] ?? 0) - s.time);
             const sub =
               cdLeft > 0
-                ? t('КД {h}', { h: fmtHrs(cdLeft / HOUR) })
+                ? t('cmd.cast.cooldown', { h: fmtHrs(cdLeft / HOUR) })
                 : (ad.range ?? 0) > 0
-                  ? t('цель на карте')
-                  : t('на месте');
+                  ? t('cmd.cast.needs-target')
+                  : t('cmd.cast.self');
             return `<button data-cmd="castdo" data-ab="${ab}" data-hero="${castHero.id}"${cdLeft > 0 ? ' disabled' : ''}><b>${esc(t(ad.name))}</b><span>${sub}</span></button>`;
           })
           .join('') +

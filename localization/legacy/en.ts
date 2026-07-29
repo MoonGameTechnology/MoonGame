@@ -37,10 +37,7 @@ export const en: Record<string, string> = {
   // — a second entry here would be silently shadowed by it.
   'Ставится навсегда — рефита нет': 'Installed for good — no refit',
   'Необратимо — установить': 'Irreversible — install',
-  Каст: 'Cast',
-  Делить: 'Split',
   'цель на карте': 'target on map',
-  'на месте': 'in place',
   // --- TT-3.1 technology tree screen --------------------------------------------
   'Ветку курирует': 'Branch curated by',
   'Без лидера ветки — узлы с условием «учёный» закрыты':
@@ -113,7 +110,6 @@ export const en: Record<string, string> = {
   '{a} и {b}: {stance}': '{a} and {b}: {stance}',
   '{a} объявил войну {b}': '{a} declared war on {b}',
   '{b} — улучшение': '{b} — upgrade',
-  '{n} ФЛОТОВ': '{n} FLEETS',
   // TGT-1: target-order composer
   Цель: 'Target',
   '◎ тапните цель на карте — соберём приказ': '◎ tap a target on the map — compose the order',
@@ -124,11 +120,8 @@ export const en: Record<string, string> = {
   '⏱{n}ч': '⏱{n}h',
   '⏱ +1ч': '⏱ +1h',
   '🎯{n}ч': '🎯{n}h',
-  'Выбрать+': 'Select+',
-  'Деж. вылет': 'Scramble',
   '⚔ авто-штурм включён — флот сам штурмует вражеский мир по прибытии':
     '⚔ auto-storm on — the fleet storms the hostile world it arrives at by itself',
-  Ускорить: 'Boost',
   '⚡ форс-марш: +50% скорости, −5% прочности за час хода':
     '⚡ forced march: +50% speed, −5% hull per hour underway',
   '⊕ тапайте свои флоты — соберите группу и отдайте общий приказ':
@@ -151,7 +144,6 @@ export const en: Record<string, string> = {
   '{who} предлагает — нажмите, чтобы принять': '{who} is offering — tap to accept',
 
   // --- fleet panel / command bar ------------------------------------------------
-  Агрес: 'Aggr',
   Атака: 'Attack',
   'Боевой счёт': 'War record',
   'Боты не вступают в коалиции': 'Bots do not join coalitions',
@@ -222,7 +214,6 @@ export const en: Record<string, string> = {
   Корпус: 'Hull',
   Крейсер: 'Cruiser',
   Купить: 'Buy',
-  Курс: 'Move',
   'Маршрут проходит через миры <b>{names}</b>, с кем у вас <b>мир</b>. Мирного прохода нет — движение сюда объявит <b>войну</b>.':
     'This route crosses worlds held by <b>{names}</b>, with whom you are at <b>peace</b>. There is no peaceful passage — advancing here declares <b>war</b>.',
   'Нет дивизий.': 'No divisions.',
@@ -251,12 +242,10 @@ export const en: Record<string, string> = {
   'панель времени в матче — пауза и множители ускорения (1× — реальное время)':
     'the in-match time bar — pause and speed multipliers (1× is real time)',
   '⚔ штурмовать можно только чужой мир': "⚔ only someone else's world can be stormed",
-  'Авто-штурм': 'Auto-storm',
   ОТМЕНА: 'CANCEL',
   Оборона: 'Defense',
   Обстрел: 'Barrage',
   'Описание метки (необязательно)…': 'Marker description (optional)…',
-  Ответ: 'Return',
   'Отделите корабли в новый флот — он останется в том же секторе. Хотя бы один корабль остаётся; десант в трюме остаётся с исходным флотом.':
     'Peel ships into a new fleet — it stays in the same sector. At least one ship stays behind; carried troops stay with the original.',
   Отмена: 'Cancel',
@@ -298,8 +287,6 @@ export const en: Record<string, string> = {
   Сессия: 'Session',
   Скор: 'Spd',
   Скорость: 'Speed',
-  Слить: 'Merge',
-  'Слить…': 'Merge…',
   'Сообщение…': 'Message…',
   'Сообщений пока нет.': 'No messages yet.',
   Сообщения: 'Messages',
@@ -309,7 +296,6 @@ export const en: Record<string, string> = {
   Стоимость: 'Cost',
   'Предложение: {stance}': 'Proposal: {stance}',
   'Стойка изменена: {stance}': 'Stance changed: {stance}',
-  Стоп: 'Stop',
   'Тащите за шапку, чтобы переместить': 'Drag the title bar to move',
   Удар: 'Strike',
   ФЛОТ: 'FLEET',
@@ -323,11 +309,6 @@ export const en: Record<string, string> = {
   // Карточка статистики мира (тап по имени планеты)
   эскадрилий: 'squadrons',
   // 🔥 режим огня артиллерии — кнопка в командном ряду + пункты меню
-  'Режим огня': 'Fire mode',
-  'не стреляет': 'holds fire',
-  'только после урона по флоту': 'only after the fleet takes damage',
-  'по тем, с кем война': 'at declared enemies',
-  'по любому, кроме пакта/союза': 'at anyone except pact/alliance',
   Фракция: 'Faction',
   // H3 — setup faction picker (pure passive house bonuses)
   'Фракция — пассивный бонус дома': 'Faction — the house passive bonus',
@@ -965,7 +946,6 @@ export const en: Record<string, string> = {
   'Ещё раз «Назад» — выход из матча': 'Press Back again to leave the match',
   // --- static H4 headers / steward toggle (build.mjs [data-i18n]) --------------
   // --- Bytro-карточка армии: ХП-бар, сводка, платный ремонт, кап линии огня ----
-  артиллерия: 'artillery',
   флагман: 'flagship',
   рой: 'swarm',
   'форс-марш': 'forced march',
@@ -990,29 +970,8 @@ export const en: Record<string, string> = {
   'в эскроу уйдёт {n} ¤ · комиссию {p}% платит получатель кредитов':
     'escrow: {n} ¤ · the {p}% fee is paid by whoever receives the credits',
   // --- fleet-command hover tooltips (what each command button does) -------------
-  'выберите планету — флот пойдёт к ней по звёздным трассам':
-    'pick a planet — the fleet routes to it along the star lanes',
-  'отменить текущее движение флота': "cancel the fleet's current movement",
-  'лететь к чужому миру и высадить десант при подходе':
-    'fly to an enemy world and land troops on arrival',
-  'тап по карте — собрать приказ: ждать · курс · штурм · обстрел':
-    'tap the map to compose an order: wait · move · assault · barrage',
-  'применить способность героя из состава флота': "use a hero ability from the fleet's roster",
-  'сосредоточить огонь артиллерии по вражескому флоту с дистанции':
-    'focus artillery fire on an enemy fleet from standoff range',
-  'когда артиллерия стреляет сама: пассив · ответ · станд · агрес':
-    'when artillery fires on its own: passive · return · standard · aggressive',
-  'объединить выбранные флоты в один': 'merge the selected fleets into one',
-  'отделить часть кораблей пришвартованного флота в новый':
-    'peel some ships off a docked fleet into a new one',
-  'дополнительные приказы': 'extra orders',
-  'добавлять флоты в группу по одному тапу': 'add fleets to the group one tap at a time',
-  'форс-марш: +50% скорости ценой −5% прочности за час хода':
-    'forced march: +50% speed at the cost of −5% hull per hour under way',
   'флот сам штурмует вражеский мир по прибытии':
     'the fleet storms an enemy world by itself on arrival',
-  'эскадрилья автоматически бьёт врага в радиусе':
-    'the squadron automatically hits enemies within range',
   // --- REL-7 seat/faction picker ------------------------------------------------
   занято: 'taken',
   свободно: 'free',
