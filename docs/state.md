@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1928 зелёных** (54 skip, 176 файлов).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1932 зелёных** (54 skip, 177 файлов).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -112,7 +112,7 @@ packages/action-layer/src/
   data/          schemas.ts (zod-схемы + parseGameData, buildingLevel/buildingMaxLevel)
   rng/           rng.ts (sfc32)
   util/          clone.ts (deepClone/deepFreeze), treasury.ts (canAfford/payCost — shared by construction & technology), fitting.ts (генерик-гейт «слоты+предметы», SHIP-4) + loadout.ts (ship-обёртка над ним)
-  modules/       army, arsenalSync, artillery, captureOnArrival, combat, construction, diplomacy, economy, effects, espionage, faction, fleetOps, hero, heroEffects, intercept, market, movement, orbital, planetType, scientist, sector, station, steward, tax, technology, victory, visibility  (27 модулей, + *.test.ts)
+  modules/       army, arsenalSync, artillery, capital, captureOnArrival, combat, construction, diplomacy, economy, effects, espionage, faction, fleetOps, hero, heroEffects, intercept, market, movement, orbital, planetType, scientist, sector, station, steward, tax, technology, victory, visibility  (28 модулей, + *.test.ts)
   examples/      skirmish.test.ts (демо-сценарий + SVG)
   index.ts       баррель (экспорт публичного API)
 data/            manifest, resources, units, buildings, factions, events, sectors, planetTypes, technologies (.json)
@@ -669,6 +669,22 @@ UX-удобность — только что построенный кораб�
 сознательно отложено: `fleet.launch` уже даёт игроку способ вывести весь гарнизон
 одним действием, авто-рэлли не блокер, а полировка.
 
+### capital (`capital`) — назначаемая столица (якорь возрождения героя)
+
+Порт прототипного `capitalModule` (`prototype/src/capital.ts`, REFP-14). `heroModule`
+уже читал `hero.home` как fallback-точку возрождения (`[home, location].find(owned)`),
+но ничто не позволяло игроку ПЕРЕНАЗНАЧИТЬ его после старта матча — этот модуль закрывает
+разрыв.
+
+- **`capital.designate {planetId}`** — назначает свой обитаемый мир столицей;
+  перевязывает `home` у ВСЕХ героев игрока разом. `isInhabited` реализован инлайн
+  (`hasOrbit` + нет `allowedBuildings`-ограничения) — не импортирован из `modules/tax.ts`
+  («модули не импортируют друг друга», инвариант #3); `hasOrbit`/`allowedBuildings`
+  сами по себе утилиты `state/sectorKind.ts`, не модуль. Коды: `E_NO_PLANET,
+  E_FORBIDDEN, E_NOT_INHABITED, E_BAD_PAYLOAD`. Событие `capital.designated`.
+- `GameState.capital?: Record<PlayerId, PlanetId>` — новое опциональное поле (тот же
+  паттерн, что `market`/`intel`/`diplomacy`); `capitalsOf`/`capitalOf` — чтение.
+
 ### victory (`victory`) — победа и счёт
 
 `victoryModule` слушает `time.advanced`, `planet.captured`, `fleet.destroyed`,
@@ -868,8 +884,10 @@ type, target?}`. Payload-схема `hero.ability` добавлена в гей�
 кораблю; без территории остаётся мёртв (`Hero.alive`). Развёрнут — **главный** (градация
 `main`) герой ростера; имя (`Hero.name`) — ник игрока. В прототипе сидируется в стартовый
 флот со своим лоадаутом, `home` = столица (на старте — родной мир); `capital.designate`
-перенацеливает `home` героев владельца на новую столицу. Развёртывание **остальных**
-героев ростера отдельными кораблями — следующий кирпич.
+перенацеливает `home` героев владельца на новую столицу — есть и в ядре
+(`modules/capital.ts`, `capitalModule`, порт прототипного `capital.ts`/REFP-14), и в
+прототипе. Развёртывание **остальных** героев ростера отдельными кораблями — следующий
+кирпич.
 
 Герой **приватен**: `visibleState` отдаёт игроку только его собственного (позиция +
 кулдауны), чужих вырезает; `tempLanes` остаются — это публичная топология (реальные
