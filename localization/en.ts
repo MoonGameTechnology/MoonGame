@@ -60,6 +60,15 @@ export const en: Record<string, string> = {
   'arsenal.empty.hint':
     'sign in with an account on a server with persistence to see your collection',
   'arsenal.filter.all': 'All',
+  'arsenal.kind.fitting': 'Fittings',
+  'arsenal.kind.hull': 'Hulls',
+  'arsenal.kind.module': 'Modules',
+  'arsenal.origin.auction': 'auction',
+  'arsenal.origin.craft': 'craft',
+  'arsenal.origin.drop': 'drop',
+  'arsenal.origin.lootbox': 'lootbox',
+  'arsenal.origin.rent': 'rent',
+  'arsenal.origin.starter': 'starter',
 
   // --- auth — Вход и регистрация: позывной, сторонние провайдеры.
   'auth.apple.soon': 'Sign in with Apple — coming soon · you entered as a guest',
@@ -77,6 +86,16 @@ export const en: Record<string, string> = {
   // --- back — Кнопка «Назад» (APK/десктоп): подтверждение выхода.
   'back.confirm': 'Press Back again to exit',
   'back.confirm.match': 'Press Back again to leave the match',
+
+  // --- callsign — Позывные ботов.
+  'callsign.comet': 'Comet',
+  'callsign.falcon': 'Falcon',
+  'callsign.orion': 'Orion',
+  'callsign.quasar': 'Quasar',
+  'callsign.rhino': 'Rhino',
+  'callsign.titan': 'Titan',
+  'callsign.vector': 'Vector',
+  'callsign.viper': 'Viper',
 
   // --- card — Карточка игрока (тап по гербу): фракция, владения, боевой счёт.
   'card.close': 'CLOSE',
@@ -271,11 +290,25 @@ export const en: Record<string, string> = {
     'Steal treasury data · {c}¤ · ~60% chance · 24h window (the fee is lost on failure too)',
   'comms.stance-changed': '🕊 {who}: relations → {stance}',
   'comms.stance-changed.short': 'Stance changed: {stance}',
+  'comms.tag.player': 'PLAYER',
   'comms.war-declared': '⚔ {who} declared war on you!',
   'comms.you': 'YOU',
 
   // --- corp — Кабинет корпорации и войны альянсов (AvA): состав, заявки, готовность, вызовы.
   'corp.apply': 'Sign up',
+  'corp.audit.accept': 'accepted the application',
+  'corp.audit.create': 'created the corporation',
+  'corp.audit.decline': 'declined the application',
+  'corp.audit.disband': 'disbanded the corporation',
+  'corp.audit.influence': 'influence movement',
+  'corp.audit.kick': 'kicked',
+  'corp.audit.leave': 'left the corporation',
+  'corp.audit.medal': 'granted a medal',
+  'corp.audit.ready': 'readiness flag',
+  'corp.audit.rent': 'rented out an item',
+  'corp.audit.rent-return': 'returned a rented item',
+  'corp.audit.role': 'changed a role',
+  'corp.audit.transfer': 'transferred headship',
   'corp.browse.empty': 'No other corporations yet.',
   'corp.browse.title': 'Find and apply',
   'corp.card.influence': 'influence',
@@ -315,6 +348,16 @@ export const en: Record<string, string> = {
   'corp.ready.yes': 'yes ✓',
   'corp.request.accept': 'accept',
   'corp.request.reject': 'decline',
+  'corp.role.head': 'Leader',
+  'corp.role.member': 'Member',
+  'corp.role.officer': 'Officer',
+  'corp.role.recruit': 'Applicant',
+  'corp.tab.comms': 'Chat',
+  'corp.tab.holdings': 'Holdings',
+  'corp.tab.members': 'Members',
+  'corp.tab.overview': 'Overview',
+  'corp.tab.treasury': 'Treasury',
+  'corp.tab.wars': 'Wars',
   'corp.transfer-lead': 'transfer headship',
   'corp.war.accept': 'Accept',
   'corp.war.by-us': 'challenge from us',
@@ -560,6 +603,12 @@ export const en: Record<string, string> = {
   'fmt.hours': '{n}h',
   'fmt.minutes': '{n}m',
 
+  // --- form — Рода войск дивизии.
+  'form.heavy-infantry': 'Heavy Infantry',
+  'form.militia': 'Militia',
+  'form.special-forces': 'Special Forces',
+  'form.tank': 'Tank',
+
   // --- hint — Подсказки режима прицеливания на карте.
   'hint.aim-cancelled': 'aiming cancelled',
   'hint.assault-enemy-only': "⚔ only someone else's world can be stormed",
@@ -610,6 +659,13 @@ export const en: Record<string, string> = {
   'queue.unknown': 'unknown order',
   'queue.upgrade': '{b} — upgrade',
 
+  // --- res — Ресурсы в косвенных падежах (для фраз «не хватает …»).
+  'res.of.credits': 'credits',
+  'res.of.energy': 'energy',
+  'res.of.food': 'food',
+  'res.of.metal': 'metal',
+  'res.of.microelectronics': 'microelectronics',
+
   // --- sandbox — Песочница (дев-инструмент): переключатели и команды.
   'sandbox.commands': 'Commands',
   'sandbox.end-wars': 'Close',
@@ -648,6 +704,13 @@ export const en: Record<string, string> = {
   'split.title':
     'Peel ships into a new fleet — it stays in the same sector. At least one ship stays behind; carried troops stay with the original.',
   'split.title': 'SPLIT FLEET',
+
+  // --- stat — Характеристики юнита в компактных подписях.
+  'stat.cargo': 'cargo',
+  'stat.hp': 'hull',
+  'stat.radar': 'radar',
+  'stat.shield': 'shield',
+  'stat.speed': 'speed',
 
   // --- tgt — Композер приказов (TGT-1): шаги плана, отправка.
   'tgt.add-wait': 'Home',
@@ -710,12 +773,19 @@ export const en: Record<string, string> = {
   'yard.pick.hero-world': "⚓ pick your world{fl}{al} — the hero's ship rises there",
   'yard.pick.own-fleet': ' / own fleet',
   'yard.pick.target': '✨ pick a target world on the map',
+  'yard.slot.defense': 'Defense',
   'yard.slot.empty': 'empty — pick a module',
   'yard.slot.named': '«{s}» slot',
+  'yard.slot.utility': 'System',
+  'yard.slot.weapon': 'Weapon',
   'yard.slots.count': '{n} module slots (by hull size)',
   'yard.slots.note':
     'Typed slots: a module fits only its own type. <b>Greyed</b> — not for a free slot, or already installed.',
   'yard.soon': '«{what}» moves into the constructor in the next brick.',
+  'yard.tab.army': 'Army',
+  'yard.tab.heroes': 'Heroes',
+  'yard.tab.ships': 'Ships',
+  'yard.tab.squads': 'Squadrons',
   'yard.title': 'CONSTRUCTOR',
 
   // --- end — Экран конца матча: исход, опыт, итоговая таблица, реванш.
@@ -810,10 +880,15 @@ export const en: Record<string, string> = {
   'hero.ability.recall.name': 'Recall',
   'hero.ability.scan.desc': 'Reveals an area around the target through the fog for a while.',
   'hero.ability.scan.name': 'Scan',
+  'hero.branch.common': 'Common',
+  'hero.branch.psionic': 'psionic',
+  'hero.branch.transhuman': 'transhuman',
   'hero.grade.common': 'Common',
   'hero.grade.legendary': 'Legendary',
   'hero.grade.main': 'Main',
   'hero.grade.rare': 'Rare',
+  'hero.hook.combat-damage': 'damage to nearby fleets',
+  'hero.hook.fleet-speed': 'fleet speed',
 
   // --- hero.hq / hero.tree / hero.abil / hero.fit — Штаб героев: состав, дерево навыков, способности, фиттинги.
   'hero.abil.activate': 'Activate',
@@ -1125,6 +1200,10 @@ export const en: Record<string, string> = {
   'rail.toggle.title': 'Tools',
 
   // --- seatpick — Выбор фракции и места перед входом в сетевой матч.
+  'seatpick.bonus.amber': '+15% fleet speed',
+  'seatpick.bonus.azure': '+12% economy',
+  'seatpick.bonus.crimson': '+10% damage',
+  'seatpick.bonus.violet': '+5% economy and +5% damage',
   'seatpick.cancel': 'Back',
   'seatpick.go': 'CHOOSE',
   'seatpick.sub': 'Choose your faction and starting position. Taken seats are marked grey.',
@@ -1139,6 +1218,9 @@ export const en: Record<string, string> = {
   'setup.cancel': 'Back',
   'setup.faction.note': 'Faction — the house passive bonus',
   'setup.go': 'LAUNCH',
+  'setup.home.pick': 'Home: {home} — tap another glowing world to change',
+  'setup.home.solo':
+    'Home: {home} — a solo sandbox, no rivals · tap another glowing world to change',
   'setup.map-hint': 'Tap a glowing world to choose your start',
   'setup.off': 'OFF',
   'setup.sandbox': '🧪 Sandbox',
@@ -1432,6 +1514,19 @@ export const en: Record<string, string> = {
   'tech.branch.missile': 'Missiles',
   'tech.branch.space': 'Space',
   'tech.branch.squadron': 'Squadrons',
+  'tech.fx.damage': 'damage',
+  'tech.fx.fleet-speed': 'fleet speed',
+  'tech.fx.production': 'production',
+  'tech.fx.radar': 'radar range',
+  'tech.group.airwing': 'Air wing',
+  'tech.group.arsenal': 'Arsenal',
+  'tech.group.automation': 'Automation',
+  'tech.group.comms': 'Signals',
+  'tech.group.doctrines': 'Doctrines',
+  'tech.group.fleet': 'Fleet',
+  'tech.group.fortifications': 'Fortifications',
+  'tech.group.industry': 'Industry',
+  'tech.group.sensors': 'Sensors',
 
   // --- tech — Дерево технологий: требования узла, рельса дней, состояния и действия.
   'tech.action.done': 'Researched',

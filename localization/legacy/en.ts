@@ -6,7 +6,6 @@
 export const en: Record<string, string> = {
   // --- STAFF-1 «Штаб героев» redesign -------------------------------------------
   резерв: 'reserve',
-  Общие: 'Common',
   способностей: 'abilities',
   актив: 'active',
   Требует: 'Requires',
@@ -15,18 +14,8 @@ export const en: Record<string, string> = {
   // --- TT-3.1 technology tree screen --------------------------------------------
   старт: 'start',
   день: 'day',
-  Индустрия: 'Industry',
-  Сенсоры: 'Sensors',
-  Доктрины: 'Doctrines',
-  Укрепления: 'Fortifications',
-  Авиакрыло: 'Air wing',
-  Арсенал: 'Arsenal',
-  Связь: 'Signals',
   Автоматизация: 'Automation',
-  производство: 'production',
-  'скорость флотов': 'fleet speed',
   урон: 'damage',
-  'радиус радаров': 'radar range',
   Хранитель: 'Steward',
   // --- SPY-UX intel tab in diplomacy --------------------------------------------
   Шпионаж: 'Espionage',
@@ -53,9 +42,7 @@ export const en: Record<string, string> = {
   ИИ: 'AI',
   Герои: 'Heroes',
   Командир: 'Commander',
-  Корпус: 'Hull',
   Крейсер: 'Cruiser',
-  Модули: 'Modules',
   Назад: 'Back',
   'Управление скоростью': 'Speed control',
   'панель времени в матче — пауза и множители ускорения (1× — реальное время)':
@@ -94,31 +81,9 @@ export const en: Record<string, string> = {
   'боты не вступают в коалиции': 'bots do not join coalitions',
 
   // --- corp mock panel (role/presence dictionaries, CORP_TABS) ------------------
-  Глава: 'Leader',
-  Офицер: 'Officer',
-  Участник: 'Member',
   'в матче': 'in a match',
-  Обзор: 'Overview',
-  Участники: 'Members',
-  Казна: 'Treasury',
-  Владения: 'Holdings',
-  Войны: 'Wars',
-  Заявка: 'Applicant',
 
   // --- corporation cabinet (AVA-C1/C2, live) ------------------------------------
-  'создала корпорацию': 'created the corporation',
-  'приняла заявку': 'accepted the application',
-  'отклонила заявку': 'declined the application',
-  исключила: 'kicked',
-  'сменила роль': 'changed a role',
-  'передала главенство': 'transferred headship',
-  'покинула корпорацию': 'left the corporation',
-  'расформировала корпорацию': 'disbanded the corporation',
-  'движение влияния': 'influence movement',
-  'флаг готовности': 'readiness flag',
-  'выдала медаль': 'granted a medal',
-  'выдала предмет в аренду': 'rented out an item',
-  'вернула арендованный предмет': 'returned a rented item',
   AvA: 'AvA',
   готов: 'ready',
   победа: 'victory',
@@ -173,7 +138,6 @@ export const en: Record<string, string> = {
   оборона: 'defense',
   орбита: 'orbit',
   пусто: 'empty',
-  роль: 'role',
   секторов: 'sectors',
   скоро: 'soon',
   вы: 'you',
@@ -200,14 +164,6 @@ export const en: Record<string, string> = {
   Экономика: 'Economy',
   Наука: 'Science',
   // --- arsenal witryna («Арсенал», hub tab, ARS-5) --------------------------------
-  Корпуса: 'Hulls',
-  Фитинги: 'Fittings',
-  стартовый: 'starter',
-  дроп: 'drop',
-  крафт: 'craft',
-  аукцион: 'auction',
-  лутбокс: 'lootbox',
-  аренда: 'rent',
   модуль: 'module',
   'Ходовые школы': 'Helm Schools',
   '+5% к скорости всех флотов с первой секунды матча.':
@@ -263,15 +219,9 @@ export const en: Record<string, string> = {
 
   // --- science council (pre-match scientist pick + tech-window header) -------------
   // --- tech-branch labels (tabs / chips / section heads) ---------------------------
-  Эскадрильи: 'Squadrons',
-  'Дом: {home} — одиночная песочница, без соперников · тапните светящийся мир, чтобы сменить':
-    'Home: {home} — a solo sandbox, no rivals · tap another glowing world to change',
-  'Дом: {home} — тапните другой светящийся мир, чтобы сменить':
-    'Home: {home} — tap another glowing world to change',
   // --- rail icon labels + window headers -------------------------------------------
   Дипло: 'Diplo',
   Сон: 'Sleep',
-  Корп: 'Corp',
   ДИПЛОМАТИЯ: 'DIPLOMACY',
 
   // --- steward window («Хранитель») + settings + end-of-match ---------------------
@@ -279,19 +229,8 @@ export const en: Record<string, string> = {
   вкл: 'on',
 
   // --- suggested-callsign wordlist -----------------------------------------------
-  Носорог: 'Rhino',
-  Комета: 'Comet',
-  Гадюка: 'Viper',
-  Орион: 'Orion',
-  Вектор: 'Vector',
-  Сокол: 'Falcon',
-  Титан: 'Titan',
-  Квазар: 'Quasar',
   // --- constructor («Верфь») — the unified loadout tab ------------------------
-  Корабли: 'Ships',
   Армия: 'Army',
-  Оружие: 'Weapon',
-  Защита: 'Defense',
   Система: 'System',
   // stat / resource words used by the module-effect chips and cost lines
   корпус: 'hull',
@@ -299,11 +238,6 @@ export const en: Record<string, string> = {
   скорость: 'speed',
   трюм: 'cargo',
   радар: 'radar',
-  металла: 'metal',
-  кредитов: 'credits',
-  энергии: 'energy',
-  еды: 'food',
-  микроэлектроники: 'microelectronics',
   // --- hero window / deploy flow (окно героя, развёртывание) --------------------
   // --- division / formation builder (конструктор дивизий) ----------------------
   // --- build ETA / misc --------------------------------------------------------

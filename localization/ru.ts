@@ -62,6 +62,15 @@ export const ru: Record<string, string> = {
   'arsenal.empty': 'Арсенал пуст',
   'arsenal.empty.hint': 'войдите под аккаунтом на сервере с накоплением, чтобы увидеть коллекцию',
   'arsenal.filter.all': 'Всё',
+  'arsenal.kind.fitting': 'Фитинги',
+  'arsenal.kind.hull': 'Корпуса',
+  'arsenal.kind.module': 'Модули',
+  'arsenal.origin.auction': 'аукцион',
+  'arsenal.origin.craft': 'крафт',
+  'arsenal.origin.drop': 'дроп',
+  'arsenal.origin.lootbox': 'лутбокс',
+  'arsenal.origin.rent': 'аренда',
+  'arsenal.origin.starter': 'стартовый',
 
   // --- auth — Вход и регистрация: позывной, сторонние провайдеры.
   'auth.apple.soon': 'Вход через Apple — скоро · ты вошёл гостем',
@@ -79,6 +88,16 @@ export const ru: Record<string, string> = {
   // --- back — Кнопка «Назад» (APK/десктоп): подтверждение выхода.
   'back.confirm': 'Ещё раз «Назад» — выход',
   'back.confirm.match': 'Ещё раз «Назад» — выход из матча',
+
+  // --- callsign — Позывные ботов.
+  'callsign.comet': 'Комета',
+  'callsign.falcon': 'Сокол',
+  'callsign.orion': 'Орион',
+  'callsign.quasar': 'Квазар',
+  'callsign.rhino': 'Носорог',
+  'callsign.titan': 'Титан',
+  'callsign.vector': 'Вектор',
+  'callsign.viper': 'Гадюка',
 
   // --- card — Карточка игрока (тап по гербу): фракция, владения, боевой счёт.
   'card.close': 'ЗАКРЫТЬ',
@@ -272,11 +291,25 @@ export const ru: Record<string, string> = {
     'Украсть данные казны · {c}¤ · шанс ~60% · окно 24ч (плата сгорает и при провале)',
   'comms.stance-changed': '🕊 {who}: отношения → {stance}',
   'comms.stance-changed.short': 'Стойка изменена: {stance}',
+  'comms.tag.player': 'ИГРОК',
   'comms.war-declared': '⚔ {who} объявил вам войну!',
   'comms.you': 'ВЫ',
 
   // --- corp — Кабинет корпорации и войны альянсов (AvA): состав, заявки, готовность, вызовы.
   'corp.apply': 'Заявиться',
+  'corp.audit.accept': 'приняла заявку',
+  'corp.audit.create': 'создала корпорацию',
+  'corp.audit.decline': 'отклонила заявку',
+  'corp.audit.disband': 'расформировала корпорацию',
+  'corp.audit.influence': 'движение влияния',
+  'corp.audit.kick': 'исключила',
+  'corp.audit.leave': 'покинула корпорацию',
+  'corp.audit.medal': 'выдала медаль',
+  'corp.audit.ready': 'флаг готовности',
+  'corp.audit.rent': 'выдала предмет в аренду',
+  'corp.audit.rent-return': 'вернула арендованный предмет',
+  'corp.audit.role': 'сменила роль',
+  'corp.audit.transfer': 'передала главенство',
   'corp.browse.empty': 'Пока нет других корпораций.',
   'corp.browse.title': 'Найти и подать заявку',
   'corp.card.influence': 'влияние',
@@ -316,6 +349,16 @@ export const ru: Record<string, string> = {
   'corp.ready.yes': 'да ✓',
   'corp.request.accept': 'принять',
   'corp.request.reject': 'отклонить',
+  'corp.role.head': 'Глава',
+  'corp.role.member': 'Участник',
+  'corp.role.officer': 'Офицер',
+  'corp.role.recruit': 'Заявка',
+  'corp.tab.comms': 'Чат',
+  'corp.tab.holdings': 'Владения',
+  'corp.tab.members': 'Участники',
+  'corp.tab.overview': 'Обзор',
+  'corp.tab.treasury': 'Казна',
+  'corp.tab.wars': 'Войны',
   'corp.transfer-lead': 'передать главенство',
   'corp.war.accept': 'Принять',
   'corp.war.by-us': 'вызов от нас',
@@ -562,6 +605,12 @@ export const ru: Record<string, string> = {
   'fmt.hours': '{n}ч',
   'fmt.minutes': '{n}м',
 
+  // --- form — Рода войск дивизии.
+  'form.heavy-infantry': 'Тяжёлая пехота',
+  'form.militia': 'Ополчение',
+  'form.special-forces': 'Спецназ',
+  'form.tank': 'Танк',
+
   // --- hint — Подсказки режима прицеливания на карте.
   'hint.aim-cancelled': 'прицеливание отменено',
   'hint.assault-enemy-only': '⚔ штурмовать можно только чужой мир',
@@ -611,6 +660,13 @@ export const ru: Record<string, string> = {
   'queue.unknown': 'неизвестный заказ',
   'queue.upgrade': '{b} — улучшение',
 
+  // --- res — Ресурсы в косвенных падежах (для фраз «не хватает …»).
+  'res.of.credits': 'кредитов',
+  'res.of.energy': 'энергии',
+  'res.of.food': 'еды',
+  'res.of.metal': 'металла',
+  'res.of.microelectronics': 'микроэлектроники',
+
   // --- sandbox — Песочница (дев-инструмент): переключатели и команды.
   'sandbox.commands': 'Команды',
   'sandbox.end-wars': 'Закрыть',
@@ -649,6 +705,13 @@ export const ru: Record<string, string> = {
   'split.title':
     'Отделите корабли в новый флот — он останется в том же секторе. Хотя бы один корабль остаётся; десант в трюме остаётся с исходным флотом.',
   'split.title': 'РАЗДЕЛЕНИЕ ФЛОТА',
+
+  // --- stat — Характеристики юнита в компактных подписях.
+  'stat.cargo': 'трюм',
+  'stat.hp': 'корпус',
+  'stat.radar': 'радар',
+  'stat.shield': 'щит',
+  'stat.speed': 'скорость',
 
   // --- tgt — Композер приказов (TGT-1): шаги плана, отправка.
   'tgt.add-wait': 'Домой',
@@ -711,12 +774,19 @@ export const ru: Record<string, string> = {
   'yard.pick.hero-world': '⚓ выберите свой мир{fl}{al} — там поднимется корабль героя',
   'yard.pick.own-fleet': ' / свой флот',
   'yard.pick.target': '✨ выберите мир-цель на карте',
+  'yard.slot.defense': 'Защита',
   'yard.slot.empty': 'пусто — выбери модуль',
   'yard.slot.named': 'слот «{s}»',
+  'yard.slot.utility': 'Система',
+  'yard.slot.weapon': 'Оружие',
   'yard.slots.count': '{n} слота под модули (по размеру корпуса)',
   'yard.slots.note':
     'Типизированные слоты: модуль встаёт только в свой тип. <b>Серые</b> — не для свободного слота или уже стоят.',
   'yard.soon': '«{what}» переезжает в конструктор следующим кирпичом.',
+  'yard.tab.army': 'Армия',
+  'yard.tab.heroes': 'Герои',
+  'yard.tab.ships': 'Корабли',
+  'yard.tab.squads': 'Эскадрильи',
   'yard.title': 'КОНСТРУКТОР',
 
   // --- end — Экран конца матча: исход, опыт, итоговая таблица, реванш.
@@ -811,10 +881,15 @@ export const ru: Record<string, string> = {
   'hero.ability.recall.name': 'Отзыв',
   'hero.ability.scan.desc': 'Раскрывает зону вокруг цели сквозь туман на время.',
   'hero.ability.scan.name': 'Разведка',
+  'hero.branch.common': 'Общие',
+  'hero.branch.psionic': 'псионик',
+  'hero.branch.transhuman': 'трансгуман',
   'hero.grade.common': 'Обычный',
   'hero.grade.legendary': 'Легендарный',
   'hero.grade.main': 'Главный',
   'hero.grade.rare': 'Редкий',
+  'hero.hook.combat-damage': 'урон флотам рядом',
+  'hero.hook.fleet-speed': 'скорость флота',
 
   // --- hero.hq / hero.tree / hero.abil / hero.fit — Штаб героев: состав, дерево навыков, способности, фиттинги.
   'hero.abil.activate': 'Активировать',
@@ -1123,6 +1198,10 @@ export const ru: Record<string, string> = {
   'rail.toggle.title': 'Инструменты',
 
   // --- seatpick — Выбор фракции и места перед входом в сетевой матч.
+  'seatpick.bonus.amber': '+15% скорость флотов',
+  'seatpick.bonus.azure': '+12% экономика',
+  'seatpick.bonus.crimson': '+10% урон',
+  'seatpick.bonus.violet': '+5% экономика и +5% урон',
   'seatpick.cancel': 'Назад',
   'seatpick.go': 'ВЫБРАТЬ',
   'seatpick.sub': 'Выберите фракцию и стартовую позицию. Занятые места отмечены серым.',
@@ -1137,6 +1216,9 @@ export const ru: Record<string, string> = {
   'setup.cancel': 'Назад',
   'setup.faction.note': 'Фракция — пассивный бонус дома',
   'setup.go': 'ЗАПУСК',
+  'setup.home.pick': 'Дом: {home} — тапните другой светящийся мир, чтобы сменить',
+  'setup.home.solo':
+    'Дом: {home} — одиночная песочница, без соперников · тапните светящийся мир, чтобы сменить',
   'setup.map-hint': 'Тапните светящийся мир, чтобы выбрать старт',
   'setup.off': 'ВЫКЛ',
   'setup.sandbox': '🧪 Песочница',
@@ -1429,6 +1511,19 @@ export const ru: Record<string, string> = {
   'tech.branch.missile': 'Ракеты',
   'tech.branch.space': 'Космос',
   'tech.branch.squadron': 'Эскадрильи',
+  'tech.fx.damage': 'урон',
+  'tech.fx.fleet-speed': 'скорость флотов',
+  'tech.fx.production': 'производство',
+  'tech.fx.radar': 'радиус радаров',
+  'tech.group.airwing': 'Авиакрыло',
+  'tech.group.arsenal': 'Арсенал',
+  'tech.group.automation': 'Автоматизация',
+  'tech.group.comms': 'Связь',
+  'tech.group.doctrines': 'Доктрины',
+  'tech.group.fleet': 'Флот',
+  'tech.group.fortifications': 'Укрепления',
+  'tech.group.industry': 'Индустрия',
+  'tech.group.sensors': 'Сенсоры',
 
   // --- tech — Дерево технологий: требования узла, рельса дней, состояния и действия.
   'tech.action.done': 'Изучено',
