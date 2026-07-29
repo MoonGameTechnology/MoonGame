@@ -399,6 +399,15 @@ export const ru: Record<string, string> = {
   'data.bomber': 'бомбардировщик',
   'data.carrier': 'носитель',
   'data.credit-refinery': 'Кредитный НПЗ',
+  'data.cargo-bay': 'Грузовой отсек',
+  'data.radar-module': 'Радар-модуль',
+  'data.ion-engine': 'Ионный двигатель',
+  'data.targeting-array': 'Система наведения',
+  'data.ablative-plating': 'Броневые плиты',
+  'data.shield-booster': 'Тяжёлый щит',
+  'data.psi-amplifier': 'Пси-усилитель',
+  'data.aegis-matrix': 'Матрица «Эгида»',
+  'data.ablative-cladding': 'Абляционная обшивка',
   'data.credits': 'кредиты',
   'data.cruiser': 'крейсер',
   'data.crystalline': 'Кристаллический',
@@ -601,6 +610,12 @@ export const ru: Record<string, string> = {
     'Медленный бронированный носитель ({hp} корпуса, трюм на {c}) — своих пушек почти нет, вся его сила в эскадрильях, что он несёт. Держите его позади и запускайте авиагруппу по цели кнопкой «🛩 Запустить эскадрилью».',
   'dossier.unit.strike-carrier.name': 'Ударный носитель',
 
+  // --- faction — Фракции: пассивный бонус дома.
+  'faction.amber.desc': 'Кочевой конкорд логистов: флоты идут по лейнам на +15% быстрее.',
+  'faction.blue.desc': 'Торгово-промышленный договор: вся планетарная экономика даёт +12%.',
+  'faction.red.desc': 'Милитаристская гегемония: весь исходящий урон флотов и армий +10%.',
+  'faction.violet.desc': 'Универсалисты восхода: понемногу всюду — экономика +5% и урон +5%.',
+
   // --- fleet — Автоимя флота по размеру соединения.
   'fleet.size.armada': 'Армада',
   'fleet.size.fleet': 'Флот',
@@ -755,6 +770,21 @@ export const ru: Record<string, string> = {
   'sandbox.toggles': 'Переключатели',
   'sandbox.wars-ended': 'Вы ни с кем не воюете',
   'sandbox.wars-ended': 'Войны прекращены: {n} — отношения нейтральные',
+
+  // --- sci — Учёные совета: имя и что даёт ветка.
+  'sci.ground-marshal.desc': 'Лидер наземной ветки: крепости и оборона фронтира.',
+  'sci.ground-marshal.name': 'Наземный маршал',
+  'sci.missile-chief.desc': 'Лидер ракетной ветки: дальнобойные системы.',
+  'sci.missile-chief.name': 'Ракетный шеф',
+  'sci.overseer.desc':
+    'Лидер ветки командования (C2): доктрины автоматизации и делегирования. Открывает «Протокол Хранитель» — передачу места ИИ на время сна.',
+  'sci.overseer.name': 'Куратор',
+  'sci.polymath.desc': 'Генералист без ветки: +1 слот исследования (2→3) вместо фокуса.',
+  'sci.polymath.name': 'Полимат',
+  'sci.void-admiral.desc': 'Лидер космической ветки: верфи, логистика, осадные доктрины.',
+  'sci.void-admiral.name': 'Космоадмирал',
+  'sci.wing-commander.desc': 'Лидер ветки эскадрилий: авианосные ударные крылья.',
+  'sci.wing-commander.name': 'Командир крыла',
 
   // --- scipick — Совет учёных: кандидаты, фокус ветки, закрепление.
   'scipick.candidates': 'Кандидаты · нажмите, чтобы занять слот',
@@ -946,11 +976,17 @@ export const ru: Record<string, string> = {
   // --- hero — Герои: грейды, способности (имя + описание).
   'hero.ability.annihilate.desc': 'Уничтожает планету в радиусе — она становится мёртвым миром.',
   'hero.ability.annihilate.name': 'Аннигиляция',
+  'hero.ability.boarding-translocation.desc':
+    'Герой формируется прямо на борту одного из своих флотов — где бы тот ни был. Пассивный навык: расширяет точки развёртывания.',
+  'hero.ability.boarding-translocation.name': 'Абордажная транслокация',
   'hero.ability.bulwark.desc': 'Временный щит: +оборона своим флотам рядом с героем.',
   'hero.ability.bulwark.name': 'Бастион',
   'hero.ability.corridor.desc':
     'Открывает временный коридор-лейн до близкого мира; свои флоты идут по нему быстрее.',
   'hero.ability.corridor.name': 'Коридор',
+  'hero.ability.diplomatic-landing.desc':
+    'Союзные миры принимают героя как своего: корабль может подняться и на планете союзника. Пассивный навык: расширяет точки развёртывания.',
+  'hero.ability.diplomatic-landing.name': 'Дипломатическая высадка',
   'hero.ability.rally.desc':
     'Боевой клич: временный доп. бонус к ауре для своих флотов рядом с героем.',
   'hero.ability.rally.name': 'Сбор',
@@ -965,12 +1001,43 @@ export const ru: Record<string, string> = {
   'hero.branch.common': 'Общие',
   'hero.branch.psionic': 'псионик',
   'hero.branch.transhuman': 'трансгуман',
+  'hero.fit.ablative-plating.desc':
+    'Дополнительные +40 к корпусу корабля героя. (Статы корабля заработают со швом эффективных статов, SHIP-3.)',
+  'hero.fit.aegis-matrix.desc':
+    'Полевой генератор воодушевляет флоты рядом с героем: +8% к урону в радиусе 300.',
+  'hero.fit.psi-amplifier.desc': 'Резонансный контур раскрывает герою разведку сквозь туман.',
   'hero.grade.common': 'Обычный',
   'hero.grade.legendary': 'Легендарный',
   'hero.grade.main': 'Главный',
   'hero.grade.rare': 'Редкий',
   'hero.hook.combat-damage': 'урон флотам рядом',
   'hero.hook.fleet-speed': 'скорость флота',
+  'hero.passive.rally-beacon.desc':
+    'Флоты рядом с героем бьются яростнее: +8% к урону своих флотов в радиусе 300.',
+  'hero.passive.rally-beacon.name': 'Маяк сбора',
+  'hero.passive.vanguard-impulse.desc':
+    'Корабль героя ведёт свой флот на форсаже: +10% к скорости флота героя.',
+  'hero.passive.vanguard-impulse.name': 'Импульс авангарда',
+  'hero.tree.neural-lace.desc':
+    'Имплант прямого канала «мозг—штурвал»: корабль героя разгоняется на +10%.',
+  'hero.tree.neural-lace.name': 'Нейрокружево',
+  'hero.tree.overclocked-helm.desc': 'Форсаж нейроинтерфейса открывает герою прокладку коридоров.',
+  'hero.tree.overclocked-helm.name': 'Разогнанный шлем',
+  'hero.tree.psi-veil.desc': 'Отточенное пси-зрение: герой учится вскрывать туман разведкой.',
+  'hero.tree.psi-veil.name': 'Пси-вуаль',
+  'hero.tree.void-attunement.desc':
+    'Пси-резонанс героя воодушевляет флоты рядом: +8% к урону в радиусе 300.',
+  'hero.tree.void-attunement.name': 'Сонастройка с Пустотой',
+  'hero.unit.commander.desc':
+    'Главный герой-флагман: командный трансгуманист, усиливает флот и открывает коридоры.',
+  'hero.unit.commander.name': 'Командир',
+  'hero.unit.ravager.desc': 'Псионик-разрушитель: аннигилирует миры и вскрывает туман.',
+  'hero.unit.ravager.name': 'Разрушитель',
+  'hero.unit.vanguard.desc':
+    'Трансгуманист-манёвренник: коридоры и боевой клич для передовых флотов.',
+  'hero.unit.vanguard.name': 'Авангард',
+  'hero.unit.warden.desc': 'Псионик-защитник: держит рубеж бастионным щитом.',
+  'hero.unit.warden.name': 'Страж',
 
   // --- hero.hq / hero.tree / hero.abil / hero.fit — Штаб героев: состав, дерево навыков, способности, фиттинги.
   'hero.abil.activate': 'Активировать',
@@ -1285,6 +1352,8 @@ export const ru: Record<string, string> = {
   'seatpick.bonus.violet': '+5% экономика и +5% урон',
   'seatpick.cancel': 'Назад',
   'seatpick.go': 'ВЫБРАТЬ',
+  'seatpick.load-failed': 'Не удалось загрузить слоты',
+  'seatpick.loading': 'Загрузка…',
   'seatpick.sub': 'Выберите фракцию и стартовую позицию. Занятые места отмечены серым.',
   'seatpick.title': 'Выбор фракции',
 
@@ -1605,6 +1674,40 @@ export const ru: Record<string, string> = {
   'tech.group.fortifications': 'Укрепления',
   'tech.group.industry': 'Индустрия',
   'tech.group.sensors': 'Сенсоры',
+  'tech.node.ace-programs.desc':
+    'Программа асов: элитные экипажи. +6% к урону и скорости флотов. Капстоун Комэска.',
+  'tech.node.ai-stewardship.desc':
+    'Автоматизация командования: доверенному ИИ можно передать место, пока вы офлайн (спите) — он держит оборону и возвращает управление к сроку. Сильная — потому открывается выбором учёного-Куратора и лишь к середине сессии (день 16).',
+  'tech.node.combined-arms.desc': 'Общевойсковой бой: слаженность пехоты и брони. +5% к урону.',
+  'tech.node.deep-survey.desc': 'Сети дальних сенсоров: +15% к радиусу радаров.',
+  'tech.node.flight-decks.desc': 'Полётные палубы: быстрый цикл вылетов. +6% к скорости флотов.',
+  'tech.node.fortified-infrastructure.desc': 'Доктрина укреплённых миров — крепости фронтира.',
+  'tech.node.garrison-networks.desc':
+    'Гарнизонные сети: тыл сам себя снабжает. +5% к производству.',
+  'tech.node.guidance-arrays.desc':
+    'Массивы наведения: телеметрия дальнего рубежа. +10% к радиусу радаров.',
+  'tech.node.industrial-automation.desc': 'Апгрейд планетарной логистики: +10% к производству.',
+  'tech.node.logistics-command.desc':
+    'Штаб логистики: конвои по расписанию. +5% к производству и скорости флотов.',
+  'tech.node.meta-drill-combat.desc': 'Мета-прокачка: +5% к урону.',
+  'tech.node.meta-drill-radar.desc': 'Мета-прокачка: +15% к радиусу радаров.',
+  'tech.node.meta-drill-speed.desc': 'Мета-прокачка: +5% к скорости флотов.',
+  'tech.node.meta-drill-veteran.desc': 'Мета-прокачка: ещё +5% к скорости и урону.',
+  'tech.node.meta-industry-2.desc': 'Мета-прокачка: ещё +5% к производству.',
+  'tech.node.meta-industry.desc': 'Мета-прокачка: +5% к производству.',
+  'tech.node.microelectronics-fabrication.desc': 'Орбитальные фабрики: +5% к производству.',
+  'tech.node.orbital-logistics.desc': 'Стандартизация перевозок: +12% к скорости флотов.',
+  'tech.node.planetary-bastions.desc':
+    'Планетарные бастионы: оборонная промышленность полного цикла. +8% к урону. Капстоун Маршала.',
+  'tech.node.saturation-barrage.desc':
+    'Насыщающий залп: перегрузка любой ПРО. +10% к урону. Капстоун Ракетчика.',
+  'tech.node.siege-doctrine.desc': 'Осадные расчёты дальнего боя: +8% к урону.',
+  'tech.node.signal-corps.desc': 'Войска связи: единая картина боя. +8% к радиусу радаров.',
+  'tech.node.strike-vectors.desc': 'Ударные векторы: расчёт заходов эскадрилий. +8% к урону.',
+  'tech.node.void-armadas.desc':
+    'Доктрина больших соединений: +6% к урону и скорости флотов. Требует 5 своих секторов.',
+  'tech.node.warhead-miniaturization.desc':
+    'Миниатюризация БЧ: плотнее залп на тот же тоннаж. +6% к урону.',
 
   // --- tech — Дерево технологий: требования узла, рельса дней, состояния и действия.
   'tech.action.done': 'Изучено',
