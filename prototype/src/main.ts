@@ -11012,60 +11012,64 @@ function renderSettings(): void {
   const pct = Math.round(sweepOpacity * 100);
   settingsEl.innerHTML =
     `<div class="setbox">` +
-    `<div class="pc-head"><span class="pc-dia" style="background:var(--cyan)"></span><b>${t('НАСТРОЙКИ')}</b><span class="pc-tag">${t('интерфейс')}</span></div>` +
+    `<div class="pc-head"><span class="pc-dia" style="background:var(--cyan)"></span><b>${t('settings.title')}</b><span class="pc-tag">${t('settings.tag')}</span></div>` +
     `<div class="set-row">` +
-    `<div class="set-lbl">${t('Радарная развёртка')}<span class="set-sub">${t('вращающийся луч на карте — только вид, не влияет на обнаружение')}</span></div>` +
-    `<div class="set-ctl"><input id="set-sweep" type="range" min="0" max="100" step="5" value="${pct}" aria-label="${t('Прозрачность радарной развёртки')}"><span id="set-sweep-val" class="set-val">${pct}%</span></div>` +
+    `<div class="set-lbl">${t('settings.sweep')}<span class="set-sub">${t('settings.sweep.hint')}</span></div>` +
+    `<div class="set-ctl"><input id="set-sweep" type="range" min="0" max="100" step="5" value="${pct}" aria-label="${t('settings.sweep.opacity')}"><span id="set-sweep-val" class="set-val">${pct}%</span></div>` +
     `</div>` +
     `<div class="set-row">` +
-    `<div class="set-lbl">${t('Свои метки на карте')}<span class="set-sub">${t('булавки 📍 ваших пингов — метки союзников видны всегда')}</span></div>` +
-    `<div class="set-ctl"><label class="set-switch"><input id="set-ownpings" type="checkbox"${showOwnPings ? ' checked' : ''} aria-label="${t('Свои метки на карте')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-ownpings-val" class="set-val">${showOwnPings ? t('вкл') : t('выкл')}</span></div>` +
+    `<div class="set-lbl">${t('settings.own-pins')}<span class="set-sub">${t('settings.own-pins.hint')}</span></div>` +
+    `<div class="set-ctl"><label class="set-switch"><input id="set-ownpings" type="checkbox"${showOwnPings ? ' checked' : ''} aria-label="${t('settings.own-pins')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-ownpings-val" class="set-val">${showOwnPings ? t('settings.on') : t('settings.off')}</span></div>` +
     `</div>` +
     (pcUi()
       ? `<div class="set-row">` +
-        `<div class="set-lbl">${t('Компактный режим меню')}<span class="set-sub">${t('плотная панель сектора — меньше отступов, мельче шрифт (на ПК)')}</span></div>` +
-        `<div class="set-ctl"><label class="set-switch"><input id="set-compact" type="checkbox"${compactPanel ? ' checked' : ''} aria-label="${t('Компактный режим меню')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-compact-val" class="set-val">${compactPanel ? t('вкл') : t('выкл')}</span></div>` +
+        `<div class="set-lbl">${t('settings.compact')}<span class="set-sub">${t('settings.compact.hint')}</span></div>` +
+        `<div class="set-ctl"><label class="set-switch"><input id="set-compact" type="checkbox"${compactPanel ? ' checked' : ''} aria-label="${t('settings.compact')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-compact-val" class="set-val">${compactPanel ? t('settings.on') : t('settings.off')}</span></div>` +
         `</div>`
       : '') +
-    `<div class="pc-sec">${t('Цвета сторон')}</div>` +
+    `<div class="pc-sec">${t('settings.colors.title')}</div>` +
     `<div class="set-row">` +
-    `<div class="set-lbl">${t('Свой цвет')}<span class="set-sub">${t('вы на карте и в панелях — форма несёт тип, цвет несёт сторону')}</span></div>` +
-    `<div class="set-ctl"><input id="set-colyou" type="color" value="${youColor}" aria-label="${t('Свой цвет')}"></div>` +
+    `<div class="set-lbl">${t('settings.colors.own')}<span class="set-sub">${t('settings.colors.own.hint')}</span></div>` +
+    `<div class="set-ctl"><input id="set-colyou" type="color" value="${youColor}" aria-label="${t('settings.colors.own')}"></div>` +
     `</div>` +
     `<div class="set-row">` +
-    `<div class="set-lbl">${t('Нейтральные')}<span class="set-sub">${t('ничейные миры и неопознанные силы')}</span></div>` +
-    `<div class="set-ctl"><input id="set-colneutral" type="color" value="${neutralColor}" aria-label="${t('Нейтральные')}"></div>` +
+    `<div class="set-lbl">${t('settings.colors.neutral')}<span class="set-sub">${t('settings.colors.neutral.hint')}</span></div>` +
+    `<div class="set-ctl"><input id="set-colneutral" type="color" value="${neutralColor}" aria-label="${t('settings.colors.neutral')}"></div>` +
     `</div>` +
     `<div class="set-row">` +
-    `<div class="set-lbl">${t('Палитра соперников')}<span class="set-sub">${t('«дальтоник» — оттенки, различимые при цветослепоте')}</span></div>` +
+    `<div class="set-lbl">${t('settings.colors.palette')}<span class="set-sub">${t('settings.colors.palette.hint')}</span></div>` +
     `<div class="set-ctl set-pals">` +
     (['classic', 'warm', 'cvd'] as const)
       .map(
         (p) =>
           `<button type="button" class="set-pal${rivalPaletteId === p ? ' on' : ''}" data-pal="${p}">${
-            p === 'classic' ? t('классика') : p === 'warm' ? t('тёплая') : t('дальтоник')
+            p === 'classic'
+              ? t('settings.palette.classic')
+              : p === 'warm'
+                ? t('settings.palette.warm')
+                : t('settings.palette.colorblind')
           }</button>`,
       )
       .join('') +
-    `<button type="button" class="set-pal" id="set-colreset" title="${t('Вернуть цвета по умолчанию')}">⟲</button>` +
+    `<button type="button" class="set-pal" id="set-colreset" title="${t('settings.colors.reset')}">⟲</button>` +
     `</div>` +
     `</div>` +
-    `<div class="pc-sec">${t('Графика')}</div>` +
+    `<div class="pc-sec">${t('settings.gfx.title')}</div>` +
     `<div class="set-row">` +
-    `<div class="set-lbl">${t('Свечение и ореолы')}<span class="set-sub">${t('мягкое сияние вокруг миров, флотов и границ — выключите ради чёткой карты и скорости')}</span></div>` +
-    `<div class="set-ctl"><label class="set-switch"><input id="set-glow" type="checkbox"${glowFx ? ' checked' : ''} aria-label="${t('Свечение и ореолы')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-glow-val" class="set-val">${glowFx ? t('вкл') : t('выкл')}</span></div>` +
-    `</div>` +
-    `<div class="set-row">` +
-    `<div class="set-lbl">${t('Звёздный фон')}<span class="set-sub">${t('дрейфующие туманности и звёзды на фоне — выключите для плоского фона')}</span></div>` +
-    `<div class="set-ctl"><label class="set-switch"><input id="set-starfield" type="checkbox"${starfield ? ' checked' : ''} aria-label="${t('Звёздный фон')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-starfield-val" class="set-val">${starfield ? t('вкл') : t('выкл')}</span></div>` +
+    `<div class="set-lbl">${t('settings.gfx.glow')}<span class="set-sub">${t('settings.gfx.glow.hint')}</span></div>` +
+    `<div class="set-ctl"><label class="set-switch"><input id="set-glow" type="checkbox"${glowFx ? ' checked' : ''} aria-label="${t('settings.gfx.glow')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-glow-val" class="set-val">${glowFx ? t('settings.on') : t('settings.off')}</span></div>` +
     `</div>` +
     `<div class="set-row">` +
-    `<div class="set-lbl">${t('Счётчик FPS')}<span class="set-sub">${t('показывать кадры в секунду в углу — для проверки производительности')}</span></div>` +
-    `<div class="set-ctl"><label class="set-switch"><input id="set-fps" type="checkbox"${showFps ? ' checked' : ''} aria-label="${t('Счётчик FPS')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-fps-val" class="set-val">${showFps ? t('вкл') : t('выкл')}</span></div>` +
+    `<div class="set-lbl">${t('settings.gfx.starfield')}<span class="set-sub">${t('settings.gfx.starfield.hint')}</span></div>` +
+    `<div class="set-ctl"><label class="set-switch"><input id="set-starfield" type="checkbox"${starfield ? ' checked' : ''} aria-label="${t('settings.gfx.starfield')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-starfield-val" class="set-val">${starfield ? t('settings.on') : t('settings.off')}</span></div>` +
+    `</div>` +
+    `<div class="set-row">` +
+    `<div class="set-lbl">${t('settings.gfx.fps')}<span class="set-sub">${t('settings.gfx.fps.hint')}</span></div>` +
+    `<div class="set-ctl"><label class="set-switch"><input id="set-fps" type="checkbox"${showFps ? ' checked' : ''} aria-label="${t('settings.gfx.fps')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-fps-val" class="set-val">${showFps ? t('settings.on') : t('settings.off')}</span></div>` +
     `</div>` +
     // The «управление скоростью» control moved to the sandbox panel (a dev-only corner),
     // so Settings no longer carries a developer section.
-    `<button class="pc-close" id="set-close" type="button">${t('ГОТОВО')}</button>` +
+    `<button class="pc-close" id="set-close" type="button">${t('settings.done')}</button>` +
     `</div>`;
   const slider = document.getElementById('set-sweep') as HTMLInputElement | null;
   const val = document.getElementById('set-sweep-val');
@@ -11077,31 +11081,31 @@ function renderSettings(): void {
   const ownVal = document.getElementById('set-ownpings-val');
   own?.addEventListener('change', () => {
     setShowOwnPings(own.checked);
-    if (ownVal) ownVal.textContent = own.checked ? t('вкл') : t('выкл');
+    if (ownVal) ownVal.textContent = own.checked ? t('settings.on') : t('settings.off');
   });
   const compact = document.getElementById('set-compact') as HTMLInputElement | null;
   const compactVal = document.getElementById('set-compact-val');
   compact?.addEventListener('change', () => {
     setCompactPanel(compact.checked);
-    if (compactVal) compactVal.textContent = compact.checked ? t('вкл') : t('выкл');
+    if (compactVal) compactVal.textContent = compact.checked ? t('settings.on') : t('settings.off');
   });
   const glow = document.getElementById('set-glow') as HTMLInputElement | null;
   const glowVal = document.getElementById('set-glow-val');
   glow?.addEventListener('change', () => {
     setGlowFx(glow.checked);
-    if (glowVal) glowVal.textContent = glow.checked ? t('вкл') : t('выкл');
+    if (glowVal) glowVal.textContent = glow.checked ? t('settings.on') : t('settings.off');
   });
   const star = document.getElementById('set-starfield') as HTMLInputElement | null;
   const starVal = document.getElementById('set-starfield-val');
   star?.addEventListener('change', () => {
     setStarfield(star.checked);
-    if (starVal) starVal.textContent = star.checked ? t('вкл') : t('выкл');
+    if (starVal) starVal.textContent = star.checked ? t('settings.on') : t('settings.off');
   });
   const fps = document.getElementById('set-fps') as HTMLInputElement | null;
   const fpsVal = document.getElementById('set-fps-val');
   fps?.addEventListener('change', () => {
     setShowFps(fps.checked);
-    if (fpsVal) fpsVal.textContent = fps.checked ? t('вкл') : t('выкл');
+    if (fpsVal) fpsVal.textContent = fps.checked ? t('settings.on') : t('settings.off');
   });
   // Цвета сторон: живые инпуты + пресеты палитры соперников. Карта красится на
   // следующем кадре сама (ownerColor читается при отрисовке), панель — при

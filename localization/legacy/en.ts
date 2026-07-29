@@ -207,7 +207,6 @@ export const en: Record<string, string> = {
   Коалиция: 'Coalition',
   'Командный бой: ВКЛ': 'Team battle: ON',
   'Командный бой: выкл': 'Team battle: off',
-  'Компактный режим меню': 'Compact panel mode',
   'одна сторона — союзники': 'one side = allies',
   Командир: 'Commander',
   Корпорация: 'Corporation',
@@ -223,7 +222,6 @@ export const en: Record<string, string> = {
   Назад: 'Back',
   'Напишите первое сообщение.': 'Write the first message.',
   Настройки: 'Settings',
-  Нейтрал: 'Neutral',
   'Нет дивизий — мобилизуй по шаблону ниже.': 'No divisions — mobilize from a template below.',
   'Нет лотов на покупку': 'No buy orders',
   'Нет лотов на продажу': 'No sell orders',
@@ -839,28 +837,8 @@ export const en: Record<string, string> = {
   '🌅 Хранитель вернул вам управление (была «Активная оборона»).':
     '🌅 The Steward returned control to you (posture was “Active defense”).',
   интерфейс: 'interface',
-  'Радарная развёртка': 'Radar sweep',
-  'вращающийся луч на карте — только вид, не влияет на обнаружение':
-    'the rotating beam on the map — visual only, does not affect detection',
-  'Прозрачность радарной развёртки': 'Radar sweep opacity',
-  'Свои метки на карте': 'My map markers',
-  'булавки 📍 ваших пингов — метки союзников видны всегда':
-    "your own 📍 ping pins — allies' markers always show",
-  'плотная панель сектора — меньше отступов, мельче шрифт (на ПК)':
-    'a denser sector panel — smaller paddings and type (PC)',
-  Графика: 'Graphics',
-  'Свечение и ореолы': 'Glow & haloes',
-  'мягкое сияние вокруг миров, флотов и границ — выключите ради чёткой карты и скорости':
-    'soft bloom around worlds, fleets and borders — turn off for a crisp, faster map',
-  'Звёздный фон': 'Star backdrop',
-  'дрейфующие туманности и звёзды на фоне — выключите для плоского фона':
-    'drifting nebulae and stars in the background — turn off for a flat backdrop',
-  'Счётчик FPS': 'FPS counter',
-  'показывать кадры в секунду в углу — для проверки производительности':
-    'show frames per second in the corner — to check performance',
   вкл: 'on',
   выкл: 'off',
-  ГОТОВО: 'DONE',
   '⟳ К выбору ботов': '⟳ Back to setup',
 
   // --- suggested-callsign wordlist -----------------------------------------------
@@ -951,19 +929,6 @@ export const en: Record<string, string> = {
   'форс-марш': 'forced march',
   Радар: 'Radar',
   // --- настройки: цвета сторон -------------------------------------------------
-  'Цвета сторон': 'Side colours',
-  'Свой цвет': 'Your colour',
-  'вы на карте и в панелях — форма несёт тип, цвет несёт сторону':
-    'you on the map and in panels — the shape carries the type, the colour carries the side',
-  Нейтральные: 'Neutrals',
-  'ничейные миры и неопознанные силы': 'unowned worlds and unidentified forces',
-  'Палитра соперников': 'Rival palette',
-  '«дальтоник» — оттенки, различимые при цветослепоте':
-    '«colourblind» — hues distinguishable with colour vision deficiency',
-  классика: 'classic',
-  тёплая: 'warm',
-  дальтоник: 'colourblind',
-  'Вернуть цвета по умолчанию': 'Reset colours to defaults',
   // --- ECON-3: экспресс-ремонт за металл ---------------------------------------
   // --- ECON-4: рыночная комиссия ------------------------------------------------
   'к получению после комиссии {p}%: {n} ¤': 'you receive after the {p}% fee: {n} ¤',

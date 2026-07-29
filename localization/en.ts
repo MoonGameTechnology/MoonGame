@@ -541,6 +541,42 @@ export const en: Record<string, string> = {
     'Pick your homeworld on the map, choose how many AI rivals join, then launch. Empty slots are taken by the AI — switch a slot OFF to command a smaller sector, or switch them all off for a peaceful solo sandbox to explore the interface.',
   'setup.title': 'SKIRMISH SETUP',
 
+  // --- settings — Экран настроек: интерфейс, цвета сторон, графика.
+  'settings.colors.neutral': 'Neutrals',
+  'settings.colors.neutral.hint': 'unowned worlds and unidentified forces',
+  'settings.colors.own': 'Your colour',
+  'settings.colors.own.hint':
+    'you on the map and in panels — the shape carries the type, the colour carries the side',
+  'settings.colors.palette': 'Rival palette',
+  'settings.colors.palette.hint':
+    '«colourblind» — hues distinguishable with colour vision deficiency',
+  'settings.colors.reset': 'Reset colours to defaults',
+  'settings.colors.title': 'Side colours',
+  'settings.compact': 'Compact panel mode',
+  'settings.compact.hint': 'a denser sector panel — smaller paddings and type (PC)',
+  'settings.done': 'DONE',
+  'settings.gfx.fps': 'FPS counter',
+  'settings.gfx.fps.hint': 'show frames per second in the corner — to check performance',
+  'settings.gfx.glow': 'Glow & haloes',
+  'settings.gfx.glow.hint':
+    'soft bloom around worlds, fleets and borders — turn off for a crisp, faster map',
+  'settings.gfx.starfield': 'Star backdrop',
+  'settings.gfx.starfield.hint':
+    'drifting nebulae and stars in the background — turn off for a flat backdrop',
+  'settings.gfx.title': 'Graphics',
+  'settings.off': 'off',
+  'settings.on': 'on',
+  'settings.own-pins': 'My map markers',
+  'settings.own-pins.hint': "your own 📍 ping pins — allies' markers always show",
+  'settings.palette.classic': 'classic',
+  'settings.palette.colorblind': 'colourblind',
+  'settings.palette.warm': 'warm',
+  'settings.sweep': 'Radar sweep',
+  'settings.sweep.hint': 'the rotating beam on the map — visual only, does not affect detection',
+  'settings.sweep.opacity': 'Radar sweep opacity',
+  'settings.tag': 'interface',
+  'settings.title': 'SETTINGS',
+
   // --- ship — Корабли: корпуса и модули (имя + описание).
   'ship.hull.cruiser': 'Cruiser',
   'ship.hull.dropship': 'Carrier',
