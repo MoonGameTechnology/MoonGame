@@ -91,8 +91,6 @@ export const en: Record<string, string> = {
   'противников нет': 'no opponents',
   ЖУРНАЛ: 'JOURNAL',
   'попыток ещё не было': 'no attempts yet',
-  '🗝 Успех: {what}': '🗝 Success: {what}',
-  '✖ Провал против {who} — плата сгорела': '✖ Failed against {who} — the fee burned',
   // --- ONB-7 first-session goals checklist -------------------------------------
   // --- ONB-5 async intro + return digest ---------------------------------------
   // --- ONB-3 just-in-time mechanic intros --------------------------------------
@@ -106,9 +104,6 @@ export const en: Record<string, string> = {
   Далее: 'Next',
   Понятно: 'Got it',
   // --- placeholders / small fragments ------------------------------------------
-  ' · потери: {tally}': ' · losses: {tally}',
-  '{a} и {b}: {stance}': '{a} and {b}: {stance}',
-  '{a} объявил войну {b}': '{a} declared war on {b}',
   '{b} — улучшение': '{b} — upgrade',
   // TGT-1: target-order composer
   Цель: 'Target',
@@ -140,7 +135,6 @@ export const en: Record<string, string> = {
   '{s}/{c} игроков': '{s}/{c} players',
   '{what} — не вышло: {err}': '{what} — failed: {err}',
   '{what} — скоро': '{what} — coming soon',
-  '{who} отклонил предложение: {stance}': '{who} declined the proposal: {stance}',
   '{who} предлагает — нажмите, чтобы принять': '{who} is offering — tap to accept',
 
   // --- fleet panel / command bar ------------------------------------------------
@@ -209,8 +203,6 @@ export const en: Record<string, string> = {
   Корпус: 'Hull',
   Крейсер: 'Cruiser',
   Купить: 'Buy',
-  'Маршрут проходит через миры <b>{names}</b>, с кем у вас <b>мир</b>. Мирного прохода нет — движение сюда объявит <b>войну</b>.':
-    'This route crosses worlds held by <b>{names}</b>, with whom you are at <b>peace</b>. There is no peaceful passage — advancing here declares <b>war</b>.',
   'Нет дивизий.': 'No divisions.',
   'Миров под контролем': 'Worlds held',
   Модули: 'Modules',
@@ -221,22 +213,12 @@ export const en: Record<string, string> = {
   'Нет дивизий — мобилизуй по шаблону ниже.': 'No divisions — mobilize from a template below.',
   'Нет лотов на покупку': 'No buy orders',
   'Нет лотов на продажу': 'No sell orders',
-  'ОБЪЯВИТЬ ВОЙНУ': 'DECLARE WAR',
-  'ОБЪЯВИТЬ ВОЙНУ?': 'DECLARE WAR?',
-  'Это мир дружественной фракции. Вы хотите объявить войну <b>{names}</b>?':
-    "This is a friendly faction's world. Do you want to declare war on <b>{names}</b>?",
   ДА: 'YES',
-  НЕТ: 'NO',
   '⚔ выберите чужой мир для штурма': "⚔ pick someone else's world to storm",
-  '⚔ штурм невозможен: на борту нет десанта, а мир защищён — погрузите войска':
-    '⚔ assault impossible: no landing force aboard and the world is defended — load troops',
-  '⚔ внимание: на борту нет десанта — защищённый мир штурмом не взять':
-    '⚔ warning: no landing force aboard — a defended world cannot be stormed',
   'Управление скоростью': 'Speed control',
   'панель времени в матче — пауза и множители ускорения (1× — реальное время)':
     'the in-match time bar — pause and speed multipliers (1× is real time)',
   '⚔ штурмовать можно только чужой мир': "⚔ only someone else's world can be stormed",
-  ОТМЕНА: 'CANCEL',
   Оборона: 'Defense',
   Обстрел: 'Barrage',
   'Описание метки (необязательно)…': 'Marker description (optional)…',
@@ -326,7 +308,6 @@ export const en: Record<string, string> = {
   Микро: 'Micro',
 
   // --- diplomatic stance (STANCE_RU, via stanceRu()) ---------------------------
-  Война: 'War',
   Мир: 'Peace',
   Союз: 'Alliance',
 
@@ -416,7 +397,6 @@ export const en: Record<string, string> = {
   'ваш лот': 'your lot',
   высадка: 'landing',
   гарнизон: 'garrison',
-  'данные мира': "a world's data",
   'данные о флотах': 'fleet data',
   десант: 'landing',
   'до {n} очк.': 'up to {n} pts.',
@@ -445,21 +425,17 @@ export const en: Record<string, string> = {
   'в гарнизоне не осталось': 'none left in the garrison',
   нет: 'none',
   'трюм полон': 'the hold is full',
-  ничья: 'a stalemate',
   'новый флот: {a} кораблей · у исходного останется {b}':
     'new fleet: {a} ships · original keeps {b}',
   'обновления доступны только в APK': 'updates are only available in the APK',
   оборона: 'defense',
   орбита: 'orbit',
   'ошибка архива': 'archive error',
-  'победа: {who}': '{who} won',
   подписка: 'subscription',
-  покупка: 'buy',
   'глобальный канал появится вместе с глобальным сервером':
     'the global channel arrives with the global server',
   'прицеливание отменено': 'aiming cancelled',
   'проверка: {msg}': 'check: {msg}',
-  продажа: 'sell',
   пусто: 'empty',
   роль: 'role',
   'сборка {b}': 'build {b}',
@@ -476,32 +452,23 @@ export const en: Record<string, string> = {
   оз: 'hp',
   цена: 'price',
   '↪ камера': '↪ camera',
-  '⇄ биржа: {n} {res} за {paid} ¤ ({side})': '⇄ market: {n} {res} for {paid} ¤ ({side})',
-  '⊟ флот разделён у {at}': '⊟ fleet split at {at}',
   '◆ новый радарный контакт ({size}) у {at}': '◆ new radar contact ({size}) at {at}',
   '● отключён от сервера': '● disconnected from server',
   '● подключён как {who}': '● connected as {who}',
   '● связь потеряна — переподключение…': '● connection lost — reconnecting…',
   '☠ Потеряно своих': '☠ Own units lost',
-  '☠️ флот {who} уничтожен': '☠️ a {who} fleet was destroyed',
   // combat forecast (ONB-6, fleet panel strike section)
   '⚠ Враг идёт к {node}: прибытие через {dur}':
     '⚠ An enemy is heading for {node}: arrival in {dur}',
   '⚠ Враг у {node}!': '⚠ An enemy at {node}!',
-  '⚔ Война объявлена — флоты выдвигаются': '⚔ War declared — fleets advancing',
   '⚔ Уничтожено юнитов врага': '⚔ Enemy units destroyed',
-  '⚔ бой у {at} завершён — {res}': '⚔ battle at {at} ended — {res}',
   '⚔ штурм': '⚔ assault',
-  '⚔️ бой у {at} ({phase})': '⚔️ battle at {at} ({phase})',
-  '⚛ изучено: {tech}': '⚛ researched: {tech}',
   '⚡ Коалиция · {n} уч.': '⚡ Coalition · {n} members',
   '△ Сессия · {n} в матче': '△ Session · {n} in match',
   'Общий канал матча — вас слышат все участники.':
     'The match-wide channel — everyone in the match hears you.',
   '⛬ выберите флот для объединения': '⛬ pick a fleet to merge with',
-  '⛬ флоты объединены у {at}': '⛬ fleets merged at {at}',
   '✓ актуально · локально {l} · сервер {r}': '✓ up to date · local {l} · server {r}',
-  '✖ {who} отклонил: {stance}': '✖ {who} declined: {stance}',
   '🕊 {who} предлагает: {stance} — ответьте тем же в Дипломатии':
     '🕊 {who} offers {stance} — answer in kind in Diplomacy',
   '⏳ {who}: предложение отправлено — {stance}': '⏳ {who}: proposal sent — {stance}',
@@ -511,7 +478,6 @@ export const en: Record<string, string> = {
   '✦ {score}/{limit}: мир — 50, прочий сектор — 10, здания добавляют по уровню (у вас {w} миров, {s} секторов). Победа: ✦ {limit}, уничтожение соперников или доминирование.':
     '✦ {score}/{limit}: a world — 50, any other province — 10, buildings add per level (you hold {w} worlds, {s} provinces). Win at ✦ {limit}, by eliminating rivals, or by domination.',
   '⟳ переподключение…': '⟳ reconnecting…',
-  '⬆️ {b} → L{lvl} на {at}': '⬆️ {b} → L{lvl} at {at}',
   '⬇ есть обновление → сборка {v}': '⬇ update available → build {v}',
   '🎯 автоприцел': '🎯 auto-target',
   '🎯 сосредоточенный огонь назначен': '🎯 focus fire set',
@@ -530,24 +496,14 @@ export const en: Record<string, string> = {
   '⟳ Играть ещё': '⟳ Play again',
   '⟳ Новый матч': '⟳ New match',
   'В меню': 'Menu',
-  '🏗️ {b}: построено на {at}': '🏗️ {b} built at {at}',
-  '💥 {b}: разрушено на {at}': '💥 {b} destroyed at {at}',
   '📍 Пинг': '📍 Ping',
   '📍 Пинг → {who}': '📍 Ping → {who}',
   '📍 Пинг → Коалиция': '📍 Ping → Coalition',
   '🕊 {who}: отношения → {stance}': '🕊 {who}: relations → {stance}',
-  '🕵 Агент добыл разведданные: {what} — окно 24ч': '🕵 Agent got intel: {what} — a 24h window',
-  '🕵 Агент провалился ({who}) — плата сгорела': '🕵 Agent failed ({who}) — the fee is gone',
   'Украсть данные казны · {c}¤ · шанс ~60% · окно 24ч (плата сгорает и при провале)':
     'Steal treasury data · {c}¤ · ~60% chance · 24h window (the fee is lost on failure too)',
   'Украсть данные о флотах · {c}¤ · шанс ~60% · окно 24ч (плата сгорает и при провале)':
     'Steal fleet data · {c}¤ · ~60% chance · 24h window (the fee is lost on failure too)',
-  '🚀 {who} поднял флот с {at}': '🚀 {who} launched a fleet from {at}',
-  '🚩 {who} захватил {at}': '🚩 {who} captured {at}',
-  '🛡 Контрразведка: агент {who} пойман при попытке кражи ({what})!':
-    '🛡 Counter-intel: agent {who} caught stealing ({what})!',
-  '🛡 Контрразведка: утечка разведданных ({what}) — вор не установлен':
-    '🛡 Counter-intel: an intel leak ({what}) — the thief is unknown',
   '🛩 дежурный вылет включён — эскадрилья бьёт врага в радиусе':
     '🛩 standing patrol on — the wing strikes any enemy in range',
   '🛩 дежурный вылет — только со стоянки в узле': '🛩 standing patrol — only from a parked node',
@@ -760,11 +716,6 @@ export const en: Record<string, string> = {
   '{h} ч': '{h} h',
   'Поза «Оборона»: держит и отбивает, застраивает очередь, торгует — без наступлений и дипломатии. Управление вернётся автоматически, с утренней сводкой.':
     'The “Defend” posture: holds and repels, keeps building and trading — no offensives, no diplomacy. Control returns automatically, with a morning report.',
-  '😴 Хранитель принял командование (Оборона) — держит рубежи, пока вы спите.':
-    '😴 The Steward took command (Defend) — holding the line while you sleep.',
-  '😴 Хранитель принял командование (Активная оборона) — держит рубежи и контратакует у своих миров.':
-    '😴 The Steward took command (Active defense) — holding the line and counterstriking at your own worlds.',
-  '🎮 Вы вернули командование себе.': '🎮 You took command back.',
   'Журнал Хранителя': "Steward's journal",
   '{dur} назад': '{dur} ago',
   '🏃 Эвакуация с {node} → {to}: прогноз потерь {pct}%, крыльев уведено: {n}':
@@ -777,12 +728,6 @@ export const en: Record<string, string> = {
   '🛡 Рубеж {node} удержан: прогноз потерь {pct}%': '🛡 The {node} line held: loss forecast {pct}%',
   '🚩 Подкрепление выслано к {node}: прогноз потерь {pct}%':
     '🚩 Reinforcement sent to {node}: loss forecast {pct}%',
-  'Решений за вахту: {n} — журнал в окне Хранителя.':
-    "Decisions this watch: {n} — see the Steward window's journal.",
-  '🌅 Хранитель вернул вам управление (была «Оборона»).':
-    '🌅 The Steward returned control to you (posture was “Defend”).',
-  '🌅 Хранитель вернул вам управление (была «Активная оборона»).':
-    '🌅 The Steward returned control to you (posture was “Active defense”).',
   интерфейс: 'interface',
   вкл: 'on',
   выкл: 'off',

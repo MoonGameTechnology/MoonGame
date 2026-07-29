@@ -2662,10 +2662,7 @@ function dispatchAssault(fleetIds: string[], destId: string): void {
       if (assaultNeedsTroops(f, destId)) {
         if (!warnedNoTroops) {
           warnedNoTroops = true;
-          note(
-            t('⚔ штурм невозможен: на борту нет десанта, а мир защищён — погрузите войска'),
-            destId,
-          );
+          note(t('log.assault.no-troops'), destId);
         }
         continue;
       }
@@ -2675,7 +2672,7 @@ function dispatchAssault(fleetIds: string[], destId: string): void {
     } else {
       if (!warnedNoTroops && assaultNeedsTroops(f, destId)) {
         warnedNoTroops = true;
-        note(t('⚔ внимание: на борту нет десанта — защищённый мир штурмом не взять'), destId);
+        note(t('log.assault.warn-no-troops'), destId);
       }
       playerOrder(moveFleet(ME, id, destId));
       assaultOnArrival.set(id, destId);
@@ -2708,7 +2705,7 @@ function pumpAssaultOrders(): void {
     }
     if (assaultNeedsTroops(f, destId)) {
       // one clear message instead of an E_NO_TROOPS rejection loop
-      note(t('⚔ штурм невозможен: на борту нет десанта, а мир защищён — погрузите войска'), destId);
+      note(t('log.assault.no-troops'), destId);
       assaultOnArrival.delete(id);
       continue;
     }
@@ -2750,7 +2747,7 @@ function confirmWarPrompt(): void {
       else playerOrder(moveFleet(ME, id, wp.destId));
     }
   }
-  note(t('⚔ Война объявлена — флоты выдвигаются'));
+  note(t('log.war.declared'));
 }
 function cancelWarPrompt(): void {
   warPrompt = null;
@@ -2761,17 +2758,14 @@ function renderWarPrompt(): void {
   if (!el || !warPrompt) return;
   const names = warPrompt.blockers.map((b) => esc(blockerName(b))).join(', ');
   const body = warPrompt.assault
-    ? t('Это мир дружественной фракции. Вы хотите объявить войну <b>{names}</b>?', { names })
-    : t(
-        'Маршрут проходит через миры <b>{names}</b>, с кем у вас <b>мир</b>. Мирного прохода нет — движение сюда объявит <b>войну</b>.',
-        { names },
-      );
+    ? t('war.confirm.friendly', { names })
+    : t('war.confirm.transit', { names });
   el.innerHTML =
     `<div class="wpbox">` +
-    `<div class="wp-head">⚔ ${t('ОБЪЯВИТЬ ВОЙНУ?')}</div>` +
+    `<div class="wp-head">⚔ ${t('war.confirm.title')}</div>` +
     `<div class="wp-body">${body}</div>` +
-    `<div class="wp-actions"><button class="wp-no">${warPrompt.assault ? t('НЕТ') : t('ОТМЕНА')}</button>` +
-    `<button class="wp-yes">${warPrompt.assault ? t('ДА') : t('ОБЪЯВИТЬ ВОЙНУ')}</button></div>` +
+    `<div class="wp-actions"><button class="wp-no">${warPrompt.assault ? t('war.confirm.no') : t('war.confirm.cancel')}</button>` +
+    `<button class="wp-yes">${warPrompt.assault ? t('war.confirm.yes') : t('war.confirm.go')}</button></div>` +
     `</div>`;
   el.classList.add('show');
 }
@@ -2872,9 +2866,10 @@ function handleEvents(events: DomainEvent[]) {
         // events server-side; this matches it for the local sim).
         if (p.attacker === ME || p.defender === ME || known(p.location as string))
           note(
-            t('⚔️ бой у {at} ({phase})', {
+            t('log.battle.start', {
               at: p.location as string,
-              phase: p.phase === 'ground' ? t('десант') : t('орбита'),
+              phase:
+                p.phase === 'ground' ? t('log.battle.phase.ground') : t('log.battle.phase.orbit'),
             }),
             p.location as string,
           );
@@ -2893,12 +2888,12 @@ function handleEvents(events: DomainEvent[]) {
                 .join(', ')
             : '';
           note(
-            t('⚔ бой у {at} завершён — {res}', {
+            t('log.battle.end', {
               at: loc,
               res: p.winner
-                ? t('победа: {who}', { who: NAME[p.winner as string] ?? (p.winner as string) })
-                : t('ничья'),
-            }) + (tally ? t(' · потери: {tally}', { tally }) : ''),
+                ? t('log.battle.win', { who: NAME[p.winner as string] ?? (p.winner as string) })
+                : t('log.battle.draw'),
+            }) + (tally ? t('log.battle.losses', { tally }) : ''),
             loc,
           );
         }
@@ -2909,7 +2904,7 @@ function handleEvents(events: DomainEvent[]) {
       case 'technology.researched':
         if (p.playerId === ME)
           note(
-            t('⚛ изучено: {tech}', {
+            t('log.tech.done', {
               tech: tData(
                 data.technologies[p.technology as string]?.name ?? (p.technology as string),
               ),
@@ -2923,10 +2918,8 @@ function handleEvents(events: DomainEvent[]) {
           stewSnapshot = stewMetrics();
           note(
             (p as { posture?: string }).posture === 'active_defend'
-              ? t(
-                  '😴 Хранитель принял командование (Активная оборона) — держит рубежи и контратакует у своих миров.',
-                )
-              : t('😴 Хранитель принял командование (Оборона) — держит рубежи, пока вы спите.'),
+              ? t('log.steward.on.active')
+              : t('log.steward.on.defense'),
           );
           if (stewWin.classList.contains('show')) renderSteward();
         }
@@ -2934,7 +2927,7 @@ function handleEvents(events: DomainEvent[]) {
       case 'steward.recalled':
         if (p.playerId === ME) {
           stewSnapshot = null;
-          note(t('🎮 Вы вернули командование себе.'));
+          note(t('log.steward.off'));
           if (stewWin.classList.contains('show')) renderSteward();
         }
         break;
@@ -2948,14 +2941,11 @@ function handleEvents(events: DomainEvent[]) {
             ? ` Пока вы спали: планет ${base.planets}→${now.planets}, металл ${sign(now.metal - base.metal)}, кредиты ${sign(now.credits - base.credits)}.`
             : '';
           const logged = s.players[ME]?.stewardLog?.length ?? 0;
-          const sitrep =
-            logged > 0
-              ? ' ' + t('Решений за вахту: {n} — журнал в окне Хранителя.', { n: String(logged) })
-              : '';
+          const sitrep = logged > 0 ? ' ' + t('log.steward.decisions', { n: String(logged) }) : '';
           note(
             ((p as { posture?: string }).posture === 'active_defend'
-              ? t('🌅 Хранитель вернул вам управление (была «Активная оборона»).')
-              : t('🌅 Хранитель вернул вам управление (была «Оборона»).')) +
+              ? t('log.steward.handback.active')
+              : t('log.steward.handback.defense')) +
               diff +
               sitrep,
           );
@@ -2969,20 +2959,20 @@ function handleEvents(events: DomainEvent[]) {
         const whoT = NAME[p.target as string] ?? (p.target as string);
         const what =
           p.kind === 'treasury'
-            ? t('казна {who}', { who: whoT })
+            ? t('log.spy.what.treasury', { who: whoT })
             : p.kind === 'fleets'
-              ? t('флоты {who}', { who: whoT })
-              : t('мир {at}', { at: String(p.intelPlanet ?? p.target) });
-        note(t('🕵 Агент добыл разведданные: {what} — окно 24ч', { what }));
-        pushSpyLog(t('🗝 Успех: {what}', { what }));
+              ? t('log.spy.what.fleets', { who: whoT })
+              : t('log.spy.what.world', { at: String(p.intelPlanet ?? p.target) });
+        note(t('log.spy.success', { what }));
+        pushSpyLog(t('log.spy.success.short', { what }));
         if (diploOpen && diploTab === 'diplo') renderDiplo(); // the intel row appeared
         break;
       }
       case 'espionage.failed':
         if (p.owner === ME) {
           const whoF = NAME[p.target as string] ?? (p.target as string);
-          note(t('🕵 Агент провалился ({who}) — плата сгорела', { who: whoF }));
-          pushSpyLog(t('✖ Провал против {who} — плата сгорела', { who: whoF }));
+          note(t('log.spy.fail', { who: whoF }));
+          pushSpyLog(t('log.spy.fail.short', { who: whoF }));
         }
         break;
       // Counter-intel (SPY-2): addressed to the VICTIM. A failed attempt names the
@@ -2993,17 +2983,17 @@ function handleEvents(events: DomainEvent[]) {
         if (p.owner !== ME) break;
         const what =
           p.kind === 'treasury'
-            ? t('казна')
+            ? t('log.spy.kind.treasury')
             : p.kind === 'fleets'
-              ? t('данные о флотах')
-              : t('данные мира');
+              ? t('log.spy.kind.fleets')
+              : t('log.spy.kind.world');
         {
           const line = p.spy
-            ? t('🛡 Контрразведка: агент {who} пойман при попытке кражи ({what})!', {
+            ? t('log.spy.caught', {
                 who: NAME[p.spy as string] ?? (p.spy as string),
                 what,
               })
-            : t('🛡 Контрразведка: утечка разведданных ({what}) — вор не установлен', { what });
+            : t('log.spy.leak', { what });
           note(line);
           pushSpyLog(line);
         }
@@ -3012,7 +3002,7 @@ function handleEvents(events: DomainEvent[]) {
       case 'planet.captured':
         if (p.owner === ME || known(p.planetId as string)) {
           note(
-            t('🚩 {who} захватил {at}', {
+            t('log.capture', {
               who: NAME[p.owner as string] ?? (p.owner as string),
               at: p.planetId as string,
             }),
@@ -3039,8 +3029,8 @@ function handleEvents(events: DomainEvent[]) {
           pushMsg(
             b,
             st === 'war'
-              ? t('{a} объявил войну {b}', { a: na, b: nb })
-              : t('{a} и {b}: {stance}', { a: na, b: nb, stance: stanceRu(st).toLowerCase() }),
+              ? t('log.diplo.war', { a: na, b: nb })
+              : t('log.diplo.stance', { a: na, b: nb, stance: stanceRu(st).toLowerCase() }),
             true,
             a,
           );
@@ -3055,18 +3045,18 @@ function handleEvents(events: DomainEvent[]) {
         const st = p.stance as DiplomaticStance;
         if (to === ME) {
           note(
-            t('🕊 {who} предлагает: {stance} — ответьте тем же в Дипломатии', {
+            t('log.diplo.offer', {
               who: NAME[from] ?? from,
               stance: stanceRu(st),
             }),
           );
-          pushMsg(from, t('Предложение: {stance}', { stance: stanceRu(st) }), true, from);
+          pushMsg(from, t('log.diplo.offer.short', { stance: stanceRu(st) }), true, from);
           unreadMsgs++;
         } else if (from === ME && !isAiSeat(to)) {
           // A bot answers inside the same order (accept/decline follows in this very
           // batch) — the "sent" line is only worth showing when a human must reply.
           note(
-            t('⏳ {who}: предложение отправлено — {stance}', {
+            t('log.diplo.sent', {
               who: NAME[to] ?? to,
               stance: stanceRu(st),
             }),
@@ -3082,21 +3072,21 @@ function handleEvents(events: DomainEvent[]) {
         if (from === ME) {
           pushMsg(
             to,
-            t('{who} отклонил предложение: {stance}', {
+            t('log.diplo.rejected', {
               who: NAME[to] ?? to,
               stance: stanceRu(st),
             }),
             true,
             to,
           );
-          note(t('✖ {who} отклонил: {stance}', { who: NAME[to] ?? to, stance: stanceRu(st) }));
+          note(t('log.diplo.rejected.short', { who: NAME[to] ?? to, stance: stanceRu(st) }));
         }
         if (diploOpen && diploTab === 'diplo') renderDiplo();
         break;
       }
       case 'building.constructed':
         note(
-          t('🏗️ {b}: построено на {at}', {
+          t('log.build.done', {
             b: buildingName(p.building as string),
             at: p.planetId as string,
           }),
@@ -3105,7 +3095,7 @@ function handleEvents(events: DomainEvent[]) {
         break;
       case 'building.upgraded':
         note(
-          t('⬆️ {b} → L{lvl} на {at}', {
+          t('log.build.upgraded', {
             b: buildingName(p.building as string),
             lvl: String(p.level),
             at: p.planetId as string,
@@ -3114,7 +3104,7 @@ function handleEvents(events: DomainEvent[]) {
         break;
       case 'building.destroyed':
         note(
-          t('💥 {b}: разрушено на {at}', {
+          t('log.build.destroyed', {
             b: buildingName(p.building as string),
             at: p.planetId as string,
           }),
@@ -3126,7 +3116,7 @@ function handleEvents(events: DomainEvent[]) {
         break;
       case 'fleet.launched':
         note(
-          t('🚀 {who} поднял флот с {at}', {
+          t('log.fleet.launched', {
             who: NAME[p.owner as string] ?? (p.owner as string),
             at: p.planetId as string,
           }),
@@ -3177,22 +3167,22 @@ function handleEvents(events: DomainEvent[]) {
       case 'market.bought':
         if (p.seller === ME || p.buyer === ME)
           note(
-            t('⇄ биржа: {n} {res} за {paid} ¤ ({side})', {
+            t('log.market.trade', {
               n: String(p.amount),
               res: TECH_CUR[p.resource as string] ?? tData(p.resource as string),
               paid: String(p.paid ?? '?'),
-              side: p.buyer === ME ? t('покупка') : t('продажа'),
+              side: p.buyer === ME ? t('log.market.buy') : t('log.market.sell'),
             }),
           );
         break;
       case 'fleet.merged':
-        if (p.owner === ME) note(t('⛬ флоты объединены у {at}', { at: p.at as string }));
+        if (p.owner === ME) note(t('log.fleet.merged', { at: p.at as string }));
         break;
       case 'fleet.split':
-        if (p.owner === ME) note(t('⊟ флот разделён у {at}', { at: p.at as string }));
+        if (p.owner === ME) note(t('log.fleet.split', { at: p.at as string }));
         break;
       case 'fleet.destroyed':
-        note(t('☠️ флот {who} уничтожен', { who: NAME[p.owner as string] ?? (p.owner as string) }));
+        note(t('log.fleet.destroyed', { who: NAME[p.owner as string] ?? (p.owner as string) }));
         break;
       case 'unit.died': {
         // War record — only count casualties in battles you're part of, so the AI's
