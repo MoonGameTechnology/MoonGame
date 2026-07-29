@@ -110,7 +110,9 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
     stance: z.enum(['war', 'peace', 'pact', 'alliance']),
   }),
   // --- prototype-host actions (the netserver runs the prototype's kernel) -----------
-  // fleetLaunch / squadron ops (prototype game.ts modules)
+  // fleet.launch/merge/split/engage: canonical `fleetOpsModule` handles these too
+  // (the missing garrison→mobile-fleet link) — not prototype-only anymore, the
+  // section header above is stale for this group specifically.
   'fleet.launch': z.object({ planetId: id }),
   'fleet.merge': z.object({ from: id, into: id }),
   'fleet.split': z.object({

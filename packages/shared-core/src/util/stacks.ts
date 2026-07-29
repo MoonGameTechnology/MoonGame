@@ -5,7 +5,7 @@ import { effectiveStats } from './loadout';
 /** Canonical, order-independent signature of a loadout (one instance per module
  *  id, so it's a set): sorted ids joined. Empty/absent loadout → `''`. Two stacks
  *  merge only when this matches — a fitted stack never silently absorbs a bare one. */
-function loadoutKey(modules?: readonly string[]): string {
+export function loadoutKey(modules?: readonly string[]): string {
   if (!modules || modules.length === 0) return '';
   return [...modules].sort().join(',');
 }
@@ -60,6 +60,65 @@ export function sumUnitStat(stacks: readonly UnitStack[], data: GameData, stat: 
     }
   }
   return total;
+}
+
+/** Move up to `count` of `unit` out of `src` (mutates src) and return the removed
+ *  stacks. `hp`/`shieldHp` are POOLS for the whole stack, so a split must APPORTION
+ *  them pro-rata — copying the whole pool onto both halves would duplicate hull
+ *  that combat then mints into extra ships. The loadout rides onto the taken stack
+ *  so a routine split never strips paid modules. Used by fleet-formation actions
+ *  (`fleet.split`) to peel ships off a fleet or a planet's garrison. */
+export function takeFromStacks(src: UnitStack[], unit: string, count: number): UnitStack[] {
+  let remaining = count;
+  const taken: UnitStack[] = [];
+  for (const st of src) {
+    if (st.unit !== unit || remaining <= 0) continue;
+    const move = Math.min(st.count, remaining);
+    remaining -= move;
+    const frac = move / st.count; // share of the pools that leaves with the taken ships
+    const t: UnitStack = { unit, count: move };
+    if (st.hp !== undefined) {
+      t.hp = st.hp * frac;
+      st.hp -= t.hp; // source keeps the remainder — total pool conserved
+    }
+    if (st.shieldHp !== undefined) {
+      t.shieldHp = st.shieldHp * frac;
+      st.shieldHp -= t.shieldHp;
+    }
+    if (st.modules && st.modules.length > 0) t.modules = [...st.modules];
+    st.count -= move;
+    taken.push(t);
+  }
+  return taken;
+}
+
+/** Fold one stack list into another. Two stacks coalesce only when they share unit,
+ *  loadout AND are both full-health (no `hp`/`shieldHp` pool) — the same rule
+ *  `findHealthyStack` uses. Merging on `hp` equality alone would fuse two damaged
+ *  stacks into ONE pool (halving hull) and smear a fitted stack's modules over bare
+ *  hulls; damaged/differently-fitted stacks stay separate (combat handles multiple
+ *  stacks of one unit fine). Used by `fleet.merge`. */
+export function mergeStacks(base: UnitStack[], add: UnitStack[]): UnitStack[] {
+  const clone = (st: UnitStack): UnitStack => ({
+    ...st,
+    ...(st.modules ? { modules: [...st.modules] } : {}),
+  });
+  const out = base.map(clone);
+  for (const st of add) {
+    const healthy = st.hp === undefined && st.shieldHp === undefined;
+    const match = healthy
+      ? out.find(
+          (o) =>
+            o.unit === st.unit &&
+            o.hp === undefined &&
+            o.shieldHp === undefined &&
+            loadoutKey(o.modules) === loadoutKey(st.modules),
+        )
+      : undefined;
+    if (match) match.count += st.count;
+    else out.push(clone(st));
+  }
+  return out;
 }
 
 /** Combat line cap (Bytro-style): only this many units per combatant side fire in
