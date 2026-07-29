@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1900 зелёных** (54 skip, 175 файлов).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1899 зелёных** (54 skip, 175 файлов).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -116,7 +116,7 @@ packages/action-layer/src/
   examples/      skirmish.test.ts (демо-сценарий + SVG)
   index.ts       баррель (экспорт публичного API)
 data/            manifest, resources, units, buildings, factions, events, sectors, planetTypes, technologies (.json)
-localization/    ВЕСЬ текст для игрока: index.ts (LOCALES/DEFAULT_LOCALE/dataKey), ru.ts, en.ts (плоские карты ключ→текст), legacy/en.ts (мост старых msgid, сокращается — LOC-2)
+localization/    ВЕСЬ текст для игрока: index.ts (LOCALES/DEFAULT_LOCALE/dataKey), ru.ts, en.ts (плоские карты ключ→текст, 1529 ключей). Мост старых msgid снят вместе с LOC-2 — в коде только ключи
 docs/            architecture, modulesystem, roadmap, deep-technical-roadmap, multiplayer, engineering-risks, gdd, metagame, state(этот)
 prototype/       src/game.ts (оркестрация, реэкспорты — REFP-рефактор: 5289→2146 строк), src/prototypeData.ts, src/map.ts, src/fleetStacks.ts, src/tax.ts, src/formations.ts, src/botFavour.ts, src/squadron.ts, src/chain.ts, src/hunger.ts, src/botDiplomacy.ts, src/sessionMarket.ts, src/capital.ts, src/fleetLaunch.ts, src/standingOrders.ts, src/forcedMarch.ts, src/instantRepair.ts, src/econScrews.ts, src/economy.ts, src/matchSetup.ts, src/actions.ts (вынесены из game.ts, Block REFP), src/main.ts (UI), src/smoke.ts, build.mjs, uitest.mjs, dist/ (артефакт, в .gitignore)
 ```
@@ -1004,33 +1004,35 @@ grants}`), `heroFittings.json` (`{statMods, grants, cost}`). Движок ПОЛ
 - **весь остальной интерфейс матча и хаба** — `threat.*`, `queue.*`, `div.*`,
   `cargo.*`, `ai.*`, `map.*`, `split.*`, `hint.*`, `meta.*`, `arsenal.*`, `auth.*`,
   `setup.*`, `scipick.*`, `hud.*`, `net.*`, `back.*`, `tgt.*`, `upd.*`, `sandbox.*`,
-  `fmt.*` (финишный проход LOC-2).
+  `fmt.*` (финишный проход LOC-2);
+- **таблицы-справочники и игровой каталог** — подписи, уходящие в `t()` переменной:
+  `tech.group/fx.*`, `hero.branch/hook/arch.*`, `yard.tab/slot.*`, `res.of.*`,
+  `stat.*`, `callsign.*`, `arsenal.*`, `form.*`, `corp.tab/role/audit.*`,
+  `meta.branch/node.*`, `fleet.size.*`, `ground.officer.*`, `sandbox.res/tog.*`, а
+  также весь каталог `prototypeData.ts` — `tech.node.*`, `sci.*`, `faction.*`,
+  `hero.unit/ability/passive/tree/fit.*` (закрытие LOC-2).
 
-Итого **1450 ключей**. Записи в локалях разложены по доменным секциям и отсортированы
-по ключу внутри каждой. Таблицы-справочники прототипа (`TECH_COLS`, `TECH_FX_LABEL`,
-`HERO_BRANCH_RU`, `HERO_HOOK_RU`, `SLOT_RU`, `RES_RU`, `STAT_RU`, `CALLSIGNS`,
-`ARSENAL_*_RU`, `FORM_RU`, `CORP_TABS`/`CORP_ROLE_LABEL`/`CORP_AUDIT_RU`, а также
-`meta.ts`, `formations.ts`, `heroes.ts`, `fleetName.ts`, `groundcombat.ts`,
-`sandbox.ts`) держат В ЗНАЧЕНИИ ключ, а не русский текст — их подписи уходят в `t()`
-переменной, и раньше именно там английский пропадал незаметно для гейта. Статичный узел в разметке ПУСТ, ключ стоит в ЗНАЧЕНИИ атрибута
+Итого **1529 ключей**. Записи в локалях разложены по доменным секциям и отсортированы
+по ключу внутри каждой. Таблицы-справочники прототипа и игровой каталог
+(`prototypeData.ts`) держат В ЗНАЧЕНИИ ключ, а не русский текст — их подписи уходят в
+`t()` переменной, и раньше именно там английский пропадал незаметно для гейта. Имена
+игровых ДАННЫХ (модули, фитинги, здания, юниты) остаются английскими: `tData()` строит
+из них слаг `dataKey()`, а он вырезает всё кроме `[a-z0-9]`, поэтому русское имя
+схлопнулось бы в ключ `data.` и перевод стал бы недостижим.
+
+Статичный узел в разметке ПУСТ, ключ стоит в ЗНАЧЕНИИ атрибута
 (`data-i18n="hub.play"`, аналогично `-title`/`-ph`/`-aria`), и `localizeStaticDom()`
 проставляет текст на старте — русская формулировка физически не может разъехаться с
-локалью. Вызовов `t('русская строка')` в прототипе **не осталось** (0), таблицы-
-справочники тоже переведены. **Мост** `/localization/legacy/en.ts` (старый msgid =
-русская строка) сократился до **96** записей и пока остаётся: его ещё держат
-`prototypeData.ts` (89 русских описаний и имён игрового каталога) и `testmode.ts`
-(дев-экран). Осторожно с первым: `name` там участвует в вычислении слага `dataKey()`
-и попадает под проверку целостности данных, поэтому описания править безопасно, а
-имена — нет. Снос моста и ужесточение теста сирот (сейчас он ищет msgid подстрокой,
-поэтому ~66 мёртвых записей выглядят живыми) — остаток кирпича `LOC-2`; добавлять в
-мост нельзя. Гейт —
-`prototype/src/i18n.test.ts` (9 тестов: паритет ru/en, ключ из кода заведён, ключ локали
-не осиротел, в EN нет кириллицы, у каждого юнита есть имя, статичная разметка на ключах
-и без старой формы, таблицы копии отдают ключи, мост не растёт). Тест таблиц держит
-пять таблиц (GLOSSARY, INTROS, FIRST_GOALS и оба тура), где ключ уходит в `t()`
-переменной и потому невидим разбору литералов; проверка моста дополнительно вычитывает
-литералы из веток `t(cond ? 'А' : 'Б')` — такой вызов разбор аргумента не видит целиком,
-и через эту дыру msgid уже уезжал в прод без английского.
+локалью. **Мост совместимости снят** (`/localization/legacy/` удалён вместе с веткой в
+`i18n.ts`): русского текста в коде прототипа нет, `t()`/`tData()` принимают только
+ключи, промах виден как сам ключ. Гейт — `prototype/src/i18n.test.ts` (8 тестов:
+паритет ru/en, ключ из кода заведён, ключ локали не осиротел, в EN нет кириллицы, у
+каждого юнита есть имя, статичная разметка на ключах и без старой формы, таблицы копии
+отдают ключи, и — главный инвариант этапа 2 — в коде нет русского текста). Тест сирот
+ищет ключ В КАВЫЧКАХ: подстрочный поиск считал живым любой ключ, чей текст встречается
+внутри другого литерала, и именно так мост держал десятки мёртвых записей. Не
+локализованы намеренно: `testmode.ts` (дев-экран), поисковые алиасы `codexIndex.ts`
+(двуязычны по назначению) и `CHAT_BADWORDS`.
 
 `pnpm run prototype` → esbuild собирает всё (ядро + zod + UI) в **два** self-contained
 HTML (открываются с диска, без сервера): `dist/void-dominion.html` — дев-клиент
