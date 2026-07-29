@@ -76,14 +76,41 @@ function extractCallArgs(src: string, fn: 't' | 'tData'): Set<string> {
       j++;
     }
     if (q === '`' && lit.includes('${')) continue; // шаблон — ключ собирается в рантайме
-    out.add(
-      lit
-        .replace(/\\'/g, "'")
-        .replace(/\\"/g, '"')
-        .replace(/\\`/g, '`')
-        .replace(/\\n/g, '\n')
-        .replace(/\\\\/g, '\\'),
-    );
+    out.add(unescape_(lit));
+  }
+  return out;
+}
+
+const unescape_ = (lit: string): string =>
+  lit
+    .replace(/\\'/g, "'")
+    .replace(/\\"/g, '"')
+    .replace(/\\`/g, '`')
+    .replace(/\\n/g, '\n')
+    .replace(/\\\\/g, '\\');
+
+/** Русские литералы ВНУТРИ `t(…)`, у которого аргумент — не литерал: `t(cond ? 'А' :
+ *  'Б')`. `extractCallArgs` читает только литерал сразу после `t(`, поэтому такой
+ *  вызов для него невидим — и msgid из ветки тернарника уезжал в прод без
+ *  английского (`corp.war.roster-open` доехал до игрока по-русски именно так).
+ *  Возвращаем только кириллические литералы: ключи из веток покрыты общим правилом. */
+function extractHiddenMsgids(src: string): Set<string> {
+  const out = new Set<string>();
+  for (let i = 0; i < src.length - 1; i++) {
+    if (!(src[i] === 't' && src[i + 1] === '(')) continue;
+    if (/[A-Za-z0-9_$.]/.test(i > 0 ? src[i - 1]! : ' ')) continue;
+    let j = i + 2;
+    while (j < src.length && /\s/.test(src[j]!)) j++;
+    if (src[j] === "'" || src[j] === '"' || src[j] === '`') continue; // обычный вызов
+    let depth = 1;
+    let arg = '';
+    for (let k = i + 2; k < src.length && depth > 0; k++) {
+      if (src[k] === '(') depth++;
+      else if (src[k] === ')') depth--;
+      if (depth > 0) arg += src[k];
+    }
+    for (const m of arg.matchAll(/'((?:[^'\\\n]|\\.)*)'/g))
+      if (hasCyrillic(m[1]!)) out.add(unescape_(m[1]!));
   }
   return out;
 }
@@ -185,9 +212,14 @@ describe('локализация — ключи', () => {
 describe('локализация — мост совместимости (сокращается до нуля)', () => {
   it('у каждого старого msgid из кода есть английский перевод', () => {
     const missing: string[] = [];
-    for (const f of srcFiles())
-      for (const lit of extractCallArgs(read(f), 't'))
+    for (const f of srcFiles()) {
+      const src = read(f);
+      for (const lit of extractCallArgs(src, 't'))
         if (!KEY_RE.test(lit) && hasCyrillic(lit) && !(lit in legacyEn)) missing.push(lit);
+      // …включая литералы из веток `t(cond ? 'А' : 'Б')`: разбор аргумента их не
+      // видит, поэтому без этой строки msgid уезжает в прод без английского.
+      for (const lit of extractHiddenMsgids(src)) if (!(lit in legacyEn)) missing.push(lit);
+    }
     expect([...new Set(missing)].sort()).toEqual([]);
   });
 

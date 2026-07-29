@@ -37,10 +37,7 @@ export const en: Record<string, string> = {
   // — a second entry here would be silently shadowed by it.
   'Ставится навсегда — рефита нет': 'Installed for good — no refit',
   'Необратимо — установить': 'Irreversible — install',
-  Каст: 'Cast',
-  Делить: 'Split',
   'цель на карте': 'target on map',
-  'на месте': 'in place',
   // --- TT-3.1 technology tree screen --------------------------------------------
   'Ветку курирует': 'Branch curated by',
   'Без лидера ветки — узлы с условием «учёный» закрыты':
@@ -113,7 +110,6 @@ export const en: Record<string, string> = {
   '{a} и {b}: {stance}': '{a} and {b}: {stance}',
   '{a} объявил войну {b}': '{a} declared war on {b}',
   '{b} — улучшение': '{b} — upgrade',
-  '{n} ФЛОТОВ': '{n} FLEETS',
   // TGT-1: target-order composer
   Цель: 'Target',
   '◎ тапните цель на карте — соберём приказ': '◎ tap a target on the map — compose the order',
@@ -124,11 +120,8 @@ export const en: Record<string, string> = {
   '⏱{n}ч': '⏱{n}h',
   '⏱ +1ч': '⏱ +1h',
   '🎯{n}ч': '🎯{n}h',
-  'Выбрать+': 'Select+',
-  'Деж. вылет': 'Scramble',
   '⚔ авто-штурм включён — флот сам штурмует вражеский мир по прибытии':
     '⚔ auto-storm on — the fleet storms the hostile world it arrives at by itself',
-  Ускорить: 'Boost',
   '⚡ форс-марш: +50% скорости, −5% прочности за час хода':
     '⚡ forced march: +50% speed, −5% hull per hour underway',
   '⊕ тапайте свои флоты — соберите группу и отдайте общий приказ':
@@ -151,7 +144,6 @@ export const en: Record<string, string> = {
   '{who} предлагает — нажмите, чтобы принять': '{who} is offering — tap to accept',
 
   // --- fleet panel / command bar ------------------------------------------------
-  Агрес: 'Aggr',
   Атака: 'Attack',
   'Боевой счёт': 'War record',
   'Боты не вступают в коалиции': 'Bots do not join coalitions',
@@ -161,7 +153,6 @@ export const en: Record<string, string> = {
   'В чат коалиции': 'To the coalition chat',
   ВЫ: 'YOU',
   ВЫКЛ: 'OFF',
-  Влияние: 'Influence',
   Войти: 'Join',
   Восстановить: 'Restore',
   Время: 'Time',
@@ -205,24 +196,19 @@ export const en: Record<string, string> = {
     'Goal: ✦ {n} (a world — 50, a province — 10) or eliminate your rivals.',
   'Закрепить размер и положение': 'Lock size and position',
   Закрыть: 'Close',
-  Заявиться: 'Sign up',
   ИИ: 'AI',
   Имя: 'Name',
   Исследовать: 'Research',
-  История: 'History',
   Герои: 'Heroes',
   'Канал «{ch}» пуст.': 'Channel "{ch}" is empty.',
   Коалиция: 'Coalition',
   'Командный бой: ВКЛ': 'Team battle: ON',
   'Командный бой: выкл': 'Team battle: off',
-  'Компактный режим меню': 'Compact panel mode',
   'одна сторона — союзники': 'one side = allies',
   Командир: 'Commander',
-  Корпорация: 'Corporation',
   Корпус: 'Hull',
   Крейсер: 'Cruiser',
   Купить: 'Buy',
-  Курс: 'Move',
   'Маршрут проходит через миры <b>{names}</b>, с кем у вас <b>мир</b>. Мирного прохода нет — движение сюда объявит <b>войну</b>.':
     'This route crosses worlds held by <b>{names}</b>, with whom you are at <b>peace</b>. There is no peaceful passage — advancing here declares <b>war</b>.',
   'Нет дивизий.': 'No divisions.',
@@ -232,7 +218,6 @@ export const en: Record<string, string> = {
   Назад: 'Back',
   'Напишите первое сообщение.': 'Write the first message.',
   Настройки: 'Settings',
-  Нейтрал: 'Neutral',
   'Нет дивизий — мобилизуй по шаблону ниже.': 'No divisions — mobilize from a template below.',
   'Нет лотов на покупку': 'No buy orders',
   'Нет лотов на продажу': 'No sell orders',
@@ -251,12 +236,10 @@ export const en: Record<string, string> = {
   'панель времени в матче — пауза и множители ускорения (1× — реальное время)':
     'the in-match time bar — pause and speed multipliers (1× is real time)',
   '⚔ штурмовать можно только чужой мир': "⚔ only someone else's world can be stormed",
-  'Авто-штурм': 'Auto-storm',
   ОТМЕНА: 'CANCEL',
   Оборона: 'Defense',
   Обстрел: 'Barrage',
   'Описание метки (необязательно)…': 'Marker description (optional)…',
-  Ответ: 'Return',
   'Отделите корабли в новый флот — он останется в том же секторе. Хотя бы один корабль остаётся; десант в трюме остаётся с исходным флотом.':
     'Peel ships into a new fleet — it stays in the same sector. At least one ship stays behind; carried troops stay with the original.',
   Отмена: 'Cancel',
@@ -270,7 +253,6 @@ export const en: Record<string, string> = {
   ПВО: 'AA',
   ПОБЕДА: 'WIN',
   Пассив: 'Passive',
-  'Пассивные бонусы': 'Passive bonuses',
   'Переподключение не удалось — войди заново': 'Reconnect failed — sign in again',
   Пинг: 'Ping',
   'Под фильтр никто не подходит.': 'Nobody matches the filter.',
@@ -280,7 +262,6 @@ export const en: Record<string, string> = {
   'Наведи на объект слева — здесь появится его досье.':
     'Hover an object on the left — its dossier appears here.',
   Постройки: 'Structures',
-  Принять: 'Accept',
   Провинции: 'Provinces',
   провинций: 'provinces',
   'Суверены — донат-валюта': 'Sovereigns — the donate currency',
@@ -298,8 +279,6 @@ export const en: Record<string, string> = {
   Сессия: 'Session',
   Скор: 'Spd',
   Скорость: 'Speed',
-  Слить: 'Merge',
-  'Слить…': 'Merge…',
   'Сообщение…': 'Message…',
   'Сообщений пока нет.': 'No messages yet.',
   Сообщения: 'Messages',
@@ -309,7 +288,6 @@ export const en: Record<string, string> = {
   Стоимость: 'Cost',
   'Предложение: {stance}': 'Proposal: {stance}',
   'Стойка изменена: {stance}': 'Stance changed: {stance}',
-  Стоп: 'Stop',
   'Тащите за шапку, чтобы переместить': 'Drag the title bar to move',
   Удар: 'Strike',
   ФЛОТ: 'FLEET',
@@ -323,11 +301,6 @@ export const en: Record<string, string> = {
   // Карточка статистики мира (тап по имени планеты)
   эскадрилий: 'squadrons',
   // 🔥 режим огня артиллерии — кнопка в командном ряду + пункты меню
-  'Режим огня': 'Fire mode',
-  'не стреляет': 'holds fire',
-  'только после урона по флоту': 'only after the fleet takes damage',
-  'по тем, с кем война': 'at declared enemies',
-  'по любому, кроме пакта/союза': 'at anyone except pact/alliance',
   Фракция: 'Faction',
   // H3 — setup faction picker (pure passive house bonuses)
   'Фракция — пассивный бонус дома': 'Faction — the house passive bonus',
@@ -388,59 +361,15 @@ export const en: Record<string, string> = {
   'выдала предмет в аренду': 'rented out an item',
   'вернула арендованный предмет': 'returned a rented item',
   AvA: 'AvA',
-  '{n} участников': '{n} members',
-  'Без корпорации': 'No corporation',
-  'Владения — скоро': 'Holdings — coming soon',
-  Вызвать: 'Challenge',
-  'Готовность корпорации': 'Corporation readiness',
-  'Готовые к войне': 'Ready for war',
   Журнал: 'Log',
-  'Журнал виден главе и офицерам.': 'The log is visible to the head and officers.',
-  'Заявиться в состав': 'Join the roster',
-  'История видна главе и офицерам.': 'History is visible to the head and officers.',
-  'Мои вызовы': 'My challenges',
-  'Моя готовность': 'My readiness',
-  'Моя роль': 'My role',
-  'Название (3–24 символа)': 'Name (3–24 characters)',
-  'Найти и подать заявку': 'Find and apply',
-  Отклонить: 'Decline',
-  'Пассивные бонусы владений придут вместе с мета-слоем секторов — пока их нет.':
-    'Holding passive bonuses arrive with the sector meta-layer — not yet.',
-  'Пока нет вызовов.': 'No challenges yet.',
-  'Пока нет других корпораций.': 'No other corporations yet.',
-  'Пока пусто.': 'Nothing yet.',
-  'Покинуть корпорацию': 'Leave the corporation',
-  'Публичная лента AvA': 'Public AvA feed',
-  'Пул пуст.': 'The pool is empty.',
-  'Расформировать корпорацию': 'Disband the corporation',
-  Создать: 'Create',
-  'Создать корпорацию': 'Create a corporation',
-  'Тратится на вызов AvA (100 ⟡ по умолчанию) — кнопка «Вызвать» во вкладке «Войны».':
-    'Spent on an AvA challenge (100 ⟡ by default) — the "Challenge" button in the "Wars" tab.',
-  'Чат — скоро': 'Chat — coming soon',
-  'в пул': 'to pool',
-  'вызов нам': 'challenge to us',
-  'вызов от нас': 'challenge from us',
   готов: 'ready',
-  'да ✓': 'yes ✓',
-  'ждёт ответа': 'awaiting response',
-  'заперт — скоро бой': 'locked — battle soon',
-  истёк: 'expired',
-  'мета-карта секторов появится вместе со вторым контуром метагейма':
-    'the sector meta-map arrives with the metagame’s second circuit',
-  'набор ростера': 'roster window open',
   назначен: 'scheduled',
-  отклонить: 'decline',
   отклонён: 'declined',
   отменён: 'cancelled',
-  'передать главенство': 'transfer headship',
   победа: 'victory',
-  'постоянный корп-чат ждёт мета-слой; журнал действий — во вкладке «Обзор»':
-    'persistent corp chat awaits the meta-layer; the action log is in the "Overview" tab',
   принять: 'accept',
   снять: 'clear',
   состав: 'roster',
-  'только глава': 'head only',
   '—': '—',
 
   // --- preset hero names (HeroLoadout, non-main; heroName() via t()) -----------
@@ -485,8 +414,6 @@ export const en: Record<string, string> = {
   'без описания': 'no description',
   'в очередь: {what} на {at}': 'queued: {what} at {at}',
   'ваш лот': 'your lot',
-  влияние: 'influence',
-  'входящий вызов': 'incoming challenge',
   высадка: 'landing',
   гарнизон: 'garrison',
   'данные мира': "a world's data",
@@ -542,7 +469,6 @@ export const en: Record<string, string> = {
   скоро: 'soon',
   убрать: 'remove',
   'уничтожением соперников': 'by eliminating rivals',
-  участников: 'members',
   вы: 'you',
   флот: 'fleet',
   флоты: 'fleets',
@@ -858,28 +784,8 @@ export const en: Record<string, string> = {
   '🌅 Хранитель вернул вам управление (была «Активная оборона»).':
     '🌅 The Steward returned control to you (posture was “Active defense”).',
   интерфейс: 'interface',
-  'Радарная развёртка': 'Radar sweep',
-  'вращающийся луч на карте — только вид, не влияет на обнаружение':
-    'the rotating beam on the map — visual only, does not affect detection',
-  'Прозрачность радарной развёртки': 'Radar sweep opacity',
-  'Свои метки на карте': 'My map markers',
-  'булавки 📍 ваших пингов — метки союзников видны всегда':
-    "your own 📍 ping pins — allies' markers always show",
-  'плотная панель сектора — меньше отступов, мельче шрифт (на ПК)':
-    'a denser sector panel — smaller paddings and type (PC)',
-  Графика: 'Graphics',
-  'Свечение и ореолы': 'Glow & haloes',
-  'мягкое сияние вокруг миров, флотов и границ — выключите ради чёткой карты и скорости':
-    'soft bloom around worlds, fleets and borders — turn off for a crisp, faster map',
-  'Звёздный фон': 'Star backdrop',
-  'дрейфующие туманности и звёзды на фоне — выключите для плоского фона':
-    'drifting nebulae and stars in the background — turn off for a flat backdrop',
-  'Счётчик FPS': 'FPS counter',
-  'показывать кадры в секунду в углу — для проверки производительности':
-    'show frames per second in the corner — to check performance',
   вкл: 'on',
   выкл: 'off',
-  ГОТОВО: 'DONE',
   '⟳ К выбору ботов': '⟳ Back to setup',
 
   // --- suggested-callsign wordlist -----------------------------------------------
@@ -965,54 +871,19 @@ export const en: Record<string, string> = {
   'Ещё раз «Назад» — выход из матча': 'Press Back again to leave the match',
   // --- static H4 headers / steward toggle (build.mjs [data-i18n]) --------------
   // --- Bytro-карточка армии: ХП-бар, сводка, платный ремонт, кап линии огня ----
-  артиллерия: 'artillery',
   флагман: 'flagship',
   рой: 'swarm',
   'форс-марш': 'forced march',
   Радар: 'Radar',
   // --- настройки: цвета сторон -------------------------------------------------
-  'Цвета сторон': 'Side colours',
-  'Свой цвет': 'Your colour',
-  'вы на карте и в панелях — форма несёт тип, цвет несёт сторону':
-    'you on the map and in panels — the shape carries the type, the colour carries the side',
-  Нейтральные: 'Neutrals',
-  'ничейные миры и неопознанные силы': 'unowned worlds and unidentified forces',
-  'Палитра соперников': 'Rival palette',
-  '«дальтоник» — оттенки, различимые при цветослепоте':
-    '«colourblind» — hues distinguishable with colour vision deficiency',
-  классика: 'classic',
-  тёплая: 'warm',
-  дальтоник: 'colourblind',
-  'Вернуть цвета по умолчанию': 'Reset colours to defaults',
   // --- ECON-3: экспресс-ремонт за металл ---------------------------------------
   // --- ECON-4: рыночная комиссия ------------------------------------------------
   'к получению после комиссии {p}%: {n} ¤': 'you receive after the {p}% fee: {n} ¤',
   'в эскроу уйдёт {n} ¤ · комиссию {p}% платит получатель кредитов':
     'escrow: {n} ¤ · the {p}% fee is paid by whoever receives the credits',
   // --- fleet-command hover tooltips (what each command button does) -------------
-  'выберите планету — флот пойдёт к ней по звёздным трассам':
-    'pick a planet — the fleet routes to it along the star lanes',
-  'отменить текущее движение флота': "cancel the fleet's current movement",
-  'лететь к чужому миру и высадить десант при подходе':
-    'fly to an enemy world and land troops on arrival',
-  'тап по карте — собрать приказ: ждать · курс · штурм · обстрел':
-    'tap the map to compose an order: wait · move · assault · barrage',
-  'применить способность героя из состава флота': "use a hero ability from the fleet's roster",
-  'сосредоточить огонь артиллерии по вражескому флоту с дистанции':
-    'focus artillery fire on an enemy fleet from standoff range',
-  'когда артиллерия стреляет сама: пассив · ответ · станд · агрес':
-    'when artillery fires on its own: passive · return · standard · aggressive',
-  'объединить выбранные флоты в один': 'merge the selected fleets into one',
-  'отделить часть кораблей пришвартованного флота в новый':
-    'peel some ships off a docked fleet into a new one',
-  'дополнительные приказы': 'extra orders',
-  'добавлять флоты в группу по одному тапу': 'add fleets to the group one tap at a time',
-  'форс-марш: +50% скорости ценой −5% прочности за час хода':
-    'forced march: +50% speed at the cost of −5% hull per hour under way',
   'флот сам штурмует вражеский мир по прибытии':
     'the fleet storms an enemy world by itself on arrival',
-  'эскадрилья автоматически бьёт врага в радиусе':
-    'the squadron automatically hits enemies within range',
   // --- REL-7 seat/faction picker ------------------------------------------------
   занято: 'taken',
   свободно: 'free',

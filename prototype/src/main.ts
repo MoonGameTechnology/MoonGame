@@ -7429,16 +7429,16 @@ function renderCmdBar() {
   // выделения, при разнобое — нейтральная подпись.
   const artFleets = fleets.filter((f) => f.owner === ME && fleetHasArtillery(f));
   const FIRE_MODES: Array<{ m: string; lbl: string; sub: string }> = [
-    { m: 'passive', lbl: t('Пассив'), sub: t('не стреляет') },
-    { m: 'return', lbl: t('Ответ'), sub: t('только после урона по флоту') },
-    { m: 'standard', lbl: t('Станд'), sub: t('по тем, с кем война') },
-    { m: 'aggressive', lbl: t('Агрес'), sub: t('по любому, кроме пакта/союза') },
+    { m: 'passive', lbl: t('cmd.fire.passive'), sub: t('cmd.fire.passive.hint') },
+    { m: 'return', lbl: t('cmd.fire.return'), sub: t('cmd.fire.return.hint') },
+    { m: 'standard', lbl: t('cmd.fire.standard'), sub: t('cmd.fire.standard.hint') },
+    { m: 'aggressive', lbl: t('cmd.fire.aggressive'), sub: t('cmd.fire.aggressive.hint') },
   ];
   const artModes = new Set(artFleets.map((f) => f.barrageMode ?? 'standard'));
   const uniMode = artModes.size === 1 ? [...artModes][0] : null;
   const fmLabel = uniMode
-    ? (FIRE_MODES.find((x) => x.m === uniMode)?.lbl ?? t('Режим огня'))
-    : t('Режим огня');
+    ? (FIRE_MODES.find((x) => x.m === uniMode)?.lbl ?? t('cmd.fire.title'))
+    : t('cmd.fire.title');
   if (artFleets.length === 0) fireMenu = false; // выделение без артиллерии — меню гаснет
   const docked = fleets.filter((f) => f.location && !f.movement && !f.battleId);
   // PC: ШТУРМ is a targeting command (fly there + storm on arrival) — armable
@@ -7474,117 +7474,82 @@ function renderCmdBar() {
   );
   if (!castHero) castMenu = false;
   const html =
-    `<span class="cmdlabel">${ids.length > 1 ? t('{n} ФЛОТОВ', { n: ids.length }) : t('ФЛОТ')}</span>` +
-    cmdBtn(
-      'move',
-      '⤳',
-      t('Курс'),
-      aiming ? 'on' : '',
-      false,
-      t('выберите планету — флот пойдёт к ней по звёздным трассам'),
-    ) +
-    cmdBtn('stop', '■', t('Стоп'), 'danger', !anyMoving, t('отменить текущее движение флота')) +
+    `<span class="cmdlabel">${ids.length > 1 ? t('cmd.selection.many', { n: ids.length }) : t('cmd.selection.one')}</span>` +
+    cmdBtn('move', '⤳', t('cmd.move'), aiming ? 'on' : '', false, t('cmd.move.hint')) +
+    cmdBtn('stop', '■', t('cmd.stop'), 'danger', !anyMoving, t('cmd.stop.hint')) +
     cmdBtn(
       'attack',
       '⚔',
-      t('Штурм'),
+      t('cmd.assault'),
       assaultAim ? 'on' : '',
       !canAssault,
-      t('лететь к чужому миру и высадить десант при подходе'),
+      t('cmd.assault.hint'),
     ) +
-    cmdBtn(
-      'target',
-      '◎',
-      t('Цель'),
-      targetAim ? 'on' : '',
-      false,
-      t('тап по карте — собрать приказ: ждать · курс · штурм · обстрел'),
-    ) +
+    cmdBtn('target', '◎', t('cmd.target'), targetAim ? 'on' : '', false, t('cmd.target.hint')) +
     (castHero
-      ? cmdBtn(
-          'cast',
-          '✨',
-          t('Каст'),
-          castMenu ? 'on' : '',
-          false,
-          t('применить способность героя из состава флота'),
-        )
+      ? cmdBtn('cast', '✨', t('cmd.cast'), castMenu ? 'on' : '', false, t('cmd.cast.hint'))
       : '') +
     (anyArtillery
       ? cmdBtn(
           'barrage',
           '🎯',
-          t('Обстрел'),
+          t('cmd.barrage'),
           barrageAim ? 'on' : '',
           false,
-          t('сосредоточить огонь артиллерии по вражескому флоту с дистанции'),
+          t('cmd.barrage.hint'),
         )
       : '') +
     (artFleets.length > 0
-      ? cmdBtn(
-          'firemode',
-          '🔥',
-          fmLabel,
-          fireMenu ? 'on' : '',
-          false,
-          t('когда артиллерия стреляет сама: пассив · ответ · станд · агрес'),
-        )
+      ? cmdBtn('firemode', '🔥', fmLabel, fireMenu ? 'on' : '', false, t('cmd.fire.hint'))
       : '') +
     cmdBtn(
       'merge',
       '⛬',
-      ids.length > 1 ? t('Слить') : t('Слить…'),
+      ids.length > 1 ? t('cmd.merge') : t('cmd.merge.pick'),
       merging ? 'on' : '',
       !canMerge,
-      t('объединить выбранные флоты в один'),
+      t('cmd.merge.hint'),
     ) +
-    cmdBtn(
-      'split',
-      '⊟',
-      t('Делить'),
-      splitState ? 'on' : '',
-      !canSplit,
-      t('отделить часть кораблей пришвартованного флота в новый'),
-    ) +
+    cmdBtn('split', '⊟', t('cmd.split'), splitState ? 'on' : '', !canSplit, t('cmd.split.hint')) +
     // ☰ — the extras row (hamburger, NOT «...» — референс не копируем дословно):
     // «Выбрать+» и будущие Ускорить/Задержка живут здесь, базовый ряд не пухнет.
-    cmdBtn('more', '☰', t('Ещё'), cmdMore ? 'on' : '', false, t('дополнительные приказы')) +
+    cmdBtn('more', '☰', t('cmd.more'), cmdMore ? 'on' : '', false, t('cmd.more.hint')) +
     (cmdMore || pickMode
       ? cmdBtn(
           'pick',
           '⊕',
-          t('Выбрать+'),
+          t('cmd.multiselect'),
           pickMode ? 'on' : '',
           false,
-          t('добавлять флоты в группу по одному тапу'),
+          t('cmd.multiselect.hint'),
         )
       : '') +
     (cmdMore
       ? cmdBtn(
           'boost',
           '⚡',
-          t('Ускорить'),
+          t('cmd.forced-march'),
           ids.length > 0 && ids.every((id) => marchFlagged(id)) ? 'on' : '',
           ids.length === 0,
-          t('форс-марш: +50% скорости ценой −5% прочности за час хода'),
+          t('cmd.forced-march.hint'),
         ) +
         // SO-UI: standing orders live here now — the bottom sheet keeps only info.
         cmdBtn(
           'qauto',
           '⚔',
-          t('Авто-штурм'),
+          t('cmd.auto-assault'),
           ids.length > 0 && ids.every((id) => isAutoAssault(id)) ? 'on' : '',
           ids.length === 0,
-          t('флот сам штурмует вражеский мир по прибытии'),
+          t('cmd.auto-assault.hint'),
         ) +
         (fleets.some(fleetHasSquadron)
           ? cmdBtn(
               'qscramble',
               '🛩',
-              t('Деж. вылет'),
+              t('cmd.standing-sortie'),
               fleets.filter(fleetHasSquadron).every((fl) => patrolOf(fl.id)) ? 'on' : '',
               false,
-              t('эскадрилья автоматически бьёт врага в радиусе'),
+              t('cmd.standing-sortie.hint'),
             )
           : '')
       : '') +
@@ -7609,10 +7574,10 @@ function renderCmdBar() {
             const cdLeft = Math.max(0, (castHero.cooldowns?.[heroCdKey(ad.type)] ?? 0) - s.time);
             const sub =
               cdLeft > 0
-                ? t('КД {h}', { h: fmtHrs(cdLeft / HOUR) })
+                ? t('cmd.cast.cooldown', { h: fmtHrs(cdLeft / HOUR) })
                 : (ad.range ?? 0) > 0
-                  ? t('цель на карте')
-                  : t('на месте');
+                  ? t('cmd.cast.needs-target')
+                  : t('cmd.cast.self');
             return `<button data-cmd="castdo" data-ab="${ab}" data-hero="${castHero.id}"${cdLeft > 0 ? ' disabled' : ''}><b>${esc(t(ad.name))}</b><span>${sub}</span></button>`;
           })
           .join('') +
@@ -11047,60 +11012,64 @@ function renderSettings(): void {
   const pct = Math.round(sweepOpacity * 100);
   settingsEl.innerHTML =
     `<div class="setbox">` +
-    `<div class="pc-head"><span class="pc-dia" style="background:var(--cyan)"></span><b>${t('НАСТРОЙКИ')}</b><span class="pc-tag">${t('интерфейс')}</span></div>` +
+    `<div class="pc-head"><span class="pc-dia" style="background:var(--cyan)"></span><b>${t('settings.title')}</b><span class="pc-tag">${t('settings.tag')}</span></div>` +
     `<div class="set-row">` +
-    `<div class="set-lbl">${t('Радарная развёртка')}<span class="set-sub">${t('вращающийся луч на карте — только вид, не влияет на обнаружение')}</span></div>` +
-    `<div class="set-ctl"><input id="set-sweep" type="range" min="0" max="100" step="5" value="${pct}" aria-label="${t('Прозрачность радарной развёртки')}"><span id="set-sweep-val" class="set-val">${pct}%</span></div>` +
+    `<div class="set-lbl">${t('settings.sweep')}<span class="set-sub">${t('settings.sweep.hint')}</span></div>` +
+    `<div class="set-ctl"><input id="set-sweep" type="range" min="0" max="100" step="5" value="${pct}" aria-label="${t('settings.sweep.opacity')}"><span id="set-sweep-val" class="set-val">${pct}%</span></div>` +
     `</div>` +
     `<div class="set-row">` +
-    `<div class="set-lbl">${t('Свои метки на карте')}<span class="set-sub">${t('булавки 📍 ваших пингов — метки союзников видны всегда')}</span></div>` +
-    `<div class="set-ctl"><label class="set-switch"><input id="set-ownpings" type="checkbox"${showOwnPings ? ' checked' : ''} aria-label="${t('Свои метки на карте')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-ownpings-val" class="set-val">${showOwnPings ? t('вкл') : t('выкл')}</span></div>` +
+    `<div class="set-lbl">${t('settings.own-pins')}<span class="set-sub">${t('settings.own-pins.hint')}</span></div>` +
+    `<div class="set-ctl"><label class="set-switch"><input id="set-ownpings" type="checkbox"${showOwnPings ? ' checked' : ''} aria-label="${t('settings.own-pins')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-ownpings-val" class="set-val">${showOwnPings ? t('settings.on') : t('settings.off')}</span></div>` +
     `</div>` +
     (pcUi()
       ? `<div class="set-row">` +
-        `<div class="set-lbl">${t('Компактный режим меню')}<span class="set-sub">${t('плотная панель сектора — меньше отступов, мельче шрифт (на ПК)')}</span></div>` +
-        `<div class="set-ctl"><label class="set-switch"><input id="set-compact" type="checkbox"${compactPanel ? ' checked' : ''} aria-label="${t('Компактный режим меню')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-compact-val" class="set-val">${compactPanel ? t('вкл') : t('выкл')}</span></div>` +
+        `<div class="set-lbl">${t('settings.compact')}<span class="set-sub">${t('settings.compact.hint')}</span></div>` +
+        `<div class="set-ctl"><label class="set-switch"><input id="set-compact" type="checkbox"${compactPanel ? ' checked' : ''} aria-label="${t('settings.compact')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-compact-val" class="set-val">${compactPanel ? t('settings.on') : t('settings.off')}</span></div>` +
         `</div>`
       : '') +
-    `<div class="pc-sec">${t('Цвета сторон')}</div>` +
+    `<div class="pc-sec">${t('settings.colors.title')}</div>` +
     `<div class="set-row">` +
-    `<div class="set-lbl">${t('Свой цвет')}<span class="set-sub">${t('вы на карте и в панелях — форма несёт тип, цвет несёт сторону')}</span></div>` +
-    `<div class="set-ctl"><input id="set-colyou" type="color" value="${youColor}" aria-label="${t('Свой цвет')}"></div>` +
+    `<div class="set-lbl">${t('settings.colors.own')}<span class="set-sub">${t('settings.colors.own.hint')}</span></div>` +
+    `<div class="set-ctl"><input id="set-colyou" type="color" value="${youColor}" aria-label="${t('settings.colors.own')}"></div>` +
     `</div>` +
     `<div class="set-row">` +
-    `<div class="set-lbl">${t('Нейтральные')}<span class="set-sub">${t('ничейные миры и неопознанные силы')}</span></div>` +
-    `<div class="set-ctl"><input id="set-colneutral" type="color" value="${neutralColor}" aria-label="${t('Нейтральные')}"></div>` +
+    `<div class="set-lbl">${t('settings.colors.neutral')}<span class="set-sub">${t('settings.colors.neutral.hint')}</span></div>` +
+    `<div class="set-ctl"><input id="set-colneutral" type="color" value="${neutralColor}" aria-label="${t('settings.colors.neutral')}"></div>` +
     `</div>` +
     `<div class="set-row">` +
-    `<div class="set-lbl">${t('Палитра соперников')}<span class="set-sub">${t('«дальтоник» — оттенки, различимые при цветослепоте')}</span></div>` +
+    `<div class="set-lbl">${t('settings.colors.palette')}<span class="set-sub">${t('settings.colors.palette.hint')}</span></div>` +
     `<div class="set-ctl set-pals">` +
     (['classic', 'warm', 'cvd'] as const)
       .map(
         (p) =>
           `<button type="button" class="set-pal${rivalPaletteId === p ? ' on' : ''}" data-pal="${p}">${
-            p === 'classic' ? t('классика') : p === 'warm' ? t('тёплая') : t('дальтоник')
+            p === 'classic'
+              ? t('settings.palette.classic')
+              : p === 'warm'
+                ? t('settings.palette.warm')
+                : t('settings.palette.colorblind')
           }</button>`,
       )
       .join('') +
-    `<button type="button" class="set-pal" id="set-colreset" title="${t('Вернуть цвета по умолчанию')}">⟲</button>` +
+    `<button type="button" class="set-pal" id="set-colreset" title="${t('settings.colors.reset')}">⟲</button>` +
     `</div>` +
     `</div>` +
-    `<div class="pc-sec">${t('Графика')}</div>` +
+    `<div class="pc-sec">${t('settings.gfx.title')}</div>` +
     `<div class="set-row">` +
-    `<div class="set-lbl">${t('Свечение и ореолы')}<span class="set-sub">${t('мягкое сияние вокруг миров, флотов и границ — выключите ради чёткой карты и скорости')}</span></div>` +
-    `<div class="set-ctl"><label class="set-switch"><input id="set-glow" type="checkbox"${glowFx ? ' checked' : ''} aria-label="${t('Свечение и ореолы')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-glow-val" class="set-val">${glowFx ? t('вкл') : t('выкл')}</span></div>` +
-    `</div>` +
-    `<div class="set-row">` +
-    `<div class="set-lbl">${t('Звёздный фон')}<span class="set-sub">${t('дрейфующие туманности и звёзды на фоне — выключите для плоского фона')}</span></div>` +
-    `<div class="set-ctl"><label class="set-switch"><input id="set-starfield" type="checkbox"${starfield ? ' checked' : ''} aria-label="${t('Звёздный фон')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-starfield-val" class="set-val">${starfield ? t('вкл') : t('выкл')}</span></div>` +
+    `<div class="set-lbl">${t('settings.gfx.glow')}<span class="set-sub">${t('settings.gfx.glow.hint')}</span></div>` +
+    `<div class="set-ctl"><label class="set-switch"><input id="set-glow" type="checkbox"${glowFx ? ' checked' : ''} aria-label="${t('settings.gfx.glow')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-glow-val" class="set-val">${glowFx ? t('settings.on') : t('settings.off')}</span></div>` +
     `</div>` +
     `<div class="set-row">` +
-    `<div class="set-lbl">${t('Счётчик FPS')}<span class="set-sub">${t('показывать кадры в секунду в углу — для проверки производительности')}</span></div>` +
-    `<div class="set-ctl"><label class="set-switch"><input id="set-fps" type="checkbox"${showFps ? ' checked' : ''} aria-label="${t('Счётчик FPS')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-fps-val" class="set-val">${showFps ? t('вкл') : t('выкл')}</span></div>` +
+    `<div class="set-lbl">${t('settings.gfx.starfield')}<span class="set-sub">${t('settings.gfx.starfield.hint')}</span></div>` +
+    `<div class="set-ctl"><label class="set-switch"><input id="set-starfield" type="checkbox"${starfield ? ' checked' : ''} aria-label="${t('settings.gfx.starfield')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-starfield-val" class="set-val">${starfield ? t('settings.on') : t('settings.off')}</span></div>` +
+    `</div>` +
+    `<div class="set-row">` +
+    `<div class="set-lbl">${t('settings.gfx.fps')}<span class="set-sub">${t('settings.gfx.fps.hint')}</span></div>` +
+    `<div class="set-ctl"><label class="set-switch"><input id="set-fps" type="checkbox"${showFps ? ' checked' : ''} aria-label="${t('settings.gfx.fps')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-fps-val" class="set-val">${showFps ? t('settings.on') : t('settings.off')}</span></div>` +
     `</div>` +
     // The «управление скоростью» control moved to the sandbox panel (a dev-only corner),
     // so Settings no longer carries a developer section.
-    `<button class="pc-close" id="set-close" type="button">${t('ГОТОВО')}</button>` +
+    `<button class="pc-close" id="set-close" type="button">${t('settings.done')}</button>` +
     `</div>`;
   const slider = document.getElementById('set-sweep') as HTMLInputElement | null;
   const val = document.getElementById('set-sweep-val');
@@ -11112,31 +11081,31 @@ function renderSettings(): void {
   const ownVal = document.getElementById('set-ownpings-val');
   own?.addEventListener('change', () => {
     setShowOwnPings(own.checked);
-    if (ownVal) ownVal.textContent = own.checked ? t('вкл') : t('выкл');
+    if (ownVal) ownVal.textContent = own.checked ? t('settings.on') : t('settings.off');
   });
   const compact = document.getElementById('set-compact') as HTMLInputElement | null;
   const compactVal = document.getElementById('set-compact-val');
   compact?.addEventListener('change', () => {
     setCompactPanel(compact.checked);
-    if (compactVal) compactVal.textContent = compact.checked ? t('вкл') : t('выкл');
+    if (compactVal) compactVal.textContent = compact.checked ? t('settings.on') : t('settings.off');
   });
   const glow = document.getElementById('set-glow') as HTMLInputElement | null;
   const glowVal = document.getElementById('set-glow-val');
   glow?.addEventListener('change', () => {
     setGlowFx(glow.checked);
-    if (glowVal) glowVal.textContent = glow.checked ? t('вкл') : t('выкл');
+    if (glowVal) glowVal.textContent = glow.checked ? t('settings.on') : t('settings.off');
   });
   const star = document.getElementById('set-starfield') as HTMLInputElement | null;
   const starVal = document.getElementById('set-starfield-val');
   star?.addEventListener('change', () => {
     setStarfield(star.checked);
-    if (starVal) starVal.textContent = star.checked ? t('вкл') : t('выкл');
+    if (starVal) starVal.textContent = star.checked ? t('settings.on') : t('settings.off');
   });
   const fps = document.getElementById('set-fps') as HTMLInputElement | null;
   const fpsVal = document.getElementById('set-fps-val');
   fps?.addEventListener('change', () => {
     setShowFps(fps.checked);
-    if (fpsVal) fpsVal.textContent = fps.checked ? t('вкл') : t('выкл');
+    if (fpsVal) fpsVal.textContent = fps.checked ? t('settings.on') : t('settings.off');
   });
   // Цвета сторон: живые инпуты + пресеты палитры соперников. Карта красится на
   // следующем кадре сама (ownerColor читается при отрисовке), панель — при
@@ -14786,17 +14755,17 @@ function corpNoneHtml(): string {
       (c) =>
         `<div class="crow2"><span class="cnm">${esc(c.name)}</span>` +
         `<span class="cinf">${nfmt(c.influence)} ⟡</span>` +
-        `<span class="cpres">${t('{n} участников', { n: String(c.members) })}</span>` +
-        `<span class="cman"><button class="cbtn2" data-corpact="apply" data-corparg="${esc(c.corpId)}">${t('Заявиться')}</button></span></div>`,
+        `<span class="cpres">${t('corp.members.count', { n: String(c.members) })}</span>` +
+        `<span class="cman"><button class="cbtn2" data-corpact="apply" data-corparg="${esc(c.corpId)}">${t('corp.apply')}</button></span></div>`,
     )
     .join('');
   return (
     `<div class="ccols">` +
-    `<section class="ccard"><h4>${t('Создать корпорацию')}</h4>` +
-    `<div class="cinput"><input id="corpnewname" placeholder="${t('Название (3–24 символа)')}" maxlength="24">` +
-    `<button class="cbtn2" data-corpact="create">${t('Создать')}</button></div></section>` +
-    `<section class="ccard"><h4>${t('Найти и подать заявку')}</h4>` +
-    `<div class="ctable">${rows || `<p class="chint">${t('Пока нет других корпораций.')}</p>`}</div></section>` +
+    `<section class="ccard"><h4>${t('corp.create.title')}</h4>` +
+    `<div class="cinput"><input id="corpnewname" placeholder="${t('corp.create.name-ph')}" maxlength="24">` +
+    `<button class="cbtn2" data-corpact="create">${t('corp.create.go')}</button></div></section>` +
+    `<section class="ccard"><h4>${t('corp.browse.title')}</h4>` +
+    `<div class="ctable">${rows || `<p class="chint">${t('corp.browse.empty')}</p>`}</div></section>` +
     `</div>`
   );
 }
@@ -14813,20 +14782,20 @@ function corpOverviewHtml(): string {
     )
     .join('');
   const feedHtml = canManage(corpMine.membership.role)
-    ? feed || `<p class="chint">${t('Пока пусто.')}</p>`
-    : `<p class="chint">${t('Журнал виден главе и офицерам.')}</p>`;
+    ? feed || `<p class="chint">${t('corp.empty')}</p>`
+    : `<p class="chint">${t('corp.log.private')}</p>`;
   const nextWar = avaChallenges.find((w) => w.status === 'accepted' || w.status === 'pending');
   const nextWarHtml = nextWar
-    ? `<div class="cwarn">⚔ ${t('AvA')} vs ${esc(corpNameOf(nextWar.challengerCorp === corpMine.membership.corpId ? nextWar.targetCorp : nextWar.challengerCorp))} — ${t(nextWar.status === 'accepted' ? 'идёт набор ростера' : 'ждёт ответа')}</div>`
+    ? `<div class="cwarn">⚔ ${t('AvA')} vs ${esc(corpNameOf(nextWar.challengerCorp === corpMine.membership.corpId ? nextWar.targetCorp : nextWar.challengerCorp))} — ${t(nextWar.status === 'accepted' ? 'corp.war.roster-open' : 'corp.war.pending')}</div>`
     : '';
   return (
     `${nextWarHtml}` +
     `<div class="ccols">` +
-    `<section class="ccard"><h4>${t('Корпорация')}</h4>` +
-    `<div class="cline"><span>${t('Влияние')}</span><em>${nfmt(c.influence)} ⟡</em></div>` +
-    `<div class="cline"><span>${t('Моя роль')}</span><em>${corpRoleLabel(corpMine.membership.role)}</em></div>` +
-    `<p class="chint">${t('Пассивные бонусы владений придут вместе с мета-слоем секторов — пока их нет.')}</p></section>` +
-    `<section class="ccard"><h4>${t('Журнал')}</h4>${feedHtml}</section>` +
+    `<section class="ccard"><h4>${t('corp.overview.name')}</h4>` +
+    `<div class="cline"><span>${t('corp.influence')}</span><em>${nfmt(c.influence)} ⟡</em></div>` +
+    `<div class="cline"><span>${t('corp.my-role')}</span><em>${corpRoleLabel(corpMine.membership.role)}</em></div>` +
+    `<p class="chint">${t('corp.holdings.note')}</p></section>` +
+    `<section class="ccard"><h4>${t('corp.log')}</h4>${feedHtml}</section>` +
     `</div>`
   );
 }
@@ -14841,8 +14810,8 @@ function corpMembersHtml(): string {
       let manage = '';
       if (m.role === 'recruit' && canManage(myRole)) {
         manage =
-          `<button class="cbtn2" data-corpact="accept" data-corparg="${esc(m.accountId)}">✓ ${t('принять')}</button>` +
-          `<button class="cbtn2 danger" data-corpact="decline" data-corparg="${esc(m.accountId)}">✖ ${t('отклонить')}</button>`;
+          `<button class="cbtn2" data-corpact="accept" data-corparg="${esc(m.accountId)}">✓ ${t('corp.request.accept')}</button>` +
+          `<button class="cbtn2 danger" data-corpact="decline" data-corparg="${esc(m.accountId)}">✖ ${t('corp.request.reject')}</button>`;
       } else if (!isMe && m.role !== 'head') {
         const bits: string[] = [];
         if (myRole === 'head') {
@@ -14851,7 +14820,7 @@ function corpMembersHtml(): string {
             `<button class="cbtn2" data-corpact="role" data-corparg="${esc(m.accountId)}" data-corprole="${toRole}">↑ ${corpRoleLabel(toRole)}</button>`,
           );
           bits.push(
-            `<button class="cbtn2" data-corpact="transfer" data-corparg="${esc(m.accountId)}">⬆ ${t('передать главенство')}</button>`,
+            `<button class="cbtn2" data-corpact="transfer" data-corparg="${esc(m.accountId)}">⬆ ${t('corp.transfer-lead')}</button>`,
           );
         }
         if (canManage(myRole) && !(myRole === 'officer' && m.role === 'officer')) {
@@ -14864,7 +14833,7 @@ function corpMembersHtml(): string {
       return (
         `<div class="crow2${isMe ? ' me' : ''}">` +
         `<span class="cdot" style="color:${CORP_ROLE_DOT[m.role]}"></span>` +
-        `<span class="cnm">${esc(m.login)}${isMe ? ` <i>(${t('вы')})</i>` : ''}</span>` +
+        `<span class="cnm">${esc(m.login)}${isMe ? ` <i>(${t('corp.you')})</i>` : ''}</span>` +
         `<span class="crole">${corpRoleLabel(m.role)}</span>` +
         `<span class="cman">${manage}</span>` +
         `</div>`
@@ -14874,8 +14843,8 @@ function corpMembersHtml(): string {
   const mine = corpMine.membership;
   const leave =
     mine.role === 'head'
-      ? `<button class="cbtn2 danger wide" data-corpact="disband">${t('Расформировать корпорацию')}</button>`
-      : `<button class="cbtn2 wide" data-corpact="leave">${t('Покинуть корпорацию')}</button>`;
+      ? `<button class="cbtn2 danger wide" data-corpact="disband">${t('corp.disband')}</button>`
+      : `<button class="cbtn2 wide" data-corpact="leave">${t('corp.leave')}</button>`;
   return `<div class="ctable">${rows}</div>${leave}`;
 }
 
@@ -14886,14 +14855,14 @@ function corpWarsHtml(): string {
   const corpReady = corpReadyOptimistic ?? avaPool.some((p) => p.corpId === myCorpId);
   const flags =
     `<div class="cbig">` +
-    `<div><span>${t('Готовность корпорации')}</span><b>${corpReady ? t('да ✓') : t('нет')}</b>` +
+    `<div><span>${t('corp.ready.corp')}</span><b>${corpReady ? t('corp.ready.yes') : t('corp.ready.no')}</b>` +
     (iAmHead
-      ? `<button class="cbtn2" data-corpact="${corpReady ? 'ready-corp-clear' : 'ready-corp'}">${corpReady ? t('снять') : t('в пул')}</button>`
-      : `<span class="chint">${t('только глава')}</span>`) +
+      ? `<button class="cbtn2" data-corpact="${corpReady ? 'ready-corp-clear' : 'ready-corp'}">${corpReady ? t('corp.ready.clear') : t('corp.ready.to-pool')}</button>`
+      : `<span class="chint">${t('corp.ready.lead-only')}</span>`) +
     `</div>` +
-    `<div><span>${t('Моя готовность')}</span><b>${playerReadyOptimistic ? t('да ✓') : t('—')}</b>` +
+    `<div><span>${t('corp.ready.mine')}</span><b>${playerReadyOptimistic ? t('corp.ready.yes') : t('—')}</b>` +
     (iCanFlag
-      ? `<button class="cbtn2" data-corpact="${playerReadyOptimistic ? 'ready-player-clear' : 'ready-player'}">${playerReadyOptimistic ? t('снять') : t('готов')}</button>`
+      ? `<button class="cbtn2" data-corpact="${playerReadyOptimistic ? 'ready-player-clear' : 'ready-player'}">${playerReadyOptimistic ? t('corp.ready.clear') : t('corp.ready.set')}</button>`
       : '') +
     `</div></div>`;
 
@@ -14902,27 +14871,27 @@ function corpWarsHtml(): string {
       const iAmChallenger = w.challengerCorp === myCorpId;
       const foe = corpNameOf(iAmChallenger ? w.targetCorp : w.challengerCorp);
       const st: Record<AvaChallengeStatus, string> = {
-        pending: iAmChallenger ? t('ждёт ответа') : t('входящий вызов'),
-        accepted: t('набор ростера'),
-        declined: t('отклонён'),
-        expired: t('истёк'),
-        locked: t('заперт — скоро бой'),
-        cancelled: t('отменён'),
-        ended: t('завершён'),
+        pending: iAmChallenger ? t('corp.war.pending') : t('corp.war.incoming'),
+        accepted: t('corp.war.roster'),
+        declined: t('corp.war.declined'),
+        expired: t('corp.war.expired'),
+        locked: t('corp.war.locked'),
+        cancelled: t('corp.war.cancelled'),
+        ended: t('corp.war.finished'),
       };
       const canRespond = w.status === 'pending' && !iAmChallenger && iAmHead;
       const act = canRespond
-        ? `<button class="cbtn2" data-corpact="ava-accept" data-corparg="${esc(w.id)}">${t('Принять')}</button>` +
-          `<button class="cbtn2 danger" data-corpact="ava-decline" data-corparg="${esc(w.id)}">${t('Отклонить')}</button>`
+        ? `<button class="cbtn2" data-corpact="ava-accept" data-corparg="${esc(w.id)}">${t('corp.war.accept')}</button>` +
+          `<button class="cbtn2 danger" data-corpact="ava-decline" data-corparg="${esc(w.id)}">${t('corp.war.decline')}</button>`
         : w.status === 'accepted' &&
             corpMine.membership &&
             corpMine.membership.role !== 'recruit' &&
             !avaRoster?.mine.some((r) => r.accountId === corpMine.membership!.accountId)
-          ? `<button class="cbtn2" data-corpact="ava-join" data-corparg="${esc(w.id)}">${t('Заявиться в состав')}</button>`
+          ? `<button class="cbtn2" data-corpact="ava-join" data-corparg="${esc(w.id)}">${t('corp.war.join-roster')}</button>`
           : '';
       const rosterOpen = w.status === 'accepted' && avaRoster && avaRoster.matchupId === w.id;
       const rosterLine = rosterOpen
-        ? `<div class="cwmid">${t('состав')}: ${avaRoster!.counts.challenger}/${avaRoster!.counts.target}</div>`
+        ? `<div class="cwmid">${t('corp.war.roster-label')}: ${avaRoster!.counts.challenger}/${avaRoster!.counts.target}</div>`
         : '';
       // AVA-6 setRoster — head/officer curates from the flagged pool wholesale;
       // everyone else still only has self-enroll `join` (rendered in `act` above).
@@ -14944,7 +14913,7 @@ function corpWarsHtml(): string {
           : '';
       return (
         `<div class="cwar"><div class="cwtop"><b>⚔ ${esc(foe)}</b><span class="cst st-${w.status}">${st[w.status]}</span></div>` +
-        `<div class="cwmid">${iAmChallenger ? t('вызов от нас') : t('вызов нам')} · ${nfmt(w.cost)} ⟡</div>${rosterLine}${curate}` +
+        `<div class="cwmid">${iAmChallenger ? t('corp.war.by-us') : t('corp.war.to-us')} · ${nfmt(w.cost)} ⟡</div>${rosterLine}${curate}` +
         (act ? `<div class="cwact">${act}</div>` : '') +
         `</div>`
       );
@@ -14957,7 +14926,7 @@ function corpWarsHtml(): string {
       (p) =>
         `<div class="crow2"><span class="cnm">${esc(p.name)}</span><span class="cinf">${nfmt(p.influence)} ⟡</span>` +
         (iAmHead
-          ? `<span class="cman"><button class="cbtn2" data-corpact="ava-challenge" data-corparg="${esc(p.corpId)}">⚔ ${t('Вызвать')}</button></span>`
+          ? `<span class="cman"><button class="cbtn2" data-corpact="ava-challenge" data-corparg="${esc(p.corpId)}">⚔ ${t('corp.war.challenge')}</button></span>`
           : '') +
         `</div>`,
     )
@@ -14968,15 +14937,15 @@ function corpWarsHtml(): string {
     .map(
       (f) =>
         `<div class="cline"><span>${esc(f.challengerName)} vs ${esc(f.targetName)}</span>` +
-        `<em class="cwhen">${f.kind === 'result' ? (f.winnerCorp ? t('победа') : t('ничья')) : t('назначен')}</em></div>`,
+        `<em class="cwhen">${f.kind === 'result' ? (f.winnerCorp ? t('corp.war.win') : t('corp.war.draw')) : t('corp.war.scheduled')}</em></div>`,
     )
     .join('');
 
   return (
     flags +
-    `<h4>${t('Мои вызовы')}</h4><div class="cwars">${wars || `<p class="chint">${t('Пока нет вызовов.')}</p>`}</div>` +
-    `<h4>${t('Готовые к войне')}</h4><div class="ctable">${pool || `<p class="chint">${t('Пул пуст.')}</p>`}</div>` +
-    `<h4>${t('Публичная лента AvA')}</h4><div class="cledger">${feed || `<p class="chint">${t('Пока пусто.')}</p>`}</div>`
+    `<h4>${t('corp.war.mine')}</h4><div class="cwars">${wars || `<p class="chint">${t('corp.war.none')}</p>`}</div>` +
+    `<h4>${t('corp.war.pool')}</h4><div class="ctable">${pool || `<p class="chint">${t('corp.war.pool-empty')}</p>`}</div>` +
+    `<h4>${t('corp.war.feed')}</h4><div class="cledger">${feed || `<p class="chint">${t('corp.empty')}</p>`}</div>`
   );
 }
 
@@ -14990,21 +14959,21 @@ function corpTreasuryHtml(): string {
     )
     .join('');
   const ledgerHtml = canManage(corpMine.membership.role)
-    ? rows || `<p class="chint">${t('Пока пусто.')}</p>`
-    : `<p class="chint">${t('История видна главе и офицерам.')}</p>`;
+    ? rows || `<p class="chint">${t('corp.empty')}</p>`
+    : `<p class="chint">${t('corp.history.private')}</p>`;
   return (
-    `<div class="cbig"><div><span>${t('Влияние')}</span><b>${nfmt(corpMine.corp.influence)} ⟡</b></div></div>` +
-    `<h4>${t('История')}</h4><div class="cledger">${ledgerHtml}</div>` +
-    `<p class="chint">${t('Тратится на вызов AvA (100 ⟡ по умолчанию) — кнопка «Вызвать» во вкладке «Войны».')}</p>`
+    `<div class="cbig"><div><span>${t('corp.influence')}</span><b>${nfmt(corpMine.corp.influence)} ⟡</b></div></div>` +
+    `<h4>${t('corp.history')}</h4><div class="cledger">${ledgerHtml}</div>` +
+    `<p class="chint">${t('corp.influence.hint')}</p>`
   );
 }
 
 function corpHoldingsHtml(): string {
-  return `<div class="hub-empty"><span class="he-ic">▦</span>${t('Владения — скоро')}<br><span style="font-size:11px;color:var(--cyan-dim)">${t('мета-карта секторов появится вместе со вторым контуром метагейма')}</span></div>`;
+  return `<div class="hub-empty"><span class="he-ic">▦</span>${t('corp.holdings.soon')}<br><span style="font-size:11px;color:var(--cyan-dim)">${t('corp.holdings.soon.hint')}</span></div>`;
 }
 
 function corpCommsHtml(): string {
-  return `<div class="hub-empty"><span class="he-ic">▭</span>${t('Чат — скоро')}<br><span style="font-size:11px;color:var(--cyan-dim)">${t('постоянный корп-чат ждёт мета-слой; журнал действий — во вкладке «Обзор»')}</span></div>`;
+  return `<div class="hub-empty"><span class="he-ic">▭</span>${t('corp.chat.soon')}<br><span style="font-size:11px;color:var(--cyan-dim)">${t('corp.chat.soon.hint')}</span></div>`;
 }
 
 function renderCorp(): void {
@@ -15013,15 +14982,15 @@ function renderCorp(): void {
   corpHdEl.innerHTML = c
     ? `<div class="chrow"><span class="cemblem">⬢</span>` +
       `<div class="cident"><b>${esc(c.name)}</b></div>` +
-      `<button id="corpclose" class="cx" title="${t('Закрыть')}">✕</button></div>` +
+      `<button id="corpclose" class="cx" title="${t('corp.close')}">✕</button></div>` +
       `<div class="cmetrics">` +
-      `<span>${t('влияние')} <b>${nfmt(c.influence)} ⟡</b></span>` +
-      `<span>${t('участников')} <b>${corpDetail?.members.filter((m) => m.role !== 'recruit').length ?? '—'}</b></span>` +
-      `<span>${t('роль')} <b>${mem ? corpRoleLabel(mem.role) : '—'}</b></span>` +
+      `<span>${t('corp.card.influence')} <b>${nfmt(c.influence)} ⟡</b></span>` +
+      `<span>${t('corp.card.members')} <b>${corpDetail?.members.filter((m) => m.role !== 'recruit').length ?? '—'}</b></span>` +
+      `<span>${t('corp.card.role')} <b>${mem ? corpRoleLabel(mem.role) : '—'}</b></span>` +
       `</div>`
     : `<div class="chrow"><span class="cemblem">⬢</span>` +
-      `<div class="cident"><b>${t('Без корпорации')}</b></div>` +
-      `<button id="corpclose" class="cx" title="${t('Закрыть')}">✕</button></div>`;
+      `<div class="cident"><b>${t('corp.card.none')}</b></div>` +
+      `<button id="corpclose" class="cx" title="${t('corp.close')}">✕</button></div>`;
   corpTabsEl.innerHTML = CORP_TABS.map(
     (ct) =>
       `<button class="ctab${ct.id === corpTab ? ' on' : ''}" data-corptab="${ct.id}">${t(ct.label)}</button>`,
