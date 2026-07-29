@@ -8845,7 +8845,10 @@ const techCost = (c: Record<string, number>): string =>
 // auto-column appended at the end, so fresh data never breaks the screen.
 const TECH_COLS: Record<string, Array<{ label: string; ids: string[] }>> = {
   space: [
-    { label: 'tech.group.industry', ids: ['industrial_automation', 'microelectronics_fabrication'] },
+    {
+      label: 'tech.group.industry',
+      ids: ['industrial_automation', 'microelectronics_fabrication'],
+    },
     { label: 'tech.group.fleet', ids: ['orbital_logistics', 'siege_doctrine', 'void_armadas'] },
     { label: 'tech.group.sensors', ids: ['deep_survey'] },
   ],
@@ -8853,9 +8856,14 @@ const TECH_COLS: Record<string, Array<{ label: string; ids: string[] }>> = {
     { label: 'tech.group.doctrines', ids: ['combined_arms', 'garrison_networks'] },
     { label: 'tech.group.fortifications', ids: ['fortified_infrastructure', 'planetary_bastions'] },
   ],
-  squadron: [{ label: 'tech.group.airwing', ids: ['flight_decks', 'strike_vectors', 'ace_programs'] }],
+  squadron: [
+    { label: 'tech.group.airwing', ids: ['flight_decks', 'strike_vectors', 'ace_programs'] },
+  ],
   missile: [
-    { label: 'tech.group.arsenal', ids: ['guidance_arrays', 'warhead_miniaturization', 'saturation_barrage'] },
+    {
+      label: 'tech.group.arsenal',
+      ids: ['guidance_arrays', 'warhead_miniaturization', 'saturation_barrage'],
+    },
   ],
   command: [
     { label: 'tech.group.comms', ids: ['signal_corps', 'logistics_command'] },
@@ -9332,7 +9340,10 @@ stewWin.addEventListener('click', (e) => {
 // skill tree (`hero.skill.unlock`) and install fittings (`hero.fit`). All gates
 // (range/cooldown/cost/slots/branch) are the core's — the window only shows them.
 const HERO_ACTIVE_CAP = 3; // mirrors the core heroModule's active cap (not exported)
-const HERO_BRANCH_RU: Record<string, string> = { transhuman: 'hero.branch.transhuman', psionic: 'hero.branch.psionic' };
+const HERO_BRANCH_RU: Record<string, string> = {
+  transhuman: 'hero.branch.transhuman',
+  psionic: 'hero.branch.psionic',
+};
 /** The cooldown slot an ability occupies — mirrors the core's `cooldownKey`. */
 const heroCdKey = (type: string): string =>
   type === 'temp_lane' ? 'path' : type === 'annihilate' ? 'annihilate' : `fx:${type}`;
@@ -9854,7 +9865,11 @@ let conTplIdx = 0; // which division template the «Армия» pane is editing
 let conModules: string[] = [];
 let conCount = 1;
 let conPlanet = '';
-const SLOT_RU: Record<string, string> = { weapon: 'yard.slot.weapon', defense: 'yard.slot.defense', utility: 'yard.slot.utility' };
+const SLOT_RU: Record<string, string> = {
+  weapon: 'yard.slot.weapon',
+  defense: 'yard.slot.defense',
+  utility: 'yard.slot.utility',
+};
 const SLOT_ICON: Record<string, string> = { weapon: '🎯', defense: '🛡', utility: '⊞' };
 const MODULE_ICON: Record<string, string> = {
   targeting_array: '🎯',
@@ -10354,7 +10369,16 @@ function showStage(stage: 'welcome' | 'register' | 'recover' | 'reset' | 'browse
 
 // A fresh callsign for a brand-new commander. Deterministic on purpose (no random/
 // time even in UI glue): a persisted counter walks a fixed wordlist.
-const CALLSIGNS = ['callsign.rhino', 'callsign.comet', 'callsign.viper', 'callsign.orion', 'callsign.vector', 'callsign.falcon', 'callsign.titan', 'callsign.quasar'];
+const CALLSIGNS = [
+  'callsign.rhino',
+  'callsign.comet',
+  'callsign.viper',
+  'callsign.orion',
+  'callsign.vector',
+  'callsign.falcon',
+  'callsign.titan',
+  'callsign.quasar',
+];
 function suggestCallsign(): string {
   const n = (Number(localStorage.getItem('void.newcount') ?? '0') || 0) + 1;
   localStorage.setItem('void.newcount', String(n));
@@ -11423,12 +11447,9 @@ function renderSetup(): void {
   const rivals = setupSlots.slice(1).filter((r) => r === 'ai').length;
   setupGoEl.disabled = false;
   setupGoEl.textContent = rivals === 0 ? t('setup.start.solo') : t('setup.start');
-  setupHintEl.textContent = t(
-    rivals === 0
-      ? 'setup.home.solo'
-      : 'setup.home.pick',
-    { home: setupStart },
-  );
+  setupHintEl.textContent = t(rivals === 0 ? 'setup.home.solo' : 'setup.home.pick', {
+    home: setupStart,
+  });
   for (const c of Array.from(setupSpeedEl.querySelectorAll('[data-spd]')))
     c.classList.toggle('on', Number((c as HTMLElement).dataset.spd) === setupSpeed);
 }
@@ -12407,7 +12428,7 @@ async function openSeatPicker(matchId: string): Promise<void> {
   seatpickFaction = null;
   if (seatpickGoEl) seatpickGoEl.disabled = true;
   if (seatpickListEl)
-    seatpickListEl.innerHTML = '<p style="color:var(--dim);text-align:center">Загрузка…</p>';
+    seatpickListEl.innerHTML = `<p style="color:var(--dim);text-align:center">${t('seatpick.loading')}</p>`;
   if (seatpickEl) seatpickEl.style.display = 'flex';
   try {
     const res = await fetch(`${httpBase(srv.base)}/matches/${encodeURIComponent(matchId)}/seats`);
@@ -12500,7 +12521,7 @@ async function openSeatPicker(matchId: string): Promise<void> {
     }
   } catch {
     if (seatpickListEl)
-      seatpickListEl.innerHTML = '<p style="color:var(--red)">Не удалось загрузить слоты</p>';
+      seatpickListEl.innerHTML = `<p style="color:var(--red)">${t('seatpick.load-failed')}</p>`;
   }
 }
 

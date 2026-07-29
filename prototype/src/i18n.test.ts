@@ -4,7 +4,6 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ru } from '../../localization/ru';
 import { en } from '../../localization/en';
-import { en as legacyEn } from '../../localization/legacy/en';
 import { dataKey } from '../../localization';
 import { GLOSSARY } from './codexIndex';
 import { INTROS } from './intros';
@@ -23,7 +22,7 @@ const TOUR_DEPS_STUB = {
 // (`t('err.no-capacity')`). Эти тесты держат три инварианта:
 //   1. локали не расходятся — у ru.ts и en.ts один и тот же набор ключей;
 //   2. ключ из кода существует, а ключ из локали не осиротел;
-//   3. МОСТ на время миграции (старый msgid = русская строка) только сокращается.
+//   3. в коде нет русского текста — только ключи (мост совместимости снят).
 // Без них непереведённая строка молча уезжает в прод по-русски, а опечатка в ключе
 // показывается игроку как `err.no-capaciti`.
 
@@ -89,32 +88,6 @@ const unescape_ = (lit: string): string =>
     .replace(/\\n/g, '\n')
     .replace(/\\\\/g, '\\');
 
-/** Русские литералы ВНУТРИ `t(…)`, у которого аргумент — не литерал: `t(cond ? 'А' :
- *  'Б')`. `extractCallArgs` читает только литерал сразу после `t(`, поэтому такой
- *  вызов для него невидим — и msgid из ветки тернарника уезжал в прод без
- *  английского (`corp.war.roster-open` доехал до игрока по-русски именно так).
- *  Возвращаем только кириллические литералы: ключи из веток покрыты общим правилом. */
-function extractHiddenMsgids(src: string): Set<string> {
-  const out = new Set<string>();
-  for (let i = 0; i < src.length - 1; i++) {
-    if (!(src[i] === 't' && src[i + 1] === '(')) continue;
-    if (/[A-Za-z0-9_$.]/.test(i > 0 ? src[i - 1]! : ' ')) continue;
-    let j = i + 2;
-    while (j < src.length && /\s/.test(src[j]!)) j++;
-    if (src[j] === "'" || src[j] === '"' || src[j] === '`') continue; // обычный вызов
-    let depth = 1;
-    let arg = '';
-    for (let k = i + 2; k < src.length && depth > 0; k++) {
-      if (src[k] === '(') depth++;
-      else if (src[k] === ')') depth--;
-      if (depth > 0) arg += src[k];
-    }
-    for (const m of arg.matchAll(/'((?:[^'\\\n]|\\.)*)'/g))
-      if (hasCyrillic(m[1]!)) out.add(unescape_(m[1]!));
-  }
-  return out;
-}
-
 /** Ключи, которых НЕТ в коде литералом — они собираются из идентификатора в рантайме.
  *  Каждая запись объясняет, кто их строит; иначе тест на сирот снесёт живой перевод. */
 /** Ключи статичной разметки (`prototype/build.mjs`): `data-i18n="hub.play"` и
@@ -140,8 +113,12 @@ const isDynamic = (k: string): boolean => DYNAMIC.some((d) => k.startsWith(d.pre
 
 describe('локализация — ключи', () => {
   it('ru.ts и en.ts описывают ровно один и тот же набор ключей', () => {
-    const onlyRu = Object.keys(ru).filter((k) => !(k in en)).sort();
-    const onlyEn = Object.keys(en).filter((k) => !(k in ru)).sort();
+    const onlyRu = Object.keys(ru)
+      .filter((k) => !(k in en))
+      .sort();
+    const onlyEn = Object.keys(en)
+      .filter((k) => !(k in ru))
+      .sort();
     expect({ onlyRu, onlyEn }).toEqual({ onlyRu: [], onlyEn: [] });
   });
 
@@ -163,11 +140,32 @@ describe('локализация — ключи', () => {
   });
 
   it('каждый ключ локали используется (нет осиротевших переводов)', () => {
+    // Ищем ключ в КАВЫЧКАХ, а не подстрокой: подстрочный поиск считал живым любой
+    // ключ, чей текст встречается внутри другого литерала, и так мост годами
+    // держал десятки мёртвых записей.
     const hay = [...srcFiles().map(read), read('prototype/build.mjs')].join('\n');
+    const quoted = new Set([
+      ...[...hay.matchAll(/'((?:[^'\\\n]|\\.)*)'/g)].map((m) => m[1]!),
+      ...[...hay.matchAll(/"((?:[^"\\\n]|\\.)*)"/g)].map((m) => m[1]!),
+    ]);
     const orphans = Object.keys(ru)
-      .filter((k) => !isDynamic(k) && !hay.includes(k))
+      .filter((k) => !isDynamic(k) && !quoted.has(k))
       .sort();
     expect(orphans).toEqual([]);
+  });
+
+  it('в коде нет русского текста — только ключи', () => {
+    // Инвариант, ради которого этап 2 и делался: мост совместимости снят, поэтому
+    // русский литерал в `t()`/`tData()` больше НЕ переведётся — он доедет до
+    // игрока как есть. Проверяем оба вызова во всех исходниках прототипа.
+    const leaks: string[] = [];
+    for (const f of srcFiles()) {
+      const src = read(f);
+      for (const fn of ['t', 'tData'] as const)
+        for (const lit of extractCallArgs(src, fn))
+          if (hasCyrillic(lit)) leaks.push(`${f}: ${fn}(${JSON.stringify(lit)})`);
+    }
+    expect(leaks.sort()).toEqual([]);
   });
 
   it('в английских значениях не осталось русского', () => {
@@ -206,28 +204,5 @@ describe('локализация — ключи', () => {
     expect(ids.length).toBeGreaterThan(5); // разбор таблицы не должен молча опустеть
     const missing = ids.map((id) => dataKey(id.replace(/_/g, ' '))).filter((k) => !(k in ru));
     expect(missing).toEqual([]);
-  });
-});
-
-describe('локализация — мост совместимости (сокращается до нуля)', () => {
-  it('у каждого старого msgid из кода есть английский перевод', () => {
-    const missing: string[] = [];
-    for (const f of srcFiles()) {
-      const src = read(f);
-      for (const lit of extractCallArgs(src, 't'))
-        if (!KEY_RE.test(lit) && hasCyrillic(lit) && !(lit in legacyEn)) missing.push(lit);
-      // …включая литералы из веток `t(cond ? 'А' : 'Б')`: разбор аргумента их не
-      // видит, поэтому без этой строки msgid уезжает в прод без английского.
-      for (const lit of extractHiddenMsgids(src)) if (!(lit in legacyEn)) missing.push(lit);
-    }
-    expect([...new Set(missing)].sort()).toEqual([]);
-  });
-
-  it('в мосте нет записей, которые уже никто не зовёт', () => {
-    const hay = [...srcFiles().map(read), read('prototype/build.mjs')].join('\n');
-    const orphans = Object.keys(legacyEn)
-      .filter((k) => !hay.includes(k))
-      .sort();
-    expect(orphans).toEqual([]);
   });
 });

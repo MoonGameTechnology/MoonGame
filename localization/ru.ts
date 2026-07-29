@@ -405,6 +405,9 @@ export const ru: Record<string, string> = {
   'data.targeting-array': 'Система наведения',
   'data.ablative-plating': 'Броневые плиты',
   'data.shield-booster': 'Тяжёлый щит',
+  'data.psi-amplifier': 'Пси-усилитель',
+  'data.aegis-matrix': 'Матрица «Эгида»',
+  'data.ablative-cladding': 'Абляционная обшивка',
   'data.credits': 'кредиты',
   'data.cruiser': 'крейсер',
   'data.crystalline': 'Кристаллический',
@@ -1349,6 +1352,8 @@ export const ru: Record<string, string> = {
   'seatpick.bonus.violet': '+5% экономика и +5% урон',
   'seatpick.cancel': 'Назад',
   'seatpick.go': 'ВЫБРАТЬ',
+  'seatpick.load-failed': 'Не удалось загрузить слоты',
+  'seatpick.loading': 'Загрузка…',
   'seatpick.sub': 'Выберите фракцию и стартовую позицию. Занятые места отмечены серым.',
   'seatpick.title': 'Выбор фракции',
 

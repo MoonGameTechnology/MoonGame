@@ -404,6 +404,9 @@ export const en: Record<string, string> = {
   'data.targeting-array': 'Targeting Array',
   'data.ablative-plating': 'Ablative Plating',
   'data.shield-booster': 'Shield Booster',
+  'data.psi-amplifier': 'Psi Amplifier',
+  'data.aegis-matrix': 'Aegis Matrix',
+  'data.ablative-cladding': 'Ablative Cladding',
   'data.credits': 'credits',
   'data.cruiser': 'cruiser',
   'data.crystalline': 'Crystalline',
@@ -1351,6 +1354,8 @@ export const en: Record<string, string> = {
   'seatpick.bonus.violet': '+5% economy and +5% damage',
   'seatpick.cancel': 'Back',
   'seatpick.go': 'CHOOSE',
+  'seatpick.load-failed': 'Could not load the seats',
+  'seatpick.loading': 'Loading…',
   'seatpick.sub': 'Choose your faction and starting position. Taken seats are marked grey.',
   'seatpick.title': 'Choose Faction',
 

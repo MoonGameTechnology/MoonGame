@@ -1047,19 +1047,19 @@ export const data: GameData = parseGameData({
   },
   heroFittings: {
     psi_amplifier: {
-      name: 'Пси-усилитель',
+      name: 'Psi Amplifier',
       description: 'hero.fit.psi-amplifier.desc',
       grants: { ability: 'scan' },
       cost: { microelectronics: 30 },
     },
     aegis_matrix: {
-      name: 'Матрица «Эгида»',
+      name: 'Aegis Matrix',
       description: 'hero.fit.aegis-matrix.desc',
       grants: { passive: 'rally_beacon' },
       cost: { metal: 60 },
     },
     ablative_plating: {
-      name: 'Абляционная обшивка',
+      name: 'Ablative Cladding',
       description: 'hero.fit.ablative-plating.desc',
       statMods: { hp: 40 },
       cost: { metal: 30 },
