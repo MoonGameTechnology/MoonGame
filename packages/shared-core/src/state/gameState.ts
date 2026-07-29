@@ -1,4 +1,6 @@
 import { seedRng, type RngState } from '../rng/rng';
+import type { SortieState } from './squadron';
+import type { FleetChain } from './chain';
 
 /**
  * The authoritative game state. Stored as JSONB on the server
@@ -532,6 +534,35 @@ export interface GameState {
    *  was seeded at match start (usually the homeworld); designating updates both this
    *  map AND every owned hero's `home` in one action. */
   capital?: Record<PlayerId, PlanetId>;
+  /** CC-2 auto-storm: fleet ids with "auto-assault when idle at a hostile world"
+   *  armed (`standingOrdersModule`, `order.auto`). A driver reads this; the module
+   *  itself only stores the flag and garbage-collects it for dead fleets. */
+  autoAssault?: Record<FleetId, true>;
+  /** CC-4 дежурный вылет ("standing patrol"): a squadron wing armed to auto-scramble
+   *  at the nearest identified hostile within `radius` of `center`, maintained by
+   *  `standingOrdersModule` (`order.scramble` arms/disarms; `patrol.stamp` is the
+   *  server driver's own runtime update of `sortie`/`rearmAt` — never client-issuable,
+   *  see `actions/payloadSchemas.ts`). */
+  patrols?: Record<FleetId, PatrolEntry>;
+  /** A wing's sortie budget stashed while its patrol is disarmed (`order.scramble`
+   *  off) — carries `fuel`/`rearming` forward instead of resetting on re-arm. */
+  wingSorties?: Record<FleetId, SortieState>;
+  /** CC-1 order chains: a fleet's queued plan (`standingOrdersModule`, `order.chain`
+   *  sets/replaces it; `chain.stamp` is the server driver's own runtime update of
+   *  the consumed head / armed wait deadline — never client-issuable). */
+  orders?: Record<FleetId, FleetChain>;
+  /** BOOST-1 форс-марш: fleet ids currently marching at +50% speed for 5% max-hp
+   *  wear per game-hour in transit (`forcedMarchModule`, `fleet.forcemarch`). */
+  forcedMarch?: Record<FleetId, true>;
+}
+
+/** A standing patrol's launch anchor + reach + current sortie budget (CC-4). */
+export interface PatrolEntry {
+  center: { x: number; y: number };
+  radius: number;
+  sortie: SortieState;
+  /** World-time (ms) the rearm cadence next ticks; stamped by the server driver. */
+  rearmAt?: number;
 }
 
 /** A standing sell order on the session market: the `seller` has escrowed `amount`

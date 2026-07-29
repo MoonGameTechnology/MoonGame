@@ -110,13 +110,12 @@ describe('state delta — diff/apply round-trip', () => {
   });
 
   it('carries HOST-EXTENSION keys (e.g. `orders` command chains) and their removal', () => {
-    type Ext = GameState & { orders?: Record<string, unknown> };
     const prev = base();
-    const next = deepClone(prev) as Ext;
-    // A key the core does not know about — the prototype's authoritative chains.
-    next.orders = { F: [{ kind: 'move', to: 'B' }] };
+    const next = deepClone(prev);
+    // A key the delta layer treats generically — `standingOrdersModule`'s chains.
+    next.orders = { F: { steps: [{ kind: 'move', to: 'B' }] } };
     const grow = diffState(prev, next);
-    expect(grow.meta).toMatchObject({ orders: { F: [{ kind: 'move', to: 'B' }] } });
+    expect(grow.meta).toMatchObject({ orders: { F: { steps: [{ kind: 'move', to: 'B' }] } } });
     expect(applyDelta(prev, grow)).toEqual(next);
     // …and the way back: the chain emptied → the key must vanish, not go stale.
     const wire = JSON.parse(JSON.stringify(diffState(next, prev)));
