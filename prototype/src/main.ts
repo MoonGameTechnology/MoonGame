@@ -2421,7 +2421,7 @@ function onGuidedTourEnded(r: TourResult): void {
     const cur = loadMeta();
     const xp = matchXp({ won: false, score: 100 }); // a modest onboarding packet
     saveMeta({ ...cur, xp: cur.xp + xp });
-    note(t('✔ Обучение пройдено · +{n} XP — теперь сыграй настоящий матч!', { n: xp }));
+    note(t('onb.tour.done', { n: xp }));
   }
   stopFirstGoals(); // ONB-7: the checklist belongs to the onboarding session only
   if (DEV_UI)
@@ -2477,7 +2477,7 @@ function updateGoals(): void {
     const bonus = 40;
     saveMeta({ ...cur, xp: cur.xp + bonus });
     note(
-      t('🏅 Все цели первой сессии выполнены! +{n} XP — ты готов к настоящему матчу.', {
+      t('onb.goals.all-done', {
         n: bonus,
       }),
     );
@@ -2488,10 +2488,10 @@ function renderGoals(): void {
   if (!el) return;
   const items = FIRST_GOALS.map((g) => {
     const done = goalsDone.includes(g.id);
-    return `<div class="gl-item${done ? ' done' : ''}"><span class="gl-ck">${done ? '✓' : '○'}</span><span>${esc(t(g.label))}</span></div>`;
+    return `<div class="gl-item${done ? ' done' : ''}"><span class="gl-ck">${done ? '✓' : '○'}</span><span>${esc(t(g.labelKey))}</span></div>`;
   }).join('');
   el.innerHTML =
-    `<div class="gl-box"><div class="gl-head"><b>${t('Цели первой сессии')}</b>` +
+    `<div class="gl-box"><div class="gl-head"><b>${t('onb.goals.title')}</b>` +
     `<span class="gl-count">${goalsDone.length}/${FIRST_GOALS.length}</span>` +
     `<button class="gl-tg" id="gl-tg" type="button">${goalsCollapsed ? '▸' : '▾'}</button></div>` +
     (goalsCollapsed ? '' : `<div class="gl-list">${items}</div>`);
@@ -7197,10 +7197,10 @@ function showIntro(card: IntroCard): void {
   const el = document.getElementById('intro');
   if (!el) return;
   el.innerHTML =
-    `<div class="inbox"><div class="in-head"><span class="in-ic">✦</span><b>${esc(t(card.title))}</b>` +
-    `<span class="in-tag">${t('впервые')}</span></div>` +
-    `<div class="in-body">${esc(t(card.body))}</div>` +
-    `<button class="in-ok">${t('Понятно')}</button></div>`;
+    `<div class="inbox"><div class="in-head"><span class="in-ic">✦</span><b>${esc(t(card.titleKey))}</b>` +
+    `<span class="in-tag">${t('onb.intro.badge')}</span></div>` +
+    `<div class="in-body">${esc(t(card.bodyKey))}</div>` +
+    `<button class="in-ok">${t('onb.intro.ok')}</button></div>`;
   el.classList.add('show');
 }
 // Panel-open hook: show the intro for `id` once (unless already seen / a veteran).
@@ -7237,13 +7237,13 @@ function openRecap(since: number): void {
   let body = '';
   if (hi.length)
     body +=
-      `<div class="rc-sec hi">${t('Требуют внимания · {n}', { n: r.attention })}</div>` +
+      `<div class="rc-sec hi">${t('onb.recap.attention', { n: r.attention })}</div>` +
       hi.map(recapItemHtml).join('');
   if (lo.length)
-    body += `<div class="rc-sec">${t('Пока тебя не было')}</div>` + lo.map(recapItemHtml).join('');
+    body += `<div class="rc-sec">${t('onb.recap.rest')}</div>` + lo.map(recapItemHtml).join('');
   el.innerHTML =
-    `<div class="rcbox"><div class="rc-head"><span class="cx-ic">🛰</span><b>${t('СВОДКА ВОЗВРАЩЕНИЯ')}</b></div>` +
-    `<div class="rc-body">${body}</div><button class="cx-close" id="rc-close">${t('ЗАКРЫТЬ')}</button></div>`;
+    `<div class="rcbox"><div class="rc-head"><span class="cx-ic">🛰</span><b>${t('onb.recap.title')}</b></div>` +
+    `<div class="rc-body">${body}</div><button class="cx-close" id="rc-close">${t('onb.recap.close')}</button></div>`;
   el.classList.add('show');
 }
 document.getElementById('recap')?.addEventListener('click', (ev) => {

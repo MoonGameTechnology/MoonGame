@@ -97,78 +97,17 @@ export const en: Record<string, string> = {
   '🗝 Успех: {what}': '🗝 Success: {what}',
   '✖ Провал против {who} — плата сгорела': '✖ Failed against {who} — the fee burned',
   // --- ONB-7 first-session goals checklist -------------------------------------
-  'Цели первой сессии': 'First-session goals',
-  'Построй шахту': 'Build a mine',
-  'Захвати мир': 'Capture a world',
-  'Набери 100 очков': 'Reach 100 points',
-  '🏅 Все цели первой сессии выполнены! +{n} XP — ты готов к настоящему матчу.':
-    '🏅 All first-session goals done! +{n} XP — you are ready for a real match.',
   // --- ONB-5 async intro + return digest ---------------------------------------
-  'Мир идёт без тебя': 'The world runs without you',
-  'Этот флот прибудет через часы реального времени — мир Void Dominion идёт непрерывно, даже когда ты офлайн. Можешь закрыть игру: приказы выполнятся сами, а к возвращению мы пришлём уведомление и покажем сводку «пока тебя не было».':
-    'This fleet will arrive in real hours — the world of Void Dominion runs continuously, even while you are offline. You can close the game: your orders carry out on their own, and on your return we will send a notification and show a "while you were away" digest.',
-  'СВОДКА ВОЗВРАЩЕНИЯ': 'RETURN DIGEST',
-  'Требуют внимания · {n}': 'Needs attention · {n}',
-  'Пока тебя не было': 'While you were away',
   // --- ONB-3 just-in-time mechanic intros --------------------------------------
-  впервые: 'first time',
-  'Дерево технологий': 'Technology tree',
-  'Здесь ты открываешь технологии — постоянные улучшения флота, экономики и обороны. Узел стоит ресурсов и времени; изучил — бонус действует до конца матча. Планируй ветку под свой стиль игры.':
-    'Here you unlock technologies — permanent upgrades to your fleet, economy and defence. A node costs resources and time; once researched, the bonus lasts the rest of the match. Plan the branch to fit your playstyle.',
-  'Сессионный рынок': 'Session market',
-  'Торгуй ресурсами с другими игроками сессии: выставляй свои лоты и забирай чужие. Рынок сглаживает нехватку — обменяй излишек одного ресурса на тот, которого не хватает.':
-    'Trade resources with the other players in the session: post your own lots and take theirs. The market smooths shortages — swap a surplus of one resource for the one you lack.',
-  'Хранитель — ИИ на сон': 'Steward — AI on sleep',
-  'Уходишь надолго? Передай оборону Хранителю — он будет держать твои миры по заданным правилам, пока тебя нет. Мир идёт 24/7, но базовая защита останется, даже когда ты офлайн.':
-    'Away for a while? Hand your defence to the Steward — it holds your worlds by your rules while you are gone. The world runs 24/7, but a baseline defence stays up even when you are offline.',
-  'Верфь — оснащение': 'Shipyard — loadouts',
-  'Здесь ты собираешь корабли, эскадрильи, дивизии и героев из модулей. Лоадаут фиксируется при постройке — выбирай слоты заранее, переоснастить готовое нельзя. Вкладка «Герои» — штаб командиров.':
-    'Here you assemble ships, squadrons, divisions and heroes from modules. The loadout is locked at build time — choose slots up front, a finished unit cannot be re-fitted. The «Heroes» tab is your commander HQ.',
-  'Объявляй войну и мир, заключай пакты и союзы. Коалиция ограничена порогом силы — всех против одного не собрать. Следи за стойками сторон: союзник сегодня может стать соперником завтра.':
-    'Declare war and peace, sign pacts and alliances. A coalition is capped by combined strength — you cannot gang everyone up on one player. Watch the stances: an ally today can be a rival tomorrow.',
   // --- ONB-8 social/meta-layer intros (corp cabinet + AvA wars tab) ------------
-  'Корпорация — это твой отряд в общей сессии: общий склад, роли участников и совместные войны альянсов (AvA). Вступи в существующую или создай свою — вкладка «Войны» открывает доступ к вызовам между корпорациями.':
-    'A corporation is your squad within the session: a shared warehouse, member roles, and joint alliance-vs-alliance wars (AvA). Join one or found your own — the «Wars» tab opens challenges between corporations.',
-  'Войны альянсов (AvA)': 'Alliance wars (AvA)',
-  'Здесь корпорации бросают друг другу вызов на организованную войну. Отметь готовность корпорации и свою личную — когда обе стороны готовы, можно принять вызов. Дальше — набор состава и сама война по расписанию.':
-    'Here corporations challenge each other to an organised war. Mark your corporation ready and yourself ready — once both sides are ready, a challenge can be accepted. Next comes roster sign-up and the scheduled war itself.',
   // --- ONB-4 codex/help hub (chrome + glossary) --------------------------------
   'Туман войны': 'Fog of war',
   // --- ONB-0 first-run offer (hub) + «Ещё → Обучение» --------------------------
   Пропустить: 'Skip',
-  Обучение: 'Tutorial',
   // --- ONB-2 guided first match (firstMatchTour) -------------------------------
-  'Это твой первый мир, командир. Проведу тебя по главному циклу — пара минут, спокойно, без соперников.':
-    'This is your first world, commander. I will walk you through the core loop — a couple of minutes, calm, no rivals.',
-  'Внизу — панель твоего домашнего мира: здания, гарнизон и стройка. Тапни свой мир, если панель пуста.':
-    'Down here is your homeworld panel: buildings, garrison and construction. Tap your world if the panel is empty.',
-  'Начни с экономики: построй Шахту — она даёт ресурсы, на них строится всё остальное.':
-    'Start with economy: build a Mine — it produces the resources everything else is built from.',
-  'Выбери свой флот (▲) и тапни соседний мир — задай курс. Флот пойдёт по звёздным трассам, и туман начнёт открываться.':
-    'Select your fleet (▲) and tap a neighbouring world to set a course. It routes along the star lanes and the fog opens.',
-  'Захвати нейтральный мир: выйди на орбиту, а если он защищён — высади десант. Захват двухфазный: сначала небо, потом земля.':
-    'Take a neutral world: enter orbit, and if it is defended, land troops. Capture is two-phase: sky first, then ground.',
-  'Мир взят — и счёт пошёл! Очки капают за миры и сектора; набери порог — и это победа.':
-    'World taken — and the score moves! Points come from worlds and sectors; reach the threshold to win.',
-  'Первая схватка выиграна! Ты прошёл весь цикл: добыча → стройка → движение → захват → счёт. Дальше — настоящий матч.':
-    'First fight won! You ran the whole loop: produce → build → move → capture → score. Next up — a real match.',
-  '✔ Обучение пройдено · +{n} XP — теперь сыграй настоящий матч!':
-    '✔ Tutorial complete · +{n} XP — now play a real match!',
   // --- ONB-1 guide-marks (spotlight) — chrome + HUD orientation tour -----------
-  'шаг {k} из {n}': 'step {k} of {n}',
   Далее: 'Next',
   Понятно: 'Got it',
-  'Пропустить обучение': 'Skip tutorial',
-  'Короткий тур по интерфейсу — на нём держится весь мир. «Пропустить обучение» доступно всегда.':
-    'A quick tour of the interface — the whole game runs on it. «Skip tutorial» is always available.',
-  'Мир идёт в реальном времени и продолжается, даже когда ты офлайн. Здесь — пауза и ускорение.':
-    'The world runs in real time and keeps going even while you are offline. Pause and speed live here.',
-  'Твоя казна: доход от шахт минус содержание флота. Следи, чтобы не уйти в минус.':
-    'Your treasury: mine income minus fleet upkeep. Keep it out of the red.',
-  'Инструменты командира: дипломатия, наука, верфь, рынок и сводки событий.':
-    "The commander's tools: diplomacy, research, shipyard, market and the event log.",
-  'Готово! Пора действовать: построй шахту, подними флот, отдай курс. Удачи, командир.':
-    'Done! Time to act: build a mine, raise a fleet, set a course. Good luck, commander.',
   // --- placeholders / small fragments ------------------------------------------
   ' · потери: {tally}': ' · losses: {tally}',
   '{a} и {b}: {stance}': '{a} and {b}: {stance}',
@@ -272,9 +211,6 @@ export const en: Record<string, string> = {
   Исследовать: 'Research',
   История: 'History',
   Герои: 'Heroes',
-  'Герои — командиры флота': 'Heroes — fleet commanders',
-  'У каждого героя своё дерево навыков — тапни узел, чтобы увидеть, что он открывает, и изучи по требованиям и стоимости. Открытые узлы дают способности (активные, с дальностью и перезарядкой) или пассивки. Погибший герой возрождается на столице.':
-    'Each hero has its own skill tree — tap a node to see what it unlocks, then learn it once its requirements and cost are met. Unlocked nodes grant abilities (active, with range and a cooldown) or passives. A fallen hero respawns at your capital.',
   'Канал «{ch}» пуст.': 'Channel "{ch}" is empty.',
   Коалиция: 'Coalition',
   'Командный бой: ВКЛ': 'Team battle: ON',
@@ -319,9 +255,6 @@ export const en: Record<string, string> = {
   ОТМЕНА: 'CANCEL',
   Оборона: 'Defense',
   Обстрел: 'Barrage',
-  'Обстрел — огонь с дистанции': 'Barrage — firing from range',
-  'Флоты с артиллерией бьют по врагу издалека, ещё до сближения — сосредоточь огонь на одной цели или дай флоту выбирать её самому. Толстая броня артиллерии слабая, её место позади линии, а не на передовой.':
-    'Artillery fleets fire on the enemy from afar, before closing the distance — focus fire on one target, or let the fleet pick one itself. Artillery has thin armor, so keep it behind the line, not on the front.',
   'Описание метки (необязательно)…': 'Marker description (optional)…',
   Ответ: 'Return',
   'Отделите корабли в новый флот — он останется в том же секторе. Хотя бы один корабль остаётся; десант в трюме остаётся с исходным флотом.':
@@ -332,10 +265,7 @@ export const en: Record<string, string> = {
   'Отметьте провинцию и отправьте — метка станет кликабельной (↪ камера).':
     'Mark a province and send — the marker becomes clickable (↪ jump the camera).',
   Отношение: 'Stance',
-  'Отступление — не бесплатно': 'Retreat is not free',
   Отправить: 'Send',
-  'Отход стоит −40% ТЕКУЩЕГО корпуса и щита (израненный флот теряет 40% остатка — отход не добивает) и даёт рывок скорости для бегства. Десант в высадке отступить не может; с орбиты вне боя корабль уходит свободно.':
-    "Retreat costs −40% of CURRENT hull and shield (a wounded fleet loses 40% of what remains — retreat never finishes it off) and grants a speed burst to flee. Troops mid-landing can't retreat; a ship in orbit outside battle leaves freely.",
   Очки: 'Score',
   ПВО: 'AA',
   ПОБЕДА: 'WIN',
@@ -359,7 +289,6 @@ export const en: Record<string, string> = {
   Прозрачность: 'Transparency',
   'РАЗДЕЛЕНИЕ ФЛОТА': 'SPLIT FLEET',
   РЫНОК: 'MARKET',
-  Рынок: 'Market',
   Развернуть: 'Expand',
   'Размер h,w': 'Size h,w',
   'Реальное время': 'Real time',
@@ -406,7 +335,6 @@ export const en: Record<string, string> = {
   '+{n}% урон': '+{n}% damage',
   '+{n}% скорость флотов': '+{n}% fleet speed',
   '+{n}% радар': '+{n}% radar',
-  ОЗ: 'HP',
   'Цвет шрифта': 'Font color',
   Цензура: 'Censorship',
   'ЧАТ — {ch}': 'CHAT — {ch}',
@@ -571,7 +499,6 @@ export const en: Record<string, string> = {
   'загрузка матчей…': 'loading matches…',
   здание: 'building',
   'здесь пусто': "it's empty here",
-  земля: 'ground',
   идёт: 'active',
   'истечением времени': 'on the clock',
   казна: 'treasury',
@@ -613,7 +540,6 @@ export const en: Record<string, string> = {
   'сервер недоступен': 'server unreachable',
   'сервер недоступен — укажи адрес сервера': 'server unreachable — enter the server address',
   скоро: 'soon',
-  спокойно: 'quiet',
   убрать: 'remove',
   'уничтожением соперников': 'by eliminating rivals',
   участников: 'members',
@@ -709,7 +635,6 @@ export const en: Record<string, string> = {
   Домой: 'Home',
   Доступные: 'Available',
   Ещё: 'More',
-  'Кабинет корпорации': 'Corporation cabinet',
   'ещё раз': 'once more',
   'Введи имя командира': 'Enter a commander name',
   'Пароли не совпадают': 'Passwords do not match',

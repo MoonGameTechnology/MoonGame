@@ -374,6 +374,84 @@ export const en: Record<string, string> = {
   'market.res.metal': 'Metal',
   'market.res.microelectronics': 'Micro',
 
+  // --- onb — Онбординг: туры-подсказки, карточки первого контакта, цели первой сессии, сводка возвращения.
+  'onb.goal.capture': 'Capture a world',
+  'onb.goal.fleet': 'Build a ship',
+  'onb.goal.mine': 'Build a mine',
+  'onb.goal.score': 'Reach 100 points',
+  'onb.goals.all-done':
+    '🏅 All first-session goals done! +{n} XP — you are ready for a real match.',
+  'onb.goals.title': 'First-session goals',
+  'onb.intro.artillery.body':
+    'Artillery fleets fire on the enemy from afar, before closing the distance — focus fire on one target, or let the fleet pick one itself. Artillery has thin armor, so keep it behind the line, not on the front.',
+  'onb.intro.artillery.title': 'Barrage — firing from range',
+  'onb.intro.async-delay.body':
+    'This fleet will arrive in real hours — the world of Void Dominion runs continuously, even while you are offline. You can close the game: your orders carry out on their own, and on your return we will send a notification and show a "while you were away" digest.',
+  'onb.intro.async-delay.title': 'The world runs without you',
+  'onb.intro.ava.body':
+    'Here corporations challenge each other to an organised war. Mark your corporation ready and yourself ready — once both sides are ready, a challenge can be accepted. Next comes roster sign-up and the scheduled war itself.',
+  'onb.intro.ava.title': 'Alliance wars (AvA)',
+  'onb.intro.badge': 'first time',
+  'onb.intro.constructor.body':
+    'Here you assemble ships, squadrons, divisions and heroes from modules. The loadout is locked at build time — choose slots up front, a finished unit cannot be re-fitted. The «Heroes» tab is your commander HQ.',
+  'onb.intro.constructor.title': 'Shipyard — loadouts',
+  'onb.intro.corp.body':
+    'A corporation is your squad within the session: a shared warehouse, member roles, and joint alliance-vs-alliance wars (AvA). Join one or found your own — the «Wars» tab opens challenges between corporations.',
+  'onb.intro.corp.title': 'Corporation cabinet',
+  'onb.intro.diplomacy.body':
+    'Declare war and peace, sign pacts and alliances. A coalition is capped by combined strength — you cannot gang everyone up on one player. Watch the stances: an ally today can be a rival tomorrow.',
+  'onb.intro.diplomacy.title': 'Diplomacy',
+  'onb.intro.hero.body':
+    'Each hero has its own skill tree — tap a node to see what it unlocks, then learn it once its requirements and cost are met. Unlocked nodes grant abilities (active, with range and a cooldown) or passives. A fallen hero respawns at your capital.',
+  'onb.intro.hero.title': 'Heroes — fleet commanders',
+  'onb.intro.market.body':
+    'Trade resources with the other players in the session: post your own lots and take theirs. The market smooths shortages — swap a surplus of one resource for the one you lack.',
+  'onb.intro.market.title': 'Session market',
+  'onb.intro.ok': 'Got it',
+  'onb.intro.retreat.body':
+    "Retreat costs −40% of CURRENT hull and shield (a wounded fleet loses 40% of what remains — retreat never finishes it off) and grants a speed burst to flee. Troops mid-landing can't retreat; a ship in orbit outside battle leaves freely.",
+  'onb.intro.retreat.title': 'Retreat is not free',
+  'onb.intro.steward.body':
+    'Away for a while? Hand your defence to the Steward — it holds your worlds by your rules while you are gone. The world runs 24/7, but a baseline defence stays up even when you are offline.',
+  'onb.intro.steward.title': 'Steward — AI on sleep',
+  'onb.intro.tech.body':
+    'Here you unlock technologies — permanent upgrades to your fleet, economy and defence. A node costs resources and time; once researched, the bonus lasts the rest of the match. Plan the branch to fit your playstyle.',
+  'onb.intro.tech.title': 'Technology tree',
+  'onb.recap.attention': 'Needs attention · {n}',
+  'onb.recap.close': 'CLOSE',
+  'onb.recap.rest': 'While you were away',
+  'onb.recap.title': 'RETURN DIGEST',
+  'onb.tour.done': '✔ Tutorial complete · +{n} XP — now play a real match!',
+  'onb.tour.first.capture':
+    'Take a neutral world: enter orbit, and if it is defended, land troops. Capture is two-phase: sky first, then ground.',
+  'onb.tour.first.course':
+    'Select your fleet (▲) and tap a neighbouring world to set a course. It routes along the star lanes and the fog opens.',
+  'onb.tour.first.done':
+    'First fight won! You ran the whole loop: produce → build → move → capture → score. Next up — a real match.',
+  'onb.tour.first.fleet':
+    'Now build a warship — the «Ships» tab of the same panel. A finished ship flies to orbit on its own and forms a fleet — wait for a «▲» to appear next to your world.',
+  'onb.tour.first.home':
+    'Down here is your homeworld panel: buildings, garrison and construction. Tap your world if the panel is empty.',
+  'onb.tour.first.mine':
+    'Start with economy: build a Mine — it produces the resources everything else is built from.',
+  'onb.tour.first.score':
+    'World taken — and the score moves! Points come from worlds and sectors; reach the threshold to win.',
+  'onb.tour.first.welcome':
+    'This is your first world, commander. I will walk you through the core loop — a couple of minutes, calm, no rivals.',
+  'onb.tour.got-it': 'Got it',
+  'onb.tour.hud.clock':
+    'The world runs in real time and keeps going even while you are offline. Pause and speed live here.',
+  'onb.tour.hud.done':
+    'Done! Time to act: build a mine, raise a fleet, set a course. Good luck, commander.',
+  'onb.tour.hud.purse': 'Your treasury: mine income minus fleet upkeep. Keep it out of the red.',
+  'onb.tour.hud.tools':
+    "The commander's tools: diplomacy, research, shipyard, market and the event log.",
+  'onb.tour.hud.welcome':
+    'A quick tour of the interface — the whole game runs on it. «Skip tutorial» is always available.',
+  'onb.tour.next': 'Next',
+  'onb.tour.skip': 'Skip tutorial',
+  'onb.tour.step': 'step {k} of {n}',
+
   // --- rail — Рельса инструментов в матче: подпись кнопки (.label) + подсказка (.title).
   'rail.chat.label': 'Chat',
   'rail.chat.title': 'Chat',

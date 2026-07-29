@@ -7,6 +7,17 @@ import { en } from '../../localization/en';
 import { en as legacyEn } from '../../localization/legacy/en';
 import { dataKey } from '../../localization';
 import { GLOSSARY } from './codexIndex';
+import { INTROS } from './intros';
+import { FIRST_GOALS } from './firstGoals';
+import { HUD_ORIENTATION_TOUR } from './onboardingTour';
+import { buildFirstMatchTour } from './firstMatchTour';
+
+/** Тур первого матча строится из предикатов хоста — для разбора копии они не важны. */
+const TOUR_DEPS_STUB = {
+  hasFleet: () => false,
+  capturedWorld: () => false,
+  scoreRose: () => false,
+};
 
 // Гейт локализации. Текст живёт в /localization, в коде — только ключи
 // (`t('err.no-capacity')`). Эти тесты держат три инварианта:
@@ -139,14 +150,22 @@ describe('локализация — ключи', () => {
     expect(leaks).toEqual([]);
   });
 
-  it('статьи глоссария кодекса заведены ключами, а не текстом', () => {
-    // GLOSSARY отдаёт `titleKey`/`bodyKey` в `t()` переменной, поэтому разбор
-    // литералов их не видит: опечатка в ключе доехала бы до игрока как
+  it('таблицы копии отдают ключи, а не текст', () => {
+    // Эти таблицы — чистые модули с копией: ключ уходит в `t()` ПЕРЕМЕННОЙ, поэтому
+    // разбор литералов его не видит, и опечатка доехала бы до игрока как
     // `codex.term.fog.bodi`. Проверяем состав напрямую.
-    expect(GLOSSARY.length).toBeGreaterThan(3); // глоссарий не должен молча опустеть
-    const bad = GLOSSARY.flatMap((g) => [g.titleKey, g.bodyKey]).filter(
-      (k) => !KEY_RE.test(k) || !(k in ru),
-    );
+    const TABLES: Array<[string, string[]]> = [
+      ['GLOSSARY', GLOSSARY.flatMap((g) => [g.titleKey, g.bodyKey])],
+      ['INTROS', INTROS.flatMap((c) => [c.titleKey, c.bodyKey])],
+      ['FIRST_GOALS', FIRST_GOALS.map((g) => g.labelKey)],
+      ['HUD_ORIENTATION_TOUR', HUD_ORIENTATION_TOUR.map((s) => s.copy)],
+      ['firstMatchTour', buildFirstMatchTour(TOUR_DEPS_STUB).map((s) => s.copy)],
+    ];
+    const bad: string[] = [];
+    for (const [name, keys] of TABLES) {
+      expect(keys.length, `${name} не должна молча опустеть`).toBeGreaterThan(3);
+      for (const k of keys) if (!KEY_RE.test(k) || !(k in ru)) bad.push(`${name}: ${k}`);
+    }
     expect(bad.sort()).toEqual([]);
   });
 
