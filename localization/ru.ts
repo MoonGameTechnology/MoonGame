@@ -49,6 +49,31 @@ export const ru: Record<string, string> = {
   'browser.solo.hint': 'Сервер не нужен — свободные места займут боты.',
   'browser.taken': 'занято',
 
+  // --- chat / spy — Переписка (сессия и коалиция) и вкладка шпионажа.
+  'chat.coalition.empty': 'Чат коалиции пуст.<br>Отметьте провинцию пингом 📍 или напишите.',
+  'chat.empty': 'Сообщений пока нет.',
+  'chat.head.coalition': '⚡ Коалиция · {n} уч.',
+  'chat.head.session': '△ Сессия · {n} в матче',
+  'chat.input.ph': 'Сообщение…',
+  'chat.jump': '↪ камера',
+  'chat.members': '{n} уч.',
+  'chat.open-card': 'Открыть карточку игрока',
+  'chat.ping': 'Отметить выбранную провинцию пингом',
+  'chat.session.note': 'Общий канал матча — вас слышат все участники.',
+  'chat.tab.coalition': 'Коалиция',
+  'chat.tab.session': 'Сессия',
+  'chat.you': 'Вы',
+  'spy.hours-left': '{n}ч',
+  'spy.log.empty': 'попыток ещё не было',
+  'spy.log.title': 'ЖУРНАЛ',
+  'spy.note':
+    'Попытка: {c}¤ · шанс ~60% · окно интела 24ч · провал сжигает плату. Разведка мира — кнопка 🕵 на карточке вражеской планеты.',
+  'spy.op.fleets': 'флоты',
+  'spy.ops.empty': 'противников нет',
+  'spy.ops.title': 'ОПЕРАЦИИ',
+  'spy.windows.empty': 'нет активных окон — добудьте интел операцией ниже',
+  'spy.windows.title': 'АКТИВНЫЕ ОКНА ИНТЕЛА',
+
   // --- cmd — Командная панель флота: приказы, режим огня артиллерии, способности героя.
   'cmd.assault': 'Штурм',
   'cmd.assault.hint': 'лететь к чужому миру и высадить десант при подходе',
@@ -213,13 +238,16 @@ export const ru: Record<string, string> = {
   'corp.war.pending': 'ждёт ответа',
   'corp.war.pool': 'Готовые к войне',
   'corp.war.pool-empty': 'Пул пуст.',
-  'corp.war.roster-open': 'идёт набор ростера',
   'corp.war.roster': 'набор ростера',
   'corp.war.roster-label': 'состав',
+  'corp.war.roster-open': 'идёт набор ростера',
   'corp.war.scheduled': 'назначен',
   'corp.war.to-us': 'вызов нам',
   'corp.war.win': 'победа',
   'corp.you': 'вы',
+
+  'codex.build-here': 'Построить здесь',
+  'codex.close': 'ЗАКРЫТЬ',
 
   // --- data — Имена игровых ДАННЫХ (data/*.json + таблицы прототипа), через tData().
   'data.aa': 'ПВО',
@@ -287,11 +315,23 @@ export const ru: Record<string, string> = {
   'data.void-fortress': 'Крепость пустоты',
   'data.volcanic': 'Вулканический',
 
-  // --- diplo — Дипломатия: названия отношений между игроками.
+  // --- diplo — Дипломатия: окно, вкладки, фильтр и сортировка ростера, названия отношений.
+  'diplo.filter': 'Фильтр',
+  'diplo.filter.ai': 'ИИ',
+  'diplo.filter.human': 'Человек',
+  'diplo.filter.reset': 'Сброс',
+  'diplo.sort': 'Сорт.',
+  'diplo.sort.name': 'Имя',
+  'diplo.sort.provinces': 'Провинции',
+  'diplo.sort.stance': 'Отношение',
   'diplo.stance.alliance': 'Союз',
   'diplo.stance.pact': 'Пакт',
   'diplo.stance.peace': 'Мир',
   'diplo.stance.war': 'Война',
+  'diplo.tab.diplomacy': 'Дипломатия',
+  'diplo.tab.espionage': 'Шпионаж',
+  'diplo.tab.messages': 'Сообщения',
+  'diplo.win.title': 'ДИПЛОМАТИЯ',
 
   // --- dossier — Досье объектов: здания, корабли, стройка в очереди, вкладки и характеристики.
   'dossier.building.barracks':
@@ -497,11 +537,11 @@ export const ru: Record<string, string> = {
   'hero.hq.empty': 'У вас пока нет героев.',
   'hero.hq.enroute': 'в пути',
   'hero.hq.fittings': 'Фиттинги',
-  'hero.hq.tab.overview': 'Обзор',
-  'hero.hq.tab.tree': 'Дерево',
+  'hero.hq.reserve': 'резерв',
   'hero.hq.tab.abilities': 'Способности',
   'hero.hq.tab.fittings': 'Фиттинги',
-  'hero.hq.reserve': 'резерв',
+  'hero.hq.tab.overview': 'Обзор',
+  'hero.hq.tab.tree': 'Дерево',
   'hero.stat.abilities': 'способностей',
   'hero.stat.active': 'актив',
   'hero.stat.bonuses': 'Текущие бонусы',
@@ -981,6 +1021,8 @@ export const ru: Record<string, string> = {
   'side.world.type-bonuses': 'Бонусы типа',
   'side.world.type.long': 'Мир типа «{pt}» — {mods}',
   'side.world.vp': 'Очки победы',
+
+  'side.tiles.empty': 'нет',
 
   // --- speed — Панель времени: подсказки множителей, перезапуска и выхода.
   'speed.exit': 'Выход в меню',

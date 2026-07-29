@@ -6814,7 +6814,7 @@ function convoLast(key: string): SessionMsg | undefined {
   return ms[ms.length - 1];
 }
 function fromName(id: string): string {
-  return id === ME ? t('Вы') : (NAME[id] ?? id);
+  return id === ME ? t('chat.you') : (NAME[id] ?? id);
 }
 /** A chat sender's name. Another live seat's name is clickable — it opens that
  *  player's card (with the diplomacy actions); your own name and system senders
@@ -6822,7 +6822,7 @@ function fromName(id: string): string {
 function nickHtml(id: string): string {
   const name = esc(fromName(id));
   if (id === ME || !s.players[id]) return `<b>${name}</b>`;
-  return `<b class="dp-nick" data-nickseat="${esc(id)}" title="${t('Открыть карточку игрока')}">${name}</b>`;
+  return `<b class="dp-nick" data-nickseat="${esc(id)}" title="${t('chat.open-card')}">${name}</b>`;
 }
 /** One message line. A ping renders as a clickable marker that flies the camera.
  *  `stamp` overrides which time fields show (the chat passes its cached toggles);
@@ -6832,7 +6832,7 @@ function convoLineHtml(m: SessionMsg, stamp?: StampOpts): string {
   if (m.ping) {
     return (
       `<div class="dp-line ping" data-ping="${esc(m.ping)}"><span class="dp-when">${stampTxt}</span>` +
-      `📍 ${nickHtml(m.from)} ${esc(m.ping)}: ${esc(m.text)}<span class="dp-jump">${t('↪ камера')}</span></div>`
+      `📍 ${nickHtml(m.from)} ${esc(m.ping)}: ${esc(m.text)}<span class="dp-jump">${t('chat.jump')}</span></div>`
     );
   }
   if (m.sys)
@@ -6844,10 +6844,10 @@ function convoFeedInnerHtml(key: string): string {
   if (msgs.length) return msgs.map((m) => convoLineHtml(m)).join('');
   const hint =
     key === COALITION
-      ? t('Чат коалиции пуст.<br>Отметьте провинцию пингом 📍 или напишите.')
+      ? t('chat.coalition.empty')
       : key === CH_SESSION
-        ? t('Общий канал матча — вас слышат все участники.')
-        : t('Сообщений пока нет.');
+        ? t('chat.session.note')
+        : t('chat.empty');
   return `<div class="dp-empty">${hint}</div>`;
 }
 /** Left column: the match-wide session channel + the coalition channel pinned on
@@ -6864,22 +6864,23 @@ function convoListHtml(): string {
     );
   const sessLast = convoLast(CH_SESSION);
   const sessPrev = sessLast
-    ? esc((sessLast.from === ME ? t('Вы') + ': ' : '') + sessLast.text)
-    : t('{n} уч.', { n: Object.keys(s.players).length });
+    ? esc((sessLast.from === ME ? t('chat.you') + ': ' : '') + sessLast.text)
+    : t('chat.members', { n: Object.keys(s.players).length });
   const sess =
     `<button class="dp-cv coal${convoOpen === CH_SESSION ? ' on' : ''}" data-convo="${CH_SESSION}">` +
     `<span class="dp-cv-ic" style="color:var(--cyan)">△</span>` +
-    `<span class="dp-cv-nm">${t('Сессия')}<em>${sessPrev}</em></span></button>`;
+    `<span class="dp-cv-nm">${t('chat.tab.session')}<em>${sessPrev}</em></span></button>`;
   const coal =
     `<button class="dp-cv coal${convoOpen === COALITION ? ' on' : ''}" data-convo="${COALITION}">` +
     `<span class="dp-cv-ic" style="color:var(--amber)">⚡</span>` +
-    `<span class="dp-cv-nm">${t('Коалиция')}<em>${t('{n} уч.', { n: coalitionMembers().length })}</em></span></button>`;
+    `<span class="dp-cv-nm">${t('chat.tab.coalition')}<em>${t('chat.members', { n: coalitionMembers().length })}</em></span></button>`;
   const items = dms
     .map((id) => {
       const last = convoLast(id);
       const prev = last
         ? esc(
-            (last.from === ME ? t('Вы') + ': ' : '') + (last.ping ? '📍 ' + last.ping : last.text),
+            (last.from === ME ? t('chat.you') + ': ' : '') +
+              (last.ping ? '📍 ' + last.ping : last.text),
           )
         : '—';
       return (
@@ -6897,16 +6898,14 @@ function convoThreadHtml(): string {
   const isCoal = convoOpen === COALITION;
   const title =
     convoOpen === CH_SESSION
-      ? t('△ Сессия · {n} в матче', { n: Object.keys(s.players).length })
+      ? t('chat.head.session', { n: Object.keys(s.players).length })
       : isCoal
-        ? t('⚡ Коалиция · {n} уч.', { n: coalitionMembers().length })
+        ? t('chat.head.coalition', { n: coalitionMembers().length })
         : `${seatBadge(convoOpen).icon} ${esc(NAME[convoOpen] ?? convoOpen)}`;
-  const pingBtn = isCoal
-    ? `<button class="dp-ping" title="${t('Отметить выбранную провинцию пингом')}">📍</button>`
-    : '';
+  const pingBtn = isCoal ? `<button class="dp-ping" title="${t('chat.ping')}">📍</button>` : '';
   // The composer is networked (chat.send relay): dispatchChat routes it — NET sends
   // to the server (rendered from the echo), solo appends locally.
-  const compose = `<div class="dp-compose">${pingBtn}<input id="dp-text" maxlength="160" placeholder="${t('Сообщение…')}" autocomplete="off"><button class="dp-send">▶</button></div>`;
+  const compose = `<div class="dp-compose">${pingBtn}<input id="dp-text" maxlength="160" placeholder="${t('chat.input.ph')}" autocomplete="off"><button class="dp-send">▶</button></div>`;
   return (
     `<div class="dp-thread">` +
     `<div class="dp-thhead">${title}</div>` +
@@ -6923,10 +6922,10 @@ function convoThreadHtml(): string {
 function intelTabHtml(): string {
   const grantLabel = (g: IntelGrant): string =>
     g.kind === 'treasury'
-      ? t('казна {who}', { who: NAME[g.target] ?? g.target })
+      ? t('log.spy.what.treasury', { who: NAME[g.target] ?? g.target })
       : g.kind === 'fleets'
-        ? t('флоты {who}', { who: NAME[g.target] ?? g.target })
-        : t('мир {at}', { at: g.target });
+        ? t('log.spy.what.fleets', { who: NAME[g.target] ?? g.target })
+        : t('log.spy.what.world', { at: g.target });
   const rows = myIntel()
     .sort((a, b) => a.until - b.until)
     .map((g) => {
@@ -6934,7 +6933,7 @@ function intelTabHtml(): string {
       const jump = g.kind === 'planet' ? ` data-iw="${esc(g.target)}"` : '';
       return (
         `<div class="in-row"${jump}><span class="in-k">🗝</span><b>${esc(grantLabel(g))}</b>` +
-        `<span class="in-t">⏳ ${t('{n}ч', { n: left })}</span>${g.kind === 'planet' ? '<span class="in-go">↪</span>' : ''}</div>`
+        `<span class="in-t">⏳ ${t('spy.hours-left', { n: left })}</span>${g.kind === 'planet' ? '<span class="in-go">↪</span>' : ''}</div>`
       );
     })
     .join('');
@@ -6943,8 +6942,8 @@ function intelTabHtml(): string {
     .map(
       (id) =>
         `<div class="in-row"><b>${esc(NAME[id] ?? id)}</b>` +
-        `<button class="dp-spy" data-spy="treasury" data-seat="${id}">🕵 ${t('казна')}</button>` +
-        `<button class="dp-spy" data-spy="fleets" data-seat="${id}">🕵 ${t('флоты')}</button></div>`,
+        `<button class="dp-spy" data-spy="treasury" data-seat="${id}">🕵 ${t('log.spy.kind.treasury')}</button>` +
+        `<button class="dp-spy" data-spy="fleets" data-seat="${id}">🕵 ${t('spy.op.fleets')}</button></div>`,
     )
     .join('');
   const log = [...spyLog]
@@ -6957,14 +6956,13 @@ function intelTabHtml(): string {
     .join('');
   return (
     `<div class="dp-list in-list">` +
-    `<div class="in-hint">${t('Попытка: {c}¤ · шанс ~60% · окно интела 24ч · провал сжигает плату. Разведка мира — кнопка 🕵 на карточке вражеской планеты.', { c: SPY_COST })}</div>` +
-    `<div class="in-sec">${t('АКТИВНЫЕ ОКНА ИНТЕЛА')}</div>` +
-    (rows ||
-      `<div class="in-empty">${t('нет активных окон — добудьте интел операцией ниже')}</div>`) +
-    `<div class="in-sec">${t('ОПЕРАЦИИ')}</div>` +
-    (ops || `<div class="in-empty">${t('противников нет')}</div>`) +
-    `<div class="in-sec">${t('ЖУРНАЛ')}</div>` +
-    (log || `<div class="in-empty">${t('попыток ещё не было')}</div>`) +
+    `<div class="in-hint">${t('spy.note', { c: SPY_COST })}</div>` +
+    `<div class="in-sec">${t('spy.windows.title')}</div>` +
+    (rows || `<div class="in-empty">${t('spy.windows.empty')}</div>`) +
+    `<div class="in-sec">${t('spy.ops.title')}</div>` +
+    (ops || `<div class="in-empty">${t('spy.ops.empty')}</div>`) +
+    `<div class="in-sec">${t('spy.log.title')}</div>` +
+    (log || `<div class="in-empty">${t('spy.log.empty')}</div>`) +
     `</div>`
   );
 }
@@ -6981,14 +6979,16 @@ function renderDiplo(): void {
     `<button class="dp-fchip ty${diploTypeFilter.has(k) ? ' on' : ''}" data-ftype="${k}">${label}</button>`;
   const anyFilter = diploStanceFilter.size || diploTypeFilter.size;
   const filterRow =
-    `<div class="dp-filters"><span>${t('Фильтр')}:</span>` +
+    `<div class="dp-filters"><span>${t('diplo.filter')}:</span>` +
     STANCES.map(stChip).join('') +
-    `<span class="dp-fsep"></span>${tyChip('human', '☻ ' + t('Человек'))}${tyChip('ai', '⌬ ' + t('ИИ'))}` +
-    (anyFilter ? `<button class="dp-fclear" data-fclear="1">${t('Сброс')}</button>` : '') +
+    `<span class="dp-fsep"></span>${tyChip('human', '☻ ' + t('diplo.filter.human'))}${tyChip('ai', '⌬ ' + t('diplo.filter.ai'))}` +
+    (anyFilter
+      ? `<button class="dp-fclear" data-fclear="1">${t('diplo.filter.reset')}</button>`
+      : '') +
     `</div>`;
   const body =
     diploTab === 'diplo'
-      ? `<div class="dp-sorts"><span>${t('Сорт.')}:</span>${sortBtn('name', t('Имя'))}${sortBtn('worlds', t('Провинции'))}${sortBtn('stance', t('Отношение'))}</div>` +
+      ? `<div class="dp-sorts"><span>${t('diplo.sort')}:</span>${sortBtn('name', t('diplo.sort.name'))}${sortBtn('worlds', t('diplo.sort.provinces'))}${sortBtn('stance', t('diplo.sort.stance'))}</div>` +
         filterRow +
         `<div class="dp-list">${diploRowsHtml()}</div>`
       : diploTab === 'intel'
@@ -6996,7 +6996,7 @@ function renderDiplo(): void {
         : `<div class="dp-convo">${convoListHtml()}${convoThreadHtml()}</div>`;
   el.innerHTML =
     `<div class="dpbox">` +
-    `<div class="dp-head"><b>${t('ДИПЛОМАТИЯ')}</b>${tabBtn('diplo', t('Дипломатия'))}${tabBtn('msgs', t('Сообщения'))}${tabBtn('intel', t('Шпионаж'))}<button class="dp-close">✕</button></div>` +
+    `<div class="dp-head"><b>${t('diplo.win.title')}</b>${tabBtn('diplo', t('diplo.tab.diplomacy'))}${tabBtn('msgs', t('diplo.tab.messages'))}${tabBtn('intel', t('diplo.tab.espionage'))}<button class="dp-close">✕</button></div>` +
     body +
     `</div>`;
   if (diploTab === 'msgs') scrollFeedToEnd();
@@ -7066,7 +7066,9 @@ function garrisonTilesHtml(stacks: Array<{ unit: string; count: number }>): stri
       return `<button class="ptile mini" data-codex="u:${esc(u.unit)}" data-desc="u:${esc(u.unit)}" data-name="${esc(name)}"><span class="pt-ic">${unitIcon(u.unit)}</span><span class="pt-c">${u.count}</span></button>`;
     })
     .join('');
-  return tiles ? `<div class="ptiles">${tiles}</div>` : `<div class="row dim">${t('нет')}</div>`;
+  return tiles
+    ? `<div class="ptiles">${tiles}</div>`
+    : `<div class="row dim">${t('side.tiles.empty')}</div>`;
 }
 /** A row of ship/troop tiles for a fleet's composition — tap one for its full specs. */
 function unitTilesHtml(stacks: Array<{ unit: string; count: number }>): string {
@@ -7080,7 +7082,7 @@ function openCodex(key: string): void {
   const [kind, id] = key.split(':');
   const el = document.getElementById('codex');
   if (!el || !kind || !id) return;
-  el.innerHTML = `<div class="cxbox">${codexHtml(kind, id)}${codexBuildBtn(kind, id)}<button class="cx-close">${t('ЗАКРЫТЬ')}</button></div>`;
+  el.innerHTML = `<div class="cxbox">${codexHtml(kind, id)}${codexBuildBtn(kind, id)}<button class="cx-close">${t('codex.close')}</button></div>`;
   el.classList.add('show');
 }
 /** A "Build here" action inside the codex when the selected province can raise this
@@ -7092,10 +7094,10 @@ function codexBuildBtn(kind: string, id: string): string {
     const buildable = (SECTOR_TYPES[SECTOR_OF[p.id]]?.allowedBuildings ?? BUILDABLE).includes(id);
     const built = p.buildings.some((b) => b.type === id);
     if (!buildable || built) return '';
-    return `<button class="cx-build" data-build="building:${id}">▣ ${t('Построить здесь')} · ${cost(data.buildings[id]?.cost)}</button>`;
+    return `<button class="cx-build" data-build="building:${id}">▣ ${t('codex.build-here')} · ${cost(data.buildings[id]?.cost)}</button>`;
   }
   if (kind === 'u' && data.units[id]) {
-    return `<button class="cx-build" data-build="unit:${id}">${unitIconHtml(id, 16)} ${t('Построить здесь')} · ${cost(data.units[id]?.cost)}</button>`;
+    return `<button class="cx-build" data-build="unit:${id}">${unitIconHtml(id, 16)} ${t('codex.build-here')} · ${cost(data.units[id]?.cost)}</button>`;
   }
   return '';
 }

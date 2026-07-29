@@ -46,6 +46,32 @@ export const en: Record<string, string> = {
   'browser.solo.hint': 'No server needed — bots fill the open seats.',
   'browser.taken': 'taken',
 
+  // --- chat / spy — Переписка (сессия и коалиция) и вкладка шпионажа.
+  'chat.coalition.empty':
+    'The coalition chat is empty.<br>Mark a province with a ping 📍 or write something.',
+  'chat.empty': 'No messages yet.',
+  'chat.head.coalition': '⚡ Coalition · {n} members',
+  'chat.head.session': '△ Session · {n} in match',
+  'chat.input.ph': 'Message…',
+  'chat.jump': '↪ camera',
+  'chat.members': '{n} members',
+  'chat.open-card': 'Open player card',
+  'chat.ping': 'Mark the selected province with a ping',
+  'chat.session.note': 'The match-wide channel — everyone in the match hears you.',
+  'chat.tab.coalition': 'Coalition',
+  'chat.tab.session': 'Session',
+  'chat.you': 'You',
+  'spy.hours-left': '{n}h',
+  'spy.log.empty': 'no attempts yet',
+  'spy.log.title': 'JOURNAL',
+  'spy.note':
+    'Attempt: {c}¤ · ~60% chance · 24h intel window · a failure burns the fee. World recon — the 🕵 button on an enemy planet card.',
+  'spy.op.fleets': 'fleets',
+  'spy.ops.empty': 'no opponents',
+  'spy.ops.title': 'OPERATIONS',
+  'spy.windows.empty': 'no active windows — steal intel with an operation below',
+  'spy.windows.title': 'ACTIVE INTEL WINDOWS',
+
   // --- cmd — Командная панель флота: приказы, режим огня артиллерии, способности героя.
   'cmd.assault': 'Assault',
   'cmd.assault.hint': 'fly to an enemy world and land troops on arrival',
@@ -210,13 +236,16 @@ export const en: Record<string, string> = {
   'corp.war.pending': 'awaiting response',
   'corp.war.pool': 'Ready for war',
   'corp.war.pool-empty': 'The pool is empty.',
-  'corp.war.roster-open': 'roster window is open',
   'corp.war.roster': 'roster window open',
   'corp.war.roster-label': 'roster',
+  'corp.war.roster-open': 'roster window is open',
   'corp.war.scheduled': 'scheduled',
   'corp.war.to-us': 'challenge to us',
   'corp.war.win': 'victory',
   'corp.you': 'you',
+
+  'codex.build-here': 'Build here',
+  'codex.close': 'CLOSE',
 
   // --- data — Имена игровых ДАННЫХ (data/*.json + таблицы прототипа), через tData().
   'data.aa': 'aa',
@@ -284,11 +313,23 @@ export const en: Record<string, string> = {
   'data.void-fortress': 'Void Fortress',
   'data.volcanic': 'Volcanic',
 
-  // --- diplo — Дипломатия: названия отношений между игроками.
+  // --- diplo — Дипломатия: окно, вкладки, фильтр и сортировка ростера, названия отношений.
+  'diplo.filter': 'Filter',
+  'diplo.filter.ai': 'AI',
+  'diplo.filter.human': 'Human',
+  'diplo.filter.reset': 'Clear',
+  'diplo.sort': 'Sort',
+  'diplo.sort.name': 'Name',
+  'diplo.sort.provinces': 'Provinces',
+  'diplo.sort.stance': 'Stance',
   'diplo.stance.alliance': 'Alliance',
   'diplo.stance.pact': 'Pact',
   'diplo.stance.peace': 'Peace',
   'diplo.stance.war': 'War',
+  'diplo.tab.diplomacy': 'Diplomacy',
+  'diplo.tab.espionage': 'Espionage',
+  'diplo.tab.messages': 'Messages',
+  'diplo.win.title': 'DIPLOMACY',
 
   // --- dossier — Досье объектов: здания, корабли, стройка в очереди, вкладки и характеристики.
   'dossier.building.barracks':
@@ -493,11 +534,11 @@ export const en: Record<string, string> = {
   'hero.hq.empty': 'You have no heroes yet.',
   'hero.hq.enroute': 'in transit',
   'hero.hq.fittings': 'Fittings',
-  'hero.hq.tab.overview': 'Overview',
-  'hero.hq.tab.tree': 'Tree',
+  'hero.hq.reserve': 'reserve',
   'hero.hq.tab.abilities': 'Abilities',
   'hero.hq.tab.fittings': 'Fittings',
-  'hero.hq.reserve': 'reserve',
+  'hero.hq.tab.overview': 'Overview',
+  'hero.hq.tab.tree': 'Tree',
   'hero.stat.abilities': 'abilities',
   'hero.stat.active': 'active',
   'hero.stat.bonuses': 'Current bonuses',
@@ -980,6 +1021,8 @@ export const en: Record<string, string> = {
   'side.world.type-bonuses': 'Type bonuses',
   'side.world.type.long': 'A {pt} world — {mods}',
   'side.world.vp': 'Victory points',
+
+  'side.tiles.empty': 'none',
 
   // --- speed — Панель времени: подсказки множителей, перезапуска и выхода.
   'speed.exit': 'Exit to menu',
