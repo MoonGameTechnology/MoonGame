@@ -7,13 +7,11 @@ export const en: Record<string, string> = {
   // --- STAFF-1 «Штаб героев» redesign -------------------------------------------
   способностей: 'abilities',
   актив: 'active',
-  Требует: 'Requires',
   // NB: `Изучить` is translated once, in the meta-progression block below ('Unlock')
   // — a second entry here would be silently shadowed by it.
   // --- TT-3.1 technology tree screen --------------------------------------------
   старт: 'start',
   день: 'day',
-  Автоматизация: 'Automation',
   урон: 'damage',
   Хранитель: 'Steward',
   // --- SPY-UX intel tab in diplomacy --------------------------------------------
@@ -37,7 +35,6 @@ export const en: Record<string, string> = {
   Все: 'All',
   Вы: 'You',
   '{h}ч': '{h}h',
-  ИИ: 'AI',
   Герои: 'Heroes',
   Командир: 'Commander',
   Крейсер: 'Cruiser',
@@ -45,22 +42,16 @@ export const en: Record<string, string> = {
   Оборона: 'Defense',
   Обстрел: 'Barrage',
   ПВО: 'AA',
-  Пассив: 'Passive',
   Скор: 'Spd',
   Скорость: 'Speed',
-  Станд: 'Std',
-  Удар: 'Strike',
-  Флот: 'Fleet',
   // Авто-имена флотов (Bytro-стиль): тип соединения по размеру
   // Карточка статистики мира (тап по имени планеты)
-  эскадрилий: 'squadrons',
   // 🔥 режим огня артиллерии — кнопка в командном ряду + пункты меню
   // H3 — setup faction picker (pure passive house bonuses)
 
   // --- market resource tabs (MARKET_RES) -----------------------------------------
 
   // --- diplomatic stance (STANCE_RU, via stanceRu()) ---------------------------
-  Союз: 'Alliance',
 
   // --- kernel rejection codes (ERR_RU, via errText()) --------------------------
   'боты не вступают в коалиции': 'bots do not join coalitions',
@@ -73,27 +64,14 @@ export const en: Record<string, string> = {
   '—': '—',
 
   // --- preset hero names (HeroLoadout, non-main; heroName() via t()) -----------
-  Разрушитель: 'Destroyer',
-  Авангард: 'Vanguard',
-  Страж: 'Sentinel',
 
   Танк: 'Tank',
   // formation doctrines (formationStats, game.ts) — organisational labels, no combat bonus (BF-23)
   // preset division template names (setupTemplates, game.ts)
 
   // --- hero grades (HERO_GRADES, heroes.ts) --------------------------------------
-  Главный: 'Main',
 
   // --- hero abilities (HERO_ABILITIES, heroes.ts) --------------------------------
-  Коридор: 'Corridor',
-  Аннигиляция: 'Annihilate',
-  Сбор: 'Rally',
-  Разведка: 'Scan',
-  'Раскрывает зону вокруг цели сквозь туман на время.':
-    'Reveals an area around the target through the fog for a while.',
-  Отзыв: 'Recall',
-  'Мгновенно отзывает корабль-героя в столицу.': 'Instantly recalls the hero ship to the capital.',
-  Бастион: 'Bulwark',
 
   // --- ship modules (SHIP_MODULES, ships.ts) -------------------------------------
 
@@ -105,13 +83,10 @@ export const en: Record<string, string> = {
   десант: 'landing',
   казна: 'treasury',
   кораблей: 'ships',
-  корабль: 'ship',
   'на орбите': 'in orbit',
   нет: 'none',
-  оборона: 'defense',
   орбита: 'orbit',
   пусто: 'empty',
-  секторов: 'sectors',
   скоро: 'soon',
   вы: 'you',
   флот: 'fleet',
@@ -119,7 +94,6 @@ export const en: Record<string, string> = {
   оз: 'hp',
   цена: 'price',
   // combat forecast (ONB-6, fleet panel strike section)
-  Флоты: 'Fleets',
   'В меню': 'Menu',
 
   // --- static markup (build.mjs, data-i18n) -------------------------------------
@@ -132,12 +106,10 @@ export const en: Record<string, string> = {
   'реальное время': 'real time',
   // --- meta-progression («Прокачка», hub tab) -----------------------------------
   // --- arsenal witryna («Арсенал», hub tab, ARS-5) --------------------------------
-  модуль: 'module',
   // --- H4: ground-army designer (3 infantry lines + tank, officer premades) -------
   Ополчение: 'Militia',
   'Тяжёлая пехота': 'Heavy Infantry',
   Спецназ: 'Special Forces',
-  Гарнизон: 'Garrison',
 
   // --- command chains (order queue / plan builder, CC-*) -----------------------
 
@@ -149,20 +121,16 @@ export const en: Record<string, string> = {
   // --- tech-branch labels (tabs / chips / section heads) ---------------------------
   // --- rail icon labels + window headers -------------------------------------------
   Дипло: 'Diplo',
-  Сон: 'Sleep',
   ДИПЛОМАТИЯ: 'DIPLOMACY',
 
   // --- steward window («Хранитель») + settings + end-of-match ---------------------
-  интерфейс: 'interface',
   вкл: 'on',
 
   // --- suggested-callsign wordlist -----------------------------------------------
   // --- constructor («Верфь») — the unified loadout tab ------------------------
   Армия: 'Army',
-  Система: 'System',
   // stat / resource words used by the module-effect chips and cost lines
   корпус: 'hull',
-  щит: 'shield',
   трюм: 'cargo',
   радар: 'radar',
   // --- hero window / deploy flow (окно героя, развёртывание) --------------------
@@ -171,9 +139,7 @@ export const en: Record<string, string> = {
   // --- static H4 headers / steward toggle (build.mjs [data-i18n]) --------------
   // --- Bytro-карточка армии: ХП-бар, сводка, платный ремонт, кап линии огня ----
   флагман: 'flagship',
-  рой: 'swarm',
   'форс-марш': 'forced march',
-  Радар: 'Radar',
   // --- настройки: цвета сторон -------------------------------------------------
   // --- ECON-3: экспресс-ремонт за металл ---------------------------------------
   // --- ECON-4: рыночная комиссия ------------------------------------------------

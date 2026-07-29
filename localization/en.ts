@@ -398,6 +398,12 @@ export const en: Record<string, string> = {
   'data.bomber': 'bomber',
   'data.carrier': 'carrier',
   'data.credit-refinery': 'Credit Refinery',
+  'data.cargo-bay': 'Cargo Bay',
+  'data.radar-module': 'Radar Module',
+  'data.ion-engine': 'Ion Engine',
+  'data.targeting-array': 'Targeting Array',
+  'data.ablative-plating': 'Ablative Plating',
+  'data.shield-booster': 'Shield Booster',
   'data.credits': 'credits',
   'data.cruiser': 'cruiser',
   'data.crystalline': 'Crystalline',
@@ -599,6 +605,13 @@ export const en: Record<string, string> = {
     'A slow armored carrier ({hp} hull, hold for {c}) — almost no guns of its own, all its strength is in the wing it carries. Keep it behind and launch the wing at a target with "🛩 Launch squadron".',
   'dossier.unit.strike-carrier.name': 'Strike Carrier',
 
+  // --- faction — Фракции: пассивный бонус дома.
+  'faction.amber.desc': 'A nomad concord of hauliers: fleets run the lanes 15% faster.',
+  'faction.blue.desc': 'A trade-and-industry compact: all planetary economy yields +12%.',
+  'faction.red.desc': 'A militarist hegemony: all outgoing fleet and army damage +10%.',
+  'faction.violet.desc':
+    'Universalists of the dawn: a little of everything — +5% economy and +5% damage.',
+
   // --- fleet — Автоимя флота по размеру соединения.
   'fleet.size.armada': 'Armada',
   'fleet.size.fleet': 'Fleet',
@@ -753,6 +766,21 @@ export const en: Record<string, string> = {
   'sandbox.toggles': 'Toggles',
   'sandbox.wars-ended': 'You are not at war with anyone',
   'sandbox.wars-ended': 'Wars ended: {n} — relations are neutral',
+
+  // --- sci — Учёные совета: имя и что даёт ветка.
+  'sci.ground-marshal.desc': 'Leader of the ground branch: strongholds and frontier defence.',
+  'sci.ground-marshal.name': 'Ground Marshal',
+  'sci.missile-chief.desc': 'Leader of the missile branch: long-range systems.',
+  'sci.missile-chief.name': 'Missile Chief',
+  'sci.overseer.desc':
+    'Leader of the command branch (C2): doctrines of automation and delegation. Unlocks the «Steward Protocol» — handing your seat to an AI while you sleep.',
+  'sci.overseer.name': 'Overseer',
+  'sci.polymath.desc': 'A generalist with no branch: +1 research slot (2→3) instead of a focus.',
+  'sci.polymath.name': 'Polymath',
+  'sci.void-admiral.desc': 'Leader of the space branch: shipyards, logistics, siege doctrines.',
+  'sci.void-admiral.name': 'Void Admiral',
+  'sci.wing-commander.desc': 'Leader of the squadron branch: carrier strike wings.',
+  'sci.wing-commander.name': 'Wing Commander',
 
   // --- scipick — Совет учёных: кандидаты, фокус ветки, закрепление.
   'scipick.candidates': 'Candidates · tap to fill a slot',
@@ -944,11 +972,17 @@ export const en: Record<string, string> = {
   // --- hero — Герои: грейды, способности (имя + описание).
   'hero.ability.annihilate.desc': 'Destroys a planet in range — it becomes a dead world.',
   'hero.ability.annihilate.name': 'Annihilate',
+  'hero.ability.boarding-translocation.desc':
+    'The hero forms aboard one of your fleets — wherever it happens to be. Passive skill: widens the deployment points.',
+  'hero.ability.boarding-translocation.name': 'Boarding Translocation',
   'hero.ability.bulwark.desc': 'A temporary shield: +defense to your fleets near the hero.',
   'hero.ability.bulwark.name': 'Bulwark',
   'hero.ability.corridor.desc':
     'Opens a temporary corridor lane to a nearby world; your fleets travel it faster.',
   'hero.ability.corridor.name': 'Corridor',
+  'hero.ability.diplomatic-landing.desc':
+    "Allied worlds receive the hero as one of their own: the ship can also rise from an ally's planet. Passive skill: widens the deployment points.",
+  'hero.ability.diplomatic-landing.name': 'Diplomatic Landing',
   'hero.ability.rally.desc':
     'A battle cry: a temporary extra aura bonus for your fleets near the hero.',
   'hero.ability.rally.name': 'Rally',
@@ -963,12 +997,43 @@ export const en: Record<string, string> = {
   'hero.branch.common': 'Common',
   'hero.branch.psionic': 'psionic',
   'hero.branch.transhuman': 'transhuman',
+  'hero.fit.ablative-plating.desc':
+    "An extra +40 hull for the hero's ship. (Ship stats take effect with the effective-stats seam, SHIP-3.)",
+  'hero.fit.aegis-matrix.desc':
+    'A field generator inspires the fleets near the hero: +8% damage within 300.',
+  'hero.fit.psi-amplifier.desc': 'A resonance circuit opens scanning through the fog to the hero.',
   'hero.grade.common': 'Common',
   'hero.grade.legendary': 'Legendary',
   'hero.grade.main': 'Main',
   'hero.grade.rare': 'Rare',
   'hero.hook.combat-damage': 'damage to nearby fleets',
   'hero.hook.fleet-speed': 'fleet speed',
+  'hero.passive.rally-beacon.desc':
+    'Fleets near the hero fight harder: +8% damage for your fleets within 300.',
+  'hero.passive.rally-beacon.name': 'Rally Beacon',
+  'hero.passive.vanguard-impulse.desc':
+    "The hero's ship drives its fleet at full burn: +10% speed for the hero's fleet.",
+  'hero.passive.vanguard-impulse.name': 'Vanguard Impulse',
+  'hero.tree.neural-lace.desc': "A direct brain-to-helm implant: the hero's ship gains +10% speed.",
+  'hero.tree.neural-lace.name': 'Neural Lace',
+  'hero.tree.overclocked-helm.desc':
+    'Overclocking the neural interface lets the hero lay corridors.',
+  'hero.tree.overclocked-helm.name': 'Overclocked Helm',
+  'hero.tree.psi-veil.desc': 'Honed psi-sight: the hero learns to tear the fog open with a scan.',
+  'hero.tree.psi-veil.name': 'Psi Veil',
+  'hero.tree.void-attunement.desc':
+    "The hero's psi resonance inspires nearby fleets: +8% damage within 300.",
+  'hero.tree.void-attunement.name': 'Void Attunement',
+  'hero.unit.commander.desc':
+    'The flagship hero: a command transhuman who strengthens the fleet and opens corridors.',
+  'hero.unit.commander.name': 'Commander',
+  'hero.unit.ravager.desc': 'A psionic destroyer: annihilates worlds and tears open the fog.',
+  'hero.unit.ravager.name': 'Destroyer',
+  'hero.unit.vanguard.desc':
+    'A transhuman manoeuvrist: corridors and a war cry for the leading fleets.',
+  'hero.unit.vanguard.name': 'Vanguard',
+  'hero.unit.warden.desc': 'A psionic defender: holds the line behind a bastion shield.',
+  'hero.unit.warden.name': 'Sentinel',
 
   // --- hero.hq / hero.tree / hero.abil / hero.fit — Штаб героев: состав, дерево навыков, способности, фиттинги.
   'hero.abil.activate': 'Activate',
@@ -1607,6 +1672,40 @@ export const en: Record<string, string> = {
   'tech.group.fortifications': 'Fortifications',
   'tech.group.industry': 'Industry',
   'tech.group.sensors': 'Sensors',
+  'tech.node.ace-programs.desc':
+    "Ace programmes: elite crews. +6% damage and fleet speed. The Wing Commander's capstone.",
+  'tech.node.ai-stewardship.desc':
+    'Command automation: hand your seat to a trusted AI while you are offline (asleep) — it holds the line and returns control on time. Powerful, which is why it needs the Overseer scientist and only opens mid-session (day 16).',
+  'tech.node.combined-arms.desc': 'Combined arms: infantry and armour in step. +5% damage.',
+  'tech.node.deep-survey.desc': 'Deep sensor networks: +15% radar range.',
+  'tech.node.flight-decks.desc': 'Flight decks: a fast sortie cycle. +6% fleet speed.',
+  'tech.node.fortified-infrastructure.desc':
+    'A doctrine of fortified worlds — frontier strongholds.',
+  'tech.node.garrison-networks.desc':
+    'Garrison networks: the rear supplies itself. +5% production.',
+  'tech.node.guidance-arrays.desc': 'Guidance arrays: far-edge telemetry. +10% radar range.',
+  'tech.node.industrial-automation.desc': 'Planetary logistics upgrade: +10% production.',
+  'tech.node.logistics-command.desc':
+    'Logistics command: convoys on schedule. +5% production and fleet speed.',
+  'tech.node.meta-drill-combat.desc': 'Meta-progression: +5% damage.',
+  'tech.node.meta-drill-radar.desc': 'Meta-progression: +15% radar range.',
+  'tech.node.meta-drill-speed.desc': 'Meta-progression: +5% fleet speed.',
+  'tech.node.meta-drill-veteran.desc': 'Meta-progression: another +5% speed and damage.',
+  'tech.node.meta-industry-2.desc': 'Meta-progression: another +5% production.',
+  'tech.node.meta-industry.desc': 'Meta-progression: +5% production.',
+  'tech.node.microelectronics-fabrication.desc': 'Orbital foundries: +5% production.',
+  'tech.node.orbital-logistics.desc': 'Standardised haulage: +12% fleet speed.',
+  'tech.node.planetary-bastions.desc':
+    "Planetary bastions: a full-cycle defence industry. +8% damage. The Marshal's capstone.",
+  'tech.node.saturation-barrage.desc':
+    "Saturation barrage: overwhelms any missile defence. +10% damage. The Missile Chief's capstone.",
+  'tech.node.siege-doctrine.desc': 'Long-range siege crews: +8% damage.',
+  'tech.node.signal-corps.desc': 'Signal corps: one picture of the battle. +8% radar range.',
+  'tech.node.strike-vectors.desc': 'Strike vectors: plotted squadron approaches. +8% damage.',
+  'tech.node.void-armadas.desc':
+    'Grand-formation doctrine: +6% damage and fleet speed. Requires 5 of your own sectors.',
+  'tech.node.warhead-miniaturization.desc':
+    'Warhead miniaturisation: a denser salvo per tonne. +6% damage.',
 
   // --- tech — Дерево технологий: требования узла, рельса дней, состояния и действия.
   'tech.action.done': 'Researched',
