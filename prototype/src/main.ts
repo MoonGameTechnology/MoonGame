@@ -79,8 +79,6 @@ import {
   FAVOUR_BASE,
   FAVOUR_EMBARGO,
   FAVOUR_WAR,
-  delegateSteward,
-  recallSteward,
   setHoldPoint,
   stewardActive,
   MAX_STEWARD_HOLD_POINTS,
@@ -238,6 +236,16 @@ import {
 import { originOf } from './arsenal';
 // ECON-4 — session market: the model + orders live next door; the WINDOW is REFM-6.
 import { initMarket } from './marketScreen';
+// ST-2/ST-3 — «Хранитель»: the window is REFM-7; the read-only helpers below are shared
+// with the threat alert (`stewFmtDur`), the side panel (`stewardTechDone`) and the
+// morning report (`stewMetrics`).
+import {
+  initSteward,
+  stewFmtDur,
+  stewMetrics,
+  stewardTechDone,
+  type StewardMetrics,
+} from './stewardScreen';
 import { initArsenal, originLabel } from './arsenalScreen';
 // AVA-C1/C2 — corporation cabinet (pure types/parsers; see prototype/src/corp.ts).
 import {
@@ -2852,25 +2860,25 @@ function handleEvents(events: DomainEvent[]) {
       // «Хранитель» lifecycle: snapshot at delegation, diff on expiry (the morning report).
       case 'steward.delegated':
         if (p.playerId === ME) {
-          stewSnapshot = stewMetrics();
+          stewSnapshot = stewMetrics(s, ME);
           note(
             (p as { posture?: string }).posture === 'active_defend'
               ? t('log.steward.on.active')
               : t('log.steward.on.defense'),
           );
-          if (stewWin.classList.contains('show')) renderSteward();
+          if (steward.isOpen()) steward.repaint();
         }
         break;
       case 'steward.recalled':
         if (p.playerId === ME) {
           stewSnapshot = null;
           note(t('log.steward.off'));
-          if (stewWin.classList.contains('show')) renderSteward();
+          if (steward.isOpen()) steward.repaint();
         }
         break;
       case 'steward.expired':
         if (p.playerId === ME) {
-          const now = stewMetrics();
+          const now = stewMetrics(s, ME);
           const base = stewSnapshot;
           stewSnapshot = null;
           const sign = (n: number) => (n >= 0 ? `+${n}` : `${n}`);
@@ -2886,7 +2894,7 @@ function handleEvents(events: DomainEvent[]) {
               diff +
               sitrep,
           );
-          if (stewWin.classList.contains('show')) renderSteward();
+          if (steward.isOpen()) steward.repaint();
         }
         break;
       // Both espionage events are addressed to the ACTOR (`owner`); in NET play the
@@ -5708,7 +5716,7 @@ function planetPanelHtml(p: Planet): string {
     }
     // Hold point (ST-2.1): a standing order for the Steward — the anchor is never
     // auto-evacuated and gets reinforced under threat. Same tech gate as delegation.
-    if (stewardTechDone()) {
+    if (stewardTechDone(s, ME)) {
       const points = s.players[ME]?.stewardHoldPoints ?? [];
       h += `<div class="row">${
         points.includes(p.id)
@@ -8692,163 +8700,29 @@ techWin.addEventListener('click', (e) => {
 });
 
 // --- steward («Хранитель»): hand the seat to the AI while you sleep ----------
-// Delegate control to a defensive AI until a game-time deadline; it holds the line and
-// returns control on time (stewardModule). Gated by the Steward tech (researched via the
-// «Командование» branch, day 15, scientist Куратор). A "morning report" note fires on expiry.
+// The window lives in `stewardScreen.ts` (REFM-7); here it gets its hooks, the rail
+// button that opens it, and the two module-level `let`s the frame loop owns.
+// `#steward` itself stays a handle: the Android-Back layer stack and the loop's
+// repaint throttle both hold it.
 const stewWin = $('steward');
 let lastStewAt = 0;
 let lastIntelAt = 0; // throttle for the live intel-window timers (диплом. вкладка «Шпионаж»)
-const STEW_DURATIONS = [4, 8, 12]; // game-hours a single delegation can run
-// Snapshot of my standing at delegation time, diffed on expiry for the morning report.
-let stewSnapshot: { planets: number; metal: number; credits: number } | null = null;
-// The posture the next delegation will run (ST-3.3): «Оборона» is the safe default,
-// «Активная оборона» adds the forecast-gated counterstrike + squadron fire-watch.
-let stewPosture: 'defend' | 'active_defend' = 'defend';
-function stewMetrics(): { planets: number; metal: number; credits: number } {
-  let planets = 0;
-  for (const pl of Object.values(s.planets)) if (pl.owner === ME) planets += 1;
-  const r = (s.players[ME]?.resources ?? {}) as Record<string, number>;
-  return { planets, metal: Math.round(r.metal ?? 0), credits: Math.round(r.credits ?? 0) };
-}
-function stewFmtDur(ms: number): string {
-  const mins = Math.max(0, Math.round(ms / 60000));
-  const h = Math.floor(mins / 60);
-  return h > 0 ? `${h}ч ${mins % 60}м` : `${mins}м`;
-}
-function stewardTechDone(): boolean {
-  return s.players[ME]?.technologies?.completed.includes('ai_stewardship') ?? false;
-}
-/** One localized line of the Steward's decision journal (SITREP, ST-2.4). */
-function stewLogLine(e: {
-  kind: string;
-  node?: string;
-  fleetId?: string;
-  to?: string;
-  count?: number;
-  fraction?: number;
-}): string {
-  const pct = e.fraction !== undefined ? String(Math.round(e.fraction * 100)) : '?';
-  const node = e.node ?? '?';
-  switch (e.kind) {
-    case 'evac':
-      return t('steward.log.evac', {
-        node,
-        to: e.to ?? '?',
-        pct,
-        n: String(e.count ?? 0),
-      });
-    case 'ferry':
-      return t('steward.log.ferry', { node });
-    case 'stranded':
-      return t('steward.log.evac-failed', {
-        node,
-        pct,
-      });
-    case 'strike':
-      return t('steward.log.counter', { node, pct });
-    case 'watch':
-      return t('steward.log.sortie', { node });
-    case 'hold':
-      return t('steward.log.held', { node, pct });
-    case 'reinforce':
-      return t('steward.log.reinforce', { node, pct });
-    default:
-      return `${e.kind}: ${node}`;
-  }
-}
-/** The journal section of the steward window — the last watch's decisions, newest
- *  first. Rendered whenever a journal exists (it survives expiry: the morning
- *  report is read AFTER the watch ends). */
-function stewLogHtml(): string {
-  const log = s.players[ME]?.stewardLog;
-  if (!log || log.length === 0) return '';
-  const lines = [...log]
-    .reverse()
-    .slice(0, 12)
-    .map(
-      (e) =>
-        `<div class="st-log-line"><span class="st-log-when">${t('steward.log.ago', { dur: stewFmtDur(Math.max(0, s.time - e.at)) })}</span> ${stewLogLine(e)}</div>`,
-    )
-    .join('');
-  return `<div class="st-h">${t('steward.log.title')}</div><div class="st-log">${lines}</div>`;
-}
-function renderSteward(): void {
-  const body = $('stewardbody');
-  const posture = stewardActive(s, ME, s.time); // null unless a live delegation
-  const cur = s.players[ME]?.steward;
-  let html = '';
-  if (posture && cur) {
-    html +=
-      `<div class="st-status on">🤖 <b>${posture === 'active_defend' ? t('steward.on.active') : t('steward.on.defense')}</b><br>` +
-      t('steward.on.returns', { dur: stewFmtDur(cur.until - s.time) }) +
-      `<br>` +
-      `${posture === 'active_defend' ? t('steward.on.active.note') : t('steward.on.defense.note')}</div>` +
-      `<div class="st-row"><button class="st-btn warn" data-stew="recall">${t('steward.take-back')}</button></div>` +
-      `<div class="st-note">${t('steward.on.warning')}</div>`;
-  } else if (!stewardTechDone()) {
-    const day = Math.floor((s.time - (s.startedAt ?? 0)) / DAY) + 1; // счёт статус-бара: день 1 — первый
-    html +=
-      `<div class="st-status locked">🔒 <b>${t('steward.locked')}</b><br>` +
-      t('steward.locked.where', { day: String(day) }) +
-      `<br>` +
-      `${t('steward.locked.how')}</div>` +
-      `<div class="st-row"><button class="st-btn" data-stew="tech">${t('steward.locked.go')}</button></div>`;
-  } else {
-    html +=
-      `<div class="st-status">😴 <b>${t('steward.ready')}</b><br>` +
-      `${t('steward.ready.note')}</div>` +
-      `<div class="st-h">${t('steward.stance')}</div><div class="st-row">` +
-      (['defend', 'active_defend'] as const)
-        .map(
-          (p) =>
-            `<button class="st-btn${stewPosture === p ? ' sel' : ''}" data-stew="posture" data-p="${p}">${p === 'defend' ? t('steward.stance.defense') : t('steward.stance.active')}</button>`,
-        )
-        .join('') +
-      `</div>` +
-      `<div class="st-h">${t('steward.duration')}</div><div class="st-row">` +
-      STEW_DURATIONS.map(
-        (h) =>
-          `<button class="st-btn" data-stew="go" data-h="${h}">${t('steward.duration.hours', { h: String(h) })}</button>`,
-      ).join('') +
-      `</div>` +
-      `<div class="st-note">${
-        stewPosture === 'active_defend'
-          ? t('steward.stance.active.note')
-          : t('steward.stance.defense.note')
-      }</div>`;
-  }
-  html += stewLogHtml();
-  body.innerHTML = html;
-}
-document.getElementById('rail-steward')?.addEventListener('click', () => {
-  stewWin.classList.add('show');
-  renderSteward();
-  maybeIntro('steward');
-});
-stewWin.addEventListener('click', (e) => {
-  const tg = e.target as HTMLElement;
-  if (tg.id === 'steward' || tg.classList.contains('tw-close')) {
-    stewWin.classList.remove('show');
-    return;
-  }
-  const btn = tg.closest('[data-stew]') as HTMLElement | null;
-  if (!btn) return;
-  const kind = btn.dataset.stew;
-  if (kind === 'posture') {
-    stewPosture = btn.dataset.p === 'active_defend' ? 'active_defend' : 'defend';
-  } else if (kind === 'go') {
-    const h = Number(btn.dataset.h) || 8;
-    playerOrder(delegateSteward(ME, s.time + h * HOUR, stewPosture));
-  } else if (kind === 'recall') {
-    playerOrder(recallSteward(ME));
-  } else if (kind === 'tech') {
-    stewWin.classList.remove('show');
+const steward = initSteward({
+  root: () => stewWin,
+  body: () => $('stewardbody'),
+  state: () => s,
+  me: () => ME,
+  order: playerOrder,
+  onOpen: () => maybeIntro('steward'),
+  openTech: () => {
     techWin.classList.add('show');
     renderTech();
-    return;
-  }
-  renderSteward();
+  },
 });
+document.getElementById('rail-steward')?.addEventListener('click', () => steward.open());
+// Snapshot of my standing at delegation time, diffed on expiry for the morning report.
+let stewSnapshot: StewardMetrics | null = null;
+
 
 // --- heroes («штаб героев»): the CORE hero engine over the inline catalogs -----
 // One window for the whole hero loop: deploy reserves (`hero.spawn`), cast abilities
@@ -12708,9 +12582,9 @@ function frame(nowReal: number) {
     renderTech();
   }
   // Keep the steward window live while open (countdown to control returning), throttled.
-  if (stewWin.classList.contains('show') && nowReal - lastStewAt > 500) {
+  if (steward.isOpen() && nowReal - lastStewAt > 500) {
     lastStewAt = nowReal;
-    renderSteward();
+    steward.repaint();
   }
   // Intel windows tick in hours — a lazy 5s refresh keeps the «Шпионаж» timers honest.
   if (diploOpen && diploTab === 'intel' && nowReal - lastIntelAt > 5000) {
