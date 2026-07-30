@@ -18,6 +18,12 @@
 - **Гейт перед коммитом:** `pnpm run check` = `lint` + `typecheck` + `test` + `docs-check`.
 - Ещё: `pnpm test`, `pnpm run lint`, `pnpm run typecheck`, `pnpm run format`,
   `pnpm run prototype` (собрать играбельный `prototype/dist/void-dominion.html`).
+- **В веб-сессиях Claude Code зависимости ставятся сами** — SessionStart-хук
+  `.claude/hooks/session-start.sh` гоняет `pnpm install --frozen-lockfile` до старта
+  сессии, чтобы гейт и тесты не падали на пустом `node_modules` в свежем контейнере.
+  Локальные машины он не трогает (условие `$CLAUDE_CODE_REMOTE`) — там установка своя.
+  Браузер для MCP хук СОЗНАТЕЛЬНО не качает: в веб-образе Chromium уже стоит, а на
+  локальной машине это отдельная история — см. раздел про MCP ниже.
 
 ## Работа через Claude Code (веб / CLI)
 
