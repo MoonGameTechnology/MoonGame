@@ -249,4 +249,30 @@ describe('локализация — ключи', () => {
     const missing = ids.map((id) => dataKey(id.replace(/_/g, ' '))).filter((k) => !(k in ru));
     expect(missing).toEqual([]);
   });
+
+  it('у каждого ИМЕНИ игровых данных есть ключ `data.*`', () => {
+    // Проверка выше смотрит только юнитов — а `tData()` так же показывает здания,
+    // модули, фитинги, сектора и типы планет. Промах у них тихий: `tData()` вернёт
+    // исходное английское имя, и в русском интерфейсе всплывёт «Spaceport» (именно
+    // это здание и жило без ключа с LOC-1).
+    const tables: Array<[string, Record<string, { name?: string }>]> = [
+      ['buildings', data.buildings],
+      ['units', data.units],
+      ['modules', data.modules],
+      ['heroFittings', data.heroFittings],
+      ['sectors', data.sectors],
+      ['planetTypes', data.planetTypes],
+    ];
+    const missing: string[] = [];
+    for (const [table, items] of tables) {
+      const entries = Object.entries(items ?? {});
+      expect(entries.length, `таблица ${table} не должна молча опустеть`).toBeGreaterThan(0);
+      for (const [id, def] of entries) {
+        const name = def?.name;
+        if (name && !(dataKey(name) in ru))
+          missing.push(`${table}.${id}: ${name} → ${dataKey(name)}`);
+      }
+    }
+    expect(missing.sort()).toEqual([]);
+  });
 });

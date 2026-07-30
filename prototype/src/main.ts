@@ -1437,6 +1437,13 @@ function cost(bag: Record<string, number> | undefined): string {
   );
   return parts.length ? parts.join(' ') : 'free';
 }
+/** Та же цена ПЛОСКИМ текстом — для мест, где подпись уходит через `esc()`
+ *  (`btn()`, `codexTile()`): там HTML из `cost()` показался бы игроку как разметка. */
+function costText(bag: Record<string, number> | undefined): string {
+  if (!bag) return 'free';
+  const parts = Object.entries(bag).map(([r, n]) => `${n}${TECH_CUR[r] ?? r[0]}`);
+  return parts.length ? parts.join(' ') : 'free';
+}
 function afford(bag: Record<string, number> | undefined): boolean {
   const res = s.players[ME]?.resources ?? {};
   for (const [r, n] of Object.entries(bag ?? {})) if ((res[r] ?? 0) < n) return false;
@@ -5218,7 +5225,7 @@ function buildButtons(_planetId: string, ids: string[], kind: 'building' | 'unit
       codexTile(
         k,
         id,
-        cost(kind === 'unit' ? data.units[id]?.cost : data.buildings[id]?.cost),
+        costText(kind === 'unit' ? data.units[id]?.cost : data.buildings[id]?.cost),
         true,
         // Buildings are one-per-planet — grey out a committed (queued/building/paused)
         // one so a second order can't be placed. PC only (the mobile build UI is frozen
@@ -5921,7 +5928,7 @@ function planetPanelHtml(p: Planet): string {
         blds += btn(
           'upgrade',
           b.type,
-          compactUi() ? `▲ ${cost(c)}` : t('side.build.upgrade', { c: cost(c) }),
+          compactUi() ? `▲ ${costText(c)}` : t('side.build.upgrade', { c: costText(c) }),
           afford(c),
           `b:${b.type}:${b.level + 1}`,
         );

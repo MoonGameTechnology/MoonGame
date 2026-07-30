@@ -473,6 +473,7 @@ export const en: Record<string, string> = {
   'data.siege-doctrine': 'Siege Doctrine',
   'data.solar-flare-zone': 'Solar Flare Zone',
   'data.space': 'space',
+  'data.spaceport': 'Spaceport',
   'data.special-forces': 'special forces',
   'data.squadron': 'squadron',
   'data.strike-carrier': 'strike carrier',
