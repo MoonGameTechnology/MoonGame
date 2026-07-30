@@ -142,3 +142,14 @@ export function canTraverse(state: GameState, mover: string, owner: string | nul
   if (owner == null || owner === mover) return true;
   return getStance(state, mover, owner) !== 'peace';
 }
+
+// Standing-order toggles, pulled ahead of the rest of the REFP-22 remainder (like
+// `castHeroAbility` before them): `stewardGuard.ts` (REFP-25) and `aiOrders` stand
+// patrols down/up, and these are leaf builders with no state entanglement.
+/** Toggle the CC-2 auto-storm stance on an owned fleet (authoritative standing order). */
+export const orderAuto = (playerId: string, fleetId: string, on: boolean) =>
+  act(playerId, 'order.auto', { fleetId, on });
+/** Stand (or stand down) a CC-4 reactive patrol on an owned squadron fleet — the server
+ *  computes the patrol itself (center / radius / fresh sortie). */
+export const orderScramble = (playerId: string, fleetId: string, on: boolean) =>
+  act(playerId, 'order.scramble', { fleetId, on });
