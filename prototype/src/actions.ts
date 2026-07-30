@@ -153,3 +153,16 @@ export const orderAuto = (playerId: string, fleetId: string, on: boolean) =>
  *  computes the patrol itself (center / radius / fresh sortie). */
 export const orderScramble = (playerId: string, fleetId: string, on: boolean) =>
   act(playerId, 'order.scramble', { fleetId, on });
+
+// Market listing, pulled ahead of the REFP-22 remainder for the same reason as the
+// standing-order toggles above: `aiOrders` (ai.ts, REFP-26) places lots and must not
+// import the facade back. Leaf builder — only the `MarketSide` type rides along.
+import type { MarketSide } from './sessionMarket';
+/** List an open lot on the session market (sell `amount` at `price`, or a buy bid). */
+export const marketList = (
+  playerId: string,
+  side: MarketSide,
+  resource: string,
+  amount: number,
+  price: number,
+) => act(playerId, 'market.list', { side, resource, amount, price });

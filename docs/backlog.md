@@ -1915,8 +1915,13 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
   `orderScramble` вытащены вперёд в `actions.ts` (лист-билдеры; гвардия и `aiOrders`
   зовут их без обратного ребра — прецедент `castHeroAbility`). `game.ts` 1223→862
   строки. Тест: `stewardGuard.test.ts` (25.5k, не менялся). Гейт зелёный (1993).
-- **REFP-26** ⏳ `[proto]` **`ai.ts`** — `SeatAiKind`, `SeatAiDecision`, `seatAiDecision`,
-  `aiOrders` (4995–5289).
+- **REFP-26** ✅ `[proto]` **`ai.ts`** — `SeatAiKind`/`SeatAiDecision`/`seatAiDecision`
+  (SES-2.2: делегирование ⊳ заместитель-после-грейса ⊳ никто) + `aiOrders` (полный
+  бот-экспандер / драйвер делегированной позы) вынесены в `prototype/src/ai.ts`
+  чистым переносом. Заодно `marketList` вытащен вперёд в `actions.ts` (лист-билдер;
+  бот выставляет лоты без обратного ребра — тот же прецедент, что orderAuto/
+  orderScramble в REFP-25). После выноса с `game.ts` сняты 12 осиротевших импортов.
+  `game.ts` 862→554 строки. Гейт зелёный (1993).
 - **REFP-27** ✅ `[proto]` **`canTraverse`** — вынесен вместе с REFP-22 в
   `prototype/src/actions.ts` (соседний, тоже чисто shared-core+`getStance`
   код — отдельный файл под 4 строки не оправдан). `game.ts` импортирует и
