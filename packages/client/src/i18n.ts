@@ -43,5 +43,9 @@ export function t(key: string, vars?: Record<string, string | number>): string {
 /** Game-DATA name (units/buildings/etc from `data/*.json`). A miss falls back to
  *  the source English name, not the key — an unrecognised name stays readable. */
 export function tData(name: string): string {
-  return lookup(dataKey(name)) ?? name;
+  // `?? lookup(name)` — страховка, а не разрешение путать вызовы. Если сюда всё же
+  // приехал КЛЮЧ (поля каталога `prototypeData.ts` частично хранят ключи), слаг
+  // `dataKey()` его схлопнет — точки и кириллица вырезаются, — и наружу вылез бы сам
+  // ключ. Так игрок получит перевод, а не `sci.overseer.name`.
+  return lookup(dataKey(name)) ?? lookup(name) ?? name;
 }

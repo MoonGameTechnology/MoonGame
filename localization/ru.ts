@@ -474,6 +474,7 @@ export const ru: Record<string, string> = {
   'data.siege-doctrine': 'Осадная доктрина',
   'data.solar-flare-zone': 'Зона солнечных вспышек',
   'data.space': 'космос',
+  'data.spaceport': 'Космопорт',
   'data.special-forces': 'спецназ',
   'data.squadron': 'эскадрилья',
   'data.strike-carrier': 'ударный носитель',
