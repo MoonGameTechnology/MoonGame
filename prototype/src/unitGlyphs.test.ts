@@ -10,7 +10,7 @@ import {
 
 // Компактные unit-def'ы под прототип-ростер: только поля, которые читает
 // система силуэтов (traits/faction/stats/signature/radarRange/domain).
-const U = (over: Partial<UnitDef> & { stats?: Partial<UnitDef['stats']> }): UnitDef =>
+const U = (over: Omit<Partial<UnitDef>, 'stats'> & { stats?: Partial<UnitDef['stats']> }): UnitDef =>
   ({
     faction: 'x',
     domain: 'space',

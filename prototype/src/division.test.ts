@@ -108,7 +108,7 @@ describe('divisions — mobilisation', () => {
     expect(d.owner).toBe('p1');
     expect(d.location).toBe(HOME);
     expect(total(d.units)).toBe(6);
-    expect(r.state.players.p1!.resources.metal).toBeLessThan(before); // paid up front
+    expect(r.state.players.p1!.resources.metal).toBeLessThan(before!); // paid up front
   });
 
   it('rejects mobilisation on a non-owned world, a bad template, or when broke', () => {

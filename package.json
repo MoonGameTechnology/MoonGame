@@ -16,7 +16,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "typecheck": "pnpm -r --if-present run typecheck",
+    "typecheck": "pnpm -r --if-present run typecheck && tsc -p prototype",
     "prototype": "node prototype/build.mjs",
     "dev:server": "node packages/server/dev.mjs",
     "dev:proto-server": "node prototype/netserver.mjs",

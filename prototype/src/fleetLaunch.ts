@@ -150,12 +150,13 @@ export const fleetLaunchModule: GameModule = {
       const gi = planet.garrison.findIndex(
         (st) => st.unit === p.unit && loadoutKey(st.modules) === key,
       );
-      if (want <= 0 || gi < 0) return;
-      const take = Math.min(want, planet.garrison[gi].count);
+      const stack = gi >= 0 ? planet.garrison[gi] : undefined;
+      if (want <= 0 || !stack) return;
+      const take = Math.min(want, stack.count);
       if (take <= 0) return;
       // pull the just-built ships out of the garrison the core added them to
-      planet.garrison[gi].count -= take;
-      if (planet.garrison[gi].count <= 0) planet.garrison.splice(gi, 1);
+      stack.count -= take;
+      if (stack.count <= 0) planet.garrison.splice(gi, 1);
       let rally = Object.values(h.state.fleets).find(
         (f) =>
           f.owner === p.owner &&
@@ -181,7 +182,8 @@ export const fleetLaunchModule: GameModule = {
       const si = rally.units.findIndex(
         (st) => st.unit === p.unit && loadoutKey(st.modules) === key,
       );
-      if (si >= 0) rally.units[si].count += take;
+      const slot = si >= 0 ? rally.units[si] : undefined;
+      if (slot) slot.count += take;
       else {
         rally.units.push({
           unit: p.unit,

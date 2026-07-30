@@ -1,0 +1,25 @@
+// REFM-0: the prototype's safety net. The playable client (main.ts, 15k lines) and
+// the prototype host (netserver.ts) historically ran with NO typecheck at all —
+// esbuild transpiles without checking, ESLint ignores prototype/**, and no test
+// imports main.ts. Silent-breakage class this closes: TDZ reads under esbuild's
+// const→var lowering (httpBase/nfmt/authMode), key-vs-text l10n mixups, dead
+// `?.name` fallbacks. Full `strict` + noUncheckedIndexedAccess from tsconfig.base —
+// the 91 pre-existing errors were fixed for real, not silenced (see the REFM-0 PR).
+// Wired into the root gate: `pnpm run typecheck` runs `tsc -p prototype` after the
+// workspace packages.
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["node"],
+    "paths": {
+      // tests import the package by its workspace name; resolve it to the source
+      "@void/shared-core": ["../packages/shared-core/src/index.ts"],
+      // netserver.ts bundles INTO packages/server/dist (see netserver.mjs), so its
+      // `pg` resolves there at runtime — point the types at the same place
+      "pg": ["../packages/server/node_modules/@types/pg/index.d.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "*.ts", "../localization/**/*.ts"]
+}
