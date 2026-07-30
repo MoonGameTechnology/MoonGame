@@ -123,6 +123,17 @@ export const spyOn = (
   kind: 'treasury' | 'planet' | 'fleets',
   planetId?: string,
 ) => act(playerId, 'espionage.spy', { target, kind, ...(planetId ? { planetId } : {}) });
+/** Cast a hero ability (HERO-4 dispatcher); `target` — planet id for ranged casts.
+ *  Pulled ahead of the rest of the "hero engine" builder cluster (REFP-22's deferred
+ *  remainder) because REFP-24's `serverChainActions` (CC-1 chain driver) needs it for
+ *  its `ability`-step branch — a leaf builder, no state entanglement of its own. */
+export const castHeroAbility = (
+  playerId: string,
+  heroId: string,
+  abilityId: string,
+  target?: string,
+) =>
+  act(playerId, 'hero.ability', { heroId, abilityId, ...(target !== undefined ? { target } : {}) });
 
 /** Can `mover`'s fleets enter/traverse a province owned by `owner`? Neutral, your own,
  *  and players you're at war / pact / alliance with are passable; a player you're at

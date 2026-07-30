@@ -1851,8 +1851,21 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
   `serverChainActions`/`serverPatrolActions` (ещё не вынесены, REFP-24) и
   реэкспортирует для `main.ts`/тестов; `squadron.test.ts` продолжает импортировать
   их из `./game`-фасада без правок. Гейт зелёный (182 файла, 1974 теста).
-- **REFP-24** ⏳ `[proto]` **`serverDrivers.ts`** — `serverAutoAssaultActions`,
-  `serverChainActions`, `serverPatrolActions` (4258–4502).
+- **REFP-24** ✅ `[proto]` **`serverDrivers.ts`** — `serverAutoAssaultActions`/
+  `serverChainActions`/`serverPatrolActions` (CC-2/CC-1/CC-4 server-side standing-order
+  drivers) вынесены в `prototype/src/serverDrivers.ts`, вместе с приватными хелперами
+  `abilityCooldownKey`/`abilityOnCooldown`/`heroCommandingFleet` (использовались только
+  `serverChainActions`'s `ability`-шагом). Зависит от уже вынесенных `chain.ts` (REFP-8),
+  `patrol.ts` (REFP-23), `squadron.ts` (REFP-7), `actions.ts` (REFP-22). Попутно
+  `castHeroAbility` (единственный ещё-не-вынесенный action-builder, нужный
+  `serverChainActions`'s `ability`-шагу) перенесён из `game.ts` в `actions.ts` — leaf-билдер
+  без своей завязки на состояние, в отличие от остатка "hero engine"-кластера
+  (`spawnHero`/`unlockHeroSkill`/`fitHero`), который остаётся отложенным (REFP-22's
+  заметка про market/division/hero-заказы всё ещё в силе для НИХ). Локальный `DriverState`
+  (узкое расширение `GameState` под `autoAssault`/`orders`/`patrols`) вместо импорта
+  кухонного `DivState` из `game.ts` — тот же паттерн, что `capital.ts`/`standingOrders.ts`.
+  `game.ts` импортирует и реэкспортирует. Гейт зелёный (182 файла, 1974 теста — число не
+  изменилось, чистый перенос; `game.ts` 2098→1851 строка).
 - **REFP-25** ⏳ `[proto]` **`stewardGuard.ts`** — `stewardGuardOrders` (4623–4994).
   Тест: `stewardGuard.test.ts`.
 - **REFP-26** ⏳ `[proto]` **`ai.ts`** — `SeatAiKind`, `SeatAiDecision`, `seatAiDecision`,
