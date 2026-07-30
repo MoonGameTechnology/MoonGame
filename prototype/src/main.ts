@@ -210,7 +210,7 @@ import {
 import { BUILD_ICON, KIND_ICON, unitIcon, unitIconHtml, archPath2d } from './icons';
 // REFM-4: the object dossiers + the codex card live in `dossiers.ts`; the renderers
 // that read live match state come out of `createDossiers(hooks)` further down.
-import { createDossiers, producesLine, type Dossier } from './dossiers';
+import { createDossiers, producesLine, unitTitle, type Dossier } from './dossiers';
 // The client-side build-queue vocabulary, shared with `dossiers.ts`.
 import type {
   ActiveBuild,
@@ -238,14 +238,10 @@ import {
   type MetaState,
   type MetaBranch,
 } from './meta';
-// ARS-5 — arsenal witryna (pure filter/group/parse; see prototype/src/arsenal.ts).
-import {
-  filterArsenal,
-  gradesOf,
-  originOf,
-  parseArsenalItems,
-  type ArsenalFilter,
-} from './arsenal';
+// ARS-5 — arsenal witryna: the pure model (`arsenal.ts`) plus the hub tab itself
+// (`arsenalScreen.ts`, REFM-5 — `initArsenal(hooks)` owns its cache and markup).
+import { originOf } from './arsenal';
+import { initArsenal, originLabel } from './arsenalScreen';
 // AVA-C1/C2 — corporation cabinet (pure types/parsers; see prototype/src/corp.ts).
 import {
   parseCorpRecord,
@@ -330,7 +326,6 @@ import type {
   DiplomaticStance,
   DomainEvent,
   IntelGrant,
-  ArsenalItem,
   UnitStack,
 } from '../../packages/shared-core/src/index';
 
@@ -5196,7 +5191,7 @@ function fleetTilesHtml(f: Fleet, stacks: UnitStack[]): string {
     .map((u) => {
       const def = data.units[u.unit];
       if (!def) return '';
-      const name = unitDossier(u.unit)?.name ?? displayUnit(u.unit);
+      const name = unitTitle(u.unit);
       const eff = effectiveStats(def, u, data);
       const full = u.count * (eff.hp ?? 0);
       const pct = full > 0 ? Math.round((Math.min(u.hp ?? full, full) / full) * 100) : 100;
@@ -5887,7 +5882,7 @@ function panelHtml(): string {
 // The hover/tap blurbs and the full-info codex card live in `dossiers.ts` now; here
 // they only get their live-state hooks. The pure parts (`buildingDossier`,
 // `producesLine`, the `Dossier` type) are imported at the top of the file.
-const { unitDossier, objDossier, codexHtml } = createDossiers({
+const { objDossier, codexHtml } = createDossiers({
   state: () => s,
   pcUi,
   youColor: () => youColor,
@@ -6558,7 +6553,7 @@ function codexTile(
 ): string {
   if (!(kind === 'b' ? data.buildings[id] : data.units[id])) return '';
   const icon = kind === 'b' ? (BUILD_ICON[id] ?? '▣') : unitIconHtml(id, data, youColor);
-  const name = kind === 'b' ? buildingName(data.buildings[id]?.name, id) : (unitDossier(id)?.name ?? displayUnit(id));
+  const name = kind === 'b' ? buildingName(data.buildings[id]?.name, id) : unitTitle(id);
   if (lockedFor) {
     // Committed already — a dim, non-ordering tile. Keeps data-desc (hover dossier),
     // drops data-codex/data-buildorder so neither left- nor right-click builds again.
@@ -6576,7 +6571,7 @@ function garrisonTilesHtml(stacks: Array<{ unit: string; count: number }>): stri
   const tiles = stacks
     .filter((u) => u.count > 0)
     .map((u) => {
-      const name = unitDossier(u.unit)?.name ?? displayUnit(u.unit);
+      const name = unitTitle(u.unit);
       return `<button class="ptile mini" data-codex="u:${esc(u.unit)}" data-desc="u:${esc(u.unit)}" data-name="${esc(name)}"><span class="pt-ic">${unitIcon(u.unit, data)}</span><span class="pt-c">${u.count}</span></button>`;
     })
     .join('');
@@ -6622,7 +6617,7 @@ const CODEX_SECTIONS: Array<[CodexCategory, string]> = [
 ];
 function codexEntryLabel(e: CodexEntry): string {
   const id = e.key.slice(2);
-  if (e.category === 'unit') return unitDossier(id)?.name ?? displayUnit(id);
+  if (e.category === 'unit') return unitTitle(id);
   if (e.category === 'building') return buildingName(data.buildings[id]?.name, id);
   return t(e.titleKey ?? e.title); // mechanic: the heading lives in the locale
 }
@@ -9455,9 +9450,9 @@ function conBar(
  *  session, never a guess). Only flags a NON-starter origin — a starter blueprint
  *  sitting in every match isn't news; a fresh drop/craft/auction pickup is. */
 function conOriginTag(defId: string): string {
-  const origin = originOf(arsenalItems, defId);
+  const origin = originOf(arsenal.items(), defId);
   if (!origin || origin === 'starter') return '';
-  return `<span class="cn-mo">${t(ARSENAL_ORIGIN_RU[origin])}</span>`;
+  return `<span class="cn-mo">${originLabel(origin)}</span>`;
 }
 function conLoadoutPane(hullList: string[]): string {
   // ARS-5: the constructor offers only what the match's arsenal snapshot (ARS-3)
@@ -9941,7 +9936,7 @@ function hubTab(tab: string): void {
   }
   currentHubTab = tab;
   if (tab === 'meta') renderMetaPanel(); // live numbers every visit (XP may have grown)
-  if (tab === 'arsenal') void refreshArsenal(); // cache paints now, server refresh trails
+  if (tab === 'arsenal') void arsenal.refresh(); // cache paints now, server refresh trails
   for (const [k, pid] of Object.entries(HUB_PANELS))
     $(pid).style.display = k === tab ? 'flex' : 'none';
   for (const b of Array.from(document.querySelectorAll('.hub-tab')))
@@ -9993,131 +9988,36 @@ $('hp-meta').addEventListener('click', (ev) => {
 });
 
 // --- «Арсенал» — the account's persistent collection (hub tab, ARS-5) --------
-// ARS-1..4 built the server-side store; nothing client-facing read it before this.
-// Cache-first (localStorage per callsign, like meta): the tab always paints instantly
-// from the last known collection, then a background GET /arsenal/me (session-gated,
-// only when a session token from a prior join is already on hand — never prompts for
-// a password just to LOOK at the hub) refreshes it. No server/no account yet ⇒ the
-// empty state, same "no restriction without a snapshot" spirit as the core build gate.
-const ARSENAL_KIND_ICON: Record<ArsenalItem['kind'], string> = {
-  hull: '◈',
-  module: '◆',
-  hero_fitting: '◇',
-};
-const ARSENAL_CODEX_KIND: Record<ArsenalItem['kind'], string> = {
-  hull: 'u',
-  module: 'md',
-  hero_fitting: 'hf',
-};
-const ARSENAL_KIND_RU: Record<ArsenalItem['kind'], string> = {
-  hull: 'arsenal.kind.hull',
-  module: 'arsenal.kind.module',
-  hero_fitting: 'arsenal.kind.fitting',
-};
-const ARSENAL_ORIGIN_RU: Record<ArsenalItem['origin'], string> = {
-  starter: 'arsenal.origin.starter',
-  drop: 'arsenal.origin.drop',
-  craft: 'arsenal.origin.craft',
-  auction: 'arsenal.origin.auction',
-  lootbox: 'arsenal.origin.lootbox',
-  rent: 'arsenal.origin.rent',
-};
+// The витрина itself lives in `arsenalScreen.ts` (REFM-5); here it gets its hooks.
+// Cache key is per callsign, like the meta store. `authorizedBase` encodes the tab's
+// policy: it may reuse a session token a prior join already stashed, but must never
+// prompt for a password just to LOOK at the collection — no server, no accounts or
+// no stashed session all read the same way (null ⇒ keep the cached paint).
+const arsenal = initArsenal({
+  root: () => $('hp-arsenal'),
+  readCache: () => {
+    try {
+      return JSON.parse(localStorage.getItem(arsenalKey()) ?? 'null');
+    } catch {
+      return null;
+    }
+  },
+  writeCache: (items) => localStorage.setItem(arsenalKey(), JSON.stringify(items)),
+  openCodex,
+  authorizedBase: async () => {
+    const srv = resolveServer();
+    if (!srv) return null;
+    await probeAuthMode(srv.base);
+    if (!authMode) return null;
+    const token = sessionToken(srv.base);
+    return token ? { base: httpBase(srv.base), token } : null;
+  },
+});
 function arsenalKey(): string {
   return 'vd.arsenal.' + (nickInput.value.trim() || 'guest');
 }
-function loadArsenalCache(): ArsenalItem[] {
-  try {
-    return parseArsenalItems(JSON.parse(localStorage.getItem(arsenalKey()) ?? 'null'));
-  } catch {
-    return [];
-  }
-}
-function saveArsenalCache(items: ArsenalItem[]): void {
-  localStorage.setItem(arsenalKey(), JSON.stringify(items));
-}
-let arsenalItems: ArsenalItem[] = [];
-let arsenalFilter: ArsenalFilter = {};
-function arsenalItemName(item: ArsenalItem): string {
-  if (item.kind === 'hull') return unitDossier(item.defId)?.name ?? displayUnit(item.defId);
-  if (item.kind === 'module') return tData(data.modules[item.defId]?.name ?? item.defId);
-  return tData(data.heroFittings[item.defId]?.name ?? item.defId);
-}
-function arsenalCardHtml(item: ArsenalItem): string {
-  const badges = [
-    item.grade ? `+${item.grade}` : '',
-    typeof item.durability === 'number' ? `⛭${item.durability}` : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
-  const origin = t(ARSENAL_ORIGIN_RU[item.origin]);
-  return (
-    `<button class="hub-tile ar-card" data-codex="${ARSENAL_CODEX_KIND[item.kind]}:${esc(item.defId)}">` +
-    `<span class="ht-ic">${ARSENAL_KIND_ICON[item.kind]}</span><span>${esc(arsenalItemName(item))}</span>` +
-    `<span class="ar-meta">${badges ? badges + ' · ' : ''}${origin}</span></button>`
-  );
-}
-function renderArsenalPanel(): void {
-  const el = $('hp-arsenal');
-  if (arsenalItems.length === 0) {
-    el.innerHTML = `<div class="hub-empty"><span class="he-ic">⚔</span>${t('arsenal.empty')}<br><span style="font-size:11px;color:var(--cyan-dim)">${t('arsenal.empty.hint')}</span></div>`;
-    return;
-  }
-  const kinds: Array<ArsenalItem['kind']> = ['hull', 'module', 'hero_fitting'];
-  let chips = `<button class="ar-fchip${arsenalFilter.kind ? '' : ' on'}" data-ar-kind="">${t('arsenal.filter.all')}</button>`;
-  for (const k of kinds)
-    chips += `<button class="ar-fchip${arsenalFilter.kind === k ? ' on' : ''}" data-ar-kind="${k}">${t(ARSENAL_KIND_RU[k])}</button>`;
-  const grades = gradesOf(arsenalItems);
-  if (grades.length) {
-    chips += `<span class="ar-fsep"></span>`;
-    for (const g of grades)
-      chips += `<button class="ar-fchip${arsenalFilter.grade === g ? ' on' : ''}" data-ar-grade="${g}">+${g}</button>`;
-  }
-  const cards = filterArsenal(arsenalItems, arsenalFilter).map(arsenalCardHtml).join('');
-  el.innerHTML = `<div class="ar-filters">${chips}</div><div class="hub-grid ar-grid">${cards}</div>`;
-}
-$('hp-arsenal').addEventListener('click', (ev) => {
-  const tg = ev.target as HTMLElement;
-  const kindBtn = tg.closest('[data-ar-kind]') as HTMLElement | null;
-  if (kindBtn) {
-    const k = kindBtn.dataset.arKind as ArsenalItem['kind'] | '';
-    arsenalFilter = { ...arsenalFilter, kind: k || undefined };
-    renderArsenalPanel();
-    return;
-  }
-  const gradeBtn = tg.closest('[data-ar-grade]') as HTMLElement | null;
-  if (gradeBtn) {
-    const g = Number(gradeBtn.dataset.arGrade);
-    arsenalFilter = { ...arsenalFilter, grade: arsenalFilter.grade === g ? undefined : g };
-    renderArsenalPanel();
-    return;
-  }
-  const card = tg.closest('[data-codex]') as HTMLElement | null;
-  if (card?.dataset.codex) openCodex(card.dataset.codex);
-});
-/** Cache-first paint, then a best-effort session-gated refresh (never prompts for
- *  a password — only reuses a session token a prior join already stashed). */
-async function refreshArsenal(): Promise<void> {
-  arsenalItems = loadArsenalCache();
-  renderArsenalPanel();
-  const srv = resolveServer();
-  if (!srv) return;
-  await probeAuthMode(srv.base);
-  if (!authMode) return;
-  const session = sessionToken(srv.base);
-  if (!session) return;
-  try {
-    const res = await fetch(`${httpBase(srv.base)}/arsenal/me`, {
-      headers: { authorization: `Bearer ${session}` },
-    });
-    if (!res.ok) return;
-    const body = (await res.json().catch(() => null)) as { items?: unknown } | null;
-    arsenalItems = parseArsenalItems(body?.items);
-    saveArsenalCache(arsenalItems);
-    renderArsenalPanel();
-  } catch {
-    // offline/unreachable — the cache painted above stays the source of truth
-  }
-}
+
+
 // --- Профиль командира — the career dossier (docs/main-menu.md §4.2) ------------
 // ONE overlay behind two doors: the hub identity strip and the in-match player card
 // («досье» button). Observation only — nothing here touches the simulation.

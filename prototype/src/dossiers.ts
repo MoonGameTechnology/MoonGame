@@ -14,7 +14,7 @@
  *
  * Shape (see the REFM method note in docs/backlog.md): `main.ts` has no export
  * surface, so a screen module takes its host dependencies EXPLICITLY. Everything
- * that only needs the catalogue is a plain exported function; the four renderers
+ * that only needs the catalogue is a plain exported function; the three renderers
  * that read live match state come out of `createDossiers(host)`.
  */
 import {
@@ -185,6 +185,13 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
   }
 }
 
+/** The unit's display name as the UI shows it everywhere: its dossier title when the
+ *  unit has one, else the plain data name. Layout-independent on purpose — `pcUi` only
+ *  ever decided the dossier BODY, so a caller that wants just the name needs no host. */
+export function unitTitle(id: string): string {
+  return unitDossier(id, true)?.name ?? displayUnit(id);
+}
+
 /** "+10 металл/ч, +5 кредиты/ч" — the always-visible output readout on a built
  *  building's row (not just on hover). Empty string for a produces-less building
  *  (defense/radar/etc.), so the row's dim-text separator (" · ") is skipped. */
@@ -266,7 +273,6 @@ export function cxRow(k: string, v: string): string {
 /** Wire the live-state renderers to the match screen. The pure exports above need no
  *  host and are imported directly. */
 export function createDossiers(host: DossierHost): {
-  unitDossier: (id: string) => Dossier | null;
   constructionDossier: (key: string) => Dossier | null;
   objDossier: (key: string) => Dossier | null;
   codexHtml: (kind: string, id: string) => string;
@@ -526,5 +532,5 @@ export function createDossiers(host: DossierHost): {
     );
   }
 
-  return { unitDossier: unitDos, constructionDossier, objDossier, codexHtml };
+  return { constructionDossier, objDossier, codexHtml };
 }
