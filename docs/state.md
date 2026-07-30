@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1986 зелёных** (54 skip, 183 файла).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1993 зелёных** (54 skip, 183 файла).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -721,9 +721,13 @@ standingOrderDriver.ts` (`autoAssaultActions`/`patrolActions`/`standingOrderTick
 - **`order.chain {fleetId, steps[]}`** — атомарно ставит/снимает (`steps: []`) весь план
   флота `state.orders[fleetId]={steps}`; шаги валидируются `validateChainSteps`
   (`state/chain.ts`, порт `prototype/src/chain.ts`) — только известные виды
-  (`move`/`wait`/`assault`/`barrage`/`strike`, ровно набор гейт-схемы; прототипный
-  `ability`-шаг не портирован — под него нет гейт-схемы), только известные миры, кап
-  8 шагов. Коды: `E_NO_FLEET, E_BAD_PAYLOAD`.
+  (`move`/`wait`/`assault`/`barrage`/`strike`/`ability`, ровно набор гейт-схемы и
+  прототипного словаря; `ability` требует реальный `abilityId` из `data.heroAbilities`
+  — валидатор берёт каталог через `ctx.data`), только известные миры, кап
+  8 шагов. Коды: `E_NO_FLEET, E_BAD_PAYLOAD`. _Исторический разъезд закрыт:_ первый
+  порт «обрезал» `ability` («под него нет гейт-схемы»), из-за чего соло принимал шаг,
+  а gated-сервер отбрасывал весь план `E_BAD_PAYLOAD`; теперь все три копии словаря
+  (гейт-zod / `state/chain.ts` / `prototype/src/chain.ts`) совпадают и запинены тестами.
 - **`chain.stamp {fleetId, steps[], waitUntil?}`** — рантайм-штамп СЕРВЕРНОГО драйвера
   (потреблённая голова / взведённый дедлайн ожидания); гейт-схемы тоже намеренно нет.
   Коды: `E_NO_FLEET, E_NO_TARGET, E_BAD_PAYLOAD`.
