@@ -10,6 +10,7 @@ import {
   createInitialState,
   createKernel,
   diplomacyModule,
+  divisionModule,
   capitalModule,
   economyModule,
   factionModule,
@@ -127,6 +128,7 @@ export const DEV_MODULES: GameModule[] = [
   factionModule, // always-on faction passives (production / speed / combat) via hooks
   marketModule, // session resource bourse: list / buy (15% burn) / cancel
   armyModule,
+  divisionModule, // H4: division mobilization + ground-combat (division-vs-division only)
   fleetOpsModule, // fleet.launch/merge/split: garrison → mobile fleet, the missing link
   capitalModule, // capital.designate: re-point the hero respawn anchor
   standingOrdersModule, // order.auto/order.scramble/order.chain: standing-order intent storage
