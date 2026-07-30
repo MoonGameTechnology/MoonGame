@@ -47,11 +47,11 @@ import {
   DEFAULT_TEMPLATES,
   FORMATION_UNITS,
   FORMATION_SLOTS,
+  FORM_RU,
   formationStats,
   divisionsOf,
   templatesOf,
   mobilizeDivision,
-  renameDivisionTemplate,
   OFFICER_TEMPLATES,
   setDivisionTemplate,
   loadDivision,
@@ -62,7 +62,6 @@ import {
   divisionCargo,
   fleetCargoFree,
   type FormationTemplate,
-  type FormationUnit,
   type SetupConfig,
   type SeatConfig,
   type StepOut,
@@ -110,7 +109,7 @@ import {
 import { fleetCallsign, fleetKindKey } from './fleetName';
 import { planetName } from './planetName';
 import { provinceScore } from '../../packages/shared-core/src/state/sectorKind';
-import { OFFICERS, GROUND_ROSTER } from './groundcombat';
+import { OFFICERS } from './groundcombat';
 import { DEFAULT_HEROES, type HeroLoadout } from './heroes';
 import { DEFAULT_SHIP_LOADOUTS, type ShipLoadout } from './ships';
 // The «Оснащение корабля» loadout constructor reuses the framework-agnostic view-model
@@ -200,7 +199,7 @@ import {
   fmtEta,
 } from './format';
 // REFM-3: the icon vocabulary (glyph tables + menu renderers) lives in `icons.ts`
-import { BUILD_ICON, KIND_ICON, unitIcon, unitIconHtml, archPath2d } from './icons';
+import { BUILD_ICON, KIND_ICON, formIcon, unitIcon, unitIconHtml, archPath2d } from './icons';
 // REFM-4: the object dossiers + the codex card live in `dossiers.ts`; the renderers
 // that read live match state come out of `createDossiers(hooks)` further down.
 import { createDossiers, producesLine, unitTitle, type Dossier } from './dossiers';
@@ -234,6 +233,8 @@ import {
 // ARS-5 — arsenal witryna: the pure model (`arsenal.ts`) plus the hub tab itself
 // (`arsenalScreen.ts`, REFM-5 — `initArsenal(hooks)` owns its cache and markup).
 import { originOf } from './arsenal';
+// H4 — конструктор шаблонов дивизий: модель в `formations.ts`, редактор — REFM-8.
+import { initDivDesign } from './divisionDesigner';
 // ECON-4 — session market: the model + orders live next door; the WINDOW is REFM-6.
 import { initMarket } from './marketScreen';
 // ST-2/ST-3 — «Хранитель»: the window is REFM-7; the read-only helpers below are shared
@@ -1653,7 +1654,7 @@ function divisionsHtml(planetId: string): string {
   let h = `<div class="sec">${t('div.title')}</div>`;
   if (here.length) {
     for (const d of here) {
-      const comp = d.units.map((u) => `${formIcon(u.type)}${u.count}`).join(' ') || '—';
+      const comp = d.units.map((u) => `${formIcon(u.type, pcUi())}${u.count}`).join(' ') || '—';
       const hp = Math.round(d.units.reduce((n, u) => n + u.hp, 0));
       const off = d.officer ? t(OFFICERS[d.officer]?.name ?? '') : '';
       // Офицер — часть ИМЕННОГО шаблона (готовый, менять нельзя): показываем, не редактируем.
@@ -1689,14 +1690,14 @@ function divisionsHtml(planetId: string): string {
     // PC: every icon self-describes on hover — composition glyphs → unit dossiers,
     // ⚔/🛡/❤ → the stat's name, cost glyphs → the resource's name.
     const comp =
-      slots.map((u) => `<span data-desc="u:${esc(u)}">${formIcon(u)}</span>`).join('') || '—';
+      slots.map((u) => `<span data-desc="u:${esc(u)}">${formIcon(u, pcUi())}</span>`).join('') || '—';
     const cost =
       Object.entries(f.cost)
         .map(([r, a]) => `<span data-desc="res:${esc(r)}">${a}${TECH_CUR[r] ?? r[0]}</span>`)
         .join(' ') || '—';
     h += `<div class="row dim">${comp} · <span data-desc="stat:datk">⚔${f.attack}</span> <span data-desc="stat:ddef">🛡${f.defense}</span> <span data-desc="stat:dhp">❤${f.hp}</span>${offLine} · ${cost}</div>`;
   } else {
-    const comp = slots.map((u) => formIcon(u)).join('') || '—';
+    const comp = slots.map((u) => formIcon(u, pcUi())).join('') || '—';
     const cost =
       Object.entries(f.cost)
         .map(([r, a]) => `<span class="rc-${r}">${a}${TECH_CUR[r] ?? r[0]}</span>`)
@@ -1746,7 +1747,7 @@ function fleetDivisionsHtml(f: Fleet, here: Planet): string {
   if (carried.length) {
     g += `<div class="row">`;
     for (const d of carried) {
-      const comp = d.units.map((u) => `${formIcon(u.type)}${u.count}`).join('') || '—';
+      const comp = d.units.map((u) => `${formIcon(u.type, pcUi())}${u.count}`).join('') || '—';
       g += btn('divunload', d.id, `▼ ${esc(d.name)} ${comp}`, true);
     }
     g += `</div>`;
@@ -7260,9 +7261,7 @@ side.addEventListener('click', (ev) => {
       playerOrder(mobilizeDivision(ME, selPlanet!, Number(arg.slice(1)), true));
     else playerOrder(mobilizeDivision(ME, selPlanet!, Number(arg)));
   } else if (act === 'divdesign') {
-    ddIdx = Math.min(mobTplIdx, templatesOf(s, ME).length - 1);
-    divDesignWin.classList.add('show');
-    renderDivDesign();
+    divDesign.open(Math.min(mobTplIdx, templatesOf(s, ME).length - 1));
   } else if (act === 'spyplanet') {
     playerOrder(spyOn(ME, arg, 'planet', selPlanet!)); // arg = the world's (last known) owner
   } else if (act === 'capital') {
@@ -8226,105 +8225,22 @@ logWin?.addEventListener('click', (e) => {
 const techWin = $('tech');
 
 // --- division template designer (H4, Stellaris-style) ------------------------------
-// Editing happens HERE, before building: the planet panel only picks a ready design.
-// Custom templates (3) are editable + renamable; named officer templates are locked
-// premades («готовый шаблон, менять нельзя») shown for reference. A mobilised division
-// is a snapshot — editing a template later never touches armies already in the field.
+// The editor lives in `divisionDesigner.ts` (REFM-8); here it gets its hooks. The
+// `#divdesign` handle stays: the Android-Back layer stack holds it, and the planet
+// panel opens it.
 const divDesignWin = $('divdesign');
-let ddIdx = 0; // selected design: 0..2 custom, 3+ officer premades
-function renderDivDesign(): void {
-  const tpls = templatesOf(s, ME);
-  const all: Array<{ tpl: FormationTemplate; officer?: string }> = [
-    ...tpls.map((tpl) => ({ tpl })),
-    ...OFFICER_TEMPLATES.map((tpl) => ({ tpl, officer: tpl.officer })),
-  ];
-  ddIdx = Math.max(0, Math.min(ddIdx, all.length - 1));
-  const pick = all[ddIdx]!;
-  const locked = pick.officer !== undefined;
-  let h = `<div class="dd-tabs">`;
-  for (let i = 0; i < all.length; i++) {
-    h += `<button data-ddtab="${i}" class="${i === ddIdx ? 'on' : ''}">${all[i]!.officer ? '★ ' : ''}${esc(t(all[i]!.tpl.name))}</button>`;
-  }
-  h += `</div>`;
-  if (locked) {
-    const off = OFFICERS[pick.officer!];
-    const bonus = [
-      off?.atk ? `+${Math.round(off.atk * 100)}% ${t('div.stat.attack')}` : '',
-      off?.def ? `+${Math.round(off.def * 100)}% ${t('div.stat.defense')}` : '',
-      off?.hp ? `+${Math.round(off.hp * 100)}% ${t('div.stat.hp')}` : '',
-    ]
-      .filter(Boolean)
-      .join(' · ');
-    h += `<div class="dd-lock">★ ${esc(t(off?.name ?? ''))} — ${bonus}</div>`;
-    h += `<div class="dd-lock">${t('div.officer-locked')}</div>`;
-  } else {
-    h += `<div class="dd-name"><input id="dd-name" maxlength="24" value="${esc(pick.tpl.name)}"><button class="b" data-ddrename>${t('div.rename')}</button></div>`;
-  }
-  h += `<div class="dd-slots">`;
-  for (let i = 0; i < FORMATION_SLOTS; i++) {
-    const u = pick.tpl.slots[i] ?? null;
-    h += `<button data-ddslot="${i}"${locked ? ' disabled' : ''}>${u ? `${formIcon(u)} ${esc(t(FORM_RU[u] ?? u))}` : '＋'}</button>`;
-  }
-  h += `</div>`;
-  const f = formationStats(pick.tpl);
-  // Per-target damage preview: the counter matrix made visible — Σ atk of the
-  // composition against each of the four unit types.
-  const vs = (target: string): number =>
-    pick.tpl.slots.reduce(
-      (n, u) => n + (u ? (GROUND_ROSTER[u]?.atk[target as FormationUnit] ?? 0) : 0),
-      0,
-    );
-  h += `<div class="dd-vs">`;
-  for (const tgt of FORMATION_UNITS) {
-    const v = vs(tgt);
-    h += `<div class="vrow"><span class="vnm">${t('div.damage-vs')} ${formIcon(tgt)} ${esc(t(FORM_RU[tgt] ?? tgt))}</span><div class="vtrack"><div class="vbar" style="width:${Math.min(100, Math.round((v / 90) * 100))}%"></div></div><span>${v}</span></div>`;
-  }
-  h += `</div>`;
-  const cost =
-    Object.entries(f.cost)
-      .map(([r, a]) => `<span class="rc-${r}">${a}${TECH_CUR[r] ?? r[0]}</span>`)
-      .join(' ') || '—';
-  const syn = f.synergies.map((x) => `${esc(t(x.name))} — ${esc(t(x.desc))}`).join('<br>');
-  h += `<div class="row dim">⚔${f.attack} 🛡${f.defense} ❤${f.hp} · ${t('div.roster', { n: f.count, s: FORMATION_SLOTS, rest: cost })}</div>`;
-  if (syn) h += `<div class="hint2">${syn}</div>`;
-  h += `<div class="hint2">${t('div.slot.note')}</div>`;
-  $('divdesignbody').innerHTML = h;
-}
-divDesignWin.addEventListener('click', (e) => {
-  const tg = e.target as HTMLElement;
-  if (tg.id === 'divdesign' || tg.closest('.tw-close')) {
-    divDesignWin.classList.remove('show');
+const divDesign = initDivDesign({
+  root: () => divDesignWin,
+  body: () => $('divdesignbody'),
+  state: () => s,
+  me: () => ME,
+  pcUi,
+  order: playerOrder,
+  onClose: () => {
     lastPanelHtml = ''; // the mobilise picker mirrors the templates — refresh it
-    return;
-  }
-  const tab = tg.closest('[data-ddtab]') as HTMLElement | null;
-  if (tab) {
-    ddIdx = Number(tab.dataset.ddtab);
-    renderDivDesign();
-    return;
-  }
-  const slot = tg.closest('[data-ddslot]') as HTMLButtonElement | null;
-  if (slot && !slot.disabled && ddIdx < templatesOf(s, ME).length) {
-    const si = Number(slot.dataset.ddslot);
-    const cur = templatesOf(s, ME)[ddIdx]?.slots[si] ?? null;
-    const order: (string | null)[] = [null, ...FORMATION_UNITS];
-    const next = order[(order.indexOf(cur) + 1) % order.length] ?? null;
-    playerOrder(setDivisionTemplate(ME, ddIdx, si, next));
-    renderDivDesign();
-    return;
-  }
-  if (tg.closest('[data-ddrename]')) {
-    const name = ($('dd-name') as HTMLInputElement).value.trim();
-    if (name && ddIdx < templatesOf(s, ME).length) {
-      playerOrder(renameDivisionTemplate(ME, ddIdx, name));
-      renderDivDesign();
-    }
-  }
+  },
 });
-// Resource glyph family (mock 2026-07: coin stack / cube / sprout / bolt / chip).
-// Producer buildings echo these in BUILD_ICON — keep both in sync. These TEXT glyphs
-// serve inline prose (cost strings, notes, market rows); the top-bar capsules draw
-// the richer RES_SVG line icons below instead.
+
 // Bar-only display icons: inline SVG line art traced from the mock (two coin rings,
 // isometric cube, sprout, bolt, IC chip). stroke=currentColor so the capsule states
 // (.short red, .dead dim) tint them exactly like a text glyph.
@@ -8343,9 +8259,6 @@ const RES_SVG: Record<string, string> = {
 // soft halo (the mock capsule is lavender; the brief keeps the game's gold identity).
 const SOV_SVG =
   '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M8 1.8 11.8 6 8 14.2 4.2 6 8 1.8Z"/><path d="M4.2 6h7.6M8 1.8 6.3 6l1.7 8.2M8 1.8 9.7 6"/></svg>';
-/** Resource token for innerHTML strings, tinted with the resource's accent colour
- *  (mock palette; .rc-* rules in the stylesheet). Plain-text contexts (toasts,
- *  titles) keep the bare TECH_CUR glyph — colour can't ride along there. */
 const TECH_BRANCHES: Array<{ key: string; label: string }> = [
   { key: 'space', label: 'tech.branch.space' },
   { key: 'ground', label: 'tech.branch.ground' },
@@ -9331,7 +9244,7 @@ function conArmyPane(): string {
   const slots = tpl.slots
     .map((u, i) => {
       const inner = u
-        ? `<span class="cn-fic">${formIcon(u)}</span><span class="cn-fn">${esc(FORM_RU[u] ?? u)}</span>`
+        ? `<span class="cn-fic">${formIcon(u, pcUi())}</span><span class="cn-fn">${esc(FORM_RU[u] ?? u)}</span>`
         : `<span class="cn-fic dim">＋</span><span class="cn-fn dim">${t('yard.div.slot-empty')}</span>`;
       return `<button class="cn-fslot${u ? ' filled' : ''}" data-confslot="${idx}|${i}">${inner}</button>`;
     })
@@ -10613,31 +10526,6 @@ const setupTemplates: FormationTemplate[] = DEFAULT_TEMPLATES.map((t) => ({
   name: t.name,
   slots: [...t.slots],
 }));
-/** Unit-type → icon, used by the in-match division roster readout (panelHtml). */
-// Mobile keeps the original emoji (phone fonts render them); PC monospace stacks
-// have no text glyph for 🪖👥🎖 (they rendered as tofu ▯) and use UNIT_ICON-style
-// text glyphs instead. Resolved per render via formIcon() on the pcUi() gate.
-const FORM_ICON_EMOJI: Record<string, string> = {
-  militia: '👥',
-  heavy_infantry: '🪖',
-  special_forces: '🎖',
-  tank: '🛡',
-};
-const FORM_ICON_TEXT: Record<string, string> = {
-  militia: '▿',
-  heavy_infantry: '◆',
-  special_forces: '✱',
-  tank: '▰',
-};
-function formIcon(type: string): string {
-  return (pcUi() ? FORM_ICON_TEXT[type] : FORM_ICON_EMOJI[type]) ?? '▪';
-}
-const FORM_RU: Record<string, string> = {
-  militia: 'form.militia',
-  heavy_infantry: 'form.heavy-infantry',
-  special_forces: 'form.special-forces',
-  tank: 'form.tank',
-};
 const setupHeroes: HeroLoadout[] = DEFAULT_HEROES.map((h) => ({
   name: h.name,
   grade: h.grade,
