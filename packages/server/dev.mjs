@@ -16,10 +16,12 @@ await build({
   format: 'esm',
   platform: 'node',
   target: 'node22',
-  // `ws`, `pg` and `fastify` ship native/optional bits and dynamic requires (fastify's
-  // avvio/find-my-way/pino); leave them for Node to resolve at runtime. Everything else
-  // (incl. the @void/shared-core TS source) is bundled. `pg` only loads with DATABASE_URL.
-  external: ['ws', 'pg', 'fastify'],
+  // `ws`, `pg`, `fastify` and `web-push` ship native/optional bits and dynamic requires
+  // (fastify's avvio/find-my-way/pino; web-push's vapid-helper does `require('crypto')`,
+  // which esbuild's CJS-in-ESM shim can't resolve — ELIFECYCLE at boot otherwise); leave
+  // them for Node to resolve at runtime. Everything else (incl. the @void/shared-core TS
+  // source) is bundled. `pg` only loads with DATABASE_URL.
+  external: ['ws', 'pg', 'fastify', 'web-push'],
 });
 
 await import(pathToFileURL(outfile).href);
