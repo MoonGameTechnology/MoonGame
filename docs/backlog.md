@@ -1844,8 +1844,13 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
   `spawnHero`/`orderChain`/…) переплетён с состоянием, которое сам `game.ts` ещё
   держит (Patrol-драйвер REFP-23, дивизии REFP-13) — не в этом заходе. Гейт
   зелёный (175 файлов, 1900 тестов).
-- **REFP-23** ⏳ `[proto]` **`patrol.ts`** — `Patrol`, `patrolTarget`, `scrambleOrder`
-  (4207–4257).
+- **REFP-23** ✅ `[proto]` **`patrol.ts`** — `Patrol`, `patrolTarget`, `scrambleOrder`
+  вынесены в `prototype/src/patrol.ts` (depends on `squadron.ts`'s `SortieState`/
+  `canSortie`/`spendSortie`/`withinRange`, REFP-7, and `actions.ts`'s `engageFleet`/
+  `moveFleet`, REFP-22). `game.ts` импортирует для `serverAutoAssaultActions`/
+  `serverChainActions`/`serverPatrolActions` (ещё не вынесены, REFP-24) и
+  реэкспортирует для `main.ts`/тестов; `squadron.test.ts` продолжает импортировать
+  их из `./game`-фасада без правок. Гейт зелёный (182 файла, 1974 теста).
 - **REFP-24** ⏳ `[proto]` **`serverDrivers.ts`** — `serverAutoAssaultActions`,
   `serverChainActions`, `serverPatrolActions` (4258–4502).
 - **REFP-25** ⏳ `[proto]` **`stewardGuard.ts`** — `stewardGuardOrders` (4623–4994).
