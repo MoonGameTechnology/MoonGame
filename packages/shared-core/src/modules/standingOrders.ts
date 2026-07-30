@@ -122,7 +122,7 @@ export const standingOrdersModule: GameModule = {
       const p = action.payload as { fleetId?: unknown; steps?: unknown };
       const f: Fleet | undefined = ownedFleet(h.state, action.playerId, p?.fleetId);
       if (!f) return h.reject('E_NO_FLEET');
-      const steps = validateChainSteps(p?.steps, h.state);
+      const steps = validateChainSteps(p?.steps, h.state, h.ctx.data.heroAbilities);
       if (steps === null) return h.reject('E_BAD_PAYLOAD');
       if (steps.length === 0) {
         if (h.state.orders) {
@@ -141,7 +141,7 @@ export const standingOrdersModule: GameModule = {
       const f: Fleet | undefined = ownedFleet(h.state, action.playerId, p?.fleetId);
       if (!f) return h.reject('E_NO_FLEET');
       if (!h.state.orders?.[f.id]) return h.reject('E_NO_TARGET');
-      const steps = validateChainSteps(p?.steps, h.state);
+      const steps = validateChainSteps(p?.steps, h.state, h.ctx.data.heroAbilities);
       if (steps === null) return h.reject('E_BAD_PAYLOAD');
       const w = p?.waitUntil;
       if (w !== undefined && (typeof w !== 'number' || !Number.isFinite(w) || w < 0)) {

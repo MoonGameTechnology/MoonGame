@@ -32,6 +32,8 @@ const data: GameData = parseGameData({
   factions: {},
   buildings: {},
   events: {},
+  // one real ability so an `ability` chain step can name it (CC-1 × HERO-4)
+  heroAbilities: { corridor: { name: 'Corridor', type: 'temp_lane' } },
 });
 const ctx: Context = { now: 0, data };
 
@@ -275,6 +277,56 @@ describe('standingOrders — order.chain (CC-1 order queue)', () => {
         kernel.applyAction(
           s,
           act('order.chain', 'p1', { fleetId: 'f1', steps: [{ kind: 'move', to: 'missing' }] }),
+          ctx,
+        ),
+      ),
+    ).toBe('E_BAD_PAYLOAD');
+  });
+
+  // The `ability` arm diverged between the three copies once (solo accepted the step,
+  // a gated server rejected the whole plan) — these two pin the core validator to the
+  // prototype's semantics so the vocabularies can't drift apart silently again.
+  it('accepts an ability step naming a real ability (CC-1 × HERO-4)', () => {
+    const kernel = createKernel([standingOrdersModule]);
+    const s = stateWith({
+      players: [player('p1')],
+      planets: [planet('A', 'p1'), planet('B', null)],
+      fleets: [fleet('f1', 'p1', 'A')],
+    });
+    const r = okApply(
+      kernel.applyAction(
+        s,
+        act('order.chain', 'p1', {
+          fleetId: 'f1',
+          steps: [
+            { kind: 'move', to: 'B' },
+            { kind: 'ability', abilityId: 'corridor', target: 'B' },
+          ],
+        }),
+        ctx,
+      ),
+    );
+    expect(r.state.orders?.f1?.steps).toEqual([
+      { kind: 'move', to: 'B' },
+      { kind: 'ability', abilityId: 'corridor', target: 'B' },
+    ]);
+  });
+
+  it('rejects an ability step naming an unknown ability', () => {
+    const kernel = createKernel([standingOrdersModule]);
+    const s = stateWith({
+      players: [player('p1')],
+      planets: [planet('A', 'p1')],
+      fleets: [fleet('f1', 'p1', 'A')],
+    });
+    expect(
+      errCode(
+        kernel.applyAction(
+          s,
+          act('order.chain', 'p1', {
+            fleetId: 'f1',
+            steps: [{ kind: 'ability', abilityId: 'bogus' }],
+          }),
           ctx,
         ),
       ),

@@ -184,6 +184,15 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
             target: id.nullable(),
             hours: z.number().positive().finite(),
           }),
+          // hero ability cast as a step (CC-1 × HERO-4): the fleet's hero casts it
+          // once the fleet is free; `target` — optional world for ranged casts.
+          // Keep in lockstep with `state/chain.ts` — this arm was missing at first,
+          // so a gated server rejected plans a solo match accepted.
+          z.object({
+            kind: z.literal('ability'),
+            abilityId: id,
+            target: id.nullable().optional(),
+          }),
         ]),
       )
       .max(8),

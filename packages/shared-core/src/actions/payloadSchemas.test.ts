@@ -137,6 +137,8 @@ describe('SV-1.2 · action payload schemas', () => {
             { kind: 'assault' },
             { kind: 'barrage', target: null },
             { kind: 'strike', target: null, hours: 3 },
+            { kind: 'ability', abilityId: 'corridor', target: 'p1' },
+            { kind: 'ability', abilityId: 'rally' }, // self/aura cast — no target
           ],
         },
       ],
@@ -165,6 +167,7 @@ describe('SV-1.2 · action payload schemas', () => {
       ['order.chain', { fleetId: 'f1', steps: [{ kind: 'wait', hours: 0 }] }], // no zero waits
       ['order.chain', { fleetId: 'f1', steps: [{ kind: 'strike', target: null, hours: 0 }] }], // no zero fire windows
       ['order.chain', { fleetId: 'f1', steps: [{ kind: 'move' }] }], // move without a target
+      ['order.chain', { fleetId: 'f1', steps: [{ kind: 'ability' }] }], // ability without an id
       [
         'order.chain',
         { fleetId: 'f1', steps: Array.from({ length: 9 }, () => ({ kind: 'assault' })) },
