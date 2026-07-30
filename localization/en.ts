@@ -1158,9 +1158,12 @@ export const en: Record<string, string> = {
   'hub.tile.updates': 'Updates',
 
   // --- hud — Постоянный интерфейс матча: верхняя панель ресурсов.
+  'hud.back.title': 'Back',
   'hud.crest.title': 'Your profile',
   'hud.deficit': '⚠ SHORTAGE — consuming buildings run at 50%',
   'hud.goal': 'Goal: ✦ {n} (a world — 50, a province — 10) or eliminate your rivals.',
+  'hud.next-day': '{t} to next day',
+  'hud.place': '#{p} of {n}',
   'hud.resource.credits': 'Credits',
   'hud.resource.energy': 'Energy',
   'hud.resource.food': 'Food',

@@ -27,6 +27,7 @@ const bundle = async (playerBuild) => {
 // --- glow, monospace, minimalist HUD on near-black. Responsive. -------------
 const css = `
 :root{
+  --tbh:84px; /* total #top height (row 1 + resource row) — offsets below hang off it */
   --cyan:#35d6e6;--cyan-dim:#1c6f78;
   --grn:#5ff0c0;--grn-dim:#2b7a66;
   --red:#ff5a4d;--amber:#ffb43a;
@@ -61,25 +62,46 @@ body::before{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;mix
 ::-webkit-scrollbar-thumb:active{background:linear-gradient(180deg,#8ff4fa,var(--cyan));}
 ::-webkit-scrollbar-corner{background:transparent;}
 
-#top{position:fixed;top:0;left:0;right:0;height:46px;z-index:30;display:flex;align-items:center;
+/* Two-row command bar. Row 1 (.tbar): back chevron, round crest-avatar, nick + live
+   standing, the victory chip in the middle gap, day card with a next-day countdown.
+   Row 2 (#purse): the resource capsules. The bottom border is the mock's divider. */
+#top{position:fixed;top:0;left:0;right:0;height:var(--tbh);z-index:30;display:flex;flex-direction:column;
   background:linear-gradient(180deg,rgba(3,13,18,.94),rgba(2,8,12,.82));border-bottom:1px solid var(--line-hi);
   box-shadow:0 0 22px rgba(40,200,210,.10),inset 0 -1px 0 rgba(53,214,230,.28);}
-.crest{display:flex;align-items:center;gap:10px;padding:0 14px;height:100%;flex:0 0 auto;cursor:pointer;}
+.tbar{display:flex;align-items:center;height:48px;flex:0 0 auto;min-width:0;padding-right:10px;}
+/* the ‹ chevron mirrors the hardware Back (history.back()): close the top layer,
+   or arm the double-press "leave the match" hint */
+#topback{flex:0 0 auto;width:34px;height:100%;border:0;background:transparent;color:var(--cyan-dim);
+  font-size:24px;line-height:1;cursor:pointer;padding:0 0 3px;}
+#topback:active{color:var(--cyan);background:rgba(53,214,230,.12);}
+.crest{display:flex;align-items:center;gap:9px;padding:0 10px 0 2px;height:100%;flex:0 1 auto;min-width:0;cursor:pointer;}
 .crest:active{background:rgba(53,214,230,.12);}
 .dia{width:15px;height:15px;transform:rotate(45deg);flex:0 0 auto;border:1.5px solid var(--cyan);
   box-shadow:0 0 9px rgba(53,214,230,.7),inset 0 0 5px rgba(53,214,230,.35);}
-.who{line-height:1.1;min-width:0;}
-.who b{display:block;color:#eafffb;font-weight:700;font-size:12px;letter-spacing:2px;white-space:nowrap;}
-.who span{color:var(--cyan-dim);font-size:9px;letter-spacing:2.5px;white-space:nowrap;}
-/* the five currencies always fit the bar — no scroll. Chips share the width and shrink
-   together (flex:1 1 0; min-width:0) so the row scales down instead of overflowing. Each
-   chip = a small coin-icon + tabular amount + flow, divided by a faint hairline. */
-#purse{display:flex;align-items:center;flex:1 1 auto;min-width:0;overflow:hidden;height:100%;margin:0 2px 0 4px;
-  border-left:1px solid var(--line);}
+.who{line-height:1.15;min-width:0;}
+.who b{display:block;color:#eafffb;font-weight:700;font-size:13px;letter-spacing:.6px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.who span{color:var(--cyan-dim);font-size:10px;letter-spacing:.8px;white-space:nowrap;}
+/* victory chip in the row-1 gap: the ✦ score race the standing is derived from.
+   Tap → plain-words breakdown (the .dstat handler on #top). Hidden until it has text. */
+#tbscore{flex:0 1 auto;margin:0 auto;padding:3px 10px;border-radius:11px;cursor:pointer;
+  color:var(--ink);font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap;
+  border:1px solid var(--line);background:rgba(3,14,18,.55);}
+#tbscore.win{color:var(--up);border-color:rgba(95,240,168,.5);font-weight:700;}
+#tbscore:empty{display:none;}
+/* day card: current game day over a countdown to the next one */
+#daycard{flex:0 0 auto;margin-left:10px;padding:5px 12px;border-radius:10px;text-align:center;
+  border:1px solid var(--line-hi);background:rgba(3,14,18,.6);
+  box-shadow:inset 0 0 10px rgba(53,214,230,.08);}
+#daycard b{display:block;color:#eafffb;font-size:12px;letter-spacing:1px;}
+#daycard span{color:var(--cyan-dim);font-size:9px;font-variant-numeric:tabular-nums;letter-spacing:.4px;}
+/* the five currencies always fit their row — no scroll. Capsules share the width and
+   shrink together (flex:1 1 0; min-width:0) so the row scales down instead of
+   overflowing. Each capsule = a small coin-icon + tabular amount + flow. */
+#purse{display:flex;align-items:center;flex:1 1 auto;min-width:0;overflow:hidden;gap:6px;padding:0 8px 6px;}
 .res{display:flex;align-items:center;justify-content:center;gap:5px;padding:0 7px;height:100%;flex:1 1 0;min-width:0;
-  position:relative;overflow:hidden;}
-.res + .res::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:1px;height:20px;
-  background:linear-gradient(180deg,transparent,rgba(53,214,230,.20),transparent);}
+  position:relative;overflow:hidden;border:1px solid var(--line);border-radius:14px;background:rgba(3,14,18,.55);}
+.res.short{border-color:rgba(255,90,77,.4);}
 /* amount + flow share one "value line" (.rv); the amount owns the room (flex:0 0 auto),
    the flow rate clips first. On phones the chip stacks the icon OVER this value line. */
 .rv{display:flex;align-items:baseline;justify-content:center;gap:3px;min-width:0;overflow:hidden;flex:0 1 auto;}
@@ -101,7 +123,7 @@ body::before{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;mix
 .res b.neg{color:var(--red,#ff5a4d);text-shadow:0 0 6px rgba(255,90,77,.35);}
 /* player emblem — a console crest the player picks in the main menu (hub), worn in the
    TOP-LEFT corner. Tap → player dossier (bubbles to the .crest handler). */
-#crestmark{width:32px;height:32px;border-radius:9px;flex:0 0 auto;cursor:pointer;padding:0;
+#crestmark{width:34px;height:34px;border-radius:50%;flex:0 0 auto;cursor:pointer;padding:0;
   display:grid;place-items:center;font-size:17px;color:var(--cyan);font-variant-emoji:text;
   background:rgba(3,12,16,.7);border:1px solid var(--line-hi);
   box-shadow:inset 0 0 10px rgba(53,214,230,.14),0 0 10px rgba(53,214,230,.12);
@@ -119,7 +141,7 @@ body::before{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;mix
 @keyframes donatePulse{
   0%,100%{box-shadow:0 0 10px rgba(255,198,72,.30),inset 0 0 7px rgba(255,214,120,.16);}
   50%{box-shadow:0 0 22px rgba(255,205,90,.7),inset 0 0 9px rgba(255,220,130,.30);}}
-#toasts{position:fixed;left:50%;top:96px;transform:translateX(-50%);z-index:40;display:flex;
+#toasts{position:fixed;left:50%;top:calc(var(--tbh) + 50px);transform:translateX(-50%);z-index:40;display:flex;
   flex-direction:column;align-items:center;gap:6px;pointer-events:none;max-width:min(92vw,520px);}
 #toasts .toast{pointer-events:auto;cursor:pointer;background:rgba(3,14,18,.88);border:1px solid var(--line-hi);
   border-radius:3px;padding:7px 12px;font:12px ui-monospace,Menlo,monospace;color:var(--fg);
@@ -132,10 +154,9 @@ body::before{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;mix
   padding:5px 7px;background:rgba(3,12,16,.78);border:1px solid var(--line-hi);border-radius:3px;
   box-shadow:0 0 16px rgba(40,200,210,.10);transition:bottom .2s ease;}
 body.sheet-open #speedbar{bottom:calc(34vh + 12px);}
-#fps{position:fixed;top:82px;right:10px;z-index:25;pointer-events:none;
+#fps{position:fixed;top:calc(var(--tbh) + 36px);right:10px;z-index:25;pointer-events:none;
   font:700 10px ui-monospace,Menlo,monospace;color:var(--grn);opacity:.72;letter-spacing:.5px;
   text-shadow:0 0 6px rgba(0,0,0,.85);}
-@media (max-width:720px), ((hover: none) and (pointer: coarse) and (max-height: 520px)){#fps{top:78px;}}
 .spd button{min-width:30px;height:26px;padding:0 5px;border-radius:2px;cursor:pointer;font:11px ui-monospace,monospace;
   background:transparent;color:var(--cyan-dim);border:1px solid var(--line-hi);}
 .spd button.on{background:rgba(53,214,230,.16);color:var(--cyan);border-color:var(--cyan);box-shadow:0 0 10px rgba(53,214,230,.4);}
@@ -615,14 +636,13 @@ body.sheet-open #cmdbar{bottom:calc(34vh + 12px);}
   border:1px solid var(--line-hi);background:transparent;color:var(--dim);font:inherit;font-size:12px;cursor:pointer;}
 #pingmenu .pm-cancel:hover{color:var(--ink);border-color:var(--cyan-dim);}
 
-/* status strip below the top bar: day/time + victory progress */
-#devline{position:fixed;top:46px;left:0;right:0;height:28px;z-index:24;display:flex;align-items:center;gap:14px;
+/* status strip below the top bar: the in-game clock + the donate currency on the right
+   (day/countdown live in the #daycard, victory progress in the #tbscore chip above) */
+#devline{position:fixed;top:var(--tbh);left:0;right:0;height:28px;z-index:24;display:flex;align-items:center;gap:14px;
   padding:0 14px;background:rgba(2,8,11,.55);color:var(--cyan-dim);font-size:11px;letter-spacing:.6px;
   white-space:nowrap;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid rgba(14,59,64,.5);}
 #devline::-webkit-scrollbar{display:none;}
 #devline #clock{color:var(--grn);font-variant-numeric:tabular-nums;flex:0 0 auto;}
-#devline .dstat{flex:0 0 auto;}
-#devline .dstat.win{color:var(--up);font-weight:700;}
 
 /* left-corner tool rail — collapsed to a single hamburger by default; tapping it expands
    the wired tools UPWARD (primary icon nearest the thumb). The tools live in their own
@@ -1292,19 +1312,15 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #endscreen .es-btn.ghost{flex-basis:100%;background:transparent;color:var(--dim);border-color:var(--line);}
 
 @media (max-width:720px), ((hover: none) and (pointer: coarse) and (max-height: 520px)){
-  #top{height:44px;}
-  .who{display:none;}
-  /* phones: the left crest is just the player emblem (title hidden) */
-  .crest{padding:0 8px;}
-  #crestmark{width:30px;height:30px;font-size:16px;}
-  #devline{top:44px;}
-  /* the chips get the full bar now (donate moved under it) — tighten just a touch */
-  /* APK / phones: stack the icon OVER the number so each value gets the full chip width */
-  .res{flex-direction:column;gap:1px;padding:0 3px;}
-  .res i{width:20px;height:20px;font-size:12px;}
-  .res b{font-size:13px;}
-  /* the value line sizes to its content on the stacked layout so the flow rate shows */
-  .rv{flex:none;gap:2px;overflow:visible;}
+  /* phones: same two rows, everything a touch tighter (nick + standing stay visible) */
+  .crest{padding:0 8px 0 2px;gap:8px;}
+  #crestmark{width:30px;height:30px;font-size:15px;}
+  .who b{font-size:12px;}
+  #tbscore{padding:2px 7px;font-size:10px;}
+  #daycard{margin-left:8px;padding:4px 9px;}
+  /* the resource capsules own a full-width row — icon and number stay inline */
+  .res{padding:0 4px;gap:4px;}
+  .res i{width:18px;height:18px;font-size:11px;}
   #devline .dl-donate{font-size:11px;padding:2px 8px;}
 
   /* phones: three tabs + ✕ no longer fit beside the window title — the tabs alone
@@ -1369,9 +1385,9 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   .dp-close,.mk-close,.lw-head button{min-width:44px;min-height:44px;}
   /* notched phones: controls step inside the safe area instead of under the notch */
   #top{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);
-    padding-top:env(safe-area-inset-top,0px);height:calc(46px + env(safe-area-inset-top,0px));}
-  #devline{top:calc(44px + env(safe-area-inset-top,0px));}
-  #fps{top:calc(78px + env(safe-area-inset-top,0px));}
+    padding-top:env(safe-area-inset-top,0px);height:calc(var(--tbh) + env(safe-area-inset-top,0px));}
+  #devline{top:calc(var(--tbh) + env(safe-area-inset-top,0px));}
+  #fps{top:calc(var(--tbh) + 36px + env(safe-area-inset-top,0px));}
   #rail{padding-bottom:env(safe-area-inset-bottom);}
   #speedbar{bottom:calc(12px + env(safe-area-inset-bottom));}
   #cmdbar{bottom:calc(10px + env(safe-area-inset-bottom));gap:5px;
@@ -1733,7 +1749,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   /* a floating card on the right whose HEIGHT fits its content (grows as rows are
      added, shrinks for a sparse fleet) instead of a fixed full-height column — only
      caps at the viewport, so ordinary panels never need an inner scrollbar */
-  #side{left:auto;right:12px;top:74px;bottom:auto;width:min(380px,40vw);height:auto;
+  #side{left:auto;right:12px;top:calc(var(--tbh) + 28px);bottom:auto;width:min(380px,40vw);height:auto;
     max-height:calc(100vh - 88px);flex-direction:column;clip-path:none;
     border:1px solid var(--cyan);border-radius:12px;
     box-shadow:-8px 0 30px rgba(0,0,0,.55),inset 0 0 30px rgba(53,214,230,.04);}
@@ -2173,9 +2189,14 @@ const page = (js) => `<!doctype html>
 <body>
 <canvas id="map"></canvas>
 <header id="top">
-  <div class="crest">
-    <button id="crestmark" data-i18n-title="hud.crest.title" type="button">◆</button>
-    <div class="who"><b>VOID DOMINION</b><span>SECTOR COMMAND</span></div>
+  <div class="tbar">
+    <button id="topback" data-i18n-title="hud.back.title" type="button">‹</button>
+    <div class="crest">
+      <button id="crestmark" data-i18n-title="hud.crest.title" type="button">◆</button>
+      <div class="who"><b id="tbname">VOID DOMINION</b><span id="tbplace">SECTOR COMMAND</span></div>
+    </div>
+    <span id="tbscore" class="dstat"></span>
+    <div id="daycard"><b id="tbday"></b><span id="tbeta"></span></div>
   </div>
   <div id="purse"></div>
 </header>
