@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Action } from '@void/shared-core';
-import { createDevMatch, loadShippedData } from './scenario';
+import { createDevMatch, loadShippedData, MODULE_MANIFEST_VERSION } from './scenario';
 import { MemoryMatchStore, MemoryReceiptStore } from './store';
 import { snapshotOf } from './persistence';
 import { startClockDriver } from './clockDriver';
@@ -247,5 +247,78 @@ describe('MP-4 · game-data integrity check on load', () => {
     const loaded = await load(MATCH);
     expect(loaded).not.toBeNull(); // no pinned hash → nothing to compare, not refused
     await loaded?.dispose();
+  });
+});
+
+// Invariant #6: a match pins the module-manifest version it was created under, and the
+// loader refuses to resume it on a different module graph — resuming would silently
+// diverge from the match's own history (and break its replay). The sibling of the MP-4
+// dataHash check above, with one deliberate difference: `version.manifest` is REQUIRED
+// in `GameVersion`, so — unlike the optional `dataHash` — there is no legitimate
+// snapshot without it, and "missing" means corrupt rather than "persisted before the
+// check existed". Hence no graceful-degradation path here. That asymmetry is the point
+// of the third test; pin it so it can't be "fixed" back into a hole.
+describe('invariant #6 · module-manifest check on load', () => {
+  it('loads normally when the pinned manifest matches the deployed module graph', async () => {
+    const store = new MemoryMatchStore();
+    const receiptStore = new MemoryReceiptStore();
+    const seed = createDevMatch(data, { now: () => 1000, time: 1000 });
+    expect(seed.state.version.manifest).toBe(MODULE_MANIFEST_VERSION); // stamped at creation
+
+    await store.save(snapshotOf(seed));
+    const load = createMatchLoader({ stores: { store, receiptStore }, data, now: () => 1000 });
+    const loaded = await load(MATCH);
+    expect(loaded).not.toBeNull();
+    await loaded?.dispose();
+  });
+
+  it('refuses to load a match created under an older module manifest', async () => {
+    const store = new MemoryMatchStore();
+    const receiptStore = new MemoryReceiptStore();
+    const seed = createDevMatch(data, { now: () => 1000, time: 1000 });
+    const snap = snapshotOf(seed);
+    await store.save({
+      ...snap,
+      state: { ...snap.state, version: { ...snap.state.version, manifest: 'ancient' } },
+    });
+
+    let flagged: string | undefined;
+    const load = createMatchLoader({
+      stores: { store, receiptStore },
+      data,
+      now: () => 1000,
+      onIntegrityFailure: (matchId) => {
+        flagged = matchId;
+      },
+    });
+    expect(await load(MATCH)).toBeNull(); // refused, not a crash
+    expect(flagged).toBe(MATCH);
+  });
+
+  it('refuses a snapshot carrying no pinned manifest at all', async () => {
+    const store = new MemoryMatchStore();
+    const receiptStore = new MemoryReceiptStore();
+    const seed = createDevMatch(data, { now: () => 1000, time: 1000 });
+    const snap = snapshotOf(seed);
+    const { manifest: _drop, ...versionWithoutManifest } = snap.state.version;
+    await store.save({
+      ...snap,
+      state: { ...snap.state, version: versionWithoutManifest as typeof snap.state.version },
+    });
+
+    let flagged: string | undefined;
+    const load = createMatchLoader({
+      stores: { store, receiptStore },
+      data,
+      now: () => 1000,
+      onIntegrityFailure: (matchId) => {
+        flagged = matchId;
+      },
+    });
+    // No graceful path, unlike the optional dataHash: an absent REQUIRED field means the
+    // snapshot was tampered with or corrupted, and "unknown module graph" is exactly the
+    // case fail-secure exists for.
+    expect(await load(MATCH)).toBeNull();
+    expect(flagged).toBe(MATCH);
   });
 });

@@ -464,6 +464,12 @@ function project(
   remembered.sort();
   view.remembered = remembered;
   delete view.fog; // memory is authoritative-internal — never shipped raw
+  // The seeded RNG stream (sfc32 a/b/c/d) is the world's dice: a client holding it can
+  // roll every upcoming combat round / dark event before the server does — the sharpest
+  // hidden-information leak there is. Authoritative-internal like `fog`: only the server
+  // runs the kernel (a net-mode client renders snapshots, it never calls advanceTo /
+  // applyAction), and `hashState` never reads it, so the desync digest is unaffected.
+  delete (view as Partial<GameState>).rng;
 
   // Fleets: own + identified enemy stay; radar-only enemy → a coarse signature;
   // everything else is removed entirely.
