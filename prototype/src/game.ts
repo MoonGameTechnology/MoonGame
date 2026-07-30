@@ -302,10 +302,9 @@ export { MODULES, kernel, SCORE_LIMIT, ctx, advance, order, type StepOut };
 // --- action builders ---------------------------------------------------------
 // REFP-22/27: the player-order action builders (moveFleet..spyOn) + canTraverse
 // moved to `actions.ts` — pure, no other game.ts deps beyond shared-core types +
-// getStance. Imported here for internal AI use and re-exported for main.ts /
-// netserver.ts / tests. (A second, scattered batch of action builders — market/
-// division/hero orders further down — stays in game.ts: interleaved with state
-// this file still owns, e.g. Patrol/ChainStep drivers, REFP-23.)
+// getStance. Re-exported for main.ts / netserver.ts / tests. (The second, scattered
+// batch — patrol/chain stamps, market/division/capital/hero orders — followed once
+// the state it was interleaved with had been extracted; see the block further down.)
 import {
   moveFleet,
   moveFleetEdge,
@@ -336,7 +335,6 @@ import {
   spyOn,
   canTraverse,
   castHeroAbility,
-  act,
 } from './actions';
 export {
   moveFleet,
@@ -440,102 +438,52 @@ export { serverAutoAssaultActions, serverChainActions, serverPatrolActions };
 // from a file the guard can import without a reverse edge) — re-exported below.
 import { orderAuto, orderScramble } from './actions';
 export { orderAuto, orderScramble };
-/** The patrol driver's runtime stamp: burned fuel / ticked rearm / next cadence mark. */
-export const patrolStamp = (
-  playerId: string,
-  fleetId: string,
-  sortie: SortieState,
-  rearmAt?: number,
-) =>
-  act(
-    playerId,
-    'patrol.stamp',
-    rearmAt === undefined ? { fleetId, sortie } : { fleetId, sortie, rearmAt },
-  );
-/** CC-1: set (or [] = cancel) an owned fleet's whole order chain atomically. */
-export const orderChain = (playerId: string, fleetId: string, steps: ChainStep[]) =>
-  act(playerId, 'order.chain', { fleetId, steps });
-/** BOOST-1: toggle форс-марш on an owned fleet (+50% speed, hull wear in transit). */
-export const forceMarchFleet = (playerId: string, fleetId: string, on: boolean) =>
-  act(playerId, 'fleet.forcemarch', { fleetId, on });
-/** Платный мгновенный ремонт корпуса всего флота (цена — `instantRepairCost`). */
-export const instantRepairFleet = (playerId: string, fleetId: string) =>
-  act(playerId, 'fleet.instantRepair', { fleetId });
-/** ECON-3а: экспресс-ремонт за metal у своего дока (цена — `dockRepairCost`). */
-export const repairFleet = (playerId: string, fleetId: string) =>
-  act(playerId, 'fleet.repair', { fleetId });
-/** The chain driver's runtime stamp: consumed head / armed wait deadline. */
-export const chainStamp = (
-  playerId: string,
-  fleetId: string,
-  steps: ChainStep[],
-  waitUntil?: number,
-) =>
-  act(
-    playerId,
-    'chain.stamp',
-    waitUntil === undefined ? { fleetId, steps } : { fleetId, steps, waitUntil },
-  );
-
-/** Place a market lot: `sell` escrows `amount` of `resource` for `price` credits/unit;
- *  `buy` escrows the credits and offers to buy that much of `resource`. */
+// REFP-22 (остаток): the second, scattered builder batch (patrol/chain stamps,
+// форс-марш/ремонты, market/division/capital/hero orders) moved to `actions.ts` —
+// the state they were "interleaved with" has since been extracted (REFP-13/23/25/26),
+// leaving pure leaf builders. Re-exported here (until REFP-28).
+import {
+  patrolStamp,
+  orderChain,
+  forceMarchFleet,
+  instantRepairFleet,
+  repairFleet,
+  chainStamp,
+  marketTake,
+  marketCancel,
+  mobilizeDivision,
+  renameDivisionTemplate,
+  setDivisionTemplate,
+  loadDivision,
+  unloadDivision,
+  designateCapital,
+  spawnHero,
+  unlockHeroSkill,
+  fitHero,
+} from './actions';
+export {
+  patrolStamp,
+  orderChain,
+  forceMarchFleet,
+  instantRepairFleet,
+  repairFleet,
+  chainStamp,
+  marketTake,
+  marketCancel,
+  mobilizeDivision,
+  renameDivisionTemplate,
+  setDivisionTemplate,
+  loadDivision,
+  unloadDivision,
+  designateCapital,
+  spawnHero,
+  unlockHeroSkill,
+  fitHero,
+};
 // marketList moved to `actions.ts` (leaf builder — `aiOrders`/ai.ts places lots
 // without a reverse edge onto the facade); re-exported here.
 import { marketList } from './actions';
 export { marketList };
-/** Take (fill) up to `amount` from an open lot — buy from a sell lot / sell into a buy lot. */
-export const marketTake = (playerId: string, id: string, amount?: number) =>
-  act(playerId, 'market.take', amount === undefined ? { id } : { id, amount });
-/** Reclaim your own lot, refunding its remaining escrow. */
-export const marketCancel = (playerId: string, id: string) =>
-  act(playerId, 'market.cancel', { id });
-/** Mobilise division template `template` (0-based) on your world `planetId`.
- *  `officer` = build from the named OFFICER_TEMPLATES roster instead (locked premades). */
-export const mobilizeDivision = (
-  playerId: string,
-  planetId: string,
-  template: number,
-  officer = false,
-) =>
-  act(
-    playerId,
-    'division.mobilize',
-    officer ? { planetId, template, officer: true } : { planetId, template },
-  );
-/** Rename your CUSTOM division template (designer menu). */
-export const renameDivisionTemplate = (playerId: string, template: number, name: string) =>
-  act(playerId, 'division.rename', { template, name });
-/** Assemble a template: set slot `slot` of your template `template` to `unit` (null = clear). */
-export const setDivisionTemplate = (
-  playerId: string,
-  template: number,
-  slot: number,
-  unit: string | null,
-) => act(playerId, 'division.template', { template, slot, unit });
-/** Load a garrisoning division into a co-located, idle fleet (by free hold). */
-export const loadDivision = (playerId: string, divisionId: string, fleetId: string) =>
-  act(playerId, 'division.load', { divisionId, fleetId });
-/** Unload a carried division onto the world its carrier is docked over. */
-export const unloadDivision = (playerId: string, divisionId: string) =>
-  act(playerId, 'division.unload', { divisionId });
-/** Designate one of your inhabited worlds as your capital (hero respawn / re-fit anchor). */
-export const designateCapital = (playerId: string, planetId: string) =>
-  act(playerId, 'capital.designate', { planetId });
-
-// --- hero engine (core heroModule, HERO-3..9): the data-driven hero actions ---
-// `castHeroAbility` moved to `actions.ts` (REFP-24) — imported/re-exported in the
-// REFP-22 block above alongside its siblings.
-/** Raise an undeployed hero's ship at an owned world (or own fleet / allied world
- *  when the hero carries the matching spawn-marker ability). */
-export const spawnHero = (playerId: string, heroId: string, at: string) =>
-  act(playerId, 'hero.spawn', { heroId, at });
-/** Unlock a hero skill-tree node (branch/requires/cost gate the order). */
-export const unlockHeroSkill = (playerId: string, heroId: string, node: string) =>
-  act(playerId, 'hero.skill.unlock', { heroId, node });
-/** Install a ship fitting into one of the hero archetype's slots (no refit). */
-export const fitHero = (playerId: string, heroId: string, fitting: string) =>
-  act(playerId, 'hero.fit', { heroId, fitting });
-
 // --- AI ----------------------------------------------------------------------
 
 
