@@ -11,11 +11,11 @@
  * return commits cost + the `fx:<type>` cooldown; any `h.reject(code)` throws and the
  * kernel discards the whole draft (fail-secure, cost included).
  */
+import { hoursToMs } from '../action/types';
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type { PlanetId } from '../state/gameState';
 import { fleetSideDealingHit, heroNode } from '../state/heroes';
 import { distance } from '../state/route';
-import { MS_PER_HOUR } from '../util/time';
 import type { HeroEffect } from './hero';
 
 const num = (v: unknown): number => (typeof v === 'number' ? v : 0);
@@ -62,7 +62,9 @@ const aura: HeroEffect = ({ heroId, hero, ability, owner }, h) => {
   const durationHours = num(p.durationHours);
   // Malformed / no-op aura → reject so the player isn't charged the cooldown for nothing.
   if (bonus <= 0 || durationHours <= 0) return h.reject('E_BAD_EFFECT');
-  const until = h.ctx.now + durationHours * MS_PER_HOUR;
+  // hoursToMs, not raw MS_PER_HOUR: the aura window must compress with the match
+  // timeScale exactly like the `fx:` cooldown it races (hero.ts `after()`).
+  const until = h.ctx.now + hoursToMs(h.ctx, durationHours);
   // Prune expired auras on cast (cooldown > duration ⇒ the list stays tiny), then add.
   const live = (hero.activeAuras ?? []).filter((a) => a.until > h.ctx.now);
   live.push({ bonus, radius, until });
@@ -112,7 +114,8 @@ const reveal: HeroEffect = ({ heroId, hero, ability, owner, target }, h) => {
   const radius = num(p.radius);
   const durationHours = num(p.durationHours);
   if (radius <= 0 || durationHours <= 0) return h.reject('E_BAD_EFFECT');
-  const until = h.ctx.now + durationHours * MS_PER_HOUR;
+  // Same timeScale rule as the aura window above.
+  const until = h.ctx.now + hoursToMs(h.ctx, durationHours);
   // Prune expired reveals on cast (cooldown > duration ⇒ the list stays tiny), then add.
   const live = (hero.activeReveals ?? []).filter((r) => r.until > h.ctx.now);
   live.push({ center: target, radius, until });
