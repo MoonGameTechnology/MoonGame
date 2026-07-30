@@ -362,6 +362,7 @@ function project(
     if (!spiedTreasury.has(player.id)) player.resources = {};
     delete player.technologies;
     delete player.scientist;
+    delete player.scientists; // the council (branch focus / +slot) — same intel as the legacy field
     delete player.arrears; // unpaid bills read as treasury intel — owner-private
     // Autopilot status is «спит — можно бить» intel, the SITREP journal narrates
     // the owner's defenses, and hold points are targeting intel («вот его якоря»)
@@ -417,6 +418,15 @@ function project(
       if (state.fleets[fleetId]?.owner !== viewerId) delete map[fleetId];
     }
     if (Object.keys(map).length === 0) delete host[key];
+  }
+  // A rival's capital designation is their hero-respawn anchor — the same
+  // targeting intel as steward hold points («вот его якорь»). Keep only the
+  // viewer's own entry; an empty map is removed (delta hygiene, as above).
+  if (view.capital) {
+    for (const playerId of Object.keys(view.capital)) {
+      if (playerId !== viewerId) delete view.capital[playerId];
+    }
+    if (Object.keys(view.capital).length === 0) delete view.capital;
   }
 
   // Planets: keep topology (id/position/links) but strip contents you can't see.
