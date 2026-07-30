@@ -1870,9 +1870,12 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
   `thresholdRamp` остались неиспользуемым импортом после переноса `netIncome` в
   `economy.ts` — убраны. Гейт зелёный (175 файлов, 1899 тестов — прирост от параллельно
   смерженной LOC-2, не от этого кирпича).
-- **REFP-21** 🔒(REFP-9..18) `[proto]` **`protoKernel.ts`** — `MODULES`, `kernel`,
-  `SCORE_LIMIT`, `ctx`, `advance`, `order`, `StepOut` (3791–3886) — точка сборки, после
-  фазы 2.
+- **REFP-21** ✅ `[proto]` **`protoKernel.ts`** — `MODULES` (порядок = контракт
+  детерминизма, инвариант #6), `kernel`, `SCORE_LIMIT`, `ctx`, `advance`, `order`,
+  `StepOut` вынесены в `prototype/src/protoKernel.ts` чистым переносом. `game.ts`
+  импортирует `ctx` для `stewardGuardOrders` и реэкспортирует всё; 24 осиротевших
+  импорта модулей ядра сняты с `game.ts` (их собирает protoKernel). `game.ts`
+  1326→1223 строк. Гейт зелёный (1993 теста — число не изменилось).
 - **REFP-22** 🔶 `[proto]` **`actions.ts`** — первый, полностью самодостаточный
   кластер экшен-билдеров (`moveFleet`…`spyOn`, 28 функций) вынесен в
   `prototype/src/actions.ts` вместе с приватным хелпером `act`/`seqCounter`
