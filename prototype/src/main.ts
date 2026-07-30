@@ -198,7 +198,15 @@ import {
   fmtEta,
 } from './format';
 // REFM-3: the icon vocabulary (glyph tables + menu renderers) lives in `icons.ts`
-import { BUILD_ICON, KIND_ICON, formIcon, unitIcon, unitIconHtml, archPath2d } from './icons';
+import {
+  BUILD_ICON,
+  KIND_ICON,
+  SOV_SVG,
+  formIcon,
+  unitIcon,
+  unitIconHtml,
+  archPath2d,
+} from './icons';
 // REFM-4: the object dossiers + the codex card live in `dossiers.ts`; the renderers
 // that read live match state come out of `createDossiers(hooks)` further down.
 import { createDossiers, producesLine, unitTitle, type Dossier } from './dossiers';
@@ -223,9 +231,6 @@ import {
   metaGrant,
   parseMetaState,
   recordMatch,
-  winRate,
-  averagePlace,
-  leagueKey,
   type MetaState,
   type MetaBranch,
 } from './meta';
@@ -236,6 +241,8 @@ import { originOf } from './arsenal';
 import { initDivDesign } from './divisionDesigner';
 // TT-3.1 — экран дерева технологий (REFM-9); `branchLabel` берёт ещё совет учёных.
 import { initTechTree, branchLabel } from './techTree';
+// «Профиль командира» — карьерное досье (REFM-10).
+import { initProfile } from './profileScreen';
 // ECON-4 — session market: the model + orders live next door; the WINDOW is REFM-6.
 import { initMarket } from './marketScreen';
 // ST-2/ST-3 — «Хранитель»: the window is REFM-7; the read-only helpers below are shared
@@ -261,7 +268,6 @@ import {
   parseRosterView,
   parseAccountIds,
   parseFeed,
-  parseMedals,
   sortMembers,
   canManage,
   type CorpRole,
@@ -8256,10 +8262,6 @@ const RES_SVG: Record<string, string> = {
   microelectronics:
     '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><rect x="4.6" y="4.6" width="6.8" height="6.8" rx="1"/><rect x="7" y="7" width="2" height="2"/><path d="M6.4 4.6v-2M9.6 4.6v-2M6.4 13.4v-2M9.6 13.4v-2M4.6 6.4h-2M4.6 9.6h-2M13.4 6.4h-2M13.4 9.6h-2"/></svg>',
 };
-// Sovereigns (donate currency): faceted-gem line icon per the mock — worn GOLD with a
-// soft halo (the mock capsule is lavender; the brief keeps the game's gold identity).
-const SOV_SVG =
-  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M8 1.8 11.8 6 8 14.2 4.2 6 8 1.8Z"/><path d="M4.2 6h7.6M8 1.8 6.3 6l1.7 8.2M8 1.8 9.7 6"/></svg>';
 // --- TT-3.1: экран-дерево технологий ------------------------------------------
 // Само окно живёт в `techTree.ts` (REFM-9); здесь только его хуки. Ручка `#tech`
 // остаётся: её держат реестр слоёв Android-Back и троттлинг живой перерисовки в
@@ -9343,167 +9345,41 @@ function arsenalKey(): string {
 
 
 // --- Профиль командира — the career dossier (docs/main-menu.md §4.2) ------------
-// ONE overlay behind two doors: the hub identity strip and the in-match player card
-// («досье» button). Observation only — nothing here touches the simulation.
-//
-// Where each number comes from, so nothing on this screen is invented:
-//   · matches / winrate / avg place / streak / season score — the local career
-//     counters folded at checkEnd (prototype/src/meta.ts `recordMatch`);
-//   · league — a cosmetic band over the commander level (`leagueKey`);
-//   · influence + corporation — the live corp record, when a session has one;
-//   · medals — the account's grants, cache-first like the arsenal.
-// Anything unavailable prints «—» rather than a plausible-looking zero.
-
-/** Medal ids the account holds, cached per callsign (the showcase must paint offline). */
-let profileMedals: string[] = [];
-/** The medal CATALOG (id → display name) as the server reports it. */
-let profileCatalog: { id: string; name: string }[] = [];
-const medalsKey = (): string => 'vd.medals.' + (nickInput.value.trim() || 'guest');
-function loadMedalCache(): { owned: string[]; catalog: { id: string; name: string }[] } {
-  try {
-    const raw = JSON.parse(localStorage.getItem(medalsKey()) ?? 'null') as unknown;
-    if (typeof raw !== 'object' || raw === null) return { owned: [], catalog: [] };
-    const v = raw as { owned?: unknown; catalog?: unknown };
-    const owned = Array.isArray(v.owned)
-      ? v.owned.filter((x): x is string => typeof x === 'string')
-      : [];
-    const catalog = Array.isArray(v.catalog)
-      ? v.catalog.flatMap((x) => {
-          const o = x as { id?: unknown; name?: unknown };
-          return typeof o?.id === 'string' && typeof o?.name === 'string'
-            ? [{ id: o.id, name: o.name }]
-            : [];
-        })
-      : [];
-    return { owned, catalog };
-  } catch {
-    return { owned: [], catalog: [] }; // a corrupt cache is an empty showcase, never a crash
-  }
-}
-
-/** Big number + caption, the end screen's tile shape. `null` prints «—». */
-function pfCell(label: string, value: string | null, accent = false): string {
-  return (
-    `<div class="pf-cell"><span class="pf-k">${esc(label)}</span>` +
-    `<span class="pf-v${accent ? ' accent' : ''}">${value === null ? '—' : esc(value)}</span></div>`
-  );
-}
-
-/** The dossier body — pure string building over the local meta + whatever the
- *  session already knows about the corp and the medals. */
-function profileHtml(): string {
-  const nick = nickInput.value.trim() || t('auth.commander');
-  const st = loadMeta();
-  const stats = st.stats;
-  const lvl = metaLevel(st.xp);
-  const corpName = corpMine.corp?.name ?? null;
-  const league = t(leagueKey(lvl));
-  // Subtitle mirrors the mock: «<corp> · Лига: <band>», degrading to the league
-  // alone when this commander flies without a corporation.
-  const sub =
-    (corpName ? `${esc(corpName)} · ` : '') + `${esc(t('profile.league'))}: ${esc(league)}`;
-  const avg = averagePlace(stats);
-  const played = stats.matches > 0;
-  const medals = profileCatalog.length
-    ? profileCatalog
-        .map((m) => {
-          const own = profileMedals.includes(m.id);
-          // Names live in data/medals.json as display text (no i18n keys), so they
-          // are printed as the server sends them — escaped, never as markup.
-          return (
-            `<div class="pf-medal${own ? '' : ' off'}"><div class="pf-mc">${own ? '◎' : '○'}</div>` +
-            `<div class="pf-mn">${esc(m.name)}</div></div>`
-          );
-        })
-        .join('')
-    : '';
-  return (
-    `<button class="pf-close" type="button" aria-label="${esc(t('card.close'))}">✕</button>` +
-    `<div class="pf-top">` +
-    `<div class="pf-av">${esc(nick.slice(0, 1).toUpperCase())}</div>` +
-    `<div class="pf-who"><div class="pf-nm">${esc(nick)}</div><div class="pf-sub">${sub}</div></div>` +
-    `<div class="pf-cur" title="${esc(t('hub.sovereigns'))}"><i>${SOV_SVG}</i><b>${kfmt(SOVEREIGNS)}</b><em>+</em></div>` +
-    `</div>` +
-    `<div class="pf-body">` +
-    `<div class="pf-h">${esc(t('profile.title'))}</div>` +
-    `<div class="pf-grid">` +
-    pfCell(t('profile.matches'), String(stats.matches)) +
-    pfCell(t('profile.winrate'), played ? `${winRate(stats)}%` : null, true) +
-    pfCell(t('profile.place'), avg === null ? null : avg.toFixed(1)) +
-    // Influence is the corporation's ledger (metagame.md) — without one there is
-    // no number to show, and a bare 0 would read as «you earned nothing».
-    pfCell(t('profile.influence'), corpMine.corp ? nfmt(corpMine.corp.influence) : null, true) +
-    pfCell(t('profile.season'), nfmt(stats.score)) +
-    pfCell(t('profile.streak'), stats.streak > 0 ? `×${stats.streak}` : '—') +
-    `</div>` +
-    `<div class="pf-sec">${esc(t('profile.medals'))}</div>` +
-    (medals
-      ? `<div class="pf-medals">${medals}</div>`
-      : `<p class="pf-hint">${esc(t('profile.medals.empty'))}</p>`) +
-    `</div>`
-  );
-}
-
-function renderProfile(): void {
-  const el = document.getElementById('profile');
-  if (el) el.innerHTML = profileHtml();
-}
-
-/** Cache-first paint, then a best-effort session-gated refresh — the arsenal's
- *  pattern. Note the prototype host does NOT mount `/medals/*` (only the full
- *  server does), so a playtest session simply keeps an empty showcase. */
-async function refreshMedals(): Promise<void> {
-  const cached = loadMedalCache();
-  profileMedals = cached.owned;
-  profileCatalog = cached.catalog;
-  renderProfile();
-  const srv = resolveServer();
-  if (!srv) return;
-  await probeAuthMode(srv.base);
-  if (!authMode) return;
-  const session = sessionToken(srv.base);
-  if (!session) return;
-  const headers = { authorization: `Bearer ${session}` };
-  try {
-    const [catRes, mineRes] = await Promise.all([
-      fetch(`${httpBase(srv.base)}/medals`, { headers }),
-      fetch(`${httpBase(srv.base)}/medals/me`, { headers }),
-    ]);
-    if (!catRes.ok || !mineRes.ok) return;
-    const cat = (await catRes.json().catch(() => null)) as { medals?: unknown } | null;
-    const mine = (await mineRes.json().catch(() => null)) as { medals?: unknown } | null;
-    profileCatalog = Array.isArray(cat?.medals)
-      ? cat.medals.flatMap((x) => {
-          const o = x as { id?: unknown; name?: unknown };
-          return typeof o?.id === 'string' && typeof o?.name === 'string'
-            ? [{ id: o.id, name: o.name }]
-            : [];
-        })
-      : [];
-    profileMedals = parseMedals(mine?.medals).map((m) => m.medalId);
-    localStorage.setItem(
-      medalsKey(),
-      JSON.stringify({ owned: profileMedals, catalog: profileCatalog }),
-    );
-    renderProfile();
-  } catch {
-    // offline/unreachable — the cached showcase painted above stays as it is
-  }
-}
-
-function openProfile(): void {
-  renderProfile();
-  document.getElementById('profile')?.classList.add('show');
-  void refreshMedals(); // cache is already on screen; the server refresh trails
-}
-function closeProfile(): void {
-  document.getElementById('profile')?.classList.remove('show');
-}
-document.getElementById('profile')?.addEventListener('click', (ev) => {
-  const tg = ev.target as HTMLElement;
-  // Close on the ✕ or on the backdrop itself, never on a tap inside the sheet.
-  if (tg.closest('.pf-close') || tg.id === 'profile') closeProfile();
+// Само досье живёт в `profileScreen.ts` (REFM-10); здесь только его хуки. Ключ кэша
+// медалей — по позывному, рядом с остальными ключами. `authorizedBase` кодирует ту же
+// политику, что у «Арсенала»: за паролем ради ПОСМОТРЕТЬ витрину не ходим.
+const profile = initProfile({
+  root: () => $('profile'),
+  view: () => {
+    const st = loadMeta();
+    return {
+      nick: nickInput.value,
+      xp: st.xp,
+      stats: st.stats,
+      corp: corpMine.corp ? { name: corpMine.corp.name, influence: corpMine.corp.influence } : null,
+      sovereigns: SOVEREIGNS,
+    };
+  },
+  readCache: () => {
+    try {
+      return JSON.parse(localStorage.getItem(medalsKey()) ?? 'null');
+    } catch {
+      return null;
+    }
+  },
+  writeCache: (value) => localStorage.setItem(medalsKey(), JSON.stringify(value)),
+  authorizedBase: async () => {
+    const srv = resolveServer();
+    if (!srv) return null;
+    await probeAuthMode(srv.base);
+    if (!authMode) return null;
+    const token = sessionToken(srv.base);
+    return token ? { base: httpBase(srv.base), token } : null;
+  },
 });
+const medalsKey = (): string => 'vd.medals.' + (nickInput.value.trim() || 'guest');
+
+// --- вход в хаб и зеркало аккаунтного XP ---------------------------------------
 
 /** Accounts mode (EC-*): pull the DURABLE account XP into the local meta mirror, so
  *  the commander level/progress a player sees is account-backed and follows them to a
@@ -12197,7 +12073,7 @@ function openEmblemPick(): void {
 document.getElementById('hubav')?.addEventListener('click', openEmblemPick);
 // The identity strip opens the career dossier — the avatar itself keeps the emblem
 // picker (its ✎ badge advertises that), so the name/status column is the door.
-document.querySelector('#hub .hub-who')?.addEventListener('click', () => openProfile());
+document.querySelector('#hub .hub-who')?.addEventListener('click', () => profile.open());
 document
   .getElementById('ep-close')
   ?.addEventListener('click', () => emblemPick?.classList.remove('show'));
@@ -12222,7 +12098,7 @@ if (playerCardEl) {
     if (tg.closest('.pc-dossier')) {
       playerCardEl.classList.remove('show');
       delete playerCardEl.dataset.seat;
-      openProfile();
+      profile.open();
       return;
     }
     if (tg.id === 'playercard' || tg.closest('.pc-close')) {
