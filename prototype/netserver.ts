@@ -68,6 +68,7 @@ import {
 } from './src/game';
 import { ActionGate } from '../packages/action-layer/src/index';
 import { isValidActionPayload } from '../packages/shared-core/src/actions/payloadSchemas';
+import type { PlayerId } from '../packages/shared-core/src/index';
 const { Pool } = pgPkg;
 
 // --- M0/M1 playtest log: append room events to a per-run JSONL and feed every one
