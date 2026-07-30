@@ -79,5 +79,4 @@ note(s.time, `launched fleet units = ${JSON.stringify(launched?.units)} landing=
 note(s.time, `final p1 treasury: ${treas(s, 'p1')}`);
 note(s.time, `fleets: ${Object.keys(s.fleets).join(', ')}`);
 
-// eslint-disable-next-line no-console
 console.log('=== Void Dominion prototype smoke ===\n' + log.join('\n'));

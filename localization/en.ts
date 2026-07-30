@@ -913,7 +913,6 @@ export const en: Record<string, string> = {
   'yard.slots.count': '{n} module slots (by hull size)',
   'yard.slots.note':
     'Typed slots: a module fits only its own type. <b>Greyed</b> — not for a free slot, or already installed.',
-  'yard.soon': '«{what}» moves into the constructor in the next brick.',
   'yard.tab.army': 'Army',
   'yard.tab.heroes': 'Heroes',
   'yard.tab.ships': 'Ships',

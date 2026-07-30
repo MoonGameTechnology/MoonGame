@@ -6,7 +6,7 @@
  *  fenced hooks in the shared code. To cut the whole feature without a trace:
  *    1. delete this file (prototype/src/testmode.ts);
  *    2. remove the `<!-- DEV TEST MODE -->` HTML block + the "Тесты" button and
- *       the `/* DEV TEST MODE *​/` CSS block in prototype/build.mjs;
+ *       the CSS block fenced by the DEV TEST MODE marker comments in build.mjs;
  *    3. remove the `initTestMode(...)` import + call in prototype/src/main.ts.
  *  Nothing else references it.
  *

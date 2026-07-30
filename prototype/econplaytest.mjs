@@ -34,7 +34,6 @@ const {
   economySnapshot,
   HOUR,
   DAY,
-  SCORE_LIMIT,
   START_CANDIDATES,
 } = mod.exports;
 

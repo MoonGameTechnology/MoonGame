@@ -446,7 +446,7 @@ describe('H4 — named officer templates + designer rename + counter matrix', ()
   });
 
   it('renames a CUSTOM template (bounded), never an officer premade', () => {
-    let s = order(richGame(), renameDivisionTemplate('p1', 0, '  Моя гвардия  '), 0).state;
+    const s = order(richGame(), renameDivisionTemplate('p1', 0, '  Моя гвардия  '), 0).state;
     expect(templatesOf(s, 'p1')[0]!.name).toBe('Моя гвардия'); // trimmed
     expect(order(s, renameDivisionTemplate('p1', 0, '   '), 0).error).toBe('E_BAD_PAYLOAD');
     expect(order(s, renameDivisionTemplate('p1', 9, 'x'), 0).error).toBe('E_NO_TEMPLATE');

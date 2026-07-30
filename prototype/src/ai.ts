@@ -27,7 +27,6 @@ import {
   loadArmy,
 } from './actions';
 import { netIncome } from './economy';
-import { botEmbargoes } from './botFavour';
 import { SECTOR_TYPES } from './map';
 import { data } from './prototypeData';
 import { marketLots, type MarketSide } from './sessionMarket';

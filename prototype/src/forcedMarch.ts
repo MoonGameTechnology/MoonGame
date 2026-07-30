@@ -4,7 +4,7 @@
  * `DivState` (forcedMarch flag), `effectiveStats`, `timeScaleOf`, `HOUR`.
  * `game.ts` imports `forcedMarchModule` for `MODULES` and re-exports constants.
  */
-import type { GameModule, GameData, Fleet } from '../../packages/shared-core/src/index';
+import type { GameModule } from '../../packages/shared-core/src/index';
 import { effectiveStats, timeScaleOf } from '../../packages/shared-core/src/index';
 
 const HOUR = 3_600_000;

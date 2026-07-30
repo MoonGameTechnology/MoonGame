@@ -136,7 +136,7 @@ describe('локализация — ключи', () => {
     // таких записей в каждой локали). tsc словари не проверяет — держим тут.
     for (const file of ['localization/ru.ts', 'localization/en.ts']) {
       const seen = new Map<string, number>();
-      for (const m of readFileSync(path.join(repoRoot, file), 'utf8').matchAll(/^  '([^']+)':/gm)) {
+      for (const m of readFileSync(path.join(repoRoot, file), 'utf8').matchAll(/^ {2}'([^']+)':/gm)) {
         seen.set(m[1]!, (seen.get(m[1]!) ?? 0) + 1);
       }
       const dupes = [...seen].filter(([, n]) => n > 1).map(([k]) => k);
