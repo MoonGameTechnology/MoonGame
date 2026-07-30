@@ -27,13 +27,18 @@ const EXPECTED = [
   { key: 'gitleaks', name: 'Gitleaks — секреты (дерево)' },
   { key: 'trufflehog', name: 'TruffleHog — секреты (история + верификация)' },
   { key: 'osv', name: 'OSV-Scanner — SCA (osv.dev)' },
-  { key: 'dependency-check', name: 'OWASP Dependency-Check — SCA (NVD/CPE)' },
+  {
+    key: 'dependency-check',
+    name: 'OWASP Dependency-Check — SCA (NVD/CPE)',
+    scheduledOnly: true,
+    skipNote: 'по расписанию/вручную',
+  },
   { key: 'trivy-fs', name: 'Trivy fs — vuln/secret/IaC' },
   { key: 'trivy-image', name: 'Trivy image — базовая ОС образа' },
   { key: 'trivy-deps', name: 'Trivy image — сторонние образы прода (postgres/caddy)' },
   { key: 'dast-zap', name: 'OWASP ZAP — DAST (baseline против запущенного сервера)' },
   { key: 'zizmor', name: 'zizmor — безопасность workflow' },
-  { key: 'scorecard', name: 'OpenSSF Scorecard — постура', mainOnly: true },
+  { key: 'scorecard', name: 'OpenSSF Scorecard — постура', mainOnly: true, skipNote: 'только на main' },
   { key: 'sbom', name: 'Syft — SBOM (CycloneDX)' },
 ];
 
@@ -154,6 +159,7 @@ const sboms = files.filter((f) => /\.cdx\.json$/i.test(f)).map((f) => basename(f
 
 // --- scan-confirmation (fail-open detector) ---
 const isMain = ref === 'main';
+const event = process.env.GITHUB_EVENT_NAME ?? '';
 const confirm = EXPECTED.map((t) => {
   const s = sentinels.get(t.key);
   // Confirmed if the job wrote a sentinel with ok=true. Defensive fallback: a tool
@@ -161,11 +167,14 @@ const confirm = EXPECTED.map((t) => {
   const ok =
     (s && s.ok === true) ||
     (!s && t.key === 'sbom' && sboms.length > 0);
-  // A main-only job (Scorecard) that's absent off `main` was SKIPPED by design —
-  // not a fail-open, so it must not raise the "NOT confirmed" alarm.
+  // A job that was SKIPPED BY DESIGN is not a fail-open and must not raise the
+  // "NOT confirmed" alarm — that alarm has to keep meaning «a scan that should have run
+  // didn't». Two such designs exist: main-only (Scorecard) and schedule-only
+  // (Dependency-Check — too slow for the PR loop, see security.yml).
   let state;
   if (ok) state = 'ok';
   else if (t.mainOnly && !isMain && !s) state = 'skipped';
+  else if (t.scheduledOnly && event === 'push' && !s) state = 'skipped';
   else state = 'bad';
   return { ...t, state };
 });
@@ -199,10 +208,14 @@ L.push('| Сканер | Подтверждён |');
 L.push('| --- | --- |');
 const CELL = {
   ok: '✅ просканировано',
-  skipped: '⏭ пропущено (только на main)',
+  skipped: '⏭ пропущено',
   bad: '⚠️ **НЕ подтверждён**',
 };
-for (const c of confirm) L.push(`| ${c.name} | ${CELL[c.state]} |`);
+// Пропуск по дизайну обязан объяснять СЕБЯ: иначе «⏭» читается как «что-то не сработало».
+for (const c of confirm)
+  L.push(
+    `| ${c.name} | ${CELL[c.state]}${c.state === 'skipped' && c.skipNote ? ` (${c.skipNote})` : ''} |`,
+  );
 L.push('');
 
 L.push('| Серьёзность | Σ |');

@@ -507,6 +507,23 @@ jobs:
     #     is the fail-open shape this pipeline exists to avoid.
     #   - The NVD feed download is slow; the data dir is cached across runs and only
     #     incrementally updated, hence the generous timeout.
+    #
+    # MEASURED ON THE FIRST LIVE RUN (2026-07-30, run 30579763480) — two corrections:
+    #   1. It died after 40 minutes with `Unable to obtain an exclusive lock on the H2
+    #      database` + `No documents exist` (exit 13). Cause: the container does not run as
+    #      the runner's user, so it could not write/lock the H2 store inside the
+    #      bind-mounted data dir. Fixed by running it as the runner uid:gid — the
+    #      upstream-documented invocation — so the mounted dir it must own is actually
+    #      writable. (The empty 185-byte cache that run saved is why the key prefix is
+    #      now v2: the old prefix would restore that poisoned empty dir forever.)
+    #   2. NOT ON EVERY PUSH any more. Even failing took 40 minutes; a successful first
+    #      feed sync is not going to be dramatically cheaper, and a scanner that slow does
+    #      not belong in the PR feedback loop. It runs on the weekly cron and on manual
+    #      dispatch, where its duration costs nobody anything. On a push it is SKIPPED BY
+    #      DESIGN — and the summarizer knows that, so it prints "⏭ skipped", not the
+    #      "NOT confirmed" alarm (which must keep meaning "a scan that should have run
+    #      didn't"). Move it back onto push only if a measured run turns out to be fast.
+    if: github.event_name != 'push'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
@@ -533,8 +550,8 @@ jobs:
       - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: dc-data
-          key: dc-nvd-${{ github.run_id }}
-          restore-keys: dc-nvd-
+          key: dc-nvd-v2-${{ github.run_id }}
+          restore-keys: dc-nvd-v2-
       - name: dependency-check
         id: scan
         if: env.NVD_API_KEY != ''
@@ -542,10 +559,16 @@ jobs:
         run: |
           set +e
           mkdir -p dc-data dc-report
+          # `-u` is load-bearing, not hygiene: without it the container user cannot lock
+          # the H2 database inside the bind-mounted data dir, and the run dies after
+          # ~40 minutes of feed sync with "Unable to obtain an exclusive lock" (seen live,
+          # exit 13). Running as the runner's own uid:gid — the upstream-documented
+          # invocation — makes both mounted dirs writable, since the runner created them.
           # Image digest-pinned (A08), resolved from the registry — same rule as every
           # other scanner here. The key goes in as an argument read from the environment;
           # Actions masks the secret in logs.
           docker run --rm \
+            -u "$(id -u):$(id -g)" \
             -v "$PWD:/src" -v "$PWD/dc-data:/usr/share/dependency-check/data" \
             owasp/dependency-check@sha256:ad169904106250816059f113d374d63a49a7cb0fd2c5e476d05c4fb814cc77b9 \
             --scan /src --out /src/dc-report --format SARIF \
@@ -791,6 +814,9 @@ jobs:
         env:
           GITHUB_SHA: ${{ github.sha }}
           GITHUB_REF_NAME: ${{ github.ref_name }}
+          # Нужен, чтобы отличить «пропущено по дизайну» (schedule-only джоба на push)
+          # от «скан не подтверждён».
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
           GITHUB_SERVER_URL: ${{ github.server_url }}
           GITHUB_REPOSITORY: ${{ github.repository }}
           GITHUB_RUN_ID: ${{ github.run_id }}
