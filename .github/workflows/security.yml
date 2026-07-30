@@ -456,8 +456,12 @@ jobs:
             # No docker-socket mount: these are registry refs, so Trivy pulls them itself
             # (the socket is only needed for the locally-built image in trivy-image).
             # --exit-code 1 → findings are visible in $rc; the gate stays informational.
+            # --ignorefile: СВОЙ список подавлений (.trivyignore-deps), не корневой.
+            # Корневой обслуживает блокирующие trivy-fs/trivy-image над нашим кодом и
+            # образом; чужой CVE, записанный туда, ослабил бы заодно и их (SEC-14).
             docker run --rm -v "$PWD:/out" -w /out \
               aquasec/trivy:0.58.2 image --exit-code 1 --format sarif \
+              --ignorefile .trivyignore-deps \
               --output "trivy-deps-sarif/trivy-deps-$i.sarif" "$ref"
             r=$?
             [ "$r" -ne 0 ] && rc=$r
