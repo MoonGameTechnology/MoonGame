@@ -249,3 +249,24 @@ L.push(
 
 writeFileSync(outFile, L.join('\n'));
 process.stdout.write(L.join('\n') + '\n');
+
+// --- полный список находок в ЛОГ (не в комментарий) ---------------------------
+// Отчёт выше намеренно урезан до топ-30: он едет в комментарий PR, и полный список
+// сделал бы его нечитаемым. Но триаж требует ВСЕХ находок с точными id — а достать их
+// из артефактов можно не всегда (SARIF лежат в blob-хранилище GitHub, доступ к которому
+// может быть закрыт политикой сети; в логи же попадает всё, что джоба напечатала).
+// Поэтому здесь тот же набор находок печатается целиком, по одной на строку, в
+// tab-separated виде: grep/awk по логу работает, а комментарий остаётся коротким.
+// Маркеры BEGIN/END дают надёжные границы блока при чтении хвоста лога.
+const FULL_CAP = 2000; // предохранитель: шумный сканер не должен раздуть лог до предела
+const shown = findings.slice(0, FULL_CAP);
+process.stdout.write(`\n--- FULL FINDINGS BEGIN (${shown.length}/${findings.length}) ---\n`);
+for (const f of shown) {
+  const where = f.path ? `${f.path}${f.line ? ':' + f.line : ''}` : '-';
+  // Табы — разделители, поэтому из полей они вычищаются вместе с переводами строк.
+  const msg = f.msg.replace(/[\t\r\n]+/g, ' ').slice(0, 200);
+  process.stdout.write(`${f.level}\t${f.tool}\t${f.rule || '-'}\t${where}\t${msg}\n`);
+}
+if (findings.length > FULL_CAP)
+  process.stdout.write(`… обрезано: ${findings.length - FULL_CAP} находок сверх лимита\n`);
+process.stdout.write('--- FULL FINDINGS END ---\n');
