@@ -1884,14 +1884,23 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #hub .hub-empty{padding:54px 16px;text-align:center;color:var(--dim);font-size:14px;letter-spacing:1px;line-height:1.9;}
 #hub .hub-empty .he-ic{font-size:38px;color:var(--cyan-dim);display:block;margin-bottom:14px;
   text-shadow:0 0 16px rgba(53,214,230,.3);}
-#hub .hub-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-#hub .hub-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:20px 10px;
-  border-radius:12px;border:1px solid var(--line-hi);background:rgba(3,12,16,.6);color:#dfeef2;
-  font:600 12px ui-monospace,monospace;letter-spacing:1px;cursor:pointer;min-height:94px;}
-#hub .hub-tile .ht-ic{font-size:23px;color:var(--cyan);}
-#hub .hub-tile:active{background:rgba(53,214,230,.12);border-color:var(--cyan);}
-#hub .hub-tile.wide{grid-column:1 / -1;flex-direction:row;gap:12px;min-height:0;padding:14px;color:var(--dim);}
-#hub .hub-tile.wide .ht-ic{font-size:17px;color:var(--dim);}
+/* tile grid: auto-fill instead of a hard 1fr 1fr — phones still land on two columns,
+   wider screens fill the row instead of stretching two giant tiles across it */
+#hub .hub-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:9px;}
+/* compact glass tile: smaller box, thinner type, a faint top highlight for the glass
+   read, hover/press feedback. Well over the 44px thumb rule even at min-height 70. */
+#hub .hub-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:13px 9px;
+  border-radius:10px;border:1px solid var(--line);color:#cfe7ea;
+  background:linear-gradient(180deg,rgba(6,18,23,.72),rgba(3,11,15,.62));
+  box-shadow:inset 0 1px 0 rgba(53,214,230,.07);
+  font:600 11px ui-monospace,monospace;letter-spacing:.9px;cursor:pointer;min-height:70px;
+  transition:border-color .15s ease,background .15s ease,transform .1s ease;}
+#hub .hub-tile .ht-ic{font-size:19px;color:var(--cyan);text-shadow:0 0 10px rgba(53,214,230,.3);}
+#hub .hub-tile:hover{border-color:var(--cyan-dim);
+  background:linear-gradient(180deg,rgba(10,28,34,.8),rgba(4,14,19,.68));}
+#hub .hub-tile:active{background:rgba(53,214,230,.12);border-color:var(--cyan);transform:translateY(1px);}
+#hub .hub-tile.wide{grid-column:1 / -1;flex-direction:row;gap:10px;min-height:0;padding:11px;color:var(--dim);}
+#hub .hub-tile.wide .ht-ic{font-size:15px;color:var(--dim);text-shadow:none;}
 #hub .hub-note{flex:0 0 auto;min-height:0;text-align:center;color:var(--amber);font-size:12px;
   padding:0 16px;}
 #hub .hub-note:not(:empty){padding:8px 16px;}
@@ -1971,7 +1980,8 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   font:600 10px ui-monospace,monospace;cursor:pointer;}
 .ar-fchip.on{color:var(--cyan);border-color:var(--cyan-dim);background:rgba(53,214,230,.08);}
 .ar-fsep{width:1px;height:14px;background:var(--line-hi);margin:0 2px;}
-.ar-grid .ar-card{min-height:78px;}
+/* arsenal cards carry a third line (badges + origin) — a touch taller than a hub tile */
+.ar-grid .ar-card{min-height:76px;}
 .ar-meta{color:var(--dim);font-size:9px;letter-spacing:.3px;}
 #hub .hub-nav{flex:0 0 auto;display:flex;border-top:1px solid var(--line-hi);background:rgba(2,9,13,.94);
   padding-bottom:env(safe-area-inset-bottom,0);}
