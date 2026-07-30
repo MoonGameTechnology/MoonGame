@@ -186,7 +186,15 @@ import {
 // Localization: one locale = one file (src/locale/*). Msgid = the canonical
 // Russian source string; `t()` wraps every user-visible literal, `tData()` maps
 // English data/*.json names, the static HTML is localized by a boot pass.
-import { t, tData, hasKey, LOCALE, LOCALE_LABEL, setLocale, localizeStaticDom } from './i18n';
+import {
+  t,
+  tData,
+  hasKey,
+  LOCALE,
+  LOCALE_LABEL,
+  setLocale,
+  localizeStaticDom,
+} from '../../localization/runtime';
 import {
   META_TREE,
   META_BRANCH_RU,

@@ -10,7 +10,7 @@
  * layer are later bricks (CP0.2 / CP1.x). No forked copy of the core or its data.
  */
 import { createInitialState, type GameState } from '@void/shared-core';
-import { t } from './i18n';
+import { t } from '../../../localization/runtime';
 import { theme } from './theme';
 import { createWelcomeModel, resolveWelcomeAction, nextCallsign } from './welcomeScreen';
 import type { WelcomeModel, WelcomeOutcome, AuthProviderId } from './welcomeScreen';
