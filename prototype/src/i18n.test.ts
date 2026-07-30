@@ -255,7 +255,10 @@ describe('локализация — ключи', () => {
     // модули, фитинги, сектора и типы планет. Промах у них тихий: `tData()` вернёт
     // исходное английское имя, и в русском интерфейсе всплывёт «Spaceport» (именно
     // это здание и жило без ключа с LOC-1).
-    const tables: Array<[string, Record<string, { name?: string }>]> = [
+    // `object` вместо `{name?: string}`: у юнитов поля name нет вовсе, и weak-type
+    // правило TS не даёт присвоить их таблицу «все-поля-опциональному» типу; имя
+    // читается ниже через сужение — таблица без имён честно даёт пустой список.
+    const tables: Array<[string, Record<string, object>]> = [
       ['buildings', data.buildings],
       ['units', data.units],
       ['modules', data.modules],
@@ -268,7 +271,7 @@ describe('локализация — ключи', () => {
       const entries = Object.entries(items ?? {});
       expect(entries.length, `таблица ${table} не должна молча опустеть`).toBeGreaterThan(0);
       for (const [id, def] of entries) {
-        const name = def?.name;
+        const name = (def as { name?: string } | undefined)?.name;
         if (name && !(dataKey(name) in ru))
           missing.push(`${table}.${id}: ${name} → ${dataKey(name)}`);
       }

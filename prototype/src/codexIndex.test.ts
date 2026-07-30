@@ -60,7 +60,7 @@ describe('searchCodex', () => {
   it('ranks title matches ahead of tag-only matches', () => {
     // 'radar' is the Radar building's title AND a tag on the fog glossary term
     const hits = searchCodex(idx, 'radar');
-    expect(hits[0].key).toBe('b:radar'); // title hit first
+    expect(hits[0]?.key).toBe('b:radar'); // title hit first
     expect(hits.map((e) => e.key)).toContain('m:fog'); // tag hit still present
   });
 

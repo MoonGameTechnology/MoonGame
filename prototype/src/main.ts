@@ -1353,6 +1353,12 @@ const cam = { scale: 1, x: 0, y: 0 };
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 // node sector type by id — drives asteroid-junction rendering + capture-by-arrival
 const SECTOR_OF: Record<string, string> = Object.fromEntries(MAP.map((n) => [n.id, n.sector]));
+/** Sector-type def of a node. SECTOR_OF is total for the generated MAP, but the type
+ *  can't promise that for an arbitrary id — fail-soft to undefined (callers `?.`). */
+function sectorTypeOf(id: string) {
+  const kind = SECTOR_OF[id];
+  return kind === undefined ? undefined : SECTOR_TYPES[kind];
+}
 function world(p: { x: number; y: number }): { x: number; y: number } {
   return camWorldToScreen(p, cam, insets(), mapBounds());
 }
@@ -1632,7 +1638,7 @@ function pumpBuildQueues(): void {
   for (const planetId of Object.keys(buildQueues)) {
     const q = buildQueues[planetId];
     const p = s.planets[planetId];
-    if (!p || p.owner !== ME) {
+    if (!q || !p || p.owner !== ME) {
       continue;
     }
     for (const lane of ['buildings', 'units'] as const) {
@@ -2301,7 +2307,8 @@ function sandboxBuildSnapshot(type: string): Record<string, number> | null {
   return { ...(s.players[ME]?.resources ?? {}) };
 }
 function sandboxBuildRestore(snap: Record<string, number> | null, ok: boolean): void {
-  if (snap && ok && s.players[ME]) s.players[ME].resources = snap;
+  const me = s.players[ME];
+  if (snap && ok && me) me.resources = snap;
 }
 
 function apply(out: StepOut) {
@@ -3271,7 +3278,7 @@ function autoEngage() {
     // AI fleets always press the capture loop; the player's do so only when opted into
     // auto-storm (CC-2) — otherwise the player drives assaults by hand.
     if (mine && !autoAssault.has(f.id)) continue;
-    if (!SECTOR_TYPES[SECTOR_OF[f.location]]?.capturable) continue; // empty space can't be taken
+    if (!sectorTypeOf(f.location)?.capturable) continue; // empty space can't be taken
     const here = s.planets[f.location];
     if (!here || here.owner === f.owner) continue;
     const enemyHere = Object.values(s.fleets).some(
@@ -3482,7 +3489,7 @@ function checkEnd() {
   const endStamp = String(s.match.endedAt ?? 'ended');
   let prior: { at: string; xp: number } | null = null;
   try {
-    prior = JSON.parse(localStorage.getItem(awardKey) ?? 'null') as typeof prior;
+    prior = JSON.parse(localStorage.getItem(awardKey) ?? 'null') as { at: string; xp: number } | null;
   } catch {
     prior = null; // a corrupt marker never blocks the flow — fail open to a fresh award
   }
@@ -3823,7 +3830,7 @@ function drawAssaultTargets() {
   for (const n of MAP) {
     const p = s.planets[n.id];
     if (!p || p.owner == null || p.owner === ME) continue;
-    if (!(SECTOR_TYPES[SECTOR_OF[n.id]]?.capturable ?? false)) continue;
+    if (!(sectorTypeOf(n.id)?.capturable ?? false)) continue;
     const c = world(n);
     cx.beginPath();
     cx.arc(c.x, c.y, 16, 0, TAU);
@@ -4408,7 +4415,7 @@ function render(now: number) {
     // tether down to the node), gently bobbing in the sector-type colour so the type
     // reads at a glance regardless of the bespoke art below (planet / asteroid / …).
     if (KIND_ICON[n.sector] && detail > 0) {
-      const kc = SECTOR_TYPES[SECTOR_OF[n.id]]?.color ?? '#9fb6bd';
+      const kc = sectorTypeOf(n.id)?.color ?? '#9fb6bd';
       const bob = Math.sin(now / 700 + n.x * 0.021 + n.y * 0.017) * 2.4;
       const brad = 11;
       const bx = c.x;
@@ -4614,7 +4621,7 @@ function render(now: number) {
       cx.stroke();
     } else if (n.sector === 'nebula' || n.sector === 'dense_nebula') {
       // Nebula: soft diamond (rotated square) with diffuse glow
-      const kc = SECTOR_TYPES[SECTOR_OF[n.id]]?.color ?? col;
+      const kc = sectorTypeOf(n.id)?.color ?? col;
       const dr = R * 0.85;
       blitGlow(kc, c.x, c.y, R + 7, showOwner ? 0.2 : 0.1);
       cx.save();
@@ -4648,7 +4655,7 @@ function render(now: number) {
       cx.restore();
     } else if (n.sector === 'ion_storm' || n.sector === 'solar_flare') {
       // Storm: spiky burst (6-pointed star)
-      const kc = SECTOR_TYPES[SECTOR_OF[n.id]]?.color ?? col;
+      const kc = sectorTypeOf(n.id)?.color ?? col;
       const outerR = R * 0.9;
       const innerR = R * 0.4;
       const spikes = n.sector === 'ion_storm' ? 5 : 8;
@@ -4675,7 +4682,7 @@ function render(now: number) {
       cx.restore();
     } else if (n.sector === 'graveyard') {
       // Derelict Graveyard: scattered debris fragments around a dim hub
-      const kc = SECTOR_TYPES[SECTOR_OF[n.id]]?.color ?? col;
+      const kc = sectorTypeOf(n.id)?.color ?? col;
       blitGlow(kc, c.x, c.y, R + 5, showOwner ? 0.16 : 0.06);
       cx.save();
       cx.strokeStyle = rgba(kc, 0.5);
@@ -4702,7 +4709,7 @@ function render(now: number) {
       cx.restore();
     } else if (n.sector === 'dead_world') {
       // Dead World: broken/dashed circle with an X through it
-      const kc = SECTOR_TYPES[SECTOR_OF[n.id]]?.color ?? col;
+      const kc = sectorTypeOf(n.id)?.color ?? col;
       blitGlow(kc, c.x, c.y, R + 5, showOwner ? 0.16 : 0.08);
       cx.save();
       cx.setLineDash([4, 4]);
@@ -4730,7 +4737,7 @@ function render(now: number) {
       cx.restore();
     } else {
       // Fallback for any other non-planet type: small hexagon marker
-      const kc = SECTOR_TYPES[SECTOR_OF[n.id]]?.color ?? col;
+      const kc = sectorTypeOf(n.id)?.color ?? col;
       blitGlow(kc, c.x, c.y, R + 5, showOwner ? 0.14 : 0.06);
       cx.save();
       cx.strokeStyle = rgba(kc, 0.55);
@@ -4809,7 +4816,7 @@ function render(now: number) {
     const fortified =
       pl.buildings.some((b) => b.type === 'starfort') ||
       (pl.garrison ?? []).some((u) => u.count > 0);
-    if (!SECTOR_TYPES[SECTOR_OF[pid]]?.orbit && !fortified) continue;
+    if (!sectorTypeOf(pid)?.orbit && !fortified) continue;
     const pc = world(pl.position);
     if (!visible(pc, 80)) continue;
     // A single orbit ring (GDD §7.4) — one orbit, so no N/F labels cluttering the map.
@@ -5569,7 +5576,7 @@ function fleetPanelHtml(f: Fleet): string {
   if (docked) {
     // enemy/neutral world you can act on — empty space is pass-through only
     const hostile =
-      here!.owner !== f.owner && (SECTOR_TYPES[SECTOR_OF[here!.id]]?.capturable ?? false);
+      here!.owner !== f.owner && (sectorTypeOf(here!.id)?.capturable ?? false);
     const cols: string[] = [];
     if (hostile) {
       let at = `<div class="sec">${t('side.strike.title')}</div><div class="row">`;
@@ -5689,7 +5696,7 @@ function planetSummaryHtml(p: Planet): string {
   const rows: string[] = [];
   const pt = p.planetType ? data.planetTypes[p.planetType] : undefined;
   const ptName = tData(pt?.name ?? p.planetType ?? '—');
-  const kindName = tData(SECTOR_TYPES[SECTOR_OF[p.id]]?.name ?? SECTOR_OF[p.id] ?? '—');
+  const kindName = tData(sectorTypeOf(p.id)?.name ?? SECTOR_OF[p.id] ?? '—');
   const sec = tData(data.sectors[p.terrain ?? '']?.name ?? p.terrain ?? '—');
   const ground = p.garrison.filter((st) => isGround(st.unit));
   const ships = p.garrison.filter((st) => isShip(st.unit));
@@ -5761,7 +5768,7 @@ function planetPanelHtml(p: Planet): string {
   const pt = p.planetType ? data.planetTypes[p.planetType] : undefined;
   const ptName = tData(pt?.name ?? p.planetType ?? '—');
   // Province type (the structural kind) — shown so the map's provinces read clearly.
-  const kindName = tData(SECTOR_TYPES[SECTOR_OF[p.id]]?.name ?? SECTOR_OF[p.id] ?? '—');
+  const kindName = tData(sectorTypeOf(p.id)?.name ?? SECTOR_OF[p.id] ?? '—');
   const ground = p.garrison.filter((st) => isGround(st.unit));
   const ships = p.garrison.filter((st) => isShip(st.unit));
   const wing = p.garrison.filter((st) => isSquadron(st.unit));
@@ -5946,7 +5953,7 @@ function planetPanelHtml(p: Planet): string {
     if (mine) {
       // Province-centric roster (data-driven): each province type lists what it can
       // raise (SECTOR_TYPES.allowedBuildings); absent = the default BUILDABLE set.
-      const buildable = SECTOR_TYPES[SECTOR_OF[p.id]]?.allowedBuildings ?? BUILDABLE;
+      const buildable = sectorTypeOf(p.id)?.allowedBuildings ?? BUILDABLE;
       const missing = buildable.filter((bt) => !p.buildings.some((b) => b.type === bt));
       if (missing.length) blds += buildButtons(p.id, missing, 'building');
     }
@@ -6316,6 +6323,7 @@ function objDossier(key: string): Dossier | null {
   }
   if (key.startsWith('c:')) return constructionDossier(key);
   const [kind, id, lvl] = key.split(':');
+  if (id === undefined) return null; // bare "b"/"u" key with no id — nothing to show
   if (kind === 'b') return buildingDossier(id, Number(lvl) || 1);
   if (kind === 'u') return unitDossier(id);
   return null;
@@ -7145,7 +7153,7 @@ function codexBuildBtn(kind: string, id: string): string {
   const p = selPlanet ? s.planets[selPlanet] : null;
   if (!p || p.owner !== ME) return ''; // only when you're looking at one of your worlds
   if (kind === 'b') {
-    const buildable = (SECTOR_TYPES[SECTOR_OF[p.id]]?.allowedBuildings ?? BUILDABLE).includes(id);
+    const buildable = (sectorTypeOf(p.id)?.allowedBuildings ?? BUILDABLE).includes(id);
     const built = p.buildings.some((b) => b.type === id);
     if (!buildable || built) return '';
     return `<button class="cx-build" data-build="building:${id}">▣ ${t('codex.build-here')} · ${cost(data.buildings[id]?.cost)}</button>`;
@@ -7496,7 +7504,7 @@ function renderCmdBar() {
           f.orbit === 'near' &&
           f.location &&
           s.planets[f.location]?.owner !== f.owner &&
-          SECTOR_TYPES[SECTOR_OF[f.location]]?.capturable, // empty space can't be taken
+          sectorTypeOf(f.location)?.capturable, // empty space can't be taken
       );
   // Merge: a group fuses in one tap; a lone fleet arms target-pick (needs a partner).
   const myFleetTotal = Object.values(s.fleets).filter((f) => f.owner === ME).length;
@@ -7752,7 +7760,7 @@ side.addEventListener('click', (ev) => {
     // action buttons, handled below) opens the same summary the desktop pane shows
     // on hover — building/task name, current vs full output, ETA.
     if (MOBILE) {
-      const key = (ev.target as HTMLElement).closest('[data-desc]')?.dataset.desc ?? null;
+      const key = (ev.target as HTMLElement).closest<HTMLElement>('[data-desc]')?.dataset.desc ?? null;
       // stat:/tab:/division dossiers exist for the PC hover tooltip only — the
       // mobile tap behaviour stays exactly as it was before they were added.
       if (
@@ -7939,7 +7947,7 @@ side.addEventListener('contextmenu', (ev) => {
     // mirror codexBuildBtn's gates: the sector must allow it, one copy per world —
     // AND already-committed (built/building/queued/paused), to stop a fast double
     // right-click from queueing a second copy before the tile re-renders locked.
-    const buildable = (SECTOR_TYPES[SECTOR_OF[p.id]]?.allowedBuildings ?? BUILDABLE).includes(id);
+    const buildable = (sectorTypeOf(p.id)?.allowedBuildings ?? BUILDABLE).includes(id);
     if (!buildable || buildingLocked(p.id, id)) return;
   }
   enqueueBuild(selPlanet, { kind: kind as BuildKind, id, count: 1 });
@@ -8236,7 +8244,7 @@ function selectAt(mx: number, my: number) {
       return;
     }
     const target = s.planets[n.id];
-    const capturable = SECTOR_TYPES[SECTOR_OF[n.id]]?.capturable ?? false;
+    const capturable = sectorTypeOf(n.id)?.capturable ?? false;
     if (!target || !capturable || target.owner == null || target.owner === ME) {
       note(t('hint.assault-enemy-only'));
       return; // stay armed — pick another target
@@ -8477,7 +8485,7 @@ canvas.addEventListener('pointerdown', (ev) => {
       note(t('hint.aim-cancelled'));
     }
     const [a, b] = [...pointers.values()];
-    pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
+    if (a && b) pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
   }
 });
 canvas.addEventListener('pointermove', (ev) => {
@@ -8489,9 +8497,11 @@ canvas.addEventListener('pointermove', (ev) => {
   if (moved) cancelLongPress(); // a moving finger is a drag, not a long-press
   if (pointers.size >= 2) {
     const [a, b] = [...pointers.values()];
-    const d = Math.hypot(a.x - b.x, a.y - b.y);
-    if (pinchDist > 0) zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, d / pinchDist);
-    pinchDist = d;
+    if (a && b) {
+      const d = Math.hypot(a.x - b.x, a.y - b.y);
+      if (pinchDist > 0) zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, d / pinchDist);
+      pinchDist = d;
+    }
     dragged = true;
   } else if ((aiming || assaultAim) && !pcUi()) {
     // TOUCH with Move/ШТУРМ armed: the finger DRAGS THE AIM (live preview via
@@ -8991,7 +9001,10 @@ function techCondText(c: TechCond): string {
     case 'controls_planet_type':
       return t('tech.req.planet', { p: tData(c.planetType), n: c.min });
     case 'has_unit':
-      return t('tech.req.unit', { u: tData(data.units[c.unit]?.name ?? c.unit), n: c.min });
+      // Unit defs carry no `name` field (buildings do) — the display name is the
+      // space-joined id via displayUnit(); the old `?.name ?? id` fallback built a
+      // broken l10n key for multiword ids ('strike_carrier' → data.strikecarrier).
+      return t('tech.req.unit', { u: displayUnit(c.unit), n: c.min });
     default:
       return t('tech.req.special');
   }
@@ -9021,7 +9034,8 @@ function techFx(td: TechDefLike): string {
     .filter(([, v]) => (v as number) !== 0)
     .map(([k, v]) => `+${Math.round((v as number) * 100)}% ${t(TECH_FX_LABEL[k] ?? k)}`);
   for (const u of td.unlocks?.units ?? [])
-    fx.push(t('tech.grants', { x: esc(tData(data.units[u]?.name ?? u)) }));
+    // no `name` on unit defs — displayUnit() is the canonical unit label (see has_unit)
+    fx.push(t('tech.grants', { x: esc(displayUnit(u)) }));
   for (const b of td.unlocks?.buildings ?? [])
     fx.push(t('tech.grants', { x: esc(tData(data.buildings[b]?.name ?? b)) }));
   for (const a of td.unlocks?.abilities ?? [])
@@ -9549,7 +9563,7 @@ function heroTreeHtml(hero: HeroInst): string {
     new Set(
       entries
         .map(([, n]) => n.branch)
-        .filter((b): b is string => b !== undefined && b !== ownBranch),
+        .filter((b): b is NonNullable<typeof b> => b !== undefined && b !== ownBranch),
     ),
   ).sort();
   const rails: Array<{ label: string; own: boolean; ps: boolean; nodes: typeof entries }> = [];
@@ -10050,12 +10064,12 @@ function conLoadoutPane(hullList: string[]): string {
           : '';
         return (
           `<div class="cn-bay filled" data-cnun="${sl.moduleId}" title="${t('yard.module.remove')}"><div class="cn-bic">${MODULE_ICON[sl.moduleId] ?? '▪'}</div>` +
-          `<div><div class="cn-bt">${t(SLOT_RU[sl.type])}</div><div class="cn-bn">${esc(tData(sl.moduleName ?? sl.moduleId))}${conOriginTag(sl.moduleId)}</div></div><div class="cn-bd">${eff}</div></div>`
+          `<div><div class="cn-bt">${t(SLOT_RU[sl.type] ?? sl.type)}</div><div class="cn-bn">${esc(tData(sl.moduleName ?? sl.moduleId))}${conOriginTag(sl.moduleId)}</div></div><div class="cn-bd">${eff}</div></div>`
         );
       }
       return (
         `<div class="cn-bay empty"><div class="cn-bic">${SLOT_ICON[sl.type] ?? '＋'}</div>` +
-        `<div><div class="cn-bt">${t(SLOT_RU[sl.type])}</div><div class="cn-bn">${t('yard.slot.empty')}</div></div></div>`
+        `<div><div class="cn-bt">${t(SLOT_RU[sl.type] ?? sl.type)}</div><div class="cn-bn">${t('yard.slot.empty')}</div></div></div>`
       );
     })
     .join('');
@@ -10072,13 +10086,13 @@ function conLoadoutPane(hullList: string[]): string {
       }
       return (
         `<div class="cn-mod locked"><span class="cn-mic">${MODULE_ICON[o.id] ?? '▪'}</span>` +
-        `<span class="cn-mn">${esc(tData(o.name))}</span><span class="cn-me">${t('yard.slot.named', { s: t(SLOT_RU[o.slot]) })}</span><span class="cn-mc">${bagRu(o.cost)}</span></div>`
+        `<span class="cn-mn">${esc(tData(o.name))}</span><span class="cn-me">${t('yard.slot.named', { s: t(SLOT_RU[o.slot] ?? o.slot) })}</span><span class="cn-mc">${bagRu(o.cost)}</span></div>`
       );
     })
     .join('');
   const palHead = freeTypes.length
     ? t('yard.modules.for-slot', {
-        s: freeTypes.map((ty) => t(SLOT_RU[ty])).join(' / '),
+        s: freeTypes.map((ty) => t(SLOT_RU[ty] ?? ty)).join(' / '),
       })
     : t('yard.modules.all-taken');
   // LARS-4: the palette above already reads the LIVE arsenal snapshot (a module
@@ -11409,6 +11423,20 @@ settingsEl.addEventListener('click', (e) => {
 //  «?reset=<token>» — a mailed password-reset link → the reset page (set a new password).
 //  «?join=<id>»     — a new tab spawned by «Войти» in the match list → straight into THAT
 //                     session, reusing this browser's stored identity (nick / session JWT).
+//
+// These four belong to the accounts section below (SES-2.5), but they MUST be declared
+// before this boot block: its async IIFEs read them SYNCHRONOUSLY when resolveServer()
+// yields no server (no await happens before the read) — with the declarations after the
+// block that read is a TDZ, and esbuild's const/let→var lowering turns the crash into a
+// silent `undefined` (the httpBase trap; caught by tsc TS2448 when the prototype gained
+// a typecheck).
+let authMode = false;
+/** When `?join=<id>` arrives without a stored session, we show the welcome card;
+ *  this holds the id so `welcomeSignIn` can auto-resume the join after login.
+ *  Cleared on successful `connectToMatch`, never leaks across sessions. */
+let pendingJoinAfterAuth: string | null = null;
+let pendingSlotAfterAuth: string | null = null;
+let pendingFactionAfterAuth: string | null = null;
 const bootParams = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
 const bootReset = (bootParams?.get('reset') ?? '').trim();
 const bootJoinId = (bootParams?.get('join') ?? '').trim();
@@ -12314,7 +12342,7 @@ function httpBase(wsBase: string): string {
 // self-configures from GET /auth/status; without accounts the nick+ticket handshake
 // stays exactly as before. The password is never persisted — only the session JWT
 // (a revocable, expiring credential) lands in localStorage, keyed per server.
-let authMode = false;
+// (`authMode` itself is declared ABOVE the boot block — see the TDZ note there.)
 const passRow = document.getElementById('cpassrow') as HTMLElement | null;
 const passInput = document.getElementById('cpass') as HTMLInputElement | null;
 const sessionKey = (base: string): string => `void.session.${base}`;
@@ -12503,12 +12531,8 @@ async function fetchJoinToken(
 
 /** The join token for the CURRENT dial attempt (auth mode) — consumed by connect(). */
 let pendingJoinToken: string | null = null;
-/** When `?join=<id>` arrives without a stored session, we show the welcome card;
- *  this holds the id so `welcomeSignIn` can auto-resume the join after login.
- *  Cleared on successful `connectToMatch`, never leaks across sessions. */
-let pendingJoinAfterAuth: string | null = null;
-let pendingSlotAfterAuth: string | null = null;
-let pendingFactionAfterAuth: string | null = null;
+// (`pendingJoinAfterAuth`/`pendingSlotAfterAuth`/`pendingFactionAfterAuth` are declared
+// above the boot block — see the TDZ note there.)
 
 interface MatchRow {
   matchId: string;
@@ -13015,7 +13039,11 @@ if (!__PLAYER_BUILD__ && DEV_UI && typeof window !== 'undefined') {
       return {
         fleets: Object.values(s.fleets)
           .filter((f) => f.owner === ME)
-          .map((f) => ({ id: f.id, ...sx(fleetAnchor(f)) })),
+          // fleetAnchor is null for a fleet with no drawable position — skip it
+          .flatMap((f) => {
+            const a = fleetAnchor(f);
+            return a ? [{ id: f.id, ...sx(a) }] : [];
+          }),
         worlds: Object.values(s.planets).map((p) => ({
           id: p.id,
           owner: p.owner,

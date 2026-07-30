@@ -1734,8 +1734,13 @@ pnpm run prototype   # собрать prototype/dist/void-dominion{,-player}.htm
 ```
 
 Тесты лежат рядом с кодом (`*.test.ts`) — и в пакетах, и в `prototype/src` (Vitest
-их видит). Прототип исключён из ESLint/tsc-скоупа (свой esbuild), но это уже НЕ
-throwaway — это играбельный клиент игроков. Разработка — на фиче-ветке, PR (draft).
+их видит). **Прототип типизируется в гейте (REFM-0):** `prototype/tsconfig.json`
+(полный `strict` + `noUncheckedIndexedAccess`, DOM-lib) накрывает `src/**` +
+`netserver.ts` + `/localization`, `pnpm run typecheck` гоняет его после workspace-пакетов
+— 91 накопившаяся ошибка починена по-настоящему (в т.ч. TDZ-класс `authMode`,
+расхождение словаря `ChainStep`, битые l10n-фолбэки юнитов). Из ESLint прототип пока
+исключён (свой esbuild), но это уже НЕ throwaway — это играбельный клиент игроков.
+Разработка — на фиче-ветке, PR (draft).
 
 Поверх юнитов — **property/fuzz-слой ядра** (fast-check, playtest-hardening FUZZ-1…4,
 SD-7.3 ✅): test-only `shared-core/src/testkit/arbitraries.ts` (генераторы действий по

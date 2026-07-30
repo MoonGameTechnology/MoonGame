@@ -152,7 +152,8 @@ export class SpotlightTour {
   // --- internals -------------------------------------------------------------
 
   private get current(): SpotlightStep {
-    return this.steps[this.i];
+    // `i` is only ever set by enter(), which bounds it to a real step before use
+    return this.steps[this.i]!;
   }
 
   /** Move onto step `i`, resolving its target (or skipping/stopping if absent). */

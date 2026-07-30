@@ -127,7 +127,9 @@ describe('constructor («Верфь») — narrowed by the arsenal snapshot (ARS
   const CON_HULLS = ['cruiser', 'siege', 'scout', 'dropship'];
 
   it('no snapshot ⇒ every hull + the full palette (graceful degradation)', () => {
-    const snap: { hulls: string[]; modules: string[] } | undefined = undefined;
+    // через функцию, чтобы CFA не сузил const до undefined — тест проверяет
+    // именно ветку «снапшота нет», сохраняя обе ветки типобезопасными
+    const snap = ((): { hulls: string[]; modules: string[] } | undefined => undefined)();
     const ownedHulls = snap ? CON_HULLS.filter((h) => snap.hulls.includes(h)) : CON_HULLS;
     expect(ownedHulls).toEqual(CON_HULLS);
     const ed = createLoadoutEditor('cruiser', data, { metal: 999 }, {

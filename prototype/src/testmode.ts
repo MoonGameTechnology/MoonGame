@@ -271,7 +271,8 @@ function buildCollisionScenario(forceA: Force, forceD: Force): GameState {
     const nbrs = cand.links.filter((l) => byId.has(l));
     for (let i = 0; i < nbrs.length; i++) {
       for (let j = i + 1; j < nbrs.length; j++) {
-        if (byId.get(nbrs[i])!.links.includes(nbrs[j])) continue; // directly linked → skip
+        // loop bounds keep i/j inside nbrs — the index reads can't miss
+        if (byId.get(nbrs[i]!)!.links.includes(nbrs[j]!)) continue; // directly linked → skip
         const d = dist(cand.id, a1);
         if (d > best) {
           best = d;
