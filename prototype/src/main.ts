@@ -2413,6 +2413,13 @@ function startGuidedMatch(): void {
   showHub(false);
   showConnect(false);
   startMatch(buildSetupConfig()); // installMatch → maybeStartPendingTour runs the guide
+  // ONB-2: a brand-new commander shouldn't sit through the Mine's real build-time
+  // (hours of game time) on the default ×10 wall-clock-ish preset — that's real
+  // MINUTES of nothing happening on the very first beat. No rivals/fairness stakes
+  // in this bot-free sandbox, so just run it fast; ×100 is the same ceiling the
+  // player's own speed control already offers, not a new/unfamiliar value.
+  applyTimeSpeed(100);
+  note(t('onb.tour.speed'));
 }
 // Fold the finished guide into the flag (+funnel); first completion earns XP + a nudge.
 function onGuidedTourEnded(r: TourResult): void {

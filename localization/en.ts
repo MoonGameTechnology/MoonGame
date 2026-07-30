@@ -382,6 +382,10 @@ export const en: Record<string, string> = {
     'Down here is your homeworld panel: buildings, garrison and construction. Tap your world to open it.',
   'onb.tour.mine':
     'Start with economy: upgrade your Metal Mine — its output funds everything else you build.',
+  'onb.tour.speed':
+    '⏩ The tutorial runs at accelerated time, so you never wait real minutes for a build or a flight.',
+  'onb.tour.troops':
+    'Your fleet has a hold for troops: tap it at your world → «Ground army ⇄ garrison» → «Load». An open world falls to orbit alone; a garrisoned one only falls to a landing — your fleet clears the defense from orbit first, then the troops take the ground.',
 
   // --- rail — Рельса инструментов в матче: подпись кнопки (.label) + подсказка (.title).
   'rail.chat.label': 'Chat',

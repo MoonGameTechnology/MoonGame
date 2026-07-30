@@ -2,8 +2,14 @@
  * ONB-2 · The guided first match — a data-described chain (ONB-1 engine) that
  * walks a brand-new commander through the core loop in a bot-free solo sandbox:
  *
- *   produce (grow the mine) → build (raise a fleet) → move (set a course, fog
- *   opens) → capture a neutral world (two-phase) → the score moves → first win.
+ *   produce (grow the mine) → build (raise a fleet) → troops (load a landing
+ *   force — informational, concept only) → move (set a course, fog opens) →
+ *   capture a neutral world (two-phase) → the score moves → first win.
+ *
+ * `startGuidedMatch` (main.ts) also forces the sim to run at accelerated time
+ * for this sandbox — a Mine upgrade alone is hours of game time, and a brand
+ * new player left on the default ×10 wall-clock-ish preset would wait real
+ * MINUTES for the very first beat to resolve.
  *
  * The "do X" beats advance on the REAL game action (`action:<type>`, fed from
  * `playerOrder`) and the home/fleet/capture/score beats on live GAME STATE
@@ -62,6 +68,17 @@ export function buildFirstMatchTour(deps: FirstMatchDeps): SpotlightStep[] {
       target: null,
       copy: 'Теперь построй боевой корабль — вкладка «Корабли» той же панели. Готовый корабль сам прилетит на орбиту и соберётся во флот — жди, пока рядом с твоим миром не появится «▲».',
       advance: { on: 'state', when: deps.hasFleet },
+    },
+    {
+      // Concept-only, tap-advance: whether THIS run's target neutral is actually
+      // garrisoned depends on the map, so this can't gate on a real load action
+      // the way `mine`/`course` gate on theirs — but the mechanic (and the "why")
+      // still needs teaching before the player sets a course and finds out the
+      // hard way that a defended world without troops aboard won't fall.
+      id: 'troops',
+      target: null,
+      copy: 'onb.tour.troops',
+      advance: { on: 'tap' },
     },
     {
       id: 'course',
