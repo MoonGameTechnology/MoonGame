@@ -65,13 +65,14 @@ export function resetSandboxConfig(): void {
   Object.assign(sandboxConfig, DEFAULTS);
 }
 
-/** The five session resources, in HUD order (icon + canonical Russian name). */
+/** The five session resources, in HUD order (icon + canonical Russian name).
+ *  Icons = the TECH_CUR glyph family in main.ts — keep in sync. */
 const RESOURCES: Array<{ key: string; icon: string; name: string }> = [
-  { key: 'credits', icon: '¤', name: 'sandbox.res.credits' },
-  { key: 'food', icon: '❖', name: 'sandbox.res.food' },
-  { key: 'metal', icon: '⬢', name: 'sandbox.res.metal' },
-  { key: 'energy', icon: '↯', name: 'sandbox.res.energy' },
-  { key: 'microelectronics', icon: '▦', name: 'sandbox.res.microelectronics' },
+  { key: 'credits', icon: '⛁', name: 'sandbox.res.credits' },
+  { key: 'metal', icon: '❒', name: 'sandbox.res.metal' },
+  { key: 'food', icon: '⚘', name: 'sandbox.res.food' },
+  { key: 'energy', icon: 'ϟ', name: 'sandbox.res.energy' },
+  { key: 'microelectronics', icon: '▣', name: 'sandbox.res.microelectronics' },
 ];
 const GRANT = 2000;
 
