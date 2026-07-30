@@ -657,12 +657,18 @@ body.sheet-open #cmdbar{bottom:calc(34vh + 12px);}
 #pingmenu .pm-cancel:hover{color:var(--ink);border-color:var(--cyan-dim);}
 
 /* status strip below the top bar: the in-game clock + the donate currency on the right
-   (day/countdown live in the #daycard, victory progress in the #tbscore chip above) */
+   (day/countdown live in the #daycard, victory progress in the #tbscore chip above).
+   The strip is TRANSPARENT — the map runs under it, so it carries no backdrop and no
+   divider; the clock leans on its own text-shadow over bright provinces, and the gold
+   capsule brings its own. Being see-through it must also be click-through, or it would
+   eat map pans along its band — only its two children take input back. */
 #devline{position:fixed;top:var(--tbh);left:0;right:0;height:28px;z-index:24;display:flex;align-items:center;gap:14px;
-  padding:0 14px;background:rgba(2,8,11,.55);color:var(--cyan-dim);font-size:11px;letter-spacing:.6px;
-  white-space:nowrap;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid rgba(14,59,64,.5);}
+  padding:0 14px;background:transparent;color:var(--cyan-dim);font-size:11px;letter-spacing:.6px;
+  white-space:nowrap;overflow-x:auto;scrollbar-width:none;pointer-events:none;}
 #devline::-webkit-scrollbar{display:none;}
-#devline #clock{color:var(--grn);font-variant-numeric:tabular-nums;flex:0 0 auto;}
+#devline > *{pointer-events:auto;}
+#devline #clock{color:var(--grn);font-variant-numeric:tabular-nums;flex:0 0 auto;
+  text-shadow:0 0 7px rgba(0,0,0,.9),0 0 3px rgba(0,0,0,.85);}
 
 /* left-corner tool rail — collapsed to a single hamburger by default; tapping it expands
    the wired tools UPWARD (primary icon nearest the thumb). The tools live in their own
@@ -1392,8 +1398,6 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   /* toasts (goal line etc.) wrap to two lines instead of clipping with an ellipsis
      that hides the rest and offers no way to read it */
   #toasts .toast{white-space:normal;text-overflow:clip;line-height:1.45;}
-  /* the status line lies over bright provinces — give it a real backdrop */
-  #devline{background:rgba(2,8,11,.9);}
   /* setup: the LAUNCH button must never scroll below the fold — the pane scrolls,
      the CTA (and Back) stay pinned at the bottom of the box */
   #setup .sbox{display:flex;flex-direction:column;overflow:hidden;}
