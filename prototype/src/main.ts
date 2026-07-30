@@ -8847,13 +8847,30 @@ divDesignWin.addEventListener('click', (e) => {
   }
 });
 // Resource glyph family (mock 2026-07: coin stack / cube / sprout / bolt / chip).
-// Producer buildings echo these in BUILD_ICON — keep both in sync.
+// Producer buildings echo these in BUILD_ICON — keep both in sync. These TEXT glyphs
+// serve inline prose (cost strings, notes, market rows); the top-bar capsules draw
+// the richer RES_SVG line icons below instead.
 const TECH_CUR: Record<string, string> = {
   credits: '⛁',
   food: '⚘',
   metal: '❒',
   energy: 'ϟ',
   microelectronics: '▣',
+};
+// Bar-only display icons: inline SVG line art traced from the mock (two coin rings,
+// isometric cube, sprout, bolt, IC chip). stroke=currentColor so the capsule states
+// (.short red, .dead dim) tint them exactly like a text glyph.
+const RES_SVG: Record<string, string> = {
+  credits:
+    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="6" cy="6.2" r="3.9"/><circle cx="10" cy="9.8" r="3.9"/></svg>',
+  metal:
+    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M8 1.8 13.4 4.9v6.2L8 14.2 2.6 11.1V4.9L8 1.8Z"/><path d="M2.6 4.9 8 8l5.4-3.1M8 8v6.2"/></svg>',
+  food:
+    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 14.2V8.8"/><path d="M8 9.6C8 6.4 6.2 4.8 3.6 4.6c.2 3 1.9 4.7 4.4 5Z"/><path d="M8 9.6c0-3.2 1.8-4.8 4.4-5-.2 3-1.9 4.7-4.4 5Z"/></svg>',
+  energy:
+    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M9.3 1.6 4.2 8.9h3.2L6.4 14.4l5.4-7.6H8.5l.8-5.2Z"/></svg>',
+  microelectronics:
+    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><rect x="4.6" y="4.6" width="6.8" height="6.8" rx="1"/><rect x="7" y="7" width="2" height="2"/><path d="M6.4 4.6v-2M9.6 4.6v-2M6.4 13.4v-2M9.6 13.4v-2M4.6 6.4h-2M4.6 9.6h-2M13.4 6.4h-2M13.4 9.6h-2"/></svg>',
 };
 const TECH_BRANCHES: Array<{ key: string; label: string }> = [
   { key: 'space', label: 'tech.branch.space' },
@@ -13304,8 +13321,8 @@ function frame(nowReal: number) {
   // Top bar = the five session resources (icon + amount). The donate currency (Суверены ◆)
   // is rendered separately on the status line right under this bar (see statusHtml above).
   const r = s.players[ME]?.resources ?? {};
-  // Monochrome line glyphs from the console's own icon family (no emoji variants, so
-  // they render as text, not colour emoji). Name in `title` for hover/long-press.
+  // Inline-SVG line icons (RES_SVG) — pixel-true to the mock, tinted via
+  // currentColor. Name in `title` for hover/long-press.
   // Flow under the stock: the tested netIncome() (production − upkeep, per hour)
   // finally shown to the player. A resource with no stock AND no flow is dimmed —
   // it plays no part in the current match yet.
@@ -13330,14 +13347,14 @@ function frame(nowReal: number) {
     const bleed = MOBILE && flow < 0 ? ' class="neg"' : '';
     return `<span class="res${dead}${short}" title="${t(`hud.resource.${key}`)}" data-res="${key}"><i>${icon}</i><span class="rv"><b${bleed}>${kfmt(stock)}</b>${short ? '<em class="dn">⚠</em>' : flowTxt}</span></span>`;
   };
-  // Glyphs from TECH_CUR (one icon language for bar and cost strings); capsule order
-  // follows the mock: coins, metal cube, food sprout, bolt, chip.
+  // Capsule icons = RES_SVG (line art traced from the mock; TECH_CUR keeps the text
+  // glyphs for prose); capsule order follows the mock: coins, cube, sprout, bolt, chip.
   const hudHtml =
-    chip(TECH_CUR['credits']!, 'credits') +
-    chip(TECH_CUR['metal']!, 'metal') +
-    chip(TECH_CUR['food']!, 'food') +
-    chip(TECH_CUR['energy']!, 'energy') +
-    chip(TECH_CUR['microelectronics']!, 'microelectronics');
+    chip(RES_SVG['credits']!, 'credits') +
+    chip(RES_SVG['metal']!, 'metal') +
+    chip(RES_SVG['food']!, 'food') +
+    chip(RES_SVG['energy']!, 'energy') +
+    chip(RES_SVG['microelectronics']!, 'microelectronics');
   if (hudHtml !== lastHudHtml) {
     purse.innerHTML = hudHtml;
     lastHudHtml = hudHtml;
