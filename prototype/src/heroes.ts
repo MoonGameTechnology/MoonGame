@@ -10,6 +10,7 @@
  * Pure + data-driven, like the formation roster. This is the menu-facing MODEL +
  * preview; in-match instances / capital / respawn / in-match re-fit are later phases.
  */
+import type { GameState } from '../../packages/shared-core/src/index';
 
 /** Hero grades, lowest → highest. The slot count is the number of module slots. */
 export type HeroGrade = 'common' | 'rare' | 'legendary' | 'main';
@@ -143,4 +144,13 @@ export function heroLoadoutInfo(loadout: HeroLoadout): HeroLoadoutInfo {
     if (a) abilities.push(a);
   }
   return { count: abilities.length, slots, abilities, planned: abilities.filter((a) => !a.live).length };
+}
+
+/** A player's hero roster (the loadouts composed in the menu), or the defaults.
+ *  Reads the prototype's `heroRoster` state extension through a narrow local view
+ *  (the division.ts/serverDrivers.ts pattern) — moved here from the `game.ts`
+ *  facade with REFP-28 (the roster is hero-domain state). */
+export function heroRosterOf(state: GameState, playerId: string): HeroLoadout[] {
+  const s = state as GameState & { heroRoster?: Record<string, HeroLoadout[]> };
+  return s.heroRoster?.[playerId] ?? DEFAULT_HEROES;
 }
