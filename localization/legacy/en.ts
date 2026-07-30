@@ -162,8 +162,8 @@ export const en: Record<string, string> = {
     'Your treasury: mine income minus fleet upkeep. Keep it out of the red.',
   'Инструменты командира: дипломатия, наука, верфь, рынок и сводки событий.':
     "The commander's tools: diplomacy, research, shipyard, market and the event log.",
-  'Готово! Пора действовать: построй шахту, подними флот, отдай курс. Удачи, командир.':
-    'Done! Time to act: build a mine, raise a fleet, set a course. Good luck, commander.',
+  'Готово! Пора действовать: улучши Металлодобычу, подними флот, отдай курс. Удачи, командир.':
+    'Done! Time to act: upgrade your Metal Mine, raise a fleet, set a course. Good luck, commander.',
   // --- placeholders / small fragments ------------------------------------------
   ' · потери: {tally}': ' · losses: {tally}',
   '{a} и {b}: {stance}': '{a} and {b}: {stance}',
