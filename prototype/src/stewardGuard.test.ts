@@ -31,7 +31,7 @@ function guardState(opts: {
   const s = createInitialState({ seed: 'sg', version: { data: '0.1.0', manifest: '1' } });
   const f: Record<string, Fleet> = {};
   for (const x of opts.fleets) f[x.id] = x;
-  const player = (id: string) => ({ id, name: id, faction: 'blue', status: 'active' as const, resources: {} });
+  const player = (id: string) => ({ id, name: id, faction: 'azure', status: 'active' as const, resources: {} });
   // p1 runs a live delegation: the guard only ever ticks for a delegated seat, and
   // the SITREP stamp (steward.report) applies through the real kernel only then.
   const p1 = { ...player('p1'), steward: { posture: 'defend', until: NOW + 1000 * HOUR } };

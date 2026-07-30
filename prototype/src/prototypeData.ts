@@ -525,15 +525,19 @@ export const data: GameData = parseGameData({
   // ядровый factionModule через те же хуки, что и технологии
   // (economy.production / fleet.speed / combat.damage). Человек выбирает дом на
   // setup-экране; ИИ-места разбирают оставшиеся.
+  // Ids MUST match the seat assignments (matchSetup.ts / main.ts SEAT_META) — the
+  // core factionModule reads `data.factions[player.faction] ?? 0`, so a mismatched
+  // id silently plays with NO passives (caught 2026-07: azure/crimson seats vs a
+  // blue/red catalog). Pinned by factions.test.ts «seat factions resolve».
   factions: {
-    blue: {
+    azure: {
       name: 'Azure Compact',
-      description: 'faction.blue.desc',
+      description: 'faction.azure.desc',
       passives: { productionBonus: 0.12 },
     },
-    red: {
+    crimson: {
       name: 'Crimson Hegemony',
-      description: 'faction.red.desc',
+      description: 'faction.crimson.desc',
       passives: { combatDamageBonus: 0.1 },
     },
     amber: {

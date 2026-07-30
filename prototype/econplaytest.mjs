@@ -40,8 +40,8 @@ const {
 
 const STEP = 2 * HOUR; // AI decision cadence (mirrors the netserver driver)
 const HOUSES = [
-  ['blue', 'Azure'],
-  ['red', 'Crimson'],
+  ['azure', 'Azure'],
+  ['crimson', 'Crimson'],
   ['amber', 'Amber'],
   ['violet', 'Violet'],
 ];

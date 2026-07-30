@@ -285,8 +285,8 @@ function buildCollisionScenario(forceA: Force, forceD: Force): GameState {
 
   let st = newGame({
     seats: [
-      { id: 'p1', name: 'Azure (тест)', faction: 'blue', start: a1, ai: false },
-      { id: 'p2', name: 'Crimson (тест)', faction: 'red', start: a2, ai: false },
+      { id: 'p1', name: 'Azure (тест)', faction: 'azure', start: a1, ai: false },
+      { id: 'p2', name: 'Crimson (тест)', faction: 'crimson', start: a2, ai: false },
     ],
   });
   st.time = 0;

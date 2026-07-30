@@ -322,8 +322,8 @@ describe('divisions — no field repair under fire (BF-22)', () => {
 function game3() {
   const s = newGame({
     seats: [
-      { id: 'p1', name: 'A', faction: 'blue', start: START_CANDIDATES[0]!, ai: false },
-      { id: 'p2', name: 'B', faction: 'red', start: START_CANDIDATES[1]!, ai: true },
+      { id: 'p1', name: 'A', faction: 'azure', start: START_CANDIDATES[0]!, ai: false },
+      { id: 'p2', name: 'B', faction: 'crimson', start: START_CANDIDATES[1]!, ai: true },
       { id: 'p3', name: 'C', faction: 'green', start: START_CANDIDATES[2]!, ai: true },
     ],
   });

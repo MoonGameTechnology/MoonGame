@@ -72,8 +72,8 @@ describe('meta-progression — the grant lands in a real match', () => {
     const g = metaGrant({ xp: 0, spent: ['cmd1', 'eco1', 'eco2', 'sci1'] });
     const s = newGame({
       seats: [
-        { id: 'p1', name: 'Me', faction: 'blue', start: 'C1R1', ai: false },
-        { id: 'p2', name: 'Bot', faction: 'red', start: 'C5R5', ai: true },
+        { id: 'p1', name: 'Me', faction: 'azure', start: 'C1R1', ai: false },
+        { id: 'p2', name: 'Bot', faction: 'crimson', start: 'C5R5', ai: true },
       ],
       meta: g,
     });

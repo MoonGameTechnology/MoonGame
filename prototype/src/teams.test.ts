@@ -8,8 +8,8 @@ import { getStance } from '../../packages/shared-core/src/index';
 // the SES-1 victory clique reads the alliance stance, so the coalition forms.
 describe('team battle — diplomacy seeded by side', () => {
   const FOUR: SeatConfig[] = [
-    { id: 'p1', name: 'A1', faction: 'blue', start: DEFAULT_SETUP.seats[0]!.start, ai: false },
-    { id: 'p2', name: 'A2', faction: 'red', start: DEFAULT_SETUP.seats[1]!.start, ai: true },
+    { id: 'p1', name: 'A1', faction: 'azure', start: DEFAULT_SETUP.seats[0]!.start, ai: false },
+    { id: 'p2', name: 'A2', faction: 'crimson', start: DEFAULT_SETUP.seats[1]!.start, ai: true },
     { id: 'p3', name: 'B1', faction: 'green', start: DEFAULT_SETUP.seats[0]!.start, ai: true },
     { id: 'p4', name: 'B2', faction: 'amber', start: DEFAULT_SETUP.seats[1]!.start, ai: true },
   ];
@@ -51,7 +51,7 @@ describe('team battle — diplomacy seeded by side', () => {
   });
 
   it('5v5 seeds alliances and wars across all ten seats', () => {
-    const factions = ['blue', 'red', 'amber', 'violet'];
+    const factions = ['azure', 'crimson', 'amber', 'violet'];
     const seats: SeatConfig[] = START_CANDIDATES.map((start, i) => ({
       id: `p${i + 1}`,
       name: `Player ${i + 1}`,

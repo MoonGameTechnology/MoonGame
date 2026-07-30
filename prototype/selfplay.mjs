@@ -58,7 +58,7 @@ function runMatch(i) {
   const starts = swapStart
     ? [START_CANDIDATES[1], START_CANDIDATES[0]]
     : [START_CANDIDATES[0], START_CANDIDATES[1]];
-  const factions = swapFaction ? ['red', 'blue'] : ['blue', 'red'];
+  const factions = swapFaction ? ['crimson', 'azure'] : ['azure', 'crimson'];
   const seats = [
     { id: 'p1', name: 'Bot One', faction: factions[0], start: starts[0], ai: true },
     { id: 'p2', name: 'Bot Two', faction: factions[1], start: starts[1], ai: true },
