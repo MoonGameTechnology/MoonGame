@@ -975,6 +975,7 @@ import {
   declareWar,
   spyOn,
   canTraverse,
+  castHeroAbility,
   act,
 } from './actions';
 export {
@@ -1006,6 +1007,7 @@ export {
   declareWar,
   spyOn,
   canTraverse,
+  castHeroAbility,
 };
 // Re-export the Steward reads so the netserver + UI import them from the `./game` façade.
 export { stewardActive, STEWARD_POSTURES, MAX_STEWARD_HOLD_POINTS };
@@ -1061,309 +1063,18 @@ export {
   type SortieState,
 };
 
-// --- squadron patrol (squadrons-roadmap SQ-4.1) ------------------------------
-// A wing left on patrol auto-strikes an enemy that enters its radius, burning a sortie
-// (SQ-2.1) each time; when it runs dry it rearms and then resumes — no live player in the
-// moment, fully deterministic. The pure decision core lives here; the frame-loop driver
-// (main.ts, mirrors autoEngage/driveQueues) issues the strike order, burns the sortie,
-// and ticks the rearm on a game-hour cadence.
+// REFP-23: Patrol/patrolTarget/scrambleOrder (squadrons-roadmap SQ-4.1 — the pure
+// reactive-scramble decision core) moved to `patrol.ts`. Imported here for the
+// server-side driver below and re-exported for `main.ts` / tests.
+import { patrolTarget, scrambleOrder, type Patrol } from './patrol';
+export { patrolTarget, scrambleOrder, type Patrol };
 
-/** A standing patrol: guard `center` out to `radius` with the wing's sortie budget. */
-export interface Patrol {
-  center: { x: number; y: number };
-  radius: number;
-  sortie: SortieState;
-}
-
-/** The contact this patrol strikes this round: the lowest-id enemy inside the radius,
- *  and only while the wing is flight-ready (fuel left, not rearming). Stable tie-break by
- *  id — the same rule orbital AA / lane intercept use. Pure; null = hold fire. */
-export function patrolTarget(
-  patrol: Patrol,
-  enemies: Array<{ id: string; pos: { x: number; y: number } }>,
-): string | null {
-  if (!canSortie(patrol.sortie)) return null;
-  let best: string | null = null;
-  for (const e of enemies) {
-    if (withinRange(patrol.center, e.pos, patrol.radius) && (best === null || e.id < best)) {
-      best = e.id;
-    }
-  }
-  return best;
-}
-
-/** One reactive-scramble tick for a patrolling wing (CC-4 — "auto-sortie at an identified
- *  target in vision + range"): pick the in-range contact (SQ-4.1) and launch at it — engage
- *  if co-located, else fly to intercept its node — burning one fuel (SQ-2.1). `targets` are
- *  the pre-filtered hostile, identified contacts that are sitting on a node. Returns the
- *  order to issue (null = hold fire) plus the wing's new sortie state. Pure — the driver
- *  gathers the world (vision + diplomacy) and issues the order. */
-export function scrambleOrder(
-  me: string,
-  fleet: Fleet,
-  patrol: Patrol,
-  targets: Array<{ id: string; location: string; pos: { x: number; y: number } }>,
-  rearmRounds: number,
-): { action: Action | null; sortie: SortieState } {
-  const pick = patrolTarget(patrol, targets);
-  if (pick === null) return { action: null, sortie: patrol.sortie };
-  const foe = targets.find((t) => t.id === pick)!;
-  const action =
-    fleet.location === foe.location
-      ? engageFleet(me, fleet.id, foe.id)
-      : moveFleet(me, fleet.id, foe.location);
-  return { action, sortie: spendSortie(patrol.sortie, rearmRounds) };
-}
-
-/** One tick of the SERVER-SIDE auto-storm driver (CC-2): every fleet flagged in
- *  `state.autoAssault` that sits over someone else's capturable world with the orbit
- *  clear gets its storm orders. Mirrors the client autoEngage() conditions exactly.
- *  Pure — the host applies the actions; a rejection is simply skipped (a standing
- *  stance has no chain to block). */
-export function serverAutoAssaultActions(
-  state: GameState,
-): Array<{ fleetId: string; owner: string; actions: Action[] }> {
-  const flagged = (state as DivState).autoAssault ?? {};
-  const out: Array<{ fleetId: string; owner: string; actions: Action[] }> = [];
-  for (const fid of Object.keys(flagged)) {
-    const f = state.fleets[fid];
-    if (!f || f.location === null || !fleetIdle(f)) continue;
-    const here = state.planets[f.location];
-    if (!here || !isCapturable(data, here) || here.owner === f.owner) continue;
-    // Auto-storm only worlds we are AT WAR with (bug-hunt MINOR): the core rejects a
-    // peaceful assault anyway (E_FORBIDDEN), but the driver re-issued the doomed pair
-    // on every wake — rejected-action churn, and the fleet.orbit half DID apply.
-    if (here.owner !== null && getStance(state, f.owner, here.owner) !== 'war') continue;
-    const enemyHere = Object.values(state.fleets).some(
-      (g) => g.owner !== f.owner && g.location === f.location && g.units.some((u) => u.count > 0),
-    );
-    if (enemyHere) continue; // let the orbital battle settle first
-    // An assault needs near orbit first (orbit is instant), mirroring the AI capture pass.
-    const actions =
-      f.orbit === 'near'
-        ? [assaultFleet(f.owner, fid)]
-        : [orbitFleet(f.owner, fid), assaultFleet(f.owner, fid)];
-    out.push({ fleetId: fid, owner: f.owner, actions });
-  }
-  return out;
-}
-
-/** The cooldown-ledger key an ability occupies — mirrors the core heroModule's
- *  `cooldownKey` so the chain driver reads the SAME slot the cast writes. */
-function abilityCooldownKey(type: string): string {
-  return type === 'temp_lane' ? 'path' : type === 'annihilate' ? 'annihilate' : `fx:${type}`;
-}
-/** Is `hero`'s `abilityId` still cooling down at `now`? An unknown ability id is NOT
- *  held (the core rejects it and the step is consumed — never a permanent deadlock). */
-function abilityOnCooldown(hero: Hero, abilityId: string, now: number): boolean {
-  const def = data.heroAbilities[abilityId];
-  if (!def) return false;
-  return ((hero.cooldowns ?? {})[abilityCooldownKey(def.type)] ?? 0) > now;
-}
-/** The living hero commanding this fleet (its ship), if any. Sorted-id lookup keeps it
- *  deterministic across hosts (JSONB scrambles object key order — BF-13). */
-function heroCommandingFleet(state: GameState, fleetId: string): Hero | undefined {
-  const heroes = state.heroes ?? {};
-  for (const id of Object.keys(heroes).sort()) {
-    const h = heroes[id]!;
-    if (h.fleetId === fleetId && h.alive !== false) return h;
-  }
-  return undefined;
-}
-
-/** One tick of the CC-1 chain driver: for every chained fleet that is FREE (not in
- *  transit, not in battle), resolve the head step into the orders to issue plus the
- *  `chain.stamp` patch ([] steps = chain done → cleared). Consume-on-issue: a step
- *  whose order the core then rejects is SKIPPED, not retried forever (the CC-2
- *  rejected-churn lesson). Sorted fleet ids ⇒ deterministic across hosts (JSONB does
- *  not preserve object key order). Pure — hosts apply the patch, then the actions. */
-export function serverChainActions(
-  state: GameState,
-  now: number,
-): Array<{
-  fleetId: string;
-  owner: string;
-  actions: Action[];
-  patch?: { steps: ChainStep[]; waitUntil?: number };
-}> {
-  const chains = (state as DivState).orders ?? {};
-  const out: Array<{
-    fleetId: string;
-    owner: string;
-    actions: Action[];
-    patch?: { steps: ChainStep[]; waitUntil?: number };
-  }> = [];
-  for (const fid of Object.keys(chains).sort()) {
-    const chain = chains[fid]!;
-    const f = state.fleets[fid];
-    if (!f) continue; // dead fleet — the module's own housekeeping sweep clears it
-    if (!fleetIdle(f)) continue; // busy: the chain resumes once the fleet is free
-    const head = chain.steps[0];
-    if (!head) {
-      out.push({ fleetId: fid, owner: f.owner, actions: [], patch: { steps: [] } });
-      continue;
-    }
-    const rest = chain.steps.slice(1);
-    if (head.kind === 'wait') {
-      // Two-phase hold: arm the deadline once, then consume when the clock passes it.
-      if (chain.waitUntil === undefined) {
-        out.push({
-          fleetId: fid,
-          owner: f.owner,
-          actions: [],
-          patch: { steps: chain.steps, waitUntil: now + head.hours * HOUR },
-        });
-      } else if (now >= chain.waitUntil) {
-        out.push({ fleetId: fid, owner: f.owner, actions: [], patch: { steps: rest } });
-      }
-    } else if (head.kind === 'move') {
-      out.push({
-        fleetId: fid,
-        owner: f.owner,
-        // Already there → nothing to issue (the core would reject E_SAME_LOCATION).
-        actions: f.location === head.to ? [] : [moveFleet(f.owner, fid, head.to)],
-        patch: { steps: rest },
-      });
-    } else if (head.kind === 'assault') {
-      out.push({
-        fleetId: fid,
-        owner: f.owner,
-        actions:
-          f.orbit === 'near'
-            ? [assaultFleet(f.owner, fid)]
-            : [orbitFleet(f.owner, fid), assaultFleet(f.owner, fid)],
-        patch: { steps: rest },
-      });
-    } else if (head.kind === 'strike') {
-      // Fire window, two-phase like `wait`: open — focus the guns and arm the
-      // deadline; close — cease fire (clear focus) and move on. A fleet with no
-      // artillery just idles through the window (the focus order rejects, the
-      // window still runs — deterministic either way).
-      if (chain.waitUntil === undefined) {
-        out.push({
-          fleetId: fid,
-          owner: f.owner,
-          actions: [barrageFleet(f.owner, fid, head.target)],
-          patch: { steps: chain.steps, waitUntil: now + head.hours * HOUR },
-        });
-      } else if (now >= chain.waitUntil) {
-        out.push({
-          fleetId: fid,
-          owner: f.owner,
-          actions: [barrageFleet(f.owner, fid, null)],
-          patch: { steps: rest },
-        });
-      }
-    } else if (head.kind === 'ability') {
-      // A hero ability queued as a step (CC-1 × HERO-4): the hero commanding THIS fleet
-      // casts it once the fleet is free. Consume-on-issue like move/assault — the core
-      // `hero.ability` re-gates ownership/liveness/equipment/range/cost, so a step it
-      // rejects is skipped, not retried. The ONE hold is a live cooldown (a transient
-      // that always clears): «дойти и открыть Коридор» waits the cooldown out instead of
-      // wasting the cast. No hero on the fleet ⇒ drop the stale step (no action).
-      const hero = heroCommandingFleet(state, fid);
-      if (hero === undefined || !abilityOnCooldown(hero, head.abilityId, now)) {
-        out.push({
-          fleetId: fid,
-          owner: f.owner,
-          actions: hero
-            ? [castHeroAbility(f.owner, hero.id, head.abilityId, head.target ?? undefined)]
-            : [],
-          patch: { steps: rest },
-        });
-      }
-    } else {
-      out.push({
-        fleetId: fid,
-        owner: f.owner,
-        actions: [barrageFleet(f.owner, fid, head.target)],
-        patch: { steps: rest },
-      });
-    }
-  }
-  return out;
-}
-
-/** One tick of the SERVER-SIDE patrol driver (CC-4): tick each standing patrol's rearm
- *  on its game-hour cadence, then — if the wing is parked and flight-ready — scramble at
- *  the lowest-id identified, at-war contact inside the radius (the same pure scrambleOrder
- *  the solo driver uses; vision comes from the owner's identify coverage, so the server
- *  never lets a patrol see through the fog its owner has). Pure — the host applies the
- *  strike `actions` and persists `patch` via patrol.stamp; `drop` retires a patrol whose
- *  fleet lost its wing. */
-export function serverPatrolActions(
-  state: GameState,
-  now: number,
-): Array<{
-  fleetId: string;
-  owner: string;
-  actions: Action[];
-  patch?: { sortie: SortieState; rearmAt?: number };
-  drop?: boolean;
-}> {
-  const patrols = (state as DivState).patrols ?? {};
-  const out: Array<{
-    fleetId: string;
-    owner: string;
-    actions: Action[];
-    patch?: { sortie: SortieState; rearmAt?: number };
-    drop?: boolean;
-  }> = [];
-  const identify = new Map<string, Set<string>>(); // owner → identified nodes (hoisted per owner)
-  // Sorted fleet-id iteration (like serverChainActions above): JSONB does not preserve
-  // object key order, so unsorted iteration would make the strike-issue order — and thus
-  // which of two co-located wings wins a race for the same target — host/hibernation
-  // dependent. Sorting pins one order across hosts and wake cycles (invariant #6).
-  for (const fid of Object.keys(patrols).sort()) {
-    const p = patrols[fid]!;
-    const f = state.fleets[fid];
-    if (!f || !fleetHasSquadron(f)) {
-      out.push({ fleetId: fid, owner: f?.owner ?? '', actions: [], drop: true });
-      continue;
-    }
-    const spec = sortieSpec(f);
-    // Rearm cadence: one round per game-hour past `rearmAt` (absolute stamps — no
-    // wall-clock drift, works however rarely the offline room wakes).
-    let sortie = p.sortie;
-    let rearmAt = p.rearmAt ?? now + HOUR;
-    while (now >= rearmAt) {
-      sortie = tickRearm(sortie, spec.maxFuel);
-      rearmAt += HOUR;
-    }
-    let actions: Action[] = [];
-    if (fleetIdle(f)) {
-      let seen = identify.get(f.owner);
-      if (!seen) {
-        seen = identifiedNodes(state, f.owner, data);
-        identify.set(f.owner, seen);
-      }
-      const targets: Array<{ id: string; location: string; pos: { x: number; y: number } }> = [];
-      for (const g of Object.values(state.fleets)) {
-        if (g.owner === f.owner || !g.location || g.movement || !g.units.some((u) => u.count > 0))
-          continue;
-        if (g.battleId) continue; // already locked in a battle — engage would reject, yet the sortie fuel is spent (BF-30)
-        if (getStance(state, f.owner, g.owner) !== 'war') continue; // declared enemies only — never auto-war
-        if (!seen.has(g.location)) continue; // identified contacts only — fog-honest
-        const pos = state.planets[g.location]?.position;
-        if (pos) targets.push({ id: g.id, location: g.location, pos });
-      }
-      const res = scrambleOrder(f.owner, f, { ...p, sortie }, targets, spec.rearmRounds);
-      sortie = res.sortie;
-      if (res.action) actions = [res.action];
-    }
-    const changed =
-      sortie.fuel !== p.sortie.fuel ||
-      sortie.rearming !== p.sortie.rearming ||
-      rearmAt !== p.rearmAt;
-    out.push({
-      fleetId: fid,
-      owner: f.owner,
-      actions,
-      patch: changed ? { sortie, rearmAt } : undefined,
-    });
-  }
-  return out;
-}
+// REFP-24: serverAutoAssaultActions/serverChainActions/serverPatrolActions (the
+// CC-2/CC-1/CC-4 server-side standing-order drivers) moved to `serverDrivers.ts`.
+// Imported here for internal use (none currently — the drivers are consumed by
+// `main.ts`'s frame loop and NET) and re-exported for `main.ts` / tests.
+import { serverAutoAssaultActions, serverChainActions, serverPatrolActions } from './serverDrivers';
+export { serverAutoAssaultActions, serverChainActions, serverPatrolActions };
 
 /** Toggle the CC-2 auto-storm stance on an owned fleet (authoritative standing order). */
 export const orderAuto = (playerId: string, fleetId: string, on: boolean) =>
@@ -1458,14 +1169,8 @@ export const designateCapital = (playerId: string, planetId: string) =>
   act(playerId, 'capital.designate', { planetId });
 
 // --- hero engine (core heroModule, HERO-3..9): the data-driven hero actions ---
-/** Cast a hero ability (HERO-4 dispatcher); `target` — planet id for ranged casts. */
-export const castHeroAbility = (
-  playerId: string,
-  heroId: string,
-  abilityId: string,
-  target?: string,
-) =>
-  act(playerId, 'hero.ability', { heroId, abilityId, ...(target !== undefined ? { target } : {}) });
+// `castHeroAbility` moved to `actions.ts` (REFP-24) — imported/re-exported in the
+// REFP-22 block above alongside its siblings.
 /** Raise an undeployed hero's ship at an owned world (or own fleet / allied world
  *  when the hero carries the matching spawn-marker ability). */
 export const spawnHero = (playerId: string, heroId: string, at: string) =>
