@@ -1429,9 +1429,12 @@ function kfmt(n: number): string {
   return Math.abs(v) >= 1000 ? (v / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : String(v);
 }
 
+// Returns HTML (resource-tinted tokens) — callers feed innerHTML, don't esc() this.
 function cost(bag: Record<string, number> | undefined): string {
   if (!bag) return 'free';
-  const parts = Object.entries(bag).map(([r, n]) => `${n}${TECH_CUR[r] ?? r[0]}`);
+  const parts = Object.entries(bag).map(
+    ([r, n]) => `<span class="rc-${r}">${n}${TECH_CUR[r] ?? r[0]}</span>`,
+  );
   return parts.length ? parts.join(' ') : 'free';
 }
 function afford(bag: Record<string, number> | undefined): boolean {
@@ -1768,7 +1771,7 @@ function divisionsHtml(planetId: string): string {
     const comp = slots.map((u) => formIcon(u)).join('') || '—';
     const cost =
       Object.entries(f.cost)
-        .map(([r, a]) => `${a}${TECH_CUR[r] ?? r[0]}`)
+        .map(([r, a]) => `<span class="rc-${r}">${a}${TECH_CUR[r] ?? r[0]}</span>`)
         .join(' ') || '—';
     h += `<div class="row dim">${comp} · ⚔${f.attack} 🛡${f.defense} ❤${f.hp}${offLine} · ${cost}</div>`;
   }
@@ -5433,7 +5436,7 @@ function fleetPanelHtml(f: Fleet): string {
   if (maxHull > 0) {
     h += `<div class="row hullrow" data-desc="stat:hull"><span class="hico">♥</span><span class="hbar${hullPct < 30 ? ' low' : ''}"><i style="width:${hullPct}%"></i></span><b>${kfmt(Math.round(curHull))}/${kfmt(maxHull)}</b>${
       atDock
-        ? `<button class="chip-metal" data-act="dockrepair" data-arg="${f.id}" title="${t('side.fleet.repair.dock.title')}">🔧 ${dockRepairCost(f, data)}❒</button>`
+        ? `<button class="chip-metal" data-act="dockrepair" data-arg="${f.id}" title="${t('side.fleet.repair.dock.title')}">🔧 <span class="rc-metal">${dockRepairCost(f, data)}❒</span></button>`
         : ''
     }${
       canRepair
@@ -5684,7 +5687,7 @@ function planetSummaryHtml(p: Planet): string {
   const base = (pt?.baseOutput ?? {}) as Record<string, number>;
   const baseStr = ['metal', 'credits', 'food', 'energy']
     .filter((r) => (base[r] ?? 0) > 0)
-    .map((r) => `${TECH_CUR[r] ?? tData(r)} ${base[r]}`)
+    .map((r) => `${TECH_CUR[r] ? curIc(r) : esc(tData(r))} ${base[r]}`)
     .join(' · ');
   if (baseStr)
     rows.push(
@@ -6741,7 +6744,7 @@ function intelRowHtml(target: string): string {
     if (g.kind === 'treasury' && g.target === target) {
       const r = s.players[target]?.resources ?? {};
       const bag = Object.entries(r)
-        .map(([k, v]) => `${TECH_CUR[k] ?? k}${Math.floor(v as number)}`)
+        .map(([k, v]) => `${curIc(k)}${Math.floor(v as number)}`)
         .join(' ');
       bits.push(t('comms.intel.treasury', { bag: bag || '—', left }));
     } else if (g.kind === 'fleets' && g.target === target) {
@@ -8807,7 +8810,7 @@ function renderDivDesign(): void {
   h += `</div>`;
   const cost =
     Object.entries(f.cost)
-      .map(([r, a]) => `${a}${TECH_CUR[r] ?? r[0]}`)
+      .map(([r, a]) => `<span class="rc-${r}">${a}${TECH_CUR[r] ?? r[0]}</span>`)
       .join(' ') || '—';
   const syn = f.synergies.map((x) => `${esc(t(x.name))} — ${esc(t(x.desc))}`).join('<br>');
   h += `<div class="row dim">⚔${f.attack} 🛡${f.defense} ❤${f.hp} · ${t('div.roster', { n: f.count, s: FORMATION_SLOTS, rest: cost })}</div>`;
@@ -8872,6 +8875,14 @@ const RES_SVG: Record<string, string> = {
   microelectronics:
     '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><rect x="4.6" y="4.6" width="6.8" height="6.8" rx="1"/><rect x="7" y="7" width="2" height="2"/><path d="M6.4 4.6v-2M9.6 4.6v-2M6.4 13.4v-2M9.6 13.4v-2M4.6 6.4h-2M4.6 9.6h-2M13.4 6.4h-2M13.4 9.6h-2"/></svg>',
 };
+// Sovereigns (donate currency): faceted-gem line icon per the mock — worn GOLD with a
+// soft halo (the mock capsule is lavender; the brief keeps the game's gold identity).
+const SOV_SVG =
+  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M8 1.8 11.8 6 8 14.2 4.2 6 8 1.8Z"/><path d="M4.2 6h7.6M8 1.8 6.3 6l1.7 8.2M8 1.8 9.7 6"/></svg>';
+/** Resource token for innerHTML strings, tinted with the resource's accent colour
+ *  (mock palette; .rc-* rules in the stylesheet). Plain-text contexts (toasts,
+ *  titles) keep the bare TECH_CUR glyph — colour can't ride along there. */
+const curIc = (r: string): string => `<span class="rc-${r}">${TECH_CUR[r] ?? r[0]}</span>`;
 const TECH_BRANCHES: Array<{ key: string; label: string }> = [
   { key: 'space', label: 'tech.branch.space' },
   { key: 'ground', label: 'tech.branch.ground' },
@@ -8883,7 +8894,7 @@ const branchLabel = (key: string): string =>
   t(TECH_BRANCHES.find((b) => b.key === key)?.label ?? key);
 const techCost = (c: Record<string, number>): string =>
   Object.entries(c)
-    .map(([k, v]) => `${TECH_CUR[k] ?? k} ${v}`)
+    .map(([k, v]) => `${curIc(k)} ${v}`)
     .join(' · ');
 // --- TT-3.1: экран-дерево (макет v4) — вкладки-ветки, рельса дней, досье по тапу ----
 // Presentation-only layout: named sub-columns per branch, ids in day order. The
@@ -9574,7 +9585,7 @@ function heroTreeHtml(hero: HeroInst): string {
       } else {
         cls += ' avail';
         crest = '◆';
-        foot = `<span class="hx-cost">${esc(cost(nd.cost))}</span>`;
+        foot = `<span class="hx-cost">${cost(nd.cost)}</span>`;
       }
       const conn = nd.requires.length
         ? `<span class="hx-conn${rail.own && reqMet ? ' lit' : ''}"></span>`
@@ -9642,7 +9653,7 @@ function heroFittingsHtml(hero: HeroInst): string {
     const action = installed
       ? `<span class="hx-badge on">✓ ${t('hero.fit.installed')}</span>`
       : canFit
-        ? `<span class="hx-cost">${esc(cost(fd.cost))}</span>`
+        ? `<span class="hx-cost">${cost(fd.cost)}</span>`
         : `<span class="hx-badge">${t('hero.fit.no-slots')}</span>`;
     const tap = canFit ? ` data-hfitd="${fid}"` : '';
     html +=
@@ -9711,7 +9722,7 @@ function heroDossierHtml(hero: HeroInst): string {
       ? `<div class="hx-drow"><span class="hx-ok">✓ ${t('hero.tree.unlocked')}</span></div>`
       : !branchOk
         ? `<div class="hx-drow"><span class="hx-no">${t('hero.tree.other-branch')}</span></div>`
-        : `<button class="hx-dbtn" data-hskill="${hero.id}" data-node="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.tree.unlock')} · ${esc(cost(nd.cost))}</button>`;
+        : `<button class="hx-dbtn" data-hskill="${hero.id}" data-node="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.tree.unlock')} · ${cost(nd.cost)}</button>`;
     return (
       `<div class="hx-dossier">` +
       `<div class="hx-dh">${def?.branch ? `<span class="hx-tag">${esc(t(HERO_BRANCH_RU[def.branch] ?? def.branch))}</span>` : ''}<span class="hx-dnm">${esc(t(nd.name))}</span>${close}</div>` +
@@ -9719,7 +9730,7 @@ function heroDossierHtml(hero: HeroInst): string {
       (reqHtml
         ? `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.requires')}</span><span class="hx-dv">${reqHtml}</span></div>`
         : '') +
-      `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.cost')}</span><span class="hx-cost">${esc(cost(nd.cost))}</span></div>` +
+      `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.cost')}</span><span class="hx-cost">${cost(nd.cost)}</span></div>` +
       btn +
       `</div>`
     );
@@ -9746,9 +9757,9 @@ function heroDossierHtml(hero: HeroInst): string {
       `<div class="hx-dossier">` +
       `<div class="hx-dh"><span class="hx-dnm">${esc(t(fd.name))}</span>${close}</div>` +
       (give ? `<div class="hx-give">${give}</div>` : '') +
-      `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.cost')}</span><span class="hx-cost">${esc(cost(fd.cost))}</span></div>` +
+      `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.cost')}</span><span class="hx-cost">${cost(fd.cost)}</span></div>` +
       `<div class="hx-warn">${t('hero.fit.permanent')}</div>` +
-      `<button class="hx-dbtn danger" data-hfit="${hero.id}" data-fit="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.fit.install')} · ${esc(cost(fd.cost))}</button>` +
+      `<button class="hx-dbtn danger" data-hfit="${hero.id}" data-fit="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.fit.install')} · ${cost(fd.cost)}</button>` +
       `</div>`
     );
   }
@@ -9784,8 +9795,8 @@ function renderMarket(): void {
     const mine = l.owner === ME;
     // ECON-4: получатель кредитов получает net (5% сгорает) — в биде это исполнитель.
     const takerNet = Math.floor(l.amount * l.price * (1 - MARKET_FEE));
-    const qp = `<span class="mk-qp"><b>${l.amount}</b> ${TECH_CUR[l.resource] ?? ''} @ ${l.price} ⛁${
-      bid && !mine ? ` <span class="mk-net">→ ${takerNet} ⛁</span>` : ''
+    const qp = `<span class="mk-qp"><b>${l.amount}</b> ${curIc(l.resource)} @ ${l.price} <span class="rc-credits">⛁</span>${
+      bid && !mine ? ` <span class="mk-net">→ ${takerNet} <span class="rc-credits">⛁</span></span>` : ''
     }</span>`;
     const who = `<span class="mk-who">${mine ? t('market.own-lot') : nameOf(l.owner)}</span>`;
     let btn: string;
@@ -9803,7 +9814,7 @@ function renderMarket(): void {
     `<button class="mk-tab${marketTab === k ? ' on' : ''}" data-mtab="${k}">${label}</button>`;
   const stock =
     `<div class="mk-lbl" style="margin-bottom:8px">${t('market.in-treasury')}: ${glyph} <b style="color:var(--ink)">${Math.round(res[good] ?? 0)}</b>` +
-    ` · ⛁ <b style="color:var(--ink)">${Math.round(res.credits ?? 0)}</b></div>`;
+    ` · <span class="rc-credits">⛁</span> <b style="color:var(--ink)">${Math.round(res.credits ?? 0)}</b></div>`;
   const form =
     `<div class="mk-form"><div class="mk-seg">${seg('sell', t('market.sell'))}${seg('buy', t('market.buy'))}</div>` +
     `<span class="mk-lbl">${t('market.qty')}</span><input class="mk-in" id="mk-amt" type="number" min="1" value="10">` +
@@ -10716,7 +10727,7 @@ function profileHtml(): string {
     `<div class="pf-top">` +
     `<div class="pf-av">${esc(nick.slice(0, 1).toUpperCase())}</div>` +
     `<div class="pf-who"><div class="pf-nm">${esc(nick)}</div><div class="pf-sub">${sub}</div></div>` +
-    `<div class="pf-cur" title="${esc(t('hub.sovereigns'))}"><i>◆</i><b>${kfmt(SOVEREIGNS)}</b><em>+</em></div>` +
+    `<div class="pf-cur" title="${esc(t('hub.sovereigns'))}"><i>${SOV_SVG}</i><b>${kfmt(SOVEREIGNS)}</b><em>+</em></div>` +
     `</div>` +
     `<div class="pf-body">` +
     `<div class="pf-h">${esc(t('profile.title'))}</div>` +
@@ -13263,7 +13274,7 @@ function frame(nowReal: number) {
   const min = floor((s.time % HOUR) / 60000);
   const statusHtml =
     `<span id="clock">${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}</span>` +
-    `<span class="dl-donate" title="${t('hub.sovereigns')}"><i>◆</i>${kfmt(SOVEREIGNS)}</span>`;
+    `<span class="dl-donate" title="${t('hub.sovereigns')}"><i>${SOV_SVG}</i>${kfmt(SOVEREIGNS)}</span>`;
   if (statusHtml !== lastClockText) {
     devlineEl.innerHTML = statusHtml;
     lastClockText = statusHtml;

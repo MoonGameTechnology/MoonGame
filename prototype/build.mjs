@@ -28,6 +28,10 @@ const bundle = async (playerBuild) => {
 const css = `
 :root{
   --tbh:84px; /* total #top height (row 1 + resource row) — offsets below hang off it */
+  /* resource accent colours (mock): gold coins / steel cube / green sprout /
+     orange bolt / orchid chip — inherited everywhere a resource token appears */
+  --rc-credits:#d9b872;--rc-metal:#bfc8dc;--rc-food:#8ccf96;--rc-energy:#f09a52;
+  --rc-microelectronics:#d795cf;
   --cyan:#35d6e6;--cyan-dim:#1c6f78;
   --grn:#5ff0c0;--grn-dim:#2b7a66;
   --red:#ff5a4d;--amber:#ffb43a;
@@ -111,12 +115,25 @@ body::before{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;mix
 .res em.up{color:var(--grn,#5ff0a8);}
 .res em.dn{color:var(--red,#ff5a4d);}
 .res.dead{opacity:.34;}
-/* bare icon, no boxed background — the mock draws icons as quiet grey line art.
-   The icon is an inline SVG (stroke:currentColor), so color rules below tint it. */
+/* bare icon, no boxed background. The icon is an inline SVG (stroke:currentColor),
+   tinted with the resource's accent colour; the number stays near-white. */
 .res i{flex:0 0 auto;font-style:normal;font-size:14px;line-height:1;color:#a9bec1;
   font-variant-emoji:text;}
 .res i svg{display:block;width:15px;height:15px;}
+.res[data-res="credits"] i{color:var(--rc-credits);}
+.res[data-res="metal"] i{color:var(--rc-metal);}
+.res[data-res="food"] i{color:var(--rc-food);}
+.res[data-res="energy"] i{color:var(--rc-energy);}
+.res[data-res="microelectronics"] i{color:var(--rc-microelectronics);}
+/* deficit wins over the accent — a resource in the red reads RED, as before */
 .res.short i{color:var(--red,#ff5a4d);text-shadow:0 0 6px rgba(255,90,77,.5);}
+/* resource-tinted tokens in prose (costs, market rows, tech/yield lines).
+   [data-desc] covers the division designer's self-describing cost spans. */
+.rc-credits,[data-desc="res:credits"]{color:var(--rc-credits);}
+.rc-metal,[data-desc="res:metal"]{color:var(--rc-metal);}
+.rc-food,[data-desc="res:food"]{color:var(--rc-food);}
+.rc-energy,[data-desc="res:energy"]{color:var(--rc-energy);}
+.rc-microelectronics,[data-desc="res:microelectronics"]{color:var(--rc-microelectronics);}
 .res b{color:#e6eeef;font-weight:700;font-size:13px;font-variant-numeric:tabular-nums;
   white-space:nowrap;flex:0 0 auto;}
 /* phones hide the flow digits — a NEGATIVE net income paints the stock itself red */
@@ -134,13 +151,16 @@ body::before{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;mix
 #devline .dl-donate{margin-left:auto;flex:0 0 auto;display:flex;align-items:center;gap:5px;
   padding:2px 9px;border-radius:11px;color:#fff2cf;font-weight:800;font-size:12px;line-height:1;
   letter-spacing:.3px;font-variant-numeric:tabular-nums;
-  background:linear-gradient(180deg,rgba(255,206,92,.20),rgba(240,170,40,.10));border:1px solid rgba(255,208,96,.55);
-  box-shadow:0 0 12px rgba(255,198,72,.30),inset 0 0 6px rgba(255,214,120,.16);
+  background:rgba(255,206,92,.08);border:1px solid rgba(255,208,96,.5);
+  box-shadow:0 0 10px rgba(255,198,72,.25),inset 0 0 6px rgba(255,214,120,.12);
   animation:donatePulse 2.8s ease-in-out infinite;white-space:nowrap;}
+/* faceted gem (SOV_SVG), gold with a soft halo */
 #devline .dl-donate i{color:#ffd45e;text-shadow:0 0 9px rgba(255,212,94,.85);font-style:normal;font-size:14px;}
+#devline .dl-donate i svg{display:block;width:14px;height:14px;
+  filter:drop-shadow(0 0 3px rgba(255,212,94,.75));}
 @keyframes donatePulse{
-  0%,100%{box-shadow:0 0 10px rgba(255,198,72,.30),inset 0 0 7px rgba(255,214,120,.16);}
-  50%{box-shadow:0 0 22px rgba(255,205,90,.7),inset 0 0 9px rgba(255,220,130,.30);}}
+  0%,100%{box-shadow:0 0 8px rgba(255,198,72,.22),inset 0 0 6px rgba(255,214,120,.12);}
+  50%{box-shadow:0 0 14px rgba(255,205,90,.5),inset 0 0 8px rgba(255,220,130,.22);}}
 #toasts{position:fixed;left:50%;top:calc(var(--tbh) + 50px);transform:translateX(-50%);z-index:40;display:flex;
   flex-direction:column;align-items:center;gap:6px;pointer-events:none;max-width:min(92vw,520px);}
 #toasts .toast{pointer-events:auto;cursor:pointer;background:rgba(3,14,18,.88);border:1px solid var(--line-hi);
@@ -1911,6 +1931,8 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   border:1px solid rgba(255,212,94,.45);background:rgba(255,212,94,.08);color:#ffd45e;
   font:700 15px ui-monospace,monospace;font-variant-numeric:tabular-nums;}
 #profile .pf-cur i{font-style:normal;font-size:15px;text-shadow:0 0 9px rgba(255,212,94,.85);}
+#profile .pf-cur i svg{display:block;width:16px;height:16px;
+  filter:drop-shadow(0 0 3px rgba(255,212,94,.75));}
 #profile .pf-cur b{font-weight:700;}
 #profile .pf-cur em{font-style:normal;color:rgba(255,212,94,.7);font-weight:400;font-size:15px;}
 #profile .pf-body{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px;display:flex;flex-direction:column;gap:14px;}
