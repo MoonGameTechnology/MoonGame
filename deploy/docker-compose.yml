@@ -17,6 +17,23 @@
 # Postgres is bound to 127.0.0.1 ONLY — never exposed publicly (the server reaches it
 # over the compose network). Set a real POSTGRES_PASSWORD in the environment (or an
 # .env file next to this compose) for anything beyond a local test.
+#
+# CONTAINER HARDENING (SEC-12). NOTE FOR FUTURE EDITS: no scanner checks this file.
+# Trivy's misconfig engine covers Dockerfile/k8s/terraform/cloudformation/helm/ARM —
+# Docker Compose is NOT among its formats, so the runtime posture below (privileges,
+# capabilities, limits) is held by review + the checklist in deploy/README.md, not by
+# CI. Keep them in sync when you touch a service.
+#   - no-new-privileges: a process in the container can never gain privileges via a
+#     setuid binary — closes the classic in-container escalation step.
+#   - cap_drop [ALL]: our server needs no Linux capability at all (non-root node on a
+#     >1024 port). Postgres's entrypoint does (chown/setuid of the data dir) — see the
+#     note on that service.
+#   - mem_limit / pids_limit: a runaway (leak, fork bomb, OOM in one service) hits a
+#     wall instead of taking the whole VPS — and with restart: unless-stopped it
+#     self-heals. Values are for a small (2 GB) VPS; raise them if the host is bigger.
+# Third-party images are digest-pinned (A08, same rule as the Dockerfile bases): a tag
+# is mutable, a digest names the exact image reviewed. `trivy-deps` in security.yml
+# reads these very lines and scans whatever they point at.
 services:
   server:
     build:
@@ -84,6 +101,17 @@ services:
       # TLS_CERT_FILE=/certs/fullchain.pem above. Harmless (empty) when TLS is off.
       - ./certs:/certs:ro
     # The image bakes its own HEALTHCHECK (GET /health); compose inherits it.
+    # Hardening (SEC-12; rationale in the header). No `read_only: true` here on purpose:
+    # netserver.mjs esbuild-transpiles the server INTO /app/packages/server/dist at every
+    # startup and appends match JSONL to /app/playtest-logs, so the root FS must stay
+    # writable. The image already runs as non-root (uid 65532), which is what read_only
+    # would mostly be buying.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    mem_limit: 1g
+    pids_limit: 512
     logging:
       driver: json-file
       options:
@@ -91,7 +119,9 @@ services:
         max-file: '3'
 
   postgres:
-    image: postgres:16-alpine
+    # Digest-pinned (A08). To bump: re-resolve the tag's digest and re-run the deploy —
+    # procedure + one-liner in docs/security/image-pinning.md. Refreshed 2026-07.
+    image: postgres:16-alpine@sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777
     restart: unless-stopped
     environment:
       POSTGRES_USER: void
@@ -106,6 +136,16 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+    # Hardening (SEC-12). Only the two settings that cannot break the official entrypoint:
+    # it starts as root to chown/initdb the data dir and then drops to the `postgres` user
+    # (a privilege DROP, which no-new-privileges does not block). `cap_drop: [ALL]` is
+    # deliberately NOT set here — that entrypoint needs CHOWN/DAC_OVERRIDE/FOWNER/SETUID/
+    # SETGID, and getting the add-back list wrong breaks the DB on the next restart, so it
+    # is an opt-in step to verify on a staging host first (recipe in deploy/README.md).
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 1g
+    pids_limit: 256
     logging:
       driver: json-file
       options:

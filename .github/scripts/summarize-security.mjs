@@ -29,6 +29,7 @@ const EXPECTED = [
   { key: 'osv', name: 'OSV-Scanner — SCA (osv.dev)' },
   { key: 'trivy-fs', name: 'Trivy fs — vuln/secret/IaC' },
   { key: 'trivy-image', name: 'Trivy image — базовая ОС образа' },
+  { key: 'trivy-deps', name: 'Trivy image — сторонние образы прода (postgres/caddy)' },
   { key: 'dast-zap', name: 'OWASP ZAP — DAST (baseline против запущенного сервера)' },
   { key: 'zizmor', name: 'zizmor — безопасность workflow' },
   { key: 'scorecard', name: 'OpenSSF Scorecard — постура', mainOnly: true },
@@ -242,7 +243,7 @@ if (findings.length) {
 
 L.push('---');
 L.push(
-  'ℹ️ _Блокирующие сканеры (SEC-1): Semgrep, Gitleaks, OSV, Trivy fs/image — находка или сбой скана валит их джобу; остальные (CodeQL, TruffleHog, zizmor, Scorecard) — информационные. Разные движки/источники — для перекрёстной валидации; «0» достоверно только у подтверждённых сканеров. Полные SARIF/SBOM — в артефактах прогона._',
+  'ℹ️ _Блокирующие сканеры (SEC-1): Semgrep, Gitleaks, OSV, Trivy fs/image — находка или сбой скана валит их джобу; остальные (CodeQL, TruffleHog, Trivy deps, zizmor, Scorecard) — информационные. Разные движки/источники — для перекрёстной валидации; «0» достоверно только у подтверждённых сканеров. Полные SARIF/SBOM — в артефактах прогона._',
 );
 
 writeFileSync(outFile, L.join('\n'));

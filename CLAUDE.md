@@ -57,8 +57,12 @@ backlog'а — исполняемая часть правила «verify docs ag
 retired — npm shut down its audit endpoints, 2026-07). CI mirrors it on every push:
 `.github/workflows/ci.yml` runs the gate + audit against a service Postgres (so the
 durable-store tests run too), `.github/workflows/security.yml` runs the gate + audit alongside
-a diverse scanner set (Semgrep, CodeQL, Trivy, OSV, Gitleaks, TruffleHog, zizmor), and
-`.github/workflows/android.yml` builds the Android APK. `main` is protected — changes land
+a diverse scanner set (Semgrep, CodeQL, Trivy, OSV, Gitleaks, TruffleHog, zizmor) — on every
+push **and weekly on `main`**, since a pinned prod image outlives the CVE feeds that scanned
+it — `.github/workflows/android.yml` builds the Android APK, and
+`.github/workflows/image.yml` publishes the prod image (build → blocking Trivy → GHCR →
+keyless cosign signature over the digest; the deploy side verifies it with
+`deploy/verify-image.sh` before starting — see `docs/security/pipeline.md`). `main` is protected — changes land
 via PR with green CI (see `CONTRIBUTING.md`); keep the gate green before pushing.
 
 ## Non-negotiable invariants

@@ -15,8 +15,8 @@ name: Security scan
 # both block (fail-secure, OWASP A10): a scanner that couldn't run can't certify.
 # New suppressions go to .semgrepignore / .gitleaks.toml / .trivyignore WITH a
 # reason + date (see docs/security/pipeline.md).
-# Still informational (not yet triaged as bricks): codeql, trufflehog, zizmor,
-# scorecard, and the `check` job (its blocking twin lives in ci.yml).
+# Still informational (not yet triaged as bricks): codeql, trufflehog, trivy-deps,
+# zizmor, scorecard, and the `check` job (its blocking twin lives in ci.yml).
 #
 # Each scan job writes a `status-<key>.json` sentinel AFTER the scan with the real
 # exit code / outcome. The summarizer LEADS with a scan-confirmation table built from
@@ -48,10 +48,23 @@ name: Security scan
 #   - See docs/security/ci-variables.md for guidelines
 #
 # This workflow is itself checked by zizmor (GitHub Actions security scanner).
+#
+# === WHY THE WEEKLY SCHEDULE (SEC-10) ===
+#
+# Push-triggered scanning certifies a COMMIT, not a RUNNING DEPLOY. Our bases are
+# digest-pinned, so a long-lived deploy keeps running the exact image that was scanned
+# at merge time while the CVE feeds move under it — nobody looks until someone happens
+# to push. The Monday cron re-scans `main` (same jobs, same blocking gates) so a CVE
+# published against the pinned base surfaces as a failed run within a week, not
+# whenever the next commit lands.
 
 on:
   push:
     branches: ['**']
+  schedule:
+    # Monday 05:17 UTC. Off-the-hour minute: GitHub drops cron runs queued at peak
+    # times (:00 is the worst), and a rescan that silently never ran is fail-open.
+    - cron: '17 5 * * 1'
   workflow_dispatch:
 
 concurrency:
@@ -407,6 +420,74 @@ jobs:
             exit 1
           fi
 
+  trivy-deps:
+    name: Vuln — third-party prod images (Trivy image)
+    # SEC-11: `trivy-image` above scans OUR image only. Production runs two more
+    # containers nobody was scanning — postgres and caddy from deploy/. Their refs are
+    # READ OUT OF THE COMPOSE FILES here (not a second hardcoded list), so a digest bump
+    # in deploy/ can't drift away from what CI actually scans.
+    # Informational on landing (the SEC-6 pattern): third-party base images carry CVEs
+    # we don't control, so this becomes blocking only after the first triage — otherwise
+    # an upstream advisory would redden `main` with nothing to fix in this repo.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: trivy image — postgres/caddy referenced by deploy/
+        id: scan
+        continue-on-error: true
+        run: |
+          set +e
+          mkdir -p trivy-deps-sarif
+          # Only the two base compose files: docker-compose.release.yml pins OUR image,
+          # which trivy-image already scans at build time.
+          refs=$(grep -hE '^[[:space:]]+image: ' deploy/docker-compose.yml deploy/docker-compose.tls.yml |
+            awk '{print $2}' | sort -u)
+          echo "refs to scan:"; echo "$refs"
+          rc=0
+          i=0
+          for ref in $refs; do
+            i=$((i + 1))
+            # No docker-socket mount: these are registry refs, so Trivy pulls them itself
+            # (the socket is only needed for the locally-built image in trivy-image).
+            # --exit-code 1 → findings are visible in $rc; the gate stays informational.
+            docker run --rm -v "$PWD:/out" -w /out \
+              aquasec/trivy:0.58.2 image --exit-code 1 --format sarif \
+              --output "trivy-deps-sarif/trivy-deps-$i.sarif" "$ref"
+            r=$?
+            [ "$r" -ne 0 ] && rc=$r
+          done
+          set -e
+          ok=true; case $rc in 125 | 126 | 127) ok=false ;; esac
+          [ "$i" -gt 0 ] || ok=false          # grep matched nothing ⇒ scanned nothing
+          [ -n "$(ls -A trivy-deps-sarif)" ] || ok=false
+          echo "{\"key\":\"trivy-deps\",\"ok\":$ok,\"exit\":$rc}" > status-trivy-deps.json
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: report-trivy-deps
+          path: |
+            trivy-deps-sarif/*.sarif
+            status-trivy-deps.json
+          if-no-files-found: warn
+      - name: upload to code scanning
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        with:
+          sarif_file: trivy-deps-sarif
+          category: trivy-deps
+      - name: report — informational (not yet blocking)
+        env:
+          RC: ${{ steps.scan.outputs.rc }}
+        run: |
+          if [ "$RC" != "0" ]; then
+            echo "::warning::Trivy found CVEs in the third-party prod images (exit $RC). Informational for now — triage them, then flip this job to blocking (SEC-11)."
+          fi
+
   dast-zap:
     name: DAST — running server (ZAP baseline)
     runs-on: ubuntu-latest
@@ -590,6 +671,7 @@ jobs:
         osv,
         trivy-fs,
         trivy-image,
+        trivy-deps,
         dast-zap,
         sbom,
         zizmor,
@@ -632,6 +714,13 @@ jobs:
         with:
           script: |
             const fs = require('fs');
+            // Weekly rescan (SEC-10) runs on `main`, where there is no PR to stick the
+            // comment to — it would drop a fresh commit comment on the same head commit
+            // every Monday. The run's own red/green + job summary is the signal there.
+            if (context.eventName === 'schedule') {
+              core.info('scheduled rescan — report stays in the job summary/artifacts');
+              return;
+            }
             const marker = '<!-- void-security-report -->';
             const body = marker + '\n' + fs.readFileSync('security-report.md', 'utf8');
             const { owner, repo } = context.repo;
