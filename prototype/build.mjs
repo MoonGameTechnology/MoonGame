@@ -104,16 +104,18 @@ body::before{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;mix
   position:relative;overflow:hidden;border:1px solid rgba(148,170,173,.26);border-radius:14px;background:rgba(6,14,16,.35);}
 .res.short{border-color:rgba(255,90,77,.4);}
 /* amount + flow share one "value line" (.rv); the amount owns the room (flex:0 0 auto),
-   the flow rate clips first. On phones the chip stacks the icon OVER this value line. */
+   the flow rate clips first (phones drop flow digits entirely — see the chip builder). */
 .rv{display:flex;align-items:baseline;justify-content:center;gap:3px;min-width:0;overflow:hidden;flex:0 1 auto;}
 .res em{font:9px ui-monospace,monospace;font-style:normal;white-space:nowrap;
   flex:0 1 auto;min-width:0;overflow:hidden;}
 .res em.up{color:var(--grn,#5ff0a8);}
 .res em.dn{color:var(--red,#ff5a4d);}
 .res.dead{opacity:.34;}
-/* bare glyph, no boxed background — the mock draws icons as quiet grey line art */
+/* bare icon, no boxed background — the mock draws icons as quiet grey line art.
+   The icon is an inline SVG (stroke:currentColor), so color rules below tint it. */
 .res i{flex:0 0 auto;font-style:normal;font-size:14px;line-height:1;color:#a9bec1;
   font-variant-emoji:text;}
+.res i svg{display:block;width:15px;height:15px;}
 .res.short i{color:var(--red,#ff5a4d);text-shadow:0 0 6px rgba(255,90,77,.5);}
 .res b{color:#e6eeef;font-weight:700;font-size:13px;font-variant-numeric:tabular-nums;
   white-space:nowrap;flex:0 0 auto;}
@@ -1319,6 +1321,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   /* the resource capsules own a full-width row — icon and number stay inline */
   .res{padding:0 5px;gap:4px;}
   .res i{font-size:13px;}
+  .res i svg{width:14px;height:14px;}
   .res b{font-size:12px;}
   #devline .dl-donate{font-size:11px;padding:2px 8px;}
 
