@@ -195,6 +195,21 @@ import {
   setLocale,
   localizeStaticDom,
 } from '../../localization/runtime';
+// REFM-2: the pure presentation formatters live in `format.ts` now (no state, no DOM)
+import {
+  esc,
+  kfmt,
+  nfmt,
+  round1,
+  hl,
+  TECH_CUR,
+  curIc,
+  cost,
+  costText,
+  displayUnit,
+  buildingName,
+  fmtEta,
+} from './format';
 import {
   META_TREE,
   META_BRANCH_RU,
@@ -529,17 +544,6 @@ interface ActiveBuild {
 }
 
 /** Escape untrusted strings before inserting into innerHTML (XSS prevention). */
-function esc(s: string): string {
-  // Covers text and both attribute-quote styles. The file currently uses only
-  // double-quoted attributes (so escaping " already prevents breakout), but escaping
-  // ' too keeps esc() complete if a single-quoted attribute is ever added. (CWE-79)
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
-}
 
 // Holographic draw primitives (rgba tint, cached glow/sphere sprites) now live in the
 // shared render kit (@void/client · holoDraw.ts, CP0.2 — one render implementation). The
@@ -1437,26 +1441,10 @@ const isShip = (u: string) => !data.units[u]?.traits.includes('ground') && !isSq
 const isGround = (u: string) => data.units[u]?.domain === 'ground';
 const floor = Math.floor;
 /** Compact number like Iron Order's bar: 15.7k, 728, … */
-function kfmt(n: number): string {
-  const v = Math.round(n);
-  return Math.abs(v) >= 1000 ? (v / 1000).toFixed(1).replace(/\.0$/, '') + 'k' : String(v);
-}
 
 // Returns HTML (resource-tinted tokens) — callers feed innerHTML, don't esc() this.
-function cost(bag: Record<string, number> | undefined): string {
-  if (!bag) return 'free';
-  const parts = Object.entries(bag).map(
-    ([r, n]) => `<span class="rc-${r}">${n}${TECH_CUR[r] ?? r[0]}</span>`,
-  );
-  return parts.length ? parts.join(' ') : 'free';
-}
 /** Та же цена ПЛОСКИМ текстом — для мест, где подпись уходит через `esc()`
  *  (`btn()`, `codexTile()`): там HTML из `cost()` показался бы игроку как разметка. */
-function costText(bag: Record<string, number> | undefined): string {
-  if (!bag) return 'free';
-  const parts = Object.entries(bag).map(([r, n]) => `${n}${TECH_CUR[r] ?? r[0]}`);
-  return parts.length ? parts.join(' ') : 'free';
-}
 function afford(bag: Record<string, number> | undefined): boolean {
   const res = s.players[ME]?.resources ?? {};
   for (const [r, n] of Object.entries(bag ?? {})) if ((res[r] ?? 0) < n) return false;
@@ -1482,15 +1470,7 @@ const ARCH_PATH2D: Partial<Record<keyof typeof ARCHETYPE_PATH, Path2D>> = {};
 function archPath2d(arch: keyof typeof ARCHETYPE_PATH): Path2D {
   return (ARCH_PATH2D[arch] ??= new Path2D(ARCHETYPE_PATH[arch]));
 }
-function displayUnit(unit: string): string {
-  // Unit ids are English-ish ("scout_drone") — the space-joined id is the DATA name
-  // the RU locale translates (see locale/ru.ts); EN shows it as-is.
-  return tData(unit.replace(/_/g, ' '));
-}
 /** Localized display name of a building id (data/*.json names are English). */
-function buildingName(id: string): string {
-  return tData(data.buildings[id]?.name ?? id);
-}
 function queueOf(planetId: string): PlanetBuildQueue {
   return (buildQueues[planetId] ??= { buildings: [], units: [] });
 }
@@ -1563,11 +1543,6 @@ function timeLeft(at: number): string {
   return fmtEta(Math.max(0, (at - s.time) / HOUR));
 }
 /** Format a travel-time-remaining in hours as `1.4ч` / `35м` (localized suffixes). */
-function fmtEta(totalH: number): string {
-  return totalH >= 1
-    ? t('fmt.hours', { n: totalH.toFixed(1) })
-    : t('fmt.minutes', { n: Math.ceil(totalH * 60) });
-}
 function progressPct(active: ActiveBuild): number {
   const duration = buildDurationHours(active.payload) * HOUR;
   if (duration <= 0) {
@@ -3124,7 +3099,7 @@ function handleEvents(events: DomainEvent[]) {
       case 'building.constructed':
         note(
           t('log.build.done', {
-            b: buildingName(p.building as string),
+            b: buildingName(data.buildings[p.building as string]?.name, p.building as string),
             at: p.planetId as string,
           }),
         );
@@ -3133,7 +3108,7 @@ function handleEvents(events: DomainEvent[]) {
       case 'building.upgraded':
         note(
           t('log.build.upgraded', {
-            b: buildingName(p.building as string),
+            b: buildingName(data.buildings[p.building as string]?.name, p.building as string),
             lvl: String(p.level),
             at: p.planetId as string,
           }),
@@ -3142,7 +3117,7 @@ function handleEvents(events: DomainEvent[]) {
       case 'building.destroyed':
         note(
           t('log.build.destroyed', {
-            b: buildingName(p.building as string),
+            b: buildingName(data.buildings[p.building as string]?.name, p.building as string),
             at: p.planetId as string,
           }),
           p.planetId as string,
@@ -5659,7 +5634,7 @@ function unknownPlanetHtml(p: Planet): string {
   if (mem) {
     const icons =
       mem.buildings
-        .map((b) => `${BUILD_ICON[b.type] ?? '▪'} ${buildingName(b.type)} L${b.level}`)
+        .map((b) => `${BUILD_ICON[b.type] ?? '▪'} ${buildingName(data.buildings[b.type]?.name, b.type)} L${b.level}`)
         .join(', ') || t('side.scan.no-buildings');
     // Espionage from memory: you know WHOSE world this was — an agent can reveal
     // its live contents without flying there. Wrong/stale owner → the kernel
@@ -5734,7 +5709,7 @@ function planetSummaryHtml(p: Planet): string {
     p.buildings
       .map(
         (b) =>
-          `${BUILD_ICON[b.type] ?? '▣'} ${buildingName(b.type)}${b.level > 1 ? ' L' + b.level : ''}`,
+          `${BUILD_ICON[b.type] ?? '▣'} ${buildingName(data.buildings[b.type]?.name, b.type)}${b.level > 1 ? ' L' + b.level : ''}`,
       )
       .join(', ') || t('side.none');
   rows.push(
@@ -5935,7 +5910,7 @@ function planetPanelHtml(p: Planet): string {
       const def = data.buildings[b.type];
       const max = def ? buildingMaxLevel(def) : 1;
       const prod = def ? producesLine(buildingLevel(def, b.level).produces) : '';
-      blds += `<div class="asset-row" data-desc="b:${b.type}:${b.level}"><span class="bicon">${BUILD_ICON[b.type] ?? '▪'}</span><b>${buildingName(b.type)}</b><span class="dim">L${b.level}/${max} · ${t('side.build.hp')} ${floor(b.hp)}/${hpOfLevel(b.type, b.level)}${prod ? ` · <span class="prod">${prod}</span>` : ''}</span>`;
+      blds += `<div class="asset-row" data-desc="b:${b.type}:${b.level}"><span class="bicon">${BUILD_ICON[b.type] ?? '▪'}</span><b>${buildingName(data.buildings[b.type]?.name, b.type)}</b><span class="dim">L${b.level}/${max} · ${t('side.build.hp')} ${floor(b.hp)}/${hpOfLevel(b.type, b.level)}${prod ? ` · <span class="prod">${prod}</span>` : ''}</span>`;
       if (mine && b.level < max) {
         const c = def?.upgrades[b.level - 1]?.cost;
         // hovering Upgrade previews the NEXT level's dossier (output it will unlock)
@@ -5985,7 +5960,6 @@ interface Dossier {
   name: string;
   body: string;
 }
-const hl = (v: string | number): string => `<em class="hl">${v}</em>`;
 
 function buildingDossier(id: string, level: number): Dossier | null {
   const def = data.buildings[id];
@@ -6119,7 +6093,6 @@ function unitDossier(id: string): Dossier | null {
   }
 }
 
-const round1 = (n: number): number => Math.round(n * 10) / 10;
 
 /** "+10 металл/ч, +5 кредиты/ч" — the always-visible output readout on a built
  *  building's row (not just on hover). Empty string for a produces-less building
@@ -7105,7 +7078,7 @@ function codexTile(
 ): string {
   if (!(kind === 'b' ? data.buildings[id] : data.units[id])) return '';
   const icon = kind === 'b' ? (BUILD_ICON[id] ?? '▣') : unitIconHtml(id);
-  const name = kind === 'b' ? buildingName(id) : (unitDossier(id)?.name ?? displayUnit(id));
+  const name = kind === 'b' ? buildingName(data.buildings[id]?.name, id) : (unitDossier(id)?.name ?? displayUnit(id));
   if (lockedFor) {
     // Committed already — a dim, non-ordering tile. Keeps data-desc (hover dossier),
     // drops data-codex/data-buildorder so neither left- nor right-click builds again.
@@ -7170,7 +7143,7 @@ const CODEX_SECTIONS: Array<[CodexCategory, string]> = [
 function codexEntryLabel(e: CodexEntry): string {
   const id = e.key.slice(2);
   if (e.category === 'unit') return unitDossier(id)?.name ?? displayUnit(id);
-  if (e.category === 'building') return buildingName(id);
+  if (e.category === 'building') return buildingName(data.buildings[id]?.name, id);
   return t(e.titleKey ?? e.title); // mechanic: the heading lives in the locale
 }
 function codexEntryIcon(e: CodexEntry): string {
@@ -8872,13 +8845,6 @@ divDesignWin.addEventListener('click', (e) => {
 // Producer buildings echo these in BUILD_ICON — keep both in sync. These TEXT glyphs
 // serve inline prose (cost strings, notes, market rows); the top-bar capsules draw
 // the richer RES_SVG line icons below instead.
-const TECH_CUR: Record<string, string> = {
-  credits: '⛁',
-  food: '⚘',
-  metal: '❒',
-  energy: 'ϟ',
-  microelectronics: '▣',
-};
 // Bar-only display icons: inline SVG line art traced from the mock (two coin rings,
 // isometric cube, sprout, bolt, IC chip). stroke=currentColor so the capsule states
 // (.short red, .dead dim) tint them exactly like a text glyph.
@@ -8900,7 +8866,6 @@ const SOV_SVG =
 /** Resource token for innerHTML strings, tinted with the resource's accent colour
  *  (mock palette; .rc-* rules in the stylesheet). Plain-text contexts (toasts,
  *  titles) keep the bare TECH_CUR glyph — colour can't ride along there. */
-const curIc = (r: string): string => `<span class="rc-${r}">${TECH_CUR[r] ?? r[0]}</span>`;
 const TECH_BRANCHES: Array<{ key: string; label: string }> = [
   { key: 'space', label: 'tech.branch.space' },
   { key: 'ground', label: 'tech.branch.ground' },
@@ -14882,9 +14847,6 @@ let corpTab = 'overview';
 // Declaration, not `const`: the profile sheet (defined far above) formats numbers
 // with it, and esbuild lowers a top-level const to `var` — the exact TDZ trap that
 // once broke the boot chain via `httpBase`. A hoisted function has no such window.
-function nfmt(n: number): string {
-  return n.toLocaleString('ru-RU');
-}
 
 // --- live state (fetched via corpFetch — see refreshCorp) --------------------
 let corpMine: { corp: CorpRecord | null; membership: CorpMembership | null } = {
