@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "browser": {
+      "command": "node",
+      "args": ["scripts/mcp-browser.mjs"]
+    }
+  }
+}
