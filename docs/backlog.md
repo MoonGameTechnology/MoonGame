@@ -1908,8 +1908,13 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
   кухонного `DivState` из `game.ts` — тот же паттерн, что `capital.ts`/`standingOrders.ts`.
   `game.ts` импортирует и реэкспортирует. Гейт зелёный (182 файла, 1974 теста — число не
   изменилось, чистый перенос; `game.ts` 2098→1851 строка).
-- **REFP-25** ⏳ `[proto]` **`stewardGuard.ts`** — `stewardGuardOrders` (4623–4994).
-  Тест: `stewardGuard.test.ts`.
+- **REFP-25** ✅ `[proto]` **`stewardGuard.ts`** — `stewardGuardOrders` + его
+  эвакуационные хелперы (`liftable`, анти-челночный `EVAC_RETURN_COOLDOWN_H`) вынесены
+  в `prototype/src/stewardGuard.ts` чистым переносом; узкая проекция `GuardState`
+  (patrols-peek) — по паттерну division/serverDrivers. Заодно `orderAuto`/
+  `orderScramble` вытащены вперёд в `actions.ts` (лист-билдеры; гвардия и `aiOrders`
+  зовут их без обратного ребра — прецедент `castHeroAbility`). `game.ts` 1223→862
+  строки. Тест: `stewardGuard.test.ts` (25.5k, не менялся). Гейт зелёный (1993).
 - **REFP-26** ⏳ `[proto]` **`ai.ts`** — `SeatAiKind`, `SeatAiDecision`, `seatAiDecision`,
   `aiOrders` (4995–5289).
 - **REFP-27** ✅ `[proto]` **`canTraverse`** — вынесен вместе с REFP-22 в
