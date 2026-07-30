@@ -164,6 +164,24 @@ export const en: Record<string, string> = {
   'chat.win.stamp.time': 'Time',
   'chat.win.title': 'CHAT — {ch}',
 
+  // --- client — PWA-first web client (packages/client): app-shell status lines.
+  'client.engine.ready': 'engine ready · t={time}',
+  'client.net.closed': '✖ Connection closed',
+  'client.net.connecting': '⇄ Connecting to match…',
+  'client.net.hint-fleet': 'tap your fleet',
+  'client.net.hint-target': 'tap a target',
+  'client.net.online': '● Online · you are {me} · {hint}',
+  'client.net.order': '▸ Order: {fleet} → {planet}',
+  'client.net.waiting': '⏳ Waiting for players…{suffix}',
+  'client.net.waiting-you': ' · you are {me}',
+  'client.provider.soon': 'soon',
+  'client.status.error': '✖ {text}',
+  'client.status.guest-notice': ' · sign in with {provider} soon — guest for now',
+  'client.status.new-commander': '→ Browse matches · new commander "{nick}"{notice}',
+  'client.status.returning': '→ Browse matches · {nick}',
+  'client.status.returning-fallback': 'returning',
+  'client.status.single': '▶ Solo game — starting sandbox… (engine in the browser)',
+
   // --- cmd — Командная панель флота: приказы, режим огня артиллерии, способности героя.
   'cmd.assault': 'Assault',
   'cmd.assault.hint': 'fly to an enemy world and land troops on arrival',
@@ -669,6 +687,15 @@ export const en: Record<string, string> = {
   'hint.squadron-launched': '🛩 squadron launched — steer it onto the target',
   'hint.standing-sortie': '🛩 standing patrol on — the wing strikes any enemy in range',
 
+  // --- loadout — Ship loadout editor (packages/client): stat-preview labels.
+  'loadout.stat.attack': 'Attack damage',
+  'loadout.stat.cargo': 'Cargo',
+  'loadout.stat.defense': 'Defense damage',
+  'loadout.stat.hp': 'Hull',
+  'loadout.stat.radar': 'Radar',
+  'loadout.stat.shield': 'Shield',
+  'loadout.stat.speed': 'Speed',
+
   // --- map — Значки на карте: фазы боя.
   'map.badge.landing': '⚒ ground',
   'map.badge.orbit': '⚔ orbital',
@@ -929,6 +956,7 @@ export const en: Record<string, string> = {
   'err.no-fleet': 'fleet not found',
   'err.no-funds': 'insufficient funds',
   'err.no-hero': 'hero not found',
+  'err.no-nick': 'Enter a callsign.',
   'err.no-node': 'unknown skill-tree node',
   'err.no-planet': 'world not found',
   'err.no-player': 'player not found',
@@ -947,6 +975,7 @@ export const en: Record<string, string> = {
   'err.same-location': 'fleet is already here',
   'err.too-early': 'too early',
   'err.unknown-building': 'unknown building',
+  'err.unknown-provider': 'Unknown provider.',
   'err.unknown-technology': 'unknown technology',
   'err.unknown-unit': 'unknown unit',
   'err.wrong-branch': 'that node belongs to another branch',
@@ -1780,6 +1809,7 @@ export const en: Record<string, string> = {
   'welcome.support': 'Support',
   'welcome.tagline': 'Edge of the Void',
   'welcome.terms': 'Terms',
+  'welcome.title': 'VOID DOMINION',
   'welcome.testmode': '🧪 Tests · developer mode',
   'welcome.update-check': 'Check for updates',
 

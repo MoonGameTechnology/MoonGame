@@ -165,6 +165,24 @@ export const ru: Record<string, string> = {
   'chat.win.stamp.time': 'Время',
   'chat.win.title': 'ЧАТ — {ch}',
 
+  // --- client — PWA-first веб-клиент (packages/client): статусы шелла-приложения.
+  'client.engine.ready': 'движок готов · t={time}',
+  'client.net.closed': '✖ Соединение закрыто',
+  'client.net.connecting': '⇄ Подключение к матчу…',
+  'client.net.hint-fleet': 'тапните свой флот',
+  'client.net.hint-target': 'тапните цель',
+  'client.net.online': '● Онлайн · вы {me} · {hint}',
+  'client.net.order': '▸ Приказ: {fleet} → {planet}',
+  'client.net.waiting': '⏳ Ожидание игроков…{suffix}',
+  'client.net.waiting-you': ' · вы {me}',
+  'client.provider.soon': 'скоро',
+  'client.status.error': '✖ {text}',
+  'client.status.guest-notice': ' · вход через {provider} скоро — пока гость',
+  'client.status.new-commander': '→ Обзор матчей · новый командир «{nick}»{notice}',
+  'client.status.returning': '→ Обзор матчей · {nick}',
+  'client.status.returning-fallback': 'возвращение',
+  'client.status.single': '▶ Одиночная игра — запуск песочницы… (движок в браузере)',
+
   // --- cmd — Командная панель флота: приказы, режим огня артиллерии, способности героя.
   'cmd.assault': 'Штурм',
   'cmd.assault.hint': 'лететь к чужому миру и высадить десант при подходе',
@@ -669,6 +687,15 @@ export const ru: Record<string, string> = {
   'hint.squadron-launched': '🛩 эскадрилья запущена — ведите её на цель',
   'hint.standing-sortie': '🛩 дежурный вылет включён — эскадрилья бьёт врага в радиусе',
 
+  // --- loadout — Оснащение корабля (packages/client): подписи характеристик в превью.
+  'loadout.stat.attack': 'Урон в атаке',
+  'loadout.stat.cargo': 'Трюм',
+  'loadout.stat.defense': 'Урон в защите',
+  'loadout.stat.hp': 'Корпус',
+  'loadout.stat.radar': 'Радар',
+  'loadout.stat.shield': 'Щит',
+  'loadout.stat.speed': 'Скорость',
+
   // --- map — Значки на карте: фазы боя.
   'map.badge.landing': '⚒ десант',
   'map.badge.orbit': '⚔ орбита',
@@ -930,6 +957,7 @@ export const ru: Record<string, string> = {
   'err.no-fleet': 'флот не найден',
   'err.no-funds': 'не хватает средств',
   'err.no-hero': 'герой не найден',
+  'err.no-nick': 'Введите позывной.',
   'err.no-node': 'неизвестный узел дерева',
   'err.no-planet': 'мир не найден',
   'err.no-player': 'игрок не найден',
@@ -948,6 +976,7 @@ export const ru: Record<string, string> = {
   'err.same-location': 'флот уже здесь',
   'err.too-early': 'слишком рано',
   'err.unknown-building': 'неизвестное здание',
+  'err.unknown-provider': 'Неизвестный провайдер.',
   'err.unknown-technology': 'неизвестная технология',
   'err.unknown-unit': 'неизвестный юнит',
   'err.wrong-branch': 'узел чужой ветви',
@@ -1777,6 +1806,7 @@ export const ru: Record<string, string> = {
   'welcome.support': 'Поддержка',
   'welcome.tagline': 'Грань пустоты',
   'welcome.terms': 'Условия',
+  'welcome.title': 'VOID DOMINION',
   'welcome.testmode': '🧪 Тесты · режим разработчика',
   'welcome.update-check': 'Проверить обновления',
 

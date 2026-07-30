@@ -41,10 +41,17 @@ const hasCyrillic = (s: string): boolean => /[А-Яа-яЁё]/.test(s);
  *  виду литерала однозначно понятно, ключ это или мост. */
 const KEY_RE = /^[a-z][a-z0-9-]*(?:\.[a-z0-9-]+)+$/;
 
-const srcFiles = (): string[] =>
-  readdirSync(path.join(repoRoot, 'prototype/src'))
+/** Every `/localization` consumer's source — prototype (`prototype/src`) and, since
+ *  LOC-3, the PWA client (`packages/client/src`). Both read the same shared pool, so
+ *  the orphan/leak checks below must see both or a client-only key reads as dead. */
+const srcFiles = (): string[] => [
+  ...readdirSync(path.join(repoRoot, 'prototype/src'))
     .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
-    .map((f) => `prototype/src/${f}`);
+    .map((f) => `prototype/src/${f}`),
+  ...readdirSync(path.join(repoRoot, 'packages/client/src'))
+    .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+    .map((f) => `packages/client/src/${f}`),
+];
 
 /** Первый строковый аргумент каждого `t(…)` / `tData(…)`. Идём посимвольно (regex
  *  ломается на `{placeholders}` / апострофах / переносах): на вызове читаем литерал,

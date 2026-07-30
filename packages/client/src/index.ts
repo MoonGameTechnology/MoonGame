@@ -82,7 +82,7 @@ export {
   createWelcomeModel,
   resolveWelcomeAction,
   nextCallsign,
-  ruStrings,
+  defaultStrings,
   CALLSIGNS,
   type WelcomeModel,
   type WelcomeStrings,

@@ -10,6 +10,7 @@
  * layer are later bricks (CP0.2 / CP1.x). No forked copy of the core or its data.
  */
 import { createInitialState, type GameState } from '@void/shared-core';
+import { t } from './i18n';
 import { theme } from './theme';
 import { createWelcomeModel, resolveWelcomeAction, nextCallsign } from './welcomeScreen';
 import type { WelcomeModel, WelcomeOutcome, AuthProviderId } from './welcomeScreen';
@@ -50,22 +51,24 @@ const esc = (v: string): string => v.replace(/[&<>"']/g, (c) => ENTITIES[c] ?? c
 let callsignSeq = 0;
 
 const REJECTIONS: Record<string, string> = {
-  E_NO_NICK: 'Введите позывной.',
-  E_UNKNOWN_PROVIDER: 'Неизвестный провайдер.',
+  E_NO_NICK: t('err.no-nick'),
+  E_UNKNOWN_PROVIDER: t('err.unknown-provider'),
 };
 
 /** Turn a routing outcome into a human status line. Routes are stubbed until the
  *  match browser (CP) and single-player sandbox land — this proves the wiring. */
 function statusText(outcome: WelcomeOutcome): string {
-  if (!outcome.ok) return `✖ ${REJECTIONS[outcome.code] ?? outcome.code}`;
-  if (outcome.route === 'single') return '▶ Одиночная игра — запуск песочницы… (движок в браузере)';
+  if (!outcome.ok) return t('client.status.error', { text: REJECTIONS[outcome.code] ?? outcome.code });
+  if (outcome.route === 'single') return t('client.status.single');
   if (outcome.mode === 'new') {
     const nick = nextCallsign(callsignSeq++);
     const notice =
-      outcome.noticeKey === 'guest_stub' ? ` · вход через ${outcome.provider ?? '—'} скоро — пока гость` : '';
-    return `→ Обзор матчей · новый командир «${nick}»${notice}`;
+      outcome.noticeKey === 'guest_stub'
+        ? t('client.status.guest-notice', { provider: outcome.provider ?? '—' })
+        : '';
+    return t('client.status.new-commander', { nick, notice });
   }
-  return `→ Обзор матчей · ${outcome.nick ?? 'возвращение'}`;
+  return t('client.status.returning', { nick: outcome.nick ?? t('client.status.returning-fallback') });
 }
 
 function render(model: WelcomeModel): void {
@@ -85,7 +88,7 @@ function render(model: WelcomeModel): void {
     model.providers
       .map(
         (p) =>
-          `<button class="btn stub" data-act="signIn" data-provider="${p.id}" title="${p.available ? '' : 'скоро'}">${esc(p.label)}</button>`,
+          `<button class="btn stub" data-act="signIn" data-provider="${p.id}" title="${p.available ? '' : t('client.provider.soon')}">${esc(p.label)}</button>`,
       )
       .join('') +
     `</div>` +
@@ -150,7 +153,7 @@ function showEngine(): void {
   const el = document.getElementById('engine');
   if (!el) return;
   const state = createInitialState({ seed: 'welcome', version: { data: '0.1.0', manifest: '1' } });
-  el.textContent = `движок готов · t=${state.time}`;
+  el.textContent = t('client.engine.ready', { time: state.time });
 }
 
 let matchStarted = false;
@@ -300,13 +303,20 @@ function connectLive(url: string): void {
   let selectedFleet: string | null = null;
   let seq = 1;
   const hint = (): void => {
-    if (me) setNetStatus(`● Онлайн · вы ${me} · ${selectedFleet ? 'тапните цель' : 'тапните свой флот'}`);
+    if (me) {
+      setNetStatus(
+        t('client.net.online', {
+          me,
+          hint: selectedFleet ? t('client.net.hint-target') : t('client.net.hint-fleet'),
+        }),
+      );
+    }
   };
-  setNetStatus('⇄ Подключение к матчу…');
+  setNetStatus(t('client.net.connecting'));
   const { client } = openLiveMatch(url, {
     onStatus: (s) => {
-      if (s === 'connecting') setNetStatus('⇄ Подключение к матчу…');
-      else if (s === 'closed') setNetStatus('✖ Соединение закрыто');
+      if (s === 'connecting') setNetStatus(t('client.net.connecting'));
+      else if (s === 'closed') setNetStatus(t('client.net.closed'));
     },
     onError: (code) => setNetStatus(`✖ ${code}`),
     onSnapshot: (snap) => {
@@ -317,7 +327,9 @@ function connectLive(url: string): void {
         client.start(); // host of an unstarted lobby → run the world
       }
       const waiting = snap.lobby ? !snap.lobby.started : !!snap.waiting;
-      if (waiting) setNetStatus(`⏳ Ожидание игроков…${me ? ` · вы ${me}` : ''}`);
+      if (waiting) {
+        setNetStatus(t('client.net.waiting', { suffix: me ? t('client.net.waiting-you', { me }) : '' }));
+      }
       else hint();
       if (!running) {
         running = true;
@@ -337,7 +349,7 @@ function connectLive(url: string): void {
               const f = live.fleets[selectedFleet];
               if (f && f.location && f.location !== planetId) {
                 client.sendAction(moveAction(me, seq++, selectedFleet, planetId));
-                setNetStatus(`▸ Приказ: ${selectedFleet} → ${planetId}`);
+                setNetStatus(t('client.net.order', { fleet: selectedFleet, planet: planetId }));
                 selectedFleet = null;
                 return;
               }

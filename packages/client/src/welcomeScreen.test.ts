@@ -3,7 +3,7 @@ import {
   createWelcomeModel,
   resolveWelcomeAction,
   nextCallsign,
-  ruStrings,
+  defaultStrings,
   CALLSIGNS,
   type AuthProviderId,
 } from './welcomeScreen';
@@ -12,7 +12,7 @@ describe('createWelcomeModel', () => {
   it('describes the screen from the default (RU) strings', () => {
     const m = createWelcomeModel();
     expect(m.title).toBe('VOID DOMINION');
-    expect(m.tagline).toBe(ruStrings.tagline);
+    expect(m.tagline).toBe(defaultStrings.tagline);
     expect(m.language).toBe('ru');
     expect(m.legal.map((l) => l.id)).toEqual(['imprint', 'terms', 'privacy', 'support']);
   });
@@ -25,7 +25,7 @@ describe('createWelcomeModel', () => {
 
   it('is i18n-driven — a custom strings bundle flows through', () => {
     const m = createWelcomeModel({
-      ...ruStrings,
+      ...defaultStrings,
       title: 'VD',
       newPlayer: 'New',
       providerLabels: { google: 'G', apple: 'A' },
@@ -114,9 +114,11 @@ describe('resolveWelcomeAction', () => {
 
 describe('nextCallsign', () => {
   it('is deterministic: word cycles, suffix counts up from 1', () => {
-    expect(nextCallsign(0)).toBe('Носорог-1');
-    expect(nextCallsign(1)).toBe('Комета-2');
-    expect(nextCallsign(CALLSIGNS.length)).toBe('Носорог-9');
+    // Words come from the active locale (`t('callsign.*')`, LOC-3) — assert against
+    // `CALLSIGNS` itself, not a hardcoded language, so the test passes under any locale.
+    expect(nextCallsign(0)).toBe(`${CALLSIGNS[0]}-1`);
+    expect(nextCallsign(1)).toBe(`${CALLSIGNS[1]}-2`);
+    expect(nextCallsign(CALLSIGNS.length)).toBe(`${CALLSIGNS[0]}-9`);
   });
 
   it('stays in range for any sequence number', () => {
