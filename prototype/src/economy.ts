@@ -18,7 +18,7 @@ import {
 } from '../../packages/shared-core/src/index';
 import { isInhabited, civicTax, inhabitedWorldCount, TAX_OFFICE_BONUS } from './tax';
 import { data } from './prototypeData';
-import { HOUR } from './game';
+import { HOUR } from './time';
 
 /** ECON-6: почасовой экономический срез для пайплайна наблюдений хоста — казна /
  *  чистый приток / arrears per player на мировом времени `state.time`. Чистая

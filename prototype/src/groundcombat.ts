@@ -1,4 +1,4 @@
-import type { FormationUnit } from './game';
+import type { FormationUnit } from './formations';
 
 // --- ground combat: type-matrix damage, weighted by the target's composition --
 // Iron-Order-style. Each unit type carries TWO damage tables, attack and defence,
