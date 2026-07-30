@@ -166,3 +166,99 @@ export const marketList = (
   amount: number,
   price: number,
 ) => act(playerId, 'market.list', { side, resource, amount, price });
+
+// REFP-22 (остаток): the second, scattered builder batch — the state it was
+// interleaved with in game.ts has since been extracted (patrol REFP-23, chains
+// REFP-8, divisions REFP-13, market REFP-12), leaving pure leaf builders.
+import type { SortieState } from './squadron';
+import type { ChainStep } from './chain';
+/** The patrol driver's runtime stamp: burned fuel / ticked rearm / next cadence mark. */
+export const patrolStamp = (
+  playerId: string,
+  fleetId: string,
+  sortie: SortieState,
+  rearmAt?: number,
+) =>
+  act(
+    playerId,
+    'patrol.stamp',
+    rearmAt === undefined ? { fleetId, sortie } : { fleetId, sortie, rearmAt },
+  );
+/** CC-1: set (or [] = cancel) an owned fleet's whole order chain atomically. */
+export const orderChain = (playerId: string, fleetId: string, steps: ChainStep[]) =>
+  act(playerId, 'order.chain', { fleetId, steps });
+/** BOOST-1: toggle форс-марш on an owned fleet (+50% speed, hull wear in transit). */
+export const forceMarchFleet = (playerId: string, fleetId: string, on: boolean) =>
+  act(playerId, 'fleet.forcemarch', { fleetId, on });
+/** Платный мгновенный ремонт корпуса всего флота (цена — `instantRepairCost`). */
+export const instantRepairFleet = (playerId: string, fleetId: string) =>
+  act(playerId, 'fleet.instantRepair', { fleetId });
+/** ECON-3а: экспресс-ремонт за metal у своего дока (цена — `dockRepairCost`). */
+export const repairFleet = (playerId: string, fleetId: string) =>
+  act(playerId, 'fleet.repair', { fleetId });
+/** The chain driver's runtime stamp: consumed head / armed wait deadline. */
+export const chainStamp = (
+  playerId: string,
+  fleetId: string,
+  steps: ChainStep[],
+  waitUntil?: number,
+) =>
+  act(
+    playerId,
+    'chain.stamp',
+    waitUntil === undefined ? { fleetId, steps } : { fleetId, steps, waitUntil },
+  );
+
+/** Take (fill) up to `amount` from an open lot — buy from a sell lot / sell into a buy lot. */
+export const marketTake = (playerId: string, id: string, amount?: number) =>
+  act(playerId, 'market.take', amount === undefined ? { id } : { id, amount });
+/** Reclaim your own lot, refunding its remaining escrow. */
+export const marketCancel = (playerId: string, id: string) =>
+  act(playerId, 'market.cancel', { id });
+/** Mobilise division template `template` (0-based) on your world `planetId`.
+ *  `officer` = build from the named OFFICER_TEMPLATES roster instead (locked premades). */
+export const mobilizeDivision = (
+  playerId: string,
+  planetId: string,
+  template: number,
+  officer = false,
+) =>
+  act(
+    playerId,
+    'division.mobilize',
+    officer ? { planetId, template, officer: true } : { planetId, template },
+  );
+/** Rename your CUSTOM division template (designer menu). */
+export const renameDivisionTemplate = (playerId: string, template: number, name: string) =>
+  act(playerId, 'division.rename', { template, name });
+/** Assemble a template: set slot `slot` of your template `template` to `unit` (null = clear). */
+export const setDivisionTemplate = (
+  playerId: string,
+  template: number,
+  slot: number,
+  unit: string | null,
+) => act(playerId, 'division.template', { template, slot, unit });
+/** Load a garrisoning division into a co-located, idle fleet (by free hold). */
+export const loadDivision = (playerId: string, divisionId: string, fleetId: string) =>
+  act(playerId, 'division.load', { divisionId, fleetId });
+/** Unload a carried division onto the world its carrier is docked over. */
+export const unloadDivision = (playerId: string, divisionId: string) =>
+  act(playerId, 'division.unload', { divisionId });
+/** Designate one of your inhabited worlds as your capital (hero respawn / re-fit anchor). */
+export const designateCapital = (playerId: string, planetId: string) =>
+  act(playerId, 'capital.designate', { planetId });
+
+// --- hero engine (core heroModule, HERO-3..9): the data-driven hero actions ---
+// `castHeroAbility` moved to `actions.ts` (REFP-24) — imported/re-exported in the
+// REFP-22 block above alongside its siblings.
+/** Raise an undeployed hero's ship at an owned world (or own fleet / allied world
+ *  when the hero carries the matching spawn-marker ability). */
+export const spawnHero = (playerId: string, heroId: string, at: string) =>
+  act(playerId, 'hero.spawn', { heroId, at });
+/** Unlock a hero skill-tree node (branch/requires/cost gate the order). */
+export const unlockHeroSkill = (playerId: string, heroId: string, node: string) =>
+  act(playerId, 'hero.skill.unlock', { heroId, node });
+/** Install a ship fitting into one of the hero archetype's slots (no refit). */
+export const fitHero = (playerId: string, heroId: string, fitting: string) =>
+  act(playerId, 'hero.fit', { heroId, fitting });
+

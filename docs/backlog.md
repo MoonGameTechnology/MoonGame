@@ -1876,16 +1876,14 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
   импортирует `ctx` для `stewardGuardOrders` и реэкспортирует всё; 24 осиротевших
   импорта модулей ядра сняты с `game.ts` (их собирает protoKernel). `game.ts`
   1326→1223 строк. Гейт зелёный (1993 теста — число не изменилось).
-- **REFP-22** 🔶 `[proto]` **`actions.ts`** — первый, полностью самодостаточный
-  кластер экшен-билдеров (`moveFleet`…`spyOn`, 28 функций) вынесен в
-  `prototype/src/actions.ts` вместе с приватным хелпером `act`/`seqCounter`
-  (реэкспортирован из `actions.ts` для оставшихся, ещё не вынесенных билдеров
-  `game.ts`, чтобы не форкать общую последовательность id). Зависел только от
-  shared-core типов + `getStance`. **Остаток кирпича:** второй, разбросанный
-  кластер (market/division/hero/chain-заказы — `marketTake`/`loadDivision`/
-  `spawnHero`/`orderChain`/…) переплетён с состоянием, которое сам `game.ts` ещё
-  держит (Patrol-драйвер REFP-23, дивизии REFP-13) — не в этом заходе. Гейт
-  зелёный (175 файлов, 1900 тестов).
+- **REFP-22** ✅ `[proto]` **`actions.ts`** — оба кластера экшен-билдеров вынесены.
+  Первый заход: самодостаточный кластер `moveFleet`…`spyOn` (28 функций) + приватный
+  `act`/`seqCounter` + `canTraverse` (REFP-27). Второй, «разбросанный» кластер
+  (patrol/chain-штампы, форс-марш/ремонты, market/division/capital/hero-заказы)
+  доехал после того, как состояние, с которым он был переплетён, вынесли
+  (REFP-13/23/25/26) — остались чистые лист-билдеры; с ними едут только типы
+  `SortieState`/`ChainStep`/`MarketSide`. `game.ts` реэкспортирует всё (до REFP-28).
+  Гейт зелёный (1993 теста — число не изменилось).
 - **REFP-23** ✅ `[proto]` **`patrol.ts`** — `Patrol`, `patrolTarget`, `scrambleOrder`
   вынесены в `prototype/src/patrol.ts` (depends on `squadron.ts`'s `SortieState`/
   `canSortie`/`spendSortie`/`withinRange`, REFP-7, and `actions.ts`'s `engageFleet`/
