@@ -1738,8 +1738,9 @@ pnpm run prototype   # собрать prototype/dist/void-dominion{,-player}.htm
 (полный `strict` + `noUncheckedIndexedAccess`, DOM-lib) накрывает `src/**` +
 `netserver.ts` + `/localization`, `pnpm run typecheck` гоняет его после workspace-пакетов
 — 91 накопившаяся ошибка починена по-настоящему (в т.ч. TDZ-класс `authMode`,
-расхождение словаря `ChainStep`, битые l10n-фолбэки юнитов). Из ESLint прототип пока
-исключён (свой esbuild), но это уже НЕ throwaway — это играбельный клиент игроков.
+расхождение словаря `ChainStep`, битые l10n-фолбэки юнитов). **ESLint зона тоже прошла (REFM-0.1)** — `prototype/**` больше не в `ignores`,
+правила общие с пакетами, единственная настройка — Node-глобалы для `*.mjs`-скриптов
+зоны. Это уже НЕ throwaway — это играбельный клиент игроков.
 Разработка — на фиче-ветке, PR (draft).
 
 Поверх юнитов — **property/fuzz-слой ядра** (fast-check, playtest-hardening FUZZ-1…4,

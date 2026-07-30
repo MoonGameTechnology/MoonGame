@@ -7,8 +7,8 @@
  *  Everything for it lives in THIS file plus a few clearly fenced hooks in the
  *  shared code. To cut the whole feature without a trace:
  *    1. delete this file (prototype/src/sandbox.ts);
- *    2. remove the `<!-- SANDBOX -->` HTML blocks + the `/* SANDBOX *​/` CSS
- *       block in prototype/build.mjs;
+ *    2. remove the `<!-- SANDBOX -->` HTML blocks + the CSS block fenced by the
+ *       SANDBOX marker comments in prototype/build.mjs;
  *    3. remove the `SANDBOX` import + the fenced hooks in prototype/src/main.ts
  *       (the setup checkbox, the frame-loop `enforceSandbox` call, the fog gate,
  *       the free-build snapshot in the order path, and the `initSandbox(...)`

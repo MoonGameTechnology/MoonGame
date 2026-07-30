@@ -218,7 +218,6 @@ import {
   filterArsenal,
   gradesOf,
   originOf,
-  ownedDefIds,
   parseArsenalItems,
   type ArsenalFilter,
 } from './arsenal';
@@ -3487,7 +3486,7 @@ function checkEnd() {
   let levelUp: number | null = null;
   const awardKey = 'vd.xpawarded.' + (nickInput.value.trim() || 'guest');
   const endStamp = String(s.match.endedAt ?? 'ended');
-  let prior: { at: string; xp: number } | null = null;
+  let prior: { at: string; xp: number } | null;
   try {
     prior = JSON.parse(localStorage.getItem(awardKey) ?? 'null') as { at: string; xp: number } | null;
   } catch {
@@ -6169,7 +6168,7 @@ function taskDossier(
       : `${BUILD_ICON[building] ?? '▣'} ${tData(def.name)}`;
   const ramp = thresholdRamp(progress);
   let base: Record<string, number> = {};
-  let final: Record<string, number> = {};
+  let final: Record<string, number>;
   if (kind === 'upgrade' && typeof level === 'number') {
     const instance = s.planets[planetId]?.buildings.find((b) => b.type === building);
     base = instance ? buildingLevel(def, instance.level).produces : {};
@@ -7131,14 +7130,6 @@ function garrisonTilesHtml(stacks: Array<{ unit: string; count: number }>): stri
   return tiles
     ? `<div class="ptiles">${tiles}</div>`
     : `<div class="row dim">${t('side.tiles.empty')}</div>`;
-}
-/** A row of ship/troop tiles for a fleet's composition — tap one for its full specs. */
-function unitTilesHtml(stacks: Array<{ unit: string; count: number }>): string {
-  const tiles = stacks
-    .filter((u) => u.count > 0)
-    .map((u) => codexTile('u', u.unit, '×' + u.count))
-    .join('');
-  return tiles ? `<div class="ptiles">${tiles}</div>` : '';
 }
 function openCodex(key: string): void {
   const [kind, id] = key.split(':');
@@ -10131,9 +10122,6 @@ function conLoadoutPane(hullList: string[]): string {
     `<button class="cn-build" data-cnbuild ${canBuild ? '' : 'disabled'}>${t('yard.build', { n: String(conCount) })}</button>` +
     `<div class="cn-lock">🔒 <span>${t('yard.loadout.note')}</span></div></div>`;
   return `<div class="cn-grid">${left}${right}</div>`;
-}
-function conSoonPane(what: string): string {
-  return `<div class="cn-soon"><div class="cn-si">🚧</div>${t('yard.soon', { what })}</div>`;
 }
 /** The «Армия» pane: edit a division template's 6 slots (per-player, global). Live
  *  aggregate stats + synergies; mobilisation stays in the planet panel. */

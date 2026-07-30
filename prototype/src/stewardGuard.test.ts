@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { stewardGuardOrders, aiOrders, order, advance, data, HOUR } from './game';
+import { stewardGuardOrders, aiOrders, order, advance, HOUR } from './game';
 import {
   createInitialState,
   type Fleet,

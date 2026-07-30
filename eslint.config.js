@@ -22,13 +22,15 @@ const NON_DETERMINISTIC_MATH = [
 
 export default tseslint.config(
   {
-    // The prototype, the multiplayer test client, and the mobile (Capacitor)
-    // wrapper are throwaway demo / build glue; not part of the core or its gate.
+    // The multiplayer test client and the mobile (Capacitor) wrapper are throwaway
+    // demo / build glue; not part of the core or its gate. `prototype/` is NOT in
+    // this list any more (REFM-0.1): it is the players' playable client, so it gets
+    // the same lint as the packages — the zone's Node scripts just need their
+    // globals (see the block at the bottom).
     ignores: [
       '**/dist/**',
       '**/coverage/**',
       '**/node_modules/**',
-      'prototype/**',
       'testclient/**',
       'mobile/**',
       // Semgrep rule fixtures (SEC-2) are intentionally-broken snippets for the
@@ -78,7 +80,12 @@ export default tseslint.config(
   {
     // CI / repo-automation scripts run on Node — give them the Node globals they use
     // (the determinism rules above never apply here; this is build glue, not the core).
-    files: ['.github/**/*.{mjs,js}', 'scripts/**/*.{mjs,js}'],
+    // `prototype/*.mjs` joins them (REFM-0.1): the zone's build/host/harness scripts
+    // (build, netserver, host, doctor, perf, selfplay, browsertest, …) are the same
+    // kind of Node glue. The zone's TypeScript is linted by the shared config above —
+    // typescript-eslint turns `no-undef` off for .ts (tsc owns that check), so the
+    // browser client needs no globals list here.
+    files: ['.github/**/*.{mjs,js}', 'scripts/**/*.{mjs,js}', 'prototype/**/*.{mjs,js}'],
     languageOptions: {
       globals: {
         process: 'readonly',
@@ -88,6 +95,7 @@ export default tseslint.config(
         fetch: 'readonly',
         setTimeout: 'readonly',
         clearTimeout: 'readonly',
+        performance: 'readonly',
       },
     },
   },
