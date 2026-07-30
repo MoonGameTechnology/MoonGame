@@ -6,7 +6,7 @@ import {
   resolveLoadoutBuild,
   type LoadoutModel,
 } from './loadoutEditor';
-import { t } from './i18n';
+import { t } from '../../../localization/runtime';
 
 const data: GameData = parseGameData({
   version: '0.1.0',

@@ -25,7 +25,7 @@
  */
 import { setStance, getStance } from '../../packages/shared-core/src/index';
 import type { GameState } from '../../packages/shared-core/src/index';
-import { t } from './i18n';
+import { t } from '../../localization/runtime';
 
 /** Persistent per-match cheat toggles (the four "held" switches). */
 export interface SandboxConfig {

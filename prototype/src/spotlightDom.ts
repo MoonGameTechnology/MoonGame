@@ -14,7 +14,7 @@
  * «Далее» is the only way on; for `action`/`state` steps the panels are
  * click-through so the player operates the real HUD to advance.
  */
-import { t } from './i18n';
+import { t } from '../../localization/runtime';
 import {
   SpotlightTour,
   frameRects,

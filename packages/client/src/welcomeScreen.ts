@@ -15,7 +15,7 @@
  * outputs are JSON-serialisable, and validation is **fail-secure** — a bad action
  * yields `{ ok: false, code }` with a stable code only, never a thrown detail.
  */
-import { t } from './i18n';
+import { t } from '../../../localization/runtime';
 
 /** External sign-in providers we plan to support (docs/accounts-roadmap.md AC-1.1:
  *  Google / Apple via OIDC). Facebook from the genre reference is intentionally

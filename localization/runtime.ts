@@ -1,17 +1,24 @@
-// Тонкий рантайм локализации прототипа. Сами тексты живут в /localization —
-// здесь только выбор языка, поиск ключа и подстановка значений.
+// Рантайм локализации — ОДИН на всех потребителей (прототип и PWA-клиент).
+// Тексты живут в соседних `ru.ts` / `en.ts`; здесь только выбор языка, поиск
+// ключа и подстановка значений.
 //
 //   t('err.no-capacity')                  → текст по ключу
 //   t('fleet.eta', { n: 3 })              → '{x}' подставляет живые значения
 //   tData('Metal Mine')                   → имя игровых ДАННЫХ (→ data.metal-mine)
 //
+// До LOC-5 этот файл существовал дважды — `prototype/src/i18n.ts` и
+// `packages/client/src/i18n.ts`, — и их расхождение ничем не ловилось: правку
+// `tData()` пришлось вносить в оба места вручную. Теперь копия одна.
+//
 // Выбор языка хранится в localStorage ('vd.locale'); переключение перезагружает
 // страницу — каждый рендерер строится заново, поэтому DOM на старом языке не выживает.
-import { LOCALES, DEFAULT_LOCALE, LOCALE_LABEL, dataKey, isLocaleId } from '../../localization';
-import type { LocaleId } from '../../localization';
+import { LOCALES, DEFAULT_LOCALE, dataKey, isLocaleId } from './index';
+import type { LocaleId } from './index';
 
+// Потребителю рантайма нужны и подписи языков в переключателе — чтобы ему хватало
+// одного импорта, а не двух из соседних файлов.
 export type { LocaleId };
-export { LOCALE_LABEL };
+export { LOCALE_LABEL } from './index';
 
 const STORE_KEY = 'vd.locale';
 
