@@ -823,6 +823,7 @@ let lastCmdHtml = '';
 let lastSplitHtml = '';
 let lastHudHtml = '';
 let lastClockText = '';
+let lastTopText = ''; // row-1 dirty check (nick / standing / score / day / countdown)
 let lastObjDescHtml = '';
 let lastLogHtml = '';
 let lastAlertText = '';
@@ -840,8 +841,15 @@ const canvas = $('map') as unknown as HTMLCanvasElement;
 const cx = canvas.getContext('2d') as CanvasRenderingContext2D;
 const side = $('side');
 const logEl = $('log');
-const devlineEl = $('devline'); // status strip below the top bar: day/time + worlds/fleets/score
+const devlineEl = $('devline'); // status strip below the top bar: clock + donate currency
 const purse = $('purse');
+// top-bar row 1: nick + live standing (left), victory chip (gap), day card (right)
+const topEl = $('top');
+const tbName = $('tbname');
+const tbPlace = $('tbplace');
+const tbScore = $('tbscore');
+const tbDay = $('tbday');
+const tbEta = $('tbeta');
 const bannerEl = $('banner');
 let lastBannerHtml = ''; // dirty-check so the banner's restart button isn't recreated each frame
 const restartBtn = $('restart'); // speedbar restart (shown in the no-bots solo sandbox)
@@ -11810,7 +11818,7 @@ purse.addEventListener('click', (ev) => {
 
 // Tap the ✦ score chip → a plain-words breakdown of how the score is built and how
 // the match ends (the victory rule is otherwise invisible mid-match).
-devlineEl.addEventListener('click', (ev) => {
+topEl.addEventListener('click', (ev) => {
   if (!(ev.target as Element).closest('.dstat')) return;
   const mine = Object.values(s.planets).filter((p) => p.owner === ME);
   const worlds = mine.filter((p) => (p.kind ?? 'planet') === 'planet').length;
@@ -13228,22 +13236,46 @@ function frame(nowReal: number) {
     renderCmdBar();
     renderSplitDialog();
   }
-  // Status strip below the top bar: day/time + victory progress, plus the donate currency
-  // (Суверены ◆) pushed to the right end — it sits one level down, directly under the
-  // resource bar, instead of crowding the six session-resource chips. (World/fleet counts
-  // moved to the player card — tap the crest in the top-left corner.)
-  const d = floor(s.time / DAY) + 1;
+  // Status strip below the top bar: the in-game clock plus the donate currency
+  // (Суверены ◆) pushed to the right end — one level down from the resource row.
+  // Day + countdown live in the #daycard, victory progress in the #tbscore chip
+  // (row 1 of the bar, below). (World/fleet counts stay on the player card.)
   const h = floor((s.time % DAY) / HOUR);
   const min = floor((s.time % HOUR) / 60000);
-  const score = Math.round(s.match?.scores?.[ME]?.total ?? 0);
-  const need = Math.max(0, SCORE_LIMIT - score);
   const statusHtml =
-    `<span id="clock">${t('browser.day', { n: d })} · ${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}</span>` +
-    `<span class="dstat${need === 0 ? ' win' : ''}">✦ ${score}/${SCORE_LIMIT}${need === 0 ? ' · ★ ' + t('card.score.goal') : ''}</span>` +
+    `<span id="clock">${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}</span>` +
     `<span class="dl-donate" title="${t('hub.sovereigns')}"><i>◆</i>${kfmt(SOVEREIGNS)}</span>`;
   if (statusHtml !== lastClockText) {
     devlineEl.innerHTML = statusHtml;
     lastClockText = statusHtml;
+  }
+  // Top-bar row 1: nick + live standing («N-е из M» — the end-screen ranking formula
+  // over the LIVE scores), the ✦ victory chip in the middle gap, and the day card
+  // with a countdown to the next game day. Fixed nodes are patched by textContent
+  // (no innerHTML rebuild — the crest/who/dstat click targets stay put).
+  const d = floor(s.time / DAY) + 1;
+  const score = Math.round(s.match?.scores?.[ME]?.total ?? 0);
+  const need = Math.max(0, SCORE_LIMIT - score);
+  const sc = s.match?.scores ?? {};
+  const ranked = Object.keys(sc).sort((a, b) => (sc[b]?.total ?? 0) - (sc[a]?.total ?? 0));
+  const myPlace = ranked.indexOf(ME) + 1;
+  // identity line = the commander's callsign; solo seats are named after the HOUSE
+  // (buildSetupConfig), so an empty callsign falls back to that seat name
+  const nick = nickInput.value.trim() || s.players[ME]?.name || '';
+  const rem = DAY - (s.time % DAY);
+  const eta =
+    `${floor(rem / HOUR)}:${String(floor((rem % HOUR) / 60000)).padStart(2, '0')}:` +
+    String(floor((rem % 60000) / 1000)).padStart(2, '0');
+  const topText = `${nick}${myPlace}/${ranked.length}${score}${d}${eta}`;
+  if (topText !== lastTopText) {
+    tbName.textContent = nick;
+    // no scored seats yet (match module absent / pre-start) → no standing line
+    tbPlace.textContent = myPlace >= 1 ? t('hud.place', { p: myPlace, n: ranked.length }) : '';
+    tbScore.textContent = `✦ ${score}/${SCORE_LIMIT}`;
+    tbScore.classList.toggle('win', need === 0);
+    tbDay.textContent = t('browser.day', { n: d });
+    tbEta.textContent = t('hud.next-day', { t: eta });
+    lastTopText = topText;
   }
 
   // FPS + net overlay: FPS; when connected, append round-trip latency and a
@@ -13410,8 +13442,12 @@ if (codexEl) {
 
 // Player card: tap the top-left crest to open your session dossier (faction, worlds,
 // fleets, score, treasury); tap the backdrop or CLOSE to dismiss.
-// the left crest (emblem + title) opens the player dossier
+// the left crest (avatar + nick) opens the player dossier
 document.querySelector('.crest')?.addEventListener('click', () => openPlayerCard());
+
+// The ‹ chevron mirrors the hardware Back exactly: pop the sentinel → the popstate
+// handler closes the topmost layer, or shows the double-press "leave the match" hint.
+$('topback').addEventListener('click', () => history.back());
 
 // mirror the chosen emblem into the top-left corner + the hub avatar
 applyEmblem();
