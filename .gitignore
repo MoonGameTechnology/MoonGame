@@ -34,3 +34,6 @@ deploy/server.env
 # Tooling caches
 .turbo/
 .eslintcache
+
+# MCP browser session output (snapshots / console logs / traces)
+.playwright-mcp/

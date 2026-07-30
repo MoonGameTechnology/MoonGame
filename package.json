@@ -28,12 +28,16 @@
     "metrics": "node prototype/report.mjs",
     "selfplay": "node prototype/selfplay.mjs",
     "dev:client": "node testclient/build.mjs",
+    "mcp:browser": "node scripts/mcp-browser.mjs",
+    "db:psql": "psql \"${DATABASE_URL:-postgres://void:void@127.0.0.1:5432/void}\"",
+    "db:schema": "psql \"${DATABASE_URL:-postgres://void:void@127.0.0.1:5432/void}\" -c '\\dt+' -c '\\di'",
     "audit": "pnpm audit --audit-level=high",
     "check": "pnpm run lint && pnpm run typecheck && pnpm run test && pnpm run docs-check",
     "docs-check": "node scripts/docs-check.mjs"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/mcp": "0.0.78",
     "@types/node": "^26.1.1",
     "@vitest/coverage-v8": "^4.1.10",
     "esbuild": "^0.28.1",
