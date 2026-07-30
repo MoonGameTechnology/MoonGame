@@ -27,6 +27,7 @@ const EXPECTED = [
   { key: 'gitleaks', name: 'Gitleaks — секреты (дерево)' },
   { key: 'trufflehog', name: 'TruffleHog — секреты (история + верификация)' },
   { key: 'osv', name: 'OSV-Scanner — SCA (osv.dev)' },
+  { key: 'dependency-check', name: 'OWASP Dependency-Check — SCA (NVD/CPE)' },
   { key: 'trivy-fs', name: 'Trivy fs — vuln/secret/IaC' },
   { key: 'trivy-image', name: 'Trivy image — базовая ОС образа' },
   { key: 'trivy-deps', name: 'Trivy image — сторонние образы прода (postgres/caddy)' },
@@ -243,7 +244,7 @@ if (findings.length) {
 
 L.push('---');
 L.push(
-  'ℹ️ _Блокирующие сканеры (SEC-1): Semgrep, Gitleaks, OSV, Trivy fs/image — находка или сбой скана валит их джобу; остальные (CodeQL, TruffleHog, Trivy deps, zizmor, Scorecard) — информационные. Разные движки/источники — для перекрёстной валидации; «0» достоверно только у подтверждённых сканеров. Полные SARIF/SBOM — в артефактах прогона._',
+  'ℹ️ _Блокирующие сканеры (SEC-1): Semgrep, Gitleaks, OSV, Trivy fs/image — находка или сбой скана валит их джобу; остальные (CodeQL, TruffleHog, Trivy deps, Dependency-Check, zizmor, Scorecard) — информационные. Разные движки/источники — для перекрёстной валидации; «0» достоверно только у подтверждённых сканеров. Полные SARIF/SBOM — в артефактах прогона._',
 );
 
 writeFileSync(outFile, L.join('\n'));
