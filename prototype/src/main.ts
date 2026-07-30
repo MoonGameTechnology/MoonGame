@@ -10971,6 +10971,12 @@ function openReset(token: string): void {
   showConnect(true);
   showHub(false);
   showStage('reset');
+  // Tell the password manager WHICH account this new password is for (the hidden
+  // `autocomplete="username"` field); without it the entry is saved unattached.
+  const resetUser = document.getElementById('cresetuser');
+  if (resetUser instanceof HTMLInputElement) {
+    resetUser.value = (localStorage.getItem('void.nick') ?? '').trim();
+  }
   cresetPassInput.value = '';
   cresetPass2Input.value = '';
   statusEl.textContent = '';
@@ -11169,52 +11175,34 @@ const bootReset = (bootParams?.get('reset') ?? '').trim();
 const bootJoinId = (bootParams?.get('join') ?? '').trim();
 const bootSlot = (bootParams?.get('slot') ?? '').trim();
 const bootFaction = (bootParams?.get('faction') ?? '').trim();
-console.log(
-  '[boot] location.search=',
-  location.search,
-  'bootJoinId=',
-  bootJoinId,
-  'bootReset=',
-  bootReset,
-  'bootSlot=',
-  bootSlot,
-);
 if (bootReset) {
   openReset(bootReset);
 } else if (bootJoinId) {
   // Direct deep-link into a match. Two paths:
   //  (a) cached session JWT → connectToMatch immediately (no welcome card)
   //  (b) no session → show welcome card, welcomeSignIn auto-resumes the join
-  console.log('[boot] ?join path — showing connect, awaiting probeAuthMode');
   showConnect(false);
   showHub(false);
   void (async () => {
     const srv = resolveServer();
-    console.log('[boot] resolveServer=', srv ? { base: srv.base, nick: srv.nick } : 'null');
     if (srv) await probeAuthMode(srv.base);
-    console.log('[boot] authMode=', authMode);
     // If auth-off LAN, just dial in (no login needed).
     if (!authMode) {
-      console.log('[boot] auth-off — connectToMatch directly');
       showStage('browse');
       connectToMatch(bootJoinId, bootSlot || undefined, bootFaction || undefined);
       return;
     }
     // Auth-on: if we have a cached session JWT, go straight to the match.
+    // NEVER log the record — even a prefix of `cached.token` is a session-JWT leak
+    // into the browser console (and into any screen recording of a playtest).
     const cached = srv ? sessionRecord(srv.base) : null;
-    console.log(
-      '[boot] cached session=',
-      cached ? { login: cached.login, token: cached.token.slice(0, 20) + '...' } : 'null',
-    );
     if (cached) {
-      console.log('[boot] cached session — connectToMatch');
       showStage('browse');
       connectToMatch(bootJoinId, bootSlot || undefined, bootFaction || undefined);
       return;
     }
     // No session — show the welcome card so the player can register/login,
     // then welcomeSignIn auto-resumes the join via pendingJoinAfterAuth.
-    console.log('[boot] no session — showing welcome card, pendingJoinAfterAuth=', bootJoinId);
     pendingJoinAfterAuth = bootJoinId;
     pendingSlotAfterAuth = bootSlot || null;
     pendingFactionAfterAuth = bootFaction || null;
@@ -11225,7 +11213,6 @@ if (bootReset) {
     wPassInput.focus();
   })();
 } else {
-  console.log('[boot] no ?join — auth gate at boot');
   // Auth gate at boot (UX fix): show the welcome/login card FIRST, before the
   // hub — like every game's login screen. Previously a cached `void.nick` in
   // localStorage skipped straight to `openHub()`, but that left the player in
@@ -11238,22 +11225,17 @@ if (bootReset) {
   showStage('welcome');
   void (async () => {
     const srv = resolveServer();
-    console.log('[boot] no-join resolveServer=', srv ? { base: srv.base, nick: srv.nick } : 'null');
     if (srv) await probeAuthMode(srv.base);
-    console.log('[boot] no-join after probeAuthMode, authMode=', authMode);
     const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
-    console.log('[boot] no-join savedNick=', savedNick);
     if (savedNick) {
       wNickInput.value = savedNick;
     } else {
       wNickInput.value = suggestCallsign();
     }
     if (authMode) {
-      console.log('[boot] no-join showing password row');
       wPassRowEl.style.display = 'flex';
       wPassInput.focus();
     } else {
-      console.log('[boot] no-join hiding password row (authMode false)');
       wPassRowEl.style.display = 'none';
     }
   })();
@@ -12130,16 +12112,17 @@ function sessionToken(base: string): string | null {
  *  a real error if the server actually wants accounts. */
 async function probeAuthMode(base: string): Promise<void> {
   const url = `${httpBase(base)}/auth/status`;
-  console.log('[probeAuthMode] fetching', url);
   try {
     const res = await fetch(url);
-    console.log('[probeAuthMode] response status=', res.status, 'ok=', res.ok);
-    const body = await res.json();
-    console.log('[probeAuthMode] body=', body);
-    authMode = res.ok && body.enabled === true;
-    console.log('[probeAuthMode] authMode=', authMode);
-  } catch (e) {
-    console.error('[probeAuthMode] fetch FAILED:', e);
+    // A non-OK answer is a normal outcome (a plain static host, an old build, a
+    // 404 page): it means «no accounts here», NOT an error to report. Parsing it
+    // as JSON is what used to throw — a bare `res.json()` on an HTML 404 body
+    // raised an unhandled SyntaxError into the console on the most ordinary path
+    // («opened the game off a static server»), drowning out real errors.
+    authMode = res.ok && ((await res.json()) as { enabled?: unknown }).enabled === true;
+  } catch {
+    // Network failure or a non-JSON body ⇒ assume nick mode; the join itself will
+    // surface a real error if the server actually wants accounts.
     authMode = false;
   }
   if (passRow) passRow.style.display = authMode ? '' : 'none';

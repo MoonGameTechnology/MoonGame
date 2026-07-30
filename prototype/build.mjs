@@ -1397,6 +1397,12 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   color:var(--cyan);font:600 13px ui-monospace,monospace;letter-spacing:1px;cursor:pointer;min-height:46px;}
 #connect .cbtn:active{background:rgba(53,214,230,.24);}
 #connect .cbtn.ghost{border-color:var(--line-hi);background:transparent;color:var(--dim);}
+/* Credential fields must sit inside a form element, or the browser refuses to
+   pair login+password for its password manager (Chrome warns «Password field is
+   not contained in a form»). display:contents makes the wrapper layout-invisible,
+   so the existing flex/label rules below keep applying unchanged.
+   (No backticks in this comment — the whole stylesheet is a JS template literal.) */
+#connect .authform{display:contents;}
 #connect .cwlogin{display:flex;gap:8px;margin-top:10px;}
 #connect .cwlogin input{flex:1;min-width:0;padding:11px 12px;background:rgba(2,10,14,.9);border:1px solid var(--line-hi);
   border-radius:7px;color:var(--ink);font:13px/1.4 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.3px;}
@@ -2206,30 +2212,34 @@ const page = (js) => `<!doctype html>
           <button id="clogin" class="cbtn ghost" type="button" data-i18n="welcome.login"></button>
           <!--dev-only--><button id="csolo" class="cbtn ghost" type="button" data-i18n="welcome.solo"></button><!--/dev-only-->
         </div>
-        <div id="cwlogin" class="cwlogin" style="display:none">
-          <input id="cwnick" type="text" autocapitalize="off" autocomplete="off" spellcheck="false" maxlength="24" data-i18n-ph="welcome.nick.ph">
-          <button id="cwgo" class="cbtn" type="button" data-i18n="welcome.go"></button>
-        </div>
-        <div id="cwpassrow" class="cwlogin" style="display:none">
-          <input id="cwpass" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.ph">
-        </div>
+        <form class="authform" onsubmit="return false">
+          <div id="cwlogin" class="cwlogin" style="display:none">
+            <input id="cwnick" type="text" autocapitalize="off" autocomplete="username" spellcheck="false" maxlength="24" data-i18n-ph="welcome.nick.ph">
+            <button id="cwgo" class="cbtn" type="button" data-i18n="welcome.go"></button>
+          </div>
+          <div id="cwpassrow" class="cwlogin" style="display:none">
+            <input id="cwpass" type="password" autocomplete="current-password" maxlength="128" data-i18n-ph="welcome.pass.ph">
+          </div>
+        </form>
       </div>
       <div id="cregister" style="display:none">
         <button id="crback" class="cback" type="button" data-i18n="welcome.back"></button>
         <div class="ctitle"><span class="dia"></span><b data-i18n="welcome.register.title"></b></div>
         <p class="csub" data-i18n="welcome.register.sub"></p>
-        <label class="cfield"><span data-i18n="welcome.register.nick"></span>
-          <input id="crnick" type="text" autocapitalize="off" autocomplete="username" spellcheck="false" maxlength="24" data-i18n-ph="welcome.nick.ph">
-        </label>
-        <label class="cfield"><span data-i18n="welcome.register.mail"></span>
-          <input id="crmail" type="email" autocapitalize="off" autocomplete="email" spellcheck="false" maxlength="254" placeholder="you@mail.com">
-        </label>
-        <label class="cfield"><span data-i18n="welcome.register.pass"></span>
-          <input id="crpass" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.min.ph">
-        </label>
-        <label class="cfield"><span data-i18n="welcome.register.pass2"></span>
-          <input id="crpass2" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.again.ph">
-        </label>
+        <form class="authform" onsubmit="return false">
+          <label class="cfield"><span data-i18n="welcome.register.nick"></span>
+            <input id="crnick" type="text" autocapitalize="off" autocomplete="username" spellcheck="false" maxlength="24" data-i18n-ph="welcome.nick.ph">
+          </label>
+          <label class="cfield"><span data-i18n="welcome.register.mail"></span>
+            <input id="crmail" type="email" autocapitalize="off" autocomplete="email" spellcheck="false" maxlength="254" placeholder="you@mail.com">
+          </label>
+          <label class="cfield"><span data-i18n="welcome.register.pass"></span>
+            <input id="crpass" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.min.ph">
+          </label>
+          <label class="cfield"><span data-i18n="welcome.register.pass2"></span>
+            <input id="crpass2" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.again.ph">
+          </label>
+        </form>
         <div class="crow">
           <button id="crgo" class="cbtn" type="button" data-i18n="welcome.register.go"></button>
         </div>
@@ -2249,12 +2259,19 @@ const page = (js) => `<!doctype html>
       <div id="creset" style="display:none">
         <div class="ctitle"><span class="dia"></span><b data-i18n="welcome.reset.title"></b></div>
         <p class="csub" data-i18n="welcome.reset.sub"></p>
-        <label class="cfield"><span data-i18n="welcome.reset.pass"></span>
-          <input id="cresetpass" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.min.ph">
-        </label>
-        <label class="cfield"><span data-i18n="welcome.reset.pass2"></span>
-          <input id="cresetpass2" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.again.ph">
-        </label>
+        <form class="authform" onsubmit="return false">
+          <!-- Hidden username: a password form without one leaves the manager unable to
+               tell WHICH account the new password belongs to (Chrome: «Password forms
+               should have (optionally hidden) username fields»). Filled from the saved
+               callsign at reset time; never submitted anywhere. -->
+          <input id="cresetuser" type="text" autocomplete="username" hidden aria-hidden="true" tabindex="-1">
+          <label class="cfield"><span data-i18n="welcome.reset.pass"></span>
+            <input id="cresetpass" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.min.ph">
+          </label>
+          <label class="cfield"><span data-i18n="welcome.reset.pass2"></span>
+            <input id="cresetpass2" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.again.ph">
+          </label>
+        </form>
         <div class="crow">
           <button id="cresetgo" class="cbtn" type="button" data-i18n="welcome.reset.go"></button>
         </div>
@@ -2266,12 +2283,14 @@ const page = (js) => `<!doctype html>
         <label class="cfield"><span data-i18n="welcome.browse.server"></span>
           <input id="csrv" type="text" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="wss://… or ws://host:8788">
         </label>
-        <label class="cfield"><span data-i18n="welcome.browse.nick"></span>
-          <input id="cnick" type="text" autocapitalize="off" autocomplete="off" spellcheck="false" maxlength="24" data-i18n-ph="welcome.nick.ph">
-        </label>
-        <label class="cfield" id="cpassrow" style="display:none"><span data-i18n="welcome.browse.pass"></span>
-          <input id="cpass" type="password" autocomplete="current-password" maxlength="128" data-i18n-ph="welcome.pass.ph">
-        </label>
+        <form class="authform" onsubmit="return false">
+          <label class="cfield"><span data-i18n="welcome.browse.nick"></span>
+            <input id="cnick" type="text" autocapitalize="off" autocomplete="username" spellcheck="false" maxlength="24" data-i18n-ph="welcome.nick.ph">
+          </label>
+          <label class="cfield" id="cpassrow" style="display:none"><span data-i18n="welcome.browse.pass"></span>
+            <input id="cpass" type="password" autocomplete="current-password" maxlength="128" data-i18n-ph="welcome.pass.ph">
+          </label>
+        </form>
         <div class="crow">
           <button id="cgo" class="cbtn" type="button" data-i18n="welcome.browse.go"></button>
         </div>
