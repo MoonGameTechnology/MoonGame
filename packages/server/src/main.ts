@@ -29,6 +29,8 @@ import { MedalService } from './medalService';
 import { registerArsenalApi } from './arsenalApi';
 import { CorpArsenalService } from './corpArsenalService';
 import { registerCorpArsenalApi } from './corpArsenalApi';
+import { registerPushApi } from './pushApi';
+import { configureWebPush, vapidFromEnv } from './push';
 import { loadMedalCatalog } from './medalCatalog';
 import { AvaOrchestrator, warDeclarationsFor } from './avaOrchestrator';
 import { MatchKeeper } from './matchFactory';
@@ -86,6 +88,11 @@ if (!readiness.ok) {
   );
   process.exit(1);
 }
+
+// ONB-5: Web Push is opt-in — no VAPID_* env means no /push routes and no sends,
+// not a boot failure (graceful degradation, same posture as auth/gate above).
+const vapid = vapidFromEnv(process.env);
+if (vapid) configureWebPush(vapid);
 
 const data = loadShippedData();
 // ARS-2: the starter blueprint set, validated against the shipped catalogs at boot
@@ -427,6 +434,13 @@ const server = createMultiplayerServer({
           registerArsenalApi(scope, { store: stores.arsenalStore, identify });
           // Corp-arsenal rentals (ARS-6) — head/officer hands out a corp item.
           registerCorpArsenalApi(scope, { service: corpArsenalService, identify });
+          // Web Push subscriptions (ONB-5) — session-gated like the rest; the /push/key
+          // route itself is only mounted when VAPID is configured.
+          registerPushApi(scope, {
+            store: stores.pushStore,
+            identify,
+            ...(vapid ? { vapidPublicKey: vapid.publicKey } : {}),
+          });
         }
       });
     }

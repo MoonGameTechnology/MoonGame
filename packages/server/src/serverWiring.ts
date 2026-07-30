@@ -1,6 +1,6 @@
 import type { ActionGate } from '@void/action-layer';
 import { hashGameDataBundle, type DomainEvent, type GameData, type PlayerReward } from '@void/shared-core';
-import { createDevMatch } from './scenario';
+import { createDevMatch, MODULE_MANIFEST_VERSION } from './scenario';
 import { startClockDriver, HEARTBEAT_MS, type ClockDriverHandle } from './clockDriver';
 import { snapshotOf, type Stores } from './persistence';
 import type { LoadedMatch } from './roomRegistry';
@@ -77,6 +77,21 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
         `match ${matchId}: game-data integrity check failed — the deployed data/*.json ` +
           `bundle no longer matches the hash this match was created with (pinned ` +
           `${pinnedHash}, deployed ${expectedDataHash}). Refusing to load.\n`,
+      );
+      return null;
+    }
+    // Invariant #6 (module execution order = the determinism contract): a match pins
+    // the module manifest version it was created under (`MODULE_MANIFEST_VERSION`,
+    // `scenario.ts`) — a mismatch means `DEV_MODULES`' membership/order changed since,
+    // so resuming under the new graph would silently diverge from the match's own
+    // history. Fail-secure, same posture as the dataHash check above.
+    const pinnedManifest = snap.state.version.manifest;
+    if (pinnedManifest !== MODULE_MANIFEST_VERSION) {
+      deps.onIntegrityFailure?.(matchId);
+      process.stderr.write(
+        `match ${matchId}: module manifest mismatch — the deployed module graph no ` +
+          `longer matches the one this match was created with (pinned ${pinnedManifest}, ` +
+          `deployed ${MODULE_MANIFEST_VERSION}). Refusing to load.\n`,
       );
       return null;
     }

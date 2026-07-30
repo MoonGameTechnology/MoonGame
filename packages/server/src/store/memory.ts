@@ -28,6 +28,8 @@ import type {
   MatchStore,
   Medal,
   MedalStore,
+  PushStore,
+  PushSubscriptionRecord,
   ReceiptStore,
   SeatAssignment,
   StoredReceipt,
@@ -799,6 +801,24 @@ export class MemoryDropStore implements DropStore {
 
   shardsOf(accountId: string): Promise<number> {
     return Promise.resolve(this.shards.get(accountId) ?? 0);
+  }
+}
+
+export class MemoryPushStore implements PushStore {
+  private readonly subs = new Map<string, PushSubscriptionRecord>();
+
+  save(accountId: string, sub: PushSubscriptionRecord): Promise<void> {
+    this.subs.set(accountId, sub);
+    return Promise.resolve();
+  }
+
+  remove(accountId: string): Promise<void> {
+    this.subs.delete(accountId);
+    return Promise.resolve();
+  }
+
+  of(accountId: string): Promise<PushSubscriptionRecord | undefined> {
+    return Promise.resolve(this.subs.get(accountId));
   }
 }
 

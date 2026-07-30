@@ -229,7 +229,19 @@
   (матрица видна барами), синергии (окоп ≥3 тяжей, рейд ≥2 спецназа, людская волна ≥4
   ополчения + прежние), стоимость иконками; панель мира — только выбор шаблона и
   «Мобилизовать» (дивизия — снапшот). Back закрывает окно. +3 теста (26 в division),
-  миграция ростера по 4 тест-файлам; RU/EN полные. Гейт 1030 зелёный.
+  миграция ростера по 4 тест-файлам; RU/EN полные. Гейт 1030 зелёный. **Порт на
+  канонический сервер:** `state/groundCombat.ts` (FND-4, до этого) получил Officer-бонусы;
+  дивизии/шаблоны/наземный тик-бой перенесены в `@void/shared-core`
+  (`data/formations.ts` + `modules/division.ts`, `Division`/`divisions`/`divisionSeq`/
+  `groundBattles` — формальные поля `GameState`, `Player.divisionTemplates`) и подключены
+  в `packages/server/src/scenario.ts`'s `DEV_MODULES` — `division.mobilize/template/
+  rename/load/unload` теперь играбельны на настоящем многопользовательском сервере
+  (`main.ts`), не только на прототип-хосте (`netserver.ts`, у которого свой кернел из
+  `game.ts` — уже мог их раньше). Аддитивно: наземный бой дивизий не трогает легаси-
+  гарнизон/`combat.ts` (та же граница, что и в прототипе). Прототипная реализация
+  (`prototype/src/division.ts`/`groundcombat.ts`/`formations.ts`) НЕ тронута — осталась
+  отдельной, уже проверенной копией (сознательное дублирование, не объединено ради
+  минимального риска для живой фичи). 15 новых тестов в shared-core.
 - **H5** ✅ Шпионаж играбелен (SPY-1 → прототип): ядровый `espionageModule` в `MODULES`
   (и в netserver), билдер `spyOn`; UI — «🕵 казна»/«🕵 флоты» в ростере дипломатии,
   «🕵 Разведать мир» на карточке чужого мира (в т.ч. по памяти «LAST KNOWN»); intel-окна
@@ -1322,10 +1334,16 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
   доводка позже._
 - **ONB-5** 🟡 `[proto/srv]` ★ **Async-модель + дневной дайджест.** Клиент-часть сделана:
   интро задержки первого `fleet.move` («мир идёт офлайн», `asyncDelay` через ONB-3-механизм);
-  recap возврата — чистый `recap.ts` (`buildRecap`, attention по emoji-маркерам, 5 тестов) +
-  оверлей `#recap` (авто на `visibilitychange` + ручной «🛰» в сводках, тап→jumpToPing). RU/EN.
-  _Осталось (`[srv]`, упирается в пуши): PWA push + серверный дайджест-хук — `buildRecap`
-  уже server-ready._
+  recap возврата — чистый `recap.ts` (`buildRecap`, attention по emoji-маркерам, 5 тестов),
+  теперь портирован в `@void/shared-core` (`util/recap.ts`) так и клиент, и сервер строят
+  дайджест по одной логике; `prototype/src/recap.ts` — тонкий re-export. Оверлей `#recap`
+  (авто на `visibilitychange` + ручной «🛰» в сводках, тап→jumpToPing). RU/EN. Серверная
+  сторона push: `packages/server/src/push.ts` (VAPID-конфиг, `digestPushPayload`, `sendPush`
+  через `web-push`, 404/410 → `gone`) + `PushStore` (Memory/Postgres, `push_subscriptions`) +
+  `pushApi.ts` (`GET /push/key`, `POST /push/subscribe`, `POST /push/unsubscribe`,
+  session-gated) — 14 тестов. _Осталось: сам триггер («когда именно слать дайджест» — учёт
+  online/offline по аккаунту, cooldown, привязка к матчу) и клиентский service worker +
+  подписка на push из UI — приёмник (`sendPush`) уже готов, зовущего пока нет._
 - **ONB-6** ✅ `[core/proto]` **Combat-preview.** «Если атакую — что будет?» — чистая
   `previewBattle(attacker, defender, data)` в `shared-core` (`state/previewBattle.ts`):
   зеркало раундового цикла combat-модуля (симультанный залп attack/ответка defense,

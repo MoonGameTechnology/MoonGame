@@ -19,6 +19,12 @@
  * the flat attack/defense/hp model shared with fleet/orbital combat) — that
  * wiring is a separate, much more invasive step touching determinism-critical
  * live code (RPL replay, golden RNG) and is intentionally left for a follow-up.
+ *
+ * Officer bonuses (`Officer`/`OFFICERS`) — ported alongside `division.ts` (the
+ * mobilization layer this engine was originally scoped out for): an officer
+ * scales its division's outgoing atk/def and toughness, and may add a flat
+ * per-target-type attack bonus. Optional everywhere — omitting it reproduces
+ * the original FND-4 numbers exactly (same tests, unchanged).
  */
 
 /** Damage by TARGET type (targetType → damage). A missing entry means 0. */
@@ -76,13 +82,41 @@ export interface GroundStack {
   hpEach: number;
 }
 
-/** Build a full-health side from a type→count map (e.g. a garrison composition). */
-export function makeSide(roster: GroundRoster, counts: Partial<Record<string, number>>): GroundStack[] {
+/** An officer attached to a division — a hero-like leader granting flexible, TUNABLE
+ *  bonuses: any combination of these, set per officer. */
+export interface Officer {
+  name: string;
+  /** +fraction to the division's outgoing ATTACK damage (0.1 = +10%). */
+  atk?: number;
+  /** +fraction to the division's outgoing DEFENCE (return fire). */
+  def?: number;
+  /** +fraction to the division's unit HP (toughness / survivability). */
+  hp?: number;
+  /** Optional flat per-target-type ATTACK bonus (e.g. an anti-tank specialist). */
+  atkVs?: DamageTable;
+}
+
+/** Placeholder officer archetypes — values are stand-ins to be tuned later. */
+export const OFFICERS: Record<string, Officer> = {
+  assault: { name: 'ground.officer.assault', atk: 0.15 },
+  defender: { name: 'ground.officer.defender', def: 0.15, hp: 0.1 },
+  quartermaster: { name: 'ground.officer.quartermaster', hp: 0.2 },
+};
+
+/** Build a full-health side from a type→count map (e.g. a garrison composition). An
+ *  attached `officer` bakes its HP bonus into each unit's `hpEach`. */
+export function makeSide(
+  roster: GroundRoster,
+  counts: Partial<Record<string, number>>,
+  officer?: Officer,
+): GroundStack[] {
+  const hpMul = 1 + (officer?.hp ?? 0);
   const side: GroundStack[] = [];
   for (const [type, count] of Object.entries(counts)) {
     const prof = roster[type];
     if (!prof || !count || count <= 0) continue;
-    side.push({ type, count, hp: count * prof.hp, hpEach: prof.hp });
+    const hpEach = prof.hp * hpMul;
+    side.push({ type, count, hp: count * hpEach, hpEach });
   }
   return side;
 }
@@ -136,12 +170,16 @@ export function damageBuckets(
   target: GroundStack[],
   which: 'atk' | 'def',
   width = COMBAT_WIDTH,
+  officer?: Officer,
 ): DamageTable {
   const total = liveCount(target);
   const out: DamageTable = {};
   if (total <= 0) return out;
   // Only the source's `width` units most effective vs THIS target fire; rest are reserve.
   const firing = activeUnits(roster, source, target, which, width);
+  // The source's officer scales its outgoing damage (atk when attacking, def on
+  // return fire) and may add a flat per-type attack bonus.
+  const mul = 1 + (which === 'atk' ? (officer?.atk ?? 0) : (officer?.def ?? 0));
   const targetCount: DamageTable = {};
   for (const s of target) if (s.count > 0) targetCount[s.type] = (targetCount[s.type] ?? 0) + s.count;
   for (const t of Object.keys(targetCount)) {
@@ -149,7 +187,8 @@ export function damageBuckets(
     for (const [type, cnt] of Object.entries(firing)) {
       armyDmg += cnt! * (roster[type]?.[which][t] ?? 0);
     }
-    out[t] = armyDmg * (targetCount[t]! / total);
+    if (which === 'atk') armyDmg += officer?.atkVs?.[t] ?? 0;
+    out[t] = armyDmg * mul * (targetCount[t]! / total);
   }
   return out;
 }
@@ -180,9 +219,11 @@ export function groundTick(
   roster: GroundRoster,
   attacker: GroundStack[],
   defender: GroundStack[],
+  attackerOfficer?: Officer,
+  defenderOfficer?: Officer,
 ): GroundTick {
-  const toDefender = damageBuckets(roster, attacker, defender, 'atk');
-  const toAttacker = damageBuckets(roster, defender, attacker, 'def');
+  const toDefender = damageBuckets(roster, attacker, defender, 'atk', COMBAT_WIDTH, attackerOfficer);
+  const toAttacker = damageBuckets(roster, defender, attacker, 'def', COMBAT_WIDTH, defenderOfficer);
   return {
     toDefender,
     toAttacker,
@@ -198,18 +239,20 @@ export interface GroundOutcome {
   defender: GroundStack[];
 }
 
-/** Resolve a ground battle to conclusion (one side wiped), or null at the round cap. */
+/** Resolve a ground battle to conclusion (one side wiped), or null at the round cap.
+ *  Each side may have an attached officer (its bonuses apply every tick). */
 export function resolveGround(
   roster: GroundRoster,
   attacker: GroundStack[],
   defender: GroundStack[],
-  maxRounds = 100,
+  opts: { attackerOfficer?: Officer; defenderOfficer?: Officer; maxRounds?: number } = {},
 ): GroundOutcome {
+  const maxRounds = opts.maxRounds ?? 100;
   let a = attacker;
   let d = defender;
   let rounds = 0;
   while (liveCount(a) > 0 && liveCount(d) > 0 && rounds < maxRounds) {
-    const t = groundTick(roster, a, d);
+    const t = groundTick(roster, a, d, opts.attackerOfficer, opts.defenderOfficer);
     a = t.attacker;
     d = t.defender;
     rounds += 1;

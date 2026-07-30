@@ -31,6 +31,8 @@ import type {
   Medal,
   MedalStore,
   OwnedArsenalItem,
+  PushStore,
+  PushSubscriptionRecord,
   ReceiptStore,
   SeatAssignment,
   StoredReceipt,
@@ -288,6 +290,15 @@ export async function migrate(pool: Pool): Promise<void> {
     CREATE TABLE IF NOT EXISTS commander_credits (
       match_id     text PRIMARY KEY,
       credited_at  timestamptz NOT NULL DEFAULT now()
+    );
+
+    -- ONB-5: one Web Push subscription per account (a fresh subscribe replaces the
+    -- old row — single-device, multi-device fan-out is a later brick).
+    CREATE TABLE IF NOT EXISTS push_subscriptions (
+      account_id  text PRIMARY KEY,
+      endpoint    text NOT NULL,
+      p256dh      text NOT NULL,
+      auth        text NOT NULL
     );
   `);
 }
@@ -1686,5 +1697,32 @@ export class PostgresDropStore implements DropStore {
       [accountId],
     );
     return r.rows[0]?.shards ?? 0;
+  }
+}
+
+export class PostgresPushStore implements PushStore {
+  constructor(private readonly pool: Pool) {}
+
+  async save(accountId: string, sub: PushSubscriptionRecord): Promise<void> {
+    await this.pool.query(
+      `INSERT INTO push_subscriptions (account_id, endpoint, p256dh, auth)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (account_id) DO UPDATE
+         SET endpoint = $2, p256dh = $3, auth = $4`,
+      [accountId, sub.endpoint, sub.keys.p256dh, sub.keys.auth],
+    );
+  }
+
+  async remove(accountId: string): Promise<void> {
+    await this.pool.query(`DELETE FROM push_subscriptions WHERE account_id = $1`, [accountId]);
+  }
+
+  async of(accountId: string): Promise<PushSubscriptionRecord | undefined> {
+    const r = await this.pool.query<{ endpoint: string; p256dh: string; auth: string }>(
+      `SELECT endpoint, p256dh, auth FROM push_subscriptions WHERE account_id = $1`,
+      [accountId],
+    );
+    const row = r.rows[0];
+    return row ? { endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } } : undefined;
   }
 }

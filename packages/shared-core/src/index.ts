@@ -55,6 +55,7 @@ export {
   type DiplomaticStance,
   type IntelGrant,
   type PatrolEntry,
+  type Division,
 } from './state/gameState';
 export {
   buildStateFromMap,
@@ -138,6 +139,8 @@ export {
   type GroundStack,
   type GroundTick,
   type GroundOutcome,
+  OFFICERS,
+  type Officer,
 } from './state/groundCombat';
 export { scanNodeThreats, type NodeThreat } from './state/threat';
 export {
@@ -223,6 +226,31 @@ export {
   type MapSlot,
   type SpawnPolicy,
 } from './data/mapSchema';
+
+// Ground divisions (H4) — templates + the mobilization/ground-combat module
+export {
+  FORMATION_UNITS,
+  FORMATION_SLOTS,
+  FORMATION_TEMPLATE_COUNT,
+  DEFAULT_TEMPLATES,
+  OFFICER_TEMPLATES,
+  formationStats,
+  type FormationUnit,
+  type FormationTemplate,
+  type OfficerTemplate,
+  type FormationSynergy,
+  type FormationStats,
+} from './data/formations';
+export {
+  divisionModule,
+  divisionsOf,
+  templatesOf,
+  regenDivision,
+  divisionCargo,
+  fleetCargoFree,
+  REGEN_PER_UNIT_PER_DAY,
+  GROUND_TICK_HOURS,
+} from './modules/division';
 
 // Data-driven content
 export {
@@ -332,6 +360,13 @@ export {
 } from './util/fitting';
 export { requireOwnedIdleFleet, type IdleFleet } from './util/fleet';
 export { buildProgress, thresholdRamp } from './util/construction';
+export {
+  buildRecap,
+  isHighEvent,
+  type Recap,
+  type RecapEvent,
+  type RecapItem,
+} from './util/recap';
 
 // Base modules (plugins) — opt-in via the manifest passed to createKernel.
 export { economyModule, BROWNOUT } from './modules/economy';
