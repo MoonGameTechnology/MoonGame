@@ -42,10 +42,6 @@ import {
   netIncome,
   retreatFleet,
   STANCE_RANK,
-  marketLots,
-  marketList,
-  marketTake,
-  marketCancel,
   canTraverse,
   START_CANDIDATES,
   DEFAULT_TEMPLATES,
@@ -103,7 +99,6 @@ import {
   repairFleet,
   dockRepairCost,
   fleetAtOwnDock,
-  MARKET_FEE,
   MAX_CHAIN_STEPS,
   type ChainStep,
   type Patrol,
@@ -241,6 +236,8 @@ import {
 // ARS-5 — arsenal witryna: the pure model (`arsenal.ts`) plus the hub tab itself
 // (`arsenalScreen.ts`, REFM-5 — `initArsenal(hooks)` owns its cache and markup).
 import { originOf } from './arsenal';
+// ECON-4 — session market: the model + orders live next door; the WINDOW is REFM-6.
+import { initMarket } from './marketScreen';
 import { initArsenal, originLabel } from './arsenalScreen';
 // AVA-C1/C2 — corporation cabinet (pure types/parsers; see prototype/src/corp.ts).
 import {
@@ -9229,140 +9226,20 @@ function heroDossierHtml(hero: HeroInst): string {
 }
 
 // --- session market: a two-sided order book, one tab per tradeable good -------
-// Sell lots (asks) and buy lots (bids) per resource; place your own, take a rival's.
-// The whole box is rendered from JS (like #diplo) so each tab re-renders in place.
-type MarketGood = 'metal' | 'food' | 'energy' | 'microelectronics';
-const MARKET_RES: Array<{ key: MarketGood; label: string }> = [
-  { key: 'metal', label: 'market.res.metal' },
-  { key: 'food', label: 'market.res.food' },
-  { key: 'energy', label: 'market.res.energy' },
-  { key: 'microelectronics', label: 'market.res.microelectronics' },
-];
-let marketTab: MarketGood = 'metal';
-let marketFormSide: 'sell' | 'buy' = 'sell';
+// The window itself lives in `marketScreen.ts` (REFM-6); here it gets its hooks and
+// the rail button that opens it.
+// The Android-Back / Escape layer stack still needs the node itself (it is a registry
+// of «layer → how to close it», see the REFM-1 note) — one handle, shared.
 const marketWin = $('market');
-function renderMarket(): void {
-  const res = (s.players[ME]?.resources ?? {}) as Record<string, number>;
-  const good = marketTab;
-  const glyph = TECH_CUR[good] ?? '';
-  const nameOf = (id: string): string => esc(s.players[id]?.name ?? id);
-  const lots = marketLots(s);
-  const asks = lots
-    .filter((l) => l.side === 'sell' && l.resource === good)
-    .sort((a, b) => a.price - b.price);
-  const bids = lots
-    .filter((l) => l.side === 'buy' && l.resource === good)
-    .sort((a, b) => b.price - a.price);
-  const lotRow = (l: (typeof lots)[number], bid: boolean): string => {
-    const mine = l.owner === ME;
-    // ECON-4: получатель кредитов получает net (5% сгорает) — в биде это исполнитель.
-    const takerNet = Math.floor(l.amount * l.price * (1 - MARKET_FEE));
-    const qp = `<span class="mk-qp"><b>${l.amount}</b> ${curIc(l.resource)} @ ${l.price} <span class="rc-credits">⛁</span>${
-      bid && !mine
-        ? ` <span class="mk-net">→ ${takerNet} <span class="rc-credits">⛁</span></span>`
-        : ''
-    }</span>`;
-    const who = `<span class="mk-who">${mine ? t('market.own-lot') : nameOf(l.owner)}</span>`;
-    let btn: string;
-    if (mine) {
-      btn = `<button class="mk-btn cancel" data-mkcancel="${l.id}">${t('market.cancel')}</button>`;
-    } else {
-      const can = l.side === 'sell' ? (res.credits ?? 0) >= l.price : (res[l.resource] ?? 0) >= 1;
-      btn = `<button class="mk-btn" data-mktake="${l.id}"${can ? '' : ' disabled'}>${l.side === 'sell' ? t('market.buy') : t('market.sell')}</button>`;
-    }
-    return `<div class="mk-row ${bid ? 'buy' : ''}">${qp}${who}${btn}</div>`;
-  };
-  const seg = (side: 'sell' | 'buy', label: string): string =>
-    `<button class="${marketFormSide === side ? 'on' : ''}" data-mkside="${side}">${label}</button>`;
-  const tabBtn = (k: string, label: string): string =>
-    `<button class="mk-tab${marketTab === k ? ' on' : ''}" data-mtab="${k}">${label}</button>`;
-  const stock =
-    `<div class="mk-lbl" style="margin-bottom:8px">${t('market.in-treasury')}: ${glyph} <b style="color:var(--ink)">${Math.round(res[good] ?? 0)}</b>` +
-    ` · <span class="rc-credits">⛁</span> <b style="color:var(--ink)">${Math.round(res.credits ?? 0)}</b></div>`;
-  const form =
-    `<div class="mk-form"><div class="mk-seg">${seg('sell', t('market.sell'))}${seg('buy', t('market.buy'))}</div>` +
-    `<span class="mk-lbl">${t('market.qty')}</span><input class="mk-in" id="mk-amt" type="number" min="1" value="10">` +
-    `<span class="mk-lbl">${t('market.price')}</span><input class="mk-in" id="mk-price" type="number" min="0" value="3">` +
-    `<button class="mk-go" data-mkgo>${t('market.place')}</button></div>` +
-    `<div class="mk-lbl" id="mk-net"></div>`;
-  const askList = asks.length
-    ? asks.map((l) => lotRow(l, false)).join('')
-    : `<div class="mk-empty">${t('market.no-asks')}</div>`;
-  const bidList = bids.length
-    ? bids.map((l) => lotRow(l, true)).join('')
-    : `<div class="mk-empty">${t('market.no-bids')}</div>`;
-  marketWin.innerHTML =
-    `<div class="mkbox"><div class="lw-head"><b>${t('market.title')}</b><button class="mk-close" style="margin-left:auto">✕</button></div>` +
-    `<div class="mk-tabs">${MARKET_RES.map((r) => tabBtn(r.key, t(r.label))).join('')}</div>` +
-    `<div id="marketbody">${stock}${form}` +
-    `<div class="mk-sec">${t('market.side.sell')} · ${asks.length}</div>${askList}` +
-    `<div class="mk-sec buy">${t('market.side.buy')} · ${bids.length}</div>${bidList}</div></div>`;
-  // ECON-4: живой «к получению» под формой — net после комиссии для стороны,
-  // которая получит кредиты (sell-лот: вы, когда его исполнят; buy-бид: эскроу).
-  const updNet = (): void => {
-    const el = document.getElementById('mk-net');
-    if (!el) return;
-    const amt = Number((document.getElementById('mk-amt') as HTMLInputElement | null)?.value) || 0;
-    const price =
-      Number((document.getElementById('mk-price') as HTMLInputElement | null)?.value) || 0;
-    const gross = amt * price;
-    el.textContent =
-      marketFormSide === 'sell'
-        ? t('market.net-after-fee', {
-            p: Math.round(MARKET_FEE * 100),
-            n: Math.floor(gross * (1 - MARKET_FEE)),
-          })
-        : t('market.escrow-note', {
-            n: Math.ceil(gross),
-            p: Math.round(MARKET_FEE * 100),
-          });
-  };
-  updNet();
-  document.getElementById('mk-amt')?.addEventListener('input', updNet);
-  document.getElementById('mk-price')?.addEventListener('input', updNet);
-}
-document.getElementById('rail-market')?.addEventListener('click', () => {
-  marketWin.classList.add('show');
-  renderMarket();
-  maybeIntro('market');
+const market = initMarket({
+  root: () => marketWin,
+  state: () => s,
+  me: () => ME,
+  order: playerOrder,
+  onOpen: () => maybeIntro('market'),
 });
-marketWin.addEventListener('click', (e) => {
-  const tg = e.target as HTMLElement;
-  if (tg.id === 'market' || tg.closest('.mk-close')) {
-    marketWin.classList.remove('show');
-    return;
-  }
-  const tab = (tg.closest('.mk-tab') as HTMLElement | null)?.dataset.mtab;
-  if (tab) {
-    marketTab = tab as MarketGood;
-    renderMarket();
-    return;
-  }
-  const side = (tg.closest('.mk-seg button') as HTMLElement | null)?.dataset.mkside;
-  if (side) {
-    marketFormSide = side as 'sell' | 'buy';
-    renderMarket();
-    return;
-  }
-  if (tg.closest('[data-mkgo]')) {
-    const amt = Math.floor(Number(($('mk-amt') as HTMLInputElement).value) || 0);
-    const price = Math.max(0, Number(($('mk-price') as HTMLInputElement).value) || 0);
-    if (amt > 0) playerOrder(marketList(ME, marketFormSide, marketTab, amt, price));
-    renderMarket();
-    return;
-  }
-  const takeId = (tg.closest('[data-mktake]') as HTMLElement | null)?.dataset.mktake;
-  if (takeId) {
-    playerOrder(marketTake(ME, takeId));
-    renderMarket();
-    return;
-  }
-  const cancelId = (tg.closest('[data-mkcancel]') as HTMLElement | null)?.dataset.mkcancel;
-  if (cancelId) {
-    playerOrder(marketCancel(ME, cancelId));
-    renderMarket();
-  }
-});
+document.getElementById('rail-market')?.addEventListener('click', () => market.open());
+
 
 // --- constructor («Верфь»): the unified loadout tab --------------------------
 // One in-match screen that switches between the loadout constructors (ships now;
