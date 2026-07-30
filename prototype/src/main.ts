@@ -31,7 +31,6 @@ import {
   mergeFleet,
   splitFleet,
   engageFleet,
-  researchTech,
   buildBuilding,
   upgradeBuilding,
   buildUnit,
@@ -235,6 +234,8 @@ import {
 import { originOf } from './arsenal';
 // H4 — конструктор шаблонов дивизий: модель в `formations.ts`, редактор — REFM-8.
 import { initDivDesign } from './divisionDesigner';
+// TT-3.1 — экран дерева технологий (REFM-9); `branchLabel` берёт ещё совет учёных.
+import { initTechTree, branchLabel } from './techTree';
 // ECON-4 — session market: the model + orders live next door; the WINDOW is REFM-6.
 import { initMarket } from './marketScreen';
 // ST-2/ST-3 — «Хранитель»: the window is REFM-7; the read-only helpers below are shared
@@ -2856,7 +2857,7 @@ function handleEvents(events: DomainEvent[]) {
               ),
             }),
           );
-        if (techWin.classList.contains('show')) renderTech();
+        if (techTree.isOpen()) techTree.repaint();
         break;
       // «Хранитель» lifecycle: snapshot at delegation, diff on expiry (the morning report).
       case 'steward.delegated':
@@ -8259,358 +8260,20 @@ const RES_SVG: Record<string, string> = {
 // soft halo (the mock capsule is lavender; the brief keeps the game's gold identity).
 const SOV_SVG =
   '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M8 1.8 11.8 6 8 14.2 4.2 6 8 1.8Z"/><path d="M4.2 6h7.6M8 1.8 6.3 6l1.7 8.2M8 1.8 9.7 6"/></svg>';
-const TECH_BRANCHES: Array<{ key: string; label: string }> = [
-  { key: 'space', label: 'tech.branch.space' },
-  { key: 'ground', label: 'tech.branch.ground' },
-  { key: 'squadron', label: 'tech.branch.squadron' },
-  { key: 'missile', label: 'tech.branch.missile' },
-  { key: 'command', label: 'tech.branch.command' }, // automation / C2 — «Хранитель» lives here
-];
-const branchLabel = (key: string): string =>
-  t(TECH_BRANCHES.find((b) => b.key === key)?.label ?? key);
-const techCost = (c: Record<string, number>): string =>
-  Object.entries(c)
-    .map(([k, v]) => `${curIc(k)} ${v}`)
-    .join(' · ');
-// --- TT-3.1: экран-дерево (макет v4) — вкладки-ветки, рельса дней, досье по тапу ----
-// Presentation-only layout: named sub-columns per branch, ids in day order. The
-// canonical data stays layout-free; a tech missing from this map falls into an
-// auto-column appended at the end, so fresh data never breaks the screen.
-const TECH_COLS: Record<string, Array<{ label: string; ids: string[] }>> = {
-  space: [
-    {
-      label: 'tech.group.industry',
-      ids: ['industrial_automation', 'microelectronics_fabrication'],
-    },
-    { label: 'tech.group.fleet', ids: ['orbital_logistics', 'siege_doctrine', 'void_armadas'] },
-    { label: 'tech.group.sensors', ids: ['deep_survey'] },
-  ],
-  ground: [
-    { label: 'tech.group.doctrines', ids: ['combined_arms', 'garrison_networks'] },
-    { label: 'tech.group.fortifications', ids: ['fortified_infrastructure', 'planetary_bastions'] },
-  ],
-  squadron: [
-    { label: 'tech.group.airwing', ids: ['flight_decks', 'strike_vectors', 'ace_programs'] },
-  ],
-  missile: [
-    {
-      label: 'tech.group.arsenal',
-      ids: ['guidance_arrays', 'warhead_miniaturization', 'saturation_barrage'],
-    },
-  ],
-  command: [
-    { label: 'tech.group.comms', ids: ['signal_corps', 'logistics_command'] },
-    { label: 'tech.group.automation', ids: ['ai_stewardship'] },
-  ],
-};
-const TECH_ICONS: Record<string, string> = {
-  industrial_automation: '⚙',
-  microelectronics_fabrication: '▣',
-  deep_survey: '📡',
-  orbital_logistics: '⛽',
-  siege_doctrine: '☄',
-  void_armadas: '🛸',
-  combined_arms: '⚔',
-  garrison_networks: '⛺',
-  fortified_infrastructure: '🏰',
-  planetary_bastions: '🛡',
-  flight_decks: '🛫',
-  strike_vectors: '🎯',
-  ace_programs: '🎖',
-  guidance_arrays: '🧭',
-  warhead_miniaturization: '🧨',
-  saturation_barrage: '🚀',
-  signal_corps: '📶',
-  logistics_command: '🧠',
-  ai_stewardship: '😴',
-};
-const TECH_FX_LABEL: Record<string, string> = {
-  productionBonus: 'tech.fx.production',
-  fleetSpeedBonus: 'tech.fx.fleet-speed',
-  combatDamageBonus: 'tech.fx.damage',
-  radarRangeBonus: 'tech.fx.radar',
-};
-let techTab = 'space'; // активная вкладка-ветка
-let techModalId: string | null = null; // открытое досье узла
-type TechDefLike = (typeof data.technologies)[string];
-type TechCond = TechDefLike['conditions'][number];
-function techCondText(c: TechCond): string {
-  switch (c.type) {
-    case 'has_scientist':
-      return t('tech.req.scientist', {
-        b: c.branch ? branchLabel(c.branch) : t('tech.req.scientist.any'),
-      });
-    case 'own_sectors':
-      return t('tech.req.sectors', { n: c.min });
-    case 'has_building':
-      return t('tech.req.building', {
-        b: tData(data.buildings[c.building]?.name ?? c.building),
-        n: c.min,
-      });
-    case 'controls_planet_type':
-      return t('tech.req.planet', { p: tData(c.planetType), n: c.min });
-    case 'has_unit':
-      // Unit defs carry no `name` field (buildings do) — the display name is the
-      // space-joined id via displayUnit(); the old `?.name ?? id` fallback built a
-      // broken l10n key for multiword ids ('strike_carrier' → data.strikecarrier).
-      return t('tech.req.unit', { u: displayUnit(c.unit), n: c.min });
-    default:
-      return t('tech.req.special');
-  }
-}
-// Клиентская проверка — только для подсветки узла; финальную правду говорит ядро
-// (technologyLock, fail-secure). Типы, которых нет в живых данных, честно показываем
-// закрытыми — reducer их всё равно проверит сам.
-function techCondOk(c: TechCond): boolean {
-  const me = s.players[ME];
-  switch (c.type) {
-    case 'has_scientist':
-      return (me?.scientists ?? []).some((sc) => {
-        const def = data.scientists[sc.id];
-        return (
-          !!def && (!c.branch || def.branch === c.branch) && (sc.level ?? 1) >= (c.minLevel ?? 1)
-        );
-      });
-    case 'own_sectors':
-      return Object.values(s.planets).filter((p) => p.owner === ME).length >= c.min;
-    default:
-      return false;
-  }
-}
-/** «+10% производство · открывает: Fort» — эффекты и анлоки узла одной строкой. */
-function techFx(td: TechDefLike): string {
-  const fx = Object.entries(td.effects ?? {})
-    .filter(([, v]) => (v as number) !== 0)
-    .map(([k, v]) => `+${Math.round((v as number) * 100)}% ${t(TECH_FX_LABEL[k] ?? k)}`);
-  for (const u of td.unlocks?.units ?? [])
-    // no `name` on unit defs — displayUnit() is the canonical unit label (see has_unit)
-    fx.push(t('tech.grants', { x: esc(displayUnit(u)) }));
-  for (const b of td.unlocks?.buildings ?? [])
-    fx.push(t('tech.grants', { x: esc(tData(data.buildings[b]?.name ?? b)) }));
-  for (const a of td.unlocks?.abilities ?? [])
-    fx.push(t('tech.grants.ability', { x: a === 'steward' ? t('tech.grants.steward') : esc(a) }));
-  return fx.join(' · ');
-}
-function renderTech(): void {
-  const body = $('techbody');
-  const me = s.players[ME];
-  // Meta-progression grants (meta_*) are account perks, not researchable session
-  // techs — the tree shows only the real nodes.
-  const techs = Object.fromEntries(
-    Object.entries(data.technologies).filter(([id]) => !id.startsWith('meta_')),
-  );
-  const done = new Set(me?.technologies?.completed ?? []);
-  // Research runs in CONCURRENT slots (core: technologies.active is a list).
-  const activeRaw = me?.technologies?.active;
-  const activeList = Array.isArray(activeRaw) ? activeRaw : activeRaw ? [activeRaw] : [];
-  const res = (me?.resources ?? {}) as Record<string, number>;
-  const started = s.startedAt ?? 0;
-  const hudDay = floor(s.time / DAY) + 1; // счёт статус-бара: день 1 — первый
-  // Рельса дней: объединение day-гейтов ВСЕХ веток (+ старт) — календарь общий,
-  // при смене вкладки строки не прыгают (правило макета). Подпись = dayGate+1,
-  // тот же счёт, что у часов в статус-баре.
-  const gates = [
-    ...new Set(
-      Object.values(techs)
-        .map((td) => td.dayGate ?? 0)
-        .concat(0),
-    ),
-  ].sort((a, b) => a - b);
-  const nowGate = gates.filter((g) => g + 1 <= hudDay).pop() ?? 0;
-  // Пилюля слотов зеркалит кламп ядра: 2 базовых, +1 от учёного, максимум 3.
-  const slotBonus = (me?.scientists ?? []).reduce(
-    (n, c) => n + (data.scientists[c.id]?.slotBonus ?? 0),
-    0,
-  );
-  const slots = Math.min(3, Math.max(2, 2 + slotBonus));
-  // Состояние узла в порядке проверок ядра (technologyLock): prereq → день → условия.
-  const nodeState = (id: string): { st: string; prog: number; eta: number } => {
-    const td = techs[id]!;
-    if (done.has(id)) return { st: 'done', prog: 1, eta: 0 };
-    const act = activeList.find((a) => a.technology === id);
-    if (act) {
-      const total = act.completesAt - act.startedAt;
-      return {
-        st: 'res',
-        prog: total > 0 ? clamp((s.time - act.startedAt) / total, 0, 1) : 1,
-        eta: Math.max(0, Math.ceil((act.completesAt - s.time) / HOUR)),
-      };
-    }
-    if ((td.prerequisites ?? []).some((p) => !done.has(p))) return { st: 'chain', prog: 0, eta: 0 };
-    if ((td.dayGate ?? 0) > 0 && s.time - started < (td.dayGate ?? 0) * DAY)
-      return { st: 'gate', prog: 0, eta: 0 };
-    if ((td.conditions ?? []).some((c) => !techCondOk(c))) return { st: 'cond', prog: 0, eta: 0 };
-    return { st: 'avail', prog: 0, eta: 0 };
-  };
-  const tabs = TECH_BRANCHES.map(
-    (b) =>
-      `<button class="tt-tab${b.key === techTab ? ' on' : ''}" data-ttab="${b.key}">${t(b.label)}</button>`,
-  ).join('');
-  // Кто из совета курирует эту ветку — и честное предупреждение, если никто.
-  const lead = (me?.scientists ?? [])
-    .map((c) => data.scientists[c.id])
-    .find((d) => d?.branch === techTab);
-  const leadHtml = lead
-    ? `🧪 ${t('tech.curator')} <b>${esc(t(lead.name))}</b>`
-    : `🔭 ${t('tech.curator.none')}`;
-  // Колонки вкладки: из карты раскладки; техи вне карты — в автоколонку в конце.
-  const colsDef = TECH_COLS[techTab] ?? [];
-  const branchIds = Object.keys(techs).filter((id) => (techs[id]!.branch ?? 'space') === techTab);
-  const placed = new Set(colsDef.flatMap((c) => c.ids));
-  const extras = branchIds
-    .filter((id) => !placed.has(id))
-    .sort((a, b) => techs[a]!.tier - techs[b]!.tier || a.localeCompare(b));
-  const cols = [
-    ...colsDef.map((c) => ({ label: c.label, ids: c.ids.filter((id) => branchIds.includes(id)) })),
-    ...(extras.length ? [{ label: '—', ids: extras }] : []),
-  ].filter((c) => c.ids.length);
-  const wide = cols.length <= 2 ? ' w2' : '';
-  let rail = `<div class="tt-rail"><div class="tt-dhead">${t('tech.rail.day')}</div>`;
-  for (const g of gates) {
-    const cls = g === nowGate ? ' now' : g + 1 > hudDay ? ' future' : '';
-    rail += `<div class="tt-drow${cls}"><b>${g + 1}</b><small>${g === 0 ? t('tech.rail.start') : t('tech.rail.day-short')}</small></div>`;
-  }
-  rail += `</div>`;
-  let colsHtml = '';
-  for (const col of cols) {
-    let cells = '';
-    for (const g of gates) {
-      const nodes = col.ids
-        .filter((id) => (techs[id]!.dayGate ?? 0) === g)
-        .map((id) => {
-          const td = techs[id]!;
-          const st = nodeState(id);
-          const badge =
-            st.st === 'done'
-              ? `<span class="tt-tick">✓</span>`
-              : st.st === 'gate'
-                ? `<span class="tt-lock">🔒</span>`
-                : st.st === 'cond'
-                  ? `<span class="tt-cnd">⚗</span>`
-                  : '';
-          const prog =
-            st.st === 'res'
-              ? `<span class="tt-prog"><i style="width:${Math.round(st.prog * 100)}%"></i></span>`
-              : '';
-          return (
-            `<div class="tt-node st-${st.st}" data-tech="${id}">` +
-            `<div class="tt-box">${TECH_ICONS[id] ?? '🔬'}${prog}${badge}</div>` +
-            `<div class="tt-lbl">${esc(tData(td.name))}</div></div>`
-          );
-        })
-        .join('');
-      cells += `<div class="tt-cell${g === nowGate ? ' now' : ''}">${nodes}</div>`;
-    }
-    colsHtml += `<div class="tt-col${wide}"><div class="tt-chead">${t(col.label)}</div><div class="tt-cellwrap">${cells}</div></div>`;
-  }
-  // Досье узла (тап) — рендерится из состояния, так что живой 500мс-ререндер
-  // обновляет прогресс/день, не закрывая окно.
-  let modal = '';
-  if (techModalId && !techs[techModalId]) techModalId = null;
-  if (techModalId) {
-    const id = techModalId;
-    const td = techs[id]!;
-    const st = nodeState(id);
-    const gate = td.dayGate ?? 0;
-    const prereqNames = (td.prerequisites ?? [])
-      .map((p) => esc(tData(techs[p]?.name ?? p)))
-      .join(', ');
-    const condRows = (td.conditions ?? [])
-      .map((c) => `<span>${techCondOk(c) ? '☑' : '⚗'} <b>${esc(techCondText(c))}</b></span>`)
-      .join('');
-    const affordable = Object.entries(td.cost).every(([k, v]) => (res[k] ?? 0) >= (v as number));
-    const tag =
-      st.st === 'done'
-        ? `<span class="tt-tag">${t('tech.state.done')}</span>`
-        : st.st === 'res'
-          ? `<span class="tt-tag amb">${t('tech.state.running')}</span>`
-          : st.st === 'avail'
-            ? `<span class="tt-tag">${t('tech.state.open')}</span>`
-            : `<span class="tt-tag dim">${t('tech.state.locked')}</span>`;
-    const btn =
-      st.st === 'avail'
-        ? `<button class="tt-mbtn" data-go="${id}"${affordable ? '' : ' disabled'}>🔬 ${affordable ? t('tech.action.research') : t('tech.action.no-resources')}</button>`
-        : st.st === 'done'
-          ? `<button class="tt-mbtn wait" disabled>✓ ${t('tech.action.done')}</button>`
-          : st.st === 'res'
-            ? `<button class="tt-mbtn wait" disabled>⏳ ${t('tech.action.running', { n: st.eta })}</button>`
-            : st.st === 'gate'
-              ? `<button class="tt-mbtn wait" disabled>🔒 ${t('tech.action.opens-day', { n: gate + 1 })}</button>`
-              : st.st === 'chain'
-                ? `<button class="tt-mbtn wait" disabled>🔒 ${t('tech.action.needs-parent')}</button>`
-                : `<button class="tt-mbtn wait" disabled>⚗ ${t('tech.action.unmet')}</button>`;
-    modal =
-      `<div class="tt-modal"><div class="tt-mback" data-mclose="1"></div><div class="tt-mwin">` +
-      `<button class="tt-mx" data-mclose="1">✕</button>` +
-      `<div class="tt-mhead"><div class="tt-mico">${TECH_ICONS[id] ?? '🔬'}</div><div>` +
-      `<div class="tt-mname">${esc(tData(td.name))}<span class="tt-tier">T${td.tier}</span></div>` +
-      `<div class="tt-mtags">${tag}</div></div></div>` +
-      (td.description ? `<div class="tt-mdesc">${esc(t(td.description))}</div>` : '') +
-      `<div class="tt-mstats">` +
-      `<span>💰 <b>${techCost(td.cost)} · ${t('fmt.hours', { n: td.researchTimeHours })}</b></span>` +
-      (techFx(td) ? `<span>✦ <b>${techFx(td)}</b></span>` : '') +
-      (gate > 0 ? `<span>📅 <b>${t('tech.from-day', { n: gate + 1 })}</b></span>` : '') +
-      (prereqNames ? `<span>🔗 <b>${t('tech.req.title')} ${prereqNames}</b></span>` : '') +
-      condRows +
-      `</div>${btn}</div></div>`;
-  }
-  const html =
-    `<div class="tt-top"><span class="tt-day">📅 ${t('tech.day', { n: hudDay })}</span>` +
-    `<span class="tt-slots">⚛ ${t('tech.slots', { a: activeList.length, b: slots })}</span></div>` +
-    `<div class="tt-tabs">${tabs}</div>` +
-    `<div class="tt-lead${lead ? '' : ' closed'}">${leadHtml}</div>` +
-    `<div class="tt-scroll"><div class="tt-grid">${rail}${colsHtml}</div></div>` +
-    modal;
-  // Живой ререндер (innerHTML) сбрасывал бы скролл панели — сохраняем и возвращаем.
-  const scr0 = body.querySelector('.tt-scroll');
-  const sx = scr0?.scrollLeft ?? 0;
-  const sy = scr0?.scrollTop ?? 0;
-  body.innerHTML = html;
-  const scr1 = body.querySelector('.tt-scroll');
-  if (scr1) {
-    scr1.scrollLeft = sx;
-    scr1.scrollTop = sy;
-  }
-}
-document.getElementById('rail-tech')?.addEventListener('click', () => {
-  techModalId = null; // свежее открытие — без прошлого досье
-  techWin.classList.add('show');
-  renderTech();
-  maybeIntro('tech');
+// --- TT-3.1: экран-дерево технологий ------------------------------------------
+// Само окно живёт в `techTree.ts` (REFM-9); здесь только его хуки. Ручка `#tech`
+// остаётся: её держат реестр слоёв Android-Back и троттлинг живой перерисовки в
+// кадровом цикле, а «Хранитель» открывает окно через `techTree.open()`.
+const techTree = initTechTree({
+  root: () => techWin,
+  body: () => $('techbody'),
+  state: () => s,
+  me: () => ME,
+  order: playerOrder,
+  onOpen: () => maybeIntro('tech'),
 });
-techWin.addEventListener('click', (e) => {
-  const tg = e.target as HTMLElement;
-  if (tg.id === 'tech' || tg.classList.contains('tw-close')) {
-    techModalId = null;
-    techWin.classList.remove('show');
-    return;
-  }
-  if (tg.closest('[data-mclose]')) {
-    techModalId = null;
-    renderTech();
-    return;
-  }
-  const go = (tg.closest('.tt-mbtn') as HTMLElement | null)?.dataset.go;
-  if (go) {
-    playerOrder(researchTech(ME, go));
-    renderTech(); // узел тут же перекрашивается в «исследуется»
-    return;
-  }
-  const tab = (tg.closest('.tt-tab') as HTMLElement | null)?.dataset.ttab;
-  if (tab) {
-    if (tab !== techTab) {
-      techTab = tab;
-      techModalId = null;
-    }
-    renderTech();
-    return;
-  }
-  const node = (tg.closest('.tt-node') as HTMLElement | null)?.dataset.tech;
-  if (node) {
-    techModalId = node;
-    renderTech();
-  }
-});
+document.getElementById('rail-tech')?.addEventListener('click', () => techTree.open());
+
 
 // --- steward («Хранитель»): hand the seat to the AI while you sleep ----------
 // The window lives in `stewardScreen.ts` (REFM-7); here it gets its hooks, the rail
@@ -8627,10 +8290,7 @@ const steward = initSteward({
   me: () => ME,
   order: playerOrder,
   onOpen: () => maybeIntro('steward'),
-  openTech: () => {
-    techWin.classList.add('show');
-    renderTech();
-  },
+  openTech: () => techTree.open(),
 });
 document.getElementById('rail-steward')?.addEventListener('click', () => steward.open());
 // Snapshot of my standing at delegation time, diffed on expiry for the morning report.
@@ -12465,9 +12125,9 @@ function frame(nowReal: number) {
     speedbarEl.style.display = showBar ? '' : 'none';
   }
   // Keep the tech window live while open (research progress bar / eta), throttled.
-  if (techWin.classList.contains('show') && nowReal - lastTechAt > 500) {
+  if (techTree.isOpen() && nowReal - lastTechAt > 500) {
     lastTechAt = nowReal;
-    renderTech();
+    techTree.repaint();
   }
   // Keep the steward window live while open (countdown to control returning), throttled.
   if (steward.isOpen() && nowReal - lastStewAt > 500) {
