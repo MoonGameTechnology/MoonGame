@@ -90,9 +90,8 @@ describe('createMultiplayerServer — native TLS (RS-5.1)', () => {
       expect(url.startsWith('wss://')).toBe(true);
       // Self-signed → rejectUnauthorized:false (the point is the encrypted handshake, not
       // a trusted CA — a real deploy uses a Let's Encrypt cert, see deploy/README.md).
-      // Обоснование стоит ЗДЕСЬ, отдельной строкой, а не в самой директиве: всё после
-      // `nosemgrep:` парсится как СПИСОК rule-id, поэтому приписанное туда ` -- причина`
-      // склеивалось с id, совпадения не было и находка продолжала ехать в панель (SEC-14).
+      // Обоснование держим отдельной строкой, а директиву — чистой: так надёжнее, чем
+      // дописывать причину в саму директиву (всё после `nosemgrep:` — список rule-id).
       // Причина: in-test self-signed localhost cert; проверяется сам wss-хендшейк, а в
       // проде сертификат от настоящего CA (deploy/README.md).
       // nosemgrep: problem-based-packs.insecure-transport.js-node.bypass-tls-verification.bypass-tls-verification

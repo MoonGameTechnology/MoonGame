@@ -38,7 +38,12 @@ const EXPECTED = [
   { key: 'trivy-deps', name: 'Trivy image — сторонние образы прода (postgres/caddy)' },
   { key: 'dast-zap', name: 'OWASP ZAP — DAST (baseline против запущенного сервера)' },
   { key: 'zizmor', name: 'zizmor — безопасность workflow' },
-  { key: 'scorecard', name: 'OpenSSF Scorecard — постура', mainOnly: true, skipNote: 'только на main' },
+  {
+    key: 'scorecard',
+    name: 'OpenSSF Scorecard — постура',
+    mainOnly: true,
+    skipNote: 'только на main',
+  },
   { key: 'sbom', name: 'Syft — SBOM (CycloneDX)' },
 ];
 
@@ -86,6 +91,8 @@ for (const f of files.filter(
 const perTool = new Map();
 const totals = { error: 0, warning: 0, note: 0, none: 0 };
 const findings = [];
+/** Сколько результатов сканеры пометили как подавленные (см. фильтр ниже). */
+let suppressedCount = 0;
 const sarifTools = new Set();
 const toolOf = (name) => {
   if (!perTool.has(name)) perTool.set(name, { error: 0, warning: 0, note: 0, none: 0 });
@@ -98,6 +105,17 @@ for (const f of files.filter((f) => f.endsWith('.sarif') || f.endsWith('.sarif.j
     const name = run.tool?.driver?.name ?? 'Unknown';
     sarifTools.add(name);
     for (const r of run.results ?? []) {
+      // Непустой `suppressions` — находка, ПОДАВЛЕННАЯ самим сканером (инлайн
+      // `nosemgrep`, dismissal в UI и т.п.). Semgrep оставляет её в SARIF с этой
+      // пометкой, но выходит с кодом 0 — для гейта её нет. Считать её наравне с живыми
+      // значит показывать как проблему то, что уже разобрано и обосновано: именно так
+      // «подавленная» находка в `wsServer.tls.test.ts` месяцами висела в отчёте, создавая
+      // впечатление, что подавление не работает. Счётчик остаётся — молча прятать тоже
+      // нельзя, число подавлений само по себе показатель.
+      if (Array.isArray(r.suppressions) && r.suppressions.length > 0) {
+        suppressedCount++;
+        continue;
+      }
       const level = norm(r.level);
       toolOf(name)[level]++;
       totals[level]++;
@@ -222,6 +240,10 @@ L.push('| Серьёзность | Σ |');
 L.push('| --- | --: |');
 for (const l of LEVELS) L.push(`| ${ICON[l]} ${l} | ${totals[l]} |`);
 L.push('');
+if (suppressedCount)
+  L.push(
+    `**Подавлено сканерами (с обоснованием в коде/конфиге):** ${suppressedCount} — в таблицы ниже не входят.  `,
+  );
 L.push(`**pnpm run check:** ${checkLine}  `);
 L.push(`**SBOM (CycloneDX):** ${sboms.length ? `✅ ${sboms.join(', ')}` : '—'}`);
 L.push('');
