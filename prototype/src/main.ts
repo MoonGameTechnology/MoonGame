@@ -31,7 +31,6 @@ import {
   mergeFleet,
   splitFleet,
   engageFleet,
-  researchTech,
   buildBuilding,
   upgradeBuilding,
   buildUnit,
@@ -42,20 +41,16 @@ import {
   netIncome,
   retreatFleet,
   STANCE_RANK,
-  marketLots,
-  marketList,
-  marketTake,
-  marketCancel,
   canTraverse,
   START_CANDIDATES,
   DEFAULT_TEMPLATES,
   FORMATION_UNITS,
   FORMATION_SLOTS,
+  FORM_RU,
   formationStats,
   divisionsOf,
   templatesOf,
   mobilizeDivision,
-  renameDivisionTemplate,
   OFFICER_TEMPLATES,
   setDivisionTemplate,
   loadDivision,
@@ -66,7 +61,6 @@ import {
   divisionCargo,
   fleetCargoFree,
   type FormationTemplate,
-  type FormationUnit,
   type SetupConfig,
   type SeatConfig,
   type StepOut,
@@ -83,8 +77,6 @@ import {
   FAVOUR_BASE,
   FAVOUR_EMBARGO,
   FAVOUR_WAR,
-  delegateSteward,
-  recallSteward,
   setHoldPoint,
   stewardActive,
   MAX_STEWARD_HOLD_POINTS,
@@ -103,7 +95,6 @@ import {
   repairFleet,
   dockRepairCost,
   fleetAtOwnDock,
-  MARKET_FEE,
   MAX_CHAIN_STEPS,
   type ChainStep,
   type Patrol,
@@ -117,7 +108,7 @@ import {
 import { fleetCallsign, fleetKindKey } from './fleetName';
 import { planetName } from './planetName';
 import { provinceScore } from '../../packages/shared-core/src/state/sectorKind';
-import { OFFICERS, GROUND_ROSTER } from './groundcombat';
+import { OFFICERS } from './groundcombat';
 import { DEFAULT_HEROES, type HeroLoadout } from './heroes';
 import { DEFAULT_SHIP_LOADOUTS, type ShipLoadout } from './ships';
 // The «Оснащение корабля» loadout constructor reuses the framework-agnostic view-model
@@ -196,7 +187,6 @@ import {
 import {
   esc,
   kfmt,
-  nfmt,
   hl,
   TECH_CUR,
   curIc,
@@ -207,10 +197,18 @@ import {
   fmtEta,
 } from './format';
 // REFM-3: the icon vocabulary (glyph tables + menu renderers) lives in `icons.ts`
-import { BUILD_ICON, KIND_ICON, unitIcon, unitIconHtml, archPath2d } from './icons';
+import {
+  BUILD_ICON,
+  KIND_ICON,
+  SOV_SVG,
+  formIcon,
+  unitIcon,
+  unitIconHtml,
+  archPath2d,
+} from './icons';
 // REFM-4: the object dossiers + the codex card live in `dossiers.ts`; the renderers
 // that read live match state come out of `createDossiers(hooks)` further down.
-import { createDossiers, producesLine, type Dossier } from './dossiers';
+import { createDossiers, producesLine, unitTitle, type Dossier } from './dossiers';
 // The client-side build-queue vocabulary, shared with `dossiers.ts`.
 import type {
   ActiveBuild,
@@ -232,45 +230,33 @@ import {
   metaGrant,
   parseMetaState,
   recordMatch,
-  winRate,
-  averagePlace,
-  leagueKey,
   type MetaState,
   type MetaBranch,
 } from './meta';
-// ARS-5 — arsenal witryna (pure filter/group/parse; see prototype/src/arsenal.ts).
+// ARS-5 — arsenal witryna: the pure model (`arsenal.ts`) plus the hub tab itself
+// (`arsenalScreen.ts`, REFM-5 — `initArsenal(hooks)` owns its cache and markup).
+import { originOf } from './arsenal';
+// H4 — конструктор шаблонов дивизий: модель в `formations.ts`, редактор — REFM-8.
+import { initDivDesign } from './divisionDesigner';
+// TT-3.1 — экран дерева технологий (REFM-9); `branchLabel` берёт ещё совет учёных.
+import { initTechTree, branchLabel } from './techTree';
+// «Профиль командира» — карьерное досье (REFM-10).
+import { initProfile } from './profileScreen';
+// AVA-C1/C2 — корпоративный кабинет (REFM-11).
+import { initCorp } from './corpScreen';
+// ECON-4 — session market: the model + orders live next door; the WINDOW is REFM-6.
+import { initMarket } from './marketScreen';
+// ST-2/ST-3 — «Хранитель»: the window is REFM-7; the read-only helpers below are shared
+// with the threat alert (`stewFmtDur`), the side panel (`stewardTechDone`) and the
+// morning report (`stewMetrics`).
 import {
-  filterArsenal,
-  gradesOf,
-  originOf,
-  parseArsenalItems,
-  type ArsenalFilter,
-} from './arsenal';
-// AVA-C1/C2 — corporation cabinet (pure types/parsers; see prototype/src/corp.ts).
-import {
-  parseCorpRecord,
-  parseCorpSummaries,
-  parseMembership,
-  parseMemberships,
-  parseAudit,
-  parseChallenges,
-  parseReadyPool,
-  parseRosterView,
-  parseAccountIds,
-  parseFeed,
-  parseMedals,
-  sortMembers,
-  canManage,
-  type CorpRole,
-  type CorpRecord,
-  type CorpMembership,
-  type CorpSummary,
-  type CorpAuditEntry,
-  type AvaChallenge,
-  type AvaChallengeStatus,
-  type AvaRosterView,
-  type AvaFeedEntry,
-} from './corp';
+  initSteward,
+  stewFmtDur,
+  stewMetrics,
+  stewardTechDone,
+  type StewardMetrics,
+} from './stewardScreen';
+import { initArsenal, originLabel } from './arsenalScreen';
 // DEV TEST MODE — self-contained dev-only scenarios; remove this import + the
 // initTestMode(...) call below + the #testmode HTML/CSS to cut it cleanly.
 // (The player build already does: the only uses sit under `!__PLAYER_BUILD__`, so
@@ -330,7 +316,6 @@ import type {
   DiplomaticStance,
   DomainEvent,
   IntelGrant,
-  ArsenalItem,
   UnitStack,
 } from '../../packages/shared-core/src/index';
 
@@ -1653,7 +1638,7 @@ function divisionsHtml(planetId: string): string {
   let h = `<div class="sec">${t('div.title')}</div>`;
   if (here.length) {
     for (const d of here) {
-      const comp = d.units.map((u) => `${formIcon(u.type)}${u.count}`).join(' ') || '—';
+      const comp = d.units.map((u) => `${formIcon(u.type, pcUi())}${u.count}`).join(' ') || '—';
       const hp = Math.round(d.units.reduce((n, u) => n + u.hp, 0));
       const off = d.officer ? t(OFFICERS[d.officer]?.name ?? '') : '';
       // Офицер — часть ИМЕННОГО шаблона (готовый, менять нельзя): показываем, не редактируем.
@@ -1689,14 +1674,14 @@ function divisionsHtml(planetId: string): string {
     // PC: every icon self-describes on hover — composition glyphs → unit dossiers,
     // ⚔/🛡/❤ → the stat's name, cost glyphs → the resource's name.
     const comp =
-      slots.map((u) => `<span data-desc="u:${esc(u)}">${formIcon(u)}</span>`).join('') || '—';
+      slots.map((u) => `<span data-desc="u:${esc(u)}">${formIcon(u, pcUi())}</span>`).join('') || '—';
     const cost =
       Object.entries(f.cost)
         .map(([r, a]) => `<span data-desc="res:${esc(r)}">${a}${TECH_CUR[r] ?? r[0]}</span>`)
         .join(' ') || '—';
     h += `<div class="row dim">${comp} · <span data-desc="stat:datk">⚔${f.attack}</span> <span data-desc="stat:ddef">🛡${f.defense}</span> <span data-desc="stat:dhp">❤${f.hp}</span>${offLine} · ${cost}</div>`;
   } else {
-    const comp = slots.map((u) => formIcon(u)).join('') || '—';
+    const comp = slots.map((u) => formIcon(u, pcUi())).join('') || '—';
     const cost =
       Object.entries(f.cost)
         .map(([r, a]) => `<span class="rc-${r}">${a}${TECH_CUR[r] ?? r[0]}</span>`)
@@ -1746,7 +1731,7 @@ function fleetDivisionsHtml(f: Fleet, here: Planet): string {
   if (carried.length) {
     g += `<div class="row">`;
     for (const d of carried) {
-      const comp = d.units.map((u) => `${formIcon(u.type)}${u.count}`).join('') || '—';
+      const comp = d.units.map((u) => `${formIcon(u.type, pcUi())}${u.count}`).join('') || '—';
       g += btn('divunload', d.id, `▼ ${esc(d.name)} ${comp}`, true);
     }
     g += `</div>`;
@@ -2855,30 +2840,30 @@ function handleEvents(events: DomainEvent[]) {
               ),
             }),
           );
-        if (techWin.classList.contains('show')) renderTech();
+        if (techTree.isOpen()) techTree.repaint();
         break;
       // «Хранитель» lifecycle: snapshot at delegation, diff on expiry (the morning report).
       case 'steward.delegated':
         if (p.playerId === ME) {
-          stewSnapshot = stewMetrics();
+          stewSnapshot = stewMetrics(s, ME);
           note(
             (p as { posture?: string }).posture === 'active_defend'
               ? t('log.steward.on.active')
               : t('log.steward.on.defense'),
           );
-          if (stewWin.classList.contains('show')) renderSteward();
+          if (steward.isOpen()) steward.repaint();
         }
         break;
       case 'steward.recalled':
         if (p.playerId === ME) {
           stewSnapshot = null;
           note(t('log.steward.off'));
-          if (stewWin.classList.contains('show')) renderSteward();
+          if (steward.isOpen()) steward.repaint();
         }
         break;
       case 'steward.expired':
         if (p.playerId === ME) {
-          const now = stewMetrics();
+          const now = stewMetrics(s, ME);
           const base = stewSnapshot;
           stewSnapshot = null;
           const sign = (n: number) => (n >= 0 ? `+${n}` : `${n}`);
@@ -2894,7 +2879,7 @@ function handleEvents(events: DomainEvent[]) {
               diff +
               sitrep,
           );
-          if (stewWin.classList.contains('show')) renderSteward();
+          if (steward.isOpen()) steward.repaint();
         }
         break;
       // Both espionage events are addressed to the ACTOR (`owner`); in NET play the
@@ -5196,7 +5181,7 @@ function fleetTilesHtml(f: Fleet, stacks: UnitStack[]): string {
     .map((u) => {
       const def = data.units[u.unit];
       if (!def) return '';
-      const name = unitDossier(u.unit)?.name ?? displayUnit(u.unit);
+      const name = unitTitle(u.unit);
       const eff = effectiveStats(def, u, data);
       const full = u.count * (eff.hp ?? 0);
       const pct = full > 0 ? Math.round((Math.min(u.hp ?? full, full) / full) * 100) : 100;
@@ -5716,7 +5701,7 @@ function planetPanelHtml(p: Planet): string {
     }
     // Hold point (ST-2.1): a standing order for the Steward — the anchor is never
     // auto-evacuated and gets reinforced under threat. Same tech gate as delegation.
-    if (stewardTechDone()) {
+    if (stewardTechDone(s, ME)) {
       const points = s.players[ME]?.stewardHoldPoints ?? [];
       h += `<div class="row">${
         points.includes(p.id)
@@ -5887,7 +5872,7 @@ function panelHtml(): string {
 // The hover/tap blurbs and the full-info codex card live in `dossiers.ts` now; here
 // they only get their live-state hooks. The pure parts (`buildingDossier`,
 // `producesLine`, the `Dossier` type) are imported at the top of the file.
-const { unitDossier, objDossier, codexHtml } = createDossiers({
+const { objDossier, codexHtml } = createDossiers({
   state: () => s,
   pcUi,
   youColor: () => youColor,
@@ -6558,7 +6543,7 @@ function codexTile(
 ): string {
   if (!(kind === 'b' ? data.buildings[id] : data.units[id])) return '';
   const icon = kind === 'b' ? (BUILD_ICON[id] ?? '▣') : unitIconHtml(id, data, youColor);
-  const name = kind === 'b' ? buildingName(data.buildings[id]?.name, id) : (unitDossier(id)?.name ?? displayUnit(id));
+  const name = kind === 'b' ? buildingName(data.buildings[id]?.name, id) : unitTitle(id);
   if (lockedFor) {
     // Committed already — a dim, non-ordering tile. Keeps data-desc (hover dossier),
     // drops data-codex/data-buildorder so neither left- nor right-click builds again.
@@ -6576,7 +6561,7 @@ function garrisonTilesHtml(stacks: Array<{ unit: string; count: number }>): stri
   const tiles = stacks
     .filter((u) => u.count > 0)
     .map((u) => {
-      const name = unitDossier(u.unit)?.name ?? displayUnit(u.unit);
+      const name = unitTitle(u.unit);
       return `<button class="ptile mini" data-codex="u:${esc(u.unit)}" data-desc="u:${esc(u.unit)}" data-name="${esc(name)}"><span class="pt-ic">${unitIcon(u.unit, data)}</span><span class="pt-c">${u.count}</span></button>`;
     })
     .join('');
@@ -6622,7 +6607,7 @@ const CODEX_SECTIONS: Array<[CodexCategory, string]> = [
 ];
 function codexEntryLabel(e: CodexEntry): string {
   const id = e.key.slice(2);
-  if (e.category === 'unit') return unitDossier(id)?.name ?? displayUnit(id);
+  if (e.category === 'unit') return unitTitle(id);
   if (e.category === 'building') return buildingName(data.buildings[id]?.name, id);
   return t(e.titleKey ?? e.title); // mechanic: the heading lives in the locale
 }
@@ -7260,9 +7245,7 @@ side.addEventListener('click', (ev) => {
       playerOrder(mobilizeDivision(ME, selPlanet!, Number(arg.slice(1)), true));
     else playerOrder(mobilizeDivision(ME, selPlanet!, Number(arg)));
   } else if (act === 'divdesign') {
-    ddIdx = Math.min(mobTplIdx, templatesOf(s, ME).length - 1);
-    divDesignWin.classList.add('show');
-    renderDivDesign();
+    divDesign.open(Math.min(mobTplIdx, templatesOf(s, ME).length - 1));
   } else if (act === 'spyplanet') {
     playerOrder(spyOn(ME, arg, 'planet', selPlanet!)); // arg = the world's (last known) owner
   } else if (act === 'capital') {
@@ -8226,105 +8209,22 @@ logWin?.addEventListener('click', (e) => {
 const techWin = $('tech');
 
 // --- division template designer (H4, Stellaris-style) ------------------------------
-// Editing happens HERE, before building: the planet panel only picks a ready design.
-// Custom templates (3) are editable + renamable; named officer templates are locked
-// premades («готовый шаблон, менять нельзя») shown for reference. A mobilised division
-// is a snapshot — editing a template later never touches armies already in the field.
+// The editor lives in `divisionDesigner.ts` (REFM-8); here it gets its hooks. The
+// `#divdesign` handle stays: the Android-Back layer stack holds it, and the planet
+// panel opens it.
 const divDesignWin = $('divdesign');
-let ddIdx = 0; // selected design: 0..2 custom, 3+ officer premades
-function renderDivDesign(): void {
-  const tpls = templatesOf(s, ME);
-  const all: Array<{ tpl: FormationTemplate; officer?: string }> = [
-    ...tpls.map((tpl) => ({ tpl })),
-    ...OFFICER_TEMPLATES.map((tpl) => ({ tpl, officer: tpl.officer })),
-  ];
-  ddIdx = Math.max(0, Math.min(ddIdx, all.length - 1));
-  const pick = all[ddIdx]!;
-  const locked = pick.officer !== undefined;
-  let h = `<div class="dd-tabs">`;
-  for (let i = 0; i < all.length; i++) {
-    h += `<button data-ddtab="${i}" class="${i === ddIdx ? 'on' : ''}">${all[i]!.officer ? '★ ' : ''}${esc(t(all[i]!.tpl.name))}</button>`;
-  }
-  h += `</div>`;
-  if (locked) {
-    const off = OFFICERS[pick.officer!];
-    const bonus = [
-      off?.atk ? `+${Math.round(off.atk * 100)}% ${t('div.stat.attack')}` : '',
-      off?.def ? `+${Math.round(off.def * 100)}% ${t('div.stat.defense')}` : '',
-      off?.hp ? `+${Math.round(off.hp * 100)}% ${t('div.stat.hp')}` : '',
-    ]
-      .filter(Boolean)
-      .join(' · ');
-    h += `<div class="dd-lock">★ ${esc(t(off?.name ?? ''))} — ${bonus}</div>`;
-    h += `<div class="dd-lock">${t('div.officer-locked')}</div>`;
-  } else {
-    h += `<div class="dd-name"><input id="dd-name" maxlength="24" value="${esc(pick.tpl.name)}"><button class="b" data-ddrename>${t('div.rename')}</button></div>`;
-  }
-  h += `<div class="dd-slots">`;
-  for (let i = 0; i < FORMATION_SLOTS; i++) {
-    const u = pick.tpl.slots[i] ?? null;
-    h += `<button data-ddslot="${i}"${locked ? ' disabled' : ''}>${u ? `${formIcon(u)} ${esc(t(FORM_RU[u] ?? u))}` : '＋'}</button>`;
-  }
-  h += `</div>`;
-  const f = formationStats(pick.tpl);
-  // Per-target damage preview: the counter matrix made visible — Σ atk of the
-  // composition against each of the four unit types.
-  const vs = (target: string): number =>
-    pick.tpl.slots.reduce(
-      (n, u) => n + (u ? (GROUND_ROSTER[u]?.atk[target as FormationUnit] ?? 0) : 0),
-      0,
-    );
-  h += `<div class="dd-vs">`;
-  for (const tgt of FORMATION_UNITS) {
-    const v = vs(tgt);
-    h += `<div class="vrow"><span class="vnm">${t('div.damage-vs')} ${formIcon(tgt)} ${esc(t(FORM_RU[tgt] ?? tgt))}</span><div class="vtrack"><div class="vbar" style="width:${Math.min(100, Math.round((v / 90) * 100))}%"></div></div><span>${v}</span></div>`;
-  }
-  h += `</div>`;
-  const cost =
-    Object.entries(f.cost)
-      .map(([r, a]) => `<span class="rc-${r}">${a}${TECH_CUR[r] ?? r[0]}</span>`)
-      .join(' ') || '—';
-  const syn = f.synergies.map((x) => `${esc(t(x.name))} — ${esc(t(x.desc))}`).join('<br>');
-  h += `<div class="row dim">⚔${f.attack} 🛡${f.defense} ❤${f.hp} · ${t('div.roster', { n: f.count, s: FORMATION_SLOTS, rest: cost })}</div>`;
-  if (syn) h += `<div class="hint2">${syn}</div>`;
-  h += `<div class="hint2">${t('div.slot.note')}</div>`;
-  $('divdesignbody').innerHTML = h;
-}
-divDesignWin.addEventListener('click', (e) => {
-  const tg = e.target as HTMLElement;
-  if (tg.id === 'divdesign' || tg.closest('.tw-close')) {
-    divDesignWin.classList.remove('show');
+const divDesign = initDivDesign({
+  root: () => divDesignWin,
+  body: () => $('divdesignbody'),
+  state: () => s,
+  me: () => ME,
+  pcUi,
+  order: playerOrder,
+  onClose: () => {
     lastPanelHtml = ''; // the mobilise picker mirrors the templates — refresh it
-    return;
-  }
-  const tab = tg.closest('[data-ddtab]') as HTMLElement | null;
-  if (tab) {
-    ddIdx = Number(tab.dataset.ddtab);
-    renderDivDesign();
-    return;
-  }
-  const slot = tg.closest('[data-ddslot]') as HTMLButtonElement | null;
-  if (slot && !slot.disabled && ddIdx < templatesOf(s, ME).length) {
-    const si = Number(slot.dataset.ddslot);
-    const cur = templatesOf(s, ME)[ddIdx]?.slots[si] ?? null;
-    const order: (string | null)[] = [null, ...FORMATION_UNITS];
-    const next = order[(order.indexOf(cur) + 1) % order.length] ?? null;
-    playerOrder(setDivisionTemplate(ME, ddIdx, si, next));
-    renderDivDesign();
-    return;
-  }
-  if (tg.closest('[data-ddrename]')) {
-    const name = ($('dd-name') as HTMLInputElement).value.trim();
-    if (name && ddIdx < templatesOf(s, ME).length) {
-      playerOrder(renameDivisionTemplate(ME, ddIdx, name));
-      renderDivDesign();
-    }
-  }
+  },
 });
-// Resource glyph family (mock 2026-07: coin stack / cube / sprout / bolt / chip).
-// Producer buildings echo these in BUILD_ICON — keep both in sync. These TEXT glyphs
-// serve inline prose (cost strings, notes, market rows); the top-bar capsules draw
-// the richer RES_SVG line icons below instead.
+
 // Bar-only display icons: inline SVG line art traced from the mock (two coin rings,
 // isometric cube, sprout, bolt, IC chip). stroke=currentColor so the capsule states
 // (.short red, .dead dim) tint them exactly like a text glyph.
@@ -8339,524 +8239,42 @@ const RES_SVG: Record<string, string> = {
   microelectronics:
     '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><rect x="4.6" y="4.6" width="6.8" height="6.8" rx="1"/><rect x="7" y="7" width="2" height="2"/><path d="M6.4 4.6v-2M9.6 4.6v-2M6.4 13.4v-2M9.6 13.4v-2M4.6 6.4h-2M4.6 9.6h-2M13.4 6.4h-2M13.4 9.6h-2"/></svg>',
 };
-// Sovereigns (donate currency): faceted-gem line icon per the mock — worn GOLD with a
-// soft halo (the mock capsule is lavender; the brief keeps the game's gold identity).
-const SOV_SVG =
-  '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M8 1.8 11.8 6 8 14.2 4.2 6 8 1.8Z"/><path d="M4.2 6h7.6M8 1.8 6.3 6l1.7 8.2M8 1.8 9.7 6"/></svg>';
-/** Resource token for innerHTML strings, tinted with the resource's accent colour
- *  (mock palette; .rc-* rules in the stylesheet). Plain-text contexts (toasts,
- *  titles) keep the bare TECH_CUR glyph — colour can't ride along there. */
-const TECH_BRANCHES: Array<{ key: string; label: string }> = [
-  { key: 'space', label: 'tech.branch.space' },
-  { key: 'ground', label: 'tech.branch.ground' },
-  { key: 'squadron', label: 'tech.branch.squadron' },
-  { key: 'missile', label: 'tech.branch.missile' },
-  { key: 'command', label: 'tech.branch.command' }, // automation / C2 — «Хранитель» lives here
-];
-const branchLabel = (key: string): string =>
-  t(TECH_BRANCHES.find((b) => b.key === key)?.label ?? key);
-const techCost = (c: Record<string, number>): string =>
-  Object.entries(c)
-    .map(([k, v]) => `${curIc(k)} ${v}`)
-    .join(' · ');
-// --- TT-3.1: экран-дерево (макет v4) — вкладки-ветки, рельса дней, досье по тапу ----
-// Presentation-only layout: named sub-columns per branch, ids in day order. The
-// canonical data stays layout-free; a tech missing from this map falls into an
-// auto-column appended at the end, so fresh data never breaks the screen.
-const TECH_COLS: Record<string, Array<{ label: string; ids: string[] }>> = {
-  space: [
-    {
-      label: 'tech.group.industry',
-      ids: ['industrial_automation', 'microelectronics_fabrication'],
-    },
-    { label: 'tech.group.fleet', ids: ['orbital_logistics', 'siege_doctrine', 'void_armadas'] },
-    { label: 'tech.group.sensors', ids: ['deep_survey'] },
-  ],
-  ground: [
-    { label: 'tech.group.doctrines', ids: ['combined_arms', 'garrison_networks'] },
-    { label: 'tech.group.fortifications', ids: ['fortified_infrastructure', 'planetary_bastions'] },
-  ],
-  squadron: [
-    { label: 'tech.group.airwing', ids: ['flight_decks', 'strike_vectors', 'ace_programs'] },
-  ],
-  missile: [
-    {
-      label: 'tech.group.arsenal',
-      ids: ['guidance_arrays', 'warhead_miniaturization', 'saturation_barrage'],
-    },
-  ],
-  command: [
-    { label: 'tech.group.comms', ids: ['signal_corps', 'logistics_command'] },
-    { label: 'tech.group.automation', ids: ['ai_stewardship'] },
-  ],
-};
-const TECH_ICONS: Record<string, string> = {
-  industrial_automation: '⚙',
-  microelectronics_fabrication: '▣',
-  deep_survey: '📡',
-  orbital_logistics: '⛽',
-  siege_doctrine: '☄',
-  void_armadas: '🛸',
-  combined_arms: '⚔',
-  garrison_networks: '⛺',
-  fortified_infrastructure: '🏰',
-  planetary_bastions: '🛡',
-  flight_decks: '🛫',
-  strike_vectors: '🎯',
-  ace_programs: '🎖',
-  guidance_arrays: '🧭',
-  warhead_miniaturization: '🧨',
-  saturation_barrage: '🚀',
-  signal_corps: '📶',
-  logistics_command: '🧠',
-  ai_stewardship: '😴',
-};
-const TECH_FX_LABEL: Record<string, string> = {
-  productionBonus: 'tech.fx.production',
-  fleetSpeedBonus: 'tech.fx.fleet-speed',
-  combatDamageBonus: 'tech.fx.damage',
-  radarRangeBonus: 'tech.fx.radar',
-};
-let techTab = 'space'; // активная вкладка-ветка
-let techModalId: string | null = null; // открытое досье узла
-type TechDefLike = (typeof data.technologies)[string];
-type TechCond = TechDefLike['conditions'][number];
-function techCondText(c: TechCond): string {
-  switch (c.type) {
-    case 'has_scientist':
-      return t('tech.req.scientist', {
-        b: c.branch ? branchLabel(c.branch) : t('tech.req.scientist.any'),
-      });
-    case 'own_sectors':
-      return t('tech.req.sectors', { n: c.min });
-    case 'has_building':
-      return t('tech.req.building', {
-        b: tData(data.buildings[c.building]?.name ?? c.building),
-        n: c.min,
-      });
-    case 'controls_planet_type':
-      return t('tech.req.planet', { p: tData(c.planetType), n: c.min });
-    case 'has_unit':
-      // Unit defs carry no `name` field (buildings do) — the display name is the
-      // space-joined id via displayUnit(); the old `?.name ?? id` fallback built a
-      // broken l10n key for multiword ids ('strike_carrier' → data.strikecarrier).
-      return t('tech.req.unit', { u: displayUnit(c.unit), n: c.min });
-    default:
-      return t('tech.req.special');
-  }
-}
-// Клиентская проверка — только для подсветки узла; финальную правду говорит ядро
-// (technologyLock, fail-secure). Типы, которых нет в живых данных, честно показываем
-// закрытыми — reducer их всё равно проверит сам.
-function techCondOk(c: TechCond): boolean {
-  const me = s.players[ME];
-  switch (c.type) {
-    case 'has_scientist':
-      return (me?.scientists ?? []).some((sc) => {
-        const def = data.scientists[sc.id];
-        return (
-          !!def && (!c.branch || def.branch === c.branch) && (sc.level ?? 1) >= (c.minLevel ?? 1)
-        );
-      });
-    case 'own_sectors':
-      return Object.values(s.planets).filter((p) => p.owner === ME).length >= c.min;
-    default:
-      return false;
-  }
-}
-/** «+10% производство · открывает: Fort» — эффекты и анлоки узла одной строкой. */
-function techFx(td: TechDefLike): string {
-  const fx = Object.entries(td.effects ?? {})
-    .filter(([, v]) => (v as number) !== 0)
-    .map(([k, v]) => `+${Math.round((v as number) * 100)}% ${t(TECH_FX_LABEL[k] ?? k)}`);
-  for (const u of td.unlocks?.units ?? [])
-    // no `name` on unit defs — displayUnit() is the canonical unit label (see has_unit)
-    fx.push(t('tech.grants', { x: esc(displayUnit(u)) }));
-  for (const b of td.unlocks?.buildings ?? [])
-    fx.push(t('tech.grants', { x: esc(tData(data.buildings[b]?.name ?? b)) }));
-  for (const a of td.unlocks?.abilities ?? [])
-    fx.push(t('tech.grants.ability', { x: a === 'steward' ? t('tech.grants.steward') : esc(a) }));
-  return fx.join(' · ');
-}
-function renderTech(): void {
-  const body = $('techbody');
-  const me = s.players[ME];
-  // Meta-progression grants (meta_*) are account perks, not researchable session
-  // techs — the tree shows only the real nodes.
-  const techs = Object.fromEntries(
-    Object.entries(data.technologies).filter(([id]) => !id.startsWith('meta_')),
-  );
-  const done = new Set(me?.technologies?.completed ?? []);
-  // Research runs in CONCURRENT slots (core: technologies.active is a list).
-  const activeRaw = me?.technologies?.active;
-  const activeList = Array.isArray(activeRaw) ? activeRaw : activeRaw ? [activeRaw] : [];
-  const res = (me?.resources ?? {}) as Record<string, number>;
-  const started = s.startedAt ?? 0;
-  const hudDay = floor(s.time / DAY) + 1; // счёт статус-бара: день 1 — первый
-  // Рельса дней: объединение day-гейтов ВСЕХ веток (+ старт) — календарь общий,
-  // при смене вкладки строки не прыгают (правило макета). Подпись = dayGate+1,
-  // тот же счёт, что у часов в статус-баре.
-  const gates = [
-    ...new Set(
-      Object.values(techs)
-        .map((td) => td.dayGate ?? 0)
-        .concat(0),
-    ),
-  ].sort((a, b) => a - b);
-  const nowGate = gates.filter((g) => g + 1 <= hudDay).pop() ?? 0;
-  // Пилюля слотов зеркалит кламп ядра: 2 базовых, +1 от учёного, максимум 3.
-  const slotBonus = (me?.scientists ?? []).reduce(
-    (n, c) => n + (data.scientists[c.id]?.slotBonus ?? 0),
-    0,
-  );
-  const slots = Math.min(3, Math.max(2, 2 + slotBonus));
-  // Состояние узла в порядке проверок ядра (technologyLock): prereq → день → условия.
-  const nodeState = (id: string): { st: string; prog: number; eta: number } => {
-    const td = techs[id]!;
-    if (done.has(id)) return { st: 'done', prog: 1, eta: 0 };
-    const act = activeList.find((a) => a.technology === id);
-    if (act) {
-      const total = act.completesAt - act.startedAt;
-      return {
-        st: 'res',
-        prog: total > 0 ? clamp((s.time - act.startedAt) / total, 0, 1) : 1,
-        eta: Math.max(0, Math.ceil((act.completesAt - s.time) / HOUR)),
-      };
-    }
-    if ((td.prerequisites ?? []).some((p) => !done.has(p))) return { st: 'chain', prog: 0, eta: 0 };
-    if ((td.dayGate ?? 0) > 0 && s.time - started < (td.dayGate ?? 0) * DAY)
-      return { st: 'gate', prog: 0, eta: 0 };
-    if ((td.conditions ?? []).some((c) => !techCondOk(c))) return { st: 'cond', prog: 0, eta: 0 };
-    return { st: 'avail', prog: 0, eta: 0 };
-  };
-  const tabs = TECH_BRANCHES.map(
-    (b) =>
-      `<button class="tt-tab${b.key === techTab ? ' on' : ''}" data-ttab="${b.key}">${t(b.label)}</button>`,
-  ).join('');
-  // Кто из совета курирует эту ветку — и честное предупреждение, если никто.
-  const lead = (me?.scientists ?? [])
-    .map((c) => data.scientists[c.id])
-    .find((d) => d?.branch === techTab);
-  const leadHtml = lead
-    ? `🧪 ${t('tech.curator')} <b>${esc(t(lead.name))}</b>`
-    : `🔭 ${t('tech.curator.none')}`;
-  // Колонки вкладки: из карты раскладки; техи вне карты — в автоколонку в конце.
-  const colsDef = TECH_COLS[techTab] ?? [];
-  const branchIds = Object.keys(techs).filter((id) => (techs[id]!.branch ?? 'space') === techTab);
-  const placed = new Set(colsDef.flatMap((c) => c.ids));
-  const extras = branchIds
-    .filter((id) => !placed.has(id))
-    .sort((a, b) => techs[a]!.tier - techs[b]!.tier || a.localeCompare(b));
-  const cols = [
-    ...colsDef.map((c) => ({ label: c.label, ids: c.ids.filter((id) => branchIds.includes(id)) })),
-    ...(extras.length ? [{ label: '—', ids: extras }] : []),
-  ].filter((c) => c.ids.length);
-  const wide = cols.length <= 2 ? ' w2' : '';
-  let rail = `<div class="tt-rail"><div class="tt-dhead">${t('tech.rail.day')}</div>`;
-  for (const g of gates) {
-    const cls = g === nowGate ? ' now' : g + 1 > hudDay ? ' future' : '';
-    rail += `<div class="tt-drow${cls}"><b>${g + 1}</b><small>${g === 0 ? t('tech.rail.start') : t('tech.rail.day-short')}</small></div>`;
-  }
-  rail += `</div>`;
-  let colsHtml = '';
-  for (const col of cols) {
-    let cells = '';
-    for (const g of gates) {
-      const nodes = col.ids
-        .filter((id) => (techs[id]!.dayGate ?? 0) === g)
-        .map((id) => {
-          const td = techs[id]!;
-          const st = nodeState(id);
-          const badge =
-            st.st === 'done'
-              ? `<span class="tt-tick">✓</span>`
-              : st.st === 'gate'
-                ? `<span class="tt-lock">🔒</span>`
-                : st.st === 'cond'
-                  ? `<span class="tt-cnd">⚗</span>`
-                  : '';
-          const prog =
-            st.st === 'res'
-              ? `<span class="tt-prog"><i style="width:${Math.round(st.prog * 100)}%"></i></span>`
-              : '';
-          return (
-            `<div class="tt-node st-${st.st}" data-tech="${id}">` +
-            `<div class="tt-box">${TECH_ICONS[id] ?? '🔬'}${prog}${badge}</div>` +
-            `<div class="tt-lbl">${esc(tData(td.name))}</div></div>`
-          );
-        })
-        .join('');
-      cells += `<div class="tt-cell${g === nowGate ? ' now' : ''}">${nodes}</div>`;
-    }
-    colsHtml += `<div class="tt-col${wide}"><div class="tt-chead">${t(col.label)}</div><div class="tt-cellwrap">${cells}</div></div>`;
-  }
-  // Досье узла (тап) — рендерится из состояния, так что живой 500мс-ререндер
-  // обновляет прогресс/день, не закрывая окно.
-  let modal = '';
-  if (techModalId && !techs[techModalId]) techModalId = null;
-  if (techModalId) {
-    const id = techModalId;
-    const td = techs[id]!;
-    const st = nodeState(id);
-    const gate = td.dayGate ?? 0;
-    const prereqNames = (td.prerequisites ?? [])
-      .map((p) => esc(tData(techs[p]?.name ?? p)))
-      .join(', ');
-    const condRows = (td.conditions ?? [])
-      .map((c) => `<span>${techCondOk(c) ? '☑' : '⚗'} <b>${esc(techCondText(c))}</b></span>`)
-      .join('');
-    const affordable = Object.entries(td.cost).every(([k, v]) => (res[k] ?? 0) >= (v as number));
-    const tag =
-      st.st === 'done'
-        ? `<span class="tt-tag">${t('tech.state.done')}</span>`
-        : st.st === 'res'
-          ? `<span class="tt-tag amb">${t('tech.state.running')}</span>`
-          : st.st === 'avail'
-            ? `<span class="tt-tag">${t('tech.state.open')}</span>`
-            : `<span class="tt-tag dim">${t('tech.state.locked')}</span>`;
-    const btn =
-      st.st === 'avail'
-        ? `<button class="tt-mbtn" data-go="${id}"${affordable ? '' : ' disabled'}>🔬 ${affordable ? t('tech.action.research') : t('tech.action.no-resources')}</button>`
-        : st.st === 'done'
-          ? `<button class="tt-mbtn wait" disabled>✓ ${t('tech.action.done')}</button>`
-          : st.st === 'res'
-            ? `<button class="tt-mbtn wait" disabled>⏳ ${t('tech.action.running', { n: st.eta })}</button>`
-            : st.st === 'gate'
-              ? `<button class="tt-mbtn wait" disabled>🔒 ${t('tech.action.opens-day', { n: gate + 1 })}</button>`
-              : st.st === 'chain'
-                ? `<button class="tt-mbtn wait" disabled>🔒 ${t('tech.action.needs-parent')}</button>`
-                : `<button class="tt-mbtn wait" disabled>⚗ ${t('tech.action.unmet')}</button>`;
-    modal =
-      `<div class="tt-modal"><div class="tt-mback" data-mclose="1"></div><div class="tt-mwin">` +
-      `<button class="tt-mx" data-mclose="1">✕</button>` +
-      `<div class="tt-mhead"><div class="tt-mico">${TECH_ICONS[id] ?? '🔬'}</div><div>` +
-      `<div class="tt-mname">${esc(tData(td.name))}<span class="tt-tier">T${td.tier}</span></div>` +
-      `<div class="tt-mtags">${tag}</div></div></div>` +
-      (td.description ? `<div class="tt-mdesc">${esc(t(td.description))}</div>` : '') +
-      `<div class="tt-mstats">` +
-      `<span>💰 <b>${techCost(td.cost)} · ${t('fmt.hours', { n: td.researchTimeHours })}</b></span>` +
-      (techFx(td) ? `<span>✦ <b>${techFx(td)}</b></span>` : '') +
-      (gate > 0 ? `<span>📅 <b>${t('tech.from-day', { n: gate + 1 })}</b></span>` : '') +
-      (prereqNames ? `<span>🔗 <b>${t('tech.req.title')} ${prereqNames}</b></span>` : '') +
-      condRows +
-      `</div>${btn}</div></div>`;
-  }
-  const html =
-    `<div class="tt-top"><span class="tt-day">📅 ${t('tech.day', { n: hudDay })}</span>` +
-    `<span class="tt-slots">⚛ ${t('tech.slots', { a: activeList.length, b: slots })}</span></div>` +
-    `<div class="tt-tabs">${tabs}</div>` +
-    `<div class="tt-lead${lead ? '' : ' closed'}">${leadHtml}</div>` +
-    `<div class="tt-scroll"><div class="tt-grid">${rail}${colsHtml}</div></div>` +
-    modal;
-  // Живой ререндер (innerHTML) сбрасывал бы скролл панели — сохраняем и возвращаем.
-  const scr0 = body.querySelector('.tt-scroll');
-  const sx = scr0?.scrollLeft ?? 0;
-  const sy = scr0?.scrollTop ?? 0;
-  body.innerHTML = html;
-  const scr1 = body.querySelector('.tt-scroll');
-  if (scr1) {
-    scr1.scrollLeft = sx;
-    scr1.scrollTop = sy;
-  }
-}
-document.getElementById('rail-tech')?.addEventListener('click', () => {
-  techModalId = null; // свежее открытие — без прошлого досье
-  techWin.classList.add('show');
-  renderTech();
-  maybeIntro('tech');
+// --- TT-3.1: экран-дерево технологий ------------------------------------------
+// Само окно живёт в `techTree.ts` (REFM-9); здесь только его хуки. Ручка `#tech`
+// остаётся: её держат реестр слоёв Android-Back и троттлинг живой перерисовки в
+// кадровом цикле, а «Хранитель» открывает окно через `techTree.open()`.
+const techTree = initTechTree({
+  root: () => techWin,
+  body: () => $('techbody'),
+  state: () => s,
+  me: () => ME,
+  order: playerOrder,
+  onOpen: () => maybeIntro('tech'),
 });
-techWin.addEventListener('click', (e) => {
-  const tg = e.target as HTMLElement;
-  if (tg.id === 'tech' || tg.classList.contains('tw-close')) {
-    techModalId = null;
-    techWin.classList.remove('show');
-    return;
-  }
-  if (tg.closest('[data-mclose]')) {
-    techModalId = null;
-    renderTech();
-    return;
-  }
-  const go = (tg.closest('.tt-mbtn') as HTMLElement | null)?.dataset.go;
-  if (go) {
-    playerOrder(researchTech(ME, go));
-    renderTech(); // узел тут же перекрашивается в «исследуется»
-    return;
-  }
-  const tab = (tg.closest('.tt-tab') as HTMLElement | null)?.dataset.ttab;
-  if (tab) {
-    if (tab !== techTab) {
-      techTab = tab;
-      techModalId = null;
-    }
-    renderTech();
-    return;
-  }
-  const node = (tg.closest('.tt-node') as HTMLElement | null)?.dataset.tech;
-  if (node) {
-    techModalId = node;
-    renderTech();
-  }
-});
+document.getElementById('rail-tech')?.addEventListener('click', () => techTree.open());
+
 
 // --- steward («Хранитель»): hand the seat to the AI while you sleep ----------
-// Delegate control to a defensive AI until a game-time deadline; it holds the line and
-// returns control on time (stewardModule). Gated by the Steward tech (researched via the
-// «Командование» branch, day 15, scientist Куратор). A "morning report" note fires on expiry.
+// The window lives in `stewardScreen.ts` (REFM-7); here it gets its hooks, the rail
+// button that opens it, and the two module-level `let`s the frame loop owns.
+// `#steward` itself stays a handle: the Android-Back layer stack and the loop's
+// repaint throttle both hold it.
 const stewWin = $('steward');
 let lastStewAt = 0;
 let lastIntelAt = 0; // throttle for the live intel-window timers (диплом. вкладка «Шпионаж»)
-const STEW_DURATIONS = [4, 8, 12]; // game-hours a single delegation can run
+const steward = initSteward({
+  root: () => stewWin,
+  body: () => $('stewardbody'),
+  state: () => s,
+  me: () => ME,
+  order: playerOrder,
+  onOpen: () => maybeIntro('steward'),
+  openTech: () => techTree.open(),
+});
+document.getElementById('rail-steward')?.addEventListener('click', () => steward.open());
 // Snapshot of my standing at delegation time, diffed on expiry for the morning report.
-let stewSnapshot: { planets: number; metal: number; credits: number } | null = null;
-// The posture the next delegation will run (ST-3.3): «Оборона» is the safe default,
-// «Активная оборона» adds the forecast-gated counterstrike + squadron fire-watch.
-let stewPosture: 'defend' | 'active_defend' = 'defend';
-function stewMetrics(): { planets: number; metal: number; credits: number } {
-  let planets = 0;
-  for (const pl of Object.values(s.planets)) if (pl.owner === ME) planets += 1;
-  const r = (s.players[ME]?.resources ?? {}) as Record<string, number>;
-  return { planets, metal: Math.round(r.metal ?? 0), credits: Math.round(r.credits ?? 0) };
-}
-function stewFmtDur(ms: number): string {
-  const mins = Math.max(0, Math.round(ms / 60000));
-  const h = Math.floor(mins / 60);
-  return h > 0 ? `${h}ч ${mins % 60}м` : `${mins}м`;
-}
-function stewardTechDone(): boolean {
-  return s.players[ME]?.technologies?.completed.includes('ai_stewardship') ?? false;
-}
-/** One localized line of the Steward's decision journal (SITREP, ST-2.4). */
-function stewLogLine(e: {
-  kind: string;
-  node?: string;
-  fleetId?: string;
-  to?: string;
-  count?: number;
-  fraction?: number;
-}): string {
-  const pct = e.fraction !== undefined ? String(Math.round(e.fraction * 100)) : '?';
-  const node = e.node ?? '?';
-  switch (e.kind) {
-    case 'evac':
-      return t('steward.log.evac', {
-        node,
-        to: e.to ?? '?',
-        pct,
-        n: String(e.count ?? 0),
-      });
-    case 'ferry':
-      return t('steward.log.ferry', { node });
-    case 'stranded':
-      return t('steward.log.evac-failed', {
-        node,
-        pct,
-      });
-    case 'strike':
-      return t('steward.log.counter', { node, pct });
-    case 'watch':
-      return t('steward.log.sortie', { node });
-    case 'hold':
-      return t('steward.log.held', { node, pct });
-    case 'reinforce':
-      return t('steward.log.reinforce', { node, pct });
-    default:
-      return `${e.kind}: ${node}`;
-  }
-}
-/** The journal section of the steward window — the last watch's decisions, newest
- *  first. Rendered whenever a journal exists (it survives expiry: the morning
- *  report is read AFTER the watch ends). */
-function stewLogHtml(): string {
-  const log = s.players[ME]?.stewardLog;
-  if (!log || log.length === 0) return '';
-  const lines = [...log]
-    .reverse()
-    .slice(0, 12)
-    .map(
-      (e) =>
-        `<div class="st-log-line"><span class="st-log-when">${t('steward.log.ago', { dur: stewFmtDur(Math.max(0, s.time - e.at)) })}</span> ${stewLogLine(e)}</div>`,
-    )
-    .join('');
-  return `<div class="st-h">${t('steward.log.title')}</div><div class="st-log">${lines}</div>`;
-}
-function renderSteward(): void {
-  const body = $('stewardbody');
-  const posture = stewardActive(s, ME, s.time); // null unless a live delegation
-  const cur = s.players[ME]?.steward;
-  let html = '';
-  if (posture && cur) {
-    html +=
-      `<div class="st-status on">🤖 <b>${posture === 'active_defend' ? t('steward.on.active') : t('steward.on.defense')}</b><br>` +
-      t('steward.on.returns', { dur: stewFmtDur(cur.until - s.time) }) +
-      `<br>` +
-      `${posture === 'active_defend' ? t('steward.on.active.note') : t('steward.on.defense.note')}</div>` +
-      `<div class="st-row"><button class="st-btn warn" data-stew="recall">${t('steward.take-back')}</button></div>` +
-      `<div class="st-note">${t('steward.on.warning')}</div>`;
-  } else if (!stewardTechDone()) {
-    const day = Math.floor((s.time - (s.startedAt ?? 0)) / DAY) + 1; // счёт статус-бара: день 1 — первый
-    html +=
-      `<div class="st-status locked">🔒 <b>${t('steward.locked')}</b><br>` +
-      t('steward.locked.where', { day: String(day) }) +
-      `<br>` +
-      `${t('steward.locked.how')}</div>` +
-      `<div class="st-row"><button class="st-btn" data-stew="tech">${t('steward.locked.go')}</button></div>`;
-  } else {
-    html +=
-      `<div class="st-status">😴 <b>${t('steward.ready')}</b><br>` +
-      `${t('steward.ready.note')}</div>` +
-      `<div class="st-h">${t('steward.stance')}</div><div class="st-row">` +
-      (['defend', 'active_defend'] as const)
-        .map(
-          (p) =>
-            `<button class="st-btn${stewPosture === p ? ' sel' : ''}" data-stew="posture" data-p="${p}">${p === 'defend' ? t('steward.stance.defense') : t('steward.stance.active')}</button>`,
-        )
-        .join('') +
-      `</div>` +
-      `<div class="st-h">${t('steward.duration')}</div><div class="st-row">` +
-      STEW_DURATIONS.map(
-        (h) =>
-          `<button class="st-btn" data-stew="go" data-h="${h}">${t('steward.duration.hours', { h: String(h) })}</button>`,
-      ).join('') +
-      `</div>` +
-      `<div class="st-note">${
-        stewPosture === 'active_defend'
-          ? t('steward.stance.active.note')
-          : t('steward.stance.defense.note')
-      }</div>`;
-  }
-  html += stewLogHtml();
-  body.innerHTML = html;
-}
-document.getElementById('rail-steward')?.addEventListener('click', () => {
-  stewWin.classList.add('show');
-  renderSteward();
-  maybeIntro('steward');
-});
-stewWin.addEventListener('click', (e) => {
-  const tg = e.target as HTMLElement;
-  if (tg.id === 'steward' || tg.classList.contains('tw-close')) {
-    stewWin.classList.remove('show');
-    return;
-  }
-  const btn = tg.closest('[data-stew]') as HTMLElement | null;
-  if (!btn) return;
-  const kind = btn.dataset.stew;
-  if (kind === 'posture') {
-    stewPosture = btn.dataset.p === 'active_defend' ? 'active_defend' : 'defend';
-  } else if (kind === 'go') {
-    const h = Number(btn.dataset.h) || 8;
-    playerOrder(delegateSteward(ME, s.time + h * HOUR, stewPosture));
-  } else if (kind === 'recall') {
-    playerOrder(recallSteward(ME));
-  } else if (kind === 'tech') {
-    stewWin.classList.remove('show');
-    techWin.classList.add('show');
-    renderTech();
-    return;
-  }
-  renderSteward();
-});
+let stewSnapshot: StewardMetrics | null = null;
+
 
 // --- heroes («штаб героев»): the CORE hero engine over the inline catalogs -----
 // One window for the whole hero loop: deploy reserves (`hero.spawn`), cast abilities
@@ -9234,140 +8652,20 @@ function heroDossierHtml(hero: HeroInst): string {
 }
 
 // --- session market: a two-sided order book, one tab per tradeable good -------
-// Sell lots (asks) and buy lots (bids) per resource; place your own, take a rival's.
-// The whole box is rendered from JS (like #diplo) so each tab re-renders in place.
-type MarketGood = 'metal' | 'food' | 'energy' | 'microelectronics';
-const MARKET_RES: Array<{ key: MarketGood; label: string }> = [
-  { key: 'metal', label: 'market.res.metal' },
-  { key: 'food', label: 'market.res.food' },
-  { key: 'energy', label: 'market.res.energy' },
-  { key: 'microelectronics', label: 'market.res.microelectronics' },
-];
-let marketTab: MarketGood = 'metal';
-let marketFormSide: 'sell' | 'buy' = 'sell';
+// The window itself lives in `marketScreen.ts` (REFM-6); here it gets its hooks and
+// the rail button that opens it.
+// The Android-Back / Escape layer stack still needs the node itself (it is a registry
+// of «layer → how to close it», see the REFM-1 note) — one handle, shared.
 const marketWin = $('market');
-function renderMarket(): void {
-  const res = (s.players[ME]?.resources ?? {}) as Record<string, number>;
-  const good = marketTab;
-  const glyph = TECH_CUR[good] ?? '';
-  const nameOf = (id: string): string => esc(s.players[id]?.name ?? id);
-  const lots = marketLots(s);
-  const asks = lots
-    .filter((l) => l.side === 'sell' && l.resource === good)
-    .sort((a, b) => a.price - b.price);
-  const bids = lots
-    .filter((l) => l.side === 'buy' && l.resource === good)
-    .sort((a, b) => b.price - a.price);
-  const lotRow = (l: (typeof lots)[number], bid: boolean): string => {
-    const mine = l.owner === ME;
-    // ECON-4: получатель кредитов получает net (5% сгорает) — в биде это исполнитель.
-    const takerNet = Math.floor(l.amount * l.price * (1 - MARKET_FEE));
-    const qp = `<span class="mk-qp"><b>${l.amount}</b> ${curIc(l.resource)} @ ${l.price} <span class="rc-credits">⛁</span>${
-      bid && !mine
-        ? ` <span class="mk-net">→ ${takerNet} <span class="rc-credits">⛁</span></span>`
-        : ''
-    }</span>`;
-    const who = `<span class="mk-who">${mine ? t('market.own-lot') : nameOf(l.owner)}</span>`;
-    let btn: string;
-    if (mine) {
-      btn = `<button class="mk-btn cancel" data-mkcancel="${l.id}">${t('market.cancel')}</button>`;
-    } else {
-      const can = l.side === 'sell' ? (res.credits ?? 0) >= l.price : (res[l.resource] ?? 0) >= 1;
-      btn = `<button class="mk-btn" data-mktake="${l.id}"${can ? '' : ' disabled'}>${l.side === 'sell' ? t('market.buy') : t('market.sell')}</button>`;
-    }
-    return `<div class="mk-row ${bid ? 'buy' : ''}">${qp}${who}${btn}</div>`;
-  };
-  const seg = (side: 'sell' | 'buy', label: string): string =>
-    `<button class="${marketFormSide === side ? 'on' : ''}" data-mkside="${side}">${label}</button>`;
-  const tabBtn = (k: string, label: string): string =>
-    `<button class="mk-tab${marketTab === k ? ' on' : ''}" data-mtab="${k}">${label}</button>`;
-  const stock =
-    `<div class="mk-lbl" style="margin-bottom:8px">${t('market.in-treasury')}: ${glyph} <b style="color:var(--ink)">${Math.round(res[good] ?? 0)}</b>` +
-    ` · <span class="rc-credits">⛁</span> <b style="color:var(--ink)">${Math.round(res.credits ?? 0)}</b></div>`;
-  const form =
-    `<div class="mk-form"><div class="mk-seg">${seg('sell', t('market.sell'))}${seg('buy', t('market.buy'))}</div>` +
-    `<span class="mk-lbl">${t('market.qty')}</span><input class="mk-in" id="mk-amt" type="number" min="1" value="10">` +
-    `<span class="mk-lbl">${t('market.price')}</span><input class="mk-in" id="mk-price" type="number" min="0" value="3">` +
-    `<button class="mk-go" data-mkgo>${t('market.place')}</button></div>` +
-    `<div class="mk-lbl" id="mk-net"></div>`;
-  const askList = asks.length
-    ? asks.map((l) => lotRow(l, false)).join('')
-    : `<div class="mk-empty">${t('market.no-asks')}</div>`;
-  const bidList = bids.length
-    ? bids.map((l) => lotRow(l, true)).join('')
-    : `<div class="mk-empty">${t('market.no-bids')}</div>`;
-  marketWin.innerHTML =
-    `<div class="mkbox"><div class="lw-head"><b>${t('market.title')}</b><button class="mk-close" style="margin-left:auto">✕</button></div>` +
-    `<div class="mk-tabs">${MARKET_RES.map((r) => tabBtn(r.key, t(r.label))).join('')}</div>` +
-    `<div id="marketbody">${stock}${form}` +
-    `<div class="mk-sec">${t('market.side.sell')} · ${asks.length}</div>${askList}` +
-    `<div class="mk-sec buy">${t('market.side.buy')} · ${bids.length}</div>${bidList}</div></div>`;
-  // ECON-4: живой «к получению» под формой — net после комиссии для стороны,
-  // которая получит кредиты (sell-лот: вы, когда его исполнят; buy-бид: эскроу).
-  const updNet = (): void => {
-    const el = document.getElementById('mk-net');
-    if (!el) return;
-    const amt = Number((document.getElementById('mk-amt') as HTMLInputElement | null)?.value) || 0;
-    const price =
-      Number((document.getElementById('mk-price') as HTMLInputElement | null)?.value) || 0;
-    const gross = amt * price;
-    el.textContent =
-      marketFormSide === 'sell'
-        ? t('market.net-after-fee', {
-            p: Math.round(MARKET_FEE * 100),
-            n: Math.floor(gross * (1 - MARKET_FEE)),
-          })
-        : t('market.escrow-note', {
-            n: Math.ceil(gross),
-            p: Math.round(MARKET_FEE * 100),
-          });
-  };
-  updNet();
-  document.getElementById('mk-amt')?.addEventListener('input', updNet);
-  document.getElementById('mk-price')?.addEventListener('input', updNet);
-}
-document.getElementById('rail-market')?.addEventListener('click', () => {
-  marketWin.classList.add('show');
-  renderMarket();
-  maybeIntro('market');
+const market = initMarket({
+  root: () => marketWin,
+  state: () => s,
+  me: () => ME,
+  order: playerOrder,
+  onOpen: () => maybeIntro('market'),
 });
-marketWin.addEventListener('click', (e) => {
-  const tg = e.target as HTMLElement;
-  if (tg.id === 'market' || tg.closest('.mk-close')) {
-    marketWin.classList.remove('show');
-    return;
-  }
-  const tab = (tg.closest('.mk-tab') as HTMLElement | null)?.dataset.mtab;
-  if (tab) {
-    marketTab = tab as MarketGood;
-    renderMarket();
-    return;
-  }
-  const side = (tg.closest('.mk-seg button') as HTMLElement | null)?.dataset.mkside;
-  if (side) {
-    marketFormSide = side as 'sell' | 'buy';
-    renderMarket();
-    return;
-  }
-  if (tg.closest('[data-mkgo]')) {
-    const amt = Math.floor(Number(($('mk-amt') as HTMLInputElement).value) || 0);
-    const price = Math.max(0, Number(($('mk-price') as HTMLInputElement).value) || 0);
-    if (amt > 0) playerOrder(marketList(ME, marketFormSide, marketTab, amt, price));
-    renderMarket();
-    return;
-  }
-  const takeId = (tg.closest('[data-mktake]') as HTMLElement | null)?.dataset.mktake;
-  if (takeId) {
-    playerOrder(marketTake(ME, takeId));
-    renderMarket();
-    return;
-  }
-  const cancelId = (tg.closest('[data-mkcancel]') as HTMLElement | null)?.dataset.mkcancel;
-  if (cancelId) {
-    playerOrder(marketCancel(ME, cancelId));
-    renderMarket();
-  }
-});
+document.getElementById('rail-market')?.addEventListener('click', () => market.open());
+
 
 // --- constructor («Верфь»): the unified loadout tab --------------------------
 // One in-match screen that switches between the loadout constructors (ships now;
@@ -9455,9 +8753,9 @@ function conBar(
  *  session, never a guess). Only flags a NON-starter origin — a starter blueprint
  *  sitting in every match isn't news; a fresh drop/craft/auction pickup is. */
 function conOriginTag(defId: string): string {
-  const origin = originOf(arsenalItems, defId);
+  const origin = originOf(arsenal.items(), defId);
   if (!origin || origin === 'starter') return '';
-  return `<span class="cn-mo">${t(ARSENAL_ORIGIN_RU[origin])}</span>`;
+  return `<span class="cn-mo">${originLabel(origin)}</span>`;
 }
 function conLoadoutPane(hullList: string[]): string {
   // ARS-5: the constructor offers only what the match's arsenal snapshot (ARS-3)
@@ -9585,7 +8883,7 @@ function conArmyPane(): string {
   const slots = tpl.slots
     .map((u, i) => {
       const inner = u
-        ? `<span class="cn-fic">${formIcon(u)}</span><span class="cn-fn">${esc(FORM_RU[u] ?? u)}</span>`
+        ? `<span class="cn-fic">${formIcon(u, pcUi())}</span><span class="cn-fn">${esc(FORM_RU[u] ?? u)}</span>`
         : `<span class="cn-fic dim">＋</span><span class="cn-fn dim">${t('yard.div.slot-empty')}</span>`;
       return `<button class="cn-fslot${u ? ' filled' : ''}" data-confslot="${idx}|${i}">${inner}</button>`;
     })
@@ -9941,7 +9239,7 @@ function hubTab(tab: string): void {
   }
   currentHubTab = tab;
   if (tab === 'meta') renderMetaPanel(); // live numbers every visit (XP may have grown)
-  if (tab === 'arsenal') void refreshArsenal(); // cache paints now, server refresh trails
+  if (tab === 'arsenal') void arsenal.refresh(); // cache paints now, server refresh trails
   for (const [k, pid] of Object.entries(HUB_PANELS))
     $(pid).style.display = k === tab ? 'flex' : 'none';
   for (const b of Array.from(document.querySelectorAll('.hub-tab')))
@@ -9993,293 +9291,75 @@ $('hp-meta').addEventListener('click', (ev) => {
 });
 
 // --- «Арсенал» — the account's persistent collection (hub tab, ARS-5) --------
-// ARS-1..4 built the server-side store; nothing client-facing read it before this.
-// Cache-first (localStorage per callsign, like meta): the tab always paints instantly
-// from the last known collection, then a background GET /arsenal/me (session-gated,
-// only when a session token from a prior join is already on hand — never prompts for
-// a password just to LOOK at the hub) refreshes it. No server/no account yet ⇒ the
-// empty state, same "no restriction without a snapshot" spirit as the core build gate.
-const ARSENAL_KIND_ICON: Record<ArsenalItem['kind'], string> = {
-  hull: '◈',
-  module: '◆',
-  hero_fitting: '◇',
-};
-const ARSENAL_CODEX_KIND: Record<ArsenalItem['kind'], string> = {
-  hull: 'u',
-  module: 'md',
-  hero_fitting: 'hf',
-};
-const ARSENAL_KIND_RU: Record<ArsenalItem['kind'], string> = {
-  hull: 'arsenal.kind.hull',
-  module: 'arsenal.kind.module',
-  hero_fitting: 'arsenal.kind.fitting',
-};
-const ARSENAL_ORIGIN_RU: Record<ArsenalItem['origin'], string> = {
-  starter: 'arsenal.origin.starter',
-  drop: 'arsenal.origin.drop',
-  craft: 'arsenal.origin.craft',
-  auction: 'arsenal.origin.auction',
-  lootbox: 'arsenal.origin.lootbox',
-  rent: 'arsenal.origin.rent',
-};
+// The витрина itself lives in `arsenalScreen.ts` (REFM-5); here it gets its hooks.
+// Cache key is per callsign, like the meta store. `authorizedBase` encodes the tab's
+// policy: it may reuse a session token a prior join already stashed, but must never
+// prompt for a password just to LOOK at the collection — no server, no accounts or
+// no stashed session all read the same way (null ⇒ keep the cached paint).
+const arsenal = initArsenal({
+  root: () => $('hp-arsenal'),
+  readCache: () => {
+    try {
+      return JSON.parse(localStorage.getItem(arsenalKey()) ?? 'null');
+    } catch {
+      return null;
+    }
+  },
+  writeCache: (items) => localStorage.setItem(arsenalKey(), JSON.stringify(items)),
+  openCodex,
+  authorizedBase: async () => {
+    const srv = resolveServer();
+    if (!srv) return null;
+    await probeAuthMode(srv.base);
+    if (!authMode) return null;
+    const token = sessionToken(srv.base);
+    return token ? { base: httpBase(srv.base), token } : null;
+  },
+});
 function arsenalKey(): string {
   return 'vd.arsenal.' + (nickInput.value.trim() || 'guest');
 }
-function loadArsenalCache(): ArsenalItem[] {
-  try {
-    return parseArsenalItems(JSON.parse(localStorage.getItem(arsenalKey()) ?? 'null'));
-  } catch {
-    return [];
-  }
-}
-function saveArsenalCache(items: ArsenalItem[]): void {
-  localStorage.setItem(arsenalKey(), JSON.stringify(items));
-}
-let arsenalItems: ArsenalItem[] = [];
-let arsenalFilter: ArsenalFilter = {};
-function arsenalItemName(item: ArsenalItem): string {
-  if (item.kind === 'hull') return unitDossier(item.defId)?.name ?? displayUnit(item.defId);
-  if (item.kind === 'module') return tData(data.modules[item.defId]?.name ?? item.defId);
-  return tData(data.heroFittings[item.defId]?.name ?? item.defId);
-}
-function arsenalCardHtml(item: ArsenalItem): string {
-  const badges = [
-    item.grade ? `+${item.grade}` : '',
-    typeof item.durability === 'number' ? `⛭${item.durability}` : '',
-  ]
-    .filter(Boolean)
-    .join(' ');
-  const origin = t(ARSENAL_ORIGIN_RU[item.origin]);
-  return (
-    `<button class="hub-tile ar-card" data-codex="${ARSENAL_CODEX_KIND[item.kind]}:${esc(item.defId)}">` +
-    `<span class="ht-ic">${ARSENAL_KIND_ICON[item.kind]}</span><span>${esc(arsenalItemName(item))}</span>` +
-    `<span class="ar-meta">${badges ? badges + ' · ' : ''}${origin}</span></button>`
-  );
-}
-function renderArsenalPanel(): void {
-  const el = $('hp-arsenal');
-  if (arsenalItems.length === 0) {
-    el.innerHTML = `<div class="hub-empty"><span class="he-ic">⚔</span>${t('arsenal.empty')}<br><span style="font-size:11px;color:var(--cyan-dim)">${t('arsenal.empty.hint')}</span></div>`;
-    return;
-  }
-  const kinds: Array<ArsenalItem['kind']> = ['hull', 'module', 'hero_fitting'];
-  let chips = `<button class="ar-fchip${arsenalFilter.kind ? '' : ' on'}" data-ar-kind="">${t('arsenal.filter.all')}</button>`;
-  for (const k of kinds)
-    chips += `<button class="ar-fchip${arsenalFilter.kind === k ? ' on' : ''}" data-ar-kind="${k}">${t(ARSENAL_KIND_RU[k])}</button>`;
-  const grades = gradesOf(arsenalItems);
-  if (grades.length) {
-    chips += `<span class="ar-fsep"></span>`;
-    for (const g of grades)
-      chips += `<button class="ar-fchip${arsenalFilter.grade === g ? ' on' : ''}" data-ar-grade="${g}">+${g}</button>`;
-  }
-  const cards = filterArsenal(arsenalItems, arsenalFilter).map(arsenalCardHtml).join('');
-  el.innerHTML = `<div class="ar-filters">${chips}</div><div class="hub-grid ar-grid">${cards}</div>`;
-}
-$('hp-arsenal').addEventListener('click', (ev) => {
-  const tg = ev.target as HTMLElement;
-  const kindBtn = tg.closest('[data-ar-kind]') as HTMLElement | null;
-  if (kindBtn) {
-    const k = kindBtn.dataset.arKind as ArsenalItem['kind'] | '';
-    arsenalFilter = { ...arsenalFilter, kind: k || undefined };
-    renderArsenalPanel();
-    return;
-  }
-  const gradeBtn = tg.closest('[data-ar-grade]') as HTMLElement | null;
-  if (gradeBtn) {
-    const g = Number(gradeBtn.dataset.arGrade);
-    arsenalFilter = { ...arsenalFilter, grade: arsenalFilter.grade === g ? undefined : g };
-    renderArsenalPanel();
-    return;
-  }
-  const card = tg.closest('[data-codex]') as HTMLElement | null;
-  if (card?.dataset.codex) openCodex(card.dataset.codex);
-});
-/** Cache-first paint, then a best-effort session-gated refresh (never prompts for
- *  a password — only reuses a session token a prior join already stashed). */
-async function refreshArsenal(): Promise<void> {
-  arsenalItems = loadArsenalCache();
-  renderArsenalPanel();
-  const srv = resolveServer();
-  if (!srv) return;
-  await probeAuthMode(srv.base);
-  if (!authMode) return;
-  const session = sessionToken(srv.base);
-  if (!session) return;
-  try {
-    const res = await fetch(`${httpBase(srv.base)}/arsenal/me`, {
-      headers: { authorization: `Bearer ${session}` },
-    });
-    if (!res.ok) return;
-    const body = (await res.json().catch(() => null)) as { items?: unknown } | null;
-    arsenalItems = parseArsenalItems(body?.items);
-    saveArsenalCache(arsenalItems);
-    renderArsenalPanel();
-  } catch {
-    // offline/unreachable — the cache painted above stays the source of truth
-  }
-}
+
+
 // --- Профиль командира — the career dossier (docs/main-menu.md §4.2) ------------
-// ONE overlay behind two doors: the hub identity strip and the in-match player card
-// («досье» button). Observation only — nothing here touches the simulation.
-//
-// Where each number comes from, so nothing on this screen is invented:
-//   · matches / winrate / avg place / streak / season score — the local career
-//     counters folded at checkEnd (prototype/src/meta.ts `recordMatch`);
-//   · league — a cosmetic band over the commander level (`leagueKey`);
-//   · influence + corporation — the live corp record, when a session has one;
-//   · medals — the account's grants, cache-first like the arsenal.
-// Anything unavailable prints «—» rather than a plausible-looking zero.
-
-/** Medal ids the account holds, cached per callsign (the showcase must paint offline). */
-let profileMedals: string[] = [];
-/** The medal CATALOG (id → display name) as the server reports it. */
-let profileCatalog: { id: string; name: string }[] = [];
-const medalsKey = (): string => 'vd.medals.' + (nickInput.value.trim() || 'guest');
-function loadMedalCache(): { owned: string[]; catalog: { id: string; name: string }[] } {
-  try {
-    const raw = JSON.parse(localStorage.getItem(medalsKey()) ?? 'null') as unknown;
-    if (typeof raw !== 'object' || raw === null) return { owned: [], catalog: [] };
-    const v = raw as { owned?: unknown; catalog?: unknown };
-    const owned = Array.isArray(v.owned)
-      ? v.owned.filter((x): x is string => typeof x === 'string')
-      : [];
-    const catalog = Array.isArray(v.catalog)
-      ? v.catalog.flatMap((x) => {
-          const o = x as { id?: unknown; name?: unknown };
-          return typeof o?.id === 'string' && typeof o?.name === 'string'
-            ? [{ id: o.id, name: o.name }]
-            : [];
-        })
-      : [];
-    return { owned, catalog };
-  } catch {
-    return { owned: [], catalog: [] }; // a corrupt cache is an empty showcase, never a crash
-  }
-}
-
-/** Big number + caption, the end screen's tile shape. `null` prints «—». */
-function pfCell(label: string, value: string | null, accent = false): string {
-  return (
-    `<div class="pf-cell"><span class="pf-k">${esc(label)}</span>` +
-    `<span class="pf-v${accent ? ' accent' : ''}">${value === null ? '—' : esc(value)}</span></div>`
-  );
-}
-
-/** The dossier body — pure string building over the local meta + whatever the
- *  session already knows about the corp and the medals. */
-function profileHtml(): string {
-  const nick = nickInput.value.trim() || t('auth.commander');
-  const st = loadMeta();
-  const stats = st.stats;
-  const lvl = metaLevel(st.xp);
-  const corpName = corpMine.corp?.name ?? null;
-  const league = t(leagueKey(lvl));
-  // Subtitle mirrors the mock: «<corp> · Лига: <band>», degrading to the league
-  // alone when this commander flies without a corporation.
-  const sub =
-    (corpName ? `${esc(corpName)} · ` : '') + `${esc(t('profile.league'))}: ${esc(league)}`;
-  const avg = averagePlace(stats);
-  const played = stats.matches > 0;
-  const medals = profileCatalog.length
-    ? profileCatalog
-        .map((m) => {
-          const own = profileMedals.includes(m.id);
-          // Names live in data/medals.json as display text (no i18n keys), so they
-          // are printed as the server sends them — escaped, never as markup.
-          return (
-            `<div class="pf-medal${own ? '' : ' off'}"><div class="pf-mc">${own ? '◎' : '○'}</div>` +
-            `<div class="pf-mn">${esc(m.name)}</div></div>`
-          );
-        })
-        .join('')
-    : '';
-  return (
-    `<button class="pf-close" type="button" aria-label="${esc(t('card.close'))}">✕</button>` +
-    `<div class="pf-top">` +
-    `<div class="pf-av">${esc(nick.slice(0, 1).toUpperCase())}</div>` +
-    `<div class="pf-who"><div class="pf-nm">${esc(nick)}</div><div class="pf-sub">${sub}</div></div>` +
-    `<div class="pf-cur" title="${esc(t('hub.sovereigns'))}"><i>${SOV_SVG}</i><b>${kfmt(SOVEREIGNS)}</b><em>+</em></div>` +
-    `</div>` +
-    `<div class="pf-body">` +
-    `<div class="pf-h">${esc(t('profile.title'))}</div>` +
-    `<div class="pf-grid">` +
-    pfCell(t('profile.matches'), String(stats.matches)) +
-    pfCell(t('profile.winrate'), played ? `${winRate(stats)}%` : null, true) +
-    pfCell(t('profile.place'), avg === null ? null : avg.toFixed(1)) +
-    // Influence is the corporation's ledger (metagame.md) — without one there is
-    // no number to show, and a bare 0 would read as «you earned nothing».
-    pfCell(t('profile.influence'), corpMine.corp ? nfmt(corpMine.corp.influence) : null, true) +
-    pfCell(t('profile.season'), nfmt(stats.score)) +
-    pfCell(t('profile.streak'), stats.streak > 0 ? `×${stats.streak}` : '—') +
-    `</div>` +
-    `<div class="pf-sec">${esc(t('profile.medals'))}</div>` +
-    (medals
-      ? `<div class="pf-medals">${medals}</div>`
-      : `<p class="pf-hint">${esc(t('profile.medals.empty'))}</p>`) +
-    `</div>`
-  );
-}
-
-function renderProfile(): void {
-  const el = document.getElementById('profile');
-  if (el) el.innerHTML = profileHtml();
-}
-
-/** Cache-first paint, then a best-effort session-gated refresh — the arsenal's
- *  pattern. Note the prototype host does NOT mount `/medals/*` (only the full
- *  server does), so a playtest session simply keeps an empty showcase. */
-async function refreshMedals(): Promise<void> {
-  const cached = loadMedalCache();
-  profileMedals = cached.owned;
-  profileCatalog = cached.catalog;
-  renderProfile();
-  const srv = resolveServer();
-  if (!srv) return;
-  await probeAuthMode(srv.base);
-  if (!authMode) return;
-  const session = sessionToken(srv.base);
-  if (!session) return;
-  const headers = { authorization: `Bearer ${session}` };
-  try {
-    const [catRes, mineRes] = await Promise.all([
-      fetch(`${httpBase(srv.base)}/medals`, { headers }),
-      fetch(`${httpBase(srv.base)}/medals/me`, { headers }),
-    ]);
-    if (!catRes.ok || !mineRes.ok) return;
-    const cat = (await catRes.json().catch(() => null)) as { medals?: unknown } | null;
-    const mine = (await mineRes.json().catch(() => null)) as { medals?: unknown } | null;
-    profileCatalog = Array.isArray(cat?.medals)
-      ? cat.medals.flatMap((x) => {
-          const o = x as { id?: unknown; name?: unknown };
-          return typeof o?.id === 'string' && typeof o?.name === 'string'
-            ? [{ id: o.id, name: o.name }]
-            : [];
-        })
-      : [];
-    profileMedals = parseMedals(mine?.medals).map((m) => m.medalId);
-    localStorage.setItem(
-      medalsKey(),
-      JSON.stringify({ owned: profileMedals, catalog: profileCatalog }),
-    );
-    renderProfile();
-  } catch {
-    // offline/unreachable — the cached showcase painted above stays as it is
-  }
-}
-
-function openProfile(): void {
-  renderProfile();
-  document.getElementById('profile')?.classList.add('show');
-  void refreshMedals(); // cache is already on screen; the server refresh trails
-}
-function closeProfile(): void {
-  document.getElementById('profile')?.classList.remove('show');
-}
-document.getElementById('profile')?.addEventListener('click', (ev) => {
-  const tg = ev.target as HTMLElement;
-  // Close on the ✕ or on the backdrop itself, never on a tap inside the sheet.
-  if (tg.closest('.pf-close') || tg.id === 'profile') closeProfile();
+// Само досье живёт в `profileScreen.ts` (REFM-10); здесь только его хуки. Ключ кэша
+// медалей — по позывному, рядом с остальными ключами. `authorizedBase` кодирует ту же
+// политику, что у «Арсенала»: за паролем ради ПОСМОТРЕТЬ витрину не ходим.
+const profile = initProfile({
+  root: () => $('profile'),
+  view: () => {
+    const st = loadMeta();
+    return {
+      nick: nickInput.value,
+      xp: st.xp,
+      stats: st.stats,
+      corp: (() => {
+        const c = corp.mine().corp;
+        return c ? { name: c.name, influence: c.influence } : null;
+      })(),
+      sovereigns: SOVEREIGNS,
+    };
+  },
+  readCache: () => {
+    try {
+      return JSON.parse(localStorage.getItem(medalsKey()) ?? 'null');
+    } catch {
+      return null;
+    }
+  },
+  writeCache: (value) => localStorage.setItem(medalsKey(), JSON.stringify(value)),
+  authorizedBase: async () => {
+    const srv = resolveServer();
+    if (!srv) return null;
+    await probeAuthMode(srv.base);
+    if (!authMode) return null;
+    const token = sessionToken(srv.base);
+    return token ? { base: httpBase(srv.base), token } : null;
+  },
 });
+const medalsKey = (): string => 'vd.medals.' + (nickInput.value.trim() || 'guest');
+
+// --- вход в хаб и зеркало аккаунтного XP ---------------------------------------
 
 /** Accounts mode (EC-*): pull the DURABLE account XP into the local meta mirror, so
  *  the commander level/progress a player sees is account-backed and follows them to a
@@ -10962,31 +10042,6 @@ const setupTemplates: FormationTemplate[] = DEFAULT_TEMPLATES.map((t) => ({
   name: t.name,
   slots: [...t.slots],
 }));
-/** Unit-type → icon, used by the in-match division roster readout (panelHtml). */
-// Mobile keeps the original emoji (phone fonts render them); PC monospace stacks
-// have no text glyph for 🪖👥🎖 (they rendered as tofu ▯) and use UNIT_ICON-style
-// text glyphs instead. Resolved per render via formIcon() on the pcUi() gate.
-const FORM_ICON_EMOJI: Record<string, string> = {
-  militia: '👥',
-  heavy_infantry: '🪖',
-  special_forces: '🎖',
-  tank: '🛡',
-};
-const FORM_ICON_TEXT: Record<string, string> = {
-  militia: '▿',
-  heavy_infantry: '◆',
-  special_forces: '✱',
-  tank: '▰',
-};
-function formIcon(type: string): string {
-  return (pcUi() ? FORM_ICON_TEXT[type] : FORM_ICON_EMOJI[type]) ?? '▪';
-}
-const FORM_RU: Record<string, string> = {
-  militia: 'form.militia',
-  heavy_infantry: 'form.heavy-infantry',
-  special_forces: 'form.special-forces',
-  tank: 'form.tank',
-};
 const setupHeroes: HeroLoadout[] = DEFAULT_HEROES.map((h) => ({
   name: h.name,
   grade: h.grade,
@@ -12926,14 +11981,14 @@ function frame(nowReal: number) {
     speedbarEl.style.display = showBar ? '' : 'none';
   }
   // Keep the tech window live while open (research progress bar / eta), throttled.
-  if (techWin.classList.contains('show') && nowReal - lastTechAt > 500) {
+  if (techTree.isOpen() && nowReal - lastTechAt > 500) {
     lastTechAt = nowReal;
-    renderTech();
+    techTree.repaint();
   }
   // Keep the steward window live while open (countdown to control returning), throttled.
-  if (stewWin.classList.contains('show') && nowReal - lastStewAt > 500) {
+  if (steward.isOpen() && nowReal - lastStewAt > 500) {
     lastStewAt = nowReal;
-    renderSteward();
+    steward.repaint();
   }
   // Intel windows tick in hours — a lazy 5s refresh keeps the «Шпионаж» timers honest.
   if (diploOpen && diploTab === 'intel' && nowReal - lastIntelAt > 5000) {
@@ -12998,7 +12053,7 @@ function openEmblemPick(): void {
 document.getElementById('hubav')?.addEventListener('click', openEmblemPick);
 // The identity strip opens the career dossier — the avatar itself keeps the emblem
 // picker (its ✎ badge advertises that), so the name/status column is the door.
-document.querySelector('#hub .hub-who')?.addEventListener('click', () => openProfile());
+document.querySelector('#hub .hub-who')?.addEventListener('click', () => profile.open());
 document
   .getElementById('ep-close')
   ?.addEventListener('click', () => emblemPick?.classList.remove('show'));
@@ -13023,7 +12078,7 @@ if (playerCardEl) {
     if (tg.closest('.pc-dossier')) {
       playerCardEl.classList.remove('show');
       delete playerCardEl.dataset.seat;
-      openProfile();
+      profile.open();
       return;
     }
     if (tg.id === 'playercard' || tg.closest('.pc-close')) {
@@ -14275,588 +13330,25 @@ requestAnimationFrame(frame);
 }
 
 // --- corporation cabinet (AVA-C1/C2) -----------------------------------------
-// The cross-session alliance ("corporation") management screen designed in
-// docs/corporation-ui.md — the REAL screen now, over the live CORP-0/AVA-2..9/
-// MED-1 HTTP API (packages/server/src/corpApi.ts/avaApi.ts/medalApi.ts). Scope
-// follows the doc's own §7 degradation order: Обзор/Участники/Войны/Казна are
-// real; Владения (sector ownership) and Чат (persistent corp chat) have no
-// server counterpart at all (no meta-layer Контур 2 yet) and stay honest "скоро"
-// stubs rather than simulated data.
-const CORP_TABS: { id: string; label: string }[] = [
-  { id: 'overview', label: 'corp.tab.overview' },
-  { id: 'members', label: 'corp.tab.members' },
-  { id: 'wars', label: 'corp.tab.wars' },
-  { id: 'treasury', label: 'corp.tab.treasury' },
-  { id: 'holdings', label: 'corp.tab.holdings' },
-  { id: 'comms', label: 'corp.tab.comms' },
-];
-const CORP_ROLE_LABEL: Record<CorpRole, string> = {
-  head: 'corp.role.head',
-  officer: 'corp.role.officer',
-  member: 'corp.role.member',
-  recruit: 'corp.role.recruit',
-};
-const corpRoleLabel = (r: CorpRole): string => t(CORP_ROLE_LABEL[r]);
-const CORP_ROLE_DOT: Record<CorpRole, string> = {
-  head: 'var(--cyan)',
-  officer: 'var(--amber)',
-  member: 'var(--dim)',
-  recruit: 'var(--red)',
-};
-const CORP_AUDIT_RU: Record<string, string> = {
-  create: 'corp.audit.create',
-  accept: 'corp.audit.accept',
-  decline: 'corp.audit.decline',
-  kick: 'corp.audit.kick',
-  role: 'corp.audit.role',
-  transfer: 'corp.audit.transfer',
-  leave: 'corp.audit.leave',
-  disband: 'corp.audit.disband',
-  influence: 'corp.audit.influence',
-  ready: 'corp.audit.ready',
-  medal: 'corp.audit.medal',
-  rent: 'corp.audit.rent',
-  rent_return: 'corp.audit.rent-return',
-};
-
-const corpEl = $('corp');
-const corpHdEl = $('corphd');
-const corpTabsEl = $('corptabs');
-const corpBodyEl = $('corpbody');
-let corpTab = 'overview';
-// Declaration, not `const`: the profile sheet (defined far above) formats numbers
-// with it, and esbuild lowers a top-level const to `var` — the exact TDZ trap that
-// once broke the boot chain via `httpBase`. A hoisted function has no such window.
-
-// --- live state (fetched via corpFetch — see refreshCorp) --------------------
-let corpMine: { corp: CorpRecord | null; membership: CorpMembership | null } = {
-  corp: null,
-  membership: null,
-};
-let corpDetail: { corp: CorpRecord; members: CorpMembership[] } | null = null;
-let corpAudit: CorpAuditEntry[] = [];
-let corpBrowseList: CorpSummary[] = [];
-let avaChallenges: AvaChallenge[] = [];
-let avaPool: Array<CorpSummary & { readySince: number }> = [];
-let avaFeed: AvaFeedEntry[] = [];
-let avaRoster: AvaRosterView | null = null;
-// AVA-6 setRoster eligibility — accountIds flagged ready in my corp (head/officer only,
-// fetched only while a roster window is open; empty otherwise).
-let avaReadyPlayers: string[] = [];
-// Optimistic — no GET exists for "am I flagged ready" (server has no such read
-// model yet); reflects only what THIS session successfully posted.
-let corpReadyOptimistic: boolean | null = null;
-let playerReadyOptimistic: boolean | null = null;
-let corpFetchBusy = false;
-
-/** Shared authenticated call for the corp/AvA/medals APIs — same session
- *  resolution as ARS-5's /arsenal/me (resolveServer/probeAuthMode/sessionKey),
- *  but no local cache: this data is too volatile (roster windows, challenges)
- *  to show stale. Returns the parsed JSON body, or null on ANY failure (no
- *  server configured, not logged in, network error, non-2xx) — surfaces a
- *  server-given error code via `note()` when there is one, never throws. */
-async function corpFetch(
-  path: string,
-  init?: { method?: string; body?: unknown },
-): Promise<unknown> {
-  const srv = resolveServer();
-  if (!srv) return null;
-  await probeAuthMode(srv.base);
-  if (!authMode) return null;
-  const session = sessionToken(srv.base);
-  if (!session) return null;
-  try {
-    const res = await fetch(`${httpBase(srv.base)}${path}`, {
-      method: init?.method ?? 'GET',
-      headers: {
-        authorization: `Bearer ${session}`,
-        ...(init?.body !== undefined ? { 'content-type': 'application/json' } : {}),
-      },
-      ...(init?.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
-    });
-    const body = (await res.json().catch(() => null)) as unknown;
-    if (!res.ok) {
-      const code = (body as { error?: unknown } | null)?.error;
-      if (typeof code === 'string') note('✖ ' + errText(code));
-      return null;
-    }
-    return body;
-  } catch {
-    return null;
-  }
-}
-
-/** Full refresh of the cabinet's live state, then re-render. Cheap enough to
- *  call after every intent (create/apply/accept/kick/…) — the server is the
- *  only source of truth, no local optimistic membership mutation. */
-async function refreshCorp(): Promise<void> {
-  if (corpFetchBusy) return;
-  corpFetchBusy = true;
-  try {
-    const mineRaw = (await corpFetch('/corps/me')) as {
-      corp?: unknown;
-      membership?: unknown;
-    } | null;
-    corpMine = mineRaw
-      ? { corp: parseCorpRecord(mineRaw.corp), membership: parseMembership(mineRaw.membership) }
-      : { corp: null, membership: null };
-
-    if (corpMine.membership) {
-      const corpId = corpMine.membership.corpId;
-      const detailRaw = (await corpFetch(`/corps/${encodeURIComponent(corpId)}`)) as {
-        corp?: unknown;
-        members?: unknown;
-      } | null;
-      const corp = detailRaw ? parseCorpRecord(detailRaw.corp) : null;
-      corpDetail = corp ? { corp, members: parseMemberships(detailRaw?.members) } : null;
-      if (canManage(corpMine.membership.role)) {
-        const auditRaw = (await corpFetch(`/corps/${encodeURIComponent(corpId)}/audit`)) as {
-          audit?: unknown;
-        } | null;
-        corpAudit = parseAudit(auditRaw?.audit);
-      } else {
-        corpAudit = [];
-      }
-      corpBrowseList = [];
-    } else {
-      corpDetail = null;
-      corpAudit = [];
-      const listRaw = (await corpFetch('/corps')) as { corps?: unknown } | null;
-      corpBrowseList = parseCorpSummaries(listRaw?.corps);
-    }
-
-    const challengesRaw = (await corpFetch('/ava/challenges')) as { challenges?: unknown } | null;
-    avaChallenges = parseChallenges(challengesRaw?.challenges);
-    const poolRaw = (await corpFetch('/ava/pool')) as { pool?: unknown } | null;
-    avaPool = parseReadyPool(poolRaw?.pool);
-    const feedRaw = (await corpFetch('/ava/feed?limit=8')) as { feed?: unknown } | null;
-    avaFeed = parseFeed(feedRaw?.feed);
-
-    // A locked-or-accepted matchup my corp is party to: show its roster window.
-    const myCorpId = corpMine.membership?.corpId;
-    const activeMatchup = avaChallenges.find(
-      (c) =>
-        (c.status === 'accepted' || c.status === 'locked') &&
-        (c.challengerCorp === myCorpId || c.targetCorp === myCorpId),
-    );
-    avaRoster = activeMatchup
-      ? parseRosterView(await corpFetch(`/ava/matchup/${encodeURIComponent(activeMatchup.id)}`))
-      : null;
-
-    // The setRoster eligibility set (AVA-6) — head/officer only, only while curating.
-    avaReadyPlayers =
-      avaRoster?.status === 'accepted' &&
-      myCorpId &&
-      corpMine.membership &&
-      canManage(corpMine.membership.role)
-        ? parseAccountIds(
-            (
-              (await corpFetch(`/corps/${encodeURIComponent(myCorpId)}/ready-players`)) as {
-                accountIds?: unknown;
-              } | null
-            )?.accountIds,
-          )
-        : [];
-  } finally {
-    corpFetchBusy = false;
-  }
-  renderCorp();
-}
-
-/** Fire an intent, then always refresh (the server is authoritative — no local
- *  guess at the new state). */
-async function corpIntent(path: string, body?: unknown): Promise<void> {
-  const result = await corpFetch(path, { method: 'POST', body: body ?? {} });
-  if (result) await refreshCorp();
-}
-
-function corpNameOf(corpId: string): string {
-  if (corpId === corpMine.membership?.corpId && corpMine.corp) return corpMine.corp.name;
-  return (
-    corpBrowseList.find((c) => c.corpId === corpId)?.name ??
-    avaPool.find((c) => c.corpId === corpId)?.name ??
-    corpId
-  );
-}
-
-function corpNoneHtml(): string {
-  const rows = corpBrowseList
-    .map(
-      (c) =>
-        `<div class="crow2"><span class="cnm">${esc(c.name)}</span>` +
-        `<span class="cinf">${nfmt(c.influence)} ⟡</span>` +
-        `<span class="cpres">${t('corp.members.count', { n: String(c.members) })}</span>` +
-        `<span class="cman"><button class="cbtn2" data-corpact="apply" data-corparg="${esc(c.corpId)}">${t('corp.apply')}</button></span></div>`,
-    )
-    .join('');
-  return (
-    `<div class="ccols">` +
-    `<section class="ccard"><h4>${t('corp.create.title')}</h4>` +
-    `<div class="cinput"><input id="corpnewname" placeholder="${t('corp.create.name-ph')}" maxlength="24">` +
-    `<button class="cbtn2" data-corpact="create">${t('corp.create.go')}</button></div></section>` +
-    `<section class="ccard"><h4>${t('corp.browse.title')}</h4>` +
-    `<div class="ctable">${rows || `<p class="chint">${t('corp.browse.empty')}</p>`}</div></section>` +
-    `</div>`
-  );
-}
-
-function corpOverviewHtml(): string {
-  if (!corpMine.corp || !corpMine.membership) return corpNoneHtml();
-  const c = corpMine.corp;
-  const feed = corpAudit
-    .slice(0, 6)
-    .map(
-      (a) =>
-        `<div class="cline"><span>${esc(a.actor)} ${t(CORP_AUDIT_RU[a.action] ?? a.action)}${a.target ? ` → ${esc(a.target)}` : ''}</span>` +
-        `<em class="cwhen">${new Date(a.at).toLocaleString('ru-RU')}</em></div>`,
-    )
-    .join('');
-  const feedHtml = canManage(corpMine.membership.role)
-    ? feed || `<p class="chint">${t('corp.empty')}</p>`
-    : `<p class="chint">${t('corp.log.private')}</p>`;
-  const nextWar = avaChallenges.find((w) => w.status === 'accepted' || w.status === 'pending');
-  const nextWarHtml = nextWar
-    ? `<div class="cwarn">⚔ ${t('corp.war.ava')} vs ${esc(corpNameOf(nextWar.challengerCorp === corpMine.membership.corpId ? nextWar.targetCorp : nextWar.challengerCorp))} — ${t(nextWar.status === 'accepted' ? 'corp.war.roster-open' : 'corp.war.pending')}</div>`
-    : '';
-  return (
-    `${nextWarHtml}` +
-    `<div class="ccols">` +
-    `<section class="ccard"><h4>${t('corp.overview.name')}</h4>` +
-    `<div class="cline"><span>${t('corp.influence')}</span><em>${nfmt(c.influence)} ⟡</em></div>` +
-    `<div class="cline"><span>${t('corp.my-role')}</span><em>${corpRoleLabel(corpMine.membership.role)}</em></div>` +
-    `<p class="chint">${t('corp.holdings.note')}</p></section>` +
-    `<section class="ccard"><h4>${t('corp.log')}</h4>${feedHtml}</section>` +
-    `</div>`
-  );
-}
-
-function corpMembersHtml(): string {
-  if (!corpDetail || !corpMine.membership) return corpNoneHtml();
-  const myRole = corpMine.membership.role;
-  const myId = corpMine.membership.accountId;
-  const rows = sortMembers(corpDetail.members)
-    .map((m) => {
-      const isMe = m.accountId === myId;
-      let manage = '';
-      if (m.role === 'recruit' && canManage(myRole)) {
-        manage =
-          `<button class="cbtn2" data-corpact="accept" data-corparg="${esc(m.accountId)}">✓ ${t('corp.request.accept')}</button>` +
-          `<button class="cbtn2 danger" data-corpact="decline" data-corparg="${esc(m.accountId)}">✖ ${t('corp.request.reject')}</button>`;
-      } else if (!isMe && m.role !== 'head') {
-        const bits: string[] = [];
-        if (myRole === 'head') {
-          const toRole = m.role === 'officer' ? 'member' : 'officer';
-          bits.push(
-            `<button class="cbtn2" data-corpact="role" data-corparg="${esc(m.accountId)}" data-corprole="${toRole}">↑ ${corpRoleLabel(toRole)}</button>`,
-          );
-          bits.push(
-            `<button class="cbtn2" data-corpact="transfer" data-corparg="${esc(m.accountId)}">⬆ ${t('corp.transfer-lead')}</button>`,
-          );
-        }
-        if (canManage(myRole) && !(myRole === 'officer' && m.role === 'officer')) {
-          bits.push(
-            `<button class="cbtn2 danger" data-corpact="kick" data-corparg="${esc(m.accountId)}">✖</button>`,
-          );
-        }
-        manage = bits.join('');
-      }
-      return (
-        `<div class="crow2${isMe ? ' me' : ''}">` +
-        `<span class="cdot" style="color:${CORP_ROLE_DOT[m.role]}"></span>` +
-        `<span class="cnm">${esc(m.login)}${isMe ? ` <i>(${t('corp.you')})</i>` : ''}</span>` +
-        `<span class="crole">${corpRoleLabel(m.role)}</span>` +
-        `<span class="cman">${manage}</span>` +
-        `</div>`
-      );
-    })
-    .join('');
-  const mine = corpMine.membership;
-  const leave =
-    mine.role === 'head'
-      ? `<button class="cbtn2 danger wide" data-corpact="disband">${t('corp.disband')}</button>`
-      : `<button class="cbtn2 wide" data-corpact="leave">${t('corp.leave')}</button>`;
-  return `<div class="ctable">${rows}</div>${leave}`;
-}
-
-function corpWarsHtml(): string {
-  const myCorpId = corpMine.membership?.corpId;
-  const iAmHead = corpMine.membership?.role === 'head';
-  const iCanFlag = corpMine.membership && corpMine.membership.role !== 'recruit';
-  const corpReady = corpReadyOptimistic ?? avaPool.some((p) => p.corpId === myCorpId);
-  const flags =
-    `<div class="cbig">` +
-    `<div><span>${t('corp.ready.corp')}</span><b>${corpReady ? t('corp.ready.yes') : t('corp.ready.no')}</b>` +
-    (iAmHead
-      ? `<button class="cbtn2" data-corpact="${corpReady ? 'ready-corp-clear' : 'ready-corp'}">${corpReady ? t('corp.ready.clear') : t('corp.ready.to-pool')}</button>`
-      : `<span class="chint">${t('corp.ready.lead-only')}</span>`) +
-    `</div>` +
-    `<div><span>${t('corp.ready.mine')}</span><b>${playerReadyOptimistic ? t('corp.ready.yes') : t('—')}</b>` +
-    (iCanFlag
-      ? `<button class="cbtn2" data-corpact="${playerReadyOptimistic ? 'ready-player-clear' : 'ready-player'}">${playerReadyOptimistic ? t('corp.ready.clear') : t('corp.ready.set')}</button>`
-      : '') +
-    `</div></div>`;
-
-  const wars = avaChallenges
-    .map((w) => {
-      const iAmChallenger = w.challengerCorp === myCorpId;
-      const foe = corpNameOf(iAmChallenger ? w.targetCorp : w.challengerCorp);
-      const st: Record<AvaChallengeStatus, string> = {
-        pending: iAmChallenger ? t('corp.war.pending') : t('corp.war.incoming'),
-        accepted: t('corp.war.roster'),
-        declined: t('corp.war.declined'),
-        expired: t('corp.war.expired'),
-        locked: t('corp.war.locked'),
-        cancelled: t('corp.war.cancelled'),
-        ended: t('corp.war.finished'),
-      };
-      const canRespond = w.status === 'pending' && !iAmChallenger && iAmHead;
-      const act = canRespond
-        ? `<button class="cbtn2" data-corpact="ava-accept" data-corparg="${esc(w.id)}">${t('corp.war.accept')}</button>` +
-          `<button class="cbtn2 danger" data-corpact="ava-decline" data-corparg="${esc(w.id)}">${t('corp.war.decline')}</button>`
-        : w.status === 'accepted' &&
-            corpMine.membership &&
-            corpMine.membership.role !== 'recruit' &&
-            !avaRoster?.mine.some((r) => r.accountId === corpMine.membership!.accountId)
-          ? `<button class="cbtn2" data-corpact="ava-join" data-corparg="${esc(w.id)}">${t('corp.war.join-roster')}</button>`
-          : '';
-      const rosterOpen = w.status === 'accepted' && avaRoster && avaRoster.matchupId === w.id;
-      const rosterLine = rosterOpen
-        ? `<div class="cwmid">${t('corp.war.roster-label')}: ${avaRoster!.counts.challenger}/${avaRoster!.counts.target}</div>`
-        : '';
-      // AVA-6 setRoster — head/officer curates from the flagged pool wholesale;
-      // everyone else still only has self-enroll `join` (rendered in `act` above).
-      const curate =
-        rosterOpen &&
-        canManage(corpMine.membership?.role ?? 'recruit') &&
-        avaReadyPlayers.length > 0
-          ? `<div class="cwroster">${avaReadyPlayers
-              .map((accountId) => {
-                const login =
-                  corpDetail?.members.find((m) => m.accountId === accountId)?.login ?? accountId;
-                const on = avaRoster!.mine.some((r) => r.accountId === accountId);
-                return (
-                  `<button class="cbtn2 ctoggle${on ? ' on' : ''}" data-corpact="ava-roster-toggle" ` +
-                  `data-corparg="${esc(w.id)}" data-corpaccount="${esc(accountId)}">${on ? '✓' : '·'} ${esc(login)}</button>`
-                );
-              })
-              .join('')}</div>`
-          : '';
-      return (
-        `<div class="cwar"><div class="cwtop"><b>⚔ ${esc(foe)}</b><span class="cst st-${w.status}">${st[w.status]}</span></div>` +
-        `<div class="cwmid">${iAmChallenger ? t('corp.war.by-us') : t('corp.war.to-us')} · ${nfmt(w.cost)} ⟡</div>${rosterLine}${curate}` +
-        (act ? `<div class="cwact">${act}</div>` : '') +
-        `</div>`
-      );
-    })
-    .join('');
-
-  const pool = avaPool
-    .filter((p) => p.corpId !== myCorpId)
-    .map(
-      (p) =>
-        `<div class="crow2"><span class="cnm">${esc(p.name)}</span><span class="cinf">${nfmt(p.influence)} ⟡</span>` +
-        (iAmHead
-          ? `<span class="cman"><button class="cbtn2" data-corpact="ava-challenge" data-corparg="${esc(p.corpId)}">⚔ ${t('corp.war.challenge')}</button></span>`
-          : '') +
-        `</div>`,
-    )
-    .join('');
-
-  const feed = avaFeed
-    .slice(0, 5)
-    .map(
-      (f) =>
-        `<div class="cline"><span>${esc(f.challengerName)} vs ${esc(f.targetName)}</span>` +
-        `<em class="cwhen">${f.kind === 'result' ? (f.winnerCorp ? t('corp.war.win') : t('corp.war.draw')) : t('corp.war.scheduled')}</em></div>`,
-    )
-    .join('');
-
-  return (
-    flags +
-    `<h4>${t('corp.war.mine')}</h4><div class="cwars">${wars || `<p class="chint">${t('corp.war.none')}</p>`}</div>` +
-    `<h4>${t('corp.war.pool')}</h4><div class="ctable">${pool || `<p class="chint">${t('corp.war.pool-empty')}</p>`}</div>` +
-    `<h4>${t('corp.war.feed')}</h4><div class="cledger">${feed || `<p class="chint">${t('corp.empty')}</p>`}</div>`
-  );
-}
-
-function corpTreasuryHtml(): string {
-  if (!corpMine.corp || !corpMine.membership) return corpNoneHtml();
-  const rows = corpAudit
-    .filter((a) => a.action === 'influence' || a.action === 'rent' || a.action === 'rent_return')
-    .map(
-      (a) =>
-        `<div class="cline"><span>${esc(a.detail ?? t(CORP_AUDIT_RU[a.action] ?? a.action))} <b class="cwhen">· ${new Date(a.at).toLocaleString('ru-RU')}</b></span></div>`,
-    )
-    .join('');
-  const ledgerHtml = canManage(corpMine.membership.role)
-    ? rows || `<p class="chint">${t('corp.empty')}</p>`
-    : `<p class="chint">${t('corp.history.private')}</p>`;
-  return (
-    `<div class="cbig"><div><span>${t('corp.influence')}</span><b>${nfmt(corpMine.corp.influence)} ⟡</b></div></div>` +
-    `<h4>${t('corp.history')}</h4><div class="cledger">${ledgerHtml}</div>` +
-    `<p class="chint">${t('corp.influence.hint')}</p>`
-  );
-}
-
-function corpHoldingsHtml(): string {
-  return `<div class="hub-empty"><span class="he-ic">▦</span>${t('corp.holdings.soon')}<br><span style="font-size:11px;color:var(--cyan-dim)">${t('corp.holdings.soon.hint')}</span></div>`;
-}
-
-function corpCommsHtml(): string {
-  return `<div class="hub-empty"><span class="he-ic">▭</span>${t('corp.chat.soon')}<br><span style="font-size:11px;color:var(--cyan-dim)">${t('corp.chat.soon.hint')}</span></div>`;
-}
-
-function renderCorp(): void {
-  const c = corpMine.corp;
-  const mem = corpMine.membership;
-  corpHdEl.innerHTML = c
-    ? `<div class="chrow"><span class="cemblem">⬢</span>` +
-      `<div class="cident"><b>${esc(c.name)}</b></div>` +
-      `<button id="corpclose" class="cx" title="${t('corp.close')}">✕</button></div>` +
-      `<div class="cmetrics">` +
-      `<span>${t('corp.card.influence')} <b>${nfmt(c.influence)} ⟡</b></span>` +
-      `<span>${t('corp.card.members')} <b>${corpDetail?.members.filter((m) => m.role !== 'recruit').length ?? '—'}</b></span>` +
-      `<span>${t('corp.card.role')} <b>${mem ? corpRoleLabel(mem.role) : '—'}</b></span>` +
-      `</div>`
-    : `<div class="chrow"><span class="cemblem">⬢</span>` +
-      `<div class="cident"><b>${t('corp.card.none')}</b></div>` +
-      `<button id="corpclose" class="cx" title="${t('corp.close')}">✕</button></div>`;
-  corpTabsEl.innerHTML = CORP_TABS.map(
-    (ct) =>
-      `<button class="ctab${ct.id === corpTab ? ' on' : ''}" data-corptab="${ct.id}">${t(ct.label)}</button>`,
-  ).join('');
-  let body = '';
-  if (corpTab === 'overview') body = corpOverviewHtml();
-  else if (corpTab === 'members') body = corpMembersHtml();
-  else if (corpTab === 'wars') body = corpWarsHtml();
-  else if (corpTab === 'treasury') body = corpTreasuryHtml();
-  else if (corpTab === 'holdings') body = corpHoldingsHtml();
-  else if (corpTab === 'comms') body = corpCommsHtml();
-  corpBodyEl.innerHTML = body;
-}
-
-function openCorp(): void {
-  renderCorp(); // paint instantly from whatever's cached in memory…
-  corpEl.style.display = 'flex';
-  void refreshCorp(); // …then refresh from the server
-  maybeIntro('corp');
-}
-function closeCorp(): void {
-  corpEl.style.display = 'none';
-}
-
-corpTabsEl.addEventListener('click', (e) => {
-  const b = (e.target as HTMLElement | null)?.closest('[data-corptab]') as HTMLElement | null;
-  if (!b) return;
-  corpTab = b.dataset.corptab ?? 'overview';
-  renderCorp();
-  if (corpTab === 'wars') maybeIntro('ava');
+// Сам кабинет живёт в `corpScreen.ts` (REFM-11); здесь только его хуки и две двери,
+// которые его открывают (кнопка хаба и рельса матча). `authorizedBase` — та же
+// политика, что у «Арсенала» и профиля; кэша у кабинета сознательно нет.
+const corp = initCorp({
+  root: () => $('corp'),
+  head: () => $('corphd'),
+  tabs: () => $('corptabs'),
+  body: () => $('corpbody'),
+  note,
+  errText,
+  onIntro: maybeIntro,
+  authorizedBase: async () => {
+    const srv = resolveServer();
+    if (!srv) return null;
+    await probeAuthMode(srv.base);
+    if (!authMode) return null;
+    const token = sessionToken(srv.base);
+    return token ? { base: httpBase(srv.base), token } : null;
+  },
 });
-corpEl.addEventListener('click', (e) => {
-  const tg = e.target as HTMLElement | null;
-  if (!tg) return;
-  if (tg.id === 'corpclose' || tg.id === 'corp') {
-    closeCorp();
-    return;
-  }
-  const btn = tg.closest('[data-corpact]') as HTMLElement | null;
-  const act = btn?.dataset.corpact;
-  if (!act) return;
-  const arg = btn?.dataset.corparg ?? '';
-  const corpId = corpMine.membership?.corpId ?? '';
-  const account = btn?.dataset.corpaccount ?? '';
-  switch (act) {
-    case 'create': {
-      const input = document.getElementById('corpnewname') as HTMLInputElement | null;
-      const name = input?.value.trim() ?? '';
-      if (name) void corpIntent('/corps', { name });
-      break;
-    }
-    case 'apply':
-      void corpIntent(`/corps/${encodeURIComponent(arg)}/apply`);
-      break;
-    case 'accept':
-      void corpIntent(`/corps/${encodeURIComponent(corpId)}/accept`, { target: arg });
-      break;
-    case 'decline':
-      void corpIntent(`/corps/${encodeURIComponent(corpId)}/decline`, { target: arg });
-      break;
-    case 'kick':
-      void corpIntent(`/corps/${encodeURIComponent(corpId)}/kick`, { target: arg });
-      break;
-    case 'role':
-      void corpIntent(`/corps/${encodeURIComponent(corpId)}/role`, {
-        target: arg,
-        role: btn?.dataset.corprole,
-      });
-      break;
-    case 'transfer':
-      void corpIntent(`/corps/${encodeURIComponent(corpId)}/transfer`, { target: arg });
-      break;
-    case 'leave':
-      void corpIntent(`/corps/${encodeURIComponent(corpId)}/leave`);
-      break;
-    case 'disband':
-      void corpIntent(`/corps/${encodeURIComponent(corpId)}/disband`);
-      break;
-    case 'ready-corp':
-      void corpFetch('/ava/ready/corp', { method: 'POST' }).then((r) => {
-        if (r) {
-          corpReadyOptimistic = true;
-          void refreshCorp();
-        }
-      });
-      break;
-    case 'ready-corp-clear':
-      void corpFetch('/ava/ready/corp/clear', { method: 'POST' }).then((r) => {
-        if (r) {
-          corpReadyOptimistic = false;
-          void refreshCorp();
-        }
-      });
-      break;
-    case 'ready-player':
-      void corpFetch('/ava/ready/player', { method: 'POST' }).then((r) => {
-        if (r) {
-          playerReadyOptimistic = true;
-          renderCorp();
-        }
-      });
-      break;
-    case 'ready-player-clear':
-      void corpFetch('/ava/ready/player/clear', { method: 'POST' }).then((r) => {
-        if (r) {
-          playerReadyOptimistic = false;
-          renderCorp();
-        }
-      });
-      break;
-    case 'ava-challenge':
-      void corpIntent('/ava/challenge', { target: arg });
-      break;
-    case 'ava-accept':
-      void corpIntent(`/ava/challenge/${encodeURIComponent(arg)}/accept`);
-      break;
-    case 'ava-decline':
-      void corpIntent(`/ava/challenge/${encodeURIComponent(arg)}/decline`);
-      break;
-    case 'ava-join':
-      void corpIntent(`/ava/matchup/${encodeURIComponent(arg)}/join`);
-      break;
-    case 'ava-roster-toggle': {
-      // arg = matchupId, account = the toggled accountId. Server is wholesale
-      // (setRoster REPLACES the side), so send the full desired set every time.
-      if (!avaRoster || avaRoster.matchupId !== arg) break;
-      const current = avaRoster.mine.map((r) => r.accountId);
-      const next = current.includes(account)
-        ? current.filter((id) => id !== account)
-        : [...current, account];
-      void corpIntent(`/ava/matchup/${encodeURIComponent(arg)}/roster`, { players: next });
-      break;
-    }
-  }
-});
-const corpEntry = $('ccorp');
-corpEntry.addEventListener('click', openCorp);
-const corpRail = $('railcorp');
-corpRail.addEventListener('click', openCorp);
+$('ccorp').addEventListener('click', () => corp.open());
+$('railcorp').addEventListener('click', () => corp.open());

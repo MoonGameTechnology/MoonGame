@@ -18,6 +18,12 @@
 - **Гейт перед коммитом:** `pnpm run check` = `lint` + `typecheck` + `test` + `docs-check`.
 - Ещё: `pnpm test`, `pnpm run lint`, `pnpm run typecheck`, `pnpm run format`,
   `pnpm run prototype` (собрать играбельный `prototype/dist/void-dominion.html`).
+- **В веб-сессиях Claude Code зависимости ставятся сами** — SessionStart-хук
+  `.claude/hooks/session-start.sh` гоняет `pnpm install --frozen-lockfile` до старта
+  сессии, чтобы гейт и тесты не падали на пустом `node_modules` в свежем контейнере.
+  Локальные машины он не трогает (условие `$CLAUDE_CODE_REMOTE`) — там установка своя.
+  Браузер для MCP хук СОЗНАТЕЛЬНО не качает: в веб-образе Chromium уже стоит, а на
+  локальной машине это отдельная история — см. раздел про MCP ниже.
 
 ## Работа через Claude Code (веб / CLI)
 
@@ -56,6 +62,7 @@
 | `brick` | взять/закрыть кирпичик из `docs/backlog.md` |
 | `new-module` | новая механика = новый модуль ядра |
 | `add-game-content` | контент в `data/*.json` |
+| `localization` | любой текст, который читает игрок: ключ в `/localization`, не литерал в коде |
 | `sync-state-doc` | привести `docs/state.md` в соответствие с кодом |
 | `determinism-audit` · `balance-analysis` · `render-profile` · `security-triage` | четыре тяжёлые задачи из списка выше |
 | `playtest-report` · `refresh-scanner-digests` | периодика: журнал плейтеста, ежемесячный ре-пин образов |
@@ -97,6 +104,30 @@ HTML-ответе на `/auth/status`, и поле пароля вне `<form>` 
 Сессия всегда `--isolated`: прототип хранит в `localStorage` посадочные билеты и
 session-JWT, и утаскивать их из прогона в прогон нельзя. Вывод (снапшоты, логи консоли)
 падает в `.playwright-mcp/` — она в `.gitignore`.
+
+**Первый запуск у нового участника: сервер нужно ОДИН РАЗ подтвердить.** `.mcp.json`
+приезжает с клоном, но Claude Code не поднимает проектные серверы молча — это же
+исполняемый код из репозитория, та самая supply-chain-поверхность, ради которой мы
+пиним версию выше. Поэтому при первом запуске в корне проекта он спрашивает доверие, а
+до ответа сервер висит неподключённым:
+
+```
+$ claude mcp list
+browser: node scripts/mcp-browser.mjs - ⏸ Pending approval (run `claude` to approve)
+```
+
+Лечится запуском `claude` (интерактивно, **из корня репозитория** — путь в `.mcp.json`
+относительный) и подтверждением запроса. Если запрос не появляется, значит выбор уже
+сделан раньше и запомнен — сбросить обе стороны выбора можно так:
+
+```bash
+claude mcp reset-project-choices   # сбрасывает и approved, и rejected для этого проекта
+claude                             # запустить снова и подтвердить
+```
+
+Проверка — `/mcp` внутри сессии: `browser` должен быть connected. Подтверждение хранится
+в пользовательском конфиге, а не в репозитории, поэтому закоммитить его нельзя и сделать
+это обязан каждый у себя — это не недоделка, а граница доверия.
 
 **Postgres-сервер сознательно НЕ подключён.** Официальный
 `@modelcontextprotocol/server-postgres` помечен `deprecated` («Package no longer

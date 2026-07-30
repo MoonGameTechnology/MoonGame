@@ -11,6 +11,15 @@ import { data } from './prototypeData';
 /** The unit ids a template slot may hold — the formation roster (data.units above). */
 export const FORMATION_UNITS = ['militia', 'heavy_infantry', 'special_forces', 'tank'] as const;
 export type FormationUnit = (typeof FORMATION_UNITS)[number];
+
+/** Localization key per roster unit — the label every formation screen prints next to
+ *  the icon (`formIcon` in `icons.ts` draws the icon half). */
+export const FORM_RU: Record<string, string> = {
+  militia: 'form.militia',
+  heavy_infantry: 'form.heavy-infantry',
+  special_forces: 'form.special-forces',
+  tank: 'form.tank',
+};
 /** Slots per template, and templates per player. */
 export const FORMATION_SLOTS = 6;
 export const FORMATION_TEMPLATE_COUNT = 3;
