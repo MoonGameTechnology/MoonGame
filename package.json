@@ -29,6 +29,8 @@
     "selfplay": "node prototype/selfplay.mjs",
     "dev:client": "node testclient/build.mjs",
     "mcp:browser": "node scripts/mcp-browser.mjs",
+    "smoke:browser": "node prototype/browsertest.mjs",
+    "smoke:browser:install": "node prototype/browsertest.mjs --install",
     "db:psql": "psql \"${DATABASE_URL:-postgres://void:void@127.0.0.1:5432/void}\"",
     "db:schema": "psql \"${DATABASE_URL:-postgres://void:void@127.0.0.1:5432/void}\" -c '\\dt+' -c '\\di'",
     "audit": "pnpm audit --audit-level=high",
