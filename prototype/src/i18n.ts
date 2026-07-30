@@ -61,7 +61,11 @@ export function t(key: string, vars?: Record<string, string | number>): string {
 /** Имя игровых ДАННЫХ. Промах → исходное английское имя из data/*.json: новый юнит
  *  виден под своим именем, а не как `data.new-unit`. */
 export function tData(name: string): string {
-  return lookup(dataKey(name)) ?? name;
+  // `?? lookup(name)` — страховка, а не разрешение путать вызовы. Если сюда всё же
+  // приехал КЛЮЧ (поля каталога `prototypeData.ts` частично хранят ключи), слаг
+  // `dataKey()` его схлопнет — точки и кириллица вырезаются, — и наружу вылез бы сам
+  // ключ. Так игрок получит перевод, а не `sci.overseer.name`.
+  return lookup(dataKey(name)) ?? lookup(name) ?? name;
 }
 
 /** Проход по статической разметке на старте. Ключ берётся из ЗНАЧЕНИЯ атрибута

@@ -3486,11 +3486,14 @@ function checkEnd() {
       // ranking) — the client never re-ranks the scoreboard itself. It is absent on
       // the dev endMatch hook, and `recordMatch` counts such a match without letting
       // it skew the average.
-      const after = recordMatch({ ...st, xp: st.xp + gained }, {
-        won: iWon,
-        score,
-        place: s.match.rewards?.[ME]?.place,
-      });
+      const after = recordMatch(
+        { ...st, xp: st.xp + gained },
+        {
+          won: iWon,
+          score,
+          place: s.match.rewards?.[ME]?.place,
+        },
+      );
       saveMeta(after);
       localStorage.setItem(awardKey, JSON.stringify({ at: endStamp, xp: gained }));
       if (metaLevel(after.xp) > before) levelUp = metaLevel(after.xp);
@@ -6385,7 +6388,7 @@ function codexHtml(kind: string, id: string): string {
       rows.push(cxRow(tData(k), (v > 0 ? '+' : '') + String(v)));
     return (
       `<div class="cx-head"><span class="cx-ic">◆</span><b>${esc(tData(def.name))}</b><span class="cx-tag">${t('codex.tag.fitting')}</span></div>` +
-      `<div class="cx-stats">${rows.join('')}</div><div class="cx-desc">${esc(tData(def.description ?? ''))}</div>`
+      `<div class="cx-stats">${rows.join('')}</div><div class="cx-desc">${esc(t(def.description ?? ''))}</div>`
     );
   }
   const def = data.units[id];
@@ -8868,8 +8871,7 @@ const RES_SVG: Record<string, string> = {
     '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="6" cy="6.2" r="3.9"/><circle cx="10" cy="9.8" r="3.9"/></svg>',
   metal:
     '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M8 1.8 13.4 4.9v6.2L8 14.2 2.6 11.1V4.9L8 1.8Z"/><path d="M2.6 4.9 8 8l5.4-3.1M8 8v6.2"/></svg>',
-  food:
-    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 14.2V8.8"/><path d="M8 9.6C8 6.4 6.2 4.8 3.6 4.6c.2 3 1.9 4.7 4.4 5Z"/><path d="M8 9.6c0-3.2 1.8-4.8 4.4-5-.2 3-1.9 4.7-4.4 5Z"/></svg>',
+  food: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 14.2V8.8"/><path d="M8 9.6C8 6.4 6.2 4.8 3.6 4.6c.2 3 1.9 4.7 4.4 5Z"/><path d="M8 9.6c0-3.2 1.8-4.8 4.4-5-.2 3-1.9 4.7-4.4 5Z"/></svg>',
   energy:
     '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M9.3 1.6 4.2 8.9h3.2L6.4 14.4l5.4-7.6H8.5l.8-5.2Z"/></svg>',
   microelectronics:
@@ -9071,7 +9073,7 @@ function renderTech(): void {
     .map((c) => data.scientists[c.id])
     .find((d) => d?.branch === techTab);
   const leadHtml = lead
-    ? `🧪 ${t('tech.curator')} <b>${esc(tData(lead.name))}</b>`
+    ? `🧪 ${t('tech.curator')} <b>${esc(t(lead.name))}</b>`
     : `🔭 ${t('tech.curator.none')}`;
   // Колонки вкладки: из карты раскладки; техи вне карты — в автоколонку в конце.
   const colsDef = TECH_COLS[techTab] ?? [];
@@ -9796,7 +9798,9 @@ function renderMarket(): void {
     // ECON-4: получатель кредитов получает net (5% сгорает) — в биде это исполнитель.
     const takerNet = Math.floor(l.amount * l.price * (1 - MARKET_FEE));
     const qp = `<span class="mk-qp"><b>${l.amount}</b> ${curIc(l.resource)} @ ${l.price} <span class="rc-credits">⛁</span>${
-      bid && !mine ? ` <span class="mk-net">→ ${takerNet} <span class="rc-credits">⛁</span></span>` : ''
+      bid && !mine
+        ? ` <span class="mk-net">→ ${takerNet} <span class="rc-credits">⛁</span></span>`
+        : ''
     }</span>`;
     const who = `<span class="mk-who">${mine ? t('market.own-lot') : nameOf(l.owner)}</span>`;
     let btn: string;
@@ -10674,11 +10678,15 @@ function loadMedalCache(): { owned: string[]; catalog: { id: string; name: strin
     const raw = JSON.parse(localStorage.getItem(medalsKey()) ?? 'null') as unknown;
     if (typeof raw !== 'object' || raw === null) return { owned: [], catalog: [] };
     const v = raw as { owned?: unknown; catalog?: unknown };
-    const owned = Array.isArray(v.owned) ? v.owned.filter((x): x is string => typeof x === 'string') : [];
+    const owned = Array.isArray(v.owned)
+      ? v.owned.filter((x): x is string => typeof x === 'string')
+      : [];
     const catalog = Array.isArray(v.catalog)
       ? v.catalog.flatMap((x) => {
           const o = x as { id?: unknown; name?: unknown };
-          return typeof o?.id === 'string' && typeof o?.name === 'string' ? [{ id: o.id, name: o.name }] : [];
+          return typeof o?.id === 'string' && typeof o?.name === 'string'
+            ? [{ id: o.id, name: o.name }]
+            : [];
         })
       : [];
     return { owned, catalog };
@@ -10706,7 +10714,8 @@ function profileHtml(): string {
   const league = t(leagueKey(lvl));
   // Subtitle mirrors the mock: «<corp> · Лига: <band>», degrading to the league
   // alone when this commander flies without a corporation.
-  const sub = (corpName ? `${esc(corpName)} · ` : '') + `${esc(t('profile.league'))}: ${esc(league)}`;
+  const sub =
+    (corpName ? `${esc(corpName)} · ` : '') + `${esc(t('profile.league'))}: ${esc(league)}`;
   const avg = averagePlace(stats);
   const played = stats.matches > 0;
   const medals = profileCatalog.length
@@ -10780,11 +10789,16 @@ async function refreshMedals(): Promise<void> {
     profileCatalog = Array.isArray(cat?.medals)
       ? cat.medals.flatMap((x) => {
           const o = x as { id?: unknown; name?: unknown };
-          return typeof o?.id === 'string' && typeof o?.name === 'string' ? [{ id: o.id, name: o.name }] : [];
+          return typeof o?.id === 'string' && typeof o?.name === 'string'
+            ? [{ id: o.id, name: o.name }]
+            : [];
         })
       : [];
     profileMedals = parseMedals(mine?.medals).map((m) => m.medalId);
-    localStorage.setItem(medalsKey(), JSON.stringify({ owned: profileMedals, catalog: profileCatalog }));
+    localStorage.setItem(
+      medalsKey(),
+      JSON.stringify({ owned: profileMedals, catalog: profileCatalog }),
+    );
     renderProfile();
   } catch {
     // offline/unreachable — the cached showcase painted above stays as it is
@@ -11680,7 +11694,7 @@ function renderSciPick(): void {
       const def = data.scientists[id];
       return (
         `<div class="sp-slot filled"><button class="sp-rm" data-sprm="${i}" title="${t('ping.remove')}">✕</button>` +
-        `<div class="sp-sn">${esc(tData(def?.name ?? id))}</div>` +
+        `<div class="sp-sn">${esc(t(def?.name ?? id))}</div>` +
         `<div class="sp-inf">${esc(sciInfluence(id))}</div></div>`
       );
     })
@@ -11692,7 +11706,7 @@ function renderSciPick(): void {
       const dis = placed || (chosen.length >= 2 && !placed);
       return (
         `<button class="sp-card${placed ? ' picked' : ''}" data-spadd="${id}"${dis ? ' disabled' : ''}>` +
-        `<div class="sp-cn">${esc(tData(def.name))}${placed ? '<span class="sp-tick">✓</span>' : ''}</div>` +
+        `<div class="sp-cn">${esc(t(def.name))}${placed ? '<span class="sp-tick">✓</span>' : ''}</div>` +
         `<div class="sp-inf">${esc(sciInfluence(id))}</div></button>`
       );
     })
@@ -14167,7 +14181,7 @@ function tgStepLabel(st: ChainStep, target: string): string {
   if (st.kind === 'assault') return '⚔';
   if (st.kind === 'strike') return t('tgt.at', { n: st.hours });
   if (st.kind === 'ability') {
-    const nm = tData(data.heroAbilities[st.abilityId]?.name ?? st.abilityId);
+    const nm = t(data.heroAbilities[st.abilityId]?.name ?? st.abilityId);
     return st.target && st.target !== target ? `★ ${nm} → ${st.target}` : `★ ${nm}`;
   }
   return '🎯';
@@ -14187,7 +14201,7 @@ function tgHeroAbilityButtons(fleetIds: string[], full: boolean): string {
     if (!ad || !HERO_CASTABLE.has(ad.type)) continue;
     const cdLeft = Math.max(0, (hero.cooldowns?.[heroCdKey(ad.type)] ?? 0) - s.time);
     const badge = cdLeft > 0 ? ` ${t('hero.abil.cooldown', { h: fmtHrs(cdLeft / HOUR) })}` : '';
-    html += `<button data-tgab="${ab}" ${full || cdLeft > 0 ? 'disabled' : ''}>★ ${esc(tData(ad.name))}${badge}</button>`;
+    html += `<button data-tgab="${ab}" ${full || cdLeft > 0 ? 'disabled' : ''}>★ ${esc(t(ad.name))}${badge}</button>`;
   }
   return html;
 }

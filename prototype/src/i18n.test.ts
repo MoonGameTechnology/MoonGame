@@ -6,6 +6,7 @@ import { ru } from '../../localization/ru';
 import { en } from '../../localization/en';
 import { dataKey } from '../../localization';
 import { GLOSSARY } from './codexIndex';
+import { data } from './prototypeData';
 import { INTROS } from './intros';
 import { FIRST_GOALS } from './firstGoals';
 import { HUD_ORIENTATION_TOUR } from './onboardingTour';
@@ -135,14 +136,34 @@ describe('локализация — ключи', () => {
     // таких записей в каждой локали). tsc словари не проверяет — держим тут.
     for (const file of ['localization/ru.ts', 'localization/en.ts']) {
       const seen = new Map<string, number>();
-      for (const m of readFileSync(path.join(repoRoot, file), 'utf8').matchAll(
-        /^  '([^']+)':/gm,
-      )) {
+      for (const m of readFileSync(path.join(repoRoot, file), 'utf8').matchAll(/^  '([^']+)':/gm)) {
         seen.set(m[1]!, (seen.get(m[1]!) ?? 0) + 1);
       }
       const dupes = [...seen].filter(([, n]) => n > 1).map(([k]) => k);
       expect({ file, dupes }).toEqual({ file, dupes: [] });
     }
+  });
+
+  it('ключи, лежащие в полях игрового каталога, заведены в локали', () => {
+    // `prototypeData.ts` хранит в части полей (`scientists.name`, `heroAbilities.*`,
+    // описания технологий и фракций…) не текст, а КЛЮЧ — он уходит в `t()`
+    // переменной, поэтому разбор литералов его не видит. Опечатка здесь доехала бы
+    // до игрока сырым ключом: ровно так на экране совета учёных светилось
+    // `sci.overseer.name`.
+    // `hook` — ИДЕНТИФИКАТОР эффекта (`fleet.speed`), а не ключ: по форме он от ключа
+    // неотличим, но переводится через таблицу `HERO_HOOK_RU` → `hero.hook.*`.
+    const NOT_A_KEY = new Set(['hook']);
+    const bad: string[] = [];
+    const walk = (node: unknown, path: string): void => {
+      if (!node || typeof node !== 'object') return;
+      for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+        if (typeof v === 'string') {
+          if (!NOT_A_KEY.has(k) && KEY_RE.test(v) && !(v in ru)) bad.push(`${path}.${k}: ${v}`);
+        } else walk(v, `${path}.${k}`);
+      }
+    };
+    walk(data, 'data');
+    expect(bad.sort()).toEqual([]);
   });
 
   it('каждый ключ из кода заведён в локали', () => {
