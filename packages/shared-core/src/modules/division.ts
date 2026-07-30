@@ -7,7 +7,16 @@ import { timeScaleOf } from '../action/types';
 import { canAfford, payCost } from '../util/treasury';
 import { sumUnitStat } from '../util/stacks';
 import { requireOwnedIdleFleet } from '../util/fleet';
-import { GROUND_ROSTER, makeSide, damageBuckets, OFFICERS, type GroundStack, type DamageTable, type Officer } from '../state/groundCombat';
+import {
+  GROUND_ROSTER,
+  COMBAT_WIDTH,
+  makeSide,
+  damageBuckets,
+  OFFICERS,
+  type GroundStack,
+  type DamageTable,
+  type Officer,
+} from '../state/groundCombat';
 import {
   DEFAULT_TEMPLATES,
   OFFICER_TEMPLATES,
@@ -32,7 +41,17 @@ import {
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
 
+/** Read-only accessor — safe to call from anywhere (fog projection, read-models,
+ *  tests) without side effects on a state that might be shared/compared/hashed
+ *  elsewhere (invariant #2: no mutation outside a handler's own draft). Returns a
+ *  fresh empty object when unset rather than materialising the field. */
 export function divisionsOf(state: GameState): Record<string, Division> {
+  return state.divisions ?? {};
+}
+/** Write-capable variant, used ONLY inside this module's own handlers (already
+ *  operating on the kernel's private draft) — the one place `state.divisions`
+ *  legitimately gets created on first mobilisation. */
+function ensureDivisions(state: GameState): Record<string, Division> {
   return (state.divisions ??= {});
 }
 function groundBattlesOf(state: GameState): Record<PlanetId, number> {
@@ -120,6 +139,13 @@ function mergeSide(divs: Division[]): GroundStack[] {
   return out;
 }
 
+/** Merge a side's per-division officers into one count-weighted mean (`atk`/`def`
+ *  fractions only). `Officer.atkVs` (a flat per-target-type bonus) is deliberately
+ *  NOT merged — a mean of per-type tables has no obvious weighting and no current
+ *  officer sets it (`OFFICERS` in `state/groundCombat.ts`). If a future officer
+ *  adds `atkVs`, it silently drops out of merged (multi-division) combat until
+ *  this is revisited — solo-division fights aren't affected (`makeSide`/damage
+ *  application there reads the division's own officer directly, not this merge). */
 function mergeOfficer(divs: Division[]): Officer | undefined {
   let total = 0;
   let atk = 0;
@@ -218,8 +244,8 @@ function groundTickAt(h: HandlerContext, planetId: string): boolean {
   const defOfficer = mergeOfficer(defenders);
   const atkMerged = mergeSide(attackers);
   const defMerged = mergeSide(defenders);
-  const toDefender = damageBuckets(GROUND_ROSTER, atkMerged, defMerged, 'atk', atkOfficer);
-  const toAttacker = damageBuckets(GROUND_ROSTER, defMerged, atkMerged, 'def', defOfficer);
+  const toDefender = damageBuckets(GROUND_ROSTER, atkMerged, defMerged, 'atk', COMBAT_WIDTH, atkOfficer);
+  const toAttacker = damageBuckets(GROUND_ROSTER, defMerged, atkMerged, 'def', COMBAT_WIDTH, defOfficer);
   applyBucketsToDivs(defenders, toDefender);
   applyBucketsToDivs(attackers, toAttacker);
   reapWipedDivisions(h.state);
@@ -249,6 +275,13 @@ function runGroundCombat(h: HandlerContext, elapsed: number): void {
       acc -= GROUND_TICK_MS;
       guard += 1;
     }
+    // `acc % GROUND_TICK_MS` is exact only while the guard never trips: if
+    // MAX_GROUND_TICKS_PER_SPAN ticks fired (≈125 continuous game-days of one
+    // unbroken battle in a single span — offline catch-up, not live play) any
+    // further whole ticks banked in `acc` beyond the cap are dropped along with
+    // the remainder, not carried to the next span. Acceptable: a battle that
+    // long has long since had a winner in practice, and the cap itself exists
+    // to bound worst-case work per span, not to preserve every tick exactly.
     if (groundContested(h.state, planetId)) battles[planetId] = acc % GROUND_TICK_MS;
     else delete battles[planetId];
   }
@@ -277,7 +310,7 @@ export const divisionModule: GameModule = {
       if (!player) return h.reject('E_NO_PLAYER');
       if (!canAfford(player.resources, stats.cost)) return h.reject('E_NO_FUNDS');
       payCost(player.resources, stats.cost);
-      const divs = divisionsOf(h.state);
+      const divs = ensureDivisions(h.state);
       const seq = (h.state.divisionSeq ?? 0) + 1;
       h.state.divisionSeq = seq;
       const id = `div:${action.playerId}:${seq}`;

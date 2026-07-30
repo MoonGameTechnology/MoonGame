@@ -169,8 +169,8 @@ export function damageBuckets(
   source: GroundStack[],
   target: GroundStack[],
   which: 'atk' | 'def',
-  officer?: Officer,
   width = COMBAT_WIDTH,
+  officer?: Officer,
 ): DamageTable {
   const total = liveCount(target);
   const out: DamageTable = {};
@@ -222,8 +222,8 @@ export function groundTick(
   attackerOfficer?: Officer,
   defenderOfficer?: Officer,
 ): GroundTick {
-  const toDefender = damageBuckets(roster, attacker, defender, 'atk', attackerOfficer);
-  const toAttacker = damageBuckets(roster, defender, attacker, 'def', defenderOfficer);
+  const toDefender = damageBuckets(roster, attacker, defender, 'atk', COMBAT_WIDTH, attackerOfficer);
+  const toAttacker = damageBuckets(roster, defender, attacker, 'def', COMBAT_WIDTH, defenderOfficer);
   return {
     toDefender,
     toAttacker,

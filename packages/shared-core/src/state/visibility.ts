@@ -371,6 +371,7 @@ function project(
     delete player.stewardLog;
     delete player.stewardHoldPoints;
     delete player.arsenal; // what an enemy CAN build is strategic intel (ARS-3)
+    delete player.divisionTemplates; // what an enemy CAN mobilise — same class of intel
   }
   // Scoreboard: each player's live planet/fleet/unit totals aggregate territory
   // the viewer can't see, so an enemy's `scores` line is fog-sensitive intel
@@ -479,6 +480,30 @@ function project(
   }
   signatures.sort((a, b) => (a.location < b.location ? -1 : a.location > b.location ? 1 : 0));
   view.signatures = signatures;
+
+  // Ground divisions: composition/HP/officer of a foreign division is the same class
+  // of intel as an enemy fleet's cargo — visible only where the fleet loop above left
+  // it visible (this division rides that fleet, or in view.fleets after the strip),
+  // OR the world it garrisons is identified. A garrisoning division reuses `battles`'
+  // own rule (`identify.has(location)`) for consistency.
+  if (view.divisions) {
+    for (const id of Object.keys(view.divisions)) {
+      const div = view.divisions[id];
+      if (!div || div.owner === viewerId) continue;
+      const visible =
+        div.carriedBy != null ? view.fleets[div.carriedBy] !== undefined : identify.has(div.location);
+      if (!visible) delete view.divisions[id];
+    }
+    if (Object.keys(view.divisions).length === 0) delete view.divisions;
+  }
+  // A world's ground-battle accumulator leaks the bare fact "a fight is happening
+  // here right now" through the fog — strip any world the viewer hasn't identified.
+  if (view.groundBattles) {
+    for (const planetId of Object.keys(view.groundBattles)) {
+      if (!identify.has(planetId)) delete view.groundBattles[planetId];
+    }
+    if (Object.keys(view.groundBattles).length === 0) delete view.groundBattles;
+  }
 
   // Battles you cannot see, and enemy timers from the schedule (it leaks future
   // events) — but KEEP the viewer's own pending events: their construction/production/
