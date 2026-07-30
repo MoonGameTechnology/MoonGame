@@ -383,6 +383,11 @@ body.sheet-open #cmdbar{bottom:calc(34vh + 12px);}
 .pc-row .pc-v{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums;text-align:right;}
 .pc-close{margin-top:10px;width:100%;padding:9px;cursor:pointer;border-radius:6px;border:1px solid var(--cyan-dim);
   background:rgba(53,214,230,.1);color:var(--cyan);font:600 12px ui-monospace,monospace;letter-spacing:1px;}
+/* Match dossier → career dossier. Ghost weight: it leaves the match context, so it
+   must not compete with the card's own actions. */
+.pc-dossier{margin-top:10px;width:100%;padding:9px;cursor:pointer;border-radius:6px;border:1px solid var(--line-hi);
+  background:transparent;color:var(--dim);font:600 12px ui-monospace,monospace;letter-spacing:1px;}
+.pc-dossier:active{border-color:var(--cyan);color:var(--cyan);}
 
 /* settings overlay (hub → «Ещё» → Настройки) — client-only display prefs */
 #settings{position:fixed;inset:0;z-index:59;display:none;align-items:center;justify-content:center;padding:18px;
@@ -1868,6 +1873,53 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .mp-buy{padding:5px 12px;border:1px solid var(--cyan-dim);border-radius:7px;background:transparent;color:var(--cyan);font:700 11px ui-monospace,monospace;cursor:pointer;}
 .mp-buy:disabled{border-color:var(--line);color:var(--dim);cursor:default;}
 .mp-note{color:var(--dim);font-size:10px;margin:2px 0 0;}
+/* --- Профиль командира: the career dossier (main-menu.md §4.2). One overlay, two
+   entry points: the hub identity strip and the in-match player card, so the mount
+   below is a full-screen sheet rather than a hub panel. */
+#profile{position:fixed;inset:0;z-index:57;display:none;flex-direction:column;
+  background:radial-gradient(130% 80% at 50% 0%,#06161e,#010409);color:var(--ink);}
+#profile.show{display:flex;}
+/* right padding clears the fixed ✕ in the corner — the capsule must never sit under it */
+#profile .pf-top{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:14px 54px 14px 16px;border-bottom:1px solid var(--line);}
+#profile .pf-av{width:52px;height:52px;border-radius:50%;border:1px solid var(--cyan-dim);background:rgba(3,12,16,.8);
+  display:grid;place-items:center;color:var(--cyan);font-size:21px;font-weight:700;flex:0 0 auto;
+  box-shadow:inset 0 0 12px rgba(53,214,230,.14);font-variant-emoji:text;}
+#profile .pf-who{flex:1;min-width:0;}
+#profile .pf-nm{font-size:19px;color:#eafffb;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#profile .pf-sub{font-size:11px;color:var(--dim);margin-top:3px;line-height:1.4;}
+/* Sovereigns capsule — the premium currency reads GOLD everywhere it appears
+   (same #ffd45e as the in-match #devline counter), never the UI's cyan. */
+#profile .pf-cur{flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:8px 12px;border-radius:999px;
+  border:1px solid rgba(255,212,94,.45);background:rgba(255,212,94,.08);color:#ffd45e;
+  font:700 15px ui-monospace,monospace;font-variant-numeric:tabular-nums;}
+#profile .pf-cur i{font-style:normal;font-size:15px;text-shadow:0 0 9px rgba(255,212,94,.85);}
+#profile .pf-cur b{font-weight:700;}
+#profile .pf-cur em{font-style:normal;color:rgba(255,212,94,.7);font-weight:400;font-size:15px;}
+#profile .pf-body{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px;display:flex;flex-direction:column;gap:14px;}
+#profile .pf-h{font-size:22px;font-weight:700;color:#eafffb;letter-spacing:.5px;}
+/* Stat tiles: the end screen's canonical shape (label-caps over a big tabular
+   number), re-declared here because those rules are scoped to #endscreen. */
+#profile .pf-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+#profile .pf-cell{border:1px solid var(--line-hi);border-radius:12px;padding:14px;background:rgba(6,18,22,.6);
+  display:flex;flex-direction:column-reverse;gap:6px;min-height:96px;justify-content:flex-end;}
+#profile .pf-k{font-size:11px;letter-spacing:.6px;color:var(--dim);}
+#profile .pf-v{font-size:30px;font-weight:700;color:#eafffb;font-variant-numeric:tabular-nums;line-height:1.1;}
+#profile .pf-v.accent{color:var(--cyan);}
+#profile .pf-sec{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-top:4px;}
+#profile .pf-medals{display:flex;flex-wrap:wrap;gap:18px;padding:4px 0 2px;}
+#profile .pf-medal{width:92px;display:flex;flex-direction:column;align-items:center;gap:9px;text-align:center;}
+#profile .pf-mc{width:76px;height:76px;border-radius:50%;display:grid;place-items:center;font-size:30px;
+  border:1px solid var(--cyan);color:var(--cyan);background:rgba(53,214,230,.06);
+  box-shadow:0 0 14px rgba(53,214,230,.18),inset 0 0 12px rgba(53,214,230,.08);font-variant-emoji:text;}
+/* Not earned yet: the same silhouette, drained of colour — the showcase shows what
+   is still ahead instead of hiding it. */
+#profile .pf-medal.off .pf-mc{border-color:var(--line-hi);color:var(--dim);background:rgba(3,12,16,.6);box-shadow:none;}
+#profile .pf-mn{font-size:11px;color:#dfeef2;line-height:1.35;}
+#profile .pf-medal.off .pf-mn{color:var(--dim);}
+#profile .pf-hint{color:var(--dim);font-size:11px;line-height:1.5;margin:0;}
+#profile .pf-close{position:absolute;top:12px;right:14px;width:34px;height:34px;border-radius:9px;
+  border:1px solid var(--line-hi);background:rgba(3,12,16,.7);color:var(--cyan);font-size:16px;cursor:pointer;z-index:2;}
+
 /* «Арсенал» — the account's persistent collection (hub tab, ARS-5) */
 #hp-arsenal{overflow-y:auto;gap:10px;}
 .ar-filters{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding-bottom:9px;border-bottom:1px solid var(--line);}
@@ -2180,6 +2232,7 @@ const page = (js) => `<!doctype html>
 <div id="recap"></div>
 <div id="goals"></div>
 <div id="playercard"></div>
+<div id="profile"></div>
 <div id="settings"></div>
 <div id="warprompt"></div>
 <div id="diplo"></div>
