@@ -1322,10 +1322,16 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
   доводка позже._
 - **ONB-5** 🟡 `[proto/srv]` ★ **Async-модель + дневной дайджест.** Клиент-часть сделана:
   интро задержки первого `fleet.move` («мир идёт офлайн», `asyncDelay` через ONB-3-механизм);
-  recap возврата — чистый `recap.ts` (`buildRecap`, attention по emoji-маркерам, 5 тестов) +
-  оверлей `#recap` (авто на `visibilitychange` + ручной «🛰» в сводках, тап→jumpToPing). RU/EN.
-  _Осталось (`[srv]`, упирается в пуши): PWA push + серверный дайджест-хук — `buildRecap`
-  уже server-ready._
+  recap возврата — чистый `recap.ts` (`buildRecap`, attention по emoji-маркерам, 5 тестов),
+  теперь портирован в `@void/shared-core` (`util/recap.ts`) так и клиент, и сервер строят
+  дайджест по одной логике; `prototype/src/recap.ts` — тонкий re-export. Оверлей `#recap`
+  (авто на `visibilitychange` + ручной «🛰» в сводках, тап→jumpToPing). RU/EN. Серверная
+  сторона push: `packages/server/src/push.ts` (VAPID-конфиг, `digestPushPayload`, `sendPush`
+  через `web-push`, 404/410 → `gone`) + `PushStore` (Memory/Postgres, `push_subscriptions`) +
+  `pushApi.ts` (`GET /push/key`, `POST /push/subscribe`, `POST /push/unsubscribe`,
+  session-gated) — 14 тестов. _Осталось: сам триггер («когда именно слать дайджест» — учёт
+  online/offline по аккаунту, cooldown, привязка к матчу) и клиентский service worker +
+  подписка на push из UI — приёмник (`sendPush`) уже готов, зовущего пока нет._
 - **ONB-6** ✅ `[core/proto]` **Combat-preview.** «Если атакую — что будет?» — чистая
   `previewBattle(attacker, defender, data)` в `shared-core` (`state/previewBattle.ts`):
   зеркало раундового цикла combat-модуля (симультанный залп attack/ответка defense,

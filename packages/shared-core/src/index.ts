@@ -332,6 +332,13 @@ export {
 } from './util/fitting';
 export { requireOwnedIdleFleet, type IdleFleet } from './util/fleet';
 export { buildProgress, thresholdRamp } from './util/construction';
+export {
+  buildRecap,
+  isHighEvent,
+  type Recap,
+  type RecapEvent,
+  type RecapItem,
+} from './util/recap';
 
 // Base modules (plugins) — opt-in via the manifest passed to createKernel.
 export { economyModule, BROWNOUT } from './modules/economy';
