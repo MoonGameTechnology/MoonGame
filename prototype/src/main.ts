@@ -110,7 +110,6 @@ import {
   type Patrol,
 } from './game';
 import {
-  ARCHETYPE_PATH,
   dominantUnit,
   unitArchetype,
   unitGlyphSvg,
@@ -210,6 +209,8 @@ import {
   buildingName,
   fmtEta,
 } from './format';
+// REFM-3: the icon vocabulary (glyph tables + menu renderers) lives in `icons.ts`
+import { BUILD_ICON, KIND_ICON, unitIcon, unitIconHtml, archPath2d } from './icons';
 import {
   META_TREE,
   META_BRANCH_RU,
@@ -471,43 +472,8 @@ const BUILDABLE = [
 // `aaStrengthAt` sums building AA) but does NOT block ground capture — only ground troops
 // do that. A space fortress also comes with one pre-installed (installFortressAA).
 const BUILD_UNITS = ['cruiser', 'scout', 'siege', 'strike_carrier', 'fighter_squadron'];
-const BUILD_ICON: Record<string, string> = {
-  mine: '❒',
-  refinery: '◇',
-  tax_office: '⛁',
-  farm: '⚘',
-  power_plant: 'ϟ',
-  fabricator: '▣',
-  barracks: '▤',
-  fort: '⬡',
-  starfort: '✦',
-  radar: '⊚',
-  orbital_aa: '⌁',
-};
-const UNIT_ICON: Record<string, string> = {
-  cruiser: '▲',
-  scout: '◌',
-  siege: '✦',
-  strike_carrier: '◈', // a flat-top capital hull — hangar bays for the wing
-  fighter_squadron: '△', // light strike wing (hollow, to read apart from the cruiser ▲)
-  hero: '♔', // the player's projection — a crowned flagship
-  militia: '▿', // massed light foot
-  heavy_infantry: '◆', // the armoured line
-  special_forces: '✱', // the elite few
-  tank: '▰',
-};
 // A small glyph per province KIND, drawn above each province so its type reads at a
 // glance (planet / asteroid / nebula / wreck-field / storm / …). Text glyphs only.
-const KIND_ICON: Record<string, string> = {
-  planet: '◉',
-  dead_world: '⊗',
-  asteroid: '⬡',
-  nebula: '≋',
-  dense_nebula: '❋',
-  graveyard: '⊘',
-  ion_storm: '⌁',
-  solar_flare: '✸',
-};
 let ME = 'p1';
 // Суверены — the donate/premium currency (docs/economy-roadmap.md). It's a meta-layer
 // account balance, NOT match state, so the prototype shows a placeholder here; the real
@@ -1450,26 +1416,14 @@ function afford(bag: Record<string, number> | undefined): boolean {
   for (const [r, n] of Object.entries(bag ?? {})) if ((res[r] ?? 0) < n) return false;
   return true;
 }
-function unitIcon(unit: string): string {
-  return UNIT_ICON[unit] ?? (isGround(unit) ? '◆' : '▲');
-}
 /** Ship/unit icon for MENUS (build menu, garrison composition, codex, constructor,
  *  split, asset lists…): the current poster silhouette (`unitGlyphs` — «силуэт = что,
  *  цвет = чей») for ships, so every menu speaks the same shape language as the map
  *  markers and the fleet card; ground units keep the text glyph (the silhouette family
  *  is space-only). `px` fits the SVG box to the icon slot; `color` is the side tint
  *  (defaults to your side — menus are about your own roster). */
-function unitIconHtml(unit: string, px = 22, color: string = youColor): string {
-  const def = data.units[unit];
-  if (def && def.domain !== 'ground') return unitGlyphSvg(def, { color, px });
-  return unitIcon(unit);
-}
 // Path2D-кэш силуэтов постера для канвы — панель берёт те же пути через SVG,
 // так что карта и карточка не могут разъехаться по форме.
-const ARCH_PATH2D: Partial<Record<keyof typeof ARCHETYPE_PATH, Path2D>> = {};
-function archPath2d(arch: keyof typeof ARCHETYPE_PATH): Path2D {
-  return (ARCH_PATH2D[arch] ??= new Path2D(ARCHETYPE_PATH[arch]));
-}
 /** Localized display name of a building id (data/*.json names are English). */
 function queueOf(planetId: string): PlanetBuildQueue {
   return (buildQueues[planetId] ??= { buildings: [], units: [] });
@@ -1517,7 +1471,7 @@ function activeConstruction(planetId: string, lane: BuildLane): ActiveBuild | nu
 }
 function constructionLabel(p: ConstructionPayload): string {
   if (p.kind === 'unit' && p.unit) {
-    return `${p.count ?? 1}× ${unitIcon(p.unit)} ${displayUnit(p.unit)}`;
+    return `${p.count ?? 1}× ${unitIcon(p.unit, data)} ${displayUnit(p.unit)}`;
   }
   if (p.kind === 'upgrade' && p.building) {
     return `${BUILD_ICON[p.building] ?? '▣'} ${tData(data.buildings[p.building]?.name ?? p.building)} → L${p.level ?? '?'}`;
@@ -1554,8 +1508,8 @@ function queuedLabel(q: QueuedBuild): string {
   if (q.kind === 'unit') {
     // PC: icon·count chips (like the garrison tiles) — the hover dossier names the
     // unit. Mobile keeps the full name.
-    if (pcUi()) return `${unitIcon(q.id)} ${q.count}`;
-    return `${q.count}× ${unitIcon(q.id)} ${displayUnit(q.id)}`;
+    if (pcUi()) return `${unitIcon(q.id, data)} ${q.count}`;
+    return `${q.count}× ${unitIcon(q.id, data)} ${displayUnit(q.id)}`;
   }
   if (q.kind === 'upgrade') {
     return t('queue.upgrade', {
@@ -5146,7 +5100,7 @@ function unitRows(stacks: Array<{ unit: string; count: number }>): string {
   return stacks
     .map(
       (st) =>
-        `<div class="asset-row" data-desc="u:${esc(st.unit)}"><span class="bicon">${unitIconHtml(st.unit, 18)}</span><b>${st.count}× ${displayUnit(st.unit)}</b><span class="dim">${isGround(st.unit) ? t('side.unit.ground') : t('side.unit.space')}</span></div>`,
+        `<div class="asset-row" data-desc="u:${esc(st.unit)}"><span class="bicon">${unitIconHtml(st.unit, data, youColor, 18)}</span><b>${st.count}× ${displayUnit(st.unit)}</b><span class="dim">${isGround(st.unit) ? t('side.unit.ground') : t('side.unit.space')}</span></div>`,
     )
     .join('');
 }
@@ -5269,7 +5223,7 @@ function fleetTilesHtml(f: Fleet, stacks: UnitStack[]): string {
       const pct = full > 0 ? Math.round((Math.min(u.hp ?? full, full) / full) * 100) : 100;
       const icon =
         def.domain === 'ground'
-          ? `<span class="pt-ic">${unitIcon(u.unit)}</span>`
+          ? `<span class="pt-ic">${unitIcon(u.unit, data)}</span>`
           : `<span class="pt-ic">${unitGlyphSvg(def, { color: ownerColor(f.owner), shield: (eff.shield ?? 0) > 0 })}</span>`;
       return `<button class="ptile" data-codex="u:${esc(u.unit)}" data-desc="u:${esc(u.unit)}" data-name="${esc(name)}" title="${esc(name)} — ${t('side.fleet.tile.hint')}">${icon}<span class="pt-c">×${u.count}</span><span class="pt-hp${pct < 30 ? ' low' : ''}"><i style="width:${pct}%"></i></span></button>`;
     })
@@ -5760,7 +5714,7 @@ function planetPanelHtml(p: Planet): string {
   if (planetInfoFor === p.id) return header + planetSummaryHtml(p);
   let h =
     header +
-    `<div class="pstats"><span data-desc="stat:garrison">⚔ ${gcount} <span class="pl">${t('side.world.stat.garrison')}</span></span><span data-desc="stat:ground">${unitIcon('heavy_infantry')} ${sumUnits(ground)} <span class="pl">${t('side.world.count.ground')}</span></span><span data-desc="stat:gships">${unitIcon('cruiser')} ${sumUnits(ships)} <span class="pl">${t('side.world.count.ships')}</span></span><span data-desc="stat:pbuild">▣ ${p.buildings.length} <span class="pl">${t('side.world.count.buildings')}</span></span></div>`;
+    `<div class="pstats"><span data-desc="stat:garrison">⚔ ${gcount} <span class="pl">${t('side.world.stat.garrison')}</span></span><span data-desc="stat:ground">${unitIcon('heavy_infantry', data)} ${sumUnits(ground)} <span class="pl">${t('side.world.count.ground')}</span></span><span data-desc="stat:gships">${unitIcon('cruiser', data)} ${sumUnits(ships)} <span class="pl">${t('side.world.count.ships')}</span></span><span data-desc="stat:pbuild">▣ ${p.buildings.length} <span class="pl">${t('side.world.count.buildings')}</span></span></div>`;
   // ECON-2: блэкаут — неоплаченная энергия глушит радары и ПВО этого владельца вдвое.
   if (mine && (s.players[ME]?.arrears ?? []).includes('energy')) {
     h += `<div class="row" style="color:var(--red)">⚡ ${t('side.world.blackout')}</div>`;
@@ -6128,7 +6082,7 @@ function taskDossier(
       : t('dossier.task.queued');
   if (kind === 'unit' && unit) {
     return {
-      name: `${count ?? 1}× ${unitIcon(unit)} ${displayUnit(unit)}`,
+      name: `${count ?? 1}× ${unitIcon(unit, data)} ${displayUnit(unit)}`,
       body: [eta, t('dossier.task.unit-ready')].join('<br>'),
     };
   }
@@ -6412,7 +6366,7 @@ function codexHtml(kind: string, id: string): string {
   if (tags) rows.push(cxRow(t('codex.row.class'), tags));
   const dos = unitDossier(id);
   return (
-    `<div class="cx-head"><span class="cx-ic">${unitIconHtml(id, 24)}</span><b>${esc(dos?.name ?? displayUnit(id))}</b><span class="cx-tag">${def.domain === 'ground' ? t('codex.tag.ground-unit') : t('codex.tag.ship')}</span></div>` +
+    `<div class="cx-head"><span class="cx-ic">${unitIconHtml(id, data, youColor, 24)}</span><b>${esc(dos?.name ?? displayUnit(id))}</b><span class="cx-tag">${def.domain === 'ground' ? t('codex.tag.ground-unit') : t('codex.tag.ship')}</span></div>` +
     `<div class="cx-stats">${rows.join('')}</div><div class="cx-desc">${dos?.body ?? ''}</div>`
   );
 }
@@ -7077,7 +7031,7 @@ function codexTile(
   lockedFor?: string,
 ): string {
   if (!(kind === 'b' ? data.buildings[id] : data.units[id])) return '';
-  const icon = kind === 'b' ? (BUILD_ICON[id] ?? '▣') : unitIconHtml(id);
+  const icon = kind === 'b' ? (BUILD_ICON[id] ?? '▣') : unitIconHtml(id, data, youColor);
   const name = kind === 'b' ? buildingName(data.buildings[id]?.name, id) : (unitDossier(id)?.name ?? displayUnit(id));
   if (lockedFor) {
     // Committed already — a dim, non-ordering tile. Keeps data-desc (hover dossier),
@@ -7097,7 +7051,7 @@ function garrisonTilesHtml(stacks: Array<{ unit: string; count: number }>): stri
     .filter((u) => u.count > 0)
     .map((u) => {
       const name = unitDossier(u.unit)?.name ?? displayUnit(u.unit);
-      return `<button class="ptile mini" data-codex="u:${esc(u.unit)}" data-desc="u:${esc(u.unit)}" data-name="${esc(name)}"><span class="pt-ic">${unitIcon(u.unit)}</span><span class="pt-c">${u.count}</span></button>`;
+      return `<button class="ptile mini" data-codex="u:${esc(u.unit)}" data-desc="u:${esc(u.unit)}" data-name="${esc(name)}"><span class="pt-ic">${unitIcon(u.unit, data)}</span><span class="pt-c">${u.count}</span></button>`;
     })
     .join('');
   return tiles
@@ -7123,7 +7077,7 @@ function codexBuildBtn(kind: string, id: string): string {
     return `<button class="cx-build" data-build="building:${id}">▣ ${t('codex.build-here')} · ${cost(data.buildings[id]?.cost)}</button>`;
   }
   if (kind === 'u' && data.units[id]) {
-    return `<button class="cx-build" data-build="unit:${id}">${unitIconHtml(id, 16)} ${t('codex.build-here')} · ${cost(data.units[id]?.cost)}</button>`;
+    return `<button class="cx-build" data-build="unit:${id}">${unitIconHtml(id, data, youColor, 16)} ${t('codex.build-here')} · ${cost(data.units[id]?.cost)}</button>`;
   }
   return '';
 }
@@ -7148,7 +7102,7 @@ function codexEntryLabel(e: CodexEntry): string {
 }
 function codexEntryIcon(e: CodexEntry): string {
   const id = e.key.slice(2);
-  if (e.category === 'unit') return unitIconHtml(id, 20);
+  if (e.category === 'unit') return unitIconHtml(id, data, youColor, 20);
   if (e.category === 'building') return BUILD_ICON[id] ?? '▣';
   return '?';
 }
@@ -7638,7 +7592,7 @@ function renderSplitDialog() {
     splitState.take[unit] = tk;
     takeTotal += tk;
     rows += `<div class="srow">
-      <span class="sname"><span class="bicon">${unitIconHtml(unit, 18)}</span>${esc(displayUnit(unit))}</span>
+      <span class="sname"><span class="bicon">${unitIconHtml(unit, data, youColor, 18)}</span>${esc(displayUnit(unit))}</span>
       <b class="scur">${have - tk}</b>
       <span class="sbtns">
         <button data-sx="dec" data-unit="${esc(unit)}" data-n="1" ${tk <= 0 ? 'disabled' : ''}>−1</button>
@@ -10002,12 +9956,12 @@ function conLoadoutPane(hullList: string[]): string {
   const hulls = ownedHulls
     .map(
       (h) =>
-        `<button class="cn-hbtn${h === conHull ? ' on' : ''}" data-cnhull="${h}">${unitIconHtml(h, 18)} ${esc(displayUnit(h))}</button>`,
+        `<button class="cn-hbtn${h === conHull ? ' on' : ''}" data-cnhull="${h}">${unitIconHtml(h, data, youColor, 18)} ${esc(displayUnit(h))}</button>`,
     )
     .join('');
   const freeTypes = [...new Set(m.slots.filter((sl) => !sl.moduleId).map((sl) => sl.type))];
   const hullCard =
-    `<div class="cn-hull"><div class="cn-hic">${unitIconHtml(conHull, 40)}</div><div><div class="cn-hn">${esc(displayUnit(conHull))}</div>` +
+    `<div class="cn-hull"><div class="cn-hic">${unitIconHtml(conHull, data, youColor, 40)}</div><div><div class="cn-hn">${esc(displayUnit(conHull))}</div>` +
     `<div class="cn-hm">${t('yard.slots.count', { n: String(m.slots.length) })}</div></div></div>`;
   const bays = m.slots
     .map((sl) => {
