@@ -625,8 +625,8 @@ export const en: Record<string, string> = {
 
   // --- faction — Фракции: пассивный бонус дома.
   'faction.amber.desc': 'A nomad concord of hauliers: fleets run the lanes 15% faster.',
-  'faction.blue.desc': 'A trade-and-industry compact: all planetary economy yields +12%.',
-  'faction.red.desc': 'A militarist hegemony: all outgoing fleet and army damage +10%.',
+  'faction.azure.desc': 'A trade-and-industry compact: all planetary economy yields +12%.',
+  'faction.crimson.desc': 'A militarist hegemony: all outgoing fleet and army damage +10%.',
   'faction.violet.desc':
     'Universalists of the dawn: a little of everything — +5% economy and +5% damage.',
 

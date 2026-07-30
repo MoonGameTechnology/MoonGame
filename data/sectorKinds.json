@@ -5,7 +5,7 @@
     "capturable": true,
     "buildable": true,
     "orbit": true,
-    "allowedBuildings": ["mine_t1", "mine_t2", "shipyard", "biomass_pit", "barracks", "spaceport", "radar", "fort", "power_plant", "fabricator"],
+    "allowedBuildings": ["mine_t1", "mine_t2", "shipyard", "biomass_pit", "barracks", "spaceport", "radar", "fort", "orbital_aa", "hospital", "power_plant", "fabricator"],
     "appearance": { "color": "#5fd0ff", "label": "planet", "shape": "city" }
   },
   "asteroid": {

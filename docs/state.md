@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1963 зелёных** (54 skip, 182 файла).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1966 зелёных** (54 skip, 182 файла).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -446,9 +446,12 @@ E_CONDITIONS_UNMET, E_INSUFFICIENT`.
 
 ### scientist (`scientist`) — research-лидер (учёный)
 
-Выбирается на старте и снапшотится в `Player.scientist {id, level}` (через
-слот-ассайнмент `buildStateFromMap`; `E_UNKNOWN_SCIENTIST` при неизвестном id;
-приватен в тумане — стрипается у чужих проекций). Каталог `data/scientists.json`
+Выбирается на старте и снапшотится в совет `Player.scientists[{id, level}]` (≤2;
+legacy-поле `scientist` только читается через `scientistsOf`) через слот-ассайнмент
+`buildStateFromMap`; `E_UNKNOWN_SCIENTIST` при неизвестном id; приватен в тумане —
+у чужих проекций стрипаются ОБА поля, и совет, и legacy (2026-07-30 закрыта утечка:
+`project` резал только legacy-`scientist`, а состав совета противника уезжал сквозь
+туман). Каталог `data/scientists.json`
 (`ScientistDef {name, branch?, slotBonus}`) — НЕ юнит, НЕ hero-модуль. Эффекты идут
 через существующие швы: **`+слот`-лидер** добавляет `slotBonus` в хук
 `research.slots` (клампится к 3); **фокус ветки и лейт-капстоун** — data-driven через
@@ -684,6 +687,9 @@ UX-удобность — только что построенный кораб�
   E_FORBIDDEN, E_NOT_INHABITED, E_BAD_PAYLOAD`. Событие `capital.designated`.
 - `GameState.capital?: Record<PlayerId, PlanetId>` — новое опциональное поле (тот же
   паттерн, что `market`/`intel`/`diplomacy`); `capitalsOf`/`capitalOf` — чтение.
+  **Приватно в тумане** (2026-07-30): чужая столица — якорь возрождения героя, та же
+  targeting-интел, что hold points Хранителя; `visibleState` оставляет только свою
+  запись (UI и так читает лишь `capitalOf(s, ME)`).
 
 ### standingOrders (`standing-orders`) — стоячие приказы + очередь приказов (CC-1/CC-2/CC-4)
 
@@ -935,6 +941,9 @@ params{bonus, radius}}`, хуки — enum `fleet.speed|combat.damage` (fail-clo
   активные раскрытия **только своих** героев (per-viewer) и поднимает полный identify
   на миры в `radius` от `center`, пока `until > state.time` — раскрытие не течёт
   сопернику; кривой reveal (0-радиус/0-длит.) → `E_BAD_EFFECT`; событие `hero.revealed`.
+  Окна `until` обоих эффектов считаются через `hoursToMs(ctx, durationHours)` — сжатие
+  timeScale, как у всех остальных геройских длительностей (фикс 2026-07-30: было голое
+  `MS_PER_HOUR` — на сжатом матче аура переживала бы собственный кулдаун).
   Эффекты приходят добавлением провайдера, ядро/диспетчер не трогаются — трилогия
   recall/aura/reveal закрывает все не-встроенные эффекты (спавн-маркеры не кастуются).
   **Кулдаун-ключи**: встроенные типы делят ключ с legacy (`path`/`annihilate`) — generic
@@ -1027,7 +1036,7 @@ ad-hoc запрос «видим ли объект на identify-уровне» 
 экран меню (Этап 4), персистентность меты + `MatchStore.list` (Postgres уже под это
 индексирован), лобби/создание матча (MM-1.1).
 
-## 6. Данные (`data/*.json`, версия `0.1.2`)
+## 6. Данные (`data/*.json`, версия `0.1.3`)
 
 - **resources:** `credits` (деньги), `metal`, `food`, `energy`, `microelectronics` —
   внутриматчевый набор из 5. Торгуются на сессионной бирже (модуль `market`).
@@ -1041,7 +1050,7 @@ drop_infantry, tank(cargoSize 3), hero, fighter_squadron, strike_carrier` (10 ю
   Щиты (аблятивные) у боевых кораблей: cruiser 15, dropship 12, hero 40.
 - **buildings** (`BuildingDef`): `cost, buildTimeHours, produces, hp,
 defenseBonus, upgrades[{…}], traits, scoreValue, radarRange, healRate, shipRepair`. Есть: `mine_t1, mine_t2,
-shipyard, biomass_pit, barracks, spaceport, radar, fort, metal_station, power_plant, fabricator`
+shipyard, biomass_pit, barracks, spaceport, radar, fort, orbital_aa, hospital, metal_station, power_plant, fabricator`
   (форт — 3 уровня: HP 35→50→65, defenseBonus 0.35→0.50→0.65; **радар — 3 уровня**: `radarRange`
   180→300→420 (расстояние), HP 18→26→34). `radarRange` теперь **уровневый** (`BuildingLevelSchema`),
   `visibleState` читает его через `buildingLevel(def, level)`. `scoreValue`: fort 20·уровень,
@@ -1053,7 +1062,10 @@ shipyard, biomass_pit, barracks, spaceport, radar, fort, metal_station, power_pl
   (кроме `credits` — валюта/сток) есть хотя бы одно здание-производитель; экономика
   начисляет любой `produces`-ресурс агностично (движок не трогался). Ростеры
   `sectorKinds`: реактор — планета/астероид/туманность/`void_station`, фабрикатор —
-  планета/`void_station`. Referential-integrity тест следит, что любой `produces`/`cost`/
+  планета/`void_station`; `orbital_aa` и `hospital` добавлены в ростер `planet`
+  (0.1.3 — до этого оба были непостроимы нигде: не входили НИ в один
+  `allowedBuildings`, мёртвый контент при активном `E_WRONG_SECTOR`).
+  Referential-integrity тест следит, что любой `produces`/`cost`/
   `upkeep`-ресурс контента есть в `resources`.
 - **sectors:** `empty_space(+скорость), asteroid_field(−скорость/+живучесть/score 5),
 nebula(score 3)`. **planetTypes** дают `scoreValue` (terran 40, oceanic 35,
@@ -1194,12 +1206,15 @@ botDiplomacy, market, division, capital, standingOrders, effects])` (27 моду
   полноэкранный экран итогов победы/поражения/ничьи (счёт+место+статы+XP, рематч; см.
   раздел victory) — а не хардкод по узлам.
 - **Фракции (H3):** setup-экран несёт **пикер из 4 лор-домов** (`data.factions`:
-  blue «Azure Compact» +12% экономика · red «Crimson Hegemony» +10% урон · amber
+  azure «Azure Compact» +12% экономика · crimson «Crimson Hegemony» +10% урон · amber
   «Amber Concord» +15% скорость флотов · violet «Violet Ascendancy» +5%/+5%) — пока
   фракция это **чисто пассивный бонус к экономике или юнитам**, применяемый ядровым
   `factionModule` через те же хуки, что и технологии. Человек выбирает дом, ИИ-места
   разбирают оставшиеся (имя места = имя дома; цвет остаётся за местом); карточка
-  игрока показывает дом + пассив. Тесты `factions.test.ts` (3).
+  игрока показывает дом + пассив. Тесты `factions.test.ts` (4). **Баг-фикс 2026-07-30:**
+  каталог прототипа держал ключи `blue`/`red`, а места раздавали `azure`/`crimson` —
+  `factionModule` читает `data.factions[id] ?? 0`, и оба дома молча играли БЕЗ пассивок;
+  ключи переименованы в канонические, паритет «место ↔ каталог» закреплён тестом.
 - **Командный бой (AVA-0, первый шаг к AvA без мета-слоя):** тумблер «⚔ Командный бой» в
   setup + A/B-чипы на местах (ты залочен в A, ИИ-места переключаются). При включении
   `SeatConfig.team` едет в `newGame`, который сеет дипломатию по стороне: **одна сторона

@@ -17,8 +17,8 @@ import type { GameState } from '../../packages/shared-core/src/index';
 function game2(): GameState {
   return newGame({
     seats: [
-      { id: 'p1', name: 'A', faction: 'blue', start: START_CANDIDATES[0]!, ai: false },
-      { id: 'p2', name: 'B', faction: 'red', start: START_CANDIDATES[1]!, ai: true },
+      { id: 'p1', name: 'A', faction: 'azure', start: START_CANDIDATES[0]!, ai: false },
+      { id: 'p2', name: 'B', faction: 'crimson', start: START_CANDIDATES[1]!, ai: true },
     ],
   });
 }
