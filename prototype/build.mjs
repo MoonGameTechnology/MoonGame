@@ -71,7 +71,7 @@ body::before{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;mix
 .tbar{display:flex;align-items:center;height:48px;flex:0 0 auto;min-width:0;padding-right:10px;}
 /* the ‹ chevron mirrors the hardware Back (history.back()): close the top layer,
    or arm the double-press "leave the match" hint */
-#topback{flex:0 0 auto;width:34px;height:100%;border:0;background:transparent;color:var(--cyan-dim);
+#topback{flex:0 0 auto;width:34px;height:100%;border:0;background:transparent;color:#c2ced0;
   font-size:24px;line-height:1;cursor:pointer;padding:0 0 3px;}
 #topback:active{color:var(--cyan);background:rgba(53,214,230,.12);}
 .crest{display:flex;align-items:center;gap:9px;padding:0 10px 0 2px;height:100%;flex:0 1 auto;min-width:0;cursor:pointer;}
@@ -81,7 +81,7 @@ body::before{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;mix
 .who{line-height:1.15;min-width:0;}
 .who b{display:block;color:#eafffb;font-weight:700;font-size:13px;letter-spacing:.6px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.who span{color:var(--cyan-dim);font-size:10px;letter-spacing:.8px;white-space:nowrap;}
+.who span{color:#8b9c9e;font-size:10px;letter-spacing:.8px;white-space:nowrap;}
 /* victory chip in the row-1 gap: the ✦ score race the standing is derived from.
    Tap → plain-words breakdown (the .dstat handler on #top). Hidden until it has text. */
 #tbscore{flex:0 1 auto;margin:0 auto;padding:3px 10px;border-radius:11px;cursor:pointer;
@@ -89,18 +89,19 @@ body::before{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;mix
   border:1px solid var(--line);background:rgba(3,14,18,.55);}
 #tbscore.win{color:var(--up);border-color:rgba(95,240,168,.5);font-weight:700;}
 #tbscore:empty{display:none;}
-/* day card: current game day over a countdown to the next one */
+/* day card: current game day over a countdown to the next one. Mock palette: neutral
+   outline, teal day, grey countdown. */
 #daycard{flex:0 0 auto;margin-left:10px;padding:5px 12px;border-radius:10px;text-align:center;
-  border:1px solid var(--line-hi);background:rgba(3,14,18,.6);
-  box-shadow:inset 0 0 10px rgba(53,214,230,.08);}
-#daycard b{display:block;color:#eafffb;font-size:12px;letter-spacing:1px;}
-#daycard span{color:var(--cyan-dim);font-size:9px;font-variant-numeric:tabular-nums;letter-spacing:.4px;}
+  border:1px solid rgba(148,170,173,.28);background:rgba(6,14,16,.5);}
+#daycard b{display:block;color:#8fdbe0;font-size:12px;letter-spacing:1px;}
+#daycard span{color:#8b9c9e;font-size:9px;font-variant-numeric:tabular-nums;letter-spacing:.4px;}
 /* the five currencies always fit their row — no scroll. Capsules share the width and
    shrink together (flex:1 1 0; min-width:0) so the row scales down instead of
-   overflowing. Each capsule = a small coin-icon + tabular amount + flow. */
+   overflowing. Each capsule = a bare line-glyph + tabular amount + flow, in the mock's
+   MUTED palette: neutral grey outline, grey icon, near-white number (no cyan glow). */
 #purse{display:flex;align-items:center;flex:1 1 auto;min-width:0;overflow:hidden;gap:6px;padding:0 8px 6px;}
-.res{display:flex;align-items:center;justify-content:center;gap:5px;padding:0 7px;height:100%;flex:1 1 0;min-width:0;
-  position:relative;overflow:hidden;border:1px solid var(--line);border-radius:14px;background:rgba(3,14,18,.55);}
+.res{display:flex;align-items:center;justify-content:center;gap:6px;padding:0 8px;height:100%;flex:1 1 0;min-width:0;
+  position:relative;overflow:hidden;border:1px solid rgba(148,170,173,.26);border-radius:14px;background:rgba(6,14,16,.35);}
 .res.short{border-color:rgba(255,90,77,.4);}
 /* amount + flow share one "value line" (.rv); the amount owns the room (flex:0 0 auto),
    the flow rate clips first. On phones the chip stacks the icon OVER this value line. */
@@ -110,14 +111,11 @@ body::before{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;mix
 .res em.up{color:var(--grn,#5ff0a8);}
 .res em.dn{color:var(--red,#ff5a4d);}
 .res.dead{opacity:.34;}
-.res i{flex:0 0 auto;width:20px;height:20px;display:grid;place-items:center;border-radius:6px;
-  font-style:normal;font-size:12px;line-height:1;color:var(--cyan);font-variant-emoji:text;
-  background:rgba(53,214,230,.08);box-shadow:inset 0 0 0 1px rgba(53,214,230,.14);
-  text-shadow:0 0 6px rgba(53,214,230,.35);}
-.res.dead i{background:rgba(120,140,150,.05);box-shadow:inset 0 0 0 1px rgba(120,140,150,.14);
-  color:var(--dim);text-shadow:none;}
-.res.short i{color:var(--red,#ff5a4d);box-shadow:inset 0 0 0 1px rgba(255,90,77,.4);text-shadow:0 0 6px rgba(255,90,77,.5);}
-.res b{color:#eafffb;font-weight:700;font-size:12px;font-variant-numeric:tabular-nums;
+/* bare glyph, no boxed background — the mock draws icons as quiet grey line art */
+.res i{flex:0 0 auto;font-style:normal;font-size:14px;line-height:1;color:#a9bec1;
+  font-variant-emoji:text;}
+.res.short i{color:var(--red,#ff5a4d);text-shadow:0 0 6px rgba(255,90,77,.5);}
+.res b{color:#e6eeef;font-weight:700;font-size:13px;font-variant-numeric:tabular-nums;
   white-space:nowrap;flex:0 0 auto;}
 /* phones hide the flow digits — a NEGATIVE net income paints the stock itself red */
 .res b.neg{color:var(--red,#ff5a4d);text-shadow:0 0 6px rgba(255,90,77,.35);}
@@ -1319,8 +1317,9 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   #tbscore{padding:2px 7px;font-size:10px;}
   #daycard{margin-left:8px;padding:4px 9px;}
   /* the resource capsules own a full-width row — icon and number stay inline */
-  .res{padding:0 4px;gap:4px;}
-  .res i{width:18px;height:18px;font-size:11px;}
+  .res{padding:0 5px;gap:4px;}
+  .res i{font-size:13px;}
+  .res b{font-size:12px;}
   #devline .dl-donate{font-size:11px;padding:2px 8px;}
 
   /* phones: three tabs + ✕ no longer fit beside the window title — the tabs alone

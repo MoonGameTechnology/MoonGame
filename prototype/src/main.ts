@@ -450,12 +450,12 @@ const BUILDABLE = [
 // do that. A space fortress also comes with one pre-installed (installFortressAA).
 const BUILD_UNITS = ['cruiser', 'scout', 'siege', 'strike_carrier', 'fighter_squadron'];
 const BUILD_ICON: Record<string, string> = {
-  mine: '⬢',
+  mine: '❒',
   refinery: '◇',
   tax_office: '⛁',
-  farm: '❖',
-  power_plant: '↯',
-  fabricator: '▦',
+  farm: '⚘',
+  power_plant: 'ϟ',
+  fabricator: '▣',
   barracks: '▤',
   fort: '⬡',
   starfort: '✦',
@@ -5433,7 +5433,7 @@ function fleetPanelHtml(f: Fleet): string {
   if (maxHull > 0) {
     h += `<div class="row hullrow" data-desc="stat:hull"><span class="hico">♥</span><span class="hbar${hullPct < 30 ? ' low' : ''}"><i style="width:${hullPct}%"></i></span><b>${kfmt(Math.round(curHull))}/${kfmt(maxHull)}</b>${
       atDock
-        ? `<button class="chip-metal" data-act="dockrepair" data-arg="${f.id}" title="${t('side.fleet.repair.dock.title')}">🔧 ${dockRepairCost(f, data)}⬢</button>`
+        ? `<button class="chip-metal" data-act="dockrepair" data-arg="${f.id}" title="${t('side.fleet.repair.dock.title')}">🔧 ${dockRepairCost(f, data)}❒</button>`
         : ''
     }${
       canRepair
@@ -8846,12 +8846,14 @@ divDesignWin.addEventListener('click', (e) => {
     }
   }
 });
+// Resource glyph family (mock 2026-07: coin stack / cube / sprout / bolt / chip).
+// Producer buildings echo these in BUILD_ICON — keep both in sync.
 const TECH_CUR: Record<string, string> = {
-  credits: '¤',
-  food: '❖',
-  metal: '⬢',
-  energy: '↯',
-  microelectronics: '▦',
+  credits: '⛁',
+  food: '⚘',
+  metal: '❒',
+  energy: 'ϟ',
+  microelectronics: '▣',
 };
 const TECH_BRANCHES: Array<{ key: string; label: string }> = [
   { key: 'space', label: 'tech.branch.space' },
@@ -8899,7 +8901,7 @@ const TECH_COLS: Record<string, Array<{ label: string; ids: string[] }>> = {
 };
 const TECH_ICONS: Record<string, string> = {
   industrial_automation: '⚙',
-  microelectronics_fabrication: '▦',
+  microelectronics_fabrication: '▣',
   deep_survey: '📡',
   orbital_logistics: '⛽',
   siege_doctrine: '☄',
@@ -9765,8 +9767,8 @@ function renderMarket(): void {
     const mine = l.owner === ME;
     // ECON-4: получатель кредитов получает net (5% сгорает) — в биде это исполнитель.
     const takerNet = Math.floor(l.amount * l.price * (1 - MARKET_FEE));
-    const qp = `<span class="mk-qp"><b>${l.amount}</b> ${TECH_CUR[l.resource] ?? ''} @ ${l.price} ¤${
-      bid && !mine ? ` <span class="mk-net">→ ${takerNet} ¤</span>` : ''
+    const qp = `<span class="mk-qp"><b>${l.amount}</b> ${TECH_CUR[l.resource] ?? ''} @ ${l.price} ⛁${
+      bid && !mine ? ` <span class="mk-net">→ ${takerNet} ⛁</span>` : ''
     }</span>`;
     const who = `<span class="mk-who">${mine ? t('market.own-lot') : nameOf(l.owner)}</span>`;
     let btn: string;
@@ -9784,7 +9786,7 @@ function renderMarket(): void {
     `<button class="mk-tab${marketTab === k ? ' on' : ''}" data-mtab="${k}">${label}</button>`;
   const stock =
     `<div class="mk-lbl" style="margin-bottom:8px">${t('market.in-treasury')}: ${glyph} <b style="color:var(--ink)">${Math.round(res[good] ?? 0)}</b>` +
-    ` · ¤ <b style="color:var(--ink)">${Math.round(res.credits ?? 0)}</b></div>`;
+    ` · ⛁ <b style="color:var(--ink)">${Math.round(res.credits ?? 0)}</b></div>`;
   const form =
     `<div class="mk-form"><div class="mk-seg">${seg('sell', t('market.sell'))}${seg('buy', t('market.buy'))}</div>` +
     `<span class="mk-lbl">${t('market.qty')}</span><input class="mk-in" id="mk-amt" type="number" min="1" value="10">` +
@@ -13328,12 +13330,14 @@ function frame(nowReal: number) {
     const bleed = MOBILE && flow < 0 ? ' class="neg"' : '';
     return `<span class="res${dead}${short}" title="${t(`hud.resource.${key}`)}" data-res="${key}"><i>${icon}</i><span class="rv"><b${bleed}>${kfmt(stock)}</b>${short ? '<em class="dn">⚠</em>' : flowTxt}</span></span>`;
   };
+  // Glyphs from TECH_CUR (one icon language for bar and cost strings); capsule order
+  // follows the mock: coins, metal cube, food sprout, bolt, chip.
   const hudHtml =
-    chip('¤', 'credits') +
-    chip('❖', 'food') +
-    chip('⬢', 'metal') +
-    chip('↯', 'energy') +
-    chip('▦', 'microelectronics');
+    chip(TECH_CUR['credits']!, 'credits') +
+    chip(TECH_CUR['metal']!, 'metal') +
+    chip(TECH_CUR['food']!, 'food') +
+    chip(TECH_CUR['energy']!, 'energy') +
+    chip(TECH_CUR['microelectronics']!, 'microelectronics');
   if (hudHtml !== lastHudHtml) {
     purse.innerHTML = hudHtml;
     lastHudHtml = hudHtml;
