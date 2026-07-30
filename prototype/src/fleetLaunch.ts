@@ -5,10 +5,8 @@
  * the core builds units into a planet's garrison; this module lets a player
  * scramble those into a new fleet (ships → units, ground troops → landing) so
  * production feeds offense, fuse/split co-located fleets, and open a battle.
- * `game.ts` imports `fleetLaunchModule` for `MODULES`; `divisionsOf` stays
- * imported FROM `game.ts` (division state isn't extracted yet, REFP-13) —
- * the reverse edge is safe because it's only read inside a handler body, never
- * at module-init time.
+ * `game.ts` imports `fleetLaunchModule` for `MODULES`; `divisionsOf` comes from
+ * `division.ts` (REFP-13 closed the old reverse edge onto `game.ts`).
  */
 import {
   type GameModule,
@@ -21,7 +19,7 @@ import {
 import { sumUnitStat } from '../../packages/shared-core/src/util/stacks';
 import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet';
 import { loadoutKey, takeFromStacks, mergeStacks } from './fleetStacks';
-import { divisionsOf } from './game';
+import { divisionsOf } from './division';
 
 /** Minimal view of the prototype's state extension this module needs. */
 interface FleetSeqState extends GameState {

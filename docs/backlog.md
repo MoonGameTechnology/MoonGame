@@ -1824,10 +1824,20 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
 - **REFP-12** ✅ `[proto]` **`sessionMarket.ts`** — `MARKET_*`, `MarketLot`,
   `marketLots`, `marketModule` вынесены в `prototype/src/sessionMarket.ts`.
   `game.ts` импортирует и реэкспортирует. Гейт зелёный.
-- **REFP-13** ⏳ `[proto]` **`division.ts`** — `Division`, `divisionsOf`, `templatesOf`,
-  `capitalOf`, `regenDivision`, `divisionCargo`, `fleetCargoFree`, `divisionModule`
-  (2866–3431). Тест: `division.test.ts`. Крупнейший — кандидат на под-дробление
-  `division.ts` + `groundBattle.ts`.
+- **REFP-13** ✅ `[proto]` **`division.ts`** — `Division`, `divisionsOf`, `templatesOf`,
+  `regenDivision`, `divisionCargo`, `fleetCargoFree`, `GROUND_TICK_HOURS`,
+  `REGEN_PER_UNIT_PER_DAY`, тиковый наземный бой и `divisionModule` вынесены в
+  `prototype/src/division.ts` (чистый перенос; часовые константы отзеркалены локально
+  по образцу `serverDrivers.ts` — без обратного ребра). Узкая проекция состояния
+  `DivisionState` (divisions/divisionSeq/templates/groundBattles) живёт в самом файле;
+  `DivState` в `game.ts` ужат до полей, которые тот ещё читает (heroRoster + patrols).
+  Обратное ребро `fleetLaunch.ts → game.ts` (`divisionsOf`) переключено на
+  `./division` — из трёх рёбер осталось два (`economy.ts` HOUR, `groundcombat.ts`
+  тип FormationUnit). `game.ts` импортирует `divisionModule` для MODULES и
+  реэкспортирует публичные имена; `game.ts` 1851→1326 строк. `heroRosterOf` остался
+  в `game.ts` (домен героев, соседство было текстовым). Гейт зелёный (1993 теста —
+  число не изменилось, чистый перенос). `capitalOf` из исходного текста кирпича давно
+  живёт в `capital.ts` (REFP-14).
 - **REFP-14** ✅ `[proto]` **`capital.ts`** — `capitalsOf`, `capitalOf`,
   `capitalModule` вынесены в `prototype/src/capital.ts`. `game.ts` импортирует и
   реэкспортирует. Гейт зелёный.
