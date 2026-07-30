@@ -56,6 +56,7 @@
 | `brick` | взять/закрыть кирпичик из `docs/backlog.md` |
 | `new-module` | новая механика = новый модуль ядра |
 | `add-game-content` | контент в `data/*.json` |
+| `localization` | любой текст, который читает игрок: ключ в `/localization`, не литерал в коде |
 | `sync-state-doc` | привести `docs/state.md` в соответствие с кодом |
 | `determinism-audit` · `balance-analysis` · `render-profile` · `security-triage` | четыре тяжёлые задачи из списка выше |
 | `playtest-report` · `refresh-scanner-digests` | периодика: журнал плейтеста, ежемесячный ре-пин образов |
