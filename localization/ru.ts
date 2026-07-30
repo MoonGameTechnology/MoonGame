@@ -75,7 +75,6 @@ export const ru: Record<string, string> = {
   // --- auth — Вход и регистрация: позывной, сторонние провайдеры.
   'auth.apple.soon': 'Вход через Apple — скоро · ты вошёл гостем',
   'auth.commander': 'Командир',
-  'auth.google.soon': 'Вход через Apple — скоро · ты вошёл гостем',
   'auth.google.soon': 'Вход через Google — скоро · ты вошёл гостем',
   'auth.need-mail': 'Введите почту',
   'auth.need-name': 'Введи имя командира',
@@ -499,8 +498,6 @@ export const ru: Record<string, string> = {
   'div.roster': 'состав {n}/{s} · {rest}',
   'div.slot.note':
     'Тап по слоту меняет род войск: ополчение → тяжёлая пехота → спецназ → танк. Танки бьют любую пехоту; спецназ — единственная пехота, опасная танкам; тяжёлая пехота держит оборону.',
-  'div.stat.attack': 'живучесть',
-  'div.stat.attack': 'оборона',
   'div.stat.attack': 'атака',
   'div.stat.defense': 'оборона',
   'div.stat.hp': 'живучесть',
@@ -612,8 +609,8 @@ export const ru: Record<string, string> = {
 
   // --- faction — Фракции: пассивный бонус дома.
   'faction.amber.desc': 'Кочевой конкорд логистов: флоты идут по лейнам на +15% быстрее.',
-  'faction.blue.desc': 'Торгово-промышленный договор: вся планетарная экономика даёт +12%.',
-  'faction.red.desc': 'Милитаристская гегемония: весь исходящий урон флотов и армий +10%.',
+  'faction.azure.desc': 'Торгово-промышленный договор: вся планетарная экономика даёт +12%.',
+  'faction.crimson.desc': 'Милитаристская гегемония: весь исходящий урон флотов и армий +10%.',
   'faction.violet.desc': 'Универсалисты восхода: понемногу всюду — экономика +5% и урон +5%.',
 
   // --- fleet — Автоимя флота по размеру соединения.
@@ -624,7 +621,6 @@ export const ru: Record<string, string> = {
   'fleet.size.squadron-heavy': 'Эскадра',
 
   // --- fmt — Форматирование величин: длительности.
-  'fmt.hours': '{n}м',
   'fmt.hours': '{n}ч',
   'fmt.minutes': '{n}м',
 
@@ -660,7 +656,6 @@ export const ru: Record<string, string> = {
   'hint.assault-enemy-only': '⚔ штурмовать можно только чужой мир',
   'hint.auto-assault': '⚔ авто-штурм включён — флот сам штурмует вражеский мир по прибытии',
   'hint.barrage-auto': '🎯 автоприцел',
-  'hint.barrage-set': '🎯 автоприцел',
   'hint.barrage-set': '🎯 сосредоточенный огонь назначен',
   'hint.cast-cancelled': '✖ каст отменён',
   'hint.deploy-cancelled': '✖ развёртывание отменено',
@@ -741,7 +736,6 @@ export const ru: Record<string, string> = {
 
   // --- sandbox — Песочница (дев-инструмент): переключатели и команды.
   'sandbox.commands': 'Команды',
-  'sandbox.end-wars': 'Закрыть',
   'sandbox.end-wars': 'Прекратить войну со всеми фракциями',
   'sandbox.no-player': 'нет игрока',
   'sandbox.no-wars': 'Вы ни с кем не воюете',
@@ -750,7 +744,6 @@ export const ru: Record<string, string> = {
   'sandbox.res.food': 'Пища',
   'sandbox.res.metal': 'Металл',
   'sandbox.res.microelectronics': 'Микроэлектроника',
-  'sandbox.title': 'Переключатели',
   'sandbox.title': 'ПЕСОЧНИЦА',
   'sandbox.tog.fog': 'Туман войны',
   'sandbox.tog.fog.hint': 'Выключите, чтобы открыть всю карту',
@@ -768,7 +761,6 @@ export const ru: Record<string, string> = {
   'sandbox.tog.speed.hint':
     'панель времени в матче — пауза и множители ускорения (1× — реальное время)',
   'sandbox.toggles': 'Переключатели',
-  'sandbox.wars-ended': 'Вы ни с кем не воюете',
   'sandbox.wars-ended': 'Войны прекращены: {n} — отношения нейтральные',
 
   // --- sci — Учёные совета: имя и что даёт ветка.
@@ -792,10 +784,8 @@ export const ru: Record<string, string> = {
   'scipick.focus': 'Фокус ветки «{br}»',
   'scipick.generalist': '+1 слот исследования (генералист, без фокуса ветки)',
   'scipick.need-two': 'Выберите двух учёных',
-  'scipick.note': 'Кандидаты · нажмите, чтобы занять слот',
   'scipick.note':
     '⚠ Совет закрепляется на весь матч. Рекомендованная пара уже выбрана — замените по вкусу.',
-  'scipick.opens': 'Фокус ветки «{br}»',
   'scipick.opens': 'Открывает ветку «{br}»: {list}',
   'scipick.pick': 'Выбрать учёного',
 
@@ -804,13 +794,10 @@ export const ru: Record<string, string> = {
 
   // --- split — Разделение флота: диалог и предпросмотр.
   'split.all': 'Все',
-  'split.confirm': 'Отмена',
   'split.confirm': 'Подтвердить',
   'split.note':
     'Отделите корабли в новый флот — он останется в том же секторе. Хотя бы один корабль остаётся; десант в трюме остаётся с исходным флотом.',
   'split.preview': 'новый флот: {a} кораблей · у исходного останется {b}',
-  'split.title':
-    'Отделите корабли в новый флот — он останется в том же секторе. Хотя бы один корабль остаётся; десант в трюме остаётся с исходным флотом.',
   'split.title': 'РАЗДЕЛЕНИЕ ФЛОТА',
 
   // --- stat — Характеристики юнита в компактных подписях.
@@ -821,23 +808,17 @@ export const ru: Record<string, string> = {
   'stat.speed': 'скорость',
 
   // --- tgt — Композер приказов (TGT-1): шаги плана, отправка.
-  'tgt.add-wait': 'Домой',
-  'tgt.add-wait': 'Огонь',
-  'tgt.add-wait': 'Штурм',
-  'tgt.add-wait': 'Сюда',
   'tgt.add-wait': '⏱ +1ч',
   'tgt.at': '🎯{n}ч',
   'tgt.clear': 'снять приказ',
   'tgt.empty': 'план пуст — добавь шаги',
   'tgt.fleets': '{n} флотов',
   'tgt.placed': '◎ приказ поставлен — флот исполнит план сам',
-  'tgt.send': 'снять приказ',
   'tgt.send': 'Отправить',
   'tgt.step.fire': 'Огонь',
   'tgt.step.here': 'Сюда',
   'tgt.step.home': 'Домой',
   'tgt.step.remove': 'убрать шаг',
-  'tgt.title': '{n} флотов',
   'tgt.title': 'ПРИКАЗ',
   'tgt.wait': '⏱{n}ч',
 
@@ -1361,7 +1342,6 @@ export const ru: Record<string, string> = {
   'setup.bonus.damage': '+{n}% урон',
   'setup.bonus.economy': '+{n}% экономика',
   'setup.bonus.radar': '+{n}% радар',
-  'setup.bonus.speed': '+{n}% радар',
   'setup.bonus.speed': '+{n}% скорость флотов',
   'setup.cancel': 'Назад',
   'setup.faction.note': 'Фракция — пассивный бонус дома',
@@ -1381,7 +1361,6 @@ export const ru: Record<string, string> = {
     'Выберите свой домашний мир на карте, задайте число соперников-ботов и запускайте. Пустые места займут боты — выключите место, чтобы командовать меньшим сектором, или выключите все ради мирной одиночной песочницы для знакомства с интерфейсом.',
   'setup.teams.note': 'одна сторона — союзники',
   'setup.teams.off': 'Командный бой: выкл',
-  'setup.teams.on': 'одна сторона — союзники',
   'setup.teams.on': 'Командный бой: ВКЛ',
   'setup.title': 'НАСТРОЙКА СХВАТКИ',
 

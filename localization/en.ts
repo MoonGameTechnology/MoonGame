@@ -73,7 +73,6 @@ export const en: Record<string, string> = {
   // --- auth — Вход и регистрация: позывной, сторонние провайдеры.
   'auth.apple.soon': 'Sign in with Apple — coming soon · you entered as a guest',
   'auth.commander': 'Commander',
-  'auth.google.soon': 'Sign in with Apple — coming soon · you entered as a guest',
   'auth.google.soon': 'Sign in with Google — coming soon · you entered as a guest',
   'auth.need-mail': 'Enter an email',
   'auth.need-name': 'Enter a commander name',
@@ -498,8 +497,6 @@ export const en: Record<string, string> = {
   'div.roster': 'composition {n}/{s} · {rest}',
   'div.slot.note':
     'Tap a slot to cycle the unit type: militia → heavy infantry → special forces → tank. Tanks shred any infantry; special forces are the one infantry that threatens armour; heavy infantry holds the line.',
-  'div.stat.attack': 'toughness',
-  'div.stat.attack': 'defense',
   'div.stat.attack': 'attack',
   'div.stat.defense': 'defense',
   'div.stat.hp': 'toughness',
@@ -610,8 +607,8 @@ export const en: Record<string, string> = {
 
   // --- faction — Фракции: пассивный бонус дома.
   'faction.amber.desc': 'A nomad concord of hauliers: fleets run the lanes 15% faster.',
-  'faction.blue.desc': 'A trade-and-industry compact: all planetary economy yields +12%.',
-  'faction.red.desc': 'A militarist hegemony: all outgoing fleet and army damage +10%.',
+  'faction.azure.desc': 'A trade-and-industry compact: all planetary economy yields +12%.',
+  'faction.crimson.desc': 'A militarist hegemony: all outgoing fleet and army damage +10%.',
   'faction.violet.desc':
     'Universalists of the dawn: a little of everything — +5% economy and +5% damage.',
 
@@ -623,7 +620,6 @@ export const en: Record<string, string> = {
   'fleet.size.squadron-heavy': 'Squadron',
 
   // --- fmt — Форматирование величин: длительности.
-  'fmt.hours': '{n}m',
   'fmt.hours': '{n}h',
   'fmt.minutes': '{n}m',
 
@@ -660,7 +656,6 @@ export const en: Record<string, string> = {
   'hint.auto-assault':
     '⚔ auto-storm on — the fleet storms the hostile world it arrives at by itself',
   'hint.barrage-auto': '🎯 auto-target',
-  'hint.barrage-set': '🎯 auto-target',
   'hint.barrage-set': '🎯 focus fire set',
   'hint.cast-cancelled': '✖ cast cancelled',
   'hint.deploy-cancelled': '✖ deploy cancelled',
@@ -741,7 +736,6 @@ export const en: Record<string, string> = {
 
   // --- sandbox — Песочница (дев-инструмент): переключатели и команды.
   'sandbox.commands': 'Commands',
-  'sandbox.end-wars': 'Close',
   'sandbox.end-wars': 'End the war with every faction',
   'sandbox.no-player': 'no player',
   'sandbox.no-wars': 'You are not at war with anyone',
@@ -750,7 +744,6 @@ export const en: Record<string, string> = {
   'sandbox.res.food': 'Food',
   'sandbox.res.metal': 'Metal',
   'sandbox.res.microelectronics': 'Microelectronics',
-  'sandbox.title': 'Toggles',
   'sandbox.title': 'SANDBOX',
   'sandbox.tog.fog': 'Fog of war',
   'sandbox.tog.fog.hint': 'Turn off to reveal the whole map',
@@ -767,7 +760,6 @@ export const en: Record<string, string> = {
   'sandbox.tog.speed': 'Speed control',
   'sandbox.tog.speed.hint': 'the in-match time bar — pause and speed multipliers (1× is real time)',
   'sandbox.toggles': 'Toggles',
-  'sandbox.wars-ended': 'You are not at war with anyone',
   'sandbox.wars-ended': 'Wars ended: {n} — relations are neutral',
 
   // --- sci — Учёные совета: имя и что даёт ветка.
@@ -791,10 +783,8 @@ export const en: Record<string, string> = {
   'scipick.focus': '{br} branch focus',
   'scipick.generalist': '+1 research slot (a generalist, no branch focus)',
   'scipick.need-two': 'Pick two scientists',
-  'scipick.note': 'Candidates · tap to fill a slot',
   'scipick.note':
     '⚠ The council locks in for the whole match. A recommended pair is pre-selected — swap to taste.',
-  'scipick.opens': '{br} branch focus',
   'scipick.opens': 'Opens the {br} branch: {list}',
   'scipick.pick': 'Pick a scientist',
 
@@ -803,13 +793,10 @@ export const en: Record<string, string> = {
 
   // --- split — Разделение флота: диалог и предпросмотр.
   'split.all': 'All',
-  'split.confirm': 'Cancel',
   'split.confirm': 'Confirm',
   'split.note':
     'Peel ships into a new fleet — it stays in the same sector. At least one ship stays behind; carried troops stay with the original.',
   'split.preview': 'new fleet: {a} ships · original keeps {b}',
-  'split.title':
-    'Peel ships into a new fleet — it stays in the same sector. At least one ship stays behind; carried troops stay with the original.',
   'split.title': 'SPLIT FLEET',
 
   // --- stat — Характеристики юнита в компактных подписях.
@@ -820,23 +807,17 @@ export const en: Record<string, string> = {
   'stat.speed': 'speed',
 
   // --- tgt — Композер приказов (TGT-1): шаги плана, отправка.
-  'tgt.add-wait': 'Home',
-  'tgt.add-wait': 'Fire',
-  'tgt.add-wait': 'Assault',
-  'tgt.add-wait': 'Go here',
   'tgt.add-wait': '⏱ +1h',
   'tgt.at': '🎯{n}h',
   'tgt.clear': 'clear the order',
   'tgt.empty': 'plan is empty — add steps',
   'tgt.fleets': '{n} fleets',
   'tgt.placed': '◎ order set — the fleet will run the plan itself',
-  'tgt.send': 'clear the order',
   'tgt.send': 'Send',
   'tgt.step.fire': 'Fire',
   'tgt.step.here': 'Go here',
   'tgt.step.home': 'Home',
   'tgt.step.remove': 'remove step',
-  'tgt.title': '{n} fleets',
   'tgt.title': 'ORDER',
   'tgt.wait': '⏱{n}h',
 
@@ -1363,7 +1344,6 @@ export const en: Record<string, string> = {
   'setup.bonus.damage': '+{n}% damage',
   'setup.bonus.economy': '+{n}% economy',
   'setup.bonus.radar': '+{n}% radar',
-  'setup.bonus.speed': '+{n}% radar',
   'setup.bonus.speed': '+{n}% fleet speed',
   'setup.cancel': 'Back',
   'setup.faction.note': 'Faction — the house passive bonus',
@@ -1383,7 +1363,6 @@ export const en: Record<string, string> = {
     'Pick your homeworld on the map, choose how many AI rivals join, then launch. Empty slots are taken by the AI — switch a slot OFF to command a smaller sector, or switch them all off for a peaceful solo sandbox to explore the interface.',
   'setup.teams.note': 'one side = allies',
   'setup.teams.off': 'Team battle: off',
-  'setup.teams.on': 'one side = allies',
   'setup.teams.on': 'Team battle: ON',
   'setup.title': 'SKIRMISH SETUP',
 
