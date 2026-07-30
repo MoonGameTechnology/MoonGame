@@ -2493,6 +2493,14 @@ function updateGoals(): void {
 function renderGoals(): void {
   const el = document.getElementById('goals');
   if (!el) return;
+  // Collapsed = a small tappable tray badge (icon + count), not just the list hidden
+  // under a still-full-width header — the whole point is to give the map its room
+  // back, not just the four rows.
+  if (goalsCollapsed) {
+    el.innerHTML = `<button class="gl-tray" id="gl-tray" type="button" title="${esc(t('onb.goal.tray.title'))}">◎ <span class="gl-count">${goalsDone.length}/${FIRST_GOALS.length}</span></button>`;
+    el.classList.add('show');
+    return;
+  }
   const items = FIRST_GOALS.map((g) => {
     const done = goalsDone.includes(g.id);
     return `<div class="gl-item${done ? ' done' : ''}"><span class="gl-ck">${done ? '✓' : '○'}</span><span>${esc(t(g.label))}</span></div>`;
@@ -2500,12 +2508,13 @@ function renderGoals(): void {
   el.innerHTML =
     `<div class="gl-box"><div class="gl-head"><b>${t('Цели первой сессии')}</b>` +
     `<span class="gl-count">${goalsDone.length}/${FIRST_GOALS.length}</span>` +
-    `<button class="gl-tg" id="gl-tg" type="button">${goalsCollapsed ? '▸' : '▾'}</button></div>` +
-    (goalsCollapsed ? '' : `<div class="gl-list">${items}</div>`);
+    `<button class="gl-tg" id="gl-tg" type="button" title="${esc(t('onb.goal.collapse.title'))}">▾</button></div>` +
+    `<div class="gl-list">${items}</div>`;
   el.classList.add('show');
 }
 document.getElementById('goals')?.addEventListener('click', (ev) => {
-  if ((ev.target as HTMLElement).closest('#gl-tg')) {
+  const tgt = ev.target as HTMLElement;
+  if (tgt.closest('#gl-tg') || tgt.closest('#gl-tray')) {
     goalsCollapsed = !goalsCollapsed;
     renderGoals();
   }
@@ -12906,11 +12915,17 @@ const BUILD_TAG = (() => {
 // topmost layer and re-arm. With nothing left to close AND a match running, the
 // first Back only shows a "press again to leave" hint (BF-17-adjacent: a bare
 // in-match Back used to silently unload the page and lose the solo match); a
-// second Back within the window is the system's (exit). Browser Back is the same.
+// second Back within the window leaves the match OURSELVES (`$('tomenu').click()`).
+// BF-31: this used to leave the second Back to "the system" (assume the platform's
+// own back-stack falls through to an app exit once our history is exhausted) — but a
+// plain browser tab (or some WebViews) just has nowhere left to go and no-ops
+// instead, so "press again" silently did nothing. Re-arming the sentinel right after
+// the hint guarantees a real second `popstate` to catch, so the exit never depends
+// on the platform's fallback. Browser Back is the same.
 let backArmed = false;
-// Double-back-to-leave window: after the hint we stop re-arming the sentinel for
-// this long, so a second Back within the window is the system's. `performance.now()`
-// is fine here (prototype UI, not the deterministic core).
+// Double-back-to-leave window: a second Back within this long of the hint leaves the
+// match; after it lapses, a bare Back is the first press again (a fresh hint).
+// `performance.now()` is fine here (prototype UI, not the deterministic core).
 const BACK_EXIT_WINDOW_MS = 2500;
 let backHintAt = -Infinity;
 
@@ -13023,10 +13038,15 @@ window.addEventListener('popstate', () => {
   }
   if (inMatch()) {
     // Nothing left to close but a match is live — don't let one stray Back drop it.
-    // Show the hint and DON'T re-arm; during the exit window `frame()` won't re-arm
-    // either, so a second Back within it is the system's (leaves the match).
+    // A second Back within the window leaves for real; re-arm so THAT press always
+    // fires its own popstate here rather than possibly running out of history.
+    if (performance.now() - backHintAt <= BACK_EXIT_WINDOW_MS) {
+      $('tomenu').click();
+      return;
+    }
     backHintAt = performance.now();
     note(t('Ещё раз «Назад» — выход из матча'));
+    armBack();
     return;
   }
   note(t('Ещё раз «Назад» — выход')); // at the hub/welcome — the next Back exits
@@ -13047,9 +13067,11 @@ window.addEventListener('keydown', (e) => {
 });
 
 function frame(nowReal: number) {
-  // Keep the Back sentinel armed while something is closable OR a match is live (so a
-  // bare in-match Back triggers the double-back hint instead of a silent unload) —
-  // but pause re-arming for the exit window after the hint, so the second Back leaves.
+  // Keep the Back sentinel armed while something is closable OR a match is live, so a
+  // bare in-match Back triggers the double-back hint instead of a silent unload. The
+  // popstate handler re-arms itself right after a hint (so a genuine second Back
+  // always has its own sentinel to pop) — this is the initial arm / self-healing net,
+  // not the steady-state path, hence gating on being past the exit window.
   const matchGuard = inMatch() && performance.now() - backHintAt > BACK_EXIT_WINDOW_MS;
   if (!backArmed && (topLayerOpen() || matchGuard)) armBack();
   const dt = nowReal - lastReal;

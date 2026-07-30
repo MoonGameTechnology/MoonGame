@@ -364,6 +364,13 @@ body.sheet-open #cmdbar{bottom:calc(34vh + 12px);}
 #goals .gl-item .gl-ck{color:var(--cyan-dim);flex:0 0 auto;font-size:13px;}
 #goals .gl-item.done{color:#dfeef2;}
 #goals .gl-item.done .gl-ck{color:var(--grn);text-shadow:0 0 8px rgba(95,240,192,.5);}
+/* the collapsed tray — a small badge, not the full header: gives the map its room
+   back instead of just hiding the four rows under a still-full-width bar. */
+#goals .gl-tray{display:flex;align-items:center;gap:5px;min-height:32px;padding:0 10px;
+  border-radius:16px;border:1px solid var(--cyan-dim);background:rgba(4,16,22,.94);
+  color:var(--cyan);font:700 12px ui-monospace,monospace;cursor:pointer;
+  box-shadow:0 4px 16px rgba(0,0,0,.45);}
+#goals .gl-tray .gl-count{color:var(--cyan);}
 /* phones: the speed control (⏸▶▶▶ + ×1/×10/×50/×100) wraps onto two ~44px rows
    above its own bottom:12px anchor — a fixed bottom:70px here used to sit the
    goals box's lower half right on top of it. Clear the whole stack instead of

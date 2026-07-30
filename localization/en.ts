@@ -375,7 +375,9 @@ export const en: Record<string, string> = {
   'market.res.microelectronics': 'Micro',
 
   // --- onb — Первый управляемый матч (гид ONB-2 по интерфейсу и первому ходу).
+  'onb.goal.collapse.title': 'Collapse to tray',
   'onb.goal.mine': 'Grow metal mining',
+  'onb.goal.tray.title': 'First-session goals — expand',
   'onb.tour.home':
     'Down here is your homeworld panel: buildings, garrison and construction. Tap your world to open it.',
   'onb.tour.mine':
