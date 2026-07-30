@@ -97,6 +97,7 @@ export const en: Record<string, string> = {
   'callsign.viper': 'Viper',
 
   // --- card — Карточка игрока (тап по гербу): фракция, владения, боевой счёт.
+  'card.dossier': 'COMMANDER DOSSIER',
   'card.close': 'CLOSE',
   'card.combat': 'War record',
   'card.commander': 'commander',
@@ -749,6 +750,21 @@ export const en: Record<string, string> = {
   'net.waiting-host': 'Waiting for the host to start…',
 
   // --- queue — Очередь стройки: постановка, улучшение, отказы.
+  'profile.title': 'Profile',
+  'profile.league': 'League',
+  'profile.league.recon': 'Recon',
+  'profile.league.patrol': 'Patrol',
+  'profile.league.squadron': 'Squadron',
+  'profile.league.fleet': 'Fleet',
+  'profile.league.armada': 'Armada',
+  'profile.matches': 'Matches',
+  'profile.winrate': 'Winrate',
+  'profile.place': 'Avg. place',
+  'profile.influence': 'Influence',
+  'profile.season': 'Season points',
+  'profile.streak': 'Win streak',
+  'profile.medals': 'Medal showcase',
+  'profile.medals.empty': 'Medals show up here once your corporation goes to war. Sign in on a server with the meta layer to see the showcase.',
   'queue.added': 'queued: {what} at {at}',
   'queue.failed': '{what} — failed: {err}',
   'queue.unknown': 'unknown order',

@@ -99,6 +99,7 @@ export const ru: Record<string, string> = {
   'callsign.viper': 'Гадюка',
 
   // --- card — Карточка игрока (тап по гербу): фракция, владения, боевой счёт.
+  'card.dossier': 'ДОСЬЕ КОМАНДИРА',
   'card.close': 'ЗАКРЫТЬ',
   'card.combat': 'Боевой счёт',
   'card.commander': 'командующий',
@@ -749,6 +750,21 @@ export const ru: Record<string, string> = {
   'net.waiting-host': 'Ждём, пока хост начнёт…',
 
   // --- queue — Очередь стройки: постановка, улучшение, отказы.
+  'profile.title': 'Профиль',
+  'profile.league': 'Лига',
+  'profile.league.recon': 'Разведка',
+  'profile.league.patrol': 'Патруль',
+  'profile.league.squadron': 'Эскадра',
+  'profile.league.fleet': 'Флот',
+  'profile.league.armada': 'Армада',
+  'profile.matches': 'Матчей',
+  'profile.winrate': 'Winrate',
+  'profile.place': 'Ср. место',
+  'profile.influence': 'Влияние',
+  'profile.season': 'Очки за сезон',
+  'profile.streak': 'Серия побед',
+  'profile.medals': 'Витрина медалей',
+  'profile.medals.empty': 'Медали появятся здесь, когда корпорация начнёт войны альянсов. Войдите под аккаунтом на сервере с мета-слоем, чтобы увидеть витрину.',
   'queue.added': 'в очередь: {what} на {at}',
   'queue.failed': '{what} — не вышло: {err}',
   'queue.unknown': 'неизвестный заказ',
