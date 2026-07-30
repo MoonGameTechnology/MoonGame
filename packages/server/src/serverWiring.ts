@@ -6,6 +6,7 @@ import { snapshotOf, type Stores } from './persistence';
 import type { LoadedMatch } from './roomRegistry';
 import type { RoomObservation } from './matchRoom';
 import type { ArsenalStore, MatchSnapshot, StoredReceipt } from './store';
+import { standingOrderTickActions } from './standingOrderDriver';
 
 /**
  * The match-loading wiring `main.ts` hands to the LazyRoomRegistry, extracted
@@ -111,6 +112,10 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
       ...(deps.arsenalStore ? { arsenalStore: deps.arsenalStore } : {}),
     });
 
+    // Re-entrancy guard for the async standing-order pass below: a slow durable submit
+    // (awaiting the actor mailbox) must not overlap a later heartbeat's own pass —
+    // mirrors the prototype host's `driversBusy` flag (netserver.ts).
+    let standingOrdersBusy = false;
     // The 24/7 heartbeat while this match is live: fire due scheduled events with no
     // player action, persisting each advance. (While hibernated, the registry's wake
     // timer does it.) NETA2-6: `heartbeatMs` also keeps the published clock/economy
@@ -118,7 +123,31 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
     // match starts with none) — without it the real host froze on "Day 1" between
     // actions, the exact drift the prototype host already fixed with its inline driver.
     driver = startClockDriver(room, {
-      onTick: () => void stores.store.save(snapshotOf(room)),
+      onTick: ({ progressed }) => {
+        void stores.store.save(snapshotOf(room));
+        // Standing orders (CC-2 auto-storm / CC-4 patrol, standingOrderDriver.ts): the
+        // missing "who decides, and when" half of `standingOrdersModule`. Skip on a
+        // same-instant stall — submitting would emit `action` observations that
+        // reschedule the driver and reset its stall guard into a 0ms spin (the driver's
+        // own STALL_LIMIT already backs off; this just avoids feeding it).
+        const stalled = !progressed && room.msUntilNextEvent() === 0;
+        if (room.isStarted && !stalled && !standingOrdersBusy) {
+          standingOrdersBusy = true;
+          void (async () => {
+            try {
+              for (const { playerId, action } of standingOrderTickActions(
+                room.state,
+                data,
+                room.state.time,
+              )) {
+                await room.submitServerAction(playerId, action);
+              }
+            } finally {
+              standingOrdersBusy = false;
+            }
+          })();
+        }
+      },
       onStall: () => deps.onStall?.(matchId),
       heartbeatMs: HEARTBEAT_MS,
     });
