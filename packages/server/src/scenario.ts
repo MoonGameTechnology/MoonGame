@@ -10,7 +10,6 @@ import {
   createInitialState,
   createKernel,
   diplomacyModule,
-  divisionModule,
   capitalModule,
   economyModule,
   factionModule,
@@ -136,11 +135,12 @@ export const DEV_MODULES: GameModule[] = [
   forcedMarchModule, // fleet.forcemarch: +50% speed for hull wear while in transit
   victoryModule,
   visibilityModule, // fog-of-war memory (variant B): records last-seen worlds
-  divisionModule, // H4: division mobilization + ground-combat (division-vs-division only).
-  // Appended at the END, not spliced in the middle — inserting it earlier would
-  // reorder every module after it (invariant #6), which is exactly what bumping
-  // MODULE_MANIFEST_VERSION below is meant to fence off; appending keeps that
-  // fence a one-line diff to reason about instead of a whole-array reshuffle.
+  // H4's `divisionModule` used to sit here, at the END. It is GONE (H4-REVERT): the
+  // game is back to individual ground units — `armyModule` moves `UnitStack`s between
+  // a planet's garrison and a fleet's hold, `combatModule` resolves the landing. That
+  // path never went away; divisions were a PARALLEL ground system layered beside it,
+  // and the seam was documented as such in `gameState.ts`. Removing the layer is the
+  // whole change — no mechanic is being rewritten.
 ];
 
 /** Bumped whenever `DEV_MODULES`' membership or order changes (invariant #6: module
@@ -149,7 +149,7 @@ export const DEV_MODULES: GameModule[] = [
  *  created under an older manifest must not silently resume on a different module
  *  graph (same fail-secure posture as `dataHash`, MP-4). Bump this alongside any
  *  `DEV_MODULES` edit. */
-export const MODULE_MANIFEST_VERSION = '2'; // H4: divisionModule appended
+export const MODULE_MANIFEST_VERSION = '3'; // H4-REVERT: divisionModule removed
 
 export interface DevMatchOptions {
   /** Match/room id (default `'dev'`). Distinct ids let a registry hold many matches. */
