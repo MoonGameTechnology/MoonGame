@@ -520,8 +520,12 @@ export function createDossiers(host: DossierHost): {
       .map(([r, n]) => t('codex.value.per-day', { n: n ?? 0, r: tData(r) }))
       .join(', ');
     if (upkeep) rows.push(cxRow(t('codex.row.upkeep'), upkeep));
-    const tags = [def.domain ?? 'space', def.line, ...(def.traits ?? [])]
-      .filter((x): x is string => !!x)
+    // Домен и трейты могут нести один и тот же ключ (у наземных юнитов domain:
+    // 'ground' И трейт 'ground' — два разных механических флага, см. fleetLaunch
+    // vs fleetOps), а игроку это одна и та же «земля» — схлопываем дубли.
+    const tags = [
+      ...new Set([def.domain ?? 'space', def.line, ...(def.traits ?? [])].filter((x): x is string => !!x)),
+    ]
       .map((x) => tData(x))
       .join(', ');
     if (tags) rows.push(cxRow(t('codex.row.class'), tags));
