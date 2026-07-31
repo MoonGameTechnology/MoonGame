@@ -33,17 +33,23 @@ case "$REF" in
 esac
 
 echo "verifying $REF"
-# Учётные данные реестра: НЕ монтируем в /root — образ cosign distroless и работает не от
-# root, поэтому ни путь, ни права на файл 0600 ему не подходят (на этом упал первый прогон
-# image.yml — cosign молча ушёл анонимом). Отдаём каталог по фиксированному пути через
-# DOCKER_CONFIG и запускаем от текущего пользователя, которому этот файл и принадлежит.
-# Для публичного пакета аутентификация не нужна вовсе — пустой каталог не мешает.
+# Пакет публичный — для `cosign verify` учётные данные не нужны вообще, поэтому здесь НЕТ
+# ни монтирования docker-конфига, ни подмены пользователя контейнера. Это осознанно:
+# первая версия скрипта монтировала конфиг в /root (образ cosign distroless и работает не
+# от root — на этом упал первый прогон image.yml), а вторая пыталась лечить это запуском
+# от uid хоста, то есть повторяла то же допущение с другой стороны. Пусть образ работает
+# так, как задуман.
+# Если пакет когда-нибудь станет приватным — передайте креды ФЛАГАМИ, как это делает
+# image.yml, а не через файл:
+#   VOID_REGISTRY_USER=<login> VOID_REGISTRY_TOKEN=<token> ./deploy/verify-image.sh <ref>
+CREDS=()
+if [ -n "${VOID_REGISTRY_USER:-}" ] && [ -n "${VOID_REGISTRY_TOKEN:-}" ]; then
+  CREDS=(--registry-username "$VOID_REGISTRY_USER" --registry-password "$VOID_REGISTRY_TOKEN")
+fi
 docker run --rm \
-  -u "$(id -u):$(id -g)" \
-  -e DOCKER_CONFIG=/dockercfg \
-  -v "${HOME}/.docker:/dockercfg:ro" \
   "$COSIGN_IMAGE" \
   verify "$REF" \
+  "${CREDS[@]}" \
   --certificate-identity-regexp "^https://github.com/${REPO}/\.github/workflows/image\.yml@refs/heads/main$" \
   --certificate-oidc-issuer https://token.actions.githubusercontent.com \
   -o text
