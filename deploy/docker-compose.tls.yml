@@ -19,9 +19,29 @@ services:
     environment:
       TRUST_PROXY: '1'
 
+  postgres:
+    environment:
+      # This overlay IS the public deploy (SEC-12). The base file defaults the password
+      # to `void` for a throwaway LAN test; here an unset password is a boot error, so a
+      # public host can never come up on the documented default. Postgres still listens
+      # on loopback only — this is defence in depth, not the only control.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD (e.g. openssl rand -hex 32) before a public deploy}
+
   caddy:
-    image: caddy:2-alpine
+    # Digest-pinned (A08) — see docs/security/image-pinning.md. Refreshed 2026-07.
+    image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
     restart: unless-stopped
+    # Hardening (SEC-12). Caddy is the ONLY service facing the internet, so it gets the
+    # tightest set: no privilege gain, and every capability dropped except the one it
+    # provably needs — NET_BIND_SERVICE, to bind the privileged ports 80/443 below.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_BIND_SERVICE
+    mem_limit: 512m
+    pids_limit: 256
     depends_on:
       - server
     ports:

@@ -1756,6 +1756,14 @@ pnpm test            # vitest
 pnpm run prototype   # собрать prototype/dist/void-dominion{,-player}.html
 ```
 
+Гейт зеркалится в CI (`ci.yml`), рядом идут `security.yml` (набор сканеров; блокирующие
+— Semgrep, Gitleaks, OSV, Trivy fs/image; с SEC-10 ещё и еженедельный ре-скан `main` по
+крону — прод крутит пиненный образ дольше, чем живут ленты CVE), `android.yml` (APK) и
+`image.yml` (SEC-13: сборка → блокирующий Trivy → GHCR → подпись cosign по дайджесту).
+Прод-деплой из подписанного образа: `deploy/verify-image.sh` + оверлей
+`docker-compose.release.yml` (runbook — `deploy/README.md`, разбор слоёв —
+`docs/security/pipeline.md`).
+
 Тесты лежат рядом с кодом (`*.test.ts`) — и в пакетах, и в `prototype/src` (Vitest
 их видит). **Прототип типизируется в гейте (REFM-0):** `prototype/tsconfig.json`
 (полный `strict` + `noUncheckedIndexedAccess`, DOM-lib) накрывает `src/**` +
