@@ -257,7 +257,7 @@ by, damage}` (эмит до применения урона; прототип р
   (`visibilitychange`) и раз в 4ч — с троттлингом 15 мин; ручная — кнопка на
   `#connect` (диагностика в `cver`) и **тайл «Обновления» в хабе** (диагностика в
   `hub-note`). Браузерная «автообновляемость» — GitHub Pages
-  (`pages.yml` → https://moonwuk.github.io/Nygame/ — ссылка всегда на свежий main);
+  (`pages.yml` → https://moonwuk.github.io/MoonGame/ — ссылка всегда на свежий main);
   ⚠ требует ОДНОГО ручного включения: Settings → Pages → Source **«GitHub Actions»**
   (без него job гибнет до шагов — см. runbook-комментарий в `pages.yml`).
   **Тач-управление (№12 аудита)**: при взведённом Move палец ТЯНЕТ прицел (живое

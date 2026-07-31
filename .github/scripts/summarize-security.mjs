@@ -182,9 +182,11 @@ const confirm = EXPECTED.map((t) => {
   const s = sentinels.get(t.key);
   // Confirmed if the job wrote a sentinel with ok=true. Defensive fallback: a tool
   // whose SARIF is present with a driver counts as confirmed even without a sentinel.
-  const ok =
-    (s && s.ok === true) ||
-    (!s && t.key === 'sbom' && sboms.length > 0);
+  // Фолбэк для SBOM ограничен ИМЕННО тем файлом, который производит джоба `sbom`.
+  // Было `sboms.length > 0` — под это подходил и `sbom-image.cdx.json` от ДРУГОЙ джобы
+  // (`trivy-image`), так что джоба `sbom` могла упасть целиком, а таблица доверия
+  // печатала «✅ просканировано» (воспроизведено на фикстуре).
+  const ok = (s && s.ok === true) || (!s && t.key === 'sbom' && sboms.includes('sbom.cdx.json'));
   // A job that was SKIPPED BY DESIGN is not a fail-open and must not raise the
   // "NOT confirmed" alarm — that alarm has to keep meaning «a scan that should have run
   // didn't». Two such designs exist: main-only (Scorecard) and schedule-only

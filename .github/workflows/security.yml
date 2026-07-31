@@ -259,11 +259,18 @@ jobs:
         continue-on-error: true
         run: |
           set +e
+          # stderr НЕ выбрасывается: stdout уже занят NDJSON-отчётом, поэтому лог джобы —
+          # единственное место, где может уцелеть причина падения скана (было `2>/dev/null`).
           docker run --rm -v "$PWD:/src" -w /src trufflesecurity/trufflehog@sha256:de8ef4e573653b30c002e3491bf0484d23e31b73fe5519db6b395408e6834d4f \
-            git file:///src --json --no-update > trufflehog.json 2>/dev/null
+            git file:///src --json --no-update > trufflehog.json
           rc=$?
           set -e
-          ok=true; case $rc in 125 | 126 | 127) ok=false ;; esac
+          # ЛЮБОЙ ненулевой код — это «скан не отработал», а не «нашлись секреты: без
+          # `--fail` находки на код выхода не влияют (упавший скан выходит 1). Проверки
+          # `[ -s trufflehog.json ]`, как у остальных сканеров, здесь быть НЕ может: пустой
+          # файл — легитимный чистый результат, она давала бы ложную тревогу. Поэтому
+          # ливнес-проверка идёт по коду выхода — она ортогональна находкам.
+          ok=true; [ "$rc" -eq 0 ] || ok=false
           echo "{\"key\":\"trufflehog\",\"ok\":$ok,\"exit\":$rc}" > status-trufflehog.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -450,6 +457,7 @@ jobs:
             awk '{print $2}' | sort -u)
           echo "refs to scan:"; echo "$refs"
           rc=0
+          fail=0
           i=0
           for ref in $refs; do
             i=$((i + 1))
@@ -464,14 +472,27 @@ jobs:
               --ignorefile .trivyignore-deps \
               --output "trivy-deps-sarif/trivy-deps-$i.sarif" "$ref"
             r=$?
-            [ "$r" -ne 0 ] && rc=$r
+            # Отличаем НАХОДКИ от СБОЯ: `--exit-code 1` даёт ровно 1, когда CVE найдены;
+            # всё остальное ненулевое (не спулился образ, нет сети, сдох сканер) — это
+            # «скан не состоялся». Раньше оба случая сливались в один rc, и упавший пул
+            # одного из двух образов проходил как «просканировано» — а предупреждение
+            # внизу ещё и списывало это на найденные CVE.
+            case $r in
+              0) ;;
+              1) rc=1 ;;
+              *) fail=$r ;;
+            esac
           done
           set -e
-          ok=true; case $rc in 125 | 126 | 127) ok=false ;; esac
+          ok=true
+          [ "$fail" -eq 0 ] || ok=false
           [ "$i" -gt 0 ] || ok=false          # grep matched nothing ⇒ scanned nothing
-          [ -n "$(ls -A trivy-deps-sarif)" ] || ok=false
-          echo "{\"key\":\"trivy-deps\",\"ok\":$ok,\"exit\":$rc}" > status-trivy-deps.json
+          # По одному SARIF на КАЖДУЮ ссылку: непустого каталога мало — при двух образах
+          # отчёт от первого маскировал бы полное отсутствие второго.
+          [ "$(ls -1 trivy-deps-sarif | wc -l)" -eq "$i" ] || ok=false
+          echo "{\"key\":\"trivy-deps\",\"ok\":$ok,\"exit\":$rc,\"fail\":$fail}" > status-trivy-deps.json
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          echo "fail=$fail" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: report-trivy-deps
@@ -488,7 +509,13 @@ jobs:
       - name: report — informational (not yet blocking)
         env:
           RC: ${{ steps.scan.outputs.rc }}
+          FAIL: ${{ steps.scan.outputs.fail }}
         run: |
+          # Сбой скана и найденные CVE — РАЗНЫЕ сообщения: раньше упавший пул образа
+          # печатался как «Trivy нашёл CVE», то есть авария маскировалась под находку.
+          if [ "$FAIL" != "0" ]; then
+            echo "::error::trivy-deps: скан НЕ состоялся (код $FAIL) — образ не спулился или сканер не отработал. Сентинел помечен ok:false, отчёт покажет «НЕ подтверждён»."
+          fi
           if [ "$RC" != "0" ]; then
             echo "::warning::Trivy found CVEs in the third-party prod images (exit $RC). Informational for now — triage them, then flip this job to blocking (SEC-11)."
           fi
