@@ -246,6 +246,8 @@ import { initProfile } from './profileScreen';
 import { initCorp } from './corpScreen';
 // ECON-4 — session market: the model + orders live next door; the WINDOW is REFM-6.
 import { initMarket } from './marketScreen';
+// Плавающее окно чата (REFM-12) — своя геометрия, свои настройки, свой кэш.
+import { initChat } from './chatWindow';
 // ST-2/ST-3 — «Хранитель»: the window is REFM-7; the read-only helpers below are shared
 // with the threat alert (`stewFmtDur`), the side panel (`stewardTechDone`) and the
 // morning report (`stewMetrics`).
@@ -602,38 +604,40 @@ const CH_GLOBAL = 'global'; // cross-session lobby (placeholder until a global s
 const GROUP_CHANNELS = new Set([COALITION, CH_SESSION, CH_GLOBAL]); // group rooms vs 1:1 DMs
 let sessionMessages: SessionMsg[] = [];
 // --- floating chat window (desktop only) -------------------------------------
-// A movable/resizable in-game chat overlay (bottom-left by default). It reuses the
-// session message store + convoLineHtml; geometry/opacity/font are applied inline so a
-// frame never rebuilds it. Settings live in a popover flown out to its right, and are
-// cached client-side (localStorage) — never round-tripped to the server.
-let chatOpen = false;
-let chatMin = false; // collapsed to just its title bar
-let chatPinned = false; // position + size locked (drag/resize disabled)
-let chatSettingsOpen = false;
-let chatPlaced = false; // has it been parked / restored at least once?
-let chatTab: string = CH_SESSION; // the open channel/DM key
-const chatGeom = { x: 12, y: 0, w: 360, h: 300 }; // CSS px; y is set on first open
-// Message-stamp toggles (showDay/showTime/showReal) ride along in the cached config.
-const chatCfg = {
-  fontPx: 13,
-  transparency: 8,
-  censor: false,
-  color: '',
-  showDay: true,
-  showTime: true,
-  showReal: false,
-};
-// Active move/resize gesture: pointer origin + the geometry snapshot we drag from.
-let chatDrag: {
-  mode: 'move' | 'resize';
-  dir: string;
-  px: number;
-  py: number;
-  gx: number;
-  gy: number;
-  gw: number;
-  gh: number;
-} | null = null;
+// REFM-12: окно уехало в `chatWindow.ts` целиком — состояние, разметка, геометрия и
+// кэш настроек живут там. Здесь только сборка, и она стоит ИМЕННО ЗДЕСЬ, а не рядом
+// с остальным UI внизу файла: `resize()` (строкой ниже по файлу, вызывается
+// синхронно при загрузке) спрашивает у окна `onViewportResize`, поэтому привязка
+// обязана существовать раньше. Внизу она попала бы в temporal dead zone и уронила
+// бы загрузку целиком. Все зависимости взяты ленивo — стрелками, поэтому объявленные
+// ниже `NAME`/`VW`/`MOBILE` читаются в момент вызова, а не сейчас.
+// пользуются рейл, реестр слоёв Back/Escape и приход нового сообщения.
+const chatWin = initChat(
+  {
+    root: () => document.getElementById('chatwin'),
+    viewport: () => ({ w: VW, h: VH }),
+    isMobile: () => MOBILE,
+    groupTabs: () => [
+      { key: CH_SESSION, label: t('chat.tab.session'), icon: '△' },
+      { key: CH_GLOBAL, label: t('chat.tab.global'), icon: '🌐' },
+      { key: COALITION, label: t('chat.tab.coalition'), icon: '⬡' },
+    ],
+    isGroup: (key) => GROUP_CHANNELS.has(key),
+    messages: () => sessionMessages,
+    me: () => ME,
+    seatExists: (id) => !!s.players[id],
+    seatLabel: (id) => NAME[id] ?? id,
+    seatIcon: (id) => seatBadge(id).icon,
+    convoMessages,
+    lineHtml: (m, stamp) => convoLineHtml(m as SessionMsg, stamp),
+    dispatch: dispatchChat,
+    openSeatCard,
+    jumpToPing,
+  },
+  CH_SESSION,
+);
+document.getElementById('rail-chat')?.addEventListener('click', () => chatWin.toggle());
+
 let diploOpen = false;
 let diploTab: 'diplo' | 'msgs' | 'intel' = 'diplo';
 let diploSort: 'name' | 'worlds' | 'stance' = 'stance';
@@ -859,10 +863,7 @@ function resize() {
   canvas.height = Math.round(VH * DPR);
   canvas.style.width = VW + 'px';
   canvas.style.height = VH + 'px';
-  if (chatOpen) {
-    clampChatGeom(); // the half-screen cap follows the new viewport
-    applyChatGeom();
-  }
+  chatWin.onViewportResize(); // the half-screen cap follows the new viewport
 }
 if (typeof window !== 'undefined') window.addEventListener('resize', resize);
 resize();
@@ -5972,7 +5973,7 @@ function refreshSeatCard(id: string): void {
   const el = document.getElementById('playercard');
   if (el && el.dataset.seat === id) el.innerHTML = `<div class="pcbox">${seatCardHtml(id)}</div>`;
   if (diploOpen) renderDiplo();
-  if (chatOpen && !chatMin) renderChatFeed();
+  chatWin.refreshIfVisible();
 }
 
 // --- session diplomacy & comms menu ------------------------------------------
@@ -6100,7 +6101,7 @@ function pushMsg(to: string, text: string, sys: boolean, from = ME, ping?: strin
   sessionMessages.push({ at: s.time, from, to, text, sys, ping, realAt: Date.now() });
   if (sessionMessages.length > 300) sessionMessages.shift();
   if (diploOpen && diploTab === 'msgs') renderDiploFeed();
-  if (chatOpen && !chatMin) renderChatFeed();
+  chatWin.refreshIfVisible();
 }
 
 /** Route an outgoing chat line for conversation key `key` (a group channel const or
@@ -10674,7 +10675,7 @@ function connect(): void {
           realAt: Date.now(),
         });
         if (diploOpen && diploTab === 'msgs') renderDiploFeed();
-        if (chatOpen && !chatMin) renderChatFeed();
+        chatWin.refreshIfVisible();
       },
       onPingRemoved: (pingId: string) => {
         sessionMessages = sessionMessages.filter((m) => m.pingId !== pingId);
@@ -10706,7 +10707,7 @@ function connect(): void {
         if (sessionMessages.length > 300) sessionMessages.shift();
         if (m.from !== ME) unreadMsgs++;
         if (diploOpen && diploTab === 'msgs') renderDiploFeed();
-        if (chatOpen && !chatMin) renderChatFeed();
+        chatWin.refreshIfVisible();
       },
       onError: (code) => {
         if (sock !== netSock) return; // ignore errors from a superseded socket
@@ -11647,7 +11648,7 @@ function topLayerOpen(): boolean {
     divDesignWin.classList.contains('show') ||
     marketWin.classList.contains('show') ||
     diploOpen ||
-    chatOpen ||
+    chatWin.isOpen() ||
     setupEl.style.display !== 'none' ||
     selFleet !== null ||
     selPlanet !== null ||
@@ -11705,8 +11706,8 @@ function closeTopLayer(): boolean {
     closeDiplo();
     return true;
   }
-  if (chatOpen) {
-    closeChat();
+  if (chatWin.isOpen()) {
+    chatWin.close();
     return true;
   }
   if (selFleet !== null || selPlanet !== null || selFleets.size > 0) {
@@ -12151,376 +12152,6 @@ document.getElementById('rail-msgs')?.addEventListener('click', () => {
   openDiplo('msgs');
 });
 
-// === floating chat window (desktop only) =====================================
-// A naive profanity scrub for the optional censor toggle — whole-word match, the
-// letters swapped for asterisks (length kept so the line doesn't reflow).
-const CHAT_BADWORDS = ['идиот', 'дурак', 'тупой', 'damn', 'hell', 'crap'];
-function censorText(text: string): string {
-  let out = text;
-  for (const w of CHAT_BADWORDS)
-    out = out.replace(new RegExp(w, 'gi'), (m) => '*'.repeat(m.length));
-  return out;
-}
-/** The chat's tabs: the three fixed group rooms, then a tab per DM that exists (plus
- *  the open one). Other rooms (e.g. a coalition-to-coalition line) join here later. */
-function chatChannels(): Array<{ key: string; label: string; icon: string }> {
-  const base = [
-    { key: CH_SESSION, label: t('chat.tab.session'), icon: '△' },
-    { key: CH_GLOBAL, label: t('chat.tab.global'), icon: '🌐' },
-    { key: COALITION, label: t('chat.tab.coalition'), icon: '⬡' },
-  ];
-  const dm = new Set<string>();
-  for (const m of sessionMessages) {
-    if (GROUP_CHANNELS.has(m.to)) continue;
-    if (m.from === ME) dm.add(m.to);
-    else if (m.to === ME) dm.add(m.from);
-  }
-  if (!GROUP_CHANNELS.has(chatTab)) dm.add(chatTab); // keep a freshly opened DM's tab
-  for (const id of dm)
-    if (s.players[id]) base.push({ key: id, label: NAME[id] ?? id, icon: seatBadge(id).icon });
-  return base;
-}
-function chatChannelLabel(key: string): string {
-  return chatChannels().find((c) => c.key === key)?.label ?? NAME[key] ?? key;
-}
-/** Cap geometry at half the screen and keep the window on-screen (title bar reachable). */
-function clampChatGeom(): void {
-  const maxW = Math.max(220, Math.floor(VW / 2));
-  const maxH = Math.max(150, Math.floor(VH / 2));
-  chatGeom.w = Math.max(220, Math.min(chatGeom.w, maxW));
-  chatGeom.h = Math.max(150, Math.min(chatGeom.h, maxH));
-  chatGeom.x = Math.max(0, Math.min(chatGeom.x, Math.max(0, VW - chatGeom.w)));
-  chatGeom.y = Math.max(46, Math.min(chatGeom.y, Math.max(46, VH - 40)));
-}
-/** Push geometry / opacity / font to the DOM without rebuilding it (frame-safe). */
-function applyChatGeom(): void {
-  const win = document.getElementById('chatwin');
-  if (!win) return;
-  const st = (win as HTMLElement).style;
-  st.left = chatGeom.x + 'px';
-  st.top = chatGeom.y + 'px';
-  st.width = chatGeom.w + 'px';
-  st.height = chatMin ? 'auto' : chatGeom.h + 'px';
-  // Transparency fades both the fill AND the frame (not element opacity — that would
-  // dim the settings popover and text too). Background and border alpha track together.
-  const k = 1 - chatCfg.transparency / 100;
-  st.background = `rgba(3,14,18,${(0.82 * k).toFixed(3)})`;
-  st.borderColor = `rgba(53,214,230,${k.toFixed(3)})`;
-  const feed = document.getElementById('cw-feed') as HTMLElement | null;
-  if (feed) feed.style.fontSize = chatCfg.fontPx + 'px';
-}
-function chatFeedInnerHtml(key: string): string {
-  const msgs = convoMessages(key);
-  if (!msgs.length)
-    return `<div class="cw-empty">${t('chat.win.empty', { ch: esc(chatChannelLabel(key)) })}<br>${t('chat.win.empty.hint')}</div>`;
-  const stamp: StampOpts = { day: chatCfg.showDay, time: chatCfg.showTime, real: chatCfg.showReal };
-  return msgs
-    .map((m) => convoLineHtml(chatCfg.censor ? { ...m, text: censorText(m.text) } : m, stamp))
-    .join('');
-}
-function renderChatFeed(): void {
-  const feed = document.getElementById('cw-feed');
-  if (!feed) return;
-  feed.innerHTML = chatFeedInnerHtml(chatTab);
-  (feed as HTMLElement).scrollTop = (feed as HTMLElement).scrollHeight;
-}
-/** Settings popover (flown out to the right): size (h,w on one line), font, colour
- *  (sub-only, label inline), censor, transparency, and the message-stamp toggles.
- *  Inputs carry data-cset; their handler patches state live and caches it. */
-function chatSettingsHtml(): string {
-  const maxW = Math.max(220, Math.floor(VW / 2));
-  const maxH = Math.max(150, Math.floor(VH / 2));
-  const chk = (on: boolean) => (on ? ' checked' : '');
-  return (
-    `<div class="cw-set">` +
-    `<h4>${t('settings.title')}</h4>` +
-    `<div class="cw-srow"><label>${t('chat.win.size')}</label>` +
-    `<input type="number" data-cset="h" min="150" max="${maxH}" value="${chatGeom.h}">` +
-    `<input type="number" data-cset="w" min="220" max="${maxW}" value="${chatGeom.w}"></div>` +
-    `<div class="cw-srow"><label>${t('chat.win.font')}</label><input type="number" data-cset="font" min="8" max="42" value="${chatCfg.fontPx}"></div>` +
-    `<div class="cw-srow"><label>${t('chat.win.color')}</label><input type="color" data-cset="color" value="#7fe7ff" disabled><span class="cw-sub">🔒 ${t('chat.win.color.premium')}</span></div>` +
-    `<div class="cw-srow"><label>${t('chat.win.censor')}</label><input type="checkbox" data-cset="censor"${chk(chatCfg.censor)}></div>` +
-    `<div class="cw-srow"><label>${t('chat.win.opacity')}</label><input type="range" data-cset="opacity" min="0" max="100" value="${chatCfg.transparency}"><span class="cw-opval">${chatCfg.transparency}%</span></div>` +
-    `<div class="cw-shdr">${t('chat.win.stamp')}</div>` +
-    `<div class="cw-srow"><label>${t('chat.win.stamp.day')}</label><input type="checkbox" data-cset="showDay"${chk(chatCfg.showDay)}></div>` +
-    `<div class="cw-srow"><label>${t('chat.win.stamp.time')}</label><input type="checkbox" data-cset="showTime"${chk(chatCfg.showTime)}></div>` +
-    `<div class="cw-srow"><label>${t('chat.win.stamp.real')}</label><input type="checkbox" data-cset="showReal"${chk(chatCfg.showReal)}></div>` +
-    `</div>`
-  );
-}
-/** Full (innerHTML) rebuild — only on an interaction (open / tab / button), never per
- *  frame. Geometry/feed are then applied/patched in place. */
-function renderChat(): void {
-  const win = document.getElementById('chatwin');
-  if (!win) return;
-  win.classList.toggle('open', chatOpen);
-  win.classList.toggle('min', chatMin);
-  win.classList.toggle('pinned', chatPinned);
-  if (!chatOpen) {
-    win.innerHTML = '';
-    return;
-  }
-  const tabs = chatChannels()
-    .map(
-      (c) =>
-        `<button class="cw-tab${c.key === chatTab ? ' on' : ''}" data-cwtab="${esc(c.key)}" title="${esc(c.label)}">${c.icon} ${esc(c.label)}</button>`,
-    )
-    .join('');
-  win.innerHTML =
-    `<div class="cw-head" data-cwhead title="${chatPinned ? '' : t('chat.win.drag')}">` +
-    `<span class="cw-title">${t('chat.win.title', { ch: esc(chatChannelLabel(chatTab)) })}</span>` +
-    `<button class="cw-btn${chatPinned ? ' on' : ''}" data-cwact="pin" title="${t('chat.win.pin')}">📎</button>` +
-    `<button class="cw-btn${chatSettingsOpen ? ' on' : ''}" data-cwact="settings" title="${t('chat.win.settings')}">⚙</button>` +
-    `<button class="cw-btn" data-cwact="min" title="${chatMin ? t('chat.win.expand') : t('chat.win.collapse')}">${chatMin ? '▢' : '—'}</button>` +
-    `</div>` +
-    `<div class="cw-tabs">${tabs}</div>` +
-    `<div class="cw-feed" id="cw-feed">${chatFeedInnerHtml(chatTab)}</div>` +
-    `<div class="cw-compose"><input id="cw-text" type="text" maxlength="240" placeholder="${t('chat.input.ph')}" autocomplete="off"><button class="cw-send" data-cwact="send" title="${t('chat.win.send')}">▶</button></div>` +
-    (chatSettingsOpen ? chatSettingsHtml() : '');
-  applyChatGeom();
-  const feed = document.getElementById('cw-feed') as HTMLElement | null;
-  if (feed) feed.scrollTop = feed.scrollHeight;
-}
-const CHAT_STORE_KEY = 'vd.chat.v1';
-/** Persist chat preferences client-side (localStorage) — never on the server, so the
- *  same machine reopens to the same look. Geometry, pin and every setting ride along. */
-function saveChat(): void {
-  try {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(
-      CHAT_STORE_KEY,
-      JSON.stringify({ cfg: chatCfg, geom: chatGeom, pinned: chatPinned }),
-    );
-  } catch {
-    /* storage disabled / full — preferences just won't persist */
-  }
-}
-/** Restore cached chat preferences (once, at startup). Marks the window placed so its
- *  first open uses the saved geometry instead of the default bottom-left parking. */
-function loadChat(): void {
-  try {
-    if (typeof localStorage === 'undefined') return;
-    const raw = localStorage.getItem(CHAT_STORE_KEY);
-    if (!raw) return;
-    const v = JSON.parse(raw) as {
-      cfg?: Partial<typeof chatCfg>;
-      geom?: Partial<typeof chatGeom>;
-      pinned?: boolean;
-    };
-    if (v.cfg) Object.assign(chatCfg, v.cfg);
-    if (v.geom) {
-      Object.assign(chatGeom, v.geom);
-      chatPlaced = true;
-    }
-    if (typeof v.pinned === 'boolean') chatPinned = v.pinned;
-  } catch {
-    /* corrupt cache — fall back to defaults */
-  }
-}
-function openChat(): void {
-  if (MOBILE) return;
-  chatOpen = true;
-  chatMin = false;
-  if (!chatPlaced) {
-    // First open (no cached geometry): park it in the bottom-left corner.
-    chatGeom.w = Math.min(360, Math.max(220, Math.floor(VW / 2)));
-    chatGeom.h = Math.min(300, Math.max(150, Math.floor(VH / 2)));
-    chatGeom.x = 12;
-    chatGeom.y = Math.max(46, VH - chatGeom.h - 12);
-    chatPlaced = true;
-    saveChat();
-  }
-  clampChatGeom();
-  renderChat();
-  (document.getElementById('cw-text') as HTMLInputElement | null)?.focus?.();
-}
-function closeChat(): void {
-  chatOpen = false;
-  chatMin = false;
-  renderChat();
-}
-function sendChatMsg(): void {
-  const input = document.getElementById('cw-text') as HTMLInputElement | null;
-  const text = input?.value.trim();
-  if (!text) return;
-  dispatchChat(chatTab, text); // NET: server relay + echo; solo: local append
-  if (input) {
-    input.value = '';
-    input.focus?.();
-  }
-}
-/** Mirror a drag back into the size fields while the settings popover is open. */
-function syncChatSizeInputs(): void {
-  const w = document.querySelector('[data-cset="w"]') as HTMLInputElement | null;
-  const h = document.querySelector('[data-cset="h"]') as HTMLInputElement | null;
-  if (w) w.value = String(chatGeom.w);
-  if (h) h.value = String(chatGeom.h);
-}
-/** Which window edge (n/s/e/w + corners, or '') the pointer is within a few px of —
- *  drives both the resize cursor and which edge a drag from here moves. */
-function chatEdgeAt(e: PointerEvent): string {
-  if (!chatwinEl) return '';
-  const r = (chatwinEl as HTMLElement).getBoundingClientRect();
-  const EDGE = 7;
-  const x = e.clientX - r.left;
-  const y = e.clientY - r.top;
-  let d = '';
-  if (y <= EDGE) d += 'n';
-  else if (y >= r.height - EDGE) d += 's';
-  if (x <= EDGE) d += 'w';
-  else if (x >= r.width - EDGE) d += 'e';
-  return d;
-}
-function chatResizeCursor(d: string): string {
-  if (d === 'n' || d === 's') return 'ns-resize';
-  if (d === 'e' || d === 'w') return 'ew-resize';
-  if (d === 'ne' || d === 'sw') return 'nesw-resize';
-  if (d === 'nw' || d === 'se') return 'nwse-resize';
-  return '';
-}
-loadChat(); // restore cached preferences before the window can be opened
-document
-  .getElementById('rail-chat')
-  ?.addEventListener('click', () => (chatOpen ? closeChat() : openChat()));
-const chatwinEl = document.getElementById('chatwin');
-if (chatwinEl) {
-  // Begin a gesture: a drag near any edge resizes in that direction; a drag on the
-  // title bar moves the window. The pin (📎) locks both. Interactive controls opt out.
-  chatwinEl.addEventListener('pointerdown', (e) => {
-    const t = e.target as HTMLElement;
-    if (t.closest('button, input, .cw-tab, .cw-set')) return;
-    if (chatPinned) return;
-    const pe = e as PointerEvent;
-    const dir = chatMin ? '' : chatEdgeAt(pe); // collapsed → no resize, header still moves
-    const onHead = !!t.closest('[data-cwhead]');
-    if (!dir && !onHead) return;
-    e.preventDefault();
-    chatDrag = {
-      mode: dir ? 'resize' : 'move',
-      dir,
-      px: pe.clientX,
-      py: pe.clientY,
-      gx: chatGeom.x,
-      gy: chatGeom.y,
-      gw: chatGeom.w,
-      gh: chatGeom.h,
-    };
-  });
-  // Hover cursor: show the resize arrow when near an edge (unless pinned/collapsed).
-  chatwinEl.addEventListener('pointermove', (e) => {
-    if (chatDrag) return; // an active gesture owns the cursor
-    const dir = !chatPinned && !chatMin ? chatEdgeAt(e as PointerEvent) : '';
-    (chatwinEl as HTMLElement).style.cursor = chatResizeCursor(dir);
-  });
-  // Tabs / head buttons / send.
-  chatwinEl.addEventListener('click', (e) => {
-    const t = e.target as HTMLElement;
-    const nick = (t.closest('[data-nickseat]') as HTMLElement | null)?.dataset.nickseat;
-    if (nick) return openSeatCard(nick);
-    const tab = (t.closest('[data-cwtab]') as HTMLElement | null)?.dataset.cwtab;
-    if (tab) {
-      chatTab = tab;
-      renderChat();
-      (document.getElementById('cw-text') as HTMLInputElement | null)?.focus?.();
-      return;
-    }
-    const act = (t.closest('[data-cwact]') as HTMLElement | null)?.dataset.cwact;
-    if (act === 'pin') {
-      chatPinned = !chatPinned;
-      saveChat();
-      renderChat();
-    } else if (act === 'settings') {
-      chatSettingsOpen = !chatSettingsOpen;
-      renderChat();
-    } else if (act === 'min') {
-      chatMin = !chatMin;
-      renderChat();
-    } else if (act === 'send') {
-      sendChatMsg();
-    }
-  });
-  chatwinEl.addEventListener('keydown', (e) => {
-    const ke = e as KeyboardEvent;
-    if (ke.key === 'Enter' && (ke.target as HTMLElement).id === 'cw-text') {
-      e.preventDefault();
-      sendChatMsg();
-    }
-  });
-  // Live settings: size/font/opacity patch geometry in place (no rebuild → no focus
-  // loss); stamp + censor toggles repaint just the feed. Every change is cached.
-  chatwinEl.addEventListener('input', (e) => {
-    const t = e.target as HTMLInputElement;
-    const k = t.dataset.cset;
-    if (!k) return;
-    if (k === 'w') {
-      chatGeom.w = Number(t.value) || chatGeom.w;
-      clampChatGeom();
-      applyChatGeom();
-    } else if (k === 'h') {
-      chatGeom.h = Number(t.value) || chatGeom.h;
-      clampChatGeom();
-      applyChatGeom();
-    } else if (k === 'font') {
-      chatCfg.fontPx = Math.max(8, Math.min(42, Number(t.value) || chatCfg.fontPx));
-      applyChatGeom();
-    } else if (k === 'opacity') {
-      chatCfg.transparency = Math.max(0, Math.min(100, Number(t.value) || 0));
-      applyChatGeom();
-      const lbl = chatwinEl.querySelector('.cw-opval');
-      if (lbl) lbl.textContent = chatCfg.transparency + '%';
-    } else if (k === 'censor') {
-      chatCfg.censor = t.checked;
-      renderChatFeed();
-    } else if (k === 'showDay') {
-      chatCfg.showDay = t.checked;
-      renderChatFeed();
-    } else if (k === 'showTime') {
-      chatCfg.showTime = t.checked;
-      renderChatFeed();
-    } else if (k === 'showReal') {
-      chatCfg.showReal = t.checked;
-      renderChatFeed();
-    }
-    saveChat();
-  });
-}
-if (typeof window !== 'undefined') {
-  window.addEventListener('pointermove', (e) => {
-    if (!chatDrag) return;
-    const pe = e as PointerEvent;
-    const dx = pe.clientX - chatDrag.px;
-    const dy = pe.clientY - chatDrag.py;
-    if (chatDrag.mode === 'move') {
-      chatGeom.x = chatDrag.gx + dx;
-      chatGeom.y = chatDrag.gy + dy;
-    } else {
-      const maxW = Math.max(220, Math.floor(VW / 2));
-      const maxH = Math.max(150, Math.floor(VH / 2));
-      const d = chatDrag.dir;
-      // Edges anchored opposite the drag: pulling 'w'/'n' moves that edge while the
-      // far edge stays put (so the box grows toward the pointer, not away from it).
-      if (d.includes('e')) chatGeom.w = chatDrag.gw + dx;
-      if (d.includes('s')) chatGeom.h = chatDrag.gh + dy;
-      if (d.includes('w')) {
-        const nw = Math.max(220, Math.min(chatDrag.gw - dx, maxW));
-        chatGeom.x = chatDrag.gx + (chatDrag.gw - nw);
-        chatGeom.w = nw;
-      }
-      if (d.includes('n')) {
-        const nh = Math.max(150, Math.min(chatDrag.gh - dy, maxH));
-        chatGeom.y = chatDrag.gy + (chatDrag.gh - nh);
-        chatGeom.h = nh;
-      }
-    }
-    clampChatGeom();
-    applyChatGeom();
-    if (chatDrag.mode === 'resize' && chatSettingsOpen) syncChatSizeInputs();
-  });
-  window.addEventListener('pointerup', () => {
-    if (chatDrag) saveChat(); // cache the new geometry once the drag ends
-    chatDrag = null;
-  });
-}
 
 function toggleSet<T>(set: Set<T>, v: T): void {
   if (set.has(v)) set.delete(v);
