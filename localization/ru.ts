@@ -507,25 +507,8 @@ export const ru: Record<string, string> = {
   'diplo.win.title': 'ДИПЛОМАТИЯ',
 
   // --- div — Дивизии: список, мобилизация, конструктор, трюм.
-  'div.damage-vs': 'Урон по:',
-  'div.designer': '⚙ Конструктор',
-  'div.empty': 'Нет дивизий.',
-  'div.empty.hint': 'Нет дивизий — мобилизуй по шаблону ниже.',
-  'div.hold': 'Дивизии ⇄ трюм (своб. {n})',
-  'div.hold.note': 'Загрузка погружает дивизию в трюм. Выгрузка высаживает её на этот мир.',
-  'div.mobilize': 'Мобилизация',
-  'div.mobilize.named': 'Мобилизовать «{name}»',
-  'div.note':
-    'Дивизия — снапшот шаблона: правка шаблона в конструкторе не меняет уже собранные. На своём мире +1 HP/юнит/день.',
-  'div.officer-locked': 'Именной шаблон офицера: состав закреплён, редактировать нельзя.',
-  'div.rename': 'Переименовать',
-  'div.roster': 'состав {n}/{s} · {rest}',
-  'div.slot.note':
-    'Тап по слоту меняет род войск: ополчение → тяжёлая пехота → спецназ → танк. Танки бьют любую пехоту; спецназ — единственная пехота, опасная танкам; тяжёлая пехота держит оборону.',
   'div.stat.attack': 'атака',
   'div.stat.defense': 'оборона',
-  'div.stat.hp': 'живучесть',
-  'div.title': 'Дивизии',
 
   // --- dossier — Досье объектов: здания, корабли, стройка в очереди, вкладки и характеристики.
   'dossier.building.barracks':
@@ -649,31 +632,8 @@ export const ru: Record<string, string> = {
   'fmt.minutes': '{n}м',
 
   // --- form — Рода войск дивизии.
-  'form.heavy-infantry': 'Тяжёлая пехота',
-  'form.militia': 'Ополчение',
-  'form.special-forces': 'Спецназ',
-  'form.syn.armor.desc': '≥3 танков — ударный клин',
-  'form.syn.armor.name': 'Танковый кулак',
-  'form.syn.combined.desc': 'Пехота и танки в одном строю',
-  'form.syn.combined.name': 'Комбинированные войска',
-  'form.syn.entrench.desc': '≥3 тяжёлой пехоты держат рубеж',
-  'form.syn.entrench.name': 'Окопались',
-  'form.syn.raid.desc': '≥2 спецназа без ополчения',
-  'form.syn.raid.name': 'Рейдовая доктрина',
-  'form.syn.wave.desc': '≥4 ополчения — берут числом',
-  'form.syn.wave.name': 'Людская волна',
-  'form.tank': 'Танк',
-  'form.tpl.breakthrough': 'Гвардия прорыва',
-  'form.tpl.fist': 'Кулак',
-  'form.tpl.iron-line': 'Железный рубеж',
-  'form.tpl.line': 'Линия',
-  'form.tpl.raid': 'Рейд',
-  'form.tpl.supply': 'Колонна снабжения',
 
   // --- ground — Наземный бой: офицеры дивизии.
-  'ground.officer.assault': 'Штурмовик',
-  'ground.officer.defender': 'Командир обороны',
-  'ground.officer.quartermaster': 'Снабженец',
 
   // --- hint — Подсказки режима прицеливания на карте.
   'hint.aim-cancelled': 'прицеливание отменено',
@@ -884,18 +844,6 @@ export const ru: Record<string, string> = {
   'yard.cost.modules': 'Модули ×{n}',
   'yard.cost.total': 'Итого',
   'yard.cost.with-modules': 'Итог с модулями',
-  'yard.div.attack': 'Атака',
-  'yard.div.cost': 'Стоимость мобилизации',
-  'yard.div.defense': 'Оборона',
-  'yard.div.doctrine': 'Доктрина состава',
-  'yard.div.doctrine.note': 'Смешай рода войск — состав задаёт доктрину.',
-  'yard.div.empty': 'Нет шаблонов.',
-  'yard.div.hull': 'Корпус',
-  'yard.div.note':
-    'Тап по слоту: пусто → пехота → танк. Мобилизация дивизии — в панели своего мира (вкладка «Дивизии»).',
-  'yard.div.slot-empty': 'пусто',
-  'yard.div.slots': '{n}/{s} юнитов · тапни слот, чтобы менять род войск',
-  'yard.div.total': 'Итог по формации',
   'yard.free': 'бесплатно',
   'yard.hull.none': 'В арсенале нет корпусов этого класса.',
   'yard.hull.unavailable': 'Корпус недоступен.',
@@ -918,7 +866,6 @@ export const ru: Record<string, string> = {
   'yard.slots.count': '{n} слота под модули (по размеру корпуса)',
   'yard.slots.note':
     'Типизированные слоты: модуль встаёт только в свой тип. <b>Серые</b> — не для свободного слота или уже стоят.',
-  'yard.tab.army': 'Армия',
   'yard.tab.heroes': 'Герои',
   'yard.tab.ships': 'Корабли',
   'yard.tab.squads': 'Эскадрильи',

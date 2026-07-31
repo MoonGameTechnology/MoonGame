@@ -43,24 +43,9 @@ import {
   STANCE_RANK,
   canTraverse,
   START_CANDIDATES,
-  DEFAULT_TEMPLATES,
-  FORMATION_UNITS,
-  FORMATION_SLOTS,
-  FORM_RU,
-  formationStats,
-  divisionsOf,
-  templatesOf,
-  mobilizeDivision,
-  OFFICER_TEMPLATES,
-  setDivisionTemplate,
-  loadDivision,
-  unloadDivision,
   designateCapital,
   capitalOf,
   isInhabited,
-  divisionCargo,
-  fleetCargoFree,
-  type FormationTemplate,
   type SetupConfig,
   type SeatConfig,
   type StepOut,
@@ -108,7 +93,6 @@ import {
 import { fleetCallsign, fleetKindKey } from './fleetName';
 import { planetName } from './planetName';
 import { provinceScore } from '../../packages/shared-core/src/state/sectorKind';
-import { OFFICERS } from './groundcombat';
 import { DEFAULT_HEROES, type HeroLoadout } from './heroes';
 import { DEFAULT_SHIP_LOADOUTS, type ShipLoadout } from './ships';
 // The «Оснащение корабля» loadout constructor reuses the framework-agnostic view-model
@@ -201,7 +185,6 @@ import {
   BUILD_ICON,
   KIND_ICON,
   SOV_SVG,
-  formIcon,
   unitIcon,
   unitIconHtml,
   archPath2d,
@@ -238,7 +221,6 @@ import {
 // (`arsenalScreen.ts`, REFM-5 — `initArsenal(hooks)` owns its cache and markup).
 import { originOf } from './arsenal';
 // H4 — конструктор шаблонов дивизий: модель в `formations.ts`, редактор — REFM-8.
-import { initDivDesign } from './divisionDesigner';
 // TT-3.1 — экран дерева технологий (REFM-9); `branchLabel` берёт ещё совет учёных.
 import { initTechTree, branchLabel } from './techTree';
 // «Профиль командира» — карьерное досье (REFM-10).
@@ -468,7 +450,22 @@ const BUILDABLE = [
 // the player builds it like a fort. It fires on hostile fleets over the world (core
 // `aaStrengthAt` sums building AA) but does NOT block ground capture — only ground troops
 // do that. A space fortress also comes with one pre-installed (installFortressAA).
-const BUILD_UNITS = ['cruiser', 'scout', 'siege', 'strike_carrier', 'fighter_squadron'];
+// H4-REVERT: наземные юниты вернулись в общий конвейер. Пока их поднимала мобилизация
+// дивизии, этот массив был чисто космическим — и снос дивизий без этой строки оставил
+// бы игрока вовсе без сухопутных войск, то есть без второй фазы захвата мира.
+// Панель уже раскладывает их по своим полкам (`groundBuilds` / `shipBuilds` /
+// `wingBuilds` фильтруют этот же список), так что достаточно их сюда вписать.
+const BUILD_UNITS = [
+  'cruiser',
+  'scout',
+  'siege',
+  'strike_carrier',
+  'fighter_squadron',
+  'militia',
+  'heavy_infantry',
+  'special_forces',
+  'tank',
+];
 // A small glyph per province KIND, drawn above each province so its type reads at a
 // glance (planet / asteroid / nebula / wreck-field / storm / …). Text glyphs only.
 let ME = 'p1';
@@ -691,7 +688,6 @@ let fleetInfoFor: string | null = null;
 // Тап по имени МИРА открывает карточку статистики планеты (какой мир сейчас в
 // режиме сводки; другой мир в панели → обычная карточка сама собой).
 let planetInfoFor: string | null = null;
-let mobTplIdx = 0; // which division template the mobilisation panel is assembling
 const buildQueues: Record<string, PlanetBuildQueue> = {};
 const logLines: string[] = [];
 let lastAiAt = 0;
@@ -1635,116 +1631,10 @@ function artilleryRangeOf(f: Fleet | undefined): number {
   return r;
 }
 
-/** The "Дивизии" block for an owned planet: garrisoned divisions + a mobilise row for
- *  the player's 3 locked templates (cost + affordability). */
-function divisionsHtml(planetId: string): string {
-  const here = Object.values(divisionsOf(s)).filter(
-    (d) => d.owner === ME && d.location === planetId,
-  );
-  let h = `<div class="sec">${t('div.title')}</div>`;
-  if (here.length) {
-    for (const d of here) {
-      const comp = d.units.map((u) => `${formIcon(u.type, pcUi())}${u.count}`).join(' ') || '—';
-      const hp = Math.round(d.units.reduce((n, u) => n + u.hp, 0));
-      const off = d.officer ? t(OFFICERS[d.officer]?.name ?? '') : '';
-      // Офицер — часть ИМЕННОГО шаблона (готовый, менять нельзя): показываем, не редактируем.
-      h += `<div class="asset-row" data-desc="division"><span class="bicon">⊞</span><b>${esc(t(d.name))}</b><span class="dim">${comp} · ❤${hp}${off ? ' · ★' + esc(off) : ''}</span></div>`;
-    }
-  } else {
-    h += `<div class="row dim">${pcUi() ? t('div.empty') : t('div.empty.hint')}</div>`;
-  }
-  const tpls = templatesOf(s, ME);
-  const res = s.players[ME]?.resources ?? {};
-  // Stellaris-style: the panel only PICKS a ready design and mobilises it; editing
-  // lives in the designer window («⚙ Конструктор»). Named officer templates ride
-  // after the custom three, marked ★ — ready-made, composition locked.
-  const officerBase = tpls.length;
-  const all: Array<{ tpl: FormationTemplate; officer?: string }> = [
-    ...tpls.map((tpl) => ({ tpl })),
-    ...OFFICER_TEMPLATES.map((tpl) => ({ tpl, officer: tpl.officer })),
-  ];
-  const idx = Math.max(0, Math.min(mobTplIdx, all.length - 1));
-  const pick = all[idx]!;
-  h += `<div class="sec">${t('div.mobilize')}</div>`;
-  h += `<div class="row">`;
-  for (let i = 0; i < all.length; i++) {
-    const star = all[i]!.officer ? '★ ' : '';
-    h += btn('mobtpl', String(i), star + esc(t(all[i]!.tpl.name)), i !== idx);
-  }
-  h += `</div>`;
-  const f = formationStats(pick.tpl);
-  const afford = Object.entries(f.cost).every(([r, a]) => (res[r] ?? 0) >= a);
-  const slots = pick.tpl.slots.filter(Boolean) as string[];
-  const offLine = pick.officer ? ` · ★${esc(t(OFFICERS[pick.officer]?.name ?? ''))}` : '';
-  if (pcUi()) {
-    // PC: every icon self-describes on hover — composition glyphs → unit dossiers,
-    // ⚔/🛡/❤ → the stat's name, cost glyphs → the resource's name.
-    const comp =
-      slots.map((u) => `<span data-desc="u:${esc(u)}">${formIcon(u, pcUi())}</span>`).join('') || '—';
-    const cost =
-      Object.entries(f.cost)
-        .map(([r, a]) => `<span data-desc="res:${esc(r)}">${a}${TECH_CUR[r] ?? r[0]}</span>`)
-        .join(' ') || '—';
-    h += `<div class="row dim">${comp} · <span data-desc="stat:datk">⚔${f.attack}</span> <span data-desc="stat:ddef">🛡${f.defense}</span> <span data-desc="stat:dhp">❤${f.hp}</span>${offLine} · ${cost}</div>`;
-  } else {
-    const comp = slots.map((u) => formIcon(u, pcUi())).join('') || '—';
-    const cost =
-      Object.entries(f.cost)
-        .map(([r, a]) => `<span class="rc-${r}">${a}${TECH_CUR[r] ?? r[0]}</span>`)
-        .join(' ') || '—';
-    h += `<div class="row dim">${comp} · ⚔${f.attack} 🛡${f.defense} ❤${f.hp}${offLine} · ${cost}</div>`;
-  }
-  h += `<div class="row">`;
-  h += btn(
-    'mobilize',
-    pick.officer ? `o${idx - officerBase}` : String(idx),
-    t('div.mobilize.named', { name: esc(t(pick.tpl.name)) }),
-    afford && f.count > 0,
-    pcUi() ? 'division' : undefined,
-  );
-  h += btn('divdesign', '', t('div.designer'), true, pcUi() ? 'act:divdesign' : undefined);
-  h += `</div>`;
-  // PC dropped this hint (its content lives in hover dossiers); mobile keeps it.
-  if (!pcUi()) {
-    h += `<div class="hint">${t('div.note')}</div>`;
-  }
-  return h;
-}
 
 /** Division ⇄ hold transport for a docked fleet `f` over world `here`: load the
  *  player's garrisoning divisions (if they fit the free hold) and unload the ones it
  *  carries (onto an enemy world = a landing). Empty string when there's nothing to do. */
-function fleetDivisionsHtml(f: Fleet, here: Planet): string {
-  const all = Object.values(divisionsOf(s));
-  const carried = all.filter((d) => d.carriedBy === f.id);
-  const loadable = all.filter(
-    (d) => d.owner === ME && d.carriedBy == null && d.location === here.id,
-  );
-  if (!carried.length && !loadable.length) return '';
-  // Clamp the readout: a carrier that lost ships while loaded can hold more footprint
-  // than its remaining capacity (carried footprint is reserved at load time, not
-  // re-validated against later losses), so raw free can go negative.
-  const free = Math.max(0, fleetCargoFree(s, f));
-  let g = `<div class="sec">${t('div.hold', { n: free })}</div>`;
-  if (loadable.length) {
-    g += `<div class="row">`;
-    for (const d of loadable) {
-      const c = divisionCargo(d);
-      g += btn('divload', d.id, `▲ ${esc(d.name)} (${c})`, c <= free);
-    }
-    g += `</div>`;
-  }
-  if (carried.length) {
-    g += `<div class="row">`;
-    for (const d of carried) {
-      const comp = d.units.map((u) => `${formIcon(u.type, pcUi())}${u.count}`).join('') || '—';
-      g += btn('divunload', d.id, `▼ ${esc(d.name)} ${comp}`, true);
-    }
-    g += `</div>`;
-  }
-  g += `<div class="hint">${t('div.hold.note')}</div>`;
-  return g;
-}
 
 const ORBIT_R = 44; // single orbit-ring radius in screen px (before the zoom bloom)
 // Past this camera zoom the orbital layer "opens up": rings widen and stationed
@@ -2472,6 +2362,13 @@ interface PendingLoad {
 }
 let pendingLoads: PendingLoad[] = [];
 
+/** Свободный трюм флота: грузоподъёмность кораблей минус уже погруженный десант.
+ *  До H4-REVERT это считал `fleetCargoFree` из division.ts, потому что трюм делили
+ *  с дивизиями; теперь делить не с кем — остаётся одно вычитание. */
+function holdFree(f: Fleet): number {
+  return sumUnitStat(f.units, data, 'cargoCapacity') - sumUnitStat(f.landing ?? [], data, 'cargoSize');
+}
+
 /** Hold footprint (cargoSize) already reserved by this fleet's in-progress loads. */
 function pendingLoadCargo(fleetId: string): number {
   let n = 0;
@@ -2500,7 +2397,7 @@ function beginLoad(fleetId: string, unit: string): void {
   const f = s.fleets[fleetId];
   if (!f || f.movement || f.battleId || !f.location) return;
   const need = data.units[unit]?.stats.cargoSize ?? 1;
-  if (need > fleetCargoFree(s, f) - pendingLoadCargo(fleetId)) {
+  if (need > holdFree(f) - pendingLoadCargo(fleetId)) {
     note('✖ ' + t('cargo.hold-full')); // hold full once the loads already in progress land
     return;
   }
@@ -4733,10 +4630,6 @@ function render(now: number) {
 
   // fleets — glowing chevrons on their orbit ring (stationed) or along the lane
   cx.textAlign = 'center';
-  // carried divisions per fleet (rendered as cargo diamonds) — counted once.
-  const carriedDivCount: Record<string, number> = {};
-  for (const d of Object.values(divisionsOf(s)))
-    if (d.carriedBy) carriedDivCount[d.carriedBy] = (carriedDivCount[d.carriedBy] ?? 0) + 1;
   for (const f of Object.values(s.fleets)) {
     if (!fleetSeen(f)) {
       // not identified and no intel window: a radar contact is shown only as a
@@ -4863,10 +4756,9 @@ function render(now: number) {
     // troops). A loading pip (~1h) fills up in place inside its shape's row. Cell
     // centres ride the rotated baseline, the pips themselves stay upright.
     const loads = pendingLoads.filter((p) => p.fleetId === f.id); // empty for enemy/idle fleets
-    type CargoPip = { kind: 'div' | 'wing' | 'troop' | 'load'; load?: PendingLoad };
-    const diaRow: CargoPip[] = []; // ромбы: дивизии + эскадрильи в трюме
+    type CargoPip = { kind: 'wing' | 'troop' | 'load'; load?: PendingLoad };
+    const diaRow: CargoPip[] = []; // ромбы: эскадрильи в трюме
     const sqRow: CargoPip[] = []; // квадраты: десант
-    for (let i = 0; i < (carriedDivCount[f.id] ?? 0); i++) diaRow.push({ kind: 'div' });
     for (let i = 0; i < wingPips; i++) diaRow.push({ kind: 'wing' });
     for (let i = 0; i < troops; i++) sqRow.push({ kind: 'troop' });
     for (const p of loads) (isSquadron(p.unit) ? diaRow : sqRow).push({ kind: 'load', load: p });
@@ -4879,7 +4771,6 @@ function render(now: number) {
     });
     const CELL = 8,
       SQ = 5,
-      DR = 3.75,
       DS = 3.1, // squadron pip: a diamond with the footprint of the square
       MAX = 8; // per-row cap; rare overflow gets a "+N" tail
     const diamond = (cxr: number, cyr: number, r: number, fill: boolean): void => {
@@ -4905,11 +4796,11 @@ function render(now: number) {
       for (let i = 0; i < n; i++) {
         const pip = row[i]!;
         const c0 = tailAt(lx, ly);
-        if (pip.kind === 'div' || pip.kind === 'wing') {
-          // carried division / hold squadron → a solid diamond ("ромбик")
+        if (pip.kind === 'wing') {
+          // hold squadron → a solid diamond ("ромбик")
           cx.fillStyle = rgba(col, 0.85);
           cx.strokeStyle = rgba(col, 0.95);
-          diamond(c0.x, c0.y, pip.kind === 'div' ? DR : DS, true);
+          diamond(c0.x, c0.y, DS, true);
         } else if (pip.kind === 'troop') {
           // loaded troop → solid square
           const x = c0.x - SQ / 2,
@@ -5520,7 +5411,7 @@ function fleetPanelHtml(f: Fleet): string {
       const groundHere = here!.garrison.filter((st) => isGround(st.unit));
       const carried = f.landing ?? [];
       const loadingN = pendingLoads.filter((p) => p.fleetId === f.id).length;
-      const freeHold = fleetCargoFree(s, f) - pendingLoadCargo(f.id); // reserve in-progress loads
+      const freeHold = holdFree(f) - pendingLoadCargo(f.id); // reserve in-progress loads
       if (groundHere.length) {
         ga += `<div class="row">`;
         for (const st of groundHere) {
@@ -5545,8 +5436,6 @@ function fleetPanelHtml(f: Fleet): string {
         ga += `<div class="row dim">${t('side.ground.empty')}</div>`;
       cols.push(ga);
     }
-    const dh = fleetDivisionsHtml(f, here!); // load/unload divisions (landing on a hostile world)
-    if (dh) cols.push(dh);
     h += pcols(cols);
   }
   return h;
@@ -5766,7 +5655,6 @@ function planetPanelHtml(p: Planet): string {
         (pcUi() ? garrisonTilesHtml(ground) : unitRows(ground)),
     );
     if (mine) {
-      cols.push(divisionsHtml(p.id));
       const groundBuilds = BUILD_UNITS.filter((u) => isGround(u));
       cols.push(
         `<div class="sec">${t('side.ground.conveyor')}</div>` +
@@ -7244,15 +7132,6 @@ side.addEventListener('click', (ev) => {
     // there) — a plain local removal, no action needed.
     const [qLane, qIdx] = arg.split(':');
     queueOf(selPlanet!)[qLane as BuildLane].splice(Number(qIdx), 1);
-  } else if (act === 'mobtpl') {
-    mobTplIdx = Number(arg); // switch which template the assembler shows (local, re-renders)
-  } else if (act === 'mobilize') {
-    // 'oN' = named officer premade (locked composition, officer attached server-side).
-    if (arg.startsWith('o'))
-      playerOrder(mobilizeDivision(ME, selPlanet!, Number(arg.slice(1)), true));
-    else playerOrder(mobilizeDivision(ME, selPlanet!, Number(arg)));
-  } else if (act === 'divdesign') {
-    divDesign.open(Math.min(mobTplIdx, templatesOf(s, ME).length - 1));
   } else if (act === 'spyplanet') {
     playerOrder(spyOn(ME, arg, 'planet', selPlanet!)); // arg = the world's (last known) owner
   } else if (act === 'capital') {
@@ -7291,10 +7170,6 @@ side.addEventListener('click', (ev) => {
     beginLoad(selFleet!, arg); // ~1h timed load (animated in the marker)
   } else if (act === 'unload') {
     playerOrder(unloadArmy(ME, selFleet!, arg, 1));
-  } else if (act === 'divload') {
-    playerOrder(loadDivision(ME, arg, selFleet!));
-  } else if (act === 'divunload') {
-    playerOrder(unloadDivision(ME, arg));
   }
   lastPanelHtml = '';
   renderPanel();
@@ -8215,26 +8090,11 @@ logWin?.addEventListener('click', (e) => {
 // grouped by branch, show cost + status, and gate on prerequisites / day / affordability.
 const techWin = $('tech');
 
-// --- division template designer (H4, Stellaris-style) ------------------------------
-// The editor lives in `divisionDesigner.ts` (REFM-8); here it gets its hooks. The
-// `#divdesign` handle stays: the Android-Back layer stack holds it, and the planet
-// panel opens it.
-const divDesignWin = $('divdesign');
-const divDesign = initDivDesign({
-  root: () => divDesignWin,
-  body: () => $('divdesignbody'),
-  state: () => s,
-  me: () => ME,
-  pcUi,
-  order: playerOrder,
-  onClose: () => {
-    lastPanelHtml = ''; // the mobilise picker mirrors the templates — refresh it
-  },
-});
-
 // Капсулы бара рисуют общий словарь RES_SVG (icons.ts) — те же линии и тот же
 // цвет несут ценники, стакан рынка и дерево технологий: один взгляд на бар учит
-// читать все остальные поверхности.// --- TT-3.1: экран-дерево технологий ------------------------------------------
+// читать все остальные поверхности.
+
+// --- TT-3.1: экран-дерево технологий ------------------------------------------
 // Само окно живёт в `techTree.ts` (REFM-9); здесь только его хуки. Ручка `#tech`
 // остаётся: её держат реестр слоёв Android-Back и троттлинг живой перерисовки в
 // кадровом цикле, а «Хранитель» открывает окно через `techTree.open()`.
@@ -8668,19 +8528,17 @@ document.getElementById('rail-market')?.addEventListener('click', () => market.o
 // @void/client `loadoutEditor` view-model — typed slots + live derived-stats + cost —
 // and confirms into `unit.build{modules}` (the core validates/prices/stamps the set).
 const constructorWin = $('constructor');
-type ConTab = 'ships' | 'squads' | 'army' | 'heroes';
+type ConTab = 'ships' | 'squads' | 'heroes';
 let conTab: ConTab = 'ships';
 const CON_TABS: [ConTab, string][] = [
   ['ships', 'yard.tab.ships'],
   ['squads', 'yard.tab.squads'],
-  ['army', 'yard.tab.army'],
   ['heroes', 'yard.tab.heroes'],
 ];
 // Buildable space hulls the «Корабли» pane fits; squadron/carrier hulls → the «Эскадрильи» pane.
 const CON_HULLS = ['cruiser', 'siege', 'scout', 'dropship'];
 const CON_SQUAD_HULLS = ['fighter_squadron', 'strike_carrier'];
 let conHull = 'cruiser';
-let conTplIdx = 0; // which division template the «Армия» pane is editing
 let conModules: string[] = [];
 let conCount = 1;
 let conPlanet = '';
@@ -8860,48 +8718,6 @@ function conLoadoutPane(hullList: string[]): string {
 }
 /** The «Армия» pane: edit a division template's 6 slots (per-player, global). Live
  *  aggregate stats + synergies; mobilisation stays in the planet panel. */
-function conArmyPane(): string {
-  const tpls = templatesOf(s, ME);
-  if (!tpls.length) return `<div class="cn-soon">${t('yard.div.empty')}</div>`;
-  const idx = Math.max(0, Math.min(conTplIdx, tpls.length - 1));
-  const tpl = tpls[idx]!;
-  const tabs = tpls
-    .map(
-      (tp, i) =>
-        `<button class="cn-hbtn${i === idx ? ' on' : ''}" data-contpl="${i}">⚔ ${esc(tp.name)}</button>`,
-    )
-    .join('');
-  const f = formationStats(tpl);
-  const slots = tpl.slots
-    .map((u, i) => {
-      const inner = u
-        ? `<span class="cn-fic">${formIcon(u, pcUi())}</span><span class="cn-fn">${esc(FORM_RU[u] ?? u)}</span>`
-        : `<span class="cn-fic dim">＋</span><span class="cn-fn dim">${t('yard.div.slot-empty')}</span>`;
-      return `<button class="cn-fslot${u ? ' filled' : ''}" data-confslot="${idx}|${i}">${inner}</button>`;
-    })
-    .join('');
-  const card =
-    `<div class="cn-hull"><div class="cn-hic">⚔</div><div><div class="cn-hn">${esc(tpl.name)}</div>` +
-    `<div class="cn-hm">${t('yard.div.slots', { n: String(f.count), s: String(FORMATION_SLOTS) })}</div></div></div>`;
-  const left =
-    `<div class="cn-fit"><div class="cn-hulls">${tabs}</div>${card}<div class="cn-fgrid">${slots}</div>` +
-    `<div class="cn-note">${t('yard.div.note')}</div></div>`;
-  const max = Math.max(1, f.attack, f.defense, f.hp);
-  const bars = [
-    conBar({ label: t('yard.div.attack'), base: f.attack, effective: f.attack, delta: 0 }, max),
-    conBar({ label: t('yard.div.defense'), base: f.defense, effective: f.defense, delta: 0 }, max),
-    conBar({ label: t('yard.div.hull'), base: f.hp, effective: f.hp, delta: 0 }, max),
-  ].join('');
-  const syn = f.synergies.length
-    ? `<div class="cn-ph" style="margin-top:14px">${t('yard.div.doctrine')}</div>` +
-      f.synergies.map((x) => `<div class="cn-syn">✦ ${esc(t(x.name))}</div>`).join('')
-    : `<div class="cn-note" style="margin-top:12px">${t('yard.div.doctrine.note')}</div>`;
-  const cost =
-    `<div class="cn-cost"><div class="cn-crow total"><span class="cn-cl">${t('yard.div.cost')}</span>` +
-    `<span class="cn-cv">${bagRu(f.cost)}</span></div></div>`;
-  const right = `<div class="cn-side"><div class="cn-ph">${t('yard.div.total')} — <em>${t('yard.cost.live')}</em></div>${bars}${syn}${cost}</div>`;
-  return `<div class="cn-grid">${left}${right}</div>`;
-}
 /** The «Герои» pane: the hero roster/штаб (folded from the old #hero window). The
  *  `#herobody` id keeps the `.hx-*` styling; hero clicks route via the constructor. */
 function conHeroPane(): string {
@@ -8915,9 +8731,7 @@ function renderConstructor(): void {
       ? conLoadoutPane(CON_HULLS)
       : conTab === 'squads'
         ? conLoadoutPane(CON_SQUAD_HULLS)
-        : conTab === 'army'
-          ? conArmyPane()
-          : conHeroPane();
+        : conHeroPane();
   constructorWin.innerHTML =
     `<div class="cnbox"><div class="cn-head"><b>${t('yard.title')}</b><button class="cn-close">✕</button></div>` +
     `<div class="cn-tabs">${CON_TABS.map(([k, l]) => tabBtn(k, l)).join('')}</div>` +
@@ -8976,22 +8790,6 @@ constructorWin.addEventListener('click', (e) => {
   const step = (tg.closest('[data-cncount]') as HTMLElement | null)?.dataset.cncount;
   if (step) {
     conCount = Math.max(1, Math.min(20, conCount + (step === '+' ? 1 : -1)));
-    renderConstructor();
-    return;
-  }
-  const tpl = (tg.closest('[data-contpl]') as HTMLElement | null)?.dataset.contpl;
-  if (tpl !== undefined) {
-    conTplIdx = Number(tpl);
-    renderConstructor();
-    return;
-  }
-  const fslot = (tg.closest('[data-confslot]') as HTMLElement | null)?.dataset.confslot;
-  if (fslot) {
-    const [ti, si] = fslot.split('|').map(Number);
-    const cur = templatesOf(s, ME)[ti!]?.slots[si!] ?? null;
-    const order: (string | null)[] = [null, ...FORMATION_UNITS];
-    const next = order[(order.indexOf(cur) + 1) % order.length] ?? null;
-    playerOrder(setDivisionTemplate(ME, ti!, si!, next));
     renderConstructor();
     return;
   }
@@ -10030,10 +9828,6 @@ const setupGoEl = $('setupgo') as HTMLButtonElement;
 // EDITORS were removed (modules unlock via tech in-match, so freezing a loadout before
 // the match is incoherent — loadout now happens in-match: ships at build time, heroes
 // in the capital). These default rosters still seed the match via buildSetupConfig.
-const setupTemplates: FormationTemplate[] = DEFAULT_TEMPLATES.map((t) => ({
-  name: t.name,
-  slots: [...t.slots],
-}));
 const setupHeroes: HeroLoadout[] = DEFAULT_HEROES.map((h) => ({
   name: h.name,
   grade: h.grade,
@@ -10349,7 +10143,6 @@ function buildSetupConfig(): SetupConfig {
     meta: metaGrant(loadMeta()),
     seats,
     ...(setupScientists.length ? { scientists: [...setupScientists] } : {}),
-    templates: setupTemplates.map((t) => ({ name: t.name, slots: [...t.slots] })),
     heroes: setupHeroes.map((h) => ({
       name: heroName(h),
       grade: h.grade,
@@ -11636,7 +11429,6 @@ function topLayerOpen(): boolean {
     codexEl?.classList.contains('show') ||
     logWin?.classList.contains('show') ||
     techWin.classList.contains('show') ||
-    divDesignWin.classList.contains('show') ||
     marketWin.classList.contains('show') ||
     diploOpen ||
     chatWin.isOpen() ||
@@ -11682,11 +11474,6 @@ function closeTopLayer(): boolean {
   }
   if (techWin.classList.contains('show')) {
     techWin.classList.remove('show');
-    return true;
-  }
-  if (divDesignWin.classList.contains('show')) {
-    divDesignWin.classList.remove('show');
-    lastPanelHtml = '';
     return true;
   }
   if (marketWin.classList.contains('show')) {

@@ -1,108 +1,238 @@
 {
   "scout_drone": {
     "faction": "vanguard",
-    "stats": { "attack": 2, "defense": 1, "speed": 12, "hp": 6 },
+    "stats": {
+      "attack": 2,
+      "defense": 1,
+      "speed": 12,
+      "hp": 6
+    },
     "line": "rear",
     "traits": [],
-    "abilities": ["long_range_scan"],
+    "abilities": [
+      "long_range_scan"
+    ],
     "signature": 1,
-    "cost": { "metal": 40 },
-    "upkeep": { "credits": 2 }
+    "cost": {
+      "metal": 40
+    },
+    "upkeep": {
+      "credits": 2
+    }
   },
   "cruiser": {
     "faction": "vanguard",
-    "stats": { "attack": 10, "defense": 8, "speed": 6, "hp": 40, "shield": 15, "cargoCapacity": 2 },
+    "stats": {
+      "attack": 10,
+      "defense": 8,
+      "speed": 6,
+      "hp": 40,
+      "shield": 15,
+      "cargoCapacity": 2
+    },
     "line": "front",
     "traits": [],
     "abilities": [],
     "signature": 4,
-    "cost": { "metal": 220, "credits": 80 },
-    "upkeep": { "credits": 8 },
-    "slots": { "weapon": 1, "defense": 1, "utility": 1 }
+    "cost": {
+      "metal": 220,
+      "credits": 80
+    },
+    "upkeep": {
+      "credits": 8
+    },
+    "slots": {
+      "weapon": 1,
+      "defense": 1,
+      "utility": 1
+    }
   },
   "siege_lance": {
     "faction": "vanguard",
-    "stats": { "attack": 18, "defense": 2, "speed": 5, "hp": 14, "range": 300 },
+    "stats": {
+      "attack": 18,
+      "defense": 2,
+      "speed": 5,
+      "hp": 14,
+      "range": 300
+    },
     "line": "rear",
-    "traits": ["artillery"],
+    "traits": [
+      "artillery"
+    ],
     "abilities": [],
     "signature": 5,
-    "cost": { "metal": 260, "credits": 140 },
-    "upkeep": { "credits": 12 }
+    "cost": {
+      "metal": 260,
+      "credits": 140
+    },
+    "upkeep": {
+      "credits": 12
+    }
   },
   "dropship": {
     "faction": "vanguard",
     "domain": "space",
-    "stats": { "attack": 2, "defense": 6, "speed": 6, "hp": 50, "shield": 12, "cargoCapacity": 12 },
+    "stats": {
+      "attack": 2,
+      "defense": 6,
+      "speed": 6,
+      "hp": 50,
+      "shield": 12,
+      "cargoCapacity": 12
+    },
     "line": "rear",
     "traits": [],
     "abilities": [],
     "signature": 4,
-    "cost": { "metal": 180, "credits": 40 },
-    "upkeep": { "credits": 5 },
-    "slots": { "defense": 1, "utility": 2 }
+    "cost": {
+      "metal": 180,
+      "credits": 40
+    },
+    "upkeep": {
+      "credits": 5
+    },
+    "slots": {
+      "defense": 1,
+      "utility": 2
+    }
   },
   "militia": {
     "faction": "vanguard",
     "domain": "ground",
-    "stats": { "attack": 6, "defense": 14, "speed": 0, "hp": 20, "cargoSize": 1 },
+    "stats": {
+      "attack": 6,
+      "defense": 14,
+      "speed": 0,
+      "hp": 20,
+      "cargoSize": 1
+    },
     "line": "front",
     "traits": [],
     "abilities": [],
     "signature": 1,
-    "cost": { "metal": 40 },
-    "upkeep": { "credits": 1 }
+    "cost": {
+      "metal": 40
+    },
+    "upkeep": {
+      "credits": 1
+    }
   },
   "drop_infantry": {
     "faction": "vanguard",
     "domain": "ground",
-    "stats": { "attack": 16, "defense": 8, "speed": 0, "hp": 22, "cargoSize": 1 },
+    "stats": {
+      "attack": 16,
+      "defense": 8,
+      "speed": 0,
+      "hp": 22,
+      "cargoSize": 1
+    },
     "line": "front",
     "traits": [],
     "abilities": [],
     "signature": 1,
-    "cost": { "metal": 60, "credits": 20 },
-    "upkeep": { "credits": 2 }
+    "cost": {
+      "metal": 60,
+      "credits": 20
+    },
+    "upkeep": {
+      "credits": 2
+    }
   },
   "tank": {
     "faction": "vanguard",
     "domain": "ground",
-    "stats": { "attack": 24, "defense": 20, "speed": 0, "hp": 50, "cargoSize": 3 },
+    "stats": {
+      "attack": 24,
+      "defense": 20,
+      "speed": 0,
+      "hp": 50,
+      "cargoSize": 1
+    },
     "line": "front",
     "traits": [],
     "abilities": [],
     "signature": 2,
-    "cost": { "metal": 140, "credits": 40 },
-    "upkeep": { "credits": 4 }
+    "cost": {
+      "metal": 140,
+      "credits": 40
+    },
+    "upkeep": {
+      "credits": 4
+    }
   },
   "hero": {
     "faction": "vanguard",
-    "stats": { "attack": 12, "defense": 12, "speed": 6, "hp": 120, "shield": 40 },
+    "stats": {
+      "attack": 12,
+      "defense": 12,
+      "speed": 6,
+      "hp": 120,
+      "shield": 40
+    },
     "line": "front",
-    "traits": ["hero"],
+    "traits": [
+      "hero"
+    ],
     "abilities": [],
     "signature": 6,
-    "cost": { "metal": 400, "credits": 200 },
-    "upkeep": { "credits": 10 }
+    "cost": {
+      "metal": 400,
+      "credits": 200
+    },
+    "upkeep": {
+      "credits": 10
+    }
   },
   "fighter_squadron": {
     "faction": "vanguard",
-    "stats": { "attack": 14, "defense": 3, "speed": 14, "hp": 10, "cargoSize": 1, "strikeRange": 180, "fuel": 3, "rearmRounds": 2 },
+    "stats": {
+      "attack": 14,
+      "defense": 3,
+      "speed": 14,
+      "hp": 10,
+      "cargoSize": 1,
+      "strikeRange": 180,
+      "fuel": 3,
+      "rearmRounds": 2
+    },
     "line": "front",
-    "traits": ["squadron"],
+    "traits": [
+      "squadron"
+    ],
     "abilities": [],
     "signature": 2,
-    "cost": { "metal": 90, "credits": 40 },
-    "upkeep": { "credits": 4 }
+    "cost": {
+      "metal": 90,
+      "credits": 40
+    },
+    "upkeep": {
+      "credits": 4
+    }
   },
   "strike_carrier": {
     "faction": "vanguard",
-    "stats": { "attack": 4, "defense": 10, "speed": 5, "hp": 70, "shield": 20, "cargoCapacity": 6 },
+    "stats": {
+      "attack": 4,
+      "defense": 10,
+      "speed": 5,
+      "hp": 70,
+      "shield": 20,
+      "cargoCapacity": 6
+    },
     "line": "front",
-    "traits": ["carrier"],
+    "traits": [
+      "carrier"
+    ],
     "abilities": [],
     "signature": 7,
-    "cost": { "metal": 320, "credits": 160 },
-    "upkeep": { "credits": 12 }
+    "cost": {
+      "metal": 320,
+      "credits": 160
+    },
+    "upkeep": {
+      "credits": 12
+    }
   }
 }

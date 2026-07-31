@@ -14,22 +14,14 @@
  *    1. Fleet/planet collision — two equal hostile fleets fly head-on (lane
  *       intercept) and, elsewhere, one passes a planet where an enemy sits in
  *       orbit (node catch against a stationed fleet).
- *    2. Ground battle lab — design a division template for each side, then run
- *       the new ground resolver and read the outcome.
- */
+  */
 import {
   newGame,
   order,
   moveFleet,
   MAP,
-  DEFAULT_TEMPLATES,
-  formationStats,
-  FORMATION_UNITS,
   type MapNode,
-  type FormationTemplate,
-  type FormationUnit,
 } from './game';
-import { makeSide, resolveGround, GROUND_ROSTER } from './groundcombat';
 import { setStance } from '../../packages/shared-core/src/index';
 import type { GameState, Fleet, UnitStack } from '../../packages/shared-core/src/index';
 
@@ -43,20 +35,6 @@ export interface TestModeHooks {
 }
 
 const SPEEDS = [1, 2, 6, 20]; // selectable game-speed multipliers
-// Keyed by the CURRENT ground roster (FORMATION_UNITS) — the old 2-type
-// infantry/tank maps rendered three of the four types as `undefined`.
-const FORM_ICON: Record<string, string> = {
-  militia: '🪓',
-  heavy_infantry: '🪖',
-  special_forces: '🎯',
-  tank: '🛡',
-};
-const FORM_RU: Record<string, string> = {
-  militia: 'Ополчение',
-  heavy_infantry: 'Тяжёлая пехота',
-  special_forces: 'Спецназ',
-  tank: 'Танк',
-};
 
 // Scenario-1 force config: the spacecraft each side's fleets are built from.
 const SHIP_UNITS = ['cruiser', 'scout', 'siege'] as const;
@@ -72,26 +50,22 @@ export function initTestMode(hooks: TestModeHooks): void {
   const el: HTMLElement = found; // non-null for the closures below
 
   let mult = 2; // chosen speed multiplier
-  let view: 'menu' | 'force' | 'ground' = 'menu';
+  let view: 'menu' | 'force' = 'menu';
   // Scenario-1 force config: composition per side (applied to that side's fleets).
   const forceA: Force = { cruiser: 3, scout: 0, siege: 0 };
   const forceD: Force = { cruiser: 3, scout: 0, siege: 0 };
   // Scenario-2 lab: an editable template per side.
-  const tplA: FormationTemplate = { name: 'Атака', slots: [...DEFAULT_TEMPLATES[1]!.slots] };
-  const tplD: FormationTemplate = { name: 'Оборона', slots: [...DEFAULT_TEMPLATES[0]!.slots] };
-  let groundResult = '';
 
   const show = (on: boolean): void => {
     el.style.display = on ? 'flex' : 'none';
     if (on) {
       view = 'menu';
-      groundResult = '';
       render();
     }
   };
 
   function render(): void {
-    el.innerHTML = view === 'menu' ? menuHtml() : view === 'force' ? forceHtml() : groundHtml();
+    el.innerHTML = view === 'menu' ? menuHtml() : forceHtml();
   }
 
   function menuHtml(): string {
@@ -105,7 +79,6 @@ export function initTestMode(hooks: TestModeHooks): void {
       <div class="tm-row">${spd}</div>
       <div class="tm-label">Сценарии</div>
       <button class="tm-scn" data-tm="scn1"><b>1 · Коллизия флотов и планет</b><span>Встречные флоты ловят друг друга в полёте; рядом — перехват флота на ближней орбите пролетающим врагом.</span></button>
-      <button class="tm-scn" data-tm="scn2"><b>2 · Наземное сражение</b><span>Собери шаблон дивизии для каждой стороны и проверь новый резолвер наземного боя.</span></button>
       <button class="tm-back" data-tm="back">← Назад</button>
     </div>`;
   }
@@ -132,60 +105,6 @@ export function initTestMode(hooks: TestModeHooks): void {
     </div>`;
   }
 
-  function slotsHtml(side: 'a' | 'd', tpl: FormationTemplate): string {
-    return tpl.slots
-      .map((u, i) => {
-        const ic = u ? FORM_ICON[u] : '＋';
-        const nm = u ? FORM_RU[u] : 'пусто';
-        return `<div class="tm-slot ${u ? '' : 'empty'}" data-tm="slot" data-side="${side}" data-i="${i}"><span class="ic">${ic}</span><span class="nm">${nm}</span></div>`;
-      })
-      .join('');
-  }
-
-  function sideHtml(side: 'a' | 'd', title: string, tpl: FormationTemplate): string {
-    const f = formationStats(tpl);
-    return `<div class="tm-side">
-      <div class="tm-side-h">${title}</div>
-      <div class="tm-slots">${slotsHtml(side, tpl)}</div>
-      <div class="tm-stats">⚔ ${f.attack} · 🛡 ${f.defense} · ❤ ${f.hp} · №${f.count}/6</div>
-    </div>`;
-  }
-
-  function groundHtml(): string {
-    return `<div class="tmbox">
-      <div class="tm-title"><span class="dia"></span><b>СЦЕНАРИЙ 2 · НАЗЕМНЫЙ БОЙ</b></div>
-      <p class="tm-sub">Тапни слот, чтобы сменить род войск (пусто → пехота → танк). Затем «Сразиться» — резолвер прогонит бой до конца.</p>
-      <div class="tm-sides">${sideHtml('a', 'Атакующий', tplA)}${sideHtml('d', 'Обороняющийся', tplD)}</div>
-      <button class="tm-fight" data-tm="fight">⚔ Сразиться</button>
-      ${groundResult ? `<div class="tm-result">${groundResult}</div>` : ''}
-      <button class="tm-back" data-tm="tomenu">← К сценариям</button>
-    </div>`;
-  }
-
-  function cycleSlot(tpl: FormationTemplate, i: number): void {
-    const order_: (FormationUnit | null)[] = [null, ...FORMATION_UNITS];
-    const cur = tpl.slots[i] ?? null;
-    tpl.slots[i] = order_[(order_.indexOf(cur) + 1) % order_.length] ?? null;
-  }
-
-  function runGround(): void {
-    const atk = makeSide(GROUND_ROSTER, formationStats(tplA).byType);
-    const def = makeSide(GROUND_ROSTER, formationStats(tplD).byType);
-    const out = resolveGround(GROUND_ROSTER, atk, def);
-    const survivors = (s: { type: FormationUnit; count: number }[]): string =>
-      s.length ? s.map((x) => `${FORM_RU[x.type]} ×${x.count}`).join(', ') : '— уничтожены';
-    const win =
-      out.winner === 'attacker'
-        ? '<b class="win">Победа: Атакующий</b>'
-        : out.winner === 'defender'
-          ? '<b class="win">Победа: Обороняющийся</b>'
-          : '<b class="draw">Ничья (лимит раундов)</b>';
-    groundResult =
-      `${win} · раундов: ${out.rounds}` +
-      `<div class="tm-surv">Атакующий: ${survivors(out.attacker)}</div>` +
-      `<div class="tm-surv">Обороняющийся: ${survivors(out.defender)}</div>`;
-  }
-
   el.addEventListener('click', (ev) => {
     const t = (ev.target as Element).closest('[data-tm]') as HTMLElement | null;
     if (!t) return;
@@ -207,18 +126,8 @@ export function initTestMode(hooks: TestModeHooks): void {
     } else if (act === 'launch1') {
       show(false);
       hooks.startScenario(buildCollisionScenario(forceA, forceD), mult);
-    } else if (act === 'scn2') {
-      view = 'ground';
-      groundResult = '';
-      render();
     } else if (act === 'tomenu') {
       view = 'menu';
-      render();
-    } else if (act === 'slot') {
-      cycleSlot(t.dataset.side === 'a' ? tplA : tplD, Number(t.dataset.i));
-      render();
-    } else if (act === 'fight') {
-      runGround();
       render();
     }
   });

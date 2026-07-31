@@ -21,10 +21,6 @@ import {
 } from '../../packages/shared-core/src/index';
 import { data } from './prototypeData';
 import { SECTOR_TYPES, MAP, START_CANDIDATES } from './map';
-import {
-  DEFAULT_TEMPLATES,
-  type FormationTemplate,
-} from './formations';
 import { FAVOUR_BASE } from './botFavour';
 import { DEFAULT_HEROES, type HeroGrade, type HeroLoadout } from './heroes';
 import { DEFAULT_SHIP_LOADOUTS, type ShipLoadout } from './ships';
@@ -90,9 +86,6 @@ export interface SetupConfig {
    *  `data.scientists`, picked BEFORE the start-point at setup (a start consecration,
    *  GDD §5.2). Absent → the command leader «overseer» by default. */
   scientists?: string[];
-  /** The player's 3 division templates, designed in the main menu and LOCKED for the
-   *  session (mobilised in-match via `formation.mobilize`). Absent → DEFAULT_TEMPLATES. */
-  templates?: FormationTemplate[];
   /** The player's hero roster (up to 3 loadouts), composed in the main menu. Absent →
    *  DEFAULT_HEROES. In-match instances / capital / respawn land in a later phase. */
   heroes?: HeroLoadout[];
@@ -100,7 +93,7 @@ export interface SetupConfig {
    *  designer). Frozen at session start (GDD §2). Absent → DEFAULT_SHIP_LOADOUTS. */
   ships?: ShipLoadout[];
   /** Meta-progression grant for the HUMAN seat (prototype/src/meta.ts metaGrant),
-   *  snapshotted at match start like scientists/templates: hidden techs land as
+   *  snapshotted at match start like scientists: hidden techs land as
    *  `completed`, the council starts higher, the treasury opens fatter. Earned by
    *  play only — never sold (main-menu.md §5). Absent = a fresh commander. */
   meta?: { tech: string[]; scientistLevel: number; resourceMult: number };
@@ -191,7 +184,8 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
     ];
     // Ground defence is what holds a world against capture (an AA battery bleeds a fleet
     // but can't stop a landing — only ground troops do). Seed a starting infantry garrison
-    // so the homeworld isn't a free walk-in; mobile ground beyond it comes via divisions.
+    // so the homeworld isn't a free walk-in. Beyond it, ground forces are built like any
+    // other unit and travel as a fleet's cargo (armyModule) — H4-REVERT.
     home.garrison = [
       { unit: 'militia', count: 2 },
       { unit: 'heavy_infantry', count: 1 },
@@ -300,19 +294,16 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
     approval[seat.id] = {};
     for (const other of ids) if (other !== seat.id) approval[seat.id]![other] = FAVOUR_BASE;
   }
-  // The player's locked division templates ride into the match; the AI uses the defaults.
-  const templates: Record<string, FormationTemplate[]> = {};
   const heroRoster: Record<string, HeroLoadout[]> = {};
   const shipLoadouts: Record<string, ShipLoadout[]> = {};
   const capital: Record<string, string> = {};
   for (const seat of setup.seats) {
-    templates[seat.id] = !seat.ai && setup.templates ? setup.templates : DEFAULT_TEMPLATES;
     heroRoster[seat.id] = !seat.ai && setup.heroes ? setup.heroes : DEFAULT_HEROES;
     shipLoadouts[seat.id] = !seat.ai && setup.ships ? setup.ships : DEFAULT_SHIP_LOADOUTS;
     capital[seat.id] = seat.start; // capital defaults to the homeworld; re-designatable in-match
   }
-  // `divisions` / `divisionSeq` / `templates` / `groundBattles` / `heroRoster` are
-  // prototype-only state (preserved by deepClone); cast past GameState's shape.
+  // `heroRoster` / `shipLoadouts` / `approval` / `sessionMarket` are prototype-only
+  // state (preserved by deepClone); cast past GameState's shape.
   return {
     ...base,
     players,
@@ -323,10 +314,6 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
     approval,
     sessionMarket: [],
     sessionMarketSeq: 0,
-    divisions: {},
-    divisionSeq: 0,
-    templates,
-    groundBattles: {},
     heroRoster,
     shipLoadouts,
     capital,

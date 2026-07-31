@@ -266,57 +266,6 @@ describe('visibleState (fog of war as a security boundary)', () => {
     expect(view.players.p2?.name).toBe('p2'); // identity kept (scoreboard)
   });
 
-  it('fogs ground divisions: garrisoning at an unidentified world, or riding a hidden fleet, is stripped', () => {
-    const state = scenario();
-    state.players.p1!.divisionTemplates = [{ name: 'mine', slots: [] }];
-    state.players.p2!.divisionTemplates = [{ name: 'theirs', slots: [] }];
-    state.divisions = {
-      'div:p1:own': {
-        id: 'div:p1:own',
-        owner: 'p1',
-        name: 'own',
-        template: 0,
-        max: { militia: 1 },
-        units: [{ type: 'militia', count: 1, hp: 14, hpEach: 14 }],
-        location: 'A', // p1's own, always identified
-      },
-      'div:p2:identified': {
-        id: 'div:p2:identified',
-        owner: 'p2',
-        name: 'at B',
-        template: 0,
-        max: { militia: 1 },
-        units: [{ type: 'militia', count: 1, hp: 14, hpEach: 14 }],
-        location: 'B', // identified neutral world (enemy-near sits there too)
-      },
-      'div:p2:hidden': {
-        id: 'div:p2:hidden',
-        owner: 'p2',
-        name: 'at D',
-        template: 0,
-        max: { militia: 1 },
-        units: [{ type: 'militia', count: 1, hp: 14, hpEach: 14 }],
-        location: 'D', // beyond radar — not identified
-      },
-      'div:p2:carried': {
-        id: 'div:p2:carried',
-        owner: 'p2',
-        name: 'aboard enemy-hidden',
-        template: 0,
-        max: { militia: 1 },
-        units: [{ type: 'militia', count: 1, hp: 14, hpEach: 14 }],
-        location: 'D',
-        carriedBy: 'enemy-hidden', // the carrying fleet is itself beyond radar
-      },
-    };
-    state.groundBattles = { B: 1000, D: 2000 };
-    const view = visibleState(state, 'p1', data);
-    expect(Object.keys(view.divisions ?? {}).sort()).toEqual(['div:p1:own', 'div:p2:identified']);
-    expect(view.groundBattles).toEqual({ B: 1000 }); // D's battle is fogged, not just its divisions
-    expect(view.players.p2?.divisionTemplates).toBeUndefined(); // enemy templates hidden
-    expect(view.players.p1?.divisionTemplates).toEqual([{ name: 'mine', slots: [] }]); // own kept
-  });
-
   it('fogs the scoreboard: viewer keeps only their own score line, enemy totals hidden', () => {
     const state = scenario();
     state.match.scores = {

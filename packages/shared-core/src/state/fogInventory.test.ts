@@ -73,9 +73,6 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   patrols: 'filtered',
   wingSorties: 'filtered',
   orders: 'filtered',
-  divisions: 'filtered',
-  divisionSeq: 'public',
-  groundBattles: 'filtered', // сам факт «здесь идёт бой» — уже разведданные
   forcedMarch: 'filtered',
 };
 
@@ -95,7 +92,6 @@ const PLAYER_EXPOSURE: Record<keyof Player, 'public' | 'owner-private'> = {
   stewardLog: 'owner-private',
   stewardHoldPoints: 'owner-private', // якоря обороны — наводка
   arsenal: 'owner-private', // что соперник МОЖЕТ построить
-  divisionTemplates: 'owner-private', // что соперник МОЖЕТ мобилизовать
 };
 
 /** Ключи, которых нет в `GameState`, — их ДОБАВЛЯЕТ сама проекция. */
@@ -176,7 +172,6 @@ function maximalState(): GameState {
         stewardLog: [{ at: 50, kind: 'hold', node: 'A' }],
         stewardHoldPoints: ['A'],
         arsenal: { hulls: ['scout'], modules: [], fittings: [] },
-        divisionTemplates: [{ name: 'own_template', slots: [null, null, null, null, null, null] }],
       },
       // Соперник: те же поля, засеянные канарейками.
       [RIVAL]: {
@@ -194,9 +189,6 @@ function maximalState(): GameState {
         stewardLog: [{ at: 60, kind: 'evac', node: 'CANARY_node' }],
         stewardHoldPoints: ['CANARY_hold'],
         arsenal: { hulls: ['CANARY_hull'], modules: [], fittings: [] },
-        divisionTemplates: [
-          { name: 'CANARY_template', slots: [null, null, null, null, null, null] },
-        ],
       },
     },
     planets: {
@@ -286,28 +278,6 @@ function maximalState(): GameState {
       mine: { steps: [{ kind: 'move', to: 'A' }] },
       CANARY_fleet: { steps: [{ kind: 'move', to: 'CANARY_dest' }] },
     },
-    divisions: {
-      mine_div: {
-        id: 'mine_div',
-        owner: VIEWER,
-        name: 'own_division',
-        template: 0,
-        max: { militia: 2 },
-        units: [{ type: 'militia', count: 2, hp: 20, hpEach: 10 }],
-        location: 'A',
-      },
-      CANARY_division: {
-        id: 'CANARY_division',
-        owner: RIVAL,
-        name: 'CANARY_divname',
-        template: 1,
-        max: { tank: 2 },
-        units: [{ type: 'tank', count: 2, hp: 40, hpEach: 20 }],
-        location: 'Z',
-      },
-    },
-    divisionSeq: 2,
-    groundBattles: { A: 10, Z: 20 },
     forcedMarch: { mine: true, CANARY_fleet: true },
   };
 }

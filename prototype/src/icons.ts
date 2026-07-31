@@ -84,25 +84,6 @@ export function archPath2d(arch: keyof typeof ARCHETYPE_PATH): Path2D {
   return (ARCH_PATH2D[arch] ??= new Path2D(ARCHETYPE_PATH[arch]));
 }
 
-/** Ground-roster icon, per layout. Mobile keeps the original emoji (phone fonts render
- *  them); PC monospace stacks have no glyph for 🪖👥🎖 — they came out as tofu ▯ — so the
- *  desktop gets text glyphs from the same family as `UNIT_ICON`. The caller passes the
- *  layout flag: a leaf module must not reach for the host's `pcUi()`. */
-const FORM_ICON_EMOJI: Record<string, string> = {
-  militia: '👥',
-  heavy_infantry: '🪖',
-  special_forces: '🎖',
-  tank: '🛡',
-};
-const FORM_ICON_TEXT: Record<string, string> = {
-  militia: '▿',
-  heavy_infantry: '◆',
-  special_forces: '✱',
-  tank: '▰',
-};
-export function formIcon(type: string, pcUi: boolean): string {
-  return (pcUi ? FORM_ICON_TEXT[type] : FORM_ICON_EMOJI[type]) ?? '▪';
-}
 
 // Sovereigns (donate currency): faceted-gem line icon per the mock — worn GOLD with a
 // soft halo (the mock capsule is lavender; the brief keeps the game's gold identity).

@@ -5,7 +5,6 @@
  * the core builds units into a planet's garrison; this module lets a player
  * scramble those into a new fleet (ships → units, ground troops → landing) so
  * production feeds offense, fuse/split co-located fleets, and open a battle.
- * `game.ts` imports `fleetLaunchModule` for `MODULES`; `divisionsOf` comes from
  * `division.ts` (REFP-13 closed the old reverse edge onto `game.ts`).
  */
 import {
@@ -19,7 +18,6 @@ import {
 import { sumUnitStat } from '../../packages/shared-core/src/util/stacks';
 import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet';
 import { loadoutKey, takeFromStacks, mergeStacks } from './fleetStacks';
-import { divisionsOf } from './division';
 
 /** Minimal view of the prototype's state extension this module needs. */
 interface FleetSeqState extends GameState {
@@ -218,12 +216,6 @@ export const fleetLaunchModule: GameModule = {
       }
       into.units = mergeStacks(into.units, from.units);
       into.landing = mergeStacks(into.landing ?? [], from.landing ?? []);
-      // Carried divisions ride `from` — re-point them to `into` BEFORE deleting `from`,
-      // or the carrier-destroyed reaper (time.advanced) would mistake them for cargo lost
-      // with a sunk ship and delete them. Merge is the one fleet-removal that isn't a death.
-      for (const d of Object.values(divisionsOf(h.state))) {
-        if (d.carriedBy === payload.from) d.carriedBy = into.id;
-      }
       // Heroes are bound by fleetId the same way (BF-3): the hero UNIT rides into the
       // merged fleet, so the hero ENTITY must follow — a stale fleetId left the hero
       // orphaned, and hero.spawn could then mint a duplicate free flagship.

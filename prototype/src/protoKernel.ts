@@ -41,7 +41,6 @@ import { hungerModule } from './hunger';
 import { fleetLaunchModule } from './fleetLaunch';
 import { botDiplomacyModule } from './botDiplomacy';
 import { marketModule } from './sessionMarket';
-import { divisionModule } from './division';
 import { capitalModule } from './capital';
 import { standingOrdersModule } from './standingOrders';
 import { forcedMarchModule } from './forcedMarch';
@@ -77,7 +76,6 @@ export const MODULES: GameModule[] = [
   espionageModule, // SPY-1 core module: espionage.spy → time-boxed intel windows (state.intel)
   botDiplomacyModule, // bots: friendly-by-default favour meter → embargo/war only when provoked
   marketModule, // session resource market: two-sided order book (sell/buy lots), embargo-gated
-  divisionModule, // ground divisions: mobilise from a template + daily restoration
   capitalModule, // designatable capital (hero respawn / module re-fit anchor)
   standingOrdersModule, // CC-2/CC-4 standing orders (auto-storm / дежурный вылет), server-driven
   forcedMarchModule, // BOOST-1 форс-марш: +50% скорости за 5% max-HP износа в час хода

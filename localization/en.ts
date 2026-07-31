@@ -506,25 +506,8 @@ export const en: Record<string, string> = {
   'diplo.win.title': 'DIPLOMACY',
 
   // --- div — Дивизии: список, мобилизация, конструктор, трюм.
-  'div.damage-vs': 'Damage vs:',
-  'div.designer': '⚙ Designer',
-  'div.empty': 'No divisions.',
-  'div.empty.hint': 'No divisions — mobilize from a template below.',
-  'div.hold': 'Divisions ⇄ hold (free {n})',
-  'div.hold.note': 'Loading takes a division into the hold. Unloading lands it on this world.',
-  'div.mobilize': 'Mobilization',
-  'div.mobilize.named': 'Mobilize "{name}"',
-  'div.note':
-    'A division is a snapshot of its template: editing a design never touches armies already fielded. On your own world it heals +1 HP/unit/day.',
-  'div.officer-locked': "An officer's named template: composition locked, no editing.",
-  'div.rename': 'Rename',
-  'div.roster': 'composition {n}/{s} · {rest}',
-  'div.slot.note':
-    'Tap a slot to cycle the unit type: militia → heavy infantry → special forces → tank. Tanks shred any infantry; special forces are the one infantry that threatens armour; heavy infantry holds the line.',
   'div.stat.attack': 'attack',
   'div.stat.defense': 'defense',
-  'div.stat.hp': 'toughness',
-  'div.title': 'Divisions',
 
   // --- dossier — Досье объектов: здания, корабли, стройка в очереди, вкладки и характеристики.
   'dossier.building.barracks':
@@ -648,31 +631,8 @@ export const en: Record<string, string> = {
   'fmt.minutes': '{n}m',
 
   // --- form — Рода войск дивизии.
-  'form.heavy-infantry': 'Heavy Infantry',
-  'form.militia': 'Militia',
-  'form.special-forces': 'Special Forces',
-  'form.syn.armor.desc': '≥3 tanks — a breakthrough wedge',
-  'form.syn.armor.name': 'Armored fist',
-  'form.syn.combined.desc': 'Infantry and tanks in one line',
-  'form.syn.combined.name': 'Combined arms',
-  'form.syn.entrench.desc': '≥3 heavy infantry hold the line',
-  'form.syn.entrench.name': 'Entrenched',
-  'form.syn.raid.desc': '≥2 special forces, no militia',
-  'form.syn.raid.name': 'Raid Doctrine',
-  'form.syn.wave.desc': '≥4 militia — winning by numbers',
-  'form.syn.wave.name': 'Human Wave',
-  'form.tank': 'Tank',
-  'form.tpl.breakthrough': 'Breakthrough Guard',
-  'form.tpl.fist': 'Fist',
-  'form.tpl.iron-line': 'Iron Line',
-  'form.tpl.line': 'Line',
-  'form.tpl.raid': 'Raid',
-  'form.tpl.supply': 'Supply Column',
 
   // --- ground — Наземный бой: офицеры дивизии.
-  'ground.officer.assault': 'Assault Leader',
-  'ground.officer.defender': 'Defense Commander',
-  'ground.officer.quartermaster': 'Quartermaster',
 
   // --- hint — Подсказки режима прицеливания на карте.
   'hint.aim-cancelled': 'aiming cancelled',
@@ -883,18 +843,6 @@ export const en: Record<string, string> = {
   'yard.cost.modules': 'Modules ×{n}',
   'yard.cost.total': 'Total',
   'yard.cost.with-modules': 'Total with modules',
-  'yard.div.attack': 'Attack',
-  'yard.div.cost': 'Mobilization cost',
-  'yard.div.defense': 'Defense',
-  'yard.div.doctrine': 'Composition doctrine',
-  'yard.div.doctrine.note': 'Mix troop types — the composition sets a doctrine.',
-  'yard.div.empty': 'No templates.',
-  'yard.div.hull': 'Hull',
-  'yard.div.note':
-    "Tap a slot: empty → infantry → tank. Mobilize the division in your world's panel (the «Divisions» tab).",
-  'yard.div.slot-empty': 'empty',
-  'yard.div.slots': '{n}/{s} units · tap a slot to change the troop type',
-  'yard.div.total': 'Formation summary',
   'yard.free': 'free',
   'yard.hull.none': 'The arsenal has no hulls of this class.',
   'yard.hull.unavailable': 'Hull unavailable.',
@@ -917,7 +865,6 @@ export const en: Record<string, string> = {
   'yard.slots.count': '{n} module slots (by hull size)',
   'yard.slots.note':
     'Typed slots: a module fits only its own type. <b>Greyed</b> — not for a free slot, or already installed.',
-  'yard.tab.army': 'Army',
   'yard.tab.heroes': 'Heroes',
   'yard.tab.ships': 'Ships',
   'yard.tab.squads': 'Squadrons',

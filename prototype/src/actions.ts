@@ -215,35 +215,6 @@ export const marketTake = (playerId: string, id: string, amount?: number) =>
 /** Reclaim your own lot, refunding its remaining escrow. */
 export const marketCancel = (playerId: string, id: string) =>
   act(playerId, 'market.cancel', { id });
-/** Mobilise division template `template` (0-based) on your world `planetId`.
- *  `officer` = build from the named OFFICER_TEMPLATES roster instead (locked premades). */
-export const mobilizeDivision = (
-  playerId: string,
-  planetId: string,
-  template: number,
-  officer = false,
-) =>
-  act(
-    playerId,
-    'division.mobilize',
-    officer ? { planetId, template, officer: true } : { planetId, template },
-  );
-/** Rename your CUSTOM division template (designer menu). */
-export const renameDivisionTemplate = (playerId: string, template: number, name: string) =>
-  act(playerId, 'division.rename', { template, name });
-/** Assemble a template: set slot `slot` of your template `template` to `unit` (null = clear). */
-export const setDivisionTemplate = (
-  playerId: string,
-  template: number,
-  slot: number,
-  unit: string | null,
-) => act(playerId, 'division.template', { template, slot, unit });
-/** Load a garrisoning division into a co-located, idle fleet (by free hold). */
-export const loadDivision = (playerId: string, divisionId: string, fleetId: string) =>
-  act(playerId, 'division.load', { divisionId, fleetId });
-/** Unload a carried division onto the world its carrier is docked over. */
-export const unloadDivision = (playerId: string, divisionId: string) =>
-  act(playerId, 'division.unload', { divisionId });
 /** Designate one of your inhabited worlds as your capital (hero respawn / re-fit anchor). */
 export const designateCapital = (playerId: string, planetId: string) =>
   act(playerId, 'capital.designate', { planetId });

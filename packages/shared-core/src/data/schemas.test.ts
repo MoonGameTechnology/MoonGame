@@ -28,7 +28,13 @@ describe('game data schema (docs/architecture.md §2)', () => {
     // fleet ⊕ ground-army separation: domains + transport capacity.
     expect(data.units.cruiser?.domain).toBe('space'); // schema default
     expect(data.units.tank?.domain).toBe('ground');
-    expect(data.units.tank?.stats.cargoSize).toBe(3); // a tank is bulky cargo
+    // H4-REVERT: «один юнит занимает один трюм» — правило игрока, а не таблица весов.
+    // Танк вёз 3 слота, пока трюм мерили тоннажем; теперь вместимость считается
+    // ШТУКАМИ, и все наземные стоят по 1. Это data-driven шов: ядро (`armyModule`)
+    // по-прежнему складывает cargoSize, просто слагаемые стали единицами.
+    for (const id of ['militia', 'drop_infantry', 'tank']) {
+      expect(data.units[id]?.stats.cargoSize).toBe(1);
+    }
     expect(data.units.dropship?.stats.cargoCapacity).toBe(12); // dedicated lift
     expect(data.units.scout_drone?.stats.cargoCapacity).toBe(0); // default, carries nothing
     expect(data.buildings.orbital_aa?.aaDamage).toBe(14); // anti-ship orbital AA — a defensive building

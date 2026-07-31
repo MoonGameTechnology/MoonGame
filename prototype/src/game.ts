@@ -105,31 +105,6 @@ export {
 } from './serverDrivers';
 
 // --- ground war --------------------------------------------------------------
-export {
-  FORMATION_UNITS,
-  FORMATION_SLOTS,
-  FORM_RU,
-  FORMATION_TEMPLATE_COUNT,
-  DEFAULT_TEMPLATES,
-  OFFICER_TEMPLATES,
-  formationStats,
-  type FormationUnit,
-  type FormationTemplate,
-  type OfficerTemplate,
-  type FormationSynergy,
-  type FormationStats,
-} from './formations';
-export {
-  divisionsOf,
-  templatesOf,
-  regenDivision,
-  divisionCargo,
-  fleetCargoFree,
-  divisionModule,
-  GROUND_TICK_HOURS,
-  REGEN_PER_UNIT_PER_DAY,
-  type Division,
-} from './division';
 
 // --- diplomacy + bots --------------------------------------------------------
 export {
@@ -192,11 +167,6 @@ export {
   marketList,
   marketTake,
   marketCancel,
-  mobilizeDivision,
-  renameDivisionTemplate,
-  setDivisionTemplate,
-  loadDivision,
-  unloadDivision,
   designateCapital,
   spawnHero,
   unlockHeroSkill,

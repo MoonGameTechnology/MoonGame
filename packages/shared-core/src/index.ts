@@ -55,7 +55,6 @@ export {
   type DiplomaticStance,
   type IntelGrant,
   type PatrolEntry,
-  type Division,
 } from './state/gameState';
 export {
   buildStateFromMap,
@@ -226,31 +225,6 @@ export {
   type MapSlot,
   type SpawnPolicy,
 } from './data/mapSchema';
-
-// Ground divisions (H4) — templates + the mobilization/ground-combat module
-export {
-  FORMATION_UNITS,
-  FORMATION_SLOTS,
-  FORMATION_TEMPLATE_COUNT,
-  DEFAULT_TEMPLATES,
-  OFFICER_TEMPLATES,
-  formationStats,
-  type FormationUnit,
-  type FormationTemplate,
-  type OfficerTemplate,
-  type FormationSynergy,
-  type FormationStats,
-} from './data/formations';
-export {
-  divisionModule,
-  divisionsOf,
-  templatesOf,
-  regenDivision,
-  divisionCargo,
-  fleetCargoFree,
-  REGEN_PER_UNIT_PER_DAY,
-  GROUND_TICK_HOURS,
-} from './modules/division';
 
 // Data-driven content
 export {
