@@ -111,18 +111,34 @@ jobs:
       # leak. Blocking on purpose (unlike the best-effort APK signature in android.yml):
       # an unsigned image would fail deploy/verify-image.sh anyway, so a silent failure
       # here would just surface later as an undeployable image.
+      #
+      # REGISTRY CREDENTIALS GO IN AS FLAGS, NOT AS A MOUNTED DOCKER CONFIG. The first
+      # live run (run #1 on the merge commit) got all the way through Fulcio, the SCT and
+      # the Rekor entry, then died pushing the signature: `UNAUTHORIZED: unauthenticated`.
+      # The `docker push` above had just succeeded with the same token, so the token was
+      # never the problem — cosign simply never saw it. The mounted `~/.docker/config.json`
+      # is unusable to it: the cosign image is distroless and does NOT run as root, so
+      # neither `/root/…` nor a 0600 file owned by the runner is reachable, and cosign
+      # fell back to an anonymous token. Passing the credentials explicitly removes the
+      # whole question of which user and which HOME the container happens to have.
       - name: sign the digest (cosign, keyless)
         env:
           COSIGN_EXPERIMENTAL: '1'
           REF: ${{ steps.push.outputs.ref }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ github.token }}
         run: |
           docker run --rm \
             -e COSIGN_EXPERIMENTAL \
             -e ACTIONS_ID_TOKEN_REQUEST_TOKEN \
             -e ACTIONS_ID_TOKEN_REQUEST_URL \
-            -v "$HOME/.docker/config.json:/root/.docker/config.json:ro" \
+            -e REGISTRY_USER \
+            -e REGISTRY_TOKEN \
             ghcr.io/sigstore/cosign/cosign@sha256:b03690aa52bfe94054187142fba24dc54137650682810633901767d8a3e15b31 \
-            sign --yes "$REF"
+            sign --yes \
+            --registry-username "$REGISTRY_USER" \
+            --registry-password "$REGISTRY_TOKEN" \
+            "$REF"
 
       # Prove the published signature is actually verifiable the way a deploy verifies
       # it — same command, same identity constraints as deploy/verify-image.sh. A green
@@ -131,11 +147,16 @@ jobs:
         env:
           REF: ${{ steps.push.outputs.ref }}
           REPO: ${{ github.repository }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ github.token }}
         run: |
           docker run --rm \
-            -v "$HOME/.docker/config.json:/root/.docker/config.json:ro" \
+            -e REGISTRY_USER \
+            -e REGISTRY_TOKEN \
             ghcr.io/sigstore/cosign/cosign@sha256:b03690aa52bfe94054187142fba24dc54137650682810633901767d8a3e15b31 \
             verify "$REF" \
+            --registry-username "$REGISTRY_USER" \
+            --registry-password "$REGISTRY_TOKEN" \
             --certificate-identity-regexp "^https://github.com/$REPO/\.github/workflows/image\.yml@refs/heads/main$" \
             --certificate-oidc-issuer https://token.actions.githubusercontent.com \
             -o text

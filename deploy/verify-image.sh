@@ -33,8 +33,15 @@ case "$REF" in
 esac
 
 echo "verifying $REF"
+# Учётные данные реестра: НЕ монтируем в /root — образ cosign distroless и работает не от
+# root, поэтому ни путь, ни права на файл 0600 ему не подходят (на этом упал первый прогон
+# image.yml — cosign молча ушёл анонимом). Отдаём каталог по фиксированному пути через
+# DOCKER_CONFIG и запускаем от текущего пользователя, которому этот файл и принадлежит.
+# Для публичного пакета аутентификация не нужна вовсе — пустой каталог не мешает.
 docker run --rm \
-  -v "${HOME}/.docker:/root/.docker:ro" \
+  -u "$(id -u):$(id -g)" \
+  -e DOCKER_CONFIG=/dockercfg \
+  -v "${HOME}/.docker:/dockercfg:ro" \
   "$COSIGN_IMAGE" \
   verify "$REF" \
   --certificate-identity-regexp "^https://github.com/${REPO}/\.github/workflows/image\.yml@refs/heads/main$" \
