@@ -1757,7 +1757,7 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
   раскрытие → Scorecard `SecurityPolicyID`). Остаток — 2 `js/missing-rate-limiting` =
   подтверждённый false-positive (кастомный `slidingWindowIpLimiter` не моделируется
   CodeQL) → dismiss в Security UI (API-токен интеграции без scope `security_events`).
-- **SEC-10** ✅ `[core]` `[srv]` Два сторожа под авто-мердж: правила, которые до сих пор
+- **SEC-16** ✅ `[core]` `[srv]` Два сторожа под авто-мердж: правила, которые до сих пор
   держались на памяти ревьюера, переведены в гейт.
   **Сторож тумана** (`shared-core/state/fogInventory.test.ts`): фог-проекция — чёрный
   список, поэтому новое поле `GameState` публично по умолчанию (так утекали
