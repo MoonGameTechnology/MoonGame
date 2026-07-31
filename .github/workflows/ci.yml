@@ -13,6 +13,12 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Merge queue: the queue builds a temporary "latest main + this PR" branch and waits
+  # for the REQUIRED checks on it — but a workflow only runs there if it subscribes to
+  # `merge_group`. Without this line the queue never sees `lint · typecheck · test ·
+  # audit` report and every PR sits until it times out. Harmless while no queue is
+  # configured (the event simply never fires), so it can land ahead of the setting.
+  merge_group:
 
 permissions:
   contents: read
