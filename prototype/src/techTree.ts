@@ -16,7 +16,7 @@ import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { data } from './prototypeData';
 import { DAY, HOUR } from './time';
-import { esc, curIc, displayUnit } from './format';
+import { esc, cost, displayUnit } from './format';
 import { researchTech } from './actions';
 
 const clamp = (v: number, a: number, b: number): number => Math.max(a, Math.min(b, v));
@@ -30,10 +30,10 @@ export const TECH_BRANCHES: Array<{ key: string; label: string }> = [
 ];
 export const branchLabel = (key: string): string =>
   t(TECH_BRANCHES.find((b) => b.key === key)?.label ?? key);
-export const techCost = (c: Record<string, number>): string =>
-  Object.entries(c)
-    .map(([k, v]) => `${curIc(k)} ${v}`)
-    .join(' · ');
+// Делегирует общему cost(): те же SVG-чипы, что в баре и карточках, и тот же
+// показ нехватки — второй аргумент красит дефицит прямо в модалке технологии.
+export const techCost = (c: Record<string, number>, have?: Record<string, number>): string =>
+  Object.keys(c).length ? cost(c, have) : '';
 // --- TT-3.1: экран-дерево (макет v4) — вкладки-ветки, рельса дней, досье по тапу ----
 // Presentation-only layout: named sub-columns per branch, ids in day order. The
 // canonical data stays layout-free; a tech missing from this map falls into an
@@ -315,7 +315,7 @@ export function techTreeHtml(
       `<div class="tt-mtags">${tag}</div></div></div>` +
       (td.description ? `<div class="tt-mdesc">${esc(t(td.description))}</div>` : '') +
       `<div class="tt-mstats">` +
-      `<span>💰 <b>${techCost(td.cost)} · ${t('fmt.hours', { n: td.researchTimeHours })}</b></span>` +
+      `<span>💰 <b>${techCost(td.cost, res)} · ${t('fmt.hours', { n: td.researchTimeHours })}</b></span>` +
       (techFx(td) ? `<span>✦ <b>${techFx(td)}</b></span>` : '') +
       (gate > 0 ? `<span>📅 <b>${t('tech.from-day', { n: gate + 1 })}</b></span>` : '') +
       (prereqNames ? `<span>🔗 <b>${t('tech.req.title')} ${prereqNames}</b></span>` : '') +

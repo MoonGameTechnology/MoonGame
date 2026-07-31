@@ -115,6 +115,10 @@ export const en: Record<string, string> = {
   'cargo.garrison-empty': 'none left in the garrison',
   'cargo.hold-full': 'the hold is full',
 
+  // --- cost — ценники: единые чипы «иконка + число» на всех поверхностях.
+  'cost.free': 'free',
+  'cost.short': '{n} more needed',
+
   // --- chat / spy — Переписка (сессия и коалиция) и вкладка шпионажа.
   'chat.coalition.empty':
     'The coalition chat is empty.<br>Mark a province with a ping 📍 or write something.',

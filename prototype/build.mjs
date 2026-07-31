@@ -134,6 +134,23 @@ body::before{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;mix
 .rc-food,[data-desc="res:food"]{color:var(--rc-food);}
 .rc-energy,[data-desc="res:energy"]{color:var(--rc-energy);}
 .rc-microelectronics,[data-desc="res:microelectronics"]{color:var(--rc-microelectronics);}
+/* Inline resource icon (curIc): the SAME SVG the top bar draws, sized for prose and
+   sitting on the text baseline. One icon + one accent everywhere — the bar teaches
+   the player once, every cost/market/tech line reads instantly after that. */
+.ri{display:inline-flex;vertical-align:-2px;}
+.ri svg{display:block;width:13px;height:13px;}
+/* A cost chip (cost()): icon + amount in the resource's accent, tabular digits so
+   stacked prices align. Bare like the bar capsules — no boxes, the colour IS the
+   grouping. */
+.rcost{display:inline-flex;align-items:center;gap:3px;white-space:nowrap;
+  font-variant-numeric:tabular-nums;}
+/* Not enough of this resource: the chip reads RED (deficit wins over the accent,
+   same rule as the bar) and carries the exact gap — «−N», slightly subdued so the
+   price stays the loudest number. */
+.rcost.short{color:var(--red,#ff5a4d);}
+.rcost.short em.lack{font-style:normal;font-size:.86em;opacity:.85;
+  text-shadow:0 0 6px rgba(255,90,77,.35);}
+.rcost-free{opacity:.75;}
 .res b{color:#e6eeef;font-weight:700;font-size:13px;font-variant-numeric:tabular-nums;
   white-space:nowrap;flex:0 0 auto;}
 /* phones hide the flow digits — a NEGATIVE net income paints the stock itself red */

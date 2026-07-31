@@ -98,10 +98,19 @@ describe('дерево технологий — подписи', () => {
     expect(branchLabel('нет-такой')).toBe('нет-такой');
   });
 
-  it('цена собирается из иконок ресурсов', () => {
+  it('цена — те же чипы cost(), что и на всех других поверхностях', () => {
     expect(techCost({ metal: 40 })).toContain('rc-metal');
-    expect(techCost({ metal: 40, credits: 10 })).toContain(' · ');
+    expect(techCost({ metal: 40 })).toContain('<svg'); // единая SVG-иконка, не глиф
+    const two = techCost({ metal: 40, credits: 10 });
+    expect(two).toContain('rc-metal');
+    expect(two).toContain('rc-credits');
     expect(techCost({})).toBe('');
+  });
+
+  it('цена с казной подсвечивает нехватку прямо в модалке технологии', () => {
+    const html = techCost({ metal: 40 }, { metal: 15 });
+    expect(html).toContain('short');
+    expect(html).toContain('−25');
   });
 
   it('раскладка колонок ссылается только на существующие техи', () => {

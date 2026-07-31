@@ -29,6 +29,7 @@ function homeState(): { s: GameState; homeId: string } {
 function hostOf(over: Partial<DossierHost> = {}): DossierHost {
   return {
     state: () => newGame(),
+    me: () => 'p1',
     pcUi: () => true,
     youColor: () => '#3ad17a',
     queueOf: () => ({ buildings: [], units: [] }) as PlanetBuildQueue,

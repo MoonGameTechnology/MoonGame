@@ -205,6 +205,7 @@ import {
   unitIcon,
   unitIconHtml,
   archPath2d,
+  RES_SVG,
 } from './icons';
 // REFM-4: the object dossiers + the codex card live in `dossiers.ts`; the renderers
 // that read live match state come out of `createDossiers(hooks)` further down.
@@ -1376,6 +1377,10 @@ const floor = Math.floor;
 // Returns HTML (resource-tinted tokens) — callers feed innerHTML, don't esc() this.
 /** Та же цена ПЛОСКИМ текстом — для мест, где подпись уходит через `esc()`
  *  (`btn()`, `codexTile()`): там HTML из `cost()` показался бы игроку как разметка. */
+/** Казна текущего игрока — то самое `have`, которым cost() красит нехватку. */
+function myRes(): Record<string, number> {
+  return s.players[ME]?.resources ?? {};
+}
 function afford(bag: Record<string, number> | undefined): boolean {
   const res = s.players[ME]?.resources ?? {};
   for (const [r, n] of Object.entries(bag ?? {})) if ((res[r] ?? 0) < n) return false;
@@ -5094,7 +5099,7 @@ function conveyorHtml(planetId: string, lane: BuildLane): string {
   } else if (pcUi() && queued[0] && !canStartQueued(planetId, queued[0])) {
     // The queue is NOT stuck — its head simply can't be paid yet. Say so, with the
     // price, instead of an idle line that reads like a broken conveyor.
-    html += `<div class="current idle"><b>⏳ ${t('side.conveyor.waiting', { c: cost(buildCost(planetId, queued[0])) })}</b></div>`;
+    html += `<div class="current idle"><b>⏳ ${t('side.conveyor.waiting', { c: cost(buildCost(planetId, queued[0]), myRes()) })}</b></div>`;
     html += `<div class="bar"><i style="width:0%"></i></div>`;
   } else if (compactUi()) {
     html += `<div class="current idle"><b>${t('side.conveyor.idle')}</b></div>`;
@@ -5875,6 +5880,7 @@ function panelHtml(): string {
 // `producesLine`, the `Dossier` type) are imported at the top of the file.
 const { objDossier, codexHtml } = createDossiers({
   state: () => s,
+  me: () => ME,
   pcUi,
   youColor: () => youColor,
   queueOf,
@@ -6586,10 +6592,10 @@ function codexBuildBtn(kind: string, id: string): string {
     const buildable = (sectorTypeOf(p.id)?.allowedBuildings ?? BUILDABLE).includes(id);
     const built = p.buildings.some((b) => b.type === id);
     if (!buildable || built) return '';
-    return `<button class="cx-build" data-build="building:${id}">▣ ${t('codex.build-here')} · ${cost(data.buildings[id]?.cost)}</button>`;
+    return `<button class="cx-build" data-build="building:${id}">▣ ${t('codex.build-here')} · ${cost(data.buildings[id]?.cost, myRes())}</button>`;
   }
   if (kind === 'u' && data.units[id]) {
-    return `<button class="cx-build" data-build="unit:${id}">${unitIconHtml(id, data, youColor, 16)} ${t('codex.build-here')} · ${cost(data.units[id]?.cost)}</button>`;
+    return `<button class="cx-build" data-build="unit:${id}">${unitIconHtml(id, data, youColor, 16)} ${t('codex.build-here')} · ${cost(data.units[id]?.cost, myRes())}</button>`;
   }
   return '';
 }
@@ -8226,21 +8232,9 @@ const divDesign = initDivDesign({
   },
 });
 
-// Bar-only display icons: inline SVG line art traced from the mock (two coin rings,
-// isometric cube, sprout, bolt, IC chip). stroke=currentColor so the capsule states
-// (.short red, .dead dim) tint them exactly like a text glyph.
-const RES_SVG: Record<string, string> = {
-  credits:
-    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="6" cy="6.2" r="3.9"/><circle cx="10" cy="9.8" r="3.9"/></svg>',
-  metal:
-    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M8 1.8 13.4 4.9v6.2L8 14.2 2.6 11.1V4.9L8 1.8Z"/><path d="M2.6 4.9 8 8l5.4-3.1M8 8v6.2"/></svg>',
-  food: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 14.2V8.8"/><path d="M8 9.6C8 6.4 6.2 4.8 3.6 4.6c.2 3 1.9 4.7 4.4 5Z"/><path d="M8 9.6c0-3.2 1.8-4.8 4.4-5-.2 3-1.9 4.7-4.4 5Z"/></svg>',
-  energy:
-    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M9.3 1.6 4.2 8.9h3.2L6.4 14.4l5.4-7.6H8.5l.8-5.2Z"/></svg>',
-  microelectronics:
-    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><rect x="4.6" y="4.6" width="6.8" height="6.8" rx="1"/><rect x="7" y="7" width="2" height="2"/><path d="M6.4 4.6v-2M9.6 4.6v-2M6.4 13.4v-2M9.6 13.4v-2M4.6 6.4h-2M4.6 9.6h-2M13.4 6.4h-2M13.4 9.6h-2"/></svg>',
-};
-// --- TT-3.1: экран-дерево технологий ------------------------------------------
+// Капсулы бара рисуют общий словарь RES_SVG (icons.ts) — те же линии и тот же
+// цвет несут ценники, стакан рынка и дерево технологий: один взгляд на бар учит
+// читать все остальные поверхности.// --- TT-3.1: экран-дерево технологий ------------------------------------------
 // Само окно живёт в `techTree.ts` (REFM-9); здесь только его хуки. Ручка `#tech`
 // остаётся: её держат реестр слоёв Android-Back и троттлинг живой перерисовки в
 // кадровом цикле, а «Хранитель» открывает окно через `techTree.open()`.
@@ -8471,7 +8465,7 @@ function heroTreeHtml(hero: HeroInst): string {
       } else {
         cls += ' avail';
         crest = '◆';
-        foot = `<span class="hx-cost">${cost(nd.cost)}</span>`;
+        foot = `<span class="hx-cost">${cost(nd.cost, myRes())}</span>`;
       }
       const conn = nd.requires.length
         ? `<span class="hx-conn${rail.own && reqMet ? ' lit' : ''}"></span>`
@@ -8539,7 +8533,7 @@ function heroFittingsHtml(hero: HeroInst): string {
     const action = installed
       ? `<span class="hx-badge on">✓ ${t('hero.fit.installed')}</span>`
       : canFit
-        ? `<span class="hx-cost">${cost(fd.cost)}</span>`
+        ? `<span class="hx-cost">${cost(fd.cost, myRes())}</span>`
         : `<span class="hx-badge">${t('hero.fit.no-slots')}</span>`;
     const tap = canFit ? ` data-hfitd="${fid}"` : '';
     html +=
@@ -8608,7 +8602,7 @@ function heroDossierHtml(hero: HeroInst): string {
       ? `<div class="hx-drow"><span class="hx-ok">✓ ${t('hero.tree.unlocked')}</span></div>`
       : !branchOk
         ? `<div class="hx-drow"><span class="hx-no">${t('hero.tree.other-branch')}</span></div>`
-        : `<button class="hx-dbtn" data-hskill="${hero.id}" data-node="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.tree.unlock')} · ${cost(nd.cost)}</button>`;
+        : `<button class="hx-dbtn" data-hskill="${hero.id}" data-node="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.tree.unlock')} · ${cost(nd.cost, myRes())}</button>`;
     return (
       `<div class="hx-dossier">` +
       `<div class="hx-dh">${def?.branch ? `<span class="hx-tag">${esc(t(HERO_BRANCH_RU[def.branch] ?? def.branch))}</span>` : ''}<span class="hx-dnm">${esc(t(nd.name))}</span>${close}</div>` +
@@ -8616,7 +8610,7 @@ function heroDossierHtml(hero: HeroInst): string {
       (reqHtml
         ? `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.requires')}</span><span class="hx-dv">${reqHtml}</span></div>`
         : '') +
-      `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.cost')}</span><span class="hx-cost">${cost(nd.cost)}</span></div>` +
+      `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.cost')}</span><span class="hx-cost">${cost(nd.cost, myRes())}</span></div>` +
       btn +
       `</div>`
     );
@@ -8643,9 +8637,9 @@ function heroDossierHtml(hero: HeroInst): string {
       `<div class="hx-dossier">` +
       `<div class="hx-dh"><span class="hx-dnm">${esc(t(fd.name))}</span>${close}</div>` +
       (give ? `<div class="hx-give">${give}</div>` : '') +
-      `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.cost')}</span><span class="hx-cost">${cost(fd.cost)}</span></div>` +
+      `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.cost')}</span><span class="hx-cost">${cost(fd.cost, myRes())}</span></div>` +
       `<div class="hx-warn">${t('hero.fit.permanent')}</div>` +
-      `<button class="hx-dbtn danger" data-hfit="${hero.id}" data-fit="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.fit.install')} · ${cost(fd.cost)}</button>` +
+      `<button class="hx-dbtn danger" data-hfit="${hero.id}" data-fit="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.fit.install')} · ${cost(fd.cost, myRes())}</button>` +
       `</div>`
     );
   }
@@ -8726,9 +8720,6 @@ function bagRu(bag: Record<string, number>): string {
     .filter(([, n]) => n)
     .map(([r, n]) => `${Math.round(n)} ${t(RES_RU[r] ?? r)}`);
   return parts.length ? parts.join(' · ') : t('yard.free');
-}
-function myRes(): Record<string, number> {
-  return (s.players[ME]?.resources ?? {}) as Record<string, number>;
 }
 /** One live stat row: label · base → effective (+delta) · track bar (base cyan, delta green). */
 function conBar(

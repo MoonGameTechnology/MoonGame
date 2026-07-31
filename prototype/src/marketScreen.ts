@@ -13,7 +13,7 @@
  */
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { t } from '../../localization/runtime';
-import { esc, curIc, TECH_CUR } from './format';
+import { esc, curIc } from './format';
 import { marketLots, MARKET_FEE } from './sessionMarket';
 import { marketList, marketTake, marketCancel } from './actions';
 
@@ -50,7 +50,6 @@ export function marketBoxHtml(
   formSide: MarketSide,
 ): string {
   const res = (state.players[me]?.resources ?? {}) as Record<string, number>;
-  const glyph = TECH_CUR[tab] ?? '';
   const nameOf = (id: string): string => esc(state.players[id]?.name ?? id);
   const lots = marketLots(state);
   const asks = lots
@@ -63,9 +62,9 @@ export function marketBoxHtml(
     const mine = l.owner === me;
     // ECON-4: получатель кредитов получает net (5% сгорает) — в биде это исполнитель.
     const takerNet = Math.floor(l.amount * l.price * (1 - MARKET_FEE));
-    const qp = `<span class="mk-qp"><b>${l.amount}</b> ${curIc(l.resource)} @ ${l.price} <span class="rc-credits">⛁</span>${
+    const qp = `<span class="mk-qp"><b>${l.amount}</b> ${curIc(l.resource)} @ ${l.price} ${curIc('credits')}${
       bid && !mine
-        ? ` <span class="mk-net">→ ${takerNet} <span class="rc-credits">⛁</span></span>`
+        ? ` <span class="mk-net">→ ${takerNet} ${curIc('credits')}</span>`
         : ''
     }</span>`;
     const who = `<span class="mk-who">${mine ? t('market.own-lot') : nameOf(l.owner)}</span>`;
@@ -83,8 +82,8 @@ export function marketBoxHtml(
   const tabBtn = (k: string, label: string): string =>
     `<button class="mk-tab${tab === k ? ' on' : ''}" data-mtab="${k}">${label}</button>`;
   const stock =
-    `<div class="mk-lbl" style="margin-bottom:8px">${t('market.in-treasury')}: ${glyph} <b style="color:var(--ink)">${Math.round(res[tab] ?? 0)}</b>` +
-    ` · <span class="rc-credits">⛁</span> <b style="color:var(--ink)">${Math.round(res.credits ?? 0)}</b></div>`;
+    `<div class="mk-lbl" style="margin-bottom:8px">${t('market.in-treasury')}: ${curIc(tab)} <b style="color:var(--ink)">${Math.round(res[tab] ?? 0)}</b>` +
+    ` · ${curIc('credits')} <b style="color:var(--ink)">${Math.round(res.credits ?? 0)}</b></div>`;
   const form =
     `<div class="mk-form"><div class="mk-seg">${seg('sell', t('market.sell'))}${seg('buy', t('market.buy'))}</div>` +
     `<span class="mk-lbl">${t('market.qty')}</span><input class="mk-in" id="mk-amt" type="number" min="1" value="10">` +
