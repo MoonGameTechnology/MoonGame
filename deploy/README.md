@@ -112,10 +112,15 @@ sudo bash deploy/setup-proxy.sh
 # 1) Выпустить сертификат на свой домен (пример — certbot standalone, порт 80 свободен):
 sudo certbot certonly --standalone -d play.example.com
 
-# 2) Положить цепочку в ./certs рядом с docker-compose.yml (монтируется в /certs :ro):
+# 2) Положить цепочку в ./certs рядом с docker-compose.yml (монтируется в /certs :ro).
+#    ВАЖНО — владелец: контейнер работает от non-root uid 65532, а certbot оставляет
+#    privkey.pem как root:root 0600. Простой `cp` даёт файл, который сервер НЕ прочитает,
+#    и старт упадёт на «половинчатой» TLS-настройке. Поэтому кладём с нужным владельцем:
 mkdir -p deploy/certs
-sudo cp /etc/letsencrypt/live/play.example.com/privkey.pem   deploy/certs/
-sudo cp /etc/letsencrypt/live/play.example.com/fullchain.pem deploy/certs/
+sudo install -o 65532 -g 65532 -m 0400 \
+  /etc/letsencrypt/live/play.example.com/privkey.pem   deploy/certs/privkey.pem
+sudo install -o 65532 -g 65532 -m 0444 \
+  /etc/letsencrypt/live/play.example.com/fullchain.pem deploy/certs/fullchain.pem
 
 # 3) Включить TLS и поднять стек:
 cd deploy
@@ -124,7 +129,9 @@ TLS_KEY_FILE=/certs/privkey.pem TLS_CERT_FILE=/certs/fullchain.pem \
 ```
 
 Теперь транспорт зашифрован end-to-end (`wss://play.example.com:8788/...`). Продление:
-`certbot renew` → повторный `cp` в `deploy/certs` → `docker compose restart server` (в cron).
+`certbot renew` → повторный **`install` с тем же владельцем 65532** (обычный `cp` вернёт
+root:root 0600 и сервер перестанет стартовать после ближайшего рестарта) →
+`docker compose restart server` (в cron).
 
 ### Реверс-прокси терминирует TLS (альтернатива)
 

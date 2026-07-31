@@ -43,10 +43,18 @@ skopeo inspect docker://aquasec/trivy:0.58.2 --format '{{.Digest}}'
 
 ### Способ 3: используя GitHub Container Registry API
 
+⚠️ Прежний рецепт здесь был неверен дважды: `ghcr.io/v2/...` без токена отдаёт 401, а
+`.config.digest` — это дайджест **конфига**, а не образа (в `image@sha256:` идёт другой).
+Правильная форма — токен + заголовок `Docker-Content-Digest`, как и для Docker Hub:
+
 ```bash
-# Для ghcr.io образов
-curl -s "https://ghcr.io/v2/OWNER/REPO/manifests/TAG" \
-  -H "Accept: application/vnd.oci.image.manifest.v1+json" | jq '.config.digest'
+IMG=google/osv-scanner; TAG=v1.9.1
+tok=$(curl -s "https://ghcr.io/token?scope=repository:$IMG:pull" |
+  sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+curl -sI -H "Authorization: Bearer $tok" \
+  -H "Accept: application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json" \
+  "https://ghcr.io/v2/$IMG/manifests/$TAG" | tr -d '\r' |
+  sed -n 's/^[Dd]ocker-[Cc]ontent-[Dd]igest: //p'
 ```
 
 ### Способ 4: Docker Hub Registry API (без Docker и skopeo)
@@ -73,9 +81,15 @@ curl -sS -o /dev/null -D - -H "Authorization: Bearer $tok" \
 | `zricethezav/gitleaks` | ⚠️ TAG | `v8.18.4` — нужен sha256 |
 | `trufflesecurity/trufflehog` | ✅ sha256 | Пинен по дайджесту |
 | `ghcr.io/google/osv-scanner` | ⚠️ TAG | `v1.9.1` — нужен sha256 |
-| `aquasec/trivy` | ⚠️ TAG | `0.58.2` — нужен sha256 (используется 2 раза) |
+| `aquasec/trivy` | ⚠️ TAG | `0.58.2` — нужен sha256 (**4 использования**: trivy-fs, trivy-image, trivy-deps в `security.yml` + гейт перед пушем в `image.yml`) |
 | `anchore/syft` | ⚠️ TAG | `v1.20.0` — нужен sha256 (используется 2 раза) |
 | `ghcr.io/zizmorcore/zizmor` | ✅ sha256 | Пинен по дайджесту |
+| `owasp/dependency-check` | ✅ sha256 | Пинен по дайджесту (SEC-15) |
+
+**Четвёртая группа — релизный конвейер.** `image.yml` и `deploy/verify-image.sh` тянут
+`ghcr.io/sigstore/cosign/cosign` — пинен по дайджесту, тот же, что в `android.yml`;
+обновлять его вместе со сканерами. Там же — четвёртое использование `aquasec/trivy`
+(блокирующий скан перед пушем в GHCR), поэтому бамп версии Trivy трогает и релиз-путь.
 
 ## Сторонние образы прода (`deploy/docker-compose*.yml`)
 
