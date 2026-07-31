@@ -258,14 +258,14 @@ Dockerfile, но это утверждение об исходниках, а н�
 
 ```bash
 # 1. Проверить подпись — это и есть гейт (exit≠0 ⇒ дальше не идти)
-./deploy/verify-image.sh ghcr.io/moonwuk/moongame@sha256:<digest>
+./deploy/verify-image.sh ghcr.io/moongametechnology/moongame@sha256:<digest>
 
 # 2. Забрать ровно эти байты
-docker pull ghcr.io/moonwuk/moongame@sha256:<digest>
+docker pull ghcr.io/moongametechnology/moongame@sha256:<digest>
 
 # 3. Поднять стек на них (--no-build обязателен: иначе compose пересоберёт локально
 #    и молча выбросит проверенный образ)
-cd deploy && VOID_IMAGE=ghcr.io/moonwuk/moongame@sha256:<digest> \
+cd deploy && VOID_IMAGE=ghcr.io/moongametechnology/moongame@sha256:<digest> \
   docker compose -f docker-compose.yml -f docker-compose.release.yml up -d --no-build
 
 # публичный хост — добавить TLS-оверлей третьим -f:

@@ -21,11 +21,11 @@ Every push to `main` that touches the game refreshes **two rolling prereleases**
 - **Player client** (`appId com.voiddominion.player`) — for regular players: no dev
   test mode, no single-player skirmish, no time controls; the main path is
   callsign → match browser → join a running session. Tutorial works offline.
-  - Releases page: https://github.com/Moonwuk/Nygame/releases/tag/player
-  - Direct APK: https://github.com/Moonwuk/Nygame/releases/download/player/void-dominion-player.apk
+  - Releases page: https://github.com/MoonGameTechnology/MoonGame/releases/tag/player
+  - Direct APK: https://github.com/MoonGameTechnology/MoonGame/releases/download/player/void-dominion-player.apk
 - **Dev client** (`appId com.voiddominion.prototype`) — everything, as before:
-  - Releases page: https://github.com/Moonwuk/Nygame/releases/tag/alpha
-  - Direct APK: https://github.com/Moonwuk/Nygame/releases/download/alpha/void-dominion-alpha.apk
+  - Releases page: https://github.com/MoonGameTechnology/MoonGame/releases/tag/alpha
+  - Direct APK: https://github.com/MoonGameTechnology/MoonGame/releases/download/alpha/void-dominion-alpha.apk
 
 The two APKs have **different application ids**, so a host can install both side by
 side; each updates from its own release lane (the in-app updater picks the lane baked

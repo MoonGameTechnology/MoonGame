@@ -57,7 +57,7 @@ jobs:
         with:
           persist-credentials: false
 
-      # GHCR namespaces are lowercase; `Moonwuk/MoonGame` is not.
+      # GHCR namespaces are lowercase; `MoonGameTechnology/MoonGame` is not.
       - name: resolve image name
         id: img
         env:
