@@ -2416,9 +2416,11 @@ function startGuidedMatch(): void {
   // ONB-2: a brand-new commander shouldn't sit through the Mine's real build-time
   // (hours of game time) on the default ×10 wall-clock-ish preset — that's real
   // MINUTES of nothing happening on the very first beat. No rivals/fairness stakes
-  // in this bot-free sandbox, so just run it fast; ×100 is the same ceiling the
-  // player's own speed control already offers, not a new/unfamiliar value.
-  applyTimeSpeed(100);
+  // in this bot-free sandbox, so just run it fast: ×300 clears the two real waits
+  // (build the Cruiser the tour points at, 3h; fly it to the nearest neutral world,
+  // ~2.8h) in well under a minute each, instead of ~110s / ~100s at the player's own
+  // ×100 ceiling. Timed/measured empirically — see the ONB-2 roadmap entry.
+  applyTimeSpeed(300);
   note(t('onb.tour.speed'));
 }
 // Fold the finished guide into the flag (+funnel); first completion earns XP + a nudge.
