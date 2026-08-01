@@ -248,10 +248,13 @@ body.sheet-open #cmdbar{bottom:calc(34vh + 12px);}
    overrides an ancestor's :none. */
 #spotlight.sl-passthrough{pointer-events:none;}
 #spotlight.sl-passthrough .sl-dim{pointer-events:none;background:transparent;}
-#spotlight .sl-ring{position:fixed;border:2px solid var(--cyan);border-radius:8px;pointer-events:none;
-  box-shadow:0 0 0 2px rgba(53,214,230,.25),0 0 18px rgba(53,214,230,.45);animation:sl-pulse 1.6s ease-in-out infinite;}
-@keyframes sl-pulse{0%,100%{box-shadow:0 0 0 2px rgba(53,214,230,.2),0 0 14px rgba(53,214,230,.35);}
-  50%{box-shadow:0 0 0 4px rgba(53,214,230,.35),0 0 22px rgba(53,214,230,.6);}}
+/* Gold blink, not the theme's usual cyan: the ring marks "tap HERE" specifically —
+   it needs to read as a distinct call-to-action against the cyan HUD, not blend into
+   it as one more glowing panel. */
+#spotlight .sl-ring{position:fixed;border:2px solid var(--amber);border-radius:8px;pointer-events:none;
+  box-shadow:0 0 0 2px rgba(255,180,58,.35),0 0 18px rgba(255,180,58,.55);animation:sl-pulse 1s ease-in-out infinite;}
+@keyframes sl-pulse{0%,100%{box-shadow:0 0 0 2px rgba(255,180,58,.12),0 0 8px rgba(255,180,58,.2);opacity:.5;}
+  50%{box-shadow:0 0 0 5px rgba(255,180,58,.6),0 0 28px rgba(255,180,58,.95);opacity:1;}}
 #spotlight .sl-bubble{position:fixed;pointer-events:auto;max-width:min(320px,82vw);
   background:rgba(4,16,22,.97);border:1px solid var(--cyan);border-radius:10px;padding:13px 15px;
   box-shadow:0 6px 22px rgba(0,0,0,.55);color:var(--ink);}
