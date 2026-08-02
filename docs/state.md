@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 2156 зелёных** (54 skip, 192 файла).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 2193 зелёных** (54 skip, 196 файла).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -112,11 +112,11 @@ packages/action-layer/src/
   data/          schemas.ts (zod-схемы + parseGameData, buildingLevel/buildingMaxLevel)
   rng/           rng.ts (sfc32)
   util/          clone.ts (deepClone/deepFreeze), treasury.ts (canAfford/payCost — shared by construction & technology), fitting.ts (генерик-гейт «слоты+предметы», SHIP-4) + loadout.ts (ship-обёртка над ним)
-  modules/       army, arsenalSync, artillery, capital, captureOnArrival, combat, construction, diplomacy, economy, effects, espionage, faction, fleetOps, fleetRepair, forcedMarch, hero, heroEffects, instantRepair, intercept, market, movement, orbital, planetType, scientist, sector, standingOrders, station, steward, tax, technology, victory, visibility  (32 модуля, + *.test.ts)
+  modules/       army, arsenalSync, artillery, capital, captureOnArrival, combat, construction, diplomacy, division, economy, effects, espionage, faction, fleetOps, fleetRepair, forcedMarch, hero, heroEffects, instantRepair, intercept, market, movement, orbital, planetType, scientist, sector, standingOrders, station, steward, tax, technology, victory, visibility  (33 модуля, + *.test.ts)
   examples/      skirmish.test.ts (демо-сценарий + SVG)
   index.ts       баррель (экспорт публичного API)
-data/            manifest, resources, units, buildings, factions, events, sectors, planetTypes, technologies (.json)
-localization/    ВЕСЬ текст для игрока: index.ts (LOCALES/DEFAULT_LOCALE/dataKey), ru.ts, en.ts (плоские карты ключ→текст, 1575 ключей), runtime.ts (ОДИН на прототип и клиент: t/tData/lookup/hasKey/setLocale/localizeStaticDom, LOC-5) + runtime.test.ts. Мост старых msgid снят вместе с LOC-2 — в коде только ключи
+data/            manifest, resources, units, buildings, factions, events, sectors, sectorKinds, planetTypes, technologies, scientists, rewards, heroes, heroAbilities, heroFittings, heroPassives, heroSkillTrees, modules, medals, dropTables, starterArsenal (.json)
+localization/    ВЕСЬ текст для игрока: index.ts (LOCALES/DEFAULT_LOCALE/dataKey), ru.ts, en.ts (плоские карты ключ→текст, 1574 ключа), runtime.ts (ОДИН на прототип и клиент: t/tData/lookup/hasKey/setLocale/localizeStaticDom, LOC-5) + runtime.test.ts. Мост старых msgid снят вместе с LOC-2 — в коде только ключи
 docs/            architecture, modulesystem, roadmap, deep-technical-roadmap, multiplayer, engineering-risks, gdd, metagame, state(этот)
 prototype/       src/game.ts (чистый index-фасад реэкспортов, REFP-28: 5289→207 строк, логики нет), src/prototypeData.ts, src/map.ts, src/fleetStacks.ts, src/tax.ts, src/formations.ts, src/botFavour.ts, src/squadron.ts, src/chain.ts, src/hunger.ts, src/botDiplomacy.ts, src/sessionMarket.ts, src/capital.ts, src/fleetLaunch.ts, src/standingOrders.ts, src/forcedMarch.ts, src/instantRepair.ts, src/econScrews.ts, src/economy.ts, src/matchSetup.ts, src/actions.ts, src/patrol.ts, src/serverDrivers.ts, src/division.ts, src/protoKernel.ts, src/stewardGuard.ts, src/ai.ts, src/time.ts (вынесены из game.ts; Block REFP закрыт 28/28, обратных рёбер на фасад ноль), src/main.ts (UI), src/format.ts (презентационные форматтеры, REFM-2), src/icons.ts (словарь иконок, REFM-3), src/dossiers.ts + src/buildQueue.ts (досье объектов и кодекс + словарь очереди стройки, REFM-4), src/arsenalScreen.ts (витрина «Арсенал», REFM-5), src/marketScreen.ts (окно рынка, REFM-6), src/stewardScreen.ts (окно «Хранителя», REFM-7), src/divisionDesigner.ts (конструктор дивизий, REFM-8), src/techTree.ts (дерево технологий, REFM-9), src/profileScreen.ts (профиль командира, REFM-10), src/corpScreen.ts (корпоративный кабинет, REFM-11), src/smoke.ts, tsconfig.json (REFM-0: typecheck в гейте), build.mjs, uitest.mjs, dist/ (артефакт, в .gitignore)
 ```
@@ -1113,6 +1113,12 @@ grants}`), `heroFittings.json` (`{statMods, grants, cost}`). Движок ПОЛ
   `hero.ability`/`hero.spawn`/`hero.skill.unlock`/`hero.fit` + пассивки на хуках +
   пред-матч ростер (`SlotAssignment.heroes`) — см. §5 hero-модуль. Referential-integrity
   тесты связывают все каталоги; загрузчик собирает 5 фрагментов.
+- **Метаданные (сервер-side `data/*.json`):** `rewards.json` (XP/место — см. victory),
+  `medals.json` (достижения — см. §8), `modules.json` (6 корабельных модулей: cargo_bay,
+  radar_module, ion_engine, targeting_array, ablative_plating, shield_booster — зеркало
+  для конструктора «Верфь»), `dropTables.json` (дроп-таблицы лута после матча: веса по
+  месту, pity-счётчик, salvage), `starterArsenal.json` (стартовый набор корпусов/модулей
+  для нового аккаунта). Загружаются сервером (`scenario.ts`), не входят в `parseGameData`.
 
 ## 7. Прототип (`prototype/`)
 
@@ -1186,7 +1192,7 @@ grants}`), `heroFittings.json` (`{statMods, grants, cost}`). Движок ПОЛ
   также весь каталог `prototypeData.ts` — `tech.node.*`, `sci.*`, `faction.*`,
   `hero.unit/ability/passive/tree/fit.*` (закрытие LOC-2).
 
-Итого **1575 ключей**. Записи в локалях разложены по доменным секциям и отсортированы
+Итого **1574 ключа**. Записи в локалях разложены по доменным секциям и отсортированы
 по ключу внутри каждой. Таблицы-справочники прототипа и игровой каталог
 (`prototypeData.ts`) держат В ЗНАЧЕНИИ ключ, а не русский текст — их подписи уходят в
 `t()` переменной, и раньше именно там английский пропадал незаметно для гейта. Имена
@@ -1229,10 +1235,11 @@ APK собирается в двух лейнах (matrix в `android.yml`): д�
 (`void-dominion-player.apk`, свой `com.voiddominion.player` — ставится рядом с
 дев-версией); каждый APK автообновляется из своего лейна.
 
-- **Реальное ядро** в браузере: `createKernel([sector, planetType, tax, faction, economy,
-movement, hero, heroEffects, orbital, combat, artillery, intercept, captureOnArrival,
-construction, technology, steward, army, victory, fleetLaunch, diplomacy, espionage,
-botDiplomacy, market, division, capital, standingOrders, effects])` (27 модулей), тик в реальном
+- **Реальное ядро** в браузере: `createKernel([sector, planetType, tax, faction, hunger,
+economy, movement, hero, heroEffects, orbital, combat, artillery, intercept, captureOnArrival,
+construction, arsenalSync, technology, steward, army, victory, fleetLaunch, diplomacy, espionage,
+botDiplomacy, market, division, capital, standingOrders, forcedMarch, instantRepair, econScrews,
+effects])` (32 модуля), тик в реальном
   времени (скорость ⏸/▶/⏩). Концовка матча — из авторитетного `state.match` (`victoryModule`),
   полноэкранный экран итогов победы/поражения/ничьи (счёт+место+статы+XP, рематч; см.
   раздел victory) — а не хардкод по узлам.
@@ -1688,7 +1695,7 @@ Memory + Postgres `ava_feed`) — только публичные факты: и
 > Компактный агрегат; помашинная матрица — [`readiness.md`](readiness.md),
 > запуск для живых игроков — [`launch-runbook.md`](launch-runbook.md).
 
-**✅ Этап 1 (ядро) — готово целиком:** 24 модуля на микроядре (шина/хуки/манифест,
+**✅ Этап 1 (ядро) — готово целиком:** 25 модулей на микроядре (шина/хуки/манифест,
 seeded RNG + golden, `advanceTo`): экономика + рынок, карта/движение/перехват, типы
 секторов и планет, бой (мелэ + орбитальное ПВО/бомбардировка + артиллерия) с двухфазным
 захватом, здания + станции, флот ⊕ армия + транспорт, технологии + учёные, фракции,
