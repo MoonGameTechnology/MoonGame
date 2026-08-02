@@ -2090,10 +2090,16 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
    from the zoom list. Percentages resolve against the (zoomed) parent, so they
    need no compensation — which is why the hub column below uses % and not vw. */
 @media (min-width:900px) and (hover:hover) and (pointer:fine){
+  /* PC HUD magnification. 1.5× on a tall monitor, but that fixed factor made the top
+     bar + devline + bottom rail eat a short window (laptop with a bookmarks bar, 150%
+     OS scale) until the interface clipped off the top and bottom. --pcz steps the zoom
+     down with the viewport HEIGHT (ladder below) so the HUD always fits; mobile is
+     untouched (this whole query is PC-gated). */
+  :root{--pcz:1.5;}
   #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#scipick,
   #divdesign,#market,#constructor,#codex,#codexhub,#intro,#recap,#goals,#playercard,
   #settings,#warprompt,#diplo,#splitdlg,#pingmenu,#banner,#endscreen,#connect,#updbar,
-  #hub,#emblempick,#corp,#setup,#testmode,#sandbox{zoom:1.5;}
+  #hub,#emblempick,#corp,#setup,#testmode,#sandbox{zoom:var(--pcz,1.5);}
   /* vw/vh compensations (base values ÷ 1.5 — see the note above) */
   #toasts{max-width:min(61vw,520px);}
   /* rail tool list: cap at ~7 items and scroll; the sticky ▲/▾ ticks (not buttons)
@@ -2176,6 +2182,14 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
     width:80%;margin-left:auto;margin-right:auto;
     border-left:1px solid var(--line-hi);border-right:1px solid var(--line-hi);}
 }
+/* --pcz ladder: shrink the PC HUD magnification as the window gets shorter so the top
+   bar, devline and bottom rail stop clipping the interface off the top and bottom edges.
+   Same source order = later (smaller max-height) match wins; 1.5× is kept for tall
+   monitors. PC-gated, so mobile/touch layouts never see it. */
+@media (min-width:900px) and (hover:hover) and (pointer:fine) and (max-height:859px){:root{--pcz:1.4;}}
+@media (min-width:900px) and (hover:hover) and (pointer:fine) and (max-height:759px){:root{--pcz:1.3;}}
+@media (min-width:900px) and (hover:hover) and (pointer:fine) and (max-height:679px){:root{--pcz:1.2;}}
+@media (min-width:900px) and (hover:hover) and (pointer:fine) and (max-height:599px){:root{--pcz:1.1;}}
 /* the right-dock panel layout (the ≥900px landscape query above) re-stated at
    vw/vh ÷ 1.5 for the zoomed PC HUD — those base rules would otherwise scale
    to 60vw-wide panels and off-screen heights */
