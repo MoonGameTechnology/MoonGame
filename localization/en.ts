@@ -1174,6 +1174,7 @@ export const en: Record<string, string> = {
   'rescard.stock': 'In treasury',
   'rescard.income': 'Income',
   'rescard.expense': 'Expenses',
+  'rescard.net': 'Net income',
   'rescard.production': 'World production',
   'rescard.upkeep': 'Building upkeep',
   'rescard.army': 'Army upkeep',

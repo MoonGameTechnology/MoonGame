@@ -1174,6 +1174,7 @@ export const ru: Record<string, string> = {
   'rescard.stock': 'В казне',
   'rescard.income': 'Доходы',
   'rescard.expense': 'Расходы',
+  'rescard.net': 'Чистый доход',
   'rescard.production': 'Производство миров',
   'rescard.upkeep': 'Содержание зданий',
   'rescard.army': 'Содержание войск',

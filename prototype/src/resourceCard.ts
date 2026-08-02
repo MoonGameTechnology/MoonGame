@@ -9,7 +9,7 @@
 import type { GameState } from '../../packages/shared-core/src/index';
 import { t } from '../../localization/runtime';
 import { esc } from './format';
-import { netIncome } from './economy';
+import { incomeBreakdown } from './economy';
 
 /** Resources that can be traded on the in-game market (credits are the currency). */
 const TRADEABLE = new Set(['metal', 'food', 'energy', 'microelectronics']);
@@ -58,18 +58,15 @@ export function initResourceCard(host: ResourceCardHost): { open: (resource: str
 export function resourceCardHtml(state: GameState, me: string, resource: string, icons: Record<string, string>): string {
   const player = state.players[me];
   const stock = Math.round(player?.resources?.[resource] ?? 0);
-  const flow = netIncome(state, me)[resource] ?? 0;
+  const bd = incomeBreakdown(state, me)[resource] ?? { production: 0, buildingUpkeep: 0, unitUpkeep: 0, net: 0 };
   const name = t(`hud.resource.${resource}`);
   const icon = icons[resource] ?? '';
   const canTrade = TRADEABLE.has(resource);
   const inDeficit = (player?.arrears ?? []).includes(resource);
 
-  // Income/expense breakdown (approximate — netIncome is the net; we split by sign)
-  const production = Math.max(0, flow);
-  const upkeep = flow < 0 ? Math.abs(flow) : 0;
-
-  const flowStr = (flow >= 0 ? '+' : '') + (Math.abs(flow) >= 1 ? String(Math.round(flow)) : String(Math.round(flow * 10) / 10));
-  const flowCls = flow >= 0 ? 'pos' : 'neg';
+  const fmt = (v: number) => (Math.abs(v) >= 1 ? String(Math.round(v)) : String(Math.round(v * 10) / 10));
+  const netStr = (bd.net >= 0 ? '+' : '') + fmt(bd.net);
+  const netCls = bd.net >= 0 ? 'pos' : 'neg';
 
   return `<div class="rc-box">
     <div class="rc-head">
@@ -77,11 +74,14 @@ export function resourceCardHtml(state: GameState, me: string, resource: string,
       <b>${esc(name)}</b>
     </div>
     <div class="rc-stat"><span class="rc-k">${esc(t('rescard.stock'))}</span><span class="rc-v">${stock}</span></div>
-    <div class="rc-flow ${flowCls}">${flowStr}/ч</div>
     ${inDeficit ? `<div style="color:#ff6b6b;font-size:12px;text-align:center;padding:4px 0">${esc(t('hud.deficit'))}</div>` : ''}
     <div class="rc-sec">${esc(t('rescard.income'))}</div>
-    <div class="rc-stat"><span class="rc-k">${esc(t('rescard.production'))}</span><span class="rc-v">+${Math.round(production)}</span></div>
-    ${upkeep > 0 ? `<div class="rc-sec">${esc(t('rescard.expense'))}</div><div class="rc-stat"><span class="rc-k">${esc(t('rescard.upkeep'))} + ${esc(t('rescard.army'))}</span><span class="rc-v">−${Math.round(upkeep)}</span></div>` : ''}
+    <div class="rc-stat"><span class="rc-k">${esc(t('rescard.production'))}</span><span class="rc-v pos">+${fmt(bd.production)}</span></div>
+    <div class="rc-sec">${esc(t('rescard.expense'))}</div>
+    <div class="rc-stat"><span class="rc-k">${esc(t('rescard.upkeep'))}</span><span class="rc-v neg">−${fmt(bd.buildingUpkeep)}</span></div>
+    <div class="rc-stat"><span class="rc-k">${esc(t('rescard.army'))}</span><span class="rc-v neg">−${fmt(bd.unitUpkeep)}</span></div>
+    <div class="rc-sec">${esc(t('rescard.net'))}</div>
+    <div class="rc-flow ${netCls}">${netStr}/ч</div>
     <button class="rc-market ${canTrade ? '' : 'disabled'}" data-rc-market="${esc(resource)}">
       ${canTrade ? esc(t('rescard.market')) : esc(t('rescard.no-trade'))}
     </button>
