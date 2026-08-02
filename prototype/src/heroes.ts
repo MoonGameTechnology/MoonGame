@@ -10,6 +10,7 @@
  * Pure + data-driven, like the formation roster. This is the menu-facing MODEL +
  * preview; in-match instances / capital / respawn / in-match re-fit are later phases.
  */
+import type { GameState } from '../../packages/shared-core/src/index';
 
 /** Hero grades, lowest → highest. The slot count is the number of module slots. */
 export type HeroGrade = 'common' | 'rare' | 'legendary' | 'main';
@@ -114,10 +115,10 @@ export interface HeroLoadout {
 /** The default roster: the main hero (renamed to the player's callsign) + one of each
  *  other grade, so all four rarities are represented until hero acquisition lands. */
 export const DEFAULT_HEROES: HeroLoadout[] = [
-  { name: 'Командир', grade: 'main', abilities: ['corridor', 'rally', 'scan', 'bulwark'] },
-  { name: 'Разрушитель', grade: 'legendary', abilities: ['annihilate', 'scan', 'recall'] },
-  { name: 'Авангард', grade: 'rare', abilities: ['corridor', 'rally'] },
-  { name: 'Страж', grade: 'common', abilities: ['bulwark'] },
+  { name: 'hero.arch.commander', grade: 'main', abilities: ['corridor', 'rally', 'scan', 'bulwark'] },
+  { name: 'hero.arch.destroyer', grade: 'legendary', abilities: ['annihilate', 'scan', 'recall'] },
+  { name: 'hero.arch.vanguard', grade: 'rare', abilities: ['corridor', 'rally'] },
+  { name: 'hero.arch.warden', grade: 'common', abilities: ['bulwark'] },
 ];
 
 /** Aggregate readout of a loadout for the designer preview. */
@@ -143,4 +144,13 @@ export function heroLoadoutInfo(loadout: HeroLoadout): HeroLoadoutInfo {
     if (a) abilities.push(a);
   }
   return { count: abilities.length, slots, abilities, planned: abilities.filter((a) => !a.live).length };
+}
+
+/** A player's hero roster (the loadouts composed in the menu), or the defaults.
+ *  Reads the prototype's `heroRoster` state extension through a narrow local view
+ *  (the division.ts/serverDrivers.ts pattern) — moved here from the `game.ts`
+ *  facade with REFP-28 (the roster is hero-domain state). */
+export function heroRosterOf(state: GameState, playerId: string): HeroLoadout[] {
+  const s = state as GameState & { heroRoster?: Record<string, HeroLoadout[]> };
+  return s.heroRoster?.[playerId] ?? DEFAULT_HEROES;
 }

@@ -57,8 +57,12 @@ backlog'а — исполняемая часть правила «verify docs ag
 retired — npm shut down its audit endpoints, 2026-07). CI mirrors it on every push:
 `.github/workflows/ci.yml` runs the gate + audit against a service Postgres (so the
 durable-store tests run too), `.github/workflows/security.yml` runs the gate + audit alongside
-a diverse scanner set (Semgrep, CodeQL, Trivy, OSV, Gitleaks, TruffleHog, zizmor), and
-`.github/workflows/android.yml` builds the Android APK. `main` is protected — changes land
+a diverse scanner set (Semgrep, CodeQL, Trivy, OSV, Gitleaks, TruffleHog, zizmor) — on every
+push **and weekly on `main`**, since a pinned prod image outlives the CVE feeds that scanned
+it — `.github/workflows/android.yml` builds the Android APK, and
+`.github/workflows/image.yml` publishes the prod image (build → blocking Trivy → GHCR →
+keyless cosign signature over the digest; the deploy side verifies it with
+`deploy/verify-image.sh` before starting — see `docs/security/pipeline.md`). `main` is protected — changes land
 via PR with green CI (see `CONTRIBUTING.md`); keep the gate green before pushing.
 
 ## Non-negotiable invariants
@@ -130,7 +134,10 @@ data. You should not need to touch the kernel.
 
 **Правило: в коде нет человекочитаемого текста. В коде есть КЛЮЧ.** Весь текст,
 который видит игрок, живёт в корневой папке `/localization` — одна локаль = один файл
-(`ru.ts`, `en.ts`, дальше `de.ts` и т.д.), плоская карта `ключ → текст`.
+(`ru.ts`, `en.ts`, дальше `de.ts` и т.д.), плоская карта `ключ → текст`. Рантайм ОДИН
+на прототип и клиент — `localization/runtime.ts`; своей копии `t()` не заводи.
+Подробный порядок работы (куда писать, что ловит каждый тест гейта, частые ловушки) —
+скилл `localization` (`.claude/skills/localization/SKILL.md`).
 
 ```ts
 t('err.no-capacity')            // → «трюм полон» / “the hold is full”
@@ -145,16 +152,37 @@ tData('Metal Mine')             // ИМЯ игровых данных → клю
 - **Новый текст = сначала ключ в `ru.ts` + `en.ts`, потом `t('ключ')` в коде.** Не
   «напишу пока по-русски, переведу потом»: гейт (`prototype/src/i18n.test.ts`) роняет
   сборку на ключе, которого нет в обеих локалях.
-- **Статичная разметка** (`build.mjs`): ключ в ЗНАЧЕНИИ атрибута —
-  `<b data-i18n="hub.play">Играть</b>`, аналогично `data-i18n-title/-ph/-aria`.
+- **Статичная разметка** (`build.mjs`): узел ПУСТ, ключ стоит в ЗНАЧЕНИИ атрибута —
+  `<b data-i18n="hub.play"></b>`, аналогично `data-i18n-title/-ph/-aria`. Текст
+  приходит только из локали, поэтому разъехаться с ней он не может.
 - **Новый язык:** положить `/localization/<код>.ts` той же формы и дописать его в
   `LOCALES`/`LOCALE_LABEL` в `/localization/index.ts`. Больше ничего.
 - Комментарии в коде — не локализуются: они для разработчика, а не для игрока.
 
-**Переходный период (кирпич `LOC-2`).** Исторически msgid'ом была сама русская строка
-(`t('трюм полон')`), и бо́льшая часть вызовов ещё такая — их держит мост
-`/localization/legacy/en.ts`. Мост только сокращается: **не добавляй в него записи**,
-новый текст заводится ключом. Ключ и старый msgid не спутать — в ключе нет кириллицы.
+**Переходного периода больше нет (`LOC-2` закрыт).** Исторически msgid'ом была сама
+русская строка (`t('трюм полон')`), и её держал мост `/localization/legacy/`. Мост
+снят: `t()`/`tData()` принимают ТОЛЬКО ключ, русский литерал в них не переведётся —
+он доедет до игрока как есть. Это держит гейт (`prototype/src/i18n.test.ts`, тест
+«в коде нет русского текста»), так что случайно вернуть старую форму не выйдет.
+
+Отдельно про **имена игровых ДАННЫХ**: они остаются английскими (`name: 'Metal Mine'`),
+потому что `tData()` строит из имени слаг `dataKey()`, а тот вырезает всё, кроме
+`[a-z0-9]`. Русское имя схлопнется в ключ `data.` — перевод станет недостижим, и игрок
+на любой локали увидит исходную строку. Русский текст такого имени живёт в `data.*`.
+
+**Ловушка `packages/server`: там нет `t()`/`/localization` вообще.** Сервер — не клиент,
+у него нет доступа к локали игрока. Если серверный код формирует текст, который увидит
+игрок (push-уведомление, письмо, будущий email-дайджест), НЕЛЬЗЯ синтезировать прозу на
+сервере («N событий», склонения и т.п.) — это либо русский текст напрямую в код (нарушает
+правило выше), либо текст без локали получателя (неверная локаль для не-RU игрока). Разрешено
+только: (а) переиспользовать уже локализованный текст, пришедший ОТТУДА, где он был
+локализован клиентом/действием под конкретного игрока (пример: `push.ts`'s
+`digestPushPayload` берёт заголовок из `RecapItem.text` — уже локализованная строка, а не
+изобретает свою), либо (б) чисто структурное/числовое форматирование без слов (`+3`, а не
+«ещё 3 события»). Поймал на себе именно эту ошибку при ONB-5 (см. PR #434) — писал
+русскую прозу с ручным склонением прямо в `push.ts` и вычистил до коммита. Перед тем как
+писать текст в любом файле `packages/server/src/**`, спроси себя: «а АНГЛОГОВОРЯЩИЙ игрок
+это увидит?» — если да и текста нет в `/localization`, это баг.
 
 ## Working agreements
 

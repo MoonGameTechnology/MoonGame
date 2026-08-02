@@ -6,7 +6,7 @@
  * diplomacy helpers + `timeScaleOf`/`DAY`. `game.ts` imports `botDiplomacyModule`
  * for `MODULES`.
  */
-import type { GameModule, GameState, PlayerId } from '../../packages/shared-core/src/index';
+import type { GameModule, GameState } from '../../packages/shared-core/src/index';
 import {
   clearOffers,
   getStance,

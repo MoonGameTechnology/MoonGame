@@ -6,7 +6,7 @@
  *  fenced hooks in the shared code. To cut the whole feature without a trace:
  *    1. delete this file (prototype/src/testmode.ts);
  *    2. remove the `<!-- DEV TEST MODE -->` HTML block + the "Тесты" button and
- *       the `/* DEV TEST MODE *​/` CSS block in prototype/build.mjs;
+ *       the CSS block fenced by the DEV TEST MODE marker comments in build.mjs;
  *    3. remove the `initTestMode(...)` import + call in prototype/src/main.ts.
  *  Nothing else references it.
  *
@@ -271,7 +271,8 @@ function buildCollisionScenario(forceA: Force, forceD: Force): GameState {
     const nbrs = cand.links.filter((l) => byId.has(l));
     for (let i = 0; i < nbrs.length; i++) {
       for (let j = i + 1; j < nbrs.length; j++) {
-        if (byId.get(nbrs[i])!.links.includes(nbrs[j])) continue; // directly linked → skip
+        // loop bounds keep i/j inside nbrs — the index reads can't miss
+        if (byId.get(nbrs[i]!)!.links.includes(nbrs[j]!)) continue; // directly linked → skip
         const d = dist(cand.id, a1);
         if (d > best) {
           best = d;
@@ -285,8 +286,8 @@ function buildCollisionScenario(forceA: Force, forceD: Force): GameState {
 
   let st = newGame({
     seats: [
-      { id: 'p1', name: 'Azure (тест)', faction: 'blue', start: a1, ai: false },
-      { id: 'p2', name: 'Crimson (тест)', faction: 'red', start: a2, ai: false },
+      { id: 'p1', name: 'Azure (тест)', faction: 'azure', start: a1, ai: false },
+      { id: 'p2', name: 'Crimson (тест)', faction: 'crimson', start: a2, ai: false },
     ],
   });
   st.time = 0;

@@ -27,11 +27,23 @@ const EXPECTED = [
   { key: 'gitleaks', name: 'Gitleaks — секреты (дерево)' },
   { key: 'trufflehog', name: 'TruffleHog — секреты (история + верификация)' },
   { key: 'osv', name: 'OSV-Scanner — SCA (osv.dev)' },
+  {
+    key: 'dependency-check',
+    name: 'OWASP Dependency-Check — SCA (NVD/CPE)',
+    scheduledOnly: true,
+    skipNote: 'по расписанию/вручную',
+  },
   { key: 'trivy-fs', name: 'Trivy fs — vuln/secret/IaC' },
   { key: 'trivy-image', name: 'Trivy image — базовая ОС образа' },
+  { key: 'trivy-deps', name: 'Trivy image — сторонние образы прода (postgres/caddy)' },
   { key: 'dast-zap', name: 'OWASP ZAP — DAST (baseline против запущенного сервера)' },
   { key: 'zizmor', name: 'zizmor — безопасность workflow' },
-  { key: 'scorecard', name: 'OpenSSF Scorecard — постура', mainOnly: true },
+  {
+    key: 'scorecard',
+    name: 'OpenSSF Scorecard — постура',
+    mainOnly: true,
+    skipNote: 'только на main',
+  },
   { key: 'sbom', name: 'Syft — SBOM (CycloneDX)' },
 ];
 
@@ -79,6 +91,8 @@ for (const f of files.filter(
 const perTool = new Map();
 const totals = { error: 0, warning: 0, note: 0, none: 0 };
 const findings = [];
+/** Сколько результатов сканеры пометили как подавленные (см. фильтр ниже). */
+let suppressedCount = 0;
 const sarifTools = new Set();
 const toolOf = (name) => {
   if (!perTool.has(name)) perTool.set(name, { error: 0, warning: 0, note: 0, none: 0 });
@@ -91,6 +105,17 @@ for (const f of files.filter((f) => f.endsWith('.sarif') || f.endsWith('.sarif.j
     const name = run.tool?.driver?.name ?? 'Unknown';
     sarifTools.add(name);
     for (const r of run.results ?? []) {
+      // Непустой `suppressions` — находка, ПОДАВЛЕННАЯ самим сканером (инлайн
+      // `nosemgrep`, dismissal в UI и т.п.). Semgrep оставляет её в SARIF с этой
+      // пометкой, но выходит с кодом 0 — для гейта её нет. Считать её наравне с живыми
+      // значит показывать как проблему то, что уже разобрано и обосновано: именно так
+      // «подавленная» находка в `wsServer.tls.test.ts` месяцами висела в отчёте, создавая
+      // впечатление, что подавление не работает. Счётчик остаётся — молча прятать тоже
+      // нельзя, число подавлений само по себе показатель.
+      if (Array.isArray(r.suppressions) && r.suppressions.length > 0) {
+        suppressedCount++;
+        continue;
+      }
       const level = norm(r.level);
       toolOf(name)[level]++;
       totals[level]++;
@@ -152,18 +177,24 @@ const sboms = files.filter((f) => /\.cdx\.json$/i.test(f)).map((f) => basename(f
 
 // --- scan-confirmation (fail-open detector) ---
 const isMain = ref === 'main';
+const event = process.env.GITHUB_EVENT_NAME ?? '';
 const confirm = EXPECTED.map((t) => {
   const s = sentinels.get(t.key);
   // Confirmed if the job wrote a sentinel with ok=true. Defensive fallback: a tool
   // whose SARIF is present with a driver counts as confirmed even without a sentinel.
-  const ok =
-    (s && s.ok === true) ||
-    (!s && t.key === 'sbom' && sboms.length > 0);
-  // A main-only job (Scorecard) that's absent off `main` was SKIPPED by design —
-  // not a fail-open, so it must not raise the "NOT confirmed" alarm.
+  // Фолбэк для SBOM ограничен ИМЕННО тем файлом, который производит джоба `sbom`.
+  // Было `sboms.length > 0` — под это подходил и `sbom-image.cdx.json` от ДРУГОЙ джобы
+  // (`trivy-image`), так что джоба `sbom` могла упасть целиком, а таблица доверия
+  // печатала «✅ просканировано» (воспроизведено на фикстуре).
+  const ok = (s && s.ok === true) || (!s && t.key === 'sbom' && sboms.includes('sbom.cdx.json'));
+  // A job that was SKIPPED BY DESIGN is not a fail-open and must not raise the
+  // "NOT confirmed" alarm — that alarm has to keep meaning «a scan that should have run
+  // didn't». Two such designs exist: main-only (Scorecard) and schedule-only
+  // (Dependency-Check — too slow for the PR loop, see security.yml).
   let state;
   if (ok) state = 'ok';
   else if (t.mainOnly && !isMain && !s) state = 'skipped';
+  else if (t.scheduledOnly && event === 'push' && !s) state = 'skipped';
   else state = 'bad';
   return { ...t, state };
 });
@@ -197,16 +228,24 @@ L.push('| Сканер | Подтверждён |');
 L.push('| --- | --- |');
 const CELL = {
   ok: '✅ просканировано',
-  skipped: '⏭ пропущено (только на main)',
+  skipped: '⏭ пропущено',
   bad: '⚠️ **НЕ подтверждён**',
 };
-for (const c of confirm) L.push(`| ${c.name} | ${CELL[c.state]} |`);
+// Пропуск по дизайну обязан объяснять СЕБЯ: иначе «⏭» читается как «что-то не сработало».
+for (const c of confirm)
+  L.push(
+    `| ${c.name} | ${CELL[c.state]}${c.state === 'skipped' && c.skipNote ? ` (${c.skipNote})` : ''} |`,
+  );
 L.push('');
 
 L.push('| Серьёзность | Σ |');
 L.push('| --- | --: |');
 for (const l of LEVELS) L.push(`| ${ICON[l]} ${l} | ${totals[l]} |`);
 L.push('');
+if (suppressedCount)
+  L.push(
+    `**Подавлено сканерами (с обоснованием в коде/конфиге):** ${suppressedCount} — в таблицы ниже не входят.  `,
+  );
 L.push(`**pnpm run check:** ${checkLine}  `);
 L.push(`**SBOM (CycloneDX):** ${sboms.length ? `✅ ${sboms.join(', ')}` : '—'}`);
 L.push('');
@@ -242,8 +281,29 @@ if (findings.length) {
 
 L.push('---');
 L.push(
-  'ℹ️ _Блокирующие сканеры (SEC-1): Semgrep, Gitleaks, OSV, Trivy fs/image — находка или сбой скана валит их джобу; остальные (CodeQL, TruffleHog, zizmor, Scorecard) — информационные. Разные движки/источники — для перекрёстной валидации; «0» достоверно только у подтверждённых сканеров. Полные SARIF/SBOM — в артефактах прогона._',
+  'ℹ️ _Блокирующие сканеры (SEC-1): Semgrep, Gitleaks, OSV, Trivy fs/image — находка или сбой скана валит их джобу; остальные (CodeQL, TruffleHog, Trivy deps, Dependency-Check, zizmor, Scorecard) — информационные. Разные движки/источники — для перекрёстной валидации; «0» достоверно только у подтверждённых сканеров. Полные SARIF/SBOM — в артефактах прогона._',
 );
 
 writeFileSync(outFile, L.join('\n'));
 process.stdout.write(L.join('\n') + '\n');
+
+// --- полный список находок в ЛОГ (не в комментарий) ---------------------------
+// Отчёт выше намеренно урезан до топ-30: он едет в комментарий PR, и полный список
+// сделал бы его нечитаемым. Но триаж требует ВСЕХ находок с точными id — а достать их
+// из артефактов можно не всегда (SARIF лежат в blob-хранилище GitHub, доступ к которому
+// может быть закрыт политикой сети; в логи же попадает всё, что джоба напечатала).
+// Поэтому здесь тот же набор находок печатается целиком, по одной на строку, в
+// tab-separated виде: grep/awk по логу работает, а комментарий остаётся коротким.
+// Маркеры BEGIN/END дают надёжные границы блока при чтении хвоста лога.
+const FULL_CAP = 2000; // предохранитель: шумный сканер не должен раздуть лог до предела
+const shown = findings.slice(0, FULL_CAP);
+process.stdout.write(`\n--- FULL FINDINGS BEGIN (${shown.length}/${findings.length}) ---\n`);
+for (const f of shown) {
+  const where = f.path ? `${f.path}${f.line ? ':' + f.line : ''}` : '-';
+  // Табы — разделители, поэтому из полей они вычищаются вместе с переводами строк.
+  const msg = f.msg.replace(/[\t\r\n]+/g, ' ').slice(0, 200);
+  process.stdout.write(`${f.level}\t${f.tool}\t${f.rule || '-'}\t${where}\t${msg}\n`);
+}
+if (findings.length > FULL_CAP)
+  process.stdout.write(`… обрезано: ${findings.length - FULL_CAP} находок сверх лимита\n`);
+process.stdout.write('--- FULL FINDINGS END ---\n');

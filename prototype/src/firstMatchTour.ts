@@ -18,10 +18,9 @@
  * (never `optional`+`tap`: the target is guaranteed absent on arrival, which
  * would silently skip a `tap` step past the very instruction it exists to show).
  *
- * `copy` is a `/localization` key (`onb.tour.*`) or, for the not-yet-migrated
- * steps, the legacy canonical-Russian msgid bridged via `/localization/legacy`
- * — `t()` (i18n.ts) resolves either. Predicates come from the host so this
- * stays pure and unit-testable.
+ * `copy` is a `/localization` key (`onb.tour.first.*`), resolved through `t()`
+ * (localization/runtime.ts). Predicates come from the host so this stays pure
+ * and unit-testable.
  */
 import type { SpotlightStep } from './spotlight';
 
@@ -42,13 +41,13 @@ export function buildFirstMatchTour(deps: FirstMatchDeps): SpotlightStep[] {
     {
       id: 'welcome',
       target: null,
-      copy: 'Это твой первый мир, командир. Проведу тебя по главному циклу — пара минут, спокойно, без соперников.',
+      copy: 'onb.tour.first.welcome',
       advance: { on: 'tap' },
     },
     {
       id: 'home',
       target: '#side',
-      copy: 'onb.tour.home',
+      copy: 'onb.tour.first.home',
       advance: { on: 'state', when: deps.homeOpened },
       placement: 'top',
     },
@@ -59,14 +58,14 @@ export function buildFirstMatchTour(deps: FirstMatchDeps): SpotlightStep[] {
       // worth spending on): a distinct `building.upgrade` order (construction.ts).
       id: 'mine',
       target: '[data-act="upgrade"][data-arg="mine"]',
-      copy: 'onb.tour.mine',
+      copy: 'onb.tour.first.mine',
       advance: { on: 'action', type: 'building.upgrade' },
       placement: 'top',
     },
     {
       id: 'fleet',
       target: null,
-      copy: 'Теперь построй боевой корабль — вкладка «Корабли» той же панели. Готовый корабль сам прилетит на орбиту и соберётся во флот — жди, пока рядом с твоим миром не появится «▲».',
+      copy: 'onb.tour.first.fleet',
       advance: { on: 'state', when: deps.hasFleet },
     },
     {
@@ -77,33 +76,33 @@ export function buildFirstMatchTour(deps: FirstMatchDeps): SpotlightStep[] {
       // hard way that a defended world without troops aboard won't fall.
       id: 'troops',
       target: null,
-      copy: 'onb.tour.troops',
+      copy: 'onb.tour.first.troops',
       advance: { on: 'tap' },
     },
     {
       id: 'course',
       target: '#cmdbar',
-      copy: 'Выбери свой флот (▲) и тапни соседний мир — задай курс. Флот пойдёт по звёздным трассам, и туман начнёт открываться.',
+      copy: 'onb.tour.first.course',
       advance: { on: 'action', type: 'fleet.move' },
       placement: 'top',
     },
     {
       id: 'capture',
       target: null,
-      copy: 'Захвати нейтральный мир: выйди на орбиту, а если он защищён — высади десант. Захват двухфазный: сначала небо, потом земля.',
+      copy: 'onb.tour.first.capture',
       advance: { on: 'state', when: deps.capturedWorld },
     },
     {
       id: 'score',
       target: '#devline',
-      copy: 'Мир взят — и счёт пошёл! Очки капают за миры и сектора; набери порог — и это победа.',
+      copy: 'onb.tour.first.score',
       advance: { on: 'state', when: deps.scoreRose },
       placement: 'bottom',
     },
     {
       id: 'done',
       target: null,
-      copy: 'Первая схватка выиграна! Ты прошёл весь цикл: добыча → стройка → движение → захват → счёт. Дальше — настоящий матч.',
+      copy: 'onb.tour.first.done',
       advance: { on: 'tap' },
     },
   ];

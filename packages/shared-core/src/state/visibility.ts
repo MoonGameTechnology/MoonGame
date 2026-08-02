@@ -362,6 +362,7 @@ function project(
     if (!spiedTreasury.has(player.id)) player.resources = {};
     delete player.technologies;
     delete player.scientist;
+    delete player.scientists; // the council (branch focus / +slot) — same intel as the legacy field
     delete player.arrears; // unpaid bills read as treasury intel — owner-private
     // Autopilot status is «спит — можно бить» intel, the SITREP journal narrates
     // the owner's defenses, and hold points are targeting intel («вот его якоря»)
@@ -370,6 +371,7 @@ function project(
     delete player.stewardLog;
     delete player.stewardHoldPoints;
     delete player.arsenal; // what an enemy CAN build is strategic intel (ARS-3)
+    delete player.divisionTemplates; // what an enemy CAN mobilise — same class of intel
   }
   // Scoreboard: each player's live planet/fleet/unit totals aggregate territory
   // the viewer can't see, so an enemy's `scores` line is fog-sensitive intel
@@ -405,11 +407,11 @@ function project(
       if (view.heroes[id]?.owner !== viewerId) delete view.heroes[id];
     }
   }
-  // Order chains and standing orders (host extensions like the prototype's `orders` /
-  // `autoAssault` / `patrols` / `forcedMarch`) are future intent — exactly what
-  // `scheduled` is stripped for below. Keep only the entries of the viewer's OWN
-  // fleets; a map left empty is removed (same delta hygiene as offers).
-  for (const key of ['orders', 'autoAssault', 'patrols', 'forcedMarch'] as const) {
+  // Order chains and standing orders (`standingOrdersModule`'s `orders` / `autoAssault`
+  // / `patrols` / `wingSorties`, and the prototype-style `forcedMarch`) are future
+  // intent — exactly what `scheduled` is stripped for below. Keep only the entries of
+  // the viewer's OWN fleets; a map left empty is removed (same delta hygiene as offers).
+  for (const key of ['orders', 'autoAssault', 'patrols', 'wingSorties', 'forcedMarch'] as const) {
     const host = view as unknown as Record<string, Record<string, unknown> | undefined>;
     const map = host[key];
     if (!map) continue;
@@ -417,6 +419,15 @@ function project(
       if (state.fleets[fleetId]?.owner !== viewerId) delete map[fleetId];
     }
     if (Object.keys(map).length === 0) delete host[key];
+  }
+  // A rival's capital designation is their hero-respawn anchor — the same
+  // targeting intel as steward hold points («вот его якорь»). Keep only the
+  // viewer's own entry; an empty map is removed (delta hygiene, as above).
+  if (view.capital) {
+    for (const playerId of Object.keys(view.capital)) {
+      if (playerId !== viewerId) delete view.capital[playerId];
+    }
+    if (Object.keys(view.capital).length === 0) delete view.capital;
   }
 
   // Planets: keep topology (id/position/links) but strip contents you can't see.
@@ -469,6 +480,30 @@ function project(
   }
   signatures.sort((a, b) => (a.location < b.location ? -1 : a.location > b.location ? 1 : 0));
   view.signatures = signatures;
+
+  // Ground divisions: composition/HP/officer of a foreign division is the same class
+  // of intel as an enemy fleet's cargo — visible only where the fleet loop above left
+  // it visible (this division rides that fleet, or in view.fleets after the strip),
+  // OR the world it garrisons is identified. A garrisoning division reuses `battles`'
+  // own rule (`identify.has(location)`) for consistency.
+  if (view.divisions) {
+    for (const id of Object.keys(view.divisions)) {
+      const div = view.divisions[id];
+      if (!div || div.owner === viewerId) continue;
+      const visible =
+        div.carriedBy != null ? view.fleets[div.carriedBy] !== undefined : identify.has(div.location);
+      if (!visible) delete view.divisions[id];
+    }
+    if (Object.keys(view.divisions).length === 0) delete view.divisions;
+  }
+  // A world's ground-battle accumulator leaks the bare fact "a fight is happening
+  // here right now" through the fog — strip any world the viewer hasn't identified.
+  if (view.groundBattles) {
+    for (const planetId of Object.keys(view.groundBattles)) {
+      if (!identify.has(planetId)) delete view.groundBattles[planetId];
+    }
+    if (Object.keys(view.groundBattles).length === 0) delete view.groundBattles;
+  }
 
   // Battles you cannot see, and enemy timers from the schedule (it leaks future
   // events) — but KEEP the viewer's own pending events: their construction/production/

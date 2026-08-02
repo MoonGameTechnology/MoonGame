@@ -44,7 +44,7 @@ jobs:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/void_test
 
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 
@@ -76,4 +76,16 @@ jobs:
       # report shows up in the job log for review; flip to PERF_STRICT=1 to gate.
       - name: Perf report (non-blocking)
         run: pnpm run perf
+        continue-on-error: true
+
+      # Boots the BUILT prototype in a real headless browser and fails on any console
+      # error. `pnpm run check` cannot see this class of defect: prototype/ is outside
+      # ESLint and tsc, and uitest/perf drive a fake DOM — esbuild-only bugs, unhandled
+      # rejections and browser warnings show up nowhere else. Non-blocking for now (same
+      # posture as perf): the runner has to fetch a Chromium, so let it prove itself in
+      # the log before it can redden main.
+      - name: Browser smoke (non-blocking)
+        run: |
+          pnpm run smoke:browser:install
+          pnpm run smoke:browser
         continue-on-error: true

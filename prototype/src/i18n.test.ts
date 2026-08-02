@@ -4,15 +4,26 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ru } from '../../localization/ru';
 import { en } from '../../localization/en';
-import { en as legacyEn } from '../../localization/legacy/en';
 import { dataKey } from '../../localization';
 import { GLOSSARY } from './codexIndex';
+import { data } from './prototypeData';
+import { INTROS } from './intros';
+import { FIRST_GOALS } from './firstGoals';
+import { HUD_ORIENTATION_TOUR } from './onboardingTour';
+import { buildFirstMatchTour } from './firstMatchTour';
+
+/** Тур первого матча строится из предикатов хоста — для разбора копии они не важны. */
+const TOUR_DEPS_STUB = {
+  hasFleet: () => false,
+  capturedWorld: () => false,
+  scoreRose: () => false,
+};
 
 // Гейт локализации. Текст живёт в /localization, в коде — только ключи
 // (`t('err.no-capacity')`). Эти тесты держат три инварианта:
 //   1. локали не расходятся — у ru.ts и en.ts один и тот же набор ключей;
 //   2. ключ из кода существует, а ключ из локали не осиротел;
-//   3. МОСТ на время миграции (старый msgid = русская строка) только сокращается.
+//   3. в коде нет русского текста — только ключи (мост совместимости снят).
 // Без них непереведённая строка молча уезжает в прод по-русски, а опечатка в ключе
 // показывается игроку как `err.no-capaciti`.
 
@@ -31,10 +42,17 @@ const hasCyrillic = (s: string): boolean => /[А-Яа-яЁё]/.test(s);
  *  виду литерала однозначно понятно, ключ это или мост. */
 const KEY_RE = /^[a-z][a-z0-9-]*(?:\.[a-z0-9-]+)+$/;
 
-const srcFiles = (): string[] =>
-  readdirSync(path.join(repoRoot, 'prototype/src'))
+/** Every `/localization` consumer's source — prototype (`prototype/src`) and, since
+ *  LOC-3, the PWA client (`packages/client/src`). Both read the same shared pool, so
+ *  the orphan/leak checks below must see both or a client-only key reads as dead. */
+const srcFiles = (): string[] => [
+  ...readdirSync(path.join(repoRoot, 'prototype/src'))
     .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
-    .map((f) => `prototype/src/${f}`);
+    .map((f) => `prototype/src/${f}`),
+  ...readdirSync(path.join(repoRoot, 'packages/client/src'))
+    .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+    .map((f) => `packages/client/src/${f}`),
+];
 
 /** Первый строковый аргумент каждого `t(…)` / `tData(…)`. Идём посимвольно (regex
  *  ломается на `{placeholders}` / апострофах / переносах): на вызове читаем литерал,
@@ -65,17 +83,18 @@ function extractCallArgs(src: string, fn: 't' | 'tData'): Set<string> {
       j++;
     }
     if (q === '`' && lit.includes('${')) continue; // шаблон — ключ собирается в рантайме
-    out.add(
-      lit
-        .replace(/\\'/g, "'")
-        .replace(/\\"/g, '"')
-        .replace(/\\`/g, '`')
-        .replace(/\\n/g, '\n')
-        .replace(/\\\\/g, '\\'),
-    );
+    out.add(unescape_(lit));
   }
   return out;
 }
+
+const unescape_ = (lit: string): string =>
+  lit
+    .replace(/\\'/g, "'")
+    .replace(/\\"/g, '"')
+    .replace(/\\`/g, '`')
+    .replace(/\\n/g, '\n')
+    .replace(/\\\\/g, '\\');
 
 /** Ключи, которых НЕТ в коде литералом — они собираются из идентификатора в рантайме.
  *  Каждая запись объясняет, кто их строит; иначе тест на сирот снесёт живой перевод. */
@@ -102,9 +121,49 @@ const isDynamic = (k: string): boolean => DYNAMIC.some((d) => k.startsWith(d.pre
 
 describe('локализация — ключи', () => {
   it('ru.ts и en.ts описывают ровно один и тот же набор ключей', () => {
-    const onlyRu = Object.keys(ru).filter((k) => !(k in en)).sort();
-    const onlyEn = Object.keys(en).filter((k) => !(k in ru)).sort();
+    const onlyRu = Object.keys(ru)
+      .filter((k) => !(k in en))
+      .sort();
+    const onlyEn = Object.keys(en)
+      .filter((k) => !(k in ru))
+      .sort();
     expect({ onlyRu, onlyEn }).toEqual({ onlyRu: [], onlyEn: [] });
+  });
+
+  it('в исходнике локали нет дублей ключей', () => {
+    // В собранном объекте дубль невидим (побеждает последняя запись), а «мёртвый»
+    // ранний текст тихо живёт в файле и путает правки (чистка 2026-07 сняла 20
+    // таких записей в каждой локали). tsc словари не проверяет — держим тут.
+    for (const file of ['localization/ru.ts', 'localization/en.ts']) {
+      const seen = new Map<string, number>();
+      for (const m of readFileSync(path.join(repoRoot, file), 'utf8').matchAll(/^ {2}'([^']+)':/gm)) {
+        seen.set(m[1]!, (seen.get(m[1]!) ?? 0) + 1);
+      }
+      const dupes = [...seen].filter(([, n]) => n > 1).map(([k]) => k);
+      expect({ file, dupes }).toEqual({ file, dupes: [] });
+    }
+  });
+
+  it('ключи, лежащие в полях игрового каталога, заведены в локали', () => {
+    // `prototypeData.ts` хранит в части полей (`scientists.name`, `heroAbilities.*`,
+    // описания технологий и фракций…) не текст, а КЛЮЧ — он уходит в `t()`
+    // переменной, поэтому разбор литералов его не видит. Опечатка здесь доехала бы
+    // до игрока сырым ключом: ровно так на экране совета учёных светилось
+    // `sci.overseer.name`.
+    // `hook` — ИДЕНТИФИКАТОР эффекта (`fleet.speed`), а не ключ: по форме он от ключа
+    // неотличим, но переводится через таблицу `HERO_HOOK_RU` → `hero.hook.*`.
+    const NOT_A_KEY = new Set(['hook']);
+    const bad: string[] = [];
+    const walk = (node: unknown, path: string): void => {
+      if (!node || typeof node !== 'object') return;
+      for (const [k, v] of Object.entries(node as Record<string, unknown>)) {
+        if (typeof v === 'string') {
+          if (!NOT_A_KEY.has(k) && KEY_RE.test(v) && !(v in ru)) bad.push(`${path}.${k}: ${v}`);
+        } else walk(v, `${path}.${k}`);
+      }
+    };
+    walk(data, 'data');
+    expect(bad.sort()).toEqual([]);
   });
 
   it('каждый ключ из кода заведён в локали', () => {
@@ -125,11 +184,32 @@ describe('локализация — ключи', () => {
   });
 
   it('каждый ключ локали используется (нет осиротевших переводов)', () => {
+    // Ищем ключ в КАВЫЧКАХ, а не подстрокой: подстрочный поиск считал живым любой
+    // ключ, чей текст встречается внутри другого литерала, и так мост годами
+    // держал десятки мёртвых записей.
     const hay = [...srcFiles().map(read), read('prototype/build.mjs')].join('\n');
+    const quoted = new Set([
+      ...[...hay.matchAll(/'((?:[^'\\\n]|\\.)*)'/g)].map((m) => m[1]!),
+      ...[...hay.matchAll(/"((?:[^"\\\n]|\\.)*)"/g)].map((m) => m[1]!),
+    ]);
     const orphans = Object.keys(ru)
-      .filter((k) => !isDynamic(k) && !hay.includes(k))
+      .filter((k) => !isDynamic(k) && !quoted.has(k))
       .sort();
     expect(orphans).toEqual([]);
+  });
+
+  it('в коде нет русского текста — только ключи', () => {
+    // Инвариант, ради которого этап 2 и делался: мост совместимости снят, поэтому
+    // русский литерал в `t()`/`tData()` больше НЕ переведётся — он доедет до
+    // игрока как есть. Проверяем оба вызова во всех исходниках прототипа.
+    const leaks: string[] = [];
+    for (const f of srcFiles()) {
+      const src = read(f);
+      for (const fn of ['t', 'tData'] as const)
+        for (const lit of extractCallArgs(src, fn))
+          if (hasCyrillic(lit)) leaks.push(`${f}: ${fn}(${JSON.stringify(lit)})`);
+    }
+    expect(leaks.sort()).toEqual([]);
   });
 
   it('в английских значениях не осталось русского', () => {
@@ -139,14 +219,22 @@ describe('локализация — ключи', () => {
     expect(leaks).toEqual([]);
   });
 
-  it('статьи глоссария кодекса заведены ключами, а не текстом', () => {
-    // GLOSSARY отдаёт `titleKey`/`bodyKey` в `t()` переменной, поэтому разбор
-    // литералов их не видит: опечатка в ключе доехала бы до игрока как
+  it('таблицы копии отдают ключи, а не текст', () => {
+    // Эти таблицы — чистые модули с копией: ключ уходит в `t()` ПЕРЕМЕННОЙ, поэтому
+    // разбор литералов его не видит, и опечатка доехала бы до игрока как
     // `codex.term.fog.bodi`. Проверяем состав напрямую.
-    expect(GLOSSARY.length).toBeGreaterThan(3); // глоссарий не должен молча опустеть
-    const bad = GLOSSARY.flatMap((g) => [g.titleKey, g.bodyKey]).filter(
-      (k) => !KEY_RE.test(k) || !(k in ru),
-    );
+    const TABLES: Array<[string, string[]]> = [
+      ['GLOSSARY', GLOSSARY.flatMap((g) => [g.titleKey, g.bodyKey])],
+      ['INTROS', INTROS.flatMap((c) => [c.titleKey, c.bodyKey])],
+      ['FIRST_GOALS', FIRST_GOALS.map((g) => g.labelKey)],
+      ['HUD_ORIENTATION_TOUR', HUD_ORIENTATION_TOUR.map((s) => s.copy)],
+      ['firstMatchTour', buildFirstMatchTour(TOUR_DEPS_STUB).map((s) => s.copy)],
+    ];
+    const bad: string[] = [];
+    for (const [name, keys] of TABLES) {
+      expect(keys.length, `${name} не должна молча опустеть`).toBeGreaterThan(3);
+      for (const k of keys) if (!KEY_RE.test(k) || !(k in ru)) bad.push(`${name}: ${k}`);
+    }
     expect(bad.sort()).toEqual([]);
   });
 
@@ -161,22 +249,33 @@ describe('локализация — ключи', () => {
     const missing = ids.map((id) => dataKey(id.replace(/_/g, ' '))).filter((k) => !(k in ru));
     expect(missing).toEqual([]);
   });
-});
 
-describe('локализация — мост совместимости (сокращается до нуля)', () => {
-  it('у каждого старого msgid из кода есть английский перевод', () => {
+  it('у каждого ИМЕНИ игровых данных есть ключ `data.*`', () => {
+    // Проверка выше смотрит только юнитов — а `tData()` так же показывает здания,
+    // модули, фитинги, сектора и типы планет. Промах у них тихий: `tData()` вернёт
+    // исходное английское имя, и в русском интерфейсе всплывёт «Spaceport» (именно
+    // это здание и жило без ключа с LOC-1).
+    // `object` вместо `{name?: string}`: у юнитов поля name нет вовсе, и weak-type
+    // правило TS не даёт присвоить их таблицу «все-поля-опциональному» типу; имя
+    // читается ниже через сужение — таблица без имён честно даёт пустой список.
+    const tables: Array<[string, Record<string, object>]> = [
+      ['buildings', data.buildings],
+      ['units', data.units],
+      ['modules', data.modules],
+      ['heroFittings', data.heroFittings],
+      ['sectors', data.sectors],
+      ['planetTypes', data.planetTypes],
+    ];
     const missing: string[] = [];
-    for (const f of srcFiles())
-      for (const lit of extractCallArgs(read(f), 't'))
-        if (!KEY_RE.test(lit) && hasCyrillic(lit) && !(lit in legacyEn)) missing.push(lit);
-    expect([...new Set(missing)].sort()).toEqual([]);
-  });
-
-  it('в мосте нет записей, которые уже никто не зовёт', () => {
-    const hay = [...srcFiles().map(read), read('prototype/build.mjs')].join('\n');
-    const orphans = Object.keys(legacyEn)
-      .filter((k) => !hay.includes(k))
-      .sort();
-    expect(orphans).toEqual([]);
+    for (const [table, items] of tables) {
+      const entries = Object.entries(items ?? {});
+      expect(entries.length, `таблица ${table} не должна молча опустеть`).toBeGreaterThan(0);
+      for (const [id, def] of entries) {
+        const name = (def as { name?: string } | undefined)?.name;
+        if (name && !(dataKey(name) in ru))
+          missing.push(`${table}.${id}: ${name} → ${dataKey(name)}`);
+      }
+    }
+    expect(missing.sort()).toEqual([]);
   });
 });

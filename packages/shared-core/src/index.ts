@@ -54,6 +54,8 @@ export {
   type PlayerReward,
   type DiplomaticStance,
   type IntelGrant,
+  type PatrolEntry,
+  type Division,
 } from './state/gameState';
 export {
   buildStateFromMap,
@@ -137,6 +139,8 @@ export {
   type GroundStack,
   type GroundTick,
   type GroundOutcome,
+  OFFICERS,
+  type Officer,
 } from './state/groundCombat';
 export { scanNodeThreats, type NodeThreat } from './state/threat';
 export {
@@ -152,6 +156,14 @@ export {
   squadronReaches,
   type SortieState,
 } from './state/squadron';
+export {
+  fleetIdle,
+  validateChainSteps,
+  MAX_CHAIN_STEPS,
+  MAX_CHAIN_WAIT_HOURS,
+  type ChainStep,
+  type FleetChain,
+} from './state/chain';
 
 // Action contract
 export {
@@ -214,6 +226,31 @@ export {
   type MapSlot,
   type SpawnPolicy,
 } from './data/mapSchema';
+
+// Ground divisions (H4) — templates + the mobilization/ground-combat module
+export {
+  FORMATION_UNITS,
+  FORMATION_SLOTS,
+  FORMATION_TEMPLATE_COUNT,
+  DEFAULT_TEMPLATES,
+  OFFICER_TEMPLATES,
+  formationStats,
+  type FormationUnit,
+  type FormationTemplate,
+  type OfficerTemplate,
+  type FormationSynergy,
+  type FormationStats,
+} from './data/formations';
+export {
+  divisionModule,
+  divisionsOf,
+  templatesOf,
+  regenDivision,
+  divisionCargo,
+  fleetCargoFree,
+  REGEN_PER_UNIT_PER_DAY,
+  GROUND_TICK_HOURS,
+} from './modules/division';
 
 // Data-driven content
 export {
@@ -301,6 +338,9 @@ export {
   sumUnitStat,
   cappedUnitStat,
   COMBAT_UNIT_CAP,
+  loadoutKey,
+  takeFromStacks,
+  mergeStacks,
 } from './util/stacks';
 export {
   effectiveStats,
@@ -320,6 +360,13 @@ export {
 } from './util/fitting';
 export { requireOwnedIdleFleet, type IdleFleet } from './util/fleet';
 export { buildProgress, thresholdRamp } from './util/construction';
+export {
+  buildRecap,
+  isHighEvent,
+  type Recap,
+  type RecapEvent,
+  type RecapItem,
+} from './util/recap';
 
 // Base modules (plugins) — opt-in via the manifest passed to createKernel.
 export { economyModule, BROWNOUT } from './modules/economy';
@@ -347,6 +394,20 @@ export { technologyModule, technologyLock } from './modules/technology';
 export { scientistModule } from './modules/scientist';
 export { factionModule } from './modules/faction';
 export { armyModule } from './modules/army';
+export { fleetOpsModule } from './modules/fleetOps';
+export { capitalModule, capitalsOf, capitalOf } from './modules/capital';
+export { standingOrdersModule } from './modules/standingOrders';
+export {
+  instantRepairCost,
+  dockRepairCost,
+  missingHull,
+  fleetAtOwnDock,
+  INSTANT_REPAIR_CREDITS_PER_HP,
+  REPAIR_HP_PER_METAL,
+} from './util/repair';
+export { instantRepairModule } from './modules/instantRepair';
+export { fleetRepairModule } from './modules/fleetRepair';
+export { forcedMarchModule, FORCED_MARCH_MULT, FORCED_MARCH_WEAR } from './modules/forcedMarch';
 export { victoryModule } from './modules/victory';
 export { visibilityModule } from './modules/visibility';
 export { heroModule } from './modules/hero';

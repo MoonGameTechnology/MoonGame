@@ -10,10 +10,16 @@ import {
   createInitialState,
   createKernel,
   diplomacyModule,
+  divisionModule,
+  capitalModule,
   economyModule,
   factionModule,
+  fleetOpsModule,
+  fleetRepairModule,
+  forcedMarchModule,
   hashGameDataBundle,
   heroModule,
+  instantRepairModule,
   interceptModule,
   marketModule,
   movementModule,
@@ -23,6 +29,7 @@ import {
   planetTypeModule,
   scientistModule,
   sectorModule,
+  standingOrdersModule,
   stationModule,
   taxModule,
   technologyModule,
@@ -121,9 +128,28 @@ export const DEV_MODULES: GameModule[] = [
   factionModule, // always-on faction passives (production / speed / combat) via hooks
   marketModule, // session resource bourse: list / buy (15% burn) / cancel
   armyModule,
+  fleetOpsModule, // fleet.launch/merge/split: garrison → mobile fleet, the missing link
+  capitalModule, // capital.designate: re-point the hero respawn anchor
+  standingOrdersModule, // order.auto/order.scramble/order.chain: standing-order intent storage
+  instantRepairModule, // fleet.instantRepair: paid-in-credits hull top-up, anywhere
+  fleetRepairModule, // fleet.repair: paid-in-metal hull top-up, at an owned dock
+  forcedMarchModule, // fleet.forcemarch: +50% speed for hull wear while in transit
   victoryModule,
   visibilityModule, // fog-of-war memory (variant B): records last-seen worlds
+  divisionModule, // H4: division mobilization + ground-combat (division-vs-division only).
+  // Appended at the END, not spliced in the middle — inserting it earlier would
+  // reorder every module after it (invariant #6), which is exactly what bumping
+  // MODULE_MANIFEST_VERSION below is meant to fence off; appending keeps that
+  // fence a one-line diff to reason about instead of a whole-array reshuffle.
 ];
+
+/** Bumped whenever `DEV_MODULES`' membership or order changes (invariant #6: module
+ *  execution order is part of the determinism contract). Stamped into every fresh
+ *  match's `version.manifest` and checked back on load (`serverWiring.ts`) — a match
+ *  created under an older manifest must not silently resume on a different module
+ *  graph (same fail-secure posture as `dataHash`, MP-4). Bump this alongside any
+ *  `DEV_MODULES` edit. */
+export const MODULE_MANIFEST_VERSION = '2'; // H4: divisionModule appended
 
 export interface DevMatchOptions {
   /** Match/room id (default `'dev'`). Distinct ids let a registry hold many matches. */
@@ -216,7 +242,7 @@ export function createDevMatch(data: GameData, options: DevMatchOptions = {}): M
   const ids = options.players ?? ['green', 'red'];
   const base = createInitialState({
     seed: 'dev-match',
-    version: { data: data.version, manifest: '1', dataHash: hashGameDataBundle(data) },
+    version: { data: data.version, manifest: MODULE_MANIFEST_VERSION, dataHash: hashGameDataBundle(data) },
     time: options.time ?? 0,
   });
   const players: Record<string, Player> = {};

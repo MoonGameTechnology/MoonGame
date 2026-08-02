@@ -11,6 +11,15 @@ import { data } from './prototypeData';
 /** The unit ids a template slot may hold — the formation roster (data.units above). */
 export const FORMATION_UNITS = ['militia', 'heavy_infantry', 'special_forces', 'tank'] as const;
 export type FormationUnit = (typeof FORMATION_UNITS)[number];
+
+/** Localization key per roster unit — the label every formation screen prints next to
+ *  the icon (`formIcon` in `icons.ts` draws the icon half). */
+export const FORM_RU: Record<string, string> = {
+  militia: 'form.militia',
+  heavy_infantry: 'form.heavy-infantry',
+  special_forces: 'form.special-forces',
+  tank: 'form.tank',
+};
 /** Slots per template, and templates per player. */
 export const FORMATION_SLOTS = 6;
 export const FORMATION_TEMPLATE_COUNT = 3;
@@ -24,15 +33,15 @@ export interface FormationTemplate {
 /** The three starter templates a player gets before customising them. */
 export const DEFAULT_TEMPLATES: FormationTemplate[] = [
   {
-    name: 'Линия',
+    name: 'form.tpl.line',
     slots: ['heavy_infantry', 'heavy_infantry', 'militia', 'militia', 'tank', 'tank'],
   },
   {
-    name: 'Кулак',
+    name: 'form.tpl.fist',
     slots: ['tank', 'tank', 'tank', 'special_forces', 'heavy_infantry', 'heavy_infantry'],
   },
   {
-    name: 'Рейд',
+    name: 'form.tpl.raid',
     slots: ['special_forces', 'special_forces', 'special_forces', 'militia', 'militia', null],
   },
 ];
@@ -45,12 +54,12 @@ export interface OfficerTemplate extends FormationTemplate {
 }
 export const OFFICER_TEMPLATES: OfficerTemplate[] = [
   {
-    name: 'Гвардия прорыва',
+    name: 'form.tpl.breakthrough',
     officer: 'assault',
     slots: ['tank', 'tank', 'special_forces', 'special_forces', 'heavy_infantry', 'heavy_infantry'],
   },
   {
-    name: 'Железный рубеж',
+    name: 'form.tpl.iron-line',
     officer: 'defender',
     slots: [
       'heavy_infantry',
@@ -62,7 +71,7 @@ export const OFFICER_TEMPLATES: OfficerTemplate[] = [
     ],
   },
   {
-    name: 'Колонна снабжения',
+    name: 'form.tpl.supply',
     officer: 'quartermaster',
     slots: ['militia', 'militia', 'militia', 'heavy_infantry', 'heavy_infantry', 'tank'],
   },
@@ -132,29 +141,29 @@ export function formationStats(tpl: FormationTemplate): FormationStats {
   if (infantry > 0 && byType.tank > 0) {
     synergies.push({
       key: 'combined',
-      name: 'Комбинированные войска',
-      desc: 'Пехота и танки в одном строю',
+      name: 'form.syn.combined.name',
+      desc: 'form.syn.combined.desc',
     });
   }
   if (byType.heavy_infantry >= 3) {
-    synergies.push({ key: 'entrench', name: 'Окопались', desc: '≥3 тяжёлой пехоты держат рубеж' });
+    synergies.push({ key: 'entrench', name: 'form.syn.entrench.name', desc: 'form.syn.entrench.desc' });
   }
   if (byType.tank >= 3) {
     synergies.push({
       key: 'armor',
-      name: 'Танковый кулак',
-      desc: '≥3 танков — ударный клин',
+      name: 'form.syn.armor.name',
+      desc: 'form.syn.armor.desc',
     });
   }
   if (byType.special_forces >= 2 && byType.militia === 0) {
     synergies.push({
       key: 'raid',
-      name: 'Рейдовая доктрина',
-      desc: '≥2 спецназа без ополчения',
+      name: 'form.syn.raid.name',
+      desc: 'form.syn.raid.desc',
     });
   }
   if (byType.militia >= 4) {
-    synergies.push({ key: 'wave', name: 'Людская волна', desc: '≥4 ополчения — берут числом' });
+    synergies.push({ key: 'wave', name: 'form.syn.wave.name', desc: 'form.syn.wave.desc' });
   }
   return {
     count,

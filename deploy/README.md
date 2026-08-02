@@ -112,10 +112,15 @@ sudo bash deploy/setup-proxy.sh
 # 1) Выпустить сертификат на свой домен (пример — certbot standalone, порт 80 свободен):
 sudo certbot certonly --standalone -d play.example.com
 
-# 2) Положить цепочку в ./certs рядом с docker-compose.yml (монтируется в /certs :ro):
+# 2) Положить цепочку в ./certs рядом с docker-compose.yml (монтируется в /certs :ro).
+#    ВАЖНО — владелец: контейнер работает от non-root uid 65532, а certbot оставляет
+#    privkey.pem как root:root 0600. Простой `cp` даёт файл, который сервер НЕ прочитает,
+#    и старт упадёт на «половинчатой» TLS-настройке. Поэтому кладём с нужным владельцем:
 mkdir -p deploy/certs
-sudo cp /etc/letsencrypt/live/play.example.com/privkey.pem   deploy/certs/
-sudo cp /etc/letsencrypt/live/play.example.com/fullchain.pem deploy/certs/
+sudo install -o 65532 -g 65532 -m 0400 \
+  /etc/letsencrypt/live/play.example.com/privkey.pem   deploy/certs/privkey.pem
+sudo install -o 65532 -g 65532 -m 0444 \
+  /etc/letsencrypt/live/play.example.com/fullchain.pem deploy/certs/fullchain.pem
 
 # 3) Включить TLS и поднять стек:
 cd deploy
@@ -124,7 +129,9 @@ TLS_KEY_FILE=/certs/privkey.pem TLS_CERT_FILE=/certs/fullchain.pem \
 ```
 
 Теперь транспорт зашифрован end-to-end (`wss://play.example.com:8788/...`). Продление:
-`certbot renew` → повторный `cp` в `deploy/certs` → `docker compose restart server` (в cron).
+`certbot renew` → повторный **`install` с тем же владельцем 65532** (обычный `cp` вернёт
+root:root 0600 и сервер перестанет стартовать после ближайшего рестарта) →
+`docker compose restart server` (в cron).
 
 ### Реверс-прокси терминирует TLS (альтернатива)
 
@@ -244,6 +251,73 @@ docker compose up -d --build
 # Ежедневно в 04:00
 0 4 * * * cd /path/to/repo/deploy && docker compose exec -T postgres pg_dump -U void void | gzip > /backups/void-$(date +\%F).sql.gz
 ```
+
+## 🔐 Деплой подписанного образа (SEC-13, рекомендуемый путь для прода)
+
+`docker compose up --build` собирает образ **на хосте** — он получается из того же
+Dockerfile, но это утверждение об исходниках, а не о байтах, которые поедут в прод: их
+никто не сканировал и не подписывал. Рекомендуемый прод-путь — забрать образ, который
+собрал и подписал CI.
+
+Что гарантирует цепочка: `image.yml` на каждый пуш в `main` собирает образ, гоняет по
+нему **блокирующий** Trivy (находка ⇒ пуша нет), кладёт в GHCR и подписывает
+**дайджест** через keyless-cosign. Дайджест печатается в summary прогона.
+
+```bash
+# 1. Проверить подпись — это и есть гейт (exit≠0 ⇒ дальше не идти)
+./deploy/verify-image.sh ghcr.io/moonwuk/moongame@sha256:<digest>
+
+# 2. Забрать ровно эти байты
+docker pull ghcr.io/moonwuk/moongame@sha256:<digest>
+
+# 3. Поднять стек на них (--no-build обязателен: иначе compose пересоберёт локально
+#    и молча выбросит проверенный образ)
+cd deploy && VOID_IMAGE=ghcr.io/moonwuk/moongame@sha256:<digest> \
+  docker compose -f docker-compose.yml -f docker-compose.release.yml up -d --no-build
+
+# публичный хост — добавить TLS-оверлей третьим -f:
+#   -f docker-compose.yml -f docker-compose.tls.yml -f docker-compose.release.yml
+```
+
+Только по дайджесту, не по тегу: тег после проверки можно перевесить на другие байты —
+`verify-image.sh` поэтому отказывается работать с тегом. Обновление = повторить те же
+три шага с новым дайджестом (старый контейнер заменится).
+
+## 🛡️ Хардненинг контейнеров — чек-лист при правке compose (SEC-12)
+
+**Этот файл не покрыт ни одним сканером.** Trivy misconfig умеет Dockerfile/k8s/
+terraform/cloudformation/helm/ARM, Docker Compose в список не входит, так что рантайм-постуру
+держат ревью и этот чек-лист. Проходить его руками при добавлении/правке сервиса:
+
+- [ ] `security_opt: [no-new-privileges:true]` — процесс не получит привилегии через setuid;
+- [ ] `cap_drop: [ALL]`, обратно — только доказанно нужное (`caddy` → `NET_BIND_SERVICE` под 80/443);
+- [ ] `mem_limit` + `pids_limit` — утечка/форк-бомба упирается в стенку, а не в весь VPS;
+- [ ] порт наружу только там, где это осознанно (`postgres` — `127.0.0.1`, не `0.0.0.0`);
+- [ ] сторонний образ — по дайджесту (`image:tag@sha256:…`), пин записан в `docs/security/image-pinning.md`;
+- [ ] секрет не имеет «рабочего» дефолта на публичном пути (публичный деплой = TLS-оверлей,
+      там `POSTGRES_PASSWORD` обязателен — стек не поднимется без него).
+
+Что осознанно **не** включено и почему:
+
+- **`read_only: true` для `server`** — `netserver.mjs` транспилирует сервер в
+  `/app/packages/server/dist` на каждом старте и дописывает JSONL матчей в
+  `/app/playtest-logs`, корневая ФС обязана быть записываемой. Образ и так работает от
+  non-root (uid 65532) — это то, что дал бы read_only в основном.
+- **`cap_drop: [ALL]` для `postgres`** — официальный энтрипойнт стартует от root
+  (chown/initdb каталога данных) и только потом роняет привилегии до `postgres`.
+  Урезание capabilities требует вернуть ровно `CHOWN`, `DAC_OVERRIDE`, `FOWNER`,
+  `SETUID`, `SETGID`, и ошибка в наборе ломает БД на следующем рестарте. Включать
+  осознанно и **сперва на тестовом хосте**:
+
+  ```yaml
+  postgres:
+    cap_drop: [ALL]
+    cap_add: [CHOWN, DAC_OVERRIDE, FOWNER, SETUID, SETGID]
+  ```
+
+  Проверка: `docker compose down && docker compose up -d`, затем `moongame status` —
+  контейнер `healthy` (энтрипойнт делает chown только на существующем томе, поэтому
+  рестарт со **старым** томом — не полная проверка; честная проверка — на чистом томе).
 
 ## 🔗 Альтернативные пути развертывания
 

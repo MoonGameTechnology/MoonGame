@@ -1,4 +1,4 @@
-import type { FormationUnit } from './game';
+import type { FormationUnit } from './formations';
 
 // --- ground combat: type-matrix damage, weighted by the target's composition --
 // Iron-Order-style. Each unit type carries TWO damage tables, attack and defence,
@@ -74,9 +74,9 @@ export interface Officer {
 
 /** Placeholder officer archetypes — values are stand-ins to be tuned later. */
 export const OFFICERS: Record<string, Officer> = {
-  assault: { name: 'Штурмовик', atk: 0.15 },
-  defender: { name: 'Командир обороны', def: 0.15, hp: 0.1 },
-  quartermaster: { name: 'Снабженец', hp: 0.2 },
+  assault: { name: 'ground.officer.assault', atk: 0.15 },
+  defender: { name: 'ground.officer.defender', def: 0.15, hp: 0.1 },
+  quartermaster: { name: 'ground.officer.quartermaster', hp: 0.2 },
 };
 
 /** A live stack on one side: a unit type, its count, the remaining HP pool, and the

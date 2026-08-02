@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 1900 зелёных** (54 skip, 175 файлов).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 2193 зелёных** (54 skip, 196 файла).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -28,13 +28,13 @@ Void Dominion — мобильная/браузерная **real-time** (неп�
 
 - `packages/shared-core` — детерминированная, data-driven симуляция. Без сервера/БД/сети.
 - `packages/action-layer` — Stage 2 security gate: `ActionEnvelope`, validation, authorization, idempotency receipts, per-session `clientSeq`.
-- `packages/server` — авторитетный сервер (Этап 3). WebSocket multiplayer slice: `MatchRoom`, `createMultiplayerServer`, action/state sync, per-player туман. Персистентность: `MatchStore`/`AccountStore`/`ReceiptStore` (in-memory + Postgres JSONB) — durable-матч переживает рестарт, durable receipts дедупят повтор после рестарта, ник-логин лобби. Offline-«будилка» (PA-4.1 v1): `MatchRoom.tick()`/`msUntilNextEvent()` + одно-процессный `setTimeout`-драйвер — отложенные события (прибытия/бои/захваты) срабатывают без подключённых игроков (мир идёт 24/7). Есть в обоих серверах: прото-сервер (`netserver.ts`, APK) с PA-4.1, боевой вход `packages/server/src/main.ts` — с F8 (`persistence.ts`+`clockDriver.ts`, паритет). Баг-фикс F8: `MatchRoom.initialSeq` восстанавливает счётчик действий при рестарте, иначе optimistic-by-seq store дропал пост-рестартные сохранения — прокинут в оба сервера. Строгий commit-before-broadcast (risk14, опция `MatchRoom.persist`): действие идёт async-путём через актор-**mailbox** (сериализован per-room; туда же lobby-`start`), ждёт durable-запись снапшота+квитанции ДО коммита/рассылки (`computeAdvance` считает догон мира чисто, не трогая `stateValue` до ack); провал записи → транзиентный reject, ретрай доезжает; синхронный `submitAction` не тронут; прошёл 3-линзовый состязательный ревью. **SV-0.2 match-actor:** `RoomRegistry` (роутинг по matchId — N изолированных матчей/процесс, `InMemoryRoomRegistry` eager) + `LazyRoomRegistry` (lifecycle/risk13: ленивая загрузка по запросу + гибернация простаивающих в стор после idle-окна → live-память ∝ активным матчам; **пробуждение спящего матча к его следующему событию** — реорганизует+персистит+снова спит, мир идёт 24/7 при всех офлайн; таймер инжектируемый = шов под pg-boss; reconnect детерминированно догоняет). Рядом — браузерный `MatchRegistry` (`matchRegistry.ts`, main-menu §2): meta-состояние матчей (карта/правила/архив) с read-model `GET /matches` + archive-интентами (`registerBrowserApi` в `matchApi.ts`); структурно совместим с `RoomRegistry`, так что служит и источником комнат для транспорта (прото-сервер). DoS-границы (аудит F-03/F-04): карта `receipts` капается с FIFO-эвикцией (`maxReceipts`), действия — per-player rate-limit (`actionRateMax`/`actionRateWindowMs`, флуд → транзиентный `E_RATE_LIMIT` без квитанции, ретрай переживает). **SV-1.1 action-layer front-door (опционально):** `MatchRoom.gate?` подключает `@void/action-layer` `ActionGate` — gated-сообщение `action.v1` (конверт) проходит validate→authorize→sequence→dedup ДО редьюсера (стабильные `E_*` без утечки), а bare-`action` на gated-комнате отклоняется (нет обхода гейта); rate-limit стоит ДО резервации seq, поэтому троттлинг не сжигает `clientSeq` (ретрай доезжает, не `E_REPLAY`). `submitAction`/`admitEnvelope` делят общее ядро `applyAndBroadcast`, не перепроверяя чужие гейты. Абьюз-e2e (E3) зелёный (невалид/несанкц/replay/out-of-order → безопасный отказ; дубль → реплей без повторного применения). **Боевой вход (Fastify, SV-0.1):** `/health` без утечки id (**F-13**), `/ready` со стор-probe `MatchStore.ping`, pino, graceful drain — заменил голый node:http. **Аутентификация handshake (SE-0.1, **F-01**):** опция `auth` требует верифицированный join-токен (`?token=`); при ней `?player=`/`?nick=` игнорируются, `matchId`/`playerId` токена сверяются с матчем и местом; `allowedOrigins` (**F-06**) режет cross-site upgrade. Токены — `verifyJoinToken`/`signJoinToken` на `jose` с пином алгоритма (нет `none`/alg-confusion), `typ`, iss/aud/exp, опц. max-age (SE-2.1, прошёл состязательное ревью — verified против исходников jose). **Живой гейт:** транспорт минтит серверный `sessionId` (randomUUID — не клиентский, это ключ курсора seq), отдаёт в `welcome` и в `receive`; gated-envelope авторизуется против него, end-to-end (SV-1.1-live-A). Стора гейта ограничены — FIFO receipts + LRU cursors (SV-1.1-live-B, закрыл MAJOR из ревью). **Payload-схемы (SV-1.2 + REL-2, инвариант #5):** zod-схема на каждый из **46** клиентских типов действий — ПОЛНЫЙ интент-набор прототипа (вкл. артиллерию/отступление/рынок обоих хостов (`market.take`/`side`)/дипломатию/дивизии/`fleet.launch`/`split`/`merge`/`engage`/капиталь/Хранителя/стоячие приказы/`unit.build{modules}`); `patrol.stamp` намеренно НЕ клиентский (рантайм-штамп серверного драйвера — клиентский штамп заправлял бы своё крыло); паритет закреплён `prototype/src/gateparity.test.ts` (сэмплы через реальные билдеры) (`shared-core/actions/payloadSchemas` + `isValidActionPayload`) инжектится в гейт как `payloadValidator` — кривой payload или не-клиентский тип → `E_BAD_PAYLOAD` до редьюсера. **Гейт на durable-пути (gate+persist):** принятое gated-действие коммитится-до-broadcast на durable-пути; весь admit→commit сериализован в mailbox (резервация seq и persist атомарны), при транзиентном сбое `SequenceGate.rollback` отпускает курсор → тот же `clientSeq` ретраится (не `E_REPLAY`). Прошло состязательное ревью (дизайн звучит; закрыт MAJOR — broadcast теперь per-player изолирован, не может застрять на throw). **Боевой вход:** `main.ts` включает auth/гейт по env (`AUTH_JWT_SECRET`, `GATE=1`, `ALLOWED_ORIGINS`), default off (live-C). **Мульти-матч (SV-4.0):** вход хостит N матчей через `LazyRoomRegistry` — матч грузится из стора по первому коннекту, гибернируется в простое, будится к событиям; `dev` сидируется на буте (реальный create — SV-2.4). **Вход игроков (SV-2.4 + SE-1.x, логин+пароль):** аккаунты `users` (Memory/Postgres, логин уникален без регистра), пароли scrypt (`node:crypto`, параметры вшиты в хеш), `POST /auth/register`/`/auth/login` → сессионный JWT (`typ session+jwt`, отдельная audience — невзаимозаменяем с join-токеном); uniform-401 + decoy-hash (не раскрываем существование аккаунта ни телом, ни таймингом), per-IP rate-limit. `POST /matches` и `GET /matches/:id/join` требуют `Authorization: Bearer <session>` — ник места = логин сессии (никем другим не зайдёшь), `accountId` штампуется в join-токен (15 мин); оба маршрута пишут durable-состояние (сид матча / занятие места), поэтому оба за per-IP sliding-window rate-limit (общий бюджет create+join, `E_RATE_LIMIT`/429, ограниченная FIFO-карта), как auth-эндпоинты. Сверх точечных лимитеров весь account+match-контур в `main.ts` обёрнут `@fastify/rate-limit` в инкапсулированном scope — грубый per-IP бэкстоп (health/ready на родительском app не троттлятся). Всё выставляется **только при включённом auth**; e2e прогнан вживую: register → login → Bearer-join → WS welcome. **Восстановление пароля (SE-1.x):** опц. email при регистрации (уникален по `lower(email)`); `POST /auth/recover` анти-энумерационен (всегда 200, письмо — только на реальный адрес), `POST /auth/reset` тратит single-use токен (`typ reset+jwt`, 15 мин, привязан к отпечатку `pwfp` текущего хэша — сменился пароль, токен мёртв, без серверного стора). Доставка — сменный `Mailer`: деф. пишет в stderr только `to`/`subject`, тело со ссылкой захвата — лишь под `MAILER_LOG_BODY=1`; реальный SMTP/API — отдельный env. Клиент вычищает `?reset=<token>` из URL/истории. **Ревокация при сбросе:** session-JWT несёт `pwfp`, `liveSession` сверяет его с текущим хэшем на гейте identity (create/join + corp/ava/medal/arsenal, оба сервера) → сброс пароля инвалидирует все прежние сессии (угнанную в т.ч.); `verify` требует непустой `pwfp` (fail-secure); остаток — уже открытый WS живёт до обрыва по 15-мин join-токену. Дальше по треку: refresh-токены (AC-0.2), OIDC как второй провайдер (AC-1.1). **Фабрика матчей (SV-2.5):** `MatchKeeper` держит `OPEN_MATCHES` (env, деф. 3) открытых матчей — как только один заполнился/закончился, засевается новый, так лента не пустеет и игрок всегда может зайти в свежую игру. Счёт открытых берётся из durable-стора (`MatchStore.ongoingMatchIds` + `occupiedSeats`), а не из in-process счётчика → рестарт реконсилит по реальному миру, не переплождая; кап на конкурентные матчи (`max`), reentrancy-guard, ошибка create/read проглатывается и ретраится следующим тиком. Реконсиляция на буте + интервал 30с. Публичная read-only лента `GET /matches/open` (id/seated/capacity из стора, переживает гибернацию — видит и спящие матчи) — браузинг до логина, join по-прежнему требует сессию. Прогнано вживую: `OPEN_MATCHES=3` → сервер добил до 3 открытых (посчитал `dev`, создал 2), все в `/matches/open`. **Метрики (OPS-0.1):** `/metrics` — агрегатные gauge'ы (число матчей/коннектов, без id). **Метрики M1 (metrics-roadmap):** observe-поток комнаты расширен наблюдениями `events` (доменные события коммита, без `time.advanced`), `broadcast` (ms + размер дельты per-player), `timing` (submit/advance) и `desync` (клиентский репорт); `MetricsAggregator` (`metrics.ts`) сводит их в счётчики/avg/max; на `desync`-сообщение комната отвечает полным `state`-ресинком с cool-down 2 с per-player (репорт наблюдается всегда — шторм виден в метриках, но не DoS). **Метрики M2:** клиентское сообщение `perf` `{fps,rttMs?,memMb?}` (клампы при parse, per-player rate-limit 5 с, только наблюдается — `client_perf`); headless перф-харнес `pnpm run perf` (CPU-стоимость кадра idle/pan/zoom против бюджета p95, нон-блок шаг в CI, `PERF_STRICT=1` — гейт). **Крит-путь до онлайн-сессии закрыт.** Пройден 3-линзовый ревью (корректность/безопасность/чистота): починен HIGH-баг живости (драйвер часов не пере-armился после committed-действия — вынес эмиссию `action`-наблюдения за окно `committing`); добавлен Fastify error-handler (инвариант #4, без утечки); ядро gate/session/JWT подтверждено безопасным. **Вектор 2 (надёжность) сделан:** durable-места (`createStores` отдаёт `PostgresAccountStore` при `DATABASE_URL` — ник→место переживает рестарт, 2.2); CI-workflow (`ci.yml`) с сервис-Postgres гоняет durable-адаптеры в CI + `configFromEnv` вынесен из `main.ts` и покрыт тестом round-trip mint↔verify (2.3). **Durable-стора гейта — НЕ нужны (2.1, verified):** они ключуются по per-connection `sessionId` (серверный, неповторимый), теряются ровно когда отслеживаемые сессии заканчиваются → переподключение минтит свежий `sessionId` → свежий курсор; персистить нечего. **Деплой одной командой (REL-3):** `pnpm stack` (= `docker compose -f deploy/docker-compose.yml up -d --build`) поднимает игровой сервер (distroless-образ: игра на `/`, WS, `/health`) + Postgres; отказоустойчивость — `restart: unless-stopped` на обоих, durable-резюме матчей из PG, healthchecks (server ждёт healthy-PG), bounded-логи, PG на loopback; runbook (обновление/бэкап+cron/восстановление/границы) — `deploy/README.md`. **Гейт на играбельном пути (REL-4):** прото-хост `prototype/netserver.ts` принимает `GATE=1|true` — комната получает тот же `ActionGate({payloadValidator: isValidActionPayload})`, что и боевой вход (зеркало serverConfig); в compose релиз-постура — `GATE` по умолчанию **ON** (`${GATE:-1}`, `GATE=0` — дев-откат к голым actions). Прогнано вживую в обе стороны: gated — `welcome{gated,sessionId}` → голый `action` отклонён (`E_BAD_MESSAGE`), `action.v1`-конверт того же клиента применён (delta); ungated — голый `action` применён (обратная совместимость). Серверные драйверы (ИИ/Хранитель/стоячие приказы) идут через `room.submitAction` МИМО гейта — так и задумано: гейт стоит на проводе, не внутри хоста. **Замок мест (REL-5, `SEAT_LOCK=1`, в compose по умолчанию ON):** ник-логин без аккаунтов защищён «посадочным билетом» — первый вход ника минтит случайный тикет (`randomBytes(24)`), транспорт хранит ТОЛЬКО его sha256 в `AccountStore` (`bindSeatTicket` — первый bind атомарно выигрывает, Memory и Postgres; колонка `seats.ticket_hash`, `ALTER … IF NOT EXISTS` — старые ряды дозамыкаются при следующем входе владельца), плэйнтекст едет клиенту один раз в `welcome.seatTicket` (`addPeer welcomeExtras`); каждый последующий вход обязан предъявить `?ticket=` (сравнение constant-time), иначе 401; прямой `?player=` под замком отклоняется (обход невозможен). Клиент самонастраивается: `MultiplayerClient.onSeatTicket` → прототип кладёт билет в `localStorage` (`void.ticket.<base>|<match>|<nick>`) и добавляет `&ticket=` при коннекте. Проверено: юнит-e2e транспорта (`seatLock.test.ts`), стор-контракт на Memory+Postgres 16 (включая миграцию старой схемы), живой raw-ws прогон и БРАУЗЕРНЫЙ CDP-прогон реального клиента (билет ложится в localStorage → реконнект пускает; удалили билет → тот же ник заперт). Потеря билета не запирает место навечно (NETA2-10): `AccountStore.resetSeatTicket(room, nick)`
+- `packages/server` — авторитетный сервер (Этап 3). WebSocket multiplayer slice: `MatchRoom`, `createMultiplayerServer`, action/state sync, per-player туман. Персистентность: `MatchStore`/`AccountStore`/`ReceiptStore` (in-memory + Postgres JSONB) — durable-матч переживает рестарт, durable receipts дедупят повтор после рестарта, ник-логин лобби. Offline-«будилка» (PA-4.1 v1): `MatchRoom.tick()`/`msUntilNextEvent()` + одно-процессный `setTimeout`-драйвер — отложенные события (прибытия/бои/захваты) срабатывают без подключённых игроков (мир идёт 24/7). Есть в обоих серверах: прото-сервер (`netserver.ts`, APK) с PA-4.1, боевой вход `packages/server/src/main.ts` — с F8 (`persistence.ts`+`clockDriver.ts`, паритет). Баг-фикс F8: `MatchRoom.initialSeq` восстанавливает счётчик действий при рестарте, иначе optimistic-by-seq store дропал пост-рестартные сохранения — прокинут в оба сервера. **Стоячие приказы, серверно (CC-2/CC-4):** `standingOrderDriver.ts` (`autoAssaultActions`/`patrolActions`) закрывает разрыв, который `clockDriver.ts`'s собственный doc-комментарий отмечал явно («the prototype host reads [onTick's `progressed`] to skip its AI/standing-order drivers on a stalled tick» — а канонический сервер до этого драйвер вообще не гонял); `serverWiring.ts`'s `onTick` вызывает его на каждом непроваленном (`progressed`) тике через `room.submitServerAction` (тот же путь, что AI/AvA-драйверы — мимо `ActionGate`, но через durable-mailbox на persist-пути), с `standingOrdersBusy`-флагом реэнтерабельности (зеркалит прототипный `driversBusy` из `netserver.ts`). CC-1 (`serverChainActions`, потребление головы цепочки) не портирован — отдельный, более крупный follow-up. Строгий commit-before-broadcast (risk14, опция `MatchRoom.persist`): действие идёт async-путём через актор-**mailbox** (сериализован per-room; туда же lobby-`start`), ждёт durable-запись снапшота+квитанции ДО коммита/рассылки (`computeAdvance` считает догон мира чисто, не трогая `stateValue` до ack); провал записи → транзиентный reject, ретрай доезжает; синхронный `submitAction` не тронут; прошёл 3-линзовый состязательный ревью. **SV-0.2 match-actor:** `RoomRegistry` (роутинг по matchId — N изолированных матчей/процесс, `InMemoryRoomRegistry` eager) + `LazyRoomRegistry` (lifecycle/risk13: ленивая загрузка по запросу + гибернация простаивающих в стор после idle-окна → live-память ∝ активным матчам; **пробуждение спящего матча к его следующему событию** — реорганизует+персистит+снова спит, мир идёт 24/7 при всех офлайн; таймер инжектируемый = шов под pg-boss; reconnect детерминированно догоняет). Рядом — браузерный `MatchRegistry` (`matchRegistry.ts`, main-menu §2): meta-состояние матчей (карта/правила/архив) с read-model `GET /matches` + archive-интентами (`registerBrowserApi` в `matchApi.ts`); структурно совместим с `RoomRegistry`, так что служит и источником комнат для транспорта (прото-сервер). DoS-границы (аудит F-03/F-04): карта `receipts` капается с FIFO-эвикцией (`maxReceipts`), действия — per-player rate-limit (`actionRateMax`/`actionRateWindowMs`, флуд → транзиентный `E_RATE_LIMIT` без квитанции, ретрай переживает). **SV-1.1 action-layer front-door (опционально):** `MatchRoom.gate?` подключает `@void/action-layer` `ActionGate` — gated-сообщение `action.v1` (конверт) проходит validate→authorize→sequence→dedup ДО редьюсера (стабильные `E_*` без утечки), а bare-`action` на gated-комнате отклоняется (нет обхода гейта); rate-limit стоит ДО резервации seq, поэтому троттлинг не сжигает `clientSeq` (ретрай доезжает, не `E_REPLAY`). `submitAction`/`admitEnvelope` делят общее ядро `applyAndBroadcast`, не перепроверяя чужие гейты. Абьюз-e2e (E3) зелёный (невалид/несанкц/replay/out-of-order → безопасный отказ; дубль → реплей без повторного применения). **Боевой вход (Fastify, SV-0.1):** `/health` без утечки id (**F-13**), `/ready` со стор-probe `MatchStore.ping`, pino, graceful drain — заменил голый node:http. **Аутентификация handshake (SE-0.1, **F-01**):** опция `auth` требует верифицированный join-токен (`?token=`); при ней `?player=`/`?nick=` игнорируются, `matchId`/`playerId` токена сверяются с матчем и местом; `allowedOrigins` (**F-06**) режет cross-site upgrade. Токены — `verifyJoinToken`/`signJoinToken` на `jose` с пином алгоритма (нет `none`/alg-confusion), `typ`, iss/aud/exp, опц. max-age (SE-2.1, прошёл состязательное ревью — verified против исходников jose). **Живой гейт:** транспорт минтит серверный `sessionId` (randomUUID — не клиентский, это ключ курсора seq), отдаёт в `welcome` и в `receive`; gated-envelope авторизуется против него, end-to-end (SV-1.1-live-A). Стора гейта ограничены — FIFO receipts + LRU cursors (SV-1.1-live-B, закрыл MAJOR из ревью). **Payload-схемы (SV-1.2 + REL-2, инвариант #5):** zod-схема на каждый из **46** клиентских типов действий — ПОЛНЫЙ интент-набор прототипа (вкл. артиллерию/отступление/рынок обоих хостов (`market.take`/`side`)/дипломатию/дивизии/`fleet.launch`/`split`/`merge`/`engage`/капиталь/Хранителя/стоячие приказы/`unit.build{modules}`); `patrol.stamp` намеренно НЕ клиентский (рантайм-штамп серверного драйвера — клиентский штамп заправлял бы своё крыло); паритет закреплён `prototype/src/gateparity.test.ts` (сэмплы через реальные билдеры) (`shared-core/actions/payloadSchemas` + `isValidActionPayload`) инжектится в гейт как `payloadValidator` — кривой payload или не-клиентский тип → `E_BAD_PAYLOAD` до редьюсера. **Гейт на durable-пути (gate+persist):** принятое gated-действие коммитится-до-broadcast на durable-пути; весь admit→commit сериализован в mailbox (резервация seq и persist атомарны), при транзиентном сбое `SequenceGate.rollback` отпускает курсор → тот же `clientSeq` ретраится (не `E_REPLAY`). Прошло состязательное ревью (дизайн звучит; закрыт MAJOR — broadcast теперь per-player изолирован, не может застрять на throw). **Боевой вход:** `main.ts` включает auth/гейт по env (`AUTH_JWT_SECRET`, `GATE=1`, `ALLOWED_ORIGINS`), default off (live-C). **Мульти-матч (SV-4.0):** вход хостит N матчей через `LazyRoomRegistry` — матч грузится из стора по первому коннекту, гибернируется в простое, будится к событиям; `dev` сидируется на буте (реальный create — SV-2.4). **Вход игроков (SV-2.4 + SE-1.x, логин+пароль):** аккаунты `users` (Memory/Postgres, логин уникален без регистра), пароли scrypt (`node:crypto`, параметры вшиты в хеш), `POST /auth/register`/`/auth/login` → сессионный JWT (`typ session+jwt`, отдельная audience — невзаимозаменяем с join-токеном); uniform-401 + decoy-hash (не раскрываем существование аккаунта ни телом, ни таймингом), per-IP rate-limit. `POST /matches` и `GET /matches/:id/join` требуют `Authorization: Bearer <session>` — ник места = логин сессии (никем другим не зайдёшь), `accountId` штампуется в join-токен (15 мин); оба маршрута пишут durable-состояние (сид матча / занятие места), поэтому оба за per-IP sliding-window rate-limit (общий бюджет create+join, `E_RATE_LIMIT`/429, ограниченная FIFO-карта), как auth-эндпоинты. Сверх точечных лимитеров весь account+match-контур в `main.ts` обёрнут `@fastify/rate-limit` в инкапсулированном scope — грубый per-IP бэкстоп (health/ready на родительском app не троттлятся). Всё выставляется **только при включённом auth**; e2e прогнан вживую: register → login → Bearer-join → WS welcome. **Восстановление пароля (SE-1.x):** опц. email при регистрации (уникален по `lower(email)`); `POST /auth/recover` анти-энумерационен (всегда 200, письмо — только на реальный адрес), `POST /auth/reset` тратит single-use токен (`typ reset+jwt`, 15 мин, привязан к отпечатку `pwfp` текущего хэша — сменился пароль, токен мёртв, без серверного стора). Доставка — сменный `Mailer`: деф. пишет в stderr только `to`/`subject`, тело со ссылкой захвата — лишь под `MAILER_LOG_BODY=1`; реальный SMTP/API — отдельный env. Клиент вычищает `?reset=<token>` из URL/истории. **Ревокация при сбросе:** session-JWT несёт `pwfp`, `liveSession` сверяет его с текущим хэшем на гейте identity (create/join + corp/ava/medal/arsenal, оба сервера) → сброс пароля инвалидирует все прежние сессии (угнанную в т.ч.); `verify` требует непустой `pwfp` (fail-secure); остаток — уже открытый WS живёт до обрыва по 15-мин join-токену. Дальше по треку: refresh-токены (AC-0.2), OIDC как второй провайдер (AC-1.1). **Фабрика матчей (SV-2.5):** `MatchKeeper` держит `OPEN_MATCHES` (env, деф. 3) открытых матчей — как только один заполнился/закончился, засевается новый, так лента не пустеет и игрок всегда может зайти в свежую игру. Счёт открытых берётся из durable-стора (`MatchStore.ongoingMatchIds` + `occupiedSeats`), а не из in-process счётчика → рестарт реконсилит по реальному миру, не переплождая; кап на конкурентные матчи (`max`), reentrancy-guard, ошибка create/read проглатывается и ретраится следующим тиком. Реконсиляция на буте + интервал 30с. Публичная read-only лента `GET /matches/open` (id/seated/capacity из стора, переживает гибернацию — видит и спящие матчи) — браузинг до логина, join по-прежнему требует сессию. Прогнано вживую: `OPEN_MATCHES=3` → сервер добил до 3 открытых (посчитал `dev`, создал 2), все в `/matches/open`. **Метрики (OPS-0.1):** `/metrics` — агрегатные gauge'ы (число матчей/коннектов, без id). **Метрики M1 (metrics-roadmap):** observe-поток комнаты расширен наблюдениями `events` (доменные события коммита, без `time.advanced`), `broadcast` (ms + размер дельты per-player), `timing` (submit/advance) и `desync` (клиентский репорт); `MetricsAggregator` (`metrics.ts`) сводит их в счётчики/avg/max; на `desync`-сообщение комната отвечает полным `state`-ресинком с cool-down 2 с per-player (репорт наблюдается всегда — шторм виден в метриках, но не DoS). **Метрики M2:** клиентское сообщение `perf` `{fps,rttMs?,memMb?}` (клампы при parse, per-player rate-limit 5 с, только наблюдается — `client_perf`); headless перф-харнес `pnpm run perf` (CPU-стоимость кадра idle/pan/zoom против бюджета p95, нон-блок шаг в CI, `PERF_STRICT=1` — гейт). **Крит-путь до онлайн-сессии закрыт.** Пройден 3-линзовый ревью (корректность/безопасность/чистота): починен HIGH-баг живости (драйвер часов не пере-armился после committed-действия — вынес эмиссию `action`-наблюдения за окно `committing`); добавлен Fastify error-handler (инвариант #4, без утечки); ядро gate/session/JWT подтверждено безопасным. **Вектор 2 (надёжность) сделан:** durable-места (`createStores` отдаёт `PostgresAccountStore` при `DATABASE_URL` — ник→место переживает рестарт, 2.2); CI-workflow (`ci.yml`) с сервис-Postgres гоняет durable-адаптеры в CI + `configFromEnv` вынесен из `main.ts` и покрыт тестом round-trip mint↔verify (2.3). **Durable-стора гейта — НЕ нужны (2.1, verified):** они ключуются по per-connection `sessionId` (серверный, неповторимый), теряются ровно когда отслеживаемые сессии заканчиваются → переподключение минтит свежий `sessionId` → свежий курсор; персистить нечего. **Деплой одной командой (REL-3):** `pnpm stack` (= `docker compose -f deploy/docker-compose.yml up -d --build`) поднимает игровой сервер (distroless-образ: игра на `/`, WS, `/health`) + Postgres; отказоустойчивость — `restart: unless-stopped` на обоих, durable-резюме матчей из PG, healthchecks (server ждёт healthy-PG), bounded-логи, PG на loopback; runbook (обновление/бэкап+cron/восстановление/границы) — `deploy/README.md`. **Гейт на играбельном пути (REL-4):** прото-хост `prototype/netserver.ts` принимает `GATE=1|true` — комната получает тот же `ActionGate({payloadValidator: isValidActionPayload})`, что и боевой вход (зеркало serverConfig); в compose релиз-постура — `GATE` по умолчанию **ON** (`${GATE:-1}`, `GATE=0` — дев-откат к голым actions). Прогнано вживую в обе стороны: gated — `welcome{gated,sessionId}` → голый `action` отклонён (`E_BAD_MESSAGE`), `action.v1`-конверт того же клиента применён (delta); ungated — голый `action` применён (обратная совместимость). Серверные драйверы (ИИ/Хранитель/стоячие приказы) идут через `room.submitAction` МИМО гейта — так и задумано: гейт стоит на проводе, не внутри хоста. **Замок мест (REL-5, `SEAT_LOCK=1`, в compose по умолчанию ON):** ник-логин без аккаунтов защищён «посадочным билетом» — первый вход ника минтит случайный тикет (`randomBytes(24)`), транспорт хранит ТОЛЬКО его sha256 в `AccountStore` (`bindSeatTicket` — первый bind атомарно выигрывает, Memory и Postgres; колонка `seats.ticket_hash`, `ALTER … IF NOT EXISTS` — старые ряды дозамыкаются при следующем входе владельца), плэйнтекст едет клиенту один раз в `welcome.seatTicket` (`addPeer welcomeExtras`); каждый последующий вход обязан предъявить `?ticket=` (сравнение constant-time), иначе 401; прямой `?player=` под замком отклоняется (обход невозможен). Клиент самонастраивается: `MultiplayerClient.onSeatTicket` → прототип кладёт билет в `localStorage` (`void.ticket.<base>|<match>|<nick>`) и добавляет `&ticket=` при коннекте. Проверено: юнит-e2e транспорта (`seatLock.test.ts`), стор-контракт на Memory+Postgres 16 (включая миграцию старой схемы), живой raw-ws прогон и БРАУЗЕРНЫЙ CDP-прогон реального клиента (билет ложится в localStorage → реконнект пускает; удалили билет → тот же ник заперт). Потеря билета не запирает место навечно (NETA2-10): `AccountStore.resetSeatTicket(room, nick)`
 (Memory+Postgres, store-контракт `store.test.ts`) чистит `ticket_hash` — следующий вход того
 же ника минтит свежий билет тем же путём, что «место занято до появления замка». Без
 самообслуживания: nick+ticket — единственная личность на этом безаккаунтном пути, так что
 несанкционированный сброс = кража чужого места, а не восстановление своего — сброс
 остаётся действием оператора (`deploy/README.md`, раздел «Замок мест — восстановление»). **`SEAT_LOCK` теперь и на боевом входе (MP-1):** `wsServer.ts` уже нёс опцию `seatLock` — `packages/server/src/main.ts` её просто не подключал (`createMultiplayerServer` шёл без неё); портирован тот же `SEAT_LOCK=1|true`-паттерн, что в `netserver.ts`, + строка `seats` в boot-логе. **Верификация целостности game-data (MP-4):** матч пинит `GameVersion.dataHash` (`hashGameDataBundle` — `shared-core`, тот же order-independent `hashJson`-примитив, что у `hashState`) при СОЗДАНИИ (`buildStateFromMap`/`createDevMatch` — единые точки создания, накрывают dev-матчи/фабрику/AvA/клиентский `skirmishState`); `serverWiring.ts` `createMatchLoader` при ЗАГРУЗКЕ пересчитывает хэш текущего задеплоенного бандла и сверяет с запиненным — расхождение (данные подменили под живым матчем) → отказ (`null`, тот же путь, что «матча нет» — без краша) + громкий stderr + опц. `onIntegrityFailure`; снапшоты без хэша (до MP-4) деградируют мягко. **Сессии Iron Order (SES-2):** автостарт без лобби (SES-2.1 — `MatchRoom.initiallyStarted` работает и без `manualStart`); два ИИ разведены `seatAiDecision` (SES-2.2 — Хранитель по делегированию vs `expand`-заместитель после `AI_GRACE_MS`=3 реальных дня); окно входа `ENTRY_WINDOW_MS` (SES-2.3, деф. 4 реальных дня): `wsServer.admitNewSeat?` отклоняет ПЕРВЫЙ вход ника (проверка `seatOf` до `resolveSeat`, 403) после `MatchRegistry.entryOpen` (возраст = `state.time/timeScale`, переживает рестарт), реконнект своих не гейтится; закрытая сессия выпадает из «Доступных». **Аккаунты на игровом пути (SES-2.5):** с `AUTH_JWT_SECRET` прото-хост монтирует SE-1.x-контур (`registerAuthApi` + общий `registerMatchApi` — NETA2-7 свёл джойн-хендшейк в одно место с боевым хостом: per-IP rate-limit + identity-гейт + error→status; `createMatch` опционален, `POST /matches` не монтируется. Bearer-сессия → seat логина → join-токен, окно входа `seatOf`-до-`resolveSeat` в netserver-`join`-депе → 403 `E_ENTRY_CLOSED`) и передаёт `auth` транспорту — nick/ticket отклоняются; без секрета — прежний nick+ticket. Клиент самонастраивается по `GET /auth/status`: поле «Пароль», zero-friction login→register, session-JWT per-server в localStorage, реконнект минтит свежий join-токен. Живой e2e 10/10 + окно на auth-пути. Плейтест-постура компоуза (SES-2.6): `TIME_SCALE` деф. ×24 (окна отсутствия/входа — реальные); полный цикл прогнан живьём 7/7 (регистрация → лента → вход → gated-игра, часы ≈×24.0). ⏳ Дальше: OIDC-идентичность, полные аккаунты на прото-пути (JWT join-токены в транспорте готовы), контейнер-хардненинг. **Реплей-детерминизм (playtest-hardening RPL-1..3):** shared-core `replay/replay.ts` — самодостаточный `ReplayLog` (полный стартовый стейт, RNG внутри; шаги `{at, action?}`) + чистый `runReplay` с fail-secure пинами версии/порядка; **границы advance — часть лога** (спановое начисление float-чувствительно к членению — движок обещает coarse ≈ fine, не бит-в-бит). `MatchRoom.record` пишет каждую исполненную границу advance и каждое успешно применённое действие (sync + durable пути, серверные драйверы включительно); CI-тест `replayDeterminism.test.ts` — живая комната на полном dev-стеке (шипнутые данные, 48 игровых часов) → реплей → `hashState` бит-в-бит, плюс JSON-round-trip лога (паритет гибернации). Остаток: durable action-log (PE-1.1) → аудит-реплей (GI-1.3). _Известный нюанс (клиентская сверка, не серверная durability):_ acked-но-недоставленное действие + рестарт + наивный ресенд может примениться дважды (`actionId` session-scoped) — закрывается сверкой клиента с полным `welcome`-состоянием на реконнекте, не durable-стора́ми гейта.
-- `packages/client` — клиент (Этап 4): направление **PWA-first веб-клиент** (TWA Android + Capacitor iOS, не React Native — см. `cross-platform-roadmap.md`). Есть `MultiplayerClient` transport adapter — **закрывает SV-1.1-петлю**: ловит `sessionId`+`gated` из `welcome` и на gated-комнате оборачивает намерение в `action.v1` конверт (`createActionEnvelope`, strict per-session `clientSeq` 1,2,…, `actionId=sessionId:playerId:clientSeq`, сброс на реконнекте), иначе — голый `action`; сервер отдаёт `gated:true` в welcome → клиент самонастраивается по рукопожатию. Прогнано вживую: gated-сервер → welcome`{gated,sessionId}` → конверт принят → delta; юнит-тесты прогоняют вывод клиента через те же `validateActionEnvelope`+`authorizeActionEnvelope`, что и гейт. **Реконнект и резюме (CP1.4/G1):** неожиданный обрыв сокета → авто-реконнект с экспоненциальным бэкоффом (1с→30с cap, сброс на успешном open) в `net.ts`; клиент флипается в `connecting` и складывает интенты в ограниченный outbox (64, переполнение → `E_OUTBOX_FULL`), флаш после реконнект-`welcome` под свежей сессией (в очереди только никогда-не-отправленные действия → без дублей); дельта с `seq` назад (вперёд-гэпы/повторы легальны) дропается как desync и форсит немедленный ресинк-реконнект; deliberate `close()` финален. **Hash-desync (M1):** на дельте с `hash` клиент сверяет свою реконструкцию (`hashState`), при mismatch шлёт `desync`-репорт и получает полный `state`-ресинк без реконнекта (один запрос за раз; UI-хук `onHashDesync`). Токены темы (`theme.ts`) и framework-agnostic view-models (паттерн: чистая фабрика + fail-secure, JSON-сериализуемо): `welcomeScreen.ts` (экран входа) и `matchHud.ts` (внутриматчевый HUD: зоны A+D — `createStatusBarModel` стат-бар, `createSelectionModel` панель флота; **боевая зона** — `createBattleModel` + `resolveBattleAction` панель активного боя с единственным действием «Отступить»; **боевой прогноз (G4/ONB-6)** — `createBattlePreviewModel`: тонкая обёртка над чистым `previewBattle` из `shared-core` — форкаст десанта пристыкованного флота против гарнизона враждебного (data-driven `sectorKinds.capturable`) мира под ним; фог структурно безопасен (пристыкованный флот уже опознал свой мир); fail-secure отказы на чужом/непристыкованном флоте, своём/некапчурабельном мире, пустом десанте/гарнизоне; всё поверх fog-проекции `visibleState`; см. `hud-inmatch.md`). App shell — рабочий
+- `packages/client` — клиент (Этап 4): направление **PWA-first веб-клиент** (TWA Android + Capacitor iOS, не React Native — см. `cross-platform-roadmap.md`). Есть `MultiplayerClient` transport adapter — **закрывает SV-1.1-петлю**: ловит `sessionId`+`gated` из `welcome` и на gated-комнате оборачивает намерение в `action.v1` конверт (`createActionEnvelope`, strict per-session `clientSeq` 1,2,…, `actionId=sessionId:playerId:clientSeq`, сброс на реконнекте), иначе — голый `action`; сервер отдаёт `gated:true` в welcome → клиент самонастраивается по рукопожатию. Прогнано вживую: gated-сервер → welcome`{gated,sessionId}` → конверт принят → delta; юнит-тесты прогоняют вывод клиента через те же `validateActionEnvelope`+`authorizeActionEnvelope`, что и гейт. **Реконнект и резюме (CP1.4/G1):** неожиданный обрыв сокета → авто-реконнект с экспоненциальным бэкоффом (1с→30с cap, сброс на успешном open) в `net.ts`; клиент флипается в `connecting` и складывает интенты в ограниченный outbox (64, переполнение → `E_OUTBOX_FULL`), флаш после реконнект-`welcome` под свежей сессией (в очереди только никогда-не-отправленные действия → без дублей); дельта с `seq` назад (вперёд-гэпы/повторы легальны) дропается как desync и форсит немедленный ресинк-реконнект; deliberate `close()` финален. **Hash-desync (M1):** на дельте с `hash` клиент сверяет свою реконструкцию (`hashState`), при mismatch шлёт `desync`-репорт и получает полный `state`-ресинк без реконнекта (один запрос за раз; UI-хук `onHashDesync`). **Локализация (LOC-3, рантайм общий с LOC-5):** текст берётся из `localization/runtime.ts` — ОДНОГО рантайма на клиент и прототип (`t()`/`tData()`/`lookup()`/`hasKey()`; собственная копия `packages/client/src/i18n.ts` удалена, третьей системы не заводилось); `welcomeScreen.ts`'s `defaultStrings`/`CALLSIGNS`, `loadoutEditor.ts`'s `STAT_LABELS` (новый ключевой домен `loadout.stat.*`) и `main.ts`'s статус/сетевые строки (новый домен `client.*` + `err.no-nick`/`err.unknown-provider`) больше не хардкодят текст. `prototype/src/i18n.test.ts` теперь сканирует и `packages/client/src` — общий гейт покрывает обоих потребителей. Токены темы (`theme.ts`) и framework-agnostic view-models (паттерн: чистая фабрика + fail-secure, JSON-сериализуемо): `welcomeScreen.ts` (экран входа) и `matchHud.ts` (внутриматчевый HUD: зоны A+D — `createStatusBarModel` стат-бар, `createSelectionModel` панель флота; **боевая зона** — `createBattleModel` + `resolveBattleAction` панель активного боя с единственным действием «Отступить»; **боевой прогноз (G4/ONB-6)** — `createBattlePreviewModel`: тонкая обёртка над чистым `previewBattle` из `shared-core` — форкаст десанта пристыкованного флота против гарнизона враждебного (data-driven `sectorKinds.capturable`) мира под ним; фог структурно безопасен (пристыкованный флот уже опознал свой мир); fail-secure отказы на чужом/непристыкованном флоте, своём/некапчурабельном мире, пустом десанте/гарнизоне; всё поверх fog-проекции `visibleState`; см. `hud-inmatch.md`). App shell — рабочий
   Vite-каркас: welcome-экран, живая карта на общем рендер-ките (камера/holoDraw/territory),
   подключение к серверу по `?join=`-диплинку (снапшоты/дельты + приказ движения через
   `action.v1`); полный игровой HUD в shell — впереди, играбельный клиент игроков — `prototype/`.
@@ -112,13 +112,13 @@ packages/action-layer/src/
   data/          schemas.ts (zod-схемы + parseGameData, buildingLevel/buildingMaxLevel)
   rng/           rng.ts (sfc32)
   util/          clone.ts (deepClone/deepFreeze), treasury.ts (canAfford/payCost — shared by construction & technology), fitting.ts (генерик-гейт «слоты+предметы», SHIP-4) + loadout.ts (ship-обёртка над ним)
-  modules/       army, artillery, captureOnArrival, combat, construction, diplomacy, economy, effects, espionage, faction, hero, heroEffects, intercept, market, movement, orbital, planetType, scientist, sector, station, steward, technology, victory, visibility  (24 модуля, + *.test.ts)
+  modules/       army, arsenalSync, artillery, capital, captureOnArrival, combat, construction, diplomacy, division, economy, effects, espionage, faction, fleetOps, fleetRepair, forcedMarch, hero, heroEffects, instantRepair, intercept, market, movement, orbital, planetType, scientist, sector, standingOrders, station, steward, tax, technology, victory, visibility  (33 модуля, + *.test.ts)
   examples/      skirmish.test.ts (демо-сценарий + SVG)
   index.ts       баррель (экспорт публичного API)
-data/            manifest, resources, units, buildings, factions, events, sectors, planetTypes, technologies (.json)
-localization/    ВЕСЬ текст для игрока: index.ts (LOCALES/DEFAULT_LOCALE/dataKey), ru.ts, en.ts (плоские карты ключ→текст), legacy/en.ts (мост старых msgid, сокращается — LOC-2)
+data/            manifest, resources, units, buildings, factions, events, sectors, sectorKinds, planetTypes, technologies, scientists, rewards, heroes, heroAbilities, heroFittings, heroPassives, heroSkillTrees, modules, medals, dropTables, starterArsenal (.json)
+localization/    ВЕСЬ текст для игрока: index.ts (LOCALES/DEFAULT_LOCALE/dataKey), ru.ts, en.ts (плоские карты ключ→текст, 1574 ключа), runtime.ts (ОДИН на прототип и клиент: t/tData/lookup/hasKey/setLocale/localizeStaticDom, LOC-5) + runtime.test.ts. Мост старых msgid снят вместе с LOC-2 — в коде только ключи
 docs/            architecture, modulesystem, roadmap, deep-technical-roadmap, multiplayer, engineering-risks, gdd, metagame, state(этот)
-prototype/       src/game.ts (оркестрация, реэкспорты — REFP-рефактор: 5289→2194 строк), src/prototypeData.ts, src/map.ts, src/fleetStacks.ts, src/tax.ts, src/formations.ts, src/botFavour.ts, src/squadron.ts, src/chain.ts, src/hunger.ts, src/botDiplomacy.ts, src/sessionMarket.ts, src/capital.ts, src/fleetLaunch.ts, src/standingOrders.ts, src/forcedMarch.ts, src/instantRepair.ts, src/econScrews.ts, src/economy.ts, src/matchSetup.ts (вынесены из game.ts, Block REFP), src/main.ts (UI), src/smoke.ts, build.mjs, uitest.mjs, dist/ (артефакт, в .gitignore)
+prototype/       src/game.ts (чистый index-фасад реэкспортов, REFP-28: 5289→207 строк, логики нет), src/prototypeData.ts, src/map.ts, src/fleetStacks.ts, src/tax.ts, src/formations.ts, src/botFavour.ts, src/squadron.ts, src/chain.ts, src/hunger.ts, src/botDiplomacy.ts, src/sessionMarket.ts, src/capital.ts, src/fleetLaunch.ts, src/standingOrders.ts, src/forcedMarch.ts, src/instantRepair.ts, src/econScrews.ts, src/economy.ts, src/matchSetup.ts, src/actions.ts, src/patrol.ts, src/serverDrivers.ts, src/division.ts, src/protoKernel.ts, src/stewardGuard.ts, src/ai.ts, src/time.ts (вынесены из game.ts; Block REFP закрыт 28/28, обратных рёбер на фасад ноль), src/main.ts (UI), src/format.ts (презентационные форматтеры, REFM-2), src/icons.ts (словарь иконок, REFM-3), src/dossiers.ts + src/buildQueue.ts (досье объектов и кодекс + словарь очереди стройки, REFM-4), src/arsenalScreen.ts (витрина «Арсенал», REFM-5), src/marketScreen.ts (окно рынка, REFM-6), src/stewardScreen.ts (окно «Хранителя», REFM-7), src/divisionDesigner.ts (конструктор дивизий, REFM-8), src/techTree.ts (дерево технологий, REFM-9), src/profileScreen.ts (профиль командира, REFM-10), src/corpScreen.ts (корпоративный кабинет, REFM-11), src/smoke.ts, tsconfig.json (REFM-0: typecheck в гейте), build.mjs, uitest.mjs, dist/ (артефакт, в .gitignore)
 ```
 
 ## 4. Модель состояния (`GameState`)
@@ -257,7 +257,7 @@ by, damage}` (эмит до применения урона; прототип р
   (`visibilitychange`) и раз в 4ч — с троттлингом 15 мин; ручная — кнопка на
   `#connect` (диагностика в `cver`) и **тайл «Обновления» в хабе** (диагностика в
   `hub-note`). Браузерная «автообновляемость» — GitHub Pages
-  (`pages.yml` → https://moonwuk.github.io/Nygame/ — ссылка всегда на свежий main);
+  (`pages.yml` → https://moonwuk.github.io/MoonGame/ — ссылка всегда на свежий main);
   ⚠ требует ОДНОГО ручного включения: Settings → Pages → Source **«GitHub Actions»**
   (без него job гибнет до шагов — см. runbook-комментарий в `pages.yml`).
   **Тач-управление (№12 аудита)**: при взведённом Move палец ТЯНЕТ прицел (живое
@@ -446,9 +446,12 @@ E_CONDITIONS_UNMET, E_INSUFFICIENT`.
 
 ### scientist (`scientist`) — research-лидер (учёный)
 
-Выбирается на старте и снапшотится в `Player.scientist {id, level}` (через
-слот-ассайнмент `buildStateFromMap`; `E_UNKNOWN_SCIENTIST` при неизвестном id;
-приватен в тумане — стрипается у чужих проекций). Каталог `data/scientists.json`
+Выбирается на старте и снапшотится в совет `Player.scientists[{id, level}]` (≤2;
+legacy-поле `scientist` только читается через `scientistsOf`) через слот-ассайнмент
+`buildStateFromMap`; `E_UNKNOWN_SCIENTIST` при неизвестном id; приватен в тумане —
+у чужих проекций стрипаются ОБА поля, и совет, и legacy (2026-07-30 закрыта утечка:
+`project` резал только legacy-`scientist`, а состав совета противника уезжал сквозь
+туман). Каталог `data/scientists.json`
 (`ScientistDef {name, branch?, slotBonus}`) — НЕ юнит, НЕ hero-модуль. Эффекты идут
 через существующие швы: **`+слот`-лидер** добавляет `slotBonus` в хук
 `research.slots` (клампится к 3); **фокус ветки и лейт-капстоун** — data-driven через
@@ -627,6 +630,150 @@ E_IMMOBILE, E_FLEET_BUSY, E_FORBIDDEN, E_NO_PLANET, E_UNKNOWN_UNIT, E_BAD_PAYLOA
 **Оптимизация:** `bombardedPlanets(state)` строит `Set<PlanetId>` за один проход O(fleets),
 затем O(1) на проверку; economy вызывает один раз на `time.advanced` вместо O(fleets) на планету.
 
+### fleetOps (`fleet-ops`) — формирование флота из гарнизона
+
+Закрывает разрыв между «построено» (`constructionModule` кладёт готовый корабль в
+гарнизон) и «играбельно» (до этого модуля ничего не выводило построенный корабль ИЗ
+гарнизона — на живом мультиплеерном сервере поднять флот было нельзя вообще). Порт
+прототипного `fleetLaunchModule` (`prototype/src/fleetLaunch.ts`, REFP-10).
+
+- **`fleet.launch {planetId}`** — поднимает гарнизон в новый флот: корабли (`domain:
+  space`) → `units`, поднимаемые наземные (`domain: ground`, не `immobile`) → `landing`
+  в пределах `Σ cargoCapacity`; `immobile`-установки (орбитальное ПВО) остаются.
+  Заблокирован, пока гарнизон держит бой (`garrisonUnderAssault`). Коды: `E_NO_PLANET,
+  E_FORBIDDEN, E_EMPTY_GARRISON, E_UNDER_ASSAULT, E_NO_SHIPS, E_BAD_PAYLOAD`.
+- **`fleet.merge {from, into}`** — сливает два стоящих на месте флота (`mergeStacks` —
+  коалесцирует только одинаковый юнит+лоадаут+полное здоровье, повреждённые/разно
+  оснащённые стеки остаются раздельными); герой на поглощённом флоте перевязывается
+  на `into.fleetId`, чтобы не осиротеть. Коды: `E_SAME_FLEET, E_NO_FLEET, E_FORBIDDEN,
+  E_IN_BATTLE, E_NOT_COLOCATED, E_BAD_PAYLOAD`.
+- **`fleet.split {fleetId, take[]}`** — отделяет выбранные корабли в новый флот на том
+  же месте (`takeFromStacks` — апорционирует пул `hp`/`shieldHp` пропорционально, не
+  дублирует корпус); héro-юнит нельзя отделить отдельно от сущности героя. Коды:
+  `E_NO_FLEET, E_FORBIDDEN, E_IN_BATTLE, E_IN_TRANSIT, E_HERO_UNIT, E_NOT_ENOUGH,
+  E_SPLIT_EMPTY, E_SPLIT_ALL, E_BAD_PAYLOAD`.
+- **`fleet.engage {fleetId, targetId}`** — намеренная атака на совместно стоящий
+  враждебный флот (прибытие уже авто-резолвит столкновение через `combatModule`'s
+  `fleet.arrived`; это путь для двух флотов, УЖЕ делящих узел без боя — например один
+  прибыл в мирное время, войну объявили после). Самодостаточная сборка боя (не
+  переиспользует приватный `startBattle` из `combat.ts` — «модули не импортируют друг
+  друга», инвариант #3), но раунд той же каденции (`hoursToMs`). Коды: `E_SAME_FLEET,
+  E_NO_FLEET, E_FORBIDDEN, E_NOT_HOSTILE, E_IN_BATTLE, E_NOT_COLOCATED, E_BAD_PAYLOAD`.
+
+Портирован С АДАПТАЦИЕЙ (не 1:1, в отличие от чистых REFP-переносов): прототип
+проверяет наземный домен трейтом `'ground'`, канон — полем `domain: 'ground'`
+(`UnitDefSchema`); поиск флота по id из недоверенного payload — `ownFleet` (own-key,
+A06/A08 — отравленный id вроде `__proto__` читается как отсутствие флота); перевязка
+carrier-дивизий при merge из прототипа НЕ портирована — у канона нет концепции дивизий
+(прототип-only состояние, REFP-13). Новые переиспользуемые утилиты — `loadoutKey`/
+`takeFromStacks`/`mergeStacks` в `util/stacks.ts` (были только в прототипном
+`fleetStacks.ts`, REFP-3). Не портирован авто-рэлли на `unit.built` (прототипная
+UX-удобность — только что построенный корабль сам летит в общий флот на орбите) —
+сознательно отложено: `fleet.launch` уже даёт игроку способ вывести весь гарнизон
+одним действием, авто-рэлли не блокер, а полировка.
+
+### capital (`capital`) — назначаемая столица (якорь возрождения героя)
+
+Порт прототипного `capitalModule` (`prototype/src/capital.ts`, REFP-14). `heroModule`
+уже читал `hero.home` как fallback-точку возрождения (`[home, location].find(owned)`),
+но ничто не позволяло игроку ПЕРЕНАЗНАЧИТЬ его после старта матча — этот модуль закрывает
+разрыв.
+
+- **`capital.designate {planetId}`** — назначает свой обитаемый мир столицей;
+  перевязывает `home` у ВСЕХ героев игрока разом. `isInhabited` реализован инлайн
+  (`hasOrbit` + нет `allowedBuildings`-ограничения) — не импортирован из `modules/tax.ts`
+  («модули не импортируют друг друга», инвариант #3); `hasOrbit`/`allowedBuildings`
+  сами по себе утилиты `state/sectorKind.ts`, не модуль. Коды: `E_NO_PLANET,
+  E_FORBIDDEN, E_NOT_INHABITED, E_BAD_PAYLOAD`. Событие `capital.designated`.
+- `GameState.capital?: Record<PlayerId, PlanetId>` — новое опциональное поле (тот же
+  паттерн, что `market`/`intel`/`diplomacy`); `capitalsOf`/`capitalOf` — чтение.
+  **Приватно в тумане** (2026-07-30): чужая столица — якорь возрождения героя, та же
+  targeting-интел, что hold points Хранителя; `visibleState` оставляет только свою
+  запись (UI и так читает лишь `capitalOf(s, ME)`).
+
+### standingOrders (`standing-orders`) — стоячие приказы + очередь приказов (CC-1/CC-2/CC-4)
+
+Порт прототипного `standingOrdersModule` (`prototype/src/standingOrders.ts`, REFP-15) —
+модуль хранит и валидирует ТОЛЬКО намерение игрока и подчищает его для мёртвых флотов
+(`time.advanced`). Сам драйвер (кто и когда решает «пора штурмовать»/«пора скремблить») —
+это НЕ функция ядра (много раз вызывает `applyAction`/`submitServerAction` СНАРУЖИ одного
+прохода событий), поэтому живёт вне `shared-core`: **CC-2 (авто-штурм) и CC-4 (дежурный
+вылет) теперь портированы на канонический сервер** — `packages/server/src/
+standingOrderDriver.ts` (`autoAssaultActions`/`patrolActions`/`standingOrderTickActions`),
+подключён в `clockDriver`'s `onTick` через `serverWiring.ts` (см. секцию сервера ниже).
+**CC-1 (потребление головы цепочки, `order.chain`) всё ещё НЕ портирован** — заход
+специально не брал `serverChainActions` (больше видов шагов, слежение за кулдауном
+способности героя), это отдельный, более крупный follow-up. Ни один из портированных
+драйверов не завязан на ИИ/бота — чистые функции над явным состоянием, применяемые
+предсказуемо через `submitServerAction`.
+
+- **`order.auto {fleetId, on}`** — взводит/снимает флаг `state.autoAssault[fleetId]`
+  (авто-штурм при простое у враждебного мира). Коды: `E_NO_FLEET, E_BAD_PAYLOAD`.
+- **`order.scramble {fleetId, on}`** — взводит/снимает дежурный вылет
+  `state.patrols[fleetId]` (центр = текущая позиция, радиус = `squadronStrikeRange`,
+  запас вылетов — свежий или подхваченный из `wingSorties`, если снимали и взводят
+  заново). Требует крыло (`fleetHasSquadron`) и простой (`fleetIdle`). Коды:
+  `E_NO_FLEET, E_NO_SHIPS, E_CONDITIONS_UNMET, E_BAD_PAYLOAD`.
+- **`patrol.stamp {fleetId, sortie, rearmAt?}`** — рантайм-штамп СЕРВЕРНОГО драйвера
+  (тратит/восстанавливает запас вылетов дежурного крыла); гейт-схемы намеренно НЕТ
+  (`actions/payloadSchemas.ts`) — с провода недостижим, штамп своего крыла заправил бы
+  топливо бесплатно. Коды: `E_NO_FLEET, E_NO_TARGET, E_BAD_PAYLOAD`.
+- **`order.chain {fleetId, steps[]}`** — атомарно ставит/снимает (`steps: []`) весь план
+  флота `state.orders[fleetId]={steps}`; шаги валидируются `validateChainSteps`
+  (`state/chain.ts`, порт `prototype/src/chain.ts`) — только известные виды
+  (`move`/`wait`/`assault`/`barrage`/`strike`/`ability`, ровно набор гейт-схемы и
+  прототипного словаря; `ability` требует реальный `abilityId` из `data.heroAbilities`
+  — валидатор берёт каталог через `ctx.data`), только известные миры, кап
+  8 шагов. Коды: `E_NO_FLEET, E_BAD_PAYLOAD`. _Исторический разъезд закрыт:_ первый
+  порт «обрезал» `ability` («под него нет гейт-схемы»), из-за чего соло принимал шаг,
+  а gated-сервер отбрасывал весь план `E_BAD_PAYLOAD`; теперь все три копии словаря
+  (гейт-zod / `state/chain.ts` / `prototype/src/chain.ts`) совпадают и запинены тестами.
+- **`chain.stamp {fleetId, steps[], waitUntil?}`** — рантайм-штамп СЕРВЕРНОГО драйвера
+  (потреблённая голова / взведённый дедлайн ожидания); гейт-схемы тоже намеренно нет.
+  Коды: `E_NO_FLEET, E_NO_TARGET, E_BAD_PAYLOAD`.
+- Подчистка на `time.advanced`: любая запись в `autoAssault`/`patrols`/`wingSorties`/
+  `orders`, чей `fleetId` больше не существует, удаляется; опустевшая карта убирается
+  целиком (та же гигиена дельт, что у `diplomacyOffers`).
+- Новые поля `GameState`: `autoAssault?/patrols?/wingSorties?/orders?` (тот же паттерн
+  опциональных карт, что `market`/`capital`); `PatrolEntry` — форма записи дежурства.
+  `state/visibility.ts` уже заранее (до этого модуля) знала стричь `orders`/`autoAssault`/
+  `patrols` как приватное намерение владельца флота — при порте добавлен `wingSorties` в
+  тот же список (тот же принцип: чужой запас топлива дежурного крыла не публичен).
+  `state/delta.ts` не требует правки — новые ключи верхнего уровня уже покрыты его
+  общим механизмом HOST-EXTENSION (`extensionKeys`), как и `capital` до них.
+
+### instantRepair (`instant-repair`) / fleetRepair (`fleet-repair`) / forcedMarch (`forced-march`)
+
+Три маленьких, независимых экономических действия флота — закрывают последнюю
+тройку разрывов «гейт-схема есть, обработчика нет» (`fleet.instantRepair`/
+`fleet.repair`/`fleet.forcemarch`), тем же методом diff схем/обработчиков, что
+`fleetOps`/`capital`/`standingOrders`. Порты прототипных `instantRepairModule`
+(`prototype/src/instantRepair.ts`, REFP-17), `econScrewsModule`
+(`prototype/src/econScrews.ts`, REFP-18) и `forcedMarchModule`
+(`prototype/src/forcedMarch.ts`, REFP-16).
+
+- **`fleet.instantRepair {fleetId}`** — мгновенный топ-ап корпуса ВСЕХ стеков
+  (корабли + десант) за кредиты, из любого места («золотой ремонт»). Коды:
+  `E_BAD_PAYLOAD, E_NO_FLEET, E_IN_BATTLE, E_NO_PLAYER, E_NOTHING_TO_REPAIR,
+  E_NO_FUNDS`. Событие `fleet.instantRepaired`.
+- **`fleet.repair {fleetId}`** — тот же топ-ап, но за metal и ТОЛЬКО у своего дока
+  (`fleetAtOwnDock` — стоит на месте над своим миром, здание с `shipRepair > 0`
+  живо). Коды те же + `E_NO_DOCK`. Событие `fleet.repaired`.
+  `missingHull`/`instantRepairCost`/`dockRepairCost`/`fleetAtOwnDock` живут в
+  `util/repair.ts` (утилита, не модуль — «модули не импортируют друг друга»,
+  инвариант #3), общие для обоих действий.
+- **`fleet.forcemarch {fleetId, on}`** — взводит/снимает флаг форс-марша: пока
+  флот В ПУТИ и флаг взведён, `fleet.speed`-хук множит скорость на `×1.5`, а
+  `time.advanced` начисляет износ корпуса `5%` max-hp в игровой час (последняя
+  единица корпуса не гасится — стек не исчезает от одного форс-марша); флаг
+  снимается сам на `fleet.arrived`. Коды: `E_BAD_PAYLOAD, E_NO_FLEET`.
+- Новые поля `GameState`: `forcedMarch?: Record<FleetId, true>` (тот же паттерн,
+  что `autoAssault`); `state/visibility.ts` уже заранее знала стричь `forcedMarch`
+  как приватное намерение владельца флота (заготовлено вместе с `orders`/
+  `autoAssault`/`patrols`) — правка не потребовалась.
+- Own-key `ownFleet` (A06/A08) — отравленный id вроде `__proto__` читается как
+  отсутствие флота, тот же паттерн, что `fleetOps`/`standingOrders`.
+
 ### victory (`victory`) — победа и счёт
 
 `victoryModule` слушает `time.advanced`, `planet.captured`, `fleet.destroyed`,
@@ -669,6 +816,23 @@ XP в durable `CommanderStore.creditMatch` — **идемпотентно по m
 «Смотреть доску». Мир замораживается (соло-симуляция стоит, пока оверлей активен),
 `xpAwarded` метит конец обработанным (не открывается повторно над хабом), сброс — на
 свежем матче / реджойне. Дев-хук `__vdFx.endMatch('win'|'lose'|'draw')` под `?dev`.
+**Профиль командира (main-menu.md §4.2, первый срез):** `MetaState` расширен карьерными
+счётчиками `stats: MetaStats` (matches/wins/placeSum+placed/streak/bestStreak/score —
+суммы, не средние; парсер чинит невозможные пары: wins ≤ matches, средн. место ≥ 1;
+блоб без `stats` читается как свежая карьера с сохранённым XP). Копятся в `checkEnd`
+за тем же once-per-match маркером, что и XP; **место берётся из авторитетного
+`match.rewards[ME].place`** (ядро, ранжирование 1224), матч без него (дев-хук)
+считается, но среднее не искажает. Экран `#profile` — полноэкранный оверлей с двумя
+дверями: шапка хаба (`.hub-who`) и кнопка «Досье командира» во внутриматчевой карточке
+(`.pc-dossier` — матчевое досье и карьерное не смешаны, переход в один тап). Показывает:
+аватар-букву, ник, «Корпорация · Лига» (лига — косметическая полоса от уровня,
+`leagueKey`, силы не даёт), капсулу Суверенов ЗОЛОТОМ (#ffd45e — канон `dl-donate`),
+6 stat-плиток (матчи/winrate/ср. место/влияние корпы/очки сезона/серия; недоступное —
+«—», не ноль) и витрину медалей (cache-first по образцу арсенала: localStorage
+`vd.medals.<ник>` + фоновый `GET /medals` + `/medals/me`; прото-хост `/medals/*` не
+монтирует — витрина честно пустая с подсказкой). Ключи `profile.*`/`card.dossier` в
+обеих локалях; +15 тестов меты (recordMatch/winRate/averagePlace/leagueKey/ремонт
+счётчиков). `nfmt` переведён в hoisted function (тот же TDZ-класс, что `httpBase`).
 
 **Счёт — data-driven, только территория** (GDD §8.1). База очков узла задаётся его
 **видом** (`sectorKinds[kind].scoreValue`): **планета — 50** (приз), любой другой вид —
@@ -803,6 +967,9 @@ params{bonus, radius}}`, хуки — enum `fleet.speed|combat.damage` (fail-clo
   активные раскрытия **только своих** героев (per-viewer) и поднимает полный identify
   на миры в `radius` от `center`, пока `until > state.time` — раскрытие не течёт
   сопернику; кривой reveal (0-радиус/0-длит.) → `E_BAD_EFFECT`; событие `hero.revealed`.
+  Окна `until` обоих эффектов считаются через `hoursToMs(ctx, durationHours)` — сжатие
+  timeScale, как у всех остальных геройских длительностей (фикс 2026-07-30: было голое
+  `MS_PER_HOUR` — на сжатом матче аура переживала бы собственный кулдаун).
   Эффекты приходят добавлением провайдера, ядро/диспетчер не трогаются — трилогия
   recall/aura/reveal закрывает все не-встроенные эффекты (спавн-маркеры не кастуются).
   **Кулдаун-ключи**: встроенные типы делят ключ с legacy (`path`/`annihilate`) — generic
@@ -826,8 +993,10 @@ type, target?}`. Payload-схема `hero.ability` добавлена в гей�
 кораблю; без территории остаётся мёртв (`Hero.alive`). Развёрнут — **главный** (градация
 `main`) герой ростера; имя (`Hero.name`) — ник игрока. В прототипе сидируется в стартовый
 флот со своим лоадаутом, `home` = столица (на старте — родной мир); `capital.designate`
-перенацеливает `home` героев владельца на новую столицу. Развёртывание **остальных**
-героев ростера отдельными кораблями — следующий кирпич.
+перенацеливает `home` героев владельца на новую столицу — есть и в ядре
+(`modules/capital.ts`, `capitalModule`, порт прототипного `capital.ts`/REFP-14), и в
+прототипе. Развёртывание **остальных** героев ростера отдельными кораблями — следующий
+кирпич.
 
 Герой **приватен**: `visibleState` отдаёт игроку только его собственного (позиция +
 кулдауны), чужих вырезает; `tempLanes` остаются — это публичная топология (реальные
@@ -893,7 +1062,7 @@ ad-hoc запрос «видим ли объект на identify-уровне» 
 экран меню (Этап 4), персистентность меты + `MatchStore.list` (Postgres уже под это
 индексирован), лобби/создание матча (MM-1.1).
 
-## 6. Данные (`data/*.json`, версия `0.1.2`)
+## 6. Данные (`data/*.json`, версия `0.1.3`)
 
 - **resources:** `credits` (деньги), `metal`, `food`, `energy`, `microelectronics` —
   внутриматчевый набор из 5. Торгуются на сессионной бирже (модуль `market`).
@@ -907,7 +1076,7 @@ drop_infantry, tank(cargoSize 3), hero, fighter_squadron, strike_carrier` (10 ю
   Щиты (аблятивные) у боевых кораблей: cruiser 15, dropship 12, hero 40.
 - **buildings** (`BuildingDef`): `cost, buildTimeHours, produces, hp,
 defenseBonus, upgrades[{…}], traits, scoreValue, radarRange, healRate, shipRepair`. Есть: `mine_t1, mine_t2,
-shipyard, biomass_pit, barracks, spaceport, radar, fort, metal_station, power_plant, fabricator`
+shipyard, biomass_pit, barracks, spaceport, radar, fort, orbital_aa, hospital, metal_station, power_plant, fabricator`
   (форт — 3 уровня: HP 35→50→65, defenseBonus 0.35→0.50→0.65; **радар — 3 уровня**: `radarRange`
   180→300→420 (расстояние), HP 18→26→34). `radarRange` теперь **уровневый** (`BuildingLevelSchema`),
   `visibleState` читает его через `buildingLevel(def, level)`. `scoreValue`: fort 20·уровень,
@@ -919,7 +1088,10 @@ shipyard, biomass_pit, barracks, spaceport, radar, fort, metal_station, power_pl
   (кроме `credits` — валюта/сток) есть хотя бы одно здание-производитель; экономика
   начисляет любой `produces`-ресурс агностично (движок не трогался). Ростеры
   `sectorKinds`: реактор — планета/астероид/туманность/`void_station`, фабрикатор —
-  планета/`void_station`. Referential-integrity тест следит, что любой `produces`/`cost`/
+  планета/`void_station`; `orbital_aa` и `hospital` добавлены в ростер `planet`
+  (0.1.3 — до этого оба были непостроимы нигде: не входили НИ в один
+  `allowedBuildings`, мёртвый контент при активном `E_WRONG_SECTOR`).
+  Referential-integrity тест следит, что любой `produces`/`cost`/
   `upkeep`-ресурс контента есть в `resources`.
 - **sectors:** `empty_space(+скорость), asteroid_field(−скорость/+живучесть/score 5),
 nebula(score 3)`. **planetTypes** дают `scoreValue` (terran 40, oceanic 35,
@@ -941,14 +1113,29 @@ grants}`), `heroFittings.json` (`{statMods, grants, cost}`). Движок ПОЛ
   `hero.ability`/`hero.spawn`/`hero.skill.unlock`/`hero.fit` + пассивки на хуках +
   пред-матч ростер (`SlotAssignment.heroes`) — см. §5 hero-модуль. Referential-integrity
   тесты связывают все каталоги; загрузчик собирает 5 фрагментов.
+- **Ещё два фрагмента бандла:** `modules.json` (6 корабельных модулей: `cargo_bay`,
+  `radar_module`, `ion_engine`, `targeting_array`, `ablative_plating`, `shield_booster` —
+  `ModuleDefSchema`; ядро читает их живьём в `util/loadout.ts`, инлайн-каталог прототипа
+  §7 их ЗЕРКАЛИТ) и `rewards.json` (XP/место по итогам — `RewardsDefSchema`, см. раздел
+  наград SES-2). Оба — обычные строки `composeGameDataBundle` (`data/loadGameData.ts`),
+  то есть проходят `parseGameData` вместе с остальным контентом.
+- **Каталоги ВНЕ ядрового бандла (только сервер):** `medals.json` (достижения — свой
+  fail-secure парсер `medalCatalog.ts`, см. §8), `dropTables.json` (дроп-таблицы лута
+  после матча: веса по месту, pity-счётчик, salvage) и `starterArsenal.json` (стартовый
+  набор корпусов/модулей для нового аккаунта) — последние два читает и валидирует против
+  уже собранного `GameData` сам сервер (`scenario.ts`: `loadDropTables`/
+  `loadStarterArsenal`, `E_INVALID_DROP_TABLES`/`E_INVALID_STARTER_ARSENAL` на кривой
+  форме). В `GameData` не входят.
 
 ## 7. Прототип (`prototype/`)
 
-**Локализация (LOC-1 готов, LOC-2 в работе).** Текста для игрока в коде НЕТ — есть ключ:
+**Локализация (LOC-1…LOC-5 закрыты).** Текста для игрока в коде НЕТ — есть ключ:
 `t('err.no-capacity')`, `tData('Metal Mine')`. Сам текст живёт в корневой
 `/localization` (одна локаль = один файл, плоская карта `ключ → текст`); формат ключа
 — `домен.сущность.аспект` (точки — иерархия, kebab-case внутри сегмента). Полное
-правило — в корневом `CLAUDE.md` §«Локализация». Порядок поиска в `prototype/src/i18n.ts`:
+правило — в корневом `CLAUDE.md` §«Локализация». Рантайм ОДИН на прототип и клиент —
+`localization/runtime.ts` (LOC-5 снял вторую копию, `packages/client/src/i18n.ts`).
+Порядок поиска в нём:
 выбранная локаль → **русский как источник** (непереведённый ключ виден по-русски, а не
 как голый ключ) → сам ключ (заметная опечатка). `tData()` строит ключ детерминированным
 слагом `dataKey()`, поэтому таблицы «имя данных → ключ» нет. На ключи переведены:
@@ -968,18 +1155,74 @@ grants}`), `heroFittings.json` (`{statMods, grants, cost}`). Движок ПОЛ
   гарнизона, характеристики флота и дивизии) и `codex.*` (строки характеристик карточки,
   теги, `codex.hub.*` справочника ONB-4, `codex.term.*` статей глоссария); статьи
   глоссария не держат копию текста в коде — `GlossaryArticle` в `codexIndex.ts` отдаёт
-  `titleKey`/`bodyKey` (третий домен LOC-2).
+  `titleKey`/`bodyKey` (третий домен LOC-2);
+- **онбординг** (ONB-1/2/3/5/7) — `onb.*`: туры-подсказки (`onb.tour.hud.*` /
+  `onb.tour.first.*` + обвязка в `spotlightDom.ts`), карточки первого контакта
+  (`onb.intro.*`), цели первой сессии (`onb.goal.*`), сводка возвращения
+  (`onb.recap.*`). Четыре чистых модуля с копией (`intros.ts`, `firstGoals.ts`,
+  `onboardingTour.ts`, `firstMatchTour.ts`) отдают ключи, а не текст (четвёртый
+  домен LOC-2);
+- **командная панель флота** (`renderCmdBar`) — `cmd.*`: приказы парами «подпись +
+  подсказка», режим огня артиллерии, каст способности героя (пятый домен LOC-2);
+- **экран настроек** — `settings.*`: интерфейс, цвета сторон с палитрой под
+  цветослепоту, графика (шестой домен LOC-2);
+- **кабинет корпорации и войны альянсов** (AVA-C1/C2) — `corp.*`: состав и заявки,
+  готовность, полный жизненный цикл вызова AvA, лента и история (седьмой домен LOC-2);
+- **журнал событий матча** — `log.*` (бой, технологии, вахта Хранителя, шпионаж,
+  захват, дипломатия, стройка, флот, биржа) и `war.confirm.*` (диалог объявления
+  войны) (восьмой домен LOC-2);
+- **штаб героев** — `hero.hq.*` / `hero.tree.*` / `hero.abil.*` / `hero.fit.*`:
+  состав, дерево навыков, способности, фиттинги (девятый домен LOC-2);
+- **аккаунты и браузер матчей** (SES-2.5) — `acc.*` (вход, регистрация, сессия,
+  переподключение) и `browser.*` (карточка матча в ленте и её действия)
+  (десятый домен LOC-2);
+- **переписка и шпионаж** (вкладки окна дипломатии) — `chat.*`, `spy.*` и `diplo.*`
+  (окно, вкладки, фильтр и сортировка ростера) (одиннадцатый домен LOC-2);
+- **«Верфь»** — `yard.*`: корпус и типизированные слоты под модули, стоимость и
+  заказ, конструктор дивизий (двенадцатый домен LOC-2);
+- **дерево технологий** (TT-3.1) — `tech.*`: требования узла, рельса дней, состояния
+  и действия (тринадцатый домен LOC-2);
+- **«Хранитель»** — `steward.*`: позы, журнал вахты, гейт неизученного протокола
+  (четырнадцатый домен LOC-2);
+- **коммуникации** — `chat.win.*` (плавающее окно чата), `comms.*` (меню связи) и
+  `ping.*` (композер меток провинции) (пятнадцатый домен LOC-2);
+- **биржа, конец матча и карточка игрока** — `market.*`, `end.*`, `card.*`
+  (шестнадцатый домен LOC-2);
+- **весь остальной интерфейс матча и хаба** — `threat.*`, `queue.*`, `div.*`,
+  `cargo.*`, `ai.*`, `map.*`, `split.*`, `hint.*`, `meta.*`, `arsenal.*`, `auth.*`,
+  `setup.*`, `scipick.*`, `hud.*`, `net.*`, `back.*`, `tgt.*`, `upd.*`, `sandbox.*`,
+  `fmt.*` (финишный проход LOC-2);
+- **таблицы-справочники и игровой каталог** — подписи, уходящие в `t()` переменной:
+  `tech.group/fx.*`, `hero.branch/hook/arch.*`, `yard.tab/slot.*`, `res.of.*`,
+  `stat.*`, `callsign.*`, `arsenal.*`, `form.*`, `corp.tab/role/audit.*`,
+  `meta.branch/node.*`, `fleet.size.*`, `ground.officer.*`, `sandbox.res/tog.*`, а
+  также весь каталог `prototypeData.ts` — `tech.node.*`, `sci.*`, `faction.*`,
+  `hero.unit/ability/passive/tree/fit.*` (закрытие LOC-2).
 
-Итого **590 ключей**. Статичный узел в разметке ПУСТ, ключ стоит в ЗНАЧЕНИИ атрибута
+Итого **1574 ключа**. Записи в локалях разложены по доменным секциям и отсортированы
+по ключу внутри каждой. Таблицы-справочники прототипа и игровой каталог
+(`prototypeData.ts`) держат В ЗНАЧЕНИИ ключ, а не русский текст — их подписи уходят в
+`t()` переменной, и раньше именно там английский пропадал незаметно для гейта. Имена
+игровых ДАННЫХ (модули, фитинги, здания, юниты) остаются английскими: `tData()` строит
+из них слаг `dataKey()`, а он вырезает всё кроме `[a-z0-9]`, поэтому русское имя
+схлопнулось бы в ключ `data.` и перевод стал бы недостижим.
+
+Статичный узел в разметке ПУСТ, ключ стоит в ЗНАЧЕНИИ атрибута
 (`data-i18n="hub.play"`, аналогично `-title`/`-ph`/`-aria`), и `localizeStaticDom()`
 проставляет текст на старте — русская формулировка физически не может разъехаться с
-локалью. Оставшиеся **756** вызовов (`main.ts` 742, `sandbox.ts` 10,
-`spotlightDom.ts` 4) ещё держит **мост** `/localization/legacy/en.ts` (старый msgid =
-русская строка, 892 записи); мост только сокращается, добавлять в него нельзя —
-домиграция это кирпич `LOC-2`. Гейт — `prototype/src/i18n.test.ts` (9 тестов: паритет
-ru/en, ключ из кода заведён, ключ локали не осиротел, в EN нет кириллицы, у каждого
-юнита есть имя, статичная разметка на ключах и без старой формы, статьи глоссария
-заведены ключами, мост не растёт).
+локалью. **Мост совместимости снят** (`/localization/legacy/` удалён вместе с веткой в
+рантайме): русского текста в коде прототипа нет, `t()`/`tData()` принимают только
+ключи, промах виден как сам ключ. Гейт — `prototype/src/i18n.test.ts` (11 тестов:
+паритет ru/en, в исходнике локали нет дублей ключей, ключи из полей игрового каталога
+заведены, ключ из кода заведён, ключ локали не осиротел, в EN нет кириллицы, у каждого
+юнита есть имя, у каждого ИМЕНИ игровых данных есть ключ `data.*`, статичная разметка
+на ключах и без старой формы, таблицы копии отдают ключи, и — главный инвариант этапа 2
+— в коде нет русского текста); поведение самого рантайма отдельно держит
+`localization/runtime.test.ts`. Тест сирот
+ищет ключ В КАВЫЧКАХ: подстрочный поиск считал живым любой ключ, чей текст встречается
+внутри другого литерала, и именно так мост держал десятки мёртвых записей. Не
+локализованы намеренно: `testmode.ts` (дев-экран), поисковые алиасы `codexIndex.ts`
+(двуязычны по назначению) и `CHAT_BADWORDS`.
 
 `pnpm run prototype` → esbuild собирает всё (ядро + zod + UI) в **два** self-contained
 HTML (открываются с диска, без сервера): `dist/void-dominion.html` — дев-клиент
@@ -999,20 +1242,24 @@ APK собирается в двух лейнах (matrix в `android.yml`): д�
 (`void-dominion-player.apk`, свой `com.voiddominion.player` — ставится рядом с
 дев-версией); каждый APK автообновляется из своего лейна.
 
-- **Реальное ядро** в браузере: `createKernel([sector, planetType, tax, faction, economy,
-movement, hero, heroEffects, orbital, combat, artillery, intercept, captureOnArrival,
-construction, technology, steward, army, victory, fleetLaunch, diplomacy, espionage,
-botDiplomacy, market, division, capital, standingOrders, effects])` (27 модулей), тик в реальном
+- **Реальное ядро** в браузере: `createKernel([sector, planetType, tax, faction, hunger,
+economy, movement, hero, heroEffects, orbital, combat, artillery, intercept, captureOnArrival,
+construction, arsenalSync, technology, steward, army, victory, fleetLaunch, diplomacy, espionage,
+botDiplomacy, market, division, capital, standingOrders, forcedMarch, instantRepair, econScrews,
+effects])` (32 модуля), тик в реальном
   времени (скорость ⏸/▶/⏩). Концовка матча — из авторитетного `state.match` (`victoryModule`),
   полноэкранный экран итогов победы/поражения/ничьи (счёт+место+статы+XP, рематч; см.
   раздел victory) — а не хардкод по узлам.
 - **Фракции (H3):** setup-экран несёт **пикер из 4 лор-домов** (`data.factions`:
-  blue «Azure Compact» +12% экономика · red «Crimson Hegemony» +10% урон · amber
+  azure «Azure Compact» +12% экономика · crimson «Crimson Hegemony» +10% урон · amber
   «Amber Concord» +15% скорость флотов · violet «Violet Ascendancy» +5%/+5%) — пока
   фракция это **чисто пассивный бонус к экономике или юнитам**, применяемый ядровым
   `factionModule` через те же хуки, что и технологии. Человек выбирает дом, ИИ-места
   разбирают оставшиеся (имя места = имя дома; цвет остаётся за местом); карточка
-  игрока показывает дом + пассив. Тесты `factions.test.ts` (3).
+  игрока показывает дом + пассив. Тесты `factions.test.ts` (4). **Баг-фикс 2026-07-30:**
+  каталог прототипа держал ключи `blue`/`red`, а места раздавали `azure`/`crimson` —
+  `factionModule` читает `data.factions[id] ?? 0`, и оба дома молча играли БЕЗ пассивок;
+  ключи переименованы в канонические, паритет «место ↔ каталог» закреплён тестом.
 - **Командный бой (AVA-0, первый шаг к AvA без мета-слоя):** тумблер «⚔ Командный бой» в
   setup + A/B-чипы на местах (ты залочен в A, ИИ-места переключаются). При включении
   `SeatConfig.team` едет в `newGame`, который сеет дипломатию по стороне: **одна сторона
@@ -1097,8 +1344,12 @@ botDiplomacy, market, division, capital, standingOrders, effects])` (27 моду
   (заполняет ширину, панится по вертикали). Победа по очкам — **1100**
   (`SCORE_LIMIT`, прототип переопределяет дефолт ядра 600). Джиттер-решётка, RNG-линки и границы канваса выводятся из констант
   `FIELD`/`*_CELLS` — карта переформировывается правкой списков клеток.
-- **Прототип-модуль `fleet.launch {planetId}`** (`fleetLaunch.ts`, REFP-10, не в ядре) —
-  поднимает флот из гарнизона (корабли→`units`, наземные→`landing`). Кандидат в ядро.
+- **`fleet.launch {planetId}`** (прототип: `fleetLaunch.ts`, REFP-10) — поднимает флот из
+  гарнизона (корабли→`units`, наземные→`landing`). **В ядре тоже есть** —
+  `packages/shared-core/src/modules/fleetOps.ts` (`fleetOpsModule`), закрывает разрыв
+  между «построено» (`constructionModule` кладёт в гарнизон) и «играбельно» (ничего не
+  выводило корабль из гарнизона). Два независимых, но идентичных по поведению
+  реализации (прото исторически впереди, порт в ядро — этим заходом).
 - **UI — тактический пульт (DEFCON-вайб):** векторно-каркасный стиль на чёрном.
   - **Карта = радарный планшет:** панорамируемая координатная сетка (двигается/
     масштабируется с камерой), редкие звёзды-тики, лёгкие скан-линии (CSS). Фон усилен мягкими туманностями и twinkle-звёздами; jump lanes
@@ -1111,10 +1362,17 @@ botDiplomacy, market, division, capital, standingOrders, effects])` (27 моду
     меток N/F); у летящих рисуется **путь** (анимированная dash-полилиния по хопам), бомбардировка —
     beam. Бой — многокольцевая пульсирующая красная волна. Render loop кэширует
     HUD/log DOM-строки и отсекает offscreen планеты/флоты.
-  - **HUD минималистичный, моноширинный, неоновые тонкие линии:** верхняя планка
-    (callsign-ромб + читалки ресурсов `MTL/CRD/WLD/FLT` с `+N/h` из `netIncome` на всю
-    ширину); кнопки скорости вынесены в **отдельный горизонтальный бар**; левая
-    рейка-иконки, нижняя карточка-досье, терминальный лог `>`. **Командный бар флота**
+  - **HUD минималистичный, моноширинный, неоновые тонкие линии:** верхний бар в
+    **два ряда** (`--tbh`; зависимые отступы `#devline`/`#fps`/`#toasts`/`#side`
+    висят на переменной): ряд 1 — «‹» (зеркало аппаратного Back: закрыть верхний
+    слой / двойное «выход из матча»), круглый аватар-эмблема (тап → досье игрока),
+    позывной + живое «N-е из M» (формула ранжира энд-скрина по live-очкам), чип
+    «✦ счёт/лимит» в зазоре (тап → разбор победных очков), справа карточка «День N»
+    с обратным отсчётом `H:MM:SS` до след. дня; ряд 2 — капсулы 5 ресурсов с `±N/ч`
+    из `netIncome` (тап → сводка; дефицит/пусто — как раньше). Суверены ◆ — уровнем
+    ниже, на статус-строке (игровые часы + золото). Кнопки скорости вынесены в
+    **отдельный горизонтальный бар**; левая рейка-иконки, нижняя карточка-досье,
+    терминальный лог `>`. **Командный бар флота**
     (горизонтальный, появляется по выбору флота): **Move** (взводит приказ → тап по миру
     отдаёт его — тап по узлу ИЛИ **по дороге** (`moveFleetEdge`/`nearestLanePoint`:
     армия выходит маршрутом на лейн и встаёт в точке; превью — путь + ETA-пип)),
@@ -1149,7 +1407,8 @@ botDiplomacy, market, division, capital, standingOrders, effects])` (27 моду
   кратко логируются (`✖ code`).
 - **Стопгап (сужен):** авто-штурм (`autoEngage`) остался **только для ИИ**
   (вражеские флоты), чтобы давление сохранялось; флоты игрока теперь полностью
-  ручные. `fleet.launch` — пока прототип-модуль.
+  ручные. `fleet.launch`/`merge`/`split`/`engage` — есть и в ядре (`fleetOpsModule`), и
+  в прототипе (`fleetLaunch.ts`).
 - **Эскадрильи-авианосцы** (squadrons-roadmap SQ-1.1→4.1): `fighter_squadron` +
   `strike_carrier` строятся; носитель отделяет крыло в отдельный быстрый флот через
   `fleet.split` (кнопка «Запустить эскадрилью»); дерётся обычным боем, `orbital_aa`
@@ -1214,18 +1473,27 @@ botDiplomacy, market, division, capital, standingOrders, effects])` (27 моду
   скрывается на конце гайд-тура и выходе в меню. RU/EN. Проверено вживую (headless-бут):
   чеклист появляется 0/4 в гайд-матче (без ложных тиков — baseline корректен), сворачивается,
   прячется на выходе. Только онбординг-сессия (DoD «чеклист скрыт после онбординга»).
-- **Async-модель + дневной дайджест (ONB-5, клиент-часть)** — учим самый трудный концепт
-  жанра (мир идёт офлайн) в два хода. (1) **Интро задержки:** первый приказ на курс
-  (`fleet.move`) → разовая карточка «мир идёт без тебя» (через ONB-3-механизм `asyncDelay`,
-  вне гайд-тура). (2) **Сводка возвращения:** чистый `src/recap.ts` (`buildRecap(events,
-  since)` → `{items (attention-first), attention, count}`, `isHighEvent` по emoji-маркерам
-  ⚔🚩☠💥 — язык-независимо) — 5 тестов. main.ts: `note()` зеркалит структурный `eventLog`
-  (bounded 80, чистится на новый матч); оверлей `#recap` (z-57) группирует «Требуют внимания»
-  (жёлтый) + «Пока тебя не было», тап-по-объекту → `jumpToPing`; авто-показ на `visibilitychange`
-  (фон-таб догоняет мир на возврате — реальный «пока тебя не было»; порог 15с) + ручной вход
-  «🛰» в окне сводок. RU/EN. Проверено вживую (headless-бут): дайджест открывается из окна
-  сводок, ловит события матча, закрывается. _Пуш-уведомления и серверный дайджест-хук — за
-  зависимостью (PWA push); `buildRecap` уже server-ready для этого шва._
+- **Async-модель + дневной дайджест (ONB-5)** — учим самый трудный концепт жанра (мир идёт
+  офлайн) в два хода. (1) **Интро задержки:** первый приказ на курс (`fleet.move`) → разовая
+  карточка «мир идёт без тебя» (через ONB-3-механизм `asyncDelay`, вне гайд-тура). (2)
+  **Сводка возвращения:** чистый `buildRecap(events, since)` → `{items (attention-first),
+  attention, count}`, `isHighEvent` по emoji-маркерам ⚔🚩☠💥 — язык-независимо; логика теперь
+  живёт в `@void/shared-core` (`util/recap.ts`), `prototype/src/recap.ts` — тонкий re-export
+  (клиент и сервер строят дайджест по одной функции). main.ts: `note()` зеркалит структурный
+  `eventLog` (bounded 80, чистится на новый матч); оверлей `#recap` (z-57) группирует «Требуют
+  внимания» (жёлтый) + «Пока тебя не было», тап-по-объекту → `jumpToPing`; авто-показ на
+  `visibilitychange` (фон-таб догоняет мир на возврате — реальный «пока тебя не было»; порог
+  15с) + ручной вход «🛰» в окне сводок. RU/EN. Проверено вживую (headless-бут): дайджест
+  открывается из окна сводок, ловит события матча, закрывается. **Серверная сторона push**
+  (`packages/server/src/push.ts`): `vapidFromEnv`/`configureWebPush` (VAPID из `VAPID_PUBLIC_KEY`/
+  `VAPID_PRIVATE_KEY`/`VAPID_SUBJECT`, отсутствие → пуш просто выключен), `digestPushPayload`
+  (title = текст верхнего `RecapItem` как есть — уже локализован по своему контракту, никакой
+  синтезированной прозы; остальные события — только `+N` числом), `sendPush` через `web-push`
+  (404/410 → `{gone:true}`, вызывающий обязан снести подписку). `PushStore` (Memory/Postgres,
+  таблица `push_subscriptions`, одна подписка на аккаунт) + `pushApi.ts` (`GET /push/key`,
+  `POST /push/subscribe`, `POST /push/unsubscribe`, session-gated как остальные write-роуты) —
+  14 тестов. _Осталось: сам триггер (когда слать — online/offline по аккаунту, cooldown,
+  привязка к матчу) и клиентский service worker + подписка на push из UI._
 - **Just-in-time интро механик (ONB-3)** — при **первом** контакте с продвинутой механикой —
   разовая интро-карточка, потом никогда: чистый `src/intros.ts` (`INTROS` — 11 карточек
   `{id,title,body,trigger}`: 5 панельных из готовой копии технологии/рынок/Хранитель/верфь/
@@ -1434,8 +1702,9 @@ Memory + Postgres `ava_feed`) — только публичные факты: и
 > Компактный агрегат; помашинная матрица — [`readiness.md`](readiness.md),
 > запуск для живых игроков — [`launch-runbook.md`](launch-runbook.md).
 
-**✅ Этап 1 (ядро) — готово целиком:** 24 модуля на микроядре (шина/хуки/манифест,
-seeded RNG + golden, `advanceTo`): экономика + рынок, карта/движение/перехват, типы
+**✅ Этап 1 (ядро) — готово целиком:** 33 модуля на микроядре (шина/хуки/манифест,
+seeded RNG + golden, `advanceTo`; список — §3, разбор — §5, сервер собирает из них
+`DEV_MODULES` — 29): экономика + рынок, карта/движение/перехват, типы
 секторов и планет, бой (мелэ + орбитальное ПВО/бомбардировка + артиллерия) с двухфазным
 захватом, здания + станции, флот ⊕ армия + транспорт, технологии + учёные, фракции,
 дипломатия (стойки + consent-офферы), шпионаж + контрразведка, герои, «Хранитель»,
@@ -1467,8 +1736,11 @@ ONB-1/ONB-2, следующие кирпичи (`docs/onboarding-roadmap.md`).
 
 - Прототип: орбитальные контролы (bombard, assault, load/unload) теперь в
   UI игрока; орбита одна (флот встаёт на неё по прибытии); `autoEngage` остался
-  только для ИИ; ПВО считается в ядре, но отдельной индикации в UI пока нет;
-  `fleet.launch` — пока прототип-модуль.
+  только для ИИ; ПВО считается в ядре, но отдельной индикации в UI пока нет.
+- ✅ ~~`fleet.launch` — пока прототип-модуль~~ — **портирован**: `fleet.launch`/
+  `merge`/`split`/`engage` теперь есть и в ядре (`packages/shared-core/src/modules/
+  fleetOps.ts`, `fleetOpsModule`, в `DEV_MODULES`), закрывая разрыв между «построено»
+  и «играбельно» на живом мультиплеерном сервере.
 - ✅ ~~Бой: флот-только-десант (без кораблей) выигрывает наземный бой, но не
   захватывает~~ — **исправлено**: `capturePlanet` вызывается до `releaseOrDestroyFleet`,
   десант депонируется в гарнизон; fleet без кораблей уничтожается после захвата.
@@ -1485,9 +1757,23 @@ pnpm test            # vitest
 pnpm run prototype   # собрать prototype/dist/void-dominion{,-player}.html
 ```
 
+Гейт зеркалится в CI (`ci.yml`), рядом идут `security.yml` (набор сканеров; блокирующие
+— Semgrep, Gitleaks, OSV, Trivy fs/image; с SEC-10 ещё и еженедельный ре-скан `main` по
+крону — прод крутит пиненный образ дольше, чем живут ленты CVE), `android.yml` (APK) и
+`image.yml` (SEC-13: сборка → блокирующий Trivy → GHCR → подпись cosign по дайджесту).
+Прод-деплой из подписанного образа: `deploy/verify-image.sh` + оверлей
+`docker-compose.release.yml` (runbook — `deploy/README.md`, разбор слоёв —
+`docs/security/pipeline.md`).
+
 Тесты лежат рядом с кодом (`*.test.ts`) — и в пакетах, и в `prototype/src` (Vitest
-их видит). Прототип исключён из ESLint/tsc-скоупа (свой esbuild), но это уже НЕ
-throwaway — это играбельный клиент игроков. Разработка — на фиче-ветке, PR (draft).
+их видит). **Прототип типизируется в гейте (REFM-0):** `prototype/tsconfig.json`
+(полный `strict` + `noUncheckedIndexedAccess`, DOM-lib) накрывает `src/**` +
+`netserver.ts` + `/localization`, `pnpm run typecheck` гоняет его после workspace-пакетов
+— 91 накопившаяся ошибка починена по-настоящему (в т.ч. TDZ-класс `authMode`,
+расхождение словаря `ChainStep`, битые l10n-фолбэки юнитов). **ESLint зона тоже прошла (REFM-0.1)** — `prototype/**` больше не в `ignores`,
+правила общие с пакетами, единственная настройка — Node-глобалы для `*.mjs`-скриптов
+зоны. Это уже НЕ throwaway — это играбельный клиент игроков.
+Разработка — на фиче-ветке, PR (draft).
 
 Поверх юнитов — **property/fuzz-слой ядра** (fast-check, playtest-hardening FUZZ-1…4,
 SD-7.3 ✅): test-only `shared-core/src/testkit/arbitraries.ts` (генераторы действий по

@@ -61,7 +61,7 @@
 | **A02 Cryptographic Failures** | Secrets/Crypto | хорошо | Gitleaks + TruffleHog (два движка секретов), Trivy secret | ★★★★☆ — двойной секрет-скан; но нет проверки crypto-алгоритмов |
 | **A03 Injection** | SAST | хорошо | Semgrep (p/typescript + custom SQLi/innerHTML), CodeQL (dataflow), Trivy misconfig | ★★★★☆ — Semgrep+CodeQL перекрытие; custom правила под инварианты |
 | **A04 Insecure Design** | Architecture | частично | zizmor (workflow design), Scorecard (posture), custom Semgrep (детерминизм) | ★★★☆☆ — нет threat-modeling автоматизации; инварианты ядра — кастомные правила |
-| **A05 Security Misconfiguration** | IaC | хорошо | Trivy fs (misconfig), Trivy image, zizmor (workflow config) | ★★★★☆ — Dockerfile/compose/yaml покрыты |
+| **A05 Security Misconfiguration** | IaC | хорошо | Trivy fs (misconfig), Trivy image, zizmor (workflow config) | ★★★★☆ — Dockerfile/yaml покрыты, **compose — нет** (см. поправку под таблицей) |
 | **A06 Vulnerable Components** | SCA | отлично | OSV-Scanner (блокирующий) + Trivy fs/image (vuln) + SBOM (Syft) | ★★★★★ — тройное перекрытие, блокирующее |
 | **A07 Auth Failures** | Auth | частично | ZAP (DAST baseline), CodeQL | ★★★☆☆ — нет специализированного auth-теста; ZAP baseline поверхностен |
 | **A08 Integrity Failures** | Supply chain | отлично | SHA-pinned actions, digest-pinned образы (частично), SBOM, cosign на APK, `hashGameDataBundle` (runtime) | ★★★★☆ — сильный для альфы; **но 4 образа по tag** (gap) |
@@ -70,6 +70,18 @@
 
 **Общий охват OWASP: ★★★★☆ (4/5)** — для инди-альфы это **выше среднего**.
 Слабые места: A09 (логирование), A01/A07 (authz/auth — только DAST+CodeQL).
+
+> **Поправка 2026-07-30 (SEC-12/13).** Этот отчёт — снапшот на свою дату; две строки
+> оказались завышены, исправлено по факту, а не переписыванием истории:
+>
+> - **A05.** «compose покрыт» — неверно: у Trivy misconfig нет формата Docker Compose
+>   (Dockerfile/k8s/terraform/cloudformation/helm/ARM), так что рантайм-настройки
+>   `deploy/docker-compose*.yml` не проверял никто. Хардненинг проставлен вручную,
+>   держится чек-листом в `deploy/README.md`.
+> - **A08.** К «4 образам по тегу» добавлялись `postgres`/`caddy` из `deploy/` — теперь
+>   пинены по дайджесту и сканируются джобой `trivy-deps`. Плюс closed-loop на прод:
+>   `image.yml` подписывает опубликованный образ (cosign), `deploy/verify-image.sh`
+>   проверяет подпись до старта.
 
 ---
 

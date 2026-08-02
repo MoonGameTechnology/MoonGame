@@ -22,7 +22,7 @@ export const data: GameData = parseGameData({
     // the meta_ prefix keeps them out of the research window (renderTech).
     meta_drill_speed: {
       name: 'Commander Drill: Logistics',
-      description: 'Мета-прокачка: +5% к скорости флотов.',
+      description: 'tech.node.meta-drill-speed.desc',
       branch: 'command',
       tier: 1,
       cost: {},
@@ -31,7 +31,7 @@ export const data: GameData = parseGameData({
     },
     meta_drill_combat: {
       name: 'Commander Drill: Gunnery',
-      description: 'Мета-прокачка: +5% к урону.',
+      description: 'tech.node.meta-drill-combat.desc',
       branch: 'command',
       tier: 1,
       cost: {},
@@ -40,7 +40,7 @@ export const data: GameData = parseGameData({
     },
     meta_drill_radar: {
       name: 'Commander Drill: Recon',
-      description: 'Мета-прокачка: +15% к радиусу радаров.',
+      description: 'tech.node.meta-drill-radar.desc',
       branch: 'command',
       tier: 1,
       cost: {},
@@ -49,7 +49,7 @@ export const data: GameData = parseGameData({
     },
     meta_drill_veteran: {
       name: 'Commander Drill: Veterancy',
-      description: 'Мета-прокачка: ещё +5% к скорости и урону.',
+      description: 'tech.node.meta-drill-veteran.desc',
       branch: 'command',
       tier: 1,
       cost: {},
@@ -58,7 +58,7 @@ export const data: GameData = parseGameData({
     },
     meta_industry: {
       name: 'Commander Drill: Industry',
-      description: 'Мета-прокачка: +5% к производству.',
+      description: 'tech.node.meta-industry.desc',
       branch: 'command',
       tier: 1,
       cost: {},
@@ -67,7 +67,7 @@ export const data: GameData = parseGameData({
     },
     meta_industry_2: {
       name: 'Commander Drill: Magnate',
-      description: 'Мета-прокачка: ещё +5% к производству.',
+      description: 'tech.node.meta-industry-2.desc',
       branch: 'command',
       tier: 1,
       cost: {},
@@ -76,7 +76,7 @@ export const data: GameData = parseGameData({
     },
     industrial_automation: {
       name: 'Industrial Automation',
-      description: 'Апгрейд планетарной логистики: +10% к производству.',
+      description: 'tech.node.industrial-automation.desc',
       branch: 'space',
       tier: 1,
       cost: { credits: 120, metal: 80 },
@@ -85,7 +85,7 @@ export const data: GameData = parseGameData({
     },
     orbital_logistics: {
       name: 'Orbital Logistics',
-      description: 'Стандартизация перевозок: +12% к скорости флотов.',
+      description: 'tech.node.orbital-logistics.desc',
       branch: 'space',
       tier: 1,
       cost: { credits: 160, metal: 120 },
@@ -94,7 +94,7 @@ export const data: GameData = parseGameData({
     },
     siege_doctrine: {
       name: 'Siege Doctrine',
-      description: 'Осадные расчёты дальнего боя: +8% к урону.',
+      description: 'tech.node.siege-doctrine.desc',
       branch: 'space',
       tier: 2,
       cost: { credits: 260, metal: 220, microelectronics: 40 },
@@ -105,7 +105,7 @@ export const data: GameData = parseGameData({
     },
     fortified_infrastructure: {
       name: 'Fortified Infrastructure',
-      description: 'Доктрина укреплённых миров — крепости фронтира.',
+      description: 'tech.node.fortified-infrastructure.desc',
       branch: 'ground',
       tier: 2,
       cost: { credits: 180, metal: 240 },
@@ -115,7 +115,7 @@ export const data: GameData = parseGameData({
     },
     microelectronics_fabrication: {
       name: 'Microelectronics Fabrication',
-      description: 'Орбитальные фабрики: +5% к производству.',
+      description: 'tech.node.microelectronics-fabrication.desc',
       branch: 'space',
       tier: 2,
       cost: { credits: 220, metal: 180 },
@@ -131,7 +131,7 @@ export const data: GameData = parseGameData({
     // (has_scientist — качественный доступ, не % скорости).
     deep_survey: {
       name: 'Deep-Space Survey',
-      description: 'Сети дальних сенсоров: +15% к радиусу радаров.',
+      description: 'tech.node.deep-survey.desc',
       branch: 'space',
       tier: 2,
       cost: { credits: 200, metal: 140 },
@@ -142,8 +142,7 @@ export const data: GameData = parseGameData({
     },
     void_armadas: {
       name: 'Void Armadas',
-      description:
-        'Доктрина больших соединений: +6% к урону и скорости флотов. Требует 5 своих секторов.',
+      description: 'tech.node.void-armadas.desc',
       branch: 'space',
       tier: 3,
       cost: { credits: 420, metal: 300, microelectronics: 60 },
@@ -155,7 +154,7 @@ export const data: GameData = parseGameData({
     },
     combined_arms: {
       name: 'Combined Arms',
-      description: 'Общевойсковой бой: слаженность пехоты и брони. +5% к урону.',
+      description: 'tech.node.combined-arms.desc',
       branch: 'ground',
       tier: 1,
       cost: { credits: 140, metal: 100 },
@@ -164,7 +163,7 @@ export const data: GameData = parseGameData({
     },
     garrison_networks: {
       name: 'Garrison Networks',
-      description: 'Гарнизонные сети: тыл сам себя снабжает. +5% к производству.',
+      description: 'tech.node.garrison-networks.desc',
       branch: 'ground',
       tier: 2,
       cost: { credits: 240, metal: 200 },
@@ -175,8 +174,7 @@ export const data: GameData = parseGameData({
     },
     planetary_bastions: {
       name: 'Planetary Bastions',
-      description:
-        'Планетарные бастионы: оборонная промышленность полного цикла. +8% к урону. Капстоун Маршала.',
+      description: 'tech.node.planetary-bastions.desc',
       branch: 'ground',
       tier: 3,
       cost: { credits: 480, metal: 360, microelectronics: 40 },
@@ -188,7 +186,7 @@ export const data: GameData = parseGameData({
     },
     flight_decks: {
       name: 'Flight Decks',
-      description: 'Полётные палубы: быстрый цикл вылетов. +6% к скорости флотов.',
+      description: 'tech.node.flight-decks.desc',
       branch: 'squadron',
       tier: 1,
       cost: { credits: 160, metal: 120 },
@@ -198,7 +196,7 @@ export const data: GameData = parseGameData({
     },
     strike_vectors: {
       name: 'Strike Vectors',
-      description: 'Ударные векторы: расчёт заходов эскадрилий. +8% к урону.',
+      description: 'tech.node.strike-vectors.desc',
       branch: 'squadron',
       tier: 2,
       cost: { credits: 280, metal: 220, microelectronics: 30 },
@@ -209,8 +207,7 @@ export const data: GameData = parseGameData({
     },
     ace_programs: {
       name: 'Ace Programs',
-      description:
-        'Программа асов: элитные экипажи. +6% к урону и скорости флотов. Капстоун Комэска.',
+      description: 'tech.node.ace-programs.desc',
       branch: 'squadron',
       tier: 3,
       cost: { credits: 500, metal: 380, microelectronics: 60 },
@@ -222,7 +219,7 @@ export const data: GameData = parseGameData({
     },
     guidance_arrays: {
       name: 'Guidance Arrays',
-      description: 'Массивы наведения: телеметрия дальнего рубежа. +10% к радиусу радаров.',
+      description: 'tech.node.guidance-arrays.desc',
       branch: 'missile',
       tier: 1,
       cost: { credits: 150, metal: 110 },
@@ -232,7 +229,7 @@ export const data: GameData = parseGameData({
     },
     warhead_miniaturization: {
       name: 'Warhead Miniaturization',
-      description: 'Миниатюризация БЧ: плотнее залп на тот же тоннаж. +6% к урону.',
+      description: 'tech.node.warhead-miniaturization.desc',
       branch: 'missile',
       tier: 2,
       cost: { credits: 260, metal: 240, microelectronics: 30 },
@@ -243,7 +240,7 @@ export const data: GameData = parseGameData({
     },
     saturation_barrage: {
       name: 'Saturation Barrage',
-      description: 'Насыщающий залп: перегрузка любой ПРО. +10% к урону. Капстоун Ракетчика.',
+      description: 'tech.node.saturation-barrage.desc',
       branch: 'missile',
       tier: 3,
       cost: { credits: 520, metal: 400, microelectronics: 80 },
@@ -255,7 +252,7 @@ export const data: GameData = parseGameData({
     },
     signal_corps: {
       name: 'Signal Corps',
-      description: 'Войска связи: единая картина боя. +8% к радиусу радаров.',
+      description: 'tech.node.signal-corps.desc',
       branch: 'command',
       tier: 1,
       cost: { credits: 130, metal: 90 },
@@ -264,7 +261,7 @@ export const data: GameData = parseGameData({
     },
     logistics_command: {
       name: 'Logistics Command',
-      description: 'Штаб логистики: конвои по расписанию. +5% к производству и скорости флотов.',
+      description: 'tech.node.logistics-command.desc',
       branch: 'command',
       tier: 2,
       cost: { credits: 300, metal: 220 },
@@ -278,8 +275,7 @@ export const data: GameData = parseGameData({
     // `steward` ability, which `stewardModule` requires before `steward.delegate` works.
     ai_stewardship: {
       name: 'Steward Protocol',
-      description:
-        'Автоматизация командования: доверенному ИИ можно передать место, пока вы офлайн (спите) — он держит оборону и возвращает управление к сроку. Сильная — потому открывается выбором учёного-Куратора и лишь к середине сессии (день 16).',
+      description: 'tech.node.ai-stewardship.desc',
       branch: 'command',
       tier: 3,
       cost: { credits: 400, metal: 260 },
@@ -294,34 +290,33 @@ export const data: GameData = parseGameData({
   // command-branch «Куратор» gates the Steward; «Полимат» trades a branch focus for +1 slot.
   scientists: {
     overseer: {
-      name: 'Куратор',
-      description:
-        'Лидер ветки командования (C2): доктрины автоматизации и делегирования. Открывает «Протокол Хранитель» — передачу места ИИ на время сна.',
+      name: 'sci.overseer.name',
+      description: 'sci.overseer.desc',
       branch: 'command',
     },
     void_admiral: {
-      name: 'Космоадмирал',
-      description: 'Лидер космической ветки: верфи, логистика, осадные доктрины.',
+      name: 'sci.void-admiral.name',
+      description: 'sci.void-admiral.desc',
       branch: 'space',
     },
     ground_marshal: {
-      name: 'Наземный маршал',
-      description: 'Лидер наземной ветки: крепости и оборона фронтира.',
+      name: 'sci.ground-marshal.name',
+      description: 'sci.ground-marshal.desc',
       branch: 'ground',
     },
     wing_commander: {
-      name: 'Командир крыла',
-      description: 'Лидер ветки эскадрилий: авианосные ударные крылья.',
+      name: 'sci.wing-commander.name',
+      description: 'sci.wing-commander.desc',
       branch: 'squadron',
     },
     missile_chief: {
-      name: 'Ракетный шеф',
-      description: 'Лидер ракетной ветки: дальнобойные системы.',
+      name: 'sci.missile-chief.name',
+      description: 'sci.missile-chief.desc',
       branch: 'missile',
     },
     polymath: {
-      name: 'Полимат',
-      description: 'Генералист без ветки: +1 слот исследования (2→3) вместо фокуса.',
+      name: 'sci.polymath.name',
+      description: 'sci.polymath.desc',
       slotBonus: 1,
     },
   },
@@ -477,7 +472,7 @@ export const data: GameData = parseGameData({
   // prices them; `unit.build{modules}` stamps the chosen set onto the built stack.
   modules: {
     cargo_bay: {
-      name: 'Грузовой отсек',
+      name: 'Cargo Bay',
       slot: 'utility',
       tag: 'horizontal',
       effects: { stats: { cargoCapacity: 6 } },
@@ -485,7 +480,7 @@ export const data: GameData = parseGameData({
       allowed: { domain: 'space' },
     },
     radar_module: {
-      name: 'Радар-модуль',
+      name: 'Radar Module',
       slot: 'utility',
       tag: 'horizontal',
       effects: { stats: { radarRange: 180 } },
@@ -493,7 +488,7 @@ export const data: GameData = parseGameData({
       allowed: { domain: 'space' },
     },
     ion_engine: {
-      name: 'Ионный двигатель',
+      name: 'Ion Engine',
       slot: 'utility',
       tag: 'vertical',
       effects: { stats: { speed: 2 } },
@@ -501,7 +496,7 @@ export const data: GameData = parseGameData({
       allowed: { domain: 'space' },
     },
     targeting_array: {
-      name: 'Система наведения',
+      name: 'Targeting Array',
       slot: 'weapon',
       tag: 'vertical',
       effects: { stats: { attack: 4 } },
@@ -509,7 +504,7 @@ export const data: GameData = parseGameData({
       allowed: { domain: 'space' },
     },
     ablative_plating: {
-      name: 'Броневые плиты',
+      name: 'Ablative Plating',
       slot: 'defense',
       tag: 'vertical',
       effects: { stats: { hp: 12 } },
@@ -517,7 +512,7 @@ export const data: GameData = parseGameData({
       allowed: { domain: 'space' },
     },
     shield_booster: {
-      name: 'Тяжёлый щит',
+      name: 'Shield Booster',
       slot: 'defense',
       tag: 'vertical',
       effects: { stats: { shield: 15 } },
@@ -530,25 +525,29 @@ export const data: GameData = parseGameData({
   // ядровый factionModule через те же хуки, что и технологии
   // (economy.production / fleet.speed / combat.damage). Человек выбирает дом на
   // setup-экране; ИИ-места разбирают оставшиеся.
+  // Ids MUST match the seat assignments (matchSetup.ts / main.ts SEAT_META) — the
+  // core factionModule reads `data.factions[player.faction] ?? 0`, so a mismatched
+  // id silently plays with NO passives (caught 2026-07: azure/crimson seats vs a
+  // blue/red catalog). Pinned by factions.test.ts «seat factions resolve».
   factions: {
-    blue: {
+    azure: {
       name: 'Azure Compact',
-      description: 'Торгово-промышленный договор: вся планетарная экономика даёт +12%.',
+      description: 'faction.azure.desc',
       passives: { productionBonus: 0.12 },
     },
-    red: {
+    crimson: {
       name: 'Crimson Hegemony',
-      description: 'Милитаристская гегемония: весь исходящий урон флотов и армий +10%.',
+      description: 'faction.crimson.desc',
       passives: { combatDamageBonus: 0.1 },
     },
     amber: {
       name: 'Amber Concord',
-      description: 'Кочевой конкорд логистов: флоты идут по лейнам на +15% быстрее.',
+      description: 'faction.amber.desc',
       passives: { fleetSpeedBonus: 0.15 },
     },
     violet: {
       name: 'Violet Ascendancy',
-      description: 'Универсалисты восхода: понемногу всюду — экономика +5% и урон +5%.',
+      description: 'faction.violet.desc',
       passives: { productionBonus: 0.05, combatDamageBonus: 0.05 },
     },
   },
@@ -896,9 +895,8 @@ export const data: GameData = parseGameData({
   // хватает у прототипных валют (credits/metal/energy/microelectronics).
   heroes: {
     commander: {
-      name: 'Командир',
-      description:
-        'Главный герой-флагман: командный трансгуманист, усиливает флот и открывает коридоры.',
+      name: 'hero.unit.commander.name',
+      description: 'hero.unit.commander.desc',
       branch: 'transhuman',
       ship: { unit: 'hero' },
       slots: 4,
@@ -906,8 +904,8 @@ export const data: GameData = parseGameData({
       startPassives: ['rally_beacon'],
     },
     ravager: {
-      name: 'Разрушитель',
-      description: 'Псионик-разрушитель: аннигилирует миры и вскрывает туман.',
+      name: 'hero.unit.ravager.name',
+      description: 'hero.unit.ravager.desc',
       branch: 'psionic',
       ship: { unit: 'hero' },
       slots: 3,
@@ -915,8 +913,8 @@ export const data: GameData = parseGameData({
       startPassives: [],
     },
     vanguard: {
-      name: 'Авангард',
-      description: 'Трансгуманист-манёвренник: коридоры и боевой клич для передовых флотов.',
+      name: 'hero.unit.vanguard.name',
+      description: 'hero.unit.vanguard.desc',
       branch: 'transhuman',
       ship: { unit: 'hero' },
       slots: 2,
@@ -924,8 +922,8 @@ export const data: GameData = parseGameData({
       startPassives: ['vanguard_impulse'],
     },
     warden: {
-      name: 'Страж',
-      description: 'Псионик-защитник: держит рубеж бастионным щитом.',
+      name: 'hero.unit.warden.name',
+      description: 'hero.unit.warden.desc',
       branch: 'psionic',
       ship: { unit: 'hero' },
       slots: 1,
@@ -939,68 +937,64 @@ export const data: GameData = parseGameData({
   // `hero.ability` на них честно отвечает `E_NO_EFFECT` (UI показывает «скоро»).
   heroAbilities: {
     corridor: {
-      name: 'Коридор',
-      description:
-        'Открывает временный публичный коридор-лейн до близкого мира; свои флоты идут по нему быстрее.',
+      name: 'hero.ability.corridor.name',
+      description: 'hero.ability.corridor.desc',
       type: 'temp_lane',
       cooldownHours: 12,
       range: 600,
       params: {},
     },
     annihilate: {
-      name: 'Аннигиляция',
-      description:
-        'Уничтожает планету в радиусе — она остаётся узлом, но становится мёртвым миром.',
+      name: 'hero.ability.annihilate.name',
+      description: 'hero.ability.annihilate.desc',
       type: 'annihilate',
       cooldownHours: 48,
       range: 500,
       params: {},
     },
     rally: {
-      name: 'Сбор',
-      description: 'Боевой клич: временный бонус к боевой ауре для своих флотов рядом с героем.',
+      name: 'hero.ability.rally.name',
+      description: 'hero.ability.rally.desc',
       type: 'aura',
       cooldownHours: 18,
       range: 0,
       params: { combatBonus: 0.1, durationHours: 2, radius: 300 },
     },
     scan: {
-      name: 'Разведка',
-      description: 'Раскрывает зону вокруг цели сквозь туман на время.',
+      name: 'hero.ability.scan.name',
+      description: 'hero.ability.scan.desc',
       type: 'reveal',
       cooldownHours: 10,
       range: 400,
       params: { radius: 250, durationHours: 3 },
     },
     recall: {
-      name: 'Отзыв',
-      description: 'Мгновенно отзывает корабль-героя в столицу.',
+      name: 'hero.ability.recall.name',
+      description: 'hero.ability.recall.desc',
       type: 'recall',
       cooldownHours: 24,
       range: 0,
       params: {},
     },
     bulwark: {
-      name: 'Бастион',
-      description: 'Временный щит: бонус к обороне своим флотам рядом с героем.',
+      name: 'hero.ability.bulwark.name',
+      description: 'hero.ability.bulwark.desc',
       type: 'aura',
       cooldownHours: 20,
       range: 0,
       params: { defenseBonus: 0.15, durationHours: 2, radius: 300 },
     },
     boarding_translocation: {
-      name: 'Абордажная транслокация',
-      description:
-        'Герой формируется прямо на борту одного из своих флотов — где бы тот ни был. Пассивный навык: расширяет точки развёртывания.',
+      name: 'hero.ability.boarding-translocation.name',
+      description: 'hero.ability.boarding-translocation.desc',
       type: 'spawn_fleet',
       cooldownHours: 0,
       range: 0,
       params: {},
     },
     diplomatic_landing: {
-      name: 'Дипломатическая высадка',
-      description:
-        'Союзные миры принимают героя как своего: корабль может подняться и на планете союзника. Пассивный навык: расширяет точки развёртывания.',
+      name: 'hero.ability.diplomatic-landing.name',
+      description: 'hero.ability.diplomatic-landing.desc',
       type: 'spawn_allied',
       cooldownHours: 0,
       range: 0,
@@ -1009,15 +1003,15 @@ export const data: GameData = parseGameData({
   },
   heroPassives: {
     vanguard_impulse: {
-      name: 'Импульс авангарда',
-      description: 'Корабль героя ведёт свой флот на форсаже: +10% к скорости флота героя.',
+      name: 'hero.passive.vanguard-impulse.name',
+      description: 'hero.passive.vanguard-impulse.desc',
       hook: 'fleet.speed',
       scope: 'heroFleet',
       params: { bonus: 0.1 },
     },
     rally_beacon: {
-      name: 'Маяк сбора',
-      description: 'Флоты рядом с героем бьются яростнее: +8% к урону своих флотов в радиусе 300.',
+      name: 'hero.passive.rally-beacon.name',
+      description: 'hero.passive.rally-beacon.desc',
       hook: 'combat.damage',
       scope: 'ownFleetsNear',
       params: { bonus: 0.08, radius: 300 },
@@ -1025,30 +1019,30 @@ export const data: GameData = parseGameData({
   },
   heroSkillTrees: {
     neural_lace: {
-      name: 'Нейрокружево',
-      description: 'Имплант прямого канала «мозг—штурвал»: корабль героя разгоняется на +10%.',
+      name: 'hero.tree.neural-lace.name',
+      description: 'hero.tree.neural-lace.desc',
       branch: 'transhuman',
       cost: { microelectronics: 20 },
       grants: { passive: 'vanguard_impulse' },
     },
     overclocked_helm: {
-      name: 'Разогнанный шлем',
-      description: 'Форсаж нейроинтерфейса открывает герою прокладку коридоров.',
+      name: 'hero.tree.overclocked-helm.name',
+      description: 'hero.tree.overclocked-helm.desc',
       branch: 'transhuman',
       requires: ['neural_lace'],
       cost: { microelectronics: 45, credits: 100 },
       grants: { ability: 'corridor' },
     },
     void_attunement: {
-      name: 'Сонастройка с Пустотой',
-      description: 'Пси-резонанс героя воодушевляет флоты рядом: +8% к урону в радиусе 300.',
+      name: 'hero.tree.void-attunement.name',
+      description: 'hero.tree.void-attunement.desc',
       branch: 'psionic',
       cost: { energy: 60 },
       grants: { passive: 'rally_beacon' },
     },
     psi_veil: {
-      name: 'Пси-вуаль',
-      description: 'Отточенное пси-зрение: герой учится вскрывать туман разведкой.',
+      name: 'hero.tree.psi-veil.name',
+      description: 'hero.tree.psi-veil.desc',
       branch: 'psionic',
       requires: ['void_attunement'],
       cost: { energy: 90, credits: 100 },
@@ -1057,22 +1051,20 @@ export const data: GameData = parseGameData({
   },
   heroFittings: {
     psi_amplifier: {
-      name: 'Пси-усилитель',
-      description: 'Резонансный контур раскрывает герою разведку сквозь туман.',
+      name: 'Psi Amplifier',
+      description: 'hero.fit.psi-amplifier.desc',
       grants: { ability: 'scan' },
       cost: { microelectronics: 30 },
     },
     aegis_matrix: {
-      name: 'Матрица «Эгида»',
-      description:
-        'Полевой генератор воодушевляет флоты рядом с героем: +8% к урону в радиусе 300.',
+      name: 'Aegis Matrix',
+      description: 'hero.fit.aegis-matrix.desc',
       grants: { passive: 'rally_beacon' },
       cost: { metal: 60 },
     },
     ablative_plating: {
-      name: 'Абляционная обшивка',
-      description:
-        'Дополнительные +40 к корпусу корабля героя. (Статы корабля заработают со швом эффективных статов, SHIP-3.)',
+      name: 'Ablative Cladding',
+      description: 'hero.fit.ablative-plating.desc',
       statMods: { hp: 40 },
       cost: { metal: 30 },
     },

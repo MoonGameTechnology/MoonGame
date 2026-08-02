@@ -22,7 +22,8 @@ describe('hero state seed — the roster rides in as core hero instances (HERO-9
         expect(h.home).toBe(capitalOf(s, pid)); // respawn anchor = capital (homeworld at start)
         expect(h.archetype && data.heroes[h.archetype]).toBeTruthy(); // catalog-known archetype
         expect(h.passives).toEqual(data.heroes[h.archetype!]!.startPassives); // archetype passives
-        for (const a of h.abilities ?? []) expect(data.heroAbilities[a]).toBeTruthy(); // known ids
+        // `abilities` — (string | null)[]: null = пустой слот, каталог сверяем по занятым
+        for (const a of h.abilities ?? []) if (a) expect(data.heroAbilities[a]).toBeTruthy(); // known ids
       }
     }
   });
@@ -31,7 +32,8 @@ describe('hero state seed — the roster rides in as core hero instances (HERO-9
     const s = newGame();
     const mine = Object.values(s.heroes ?? {}).filter((h) => h.owner === 'p1');
     for (const h of mine) {
-      const abilities = h.abilities ?? [];
+      // `abilities` — (string | null)[]: null = пустой слот, бюджет и маркеры — по занятым
+      const abilities = (h.abilities ?? []).filter((a): a is string => a !== null);
       const markers = abilities.filter((a) => data.heroAbilities[a]!.type.startsWith('spawn_'));
       const picks = abilities.filter((a) => !data.heroAbilities[a]!.type.startsWith('spawn_'));
       expect(picks.length).toBeLessThanOrEqual(heroSlots(h.grade! as never)); // menu slot budget

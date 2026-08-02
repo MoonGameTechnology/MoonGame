@@ -68,6 +68,7 @@ import {
 } from './src/game';
 import { ActionGate } from '../packages/action-layer/src/index';
 import { isValidActionPayload } from '../packages/shared-core/src/actions/payloadSchemas';
+import type { PlayerId } from '../packages/shared-core/src/index';
 const { Pool } = pgPkg;
 
 // --- M0/M1 playtest log: append room events to a per-run JSONL and feed every one
@@ -154,7 +155,7 @@ function ipv4s(): string[] {
 function ipKind(ip: string): 'vm-nat' | 'link-local' | 'cgnat' | 'lan' | 'public' {
   if (ip.startsWith('10.0.2.') || ip.startsWith('10.0.3.')) return 'vm-nat';
   if (ip.startsWith('169.254.')) return 'link-local';
-  const [a, b] = ip.split('.').map(Number);
+  const [a = -1, b = -1] = ip.split('.').map(Number); // malformed ip → no range matches
   if (a === 100 && b >= 64 && b <= 127) return 'cgnat';
   if (ip.startsWith('192.168.') || ip.startsWith('10.') || (a === 172 && b >= 16 && b <= 31)) {
     return 'lan';
@@ -685,7 +686,11 @@ const server = createMultiplayerServer({
     // chooses a slot, then POST /matches/:id/join with {slotId} reserves it.
     app.get('/matches/:id/seats', async (request, reply) => {
       const { id } = request.params as { id: string };
-      const room = registry.get(id) ?? (await registry.resolve?.(id));
+      // Load-on-demand mirror of wsServer's pattern: a LAZY registry reloads an
+      // evicted match here; this eager MatchRegistry has no `resolve`, so the
+      // optional call is a typed no-op (kept so a lazy registry can slot in).
+      const lazyRegistry = registry as { resolve?: (id: string) => Promise<MatchRoom | undefined> };
+      const room = registry.get(id) ?? (await lazyRegistry.resolve?.(id));
       if (!room) {
         void reply.code(404);
         return { error: 'E_NO_MATCH' as const };

@@ -7,8 +7,8 @@
  *  Everything for it lives in THIS file plus a few clearly fenced hooks in the
  *  shared code. To cut the whole feature without a trace:
  *    1. delete this file (prototype/src/sandbox.ts);
- *    2. remove the `<!-- SANDBOX -->` HTML blocks + the `/* SANDBOX *​/` CSS
- *       block in prototype/build.mjs;
+ *    2. remove the `<!-- SANDBOX -->` HTML blocks + the CSS block fenced by the
+ *       SANDBOX marker comments in prototype/build.mjs;
  *    3. remove the `SANDBOX` import + the fenced hooks in prototype/src/main.ts
  *       (the setup checkbox, the frame-loop `enforceSandbox` call, the fog gate,
  *       the free-build snapshot in the order path, and the `initSandbox(...)`
@@ -25,7 +25,7 @@
  */
 import { setStance, getStance } from '../../packages/shared-core/src/index';
 import type { GameState } from '../../packages/shared-core/src/index';
-import { t } from './i18n';
+import { t } from '../../localization/runtime';
 
 /** Persistent per-match cheat toggles (the four "held" switches). */
 export interface SandboxConfig {
@@ -65,13 +65,14 @@ export function resetSandboxConfig(): void {
   Object.assign(sandboxConfig, DEFAULTS);
 }
 
-/** The five session resources, in HUD order (icon + canonical Russian name). */
+/** The five session resources, in HUD order (icon + canonical Russian name).
+ *  Icons = the TECH_CUR glyph family in main.ts — keep in sync. */
 const RESOURCES: Array<{ key: string; icon: string; name: string }> = [
-  { key: 'credits', icon: '¤', name: 'Кредиты' },
-  { key: 'food', icon: '❖', name: 'Пища' },
-  { key: 'metal', icon: '⬢', name: 'Металл' },
-  { key: 'energy', icon: '↯', name: 'Энергия' },
-  { key: 'microelectronics', icon: '▦', name: 'Микроэлектроника' },
+  { key: 'credits', icon: '⛁', name: 'sandbox.res.credits' },
+  { key: 'metal', icon: '❒', name: 'sandbox.res.metal' },
+  { key: 'food', icon: '⚘', name: 'sandbox.res.food' },
+  { key: 'energy', icon: 'ϟ', name: 'sandbox.res.energy' },
+  { key: 'microelectronics', icon: '▣', name: 'sandbox.res.microelectronics' },
 ];
 const GRANT = 2000;
 
@@ -91,7 +92,7 @@ export function isBuildAction(type: string): boolean {
 /** +`GRANT` of one resource to the player's treasury. */
 export function sbAddResource(s: GameState, me: string, key: string): string {
   const p = s.players[me];
-  if (!p) return t('нет игрока');
+  if (!p) return t('sandbox.no-player');
   p.resources[key] = (p.resources[key] ?? 0) + GRANT;
   const r = RESOURCES.find((x) => x.key === key);
   return t('+{n} {res}', { n: GRANT, res: r ? t(r.name) : key });
@@ -123,9 +124,7 @@ export function sbEndWars(s: GameState, me: string): string {
       ended++;
     }
   }
-  return ended > 0
-    ? t('Войны прекращены: {n} — отношения нейтральные', { n: ended })
-    : t('Вы ни с кем не воюете');
+  return ended > 0 ? t('sandbox.wars-ended', { n: ended }) : t('sandbox.no-wars');
 }
 
 // --- per-frame enforcement for the "held" toggles ----------------------------
@@ -195,12 +194,12 @@ export interface SandboxHooks {
 }
 
 const TOGGLES: Array<{ key: keyof SandboxConfig; label: string; hint: string }> = [
-  { key: 'fog', label: 'Туман войны', hint: 'Выключите, чтобы открыть всю карту' },
-  { key: 'instantBuild', label: 'Моментальная постройка', hint: 'Стройка завершается мгновенно' },
-  { key: 'freeBuild', label: 'Бесплатная прокачка', hint: 'Постройки не тратят ресурсы' },
-  { key: 'immortalHome', label: 'Бессмертный дом', hint: 'Домашний мир нельзя захватить' },
-  { key: 'freezeQueues', label: 'Заморозить очередь', hint: 'Стройка стоит у всех' },
-  { key: 'instantCooldown', label: 'Перезарядка скиллов', hint: 'Умения командиров всегда готовы' },
+  { key: 'fog', label: 'sandbox.tog.fog', hint: 'sandbox.tog.fog.hint' },
+  { key: 'instantBuild', label: 'sandbox.tog.instant-build', hint: 'sandbox.tog.instant-build.hint' },
+  { key: 'freeBuild', label: 'sandbox.tog.free-build', hint: 'sandbox.tog.free-build.hint' },
+  { key: 'immortalHome', label: 'sandbox.tog.immortal-home', hint: 'sandbox.tog.immortal-home.hint' },
+  { key: 'freezeQueues', label: 'sandbox.tog.freeze-queues', hint: 'sandbox.tog.freeze-queues.hint' },
+  { key: 'instantCooldown', label: 'sandbox.tog.instant-cooldown', hint: 'sandbox.tog.instant-cooldown.hint' },
 ];
 
 /** Wire the `#sandbox` overlay + its floating opener. No-op if the markup is
@@ -221,7 +220,7 @@ export function initSandbox(hooks: SandboxHooks): void {
     `<div class="set-row"><div class="set-lbl">${t(label)}<span class="set-sub">${t(hint)}</span></div>` +
     `<div class="set-ctl"><label class="set-switch"><input type="checkbox" ${attrs}${on ? ' checked' : ''}>` +
     `<span class="sw-track"></span><span class="sw-knob"></span></label>` +
-    `<span class="set-val">${on ? t('вкл') : t('выкл')}</span></div></div>`;
+    `<span class="set-val">${on ? t('settings.on') : t('settings.off')}</span></div></div>`;
 
   const resBtns = RESOURCES.map(
     (r) =>
@@ -235,18 +234,18 @@ export function initSandbox(hooks: SandboxHooks): void {
     ).join('');
     const speedRow = switchRow(
       'data-sbx="speed"',
-      'Управление скоростью',
-      'панель времени в матче — пауза и множители ускорения (1× — реальное время)',
+      'sandbox.tog.speed',
+      'sandbox.tog.speed.hint',
       hooks.getSpeedControl(),
     );
     el.innerHTML = `<div class="sbx-box-w">
-      <div class="sbx-title"><span class="dia"></span><b>${t('ПЕСОЧНИЦА')}</b><span class="sbx-dev">DEV</span></div>
-      <div class="sbx-label">${t('Переключатели')}</div>
+      <div class="sbx-title"><span class="dia"></span><b>${t('sandbox.title')}</b><span class="sbx-dev">DEV</span></div>
+      <div class="sbx-label">${t('sandbox.toggles')}</div>
       <div class="sbx-togs">${togs}${speedRow}</div>
-      <div class="sbx-label">${t('Команды')}</div>
+      <div class="sbx-label">${t('sandbox.commands')}</div>
       <div class="sbx-cmds">${resBtns}</div>
-      <button class="sbx-cmd" data-sbx="peace">${t('Прекратить войну со всеми фракциями')}</button>
-      <button class="sbx-close" data-sbx="close">${t('Закрыть')}</button>
+      <button class="sbx-cmd" data-sbx="peace">${t('sandbox.end-wars')}</button>
+      <button class="sbx-close" data-sbx="close">${t('hub.emblem.close')}</button>
     </div>`;
   }
 

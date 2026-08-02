@@ -12,11 +12,11 @@
 
 export type IntroTrigger = 'panelOpen' | 'firstAvailable' | 'firstFail';
 
-/** One intro card — copy is a locale msgid (canonical Russian), shown once. */
+/** One intro card — copy lives in /localization; here are its keys. Shown once. */
 export interface IntroCard {
   id: string;
-  title: string;
-  body: string;
+  titleKey: string;
+  bodyKey: string;
   trigger: IntroTrigger;
 }
 
@@ -26,62 +26,62 @@ export const INTROS: IntroCard[] = [
   {
     id: 'tech',
     trigger: 'panelOpen',
-    title: 'Дерево технологий',
-    body: 'Здесь ты открываешь технологии — постоянные улучшения флота, экономики и обороны. Узел стоит ресурсов и времени; изучил — бонус действует до конца матча. Планируй ветку под свой стиль игры.',
+    titleKey: 'onb.intro.tech.title',
+    bodyKey: 'onb.intro.tech.body',
   },
   {
     id: 'market',
     trigger: 'panelOpen',
-    title: 'Сессионный рынок',
-    body: 'Торгуй ресурсами с другими игроками сессии: выставляй свои лоты и забирай чужие. Рынок сглаживает нехватку — обменяй излишек одного ресурса на тот, которого не хватает.',
+    titleKey: 'onb.intro.market.title',
+    bodyKey: 'onb.intro.market.body',
   },
   {
     id: 'steward',
     trigger: 'panelOpen',
-    title: 'Хранитель — ИИ на сон',
-    body: 'Уходишь надолго? Передай оборону Хранителю — он будет держать твои миры по заданным правилам, пока тебя нет. Мир идёт 24/7, но базовая защита останется, даже когда ты офлайн.',
+    titleKey: 'onb.intro.steward.title',
+    bodyKey: 'onb.intro.steward.body',
   },
   {
     id: 'constructor',
     trigger: 'panelOpen',
-    title: 'Верфь — оснащение',
-    body: 'Здесь ты собираешь корабли, эскадрильи, дивизии и героев из модулей. Лоадаут фиксируется при постройке — выбирай слоты заранее, переоснастить готовое нельзя. Вкладка «Герои» — штаб командиров.',
+    titleKey: 'onb.intro.constructor.title',
+    bodyKey: 'onb.intro.constructor.body',
   },
   {
     // ONB-3 remainder: fired on first open of the «Герои» tab inside the shipyard
     // (constructor panel already teases it, this is the actual explainer).
     id: 'hero',
     trigger: 'panelOpen',
-    title: 'Герои — командиры флота',
-    body: 'У каждого героя своё дерево навыков — тапни узел, чтобы увидеть, что он открывает, и изучи по требованиям и стоимости. Открытые узлы дают способности (активные, с дальностью и перезарядкой) или пассивки. Погибший герой возрождается на столице.',
+    titleKey: 'onb.intro.hero.title',
+    bodyKey: 'onb.intro.hero.body',
   },
   {
     id: 'diplomacy',
     trigger: 'panelOpen',
-    title: 'Дипломатия',
-    body: 'Объявляй войну и мир, заключай пакты и союзы. Коалиция ограничена порогом силы — всех против одного не собрать. Следи за стойками сторон: союзник сегодня может стать соперником завтра.',
+    titleKey: 'onb.intro.diplomacy.title',
+    bodyKey: 'onb.intro.diplomacy.body',
   },
   {
     // ONB-8: fired on first open of the corporation cabinet.
     id: 'corp',
     trigger: 'panelOpen',
-    title: 'Кабинет корпорации',
-    body: 'Корпорация — это твой отряд в общей сессии: общий склад, роли участников и совместные войны альянсов (AvA). Вступи в существующую или создай свою — вкладка «Войны» открывает доступ к вызовам между корпорациями.',
+    titleKey: 'onb.intro.corp.title',
+    bodyKey: 'onb.intro.corp.body',
   },
   {
     // ONB-8: fired on first open of the "Войны" (AvA) tab inside the corp cabinet.
     id: 'ava',
     trigger: 'panelOpen',
-    title: 'Войны альянсов (AvA)',
-    body: 'Здесь корпорации бросают друг другу вызов на организованную войну. Отметь готовность корпорации и свою личную — когда обе стороны готовы, можно принять вызов. Дальше — набор состава и сама война по расписанию.',
+    titleKey: 'onb.intro.ava.title',
+    bodyKey: 'onb.intro.ava.body',
   },
   {
     // ONB-5: fired on the FIRST order that takes real time (a fleet leaving on a
     // course) — the moment the async model becomes tangible.
     id: 'asyncDelay',
     trigger: 'firstAvailable',
-    title: 'Мир идёт без тебя',
-    body: 'Этот флот прибудет через часы реального времени — мир Void Dominion идёт непрерывно, даже когда ты офлайн. Можешь закрыть игру: приказы выполнятся сами, а к возвращению мы пришлём уведомление и покажем сводку «пока тебя не было».',
+    titleKey: 'onb.intro.async-delay.title',
+    bodyKey: 'onb.intro.async-delay.body',
   },
   {
     // ONB-3 remainder (docs/onboarding-roadmap.md): fired on the FIRST `fleet.retreat`
@@ -89,16 +89,16 @@ export const INTROS: IntroCard[] = [
     // instead of leaving it buried in the mid-battle `.hint` (same copy, calmer moment).
     id: 'retreat',
     trigger: 'firstFail',
-    title: 'Отступление — не бесплатно',
-    body: 'Отход стоит −40% ТЕКУЩЕГО корпуса и щита (израненный флот теряет 40% остатка — отход не добивает) и даёт рывок скорости для бегства. Десант в высадке отступить не может; с орбиты вне боя корабль уходит свободно.',
+    titleKey: 'onb.intro.retreat.title',
+    bodyKey: 'onb.intro.retreat.body',
   },
   {
     // ONB-3 remainder: fired on the FIRST `fleet.barrage` order — the moment standoff
     // fire becomes tangible, mirroring asyncDelay's "teach on first real use" pattern.
     id: 'artillery',
     trigger: 'firstAvailable',
-    title: 'Обстрел — огонь с дистанции',
-    body: 'Флоты с артиллерией бьют по врагу издалека, ещё до сближения — сосредоточь огонь на одной цели или дай флоту выбирать её самому. Толстая броня артиллерии слабая, её место позади линии, а не на передовой.',
+    titleKey: 'onb.intro.artillery.title',
+    bodyKey: 'onb.intro.artillery.body',
   },
 ];
 

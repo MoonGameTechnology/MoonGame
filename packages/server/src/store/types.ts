@@ -593,3 +593,25 @@ export interface DropStore {
   shardsOf(accountId: string): Promise<number>;
   close?(): Promise<void>;
 }
+
+/** A Web Push subscription (the standard PushSubscription.toJSON() shape a browser
+ *  hands back from `PushManager.subscribe()`). Opaque to us — only `web-push` reads
+ *  `endpoint`/`keys` to address and encrypt a message. */
+export interface PushSubscriptionRecord {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+}
+
+/** ONB-5 · Push subscriptions (one active endpoint per account — a fresh subscribe
+ *  from a new device/browser replaces the old one; multi-device fan-out is a later
+ *  brick, not this one). Durable so a subscription survives a server restart; the
+ *  send path itself (`push.ts`) lives above the store, same split as the other
+ *  policy-vs-storage stores here. */
+export interface PushStore {
+  save(accountId: string, sub: PushSubscriptionRecord): Promise<void>;
+  /** Drop the subscription — an explicit unsubscribe, or the push service reported
+   *  the endpoint gone (410/404) on a send attempt. */
+  remove(accountId: string): Promise<void>;
+  of(accountId: string): Promise<PushSubscriptionRecord | undefined>;
+  close?(): Promise<void>;
+}

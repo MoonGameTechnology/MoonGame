@@ -116,7 +116,7 @@ describe('10-seat skirmish field', () => {
   });
 
   it('spawns ten distinct players, homeworlds and starting fleets', () => {
-    const factions = ['blue', 'red', 'amber', 'violet'];
+    const factions = ['azure', 'crimson', 'amber', 'violet'];
     const seats = START_CANDIDATES.map((start, i) => ({
       id: `p${i + 1}`,
       name: `Player ${i + 1}`,

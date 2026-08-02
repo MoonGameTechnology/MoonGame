@@ -41,8 +41,8 @@
 | 3D-модели бригады | Рендер выбранного флота на узле | выбранный `fleet.units` (корабли) / `fleet.landing` (десант) |
 | Оранжевый юнит | Вражеский флот (лишь если засечён) | `visibleState.fleets` (туман: `radarRange × signature`) |
 | Ящик снабжения | Планета/узел с доходом · end-match дроп | планета-yield · дроп (economy) |
-| **SPLIT** | Разделить флот | ✅ `fleet.split` (в `payloadSchemas`) |
-| **ADD ARMY** | Слить флоты · загрузить десант | ✅ `fleet.merge` · ✅ `army.load` |
+| **SPLIT** | Разделить флот | ✅ `fleet.split` (`fleetOpsModule`, живой обработчик — не только схема) |
+| **ADD ARMY** | Слить флоты · загрузить десант | ✅ `fleet.merge` (`fleetOpsModule`) · ✅ `army.load` |
 | **ATTACK** | Штурм/бой | ✅ `fleet.assault` (двухфазный захват) · авто-бой на контакте |
 | **MOVE** | Приказ по лейнам | ✅ `fleet.move` (movement-модуль, маршрут по `route.ts`) |
 | «1ST INFANTRY BRIGADE» + нация | Имя флота + владелец | `fleet.id`/имя + `owner` |
@@ -192,7 +192,7 @@ export function resolveHudAction(action: HudTap, model: HudModel): HudIntent | {
 - ⏳ **Нужен код (кирпичи):**
   - `HUD-1b` объединённый `createHudModel`/`resolveHudAction` + зоны B (карта) / C (действия-намерения).
   - `HUD-2` производные для панели: `fleetPower` / `damageReduction` (сборка из статов+бонусов).
-  - `HUD-3` — `fleet.split`/`fleet.merge` уже в ядре (`payloadSchemas`); остаётся HUD-обвязка (референсные SPLIT/ADD).
+  - `HUD-3` — `fleet.split`/`fleet.merge` уже в ядре (`fleetOpsModule`, живые обработчики); остаётся HUD-обвязка (референсные SPLIT/ADD).
   - `HUD-4` две HP-полоски (корпус/щит) — по мере `shields-roadmap`; иконки модулей — `ship-modules`.
 - 🔒 **Мета/блокировано:** ранг/место — из scoreboard (есть) ИЛИ account-level (docs-only);
   кошелёк Суверены/Варранты и магазин «+» — мета-экономика (`economy-roadmap`), поверх матча;

@@ -1,28 +1,24 @@
-// Тонкий рантайм локализации прототипа. Сами тексты живут в /localization —
-// здесь только выбор языка, поиск ключа и подстановка значений.
+// Рантайм локализации — ОДИН на всех потребителей (прототип и PWA-клиент).
+// Тексты живут в соседних `ru.ts` / `en.ts`; здесь только выбор языка, поиск
+// ключа и подстановка значений.
 //
 //   t('err.no-capacity')                  → текст по ключу
 //   t('fleet.eta', { n: 3 })              → '{x}' подставляет живые значения
 //   tData('Metal Mine')                   → имя игровых ДАННЫХ (→ data.metal-mine)
 //
-// ПЕРЕХОДНЫЙ ПЕРИОД (этап 2 миграции). Исторически msgid'ом была сама русская
-// строка (`t('трюм полон')`), и большая часть вызовов ещё такая. Пока они живы,
-// работает мост: если аргумент — не ключ, он трактуется как старый русский msgid и
-// ищется в /localization/legacy. Мост уйдёт вместе с последним немигрированным
-// вызовом; ключи и старые msgid'ы не пересекаются (в ключе нет кириллицы).
+// До LOC-5 этот файл существовал дважды — `prototype/src/i18n.ts` и
+// `packages/client/src/i18n.ts`, — и их расхождение ничем не ловилось: правку
+// `tData()` пришлось вносить в оба места вручную. Теперь копия одна.
 //
 // Выбор языка хранится в localStorage ('vd.locale'); переключение перезагружает
 // страницу — каждый рендерер строится заново, поэтому DOM на старом языке не выживает.
-import { LOCALES, DEFAULT_LOCALE, LOCALE_LABEL, dataKey, isLocaleId } from '../../localization';
-import type { LocaleId } from '../../localization';
-import { en as legacyEn } from '../../localization/legacy/en';
+import { LOCALES, DEFAULT_LOCALE, dataKey, isLocaleId } from './index';
+import type { LocaleId } from './index';
 
+// Потребителю рантайма нужны и подписи языков в переключателе — чтобы ему хватало
+// одного импорта, а не двух из соседних файлов.
 export type { LocaleId };
-export { LOCALE_LABEL };
-
-/** Старые msgid-карты (msgid = русская строка). Для РУССКОГО она пуста: msgid и есть
- *  текст, поэтому запись не нужна — строка показывается как написана. */
-const LEGACY: Record<LocaleId, Record<string, string>> = { ru: {}, en: legacyEn };
+export { LOCALE_LABEL } from './index';
 
 const STORE_KEY = 'vd.locale';
 
@@ -64,15 +60,19 @@ function interpolate(s: string, vars?: Record<string, string | number>): string 
   return s.replace(/\{(\w+)\}/g, (m, k: string) => (k in vars ? String(vars[k]) : m));
 }
 
-/** Текст интерфейса по ключу. Промах → старый русский msgid (мост), иначе — сам ключ. */
+/** Текст интерфейса по ключу. Промах → сам ключ (заметная опечатка). */
 export function t(key: string, vars?: Record<string, string | number>): string {
-  return interpolate(lookup(key) ?? LEGACY[LOCALE][key] ?? key, vars);
+  return interpolate(lookup(key) ?? key, vars);
 }
 
 /** Имя игровых ДАННЫХ. Промах → исходное английское имя из data/*.json: новый юнит
  *  виден под своим именем, а не как `data.new-unit`. */
 export function tData(name: string): string {
-  return lookup(dataKey(name)) ?? LEGACY[LOCALE][`data:${name}`] ?? name;
+  // `?? lookup(name)` — страховка, а не разрешение путать вызовы. Если сюда всё же
+  // приехал КЛЮЧ (поля каталога `prototypeData.ts` частично хранят ключи), слаг
+  // `dataKey()` его схлопнет — точки и кириллица вырезаются, — и наружу вылез бы сам
+  // ключ. Так игрок получит перевод, а не `sci.overseer.name`.
+  return lookup(dataKey(name)) ?? lookup(name) ?? name;
 }
 
 /** Проход по статической разметке на старте. Ключ берётся из ЗНАЧЕНИЯ атрибута

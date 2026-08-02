@@ -18,7 +18,7 @@ import {
 } from '../../packages/shared-core/src/index';
 import { isInhabited, civicTax, inhabitedWorldCount, TAX_OFFICE_BONUS } from './tax';
 import { data } from './prototypeData';
-import { HOUR } from './game';
+import { HOUR } from './time';
 
 /** ECON-6: почасовой экономический срез для пайплайна наблюдений хоста — казна /
  *  чистый приток / arrears per player на мировом времени `state.time`. Чистая
@@ -209,6 +209,87 @@ export function netIncome(state: GameState, playerId: string): Record<string, nu
     }
   for (const p of Object.values(state.planets)) if (p.owner === playerId) addUpkeep(p.garrison);
   return out;
+}
+
+/** Per-resource income breakdown: production (gross income), building upkeep,
+ *  unit upkeep, and net (production − buildingUpkeep − unitUpkeep). Used by the
+ *  resource card (RC-1) to show a real split instead of just the sign of `netIncome`. */
+export function incomeBreakdown(
+  state: GameState,
+  playerId: string,
+): Record<string, { production: number; buildingUpkeep: number; unitUpkeep: number; net: number }> {
+  const result: Record<string, { production: number; buildingUpkeep: number; unitUpkeep: number; net: number }> = {};
+  const cell = (res: string) => {
+    if (!result[res]) result[res] = { production: 0, buildingUpkeep: 0, unitUpkeep: 0, net: 0 };
+    return result[res]!;
+  };
+  const arrears = state.players[playerId]?.arrears ?? [];
+  const inhabited = inhabitedWorldCount(state, playerId);
+  const me = state.players[playerId];
+  const factionBonus = me?.faction ? (data.factions[me.faction]?.passives?.productionBonus ?? 0) : 0;
+  let techBonus = 0;
+  for (const id of me?.technologies?.completed ?? [])
+    techBonus += data.technologies[id]?.effects?.productionBonus ?? 0;
+  const bonusMult = (1 + factionBonus) * (1 + techBonus);
+
+  for (const p of Object.values(state.planets)) {
+    if (p.owner !== playerId || isBombarded(state, p.id)) continue;
+    const mult =
+      (1 + (p.planetType ? (data.planetTypes[p.planetType]?.productionBonus ?? 0) : 0)) * bonusMult;
+    let credits = 0;
+    const ptDef = p.planetType ? data.planetTypes[p.planetType] : undefined;
+    const ptByRes = ptDef?.productionByResource ?? {};
+    for (const res of Object.keys(ptDef?.baseOutput ?? {})) {
+      const v = (ptDef!.baseOutput[res] ?? 0) * mult * (1 + (ptByRes[res] ?? 0));
+      if (res === 'credits') credits += v;
+      else { cell(res).production += v; }
+    }
+    for (const b of p.buildings) {
+      const def = data.buildings[b.type];
+      if (!def) continue;
+      const level = buildingLevel(def, b.level);
+      const starved =
+        arrears.length > 0 &&
+        Object.keys(level.upkeep).some((r) => (level.upkeep[r] ?? 0) > 0 && arrears.includes(r));
+      const bMult = mult * (starved ? BROWNOUT : 1);
+      for (const res of Object.keys(level.produces)) {
+        const v = (level.produces[res] ?? 0) * bMult;
+        if (res === 'credits') credits += v;
+        else { cell(res).production += v; }
+      }
+      for (const res of Object.keys(level.upkeep)) {
+        const v = (level.upkeep[res] ?? 0) / 24;
+        if (res === 'credits') credits -= v;
+        else { cell(res).buildingUpkeep += v; }
+      }
+    }
+    if (isInhabited(p)) {
+      credits += civicTax(inhabited) * bonusMult;
+      if (p.buildings.some((b) => b.type === 'tax_office')) credits *= 1 + TAX_OFFICE_BONUS;
+    }
+    if (credits !== 0) cell('credits').production += credits;
+  }
+  const addUnitUpkeep = (stacks: Array<{ unit: string; count: number }>) => {
+    for (const st of stacks) {
+      const def = data.units[st.unit];
+      if (!def) continue;
+      for (const res of Object.keys(def.upkeep)) {
+        const v = ((def.upkeep[res] ?? 0) * st.count) / 24;
+        cell(res).unitUpkeep += v;
+      }
+    }
+  };
+  for (const f of Object.values(state.fleets))
+    if (f.owner === playerId) {
+      addUnitUpkeep(f.units);
+      if (f.landing) addUnitUpkeep(f.landing);
+    }
+  for (const p of Object.values(state.planets)) if (p.owner === playerId) addUnitUpkeep(p.garrison);
+  for (const res of Object.keys(result)) {
+    const c = result[res]!;
+    c.net = c.production - c.buildingUpkeep - c.unitUpkeep;
+  }
+  return result;
 }
 
 /** Max HP of a building level (mirrors the core's per-level data). */

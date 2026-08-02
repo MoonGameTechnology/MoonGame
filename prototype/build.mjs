@@ -27,6 +27,11 @@ const bundle = async (playerBuild) => {
 // --- glow, monospace, minimalist HUD on near-black. Responsive. -------------
 const css = `
 :root{
+  --tbh:84px; /* total #top height (row 1 + resource row) — offsets below hang off it */
+  /* resource accent colours (mock): gold coins / steel cube / green sprout /
+     orange bolt / orchid chip — inherited everywhere a resource token appears */
+  --rc-credits:#d9b872;--rc-metal:#bfc8dc;--rc-food:#8ccf96;--rc-energy:#f09a52;
+  --rc-microelectronics:#d795cf;
   --cyan:#35d6e6;--cyan-dim:#1c6f78;
   --grn:#5ff0c0;--grn-dim:#2b7a66;
   --red:#ff5a4d;--amber:#ffb43a;
@@ -61,47 +66,81 @@ body::before{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;mix
 ::-webkit-scrollbar-thumb:active{background:linear-gradient(180deg,#8ff4fa,var(--cyan));}
 ::-webkit-scrollbar-corner{background:transparent;}
 
-#top{position:fixed;top:0;left:0;right:0;height:46px;z-index:30;display:flex;align-items:center;
+/* Two-row command bar. Row 1 (.tbar): back chevron, round crest-avatar, nick + live
+   standing, the victory chip in the middle gap, day card with a next-day countdown.
+   Row 2 (#purse): the resource capsules. The bottom border is the mock's divider. */
+#top{position:fixed;top:0;left:0;right:0;height:var(--tbh);z-index:30;display:flex;flex-direction:column;
   background:linear-gradient(180deg,rgba(3,13,18,.94),rgba(2,8,12,.82));border-bottom:1px solid var(--line-hi);
   box-shadow:0 0 22px rgba(40,200,210,.10),inset 0 -1px 0 rgba(53,214,230,.28);}
-.crest{display:flex;align-items:center;gap:10px;padding:0 14px;height:100%;flex:0 0 auto;cursor:pointer;}
+.tbar{display:flex;align-items:center;height:48px;flex:0 0 auto;min-width:0;padding-right:10px;}
+/* the ‹ chevron mirrors the hardware Back (history.back()): close the top layer,
+   or arm the double-press "leave the match" hint */
+#topback{flex:0 0 auto;width:34px;height:100%;border:0;background:transparent;color:#c2ced0;
+  font-size:24px;line-height:1;cursor:pointer;padding:0 0 3px;}
+#topback:active{color:var(--cyan);background:rgba(53,214,230,.12);}
+.crest{display:flex;align-items:center;gap:9px;padding:0 10px 0 2px;height:100%;flex:0 1 auto;min-width:0;cursor:pointer;}
 .crest:active{background:rgba(53,214,230,.12);}
 .dia{width:15px;height:15px;transform:rotate(45deg);flex:0 0 auto;border:1.5px solid var(--cyan);
   box-shadow:0 0 9px rgba(53,214,230,.7),inset 0 0 5px rgba(53,214,230,.35);}
-.who{line-height:1.1;min-width:0;}
-.who b{display:block;color:#eafffb;font-weight:700;font-size:12px;letter-spacing:2px;white-space:nowrap;}
-.who span{color:var(--cyan-dim);font-size:9px;letter-spacing:2.5px;white-space:nowrap;}
-/* the five currencies always fit the bar — no scroll. Chips share the width and shrink
-   together (flex:1 1 0; min-width:0) so the row scales down instead of overflowing. Each
-   chip = a small coin-icon + tabular amount + flow, divided by a faint hairline. */
-#purse{display:flex;align-items:center;flex:1 1 auto;min-width:0;overflow:hidden;height:100%;margin:0 2px 0 4px;
-  border-left:1px solid var(--line);}
-.res{display:flex;align-items:center;justify-content:center;gap:5px;padding:0 7px;height:100%;flex:1 1 0;min-width:0;
-  position:relative;overflow:hidden;}
-.res + .res::before{content:"";position:absolute;left:0;top:50%;transform:translateY(-50%);width:1px;height:20px;
-  background:linear-gradient(180deg,transparent,rgba(53,214,230,.20),transparent);}
+.who{line-height:1.15;min-width:0;}
+.who b{display:block;color:#eafffb;font-weight:700;font-size:13px;letter-spacing:.6px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.who span{color:#8b9c9e;font-size:10px;letter-spacing:.8px;white-space:nowrap;}
+/* victory chip in the row-1 gap: the ✦ score race the standing is derived from.
+   Tap → plain-words breakdown (the .dstat handler on #top). Hidden until it has text. */
+#tbscore{flex:0 1 auto;margin:0 auto;padding:3px 10px;border-radius:11px;cursor:pointer;
+  color:var(--ink);font-size:11px;font-variant-numeric:tabular-nums;white-space:nowrap;
+  border:1px solid var(--line);background:rgba(3,14,18,.55);}
+#tbscore.win{color:var(--up);border-color:rgba(95,240,168,.5);font-weight:700;}
+#tbscore:empty{display:none;}
+/* day card: current game day over a countdown to the next one. Mock palette: neutral
+   outline, teal day, grey countdown. */
+#daycard{flex:0 0 auto;margin-left:10px;padding:5px 12px;border-radius:10px;text-align:center;
+  border:1px solid rgba(148,170,173,.28);background:rgba(6,14,16,.5);}
+#daycard b{display:block;color:#8fdbe0;font-size:12px;letter-spacing:1px;}
+#daycard span{color:#8b9c9e;font-size:9px;font-variant-numeric:tabular-nums;letter-spacing:.4px;}
+/* the five currencies always fit their row — no scroll. Capsules share the width and
+   shrink together (flex:1 1 0; min-width:0) so the row scales down instead of
+   overflowing. Each capsule = a bare line-glyph + tabular amount + flow, in the mock's
+   MUTED palette: neutral grey outline, grey icon, near-white number (no cyan glow). */
+#purse{display:flex;align-items:center;flex:1 1 auto;min-width:0;overflow:hidden;gap:6px;padding:0 8px 6px;}
+.res{display:flex;align-items:center;justify-content:center;gap:6px;padding:0 8px;height:100%;flex:1 1 0;min-width:0;
+  position:relative;overflow:hidden;border:1px solid rgba(148,170,173,.26);border-radius:14px;background:rgba(6,14,16,.35);}
+.res.short{border-color:rgba(255,90,77,.4);}
 /* amount + flow share one "value line" (.rv); the amount owns the room (flex:0 0 auto),
-   the flow rate clips first. On phones the chip stacks the icon OVER this value line. */
+   the flow rate clips first (phones drop flow digits entirely — see the chip builder). */
 .rv{display:flex;align-items:baseline;justify-content:center;gap:3px;min-width:0;overflow:hidden;flex:0 1 auto;}
 .res em{font:9px ui-monospace,monospace;font-style:normal;white-space:nowrap;
   flex:0 1 auto;min-width:0;overflow:hidden;}
 .res em.up{color:var(--grn,#5ff0a8);}
 .res em.dn{color:var(--red,#ff5a4d);}
 .res.dead{opacity:.34;}
-.res i{flex:0 0 auto;width:20px;height:20px;display:grid;place-items:center;border-radius:6px;
-  font-style:normal;font-size:12px;line-height:1;color:var(--cyan);font-variant-emoji:text;
-  background:rgba(53,214,230,.08);box-shadow:inset 0 0 0 1px rgba(53,214,230,.14);
-  text-shadow:0 0 6px rgba(53,214,230,.35);}
-.res.dead i{background:rgba(120,140,150,.05);box-shadow:inset 0 0 0 1px rgba(120,140,150,.14);
-  color:var(--dim);text-shadow:none;}
-.res.short i{color:var(--red,#ff5a4d);box-shadow:inset 0 0 0 1px rgba(255,90,77,.4);text-shadow:0 0 6px rgba(255,90,77,.5);}
-.res b{color:#eafffb;font-weight:700;font-size:12px;font-variant-numeric:tabular-nums;
+/* bare icon, no boxed background. The icon is an inline SVG (stroke:currentColor),
+   tinted with the resource's accent colour; the number stays near-white. */
+.res i{flex:0 0 auto;font-style:normal;font-size:14px;line-height:1;color:#a9bec1;
+  font-variant-emoji:text;}
+.res i svg{display:block;width:15px;height:15px;}
+.res[data-res="credits"] i{color:var(--rc-credits);}
+.res[data-res="metal"] i{color:var(--rc-metal);}
+.res[data-res="food"] i{color:var(--rc-food);}
+.res[data-res="energy"] i{color:var(--rc-energy);}
+.res[data-res="microelectronics"] i{color:var(--rc-microelectronics);}
+/* deficit wins over the accent — a resource in the red reads RED, as before */
+.res.short i{color:var(--red,#ff5a4d);text-shadow:0 0 6px rgba(255,90,77,.5);}
+/* resource-tinted tokens in prose (costs, market rows, tech/yield lines).
+   [data-desc] covers the division designer's self-describing cost spans. */
+.rc-credits,[data-desc="res:credits"]{color:var(--rc-credits);}
+.rc-metal,[data-desc="res:metal"]{color:var(--rc-metal);}
+.rc-food,[data-desc="res:food"]{color:var(--rc-food);}
+.rc-energy,[data-desc="res:energy"]{color:var(--rc-energy);}
+.rc-microelectronics,[data-desc="res:microelectronics"]{color:var(--rc-microelectronics);}
+.res b{color:#e6eeef;font-weight:700;font-size:13px;font-variant-numeric:tabular-nums;
   white-space:nowrap;flex:0 0 auto;}
 /* phones hide the flow digits — a NEGATIVE net income paints the stock itself red */
 .res b.neg{color:var(--red,#ff5a4d);text-shadow:0 0 6px rgba(255,90,77,.35);}
 /* player emblem — a console crest the player picks in the main menu (hub), worn in the
    TOP-LEFT corner. Tap → player dossier (bubbles to the .crest handler). */
-#crestmark{width:32px;height:32px;border-radius:9px;flex:0 0 auto;cursor:pointer;padding:0;
+#crestmark{width:34px;height:34px;border-radius:50%;flex:0 0 auto;cursor:pointer;padding:0;
   display:grid;place-items:center;font-size:17px;color:var(--cyan);font-variant-emoji:text;
   background:rgba(3,12,16,.7);border:1px solid var(--line-hi);
   box-shadow:inset 0 0 10px rgba(53,214,230,.14),0 0 10px rgba(53,214,230,.12);
@@ -112,14 +151,17 @@ body::before{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;mix
 #devline .dl-donate{margin-left:auto;flex:0 0 auto;display:flex;align-items:center;gap:5px;
   padding:2px 9px;border-radius:11px;color:#fff2cf;font-weight:800;font-size:12px;line-height:1;
   letter-spacing:.3px;font-variant-numeric:tabular-nums;
-  background:linear-gradient(180deg,rgba(255,206,92,.20),rgba(240,170,40,.10));border:1px solid rgba(255,208,96,.55);
-  box-shadow:0 0 12px rgba(255,198,72,.30),inset 0 0 6px rgba(255,214,120,.16);
+  background:rgba(255,206,92,.08);border:1px solid rgba(255,208,96,.5);
+  box-shadow:0 0 10px rgba(255,198,72,.25),inset 0 0 6px rgba(255,214,120,.12);
   animation:donatePulse 2.8s ease-in-out infinite;white-space:nowrap;}
+/* faceted gem (SOV_SVG), gold with a soft halo */
 #devline .dl-donate i{color:#ffd45e;text-shadow:0 0 9px rgba(255,212,94,.85);font-style:normal;font-size:14px;}
+#devline .dl-donate i svg{display:block;width:14px;height:14px;
+  filter:drop-shadow(0 0 3px rgba(255,212,94,.75));}
 @keyframes donatePulse{
-  0%,100%{box-shadow:0 0 10px rgba(255,198,72,.30),inset 0 0 7px rgba(255,214,120,.16);}
-  50%{box-shadow:0 0 22px rgba(255,205,90,.7),inset 0 0 9px rgba(255,220,130,.30);}}
-#toasts{position:fixed;left:50%;top:96px;transform:translateX(-50%);z-index:40;display:flex;
+  0%,100%{box-shadow:0 0 8px rgba(255,198,72,.22),inset 0 0 6px rgba(255,214,120,.12);}
+  50%{box-shadow:0 0 14px rgba(255,205,90,.5),inset 0 0 8px rgba(255,220,130,.22);}}
+#toasts{position:fixed;left:50%;top:calc(var(--tbh) + 50px);transform:translateX(-50%);z-index:40;display:flex;
   flex-direction:column;align-items:center;gap:6px;pointer-events:none;max-width:min(92vw,520px);}
 #toasts .toast{pointer-events:auto;cursor:pointer;background:rgba(3,14,18,.88);border:1px solid var(--line-hi);
   border-radius:3px;padding:7px 12px;font:12px ui-monospace,Menlo,monospace;color:var(--fg);
@@ -132,10 +174,9 @@ body::before{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;mix
   padding:5px 7px;background:rgba(3,12,16,.78);border:1px solid var(--line-hi);border-radius:3px;
   box-shadow:0 0 16px rgba(40,200,210,.10);transition:bottom .2s ease;}
 body.sheet-open #speedbar{bottom:calc(34vh + 12px);}
-#fps{position:fixed;top:82px;right:10px;z-index:25;pointer-events:none;
+#fps{position:fixed;top:calc(var(--tbh) + 36px);right:10px;z-index:25;pointer-events:none;
   font:700 10px ui-monospace,Menlo,monospace;color:var(--grn);opacity:.72;letter-spacing:.5px;
   text-shadow:0 0 6px rgba(0,0,0,.85);}
-@media (max-width:720px), ((hover: none) and (pointer: coarse) and (max-height: 520px)){#fps{top:78px;}}
 .spd button{min-width:30px;height:26px;padding:0 5px;border-radius:2px;cursor:pointer;font:11px ui-monospace,monospace;
   background:transparent;color:var(--cyan-dim);border:1px solid var(--line-hi);}
 .spd button.on{background:rgba(53,214,230,.16);color:var(--cyan);border-color:var(--cyan);box-shadow:0 0 10px rgba(53,214,230,.4);}
@@ -397,6 +438,33 @@ body.sheet-open #cmdbar{bottom:calc(34vh + 12px);}
 .pc-row .pc-v{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums;text-align:right;}
 .pc-close{margin-top:10px;width:100%;padding:9px;cursor:pointer;border-radius:6px;border:1px solid var(--cyan-dim);
   background:rgba(53,214,230,.1);color:var(--cyan);font:600 12px ui-monospace,monospace;letter-spacing:1px;}
+/* Match dossier → career dossier. Ghost weight: it leaves the match context, so it
+   must not compete with the card's own actions. */
+.pc-dossier{margin-top:10px;width:100%;padding:9px;cursor:pointer;border-radius:6px;border:1px solid var(--line-hi);
+  background:transparent;color:var(--dim);font:600 12px ui-monospace,monospace;letter-spacing:1px;}
+.pc-dossier:active{border-color:var(--cyan);color:var(--cyan);}
+/* resource card — tap a resource chip in the top bar */
+#rescard{position:fixed;inset:0;z-index:51;display:none;align-items:center;justify-content:center;padding:18px;
+  background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#rescard.show{display:flex;}
+#rescard .rc-box{width:min(360px,92vw);max-height:86vh;overflow:auto;background:var(--glass);border:1px solid var(--cyan);
+  border-radius:10px;padding:16px 18px 14px;box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
+.rc-head{display:flex;align-items:center;gap:10px;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line-hi);}
+.rc-head .rc-ic{width:28px;height:28px;flex:0 0 auto;color:var(--cyan);}
+.rc-head b{font-size:16px;letter-spacing:1.5px;color:#eafffb;flex:1;}
+.rc-stat{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:4px 0;border-bottom:1px solid rgba(14,59,64,.4);}
+.rc-stat .rc-k{color:var(--dim);}
+.rc-stat .rc-v{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums;text-align:right;}
+.rc-sec{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan-dim);margin:8px 0 4px;}
+.rc-flow{font-size:18px;font-weight:700;text-align:center;padding:8px 0;font-variant-numeric:tabular-nums;}
+.rc-flow.pos{color:#7df0d0;}
+.rc-flow.neg{color:#ff6b6b;}
+.rc-market{margin-top:12px;width:100%;padding:10px;cursor:pointer;border-radius:6px;border:1px solid var(--cyan);
+  background:rgba(53,214,230,.12);color:var(--cyan);font:600 13px ui-monospace,monospace;letter-spacing:1px;}
+.rc-market:active{background:rgba(53,214,230,.22);}
+.rc-market.disabled{opacity:.4;cursor:default;border-color:var(--line-hi);color:var(--dim);background:transparent;}
+.rc-close{margin-top:8px;width:100%;padding:9px;cursor:pointer;border-radius:6px;border:1px solid var(--cyan-dim);
+  background:rgba(53,214,230,.1);color:var(--cyan);font:600 12px ui-monospace,monospace;letter-spacing:1px;}
 
 /* settings overlay (hub → «Ещё» → Настройки) — client-only display prefs */
 #settings{position:fixed;inset:0;z-index:59;display:none;align-items:center;justify-content:center;padding:18px;
@@ -624,14 +692,19 @@ body.sheet-open #cmdbar{bottom:calc(34vh + 12px);}
   border:1px solid var(--line-hi);background:transparent;color:var(--dim);font:inherit;font-size:12px;cursor:pointer;}
 #pingmenu .pm-cancel:hover{color:var(--ink);border-color:var(--cyan-dim);}
 
-/* status strip below the top bar: day/time + victory progress */
-#devline{position:fixed;top:46px;left:0;right:0;height:28px;z-index:24;display:flex;align-items:center;gap:14px;
-  padding:0 14px;background:rgba(2,8,11,.55);color:var(--cyan-dim);font-size:11px;letter-spacing:.6px;
-  white-space:nowrap;overflow-x:auto;scrollbar-width:none;border-bottom:1px solid rgba(14,59,64,.5);}
+/* status strip below the top bar: the in-game clock + the donate currency on the right
+   (day/countdown live in the #daycard, victory progress in the #tbscore chip above).
+   The strip is TRANSPARENT — the map runs under it, so it carries no backdrop and no
+   divider; the clock leans on its own text-shadow over bright provinces, and the gold
+   capsule brings its own. Being see-through it must also be click-through, or it would
+   eat map pans along its band — only its two children take input back. */
+#devline{position:fixed;top:var(--tbh);left:0;right:0;height:28px;z-index:24;display:flex;align-items:center;gap:14px;
+  padding:0 14px;background:transparent;color:var(--cyan-dim);font-size:11px;letter-spacing:.6px;
+  white-space:nowrap;overflow-x:auto;scrollbar-width:none;pointer-events:none;}
 #devline::-webkit-scrollbar{display:none;}
-#devline #clock{color:var(--grn);font-variant-numeric:tabular-nums;flex:0 0 auto;}
-#devline .dstat{flex:0 0 auto;}
-#devline .dstat.win{color:var(--up);font-weight:700;}
+#devline > *{pointer-events:auto;}
+#devline #clock{color:var(--grn);font-variant-numeric:tabular-nums;flex:0 0 auto;
+  text-shadow:0 0 7px rgba(0,0,0,.9),0 0 3px rgba(0,0,0,.85);}
 
 /* left-corner tool rail — collapsed to a single hamburger by default; tapping it expands
    the wired tools UPWARD (primary icon nearest the thumb). The tools live in their own
@@ -1301,19 +1374,17 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #endscreen .es-btn.ghost{flex-basis:100%;background:transparent;color:var(--dim);border-color:var(--line);}
 
 @media (max-width:720px), ((hover: none) and (pointer: coarse) and (max-height: 520px)){
-  #top{height:44px;}
-  .who{display:none;}
-  /* phones: the left crest is just the player emblem (title hidden) */
-  .crest{padding:0 8px;}
-  #crestmark{width:30px;height:30px;font-size:16px;}
-  #devline{top:44px;}
-  /* the chips get the full bar now (donate moved under it) — tighten just a touch */
-  /* APK / phones: stack the icon OVER the number so each value gets the full chip width */
-  .res{flex-direction:column;gap:1px;padding:0 3px;}
-  .res i{width:20px;height:20px;font-size:12px;}
-  .res b{font-size:13px;}
-  /* the value line sizes to its content on the stacked layout so the flow rate shows */
-  .rv{flex:none;gap:2px;overflow:visible;}
+  /* phones: same two rows, everything a touch tighter (nick + standing stay visible) */
+  .crest{padding:0 8px 0 2px;gap:8px;}
+  #crestmark{width:30px;height:30px;font-size:15px;}
+  .who b{font-size:12px;}
+  #tbscore{padding:2px 7px;font-size:10px;}
+  #daycard{margin-left:8px;padding:4px 9px;}
+  /* the resource capsules own a full-width row — icon and number stay inline */
+  .res{padding:0 5px;gap:4px;}
+  .res i{font-size:13px;}
+  .res i svg{width:14px;height:14px;}
+  .res b{font-size:12px;}
   #devline .dl-donate{font-size:11px;padding:2px 8px;}
 
   /* phones: three tabs + ✕ no longer fit beside the window title — the tabs alone
@@ -1367,8 +1438,6 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   /* toasts (goal line etc.) wrap to two lines instead of clipping with an ellipsis
      that hides the rest and offers no way to read it */
   #toasts .toast{white-space:normal;text-overflow:clip;line-height:1.45;}
-  /* the status line lies over bright provinces — give it a real backdrop */
-  #devline{background:rgba(2,8,11,.9);}
   /* setup: the LAUNCH button must never scroll below the fold — the pane scrolls,
      the CTA (and Back) stay pinned at the bottom of the box */
   #setup .sbox{display:flex;flex-direction:column;overflow:hidden;}
@@ -1382,9 +1451,9 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   .dp-close,.mk-close,.lw-head button{min-width:44px;min-height:44px;}
   /* notched phones: controls step inside the safe area instead of under the notch */
   #top{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);
-    padding-top:env(safe-area-inset-top,0px);height:calc(46px + env(safe-area-inset-top,0px));}
-  #devline{top:calc(44px + env(safe-area-inset-top,0px));}
-  #fps{top:calc(78px + env(safe-area-inset-top,0px));}
+    padding-top:env(safe-area-inset-top,0px);height:calc(var(--tbh) + env(safe-area-inset-top,0px));}
+  #devline{top:calc(var(--tbh) + env(safe-area-inset-top,0px));}
+  #fps{top:calc(var(--tbh) + 36px + env(safe-area-inset-top,0px));}
   #rail{padding-bottom:env(safe-area-inset-bottom);}
   #speedbar{bottom:calc(12px + env(safe-area-inset-bottom));}
   #cmdbar{bottom:calc(10px + env(safe-area-inset-bottom));gap:5px;
@@ -1415,6 +1484,12 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   color:var(--cyan);font:600 13px ui-monospace,monospace;letter-spacing:1px;cursor:pointer;min-height:46px;}
 #connect .cbtn:active{background:rgba(53,214,230,.24);}
 #connect .cbtn.ghost{border-color:var(--line-hi);background:transparent;color:var(--dim);}
+/* Credential fields must sit inside a form element, or the browser refuses to
+   pair login+password for its password manager (Chrome warns «Password field is
+   not contained in a form»). display:contents makes the wrapper layout-invisible,
+   so the existing flex/label rules below keep applying unchanged.
+   (No backticks in this comment — the whole stylesheet is a JS template literal.) */
+#connect .authform{display:contents;}
 #connect .cwlogin{display:flex;gap:8px;margin-top:10px;}
 #connect .cwlogin input{flex:1;min-width:0;padding:11px 12px;background:rgba(2,10,14,.9);border:1px solid var(--line-hi);
   border-radius:7px;color:var(--ink);font:13px/1.4 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.3px;}
@@ -1740,7 +1815,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   /* a floating card on the right whose HEIGHT fits its content (grows as rows are
      added, shrinks for a sparse fleet) instead of a fixed full-height column — only
      caps at the viewport, so ordinary panels never need an inner scrollbar */
-  #side{left:auto;right:12px;top:74px;bottom:auto;width:min(380px,40vw);height:auto;
+  #side{left:auto;right:12px;top:calc(var(--tbh) + 28px);bottom:auto;width:min(380px,40vw);height:auto;
     max-height:calc(100vh - 88px);flex-direction:column;clip-path:none;
     border:1px solid var(--cyan);border-radius:12px;
     box-shadow:-8px 0 30px rgba(0,0,0,.55),inset 0 0 30px rgba(53,214,230,.04);}
@@ -1849,14 +1924,23 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #hub .hub-empty{padding:54px 16px;text-align:center;color:var(--dim);font-size:14px;letter-spacing:1px;line-height:1.9;}
 #hub .hub-empty .he-ic{font-size:38px;color:var(--cyan-dim);display:block;margin-bottom:14px;
   text-shadow:0 0 16px rgba(53,214,230,.3);}
-#hub .hub-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
-#hub .hub-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;padding:20px 10px;
-  border-radius:12px;border:1px solid var(--line-hi);background:rgba(3,12,16,.6);color:#dfeef2;
-  font:600 12px ui-monospace,monospace;letter-spacing:1px;cursor:pointer;min-height:94px;}
-#hub .hub-tile .ht-ic{font-size:23px;color:var(--cyan);}
-#hub .hub-tile:active{background:rgba(53,214,230,.12);border-color:var(--cyan);}
-#hub .hub-tile.wide{grid-column:1 / -1;flex-direction:row;gap:12px;min-height:0;padding:14px;color:var(--dim);}
-#hub .hub-tile.wide .ht-ic{font-size:17px;color:var(--dim);}
+/* tile grid: auto-fill instead of a hard 1fr 1fr — phones still land on two columns,
+   wider screens fill the row instead of stretching two giant tiles across it */
+#hub .hub-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:9px;}
+/* compact glass tile: smaller box, thinner type, a faint top highlight for the glass
+   read, hover/press feedback. Well over the 44px thumb rule even at min-height 70. */
+#hub .hub-tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:13px 9px;
+  border-radius:10px;border:1px solid var(--line);color:#cfe7ea;
+  background:linear-gradient(180deg,rgba(6,18,23,.72),rgba(3,11,15,.62));
+  box-shadow:inset 0 1px 0 rgba(53,214,230,.07);
+  font:600 11px ui-monospace,monospace;letter-spacing:.9px;cursor:pointer;min-height:70px;
+  transition:border-color .15s ease,background .15s ease,transform .1s ease;}
+#hub .hub-tile .ht-ic{font-size:19px;color:var(--cyan);text-shadow:0 0 10px rgba(53,214,230,.3);}
+#hub .hub-tile:hover{border-color:var(--cyan-dim);
+  background:linear-gradient(180deg,rgba(10,28,34,.8),rgba(4,14,19,.68));}
+#hub .hub-tile:active{background:rgba(53,214,230,.12);border-color:var(--cyan);transform:translateY(1px);}
+#hub .hub-tile.wide{grid-column:1 / -1;flex-direction:row;gap:10px;min-height:0;padding:11px;color:var(--dim);}
+#hub .hub-tile.wide .ht-ic{font-size:15px;color:var(--dim);text-shadow:none;}
 #hub .hub-note{flex:0 0 auto;min-height:0;text-align:center;color:var(--amber);font-size:12px;
   padding:0 16px;}
 #hub .hub-note:not(:empty){padding:8px 16px;}
@@ -1880,6 +1964,55 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .mp-buy{padding:5px 12px;border:1px solid var(--cyan-dim);border-radius:7px;background:transparent;color:var(--cyan);font:700 11px ui-monospace,monospace;cursor:pointer;}
 .mp-buy:disabled{border-color:var(--line);color:var(--dim);cursor:default;}
 .mp-note{color:var(--dim);font-size:10px;margin:2px 0 0;}
+/* --- Профиль командира: the career dossier (main-menu.md §4.2). One overlay, two
+   entry points: the hub identity strip and the in-match player card, so the mount
+   below is a full-screen sheet rather than a hub panel. */
+#profile{position:fixed;inset:0;z-index:57;display:none;flex-direction:column;
+  background:radial-gradient(130% 80% at 50% 0%,#06161e,#010409);color:var(--ink);}
+#profile.show{display:flex;}
+/* right padding clears the fixed ✕ in the corner — the capsule must never sit under it */
+#profile .pf-top{flex:0 0 auto;display:flex;align-items:center;gap:12px;padding:14px 54px 14px 16px;border-bottom:1px solid var(--line);}
+#profile .pf-av{width:52px;height:52px;border-radius:50%;border:1px solid var(--cyan-dim);background:rgba(3,12,16,.8);
+  display:grid;place-items:center;color:var(--cyan);font-size:21px;font-weight:700;flex:0 0 auto;
+  box-shadow:inset 0 0 12px rgba(53,214,230,.14);font-variant-emoji:text;}
+#profile .pf-who{flex:1;min-width:0;}
+#profile .pf-nm{font-size:19px;color:#eafffb;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#profile .pf-sub{font-size:11px;color:var(--dim);margin-top:3px;line-height:1.4;}
+/* Sovereigns capsule — the premium currency reads GOLD everywhere it appears
+   (same #ffd45e as the in-match #devline counter), never the UI's cyan. */
+#profile .pf-cur{flex:0 0 auto;display:flex;align-items:center;gap:7px;padding:8px 12px;border-radius:999px;
+  border:1px solid rgba(255,212,94,.45);background:rgba(255,212,94,.08);color:#ffd45e;
+  font:700 15px ui-monospace,monospace;font-variant-numeric:tabular-nums;}
+#profile .pf-cur i{font-style:normal;font-size:15px;text-shadow:0 0 9px rgba(255,212,94,.85);}
+#profile .pf-cur i svg{display:block;width:16px;height:16px;
+  filter:drop-shadow(0 0 3px rgba(255,212,94,.75));}
+#profile .pf-cur b{font-weight:700;}
+#profile .pf-cur em{font-style:normal;color:rgba(255,212,94,.7);font-weight:400;font-size:15px;}
+#profile .pf-body{flex:1 1 auto;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:16px;display:flex;flex-direction:column;gap:14px;}
+#profile .pf-h{font-size:22px;font-weight:700;color:#eafffb;letter-spacing:.5px;}
+/* Stat tiles: the end screen's canonical shape (label-caps over a big tabular
+   number), re-declared here because those rules are scoped to #endscreen. */
+#profile .pf-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+#profile .pf-cell{border:1px solid var(--line-hi);border-radius:12px;padding:14px;background:rgba(6,18,22,.6);
+  display:flex;flex-direction:column-reverse;gap:6px;min-height:96px;justify-content:flex-end;}
+#profile .pf-k{font-size:11px;letter-spacing:.6px;color:var(--dim);}
+#profile .pf-v{font-size:30px;font-weight:700;color:#eafffb;font-variant-numeric:tabular-nums;line-height:1.1;}
+#profile .pf-v.accent{color:var(--cyan);}
+#profile .pf-sec{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--dim);margin-top:4px;}
+#profile .pf-medals{display:flex;flex-wrap:wrap;gap:18px;padding:4px 0 2px;}
+#profile .pf-medal{width:92px;display:flex;flex-direction:column;align-items:center;gap:9px;text-align:center;}
+#profile .pf-mc{width:76px;height:76px;border-radius:50%;display:grid;place-items:center;font-size:30px;
+  border:1px solid var(--cyan);color:var(--cyan);background:rgba(53,214,230,.06);
+  box-shadow:0 0 14px rgba(53,214,230,.18),inset 0 0 12px rgba(53,214,230,.08);font-variant-emoji:text;}
+/* Not earned yet: the same silhouette, drained of colour — the showcase shows what
+   is still ahead instead of hiding it. */
+#profile .pf-medal.off .pf-mc{border-color:var(--line-hi);color:var(--dim);background:rgba(3,12,16,.6);box-shadow:none;}
+#profile .pf-mn{font-size:11px;color:#dfeef2;line-height:1.35;}
+#profile .pf-medal.off .pf-mn{color:var(--dim);}
+#profile .pf-hint{color:var(--dim);font-size:11px;line-height:1.5;margin:0;}
+#profile .pf-close{position:absolute;top:12px;right:14px;width:34px;height:34px;border-radius:9px;
+  border:1px solid var(--line-hi);background:rgba(3,12,16,.7);color:var(--cyan);font-size:16px;cursor:pointer;z-index:2;}
+
 /* «Арсенал» — the account's persistent collection (hub tab, ARS-5) */
 #hp-arsenal{overflow-y:auto;gap:10px;}
 .ar-filters{display:flex;align-items:center;gap:5px;flex-wrap:wrap;padding-bottom:9px;border-bottom:1px solid var(--line);}
@@ -1887,7 +2020,8 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   font:600 10px ui-monospace,monospace;cursor:pointer;}
 .ar-fchip.on{color:var(--cyan);border-color:var(--cyan-dim);background:rgba(53,214,230,.08);}
 .ar-fsep{width:1px;height:14px;background:var(--line-hi);margin:0 2px;}
-.ar-grid .ar-card{min-height:78px;}
+/* arsenal cards carry a third line (badges + origin) — a touch taller than a hub tile */
+.ar-grid .ar-card{min-height:76px;}
 .ar-meta{color:var(--dim);font-size:9px;letter-spacing:.3px;}
 #hub .hub-nav{flex:0 0 auto;display:flex;border-top:1px solid var(--line-hi);background:rgba(2,9,13,.94);
   padding-bottom:env(safe-area-inset-bottom,0);}
@@ -1996,10 +2130,16 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
    from the zoom list. Percentages resolve against the (zoomed) parent, so they
    need no compensation — which is why the hub column below uses % and not vw. */
 @media (min-width:900px) and (hover:hover) and (pointer:fine){
+  /* PC HUD magnification. 1.5× on a tall monitor, but that fixed factor made the top
+     bar + devline + bottom rail eat a short window (laptop with a bookmarks bar, 150%
+     OS scale) until the interface clipped off the top and bottom. --pcz steps the zoom
+     down with the viewport HEIGHT (ladder below) so the HUD always fits; mobile is
+     untouched (this whole query is PC-gated). */
+  :root{--pcz:1.5;}
   #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#scipick,
   #divdesign,#market,#constructor,#codex,#codexhub,#intro,#recap,#goals,#playercard,
   #settings,#warprompt,#diplo,#splitdlg,#pingmenu,#banner,#endscreen,#connect,#updbar,
-  #hub,#emblempick,#corp,#setup,#testmode,#sandbox{zoom:1.5;}
+  #hub,#emblempick,#corp,#setup,#testmode,#sandbox{zoom:var(--pcz,1.5);}
   /* vw/vh compensations (base values ÷ 1.5 — see the note above) */
   #toasts{max-width:min(61vw,520px);}
   /* rail tool list: cap at ~7 items and scroll; the sticky ▲/▾ ticks (not buttons)
@@ -2082,6 +2222,14 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
     width:80%;margin-left:auto;margin-right:auto;
     border-left:1px solid var(--line-hi);border-right:1px solid var(--line-hi);}
 }
+/* --pcz ladder: shrink the PC HUD magnification as the window gets shorter so the top
+   bar, devline and bottom rail stop clipping the interface off the top and bottom edges.
+   Same source order = later (smaller max-height) match wins; 1.5× is kept for tall
+   monitors. PC-gated, so mobile/touch layouts never see it. */
+@media (min-width:900px) and (hover:hover) and (pointer:fine) and (max-height:859px){:root{--pcz:1.4;}}
+@media (min-width:900px) and (hover:hover) and (pointer:fine) and (max-height:759px){:root{--pcz:1.3;}}
+@media (min-width:900px) and (hover:hover) and (pointer:fine) and (max-height:679px){:root{--pcz:1.2;}}
+@media (min-width:900px) and (hover:hover) and (pointer:fine) and (max-height:599px){:root{--pcz:1.1;}}
 /* the right-dock panel layout (the ≥900px landscape query above) re-stated at
    vw/vh ÷ 1.5 for the zoomed PC HUD — those base rules would otherwise scale
    to 60vw-wide panels and off-screen heights */
@@ -2133,9 +2281,14 @@ const page = (js) => `<!doctype html>
 <body>
 <canvas id="map"></canvas>
 <header id="top">
-  <div class="crest">
-    <button id="crestmark" data-i18n-title="hud.crest.title" type="button">◆</button>
-    <div class="who"><b>VOID DOMINION</b><span>SECTOR COMMAND</span></div>
+  <div class="tbar">
+    <button id="topback" data-i18n-title="hud.back.title" type="button">‹</button>
+    <div class="crest">
+      <button id="crestmark" data-i18n-title="hud.crest.title" type="button">◆</button>
+      <div class="who"><b id="tbname">VOID DOMINION</b><span id="tbplace">SECTOR COMMAND</span></div>
+    </div>
+    <span id="tbscore" class="dstat"></span>
+    <div id="daycard"><b id="tbday"></b><span id="tbeta"></span></div>
   </div>
   <div id="purse"></div>
 </header>
@@ -2192,6 +2345,8 @@ const page = (js) => `<!doctype html>
 <div id="recap"></div>
 <div id="goals"></div>
 <div id="playercard"></div>
+<div id="rescard"></div>
+<div id="profile"></div>
 <div id="settings"></div>
 <div id="warprompt"></div>
 <div id="diplo"></div>
@@ -2224,30 +2379,34 @@ const page = (js) => `<!doctype html>
           <button id="clogin" class="cbtn ghost" type="button" data-i18n="welcome.login"></button>
           <!--dev-only--><button id="csolo" class="cbtn ghost" type="button" data-i18n="welcome.solo"></button><!--/dev-only-->
         </div>
-        <div id="cwlogin" class="cwlogin" style="display:none">
-          <input id="cwnick" type="text" autocapitalize="off" autocomplete="off" spellcheck="false" maxlength="24" data-i18n-ph="welcome.nick.ph">
-          <button id="cwgo" class="cbtn" type="button" data-i18n="welcome.go"></button>
-        </div>
-        <div id="cwpassrow" class="cwlogin" style="display:none">
-          <input id="cwpass" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.ph">
-        </div>
+        <form class="authform" onsubmit="return false">
+          <div id="cwlogin" class="cwlogin" style="display:none">
+            <input id="cwnick" type="text" autocapitalize="off" autocomplete="username" spellcheck="false" maxlength="24" data-i18n-ph="welcome.nick.ph">
+            <button id="cwgo" class="cbtn" type="button" data-i18n="welcome.go"></button>
+          </div>
+          <div id="cwpassrow" class="cwlogin" style="display:none">
+            <input id="cwpass" type="password" autocomplete="current-password" maxlength="128" data-i18n-ph="welcome.pass.ph">
+          </div>
+        </form>
       </div>
       <div id="cregister" style="display:none">
         <button id="crback" class="cback" type="button" data-i18n="welcome.back"></button>
         <div class="ctitle"><span class="dia"></span><b data-i18n="welcome.register.title"></b></div>
         <p class="csub" data-i18n="welcome.register.sub"></p>
-        <label class="cfield"><span data-i18n="welcome.register.nick"></span>
-          <input id="crnick" type="text" autocapitalize="off" autocomplete="username" spellcheck="false" maxlength="24" data-i18n-ph="welcome.nick.ph">
-        </label>
-        <label class="cfield"><span data-i18n="welcome.register.mail"></span>
-          <input id="crmail" type="email" autocapitalize="off" autocomplete="email" spellcheck="false" maxlength="254" placeholder="you@mail.com">
-        </label>
-        <label class="cfield"><span data-i18n="welcome.register.pass"></span>
-          <input id="crpass" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.min.ph">
-        </label>
-        <label class="cfield"><span data-i18n="welcome.register.pass2"></span>
-          <input id="crpass2" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.again.ph">
-        </label>
+        <form class="authform" onsubmit="return false">
+          <label class="cfield"><span data-i18n="welcome.register.nick"></span>
+            <input id="crnick" type="text" autocapitalize="off" autocomplete="username" spellcheck="false" maxlength="24" data-i18n-ph="welcome.nick.ph">
+          </label>
+          <label class="cfield"><span data-i18n="welcome.register.mail"></span>
+            <input id="crmail" type="email" autocapitalize="off" autocomplete="email" spellcheck="false" maxlength="254" placeholder="you@mail.com">
+          </label>
+          <label class="cfield"><span data-i18n="welcome.register.pass"></span>
+            <input id="crpass" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.min.ph">
+          </label>
+          <label class="cfield"><span data-i18n="welcome.register.pass2"></span>
+            <input id="crpass2" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.again.ph">
+          </label>
+        </form>
         <div class="crow">
           <button id="crgo" class="cbtn" type="button" data-i18n="welcome.register.go"></button>
         </div>
@@ -2267,12 +2426,19 @@ const page = (js) => `<!doctype html>
       <div id="creset" style="display:none">
         <div class="ctitle"><span class="dia"></span><b data-i18n="welcome.reset.title"></b></div>
         <p class="csub" data-i18n="welcome.reset.sub"></p>
-        <label class="cfield"><span data-i18n="welcome.reset.pass"></span>
-          <input id="cresetpass" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.min.ph">
-        </label>
-        <label class="cfield"><span data-i18n="welcome.reset.pass2"></span>
-          <input id="cresetpass2" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.again.ph">
-        </label>
+        <form class="authform" onsubmit="return false">
+          <!-- Hidden username: a password form without one leaves the manager unable to
+               tell WHICH account the new password belongs to (Chrome: «Password forms
+               should have (optionally hidden) username fields»). Filled from the saved
+               callsign at reset time; never submitted anywhere. -->
+          <input id="cresetuser" type="text" autocomplete="username" hidden aria-hidden="true" tabindex="-1">
+          <label class="cfield"><span data-i18n="welcome.reset.pass"></span>
+            <input id="cresetpass" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.min.ph">
+          </label>
+          <label class="cfield"><span data-i18n="welcome.reset.pass2"></span>
+            <input id="cresetpass2" type="password" autocomplete="new-password" maxlength="128" data-i18n-ph="welcome.pass.again.ph">
+          </label>
+        </form>
         <div class="crow">
           <button id="cresetgo" class="cbtn" type="button" data-i18n="welcome.reset.go"></button>
         </div>
@@ -2284,12 +2450,14 @@ const page = (js) => `<!doctype html>
         <label class="cfield"><span data-i18n="welcome.browse.server"></span>
           <input id="csrv" type="text" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false" placeholder="wss://… or ws://host:8788">
         </label>
-        <label class="cfield"><span data-i18n="welcome.browse.nick"></span>
-          <input id="cnick" type="text" autocapitalize="off" autocomplete="off" spellcheck="false" maxlength="24" data-i18n-ph="welcome.nick.ph">
-        </label>
-        <label class="cfield" id="cpassrow" style="display:none"><span data-i18n="welcome.browse.pass"></span>
-          <input id="cpass" type="password" autocomplete="current-password" maxlength="128" data-i18n-ph="welcome.pass.ph">
-        </label>
+        <form class="authform" onsubmit="return false">
+          <label class="cfield"><span data-i18n="welcome.browse.nick"></span>
+            <input id="cnick" type="text" autocapitalize="off" autocomplete="username" spellcheck="false" maxlength="24" data-i18n-ph="welcome.nick.ph">
+          </label>
+          <label class="cfield" id="cpassrow" style="display:none"><span data-i18n="welcome.browse.pass"></span>
+            <input id="cpass" type="password" autocomplete="current-password" maxlength="128" data-i18n-ph="welcome.pass.ph">
+          </label>
+        </form>
         <div class="crow">
           <button id="cgo" class="cbtn" type="button" data-i18n="welcome.browse.go"></button>
         </div>

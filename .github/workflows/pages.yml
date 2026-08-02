@@ -1,7 +1,10 @@
 name: Play in browser (GitHub Pages)
 
 # Builds the self-contained prototype HTML and publishes it to GitHub Pages, so the
-# game can be tried in a browser with no install at https://moonwuk.github.io/Nygame/.
+# game can be tried in a browser with no install at https://moonwuk.github.io/MoonGame/.
+# (Адрес проектных Pages — это ИМЯ РЕПОЗИТОРИЯ: `…github.io/<repo>/`. Раньше здесь и в
+# доках стояло `/Nygame/` — такого репозитория нет, ссылка вела бы в 404 даже после
+# включения Pages. Кастомного домена (CNAME) в репозитории нет.)
 #
 # ⚠ ONE-TIME MANUAL STEP (the reason every run failed until now — 0 green out of 119):
 # GitHub Pages must be enabled in the repo settings FIRST — Settings → Pages →
@@ -43,7 +46,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
 

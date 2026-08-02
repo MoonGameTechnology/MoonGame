@@ -127,50 +127,47 @@ describe('visibleState — diplomatic offers are private to the two parties', ()
 
 describe('visibleState — order chains are the owner’s secret (future intent)', () => {
   it('keeps only the viewer’s own fleets’ chains, drops the key when none remain', () => {
-    const state = scenario() as GameState & { orders?: Record<string, unknown> };
+    const state = scenario();
     state.orders = {
-      'mine-1': [{ kind: 'move', to: 'B' }], // viewer's plan
-      'enemy-near': [{ kind: 'assault' }], // the enemy's plan — must not leak
-      ghost: [{ kind: 'orbit' }], // a dead fleet's stale entry — nobody's
+      'mine-1': { steps: [{ kind: 'move', to: 'B' }] }, // viewer's plan
+      'enemy-near': { steps: [{ kind: 'assault' }] }, // the enemy's plan — must not leak
+      ghost: { steps: [{ kind: 'assault' }] }, // a dead fleet's stale entry — nobody's
     };
-    const view = visibleState(state, 'p1', data) as VisibleState & {
-      orders?: Record<string, unknown>;
-    };
-    expect(view.orders).toEqual({ 'mine-1': [{ kind: 'move', to: 'B' }] });
+    const view = visibleState(state, 'p1', data) as VisibleState & GameState;
+    expect(view.orders).toEqual({ 'mine-1': { steps: [{ kind: 'move', to: 'B' }] } });
     // The enemy (p2) in turn sees only its own chain — and never the viewer's.
-    const enemy = visibleState(state, 'p2', data) as VisibleState & {
-      orders?: Record<string, unknown>;
-    };
-    expect(enemy.orders).toEqual({ 'enemy-near': [{ kind: 'assault' }] });
+    const enemy = visibleState(state, 'p2', data) as VisibleState & GameState;
+    expect(enemy.orders).toEqual({ 'enemy-near': { steps: [{ kind: 'assault' }] } });
     // A player with no chains gets no key at all (no empty-map blip in deltas).
-    state.orders = { 'enemy-near': [{ kind: 'assault' }] };
+    state.orders = { 'enemy-near': { steps: [{ kind: 'assault' }] } };
     expect('orders' in visibleState(state, 'p1', data)).toBe(false);
   });
 
-  it('standing orders (autoAssault / patrols) are stripped by the same rule', () => {
-    const state = scenario() as GameState & {
-      autoAssault?: Record<string, unknown>;
-      patrols?: Record<string, unknown>;
-    };
+  it('standing orders (autoAssault / patrols / wingSorties) are stripped by the same rule', () => {
+    const state = scenario();
     state.autoAssault = { 'mine-1': true, 'enemy-near': true };
     state.patrols = {
       'mine-1': { center: { x: 0, y: 0 }, radius: 5, sortie: { fuel: 2, rearming: 0 } },
       'enemy-near': { center: { x: 9, y: 9 }, radius: 7, sortie: { fuel: 1, rearming: 0 } },
     };
-    const view = visibleState(state, 'p1', data) as VisibleState & {
-      autoAssault?: Record<string, unknown>;
-      patrols?: Record<string, unknown>;
+    state.wingSorties = {
+      'mine-1': { fuel: 1, rearming: 2 },
+      'enemy-near': { fuel: 0, rearming: 1 },
     };
+    const view = visibleState(state, 'p1', data) as VisibleState & GameState;
     expect(view.autoAssault).toEqual({ 'mine-1': true });
     expect(Object.keys(view.patrols ?? {})).toEqual(['mine-1']);
+    expect(view.wingSorties).toEqual({ 'mine-1': { fuel: 1, rearming: 2 } });
     // With nothing of the viewer's left, the keys vanish entirely (delta hygiene).
     state.autoAssault = { 'enemy-near': true };
     state.patrols = {
       'enemy-near': { center: { x: 9, y: 9 }, radius: 7, sortie: { fuel: 1, rearming: 0 } },
     };
+    state.wingSorties = { 'enemy-near': { fuel: 0, rearming: 1 } };
     const bare = visibleState(state, 'p1', data);
     expect('autoAssault' in bare).toBe(false);
     expect('patrols' in bare).toBe(false);
+    expect('wingSorties' in bare).toBe(false);
   });
 
   it('forced-march flags (BOOST-1) are stripped by the same rule', () => {
@@ -248,19 +245,76 @@ describe('visibleState (fog of war as a security boundary)', () => {
     state.players.p2!.steward = { posture: 'defend', until: state.time + 1 };
     state.players.p2!.stewardLog = [{ at: 0, kind: 'evac', node: 'A' }];
     state.players.p2!.stewardHoldPoints = ['A'];
+    state.players.p2!.scientists = [{ id: 'void_admiral', level: 3 }];
     state.players.p1!.steward = { posture: 'defend', until: state.time + 1 };
     state.players.p1!.stewardHoldPoints = ['B'];
+    state.players.p1!.scientists = [{ id: 'ground_marshal', level: 2 }];
+    state.capital = { p1: 'B', p2: 'A' };
     const view = visibleState(state, 'p1', data);
     expect(view.players.p1?.resources).toEqual({ metal: 99 }); // own treasury intact
     expect(view.players.p2?.resources).toEqual({}); // enemy treasury hidden
     expect(view.players.p2?.technologies).toBeUndefined();
     expect(view.players.p2?.scientist).toBeUndefined(); // enemy research leader hidden
+    expect(view.players.p2?.scientists).toBeUndefined(); // enemy council hidden (same intel)
+    expect(view.players.p1?.scientists).toEqual([{ id: 'ground_marshal', level: 2 }]); // own council stays
+    expect(view.capital).toEqual({ p1: 'B' }); // rival capital = hero-respawn anchor, hidden
     expect(view.players.p2?.steward).toBeUndefined(); // enemy autopilot status hidden
     expect(view.players.p2?.stewardLog).toBeUndefined(); // enemy SITREP hidden
     expect(view.players.p2?.stewardHoldPoints).toBeUndefined(); // enemy anchors hidden
     expect(view.players.p1?.steward).toBeDefined(); // own delegation stays visible
     expect(view.players.p1?.stewardHoldPoints).toEqual(['B']); // own anchors stay visible
     expect(view.players.p2?.name).toBe('p2'); // identity kept (scoreboard)
+  });
+
+  it('fogs ground divisions: garrisoning at an unidentified world, or riding a hidden fleet, is stripped', () => {
+    const state = scenario();
+    state.players.p1!.divisionTemplates = [{ name: 'mine', slots: [] }];
+    state.players.p2!.divisionTemplates = [{ name: 'theirs', slots: [] }];
+    state.divisions = {
+      'div:p1:own': {
+        id: 'div:p1:own',
+        owner: 'p1',
+        name: 'own',
+        template: 0,
+        max: { militia: 1 },
+        units: [{ type: 'militia', count: 1, hp: 14, hpEach: 14 }],
+        location: 'A', // p1's own, always identified
+      },
+      'div:p2:identified': {
+        id: 'div:p2:identified',
+        owner: 'p2',
+        name: 'at B',
+        template: 0,
+        max: { militia: 1 },
+        units: [{ type: 'militia', count: 1, hp: 14, hpEach: 14 }],
+        location: 'B', // identified neutral world (enemy-near sits there too)
+      },
+      'div:p2:hidden': {
+        id: 'div:p2:hidden',
+        owner: 'p2',
+        name: 'at D',
+        template: 0,
+        max: { militia: 1 },
+        units: [{ type: 'militia', count: 1, hp: 14, hpEach: 14 }],
+        location: 'D', // beyond radar — not identified
+      },
+      'div:p2:carried': {
+        id: 'div:p2:carried',
+        owner: 'p2',
+        name: 'aboard enemy-hidden',
+        template: 0,
+        max: { militia: 1 },
+        units: [{ type: 'militia', count: 1, hp: 14, hpEach: 14 }],
+        location: 'D',
+        carriedBy: 'enemy-hidden', // the carrying fleet is itself beyond radar
+      },
+    };
+    state.groundBattles = { B: 1000, D: 2000 };
+    const view = visibleState(state, 'p1', data);
+    expect(Object.keys(view.divisions ?? {}).sort()).toEqual(['div:p1:own', 'div:p2:identified']);
+    expect(view.groundBattles).toEqual({ B: 1000 }); // D's battle is fogged, not just its divisions
+    expect(view.players.p2?.divisionTemplates).toBeUndefined(); // enemy templates hidden
+    expect(view.players.p1?.divisionTemplates).toEqual([{ name: 'mine', slots: [] }]); // own kept
   });
 
   it('fogs the scoreboard: viewer keeps only their own score line, enemy totals hidden', () => {

@@ -1,0 +1,24 @@
+# Void Dominion — release overlay (SEC-13): run the SIGNED, SCANNED image from GHCR
+# instead of building on the host. Compose it WITH the base file (and the TLS overlay
+# when the host is public):
+#
+#   ./verify-image.sh "$VOID_IMAGE"          # cosign verify — the gate, run it first
+#   docker pull "$VOID_IMAGE"
+#   VOID_IMAGE=ghcr.io/moonwuk/moongame@sha256:… \
+#     docker compose -f docker-compose.yml -f docker-compose.release.yml up -d --no-build
+#
+# Why this exists: `up --build` on the host produces an image nobody scanned or signed —
+# it happens to be built from the same Dockerfile, but that is a claim about the source,
+# not about the bytes that end up running. Pulling the published digest makes "what is
+# running in production passed the security gate" a checkable statement.
+#
+# `--no-build` matters: the base file still carries a `build:` section (the from-source
+# path stays supported), and without the flag compose may rebuild locally and silently
+# discard the verified image.
+services:
+  server:
+    # Digest ref, never a tag — a tag can be re-pointed after verification, which would
+    # make the cosign check theatre. image.yml prints the exact line in its run summary.
+    image: ${VOID_IMAGE:?set VOID_IMAGE to the verified digest ref, e.g. ghcr.io/moonwuk/moongame@sha256:...}
+    # Never silently fall back to a stale local copy of the same ref.
+    pull_policy: always

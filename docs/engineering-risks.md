@@ -91,7 +91,7 @@ For React Native, keep `shared-core` preview work off the UI thread where possib
 
 **Risk:** prototype UX can accidentally hard-code mechanics that should stay data-driven.
 
-**Decision:** prototype-only helpers are allowed (`fleet.launch` currently lives there), but anything used by server/client gameplay should graduate into `shared-core` as a module with tests. UI affordances such as selection groups must submit player intent only, not mutate state directly.
+**Decision:** prototype-only helpers are allowed, but anything used by server/client gameplay should graduate into `shared-core` as a module with tests. UI affordances such as selection groups must submit player intent only, not mutate state directly. (`fleet.launch`/`merge`/`split`/`engage` graduated to `packages/shared-core/src/modules/fleetOps.ts` — the pattern worked as intended.)
 
 ## 11. Action latency and optimistic UI
 

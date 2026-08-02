@@ -228,6 +228,16 @@ describe('heroEffects — aura (rally/bulwark → time-boxed combat.damage)', ()
     expect(auras).toEqual([{ bonus: 0.1, radius: 300, until: HOUR + 2 * HOUR }]); // only the fresh one
   });
 
+  it('the aura window compresses with the match timeScale, like its fx: cooldown', () => {
+    // On a ×4 match a 2h aura lasts 2h/4 of world time — the same hoursToMs rule
+    // every other hero duration follows. A raw MS_PER_HOUR window would outlive
+    // its own compressed cooldown (the pre-fix drift).
+    const scaled: Context = { now: 0, data, config: { timeScale: 4 } };
+    const r = okApply(kernel.applyAction(auraWorld(), rally, scaled));
+    const auras = r.state.heroes!['hero:p1:1']?.activeAuras;
+    expect(auras).toEqual([{ bonus: 0.1, radius: 300, until: (2 * HOUR) / 4 }]);
+  });
+
   // --- the aura actually reaching combat.damage ------------------------------
   const battleKernel = createKernel([heroModule, heroEffectsModule, combatModule, arriveModule]);
   /** p1's fleet A fights p2's D over P(0,0); the hero sits at `heroAt` with `auras`. */

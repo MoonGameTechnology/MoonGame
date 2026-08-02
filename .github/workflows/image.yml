@@ -1,0 +1,177 @@
+name: Release image (GHCR + cosign)
+
+# SEC-13 — the missing link between "we scan containers" and "we run containers".
+#
+# THE GAP THIS CLOSES. Until now nothing published an image: Render rebuilt the
+# Dockerfile on its own infra and the VPS ran `docker compose up --build` on the box.
+# Both are INDEPENDENT rebuilds of the same Dockerfile, so the artifact `trivy-image`
+# scanned in CI was never the artifact that ran in production — there was no way to
+# state "what is running was scanned", and no identity (digest) to even ask about.
+#
+# THE CHAIN. build → scan (BLOCKING, same .trivyignore as security.yml) → push to GHCR
+# → keyless cosign signature over the resulting DIGEST. A failed scan means no push, so
+# an unscanned image cannot reach the registry the deploy pulls from. The deploy side
+# verifies the signature before starting anything: deploy/verify-image.sh +
+# deploy/docker-compose.release.yml (runbook in deploy/README.md).
+#
+# WHY A DIGEST, NOT A TAG. Tags are mutable; a signature over a tag proves nothing about
+# the bytes that get pulled later. Everything downstream — signing, verification, the
+# compose overlay — speaks `ghcr.io/<repo>@sha256:…`.
+#
+# WHY COSIGN-AS-A-PINNED-CONTAINER (not actions/attest-build-provenance): the SEC-7
+# reasoning applies unchanged — that Action can't be SHA-pinned from this dev
+# environment, while ghcr.io's registry API gives a real, verified digest. Same image
+# pin as android.yml.
+#
+# ONE-TIME REPO SETTING. The push needs a GITHUB_TOKEN that may write packages. If
+# Settings → Actions → General → Workflow permissions is on "Read repository contents
+# and packages permissions", the `packages: write` request below is capped by that
+# setting and the push fails with 403 — the workflow can only narrow the default, never
+# exceed it. Flip that setting to read/write (or grant the package `write` to this repo
+# under the package's own settings once it exists). The first package a workflow pushes
+# inherits the repository's visibility.
+#
+# Actions are SHA-pinned (SD-6.1 / F-16); checkouts don't persist credentials.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: image-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+jobs:
+  publish:
+    name: build → scan → push → sign
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # push image + signature to ghcr.io
+      id-token: write # keyless cosign: GitHub OIDC → Fulcio → Rekor
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # GHCR namespaces are lowercase; `Moonwuk/MoonGame` is not.
+      - name: resolve image name
+        id: img
+        env:
+          REPO: ${{ github.repository }}
+        run: |
+          echo "image=ghcr.io/$(echo "$REPO" | tr '[:upper:]' '[:lower:]')" >> "$GITHUB_OUTPUT"
+
+      - name: build
+        env:
+          IMAGE: ${{ steps.img.outputs.image }}
+        run: docker build -t "$IMAGE:ci" .
+
+      # BLOCKING gate before the image can exist in the registry. Mirrors the
+      # `trivy-image` job in security.yml (same pinned scanner, same .trivyignore
+      # mounted from the repo root) — this one just runs earlier in the same job so a
+      # finding stops the push instead of reporting on an image already published.
+      - name: scan before push (blocking)
+        env:
+          IMAGE: ${{ steps.img.outputs.image }}
+        run: |
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/out" -w /out \
+            aquasec/trivy:0.58.2 image --exit-code 1 --format table "$IMAGE:ci"
+
+      - name: push
+        id: push
+        env:
+          IMAGE: ${{ steps.img.outputs.image }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          echo "$REGISTRY_TOKEN" | docker login ghcr.io -u "$REGISTRY_USER" --password-stdin
+          short="${SHA:0:12}"
+          docker tag "$IMAGE:ci" "$IMAGE:main"
+          docker tag "$IMAGE:ci" "$IMAGE:sha-$short"
+          docker push "$IMAGE:main"
+          docker push "$IMAGE:sha-$short"
+          # The digest is assigned by the registry on push — read it back rather than
+          # computing it locally, so what we sign is exactly what a `docker pull` gets.
+          ref=$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$IMAGE:main" |
+            grep "^$IMAGE@" | head -1)
+          if [ -z "$ref" ]; then
+            echo "::error::could not resolve the pushed digest — refusing to sign a tag"
+            exit 1
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          echo "pushed $ref"
+
+      # Keyless: the Fulcio cert binds the signature to THIS workflow file + repo +
+      # commit, and the Rekor entry makes it publicly auditable. No key to manage or
+      # leak. Blocking on purpose (unlike the best-effort APK signature in android.yml):
+      # an unsigned image would fail deploy/verify-image.sh anyway, so a silent failure
+      # here would just surface later as an undeployable image.
+      #
+      # REGISTRY CREDENTIALS GO IN AS FLAGS, NOT AS A MOUNTED DOCKER CONFIG. The first
+      # live run (run #1 on the merge commit) got all the way through Fulcio, the SCT and
+      # the Rekor entry, then died pushing the signature: `UNAUTHORIZED: unauthenticated`.
+      # The `docker push` above had just succeeded with the same token, so the token was
+      # never the problem — cosign simply never saw it. The mounted `~/.docker/config.json`
+      # is unusable to it: the cosign image is distroless and does NOT run as root, so
+      # neither `/root/…` nor a 0600 file owned by the runner is reachable, and cosign
+      # fell back to an anonymous token. Passing the credentials explicitly removes the
+      # whole question of which user and which HOME the container happens to have.
+      - name: sign the digest (cosign, keyless)
+        env:
+          COSIGN_EXPERIMENTAL: '1'
+          REF: ${{ steps.push.outputs.ref }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ github.token }}
+        run: |
+          docker run --rm \
+            -e COSIGN_EXPERIMENTAL \
+            -e ACTIONS_ID_TOKEN_REQUEST_TOKEN \
+            -e ACTIONS_ID_TOKEN_REQUEST_URL \
+            -e REGISTRY_USER \
+            -e REGISTRY_TOKEN \
+            ghcr.io/sigstore/cosign/cosign@sha256:b03690aa52bfe94054187142fba24dc54137650682810633901767d8a3e15b31 \
+            sign --yes \
+            --registry-username "$REGISTRY_USER" \
+            --registry-password "$REGISTRY_TOKEN" \
+            "$REF"
+
+      # Prove the published signature is actually verifiable the way a deploy verifies
+      # it — same command, same identity constraints as deploy/verify-image.sh. A green
+      # publish that nobody can verify is worse than no signature at all.
+      - name: verify what we just signed
+        env:
+          REF: ${{ steps.push.outputs.ref }}
+          REPO: ${{ github.repository }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ github.token }}
+        run: |
+          docker run --rm \
+            -e REGISTRY_USER \
+            -e REGISTRY_TOKEN \
+            ghcr.io/sigstore/cosign/cosign@sha256:b03690aa52bfe94054187142fba24dc54137650682810633901767d8a3e15b31 \
+            verify "$REF" \
+            --registry-username "$REGISTRY_USER" \
+            --registry-password "$REGISTRY_TOKEN" \
+            --certificate-identity-regexp "^https://github.com/$REPO/\.github/workflows/image\.yml@refs/heads/main$" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            -o text
+
+      - name: deploy instructions
+        env:
+          REF: ${{ steps.push.outputs.ref }}
+        run: |
+          {
+            echo "## 📦 Signed image published"
+            echo ""
+            echo '```bash'
+            echo "./deploy/verify-image.sh $REF   # cosign verify — run this FIRST"
+            echo "docker pull $REF"
+            echo "cd deploy && VOID_IMAGE=$REF \\"
+            echo "  docker compose -f docker-compose.yml -f docker-compose.release.yml up -d --no-build"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"

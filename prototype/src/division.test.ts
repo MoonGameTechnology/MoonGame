@@ -108,7 +108,7 @@ describe('divisions — mobilisation', () => {
     expect(d.owner).toBe('p1');
     expect(d.location).toBe(HOME);
     expect(total(d.units)).toBe(6);
-    expect(r.state.players.p1!.resources.metal).toBeLessThan(before); // paid up front
+    expect(r.state.players.p1!.resources.metal).toBeLessThan(before!); // paid up front
   });
 
   it('rejects mobilisation on a non-owned world, a bad template, or when broke', () => {
@@ -322,8 +322,8 @@ describe('divisions — no field repair under fire (BF-22)', () => {
 function game3() {
   const s = newGame({
     seats: [
-      { id: 'p1', name: 'A', faction: 'blue', start: START_CANDIDATES[0]!, ai: false },
-      { id: 'p2', name: 'B', faction: 'red', start: START_CANDIDATES[1]!, ai: true },
+      { id: 'p1', name: 'A', faction: 'azure', start: START_CANDIDATES[0]!, ai: false },
+      { id: 'p2', name: 'B', faction: 'crimson', start: START_CANDIDATES[1]!, ai: true },
       { id: 'p3', name: 'C', faction: 'green', start: START_CANDIDATES[2]!, ai: true },
     ],
   });
@@ -446,7 +446,7 @@ describe('H4 — named officer templates + designer rename + counter matrix', ()
   });
 
   it('renames a CUSTOM template (bounded), never an officer premade', () => {
-    let s = order(richGame(), renameDivisionTemplate('p1', 0, '  Моя гвардия  '), 0).state;
+    const s = order(richGame(), renameDivisionTemplate('p1', 0, '  Моя гвардия  '), 0).state;
     expect(templatesOf(s, 'p1')[0]!.name).toBe('Моя гвардия'); // trimmed
     expect(order(s, renameDivisionTemplate('p1', 0, '   '), 0).error).toBe('E_BAD_PAYLOAD');
     expect(order(s, renameDivisionTemplate('p1', 9, 'x'), 0).error).toBe('E_NO_TEMPLATE');

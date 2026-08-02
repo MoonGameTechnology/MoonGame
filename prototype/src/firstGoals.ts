@@ -11,7 +11,7 @@
 
 export interface Goal {
   id: string;
-  label: string; // canonical-Russian msgid, rendered through t()
+  labelKey: string; // ключ локали, рендерится через t()
 }
 
 /** Reach this score to close the last goal (home world alone is below it). */
@@ -19,10 +19,10 @@ export const SCORE_GOAL = 100;
 
 /** The four first-match goals, in the order the guided match teaches them. */
 export const FIRST_GOALS: Goal[] = [
-  { id: 'mine', label: 'onb.goal.mine' },
-  { id: 'fleet', label: 'Построй корабль' },
-  { id: 'capture', label: 'Захвати мир' },
-  { id: 'score', label: 'Набери 100 очков' },
+  { id: 'mine', labelKey: 'onb.goal.mine' },
+  { id: 'fleet', labelKey: 'onb.goal.fleet' },
+  { id: 'capture', labelKey: 'onb.goal.capture' },
+  { id: 'score', labelKey: 'onb.goal.score' },
 ];
 
 /** Live progress signals, measured against the onboarding match's start baseline. */

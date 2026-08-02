@@ -110,7 +110,9 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
     stance: z.enum(['war', 'peace', 'pact', 'alliance']),
   }),
   // --- prototype-host actions (the netserver runs the prototype's kernel) -----------
-  // fleetLaunch / squadron ops (prototype game.ts modules)
+  // fleet.launch/merge/split/engage: canonical `fleetOpsModule` handles these too
+  // (the missing garrison→mobile-fleet link) — not prototype-only anymore, the
+  // section header above is stale for this group specifically.
   'fleet.launch': z.object({ planetId: id }),
   'fleet.merge': z.object({ from: id, into: id }),
   'fleet.split': z.object({
@@ -181,6 +183,15 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
             kind: z.literal('strike'),
             target: id.nullable(),
             hours: z.number().positive().finite(),
+          }),
+          // hero ability cast as a step (CC-1 × HERO-4): the fleet's hero casts it
+          // once the fleet is free; `target` — optional world for ranged casts.
+          // Keep in lockstep with `state/chain.ts` — this arm was missing at first,
+          // so a gated server rejected plans a solo match accepted.
+          z.object({
+            kind: z.literal('ability'),
+            abilityId: id,
+            target: id.nullable().optional(),
           }),
         ]),
       )

@@ -13,12 +13,14 @@
     "@void/action-layer": "workspace:*",
     "@void/shared-core": "workspace:*",
     "fastify": "^5.10.0",
-    "jose": "^6.2.3",
+    "jose": "^6.2.4",
     "pg": "^8.22.0",
+    "web-push": "^3.6.7",
     "ws": "8.21.1"
   },
   "devDependencies": {
     "@types/pg": "^8.20.0",
+    "@types/web-push": "^3.6.4",
     "@types/ws": "8.18.1"
   }
 }

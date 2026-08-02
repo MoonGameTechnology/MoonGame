@@ -4,14 +4,15 @@
 > Обновлять при заметных сдвигах. Подробный нарратив — [`state.md`](state.md);
 > план сборки — [`roadmap.md`](roadmap.md).
 
-**Гейт:** ✅ зелёный · `pnpm run check` (lint + typecheck + test + docs-check) · **~1554 теста / 143 файла**.
+**Гейт:** ✅ зелёный · `pnpm run check` (lint + typecheck + test + docs-check) ·
+актуальный счётчик тестов — в шапке [`state.md`](state.md) (единственный дом этого числа).
 
 ## Этапы сборки
 
 | Этап                                                 | Статус                           | Что готово                                                                                                                                                                                                                                                                                                                                                                        | Осталось                                                                                                |
 | ---------------------------------------------------- | -------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | **0 · Каркас**                                       | ✅ Готово                        | Монорепа (pnpm workspaces), TS strict, ESLint (+правила детерминизма), Prettier, Vitest, CI-гейт, lockfile, `data/*.json` + zod                                                                                                                                                                                                                                                   | —                                                                                                       |
-| **1 · Ядро** (`shared-core`)                         | ✅ Готово                        | 24 модуля (ниже), микроядро + `advanceTo`, детерминизм (sfc32 + golden), fail-secure                                                                                                                                                                                                                                                                                              | —                                                                                                       |
+| **1 · Ядро** (`shared-core`)                         | ✅ Готово                        | 32 модуля (ниже), микроядро + `advanceTo`, детерминизм (sfc32 + golden), fail-secure                                                                                                                                                                                                                                                                                              | —                                                                                                       |
 | **2 · Слой действий** (`action-layer`)               | ✅ Готово и подключено           | envelope-валидация, gate (validate→payload→authorize→dedup→sequence), idempotency-квитанции, per-session `clientSeq`, стабильные коды; **вшит в сервер**; клиент шлёт `action.v1` по `gated`-рукопожатию                                                                                                                                                                          | —                                                                                                       |
 | **3 · Сервер**                                       | 🚧 Крит-путь закрыт              | Fastify WS (`/health`·`/ready`·`/metrics`·drain), MatchRoom + `LazyRoomRegistry` (N матчей, гибернация, 24/7), **MatchKeeper** (пул `OPEN_MATCHES` открытых матчей) + `GET /matches/open`, commit-before-broadcast + durable Postgres/in-memory, туман-на-отправке, **аккаунты логин/пароль (scrypt) + session/join-JWT**, action-gate (под флагом `GATE=1`), offline-планировщик | **включить auth/gate на играбельном пути (прототип-хост)**, OIDC-идентичность, мультипроцессный масштаб |
 | **4 · Клиент** (`client`)                            | 🚧 В работе                      | view-models `welcomeScreen`/`matchHud`, токены темы, `MultiplayerClient` (welcome/delta + **`action.v1`-конверты**), **Vite-shell с живой картой** (общий рендер-кит: камера/holo/территории, `?join=`-диплинк, приказ движения)                                                                                                                                                  | Полный HUD в shell; играбельный клиент игроков — `prototype/` (RU/EN, мобильный UI-пасс)                |
@@ -20,9 +21,9 @@
 
 ## Ядро — модули (все ✅, покрыты тестами)
 
-kernel + `advanceTo` · movement (Дейкстра по лейнам) · **combat / orbital / artillery / intercept** (распил монолита, PR #100) · construction + buildings (уровни/HP/оборона/разрушение) · economy (+содержание) · army (domain, load/unload, десант) · victory/счёт · technology (сессионное древо) · planetType · sector · faction · hero · market · scientist · station · **espionage** (SPY-1/SPY-2, PR #102) · **steward** («Хранитель» — делегирование места ИИ, PR #105) · visibility (туман: identify + radar + память + anti-leak) · diplomacy (war/peace/pact/alliance + consent-офферы) · captureOnArrival · **effects** (EFX-1: интерпретатор `data.events` trigger→effect, generic-чтение трейтов).
+kernel + `advanceTo` · movement (Дейкстра по лейнам) · **combat / orbital / artillery / intercept** (распил монолита, PR #100) · construction + buildings (уровни/HP/оборона/разрушение) · economy (+содержание) · tax (гражданский налог) · army (domain, load/unload, десант) · **fleetOps** (`fleet.launch`/`merge`/`split`/`engage`) · victory/счёт · technology (сессионное древо) · planetType · sector · faction · hero · **heroEffects** (recall/aura/reveal) · capital · market · scientist · station · **espionage** (SPY-1/SPY-2, PR #102) · **steward** («Хранитель» — делегирование места ИИ, PR #105) · **standingOrders** (order.auto/scramble/chain) · instantRepair · fleetRepair · forcedMarch · arsenalSync (LARS-1) · visibility (туман: identify + radar + память + anti-leak) · diplomacy (war/peace/pact/alliance + consent-офферы) · captureOnArrival · **effects** (EFX-1: интерпретатор `data.events` trigger→effect, generic-чтение трейтов).
 
-## Прототип (играбельный клиент игроков — 35 файлов тестов)
+## Прототип (играбельный клиент игроков; тесты лежат рядом в `prototype/src/*.test.ts`)
 
 Движение/лейны + task-группы · бой + двухфазный захват · экономика + постройки + апгрейд · дипломатия-меню · чат коалиции + **пинги (коалиция / ЛС игроку)** · эскадрильи (вылет/топливо/патруль) + авианосцы · **цепочки команд** (пауза-на-отказе, план на карте, правка по шагу, 🔁 — PR #101) · **стоячие приказы** (авто-штурм) · дивизии (пехота+танк): внутриматчевая сборка шаблонов с превью характеристик + мобилизация + наземный бой · артиллерия (режимы огня, **дуги снарядов с разрывами**) · герои (грейды/респаун) + **совет учёных** (предматчевый выбор, рекомендованная пара) · радар/туман · **орбитальное AA как здание** + наземная оборона захвата · **шпионаж** играбелен · **«Хранитель»** (сон → ИИ держит оборону) · налоги/рынок · **мета-прогрессия командира** (XP между матчами, 3 ветки прокачки, PR #126) · **локализация RU/EN** · мобильный UI-пасс (safe-area, 44px, нижние листы, PR #125) · in-app APK-обновление · Back закрывает слои UI.
 
@@ -41,8 +42,11 @@ kernel + `advanceTo` · movement (Дейкстра по лейнам) · **comba
 > Трёхуровневый вердикт (аудит 2026-07-07): дружеский плейтест по ссылке — ✅ готов;
 > недельный матч ×1 — ⚠️ впритык по контенту; публичный запуск — ❌ (auth/TLS/gate).
 
-1. **Auth/gate не на играбельном пути:** `packages/server` умеет логин/пароль + JWT + gate,
-   но прототип-хост (`pnpm host`) пускает по нику без пароля и принимает голые action.
+1. **Auth на играбельном пути — opt-in (постура деплоя):** гейт действий и замок мест
+   на прототип-хосте есть и в compose включены по умолчанию (REL-4 `GATE=1`, REL-5
+   `SEAT_LOCK=1`), контур аккаунтов монтируется при `AUTH_JWT_SECRET` (SES-2.5); но без
+   секрета вход остаётся ник+билет, а строгую связку требует только `PROD=1` —
+   «построено ≠ включено» остаётся риском конфигурации, не кода.
 2. **P0-баги сетевого матча — закрыты (NET-P0 ✅):** порог победы/timeScale передаются в
    MatchRoom; p2 сеется человеком (совет учёных на месте); доменные события доезжают до
    клиента (боевые эффекты видны по сети); сессионный чат ходит через сервер
@@ -51,9 +55,10 @@ kernel + `advanceTo` · movement (Дейкстра по лейнам) · **comba
 3. **TLS на self-hosted пути нет** (`deploy/Caddyfile` — кирпич HTTPS-2.1); наружу — только
    через cloudflared-туннель.
 4. **Контент на длинный матч:** 19 исследуемых техов (эпохи, day-gate до дня 16), одна карта
-   (фиксированный seed), событий пока минимум (`void_anomaly` в `data/events.json`);
-   модули кораблей `live:false`. (Скиллы героев уже кастуются из UI — `data-hcast`/
-   `heroAim`, `heroactions.test.ts`.)
+   (фиксированный seed), событий пока минимум (`void_anomaly` в `data/events.json`).
+   Модули кораблей живые (`data.modules` + `effectiveStats`, `unit.build{modules}` — SHIP-3);
+   `live:false` остался только у legacy-превью `prototype/src/ships.ts`. (Скиллы героев
+   кастуются из UI — `data-hcast`/`heroAim`, `heroactions.test.ts`.)
 5. **OIDC-идентичность** (сейчас логин/пароль + dev-grade JWT).
 6. **Мультипроцессный масштаб сервера.**
 7. **Метаигра / AvA-сектора** — отложено надолго.
