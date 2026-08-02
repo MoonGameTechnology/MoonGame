@@ -3,6 +3,7 @@ import type { Fleet, FleetEdge, GameState, PlanetId } from '../state/gameState';
 import { hoursToMs } from '../action/types';
 import { legT } from '../state/fleetPosition';
 import { distance, fleetBaseSpeed, planRoute, routeDistance } from '../state/route';
+import { getStance } from '../state/diplomacy';
 
 /** A target a `fleet.move` can aim at: a node, or a continuous point on a lane. */
 interface MovePayload {
@@ -305,6 +306,19 @@ export const movementModule: GameModule = {
       }
       if ('error' in plan) {
         return h.reject(plan.error);
+      }
+      // Diplomacy gate: a fleet may not enter a node owned by a player it's at
+      // PEACE with (must declare war first). Neutral, own, and war/pact/alliance
+      // territory is passable. Checked on every hop in the route, not just the
+      // destination — passing THROUGH a peace-locked player's territory is also
+      // forbidden. (D2 — right of way.)
+      for (const hop of plan.hops) {
+        const hopOwner = h.state.planets[hop]?.owner ?? null;
+        if (hopOwner !== null && hopOwner !== action.playerId) {
+          if (getStance(h.state, action.playerId, hopOwner) === 'peace') {
+            return h.reject('E_NO_RIGHT_OF_WAY');
+          }
+        }
       }
       const origin = fleet.location ?? fleet.edge?.from ?? null;
       if (!beginLeg(h, fleet, plan.fromId, plan.hops, plan.startT, plan.parkT)) {
