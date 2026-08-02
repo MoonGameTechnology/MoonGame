@@ -10599,6 +10599,7 @@ function connect(): void {
           xpAwarded = false;
           pendingLoads = []; // drop any queued loads from a prior/local session
           showConnect(false);
+          showHub(false); // hide the hub so inMatch() is true → Back works (BF-31)
           note(t('net.connected', { who: NAME[ME] ?? ME }));
           // Latency probe: ping every 2s with a client timestamp the pong echoes.
           if (pingTimer) clearInterval(pingTimer);
@@ -11645,6 +11646,7 @@ function topLayerOpen(): boolean {
     logWin?.classList.contains('show') ||
     techWin.classList.contains('show') ||
     divDesignWin.classList.contains('show') ||
+    stewWin?.classList.contains('show') ||
     marketWin.classList.contains('show') ||
     diploOpen ||
     chatOpen ||
@@ -11695,6 +11697,10 @@ function closeTopLayer(): boolean {
   if (divDesignWin.classList.contains('show')) {
     divDesignWin.classList.remove('show');
     lastPanelHtml = '';
+    return true;
+  }
+  if (stewWin?.classList.contains('show')) {
+    stewWin.classList.remove('show');
     return true;
   }
   if (marketWin.classList.contains('show')) {
