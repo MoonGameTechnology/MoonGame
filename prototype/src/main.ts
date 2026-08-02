@@ -8766,6 +8766,13 @@ $('tomenu').addEventListener('click', () => {
     speed = 0; // BF-29: freeze the solo sim so the AI can't "win" while you're in the hub
   }
   stopFirstGoals(); // ONB-7: leaving the match ends the onboarding checklist
+  // ONB-2 (found live): a mid-tutorial exit via ⌂/Back used to leave the guide's
+  // rAF loop running — its own `stop()` never fired, so #spotlight (a document.body
+  // singleton) kept painting the LAST step's overlay over the hub, and over whatever
+  // match got installed next (its dim/ring/bubble sit at z-50, above everything).
+  // Any exit from a live match must kill the tour, not just the ones that walk off
+  // its own end (`done`) or its own «Пропустить обучение».
+  activeTour?.stop();
   openHub();
 });
 // Rail: «Покинуть сессию» — same exit as the speedbar ⌂, reachable from the rail too.
@@ -11727,6 +11734,12 @@ function installMatch(state: GameState, aiPlayers: Set<string>): void {
   ME = 'p1';
   AI_PLAYERS = aiPlayers;
   lastAiAt = s.time;
+  // ONB-2 (found live): a leftover guide from whatever was on screen before (a
+  // tutorial the player exited without finishing/skipping, a stale reconnect) must
+  // never survive into this match — #spotlight is a document.body singleton, so an
+  // un-stopped tour keeps painting its last step over the NEW match too. Runs before
+  // `maybeStartPendingTour()` (below) arms this match's own guide, if any.
+  activeTour?.stop();
   // Reset interaction + queues + camera to the framed whole-map view.
   selFleet = null;
   selPlanet = null;
