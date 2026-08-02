@@ -246,6 +246,7 @@ import { initProfile } from './profileScreen';
 import { initCorp } from './corpScreen';
 // ECON-4 — session market: the model + orders live next door; the WINDOW is REFM-6.
 import { initMarket } from './marketScreen';
+import { initResourceCard } from './resourceCard';
 // ST-2/ST-3 — «Хранитель»: the window is REFM-7; the read-only helpers below are shared
 // with the threat alert (`stewFmtDur`), the side panel (`stewardTechDone`) and the
 // morning report (`stewMetrics`).
@@ -8666,6 +8667,16 @@ const market = initMarket({
 });
 document.getElementById('rail-market')?.addEventListener('click', () => market.open());
 
+// --- resource card (RC-1): tap a resource chip → popup with stats + market button -
+const resCardEl = $('rescard');
+const resourceCard = initResourceCard({
+  root: () => resCardEl,
+  state: () => s,
+  me: () => ME,
+  icons: RES_SVG,
+  onOpenMarket: (res) => market.open(res),
+});
+
 
 // --- constructor («Верфь»): the unified loadout tab --------------------------
 // One in-match screen that switches between the loadout constructors (ships now;
@@ -10370,25 +10381,12 @@ function buildSetupConfig(): SetupConfig {
 // Install a ready GameState as the live match: reset all interaction state, queues,
 // camera and log, then hide the setup overlay. `aiPlayers` are the seats the local
 // sim drives. Shared by the normal skirmish and (via a hook) the dev test mode.
-// Tap a resource chip → what the number means: stock and hourly net flow.
+// Tap a resource chip → open the resource card (RC-1): stock, net flow, breakdown,
+// and a button to open the market on that resource.
 purse.addEventListener('click', (ev) => {
   const el = (ev.target as Element).closest('[data-res]') as HTMLElement | null;
   if (!el) return;
-  const key = el.dataset.res!;
-  const stock = Math.round(s.players[ME]?.resources?.[key] ?? 0);
-  // Same rounding as the chip: one decimal below 1/ч, so a slow bleed reads as −0.4,
-  // not a lying 0. On phones this note is the only income readout (the bar hides flow).
-  const raw = netIncome(s, ME)[key] ?? 0;
-  const flow = Math.abs(raw) >= 1 ? Math.round(raw) : Math.round(raw * 10) / 10;
-  const short = (s.players[ME]?.arrears ?? []).includes(key);
-  note(
-    t('hud.resource.tip', {
-      ic: TECH_CUR[key] ?? '',
-      name: el.title,
-      stock: kfmt(stock),
-      flow: (flow >= 0 ? '+' : '') + (Math.abs(flow) >= 1 ? kfmt(flow) : String(flow)),
-    }) + (short ? ' ' + t('hud.deficit') : ''),
-  );
+  resourceCard.open(el.dataset.res!);
 });
 
 // Tap the ✦ score chip → a plain-words breakdown of how the score is built and how
@@ -11648,6 +11646,7 @@ function topLayerOpen(): boolean {
     divDesignWin.classList.contains('show') ||
     stewWin?.classList.contains('show') ||
     marketWin.classList.contains('show') ||
+    resCardEl.classList.contains('show') ||
     diploOpen ||
     chatOpen ||
     setupEl.style.display !== 'none' ||
@@ -11705,6 +11704,10 @@ function closeTopLayer(): boolean {
   }
   if (marketWin.classList.contains('show')) {
     marketWin.classList.remove('show');
+    return true;
+  }
+  if (resCardEl.classList.contains('show')) {
+    resCardEl.classList.remove('show');
     return true;
   }
   if (diploOpen) {
