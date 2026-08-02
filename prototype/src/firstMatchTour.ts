@@ -2,9 +2,11 @@
  * ONB-2 · The guided first match — a data-described chain (ONB-1 engine) that
  * walks a brand-new commander through the core loop in a bot-free solo sandbox:
  *
- *   produce (grow the mine) → build (raise a fleet) → troops (load a landing
- *   force — informational, concept only) → move (set a course, fog opens) →
- *   capture a neutral world (two-phase) → the score moves → first win.
+ *   produce (grow the mine) → build (raise a fleet) → scan (inspect a ship/fleet's
+ *   stats — informational, concept only) → troops (load a landing force —
+ *   informational, concept only) → spy (scout an enemy world first — informational,
+ *   concept only) → move (set a course, fog opens) → capture a neutral world
+ *   (two-phase) → the score moves → first win.
  *
  * `startGuidedMatch` (main.ts) also forces the sim to run at accelerated time
  * for this sandbox — a Mine upgrade alone is hours of game time, and a brand
@@ -69,6 +71,15 @@ export function buildFirstMatchTour(deps: FirstMatchDeps): SpotlightStep[] {
       advance: { on: 'state', when: deps.hasFleet },
     },
     {
+      // Concept-only, tap-advance: a fresh ship's exact rect/id isn't something this
+      // pure predicate set tracks, so — same as `troops` below — this teaches the
+      // mechanic (tap any ship/fleet to inspect it) rather than gating on one.
+      id: 'scan',
+      target: null,
+      copy: 'onb.tour.first.scan',
+      advance: { on: 'tap' },
+    },
+    {
       // Concept-only, tap-advance: whether THIS run's target neutral is actually
       // garrisoned depends on the map, so this can't gate on a real load action
       // the way `mine`/`course` gate on theirs — but the mechanic (and the "why")
@@ -77,6 +88,17 @@ export function buildFirstMatchTour(deps: FirstMatchDeps): SpotlightStep[] {
       id: 'troops',
       target: null,
       copy: 'onb.tour.first.troops',
+      advance: { on: 'tap' },
+    },
+    {
+      // Concept-only, tap-advance: this bot-free sandbox has no rival to scout (the
+      // capture target is always a neutral, never an owned enemy world — espionage
+      // needs an owner), so — same reasoning as `troops` — teach the mechanic and the
+      // "why" here, right before the player sets a course toward a live opponent for
+      // the first time in a real match.
+      id: 'spy',
+      target: null,
+      copy: 'onb.tour.first.spy',
       advance: { on: 'tap' },
     },
     {

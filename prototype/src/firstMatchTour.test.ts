@@ -22,7 +22,9 @@ describe('buildFirstMatchTour — shape', () => {
       'home',
       'mine',
       'fleet',
+      'scan',
       'troops',
+      'spy',
       'course',
       'capture',
       'score',
@@ -39,9 +41,11 @@ describe('buildFirstMatchTour — shape', () => {
     });
     expect(tour.find((s) => s.id === 'home')?.advance.on).toBe('state');
     expect(tour.find((s) => s.id === 'fleet')?.advance.on).toBe('state');
-    // troops is concept-only (map-dependent whether it's ever strictly needed) — a
-    // tap-advance beat, not gated on a real load action
+    // scan/troops/spy are concept-only (nothing to gate a predicate on) — tap-advance
+    // beats, not gated on a real action
+    expect(tour.find((s) => s.id === 'scan')?.advance.on).toBe('tap');
     expect(tour.find((s) => s.id === 'troops')?.advance.on).toBe('tap');
+    expect(tour.find((s) => s.id === 'spy')?.advance.on).toBe('tap');
     expect(tour.find((s) => s.id === 'capture')?.advance.on).toBe('state');
     expect(tour.find((s) => s.id === 'score')?.advance.on).toBe('state');
   });
@@ -76,26 +80,29 @@ describe('buildFirstMatchTour — capture is gated on real state', () => {
     expect(t.index).toBe(3);
 
     fleetRaised = true;
-    t.refresh(); // a built ship auto-rallied → fleet advances to troops
-    expect(t.index).toBe(4); // parked on the (informational) troops step
-    t.tap(); // troops → course
+    t.refresh(); // a built ship auto-rallied → fleet advances to the (informational) scan step
+    expect(t.index).toBe(4);
+    t.tap(); // scan → troops
+    expect(t.index).toBe(5); // parked on the (informational) troops step
+    t.tap(); // troops → spy
+    t.tap(); // spy → course
     t.notifyAction('fleet.move'); // course → capture
-    expect(t.index).toBe(6); // parked on the capture step
+    expect(t.index).toBe(8); // parked on the capture step
 
     for (let f = 0; f < 30; f++) t.refresh(); // world not yet taken — stays put
-    expect(t.index).toBe(6);
+    expect(t.index).toBe(8);
     expect(result).toBeNull();
 
     captured = true;
     t.refresh(); // world taken → capture advances to score
-    expect(t.index).toBe(7);
+    expect(t.index).toBe(9);
 
     scored = true;
     t.refresh(); // score moved → score advances to the final beat
     t.tap(); // done → finish
     expect(result).not.toBeNull();
     expect(result!.completed).toBe(true);
-    expect(result!.reachedStep).toBe(8);
+    expect(result!.reachedStep).toBe(10);
   });
 });
 

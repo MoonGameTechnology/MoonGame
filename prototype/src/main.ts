@@ -8183,6 +8183,11 @@ endscreenEl.addEventListener('click', (ev) => {
   }
   endScreen = null; // leaving the finished match — the overlay must not linger over the hub
   lastEndHtml = '';
+  // ONB-2: the match can end (win/lose) while a guide is still mid-chain — e.g. a
+  // player who raced ahead of the tutorial prompts and hit the score threshold on
+  // their own. Same leak as the ⌂/Back exit below: an un-stopped `activeTour` keeps
+  // painting its last step's #spotlight overlay over the hub and the next match.
+  activeTour?.stop();
   if (which === 'again') {
     // Solo: straight back into a skirmish setup. Net: the match browser (a same-table
     // rematch needs server support — a separate brick); either way, one tap to next game.

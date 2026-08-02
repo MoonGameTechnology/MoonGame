@@ -1330,8 +1330,12 @@ export const en: Record<string, string> = {
     'Down here is your homeworld panel: buildings, garrison and construction. Tap your world to open it.',
   'onb.tour.first.mine':
     'Start with economy: upgrade your Metal Mine — its output funds everything else you build.',
+  'onb.tour.first.scan':
+    "Want a ship or fleet's stats? Tap it (hover on PC) — a card opens with damage, armor, speed and troop capacity.",
   'onb.tour.first.score':
     'World taken — and the score moves! Points come from worlds and sectors; reach the threshold to win.',
+  'onb.tour.first.spy':
+    'Scout an enemy world before you attack it: tap it → «Scout world» (or the Diplomacy → Espionage tab) for a 24-hour window into its garrison and fleets. No rivals here, but in a real match it saves you from an ambush.',
   'onb.tour.first.troops':
     'Your fleet has a hold for troops: tap it at your world → «Ground army ⇄ garrison» → «Load». An open world falls to orbit alone; a garrisoned one only falls to a landing — your fleet clears the defense from orbit first, then the troops take the ground.',
   'onb.tour.first.welcome':
