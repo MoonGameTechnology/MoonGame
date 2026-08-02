@@ -429,6 +429,28 @@ body.sheet-open #cmdbar{bottom:calc(34vh + 12px);}
 .pc-dossier{margin-top:10px;width:100%;padding:9px;cursor:pointer;border-radius:6px;border:1px solid var(--line-hi);
   background:transparent;color:var(--dim);font:600 12px ui-monospace,monospace;letter-spacing:1px;}
 .pc-dossier:active{border-color:var(--cyan);color:var(--cyan);}
+/* resource card — tap a resource chip in the top bar */
+#rescard{position:fixed;inset:0;z-index:51;display:none;align-items:center;justify-content:center;padding:18px;
+  background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#rescard.show{display:flex;}
+#rescard .rc-box{width:min(360px,92vw);max-height:86vh;overflow:auto;background:var(--glass);border:1px solid var(--cyan);
+  border-radius:10px;padding:16px 18px 14px;box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
+.rc-head{display:flex;align-items:center;gap:10px;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line-hi);}
+.rc-head .rc-ic{width:28px;height:28px;flex:0 0 auto;color:var(--cyan);}
+.rc-head b{font-size:16px;letter-spacing:1.5px;color:#eafffb;flex:1;}
+.rc-stat{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:4px 0;border-bottom:1px solid rgba(14,59,64,.4);}
+.rc-stat .rc-k{color:var(--dim);}
+.rc-stat .rc-v{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums;text-align:right;}
+.rc-sec{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan-dim);margin:8px 0 4px;}
+.rc-flow{font-size:18px;font-weight:700;text-align:center;padding:8px 0;font-variant-numeric:tabular-nums;}
+.rc-flow.pos{color:#7df0d0;}
+.rc-flow.neg{color:#ff6b6b;}
+.rc-market{margin-top:12px;width:100%;padding:10px;cursor:pointer;border-radius:6px;border:1px solid var(--cyan);
+  background:rgba(53,214,230,.12);color:var(--cyan);font:600 13px ui-monospace,monospace;letter-spacing:1px;}
+.rc-market:active{background:rgba(53,214,230,.22);}
+.rc-market.disabled{opacity:.4;cursor:default;border-color:var(--line-hi);color:var(--dim);background:transparent;}
+.rc-close{margin-top:8px;width:100%;padding:9px;cursor:pointer;border-radius:6px;border:1px solid var(--cyan-dim);
+  background:rgba(53,214,230,.1);color:var(--cyan);font:600 12px ui-monospace,monospace;letter-spacing:1px;}
 
 /* settings overlay (hub → «Ещё» → Настройки) — client-only display prefs */
 #settings{position:fixed;inset:0;z-index:59;display:none;align-items:center;justify-content:center;padding:18px;
@@ -2291,6 +2313,7 @@ const page = (js) => `<!doctype html>
 <div id="recap"></div>
 <div id="goals"></div>
 <div id="playercard"></div>
+<div id="rescard"></div>
 <div id="profile"></div>
 <div id="settings"></div>
 <div id="warprompt"></div>

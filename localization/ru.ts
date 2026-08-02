@@ -1171,6 +1171,15 @@ export const ru: Record<string, string> = {
   'hud.resource.microelectronics': 'Микроэлектроника',
   'hud.resource.tip':
     '{ic} {name}: {stock} в казне · {flow}/ч (производство минус содержание войск и зданий)',
+  'rescard.stock': 'В казне',
+  'rescard.income': 'Доходы',
+  'rescard.expense': 'Расходы',
+  'rescard.production': 'Производство миров',
+  'rescard.upkeep': 'Содержание зданий',
+  'rescard.army': 'Содержание войск',
+  'rescard.market': 'Рынок',
+  'rescard.close': 'Закрыть',
+  'rescard.no-trade': 'Кредиты — валюта, их нельзя продать на рынке',
   'hud.score.tip':
     '✦ {score}/{limit}: мир — 50, прочий сектор — 10, здания добавляют по уровню (у вас {w} миров, {s} секторов). Победа: ✦ {limit}, уничтожение соперников или доминирование.',
 

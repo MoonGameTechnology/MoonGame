@@ -1171,6 +1171,15 @@ export const en: Record<string, string> = {
   'hud.resource.microelectronics': 'Microelectronics',
   'hud.resource.tip':
     '{ic} {name}: {stock} in the treasury · {flow}/h (production minus army and building upkeep)',
+  'rescard.stock': 'In treasury',
+  'rescard.income': 'Income',
+  'rescard.expense': 'Expenses',
+  'rescard.production': 'World production',
+  'rescard.upkeep': 'Building upkeep',
+  'rescard.army': 'Army upkeep',
+  'rescard.market': 'Market',
+  'rescard.close': 'Close',
+  'rescard.no-trade': 'Credits are the currency — not tradeable on the market',
   'hud.score.tip':
     '✦ {score}/{limit}: a world — 50, any other province — 10, buildings add per level (you hold {w} worlds, {s} provinces). Win at ✦ {limit}, by eliminating rivals, or by domination.',
 
