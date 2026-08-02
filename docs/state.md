@@ -1113,12 +1113,19 @@ grants}`), `heroFittings.json` (`{statMods, grants, cost}`). Движок ПОЛ
   `hero.ability`/`hero.spawn`/`hero.skill.unlock`/`hero.fit` + пассивки на хуках +
   пред-матч ростер (`SlotAssignment.heroes`) — см. §5 hero-модуль. Referential-integrity
   тесты связывают все каталоги; загрузчик собирает 5 фрагментов.
-- **Метаданные (сервер-side `data/*.json`):** `rewards.json` (XP/место — см. victory),
-  `medals.json` (достижения — см. §8), `modules.json` (6 корабельных модулей: cargo_bay,
-  radar_module, ion_engine, targeting_array, ablative_plating, shield_booster — зеркало
-  для конструктора «Верфь»), `dropTables.json` (дроп-таблицы лута после матча: веса по
-  месту, pity-счётчик, salvage), `starterArsenal.json` (стартовый набор корпусов/модулей
-  для нового аккаунта). Загружаются сервером (`scenario.ts`), не входят в `parseGameData`.
+- **Ещё два фрагмента бандла:** `modules.json` (6 корабельных модулей: `cargo_bay`,
+  `radar_module`, `ion_engine`, `targeting_array`, `ablative_plating`, `shield_booster` —
+  `ModuleDefSchema`; ядро читает их живьём в `util/loadout.ts`, инлайн-каталог прототипа
+  §7 их ЗЕРКАЛИТ) и `rewards.json` (XP/место по итогам — `RewardsDefSchema`, см. раздел
+  наград SES-2). Оба — обычные строки `composeGameDataBundle` (`data/loadGameData.ts`),
+  то есть проходят `parseGameData` вместе с остальным контентом.
+- **Каталоги ВНЕ ядрового бандла (только сервер):** `medals.json` (достижения — свой
+  fail-secure парсер `medalCatalog.ts`, см. §8), `dropTables.json` (дроп-таблицы лута
+  после матча: веса по месту, pity-счётчик, salvage) и `starterArsenal.json` (стартовый
+  набор корпусов/модулей для нового аккаунта) — последние два читает и валидирует против
+  уже собранного `GameData` сам сервер (`scenario.ts`: `loadDropTables`/
+  `loadStarterArsenal`, `E_INVALID_DROP_TABLES`/`E_INVALID_STARTER_ARSENAL` на кривой
+  форме). В `GameData` не входят.
 
 ## 7. Прототип (`prototype/`)
 
@@ -1695,8 +1702,9 @@ Memory + Postgres `ava_feed`) — только публичные факты: и
 > Компактный агрегат; помашинная матрица — [`readiness.md`](readiness.md),
 > запуск для живых игроков — [`launch-runbook.md`](launch-runbook.md).
 
-**✅ Этап 1 (ядро) — готово целиком:** 25 модулей на микроядре (шина/хуки/манифест,
-seeded RNG + golden, `advanceTo`): экономика + рынок, карта/движение/перехват, типы
+**✅ Этап 1 (ядро) — готово целиком:** 33 модуля на микроядре (шина/хуки/манифест,
+seeded RNG + golden, `advanceTo`; список — §3, разбор — §5, сервер собирает из них
+`DEV_MODULES` — 29): экономика + рынок, карта/движение/перехват, типы
 секторов и планет, бой (мелэ + орбитальное ПВО/бомбардировка + артиллерия) с двухфазным
 захватом, здания + станции, флот ⊕ армия + транспорт, технологии + учёные, фракции,
 дипломатия (стойки + consent-офферы), шпионаж + контрразведка, герои, «Хранитель»,
