@@ -1740,7 +1740,7 @@ function fleetDivisionsHtml(f: Fleet, here: Planet): string {
   return g;
 }
 
-const ORBIT_R = 44; // single orbit-ring radius in screen px (before the zoom bloom)
+const ORBIT_R = 31; // single orbit-ring radius in screen px (before the zoom bloom) — was 44, −30%
 // Past this camera zoom the orbital layer "opens up": rings widen and stationed
 // fleets start to circle their planet. Below it everything stays static (and
 // fixed-size), exactly as before — cheap at the whole-map view where it'd be invisible.
