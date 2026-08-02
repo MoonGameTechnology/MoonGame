@@ -12028,9 +12028,20 @@ if (codexEl) {
 // the left crest (avatar + nick) opens the player dossier
 document.querySelector('.crest')?.addEventListener('click', () => openPlayerCard());
 
-// The ‹ chevron mirrors the hardware Back exactly: pop the sentinel → the popstate
-// handler closes the topmost layer, or shows the double-press "leave the match" hint.
-$('topback').addEventListener('click', () => history.back());
+// The ‹ chevron: close the top layer if any are open (mirrors hardware Back),
+// or leave the match straight to the hub if none are (a visible button should act
+// in one tap, not require the double-back hint that hardware Back uses).
+$('topback').addEventListener('click', () => {
+  if (closeTopLayer()) {
+    if (topLayerOpen() || inMatch()) armBack();
+    return;
+  }
+  if (inMatch()) {
+    $('tomenu').click(); // no layers + in match → straight to the hub
+    return;
+  }
+  history.back(); // at the hub/welcome → system Back
+});
 
 // mirror the chosen emblem into the top-left corner + the hub avatar
 applyEmblem();
