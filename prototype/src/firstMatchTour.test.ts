@@ -12,6 +12,7 @@ function anyHost(): SpotlightHost {
 describe('buildFirstMatchTour — shape', () => {
   it('walks produce → build → move → capture → score → done', () => {
     const tour = buildFirstMatchTour({
+      homeOpened: () => false,
       hasFleet: () => false,
       capturedWorld: () => false,
       scoreRose: () => false,
@@ -21,21 +22,30 @@ describe('buildFirstMatchTour — shape', () => {
       'home',
       'mine',
       'fleet',
+      'scan',
+      'troops',
+      'spy',
       'course',
       'capture',
       'score',
       'done',
     ]);
-    // the "do X" beats advance on real actions; capture/score/fleet on live state
+    // the "do X" beats advance on real actions; capture/score/fleet/home on live state
     expect(tour.find((s) => s.id === 'mine')?.advance).toMatchObject({
       on: 'action',
-      type: 'building.construct',
+      type: 'building.upgrade',
     });
     expect(tour.find((s) => s.id === 'course')?.advance).toMatchObject({
       on: 'action',
       type: 'fleet.move',
     });
+    expect(tour.find((s) => s.id === 'home')?.advance.on).toBe('state');
     expect(tour.find((s) => s.id === 'fleet')?.advance.on).toBe('state');
+    // scan/troops/spy are concept-only (nothing to gate a predicate on) — tap-advance
+    // beats, not gated on a real action
+    expect(tour.find((s) => s.id === 'scan')?.advance.on).toBe('tap');
+    expect(tour.find((s) => s.id === 'troops')?.advance.on).toBe('tap');
+    expect(tour.find((s) => s.id === 'spy')?.advance.on).toBe('tap');
     expect(tour.find((s) => s.id === 'capture')?.advance.on).toBe('state');
     expect(tour.find((s) => s.id === 'score')?.advance.on).toBe('state');
   });
@@ -43,10 +53,12 @@ describe('buildFirstMatchTour — shape', () => {
 
 describe('buildFirstMatchTour — capture is gated on real state', () => {
   it('does not pass the capture step until a world is actually taken', () => {
+    let homeOpen = false;
     let fleetRaised = false;
     let captured = false;
     let scored = false;
     const tour = buildFirstMatchTour({
+      homeOpened: () => homeOpen,
       hasFleet: () => fleetRaised,
       capturedWorld: () => captured,
       scoreRose: () => scored,
@@ -56,38 +68,48 @@ describe('buildFirstMatchTour — capture is gated on real state', () => {
     t.start();
 
     t.tap(); // welcome → home
-    t.tap(); // home → mine
-    t.notifyAction('building.construct'); // mine → fleet
+    for (let f = 0; f < 30; f++) t.refresh(); // panel not opened yet — stays put
+    expect(t.index).toBe(1);
+
+    homeOpen = true;
+    t.refresh(); // homeworld panel opened → home advances to mine
+    t.notifyAction('building.upgrade'); // mine → fleet
     expect(t.index).toBe(3); // parked on the fleet step — a ship must actually auto-rally
 
     for (let f = 0; f < 30; f++) t.refresh(); // no fleet yet — stays put
     expect(t.index).toBe(3);
 
     fleetRaised = true;
-    t.refresh(); // a built ship auto-rallied → fleet advances to course
+    t.refresh(); // a built ship auto-rallied → fleet advances to the (informational) scan step
+    expect(t.index).toBe(4);
+    t.tap(); // scan → troops
+    expect(t.index).toBe(5); // parked on the (informational) troops step
+    t.tap(); // troops → spy
+    t.tap(); // spy → course
     t.notifyAction('fleet.move'); // course → capture
-    expect(t.index).toBe(5); // parked on the capture step
+    expect(t.index).toBe(8); // parked on the capture step
 
     for (let f = 0; f < 30; f++) t.refresh(); // world not yet taken — stays put
-    expect(t.index).toBe(5);
+    expect(t.index).toBe(8);
     expect(result).toBeNull();
 
     captured = true;
     t.refresh(); // world taken → capture advances to score
-    expect(t.index).toBe(6);
+    expect(t.index).toBe(9);
 
     scored = true;
     t.refresh(); // score moved → score advances to the final beat
     t.tap(); // done → finish
     expect(result).not.toBeNull();
     expect(result!.completed).toBe(true);
-    expect(result!.reachedStep).toBe(7);
+    expect(result!.reachedStep).toBe(10);
   });
 });
 
 describe('buildFirstMatchTour — skippable', () => {
   it('a skip mid-guide ends the whole chain as skipped', () => {
     const tour = buildFirstMatchTour({
+      homeOpened: () => true, // already open — walk straight onto mine
       hasFleet: () => false,
       capturedWorld: () => false,
       scoreRose: () => false,
@@ -95,8 +117,7 @@ describe('buildFirstMatchTour — skippable', () => {
     let result: TourResult | null = null;
     const t = new SpotlightTour(tour, anyHost(), (r) => (result = r));
     t.start();
-    t.tap(); // onto home
-    t.tap(); // onto mine
+    t.tap(); // welcome → home → (state already true) → mine
     t.skip();
     expect(result).not.toBeNull();
     expect(result!.skipped).toBe(true);

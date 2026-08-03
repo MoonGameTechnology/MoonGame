@@ -289,10 +289,13 @@ body.sheet-open #cmdbar{bottom:calc(34vh + 12px);}
    overrides an ancestor's :none. */
 #spotlight.sl-passthrough{pointer-events:none;}
 #spotlight.sl-passthrough .sl-dim{pointer-events:none;background:transparent;}
-#spotlight .sl-ring{position:fixed;border:2px solid var(--cyan);border-radius:8px;pointer-events:none;
-  box-shadow:0 0 0 2px rgba(53,214,230,.25),0 0 18px rgba(53,214,230,.45);animation:sl-pulse 1.6s ease-in-out infinite;}
-@keyframes sl-pulse{0%,100%{box-shadow:0 0 0 2px rgba(53,214,230,.2),0 0 14px rgba(53,214,230,.35);}
-  50%{box-shadow:0 0 0 4px rgba(53,214,230,.35),0 0 22px rgba(53,214,230,.6);}}
+/* Gold blink, not the theme's usual cyan: the ring marks "tap HERE" specifically —
+   it needs to read as a distinct call-to-action against the cyan HUD, not blend into
+   it as one more glowing panel. */
+#spotlight .sl-ring{position:fixed;border:2px solid var(--amber);border-radius:8px;pointer-events:none;
+  box-shadow:0 0 0 2px rgba(255,180,58,.35),0 0 18px rgba(255,180,58,.55);animation:sl-pulse 1s ease-in-out infinite;}
+@keyframes sl-pulse{0%,100%{box-shadow:0 0 0 2px rgba(255,180,58,.12),0 0 8px rgba(255,180,58,.2);opacity:.5;}
+  50%{box-shadow:0 0 0 5px rgba(255,180,58,.6),0 0 28px rgba(255,180,58,.95);opacity:1;}}
 #spotlight .sl-bubble{position:fixed;pointer-events:auto;max-width:min(320px,82vw);
   background:rgba(4,16,22,.97);border:1px solid var(--cyan);border-radius:10px;padding:13px 15px;
   box-shadow:0 6px 22px rgba(0,0,0,.55);color:var(--ink);}
@@ -405,7 +408,18 @@ body.sheet-open #cmdbar{bottom:calc(34vh + 12px);}
 #goals .gl-item .gl-ck{color:var(--cyan-dim);flex:0 0 auto;font-size:13px;}
 #goals .gl-item.done{color:#dfeef2;}
 #goals .gl-item.done .gl-ck{color:var(--grn);text-shadow:0 0 8px rgba(95,240,192,.5);}
-@media (max-width:640px){#goals{top:auto;bottom:70px;right:8px;}}
+/* the collapsed tray — a small badge, not the full header: gives the map its room
+   back instead of just hiding the four rows under a still-full-width bar. */
+#goals .gl-tray{display:flex;align-items:center;gap:5px;min-height:32px;padding:0 10px;
+  border-radius:16px;border:1px solid var(--cyan-dim);background:rgba(4,16,22,.94);
+  color:var(--cyan);font:700 12px ui-monospace,monospace;cursor:pointer;
+  box-shadow:0 4px 16px rgba(0,0,0,.45);}
+#goals .gl-tray .gl-count{color:var(--cyan);}
+/* phones: the speed control (⏸▶▶▶ + ×1/×10/×50/×100) wraps onto two ~44px rows
+   above its own bottom:12px anchor — a fixed bottom:70px here used to sit the
+   goals box's lower half right on top of it. Clear the whole stack instead of
+   guessing one row's height. */
+@media (max-width:640px){#goals{top:auto;bottom:calc(120px + env(safe-area-inset-bottom,0px));right:8px;}}
 
 /* player card — tap the top-left crest for your session dossier */
 #playercard{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;padding:18px;
@@ -1402,6 +1416,10 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
      selection opens the sheet, so it never collides with the command bar */
   #speedbar{right:10px;bottom:12px;top:auto;padding:4px 6px;}
   body.sheet-open #speedbar{display:none;}
+  /* the first-session goals checklist sits bottom-right too (below the sheet's own
+     50vh) — hide it the same way while the sheet is open, or its box floats on top
+     of the world/fleet panel the player is actually using. */
+  body.sheet-open #goals{display:none;}
 
   #banner{font-size:16px;padding:14px 20px;letter-spacing:2px;}
   /* finger-first targets: everything tappable grows to the 44px rule (hud-inmatch.md) */

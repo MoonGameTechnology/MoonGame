@@ -2333,6 +2333,7 @@ function startGuidedMatch(): void {
     startFirstGoals(); // ONB-7: the first-session checklist rides alongside the guide
     launchTour(
       buildFirstMatchTour({
+        homeOpened: () => selPlanet !== null && s.planets[selPlanet]?.owner === ME,
         hasFleet: () => myFleetCount() > startFleets,
         capturedWorld: () => myWorldCount() > startWorlds,
         scoreRose: () => myScore() > startScore + 1,
@@ -2343,6 +2344,15 @@ function startGuidedMatch(): void {
   showHub(false);
   showConnect(false);
   startMatch(buildSetupConfig()); // installMatch → maybeStartPendingTour runs the guide
+  // ONB-2: a brand-new commander shouldn't sit through the Mine's real build-time
+  // (hours of game time) on the default ×10 wall-clock-ish preset — that's real
+  // MINUTES of nothing happening on the very first beat. No rivals/fairness stakes
+  // in this bot-free sandbox, so just run it fast: ×300 clears the two real waits
+  // (build the Cruiser the tour points at, 3h; fly it to the nearest neutral world,
+  // ~2.8h) in well under a minute each, instead of ~110s / ~100s at the player's own
+  // ×100 ceiling. Timed/measured empirically — see the ONB-2 roadmap entry.
+  applyTimeSpeed(300);
+  note(t('onb.tour.speed'));
 }
 // Fold the finished guide into the flag (+funnel); first completion earns XP + a nudge.
 function onGuidedTourEnded(r: TourResult): void {
@@ -2369,22 +2379,28 @@ let goalsActive = false;
 let goalsCollapsed = false;
 let goalsRewarded = false;
 let goalsDone: string[] = [];
-let goalBase = { worlds: 0, mines: 0, fleets: 0 };
-const myMineCount = (): number =>
+let goalBase = { worlds: 0, mineLevel: 0, fleets: 0 };
+// Sum of mine LEVELS (not a count of buildings) — the homeworld's Mine starts
+// already built, so "progress" is its level growing via upgrade, and this also
+// keeps working if a captured world adds a second mine somewhere down the line.
+const myMineLevel = (): number =>
   Object.values(s.planets)
     .filter((p) => p.owner === ME)
-    .reduce((n, p) => n + p.buildings.filter((b) => b.type === 'mine').length, 0);
+    .reduce(
+      (n, p) => n + p.buildings.filter((b) => b.type === 'mine').reduce((m, b) => m + b.level, 0),
+      0,
+    );
 const myFleetCount = (): number => Object.values(s.fleets).filter((f) => f.owner === ME).length;
 function goalSignals(): GoalSignals {
   return {
-    builtMine: myMineCount() > goalBase.mines,
+    builtMine: myMineLevel() > goalBase.mineLevel,
     launchedFleet: myFleetCount() > goalBase.fleets,
     capturedWorld: myWorldCount() > goalBase.worlds,
     score: myScore(),
   };
 }
 function startFirstGoals(): void {
-  goalBase = { worlds: myWorldCount(), mines: myMineCount(), fleets: myFleetCount() };
+  goalBase = { worlds: myWorldCount(), mineLevel: myMineLevel(), fleets: myFleetCount() };
   goalsDone = [];
   goalsRewarded = false;
   goalsCollapsed = false;
@@ -2417,6 +2433,14 @@ function updateGoals(): void {
 function renderGoals(): void {
   const el = document.getElementById('goals');
   if (!el) return;
+  // Collapsed = a small tappable tray badge (icon + count), not just the list hidden
+  // under a still-full-width header — the whole point is to give the map its room
+  // back, not just the four rows.
+  if (goalsCollapsed) {
+    el.innerHTML = `<button class="gl-tray" id="gl-tray" type="button" title="${esc(t('onb.goal.tray.title'))}">◎ <span class="gl-count">${goalsDone.length}/${FIRST_GOALS.length}</span></button>`;
+    el.classList.add('show');
+    return;
+  }
   const items = FIRST_GOALS.map((g) => {
     const done = goalsDone.includes(g.id);
     return `<div class="gl-item${done ? ' done' : ''}"><span class="gl-ck">${done ? '✓' : '○'}</span><span>${esc(t(g.labelKey))}</span></div>`;
@@ -2424,12 +2448,13 @@ function renderGoals(): void {
   el.innerHTML =
     `<div class="gl-box"><div class="gl-head"><b>${t('onb.goals.title')}</b>` +
     `<span class="gl-count">${goalsDone.length}/${FIRST_GOALS.length}</span>` +
-    `<button class="gl-tg" id="gl-tg" type="button">${goalsCollapsed ? '▸' : '▾'}</button></div>` +
-    (goalsCollapsed ? '' : `<div class="gl-list">${items}</div>`);
+    `<button class="gl-tg" id="gl-tg" type="button" title="${esc(t('onb.goal.collapse.title'))}">▾</button></div>` +
+    `<div class="gl-list">${items}</div>`;
   el.classList.add('show');
 }
 document.getElementById('goals')?.addEventListener('click', (ev) => {
-  if ((ev.target as HTMLElement).closest('#gl-tg')) {
+  const tgt = ev.target as HTMLElement;
+  if (tgt.closest('#gl-tg') || tgt.closest('#gl-tray')) {
     goalsCollapsed = !goalsCollapsed;
     renderGoals();
   }
@@ -8158,6 +8183,11 @@ endscreenEl.addEventListener('click', (ev) => {
   }
   endScreen = null; // leaving the finished match — the overlay must not linger over the hub
   lastEndHtml = '';
+  // ONB-2: the match can end (win/lose) while a guide is still mid-chain — e.g. a
+  // player who raced ahead of the tutorial prompts and hit the score threshold on
+  // their own. Same leak as the ⌂/Back exit below: an un-stopped `activeTour` keeps
+  // painting its last step's #spotlight overlay over the hub and the next match.
+  activeTour?.stop();
   if (which === 'again') {
     // Solo: straight back into a skirmish setup. Net: the match browser (a same-table
     // rematch needs server support — a separate brick); either way, one tap to next game.
@@ -8190,6 +8220,13 @@ $('tomenu').addEventListener('click', () => {
     speed = 0; // BF-29: freeze the solo sim so the AI can't "win" while you're in the hub
   }
   stopFirstGoals(); // ONB-7: leaving the match ends the onboarding checklist
+  // ONB-2 (found live): a mid-tutorial exit via ⌂/Back used to leave the guide's
+  // rAF loop running — its own `stop()` never fired, so #spotlight (a document.body
+  // singleton) kept painting the LAST step's overlay over the hub, and over whatever
+  // match got installed next (its dim/ring/bubble sit at z-50, above everything).
+  // Any exit from a live match must kill the tour, not just the ones that walk off
+  // its own end (`done`) or its own «Пропустить обучение».
+  activeTour?.stop();
   openHub();
 });
 // Rail: «Покинуть сессию» — same exit as the speedbar ⌂, reachable from the rail too.
@@ -10412,6 +10449,12 @@ function installMatch(state: GameState, aiPlayers: Set<string>): void {
   ME = 'p1';
   AI_PLAYERS = aiPlayers;
   lastAiAt = s.time;
+  // ONB-2 (found live): a leftover guide from whatever was on screen before (a
+  // tutorial the player exited without finishing/skipping, a stale reconnect) must
+  // never survive into this match — #spotlight is a document.body singleton, so an
+  // un-stopped tour keeps painting its last step over the NEW match too. Runs before
+  // `maybeStartPendingTour()` (below) arms this match's own guide, if any.
+  activeTour?.stop();
   // Reset interaction + queues + camera to the framed whole-map view.
   selFleet = null;
   selPlanet = null;
@@ -11610,11 +11653,17 @@ const BUILD_TAG = (() => {
 // topmost layer and re-arm. With nothing left to close AND a match running, the
 // first Back only shows a "press again to leave" hint (BF-17-adjacent: a bare
 // in-match Back used to silently unload the page and lose the solo match); a
-// second Back within the window is the system's (exit). Browser Back is the same.
+// second Back within the window leaves the match OURSELVES (`$('tomenu').click()`).
+// BF-31: this used to leave the second Back to "the system" (assume the platform's
+// own back-stack falls through to an app exit once our history is exhausted) — but a
+// plain browser tab (or some WebViews) just has nowhere left to go and no-ops
+// instead, so "press again" silently did nothing. Re-arming the sentinel right after
+// the hint guarantees a real second `popstate` to catch, so the exit never depends
+// on the platform's fallback. Browser Back is the same.
 let backArmed = false;
-// Double-back-to-leave window: after the hint we stop re-arming the sentinel for
-// this long, so a second Back within the window is the system's. `performance.now()`
-// is fine here (prototype UI, not the deterministic core).
+// Double-back-to-leave window: a second Back within this long of the hint leaves the
+// match; after it lapses, a bare Back is the first press again (a fresh hint).
+// `performance.now()` is fine here (prototype UI, not the deterministic core).
 const BACK_EXIT_WINDOW_MS = 2500;
 let backHintAt = -Infinity;
 
@@ -11737,10 +11786,15 @@ window.addEventListener('popstate', () => {
   }
   if (inMatch()) {
     // Nothing left to close but a match is live — don't let one stray Back drop it.
-    // Show the hint and DON'T re-arm; during the exit window `frame()` won't re-arm
-    // either, so a second Back within it is the system's (leaves the match).
+    // A second Back within the window leaves for real; re-arm so THAT press always
+    // fires its own popstate here rather than possibly running out of history.
+    if (performance.now() - backHintAt <= BACK_EXIT_WINDOW_MS) {
+      $('tomenu').click();
+      return;
+    }
     backHintAt = performance.now();
     note(t('back.confirm.match'));
+    armBack();
     return;
   }
   note(t('back.confirm')); // at the hub/welcome — the next Back exits
@@ -11761,9 +11815,11 @@ window.addEventListener('keydown', (e) => {
 });
 
 function frame(nowReal: number) {
-  // Keep the Back sentinel armed while something is closable OR a match is live (so a
-  // bare in-match Back triggers the double-back hint instead of a silent unload) —
-  // but pause re-arming for the exit window after the hint, so the second Back leaves.
+  // Keep the Back sentinel armed while something is closable OR a match is live, so a
+  // bare in-match Back triggers the double-back hint instead of a silent unload. The
+  // popstate handler re-arms itself right after a hint (so a genuine second Back
+  // always has its own sentinel to pop) — this is the initial arm / self-healing net,
+  // not the steady-state path, hence gating on being past the exit window.
   const matchGuard = inMatch() && performance.now() - backHintAt > BACK_EXIT_WINDOW_MS;
   if (!backArmed && (topLayerOpen() || matchGuard)) armBack();
   const dt = nowReal - lastReal;

@@ -27,7 +27,10 @@ export const FIRST_GOALS: Goal[] = [
 
 /** Live progress signals, measured against the onboarding match's start baseline. */
 export interface GoalSignals {
-  builtMine: boolean; // built a mine beyond the starting layout
+  // The homeworld starts with a level-1 Mine already built (matchSetup.ts), so
+  // "built" tracks its output growing (an upgrade), not a fresh instance — a
+  // second Mine is impossible anyway (one building of a kind per planet).
+  builtMine: boolean; // grew the Mine's output beyond the starting level
   launchedFleet: boolean; // raised a mobile fleet
   capturedWorld: boolean; // owns a world beyond the start
   score: number; // current score
