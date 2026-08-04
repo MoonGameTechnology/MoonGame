@@ -86,6 +86,7 @@ curl -sS -o /dev/null -D - -H "Authorization: Bearer $tok" \
 | `ghcr.io/zaproxy/zaproxy` | ✅ sha256 | джоба `dast-zap` (SEC-6) |
 | `ghcr.io/zizmorcore/zizmor` | ✅ sha256 | |
 | `owasp/dependency-check` | ✅ sha256 | SEC-15 |
+| `checkmarx/kics` | ✅ sha256 | `= v2.1.20-alpine`, джоба `kics`. Тег выбран осознанно: 22.04.2026 репозиторий образа компрометировали, взят дайджест, побайтово совпадающий с доинцидентной публикацией и не входящий в список отравленных |
 
 **Четвёртая группа — релизный конвейер.** `image.yml` и `deploy/verify-image.sh` тянут
 `ghcr.io/sigstore/cosign/cosign` — пинен по дайджесту, тот же, что в `android.yml`;

@@ -36,6 +36,7 @@ const EXPECTED = [
   { key: 'trivy-fs', name: 'Trivy fs — vuln/secret/IaC' },
   { key: 'trivy-image', name: 'Trivy image — базовая ОС образа' },
   { key: 'trivy-deps', name: 'Trivy image — сторонние образы прода (postgres/caddy)' },
+  { key: 'kics', name: 'KICS — IaC (Docker Compose прода)' },
   { key: 'dast-zap', name: 'OWASP ZAP — DAST (baseline против запущенного сервера)' },
   { key: 'zizmor', name: 'zizmor — безопасность workflow' },
   {
