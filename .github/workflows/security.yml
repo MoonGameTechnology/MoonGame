@@ -39,7 +39,7 @@ name: Security scan
 #   - Reason: prevents tag reuse / MITM / registry compromise attacks
 #   - Update method: ./.github/scripts/update-image-digests.sh (re-pin every month)
 #   - See docs/security/image-pinning.md for details
-#   - Last updated: 2026-07
+#   - Last updated: 2026-08
 #
 # Variables and secrets (least privilege):
 #   - Secrets ALWAYS use ${{ secrets.NAME }} (auto-masked in logs)
@@ -231,10 +231,9 @@ jobs:
         id: scan
         run: |
           set +e
-          # TODO: Update to sha256 digest — run: ./.github/scripts/update-image-digests.sh
-          # Currently pinned by tag (v8.18.4); sha256 provides supply-chain integrity
+          # Pinned by digest (= v8.18.4), snapped live from the registry API and re-checked.
           # exits 1 on leaks by default (blocking, SEC-1)
-          docker run --rm -v "$PWD:/src" -w /src zricethezav/gitleaks:v8.18.4 \
+          docker run --rm -v "$PWD:/src" -w /src zricethezav/gitleaks@sha256:75bdb2b2f4db213cde0b8295f13a88d6b333091bbfbf3012a4e083d00d31caba \
             detect --source=/src --no-git --redact \
             --report-format sarif --report-path gitleaks.sarif
           rc=$?
@@ -314,10 +313,9 @@ jobs:
         id: scan
         run: |
           set +e
-          # TODO: Update to sha256 digest — run: ./.github/scripts/update-image-digests.sh
-          # Supply-chain integrity: pin image digest to prevent tag reuse attacks
+          # Pinned by digest (= v1.9.1): a tag can be re-pointed, a digest cannot.
           # exits 1 on vulnerabilities by default (blocking, SEC-1)
-          docker run --rm -v "$PWD:/src" -w /src ghcr.io/google/osv-scanner:v1.9.1 \
+          docker run --rm -v "$PWD:/src" -w /src ghcr.io/google/osv-scanner@sha256:36dea1baa2b34df3ee911d712e6a774eff04cc8b25789e0e6837d40759afaeab \
             --lockfile=pnpm-lock.yaml --lockfile=mobile/package-lock.json \
             --format=sarif --output=osv.sarif
           rc=$?
@@ -362,10 +360,9 @@ jobs:
         id: scan
         run: |
           set +e
-          # TODO: Update to sha256 digest — run: ./.github/scripts/update-image-digests.sh
-          # Pin docker image digest for supply-chain integrity (prevents tag hijacking)
+          # Pinned by digest (= 0.58.2): a tag can be re-pointed, a digest cannot.
           # --exit-code 1 → exit 1 on findings (blocking, SEC-1); .trivyignore applies
-          docker run --rm -v "$PWD:/src" -w /src aquasec/trivy:0.58.2 \
+          docker run --rm -v "$PWD:/src" -w /src aquasec/trivy@sha256:665030f4d33a82c1e8d9d5e0453365842236723c1ee5cc3becca698268e66a56 \
             fs --scanners vuln,secret,misconfig --exit-code 1 --format sarif --output trivy.sarif .
           rc=$?
           set -e
@@ -412,14 +409,13 @@ jobs:
         id: scan
         run: |
           set +e
-          # TODO: Update to sha256 digests — run: ./.github/scripts/update-image-digests.sh
-          # Docker image pinning (aquasec/trivy + anchore/syft) for supply-chain integrity
+          # Pinned by digest: aquasec/trivy (= 0.58.2) + anchore/syft (= v1.20.0).
           # --exit-code 1 → exit 1 on findings (blocking, SEC-1); .trivyignore applies
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/out" -w /out \
-            aquasec/trivy:0.58.2 image --exit-code 1 --format sarif --output trivy-image.sarif void-dominion:scan
+            aquasec/trivy@sha256:665030f4d33a82c1e8d9d5e0453365842236723c1ee5cc3becca698268e66a56 image --exit-code 1 --format sarif --output trivy-image.sarif void-dominion:scan
           rc=$?
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/out" -w /out \
-            anchore/syft:v1.20.0 scan void-dominion:scan -o cyclonedx-json=sbom-image.cdx.json
+            anchore/syft@sha256:b46e597614ddc78621e560af3fabf9346e35462ea1c886a38b30bcc7ca601a73 scan void-dominion:scan -o cyclonedx-json=sbom-image.cdx.json
           set -e
           ok=true; case $rc in 125 | 126 | 127) ok=false ;; esac
           [ -s trivy-image.sarif ] || ok=false
@@ -488,7 +484,7 @@ jobs:
             # Корневой обслуживает блокирующие trivy-fs/trivy-image над нашим кодом и
             # образом; чужой CVE, записанный туда, ослабил бы заодно и их (SEC-14).
             docker run --rm -v "$PWD:/out" -w /out \
-              aquasec/trivy:0.58.2 image --exit-code 1 --format sarif \
+              aquasec/trivy@sha256:665030f4d33a82c1e8d9d5e0453365842236723c1ee5cc3becca698268e66a56 image --exit-code 1 --format sarif \
               --ignorefile .trivyignore-deps \
               --output "trivy-deps-sarif/trivy-deps-$i.sarif" "$ref"
             r=$?
@@ -694,7 +690,6 @@ jobs:
           # dedicated, world-writable subdir instead of the whole repo root.
           mkdir -p zap-wrk
           chmod 777 zap-wrk
-          # TODO: Update to sha256 digest — run: ./.github/scripts/update-image-digests.sh
           # ghcr.io/zaproxy/zaproxy@sha256 pin snapped live from the registry API (SEC-3).
           # --network host: the target is the bare node process on the runner, not a
           # container — ZAP reaches it via localhost like trivy-image reaches the socket.
@@ -733,9 +728,8 @@ jobs:
         continue-on-error: true
         run: |
           set +e
-          # TODO: Update to sha256 digest — run: ./.github/scripts/update-image-digests.sh
-          # Image pinning: anchore/syft by digest for supply-chain integrity
-          docker run --rm -v "$PWD:/src" -w /src anchore/syft:v1.20.0 \
+          # Pinned by digest (= v1.20.0).
+          docker run --rm -v "$PWD:/src" -w /src anchore/syft@sha256:b46e597614ddc78621e560af3fabf9346e35462ea1c886a38b30bcc7ca601a73 \
             scan dir:/src -o cyclonedx-json=sbom.cdx.json
           rc=$?
           set -e

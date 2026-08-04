@@ -77,14 +77,15 @@ curl -sS -o /dev/null -D - -H "Authorization: Bearer $tok" \
 
 | Образ | Статус | Примечание |
 |-------|--------|-----------|
-| `semgrep/semgrep` | ✅ sha256 | Пинен по дайджесту |
-| `zricethezav/gitleaks` | ⚠️ TAG | `v8.18.4` — нужен sha256 |
-| `trufflesecurity/trufflehog` | ✅ sha256 | Пинен по дайджесту |
-| `ghcr.io/google/osv-scanner` | ⚠️ TAG | `v1.9.1` — нужен sha256 |
-| `aquasec/trivy` | ⚠️ TAG | `0.58.2` — нужен sha256 (**4 использования**: trivy-fs, trivy-image, trivy-deps в `security.yml` + гейт перед пушем в `image.yml`) |
-| `anchore/syft` | ⚠️ TAG | `v1.20.0` — нужен sha256 (используется 2 раза) |
-| `ghcr.io/zizmorcore/zizmor` | ✅ sha256 | Пинен по дайджесту |
-| `owasp/dependency-check` | ✅ sha256 | Пинен по дайджесту (SEC-15) |
+| `semgrep/semgrep` | ✅ sha256 | 2 вызова в джобе `semgrep` |
+| `zricethezav/gitleaks` | ✅ sha256 | `= v8.18.4` |
+| `trufflesecurity/trufflehog` | ✅ sha256 | |
+| `ghcr.io/google/osv-scanner` | ✅ sha256 | `= v1.9.1` |
+| `aquasec/trivy` | ✅ sha256 | `= 0.58.2`, **4 использования**: `trivy-fs`, `trivy-image`, `trivy-deps` в `security.yml` + гейт перед пушем в `image.yml` — бампить вместе |
+| `anchore/syft` | ✅ sha256 | `= v1.20.0`, 2 использования: `trivy-image` и `sbom` |
+| `ghcr.io/zaproxy/zaproxy` | ✅ sha256 | джоба `dast-zap` (SEC-6) |
+| `ghcr.io/zizmorcore/zizmor` | ✅ sha256 | |
+| `owasp/dependency-check` | ✅ sha256 | SEC-15 |
 
 **Четвёртая группа — релизный конвейер.** `image.yml` и `deploy/verify-image.sh` тянут
 `ghcr.io/sigstore/cosign/cosign` — пинен по дайджесту, тот же, что в `android.yml`;
@@ -112,7 +113,7 @@ curl -sS -o /dev/null -D - -H "Authorization: Bearer $tok" \
 
 1. **Получить новый дайджест** для версии образа (см. методы выше)
 2. **Заменить в security.yml**: `image:tag` → `image@sha256:xxx`
-3. **Обновить дату комментария** (line 23): `pinned from their :latest on 2026-07`
+3. **Обновить дату** в шапке `security.yml`: `#   - Last updated: YYYY-MM`
 4. **Запустить pipeline** локально для проверки
 5. **Коммитить с сообщением**: `sec: update scanner image digests`
 

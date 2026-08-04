@@ -79,8 +79,12 @@ jobs:
         env:
           IMAGE: ${{ steps.img.outputs.image }}
         run: |
+          # Пин по дайджесту (= 0.58.2), тот же, что у trivy-fs/trivy-image/trivy-deps в
+          # security.yml — бампить их надо вместе. Тег mutable, а этот скан решает, уедет
+          # ли образ в GHCR.
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/out" -w /out \
-            aquasec/trivy:0.58.2 image --exit-code 1 --format table "$IMAGE:ci"
+            aquasec/trivy@sha256:665030f4d33a82c1e8d9d5e0453365842236723c1ee5cc3becca698268e66a56 \
+            image --exit-code 1 --format table "$IMAGE:ci"
 
       - name: push
         id: push
