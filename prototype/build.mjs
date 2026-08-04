@@ -209,6 +209,12 @@ body.sheet-open #speedbar{bottom:calc(34vh + 12px);}
   box-shadow:0 0 22px rgba(40,200,210,.14);}
 #cmdbar.show{display:flex;}
 #cmdbar .cmdlabel{color:var(--cyan-dim);font-size:9px;letter-spacing:1.5px;padding-right:4px;white-space:nowrap;}
+/* CHAIN-UX: подпись полоски режима «Приказ» — в отличие от .cmdlabel ВИДНА и на
+   телефоне (счётчик шагов и «~T» — суть полоски, не декор) */
+#cmdbar .chlabel{color:var(--cyan);font-size:10px;letter-spacing:1px;padding:0 6px;white-space:nowrap;}
+#cmdbar .chlabel b{color:#eafffb;font-variant-numeric:tabular-nums;}
+#cmdbar .chlabel .chhint{color:var(--dim);font-style:normal;letter-spacing:.4px;}
+#cmdbar .chlabel .chwarn{color:var(--amber,#f5cf6b);cursor:help;}
 #cmdbar button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
   min-width:48px;height:44px;padding:4px 7px;cursor:pointer;font:700 11px ui-monospace,monospace;
   letter-spacing:.5px;background:transparent;color:var(--cyan);border:1px solid var(--cyan-dim);border-radius:9px;}
@@ -1450,6 +1456,13 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
      the bottom-left and the panel covers it, instead of the rail jumping up into the
      command bar and overlapping it. Hidden while a panel is open (reopen by closing it). */
   body.sheet-open #rail{opacity:0;pointer-events:none;}
+  /* CHAIN-UX режим «Приказ»: заказ владельца — «на мобиле убирается нижний хаб».
+     Лист прячет формула renderPanel (chainMode → !open); рейл/скорость/цели —
+     этими правилами, той же тройкой, что прячет их открытый лист. Полоска плана
+     живёт в #cmdbar и остаётся единственным низом экрана. */
+  body.chain-mode #rail{opacity:0;pointer-events:none;}
+  body.chain-mode #speedbar{display:none;}
+  body.chain-mode #goals{display:none;}
   /* phones have no hover and no room — drop the dossier pane, content fills width */
   .pdesc{display:none;}
   .pscroll{padding:13px 14px;}
