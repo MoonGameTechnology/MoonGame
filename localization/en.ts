@@ -114,6 +114,7 @@ export const en: Record<string, string> = {
   // --- cargo — Погрузка десанта: отказы трюма и гарнизона.
   'cargo.garrison-empty': 'none left in the garrison',
   'cargo.hold-full': 'the hold is full',
+  'cargo.under-assault': 'the garrison is locked in battle — no troops can leave',
 
   // --- cost — ценники: единые чипы «иконка + число» на всех поверхностях.
   'cost.free': 'free',
@@ -227,6 +228,9 @@ export const en: Record<string, string> = {
   'cmd.standing-sortie': 'Scramble',
   'cmd.standing-sortie.hint': 'the squadron automatically hits enemies within range',
   'cmd.stop': 'Stop',
+  'cmd.troops': 'Troops',
+  'cmd.troops.hint':
+    'load and unload ground units — at your own world, with a fleet that is going nowhere',
   'cmd.stop.hint': "cancel the fleet's current movement",
   'cmd.target': 'Target',
   'cmd.target.hint': 'tap the map to compose an order: wait · move · assault · barrage',
@@ -1288,7 +1292,7 @@ export const en: Record<string, string> = {
   'onb.tour.first.spy':
     'Scout an enemy world before you attack it: tap it → «Scout world» (or the Diplomacy → Espionage tab) for a 24-hour window into its garrison and fleets. No rivals here, but in a real match it saves you from an ambush.',
   'onb.tour.first.troops':
-    'Your fleet has a hold for troops: tap it at your world → «Ground army ⇄ garrison» → «Load». An open world falls to orbit alone; a garrisoned one only falls to a landing — your fleet clears the defense from orbit first, then the troops take the ground.',
+    'Your fleet has a hold for troops: select it at your world and press ⇅ "Troops" on the command bar — it shows who can come aboard and how many. An open world falls to orbit alone; a garrisoned one only falls to a landing — your fleet clears the defense from orbit first, then the troops take the ground.',
   'onb.tour.first.welcome':
     'This is your first world, commander. I will walk you through the core loop — a couple of minutes, calm, no rivals.',
   'onb.tour.got-it': 'Got it',
@@ -1493,11 +1497,13 @@ export const en: Record<string, string> = {
   'side.ground.empty': 'no ground army here',
   'side.ground.hint':
     'Ground units defend your worlds. Load them onto a fleet to capture enemy worlds.',
+  'side.ground.legend': 'garrison ▸ hold',
   'side.ground.load': '▲ Load {u}',
-  'side.ground.loading': '⏳ loading: {n} (≈1h each)',
+  'side.ground.loading': '⏳ loading: {n}',
   'side.ground.title': 'Ground army ⇄ garrison',
   'side.ground.units': 'Ground units',
   'side.ground.unload': '▼ Unload {u}',
+  'side.ground.via-cmd': 'Loading and unloading — the ⇅ "Troops" button on the fleet command bar.',
   'side.group.clear': 'Deselect group',
   'side.group.hint':
     'Press "Move" and tap a destination — every selected fleet routes there and stops. "Merge" fuses the group into one fleet (distant ones fly in first). Shift- or Ctrl/⌘-click a fleet to add it to the group; Shift-drag empty space to box-select several.',
@@ -1741,6 +1747,13 @@ export const en: Record<string, string> = {
   'tech.state.locked': 'LOCKED',
   'tech.state.open': 'AVAILABLE',
   'tech.state.running': 'RESEARCHING',
+
+  // --- troops — ⇅-меню десанта в ряду команд: шапка, план, сноски.
+  'troops.damaged': "damaged units don't embark",
+  'troops.hold': 'hold {a}/{b}',
+  'troops.planned': 'ordered {n}',
+  'troops.timing': 'loading ≈1h per unit · unloading is instant',
+  'troops.title': 'TROOPS',
 
   // --- upd — Баннер обновления сборки (APK; в браузере не показывается).
   'upd.apk-only': 'updates are only available in the APK',

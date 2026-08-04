@@ -116,9 +116,9 @@ packages/action-layer/src/
   examples/      skirmish.test.ts (демо-сценарий + SVG)
   index.ts       баррель (экспорт публичного API)
 data/            manifest, resources, units, buildings, factions, events, sectors, sectorKinds, planetTypes, technologies, scientists, rewards, heroes, heroAbilities, heroFittings, heroPassives, heroSkillTrees, modules, medals, dropTables, starterArsenal (.json)
-localization/    ВЕСЬ текст для игрока: index.ts (LOCALES/DEFAULT_LOCALE/dataKey), ru.ts, en.ts (плоские карты ключ→текст, 1574 ключа), runtime.ts (ОДИН на прототип и клиент: t/tData/lookup/hasKey/setLocale/localizeStaticDom, LOC-5) + runtime.test.ts. Мост старых msgid снят вместе с LOC-2 — в коде только ключи
+localization/    ВЕСЬ текст для игрока: index.ts (LOCALES/DEFAULT_LOCALE/dataKey), ru.ts, en.ts (плоские карты ключ→текст, 1552 ключа), runtime.ts (ОДИН на прототип и клиент: t/tData/lookup/hasKey/setLocale/localizeStaticDom, LOC-5) + runtime.test.ts. Мост старых msgid снят вместе с LOC-2 — в коде только ключи
 docs/            architecture, modulesystem, roadmap, deep-technical-roadmap, multiplayer, engineering-risks, gdd, metagame, state(этот)
-prototype/       src/game.ts (чистый index-фасад реэкспортов, REFP-28: 5289→207 строк, логики нет), src/prototypeData.ts, src/map.ts, src/fleetStacks.ts, src/tax.ts, src/botFavour.ts, src/squadron.ts, src/chain.ts, src/hunger.ts, src/botDiplomacy.ts, src/sessionMarket.ts, src/capital.ts, src/fleetLaunch.ts, src/standingOrders.ts, src/forcedMarch.ts, src/instantRepair.ts, src/econScrews.ts, src/economy.ts, src/matchSetup.ts, src/actions.ts, src/patrol.ts, src/serverDrivers.ts, src/protoKernel.ts, src/stewardGuard.ts, src/ai.ts, src/time.ts (вынесены из game.ts; Block REFP закрыт 28/28, обратных рёбер на фасад ноль), src/main.ts (UI), src/format.ts (презентационные форматтеры, REFM-2), src/icons.ts (словарь иконок, REFM-3), src/dossiers.ts + src/buildQueue.ts (досье объектов и кодекс + словарь очереди стройки, REFM-4), src/arsenalScreen.ts (витрина «Арсенал», REFM-5), src/marketScreen.ts (окно рынка, REFM-6), src/stewardScreen.ts (окно «Хранителя», REFM-7), src/techTree.ts (дерево технологий, REFM-9), src/profileScreen.ts (профиль командира, REFM-10), src/corpScreen.ts (корпоративный кабинет, REFM-11), src/chatWindow.ts (плавающее окно чата, REFM-12), src/smoke.ts, tsconfig.json (REFM-0: typecheck в гейте), build.mjs, uitest.mjs, dist/ (артефакт, в .gitignore)
+prototype/       src/game.ts (чистый index-фасад реэкспортов, REFP-28: 5289→207 строк, логики нет), src/prototypeData.ts, src/map.ts, src/fleetStacks.ts, src/tax.ts, src/botFavour.ts, src/squadron.ts, src/chain.ts, src/hunger.ts, src/botDiplomacy.ts, src/sessionMarket.ts, src/capital.ts, src/fleetLaunch.ts, src/standingOrders.ts, src/forcedMarch.ts, src/instantRepair.ts, src/econScrews.ts, src/economy.ts, src/matchSetup.ts, src/actions.ts, src/patrol.ts, src/serverDrivers.ts, src/protoKernel.ts, src/stewardGuard.ts, src/ai.ts, src/time.ts (вынесены из game.ts; Block REFP закрыт 28/28, обратных рёбер на фасад ноль), src/main.ts (UI), src/format.ts (презентационные форматтеры, REFM-2), src/icons.ts (словарь иконок, REFM-3), src/dossiers.ts + src/buildQueue.ts (досье объектов и кодекс + словарь очереди стройки, REFM-4), src/arsenalScreen.ts (витрина «Арсенал», REFM-5), src/marketScreen.ts (окно рынка, REFM-6), src/stewardScreen.ts (окно «Хранителя», REFM-7), src/techTree.ts (дерево технологий, REFM-9), src/profileScreen.ts (профиль командира, REFM-10), src/corpScreen.ts (корпоративный кабинет, REFM-11), src/chatWindow.ts (плавающее окно чата, REFM-12), src/resourceCard.ts (карточка ресурса, RC-1), src/troopsMenu.ts (модель и разметка ⇅-меню десанта, GRND-1), src/smoke.ts, tsconfig.json (REFM-0: typecheck в гейте), build.mjs, uitest.mjs, dist/ (артефакт, в .gitignore)
 ```
 
 ## 4. Модель состояния (`GameState`)
@@ -1213,7 +1213,7 @@ grants}`), `heroFittings.json` (`{statMods, grants, cost}`). Движок ПОЛ
   также весь каталог `prototypeData.ts` — `tech.node.*`, `sci.*`, `faction.*`,
   `hero.unit/ability/passive/tree/fit.*` (закрытие LOC-2).
 
-Итого **1574 ключа**. Записи в локалях разложены по доменным секциям и отсортированы
+Итого **1552 ключа**. Записи в локалях разложены по доменным секциям и отсортированы
 по ключу внутри каждой. Таблицы-справочники прототипа и игровой каталог
 (`prototypeData.ts`) держат В ЗНАЧЕНИИ ключ, а не русский текст — их подписи уходят в
 `t()` переменной, и раньше именно там английский пропадал незаметно для гейта. Имена
@@ -1475,6 +1475,31 @@ effects])` (31 модуль), тик в реальном
   палитры соперников (классика/тёплая/дальтоник Okabe–Ito), localStorage-косметика
   поверх `ownerColor`. Известный долг: `uitest.mjs` сломан на main до этой правки
   (`document.addEventListener` в фейк-DOM) — не входит в гейт.
+- **Десант: «кого и сколько» (GRND-1, заказ владельца)** — погрузка/выгрузка наземных
+  частей ушла из карточки флота в ряд команд: кнопка **⇅ «Десант»** (рядом с «Делить»,
+  так же строго ОДНОФЛОТОВАЯ — гарнизон и трюм у каждого свои) раскрывает третий
+  `.cmdpop`-поповер над рядом, без затемнения и без своего DOM-узла/слушателя. Внутри —
+  строка на УНИКАЛЬНЫЙ тип (стеки схлопываются), «гарнизон ▸ трюм», знаковый счётчик
+  `▼ − N + ▲`: `+N` поднять, `−N` высадить, обе стороны в одном заходе, без вкладок.
+  Чистая модель и разметка — `src/troopsMenu.ts` (`troopsModel`/`stepPlan`/`maxPlan`/
+  `planOrders`/`troopsMenuHtml`), 26 тестов: `floor(free/cargoSize)` (а не `free`),
+  двойной резерв (трюм — своей очередью, гарнизон — очередями ВСЕХ флотов у мира),
+  только здоровые стеки (`findHealthyStack`, как в ядре), конкуренция строк за место,
+  «выгрузка освобождает трюм для погрузки в том же плане». Шаг КЛАМПИТСЯ, а не
+  блокируется (идиома `+10` из диалога разделения). Подтверждение: выгрузка мгновенна
+  и уходит ОДНИМ `army.unload {count}` на тип (ядро принимает `count` атомарно),
+  погрузка ложится в часовую очередь `pendingLoads` по одной записи на единицу —
+  сознательно, потому что ядро грузит «всё или ничего», и N записей доедут частично,
+  если гарнизон за час обмелел. Fail-secure: гарнизон под штурмом (`garrisonUnderAssault`)
+  отбивается на входе, а не через час. Реестр Back/Escape — рядом со `splitState`;
+  меню гаснет само в раннем выходе `renderCmdBar`, в серии взаимного гашения приказов,
+  в `apply()` при пропаже флота, в `clearSelection` и на старте матча. Карточка флота
+  оставила ту же секцию БЕЗ кнопок — сводка «гарнизон ▸ трюм» + отсылка к ⇅ (прецедент
+  подписан в коде: SO-UI, стоячие приказы). Текст тура `onb.tour.first.troops` переписан
+  под новый путь в обеих локалях. Проверено вживую (412×915, RU): ⇅ активна у своего
+  мира, «до упора» набирает 2 ополченца, шапка показывает `трюм 2/11 · заказано +2`,
+  Подтвердить → «⏳ грузится: 2» → через игровой час `ополчение 0 ▸ 2`; обратный ▼ →
+  мгновенно `2 ▸ 0`; Escape закрывает меню, не роняя матч.
 - **Цели первой сессии / чек-лист (ONB-7)** — лёгкий «правильно ли я играю?»-сигнал только в
   онбординг-матче: чистый `src/firstGoals.ts` (`FIRST_GOALS` — шахта/флот/захват/100 очков;
   `metGoals(signals)`→Set, `mergeDone` монотонно, `goalsComplete`) — 10 тестов. main.ts:

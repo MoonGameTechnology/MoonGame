@@ -93,6 +93,8 @@ import {
 import { fleetCallsign, fleetKindKey } from './fleetName';
 import { planetName } from './planetName';
 import { provinceScore } from '../../packages/shared-core/src/state/sectorKind';
+// GRND-1: гарнизон, запертый живым боем, не отпускает войска (ядро: E_UNDER_ASSAULT).
+import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet';
 import { DEFAULT_HEROES, type HeroLoadout } from './heroes';
 import { DEFAULT_SHIP_LOADOUTS, type ShipLoadout } from './ships';
 // The «Оснащение корабля» loadout constructor reuses the framework-agnostic view-model
@@ -232,6 +234,16 @@ import { initMarket } from './marketScreen';
 // Плавающее окно чата (REFM-12) — своя геометрия, свои настройки, свой кэш.
 import { initChat } from './chatWindow';
 import { initResourceCard } from './resourceCard';
+// GRND-1 — меню десанта: чистая модель «кого и сколько» + разметка поповера.
+import {
+  maxPlan,
+  planOrders,
+  stepPlan,
+  troopsMenuHtml,
+  troopsModel,
+  type TroopsInput,
+  type TroopsUnitInput,
+} from './troopsMenu';
 // ST-2/ST-3 — «Хранитель»: the window is REFM-7; the read-only helpers below are shared
 // with the threat alert (`stewFmtDur`), the side panel (`stewardTechDone`) and the
 // morning report (`stewMetrics`).
@@ -578,6 +590,9 @@ let pendingMerges: Array<{ mover: string; into: string }> = [];
 let additive = false; // Shift or Ctrl/⌘ held on the current tap → add to the fleet selection
 // Split-fleet dialog: which fleet, and how many of each ship type peel off.
 let splitState: { fleetId: string; take: Record<string, number> } | null = null;
+// GRND-1 ⇅ «Десант»: поповер погрузки/выгрузки над рядом команд. `plan` — знаковая
+// дельта на тип: >0 поднять из гарнизона, <0 высадить. null = меню закрыто.
+let troopsPlan: { fleetId: string; plan: Record<string, number> } | null = null;
 
 // --- session diplomacy & comms menu state ------------------------------------
 // Messages are a prototype-local session log — they don't touch the deterministic
@@ -2104,6 +2119,7 @@ function apply(out: StepOut) {
   s = out.state;
   if (selFleet && !s.fleets[selFleet]) selFleet = null;
   if (splitState && !s.fleets[splitState.fleetId]) splitState = null; // fleet gone → close
+  if (troopsPlan && !s.fleets[troopsPlan.fleetId]) troopsPlan = null; // ⇅-меню тоже
   selFleets = new Set([...selFleets].filter((id) => s.fleets[id]?.owner === ME));
   handleEvents(out.events);
 }
@@ -2388,13 +2404,6 @@ interface PendingLoad {
 }
 let pendingLoads: PendingLoad[] = [];
 
-/** Свободный трюм флота: грузоподъёмность кораблей минус уже погруженный десант.
- *  До H4-REVERT это считал `fleetCargoFree` из division.ts, потому что трюм делили
- *  с дивизиями; теперь делить не с кем — остаётся одно вычитание. */
-function holdFree(f: Fleet): number {
-  return sumUnitStat(f.units, data, 'cargoCapacity') - sumUnitStat(f.landing ?? [], data, 'cargoSize');
-}
-
 /** Hold footprint (cargoSize) already reserved by this fleet's in-progress loads. */
 function pendingLoadCargo(fleetId: string): number {
   let n = 0;
@@ -2415,25 +2424,22 @@ function pendingLoadUnits(planetId: string, unit: string): number {
   return n;
 }
 
-/** Queue a ~1h ground-army load if the hold has room AND the garrison still holds
- *  a free unit (both reserving for loads already under way), so the player can't
- *  over-fill the trim, nor queue more troops than the world can actually spare
- *  — which would later fire real `army.load`s that reject with `E_NO_ARMY`. */
-function beginLoad(fleetId: string, unit: string): void {
-  const f = s.fleets[fleetId];
-  if (!f || f.movement || f.battleId || !f.location) return;
-  const need = data.units[unit]?.stats.cargoSize ?? 1;
-  if (need > holdFree(f) - pendingLoadCargo(fleetId)) {
-    note('✖ ' + t('cargo.hold-full')); // hold full once the loads already in progress land
-    return;
-  }
-  // Match the core's acceptance: only a healthy, default-loadout garrison stack embarks.
-  const stock = findHealthyStack(s.planets[f.location]!.garrison, unit)?.count ?? 0;
-  if (pendingLoadUnits(f.location, unit) >= stock) {
-    note('✖ ' + t('cargo.garrison-empty')); // nothing left once the queued loads lift
-    return;
-  }
-  pendingLoads.push({ fleetId, unit, startAt: s.time, doneAt: s.time + LOAD_TIME });
+/** Положить в очередь `count` часовых погрузок БЕЗ проверок — вызывающий уже
+ *  посчитал и место, и запас гарнизона (меню десанта делает это своей моделью).
+ *  Записи по одной единице, а не одна на партию, СОЗНАТЕЛЬНО: ядро грузит «всё или
+ *  ничего», поэтому N отдельных `army.load` доедут частично, если за этот час
+ *  гарнизон обмелел, — партия одним действием отскочила бы целиком. */
+function pushLoads(fleetId: string, unit: string, count: number): void {
+  for (let i = 0; i < count; i++)
+    pendingLoads.push({ fleetId, unit, startAt: s.time, doneAt: s.time + LOAD_TIME });
+}
+
+/** Fail-secure: ядро не выпускает войска из гарнизона, запертого живым боем
+ *  (`E_UNDER_ASSAULT`). Без этой проверки заказ висел бы час и молча отскочил. */
+function troopsLiftable(planetId: string): boolean {
+  if (!garrisonUnderAssault(s, planetId)) return true;
+  note('✖ ' + t('cargo.under-assault'));
+  return false;
 }
 
 /** Drive queued loads each frame: drop any whose carrier moved / fights / vanished
@@ -2451,6 +2457,42 @@ function pumpPendingLoads(): void {
     keep.push(p);
   }
   pendingLoads = keep;
+}
+
+/** GRND-1: собрать вход меню десанта для флота. `null` — показывать нечего: флот не
+ *  пришвартован у СВОЕГО мира, или наземных частей нет ни в гарнизоне, ни в трюме.
+ *  Здесь и только здесь живая сцена превращается в числа — дальше меню чистое. */
+function troopsInputFor(fleetId: string): TroopsInput | null {
+  const f = s.fleets[fleetId];
+  if (!f || f.movement || f.battleId || !f.location) return null;
+  const here = s.planets[f.location];
+  if (!here || here.owner !== ME) return null;
+  const landing = f.landing ?? [];
+  const types: string[] = [];
+  for (const st of [...here.garrison, ...landing])
+    if (isGround(st.unit) && !types.includes(st.unit)) types.push(st.unit);
+  if (!types.length) return null;
+  // Стеков одного типа может быть несколько (побитый + целый): «всего» складывает
+  // их все, а поднять/высадить ядро даст только здоровый с дефолтным лоадаутом.
+  const total = (stacks: Array<{ unit: string; count: number }>, unit: string): number =>
+    stacks.reduce((n, st) => (st.unit === unit ? n + st.count : n), 0);
+  const units: TroopsUnitInput[] = types.map((unit) => ({
+    unit,
+    garrison: findHealthyStack(here.garrison, unit)?.count ?? 0,
+    garrisonAll: total(here.garrison, unit),
+    hold: findHealthyStack(landing, unit)?.count ?? 0,
+    holdAll: total(landing, unit),
+    queued: pendingLoads.filter((p) => p.fleetId === fleetId && p.unit === unit).length,
+    reserved: pendingLoadUnits(here.id, unit),
+    cargoSize: data.units[unit]?.stats.cargoSize ?? 1,
+  }));
+  return {
+    units,
+    capacity: sumUnitStat(f.units, data, 'cargoCapacity'),
+    used: sumUnitStat(landing, data, 'cargoSize'),
+    reservedCargo: pendingLoadCargo(fleetId),
+    plan: troopsPlan?.fleetId === fleetId ? troopsPlan.plan : {},
+  };
 }
 
 // --- diplomacy gate (client order layer) -------------------------------------
@@ -2649,6 +2691,7 @@ function clearSelection() {
   selFleets = new Set();
   merging = false;
   splitState = null;
+  troopsPlan = null;
   lastPanelHtml = '';
 }
 
@@ -5431,35 +5474,28 @@ function fleetPanelHtml(f: Fleet): string {
       }
       cols.push(at);
     }
-    // load / unload ground army at your own world
+    // Ground army at your own world — СВОДКА, без кнопок: сама погрузка/выгрузка
+    // переехала в ⇅-меню ряда команд (GRND-1), где есть выбор «кого и сколько».
+    // Панель осталась информационной ровно как у стоячих приказов (SO-UI ниже).
     if (here!.owner === ME) {
       let ga = `<div class="sec">${t('side.ground.title')}</div>`;
       const groundHere = here!.garrison.filter((st) => isGround(st.unit));
       const carried = f.landing ?? [];
       const loadingN = pendingLoads.filter((p) => p.fleetId === f.id).length;
-      const freeHold = holdFree(f) - pendingLoadCargo(f.id); // reserve in-progress loads
-      if (groundHere.length) {
-        ga += `<div class="row">`;
-        for (const st of groundHere) {
-          const sz = data.units[st.unit]?.stats.cargoSize ?? 1;
-          ga += btn(
-            'load',
-            st.unit,
-            t('side.ground.load', { u: displayUnit(st.unit) }),
-            sz <= freeHold,
-          );
-        }
-        ga += `</div>`;
-      }
-      if (carried.length) {
-        ga += `<div class="row">`;
-        for (const st of carried)
-          ga += btn('unload', st.unit, t('side.ground.unload', { u: displayUnit(st.unit) }), true);
-        ga += `</div>`;
+      const types: string[] = [];
+      for (const st of [...groundHere, ...carried])
+        if (isGround(st.unit) && !types.includes(st.unit)) types.push(st.unit);
+      if (types.length) {
+        ga += `<div class="row dim">${t('side.ground.legend')}</div>`;
+        const cnt = (stacks: Array<{ unit: string; count: number }>, u: string): number =>
+          stacks.reduce((n, st) => (st.unit === u ? n + st.count : n), 0);
+        for (const u of types)
+          ga += `<div class="row"><span class="bicon">${unitIconHtml(u, data, youColor, 16)}</span>${esc(displayUnit(u))} <b>${cnt(groundHere, u)} ▸ ${cnt(carried, u)}</b></div>`;
       }
       if (loadingN) ga += `<div class="hint">${t('side.ground.loading', { n: loadingN })}</div>`;
-      if (!groundHere.length && !carried.length && !loadingN)
+      if (!types.length && !loadingN)
         ga += `<div class="row dim">${t('side.ground.empty')}</div>`;
+      ga += `<div class="hint">${t('side.ground.via-cmd')}</div>`;
       cols.push(ga);
     }
     h += pcols(cols);
@@ -6823,6 +6859,7 @@ function renderCmdBar() {
     if (targetAim) targetAim = false;
     if (merging) merging = false;
     fireMenu = false; // пустое выделение — 🔥-меню не должно всплыть при новом выборе
+    troopsPlan = null; // ⇅-меню тоже: иначе всплывёт над СЛЕДУЮЩИМ выбранным флотом
     cmdbar.classList.remove('show');
     lastCmdHtml = '';
     return;
@@ -6863,6 +6900,10 @@ function renderCmdBar() {
   const lone = ids.length === 1 && fleets[0] ? fleets[0] : null;
   const canSplit =
     !!lone && !!lone.location && !lone.movement && !lone.battleId && sumUnits(lone.units) >= 2;
+  // GRND-1 ⇅ «Десант»: как и split, команда строго ОДНОФЛОТОВАЯ — гарнизон и трюм у
+  // каждого свои, один клик на группу разослал бы приказы с разной арифметикой.
+  const troopsIn = lone ? troopsInputFor(lone.id) : null;
+  if (troopsPlan && (!troopsIn || troopsPlan.fleetId !== lone?.id)) troopsPlan = null;
   // Artillery in the selection → offer the standoff-fire focus order.
   const anyArtillery = fleets.some(fleetHasArtillery);
   // Hero-flagship aboard a selected fleet → its castable abilities become a ✨ popover
@@ -6915,6 +6956,14 @@ function renderCmdBar() {
       t('cmd.merge.hint'),
     ) +
     cmdBtn('split', '⊟', t('cmd.split'), splitState ? 'on' : '', !canSplit, t('cmd.split.hint')) +
+    cmdBtn(
+      'troops',
+      '⇅',
+      t('cmd.troops'),
+      troopsPlan ? 'on' : '',
+      !troopsIn,
+      t('cmd.troops.hint'),
+    ) +
     // ☰ — the extras row (hamburger, NOT «...» — референс не копируем дословно):
     // «Выбрать+» и будущие Ускорить/Задержка живут здесь, базовый ряд не пухнет.
     cmdBtn('more', '☰', t('cmd.more'), cmdMore ? 'on' : '', false, t('cmd.more.hint')) +
@@ -6986,6 +7035,13 @@ function renderCmdBar() {
           })
           .join('') +
         `</div>`
+      : '') +
+    // ⇅ поповер десанта: строка на тип, знаковый счётчик «сколько», одно подтверждение.
+    (troopsPlan && troopsIn
+      ? troopsMenuHtml(troopsModel(troopsIn), {
+          icon: (u) => unitIconHtml(u, data, youColor, 18),
+          name: displayUnit,
+        })
       : '');
   if (html !== lastCmdHtml) {
     cmdbar.innerHTML = html;
@@ -7192,10 +7248,6 @@ side.addEventListener('click', (ev) => {
       playerOrder(splitFleet(ME, f!.id, squadronTake(f!)));
       note(t('hint.squadron-launched'));
     }
-  } else if (act === 'load') {
-    beginLoad(selFleet!, arg); // ~1h timed load (animated in the marker)
-  } else if (act === 'unload') {
-    playerOrder(unloadArmy(ME, selFleet!, arg, 1));
   }
   lastPanelHtml = '';
   renderPanel();
@@ -7372,6 +7424,8 @@ cmdbar.addEventListener('click', (ev) => {
   if (cmd !== 'barrage') barrageAim = false; // any other command disarms barrage-targeting
   if (cmd !== 'firemode' && cmd !== 'fmset') fireMenu = false; // другой приказ закрывает 🔥-меню
   if (cmd !== 'cast' && cmd !== 'castdo') castMenu = false; // другой приказ закрывает ✨-меню
+  // другой приказ закрывает ⇅-меню (иначе два absolute-поповера легли бы друг на друга)
+  if (cmd !== 'troops' && cmd !== 'tstep' && cmd !== 'tmax' && cmd !== 'tok') troopsPlan = null;
   if (cmd !== 'attack') assaultAim = false; // any other command disarms assault-targeting
   if (cmd !== 'target') targetAim = false; // any other command disarms order-targeting
   // A real order leaves «Выбрать+» (the group stays selected and takes it);
@@ -7409,6 +7463,38 @@ cmdbar.addEventListener('click', (ev) => {
       aiming = false;
       renderSplitDialog();
     }
+  } else if (cmd === 'troops') {
+    const id = ids[0];
+    if (id) {
+      troopsPlan = troopsPlan ? null : { fleetId: id, plan: {} }; // toggle the popover
+      aiming = false;
+    }
+  } else if (cmd === 'tstep' || cmd === 'tmax') {
+    // Набор количества. Шаг КЛАМПИТСЯ моделью, а не блокируется — как «+10» в
+    // диалоге разделения флота: «+5» при трёх доступных даст +3, а не откажет.
+    const inp = troopsPlan ? troopsInputFor(troopsPlan.fleetId) : null;
+    if (troopsPlan && inp) {
+      const unit = bEl.dataset.unit ?? '';
+      troopsPlan.plan =
+        cmd === 'tmax'
+          ? maxPlan(inp, unit, Number(bEl.dataset.dir) > 0 ? 1 : -1)
+          : stepPlan(inp, unit, Number(bEl.dataset.n));
+    }
+  } else if (cmd === 'tok') {
+    const st = troopsPlan;
+    const inp = st ? troopsInputFor(st.fleetId) : null;
+    const at = st ? s.fleets[st.fleetId]?.location : undefined;
+    if (st && inp && at && troopsLiftable(at)) {
+      const { load, unload } = planOrders(troopsModel(inp));
+      // Выгрузка мгновенна и уходит в ядро ОДНИМ действием на тип (count оно
+      // принимает атомарно). Погрузка ложится в часовую очередь БЕЗ повторной
+      // проверки места: модель уже посчитала её ровно на тот трюм, который
+      // освободит эта выгрузка, а реальный `army.load` уйдёт лишь через игровой
+      // час — к тому времени выгрузка применена и в соло, и по сети.
+      for (const o of unload) playerOrder(unloadArmy(ME, st.fleetId, o.unit, o.count));
+      for (const o of load) pushLoads(st.fleetId, o.unit, o.count);
+    }
+    troopsPlan = null;
   } else if (cmd === 'barrage') {
     // Arm focus-fire: the next tap on an enemy fleet aims the selected artillery
     // at it; a tap on empty space clears back to auto-targeting the nearest.
@@ -10252,6 +10338,7 @@ function installMatch(state: GameState, aiPlayers: Set<string>): void {
   merging = false;
   additive = false;
   splitState = null;
+  troopsPlan = null;
   killStats = { destroyed: 0, lost: 0 };
   myBattleLocs.clear();
   memory.clear(); // fog memory belongs to the OLD match — stale intel must not carry over
@@ -11474,6 +11561,7 @@ function topLayerOpen(): boolean {
     pingMenuLoc !== null ||
     pingPopEl?.classList.contains('show') ||
     splitState !== null ||
+    troopsPlan !== null ||
     codexEl?.classList.contains('show') ||
     logWin?.classList.contains('show') ||
     techWin.classList.contains('show') ||
@@ -11512,6 +11600,13 @@ function closeTopLayer(): boolean {
   if (splitState !== null) {
     splitState = null;
     lastPanelHtml = '';
+    return true;
+  }
+  if (troopsPlan !== null) {
+    // Поповер живёт внутри строки #cmdbar — прячет его ближайший renderCmdBar,
+    // но кэш надо сбить руками, иначе строка не изменится и DOM останется прежним.
+    troopsPlan = null;
+    lastCmdHtml = '';
     return true;
   }
   if (codexEl?.classList.contains('show')) {
