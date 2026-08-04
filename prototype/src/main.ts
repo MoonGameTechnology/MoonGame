@@ -238,6 +238,8 @@ import {
   type TroopsInput,
   type TroopsUnitInput,
 } from './troopsMenu';
+// SND-1 — синтезированные звуки интерфейса (тёмный космос + космическая опера).
+import { initSound } from './sound';
 // CHAIN-UX — режим «Приказ»: модель черновика, меню точки, таймлайн, разметка.
 import {
   applyMenuAction,
@@ -984,6 +986,10 @@ function setGlowFx(v: boolean): void {
     /* private-mode / storage-full: keep the in-memory value, just don't persist */
   }
 }
+// SND-1 — звуки интерфейса: синтезатор целиком в sound.ts, здесь только фабрика.
+// AudioContext создаётся лениво при первом play() (всегда внутри клика — autoplay
+// доволен); среда без WebAudio/localStorage — молча беззвучна, UI живёт как жил.
+const snd = initSound(typeof localStorage === 'undefined' ? null : localStorage);
 // shadowBlur gate: a per-draw gaussian blur is one of the priciest canvas ops on
 // mobile GPUs. `blitGlow` already honours glowFx, but the ~20 `cx.shadowBlur = n`
 // halos on nodes / fleets / projectiles / HUD did not — so "Свечение и ореолы: выкл"
@@ -2183,7 +2189,10 @@ function playerOrder(action: Action) {
   const out = order(s, action, s.time);
   apply(out);
   sandboxBuildRestore(before, !out.error);
-  if (out.error) note('✖ ' + errText(out.error));
+  if (out.error) {
+    snd.play('error'); // тёмный сбой — отказ слышен, не только виден
+    note('✖ ' + errText(out.error));
+  }
   else {
     activeTour?.notifyAction(action.type); // an accepted intent advances `action` steps
     // ONB-5: the first fleet leaving on a course is when "the world runs offline"
@@ -7513,6 +7522,15 @@ document.addEventListener?.(
   },
   true, // capture — ahead of the side panel's click handler
 );
+// SND-1: консольный блип на ЛЮБУЮ живую кнопку — один bubble-слушатель вместо
+// правки десятков делегированных обработчиков. isTrusted отсекает синтетические
+// .click() (rail-exit, tomenu при Back) — программный переход не «тапает»; bubble
+// (не capture), чтобы stopPropagation созревшего long-press глушил и звук.
+document.addEventListener?.('click', (ev) => {
+  if (!ev.isTrusted) return;
+  const b = (ev.target as HTMLElement).closest?.('button');
+  if (b && !(b as HTMLButtonElement).disabled) snd.play('tap');
+});
 
 cmdbar.addEventListener('click', (ev) => {
   const bEl = (ev.target as HTMLElement).closest('button') as HTMLButtonElement | null;
@@ -7629,6 +7647,7 @@ cmdbar.addEventListener('click', (ev) => {
       // Пустой черновик при живых планах — это «снять приказ»: order.chain []
       // атомарно удаляет план каждого флота.
       for (const id of chainMode.fleetIds) playerOrder(orderChain(ME, id, chainMode.steps));
+      snd.play('send'); // квинты-арпеджио: план ушёл — маленький оперный жест
       note(t('tgt.placed'));
       exitChainMode();
     }
@@ -9631,10 +9650,34 @@ function renderSettings(): void {
     `<div class="set-lbl">${t('settings.gfx.fps')}<span class="set-sub">${t('settings.gfx.fps.hint')}</span></div>` +
     `<div class="set-ctl"><label class="set-switch"><input id="set-fps" type="checkbox"${showFps ? ' checked' : ''} aria-label="${t('settings.gfx.fps')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-fps-val" class="set-val">${showFps ? t('settings.on') : t('settings.off')}</span></div>` +
     `</div>` +
+    // SND-1: секция «Звук» — тумблер синтезированных откликов + громкость.
+    `<div class="pc-sec">${t('settings.snd.title')}</div>` +
+    `<div class="set-row">` +
+    `<div class="set-lbl">${t('settings.snd.ui')}<span class="set-sub">${t('settings.snd.ui.hint')}</span></div>` +
+    `<div class="set-ctl"><label class="set-switch"><input id="set-snd" type="checkbox"${snd.enabled() ? ' checked' : ''} aria-label="${t('settings.snd.ui')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-snd-val" class="set-val">${snd.enabled() ? t('settings.on') : t('settings.off')}</span></div>` +
+    `</div>` +
+    `<div class="set-row">` +
+    `<div class="set-lbl">${t('settings.snd.vol')}</div>` +
+    `<div class="set-ctl"><input id="set-snd-vol" type="range" min="0" max="100" step="5" value="${Math.round(snd.volume() * 100)}" aria-label="${t('settings.snd.vol')}"><span id="set-snd-vol-val" class="set-val">${Math.round(snd.volume() * 100)}%</span></div>` +
+    `</div>` +
     // The «управление скоростью» control moved to the sandbox panel (a dev-only corner),
     // so Settings no longer carries a developer section.
     `<button class="pc-close" id="set-close" type="button">${t('settings.done')}</button>` +
     `</div>`;
+  const sndSw = document.getElementById('set-snd') as HTMLInputElement | null;
+  const sndSwVal = document.getElementById('set-snd-val');
+  sndSw?.addEventListener('change', () => {
+    snd.setEnabled(sndSw.checked);
+    if (sndSwVal) sndSwVal.textContent = sndSw.checked ? t('settings.on') : t('settings.off');
+    if (sndSw.checked) snd.play('tap'); // включил — сразу слышно, ЧТО включил
+  });
+  const sndVol = document.getElementById('set-snd-vol') as HTMLInputElement | null;
+  const sndVolVal = document.getElementById('set-snd-vol-val');
+  sndVol?.addEventListener('input', () => {
+    snd.setVolume(Number(sndVol.value) / 100);
+    if (sndVolVal) sndVolVal.textContent = `${Math.round(snd.volume() * 100)}%`;
+    snd.play('tap'); // живой предпросмотр уровня; анти-трель зазор глушит спам
+  });
   const slider = document.getElementById('set-sweep') as HTMLInputElement | null;
   const val = document.getElementById('set-sweep-val');
   slider?.addEventListener('input', () => {
@@ -10227,6 +10270,7 @@ function installMatch(state: GameState, aiPlayers: Set<string>): void {
     setSandboxButton(false);
   }
   maybeStartPendingTour(); // ONB-0: run a queued onboarding guide over the fresh HUD
+  snd.play('start'); // приглушённая фанфара — матч начался (соло и дев-сценарии)
 }
 function startMatch(setup: SetupConfig): void {
   const st = newGame(setup);
@@ -10361,6 +10405,9 @@ function connect(): void {
           // Server accepted us — NOW we're really in the match.
           admitted = true;
           netAdmitted = true; // BF-30: ME is now the server-assigned seat — safe to render
+          // Фанфара только на ПЕРВЫЙ вход: каждый реконнект заново проходит эту
+          // ветку (admitted обнуляется с сокетом), а флаг reconnecting ещё жив.
+          if (!reconnecting) snd.play('start');
           reconnecting = false; // a fresh welcome ends any reconnect cycle
           reconnectAttempts = 0;
           if (banner && banner.startsWith('⟳')) banner = null;
@@ -10423,7 +10470,10 @@ function connect(): void {
         }
         lastPanelHtml = '';
       },
-      onRejection: (_id, code) => note('✖ ' + errText(code)),
+      onRejection: (_id, code) => {
+        snd.play('error');
+        note('✖ ' + errText(code));
+      },
       // Fog-filtered domain events ride each delta (the server already cuts what we
       // may not see): feed them to the SAME pipeline the local sim uses, so battle
       // toasts, AA tracers, siege arcs, loss tallies and the victory banner all work
@@ -11528,6 +11578,7 @@ function closeTopLayer(): boolean {
 window.addEventListener('popstate', () => {
   backArmed = false;
   if (closeTopLayer()) {
+    snd.play('close'); // обратный блип: слой закрылся аппаратным Back
     if (topLayerOpen() || inMatch()) armBack(); // more layers / still in a match — stay
     return;
   }
@@ -11558,7 +11609,10 @@ window.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape' && e.key !== 'Esc') return;
   const el = e.target as HTMLElement | null;
   if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
-  if (closeTopLayer()) e.preventDefault();
+  if (closeTopLayer()) {
+    snd.play('close');
+    e.preventDefault();
+  }
 });
 
 function frame(nowReal: number) {
@@ -11839,6 +11893,7 @@ document.querySelector('.crest')?.addEventListener('click', () => openPlayerCard
 // in one tap, not require the double-back hint that hardware Back uses).
 $('topback').addEventListener('click', () => {
   if (closeTopLayer()) {
+    snd.play('close'); // ложится поверх тапа шеврона — осознанное наложение
     if (topLayerOpen() || inMatch()) armBack();
     return;
   }
