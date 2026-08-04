@@ -67,8 +67,6 @@ import {
   MAX_STEWARD_HOLD_POINTS,
   castHeroAbility,
   spawnHero,
-  unlockHeroSkill,
-  fitHero,
   serverChainActions,
   chainStamp,
   orderChain,
@@ -99,6 +97,7 @@ import { DEFAULT_SHIP_LOADOUTS, type ShipLoadout } from './ships';
 // «Верфь» — вкладка оснащения (REFM-13): окно целиком живёт в `shipyard.ts`, здесь
 // только проводка (host-хуки) и панель героев, которая переедет своим кирпичом.
 import { initShipyard } from './shipyard';
+import { initHeroStaff, HERO_CASTABLE, heroCdKey } from './heroStaff';
 // HUD-DOCK: видимость листа и «нижний хаб уезжает» — одна чистая модель на все
 // прицельные режимы; она же держит замер высоты листа для привязки ряда команд.
 import { mapIsWorkspace, panelOpen, sheetHeightVar, type DockState } from './hudDock';
@@ -185,6 +184,7 @@ import {
   displayUnit,
   buildingName,
   fmtEta,
+  fmtHrs,
 } from './format';
 // REFM-3: the icon vocabulary (glyph tables + menu renderers) lives in `icons.ts`
 import {
@@ -3316,13 +3316,6 @@ function setScramble(ids: string[], on: boolean): void {
       wingSorties.delete(id);
     }
   }
-}
-/** «≈14ч» / «≈2д 3ч» — plan durations are game-hours, like every duration in the UI. */
-function fmtHrs(h: number): string {
-  const r = Math.max(0, Math.round(h));
-  return r >= 48
-    ? t('browser.left.days', { d: Math.floor(r / 24), h: r % 24 })
-    : t('fmt.hours', { n: r });
 }
 
 // CC-4 reactive auto-scramble driver: each frame, a squadron fleet on "дежурный вылет"
@@ -8443,380 +8436,23 @@ document.getElementById('rail-steward')?.addEventListener('click', () => steward
 let stewSnapshot: StewardMetrics | null = null;
 
 
-// --- heroes («штаб героев»): the CORE hero engine over the inline catalogs -----
-// One window for the whole hero loop: deploy reserves (`hero.spawn`), cast abilities
-// (`hero.ability` — built-ins live, typed-but-unwired honestly say «скоро»), walk the
-// skill tree (`hero.skill.unlock`) and install fittings (`hero.fit`). All gates
-// (range/cooldown/cost/slots/branch) are the core's — the window only shows them.
-const HERO_ACTIVE_CAP = 3; // mirrors the core heroModule's active cap (not exported)
-const HERO_BRANCH_RU: Record<string, string> = {
-  transhuman: 'hero.branch.transhuman',
-  psionic: 'hero.branch.psionic',
-};
-/** The cooldown slot an ability occupies — mirrors the core's `cooldownKey`. */
-const heroCdKey = (type: string): string =>
-  type === 'temp_lane' ? 'path' : type === 'annihilate' ? 'annihilate' : `fx:${type}`;
-// Ability types the prototype kernel can actually resolve: the two heroModule
-// built-ins + every `hero.effect.<type>` the kernel's MODULES provide (heroEffects →
-// recall/aura/reveal). Types not here have no engine effect yet → the «скоро» badge.
-const HERO_CASTABLE = new Set(['temp_lane', 'annihilate', 'recall', 'aura', 'reveal']);
-// «Штаб героев» redesign (STAFF-1): one focused hero + tabs (Обзор / Дерево /
-// Способности / Фиттинги), a real branch skill-tree with prereq connectors and
-// per-node states, and a tap-to-open dossier that shows what a node/fitting grants
-// BEFORE you buy it. View state is client-only (like conTab/heroAim).
-type HeroInst = NonNullable<GameState['heroes']>[string];
-type HeroTab = 'overview' | 'tree' | 'abilities' | 'fittings';
-let heroSel: string | null = null; // focused hero id (null → first owned)
-let heroTab: HeroTab = 'tree';
-let heroDossier: string | null = null; // "node:<id>" | "fit:<id>" — the inspected node/fitting
-
-/** Human short labels for a passive's hook (what the bonus actually does). */
-const HERO_HOOK_RU: Record<string, string> = {
-  'fleet.speed': 'hero.hook.fleet-speed',
-  'combat.damage': 'hero.hook.combat-damage',
-};
-/** A passive rendered as a one-line bonus, e.g. «+10% скорость флота» / «+8% урон · r300». */
-function heroPassiveLine(pid: string): string {
-  const p = data.heroPassives[pid];
-  if (!p) return t(pid);
-  const pct = Math.round((p.params.bonus ?? 0) * 100);
-  const r = p.params.radius ? ` · r${p.params.radius}` : '';
-  return `+${pct}% ${t(HERO_HOOK_RU[p.hook] ?? p.hook)}${r}`;
-}
-
-/** The «Герои» pane body: selector chips → identity header → tabs → active tab → dossier. */
-function heroBodyHtml(): string {
-  const mine = Object.keys(s.heroes ?? {})
-    .sort()
-    .map((id) => s.heroes![id]!)
-    .filter((h) => h.owner === ME);
-  if (!mine.length) return `<div class="hx-note">${t('hero.hq.empty')}</div>`;
-  const active = mine.filter((h) => h.alive !== false && h.fleetId && s.fleets[h.fleetId]).length;
-  let hero = mine.find((h) => h.id === heroSel);
-  if (!hero) {
-    hero = mine[0]!;
-    heroSel = hero.id;
-  }
-  const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
-  const dead = hero.alive === false;
-  const fleet = !dead && hero.fleetId !== undefined ? s.fleets[hero.fleetId] : undefined;
-
-  // selector chips (one focused hero at a time)
-  let chips = `<div class="hx-chips">`;
-  for (const h of mine) {
-    const d = h.archetype !== undefined ? data.heroes[h.archetype] : undefined;
-    const dep = h.alive !== false && h.fleetId && s.fleets[h.fleetId];
-    const st =
-      h.alive === false ? t('hero.hq.dead') : dep ? t('hero.hq.deployed') : t('hero.hq.reserve');
-    chips +=
-      `<button class="hx-chip${h.id === hero.id ? ' sel' : ''}${d?.branch === 'psionic' ? ' ps' : ''}" data-hsel="${h.id}">` +
-      `<span class="hx-cr">♔</span>${esc(t(d?.name ?? h.archetype ?? h.id))}` +
-      `<span class="hx-cst${dep ? ' on' : ''}">${st}</span></button>`;
-  }
-  chips += `<span class="hx-cap">${t('hero.hq.deployed-count', { a: active, c: HERO_ACTIVE_CAP })}</span></div>`;
-
-  // identity header — name, branch, deploy state, aggregated build bonuses
-  const deploy = dead
-    ? `<span class="hx-dead">${t('hero.hq.dead')}</span>`
-    : fleet
-      ? `<span class="hx-dep">⚓ ${esc(typeof fleet.location === 'string' ? fleet.location : t('hero.hq.enroute'))}</span>`
-      : `<button class="hx-btn" data-hspawn="${hero.id}" ${active >= HERO_ACTIVE_CAP ? 'disabled' : ''}>${t('hero.hq.deploy')}</button>`;
-  const bonuses = (hero.passives ?? [])
-    .map((p) => `<span class="hx-trait">${esc(heroPassiveLine(p))}</span>`)
-    .join('');
-  const slots = def?.slots ?? 0;
-  const used = (hero.fittings ?? []).length;
-  const fitPips =
-    slots > 0
-      ? `<span class="hx-trait">${t('hero.hq.fittings')} <span class="hx-pips">${'●'.repeat(used)}${'○'.repeat(Math.max(0, slots - used))}</span></span>`
-      : '';
-  const ident =
-    `<div class="hx-ident${def?.branch === 'psionic' ? ' ps' : ''}">` +
-    `<div class="hx-irow"><span class="hx-name">♔ ${esc(hero.name ?? hero.id)}</span>` +
-    (def?.branch
-      ? `<span class="hx-tag">${esc(t(HERO_BRANCH_RU[def.branch] ?? def.branch))}</span>`
-      : '') +
-    `<span class="hx-dstat">${deploy}</span></div>` +
-    (bonuses || fitPips ? `<div class="hx-traits">${bonuses}${fitPips}</div>` : '') +
-    `</div>`;
-
-  // tabs
-  const TABS: [HeroTab, string][] = [
-    ['overview', 'hero.hq.tab.overview'],
-    ['tree', 'hero.hq.tab.tree'],
-    ['abilities', 'hero.hq.tab.abilities'],
-    ['fittings', 'hero.hq.tab.fittings'],
-  ];
-  const tabs =
-    `<div class="hx-tabs">` +
-    TABS.map(
-      ([k, l]) =>
-        `<button class="hx-tab${heroTab === k ? ' on' : ''}" data-htab="${k}">${t(l)}</button>`,
-    ).join('') +
-    `</div>`;
-
-  const body =
-    heroTab === 'tree'
-      ? heroTreeHtml(hero)
-      : heroTab === 'abilities'
-        ? heroAbilitiesHtml(hero)
-        : heroTab === 'fittings'
-          ? heroFittingsHtml(hero)
-          : heroOverviewHtml(hero);
-
-  const dossier = heroDossier ? heroDossierHtml(hero) : '';
-  return chips + ident + tabs + `<div class="hx-view">${body}</div>` + dossier;
-}
-
-/** The skill tree tab — the hero's own rail (own-branch nodes + branch-less «common»
- *  nodes any hero may take) plus a dimmed rail per foreign branch; nodes ordered
- *  roots-first with a prereq connector; tap an own, un-owned node → dossier. */
-function heroTreeHtml(hero: HeroInst): string {
-  const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
-  const skills = hero.skills ?? [];
-  const entries = Object.entries(data.heroSkillTrees);
-  const ownBranch = def?.branch;
-  // The hero's rail carries own-branch AND branch-less common nodes (both unlockable),
-  // so the tree membership matches heroOverviewHtml's node count. Foreign branches get a
-  // dimmed reference rail.
-  const ownNodes = entries.filter(([, n]) => n.branch === ownBranch || n.branch === undefined);
-  const foreignBranches = Array.from(
-    new Set(
-      entries
-        .map(([, n]) => n.branch)
-        .filter((b): b is NonNullable<typeof b> => b !== undefined && b !== ownBranch),
-    ),
-  ).sort();
-  const rails: Array<{ label: string; own: boolean; ps: boolean; nodes: typeof entries }> = [];
-  if (ownNodes.length) {
-    rails.push({
-      label: ownBranch ? (HERO_BRANCH_RU[ownBranch] ?? ownBranch) : 'hero.branch.common',
-      own: true,
-      ps: ownBranch === 'psionic',
-      nodes: ownNodes,
-    });
-  }
-  for (const br of foreignBranches) {
-    rails.push({
-      label: HERO_BRANCH_RU[br] ?? br,
-      own: false,
-      ps: br === 'psionic',
-      nodes: entries.filter(([, n]) => n.branch === br),
-    });
-  }
-  if (!rails.length) return `<div class="hx-note">${t('hero.tree.empty')}</div>`;
-  let html = `<div class="hx-tree">`;
-  for (const rail of rails) {
-    const rn = rail.nodes
-      .slice()
-      .sort((a, b) => a[1].requires.length - b[1].requires.length || a[0].localeCompare(b[0]));
-    html +=
-      `<div class="hx-rail${rail.own ? '' : ' foreign'}${rail.ps ? ' ps' : ''}">` +
-      `<div class="hx-rhd"><span class="hx-dot"></span>${esc(t(rail.label))}` +
-      (rail.own ? '' : `<span class="hx-ftag">${t('hero.tree.not-your-branch')}</span>`) +
-      `</div>`;
-    for (const [nid, nd] of rn) {
-      const owned = skills.includes(nid);
-      const reqMet = nd.requires.every((r) => skills.includes(r));
-      let cls = 'hx-node';
-      let crest: string;
-      let foot: string;
-      if (!rail.own) {
-        cls += ' foreignn';
-        crest = '·';
-        foot = `<span class="hx-st">${t('hero.tree.other-branch')}</span>`;
-      } else if (owned) {
-        cls += ' owned';
-        crest = '✓';
-        foot = `<span class="hx-st on">✓ ${t('hero.tree.unlocked')}</span>`;
-      } else if (!reqMet) {
-        cls += ' locked';
-        crest = '🔒';
-        const need = esc(nd.requires.map((r) => t(data.heroSkillTrees[r]?.name ?? r)).join(', '));
-        foot = `<span class="hx-st">${t('hero.tree.needs', { n: need })}</span>`;
-      } else {
-        cls += ' avail';
-        crest = '◆';
-        foot = `<span class="hx-cost">${cost(nd.cost, myRes())}</span>`;
-      }
-      const conn = nd.requires.length
-        ? `<span class="hx-conn${rail.own && reqMet ? ' lit' : ''}"></span>`
-        : '';
-      const grant = nd.grants.ability
-        ? `<span class="hx-g ab">${t('hero.tree.ability')}</span>`
-        : nd.grants.passive
-          ? `<span class="hx-g pa">${t('hero.tree.passive')}</span>`
-          : '';
-      const tap = rail.own && !owned ? ` data-hnode="${nid}"` : '';
-      html +=
-        `<div class="${cls}"${tap}>${conn}<div class="hx-nn"><span class="hx-crest">${crest}</span>${esc(t(nd.name))}</div>` +
-        `<div class="hx-nd">${esc(t(nd.description ?? ''))}</div>` +
-        `<div class="hx-nf">${grant}${foot}</div></div>`;
-    }
-    html += `</div>`;
-  }
-  return html + `</div>`;
-}
-
-/** The abilities tab — the hero's equipped, castable loadout (cast via the command flow;
- *  ranged casts arm the map, self/aura fire in place). Spawn-markers show as passive perks. */
-function heroAbilitiesHtml(hero: HeroInst): string {
-  const dead = hero.alive === false;
-  const abilities = (hero.abilities ?? []).filter(
-    (a): a is string => a !== null && !!data.heroAbilities[a],
-  );
-  if (!abilities.length) return `<div class="hx-note">${t('hero.abil.empty')}</div>`;
-  let html = '';
-  for (const ab of abilities) {
-    const ad = data.heroAbilities[ab]!;
-    const cdLeft = Math.max(0, (hero.cooldowns?.[heroCdKey(ad.type)] ?? 0) - s.time);
-    const action = ad.type.startsWith('spawn_')
-      ? `<span class="hx-badge">${t('hero.abil.deploy-perk')}</span>`
-      : cdLeft > 0
-        ? `<span class="hx-badge cd">${t('hero.abil.cooldown', { h: fmtHrs(cdLeft / HOUR) })}</span>`
-        : HERO_CASTABLE.has(ad.type)
-          ? `<button class="hx-btn" data-hcast="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${(ad.range ?? 0) > 0 ? t('hero.abil.pick-target') : t('hero.abil.activate')}</button>`
-          : `<span class="hx-badge">${t('hero.abil.soon')}</span>`;
-    html +=
-      `<div class="hx-row"><div class="hx-grow"><span class="hx-an">${esc(t(ad.name))}</span>` +
-      `<div class="hx-note">${esc(t(ad.description ?? ''))}</div></div>${action}</div>`;
-  }
-  return html;
-}
-
-/** The fittings tab — slot budget as pips, each fitting a row; tap an installable one to
- *  open its dossier (with the irreversibility warning) before committing a slot. */
-function heroFittingsHtml(hero: HeroInst): string {
-  const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
-  const slots = def?.slots ?? 0;
-  if (slots <= 0) return `<div class="hx-note">${t('hero.fit.none')}</div>`;
-  const fitted = hero.fittings ?? [];
-  let html = `<div class="hx-h">${t('hero.fit.slots', { u: fitted.length, n: slots })}</div>`;
-  for (const [fid, fd] of Object.entries(data.heroFittings)) {
-    const installed = fitted.includes(fid);
-    const grant = fd.grants.ability
-      ? `<span class="hx-g ab">${t('hero.tree.ability')}</span>`
-      : fd.grants.passive
-        ? `<span class="hx-g pa">${t('hero.tree.passive')}</span>`
-        : fd.statMods
-          ? `<span class="hx-g pa">${t('hero.fit.hull')}</span>`
-          : '';
-    const canFit = !installed && fitted.length < slots;
-    const action = installed
-      ? `<span class="hx-badge on">✓ ${t('hero.fit.installed')}</span>`
-      : canFit
-        ? `<span class="hx-cost">${cost(fd.cost, myRes())}</span>`
-        : `<span class="hx-badge">${t('hero.fit.no-slots')}</span>`;
-    const tap = canFit ? ` data-hfitd="${fid}"` : '';
-    html +=
-      `<div class="hx-row"${tap}><div class="hx-grow"><span class="hx-an">${esc(t(fd.name))}</span>` +
-      `<div class="hx-note">${esc(t(fd.description ?? ''))}</div></div>${grant}${action}</div>`;
-  }
-  return html;
-}
-
-/** The overview tab — archetype line, a stat strip (abilities / tree progress / fittings)
- *  and the hero's live passive bonuses. */
-function heroOverviewHtml(hero: HeroInst): string {
-  const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
-  const learned = (hero.skills ?? []).length;
-  const treeTotal = Object.values(data.heroSkillTrees).filter(
-    (n) => n.branch === undefined || n.branch === def?.branch,
-  ).length;
-  const abil = (hero.abilities ?? []).filter((a) => a !== null).length;
-  let html =
-    `<div class="hx-note" style="margin-bottom:10px;">${esc(t(def?.description ?? ''))}</div>` +
-    `<div class="hx-ov">` +
-    `<div class="hx-ovc"><b>${abil}</b><span>${t('hero.stat.abilities')}</span></div>` +
-    `<div class="hx-ovc"><b>${learned}/${treeTotal}</b><span>${t('hero.stat.tree-nodes')}</span></div>` +
-    `<div class="hx-ovc"><b>${(hero.fittings ?? []).length}/${def?.slots ?? 0}</b><span>${t('hero.stat.fittings')}</span></div>` +
-    `</div>`;
-  const bonuses = (hero.passives ?? [])
-    .map(
-      (p) =>
-        `<div class="hx-row"><span class="hx-grow hx-an">${esc(heroPassiveLine(p))}</span><span class="hx-badge on">${t('hero.stat.active')}</span></div>`,
-    )
-    .join('');
-  if (bonuses) html += `<div class="hx-h">${t('hero.stat.bonuses')}</div>${bonuses}`;
-  return html;
-}
-
-/** The dossier card — what the tapped node/fitting grants, its prereqs and price, and the
- *  commit button (a node's «Изучить», a fitting's irreversible «Установить»). */
-function heroDossierHtml(hero: HeroInst): string {
-  const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
-  const dead = hero.alive === false;
-  const sep = (heroDossier ?? '').indexOf(':');
-  const kind = (heroDossier ?? '').slice(0, sep);
-  const id = (heroDossier ?? '').slice(sep + 1);
-  const close = `<button class="hx-dx" data-hdclose>✕</button>`;
-  if (kind === 'node') {
-    const nd = data.heroSkillTrees[id];
-    if (!nd) return '';
-    const skills = hero.skills ?? [];
-    const gAb = nd.grants.ability ? data.heroAbilities[nd.grants.ability] : undefined;
-    const give = gAb
-      ? `<div class="hx-dgl">${t('hero.tree.grants-ability')}</div><div class="hx-dgv">${esc(t(gAb.name))}${(gAb.range ?? 0) > 0 ? ` · ${t('hero.tree.range', { r: gAb.range })}` : ''}${gAb.cooldownHours ? ` · ${t('hero.tree.cooldown', { h: gAb.cooldownHours })}` : ''}</div><div class="hx-note">${esc(t(gAb.description ?? ''))}</div>`
-      : nd.grants.passive
-        ? `<div class="hx-dgl">${t('hero.tree.grants-passive')}</div><div class="hx-dgv">${esc(heroPassiveLine(nd.grants.passive))}</div>`
-        : '';
-    const branchOk = nd.branch === undefined || nd.branch === def?.branch;
-    const reqMet = nd.requires.every((r) => skills.includes(r));
-    const owned = skills.includes(id);
-    const reqHtml = nd.requires
-      .map(
-        (r) =>
-          `<span class="${skills.includes(r) ? 'hx-ok' : 'hx-no'}">${skills.includes(r) ? '✓' : '✗'} ${esc(t(data.heroSkillTrees[r]?.name ?? r))}</span>`,
-      )
-      .join(' ');
-    const canBuy = branchOk && reqMet && !owned && afford(nd.cost) && !dead;
-    const btn = owned
-      ? `<div class="hx-drow"><span class="hx-ok">✓ ${t('hero.tree.unlocked')}</span></div>`
-      : !branchOk
-        ? `<div class="hx-drow"><span class="hx-no">${t('hero.tree.other-branch')}</span></div>`
-        : `<button class="hx-dbtn" data-hskill="${hero.id}" data-node="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.tree.unlock')} · ${cost(nd.cost, myRes())}</button>`;
-    return (
-      `<div class="hx-dossier">` +
-      `<div class="hx-dh">${def?.branch ? `<span class="hx-tag">${esc(t(HERO_BRANCH_RU[def.branch] ?? def.branch))}</span>` : ''}<span class="hx-dnm">${esc(t(nd.name))}</span>${close}</div>` +
-      (give ? `<div class="hx-give">${give}</div>` : '') +
-      (reqHtml
-        ? `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.requires')}</span><span class="hx-dv">${reqHtml}</span></div>`
-        : '') +
-      `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.cost')}</span><span class="hx-cost">${cost(nd.cost, myRes())}</span></div>` +
-      btn +
-      `</div>`
-    );
-  }
-  if (kind === 'fit') {
-    const fd = data.heroFittings[id];
-    if (!fd) return '';
-    const fitted = hero.fittings ?? [];
-    const slots = def?.slots ?? 0;
-    const gAb = fd.grants.ability ? data.heroAbilities[fd.grants.ability] : undefined;
-    const give = gAb
-      ? `<div class="hx-dgl">${t('hero.tree.grants-ability')}</div><div class="hx-dgv">${esc(t(gAb.name))}</div><div class="hx-note">${esc(t(gAb.description ?? ''))}</div>`
-      : fd.grants.passive
-        ? `<div class="hx-dgl">${t('hero.tree.grants-passive')}</div><div class="hx-dgv">${esc(heroPassiveLine(fd.grants.passive))}</div>`
-        : fd.statMods
-          ? `<div class="hx-dgl">${t('hero.fit.hull-mod')}</div><div class="hx-dgv">${esc(
-              Object.entries(fd.statMods)
-                .map(([k, v]) => `${k} +${v}`)
-                .join(', '),
-            )}</div>`
-          : '';
-    const canBuy = !fitted.includes(id) && fitted.length < slots && afford(fd.cost) && !dead;
-    return (
-      `<div class="hx-dossier">` +
-      `<div class="hx-dh"><span class="hx-dnm">${esc(t(fd.name))}</span>${close}</div>` +
-      (give ? `<div class="hx-give">${give}</div>` : '') +
-      `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.cost')}</span><span class="hx-cost">${cost(fd.cost, myRes())}</span></div>` +
-      `<div class="hx-warn">${t('hero.fit.permanent')}</div>` +
-      `<button class="hx-dbtn danger" data-hfit="${hero.id}" data-fit="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.fit.install')} · ${cost(fd.cost, myRes())}</button>` +
-      `</div>`
-    );
-  }
-  return '';
-}
+// --- heroes («штаб героев») ---------------------------------------------------
+// The hero pane of the Верфь: roster, skill tree, abilities, fittings. The pane
+// itself lives in `heroStaff.ts` (REFM-14); here it only gets the host state it
+// cannot reach on its own. Ranged casts and deploys resolve on the MAP, so the pane
+// arms `heroAim`/`heroSpawnAim` through these two hooks and the world tap fires them.
+const heroStaff = initHeroStaff({
+  state: () => s,
+  me: () => ME,
+  order: playerOrder,
+  note: (msg) => note(msg),
+  armCast: (heroId, abilityId) => {
+    heroAim = { heroId, abilityId };
+  },
+  armSpawn: (heroId) => {
+    heroSpawnAim = heroId;
+  },
+});
 
 // --- session market: a two-sided order book, one tab per tradeable good -------
 // The window itself lives in `marketScreen.ts` (REFM-6); here it gets its hooks and
@@ -8861,79 +8497,11 @@ const shipyard = initShipyard({
   errText,
   arsenalItems: () => arsenal.items(),
   onOpen: () => maybeIntro('constructor'),
-  // The «Герои» pane: the hero roster/штаб (folded from the old #hero window). The
-  // `#herobody` id keeps the `.hx-*` styling; hero clicks route through the yard.
-  heroPaneHtml: () => `<div id="herobody">${heroBodyHtml()}</div>`,
+  // The «Герои» pane: the hero roster/штаб lives in `heroStaff.ts` (REFM-14) — the
+  // yard only asks it for markup and hands its clicks over.
+  heroPaneHtml: heroStaff.paneHtml,
   onHeroTab: () => maybeIntro('hero'),
-  heroClick: (tg) => {
-    // STAFF-1 view state: focus a hero / switch tab / open-close the node·fitting dossier.
-    const selBtn = tg.closest('[data-hsel]') as HTMLElement | null;
-    if (selBtn) {
-      heroSel = selBtn.dataset.hsel!;
-      heroDossier = null;
-      return 'repaint';
-    }
-    const htab = (tg.closest('[data-htab]') as HTMLElement | null)?.dataset.htab;
-    if (htab) {
-      heroTab = htab as HeroTab;
-      heroDossier = null;
-      return 'repaint';
-    }
-    const nodeBtn = tg.closest('[data-hnode]') as HTMLElement | null;
-    if (nodeBtn) {
-      heroDossier = `node:${nodeBtn.dataset.hnode!}`;
-      return 'repaint';
-    }
-    const fitdBtn = tg.closest('[data-hfitd]') as HTMLElement | null;
-    if (fitdBtn) {
-      heroDossier = `fit:${fitdBtn.dataset.hfitd!}`;
-      return 'repaint';
-    }
-    if (tg.closest('[data-hdclose]')) {
-      heroDossier = null;
-      return 'repaint';
-    }
-    const castBtn = tg.closest('[data-hcast]') as HTMLElement | null;
-    if (castBtn) {
-      const heroId = castBtn.dataset.hcast!;
-      const abilityId = castBtn.dataset.ab!;
-      if ((data.heroAbilities[abilityId]?.range ?? 0) > 0) {
-        heroAim = { heroId, abilityId }; // ranged cast → arm the map (next world tap is the target)
-        note(t('yard.pick.target'));
-        return 'close';
-      }
-      playerOrder(castHeroAbility(ME, heroId, abilityId));
-      return 'repaint';
-    }
-    const spawnBtn = tg.closest('[data-hspawn]') as HTMLElement | null;
-    if (spawnBtn) {
-      heroSpawnAim = spawnBtn.dataset.hspawn!;
-      const hero = s.heroes?.[heroSpawnAim];
-      const perks = (hero?.abilities ?? []).map((a) =>
-        a !== null ? data.heroAbilities[a]?.type : undefined,
-      );
-      note(
-        t('yard.pick.hero-world', {
-          fl: perks.includes('spawn_fleet') ? t('yard.pick.own-fleet') : '',
-          al: perks.includes('spawn_allied') ? t('yard.pick.ally-world') : '',
-        }),
-      );
-      return 'close';
-    }
-    const skillBtn = tg.closest('[data-hskill]') as HTMLElement | null;
-    if (skillBtn) {
-      playerOrder(unlockHeroSkill(ME, skillBtn.dataset.hskill!, skillBtn.dataset.node!));
-      heroDossier = null; // the node is bought — dismiss its dossier
-      return 'repaint';
-    }
-    const fitBtn = tg.closest('[data-hfit]') as HTMLElement | null;
-    if (fitBtn) {
-      playerOrder(fitHero(ME, fitBtn.dataset.hfit!, fitBtn.dataset.fit!));
-      heroDossier = null; // the fitting is installed — dismiss its dossier
-      return 'repaint';
-    }
-    return null;
-  },
+  heroClick: heroStaff.click,
 });
 document.getElementById('rail-constructor')?.addEventListener('click', () => shipyard.open());
 

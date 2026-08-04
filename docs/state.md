@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 2243 зелёных** (54 skip, 194 файла).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 2310 зелёных** (54 skip, 198 файлов).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -118,8 +118,7 @@ packages/action-layer/src/
 data/            manifest, resources, units, buildings, factions, events, sectors, sectorKinds, planetTypes, technologies, scientists, rewards, heroes, heroAbilities, heroFittings, heroPassives, heroSkillTrees, modules, medals, dropTables, starterArsenal (.json)
 localization/    ВЕСЬ текст для игрока: index.ts (LOCALES/DEFAULT_LOCALE/dataKey), ru.ts, en.ts (плоские карты ключ→текст, 1558 ключей), runtime.ts (ОДИН на прототип и клиент: t/tData/lookup/hasKey/setLocale/localizeStaticDom, LOC-5) + runtime.test.ts. Мост старых msgid снят вместе с LOC-2 — в коде только ключи
 docs/            architecture, modulesystem, roadmap, deep-technical-roadmap, multiplayer, engineering-risks, gdd, metagame, state(этот)
-prototype/       src/game.ts (чистый index-фасад реэкспортов, REFP-28: 5289→207 строк, логики нет), src/prototypeData.ts, src/map.ts, src/fleetStacks.ts, src/tax.ts, src/botFavour.ts, src/squadron.ts, src/chain.ts, src/hunger.ts, src/botDiplomacy.ts, src/sessionMarket.ts, src/capital.ts, src/fleetLaunch.ts, src/standingOrders.ts, src/forcedMarch.ts, src/instantRepair.ts, src/econScrews.ts, src/economy.ts, src/matchSetup.ts, src/actions.ts, src/patrol.ts, src/serverDrivers.ts, src/protoKernel.ts, src/stewardGuard.ts, src/ai.ts, src/time.ts (вынесены из game.ts; Block REFP закрыт 28/28, обратных рёбер на фасад ноль), src/main.ts (UI), src/format.ts (презентационные форматтеры, REFM-2), src/icons.ts (словарь иконок, REFM-3), src/dossiers.ts + src/buildQueue.ts (досье объектов и кодекс + словарь очереди стройки, REFM-4), src/arsenalScreen.ts (витрина «Арсенал», REFM-5), src/marketScreen.ts (окно рынка, REFM-6), src/stewardScreen.ts (окно «Хранителя», REFM-7), src/techTree.ts (дерево технологий, REFM-9), src/profileScreen.ts (профиль командира, REFM-10), src/corpScreen.ts (корпоративный кабинет, REFM-11), src/chatWindow.ts (плавающее окно чата, REFM-12), src/shipyard.ts (окно «Верфь», REFM-13), src/resourceCard.ts (карточка ресурса, RC-1), src/troopsMenu.ts (модель и разметка ⇅-меню десанта, GRND-1), src/chainPlanner.ts (модель режима «Приказ», CHAIN-UX), src/sound.ts (синтезированные звуки интерфейса, SND-1), src/hudDock.ts (низ экрана: видимость листа в прицельных режимах + привязка ряда команд к листу, HUD-DOCK), src/backLayers.ts (лестница слоёв Android-Back/Escape + опись всех оверлеев, BACK-1), src/smoke.ts, tsconfig.json (REFM-0: typecheck в гейте), build.mjs, uitest.mjs, dist/ (артефакт, в .gitignore)```
-
+prototype/       src/game.ts (чистый index-фасад реэкспортов, REFP-28: 5289→207 строк, логики нет), src/prototypeData.ts, src/map.ts, src/fleetStacks.ts, src/tax.ts, src/botFavour.ts, src/squadron.ts, src/chain.ts, src/hunger.ts, src/botDiplomacy.ts, src/sessionMarket.ts, src/capital.ts, src/fleetLaunch.ts, src/standingOrders.ts, src/forcedMarch.ts, src/instantRepair.ts, src/econScrews.ts, src/economy.ts, src/matchSetup.ts, src/actions.ts, src/patrol.ts, src/serverDrivers.ts, src/protoKernel.ts, src/stewardGuard.ts, src/ai.ts, src/time.ts (вынесены из game.ts; Block REFP закрыт 28/28, обратных рёбер на фасад ноль), src/main.ts (UI), src/format.ts (презентационные форматтеры, REFM-2), src/icons.ts (словарь иконок, REFM-3), src/dossiers.ts + src/buildQueue.ts (досье объектов и кодекс + словарь очереди стройки, REFM-4), src/arsenalScreen.ts (витрина «Арсенал», REFM-5), src/marketScreen.ts (окно рынка, REFM-6), src/stewardScreen.ts (окно «Хранителя», REFM-7), src/techTree.ts (дерево технологий, REFM-9), src/profileScreen.ts (профиль командира, REFM-10), src/corpScreen.ts (корпоративный кабинет, REFM-11), src/chatWindow.ts (плавающее окно чата, REFM-12), src/shipyard.ts (окно «Верфь», REFM-13), src/heroStaff.ts (штаб героев, REFM-14), src/resourceCard.ts (карточка ресурса, RC-1), src/troopsMenu.ts (модель и разметка ⇅-меню десанта, GRND-1), src/chainPlanner.ts (модель режима «Приказ», CHAIN-UX), src/sound.ts (синтезированные звуки интерфейса, SND-1), src/hudDock.ts (низ экрана: видимость листа в прицельных режимах + привязка ряда команд к листу, HUD-DOCK), src/backLayers.ts (лестница слоёв Android-Back/Escape + опись всех оверлеев, BACK-1), src/smoke.ts, tsconfig.json (REFM-0: typecheck в гейте), build.mjs, uitest.mjs, dist/ (артефакт, в .gitignore)```
 ## 4. Модель состояния (`GameState`)
 
 - `version {data, manifest}`, `time`, `rng`.
@@ -1310,7 +1309,7 @@ effects])` (31 модуль), тик в реальном
   сеется **core-инстансами** `hero:{seat}:{n}` (grade→архетип 1:1: main→commander,
   legendary→ravager, rare→vanguard, common→warden; главный — флагман домашнего флота,
   остальные — резерв как в `buildFromMap`; способности = выбор меню + маркер-перки
-  архетипа). Ростер героев **свёрнут в таб «Верфи»** (панель «Герои» → `heroBodyHtml`;
+  архетипа). Ростер героев **свёрнут в таб «Верфи»** (панель «Герои» → `heroStaff.ts`;
   окно `#hero`/рельс `rail-hero` ретайрнуты в CON-4) — весь цикл: развёртывание
   `hero.spawn` armed-тапом (свой мир / свой флот / мир союзника по маркерам), каст
   `hero.ability` (встроенные `temp_lane`/`annihilate` armed-тапом цели + `recall` /
@@ -1337,18 +1336,22 @@ effects])` (31 модуль), тик в реальном
   `buildShip` → `unit.build{modules}` (ядро валидирует/платит/штампует; лоадаут заморожен
   на постройке — без переоснастки). Панель **Армия** снесена вместе с дивизиями
   (H4-REVERT): наземные войска строятся как обычные юниты в конвейере «Земля» панели
-  мира. Панель **Герои** — ростер/штаб (`heroBodyHtml`:
-  способности `hero.ability`, дерево `hero.skill.unlock`, фиттинги `hero.fit`) — всё ещё
-  за `main.ts` (её кирпич отдельный): Верфь просит у хозяина разметку (`heroPaneHtml`) и
-  отдаёт клики обратно (`heroClick` → `repaint`/`close`). Инлайн-данные `game.ts` дополнены каталогом
+  мира. Панель **Герои** — ростер/штаб, живёт в
+  `heroStaff.ts` (REFM-14, `initHeroStaff(host)`): способности `hero.ability`, дерево
+  `hero.skill.unlock`, фиттинги `hero.fit`; вид панели — значение `HeroView` с чистой
+  `normalizeHeroView`, разметка ничего не мутирует. Верфь берёт у неё `paneHtml()` и
+  отдаёт клики в `click()` (→ `repaint`/`close`/null). Дальний каст и развёртывание
+  целятся тапом по КАРТЕ, поэтому взводят хост (`armCast`/`armSpawn`) и отвечают
+  `'close'` — `heroAim`/`heroSpawnAim` остались в `main.ts`. Инлайн-данные `game.ts` дополнены каталогом
   `modules` (6 модулей, зеркало `data/modules.json`) + типизированными `slots` на корпусах
   кораблей (cruiser/siege/scout/dropship) и эскадрилий (fighter_squadron/strike_carrier).
   Тесты: `shipyard.test.ts` (38) — цена и полоса характеристики (включая экранирование
   подписи, CWE-79), метка «откуда» (LARS-4), фильтр по снимку арсенала (ARS-5),
   нормализация черновика, разметка панели (гашение заказа без казны и без своих миров),
   окно целиком (вкладки, смена корпуса сбрасывает обвес, отказ ядра доезжает текстом кода,
-  границы счётчика, заказ уходит в `unit.build`); плюс `loadoutEditor` в `packages/client`
-  и живая проверка в браузере.
+  границы счётчика, заказ уходит в `unit.build`) и `heroStaff.test.ts` (23) — ростер,
+  нормализация вида, роутинг кликов (дальний каст взводит карту и не шлёт приказ, ближний
+  уходит сразу); плюс `loadoutEditor` в `packages/client` и живая проверка в браузере.
   **Мобильная адаптация** (`@media (max-width:560px)`): двухколоночная сетка панелей
   уже сворачивается в одну на ≤760px; на телефоне палитра модулей `.cn-pal` переходит
   на 2 колонки (имена перестают переноситься), крупнее тап-таргеты (`.cn-close` 36px,

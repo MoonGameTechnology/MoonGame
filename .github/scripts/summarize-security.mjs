@@ -37,6 +37,12 @@ const EXPECTED = [
   { key: 'trivy-image', name: 'Trivy image — базовая ОС образа' },
   { key: 'trivy-deps', name: 'Trivy image — сторонние образы прода (postgres/caddy)' },
   { key: 'kics', name: 'KICS — IaC (Docker Compose прода)' },
+  {
+    key: 'dependency-review',
+    name: 'Dependency Review — что вносит PR (GHSA)',
+    prOnly: true,
+    skipNote: 'только на PR',
+  },
   { key: 'dast-zap', name: 'OWASP ZAP — DAST (baseline против запущенного сервера)' },
   { key: 'zizmor', name: 'zizmor — безопасность workflow' },
   {
@@ -190,8 +196,9 @@ const confirm = EXPECTED.map((t) => {
   const ok = (s && s.ok === true) || (!s && t.key === 'sbom' && sboms.includes('sbom.cdx.json'));
   // A job that was SKIPPED BY DESIGN is not a fail-open and must not raise the
   // "NOT confirmed" alarm — that alarm has to keep meaning «a scan that should have run
-  // didn't». Two such designs exist: main-only (Scorecard) and schedule-only
-  // (Dependency-Check — too slow for the PR loop, see security.yml).
+  // didn't». Three such designs exist: main-only (Scorecard), schedule-only
+  // (Dependency-Check — too slow for the PR loop) and PR-only (Dependency Review — it
+  // diffs base against head, so outside a pull_request there is nothing to compare).
   let state;
   if (ok) state = 'ok';
   else if (t.mainOnly && !isMain && !s) state = 'skipped';
@@ -201,6 +208,8 @@ const confirm = EXPECTED.map((t) => {
   // тревога на каждом PR, а это ровно то, что обесценивает главный сигнал отчёта.
   else if (t.scheduledOnly && event !== 'schedule' && event !== 'workflow_dispatch' && !s)
     state = 'skipped';
+  // Зеркало `if: github.event_name == 'pull_request'` в security.yml.
+  else if (t.prOnly && event !== 'pull_request' && !s) state = 'skipped';
   else state = 'bad';
   return { ...t, state };
 });

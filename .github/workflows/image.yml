@@ -122,8 +122,17 @@ jobs:
       # SHA: `api.github.com` из dev-среды недоступен, а пин по тегу поймал бы zizmor. Но
       # SHA прекрасно снимается `git ls-remote` — тем же способом, каким пинится
       # actions/cache. Ограничение снято, причина отказа больше не действует.
+      #
+      # ПИН — SHA КОММИТА, а не тег-объекта. У этого репозитория `v3.2.0` — АННОТИРОВАННЫЙ
+      # тег, то есть `git ls-remote` печатает две строки: `refs/tags/v3.2.0` = 62fc1d59…
+      # (сам тег-объект) и `refs/tags/v3.2.0^{}` = 96278af6… (коммит). Раньше здесь стоял
+      # первый, и zizmor справедливо ругался `ref-version-mismatch`: «points to commit
+      # 96278af6caaf». У остальных наших экшенов теги легковесные, там SHA тега и коммита
+      # совпадают, поэтому подвох виден только на аннотированном. Оба SHA неизменяемы, так
+      # что дырой это не было — но пин по коммиту это конвенция, которую понимают
+      # инструменты (zizmor, dependabot), а непонятый пин никто не перепроверит.
       - name: attest build provenance (SLSA)
-        uses: actions/attest-build-provenance@62fc1d596301d0ab9914e1fec14dc5c8d93f65cd # v3.2.0
+        uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
         with:
           subject-name: ${{ steps.img.outputs.image }}
           subject-digest: ${{ steps.push.outputs.digest }}

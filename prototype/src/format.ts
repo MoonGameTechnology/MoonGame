@@ -106,3 +106,11 @@ export function fmtEta(totalH: number): string {
     ? t('fmt.hours', { n: totalH.toFixed(1) })
     : t('fmt.minutes', { n: Math.ceil(totalH * 60) });
 }
+
+/** «≈14ч» / «≈2д 3ч» — plan durations are game-hours, like every duration in the UI. */
+export function fmtHrs(h: number): string {
+  const r = Math.max(0, Math.round(h));
+  return r >= 48
+    ? t('browser.left.days', { d: Math.floor(r / 24), h: r % 24 })
+    : t('fmt.hours', { n: r });
+}
