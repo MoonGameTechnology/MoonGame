@@ -16,8 +16,8 @@ name: Security scan
 # New suppressions go to .semgrepignore / .gitleaks.toml / .trivyignore WITH a
 # reason + date (see docs/security/pipeline.md).
 # Still informational (not yet triaged as bricks): codeql, trufflehog, trivy-deps,
-# dependency-check, zizmor, scorecard, and the `check` job (its blocking twin lives in
-# ci.yml).
+# kics, dependency-check, zizmor, scorecard, and the `check` job (its blocking twin lives
+# in ci.yml).
 #
 # Each scan job writes a `status-<key>.json` sentinel AFTER the scan with the real
 # exit code / outcome. The summarizer LEADS with a scan-confirmation table built from
@@ -35,7 +35,7 @@ name: Security scan
 # Actions are SHA-pinned (SD-6.1 / F-16) with a trailing `# vN` for readability.
 #
 # Docker images are pinned by sha256 digest (supply-chain integrity):
-#   - All scanners: semgrep, gitleaks, trufflehog, osv-scanner, trivy, syft, zizmor
+#   - All scanners: semgrep, gitleaks, trufflehog, osv-scanner, trivy, syft, zizmor, kics
 #   - Reason: prevents tag reuse / MITM / registry compromise attacks
 #   - Update method: ./.github/scripts/update-image-digests.sh (re-pin every month)
 #   - See docs/security/image-pinning.md for details
@@ -534,6 +534,115 @@ jobs:
           fi
           if [ "$RC" != "0" ]; then
             echo "::warning::Trivy found CVEs in the third-party prod images (exit $RC). Informational for now — triage them, then flip this job to blocking (SEC-11)."
+          fi
+
+  kics:
+    name: IaC — Docker Compose (KICS)
+    # ЗАЧЕМ ОТДЕЛЬНЫЙ ДВИЖОК. У Trivy misconfig НЕТ формата Docker Compose (он умеет
+    # Dockerfile/k8s/terraform/cloudformation/helm/ARM), поэтому рантайм-постура прода —
+    # привилегии, лимиты, дефолты паролей, healthcheck'и в `deploy/docker-compose*.yml` —
+    # до сих пор не проверялась НИКЕМ и держалась ревью плюс чек-листом в deploy/README.md.
+    # Это записано поправкой A05 в docs/security/scanner-coverage-2026-07-26.md и стоило
+    # нам живого бага: `POSTGRES_PASSWORD:-void` в прод-пути никто не поймал.
+    #
+    # ПРО КОМПРОМЕТАЦИЮ ОБРАЗА. 22.04.2026 в checkmarx/kics залили вредоносные образы по
+    # украденным publisher-кредам; отравленный бинарь сохранял рабочую поверхность и
+    # экфильтровал ВЫВОД СКАНА. Поэтому пин строго по дайджесту и осознанный выбор тега:
+    # взят `v2.1.20-alpine`, чей дайджест побайтово совпадает с доинцидентной публикацией
+    # (03.03.2026) и не входит в список отравленных, опубликованный Docker. Плавающие
+    # `latest`/`alpine` не берём принципиально.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # KICS опознаёт Docker Compose ТОЛЬКО по расширению `.yaml` (docs/platforms.md;
+      # та же беда у Ansible — Checkmarx/kics#7110, и прямо про compose — #1981), а у нас
+      # все три файла `.yml`. Переименовывать их нельзя: на имена завязаны install-ubuntu.sh,
+      # verify-image.sh и полдюжины мест в доках, то есть боевой путь деплоя. Поэтому
+      # копии с нужным расширением делаются ВНУТРИ джобы, а пути в SARIF ниже возвращаются
+      # к настоящим файлам.
+      - name: собрать .yaml-копии compose-файлов
+        id: prep
+        run: |
+          set -euo pipefail
+          mkdir -p kics-src kics-out
+          chmod 777 kics-out # контейнер пишет отчёт своим uid — как в dast-zap
+          n=0
+          for f in deploy/docker-compose*.yml; do
+            [ -e "$f" ] || continue
+            cp "$f" "kics-src/$(basename "$f" .yml).yaml"
+            n=$((n + 1))
+          done
+          echo "copied=$n" >> "$GITHUB_OUTPUT"
+          ls -1 kics-src
+      - name: kics
+        id: scan
+        env:
+          COPIED: ${{ steps.prep.outputs.copied }}
+        run: |
+          set +e
+          docker run --rm -v "$PWD:/src" -w /src \
+            checkmarx/kics@sha256:990ae994fbbe59760c8e4f7e89b1193a39a0c2968909058ec29335cb6d80efc1 \
+            scan -p /src/kics-src -o /src/kics-out --report-formats sarif,json \
+            --type docker-compose --no-progress
+          rc=$?
+          set -e
+          ok=true
+          case $rc in 125 | 126 | 127) ok=false ;; esac # образ не стянулся / не запустился
+          # «Просканировал НОЛЬ файлов» — не находка, а сломанная конфигурация, и молчать
+          # о ней нельзя: пустой отчёт неотличим от чистого. Ровно тот же приём, что у
+          # trivy-deps («grep matched nothing ⇒ scanned nothing»).
+          scanned=$(jq -r '.files_scanned // 0' kics-out/results.json 2>/dev/null || echo 0)
+          [ "$scanned" -ge "${COPIED:-1}" ] || ok=false
+          echo "{\"key\":\"kics\",\"ok\":$ok,\"exit\":$rc,\"scanned\":$scanned}" > status-kics.json
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          echo "scanned=$scanned" >> "$GITHUB_OUTPUT"
+      # SARIF ссылается на копии (kics-src/*.yaml), которых в репозитории нет — аннотации
+      # Code Scanning указывали бы в пустоту. Возвращаем пути к настоящим файлам.
+      - name: вернуть пути в SARIF к deploy/*.yml
+        if: always()
+        run: |
+          set -euo pipefail
+          [ -f kics-out/results.sarif ] || exit 0
+          jq '(.. | objects | select(has("uri")) | .uri) |=
+                (if startswith("kics-src/") then
+                   sub("^kics-src/"; "deploy/") | sub("\\.yaml$"; ".yml")
+                 else . end)' \
+            kics-out/results.sarif > kics-out/results.fixed.sarif
+          mv kics-out/results.fixed.sarif kics-out/results.sarif
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: report-kics
+          path: |
+            kics-out/results.sarif
+            kics-out/results.json
+            status-kics.json
+          if-no-files-found: warn
+      - name: upload to code scanning
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
+        with:
+          sarif_file: kics-out/results.sarif
+          category: kics
+      - name: report — informational (not yet blocking)
+        env:
+          RC: ${{ steps.scan.outputs.rc }}
+          SCANNED: ${{ steps.scan.outputs.scanned }}
+          COPIED: ${{ steps.prep.outputs.copied }}
+        run: |
+          # Сломанный скан и найденные проблемы — РАЗНЫЕ сообщения. Первое валит джобу
+          # намеренно (она информационная, поэтому мерж не блокирует, но краснеет и видна),
+          # второе только предупреждает до триажа базовой линии.
+          if [ "$SCANNED" -lt "${COPIED:-1}" ]; then
+            echo "::error::kics: просканировано $SCANNED из $COPIED compose-файлов — скан НЕ состоялся. Проверь расширения копий и --type docker-compose."
+            exit 1
+          fi
+          if [ "$RC" != "0" ]; then
+            echo "::warning::KICS нашёл проблемы в compose ($SCANNED файлов, exit $RC). Информационно: разобрать базовую линию, затем перевести в блокирующие (SEC-1)."
           fi
 
   dependency-check:
