@@ -190,7 +190,10 @@ body::before{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;mix
 #speedbar{position:fixed;right:14px;bottom:14px;z-index:24;display:flex;align-items:center;gap:4px;
   padding:5px 7px;background:rgba(3,12,16,.78);border:1px solid var(--line-hi);border-radius:3px;
   box-shadow:0 0 16px rgba(40,200,210,.10);transition:bottom .2s ease;}
-body.sheet-open #speedbar{bottom:calc(34vh + 12px);}
+/* --sheeth = ИЗМЕРЕННАЯ высота листа (ставит renderPanel через ResizeObserver).
+   34vh здесь — только фолбэк до первого замера: лист растёт по содержимому при
+   max-height:34vh, поэтому догадка в vh отрывала бы плавающие элементы от него. */
+body.sheet-open #speedbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 #fps{position:fixed;top:calc(var(--tbh) + 36px);right:10px;z-index:25;pointer-events:none;
   font:700 10px ui-monospace,Menlo,monospace;color:var(--grn);opacity:.72;letter-spacing:.5px;
   text-shadow:0 0 6px rgba(0,0,0,.85);}
@@ -265,8 +268,11 @@ body.sheet-open #speedbar{bottom:calc(34vh + 12px);}
 #cmdbar .tpop .tacts{display:flex;gap:8px;margin-top:9px;}
 #cmdbar .tpop .tacts .cbtn{flex-direction:row;justify-content:center;height:auto;min-width:0;
   padding:9px 8px;text-align:center;}
-/* panel is glued to the bottom edge — lift the fleet command bar above it (mobile overrides below) */
-body.sheet-open #cmdbar{bottom:calc(34vh + 12px);}
+/* Ряд команд ПРИВЯЗАН к листу, а не к догадке о его высоте: лист приклеен к низу и
+   растёт по содержимому (max-height:34vh), поэтому короткий лист — мир без построек,
+   флот без груза — оставлял между ними дыру в треть экрана. --sheeth приходит замером
+   (см. renderPanel), 34vh остаётся фолбэком до первого кадра. */
+body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 
 /* contextual build/ship tiles — live inside the build menu + fleet panel (icon +
    cost/count); tap one for the full dossier, with a "Build here" action for buildables. */
@@ -1460,9 +1466,14 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
      Лист прячет формула renderPanel (chainMode → !open); рейл/скорость/цели —
      этими правилами, той же тройкой, что прячет их открытый лист. Полоска плана
      живёт в #cmdbar и остаётся единственным низом экрана. */
-  body.chain-mode #rail{opacity:0;pointer-events:none;}
-  body.chain-mode #speedbar{display:none;}
-  body.chain-mode #goals{display:none;}
+  /* HUD-DOCK: тот же низ уезжает во ВСЕХ прицельных режимах, а не только в «Приказе» —
+     взведённый «Курс» ждёт тап по карте ровно там, где стоял хаб. Два имени класса
+     живут рядом осознанно: chain-mode — режим соседнего кирпича (CHAIN-UX), aim-mode
+     ставит renderPanel по общему признаку «карта сейчас рабочая поверхность»
+     (курс/слияние/набор группы/цепочка), и в режиме «Приказ» стоят оба. */
+  body.chain-mode #rail,body.aim-mode #rail{opacity:0;pointer-events:none;}
+  body.chain-mode #speedbar,body.aim-mode #speedbar{display:none;}
+  body.chain-mode #goals,body.aim-mode #goals{display:none;}
   /* phones have no hover and no room — drop the dossier pane, content fills width */
   .pdesc{display:none;}
   .pscroll{padding:13px 14px;}
@@ -1524,7 +1535,9 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   #cmdbar .cmdlabel{display:none;}
   #cmdbar button{min-width:50px;height:46px;border-radius:10px;}
   #cmdbar button .ci{font-size:18px;}
-  body.sheet-open #cmdbar{bottom:calc(50vh + 8px);}
+  /* телефон: лист выше (max-height:50vh) и уже несёт safe-area в своей высоте, поэтому
+     замер --sheeth годится как есть; 50vh — тот же фолбэк до первого замера */
+  body.sheet-open #cmdbar{bottom:calc(var(--sheeth,50vh) + 8px);}
 }
 /* connect overlay — entry screen (single-player vs join a live session) */
 /* Identity is its OWN page, not an overlay: an OPAQUE full-screen backdrop so the live
@@ -2260,9 +2273,11 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   .spd .spd-pc-hide{display:none;}
   .spd .spd-mult-legacy{display:none;}
   .spd .spd-mult-pc{display:contents;}
-  /* base (portrait) bottom-sheet panel + the bars it lifts */
+  /* base (portrait) bottom-sheet panel + the bars it lifts (замер --sheeth, 22.5vh —
+     фолбэк: третья копия той же догадки, из-за которой дыра между рядом и листом
+     вылезала «иногда» — на конкретной раскладке) */
   #side{max-height:22.5vh;}
-  body.sheet-open #cmdbar,body.sheet-open #speedbar{bottom:calc(22.5vh + 12px);}
+  body.sheet-open #cmdbar,body.sheet-open #speedbar{bottom:calc(var(--sheeth,22.5vh) + 12px);}
   #fps{top:120px;}
   /* PC: the docked dossier pane is retired — the dossier follows the cursor as a
      translucent tooltip instead (#objtip, filled/positioned by main.ts). The tooltip
