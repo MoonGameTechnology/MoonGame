@@ -60,8 +60,29 @@
 - **scrypt** (`password.ts`) — memory-hard KDF, не bcrypt/MD5. Настраиваемые параметры.
 - **Session-JWT → короткий join-JWT** (`authApi.ts`) — разделение токенов по времени
   жизни: длинная session для API, короткий join для WS-handshake.
-- **Per-IP rate-limit** (`rateLimit.ts`, Fastify `@fastify/rate-limit`) — брутфорс
-  `/auth/login`/`/auth/register` ограничен per-IP.
+- **Per-IP rate-limit — ДВА слоя**, а не один (строка выше раньше называла их одним,
+  сверено с кодом 2026-08-04):
+  1. `@fastify/rate-limit` в **инкапсулированном scope** (`main.ts`: `scope.register(
+     rateLimit, { max: 100, timeWindow: '1 minute' })`) — общий потолок на auth-поверхность;
+  2. `slidingWindowIpLimiter` (`rateLimit.ts`) **внутри каждого обработчика** — свой,
+     более тесный бюджет на `/auth/login`, `/auth/register`, `/auth/recover`, `/auth/reset`
+     (и отдельно в `avaApi`, `corpApi`, `matchApi`, `pushApi`). Проверка РЕГИСТРИРУЕТ
+     попытку: отклонённый запрос тоже тратит бюджет.
+
+  > **CodeQL считает это отсутствием rate-limit — ложное срабатывание.** Запрос
+  > `js/missing-rate-limiting` показывает `authApi.ts:188` и `:264` (`/auth/login`,
+  > `/auth/reset`). Причина: его модель ищет известную мидлварь, применённую на пути,
+  > который она умеет проследить, а у нас потолок ставится через `scope.register` в
+  > инкапсулированном контексте, а per-endpoint проверка — самописная и вызывается первым
+  > оператором обработчика. Ни то, ни другое модель не связывает с конкретным маршрутом.
+  > Покрытие есть и проверено тестом `authApi.test.ts:151` («rate-limits per IP across
+  > register+login, and the window resets»).
+  >
+  > Подавлять НЕ стали осознанно: `codeql-action` инлайн-комментарии `// codeql[...]`
+  > не применяет (github/codeql#3293, #4511, #9383 — CLI умеет, действие нет), а
+  > исключать правило целиком в конфиге значило бы потерять его на РЕАЛЬНО незащищённом
+  > маршруте в будущем. CodeQL информационный, цена находки — две строки в отчёте;
+  > цена неверного подавления — необнаруженная дыра.
 - **Uniform 401** — одинаковый ответ на «нет пользователя» и «неверный пароль»
   (anti-enumeration).
 - **Decoy timing** — одинаковая задержка на оба пути (anti-timing attack).
