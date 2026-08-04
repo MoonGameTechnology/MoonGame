@@ -59,7 +59,7 @@ RUN mkdir -p playtest-logs packages/server/dist
 # flags — debian13 is the actively rebuilt line with current trixie-security packages.
 # Digest-pinned like the build stage (bump procedure in the Stage 1 comment);
 # nodejs22-debian13:nonroot digest refreshed 2026-07.
-FROM gcr.io/distroless/nodejs22-debian13:nonroot@sha256:a2723a2817c5b01b8e7b98d567bc8b5a6b0e713e25bfb0a82b6ade4b9db06f50 AS runtime
+FROM gcr.io/distroless/nodejs22-debian13:nonroot@sha256:939d6f1671529d230f50b563578e9b5d206af58f038b10ebd7e1233023d4e167 AS runtime
 # Bring the fully-installed app (source + node_modules incl. esbuild/ws/pg + baked HTML)
 # and hand the whole tree to the non-root user so startup writes (esbuild bundle, logs)
 # succeed. node_modules uses pnpm's relative symlink layout, so copying all of /app keeps
