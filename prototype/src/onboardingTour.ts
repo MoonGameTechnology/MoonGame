@@ -3,7 +3,7 @@
  * proof that the spotlight engine (`./spotlight`) leads a player around REAL
  * elements, and the base ONB-2 extends into the full guided first match.
  *
- * `copy` is a locale key: the canonical-Russian msgid (translated by locale/en.ts).
+ * `copy` is a `/localization` key, resolved through `t()` (localization/runtime.ts).
  * The HUD-targeted steps are `optional` so launching the tour outside a match
  * (targets hidden → engine sees no rect) skips them gracefully instead of
  * safe-stopping — see spotlight.ts. Selectors are stable HUD ids from build.mjs.

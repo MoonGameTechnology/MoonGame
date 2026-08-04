@@ -1122,6 +1122,16 @@ export const en: Record<string, string> = {
   'hud.resource.microelectronics': 'Microelectronics',
   'hud.resource.tip':
     '{ic} {name}: {stock} in the treasury · {flow}/h (production minus army and building upkeep)',
+  'rescard.stock': 'In treasury',
+  'rescard.income': 'Income',
+  'rescard.expense': 'Expenses',
+  'rescard.net': 'Net income',
+  'rescard.production': 'World production',
+  'rescard.upkeep': 'Building upkeep',
+  'rescard.army': 'Army upkeep',
+  'rescard.market': 'Market',
+  'rescard.close': 'Close',
+  'rescard.no-trade': 'Credits are the currency — not tradeable on the market',
   'hud.score.tip':
     '✦ {score}/{limit}: a world — 50, any other province — 10, buildings add per level (you hold {w} worlds, {s} provinces). Win at ✦ {limit}, by eliminating rivals, or by domination.',
 
@@ -1211,9 +1221,11 @@ export const en: Record<string, string> = {
 
   // --- onb — Онбординг: туры-подсказки, карточки первого контакта, цели первой сессии, сводка возвращения.
   'onb.goal.capture': 'Capture a world',
+  'onb.goal.collapse.title': 'Collapse to tray',
   'onb.goal.fleet': 'Build a ship',
-  'onb.goal.mine': 'Build a mine',
+  'onb.goal.mine': 'Grow metal mining',
   'onb.goal.score': 'Reach 100 points',
+  'onb.goal.tray.title': 'First-session goals — expand',
   'onb.goals.all-done':
     '🏅 All first-session goals done! +{n} XP — you are ready for a real match.',
   'onb.goals.title': 'First-session goals',
@@ -1266,18 +1278,24 @@ export const en: Record<string, string> = {
   'onb.tour.first.fleet':
     'Now build a warship — the «Ships» tab of the same panel. A finished ship flies to orbit on its own and forms a fleet — wait for a «▲» to appear next to your world.',
   'onb.tour.first.home':
-    'Down here is your homeworld panel: buildings, garrison and construction. Tap your world if the panel is empty.',
+    'Down here is your homeworld panel: buildings, garrison and construction. Tap your world to open it.',
   'onb.tour.first.mine':
-    'Start with economy: build a Mine — it produces the resources everything else is built from.',
+    'Start with economy: upgrade your Metal Mine — its output funds everything else you build.',
+  'onb.tour.first.scan':
+    "Want a ship or fleet's stats? Tap it (hover on PC) — a card opens with damage, armor, speed and troop capacity.",
   'onb.tour.first.score':
     'World taken — and the score moves! Points come from worlds and sectors; reach the threshold to win.',
+  'onb.tour.first.spy':
+    'Scout an enemy world before you attack it: tap it → «Scout world» (or the Diplomacy → Espionage tab) for a 24-hour window into its garrison and fleets. No rivals here, but in a real match it saves you from an ambush.',
+  'onb.tour.first.troops':
+    'Your fleet has a hold for troops: tap it at your world → «Ground army ⇄ garrison» → «Load». An open world falls to orbit alone; a garrisoned one only falls to a landing — your fleet clears the defense from orbit first, then the troops take the ground.',
   'onb.tour.first.welcome':
     'This is your first world, commander. I will walk you through the core loop — a couple of minutes, calm, no rivals.',
   'onb.tour.got-it': 'Got it',
   'onb.tour.hud.clock':
     'The world runs in real time and keeps going even while you are offline. Pause and speed live here.',
   'onb.tour.hud.done':
-    'Done! Time to act: build a mine, raise a fleet, set a course. Good luck, commander.',
+    'Done! Time to act: upgrade your Metal Mine, raise a fleet, set a course. Good luck, commander.',
   'onb.tour.hud.purse': 'Your treasury: mine income minus fleet upkeep. Keep it out of the red.',
   'onb.tour.hud.tools':
     "The commander's tools: diplomacy, research, shipyard, market and the event log.",
@@ -1285,6 +1303,8 @@ export const en: Record<string, string> = {
     'A quick tour of the interface — the whole game runs on it. «Skip tutorial» is always available.',
   'onb.tour.next': 'Next',
   'onb.tour.skip': 'Skip tutorial',
+  'onb.tour.speed':
+    '⏩ The tutorial runs at accelerated time, so you never wait real minutes for a build or a flight.',
   'onb.tour.step': 'step {k} of {n}',
 
   // --- ping — Композер меток провинции: адресат, описание, отправка.

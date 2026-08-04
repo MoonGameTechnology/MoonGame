@@ -2,22 +2,33 @@
  * ONB-2 · The guided first match — a data-described chain (ONB-1 engine) that
  * walks a brand-new commander through the core loop in a bot-free solo sandbox:
  *
- *   produce (build a mine) → build (raise a fleet) → move (set a course, fog
- *   opens) → capture a neutral world (two-phase) → the score moves → first win.
+ *   produce (grow the mine) → build (raise a fleet) → scan (inspect a ship/fleet's
+ *   stats — informational, concept only) → troops (load a landing force —
+ *   informational, concept only) → spy (scout an enemy world first — informational,
+ *   concept only) → move (set a course, fog opens) → capture a neutral world
+ *   (two-phase) → the score moves → first win.
+ *
+ * `startGuidedMatch` (main.ts) also forces the sim to run at accelerated time
+ * for this sandbox — a Mine upgrade alone is hours of game time, and a brand
+ * new player left on the default ×10 wall-clock-ish preset would wait real
+ * MINUTES for the very first beat to resolve.
  *
  * The "do X" beats advance on the REAL game action (`action:<type>`, fed from
- * `playerOrder`) and the capture/score beats on live GAME STATE (`state`,
- * predicates over `s`) — so the guide tracks what the player actually does, not
- * a scripted click path. The narration steers even where a precise highlight is
- * unavailable: HUD highlights are `optional`, so a missing/renamed selector
- * degrades to copy-only guidance instead of stopping the tour (spotlight.ts).
+ * `playerOrder`) and the home/fleet/capture/score beats on live GAME STATE
+ * (`state`, predicates over `s`) — so the guide tracks what the player actually
+ * does, not a scripted click path. `home` gates on the panel actually being open
+ * (never `optional`+`tap`: the target is guaranteed absent on arrival, which
+ * would silently skip a `tap` step past the very instruction it exists to show).
  *
- * `copy` is a locale key (canonical-Russian msgid; en.ts translates). Predicates
- * come from the host so this stays pure and unit-testable.
+ * `copy` is a `/localization` key (`onb.tour.first.*`), resolved through `t()`
+ * (localization/runtime.ts). Predicates come from the host so this stays pure
+ * and unit-testable.
  */
 import type { SpotlightStep } from './spotlight';
 
 export interface FirstMatchDeps {
+  /** True once the player has tapped their homeworld and its panel is open. */
+  homeOpened: () => boolean;
   /** True once the player has raised a mobile fleet (a built ship auto-rallies to orbit). */
   hasFleet: () => boolean;
   /** True once the player owns a world beyond their start (a neutral was taken). */
@@ -39,15 +50,18 @@ export function buildFirstMatchTour(deps: FirstMatchDeps): SpotlightStep[] {
       id: 'home',
       target: '#side',
       copy: 'onb.tour.first.home',
-      advance: { on: 'tap' },
+      advance: { on: 'state', when: deps.homeOpened },
       placement: 'top',
-      optional: true,
     },
     {
+      // The homeworld starts with a level-1 Mine already built (matchSetup.ts) — a
+      // fresh `building.construct` order for it is never possible, so the first
+      // economy beat is its upgrade instead (still `mine`, still the first thing
+      // worth spending on): a distinct `building.upgrade` order (construction.ts).
       id: 'mine',
-      target: '[data-buildorder="building:mine"]',
+      target: '[data-act="upgrade"][data-arg="mine"]',
       copy: 'onb.tour.first.mine',
-      advance: { on: 'action', type: 'building.construct' },
+      advance: { on: 'action', type: 'building.upgrade' },
       placement: 'top',
     },
     {
@@ -55,6 +69,37 @@ export function buildFirstMatchTour(deps: FirstMatchDeps): SpotlightStep[] {
       target: null,
       copy: 'onb.tour.first.fleet',
       advance: { on: 'state', when: deps.hasFleet },
+    },
+    {
+      // Concept-only, tap-advance: a fresh ship's exact rect/id isn't something this
+      // pure predicate set tracks, so — same as `troops` below — this teaches the
+      // mechanic (tap any ship/fleet to inspect it) rather than gating on one.
+      id: 'scan',
+      target: null,
+      copy: 'onb.tour.first.scan',
+      advance: { on: 'tap' },
+    },
+    {
+      // Concept-only, tap-advance: whether THIS run's target neutral is actually
+      // garrisoned depends on the map, so this can't gate on a real load action
+      // the way `mine`/`course` gate on theirs — but the mechanic (and the "why")
+      // still needs teaching before the player sets a course and finds out the
+      // hard way that a defended world without troops aboard won't fall.
+      id: 'troops',
+      target: null,
+      copy: 'onb.tour.first.troops',
+      advance: { on: 'tap' },
+    },
+    {
+      // Concept-only, tap-advance: this bot-free sandbox has no rival to scout (the
+      // capture target is always a neutral, never an owned enemy world — espionage
+      // needs an owner), so — same reasoning as `troops` — teach the mechanic and the
+      // "why" here, right before the player sets a course toward a live opponent for
+      // the first time in a real match.
+      id: 'spy',
+      target: null,
+      copy: 'onb.tour.first.spy',
+      advance: { on: 'tap' },
     },
     {
       id: 'course',

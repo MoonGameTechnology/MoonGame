@@ -162,15 +162,25 @@ export function startTour(steps: readonly SpotlightStep[], onEnd?: TourEnd): Run
   const o = ensureOverlay();
   current?.skip(); // one tour at a time
 
+  // A highlighted target can sit inside a scrollable panel (the world/fleet sheet)
+  // below the fold — the player would have to guess a scroll is needed to even SEE
+  // the ring. Scroll it into view once per step (not every frame, or a `behavior:
+  // 'smooth'` scroll would never settle): `scrollIntoView` only actually moves a
+  // genuinely scrollable ancestor (the app's own body/window never scroll — fixed
+  // single-viewport layout), so this is a no-op for fixed HUD targets like #cmdbar.
+  let scrolledFor: string | null = null;
   const host: SpotlightHost = {
     locate: (sel) => {
       const node = document.querySelector(sel);
       if (!node) return null;
       const r = node.getBoundingClientRect();
       // A detached / display:none node reports a zero box — treat as absent.
-      return r.width === 0 && r.height === 0
-        ? null
-        : { left: r.left, top: r.top, width: r.width, height: r.height };
+      if (r.width === 0 && r.height === 0) return null;
+      if (scrolledFor !== sel) {
+        scrolledFor = sel;
+        node.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+      return { left: r.left, top: r.top, width: r.width, height: r.height };
     },
     render: (view) => paint(o, view),
   };

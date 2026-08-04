@@ -306,10 +306,13 @@ body.sheet-open #cmdbar{bottom:calc(34vh + 12px);}
    overrides an ancestor's :none. */
 #spotlight.sl-passthrough{pointer-events:none;}
 #spotlight.sl-passthrough .sl-dim{pointer-events:none;background:transparent;}
-#spotlight .sl-ring{position:fixed;border:2px solid var(--cyan);border-radius:8px;pointer-events:none;
-  box-shadow:0 0 0 2px rgba(53,214,230,.25),0 0 18px rgba(53,214,230,.45);animation:sl-pulse 1.6s ease-in-out infinite;}
-@keyframes sl-pulse{0%,100%{box-shadow:0 0 0 2px rgba(53,214,230,.2),0 0 14px rgba(53,214,230,.35);}
-  50%{box-shadow:0 0 0 4px rgba(53,214,230,.35),0 0 22px rgba(53,214,230,.6);}}
+/* Gold blink, not the theme's usual cyan: the ring marks "tap HERE" specifically —
+   it needs to read as a distinct call-to-action against the cyan HUD, not blend into
+   it as one more glowing panel. */
+#spotlight .sl-ring{position:fixed;border:2px solid var(--amber);border-radius:8px;pointer-events:none;
+  box-shadow:0 0 0 2px rgba(255,180,58,.35),0 0 18px rgba(255,180,58,.55);animation:sl-pulse 1s ease-in-out infinite;}
+@keyframes sl-pulse{0%,100%{box-shadow:0 0 0 2px rgba(255,180,58,.12),0 0 8px rgba(255,180,58,.2);opacity:.5;}
+  50%{box-shadow:0 0 0 5px rgba(255,180,58,.6),0 0 28px rgba(255,180,58,.95);opacity:1;}}
 #spotlight .sl-bubble{position:fixed;pointer-events:auto;max-width:min(320px,82vw);
   background:rgba(4,16,22,.97);border:1px solid var(--cyan);border-radius:10px;padding:13px 15px;
   box-shadow:0 6px 22px rgba(0,0,0,.55);color:var(--ink);}
@@ -422,7 +425,18 @@ body.sheet-open #cmdbar{bottom:calc(34vh + 12px);}
 #goals .gl-item .gl-ck{color:var(--cyan-dim);flex:0 0 auto;font-size:13px;}
 #goals .gl-item.done{color:#dfeef2;}
 #goals .gl-item.done .gl-ck{color:var(--grn);text-shadow:0 0 8px rgba(95,240,192,.5);}
-@media (max-width:640px){#goals{top:auto;bottom:70px;right:8px;}}
+/* the collapsed tray — a small badge, not the full header: gives the map its room
+   back instead of just hiding the four rows under a still-full-width bar. */
+#goals .gl-tray{display:flex;align-items:center;gap:5px;min-height:32px;padding:0 10px;
+  border-radius:16px;border:1px solid var(--cyan-dim);background:rgba(4,16,22,.94);
+  color:var(--cyan);font:700 12px ui-monospace,monospace;cursor:pointer;
+  box-shadow:0 4px 16px rgba(0,0,0,.45);}
+#goals .gl-tray .gl-count{color:var(--cyan);}
+/* phones: the speed control (⏸▶▶▶ + ×1/×10/×50/×100) wraps onto two ~44px rows
+   above its own bottom:12px anchor — a fixed bottom:70px here used to sit the
+   goals box's lower half right on top of it. Clear the whole stack instead of
+   guessing one row's height. */
+@media (max-width:640px){#goals{top:auto;bottom:calc(120px + env(safe-area-inset-bottom,0px));right:8px;}}
 
 /* player card — tap the top-left crest for your session dossier */
 #playercard{position:fixed;inset:0;z-index:50;display:none;align-items:center;justify-content:center;padding:18px;
@@ -446,6 +460,28 @@ body.sheet-open #cmdbar{bottom:calc(34vh + 12px);}
 .pc-dossier{margin-top:10px;width:100%;padding:9px;cursor:pointer;border-radius:6px;border:1px solid var(--line-hi);
   background:transparent;color:var(--dim);font:600 12px ui-monospace,monospace;letter-spacing:1px;}
 .pc-dossier:active{border-color:var(--cyan);color:var(--cyan);}
+/* resource card — tap a resource chip in the top bar */
+#rescard{position:fixed;inset:0;z-index:51;display:none;align-items:center;justify-content:center;padding:18px;
+  background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#rescard.show{display:flex;}
+#rescard .rc-box{width:min(360px,92vw);max-height:86vh;overflow:auto;background:var(--glass);border:1px solid var(--cyan);
+  border-radius:10px;padding:16px 18px 14px;box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
+.rc-head{display:flex;align-items:center;gap:10px;padding-bottom:10px;margin-bottom:10px;border-bottom:1px solid var(--line-hi);}
+.rc-head .rc-ic{width:28px;height:28px;flex:0 0 auto;color:var(--cyan);}
+.rc-head b{font-size:16px;letter-spacing:1.5px;color:#eafffb;flex:1;}
+.rc-stat{display:flex;justify-content:space-between;gap:10px;font-size:13px;padding:4px 0;border-bottom:1px solid rgba(14,59,64,.4);}
+.rc-stat .rc-k{color:var(--dim);}
+.rc-stat .rc-v{color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums;text-align:right;}
+.rc-sec{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan-dim);margin:8px 0 4px;}
+.rc-flow{font-size:18px;font-weight:700;text-align:center;padding:8px 0;font-variant-numeric:tabular-nums;}
+.rc-flow.pos{color:#7df0d0;}
+.rc-flow.neg{color:#ff6b6b;}
+.rc-market{margin-top:12px;width:100%;padding:10px;cursor:pointer;border-radius:6px;border:1px solid var(--cyan);
+  background:rgba(53,214,230,.12);color:var(--cyan);font:600 13px ui-monospace,monospace;letter-spacing:1px;}
+.rc-market:active{background:rgba(53,214,230,.22);}
+.rc-market.disabled{opacity:.4;cursor:default;border-color:var(--line-hi);color:var(--dim);background:transparent;}
+.rc-close{margin-top:8px;width:100%;padding:9px;cursor:pointer;border-radius:6px;border:1px solid var(--cyan-dim);
+  background:rgba(53,214,230,.1);color:var(--cyan);font:600 12px ui-monospace,monospace;letter-spacing:1px;}
 
 /* settings overlay (hub → «Ещё» → Настройки) — client-only display prefs */
 #settings{position:fixed;inset:0;z-index:59;display:none;align-items:center;justify-content:center;padding:18px;
@@ -1397,6 +1433,10 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
      selection opens the sheet, so it never collides with the command bar */
   #speedbar{right:10px;bottom:12px;top:auto;padding:4px 6px;}
   body.sheet-open #speedbar{display:none;}
+  /* the first-session goals checklist sits bottom-right too (below the sheet's own
+     50vh) — hide it the same way while the sheet is open, or its box floats on top
+     of the world/fleet panel the player is actually using. */
+  body.sheet-open #goals{display:none;}
 
   #banner{font-size:16px;padding:14px 20px;letter-spacing:2px;}
   /* finger-first targets: everything tappable grows to the 44px rule (hud-inmatch.md) */
@@ -2107,10 +2147,16 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
    from the zoom list. Percentages resolve against the (zoomed) parent, so they
    need no compensation — which is why the hub column below uses % and not vw. */
 @media (min-width:900px) and (hover:hover) and (pointer:fine){
+  /* PC HUD magnification. 1.5× on a tall monitor, but that fixed factor made the top
+     bar + devline + bottom rail eat a short window (laptop with a bookmarks bar, 150%
+     OS scale) until the interface clipped off the top and bottom. --pcz steps the zoom
+     down with the viewport HEIGHT (ladder below) so the HUD always fits; mobile is
+     untouched (this whole query is PC-gated). */
+  :root{--pcz:1.5;}
   #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#scipick,
   #divdesign,#market,#constructor,#codex,#codexhub,#intro,#recap,#goals,#playercard,
   #settings,#warprompt,#diplo,#splitdlg,#pingmenu,#banner,#endscreen,#connect,#updbar,
-  #hub,#emblempick,#corp,#setup,#testmode,#sandbox{zoom:1.5;}
+  #hub,#emblempick,#corp,#setup,#testmode,#sandbox{zoom:var(--pcz,1.5);}
   /* vw/vh compensations (base values ÷ 1.5 — see the note above) */
   #toasts{max-width:min(61vw,520px);}
   /* rail tool list: cap at ~7 items and scroll; the sticky ▲/▾ ticks (not buttons)
@@ -2193,6 +2239,14 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
     width:80%;margin-left:auto;margin-right:auto;
     border-left:1px solid var(--line-hi);border-right:1px solid var(--line-hi);}
 }
+/* --pcz ladder: shrink the PC HUD magnification as the window gets shorter so the top
+   bar, devline and bottom rail stop clipping the interface off the top and bottom edges.
+   Same source order = later (smaller max-height) match wins; 1.5× is kept for tall
+   monitors. PC-gated, so mobile/touch layouts never see it. */
+@media (min-width:900px) and (hover:hover) and (pointer:fine) and (max-height:859px){:root{--pcz:1.4;}}
+@media (min-width:900px) and (hover:hover) and (pointer:fine) and (max-height:759px){:root{--pcz:1.3;}}
+@media (min-width:900px) and (hover:hover) and (pointer:fine) and (max-height:679px){:root{--pcz:1.2;}}
+@media (min-width:900px) and (hover:hover) and (pointer:fine) and (max-height:599px){:root{--pcz:1.1;}}
 /* the right-dock panel layout (the ≥900px landscape query above) re-stated at
    vw/vh ÷ 1.5 for the zoomed PC HUD — those base rules would otherwise scale
    to 60vw-wide panels and off-screen heights */
@@ -2308,6 +2362,7 @@ const page = (js) => `<!doctype html>
 <div id="recap"></div>
 <div id="goals"></div>
 <div id="playercard"></div>
+<div id="rescard"></div>
 <div id="profile"></div>
 <div id="settings"></div>
 <div id="warprompt"></div>

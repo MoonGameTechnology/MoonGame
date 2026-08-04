@@ -122,7 +122,7 @@ export interface MarketHost {
 /** Wire the window up: tabs, the compose form, taking and cancelling lots. Call once
  *  at boot (it attaches the window's click delegate); `open()` is what the rail button
  *  calls. */
-export function initMarket(host: MarketHost): { open: () => void } {
+export function initMarket(host: MarketHost): { open: (resource?: string) => void } {
   let tab: MarketGood = 'metal';
   let formSide: MarketSide = 'sell';
 
@@ -185,7 +185,10 @@ export function initMarket(host: MarketHost): { open: () => void } {
   });
 
   return {
-    open: () => {
+    open: (resource?: string) => {
+      if (resource && (MARKET_RES.some((r) => r.key === resource))) {
+        tab = resource as MarketGood;
+      }
       host.root().classList.add('show');
       paint();
       host.onOpen();
