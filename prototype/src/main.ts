@@ -110,6 +110,12 @@ import {
 // HUD-DOCK: видимость листа и «нижний хаб уезжает» — одна чистая модель на все
 // прицельные режимы; она же держит замер высоты листа для привязки ряда команд.
 import { mapIsWorkspace, panelOpen, sheetHeightVar, type DockState } from './hudDock';
+// BACK-1: лестница слоёв Android-Back/Escape — чистая модель + опись, которую держит тест.
+import {
+  closeTopLayer as closeTop,
+  topLayerOpen as layersOpen,
+  type BackLayer,
+} from './backLayers';
 import {
   buildingLevel,
   buildingMaxLevel,
@@ -10954,117 +10960,137 @@ function inMatch(): boolean {
   );
 }
 
-/** Is any layer open that the Back button should close (probe only)? */
-function topLayerOpen(): boolean {
-  return Boolean(
-    chainMode !== null ||
-    aiming ||
-    assaultAim ||
-    merging ||
-    barrageAim ||
-    pingMenuLoc !== null ||
-    pingPopEl?.classList.contains('show') ||
-    splitState !== null ||
-    troopsPlan !== null ||
-    codexEl?.classList.contains('show') ||
-    logWin?.classList.contains('show') ||
-    techWin.classList.contains('show') ||
-    stewWin?.classList.contains('show') ||
-    marketWin.classList.contains('show') ||
-    resCardEl.classList.contains('show') ||
-    diploOpen ||
-    chatWin.isOpen() ||
-    setupEl.style.display !== 'none' ||
-    selFleet !== null ||
-    selPlanet !== null ||
-    selFleets.size > 0,
-  );
+// BACK-1: лестница слоёв — ДАННЫЕ, а не цепочка `if`. Порядок = визуальная стопка
+// сверху вниз (z-index из build.mjs указан у каждой ступени), поэтому Back закрывает
+// ровно то, что игрок видит верхним. Раньше порядок был «взведённые режимы вперёд», и
+// при открытом окне поверх карты первый Back гасил невидимый прицел, а не окно.
+//
+// Полноту держит сторож `backLayers.test.ts`: каждый оверлей из CSS обязан быть в описи
+// `LAYER_INVENTORY` слоем или не-слоем с причиной, а каждый слой описи — ступенью здесь.
+// Опись нашла 37 оверлеев; 29 из них Back не видел вовсе.
+//
+// ЛОВУШКА ПРОБЫ. У экранов с инлайновым display сравниваем строго с 'flex', а НЕ
+// `!== 'none'`: до первого открытия инлайновый стиль пуст (''), и «не none» залипло бы
+// в «открыто» — Back бесконечно «закрывал» бы невидимый слой и никогда не дошёл до
+// выхода из матча. Исключение — #setup: он ставит display явно на обеих ветках.
+const shown = (id: string): boolean => document.getElementById(id)?.classList.contains('show') === true;
+const hide = (id: string): void => document.getElementById(id)?.classList.remove('show');
+const flexed = (id: string): boolean => document.getElementById(id)?.style.display === 'flex';
+
+const BACK_LAYERS: BackLayer[] = [
+  // --- модалки поверх всего (z60…z57) ---
+  { id: 'corp', isOpen: () => flexed('corp'), close: () => corp.close() }, // z60
+  { id: 'scipick', isOpen: () => shown('scipick'), close: () => hide('scipick') }, // z60
+  { id: 'emblempick', isOpen: () => shown('emblempick'), close: () => hide('emblempick') }, // z60
+  { id: 'settings', isOpen: () => shown('settings'), close: () => hide('settings') }, // z59
+  // dev-оверлеи: в плеерной сборке узлов нет, проба просто всегда false
+  { id: 'testmode', isOpen: () => flexed('testmode'), close: () => hideFlex('testmode') }, // z59
+  { id: 'sandbox', isOpen: () => flexed('sandbox'), close: () => hideFlex('sandbox') }, // z59
+  { id: 'intro', isOpen: () => shown('intro'), close: () => hide('intro') }, // z58
+  { id: 'seatpick', isOpen: () => flexed('seatpick'), close: () => seatpickCancelEl?.click() }, // z58
+  { id: 'recap', isOpen: () => shown('recap'), close: () => hide('recap') }, // z57
+  { id: 'profile', isOpen: () => shown('profile'), close: () => profile.close() }, // z57
+  // --- окна и карточки (z51…z44) ---
+  { id: 'rescard', isOpen: () => resCardEl.classList.contains('show'), close: () => resCardEl.classList.remove('show') }, // z51
+  // Обучающий тур (ONB-1): его панели глотают клики, так что без этой ступени игрок в
+  // туре заперт. Проба идёт по ЖИВОСТИ тура, а не только по узлу: если stop() почему-то
+  // не уберёт подсветку, лестница всё равно не залипнет в «открыто».
+  {
+    id: 'spotlight',
+    isOpen: () => activeTour?.active === true && document.getElementById('spotlight') !== null,
+    close: () => activeTour?.stop(), // ровно кнопка «Пропустить»
+  }, // z50
+  {
+    id: 'playercard',
+    isOpen: () => shown('playercard'),
+    close: () => {
+      const el = document.getElementById('playercard');
+      el?.classList.remove('show');
+      // Место чужого игрока обязано уйти вместе с карточкой: делегат кликов читает
+      // dataset.seat, и забытое значение увело бы следующее открытие СВОЕЙ карточки
+      // в ветку дипломатии по чужому месту.
+      if (el) delete el.dataset.seat;
+    },
+  }, // z50
+  { id: 'diplo', isOpen: () => diploOpen, close: () => closeDiplo() }, // z49
+  // Проба по состоянию, а не по классу: `warPrompt` — источник истины, класс лишь его
+  // отражение. Back здесь обязан вести в ОТМЕНУ: подтверждение объявляет войну, и вешать
+  // необратимое действие на аппаратную кнопку нельзя.
+  { id: 'warprompt', isOpen: () => warPrompt !== null, close: () => cancelWarPrompt() }, // z48
+  { id: 'pingmenu', isOpen: () => pingMenuLoc !== null, close: () => closePingMenu() }, // z47
+  { id: 'tech', isOpen: () => techWin.classList.contains('show'), close: () => techWin.classList.remove('show') }, // z47
+  { id: 'steward', isOpen: () => stewWin?.classList.contains('show') === true, close: () => stewWin?.classList.remove('show') }, // z47
+  { id: 'market', isOpen: () => marketWin.classList.contains('show'), close: () => marketWin.classList.remove('show') }, // z47
+  { id: 'constructor', isOpen: () => constructorWin.classList.contains('show'), close: () => shipyard.close() }, // z47 «Верфь»
+  { id: 'codex', isOpen: () => codexEl?.classList.contains('show') === true, close: () => codexEl?.classList.remove('show') }, // z46
+  // Двухступенчатый Back режима «Приказ» (CHAIN-UX): сперва меню точки…
+  {
+    id: 'tgted',
+    isOpen: () => chainMode?.menu != null,
+    close: () => {
+      if (chainMode) chainMode.menu = null;
+      hide('tgted');
+    },
+  }, // z46
+  { id: 'logwin', isOpen: () => logWin?.classList.contains('show') === true, close: () => logWin?.classList.remove('show') }, // z46
+  { id: 'codexhub', isOpen: () => shown('codexhub'), close: () => hide('codexhub') }, // z45
+  { id: 'pingpop', isOpen: () => pingPopEl?.classList.contains('show') === true, close: () => closePingPop() }, // z45
+  { id: 'splitdlg', isOpen: () => splitState !== null, close: () => { splitState = null; lastPanelHtml = ''; } }, // z45
+  // --- низ экрана (z27…z20) ---
+  { id: 'chatwin', isOpen: () => chatWin.isOpen(), close: () => chatWin.close() }, // z27
+  // Поповеры ряда команд живут ВНУТРИ #cmdbar: прячет их ближайший renderCmdBar, но
+  // кэш разметки надо сбить руками, иначе строка не изменится и DOM останется прежним.
+  {
+    id: 'cmdbar',
+    isOpen: () => troopsPlan !== null || fireMenu || castMenu,
+    close: () => {
+      troopsPlan = null;
+      fireMenu = false;
+      castMenu = false;
+      lastCmdHtml = '';
+    },
+  }, // z26
+  // …а вторым Back — сам режим (черновик выбрасывается, живые планы не тронуты).
+  { id: 'chain', isOpen: () => chainMode !== null, close: () => exitChainMode() },
+  {
+    id: 'aim',
+    isOpen: () => aiming || assaultAim || merging || barrageAim,
+    close: () => {
+      aiming = false;
+      assaultAim = false;
+      merging = false;
+      barrageAim = false;
+      lastPanelHtml = '';
+    },
+  },
+  // Раскрытая панель инструментов рельсы: на телефоне она занимает пол-экрана, а CSS-опись
+  // её не видит — узел живёт всегда, раскрытость это класс `.open` (см. EXTRA_LAYERS).
+  { id: 'rail', isOpen: () => railEl.classList.contains('open'), close: () => setRailOpen(false) }, // z26
+  { id: 'side', isOpen: () => selFleet !== null || selPlanet !== null || selFleets.size > 0, close: () => clearSelection() }, // z20
+  // Экран настройки матча — последняя ступень: это не слой поверх матча, а сам экран,
+  // и у него свой путь назад (в хаб / на экран входа).
+  {
+    id: 'setup',
+    isOpen: () => setupEl.style.display !== 'none',
+    close: () => ($('setupcancel') as HTMLButtonElement | null)?.click(),
+  }, // z58
+];
+
+/** Спрятать оверлей с инлайновым display (dev-панели ставят его вручную). */
+function hideFlex(id: string): void {
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'none';
 }
 
-/** Close the TOPMOST open layer; returns false when nothing was open. The order
- *  mirrors visual stacking: armed order modes → popups → windows → menus →
- *  the selection sheet → the setup screen. */
+/** Is any layer open that the Back button should close (probe only)? */
+function topLayerOpen(): boolean {
+  return layersOpen(BACK_LAYERS);
+}
+
+/** Close the TOPMOST open layer; returns false when nothing was open. Порядок —
+ *  в `BACK_LAYERS` выше (визуальная стопка), сама лестница — в `backLayers.ts`. */
 function closeTopLayer(): boolean {
-  // CHAIN-UX двухступенчато: первый Back закрывает меню точки, второй — режим
-  // (черновик выбрасывается, живые планы не тронуты).
-  if (chainMode) {
-    if (chainMode.menu) {
-      chainMode.menu = null;
-      document.getElementById('tgted')?.classList.remove('show');
-      return true;
-    }
-    exitChainMode();
-    return true;
-  }
-  if (aiming || assaultAim || merging || barrageAim) {
-    aiming = false;
-    assaultAim = false;
-    merging = false;
-    barrageAim = false;
-    lastPanelHtml = '';
-    return true;
-  }
-  if (pingMenuLoc !== null) {
-    closePingMenu();
-    return true;
-  }
-  if (pingPopEl?.classList.contains('show')) {
-    closePingPop();
-    return true;
-  }
-  if (splitState !== null) {
-    splitState = null;
-    lastPanelHtml = '';
-    return true;
-  }
-  if (troopsPlan !== null) {
-    // Поповер живёт внутри строки #cmdbar — прячет его ближайший renderCmdBar,
-    // но кэш надо сбить руками, иначе строка не изменится и DOM останется прежним.
-    troopsPlan = null;
-    lastCmdHtml = '';
-    return true;
-  }
-  if (codexEl?.classList.contains('show')) {
-    codexEl.classList.remove('show');
-    return true;
-  }
-  if (logWin?.classList.contains('show')) {
-    logWin.classList.remove('show');
-    return true;
-  }
-  if (techWin.classList.contains('show')) {
-    techWin.classList.remove('show');
-    return true;
-  }
-  if (stewWin?.classList.contains('show')) {
-    stewWin.classList.remove('show');
-    return true;
-  }
-  if (marketWin.classList.contains('show')) {
-    marketWin.classList.remove('show');
-    return true;
-  }
-  if (resCardEl.classList.contains('show')) {
-    resCardEl.classList.remove('show');
-    return true;
-  }
-  if (diploOpen) {
-    closeDiplo();
-    return true;
-  }
-  if (chatWin.isOpen()) {
-    chatWin.close();
-    return true;
-  }
-  if (selFleet !== null || selPlanet !== null || selFleets.size > 0) {
-    clearSelection();
-    return true;
-  }
-  if (setupEl.style.display !== 'none') {
-    ($('setupcancel') as HTMLButtonElement | null)?.click(); // its own Back path (hub/welcome)
-    return true;
-  }
-  return false;
+  return closeTop(BACK_LAYERS) !== null;
 }
 
 window.addEventListener('popstate', () => {

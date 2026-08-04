@@ -36,6 +36,14 @@
 ¹ `check` дублируется блокирующим в `ci.yml`; в `security.yml` он информационный,
 чтобы отчёт собирался всегда.
 
+> **Поправка 2026-08-04 (состав вырос).** Таблица выше — снимок на дату отчёта, 13 джоб.
+> С тех пор добавились `trivy-deps` (сторонние образы прода), `dependency-check` (SCA по
+> NVD/CPE), `kics` (compose/A05), `dependency-review` (что вносит PR) — в `security.yml`
+> сейчас 17 джоб, из них 15 сканирующих. Чинить это число здесь при каждом новом сканере
+> смысла нет: актуальный состав и разбивка «блокирующий / информационный» живут в
+> `docs/security/pipeline.md`, а машинно-проверяемый список — в реестре `EXPECTED`
+> у `.github/scripts/summarize-security.mjs` (он же печатает таблицу подтверждения сканов).
+
 **Дополнительно:**
 - `ci.yml`: OSV-Scanner по lockfile'ам (дублирует osv-джобу — defense-in-depth).
 - `android.yml`: `cosign sign-blob` (keyless OIDC) — подпись APK.
@@ -65,7 +73,7 @@
 | **A05 Security Misconfiguration** | IaC | хорошо | Trivy fs (misconfig), Trivy image, zizmor (workflow config) | ★★★★☆ — Dockerfile/yaml покрыты, **compose — нет** (см. поправку под таблицей) |
 | **A06 Vulnerable Components** | SCA | отлично | OSV-Scanner (блокирующий) + Trivy fs/image (vuln) + SBOM (Syft) | ★★★★★ — тройное перекрытие, блокирующее |
 | **A07 Auth Failures** | Auth | частично | ZAP (DAST baseline), CodeQL | ★★★☆☆ — нет специализированного auth-теста; ZAP baseline поверхностен |
-| **A08 Integrity Failures** | Supply chain | отлично | SHA-pinned actions, digest-pinned образы (частично), SBOM, cosign на APK, `hashGameDataBundle` (runtime) | ★★★★☆ — сильный для альфы; **но 4 образа по tag** (gap) |
+| **A08 Integrity Failures** | Supply chain | отлично | SHA-pinned actions, digest-pinned образы (частично), SBOM, cosign на APK, `hashGameDataBundle` (runtime) | ★★★★☆ — сильный для альфы; ~~но 4 образа по tag~~ — закрыто 2026-08-04, см. поправку к G-1 |
 | **A09 Logging Failures** | Logging | не покрыто | — | ★☆☆☆☆ — нет сканера логирования; метрики есть, но не сканируются |
 | **A10 SSRF** | SAST | частично | CodeQL (dataflow), Semgrep | ★★★☆☆ — CodeQL ловит dataflow; нет custom-правила |
 
@@ -151,6 +159,15 @@ template-injection). `permissions: {}` по умолчанию, каждая д�
   компрометирует CI-раннер.
 - **Фикс:** скилл `refresh-scanner-digests` — снять дайджесты живым запросом к
   реестру, заменить tag→digest. ~30 минут работы. **Первый приоритет.**
+
+> **Поправка 2026-08-04 (G-1 закрыт).** Все четыре образа запинены по `sha256`
+> (коммит `4721672`), TODO-комментарии сняты. Заодно нашлось и починено то, чего этот
+> отчёт не видел: `ci.yml` в инвентаризацию не входил, а его **блокирующий** SCA-шаг
+> продолжал тянуть `osv-scanner` по тегу — то есть «главный supply-chain gap закрыт»
+> было бы неправдой ещё две недели после закрытия G-1. Там же по тегу шёл сервис-контейнер
+> `postgres:16`. Оба запинены; `ci.yml` добавлен в перечень групп в
+> `docs/security/image-pinning.md`, чтобы «пиненных групп три» больше не считалось
+> исчерпывающим списком. Критичных пунктов supply-chain в этом отчёте не осталось.
 
 ### 🟡 Средние (охват/зрелость)
 
@@ -253,6 +270,13 @@ template-injection). `permissions: {}` по умолчанию, каждая д�
   PR на обновление. Дополнительно — `dependabot-security-updates` для GitHub
   Actions.
 
+> **Поправка 2026-08-04 (G-10 закрыт).** `.github/dependabot.yml` настроен, в нём же
+> `cooldown` на 7 дней — плановое обновление не приезжает в первые сутки после
+> публикации, когда чаще всего и ловят компрометацию. Второй слой того же приёма живёт
+> в `pnpm-workspace.yaml` (`minimumReleaseAge: 1440`): это пол для ЛЮБОГО разрешения
+> версии, включая ручной `pnpm add`, а не только для плановых PR. Пол взят суточный, а
+> не недельный, намеренно — иначе срочный секьюрити-патч пришлось бы ждать неделю.
+
 ---
 
 ## 5. Сводная оценка
@@ -263,14 +287,14 @@ template-injection). `permissions: {}` по умолчанию, каждая д�
 | **OWASP Top 10** | ★★★★☆ | 8/10 покрыты хорошо; A09 не покрыт, A01/A07 — частично |
 | **Defense-in-depth** | ★★★★★ | Перекрытие движков в каждом классе (Semgrep+CodeQL, Gitleaks+TruffleHog, OSV+Trivy) |
 | **Gating discipline** | ★★★★☆ | 5 блокирующих, ratcheting, fail-secure, сентинелы. CodeQL/TruffleHog ещё информационные |
-| **Supply-chain** | ★★★★☆ | SHA-pinned actions, cosign, SBOM, hashGameDataBundle. **Но 4 образа по tag — gap** |
+| **Supply-chain** | ★★★★☆ | SHA-pinned actions, cosign, SBOM, hashGameDataBundle. ~~Но 4 образа по tag — gap~~ — закрыто 2026-08-04 (и `ci.yml` заодно), см. поправку к G-1 |
 | **Custom rules** | ★★★★★ | 5 правил под инварианты ядра + unit-тесты правил — редкая зрелость |
 | **Pipeline hardening** | ★★★★★ | persist-credentials, template-injection prevention, least-privilege permissions, zizmor |
 | **Reporting** | ★★★★☆ | Единый отчёт, sticky PR-комментарий, SARIF→Code Scanning. TruffleHog/ZAP не в SARIF |
 
 **Общий вердикт: ★★★★☆ (4/5)** — для инди-альфы это **очень сильный**
 DevSecOps-пайплайн, выше большинства коммерческих проектов малого масштаба.
-Главный gap — 4 непиненных образа (G-1), это единственный критичный пункт.
+Главный gap на дату отчёта — 4 непиненных образа (G-1), это был единственный критичный пункт. **Закрыт 2026-08-04** (см. поправку к G-1); критичных пунктов supply-chain в отчёте не осталось.
 
 ---
 
@@ -278,13 +302,13 @@ DevSecOps-пайплайн, выше большинства коммерческ
 
 | # | Предложение | Приоритет | Усилие | Зона | Когда |
 |---|---|---|---|---|---|
-| **1** | Перепиновать 4 образа (gitleaks/osv/trivy/syft) по sha256 | 🔴 критичный | 30 мин | `[sec]` | сейчас |
+| **1** | ~~Перепиновать 4 образа (gitleaks/osv/trivy/syft) по sha256~~ | 🔴 критичный | 30 мин | `[sec]` | ✅ запинены 2026-08-04 (+ `ci.yml`, см. поправку к G-1) |
 | **2** | Перевести CodeQL в блокирующий после триажа | 🟡 средний | 1 ч | `[sec]` | перед продом |
 | **3** | Добавить Semgrep-правило `no-secret-in-log` (A09) | 🟡 средний | 30 мин | `[sec]` | следующий триаж |
 | **4** | Перевести TruffleHog в блокирующий после триажа | 🟡 средний | 1 ч | `[sec]` | перед продом |
 | **5** | Authz property-тест (случайный playerId × action) | 🟡 средний | 2 ч | `[core]` `[srv]` | перед продом |
 | **6** | Authenticated ZAP scan (SEC-6.2) | 🟡 средний | 4 ч | `[sec]` | перед продом |
-| **7** | Включить Dependabot для npm + actions | 🟢 низкий | 15 мин | `[sec]` | когда-нибудь |
+| **7** | ~~Включить Dependabot для npm + actions~~ | 🟢 низкий | 15 мин | `[sec]` | ✅ настроен (+ `minimumReleaseAge`, см. поправку к G-10) |
 | **8** | Создать `.gitleaks.toml` с allowlist для тестов | 🟢 низкий | 15 мин | `[sec]` | при первом FP |
 | **9** | ~~Удалить или активировать `bearer.yml`~~ | 🟢 низкий | 5 мин | `[sec]` | ✅ удалён 2026-08-04 |
 
@@ -324,8 +348,12 @@ DevSecOps-пайплайн, выше большинства коммерческ
 
 ---
 
-_Сверено с кодом: `.github/workflows/security.yml` (13 джоб, 5 sha256-пинов, 6
-TODO), `.semgrep/rules/*.yaml` (5 правил), `.trivyignore` (13 CVE, дата ревью
-2026-07-10), `bearer.yml`, `Dockerfile` (digest-pinned base images),
+_Сверено с кодом **на 2026-07-26**: `.github/workflows/security.yml` (13 джоб, 5
+sha256-пинов, 6 TODO), `.semgrep/rules/*.yaml` (5 правил), `.trivyignore` (13 CVE, дата
+ревью 2026-07-10), `bearer.yml`, `Dockerfile` (digest-pinned base images),
 `docs/security/pipeline.md`, `docs/security/image-pinning.md`,
 `docs/security/security-master-plan.md`._
+
+_Числа в этой строке — состояние на дату отчёта, а не сегодняшнее: 17 джоб, все образы
+по дайджесту, TODO-пинов не осталось, `bearer.yml` удалён. Список файлов оставлен как
+есть — это запись о том, что читалось при написании._

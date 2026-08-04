@@ -172,6 +172,42 @@ if (thFile) {
   if (verified || unverified) sarifTools.add('TruffleHog');
 }
 
+// --- OWASP ZAP baseline (собственный JSON: SARIF эта утилита не умеет) ---
+// ЗАЧЕМ ОТДЕЛЬНЫЙ РАЗБОР. Выше читаются только `*.sarif` и NDJSON TruffleHog, а `zap`
+// кладёт свой `zap-report.json` — он лежал в артефакте НЕПРОЧИТАННЫМ. Из-за этого
+// алерты DAST не попадали ни в таблицу «По инструментам», ни в список находок, ни в
+// счётчики: при живых находках отчёт мог напечатать «Сканеры не вернули находок», и
+// единственным следом оставалась `::warning::`-аннотация в логе джобы. Строка
+// «✅ просканировано» при этом была формально верной — сентинел не врал, врала полнота.
+const zapFile = files.find((f) => /(^|\/)zap-report\.json$/.test(f));
+if (zapFile) {
+  const data = readJson(zapFile);
+  // riskcode: 3=High, 2=Medium, 1=Low, 0=Informational. Раскладка по тем же вёдрам,
+  // что у SARIF, чтобы находка DAST весила столько же, сколько равная ей из SAST.
+  const LEVEL = { 3: 'error', 2: 'warning', 1: 'note', 0: 'none' };
+  let seen = 0;
+  for (const site of data?.site ?? []) {
+    for (const a of site.alerts ?? []) {
+      const level = LEVEL[Number(a.riskcode)] ?? 'note';
+      seen++;
+      toolOf('ZAP')[level]++;
+      totals[level]++;
+      findings.push({
+        tool: 'ZAP',
+        level,
+        rule: String(a.pluginid ?? a.alertRef ?? ''),
+        // У DAST «где» — это URL, а не файл: берём первый инстанс, их число в msg.
+        path: a.instances?.[0]?.uri ?? site['@name'] ?? '',
+        line: '',
+        msg: `${String(a.alert ?? a.name ?? '').replace(/\s+/g, ' ').trim()}${
+          Number(a.count) > 1 ? ` (×${a.count})` : ''
+        }`.slice(0, 140),
+      });
+    }
+  }
+  if (seen) sarifTools.add('ZAP');
+}
+
 // --- pnpm run check ---
 let checkLine = '_неизвестно_';
 const checkFile = files.find((f) => /check-status\.json$/.test(f));
@@ -187,9 +223,11 @@ const isMain = ref === 'main';
 const event = process.env.GITHUB_EVENT_NAME ?? '';
 const confirm = EXPECTED.map((t) => {
   const s = sentinels.get(t.key);
-  // Confirmed if the job wrote a sentinel with ok=true. Defensive fallback: a tool
-  // whose SARIF is present with a driver counts as confirmed even without a sentinel.
-  // Фолбэк для SBOM ограничен ИМЕННО тем файлом, который производит джоба `sbom`.
+  // Confirmed if the job wrote a sentinel with ok=true. Единственный фолбэк — SBOM, и он
+  // ограничен ИМЕННО тем файлом, который производит джоба `sbom`. (Раньше тут же
+  // описывался общий фолбэк «есть SARIF с драйвером ⇒ подтверждён»; в коде его давно
+  // нет, и держать в комментарии несуществующее поведение опаснее, чем не описывать его
+  // вовсе: читатель поверит, что сканер без сентинела всё равно засчитается.)
   // Было `sboms.length > 0` — под это подходил и `sbom-image.cdx.json` от ДРУГОЙ джобы
   // (`trivy-image`), так что джоба `sbom` могла упасть целиком, а таблица доверия
   // печатала «✅ просканировано» (воспроизведено на фикстуре).

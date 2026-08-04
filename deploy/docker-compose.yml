@@ -18,11 +18,16 @@
 # over the compose network). Set a real POSTGRES_PASSWORD in the environment (or an
 # .env file next to this compose) for anything beyond a local test.
 #
-# CONTAINER HARDENING (SEC-12). NOTE FOR FUTURE EDITS: no scanner checks this file.
-# Trivy's misconfig engine covers Dockerfile/k8s/terraform/cloudformation/helm/ARM —
-# Docker Compose is NOT among its formats, so the runtime posture below (privileges,
-# capabilities, limits) is held by review + the checklist in deploy/README.md, not by
-# CI. Keep them in sync when you touch a service.
+# CONTAINER HARDENING (SEC-12). NOTE FOR FUTURE EDITS: Trivy's misconfig engine covers
+# Dockerfile/k8s/terraform/cloudformation/helm/ARM — Docker Compose is NOT among its
+# formats. That gap is now covered by a second engine: the `kics` job in security.yml
+# scans these files (informational until its baseline is triaged). Two things it does
+# NOT do, which is why the checklist in deploy/README.md is still a live second layer
+# rather than a leftover: KICS reads each file in ISOLATION and does not understand
+# compose overlay merging, so tls.yml/release.yml fragments are routinely reported as
+# missing healthcheck/cap_drop/security_opt that in fact live here and merge at runtime;
+# and its rule set says nothing about the deliberate exceptions documented below. Keep
+# the checklist in sync when you touch a service.
 #   - no-new-privileges: a process in the container can never gain privileges via a
 #     setuid binary — closes the classic in-container escalation step.
 #   - cap_drop [ALL]: our server needs no Linux capability at all (non-root node on a
