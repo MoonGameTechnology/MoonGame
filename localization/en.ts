@@ -188,6 +188,14 @@ export const en: Record<string, string> = {
   'client.status.returning-fallback': 'returning',
   'client.status.single': '▶ Solo game — starting sandbox… (engine in the browser)',
 
+  // --- chain — Режим «Приказ»: полоска плана, меню точки, отказы.
+  'chain.add-wait6': '⏱ +6h',
+  'chain.fire': '🎯 Fire +1h',
+  'chain.full': 'plan is full — 8 steps',
+  'chain.no-art': 'no artillery in the selection',
+  'chain.overwrite': 'fleet plans differ — sending replaces them all',
+  'chain.undo': 'Undo step',
+
   // --- cmd — Командная панель флота: приказы, режим огня артиллерии, способности героя.
   'cmd.assault': 'Assault',
   'cmd.assault.hint': 'fly to an enemy world and land troops on arrival',
@@ -232,8 +240,9 @@ export const en: Record<string, string> = {
   'cmd.troops.hint':
     'load and unload ground units — at your own world, with a fleet that is going nowhere',
   'cmd.stop.hint': "cancel the fleet's current movement",
-  'cmd.target': 'Target',
-  'cmd.target.hint': 'tap the map to compose an order: wait · move · assault · barrage',
+  'cmd.target': 'Orders',
+  'cmd.target.hint':
+    'plan mode: tap map points — move · wait · assault · fire; the fleet runs the chain itself',
 
   // --- codex — Кодекс: карточка здания/юнита/модуля (строки характеристик) и статьи-термины.
   'codex.hub.close': 'CLOSE',
@@ -649,11 +658,10 @@ export const en: Record<string, string> = {
   'hint.deploy-cancelled': '✖ deploy cancelled',
   'hint.forced-march': '⚡ forced march: +50% speed, −5% hull per hour underway',
   'hint.multiselect': '⊕ tap your fleets — build the group, then give a common order',
-  'hint.no-target': '◎ no target picked',
   'hint.pick-assault': "⚔ pick someone else's world to storm",
   'hint.pick-barrage': '🎯 tap an enemy fleet to focus fire · empty space = auto',
   'hint.pick-merge': '⛬ pick a fleet to merge with',
-  'hint.pick-order': '◎ tap a target on the map — compose the order',
+  'hint.pick-order': 'tap a point on the map — each tap adds an order',
   'hint.squadron-launched': '🛩 squadron launched — steer it onto the target',
   'hint.standing-sortie': '🛩 standing patrol on — the wing strikes any enemy in range',
 
@@ -822,14 +830,11 @@ export const en: Record<string, string> = {
   'tgt.add-wait': '⏱ +1h',
   'tgt.at': '🎯{n}h',
   'tgt.clear': 'clear the order',
-  'tgt.empty': 'plan is empty — add steps',
   'tgt.fleets': '{n} fleets',
   'tgt.placed': '◎ order set — the fleet will run the plan itself',
   'tgt.send': 'Send',
-  'tgt.step.fire': 'Fire',
   'tgt.step.here': 'Go here',
   'tgt.step.home': 'Home',
-  'tgt.step.remove': 'remove step',
   'tgt.title': 'ORDER',
   'tgt.wait': '⏱{n}h',
 

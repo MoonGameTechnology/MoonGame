@@ -40,6 +40,7 @@ import {
   unlockHeroSkill,
   fitHero,
   freshSortie,
+  orderChain,
 } from './game';
 
 // RELEASE gate parity (REL-2): every intent the prototype UI can emit must clear the
@@ -85,6 +86,16 @@ const CLIENT_ACTIONS: Action[] = [
   spawnHero(P, 'hero:p1:2', 'C1R1'),
   unlockHeroSkill(P, 'hero:p1:1', 'neural_lace'),
   fitHero(P, 'hero:p1:1', 'psi_lens'),
+  // CHAIN-UX: многоточечный план через реальный билдер — дрейф формы шага между
+  // билдером и гейт-схемой обязан падать здесь, а не на боевом gated-сервере.
+  orderChain(P, 'f1', [
+    { kind: 'move', to: 'B2' },
+    { kind: 'wait', hours: 2 },
+    { kind: 'move', to: 'C1R1' },
+    { kind: 'assault' },
+    { kind: 'strike', target: null, hours: 3 },
+  ]),
+  orderChain(P, 'f1', []), // снять план — тоже клиентский интент (✓ на пустом черновике)
 ];
 
 describe('gate parity (REL-2) — the schemas cover every prototype intent', () => {

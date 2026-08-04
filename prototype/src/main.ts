@@ -112,6 +112,7 @@ import {
   COMBAT_UNIT_CAP,
   effectiveStats,
   estimateTravelHours,
+  journeyDestination,
   findHealthyStack,
   fleetBaseSpeed,
   sumUnitStat,
@@ -244,6 +245,21 @@ import {
   type TroopsInput,
   type TroopsUnitInput,
 } from './troopsMenu';
+// CHAIN-UX — режим «Приказ»: модель черновика, меню точки, таймлайн, разметка.
+import {
+  applyMenuAction,
+  chainMenuItems,
+  chainMenuHtml,
+  chainStripHtml,
+  chainTimeline,
+  draftFinish,
+  draftFrom,
+  stepGlyph,
+  stepHours,
+  undoGesture,
+  type ChainAbility,
+  type ChainPointKind,
+} from './chainPlanner';
 // ST-2/ST-3 — «Хранитель»: the window is REFM-7; the read-only helpers below are shared
 // with the threat alert (`stewFmtDur`), the side panel (`stewardTechDone`) and the
 // morning report (`stewMetrics`).
@@ -571,11 +587,20 @@ let warPrompt: {
   assault?: boolean;
 } | null = null;
 // TGT-1: target-order composer over CC-1 chains. «Цель» arms targeting; the next
-// world tap opens a small composer BESIDE the target; a standing marker stays on the
-// target while a plan referencing it lives, and tapping it re-opens the composer.
-let targetAim = false;
-let tgtEditor: { fleetIds: string[]; target: string; steps: ChainStep[] } | null = null;
-let tgtHits: Array<{ target: string; fleetIds: string[]; x: number; y: number }> = [];
+// CHAIN-UX «Приказ» (перерос TGT-1): персистентный режим построения плана тапами по
+// карте. Пока он жив, карта — рабочая поверхность: тап по точке открывает меню
+// действий ПО ТИПУ точки, выбор дописывает жест в черновик, полоска вместо cmdbar
+// держит ⟲/⌂/✓/✕. Черновик привязан к fleetIds, НЕ к выделению (как старый композер).
+let chainMode: {
+  fleetIds: string[];
+  steps: ChainStep[];
+  gestures: number[];
+  menu: { id: string; kind: ChainPointKind } | null;
+} | null = null;
+// Хитбоксы ◎-бейджей отправленных планов (тап вне режима = редактирование плана).
+let chainHits: Array<{ target: string; fleetIds: string[]; x: number; y: number }> = [];
+// Кэш маршрутов для отрисовки цепочек: граф лейнов статичен всю партию.
+const chainRouteCache = new Map<string, string[] | null>();
 // SEL-1 «Выбрать+»: touch multi-select. While ON the bottom sheet collapses, map
 // taps only toggle OWN fleets in/out of the group, and the group takes any common
 // order (Курс/Штурм/Цель…) — issuing one drops back out of the mode.
@@ -2120,6 +2145,8 @@ function apply(out: StepOut) {
   if (selFleet && !s.fleets[selFleet]) selFleet = null;
   if (splitState && !s.fleets[splitState.fleetId]) splitState = null; // fleet gone → close
   if (troopsPlan && !s.fleets[troopsPlan.fleetId]) troopsPlan = null; // ⇅-меню тоже
+  // Режим «Приказ»: пропавшие флоты выбрасываются покадрово в renderChainBar; здесь
+  // достаточно ничего не делать — режим сам гаснет, когда fleetIds опустеет.
   selFleets = new Set([...selFleets].filter((id) => s.fleets[id]?.owner === ME));
   handleEvents(out.events);
 }
@@ -4983,7 +5010,7 @@ function render(now: number) {
     cx.restore();
   }
   drawPings(now); // ally ping markers (coalition), with screen hit-boxes for taps
-  drawTargetMarkers(now); // TGT-1: standing order reticles (tap = edit the plan)
+  drawChainOverlay(now); // CHAIN-UX: цепочки планов + черновик режима «Приказ»
   drawAssaultTargets();
   drawAimPreview();
 }
@@ -6762,8 +6789,13 @@ function renderPanel() {
   // While arming a merge target, collapse the panel so the map (and the fleet to
   // merge with) is fully tappable — important on phones where the sheet covers it.
   // «Выбрать+» collapses the sheet the same way merging does — picking needs the map.
+  // «Приказ» (chainMode) прячет лист целиком: заказ владельца — на мобиле нижний
+  // хаб убирается, карта остаётся рабочей поверхностью построения плана.
   const open =
-    !merging && !pickMode && (selFleet !== null || selPlanet !== null || selFleets.size > 0);
+    !merging &&
+    !pickMode &&
+    !chainMode &&
+    (selFleet !== null || selPlanet !== null || selFleets.size > 0);
   side.style.display = open ? 'flex' : 'none';
   document.body.classList.toggle('sheet-open', open); // mobile: hide log/comms under the sheet
   // Phone: the bottom sheet covers ~50vh — when it OPENS, pan the camera so the
@@ -6847,19 +6879,93 @@ function cmdBtn(
   return `<button data-cmd="${cmd}" class="${cls}" title="${esc(tip)}" aria-label="${esc(tip)}" ${disabled ? 'disabled' : ''}><span class="ci">${icon}</span><span class="cl">${esc(label)}</span></button>`;
 }
 
+/** CHAIN-UX: полоска режима «Приказ» — живёт в ноде #cmdbar (все четыре
+ *  медиа-раскладки позиционирования достаются бесплатно). Строится каждый кадр
+ *  по кэшу lastCmdHtml; времена в HTML-сигнатуру НЕ входят — их патчит
+ *  updateChainDom() через textContent, иначе тикающее «~T» перестраивало бы DOM
+ *  под пальцем и съедало тапы. */
+function renderChainBar(): void {
+  if (!chainMode) return;
+  // Самогашение: флоты умерли/перешли к другому — режим не висит над пустотой.
+  chainMode.fleetIds = chainMode.fleetIds.filter((id) => s.fleets[id]?.owner === ME);
+  if (!chainMode.fleetIds.length) {
+    exitChainMode();
+    renderCmdBar();
+    return;
+  }
+  document.body.classList.add('chain-mode');
+  const plans = chainMode.fleetIds.map((id) => JSON.stringify(chainStepsOf(id) ?? []));
+  const anyPlan = plans.some((p) => p !== '[]');
+  const f0 = s.fleets[chainMode.fleetIds[0]!]!;
+  const finish = draftFinish(chainMode.steps, chainStart(f0).fromId);
+  const html = chainStripHtml({
+    fleets: chainMode.fleetIds.length,
+    count: chainMode.steps.length,
+    cap: MAX_CHAIN_STEPS,
+    canUndo: chainMode.gestures.length > 0,
+    canHome:
+      chainMode.steps.length < MAX_CHAIN_STEPS && !!finish && !!nearestOwnWorld(finish),
+    clearMode: chainMode.steps.length === 0 && anyPlan,
+    canSend: chainMode.steps.length > 0 || anyPlan,
+    overwrite: plans.some((p) => p !== plans[0]),
+  });
+  if (html !== lastCmdHtml) {
+    cmdbar.innerHTML = html;
+    lastCmdHtml = html;
+  }
+  cmdbar.classList.add('show');
+  updateChainDom();
+}
+/** Покадровые НЕструктурные обновления режима: итоговое «~T» полоски и позиция
+ *  меню точки (оно едет с камерой и с движущимся флотом-целью). */
+function updateChainDom(): void {
+  if (!chainMode) return;
+  const eta = cmdbar.querySelector('.ch-eta') as HTMLElement | null;
+  const f0 = s.fleets[chainMode.fleetIds[0]!];
+  if (eta && f0) {
+    const st = chainStart(f0);
+    const tl = chainTimeline(
+      chainMode.steps,
+      st.fromId,
+      st.baseH,
+      chainTravelH(f0),
+      chainAbilityHoldH(chainMode.fleetIds),
+    );
+    const tail = tl[tl.length - 1];
+    eta.textContent = tail && tail.endH !== null ? `~${fmtEta(tail.endH)}` : '~ —';
+  }
+  if (chainMode.menu) {
+    const el = document.getElementById('tgted');
+    if (!chainMenuAnchor()) {
+      // цель меню исчезла (флот сбит) — меню гаснет само, режим живёт
+      chainMode.menu = null;
+      el?.classList.remove('show');
+    } else if (el?.classList.contains('show')) {
+      positionChainMenu(el);
+    }
+  }
+}
+
 /** Horizontal fleet command bar — Move (arm) / Stop / Attack / orbit change —
  *  acting on the current fleet selection, buttons enabled by context. */
 function renderCmdBar() {
+  // CHAIN-UX: в режиме «Приказ» вместо ряда команд — полоска плана. Она живёт и
+  // без выделения (режим держит свои fleetIds), поэтому ветка стоит ДО раннего
+  // выхода на пустом выделении.
+  if (chainMode) {
+    renderChainBar();
+    return;
+  }
+  document.body.classList.remove('chain-mode');
   const ids = selectedFleetIds();
   if (ids.length === 0 && !pickMode) {
     // (pickMode keeps the bar alive at zero selection — the ⊕ toggle must stay
     // reachable, or an emptied group would strand the player in the mode.)
     if (aiming) aiming = false;
     if (assaultAim) assaultAim = false;
-    if (targetAim) targetAim = false;
     if (merging) merging = false;
     fireMenu = false; // пустое выделение — 🔥-меню не должно всплыть при новом выборе
-    troopsPlan = null; // ⇅-меню тоже: иначе всплывёт над СЛЕДУЮЩИМ выбранным флотом
+    troopsPlan = null; // ⇵-меню тоже: иначе всплывёт над СЛЕДУЮЩИМ выбранным флотом
     cmdbar.classList.remove('show');
     lastCmdHtml = '';
     return;
@@ -6930,7 +7036,7 @@ function renderCmdBar() {
       !canAssault,
       t('cmd.assault.hint'),
     ) +
-    cmdBtn('target', '◎', t('cmd.target'), targetAim ? 'on' : '', false, t('cmd.target.hint')) +
+    cmdBtn('target', '◎', t('cmd.target'), '', false, t('cmd.target.hint')) +
     (castHero
       ? cmdBtn('cast', '✨', t('cmd.cast'), castMenu ? 'on' : '', false, t('cmd.cast.hint'))
       : '') +
@@ -7427,7 +7533,8 @@ cmdbar.addEventListener('click', (ev) => {
   // другой приказ закрывает ⇅-меню (иначе два absolute-поповера легли бы друг на друга)
   if (cmd !== 'troops' && cmd !== 'tstep' && cmd !== 'tmax' && cmd !== 'tok') troopsPlan = null;
   if (cmd !== 'attack') assaultAim = false; // any other command disarms assault-targeting
-  if (cmd !== 'target') targetAim = false; // any other command disarms order-targeting
+  // chainMode не в этой преамбуле: в режиме полоска ЗАМЕНЯЕТ ряд — других команд
+  // физически нет; выход только своими кнопками (chexit/chsend), Back/Escape.
   // A real order leaves «Выбрать+» (the group stays selected and takes it);
   // ☰ and the ⊕ toggle itself keep the picking session alive.
   if (cmd !== 'pick' && cmd !== 'more') pickMode = false;
@@ -7502,11 +7609,38 @@ cmdbar.addEventListener('click', (ev) => {
     aiming = false;
     if (barrageAim) note(t('hint.pick-barrage'));
   } else if (cmd === 'target') {
-    // TGT-1: arm order-targeting — the next world tap opens the plan composer
-    // beside the target (CC-1 chain: wait/move/assault/barrage, editable later).
-    targetAim = !targetAim;
-    aiming = false;
-    if (targetAim) note(t('hint.pick-order'));
+    // CHAIN-UX: вход в режим «Приказ» — карта становится рабочей поверхностью,
+    // тапы по точкам собирают план (CC-1 цепочка), полоска заменяет ряд команд.
+    enterChainMode(ids);
+  } else if (cmd === 'chundo') {
+    if (chainMode) {
+      const d = undoGesture({ steps: chainMode.steps, gestures: chainMode.gestures });
+      chainMode.steps = d.steps;
+      chainMode.gestures = d.gestures;
+      lastCmdHtml = '';
+      if (chainMode.menu) renderChainMenu(); // серость пунктов могла измениться
+    }
+  } else if (cmd === 'chhome') {
+    if (chainMode) {
+      const f0 = s.fleets[chainMode.fleetIds[0]!];
+      const finish = f0 ? draftFinish(chainMode.steps, chainStart(f0).fromId) : null;
+      const home = finish ? nearestOwnWorld(finish) : null;
+      if (home && chainMode.steps.length < MAX_CHAIN_STEPS) {
+        chainMode.steps = [...chainMode.steps, { kind: 'move', to: home }];
+        chainMode.gestures = [...chainMode.gestures, 1];
+        lastCmdHtml = '';
+      }
+    }
+  } else if (cmd === 'chsend') {
+    if (chainMode) {
+      // Пустой черновик при живых планах — это «снять приказ»: order.chain []
+      // атомарно удаляет план каждого флота.
+      for (const id of chainMode.fleetIds) playerOrder(orderChain(ME, id, chainMode.steps));
+      note(t('tgt.placed'));
+      exitChainMode();
+    }
+  } else if (cmd === 'chexit') {
+    exitChainMode(); // выход без отправки — живые планы не тронуты
   } else if (cmd === 'more') {
     cmdMore = !cmdMore; // ☰ — show/hide the extras row
   } else if (cmd === 'cast') {
@@ -7572,7 +7706,13 @@ cmdbar.addEventListener('click', (ev) => {
 // Tap/click selection at a screen point (drag-aware — see the pointer handlers).
 function selectAt(mx: number, my: number) {
   closePingPop(); // any map tap dismisses an open ping popup (a marker tap reopens below)
-  closeTgtEditor(); // same for the order composer — its own marker tap reopens it
+  // CHAIN-UX: в режиме «Приказ» карта — рабочая поверхность построения плана.
+  // Ветка стоит ПЕРВОЙ: пока режим жив, ни выделение, ни прочие перехваты тапов
+  // не работают — тап это всегда «точка плана или закрыть меню».
+  if (chainMode) {
+    chainMapTap(mx, my);
+    return;
+  }
   // Hit radii: widened for a finger (44px-target rule); nearest-in-radius wins, so
   // clustered objects resolve to what the player aimed at, not iteration order.
   const rFleet = tapByTouch ? 24 : 16;
@@ -7689,20 +7829,12 @@ function selectAt(mx: number, my: number) {
     if (mine) toggleFleetInSelection(mine.id);
     return;
   }
-  // TGT-1: «Цель» armed → the next world tap opens the order composer beside it.
-  if (targetAim) {
-    const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
-    targetAim = false;
-    lastCmdHtml = '';
-    if (n) openTgtEditor(n.id, selectedFleetIds());
-    else note(t('hint.no-target'));
-    return;
-  }
-  // A standing order marker: tap re-opens the composer with the live plan.
+  // CHAIN-UX: тап по ◎-бейджу отправленного плана открывает режим «Приказ» с этим
+  // планом в черновике (редактирование; работает и без выделения).
   if (!aiming) {
-    const tm = nearestHit(tgtHits, (h) => h, mx, my, rPing);
+    const tm = nearestHit(chainHits, (h) => h, mx, my, rPing);
     if (tm) {
-      openTgtEditor(tm.target, tm.fleetIds);
+      enterChainMode(tm.fleetIds);
       return;
     }
   }
@@ -7874,8 +8006,8 @@ canvas.addEventListener('pointerdown', (ev) => {
     if (aiming || assaultAim) aimPointer = p; // the aim preview starts under the finger at once
     // Touch long-press: a still finger for ~350ms picks a fleet ADDITIVELY (the
     // Ctrl-click of phones) or opens a BOX-SELECT from empty space (the Shift-drag).
-    // Not while an armed mode (move/merge/barrage) owns the taps.
-    if (ev.pointerType === 'touch' && !aiming && !merging && !barrageAim) {
+    // Not while an armed mode (move/merge/barrage/chain) owns the taps.
+    if (ev.pointerType === 'touch' && !aiming && !merging && !barrageAim && !chainMode) {
       cancelLongPress();
       longPressTimer = window.setTimeout(() => {
         longPressTimer = null;
@@ -10339,6 +10471,8 @@ function installMatch(state: GameState, aiPlayers: Set<string>): void {
   additive = false;
   splitState = null;
   troopsPlan = null;
+  if (chainMode) exitChainMode(); // режим «Приказ» не переживает смену матча
+  chainRouteCache.clear(); // маршруты принадлежат карте СТАРОГО матча
   killStats = { destroyed: 0, lost: 0 };
   myBattleLocs.clear();
   memory.clear(); // fog memory belongs to the OLD match — stale intel must not carry over
@@ -10511,6 +10645,8 @@ function connect(): void {
           endScreen = null; // joining a match must not carry the previous result
           xpAwarded = false;
           pendingLoads = []; // drop any queued loads from a prior/local session
+          if (chainMode) exitChainMode(); // черновик прежней сессии не переносится
+          chainRouteCache.clear();
           showConnect(false);
           showHub(false); // hide the hub so inMatch() is true → Back works (BF-31)
           note(t('net.connected', { who: NAME[ME] ?? ME }));
@@ -11554,6 +11690,7 @@ function inMatch(): boolean {
 /** Is any layer open that the Back button should close (probe only)? */
 function topLayerOpen(): boolean {
   return Boolean(
+    chainMode !== null ||
     aiming ||
     assaultAim ||
     merging ||
@@ -11581,6 +11718,17 @@ function topLayerOpen(): boolean {
  *  mirrors visual stacking: armed order modes → popups → windows → menus →
  *  the selection sheet → the setup screen. */
 function closeTopLayer(): boolean {
+  // CHAIN-UX двухступенчато: первый Back закрывает меню точки, второй — режим
+  // (черновик выбрасывается, живые планы не тронуты).
+  if (chainMode) {
+    if (chainMode.menu) {
+      chainMode.menu = null;
+      document.getElementById('tgted')?.classList.remove('show');
+      return true;
+    }
+    exitChainMode();
+    return true;
+  }
   if (aiming || assaultAim || merging || barrageAim) {
     aiming = false;
     assaultAim = false;
@@ -12286,149 +12434,210 @@ function nearestOwnWorld(fromId: string): string | null {
   }
   return best;
 }
-function tgStepLabel(st: ChainStep, target: string): string {
-  if (st.kind === 'wait') return t('tgt.wait', { n: st.hours });
-  if (st.kind === 'move') return st.to === target ? '✈' : `✈ ${st.to}`;
-  if (st.kind === 'assault') return '⚔';
-  if (st.kind === 'strike') return t('tgt.at', { n: st.hours });
-  if (st.kind === 'ability') {
-    const nm = t(data.heroAbilities[st.abilityId]?.name ?? st.abilityId);
-    return st.target && st.target !== target ? `★ ${nm} → ${st.target}` : `★ ${nm}`;
-  }
-  return '🎯';
+/** Классифицировать тапнутый мир — «в зависимости от того, что это». */
+function chainWorldKind(id: string): ChainPointKind {
+  const p = s.planets[id];
+  if (!p || p.owner == null) return 'neutral';
+  return p.owner === ME ? 'own' : 'enemy';
 }
-/** Castable hero abilities of the first hero commanding one of `fleetIds`, rendered as
- *  composer buttons that append an `ability` chain step (CC-1 × HERO-4). Spawn-markers
- *  and engine-less types are skipped (same rule as the hero window); a live cooldown
- *  disables the button. Empty string when no hero rides these fleets. */
-function tgHeroAbilityButtons(fleetIds: string[], full: boolean): string {
+/** Способности героя на борту — данные для пунктов меню (CC-1 × HERO-4; та же
+ *  фильтрация, что у старого композера: только кастуемые типы). */
+function chainAbilitiesFor(fleetIds: string[]): ChainAbility[] {
   const hero = Object.values(s.heroes ?? {}).find(
     (h) => h.alive !== false && h.fleetId !== undefined && fleetIds.includes(h.fleetId),
   );
-  if (!hero) return '';
-  let html = '';
+  if (!hero) return [];
+  const out: ChainAbility[] = [];
   for (const ab of hero.abilities ?? []) {
     const ad = ab !== null ? data.heroAbilities[ab] : undefined;
-    if (!ad || !HERO_CASTABLE.has(ad.type)) continue;
-    const cdLeft = Math.max(0, (hero.cooldowns?.[heroCdKey(ad.type)] ?? 0) - s.time);
-    const badge = cdLeft > 0 ? ` ${t('hero.abil.cooldown', { h: fmtHrs(cdLeft / HOUR) })}` : '';
-    html += `<button data-tgab="${ab}" ${full || cdLeft > 0 ? 'disabled' : ''}>★ ${esc(t(ad.name))}${badge}</button>`;
+    if (!ad || !ab || !HERO_CASTABLE.has(ad.type)) continue;
+    out.push({
+      id: ab,
+      name: t(ad.name),
+      cdH: Math.max(0, (hero.cooldowns?.[heroCdKey(ad.type)] ?? 0) - s.time) / HOUR,
+      ranged: (ad.range ?? 0) > 0,
+    });
   }
-  return html;
+  return out;
 }
-/** Open the composer for `target`, editing the FIRST chained fleet's plan (or a
- *  fresh one). `fleetIds` — who the plan will be sent to (all owned, alive). */
-function openTgtEditor(target: string, fleetIds: string[]): void {
+/** Остаток кулдауна способности — единственный реальный холд драйвера цепочек. */
+function chainAbilityHoldH(fleetIds: string[]): (abilityId: string) => number {
+  const abs = chainAbilitiesFor(fleetIds);
+  return (id) => abs.find((a) => a.id === id)?.cdH ?? 0;
+}
+/** Старт плана флота: летящий начнёт исполнять цепочку в пункте назначения —
+ *  от него и считаем (голова авторитетна по arrivesAt, хвост — оценка). */
+function chainStart(f: Fleet): { fromId: string | null; baseH: number } {
+  if (f.movement) {
+    const mv = f.movement;
+    const dest = journeyDestination(mv);
+    const rawRestH = dest !== mv.to ? (estimateTravelHours(s, data, mv.to, dest, f) ?? 0) : 0;
+    const restH = marchFlagged(f.id) ? rawRestH / FORCED_MARCH_MULT : rawRestH;
+    return { fromId: dest, baseH: Math.max(0, (mv.arrivesAt - s.time) / HOUR) + restH };
+  }
+  return { fromId: fleetNode(f), baseH: 0 };
+}
+/** Оценка перелёта для таймлайна (форс-марш ускоряет, как в pn-eta панели). */
+function chainTravelH(f: Fleet): (from: string, to: string) => number | null {
+  const boost = marchFlagged(f.id) ? FORCED_MARCH_MULT : 1;
+  return (from, to) => {
+    const h = estimateTravelHours(s, data, from, to, f);
+    return h == null ? null : h / boost;
+  };
+}
+/** Маршрут для полилинии цепочки. Граф лейнов статичен всю партию — кэш на матч
+ *  (Дейкстра на каждый кадр для каждого шага была бы расточительна). */
+function chainRoute(from: string, to: string): string[] | null {
+  const key = `${from}>${to}`;
+  let hops = chainRouteCache.get(key);
+  if (hops === undefined) {
+    hops = planRoute(s, from, to);
+    chainRouteCache.set(key, hops);
+  }
+  return hops;
+}
+/** Вход в режим «Приказ»: черновик — живой план ПЕРВОГО флота (весь префилл — один
+ *  жест, ⟲ снимает его целиком). Режим держит свои fleetIds и живёт без выделения. */
+function enterChainMode(fleetIds: string[]): void {
   const mine = fleetIds.filter((id) => s.fleets[id]?.owner === ME);
-  if (!mine.length || !s.planets[target]) return;
-  tgtEditor = { fleetIds: mine, target, steps: [...(chainStepsOf(mine[0]!) ?? [])] };
-  renderTgtEditor(true);
+  if (!mine.length) return;
+  const pre = draftFrom(chainStepsOf(mine[0]!) ?? []);
+  chainMode = { fleetIds: mine, steps: pre.steps, gestures: pre.gestures, menu: null };
+  aiming = false;
+  note(t('hint.pick-order'));
+  lastCmdHtml = '';
+  lastPanelHtml = '';
 }
-function closeTgtEditor(): void {
-  tgtEditor = null;
+function exitChainMode(): void {
+  chainMode = null;
+  document.getElementById('tgted')?.classList.remove('show');
+  document.body.classList.remove('chain-mode');
+  lastCmdHtml = '';
+  lastPanelHtml = '';
+}
+/** Тап карты в режиме: точка → меню действий по её типу, пустота → закрыть меню.
+ *  Радиусы хитов — те же, что у selectAt (рассинхрон рисовал бы одно, слал другое). */
+function chainMapTap(mx: number, my: number): void {
+  if (!chainMode) return;
+  const rFleet = tapByTouch ? 24 : 16;
+  const rNode = tapByTouch ? 30 : 24;
+  // Мир ПРИОРИТЕТНЕЕ флота — в отличие от обычного выделения, где на мобиле
+  // побеждает флот. Здесь план строится по ТОЧКАМ карты, и у вражеского мира почти
+  // всегда стоит его флот: победи он, меню давало бы только «Огонь», а штурм самого
+  // мира стал бы недостижим. Огонь по конкретному флоту остаётся — для флотов, у
+  // которых узла под пальцем нет (в пути, на лейне, на чужой орбите поодаль).
+  const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
+  if (n) {
+    chainMode.menu = { id: n.id, kind: chainWorldKind(n.id) };
+    renderChainMenu();
+    return;
+  }
+  const foe = nearestHit(
+    Object.values(s.fleets).filter((f) => f.owner !== ME),
+    fleetAnchor,
+    mx,
+    my,
+    rFleet,
+  );
+  if (foe) {
+    chainMode.menu = { id: foe.id, kind: 'fleet' };
+    renderChainMenu();
+    return;
+  }
+  chainMode.menu = null;
   document.getElementById('tgted')?.classList.remove('show');
 }
-function renderTgtEditor(reposition = false): void {
+/** Экранная позиция точки открытого меню (флот движется — зовётся покадрово). */
+function chainMenuAnchor(): { x: number; y: number } | null {
+  const m = chainMode?.menu;
+  if (!m) return null;
+  if (m.kind === 'fleet') {
+    const f = s.fleets[m.id];
+    return f ? fleetAnchor(f) : null;
+  }
+  const pl = s.planets[m.id];
+  return pl ? world(pl.position) : null;
+}
+/** Меню точки — в том же плавающем боксе #tgted, что жил у старого композера.
+ *  Позицию каждый кадр обновляет updateChainDom (меню едет с камерой и флотом). */
+function renderChainMenu(): void {
   const el = document.getElementById('tgted');
-  if (!el) return;
-  if (!tgtEditor) {
+  if (!el || !chainMode) return;
+  const m = chainMode.menu;
+  if (!m) {
     el.classList.remove('show');
     return;
   }
-  const pl = s.planets[tgtEditor.target];
-  const alive = tgtEditor.fleetIds.filter((id) => s.fleets[id]?.owner === ME);
-  if (!pl || !alive.length) {
-    closeTgtEditor();
-    return;
-  }
-  tgtEditor.fleetIds = alive;
-  const st = tgtEditor.steps;
-  const full = st.length >= MAX_CHAIN_STEPS;
-  const plan = st.length
-    ? st
-        .map(
-          (x, i) =>
-            `<button data-step="${i}" title="${t('tgt.step.remove')}">${esc(tgStepLabel(x, tgtEditor!.target))}</button>`,
-        )
-        .join('<i>→</i>')
-    : `<i>${t('tgt.empty')}</i>`;
-  el.innerHTML =
-    `<div class="tg-top"><b>◎ ${t('tgt.title')}</b><span>${esc(tgtEditor.target)}${
-      alive.length > 1 ? ` · ${t('tgt.fleets', { n: alive.length })}` : ''
-    }</span></div>` +
-    `<div class="tg-plan">${plan}</div>` +
-    `<div class="tg-add">` +
-    `<button data-tg="wait" ${full ? 'disabled' : ''}>${t('tgt.add-wait')}</button>` +
-    `<button data-tg="move" ${full ? 'disabled' : ''}>✈ ${t('tgt.step.here')}</button>` +
-    `<button data-tg="assault" ${full ? 'disabled' : ''}>⚔ ${t('cmd.assault')}</button>` +
-    `<button data-tg="barrage" ${full ? 'disabled' : ''}>🎯 ${t('tgt.step.fire')}</button>` +
-    `<button data-tg="home" ${full || !nearestOwnWorld(tgtEditor.target) ? 'disabled' : ''}>⌂ ${t('tgt.step.home')}</button>` +
-    tgHeroAbilityButtons(tgtEditor.fleetIds, full) +
-    `</div>` +
-    `<div class="tg-act">` +
-    `<button data-tg="send" ${st.length ? '' : 'disabled'}>✓ ${t('tgt.send')}</button>` +
-    `<button data-tg="drop" class="tg-drop" title="${t('tgt.clear')}">✕</button>` +
-    `</div>`;
+  const f0 = s.fleets[chainMode.fleetIds[0]!];
+  const startId = f0 ? chainStart(f0).fromId : null;
+  const items = chainMenuItems(
+    { steps: chainMode.steps, gestures: chainMode.gestures },
+    m,
+    startId,
+    {
+      capturable: m.kind !== 'fleet' && (sectorTypeOf(m.id)?.capturable ?? false),
+      hasArtillery: chainMode.fleetIds.some((id) => fleetHasArtillery(s.fleets[id])),
+      abilities: chainAbilitiesFor(chainMode.fleetIds),
+    },
+  );
+  el.innerHTML = chainMenuHtml(
+    t('tgt.title'),
+    `${m.id} · ${chainMode.steps.length}/${MAX_CHAIN_STEPS}`,
+    items,
+  );
   el.classList.add('show');
-  if (reposition) {
-    const c = world(pl.position);
-    const r = canvas.getBoundingClientRect();
-    el.style.left = `${Math.round(r.left + (c.x / VW) * r.width)}px`;
-    el.style.top = `${Math.round(r.top + (c.y / VH) * r.height)}px`;
-    // Clamp into the viewport — a target near a map edge must not clip the composer.
-    const b = el.getBoundingClientRect();
-    const minLeft = b.width / 2 + 6;
-    const maxLeft = window.innerWidth - b.width / 2 - 6;
-    el.style.left = `${Math.round(Math.min(maxLeft, Math.max(minLeft, parseFloat(el.style.left))))}px`;
-    if (b.top < 96) el.style.top = `${Math.round(parseFloat(el.style.top) + (96 - b.top))}px`;
-  }
+  positionChainMenu(el);
+}
+/** Приклеить бокс меню к точке карты (кламп в вьюпорт — как у старого композера). */
+function positionChainMenu(el: HTMLElement): void {
+  const a = chainMenuAnchor();
+  if (!a) return;
+  const r = canvas.getBoundingClientRect();
+  el.style.left = `${Math.round(r.left + (a.x / VW) * r.width)}px`;
+  el.style.top = `${Math.round(r.top + (a.y / VH) * r.height)}px`;
+  const b = el.getBoundingClientRect();
+  const minLeft = b.width / 2 + 6;
+  const maxLeft = window.innerWidth - b.width / 2 - 6;
+  el.style.left = `${Math.round(Math.min(maxLeft, Math.max(minLeft, parseFloat(el.style.left))))}px`;
+  if (b.top < 96) el.style.top = `${Math.round(parseFloat(el.style.top) + (96 - b.top))}px`;
 }
 document.getElementById('tgted')?.addEventListener('click', (ev) => {
   const btn = (ev.target as HTMLElement).closest('button');
-  if (!btn || btn.disabled || !tgtEditor) return;
-  if (btn.dataset.step !== undefined) {
-    tgtEditor.steps.splice(Number(btn.dataset.step), 1); // tap a chip → drop that step
-    renderTgtEditor();
+  if (!btn || btn.disabled || !chainMode || !chainMode.menu) return;
+  const act = btn.dataset.ch as
+    | 'move'
+    | 'wait'
+    | 'wait6'
+    | 'assault'
+    | 'fire'
+    | 'ability'
+    | undefined;
+  if (!act) return;
+  const f0 = s.fleets[chainMode.fleetIds[0]!];
+  const startId = f0 ? chainStart(f0).fromId : null;
+  const ab = btn.dataset.chab
+    ? chainAbilitiesFor(chainMode.fleetIds).find((a) => a.id === btn.dataset.chab)
+    : undefined;
+  const next = applyMenuAction(
+    { steps: chainMode.steps, gestures: chainMode.gestures },
+    act,
+    chainMode.menu,
+    startId,
+    ab,
+  );
+  if (!next) {
+    note('✖ ' + t('chain.full'));
     return;
   }
-  const act = btn.dataset.tg;
-  const st = tgtEditor.steps;
-  if (btn.dataset.tgab) {
-    // A hero ability queued as a chain step: ranged casts carry the composer's target
-    // world; self/aura casts (range 0) carry none. The core re-gates it at execution.
-    const ab = btn.dataset.tgab;
-    const ranged = (data.heroAbilities[ab]?.range ?? 0) > 0;
-    st.push({ kind: 'ability', abilityId: ab, ...(ranged ? { target: tgtEditor.target } : {}) });
-    renderTgtEditor();
-    return;
+  chainMode.steps = next.steps;
+  chainMode.gestures = next.gestures;
+  lastCmdHtml = ''; // полоска пересоберётся (счётчик шагов/кнопки)
+  // ⏱/🎯 наращивают часы повторными тапами — меню живёт; остальное закрывает его.
+  if (btn.dataset.keep) renderChainMenu();
+  else {
+    chainMode.menu = null;
+    document.getElementById('tgted')?.classList.remove('show');
   }
-  if (act === 'wait') {
-    const last = st[st.length - 1];
-    if (last?.kind === 'wait') last.hours = Math.min(24 * 14, last.hours + 1);
-    else st.push({ kind: 'wait', hours: 1 });
-  } else if (act === 'move') {
-    st.push({ kind: 'move', to: tgtEditor.target });
-  } else if (act === 'assault') {
-    st.push({ kind: 'assault' });
-  } else if (act === 'barrage') {
-    // Fire window (STRIKE-1): repeat taps grow the window by an hour, like Задержка.
-    const last = st[st.length - 1];
-    if (last?.kind === 'strike') last.hours = Math.min(24 * 14, last.hours + 1);
-    else st.push({ kind: 'strike', target: null, hours: 1 });
-  } else if (act === 'home') {
-    const home = nearestOwnWorld(tgtEditor.target);
-    if (home) st.push({ kind: 'move', to: home });
-  } else if (act === 'send') {
-    for (const id of tgtEditor.fleetIds) playerOrder(orderChain(ME, id, st));
-    note(t('tgt.placed'));
-    closeTgtEditor();
-    return;
-  } else if (act === 'drop') {
-    for (const id of tgtEditor.fleetIds) if (chainStepsOf(id)) playerOrder(orderChain(ME, id, []));
-    closeTgtEditor();
-    return;
-  }
-  renderTgtEditor();
 });
 /** Draw a pin per active coalition ping (owner-coloured), recording screen hit-boxes
  *  for tap detection. Pins float just above the node, tip pointing at it. Two sonar
@@ -12502,45 +12711,124 @@ function drawPings(now: number): void {
  *  chained fleet is planned against (last move leg; a legless plan anchors at the
  *  fleet's spot). The ◎ badge above the ring is the tap handle (screen hit-boxes,
  *  like pings) — tapping it re-opens the composer with the live plan. */
-function drawTargetMarkers(now: number): void {
-  tgtHits = [];
-  const orders = (s as { orders?: Record<string, { steps: ChainStep[] }> }).orders;
-  if (!orders) return;
+/** CHAIN-UX: полилиния + капсулы шагов + накопленное «~T» для ОДНОЙ цепочки.
+ *  Времена — клиентская оценка (авторитетны только arrivesAt/waitUntil головы),
+ *  поэтому всегда с «~». Рисуется без LOD-затухания: план — то, ради чего смотрят. */
+function drawChainPath(
+  f: Fleet,
+  steps: ChainStep[],
+  fromId: string | null,
+  baseH: number,
+  headRemH: number | undefined,
+  alpha: number,
+): void {
+  if (!steps.length || !fromId) return;
+  const start = fleetAnchor(f);
+  if (!start) return;
+  const tl = chainTimeline(steps, fromId, baseH, chainTravelH(f), chainAbilityHoldH([f.id]), headRemH);
+  // Полилиния: от якоря флота по маршруту каждого перелёта (стиль drawFleetRoutes).
+  const pts: Array<{ x: number; y: number }> = [start];
+  let cur = fromId;
+  for (const st of steps) {
+    if (st.kind !== 'move' || st.to === cur) continue;
+    const hops = chainRoute(cur, st.to) ?? [st.to];
+    for (const hop of hops) {
+      const pl = s.planets[hop];
+      if (pl) pts.push(world(pl.position));
+    }
+    cur = st.to;
+  }
+  cx.save();
+  cx.globalAlpha = alpha;
+  if (pts.length > 1) {
+    cx.setLineDash([4, 6]);
+    cx.strokeStyle = rgba(LOCK, 0.75);
+    cx.lineWidth = 1.4;
+    cx.shadowColor = LOCK;
+    cx.shadowBlur = fxBlur(3);
+    cx.beginPath();
+    cx.moveTo(pts[0]!.x, pts[0]!.y);
+    for (let i = 1; i < pts.length; i++) cx.lineTo(pts[i]!.x, pts[i]!.y);
+    cx.stroke();
+    cx.setLineDash([]);
+    cx.shadowBlur = 0;
+  }
+  // Капсулы шагов: стопка вправо от точки; «~T» — под последней капсулой точки.
+  const seen = new Map<string, number>();
+  const last = new Map<string, { x: number; y: number; endH: number | null }>();
+  cx.textAlign = 'center';
+  for (let i = 0; i < steps.length; i++) {
+    const pid = tl[i]!.pointId;
+    const pl = pid ? s.planets[pid] : undefined;
+    if (!pid || !pl) continue;
+    const c = world(pl.position);
+    const k = seen.get(pid) ?? 0;
+    seen.set(pid, k + 1);
+    if (!visible(c)) continue;
+    const bx = c.x + 16 + k * 20;
+    const by = c.y - 16;
+    cx.fillStyle = 'rgba(6,18,22,.92)';
+    cx.strokeStyle = rgba(LOCK, 0.85);
+    cx.lineWidth = 1.2;
+    cx.beginPath();
+    cx.arc(bx, by, 9, 0, TAU);
+    cx.fill();
+    cx.stroke();
+    cx.fillStyle = rgba(LOCK, 0.95);
+    cx.font = '700 10px ui-monospace,Menlo,monospace';
+    cx.fillText(stepGlyph(steps[i]!), bx, by + 3.5);
+    const hrs = stepHours(steps[i]!);
+    if (hrs) {
+      cx.font = '600 8px ui-monospace,Menlo,monospace';
+      cx.fillText(hrs, bx, by - 12);
+    }
+    last.set(pid, { x: bx, y: by, endH: tl[i]!.endH });
+  }
+  cx.font = '600 9px ui-monospace,Menlo,monospace';
+  for (const p of last.values()) {
+    if (p.endH === null) continue;
+    cx.shadowColor = 'rgba(0,0,0,0.85)';
+    cx.shadowBlur = fxBlur(3);
+    cx.fillStyle = rgba(LOCK, 0.95);
+    cx.fillText(`~${fmtEta(p.endH)}`, p.x, p.y + 20);
+    cx.shadowBlur = 0;
+  }
+  cx.restore();
+}
+/** CHAIN-UX: слой цепочек — отправленные планы всех своих флотов (голова
+ *  авторитетна: летящий — по arrivesAt, взведённая задержка — по waitUntil) и
+ *  черновик открытого режима поверх. ◎-бейдж на якоре плана — хэндл: тап вне
+ *  режима открывает редактирование. */
+function drawChainOverlay(now: number): void {
+  chainHits = [];
+  const col = ownerColor(ME);
+  const pulse = 0.55 + 0.45 * Math.sin(now / 260);
+  const orders = (s as { orders?: Record<string, { steps: ChainStep[]; waitUntil?: number }> })
+    .orders;
+  const editing = new Set(chainMode?.fleetIds ?? []);
   const byWorld = new Map<string, string[]>();
-  for (const fid of Object.keys(orders).sort()) {
+  for (const fid of Object.keys(orders ?? {}).sort()) {
     const f = s.fleets[fid];
-    if (!f || f.owner !== ME) continue;
-    let anchor: string | null = null;
-    for (const stp of orders[fid]!.steps) if (stp.kind === 'move') anchor = stp.to;
-    anchor ??= f.location;
+    if (!f || f.owner !== ME || editing.has(fid)) continue;
+    const chain = orders![fid]!;
+    const st = chainStart(f);
+    const headRem =
+      chain.waitUntil !== undefined
+        ? Math.max(0, (chain.waitUntil - s.time) / HOUR)
+        : undefined;
+    drawChainPath(f, chain.steps, st.fromId, st.baseH, headRem, 0.5);
+    const anchor = draftFinish(chain.steps, st.fromId);
     if (!anchor || !s.planets[anchor]) continue;
     const arr = byWorld.get(anchor) ?? [];
     if (!arr.length) byWorld.set(anchor, arr);
     arr.push(fid);
   }
-  const col = ownerColor(ME);
   for (const [wid, fids] of byWorld) {
     const c = world(s.planets[wid]!.position);
-    const pulse = 0.55 + 0.45 * Math.sin(now / 260);
-    const rr = 15 + 1.6 * Math.sin(now / 260);
-    cx.save();
-    cx.strokeStyle = rgba(col, 0.45 + 0.4 * pulse);
-    cx.lineWidth = 1.6;
-    cx.setLineDash([7, 5]);
-    cx.lineDashOffset = -(now / 60) % 12; // slow spin — a "live" reticle
-    cx.beginPath();
-    cx.arc(c.x, c.y, rr, 0, TAU);
-    cx.stroke();
-    cx.setLineDash([]);
-    for (let q = 0; q < 4; q++) {
-      const a = (q * TAU) / 4 + now / 900;
-      cx.beginPath();
-      cx.moveTo(c.x + Math.cos(a) * (rr + 3), c.y + Math.sin(a) * (rr + 3));
-      cx.lineTo(c.x + Math.cos(a) * (rr + 8), c.y + Math.sin(a) * (rr + 8));
-      cx.stroke();
-    }
+    if (!visible(c)) continue;
     const bx = c.x;
-    const by = c.y - rr - 14;
+    const by = c.y - 29;
+    cx.save();
     cx.shadowColor = rgba(col, 0.8);
     cx.shadowBlur = fxBlur(3 + 6 * pulse);
     cx.fillStyle = 'rgba(6,18,22,.92)';
@@ -12561,7 +12849,27 @@ function drawTargetMarkers(now: number): void {
       cx.fillText(String(fids.length), bx + 11, by - 5);
     }
     cx.restore();
-    tgtHits.push({ target: wid, fleetIds: fids, x: bx, y: by });
+    chainHits.push({ target: wid, fleetIds: fids, x: bx, y: by });
+  }
+  // Черновик открытого режима — ярче отправленных; точка меню подсвечена кольцом.
+  if (chainMode) {
+    const f0 = s.fleets[chainMode.fleetIds[0]!];
+    if (f0) {
+      const st = chainStart(f0);
+      drawChainPath(f0, chainMode.steps, st.fromId, st.baseH, undefined, 0.95);
+    }
+    const a = chainMenuAnchor();
+    if (a) {
+      cx.save();
+      cx.strokeStyle = rgba(LOCK, 0.5 + 0.4 * pulse);
+      cx.lineWidth = 1.6;
+      cx.setLineDash([5, 4]);
+      cx.lineDashOffset = -(now / 50) % 9;
+      cx.beginPath();
+      cx.arc(a.x, a.y, 17, 0, TAU);
+      cx.stroke();
+      cx.restore();
+    }
   }
 }
 /** Tap a ping → fly the camera to that province (and select it); close the menu. */
