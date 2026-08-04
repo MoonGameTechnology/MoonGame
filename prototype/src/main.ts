@@ -98,6 +98,15 @@ import { DEFAULT_SHIP_LOADOUTS, type ShipLoadout } from './ships';
 // только проводка (host-хуки) и панель героев, которая переедет своим кирпичом.
 import { initShipyard } from './shipyard';
 import { initHeroStaff, HERO_CASTABLE, heroCdKey } from './heroStaff';
+import {
+  initConversations,
+  COALITION,
+  CH_SESSION,
+  CH_GLOBAL,
+  GROUP_CHANNELS,
+  type SessionMsg,
+  type StampOpts,
+} from './conversations';
 // HUD-DOCK: видимость листа и «нижний хаб уезжает» — одна чистая модель на все
 // прицельные режимы; она же держит замер высоты листа для привязки ряда команд.
 import { mapIsWorkspace, panelOpen, sheetHeightVar, type DockState } from './hudDock';
@@ -630,21 +639,6 @@ let troopsPlan: { fleetId: string; plan: Record<string, number> } | null = null;
 // `to` is a conversation key: a seat id (a 1:1 DM) or COALITION (the allies' group
 // chat). `ping` (coalition only) carries a province id → a clickable map marker.
 // `pingId` (net only) is the server-assigned id, so a `ping.removed` can find its line.
-type SessionMsg = {
-  at: number;
-  from: string;
-  to: string;
-  text: string;
-  sys: boolean;
-  ping?: string;
-  pingId?: string;
-  chatId?: string; // net only: server-assigned chat id — dedupes live echo vs join replay
-  realAt?: number; // wall-clock ms at creation, for the chat's "real time" stamp
-};
-const COALITION = 'coalition';
-const CH_SESSION = 'session'; // everyone in this match
-const CH_GLOBAL = 'global'; // cross-session lobby (placeholder until a global server)
-const GROUP_CHANNELS = new Set([COALITION, CH_SESSION, CH_GLOBAL]); // group rooms vs 1:1 DMs
 let sessionMessages: SessionMsg[] = [];
 // --- floating chat window (desktop only) -------------------------------------
 // REFM-12: окно уехало в `chatWindow.ts` целиком — состояние, разметка, геометрия и
@@ -671,8 +665,8 @@ const chatWin = initChat(
     seatExists: (id) => !!s.players[id],
     seatLabel: (id) => NAME[id] ?? id,
     seatIcon: (id) => seatBadge(id).icon,
-    convoMessages,
-    lineHtml: (m, stamp) => convoLineHtml(m as SessionMsg, stamp),
+    convoMessages: (key) => conversations.messagesOf(key),
+    lineHtml: (m, stamp) => conversations.lineHtml(m as SessionMsg, stamp),
     dispatch: dispatchChat,
     openSeatCard,
     jumpToPing,
@@ -690,7 +684,6 @@ let diploExpanded: string | null = null; // participant row showing its action b
 // OR within one. A stance filter excludes your own seat (you have no self-stance).
 const diploStanceFilter = new Set<DiplomaticStance>();
 const diploTypeFilter = new Set<'human' | 'ai'>();
-let convoOpen = COALITION; // the open conversation in the messages tab (seat id or COALITION)
 let pingMenuLoc: string | null = null; // province whose ping composer is open (null = closed)
 // Screen hit-boxes for the on-map ping markers, rebuilt every frame by drawPings().
 let pingHits: Array<{ loc: string; x: number; y: number }> = [];
@@ -6033,7 +6026,6 @@ function isAiSeat(id: string): boolean {
 function diploSeats(): string[] {
   return SEAT_META.map((m) => m.id).filter((id) => !!s.players[id]);
 }
-type StampOpts = { day?: boolean; time?: boolean; real?: boolean; realAt?: number };
 /** Message stamp. Defaults to `Day N · HH:MM` (game day + game time, mirrors the status
  *  strip); the chat passes toggles to add/drop fields and append the real wall-clock. */
 function fmtStamp(at: number, opts?: StampOpts): string {
@@ -6310,125 +6302,19 @@ function diploRowsHtml(): string {
 }
 
 // --- conversations (messages tab: list of chats + the open thread) -----------
-/** Your coalition: you + everyone you're at `alliance` with. */
-function coalitionMembers(): string[] {
-  return [ME, ...diploSeats().filter((id) => id !== ME && getStance(s, ME, id) === 'alliance')];
-}
-/** Messages in a conversation: a group channel (coalition / session / global) collects
- *  everything addressed to it; a seat id = the 1:1 DM between you and them (either dir). */
-function convoMessages(key: string): SessionMsg[] {
-  if (GROUP_CHANNELS.has(key)) return sessionMessages.filter((m) => m.to === key);
-  return sessionMessages.filter(
-    (m) =>
-      !GROUP_CHANNELS.has(m.to) &&
-      ((m.from === ME && m.to === key) || (m.from === key && m.to === ME)),
-  );
-}
-function convoLast(key: string): SessionMsg | undefined {
-  const ms = convoMessages(key);
-  return ms[ms.length - 1];
-}
-function fromName(id: string): string {
-  return id === ME ? t('chat.you') : (NAME[id] ?? id);
-}
-/** A chat sender's name. Another live seat's name is clickable — it opens that
- *  player's card (with the diplomacy actions); your own name and system senders
- *  stay plain. */
-function nickHtml(id: string): string {
-  const name = esc(fromName(id));
-  if (id === ME || !s.players[id]) return `<b>${name}</b>`;
-  return `<b class="dp-nick" data-nickseat="${esc(id)}" title="${t('chat.open-card')}">${name}</b>`;
-}
-/** One message line. A ping renders as a clickable marker that flies the camera.
- *  `stamp` overrides which time fields show (the chat passes its cached toggles);
- *  omitted → the default `Day N · HH:MM` used by the diplomacy feed. */
-function convoLineHtml(m: SessionMsg, stamp?: StampOpts): string {
-  const stampTxt = fmtStamp(m.at, stamp && { ...stamp, realAt: m.realAt });
-  if (m.ping) {
-    return (
-      `<div class="dp-line ping" data-ping="${esc(m.ping)}"><span class="dp-when">${stampTxt}</span>` +
-      `📍 ${nickHtml(m.from)} ${esc(m.ping)}: ${esc(m.text)}<span class="dp-jump">${t('chat.jump')}</span></div>`
-    );
-  }
-  if (m.sys)
-    return `<div class="dp-line sys"><span class="dp-when">${stampTxt}</span>${esc(m.text)}</div>`;
-  return `<div class="dp-line${m.from === ME ? ' me' : ''}"><span class="dp-when">${stampTxt}</span>${nickHtml(m.from)}<b>:</b> ${esc(m.text)}</div>`;
-}
-function convoFeedInnerHtml(key: string): string {
-  const msgs = convoMessages(key);
-  if (msgs.length) return msgs.map((m) => convoLineHtml(m)).join('');
-  const hint =
-    key === COALITION
-      ? t('chat.coalition.empty')
-      : key === CH_SESSION
-        ? t('chat.session.note')
-        : t('chat.empty');
-  return `<div class="dp-empty">${hint}</div>`;
-}
-/** Left column: the match-wide session channel + the coalition channel pinned on
- *  top, then a DM per participant (most-recently-active first). Selecting one
- *  opens its thread on the right. Session here is what makes the NET chat fully
- *  reachable from a PHONE — the floating chat window is desktop-only. */
-function convoListHtml(): string {
-  const dms = diploSeats()
-    .filter((id) => id !== ME)
-    .sort(
-      (a, b) =>
-        (convoLast(b)?.at ?? -1) - (convoLast(a)?.at ?? -1) ||
-        (NAME[a] ?? a).localeCompare(NAME[b] ?? b),
-    );
-  const sessLast = convoLast(CH_SESSION);
-  const sessPrev = sessLast
-    ? esc((sessLast.from === ME ? t('chat.you') + ': ' : '') + sessLast.text)
-    : t('chat.members', { n: Object.keys(s.players).length });
-  const sess =
-    `<button class="dp-cv coal${convoOpen === CH_SESSION ? ' on' : ''}" data-convo="${CH_SESSION}">` +
-    `<span class="dp-cv-ic" style="color:var(--cyan)">△</span>` +
-    `<span class="dp-cv-nm">${t('chat.tab.session')}<em>${sessPrev}</em></span></button>`;
-  const coal =
-    `<button class="dp-cv coal${convoOpen === COALITION ? ' on' : ''}" data-convo="${COALITION}">` +
-    `<span class="dp-cv-ic" style="color:var(--amber)">⚡</span>` +
-    `<span class="dp-cv-nm">${t('chat.tab.coalition')}<em>${t('chat.members', { n: coalitionMembers().length })}</em></span></button>`;
-  const items = dms
-    .map((id) => {
-      const last = convoLast(id);
-      const prev = last
-        ? esc(
-            (last.from === ME ? t('chat.you') + ': ' : '') +
-              (last.ping ? '📍 ' + last.ping : last.text),
-          )
-        : '—';
-      return (
-        `<button class="dp-cv${convoOpen === id ? ' on' : ''}" data-convo="${id}">` +
-        `<span class="dp-cv-ic" style="color:${ownerColor(id)}">${seatBadge(id).icon}</span>` +
-        `<span class="dp-cv-nm">${esc(NAME[id] ?? id)}<em>${prev}</em></span></button>`
-      );
-    })
-    .join('');
-  return `<div class="dp-cvlist">${sess}${coal}${items}</div>`;
-}
-/** Right column: header, the open conversation's messages, and the composer (with a
- *  ping button in the coalition channel). */
-function convoThreadHtml(): string {
-  const isCoal = convoOpen === COALITION;
-  const title =
-    convoOpen === CH_SESSION
-      ? t('chat.head.session', { n: Object.keys(s.players).length })
-      : isCoal
-        ? t('chat.head.coalition', { n: coalitionMembers().length })
-        : `${seatBadge(convoOpen).icon} ${esc(NAME[convoOpen] ?? convoOpen)}`;
-  const pingBtn = isCoal ? `<button class="dp-ping" title="${t('chat.ping')}">📍</button>` : '';
-  // The composer is networked (chat.send relay): dispatchChat routes it — NET sends
-  // to the server (rendered from the echo), solo appends locally.
-  const compose = `<div class="dp-compose">${pingBtn}<input id="dp-text" maxlength="160" placeholder="${t('chat.input.ph')}" autocomplete="off"><button class="dp-send">▶</button></div>`;
-  return (
-    `<div class="dp-thread">` +
-    `<div class="dp-thhead">${title}</div>` +
-    `<div class="dp-feed" id="dp-feed">${convoFeedInnerHtml(convoOpen)}</div>` +
-    compose +
-    `</div>`
-  );
-}
+// The tab lives in `conversations.ts` (REFM-15); here it only gets the host state it
+// cannot reach on its own. The message log itself STAYS here — the net writes it and
+// the floating chat window reads it, so the module borrows it through `messages()`.
+const conversations = initConversations({
+  state: () => s,
+  me: () => ME,
+  messages: () => sessionMessages,
+  nameOf: (id) => NAME[id] ?? id,
+  seats: diploSeats,
+  seatBadge,
+  fmtStamp,
+  ownerColor,
+});
 
 /** SPY-UX (плейтест, вариант 1): весь шпионаж в одном месте — активные окна интела
  *  с таймерами, операции по каждому противнику (те же .dp-spy обработчики, что и в
@@ -6508,7 +6394,7 @@ function renderDiplo(): void {
         `<div class="dp-list">${diploRowsHtml()}</div>`
       : diploTab === 'intel'
         ? intelTabHtml()
-        : `<div class="dp-convo">${convoListHtml()}${convoThreadHtml()}</div>`;
+        : `<div class="dp-convo">${conversations.listHtml()}${conversations.threadHtml()}</div>`;
   el.innerHTML =
     `<div class="dpbox">` +
     `<div class="dp-head"><b>${t('diplo.win.title')}</b>${tabBtn('diplo', t('diplo.tab.diplomacy'))}${tabBtn('msgs', t('diplo.tab.messages'))}${tabBtn('intel', t('diplo.tab.espionage'))}<button class="dp-close">✕</button></div>` +
@@ -6520,7 +6406,7 @@ function renderDiplo(): void {
 function renderDiploFeed(): void {
   const feed = document.getElementById('dp-feed');
   if (!feed) return;
-  feed.innerHTML = convoFeedInnerHtml(convoOpen);
+  feed.innerHTML = conversations.feedInnerHtml();
   feed.scrollTop = feed.scrollHeight;
 }
 function scrollFeedToEnd(): void {
@@ -11617,7 +11503,7 @@ if (playerCardEl) {
       playerCardEl.classList.remove('show');
       delete playerCardEl.dataset.seat;
       openDiplo('msgs'); // hand off to the full message thread
-      convoOpen = msgseat;
+      conversations.open(msgseat);
       renderDiplo();
       document.getElementById('dp-text')?.focus();
     }
@@ -11670,7 +11556,7 @@ function sendDiploMsg(): void {
   const input = document.getElementById('dp-text') as HTMLInputElement | null;
   const text = input?.value.trim();
   if (!text) return;
-  dispatchChat(convoOpen, text); // NET: server relay + echo; solo: local append
+  dispatchChat(conversations.current(), text); // NET: server relay + echo; solo: local append
   if (input) {
     input.value = '';
     input.focus();
@@ -11737,7 +11623,7 @@ function renderPingMenu(): void {
     'var(--amber)',
     '⚡',
     t('chat.tab.coalition'),
-    t('chat.members', { n: coalitionMembers().length }),
+    t('chat.members', { n: conversations.coalition().length }),
     ' coal',
   );
   const dms = diploSeats()
@@ -12464,7 +12350,7 @@ if (diploEl) {
     }
     const msgseat = (tg.closest('.dp-msg') as HTMLElement | null)?.dataset.msgseat;
     if (msgseat) {
-      convoOpen = msgseat;
+      conversations.open(msgseat);
       diploTab = 'msgs';
       renderDiplo();
       document.getElementById('dp-text')?.focus();
@@ -12472,7 +12358,7 @@ if (diploEl) {
     }
     const convo = (tg.closest('.dp-cv') as HTMLElement | null)?.dataset.convo;
     if (convo) {
-      convoOpen = convo;
+      conversations.open(convo);
       renderDiplo();
       document.getElementById('dp-text')?.focus();
       return;
