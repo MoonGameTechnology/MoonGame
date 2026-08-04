@@ -194,7 +194,12 @@ const confirm = EXPECTED.map((t) => {
   let state;
   if (ok) state = 'ok';
   else if (t.mainOnly && !isMain && !s) state = 'skipped';
-  else if (t.scheduledOnly && event === 'push' && !s) state = 'skipped';
+  // Зеркало условия в security.yml: джоба бежит ТОЛЬКО на schedule/workflow_dispatch.
+  // Проверять здесь `event === 'push'` было бы неверно — с появлением `pull_request`
+  // в триггерах пропуск на PR читался бы как «скан не подтверждён», то есть ложная
+  // тревога на каждом PR, а это ровно то, что обесценивает главный сигнал отчёта.
+  else if (t.scheduledOnly && event !== 'schedule' && event !== 'workflow_dispatch' && !s)
+    state = 'skipped';
   else state = 'bad';
   return { ...t, state };
 });
