@@ -280,7 +280,7 @@ fi
 # этой машине из текущего main. Оставлен рабочим для плейтест-хостов, но теперь честно
 # об этом говорит и хотя бы проверяет здоровье с откатом.
 echo "[!] Путь без гейта: сборка на хосте — образ не сканирован и не подписан."
-echo "[!] Проверяемый путь: VOID_IMAGE=ghcr.io/moonwuk/moongame@sha256:... moongame update"
+echo "[!] Проверяемый путь: VOID_IMAGE=ghcr.io/moongametechnology/moongame@sha256:... moongame update"
 
 echo "[*] Обновляем код из репозитория..."
 cd "$INSTALL_DIR"

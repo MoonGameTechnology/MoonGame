@@ -44,8 +44,16 @@ declare const __PLAYER_BUILD__: boolean | undefined;
 const RELEASE_TAG =
   typeof __PLAYER_BUILD__ !== 'undefined' && __PLAYER_BUILD__ === true ? 'player' : 'alpha';
 
-/** Rolling prerelease of this build's lane — a stable tag whose APK asset URL never changes. */
-const RELEASE_API = `https://api.github.com/repos/moonwuk/nygame/releases/tags/${RELEASE_TAG}`;
+/** Rolling prerelease of this build's lane — a stable tag whose APK asset URL never changes.
+ *
+ *  Путь пишется КАНОНИЧЕСКИЙ, а не «тот, что пока редиректит». Репозиторий уже дважды
+ *  переезжал (`moonwuk/nygame` → `Moonwuk/MoonGame` → `MoonGameTechnology/MoonGame`), и
+ *  API GitHub всё это время послушно отдавал 301 — то есть обновление АПК работало по
+ *  цепочке редиректов. Опасность не в том, что цепочка порвётся, а в том, что старое имя
+ *  можно занять: `isTrustedApkUrl` ниже пускает любой github.com-хост, поэтому чужой
+ *  репозиторий под освободившимся именем скормил бы установщику свой APK, пройдя
+ *  аллоулист. Ссылаемся на текущее имя. */
+const RELEASE_API = `https://api.github.com/repos/MoonGameTechnology/MoonGame/releases/tags/${RELEASE_TAG}`;
 const APK_ASSET = `void-dominion-${RELEASE_TAG}.apk`;
 
 /**
