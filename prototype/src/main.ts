@@ -7312,14 +7312,9 @@ side.addEventListener('click', (ev) => {
     // on hover — building/task name, current vs full output, ETA.
     if (MOBILE) {
       const key = (ev.target as HTMLElement).closest<HTMLElement>('[data-desc]')?.dataset.desc ?? null;
-      // stat:/tab:/division dossiers exist for the PC hover tooltip only — the
-      // mobile tap behaviour stays exactly as it was before they were added.
-      if (
-        key !== null &&
-        !key.startsWith('stat:') &&
-        !key.startsWith('tab:') &&
-        key !== 'division'
-      ) {
+      // stat:/tab: dossiers exist for the PC hover tooltip only — the mobile tap
+      // behaviour stays exactly as it was before they were added.
+      if (key !== null && !key.startsWith('stat:') && !key.startsWith('tab:')) {
         openDossier(key);
       }
     }

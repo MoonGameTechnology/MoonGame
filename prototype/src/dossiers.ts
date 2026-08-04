@@ -375,12 +375,6 @@ export function createDossiers(host: DossierHost): {
         body: t('dossier.tab.buildings.desc'),
       };
     }
-    if (key === 'division') {
-      return {
-        name: t('dossier.division.name'),
-        body: t('dossier.division.desc'),
-      };
-    }
     if (key.startsWith('stat:')) {
       const STAT_DOSSIER: Record<string, [string, string]> = {
         atk: [t('dossier.stat.atk.name'), t('dossier.stat.atk.desc')],
@@ -410,12 +404,6 @@ export function createDossiers(host: DossierHost): {
       // Resource glyph → the resource's localized name (data name, e.g. metal/credits).
       const r = key.slice(4);
       return { name: tData(r), body: '' };
-    }
-    if (key === 'act:divdesign') {
-      return {
-        name: t('dossier.divdesign.name'),
-        body: t('dossier.divdesign.desc'),
-      };
     }
     if (key.startsWith('c:')) return constructionDossier(key);
     const [kind, id, lvl] = key.split(':');

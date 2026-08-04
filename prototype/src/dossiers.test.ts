@@ -175,8 +175,13 @@ describe('dossiers — маршрутизация objDossier', () => {
   it('ключи-чипы отдают свои статьи', () => {
     expect(objDossier('fleet')?.name).toBeTruthy();
     expect(objDossier('tab:ground')?.name).toBeTruthy();
-    expect(objDossier('division')?.name).toBeTruthy();
-    expect(objDossier('act:divdesign')?.name).toBeTruthy();
+  });
+
+  it('статьи снесённых дивизий не воскресают', () => {
+    // H4-REVERT снёс механику дивизий; статьи «Дивизия» и «Конструктор дивизий»
+    // пережили её и оставались достижимы по ключу — теперь их нет.
+    expect(objDossier('division')).toBeNull();
+    expect(objDossier('act:divdesign')).toBeNull();
   });
 
   it('stat: подставляет живую константу лимита стека', () => {
