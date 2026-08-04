@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Verify a published Void Dominion image before deploying it (SEC-13).
 #
-#   ./deploy/verify-image.sh ghcr.io/moonwuk/moongame@sha256:<digest>
+#   ./deploy/verify-image.sh ghcr.io/moongametechnology/moongame@sha256:<digest>
 #
 # What it proves: those exact bytes were built and signed by THIS repository's
 # image.yml workflow on `main` (keyless cosign — Fulcio certificate + Rekor
@@ -13,7 +13,7 @@ set -euo pipefail
 
 # Same pin as .github/workflows/image.yml and android.yml (A08 — a tag is mutable).
 COSIGN_IMAGE='ghcr.io/sigstore/cosign/cosign@sha256:b03690aa52bfe94054187142fba24dc54137650682810633901767d8a3e15b31'
-REPO="${VOID_REPO:-Moonwuk/MoonGame}"
+REPO="${VOID_REPO:-MoonGameTechnology/MoonGame}"
 
 REF="${1:-}"
 if [ -z "$REF" ]; then

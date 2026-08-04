@@ -5,6 +5,7 @@ import {
   createKernel,
   hashState,
   parseGameData,
+  visibleView,
   type Action,
   type GameData,
   type GameModule,
@@ -163,7 +164,13 @@ describe('MatchRoom', () => {
     for (const m of p1.messages) {
       if (m.type === 'delta') clientState = applyDelta(clientState, m.delta);
     }
-    expect(clientState).toEqual(r.state);
+    // What the peer must reconstruct is its own PROJECTION, not the raw server state:
+    // the fog boundary drops the authoritative-internal bits before anything goes on the
+    // wire (`rng` — the world's dice — and `fog` itself). Compare against exactly what
+    // the room sends, so this stays a test of the delta pipeline's losslessness rather
+    // than an accidental assertion that the projection strips nothing.
+    const { signatures: _sig, remembered: _rem, ...sent } = visibleView(r.state, 'p1', testData()).view;
+    expect(clientState).toEqual(sent);
   });
 
   it('rejects cross-player spoofed actions without broadcasting state', () => {

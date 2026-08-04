@@ -11,7 +11,7 @@
 ## 1. Быстрый запуск (VPS / любая Linux-машина)
 
 ```bash
-git clone https://github.com/Moonwuk/Nygame && cd Nygame
+git clone https://github.com/MoonGameTechnology/MoonGame && cd Nygame
 pnpm install
 
 # (опционально, но нужно для «матч переживает рестарт») — Postgres:

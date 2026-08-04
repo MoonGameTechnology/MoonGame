@@ -4,7 +4,7 @@
 #
 #   ./verify-image.sh "$VOID_IMAGE"          # cosign verify — the gate, run it first
 #   docker pull "$VOID_IMAGE"
-#   VOID_IMAGE=ghcr.io/moonwuk/moongame@sha256:… \
+#   VOID_IMAGE=ghcr.io/moongametechnology/moongame@sha256:… \
 #     docker compose -f docker-compose.yml -f docker-compose.release.yml up -d --no-build
 #
 # Why this exists: `up --build` on the host produces an image nobody scanned or signed —
@@ -19,6 +19,6 @@ services:
   server:
     # Digest ref, never a tag — a tag can be re-pointed after verification, which would
     # make the cosign check theatre. image.yml prints the exact line in its run summary.
-    image: ${VOID_IMAGE:?set VOID_IMAGE to the verified digest ref, e.g. ghcr.io/moonwuk/moongame@sha256:...}
+    image: ${VOID_IMAGE:?set VOID_IMAGE to the verified digest ref, e.g. ghcr.io/moongametechnology/moongame@sha256:...}
     # Never silently fall back to a stale local copy of the same ref.
     pull_policy: always

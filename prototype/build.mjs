@@ -134,6 +134,23 @@ body::before{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;mix
 .rc-food,[data-desc="res:food"]{color:var(--rc-food);}
 .rc-energy,[data-desc="res:energy"]{color:var(--rc-energy);}
 .rc-microelectronics,[data-desc="res:microelectronics"]{color:var(--rc-microelectronics);}
+/* Inline resource icon (curIc): the SAME SVG the top bar draws, sized for prose and
+   sitting on the text baseline. One icon + one accent everywhere — the bar teaches
+   the player once, every cost/market/tech line reads instantly after that. */
+.ri{display:inline-flex;vertical-align:-2px;}
+.ri svg{display:block;width:13px;height:13px;}
+/* A cost chip (cost()): icon + amount in the resource's accent, tabular digits so
+   stacked prices align. Bare like the bar capsules — no boxes, the colour IS the
+   grouping. */
+.rcost{display:inline-flex;align-items:center;gap:3px;white-space:nowrap;
+  font-variant-numeric:tabular-nums;}
+/* Not enough of this resource: the chip reads RED (deficit wins over the accent,
+   same rule as the bar) and carries the exact gap — «−N», slightly subdued so the
+   price stays the loudest number. */
+.rcost.short{color:var(--red,#ff5a4d);}
+.rcost.short em.lack{font-style:normal;font-size:.86em;opacity:.85;
+  text-shadow:0 0 6px rgba(255,90,77,.35);}
+.rcost-free{opacity:.75;}
 .res b{color:#e6eeef;font-weight:700;font-size:13px;font-variant-numeric:tabular-nums;
   white-space:nowrap;flex:0 0 auto;}
 /* phones hide the flow digits — a NEGATIVE net income paints the stock itself red */
@@ -210,6 +227,38 @@ body.sheet-open #speedbar{bottom:calc(34vh + 12px);}
   padding:7px 10px;text-align:left;}
 #cmdbar .cmdpop button b{font-size:11px;letter-spacing:.5px;white-space:nowrap;}
 #cmdbar .cmdpop button span{font-size:9px;color:var(--dim);letter-spacing:.3px;text-transform:none;}
+/* ⇅ десант (GRND-1): тот же поповер, но не список приказов, а строки «кого и сколько».
+   Кнопки в нём — компактные глифы в ряд, поэтому базовые правила .cmdpop button
+   (широкая строка с текстом слева) для .tbtns переопределяются. */
+#cmdbar .cmdpop.tpop{min-width:min(320px,86vw);max-width:min(360px,92vw);gap:0;padding:8px 10px 10px;
+  max-height:min(58vh,420px);overflow-y:auto;-webkit-overflow-scrolling:touch;}
+#cmdbar .tpop .thead{color:var(--cyan);font:700 11px ui-monospace,monospace;letter-spacing:1.4px;
+  white-space:nowrap;}
+#cmdbar .tpop .tlegend{color:var(--dim);font-size:9px;letter-spacing:.4px;margin:2px 0 4px;}
+#cmdbar .tpop .trow{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center;
+  padding:6px 0;border-top:1px solid var(--line);}
+#cmdbar .tpop .tinfo{display:flex;flex-direction:column;gap:1px;min-width:0;}
+#cmdbar .tpop .tname{display:flex;align-items:center;gap:4px;color:var(--ink);
+  font:700 11px ui-monospace,monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+#cmdbar .tpop .tcnt{color:var(--dim);font:11px ui-monospace,monospace;font-variant-numeric:tabular-nums;}
+#cmdbar .tpop .tcnt em{color:var(--amber);font-style:normal;}
+#cmdbar .tpop .tbtns{display:flex;align-items:center;gap:3px;}
+#cmdbar .tpop .tbtns button{flex-direction:row;justify-content:center;gap:0;min-width:30px;width:30px;
+  height:30px;padding:0;text-align:center;font:700 13px ui-monospace,monospace;border-radius:5px;}
+/* пресеты «до упора» — форма и вес отличаются от мелкого шага, чтобы под пальцем
+   ▲ и + не читались как одна кнопка */
+#cmdbar .tpop .tbtns button.tall{font-size:10px;border-color:var(--line-hi);color:var(--cyan-dim);
+  background:rgba(53,214,230,.07);}
+#cmdbar .tpop .tbtns button.tall:hover:not(:disabled){background:rgba(53,214,230,.18);}
+#cmdbar .tpop .tdelta{min-width:30px;text-align:center;color:var(--dim);
+  font:700 12px ui-monospace,monospace;font-variant-numeric:tabular-nums;}
+#cmdbar .tpop .tdelta.pos{color:var(--grn);}
+#cmdbar .tpop .tdelta.neg{color:var(--amber);}
+#cmdbar .tpop .tnote{color:var(--dim);font-size:9px;line-height:1.45;margin-top:5px;}
+#cmdbar .tpop .tnote.warn{color:var(--amber);}
+#cmdbar .tpop .tacts{display:flex;gap:8px;margin-top:9px;}
+#cmdbar .tpop .tacts .cbtn{flex-direction:row;justify-content:center;height:auto;min-width:0;
+  padding:9px 8px;text-align:center;}
 /* panel is glued to the bottom edge — lift the fleet command bar above it (mobile overrides below) */
 body.sheet-open #cmdbar{bottom:calc(34vh + 12px);}
 

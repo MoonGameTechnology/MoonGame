@@ -12,7 +12,7 @@ https://moonwuk.github.io/Void-Domonin-site/
 добавляются данными, а не переписыванием логики.
 
 **Играбельная альфа (Android APK, rolling-релиз):**
-https://github.com/Moonwuk/Nygame/releases/download/alpha/void-dominion-alpha.apk
+https://github.com/MoonGameTechnology/MoonGame/releases/download/alpha/void-dominion-alpha.apk
 
 Браузерная версия — тот же single-file HTML: собери `pnpm run prototype` и открой
 `prototype/dist/void-dominion.html`. Поднять сессию для друзей — `pnpm host` (раздаёт

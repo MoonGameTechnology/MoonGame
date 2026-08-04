@@ -129,7 +129,7 @@ the debug build allows cleartext (`usesCleartextTraffic`), so it connects over p
 
 1. Host runs `pnpm host`.
 2. Get the APK — for regular players use the **player** build:
-   https://github.com/Moonwuk/Nygame/releases/download/player/void-dominion-player.apk
+   https://github.com/MoonGameTechnology/MoonGame/releases/download/player/void-dominion-player.apk
    (dev build with test tools: the `alpha` release, or the
    `void-dominion-debug-apk` / `void-dominion-player-apk` CI artifacts from
    **Actions → "Android APK (prototype)"**).

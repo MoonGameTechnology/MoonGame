@@ -398,20 +398,18 @@ export const data: GameData = parseGameData({
       upkeep: { credits: 12 },
       slots: { defense: 1, utility: 2 }, // a flat-top: armour + sensor/cargo bays
     },
-    // (marine retired — mobile ground troops now come only from the division/formation
-    //  system. Orbital AA is no longer a unit either: it's a defensive *building* now
-    //  (see `orbital_aa` under buildings) — anti-ship, immobile, player-built.)
-    // --- formation roster: the ground units that fill a division template's 6 slots
-    // (formation.ts). Each has a distinct role. The division's aggregate attack/defense
-    // ratings come from GROUND_ROSTER (the per-target matrix combat uses); only hp/cost/
-    // upkeep are read from here (`stats.attack/defense/speed` on these four are legacy and
-    // now unread — kept as reference). Composition doctrines are organisational labels,
-    // not stat bonuses (BF-23).
-    // Пехота — cheap, defensive front line; the backbone that holds ground.
-    // Пехота в трёх вариантах (H4): ополчение — дешёвое мясо, тяжёлая пехота — щит
-    // обороны, спецназ — элита с противотанковыми средствами (см. GROUND_ROSTER —
-    // матрица «кто кого бьёт» живёт там; агрегатный рейтинг ⚔/🛡 = среднее её строк,
-    // здесь же — hp, цена и содержание).
+    // (Orbital AA is not a unit: it's a defensive *building* — anti-ship, immobile,
+    //  player-built, see `orbital_aa` under buildings.)
+    // --- НАЗЕМНЫЙ РОСТЕР. Четыре рода войск, каждый со своей ролью. Строятся как
+    // обычные юниты, стоят в гарнизоне мира и ездят в трюме флота (armyModule);
+    // высадку разрешает combatModule — десант против гарнизона.
+    // ВАЖНО (H4-REVERT): `attack`/`defense` здесь — ЖИВЫЕ числа, по ним и считается
+    // наземный бой. Пока войска водили дивизии, бой шёл по матрице GROUND_ROSTER, а
+    // эти поля лежали мёртвым грузом; после сноса надстройки они снова читаются.
+    // `cargoSize: 1` у всех — правило «один юнит занимает один трюм».
+    // Ополчение — дешёвое мясо, держит землю числом. Тяжёлая пехота — щит обороны.
+    // Спецназ — элита с высоким уроном. Танк — тяжёлый кулак: дорог и в металле, и
+    // в содержании.
     militia: {
       faction: 'blue',
       stats: { attack: 4, defense: 8, speed: 44, hp: 14, cargoSize: 1 },
@@ -424,7 +422,7 @@ export const data: GameData = parseGameData({
     },
     heavy_infantry: {
       faction: 'blue',
-      stats: { attack: 8, defense: 20, speed: 40, hp: 34, cargoSize: 2 },
+      stats: { attack: 8, defense: 20, speed: 40, hp: 34, cargoSize: 1 },
       domain: 'ground',
       traits: ['ground'],
       signature: 1,
@@ -445,7 +443,7 @@ export const data: GameData = parseGameData({
     // Танк — heavy front line: high attack and hull, but pricey and bulky to lift.
     tank: {
       faction: 'blue',
-      stats: { attack: 22, defense: 14, speed: 40, hp: 46, cargoSize: 3 },
+      stats: { attack: 22, defense: 14, speed: 40, hp: 46, cargoSize: 1 },
       domain: 'ground',
       traits: ['ground'],
       signature: 2,

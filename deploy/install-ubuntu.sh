@@ -23,7 +23,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Конфигурация (любую переменную можно переопределить окружением: VAR=... ./install-ubuntu.sh)
-REPO_URL="${REPO_URL:-https://github.com/Moonwuk/MoonGame.git}"
+REPO_URL="${REPO_URL:-https://github.com/MoonGameTechnology/MoonGame.git}"
 REPO_BRANCH="${REPO_BRANCH:-main}"
 INSTALL_DIR="/opt/moongame"
 SERVICE_USER="moongame"
@@ -172,7 +172,7 @@ log_info "Настройка автозапуска (systemd)..."
 cat > /etc/systemd/system/$SERVICE_NAME.service << EOF
 [Unit]
 Description=Void Dominion Game Server
-Documentation=https://github.com/Moonwuk/moongame
+Documentation=https://github.com/MoonGameTechnology/MoonGame
 After=docker.service network-online.target
 Wants=network-online.target
 Requires=docker.service

@@ -182,7 +182,7 @@ jobs:
       # Rekor transparency-log entry. Verify with:
       #   cosign verify-blob app-debug.apk --signature app-debug.apk.sig \
       #     --certificate app-debug.apk.cert \
-      #     --certificate-identity-regexp 'https://github.com/Moonwuk/MoonGame/.*' \
+      #     --certificate-identity-regexp 'https://github.com/MoonGameTechnology/MoonGame/.*' \
       #     --certificate-oidc-issuer https://token.actions.githubusercontent.com
       # cosign runs as a pinned container (same pattern as the scanners in
       # security.yml), NOT the `actions/attest-build-provenance` Action — that Action
@@ -263,7 +263,7 @@ jobs:
               echo
               echo "Build provenance (SEC-7): verify these exact bytes came from this repo's CI —"
               echo "  cosign verify-blob $ASSET --signature $ASSET.sig --certificate $ASSET.cert \\"
-              echo "    --certificate-identity-regexp 'https://github.com/Moonwuk/MoonGame/.*' \\"
+              echo "    --certificate-identity-regexp 'https://github.com/MoonGameTechnology/MoonGame/.*' \\"
               echo "    --certificate-oidc-issuer https://token.actions.githubusercontent.com"
             fi
           } > release-notes.md

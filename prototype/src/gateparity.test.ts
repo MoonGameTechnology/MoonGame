@@ -28,11 +28,6 @@ import {
   marketList,
   marketTake,
   marketCancel,
-  mobilizeDivision,
-  renameDivisionTemplate,
-  setDivisionTemplate,
-  loadDivision,
-  unloadDivision,
   designateCapital,
   delegateSteward,
   recallSteward,
@@ -49,7 +44,7 @@ import {
 
 // RELEASE gate parity (REL-2): every intent the prototype UI can emit must clear the
 // action-layer payload schemas — otherwise a GATED release server silently locks the
-// player out of that mechanic (divisions, launches, steward…). The sample actions come
+// player out of that mechanic (launches, steward, standing orders…). The sample actions come
 // from the REAL builders, so a builder/schema drift fails here, not in production.
 
 const P = 'p1';
@@ -79,13 +74,6 @@ const CLIENT_ACTIONS: Action[] = [
   marketList(P, 'sell', 'metal', 10, 5),
   marketTake(P, 'lot:1', 5),
   marketCancel(P, 'lot:1'),
-  mobilizeDivision(P, 'C1R1', 0),
-  mobilizeDivision(P, 'C1R1', 1, true), // officer premade (BF-20)
-  renameDivisionTemplate(P, 0, 'Гвардия'), // designer rename (BF-20)
-  setDivisionTemplate(P, 0, 2, 'tank'),
-  setDivisionTemplate(P, 0, 2, null),
-  loadDivision(P, 'div:1', 'f1'),
-  unloadDivision(P, 'div:1'),
   designateCapital(P, 'C1R1'),
   delegateSteward(P, 123456789),
   recallSteward(P),
@@ -122,15 +110,25 @@ describe('gate parity (REL-2) — the schemas cover every prototype intent', () 
     }
   });
 
-  it('the retired officer attach/detach action is not client-submittable (BF-19)', () => {
-    expect(isValidActionPayload('division.officer', { divisionId: 'div:1', officer: 'assault' })).toBe(false);
-    expect(isValidActionPayload('division.officer', { divisionId: 'div:1', officer: null })).toBe(false);
+  it('H4-REVERT: вся семья division.* закрыта для клиента', () => {
+    // Схемы действий — внешняя дверь гейтованного сервера. После сноса H4 ни один
+    // тип этой семьи не должен через неё проходить: обработчика за дверью нет.
+    for (const type of [
+      'division.mobilize',
+      'division.template',
+      'division.rename',
+      'division.load',
+      'division.unload',
+      'division.officer', // снят ещё раньше (BF-19) — проверяем заодно
+    ]) {
+      expect(isValidActionPayload(type, { divisionId: 'div:1', template: 0, planetId: 'p1' })).toBe(
+        false,
+      );
+    }
   });
 
   it('malformed payloads of the new types are refused (fail-secure spot checks)', () => {
     expect(isValidActionPayload('fleet.split', { fleetId: 'f1', take: [] })).toBe(false); // empty take
-    expect(isValidActionPayload('division.rename', { template: 0, name: '' })).toBe(false); // empty name
-    expect(isValidActionPayload('division.template', { template: 0, slot: -1, unit: null })).toBe(false);
     expect(isValidActionPayload('steward.delegate', { posture: 'defend' })).toBe(false); // no until
     expect(isValidActionPayload('order.auto', { fleetId: 'f1', on: 'yes' })).toBe(false);
     expect(isValidActionPayload('unit.build', { planetId: 'p', unit: 'cruiser', modules: 'targeting_array' })).toBe(false);

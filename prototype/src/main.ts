@@ -43,24 +43,9 @@ import {
   STANCE_RANK,
   canTraverse,
   START_CANDIDATES,
-  DEFAULT_TEMPLATES,
-  FORMATION_UNITS,
-  FORMATION_SLOTS,
-  FORM_RU,
-  formationStats,
-  divisionsOf,
-  templatesOf,
-  mobilizeDivision,
-  OFFICER_TEMPLATES,
-  setDivisionTemplate,
-  loadDivision,
-  unloadDivision,
   designateCapital,
   capitalOf,
   isInhabited,
-  divisionCargo,
-  fleetCargoFree,
-  type FormationTemplate,
   type SetupConfig,
   type SeatConfig,
   type StepOut,
@@ -108,7 +93,8 @@ import {
 import { fleetCallsign, fleetKindKey } from './fleetName';
 import { planetName } from './planetName';
 import { provinceScore } from '../../packages/shared-core/src/state/sectorKind';
-import { OFFICERS } from './groundcombat';
+// GRND-1: гарнизон, запертый живым боем, не отпускает войска (ядро: E_UNDER_ASSAULT).
+import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet';
 import { DEFAULT_HEROES, type HeroLoadout } from './heroes';
 import { DEFAULT_SHIP_LOADOUTS, type ShipLoadout } from './ships';
 // The «Оснащение корабля» loadout constructor reuses the framework-agnostic view-model
@@ -201,10 +187,10 @@ import {
   BUILD_ICON,
   KIND_ICON,
   SOV_SVG,
-  formIcon,
   unitIcon,
   unitIconHtml,
   archPath2d,
+  RES_SVG,
 } from './icons';
 // REFM-4: the object dossiers + the codex card live in `dossiers.ts`; the renderers
 // that read live match state come out of `createDossiers(hooks)` further down.
@@ -237,7 +223,6 @@ import {
 // (`arsenalScreen.ts`, REFM-5 — `initArsenal(hooks)` owns its cache and markup).
 import { originOf } from './arsenal';
 // H4 — конструктор шаблонов дивизий: модель в `formations.ts`, редактор — REFM-8.
-import { initDivDesign } from './divisionDesigner';
 // TT-3.1 — экран дерева технологий (REFM-9); `branchLabel` берёт ещё совет учёных.
 import { initTechTree, branchLabel } from './techTree';
 // «Профиль командира» — карьерное досье (REFM-10).
@@ -246,7 +231,19 @@ import { initProfile } from './profileScreen';
 import { initCorp } from './corpScreen';
 // ECON-4 — session market: the model + orders live next door; the WINDOW is REFM-6.
 import { initMarket } from './marketScreen';
+// Плавающее окно чата (REFM-12) — своя геометрия, свои настройки, свой кэш.
+import { initChat } from './chatWindow';
 import { initResourceCard } from './resourceCard';
+// GRND-1 — меню десанта: чистая модель «кого и сколько» + разметка поповера.
+import {
+  maxPlan,
+  planOrders,
+  stepPlan,
+  troopsMenuHtml,
+  troopsModel,
+  type TroopsInput,
+  type TroopsUnitInput,
+} from './troopsMenu';
 // ST-2/ST-3 — «Хранитель»: the window is REFM-7; the read-only helpers below are shared
 // with the threat alert (`stewFmtDur`), the side panel (`stewardTechDone`) and the
 // morning report (`stewMetrics`).
@@ -466,7 +463,22 @@ const BUILDABLE = [
 // the player builds it like a fort. It fires on hostile fleets over the world (core
 // `aaStrengthAt` sums building AA) but does NOT block ground capture — only ground troops
 // do that. A space fortress also comes with one pre-installed (installFortressAA).
-const BUILD_UNITS = ['cruiser', 'scout', 'siege', 'strike_carrier', 'fighter_squadron'];
+// H4-REVERT: наземные юниты вернулись в общий конвейер. Пока их поднимала мобилизация
+// дивизии, этот массив был чисто космическим — и снос дивизий без этой строки оставил
+// бы игрока вовсе без сухопутных войск, то есть без второй фазы захвата мира.
+// Панель уже раскладывает их по своим полкам (`groundBuilds` / `shipBuilds` /
+// `wingBuilds` фильтруют этот же список), так что достаточно их сюда вписать.
+const BUILD_UNITS = [
+  'cruiser',
+  'scout',
+  'siege',
+  'strike_carrier',
+  'fighter_squadron',
+  'militia',
+  'heavy_infantry',
+  'special_forces',
+  'tank',
+];
 // A small glyph per province KIND, drawn above each province so its type reads at a
 // glance (planet / asteroid / nebula / wreck-field / storm / …). Text glyphs only.
 let ME = 'p1';
@@ -578,6 +590,9 @@ let pendingMerges: Array<{ mover: string; into: string }> = [];
 let additive = false; // Shift or Ctrl/⌘ held on the current tap → add to the fleet selection
 // Split-fleet dialog: which fleet, and how many of each ship type peel off.
 let splitState: { fleetId: string; take: Record<string, number> } | null = null;
+// GRND-1 ⇅ «Десант»: поповер погрузки/выгрузки над рядом команд. `plan` — знаковая
+// дельта на тип: >0 поднять из гарнизона, <0 высадить. null = меню закрыто.
+let troopsPlan: { fleetId: string; plan: Record<string, number> } | null = null;
 
 // --- session diplomacy & comms menu state ------------------------------------
 // Messages are a prototype-local session log — they don't touch the deterministic
@@ -603,38 +618,40 @@ const CH_GLOBAL = 'global'; // cross-session lobby (placeholder until a global s
 const GROUP_CHANNELS = new Set([COALITION, CH_SESSION, CH_GLOBAL]); // group rooms vs 1:1 DMs
 let sessionMessages: SessionMsg[] = [];
 // --- floating chat window (desktop only) -------------------------------------
-// A movable/resizable in-game chat overlay (bottom-left by default). It reuses the
-// session message store + convoLineHtml; geometry/opacity/font are applied inline so a
-// frame never rebuilds it. Settings live in a popover flown out to its right, and are
-// cached client-side (localStorage) — never round-tripped to the server.
-let chatOpen = false;
-let chatMin = false; // collapsed to just its title bar
-let chatPinned = false; // position + size locked (drag/resize disabled)
-let chatSettingsOpen = false;
-let chatPlaced = false; // has it been parked / restored at least once?
-let chatTab: string = CH_SESSION; // the open channel/DM key
-const chatGeom = { x: 12, y: 0, w: 360, h: 300 }; // CSS px; y is set on first open
-// Message-stamp toggles (showDay/showTime/showReal) ride along in the cached config.
-const chatCfg = {
-  fontPx: 13,
-  transparency: 8,
-  censor: false,
-  color: '',
-  showDay: true,
-  showTime: true,
-  showReal: false,
-};
-// Active move/resize gesture: pointer origin + the geometry snapshot we drag from.
-let chatDrag: {
-  mode: 'move' | 'resize';
-  dir: string;
-  px: number;
-  py: number;
-  gx: number;
-  gy: number;
-  gw: number;
-  gh: number;
-} | null = null;
+// REFM-12: окно уехало в `chatWindow.ts` целиком — состояние, разметка, геометрия и
+// кэш настроек живут там. Здесь только сборка, и она стоит ИМЕННО ЗДЕСЬ, а не рядом
+// с остальным UI внизу файла: `resize()` (строкой ниже по файлу, вызывается
+// синхронно при загрузке) спрашивает у окна `onViewportResize`, поэтому привязка
+// обязана существовать раньше. Внизу она попала бы в temporal dead zone и уронила
+// бы загрузку целиком. Все зависимости взяты ленивo — стрелками, поэтому объявленные
+// ниже `NAME`/`VW`/`MOBILE` читаются в момент вызова, а не сейчас.
+// пользуются рейл, реестр слоёв Back/Escape и приход нового сообщения.
+const chatWin = initChat(
+  {
+    root: () => document.getElementById('chatwin'),
+    viewport: () => ({ w: VW, h: VH }),
+    isMobile: () => MOBILE,
+    groupTabs: () => [
+      { key: CH_SESSION, label: t('chat.tab.session'), icon: '△' },
+      { key: CH_GLOBAL, label: t('chat.tab.global'), icon: '🌐' },
+      { key: COALITION, label: t('chat.tab.coalition'), icon: '⬡' },
+    ],
+    isGroup: (key) => GROUP_CHANNELS.has(key),
+    messages: () => sessionMessages,
+    me: () => ME,
+    seatExists: (id) => !!s.players[id],
+    seatLabel: (id) => NAME[id] ?? id,
+    seatIcon: (id) => seatBadge(id).icon,
+    convoMessages,
+    lineHtml: (m, stamp) => convoLineHtml(m as SessionMsg, stamp),
+    dispatch: dispatchChat,
+    openSeatCard,
+    jumpToPing,
+  },
+  CH_SESSION,
+);
+document.getElementById('rail-chat')?.addEventListener('click', () => chatWin.toggle());
+
 let diploOpen = false;
 let diploTab: 'diplo' | 'msgs' | 'intel' = 'diplo';
 let diploSort: 'name' | 'worlds' | 'stance' = 'stance';
@@ -687,7 +704,6 @@ let fleetInfoFor: string | null = null;
 // Тап по имени МИРА открывает карточку статистики планеты (какой мир сейчас в
 // режиме сводки; другой мир в панели → обычная карточка сама собой).
 let planetInfoFor: string | null = null;
-let mobTplIdx = 0; // which division template the mobilisation panel is assembling
 const buildQueues: Record<string, PlanetBuildQueue> = {};
 const logLines: string[] = [];
 let lastAiAt = 0;
@@ -860,10 +876,7 @@ function resize() {
   canvas.height = Math.round(VH * DPR);
   canvas.style.width = VW + 'px';
   canvas.style.height = VH + 'px';
-  if (chatOpen) {
-    clampChatGeom(); // the half-screen cap follows the new viewport
-    applyChatGeom();
-  }
+  chatWin.onViewportResize(); // the half-screen cap follows the new viewport
 }
 if (typeof window !== 'undefined') window.addEventListener('resize', resize);
 resize();
@@ -1376,6 +1389,10 @@ const floor = Math.floor;
 // Returns HTML (resource-tinted tokens) — callers feed innerHTML, don't esc() this.
 /** Та же цена ПЛОСКИМ текстом — для мест, где подпись уходит через `esc()`
  *  (`btn()`, `codexTile()`): там HTML из `cost()` показался бы игроку как разметка. */
+/** Казна текущего игрока — то самое `have`, которым cost() красит нехватку. */
+function myRes(): Record<string, number> {
+  return s.players[ME]?.resources ?? {};
+}
 function afford(bag: Record<string, number> | undefined): boolean {
   const res = s.players[ME]?.resources ?? {};
   for (const [r, n] of Object.entries(bag ?? {})) if ((res[r] ?? 0) < n) return false;
@@ -1630,116 +1647,10 @@ function artilleryRangeOf(f: Fleet | undefined): number {
   return r;
 }
 
-/** The "Дивизии" block for an owned planet: garrisoned divisions + a mobilise row for
- *  the player's 3 locked templates (cost + affordability). */
-function divisionsHtml(planetId: string): string {
-  const here = Object.values(divisionsOf(s)).filter(
-    (d) => d.owner === ME && d.location === planetId,
-  );
-  let h = `<div class="sec">${t('div.title')}</div>`;
-  if (here.length) {
-    for (const d of here) {
-      const comp = d.units.map((u) => `${formIcon(u.type, pcUi())}${u.count}`).join(' ') || '—';
-      const hp = Math.round(d.units.reduce((n, u) => n + u.hp, 0));
-      const off = d.officer ? t(OFFICERS[d.officer]?.name ?? '') : '';
-      // Офицер — часть ИМЕННОГО шаблона (готовый, менять нельзя): показываем, не редактируем.
-      h += `<div class="asset-row" data-desc="division"><span class="bicon">⊞</span><b>${esc(t(d.name))}</b><span class="dim">${comp} · ❤${hp}${off ? ' · ★' + esc(off) : ''}</span></div>`;
-    }
-  } else {
-    h += `<div class="row dim">${pcUi() ? t('div.empty') : t('div.empty.hint')}</div>`;
-  }
-  const tpls = templatesOf(s, ME);
-  const res = s.players[ME]?.resources ?? {};
-  // Stellaris-style: the panel only PICKS a ready design and mobilises it; editing
-  // lives in the designer window («⚙ Конструктор»). Named officer templates ride
-  // after the custom three, marked ★ — ready-made, composition locked.
-  const officerBase = tpls.length;
-  const all: Array<{ tpl: FormationTemplate; officer?: string }> = [
-    ...tpls.map((tpl) => ({ tpl })),
-    ...OFFICER_TEMPLATES.map((tpl) => ({ tpl, officer: tpl.officer })),
-  ];
-  const idx = Math.max(0, Math.min(mobTplIdx, all.length - 1));
-  const pick = all[idx]!;
-  h += `<div class="sec">${t('div.mobilize')}</div>`;
-  h += `<div class="row">`;
-  for (let i = 0; i < all.length; i++) {
-    const star = all[i]!.officer ? '★ ' : '';
-    h += btn('mobtpl', String(i), star + esc(t(all[i]!.tpl.name)), i !== idx);
-  }
-  h += `</div>`;
-  const f = formationStats(pick.tpl);
-  const afford = Object.entries(f.cost).every(([r, a]) => (res[r] ?? 0) >= a);
-  const slots = pick.tpl.slots.filter(Boolean) as string[];
-  const offLine = pick.officer ? ` · ★${esc(t(OFFICERS[pick.officer]?.name ?? ''))}` : '';
-  if (pcUi()) {
-    // PC: every icon self-describes on hover — composition glyphs → unit dossiers,
-    // ⚔/🛡/❤ → the stat's name, cost glyphs → the resource's name.
-    const comp =
-      slots.map((u) => `<span data-desc="u:${esc(u)}">${formIcon(u, pcUi())}</span>`).join('') || '—';
-    const cost =
-      Object.entries(f.cost)
-        .map(([r, a]) => `<span data-desc="res:${esc(r)}">${a}${TECH_CUR[r] ?? r[0]}</span>`)
-        .join(' ') || '—';
-    h += `<div class="row dim">${comp} · <span data-desc="stat:datk">⚔${f.attack}</span> <span data-desc="stat:ddef">🛡${f.defense}</span> <span data-desc="stat:dhp">❤${f.hp}</span>${offLine} · ${cost}</div>`;
-  } else {
-    const comp = slots.map((u) => formIcon(u, pcUi())).join('') || '—';
-    const cost =
-      Object.entries(f.cost)
-        .map(([r, a]) => `<span class="rc-${r}">${a}${TECH_CUR[r] ?? r[0]}</span>`)
-        .join(' ') || '—';
-    h += `<div class="row dim">${comp} · ⚔${f.attack} 🛡${f.defense} ❤${f.hp}${offLine} · ${cost}</div>`;
-  }
-  h += `<div class="row">`;
-  h += btn(
-    'mobilize',
-    pick.officer ? `o${idx - officerBase}` : String(idx),
-    t('div.mobilize.named', { name: esc(t(pick.tpl.name)) }),
-    afford && f.count > 0,
-    pcUi() ? 'division' : undefined,
-  );
-  h += btn('divdesign', '', t('div.designer'), true, pcUi() ? 'act:divdesign' : undefined);
-  h += `</div>`;
-  // PC dropped this hint (its content lives in hover dossiers); mobile keeps it.
-  if (!pcUi()) {
-    h += `<div class="hint">${t('div.note')}</div>`;
-  }
-  return h;
-}
 
 /** Division ⇄ hold transport for a docked fleet `f` over world `here`: load the
  *  player's garrisoning divisions (if they fit the free hold) and unload the ones it
  *  carries (onto an enemy world = a landing). Empty string when there's nothing to do. */
-function fleetDivisionsHtml(f: Fleet, here: Planet): string {
-  const all = Object.values(divisionsOf(s));
-  const carried = all.filter((d) => d.carriedBy === f.id);
-  const loadable = all.filter(
-    (d) => d.owner === ME && d.carriedBy == null && d.location === here.id,
-  );
-  if (!carried.length && !loadable.length) return '';
-  // Clamp the readout: a carrier that lost ships while loaded can hold more footprint
-  // than its remaining capacity (carried footprint is reserved at load time, not
-  // re-validated against later losses), so raw free can go negative.
-  const free = Math.max(0, fleetCargoFree(s, f));
-  let g = `<div class="sec">${t('div.hold', { n: free })}</div>`;
-  if (loadable.length) {
-    g += `<div class="row">`;
-    for (const d of loadable) {
-      const c = divisionCargo(d);
-      g += btn('divload', d.id, `▲ ${esc(d.name)} (${c})`, c <= free);
-    }
-    g += `</div>`;
-  }
-  if (carried.length) {
-    g += `<div class="row">`;
-    for (const d of carried) {
-      const comp = d.units.map((u) => `${formIcon(u.type, pcUi())}${u.count}`).join('') || '—';
-      g += btn('divunload', d.id, `▼ ${esc(d.name)} ${comp}`, true);
-    }
-    g += `</div>`;
-  }
-  g += `<div class="hint">${t('div.hold.note')}</div>`;
-  return g;
-}
 
 const ORBIT_R = 31; // single orbit-ring radius in screen px (before the zoom bloom) — was 44, −30%
 // Past this camera zoom the orbital layer "opens up": rings widen and stationed
@@ -2208,6 +2119,7 @@ function apply(out: StepOut) {
   s = out.state;
   if (selFleet && !s.fleets[selFleet]) selFleet = null;
   if (splitState && !s.fleets[splitState.fleetId]) splitState = null; // fleet gone → close
+  if (troopsPlan && !s.fleets[troopsPlan.fleetId]) troopsPlan = null; // ⇅-меню тоже
   selFleets = new Set([...selFleets].filter((id) => s.fleets[id]?.owner === ME));
   handleEvents(out.events);
 }
@@ -2512,25 +2424,22 @@ function pendingLoadUnits(planetId: string, unit: string): number {
   return n;
 }
 
-/** Queue a ~1h ground-army load if the hold has room AND the garrison still holds
- *  a free unit (both reserving for loads already under way), so the player can't
- *  over-fill the trim, nor queue more troops than the world can actually spare
- *  — which would later fire real `army.load`s that reject with `E_NO_ARMY`. */
-function beginLoad(fleetId: string, unit: string): void {
-  const f = s.fleets[fleetId];
-  if (!f || f.movement || f.battleId || !f.location) return;
-  const need = data.units[unit]?.stats.cargoSize ?? 1;
-  if (need > fleetCargoFree(s, f) - pendingLoadCargo(fleetId)) {
-    note('✖ ' + t('cargo.hold-full')); // hold full once the loads already in progress land
-    return;
-  }
-  // Match the core's acceptance: only a healthy, default-loadout garrison stack embarks.
-  const stock = findHealthyStack(s.planets[f.location]!.garrison, unit)?.count ?? 0;
-  if (pendingLoadUnits(f.location, unit) >= stock) {
-    note('✖ ' + t('cargo.garrison-empty')); // nothing left once the queued loads lift
-    return;
-  }
-  pendingLoads.push({ fleetId, unit, startAt: s.time, doneAt: s.time + LOAD_TIME });
+/** Положить в очередь `count` часовых погрузок БЕЗ проверок — вызывающий уже
+ *  посчитал и место, и запас гарнизона (меню десанта делает это своей моделью).
+ *  Записи по одной единице, а не одна на партию, СОЗНАТЕЛЬНО: ядро грузит «всё или
+ *  ничего», поэтому N отдельных `army.load` доедут частично, если за этот час
+ *  гарнизон обмелел, — партия одним действием отскочила бы целиком. */
+function pushLoads(fleetId: string, unit: string, count: number): void {
+  for (let i = 0; i < count; i++)
+    pendingLoads.push({ fleetId, unit, startAt: s.time, doneAt: s.time + LOAD_TIME });
+}
+
+/** Fail-secure: ядро не выпускает войска из гарнизона, запертого живым боем
+ *  (`E_UNDER_ASSAULT`). Без этой проверки заказ висел бы час и молча отскочил. */
+function troopsLiftable(planetId: string): boolean {
+  if (!garrisonUnderAssault(s, planetId)) return true;
+  note('✖ ' + t('cargo.under-assault'));
+  return false;
 }
 
 /** Drive queued loads each frame: drop any whose carrier moved / fights / vanished
@@ -2548,6 +2457,42 @@ function pumpPendingLoads(): void {
     keep.push(p);
   }
   pendingLoads = keep;
+}
+
+/** GRND-1: собрать вход меню десанта для флота. `null` — показывать нечего: флот не
+ *  пришвартован у СВОЕГО мира, или наземных частей нет ни в гарнизоне, ни в трюме.
+ *  Здесь и только здесь живая сцена превращается в числа — дальше меню чистое. */
+function troopsInputFor(fleetId: string): TroopsInput | null {
+  const f = s.fleets[fleetId];
+  if (!f || f.movement || f.battleId || !f.location) return null;
+  const here = s.planets[f.location];
+  if (!here || here.owner !== ME) return null;
+  const landing = f.landing ?? [];
+  const types: string[] = [];
+  for (const st of [...here.garrison, ...landing])
+    if (isGround(st.unit) && !types.includes(st.unit)) types.push(st.unit);
+  if (!types.length) return null;
+  // Стеков одного типа может быть несколько (побитый + целый): «всего» складывает
+  // их все, а поднять/высадить ядро даст только здоровый с дефолтным лоадаутом.
+  const total = (stacks: Array<{ unit: string; count: number }>, unit: string): number =>
+    stacks.reduce((n, st) => (st.unit === unit ? n + st.count : n), 0);
+  const units: TroopsUnitInput[] = types.map((unit) => ({
+    unit,
+    garrison: findHealthyStack(here.garrison, unit)?.count ?? 0,
+    garrisonAll: total(here.garrison, unit),
+    hold: findHealthyStack(landing, unit)?.count ?? 0,
+    holdAll: total(landing, unit),
+    queued: pendingLoads.filter((p) => p.fleetId === fleetId && p.unit === unit).length,
+    reserved: pendingLoadUnits(here.id, unit),
+    cargoSize: data.units[unit]?.stats.cargoSize ?? 1,
+  }));
+  return {
+    units,
+    capacity: sumUnitStat(f.units, data, 'cargoCapacity'),
+    used: sumUnitStat(landing, data, 'cargoSize'),
+    reservedCargo: pendingLoadCargo(fleetId),
+    plan: troopsPlan?.fleetId === fleetId ? troopsPlan.plan : {},
+  };
 }
 
 // --- diplomacy gate (client order layer) -------------------------------------
@@ -2746,6 +2691,7 @@ function clearSelection() {
   selFleets = new Set();
   merging = false;
   splitState = null;
+  troopsPlan = null;
   lastPanelHtml = '';
 }
 
@@ -4753,10 +4699,6 @@ function render(now: number) {
 
   // fleets — glowing chevrons on their orbit ring (stationed) or along the lane
   cx.textAlign = 'center';
-  // carried divisions per fleet (rendered as cargo diamonds) — counted once.
-  const carriedDivCount: Record<string, number> = {};
-  for (const d of Object.values(divisionsOf(s)))
-    if (d.carriedBy) carriedDivCount[d.carriedBy] = (carriedDivCount[d.carriedBy] ?? 0) + 1;
   for (const f of Object.values(s.fleets)) {
     if (!fleetSeen(f)) {
       // not identified and no intel window: a radar contact is shown only as a
@@ -4883,10 +4825,9 @@ function render(now: number) {
     // troops). A loading pip (~1h) fills up in place inside its shape's row. Cell
     // centres ride the rotated baseline, the pips themselves stay upright.
     const loads = pendingLoads.filter((p) => p.fleetId === f.id); // empty for enemy/idle fleets
-    type CargoPip = { kind: 'div' | 'wing' | 'troop' | 'load'; load?: PendingLoad };
-    const diaRow: CargoPip[] = []; // ромбы: дивизии + эскадрильи в трюме
+    type CargoPip = { kind: 'wing' | 'troop' | 'load'; load?: PendingLoad };
+    const diaRow: CargoPip[] = []; // ромбы: эскадрильи в трюме
     const sqRow: CargoPip[] = []; // квадраты: десант
-    for (let i = 0; i < (carriedDivCount[f.id] ?? 0); i++) diaRow.push({ kind: 'div' });
     for (let i = 0; i < wingPips; i++) diaRow.push({ kind: 'wing' });
     for (let i = 0; i < troops; i++) sqRow.push({ kind: 'troop' });
     for (const p of loads) (isSquadron(p.unit) ? diaRow : sqRow).push({ kind: 'load', load: p });
@@ -4899,7 +4840,6 @@ function render(now: number) {
     });
     const CELL = 8,
       SQ = 5,
-      DR = 3.75,
       DS = 3.1, // squadron pip: a diamond with the footprint of the square
       MAX = 8; // per-row cap; rare overflow gets a "+N" tail
     const diamond = (cxr: number, cyr: number, r: number, fill: boolean): void => {
@@ -4925,11 +4865,11 @@ function render(now: number) {
       for (let i = 0; i < n; i++) {
         const pip = row[i]!;
         const c0 = tailAt(lx, ly);
-        if (pip.kind === 'div' || pip.kind === 'wing') {
-          // carried division / hold squadron → a solid diamond ("ромбик")
+        if (pip.kind === 'wing') {
+          // hold squadron → a solid diamond ("ромбик")
           cx.fillStyle = rgba(col, 0.85);
           cx.strokeStyle = rgba(col, 0.95);
-          diamond(c0.x, c0.y, pip.kind === 'div' ? DR : DS, true);
+          diamond(c0.x, c0.y, DS, true);
         } else if (pip.kind === 'troop') {
           // loaded troop → solid square
           const x = c0.x - SQ / 2,
@@ -5119,7 +5059,7 @@ function conveyorHtml(planetId: string, lane: BuildLane): string {
   } else if (pcUi() && queued[0] && !canStartQueued(planetId, queued[0])) {
     // The queue is NOT stuck — its head simply can't be paid yet. Say so, with the
     // price, instead of an idle line that reads like a broken conveyor.
-    html += `<div class="current idle"><b>⏳ ${t('side.conveyor.waiting', { c: cost(buildCost(planetId, queued[0])) })}</b></div>`;
+    html += `<div class="current idle"><b>⏳ ${t('side.conveyor.waiting', { c: cost(buildCost(planetId, queued[0]), myRes()) })}</b></div>`;
     html += `<div class="bar"><i style="width:0%"></i></div>`;
   } else if (compactUi()) {
     html += `<div class="current idle"><b>${t('side.conveyor.idle')}</b></div>`;
@@ -5534,39 +5474,30 @@ function fleetPanelHtml(f: Fleet): string {
       }
       cols.push(at);
     }
-    // load / unload ground army at your own world
+    // Ground army at your own world — СВОДКА, без кнопок: сама погрузка/выгрузка
+    // переехала в ⇅-меню ряда команд (GRND-1), где есть выбор «кого и сколько».
+    // Панель осталась информационной ровно как у стоячих приказов (SO-UI ниже).
     if (here!.owner === ME) {
       let ga = `<div class="sec">${t('side.ground.title')}</div>`;
       const groundHere = here!.garrison.filter((st) => isGround(st.unit));
       const carried = f.landing ?? [];
       const loadingN = pendingLoads.filter((p) => p.fleetId === f.id).length;
-      const freeHold = fleetCargoFree(s, f) - pendingLoadCargo(f.id); // reserve in-progress loads
-      if (groundHere.length) {
-        ga += `<div class="row">`;
-        for (const st of groundHere) {
-          const sz = data.units[st.unit]?.stats.cargoSize ?? 1;
-          ga += btn(
-            'load',
-            st.unit,
-            t('side.ground.load', { u: displayUnit(st.unit) }),
-            sz <= freeHold,
-          );
-        }
-        ga += `</div>`;
-      }
-      if (carried.length) {
-        ga += `<div class="row">`;
-        for (const st of carried)
-          ga += btn('unload', st.unit, t('side.ground.unload', { u: displayUnit(st.unit) }), true);
-        ga += `</div>`;
+      const types: string[] = [];
+      for (const st of [...groundHere, ...carried])
+        if (isGround(st.unit) && !types.includes(st.unit)) types.push(st.unit);
+      if (types.length) {
+        ga += `<div class="row dim">${t('side.ground.legend')}</div>`;
+        const cnt = (stacks: Array<{ unit: string; count: number }>, u: string): number =>
+          stacks.reduce((n, st) => (st.unit === u ? n + st.count : n), 0);
+        for (const u of types)
+          ga += `<div class="row"><span class="bicon">${unitIconHtml(u, data, youColor, 16)}</span>${esc(displayUnit(u))} <b>${cnt(groundHere, u)} ▸ ${cnt(carried, u)}</b></div>`;
       }
       if (loadingN) ga += `<div class="hint">${t('side.ground.loading', { n: loadingN })}</div>`;
-      if (!groundHere.length && !carried.length && !loadingN)
+      if (!types.length && !loadingN)
         ga += `<div class="row dim">${t('side.ground.empty')}</div>`;
+      ga += `<div class="hint">${t('side.ground.via-cmd')}</div>`;
       cols.push(ga);
     }
-    const dh = fleetDivisionsHtml(f, here!); // load/unload divisions (landing on a hostile world)
-    if (dh) cols.push(dh);
     h += pcols(cols);
   }
   return h;
@@ -5786,7 +5717,6 @@ function planetPanelHtml(p: Planet): string {
         (pcUi() ? garrisonTilesHtml(ground) : unitRows(ground)),
     );
     if (mine) {
-      cols.push(divisionsHtml(p.id));
       const groundBuilds = BUILD_UNITS.filter((u) => isGround(u));
       cols.push(
         `<div class="sec">${t('side.ground.conveyor')}</div>` +
@@ -5900,6 +5830,7 @@ function panelHtml(): string {
 // `producesLine`, the `Dossier` type) are imported at the top of the file.
 const { objDossier, codexHtml } = createDossiers({
   state: () => s,
+  me: () => ME,
   pcUi,
   youColor: () => youColor,
   queueOf,
@@ -5998,7 +5929,7 @@ function refreshSeatCard(id: string): void {
   const el = document.getElementById('playercard');
   if (el && el.dataset.seat === id) el.innerHTML = `<div class="pcbox">${seatCardHtml(id)}</div>`;
   if (diploOpen) renderDiplo();
-  if (chatOpen && !chatMin) renderChatFeed();
+  chatWin.refreshIfVisible();
 }
 
 // --- session diplomacy & comms menu ------------------------------------------
@@ -6126,7 +6057,7 @@ function pushMsg(to: string, text: string, sys: boolean, from = ME, ping?: strin
   sessionMessages.push({ at: s.time, from, to, text, sys, ping, realAt: Date.now() });
   if (sessionMessages.length > 300) sessionMessages.shift();
   if (diploOpen && diploTab === 'msgs') renderDiploFeed();
-  if (chatOpen && !chatMin) renderChatFeed();
+  chatWin.refreshIfVisible();
 }
 
 /** Route an outgoing chat line for conversation key `key` (a group channel const or
@@ -6611,10 +6542,10 @@ function codexBuildBtn(kind: string, id: string): string {
     const buildable = (sectorTypeOf(p.id)?.allowedBuildings ?? BUILDABLE).includes(id);
     const built = p.buildings.some((b) => b.type === id);
     if (!buildable || built) return '';
-    return `<button class="cx-build" data-build="building:${id}">▣ ${t('codex.build-here')} · ${cost(data.buildings[id]?.cost)}</button>`;
+    return `<button class="cx-build" data-build="building:${id}">▣ ${t('codex.build-here')} · ${cost(data.buildings[id]?.cost, myRes())}</button>`;
   }
   if (kind === 'u' && data.units[id]) {
-    return `<button class="cx-build" data-build="unit:${id}">${unitIconHtml(id, data, youColor, 16)} ${t('codex.build-here')} · ${cost(data.units[id]?.cost)}</button>`;
+    return `<button class="cx-build" data-build="unit:${id}">${unitIconHtml(id, data, youColor, 16)} ${t('codex.build-here')} · ${cost(data.units[id]?.cost, myRes())}</button>`;
   }
   return '';
 }
@@ -6928,6 +6859,7 @@ function renderCmdBar() {
     if (targetAim) targetAim = false;
     if (merging) merging = false;
     fireMenu = false; // пустое выделение — 🔥-меню не должно всплыть при новом выборе
+    troopsPlan = null; // ⇅-меню тоже: иначе всплывёт над СЛЕДУЮЩИМ выбранным флотом
     cmdbar.classList.remove('show');
     lastCmdHtml = '';
     return;
@@ -6968,6 +6900,10 @@ function renderCmdBar() {
   const lone = ids.length === 1 && fleets[0] ? fleets[0] : null;
   const canSplit =
     !!lone && !!lone.location && !lone.movement && !lone.battleId && sumUnits(lone.units) >= 2;
+  // GRND-1 ⇅ «Десант»: как и split, команда строго ОДНОФЛОТОВАЯ — гарнизон и трюм у
+  // каждого свои, один клик на группу разослал бы приказы с разной арифметикой.
+  const troopsIn = lone ? troopsInputFor(lone.id) : null;
+  if (troopsPlan && (!troopsIn || troopsPlan.fleetId !== lone?.id)) troopsPlan = null;
   // Artillery in the selection → offer the standoff-fire focus order.
   const anyArtillery = fleets.some(fleetHasArtillery);
   // Hero-flagship aboard a selected fleet → its castable abilities become a ✨ popover
@@ -7020,6 +6956,14 @@ function renderCmdBar() {
       t('cmd.merge.hint'),
     ) +
     cmdBtn('split', '⊟', t('cmd.split'), splitState ? 'on' : '', !canSplit, t('cmd.split.hint')) +
+    cmdBtn(
+      'troops',
+      '⇅',
+      t('cmd.troops'),
+      troopsPlan ? 'on' : '',
+      !troopsIn,
+      t('cmd.troops.hint'),
+    ) +
     // ☰ — the extras row (hamburger, NOT «...» — референс не копируем дословно):
     // «Выбрать+» и будущие Ускорить/Задержка живут здесь, базовый ряд не пухнет.
     cmdBtn('more', '☰', t('cmd.more'), cmdMore ? 'on' : '', false, t('cmd.more.hint')) +
@@ -7091,6 +7035,13 @@ function renderCmdBar() {
           })
           .join('') +
         `</div>`
+      : '') +
+    // ⇅ поповер десанта: строка на тип, знаковый счётчик «сколько», одно подтверждение.
+    (troopsPlan && troopsIn
+      ? troopsMenuHtml(troopsModel(troopsIn), {
+          icon: (u) => unitIconHtml(u, data, youColor, 18),
+          name: displayUnit,
+        })
       : '');
   if (html !== lastCmdHtml) {
     cmdbar.innerHTML = html;
@@ -7263,15 +7214,6 @@ side.addEventListener('click', (ev) => {
     // there) — a plain local removal, no action needed.
     const [qLane, qIdx] = arg.split(':');
     queueOf(selPlanet!)[qLane as BuildLane].splice(Number(qIdx), 1);
-  } else if (act === 'mobtpl') {
-    mobTplIdx = Number(arg); // switch which template the assembler shows (local, re-renders)
-  } else if (act === 'mobilize') {
-    // 'oN' = named officer premade (locked composition, officer attached server-side).
-    if (arg.startsWith('o'))
-      playerOrder(mobilizeDivision(ME, selPlanet!, Number(arg.slice(1)), true));
-    else playerOrder(mobilizeDivision(ME, selPlanet!, Number(arg)));
-  } else if (act === 'divdesign') {
-    divDesign.open(Math.min(mobTplIdx, templatesOf(s, ME).length - 1));
   } else if (act === 'spyplanet') {
     playerOrder(spyOn(ME, arg, 'planet', selPlanet!)); // arg = the world's (last known) owner
   } else if (act === 'capital') {
@@ -7306,14 +7248,6 @@ side.addEventListener('click', (ev) => {
       playerOrder(splitFleet(ME, f!.id, squadronTake(f!)));
       note(t('hint.squadron-launched'));
     }
-  } else if (act === 'load') {
-    beginLoad(selFleet!, arg); // ~1h timed load (animated in the marker)
-  } else if (act === 'unload') {
-    playerOrder(unloadArmy(ME, selFleet!, arg, 1));
-  } else if (act === 'divload') {
-    playerOrder(loadDivision(ME, arg, selFleet!));
-  } else if (act === 'divunload') {
-    playerOrder(unloadDivision(ME, arg));
   }
   lastPanelHtml = '';
   renderPanel();
@@ -7490,6 +7424,8 @@ cmdbar.addEventListener('click', (ev) => {
   if (cmd !== 'barrage') barrageAim = false; // any other command disarms barrage-targeting
   if (cmd !== 'firemode' && cmd !== 'fmset') fireMenu = false; // другой приказ закрывает 🔥-меню
   if (cmd !== 'cast' && cmd !== 'castdo') castMenu = false; // другой приказ закрывает ✨-меню
+  // другой приказ закрывает ⇅-меню (иначе два absolute-поповера легли бы друг на друга)
+  if (cmd !== 'troops' && cmd !== 'tstep' && cmd !== 'tmax' && cmd !== 'tok') troopsPlan = null;
   if (cmd !== 'attack') assaultAim = false; // any other command disarms assault-targeting
   if (cmd !== 'target') targetAim = false; // any other command disarms order-targeting
   // A real order leaves «Выбрать+» (the group stays selected and takes it);
@@ -7527,6 +7463,38 @@ cmdbar.addEventListener('click', (ev) => {
       aiming = false;
       renderSplitDialog();
     }
+  } else if (cmd === 'troops') {
+    const id = ids[0];
+    if (id) {
+      troopsPlan = troopsPlan ? null : { fleetId: id, plan: {} }; // toggle the popover
+      aiming = false;
+    }
+  } else if (cmd === 'tstep' || cmd === 'tmax') {
+    // Набор количества. Шаг КЛАМПИТСЯ моделью, а не блокируется — как «+10» в
+    // диалоге разделения флота: «+5» при трёх доступных даст +3, а не откажет.
+    const inp = troopsPlan ? troopsInputFor(troopsPlan.fleetId) : null;
+    if (troopsPlan && inp) {
+      const unit = bEl.dataset.unit ?? '';
+      troopsPlan.plan =
+        cmd === 'tmax'
+          ? maxPlan(inp, unit, Number(bEl.dataset.dir) > 0 ? 1 : -1)
+          : stepPlan(inp, unit, Number(bEl.dataset.n));
+    }
+  } else if (cmd === 'tok') {
+    const st = troopsPlan;
+    const inp = st ? troopsInputFor(st.fleetId) : null;
+    const at = st ? s.fleets[st.fleetId]?.location : undefined;
+    if (st && inp && at && troopsLiftable(at)) {
+      const { load, unload } = planOrders(troopsModel(inp));
+      // Выгрузка мгновенна и уходит в ядро ОДНИМ действием на тип (count оно
+      // принимает атомарно). Погрузка ложится в часовую очередь БЕЗ повторной
+      // проверки места: модель уже посчитала её ровно на тот трюм, который
+      // освободит эта выгрузка, а реальный `army.load` уйдёт лишь через игровой
+      // час — к тому времени выгрузка применена и в соло, и по сети.
+      for (const o of unload) playerOrder(unloadArmy(ME, st.fleetId, o.unit, o.count));
+      for (const o of load) pushLoads(st.fleetId, o.unit, o.count);
+    }
+    troopsPlan = null;
   } else if (cmd === 'barrage') {
     // Arm focus-fire: the next tap on an enemy fleet aims the selected artillery
     // at it; a tap on empty space clears back to auto-targeting the nearest.
@@ -8246,37 +8214,10 @@ logWin?.addEventListener('click', (e) => {
 // grouped by branch, show cost + status, and gate on prerequisites / day / affordability.
 const techWin = $('tech');
 
-// --- division template designer (H4, Stellaris-style) ------------------------------
-// The editor lives in `divisionDesigner.ts` (REFM-8); here it gets its hooks. The
-// `#divdesign` handle stays: the Android-Back layer stack holds it, and the planet
-// panel opens it.
-const divDesignWin = $('divdesign');
-const divDesign = initDivDesign({
-  root: () => divDesignWin,
-  body: () => $('divdesignbody'),
-  state: () => s,
-  me: () => ME,
-  pcUi,
-  order: playerOrder,
-  onClose: () => {
-    lastPanelHtml = ''; // the mobilise picker mirrors the templates — refresh it
-  },
-});
+// Капсулы бара рисуют общий словарь RES_SVG (icons.ts) — те же линии и тот же
+// цвет несут ценники, стакан рынка и дерево технологий: один взгляд на бар учит
+// читать все остальные поверхности.
 
-// Bar-only display icons: inline SVG line art traced from the mock (two coin rings,
-// isometric cube, sprout, bolt, IC chip). stroke=currentColor so the capsule states
-// (.short red, .dead dim) tint them exactly like a text glyph.
-const RES_SVG: Record<string, string> = {
-  credits:
-    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="6" cy="6.2" r="3.9"/><circle cx="10" cy="9.8" r="3.9"/></svg>',
-  metal:
-    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M8 1.8 13.4 4.9v6.2L8 14.2 2.6 11.1V4.9L8 1.8Z"/><path d="M2.6 4.9 8 8l5.4-3.1M8 8v6.2"/></svg>',
-  food: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 14.2V8.8"/><path d="M8 9.6C8 6.4 6.2 4.8 3.6 4.6c.2 3 1.9 4.7 4.4 5Z"/><path d="M8 9.6c0-3.2 1.8-4.8 4.4-5-.2 3-1.9 4.7-4.4 5Z"/></svg>',
-  energy:
-    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M9.3 1.6 4.2 8.9h3.2L6.4 14.4l5.4-7.6H8.5l.8-5.2Z"/></svg>',
-  microelectronics:
-    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><rect x="4.6" y="4.6" width="6.8" height="6.8" rx="1"/><rect x="7" y="7" width="2" height="2"/><path d="M6.4 4.6v-2M9.6 4.6v-2M6.4 13.4v-2M9.6 13.4v-2M4.6 6.4h-2M4.6 9.6h-2M13.4 6.4h-2M13.4 9.6h-2"/></svg>',
-};
 // --- TT-3.1: экран-дерево технологий ------------------------------------------
 // Само окно живёт в `techTree.ts` (REFM-9); здесь только его хуки. Ручка `#tech`
 // остаётся: её держат реестр слоёв Android-Back и троттлинг живой перерисовки в
@@ -8508,7 +8449,7 @@ function heroTreeHtml(hero: HeroInst): string {
       } else {
         cls += ' avail';
         crest = '◆';
-        foot = `<span class="hx-cost">${cost(nd.cost)}</span>`;
+        foot = `<span class="hx-cost">${cost(nd.cost, myRes())}</span>`;
       }
       const conn = nd.requires.length
         ? `<span class="hx-conn${rail.own && reqMet ? ' lit' : ''}"></span>`
@@ -8576,7 +8517,7 @@ function heroFittingsHtml(hero: HeroInst): string {
     const action = installed
       ? `<span class="hx-badge on">✓ ${t('hero.fit.installed')}</span>`
       : canFit
-        ? `<span class="hx-cost">${cost(fd.cost)}</span>`
+        ? `<span class="hx-cost">${cost(fd.cost, myRes())}</span>`
         : `<span class="hx-badge">${t('hero.fit.no-slots')}</span>`;
     const tap = canFit ? ` data-hfitd="${fid}"` : '';
     html +=
@@ -8645,7 +8586,7 @@ function heroDossierHtml(hero: HeroInst): string {
       ? `<div class="hx-drow"><span class="hx-ok">✓ ${t('hero.tree.unlocked')}</span></div>`
       : !branchOk
         ? `<div class="hx-drow"><span class="hx-no">${t('hero.tree.other-branch')}</span></div>`
-        : `<button class="hx-dbtn" data-hskill="${hero.id}" data-node="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.tree.unlock')} · ${cost(nd.cost)}</button>`;
+        : `<button class="hx-dbtn" data-hskill="${hero.id}" data-node="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.tree.unlock')} · ${cost(nd.cost, myRes())}</button>`;
     return (
       `<div class="hx-dossier">` +
       `<div class="hx-dh">${def?.branch ? `<span class="hx-tag">${esc(t(HERO_BRANCH_RU[def.branch] ?? def.branch))}</span>` : ''}<span class="hx-dnm">${esc(t(nd.name))}</span>${close}</div>` +
@@ -8653,7 +8594,7 @@ function heroDossierHtml(hero: HeroInst): string {
       (reqHtml
         ? `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.requires')}</span><span class="hx-dv">${reqHtml}</span></div>`
         : '') +
-      `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.cost')}</span><span class="hx-cost">${cost(nd.cost)}</span></div>` +
+      `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.cost')}</span><span class="hx-cost">${cost(nd.cost, myRes())}</span></div>` +
       btn +
       `</div>`
     );
@@ -8680,9 +8621,9 @@ function heroDossierHtml(hero: HeroInst): string {
       `<div class="hx-dossier">` +
       `<div class="hx-dh"><span class="hx-dnm">${esc(t(fd.name))}</span>${close}</div>` +
       (give ? `<div class="hx-give">${give}</div>` : '') +
-      `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.cost')}</span><span class="hx-cost">${cost(fd.cost)}</span></div>` +
+      `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.cost')}</span><span class="hx-cost">${cost(fd.cost, myRes())}</span></div>` +
       `<div class="hx-warn">${t('hero.fit.permanent')}</div>` +
-      `<button class="hx-dbtn danger" data-hfit="${hero.id}" data-fit="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.fit.install')} · ${cost(fd.cost)}</button>` +
+      `<button class="hx-dbtn danger" data-hfit="${hero.id}" data-fit="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.fit.install')} · ${cost(fd.cost, myRes())}</button>` +
       `</div>`
     );
   }
@@ -8721,19 +8662,17 @@ const resourceCard = initResourceCard({
 // @void/client `loadoutEditor` view-model — typed slots + live derived-stats + cost —
 // and confirms into `unit.build{modules}` (the core validates/prices/stamps the set).
 const constructorWin = $('constructor');
-type ConTab = 'ships' | 'squads' | 'army' | 'heroes';
+type ConTab = 'ships' | 'squads' | 'heroes';
 let conTab: ConTab = 'ships';
 const CON_TABS: [ConTab, string][] = [
   ['ships', 'yard.tab.ships'],
   ['squads', 'yard.tab.squads'],
-  ['army', 'yard.tab.army'],
   ['heroes', 'yard.tab.heroes'],
 ];
 // Buildable space hulls the «Корабли» pane fits; squadron/carrier hulls → the «Эскадрильи» pane.
 const CON_HULLS = ['cruiser', 'siege', 'scout', 'dropship'];
 const CON_SQUAD_HULLS = ['fighter_squadron', 'strike_carrier'];
 let conHull = 'cruiser';
-let conTplIdx = 0; // which division template the «Армия» pane is editing
 let conModules: string[] = [];
 let conCount = 1;
 let conPlanet = '';
@@ -8773,9 +8712,6 @@ function bagRu(bag: Record<string, number>): string {
     .filter(([, n]) => n)
     .map(([r, n]) => `${Math.round(n)} ${t(RES_RU[r] ?? r)}`);
   return parts.length ? parts.join(' · ') : t('yard.free');
-}
-function myRes(): Record<string, number> {
-  return (s.players[ME]?.resources ?? {}) as Record<string, number>;
 }
 /** One live stat row: label · base → effective (+delta) · track bar (base cyan, delta green). */
 function conBar(
@@ -8916,48 +8852,6 @@ function conLoadoutPane(hullList: string[]): string {
 }
 /** The «Армия» pane: edit a division template's 6 slots (per-player, global). Live
  *  aggregate stats + synergies; mobilisation stays in the planet panel. */
-function conArmyPane(): string {
-  const tpls = templatesOf(s, ME);
-  if (!tpls.length) return `<div class="cn-soon">${t('yard.div.empty')}</div>`;
-  const idx = Math.max(0, Math.min(conTplIdx, tpls.length - 1));
-  const tpl = tpls[idx]!;
-  const tabs = tpls
-    .map(
-      (tp, i) =>
-        `<button class="cn-hbtn${i === idx ? ' on' : ''}" data-contpl="${i}">⚔ ${esc(tp.name)}</button>`,
-    )
-    .join('');
-  const f = formationStats(tpl);
-  const slots = tpl.slots
-    .map((u, i) => {
-      const inner = u
-        ? `<span class="cn-fic">${formIcon(u, pcUi())}</span><span class="cn-fn">${esc(FORM_RU[u] ?? u)}</span>`
-        : `<span class="cn-fic dim">＋</span><span class="cn-fn dim">${t('yard.div.slot-empty')}</span>`;
-      return `<button class="cn-fslot${u ? ' filled' : ''}" data-confslot="${idx}|${i}">${inner}</button>`;
-    })
-    .join('');
-  const card =
-    `<div class="cn-hull"><div class="cn-hic">⚔</div><div><div class="cn-hn">${esc(tpl.name)}</div>` +
-    `<div class="cn-hm">${t('yard.div.slots', { n: String(f.count), s: String(FORMATION_SLOTS) })}</div></div></div>`;
-  const left =
-    `<div class="cn-fit"><div class="cn-hulls">${tabs}</div>${card}<div class="cn-fgrid">${slots}</div>` +
-    `<div class="cn-note">${t('yard.div.note')}</div></div>`;
-  const max = Math.max(1, f.attack, f.defense, f.hp);
-  const bars = [
-    conBar({ label: t('yard.div.attack'), base: f.attack, effective: f.attack, delta: 0 }, max),
-    conBar({ label: t('yard.div.defense'), base: f.defense, effective: f.defense, delta: 0 }, max),
-    conBar({ label: t('yard.div.hull'), base: f.hp, effective: f.hp, delta: 0 }, max),
-  ].join('');
-  const syn = f.synergies.length
-    ? `<div class="cn-ph" style="margin-top:14px">${t('yard.div.doctrine')}</div>` +
-      f.synergies.map((x) => `<div class="cn-syn">✦ ${esc(t(x.name))}</div>`).join('')
-    : `<div class="cn-note" style="margin-top:12px">${t('yard.div.doctrine.note')}</div>`;
-  const cost =
-    `<div class="cn-cost"><div class="cn-crow total"><span class="cn-cl">${t('yard.div.cost')}</span>` +
-    `<span class="cn-cv">${bagRu(f.cost)}</span></div></div>`;
-  const right = `<div class="cn-side"><div class="cn-ph">${t('yard.div.total')} — <em>${t('yard.cost.live')}</em></div>${bars}${syn}${cost}</div>`;
-  return `<div class="cn-grid">${left}${right}</div>`;
-}
 /** The «Герои» pane: the hero roster/штаб (folded from the old #hero window). The
  *  `#herobody` id keeps the `.hx-*` styling; hero clicks route via the constructor. */
 function conHeroPane(): string {
@@ -8971,9 +8865,7 @@ function renderConstructor(): void {
       ? conLoadoutPane(CON_HULLS)
       : conTab === 'squads'
         ? conLoadoutPane(CON_SQUAD_HULLS)
-        : conTab === 'army'
-          ? conArmyPane()
-          : conHeroPane();
+        : conHeroPane();
   constructorWin.innerHTML =
     `<div class="cnbox"><div class="cn-head"><b>${t('yard.title')}</b><button class="cn-close">✕</button></div>` +
     `<div class="cn-tabs">${CON_TABS.map(([k, l]) => tabBtn(k, l)).join('')}</div>` +
@@ -9032,22 +8924,6 @@ constructorWin.addEventListener('click', (e) => {
   const step = (tg.closest('[data-cncount]') as HTMLElement | null)?.dataset.cncount;
   if (step) {
     conCount = Math.max(1, Math.min(20, conCount + (step === '+' ? 1 : -1)));
-    renderConstructor();
-    return;
-  }
-  const tpl = (tg.closest('[data-contpl]') as HTMLElement | null)?.dataset.contpl;
-  if (tpl !== undefined) {
-    conTplIdx = Number(tpl);
-    renderConstructor();
-    return;
-  }
-  const fslot = (tg.closest('[data-confslot]') as HTMLElement | null)?.dataset.confslot;
-  if (fslot) {
-    const [ti, si] = fslot.split('|').map(Number);
-    const cur = templatesOf(s, ME)[ti!]?.slots[si!] ?? null;
-    const order: (string | null)[] = [null, ...FORMATION_UNITS];
-    const next = order[(order.indexOf(cur) + 1) % order.length] ?? null;
-    playerOrder(setDivisionTemplate(ME, ti!, si!, next));
     renderConstructor();
     return;
   }
@@ -10086,10 +9962,6 @@ const setupGoEl = $('setupgo') as HTMLButtonElement;
 // EDITORS were removed (modules unlock via tech in-match, so freezing a loadout before
 // the match is incoherent — loadout now happens in-match: ships at build time, heroes
 // in the capital). These default rosters still seed the match via buildSetupConfig.
-const setupTemplates: FormationTemplate[] = DEFAULT_TEMPLATES.map((t) => ({
-  name: t.name,
-  slots: [...t.slots],
-}));
 const setupHeroes: HeroLoadout[] = DEFAULT_HEROES.map((h) => ({
   name: h.name,
   grade: h.grade,
@@ -10405,7 +10277,6 @@ function buildSetupConfig(): SetupConfig {
     meta: metaGrant(loadMeta()),
     seats,
     ...(setupScientists.length ? { scientists: [...setupScientists] } : {}),
-    templates: setupTemplates.map((t) => ({ name: t.name, slots: [...t.slots] })),
     heroes: setupHeroes.map((h) => ({
       name: heroName(h),
       grade: h.grade,
@@ -10467,6 +10338,7 @@ function installMatch(state: GameState, aiPlayers: Set<string>): void {
   merging = false;
   additive = false;
   splitState = null;
+  troopsPlan = null;
   killStats = { destroyed: 0, lost: 0 };
   myBattleLocs.clear();
   memory.clear(); // fog memory belongs to the OLD match — stale intel must not carry over
@@ -10716,7 +10588,7 @@ function connect(): void {
           realAt: Date.now(),
         });
         if (diploOpen && diploTab === 'msgs') renderDiploFeed();
-        if (chatOpen && !chatMin) renderChatFeed();
+        chatWin.refreshIfVisible();
       },
       onPingRemoved: (pingId: string) => {
         sessionMessages = sessionMessages.filter((m) => m.pingId !== pingId);
@@ -10748,7 +10620,7 @@ function connect(): void {
         if (sessionMessages.length > 300) sessionMessages.shift();
         if (m.from !== ME) unreadMsgs++;
         if (diploOpen && diploTab === 'msgs') renderDiploFeed();
-        if (chatOpen && !chatMin) renderChatFeed();
+        chatWin.refreshIfVisible();
       },
       onError: (code) => {
         if (sock !== netSock) return; // ignore errors from a superseded socket
@@ -11689,15 +11561,15 @@ function topLayerOpen(): boolean {
     pingMenuLoc !== null ||
     pingPopEl?.classList.contains('show') ||
     splitState !== null ||
+    troopsPlan !== null ||
     codexEl?.classList.contains('show') ||
     logWin?.classList.contains('show') ||
     techWin.classList.contains('show') ||
-    divDesignWin.classList.contains('show') ||
     stewWin?.classList.contains('show') ||
     marketWin.classList.contains('show') ||
     resCardEl.classList.contains('show') ||
     diploOpen ||
-    chatOpen ||
+    chatWin.isOpen() ||
     setupEl.style.display !== 'none' ||
     selFleet !== null ||
     selPlanet !== null ||
@@ -11730,6 +11602,13 @@ function closeTopLayer(): boolean {
     lastPanelHtml = '';
     return true;
   }
+  if (troopsPlan !== null) {
+    // Поповер живёт внутри строки #cmdbar — прячет его ближайший renderCmdBar,
+    // но кэш надо сбить руками, иначе строка не изменится и DOM останется прежним.
+    troopsPlan = null;
+    lastCmdHtml = '';
+    return true;
+  }
   if (codexEl?.classList.contains('show')) {
     codexEl.classList.remove('show');
     return true;
@@ -11740,11 +11619,6 @@ function closeTopLayer(): boolean {
   }
   if (techWin.classList.contains('show')) {
     techWin.classList.remove('show');
-    return true;
-  }
-  if (divDesignWin.classList.contains('show')) {
-    divDesignWin.classList.remove('show');
-    lastPanelHtml = '';
     return true;
   }
   if (stewWin?.classList.contains('show')) {
@@ -11763,8 +11637,8 @@ function closeTopLayer(): boolean {
     closeDiplo();
     return true;
   }
-  if (chatOpen) {
-    closeChat();
+  if (chatWin.isOpen()) {
+    chatWin.close();
     return true;
   }
   if (selFleet !== null || selPlanet !== null || selFleets.size > 0) {
@@ -12227,376 +12101,6 @@ document.getElementById('rail-msgs')?.addEventListener('click', () => {
   openDiplo('msgs');
 });
 
-// === floating chat window (desktop only) =====================================
-// A naive profanity scrub for the optional censor toggle — whole-word match, the
-// letters swapped for asterisks (length kept so the line doesn't reflow).
-const CHAT_BADWORDS = ['идиот', 'дурак', 'тупой', 'damn', 'hell', 'crap'];
-function censorText(text: string): string {
-  let out = text;
-  for (const w of CHAT_BADWORDS)
-    out = out.replace(new RegExp(w, 'gi'), (m) => '*'.repeat(m.length));
-  return out;
-}
-/** The chat's tabs: the three fixed group rooms, then a tab per DM that exists (plus
- *  the open one). Other rooms (e.g. a coalition-to-coalition line) join here later. */
-function chatChannels(): Array<{ key: string; label: string; icon: string }> {
-  const base = [
-    { key: CH_SESSION, label: t('chat.tab.session'), icon: '△' },
-    { key: CH_GLOBAL, label: t('chat.tab.global'), icon: '🌐' },
-    { key: COALITION, label: t('chat.tab.coalition'), icon: '⬡' },
-  ];
-  const dm = new Set<string>();
-  for (const m of sessionMessages) {
-    if (GROUP_CHANNELS.has(m.to)) continue;
-    if (m.from === ME) dm.add(m.to);
-    else if (m.to === ME) dm.add(m.from);
-  }
-  if (!GROUP_CHANNELS.has(chatTab)) dm.add(chatTab); // keep a freshly opened DM's tab
-  for (const id of dm)
-    if (s.players[id]) base.push({ key: id, label: NAME[id] ?? id, icon: seatBadge(id).icon });
-  return base;
-}
-function chatChannelLabel(key: string): string {
-  return chatChannels().find((c) => c.key === key)?.label ?? NAME[key] ?? key;
-}
-/** Cap geometry at half the screen and keep the window on-screen (title bar reachable). */
-function clampChatGeom(): void {
-  const maxW = Math.max(220, Math.floor(VW / 2));
-  const maxH = Math.max(150, Math.floor(VH / 2));
-  chatGeom.w = Math.max(220, Math.min(chatGeom.w, maxW));
-  chatGeom.h = Math.max(150, Math.min(chatGeom.h, maxH));
-  chatGeom.x = Math.max(0, Math.min(chatGeom.x, Math.max(0, VW - chatGeom.w)));
-  chatGeom.y = Math.max(46, Math.min(chatGeom.y, Math.max(46, VH - 40)));
-}
-/** Push geometry / opacity / font to the DOM without rebuilding it (frame-safe). */
-function applyChatGeom(): void {
-  const win = document.getElementById('chatwin');
-  if (!win) return;
-  const st = (win as HTMLElement).style;
-  st.left = chatGeom.x + 'px';
-  st.top = chatGeom.y + 'px';
-  st.width = chatGeom.w + 'px';
-  st.height = chatMin ? 'auto' : chatGeom.h + 'px';
-  // Transparency fades both the fill AND the frame (not element opacity — that would
-  // dim the settings popover and text too). Background and border alpha track together.
-  const k = 1 - chatCfg.transparency / 100;
-  st.background = `rgba(3,14,18,${(0.82 * k).toFixed(3)})`;
-  st.borderColor = `rgba(53,214,230,${k.toFixed(3)})`;
-  const feed = document.getElementById('cw-feed') as HTMLElement | null;
-  if (feed) feed.style.fontSize = chatCfg.fontPx + 'px';
-}
-function chatFeedInnerHtml(key: string): string {
-  const msgs = convoMessages(key);
-  if (!msgs.length)
-    return `<div class="cw-empty">${t('chat.win.empty', { ch: esc(chatChannelLabel(key)) })}<br>${t('chat.win.empty.hint')}</div>`;
-  const stamp: StampOpts = { day: chatCfg.showDay, time: chatCfg.showTime, real: chatCfg.showReal };
-  return msgs
-    .map((m) => convoLineHtml(chatCfg.censor ? { ...m, text: censorText(m.text) } : m, stamp))
-    .join('');
-}
-function renderChatFeed(): void {
-  const feed = document.getElementById('cw-feed');
-  if (!feed) return;
-  feed.innerHTML = chatFeedInnerHtml(chatTab);
-  (feed as HTMLElement).scrollTop = (feed as HTMLElement).scrollHeight;
-}
-/** Settings popover (flown out to the right): size (h,w on one line), font, colour
- *  (sub-only, label inline), censor, transparency, and the message-stamp toggles.
- *  Inputs carry data-cset; their handler patches state live and caches it. */
-function chatSettingsHtml(): string {
-  const maxW = Math.max(220, Math.floor(VW / 2));
-  const maxH = Math.max(150, Math.floor(VH / 2));
-  const chk = (on: boolean) => (on ? ' checked' : '');
-  return (
-    `<div class="cw-set">` +
-    `<h4>${t('settings.title')}</h4>` +
-    `<div class="cw-srow"><label>${t('chat.win.size')}</label>` +
-    `<input type="number" data-cset="h" min="150" max="${maxH}" value="${chatGeom.h}">` +
-    `<input type="number" data-cset="w" min="220" max="${maxW}" value="${chatGeom.w}"></div>` +
-    `<div class="cw-srow"><label>${t('chat.win.font')}</label><input type="number" data-cset="font" min="8" max="42" value="${chatCfg.fontPx}"></div>` +
-    `<div class="cw-srow"><label>${t('chat.win.color')}</label><input type="color" data-cset="color" value="#7fe7ff" disabled><span class="cw-sub">🔒 ${t('chat.win.color.premium')}</span></div>` +
-    `<div class="cw-srow"><label>${t('chat.win.censor')}</label><input type="checkbox" data-cset="censor"${chk(chatCfg.censor)}></div>` +
-    `<div class="cw-srow"><label>${t('chat.win.opacity')}</label><input type="range" data-cset="opacity" min="0" max="100" value="${chatCfg.transparency}"><span class="cw-opval">${chatCfg.transparency}%</span></div>` +
-    `<div class="cw-shdr">${t('chat.win.stamp')}</div>` +
-    `<div class="cw-srow"><label>${t('chat.win.stamp.day')}</label><input type="checkbox" data-cset="showDay"${chk(chatCfg.showDay)}></div>` +
-    `<div class="cw-srow"><label>${t('chat.win.stamp.time')}</label><input type="checkbox" data-cset="showTime"${chk(chatCfg.showTime)}></div>` +
-    `<div class="cw-srow"><label>${t('chat.win.stamp.real')}</label><input type="checkbox" data-cset="showReal"${chk(chatCfg.showReal)}></div>` +
-    `</div>`
-  );
-}
-/** Full (innerHTML) rebuild — only on an interaction (open / tab / button), never per
- *  frame. Geometry/feed are then applied/patched in place. */
-function renderChat(): void {
-  const win = document.getElementById('chatwin');
-  if (!win) return;
-  win.classList.toggle('open', chatOpen);
-  win.classList.toggle('min', chatMin);
-  win.classList.toggle('pinned', chatPinned);
-  if (!chatOpen) {
-    win.innerHTML = '';
-    return;
-  }
-  const tabs = chatChannels()
-    .map(
-      (c) =>
-        `<button class="cw-tab${c.key === chatTab ? ' on' : ''}" data-cwtab="${esc(c.key)}" title="${esc(c.label)}">${c.icon} ${esc(c.label)}</button>`,
-    )
-    .join('');
-  win.innerHTML =
-    `<div class="cw-head" data-cwhead title="${chatPinned ? '' : t('chat.win.drag')}">` +
-    `<span class="cw-title">${t('chat.win.title', { ch: esc(chatChannelLabel(chatTab)) })}</span>` +
-    `<button class="cw-btn${chatPinned ? ' on' : ''}" data-cwact="pin" title="${t('chat.win.pin')}">📎</button>` +
-    `<button class="cw-btn${chatSettingsOpen ? ' on' : ''}" data-cwact="settings" title="${t('chat.win.settings')}">⚙</button>` +
-    `<button class="cw-btn" data-cwact="min" title="${chatMin ? t('chat.win.expand') : t('chat.win.collapse')}">${chatMin ? '▢' : '—'}</button>` +
-    `</div>` +
-    `<div class="cw-tabs">${tabs}</div>` +
-    `<div class="cw-feed" id="cw-feed">${chatFeedInnerHtml(chatTab)}</div>` +
-    `<div class="cw-compose"><input id="cw-text" type="text" maxlength="240" placeholder="${t('chat.input.ph')}" autocomplete="off"><button class="cw-send" data-cwact="send" title="${t('chat.win.send')}">▶</button></div>` +
-    (chatSettingsOpen ? chatSettingsHtml() : '');
-  applyChatGeom();
-  const feed = document.getElementById('cw-feed') as HTMLElement | null;
-  if (feed) feed.scrollTop = feed.scrollHeight;
-}
-const CHAT_STORE_KEY = 'vd.chat.v1';
-/** Persist chat preferences client-side (localStorage) — never on the server, so the
- *  same machine reopens to the same look. Geometry, pin and every setting ride along. */
-function saveChat(): void {
-  try {
-    if (typeof localStorage === 'undefined') return;
-    localStorage.setItem(
-      CHAT_STORE_KEY,
-      JSON.stringify({ cfg: chatCfg, geom: chatGeom, pinned: chatPinned }),
-    );
-  } catch {
-    /* storage disabled / full — preferences just won't persist */
-  }
-}
-/** Restore cached chat preferences (once, at startup). Marks the window placed so its
- *  first open uses the saved geometry instead of the default bottom-left parking. */
-function loadChat(): void {
-  try {
-    if (typeof localStorage === 'undefined') return;
-    const raw = localStorage.getItem(CHAT_STORE_KEY);
-    if (!raw) return;
-    const v = JSON.parse(raw) as {
-      cfg?: Partial<typeof chatCfg>;
-      geom?: Partial<typeof chatGeom>;
-      pinned?: boolean;
-    };
-    if (v.cfg) Object.assign(chatCfg, v.cfg);
-    if (v.geom) {
-      Object.assign(chatGeom, v.geom);
-      chatPlaced = true;
-    }
-    if (typeof v.pinned === 'boolean') chatPinned = v.pinned;
-  } catch {
-    /* corrupt cache — fall back to defaults */
-  }
-}
-function openChat(): void {
-  if (MOBILE) return;
-  chatOpen = true;
-  chatMin = false;
-  if (!chatPlaced) {
-    // First open (no cached geometry): park it in the bottom-left corner.
-    chatGeom.w = Math.min(360, Math.max(220, Math.floor(VW / 2)));
-    chatGeom.h = Math.min(300, Math.max(150, Math.floor(VH / 2)));
-    chatGeom.x = 12;
-    chatGeom.y = Math.max(46, VH - chatGeom.h - 12);
-    chatPlaced = true;
-    saveChat();
-  }
-  clampChatGeom();
-  renderChat();
-  (document.getElementById('cw-text') as HTMLInputElement | null)?.focus?.();
-}
-function closeChat(): void {
-  chatOpen = false;
-  chatMin = false;
-  renderChat();
-}
-function sendChatMsg(): void {
-  const input = document.getElementById('cw-text') as HTMLInputElement | null;
-  const text = input?.value.trim();
-  if (!text) return;
-  dispatchChat(chatTab, text); // NET: server relay + echo; solo: local append
-  if (input) {
-    input.value = '';
-    input.focus?.();
-  }
-}
-/** Mirror a drag back into the size fields while the settings popover is open. */
-function syncChatSizeInputs(): void {
-  const w = document.querySelector('[data-cset="w"]') as HTMLInputElement | null;
-  const h = document.querySelector('[data-cset="h"]') as HTMLInputElement | null;
-  if (w) w.value = String(chatGeom.w);
-  if (h) h.value = String(chatGeom.h);
-}
-/** Which window edge (n/s/e/w + corners, or '') the pointer is within a few px of —
- *  drives both the resize cursor and which edge a drag from here moves. */
-function chatEdgeAt(e: PointerEvent): string {
-  if (!chatwinEl) return '';
-  const r = (chatwinEl as HTMLElement).getBoundingClientRect();
-  const EDGE = 7;
-  const x = e.clientX - r.left;
-  const y = e.clientY - r.top;
-  let d = '';
-  if (y <= EDGE) d += 'n';
-  else if (y >= r.height - EDGE) d += 's';
-  if (x <= EDGE) d += 'w';
-  else if (x >= r.width - EDGE) d += 'e';
-  return d;
-}
-function chatResizeCursor(d: string): string {
-  if (d === 'n' || d === 's') return 'ns-resize';
-  if (d === 'e' || d === 'w') return 'ew-resize';
-  if (d === 'ne' || d === 'sw') return 'nesw-resize';
-  if (d === 'nw' || d === 'se') return 'nwse-resize';
-  return '';
-}
-loadChat(); // restore cached preferences before the window can be opened
-document
-  .getElementById('rail-chat')
-  ?.addEventListener('click', () => (chatOpen ? closeChat() : openChat()));
-const chatwinEl = document.getElementById('chatwin');
-if (chatwinEl) {
-  // Begin a gesture: a drag near any edge resizes in that direction; a drag on the
-  // title bar moves the window. The pin (📎) locks both. Interactive controls opt out.
-  chatwinEl.addEventListener('pointerdown', (e) => {
-    const t = e.target as HTMLElement;
-    if (t.closest('button, input, .cw-tab, .cw-set')) return;
-    if (chatPinned) return;
-    const pe = e as PointerEvent;
-    const dir = chatMin ? '' : chatEdgeAt(pe); // collapsed → no resize, header still moves
-    const onHead = !!t.closest('[data-cwhead]');
-    if (!dir && !onHead) return;
-    e.preventDefault();
-    chatDrag = {
-      mode: dir ? 'resize' : 'move',
-      dir,
-      px: pe.clientX,
-      py: pe.clientY,
-      gx: chatGeom.x,
-      gy: chatGeom.y,
-      gw: chatGeom.w,
-      gh: chatGeom.h,
-    };
-  });
-  // Hover cursor: show the resize arrow when near an edge (unless pinned/collapsed).
-  chatwinEl.addEventListener('pointermove', (e) => {
-    if (chatDrag) return; // an active gesture owns the cursor
-    const dir = !chatPinned && !chatMin ? chatEdgeAt(e as PointerEvent) : '';
-    (chatwinEl as HTMLElement).style.cursor = chatResizeCursor(dir);
-  });
-  // Tabs / head buttons / send.
-  chatwinEl.addEventListener('click', (e) => {
-    const t = e.target as HTMLElement;
-    const nick = (t.closest('[data-nickseat]') as HTMLElement | null)?.dataset.nickseat;
-    if (nick) return openSeatCard(nick);
-    const tab = (t.closest('[data-cwtab]') as HTMLElement | null)?.dataset.cwtab;
-    if (tab) {
-      chatTab = tab;
-      renderChat();
-      (document.getElementById('cw-text') as HTMLInputElement | null)?.focus?.();
-      return;
-    }
-    const act = (t.closest('[data-cwact]') as HTMLElement | null)?.dataset.cwact;
-    if (act === 'pin') {
-      chatPinned = !chatPinned;
-      saveChat();
-      renderChat();
-    } else if (act === 'settings') {
-      chatSettingsOpen = !chatSettingsOpen;
-      renderChat();
-    } else if (act === 'min') {
-      chatMin = !chatMin;
-      renderChat();
-    } else if (act === 'send') {
-      sendChatMsg();
-    }
-  });
-  chatwinEl.addEventListener('keydown', (e) => {
-    const ke = e as KeyboardEvent;
-    if (ke.key === 'Enter' && (ke.target as HTMLElement).id === 'cw-text') {
-      e.preventDefault();
-      sendChatMsg();
-    }
-  });
-  // Live settings: size/font/opacity patch geometry in place (no rebuild → no focus
-  // loss); stamp + censor toggles repaint just the feed. Every change is cached.
-  chatwinEl.addEventListener('input', (e) => {
-    const t = e.target as HTMLInputElement;
-    const k = t.dataset.cset;
-    if (!k) return;
-    if (k === 'w') {
-      chatGeom.w = Number(t.value) || chatGeom.w;
-      clampChatGeom();
-      applyChatGeom();
-    } else if (k === 'h') {
-      chatGeom.h = Number(t.value) || chatGeom.h;
-      clampChatGeom();
-      applyChatGeom();
-    } else if (k === 'font') {
-      chatCfg.fontPx = Math.max(8, Math.min(42, Number(t.value) || chatCfg.fontPx));
-      applyChatGeom();
-    } else if (k === 'opacity') {
-      chatCfg.transparency = Math.max(0, Math.min(100, Number(t.value) || 0));
-      applyChatGeom();
-      const lbl = chatwinEl.querySelector('.cw-opval');
-      if (lbl) lbl.textContent = chatCfg.transparency + '%';
-    } else if (k === 'censor') {
-      chatCfg.censor = t.checked;
-      renderChatFeed();
-    } else if (k === 'showDay') {
-      chatCfg.showDay = t.checked;
-      renderChatFeed();
-    } else if (k === 'showTime') {
-      chatCfg.showTime = t.checked;
-      renderChatFeed();
-    } else if (k === 'showReal') {
-      chatCfg.showReal = t.checked;
-      renderChatFeed();
-    }
-    saveChat();
-  });
-}
-if (typeof window !== 'undefined') {
-  window.addEventListener('pointermove', (e) => {
-    if (!chatDrag) return;
-    const pe = e as PointerEvent;
-    const dx = pe.clientX - chatDrag.px;
-    const dy = pe.clientY - chatDrag.py;
-    if (chatDrag.mode === 'move') {
-      chatGeom.x = chatDrag.gx + dx;
-      chatGeom.y = chatDrag.gy + dy;
-    } else {
-      const maxW = Math.max(220, Math.floor(VW / 2));
-      const maxH = Math.max(150, Math.floor(VH / 2));
-      const d = chatDrag.dir;
-      // Edges anchored opposite the drag: pulling 'w'/'n' moves that edge while the
-      // far edge stays put (so the box grows toward the pointer, not away from it).
-      if (d.includes('e')) chatGeom.w = chatDrag.gw + dx;
-      if (d.includes('s')) chatGeom.h = chatDrag.gh + dy;
-      if (d.includes('w')) {
-        const nw = Math.max(220, Math.min(chatDrag.gw - dx, maxW));
-        chatGeom.x = chatDrag.gx + (chatDrag.gw - nw);
-        chatGeom.w = nw;
-      }
-      if (d.includes('n')) {
-        const nh = Math.max(150, Math.min(chatDrag.gh - dy, maxH));
-        chatGeom.y = chatDrag.gy + (chatDrag.gh - nh);
-        chatGeom.h = nh;
-      }
-    }
-    clampChatGeom();
-    applyChatGeom();
-    if (chatDrag.mode === 'resize' && chatSettingsOpen) syncChatSizeInputs();
-  });
-  window.addEventListener('pointerup', () => {
-    if (chatDrag) saveChat(); // cache the new geometry once the drag ends
-    chatDrag = null;
-  });
-}
 
 function toggleSet<T>(set: Set<T>, v: T): void {
   if (set.has(v)) set.delete(v);

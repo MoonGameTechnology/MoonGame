@@ -44,6 +44,9 @@ export interface Dossier {
 export interface DossierHost {
   /** The current match state (read fresh on every call — it is replaced, not mutated). */
   state(): GameState;
+  /** Whose treasury prices are checked against — the player you are. The codex card
+   *  marks each unaffordable resource with its exact deficit (cost(bag, have)). */
+  me(): string;
   /** PC layout? The desktop tooltip shows the name alone; mobile keeps a filler line. */
   pcUi(): boolean;
   /** Your side's colour, for the unit silhouettes in codex cards. */
@@ -278,6 +281,8 @@ export function createDossiers(host: DossierHost): {
   codexHtml: (kind: string, id: string) => string;
 } {
   const unitDos = (id: string): Dossier | null => unitDossier(id, host.pcUi());
+  /** Казна зрителя на момент отрисовки — `have` для ценников карточек. */
+  const treasury = (): Record<string, number> => host.state().players[host.me()]?.resources ?? {};
 
   function constructionDossier(key: string): Dossier | null {
     const s = host.state();
@@ -437,7 +442,7 @@ export function createDossiers(host: DossierHost): {
       const lv = buildingLevel(def, 1);
       const maxLvl = 1 + (def.upgrades?.length ?? 0);
       const rows = [
-        cxRow(t('codex.row.cost'), cost(def.cost)),
+        cxRow(t('codex.row.cost'), cost(def.cost, treasury())),
         cxRow(t('codex.row.build-time'), t('codex.value.hours', { n: def.buildTimeHours ?? 0 })),
         cxRow(t('codex.row.hp'), String(def.hp ?? 0)),
       ];
@@ -480,7 +485,7 @@ export function createDossiers(host: DossierHost): {
       if (!def) return '';
       const rows = [
         cxRow(t('codex.row.slot'), tData(def.slot)),
-        cxRow(t('codex.row.cost'), cost(def.cost)),
+        cxRow(t('codex.row.cost'), cost(def.cost, treasury())),
       ];
       for (const [k, v] of Object.entries(def.effects?.stats ?? {}))
         rows.push(cxRow(tData(k), String(v)));
@@ -492,7 +497,7 @@ export function createDossiers(host: DossierHost): {
     if (kind === 'hf') {
       const def = data.heroFittings[id];
       if (!def) return '';
-      const rows = [cxRow(t('codex.row.cost'), cost(def.cost))];
+      const rows = [cxRow(t('codex.row.cost'), cost(def.cost, treasury()))];
       for (const [k, v] of Object.entries(def.statMods ?? {}))
         rows.push(cxRow(tData(k), (v > 0 ? '+' : '') + String(v)));
       return (
@@ -504,7 +509,7 @@ export function createDossiers(host: DossierHost): {
     if (!def) return '';
     const st = def.stats;
     const rows = [
-      cxRow(t('codex.row.cost'), cost(def.cost)),
+      cxRow(t('codex.row.cost'), cost(def.cost, treasury())),
       cxRow(t('codex.row.build-time'), t('codex.value.hours', { n: def.buildTimeHours ?? 0 })),
       cxRow(t('codex.row.atk-def'), `${st.attack ?? 0} / ${st.defense ?? 0}`),
       cxRow(t('codex.row.hull'), String(st.hp ?? 0)),
@@ -520,8 +525,12 @@ export function createDossiers(host: DossierHost): {
       .map(([r, n]) => t('codex.value.per-day', { n: n ?? 0, r: tData(r) }))
       .join(', ');
     if (upkeep) rows.push(cxRow(t('codex.row.upkeep'), upkeep));
-    const tags = [def.domain ?? 'space', def.line, ...(def.traits ?? [])]
-      .filter((x): x is string => !!x)
+    // Домен и трейты могут нести один и тот же ключ (у наземных юнитов domain:
+    // 'ground' И трейт 'ground' — два разных механических флага, см. fleetLaunch
+    // vs fleetOps), а игроку это одна и та же «земля» — схлопываем дубли.
+    const tags = [
+      ...new Set([def.domain ?? 'space', def.line, ...(def.traits ?? [])].filter((x): x is string => !!x)),
+    ]
       .map((x) => tData(x))
       .join(', ');
     if (tags) rows.push(cxRow(t('codex.row.class'), tags));

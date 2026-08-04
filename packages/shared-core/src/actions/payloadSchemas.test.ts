@@ -41,11 +41,6 @@ const CLIENT_ACTION_TYPES = [
   'fleet.split',
   'fleet.engage',
   'capital.designate',
-  'division.mobilize',
-  'division.template',
-  'division.rename',
-  'division.load',
-  'division.unload',
   'steward.delegate',
   'steward.recall',
   'steward.holdpoint',
@@ -111,13 +106,6 @@ describe('SV-1.2 · action payload schemas', () => {
       ['fleet.split', { fleetId: 'f1', take: [{ unit: 'fighter_squadron', count: 2 }] }],
       ['fleet.engage', { fleetId: 'f1', targetId: 'f2' }],
       ['capital.designate', { planetId: 'p1' }],
-      ['division.mobilize', { planetId: 'p1', template: 0 }],
-      ['division.mobilize', { planetId: 'p1', template: 1, officer: true }], // officer premade (BF-20)
-      ['division.template', { template: 0, slot: 2, unit: 'tank' }],
-      ['division.template', { template: 0, slot: 2, unit: null }], // clear the slot
-      ['division.rename', { template: 0, name: 'Гвардия' }], // custom-template rename (BF-20)
-      ['division.load', { divisionId: 'div:1', fleetId: 'f1' }],
-      ['division.unload', { divisionId: 'div:1' }],
       ['steward.delegate', { posture: 'defend', until: 123456 }],
       ['steward.recall', {}],
       ['steward.holdpoint', { planetId: 'p1', on: true }],
@@ -211,5 +199,21 @@ describe('SV-1.2 · action payload schemas', () => {
     expect(isValidActionPayload('arrive', { fleetId: 'f1', at: 'p1' })).toBe(false);
     expect(isValidActionPayload('fleet.arrival', { fleetId: 'f1' })).toBe(false);
     expect(isValidActionPayload('nonsense.type', {})).toBe(false);
+  });
+
+  it('H4-REVERT: division.* больше не client-submittable', () => {
+    // Надгробие сноса H4. Схемы действий — это ВНЕШНЯЯ дверь: пока тип здесь описан,
+    // гейтованный сервер принимает его от клиента и несёт в редьюсер, где обработчика
+    // больше нет. Оставить схему живой после сноса модуля значит оставить дверь в
+    // пустую комнату, а не закрыть её.
+    for (const type of [
+      'division.mobilize',
+      'division.template',
+      'division.rename',
+      'division.load',
+      'division.unload',
+    ]) {
+      expect(isValidActionPayload(type, { planetId: 'p1', template: 0 })).toBe(false);
+    }
   });
 });

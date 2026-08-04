@@ -29,6 +29,7 @@ function homeState(): { s: GameState; homeId: string } {
 function hostOf(over: Partial<DossierHost> = {}): DossierHost {
   return {
     state: () => newGame(),
+    me: () => 'p1',
     pcUi: () => true,
     youColor: () => '#3ad17a',
     queueOf: () => ({ buildings: [], units: [] }) as PlanetBuildQueue,
@@ -221,6 +222,18 @@ describe('codex — карточка полной информации', () => {
     const ground = codexHtml('u', 'militia');
     expect(ground).not.toBe('');
     expect(ground).not.toContain('#3ad17a'); // наземные держат текстовый глиф
+  });
+
+  it('строка «Класс» не повторяет один тег дважды (domain и трейт делят ключ)', () => {
+    // У наземных юнитов domain: 'ground' И трейт 'ground' — два разных механических
+    // флага (fleetLaunch читает трейт, fleetOps — домен), но игроку это одна «земля».
+    // До фикса танк показывал «земля, передняя линия, земля».
+    const html = codexHtml('u', 'tank');
+    const classRow = /Класс<\/span><span class="cx-v">([^<]*)</.exec(html)?.[1] ?? '';
+    expect(classRow).not.toBe('');
+    const parts = classRow.split(', ');
+    expect(new Set(parts).size).toBe(parts.length); // ни один тег не встречается дважды
+    expect(parts.filter((p) => p === 'земля')).toHaveLength(1);
   });
 
   it('статья глоссария экранируется и помечена как механика', () => {

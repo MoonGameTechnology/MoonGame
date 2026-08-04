@@ -49,7 +49,7 @@ sudo apt-get update && sudo apt-get upgrade -y
 
 ```bash
 # Скачай репозиторий (если еще не скачан)
-git clone https://github.com/Moonwuk/moongame.git
+git clone https://github.com/MoonGameTechnology/MoonGame.git
 cd moongame
 
 # Или если уже есть репозиторий
@@ -367,7 +367,7 @@ ssh-keygen -t ed25519 -f ~/.ssh/moongame_deploy -N ""
 
 # Используй SSH для клонирования
 cd /opt/moongame
-git remote set-url origin git@github.com:Moonwuk/moongame.git
+git remote set-url origin git@github.com:MoonGameTechnology/MoonGame.git
 ```
 
 ### Переменные окружения
@@ -417,7 +417,7 @@ docker exec -it $(docker ps -qf "name=postgres") psql -U void -d void -c "SELECT
 
 ### Контакты
 
-- GitHub Issues: https://github.com/Moonwuk/moongame/issues
+- GitHub Issues: https://github.com/MoonGameTechnology/MoonGame/issues
 - Документация: `docs/` в репозитории
 
 ---

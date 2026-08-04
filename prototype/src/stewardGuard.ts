@@ -26,12 +26,11 @@ import {
   type Fleet,
   type UnitStack,
 } from '../../packages/shared-core/src/index';
-import { findHealthyStack } from '../../packages/shared-core/src/util/stacks';
+import { findHealthyStack, sumUnitStat } from '../../packages/shared-core/src/util/stacks';
 import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet';
 import { act, moveFleet, loadArmy, engageFleet, orderScramble } from './actions';
 import { data } from './prototypeData';
 import { ctx } from './protoKernel';
-import { fleetCargoFree } from './division';
 import { fleetHasSquadron } from './squadron';
 import type { Patrol } from './patrol';
 
@@ -115,9 +114,12 @@ export function stewardGuardOrders(
   const tasked = new Set<string>();
   const idleOwn = (f: Fleet): boolean =>
     f.owner === ai && f.location != null && !f.movement && !f.battleId && !tasked.has(f.id);
-  // fleetCargoFree, not a local re-count: the hold is shared with carried DIVISIONS
+  // Свободный трюм = грузоподъёмность кораблей минус уже погруженный десант.
+  // Раньше это считал `fleetCargoFree` из division.ts, потому что трюм делили с
+  // дивизиями; после H4-REVERT делить не с кем — остаётся одна вычитание.
   // too — a transport already ferrying a formation must not be over-filled.
-  const freeHold = (f: Fleet): number => fleetCargoFree(state, f);
+  const freeHold = (f: Fleet): number =>
+    sumUnitStat(f.units, data, 'cargoCapacity') - sumUnitStat(f.landing ?? [], data, 'cargoSize');
 
   for (const p of mine) {
     const threats = threatsOf(p.id);

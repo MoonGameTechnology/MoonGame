@@ -84,27 +84,25 @@ export function archPath2d(arch: keyof typeof ARCHETYPE_PATH): Path2D {
   return (ARCH_PATH2D[arch] ??= new Path2D(ARCHETYPE_PATH[arch]));
 }
 
-/** Ground-roster icon, per layout. Mobile keeps the original emoji (phone fonts render
- *  them); PC monospace stacks have no glyph for 🪖👥🎖 — they came out as tofu ▯ — so the
- *  desktop gets text glyphs from the same family as `UNIT_ICON`. The caller passes the
- *  layout flag: a leaf module must not reach for the host's `pcUi()`. */
-const FORM_ICON_EMOJI: Record<string, string> = {
-  militia: '👥',
-  heavy_infantry: '🪖',
-  special_forces: '🎖',
-  tank: '🛡',
-};
-const FORM_ICON_TEXT: Record<string, string> = {
-  militia: '▿',
-  heavy_infantry: '◆',
-  special_forces: '✱',
-  tank: '▰',
-};
-export function formIcon(type: string, pcUi: boolean): string {
-  return (pcUi ? FORM_ICON_TEXT[type] : FORM_ICON_EMOJI[type]) ?? '▪';
-}
 
 // Sovereigns (donate currency): faceted-gem line icon per the mock — worn GOLD with a
 // soft halo (the mock capsule is lavender; the brief keeps the game's gold identity).
 export const SOV_SVG =
   '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M8 1.8 11.8 6 8 14.2 4.2 6 8 1.8Z"/><path d="M4.2 6h7.6M8 1.8 6.3 6l1.7 8.2M8 1.8 9.7 6"/></svg>';
+
+// The five session resources: inline-SVG line art traced from the mock (two coin
+// rings, isometric cube, sprout, bolt, IC chip), stroke=currentColor so ONE
+// stylesheet accent (`--rc-*` / `.rc-*`) tints the icon wherever it appears — the
+// top bar, cost rows, the market book, tech-tree prices. One dictionary, one look:
+// a player who learned the bar reads every other surface for free.
+export const RES_SVG: Record<string, string> = {
+  credits:
+    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="6" cy="6.2" r="3.9"/><circle cx="10" cy="9.8" r="3.9"/></svg>',
+  metal:
+    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"><path d="M8 1.8 13.4 4.9v6.2L8 14.2 2.6 11.1V4.9L8 1.8Z"/><path d="M2.6 4.9 8 8l5.4-3.1M8 8v6.2"/></svg>',
+  food: '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M8 14.2V8.8"/><path d="M8 9.6C8 6.4 6.2 4.8 3.6 4.6c.2 3 1.9 4.7 4.4 5Z"/><path d="M8 9.6c0-3.2 1.8-4.8 4.4-5-.2 3-1.9 4.7-4.4 5Z"/></svg>',
+  energy:
+    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><path d="M9.3 1.6 4.2 8.9h3.2L6.4 14.4l5.4-7.6H8.5l.8-5.2Z"/></svg>',
+  microelectronics:
+    '<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"><rect x="4.6" y="4.6" width="6.8" height="6.8" rx="1"/><rect x="7" y="7" width="2" height="2"/><path d="M6.4 4.6v-2M9.6 4.6v-2M6.4 13.4v-2M9.6 13.4v-2M4.6 6.4h-2M4.6 9.6h-2M13.4 6.4h-2M13.4 9.6h-2"/></svg>',
+};

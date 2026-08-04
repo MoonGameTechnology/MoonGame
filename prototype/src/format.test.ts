@@ -66,11 +66,31 @@ describe('format — числа', () => {
 });
 
 describe('format — ресурсы', () => {
-  it('cost отдаёт РАЗМЕТКУ с подкраской по ресурсу', () => {
-    expect(cost({ metal: 80 })).toBe('<span class="rc-metal">80❒</span>');
-    expect(cost({ metal: 80, credits: 20 })).toBe(
-      '<span class="rc-metal">80❒</span> <span class="rc-credits">20⛁</span>',
-    );
+  it('cost отдаёт чипы: ТОТ ЖЕ SVG, что в баре, + подкраска по ресурсу', () => {
+    const one = cost({ metal: 80 });
+    expect(one).toContain('class="rcost rc-metal"');
+    expect(one).toContain('<svg'); // единая иконка бара, не текстовый глиф
+    expect(one).toContain('>80<');
+    expect(one).not.toContain('❒'); // старый глиф в innerHTML-поверхностях умер
+    const two = cost({ metal: 80, credits: 20 });
+    expect(two).toContain('rc-metal');
+    expect(two).toContain('rc-credits');
+  });
+
+  it('cost с казной красит нехватку и называет точный дефицит', () => {
+    // Казна 50 металла из 80 и 25 кредитов из 20: металл — красный с «−30»,
+    // кредиты — обычный чип (хватает).
+    const html = cost({ metal: 80, credits: 20 }, { metal: 50, credits: 25 });
+    expect(html).toContain('rcost rc-metal short');
+    expect(html).toContain('>−30</em>');
+    expect(html).toContain('не хватает 30'); // подсказка с локализованным дефицитом
+    expect(html).not.toContain('rc-credits short');
+    // Без казны нехватка не рисуется вовсе — нейтральный ценник.
+    expect(cost({ metal: 80 })).not.toContain('short');
+  });
+
+  it('нехватка отсутствующего в казне ресурса — вся цена целиком', () => {
+    expect(cost({ microelectronics: 5 }, { metal: 999 })).toContain('>−5</em>');
   });
 
   it('costText отдаёт ЧИСТЫЙ текст — для title и подписей через esc()', () => {
@@ -80,15 +100,16 @@ describe('format — ресурсы', () => {
     expect(costText({ metal: 80 })).not.toContain('<');
   });
 
-  it('пустой мешок и его отсутствие читаются как «free»', () => {
-    expect(cost(undefined)).toBe('free');
-    expect(cost({})).toBe('free');
-    expect(costText(undefined)).toBe('free');
+  it('пустой мешок и его отсутствие читаются как «бесплатно» — ключом, не литералом', () => {
+    expect(cost(undefined)).toContain('бесплатно');
+    expect(cost({})).toContain('бесплатно');
+    expect(costText(undefined)).toBe('бесплатно');
   });
 
-  it('незнакомый ресурс не роняет строку — берётся первая буква id', () => {
+  it('незнакомый ресурс не роняет строку — берётся первая буква имени', () => {
     expect(costText({ unobtainium: 3 })).toBe('3u');
-    expect(curIc('unobtainium')).toBe('<span class="rc-unobtainium">u</span>');
+    expect(curIc('unobtainium')).toContain('rc-unobtainium');
+    expect(curIc('unobtainium')).not.toContain('<svg');
   });
 
   it('у всех пяти сессионных ресурсов есть глиф', () => {

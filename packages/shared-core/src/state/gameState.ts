@@ -1,8 +1,6 @@
 import { seedRng, type RngState } from '../rng/rng';
 import type { SortieState } from './squadron';
 import type { FleetChain } from './chain';
-import type { GroundStack } from './groundCombat';
-import type { FormationTemplate, FormationUnit } from '../data/formations';
 
 /**
  * The authoritative game state. Stored as JSONB on the server
@@ -132,31 +130,8 @@ export interface Player {
    *  Owner-private like the treasury (stripped from other players' views). LARS-1
    *  will complement this with the live server-side ownership read (LARS-0.2). */
   arsenal?: PlayerArsenal;
-  /** This player's division templates (H4 designer), materialised from
-   *  `DEFAULT_TEMPLATES` on first edit (`division.template`/`division.rename`).
-   *  Absent = still using the unmodified defaults. */
-  divisionTemplates?: FormationTemplate[];
 }
 
-/** A mobilised ground division (H4/division module) — a cohesive formation built
- *  from a locked template, garrisoning a world or riding a fleet as cargo. */
-export interface Division {
-  id: string;
-  owner: PlayerId;
-  name: string;
-  template: number;
-  /** Template counts per type — the regrow target (units rebuild toward this). */
-  max: Partial<Record<FormationUnit, number>>;
-  units: GroundStack[];
-  /** Optional attached officer (an `OFFICERS` key) — its bonuses apply in battle
-   *  and toughness. Arrives ONLY with a locked officer premade at mobilisation. */
-  officer?: string;
-  /** Planet id it garrisons (the world it sits on when not aboard a fleet). */
-  location: PlanetId;
-  /** Fleet id carrying it as cargo, or null/absent when garrisoning `location`.
-   *  A carried division is "in the hold": it rides the fleet and does not fight. */
-  carriedBy?: FleetId | null;
-}
 
 /** The build-permission snapshot of a seat (see `Player.arsenal`): unique, sorted
  *  catalog ids per kind — the shape both the core gate and the UI filter read. */
@@ -577,18 +552,6 @@ export interface GameState {
    *  sets/replaces it; `chain.stamp` is the server driver's own runtime update of
    *  the consumed head / armed wait deadline — never client-issuable). */
   orders?: Record<FleetId, FleetChain>;
-  /** Mobilised ground divisions (`divisionModule`, H4), keyed by `Division.id`.
-   *  Separate from the legacy `Planet.garrison` army (loaded via `armyModule`) —
-   *  a documented seam: division combat only engages other divisions, never the
-   *  legacy garrison, which still resists capture until cleared by the fleet-
-   *  assault path (`combatModule`). */
-  divisions?: Record<string, Division>;
-  /** Monotonic counter handing each division its id. */
-  divisionSeq?: number;
-  /** The live ground-battle accumulator: planetId → combat-time remainder not yet
-   *  spent on a whole tick (ms). A world is present exactly while a division-vs-
-   *  division ground battle is underway (`divisionModule`'s continuous-time driver). */
-  groundBattles?: Record<PlanetId, number>;
   /** BOOST-1 форс-марш: fleet ids currently marching at +50% speed for 5% max-hp
    *  wear per game-hour in transit (`forcedMarchModule`, `fleet.forcemarch`). */
   forcedMarch?: Record<FleetId, true>;
