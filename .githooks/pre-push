@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Локальный гейт перед пушем: `pnpm run check` (lint + typecheck + test + docs-check).
+#
+# ЗАЧЕМ. Правило «гоняй гейт перед коммитом» жило только в CONTRIBUTING.md, а машиной не
+# принуждалось: git-хуков в репозитории не было вовсе. При этом до открытия PR красный
+# код никто не ловил. Теперь ветка проверяется до того, как уедет в origin.
+#
+# ПОЧЕМУ pre-push, А НЕ pre-commit. Гейт идёт ~1.5 минуты — на каждый коммит это
+# невыносимо и приводит к тому, что хук отключают совсем. Пуш случается реже и уже
+# является «публикацией», так что цена уместна.
+#
+# ЛЮК. `git push --no-verify` пропускает хук — сознательно: хук помогает, а не запирает
+# (аварийный пуш недописанной ветки на другую машину бывает нужен). Ветку всё равно
+# встретит CI: с этого же изменения `ci.yml` бежит на push в ЛЮБУЮ ветку.
+#
+# Ставится не вручную: `prepare` в package.json прописывает core.hooksPath=.githooks
+# при каждом `pnpm install`.
+set -euo pipefail
+
+# Пуш пустой ссылки (удаление ветки) проверять нечего.
+if [ -t 0 ]; then
+  refs_present=1
+else
+  refs_present=0
+  while read -r _local_ref local_sha _remote_ref _remote_sha; do
+    [ "$local_sha" = "0000000000000000000000000000000000000000" ] || refs_present=1
+  done
+fi
+if [ "$refs_present" -eq 0 ]; then
+  exit 0
+fi
+
+echo "pre-push: pnpm run check (пропустить — git push --no-verify)"
+if ! pnpm run check; then
+  echo >&2
+  echo "pre-push: гейт красный — пуш остановлен. Почини или push --no-verify осознанно." >&2
+  exit 1
+fi

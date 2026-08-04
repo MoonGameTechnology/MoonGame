@@ -28,8 +28,14 @@ services:
         value: '1'
       - key: AUTH_JWT_SECRET
         # REQUIRED for a public Render deploy — set this in the Render dashboard
-        # to a stable random string (e.g. `openssl rand -hex 32`). Empty = the
-        # server logs a warning and refuses to boot (PROD=1 fail-secure).
+        # to a stable random string (`openssl rand -hex 32`). Empty, or shorter than
+        # 32 characters, = the server refuses to boot (PROD=1 fail-secure): a short
+        # HS256 secret is brute-forced offline from a single captured token.
+        value: ''
+      - key: ALLOWED_ORIGINS
+        # ALSO REQUIRED under PROD=1 — the Origin allowlist that stops CSWSH (a foreign
+        # page opening a wss:// session against this server). Set it in the Render
+        # dashboard to the URL Render assigned you, e.g. `https://void-dominion.onrender.com`.
         value: ''
       - key: TIME_SCALE
         value: '24'

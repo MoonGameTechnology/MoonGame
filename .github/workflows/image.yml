@@ -52,6 +52,7 @@ jobs:
       contents: read
       packages: write # push image + signature to ghcr.io
       id-token: write # keyless cosign: GitHub OIDC → Fulcio → Rekor
+      attestations: write # SLSA build provenance (см. шаг attest ниже)
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -105,6 +106,24 @@ jobs:
           fi
           echo "ref=$ref" >> "$GITHUB_OUTPUT"
           echo "pushed $ref"
+          echo "digest=${ref#*@}" >> "$GITHUB_OUTPUT"
+
+      # SLSA build provenance — ДОПОЛНЕНИЕ к подписи, а не замена. Подпись cosign
+      # отвечает на вопрос «кто это подписал»; provenance отвечает на «чем и из чего это
+      # собрано»: какой воркфлоу, какой коммит, какой раннер, какие входы. Именно это
+      # закрывает класс атак SolarWinds-типа, где исходник чист, а подменён сам билд.
+      # Проверяется без cosign, штатным `gh attestation verify <ref> --repo <owner/repo>`.
+      #
+      # SEC-7 когда-то отказался от этого экшена, потому что его нельзя было закрепить по
+      # SHA: `api.github.com` из dev-среды недоступен, а пин по тегу поймал бы zizmor. Но
+      # SHA прекрасно снимается `git ls-remote` — тем же способом, каким пинится
+      # actions/cache. Ограничение снято, причина отказа больше не действует.
+      - name: attest build provenance (SLSA)
+        uses: actions/attest-build-provenance@62fc1d596301d0ab9914e1fec14dc5c8d93f65cd # v3.2.0
+        with:
+          subject-name: ${{ steps.img.outputs.image }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
 
       # Keyless: the Fulcio cert binds the signature to THIS workflow file + repo +
       # commit, and the Rekor entry makes it publicly auditable. No key to manage or
