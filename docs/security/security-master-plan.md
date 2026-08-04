@@ -53,7 +53,9 @@ sequence, `GATE=1`); идемпотентные bounded rate-limited квита�
 broadcast над Postgres (`F2`/`F8`); JWT-handshake + Origin-allowlist (`F7`/`SE-0.1`);
 scrypt-аккаунты с униформным 401 и decoy-таймингом + per-IP rate-limit; детерминизм с
 golden-RNG и **replay-проверкой** (`RPL-1..4`), property/fuzz-тесты (`FUZZ-1..4`); CI —
-8 сканеров с ratcheting-гейтом (`SEC-0/1`), кастомные Semgrep-правила инвариантов
+набор сканеров с ratcheting-гейтом (`SEC-0/1`; актуальный состав и разбивка
+«блокирующий / информационный» — в `docs/security/pipeline.md`, чтобы число жило в одном
+месте), кастомные Semgrep-правила инвариантов
 (`SEC-2`), SARIF→Code Scanning (`SEC-4`), SHA-пины + digest-пины + SBOM + cosign на APK
 (`SEC-3/5/7`); анти-сговор `E_BOT_ALLIANCE` (коалиции — только люди); A06-контроли
 (opaque reject-коды `SEC-A06-1`, cap ордеров `SEC-A06-2`).

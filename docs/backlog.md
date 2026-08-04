@@ -1630,10 +1630,12 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
   (image-pinning.md / ci-variables.md / setup-github-secrets.md), скрипт обновления
   дайджестов, комментарии в security.yml. Ready for PR.
 - **SEC-4** ✅ _(аудитом доков — GitHub Code Scanning половина уже была реализована, не
-  отмечена)_ Агрегация находок: все 8 SARIF-джоб (semgrep/gitleaks/osv/trivy fs/trivy
-  image/zizmor/scorecard + нативный codeql) безусловно льют `upload-sarif` → единая
-  панель `Security → Code scanning` (`continue-on-error: true`, чтобы сбой аплоада не
-  валил джобу; `security-events: write` у всех 8). DefectDojo — не сделан: требует
+  отмечена)_ Агрегация находок: КАЖДАЯ SARIF-джоба безусловно льёт `upload-sarif` →
+  единая панель `Security → Code scanning` (`continue-on-error: true`, чтобы сбой
+  аплоада не валил джобу; `security-events: write` у каждой такой джобы). Актуальный
+  список — в `security.yml`; здесь его намеренно нет числом, иначе счётчик приходится
+  чинить при каждом новом сканере (на SEC-4 их было 8, с тех пор добавились kics и
+  dependency-review). DefectDojo — не сделан: требует
   внешний инстанс/API-ключ, которых у нас нет; заведётся отдельным кирпичом, когда
   появится инстанс.
 - **SEC-5** ✅ Container scanning: `Dockerfile` (multi-stage, пин distroless-базы) +
@@ -1688,10 +1690,12 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
   заодно пинены по sha256 (дайджесты сняты живым запросом к registry API, метод
   дописан в `image-pinning.md`). Информационная на посадке — по образцу SEC-6:
   апстримный CVE в чужом образе иначе красит `main` без того, что тут можно починить.
-- **SEC-12** ✅ [sec] Хардненинг рантайма контейнеров + честная запись о том, что его
-  **не проверяет ни один сканер**: у Trivy misconfig нет формата Docker Compose
-  (Dockerfile/k8s/terraform/cloudformation/helm/ARM), поэтому постуру держат ревью и
-  чек-лист в `deploy/README.md`. Проставлено: `no-new-privileges` на всех сервисах,
+- **SEC-12** ✅ [sec] Хардненинг рантайма контейнеров + честная запись о том, что на
+  момент SEC-12 его **не проверял ни один сканер**: у Trivy misconfig нет формата Docker
+  Compose (Dockerfile/k8s/terraform/cloudformation/helm/ARM), поэтому постуру держали
+  ревью и чек-лист в `deploy/README.md`. **Пробел закрыт 2026-08-04** джобой `kics`
+  (`--type DockerCompose`, информационная до триажа базовой линии); чек-лист остался
+  вторым слоем — KICS читает файлы изолированно и не понимает мерж оверлеев. Проставлено: `no-new-privileges` на всех сервисах,
   `cap_drop: [ALL]` на `server` (non-root node на порту >1024 — capabilities не нужны)
   и на `caddy` с возвратом `NET_BIND_SERVICE` (80/443), `mem_limit`/`pids_limit`
   везде, обязательный `POSTGRES_PASSWORD` в TLS-оверлее (публичный путь не поднимется
