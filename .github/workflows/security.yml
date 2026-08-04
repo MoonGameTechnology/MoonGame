@@ -69,6 +69,12 @@ on:
   push:
     branches: ['**']
   pull_request:
+  # Merge queue: очередь собирает временную ветку «свежий main + этот PR» и ждёт на НЕЙ
+  # отчёта от required-чеков — но воркфлоу попадает туда, только если подписан на
+  # `merge_group`. Без этой строки очередь не увидит отсюда ни одного сканера и будет
+  # ждать до таймаута, а PR останется висеть. Ровно то же соображение, что в ci.yml;
+  # там строка уже стоит, здесь её не хватало — и очередь вставала на первом же PR.
+  merge_group:
   schedule:
     # Monday 05:17 UTC. Off-the-hour minute: GitHub drops cron runs queued at peak
     # times (:00 is the worst), and a rescan that silently never ran is fail-open.
