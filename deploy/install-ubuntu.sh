@@ -140,7 +140,11 @@ git clone --branch $REPO_BRANCH $REPO_URL .
 chown -R $SERVICE_USER:$SERVICE_USER "$INSTALL_DIR"
 log_success "Репозиторий клонирован"
 
-# Создание .env файла для Docker Compose
+# Конфиг сервера. ВАЖНО: файл называется server.env, а НЕ .env — значит docker compose
+# сам его не подхватит (он читает только .env рядом с проектом). Systemd-юнит ниже
+# отдаёт его через EnvironmentFile, а все ПРЯМЫЕ вызовы compose обязаны передавать
+# --env-file "$ENV_FILE" явно, иначе интерполяция ${POSTGRES_PASSWORD:-void} молча
+# подставит дефолт, и стек поднимется с другим паролем, чем под systemd.
 log_info "Создание конфигурации сервера..."
 cat > "$ENV_FILE" << EOF
 # Void Dominion — Конфигурация сервера
@@ -229,6 +233,10 @@ SERVICE_NAME="moongame"
 COMPOSE_BASE="$INSTALL_DIR/deploy/docker-compose.yml"
 RELEASE_OVERLAY="$INSTALL_DIR/deploy/docker-compose.release.yml"
 LAST_GOOD="$INSTALL_DIR/.last-good-image"
+# Тот же файл, что EnvironmentFile у systemd-юнита. Прямые вызовы compose (в отличие
+# от `systemctl restart`) его не видят — передаём явно, иначе POSTGRES_PASSWORD
+# схлопнется в дефолт `void`.
+ENV_FILE="$INSTALL_DIR/deploy/server.env"
 HEALTH_PORT="${PORT:-8788}"
 HEALTH_TRIES="${HEALTH_TRIES:-30}"
 
@@ -255,7 +263,7 @@ if [ -n "${VOID_IMAGE:-}" ]; then
 
   echo "[*] Забираем образ и поднимаем на нём стек..."
   docker pull "$VOID_IMAGE"
-  VOID_IMAGE="$VOID_IMAGE" docker compose -f "$COMPOSE_BASE" -f "$RELEASE_OVERLAY" up -d --no-build
+  VOID_IMAGE="$VOID_IMAGE" docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" -f "$RELEASE_OVERLAY" up -d --no-build
 
   if health_ok; then
     echo "$VOID_IMAGE" > "$LAST_GOOD"
@@ -266,7 +274,7 @@ if [ -n "${VOID_IMAGE:-}" ]; then
   echo "[✗] Сервер не поднялся после обновления." >&2
   if [ -n "$PREV_IMAGE" ]; then
     echo "[*] Откатываемся на предыдущий проверенный образ: $PREV_IMAGE" >&2
-    VOID_IMAGE="$PREV_IMAGE" docker compose -f "$COMPOSE_BASE" -f "$RELEASE_OVERLAY" up -d --no-build
+    VOID_IMAGE="$PREV_IMAGE" docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" -f "$RELEASE_OVERLAY" up -d --no-build
     health_ok && echo "[✓] Откат удался, работает предыдущая версия." >&2 \
       || echo "[✗] Откат НЕ помог — смотри логи: moongame logs" >&2
   else
@@ -287,11 +295,11 @@ cd "$INSTALL_DIR"
 git pull origin main
 
 # Образ, на котором сервер работает ПРЯМО СЕЙЧАС — единственная точка отката.
-PREV_IMAGE_ID="$(docker compose -f "$COMPOSE_BASE" ps -q server 2>/dev/null \
+PREV_IMAGE_ID="$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" ps -q server 2>/dev/null \
   | head -1 | xargs -r docker inspect --format '{{.Image}}' 2>/dev/null || true)"
 
 echo "[*] Пересобираем образ (сервер пока работает, ~1-3 мин)..."
-docker compose -f "$COMPOSE_BASE" build
+docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" build
 
 echo "[*] Перезапускаем сервер на новом образе..."
 sudo systemctl restart "$SERVICE_NAME"
@@ -304,7 +312,7 @@ fi
 
 echo "[✗] Сервер не отвечает на /health после обновления." >&2
 if [ -n "$PREV_IMAGE_ID" ]; then
-  IMAGE_NAME="$(docker compose -f "$COMPOSE_BASE" config --images 2>/dev/null | head -1)"
+  IMAGE_NAME="$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" config --images 2>/dev/null | head -1)"
   if [ -n "$IMAGE_NAME" ]; then
     echo "[*] Откатываемся на предыдущий образ ($PREV_IMAGE_ID)..." >&2
     docker tag "$PREV_IMAGE_ID" "$IMAGE_NAME"
@@ -381,7 +389,7 @@ log_success "Команды CLI установлены"
 log_info "Запуск Docker контейнеров..."
 log_warning "Это займет время (~2-3 минуты) при первом запуске..."
 cd "$INSTALL_DIR/deploy"
-sudo -u $SERVICE_USER docker compose up -d --build
+sudo -u $SERVICE_USER docker compose --env-file "$ENV_FILE" up -d --build
 
 # Проверка здоровья сервера
 log_info "Проверка здоровья сервера..."

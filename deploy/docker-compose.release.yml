@@ -22,3 +22,21 @@ services:
     image: ${VOID_IMAGE:?set VOID_IMAGE to the verified digest ref, e.g. ghcr.io/moongametechnology/moongame@sha256:...}
     # Never silently fall back to a stale local copy of the same ref.
     pull_policy: always
+
+  postgres:
+    environment:
+      # ТРЕБУЕМ пароль, а не подставляем дефолт. В базовом файле стоит
+      # `${POSTGRES_PASSWORD:-void}` — и это правильно: он обещает «весь стек одной
+      # командой» для локального теста, где Postgres слушает только 127.0.0.1.
+      #
+      # Но этот оверлей по определению НЕ локальный тест: он тянет подписанный образ из
+      # GHCR, то есть его запускают на боевом хосте. До сих пор требование пароля жило
+      # только в `docker-compose.tls.yml`, а это не тот слой: TLS — про публичное имя
+      # хоста, а не про то, прод это или нет. Развернуть прод БЕЗ tls-оверлея (ровно
+      # команда из README «Обновление образа») можно было, и Postgres молча поднимался
+      # с паролем `void`.
+      #
+      # `install-ubuntu.sh` эту дыру не задевает — он генерирует случайный пароль в
+      # server.env. Речь про ручной путь: оператор копирует команду, забывает переменную
+      # и не получает ни ошибки, ни предупреждения. Теперь compose не стартует вовсе.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD (e.g. openssl rand -hex 32) before a production deploy}
