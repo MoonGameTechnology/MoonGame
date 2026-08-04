@@ -69,7 +69,6 @@ import {
   spawnHero,
   unlockHeroSkill,
   fitHero,
-  buildShip,
   serverChainActions,
   chainStamp,
   orderChain,
@@ -97,14 +96,9 @@ import { provinceScore } from '../../packages/shared-core/src/state/sectorKind';
 import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet';
 import { DEFAULT_HEROES, type HeroLoadout } from './heroes';
 import { DEFAULT_SHIP_LOADOUTS, type ShipLoadout } from './ships';
-// The «Оснащение корабля» loadout constructor reuses the framework-agnostic view-model
-// from @void/client (typed slots + canEquip/effectiveStats/loadoutCost via shared-core).
-import {
-  createLoadoutEditor,
-  applyLoadoutAction,
-  type LoadoutModel,
-  type LoadoutEditorResult,
-} from '../../packages/client/src/loadoutEditor';
+// «Верфь» — вкладка оснащения (REFM-13): окно целиком живёт в `shipyard.ts`, здесь
+// только проводка (host-хуки) и панель героев, которая переедет своим кирпичом.
+import { initShipyard } from './shipyard';
 import {
   buildingLevel,
   buildingMaxLevel,
@@ -219,9 +213,8 @@ import {
   type MetaState,
   type MetaBranch,
 } from './meta';
-// ARS-5 — arsenal witryna: the pure model (`arsenal.ts`) plus the hub tab itself
-// (`arsenalScreen.ts`, REFM-5 — `initArsenal(hooks)` owns its cache and markup).
-import { originOf } from './arsenal';
+// ARS-5 — arsenal witryna: the hub tab itself (`arsenalScreen.ts`, REFM-5 —
+// `initArsenal(hooks)` owns its cache and markup); the pure model is `arsenal.ts`.
 // H4 — конструктор шаблонов дивизий: модель в `formations.ts`, редактор — REFM-8.
 // TT-3.1 — экран дерева технологий (REFM-9); `branchLabel` берёт ещё совет учёных.
 import { initTechTree, branchLabel } from './techTree';
@@ -254,7 +247,7 @@ import {
   stewardTechDone,
   type StewardMetrics,
 } from './stewardScreen';
-import { initArsenal, originLabel } from './arsenalScreen';
+import { initArsenal } from './arsenalScreen';
 // DEV TEST MODE — self-contained dev-only scenarios; remove this import + the
 // initTestMode(...) call below + the #testmode HTML/CSS to cut it cleanly.
 // (The player build already does: the only uses sit under `!__PLAYER_BUILD__`, so
@@ -8657,365 +8650,97 @@ const resourceCard = initResourceCard({
 
 
 // --- constructor («Верфь»): the unified loadout tab --------------------------
-// One in-match screen that switches between the loadout constructors (ships now;
-// squadrons / army / heroes fold in next). The «Корабли» pane renders the shared
-// @void/client `loadoutEditor` view-model — typed slots + live derived-stats + cost —
-// and confirms into `unit.build{modules}` (the core validates/prices/stamps the set).
+// One in-match screen that switches between the loadout constructors (ships and
+// squadrons now; the «Герои» pane is still the hero штаб below — it folds in with
+// its own brick). The window itself lives in `shipyard.ts` (REFM-13); here it only
+// gets the host state it cannot reach on its own, plus the hero pane's markup and
+// its clicks.
 const constructorWin = $('constructor');
-type ConTab = 'ships' | 'squads' | 'heroes';
-let conTab: ConTab = 'ships';
-const CON_TABS: [ConTab, string][] = [
-  ['ships', 'yard.tab.ships'],
-  ['squads', 'yard.tab.squads'],
-  ['heroes', 'yard.tab.heroes'],
-];
-// Buildable space hulls the «Корабли» pane fits; squadron/carrier hulls → the «Эскадрильи» pane.
-const CON_HULLS = ['cruiser', 'siege', 'scout', 'dropship'];
-const CON_SQUAD_HULLS = ['fighter_squadron', 'strike_carrier'];
-let conHull = 'cruiser';
-let conModules: string[] = [];
-let conCount = 1;
-let conPlanet = '';
-const SLOT_RU: Record<string, string> = {
-  weapon: 'yard.slot.weapon',
-  defense: 'yard.slot.defense',
-  utility: 'yard.slot.utility',
-};
-const SLOT_ICON: Record<string, string> = { weapon: '🎯', defense: '🛡', utility: '⊞' };
-const MODULE_ICON: Record<string, string> = {
-  targeting_array: '🎯',
-  shield_booster: '🛡',
-  ablative_plating: '🧱',
-  ion_engine: '🚀',
-  radar_module: '📡',
-  cargo_bay: '📦',
-};
-const RES_RU: Record<string, string> = {
-  metal: 'res.of.metal',
-  credits: 'res.of.credits',
-  energy: 'res.of.energy',
-  food: 'res.of.food',
-  microelectronics: 'res.of.microelectronics',
-};
-// Short stat labels for module-effect chips («+4 атака», «+15 щит»).
-const STAT_RU: Record<string, string> = {
-  attack: 'div.stat.attack',
-  defense: 'div.stat.defense',
-  hp: 'stat.hp',
-  shield: 'stat.shield',
-  speed: 'stat.speed',
-  cargoCapacity: 'stat.cargo',
-  radarRange: 'stat.radar',
-};
-function bagRu(bag: Record<string, number>): string {
-  const parts = Object.entries(bag)
-    .filter(([, n]) => n)
-    .map(([r, n]) => `${Math.round(n)} ${t(RES_RU[r] ?? r)}`);
-  return parts.length ? parts.join(' · ') : t('yard.free');
-}
-/** One live stat row: label · base → effective (+delta) · track bar (base cyan, delta green). */
-function conBar(
-  line: { label: string; base: number; effective: number; delta: number },
-  max: number,
-): string {
-  const basePct = max > 0 ? Math.min(100, (line.base / max) * 100) : 0;
-  const deltaPct = max > 0 ? Math.min(100 - basePct, (Math.max(0, line.delta) / max) * 100) : 0;
-  const val =
-    line.delta !== 0
-      ? `${line.base} <span class="dim">→</span> <b>${line.effective}</b> <span class="cn-up">${line.delta > 0 ? '+' : ''}${line.delta}</span>`
-      : `<b>${line.effective}</b>`;
-  return (
-    `<div class="cn-stat"><div class="cn-srow"><span class="cn-snm">${esc(line.label)}</span><span class="cn-sval">${val}</span></div>` +
-    `<div class="cn-strack"><span class="cn-sbar" style="width:${basePct}%"></span><span class="cn-sdelta" style="width:${deltaPct}%"></span></div></div>`
-  );
-}
-/** The loadout constructor pane for a family of hulls (ships or squadrons) — same
- *  `loadoutEditor` view-model, just a different hull list. Resets the draft when the
- *  selected hull isn't in this family (a tab switch). */
-/** LARS-4 — a small "откуда" tag for a Верфь card, from whatever the hub Arsenal
- *  witryna has cached (best-effort: blank if the player never opened that tab this
- *  session, never a guess). Only flags a NON-starter origin — a starter blueprint
- *  sitting in every match isn't news; a fresh drop/craft/auction pickup is. */
-function conOriginTag(defId: string): string {
-  const origin = originOf(arsenal.items(), defId);
-  if (!origin || origin === 'starter') return '';
-  return `<span class="cn-mo">${originLabel(origin)}</span>`;
-}
-function conLoadoutPane(hullList: string[]): string {
-  // ARS-5: the constructor offers only what the match's arsenal snapshot (ARS-3)
-  // says the player owns — the same `Player.arsenal` the core build gate reads, so
-  // the palette can never promise a build the server would then reject. No snapshot
-  // (regular/dev match, bots) ⇒ unrestricted, mirroring the core's own degradation.
-  const snap = s.players[ME]?.arsenal;
-  const ownedHulls = snap ? hullList.filter((h) => snap.hulls.includes(h)) : hullList;
-  const ownedModules = snap ? new Set(snap.modules) : undefined;
-  if (!ownedHulls.length) return `<div class="cn-soon">${t('yard.hull.none')}</div>`;
-  if (!ownedHulls.includes(conHull)) {
-    conHull = ownedHulls[0]!;
-    conModules = [];
-  }
-  const ed: LoadoutEditorResult = createLoadoutEditor(conHull, data, myRes(), {
-    modules: conModules,
-    count: conCount,
-    ownedModules,
-  });
-  if (!ed.ok) return `<div class="cn-soon">${t('yard.hull.unavailable')}</div>`;
-  const m: LoadoutModel = ed;
-  const hulls = ownedHulls
-    .map(
-      (h) =>
-        `<button class="cn-hbtn${h === conHull ? ' on' : ''}" data-cnhull="${h}">${unitIconHtml(h, data, youColor, 18)} ${esc(displayUnit(h))}</button>`,
-    )
-    .join('');
-  const freeTypes = [...new Set(m.slots.filter((sl) => !sl.moduleId).map((sl) => sl.type))];
-  const hullCard =
-    `<div class="cn-hull"><div class="cn-hic">${unitIconHtml(conHull, data, youColor, 40)}</div><div><div class="cn-hn">${esc(displayUnit(conHull))}</div>` +
-    `<div class="cn-hm">${t('yard.slots.count', { n: String(m.slots.length) })}</div></div></div>`;
-  const bays = m.slots
-    .map((sl) => {
-      if (sl.moduleId) {
-        const md = data.modules[sl.moduleId];
-        const eff = md
-          ? Object.entries(md.effects.stats)
-              .map(([k, v]) => `+${v} ${t(STAT_RU[k] ?? k)}`)
-              .join(' ')
-          : '';
-        return (
-          `<div class="cn-bay filled" data-cnun="${sl.moduleId}" title="${t('yard.module.remove')}"><div class="cn-bic">${MODULE_ICON[sl.moduleId] ?? '▪'}</div>` +
-          `<div><div class="cn-bt">${t(SLOT_RU[sl.type] ?? sl.type)}</div><div class="cn-bn">${esc(tData(sl.moduleName ?? sl.moduleId))}${conOriginTag(sl.moduleId)}</div></div><div class="cn-bd">${eff}</div></div>`
-        );
+const shipyard = initShipyard({
+  root: () => constructorWin,
+  state: () => s,
+  me: () => ME,
+  youColor: () => youColor,
+  order: playerOrder,
+  note: (msg) => note(msg),
+  errText,
+  arsenalItems: () => arsenal.items(),
+  onOpen: () => maybeIntro('constructor'),
+  // The «Герои» pane: the hero roster/штаб (folded from the old #hero window). The
+  // `#herobody` id keeps the `.hx-*` styling; hero clicks route through the yard.
+  heroPaneHtml: () => `<div id="herobody">${heroBodyHtml()}</div>`,
+  onHeroTab: () => maybeIntro('hero'),
+  heroClick: (tg) => {
+    // STAFF-1 view state: focus a hero / switch tab / open-close the node·fitting dossier.
+    const selBtn = tg.closest('[data-hsel]') as HTMLElement | null;
+    if (selBtn) {
+      heroSel = selBtn.dataset.hsel!;
+      heroDossier = null;
+      return 'repaint';
+    }
+    const htab = (tg.closest('[data-htab]') as HTMLElement | null)?.dataset.htab;
+    if (htab) {
+      heroTab = htab as HeroTab;
+      heroDossier = null;
+      return 'repaint';
+    }
+    const nodeBtn = tg.closest('[data-hnode]') as HTMLElement | null;
+    if (nodeBtn) {
+      heroDossier = `node:${nodeBtn.dataset.hnode!}`;
+      return 'repaint';
+    }
+    const fitdBtn = tg.closest('[data-hfitd]') as HTMLElement | null;
+    if (fitdBtn) {
+      heroDossier = `fit:${fitdBtn.dataset.hfitd!}`;
+      return 'repaint';
+    }
+    if (tg.closest('[data-hdclose]')) {
+      heroDossier = null;
+      return 'repaint';
+    }
+    const castBtn = tg.closest('[data-hcast]') as HTMLElement | null;
+    if (castBtn) {
+      const heroId = castBtn.dataset.hcast!;
+      const abilityId = castBtn.dataset.ab!;
+      if ((data.heroAbilities[abilityId]?.range ?? 0) > 0) {
+        heroAim = { heroId, abilityId }; // ranged cast → arm the map (next world tap is the target)
+        note(t('yard.pick.target'));
+        return 'close';
       }
-      return (
-        `<div class="cn-bay empty"><div class="cn-bic">${SLOT_ICON[sl.type] ?? '＋'}</div>` +
-        `<div><div class="cn-bt">${t(SLOT_RU[sl.type] ?? sl.type)}</div><div class="cn-bn">${t('yard.slot.empty')}</div></div></div>`
-      );
-    })
-    .join('');
-  const palette = m.palette
-    .map((o) => {
-      const eff = Object.entries(o.effect)
-        .map(([k, v]) => `+${v} ${t(STAT_RU[k] ?? k)}`)
-        .join(' ');
-      if (o.installable) {
-        return (
-          `<button class="cn-mod" data-cnmod="${o.id}"><span class="cn-mic">${MODULE_ICON[o.id] ?? '▪'}</span>` +
-          `<span class="cn-mn">${esc(tData(o.name))}${conOriginTag(o.id)}</span><span class="cn-me">${eff}</span><span class="cn-mc">${bagRu(o.cost)}</span></button>`
-        );
-      }
-      return (
-        `<div class="cn-mod locked"><span class="cn-mic">${MODULE_ICON[o.id] ?? '▪'}</span>` +
-        `<span class="cn-mn">${esc(tData(o.name))}</span><span class="cn-me">${t('yard.slot.named', { s: t(SLOT_RU[o.slot] ?? o.slot) })}</span><span class="cn-mc">${bagRu(o.cost)}</span></div>`
-      );
-    })
-    .join('');
-  const palHead = freeTypes.length
-    ? t('yard.modules.for-slot', {
-        s: freeTypes.map((ty) => t(SLOT_RU[ty] ?? ty)).join(' / '),
-      })
-    : t('yard.modules.all-taken');
-  // LARS-4: the palette above already reads the LIVE arsenal snapshot (a module
-  // bought mid-match shows up here without a new match) — this note is the only
-  // thing that needed adding: make the timing honest (built, not instant).
-  const liveNote = snap ? `<div class="cn-note">${t('yard.arsenal.note')}</div>` : '';
-  const left =
-    `<div class="cn-fit"><div class="cn-hulls">${hulls}</div>${hullCard}${bays}` +
-    `<div class="cn-ph">${palHead}</div><div class="cn-pal">${palette}</div>` +
-    `<div class="cn-note">${t('yard.slots.note')}</div>${liveNote}</div>`;
-  // right: live preview + cost + build
-  const maxStat = Math.max(1, ...m.preview.map((p) => p.effective));
-  const bars = m.preview.map((p) => conBar(p, maxStat)).join('');
-  const owned = Object.values(s.planets).filter(
-    (p) => p.owner === ME && SECTOR_TYPES[p.kind ?? '']?.buildable,
-  );
-  if (!conPlanet || !owned.some((p) => p.id === conPlanet)) conPlanet = owned[0]?.id ?? '';
-  const planOpts = owned
-    .map(
-      (p) =>
-        `<option value="${p.id}"${p.id === conPlanet ? ' selected' : ''}>${esc(p.id)}</option>`,
-    )
-    .join('');
-  const cost =
-    `<div class="cn-cost">` +
-    `<div class="cn-crow"><span class="cn-cl">${t('yard.cost.hull', { n: String(m.count) })}</span><span class="cn-cv">${bagRu(m.hullCost)}</span></div>` +
-    (conModules.length
-      ? `<div class="cn-crow"><span class="cn-cl">${t('yard.cost.modules', { n: String(m.count) })}</span><span class="cn-cv">${bagRu(m.modulesCost)}</span></div>`
-      : '') +
-    `<div class="cn-crow total"><span class="cn-cl">${t('yard.cost.total')}</span><span class="cn-cv">${bagRu(m.totalCost)}</span></div></div>`;
-  const canBuild = m.affordable && conPlanet !== '';
-  const right =
-    `<div class="cn-side"><div class="cn-ph">${t('yard.cost.with-modules')} — <em>${t('yard.cost.live')}</em></div>${bars}${cost}` +
-    `<div class="cn-row2"><div class="cn-step"><button data-cncount="-" ${conCount <= 1 ? 'disabled' : ''}>−</button><span class="cn-sv">${conCount}</span><button data-cncount="+" ${conCount >= 20 ? 'disabled' : ''}>+</button></div>` +
-    `<select class="cn-plan" id="cn-planet"${owned.length ? '' : ' disabled'}>${planOpts || `<option>${t('yard.no-worlds')}</option>`}</select></div>` +
-    `<button class="cn-build" data-cnbuild ${canBuild ? '' : 'disabled'}>${t('yard.build', { n: String(conCount) })}</button>` +
-    `<div class="cn-lock">🔒 <span>${t('yard.loadout.note')}</span></div></div>`;
-  return `<div class="cn-grid">${left}${right}</div>`;
-}
-/** The «Армия» pane: edit a division template's 6 slots (per-player, global). Live
- *  aggregate stats + synergies; mobilisation stays in the planet panel. */
-/** The «Герои» pane: the hero roster/штаб (folded from the old #hero window). The
- *  `#herobody` id keeps the `.hx-*` styling; hero clicks route via the constructor. */
-function conHeroPane(): string {
-  return `<div id="herobody">${heroBodyHtml()}</div>`;
-}
-function renderConstructor(): void {
-  const tabBtn = (k: ConTab, label: string) =>
-    `<button class="cn-tab${conTab === k ? ' on' : ''}" data-ctab="${k}">${t(label)}</button>`;
-  const body =
-    conTab === 'ships'
-      ? conLoadoutPane(CON_HULLS)
-      : conTab === 'squads'
-        ? conLoadoutPane(CON_SQUAD_HULLS)
-        : conHeroPane();
-  constructorWin.innerHTML =
-    `<div class="cnbox"><div class="cn-head"><b>${t('yard.title')}</b><button class="cn-close">✕</button></div>` +
-    `<div class="cn-tabs">${CON_TABS.map(([k, l]) => tabBtn(k, l)).join('')}</div>` +
-    `<div id="constructorbody">${body}</div></div>`;
-}
-/** Equip / unequip a module through the core-validated reducer, then re-render. */
-function conFit(moduleId: string, remove: boolean): void {
-  const snap = s.players[ME]?.arsenal;
-  const ed = createLoadoutEditor(conHull, data, myRes(), {
-    modules: conModules,
-    count: conCount,
-    ownedModules: snap ? new Set(snap.modules) : undefined,
-  });
-  if (!ed.ok) return;
-  const r = applyLoadoutAction({ kind: remove ? 'unequip' : 'equip', moduleId }, ed, data, myRes());
-  if (r.ok) conModules = r.modules;
-  else note('✖ ' + errText(r.code));
-}
-document.getElementById('rail-constructor')?.addEventListener('click', () => {
-  constructorWin.classList.add('show');
-  renderConstructor();
-  maybeIntro('constructor');
-});
-constructorWin.addEventListener('click', (e) => {
-  const tg = e.target as HTMLElement;
-  if (tg.id === 'constructor' || tg.closest('.cn-close')) {
-    constructorWin.classList.remove('show');
-    return;
-  }
-  const tab = (tg.closest('.cn-tab') as HTMLElement | null)?.dataset.ctab;
-  if (tab) {
-    conTab = tab as ConTab;
-    renderConstructor();
-    if (conTab === 'heroes') maybeIntro('hero'); // ONB-3 remainder
-    return;
-  }
-  const hull = (tg.closest('.cn-hbtn') as HTMLElement | null)?.dataset.cnhull;
-  if (hull) {
-    conHull = hull;
-    conModules = []; // a fresh draft per hull (its slot types differ)
-    renderConstructor();
-    return;
-  }
-  const mod = (tg.closest('.cn-mod') as HTMLElement | null)?.dataset.cnmod;
-  if (mod) {
-    conFit(mod, false);
-    renderConstructor();
-    return;
-  }
-  const un = (tg.closest('.cn-bay.filled') as HTMLElement | null)?.dataset.cnun;
-  if (un) {
-    conFit(un, true);
-    renderConstructor();
-    return;
-  }
-  const step = (tg.closest('[data-cncount]') as HTMLElement | null)?.dataset.cncount;
-  if (step) {
-    conCount = Math.max(1, Math.min(20, conCount + (step === '+' ? 1 : -1)));
-    renderConstructor();
-    return;
-  }
-  // --- «Герои» pane actions (folded from the old #hero window) ---
-  // STAFF-1 view state: focus a hero / switch tab / open-close the node·fitting dossier.
-  const selBtn = tg.closest('[data-hsel]') as HTMLElement | null;
-  if (selBtn) {
-    heroSel = selBtn.dataset.hsel!;
-    heroDossier = null;
-    renderConstructor();
-    return;
-  }
-  const htab = (tg.closest('[data-htab]') as HTMLElement | null)?.dataset.htab;
-  if (htab) {
-    heroTab = htab as HeroTab;
-    heroDossier = null;
-    renderConstructor();
-    return;
-  }
-  const nodeBtn = tg.closest('[data-hnode]') as HTMLElement | null;
-  if (nodeBtn) {
-    heroDossier = `node:${nodeBtn.dataset.hnode!}`;
-    renderConstructor();
-    return;
-  }
-  const fitdBtn = tg.closest('[data-hfitd]') as HTMLElement | null;
-  if (fitdBtn) {
-    heroDossier = `fit:${fitdBtn.dataset.hfitd!}`;
-    renderConstructor();
-    return;
-  }
-  if (tg.closest('[data-hdclose]')) {
-    heroDossier = null;
-    renderConstructor();
-    return;
-  }
-  const castBtn = tg.closest('[data-hcast]') as HTMLElement | null;
-  if (castBtn) {
-    const heroId = castBtn.dataset.hcast!;
-    const abilityId = castBtn.dataset.ab!;
-    if ((data.heroAbilities[abilityId]?.range ?? 0) > 0) {
-      heroAim = { heroId, abilityId }; // ranged cast → arm the map (next world tap is the target)
-      constructorWin.classList.remove('show');
-      note(t('yard.pick.target'));
-    } else {
       playerOrder(castHeroAbility(ME, heroId, abilityId));
-      renderConstructor();
+      return 'repaint';
     }
-    return;
-  }
-  const spawnBtn = tg.closest('[data-hspawn]') as HTMLElement | null;
-  if (spawnBtn) {
-    heroSpawnAim = spawnBtn.dataset.hspawn!;
-    constructorWin.classList.remove('show');
-    const hero = s.heroes?.[heroSpawnAim];
-    const perks = (hero?.abilities ?? []).map((a) =>
-      a !== null ? data.heroAbilities[a]?.type : undefined,
-    );
-    note(
-      t('yard.pick.hero-world', {
-        fl: perks.includes('spawn_fleet') ? t('yard.pick.own-fleet') : '',
-        al: perks.includes('spawn_allied') ? t('yard.pick.ally-world') : '',
-      }),
-    );
-    return;
-  }
-  const skillBtn = tg.closest('[data-hskill]') as HTMLElement | null;
-  if (skillBtn) {
-    playerOrder(unlockHeroSkill(ME, skillBtn.dataset.hskill!, skillBtn.dataset.node!));
-    heroDossier = null; // the node is bought — dismiss its dossier
-    renderConstructor();
-    return;
-  }
-  const fitBtn = tg.closest('[data-hfit]') as HTMLElement | null;
-  if (fitBtn) {
-    playerOrder(fitHero(ME, fitBtn.dataset.hfit!, fitBtn.dataset.fit!));
-    heroDossier = null; // the fitting is installed — dismiss its dossier
-    renderConstructor();
-    return;
-  }
-  if (tg.closest('[data-cnbuild]')) {
-    if (conPlanet) {
-      playerOrder(buildShip(ME, conPlanet, conHull, conCount, conModules));
-      note(t('yard.ordered', { n: String(conCount), hull: displayUnit(conHull) }));
+    const spawnBtn = tg.closest('[data-hspawn]') as HTMLElement | null;
+    if (spawnBtn) {
+      heroSpawnAim = spawnBtn.dataset.hspawn!;
+      const hero = s.heroes?.[heroSpawnAim];
+      const perks = (hero?.abilities ?? []).map((a) =>
+        a !== null ? data.heroAbilities[a]?.type : undefined,
+      );
+      note(
+        t('yard.pick.hero-world', {
+          fl: perks.includes('spawn_fleet') ? t('yard.pick.own-fleet') : '',
+          al: perks.includes('spawn_allied') ? t('yard.pick.ally-world') : '',
+        }),
+      );
+      return 'close';
     }
-    return;
-  }
+    const skillBtn = tg.closest('[data-hskill]') as HTMLElement | null;
+    if (skillBtn) {
+      playerOrder(unlockHeroSkill(ME, skillBtn.dataset.hskill!, skillBtn.dataset.node!));
+      heroDossier = null; // the node is bought — dismiss its dossier
+      return 'repaint';
+    }
+    const fitBtn = tg.closest('[data-hfit]') as HTMLElement | null;
+    if (fitBtn) {
+      playerOrder(fitHero(ME, fitBtn.dataset.hfit!, fitBtn.dataset.fit!));
+      heroDossier = null; // the fitting is installed — dismiss its dossier
+      return 'repaint';
+    }
+    return null;
+  },
 });
-constructorWin.addEventListener('change', (e) => {
-  const sel = e.target as HTMLSelectElement;
-  if (sel.id === 'cn-planet') conPlanet = sel.value;
-});
+document.getElementById('rail-constructor')?.addEventListener('click', () => shipyard.open());
 
 // --- connect overlay (single-player vs join a live session) ------------------
 // Entry screen: pick a faction, then run a local skirmish or connect to a server
