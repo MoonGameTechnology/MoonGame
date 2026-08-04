@@ -109,20 +109,20 @@ jobs:
 
           # Идемпотентность и все предусловия — одним ЧТЕНИЕМ состояния, а не глушением
           # ошибки мутации: так «уже в очереди» не смешивается с «очередь не настроена».
-          read -r ID STATE DRAFT STATUS QUEUED <<<"$(
+          read -r ID STATE DRAFT STATUS BASE QUEUED <<<"$(
             gh api graphql \
               -f query='
                 query($owner:String!, $name:String!, $number:Int!) {
                   repository(owner:$owner, name:$name) {
                     pullRequest(number:$number) {
-                      id state isDraft mergeStateStatus
+                      id state isDraft mergeStateStatus baseRefName
                       mergeQueueEntry { position }
                     }
                   }
                 }' \
               -F owner="${REPO%/*}" -F name="${REPO#*/}" -F number="$PR" \
               -q '.data.repository.pullRequest
-                  | "\(.id) \(.state) \(.isDraft) \(.mergeStateStatus) \(.mergeQueueEntry != null)"'
+                  | "\(.id) \(.state) \(.isDraft) \(.mergeStateStatus) \(.baseRefName) \(.mergeQueueEntry != null)"'
           )"
 
           if [ "$QUEUED" = 'true' ]; then
@@ -146,6 +146,28 @@ jobs:
           # нас снова.
           if [ "$STATUS" != 'CLEAN' ] && [ "$STATUS" != 'UNSTABLE' ]; then
             echo "PR #$PR: mergeStateStatus=$STATUS — ещё не готов, ждём следующего прогона"
+            exit 0
+          fi
+
+          # У СТЕКОВОГО PR база — не `main`, а другая ветка, и очереди у неё нет: мутация
+          # падает с `No merge queue found for branch '<base>'`, а джоба краснеет на ровном
+          # месте. Это не ошибка, а нормальное состояние — база станет `main`, когда нижний
+          # PR вольётся (GitHub перецелит автоматически), и тогда же PR поедет. Проверяем
+          # ЧТЕНИЕМ, а не отловом текста ошибки: `mergeQueue` возвращает null, если очереди
+          # для ветки нет.
+          HAS_QUEUE=$(
+            gh api graphql \
+              -f query='
+                query($owner:String!, $name:String!, $branch:String!) {
+                  repository(owner:$owner, name:$name) {
+                    mergeQueue(branch:$branch) { id }
+                  }
+                }' \
+              -F owner="${REPO%/*}" -F name="${REPO#*/}" -F branch="$BASE" \
+              -q '.data.repository.mergeQueue != null'
+          )
+          if [ "$HAS_QUEUE" != 'true' ]; then
+            echo "PR #$PR: у базовой ветки '$BASE' нет merge queue (стековый PR) — ставить некуда, ждём смены базы"
             exit 0
           fi
 
