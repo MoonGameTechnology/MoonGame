@@ -50,6 +50,27 @@ name: Security scan
 #
 # This workflow is itself checked by zizmor (GitHub Actions security scanner).
 #
+# === HARDEN-RUNNER (egress-policy: audit) ===
+#
+# ЗАЧЕМ. Почти каждая джоба ниже запускает ЧУЖОЙ docker-образ с примонтированным репозиторием.
+# Именно этот вектор выстрелил в 2026-м дважды на тех самых сканерах: Trivy в марте, KICS
+# 22 апреля — украденные publisher-креды, вредоносный образ под легитимным тегом, и
+# отравленный бинарь тихо отправлял ВЫВОД СКАНА наружу, сохраняя рабочую поверхность.
+# Дайджест-пины (см. выше) закрывают «подменили образ»; harden-runner отвечает на
+# следующий вопрос — «а куда этот образ вообще ходит». Он снимает egress на уровне ядра
+# (eBPF), поэтому видит и трафик контейнеров, запущенных внутри джобы.
+#
+# ЦЕНА, О КОТОРОЙ НАДО ЗНАТЬ. Это сторонний агент с доступом уровня ядра на каждом прогоне,
+# и в audit-режиме он отправляет телеметрию о наших прогонах в SaaS вендора. Для пайплайна,
+# посылка которого — «не доверяй чужому коду с нашими секретами», это осознанный размен, а
+# не бесплатное усиление. Откат — удалить шаг, ничего больше от него не зависит.
+#
+# ПОЧЕМУ AUDIT, А НЕ BLOCK. Блокирующий режим обходится через DNS-over-HTTPS
+# (GHSA-46g3-37rh-v698, Community-тариф) — то есть даёт не гарантию, а видимость с
+# дополнительным риском сломать легитимный трафик сканеров. Сначала неделя наблюдений и
+# список реальных эндпоинтов, потом уже разговор про block. Версия 2.19.4 — заведомо выше
+# 2.16.0, где DoH-обход закрыли.
+#
 # === WHY THE WEEKLY SCHEDULE (SEC-10) ===
 #
 # Push-triggered scanning certifies a COMMIT, not a RUNNING DEPLOY. Our bases are
@@ -101,6 +122,9 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -136,6 +160,9 @@ jobs:
       contents: read
       security-events: write
     steps:
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -187,6 +214,9 @@ jobs:
       security-events: write
       actions: read
     steps:
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -224,6 +254,9 @@ jobs:
       contents: read
       security-events: write
     steps:
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -270,6 +303,9 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # full history — the differentiator vs Gitleaks (--no-git)
@@ -306,6 +342,9 @@ jobs:
       contents: read
       security-events: write
     steps:
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -353,6 +392,9 @@ jobs:
       contents: read
       security-events: write
     steps:
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -399,6 +441,9 @@ jobs:
       contents: read
       security-events: write
     steps:
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -458,6 +503,9 @@ jobs:
       contents: read
       security-events: write
     steps:
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -556,6 +604,9 @@ jobs:
       contents: read
       security-events: write
     steps:
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -664,6 +715,9 @@ jobs:
       contents: read
       pull-requests: write # для comment-summary-in-pr: on-failure
     steps:
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -758,6 +812,9 @@ jobs:
       # a quiet green.
       NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
     steps:
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -835,6 +892,9 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -895,6 +955,9 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -925,6 +988,9 @@ jobs:
       contents: read
       security-events: write
     steps:
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -964,6 +1030,9 @@ jobs:
       security-events: write
       id-token: write
     steps:
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -1024,6 +1093,9 @@ jobs:
       pull-requests: write # PR comments
       issues: write
     steps:
+      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
