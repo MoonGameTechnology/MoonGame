@@ -559,12 +559,18 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # KICS опознаёт Docker Compose ТОЛЬКО по расширению `.yaml` (docs/platforms.md;
-      # та же беда у Ansible — Checkmarx/kics#7110, и прямо про compose — #1981), а у нас
-      # все три файла `.yml`. Переименовывать их нельзя: на имена завязаны install-ubuntu.sh,
-      # verify-image.sh и полдюжины мест в доках, то есть боевой путь деплоя. Поэтому
-      # копии с нужным расширением делаются ВНУТРИ джобы, а пути в SARIF ниже возвращаются
-      # к настоящим файлам.
+      # ДВЕ ЛОВУШКИ KICS, обе стоили красной джобы — не убирай, не проверив.
+      #
+      # 1. Расширение. KICS опознаёт Docker Compose ТОЛЬКО по `.yaml` (его апстрим-док
+      #    platforms.md; та же беда у Ansible — Checkmarx/kics#7110, про compose — #1981),
+      #    а у нас все три файла `.yml`. Переименовывать нельзя: на имена завязаны
+      #    install-ubuntu.sh, verify-image.sh и полдюжины мест в доках — боевой деплой.
+      #    Поэтому копии с нужным расширением делаются ВНУТРИ джобы, а пути в SARIF ниже
+      #    возвращаются к настоящим файлам.
+      # 2. Значение `--type`. В апстрим-доке KICS написано `docker-compose`, и CLI такое
+      #    значение ОТВЕРГАЕТ: печатает справку и выходит с 126. Рабочее значение —
+      #    `DockerCompose`, как перечислено в выводе `kics scan --help`. Документация
+      #    разошлась с бинарём; источник истины — справка самого образа.
       - name: собрать .yaml-копии compose-файлов
         id: prep
         run: |
@@ -588,7 +594,7 @@ jobs:
           docker run --rm -v "$PWD:/src" -w /src \
             checkmarx/kics@sha256:990ae994fbbe59760c8e4f7e89b1193a39a0c2968909058ec29335cb6d80efc1 \
             scan -p /src/kics-src -o /src/kics-out --report-formats sarif,json \
-            --type docker-compose --no-progress
+            --type DockerCompose --no-progress
           rc=$?
           set -e
           ok=true
@@ -638,7 +644,11 @@ jobs:
           # намеренно (она информационная, поэтому мерж не блокирует, но краснеет и видна),
           # второе только предупреждает до триажа базовой линии.
           if [ "$SCANNED" -lt "${COPIED:-1}" ]; then
-            echo "::error::kics: просканировано $SCANNED из $COPIED compose-файлов — скан НЕ состоялся. Проверь расширения копий и --type docker-compose."
+            if [ "$RC" = "126" ] || [ "$RC" = "127" ] || [ "$RC" = "125" ]; then
+              echo "::error::kics: контейнер не отработал (код $RC) — образ не запустился ЛИБО CLI отверг аргументы и напечатал справку. Сверь флаги с выводом \`kics scan --help\` в логе шага выше."
+            else
+              echo "::error::kics: просканировано $SCANNED из $COPIED compose-файлов — скан НЕ состоялся. Проверь, что копии имеют расширение .yaml и что --type принят (правильное значение: DockerCompose)."
+            fi
             exit 1
           fi
           if [ "$RC" != "0" ]; then
