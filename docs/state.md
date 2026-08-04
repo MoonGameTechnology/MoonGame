@@ -1795,8 +1795,15 @@ pnpm run prototype   # собрать prototype/dist/void-dominion{,-player}.htm
 
 Гейт зеркалится в CI (`ci.yml`), рядом идут `security.yml` (набор сканеров; блокирующие
 — Semgrep, Gitleaks, OSV, Trivy fs/image; с SEC-10 ещё и еженедельный ре-скан `main` по
-крону — прод крутит пиненный образ дольше, чем живут ленты CVE), `android.yml` (APK) и
-`image.yml` (SEC-13: сборка → блокирующий Trivy → GHCR → подпись cosign по дайджесту).
+крону — прод крутит пиненный образ дольше, чем живут ленты CVE), `android.yml` (APK),
+`image.yml` (SEC-13: сборка → блокирующий Trivy → GHCR → подпись cosign по дайджесту) и
+`automerge.yml` (жмёт «Enable auto-merge» на открытии PR: решение «влить, когда
+позеленеет» принимается один раз, а не кликом на каждом; гейт при этом не обходится —
+слияние всё равно ждёт required-чеков). `ci.yml` и `security.yml` подписаны на событие
+`merge_group`: `main` идёт через merge queue, а она ждёт required-чеков на своей
+временной ветке — воркфлоу без этой подписки туда не попадает, и PR вышибает по
+таймауту. Заводишь required-чек в новом воркфлоу — добавляй `merge_group` и ему
+(процедура настройки ветки целиком — в `CONTRIBUTING.md`).
 Прод-деплой из подписанного образа: `deploy/verify-image.sh` + оверлей
 `docker-compose.release.yml` (runbook — `deploy/README.md`, разбор слоёв —
 `docs/security/pipeline.md`).
