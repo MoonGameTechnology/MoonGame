@@ -51,7 +51,7 @@ TIME_SCALE=200 HOST=0.0.0.0 PORT=8788 pnpm host
 - **Свой домен** — реверс-прокси с TLS перед портом 8788 (Caddy/Nginx).
   Готового `deploy/Caddyfile` ещё нет — кирпич HTTPS-2.1 в `docs/https-roadmap.md`.
 - **Клиент из веба (GitHub Pages)** — workflow `pages.yml` задуман публиковать HTML на
-  `https://moonwuk.github.io/MoonGame/`, но **деплой не проходит**: все раны падают за
+  `https://moongametechnology.github.io/MoonGame/`, но **деплой не проходит**: все раны падают за
   ~3 с без раннера (окружение `github-pages` недоступно). Сверено 2026-07-31: красные
   **30 прогонов из 30** в выборке, последний — #329.
   Лечится ОДНИМ действием владельца: Settings → Pages → Source «GitHub Actions».

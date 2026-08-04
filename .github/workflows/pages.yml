@@ -1,7 +1,7 @@
 name: Play in browser (GitHub Pages)
 
 # Builds the self-contained prototype HTML and publishes it to GitHub Pages, so the
-# game can be tried in a browser with no install at https://moonwuk.github.io/MoonGame/.
+# game can be tried in a browser with no install at https://moongametechnology.github.io/MoonGame/.
 # (Адрес проектных Pages — это ИМЯ РЕПОЗИТОРИЯ: `…github.io/<repo>/`. Раньше здесь и в
 # доках стояло `/Nygame/` — такого репозитория нет, ссылка вела бы в 404 даже после
 # включения Pages. Кастомного домена (CNAME) в репозитории нет.)

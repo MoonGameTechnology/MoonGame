@@ -73,7 +73,7 @@ moongame restart    # перезапустить
 moongame status     # статус сервера
 moongame logs       # просмотреть логи (реальное время)
 moongame update     # обновление: проверка здоровья после рестарта + откат при провале
-                    #   VOID_IMAGE=ghcr.io/moonwuk/moongame@sha256:… moongame update
+                    #   VOID_IMAGE=ghcr.io/moongametechnology/moongame@sha256:… moongame update
                     #   ↑ проверяемый путь: подпись проверяется ДО рестарта (гейт),
                     #     без неё обновление отменяется и сервер не трогается.
                     #   Без VOID_IMAGE — сборка на хосте: без скана и подписи.

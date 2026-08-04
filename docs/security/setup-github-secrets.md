@@ -182,10 +182,10 @@ permissions:
 
 ```
 # Require review from security team for changes to workflows
-.github/workflows/ @moonwuk/security
+.github/workflows/ @MoonGameTechnology/security
 
 # Require review from release team for version files
-package.json @moonwuk/release
+package.json @MoonGameTechnology/release
 ```
 
 ### 2. Commit signing

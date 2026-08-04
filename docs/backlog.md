@@ -1550,7 +1550,7 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
   (мок `__BUILD__`+release API): баннер поверх хаба, ручная проверка «⬇ есть
   обновление», «Позже» скрывает. ⚠ Остался **один ручной шаг владельца**: Settings →
   Pages → Source «GitHub Actions» — после него ссылка
-  https://moonwuk.github.io/MoonGame/ всегда отдаёт свежий main (веб-«автообновление»),
+  https://moongametechnology.github.io/MoonGame/ всегда отдаёт свежий main (веб-«автообновление»),
   а APK-путь уже работает целиком (баннер → системный браузер → установка поверх,
   подпись стабильна).
 - **PERF-2** ✅ Оптимизационный проход по `shared-core` (3-линзовый агент-ревью: горячие пути
