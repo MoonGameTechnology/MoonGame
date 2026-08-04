@@ -16,8 +16,8 @@ name: Security scan
 # New suppressions go to .semgrepignore / .gitleaks.toml / .trivyignore WITH a
 # reason + date (see docs/security/pipeline.md).
 # Still informational (not yet triaged as bricks): codeql, trufflehog, trivy-deps,
-# kics, dependency-check, zizmor, scorecard, and the `check` job (its blocking twin lives
-# in ci.yml).
+# kics, dependency-review, dependency-check, zizmor, scorecard, and the `check` job (its
+# blocking twin lives in ci.yml).
 #
 # Each scan job writes a `status-<key>.json` sentinel AFTER the scan with the real
 # exit code / outcome. The summarizer LEADS with a scan-confirmation table built from
@@ -653,6 +653,71 @@ jobs:
           fi
           if [ "$RC" != "0" ]; then
             echo "::warning::KICS нашёл проблемы в compose ($SCANNED файлов, exit $RC). Информационно: разобрать базовую линию, затем перевести в блокирующие (SEC-1)."
+          fi
+
+  dependency-review:
+    name: SCA — что вносит ЭТОТ PR (Dependency Review)
+    # ЧЕМ ОТЛИЧАЕТСЯ ОТ OSV. Блокирующий `osv` смотрит на lockfile ЦЕЛИКОМ и отвечает
+    # «в проекте есть уязвимая зависимость». Это действие диффает граф зависимостей базы
+    # и головы и отвечает на другой вопрос — «уязвимость приехала ИМЕННО В ЭТОМ PR».
+    # Разница практическая: первое говорит, что чинить, второе — что откатывать и кому
+    # идти разбираться. Данные при этом почти те же (GHSA против osv.dev, который GHSA
+    # зеркалит), так что как ДЕТЕКТОР сверх osv это добавляет мало — ценность в атрибуции
+    # и в том, что через него позже включается лицензионная политика (`deny-licenses`),
+    # которой сейчас нет ни у одного сканера в пайплайне.
+    #
+    # ТОЛЬКО НА PR: вне pull_request диффать нечего, базы для сравнения не существует.
+    # Сводный отчёт знает про это (`prOnly`) и печатает «⏭ пропущено», а не «НЕ подтверждён».
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+      pull-requests: write # для comment-summary-in-pr: on-failure
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: dependency review
+        id: scan
+        continue-on-error: true # информационная до триажа (SEC-1)
+        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+        with:
+          fail-on-severity: high
+          # Комментарий ТОЛЬКО при находке: в обычном случае канал отчётности один —
+          # sticky-комментарий summarizer'а, второй бот в треде был бы шумом. Но если PR
+          # реально вносит уязвимую зависимость, сказать об этом надо там, где смотрят.
+          comment-summary-in-pr: on-failure
+          # Лицензионная политика НЕ включена намеренно: `deny-licenses` — решение
+          # команды, а не сканера, и ошибка в нём блокирует PR из-за ТРАНЗИТИВНОЙ
+          # зависимости, которую никто не выбирал. Включать отдельным кирпичом, когда
+          # политика будет выбрана.
+      - name: sentinel
+        if: always()
+        env:
+          OUTCOME: ${{ steps.scan.outcome }}
+        run: |
+          # ОГОВОРКА: в отличие от docker-сканеров это действие НЕ различает «нашёл» и
+          # «сломался» — оба дают outcome=failure. Пишем outcome как есть и говорим об
+          # этом вслух, вместо того чтобы делать вид, будто сигнал точный.
+          ok=true
+          case "$OUTCOME" in success | failure) ;; *) ok=false ;; esac
+          rc=0
+          [ "$OUTCOME" = 'success' ] || rc=1
+          echo "{\"key\":\"dependency-review\",\"ok\":$ok,\"exit\":$rc,\"outcome\":\"$OUTCOME\"}" \
+            > status-dependency-review.json
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: report-dependency-review
+          path: status-dependency-review.json
+          if-no-files-found: warn
+      - name: report — informational (not yet blocking)
+        if: always()
+        env:
+          OUTCOME: ${{ steps.scan.outcome }}
+        run: |
+          if [ "$OUTCOME" != 'success' ]; then
+            echo "::warning::Dependency Review: PR вносит уязвимую зависимость ЛИБО действие не отработало (outcome=$OUTCOME) — оно эти случаи не различает, смотри лог шага. Информационно до триажа."
           fi
 
   dependency-check:
