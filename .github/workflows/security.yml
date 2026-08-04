@@ -86,7 +86,11 @@ concurrency:
   # refs/pull/N/merge и не схлопнулся бы с прогоном от push той же ветки — вышло бы два
   # полных прогона сканеров на каждый коммит в PR.
   group: security-${{ github.head_ref || github.ref }}
-  cancel-in-progress: true
+  # На `merge_group` не отменяем — по той же причине, что в `ci.yml`: у всех попыток
+  # поставить тот же PR на ту же базу имя ветки очереди совпадает, и повторная постановка
+  # гасила бы ещё идущий прогон прошлой записи. Отменённый required-чек очередь считает
+  # провалом и выбрасывает PR с `CI_FAILURE`, хотя код зелёный.
+  cancel-in-progress: ${{ github.event_name != 'merge_group' }}
 
 permissions: {}
 

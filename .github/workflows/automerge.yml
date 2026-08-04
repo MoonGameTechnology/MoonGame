@@ -38,6 +38,15 @@ on:
   pull_request:
     types: [ready_for_review]
 
+concurrency:
+  # `CI` и `Security scan` заканчиваются почти одновременно, и оба будят этот воркфлоу.
+  # Без сериализации обе копии прочитали бы «в очереди не стоит» и обе позвали бы
+  # `enqueuePullRequest` — вторая упала бы с ошибкой на уже поставленном PR. Ключ по имени
+  # ветки: у PR она одна. Отменять НЕ надо (`cancel-in-progress: false`) — вторая копия
+  # должна дождаться первую и увидеть уже созданную запись очереди, а не умереть.
+  group: automerge-${{ github.event.workflow_run.head_branch || github.event.pull_request.head.ref }}
+  cancel-in-progress: false
+
 permissions:
   # Постановка в очередь — мутация pull request'а.
   pull-requests: write
