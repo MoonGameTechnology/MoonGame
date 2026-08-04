@@ -2054,6 +2054,15 @@ function known(id: string | null | undefined): boolean {
 function radarHas(id: string | null | undefined): boolean {
   return !!vision && id != null && vision.radar.has(id);
 }
+/** Fog gate: «этот мир игроку вообще видно в деталях?» — опознан или свой.
+ *  ОДНО место на весь файл специально: это условие нужно и панели, и отрисовке
+ *  радиусов, а когда оно было выписано дважды, второе место про него забыли — тап по
+ *  неисследованной системе рисовал её радарные окружности с подписями, выдавая и факт
+ *  присутствия владельца, и наличие радара, и его точный радиус. Панель при этом честно
+ *  писала «нет телеметрии»: расхождение было видно на одном экране. */
+function seesDetails(p: Planet): boolean {
+  return known(p.id) || p.owner === ME;
+}
 
 /** Draw a fogged system: a greyed last-known blip from memory, or an unexplored
  *  marker if it has never been identified. */
@@ -3992,6 +4001,10 @@ function drawRadarRange(now: number): void {
   if (!selPlanet) return;
   const p = s.planets[selPlanet];
   if (!p) return;
+  // Туман войны. `planetRadar` читает ПОСТРОЙКИ выбранного мира, поэтому без этого
+  // гейта тап по чужой неисследованной системе рисовал её окружности и подписи —
+  // мгновенная разведка одним касанием, мимо сенсоров и без единого корабля.
+  if (!seesDetails(p)) return;
   const reach = planetRadar(p);
   if (reach <= 0) return;
   const c = world(p.position);
@@ -5849,7 +5862,7 @@ function panelHtml(): string {
   }
   const p = planet(selPlanet);
   if (!p) return `<div class="hint">${t('side.empty')}</div>`;
-  if (!known(p.id) && p.owner !== ME) return unknownPlanetHtml(p);
+  if (!seesDetails(p)) return unknownPlanetHtml(p);
   return planetPanelHtml(p);
 }
 
