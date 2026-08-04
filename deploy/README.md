@@ -21,7 +21,7 @@ sudo bash deploy/install-ubuntu.sh
 ```bash
 moongame status      # проверить статус
 moongame logs        # просмотреть логи
-moongame update      # обновление кода (pull + пересборка образа)
+moongame update      # обновление (см. ниже: с VOID_IMAGE — с проверкой подписи)
 ```
 
 ### Вариант 2: Docker Compose вручную (как прежде)
@@ -72,7 +72,11 @@ moongame stop       # остановить
 moongame restart    # перезапустить
 moongame status     # статус сервера
 moongame logs       # просмотреть логи (реальное время)
-moongame update     # обновление кода: pull + пересборка образа + рестарт (~1-3 мин)
+moongame update     # обновление: проверка здоровья после рестарта + откат при провале
+                    #   VOID_IMAGE=ghcr.io/moonwuk/moongame@sha256:… moongame update
+                    #   ↑ проверяемый путь: подпись проверяется ДО рестарта (гейт),
+                    #     без неё обновление отменяется и сервер не трогается.
+                    #   Без VOID_IMAGE — сборка на хосте: без скана и подписи.
 moongame shell      # shell в директории проекта
 ```
 

@@ -213,24 +213,109 @@ log_success "Systemd сервис настроен"
 log_info "Создание скрипта быстрого обновления..."
 cat > "$INSTALL_DIR/update-dev.sh" << 'UPDATEEOF'
 #!/bin/bash
-
-set -e
+#
+# Обновление живого прода. Три вещи, которых здесь раньше не было и без которых
+# «обновление» было прыжком с завязанными глазами:
+#   1. ПРОВЕРКА ПОДПИСИ на образном пути — верификация обязательна, а не по желанию
+#      оператора: непроверенный образ до рестарта не доходит.
+#   2. ПРОВЕРКА ЗДОРОВЬЯ после рестарта — раньше скрипт печатал «Обновление
+#      завершено!» ровно после `systemctl restart`, то есть радостно рапортовал об
+#      успехе, даже если сервер немедленно падал в цикл перезапуска.
+#   3. ОТКАТ на предыдущий образ, если здоровье не поднялось.
+set -euo pipefail
 
 INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVICE_NAME="moongame"
+COMPOSE_BASE="$INSTALL_DIR/deploy/docker-compose.yml"
+RELEASE_OVERLAY="$INSTALL_DIR/deploy/docker-compose.release.yml"
+LAST_GOOD="$INSTALL_DIR/.last-good-image"
+HEALTH_PORT="${PORT:-8788}"
+HEALTH_TRIES="${HEALTH_TRIES:-30}"
+
+health_ok() {
+  local i
+  for ((i = 1; i <= HEALTH_TRIES; i++)); do
+    if curl -fsS --max-time 3 "http://127.0.0.1:${HEALTH_PORT}/health" >/dev/null 2>&1; then
+      return 0
+    fi
+    sleep 2
+  done
+  return 1
+}
+
+# ---- путь 1: подписанный образ из реестра (VOID_IMAGE=ghcr.io/...@sha256:...) ----
+if [ -n "${VOID_IMAGE:-}" ]; then
+  echo "[*] Проверяем подпись образа (гейт — без неё дальше не идём)..."
+  if ! "$INSTALL_DIR/deploy/verify-image.sh" "$VOID_IMAGE"; then
+    echo "[✗] Подпись не подтверждена — обновление ОТМЕНЕНО, сервер не тронут." >&2
+    exit 1
+  fi
+
+  PREV_IMAGE="$(cat "$LAST_GOOD" 2>/dev/null || true)"
+
+  echo "[*] Забираем образ и поднимаем на нём стек..."
+  docker pull "$VOID_IMAGE"
+  VOID_IMAGE="$VOID_IMAGE" docker compose -f "$COMPOSE_BASE" -f "$RELEASE_OVERLAY" up -d --no-build
+
+  if health_ok; then
+    echo "$VOID_IMAGE" > "$LAST_GOOD"
+    echo "[✓] Обновление завершено, /health отвечает."
+    exit 0
+  fi
+
+  echo "[✗] Сервер не поднялся после обновления." >&2
+  if [ -n "$PREV_IMAGE" ]; then
+    echo "[*] Откатываемся на предыдущий проверенный образ: $PREV_IMAGE" >&2
+    VOID_IMAGE="$PREV_IMAGE" docker compose -f "$COMPOSE_BASE" -f "$RELEASE_OVERLAY" up -d --no-build
+    health_ok && echo "[✓] Откат удался, работает предыдущая версия." >&2 \
+      || echo "[✗] Откат НЕ помог — смотри логи: moongame logs" >&2
+  else
+    echo "[!] Отката нет: предыдущий образ неизвестен ($LAST_GOOD пуст)." >&2
+  fi
+  exit 1
+fi
+
+# ---- путь 2: сборка из исходников (историческое поведение) ----
+# У этого пути нет ни сканирования, ни подписи: в прод уезжает то, что собралось на
+# этой машине из текущего main. Оставлен рабочим для плейтест-хостов, но теперь честно
+# об этом говорит и хотя бы проверяет здоровье с откатом.
+echo "[!] Путь без гейта: сборка на хосте — образ не сканирован и не подписан."
+echo "[!] Проверяемый путь: VOID_IMAGE=ghcr.io/moonwuk/moongame@sha256:... moongame update"
 
 echo "[*] Обновляем код из репозитория..."
-cd $INSTALL_DIR
+cd "$INSTALL_DIR"
 git pull origin main
 
+# Образ, на котором сервер работает ПРЯМО СЕЙЧАС — единственная точка отката.
+PREV_IMAGE_ID="$(docker compose -f "$COMPOSE_BASE" ps -q server 2>/dev/null \
+  | head -1 | xargs -r docker inspect --format '{{.Image}}' 2>/dev/null || true)"
+
 echo "[*] Пересобираем образ (сервер пока работает, ~1-3 мин)..."
-docker compose -f "$INSTALL_DIR/deploy/docker-compose.yml" build
+docker compose -f "$COMPOSE_BASE" build
 
 echo "[*] Перезапускаем сервер на новом образе..."
-sudo systemctl restart $SERVICE_NAME
+sudo systemctl restart "$SERVICE_NAME"
 
-echo "[✓] Обновление завершено!"
-echo "[*] Логи: sudo journalctl -u $SERVICE_NAME -f"
+if health_ok; then
+  echo "[✓] Обновление завершено, /health отвечает."
+  echo "[*] Логи: sudo journalctl -u $SERVICE_NAME -f"
+  exit 0
+fi
+
+echo "[✗] Сервер не отвечает на /health после обновления." >&2
+if [ -n "$PREV_IMAGE_ID" ]; then
+  IMAGE_NAME="$(docker compose -f "$COMPOSE_BASE" config --images 2>/dev/null | head -1)"
+  if [ -n "$IMAGE_NAME" ]; then
+    echo "[*] Откатываемся на предыдущий образ ($PREV_IMAGE_ID)..." >&2
+    docker tag "$PREV_IMAGE_ID" "$IMAGE_NAME"
+    sudo systemctl restart "$SERVICE_NAME"
+    health_ok && echo "[✓] Откат удался, работает предыдущая версия." >&2 \
+      || echo "[✗] Откат НЕ помог — смотри логи: moongame logs" >&2
+  fi
+else
+  echo "[!] Отката нет: не удалось определить предыдущий образ." >&2
+fi
+exit 1
 UPDATEEOF
 
 chmod +x "$INSTALL_DIR/update-dev.sh"
