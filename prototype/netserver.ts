@@ -233,7 +233,17 @@ if (AUTH && !authCfg.allowedOrigins) {
 const PROD_FLAG = process.env.PROD === '1' || process.env.PROD === 'true';
 if (PROD_FLAG) {
   const missing: string[] = [];
+  // Зеркало serverConfig.ts: секрет проверяется и на длину (короткий HS256-секрет
+  // подбирается офлайн по одному токену), а ALLOWED_ORIGINS обязателен — без него
+  // публичный сервер принимает wss-соединение с любой чужой страницы (CSWSH).
+  const MIN_SECRET_LEN = 32;
   if (!process.env.AUTH_JWT_SECRET) missing.push('AUTH_JWT_SECRET');
+  else if (process.env.AUTH_JWT_SECRET.length < MIN_SECRET_LEN) {
+    missing.push(`AUTH_JWT_SECRET длиной ≥${MIN_SECRET_LEN} (например \`openssl rand -hex 32\`)`);
+  }
+  if (!process.env.ALLOWED_ORIGINS || !process.env.ALLOWED_ORIGINS.split(',').some((o) => o.trim())) {
+    missing.push('ALLOWED_ORIGINS (Origin-allowlist против CSWSH)');
+  }
   if (!(process.env.GATE === '1' || process.env.GATE === 'true')) missing.push('GATE=1');
   const tlsNative = Boolean(process.env.TLS_KEY_FILE && process.env.TLS_CERT_FILE);
   const tlsProxy = process.env.TRUST_PROXY === '1';

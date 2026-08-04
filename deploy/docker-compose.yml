@@ -68,6 +68,12 @@ services:
       # (anyone who knows a nick can take a seat). The server logs a stderr warning
       # if HOST=0.0.0.0 and AUTH_JWT_SECRET is empty.
       AUTH_JWT_SECRET: ${AUTH_JWT_SECRET:-}
+      # Origin-allowlist против CSWSH — ОБЯЗАТЕЛЕН под PROD=1 (сервер откажется
+      # стартовать без него). Браузер сам пришлёт сессию на wss:// с чужой страницы,
+      # и без allowlist сервер такое соединение примет. Значение — origin, с которого
+      # игроки открывают игру, через запятую: `https://play.example.com` (для LAN-теста
+      # — `http://<ip-хоста>:8788`). TLS-оверлей проставляет его из ${DOMAIN} сам.
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
       # Production posture (SEC-1 / MP-1): fail-secure — refuses to boot if any of
       # GATE/SEAT_LOCK/AUTH_JWT_SECRET is unset on a public bind. Defaults ON so a
       # plain `docker compose up` against the public interface is safe. Override

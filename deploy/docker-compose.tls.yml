@@ -18,6 +18,10 @@ services:
     # headers (a client could otherwise spoof its scheme/IP), which is the fail-secure default.
     environment:
       TRUST_PROXY: '1'
+      # Публичный путь знает свой домен, поэтому Origin-allowlist выводится из него и
+      # оператору не нужно помнить про ещё одну переменную. Переопределить (например,
+      # добавить второй origin) можно, задав ALLOWED_ORIGINS в окружении.
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://${DOMAIN}}
 
   postgres:
     environment:

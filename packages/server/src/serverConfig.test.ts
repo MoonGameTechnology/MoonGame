@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { verifyJoinToken } from './auth';
-import { checkProductionReadiness, configFromEnv } from './serverConfig';
+import { checkProductionReadiness, configFromEnv, MIN_SECRET_LEN } from './serverConfig';
 
 // 2.3 — the entrypoint's security composition (previously only boot-smoked). The critical
 // property: a token minted by `signToken` verifies under `auth` (same secret/alg/iss/aud),
@@ -62,9 +62,13 @@ describe('configFromEnv', () => {
 
 // MP-1: secure-by-default launch guard — "prod-mode without a secret refuses to start".
 describe('checkProductionReadiness', () => {
+  // Секрет намеренно длинный: гард требует ≥32 символов (короткий HS256-секрет
+  // подбирается офлайн по одному перехваченному токену).
+  const SECRET = 'a'.repeat(64);
   const FULL = {
     PROD: '1',
-    AUTH_JWT_SECRET: 'secret-xyz',
+    AUTH_JWT_SECRET: SECRET,
+    ALLOWED_ORIGINS: 'https://play.example.com',
     GATE: '1',
     TRUST_PROXY: '1',
     SEAT_LOCK: '1',
@@ -81,6 +85,7 @@ describe('checkProductionReadiness', () => {
     expect(r.ok).toBe(false);
     expect(r.missing).toEqual([
       'AUTH_JWT_SECRET',
+      'ALLOWED_ORIGINS (Origin-allowlist против CSWSH)',
       'GATE=1',
       'TLS (TLS_KEY_FILE+TLS_CERT_FILE for native TLS, or TRUST_PROXY=1 behind a TLS-terminating proxy)',
       'SEAT_LOCK=1',
@@ -110,6 +115,31 @@ describe('checkProductionReadiness', () => {
     expect(r.missing).toEqual([
       'TLS (TLS_KEY_FILE+TLS_CERT_FILE for native TLS, or TRUST_PROXY=1 behind a TLS-terminating proxy)',
     ]);
+  });
+
+  it('короткий AUTH_JWT_SECRET отвергается так же, как отсутствующий', () => {
+    const r = checkProductionReadiness({ ...FULL, AUTH_JWT_SECRET: 'x'.repeat(MIN_SECRET_LEN - 1) });
+    expect(r.ok).toBe(false);
+    expect(r.missing).toEqual([`AUTH_JWT_SECRET длиной ≥${MIN_SECRET_LEN} (например \`openssl rand -hex 32\`)`]);
+    // Ровно на границе — проходит.
+    expect(checkProductionReadiness({ ...FULL, AUTH_JWT_SECRET: 'x'.repeat(MIN_SECRET_LEN) }).ok).toBe(true);
+  });
+
+  it('ALLOWED_ORIGINS обязателен под PROD=1 — без него публичный сервер открыт к CSWSH', () => {
+    const { ALLOWED_ORIGINS, ...rest } = FULL;
+    void ALLOWED_ORIGINS;
+    expect(checkProductionReadiness(rest)).toEqual({
+      ok: false,
+      missing: ['ALLOWED_ORIGINS (Origin-allowlist против CSWSH)'],
+    });
+  });
+
+  it('ALLOWED_ORIGINS из одних разделителей/пробелов не считается заданным', () => {
+    for (const value of [' ', ',', ' , , ']) {
+      const r = checkProductionReadiness({ ...FULL, ALLOWED_ORIGINS: value });
+      expect(r.ok, `значение ${JSON.stringify(value)} должно отвергаться`).toBe(false);
+      expect(r.missing).toEqual(['ALLOWED_ORIGINS (Origin-allowlist против CSWSH)']);
+    }
   });
 
   it('flags exactly one missing switch at a time', () => {

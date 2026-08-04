@@ -151,6 +151,9 @@ export interface ProdReadiness {
   missing: string[];
 }
 
+/** Минимальная длина `AUTH_JWT_SECRET` под `PROD=1` (см. checkProductionReadiness). */
+export const MIN_SECRET_LEN = 32;
+
 /**
  * MP-1: turn the "never leave a public plain port" anti-goal into an enforced check
  * instead of a comment. When `PROD=1`/`PROD=true`, a boot MUST have auth, the action
@@ -164,7 +167,21 @@ export function checkProductionReadiness(env: NodeJS.ProcessEnv): ProdReadiness 
   if (!prod) return { ok: true, missing: [] };
 
   const missing: string[] = [];
+  // Секрет проверяется не только на наличие, но и на ДЛИНУ. HS256 подписывает HMAC'ом
+  // ровно этим значением: `AUTH_JWT_SECRET=x` формально «задан», но подбирается офлайн
+  // по одному перехваченному токену, и тогда join-токен можно выписать себе самому.
+  // 32 байта — нижняя граница, при которой перебор перестаёт быть вопросом времени.
   if (!env.AUTH_JWT_SECRET) missing.push('AUTH_JWT_SECRET');
+  else if (env.AUTH_JWT_SECRET.length < MIN_SECRET_LEN) {
+    missing.push(`AUTH_JWT_SECRET длиной ≥${MIN_SECRET_LEN} (например \`openssl rand -hex 32\`)`);
+  }
+  // ALLOWED_ORIGINS — единственная защита от CSWSH: браузер сам пришлёт cookie/сессию
+  // на wss:// с чужой страницы, и без allowlist сервер примет такое соединение. Раньше
+  // это было лишь предупреждение в stderr, то есть публичный сервер спокойно стартовал
+  // без него — дыра в fail-closed гарде, а не осознанное послабление.
+  if (!env.ALLOWED_ORIGINS || !env.ALLOWED_ORIGINS.split(',').some((o) => o.trim())) {
+    missing.push('ALLOWED_ORIGINS (Origin-allowlist против CSWSH)');
+  }
   if (!(env.GATE === '1' || env.GATE === 'true')) missing.push('GATE=1');
   const tlsNative = Boolean(env.TLS_KEY_FILE && env.TLS_CERT_FILE);
   const tlsProxy = env.TRUST_PROXY === '1';
