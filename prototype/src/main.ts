@@ -99,6 +99,9 @@ import { DEFAULT_SHIP_LOADOUTS, type ShipLoadout } from './ships';
 // «Верфь» — вкладка оснащения (REFM-13): окно целиком живёт в `shipyard.ts`, здесь
 // только проводка (host-хуки) и панель героев, которая переедет своим кирпичом.
 import { initShipyard } from './shipyard';
+// HUD-DOCK: видимость листа и «нижний хаб уезжает» — одна чистая модель на все
+// прицельные режимы; она же держит замер высоты листа для привязки ряда команд.
+import { mapIsWorkspace, panelOpen, sheetHeightVar, type DockState } from './hudDock';
 import {
   buildingLevel,
   buildingMaxLevel,
@@ -818,6 +821,21 @@ const $ = (id: string) => document.getElementById(id) as HTMLElement;
 const canvas = $('map') as unknown as HTMLCanvasElement;
 const cx = canvas.getContext('2d') as CanvasRenderingContext2D;
 const side = $('side');
+// HUD-DOCK: ряд команд (и регулятор скорости) стоят НА листе, поэтому его РЕАЛЬНАЯ
+// высота уезжает в `--sheeth`. Наблюдатель, а не замер в кадре: `offsetHeight` каждый
+// кадр — принудительный layout на 60 Гц ради величины, которая меняется раз в
+// несколько секунд. Нулевую высоту (лист спрятан через display:none) пропускаем: она
+// не нужна — правило висит на `body.sheet-open` — а записать её значило бы на один кадр
+// уронить ряд в самый низ при каждом открытии листа.
+if (typeof ResizeObserver !== 'undefined')
+  new ResizeObserver((entries) => {
+    const e = entries[entries.length - 1];
+    if (!e) return;
+    // borderBoxSize — высота С рамкой и padding'ом (у листа там сидит safe-area
+    // телефона); contentRect их не считает, и ряд наехал бы на лист снизу.
+    const h = e.borderBoxSize?.[0]?.blockSize ?? (e.target as HTMLElement).offsetHeight;
+    if (h > 0) document.body.style.setProperty('--sheeth', sheetHeightVar(h));
+  }).observe(side);
 const logEl = $('log');
 const devlineEl = $('devline'); // status strip below the top bar: clock + donate currency
 const purse = $('purse');
@@ -2053,6 +2071,15 @@ function known(id: string | null | undefined): boolean {
 /** True if node `id` is inside radar reach (signature-level detection). */
 function radarHas(id: string | null | undefined): boolean {
   return !!vision && id != null && vision.radar.has(id);
+}
+/** Fog gate: «этот мир игроку вообще видно в деталях?» — опознан или свой.
+ *  ОДНО место на весь файл специально: это условие нужно и панели, и отрисовке
+ *  радиусов, а когда оно было выписано дважды, второе место про него забыли — тап по
+ *  неисследованной системе рисовал её радарные окружности с подписями, выдавая и факт
+ *  присутствия владельца, и наличие радара, и его точный радиус. Панель при этом честно
+ *  писала «нет телеметрии»: расхождение было видно на одном экране. */
+function seesDetails(p: Planet): boolean {
+  return known(p.id) || p.owner === ME;
 }
 
 /** Draw a fogged system: a greyed last-known blip from memory, or an unexplored
@@ -3992,6 +4019,10 @@ function drawRadarRange(now: number): void {
   if (!selPlanet) return;
   const p = s.planets[selPlanet];
   if (!p) return;
+  // Туман войны. `planetRadar` читает ПОСТРОЙКИ выбранного мира, поэтому без этого
+  // гейта тап по чужой неисследованной системе рисовал её окружности и подписи —
+  // мгновенная разведка одним касанием, мимо сенсоров и без единого корабля.
+  if (!seesDetails(p)) return;
   const reach = planetRadar(p);
   if (reach <= 0) return;
   const c = world(p.position);
@@ -5849,7 +5880,7 @@ function panelHtml(): string {
   }
   const p = planet(selPlanet);
   if (!p) return `<div class="hint">${t('side.empty')}</div>`;
-  if (!known(p.id) && p.owner !== ME) return unknownPlanetHtml(p);
+  if (!seesDetails(p)) return unknownPlanetHtml(p);
   return planetPanelHtml(p);
 }
 
@@ -6788,18 +6819,25 @@ function renderObjDesc(): void {
 
 let sheetWasOpen = false;
 function renderPanel() {
-  // While arming a merge target, collapse the panel so the map (and the fleet to
-  // merge with) is fully tappable — important on phones where the sheet covers it.
-  // «Выбрать+» collapses the sheet the same way merging does — picking needs the map.
-  // «Приказ» (chainMode) прячет лист целиком: заказ владельца — на мобиле нижний
-  // хаб убирается, карта остаётся рабочей поверхностью построения плана.
-  const open =
-    !merging &&
-    !pickMode &&
-    !chainMode &&
-    (selFleet !== null || selPlanet !== null || selFleets.size > 0);
+  // Кто прячет лист — решает hudDock.panelOpen: признак один на все режимы прицела
+  // («ждём тап по карте»), и «Курс» в нём теперь наравне со слиянием, набором группы
+  // и режимом «Приказ». Раньше движение было исключением: игрок жал ⤳ и тапал в лист,
+  // который закрывал пол-карты (заказ владельца — убирать нижний хаб и на движении).
+  const dock: DockState = {
+    aiming,
+    merging,
+    picking: pickMode,
+    chaining: chainMode !== null,
+    hasSelection: selFleet !== null || selPlanet !== null || selFleets.size > 0,
+  };
+  const open = panelOpen(dock);
   side.style.display = open ? 'flex' : 'none';
   document.body.classList.toggle('sheet-open', open); // mobile: hide log/comms under the sheet
+  // Нижний хаб (рейл/скорость/цели) уезжает на телефоне, пока карта — рабочая
+  // поверхность. Класс ставится здесь, а не в обработчиках: renderPanel гоняется
+  // каждый кадр, поэтому класс физически не может разъехаться с состоянием — а
+  // взводится и гасится прицел из полутора десятков мест.
+  document.body.classList.toggle('aim-mode', mapIsWorkspace(dock));
   // Phone: the bottom sheet covers ~50vh — when it OPENS, pan the camera so the
   // selected object is not the one thing the panel talks about yet hides.
   if (open && !sheetWasOpen && MOBILE) {
