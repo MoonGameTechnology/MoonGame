@@ -3,6 +3,14 @@
 Guidance for working in this repository. Read `docs/` for the full design;
 this file is the short, operational version plus the non-obvious invariants.
 
+## Язык общения
+
+**Отвечай пользователю по-русски.** Это про ОБЩЕНИЕ: сообщения в чате, объяснения,
+вопросы, отчёты о сделанном, тексты коммитов и описания PR. Правило не меняет язык
+самого репозитория: комментарии и doc-строки в коде пишутся в стиле файла, который
+правишь (в `packages/**` это английский), а текст для игрока живёт только в
+`/localization` по ключу — см. раздел «Локализация» ниже.
+
 ## What this is
 
 Void Dominion — a mobile, **real-time**, massively-multiplayer space grand strategy
