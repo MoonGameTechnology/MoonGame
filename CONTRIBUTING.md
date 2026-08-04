@@ -222,10 +222,32 @@ supported»), единственная живая замена (`@henkey/postgre
 
 1. **Доступ.** Settings → Collaborators → добавить человека с правами **Write**
    (или через организацию/команду). Для Claude он ставит Claude GitHub App у себя.
-2. **Branch protection** на `main` (Settings → Branches → Add rule, паттерн `main`):
-   - Require a pull request before merging → Require approvals: **1**.
-   - Require status checks to pass → отметить `check` (job из `ci.yml` — lint · typecheck · test · audit).
-   - Require branches to be up to date before merging.
-   - Запретить обход правил и прямой push в `main`.
-3. **`CODEOWNERS`.** Заполни GitHub-ник'ами по зонам (см. `.github/CODEOWNERS`),
+2. **Ruleset** на `main` (Settings → Rules → Rulesets → New ruleset, target `main`).
+   Именно ruleset, а НЕ Settings → Branches: классический branch protection — вторая,
+   параллельная система, и включённая заодно она даёт два независимых набора правил
+   на одну ветку, из которых в UI виден только тот, что открыт.
+   - Restrict deletions, Block force pushes.
+   - Require a pull request before merging → Required approvals: **1**,
+     Dismiss stale approvals when new commits are pushed.
+   - Require status checks to pass — список в пункте 3.
+   - Bypass-список оставить пустым: обход правил и прямой push в `main` запрещены.
+3. **Required-чеки.** Брать только те, что действительно краснеют:
+   `lint · typecheck · test · audit` (через ТОЧКИ — job из `ci.yml`; у него сервис
+   Postgres и `DATABASE_URL`, поэтому контракты адаптеров в `store.test.ts` реально
+   выполняются) плюс блокирующие сканеры SEC-1 — `SAST patterns (Semgrep)`,
+   `Secrets — tree (Gitleaks)`, `SCA — osv.dev (OSV-Scanner)`,
+   `Vuln + IaC — files (Trivy fs)`, `Vuln — built image base OS (Trivy image)`.
+   - **Не бери `lint + typecheck + test + audit`** (через ПЛЮСЫ — job из
+     `security.yml`): у шага стоит `continue-on-error: true`, а результат лишь
+     пишется в JSON для сводного отчёта, так что джоба зелёная и при красном
+     `pnpm run check`. Единственным обязательным чеком она защищает `main` на вид.
+   - **Не бери `Vuln — third-party prod images (Trivy image)`** — он помечен
+     `report — informational`, там CVE сторонних образов прода: репозиторий запрётся
+     до апстрим-обновления caddy/postgres, которое от нас не зависит.
+4. **Merge queue** (необязательно, Require merge queue в том же ruleset'е). Очередь
+   собирает временную ветку «свежий `main` + PR» и ждёт required-чеков на НЕЙ, а
+   воркфлоу попадает туда, только если подписан на событие `merge_group`. Подписаны
+   и `ci.yml`, и `security.yml`; заведёшь required-чек из нового воркфлоу — добавь
+   `merge_group` и ему, иначе очередь будет вышибать каждый PR по таймауту.
+5. **`CODEOWNERS`.** Заполни GitHub-ник'ами по зонам (см. `.github/CODEOWNERS`),
    когда распределите ответственность.
