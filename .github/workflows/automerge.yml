@@ -1,60 +1,128 @@
 name: Auto-merge
 
-# ЗАЧЕМ. Ruleset на `main` не даёт влить PR с красным CI — и это правильно. Но «Enable
-# auto-merge» остаётся РУЧНЫМ кликом на каждом pull request'е, а решение «влить, когда
-# позеленеет» принимается один раз, в момент открытия PR. Этот воркфлоу нажимает кнопку
-# за человека.
+# ЗАЧЕМ. `main` идёт через merge queue, и последнее звено цепочки «PR → сканеры →
+# зелено → очередь → мердж» до сих пор было ручным: зелёный PR ждал, пока человек нажмёт
+# «Merge when ready». Этот воркфлоу нажимает её за человека.
 #
-# ЧТО ЭТО НЕ ДЕЛАЕТ. Авто-мердж ничего не обходит: он лишь ставит PR в очередь на слияние
-# ПОСЛЕ того, как все required checks позеленеют. Красный гейт — PR так и висит открытым.
-# Если в ruleset'е включено «Require approvals», авто-мердж будет ждать ревью столько,
-# сколько понадобится; свой собственный PR апрувить GitHub не даёт, так что при
-# одиночной разработке этот пункт в ruleset'е и есть то, что заставляет кликать руками.
+# ЧТО ЭТО НЕ ДЕЛАЕТ. Гейт не обходится ничем: в очередь попадает только PR, который GitHub
+# сам считает готовым (`mergeStateStatus == CLEAN` — required-чеки зелёные, конфликтов нет,
+# ревью собрано). Дальше очередь ПЕРЕПРОВЕРЯЕТ его на временной ветке «свежий main + PR» и
+# вливает, только если и там всё зелено. Красный PR просто не ставится.
 #
-# ПОЧЕМУ `pull_request`, А НЕ `pull_request_target`. Второй дал бы write-права и на PR из
-# форка, но запускается в контексте базовой ветки — классический футган. Здесь он не
-# нужен: PR из форка авто-мерджить как раз НЕ хочется (чужой код влился бы без участия
-# человека), а на ветках самого репозитория прав у `GITHUB_TOKEN` и так достаточно.
-# Проверка на форк ниже написана явно, чтобы правило было видно, а не подразумевалось.
+# ПОЧЕМУ НЕ `gh pr merge --auto`. Так было раньше, и под очередью это не работает: `--auto`
+# зовёт `enablePullRequestAutoMerge`, а кнопка «Merge when ready» — совсем другую мутацию,
+# `enqueuePullRequest`. Авто-мердж включался, PR зеленел и всё равно стоял, пока его не
+# ставили в очередь руками. Зовём ту мутацию, которую зовёт кнопка.
 #
-# ПРЕДУСЛОВИЕ. Settings → General → Pull Requests → «Allow auto-merge» должно быть
-# включено, иначе API откажет. Шаг НЕ глушит эту ошибку намеренно: молча неработающая
-# автоматизация хуже отсутствующей.
+# ПОЧЕМУ `workflow_run`, А НЕ `pull_request`. Ставить в очередь можно только ПОСЛЕ того, как
+# required-чеки отчитались; на открытии PR они ещё красные. `workflow_run` даёт ровно этот
+# момент — «прогон завершился». Подписаны оба воркфлоу, дающих required-чеки: какой из них
+# закончит последним, тот и поставит PR в очередь, а первый увидит `mergeStateStatus` не
+# `CLEAN` и тихо выйдет. Заведёшь required-чек в новом воркфлоу — допиши его сюда.
+#
+# БЕЗОПАСНОСТЬ. `workflow_run` запускается в контексте базовой ветки и с write-правами —
+# тот же класс граблей, что `pull_request_target`. Поэтому здесь НЕТ checkout: код PR не
+# выкачивается и не исполняется, шаг только ходит в API. Плюс явная проверка на форк: чужой
+# код в очередь автоматом не поедет, ему нужен человек.
+#
+# ПРЕДУСЛОВИЕ. `workflow_run` срабатывает только для версии файла на ветке по умолчанию —
+# правка начинает действовать после того, как влилась в `main`, а не на своём же PR.
 
 on:
+  workflow_run:
+    workflows: [CI, Security scan]
+    types: [completed]
+  # Черновик, помеченный готовым, нового прогона CI не порождает (`ready_for_review` не
+  # входит в типы по умолчанию у `pull_request`), так что без этой подписки такой PR
+  # остался бы вне очереди навсегда. Чеки к этому моменту уже зелёные.
   pull_request:
-    # `synchronize` сознательно НЕ подписан: если человек выключил авто-мердж руками,
-    # следующий же пуш в ветку включал бы его обратно — автоматика спорила бы с решением.
-    types: [opened, reopened, ready_for_review]
+    types: [ready_for_review]
 
 permissions:
-  # Включение авто-мерджа — это мутация pull request'а.
+  # Постановка в очередь — мутация pull request'а.
   pull-requests: write
-  # Нужно на случай, когда PR уже зелёный в момент открытия: тогда `--auto` сливает
-  # сразу, и слияние выполняется нашим токеном, а не отложенно самим GitHub.
-  contents: write
+  # Чтение PR через GraphQL. `write` не нужен: слияние выполняет сама очередь, не наш токен.
+  contents: read
 
 jobs:
-  enable:
-    name: enable auto-merge
+  enqueue:
+    name: enqueue when green
     runs-on: ubuntu-latest
-    # Черновик — явное «ещё не готово». Форк — чужой код, ему нужен человек.
+    # Отсекаем всё, что ставить в очередь нельзя или незачем: чужие форки, черновики,
+    # красные прогоны и прогоны не по PR (`push` в ветку, `merge_group` самой очереди —
+    # оба гоняют те же воркфлоу, но PR к ним не привязан).
     if: >-
-      github.event.pull_request.draft == false &&
-      github.event.pull_request.head.repo.full_name == github.repository
+      (github.event_name == 'pull_request' &&
+       github.event.pull_request.draft == false &&
+       github.event.pull_request.head.repo.full_name == github.repository) ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.event == 'pull_request' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_repository.full_name == github.repository)
     steps:
-      - name: enable auto-merge
+      - name: enqueue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
+          EVENT: ${{ github.event_name }}
+          PR_FROM_EVENT: ${{ github.event.pull_request.number }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
           set -euo pipefail
-          # Идемпотентность через ЧТЕНИЕ состояния, а не через глушение ошибки: так
-          # «уже включён» не смешивается с «Allow auto-merge выключен в настройках».
-          if [ "$(gh pr view "$PR" --repo "$REPO" --json autoMergeRequest -q '.autoMergeRequest')" != "null" ]; then
-            echo "авто-мердж уже включён — нечего делать"
+
+          if [ "$EVENT" = 'pull_request' ]; then
+            PR="$PR_FROM_EVENT"
+          else
+            # У `workflow_run` номера PR в событии нет (поле `pull_requests` пустое чаще,
+            # чем хотелось бы), поэтому ищем открытый PR по имени ветки прогона.
+            PR="$(gh pr list --repo "$REPO" --state open --head "$HEAD_BRANCH" \
+                    --json number -q '.[0].number // empty')"
+          fi
+          if [ -z "$PR" ]; then
+            echo "открытого PR для ветки '$HEAD_BRANCH' нет — ставить нечего"
             exit 0
           fi
-          gh pr merge "$PR" --repo "$REPO" --auto --merge
-          echo "авто-мердж включён: PR вольётся, как только позеленеют required checks"
+
+          # Идемпотентность и все предусловия — одним ЧТЕНИЕМ состояния, а не глушением
+          # ошибки мутации: так «уже в очереди» не смешивается с «очередь не настроена».
+          read -r ID STATE DRAFT STATUS QUEUED <<<"$(
+            gh api graphql \
+              -f query='
+                query($owner:String!, $name:String!, $number:Int!) {
+                  repository(owner:$owner, name:$name) {
+                    pullRequest(number:$number) {
+                      id state isDraft mergeStateStatus
+                      mergeQueueEntry { position }
+                    }
+                  }
+                }' \
+              -F owner="${REPO%/*}" -F name="${REPO#*/}" -F number="$PR" \
+              -q '.data.repository.pullRequest
+                  | "\(.id) \(.state) \(.isDraft) \(.mergeStateStatus) \(.mergeQueueEntry != null)"'
+          )"
+
+          if [ "$QUEUED" = 'true' ]; then
+            echo "PR #$PR уже в очереди — нечего делать"
+            exit 0
+          fi
+          if [ "$STATE" != 'OPEN' ] || [ "$DRAFT" = 'true' ]; then
+            echo "PR #$PR: state=$STATE, draft=$DRAFT — пропускаем"
+            exit 0
+          fi
+          # BLOCKED (чек ещё не отчитался / нет ревью), UNSTABLE (упал необязательный чек),
+          # BEHIND, DIRTY, UNKNOWN — всё это «ещё не готов». Не ошибка: второй воркфлоу
+          # закончит позже и вызовет нас снова уже с CLEAN.
+          if [ "$STATUS" != 'CLEAN' ]; then
+            echo "PR #$PR: mergeStateStatus=$STATUS — ещё не готов, ждём следующего прогона"
+            exit 0
+          fi
+
+          gh api graphql \
+            -f query='
+              mutation($id:ID!) {
+                enqueuePullRequest(input:{pullRequestId:$id}) {
+                  mergeQueueEntry { position }
+                }
+              }' \
+            -F id="$ID"
+          echo "PR #$PR поставлен в очередь: очередь перепроверит его на «свежий main + PR» и вольёт"
