@@ -446,3 +446,65 @@ describe('movement — march to a point ON a lane (toEdge), and re-route from a 
     );
   });
 });
+
+// --- D2 право прохода: гейт ветирует ХОД, но не МАРШРУТ -----------------------
+// Регресс живого плейтеста: гейт #452 резал кратчайший путь ПОСЛЕ построения, а
+// Dijkstra дипломатию не знал — один мирный узел на единственном кратчайшем пути
+// читался как «пути нет вообще», и к середине партии флоты не ходили никуда.
+describe('movement — дипломатический обход (D2)', () => {
+  // Ромб: A(p1) → D. Прямая через B (60) короче обхода через C (100).
+  //   B(p2, 30,0) — мирный владелец на кратчайшем пути; C(60,40… нет: 30,40) нейтрален.
+  function diamond(ownerB: string | null, ownerC: string | null = null): Planet[] {
+    const a = planet('A', 'p1', 0, 0);
+    const b = planet('B', ownerB, 30, 0);
+    const c = planet('C', ownerC, 30, 40);
+    const d = planet('D', null, 60, 0);
+    a.links = ['B', 'C'];
+    b.links = ['A', 'D'];
+    c.links = ['A', 'D'];
+    d.links = ['B', 'C'];
+    return [a, b, c, d];
+  }
+  const peaceP2 = { 'p1|p2': 'peace' as const };
+
+  it('мирный узел на кратчайшем пути → флот идёт ОБХОДОМ, а не стоит', () => {
+    const kernel = createKernel([movementModule]);
+    const st = { ...baseState(diamond('p2'), [fleet('F', 'p1', 'A', ['scout'])]), diplomacy: peaceP2 };
+    const r = okApply(kernel.applyAction(st, move('F', 'D'), ctx(0)));
+    const f = r.state.fleets.F!;
+    expect(f.movement?.to).toBe('C'); // первый хоп обхода — не мирная B
+    // весь маршрут не касается B: конечная точка достигается через C
+    expect(f.movement?.path ?? [f.movement?.to]).not.toContain('B');
+  });
+
+  it('обхода нет (оба плеча мирные) → E_NO_RIGHT_OF_WAY, как и раньше', () => {
+    const kernel = createKernel([movementModule]);
+    const st = { ...baseState(diamond('p2', 'p2'), [fleet('F', 'p1', 'A', ['scout'])]), diplomacy: peaceP2 };
+    expect(errCode(kernel.applyAction(st, move('F', 'D'), ctx(0)))).toBe('E_NO_RIGHT_OF_WAY');
+  });
+
+  it('ЦЕЛЬ — мирный мир: по-прежнему E_NO_RIGHT_OF_WAY (война объявляется явно), не E_NO_ROUTE', () => {
+    const kernel = createKernel([movementModule]);
+    const st = { ...baseState(diamond(null), [fleet('F', 'p1', 'A', ['scout'])]), diplomacy: peaceP2 };
+    st.planets.D!.owner = 'p2';
+    expect(errCode(kernel.applyAction(st, move('F', 'D'), ctx(0)))).toBe('E_NO_RIGHT_OF_WAY');
+  });
+
+  it('война с владельцем — кратчайший путь снова открыт (обход не навязывается)', () => {
+    const kernel = createKernel([movementModule]);
+    const st = {
+      ...baseState(diamond('p2'), [fleet('F', 'p1', 'A', ['scout'])]),
+      diplomacy: { 'p1|p2': 'war' as const },
+    };
+    const r = okApply(kernel.applyAction(st, move('F', 'D'), ctx(0)));
+    expect(r.state.fleets.F!.movement?.to).toBe('B'); // прямая через B
+  });
+
+  it('детерминизм: два одинаковых вызова дают идентичный обход', () => {
+    const kernel = createKernel([movementModule]);
+    const mk = () => ({ ...baseState(diamond('p2'), [fleet('F', 'p1', 'A', ['scout'])]), diplomacy: peaceP2 });
+    const r1 = okApply(kernel.applyAction(mk(), move('F', 'D'), ctx(0)));
+    const r2 = okApply(kernel.applyAction(mk(), move('F', 'D'), ctx(0)));
+    expect(JSON.stringify(r1.state.fleets.F!.movement)).toBe(JSON.stringify(r2.state.fleets.F!.movement));
+  });
+});

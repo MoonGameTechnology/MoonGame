@@ -936,6 +936,7 @@ export const en: Record<string, string> = {
   'err.no-node': 'unknown skill-tree node',
   'err.no-planet': 'world not found',
   'err.no-player': 'player not found',
+  'err.no-right-of-way': 'no right of way: every route crosses a power you are at peace with',
   'err.no-ships': 'no ships',
   'err.no-shipyard': 'needs a shipyard/spaceport',
   'err.no-slots': 'all fitting slots are taken',

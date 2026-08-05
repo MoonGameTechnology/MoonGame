@@ -51,6 +51,17 @@ class RouteCache {
   }
 }
 
+/** True when any hop enters territory its mover is at PEACE with (D2 gate predicate). */
+function crossesPeace(state: GameState, playerId: string, hops: readonly PlanetId[]): boolean {
+  for (const hop of hops) {
+    const owner = state.planets[hop]?.owner ?? null;
+    if (owner !== null && owner !== playerId && getStance(state, playerId, owner) === 'peace') {
+      return true;
+    }
+  }
+  return false;
+}
+
 /** Euclidean length of the lane between two nodes (0 if either is missing). */
 function laneLength(state: GameState, a: PlanetId, b: PlanetId): number {
   const pa = state.planets[a]?.position;
@@ -209,6 +220,12 @@ function planJourney(
   routes: RouteCache,
   fleet: Fleet,
   payload: MovePayload,
+  // Diplomacy-aware replan (D2): with a veto predicate the mid-route is computed
+  // DIRECTLY, bypassing RouteCache — a diplomatic route depends on owners and
+  // stances, which change without bumping `state.topology`, so caching it would
+  // serve stale detours. The cheap cached topology-only plan stays the fast path;
+  // this parameter is only passed after that plan tripped the right-of-way gate.
+  blocked?: (id: PlanetId) => boolean,
 ): Journey | { error: string } | null {
   const targets = targetsOf(state, payload);
   if ('error' in targets) {
@@ -243,7 +260,10 @@ function planJourney(
   let bestKey = '';
   for (const o of origins) {
     for (const t of targets) {
-      const mid = routes.lookup(state, o.routingNode, t.routeTo);
+      const mid =
+        blocked === undefined
+          ? routes.lookup(state, o.routingNode, t.routeTo)
+          : planRoute(state, o.routingNode, t.routeTo, blocked);
       if (mid === null) {
         continue; // unreachable by lanes from this origin endpoint
       }
@@ -300,25 +320,40 @@ export const movementModule: GameModule = {
       if (payload.to !== undefined && payload.to === fleet.location) {
         return h.reject('E_SAME_LOCATION');
       }
-      const plan = planJourney(h.state, routes, fleet, payload as MovePayload);
+      let plan = planJourney(h.state, routes, fleet, payload as MovePayload);
       if (plan === null) {
         return h.reject('E_NO_ROUTE'); // not connected by lanes
       }
       if ('error' in plan) {
         return h.reject(plan.error);
       }
-      // Diplomacy gate: a fleet may not enter a node owned by a player it's at
-      // PEACE with (must declare war first). Neutral, own, and war/pact/alliance
-      // territory is passable. Checked on every hop in the route, not just the
-      // destination — passing THROUGH a peace-locked player's territory is also
-      // forbidden. (D2 — right of way.)
-      for (const hop of plan.hops) {
-        const hopOwner = h.state.planets[hop]?.owner ?? null;
-        if (hopOwner !== null && hopOwner !== action.playerId) {
-          if (getStance(h.state, action.playerId, hopOwner) === 'peace') {
-            return h.reject('E_NO_RIGHT_OF_WAY');
-          }
+      // Diplomacy gate (D2 — right of way): a fleet may not enter a node owned by a
+      // player it's at PEACE with (must declare war first). Neutral, own, and
+      // war/pact/alliance territory is passable. Checked on every hop, not just the
+      // destination — passing THROUGH peace-locked territory is also forbidden.
+      //
+      // The gate does NOT get the last word over the ROUTE, only over the move: the
+      // cached plan is topology-shortest, so when it trips the gate we REPLAN with a
+      // diplomacy veto and take a legal detour if one exists. Vetoing the shortest
+      // path outright (the pre-fix behaviour) cut fleets off from the entire map as
+      // soon as bots' walk-in captures peppered the lanes — one peace-owned node on
+      // the unique shortest path read as «no route anywhere», even to own worlds.
+      if (crossesPeace(h.state, action.playerId, plan.hops)) {
+        const detour = planJourney(h.state, routes, fleet, payload as MovePayload, (id) => {
+          const owner = h.state.planets[id]?.owner ?? null;
+          return (
+            owner !== null &&
+            owner !== action.playerId &&
+            getStance(h.state, action.playerId, owner) === 'peace'
+          );
+        });
+        // Re-check the detour: the veto exempts the DESTINATION node on purpose
+        // (landing on a peace-locked world must reject as right-of-way, so the
+        // client can offer the war declaration — not as a bogus «no route»).
+        if (detour === null || 'error' in detour || crossesPeace(h.state, action.playerId, detour.hops)) {
+          return h.reject('E_NO_RIGHT_OF_WAY');
         }
+        plan = detour;
       }
       const origin = fleet.location ?? fleet.edge?.from ?? null;
       if (!beginLeg(h, fleet, plan.fromId, plan.hops, plan.startT, plan.parkT)) {

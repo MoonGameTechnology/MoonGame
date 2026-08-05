@@ -938,6 +938,7 @@ export const ru: Record<string, string> = {
   'err.no-node': 'неизвестный узел дерева',
   'err.no-planet': 'мир не найден',
   'err.no-player': 'игрок не найден',
+  'err.no-right-of-way': 'нет права прохода: маршрут только через территорию мирной державы',
   'err.no-ships': 'нет кораблей',
   'err.no-shipyard': 'нужна верфь/космопорт',
   'err.no-slots': 'слоты фиттингов заняты',

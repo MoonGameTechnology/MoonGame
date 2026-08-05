@@ -2558,11 +2558,21 @@ function troopsInputFor(fleetId: string): TroopsInput | null {
 function blockerName(id: string): string {
   return s.players[id]?.name ?? NAME[id] ?? id;
 }
-/** Distinct PEACE owners a fleet at node `from` would cross or land on reaching `toId`
- *  — each must be at war before the route opens. Empty ⇒ the move is free. */
+/** Distinct PEACE owners that make the move IMPOSSIBLE without a war — mirrors the
+ *  kernel's D2 gate, including its detour: since the right-of-way fix the kernel
+ *  reroutes AROUND peace-locked territory, so a blocker on the shortest path is not
+ *  a blocker if a peaceful detour exists. Prompting war for it anyway (the pre-fix
+ *  behaviour) pushed players into wars the move never needed. Empty ⇒ move is free. */
 function peaceBlockers(from: string | null, toId: string): string[] {
   if (!from || from === toId) return [];
-  const route = planRoute(s, from, toId) ?? [toId]; // hops after `from`, incl. dest
+  const peaceLocked = (id: string): boolean => {
+    const owner = s.planets[id]?.owner ?? null;
+    return owner != null && !canTraverse(s, ME, owner);
+  };
+  // The same veto predicate the kernel replans with; planRoute exempts the
+  // destination, so a reachable-by-detour move reports at most the DESTINATION's
+  // owner (landing on their world genuinely needs the war declaration).
+  const route = planRoute(s, from, toId, peaceLocked) ?? planRoute(s, from, toId) ?? [toId];
   const set = new Set<string>();
   for (const hop of route) {
     const owner = s.planets[hop]?.owner ?? null;
