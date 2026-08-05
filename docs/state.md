@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 2310 зелёных** (54 skip, 198 файлов).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 2346 зелёных** (54 skip, 200 файлов).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -118,7 +118,7 @@ packages/action-layer/src/
 data/            manifest, resources, units, buildings, factions, events, sectors, sectorKinds, planetTypes, technologies, scientists, rewards, heroes, heroAbilities, heroFittings, heroPassives, heroSkillTrees, modules, medals, dropTables, starterArsenal (.json)
 localization/    ВЕСЬ текст для игрока: index.ts (LOCALES/DEFAULT_LOCALE/dataKey), ru.ts, en.ts (плоские карты ключ→текст, 1553 ключа), runtime.ts (ОДИН на прототип и клиент: t/tData/lookup/hasKey/setLocale/localizeStaticDom, LOC-5) + runtime.test.ts. Мост старых msgid снят вместе с LOC-2 — в коде только ключи
 docs/            architecture, modulesystem, roadmap, deep-technical-roadmap, multiplayer, engineering-risks, gdd, metagame, state(этот)
-prototype/       src/game.ts (чистый index-фасад реэкспортов, REFP-28: 5289→207 строк, логики нет), src/prototypeData.ts, src/map.ts, src/fleetStacks.ts, src/tax.ts, src/botFavour.ts, src/squadron.ts, src/chain.ts, src/hunger.ts, src/botDiplomacy.ts, src/sessionMarket.ts, src/capital.ts, src/fleetLaunch.ts, src/standingOrders.ts, src/forcedMarch.ts, src/instantRepair.ts, src/econScrews.ts, src/economy.ts, src/matchSetup.ts, src/actions.ts, src/patrol.ts, src/serverDrivers.ts, src/protoKernel.ts, src/stewardGuard.ts, src/ai.ts, src/time.ts (вынесены из game.ts; Block REFP закрыт 28/28, обратных рёбер на фасад ноль), src/main.ts (UI), src/format.ts (презентационные форматтеры, REFM-2), src/icons.ts (словарь иконок, REFM-3), src/dossiers.ts + src/buildQueue.ts (досье объектов и кодекс + словарь очереди стройки, REFM-4), src/arsenalScreen.ts (витрина «Арсенал», REFM-5), src/marketScreen.ts (окно рынка, REFM-6), src/stewardScreen.ts (окно «Хранителя», REFM-7), src/techTree.ts (дерево технологий, REFM-9), src/profileScreen.ts (профиль командира, REFM-10), src/corpScreen.ts (корпоративный кабинет, REFM-11), src/chatWindow.ts (плавающее окно чата, REFM-12), src/shipyard.ts (окно «Верфь», REFM-13), src/heroStaff.ts (штаб героев, REFM-14), src/resourceCard.ts (карточка ресурса, RC-1), src/troopsMenu.ts (модель и разметка ⇅-меню десанта, GRND-1), src/chainPlanner.ts (модель режима «Приказ», CHAIN-UX), src/sound.ts (синтезированные звуки интерфейса, SND-1), src/hudDock.ts (низ экрана: видимость листа в прицельных режимах + привязка ряда команд к листу, HUD-DOCK), src/backLayers.ts (лестница слоёв Android-Back/Escape + опись всех оверлеев, BACK-1), src/smoke.ts, tsconfig.json (REFM-0: typecheck в гейте), build.mjs, uitest.mjs, dist/ (артефакт, в .gitignore)```
+prototype/       src/game.ts (чистый index-фасад реэкспортов, REFP-28: 5289→207 строк, логики нет), src/prototypeData.ts, src/map.ts, src/fleetStacks.ts, src/tax.ts, src/botFavour.ts, src/squadron.ts, src/chain.ts, src/hunger.ts, src/botDiplomacy.ts, src/sessionMarket.ts, src/capital.ts, src/fleetLaunch.ts, src/standingOrders.ts, src/forcedMarch.ts, src/instantRepair.ts, src/econScrews.ts, src/economy.ts, src/matchSetup.ts, src/actions.ts, src/patrol.ts, src/serverDrivers.ts, src/protoKernel.ts, src/stewardGuard.ts, src/ai.ts, src/time.ts (вынесены из game.ts; Block REFP закрыт 28/28, обратных рёбер на фасад ноль), src/main.ts (UI), src/format.ts (презентационные форматтеры, REFM-2), src/icons.ts (словарь иконок, REFM-3), src/dossiers.ts + src/buildQueue.ts (досье объектов и кодекс + словарь очереди стройки, REFM-4), src/arsenalScreen.ts (витрина «Арсенал», REFM-5), src/marketScreen.ts (окно рынка, REFM-6), src/stewardScreen.ts (окно «Хранителя», REFM-7), src/techTree.ts (дерево технологий, REFM-9), src/profileScreen.ts (профиль командира, REFM-10), src/corpScreen.ts (корпоративный кабинет, REFM-11), src/chatWindow.ts (плавающее окно чата, REFM-12), src/shipyard.ts (окно «Верфь», REFM-13), src/heroStaff.ts (штаб героев, REFM-14), src/conversations.ts (вкладка сообщений, REFM-15), src/resourceCard.ts (карточка ресурса, RC-1), src/troopsMenu.ts (модель и разметка ⇅-меню десанта, GRND-1), src/chainPlanner.ts (модель режима «Приказ», CHAIN-UX), src/sound.ts (синтезированные звуки интерфейса, SND-1), src/hudDock.ts (низ экрана: видимость листа в прицельных режимах + привязка ряда команд к листу, HUD-DOCK), src/backLayers.ts (лестница слоёв Android-Back/Escape + опись всех оверлеев, BACK-1), src/smoke.ts, tsconfig.json (REFM-0: typecheck в гейте), build.mjs, uitest.mjs, dist/ (артефакт, в .gitignore)```
 ## 4. Модель состояния (`GameState`)
 
 - `version {data, manifest}`, `time`, `rng`.
@@ -274,8 +274,13 @@ by, damage}` (эмит до применения урона; прототип р
   читает из state (`Player.ai`; в NET-режиме сервер снимает флаги — место, занятое
   человеком, не бот).
   Вкладка «Сообщения» — переписки master-detail: слева список чатов (групповой
-  «⚡ Коалиция» = ты + союзники, закреплён сверху; ниже личные DM по участникам),
-  справа открывается выбранный тред + composer. Системные дип-события с твоим участием
+  «⚡ Коалиция» = вы + союзники, закреплён сверху; ниже личные DM по участникам),
+  справа открывается выбранный тред + composer. Живёт в `conversations.ts` (REFM-15,
+  `initConversations(host)`): туда же уехали тип `SessionMsg` и словарь каналов
+  (`GROUP_CHANNELS` — единственное место, где различаются групповая комната и личка), а
+  открытая переписка стала внутренним состоянием (`open`/`current`). Сам журнал
+  `sessionMessages` остался у хоста — его пишет сеть и читает плавающее окно чата, —
+  и приходит модулю хуком `messages()`. Системные дип-события с твоим участием
   ложатся в DM с этой стороной (через `diplomacy.changed`). В чате коалиции — **пинги**:
   выделил провинцию → 📍 шлёт метку; тык по метке → камера летит туда (`centerOn`) и
   меню закрывается. **Пинг виден и на карте** как маркер-булавка (цвет владельца) с
@@ -1828,13 +1833,24 @@ pnpm run prototype   # собрать prototype/dist/void-dominion{,-player}.htm
 — Semgrep, Gitleaks, OSV, Trivy fs/image; с SEC-10 ещё и еженедельный ре-скан `main` по
 крону — прод крутит пиненный образ дольше, чем живут ленты CVE), `android.yml` (APK),
 `image.yml` (SEC-13: сборка → блокирующий Trivy → GHCR → подпись cosign по дайджесту) и
-`automerge.yml` (жмёт «Enable auto-merge» на открытии PR: решение «влить, когда
-позеленеет» принимается один раз, а не кликом на каждом; гейт при этом не обходится —
-слияние всё равно ждёт required-чеков). `ci.yml` и `security.yml` подписаны на событие
+`automerge.yml` (ставит зелёный PR в merge queue). Про последний важно, что он делает
+**не** «Enable auto-merge»: под очередью эта кнопка не работает — она зовёт
+`enablePullRequestAutoMerge`, тогда как «Merge when ready» зовёт совсем другую мутацию,
+`enqueuePullRequest`. Воркфлоу подписан на ЗАВЕРШЕНИЕ прогонов `CI`/`Security scan`
+(момент «required-чеки отчитались») плюс на `ready_for_review`, читает
+`mergeStateStatus` и ставит в очередь `CLEAN` и `UNSTABLE` — последнее потому, что
+информационные сканеры краснеют штатно (чужие CVE в caddy/gosu чинятся апстримом), и
+требование строгого `CLEAN` остановило бы авто-постановку для всех PR разом. Гейт этим
+не обходится: очередь ПЕРЕПРОВЕРЯЕТ PR на временной ветке «свежий `main` + PR» и не
+вливает красное. Безопасность `workflow_run` (он бежит с правами базовой ветки) держится
+на том, что checkout кода PR там НЕТ вообще и артефакты вызвавшего прогона не читаются,
+плюс явная отсечка форков и черновиков. `ci.yml` и `security.yml` подписаны на событие
 `merge_group`: `main` идёт через merge queue, а она ждёт required-чеков на своей
 временной ветке — воркфлоу без этой подписки туда не попадает, и PR вышибает по
-таймауту. Заводишь required-чек в новом воркфлоу — добавляй `merge_group` и ему
-(процедура настройки ветки целиком — в `CONTRIBUTING.md`).
+таймауту. Заводишь required-чек в новом воркфлоу — добавляй `merge_group` и ему, И
+дописывай воркфлоу в список `workflows:` у `automerge.yml`, иначе авто-постановка
+сработает раньше, чем этот чек отчитается (процедура настройки ветки целиком — в
+`CONTRIBUTING.md`).
 Прод-деплой из подписанного образа: `deploy/verify-image.sh` + оверлей
 `docker-compose.release.yml` (runbook — `deploy/README.md`, разбор слоёв —
 `docs/security/pipeline.md`).
