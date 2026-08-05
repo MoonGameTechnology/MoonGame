@@ -32,13 +32,11 @@ import {
   unloadArmy,
   mergeFleet,
   splitFleet,
-  engageFleet,
   buildBuilding,
   upgradeBuilding,
   buildUnit,
   cancelConstruction,
   resumeConstruction,
-  aiOrders,
   declareWar,
   shareMap,
   netIncome,
@@ -61,19 +59,14 @@ import {
   squadronStrikeRange,
   sortieSpec,
   freshSortie,
-  tickRearm,
-  scrambleOrder,
   botFavour,
   FAVOUR_BASE,
   FAVOUR_EMBARGO,
   FAVOUR_WAR,
   setHoldPoint,
-  stewardActive,
   MAX_STEWARD_HOLD_POINTS,
   castHeroAbility,
   spawnHero,
-  serverChainActions,
-  chainStamp,
   orderChain,
   forceMarchFleet,
   FORCED_MARCH_MULT,
@@ -174,6 +167,7 @@ import { buildLabel, currentBuild } from './updater';
 import { initApkUpdater } from './apkUpdate';
 import { measureViewport, STARS, NEBULAE } from './viewport';
 import { initPingUi } from './pingUi';
+import { initSoloDrivers } from './soloDrivers';
 // Localization: one locale = one file (src/locale/*). Msgid = the canonical
 // Russian source string; `t()` wraps every user-visible literal, `tData()` maps
 // English data/*.json names, the static HTML is localized by a boot pass.
@@ -591,7 +585,6 @@ const patrols = new Map<string, Patrol>();
 // order.scramble path (st.wingSorties in game.ts); without it, toggling free-refuels a
 // dry wing. (NET arms via order.scramble, which does its own stash server-side.)
 const wingSorties = new Map<string, Patrol['sortie']>();
-let lastPatrolTick = 0; // game-time (ms) the rearm cadence last advanced
 // A staged move that would cross territory of a player you're at PEACE with: held
 // until you confirm in the war-prompt (declaring war opens the route) or cancel.
 let warPrompt: {
@@ -731,7 +724,6 @@ let fleetInfoFor: string | null = null;
 let planetInfoFor: string | null = null;
 const buildQueues: Record<string, PlanetBuildQueue> = {};
 const logLines: string[] = [];
-let lastAiAt = 0;
 // Player ids the local sim drives as AI (empty seats become AI). Default solo = p2.
 let AI_PLAYERS = new Set<string>(['p2']);
 // Session war record (from `unit.died` events): enemy units you destroyed vs your own
@@ -3141,97 +3133,20 @@ function handleEvents(events: DomainEvent[]) {
 // in single-player alike; the resulting `planet.captured` event is noted above.
 
 // --- red AI ------------------------------------------------------------------
-
-function runAI() {
-  if (s.time - lastAiAt < 2 * HOUR) return;
-  lastAiAt = s.time;
-  // Each empty seat's orders come from the shared `aiOrders` (same logic the net
-  // server uses to drive unfilled multiplayer seats). Apply them in sequence.
-  for (const ai of AI_PLAYERS) {
-    for (const a of aiOrders(s, ai)) apply(order(s, a, s.time));
-  }
-  // «Хранитель»: while your own seat is delegated, the local AI plays it too — on its
-  // posture (defend), so solo delegation actually holds the line, not just shows a timer.
-  const myPosture = stewardActive(s, ME, s.time);
-  if (myPosture && !AI_PLAYERS.has(ME)) {
-    for (const a of aiOrders(s, ME, myPosture)) apply(order(s, a, s.time));
-  }
-}
-
-// Enemy (AI) auto-engagement: an idle hostile fleet over a world it doesn't own,
-// with the orbit clear, descends and lands automatically — keeps the AI pressing
-// the capture loop. The player's own fleets are driven by hand (orbit/bombard/
-// assault controls in the fleet panel), so they are skipped here.
-// Память проб авто-штурма: «этот флот в этом часе мира и на этой орбите — обречён».
-// Проба стоит прогона редьюсера, а цикл гоняется каждый кадр; состояние между
-// продвижениями часа меняют только приказы, и они же ключ сбрасывают (см. apply()).
-const autoProbed = new Map<string, string>();
-const autoProbeKey = (f: Fleet): string => `${s.time}|${f.orbit ?? ''}|${f.location ?? ''}`;
-function autoProbeSkip(f: Fleet, here: Planet): boolean {
-  return autoProbed.get(f.id) === autoProbeKey(f) + '|' + (here.owner ?? '');
-}
-function autoProbeMark(f: Fleet): void {
-  const here = s.planets[f.location ?? ''];
-  autoProbed.set(f.id, autoProbeKey(f) + '|' + (here?.owner ?? ''));
-}
-
-function autoEngage() {
-  for (const f of Object.values(s.fleets)) {
-    if (f.location == null || f.movement || f.battleId) continue;
-    const mine = f.owner === ME;
-    // AI fleets always press the capture loop; the player's do so only when opted into
-    // auto-storm (CC-2) — otherwise the player drives assaults by hand.
-    if (mine && !autoAssault.has(f.id)) continue;
-    const here = s.planets[f.location];
-    if (!here || here.owner === f.owner) continue; // свой мир штурмовать нечего
-    const enemyHere = Object.values(s.fleets).some(
-      (g) => g.owner !== f.owner && g.location === f.location && g.units.some((u) => u.count > 0),
-    );
-    if (enemyHere) continue; // ПОЛИТИКА клиента: дать орбитальному бою утихнуть
-    // RULES-1. Выше — только политика (опт-ин авто-штурма, «дай бою утихнуть»);
-    // ПРАВИЛА игры (захватываемая провинция, дипломатия, наличие десанта) больше не
-    // переписываются здесь руками — их называет ядро. Прошлые рукописные копии
-    // разъезжались с редьюсером и сыпали отказами каждый кадр.
-    //
-    // Проверяется вся ПАРА «встать на низкую орбиту → штурм»: штурм нелегален с
-    // дальней орбиты, поэтому проба идёт по состоянию ПОСЛЕ орбиты (order чист —
-    // это черновик, живой мир не трогается). Иначе применилась бы половина обречённой
-    // пары: орбита проходит, штурм отбивается — ровно та болезнь, что описана в
-    // serverDrivers.ts.
-    if (autoProbeSkip(f, here)) continue;
-    const needOrbit = f.orbit !== 'near';
-    const step = needOrbit ? order(s, orbitFleet(f.owner, f.id, 'near'), s.time) : null;
-    if (step?.error) continue;
-    const probe = step ? step.state : s;
-    if (canOrder(probe, assaultFleet(f.owner, f.id)) !== null) {
-      autoProbeMark(f); // обречён в этом часе мира — не пережимать каждый кадр
-      continue;
-    }
-    // Player fleets go through playerOrder (server-authoritative in net play); AI applies locally.
-    const issue = (a: Action) => (mine ? playerOrder(a) : apply(order(s, a, s.time)));
-    if (needOrbit) issue(orbitFleet(f.owner, f.id, 'near'));
-    issue(assaultFleet(f.owner, f.id));
-  }
-}
-
-// Safety-net: detect two docked enemy fleets sharing a sector without a battle
-// and force-engage them. Catches the case where both fleets were in-transit when
-// the other arrived, so the combat module's arrival handler found no enemy.
-function checkFleetClashes() {
-  const fleets = Object.values(s.fleets);
-  for (const f of fleets) {
-    if (!f.location || f.movement || f.battleId) continue;
-    for (const g of fleets) {
-      if (g.id <= f.id) continue; // avoid processing the same pair twice
-      if (!g.location || g.movement || g.battleId) continue;
-      if (f.owner === g.owner || f.location !== g.location) continue;
-      // Two idle enemy fleets in the same sector — start a battle from the ME side
-      const myFleet = f.owner === ME ? f : g.owner === ME ? g : f;
-      const foeFleet = myFleet === f ? g : f;
-      apply(order(s, engageFleet(myFleet.owner, myFleet.id, foeFleet.id), s.time));
-    }
-  }
-}
+// Ходы ИИ, авто-штурм, столкновения флотов, дежурные вылеты и цепочки приказов живут в
+// `soloDrivers.ts` (REFM-26): в сетевом матче всё это делает сервер, в одиночном —
+// подталкивает кадр. Здесь только хуки: состояние, два пути приказов (свой идёт через
+// `playerOrder`, чужой применяется локально) и опт-ин авто-штурма.
+const solo = initSoloDrivers({
+  state: () => s,
+  me: () => ME,
+  aiSeats: () => AI_PLAYERS,
+  applyLocal: (a) => apply(order(s, a, s.time)),
+  playerOrder: (a) => void playerOrder(a),
+  autoAssault: (id) => autoAssault.has(id),
+  patrols: () => patrols,
+  known,
+});
 
 /** The CC-2 auto-storm stance of a fleet — authoritative state in NET, local Set solo. */
 function isAutoAssault(fleetId: string): boolean {
@@ -3290,7 +3205,7 @@ function setScramble(ids: string[], on: boolean): void {
     if (NET) {
       playerOrder(orderScramble(ME, id, true));
     } else {
-      if (patrols.size === 0) lastPatrolTick = s.time; // start the rearm cadence from now
+      if (patrols.size === 0) solo.startPatrolCadence(); // счёт перезарядки — с этого мига
       const spec = sortieSpec(f);
       const stashed = wingSorties.get(id);
       patrols.set(id, {
@@ -3307,54 +3222,6 @@ function setScramble(ids: string[], on: boolean): void {
       });
       wingSorties.delete(id);
     }
-  }
-}
-
-// CC-4 reactive auto-scramble driver: each frame, a squadron fleet on "дежурный вылет"
-// that's idle auto-sorties at the lowest-id identified, at-war contact inside its strike
-// radius — burning one fuel (SQ-2.1) — and rearms one round per elapsed game-hour. The
-// pure decision is scrambleOrder (tested); this just reads the world (vision + diplomacy)
-// CC-1 chain driver (solo): the same pure core the netserver runs — stamp the chain
-// forward (consume-on-issue), then issue the head step's orders. In net play the
-// server drives chains; this runs only inside the solo sim block of the frame loop.
-function driveChains(): void {
-  for (const c of serverChainActions(s, s.time)) {
-    const issue = (a: Action) => (c.owner === ME ? playerOrder(a) : apply(order(s, a, s.time)));
-    if (c.patch) issue(chainStamp(c.owner, c.fleetId, c.patch.steps, c.patch.waitUntil));
-    for (const a of c.actions) issue(a);
-  }
-}
-
-// and issues the order. Same host-side shape as autoEngage/driveQueues; single-player only
-// (net play → the server owns fleets — promoting this server-side is the CC-server brick).
-function drivePatrols(): void {
-  if (patrols.size === 0) return;
-  const rounds = Math.max(0, Math.floor((s.time - lastPatrolTick) / HOUR));
-  if (rounds > 0) lastPatrolTick += rounds * HOUR;
-  for (const [fid, p] of [...patrols]) {
-    const f = s.fleets[fid];
-    if (!f || f.owner !== ME || !fleetHasSquadron(f)) {
-      patrols.delete(fid);
-      continue;
-    }
-    const spec = sortieSpec(f);
-    for (let i = 0; i < rounds && p.sortie.rearming > 0; i++)
-      p.sortie = tickRearm(p.sortie, spec.maxFuel);
-    if (!fleetIdle(f)) continue; // busy (transit / battle) — let it resolve first
-    // Hostile, identified contacts parked on a node — the wing's legal targets.
-    const targets: Array<{ id: string; location: string; pos: { x: number; y: number } }> = [];
-    for (const g of Object.values(s.fleets)) {
-      if (g.owner === ME || !g.location || g.movement || !g.units.some((u) => u.count > 0))
-        continue;
-      if (g.battleId) continue; // in a battle — engage would reject, yet the sortie fuel is spent (BF-30)
-      if (getStance(s, ME, g.owner) !== 'war') continue; // only declared enemies — never auto-war
-      if (!known(g.location)) continue; // identified only — "опознанная цель в зоне видимости"
-      const pos = s.planets[g.location]?.position;
-      if (pos) targets.push({ id: g.id, location: g.location, pos });
-    }
-    const { action, sortie } = scrambleOrder(ME, f, p, targets, spec.rearmRounds);
-    p.sortie = sortie;
-    if (action) playerOrder(action);
   }
 }
 
@@ -9710,7 +9577,7 @@ function installMatch(state: GameState, aiPlayers: Set<string>): void {
   syncPlayerNames(s);
   ME = 'p1';
   AI_PLAYERS = aiPlayers;
-  lastAiAt = s.time;
+  solo.reset();
   // ONB-2 (found live): a leftover guide from whatever was on screen before (a
   // tutorial the player exited without finishing/skipping, a stale reconnect) must
   // never survive into this match — #spotlight is a document.body singleton, so an
@@ -11162,12 +11029,12 @@ function frame(nowReal: number) {
     // A finished match (endScreen set) freezes the world — no advancing a decided game.
     const target = s.time + (dt / 1000) * speed * HOUR;
     apply(advance(s, target));
-    autoEngage();
+    solo.autoEngage();
     pumpAssaultOrders();
-    checkFleetClashes();
-    drivePatrols(); // CC-4: squadrons on дежурный вылет auto-strike contacts in range
-    driveChains(); // CC-1: advance fleet order chains (wait → move → assault/barrage)
-    runAI();
+    solo.checkFleetClashes();
+    solo.drivePatrols(); // CC-4: дежурные вылеты бьют контакты в радиусе
+    solo.driveChains(); // CC-1: продвинуть цепочки приказов (ждать → курс → штурм/обстрел)
+    solo.runAI();
     pumpBuildQueues();
     closeIdleRallies(); // drop the 'rally' tag once a world's build pipeline empties
   }
