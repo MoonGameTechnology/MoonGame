@@ -97,6 +97,16 @@ export interface CommanderStore {
   ): Promise<boolean>;
   /** Accumulated lifetime XP for an account (0 when it never finished a match). */
   xpOf(accountId: string): Promise<number>;
+  /** Leaderboard page (RANK-1): the `limit` accounts with the most lifetime XP,
+   *  highest first. Ties break by `accountId` so two calls give the same order —
+   *  a board whose equal rows shuffle between refreshes reads as broken. */
+  topXp(limit: number): Promise<Array<{ accountId: string; xp: number }>>;
+  /** Where ONE account stands among all of them (RANK-1). `rank` is 1-based and
+   *  ties SHARE it (rank = how many accounts have strictly more XP, +1), so the
+   *  number means «выше меня столько-то», not «я такой-то по счёту в выборке».
+   *  `rank` is null when the account has no XP row at all: never finished a match
+   *  is «нет места», not «последнее место». `total` counts the ranked accounts. */
+  standingOf(accountId: string): Promise<{ rank: number | null; xp: number; total: number }>;
   close?(): Promise<void>;
 }
 
@@ -134,6 +144,10 @@ export interface UserStore {
   /** Look up by account id — the reset route re-fetches the current hash to re-check a
    *  reset token's password fingerprint (single-use). Null when the account is gone. */
   findById(userId: string): Promise<UserRecord | null>;
+  /** Display logins for a batch of account ids (RANK-1) — one round-trip instead of
+   *  one per leaderboard row. Ids with no account are simply absent from the result;
+   *  the caller decides what an orphan row means (the board drops it). */
+  loginsOf(userIds: readonly string[]): Promise<Record<string, string>>;
   /** Set a new password hash (the /auth/reset endpoint). No-op if the account is gone. */
   setPassword(userId: string, passHash: string): Promise<void>;
   close?(): Promise<void>;

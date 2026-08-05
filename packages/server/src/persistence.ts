@@ -8,6 +8,7 @@ import {
   MemoryAvaRosterStore,
   MemoryAvaSessionStore,
   MemoryCorpRentStore,
+  MemoryCommanderStore,
   MemoryCorpStore,
   MemoryDropStore,
   MemoryMatchStore,
@@ -24,6 +25,7 @@ import {
   PostgresAvaRosterStore,
   PostgresAvaSessionStore,
   PostgresCorpRentStore,
+  PostgresCommanderStore,
   PostgresCorpStore,
   PostgresDropStore,
   PostgresMatchStore,
@@ -41,6 +43,7 @@ import {
   type AvaRosterStore,
   type AvaSessionStore,
   type CorpRentStore,
+  type CommanderStore,
   type CorpStore,
   type DropStore,
   type MatchSnapshot,
@@ -71,6 +74,9 @@ export interface Stores {
   userStore: UserStore;
   /** Corporations (CORP-0) — membership/roles between matches, the AvA org layer. */
   corpStore: CorpStore;
+  /** Lifetime commander XP (EC-*) — the account-level progression a new device
+   *  inherits; RANK-1's player board ranks exactly this number. */
+  commanderStore: CommanderStore;
   /** AvA challenges (AVA-4) — the S0→S2 challenge state machine, durable. */
   challengeStore: AvaChallengeStore;
   /** AvA rosters (AVA-6) — the pause-window roster of an accepted matchup. */
@@ -109,6 +115,7 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
       accountStore: new MemoryAccountStore(),
       userStore: new MemoryUserStore(),
       corpStore: new MemoryCorpStore(),
+      commanderStore: new MemoryCommanderStore(),
       challengeStore: new MemoryAvaChallengeStore(),
       rosterStore: new MemoryAvaRosterStore(),
       resultStore: new MemoryAvaResultStore(),
@@ -135,6 +142,7 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
     accountStore: new PostgresAccountStore(pool), // shares the pool; closed by pool.end()
     userStore: new PostgresUserStore(pool),
     corpStore: new PostgresCorpStore(pool),
+    commanderStore: new PostgresCommanderStore(pool),
     challengeStore: new PostgresAvaChallengeStore(pool),
     rosterStore: new PostgresAvaRosterStore(pool),
     resultStore: new PostgresAvaResultStore(pool),
