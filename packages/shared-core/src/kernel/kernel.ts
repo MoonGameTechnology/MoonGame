@@ -183,6 +183,33 @@ export class Kernel {
   }
 
   /**
+   * RULES-3. «Прошла бы вся эта ПОСЛЕДОВАТЕЛЬНОСТЬ?» — первый код отказа или `null`,
+   * если проходит целиком. Каждый следующий приказ спрашивается по ЧЕРНОВИКУ, который
+   * оставили предыдущие: состояние вызывающего не меняется (`applyAction` возвращает
+   * новое, инвариант #2).
+   *
+   * Зачем отдельно от `canApply`. Автоматика издаёт не одиночные приказы, а связки:
+   * авто-штурм — «встать на низкую орбиту → штурм». Штурм нелегален с дальней орбиты,
+   * поэтому вопрос об одном лишь штурме вернёт `E_WRONG_ORBIT` про мир ДО первого
+   * действия связки — и приказ не будет выдан никогда. Вопрос об одной лишь орбите
+   * пропустит связку, у которой обречена вторая половина, и та применится: орбита
+   * прошла, штурм отбит, и так каждое пробуждение. Без этого входа каждый драйвер
+   * решал задачу сам и заводил свою копию правил — то, что RULES-1 закрывал.
+   *
+   * Пустая последовательность — `null` («нечему отказывать»): вызывающий сам решает,
+   * издавать ли ничто.
+   */
+  canApplyAll(state: GameState, actions: readonly Action[], ctx: Context): string | null {
+    let draft = state;
+    for (const action of actions) {
+      const out = this.applyAction(draft, action, ctx);
+      if (!out.ok) return out.code;
+      draft = out.state;
+    }
+    return null;
+  }
+
+  /**
    * Advances the world clock to `ctx.now`, firing every scheduled event due in
    * between, in chronological (`at`, then `seq`) order. This is what makes the
    * game real-time: durations are scheduled events, and the server "sleeps"

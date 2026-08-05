@@ -12,7 +12,6 @@
  * for internal use and re-exports for `main.ts` / tests.
  */
 import {
-  isCapturable,
   identifiedNodes,
   getStance,
   type Action,
@@ -20,6 +19,7 @@ import {
   type Hero,
 } from '../../packages/shared-core/src/index';
 import { data } from './prototypeData';
+import { canOrderAll } from './protoKernel';
 import { fleetIdle, type ChainStep, type FleetChain } from './chain';
 import { scrambleOrder, type Patrol } from './patrol';
 import { sortieSpec, tickRearm, fleetHasSquadron, type SortieState } from './squadron';
@@ -36,33 +36,38 @@ interface DriverState extends GameState {
 }
 
 /** One tick of the SERVER-SIDE auto-storm driver (CC-2): every fleet flagged in
- *  `state.autoAssault` that sits over someone else's capturable world with the orbit
- *  clear gets its storm orders. Mirrors the client autoEngage() conditions exactly.
+ *  `state.autoAssault` whose storm orders the KERNEL would accept gets them issued.
  *  Pure — the host applies the actions; a rejection is simply skipped (a standing
- *  stance has no chain to block). */
+ *  stance has no chain to block).
+ *
+ *  RULES-3. Правила штурма (захватываемость, владелец, дипломатия, чужой флот на
+ *  узле, десант, идущий наземный бой) здесь БОЛЬШЕ НЕ ПЕРЕПИСЫВАЮТСЯ — их называет
+ *  ядро тем же кодом, каким отбило бы сам приказ. Опт-ин игрока (`autoAssault`)
+ *  остаётся политикой: это не правило, а согласие. Раньше клиентский двойник
+ *  (`autoEngage`) уже спрашивал ядро, а этот — нет; в сети работает именно ЭТОТ,
+ *  то есть единый источник правил доставался той половине, которая в онлайне не
+ *  решает.
+ *
+ *  Проверяется вся ПАРА «встать на низкую орбиту → штурм» по ЧЕРНОВОМУ состоянию:
+ *  штурм нелегален с дальней орбиты, поэтому вопрос про него задаётся уже ПОСЛЕ
+ *  орбиты. Иначе применилась бы половина обречённой пары — орбита проходит, штурм
+ *  отбивается, и так каждое пробуждение (та самая rejected-churn). */
 export function serverAutoAssaultActions(
   state: GameState,
 ): Array<{ fleetId: string; owner: string; actions: Action[] }> {
   const flagged = (state as DriverState).autoAssault ?? {};
   const out: Array<{ fleetId: string; owner: string; actions: Action[] }> = [];
-  for (const fid of Object.keys(flagged)) {
+  // Сортировка ключей — как в двух других драйверах этого файла: JSONB не хранит
+  // порядок ключей объекта, поэтому несортированный обход делал ПОРЯДОК выдачи
+  // приказов зависимым от хоста и гибернации (инвариант №6).
+  for (const fid of Object.keys(flagged).sort()) {
     const f = state.fleets[fid];
-    if (!f || f.location === null || !fleetIdle(f)) continue;
-    const here = state.planets[f.location];
-    if (!here || !isCapturable(data, here) || here.owner === f.owner) continue;
-    // Auto-storm only worlds we are AT WAR with (bug-hunt MINOR): the core rejects a
-    // peaceful assault anyway (E_FORBIDDEN), but the driver re-issued the doomed pair
-    // on every wake — rejected-action churn, and the fleet.orbit half DID apply.
-    if (here.owner !== null && getStance(state, f.owner, here.owner) !== 'war') continue;
-    const enemyHere = Object.values(state.fleets).some(
-      (g) => g.owner !== f.owner && g.location === f.location && g.units.some((u) => u.count > 0),
-    );
-    if (enemyHere) continue; // let the orbital battle settle first
-    // An assault needs near orbit first (orbit is instant), mirroring the AI capture pass.
+    if (!f) continue; // нет флота — не из чего собрать приказ (нужен f.owner)
     const actions =
       f.orbit === 'near'
         ? [assaultFleet(f.owner, fid)]
         : [orbitFleet(f.owner, fid), assaultFleet(f.owner, fid)];
+    if (canOrderAll(state, actions) !== null) continue;
     out.push({ fleetId: fid, owner: f.owner, actions });
   }
   return out;

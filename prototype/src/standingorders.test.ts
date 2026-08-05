@@ -162,6 +162,35 @@ describe('serverAutoAssaultActions — the CC-2 server driver core', () => {
     (s as SOState).autoAssault = { GONE: true };
     expect(serverAutoAssaultActions(s)).toEqual([]);
   });
+
+  // --- RULES-3: драйвер спрашивает ядро, а не переписывает правила ---------------
+  // Смысл конверсии не в красоте, а в отказах, которых рукописные условия НЕ ЗНАЛИ:
+  // их драйвер выдавал каждое пробуждение (rejected-churn), причём половина пары
+  // «орбита → штурм» успевала примениться.
+  it('молчит по защищённому миру без десанта — отказ, которого условия не знали', () => {
+    const defended = planet('A', { x: 0, y: 0 }, 'red');
+    (defended as unknown as { garrison: Array<{ unit: string; count: number }> }).garrison = [
+      { unit: 'militia', count: 3 },
+    ];
+    const s = flag(stateWith([fleet('F')], [defended]), 'F'); // у флота landing: []
+    expect(serverAutoAssaultActions(s)).toEqual([]); // ядро: E_NO_TROOPS
+  });
+
+  it('молчит по незахватываемому сектору — правило теперь в ядре, а не в копии драйвера', () => {
+    const nowhere = planet('A', { x: 0, y: 0 }, null);
+    (nowhere as unknown as { kind: string }).kind = 'empty';
+    const s = flag(stateWith([fleet('F')], [nowhere]), 'F');
+    expect(serverAutoAssaultActions(s)).toEqual([]); // ядро: E_NOT_CAPTURABLE
+  });
+
+  it('выдаёт приказы в порядке id, а не в порядке ключей JSONB (инвариант №6)', () => {
+    const s = stateWith(
+      [fleet('Z'), fleet('A2')],
+      [planet('A', { x: 0, y: 0 }, 'red')],
+    );
+    (s as SOState).autoAssault = { Z: true, A2: true }; // ключи вставлены НЕ по порядку
+    expect(serverAutoAssaultActions(s).map((o) => o.fleetId)).toEqual(['A2', 'Z']);
+  });
 });
 
 describe('serverPatrolActions — the CC-4 server driver core', () => {

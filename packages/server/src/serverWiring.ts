@@ -154,6 +154,7 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
                 room.state,
                 data,
                 room.state.time,
+                (state, actions) => room.canApplyAll(state, actions, room.state.time),
               )) {
                 await room.submitServerAction(playerId, action);
               }

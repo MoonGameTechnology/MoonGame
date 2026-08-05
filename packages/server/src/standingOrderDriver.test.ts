@@ -7,7 +7,7 @@ import {
   type Planet,
   type Player,
 } from '@void/shared-core';
-import { parseGameData, createKernel, type GameData, type Context } from '@void/shared-core';
+import { parseGameData, createKernel, type Action, type GameData, type Context } from '@void/shared-core';
 import { autoAssaultActions, patrolActions, standingOrderTickActions } from './standingOrderDriver';
 import { DEV_MODULES } from './scenario';
 
@@ -96,6 +96,13 @@ function stateWith(opts: {
   };
 }
 
+// RULES-3. Проба — НАСТОЯЩЕЕ ядро (DEV_MODULES), а не заглушка: драйвер больше не
+// переписывает правила штурма, он их спрашивает, и тест обязан спрашивать так же.
+// Заглушка здесь превратила бы сторожа в проверку самого себя.
+const probeKernel = createKernel(DEV_MODULES);
+const probe = (state: GameState, actions: readonly Action[]): string | null =>
+  probeKernel.canApplyAll(state, actions, { now: state.time, data });
+
 describe('autoAssaultActions — CC-2', () => {
   it('orbits then storms a flagged fleet at an idle, at-war, capturable foreign world', () => {
     const s = stateWith({
@@ -105,7 +112,7 @@ describe('autoAssaultActions — CC-2', () => {
       autoAssault: { f1: true },
     });
     setStance(s, 'p1', 'p2', 'war');
-    const out = autoAssaultActions(s, data);
+    const out = autoAssaultActions(s, probe);
     expect(out.map((a) => a.action.type)).toEqual(['fleet.orbit', 'fleet.assault']);
     expect(out.every((a) => a.playerId === 'p1')).toBe(true);
     expect(out[0]!.action.payload).toEqual({ fleetId: 'f1', orbit: 'near' });
@@ -119,7 +126,7 @@ describe('autoAssaultActions — CC-2', () => {
       autoAssault: { f1: true },
     });
     setStance(s, 'p1', 'p2', 'war');
-    const out = autoAssaultActions(s, data);
+    const out = autoAssaultActions(s, probe);
     expect(out.map((a) => a.action.type)).toEqual(['fleet.assault']);
   });
 
@@ -134,7 +141,7 @@ describe('autoAssaultActions — CC-2', () => {
 
     const atPeace = dock();
     setStance(atPeace, 'p1', 'p2', 'peace');
-    expect(autoAssaultActions(atPeace, data)).toEqual([]);
+    expect(autoAssaultActions(atPeace, probe)).toEqual([]);
 
     const ownWorld = stateWith({
       players: [player('p1')],
@@ -142,11 +149,11 @@ describe('autoAssaultActions — CC-2', () => {
       fleets: [fleet('f1', 'p1', 'A', [['cruiser', 1]])],
       autoAssault: { f1: true },
     });
-    expect(autoAssaultActions(ownWorld, data)).toEqual([]);
+    expect(autoAssaultActions(ownWorld, probe)).toEqual([]);
 
     const inBattle = dock({ battleId: 'b1' });
     setStance(inBattle, 'p1', 'p2', 'war');
-    expect(autoAssaultActions(inBattle, data)).toEqual([]);
+    expect(autoAssaultActions(inBattle, probe)).toEqual([]);
 
     const inTransit = stateWith({
       players: [player('p1'), player('p2')],
@@ -160,7 +167,7 @@ describe('autoAssaultActions — CC-2', () => {
       autoAssault: { f1: true },
     });
     setStance(inTransit, 'p1', 'p2', 'war');
-    expect(autoAssaultActions(inTransit, data)).toEqual([]);
+    expect(autoAssaultActions(inTransit, probe)).toEqual([]);
 
     const contested = stateWith({
       players: [player('p1'), player('p2')],
@@ -172,7 +179,7 @@ describe('autoAssaultActions — CC-2', () => {
       autoAssault: { f1: true },
     });
     setStance(contested, 'p1', 'p2', 'war');
-    expect(autoAssaultActions(contested, data)).toEqual([]);
+    expect(autoAssaultActions(contested, probe)).toEqual([]);
   });
 });
 
@@ -266,7 +273,7 @@ describe('standingOrderTickActions — combines both drivers in a fixed order', 
       patrols: { wing: { center: { x: 0, y: 0 }, radius: 50, sortie: { fuel: 2, rearming: 0 } } },
     });
     setStance(s, 'p1', 'p2', 'war');
-    const out = standingOrderTickActions(s, data, 0);
+    const out = standingOrderTickActions(s, data, 0, probe);
     expect(out[0]!.action.type).toBe('fleet.orbit'); // auto-assault first
     expect(out.some((a) => a.action.type === 'fleet.assault')).toBe(true);
   });
@@ -290,7 +297,7 @@ describe('integration — every emitted action is accepted by the REAL kernel', 
     });
     setStance(s, 'p1', 'p2', 'war');
     let state = s;
-    for (const { playerId, action } of autoAssaultActions(state, data)) {
+    for (const { playerId, action } of autoAssaultActions(state, probe)) {
       const r = kernel.applyAction(state, action, ctx);
       expect(r.ok, `${playerId}: ${action.type} → ${!r.ok ? r.code : 'ok'}`).toBe(true);
       if (r.ok) state = r.state;
