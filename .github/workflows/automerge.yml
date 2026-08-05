@@ -54,6 +54,20 @@ on: # zizmor: ignore[dangerous-triggers]
   # остался бы вне очереди навсегда. Чеки к этому моменту уже зелёные.
   pull_request:
     types: [ready_for_review]
+  # ПОДМЕТАНИЕ ЗАСТРЯВШИХ. Оба триггера выше — событийные, и у них общий изъян: разбудив
+  # воркфлоу, они дают ему ОДИН шанс. Джоба `enqueue` читает `mergeStateStatus` циклом
+  # ~100 с и, не дождавшись `CLEAN`/`UNSTABLE`, выходит с кодом 0 — а будить её больше
+  # нечем, потому что прогоны, на которые она подписана, уже закончились. PR остаётся
+  # зелёным и вечно вне очереди (живые примеры: #485 простоял семь часов, #500 — четыре).
+  #
+  # Хуже того, событийный заход отравляет собственное чтение: пока джоба работает, на
+  # головном коммите PR висит её НЕЗАВЕРШЁННЫЙ чек `enqueue when green`, и состояние не
+  # успевает стать пригодным до конца её же цикла. Прогон по расписанию к коммиту PR не
+  # привязан и чек-рана на нём не создаёт — он видит состояние чистым, без себя в нём.
+  schedule:
+    # Дважды в час, на нечётной минуте: GitHub роняет cron-прогоны, поставленные на пик
+    # (:00 — худший вариант), а тихо не выполнившееся подметание — это fail-open.
+    - cron: '11,41 * * * *'
 
 concurrency:
   # `CI` и `Security scan` заканчиваются почти одновременно, и оба будят этот воркфлоу.
@@ -260,3 +274,67 @@ jobs:
           echo "PR #$PR поставлен в очередь: очередь перепроверит его на «свежий main + PR» и вольёт"
           # Схлопываем объяснялку в одну строку, если она висела с прошлого прогона.
           explain "$STATUS" 1
+
+  sweep:
+    name: sweep stranded PRs
+    # Только по расписанию: событийные заходы обслуживает джоба выше, и запускать обе на
+    # одно событие незачем.
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    steps:
+      # Здесь НЕТ checkout: джоба не исполняет ничего из репозитория, только два запроса
+      # к API. Меньше поверхности — меньше поводов для разбора у zizmor.
+      - name: enqueue everything green that nothing is left to wake
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          BASE: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+
+          # Отбор делает САМ GitHub: база фильтруется аргументом запроса (у стекового PR
+          # база другая, очереди у неё нет и ставить туда некуда), остальное — предикатами.
+          # `isCrossRepository == false` — та же отсечка форков, что и в джобе выше: чужой
+          # код в очередь автоматом не поедет. `UNSTABLE` берём наравне с `CLEAN` по той же
+          # причине, что и там: информационные сканеры краснеют штатно (чужие CVE в
+          # caddy/gosu), а обязательные всё равно перепроверит очередь на своей ветке.
+          CANDIDATES="$(
+            gh api graphql \
+              -f query='
+                query($owner:String!, $name:String!, $base:String!) {
+                  repository(owner:$owner, name:$name) {
+                    pullRequests(states:OPEN, baseRefName:$base, first:50) {
+                      nodes {
+                        id number isDraft isCrossRepository mergeStateStatus
+                        mergeQueueEntry { position }
+                      }
+                    }
+                  }
+                }' \
+              -F owner="${REPO%/*}" -F name="${REPO#*/}" -F base="$BASE" \
+              -q '.data.repository.pullRequests.nodes[]
+                  | select(.isDraft == false)
+                  | select(.isCrossRepository == false)
+                  | select(.mergeQueueEntry == null)
+                  | select(.mergeStateStatus == "CLEAN" or .mergeStateStatus == "UNSTABLE")
+                  | "\(.id) \(.number)"'
+          )"
+
+          if [ -z "$CANDIDATES" ]; then
+            echo 'застрявших зелёных PR нет — подметать нечего'
+            exit 0
+          fi
+
+          # `|| true` на мутации: один упавший PR (гонка — его успели поставить между
+          # чтением и записью) не должен ронять подметание остальных.
+          echo "$CANDIDATES" | while read -r ID NUM; do
+            echo "PR #$NUM зелёный и вне очереди — ставлю"
+            gh api graphql \
+              -f query='
+                mutation($id:ID!) {
+                  enqueuePullRequest(input:{pullRequestId:$id}) {
+                    mergeQueueEntry { position }
+                  }
+                }' \
+              -F id="$ID" || echo "PR #$NUM поставить не вышло — разберётся следующее подметание"
+          done

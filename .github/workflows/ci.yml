@@ -18,7 +18,15 @@ name: CI
 on:
   workflow_dispatch:
   push:
-    branches: ['**']
+    # `branches-ignore`, не `branches: ['**']`: ветку очереди (`gh-readonly-queue/**`)
+    # создаёт сам merge-queue, и на неё прилетает ОБА события — `merge_group` и `push`.
+    # Оба дают один ключ concurrency (`github.head_ref` на обоих пуст, остаётся
+    # `github.ref` = имя ветки очереди), а у push-прогона `cancel-in-progress` истинно —
+    # он убивал merge_group-прогон через секунду после старта, очередь читала отменённый
+    # required-чек как провал и выбрасывала PR с `CI_FAILURE` при зелёном коде. Guard
+    # ниже от этого не спасает: он разводит merge_group-прогоны между собой, а убивал их
+    # push. Прогон на ветке очереди тут и не нужен — тот же коммит проверяет merge_group.
+    branches-ignore: ['gh-readonly-queue/**']
   pull_request:
   # Merge queue: the queue builds a temporary "latest main + this PR" branch and waits
   # for the REQUIRED checks on it — but a workflow only runs there if it subscribes to

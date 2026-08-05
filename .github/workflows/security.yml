@@ -94,7 +94,11 @@ name: Security scan
 # `continue-on-error`, а сами гейты (semgrep/gitleaks/osv/trivy) от прав не зависят.
 on:
   push:
-    branches: ['**']
+    # См. тот же комментарий в ci.yml: на ветке merge-queue событие `push` порождает
+    # второй прогон в одной concurrency-группе с `merge_group` и гасит его
+    # (`cancel-in-progress` истинно вне merge_group), из-за чего очередь выбрасывала PR
+    # с `CI_FAILURE` при зелёном коде. Сканеры на ветке очереди и так бегут от merge_group.
+    branches-ignore: ['gh-readonly-queue/**']
   pull_request:
   # Merge queue: очередь собирает временную ветку «свежий main + этот PR» и ждёт на НЕЙ
   # отчёта от required-чеков — но воркфлоу попадает туда, только если подписан на
