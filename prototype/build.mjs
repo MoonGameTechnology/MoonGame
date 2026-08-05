@@ -1102,9 +1102,10 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #stewardbody .st-log-line{padding:4px 6px;border-left:2px solid rgba(53,214,230,.35);background:rgba(53,214,230,.05);border-radius:0 6px 6px 0;}
 #stewardbody .st-log-when{opacity:.55;margin-right:4px;}
 #stewardbody .st-note{margin-top:12px;font-size:11px;color:var(--dim);line-height:1.55;}
-/* TT-3.1: technology tree (mockup v4) — tabs = branches, one shared sticky day
-   rail (rows = epoch day-gates), node states, tap → dossier modal. Fixed-basis
-   columns: the pane scrolls horizontally inside .tt-scroll, the rail stays pinned. */
+/* TT-3.1 + TT-4: technology tree — tabs = branches, the branch's nodes as a
+   tier-grouped LIST (one full-width row per node: name, state, effect, cost, time),
+   tap → dossier modal. Сетка 52-пиксельных иконок вмещала больше узлов,
+   но про каждый молчала: что даёт «⚙», было видно только из досье. */
 #tech .twbox{position:relative;width:min(430px,94vw);}
 #techbody{padding:0;overflow:hidden;display:flex;flex-direction:column;}
 .tt-top{display:flex;align-items:center;justify-content:space-between;padding:9px 12px 0;flex:none;}
@@ -1121,56 +1122,46 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .tt-lead b{color:#4fe0b0;}
 .tt-lead.closed{color:var(--amber);}
 .tt-scroll{flex:1;min-height:0;overflow:auto;touch-action:pan-x pan-y;}
-.tt-grid{display:flex;min-width:max-content;}
-.tt-rail{position:sticky;left:0;z-index:6;flex:0 0 44px;background:var(--glass);border-right:1px solid var(--line-hi);}
-.tt-dhead,.tt-chead{height:34px;display:flex;align-items:center;justify-content:center;position:sticky;top:0;z-index:5;
-  background:rgba(3,14,18,.97);border-bottom:1px solid var(--line-hi);
-  font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--cyan-dim);text-align:center;}
-.tt-drow{height:96px;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  border-bottom:1px dashed rgba(29,107,112,.28);color:var(--dim);}
-.tt-drow b{font-size:15px;color:var(--ink);}
-.tt-drow small{font-size:8px;}
-.tt-drow.now{background:linear-gradient(90deg,rgba(95,240,192,.14),rgba(95,240,192,.03));}
-.tt-drow.now b{color:var(--grn);}
-.tt-drow.future{opacity:.55;}
-.tt-col{flex:0 0 112px;border-right:1px solid var(--line);}
-.tt-col.w2{flex:0 0 168px;}
-.tt-cellwrap{position:relative;}
-.tt-cellwrap::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:2px;margin-left:-1px;
-  background:linear-gradient(180deg,var(--line-hi),var(--line));opacity:.6;}
-.tt-cell{position:relative;height:96px;display:flex;align-items:center;justify-content:center;gap:6px;
-  border-bottom:1px dashed rgba(29,107,112,.28);}
-.tt-cell.now{background:linear-gradient(90deg,rgba(95,240,192,.05),transparent);}
-.tt-node{position:relative;z-index:2;width:100px;cursor:pointer;text-align:center;}
-.tt-node:active{transform:scale(.95);}
-.tt-box{position:relative;width:52px;height:52px;margin:0 auto;border-radius:12px;border:2px solid var(--line-hi);
-  background:linear-gradient(180deg,#0f2b31,#0a1a1f);display:grid;place-items:center;
-  font-size:23px;font-variant-emoji:text;color:var(--cyan);}
-.tt-lbl{margin:3px auto 0;max-width:108px;font-size:10px;line-height:1.25;color:var(--ink);
-  background:rgba(4,14,17,.92);border-radius:5px;padding:1px 3px;max-height:27px;overflow:hidden;}
-.tt-node.st-done .tt-box{border-color:#4fe0b0;background:linear-gradient(180deg,#0e3b2f,#0a231e);box-shadow:0 0 14px rgba(79,224,176,.25);}
-.tt-node.st-avail .tt-box{border-color:var(--cyan);box-shadow:0 0 12px rgba(53,214,230,.22);}
+/* Закреплённая шапка «исследуется сейчас» — единственное, ради чего экран
+   открывают повторно; раньше это приходилось искать глазами по всей сетке. */
+.tt-now{flex:none;margin:0 12px 8px;padding:7px 9px;border:1px solid var(--amber-dim,rgba(255,180,58,.35));
+  border-radius:10px;background:rgba(255,180,58,.07);display:flex;flex-direction:column;gap:6px;}
+.tt-nowrow{position:relative;display:flex;align-items:center;gap:7px;padding-bottom:6px;font-size:11px;color:var(--ink);}
+.tt-nowrow b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;}
+.tt-nowdot{flex:none;width:7px;height:7px;border-radius:50%;background:var(--amber);animation:ttpulse 1.6s ease-in-out infinite;}
+@keyframes ttpulse{0%,100%{opacity:.35;}50%{opacity:1;}}
+.tt-nowt{flex:none;font:700 11px ui-monospace,monospace;color:var(--amber);font-variant-numeric:tabular-nums;}
+.tt-list{padding:0 12px 12px;display:flex;flex-direction:column;gap:7px;}
+/* Ярус вместо рельсы дней: day-гейт не пропал, он стал ПРИЧИНОЙ замка в самой строке */
+.tt-tierh{margin:9px 0 1px;font:800 9px ui-monospace,monospace;letter-spacing:1.4px;color:var(--cyan-dim);}
+.tt-tierh:first-child{margin-top:2px;}
+.tt-item{position:relative;padding:9px 10px 10px;border:1px solid var(--line);border-radius:10px;
+  background:linear-gradient(180deg,rgba(12,32,38,.85),rgba(8,20,24,.85));cursor:pointer;}
+.tt-item:active{transform:scale(.995);}
+.tt-ih{display:flex;align-items:center;gap:8px;}
+.tt-ih b{flex:1;min-width:0;font-size:12.5px;font-weight:700;color:#eafffb;}
+.tt-ifx{margin-top:4px;font-size:10px;line-height:1.45;color:var(--cyan-dim);}
+.tt-ifoot{margin-top:6px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;color:var(--dim);}
+.tt-idur{flex:none;font-variant-numeric:tabular-nums;}
+/* Правое поле строки — РОВНО ОДНО состояние: сделано / идёт / можно / причина замка */
+.tt-st{flex:none;max-width:56%;font-size:9.5px;line-height:1.3;text-align:right;color:var(--dim);}
+.tt-st.done{color:#4fe0b0;}
+.tt-st.run{color:var(--amber);font-weight:700;}
+.tt-take{flex:none;padding:6px 11px;border-radius:8px;border:1px solid var(--grn);cursor:pointer;
+  font:800 10px ui-monospace,monospace;letter-spacing:.6px;text-transform:uppercase;white-space:nowrap;
+  color:#04231c;background:linear-gradient(180deg,var(--grn),#4fe0b0);}
+.tt-take:disabled{background:#0a1a1f;border-color:var(--line-hi);color:var(--dim);opacity:.8;cursor:not-allowed;}
 /* Доступный И оплачиваемый узел дышит — то же правило, что зажигает кнопку в досье */
-.tt-node.st-avail.can .tt-box{animation:ttcan 2s ease-in-out infinite;}
-@keyframes ttcan{
-  0%,100%{box-shadow:0 0 10px rgba(53,214,230,.18);}
-  50%{box-shadow:0 0 18px rgba(53,214,230,.45);}
-}
-.tt-node.st-res .tt-box{border-color:var(--amber);}
-.tt-node.st-gate .tt-box,.tt-node.st-chain .tt-box,.tt-node.st-cond .tt-box{opacity:.55;filter:saturate(.4);}
-.tt-eta{margin-top:2px;font-size:9px;color:var(--amber);}
-/* PC: наведение подсвечивает узел — до этого отклик был только у нажатия.
-   :where() роняет специфичность до нуля, чтобы hover НЕ перебивал фильтр-приглушение
-   запертых состояний (st-gate/st-chain/st-cond) — их видимость важнее подсветки. */
+.tt-item.st-avail{border-color:var(--cyan);}
+.tt-item.st-res{border-color:var(--amber);}
+.tt-item.st-done{opacity:.7;}
+.tt-item.st-gate,.tt-item.st-chain,.tt-item.st-cond{opacity:.62;}
 @media(hover:hover){
-  :where(.tt-node:hover) .tt-box{filter:brightness(1.2);}
-  .tt-node:hover .tt-lbl{color:var(--cyan);}
+  :where(.tt-item:hover){border-color:var(--line-hi);}
 }
-.tt-tick{position:absolute;right:-6px;bottom:-6px;font-size:10px;color:#04231c;background:#4fe0b0;border-radius:6px;padding:0 3px;}
-.tt-lock{position:absolute;right:-6px;top:-6px;font-size:10px;}
-.tt-cnd{position:absolute;right:-6px;top:-6px;font-size:10px;color:var(--amber);}
-.tt-prog{position:absolute;left:4px;right:4px;bottom:3px;height:4px;border-radius:2px;background:rgba(255,180,58,.22);overflow:hidden;}
+.tt-prog{position:absolute;left:9px;right:9px;bottom:4px;height:3px;border-radius:2px;background:rgba(255,180,58,.22);overflow:hidden;}
 .tt-prog i{position:absolute;left:0;top:0;bottom:0;background:var(--amber);}
+.tt-nowrow .tt-prog{left:0;right:0;bottom:0;}
 /* dossier modal over the tree (inside .twbox, so Esc/back close the whole window) */
 .tt-modal{position:absolute;inset:0;z-index:8;display:flex;align-items:center;justify-content:center;}
 .tt-mback{position:absolute;inset:0;background:rgba(1,6,8,.72);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}

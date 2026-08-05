@@ -1,10 +1,10 @@
 /**
- * Tech-tree screen (TT-3.1, REFM-9) — the session research window: branch tabs, a
- * shared day rail, a node grid, and the tap-through node dossier with the «research»
- * button.
+ * Tech-tree screen (TT-3.1, REFM-9, TT-4) — the session research window: a pinned
+ * «researching now» strip, branch tabs, the branch's nodes as a tier-grouped LIST, and
+ * the tap-through node dossier with the «research» button.
  *
  * The rules live in the core (`technologyModule` / `technologyLock` decides what may
- * start); everything here is a READ of that truth plus the layout map. `techCondOk`
+ * start); everything here is a READ of that truth. `techCondOk`
  * форвардит вопрос в ядро (`conditionMet`) — своей копии перебора условий здесь нет
  * (RULES-4); неизвестный тип условия ядро считает невыполненным (fail-secure).
  *
@@ -17,7 +17,7 @@ import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { data } from './prototypeData';
 import { DAY, HOUR } from './time';
-import { esc, cost, displayUnit } from './format';
+import { esc, cost, displayUnit, fmtEta } from './format';
 import { researchTech } from './actions';
 
 const clamp = (v: number, a: number, b: number): number => Math.max(a, Math.min(b, v));
@@ -35,37 +35,6 @@ export const branchLabel = (key: string): string =>
 // показ нехватки — второй аргумент красит дефицит прямо в модалке технологии.
 export const techCost = (c: Record<string, number>, have?: Record<string, number>): string =>
   Object.keys(c).length ? cost(c, have) : '';
-// --- TT-3.1: экран-дерево (макет v4) — вкладки-ветки, рельса дней, досье по тапу ----
-// Presentation-only layout: named sub-columns per branch, ids in day order. The
-// canonical data stays layout-free; a tech missing from this map falls into an
-// auto-column appended at the end, so fresh data never breaks the screen.
-export const TECH_COLS: Record<string, Array<{ label: string; ids: string[] }>> = {
-  space: [
-    {
-      label: 'tech.group.industry',
-      ids: ['industrial_automation', 'microelectronics_fabrication'],
-    },
-    { label: 'tech.group.fleet', ids: ['orbital_logistics', 'siege_doctrine', 'void_armadas'] },
-    { label: 'tech.group.sensors', ids: ['deep_survey'] },
-  ],
-  ground: [
-    { label: 'tech.group.doctrines', ids: ['combined_arms', 'garrison_networks'] },
-    { label: 'tech.group.fortifications', ids: ['fortified_infrastructure', 'planetary_bastions'] },
-  ],
-  squadron: [
-    { label: 'tech.group.airwing', ids: ['flight_decks', 'strike_vectors', 'ace_programs'] },
-  ],
-  missile: [
-    {
-      label: 'tech.group.arsenal',
-      ids: ['guidance_arrays', 'warhead_miniaturization', 'saturation_barrage'],
-    },
-  ],
-  command: [
-    { label: 'tech.group.comms', ids: ['signal_corps', 'logistics_command'] },
-    { label: 'tech.group.automation', ids: ['ai_stewardship'] },
-  ],
-};
 export const TECH_ICONS: Record<string, string> = {
   industrial_automation: '⚙',
   microelectronics_fabrication: '▣',
@@ -93,6 +62,22 @@ export const TECH_FX_LABEL: Record<string, string> = {
   combatDamageBonus: 'tech.fx.damage',
   radarRangeBonus: 'tech.fx.radar',
 };
+/** Ярус римской цифрой — как в макете. Ярусов у контента единицы, поэтому таблица. */
+const ROMAN = ['0', 'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
+function roman(n: number): string {
+  return ROMAN[n] ?? String(n);
+}
+
+/** «ч:мм:сс» игрового времени — тот же формат, что у обратного отсчёта до нового дня
+ *  в статус-баре. Часы отбрасываются, когда их нет: «38:12» читается лучше «0:38:12». */
+export function fmtClock(ms: number): string {
+  const total = Math.max(0, Math.floor(ms / 1000));
+  const h = Math.floor(total / 3600);
+  const m = String(Math.floor((total % 3600) / 60)).padStart(2, '0');
+  const sec = String(total % 60).padStart(2, '0');
+  return h > 0 ? `${h}:${m}:${sec}` : `${m}:${sec}`;
+}
+
 type TechDefLike = (typeof data.technologies)[string];
 type TechCond = TechDefLike['conditions'][number];
 export function techCondText(c: TechCond): string {
@@ -144,9 +129,9 @@ export function techFx(td: TechDefLike): string {
   return fx.join(' · ');
 }
 
-/** The whole window body for one branch tab: day rail + node columns + (optionally) the
- *  open node's dossier. Pure — `initTechTree` feeds it the live state and the two bits
- *  of view state the window owns. */
+/** The whole window body for one branch tab: the «researching now» strip + the branch's
+ *  tier-grouped node list + (optionally) the open node's dossier. Pure — `initTechTree`
+ *  feeds it the live state and the two bits of view state the window owns. */
 export function techTreeHtml(
   state: GameState,
   me: string,
@@ -166,17 +151,6 @@ export function techTreeHtml(
   const res = (seat?.resources ?? {}) as Record<string, number>;
   const started = state.startedAt ?? 0;
   const hudDay = Math.floor(state.time / DAY) + 1; // счёт статус-бара: день 1 — первый
-  // Рельса дней: объединение day-гейтов ВСЕХ веток (+ старт) — календарь общий,
-  // при смене вкладки строки не прыгают (правило макета). Подпись = dayGate+1,
-  // тот же счёт, что у часов в статус-баре.
-  const gates = [
-    ...new Set(
-      Object.values(techs)
-        .map((td) => td.dayGate ?? 0)
-        .concat(0),
-    ),
-  ].sort((a, b) => a - b);
-  const nowGate = gates.filter((g) => g + 1 <= hudDay).pop() ?? 0;
   // Пилюля слотов зеркалит кламп ядра: 2 базовых, +1 от учёного, максимум 3.
   const slotBonus = (seat?.scientists ?? []).reduce(
     (n, c) => n + (data.scientists[c.id]?.slotBonus ?? 0),
@@ -217,69 +191,87 @@ export function techTreeHtml(
   const leadHtml = lead
     ? `🧪 ${t('tech.curator')} <b>${esc(t(lead.name))}</b>`
     : `🔭 ${t('tech.curator.none')}`;
-  // Колонки вкладки: из карты раскладки; техи вне карты — в автоколонку в конце.
-  const colsDef = TECH_COLS[tab] ?? [];
-  const branchIds = Object.keys(techs).filter((id) => (techs[id]!.branch ?? 'space') === tab);
-  const placed = new Set(colsDef.flatMap((c) => c.ids));
-  const extras = branchIds
-    .filter((id) => !placed.has(id))
-    .sort((a, b) => techs[a]!.tier - techs[b]!.tier || a.localeCompare(b));
-  const cols = [
-    ...colsDef.map((c) => ({ label: c.label, ids: c.ids.filter((id) => branchIds.includes(id)) })),
-    ...(extras.length ? [{ label: '—', ids: extras }] : []),
-  ].filter((c) => c.ids.length);
-  const wide = cols.length <= 2 ? ' w2' : '';
-  let rail = `<div class="tt-rail"><div class="tt-dhead">${t('tech.rail.day')}</div>`;
-  for (const g of gates) {
-    const cls = g === nowGate ? ' now' : g + 1 > hudDay ? ' future' : '';
-    rail += `<div class="tt-drow${cls}"><b>${g + 1}</b><small>${g === 0 ? t('tech.rail.start') : t('tech.rail.day-short')}</small></div>`;
+  // СПИСОК вместо сетки (TT-4, макет владельца): узлы ветки идут ярусами, каждый —
+  // полноразмерной строкой, где ЭФФЕКТ, ЦЕНА и СРОК видны без тапа. Сетка 52-пиксельных
+  // иконок помещала на экран больше узлов, но про каждый молчала: чтобы узнать, что даёт
+  // «⚙», приходилось открывать досье. На телефоне это ровно наоборот тому, что нужно.
+  //
+  // Ярус вместо рельсы дней: day-гейт никуда не делся, он стал ПРИЧИНОЙ ЗАМКА в самой
+  // строке («нужно: день 3») — в одном ряду с «нужно: <родитель>». Так обе причины
+  // читаются одинаково и обе называют лекарство, а не просто гасят узел.
+  const branchIds = Object.keys(techs)
+    .filter((id) => (techs[id]!.branch ?? 'space') === tab)
+    .sort(
+      (x, y) =>
+        techs[x]!.tier - techs[y]!.tier ||
+        (techs[x]!.dayGate ?? 0) - (techs[y]!.dayGate ?? 0) ||
+        (x < y ? -1 : 1),
+    );
+  /** Почему узел заперт — словами и с ЛЕКАРСТВОМ, а не просто «закрыто». */
+  const lockText = (id: string, st: string): string => {
+    const td = techs[id]!;
+    if (st === 'chain') {
+      const missing = (td.prerequisites ?? []).find((p) => !done.has(p));
+      return t('tech.lock.needs', { x: esc(tData(techs[missing ?? '']?.name ?? (missing ?? ''))) });
+    }
+    if (st === 'gate') return t('tech.lock.day', { n: (td.dayGate ?? 0) + 1 });
+    const unmet = (td.conditions ?? []).find((c) => !techCondOk(state, me, c));
+    return unmet ? esc(techCondText(unmet)) : t('tech.action.unmet');
+  };
+  let listHtml = '';
+  let lastTier = -1;
+  for (const id of branchIds) {
+    const td = techs[id]!;
+    const st = nodeState(id);
+    if (td.tier !== lastTier) {
+      lastTier = td.tier;
+      listHtml += `<div class="tt-tierh">${t('tech.tier', { n: roman(td.tier) })}</div>`;
+    }
+    const affordable = Object.entries(td.cost).every(([k, v]) => (res[k] ?? 0) >= (v as number));
+    // Правое поле строки — ОДНО состояние: сделано / идёт / можно взять / причина замка.
+    const right =
+      st.st === 'done'
+        ? `<span class="tt-st done">✓ ${t('tech.state.done')}</span>`
+        : st.st === 'res'
+          ? `<span class="tt-st run">⚗ ${fmtEta(st.eta)}</span>`
+          : st.st === 'avail'
+            ? `<button class="tt-take" data-go="${id}"${affordable ? '' : ' disabled'}>▷ ${
+                affordable ? t('tech.action.research') : t('tech.action.no-resources')
+              }</button>`
+            : `<span class="tt-st lock">🔒 ${lockText(id, st.st)}</span>`;
+    listHtml +=
+      `<div class="tt-item st-${st.st}" data-tech="${id}">` +
+      `<div class="tt-ih"><b>${esc(tData(td.name))}</b>${right}</div>` +
+      (techFx(td) ? `<div class="tt-ifx">${techFx(td)}</div>` : '') +
+      `<div class="tt-ifoot"><span>${techCost(td.cost, res)}</span>` +
+      `<span class="tt-idur">${t('fmt.hours', { n: td.researchTimeHours })}</span></div>` +
+      (st.st === 'res'
+        ? `<span class="tt-prog"><i style="width:${Math.round(st.prog * 100)}%"></i></span>`
+        : '') +
+      `</div>`;
   }
-  rail += `</div>`;
-  let colsHtml = '';
-  for (const col of cols) {
-    let cells = '';
-    for (const g of gates) {
-      const nodes = col.ids
-        .filter((id) => (techs[id]!.dayGate ?? 0) === g)
-        .map((id) => {
-          const td = techs[id]!;
-          const st = nodeState(id);
-          // У каждого запертого состояния СВОЙ значок: «ждёт родителя» (🔗) раньше
-          // просто тускнел и был неотличим от day-гейта — а причины-то разные, и
-          // разные у них и лекарства (исследовать родителя vs подождать день).
-          const badge =
-            st.st === 'done'
-              ? `<span class="tt-tick">✓</span>`
-              : st.st === 'gate'
-                ? `<span class="tt-lock">🔒</span>`
-                : st.st === 'chain'
-                  ? `<span class="tt-lock">🔗</span>`
-                  : st.st === 'cond'
-                    ? `<span class="tt-cnd">⚗</span>`
-                    : '';
-          const prog =
-            st.st === 'res'
-              ? `<span class="tt-prog"><i style="width:${Math.round(st.prog * 100)}%"></i></span>`
-              : '';
-          // ETA идущего исследования — прямо на сетке, а не только в досье.
-          const eta =
-            st.st === 'res' ? `<div class="tt-eta">⏳ ${t('fmt.hours', { n: st.eta })}</div>` : '';
-          // Доступный И оплачиваемый прямо сейчас узел дышит рамкой — то же правило,
-          // которым в досье живёт кнопка «исследовать» (afford по казне места).
-          const can =
-            st.st === 'avail' &&
-            Object.entries(td.cost).every(([k, v]) => (res[k] ?? 0) >= (v as number));
+  // Закреплённая шапка: что исследуется ПРЯМО СЕЙЧАС, со сроком и полосой. Раньше это
+  // приходилось искать глазами по сетке — а это единственное, ради чего экран открывают
+  // повторно.
+  const activeHtml = activeList.length
+    ? `<div class="tt-now">` +
+      activeList
+        .map((a) => {
+          const td = techs[a.technology];
+          const total = a.completesAt - a.startedAt;
+          const pct = total > 0 ? Math.round(clamp((state.time - a.startedAt) / total, 0, 1) * 100) : 100;
+          const left = Math.max(0, a.completesAt - state.time);
           return (
-            `<div class="tt-node st-${st.st}${can ? ' can' : ''}" data-tech="${id}">` +
-            `<div class="tt-box">${TECH_ICONS[id] ?? '🔬'}${prog}${badge}</div>` +
-            `<div class="tt-lbl">${esc(tData(td.name))}</div>${eta}</div>`
+            `<div class="tt-nowrow"><i class="tt-nowdot"></i>` +
+            `<b>${esc(tData(td?.name ?? a.technology))}</b>` +
+            `<span class="tt-nowt">${fmtClock(left)}</span>` +
+            `<span class="tt-prog"><i style="width:${pct}%"></i></span></div>`
           );
         })
-        .join('');
-      cells += `<div class="tt-cell${g === nowGate ? ' now' : ''}">${nodes}</div>`;
-    }
-    colsHtml += `<div class="tt-col${wide}"><div class="tt-chead">${t(col.label)}</div><div class="tt-cellwrap">${cells}</div></div>`;
-  }
+        .join('') +
+      `</div>`
+    : '';
+
   // Досье узла (тап) — рендерится из состояния, так что живой 500мс-ререндер
   // обновляет прогресс/день, не закрывая окно.
   let modal = '';
@@ -334,9 +326,10 @@ export function techTreeHtml(
   const html =
     `<div class="tt-top"><span class="tt-day">📅 ${t('tech.day', { n: hudDay })}</span>` +
     `<span class="tt-slots">⚛ ${t('tech.slots', { a: activeList.length, b: slots })}</span></div>` +
+    activeHtml +
     `<div class="tt-tabs">${tabs}</div>` +
     `<div class="tt-lead${lead ? '' : ' closed'}">${leadHtml}</div>` +
-    `<div class="tt-scroll"><div class="tt-grid">${rail}${colsHtml}</div></div>` +
+    `<div class="tt-scroll"><div class="tt-list">${listHtml}</div></div>` +
     modal;
   return html;
 }
@@ -412,7 +405,10 @@ export function initTechTree(host: TechHost): {
       repaint();
       return;
     }
-    const go = (tg.closest('.tt-mbtn') as HTMLElement | null)?.dataset.go;
+    // Кнопка «исследовать» есть и в строке списка (.tt-take), и в досье (.tt-mbtn) —
+    // спрашиваем по САМОМУ приказу (data-go), а не по классу кнопки. Ранний выход тут
+    // же гасит открытие досье: тап по кнопке в строке — это приказ, а не «показать».
+    const go = (tg.closest('[data-go]') as HTMLElement | null)?.dataset.go;
     if (go) {
       host.order(researchTech(host.me(), go));
       repaint(); // узел тут же перекрашивается в «исследуется»
@@ -427,7 +423,7 @@ export function initTechTree(host: TechHost): {
       repaint();
       return;
     }
-    const node = (tg.closest('.tt-node') as HTMLElement | null)?.dataset.tech;
+    const node = (tg.closest('.tt-item') as HTMLElement | null)?.dataset.tech;
     if (node) {
       modalId = node;
       modalPop = true; // реальное открытие досье — единственный случай с анимацией
