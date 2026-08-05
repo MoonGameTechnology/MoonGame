@@ -235,6 +235,10 @@ jobs:
       - uses: github/codeql-action/init@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
         with:
           languages: javascript-typescript
+          # Конфиг существует ради ОДНОГО подавления — `js/missing-rate-limiting`,
+          # которое у нас ложное на 100% срабатываний. Разбор, чем закрыт потерянный
+          # охват, и когда подавление снимать — в самом файле, рядом с фильтром.
+          config-file: ./.github/codeql/codeql-config.yml
       - id: cqa
         continue-on-error: true
         uses: github/codeql-action/analyze@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
@@ -540,12 +544,12 @@ jobs:
             # No docker-socket mount: these are registry refs, so Trivy pulls them itself
             # (the socket is only needed for the locally-built image in trivy-image).
             # --exit-code 1 → findings are visible in $rc; the gate stays informational.
-            # --ignorefile: СВОЙ список подавлений (.trivyignore-deps), не корневой.
+            # --ignorefile: СВОЙ список подавлений (.trivyignore-deps.yaml), не корневой.
             # Корневой обслуживает блокирующие trivy-fs/trivy-image над нашим кодом и
             # образом; чужой CVE, записанный туда, ослабил бы заодно и их (SEC-14).
             docker run --rm -v "$PWD:/out" -w /out \
               aquasec/trivy@sha256:665030f4d33a82c1e8d9d5e0453365842236723c1ee5cc3becca698268e66a56 image --exit-code 1 --format sarif \
-              --ignorefile .trivyignore-deps \
+              --ignorefile .trivyignore-deps.yaml \
               --output "trivy-deps-sarif/trivy-deps-$i.sarif" "$ref"
             r=$?
             # Отличаем НАХОДКИ от СБОЯ: `--exit-code 1` даёт ровно 1, когда CVE найдены;
@@ -628,30 +632,55 @@ jobs:
       #    platforms.md; та же беда у Ansible — Checkmarx/kics#7110, про compose — #1981),
       #    а у нас все три файла `.yml`. Переименовывать нельзя: на имена завязаны
       #    install-ubuntu.sh, verify-image.sh и полдюжины мест в доках — боевой деплой.
-      #    Поэтому копии с нужным расширением делаются ВНУТРИ джобы, а пути в SARIF ниже
-      #    возвращаются к настоящим файлам.
+      #    Сейчас это решается само собой: шаг ниже ГЕНЕРИРУЕТ слитые конфиги и сразу
+      #    кладёт их с нужным расширением. Ловушка не исчезла — просто перестала нас
+      #    касаться; вернёшь скан по исходным файлам, и она вернётся вместе с ним.
       # 2. Значение `--type`. В апстрим-доке KICS написано `docker-compose`, и CLI такое
       #    значение ОТВЕРГАЕТ: печатает справку и выходит с 126. Рабочее значение —
       #    `DockerCompose`, как перечислено в выводе `kics scan --help`. Документация
       #    разошлась с бинарём; источник истины — справка самого образа.
-      - name: собрать .yaml-копии compose-файлов
+      - name: собрать СЛИТЫЕ конфиги (то, что реально запускается)
         id: prep
         run: |
           set -euo pipefail
           mkdir -p kics-src kics-out
           chmod 777 kics-out # контейнер пишет отчёт своим uid — как в dast-zap
-          n=0
-          for f in deploy/docker-compose*.yml; do
-            [ -e "$f" ] || continue
-            cp "$f" "kics-src/$(basename "$f" .yml).yaml"
-            n=$((n + 1))
-          done
+
+          # ПОЧЕМУ СЛИТЫЕ, А НЕ ФАЙЛЫ ПО ОТДЕЛЬНОСТИ. KICS читает каждый файл
+          # ИЗОЛИРОВАННО и ничего не знает про мерж оверлеев. Прод собирается как
+          # «база + оверлей», и в оверлее сервис описан ЧАСТИЧНО — только тем, что
+          # переопределяется. Поэтому фрагментам `tls.yml`/`release.yml` сканер штатно
+          # ставил «нет healthcheck / cap_drop / security_opt», хотя всё это лежит в
+          # базовом файле и сливается в рантайме: 20 из 26 предупреждений были ровно
+          # этим артефактом. Теперь сканируется то, что ДЕЙСТВИТЕЛЬНО запускается.
+          #
+          # `--no-interpolate` ОБЯЗАТЕЛЕН, и не ради удобства. Без него compose
+          #   а) потребует значения для `${DOMAIN:?…}` / `${POSTGRES_PASSWORD:?…}` —
+          #      сборка конфига упадёт на fail-closed гардах, которые мы сами и ставили;
+          #   б) подставит переданные значения в ВЫВОД, а вывод уезжает в SARIF и в
+          #      Code Scanning. Скармливать сканеру секретов файл с подставленными
+          #      секретами — ровно то, чего делать нельзя.
+          # С флагом `${…}` остаются литералами: мерж выполняется, интерполяция — нет.
+          gen() {
+            out="$1"; shift
+            args=""
+            for f in "$@"; do args="$args -f $f"; done
+            # shellcheck disable=SC2086
+            (cd deploy && docker compose $args config --no-interpolate) > "kics-src/$out.yaml"
+          }
+          gen base docker-compose.yml
+          gen base+tls docker-compose.yml docker-compose.tls.yml
+          gen base+release docker-compose.yml docker-compose.release.yml
+
+          n=$(find kics-src -name '*.yaml' -size +0 | wc -l)
           echo "copied=$n" >> "$GITHUB_OUTPUT"
-          ls -1 kics-src
+          echo "expected=3" >> "$GITHUB_OUTPUT"
+          ls -l kics-src
       - name: kics
         id: scan
         env:
           COPIED: ${{ steps.prep.outputs.copied }}
+          EXPECTED: ${{ steps.prep.outputs.expected }}
         run: |
           set +e
           docker run --rm -v "$PWD:/src" -w /src \
@@ -673,21 +702,29 @@ jobs:
           # "0". Сравнение вырождалось в `[ 0 -ge 0 ]` и ПРОХОДИЛО: ноль просканированных
           # compose-файлов уходил как «✅ просканировано». Поэтому число целей
           # проверяется ОТДЕЛЬНО и раньше, а не через дефолт подстановки.
-          [ "${COPIED:-0}" -gt 0 ] || ok=false
+          [ "${COPIED:-0}" -ge "${EXPECTED:-3}" ] || ok=false
           [ "$scanned" -ge "${COPIED:-1}" ] || ok=false
           echo "{\"key\":\"kics\",\"ok\":$ok,\"exit\":$rc,\"scanned\":$scanned}" > status-kics.json
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
           echo "scanned=$scanned" >> "$GITHUB_OUTPUT"
-      # SARIF ссылается на копии (kics-src/*.yaml), которых в репозитории нет — аннотации
-      # Code Scanning указывали бы в пустоту. Возвращаем пути к настоящим файлам.
-      - name: вернуть пути в SARIF к deploy/*.yml
+      # ПУТИ В SARIF. Раньше здесь `kics-src/X.yaml` переписывался в `deploy/X.yml` — и это
+      # было честно, потому что сканировалась ПОБАЙТОВАЯ КОПИЯ файла: и путь, и номер
+      # строки совпадали с оригиналом. Со слитыми конфигами так делать НЕЛЬЗЯ: строка
+      # такого файла не соответствует ни одной строке ни одного файла в репозитории, и
+      # переписать путь в `deploy/docker-compose.yml` значило бы указать на случайное
+      # место. Поэтому путь остаётся производным и назван так, чтобы это было видно:
+      # `deploy/(merged)/base+tls.yaml`. В Code Scanning такая находка приходит без
+      # превью кода — цена за то, что сканируется реально запускаемая конфигурация, а не
+      # её фрагменты. Комбинация в имени говорит, ГДЕ искать: `base+tls` — это
+      # `docker-compose.yml` вместе с `docker-compose.tls.yml`.
+      - name: пометить пути в SARIF как производные
         if: always()
         run: |
           set -euo pipefail
           [ -f kics-out/results.sarif ] || exit 0
           jq '(.. | objects | select(has("uri")) | .uri) |=
                 (if startswith("kics-src/") then
-                   sub("^kics-src/"; "deploy/") | sub("\\.yaml$"; ".yml")
+                   sub("^kics-src/"; "deploy/(merged)/")
                  else . end)' \
             kics-out/results.sarif > kics-out/results.fixed.sarif
           mv kics-out/results.fixed.sarif kics-out/results.sarif
@@ -710,6 +747,7 @@ jobs:
           RC: ${{ steps.scan.outputs.rc }}
           SCANNED: ${{ steps.scan.outputs.scanned }}
           COPIED: ${{ steps.prep.outputs.copied }}
+          EXPECTED: ${{ steps.prep.outputs.expected }}
         run: |
           # Сломанный скан и найденные проблемы — РАЗНЫЕ сообщения. Первое валит джобу
           # намеренно (она информационная, поэтому мерж не блокирует, но краснеет и видна),
@@ -717,8 +755,8 @@ jobs:
           # «Целей не нашлось» — отдельный случай, и раньше он проваливался мимо гейта по
           # той же причине, что и сентинел: `${COPIED:-1}` не защищает от строки "0".
           # Сообщение тоже своё: тут виноват не KICS, а исчезнувший glob.
-          if [ "${COPIED:-0}" -lt 1 ]; then
-            echo "::error::kics: ни одного compose-файла не найдено — glob \`deploy/docker-compose*.yml\` пуст, сканировать было нечего. Проверь, не переехали ли файлы; если переехали, поправь glob в шаге «собрать .yaml-копии»."
+          if [ "${COPIED:-0}" -lt "${EXPECTED:-3}" ]; then
+            echo "::error::kics: собрано ${COPIED:-0} слитых конфигов из ${EXPECTED:-3} — сборка не состоялась, сканировать было нечего. Обычная причина: \`docker compose config\` не отработал (переехал файл, сломался оверлей, или compose перестал принимать --no-interpolate). Смотри вывод шага «собрать СЛИТЫЕ конфиги»."
             exit 1
           fi
           if [ "$SCANNED" -lt "$COPIED" ]; then
