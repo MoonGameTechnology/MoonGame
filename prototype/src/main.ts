@@ -9,6 +9,7 @@ import {
   newGame,
   advance,
   order,
+  canOrder,
   ctx,
   data,
   MAP,
@@ -3220,6 +3221,19 @@ function runAI() {
 // with the orbit clear, descends and lands automatically — keeps the AI pressing
 // the capture loop. The player's own fleets are driven by hand (orbit/bombard/
 // assault controls in the fleet panel), so they are skipped here.
+// Память проб авто-штурма: «этот флот в этом часе мира и на этой орбите — обречён».
+// Проба стоит прогона редьюсера, а цикл гоняется каждый кадр; состояние между
+// продвижениями часа меняют только приказы, и они же ключ сбрасывают (см. apply()).
+const autoProbed = new Map<string, string>();
+const autoProbeKey = (f: Fleet): string => `${s.time}|${f.orbit ?? ''}|${f.location ?? ''}`;
+function autoProbeSkip(f: Fleet, here: Planet): boolean {
+  return autoProbed.get(f.id) === autoProbeKey(f) + '|' + (here.owner ?? '');
+}
+function autoProbeMark(f: Fleet): void {
+  const here = s.planets[f.location ?? ''];
+  autoProbed.set(f.id, autoProbeKey(f) + '|' + (here?.owner ?? ''));
+}
+
 function autoEngage() {
   for (const f of Object.values(s.fleets)) {
     if (f.location == null || f.movement || f.battleId) continue;
@@ -3227,25 +3241,34 @@ function autoEngage() {
     // AI fleets always press the capture loop; the player's do so only when opted into
     // auto-storm (CC-2) — otherwise the player drives assaults by hand.
     if (mine && !autoAssault.has(f.id)) continue;
-    if (!sectorTypeOf(f.location)?.capturable) continue; // empty space can't be taken
     const here = s.planets[f.location];
-    if (!here || here.owner === f.owner) continue;
-    // Auto-storm only worlds we are AT WAR with — the core rejects a peaceful assault
-    // anyway (E_FORBIDDEN), but this loop runs EVERY FRAME: the doomed order re-pressed
-    // 60 раз в секунду и сыпал «действие запрещено» без остановки (живой плейтест).
-    // Зеркало того же гейта в serverDrivers.ts (auto-storm only at war).
-    if (here.owner !== null && getStance(s, f.owner, here.owner) !== 'war') continue;
+    if (!here || here.owner === f.owner) continue; // свой мир штурмовать нечего
     const enemyHere = Object.values(s.fleets).some(
       (g) => g.owner !== f.owner && g.location === f.location && g.units.some((u) => u.count > 0),
     );
-    if (enemyHere) continue; // let the auto orbital battle settle first
-    // A defended world + no landing troops = the assault can only be rejected
-    // (E_NO_TROOPS) — skip instead of re-pressing it every frame (toast spam).
-    if (here.garrison.some((u) => u.count > 0) && !(f.landing ?? []).some((u) => u.count > 0))
+    if (enemyHere) continue; // ПОЛИТИКА клиента: дать орбитальному бою утихнуть
+    // RULES-1. Выше — только политика (опт-ин авто-штурма, «дай бою утихнуть»);
+    // ПРАВИЛА игры (захватываемая провинция, дипломатия, наличие десанта) больше не
+    // переписываются здесь руками — их называет ядро. Прошлые рукописные копии
+    // разъезжались с редьюсером и сыпали отказами каждый кадр.
+    //
+    // Проверяется вся ПАРА «встать на низкую орбиту → штурм»: штурм нелегален с
+    // дальней орбиты, поэтому проба идёт по состоянию ПОСЛЕ орбиты (order чист —
+    // это черновик, живой мир не трогается). Иначе применилась бы половина обречённой
+    // пары: орбита проходит, штурм отбивается — ровно та болезнь, что описана в
+    // serverDrivers.ts.
+    if (autoProbeSkip(f, here)) continue;
+    const needOrbit = f.orbit !== 'near';
+    const step = needOrbit ? order(s, orbitFleet(f.owner, f.id, 'near'), s.time) : null;
+    if (step?.error) continue;
+    const probe = step ? step.state : s;
+    if (canOrder(probe, assaultFleet(f.owner, f.id)) !== null) {
+      autoProbeMark(f); // обречён в этом часе мира — не пережимать каждый кадр
       continue;
+    }
     // Player fleets go through playerOrder (server-authoritative in net play); AI applies locally.
     const issue = (a: Action) => (mine ? playerOrder(a) : apply(order(s, a, s.time)));
-    if (f.orbit !== 'near') issue(orbitFleet(f.owner, f.id, 'near'));
+    if (needOrbit) issue(orbitFleet(f.owner, f.id, 'near'));
     issue(assaultFleet(f.owner, f.id));
   }
 }
@@ -6465,13 +6488,22 @@ function scrollFeedToEnd(): void {
 function buildingLocked(planetId: string, id: string): 'built' | 'queued' | null {
   const p = s.planets[planetId];
   if (!p) return null;
-  if (p.buildings.some((b) => b.type === id)) return 'built';
+  // RULES-1: правило «одно здание такого типа на мир» больше НЕ переписано здесь —
+  // его называет ядро тем же кодом отказа, каким отбило бы сам приказ. Раньше клиент
+  // держал свою копию (буквально `p.buildings.some(...)` + скан scheduled + paused),
+  // и копия разъезжалась: кодекс проверял только «уже стоит» и всю стройку первого
+  // экземпляра предлагал заказать второй.
+  const code = canOrder(s, buildBuilding(ME, planetId, id));
+  if (code === 'E_ALREADY_BUILT') return 'built';
+  if (code === 'E_ALREADY_QUEUED' || code === 'E_ALREADY_PAUSED') return 'queued';
+  // Локальная очередь прототипа ядру неизвестна по определению (в сети её нет —
+  // там стройку таймит сервер), поэтому она добавляется здесь ЯВНО, а не как «ещё
+  // одно правило». Это единственная местная добавка к вердикту ядра.
   if (queueOf(planetId).buildings.some((q) => q.kind === 'building' && q.id === id))
     return 'queued';
-  const act = activeConstruction(planetId, 'buildings');
-  if (act && act.payload.kind === 'building' && act.payload.building === id) return 'queued';
-  if (p.pausedConstruction?.some((s) => s.kind === 'building' && s.building === id))
-    return 'queued';
+  // Прочие отказы (E_INSUFFICIENT, E_BOMBARDED, E_WRONG_SECTOR…) плитку НЕ гасят:
+  // нехватку показывает сама цена с дефицитом (UI-RES), и серая кнопка вместо цифры
+  // «сколько не хватает» была бы хуже. Это решение ПОДАЧИ, не правило.
   return null;
 }
 function codexTile(
