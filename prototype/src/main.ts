@@ -170,13 +170,8 @@ import {
   computePowerCell,
   type TerritorySeed,
 } from '../../packages/client/src/territory';
-import {
-  buildLabel,
-  checkForUpdateDetailed,
-  currentBuild,
-  type UpdateCheck,
-  type UpdateInfo,
-} from './updater';
+import { buildLabel, currentBuild } from './updater';
+import { initApkUpdater } from './apkUpdate';
 // Localization: one locale = one file (src/locale/*). Msgid = the canonical
 // Russian source string; `t()` wraps every user-visible literal, `tData()` maps
 // English data/*.json names, the static HTML is localized by a boot pass.
@@ -12643,111 +12638,9 @@ if (pingMenuEl) {
 requestAnimationFrame(frame);
 
 // --- in-app APK auto-update -------------------------------------------------
-// Only live in the packaged APK (it carries a baked window.__BUILD__); the browser /
-// dev build has none, so currentBuild() is null and every path below no-ops. We check
-// the rolling release on launch (when online) and via a manual button, and surface a
-// banner whose "Обновить" hands the APK asset URL to the SYSTEM BROWSER via the native
-// bridge (window.VoidNative.open) — the browser downloads it and offers to install,
-// which is reliable on any device. See prototype/src/updater.ts and mobile/patch-updater.mjs.
-{
-  const myBuild = currentBuild();
-  if (myBuild) {
-    const cver = $('cver');
-    if (cver) cver.textContent = t('upd.build', { b: buildLabel(myBuild) });
-    const cupd = $('cupd');
-    if (cupd) cupd.style.display = '';
-
-    const showUpdate = (u: UpdateInfo): void => {
-      const ver = $('ub-ver');
-      if (ver) ver.textContent = buildLabel(u);
-      const go = $('ub-go') as HTMLAnchorElement | null;
-      if (go) go.href = u.apkUrl;
-      $('updbar').style.display = 'block'; // override the stylesheet's display:none
-    };
-
-    // A readable line for every check outcome, so a manual check can be TRACED — it tells
-    // "you're up to date" apart from "the check couldn't reach GitHub".
-    const diagMsg = (r: UpdateCheck): string => {
-      switch (r.kind) {
-        case 'update':
-          return t('upd.available', { v: r.info.versionCode });
-        case 'current':
-          return t('upd.current', { l: r.local, r: r.remote });
-        case 'offline':
-          return t('upd.no-network');
-        case 'http':
-          return t('upd.http-error', { s: r.status });
-        case 'unparsable':
-          return t('upd.bad-version');
-        case 'dormant':
-          return t('upd.apk-only');
-      }
-    };
-    let checking = false;
-    const runCheck = async (manual: boolean, out?: HTMLElement | null): Promise<void> => {
-      if (checking) return;
-      checking = true;
-      try {
-        const r = await checkForUpdateDetailed();
-        if (r.kind === 'update') showUpdate(r.info);
-        if (manual && out) {
-          const prev = out.textContent;
-          out.textContent = t('upd.checking', { msg: diagMsg(r) });
-          out.style.color = r.kind === 'offline' || r.kind === 'http' ? 'var(--amber)' : '';
-          window.setTimeout(() => {
-            out.textContent = prev;
-            out.style.color = '';
-          }, 8000);
-        }
-      } finally {
-        checking = false;
-      }
-    };
-
-    // "Обновить" → open the APK in the system browser via the native bridge (downloads +
-    // offers install, reliable everywhere). Falls back to the plain <a href> navigation
-    // when the bridge is absent (a real browser / dev build).
-    $('ub-go')?.addEventListener('click', (e) => {
-      const native = (globalThis as { VoidNative?: { open?: (u: string) => void } }).VoidNative;
-      const url = ($('ub-go') as HTMLAnchorElement).href;
-      if (native?.open && url) {
-        e.preventDefault();
-        native.open(url);
-      }
-    });
-    $('ub-later')?.addEventListener('click', () => {
-      $('updbar').style.display = 'none';
-    });
-    cupd?.addEventListener('click', () => void runCheck(true, cver));
-    // The hub carries its own manual check (the returning-player path never shows
-    // #connect); diagnostics land in the hub's note line.
-    const hubUpd = document.getElementById('hub-upd');
-    if (hubUpd) {
-      hubUpd.style.display = '';
-      hubUpd.addEventListener(
-        'click',
-        () => void runCheck(true, document.getElementById('hub-note')),
-      );
-    }
-    // Silent re-checks: once at launch, whenever the app returns to the FOREGROUND
-    // (the phone pattern — launch offline, open later on wifi), and every 4h for a
-    // long-lived session. Throttled so foreground flapping can't hammer the API.
-    const CHECK_GAP_MS = 15 * 60_000;
-    let lastCheckAt = 0;
-    const maybeCheck = (): void => {
-      if (navigator.onLine === false) return;
-      const now = Date.now();
-      if (now - lastCheckAt < CHECK_GAP_MS) return;
-      lastCheckAt = now;
-      void runCheck(false);
-    };
-    document.addEventListener('visibilitychange', () => {
-      if (!document.hidden) maybeCheck();
-    });
-    window.setInterval(maybeCheck, 4 * 3_600_000);
-    maybeCheck(); // launch check (throttle-stamped so a foreground right after boot is free)
-  }
-}
+// Вся проводка (и оба решения под ней — что сказать про исход и когда проверять) —
+// в `apkUpdate.ts`. Вне APK вызов тихо ничего не делает.
+initApkUpdater();
 
 // --- corporation cabinet (AVA-C1/C2) -----------------------------------------
 // Сам кабинет живёт в `corpScreen.ts` (REFM-11); здесь только его хуки и две двери,
