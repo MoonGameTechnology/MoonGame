@@ -1897,7 +1897,9 @@ pnpm run prototype   # собрать prototype/dist/void-dominion{,-player}.htm
 Гейт зеркалится в CI (`ci.yml`), рядом идут `security.yml` (набор сканеров; блокирующие
 — Semgrep, Gitleaks, OSV, Trivy fs/image; с SEC-10 ещё и еженедельный ре-скан `main` по
 крону — прод крутит пиненный образ дольше, чем живут ленты CVE), `android.yml` (APK),
-`image.yml` (SEC-13: сборка → блокирующий Trivy → GHCR → подпись cosign по дайджесту) и
+`image.yml` (SEC-13: сборка → блокирующий Trivy → блокирующий смоук «образ стартует» →
+GHCR → подпись cosign по дайджесту; смоук — SEC-17, потому что сканеры читают файловую
+систему образа и ни один его не запускает, так что мёртвый образ сканируется начисто) и
 `automerge.yml` (ставит зелёный PR в merge queue). Про последний важно, что он делает
 **не** «Enable auto-merge»: под очередью эта кнопка не работает — она зовёт
 `enablePullRequestAutoMerge`, тогда как «Merge when ready» зовёт совсем другую мутацию,
