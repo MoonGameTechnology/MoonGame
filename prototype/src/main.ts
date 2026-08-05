@@ -326,6 +326,7 @@ import {
 import { resolveIntro, parseSeenIntros, type IntroCard } from './intros';
 // ONB-5 — return digest ("пока тебя не было"): aggregate the away-window event log.
 import { buildRecap, type RecapEvent } from './recap';
+import { combatRanges } from './combatRanges';
 // ONB-7 — first-session goals checklist (mine/fleet/capture/score, ticked from state).
 import { FIRST_GOALS, metGoals, mergeDone, goalsComplete, type GoalSignals } from './firstGoals';
 import { reconnectDelayMs } from './reconnect';
@@ -478,6 +479,11 @@ const SEAT_META: ReadonlyArray<{ id: string; name: string; faction: string; colo
 ];
 const GRID = 'rgba(46,150,160,0.07)';
 const LOCK = '#7df0d0'; // selection / targeting reticle accent
+// RANGE-UX: три вида оружия — три РАЗНЫХ цвета, чтобы круги не сливались в кашу, когда
+// в выделении и артиллерия, и носитель. Линия огня — того же цвета, что круг стрелка.
+const R_ARTY = '#ffb43a'; // артиллерия: янтарный (как и весь огневой контур в HUD)
+const R_WING = '#9ad7ff'; // эскадрилья: холодный голубой
+const R_AA = '#c07dff'; // ПВО: сиреневый — это ОТМЕТКА на мире, а не область
 const TAU = Math.PI * 2;
 const TOP = 50; // top-bar height
 const RAIL = 50; // left-rail width
@@ -3886,6 +3892,64 @@ function drawAssaultTargets() {
   cx.restore();
 }
 
+/**
+ * RANGE-UX — круги досягаемости выделенных флотов и отметки ПВО.
+ *
+ * Вся арифметика — в `combatRanges.ts` (чистая, покрыта гейтом); здесь только канва.
+ * Радиусы приходят ИЗ ЯДРА — рисуется ровно тот круг, по которому ядро стреляет.
+ */
+function drawCombatRanges(): void {
+  const ids = selectedFleetIds();
+  const { rings, lines } = combatRanges(
+    s,
+    data,
+    ids,
+    ME,
+    (id: string) => {
+      const f = s.fleets[id];
+      if (f) return fleetPos(f);
+      const p = s.planets[id];
+      return p ? { ...p.position } : null;
+    },
+    known,
+  );
+  if (!rings.length && !lines.length) return;
+  const tint: Record<string, string> = { artillery: R_ARTY, squadron: R_WING, aa: R_AA };
+  cx.save();
+  for (const ring of rings) {
+    const c = world({ x: ring.x, y: ring.y } as never);
+    cx.strokeStyle = rgba(tint[ring.kind] ?? R_ARTY, ring.kind === 'aa' ? 0.7 : 0.32);
+    cx.lineWidth = 1.2;
+    if (ring.radius > 0) {
+      cx.setLineDash([5, 7]);
+      cx.beginPath();
+      cx.arc(c.x, c.y, ring.radius * cam.scale, 0, TAU);
+      cx.stroke();
+    } else {
+      // ПВО: у него нет области — только «у этого мира есть зубы».
+      cx.setLineDash([2, 3]);
+      cx.beginPath();
+      cx.arc(c.x, c.y, 13, 0, TAU);
+      cx.stroke();
+    }
+  }
+  cx.setLineDash([]);
+  for (const line of lines) {
+    const a = world({ x: line.from.x, y: line.from.y } as never);
+    const b = world({ x: line.to.x, y: line.to.y } as never);
+    cx.strokeStyle = rgba(R_ARTY, 0.85);
+    cx.lineWidth = 1.6;
+    cx.shadowColor = R_ARTY;
+    cx.shadowBlur = fxBlur(6);
+    cx.beginPath();
+    cx.moveTo(a.x, a.y);
+    cx.lineTo(b.x, b.y);
+    cx.stroke();
+    cx.shadowBlur = 0;
+  }
+  cx.restore();
+}
+
 /** While "Move" is armed: a dashed line from each selected fleet to the world under
  *  the pointer (snaps to the nearest blip) — preview before committing. */
 function drawAimPreview() {
@@ -5174,6 +5238,7 @@ function render(now: number) {
   drawPings(now); // ally ping markers (coalition), with screen hit-boxes for taps
   drawChainOverlay(now); // CHAIN-UX: цепочки планов + черновик режима «Приказ»
   drawAssaultTargets();
+  drawCombatRanges(); // RANGE-UX: артиллерия / эскадрилья / ПВО — до прицельных линий
   drawAimPreview();
 }
 

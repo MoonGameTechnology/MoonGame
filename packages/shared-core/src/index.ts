@@ -347,7 +347,7 @@ export { economyModule, BROWNOUT } from './modules/economy';
 export { movementModule } from './modules/movement';
 export { combatModule } from './modules/combat';
 export { orbitalModule } from './modules/orbital';
-export { artilleryModule } from './modules/artillery';
+export { artilleryModule, artilleryRange } from './modules/artillery';
 export { interceptModule } from './modules/intercept';
 export { captureOnArrivalModule } from './modules/captureOnArrival';
 export { sectorModule } from './modules/sector';
