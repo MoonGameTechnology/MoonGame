@@ -15,8 +15,9 @@ import {
   BROWNOUT,
   buildProgress,
   thresholdRamp,
+  creditsBonusOf,
 } from '../../packages/shared-core/src/index';
-import { isInhabited, civicTax, inhabitedWorldCount, TAX_OFFICE_BONUS } from './tax';
+import { isInhabited, civicTax, inhabitedWorldCount } from './tax';
 import { data } from './prototypeData';
 import { HOUR } from './time';
 
@@ -190,7 +191,8 @@ export function netIncome(state: GameState, playerId: string): Record<string, nu
     }
     if (isInhabited(p)) {
       credits += civicTax(inhabited) * bonusMult; // civic tax is post-tax income → also boosted (BF-35)
-      if (p.buildings.some((b) => b.type === 'tax_office')) credits *= 1 + TAX_OFFICE_BONUS;
+      const taxBonus = creditsBonusOf(data, p); // RULES-2: правило из данных здания
+      if (taxBonus !== 0) credits *= 1 + taxBonus;
     }
     if (credits !== 0) out.credits = (out.credits ?? 0) + credits;
   }
@@ -265,7 +267,8 @@ export function incomeBreakdown(
     }
     if (isInhabited(p)) {
       credits += civicTax(inhabited) * bonusMult;
-      if (p.buildings.some((b) => b.type === 'tax_office')) credits *= 1 + TAX_OFFICE_BONUS;
+      const taxBonus = creditsBonusOf(data, p); // RULES-2: правило из данных здания
+      if (taxBonus !== 0) credits *= 1 + taxBonus;
     }
     if (credits !== 0) cell('credits').production += credits;
   }

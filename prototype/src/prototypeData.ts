@@ -660,13 +660,16 @@ export const data: GameData = parseGameData({
       ],
     },
     // tax office — a one-time civic upgrade (no levels): lifts the whole credit take
-    // of the inhabited world it sits on by +25% (taxModule). Cannot stack.
+    // of the inhabited world it sits on (taxModule). Cannot stack (maxPerPlanet: 1 —
+    // дефолт схемы). RULES-2: сама прибавка теперь ОБЪЯВЛЕНА тут, а не спрятана
+    // константой TAX_OFFICE_BONUS в коде трёх модулей.
     tax_office: {
       name: 'Tax Office',
       cost: { metal: 120, credits: 60 },
       buildTimeHours: 4,
       hp: 16,
       scoreValue: 3,
+      creditsBonus: 0.25,
     },
     // salvage metal rig — the ONLY thing raisable on a dead world (sectorKinds roster);
     // mines the corpse for metal, boosted +30% by the dead world's metal bonus.

@@ -44,7 +44,6 @@ export { MODULES, kernel, SCORE_LIMIT, ctx, advance, order, canOrder, type StepO
 // --- economy family ----------------------------------------------------------
 export {
   TAX_PER_HOUR,
-  TAX_OFFICE_BONUS,
   TAX_DIMINISH,
   isInhabited,
   civicTax,
