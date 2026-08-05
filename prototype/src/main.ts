@@ -329,6 +329,7 @@ import {
 import { resolveIntro, parseSeenIntros, type IntroCard } from './intros';
 // ONB-5 — return digest ("пока тебя не было"): aggregate the away-window event log.
 import { buildRecap, type RecapEvent } from './recap';
+import { recapAdmits } from './recapGate';
 // ONB-7 — first-session goals checklist (mine/fleet/capture/score, ticked from state).
 import { FIRST_GOALS, metGoals, mergeDone, goalsComplete, type GoalSignals } from './firstGoals';
 import { reconnectDelayMs } from './reconnect';
@@ -2102,6 +2103,12 @@ function updateMemory(identify: Set<string>): void {
 function known(id: string | null | undefined): boolean {
   return !vision || (id != null && vision.identify.has(id));
 }
+/** RECAP-FOG: пускать ли событие в журнал (а значит, и в сводку). Правило живёт
+ *  чистой функцией в `recapGate.ts` — это правило безопасности, и гейт проверяет
+ *  именно его, а не рукописный `if` внутри свитча. */
+function admits(type: string, p: Record<string, unknown>): boolean {
+  return recapAdmits(type, p.owner as string | undefined, ME, known(p.planetId as string));
+}
 /** True if node `id` is inside radar reach (signature-level detection). */
 function radarHas(id: string | null | undefined): boolean {
   return !!vision && id != null && vision.radar.has(id);
@@ -3164,7 +3171,12 @@ function handleEvents(events: DomainEvent[]) {
         if (diploOpen && diploTab === 'diplo') renderDiplo();
         break;
       }
+      // RECAP-FOG. Стройка и производство ДРУГОГО игрока в мой журнал не попадают —
+      // а журнал и есть источник сводки возвращения (`buildRecap`), так что чужая
+      // экономика утекала и в дайджест, и в пуш. Сводка — про МОЮ империю; чужое
+      // строительство я узнаю разведкой, а не уведомлением.
       case 'building.constructed':
+        if (!admits('building.constructed', p)) break;
         note(
           t('log.build.done', {
             b: buildingName(data.buildings[p.building as string]?.name, p.building as string),
@@ -3174,6 +3186,7 @@ function handleEvents(events: DomainEvent[]) {
         if (p.building === 'starfort') installFortressAA(p.planetId as string);
         break;
       case 'building.upgraded':
+        if (!admits('building.upgraded', p)) break;
         note(
           t('log.build.upgraded', {
             b: buildingName(data.buildings[p.building as string]?.name, p.building as string),
@@ -3183,6 +3196,10 @@ function handleEvents(events: DomainEvent[]) {
         );
         break;
       case 'building.destroyed':
+        // Разрушение — исключение: своё узнаю всегда, чужое лишь там, где ВИЖУ
+        // (тот же фог-гейт, что у `aa.fired`). Взрыв на наблюдаемом мире — это
+        // наблюдение, а не раскрытие.
+        if (!admits('building.destroyed', p)) break;
         note(
           t('log.build.destroyed', {
             b: buildingName(data.buildings[p.building as string]?.name, p.building as string),
@@ -3192,9 +3209,13 @@ function handleEvents(events: DomainEvent[]) {
         );
         break;
       case 'unit.built':
+        if (!admits('unit.built', p)) break;
         note(`🛠️ ${p.count}× ${displayUnit(p.unit as string)} · ${p.planetId}`);
         break;
       case 'fleet.launched':
+        // Вылет — событие КАРТЫ: чужой флот, поднявшийся на мире, который я вижу,
+        // это наблюдение. Но за туманом его быть не должно (как у `aa.fired`).
+        if (!admits('fleet.launched', p)) break;
         note(
           t('log.fleet.launched', {
             who: NAME[p.owner as string] ?? (p.owner as string),
