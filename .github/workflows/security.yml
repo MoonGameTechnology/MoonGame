@@ -19,6 +19,12 @@ name: Security scan
 # kics, dependency-review, dependency-check, zizmor, scorecard, and the `check` job (its
 # blocking twin lives in ci.yml).
 #
+# One BLOCKING check in `trivy-image` is not a scanner at all: the smoke step runs the
+# image it just built and requires /health and / to answer. Every scanner here reads a
+# filesystem; none of them starts what they certify, so an image that dies at boot gets
+# a perfectly clean report. `.github/scripts/smoke-image.sh`, mirrored in image.yml
+# before the push, so an unbootable image can neither merge nor be signed.
+#
 # Each scan job writes a `status-<key>.json` sentinel AFTER the scan with the real
 # exit code / outcome. The summarizer LEADS with a scan-confirmation table built from
 # those sentinels, so a silently-failed scanner is flagged "⚠️ NOT confirmed" instead
@@ -466,6 +472,19 @@ jobs:
       - name: build image
         continue-on-error: true
         run: docker build -t void-dominion:scan .
+      # БЛОКИРУЮЩИЙ, и не ради полноты. Trivy читает файловую систему образа и никогда
+      # его не запускает — образ, умирающий на первой секунде, проходит скан идеально
+      # чисто. Живой случай и оба зонда описаны в шапке скрипта.
+      - name: smoke — образ реально стартует и отвечает
+        id: smoke
+        run: |
+          set +e
+          .github/scripts/smoke-image.sh void-dominion:scan
+          rc=$?
+          set -e
+          ok=true; [ "$rc" -eq 0 ] || ok=false
+          echo "{\"key\":\"smoke-image\",\"ok\":$ok,\"exit\":$rc}" > status-smoke-image.json
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
       - name: trivy image + image SBOM
         id: scan
         run: |
@@ -489,6 +508,7 @@ jobs:
             trivy-image.sarif
             sbom-image.cdx.json
             status-trivy-image.json
+            status-smoke-image.json
           if-no-files-found: warn
       - name: upload to code scanning
         continue-on-error: true
@@ -496,14 +516,21 @@ jobs:
         with:
           sarif_file: trivy-image.sarif
           category: trivy-image
-      - name: gate — blocking on findings or scan failure (SEC-1)
+      - name: gate — blocking on findings, scan failure or a dead image (SEC-1)
         env:
           RC: ${{ steps.scan.outputs.rc }}
+          SMOKE_RC: ${{ steps.smoke.outputs.rc }}
         run: |
+          fail=0
+          if [ "$SMOKE_RC" != "0" ]; then
+            echo "::error::The built image does not boot or does not serve (smoke exit $SMOKE_RC). A clean Trivy report says nothing about this — Trivy never runs the image. See the step log for the container's own output."
+            fail=1
+          fi
           if [ "$RC" != "0" ]; then
             echo "::error::Trivy image is a blocking scanner (SEC-1): finding or scan/build failure (exit $RC). Fix the image; suppress ONLY via .trivyignore WITH CVE-id, reason and review date."
-            exit 1
+            fail=1
           fi
+          exit $fail
 
   trivy-deps:
     name: Vuln — third-party prod images (Trivy image)
@@ -1206,6 +1233,8 @@ jobs:
     # отработавшем сканере, и это хуже, чем кажется: обесценивается ровно тот сигнал,
     # ради которого вся таблица доверия и заведена. `kics` и `dependency-review` сюда
     # забыли дописать, когда их заводили (#471, #473).
+    # Исключение ровно одно: `smoke-image` в EXPECTED — не джоба, а шаг ВНУТРИ
+    # `trivy-image` (он же кладёт его сентинел), поэтому отдельной строки тут нет.
     needs:
       [
         check,

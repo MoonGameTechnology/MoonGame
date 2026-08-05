@@ -51,20 +51,34 @@ RUN pnpm run prototype # bake dist/void-dominion{,-player}.html (player at /, de
 # second one is the important one:
 #   1. Startup gets shorter and deterministic — no transpile on every boot.
 #   2. It removes esbuild from the RUNTIME requirements, which is what finally lets the
-#      prune below happen. The root package.json has NO production dependencies at all —
-#      esbuild, typescript, eslint, vitest and prettier are all devDependencies — so as
-#      long as the server needed esbuild to boot, the image had to ship the whole dev
-#      toolchain into production.
+#      dev-toolchain drop below happen. The root package.json has NO production
+#      dependencies at all — esbuild, typescript, eslint, vitest and prettier are all
+#      devDependencies — so as long as the server needed esbuild to boot, the image had
+#      to ship the whole dev toolchain into production.
 # What made this concrete: TypeScript 7 started shipping a NATIVE Go-compiled tsc, and
 # Trivy found Go CVEs inside our production image, in
 # `node_modules/.pnpm/@typescript+typescript-linux-x64/.../tsc` (blocked PR #489). The
 # vulnerability was in a compiler that has no business being in production at all.
 RUN node prototype/bundle-netserver.mjs
 
-# Drop devDependencies from the tree that gets copied into the runtime stage. What
-# survives is what `packages/server` declares as real dependencies — ws, pg and fastify,
-# the three the bundle deliberately leaves external — plus the baked HTML and bundle.
-RUN pnpm prune --prod
+# Drop devDependencies from the tree that gets copied into the runtime stage: re-resolve
+# node_modules with --prod, which removes the root's toolchain (esbuild, typescript,
+# eslint, vitest, prettier, …) and keeps every workspace project's real dependencies —
+# `packages/server`'s ws/pg/fastify (left external by the bundle) plus @fastify/rate-limit,
+# jose and web-push, which the bundle inlines but whose native/optional parts resolve at
+# runtime. The baked HTML and the bundle itself are untouched.
+#
+# NOT `pnpm prune --prod`, which is the obvious choice and is wrong here: `prune` operates
+# on ONE project, so at the workspace root it rewrites the modules layout with only the
+# root importer included and leaves every packages/*/node_modules EMPTY. The image still
+# builds and Trivy still scans it clean — nothing runs the server — but the container dies
+# at boot on `Cannot find module 'ws'`. `install --prod` covers all importers.
+#
+# CI=true is load-bearing, not decoration: this purges node_modules, and pnpm 10 asks for
+# interactive confirmation first. `docker build` has no TTY, so pnpm refuses outright
+# (ERR_PNPM_ABORTED_REMOVE_MODULES_DIR_NO_TTY) and the build dies here. The variable is
+# scoped to this one RUN so it cannot change how any other step behaves.
+RUN CI=true pnpm install --prod --frozen-lockfile --ignore-scripts
 
 # Pre-create the dir the server writes at runtime so it exists (and, after the
 # COPY --chown below, is owned by the non-root user): playtest-logs/ (event JSONL).
@@ -79,10 +93,10 @@ RUN mkdir -p playtest-logs
 # Digest-pinned like the build stage (bump procedure in the Stage 1 comment);
 # nodejs22-debian13:nonroot digest refreshed 2026-07.
 FROM gcr.io/distroless/nodejs22-debian13:nonroot@sha256:939d6f1671529d230f50b563578e9b5d206af58f038b10ebd7e1233023d4e167 AS runtime
-# Bring the PRUNED app (source + prod-only node_modules — ws/pg/fastify — + baked HTML +
-# the pre-built server bundle) and hand the tree to the non-root user so the one runtime
-# write left (playtest-logs) succeeds. node_modules uses pnpm's relative symlink layout,
-# so copying all of /app keeps the links valid.
+# Bring the app (source + prod-only node_modules + baked HTML + the pre-built server
+# bundle) and hand the tree to the non-root user so the one runtime write left
+# (playtest-logs) succeeds. node_modules uses pnpm's relative symlink layout, so copying
+# all of /app keeps the links valid.
 COPY --from=build --chown=nonroot:nonroot /app /app
 WORKDIR /app
 USER nonroot
