@@ -168,6 +168,7 @@ import { initApkUpdater } from './apkUpdate';
 import { measureViewport, STARS, NEBULAE } from './viewport';
 import { initPingUi } from './pingUi';
 import { initSoloDrivers } from './soloDrivers';
+import { initMatchEnd } from './matchEnd';
 // Localization: one locale = one file (src/locale/*). Msgid = the canonical
 // Russian source string; `t()` wraps every user-visible literal, `tData()` maps
 // English data/*.json names, the static HTML is localized by a boot pass.
@@ -227,7 +228,6 @@ import {
   matchXp,
   metaGrant,
   parseMetaState,
-  recordMatch,
   type MetaState,
   type MetaBranch,
 } from './meta';
@@ -238,7 +238,7 @@ import {
 import { initTechTree, branchLabel } from './techTree';
 import { initSciPick } from './sciPick';
 import { initPasswordReset } from './passwordReset';
-import { initEndScreen } from './endScreen';
+import { initEndScreen, type MatchEnd } from './endScreen';
 import {
   fxBlur,
   pcUi,
@@ -550,14 +550,7 @@ let banner: string | null = null;
 // once by checkEnd from the authoritative `match` state. `dismissed` lets the player
 // hide it to look at the final board (the match stays frozen). Reset on a fresh match
 // / reconnect so a new game never opens straight into the old result.
-let endScreen: {
-  won: boolean;
-  draw: boolean;
-  why: string;
-  xp: number;
-  levelUp: number | null;
-  dismissed: boolean;
-} | null = null;
+let endScreen: MatchEnd | null = null;
 let selFleet: string | null = null;
 let selPlanet: string | null = null;
 let selFleets = new Set<string>();
@@ -3225,84 +3218,19 @@ function setScramble(ids: string[], on: boolean): void {
   }
 }
 
-/** How the match ended, in plain words (perspective comes from the prefix). */
-function endReasonText(reason: string | undefined): string {
-  switch (reason) {
-    case 'domination':
-      return t('ai.end.domination');
-    case 'elimination':
-      return t('ai.end.elimination');
-    case 'score':
-      return t('ai.end.score');
-    case 'timeout':
-      return t('ai.end.timeout');
-    default:
-      return t('ai.end.over');
-  }
-}
-
-/** Terminal banner read from the AUTHORITATIVE `match` state (the victory module
- *  in the kernel — local sim and the net server both run it), not a hand-rolled
- *  guess. Fires once; a draw (no winner on timeout) is its own line. */
-function checkEnd() {
-  // `xpAwarded` marks this match's end as already handled — it survives navigating
-  // away (hub/setup) while the match stays 'ended', so the overlay isn't re-created
-  // over the menu; only a fresh match / reconnect resets it.
-  if (endScreen || xpAwarded) return;
-  if (s.match?.status !== 'ended') return;
-  const why = endReasonText(s.match.reason);
-  // A coalition wins together (SES-1): every member of match.winners is a victor,
-  // not only the top scorer in match.winner.
-  const iWon = s.match.winner === ME || (s.match.winners?.includes(ME) ?? false);
-  const draw = !iWon && s.match.winner === null;
-  // Meta-progression: one XP award per finished match (прокачка командующего).
-  // `xpAwarded` alone is a per-INSTALL latch — a reconnect to an already-ended
-  // match resets it (net welcome handler), so refreshing the page would farm the
-  // award repeatedly. A durable per-match marker (keyed by the match's endedAt,
-  // unique per finished match for this nick) makes the award idempotent; the
-  // recorded amount replays on the end screen instead of a misleading «+0».
-  let gained = 0;
-  let levelUp: number | null = null;
-  const awardKey = 'vd.xpawarded.' + (nickInput.value.trim() || 'guest');
-  const endStamp = String(s.match.endedAt ?? 'ended');
-  let prior: { at: string; xp: number } | null;
-  try {
-    prior = JSON.parse(localStorage.getItem(awardKey) ?? 'null') as { at: string; xp: number } | null;
-  } catch {
-    prior = null; // a corrupt marker never blocks the flow — fail open to a fresh award
-  }
-  if (!xpAwarded) {
-    xpAwarded = true;
-    if (prior?.at === endStamp) {
-      gained = prior.xp; // this match already paid out — just replay the receipt
-    } else {
-      const st = loadMeta();
-      const score = s.match.scores?.[ME]?.total ?? 0;
-      gained = matchXp({ won: iWon, score });
-      const before = metaLevel(st.xp);
-      // Career counters ride the SAME once-per-match marker as the XP (below): they
-      // must not be farmable by reloading a finished match. The place comes from the
-      // kernel's own reward table (victoryModule computes standard competition
-      // ranking) — the client never re-ranks the scoreboard itself. It is absent on
-      // the dev endMatch hook, and `recordMatch` counts such a match without letting
-      // it skew the average.
-      const after = recordMatch(
-        { ...st, xp: st.xp + gained },
-        {
-          won: iWon,
-          score,
-          place: s.match.rewards?.[ME]?.place,
-        },
-      );
-      saveMeta(after);
-      localStorage.setItem(awardKey, JSON.stringify({ at: endStamp, xp: gained }));
-      if (metaLevel(after.xp) > before) levelUp = metaLevel(after.xp);
-    }
-  }
-  // The full end screen (renderEndScreen) reads this — outcome, reason, XP. The old
-  // thin victory `banner` is retired; `banner` now carries only NET-status lines.
-  endScreen = { won: iWon, draw, why, xp: gained, levelUp, dismissed: false };
-}
+// Итог матча и награда за него живут в `matchEnd.ts` (REFM-27): исход берётся из
+// авторитетного `match` (его считает модуль победы в ядре), а награда выдаётся РОВНО
+// один раз за матч — долговечная метка не даёт фармить опыт перезаходом.
+const matchEnd = initMatchEnd({
+  state: () => s,
+  me: () => ME,
+  nick: () => nickInput.value,
+  endShown: () => endScreen !== null,
+  readMarker: (k) => localStorage.getItem(k),
+  writeMarker: (k, v) => localStorage.setItem(k, v),
+  loadMeta,
+  saveMeta,
+});
 
 // --- rendering ---------------------------------------------------------------
 
@@ -9496,7 +9424,6 @@ function loadMeta(): MetaState {
 function saveMeta(st: MetaState): void {
   localStorage.setItem(metaKey(), JSON.stringify(st));
 }
-let xpAwarded = false; // one award per installed match
 
 function buildSetupConfig(): SetupConfig {
   // Seats play the HOUSES assigned at setup (H3): you = setupFaction, AI = the rest.
@@ -9612,7 +9539,7 @@ function installMatch(state: GameState, aiPlayers: Set<string>): void {
   awayFromGameTime = null; // reset the away-window baseline for the new match
   banner = null; // clear any end-banner left by the menu-background match (else it sticks)
   endScreen = null; // a fresh match must not open into the previous result
-  xpAwarded = false; // a fresh match earns its own meta-XP award
+  matchEnd.reset(); // новый матч зарабатывает свою награду
   // The match goal, written AFTER the wipe so it is the first line a player can read.
   // Kept honest against the kernel: victoryModule ends on score (SCORE_LIMIT), on
   // elimination, or on domination — no "capital capture" victory exists.
@@ -9773,7 +9700,7 @@ function connect(): void {
           ME = snap.playerId ?? ME;
           clearSelection();
           endScreen = null; // joining a match must not carry the previous result
-          xpAwarded = false;
+          matchEnd.reset(); // переподключение к матчу считает его конец заново
           pendingLoads = []; // drop any queued loads from a prior/local session
           if (chainMode) exitChainMode(); // черновик прежней сессии не переносится
           chainRouteCache.clear();
@@ -11049,7 +10976,9 @@ function frame(nowReal: number) {
   if (dt > 0 && dt < 1000 && (NET || (speed > 0 && !banner))) orbitPhase += dt;
   pumpPendingLoads(); // fire ~1h cargo loads whose hour has elapsed (both modes)
   resolvePendingMerges(); // complete fleet merges whose movers have arrived
-  checkEnd(); // terminal banner from `match` — runs in BOTH modes (net snapshots carry it)
+  // Итог матча приходит в ОБОИХ режимах (сетевые снимки несут его в `match`).
+  const ended = matchEnd.check();
+  if (ended) endScreen = ended;
   // SANDBOX — fenced hook. Hold the "immortal home" + "frozen queues" toggles every
   // solo frame (paused or not); the whole feature no-ops outside a sandboxed solo match.
   // Leading `!__PLAYER_BUILD__` lets esbuild tree-shake the sandbox out of the player bundle.
