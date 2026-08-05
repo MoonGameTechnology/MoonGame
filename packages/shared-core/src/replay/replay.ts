@@ -26,6 +26,7 @@ import type { GameState } from '../state/gameState';
 import type { Action, AdvanceFailure, Context, MatchConfig } from '../action/types';
 import type { GameData } from '../data/schemas';
 import type { Kernel } from '../kernel/kernel';
+import { E_ADVANCE_STUCK, runUntil } from '../kernel/runUntil';
 
 /** One recorded instant: advance the world to `at`, then (optionally) apply `action`
  *  at that instant. `at` is the EFFECTIVE apply time the live path used (the server
@@ -87,18 +88,17 @@ export function runReplay(kernel: Kernel, data: GameData, log: ReplayLog): Repla
       );
     }
     const ctx: Context = { now: step.at, data, ...(log.config ? { config: log.config } : {}) };
-    // Mirror the server loop: chain partial advances until the clock reaches `at`;
-    // a partial round that makes no progress means a same-instant runaway — refuse
-    // to spin instead of hanging the caller.
-    while (state.time < step.at) {
-      const before = state.time;
-      const adv = kernel.advanceTo(state, ctx);
-      if (!adv.ok) throw new Error(`replay advance failed: ${adv.code} at ${step.at}`);
-      state = adv.state;
-      failures.push(...adv.failures);
-      if (!adv.partial) break;
-      if (state.time === before) throw new Error(`replay advance stuck at ${state.time}`);
+    // Chain partial advances until the clock reaches `at` — the shared `runUntil`
+    // (AUD-5), which is the same loop this file used to spell out by hand.
+    const advanced = runUntil(kernel, state, ctx);
+    if (!advanced.ok) {
+      if (advanced.code === E_ADVANCE_STUCK) {
+        throw new Error(`replay advance stuck at ${state.time}`);
+      }
+      throw new Error(`replay advance failed: ${advanced.code} at ${step.at}`);
     }
+    state = advanced.state;
+    failures.push(...advanced.failures);
     if (step.action) {
       const res = kernel.applyAction(state, step.action, ctx);
       if (res.ok) state = res.state;

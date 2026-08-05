@@ -185,7 +185,21 @@ export {
   type AdvanceFailure,
   type ActionIdParts,
 } from './action/types';
-export { isValidActionPayload } from './actions/payloadSchemas';
+// AUD-6: the schema map and the catalog of legal client action types are public now —
+// the boolean alone forced anyone writing a client to deep-import a test-only file.
+export {
+  actionPayloadSchemas,
+  isValidActionPayload,
+  CLIENT_ACTION_TYPES,
+} from './actions/payloadSchemas';
+// AUD-5: the shared "chain partial advances until `ctx.now`" loop.
+export {
+  runUntil,
+  E_ADVANCE_STUCK,
+  E_ADVANCE_BUDGET,
+  type RunUntilOptions,
+  type RunUntilResult,
+} from './kernel/runUntil';
 
 // Microkernel
 export { Kernel, createKernel } from './kernel/kernel';
