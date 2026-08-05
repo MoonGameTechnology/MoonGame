@@ -210,6 +210,14 @@ tData('Metal Mine')             // ИМЯ игровых данных → клю
 - When you finish a roadmap milestone, update the "Статус реализации" section in
   `docs/roadmap.md`.
 - Development happens on the feature branch; open a PR (draft) after pushing.
+- **Subscribe to every PR you open, right after opening it** (`subscribe_pr_activity`),
+  and stay on it until it is merged or closed. Owning a PR means driving it to green:
+  on a CI failure either push a fix or reply in the thread with the concrete blocker —
+  never end a red-CI wake silently. Same for review comments: address them or say why
+  not. Webhooks don't reliably deliver CI success, new pushes, or merge-conflict
+  transitions, so also schedule a self check-in (`send_later`, ~1h) and re-arm it
+  quietly while nothing changes — a check-in that finds no news must not ping the owner
+  or comment on the PR. Unsubscribe once it merges or closes.
 - **Team workflow & tasks.** `main` is the only integration point — branch off it,
   keep PRs small and single-zone, get the gate green, PR back to `main`. Full regimen
   is in `CONTRIBUTING.md`. The assignable task list ("кирпичики", one brick ≈ one PR ≈
