@@ -110,6 +110,9 @@ import {
 // HUD-DOCK: видимость листа и «нижний хаб уезжает» — одна чистая модель на все
 // прицельные режимы; она же держит замер высоты листа для привязки ряда команд.
 import { mapIsWorkspace, panelOpen, sheetHeightVar, type DockState } from './hudDock';
+// Хвост маркера флота (пипсы трюма, «×N») — чистая геометрия с тестом на разворот
+// наружу у стоящего флота (пипсы не должны ложиться на диск планеты).
+import { tailTheta, tailAt as tailPoint } from './markerTail';
 // BACK-1: лестница слоёв Android-Back/Escape — чистая модель + опись, которую держит тест.
 import {
   closeTopLayer as closeTop,
@@ -4900,11 +4903,13 @@ function render(now: number) {
     for (const p of loads) (isSquadron(p.unit) ? diaRow : sqRow).push({ kind: 'load', load: p });
     // The same rotation the pyramid uses; local +y = the tail. Pips and the ship
     // count are placed through this, drawn upright at their rotated spots.
-    const th = A.ang + Math.PI / 2;
-    const tailAt = (lx: number, ly: number): { x: number; y: number } => ({
-      x: A.x + lx * Math.cos(th) - ly * Math.sin(th),
-      y: A.y + lx * Math.sin(th) + ly * Math.cos(th),
-    });
+    // Стоящий у мира флот ниже ORBIT_ZOOM_IN стоит РАДИАЛЬНО, и его хвост смотрел
+    // внутрь орбиты — после ужатия кольца пипсы ложились на диск планеты; для этой
+    // позы хвост разворачивается наружу (геометрия и причина — markerTail.ts).
+    const staticDock = !f.movement && f.location !== null && !orbitsLive();
+    const th = tailTheta(A.ang, staticDock);
+    const tailAt = (lx: number, ly: number): { x: number; y: number } =>
+      tailPoint(A.x, A.y, th, lx, ly);
     const CELL = 8,
       SQ = 5,
       DS = 3.1, // squadron pip: a diamond with the footprint of the square
