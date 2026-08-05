@@ -166,7 +166,10 @@ function radarMultiplier(state: GameState, viewerId: PlayerId, data: GameData): 
   return player.arrears?.includes('energy') ? mult * BLACKOUT_MULT : mult;
 }
 
-interface Coverage {
+/** What a viewer senses right now: full detail (`identify`) and the wider
+ *  signatures-only ring (`radar`). Exported because a RENDERER needs both halves —
+ *  `identifiedNodes` alone answers only the inner one. */
+export interface Coverage {
   identify: Set<PlanetId>;
   radar: Set<PlanetId>;
 }
@@ -266,7 +269,7 @@ function accumulateCoverage(
  *  (`project`), the remembered-fog writer (`visibilityModule`), the broadcast event
  *  filter (`matchRoom`) and threat scanning all route through here, so shared vision
  *  stays consistent across every surface instead of being re-derived per caller. */
-function coverageFor(state: GameState, viewerId: PlayerId, data: GameData): Coverage {
+export function sensorCoverage(state: GameState, viewerId: PlayerId, data: GameData): Coverage {
   const identify = new Set<PlanetId>();
   const radar = new Set<PlanetId>();
   for (const memberId of visionBloc(state, viewerId)) {
@@ -283,7 +286,7 @@ export function identifiedNodes(
   viewerId: PlayerId,
   data: GameData,
 ): Set<PlanetId> {
-  return coverageFor(state, viewerId, data).identify;
+  return sensorCoverage(state, viewerId, data).identify;
 }
 
 /** Ad-hoc query (A4): can `viewerId` see this object at IDENTIFY detail right
@@ -340,7 +343,7 @@ export interface VisibleView {
  * events); computing them together halves the per-player coverage work.
  */
 export function visibleView(state: GameState, viewerId: PlayerId, data: GameData): VisibleView {
-  const coverage = coverageFor(state, viewerId, data);
+  const coverage = sensorCoverage(state, viewerId, data);
   return { view: project(state, viewerId, data, coverage), identified: coverage.identify };
 }
 

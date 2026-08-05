@@ -107,10 +107,12 @@ export {
   visibleState,
   visibleView,
   identifiedNodes,
+  sensorCoverage,
   isVisibleTo,
   BLACKOUT_MULT,
 } from './state/visibility';
 export type {
+  Coverage,
   VisibleState,
   VisibleView,
   SignatureContact,

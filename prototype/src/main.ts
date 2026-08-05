@@ -144,7 +144,7 @@ import {
   previewLossCount,
   scanNodeThreats,
   identifiedNodes,
-  BLACKOUT_MULT,
+  sensorCoverage,
   type PausedConstructionSite,
 } from '../../packages/shared-core/src/index';
 import {
@@ -1865,7 +1865,6 @@ function laneAim(
 // networked view agree by construction, with no mirrored constants to drift. The
 // reach values themselves (and why a radar must clear your border to the next ring
 // of worlds to yield any signature) are tuned in the content, next to the data.
-const SENSOR_HOPS = 1; // identify (full-detail) range from an owned WORLD (jumps); fleets see their own node only
 // A radar projects two concentric ranges: signatures out to its full reach, and
 // full identification within the inner half (mirrors shared-core visibility).
 const IDENTIFY_REACH_FRACTION = 0.5;
@@ -1897,41 +1896,6 @@ function planetRadar(p: Planet): number {
   }
   return r;
 }
-/** Add every node within Euclidean `radius` of `start`'s position — radar is a
- *  physical signal, not jumps: a node close in space shows up even if many jumps
- *  away (or unreachable) by the lane graph. */
-function withinRadiusAt(origin: { x: number; y: number }, radius: number, out: Set<string>): void {
-  const r2 = radius * radius;
-  for (const pl of Object.values(s.planets)) {
-    const dx = pl.position.x - origin.x;
-    const dy = pl.position.y - origin.y;
-    if (dx * dx + dy * dy <= r2) out.add(pl.id);
-  }
-}
-function withinRadius(start: string, radius: number, out: Set<string>): void {
-  const origin = s.planets[start]?.position;
-  if (origin) withinRadiusAt(origin, radius, out);
-}
-
-/** Flood `hops` jumps out from `start` over the lane graph into `out`. */
-function floodHops(start: string, hops: number, out: Set<string>): void {
-  out.add(start);
-  let frontier = [start];
-  for (let d = 0; d < hops; d++) {
-    const next: string[] = [];
-    for (const id of frontier) {
-      const pl = s.planets[id];
-      if (!pl?.links) continue;
-      for (const l of pl.links)
-        if (!out.has(l)) {
-          out.add(l);
-          next.push(l);
-        }
-    }
-    frontier = next;
-  }
-}
-
 interface Vision {
   identify: Set<string>;
   radar: Set<string>;
@@ -1970,41 +1934,39 @@ function pushSpyLog(text: string): void {
 /** Variant-B visibility: an identify range (full detail, feeds memory) plus a
  *  wider radar range (enemy fleets seen only as coarse signatures). The radar
  *  reach scales with radar-array level and radar-ships. null vision = fog off. */
+/**
+ * RULES-5 — туман карты СПРАШИВАЕТСЯ у ядра, а не выводится заново.
+ *
+ * Здесь стояла рукописная копия `sensorCoverage`: те же обходы своих миров и флотов,
+ * те же два кольца (сигнатуры снаружи, опознание внутри). Копия была БЕДНЕЕ оригинала
+ * ровно на три правила, и каждое — живое:
+ *
+ *  · множитель радара от технологий и пассивки фракции (`radarRangeBonus`) копия не
+ *    знала вовсе — исследованная дальность расширяла тревоги, но не карту, на которую
+ *    игрок смотрит;
+ *  · блок зрения (союз + договор об обмене картами) не сводился — разведка союзника
+ *    приходила в состояние, но рисовалась туманом;
+ *  · активные «сканы» героя (`activeReveals`) карту не подсвечивали.
+ *
+ * Расхождение было доказуемо на одном экране: ЭТОТ ЖЕ файл уже звал ядро за туманом для
+ * тревог (`identifiedNodes` в `updateThreatAlerts`), то есть тревога могла сообщить об
+ * угрозе в мире, который карта рядом рисовала неопознанным.
+ *
+ * Клиентского здесь осталось только то, чего у ядра в этой точке и нет: окна краденой
+ * разведки. У ядра они живут в ПРОЕКЦИИ (`visibleState`), которую соло-режим не гоняет —
+ * он считает туман сам, по полному состоянию.
+ */
 function computeVision(): Vision {
-  const identify = new Set<string>();
-  const radar = new Set<string>();
-  // ECON-2 «блэкаут»: неоплаченная энергия глушит каждый свой радар вдвое —
-  // зеркалит серверную fog-проекцию (radarMultiplier, visibility.ts).
-  const dim = (s.players[ME]?.arrears ?? []).includes('energy') ? BLACKOUT_MULT : 1;
-  for (const p of Object.values(s.planets))
-    if (p.owner === ME) {
-      floodHops(p.id, SENSOR_HOPS, identify);
-      const rr = planetRadar(p) * dim;
-      if (rr > 0) {
-        withinRadius(p.id, rr, radar); // signatures (outer)
-        withinRadius(p.id, rr * IDENTIFY_REACH_FRACTION, identify); // full reveal (inner)
-      }
-    }
-  for (const f of Object.values(s.fleets))
-    if (f.owner === ME) {
-      const node = fleetNode(f);
-      if (!node) continue;
-      floodHops(node, 0, identify); // own node only — ships are near-blind (mirrors FLEET_IDENTIFY_HOPS)
-      const rr = fleetRadar(f) * dim;
-      if (rr > 0) {
-        const pos = fleetPos(f); // radar from the SHIP's position, not its destination
-        if (pos) {
-          withinRadiusAt(pos, rr, radar); // signatures (outer)
-          withinRadiusAt(pos, rr * IDENTIFY_REACH_FRACTION, identify); // full reveal (inner)
-        }
-      }
-    }
+  const { identify, radar } = sensorCoverage(s, ME, data);
   // Stolen `planet` windows identify their node (feeds memory too, so the scan
   // is remembered after the window closes); `fleets` windows fill the owner set
   // that fleet rendering consults.
-  for (const id of intelTargets('planet')) if (s.planets[id]) identify.add(id);
+  for (const id of intelTargets('planet'))
+    if (s.planets[id]) {
+      identify.add(id);
+      radar.add(id); // identify implies radar
+    }
   intelFleetOwners = intelTargets('fleets');
-  for (const id of identify) radar.add(id); // identify implies radar
   return { identify, radar };
 }
 
