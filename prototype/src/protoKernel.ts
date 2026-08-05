@@ -163,3 +163,19 @@ export function canOrder(state: GameState, action: Action): string | null {
 }
 let memoState: GameState | null = null;
 const memo = new Map<string, string | null>();
+
+/**
+ * RULES-3 — «прошла бы вся СВЯЗКА приказов?»: первый код отказа или `null`.
+ *
+ * Тот же вопрос, что `canOrder`, но про последовательность — `kernel.canApplyAll`.
+ * Нужен автоматике, которая издаёт связки, а не одиночные приказы: авто-штурм — это
+ * «встать на низкую орбиту → штурм», и спросить можно только про пару целиком. Про
+ * один штурм ответом был бы `E_WRONG_ORBIT` (орбита ещё не выставлена), про одну
+ * орбиту — «можно», после чего применилась бы половина обречённой связки.
+ *
+ * Без памяти: связки спрашивают драйверы (раз в тик), а не покадровый рендер, и ключ
+ * по массиву действий стоил бы дороже самой пробы.
+ */
+export function canOrderAll(state: GameState, actions: readonly Action[]): string | null {
+  return kernel.canApplyAll(state, actions, ctx(state.time));
+}

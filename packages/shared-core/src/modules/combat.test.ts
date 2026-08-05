@@ -529,6 +529,39 @@ describe('combat — two-phase planet capture (GDD §7.4)', () => {
     const st3 = baseState([grounded], [planet('P', 'p2')]);
     expect(rej(kernel.applyAction(st3, assault('C'), ctx(0)))).toBe('E_WRONG_ORBIT');
   });
+
+  // --- RULES-3: незахватываемая цель отказывает, а не «успешно» ничего не делает ---
+  // Раньше приказ проходил, а `capturePlanet` молча выходил по isCapturable: снаружи
+  // это выглядело как успех без последствий. Молчаливый no-op нарушает fail-secure и
+  // делает правило неспрашиваемым — поэтому каждый драйвер постоянных приказов держал
+  // свою копию `isCapturable`, чтобы не сыпать пустыми штурмами каждое пробуждение.
+  it('штурм незахватываемого сектора отбивается кодом, а не проходит вхолостую', () => {
+    const voidData = parseGameData({
+      version: '0.1.0',
+      resources: ['metal'],
+      units: { fighter: { faction: 'x', stats: { attack: 10, defense: 0, speed: 10, hp: 20 } } },
+      factions: {},
+      buildings: {},
+      sectorKinds: { empty: { capturable: false, buildable: false, orbit: false } },
+      events: {},
+    });
+    const kernel = createKernel([...combatFamily]);
+    const f = fleet('A', 'p1', 'P', [['fighter', 1]]);
+    f.orbit = 'near'; // орбита выставлена — отказ должен быть именно про захватываемость
+    const nowhere = planet('P', null);
+    nowhere.kind = 'empty';
+    const st = baseState([f], [nowhere]);
+    const r = kernel.applyAction(st, assault('A'), { now: 0, data: voidData });
+    expect(rej(r)).toBe('E_NOT_CAPTURABLE');
+  });
+
+  it('мир без объявленного kind по-прежнему штурмуется (дефолт схемы — разрешительный)', () => {
+    const kernel = createKernel([...combatFamily]);
+    const f = fleet('A', 'p1', 'P', [['fighter', 1]]);
+    f.orbit = 'near';
+    const st = baseState([f], [planet('P', null)]); // kind не задан
+    expect(okApply(kernel.applyAction(st, assault('A'), ctx(0))).state.planets.P?.owner).toBe('p1');
+  });
 });
 
 describe('combat — shipless fleet capture (bug fix)', () => {

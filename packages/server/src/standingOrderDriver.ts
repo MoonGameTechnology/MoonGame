@@ -33,7 +33,6 @@ import {
   withinRange,
   getStance,
   identifiedNodes,
-  isCapturable,
   type Action,
   type GameData,
   type GameState,
@@ -49,49 +48,51 @@ function driverActionId(kind: string, fleetId: string): string {
   return `driver:${kind}:${fleetId}:${seq++}`;
 }
 
-/** One tick of the CC-2 auto-storm driver: every fleet flagged in `state.autoAssault`
- *  that sits over someone else's capturable, at-war world with the orbit clear gets
- *  its storm orders (orbit first if not already in orbit, then assault). */
+/**
+ * One tick of the CC-2 auto-storm driver: every fleet flagged in `state.autoAssault`
+ * whose storm orders the KERNEL would accept gets them issued (orbit first if not
+ * already in orbit, then assault).
+ *
+ * RULES-3. Правила штурма — захватываемость цели, владелец, дипломатия, чужой флот на
+ * узле, наличие десанта, уже идущий наземный бой — здесь БОЛЬШЕ НЕ ПЕРЕПИСЫВАЮТСЯ.
+ * Их называет ядро через `probe` (`MatchRoom.canApplyAll`) тем же кодом, каким отбило
+ * бы сам приказ. Флаг игрока (`autoAssault`) остаётся: это не правило, а согласие.
+ *
+ * Спрашивается вся ПАРА сразу — штурм нелегален с дальней орбиты, так что вопрос об
+ * одном лишь штурме вернул бы `E_WRONG_ORBIT` про мир ДО первого действия пары. Заодно
+ * бесплатно закрылись отказы, которых рукописные условия не знали (`E_NO_TROOPS`,
+ * `E_UNDER_ASSAULT`) и которые драйвер поэтому выдавал каждый тик — ровно тот
+ * rejected-churn, против которого была написана вся остальная защита.
+ *
+ * `probe` не опционален СПЕЦИАЛЬНО: дефолт «если ядра не дали — решай сам» вернул бы
+ * вторую копию правил через чёрный ход.
+ */
 export function autoAssaultActions(
   state: GameState,
-  data: GameData,
+  probe: (state: GameState, actions: readonly Action[]) => string | null,
 ): Array<{ playerId: string; action: Action }> {
   const flagged = state.autoAssault ?? {};
   const out: Array<{ playerId: string; action: Action }> = [];
   for (const fid of Object.keys(flagged).sort()) {
     const f = state.fleets[fid];
-    if (!f || f.location === null || f.movement || f.battleId) continue;
-    const here = state.planets[f.location];
-    if (!here || !isCapturable(data, here) || here.owner === f.owner) continue;
-    // Only worlds we are AT WAR with — the core rejects a peaceful assault anyway
-    // (E_FORBIDDEN), but re-issuing the doomed pair every tick is rejected-action churn.
-    if (here.owner !== null && getStance(state, f.owner, here.owner) !== 'war') continue;
-    const enemyHere = Object.values(state.fleets).some(
-      (g) => g.owner !== f.owner && g.location === f.location && g.units.some((u) => u.count > 0),
-    );
-    if (enemyHere) continue; // let the orbital battle settle first
-    if (f.orbit !== 'near') {
-      out.push({
-        playerId: f.owner,
-        action: {
-          id: driverActionId('orbit', fid),
-          type: 'fleet.orbit',
-          playerId: f.owner,
-          payload: { fleetId: fid, orbit: 'near' },
-          issuedAt: state.time,
-        },
-      });
-    }
-    out.push({
+    if (!f) continue; // нет флота — не из чего собрать приказ (нужен f.owner)
+    const orbit: Action = {
+      id: driverActionId('orbit', fid),
+      type: 'fleet.orbit',
       playerId: f.owner,
-      action: {
-        id: driverActionId('assault', fid),
-        type: 'fleet.assault',
-        playerId: f.owner,
-        payload: { fleetId: fid },
-        issuedAt: state.time,
-      },
-    });
+      payload: { fleetId: fid, orbit: 'near' },
+      issuedAt: state.time,
+    };
+    const assault: Action = {
+      id: driverActionId('assault', fid),
+      type: 'fleet.assault',
+      playerId: f.owner,
+      payload: { fleetId: fid },
+      issuedAt: state.time,
+    };
+    const pair = f.orbit !== 'near' ? [orbit, assault] : [assault];
+    if (probe(state, pair) !== null) continue;
+    for (const action of pair) out.push({ playerId: f.owner, action });
   }
   return out;
 }
@@ -207,11 +208,14 @@ export function patrolActions(
 }
 
 /** Both drivers for one tick, in a fixed order (auto-storm then patrol) — the
- *  single call site `serverWiring.ts` needs. */
+ *  single call site `serverWiring.ts` needs. `probe` is the room's kernel verdict
+ *  (`MatchRoom.canApplyAll`): auto-storm asks it instead of re-stating the assault
+ *  rules (RULES-3). */
 export function standingOrderTickActions(
   state: GameState,
   data: GameData,
   now: number,
+  probe: (state: GameState, actions: readonly Action[]) => string | null,
 ): Array<{ playerId: string; action: Action }> {
-  return [...autoAssaultActions(state, data), ...patrolActions(state, data, now)];
+  return [...autoAssaultActions(state, probe), ...patrolActions(state, data, now)];
 }
