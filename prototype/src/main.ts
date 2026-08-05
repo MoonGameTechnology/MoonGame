@@ -269,6 +269,8 @@ import { initSound } from './sound';
 // REFM-16 — клиентские настройки: одно правило чтения/записи на весь клиент вместо
 // восьми рукописных копий «нет ключа ⇒ умолчание» + try/catch вокруг setItem.
 import { prefStore, readBool, readNum, readRaw, writeBool, writeRaw } from './prefs';
+// AIM-PAN — «коммитит ли отпускание вооружённый приказ»: правило со сторожем.
+import { releaseCommits } from './aimGesture';
 // REFM-17 — палитра и правило «цвет = отношение»: одна таблица на карту и на экран
 // дипломатии (раньше их было две, и настройку палитры знала только карта).
 import {
@@ -7781,6 +7783,9 @@ cmdbar.addEventListener('click', (ev) => {
   if (cmd === 'move') {
     aiming = !aiming; // arm / disarm the move order
     assaultAim = false;
+    // Подсказка только на тач: там один палец занят прицелом, и жест камеры надо
+    // назвать вслух. На PC мышь и так возит камеру перетаскиванием.
+    if (aiming && !pcUi()) note(t('hint.aim-armed'));
   } else if (cmd === 'merge') {
     if (ids.length >= 2) mergeGroup(ids);
     else {
@@ -8218,6 +8223,15 @@ function cancelLongPress(): void {
   }
 }
 let pinchDist = 0;
+// Середина щипка: два пальца не только МАСШТАБИРУЮТ, но и ВЕЗУТ камеру. Нужно это
+// прежде всего вооружённому приказу: одним пальцем там целятся, и без второго жеста
+// камера оказывалась заперта — цель за краем экрана была недостижима.
+let pinchMid: { x: number; y: number } | null = null;
+// Был ли в этом жесте второй палец. Одиночный тап при вооружённом приказе КОММИТИТ его
+// даже после протяжки (так целятся на телефоне), поэтому отпускание последнего пальца
+// после щипка обязано быть исключением: иначе панорама заканчивалась бы случайным
+// приказом в точке, где палец просто оторвался.
+let multiTouched = false;
 let boxSelecting = false;
 const ptXY = (ev: PointerEvent) => {
   const r = canvas.getBoundingClientRect();
@@ -8231,6 +8245,7 @@ canvas.addEventListener('pointerdown', (ev) => {
     dragStart = p;
     tapByTouch = ev.pointerType === 'touch'; // preview + commit share the snap radius
     longPressFired = false;
+    multiTouched = false; // новый жест — пока однопальцевый
     // Shift OR Ctrl/⌘ extends the fleet selection (the RTS/Bytro habit — Shift-click
     // gathers fleets for one group order). Shift over EMPTY space still opens a
     // box-select; Shift over one of YOUR fleets is an additive click instead, so the
@@ -8274,14 +8289,17 @@ canvas.addEventListener('pointerdown', (ev) => {
     }
   } else if (pointers.size === 2) {
     cancelLongPress();
-    if (aiming) {
-      // Second finger = cancel the armed move (the audit's escape hatch).
-      aiming = false;
-      lastPanelHtml = '';
-      note(t('hint.aim-cancelled'));
-    }
+    multiTouched = true;
+    // Второй палец ВЕЗЁТ КАМЕРУ (и масштабирует), а не отменяет вооружённый приказ.
+    // Раньше он отменял — и это запирало игрока: одним пальцем целятся, значит камеру
+    // при вооружённом «Курсе» было не сдвинуть вовсе, а цель за краем экрана
+    // становилась недостижимой. Отменить приказ по-прежнему можно кнопкой (повторный
+    // тап по «Курс») и Back/Escape — обе дороги живы.
     const [a, b] = [...pointers.values()];
-    if (a && b) pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
+    if (a && b) {
+      pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
+      pinchMid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+    }
   }
 });
 canvas.addEventListener('pointermove', (ev) => {
@@ -8295,8 +8313,17 @@ canvas.addEventListener('pointermove', (ev) => {
     const [a, b] = [...pointers.values()];
     if (a && b) {
       const d = Math.hypot(a.x - b.x, a.y - b.y);
-      if (pinchDist > 0) zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, d / pinchDist);
+      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      if (pinchDist > 0) zoomAt(mid.x, mid.y, d / pinchDist);
+      // Щипок ведёт камеру за собой: сдвиг середины между пальцами — это панорама.
+      // Масштаб уже удержал точку под пальцами, поэтому одно другому не мешает.
+      if (pinchMid) {
+        cam.x += mid.x - pinchMid.x;
+        cam.y += mid.y - pinchMid.y;
+        clampCam();
+      }
       pinchDist = d;
+      pinchMid = mid;
     }
     dragged = true;
   } else if ((aiming || assaultAim) && !pcUi()) {
@@ -8344,17 +8371,24 @@ function endPointer(ev: PointerEvent) {
     boxSelecting = false;
   }
   pointers.delete(ev.pointerId);
-  if (pointers.size < 2) pinchDist = 0;
+  if (pointers.size < 2) {
+    pinchDist = 0;
+    pinchMid = null;
+  }
   cancelLongPress();
   if (longPressFired) {
     longPressFired = false; // the long-press already acted; this release is spent
     return;
   }
-  // Touch: while an aim is armed the drag steered the preview, so a dragged release
-  // still commits. PC: a drag is a camera pan — only a clean click commits, and the
-  // armed order stays armed through pans.
-  const aimDragCommits = (aiming || assaultAim) && !pcUi();
-  if (single && p && (aimDragCommits || !dragged)) {
+  // Коммитит ли это отпускание вооружённый приказ — правило целиком в `aimGesture.ts`
+  // (там же его сторож): на нём ввод ломался дважды и оба раза молча.
+  const commits = releaseCommits({
+    armed: aiming || assaultAim,
+    pc: pcUi(),
+    multiTouched,
+    dragged,
+  });
+  if (single && p && commits) {
     tapByTouch = ev.pointerType === 'touch';
     selectAt(p.x, p.y);
   }
