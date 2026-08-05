@@ -7101,7 +7101,12 @@ function renderCmdBar() {
     return;
   }
   const fleets = ids.map((id) => s.fleets[id]).filter((f): f is Fleet => !!f);
-  const anyMoving = fleets.some((f) => f.movement);
+  // CMD-VIS: доступность приказа СПРАШИВАЕТСЯ у ядра (canOrder, RULES-1), а кнопка
+  // рисуется от ответа — недоступный приказ не серый, его просто НЕТ. Одна проба
+  // покрывает все причины разом: стоит на месте (E_FLEET_BUSY), в коридоре
+  // (E_NOT_A_LANE — у прыжка нет середины), в бою. Правило переиспользуемое: любую
+  // командную кнопку можно вешать на ту же пробу её настоящего приказа.
+  const anyStoppable = fleets.some((f) => canOrder(s, stopFleet(ME, f.id)) === null);
   // Режим огня артиллерии (одна кнопка + меню): на кнопке — общий режим арт-флотов
   // выделения, при разнобое — нейтральная подпись.
   const artFleets = fleets.filter((f) => f.owner === ME && fleetHasArtillery(f));
@@ -7157,7 +7162,7 @@ function renderCmdBar() {
   const html =
     `<span class="cmdlabel">${ids.length > 1 ? t('cmd.selection.many', { n: ids.length }) : t('cmd.selection.one')}</span>` +
     cmdBtn('move', '⤳', t('cmd.move'), aiming ? 'on' : '', false, t('cmd.move.hint')) +
-    cmdBtn('stop', '■', t('cmd.stop'), 'danger', !anyMoving, t('cmd.stop.hint')) +
+    (anyStoppable ? cmdBtn('stop', '■', t('cmd.stop'), 'danger', false, t('cmd.stop.hint')) : '') +
     cmdBtn(
       'attack',
       '⚔',
@@ -7688,7 +7693,9 @@ cmdbar.addEventListener('click', (ev) => {
       if (merging) note(t('hint.pick-merge'));
     }
   } else if (cmd === 'stop') {
-    for (const id of ids) if (s.fleets[id]?.movement) playerOrder(stopFleet(ME, id));
+    // Без тостов: в группе стоп уходит только тем, кому ядро его РАЗРЕШАЕТ (та же
+    // проба, что показала кнопку) — флот в коридоре просто доезжает, отказа не видно.
+    for (const id of ids) if (canOrder(s, stopFleet(ME, id)) === null) playerOrder(stopFleet(ME, id));
   } else if (cmd === 'attack') {
     if (pcUi()) {
       // PC: ШТУРМ aims like «Курс» — the next click on someone else's world sends
