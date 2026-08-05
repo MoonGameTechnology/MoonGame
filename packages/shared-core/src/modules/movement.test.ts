@@ -348,6 +348,23 @@ describe('movement — fleet.stop parks the fleet ON the lane (Bytro continuous 
     expect(arrived.state.fleets.F?.location).toBe('B');
   });
 
+  it('переназначение курса ПОСРЕДИ коридора отвергается тем же кодом, что и стоп', () => {
+    // Слияние RETASK с CMD-VIS открыло бы дыру во ВТОРОЙ двери: «Курс» летящему флоту
+    // паркует его ровно так же, как «Стоп», — значит запрет обязан держаться на обоих,
+    // иначе «Курс» становится вторым способом сделать то, в чём «Стоп» отказывает.
+    const kernel = createKernel([movementModule]);
+    const st = baseState(fieldAB(), [fleet('F', 'p1', 'A', ['scout'])]);
+    st.tempLanes = [
+      { id: 'lane:1', owner: 'p1', from: 'A', to: 'B', speedBonus: 0, expiresAt: 99 * HOUR, addedLink: true },
+    ];
+    const going = okApply(kernel.applyAction(st, move('F', 'B'), ctx(0)));
+    const r = kernel.applyAction(going.state, move('F', 'A'), ctx(HOUR));
+    expect(errCode(r)).toBe('E_NOT_A_LANE');
+    // Отказ не рвёт поездку: флот доезжает до конца прыжка.
+    const arrived = okAdvance(kernel.advanceTo(going.state, ctx(5 * HOUR)));
+    expect(arrived.state.fleets.F?.location).toBe('B');
+  });
+
   it('rejects stopping a fleet that is not under way', () => {
     const kernel = createKernel([movementModule]);
     const st = baseState([{ ...planet('A', 'p1', 0, 0), links: [] }], [fleet('F', 'p1', 'A', ['scout'])]);

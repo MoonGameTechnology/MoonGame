@@ -344,6 +344,16 @@ export const movementModule: GameModule = {
         //    instead of stranding the fleet mid-lane.
         // The abandoned leg's scheduled arrival stays in the timeline; the arrival
         // handler ignores it (its departedAt/arrivesAt no longer match).
+        //
+        // …but re-tasking INSIDE a corridor is refused, by the same rule and the same
+        // code as `fleet.stop` (HERO-CORRIDOR / CMD-VIS): a corridor is a jump with no
+        // middle, and a fleet parked on a corridor edge would be left standing on an
+        // edge the graph loses when the corridor closes. The re-task parks the fleet
+        // EXACTLY like a stop does, so the ban has to hold at both doors — otherwise
+        // «Курс» becomes a second way to do the thing «Стоп» refuses.
+        if (isCorridorEdge(h.state, fleet.movement.from, fleet.movement.to)) {
+          return h.reject('E_NOT_A_LANE');
+        }
         const mv = fleet.movement;
         const frac = Math.min(1 - EPS, Math.max(EPS, legT(mv, h.ctx.now)));
         fleet.edge = { from: mv.from, to: mv.to, t: frac };
