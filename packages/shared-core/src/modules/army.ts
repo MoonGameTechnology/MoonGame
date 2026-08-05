@@ -4,6 +4,8 @@ import type { GameData } from '../data/schemas';
 import { defHasTrait } from '../data/traits';
 import { findHealthyStack, addUnits, sumUnitStat } from '../util/stacks';
 import { garrisonUnderAssault, requireOwnedIdleFleet } from '../util/fleet';
+import { isAllied } from '../util/combat';
+import { hasMapShare } from '../state/diplomacy';
 
 interface TransferPayload {
   fleetId: string;
@@ -52,9 +54,8 @@ export const armyModule: GameModule = {
       if (!planet) {
         return h.reject('E_NO_PLANET');
       }
-      if (planet.owner !== action.playerId) {
-        return h.reject('E_FORBIDDEN'); // load from / unload onto your own world
-      }
+      // Владелец мира здесь НЕ проверяется: у погрузки и высадки правила разные
+      // (ALLY-LAND). Каждое действие проверяет своё — см. `army.load` / `army.unload`.
       const def = h.ctx.data.units[p.unit];
       if (!def) {
         return h.reject('E_UNKNOWN_UNIT');
@@ -67,6 +68,11 @@ export const armyModule: GameModule = {
 
     api.onAction('army.load', (action, h) => {
       const { fleet, planet, def, unit, count } = resolve(action, h);
+      // Поднять можно ТОЛЬКО со своего мира. Союзный гарнизон — не твой ресурс:
+      // иначе «помощь» превращалась бы в вывоз чужой обороны.
+      if (planet.owner !== action.playerId) {
+        return h.reject('E_FORBIDDEN');
+      }
       if (defHasTrait(def, 'immobile')) {
         return h.reject('E_IMMOBILE'); // fixed emplacements (e.g. orbital AA) can't be lifted
       }
@@ -99,6 +105,22 @@ export const armyModule: GameModule = {
 
     api.onAction('army.unload', (action, h) => {
       const { fleet, planet, unit, count } = resolve(action, h);
+      // ALLY-LAND. Высадиться можно на свой мир, на мир СОЮЗНИКА (коалиция) и на мир
+      // того, с кем заключён ОБМЕН КАРТАМИ (MAPSHARE-1) — оба права даны по взаимному
+      // согласию, поэтому пускать чужие войска на свою землю никого не заставляют.
+      // Мир, с чьим владельцем всего лишь мир/пакт без договора, по-прежнему закрыт.
+      const host = planet.owner;
+      const guest =
+        host !== null &&
+        (isAllied(h, action.playerId, host) || hasMapShare(h.state, action.playerId, host));
+      if (host !== action.playerId && !guest) {
+        return h.reject('E_FORBIDDEN');
+      }
+      // Высадка в ИДУЩИЙ наземный бой намеренно НЕ запрещена — в отличие от погрузки.
+      // Погрузку запрещает уклонение от размена (защитник уплыл бы небитым), а высадка
+      // — это подкрепление, ровно тот сценарий, ради которого союзная высадка и нужна.
+      // Механически это корректно: ссылка защитника (`kind: 'garrison'`) адресует мир,
+      // а не снимок стеков, поэтому подошедшие войска считаются со следующего раунда.
       const carried = findHealthyStack(fleet.landing ?? [], unit);
       if (!carried || carried.count < count) {
         return h.reject('E_NO_ARMY'); // not that many aboard

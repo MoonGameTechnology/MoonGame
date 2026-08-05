@@ -1,11 +1,16 @@
 import type { GameModule } from '../kernel/module';
 import type { DiplomaticStance } from '../state/gameState';
 import {
+  clearMapShareOffers,
   clearOffers,
   getOffer,
   getStance,
+  hasMapShare,
+  hasMapShareOffer,
   isBotPair,
   offerInvolves,
+  setMapShare,
+  setMapShareOffer,
   setOffer,
   setStance,
   stanceToRelation,
@@ -82,6 +87,13 @@ export const diplomacyModule: GameModule = {
       if (HOSTILITY[stance] > HOSTILITY[from]) {
         // Escalation — unilateral, and it ends any negotiation in flight.
         clearOffers(h.state, me, target);
+        // MAPSHARE-1: война рвёт договор об обмене картами вместе с переговорами о нём.
+        // Делиться разведкой и пускать войска к тому, кому только что объявил войну, —
+        // противоречие, и держать такой договор значило бы отдавать врагу свою карту.
+        if (stance === 'war') {
+          setMapShare(h.state, me, target, false);
+          clearMapShareOffers(h.state, me, target);
+        }
         setStance(h.state, me, target, stance);
         h.emit('diplomacy.changed', { a: me, b: target, stance, from });
         return;
@@ -108,17 +120,96 @@ export const diplomacyModule: GameModule = {
       h.emit('diplomacy.offered', { from: me, to: target, stance });
     });
 
+    /**
+     * MAPSHARE-1 — `diplomacy.mapshare { target, on }`: договор об ОБМЕНЕ КАРТАМИ.
+     *
+     * Отдельное соглашение поверх лестницы стоек, а не её ступень: заключается и при
+     * мире, и при пакте, даёт ровно два права (общая разведка + чужой десант на свою
+     * землю) и НЕ делает участников союзниками ни в бою, ни в зачёте коалиции.
+     *
+     * Заключение — по ВЗАИМНОМУ согласию, тем же протоколом, что смягчение стойки:
+     * первое `on:true` кладёт предложение, встречное — коммитит. Иначе игрок мог бы
+     * односторонне открыть себе чужую карту и высадку на чужую землю.
+     * Расторжение — ОДНОСТОРОННЕЕ (`on:false`): удерживать в договоре против воли
+     * нельзя, и это же делает войну чистой (война рвёт договор сама, см. эскалацию).
+     */
+    api.onAction('diplomacy.mapshare', (action, h) => {
+      const { target, on } = action.payload as { target?: unknown; on?: unknown };
+      if (typeof target !== 'string' || target === action.playerId || typeof on !== 'boolean') {
+        return h.reject('E_BAD_PAYLOAD');
+      }
+      const actor = h.state.players[action.playerId];
+      if (!actor || actor.status !== 'active') {
+        return h.reject('E_FORBIDDEN');
+      }
+      const victim = h.state.players[target];
+      if (!victim || victim.status !== 'active') {
+        return h.reject('E_NO_PLAYER');
+      }
+      const me = action.playerId;
+
+      if (!on) {
+        // Расторжение (или отзыв своего предложения) — всегда одностороннее.
+        if (!hasMapShare(h.state, me, target) && !hasMapShareOffer(h.state, me, target)) {
+          return h.reject('E_NO_MAPSHARE');
+        }
+        setMapShare(h.state, me, target, false);
+        clearMapShareOffers(h.state, me, target);
+        h.emit('diplomacy.mapshare.changed', { a: me, b: target, on: false });
+        return;
+      }
+
+      if (hasMapShare(h.state, me, target)) {
+        return h.reject('E_ALREADY_SHARED');
+      }
+      // С тем, с кем идёт война, договориться нельзя: эскалация такой договор рвёт,
+      // так что заключить его при войне значило бы завести заведомо противоречивое
+      // состояние. Сначала мир — потом карты.
+      if (getStance(h.state, me, target) === 'war') {
+        return h.reject('E_FORBIDDEN');
+      }
+      if (hasMapShareOffer(h.state, target, me)) {
+        clearMapShareOffers(h.state, me, target);
+        setMapShare(h.state, me, target, true);
+        h.emit('diplomacy.mapshare.changed', { a: me, b: target, on: true });
+        return;
+      }
+      if (hasMapShareOffer(h.state, me, target)) {
+        return h.reject('E_ALREADY_OFFERED');
+      }
+      setMapShareOffer(h.state, me, target);
+      h.emit('diplomacy.mapshare.offered', { from: me, to: target });
+    });
+
     // An eliminated player can never counter-declare, so their standing offers
     // (sent OR received) would hang in state and in the counterparty's view
     // forever — sweep them the moment the player falls.
     api.on('player.eliminated', (event, h) => {
       const playerId = (event.payload as { playerId?: string })?.playerId;
+      if (typeof playerId !== 'string') return;
       const offers = h.state.diplomacyOffers;
-      if (typeof playerId !== 'string' || !offers) return;
-      for (const key of Object.keys(offers)) {
-        if (offerInvolves(key, playerId)) delete offers[key];
+      if (offers) {
+        for (const key of Object.keys(offers)) {
+          if (offerInvolves(key, playerId)) delete offers[key];
+        }
+        if (Object.keys(offers).length === 0) delete h.state.diplomacyOffers;
       }
-      if (Object.keys(offers).length === 0) delete h.state.diplomacyOffers;
+      // MAPSHARE-1: то же самое для обмена картами — и предложения, и сами договоры.
+      // Договор выбывшего иначе продолжал бы светить его картой (а живой участник —
+      // держать право высадки на землю, у которой больше нет хозяина-переговорщика).
+      const mapOffers = h.state.mapShareOffers;
+      if (mapOffers) {
+        for (const key of Object.keys(mapOffers)) {
+          if (offerInvolves(key, playerId)) delete mapOffers[key];
+        }
+        if (Object.keys(mapOffers).length === 0) delete h.state.mapShareOffers;
+      }
+      const shares = h.state.mapShares;
+      if (shares) {
+        for (const id of Object.keys(h.state.players)) {
+          if (id !== playerId) setMapShare(h.state, playerId, id, false);
+        }
+      }
     });
   },
 };

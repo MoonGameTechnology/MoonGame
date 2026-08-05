@@ -78,22 +78,29 @@ concurrency:
   group: automerge-${{ github.event.workflow_run.head_branch || github.event.pull_request.head.ref }}
   cancel-in-progress: false
 
-permissions:
-  # Постановка в очередь — мутация pull request'а. Плюс объяснялка «почему не вливается»
-  # пишется комментарием в PR.
-  pull-requests: write
-  # Комментарий в PR идёт через issues-API (PR — это issue), поэтому нужно и это право.
-  issues: write
-  # `write`, а НЕ `read`. Рассуждение «слияние выполняет очередь, а не наш токен, значит
-  # хватит чтения» — неверное, проверено на живом прогоне: `enqueuePullRequest` вернул
-  # `FORBIDDEN` / «Resource not accessible by integration». Постановка в очередь двигает
-  # ref (очередь заводит свою временную ветку от нашего имени), и это требует записи.
-  contents: write
+# НИЧЕГО по умолчанию: права выдаются ПОДЖОБНО (ниже), потому что джобы здесь просят
+# разное. Пока джоба была одна, права уровня воркфлоу совпадали с её собственными и разницы
+# не было; со второй джобой тот же блок стал раздавать ей лишнее — zizmor справедливо
+# пометил это как `excessive-permissions`. Пустой блок ещё и делает добавление третьей
+# джобы безопасным по умолчанию: она не унаследует записи молча.
+permissions: {}
 
 jobs:
   enqueue:
     name: enqueue when green
     runs-on: ubuntu-latest
+    permissions:
+      # Постановка в очередь — мутация pull request'а. Плюс объяснялка «почему не
+      # вливается» пишется комментарием в PR.
+      pull-requests: write
+      # Комментарий в PR идёт через issues-API (PR — это issue), поэтому нужно и это право.
+      issues: write
+      # `write`, а НЕ `read`. Рассуждение «слияние выполняет очередь, а не наш токен,
+      # значит хватит чтения» — неверное, проверено на живом прогоне: `enqueuePullRequest`
+      # вернул `FORBIDDEN` / «Resource not accessible by integration». Постановка в
+      # очередь двигает ref (очередь заводит свою временную ветку от нашего имени), и это
+      # требует записи.
+      contents: write
     # Отсекаем всё, что ставить в очередь нельзя или незачем: чужие форки, черновики и
     # прогоны не по PR (`push` в ветку, `merge_group` самой очереди — оба гоняют те же
     # воркфлоу, но PR к ним не привязан).
@@ -281,6 +288,11 @@ jobs:
     # одно событие незачем.
     if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
+    permissions:
+      # Тот же набор, что у `enqueue`, МИНУС `issues: write`: подметание ничего не
+      # комментирует — оно только читает список PR и зовёт `enqueuePullRequest`.
+      pull-requests: write
+      contents: write
     steps:
       # Здесь НЕТ checkout: джоба не исполняет ничего из репозитория, только два запроса
       # к API. Меньше поверхности — меньше поводов для разбора у zizmor.
