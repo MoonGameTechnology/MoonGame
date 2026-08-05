@@ -172,6 +172,7 @@ import {
 } from '../../packages/client/src/territory';
 import { buildLabel, currentBuild } from './updater';
 import { initApkUpdater } from './apkUpdate';
+import { measureViewport, STARS, NEBULAE } from './viewport';
 // Localization: one locale = one file (src/locale/*). Msgid = the canonical
 // Russian source string; `t()` wraps every user-visible literal, `tData()` maps
 // English data/*.json names, the static HTML is localized by a boot pass.
@@ -883,28 +884,18 @@ function setPlayerEmblem(g: string): void {
 
 // --- viewport, galaxy backdrop & map projection ------------------------------
 
-function viewW(): number {
-  return typeof window !== 'undefined' ? window.innerWidth : 1280;
-}
-function viewH(): number {
-  return typeof window !== 'undefined' ? window.innerHeight : 720;
-}
 let VW = 1280; // viewport size in CSS pixels (drives layout + projection)
 let VH = 720;
 let DPR = 1;
 let MOBILE = false;
 function resize() {
-  VW = viewW();
-  VH = viewH();
-  // Cap the device-pixel-ratio at 2. A 2D canvas is fill-rate bound, and cost scales
-  // with DPR²: a 3× phone (common on Android) would render 9× the pixels for no visible
-  // gain at arm's length — the #1 reason the APK's FPS tanks. 2× stays crisp on retina.
-  const rawDpr = (typeof window !== 'undefined' ? window.devicePixelRatio : 1) || 1;
-  DPR = Math.min(rawDpr, 2);
-  // Width alone misses a LANDSCAPE phone (wide but short, finger-driven): treat a
-  // coarse-pointer device with a short viewport as mobile too, so it never falls
-  // into the hover-dependent desktop layout (audit: ландшафт проваливался в десктоп).
-  MOBILE = VW < 720 || (matchMedia('(pointer: coarse)').matches && VH < 520);
+  // The two decisions under this — the DPR cap and what counts as a phone — live in
+  // `viewport.ts` (REFM-24), where they are covered by tests.
+  const v = measureViewport();
+  VW = v.w;
+  VH = v.h;
+  DPR = v.dpr;
+  MOBILE = v.mobile;
   canvas.width = Math.round(VW * DPR);
   canvas.height = Math.round(VH * DPR);
   canvas.style.width = VW + 'px';
@@ -913,31 +904,6 @@ function resize() {
 }
 if (typeof window !== 'undefined') window.addEventListener('resize', resize);
 resize();
-
-// Deterministic faint starfield (normalized 0..1), drawn as dim vector ticks.
-const STARS = Array.from({ length: 280 }, (_, i) => {
-  const r1 = (Math.sin(i * 12.9898) * 43758.5453) % 1;
-  const r2 = (Math.sin(i * 78.233) * 12543.1234) % 1;
-  const r3 = (Math.sin(i * 3.71) * 9281.77) % 1;
-  return {
-    x: (r1 + 1) % 1,
-    y: (r2 + 1) % 1,
-    b: 0.12 + ((r3 + 1) % 1) * 0.45,
-    phase: i * 0.37,
-  };
-});
-const NEBULAE = Array.from({ length: 5 }, (_, i) => {
-  const r1 = (Math.sin(i * 21.771) * 36137.13) % 1;
-  const r2 = (Math.sin(i * 9.317) * 21891.41) % 1;
-  const r3 = (Math.sin(i * 15.913) * 11923.71) % 1;
-  return {
-    x: (r1 + 1) % 1,
-    y: (r2 + 1) % 1,
-    r: 160 + ((r3 + 1) % 1) * 180,
-    color: i % 2 ? '#8f6dff' : '#35d6e6',
-    phase: i * 1.7,
-  };
-});
 
 // The backdrop (deep-space + nebulae + radar grid + star ticks) is baked into the
 // cached static layer (see buildStaticLayer). This is the only live backdrop bit:
@@ -11693,9 +11659,13 @@ function renderPingPanel(): void {
         })
         .join('')
     : `<div class="pp-empty">${t('ping.panel.empty')}</div>`;
+  // Шапка — СТАНДАРТНАЯ (.lw-head + ✕), как у лога, технологий и «Хранителя»: до этого
+  // здесь стояла сырая браузерная кнопка с текстом — единственная нестилизованная
+  // кнопка в интерфейсе. Заодно бесплатно достаётся телефонное правило 44px
+  // (мобильный media-блок целится в `.lw-head button`).
   el.innerHTML =
-    `<div class="pp-head"><b>${t('ping.panel.title')}</b>` +
-    `<button data-pact="close">${t('card.close')}</button></div>` +
+    `<div class="lw-head"><b>${t('ping.panel.title')}</b>` +
+    `<button class="lw-close" data-pact="close" aria-label="${t('card.close')}">✕</button></div>` +
     body;
 }
 
