@@ -43,6 +43,9 @@ const data: GameData = parseGameData({
   factions: {},
   buildings: {
     mine: { name: 'Mine', cost: { metal: 50 }, buildTimeHours: 4, produces: { metal: 10 } },
+    // RULES-2: здание, которому каталог РАЗРЕШАЕТ стоять в двух экземплярах —
+    // сторож ниже проверяет, что лимит берётся из данных, а не зашит в редьюсере.
+    turret: { name: 'Turret', cost: { metal: 10 }, buildTimeHours: 1, maxPerPlanet: 2 },
     shipyard: {
       name: 'Shipyard',
       cost: { metal: 100 },
@@ -415,6 +418,30 @@ describe('construction module — building levels and upgrades', () => {
     a.buildings = [{ type: 'mine', level: 1, hp: 0 }];
     const st = stateWith({ players: [player('p1', { metal: 100 })], planets: [a] });
     expect(errCode(kernel.applyAction(st, construct('mine'), ctx(0)))).toBe('E_ALREADY_BUILT');
+  });
+
+  // --- RULES-2: лимит экземпляров объявляют ДАННЫЕ ---------------------------
+  // «Одно здание такого типа на мир» было строкой в редьюсере; теперь это поле
+  // maxPerPlanet с дефолтом 1. Проверяем ровно то, ради чего переезд: поведение
+  // следует объявленному числу, а не остаётся зашитым.
+  it('второй экземпляр РАЗРЕШЁН, если каталог объявил maxPerPlanet: 2', () => {
+    const kernel = createKernel([constructionModule]);
+    const a = planet('A', 'p1');
+    a.buildings = [{ type: 'turret', level: 1, hp: 0 }];
+    const st = stateWith({ players: [player('p1', { metal: 100 })], planets: [a] });
+    const r = kernel.applyAction(st, construct('turret'), ctx(0));
+    expect(r.ok).toBe(true);
+  });
+
+  it('третий экземпляр всё же отбивается — лимит именно тот, что в данных', () => {
+    const kernel = createKernel([constructionModule]);
+    const a = planet('A', 'p1');
+    a.buildings = [
+      { type: 'turret', level: 1, hp: 0 },
+      { type: 'turret', level: 1, hp: 0 },
+    ];
+    const st = stateWith({ players: [player('p1', { metal: 100 })], planets: [a] });
+    expect(errCode(kernel.applyAction(st, construct('turret'), ctx(0)))).toBe('E_ALREADY_BUILT');
   });
 });
 

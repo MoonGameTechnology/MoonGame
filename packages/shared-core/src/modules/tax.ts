@@ -1,5 +1,6 @@
 import type { GameModule } from '../kernel/module';
 import type { GameData, ResourceBag } from '../data/schemas';
+import { buildingLevel } from '../data/schemas';
 import type { GameState, Planet } from '../state/gameState';
 import { allowedBuildings, hasOrbit } from '../state/sectorKind';
 
@@ -19,8 +20,10 @@ import { allowedBuildings, hasOrbit } from '../state/sectorKind';
  *  prototype comment: worlds also make credits PASSIVELY via baseOutput now,
  *  so this flat capital tax is a modest bonus, not the sole income source). */
 export const TAX_PER_HOUR = 20;
-/** Tax Office building (FND-3): +this fraction to that world's WHOLE credit take. */
-export const TAX_OFFICE_BONUS = 0.25;
+/** RULES-2. Кредитный бонус здания больше НЕ константа с именем конкретного здания:
+ *  его объявляет само здание полем `creditsBonus` (data/*.json). Раньше здесь стояло
+ *  `TAX_OFFICE_BONUS = 0.25` и проверка `type === 'tax_office'` — правило про контент,
+ *  зашитое в механику, причём про здание, которого в поставляемом каталоге нет. */
 /** Civic tax per world tapers as an empire grows. */
 export const TAX_DIMINISH = 0.06;
 
@@ -52,6 +55,16 @@ export function inhabitedWorldCount(
   return n;
 }
 
+/** Суммарная доля прибавки к кредитному доходу мира от его зданий (RULES-2). */
+export function creditsBonusOf(data: GameData, planet: Pick<Planet, 'buildings'>): number {
+  let sum = 0;
+  for (const b of planet.buildings) {
+    const def = data.buildings[b.type];
+    if (def) sum += buildingLevel(def, b.level).creditsBonus;
+  }
+  return sum;
+}
+
 export const taxModule: GameModule = {
   id: 'tax',
   version: '1.0.0',
@@ -68,9 +81,11 @@ export const taxModule: GameModule = {
       const out: Record<string, number> = { ...bag };
       out.credits =
         (out.credits ?? 0) + civicTax(inhabitedWorldCount(h.ctx.data, h.state, planet.owner));
-      if (planet.buildings.some((b) => b.type === 'tax_office')) {
-        out.credits *= 1 + TAX_OFFICE_BONUS;
-      }
+      // Сумма объявленных бонусов всех стоящих зданий мира (уровень учитывается —
+      // как у `produces`/`radarRange`). Пустая сумма = множитель 1, поэтому каталог
+      // без таких зданий ведёт себя ровно как прежде.
+      const bonus = creditsBonusOf(h.ctx.data, planet);
+      if (bonus !== 0) out.credits *= 1 + bonus;
       return out;
     });
   },

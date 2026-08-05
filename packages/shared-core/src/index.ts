@@ -358,7 +358,7 @@ export {
   isInhabited,
   inhabitedWorldCount,
   TAX_PER_HOUR,
-  TAX_OFFICE_BONUS,
+  creditsBonusOf,
   TAX_DIMINISH,
 } from './modules/tax';
 export { constructionModule } from './modules/construction';

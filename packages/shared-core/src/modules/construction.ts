@@ -108,6 +108,17 @@ function scheduleCompletion(h: HandlerContext, hours: number, payload: CompleteP
 
 /** True if a `construction.complete` of this `kind` for this planet+building is already
  *  in flight — the "already queued?" guard shared verbatim by build and upgrade. */
+/**
+ * RULES-2. Занят ли лимит экземпляров здания на мире. Правило («одно такое здание на
+ * мир, уровень растят улучшением») больше не строка в редьюсере — его объявляет само
+ * здание полем `maxPerPlanet`, а код лишь исполняет объявленное. Дефолт схемы `1`
+ * сохраняет прежнее поведение всего каталога.
+ */
+function atInstanceCap(h: HandlerContext, planet: Planet, building: string): boolean {
+  const cap = h.ctx.data.buildings[building]?.maxPerPlanet ?? 1;
+  return planet.buildings.filter((b) => b.type === building).length >= cap;
+}
+
 function isQueued(
   h: HandlerContext,
   kind: CompletePayload['kind'],
@@ -257,8 +268,8 @@ export const constructionModule: GameModule = {
         return h.reject('E_WRONG_SECTOR'); // this structure does not fit this province type
       }
       requireUnlocked(h, action.playerId, 'building', payload.building);
-      if (planet.buildings.some((b) => b.type === payload.building)) {
-        return h.reject('E_ALREADY_BUILT'); // one of each type; grow it with building.upgrade
+      if (atInstanceCap(h, planet, payload.building)) {
+        return h.reject('E_ALREADY_BUILT'); // лимит экземпляров исчерпан (maxPerPlanet)
       }
       if (isQueued(h, 'building', planet.id, payload.building)) {
         return h.reject('E_ALREADY_QUEUED');
@@ -470,7 +481,7 @@ export const constructionModule: GameModule = {
         return h.reject('E_NOT_PAUSED');
       }
       if (site.kind === 'building' && typeof site.building === 'string') {
-        if (planet.buildings.some((b) => b.type === site.building)) {
+        if (atInstanceCap(h, planet, site.building)) {
           return h.reject('E_ALREADY_BUILT');
         }
         if (isQueued(h, 'building', planet.id, site.building)) {
