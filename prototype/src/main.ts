@@ -329,6 +329,7 @@ import {
 import { resolveIntro, parseSeenIntros, type IntroCard } from './intros';
 // ONB-5 — return digest ("пока тебя не было"): aggregate the away-window event log.
 import { buildRecap, type RecapEvent } from './recap';
+import { canEditPing, canRemovePing, pingRows, toggleHidden } from './pingPanel';
 // ONB-7 — first-session goals checklist (mine/fleet/capture/score, ticked from state).
 import { FIRST_GOALS, metGoals, mergeDone, goalsComplete, type GoalSignals } from './firstGoals';
 import { reconnectDelayMs } from './reconnect';
@@ -8499,6 +8500,7 @@ const techTree = initTechTree({
   order: playerOrder,
   onOpen: () => maybeIntro('tech'),
 });
+wirePingPanel(); // PING-PANEL: кнопка рельсы + обработчики окна меток
 document.getElementById('rail-tech')?.addEventListener('click', () => techTree.open());
 
 
@@ -11236,6 +11238,7 @@ const BACK_LAYERS: BackLayer[] = [
   }, // z46
   { id: 'logwin', isOpen: () => logWin?.classList.contains('show') === true, close: () => logWin?.classList.remove('show') }, // z46
   { id: 'codexhub', isOpen: () => shown('codexhub'), close: () => hide('codexhub') }, // z45
+  { id: 'pingpanel', isOpen: () => pingPanelOpen, close: () => closePingPanel() }, // z60
   { id: 'pingpop', isOpen: () => pingPopEl?.classList.contains('show') === true, close: () => closePingPop() }, // z45
   { id: 'splitdlg', isOpen: () => splitState !== null, close: () => { splitState = null; lastPanelHtml = ''; } }, // z45
   // --- низ экрана (z27…z20) ---
@@ -11869,6 +11872,100 @@ function createPingTo(dest: string): void {
   }
   closePingMenu();
 }
+/**
+ * PING-PANEL — окно «метки коалиции»: свои и союзные в одном списке.
+ *
+ * Права разведены в чистой модели (`pingPanel.ts`): свой пинг правится и снимается у
+ * всех, чужой — только прячется у меня. Здесь только разметка и обработчики.
+ */
+let hiddenPings: ReadonlySet<string> = new Set();
+let pingPanelOpen = false;
+
+function renderPingPanel(): void {
+  const el = document.getElementById('pingpanel');
+  if (!el) return;
+  const rows = pingRows(sessionMessages, ME, hiddenPings);
+  const body = rows.length
+    ? rows
+        .map((r) => {
+          const pl = s.planets[r.loc];
+          const where = pl ? planetName(r.loc) : r.loc;
+          const who = NAME[r.from] ?? r.from;
+          return (
+            `<div class="pp-row${r.hidden ? ' off' : ''}" data-ploc="${esc(r.loc)}">` +
+            `<i class="pp-dot" style="background:${ownerColor(r.from)}"></i>` +
+            `<span class="pp-txt"><b>${esc(where)}</b><span>${esc(r.text || '—')} · ${esc(who)}</span></span>` +
+            `<button data-pact="go" title="${t('ping.panel.go')}">🎯</button>` +
+            `<button data-pact="hide" title="${t(r.hidden ? 'ping.panel.show' : 'ping.panel.hide')}">${r.hidden ? '🙈' : '👁'}</button>` +
+            (canEditPing(r) ? `<button data-pact="edit" title="${t('ping.panel.edit')}">✎</button>` : '') +
+            (canRemovePing(r) ? `<button data-pact="del" title="${t('ping.panel.del')}">✕</button>` : '') +
+            `</div>`
+          );
+        })
+        .join('')
+    : `<div class="pp-empty">${t('ping.panel.empty')}</div>`;
+  el.innerHTML =
+    `<div class="pp-head"><b>${t('ping.panel.title')}</b>` +
+    `<button data-pact="close">${t('card.close')}</button></div>` +
+    body;
+}
+
+function wirePingPanel(): void {
+  document.getElementById('rail-pings')?.addEventListener('click', () => {
+    if (pingPanelOpen) closePingPanel();
+    else openPingPanel();
+  });
+  document.getElementById('pingpanel')?.addEventListener('click', (ev) => {
+    const btn = (ev.target as HTMLElement).closest('[data-pact]') as HTMLElement | null;
+    if (!btn) return;
+    const act = btn.dataset.pact;
+    if (act === 'close') return void closePingPanel();
+    const loc = btn.closest('[data-ploc]') as HTMLElement | null;
+    const id = loc?.dataset.ploc;
+    if (!id) return;
+    if (act === 'go') {
+      focusWorld(id); // камера — к любому пингу: смотреть не запрещено никому
+      closePingPanel();
+      return;
+    }
+    if (act === 'hide') {
+      hiddenPings = toggleHidden(hiddenPings, id); // ЛОКАЛЬНО — у союзника метка цела
+      renderPingPanel();
+      return;
+    }
+    if (act === 'edit') {
+      const row = pingRows(sessionMessages, ME, hiddenPings).find((r) => r.loc === id);
+      if (!row || !canEditPing(row)) return; // право проверяет модель, не разметка
+      const next = prompt(t('ping.panel.edit'), row.text);
+      if (next === null) return;
+      // Правка = снять и поставить заново: пинг — это СООБЩЕНИЕ, отдельного
+      // «изменить текст» ни у ленты, ни у сервера нет, а изобретать его ради UI
+      // значило бы завести второй путь записи метки.
+      const text = next.trim();
+      removePing(id);
+      if (NET && netClient) netClient.placePing({ kind: 'mark', target: { node: id }, label: text });
+      else pushMsg(COALITION, text || t('ping.mark', { loc: id }), false, ME, id);
+      renderPingPanel();
+      return;
+    }
+    if (act === 'del') {
+      const row = pingRows(sessionMessages, ME, hiddenPings).find((r) => r.loc === id);
+      if (row && canRemovePing(row)) removePing(id);
+      renderPingPanel();
+    }
+  });
+}
+
+function openPingPanel(): void {
+  pingPanelOpen = true;
+  renderPingPanel();
+  document.getElementById('pingpanel')?.classList.add('show');
+}
+function closePingPanel(): void {
+  pingPanelOpen = false;
+  document.getElementById('pingpanel')?.classList.remove('show');
+}
+
 /** Active coalition pings, one marker per province (the latest ping there wins). The
  *  coalition chat log and the map markers share this single source. */
 function activePings(): SessionMsg[] {
@@ -12154,6 +12251,7 @@ function drawPings(now: number): void {
   pingHits = [];
   for (const m of activePings()) {
     if (m.from === ME && !showOwnPings) continue; // hidden by «Свои метки» switch
+    if (hiddenPings.has(m.ping!)) continue; // PING-PANEL: спрятан ЛОКАЛЬНО (у союзника метка цела)
     const pl = s.planets[m.ping!];
     if (!pl) continue;
     const c = world(pl.position);
