@@ -291,7 +291,10 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
 
   /** An auth app with recovery wired + a capturing mailer (the reset link never leaves the
    *  test). Mirrors the serverConfig composition: same key, a distinct `reset` audience. */
-  function recoverApp(resetBaseUrl = 'https://play.example'): {
+  function recoverApp(
+    resetBaseUrl = 'https://play.example',
+    rate: { rateMax?: number; rateWindowMs?: number } = {},
+  ): {
     server: FastifyInstance;
     sent: Array<{ to: string; text: string }>;
     users: MemoryUserStore;
@@ -315,9 +318,40 @@ describe('SE-1.x · password recovery (/auth/recover + /auth/reset)', () => {
         return Promise.resolve();
       },
       scryptParams: FAST,
+      ...rate,
     });
     return { server: app, sent, users };
   }
+
+  // КОМПЕНСАЦИЯ ЗА ПОДАВЛЕННЫЙ CodeQL-запрос `js/missing-rate-limiting`.
+  //
+  // Запрос ищет ИЗВЕСТНЫЕ ему middleware и, не найдя, объявляет роут незащищённым —
+  // наш `slidingWindowIpLimiter` он опознать не может, поэтому все его срабатывания
+  // здесь ложные, и он исключён в `.github/codeql/codeql-config.yml`. Исключение
+  // выключает запрос ЦЕЛИКОМ, то есть новый auth-роут без лимита CodeQL уже не поймает.
+  // Ловит этот тест — и ловит строже: он проверяет ПОВЕДЕНИЕ (пришёл ли 429), а не
+  // присутствие известного пакета.
+  //
+  // Существующий тест выше покрывает только register+login; recover и reset до сих пор
+  // не проверялись на лимит вообще. Заводишь новый `/auth/*` — допиши строку в таблицу.
+  it('лимитирует КАЖДЫЙ auth-роут (компенсация за подавленный js/missing-rate-limiting)', async () => {
+    const ROUTES: Array<{ url: string; body: unknown }> = [
+      { url: '/auth/register', body: { login: 'limit_probe', password: 'longenough' } },
+      { url: '/auth/login', body: { login: 'limit_probe', password: 'longenough' } },
+      { url: '/auth/recover', body: { email: 'limit_probe@example.com' } },
+      { url: '/auth/reset', body: { token: 'irrelevant', password: 'longenough' } },
+    ];
+    for (const route of ROUTES) {
+      // Своя копия приложения на каждый роут: лимитер общий на IP, и без этого первый
+      // же роут сжёг бы квоту за остальных, а тест бы «прошёл», ничего не проверив.
+      const { server } = recoverApp('https://play.example', { rateMax: 1, rateWindowMs: 60_000 });
+      await post(server, route.url, route.body); // сжигаем единственную попытку
+      const throttled = await post(server, route.url, route.body);
+      expect(throttled.statusCode, `${route.url} не ответил 429 на исчерпанном лимите`).toBe(429);
+      expect(throttled.json()).toEqual({ error: 'E_RATE_LIMIT' });
+      await server.close();
+    }
+  });
 
   const tokenFrom = (text: string): string => decodeURIComponent(text.match(/\?reset=(\S+)/)![1]!);
 
