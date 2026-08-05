@@ -266,6 +266,9 @@ import {
 } from './troopsMenu';
 // SND-1 — синтезированные звуки интерфейса (тёмный космос + космическая опера).
 import { initSound } from './sound';
+// REFM-16 — клиентские настройки: одно правило чтения/записи на весь клиент вместо
+// восьми рукописных копий «нет ключа ⇒ умолчание» + try/catch вокруг setItem.
+import { prefStore, readBool, readNum, readRaw, writeBool, writeRaw } from './prefs';
 // CHAIN-UX — режим «Приказ»: модель черновика, меню точки, таймлайн, разметка.
 import {
   applyMenuAction,
@@ -394,8 +397,6 @@ const RELATION_SCHEMES: Record<string, SideScheme> = {
   warm: { enemy: '#ff6a3a', ally: '#2fb5c9', neutral: '#a8a29a' },
   cvd: { enemy: '#d55e00', ally: '#0072b2', neutral: '#9a9a9a' }, // Okabe–Ito, CVD-safe
 };
-const readPref = (k: string): string | null =>
-  typeof localStorage !== 'undefined' ? localStorage.getItem(k) : null;
 /** Side colours feed inline `style="color:…"` and `<input type=color value>` sinks, so a
  *  value reaching them MUST be a literal `#rrggbb` — never free text. They originate from
  *  `<input type="color">` (already constrained) but round-trip through localStorage, which a
@@ -410,19 +411,17 @@ function safeHexColor(c: string | null | undefined, fallback: string): string {
   // default. (The guard form is what taint-analysis recognizes as a sanitizer.)
   return typeof c === 'string' && /^#[0-9a-fA-F]{6}$/.test(c) ? c : fallback;
 }
-let youColor = safeHexColor(readPref('void.colorYou'), COLOR.p1!);
-let neutralColor = safeHexColor(readPref('void.colorNeutral'), COLOR.null!);
-let rivalPaletteId = readPref('void.rivalPalette') ?? 'classic';
+let youColor = safeHexColor(readRaw('void.colorYou'), COLOR.p1!);
+let neutralColor = safeHexColor(readRaw('void.colorNeutral'), COLOR.null!);
+let rivalPaletteId = readRaw('void.rivalPalette') ?? 'classic';
 if (!RELATION_SCHEMES[rivalPaletteId]) rivalPaletteId = 'classic';
 function setSideColors(you: string, neutral: string, palette: string): void {
   youColor = safeHexColor(you, COLOR.p1!);
   neutralColor = safeHexColor(neutral, COLOR.null!);
   rivalPaletteId = RELATION_SCHEMES[palette] ? palette : 'classic';
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem('void.colorYou', youColor);
-    localStorage.setItem('void.colorNeutral', neutralColor);
-    localStorage.setItem('void.rivalPalette', rivalPaletteId);
-  }
+  writeRaw('void.colorYou', youColor);
+  writeRaw('void.colorNeutral', neutralColor);
+  writeRaw('void.rivalPalette', rivalPaletteId);
 }
 // Political colour is relative to the local commander: YOU are your configured hue,
 // unowned space grey, and every other commander is coloured by your STANCE toward them
@@ -464,7 +463,7 @@ const DEV_UI = ((): boolean => {
   try {
     if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('dev'))
       return true;
-    return typeof localStorage !== 'undefined' && localStorage.getItem('vd.dev') === '1';
+    return readBool('vd.dev', false);
   } catch {
     return false;
   }
@@ -893,7 +892,7 @@ const crestMark = $('crestmark');
 // state, never sent to the server. Falls back to the first glyph if unset/unknown.
 const EMBLEMS = ['◆', '◇', '⬡', '⬢', '✦', '✧', '★', '⚛', '◉', '⌖', '❖', '⟡'];
 function playerEmblem(): string {
-  const e = (typeof localStorage !== 'undefined' && localStorage.getItem('void.emblem')) || '';
+  const e = readRaw('void.emblem') ?? '';
   return EMBLEMS.includes(e) ? e : EMBLEMS[0]!;
 }
 function applyEmblem(): void {
@@ -904,11 +903,7 @@ function applyEmblem(): void {
 }
 function setPlayerEmblem(g: string): void {
   if (!EMBLEMS.includes(g)) return;
-  try {
-    localStorage.setItem('void.emblem', g);
-  } catch {
-    /* private mode — keep the in-memory choice only */
-  }
+  writeRaw('void.emblem', g);
   applyEmblem();
 }
 
@@ -987,33 +982,18 @@ let sweepPrevAng = -1; // previous frame's arm angle, for "did the arm cross X" 
 // 0 hides the wedge + arm entirely; any value only dims the CHROME — the radar MECHANIC
 // (contact snapshots + blip afterglow) is computed before the visual gate, so it is
 // unaffected at every setting. Absent key ⇒ full (1); a stored 0 must NOT be read as absent.
-let sweepOpacity = ((): number => {
-  const raw =
-    typeof localStorage !== 'undefined' ? localStorage.getItem('void.sweepOpacity') : null;
-  if (raw === null) return 1;
-  const n = Number(raw);
-  return Number.isFinite(n) && n >= 0 && n <= 1 ? n : 1;
-})();
+let sweepOpacity = readNum('void.sweepOpacity', 1, 0, 1);
 function setSweepOpacity(v: number): void {
   sweepOpacity = Math.min(1, Math.max(0, v));
-  try {
-    localStorage.setItem('void.sweepOpacity', String(sweepOpacity));
-  } catch {
-    /* private-mode / storage-full: keep the in-memory value, just don't persist */
-  }
+  writeRaw('void.sweepOpacity', String(sweepOpacity));
 }
 // Player display preference (client-only, localStorage): show YOUR OWN ping markers
 // on the map. Purely visual — the ping itself (chat line, allies' view, the server
 // relay) is untouched; allies' pins are always drawn. Default on.
-let showOwnPings =
-  typeof localStorage === 'undefined' || localStorage.getItem('void.showOwnPings') !== '0';
+let showOwnPings = readBool('void.showOwnPings', true);
 function setShowOwnPings(v: boolean): void {
   showOwnPings = v;
-  try {
-    localStorage.setItem('void.showOwnPings', v ? '1' : '0');
-  } catch {
-    /* private-mode / storage-full: keep the in-memory value, just don't persist */
-  }
+  writeBool('void.showOwnPings', v);
 }
 // --- graphics preferences (client-only, localStorage) ------------------------
 // Cosmetic quality knobs, never sent to the server and never touching the sim.
@@ -1021,19 +1001,15 @@ function setShowOwnPings(v: boolean): void {
 // flatter, faster read of the map.
 // Glow & haloes: the soft bloom discs (blitGlow) around worlds, fleets and
 // frontiers. Off makes blitGlow a no-op — cheaper frames, a crisper flat map.
-let glowFx = typeof localStorage === 'undefined' || localStorage.getItem('void.glowFx') !== '0';
+let glowFx = readBool('void.glowFx', true);
 function setGlowFx(v: boolean): void {
   glowFx = v;
-  try {
-    localStorage.setItem('void.glowFx', v ? '1' : '0');
-  } catch {
-    /* private-mode / storage-full: keep the in-memory value, just don't persist */
-  }
+  writeBool('void.glowFx', v);
 }
 // SND-1 — звуки интерфейса: синтезатор целиком в sound.ts, здесь только фабрика.
 // AudioContext создаётся лениво при первом play() (всегда внутри клика — autoplay
 // доволен); среда без WebAudio/localStorage — молча беззвучна, UI живёт как жил.
-const snd = initSound(typeof localStorage === 'undefined' ? null : localStorage);
+const snd = initSound(prefStore());
 // shadowBlur gate: a per-draw gaussian blur is one of the priciest canvas ops on
 // mobile GPUs. `blitGlow` already honours glowFx, but the ~20 `cx.shadowBlur = n`
 // halos on nodes / fleets / projectiles / HUD did not — so "Свечение и ореолы: выкл"
@@ -1045,21 +1021,15 @@ function fxBlur(n: number): number {
 // Deep-space backdrop: the drifting nebulae + faint star ticks baked into the
 // static layer. Off leaves the flat fill + plotting grid. Toggling rebuilds the
 // bake (starfield flag rides the static-layer cache signature in buildStaticLayer).
-let starfield =
-  typeof localStorage === 'undefined' || localStorage.getItem('void.starfield') !== '0';
+let starfield = readBool('void.starfield', true);
 function setStarfield(v: boolean): void {
   starfield = v;
-  try {
-    localStorage.setItem('void.starfield', v ? '1' : '0');
-  } catch {
-    /* private-mode / storage-full: keep the in-memory value, just don't persist */
-  }
+  writeBool('void.starfield', v);
 }
 // «Компактный режим меню» (PC): a denser sector panel — tighter paddings, smaller
 // type/chips/tiles. Rides a body class so pure CSS restyles the panel live; the
 // panel markup and behaviour are untouched. Default off.
-let compactPanel =
-  typeof localStorage !== 'undefined' && localStorage.getItem('void.compactPanel') === '1';
+let compactPanel = readBool('void.compactPanel', false);
 function applyCompactPanel(): void {
   document.body.classList.toggle('compact-panel', compactPanel);
 }
@@ -1067,39 +1037,24 @@ applyCompactPanel();
 function setCompactPanel(v: boolean): void {
   compactPanel = v;
   applyCompactPanel();
-  try {
-    localStorage.setItem('void.compactPanel', v ? '1' : '0');
-  } catch {
-    /* private-mode / storage-full: keep the in-memory value, just don't persist */
-  }
+  writeBool('void.compactPanel', v);
 }
 // FPS counter: the little frames-per-second readout in the corner. A diagnostics
 // knob for players checking performance on their device — default OFF so the HUD
 // stays clean, opt-in from Settings. (DEV_UI / net-desync still force it on.)
-let showFps = typeof localStorage !== 'undefined' && localStorage.getItem('void.showFps') === '1';
+let showFps = readBool('void.showFps', false);
 function setShowFps(v: boolean): void {
   showFps = v;
-  try {
-    localStorage.setItem('void.showFps', v ? '1' : '0');
-  } catch {
-    /* private-mode / storage-full: keep the in-memory value, just don't persist */
-  }
+  writeBool('void.showFps', v);
 }
 // Developer setting (PC): show the speedbar time controls (pause + speed multipliers).
 // Off for a normal player — the world runs at its launch pace, real-time-async; a dev
 // flips it on to pause / accelerate for testing. Defaults on in the dev client so its
 // long-standing speedbar stays; off in the player build. Client-only (localStorage).
-let devSpeedControl = ((): boolean => {
-  const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('void.devSpeed') : null;
-  return raw === null ? !__PLAYER_BUILD__ : raw === '1';
-})();
+let devSpeedControl = readBool('void.devSpeed', !__PLAYER_BUILD__);
 function setDevSpeedControl(v: boolean): void {
   devSpeedControl = v;
-  try {
-    localStorage.setItem('void.devSpeed', v ? '1' : '0');
-  } catch {
-    /* private-mode / storage-full: keep the in-memory value, just don't persist */
-  }
+  writeBool('void.devSpeed', v);
 }
 // The compact-mode CSS is gated on the PC media query — JS-side string shortening
 // (ping button, conveyor idle line, upgrade buttons) must follow the same gate, or

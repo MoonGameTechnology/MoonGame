@@ -21,6 +21,10 @@
  * пользовательского жеста (клик), что удовлетворяет autoplay-политике браузеров.
  */
 
+// REFM-16: правила хранения настройки (умолчание при отсутствии ключа, диапазон,
+// молчаливый провал записи) живут в одном месте — здесь только СВОИ ключи и умолчания.
+import { readBool, readNum, writeBool, writeRaw, type PrefStore } from './prefs';
+
 export type SoundId = 'tap' | 'close' | 'error' | 'send' | 'start';
 
 export interface SoundVoice {
@@ -143,19 +147,13 @@ const STORE_VOL = 'void.sndVol';
 /** Общий трим: даже на полной громкости звуки сидят под интерфейсом, не поверх. */
 const MASTER_TRIM = 0.4;
 
-type Store = Pick<Storage, 'getItem' | 'setItem'>;
+type Store = PrefStore;
 
 /** Собрать синт. `store` инжектится ради тестов (в Node нет ни localStorage, ни
  *  AudioContext — сам синт при их отсутствии молча выключен, настройки работают). */
 export function initSound(store: Store | null): SoundApi {
-  let on = store?.getItem(STORE_ON) !== '0'; // по умолчанию ВКЛ — но тихо
-  let vol = (() => {
-    // ЛОВУШКА: Number(null) === 0, не NaN — отсутствующий ключ без явной проверки
-    // рождал бы громкость 0 на каждом чистом профиле (поймано живой проверкой).
-    const raw = store?.getItem(STORE_VOL);
-    const n = raw == null ? NaN : Number(raw);
-    return Number.isFinite(n) && n >= 0 && n <= 1 ? n : 0.7;
-  })();
+  let on = readBool(STORE_ON, true, store); // по умолчанию ВКЛ — но тихо
+  let vol = readNum(STORE_VOL, 0.7, 0, 1, store);
 
   let ctx: AudioContext | null = null;
   let master: GainNode | null = null;
@@ -270,21 +268,13 @@ export function initSound(store: Store | null): SoundApi {
     enabled: () => on,
     setEnabled(next) {
       on = next;
-      try {
-        store?.setItem(STORE_ON, next ? '1' : '0');
-      } catch {
-        /* приватный режим без localStorage — настройка живёт до перезагрузки */
-      }
+      writeBool(STORE_ON, next, store);
       if (!next && ctx) void ctx.suspend().catch(() => {});
     },
     volume: () => vol,
     setVolume(v) {
       vol = Math.max(0, Math.min(1, v));
-      try {
-        store?.setItem(STORE_VOL, String(vol));
-      } catch {
-        /* см. выше */
-      }
+      writeRaw(STORE_VOL, String(vol), store);
       if (master) master.gain.value = vol * MASTER_TRIM;
     },
   };
