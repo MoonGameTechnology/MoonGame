@@ -521,6 +521,25 @@ export interface GameState {
    *  `visibleState` strips everyone else's negotiations. Maintained by
    *  `diplomacyModule`; helpers in `state/diplomacy.ts`. */
   diplomacyOffers?: Record<string, DiplomaticStance>;
+  /** MAPSHARE-1. Договоры об ОБМЕНЕ КАРТАМИ, ключ — симметричный `pairKey`.
+   *
+   *  Это НЕ ступень дипломатической лестницы, а отдельное соглашение поверх неё:
+   *  лестница `war→peace→pact→alliance` линейна и задаёт враждебность, а обмен
+   *  картами ортогонален — его заключают и при мире, и при пакте, и он не делает
+   *  участников союзниками. Даёт ровно два права: делится разведкой (`coverageFor`
+   *  пулит покрытие так же, как по `alliance`) и пускает чужой десант на свою землю
+   *  (`army.unload`). НЕ даёт: союзного отношения в бою (`stanceToRelation` не
+   *  трогается) и места в коалиции для победы (`victory.ts` считает только
+   *  взаимно-союзные клики).
+   *
+   *  Заключается по взаимному согласию (тот же consent-протокол, что у смягчения
+   *  стойки), расторгается односторонне и рвётся сам при объявлении войны. Симметричен
+   *  и ПУБЛИЧЕН, как `diplomacy`: кто с кем делится картой — не тайна. */
+  mapShares?: Record<string, true>;
+  /** Стоящие ПРЕДЛОЖЕНИЯ обмена картами, ключ — направленный `offerKey` (`from>to`).
+   *  Приватны для двух сторон, как `diplomacyOffers` — `visibleState` вырезает чужие
+   *  переговоры. */
+  mapShareOffers?: Record<string, true>;
   /** Stolen intel windows per beneficiary (`espionageModule`). PRIVATE: a viewer's
    *  projection carries only their own grants — who spies on whom is never public. */
   intel?: Record<PlayerId, IntelGrant[]>;

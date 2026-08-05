@@ -8,6 +8,9 @@ import { parseGameData, type GameData } from '../data/schemas';
 import {
   getOffer,
   getStance,
+  hasMapShare,
+  hasMapShareOffer,
+  setMapShare,
   setStance,
   stanceToRelation,
   type DiplomacyCapability,
@@ -315,5 +318,96 @@ describe('diplomacyModule — eliminated seats are out of the game (BF-32)', () 
     expect(errCode(kernel.applyAction(state, declare('p1', 'p2', 'peace'), ctx()))).toBe(
       'E_NO_PLAYER',
     );
+  });
+});
+
+// --- MAPSHARE-1: договор об обмене картами -----------------------------------
+// Заказ владельца: высадка «к членам коалиции И к тем, с кем заключён обмен картами».
+// Коалиция в этой модели — стойка `alliance`; отдельного обмена картами не было, и он
+// заведён здесь ОТДЕЛЬНЫМ соглашением поверх лестницы стоек, а не пятой ступенью:
+// лестница линейна и задаёт враждебность, а обмен ортогонален — его заключают и при
+// мире, и при пакте, и он не делает участников союзниками.
+describe('diplomacyModule — MAPSHARE-1: обмен картами', () => {
+  const kernel = createKernel([diplomacyModule]);
+  const share = (playerId: string, target: string, on: boolean, seq = 1): Action => ({
+    id: `s:${playerId}:m${seq}`,
+    type: 'diplomacy.mapshare',
+    playerId,
+    payload: { target, on },
+    issuedAt: 0,
+  });
+  /** Пара в мире — с врагом договориться нельзя (см. тест ниже). */
+  const atPeace = (): GameState => {
+    const s = baseState();
+    setStance(s, 'p1', 'p2', 'peace');
+    return s;
+  };
+
+  it('одностороннего договора не бывает: первое согласие — только предложение', () => {
+    const out = okApply(kernel.applyAction(atPeace(), share('p1', 'p2', true), ctx()));
+    expect(hasMapShare(out.state, 'p1', 'p2')).toBe(false);
+    expect(hasMapShareOffer(out.state, 'p1', 'p2')).toBe(true);
+    expect(out.events.map((e) => e.type)).toContain('diplomacy.mapshare.offered');
+  });
+
+  it('встречное согласие заключает договор и снимает предложения', () => {
+    const first = okApply(kernel.applyAction(atPeace(), share('p1', 'p2', true), ctx()));
+    const out = okApply(kernel.applyAction(first.state, share('p2', 'p1', true, 2), ctx()));
+    expect(hasMapShare(out.state, 'p1', 'p2')).toBe(true);
+    expect(hasMapShareOffer(out.state, 'p1', 'p2')).toBe(false);
+    expect(out.events.map((e) => e.type)).toContain('diplomacy.mapshare.changed');
+  });
+
+  it('расторжение — ОДНОСТОРОННЕЕ: держать в договоре против воли нельзя', () => {
+    const s = atPeace();
+    setMapShare(s, 'p1', 'p2', true);
+    const out = okApply(kernel.applyAction(s, share('p2', 'p1', false), ctx()));
+    expect(hasMapShare(out.state, 'p1', 'p2')).toBe(false);
+  });
+
+  it('договор НЕ делает союзниками: стойка и отношение не меняются', () => {
+    const s = atPeace();
+    setMapShare(s, 'p1', 'p2', true);
+    expect(getStance(s, 'p1', 'p2')).toBe('peace');
+    expect(stanceToRelation(getStance(s, 'p1', 'p2'))).toBe('neutral');
+  });
+
+  it('война рвёт договор сама — врагу свою карту не оставляют', () => {
+    const s = atPeace();
+    setMapShare(s, 'p1', 'p2', true);
+    const out = okApply(kernel.applyAction(s, declare('p1', 'p2', 'war'), ctx()));
+    expect(hasMapShare(out.state, 'p1', 'p2')).toBe(false);
+  });
+
+  it('с тем, с кем война, договориться нельзя — сначала мир, потом карты', () => {
+    const s = baseState(); // дефолт пары — война (FFA)
+    expect(errCode(kernel.applyAction(s, share('p1', 'p2', true), ctx()))).toBe('E_FORBIDDEN');
+  });
+
+  it('повторы отбиваются стабильными кодами, а не молча', () => {
+    const s = atPeace();
+    const offered = okApply(kernel.applyAction(s, share('p1', 'p2', true), ctx()));
+    expect(errCode(kernel.applyAction(offered.state, share('p1', 'p2', true, 2), ctx()))).toBe(
+      'E_ALREADY_OFFERED',
+    );
+    const live = atPeace();
+    setMapShare(live, 'p1', 'p2', true);
+    expect(errCode(kernel.applyAction(live, share('p1', 'p2', true, 3), ctx()))).toBe(
+      'E_ALREADY_SHARED',
+    );
+    expect(errCode(kernel.applyAction(atPeace(), share('p1', 'p2', false), ctx()))).toBe(
+      'E_NO_MAPSHARE',
+    );
+  });
+
+  it('выбывший игрок не остаётся в договорах (иначе его карта светит вечно)', () => {
+    const s = atPeace();
+    setMapShare(s, 'p1', 'p2', true);
+    const gone = createKernel([diplomacyModule]).applyAction(
+      s,
+      { id: 'x', type: 'diplomacy.declare', playerId: 'p1', payload: { target: 'p2', stance: 'war' }, issuedAt: 0 },
+      ctx(),
+    );
+    expect(gone.ok && hasMapShare(gone.state, 'p1', 'p2')).toBe(false);
   });
 });

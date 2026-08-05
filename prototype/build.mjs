@@ -631,6 +631,14 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 .dp-spy{padding:6px 10px;border-radius:6px;border:1px solid var(--amber-dim,#8a6a2f);background:transparent;
   color:var(--amber);font:700 11px ui-monospace,monospace;cursor:pointer;}
 .dp-spy:hover{border-color:var(--amber);background:rgba(255,180,58,.1);}
+/* MAPSHARE-1: договор об обмене картами — отдельная кнопка, не ступень лестницы стоек,
+   поэтому и цвет свой (не STANCE_COLOR): нейтральный «картографический» зелёный. */
+.dp-map{padding:6px 10px;border-radius:6px;border:1px solid #3f7a5e;background:transparent;
+  color:#6fd6a4;font:700 11px ui-monospace,monospace;cursor:pointer;}
+.dp-map:hover:not(:disabled){border-color:#6fd6a4;background:rgba(111,214,164,.1);}
+.dp-map.on{color:#8ff0c2;border-color:#8ff0c2;background:rgba(111,214,164,.14);}
+.dp-map.offer{color:#8ff0c2;border-color:#8ff0c2;animation:sppulse 1.6s ease-in-out infinite;}
+.dp-map.pend,.dp-map:disabled{opacity:.5;cursor:default;}
 .dp-intel{padding:2px 10px 9px 39px;font-size:11px;color:var(--cyan);}
 .dp-intel b{color:#eafffb;}
 /* SPY-UX: вкладка «Шпионаж» — активные окна интела, операции, сессионный журнал */
