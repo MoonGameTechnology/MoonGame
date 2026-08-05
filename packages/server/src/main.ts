@@ -21,6 +21,9 @@ import {
 } from './matchApi';
 import { registerAuthApi, liveSession } from './authApi';
 import { registerCorpApi } from './corpApi';
+import { MS_PER_DAY } from '@void/shared-core';
+import { registerFriendApi } from './friendApi';
+import { FriendService } from './friendService';
 import { CorpService } from './corpService';
 import { registerAvaApi, registerAvaFeed } from './avaApi';
 import { AvaService } from './avaService';
@@ -434,6 +437,32 @@ const server = createMultiplayerServer({
           registerArsenalApi(scope, { store: stores.arsenalStore, identify });
           // Corp-arsenal rentals (ARS-6) — head/officer hands out a corp item.
           registerCorpArsenalApi(scope, { service: corpArsenalService, identify });
+          // Friends (FRIENDS-1) — roster + requests, session-gated. Presence is read
+          // from the LIVE registry at request time (never stored): a friend seated in
+          // a running match reads as «в матче · день N».
+          registerFriendApi(scope, {
+            service: new FriendService({
+              friends: stores.friendStore,
+              users: stores.userStore,
+            }),
+            identify,
+            matches: {
+              // Only LOADED rooms are consulted: a hibernated match means nobody is
+              // playing it this second, which is exactly what presence asks about.
+              // Waking rooms to answer a friend-list paint would be the tail wagging
+              // the dog (and would defeat hibernation entirely).
+              seatOf: async (login) => {
+                for (const id of registry.ids()) {
+                  if (!(await stores.accountStore.seatOf(id, login))) continue;
+                  const room = registry.get(id);
+                  if (!room) continue;
+                  const days = Math.floor(room.state.time / MS_PER_DAY);
+                  return { matchId: id, days };
+                }
+                return null;
+              },
+            },
+          });
           // Web Push subscriptions (ONB-5) — session-gated like the rest; the /push/key
           // route itself is only mounted when VAPID is configured.
           registerPushApi(scope, {
