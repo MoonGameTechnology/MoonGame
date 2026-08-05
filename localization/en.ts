@@ -316,6 +316,11 @@ export const en: Record<string, string> = {
   'comms.intel.fleets': 'fleets visible on the map <em>{left}</em>',
   'comms.intel.treasury': 'treasury: <b>{bag}</b> <em>{left}</em>',
   'comms.intel.world': 'world <b>{id}</b> revealed <em>{left}</em>',
+  'comms.mapshare': 'Map exchange',
+  'comms.mapshare.drop': 'the treaty stands — tap to tear it up',
+  'comms.mapshare.hint':
+    'Offer a map exchange: you share each other’s intel and may land troops on each other’s worlds. It does not make you allies and does not merge you into a victory coalition.',
+  'comms.mapshare.war': 'you cannot treaty with someone you are at war with — make peace first',
   'comms.offer.incoming': '{who} is offering — tap to accept',
   'comms.offer.sent': 'a proposal is already pending',
   'comms.provinces': 'provinces',

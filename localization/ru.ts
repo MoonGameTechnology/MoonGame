@@ -317,6 +317,11 @@ export const ru: Record<string, string> = {
   'comms.intel.fleets': 'флоты видны на карте <em>{left}</em>',
   'comms.intel.treasury': 'казна: <b>{bag}</b> <em>{left}</em>',
   'comms.intel.world': 'мир <b>{id}</b> раскрыт <em>{left}</em>',
+  'comms.mapshare': 'Обмен картами',
+  'comms.mapshare.drop': 'договор действует — нажмите, чтобы расторгнуть',
+  'comms.mapshare.hint':
+    'Предложить обмен картами: вы видите разведку друг друга и пускаете войска друг друга на свою землю. Союзниками это не делает и в коалицию для победы не объединяет.',
+  'comms.mapshare.war': 'с тем, с кем идёт война, договориться нельзя — сначала мир',
   'comms.offer.incoming': '{who} предлагает — нажмите, чтобы принять',
   'comms.offer.sent': 'предложение уже отправлено',
   'comms.provinces': 'провинций',

@@ -40,9 +40,12 @@ import {
   resumeConstruction,
   aiOrders,
   declareWar,
+  shareMap,
   netIncome,
   retreatFleet,
   STANCE_RANK,
+  hasMapShare,
+  hasMapShareOffer,
   canTraverse,
   START_CANDIDATES,
   designateCapital,
@@ -2559,10 +2562,22 @@ function troopsInputFor(fleetId: string): TroopsInput | null {
   const f = s.fleets[fleetId];
   if (!f || f.movement || f.battleId || !f.location) return null;
   const here = s.planets[f.location];
-  if (!here || here.owner !== ME) return null;
+  if (!here) return null;
   const landing = f.landing ?? [];
+  const mine = here.owner === ME;
+  // ALLY-LAND. Над ЧУЖИМ миром меню открывается только на ВЫСАДКУ и только если ядро
+  // её примет. Правило («свой мир или мир союзника») здесь не переписывается — задаётся
+  // вопрос про настоящий приказ, поэтому если ядро когда-нибудь расширит круг (скажем,
+  // на пакт), клиент поедет за ним сам, без правки этой строки.
+  const carried = landing.filter((st) => isGround(st.unit) && st.count > 0);
+  const guestLanding =
+    !mine && carried.length > 0 && canOrder(s, unloadArmy(ME, fleetId, carried[0]!.unit, 1)) === null;
+  if (!mine && !guestLanding) return null;
   const types: string[] = [];
-  for (const st of [...here.garrison, ...landing])
+  // На союзном мире поднимать нечего: чужой гарнизон не твой, ядро отобьёт погрузку.
+  // Поэтому и типы, и «в гарнизоне» берутся только из трюма — счётчик выходит
+  // односторонним (только «высадить») сам собой, без отдельного режима меню.
+  for (const st of mine ? [...here.garrison, ...landing] : landing)
     if (isGround(st.unit) && !types.includes(st.unit)) types.push(st.unit);
   if (!types.length) return null;
   // Стеков одного типа может быть несколько (побитый + целый): «всего» складывает
@@ -2571,8 +2586,8 @@ function troopsInputFor(fleetId: string): TroopsInput | null {
     stacks.reduce((n, st) => (st.unit === unit ? n + st.count : n), 0);
   const units: TroopsUnitInput[] = types.map((unit) => ({
     unit,
-    garrison: findHealthyStack(here.garrison, unit)?.count ?? 0,
-    garrisonAll: total(here.garrison, unit),
+    garrison: mine ? (findHealthyStack(here.garrison, unit)?.count ?? 0) : 0,
+    garrisonAll: mine ? total(here.garrison, unit) : 0,
     hold: findHealthyStack(landing, unit)?.count ?? 0,
     holdAll: total(landing, unit),
     queued: pendingLoads.filter((p) => p.fleetId === fleetId && p.unit === unit).length,
@@ -6288,6 +6303,13 @@ function proposeStance(target: string, to: DiplomaticStance): void {
   playerOrder(declareWar(ME, target, to));
 }
 
+/** MAPSHARE-1: один тап — предложить, принять или расторгнуть. Что именно, решает
+ *  ядро по текущему состоянию договора; клиент лишь называет сторону и «включить/нет». */
+function toggleMapShare(target: string): void {
+  if (target === ME || !s.players[target]) return;
+  playerOrder(shareMap(ME, target, !hasMapShare(s, ME, target)));
+}
+
 function openDiplo(tab: 'diplo' | 'msgs' | 'intel'): void {
   diploOpen = true;
   diploTab = tab;
@@ -6373,6 +6395,31 @@ function intelRowHtml(target: string): string {
  *  consent state — их предложение ✓ / наше ⏳), the two spy buttons, and the DM
  *  button, followed by the live intel row. Shared by the roster's expanded row and
  *  the player card opened from a chat nick, so both stay in lockstep. */
+/**
+ * MAPSHARE-1 — кнопка договора об обмене картами. Отдельная от лестницы стоек, потому
+ * что и сам договор отдельный: его заключают и при мире, и при пакте, и он не делает
+ * союзником. Те же аффордансы согласия, что у смягчения стойки: их предложение — «✓»
+ * (тап принимает), моё — «⏳» (ждём их), действующий договор — активная кнопка (тап
+ * расторгает). При войне заключить нельзя — ядро отобьёт, поэтому и кнопка заперта.
+ */
+function mapShareBtnHtml(id: string): string {
+  const live = hasMapShare(s, ME, id);
+  const theirs = !live && hasMapShareOffer(s, id, ME);
+  const mine = !live && !theirs && hasMapShareOffer(s, ME, id);
+  const atWar = !live && getStance(s, ME, id) === 'war';
+  const label = theirs ? `✓ ${t('comms.mapshare')}` : mine ? `⏳ ${t('comms.mapshare')}` : t('comms.mapshare');
+  const title = atWar
+    ? t('comms.mapshare.war')
+    : live
+      ? t('comms.mapshare.drop')
+      : theirs
+        ? t('comms.offer.incoming', { who: NAME[id] ?? id })
+        : mine
+          ? t('comms.offer.sent')
+          : t('comms.mapshare.hint');
+  const cls = `dp-map${live ? ' on' : ''}${theirs ? ' offer' : ''}${mine ? ' pend' : ''}`;
+  return `<button class="${cls}" data-mapseat="${id}"${atWar || mine ? ' disabled' : ''} title="${esc(title)}">🗺 ${label}</button>`;
+}
 function seatDiploActionsHtml(id: string): string {
   const st = getStance(s, ME, id);
   return (
@@ -6394,6 +6441,7 @@ function seatDiploActionsHtml(id: string): string {
             : '';
       return `<button class="${cls}" data-stance="${sk}" data-seat="${id}" style="--sc:${STANCE_COLOR[sk]}"${barred || mine ? ' disabled' : ''}${title ? ` title="${esc(title)}"` : ''}>${label}</button>`;
     }).join('') +
+    mapShareBtnHtml(id) +
     `<button class="dp-spy" data-spy="treasury" data-seat="${id}" title="${t('comms.spy.treasury', { c: SPY_COST })}">🕵 ${t('log.spy.kind.treasury')}</button>` +
     `<button class="dp-spy" data-spy="fleets" data-seat="${id}" title="${t('comms.spy.fleets', { c: SPY_COST })}">🕵 ${t('spy.op.fleets')}</button>` +
     `<button class="dp-msg" data-msgseat="${id}">✉</button></div>` +
@@ -7675,7 +7723,7 @@ cmdbar.addEventListener('click', (ev) => {
     const st = troopsPlan;
     const inp = st ? troopsInputFor(st.fleetId) : null;
     const at = st ? s.fleets[st.fleetId]?.location : undefined;
-    if (st && inp && at && troopsLiftable(at)) {
+    if (st && inp && at) {
       const { load, unload } = planOrders(troopsModel(inp));
       // Выгрузка мгновенна и уходит в ядро ОДНИМ действием на тип (count оно
       // принимает атомарно). Погрузка ложится в часовую очередь БЕЗ повторной
@@ -7683,7 +7731,11 @@ cmdbar.addEventListener('click', (ev) => {
       // освободит эта выгрузка, а реальный `army.load` уйдёт лишь через игровой
       // час — к тому времени выгрузка применена и в соло, и по сети.
       for (const o of unload) playerOrder(unloadArmy(ME, st.fleetId, o.unit, o.count));
-      for (const o of load) pushLoads(st.fleetId, o.unit, o.count);
+      // ALLY-LAND. Идущий наземный бой запирает ТОЛЬКО погрузку (ядро: `E_UNDER_ASSAULT`
+      // на `army.load` — иначе защитник уплыл бы небитым). Высадку он не запирает, и
+      // раньше один общий гейт резал обе половины: подкрепить осаждённый мир было
+      // нельзя — ровно то, ради чего союзная высадка и нужна.
+      if (load.length && troopsLiftable(at)) for (const o of load) pushLoads(st.fleetId, o.unit, o.count);
     }
     troopsPlan = null;
   } else if (cmd === 'barrage') {
@@ -11642,6 +11694,12 @@ if (playerCardEl) {
       refreshSeatCard(seat);
       return;
     }
+    const mapBtn = tg.closest('.dp-map') as HTMLElement | null;
+    if (mapBtn) {
+      toggleMapShare(mapBtn.dataset.mapseat!);
+      refreshSeatCard(seat);
+      return;
+    }
     const spyBtn = tg.closest('.dp-spy') as HTMLElement | null;
     if (spyBtn) {
       playerOrder(spyOn(ME, spyBtn.dataset.seat!, spyBtn.dataset.spy as 'treasury' | 'fleets'));
@@ -12482,6 +12540,12 @@ if (diploEl) {
     const actBtn = tg.closest('.dp-act') as HTMLElement | null;
     if (actBtn) {
       proposeStance(actBtn.dataset.seat!, actBtn.dataset.stance as DiplomaticStance);
+      renderDiplo();
+      return;
+    }
+    const mapBtn = tg.closest('.dp-map') as HTMLElement | null;
+    if (mapBtn) {
+      toggleMapShare(mapBtn.dataset.mapseat!);
       renderDiplo();
       return;
     }

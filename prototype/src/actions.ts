@@ -113,6 +113,9 @@ export const recallSteward = (playerId: string) => act(playerId, 'steward.recall
 export const setHoldPoint = (playerId: string, planetId: string, on: boolean) =>
   act(playerId, 'steward.holdpoint', { planetId, on });
 /** Declare war on (or otherwise re-stance) another commander. */
+/** MAPSHARE-1: предложить / принять / расторгнуть договор об обмене картами. */
+export const shareMap = (playerId: string, target: string, on: boolean) =>
+  act(playerId, 'diplomacy.mapshare', { target, on });
 export const declareWar = (playerId: string, target: string, stance: DiplomaticStance = 'war') =>
   act(playerId, 'diplomacy.declare', { target, stance });
 /** Steal a time-boxed intel window on another commander (SPY-1 core module):
