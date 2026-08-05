@@ -330,6 +330,7 @@ import { resolveIntro, parseSeenIntros, type IntroCard } from './intros';
 // ONB-5 — return digest ("пока тебя не было"): aggregate the away-window event log.
 import { buildRecap, type RecapEvent } from './recap';
 import { canEditPing, canRemovePing, pingRows, toggleHidden } from './pingPanel';
+import { recapAdmits } from './recapGate';
 // ONB-7 — first-session goals checklist (mine/fleet/capture/score, ticked from state).
 import { FIRST_GOALS, metGoals, mergeDone, goalsComplete, type GoalSignals } from './firstGoals';
 import { reconnectDelayMs } from './reconnect';
@@ -482,6 +483,12 @@ const SEAT_META: ReadonlyArray<{ id: string; name: string; faction: string; colo
 ];
 const GRID = 'rgba(46,150,160,0.07)';
 const LOCK = '#7df0d0'; // selection / targeting reticle accent
+// CAST-UX: круги прицела каста. Отдельные имена, а не переиспользование LOCK, потому
+// что дальность и область — РАЗНЫЕ сущности, и игрок должен различать их с одного
+// взгляда: тонкий пунктир «докуда достану» против залитого пятна «что накроет».
+const CAST_REACH = '#7df0d0'; // круг дальности способности
+const CAST_AREA = '#9ad7ff'; // круг области действия (AoE)
+const CAST_FAR = '#ff6b6b'; // цель вне дальности — подсказка, вердикт всё равно за ядром
 const TAU = Math.PI * 2;
 const TOP = 50; // top-bar height
 const RAIL = 50; // left-rail width
@@ -2103,6 +2110,12 @@ function updateMemory(identify: Set<string>): void {
 function known(id: string | null | undefined): boolean {
   return !vision || (id != null && vision.identify.has(id));
 }
+/** RECAP-FOG: пускать ли событие в журнал (а значит, и в сводку). Правило живёт
+ *  чистой функцией в `recapGate.ts` — это правило безопасности, и гейт проверяет
+ *  именно его, а не рукописный `if` внутри свитча. */
+function admits(type: string, p: Record<string, unknown>): boolean {
+  return recapAdmits(type, p.owner as string | undefined, ME, known(p.planetId as string));
+}
 /** True if node `id` is inside radar reach (signature-level detection). */
 function radarHas(id: string | null | undefined): boolean {
   return !!vision && id != null && vision.radar.has(id);
@@ -3165,7 +3178,12 @@ function handleEvents(events: DomainEvent[]) {
         if (diploOpen && diploTab === 'diplo') renderDiplo();
         break;
       }
+      // RECAP-FOG. Стройка и производство ДРУГОГО игрока в мой журнал не попадают —
+      // а журнал и есть источник сводки возвращения (`buildRecap`), так что чужая
+      // экономика утекала и в дайджест, и в пуш. Сводка — про МОЮ империю; чужое
+      // строительство я узнаю разведкой, а не уведомлением.
       case 'building.constructed':
+        if (!admits('building.constructed', p)) break;
         note(
           t('log.build.done', {
             b: buildingName(data.buildings[p.building as string]?.name, p.building as string),
@@ -3175,6 +3193,7 @@ function handleEvents(events: DomainEvent[]) {
         if (p.building === 'starfort') installFortressAA(p.planetId as string);
         break;
       case 'building.upgraded':
+        if (!admits('building.upgraded', p)) break;
         note(
           t('log.build.upgraded', {
             b: buildingName(data.buildings[p.building as string]?.name, p.building as string),
@@ -3184,6 +3203,10 @@ function handleEvents(events: DomainEvent[]) {
         );
         break;
       case 'building.destroyed':
+        // Разрушение — исключение: своё узнаю всегда, чужое лишь там, где ВИЖУ
+        // (тот же фог-гейт, что у `aa.fired`). Взрыв на наблюдаемом мире — это
+        // наблюдение, а не раскрытие.
+        if (!admits('building.destroyed', p)) break;
         note(
           t('log.build.destroyed', {
             b: buildingName(data.buildings[p.building as string]?.name, p.building as string),
@@ -3193,9 +3216,13 @@ function handleEvents(events: DomainEvent[]) {
         );
         break;
       case 'unit.built':
+        if (!admits('unit.built', p)) break;
         note(`🛠️ ${p.count}× ${displayUnit(p.unit as string)} · ${p.planetId}`);
         break;
       case 'fleet.launched':
+        // Вылет — событие КАРТЫ: чужой флот, поднявшийся на мире, который я вижу,
+        // это наблюдение. Но за туманом его быть не должно (как у `aa.fired`).
+        if (!admits('fleet.launched', p)) break;
         note(
           t('log.fleet.launched', {
             who: NAME[p.owner as string] ?? (p.owner as string),
@@ -3897,6 +3924,51 @@ function drawAssaultTargets() {
     const c = world(n);
     cx.beginPath();
     cx.arc(c.x, c.y, 16, 0, TAU);
+    cx.stroke();
+  }
+  cx.restore();
+}
+
+/**
+ * CAST-UX — что видно, пока целишься способностью героя: КРУГ ДАЛЬНОСТИ вокруг
+ * кастующего (`def.range`, те же мировые единицы, что у ядра) и, если способность
+ * площадная, КРУГ ОБЛАСТИ под прицелом (`params.radius`).
+ *
+ * Оба радиуса берутся из каталога, а не из констант интерфейса: правило «докуда
+ * достаёт» живёт в данных, и картинка обязана показывать ровно его, иначе игрок
+ * целится по одной границе, а ядро считает по другой.
+ *
+ * Цель за пределами дальности красится отказом — это подсказка, а не запрет: финальный
+ * вердикт всё равно за ядром (`E_OUT_OF_RANGE`).
+ */
+function drawCastAim(): void {
+  if (!heroAim || !aimPointer) return;
+  const hero = (s.heroes ?? {})[heroAim.heroId];
+  const def = data.heroAbilities[heroAim.abilityId];
+  if (!hero || !def) return;
+  const fleet = hero.fleetId ? s.fleets[hero.fleetId] : undefined;
+  const origin = fleet ? fleetAnchor(fleet) : null;
+  if (!origin) return;
+  const reach = def.range ?? 0;
+  const aoe = Number(def.params?.radius ?? 0);
+  const far = reach > 0 && Math.hypot(aimPointer.x - origin.x, aimPointer.y - origin.y) > reach * cam.scale;
+  cx.save();
+  if (reach > 0) {
+    cx.strokeStyle = rgba(far ? CAST_FAR : CAST_REACH, 0.5);
+    cx.lineWidth = 1.2;
+    cx.setLineDash([6, 6]);
+    cx.beginPath();
+    cx.arc(origin.x, origin.y, reach * cam.scale, 0, TAU);
+    cx.stroke();
+  }
+  if (aoe > 0) {
+    cx.setLineDash([]);
+    cx.fillStyle = rgba(CAST_AREA, 0.1);
+    cx.strokeStyle = rgba(CAST_AREA, 0.75);
+    cx.lineWidth = 1.4;
+    cx.beginPath();
+    cx.arc(aimPointer.x, aimPointer.y, aoe * cam.scale, 0, TAU);
+    cx.fill();
     cx.stroke();
   }
   cx.restore();
@@ -5191,6 +5263,7 @@ function render(now: number) {
   drawChainOverlay(now); // CHAIN-UX: цепочки планов + черновик режима «Приказ»
   drawAssaultTargets();
   drawAimPreview();
+  drawCastAim(); // CAST-UX: дальность каста + область действия
 }
 
 // --- side panel --------------------------------------------------------------
@@ -7041,6 +7114,13 @@ function renderChainBar(): void {
   if (html !== lastCmdHtml) {
     cmdbar.innerHTML = html;
     lastCmdHtml = html;
+  }
+  // CAST-UX. Пока каст ПРИЦЕЛИВАЕТСЯ, нижний хаб уходит: он занимает ту самую полосу
+  // экрана, по которой целятся на телефоне, и перекрывает круг дальности. Прицел
+  // снимается любым приказом и самим кастом (`heroAim = null`), так что хаб вернётся.
+  if (heroAim) {
+    cmdbar.classList.remove('show');
+    return;
   }
   cmdbar.classList.add('show');
   updateChainDom();
