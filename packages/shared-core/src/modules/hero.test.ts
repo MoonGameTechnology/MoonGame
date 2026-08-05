@@ -319,6 +319,32 @@ describe('hero — temp lane speed bonus (fleet.speed hook)', () => {
     expect(arrived.state.tempLanes ?? []).toHaveLength(0); // одноразовый — израсходован
   });
 
+  it('встать ПОСРЕДИ коридора нельзя — это прыжок, середины у него нет', () => {
+    const kernel = createKernel([heroModule, movementModule]);
+    const base = world();
+    base.fleets = { F1: fleet('F1', 'p1', 'A') };
+    const laned = okApply(kernel.applyAction(base, act('hero.path.create', 'p1', { to: 'C' }), ctx(0)));
+    const heroId = laned.state.tempLanes![0]!.heroId!;
+    laned.state.heroes![heroId]!.fleetId = 'F1';
+    expect(laned.state.tempLanes![0]!.addedLink).toBe(true); // ребра A↔C до коридора не было
+
+    const parked = kernel.applyAction(
+      laned.state,
+      act('fleet.move', 'p1', { fleetId: 'F1', toEdge: { from: 'A', to: 'C', t: 0.5 } }),
+      ctx(0),
+    );
+    expect(parked.ok ? null : parked.code).toBe('E_NOT_A_LANE');
+    // А на ОБЫЧНОЙ лейне парковка по-прежнему разрешена — запрет точечный.
+    const onRealLane = okApply(
+      kernel.applyAction(
+        laned.state,
+        act('fleet.move', 'p1', { fleetId: 'F1', toEdge: { from: 'A', to: 'B', t: 0.5 } }),
+        ctx(0),
+      ),
+    );
+    expect(onRealLane.state.fleets.F1?.movement).not.toBeNull();
+  });
+
   it('ОБЩИЙ коридор (ступень 3): враг проезжает, но БЕЗ ускорения', () => {
     const kernel = createKernel([heroModule, movementModule]);
     const base = world();

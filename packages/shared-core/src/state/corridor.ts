@@ -74,3 +74,15 @@ export function corridorVeto(
     return !here.some((l) => fleetId !== undefined && mayTraverse(state, l, fleetId));
   };
 }
+
+/**
+ * Коридор ли эта пара узлов — то есть существует ли ребро между ними ТОЛЬКО благодаря
+ * временному коридору. Нужно, чтобы запретить остановку ПОСРЕДИ коридора: коридор это
+ * прыжок, у него нет «середины», где можно встать.
+ *
+ * Без запрета флот, припарковавшийся на коридорном ребре, после закрытия коридора
+ * оставался бы стоять на ребре, которого в графе больше нет.
+ */
+export function isCorridorEdge(state: GameState, a: PlanetId, b: PlanetId): boolean {
+  return (state.tempLanes ?? []).some((l) => l.addedLink && laneJoins(l, a, b));
+}
