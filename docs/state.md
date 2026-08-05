@@ -447,7 +447,14 @@ tax_office/без модуля).
 dayGate·MS_PER_DAY`, совпадает с «Day N» матч-браузера) **И** выполнены все
 `conditions`. Условия — курируемый каталог (`own_sectors` / `has_building` /
 `controls_planet_type` / `has_unit` с count-порогом `min`; `has_scientist
-{branch?, minLevel?}` — учёный), диспетч по `type`, fail-secure на неизвестный тип. Коды: `E_BAD_PAYLOAD, E_FORBIDDEN, E_UNKNOWN_TECHNOLOGY,
+{branch?, minLevel?}` — учёный), диспетч по `type`, fail-secure на неизвестный тип.
+**RULES-4:** сам предикат одного условия — `conditionMet(cond, state, playerId, data)` —
+тоже экспортируется, потому что дереву технологий надо рисовать галочку у КАЖДОЙ строки
+требований, а `technologyLock` отвечает только про узел целиком. Клиентская копия этого
+перебора снята: она покрывала 2 типа из 5, то есть узел с `has_building` /
+`controls_planet_type` / `has_unit` читался бы как запертый навсегда, хотя ядро
+исследование разрешает (в живом каталоге таких условий нет — баг был латентным).
+Коды: `E_BAD_PAYLOAD, E_FORBIDDEN, E_UNKNOWN_TECHNOLOGY,
 E_ALREADY_RESEARCHED, E_RESEARCH_SLOTS_FULL, E_PREREQUISITE, E_TOO_EARLY,
 E_CONDITIONS_UNMET, E_INSUFFICIENT`.
 

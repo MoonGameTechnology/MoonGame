@@ -9,8 +9,8 @@
 // вопрос ничего не меняет, автоматика не издаёт обречённого приказа.
 import { describe, it, expect } from 'vitest';
 import { hashState } from '../../packages/shared-core/src/index';
-import { newGame, order, canOrder } from './game';
-import { buildBuilding, assaultFleet, moveFleet, orbitFleet } from './actions';
+import { newGame, order, canOrder, canOrderAll } from './game';
+import { buildBuilding, buildUnit, assaultFleet, moveFleet, orbitFleet } from './actions';
 import { serverAutoAssaultActions } from './serverDrivers';
 
 const ME = 'p1';
@@ -97,6 +97,48 @@ function enemyWorldField(s: ReturnType<typeof newGame>, fleet: { id: string }, s
     autoAssault: { [f.id]: true },
   } as ReturnType<typeof newGame> & { autoAssault: Record<string, true> };
 }
+
+// RULES-4 — правды ядра, на которые опирается проводка в `main.ts`. Сам `main.ts` —
+// это DOM-вход приложения, юнит-харнеса у него нет, поэтому здесь закреплены не вызовы
+// интерфейса, а ровно те факты редьюсера, ради которых проводку и переделали. Разъедься
+// любой из них — правка в `main.ts` станет неверной молча.
+describe('RULES-4 — очередь стройки обязана спрашивать с КОЛИЧЕСТВОМ', () => {
+  it('цена масштабируется на count: одного хватает, девяти — нет', () => {
+    const { s, home } = field();
+    // Ядро считает цену через scaleCost, поэтому вердикт по count=1 и count=9 разный.
+    // Прежний клиент спрашивал afford() по цене ОДНОГО юнита и на батче вычёркивал
+    // заказ из очереди отказом вместо того, чтобы ждать денег.
+    expect(canOrder(s, buildUnit(ME, home.id, 'cruiser', 1))).toBeNull();
+    expect(canOrder(s, buildUnit(ME, home.id, 'cruiser', 9))).toBe('E_INSUFFICIENT');
+  });
+
+  it('нехватка денег отличима от «нельзя вообще» — очередь ждёт только первое', () => {
+    const { s, home } = field();
+    // Очередь держит голову ТОЛЬКО на E_INSUFFICIENT. Остальные отказы ожиданием не
+    // лечатся, и голова обязана уехать в ядро за настоящим сообщением игроку.
+    expect(canOrder(s, buildUnit(ME, home.id, 'cruiser', 9))).toBe('E_INSUFFICIENT');
+    expect(canOrder(s, buildBuilding(ME, home.id, 'нет-такого-здания'))).not.toBe('E_INSUFFICIENT');
+    expect(canOrder(s, buildBuilding(ME, 'нет-такого-мира', 'mine'))).not.toBe('E_INSUFFICIENT');
+  });
+});
+
+describe('RULES-4 — про штурм спрашивают СВЯЗКУ, а не один приказ', () => {
+  it('одиночный вопрос про штурм с дальней орбиты врёт, вопрос про пару — нет', () => {
+    const { s, fleet } = field();
+    if (!fleet?.location) return; // партия без стартового флота — проверять нечего
+    const far = {
+      ...s,
+      fleets: { ...s.fleets, [fleet.id]: { ...s.fleets[fleet.id]!, orbit: undefined } },
+    } as typeof s;
+    // Про один штурм ядро отвечает про мир ДО орбиты — именно поэтому клиент, который
+    // спрашивал бы так, не выдал бы приказ никогда.
+    expect(canOrder(far, assaultFleet(ME, fleet.id))).toBe('E_WRONG_ORBIT');
+    // А связка «орбита → штурм» спрашивается по черновику и до E_WRONG_ORBIT не доходит.
+    expect(canOrderAll(far, [orbitFleet(ME, fleet.id, 'near'), assaultFleet(ME, fleet.id)])).not.toBe(
+      'E_WRONG_ORBIT',
+    );
+  });
+});
 
 describe('RULES-1 — автоматика не издаёт обречённых приказов', () => {
   it('авто-штурм молчит, пока с владельцем мира МИР (а не сыплет отказами)', () => {

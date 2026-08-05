@@ -10,6 +10,7 @@ import {
   advance,
   order,
   canOrder,
+  canOrderAll,
   ctx,
   data,
   MAP,
@@ -1443,24 +1444,24 @@ function afford(bag: Record<string, number> | undefined): boolean {
   for (const [r, n] of Object.entries(bag ?? {})) if ((res[r] ?? 0) < n) return false;
   return true;
 }
-/** Ship/unit icon for MENUS (build menu, garrison composition, codex, constructor,
- *  split, asset lists…): the current poster silhouette (`unitGlyphs` — «силуэт = что,
- *  цвет = чей») for ships, so every menu speaks the same shape language as the map
- *  markers and the fleet card; ground units keep the text glyph (the silhouette family
- *  is space-only). `px` fits the SVG box to the icon slot; `color` is the side tint
- *  (defaults to your side — menus are about your own roster). */
-// Path2D-кэш силуэтов постера для канвы — панель берёт те же пути через SVG,
-// так что карта и карточка не могут разъехаться по форме.
-/** Localized display name of a building id (data/*.json names are English). */
+/** Локальная (офлайновая) очередь стройки этого мира — ядру она неизвестна: в сети
+ *  стройку таймит сервер. Создаётся по первому обращению. */
 function queueOf(planetId: string): PlanetBuildQueue {
   return (buildQueues[planetId] ??= { buildings: [], units: [] });
 }
 function laneOf(kind: BuildKind): BuildLane {
   return kind === 'unit' ? 'units' : 'buildings';
 }
+/** Цена головы очереди — ДЛЯ ПОКАЗА (строка «⏳ ждём: …»). Решение «пора ли пускать»
+ *  на неё больше не опирается: его принимает ядро (см. `canStartQueued`). */
 function buildCost(planetId: string, q: QueuedBuild): Record<string, number> | undefined {
   if (q.kind === 'unit') {
-    return data.units[q.id]?.cost;
+    const per = data.units[q.id]?.cost;
+    // Ядро масштабирует цену на count (`scaleCost`), поэтому и подпись обязана: иначе
+    // очередь из пяти корветов показывала бы цену одного.
+    if (!per) return undefined;
+    const n = q.count ?? 1;
+    return n === 1 ? per : Object.fromEntries(Object.entries(per).map(([r, v]) => [r, v * n]));
   }
   if (q.kind === 'building') {
     return data.buildings[q.id]?.cost;
@@ -1469,8 +1470,33 @@ function buildCost(planetId: string, q: QueuedBuild): Record<string, number> | u
   const inst = pl?.buildings.find((b) => b.type === q.id);
   return inst ? data.buildings[q.id]?.upgrades[inst.level - 1]?.cost : undefined;
 }
+/** Приказ, которым голова очереди уедет в ядро. Один построитель на оба пути —
+ *  и на вопрос «можно ли уже», и на само применение (`submitQueued`): иначе
+ *  спрашивали бы про одно, а издавали другое. */
+function queuedAction(planetId: string, q: QueuedBuild): Action {
+  return q.kind === 'unit'
+    ? buildUnit(ME, planetId, q.id, q.count)
+    : q.kind === 'upgrade'
+      ? upgradeBuilding(ME, planetId, q.id)
+      : buildBuilding(ME, planetId, q.id);
+}
+/**
+ * RULES-4. Пора ли пускать голову очереди — ВЕРДИКТ ЯДРА, а не свой прайс-лист.
+ *
+ * Очередь умеет ждать ровно одно — деньги, поэтому единственный код, на котором она
+ * держит голову, это `E_INSUFFICIENT`. Любой другой отказ ожиданием не лечится (или
+ * лечится не очередью), и голова уезжает в ядро, где игрок получает НАСТОЯЩУЮ причину
+ * (`queue.failed` печатает `errText(код)`) вместо молчаливого зависания.
+ *
+ * Что это чинит. Прежний `afford(buildCost(...))` был FAIL-OPEN против инварианта #4:
+ * `buildCost` возвращал `undefined` для неизвестного id и для уже максимального
+ * уровня, а `afford(undefined)` — `true`, то есть очередь считала голову «готовой» и
+ * дёргала ядро. Плюс он переписывал прайс ядра целиком и мимо него проходили и
+ * масштаб на `count`, и все неденежные ворота (`E_BOMBARDED`, `E_WRONG_SECTOR`,
+ * `E_NO_SHIPYARD`, `E_MAX_LEVEL`) — очередь считала «можно», ядро отбивало.
+ */
 function canStartQueued(planetId: string, q: QueuedBuild): boolean {
-  return afford(buildCost(planetId, q));
+  return canOrder(s, queuedAction(planetId, q)) !== 'E_INSUFFICIENT';
 }
 function constructionPayload(payload: unknown): ConstructionPayload | null {
   const p = payload as ConstructionPayload;
@@ -1569,12 +1595,7 @@ function enqueueBuild(planetId: string, order: QueuedBuild): void {
   pumpBuildQueues();
 }
 function submitQueued(planetId: string, queued: QueuedBuild): StepOut {
-  const action =
-    queued.kind === 'unit'
-      ? buildUnit(ME, planetId, queued.id, queued.count)
-      : queued.kind === 'upgrade'
-        ? upgradeBuilding(ME, planetId, queued.id)
-        : buildBuilding(ME, planetId, queued.id);
+  const action = queuedAction(planetId, queued);
   const before = sandboxBuildSnapshot(action.type);
   const out = order(s, action, s.time);
   apply(out);
@@ -1788,6 +1809,7 @@ function fleetAnchor(f: Fleet): { x: number; y: number; ang: number } | null {
 const eventLog: RecapEvent[] = [];
 let lastNoteMsg = '';
 let lastNoteAtMs = 0;
+/** Append a line to the session log (bounded). Patches the feed if it's on screen. */
 function note(msg: string, at?: string) {
   // Dedupe guard: an order loop re-rejecting every frame must not machine-gun the
   // same toast/log line — an identical message within 2s (real time) is dropped.
@@ -2579,6 +2601,23 @@ function blockerName(id: string): string {
  *  reroutes AROUND peace-locked territory, so a blocker on the shortest path is not
  *  a blocker if a peaceful detour exists. Prompting war for it anyway (the pre-fix
  *  behaviour) pushed players into wars the move never needed. Empty ⇒ move is free. */
+/**
+ * RULES-4. ЗАПЕРТ ЛИ ход миром — вердикт ядра по тому самому приказу, который сайт и
+ * издаст. Решение принимает ядро; `peaceBlockers` ниже только НАЗЫВАЕТ виновников для
+ * окна войны (в вердикте имён нет, там код — это «подача», а не правило).
+ *
+ * Что это чинит. `peaceBlockers` строит маршрут из ОДНОГО ближайшего узла
+ * (`fleetNode`: t≤0.5 ? from : to), а ядро — из ОБОИХ концов ребра, на котором
+ * припаркован флот (`originsOf`), выбирая самую дешёвую пару. Для припаркованного на
+ * ребре флота это расходилось в обе стороны: клиент говорил «путь свободен» и приказ
+ * ловил `E_NO_RIGHT_OF_WAY`, либо клиент требовал объявления войны там, где ядро
+ * спокойно проехало бы другим концом.
+ */
+function peaceBlocked(action: Action): boolean {
+  return canOrder(s, action) === 'E_NO_RIGHT_OF_WAY';
+}
+/** Кого назвать в окне войны, когда ядро уже сказало «заперто». Список — объяснение,
+ *  а не решение: вердикт выше принят ядром. */
 function peaceBlockers(from: string | null, toId: string): string[] {
   if (!from || from === toId) return [];
   const peaceLocked = (id: string): boolean => {
@@ -2602,8 +2641,10 @@ function tryMoveGroup(fleetIds: string[], destId: string): void {
   const movers = fleetIds.filter((id) => s.fleets[id] && s.fleets[id]!.location !== destId);
   if (!movers.length) return;
   const blockers = new Set<string>();
-  for (const id of movers)
+  for (const id of movers) {
+    if (!peaceBlocked(moveFleet(ME, id, destId))) continue; // ядро пропускает — объезд есть
     for (const b of peaceBlockers(fleetNode(s.fleets[id]!), destId)) blockers.add(b);
+  }
   if (blockers.size) {
     warPrompt = { fleetIds: movers, destId, blockers: [...blockers] };
     renderWarPrompt();
@@ -2618,8 +2659,13 @@ function tryAssaultGroup(fleetIds: string[], destId: string): void {
   const movers = fleetIds.filter((id) => s.fleets[id]);
   if (!movers.length) return;
   const blockers = new Set<string>();
-  for (const id of movers)
+  for (const id of movers) {
+    if (!peaceBlocked(moveFleet(ME, id, destId))) continue;
     for (const b of peaceBlockers(fleetNode(s.fleets[id]!), destId)) blockers.add(b);
+  }
+  // Штурм — не просто ход: даже по свободному маршруту нельзя высадиться на мир
+  // НЕвраждебного игрока (ядро: `E_FORBIDDEN`). Спросить об этом ядро нельзя — флот
+  // ещё не там, — поэтому владелец цели проверяется здесь и ТОЛЬКО здесь.
   const owner = s.planets[destId]?.owner;
   if (owner != null && owner !== ME && !canTraverse(s, ME, owner)) blockers.add(owner);
   if (blockers.size) {
@@ -2629,11 +2675,39 @@ function tryAssaultGroup(fleetIds: string[], destId: string): void {
   }
   dispatchAssault(movers, destId);
 }
-/** A defended world can only be stormed with landing troops aboard — pressing the
- *  assault anyway just spams E_NO_TROOPS rejections. */
+/**
+ * ПРОГНОЗ (не гейт): похоже ли, что к прилёту штурмовать будет нечем. Нужен ровно там,
+ * где приказ издаётся НЕ сейчас, — флот ещё летит, спросить ядро про штурм нельзя
+ * (оно ответит про мир, в котором флот в другом месте). Поэтому здесь остаётся ручная
+ * прикидка, и она честно предупреждает, а не отменяет: десант могут догрузить в пути.
+ *
+ * RULES-4: там, где приказ издаётся СЕЙЧАС, этой прикидки больше нет — решает
+ * `assaultVerdict` ниже.
+ */
 function assaultNeedsTroops(f: Fleet, planetId: string): boolean {
   const defended = (s.planets[planetId]?.garrison ?? []).some((u) => u.count > 0);
   return defended && !(f.landing ?? []).some((u) => u.count > 0);
+}
+/**
+ * RULES-4. «Пройдёт ли штурм ПРЯМО СЕЙЧАС» — код отказа или `null`, от ядра.
+ *
+ * Спрашивается вся связка «встать на низкую орбиту → штурм» (`canOrderAll`, RULES-3):
+ * штурм нелегален с дальней орбиты, поэтому вопрос об одном лишь штурме вернул бы
+ * `E_WRONG_ORBIT`, а вопрос об одной орбите пропустил бы обречённую пару — и её первая
+ * половина применилась бы.
+ *
+ * Раньше здесь стоял `assaultNeedsTroops`, то есть ОДИН отказ из шести. Остальные пять
+ * (`E_OWN_PLANET`, `E_FORBIDDEN` по миру союзника, `E_UNDER_ASSAULT`,
+ * `E_ORBIT_CONTESTED`, `E_NOT_CAPTURABLE`) клиент не знал и честно доезжал до отказа —
+ * то есть обещанного «одно понятное сообщение вместо потока E_*» предикат не давал.
+ */
+function assaultVerdict(fleetId: string, f: Fleet): string | null {
+  return canOrderAll(
+    s,
+    f.orbit === 'near'
+      ? [assaultFleet(ME, fleetId)]
+      : [orbitFleet(ME, fleetId, 'near'), assaultFleet(ME, fleetId)],
+  );
 }
 function dispatchAssault(fleetIds: string[], destId: string): void {
   let warnedNoTroops = false;
@@ -2641,10 +2715,13 @@ function dispatchAssault(fleetIds: string[], destId: string): void {
     const f = s.fleets[id];
     if (!f) continue;
     if (f.location === destId && !f.movement) {
-      if (assaultNeedsTroops(f, destId)) {
+      // RULES-4: приказ издаётся СЕЙЧАС — спрашиваем ядро про всю связку, а не
+      // проверяем один десант руками.
+      const code = assaultVerdict(id, f);
+      if (code !== null) {
         if (!warnedNoTroops) {
           warnedNoTroops = true;
-          note(t('log.assault.no-troops'), destId);
+          note(code === 'E_NO_TROOPS' ? t('log.assault.no-troops') : '✖ ' + errText(code), destId);
         }
         continue;
       }
@@ -2680,14 +2757,13 @@ function pumpAssaultOrders(): void {
       assaultOnArrival.delete(id); // parked elsewhere — the order lapsed
       continue;
     }
-    const here = s.planets[destId];
-    if (!here || here.owner === ME || here.owner == null) {
-      assaultOnArrival.delete(id); // captured meanwhile / emptied — nothing to storm
-      continue;
-    }
-    if (assaultNeedsTroops(f, destId)) {
-      // one clear message instead of an E_NO_TROOPS rejection loop
-      note(t('log.assault.no-troops'), destId);
+    // RULES-4. Флот на месте — приказ издаётся СЕЙЧАС, поэтому решает ядро, а не
+    // три рукописных условия («захвачен своими / опустел» + отдельно десант). Оно
+    // же покрывает и `E_OWN_PLANET`, и `E_NOT_CAPTURABLE`, и чужой идущий штурм.
+    const code = assaultVerdict(id, f);
+    if (code !== null) {
+      // одно понятное сообщение вместо цикла отказов; приказ снимается в любом случае
+      note(code === 'E_NO_TROOPS' ? t('log.assault.no-troops') : '✖ ' + errText(code), destId);
       assaultOnArrival.delete(id);
       continue;
     }
@@ -2701,6 +2777,7 @@ function pumpAssaultOrders(): void {
 function tryMoveEdgeGroup(fleetIds: string[], edge: { from: string; to: string; t: number }): void {
   const blockers = new Set<string>();
   for (const id of fleetIds) {
+    if (!peaceBlocked(moveFleetEdge(ME, id, edge))) continue;
     const node = fleetNode(s.fleets[id]!);
     for (const end of [edge.from, edge.to])
       for (const b of peaceBlockers(node, end)) blockers.add(b);
@@ -5252,7 +5329,6 @@ function taskGroupPanelHtml(group: Fleet[]): string {
   return h;
 }
 
-/** Side-panel: a single selected fleet — combat stats, orders, docking. */
 /** Тайлы состава флота Bytro-стиля: силуэт-архетип в цвете стороны (наземные —
  *  прежние текст-глифы), счётчик и мини-бар корпуса стека; тап — досье юнита. */
 function fleetTilesHtml(f: Fleet, stacks: UnitStack[]): string {
@@ -5378,6 +5454,7 @@ function fleetSummaryHtml(f: Fleet): string {
   );
 }
 
+/** Side-panel: a single selected fleet — combat stats, orders, docking. */
 function fleetPanelHtml(f: Fleet): string {
   const nShips = sumUnits(f.units);
   const nTr = sumUnits(f.landing ?? []);
@@ -5651,7 +5728,6 @@ function unknownPlanetHtml(p: Planet): string {
   );
 }
 
-/** Side-panel: a known world — ownership header + ground/ships/squadron/buildings tabs. */
 /** Карточка статистики мира (тап по имени планеты) — полная сводка: обозначение,
  *  владелец, вид/тип/местность, пассивный выход по ресурсам (ECON-7 перекос),
  *  бонусы типа, гарнизон, постройки, очки победы, флоты на орбите. */
@@ -5725,6 +5801,7 @@ function planetSummaryHtml(p: Planet): string {
   );
 }
 
+/** Side-panel: a known world — ownership header + ground/ships/squadron/buildings tabs. */
 function planetPanelHtml(p: Planet): string {
   const mine = p.owner === ME;
   const sec = tData(data.sectors[p.terrain ?? '']?.name ?? p.terrain ?? '—');
@@ -6107,7 +6184,6 @@ function fmtStamp(at: number, opts?: StampOpts): string {
   return parts.join(' ');
 }
 
-/** Append a line to the session log (bounded). Patches the feed if it's on screen. */
 /** Unread social events (war declarations, stance shifts) — badge on the ✉ rail. */
 let unreadMsgs = 0;
 /** Diplomacy events don't pass the server's fog filter (their payload names no
@@ -12244,7 +12320,6 @@ function drawChainOverlay(now: number): void {
     }
   }
 }
-/** Tap a ping → fly the camera to that province (and select it); close the menu. */
 /** Pan the camera to a world referenced from a plan row (data-goto) — selection stays
  *  untouched (the fleet panel must survive the tap) and a short ring marks the spot. */
 let goFlash: { id: string; until: number } | null = null;
