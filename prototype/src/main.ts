@@ -247,6 +247,7 @@ import {
 import { initTechTree, branchLabel } from './techTree';
 import { initSciPick } from './sciPick';
 import { initPasswordReset } from './passwordReset';
+import { initEndScreen } from './endScreen';
 // «Профиль командира» — карьерное досье (REFM-10).
 import { initProfile } from './profileScreen';
 // AVA-C1/C2 — корпоративный кабинет (REFM-11).
@@ -8464,122 +8465,50 @@ bannerEl.addEventListener('click', (ev) => {
 });
 
 // --- end screen (match over): outcome + stats + rematch ----------------------
+// Панель живёт в `endScreen.ts` (REFM-20); здесь проводка. Уход из матча остаётся тут:
+// сеть, гайд-тур и хаб — хозяйство экрана матча, модуль лишь говорит, что выбрал игрок.
 const endscreenEl = $('endscreen');
-let lastEndHtml = '';
-/** Paint the terminal end screen from `endScreen` (set by checkEnd). Reads final
- *  numbers straight from the AUTHORITATIVE `match` state, so the same panel serves a
- *  solo match and a net one. Hidden while no match is over or the player dismissed it
- *  to look at the board. */
-function renderEndScreen(): void {
-  // BF-29: don't paint the end-screen overlay while the hub is visible — the player
-  // left the match to the menu (net: the server keeps ticking, the match may end, but
-  // "Victory!" over the hub is a confusing false positive). The overlay reappears when
-  // the player returns to the match (hub hidden).
-  if (hubEl && hubEl.style.display !== 'none') {
-    if (endscreenEl.style.display !== 'none') {
-      endscreenEl.style.display = 'none';
-      lastEndHtml = '';
-    }
-    return;
-  }
-  if (!endScreen || endScreen.dismissed) {
-    if (endscreenEl.style.display !== 'none') {
-      endscreenEl.style.display = 'none';
-      lastEndHtml = '';
-    }
-    return;
-  }
-  const sc = s.match?.scores ?? {};
-  const mine = sc[ME];
-  // Placement: rank among all scored seats by total (1st of N).
-  const ranked = Object.keys(sc).sort((a, b) => (sc[b]?.total ?? 0) - (sc[a]?.total ?? 0));
-  const place = ranked.indexOf(ME) + 1;
-  const total = Math.round(mine?.total ?? 0);
-  const provinces = mine?.controlledPlanets ?? worldsOf(ME);
-  const fleets = mine?.fleets ?? 0;
-  const units = mine?.units ?? 0;
-  const elapsed = Math.max(0, (s.match?.endedAt ?? s.time) - (s.startedAt ?? 0));
-  const dur = fmtStamp(elapsed, { day: true, time: true });
-  const cls = endScreen.won ? 'win' : endScreen.draw ? 'draw' : 'lose';
-  const head = endScreen.won
-    ? s.match?.winners && s.match.winners.length > 1
-      ? t('end.win.coalition')
-      : t('end.win')
-    : endScreen.draw
-      ? t('end.draw')
-      : t('end.loss');
-  const cell = (k: string, v: string) =>
-    `<div class="es-cell"><span class="es-k">${k}</span><span class="es-v">${v}</span></div>`;
-  const xpLine =
-    endScreen.xp > 0
-      ? `<div class="es-xp">${t('end.xp', { n: endScreen.xp })}` +
-        (endScreen.levelUp !== null
-          ? `<span class="lvl">${t('end.level-up', { lvl: endScreen.levelUp })}</span>`
-          : '') +
-        `</div>`
-      : '';
-  // Rematch wording is honest per mode: solo restarts a skirmish; a NET match can't
-  // re-seat the same table client-side (server brick), so "again" opens the browser.
-  const againLabel = NET ? t('end.new-match') : t('end.play-again');
-  const html =
-    `<div class="es-box">` +
-    `<div class="es-head ${cls}">${head}</div>` +
-    `<div class="es-why">${esc(endScreen.why)}</div>` +
-    `<div class="es-grid">` +
-    `<div class="es-cell wide"><span class="es-k">${t('end.score')}</span><span class="es-v">✦ ${total} <small>· ${t('end.place', { p: place, n: ranked.length })}</small></span></div>` +
-    cell(t('end.provinces'), `⬣ ${provinces}`) +
-    cell(t('end.fleets'), `⛴ ${fleets}`) +
-    cell(t('end.units'), `⚔ ${units}`) +
-    cell(t('end.duration'), dur) +
-    `</div>` +
-    xpLine +
-    `<div class="es-acts">` +
-    `<button class="es-btn primary" data-es="again">${againLabel}</button>` +
-    `<button class="es-btn" data-es="menu">⌂ ${t('end.to-menu')}</button>` +
-    `<button class="es-btn ghost" data-es="board">${t('end.board')}</button>` +
-    `</div></div>`;
-  if (html !== lastEndHtml) {
-    endscreenEl.innerHTML = html;
-    lastEndHtml = html;
-  }
-  endscreenEl.style.display = 'flex';
-}
-endscreenEl.addEventListener('click', (ev) => {
-  const act = (ev.target as Element).closest('[data-es]') as HTMLElement | null;
-  if (!act) return;
-  const which = act.dataset.es;
-  if (which === 'board') {
-    if (endScreen) endScreen.dismissed = true; // hide the panel, leave the frozen board
-    return;
-  }
-  // Leaving a net match is a deliberate disconnect (no auto-reconnect).
-  const wasNet = NET;
-  if (NET) {
-    userClosed = true;
-    NET = false;
-    netAdmitted = false;
-    if (netSock) netSock.close();
-  }
-  endScreen = null; // leaving the finished match — the overlay must not linger over the hub
-  lastEndHtml = '';
-  // ONB-2: the match can end (win/lose) while a guide is still mid-chain — e.g. a
-  // player who raced ahead of the tutorial prompts and hit the score threshold on
-  // their own. Same leak as the ⌂/Back exit below: an un-stopped `activeTour` keeps
-  // painting its last step's #spotlight overlay over the hub and the next match.
-  activeTour?.stop();
-  if (which === 'again') {
-    // Solo: straight back into a skirmish setup. Net: the match browser (a same-table
-    // rematch needs server support — a separate brick); either way, one tap to next game.
+const endScreenPanel = initEndScreen({
+  root: () => endscreenEl,
+  state: () => s,
+  me: () => ME,
+  end: () => endScreen,
+  dismiss: () => {
+    if (endScreen) endScreen.dismissed = true;
+  },
+  clearEnd: () => {
+    endScreen = null;
+  },
+  hubVisible: () => !!hubEl && hubEl.style.display !== 'none',
+  net: () => NET,
+  worldsFallback: () => worldsOf(ME),
+  fmtStamp,
+  onLeave: (which, wasNet) => {
+    // Уход из сетевого матча — намеренный дисконнект (без авто-реконнекта).
     if (wasNet) {
-      openHub();
-      hubTab('games');
-    } else {
-      openSetup('hub');
+      userClosed = true;
+      NET = false;
+      netAdmitted = false;
+      if (netSock) netSock.close();
     }
-  } else {
-    openHub(); // "В меню"
-  }
+    // ONB-2: матч мог закончиться посреди гайда — незакрытый тур продолжил бы рисовать
+    // свой #spotlight поверх хаба и следующего матча.
+    activeTour?.stop();
+    if (which === 'again') {
+      // Соло — сразу в настройку схватки; сеть — в браузер матчей (пересадить тот же
+      // стол клиент не может, это отдельный серверный кирпич).
+      if (wasNet) {
+        openHub();
+        hubTab('games');
+      } else {
+        openSetup('hub');
+      }
+    } else {
+      openHub(); // «В меню»
+    }
+  },
 });
+const renderEndScreen = (): void => endScreenPanel.render();
 
 // Speedbar "⌂ В меню": leave the current match back to the hub from anywhere in-game.
 // In net mode this is an intentional disconnect (userClosed → no auto-reconnect). The
