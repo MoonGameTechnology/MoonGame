@@ -571,7 +571,8 @@ INSTEAD-of-фокус — opportunity-cost (лидер-«+слот» branchless)
   `construction.complete` (`buildTimeHours`×timeScale). Сколько экземпляров здания
   может стоять на мире, объявляет каталог полем **`maxPerPlanet`** (дефолт 1 — «одно
   каждого типа, уровень растят улучшением»; RULES-2: раньше это была строка в редьюсере,
-  причём в двух местах); юниты идут в гарнизон. Коды: `E_BAD_PAYLOAD, E_NO_PLANET,
+  причём в ТРЁХ местах: заказ, возобновление паузы и обработчик `construction.complete`
+  — последний барьер против дубля завершения); юниты идут в гарнизон. Коды: `E_BAD_PAYLOAD, E_NO_PLANET,
 E_FORBIDDEN, E_UNKNOWN_BUILDING/UNIT, E_ALREADY_BUILT, E_ALREADY_QUEUED,
 E_NO_BUILDING, E_MAX_LEVEL, E_INSUFFICIENT, E_BOMBARDED, E_WRONG_SECTOR,
 E_NO_SHIPYARD`.

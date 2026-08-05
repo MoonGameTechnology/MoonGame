@@ -424,13 +424,38 @@ describe('construction module — building levels and upgrades', () => {
   // «Одно здание такого типа на мир» было строкой в редьюсере; теперь это поле
   // maxPerPlanet с дефолтом 1. Проверяем ровно то, ради чего переезд: поведение
   // следует объявленному числу, а не остаётся зашитым.
-  it('второй экземпляр РАЗРЕШЁН, если каталог объявил maxPerPlanet: 2', () => {
+  // Проверяем не «приказ принят», а «здание ПОЯВИЛОСЬ»: приказ проходит через один
+  // барьер, а достраивает здание другой — обработчик construction.complete. Первая
+  // версия этого теста останавливалась на `r.ok` и пропустила ровно такую дыру:
+  // заказ принимался по данным, а завершение резало по зашитому «уже есть», и
+  // оплаченное здание молча исчезало. Тест обязан доходить до итога.
+  it('второй экземпляр РЕАЛЬНО достраивается, если каталог объявил maxPerPlanet: 2', () => {
     const kernel = createKernel([constructionModule]);
     const a = planet('A', 'p1');
     a.buildings = [{ type: 'turret', level: 1, hp: 0 }];
     const st = stateWith({ players: [player('p1', { metal: 100 })], planets: [a] });
-    const r = kernel.applyAction(st, construct('turret'), ctx(0));
-    expect(r.ok).toBe(true);
+    const ordered = okApply(kernel.applyAction(st, construct('turret'), ctx(0)));
+    const done = okAdvance(kernel.advanceTo(ordered.state, ctx(HOUR))); // turret: 1 час
+    const turrets = done.state.planets.A?.buildings.filter((b) => b.type === 'turret');
+    expect(turrets).toHaveLength(2);
+  });
+
+  // Обратная сторона того же барьера: с дефолтным лимитом 1 дубль завершения не
+  // должен построить второе здание (идемпотентность повторного/переигранного события).
+  it('при дефолтном лимите повторное завершение НЕ строит второй экземпляр', () => {
+    const kernel = createKernel([constructionModule]);
+    const st = stateWith({
+      players: [player('p1', { metal: 100 })],
+      planets: [planet('A', 'p1')],
+    });
+    const ordered = okApply(kernel.applyAction(st, construct('mine'), ctx(0)));
+    // два одинаковых завершения в очереди — второе обязано стать no-op
+    const twice = {
+      ...ordered.state,
+      scheduled: [...ordered.state.scheduled, ...ordered.state.scheduled],
+    };
+    const done = okAdvance(kernel.advanceTo(twice, ctx(4 * HOUR))); // mine: 4 часа
+    expect(done.state.planets.A?.buildings.filter((b) => b.type === 'mine')).toHaveLength(1);
   });
 
   it('третий экземпляр всё же отбивается — лимит именно тот, что в данных', () => {
