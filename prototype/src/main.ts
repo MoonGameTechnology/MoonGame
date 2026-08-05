@@ -331,6 +331,7 @@ import { resolveIntro, parseSeenIntros, type IntroCard } from './intros';
 import { buildRecap, type RecapEvent } from './recap';
 import { canEditPing, canRemovePing, pingRows, toggleHidden } from './pingPanel';
 import { combatRanges } from './combatRanges';
+import { corridorLines } from './corridorView';
 import { recapAdmits } from './recapGate';
 // ONB-7 — first-session goals checklist (mine/fleet/capture/score, ticked from state).
 import { FIRST_GOALS, metGoals, mergeDone, goalsComplete, type GoalSignals } from './firstGoals';
@@ -489,6 +490,10 @@ const LOCK = '#7df0d0'; // selection / targeting reticle accent
 const R_ARTY = '#ffb43a'; // артиллерия: янтарный (как и весь огневой контур в HUD)
 const R_WING = '#9ad7ff'; // эскадрилья: холодный голубой
 const R_AA = '#c07dff'; // ПВО: сиреневый — это ОТМЕТКА на мире, а не область
+// HERO-CORRIDOR: одноразовый коридор — КРАСНЫЙ мигающий пунктир (он исчезнет с первым
+// же проходом, это не дорога); временный и общий — спокойная бирюза с таймером.
+const CORR_ONCE = '#ff5c5c';
+const CORR_LIVE = '#5ce1d6';
 // CAST-UX: круги прицела каста. Отдельные имена, а не переиспользование LOCK, потому
 // что дальность и область — РАЗНЫЕ сущности, и игрок должен различать их с одного
 // взгляда: тонкий пунктир «докуда достану» против залитого пятна «что накроет».
@@ -3936,6 +3941,52 @@ function drawAssaultTargets() {
 }
 
 /**
+ * HERO-CORRIDOR — временные коридоры героев на карте.
+ *
+ * До этого их не рисовали ВООБЩЕ: статический слой лейн строится из `MAP`, а коридор
+ * живёт в состоянии, поэтому игрок не видел ни что коридор открыт, ни куда он ведёт.
+ *
+ * Что и почему различается — решает чистая модель `corridorView.ts`; здесь только
+ * канва. Одноразовый мигает красным и БЕЗ таймера (он закрывается прибытием армии, а
+ * не по часам — цифра «осталось» была бы враньём); временный и общий идут спокойной
+ * линией с оставшимся сроком.
+ */
+function drawCorridors(now: number): void {
+  const lines = corridorLines(s, ME, s.time, known);
+  if (!lines.length) return;
+  cx.save();
+  for (const line of lines) {
+    const a = s.planets[line.from]?.position;
+    const b = s.planets[line.to]?.position;
+    if (!a || !b) continue;
+    const p1 = world(a);
+    const p2 = world(b);
+    const col = line.blink ? CORR_ONCE : CORR_LIVE;
+    // Мигание — только у одноразового: он вот-вот исчезнет, и это надо чувствовать.
+    const pulse = line.blink ? 0.35 + 0.45 * Math.abs(Math.sin(now / 320)) : 0.6;
+    cx.strokeStyle = rgba(col, line.mine ? pulse : pulse * 0.6);
+    cx.lineWidth = line.mine ? 2 : 1.4;
+    cx.setLineDash(line.blink ? [7, 6] : [10, 6]);
+    cx.shadowColor = col;
+    cx.shadowBlur = fxBlur(line.blink ? 8 : 4);
+    cx.beginPath();
+    cx.moveTo(p1.x, p1.y);
+    cx.lineTo(p2.x, p2.y);
+    cx.stroke();
+    cx.shadowBlur = 0;
+    if (line.msLeft !== null) {
+      cx.setLineDash([]);
+      cx.fillStyle = rgba(col, 0.9);
+      cx.font = '600 11px ui-monospace,monospace';
+      cx.textAlign = 'center';
+      cx.fillText(fmtHrs(line.msLeft / HOUR), (p1.x + p2.x) / 2, (p1.y + p2.y) / 2 - 6);
+    }
+  }
+  cx.setLineDash([]);
+  cx.restore();
+}
+
+/**
  * RANGE-UX — круги досягаемости выделенных флотов и отметки ПВО.
  *
  * Вся арифметика — в `combatRanges.ts` (чистая, покрыта гейтом); здесь только канва.
@@ -5326,6 +5377,7 @@ function render(now: number) {
   drawPings(now); // ally ping markers (coalition), with screen hit-boxes for taps
   drawChainOverlay(now); // CHAIN-UX: цепочки планов + черновик режима «Приказ»
   drawAssaultTargets();
+  drawCorridors(now); // HERO-CORRIDOR: временные коридоры героев
   drawCombatRanges(); // RANGE-UX: артиллерия / эскадрилья / ПВО — до прицельных линий
   drawAimPreview();
   drawCastAim(); // CAST-UX: дальность каста + область действия
@@ -11234,6 +11286,22 @@ if (!__PLAYER_BUILD__ && DEV_UI && typeof window !== 'undefined') {
       const b = s.planets[toId]?.position;
       if (!a || !b) return false;
       siegeShots.push({ from: { ...a }, to: { ...b }, at: performance.now(), seed: siegeSeed++ });
+      return true;
+    },
+    // Open a hero corridor between two nodes so its overlay (blinking one-shot vs
+    // timed lane) can be looked at without levelling a hero and casting for real.
+    openCorridor(fromId: string, toId: string, tier: number): boolean {
+      if (!s.planets[fromId] || !s.planets[toId]) return false;
+      (s.tempLanes ??= []).push({
+        id: `lane:dev:${s.tempLanes.length}`,
+        owner: ME,
+        from: fromId,
+        to: toId,
+        speedBonus: 0.5,
+        expiresAt: s.time + 6 * HOUR,
+        addedLink: true,
+        tier,
+      });
       return true;
     },
     // Preview the capture wave over a province without staging a real ground battle.

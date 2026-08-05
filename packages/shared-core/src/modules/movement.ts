@@ -3,7 +3,7 @@ import type { Fleet, FleetEdge, GameState, PlanetId } from '../state/gameState';
 import { hoursToMs } from '../action/types';
 import { legT } from '../state/fleetPosition';
 import { distance, fleetBaseSpeed, planRoute, routeDistance } from '../state/route';
-import { corridorVeto } from '../state/corridor';
+import { corridorVeto, isCorridorEdge } from '../state/corridor';
 import { getStance } from '../state/diplomacy';
 
 /** A target a `fleet.move` can aim at: a node, or a continuous point on a lane. */
@@ -187,6 +187,12 @@ function targetsOf(state: GameState, payload: MovePayload): Target[] | { error: 
     }
     if (!a.links?.includes(to) || !b.links?.includes(from)) {
       return { error: 'E_NOT_A_LANE' }; // a point can only sit on a real lane
+    }
+    // HERO-CORRIDOR: встать ПОСРЕДИ коридора нельзя — это прыжок, середины у него нет.
+    // Иначе флот, припарковавшийся на коридорном ребре, после закрытия коридора остался
+    // бы стоять на ребре, которого в графе больше нет.
+    if (isCorridorEdge(state, from, to)) {
+      return { error: 'E_NOT_A_LANE' };
     }
     // Near a node → just go to that node (no degenerate parked edge).
     if (t <= EPS) {
