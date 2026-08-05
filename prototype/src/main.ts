@@ -248,6 +248,20 @@ import { initTechTree, branchLabel } from './techTree';
 import { initSciPick } from './sciPick';
 import { initPasswordReset } from './passwordReset';
 import { initEndScreen } from './endScreen';
+import {
+  fxBlur,
+  pcUi,
+  compactUi,
+  glowOn,
+  setGlowFx,
+  starfieldOn,
+  setStarfield,
+  showFpsOn,
+  setShowFps,
+  compactPanelOn,
+  setCompactPanel,
+  applyCompactPanel,
+} from './graphicsPrefs';
 // «Профиль командира» — карьерное досье (REFM-10).
 import { initProfile } from './profileScreen';
 // AVA-C1/C2 — корпоративный кабинет (REFM-11).
@@ -513,7 +527,7 @@ type PlanetTab = 'ground' | 'ships' | 'squadron' | 'buildings';
 // canvas ctx (`cx`) + current DPR, and the module owns the dpr-keyed sprite caches. `rgba`
 // is imported directly (a pure colour helper).
 function blitGlow(color: string, x: number, y: number, r: number, a: number): void {
-  if (!glowFx) return; // graphics pref: glow & haloes off → skip the bloom discs entirely
+  if (!glowOn()) return; // graphics pref: glow & haloes off → skip the bloom discs entirely
   hdBlitGlow(cx, DPR, color, x, y, r, a);
 }
 function blitSphere(color: string, x: number, y: number, r: number, a = 1): void {
@@ -960,57 +974,14 @@ function setShowOwnPings(v: boolean): void {
   writeBool('void.showOwnPings', v);
 }
 // --- graphics preferences (client-only, localStorage) ------------------------
-// Cosmetic quality knobs, never sent to the server and never touching the sim.
-// Both default ON; a stored '0' turns the effect off on weaker devices / for a
-// flatter, faster read of the map.
-// Glow & haloes: the soft bloom discs (blitGlow) around worlds, fleets and
-// frontiers. Off makes blitGlow a no-op — cheaper frames, a crisper flat map.
-let glowFx = readBool('void.glowFx', true);
-function setGlowFx(v: boolean): void {
-  glowFx = v;
-  writeBool('void.glowFx', v);
-}
+// Тумблеры косметики и режима вёрстки живут в `graphicsPrefs.ts` (REFM-21): свечение,
+// звёздное поле, счётчик кадров, компактная подача и ПК-гейт. Здесь остаётся только то,
+// что завязано на сборку и на панель времени.
+applyCompactPanel();
 // SND-1 — звуки интерфейса: синтезатор целиком в sound.ts, здесь только фабрика.
 // AudioContext создаётся лениво при первом play() (всегда внутри клика — autoplay
 // доволен); среда без WebAudio/localStorage — молча беззвучна, UI живёт как жил.
 const snd = initSound(prefStore());
-// shadowBlur gate: a per-draw gaussian blur is one of the priciest canvas ops on
-// mobile GPUs. `blitGlow` already honours glowFx, but the ~20 `cx.shadowBlur = n`
-// halos on nodes / fleets / projectiles / HUD did not — so "Свечение и ореолы: выкл"
-// only removed the bloom discs, not the real per-frame cost. Route them through this
-// so the toggle now flattens ALL glow (crisp + fast) on weaker devices.
-function fxBlur(n: number): number {
-  return glowFx ? n : 0;
-}
-// Deep-space backdrop: the drifting nebulae + faint star ticks baked into the
-// static layer. Off leaves the flat fill + plotting grid. Toggling rebuilds the
-// bake (starfield flag rides the static-layer cache signature in buildStaticLayer).
-let starfield = readBool('void.starfield', true);
-function setStarfield(v: boolean): void {
-  starfield = v;
-  writeBool('void.starfield', v);
-}
-// «Компактный режим меню» (PC): a denser sector panel — tighter paddings, smaller
-// type/chips/tiles. Rides a body class so pure CSS restyles the panel live; the
-// panel markup and behaviour are untouched. Default off.
-let compactPanel = readBool('void.compactPanel', false);
-function applyCompactPanel(): void {
-  document.body.classList.toggle('compact-panel', compactPanel);
-}
-applyCompactPanel();
-function setCompactPanel(v: boolean): void {
-  compactPanel = v;
-  applyCompactPanel();
-  writeBool('void.compactPanel', v);
-}
-// FPS counter: the little frames-per-second readout in the corner. A diagnostics
-// knob for players checking performance on their device — default OFF so the HUD
-// stays clean, opt-in from Settings. (DEV_UI / net-desync still force it on.)
-let showFps = readBool('void.showFps', false);
-function setShowFps(v: boolean): void {
-  showFps = v;
-  writeBool('void.showFps', v);
-}
 // Developer setting (PC): show the speedbar time controls (pause + speed multipliers).
 // Off for a normal player — the world runs at its launch pace, real-time-async; a dev
 // flips it on to pause / accelerate for testing. Defaults on in the dev client so its
@@ -1019,21 +990,6 @@ let devSpeedControl = readBool('void.devSpeed', !__PLAYER_BUILD__);
 function setDevSpeedControl(v: boolean): void {
   devSpeedControl = v;
   writeBool('void.devSpeed', v);
-}
-// The compact-mode CSS is gated on the PC media query — JS-side string shortening
-// (ping button, conveyor idle line, upgrade buttons) must follow the same gate, or
-// a phone with the pref on would get PC-compact wording under phone styling.
-const PC_FINE =
-  typeof matchMedia !== 'undefined'
-    ? matchMedia('(min-width:900px) and (hover:hover) and (pointer:fine)')
-    : null;
-/** True only in the PC layout mode (the same media query that gates the PC CSS).
- *  Every JS-side PC-only tweak MUST ride this gate — the mobile build is frozen. */
-function pcUi(): boolean {
-  return PC_FINE?.matches ?? false;
-}
-function compactUi(): boolean {
-  return compactPanel && pcUi();
 }
 const SWEEP_DIV = 1600; // sweep angular rate: ang = now / SWEEP_DIV
 const SWEEP_PERIOD = TAU * SWEEP_DIV; // ms for a full rotation (~10s) — the radar refresh tick
@@ -4093,7 +4049,7 @@ function buildStaticLayer(): void {
   // Rebuild only when the content/size changes, or when the camera has SETTLED at a
   // new spot. During an active pan/zoom we skip the O(n²) re-tessellation entirely
   // and let blitStaticLayer follow the camera with the last bake (transformed).
-  const content = `${VW}x${VH}:${DPR.toFixed(2)}|${ME}|${ownersSig()}|${starfield ? 1 : 0}`;
+  const content = `${VW}x${VH}:${DPR.toFixed(2)}|${ME}|${ownersSig()}|${starfieldOn() ? 1 : 0}`;
   const sizeOk = bg.width === Math.round(VW * DPR);
   const camSame = cam.x === bgCam.x && cam.y === bgCam.y && cam.scale === bgCam.scale;
   // Re-bake whenever the camera moved. The bake is viewport-sized, so following a pan
@@ -4115,7 +4071,7 @@ function buildStaticLayer(): void {
   g.fillStyle = '#02060c';
   g.fillRect(0, 0, VW, VH);
   // Graphics pref: `starfield` off leaves the flat fill + grid (nebulae/stars skipped).
-  if (starfield)
+  if (starfieldOn())
     for (const neb of NEBULAE) {
       const r = neb.r * (MOBILE ? 0.7 : 1);
       const grd = g.createRadialGradient(neb.x * VW, neb.y * VH, 0, neb.x * VW, neb.y * VH, r);
@@ -4140,7 +4096,7 @@ function buildStaticLayer(): void {
     g.lineTo(VW, y);
   }
   g.stroke();
-  if (starfield)
+  if (starfieldOn())
     for (const st of STARS) {
       g.fillStyle = rgba('#9fe6e0', st.b);
       g.fillRect(st.x * VW, st.y * VH, 1, 1);
@@ -7577,7 +7533,7 @@ side.addEventListener('pointermove', (ev) => {
   const t = ev.target as HTMLElement;
   if (t.closest('#pdesc')) return; // over the docked pane itself — keep what's shown
   const key = (t.closest('[data-desc]') as HTMLElement | null)?.dataset.desc ?? null;
-  if (PC_FINE?.matches && objTipEl) {
+  if (pcUi() && objTipEl) {
     // Cursor tooltip: shown only while an object is actually under the pointer.
     if (key !== hoverObj) {
       hoverObj = key;
@@ -9317,7 +9273,7 @@ function renderSettings(): void {
     (pcUi()
       ? `<div class="set-row">` +
         `<div class="set-lbl">${t('settings.compact')}<span class="set-sub">${t('settings.compact.hint')}</span></div>` +
-        `<div class="set-ctl"><label class="set-switch"><input id="set-compact" type="checkbox"${compactPanel ? ' checked' : ''} aria-label="${t('settings.compact')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-compact-val" class="set-val">${compactPanel ? t('settings.on') : t('settings.off')}</span></div>` +
+        `<div class="set-ctl"><label class="set-switch"><input id="set-compact" type="checkbox"${compactPanelOn() ? ' checked' : ''} aria-label="${t('settings.compact')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-compact-val" class="set-val">${compactPanelOn() ? t('settings.on') : t('settings.off')}</span></div>` +
         `</div>`
       : '') +
     `<div class="pc-sec">${t('settings.colors.title')}</div>` +
@@ -9350,15 +9306,15 @@ function renderSettings(): void {
     `<div class="pc-sec">${t('settings.gfx.title')}</div>` +
     `<div class="set-row">` +
     `<div class="set-lbl">${t('settings.gfx.glow')}<span class="set-sub">${t('settings.gfx.glow.hint')}</span></div>` +
-    `<div class="set-ctl"><label class="set-switch"><input id="set-glow" type="checkbox"${glowFx ? ' checked' : ''} aria-label="${t('settings.gfx.glow')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-glow-val" class="set-val">${glowFx ? t('settings.on') : t('settings.off')}</span></div>` +
+    `<div class="set-ctl"><label class="set-switch"><input id="set-glow" type="checkbox"${glowOn() ? ' checked' : ''} aria-label="${t('settings.gfx.glow')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-glow-val" class="set-val">${glowOn() ? t('settings.on') : t('settings.off')}</span></div>` +
     `</div>` +
     `<div class="set-row">` +
     `<div class="set-lbl">${t('settings.gfx.starfield')}<span class="set-sub">${t('settings.gfx.starfield.hint')}</span></div>` +
-    `<div class="set-ctl"><label class="set-switch"><input id="set-starfield" type="checkbox"${starfield ? ' checked' : ''} aria-label="${t('settings.gfx.starfield')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-starfield-val" class="set-val">${starfield ? t('settings.on') : t('settings.off')}</span></div>` +
+    `<div class="set-ctl"><label class="set-switch"><input id="set-starfield" type="checkbox"${starfieldOn() ? ' checked' : ''} aria-label="${t('settings.gfx.starfield')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-starfield-val" class="set-val">${starfieldOn() ? t('settings.on') : t('settings.off')}</span></div>` +
     `</div>` +
     `<div class="set-row">` +
     `<div class="set-lbl">${t('settings.gfx.fps')}<span class="set-sub">${t('settings.gfx.fps.hint')}</span></div>` +
-    `<div class="set-ctl"><label class="set-switch"><input id="set-fps" type="checkbox"${showFps ? ' checked' : ''} aria-label="${t('settings.gfx.fps')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-fps-val" class="set-val">${showFps ? t('settings.on') : t('settings.off')}</span></div>` +
+    `<div class="set-ctl"><label class="set-switch"><input id="set-fps" type="checkbox"${showFpsOn() ? ' checked' : ''} aria-label="${t('settings.gfx.fps')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-fps-val" class="set-val">${showFpsOn() ? t('settings.on') : t('settings.off')}</span></div>` +
     `</div>` +
     // SND-1: секция «Звук» — тумблер синтезированных откликов + громкость.
     `<div class="pc-sec">${t('settings.snd.title')}</div>` +
@@ -11404,7 +11360,7 @@ function frame(nowReal: number) {
   // desync flag (✓ in sync with the server, ✗ + running mismatch count if not).
   // Shown when the player opts in (Settings → FPS), forced on for dev chrome
   // (DEV_UI) and on a live desync — which everyone must be able to see and report.
-  if (showFps || DEV_UI || (NET && netDesync)) {
+  if (showFpsOn() || DEV_UI || (NET && netDesync)) {
     let fpsText = `${Math.round(fpsEma)} FPS`;
     if (NET) {
       const rtt = rttEma === null ? '· · ms' : `${Math.round(rttEma)} ms`;
