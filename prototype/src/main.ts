@@ -3210,6 +3210,11 @@ function autoEngage() {
     if (!sectorTypeOf(f.location)?.capturable) continue; // empty space can't be taken
     const here = s.planets[f.location];
     if (!here || here.owner === f.owner) continue;
+    // Auto-storm only worlds we are AT WAR with — the core rejects a peaceful assault
+    // anyway (E_FORBIDDEN), but this loop runs EVERY FRAME: the doomed order re-pressed
+    // 60 раз в секунду и сыпал «действие запрещено» без остановки (живой плейтест).
+    // Зеркало того же гейта в serverDrivers.ts (auto-storm only at war).
+    if (here.owner !== null && getStance(s, f.owner, here.owner) !== 'war') continue;
     const enemyHere = Object.values(s.fleets).some(
       (g) => g.owner !== f.owner && g.location === f.location && g.units.some((u) => u.count > 0),
     );
@@ -5163,11 +5168,12 @@ function buildButtons(_planetId: string, ids: string[], kind: 'building' | 'unit
         costText(kind === 'unit' ? data.units[id]?.cost : data.buildings[id]?.cost),
         true,
         // Buildings are one-per-planet — grey out a committed (queued/building/paused)
-        // one so a second order can't be placed. PC only (the mobile build UI is frozen
-        // in this chat); units stack freely so they're never locked.
-        kind === 'building' && pcUi() && !NET
-          ? (buildingLocked(_planetId, id) ?? undefined)
-          : undefined,
+        // one so a second order can't be placed. On EVERY layout and in net play too:
+        // условие `pcUi() && !NET` оставляло плитку кликабельной на телефоне и на
+        // сервере, и налоговую управу можно было заказать дважды (живой плейтест).
+        // buildingLocked читает p.buildings + scheduled + pausedConstruction — всё это
+        // есть и в сетевых снапшотах. Units stack freely so they're never locked.
+        kind === 'building' ? (buildingLocked(_planetId, id) ?? undefined) : undefined,
       ),
     )
     .join('');
@@ -6495,8 +6501,10 @@ function codexBuildBtn(kind: string, id: string): string {
   if (!p || p.owner !== ME) return ''; // only when you're looking at one of your worlds
   if (kind === 'b') {
     const buildable = (sectorTypeOf(p.id)?.allowedBuildings ?? BUILDABLE).includes(id);
-    const built = p.buildings.some((b) => b.type === id);
-    if (!buildable || built) return '';
+    // buildingLocked, а не только «уже стоит»: СТРОЯЩЕЕСЯ здание ещё не в p.buildings
+    // (оно попадает туда на construction.complete), и кодекс предлагал «Построить
+    // здесь» второй экземпляр одноэкземплярного здания всю стройку первого.
+    if (!buildable || buildingLocked(p.id, id)) return '';
     return `<button class="cx-build" data-build="building:${id}">▣ ${t('codex.build-here')} · ${cost(data.buildings[id]?.cost, myRes())}</button>`;
   }
   if (kind === 'u' && data.units[id]) {

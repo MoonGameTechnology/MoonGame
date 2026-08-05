@@ -901,8 +901,11 @@ export const ru: Record<string, string> = {
 
   // --- err — Отказы ядра (kernel rejection codes). Ключ выводится из кода: E_NO_CAPACITY → err.no-capacity.
   'err.already': 'уже действует',
+  'err.already-built': 'уже построено — уровень растёт улучшением',
   'err.already-fitted': 'фиттинг уже установлен',
   'err.already-offered': 'предложение уже отправлено',
+  'err.already-paused': 'стройка уже приостановлена — возобновите её',
+  'err.already-queued': 'уже в очереди стройки',
   'err.already-unlocked': 'узел уже изучен',
   'err.bad-effect': 'способность настроена некорректно',
   'err.bad-payload': 'некорректный приказ',
