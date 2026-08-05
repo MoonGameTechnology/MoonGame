@@ -21,9 +21,12 @@ name: Auto-merge
 # `CLEAN` и тихо выйдет. Заведёшь required-чек в новом воркфлоу — допиши его сюда.
 #
 # БЕЗОПАСНОСТЬ. `workflow_run` запускается в контексте базовой ветки и с write-правами —
-# тот же класс граблей, что `pull_request_target`. Поэтому здесь НЕТ checkout: код PR не
-# выкачивается и не исполняется, шаг только ходит в API. Плюс явная проверка на форк: чужой
-# код в очередь автоматом не поедет, ему нужен человек.
+# тот же класс граблей, что `pull_request_target`. Код PR здесь не выкачивается и не
+# исполняется НИКОГДА: единственный checkout прибит к ветке по умолчанию явным `ref` и
+# сужен `sparse-checkout`'ом до `.github/scripts` — то есть исполняется только то, что уже
+# влито в `main` и прошло ревью. Явный `ref` тут не перестраховка: у второго триггера
+# (`pull_request`) дефолтом был бы merge-ref, а это уже код автора PR рядом с write-токеном.
+# Плюс явная проверка на форк: чужой код в очередь автоматом не поедет, ему нужен человек.
 #
 # ПРЕДУСЛОВИЕ. `workflow_run` срабатывает только для версии файла на ветке по умолчанию —
 # правка начинает действовать после того, как влилась в `main`, а не на своём же PR.
@@ -31,7 +34,9 @@ name: Auto-merge
 # ПОДАВЛЕНИЕ zizmor/dangerous-triggers. Правило категорично: «workflow_run is almost always
 # used insecurely». По умолчанию это верно, поэтому подавляем точечно и с разбором, а не
 # правилом целиком. Опасность `workflow_run` — в трёх вещах, и здесь закрыта каждая:
-#   1. checkout кода PR и его исполнение с базовым токеном — checkout'а в этом воркфлоу НЕТ;
+#   1. checkout кода PR и его исполнение с базовым токеном — checkout здесь есть, но он
+#      прибит к ветке по умолчанию явным `ref` и сужен до `.github/scripts`, так что код
+#      PR им недостижим в принципе (см. комментарий у самого шага);
 #   2. доверие артефактам вызвавшего прогона — ничего не скачивается;
 #   3. инъекция через `${{ }}` прямо в `run:` — все поля события идут через `env:`, а в
 #      скрипте используются только как закавыченные переменные (`"$HEAD_BRANCH"`).
@@ -60,8 +65,11 @@ concurrency:
   cancel-in-progress: false
 
 permissions:
-  # Постановка в очередь — мутация pull request'а.
+  # Постановка в очередь — мутация pull request'а. Плюс объяснялка «почему не вливается»
+  # пишется комментарием в PR.
   pull-requests: write
+  # Комментарий в PR идёт через issues-API (PR — это issue), поэтому нужно и это право.
+  issues: write
   # `write`, а НЕ `read`. Рассуждение «слияние выполняет очередь, а не наш токен, значит
   # хватит чтения» — неверное, проверено на живом прогоне: `enqueuePullRequest` вернул
   # `FORBIDDEN` / «Resource not accessible by integration». Постановка в очередь двигает
@@ -84,6 +92,18 @@ jobs:
        github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.head_repository.full_name == github.repository)
     steps:
+      # ЕДИНСТВЕННЫЙ checkout здесь — и он НАМЕРЕННО не может достать код PR.
+      # `ref` прибит к ветке по умолчанию явно, а не оставлен на дефолт: у `workflow_run`
+      # дефолт и так безопасен, но у второго нашего триггера (`pull_request`) дефолтом
+      # был бы merge-ref, то есть код автора PR — с write-токеном это классическая дыра.
+      # `sparse-checkout` сужает выкачку до каталога со скриптами: исполняем только то,
+      # что уже влито в `main` и прошло ревью.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+          sparse-checkout-cone-mode: false
       - name: enqueue
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -109,43 +129,98 @@ jobs:
 
           # Идемпотентность и все предусловия — одним ЧТЕНИЕМ состояния, а не глушением
           # ошибки мутации: так «уже в очереди» не смешивается с «очередь не настроена».
-          read -r ID STATE DRAFT STATUS QUEUED <<<"$(
-            gh api graphql \
-              -f query='
-                query($owner:String!, $name:String!, $number:Int!) {
-                  repository(owner:$owner, name:$name) {
-                    pullRequest(number:$number) {
-                      id state isDraft mergeStateStatus
-                      mergeQueueEntry { position }
+          #
+          # ПОЧЕМУ ЦИКЛ, А НЕ ОДНО ЧТЕНИЕ. Здесь была авария, из-за которой зелёные PR
+          # висели часами. `mergeStateStatus` GitHub считает АСИНХРОННО, и сразу после
+          # того, как позеленел последний чек, он ещё какое-то время отдаёт `BLOCKED`.
+          # Нас будит ровно это событие — завершение прогона, — поэтому одно чтение
+          # попадало в окно пересчёта, воркфлоу писал «ждём следующего прогона» и выходил
+          # с кодом 0. А следующего прогона НЕ БЫЛО: оба воркфлоу уже закончились, будить
+          # больше некому. Живой пример — PR #485: в 20:36:11 прочитано `BLOCKED`, при
+          # том что все чеки были зелёными с 20:35:58, и PR простоял так семь часов, имея
+          # `mergeable_state: clean`.
+          # Поэтому нечёткие состояния (`BLOCKED`, `UNKNOWN`) перечитываются с паузами.
+          # Остальные — `BEHIND`, `DIRTY`, `DRAFT` — настоящие, их перечитывать незачем.
+          ATTEMPT=0
+          MAX_ATTEMPTS=6
+          while :; do
+            ATTEMPT=$((ATTEMPT + 1))
+            read -r ID STATE DRAFT STATUS BASE QUEUED <<<"$(
+              gh api graphql \
+                -f query='
+                  query($owner:String!, $name:String!, $number:Int!) {
+                    repository(owner:$owner, name:$name) {
+                      pullRequest(number:$number) {
+                        id state isDraft mergeStateStatus baseRefName
+                        mergeQueueEntry { position }
+                      }
                     }
-                  }
-                }' \
-              -F owner="${REPO%/*}" -F name="${REPO#*/}" -F number="$PR" \
-              -q '.data.repository.pullRequest
-                  | "\(.id) \(.state) \(.isDraft) \(.mergeStateStatus) \(.mergeQueueEntry != null)"'
-          )"
+                  }' \
+                -F owner="${REPO%/*}" -F name="${REPO#*/}" -F number="$PR" \
+                -q '.data.repository.pullRequest
+                    | "\(.id) \(.state) \(.isDraft) \(.mergeStateStatus) \(.baseRefName) \(.mergeQueueEntry != null)"'
+            )"
+            echo "PR #$PR: попытка $ATTEMPT/$MAX_ATTEMPTS — mergeStateStatus=$STATUS, queued=$QUEUED"
+            [ "$QUEUED" = 'true' ] && break
+            [ "$STATE" != 'OPEN' ] && break
+            [ "$DRAFT" = 'true' ] && break
+            # Пропускаем и CLEAN, и UNSTABLE. UNSTABLE значит «влить можно, ОБЯЗАТЕЛЬНЫЕ
+            # чеки зелёные, но какой-то НЕобязательный красный» — а у нас информационные
+            # сканеры (CodeQL, TruffleHog, zizmor, Trivy по сторонним образам) красными
+            # бывают штатно: в caddy/gosu висят HIGH-CVE, которые чинятся только апстримом.
+            # Требуй мы строго CLEAN — один такой чек остановил бы авто-постановку для ВСЕХ
+            # PR, и клик вернулся бы ровно там, где по замыслу ничего блокировать не должно.
+            # Риска нет: очередь всё равно перепроверяет обязательные чеки на своей ветке и
+            # не вольёт красное, а GitHub и сам разрешает ставить UNSTABLE-PR кнопкой.
+            { [ "$STATUS" = 'CLEAN' ] || [ "$STATUS" = 'UNSTABLE' ]; } && break
+            { [ "$STATUS" != 'BLOCKED' ] && [ "$STATUS" != 'UNKNOWN' ]; } && break
+            [ "$ATTEMPT" -ge "$MAX_ATTEMPTS" ] && break
+            sleep 20
+          done
+
+          # Дальше каждый отказ ОБЪЯСНЯЕТСЯ в самом PR, а не одной строкой в логе джобы,
+          # которую надо ещё догадаться открыть. Скрипт разбирает, что именно красное,
+          # и отделяет находку сканера от упавшего скрипта или сбоя раннера.
+          explain() {
+            STATE="$1" ATTEMPTS="$ATTEMPT" RESOLVED="${2:-}" \
+              node .github/scripts/why-not-merging.mjs || true
+          }
 
           if [ "$QUEUED" = 'true' ]; then
             echo "PR #$PR уже в очереди — нечего делать"
+            explain "$STATUS" 1
             exit 0
           fi
           if [ "$STATE" != 'OPEN' ] || [ "$DRAFT" = 'true' ]; then
             echo "PR #$PR: state=$STATE, draft=$DRAFT — пропускаем"
             exit 0
           fi
-          # Пропускаем и CLEAN, и UNSTABLE. UNSTABLE значит «влить можно, ОБЯЗАТЕЛЬНЫЕ чеки
-          # зелёные, но какой-то НЕобязательный красный» — а у нас информационные сканеры
-          # (CodeQL, TruffleHog, zizmor, Trivy по сторонним образам) красными бывают штатно:
-          # в caddy/gosu висят HIGH-CVE, которые чинятся только апстримом. Требуй мы строго
-          # CLEAN — один такой чек остановил бы авто-постановку для ВСЕХ PR, и клик вернулся
-          # бы ровно там, где по замыслу ничего блокировать не должно.
-          # Риска нет: очередь всё равно перепроверяет обязательные чеки на своей ветке и не
-          # вольёт красное, а GitHub и сам разрешает ставить UNSTABLE-PR кнопкой.
-          # BLOCKED (обязательный чек не отчитался или упал, нет ревью), BEHIND, DIRTY,
-          # UNKNOWN — «ещё не готов». Не ошибка: второй воркфлоу закончит позже и вызовет
-          # нас снова.
           if [ "$STATUS" != 'CLEAN' ] && [ "$STATUS" != 'UNSTABLE' ]; then
-            echo "PR #$PR: mergeStateStatus=$STATUS — ещё не готов, ждём следующего прогона"
+            echo "PR #$PR: mergeStateStatus=$STATUS после $ATTEMPT попыт(ок) — не готов"
+            explain "$STATUS"
+            exit 0
+          fi
+
+          # У СТЕКОВОГО PR база — не `main`, а другая ветка, и очереди у неё нет: мутация
+          # падает с `No merge queue found for branch '<base>'`, а джоба краснеет на ровном
+          # месте. Это не ошибка, а нормальное состояние — база станет `main`, когда нижний
+          # PR вольётся (GitHub перецелит автоматически), и тогда же PR поедет. Проверяем
+          # ЧТЕНИЕМ, а не отловом текста ошибки: `mergeQueue` возвращает null, если очереди
+          # для ветки нет.
+          HAS_QUEUE=$(
+            gh api graphql \
+              -f query='
+                query($owner:String!, $name:String!, $branch:String!) {
+                  repository(owner:$owner, name:$name) {
+                    mergeQueue(branch:$branch) { id }
+                  }
+                }' \
+              -F owner="${REPO%/*}" -F name="${REPO#*/}" -F branch="$BASE" \
+              -q '.data.repository.mergeQueue != null'
+          )
+          if [ "$HAS_QUEUE" != 'true' ]; then
+            echo "PR #$PR: у базовой ветки '$BASE' нет merge queue (стековый PR) — ставить некуда, ждём смены базы"
+            explain NO_QUEUE
             exit 0
           fi
 
@@ -158,3 +233,5 @@ jobs:
               }' \
             -F id="$ID"
           echo "PR #$PR поставлен в очередь: очередь перепроверит его на «свежий main + PR» и вольёт"
+          # Схлопываем объяснялку в одну строку, если она висела с прошлого прогона.
+          explain "$STATUS" 1

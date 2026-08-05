@@ -50,6 +50,27 @@ name: Security scan
 #
 # This workflow is itself checked by zizmor (GitHub Actions security scanner).
 #
+# === HARDEN-RUNNER (egress-policy: audit) ===
+#
+# ЗАЧЕМ. Почти каждая джоба ниже запускает ЧУЖОЙ docker-образ с примонтированным репозиторием.
+# Именно этот вектор выстрелил в 2026-м дважды на тех самых сканерах: Trivy в марте, KICS
+# 22 апреля — украденные publisher-креды, вредоносный образ под легитимным тегом, и
+# отравленный бинарь тихо отправлял ВЫВОД СКАНА наружу, сохраняя рабочую поверхность.
+# Дайджест-пины (см. выше) закрывают «подменили образ»; harden-runner отвечает на
+# следующий вопрос — «а куда этот образ вообще ходит». Он снимает egress на уровне ядра
+# (eBPF), поэтому видит и трафик контейнеров, запущенных внутри джобы.
+#
+# ЦЕНА, О КОТОРОЙ НАДО ЗНАТЬ. Это сторонний агент с доступом уровня ядра на каждом прогоне,
+# и в audit-режиме он отправляет телеметрию о наших прогонах в SaaS вендора. Для пайплайна,
+# посылка которого — «не доверяй чужому коду с нашими секретами», это осознанный размен, а
+# не бесплатное усиление. Откат — удалить шаг, ничего больше от него не зависит.
+#
+# ПОЧЕМУ AUDIT, А НЕ BLOCK. Блокирующий режим обходится через DNS-over-HTTPS
+# (GHSA-46g3-37rh-v698, Community-тариф) — то есть даёт не гарантию, а видимость с
+# дополнительным риском сломать легитимный трафик сканеров. Сначала неделя наблюдений и
+# список реальных эндпоинтов, потом уже разговор про block. Версия 2.19.4 — заведомо выше
+# 2.16.0, где DoH-обход закрыли.
+#
 # === WHY THE WEEKLY SCHEDULE (SEC-10) ===
 #
 # Push-triggered scanning certifies a COMMIT, not a RUNNING DEPLOY. Our bases are
@@ -101,6 +122,9 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -136,6 +160,9 @@ jobs:
       contents: read
       security-events: write
     steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -187,6 +214,9 @@ jobs:
       security-events: write
       actions: read
     steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -224,6 +254,9 @@ jobs:
       contents: read
       security-events: write
     steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -270,6 +303,9 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0 # full history — the differentiator vs Gitleaks (--no-git)
@@ -306,6 +342,9 @@ jobs:
       contents: read
       security-events: write
     steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -353,6 +392,9 @@ jobs:
       contents: read
       security-events: write
     steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -399,6 +441,9 @@ jobs:
       contents: read
       security-events: write
     steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -458,6 +503,9 @@ jobs:
       contents: read
       security-events: write
     steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -556,6 +604,9 @@ jobs:
       contents: read
       security-events: write
     steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -674,13 +725,16 @@ jobs:
       contents: read
       pull-requests: write # для comment-summary-in-pr: on-failure
     steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - name: dependency review
         id: scan
         continue-on-error: true # информационная до триажа (SEC-1)
-        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: high
           # Комментарий ТОЛЬКО при находке: в обычном случае канал отчётности один —
@@ -768,6 +822,9 @@ jobs:
       # a quiet green.
       NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
     steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -845,6 +902,9 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -874,17 +934,47 @@ jobs:
           # dedicated, world-writable subdir instead of the whole repo root.
           mkdir -p zap-wrk
           chmod 777 zap-wrk
-          # ghcr.io/zaproxy/zaproxy@sha256 pin snapped live from the registry API (SEC-3).
-          # --network host: the target is the bare node process on the runner, not a
-          # container — ZAP reaches it via localhost like trivy-image reaches the socket.
-          docker run --rm --network host -v "$PWD/zap-wrk:/zap/wrk/:rw" \
-            ghcr.io/zaproxy/zaproxy@sha256:8d387b1a63e3425beef4846e39719f5af2a787753af2d8b6558c6257d7a577a2 \
-            zap-baseline.py -t http://localhost:8787 -r zap-report.html -J zap-report.json
-          rc=$?
+          # ПОЧЕМУ ДВЕ ПОПЫТКИ. ZAP тут флапает: 04.08.2026 на PR #480 демон не
+          # поднялся, `zap-baseline.py` напечатал «Failed to access summary file
+          # /home/zap/zap_out.json», отчёт не создался — и всё это за 34 секунды
+          # вместо обычных 6 минут. Семь минут назад, на #479, тот же образ по тому же
+          # дайджесту отработал штатно. То есть это не поломка конфигурации, а срыв
+          # старта демона под нагрузкой раннера.
+          # Без повтора шаг ниже красил бы джобу примерно на каждом десятом PR, и
+          # красный DAST быстро стал бы фоном, который никто не читает. Повтор — ровно
+          # для того, чтобы красный цвет означал «DAST правда не отработал», а не
+          # «сегодня не повезло». Две попытки, потому что одна независимая ретрая
+          # уводит вероятность ложной тревоги на порядок; больше — уже маскировка
+          # настоящей поломки.
+          run_zap() {
+            # ghcr.io/zaproxy/zaproxy@sha256 pin snapped live from the registry API (SEC-3).
+            # --network host: the target is the bare node process on the runner, not a
+            # container — ZAP reaches it via localhost like trivy-image reaches the socket.
+            docker run --rm --network host -v "$PWD/zap-wrk:/zap/wrk/:rw" \
+              ghcr.io/zaproxy/zaproxy@sha256:8d387b1a63e3425beef4846e39719f5af2a787753af2d8b6558c6257d7a577a2 \
+              zap-baseline.py -t http://localhost:8787 -r zap-report.html -J zap-report.json
+          }
+          # Вывод контейнера дублируется в файл: он уезжает в артефакт, поэтому
+          # следующий срыв можно будет разобрать постфактум, а не собирать заново.
+          run_zap 2>&1 | tee zap-wrk/zap-stdout.log
+          rc=${PIPESTATUS[0]}
+          attempts=1
+          if [ ! -s zap-wrk/zap-report.json ]; then
+            echo "::warning::ZAP не создал отчёт с первой попытки (exit $rc) — повтор, см. zap-stdout.log в артефакте"
+            run_zap 2>&1 | tee -a zap-wrk/zap-stdout.log
+            rc=${PIPESTATUS[0]}
+            attempts=2
+          fi
           set -e
           ok=true; case $rc in 125 | 126 | 127) ok=false ;; esac
+          # Ключевая проверка: «отчёта нет» ⇒ скана НЕ БЫЛО. Пустой результат
+          # неотличим от чистого — тот же приём, что у kics (files_scanned) и
+          # trivy-deps (grep matched nothing).
           [ -s zap-wrk/zap-report.json ] || ok=false
-          echo "{\"key\":\"dast-zap\",\"ok\":$ok,\"exit\":$rc}" > status-dast-zap.json
+          echo "{\"key\":\"dast-zap\",\"ok\":$ok,\"exit\":$rc,\"attempts\":$attempts}" > status-dast-zap.json
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
+          echo "ok=$ok" >> "$GITHUB_OUTPUT"
+          echo "attempts=$attempts" >> "$GITHUB_OUTPUT"
       - name: stop the server
         if: always()
         run: kill "$(cat server.pid)" 2>/dev/null || true
@@ -895,9 +985,35 @@ jobs:
           path: |
             zap-wrk/zap-report.html
             zap-wrk/zap-report.json
+            zap-wrk/zap-stdout.log
             status-dast-zap.json
             server.log
           if-no-files-found: warn
+      - name: report — informational (not yet blocking)
+        env:
+          RC: ${{ steps.scan.outputs.rc }}
+          OK: ${{ steps.scan.outputs.ok }}
+          ATTEMPTS: ${{ steps.scan.outputs.attempts }}
+        run: |
+          # ЗАЧЕМ ЭТОТ ШАГ. До него сорванный скан оставлял джобу ЗЕЛЁНОЙ: сам
+          # `zap-baseline.py` стоит под `continue-on-error`, а гейта не было вовсе.
+          # Провал жил ровно в одном месте — в строке «НЕ подтверждён» сводного
+          # комментария, то есть замечал его только тот, кто дочитал таблицу. Так и
+          # вышло: на #480 DAST не отработал, а джоба отчиталась успехом.
+          # Теперь сорванный скан красит джобу. Мерж это не блокирует (dast-zap
+          # информационный, а авто-постановка в очередь принимает UNSTABLE) — но
+          # красное видно в списке чеков, а не только в тексте отчёта.
+          # Сломанный скан и НАЙДЕННЫЕ проблемы — разные сообщения, как у kics.
+          if [ "$OK" != 'true' ]; then
+            echo "::error::ZAP не отработал: отчёт не создан за $ATTEMPTS попытк(и) (exit $RC). Это НЕ «уязвимостей нет» — DAST на этом коммите не проверял ничего. Разбор: zap-stdout.log и server.log в артефакте report-dast-zap."
+            exit 1
+          fi
+          if [ "$ATTEMPTS" != '1' ]; then
+            echo "::warning::ZAP отработал со второй попытки — первая сорвалась. Если это станет постоянным, проблема не в флапе."
+          fi
+          if [ "$RC" != '0' ]; then
+            echo "::warning::ZAP baseline нашёл проблемы (exit $RC). Информационно: разобрать базовую линию, затем перевести в блокирующие (SEC-1)."
+          fi
 
   sbom:
     name: SBOM — files (Syft / CycloneDX)
@@ -905,6 +1021,9 @@ jobs:
     permissions:
       contents: read
     steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -935,6 +1054,9 @@ jobs:
       contents: read
       security-events: write
     steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
@@ -974,12 +1096,15 @@ jobs:
       security-events: write
       id-token: write
     steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
       - id: sc
         continue-on-error: true
-        uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a # v2.4.3
+        uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc # v2.4.4
         with:
           results_file: scorecard.sarif
           results_format: sarif
@@ -1034,6 +1159,9 @@ jobs:
       pull-requests: write # PR comments
       issues: write
     steps:
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
+        with:
+          egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
