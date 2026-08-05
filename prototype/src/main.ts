@@ -269,6 +269,17 @@ import { initSound } from './sound';
 // REFM-16 — клиентские настройки: одно правило чтения/записи на весь клиент вместо
 // восьми рукописных копий «нет ключа ⇒ умолчание» + try/catch вокруг setItem.
 import { prefStore, readBool, readNum, readRaw, writeBool, writeRaw } from './prefs';
+// REFM-17 — палитра и правило «цвет = отношение»: одна таблица на карту и на экран
+// дипломатии (раньше их было две, и настройку палитры знала только карта).
+import {
+  COLOR,
+  VOID_COLOR,
+  isPaletteId,
+  paletteOf,
+  relationColor,
+  safeHexColor,
+  stanceColor,
+} from './sideColors';
 // CHAIN-UX — режим «Приказ»: модель черновика, меню точки, таймлайн, разметка.
 import {
   applyMenuAction,
@@ -363,87 +374,35 @@ import type {
 
 // --- constants ---------------------------------------------------------------
 
-// Political palette (Bytro/Paradox-style): YOU = green, ally = blue, neutral =
-// gray, enemy = red — used for fleets/planets and to tint each owner's province.
-// Cyan stays the console-chrome accent (grid, borders, targeting reticle).
-const COLOR: Record<string, string> = {
-  p1: '#3ad17a', // you — green
-  p2: '#ff5a4d',
-  p3: '#ffb43a',
-  p4: '#b07cff',
-  p5: '#35d6e6',
-  p6: '#ff7ac8',
-  p7: '#9ed85a',
-  p8: '#e58b4a',
-  p9: '#6f9cff',
-  p10: '#d8cf5a',
-  ally: '#4a8cff', // friendly bloc (pact / alliance) — blue
-  null: '#6f8a93', // unowned territory — gray
-};
-const VOID_COLOR = '#46606e'; // empty-space provinces — uncapturable void
 // --- side-colour SCHEMES (client-only, localStorage) --------------------------
-// «Цвет = отношение»: другие командиры красятся по ТВОЕЙ стойке к ним (враг /
-// дружественный блок / мир), а не по личному цвету. `cvd` — оттенки, различимые
-// при цветослепоте (Okabe–Ito): красный враг против зелёного «тебя» — классическая
-// красно-зелёная ловушка, поэтому там вермилион + синий + серый. Свой цвет
-// (`youColor`) и ничейное пространство (`neutralColor`) настраиваются отдельно.
-interface SideScheme {
-  enemy: string; // at WAR — red
-  ally: string; // pact / alliance (friendly bloc) — blue
-  neutral: string; // at PEACE — a distinct grey, ≠ unowned void
-}
-const RELATION_SCHEMES: Record<string, SideScheme> = {
-  classic: { enemy: '#ff5a4d', ally: COLOR.ally!, neutral: '#9fb0b6' },
-  warm: { enemy: '#ff6a3a', ally: '#2fb5c9', neutral: '#a8a29a' },
-  cvd: { enemy: '#d55e00', ally: '#0072b2', neutral: '#9a9a9a' }, // Okabe–Ito, CVD-safe
-};
-/** Side colours feed inline `style="color:…"` and `<input type=color value>` sinks, so a
- *  value reaching them MUST be a literal `#rrggbb` — never free text. They originate from
- *  `<input type="color">` (already constrained) but round-trip through localStorage, which a
- *  hostile extension/page could tamper. Validate on the way IN and rebuild the string from
- *  the matched digits so every downstream sink is safe by construction — a tampered value
- *  degrades to the default instead of injecting markup (CWE-79 / CodeQL js/xss-through-dom).
- *  The fallback is a trusted constant, used verbatim. */
-function safeHexColor(c: string | null | undefined, fallback: string): string {
-  // A validating GUARD (not a rebuild): the value is used only when it matched
-  // `#rrggbb` — a pattern that cannot contain HTML metacharacters — so it is inert
-  // in the inline `style`/attribute sinks. Anything else degrades to the trusted
-  // default. (The guard form is what taint-analysis recognizes as a sanitizer.)
-  return typeof c === 'string' && /^#[0-9a-fA-F]{6}$/.test(c) ? c : fallback;
-}
+// Палитра и само правило «цвет = отношение» живут в `sideColors.ts` — одной таблицей на
+// оба представления (карта и экран дипломатии). Здесь остаётся только клиентская
+// НАСТРОЙКА: свой цвет, ничейное пространство и выбранная палитра.
 let youColor = safeHexColor(readRaw('void.colorYou'), COLOR.p1!);
 let neutralColor = safeHexColor(readRaw('void.colorNeutral'), COLOR.null!);
 let rivalPaletteId = readRaw('void.rivalPalette') ?? 'classic';
-if (!RELATION_SCHEMES[rivalPaletteId]) rivalPaletteId = 'classic';
+if (!isPaletteId(rivalPaletteId)) rivalPaletteId = 'classic';
 function setSideColors(you: string, neutral: string, palette: string): void {
   youColor = safeHexColor(you, COLOR.p1!);
   neutralColor = safeHexColor(neutral, COLOR.null!);
-  rivalPaletteId = RELATION_SCHEMES[palette] ? palette : 'classic';
+  rivalPaletteId = isPaletteId(palette) ? palette : 'classic';
   writeRaw('void.colorYou', youColor);
   writeRaw('void.colorNeutral', neutralColor);
   writeRaw('void.rivalPalette', rivalPaletteId);
 }
 // Political colour is relative to the local commander: YOU are your configured hue,
 // unowned space grey, and every other commander is coloured by your STANCE toward them
-// (enemy red / friendly blue / neutral grey — see ownerColor). Works for solo (you = p1)
-// and net (you may be any seat).
+// (enemy red / friendly blue / neutral grey — see relationColor). Works for solo
+// (you = p1) and net (you may be any seat). Stance is public (never fogged), so the
+// client always has the true value.
 function ownerColor(owner: string | null | undefined): string {
   if (!owner) return neutralColor; // unowned territory (void / no-man's land)
   if (owner === ME) return youColor; // you
-  // POLITICAL colour, relative to the local commander — mark by RELATION, not a fixed
-  // per-rival hue: war → red, pact/alliance → friendly blue, peace → a distinct
-  // neutral-player grey (lighter than empty void, so an at-peace world still reads as
-  // "owned"). Stance is public (never fogged), so the client always has the true value.
-  const scheme = RELATION_SCHEMES[rivalPaletteId] ?? RELATION_SCHEMES.classic!;
-  switch (getStance(s, ME, owner)) {
-    case 'war':
-      return scheme.enemy;
-    case 'pact':
-    case 'alliance':
-      return scheme.ally;
-    default: // peace (the war-by-default fallback maps to `war` above, not here)
-      return scheme.neutral;
-  }
+  return relationColor(getStance(s, ME, owner), paletteOf(rivalPaletteId));
+}
+/** Цвет чипа стойки на экране дипломатии — из той же палитры, что и карта. */
+function stanceCol(st: DiplomaticStance): string {
+  return stanceColor(st, paletteOf(rivalPaletteId));
 }
 // Build profile. `__PLAYER_BUILD__` is an esbuild define — REQUIRED by every bundler
 // of this file (build.mjs sets it for both artifacts, uitest.mjs pins `false`); a
@@ -6261,7 +6220,7 @@ function seatCardHtml(id: string): string {
     `<div class="pc-stats">` +
     row(
       t('card.stances'),
-      `<span class="dp-stance" style="color:${STANCE_COLOR[st]};border-color:${STANCE_COLOR[st]}">${stanceRu(st)}</span>`,
+      `<span class="dp-stance" style="color:${stanceCol(st)};border-color:${stanceCol(st)}">${stanceRu(st)}</span>`,
     ) +
     row(t('card.worlds'), String(worldsOf(id))) +
     `</div>` +
@@ -6303,12 +6262,6 @@ const STANCE_RU: Record<DiplomaticStance, string> = {
 function stanceRu(st: DiplomaticStance): string {
   return t(STANCE_RU[st]);
 }
-const STANCE_COLOR: Record<DiplomaticStance, string> = {
-  war: '#ff5a4d',
-  peace: '#9fb8c0',
-  pact: '#35d6e6',
-  alliance: '#5ff0a8',
-};
 // Friendliness rank: war (hostile) < peace < pact < alliance (closest). Warming the
 // relation up a rank needs the other side's consent; cooling it down is unilateral.
 const STANCES: DiplomaticStance[] = ['war', 'peace', 'pact', 'alliance'];
@@ -6585,7 +6538,7 @@ function seatDiploActionsHtml(id: string): string {
           : mine
             ? t('comms.offer.sent')
             : '';
-      return `<button class="${cls}" data-stance="${sk}" data-seat="${id}" style="--sc:${STANCE_COLOR[sk]}"${barred || mine ? ' disabled' : ''}${title ? ` title="${esc(title)}"` : ''}>${label}</button>`;
+      return `<button class="${cls}" data-stance="${sk}" data-seat="${id}" style="--sc:${stanceCol(sk)}"${barred || mine ? ' disabled' : ''}${title ? ` title="${esc(title)}"` : ''}>${label}</button>`;
     }).join('') +
     mapShareBtnHtml(id) +
     `<button class="dp-spy" data-spy="treasury" data-seat="${id}" title="${t('comms.spy.treasury', { c: SPY_COST })}">🕵 ${t('log.spy.kind.treasury')}</button>` +
@@ -6618,7 +6571,7 @@ function diploRowsHtml(): string {
       const st = isMe ? null : getStance(s, ME, id);
       const stanceTag = isMe
         ? `<span class="dp-tag">${t('comms.you')}</span>`
-        : `<span class="dp-stance" style="color:${STANCE_COLOR[st!]};border-color:${STANCE_COLOR[st!]}">${stanceRu(st!)}</span>`;
+        : `<span class="dp-stance" style="color:${stanceCol(st!)};border-color:${stanceCol(st!)}">${stanceRu(st!)}</span>`;
       // Bots (AI seats) carry a favour meter toward you; humans/you don't.
       const favBar = !isMe && isAiSeat(id) ? favourBarHtml(id) : '';
       const expanded = diploExpanded === id && !isMe;
@@ -6711,7 +6664,7 @@ function renderDiplo(): void {
   const sortBtn = (k: typeof diploSort, label: string) =>
     `<button class="dp-sortb${diploSort === k ? ' on' : ''}" data-sort="${k}">${label}</button>`;
   const stChip = (k: DiplomaticStance) =>
-    `<button class="dp-fchip${diploStanceFilter.has(k) ? ' on' : ''}" data-fstance="${k}" style="--sc:${STANCE_COLOR[k]}">${stanceRu(k)}</button>`;
+    `<button class="dp-fchip${diploStanceFilter.has(k) ? ' on' : ''}" data-fstance="${k}" style="--sc:${stanceCol(k)}">${stanceRu(k)}</button>`;
   const tyChip = (k: 'human' | 'ai', label: string) =>
     `<button class="dp-fchip ty${diploTypeFilter.has(k) ? ' on' : ''}" data-ftype="${k}">${label}</button>`;
   const anyFilter = diploStanceFilter.size || diploTypeFilter.size;
