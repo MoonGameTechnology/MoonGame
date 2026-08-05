@@ -3,6 +3,7 @@ import type { Fleet, FleetEdge, GameState, PlanetId } from '../state/gameState';
 import { hoursToMs } from '../action/types';
 import { legT } from '../state/fleetPosition';
 import { distance, fleetBaseSpeed, planRoute, routeDistance } from '../state/route';
+import { corridorVeto } from '../state/corridor';
 import { getStance } from '../state/diplomacy';
 
 /** A target a `fleet.move` can aim at: a node, or a continuous point on a lane. */
@@ -227,6 +228,12 @@ function planJourney(
   // this parameter is only passed after that plan tripped the right-of-way gate.
   blocked?: (id: PlanetId) => boolean,
 ): Journey | { error: string } | null {
+  // HERO-CORRIDOR: чужой ЛИЧНЫЙ коридор — не дорога. Вето по ребру зависит от ФЛОТА
+  // (право прохода у того, кто несёт героя), а `RouteCache` ключуется только
+  // топологией, поэтому при живом личном коридоре кэш обходится — та же причина, по
+  // которой его обходит дипломатическое вето. Нет личных коридоров → `undefined`, и
+  // быстрый кэшированный путь остаётся нетронутым.
+  const edgeVeto = corridorVeto(state, fleet.id);
   const targets = targetsOf(state, payload);
   if ('error' in targets) {
     return targets;
@@ -261,9 +268,9 @@ function planJourney(
   for (const o of origins) {
     for (const t of targets) {
       const mid =
-        blocked === undefined
+        blocked === undefined && edgeVeto === undefined
           ? routes.lookup(state, o.routingNode, t.routeTo)
-          : planRoute(state, o.routingNode, t.routeTo, blocked);
+          : planRoute(state, o.routingNode, t.routeTo, blocked, edgeVeto);
       if (mid === null) {
         continue; // unreachable by lanes from this origin endpoint
       }

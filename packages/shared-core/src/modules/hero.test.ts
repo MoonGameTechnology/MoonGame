@@ -275,17 +275,57 @@ describe('hero — temp public lane (path.create / expire)', () => {
 });
 
 describe('hero — temp lane speed bonus (fleet.speed hook)', () => {
-  it("speeds the owner's fleet along the lane (+50%), but not an enemy's", () => {
+  // HERO-CORRIDOR. Прежняя редакция этого теста утверждала, что ВРАГ по коридору
+  // проехать может — просто без ускорения. Она документировала ДЫРУ: `addLink` писал
+  // ребро в общий граф, и коридор был проходим всем, чего никто не проектировал.
+  // Теперь ступень решает, кому можно, и тест держит обе стороны правила.
+  it('ЛИЧНЫЙ коридор (ступень 1): свой летит с ускорением, врагу маршрута НЕТ', () => {
     const kernel = createKernel([heroModule, movementModule]);
     const base = world();
     base.fleets = { F1: fleet('F1', 'p1', 'A'), E1: fleet('E1', 'p2', 'A') };
     const laned = okApply(kernel.applyAction(base, act('hero.path.create', 'p1', { to: 'C' }), ctx(0)));
+    // Право прохода — у флота, который несёт героя коридора.
+    const heroId = laned.state.tempLanes![0]!.heroId!;
+    laned.state.heroes![heroId]!.fleetId = 'F1';
 
     // Owner's fleet: 400 units at speed 10 × 1.5 = 15 → 96 000 000 ms.
     const own = okApply(kernel.applyAction(laned.state, act('fleet.move', 'p1', { fleetId: 'F1', to: 'C' }), ctx(0)));
     expect(own.state.fleets.F1?.movement?.arrivesAt).toBeCloseTo((400 / 15) * HOUR, 0);
 
-    // Enemy uses the public lane too, but with no bonus: 400 / 10 → 144 000 000 ms.
+    // Врагу ребра просто нет: A↔C соединял ТОЛЬКО этот личный коридор.
+    const enemy = kernel.applyAction(laned.state, act('fleet.move', 'p2', { fleetId: 'E1', to: 'C' }), ctx(0));
+    expect(enemy.ok ? null : enemy.code).toBe('E_NO_ROUTE');
+  });
+
+  it('ОДНОРАЗОВЫЙ коридор закрывается, когда армия с героем ПРИБЫЛА', () => {
+    const kernel = createKernel([heroModule, movementModule]);
+    const base = world();
+    base.fleets = { F1: fleet('F1', 'p1', 'A') };
+    const laned = okApply(kernel.applyAction(base, act('hero.path.create', 'p1', { to: 'C' }), ctx(0)));
+    const heroId = laned.state.tempLanes![0]!.heroId!;
+    laned.state.heroes![heroId]!.fleetId = 'F1';
+    expect(laned.state.tempLanes).toHaveLength(1);
+
+    const flying = okApply(
+      kernel.applyAction(laned.state, act('fleet.move', 'p1', { fleetId: 'F1', to: 'C' }), ctx(0)),
+    );
+    // В ПУТИ коридор ещё жив — правило «кто вошёл, доезжает» держится тем, что
+    // закрытие привязано к ПРИБЫТИЮ, а не к отправлению.
+    const midway = okAdvance(kernel.advanceTo(flying.state, ctx(HOUR)));
+    expect(midway.state.tempLanes).toHaveLength(1);
+
+    const arrived = okAdvance(kernel.advanceTo(flying.state, ctx(40 * HOUR)));
+    expect(arrived.state.fleets.F1?.location).toBe('C');
+    expect(arrived.state.tempLanes ?? []).toHaveLength(0); // одноразовый — израсходован
+  });
+
+  it('ОБЩИЙ коридор (ступень 3): враг проезжает, но БЕЗ ускорения', () => {
+    const kernel = createKernel([heroModule, movementModule]);
+    const base = world();
+    base.fleets = { F1: fleet('F1', 'p1', 'A'), E1: fleet('E1', 'p2', 'A') };
+    const laned = okApply(kernel.applyAction(base, act('hero.path.create', 'p1', { to: 'C' }), ctx(0)));
+    laned.state.tempLanes![0]!.tier = 3; // третья ступень: идут все
+
     const enemy = okApply(kernel.applyAction(laned.state, act('fleet.move', 'p2', { fleetId: 'E1', to: 'C' }), ctx(0)));
     expect(enemy.state.fleets.E1?.movement?.arrivesAt).toBeCloseTo((400 / 10) * HOUR, 0);
   });
