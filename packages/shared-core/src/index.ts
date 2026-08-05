@@ -364,7 +364,7 @@ export {
 export { constructionModule } from './modules/construction';
 export { arsenalSyncModule } from './modules/arsenalSync';
 export { stationModule } from './modules/station';
-export { technologyModule, technologyLock } from './modules/technology';
+export { technologyModule, technologyLock, conditionMet } from './modules/technology';
 export { scientistModule } from './modules/scientist';
 export { factionModule } from './modules/faction';
 export { armyModule } from './modules/army';
