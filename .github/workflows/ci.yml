@@ -12,10 +12,20 @@ name: CI
 # не проверялся ВООБЩЕ, и обратная связь появлялась лишь в момент открытия PR. Локально
 # правило «перед коммитом гоняй pnpm run check» машиной не принуждается (git-хуков в репо
 # нет), так что до открытия PR красный код мог жить в ветке сколько угодно. Теперь гейт
-# бежит на push в любую ветку. `concurrency` ниже гасит дубль «push + pull_request» на
-# одной и той же ветке: побеждает последний прогон, предыдущий отменяется.
+# бежит на push в любую ветку. Цена этого решения — на ветке с открытым PR гейт бежит
+# ДВАЖДЫ (от push и от pull_request); `concurrency` ниже дубль не гасит, и почему гасить
+# его нельзя — расписано там же.
 on:
   workflow_dispatch:
+  # ВНИМАНИЕ: здесь стояло `branches-ignore: ['gh-readonly-queue/**']` (AUD-9) — и после
+  # того, как эта правка доехала до `main`, очередь встала НАСМЕРТЬ: на всех ветках
+  # очереди, собранных поверх такого `main`, не запускалось НИ ОДНОГО прогона (`merge_group`
+  # в том числе), required-чеки не отчитывались никогда, и записи выбрасывало по таймауту.
+  # Корреляция точная: pr-497 и pr-500 на прежнем `main` — прогоны были; pr-507…pr-510 на
+  # новом — ноль. Похоже, GitHub решает, слать ли событие, по конфигу с БАЗОВОЙ ветки, а не
+  # с ветки очереди. Механизм до конца не доказан, но цена ошибки несимметрична: столкновение
+  # прогонов стоит редкого ложного выброса, а нерассылка событий — полной остановки мержа.
+  # Возвращаем заведомо рабочую форму, а задачу AUD-9 решаем ключом `concurrency` ниже.
   push:
     branches: ['**']
   pull_request:
@@ -27,7 +37,19 @@ on:
   merge_group:
 
 concurrency:
-  group: ci-${{ github.head_ref || github.ref }}
+  # Про push+pull_request: ключ их НЕ схлопывает, и это осознанно — полный разбор в
+  # шапке `concurrency` в security.yml (там же, почему `github.ref_name` брать нельзя).
+  # Здесь ключ гасит только последовательные пуши в одну ветку.
+  # `github.event_name` в ключе — это и есть починка AUD-9, но без правки триггеров.
+  # Ветку очереди создаёт merge-queue, и на неё прилетают ОБА события — `merge_group` и
+  # `push`. Без префикса по событию ключ у них совпадал (`github.head_ref` на обоих пуст,
+  # остаётся `github.ref` = имя ветки очереди), а у push-прогона `cancel-in-progress`
+  # истинно — он убивал merge_group-прогон через секунду после старта, очередь читала
+  # отменённый required-чек как провал и выбрасывала PR с `CI_FAILURE` при зелёном коде.
+  # Guard ниже от этого не спасал: он разводит merge_group-прогоны между собой, а убивал
+  # их push. С префиксом группы разные — погасить друг друга они больше не могут.
+  # Последовательные пуши в одну ветку по-прежнему схлопываются: у них и событие одно.
+  group: ci-${{ github.event_name }}-${{ github.head_ref || github.ref }}
   # На `merge_group` отменять НЕЛЬЗЯ. Ключ группы там складывается из имени ветки очереди
   # (`gh-readonly-queue/main/pr-N-<база>`), а оно одинаково у всех попыток поставить тот же
   # PR на ту же базу. Повторная постановка гасила бы ещё идущий прогон прошлой записи,
@@ -46,7 +68,11 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16
+        # По дайджесту, как все остальные образы (docs/security/image-pinning.md). Сервис
+        # поднимается в той же джобе, где лежит выкачанный репозиторий, так что подменённый
+        # `postgres:16` — это чужой код рядом с нашим деревом, а не «просто база для тестов».
+        # Обновляется вместе со сканерами (скилл refresh-scanner-digests).
+        image: postgres:16@sha256:33f923b05f64ca54ac4401c01126a6b92afe839a0aa0a52bc5aeb5cc958e5f20
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
@@ -66,7 +92,7 @@ jobs:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/void_test
 
     steps:
-      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -93,7 +119,11 @@ jobs:
       # (fail-secure: a scanner that couldn't run can't certify).
       - name: Dependency audit (OSV-Scanner)
         run: |
-          docker run --rm -v "$PWD:/src" -w /src ghcr.io/google/osv-scanner:v1.9.1 \
+          # Дайджест, а не тег: этот шаг БЛОКИРУЮЩИЙ, то есть чужой образ решает, войдёт
+          # код в main или нет — подменённый `:v1.9.1` тихо начал бы отвечать «чисто».
+          # Пин тот же, что у джобы `osv` в security.yml:357 — бампить их ВМЕСТЕ
+          # (скилл refresh-scanner-digests).
+          docker run --rm -v "$PWD:/src" -w /src ghcr.io/google/osv-scanner@sha256:36dea1baa2b34df3ee911d712e6a774eff04cc8b25789e0e6837d40759afaeab \
             --lockfile=pnpm-lock.yaml --lockfile=mobile/package-lock.json
 
       # M2 perf report (metrics-roadmap): CPU frame cost of the prototype's render

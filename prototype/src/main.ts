@@ -9,6 +9,8 @@ import {
   newGame,
   advance,
   order,
+  canOrder,
+  canOrderAll,
   ctx,
   data,
   MAP,
@@ -38,9 +40,12 @@ import {
   resumeConstruction,
   aiOrders,
   declareWar,
+  shareMap,
   netIncome,
   retreatFleet,
   STANCE_RANK,
+  hasMapShare,
+  hasMapShareOffer,
   canTraverse,
   START_CANDIDATES,
   designateCapital,
@@ -110,6 +115,9 @@ import {
 // HUD-DOCK: видимость листа и «нижний хаб уезжает» — одна чистая модель на все
 // прицельные режимы; она же держит замер высоты листа для привязки ряда команд.
 import { mapIsWorkspace, panelOpen, sheetHeightVar, type DockState } from './hudDock';
+// Хвост маркера флота (пипсы трюма, «×N») — чистая геометрия с тестом на разворот
+// наружу у стоящего флота (пипсы не должны ложиться на диск планеты).
+import { tailTheta, tailAt as tailPoint } from './markerTail';
 // BACK-1: лестница слоёв Android-Back/Escape — чистая модель + опись, которую держит тест.
 import {
   closeTopLayer as closeTop,
@@ -259,6 +267,20 @@ import {
 } from './troopsMenu';
 // SND-1 — синтезированные звуки интерфейса (тёмный космос + космическая опера).
 import { initSound } from './sound';
+// REFM-16 — клиентские настройки: одно правило чтения/записи на весь клиент вместо
+// восьми рукописных копий «нет ключа ⇒ умолчание» + try/catch вокруг setItem.
+import { prefStore, readBool, readNum, readRaw, writeBool, writeRaw } from './prefs';
+// REFM-17 — палитра и правило «цвет = отношение»: одна таблица на карту и на экран
+// дипломатии (раньше их было две, и настройку палитры знала только карта).
+import {
+  COLOR,
+  VOID_COLOR,
+  isPaletteId,
+  paletteOf,
+  relationColor,
+  safeHexColor,
+  stanceColor,
+} from './sideColors';
 // CHAIN-UX — режим «Приказ»: модель черновика, меню точки, таймлайн, разметка.
 import {
   applyMenuAction,
@@ -322,6 +344,10 @@ import {
 import { resolveIntro, parseSeenIntros, type IntroCard } from './intros';
 // ONB-5 — return digest ("пока тебя не было"): aggregate the away-window event log.
 import { buildRecap, type RecapEvent } from './recap';
+import { canEditPing, canRemovePing, pingRows, toggleHidden } from './pingPanel';
+import { combatRanges } from './combatRanges';
+import { corridorLines } from './corridorView';
+import { recapAdmits } from './recapGate';
 // ONB-7 — first-session goals checklist (mine/fleet/capture/score, ticked from state).
 import { FIRST_GOALS, metGoals, mergeDone, goalsComplete, type GoalSignals } from './firstGoals';
 import { reconnectDelayMs } from './reconnect';
@@ -349,91 +375,35 @@ import type {
 
 // --- constants ---------------------------------------------------------------
 
-// Political palette (Bytro/Paradox-style): YOU = green, ally = blue, neutral =
-// gray, enemy = red — used for fleets/planets and to tint each owner's province.
-// Cyan stays the console-chrome accent (grid, borders, targeting reticle).
-const COLOR: Record<string, string> = {
-  p1: '#3ad17a', // you — green
-  p2: '#ff5a4d',
-  p3: '#ffb43a',
-  p4: '#b07cff',
-  p5: '#35d6e6',
-  p6: '#ff7ac8',
-  p7: '#9ed85a',
-  p8: '#e58b4a',
-  p9: '#6f9cff',
-  p10: '#d8cf5a',
-  ally: '#4a8cff', // friendly bloc (pact / alliance) — blue
-  null: '#6f8a93', // unowned territory — gray
-};
-const VOID_COLOR = '#46606e'; // empty-space provinces — uncapturable void
 // --- side-colour SCHEMES (client-only, localStorage) --------------------------
-// «Цвет = отношение»: другие командиры красятся по ТВОЕЙ стойке к ним (враг /
-// дружественный блок / мир), а не по личному цвету. `cvd` — оттенки, различимые
-// при цветослепоте (Okabe–Ito): красный враг против зелёного «тебя» — классическая
-// красно-зелёная ловушка, поэтому там вермилион + синий + серый. Свой цвет
-// (`youColor`) и ничейное пространство (`neutralColor`) настраиваются отдельно.
-interface SideScheme {
-  enemy: string; // at WAR — red
-  ally: string; // pact / alliance (friendly bloc) — blue
-  neutral: string; // at PEACE — a distinct grey, ≠ unowned void
-}
-const RELATION_SCHEMES: Record<string, SideScheme> = {
-  classic: { enemy: '#ff5a4d', ally: COLOR.ally!, neutral: '#9fb0b6' },
-  warm: { enemy: '#ff6a3a', ally: '#2fb5c9', neutral: '#a8a29a' },
-  cvd: { enemy: '#d55e00', ally: '#0072b2', neutral: '#9a9a9a' }, // Okabe–Ito, CVD-safe
-};
-const readPref = (k: string): string | null =>
-  typeof localStorage !== 'undefined' ? localStorage.getItem(k) : null;
-/** Side colours feed inline `style="color:…"` and `<input type=color value>` sinks, so a
- *  value reaching them MUST be a literal `#rrggbb` — never free text. They originate from
- *  `<input type="color">` (already constrained) but round-trip through localStorage, which a
- *  hostile extension/page could tamper. Validate on the way IN and rebuild the string from
- *  the matched digits so every downstream sink is safe by construction — a tampered value
- *  degrades to the default instead of injecting markup (CWE-79 / CodeQL js/xss-through-dom).
- *  The fallback is a trusted constant, used verbatim. */
-function safeHexColor(c: string | null | undefined, fallback: string): string {
-  // A validating GUARD (not a rebuild): the value is used only when it matched
-  // `#rrggbb` — a pattern that cannot contain HTML metacharacters — so it is inert
-  // in the inline `style`/attribute sinks. Anything else degrades to the trusted
-  // default. (The guard form is what taint-analysis recognizes as a sanitizer.)
-  return typeof c === 'string' && /^#[0-9a-fA-F]{6}$/.test(c) ? c : fallback;
-}
-let youColor = safeHexColor(readPref('void.colorYou'), COLOR.p1!);
-let neutralColor = safeHexColor(readPref('void.colorNeutral'), COLOR.null!);
-let rivalPaletteId = readPref('void.rivalPalette') ?? 'classic';
-if (!RELATION_SCHEMES[rivalPaletteId]) rivalPaletteId = 'classic';
+// Палитра и само правило «цвет = отношение» живут в `sideColors.ts` — одной таблицей на
+// оба представления (карта и экран дипломатии). Здесь остаётся только клиентская
+// НАСТРОЙКА: свой цвет, ничейное пространство и выбранная палитра.
+let youColor = safeHexColor(readRaw('void.colorYou'), COLOR.p1!);
+let neutralColor = safeHexColor(readRaw('void.colorNeutral'), COLOR.null!);
+let rivalPaletteId = readRaw('void.rivalPalette') ?? 'classic';
+if (!isPaletteId(rivalPaletteId)) rivalPaletteId = 'classic';
 function setSideColors(you: string, neutral: string, palette: string): void {
   youColor = safeHexColor(you, COLOR.p1!);
   neutralColor = safeHexColor(neutral, COLOR.null!);
-  rivalPaletteId = RELATION_SCHEMES[palette] ? palette : 'classic';
-  if (typeof localStorage !== 'undefined') {
-    localStorage.setItem('void.colorYou', youColor);
-    localStorage.setItem('void.colorNeutral', neutralColor);
-    localStorage.setItem('void.rivalPalette', rivalPaletteId);
-  }
+  rivalPaletteId = isPaletteId(palette) ? palette : 'classic';
+  writeRaw('void.colorYou', youColor);
+  writeRaw('void.colorNeutral', neutralColor);
+  writeRaw('void.rivalPalette', rivalPaletteId);
 }
 // Political colour is relative to the local commander: YOU are your configured hue,
 // unowned space grey, and every other commander is coloured by your STANCE toward them
-// (enemy red / friendly blue / neutral grey — see ownerColor). Works for solo (you = p1)
-// and net (you may be any seat).
+// (enemy red / friendly blue / neutral grey — see relationColor). Works for solo
+// (you = p1) and net (you may be any seat). Stance is public (never fogged), so the
+// client always has the true value.
 function ownerColor(owner: string | null | undefined): string {
   if (!owner) return neutralColor; // unowned territory (void / no-man's land)
   if (owner === ME) return youColor; // you
-  // POLITICAL colour, relative to the local commander — mark by RELATION, not a fixed
-  // per-rival hue: war → red, pact/alliance → friendly blue, peace → a distinct
-  // neutral-player grey (lighter than empty void, so an at-peace world still reads as
-  // "owned"). Stance is public (never fogged), so the client always has the true value.
-  const scheme = RELATION_SCHEMES[rivalPaletteId] ?? RELATION_SCHEMES.classic!;
-  switch (getStance(s, ME, owner)) {
-    case 'war':
-      return scheme.enemy;
-    case 'pact':
-    case 'alliance':
-      return scheme.ally;
-    default: // peace (the war-by-default fallback maps to `war` above, not here)
-      return scheme.neutral;
-  }
+  return relationColor(getStance(s, ME, owner), paletteOf(rivalPaletteId));
+}
+/** Цвет чипа стойки на экране дипломатии — из той же палитры, что и карта. */
+function stanceCol(st: DiplomaticStance): string {
+  return stanceColor(st, paletteOf(rivalPaletteId));
 }
 // Build profile. `__PLAYER_BUILD__` is an esbuild define — REQUIRED by every bundler
 // of this file (build.mjs sets it for both artifacts, uitest.mjs pins `false`); a
@@ -453,7 +423,7 @@ const DEV_UI = ((): boolean => {
   try {
     if (typeof location !== 'undefined' && new URLSearchParams(location.search).has('dev'))
       return true;
-    return typeof localStorage !== 'undefined' && localStorage.getItem('vd.dev') === '1';
+    return readBool('vd.dev', false);
   } catch {
     return false;
   }
@@ -474,6 +444,21 @@ const SEAT_META: ReadonlyArray<{ id: string; name: string; faction: string; colo
 ];
 const GRID = 'rgba(46,150,160,0.07)';
 const LOCK = '#7df0d0'; // selection / targeting reticle accent
+// RANGE-UX: три вида оружия — три РАЗНЫХ цвета, чтобы круги не сливались в кашу, когда
+// в выделении и артиллерия, и носитель. Линия огня — того же цвета, что круг стрелка.
+const R_ARTY = '#ffb43a'; // артиллерия: янтарный (как и весь огневой контур в HUD)
+const R_WING = '#9ad7ff'; // эскадрилья: холодный голубой
+const R_AA = '#c07dff'; // ПВО: сиреневый — это ОТМЕТКА на мире, а не область
+// HERO-CORRIDOR: одноразовый коридор — КРАСНЫЙ мигающий пунктир (он исчезнет с первым
+// же проходом, это не дорога); временный и общий — спокойная бирюза с таймером.
+const CORR_ONCE = '#ff5c5c';
+const CORR_LIVE = '#5ce1d6';
+// CAST-UX: круги прицела каста. Отдельные имена, а не переиспользование LOCK, потому
+// что дальность и область — РАЗНЫЕ сущности, и игрок должен различать их с одного
+// взгляда: тонкий пунктир «докуда достану» против залитого пятна «что накроет».
+const CAST_REACH = '#7df0d0'; // круг дальности способности
+const CAST_AREA = '#9ad7ff'; // круг области действия (AoE)
+const CAST_FAR = '#ff6b6b'; // цель вне дальности — подсказка, вердикт всё равно за ядром
 const TAU = Math.PI * 2;
 const TOP = 50; // top-bar height
 const RAIL = 50; // left-rail width
@@ -867,7 +852,7 @@ const crestMark = $('crestmark');
 // state, never sent to the server. Falls back to the first glyph if unset/unknown.
 const EMBLEMS = ['◆', '◇', '⬡', '⬢', '✦', '✧', '★', '⚛', '◉', '⌖', '❖', '⟡'];
 function playerEmblem(): string {
-  const e = (typeof localStorage !== 'undefined' && localStorage.getItem('void.emblem')) || '';
+  const e = readRaw('void.emblem') ?? '';
   return EMBLEMS.includes(e) ? e : EMBLEMS[0]!;
 }
 function applyEmblem(): void {
@@ -878,11 +863,7 @@ function applyEmblem(): void {
 }
 function setPlayerEmblem(g: string): void {
   if (!EMBLEMS.includes(g)) return;
-  try {
-    localStorage.setItem('void.emblem', g);
-  } catch {
-    /* private mode — keep the in-memory choice only */
-  }
+  writeRaw('void.emblem', g);
   applyEmblem();
 }
 
@@ -961,33 +942,18 @@ let sweepPrevAng = -1; // previous frame's arm angle, for "did the arm cross X" 
 // 0 hides the wedge + arm entirely; any value only dims the CHROME — the radar MECHANIC
 // (contact snapshots + blip afterglow) is computed before the visual gate, so it is
 // unaffected at every setting. Absent key ⇒ full (1); a stored 0 must NOT be read as absent.
-let sweepOpacity = ((): number => {
-  const raw =
-    typeof localStorage !== 'undefined' ? localStorage.getItem('void.sweepOpacity') : null;
-  if (raw === null) return 1;
-  const n = Number(raw);
-  return Number.isFinite(n) && n >= 0 && n <= 1 ? n : 1;
-})();
+let sweepOpacity = readNum('void.sweepOpacity', 1, 0, 1);
 function setSweepOpacity(v: number): void {
   sweepOpacity = Math.min(1, Math.max(0, v));
-  try {
-    localStorage.setItem('void.sweepOpacity', String(sweepOpacity));
-  } catch {
-    /* private-mode / storage-full: keep the in-memory value, just don't persist */
-  }
+  writeRaw('void.sweepOpacity', String(sweepOpacity));
 }
 // Player display preference (client-only, localStorage): show YOUR OWN ping markers
 // on the map. Purely visual — the ping itself (chat line, allies' view, the server
 // relay) is untouched; allies' pins are always drawn. Default on.
-let showOwnPings =
-  typeof localStorage === 'undefined' || localStorage.getItem('void.showOwnPings') !== '0';
+let showOwnPings = readBool('void.showOwnPings', true);
 function setShowOwnPings(v: boolean): void {
   showOwnPings = v;
-  try {
-    localStorage.setItem('void.showOwnPings', v ? '1' : '0');
-  } catch {
-    /* private-mode / storage-full: keep the in-memory value, just don't persist */
-  }
+  writeBool('void.showOwnPings', v);
 }
 // --- graphics preferences (client-only, localStorage) ------------------------
 // Cosmetic quality knobs, never sent to the server and never touching the sim.
@@ -995,19 +961,15 @@ function setShowOwnPings(v: boolean): void {
 // flatter, faster read of the map.
 // Glow & haloes: the soft bloom discs (blitGlow) around worlds, fleets and
 // frontiers. Off makes blitGlow a no-op — cheaper frames, a crisper flat map.
-let glowFx = typeof localStorage === 'undefined' || localStorage.getItem('void.glowFx') !== '0';
+let glowFx = readBool('void.glowFx', true);
 function setGlowFx(v: boolean): void {
   glowFx = v;
-  try {
-    localStorage.setItem('void.glowFx', v ? '1' : '0');
-  } catch {
-    /* private-mode / storage-full: keep the in-memory value, just don't persist */
-  }
+  writeBool('void.glowFx', v);
 }
 // SND-1 — звуки интерфейса: синтезатор целиком в sound.ts, здесь только фабрика.
 // AudioContext создаётся лениво при первом play() (всегда внутри клика — autoplay
 // доволен); среда без WebAudio/localStorage — молча беззвучна, UI живёт как жил.
-const snd = initSound(typeof localStorage === 'undefined' ? null : localStorage);
+const snd = initSound(prefStore());
 // shadowBlur gate: a per-draw gaussian blur is one of the priciest canvas ops on
 // mobile GPUs. `blitGlow` already honours glowFx, but the ~20 `cx.shadowBlur = n`
 // halos on nodes / fleets / projectiles / HUD did not — so "Свечение и ореолы: выкл"
@@ -1019,21 +981,15 @@ function fxBlur(n: number): number {
 // Deep-space backdrop: the drifting nebulae + faint star ticks baked into the
 // static layer. Off leaves the flat fill + plotting grid. Toggling rebuilds the
 // bake (starfield flag rides the static-layer cache signature in buildStaticLayer).
-let starfield =
-  typeof localStorage === 'undefined' || localStorage.getItem('void.starfield') !== '0';
+let starfield = readBool('void.starfield', true);
 function setStarfield(v: boolean): void {
   starfield = v;
-  try {
-    localStorage.setItem('void.starfield', v ? '1' : '0');
-  } catch {
-    /* private-mode / storage-full: keep the in-memory value, just don't persist */
-  }
+  writeBool('void.starfield', v);
 }
 // «Компактный режим меню» (PC): a denser sector panel — tighter paddings, smaller
 // type/chips/tiles. Rides a body class so pure CSS restyles the panel live; the
 // panel markup and behaviour are untouched. Default off.
-let compactPanel =
-  typeof localStorage !== 'undefined' && localStorage.getItem('void.compactPanel') === '1';
+let compactPanel = readBool('void.compactPanel', false);
 function applyCompactPanel(): void {
   document.body.classList.toggle('compact-panel', compactPanel);
 }
@@ -1041,39 +997,24 @@ applyCompactPanel();
 function setCompactPanel(v: boolean): void {
   compactPanel = v;
   applyCompactPanel();
-  try {
-    localStorage.setItem('void.compactPanel', v ? '1' : '0');
-  } catch {
-    /* private-mode / storage-full: keep the in-memory value, just don't persist */
-  }
+  writeBool('void.compactPanel', v);
 }
 // FPS counter: the little frames-per-second readout in the corner. A diagnostics
 // knob for players checking performance on their device — default OFF so the HUD
 // stays clean, opt-in from Settings. (DEV_UI / net-desync still force it on.)
-let showFps = typeof localStorage !== 'undefined' && localStorage.getItem('void.showFps') === '1';
+let showFps = readBool('void.showFps', false);
 function setShowFps(v: boolean): void {
   showFps = v;
-  try {
-    localStorage.setItem('void.showFps', v ? '1' : '0');
-  } catch {
-    /* private-mode / storage-full: keep the in-memory value, just don't persist */
-  }
+  writeBool('void.showFps', v);
 }
 // Developer setting (PC): show the speedbar time controls (pause + speed multipliers).
 // Off for a normal player — the world runs at its launch pace, real-time-async; a dev
 // flips it on to pause / accelerate for testing. Defaults on in the dev client so its
 // long-standing speedbar stays; off in the player build. Client-only (localStorage).
-let devSpeedControl = ((): boolean => {
-  const raw = typeof localStorage !== 'undefined' ? localStorage.getItem('void.devSpeed') : null;
-  return raw === null ? !__PLAYER_BUILD__ : raw === '1';
-})();
+let devSpeedControl = readBool('void.devSpeed', !__PLAYER_BUILD__);
 function setDevSpeedControl(v: boolean): void {
   devSpeedControl = v;
-  try {
-    localStorage.setItem('void.devSpeed', v ? '1' : '0');
-  } catch {
-    /* private-mode / storage-full: keep the in-memory value, just don't persist */
-  }
+  writeBool('void.devSpeed', v);
 }
 // The compact-mode CSS is gated on the PC media query — JS-side string shortening
 // (ping button, conveyor idle line, upgrade buttons) must follow the same gate, or
@@ -1440,24 +1381,24 @@ function afford(bag: Record<string, number> | undefined): boolean {
   for (const [r, n] of Object.entries(bag ?? {})) if ((res[r] ?? 0) < n) return false;
   return true;
 }
-/** Ship/unit icon for MENUS (build menu, garrison composition, codex, constructor,
- *  split, asset lists…): the current poster silhouette (`unitGlyphs` — «силуэт = что,
- *  цвет = чей») for ships, so every menu speaks the same shape language as the map
- *  markers and the fleet card; ground units keep the text glyph (the silhouette family
- *  is space-only). `px` fits the SVG box to the icon slot; `color` is the side tint
- *  (defaults to your side — menus are about your own roster). */
-// Path2D-кэш силуэтов постера для канвы — панель берёт те же пути через SVG,
-// так что карта и карточка не могут разъехаться по форме.
-/** Localized display name of a building id (data/*.json names are English). */
+/** Локальная (офлайновая) очередь стройки этого мира — ядру она неизвестна: в сети
+ *  стройку таймит сервер. Создаётся по первому обращению. */
 function queueOf(planetId: string): PlanetBuildQueue {
   return (buildQueues[planetId] ??= { buildings: [], units: [] });
 }
 function laneOf(kind: BuildKind): BuildLane {
   return kind === 'unit' ? 'units' : 'buildings';
 }
+/** Цена головы очереди — ДЛЯ ПОКАЗА (строка «⏳ ждём: …»). Решение «пора ли пускать»
+ *  на неё больше не опирается: его принимает ядро (см. `canStartQueued`). */
 function buildCost(planetId: string, q: QueuedBuild): Record<string, number> | undefined {
   if (q.kind === 'unit') {
-    return data.units[q.id]?.cost;
+    const per = data.units[q.id]?.cost;
+    // Ядро масштабирует цену на count (`scaleCost`), поэтому и подпись обязана: иначе
+    // очередь из пяти корветов показывала бы цену одного.
+    if (!per) return undefined;
+    const n = q.count ?? 1;
+    return n === 1 ? per : Object.fromEntries(Object.entries(per).map(([r, v]) => [r, v * n]));
   }
   if (q.kind === 'building') {
     return data.buildings[q.id]?.cost;
@@ -1466,8 +1407,33 @@ function buildCost(planetId: string, q: QueuedBuild): Record<string, number> | u
   const inst = pl?.buildings.find((b) => b.type === q.id);
   return inst ? data.buildings[q.id]?.upgrades[inst.level - 1]?.cost : undefined;
 }
+/** Приказ, которым голова очереди уедет в ядро. Один построитель на оба пути —
+ *  и на вопрос «можно ли уже», и на само применение (`submitQueued`): иначе
+ *  спрашивали бы про одно, а издавали другое. */
+function queuedAction(planetId: string, q: QueuedBuild): Action {
+  return q.kind === 'unit'
+    ? buildUnit(ME, planetId, q.id, q.count)
+    : q.kind === 'upgrade'
+      ? upgradeBuilding(ME, planetId, q.id)
+      : buildBuilding(ME, planetId, q.id);
+}
+/**
+ * RULES-4. Пора ли пускать голову очереди — ВЕРДИКТ ЯДРА, а не свой прайс-лист.
+ *
+ * Очередь умеет ждать ровно одно — деньги, поэтому единственный код, на котором она
+ * держит голову, это `E_INSUFFICIENT`. Любой другой отказ ожиданием не лечится (или
+ * лечится не очередью), и голова уезжает в ядро, где игрок получает НАСТОЯЩУЮ причину
+ * (`queue.failed` печатает `errText(код)`) вместо молчаливого зависания.
+ *
+ * Что это чинит. Прежний `afford(buildCost(...))` был FAIL-OPEN против инварианта #4:
+ * `buildCost` возвращал `undefined` для неизвестного id и для уже максимального
+ * уровня, а `afford(undefined)` — `true`, то есть очередь считала голову «готовой» и
+ * дёргала ядро. Плюс он переписывал прайс ядра целиком и мимо него проходили и
+ * масштаб на `count`, и все неденежные ворота (`E_BOMBARDED`, `E_WRONG_SECTOR`,
+ * `E_NO_SHIPYARD`, `E_MAX_LEVEL`) — очередь считала «можно», ядро отбивало.
+ */
 function canStartQueued(planetId: string, q: QueuedBuild): boolean {
-  return afford(buildCost(planetId, q));
+  return canOrder(s, queuedAction(planetId, q)) !== 'E_INSUFFICIENT';
 }
 function constructionPayload(payload: unknown): ConstructionPayload | null {
   const p = payload as ConstructionPayload;
@@ -1543,6 +1509,12 @@ function queuedLabel(q: QueuedBuild): string {
   return `${BUILD_ICON[q.id] ?? '▣'} ${tData(data.buildings[q.id]?.name ?? q.id)}`;
 }
 function enqueueBuild(planetId: string, order: QueuedBuild): void {
+  // Одна точка опоры против дубля одноэкземплярного здания: плитка, кодекс и любой
+  // будущий вход проходят здесь, и серые плитки остаются чистой косметикой.
+  if (order.kind === 'building' && buildingLocked(planetId, order.id)) {
+    note('✖ ' + errText(buildingLocked(planetId, order.id) === 'built' ? 'E_ALREADY_BUILT' : 'E_ALREADY_QUEUED'));
+    return;
+  }
   if (NET) {
     // No local build queue in net mode — the server times construction. Send the
     // order straight away (one tap = one build queued server-side).
@@ -1560,12 +1532,7 @@ function enqueueBuild(planetId: string, order: QueuedBuild): void {
   pumpBuildQueues();
 }
 function submitQueued(planetId: string, queued: QueuedBuild): StepOut {
-  const action =
-    queued.kind === 'unit'
-      ? buildUnit(ME, planetId, queued.id, queued.count)
-      : queued.kind === 'upgrade'
-        ? upgradeBuilding(ME, planetId, queued.id)
-        : buildBuilding(ME, planetId, queued.id);
+  const action = queuedAction(planetId, queued);
   const before = sandboxBuildSnapshot(action.type);
   const out = order(s, action, s.time);
   apply(out);
@@ -1779,6 +1746,7 @@ function fleetAnchor(f: Fleet): { x: number; y: number; ang: number } | null {
 const eventLog: RecapEvent[] = [];
 let lastNoteMsg = '';
 let lastNoteAtMs = 0;
+/** Append a line to the session log (bounded). Patches the feed if it's on screen. */
 function note(msg: string, at?: string) {
   // Dedupe guard: an order loop re-rejecting every frame must not machine-gun the
   // same toast/log line — an identical message within 2s (real time) is dropped.
@@ -2068,6 +2036,12 @@ function updateMemory(identify: Set<string>): void {
 function known(id: string | null | undefined): boolean {
   return !vision || (id != null && vision.identify.has(id));
 }
+/** RECAP-FOG: пускать ли событие в журнал (а значит, и в сводку). Правило живёт
+ *  чистой функцией в `recapGate.ts` — это правило безопасности, и гейт проверяет
+ *  именно его, а не рукописный `if` внутри свитча. */
+function admits(type: string, p: Record<string, unknown>): boolean {
+  return recapAdmits(type, p.owner as string | undefined, ME, known(p.planetId as string));
+}
 /** True if node `id` is inside radar reach (signature-level detection). */
 function radarHas(id: string | null | undefined): boolean {
   return !!vision && id != null && vision.radar.has(id);
@@ -2198,11 +2172,15 @@ function errText(code: string): string {
   const key = `err.${bare.replace(/_/g, '-')}`;
   return hasKey(key) ? t(key) : bare.replace(/_/g, ' ');
 }
-function playerOrder(action: Action) {
+function playerOrder(action: Action): boolean {
+  // Возврат — «приказ не ОТВЕРГНУТ сейчас»: в соло это честный исход редьюсера,
+  // в сети и при реконнекте — true (исход асинхронный). Нужен покадровым циклам
+  // (resolvePendingMerges), чтобы выбрасывать отвергнутый приказ, а не пережимать
+  // его каждый кадр — бесконечные тосты отказа (живой плейтест).
   if (NET && netClient) {
     netClient.sendAction(action); // server is authoritative — await its broadcast
     activeTour?.notifyAction(action.type); // optimistic — server result is async
-    return;
+    return true;
   }
   // Net match, socket temporarily down (auto-reconnecting): DON'T run the local reducer
   // — the order would apply to `s`, look accepted on-screen, then vanish when the
@@ -2210,7 +2188,7 @@ function playerOrder(action: Action) {
   // instead of silently losing it. (Solo/skirmish has `reconnecting === false`.)
   if (reconnecting) {
     note('⟳ ' + t('net.reconnecting-order'));
-    return;
+    return true;
   }
   const before = sandboxBuildSnapshot(action.type);
   const out = order(s, action, s.time);
@@ -2219,6 +2197,7 @@ function playerOrder(action: Action) {
   if (out.error) {
     snd.play('error'); // тёмный сбой — отказ слышен, не только виден
     note('✖ ' + errText(out.error));
+    return false;
   }
   else {
     activeTour?.notifyAction(action.type); // an accepted intent advances `action` steps
@@ -2230,6 +2209,7 @@ function playerOrder(action: Action) {
     if (action.type === 'fleet.retreat' && !activeTour?.active) maybeIntro('retreat');
     if (action.type === 'fleet.barrage' && !activeTour?.active) maybeIntro('artillery');
   }
+  return true;
 }
 
 // --- ONB-1 guide-mark launcher ------------------------------------------------
@@ -2522,10 +2502,22 @@ function troopsInputFor(fleetId: string): TroopsInput | null {
   const f = s.fleets[fleetId];
   if (!f || f.movement || f.battleId || !f.location) return null;
   const here = s.planets[f.location];
-  if (!here || here.owner !== ME) return null;
+  if (!here) return null;
   const landing = f.landing ?? [];
+  const mine = here.owner === ME;
+  // ALLY-LAND. Над ЧУЖИМ миром меню открывается только на ВЫСАДКУ и только если ядро
+  // её примет. Правило («свой мир или мир союзника») здесь не переписывается — задаётся
+  // вопрос про настоящий приказ, поэтому если ядро когда-нибудь расширит круг (скажем,
+  // на пакт), клиент поедет за ним сам, без правки этой строки.
+  const carried = landing.filter((st) => isGround(st.unit) && st.count > 0);
+  const guestLanding =
+    !mine && carried.length > 0 && canOrder(s, unloadArmy(ME, fleetId, carried[0]!.unit, 1)) === null;
+  if (!mine && !guestLanding) return null;
   const types: string[] = [];
-  for (const st of [...here.garrison, ...landing])
+  // На союзном мире поднимать нечего: чужой гарнизон не твой, ядро отобьёт погрузку.
+  // Поэтому и типы, и «в гарнизоне» берутся только из трюма — счётчик выходит
+  // односторонним (только «высадить») сам собой, без отдельного режима меню.
+  for (const st of mine ? [...here.garrison, ...landing] : landing)
     if (isGround(st.unit) && !types.includes(st.unit)) types.push(st.unit);
   if (!types.length) return null;
   // Стеков одного типа может быть несколько (побитый + целый): «всего» складывает
@@ -2534,8 +2526,8 @@ function troopsInputFor(fleetId: string): TroopsInput | null {
     stacks.reduce((n, st) => (st.unit === unit ? n + st.count : n), 0);
   const units: TroopsUnitInput[] = types.map((unit) => ({
     unit,
-    garrison: findHealthyStack(here.garrison, unit)?.count ?? 0,
-    garrisonAll: total(here.garrison, unit),
+    garrison: mine ? (findHealthyStack(here.garrison, unit)?.count ?? 0) : 0,
+    garrisonAll: mine ? total(here.garrison, unit) : 0,
     hold: findHealthyStack(landing, unit)?.count ?? 0,
     holdAll: total(landing, unit),
     queued: pendingLoads.filter((p) => p.fleetId === fleetId && p.unit === unit).length,
@@ -2559,11 +2551,38 @@ function troopsInputFor(fleetId: string): TroopsInput | null {
 function blockerName(id: string): string {
   return s.players[id]?.name ?? NAME[id] ?? id;
 }
-/** Distinct PEACE owners a fleet at node `from` would cross or land on reaching `toId`
- *  — each must be at war before the route opens. Empty ⇒ the move is free. */
+/** Distinct PEACE owners that make the move IMPOSSIBLE without a war — mirrors the
+ *  kernel's D2 gate, including its detour: since the right-of-way fix the kernel
+ *  reroutes AROUND peace-locked territory, so a blocker on the shortest path is not
+ *  a blocker if a peaceful detour exists. Prompting war for it anyway (the pre-fix
+ *  behaviour) pushed players into wars the move never needed. Empty ⇒ move is free. */
+/**
+ * RULES-4. ЗАПЕРТ ЛИ ход миром — вердикт ядра по тому самому приказу, который сайт и
+ * издаст. Решение принимает ядро; `peaceBlockers` ниже только НАЗЫВАЕТ виновников для
+ * окна войны (в вердикте имён нет, там код — это «подача», а не правило).
+ *
+ * Что это чинит. `peaceBlockers` строит маршрут из ОДНОГО ближайшего узла
+ * (`fleetNode`: t≤0.5 ? from : to), а ядро — из ОБОИХ концов ребра, на котором
+ * припаркован флот (`originsOf`), выбирая самую дешёвую пару. Для припаркованного на
+ * ребре флота это расходилось в обе стороны: клиент говорил «путь свободен» и приказ
+ * ловил `E_NO_RIGHT_OF_WAY`, либо клиент требовал объявления войны там, где ядро
+ * спокойно проехало бы другим концом.
+ */
+function peaceBlocked(action: Action): boolean {
+  return canOrder(s, action) === 'E_NO_RIGHT_OF_WAY';
+}
+/** Кого назвать в окне войны, когда ядро уже сказало «заперто». Список — объяснение,
+ *  а не решение: вердикт выше принят ядром. */
 function peaceBlockers(from: string | null, toId: string): string[] {
   if (!from || from === toId) return [];
-  const route = planRoute(s, from, toId) ?? [toId]; // hops after `from`, incl. dest
+  const peaceLocked = (id: string): boolean => {
+    const owner = s.planets[id]?.owner ?? null;
+    return owner != null && !canTraverse(s, ME, owner);
+  };
+  // The same veto predicate the kernel replans with; planRoute exempts the
+  // destination, so a reachable-by-detour move reports at most the DESTINATION's
+  // owner (landing on their world genuinely needs the war declaration).
+  const route = planRoute(s, from, toId, peaceLocked) ?? planRoute(s, from, toId) ?? [toId];
   const set = new Set<string>();
   for (const hop of route) {
     const owner = s.planets[hop]?.owner ?? null;
@@ -2577,8 +2596,10 @@ function tryMoveGroup(fleetIds: string[], destId: string): void {
   const movers = fleetIds.filter((id) => s.fleets[id] && s.fleets[id]!.location !== destId);
   if (!movers.length) return;
   const blockers = new Set<string>();
-  for (const id of movers)
+  for (const id of movers) {
+    if (!peaceBlocked(moveFleet(ME, id, destId))) continue; // ядро пропускает — объезд есть
     for (const b of peaceBlockers(fleetNode(s.fleets[id]!), destId)) blockers.add(b);
+  }
   if (blockers.size) {
     warPrompt = { fleetIds: movers, destId, blockers: [...blockers] };
     renderWarPrompt();
@@ -2593,8 +2614,13 @@ function tryAssaultGroup(fleetIds: string[], destId: string): void {
   const movers = fleetIds.filter((id) => s.fleets[id]);
   if (!movers.length) return;
   const blockers = new Set<string>();
-  for (const id of movers)
+  for (const id of movers) {
+    if (!peaceBlocked(moveFleet(ME, id, destId))) continue;
     for (const b of peaceBlockers(fleetNode(s.fleets[id]!), destId)) blockers.add(b);
+  }
+  // Штурм — не просто ход: даже по свободному маршруту нельзя высадиться на мир
+  // НЕвраждебного игрока (ядро: `E_FORBIDDEN`). Спросить об этом ядро нельзя — флот
+  // ещё не там, — поэтому владелец цели проверяется здесь и ТОЛЬКО здесь.
   const owner = s.planets[destId]?.owner;
   if (owner != null && owner !== ME && !canTraverse(s, ME, owner)) blockers.add(owner);
   if (blockers.size) {
@@ -2604,11 +2630,39 @@ function tryAssaultGroup(fleetIds: string[], destId: string): void {
   }
   dispatchAssault(movers, destId);
 }
-/** A defended world can only be stormed with landing troops aboard — pressing the
- *  assault anyway just spams E_NO_TROOPS rejections. */
+/**
+ * ПРОГНОЗ (не гейт): похоже ли, что к прилёту штурмовать будет нечем. Нужен ровно там,
+ * где приказ издаётся НЕ сейчас, — флот ещё летит, спросить ядро про штурм нельзя
+ * (оно ответит про мир, в котором флот в другом месте). Поэтому здесь остаётся ручная
+ * прикидка, и она честно предупреждает, а не отменяет: десант могут догрузить в пути.
+ *
+ * RULES-4: там, где приказ издаётся СЕЙЧАС, этой прикидки больше нет — решает
+ * `assaultVerdict` ниже.
+ */
 function assaultNeedsTroops(f: Fleet, planetId: string): boolean {
   const defended = (s.planets[planetId]?.garrison ?? []).some((u) => u.count > 0);
   return defended && !(f.landing ?? []).some((u) => u.count > 0);
+}
+/**
+ * RULES-4. «Пройдёт ли штурм ПРЯМО СЕЙЧАС» — код отказа или `null`, от ядра.
+ *
+ * Спрашивается вся связка «встать на низкую орбиту → штурм» (`canOrderAll`, RULES-3):
+ * штурм нелегален с дальней орбиты, поэтому вопрос об одном лишь штурме вернул бы
+ * `E_WRONG_ORBIT`, а вопрос об одной орбите пропустил бы обречённую пару — и её первая
+ * половина применилась бы.
+ *
+ * Раньше здесь стоял `assaultNeedsTroops`, то есть ОДИН отказ из шести. Остальные пять
+ * (`E_OWN_PLANET`, `E_FORBIDDEN` по миру союзника, `E_UNDER_ASSAULT`,
+ * `E_ORBIT_CONTESTED`, `E_NOT_CAPTURABLE`) клиент не знал и честно доезжал до отказа —
+ * то есть обещанного «одно понятное сообщение вместо потока E_*» предикат не давал.
+ */
+function assaultVerdict(fleetId: string, f: Fleet): string | null {
+  return canOrderAll(
+    s,
+    f.orbit === 'near'
+      ? [assaultFleet(ME, fleetId)]
+      : [orbitFleet(ME, fleetId, 'near'), assaultFleet(ME, fleetId)],
+  );
 }
 function dispatchAssault(fleetIds: string[], destId: string): void {
   let warnedNoTroops = false;
@@ -2616,10 +2670,13 @@ function dispatchAssault(fleetIds: string[], destId: string): void {
     const f = s.fleets[id];
     if (!f) continue;
     if (f.location === destId && !f.movement) {
-      if (assaultNeedsTroops(f, destId)) {
+      // RULES-4: приказ издаётся СЕЙЧАС — спрашиваем ядро про всю связку, а не
+      // проверяем один десант руками.
+      const code = assaultVerdict(id, f);
+      if (code !== null) {
         if (!warnedNoTroops) {
           warnedNoTroops = true;
-          note(t('log.assault.no-troops'), destId);
+          note(code === 'E_NO_TROOPS' ? t('log.assault.no-troops') : '✖ ' + errText(code), destId);
         }
         continue;
       }
@@ -2655,14 +2712,13 @@ function pumpAssaultOrders(): void {
       assaultOnArrival.delete(id); // parked elsewhere — the order lapsed
       continue;
     }
-    const here = s.planets[destId];
-    if (!here || here.owner === ME || here.owner == null) {
-      assaultOnArrival.delete(id); // captured meanwhile / emptied — nothing to storm
-      continue;
-    }
-    if (assaultNeedsTroops(f, destId)) {
-      // one clear message instead of an E_NO_TROOPS rejection loop
-      note(t('log.assault.no-troops'), destId);
+    // RULES-4. Флот на месте — приказ издаётся СЕЙЧАС, поэтому решает ядро, а не
+    // три рукописных условия («захвачен своими / опустел» + отдельно десант). Оно
+    // же покрывает и `E_OWN_PLANET`, и `E_NOT_CAPTURABLE`, и чужой идущий штурм.
+    const code = assaultVerdict(id, f);
+    if (code !== null) {
+      // одно понятное сообщение вместо цикла отказов; приказ снимается в любом случае
+      note(code === 'E_NO_TROOPS' ? t('log.assault.no-troops') : '✖ ' + errText(code), destId);
       assaultOnArrival.delete(id);
       continue;
     }
@@ -2676,6 +2732,7 @@ function pumpAssaultOrders(): void {
 function tryMoveEdgeGroup(fleetIds: string[], edge: { from: string; to: string; t: number }): void {
   const blockers = new Set<string>();
   for (const id of fleetIds) {
+    if (!peaceBlocked(moveFleetEdge(ME, id, edge))) continue;
     const node = fleetNode(s.fleets[id]!);
     for (const end of [edge.from, edge.to])
       for (const b of peaceBlockers(node, end)) blockers.add(b);
@@ -2811,7 +2868,12 @@ function resolvePendingMerges() {
       return false; // co-located & idle → fused, order complete
     }
     const dest = a.location ?? a.movement?.to ?? null;
-    if (!m.movement && dest && m.location !== dest) playerOrder(moveFleet(ME, mover, dest));
+    if (!m.movement && dest && m.location !== dest) {
+      // Consume-on-reject: отвергнутый догоняющий ход (нет права прохода и т.п.)
+      // выбрасывает слияние, иначе idle-флот пережимал бы его каждый кадр —
+      // бесконечные «✖ …» (второй такой же цикл нашёл скептик bug-hunt'а).
+      if (!playerOrder(moveFleet(ME, mover, dest))) return false;
+    }
     return true;
   });
 }
@@ -3042,7 +3104,12 @@ function handleEvents(events: DomainEvent[]) {
         if (diploOpen && diploTab === 'diplo') renderDiplo();
         break;
       }
+      // RECAP-FOG. Стройка и производство ДРУГОГО игрока в мой журнал не попадают —
+      // а журнал и есть источник сводки возвращения (`buildRecap`), так что чужая
+      // экономика утекала и в дайджест, и в пуш. Сводка — про МОЮ империю; чужое
+      // строительство я узнаю разведкой, а не уведомлением.
       case 'building.constructed':
+        if (!admits('building.constructed', p)) break;
         note(
           t('log.build.done', {
             b: buildingName(data.buildings[p.building as string]?.name, p.building as string),
@@ -3052,6 +3119,7 @@ function handleEvents(events: DomainEvent[]) {
         if (p.building === 'starfort') installFortressAA(p.planetId as string);
         break;
       case 'building.upgraded':
+        if (!admits('building.upgraded', p)) break;
         note(
           t('log.build.upgraded', {
             b: buildingName(data.buildings[p.building as string]?.name, p.building as string),
@@ -3061,6 +3129,10 @@ function handleEvents(events: DomainEvent[]) {
         );
         break;
       case 'building.destroyed':
+        // Разрушение — исключение: своё узнаю всегда, чужое лишь там, где ВИЖУ
+        // (тот же фог-гейт, что у `aa.fired`). Взрыв на наблюдаемом мире — это
+        // наблюдение, а не раскрытие.
+        if (!admits('building.destroyed', p)) break;
         note(
           t('log.build.destroyed', {
             b: buildingName(data.buildings[p.building as string]?.name, p.building as string),
@@ -3070,9 +3142,13 @@ function handleEvents(events: DomainEvent[]) {
         );
         break;
       case 'unit.built':
+        if (!admits('unit.built', p)) break;
         note(`🛠️ ${p.count}× ${displayUnit(p.unit as string)} · ${p.planetId}`);
         break;
       case 'fleet.launched':
+        // Вылет — событие КАРТЫ: чужой флот, поднявшийся на мире, который я вижу,
+        // это наблюдение. Но за туманом его быть не должно (как у `aa.fired`).
+        if (!admits('fleet.launched', p)) break;
         note(
           t('log.fleet.launched', {
             who: NAME[p.owner as string] ?? (p.owner as string),
@@ -3191,6 +3267,19 @@ function runAI() {
 // with the orbit clear, descends and lands automatically — keeps the AI pressing
 // the capture loop. The player's own fleets are driven by hand (orbit/bombard/
 // assault controls in the fleet panel), so they are skipped here.
+// Память проб авто-штурма: «этот флот в этом часе мира и на этой орбите — обречён».
+// Проба стоит прогона редьюсера, а цикл гоняется каждый кадр; состояние между
+// продвижениями часа меняют только приказы, и они же ключ сбрасывают (см. apply()).
+const autoProbed = new Map<string, string>();
+const autoProbeKey = (f: Fleet): string => `${s.time}|${f.orbit ?? ''}|${f.location ?? ''}`;
+function autoProbeSkip(f: Fleet, here: Planet): boolean {
+  return autoProbed.get(f.id) === autoProbeKey(f) + '|' + (here.owner ?? '');
+}
+function autoProbeMark(f: Fleet): void {
+  const here = s.planets[f.location ?? ''];
+  autoProbed.set(f.id, autoProbeKey(f) + '|' + (here?.owner ?? ''));
+}
+
 function autoEngage() {
   for (const f of Object.values(s.fleets)) {
     if (f.location == null || f.movement || f.battleId) continue;
@@ -3198,20 +3287,34 @@ function autoEngage() {
     // AI fleets always press the capture loop; the player's do so only when opted into
     // auto-storm (CC-2) — otherwise the player drives assaults by hand.
     if (mine && !autoAssault.has(f.id)) continue;
-    if (!sectorTypeOf(f.location)?.capturable) continue; // empty space can't be taken
     const here = s.planets[f.location];
-    if (!here || here.owner === f.owner) continue;
+    if (!here || here.owner === f.owner) continue; // свой мир штурмовать нечего
     const enemyHere = Object.values(s.fleets).some(
       (g) => g.owner !== f.owner && g.location === f.location && g.units.some((u) => u.count > 0),
     );
-    if (enemyHere) continue; // let the auto orbital battle settle first
-    // A defended world + no landing troops = the assault can only be rejected
-    // (E_NO_TROOPS) — skip instead of re-pressing it every frame (toast spam).
-    if (here.garrison.some((u) => u.count > 0) && !(f.landing ?? []).some((u) => u.count > 0))
+    if (enemyHere) continue; // ПОЛИТИКА клиента: дать орбитальному бою утихнуть
+    // RULES-1. Выше — только политика (опт-ин авто-штурма, «дай бою утихнуть»);
+    // ПРАВИЛА игры (захватываемая провинция, дипломатия, наличие десанта) больше не
+    // переписываются здесь руками — их называет ядро. Прошлые рукописные копии
+    // разъезжались с редьюсером и сыпали отказами каждый кадр.
+    //
+    // Проверяется вся ПАРА «встать на низкую орбиту → штурм»: штурм нелегален с
+    // дальней орбиты, поэтому проба идёт по состоянию ПОСЛЕ орбиты (order чист —
+    // это черновик, живой мир не трогается). Иначе применилась бы половина обречённой
+    // пары: орбита проходит, штурм отбивается — ровно та болезнь, что описана в
+    // serverDrivers.ts.
+    if (autoProbeSkip(f, here)) continue;
+    const needOrbit = f.orbit !== 'near';
+    const step = needOrbit ? order(s, orbitFleet(f.owner, f.id, 'near'), s.time) : null;
+    if (step?.error) continue;
+    const probe = step ? step.state : s;
+    if (canOrder(probe, assaultFleet(f.owner, f.id)) !== null) {
+      autoProbeMark(f); // обречён в этом часе мира — не пережимать каждый кадр
       continue;
+    }
     // Player fleets go through playerOrder (server-authoritative in net play); AI applies locally.
     const issue = (a: Action) => (mine ? playerOrder(a) : apply(order(s, a, s.time)));
-    if (f.orbit !== 'near') issue(orbitFleet(f.owner, f.id, 'near'));
+    if (needOrbit) issue(orbitFleet(f.owner, f.id, 'near'));
     issue(assaultFleet(f.owner, f.id));
   }
 }
@@ -3747,6 +3850,155 @@ function drawAssaultTargets() {
     const c = world(n);
     cx.beginPath();
     cx.arc(c.x, c.y, 16, 0, TAU);
+    cx.stroke();
+  }
+  cx.restore();
+}
+
+/**
+ * HERO-CORRIDOR — временные коридоры героев на карте.
+ *
+ * До этого их не рисовали ВООБЩЕ: статический слой лейн строится из `MAP`, а коридор
+ * живёт в состоянии, поэтому игрок не видел ни что коридор открыт, ни куда он ведёт.
+ *
+ * Что и почему различается — решает чистая модель `corridorView.ts`; здесь только
+ * канва. Одноразовый мигает красным и БЕЗ таймера (он закрывается прибытием армии, а
+ * не по часам — цифра «осталось» была бы враньём); временный и общий идут спокойной
+ * линией с оставшимся сроком.
+ */
+function drawCorridors(now: number): void {
+  const lines = corridorLines(s, ME, s.time, known);
+  if (!lines.length) return;
+  cx.save();
+  for (const line of lines) {
+    const a = s.planets[line.from]?.position;
+    const b = s.planets[line.to]?.position;
+    if (!a || !b) continue;
+    const p1 = world(a);
+    const p2 = world(b);
+    const col = line.blink ? CORR_ONCE : CORR_LIVE;
+    // Мигание — только у одноразового: он вот-вот исчезнет, и это надо чувствовать.
+    const pulse = line.blink ? 0.35 + 0.45 * Math.abs(Math.sin(now / 320)) : 0.6;
+    cx.strokeStyle = rgba(col, line.mine ? pulse : pulse * 0.6);
+    cx.lineWidth = line.mine ? 2 : 1.4;
+    cx.setLineDash(line.blink ? [7, 6] : [10, 6]);
+    cx.shadowColor = col;
+    cx.shadowBlur = fxBlur(line.blink ? 8 : 4);
+    cx.beginPath();
+    cx.moveTo(p1.x, p1.y);
+    cx.lineTo(p2.x, p2.y);
+    cx.stroke();
+    cx.shadowBlur = 0;
+    if (line.msLeft !== null) {
+      cx.setLineDash([]);
+      cx.fillStyle = rgba(col, 0.9);
+      cx.font = '600 11px ui-monospace,monospace';
+      cx.textAlign = 'center';
+      cx.fillText(fmtHrs(line.msLeft / HOUR), (p1.x + p2.x) / 2, (p1.y + p2.y) / 2 - 6);
+    }
+  }
+  cx.setLineDash([]);
+  cx.restore();
+}
+
+/**
+ * RANGE-UX — круги досягаемости выделенных флотов и отметки ПВО.
+ *
+ * Вся арифметика — в `combatRanges.ts` (чистая, покрыта гейтом); здесь только канва.
+ * Радиусы приходят ИЗ ЯДРА — рисуется ровно тот круг, по которому ядро стреляет.
+ */
+function drawCombatRanges(): void {
+  const ids = selectedFleetIds();
+  const { rings, lines } = combatRanges(
+    s,
+    data,
+    ids,
+    ME,
+    (id: string) => {
+      const f = s.fleets[id];
+      if (f) return fleetPos(f);
+      const p = s.planets[id];
+      return p ? { ...p.position } : null;
+    },
+    known,
+  );
+  if (!rings.length && !lines.length) return;
+  const tint: Record<string, string> = { artillery: R_ARTY, squadron: R_WING, aa: R_AA };
+  cx.save();
+  for (const ring of rings) {
+    const c = world({ x: ring.x, y: ring.y } as never);
+    cx.strokeStyle = rgba(tint[ring.kind] ?? R_ARTY, ring.kind === 'aa' ? 0.7 : 0.32);
+    cx.lineWidth = 1.2;
+    if (ring.radius > 0) {
+      cx.setLineDash([5, 7]);
+      cx.beginPath();
+      cx.arc(c.x, c.y, ring.radius * cam.scale, 0, TAU);
+      cx.stroke();
+    } else {
+      // ПВО: у него нет области — только «у этого мира есть зубы».
+      cx.setLineDash([2, 3]);
+      cx.beginPath();
+      cx.arc(c.x, c.y, 13, 0, TAU);
+      cx.stroke();
+    }
+  }
+  cx.setLineDash([]);
+  for (const line of lines) {
+    const a = world({ x: line.from.x, y: line.from.y } as never);
+    const b = world({ x: line.to.x, y: line.to.y } as never);
+    cx.strokeStyle = rgba(R_ARTY, 0.85);
+    cx.lineWidth = 1.6;
+    cx.shadowColor = R_ARTY;
+    cx.shadowBlur = fxBlur(6);
+    cx.beginPath();
+    cx.moveTo(a.x, a.y);
+    cx.lineTo(b.x, b.y);
+    cx.stroke();
+    cx.shadowBlur = 0;
+  }
+  cx.restore();
+}
+
+/**
+ * CAST-UX — что видно, пока целишься способностью героя: КРУГ ДАЛЬНОСТИ вокруг
+ * кастующего (`def.range`, те же мировые единицы, что у ядра) и, если способность
+ * площадная, КРУГ ОБЛАСТИ под прицелом (`params.radius`).
+ *
+ * Оба радиуса берутся из каталога, а не из констант интерфейса: правило «докуда
+ * достаёт» живёт в данных, и картинка обязана показывать ровно его, иначе игрок
+ * целится по одной границе, а ядро считает по другой.
+ *
+ * Цель за пределами дальности красится отказом — это подсказка, а не запрет: финальный
+ * вердикт всё равно за ядром (`E_OUT_OF_RANGE`).
+ */
+function drawCastAim(): void {
+  if (!heroAim || !aimPointer) return;
+  const hero = (s.heroes ?? {})[heroAim.heroId];
+  const def = data.heroAbilities[heroAim.abilityId];
+  if (!hero || !def) return;
+  const fleet = hero.fleetId ? s.fleets[hero.fleetId] : undefined;
+  const origin = fleet ? fleetAnchor(fleet) : null;
+  if (!origin) return;
+  const reach = def.range ?? 0;
+  const aoe = Number(def.params?.radius ?? 0);
+  const far = reach > 0 && Math.hypot(aimPointer.x - origin.x, aimPointer.y - origin.y) > reach * cam.scale;
+  cx.save();
+  if (reach > 0) {
+    cx.strokeStyle = rgba(far ? CAST_FAR : CAST_REACH, 0.5);
+    cx.lineWidth = 1.2;
+    cx.setLineDash([6, 6]);
+    cx.beginPath();
+    cx.arc(origin.x, origin.y, reach * cam.scale, 0, TAU);
+    cx.stroke();
+  }
+  if (aoe > 0) {
+    cx.setLineDash([]);
+    cx.fillStyle = rgba(CAST_AREA, 0.1);
+    cx.strokeStyle = rgba(CAST_AREA, 0.75);
+    cx.lineWidth = 1.4;
+    cx.beginPath();
+    cx.arc(aimPointer.x, aimPointer.y, aoe * cam.scale, 0, TAU);
+    cx.fill();
     cx.stroke();
   }
   cx.restore();
@@ -4886,11 +5138,13 @@ function render(now: number) {
     for (const p of loads) (isSquadron(p.unit) ? diaRow : sqRow).push({ kind: 'load', load: p });
     // The same rotation the pyramid uses; local +y = the tail. Pips and the ship
     // count are placed through this, drawn upright at their rotated spots.
-    const th = A.ang + Math.PI / 2;
-    const tailAt = (lx: number, ly: number): { x: number; y: number } => ({
-      x: A.x + lx * Math.cos(th) - ly * Math.sin(th),
-      y: A.y + lx * Math.sin(th) + ly * Math.cos(th),
-    });
+    // Стоящий у мира флот ниже ORBIT_ZOOM_IN стоит РАДИАЛЬНО, и его хвост смотрел
+    // внутрь орбиты — после ужатия кольца пипсы ложились на диск планеты; для этой
+    // позы хвост разворачивается наружу (геометрия и причина — markerTail.ts).
+    const staticDock = !f.movement && f.location !== null && !orbitsLive();
+    const th = tailTheta(A.ang, staticDock);
+    const tailAt = (lx: number, ly: number): { x: number; y: number } =>
+      tailPoint(A.x, A.y, th, lx, ly);
     const CELL = 8,
       SQ = 5,
       DS = 3.1, // squadron pip: a diamond with the footprint of the square
@@ -5038,7 +5292,10 @@ function render(now: number) {
   drawPings(now); // ally ping markers (coalition), with screen hit-boxes for taps
   drawChainOverlay(now); // CHAIN-UX: цепочки планов + черновик режима «Приказ»
   drawAssaultTargets();
+  drawCorridors(now); // HERO-CORRIDOR: временные коридоры героев
+  drawCombatRanges(); // RANGE-UX: артиллерия / эскадрилья / ПВО — до прицельных линий
   drawAimPreview();
+  drawCastAim(); // CAST-UX: дальность каста + область действия
 }
 
 // --- side panel --------------------------------------------------------------
@@ -5153,12 +5410,14 @@ function buildButtons(_planetId: string, ids: string[], kind: 'building' | 'unit
         id,
         costText(kind === 'unit' ? data.units[id]?.cost : data.buildings[id]?.cost),
         true,
-        // Buildings are one-per-planet — grey out a committed (queued/building/paused)
-        // one so a second order can't be placed. PC only (the mobile build UI is frozen
-        // in this chat); units stack freely so they're never locked.
-        kind === 'building' && pcUi() && !NET
-          ? (buildingLocked(_planetId, id) ?? undefined)
-          : undefined,
+        // Buildings are one-per-planet by default (`maxPerPlanet`, RULES-2) — grey out a
+        // committed (queued/building/paused)
+        // one so a second order can't be placed. On EVERY layout and in net play too:
+        // условие `pcUi() && !NET` оставляло плитку кликабельной на телефоне и на
+        // сервере, и налоговую управу можно было заказать дважды (живой плейтест).
+        // buildingLocked читает p.buildings + scheduled + pausedConstruction — всё это
+        // есть и в сетевых снапшотах. Units stack freely so they're never locked.
+        kind === 'building' ? (buildingLocked(_planetId, id) ?? undefined) : undefined,
       ),
     )
     .join('');
@@ -5191,7 +5450,6 @@ function taskGroupPanelHtml(group: Fleet[]): string {
   return h;
 }
 
-/** Side-panel: a single selected fleet — combat stats, orders, docking. */
 /** Тайлы состава флота Bytro-стиля: силуэт-архетип в цвете стороны (наземные —
  *  прежние текст-глифы), счётчик и мини-бар корпуса стека; тап — досье юнита. */
 function fleetTilesHtml(f: Fleet, stacks: UnitStack[]): string {
@@ -5317,6 +5575,7 @@ function fleetSummaryHtml(f: Fleet): string {
   );
 }
 
+/** Side-panel: a single selected fleet — combat stats, orders, docking. */
 function fleetPanelHtml(f: Fleet): string {
   const nShips = sumUnits(f.units);
   const nTr = sumUnits(f.landing ?? []);
@@ -5590,7 +5849,6 @@ function unknownPlanetHtml(p: Planet): string {
   );
 }
 
-/** Side-panel: a known world — ownership header + ground/ships/squadron/buildings tabs. */
 /** Карточка статистики мира (тап по имени планеты) — полная сводка: обозначение,
  *  владелец, вид/тип/местность, пассивный выход по ресурсам (ECON-7 перекос),
  *  бонусы типа, гарнизон, постройки, очки победы, флоты на орбите. */
@@ -5664,6 +5922,7 @@ function planetSummaryHtml(p: Planet): string {
   );
 }
 
+/** Side-panel: a known world — ownership header + ground/ships/squadron/buildings tabs. */
 function planetPanelHtml(p: Planet): string {
   const mine = p.owner === ME;
   const sec = tData(data.sectors[p.terrain ?? '']?.name ?? p.terrain ?? '—');
@@ -5855,6 +6114,10 @@ function planetPanelHtml(p: Planet): string {
       // Province-centric roster (data-driven): each province type lists what it can
       // raise (SECTOR_TYPES.allowedBuildings); absent = the default BUILDABLE set.
       const buildable = sectorTypeOf(p.id)?.allowedBuildings ?? BUILDABLE;
+      // Показываем то, чего на мире ещё НЕТ. Это допущение «лимит = 1»: при
+      // `maxPerPlanet > 1` плитка второго экземпляра не погаснет, а исчезнет из меню,
+      // хотя ядро такой заказ разрешило бы. Пока весь каталог на дефолте 1, расхождения
+      // нет; поднимать лимит без правки этой строки нельзя (см. `maxPerPlanet` в схеме).
       const missing = buildable.filter((bt) => !p.buildings.some((b) => b.type === bt));
       if (missing.length) blds += buildButtons(p.id, missing, 'building');
     }
@@ -5958,7 +6221,7 @@ function seatCardHtml(id: string): string {
     `<div class="pc-stats">` +
     row(
       t('card.stances'),
-      `<span class="dp-stance" style="color:${STANCE_COLOR[st]};border-color:${STANCE_COLOR[st]}">${stanceRu(st)}</span>`,
+      `<span class="dp-stance" style="color:${stanceCol(st)};border-color:${stanceCol(st)}">${stanceRu(st)}</span>`,
     ) +
     row(t('card.worlds'), String(worldsOf(id))) +
     `</div>` +
@@ -6000,12 +6263,6 @@ const STANCE_RU: Record<DiplomaticStance, string> = {
 function stanceRu(st: DiplomaticStance): string {
   return t(STANCE_RU[st]);
 }
-const STANCE_COLOR: Record<DiplomaticStance, string> = {
-  war: '#ff5a4d',
-  peace: '#9fb8c0',
-  pact: '#35d6e6',
-  alliance: '#5ff0a8',
-};
 // Friendliness rank: war (hostile) < peace < pact < alliance (closest). Warming the
 // relation up a rank needs the other side's consent; cooling it down is unilateral.
 const STANCES: DiplomaticStance[] = ['war', 'peace', 'pact', 'alliance'];
@@ -6042,7 +6299,6 @@ function fmtStamp(at: number, opts?: StampOpts): string {
   return parts.join(' ');
 }
 
-/** Append a line to the session log (bounded). Patches the feed if it's on screen. */
 /** Unread social events (war declarations, stance shifts) — badge on the ✉ rail. */
 let unreadMsgs = 0;
 /** Diplomacy events don't pass the server's fog filter (their payload names no
@@ -6147,6 +6403,13 @@ function proposeStance(target: string, to: DiplomaticStance): void {
   playerOrder(declareWar(ME, target, to));
 }
 
+/** MAPSHARE-1: один тап — предложить, принять или расторгнуть. Что именно, решает
+ *  ядро по текущему состоянию договора; клиент лишь называет сторону и «включить/нет». */
+function toggleMapShare(target: string): void {
+  if (target === ME || !s.players[target]) return;
+  playerOrder(shareMap(ME, target, !hasMapShare(s, ME, target)));
+}
+
 function openDiplo(tab: 'diplo' | 'msgs' | 'intel'): void {
   diploOpen = true;
   diploTab = tab;
@@ -6232,6 +6495,31 @@ function intelRowHtml(target: string): string {
  *  consent state — их предложение ✓ / наше ⏳), the two spy buttons, and the DM
  *  button, followed by the live intel row. Shared by the roster's expanded row and
  *  the player card opened from a chat nick, so both stay in lockstep. */
+/**
+ * MAPSHARE-1 — кнопка договора об обмене картами. Отдельная от лестницы стоек, потому
+ * что и сам договор отдельный: его заключают и при мире, и при пакте, и он не делает
+ * союзником. Те же аффордансы согласия, что у смягчения стойки: их предложение — «✓»
+ * (тап принимает), моё — «⏳» (ждём их), действующий договор — активная кнопка (тап
+ * расторгает). При войне заключить нельзя — ядро отобьёт, поэтому и кнопка заперта.
+ */
+function mapShareBtnHtml(id: string): string {
+  const live = hasMapShare(s, ME, id);
+  const theirs = !live && hasMapShareOffer(s, id, ME);
+  const mine = !live && !theirs && hasMapShareOffer(s, ME, id);
+  const atWar = !live && getStance(s, ME, id) === 'war';
+  const label = theirs ? `✓ ${t('comms.mapshare')}` : mine ? `⏳ ${t('comms.mapshare')}` : t('comms.mapshare');
+  const title = atWar
+    ? t('comms.mapshare.war')
+    : live
+      ? t('comms.mapshare.drop')
+      : theirs
+        ? t('comms.offer.incoming', { who: NAME[id] ?? id })
+        : mine
+          ? t('comms.offer.sent')
+          : t('comms.mapshare.hint');
+  const cls = `dp-map${live ? ' on' : ''}${theirs ? ' offer' : ''}${mine ? ' pend' : ''}`;
+  return `<button class="${cls}" data-mapseat="${id}"${atWar || mine ? ' disabled' : ''} title="${esc(title)}">🗺 ${label}</button>`;
+}
 function seatDiploActionsHtml(id: string): string {
   const st = getStance(s, ME, id);
   return (
@@ -6251,8 +6539,9 @@ function seatDiploActionsHtml(id: string): string {
           : mine
             ? t('comms.offer.sent')
             : '';
-      return `<button class="${cls}" data-stance="${sk}" data-seat="${id}" style="--sc:${STANCE_COLOR[sk]}"${barred || mine ? ' disabled' : ''}${title ? ` title="${esc(title)}"` : ''}>${label}</button>`;
+      return `<button class="${cls}" data-stance="${sk}" data-seat="${id}" style="--sc:${stanceCol(sk)}"${barred || mine ? ' disabled' : ''}${title ? ` title="${esc(title)}"` : ''}>${label}</button>`;
     }).join('') +
+    mapShareBtnHtml(id) +
     `<button class="dp-spy" data-spy="treasury" data-seat="${id}" title="${t('comms.spy.treasury', { c: SPY_COST })}">🕵 ${t('log.spy.kind.treasury')}</button>` +
     `<button class="dp-spy" data-spy="fleets" data-seat="${id}" title="${t('comms.spy.fleets', { c: SPY_COST })}">🕵 ${t('spy.op.fleets')}</button>` +
     `<button class="dp-msg" data-msgseat="${id}">✉</button></div>` +
@@ -6283,7 +6572,7 @@ function diploRowsHtml(): string {
       const st = isMe ? null : getStance(s, ME, id);
       const stanceTag = isMe
         ? `<span class="dp-tag">${t('comms.you')}</span>`
-        : `<span class="dp-stance" style="color:${STANCE_COLOR[st!]};border-color:${STANCE_COLOR[st!]}">${stanceRu(st!)}</span>`;
+        : `<span class="dp-stance" style="color:${stanceCol(st!)};border-color:${stanceCol(st!)}">${stanceRu(st!)}</span>`;
       // Bots (AI seats) carry a favour meter toward you; humans/you don't.
       const favBar = !isMe && isAiSeat(id) ? favourBarHtml(id) : '';
       const expanded = diploExpanded === id && !isMe;
@@ -6376,7 +6665,7 @@ function renderDiplo(): void {
   const sortBtn = (k: typeof diploSort, label: string) =>
     `<button class="dp-sortb${diploSort === k ? ' on' : ''}" data-sort="${k}">${label}</button>`;
   const stChip = (k: DiplomaticStance) =>
-    `<button class="dp-fchip${diploStanceFilter.has(k) ? ' on' : ''}" data-fstance="${k}" style="--sc:${STANCE_COLOR[k]}">${stanceRu(k)}</button>`;
+    `<button class="dp-fchip${diploStanceFilter.has(k) ? ' on' : ''}" data-fstance="${k}" style="--sc:${stanceCol(k)}">${stanceRu(k)}</button>`;
   const tyChip = (k: 'human' | 'ai', label: string) =>
     `<button class="dp-fchip ty${diploTypeFilter.has(k) ? ' on' : ''}" data-ftype="${k}">${label}</button>`;
   const anyFilter = diploStanceFilter.size || diploTypeFilter.size;
@@ -6421,20 +6710,31 @@ function scrollFeedToEnd(): void {
  *  panel — not in a global HUD strip. Identification is the game tooltip only: the
  *  PC cursor dossier (#objtip, via data-desc) and the mobile long-press bubble
  *  (data-name). No native `title` — it duplicated #objtip as a second, uglier popup. */
-/** A building is one-per-planet (the reducer grows it via upgrade, never a 2nd copy).
+/** A building is one-per-planet BY DEFAULT — since RULES-2 the number is the catalogue's
+ *  `maxPerPlanet`, and the core (not this helper) enforces it; the whole shipped catalogue
+ *  is still on the default 1.
  *  Returns why a fresh build order would be refused — so the build tile can grey out
  *  the moment it's committed (built / building / queued / paused), instead of taking
  *  the order and only rejecting it when the queue reaches it. `null` = orderable. */
 function buildingLocked(planetId: string, id: string): 'built' | 'queued' | null {
   const p = s.planets[planetId];
   if (!p) return null;
-  if (p.buildings.some((b) => b.type === id)) return 'built';
+  // RULES-1: правило «одно здание такого типа на мир» больше НЕ переписано здесь —
+  // его называет ядро тем же кодом отказа, каким отбило бы сам приказ. Раньше клиент
+  // держал свою копию (буквально `p.buildings.some(...)` + скан scheduled + paused),
+  // и копия разъезжалась: кодекс проверял только «уже стоит» и всю стройку первого
+  // экземпляра предлагал заказать второй.
+  const code = canOrder(s, buildBuilding(ME, planetId, id));
+  if (code === 'E_ALREADY_BUILT') return 'built';
+  if (code === 'E_ALREADY_QUEUED' || code === 'E_ALREADY_PAUSED') return 'queued';
+  // Локальная очередь прототипа ядру неизвестна по определению (в сети её нет —
+  // там стройку таймит сервер), поэтому она добавляется здесь ЯВНО, а не как «ещё
+  // одно правило». Это единственная местная добавка к вердикту ядра.
   if (queueOf(planetId).buildings.some((q) => q.kind === 'building' && q.id === id))
     return 'queued';
-  const act = activeConstruction(planetId, 'buildings');
-  if (act && act.payload.kind === 'building' && act.payload.building === id) return 'queued';
-  if (p.pausedConstruction?.some((s) => s.kind === 'building' && s.building === id))
-    return 'queued';
+  // Прочие отказы (E_INSUFFICIENT, E_BOMBARDED, E_WRONG_SECTOR…) плитку НЕ гасят:
+  // нехватку показывает сама цена с дефицитом (UI-RES), и серая кнопка вместо цифры
+  // «сколько не хватает» была бы хуже. Это решение ПОДАЧИ, не правило.
   return null;
 }
 function codexTile(
@@ -6486,8 +6786,10 @@ function codexBuildBtn(kind: string, id: string): string {
   if (!p || p.owner !== ME) return ''; // only when you're looking at one of your worlds
   if (kind === 'b') {
     const buildable = (sectorTypeOf(p.id)?.allowedBuildings ?? BUILDABLE).includes(id);
-    const built = p.buildings.some((b) => b.type === id);
-    if (!buildable || built) return '';
+    // buildingLocked, а не только «уже стоит»: СТРОЯЩЕЕСЯ здание ещё не в p.buildings
+    // (оно попадает туда на construction.complete), и кодекс предлагал «Построить
+    // здесь» второй экземпляр одноэкземплярного здания всю стройку первого.
+    if (!buildable || buildingLocked(p.id, id)) return '';
     return `<button class="cx-build" data-build="building:${id}">▣ ${t('codex.build-here')} · ${cost(data.buildings[id]?.cost, myRes())}</button>`;
   }
   if (kind === 'u' && data.units[id]) {
@@ -6838,6 +7140,13 @@ function renderChainBar(): void {
   if (html !== lastCmdHtml) {
     cmdbar.innerHTML = html;
     lastCmdHtml = html;
+  }
+  // CAST-UX. Пока каст ПРИЦЕЛИВАЕТСЯ, нижний хаб уходит: он занимает ту самую полосу
+  // экрана, по которой целятся на телефоне, и перекрывает круг дальности. Прицел
+  // снимается любым приказом и самим кастом (`heroAim = null`), так что хаб вернётся.
+  if (heroAim) {
+    cmdbar.classList.remove('show');
+    return;
   }
   cmdbar.classList.add('show');
   updateChainDom();
@@ -7199,14 +7508,9 @@ side.addEventListener('click', (ev) => {
     // on hover — building/task name, current vs full output, ETA.
     if (MOBILE) {
       const key = (ev.target as HTMLElement).closest<HTMLElement>('[data-desc]')?.dataset.desc ?? null;
-      // stat:/tab:/division dossiers exist for the PC hover tooltip only — the
-      // mobile tap behaviour stays exactly as it was before they were added.
-      if (
-        key !== null &&
-        !key.startsWith('stat:') &&
-        !key.startsWith('tab:') &&
-        key !== 'division'
-      ) {
+      // stat:/tab: dossiers exist for the PC hover tooltip only — the mobile tap
+      // behaviour stays exactly as it was before they were added.
+      if (key !== null && !key.startsWith('stat:') && !key.startsWith('tab:')) {
         openDossier(key);
       }
     }
@@ -7526,7 +7830,7 @@ cmdbar.addEventListener('click', (ev) => {
     const st = troopsPlan;
     const inp = st ? troopsInputFor(st.fleetId) : null;
     const at = st ? s.fleets[st.fleetId]?.location : undefined;
-    if (st && inp && at && troopsLiftable(at)) {
+    if (st && inp && at) {
       const { load, unload } = planOrders(troopsModel(inp));
       // Выгрузка мгновенна и уходит в ядро ОДНИМ действием на тип (count оно
       // принимает атомарно). Погрузка ложится в часовую очередь БЕЗ повторной
@@ -7534,7 +7838,11 @@ cmdbar.addEventListener('click', (ev) => {
       // освободит эта выгрузка, а реальный `army.load` уйдёт лишь через игровой
       // час — к тому времени выгрузка применена и в соло, и по сети.
       for (const o of unload) playerOrder(unloadArmy(ME, st.fleetId, o.unit, o.count));
-      for (const o of load) pushLoads(st.fleetId, o.unit, o.count);
+      // ALLY-LAND. Идущий наземный бой запирает ТОЛЬКО погрузку (ядро: `E_UNDER_ASSAULT`
+      // на `army.load` — иначе защитник уплыл бы небитым). Высадку он не запирает, и
+      // раньше один общий гейт резал обе половины: подкрепить осаждённый мир было
+      // нельзя — ровно то, ради чего союзная высадка и нужна.
+      if (load.length && troopsLiftable(at)) for (const o of load) pushLoads(st.fleetId, o.unit, o.count);
     }
     troopsPlan = null;
   } else if (cmd === 'barrage') {
@@ -8298,6 +8606,7 @@ const techTree = initTechTree({
   order: playerOrder,
   onOpen: () => maybeIntro('tech'),
 });
+wirePingPanel(); // PING-PANEL: кнопка рельсы + обработчики окна меток
 document.getElementById('rail-tech')?.addEventListener('click', () => techTree.open());
 
 
@@ -9514,7 +9823,7 @@ function renderSetup(): void {
 // arriving from the hub goes back to the hub, not the raw identity card.
 let setupReturn: 'welcome' | 'hub' = 'welcome';
 // --- scientist council picker: choose your 2 research leaders BEFORE the start-point ----
-// Окно живёт в `sciPick.ts` (REFM-16); здесь только проводка. Список выбранных —
+// Окно живёт в `sciPick.ts` (REFM-18); здесь только проводка. Список выбранных —
 // `setupScientists` — принадлежит сетапу (его читает старт матча), поэтому ходит хуками.
 const sciWin = $('scipick');
 const sciPick = initSciPick({
@@ -10822,6 +11131,22 @@ if (!__PLAYER_BUILD__ && DEV_UI && typeof window !== 'undefined') {
       siegeShots.push({ from: { ...a }, to: { ...b }, at: performance.now(), seed: siegeSeed++ });
       return true;
     },
+    // Open a hero corridor between two nodes so its overlay (blinking one-shot vs
+    // timed lane) can be looked at without levelling a hero and casting for real.
+    openCorridor(fromId: string, toId: string, tier: number): boolean {
+      if (!s.planets[fromId] || !s.planets[toId]) return false;
+      (s.tempLanes ??= []).push({
+        id: `lane:dev:${s.tempLanes.length}`,
+        owner: ME,
+        from: fromId,
+        to: toId,
+        speedBonus: 0.5,
+        expiresAt: s.time + 6 * HOUR,
+        addedLink: true,
+        tier,
+      });
+      return true;
+    },
     // Preview the capture wave over a province without staging a real ground battle.
     flashCapture(node: string, owner: string): boolean {
       if (!s.planets[node]) return false;
@@ -10969,6 +11294,7 @@ const BACK_LAYERS: BackLayer[] = [
   }, // z46
   { id: 'logwin', isOpen: () => logWin?.classList.contains('show') === true, close: () => logWin?.classList.remove('show') }, // z46
   { id: 'codexhub', isOpen: () => shown('codexhub'), close: () => hide('codexhub') }, // z45
+  { id: 'pingpanel', isOpen: () => pingPanelOpen, close: () => closePingPanel() }, // z60
   { id: 'pingpop', isOpen: () => pingPopEl?.classList.contains('show') === true, close: () => closePingPop() }, // z45
   { id: 'splitdlg', isOpen: () => splitState !== null, close: () => { splitState = null; lastPanelHtml = ''; } }, // z45
   // --- низ экрана (z27…z20) ---
@@ -11427,6 +11753,12 @@ if (playerCardEl) {
       refreshSeatCard(seat);
       return;
     }
+    const mapBtn = tg.closest('.dp-map') as HTMLElement | null;
+    if (mapBtn) {
+      toggleMapShare(mapBtn.dataset.mapseat!);
+      refreshSeatCard(seat);
+      return;
+    }
     const spyBtn = tg.closest('.dp-spy') as HTMLElement | null;
     if (spyBtn) {
       playerOrder(spyOn(ME, spyBtn.dataset.seat!, spyBtn.dataset.spy as 'treasury' | 'fleets'));
@@ -11596,6 +11928,100 @@ function createPingTo(dest: string): void {
   }
   closePingMenu();
 }
+/**
+ * PING-PANEL — окно «метки коалиции»: свои и союзные в одном списке.
+ *
+ * Права разведены в чистой модели (`pingPanel.ts`): свой пинг правится и снимается у
+ * всех, чужой — только прячется у меня. Здесь только разметка и обработчики.
+ */
+let hiddenPings: ReadonlySet<string> = new Set();
+let pingPanelOpen = false;
+
+function renderPingPanel(): void {
+  const el = document.getElementById('pingpanel');
+  if (!el) return;
+  const rows = pingRows(sessionMessages, ME, hiddenPings);
+  const body = rows.length
+    ? rows
+        .map((r) => {
+          const pl = s.planets[r.loc];
+          const where = pl ? planetName(r.loc) : r.loc;
+          const who = NAME[r.from] ?? r.from;
+          return (
+            `<div class="pp-row${r.hidden ? ' off' : ''}" data-ploc="${esc(r.loc)}">` +
+            `<i class="pp-dot" style="background:${ownerColor(r.from)}"></i>` +
+            `<span class="pp-txt"><b>${esc(where)}</b><span>${esc(r.text || '—')} · ${esc(who)}</span></span>` +
+            `<button data-pact="go" title="${t('ping.panel.go')}">🎯</button>` +
+            `<button data-pact="hide" title="${t(r.hidden ? 'ping.panel.show' : 'ping.panel.hide')}">${r.hidden ? '🙈' : '👁'}</button>` +
+            (canEditPing(r) ? `<button data-pact="edit" title="${t('ping.panel.edit')}">✎</button>` : '') +
+            (canRemovePing(r) ? `<button data-pact="del" title="${t('ping.panel.del')}">✕</button>` : '') +
+            `</div>`
+          );
+        })
+        .join('')
+    : `<div class="pp-empty">${t('ping.panel.empty')}</div>`;
+  el.innerHTML =
+    `<div class="pp-head"><b>${t('ping.panel.title')}</b>` +
+    `<button data-pact="close">${t('card.close')}</button></div>` +
+    body;
+}
+
+function wirePingPanel(): void {
+  document.getElementById('rail-pings')?.addEventListener('click', () => {
+    if (pingPanelOpen) closePingPanel();
+    else openPingPanel();
+  });
+  document.getElementById('pingpanel')?.addEventListener('click', (ev) => {
+    const btn = (ev.target as HTMLElement).closest('[data-pact]') as HTMLElement | null;
+    if (!btn) return;
+    const act = btn.dataset.pact;
+    if (act === 'close') return void closePingPanel();
+    const loc = btn.closest('[data-ploc]') as HTMLElement | null;
+    const id = loc?.dataset.ploc;
+    if (!id) return;
+    if (act === 'go') {
+      focusWorld(id); // камера — к любому пингу: смотреть не запрещено никому
+      closePingPanel();
+      return;
+    }
+    if (act === 'hide') {
+      hiddenPings = toggleHidden(hiddenPings, id); // ЛОКАЛЬНО — у союзника метка цела
+      renderPingPanel();
+      return;
+    }
+    if (act === 'edit') {
+      const row = pingRows(sessionMessages, ME, hiddenPings).find((r) => r.loc === id);
+      if (!row || !canEditPing(row)) return; // право проверяет модель, не разметка
+      const next = prompt(t('ping.panel.edit'), row.text);
+      if (next === null) return;
+      // Правка = снять и поставить заново: пинг — это СООБЩЕНИЕ, отдельного
+      // «изменить текст» ни у ленты, ни у сервера нет, а изобретать его ради UI
+      // значило бы завести второй путь записи метки.
+      const text = next.trim();
+      removePing(id);
+      if (NET && netClient) netClient.placePing({ kind: 'mark', target: { node: id }, label: text });
+      else pushMsg(COALITION, text || t('ping.mark', { loc: id }), false, ME, id);
+      renderPingPanel();
+      return;
+    }
+    if (act === 'del') {
+      const row = pingRows(sessionMessages, ME, hiddenPings).find((r) => r.loc === id);
+      if (row && canRemovePing(row)) removePing(id);
+      renderPingPanel();
+    }
+  });
+}
+
+function openPingPanel(): void {
+  pingPanelOpen = true;
+  renderPingPanel();
+  document.getElementById('pingpanel')?.classList.add('show');
+}
+function closePingPanel(): void {
+  pingPanelOpen = false;
+  document.getElementById('pingpanel')?.classList.remove('show');
+}
+
 /** Active coalition pings, one marker per province (the latest ping there wins). The
  *  coalition chat log and the map markers share this single source. */
 function activePings(): SessionMsg[] {
@@ -11881,6 +12307,7 @@ function drawPings(now: number): void {
   pingHits = [];
   for (const m of activePings()) {
     if (m.from === ME && !showOwnPings) continue; // hidden by «Свои метки» switch
+    if (hiddenPings.has(m.ping!)) continue; // PING-PANEL: спрятан ЛОКАЛЬНО (у союзника метка цела)
     const pl = s.planets[m.ping!];
     if (!pl) continue;
     const c = world(pl.position);
@@ -12105,7 +12532,6 @@ function drawChainOverlay(now: number): void {
     }
   }
 }
-/** Tap a ping → fly the camera to that province (and select it); close the menu. */
 /** Pan the camera to a world referenced from a plan row (data-goto) — selection stays
  *  untouched (the fleet panel must survive the tap) and a short ring marks the spot. */
 let goFlash: { id: string; until: number } | null = null;
@@ -12268,6 +12694,12 @@ if (diploEl) {
     const actBtn = tg.closest('.dp-act') as HTMLElement | null;
     if (actBtn) {
       proposeStance(actBtn.dataset.seat!, actBtn.dataset.stance as DiplomaticStance);
+      renderDiplo();
+      return;
+    }
+    const mapBtn = tg.closest('.dp-map') as HTMLElement | null;
+    if (mapBtn) {
+      toggleMapShare(mapBtn.dataset.mapseat!);
       renderDiplo();
       return;
     }

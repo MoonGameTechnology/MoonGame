@@ -1,0 +1,88 @@
+import type { GameState, PlanetId, TempLane } from './gameState';
+
+/**
+ * HERO-CORRIDOR — ПРАВО ПРОХОДА по временному коридору героя.
+ *
+ * Коридор — не просто ускоряющая лейна: на младших ступенях он ЛИЧНЫЙ. Ребро в графе
+ * при этом есть (без него не посчитать геометрию и не построить маршрут), поэтому
+ * «личность» держится вето по ребру в маршрутизаторе — тем же механизмом, что и
+ * дипломатическое вето по узлу, а не вторым роутером.
+ *
+ * Почему это вообще понадобилось. `addLink` пишет ребро в ОБЩИЙ `planet.links`, по
+ * которому строят маршруты все игроки; владельцем был помечен только бонус скорости.
+ * То есть коридор УЖЕ был проходим врагом — просто без ускорения. Это никто не
+ * проектировал, оно выпало из решения класть временный лейн в мировую топологию.
+ *
+ * Ступени (см. `TempLane.tier`): 1 — одноразовый, только стак с героем; 2 — то же со
+ * сроком жизни; 3 — общий, идут все. Отсутствие поля читается как 1 — fail-secure:
+ * по умолчанию коридор ЛИЧНЫЙ, а не открытый всему миру.
+ */
+
+/** Ступень коридора. Отсутствие — самая закрытая (fail-secure). */
+export function laneTier(lane: TempLane): number {
+  return lane.tier ?? 1;
+}
+
+/** Общий ли коридор — по нему идут все, включая врага. */
+export function laneIsPublic(lane: TempLane): boolean {
+  return laneTier(lane) >= 3;
+}
+
+/** Ребро, которое коридор ДОБАВИЛ в граф (на существующей лейне ограничивать нечего —
+ *  там коридор лишь ускоряет, и закрывать чужим исходную дорогу было бы грабежом). */
+function lanePrivate(lane: TempLane): boolean {
+  return lane.addedLink && !laneIsPublic(lane);
+}
+
+/** Соединяет ли лейн именно эту пару узлов (в любую сторону). */
+function laneJoins(lane: TempLane, a: PlanetId, b: PlanetId): boolean {
+  return (lane.from === a && lane.to === b) || (lane.from === b && lane.to === a);
+}
+
+/**
+ * Может ли ЭТОТ флот пройти по этому коридору. На ступенях 1–2 право у флота, который
+ * НЕСЁТ героя коридора (герой пересаживается — поэтому храним героя, а не флот).
+ * Коридор без `heroId` (старое состояние до этой правки) считается общим: ломать
+ * сохранённые матчи задним числом хуже, чем оставить их прежними.
+ */
+export function mayTraverse(state: GameState, lane: TempLane, fleetId: string): boolean {
+  if (laneIsPublic(lane)) return true;
+  if (lane.heroId === undefined) return true; // legacy-состояние: вело себя как общий
+  const hero = (state.heroes ?? {})[lane.heroId];
+  return hero?.fleetId === fleetId;
+}
+
+/**
+ * Предикат «это ребро закрыто для меня» для {@link planRoute}. Закрыто, если пару
+ * узлов соединяет ТОЛЬКО чужой личный коридор: если между ними есть и обычная лейна,
+ * ехать можно — просто без коридорного ускорения.
+ *
+ * `fleetId === undefined` (планирование без конкретного флота — например, превью) даёт
+ * самый строгий ответ: чужие личные коридоры не учитываются как дорога.
+ */
+export function corridorVeto(
+  state: GameState,
+  fleetId: string | undefined,
+): ((from: PlanetId, to: PlanetId) => boolean) | undefined {
+  const lanes = state.tempLanes?.filter(lanePrivate);
+  if (!lanes || lanes.length === 0) return undefined; // нет личных коридоров — нет и вето
+  return (from, to) => {
+    const here = lanes.filter((l) => laneJoins(l, from, to));
+    if (here.length === 0) return false;
+    // Ребро существует только благодаря этим коридорам. Открыто, если хотя бы один
+    // из них пускает меня.
+    return !here.some((l) => fleetId !== undefined && mayTraverse(state, l, fleetId));
+  };
+}
+
+/**
+ * Коридор ли эта пара узлов — то есть существует ли ребро между ними ТОЛЬКО благодаря
+ * временному коридору. Нужно, чтобы запретить остановку ПОСРЕДИ коридора: коридор это
+ * прыжок, у него нет «середины», где можно встать.
+ *
+ * Без запрета флот, припарковавшийся на коридорном ребре, после закрытия коридора
+ * оставался бы стоять на ребре, которого в графе больше нет.
+ */
+export function isCorridorEdge(state: GameState, a: PlanetId, b: PlanetId): boolean {
+  return (state.tempLanes ?? []).some((l) => l.addedLink && laneJoins(l, a, b));
+}

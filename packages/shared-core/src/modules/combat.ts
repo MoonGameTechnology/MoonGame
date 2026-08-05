@@ -177,6 +177,15 @@ function assaultPlanet(h: HandlerContext, fleet: Fleet): string | null {
   if (!planet) {
     return 'E_NO_PLANET';
   }
+  // RULES-3. Пустое пространство захватить нельзя, и раньше это правило жило ТОЛЬКО
+  // ниже по течению: приказ проходил, `capturePlanet` молча выходил, и штурм пустоты
+  // был «успешным» приказом без единого последствия. Молчаливый no-op противоречит
+  // fail-secure (инвариант #4) и делает правило неспрашиваемым: `canApply` отвечал
+  // «можно» на то, что заведомо ничего не сделает, поэтому каждый драйвер постоянных
+  // приказов держал СВОЮ копию `isCapturable`, чтобы не сыпать пустыми штурмами.
+  if (!isCapturable(h.ctx.data, planet)) {
+    return 'E_NOT_CAPTURABLE';
+  }
   if (planet.owner === fleet.owner) {
     return 'E_OWN_PLANET';
   }

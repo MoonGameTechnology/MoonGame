@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 2365 зелёных** (54 skip, 201 файл).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 2442 зелёных** (54 skip, 209 файлов).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -38,6 +38,15 @@ Void Dominion — мобильная/браузерная **real-time** (неп�
   Vite-каркас: welcome-экран, живая карта на общем рендер-ките (камера/holoDraw/territory),
   подключение к серверу по `?join=`-диплинку (снапшоты/дельты + приказ движения через
   `action.v1`); полный игровой HUD в shell — впереди, играбельный клиент игроков — `prototype/`.
+  **Контент в браузере (AUD-1):** `gameData.ts`'s `FRAGMENTS` — клиентская копия списка
+  фрагментов — несла 11 позиций из 18; не хватало `modules` и всего геройского слоя
+  (`heroes`/`heroAbilities`/`heroPassives`/`heroSkillTrees`/`heroFittings`) плюс `rewards`.
+  Молчал баг из-за схемы: у каталогов стоит `.default({})`, поэтому неподанный фрагмент
+  превращался в пустой объект, и `shippedGameData()` отдавал ВАЛИДНЫЙ бандл без контента.
+  Починено; сторож `gameData.test.ts` (3 теста) держит три пути регрессии: паритет ключей
+  со списком, снятым с самого `composeGameDataBundle` записывающим ридером (новый фрагмент
+  покрывается сам); запрет `undefined`-значения при живом ключе; запрет пустого
+  record-каталога в собранном бандле (список каталогов выводится из бандла, не перечисляется).
   **Устанавливаемость (CP2.1):** `public/manifest.webmanifest` (`standalone`, тема/фон
   `#03141a`) + иконки 192/512/maskable-512 (сгенерированы из уже существующего
   Android-брендинга `mobile/assets/icon-*.png`, не новый плейсхолдер) + `<link
@@ -65,9 +74,26 @@ Void Dominion — мобильная/браузерная **real-time** (неп�
 ## 2. Архитектура ядра
 
 `createKernel(modules)` компилирует неизменяемое ядро из упорядоченного списка
-модулей (порядок = приоритет, версионируется per-match). Два **чистых** входа:
+модулей (порядок = приоритет, версионируется per-match). Четыре **чистых** входа:
 
 - `applyAction(state, action, ctx)` — применить намерение игрока в `ctx.now`.
+- `canApply(state, action, ctx)` — **RULES-1**, «можно ли?» ЗАРАНЕЕ: код отказа `E_*`
+  или `null`. Это тот же `applyAction` с выброшенным результатом, поэтому второго
+  описания правил не появляется ПО ПОСТРОЕНИЮ. Спрашивают интерфейс (гасит кнопку и
+  называет причину) и автоматика (не издаёт заведомо отвергаемый приказ). Границы:
+  это вопрос ПРАВИЛ ИГРЫ — сессия/`clientSeq`/идемпотентность живут в `action-layer`;
+  клиент под туманом отвечает по своей проекции, авторитет остаётся у сервера.
+  Прототип зовёт через `canOrder(state, action)` (`protoKernel.ts`) с памятью ответов
+  по идентичности состояния — она корректна ровно из-за инварианта неизменяемости.
+- `canApplyAll(state, actions, ctx)` — **RULES-3**, тот же вопрос про СВЯЗКУ приказов:
+  первый код отказа или `null`. Каждый следующий приказ спрашивается по черновику,
+  который оставили предыдущие; состояние вызывающего не меняется. Нужен автоматике,
+  которая издаёт не одиночные приказы, а пары: авто-штурм — это «встать на низкую
+  орбиту → штурм», и спросить про него можно только целиком (про один штурм ответом
+  будет `E_WRONG_ORBIT` — орбита ещё не выставлена; про одну орбиту — «можно», после
+  чего применится половина обречённой пары). Зовут: прототип — `canOrderAll`
+  (`protoKernel.ts`, без памяти — спрашивают драйверы раз в тик, не рендер),
+  сервер — `MatchRoom.canApplyAll(state, actions, now)`.
 - `advanceTo(state, ctx)` — продвинуть мировые часы до `ctx.now`: исполняет
   запланированные события в порядке `(at, seq)` и эмитит непрерывные спаны
   `time.advanced {from,to}` (накопление по формуле, а не по тикам).
@@ -76,6 +102,13 @@ Void Dominion — мобильная/браузерная **real-time** (неп�
   (`partial:true`), а не выбрасывает работу — комната догоняет чанками и детектит
   same-instant runaway (стойло), драйверы делают backoff (отказоустойчивость,
   `infra-sizing-roadmap.md` блокер #3).
+- `runUntil(kernel, state, ctx, opts?)` (AUD-5) — **не третий вход ядра, а общая копия
+  цикла** «звать `advanceTo`, пока `partial:true` и часы двигаются». Раньше этот цикл был
+  переписан от руки трижды (`MatchRoom.computeAdvance`, `protoKernel.advance`,
+  `replay.ts`). Отдаёт `{ok, state, events, failures}` либо стабильный код:
+  `E_ADVANCE_STUCK` (частичный проход без движения часов — стойло) и `E_ADVANCE_BUDGET`
+  (исчерпан необязательный `maxChunks`; без него цикл не ограничен). Переведён пока
+  только `replay.ts`; `MatchRoom` оставлен как есть — там на пути `observe`-хуки.
 
   **Оптимизация:** `scheduled` поддерживается в отсортированном порядке `(at, seq)` —
   вставка через binary search (`O(log N)`), извлечение ближайшего события `O(1)` вместо
@@ -116,9 +149,9 @@ packages/action-layer/src/
   examples/      skirmish.test.ts (демо-сценарий + SVG)
   index.ts       баррель (экспорт публичного API)
 data/            manifest, resources, units, buildings, factions, events, sectors, sectorKinds, planetTypes, technologies, scientists, rewards, heroes, heroAbilities, heroFittings, heroPassives, heroSkillTrees, modules, medals, dropTables, starterArsenal (.json)
-localization/    ВЕСЬ текст для игрока: index.ts (LOCALES/DEFAULT_LOCALE/dataKey), ru.ts, en.ts (плоские карты ключ→текст, 1558 ключей), runtime.ts (ОДИН на прототип и клиент: t/tData/lookup/hasKey/setLocale/localizeStaticDom, LOC-5) + runtime.test.ts. Мост старых msgid снят вместе с LOC-2 — в коде только ключи
+localization/    ВЕСЬ текст для игрока: index.ts (LOCALES/DEFAULT_LOCALE/dataKey), ru.ts, en.ts (плоские карты ключ→текст, 1553 ключа), runtime.ts (ОДИН на прототип и клиент: t/tData/lookup/hasKey/setLocale/localizeStaticDom, LOC-5) + runtime.test.ts. Мост старых msgid снят вместе с LOC-2 — в коде только ключи
 docs/            architecture, modulesystem, roadmap, deep-technical-roadmap, multiplayer, engineering-risks, gdd, metagame, state(этот)
-prototype/       src/game.ts (чистый index-фасад реэкспортов, REFP-28: 5289→207 строк, логики нет), src/prototypeData.ts, src/map.ts, src/fleetStacks.ts, src/tax.ts, src/botFavour.ts, src/squadron.ts, src/chain.ts, src/hunger.ts, src/botDiplomacy.ts, src/sessionMarket.ts, src/capital.ts, src/fleetLaunch.ts, src/standingOrders.ts, src/forcedMarch.ts, src/instantRepair.ts, src/econScrews.ts, src/economy.ts, src/matchSetup.ts, src/actions.ts, src/patrol.ts, src/serverDrivers.ts, src/protoKernel.ts, src/stewardGuard.ts, src/ai.ts, src/time.ts (вынесены из game.ts; Block REFP закрыт 28/28, обратных рёбер на фасад ноль), src/main.ts (UI), src/format.ts (презентационные форматтеры, REFM-2), src/icons.ts (словарь иконок, REFM-3), src/dossiers.ts + src/buildQueue.ts (досье объектов и кодекс + словарь очереди стройки, REFM-4), src/arsenalScreen.ts (витрина «Арсенал», REFM-5), src/marketScreen.ts (окно рынка, REFM-6), src/stewardScreen.ts (окно «Хранителя», REFM-7), src/techTree.ts (дерево технологий, REFM-9), src/profileScreen.ts (профиль командира, REFM-10), src/corpScreen.ts (корпоративный кабинет, REFM-11), src/chatWindow.ts (плавающее окно чата, REFM-12), src/shipyard.ts (окно «Верфь», REFM-13), src/heroStaff.ts (штаб героев, REFM-14), src/conversations.ts (вкладка сообщений, REFM-15), src/sciPick.ts (выбор совета учёных, REFM-16), src/resourceCard.ts (карточка ресурса, RC-1), src/troopsMenu.ts (модель и разметка ⇅-меню десанта, GRND-1), src/chainPlanner.ts (модель режима «Приказ», CHAIN-UX), src/sound.ts (синтезированные звуки интерфейса, SND-1), src/hudDock.ts (низ экрана: видимость листа в прицельных режимах + привязка ряда команд к листу, HUD-DOCK), src/backLayers.ts (лестница слоёв Android-Back/Escape + опись всех оверлеев, BACK-1), src/smoke.ts, tsconfig.json (REFM-0: typecheck в гейте), build.mjs, uitest.mjs, dist/ (артефакт, в .gitignore)```
+prototype/       src/game.ts (чистый index-фасад реэкспортов, REFP-28: 5289→207 строк, логики нет), src/prototypeData.ts, src/map.ts, src/fleetStacks.ts, src/tax.ts, src/botFavour.ts, src/squadron.ts, src/chain.ts, src/hunger.ts, src/botDiplomacy.ts, src/sessionMarket.ts, src/capital.ts, src/fleetLaunch.ts, src/standingOrders.ts, src/forcedMarch.ts, src/instantRepair.ts, src/econScrews.ts, src/economy.ts, src/matchSetup.ts, src/actions.ts, src/patrol.ts, src/serverDrivers.ts, src/protoKernel.ts, src/stewardGuard.ts, src/ai.ts, src/time.ts (вынесены из game.ts; Block REFP закрыт 28/28, обратных рёбер на фасад ноль), src/main.ts (UI), src/format.ts (презентационные форматтеры, REFM-2), src/icons.ts (словарь иконок, REFM-3), src/dossiers.ts + src/buildQueue.ts (досье объектов и кодекс + словарь очереди стройки, REFM-4), src/arsenalScreen.ts (витрина «Арсенал», REFM-5), src/marketScreen.ts (окно рынка, REFM-6), src/stewardScreen.ts (окно «Хранителя», REFM-7), src/techTree.ts (дерево технологий, REFM-9), src/profileScreen.ts (профиль командира, REFM-10), src/corpScreen.ts (корпоративный кабинет, REFM-11), src/chatWindow.ts (плавающее окно чата, REFM-12), src/shipyard.ts (окно «Верфь», REFM-13), src/heroStaff.ts (штаб героев, REFM-14), src/conversations.ts (вкладка сообщений, REFM-15), src/sciPick.ts (выбор совета учёных, REFM-18), src/resourceCard.ts (карточка ресурса, RC-1), src/troopsMenu.ts (модель и разметка ⇅-меню десанта, GRND-1), src/chainPlanner.ts (модель режима «Приказ», CHAIN-UX), src/sound.ts (синтезированные звуки интерфейса, SND-1), src/hudDock.ts (низ экрана: видимость листа в прицельных режимах + привязка ряда команд к листу, HUD-DOCK), src/backLayers.ts (лестница слоёв Android-Back/Escape + опись всех оверлеев, BACK-1), src/markerTail.ts (геометрия хвоста маркера флота), src/smoke.ts, tsconfig.json (REFM-0: typecheck в гейте), build.mjs, uitest.mjs, dist/ (артефакт, в .gitignore)```
 ## 4. Модель состояния (`GameState`)
 
 - `version {data, manifest}`, `time`, `rng`.
@@ -185,7 +218,17 @@ prototype/       src/game.ts (чистый index-фасад реэкспорто
   у него `alliance`), поэтому союзник видит миры/контент/флоты/бои глазами союзника. Это
   ПРЯМОЕ соседство, а не клика победы и не связная компонента: делёжка попарная, так что
   при A–B и B–C (A–C война) B видит обе стороны, а A и C — ничего друг о друге (компонента
-  утекла бы картой A её врагу через B). `pact`/`peace` разведку НЕ делят. Делится только
+  утекла бы картой A её врагу через B). **MAPSHARE-1:** карту делит ещё и отдельный
+  ДОГОВОР `state.mapShares` — он ортогонален лестнице стоек (заключают и при мире, и при
+  пакте), даёт ровно два права (общая разведка + чужой десант на свою землю через
+  `army.unload`) и НЕ делает союзниками: `stanceToRelation` не трогается, в коалицию для
+  победы участники не объединяются. Заключается по взаимному согласию (тот же
+  consent-протокол, что смягчение стойки: `diplomacy.mapshare {target, on}` — первое
+  согласие кладёт предложение, встречное коммитит), расторгается односторонне и рвётся
+  сам при объявлении войны. Сам договор ПУБЛИЧЕН (как стойка), предложения — приватны
+  для двоих (`mapShareOffers`, режется проекцией). Коды: `E_ALREADY_SHARED`,
+  `E_ALREADY_OFFERED`, `E_NO_MAPSHARE`, `E_FORBIDDEN` (при войне), `E_NO_PLAYER`.
+  Сами по себе `pact`/`peace` разведку НЕ делят. Делится только
   КАРТА: казна/техи/герои/приказы союзника остаются приватными (`project` по-прежнему
   режет по `viewerId`). Одна точка — `coverageFor`, поэтому общая видимость одинаково
   работает в проекции, памяти тумана (`visibilityModule`), фильтре событий broadcast'а
@@ -389,7 +432,9 @@ game-vision-roadmap.md — пассивный почасовой доход ми
 через хук `economy.production`, где `n` — число обитаемых миров владельца; ставка
 **TAX_PER_HOUR=20** делится на `(1 + 0.06·(n−1))` — налог с одного мира падает по
 мере роста империи, но суммарный доход всё равно растёт (сублинейно, не даёт снежному
-кому). Здание `tax_office` умножает ВЕСЬ кредитный доход мира (produces+baseOutput+
+кому). **RULES-2:** прибавка здания больше не константа `TAX_OFFICE_BONUS` с проверкой
+по id в коде — её объявляет само здание полем `creditsBonus` (суммируется по всем
+постройкам мира, уровень учитывается). Здание `tax_office` умножает ВЕСЬ кредитный доход мира (produces+baseOutput+
 налог) на ×1.25. Регистрация в `DEV_MODULES` (`scenario.ts`) — сразу после
 `planetTypeModule`, до `economyModule` (тот же относительный порядок, что в
 прототипном `MODULES`). Порт прототипной `taxModule`/`civicTax` (`prototype/src/
@@ -419,7 +464,14 @@ tax_office/без модуля).
 dayGate·MS_PER_DAY`, совпадает с «Day N» матч-браузера) **И** выполнены все
 `conditions`. Условия — курируемый каталог (`own_sectors` / `has_building` /
 `controls_planet_type` / `has_unit` с count-порогом `min`; `has_scientist
-{branch?, minLevel?}` — учёный), диспетч по `type`, fail-secure на неизвестный тип. Коды: `E_BAD_PAYLOAD, E_FORBIDDEN, E_UNKNOWN_TECHNOLOGY,
+{branch?, minLevel?}` — учёный), диспетч по `type`, fail-secure на неизвестный тип.
+**RULES-4:** сам предикат одного условия — `conditionMet(cond, state, playerId, data)` —
+тоже экспортируется, потому что дереву технологий надо рисовать галочку у КАЖДОЙ строки
+требований, а `technologyLock` отвечает только про узел целиком. Клиентская копия этого
+перебора снята: она покрывала 2 типа из 5, то есть узел с `has_building` /
+`controls_planet_type` / `has_unit` читался бы как запертый навсегда, хотя ядро
+исследование разрешает (в живом каталоге таких условий нет — баг был латентным).
+Коды: `E_BAD_PAYLOAD, E_FORBIDDEN, E_UNKNOWN_TECHNOLOGY,
 E_ALREADY_RESEARCHED, E_RESEARCH_SLOTS_FULL, E_PREREQUISITE, E_TOO_EARLY,
 E_CONDITIONS_UNMET, E_INSUFFICIENT`.
 
@@ -508,7 +560,12 @@ INSTEAD-of-фокус — opportunity-cost (лидер-«+слот» branchless)
 - Действие **`fleet.assault`** — стоя **на орбите**: штурм гарнизона десантом
   (`landing`) или оккупация необоронённого враждебного мира. Победа десанта →
   `capturePlanet` (десант становится гарнизоном, `planet.captured`). Коды:
-  `E_WRONG_ORBIT, E_ORBIT_CONTESTED, E_NO_TROOPS, E_OWN_PLANET, E_NO_PLANET, E_FLEET_BUSY,…`.
+  `E_WRONG_ORBIT, E_ORBIT_CONTESTED, E_NO_TROOPS, E_OWN_PLANET, E_NO_PLANET, E_FLEET_BUSY,
+  E_NOT_CAPTURABLE,…`. **RULES-3:** незахватываемая цель (пустота) теперь отбивается
+  кодом на входе, а не «успешно» ничего не делает — раньше приказ проходил, а
+  `capturePlanet` молча выходил по `isCapturable`, и правило было неспрашиваемым
+  (`canApply` отвечал «можно» на заведомо пустой приказ), из-за чего каждый драйвер
+  постоянных приказов держал свою копию проверки.
 - Действие **`fleet.bombard {on}`** — тумблер бомбардировки (стоя на орбите,
   враждебный мир, есть корабли; `E_NO_SHIPS`).
 - На `time.advanced` — **орбитальный тик** (`runOrbital`): (а) **ПВО** —
@@ -558,8 +615,11 @@ INSTEAD-of-фокус — opportunity-cost (лидер-«+слот» branchless)
 
 - Действия **`building.construct`**, **`building.upgrade`**, **`unit.build
 {count}`** — оплата вперёд из казны, отложенное завершение через
-  `construction.complete` (`buildTimeHours`×timeScale). Одно здание каждого типа
-  на планету; юниты идут в гарнизон. Коды: `E_BAD_PAYLOAD, E_NO_PLANET,
+  `construction.complete` (`buildTimeHours`×timeScale). Сколько экземпляров здания
+  может стоять на мире, объявляет каталог полем **`maxPerPlanet`** (дефолт 1 — «одно
+  каждого типа, уровень растят улучшением»; RULES-2: раньше это была строка в редьюсере,
+  причём в ТРЁХ местах: заказ, возобновление паузы и обработчик `construction.complete`
+  — последний барьер против дубля завершения); юниты идут в гарнизон. Коды: `E_BAD_PAYLOAD, E_NO_PLANET,
 E_FORBIDDEN, E_UNKNOWN_BUILDING/UNIT, E_ALREADY_BUILT, E_ALREADY_QUEUED,
 E_NO_BUILDING, E_MAX_LEVEL, E_INSUFFICIENT, E_BOMBARDED, E_WRONG_SECTOR,
 E_NO_SHIPYARD`.
@@ -627,6 +687,20 @@ E_NO_PLANET, E_NOT_EMPTY, E_FORBIDDEN, E_NO_ANCHOR, E_INSUFFICIENT`. Событ�
 ПВО) грузить нельзя (`E_IMMOBILE`). Коды: `E_NO_CAPACITY, E_NO_ARMY, E_NOT_GROUND,
 E_IMMOBILE, E_FLEET_BUSY, E_FORBIDDEN, E_NO_PLANET, E_UNKNOWN_UNIT, E_BAD_PAYLOAD`.
 События `army.loaded/unloaded`.
+
+**ALLY-LAND — куда можно высаживаться.** У погрузки и высадки правила РАЗНЫЕ, поэтому
+владельца мира проверяет каждое действие само, а не общий `resolve`:
+- **`army.load` — только свой мир.** Союзный гарнизон не твой ресурс: иначе «помощь»
+  превращалась бы в вывоз чужой обороны. Идущий наземный бой погрузку запирает
+  (`E_UNDER_ASSAULT`) — иначе защитник уплыл бы небитым, уклонившись от размена.
+- **`army.unload` — свой мир, мир СОЮЗНИКА (`alliance` = коалиция) и мир того, с кем
+  заключён ОБМЕН КАРТАМИ (`state.mapShares`, MAPSHARE-1).** Оба права даны по взаимному
+  согласию, поэтому чужие войска никого не пускают молча; мир/пакт без договора закрыт.
+  Идущий бой высадку НЕ запирает — подкрепление осаждённого союзника и есть главный
+  сценарий, а ссылка защитника (`kind: 'garrison'`) адресует мир, а не снимок стеков,
+  так что подошедшие войска считаются со следующего раунда.
+Союзность спрашивается через `isAllied(h, a, b)` (`util/combat.ts`) — тот же путь, что
+у `isHostile`: capability `diplomacy`, а без модуля дипломатии честное чтение D1-стойки.
 
 **Общий запрос:** `isBombarded(state, planetId)` / `bombardedPlanets(state)` (`state/orbit.ts`) —
 есть ли враждебный бомбящий флот на near; используют economy и construction.
@@ -709,6 +783,20 @@ standingOrderDriver.ts` (`autoAssaultActions`/`patrolActions`/`standingOrderTick
 способности героя), это отдельный, более крупный follow-up. Ни один из портированных
 драйверов не завязан на ИИ/бота — чистые функции над явным состоянием, применяемые
 предсказуемо через `submitServerAction`.
+
+**RULES-3 — авто-штурм спрашивает ядро, а не переписывает правила.** Оба драйвера
+(`packages/server/src/standingOrderDriver.ts` и прототипный
+`prototype/src/serverDrivers.ts`) больше не повторяют условия штурма своими словами:
+захватываемость, владельца, дипломатию, чужой флот на узле, наличие десанта и уже
+идущий наземный бой называет ядро через `canApplyAll` — тем же кодом, каким отбило бы
+сам приказ. Серверный драйвер получает пробу параметром (`probe`, из `MatchRoom`) и
+делает это НЕ опционально: дефолт «нет ядра — решай сам» вернул бы вторую копию правил
+через чёрный ход. Флаг игрока (`state.autoAssault`) остаётся местной политикой — это
+согласие, а не правило. Что это починило: рукописные условия не знали `E_NO_TROOPS` и
+`E_UNDER_ASSAULT`, поэтому драйвер выдавал обречённую пару каждое пробуждение, а её
+первая половина (орбита) успевала примениться. Заодно у прототипного драйвера обход
+флагов стал сортированным — несортированный делал ПОРЯДОК выдачи приказов зависимым от
+порядка ключей JSONB, то есть от хоста и гибернации (инвариант №6).
 
 - **`order.auto {fleetId, on}`** — взводит/снимает флаг `state.autoAssault[fleetId]`
   (авто-штурм при простое у враждебного мира). Коды: `E_NO_FLEET, E_BAD_PAYLOAD`.
@@ -1060,7 +1148,14 @@ ad-hoc запрос «видим ли объект на identify-уровне» 
 дельты** от `visibleState` (своя базовая линия на игрока) + сигнатуры/`remembered`
 отдельными полями; **события тоже фильтруются** по видимости (`eventVisibleTo`). e2e:
 на dev-карте green не видит флот red и `red_1` **не появляется по проводу** ни в стейте,
-ни в событиях. **Дальше:** AOI-оптимизация, JWT в рукопожатии (F7).
+ни в событиях. **Контракт роутинга закреплён тестом (AUD-2):** `eventVisibleTo` адресует
+события по ИМЕНАМ ключей payload — соглашению без схемы, — поэтому
+`packages/server/src/eventFogContract.test.ts` статически разбирает все 79 нетестовых
+`emit()` в `shared-core/src/modules/**` и требует хотя бы один маршрутизируемый ключ:
+`time.advanced`/`match.*` освобождены, `hero.*` требует именно `owner` (короткое
+замыкание срабатывает до списка адресатов), ключи из условного спреда не в счёт.
+Тест сразу нашёл живое: `hero.path.expired` эмитился без `owner` и не доходил НИ ДО КОГО,
+включая владельца героя — починено. **Дальше:** AOI-оптимизация, JWT в рукопожатии (F7).
 
 **Реестр матчей / мета-шелл (`packages/server/MatchRegistry`, первый кирпич MM-0.1).**
 Мульти-матч реестр поверх `MatchRoom` + **мета-запись рядом с матчем** (`MatchMeta`:
@@ -1080,6 +1175,14 @@ ad-hoc запрос «видим ли объект на identify-уровне» 
 индексирован), лобби/создание матча (MM-1.1).
 
 ## 6. Данные (`data/*.json`, версия `0.1.3`)
+
+> **RULES-2 — правила про КОНТЕНТ живут здесь, а не в коде.** Поля-правила у зданий:
+> `maxPerPlanet` (лимит экземпляров на мире, дефолт 1) и `creditsBonus` (доля прибавки ко
+> всему кредитному доходу мира). Оба заменили зашитые в модулях условия и константу с
+> именем конкретного здания. Сторож — не «поле существует», а «поведение следует числу»:
+> тесты меняют объявленное значение и требуют, чтобы игра его исполнила, иначе данные
+> превратятся в украшение. Константы АЛГОРИТМА и глобальный тюнинг механик остаются в
+> коде до отдельного кирпича.
 
 - **resources:** `credits` (деньги), `metal`, `food`, `energy`, `microelectronics` —
   внутриматчевый набор из 5. Торгуются на сессионной бирже (модуль `market`).
@@ -1832,7 +1935,9 @@ pnpm run prototype   # собрать prototype/dist/void-dominion{,-player}.htm
 Гейт зеркалится в CI (`ci.yml`), рядом идут `security.yml` (набор сканеров; блокирующие
 — Semgrep, Gitleaks, OSV, Trivy fs/image; с SEC-10 ещё и еженедельный ре-скан `main` по
 крону — прод крутит пиненный образ дольше, чем живут ленты CVE), `android.yml` (APK),
-`image.yml` (SEC-13: сборка → блокирующий Trivy → GHCR → подпись cosign по дайджесту) и
+`image.yml` (SEC-13: сборка → блокирующий Trivy → блокирующий смоук «образ стартует» →
+GHCR → подпись cosign по дайджесту; смоук — SEC-17, потому что сканеры читают файловую
+систему образа и ни один его не запускает, так что мёртвый образ сканируется начисто) и
 `automerge.yml` (ставит зелёный PR в merge queue). Про последний важно, что он делает
 **не** «Enable auto-merge»: под очередью эта кнопка не работает — она зовёт
 `enablePullRequestAutoMerge`, тогда как «Merge when ready» зовёт совсем другую мутацию,

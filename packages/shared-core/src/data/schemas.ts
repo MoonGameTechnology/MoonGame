@@ -173,6 +173,9 @@ export const BuildingLevelSchema = z.object({
   /** Anti-ship orbital-AA firepower this level fires per game hour at a hostile fleet on the
    *  near orbit (an emplacement building). Summed alongside garrison `aaDamage` in combat. */
   aaDamage: z.number().nonnegative().default(0),
+  /** Доля, на которую здание поднимает ВЕСЬ кредитный доход своего мира на этом
+   *  уровне (0.25 = +25%). См. одноимённое поле в `BuildingDefSchema`. */
+  creditsBonus: z.number().default(0),
 });
 
 export const BuildingDefSchema = z.object({
@@ -210,6 +213,34 @@ export const BuildingDefSchema = z.object({
    *  at least one standing (undestroyed) building with this flag to build any
    *  space-domain unit (`unit.build`). Not per-level: the capability doesn't scale. */
   enablesShipConstruction: z.boolean().default(false),
+  /** RULES-2. Сколько экземпляров этого здания может стоять на ОДНОМ мире.
+   *
+   *  Правило «одно здание такого типа на мир, уровень растят улучшением» жило
+   *  СТРОКОЙ в редьюсере (`planet.buildings.some(...)`, причём в ТРЁХ местах: заказ,
+   *  возобновление паузы и обработчик завершения) — в данных о нём не было ни слова,
+   *  и прочитать «правила игры» было негде. Дефолт `1` сохраняет прежнее поведение
+   *  для всего каталога; здание, которому можно стоять в нескольких экземплярах,
+   *  объявляет это числом, а не правкой ядра.
+   *
+   *  ВНИМАНИЕ, прежде чем объявить здесь число > 1. Стройка второго экземпляра уже
+   *  работает сквозняком (заказ → оплата → завершение), а вот УЛУЧШЕНИЕ — нет:
+   *  у `BuildingInstance` нет идентификатора, и `building.upgrade` адресует здание
+   *  ТИПОМ (`buildings.find(b => b.type === …)`). При двух экземплярах улучшение
+   *  всегда садится на первый, второй поднять нечем, а оплаченный апгрейд может
+   *  молча пропасть, если первый найденный экземпляр не того уровня. Меню стройки
+   *  прототипа второй экземпляр к тому же вовсе не показывает. Поэтому сегодня во
+   *  всём каталоге стоит дефолт 1; полноценная поддержка — отдельный кирпич
+   *  (адресация экземпляра + меню + локальная очередь + бот), см. `docs/backlog.md`. */
+  maxPerPlanet: z.number().int().positive().default(1),
+  /** RULES-2. Доля, на которую здание поднимает ВЕСЬ кредитный доход своего мира
+   *  (0.25 = +25%).
+   *
+   *  Раньше это правило звучало как константа `TAX_OFFICE_BONUS` плюс проверка по
+   *  ИДЕНТИФИКАТОРУ здания прямо в модуле налога — и в трёх копиях (ядро, налоговый
+   *  модуль прототипа, его же экономика). Причём здания `tax_office` в поставляемом
+   *  `data/buildings.json` нет вовсе: ядро знало про контент, которого у него не было.
+   *  Теперь эффект объявляет само здание, как уже объявляет `produces`/`radarRange`. */
+  creditsBonus: z.number().default(0),
 });
 
 /**
@@ -666,8 +697,8 @@ export type GameData = z.infer<typeof GameDataSchema>;
  *  levels 2..N come from `upgrades`. Out-of-range levels fall back to level 1. */
 export function buildingLevel(def: BuildingDef, level: number): BuildingLevel {
   if (level <= 1) {
-    const { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage } = def;
-    return { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage };
+    const { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage, creditsBonus } = def;
+    return { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage, creditsBonus };
   }
   return def.upgrades[level - 2] ?? buildingLevel(def, 1);
 }

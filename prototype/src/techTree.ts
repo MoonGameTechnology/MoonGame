@@ -4,14 +4,15 @@
  * button.
  *
  * The rules live in the core (`technologyModule` / `technologyLock` decides what may
- * start); everything here is a READ of that truth plus the layout map. The client-side
- * `techCondOk` is deliberately optimistic-free: unknown condition types read as locked,
- * because the reducer checks them for real anyway (fail-secure).
+ * start); everything here is a READ of that truth plus the layout map. `techCondOk`
+ * форвардит вопрос в ядро (`conditionMet`) — своей копии перебора условий здесь нет
+ * (RULES-4); неизвестный тип условия ядро считает невыполненным (fail-secure).
  *
  * Same REFM shape as the other screens: the markup is pure (`techTreeHtml`), the shared
  * label helpers are plain exports (the scientist-council picker imports `branchLabel`),
  * and only `initTechTree(host)` touches the host, through explicit hooks.
  */
+import { conditionMet } from '../../packages/shared-core/src/index';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { data } from './prototypeData';
@@ -118,24 +119,15 @@ export function techCondText(c: TechCond): string {
       return t('tech.req.special');
   }
 }
-// Клиентская проверка — только для подсветки узла; финальную правду говорит ядро
-// (technologyLock, fail-secure). Типы, которых нет в живых данных, честно показываем
-// закрытыми — reducer их всё равно проверит сам.
+/** Выполнено ли ОДНО условие узла — для галочки в строке требований. Финальную правду
+ *  про весь узел по-прежнему говорит `technologyLock` в ядре. */
 export function techCondOk(state: GameState, me: string, c: TechCond): boolean {
-  const seat = state.players[me];
-  switch (c.type) {
-    case 'has_scientist':
-      return (seat?.scientists ?? []).some((sc) => {
-        const def = data.scientists[sc.id];
-        return (
-          !!def && (!c.branch || def.branch === c.branch) && (sc.level ?? 1) >= (c.minLevel ?? 1)
-        );
-      });
-    case 'own_sectors':
-      return Object.values(state.planets).filter((p) => p.owner === me).length >= c.min;
-    default:
-      return false;
-  }
+  // RULES-4: правило «выполнено ли условие» живёт в ядре и спрашивается, а не
+  // переписывается. Прежняя копия перебирала 2 типа из 5 и на остальных возвращала
+  // false — узел с условием `has_building` / `controls_planet_type` / `has_unit`
+  // читался бы как запертый НАВСЕГДА, хотя ядро исследование разрешает. Fail-secure
+  // при этом не ослаблен: неизвестный тип ядро тоже считает невыполненным.
+  return conditionMet(c as Parameters<typeof conditionMet>[0], state, me, data);
 }
 /** «+10% производство · открывает: Fort» — эффекты и анлоки узла одной строкой. */
 export function techFx(td: TechDefLike): string {
@@ -358,18 +350,36 @@ export function initTechTree(host: TechHost): {
 } {
   let tab = 'space'; // активная вкладка-ветка
   let modalId: string | null = null; // открытое досье узла
+  // Появление досье анимируется одноразовым классом .pop: живой 500мс-ререндер окна
+  // пересоздаёт DOM, и анимация на самом .tt-mwin переигрывалась бы каждый тик —
+  // досье «схлопывалось и выпрыгивало» дважды в секунду (баг живого плейтеста).
+  let modalPop = false;
+  // Кэш разметки в духе lastCmdHtml/lastPanelHtml из main.ts: одинаковую строку не
+  // переприсваиваем — innerHTML пересоздаёт DOM даже на идентичном тексте (и выбивал
+  // бы элемент из-под пальца между touchstart и click).
+  let lastHtml = '';
 
   function repaint(): void {
     const body = host.body();
-    // A live re-render (innerHTML) would reset the panel's scroll — save and restore it.
-    const before = body.querySelector('.tt-scroll');
-    const sx = before?.scrollLeft ?? 0;
-    const sy = before?.scrollTop ?? 0;
-    body.innerHTML = techTreeHtml(host.state(), host.me(), tab, modalId);
-    const after = body.querySelector('.tt-scroll');
-    if (after) {
-      after.scrollLeft = sx;
-      after.scrollTop = sy;
+    const html = techTreeHtml(host.state(), host.me(), tab, modalId);
+    if (html !== lastHtml) {
+      // A live re-render (innerHTML) would reset the panel's scroll — save and restore it.
+      const before = body.querySelector('.tt-scroll');
+      const sx = before?.scrollLeft ?? 0;
+      const sy = before?.scrollTop ?? 0;
+      body.innerHTML = html;
+      lastHtml = html;
+      const after = body.querySelector('.tt-scroll');
+      if (after) {
+        after.scrollLeft = sx;
+        after.scrollTop = sy;
+      }
+    }
+    if (modalPop) {
+      // Класс мутирует DOM, но кэш сравнивает СТРОКУ разметки, а не живой DOM —
+      // .pop не делает кэш вечно «грязным».
+      body.querySelector('.tt-mwin')?.classList.add('pop');
+      modalPop = false;
     }
   }
 
@@ -403,6 +413,7 @@ export function initTechTree(host: TechHost): {
     const node = (tg.closest('.tt-node') as HTMLElement | null)?.dataset.tech;
     if (node) {
       modalId = node;
+      modalPop = true; // реальное открытие досье — единственный случай с анимацией
       repaint();
     }
   });

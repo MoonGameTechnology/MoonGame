@@ -130,3 +130,52 @@ export function order(state: GameState, action: Action, now: number): StepOut {
   if (!r.ok) return { state: advanced.state, events: advanced.events, error: r.code };
   return { state: r.state, events: [...advanced.events, ...r.events] };
 }
+
+/**
+ * RULES-1 — «можно ли?» по правилам игры: код отказа (`E_*`) или `null`.
+ *
+ * Тот же вердикт, что вернул бы `order()`, но без применения — и БЕЗ второго описания
+ * правил: под капотом `kernel.canApply`, то есть буквально те же обработчики модулей.
+ * Спрашивают отсюда интерфейс (гасит кнопку и печатает причину) и автоматика
+ * (покадровые циклы, драйверы), чтобы не издавать заведомо отвергаемый приказ.
+ *
+ * Спрашивается на `state.time`, а не на «сейчас»: вопрос про МИР В ЕГО ЧАСЕ. Спросить
+ * на будущем `now` значило бы сперва прокрутить время (advance) — то есть изменить мир
+ * ради вопроса, чего проба делать не должна. Гейты `E_TIME_*` при этом заведомо чисты.
+ */
+export function canOrder(state: GameState, action: Action): string | null {
+  // Память ответов на ОДНО состояние. Ключ — сам объект состояния: `GameState`
+  // неизменяем по инварианту №2 (редьюсер возвращает новый объект, а не правит старый),
+  // поэтому «другой мир» — это всегда другая ссылка, и устареть ответ не может.
+  // Без памяти проба стоила бы дорого не из-за себя, а из-за частоты: панель собирает
+  // HTML каждый кадр (dirty-check сравнивает уже готовую строку), и меню стройки
+  // спрашивало бы ядро семь раз в кадр — ~2 мс, 12% бюджета, за один только серый цвет.
+  if (memoState !== state) {
+    memoState = state;
+    memo.clear();
+  }
+  const key = `${action.playerId} ${action.type} ${JSON.stringify(action.payload)}`;
+  const hit = memo.get(key);
+  if (hit !== undefined) return hit;
+  const verdict = kernel.canApply(state, action, ctx(state.time));
+  memo.set(key, verdict);
+  return verdict;
+}
+let memoState: GameState | null = null;
+const memo = new Map<string, string | null>();
+
+/**
+ * RULES-3 — «прошла бы вся СВЯЗКА приказов?»: первый код отказа или `null`.
+ *
+ * Тот же вопрос, что `canOrder`, но про последовательность — `kernel.canApplyAll`.
+ * Нужен автоматике, которая издаёт связки, а не одиночные приказы: авто-штурм — это
+ * «встать на низкую орбиту → штурм», и спросить можно только про пару целиком. Про
+ * один штурм ответом был бы `E_WRONG_ORBIT` (орбита ещё не выставлена), про одну
+ * орбиту — «можно», после чего применилась бы половина обречённой связки.
+ *
+ * Без памяти: связки спрашивают драйверы (раз в тик), а не покадровый рендер, и ключ
+ * по массиву действий стоил бы дороже самой пробы.
+ */
+export function canOrderAll(state: GameState, actions: readonly Action[]): string | null {
+  return kernel.canApplyAll(state, actions, ctx(state.time));
+}

@@ -85,6 +85,28 @@ export function sideDamage(
   return units ? cappedUnitStat(units, data, stat) : 0;
 }
 
+/**
+ * ALLY-LAND. Союзники ли `a` и `b` — та же дорога, что у {@link isHostile}, только про
+ * другой конец шкалы: спрашиваем capability `diplomacy` (D2 владеет проекцией
+ * стойка→отношение), а без модуля дипломатии честно читаем D1. Себе игрок не союзник:
+ * «свой мир» — отдельное условие у каждого вызывающего, и путать их нельзя.
+ *
+ * В этой модели `alliance` — это И коалиция (`victory.ts` считает коалицией именно
+ * взаимно-союзную клику), И обмен картами (`coverageFor` пулит разведку только по
+ * `alliance`). `pact`/`peace` не делят ни того, ни другого, поэтому союзником здесь
+ * считается ровно `alliance`.
+ */
+export function isAllied(h: HandlerContext, a: string, b: string): boolean {
+  if (a === b) {
+    return false;
+  }
+  const diplomacy = h.capability<DiplomacyCapability>('diplomacy');
+  if (diplomacy) {
+    return diplomacy.getRelation(h.state, a, b) === 'ally';
+  }
+  return getStance(h.state, a, b) === 'alliance';
+}
+
 export function isHostile(h: HandlerContext, a: string, b: string): boolean {
   if (a === b) {
     return false;

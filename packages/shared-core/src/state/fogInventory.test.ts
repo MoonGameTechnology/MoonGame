@@ -65,6 +65,8 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   heroSeq: 'public',
   diplomacy: 'public', // кто с кем воюет — открытое знание
   diplomacyOffers: 'filtered', // а кто с кем ТОРГУЕТСЯ — дело двоих
+  mapShares: 'public', // кто с кем делится картой — тоже открытое знание (MAPSHARE-1)
+  mapShareOffers: 'filtered', // предложение обмена — переговоры двоих
   intel: 'filtered', // кто за кем шпионит — секрет самого шпиона
   market: 'public', // сессионный стакан публичен по замыслу
   marketSeq: 'public',
@@ -259,6 +261,15 @@ function maximalState(): GameState {
     diplomacyOffers: {
       [offerKey(VIEWER, RIVAL)]: 'peace', // зритель — сторона сделки, увидит
       [offerKey(RIVAL, 'CANARY_third')]: 'pact', // чужие переговоры
+    },
+    // MAPSHARE-1: сам договор публичен (как стойка), предложение — дело двоих.
+    // Договор ПУБЛИЧЕН (как стойка), поэтому канареек в нём быть не должно; и он
+    // намеренно между третьими лицами — договор со зрителем открыл бы ему карту
+    // соперника по-настоящему (в этом и смысл механики) и снял бы туман фикстуры.
+    mapShares: { [pairKey('bystanderA', 'bystanderB')]: true },
+    mapShareOffers: {
+      [offerKey(VIEWER, RIVAL)]: true, // зритель — сторона, увидит
+      [offerKey(RIVAL, 'CANARY_third')]: true, // чужие переговоры — вырезаются
     },
     intel: {
       // Своё окно — безобидное (свой же мир), чтобы оно не пробило туман само.

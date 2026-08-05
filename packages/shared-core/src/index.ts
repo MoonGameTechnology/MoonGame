@@ -93,6 +93,11 @@ export {
   getOffer,
   setOffer,
   clearOffers,
+  hasMapShare,
+  setMapShare,
+  hasMapShareOffer,
+  setMapShareOffer,
+  clearMapShareOffers,
   stanceToRelation,
   type DiplomaticRelation,
   type DiplomacyCapability,
@@ -180,7 +185,21 @@ export {
   type AdvanceFailure,
   type ActionIdParts,
 } from './action/types';
-export { isValidActionPayload } from './actions/payloadSchemas';
+// AUD-6: the schema map and the catalog of legal client action types are public now —
+// the boolean alone forced anyone writing a client to deep-import a test-only file.
+export {
+  actionPayloadSchemas,
+  isValidActionPayload,
+  CLIENT_ACTION_TYPES,
+} from './actions/payloadSchemas';
+// AUD-5: the shared "chain partial advances until `ctx.now`" loop.
+export {
+  runUntil,
+  E_ADVANCE_STUCK,
+  E_ADVANCE_BUDGET,
+  type RunUntilOptions,
+  type RunUntilResult,
+} from './kernel/runUntil';
 
 // Microkernel
 export { Kernel, createKernel } from './kernel/kernel';
@@ -347,7 +366,7 @@ export { economyModule, BROWNOUT } from './modules/economy';
 export { movementModule } from './modules/movement';
 export { combatModule } from './modules/combat';
 export { orbitalModule } from './modules/orbital';
-export { artilleryModule } from './modules/artillery';
+export { artilleryModule, artilleryRange } from './modules/artillery';
 export { interceptModule } from './modules/intercept';
 export { captureOnArrivalModule } from './modules/captureOnArrival';
 export { sectorModule } from './modules/sector';
@@ -358,13 +377,13 @@ export {
   isInhabited,
   inhabitedWorldCount,
   TAX_PER_HOUR,
-  TAX_OFFICE_BONUS,
+  creditsBonusOf,
   TAX_DIMINISH,
 } from './modules/tax';
 export { constructionModule } from './modules/construction';
 export { arsenalSyncModule } from './modules/arsenalSync';
 export { stationModule } from './modules/station';
-export { technologyModule, technologyLock } from './modules/technology';
+export { technologyModule, technologyLock, conditionMet } from './modules/technology';
 export { scientistModule } from './modules/scientist';
 export { factionModule } from './modules/faction';
 export { armyModule } from './modules/army';

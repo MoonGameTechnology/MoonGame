@@ -521,6 +521,25 @@ export interface GameState {
    *  `visibleState` strips everyone else's negotiations. Maintained by
    *  `diplomacyModule`; helpers in `state/diplomacy.ts`. */
   diplomacyOffers?: Record<string, DiplomaticStance>;
+  /** MAPSHARE-1. Договоры об ОБМЕНЕ КАРТАМИ, ключ — симметричный `pairKey`.
+   *
+   *  Это НЕ ступень дипломатической лестницы, а отдельное соглашение поверх неё:
+   *  лестница `war→peace→pact→alliance` линейна и задаёт враждебность, а обмен
+   *  картами ортогонален — его заключают и при мире, и при пакте, и он не делает
+   *  участников союзниками. Даёт ровно два права: делится разведкой (`coverageFor`
+   *  пулит покрытие так же, как по `alliance`) и пускает чужой десант на свою землю
+   *  (`army.unload`). НЕ даёт: союзного отношения в бою (`stanceToRelation` не
+   *  трогается) и места в коалиции для победы (`victory.ts` считает только
+   *  взаимно-союзные клики).
+   *
+   *  Заключается по взаимному согласию (тот же consent-протокол, что у смягчения
+   *  стойки), расторгается односторонне и рвётся сам при объявлении войны. Симметричен
+   *  и ПУБЛИЧЕН, как `diplomacy`: кто с кем делится картой — не тайна. */
+  mapShares?: Record<string, true>;
+  /** Стоящие ПРЕДЛОЖЕНИЯ обмена картами, ключ — направленный `offerKey` (`from>to`).
+   *  Приватны для двух сторон, как `diplomacyOffers` — `visibleState` вырезает чужие
+   *  переговоры. */
+  mapShareOffers?: Record<string, true>;
   /** Stolen intel windows per beneficiary (`espionageModule`). PRIVATE: a viewer's
    *  projection carries only their own grants — who spies on whom is never public. */
   intel?: Record<PlayerId, IntelGrant[]>;
@@ -646,6 +665,22 @@ export interface TempLane {
   /** Whether the lane ADDED the `links` edge (vs the nodes were already linked) — so
    *  expiry only removes a link the lane itself created. */
   addedLink: boolean;
+  /** HERO-CORRIDOR — ступень способности, она же ПРАВО ПРОХОДА:
+   *  · `1` — одноразовый: идёт только стак с этим героем, коридор закрывается, как
+   *    только эта армия ПРИБЫЛА (не когда вышла — иначе она летела бы по уже
+   *    закрытому коридору);
+   *  · `2` — временный: то же право прохода, но живёт до `expiresAt`;
+   *  · `3` — общий: по нему двигаются ВСЕ — враг, союзник, свои, нейтральные.
+   *
+   *  Ступени 1–2 держатся ВЕТО ПО РЕБРУ в маршрутизаторе: ребро в графе есть (без него
+   *  не посчитать геометрию), но чужому оно закрыто. Раньше ступени не было вовсе, и
+   *  коридор вёл себя как ступень 3 ДЛЯ ВСЕХ — то есть уже был проходим врагом, просто
+   *  без бонуса скорости. Отсутствие поля читается как `1` (fail-secure: по умолчанию
+   *  коридор ЛИЧНЫЙ, а не общий). */
+  tier?: number;
+  /** Герой, чей это коридор — на ступенях 1–2 право прохода у флота, который его несёт.
+   *  Флот меняется (герой пересаживается), поэтому храним героя, а не флот. */
+  heroId?: string;
 }
 
 /** A player's remembered last-known state of one world (fog-of-war memory). */

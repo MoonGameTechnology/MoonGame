@@ -17,7 +17,11 @@ const data: GameData = parseGameData({
   units: {},
   factions: {},
   buildings: {
-    tax_office: { name: 'Tax Office', cost: {} },
+    // RULES-2: прибавка ОБЪЯВЛЕНА зданием — код её только исполняет.
+    tax_office: { name: 'Tax Office', cost: {}, creditsBonus: 0.25 },
+    // близнец с другим числом: сторож ниже проверяет, что поведение следует ДАННЫМ
+    tax_office_big: { name: 'Grand Exchange', cost: {}, creditsBonus: 1 },
+    plain_hut: { name: 'Hut', cost: {} }, // бонуса не объявляет — значит его нет
   },
   events: {},
   sectorKinds: {
@@ -131,6 +135,36 @@ describe('tax module — economy.production hook (kernel-integrated)', () => {
     const s = stateWith({ a: world('a', 'p1', undefined, [{ type: 'tax_office', level: 1, hp: 0 }]) });
     const r = okAdvance(kernel.advanceTo(s, ctx(HOUR)));
     expect(r.state.players.p1?.resources.credits).toBeCloseTo(TAX_PER_HOUR * 1.25);
+  });
+
+  // --- RULES-2: сторож «данные не врут» --------------------------------------
+  // Правило переехало из константы TAX_OFFICE_BONUS в поле здания. Ценность такого
+  // переезда ровно одна: ПОВЕДЕНИЕ следует объявленному числу. Иначе данные станут
+  // украшением — в json одно, в игре другое, и это хуже, чем честная константа.
+  it('прибавка следует ОБЪЯВЛЕННОМУ числу, а не зашитой константе', () => {
+    const kernel = createKernel([taxModule, economyModule]);
+    const big = stateWith({ a: world('a', 'p1', undefined, [{ type: 'tax_office_big', level: 1, hp: 0 }]) });
+    const r = okAdvance(kernel.advanceTo(big, ctx(HOUR)));
+    expect(r.state.players.p1?.resources.credits).toBeCloseTo(TAX_PER_HOUR * 2); // creditsBonus: 1
+  });
+
+  it('здание без объявленной прибавки её не даёт', () => {
+    const kernel = createKernel([taxModule, economyModule]);
+    const s = stateWith({ a: world('a', 'p1', undefined, [{ type: 'plain_hut', level: 1, hp: 0 }]) });
+    const r = okAdvance(kernel.advanceTo(s, ctx(HOUR)));
+    expect(r.state.players.p1?.resources.credits).toBeCloseTo(TAX_PER_HOUR);
+  });
+
+  it('прибавки нескольких зданий складываются (правило читается со ВСЕХ построек)', () => {
+    const kernel = createKernel([taxModule, economyModule]);
+    const s = stateWith({
+      a: world('a', 'p1', undefined, [
+        { type: 'tax_office', level: 1, hp: 0 },
+        { type: 'tax_office_big', level: 1, hp: 0 },
+      ]),
+    });
+    const r = okAdvance(kernel.advanceTo(s, ctx(HOUR)));
+    expect(r.state.players.p1?.resources.credits).toBeCloseTo(TAX_PER_HOUR * 2.25);
   });
 
   it('without the module, no civic tax accrues (graceful degradation)', () => {

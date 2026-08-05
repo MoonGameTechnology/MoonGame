@@ -19,6 +19,12 @@ name: Security scan
 # kics, dependency-review, dependency-check, zizmor, scorecard, and the `check` job (its
 # blocking twin lives in ci.yml).
 #
+# One BLOCKING check in `trivy-image` is not a scanner at all: the smoke step runs the
+# image it just built and requires /health and / to answer. Every scanner here reads a
+# filesystem; none of them starts what they certify, so an image that dies at boot gets
+# a perfectly clean report. `.github/scripts/smoke-image.sh`, mirrored in image.yml
+# before the push, so an unbootable image can neither merge nor be signed.
+#
 # Each scan job writes a `status-<key>.json` sentinel AFTER the scan with the real
 # exit code / outcome. The summarizer LEADS with a scan-confirmation table built from
 # those sentinels, so a silently-failed scanner is flagged "⚠️ NOT confirmed" instead
@@ -88,6 +94,11 @@ name: Security scan
 # `continue-on-error`, а сами гейты (semgrep/gitleaks/osv/trivy) от прав не зависят.
 on:
   push:
+    # Здесь стояло `branches-ignore: ['gh-readonly-queue/**']` (AUD-9) и возвращено обратно:
+    # с ним очередь встала насмерть — на ветках очереди не запускалось ни одного прогона,
+    # required-чеки не отчитывались, записи выбрасывало по таймауту. Полный разбор — в
+    # шапке `push` в ci.yml. Столкновение push и merge_group теперь разводит ключ
+    # `concurrency` ниже, а не фильтр событий.
     branches: ['**']
   pull_request:
   # Merge queue: очередь собирает временную ветку «свежий main + этот PR» и ждёт на НЕЙ
@@ -103,10 +114,24 @@ on:
   workflow_dispatch:
 
 concurrency:
-  # Ключ по ИМЕНИ ВЕТКИ, а не по github.ref: на pull_request ref выглядит как
-  # refs/pull/N/merge и не схлопнулся бы с прогоном от push той же ветки — вышло бы два
-  # полных прогона сканеров на каждый коммит в PR.
-  group: security-${{ github.head_ref || github.ref }}
+  # ЧТО ЭТОТ КЛЮЧ ДЕЛАЕТ НА САМОМ ДЕЛЕ — и это НЕ то, что тут было написано раньше.
+  # `github.head_ref` пуст везде, кроме `pull_request`. Значит на push ключ равен
+  # `security-refs/heads/foo`, а на PR из той же ветки — `security-foo`. Группы РАЗНЫЕ,
+  # и дубль «push + pull_request» он не гасит: на каждый коммит в PR сканеры бегут
+  # дважды. Прежний комментарий утверждал обратное — исправлен по факту.
+  #
+  # ПОЧЕМУ НЕ СХЛОПЫВАЕМ (`github.ref_name` вместо `github.ref` дал бы совпадение).
+  # Потому что вместе с `cancel-in-progress: true` совпадение означает не «один прогон
+  # вместо двух», а «кто стартовал вторым, гасит первого». Push и synchronize приходят
+  # на один и тот же коммит практически одновременно, порядок не определён — и в части
+  # случаев отменённым окажется ИМЕННО прогон от `pull_request`, тот самый, чей
+  # required-чек читает очередь. Отменённый required-чек она считает провалом и
+  # выбрасывает PR с `CI_FAILURE` при зелёном коде — ровно та авария, которую чинил #464
+  # для `merge_group`. Лишний прогон стоит минут раннера; ложный выброс стоит доверия к
+  # гейту, поэтому размен сознательный, а не «руки не дошли».
+  # Префикс по событию (AUD-9, вторая редакция): на ветке очереди `push` и `merge_group`
+  # давали ОДИН ключ и гасили друг друга — теперь группы разные. Разбор в ci.yml.
+  group: security-${{ github.event_name }}-${{ github.head_ref || github.ref }}
   # На `merge_group` не отменяем — по той же причине, что в `ci.yml`: у всех попыток
   # поставить тот же PR на ту же базу имя ветки очереди совпадает, и повторная постановка
   # гасила бы ещё идущий прогон прошлой записи. Отменённый required-чек очередь считает
@@ -122,7 +147,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -160,7 +185,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -214,7 +239,7 @@ jobs:
       security-events: write
       actions: read
     steps:
-      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -223,6 +248,10 @@ jobs:
       - uses: github/codeql-action/init@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
         with:
           languages: javascript-typescript
+          # Конфиг существует ради ОДНОГО подавления — `js/missing-rate-limiting`,
+          # которое у нас ложное на 100% срабатываний. Разбор, чем закрыт потерянный
+          # охват, и когда подавление снимать — в самом файле, рядом с фильтром.
+          config-file: ./.github/codeql/codeql-config.yml
       - id: cqa
         continue-on-error: true
         uses: github/codeql-action/analyze@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
@@ -254,7 +283,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -303,7 +332,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -342,7 +371,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -392,7 +421,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -441,7 +470,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -450,6 +479,19 @@ jobs:
       - name: build image
         continue-on-error: true
         run: docker build -t void-dominion:scan .
+      # БЛОКИРУЮЩИЙ, и не ради полноты. Trivy читает файловую систему образа и никогда
+      # его не запускает — образ, умирающий на первой секунде, проходит скан идеально
+      # чисто. Живой случай и оба зонда описаны в шапке скрипта.
+      - name: smoke — образ реально стартует и отвечает
+        id: smoke
+        run: |
+          set +e
+          .github/scripts/smoke-image.sh void-dominion:scan
+          rc=$?
+          set -e
+          ok=true; [ "$rc" -eq 0 ] || ok=false
+          echo "{\"key\":\"smoke-image\",\"ok\":$ok,\"exit\":$rc}" > status-smoke-image.json
+          echo "rc=$rc" >> "$GITHUB_OUTPUT"
       - name: trivy image + image SBOM
         id: scan
         run: |
@@ -473,6 +515,7 @@ jobs:
             trivy-image.sarif
             sbom-image.cdx.json
             status-trivy-image.json
+            status-smoke-image.json
           if-no-files-found: warn
       - name: upload to code scanning
         continue-on-error: true
@@ -480,14 +523,21 @@ jobs:
         with:
           sarif_file: trivy-image.sarif
           category: trivy-image
-      - name: gate — blocking on findings or scan failure (SEC-1)
+      - name: gate — blocking on findings, scan failure or a dead image (SEC-1)
         env:
           RC: ${{ steps.scan.outputs.rc }}
+          SMOKE_RC: ${{ steps.smoke.outputs.rc }}
         run: |
+          fail=0
+          if [ "$SMOKE_RC" != "0" ]; then
+            echo "::error::The built image does not boot or does not serve (smoke exit $SMOKE_RC). A clean Trivy report says nothing about this — Trivy never runs the image. See the step log for the container's own output."
+            fail=1
+          fi
           if [ "$RC" != "0" ]; then
             echo "::error::Trivy image is a blocking scanner (SEC-1): finding or scan/build failure (exit $RC). Fix the image; suppress ONLY via .trivyignore WITH CVE-id, reason and review date."
-            exit 1
+            fail=1
           fi
+          exit $fail
 
   trivy-deps:
     name: Vuln — third-party prod images (Trivy image)
@@ -503,7 +553,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -528,12 +578,12 @@ jobs:
             # No docker-socket mount: these are registry refs, so Trivy pulls them itself
             # (the socket is only needed for the locally-built image in trivy-image).
             # --exit-code 1 → findings are visible in $rc; the gate stays informational.
-            # --ignorefile: СВОЙ список подавлений (.trivyignore-deps), не корневой.
+            # --ignorefile: СВОЙ список подавлений (.trivyignore-deps.yaml), не корневой.
             # Корневой обслуживает блокирующие trivy-fs/trivy-image над нашим кодом и
             # образом; чужой CVE, записанный туда, ослабил бы заодно и их (SEC-14).
             docker run --rm -v "$PWD:/out" -w /out \
               aquasec/trivy@sha256:665030f4d33a82c1e8d9d5e0453365842236723c1ee5cc3becca698268e66a56 image --exit-code 1 --format sarif \
-              --ignorefile .trivyignore-deps \
+              --ignorefile .trivyignore-deps.yaml \
               --output "trivy-deps-sarif/trivy-deps-$i.sarif" "$ref"
             r=$?
             # Отличаем НАХОДКИ от СБОЯ: `--exit-code 1` даёт ровно 1, когда CVE найдены;
@@ -604,7 +654,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -616,30 +666,55 @@ jobs:
       #    platforms.md; та же беда у Ansible — Checkmarx/kics#7110, про compose — #1981),
       #    а у нас все три файла `.yml`. Переименовывать нельзя: на имена завязаны
       #    install-ubuntu.sh, verify-image.sh и полдюжины мест в доках — боевой деплой.
-      #    Поэтому копии с нужным расширением делаются ВНУТРИ джобы, а пути в SARIF ниже
-      #    возвращаются к настоящим файлам.
+      #    Сейчас это решается само собой: шаг ниже ГЕНЕРИРУЕТ слитые конфиги и сразу
+      #    кладёт их с нужным расширением. Ловушка не исчезла — просто перестала нас
+      #    касаться; вернёшь скан по исходным файлам, и она вернётся вместе с ним.
       # 2. Значение `--type`. В апстрим-доке KICS написано `docker-compose`, и CLI такое
       #    значение ОТВЕРГАЕТ: печатает справку и выходит с 126. Рабочее значение —
       #    `DockerCompose`, как перечислено в выводе `kics scan --help`. Документация
       #    разошлась с бинарём; источник истины — справка самого образа.
-      - name: собрать .yaml-копии compose-файлов
+      - name: собрать СЛИТЫЕ конфиги (то, что реально запускается)
         id: prep
         run: |
           set -euo pipefail
           mkdir -p kics-src kics-out
           chmod 777 kics-out # контейнер пишет отчёт своим uid — как в dast-zap
-          n=0
-          for f in deploy/docker-compose*.yml; do
-            [ -e "$f" ] || continue
-            cp "$f" "kics-src/$(basename "$f" .yml).yaml"
-            n=$((n + 1))
-          done
+
+          # ПОЧЕМУ СЛИТЫЕ, А НЕ ФАЙЛЫ ПО ОТДЕЛЬНОСТИ. KICS читает каждый файл
+          # ИЗОЛИРОВАННО и ничего не знает про мерж оверлеев. Прод собирается как
+          # «база + оверлей», и в оверлее сервис описан ЧАСТИЧНО — только тем, что
+          # переопределяется. Поэтому фрагментам `tls.yml`/`release.yml` сканер штатно
+          # ставил «нет healthcheck / cap_drop / security_opt», хотя всё это лежит в
+          # базовом файле и сливается в рантайме: 20 из 26 предупреждений были ровно
+          # этим артефактом. Теперь сканируется то, что ДЕЙСТВИТЕЛЬНО запускается.
+          #
+          # `--no-interpolate` ОБЯЗАТЕЛЕН, и не ради удобства. Без него compose
+          #   а) потребует значения для `${DOMAIN:?…}` / `${POSTGRES_PASSWORD:?…}` —
+          #      сборка конфига упадёт на fail-closed гардах, которые мы сами и ставили;
+          #   б) подставит переданные значения в ВЫВОД, а вывод уезжает в SARIF и в
+          #      Code Scanning. Скармливать сканеру секретов файл с подставленными
+          #      секретами — ровно то, чего делать нельзя.
+          # С флагом `${…}` остаются литералами: мерж выполняется, интерполяция — нет.
+          gen() {
+            out="$1"; shift
+            args=""
+            for f in "$@"; do args="$args -f $f"; done
+            # shellcheck disable=SC2086
+            (cd deploy && docker compose $args config --no-interpolate) > "kics-src/$out.yaml"
+          }
+          gen base docker-compose.yml
+          gen base+tls docker-compose.yml docker-compose.tls.yml
+          gen base+release docker-compose.yml docker-compose.release.yml
+
+          n=$(find kics-src -name '*.yaml' -size +0 | wc -l)
           echo "copied=$n" >> "$GITHUB_OUTPUT"
-          ls -1 kics-src
+          echo "expected=3" >> "$GITHUB_OUTPUT"
+          ls -l kics-src
       - name: kics
         id: scan
         env:
           COPIED: ${{ steps.prep.outputs.copied }}
+          EXPECTED: ${{ steps.prep.outputs.expected }}
         run: |
           set +e
           docker run --rm -v "$PWD:/src" -w /src \
@@ -654,20 +729,36 @@ jobs:
           # о ней нельзя: пустой отчёт неотличим от чистого. Ровно тот же приём, что у
           # trivy-deps («grep matched nothing ⇒ scanned nothing»).
           scanned=$(jq -r '.files_scanned // 0' kics-out/results.json 2>/dev/null || echo 0)
+          # ЛОВУШКА, из-за которой проверка ниже была ИНЕРТНА и пропускала ровно тот
+          # случай, против которого написана. `${COPIED:-1}` подставляет 1, только когда
+          # переменная НЕ ЗАДАНА или пуста — а шаг `prep` пишет её всегда, и при пустом
+          # глобе `deploy/docker-compose*.yml` (файлы переименовали/перенесли) там строка
+          # "0". Сравнение вырождалось в `[ 0 -ge 0 ]` и ПРОХОДИЛО: ноль просканированных
+          # compose-файлов уходил как «✅ просканировано». Поэтому число целей
+          # проверяется ОТДЕЛЬНО и раньше, а не через дефолт подстановки.
+          [ "${COPIED:-0}" -ge "${EXPECTED:-3}" ] || ok=false
           [ "$scanned" -ge "${COPIED:-1}" ] || ok=false
           echo "{\"key\":\"kics\",\"ok\":$ok,\"exit\":$rc,\"scanned\":$scanned}" > status-kics.json
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
           echo "scanned=$scanned" >> "$GITHUB_OUTPUT"
-      # SARIF ссылается на копии (kics-src/*.yaml), которых в репозитории нет — аннотации
-      # Code Scanning указывали бы в пустоту. Возвращаем пути к настоящим файлам.
-      - name: вернуть пути в SARIF к deploy/*.yml
+      # ПУТИ В SARIF. Раньше здесь `kics-src/X.yaml` переписывался в `deploy/X.yml` — и это
+      # было честно, потому что сканировалась ПОБАЙТОВАЯ КОПИЯ файла: и путь, и номер
+      # строки совпадали с оригиналом. Со слитыми конфигами так делать НЕЛЬЗЯ: строка
+      # такого файла не соответствует ни одной строке ни одного файла в репозитории, и
+      # переписать путь в `deploy/docker-compose.yml` значило бы указать на случайное
+      # место. Поэтому путь остаётся производным и назван так, чтобы это было видно:
+      # `deploy/(merged)/base+tls.yaml`. В Code Scanning такая находка приходит без
+      # превью кода — цена за то, что сканируется реально запускаемая конфигурация, а не
+      # её фрагменты. Комбинация в имени говорит, ГДЕ искать: `base+tls` — это
+      # `docker-compose.yml` вместе с `docker-compose.tls.yml`.
+      - name: пометить пути в SARIF как производные
         if: always()
         run: |
           set -euo pipefail
           [ -f kics-out/results.sarif ] || exit 0
           jq '(.. | objects | select(has("uri")) | .uri) |=
                 (if startswith("kics-src/") then
-                   sub("^kics-src/"; "deploy/") | sub("\\.yaml$"; ".yml")
+                   sub("^kics-src/"; "deploy/(merged)/")
                  else . end)' \
             kics-out/results.sarif > kics-out/results.fixed.sarif
           mv kics-out/results.fixed.sarif kics-out/results.sarif
@@ -690,11 +781,19 @@ jobs:
           RC: ${{ steps.scan.outputs.rc }}
           SCANNED: ${{ steps.scan.outputs.scanned }}
           COPIED: ${{ steps.prep.outputs.copied }}
+          EXPECTED: ${{ steps.prep.outputs.expected }}
         run: |
           # Сломанный скан и найденные проблемы — РАЗНЫЕ сообщения. Первое валит джобу
           # намеренно (она информационная, поэтому мерж не блокирует, но краснеет и видна),
           # второе только предупреждает до триажа базовой линии.
-          if [ "$SCANNED" -lt "${COPIED:-1}" ]; then
+          # «Целей не нашлось» — отдельный случай, и раньше он проваливался мимо гейта по
+          # той же причине, что и сентинел: `${COPIED:-1}` не защищает от строки "0".
+          # Сообщение тоже своё: тут виноват не KICS, а исчезнувший glob.
+          if [ "${COPIED:-0}" -lt "${EXPECTED:-3}" ]; then
+            echo "::error::kics: собрано ${COPIED:-0} слитых конфигов из ${EXPECTED:-3} — сборка не состоялась, сканировать было нечего. Обычная причина: \`docker compose config\` не отработал (переехал файл, сломался оверлей, или compose перестал принимать --no-interpolate). Смотри вывод шага «собрать СЛИТЫЕ конфиги»."
+            exit 1
+          fi
+          if [ "$SCANNED" -lt "$COPIED" ]; then
             if [ "$RC" = "126" ] || [ "$RC" = "127" ] || [ "$RC" = "125" ]; then
               echo "::error::kics: контейнер не отработал (код $RC) — образ не запустился ЛИБО CLI отверг аргументы и напечатал справку. Сверь флаги с выводом \`kics scan --help\` в логе шага выше."
             else
@@ -725,7 +824,7 @@ jobs:
       contents: read
       pull-requests: write # для comment-summary-in-pr: on-failure
     steps:
-      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -734,7 +833,7 @@ jobs:
       - name: dependency review
         id: scan
         continue-on-error: true # информационная до триажа (SEC-1)
-        uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4.9.0
+        uses: actions/dependency-review-action@a1d282b36b6f3519aa1f3fc636f609c47dddb294 # v5.0.0
         with:
           fail-on-severity: high
           # Комментарий ТОЛЬКО при находке: в обычном случае канал отчётности один —
@@ -822,7 +921,7 @@ jobs:
       # a quiet green.
       NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
     steps:
-      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -902,7 +1001,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1021,7 +1120,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1054,7 +1153,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1096,7 +1195,7 @@ jobs:
       security-events: write
       id-token: write
     steps:
-      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1104,7 +1203,7 @@ jobs:
           persist-credentials: false
       - id: sc
         continue-on-error: true
-        uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a # v2.4.3
+        uses: ossf/scorecard-action@2d1146689b8cda280b9bc96326124645441f03bc # v2.4.4
         with:
           results_file: scorecard.sarif
           results_format: sarif
@@ -1135,6 +1234,14 @@ jobs:
 
   report:
     name: summarize + report
+    # Список обязан совпадать с реестром EXPECTED в summarize-security.mjs. Джоба, которой
+    # тут нет, не удерживает `report` — а он забирает артефакты БЕЗ `name`, то есть только
+    # уже загруженные. Опоздавший сентинел даёт «⚠️ НЕ подтверждён» на исправно
+    # отработавшем сканере, и это хуже, чем кажется: обесценивается ровно тот сигнал,
+    # ради которого вся таблица доверия и заведена. `kics` и `dependency-review` сюда
+    # забыли дописать, когда их заводили (#471, #473).
+    # Исключение ровно одно: `smoke-image` в EXPECTED — не джоба, а шаг ВНУТРИ
+    # `trivy-image` (он же кладёт его сентинел), поэтому отдельной строки тут нет.
     needs:
       [
         check,
@@ -1146,6 +1253,8 @@ jobs:
         trivy-fs,
         trivy-image,
         trivy-deps,
+        kics,
+        dependency-review,
         dependency-check,
         dast-zap,
         sbom,
@@ -1159,7 +1268,7 @@ jobs:
       pull-requests: write # PR comments
       issues: write
     steps:
-      - uses: step-security/harden-runner@9af89fc71515a100421586dfdb3dc9c984fbf411 # v2.19.4
+      - uses: step-security/harden-runner@bf7454d06d71f1098171f2acdf0cd4708d7b5920 # v2.20.0
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

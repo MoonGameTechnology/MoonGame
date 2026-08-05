@@ -50,7 +50,25 @@ export function fleetBaseSpeed(fleet: Fleet, data: GameData): number {
  * Returns the hops after `fromId` up to and including `toId`, or null if there
  * is no route. Deterministic: ties broken by planet id.
  */
-export function planRoute(state: GameState, fromId: PlanetId, toId: PlanetId): PlanetId[] | null {
+export function planRoute(
+  state: GameState,
+  fromId: PlanetId,
+  toId: PlanetId,
+  // Optional node veto for diplomacy-aware planning (D2 right of way): a vetoed
+  // node is not ENTERED, so the route detours around it. The DESTINATION is exempt
+  // on purpose — "move onto a peace-locked world" must still produce a route so the
+  // movement gate can reject it with E_NO_RIGHT_OF_WAY (and the client can offer a
+  // war declaration) instead of a misleading E_NO_ROUTE. `fromId` needs no exemption:
+  // routes never re-enter their origin. Pure and deterministic: the predicate is a
+  // function of (state, player), never of wall-clock or randomness.
+  blocked?: (id: PlanetId) => boolean,
+  // HERO-CORRIDOR: вето по РЕБРУ — тем же механизмом, что и вето по узлу выше, а не
+  // вторым маршрутизатором. Нужно для ЛИЧНОГО коридора: ребро физически есть в графе
+  // (иначе не посчитать геометрию), но пройти по нему может не всякий. Предикат
+  // спрашивается на каждом шаге релаксации, поэтому маршрут ОБХОДИТ закрытое ребро,
+  // а не упирается в него. Чист и детерминирован, как и `blocked`.
+  blockedEdge?: (from: PlanetId, to: PlanetId) => boolean,
+): PlanetId[] | null {
   if (fromId === toId) {
     return [];
   }
@@ -83,6 +101,12 @@ export function planRoute(state: GameState, fromId: PlanetId, toId: PlanetId): P
       const vp = state.planets[v];
       if (!vp || visited.has(v)) {
         continue;
+      }
+      if (blocked !== undefined && v !== toId && blocked(v)) {
+        continue; // diplomacy veto: don't enter, detour around
+      }
+      if (blockedEdge !== undefined && blockedEdge(u, v)) {
+        continue; // HERO-CORRIDOR: чужой личный коридор — ребра для нас нет
       }
       const nd = best + distance(planet.position, vp.position);
       const cur = dist.get(v);

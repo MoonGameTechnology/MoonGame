@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { createKernel } from '../kernel/kernel';
 import { armyModule } from './army';
+import { diplomacyModule } from './diplomacy';
+import { setMapShare, setStance } from '../state/diplomacy';
 import {
   createInitialState,
   type Fleet,
@@ -262,5 +264,77 @@ describe('army module — no mid-assault evacuation (BF-27)', () => {
       round: 1,
     };
     okApply(kernel.applyAction(other, load('F', 'militia', 1), ctx));
+  });
+});
+
+// --- ALLY-LAND: высадка на мир СОЮЗНИКА ------------------------------------
+// Заказ владельца: «добавь возможность высаживать к членам коалиции и к тем, с кем
+// заключён обмен картами». В этой модели и коалиция, и обмен картами — это ОДНА
+// стойка `alliance` (`victory.ts` считает коалицией взаимно-союзную клику, а
+// `coverageFor` пулит разведку только по `alliance`), поэтому правило одно.
+describe('army — ALLY-LAND: высадка к союзнику', () => {
+  const kernel = createKernel([armyModule, diplomacyModule]);
+  /** Мой флот с десантом в трюме стоит над миром игрока p2. */
+  const abroad = (stance: 'war' | 'peace' | 'pact' | 'alliance'): GameState => {
+    const f = fleet('F', 'p1', 'A', [['cruiser', 2]]);
+    f.landing = [{ unit: 'militia', count: 3 }];
+    const st = stateWith({
+      players: [player('p1'), player('p2')],
+      planets: [planet('A', 'p2', [['militia', 1]])],
+      fleets: [f],
+    });
+    setStance(st, 'p1', 'p2', stance);
+    return st;
+  };
+
+  it('на мир СОЮЗНИКА десант высаживается и пополняет ЕГО гарнизон', () => {
+    const out = okApply(kernel.applyAction(abroad('alliance'), unload('F', 'militia', 2), ctx));
+    expect(out.state.planets.A?.garrison.find((u) => u.unit === 'militia')?.count).toBe(3); // 1 + 2
+    expect(out.state.fleets.F?.landing?.find((u) => u.unit === 'militia')?.count).toBe(1);
+  });
+
+  it('мир и пакт НЕ пускают чужие войска — это решение принимают союзом', () => {
+    for (const stance of ['peace', 'pact', 'war'] as const) {
+      expect(errCode(kernel.applyAction(abroad(stance), unload('F', 'militia', 1), ctx)), stance).toBe(
+        'E_FORBIDDEN',
+      );
+    }
+  });
+
+  it('поднять союзный гарнизон нельзя — помощь не должна быть вывозом обороны', () => {
+    expect(errCode(kernel.applyAction(abroad('alliance'), load('F', 'militia', 1), ctx))).toBe(
+      'E_FORBIDDEN',
+    );
+  });
+
+  it('подкрепление в ИДУЩИЙ наземный бой союзника проходит (в этом весь смысл)', () => {
+    const st = abroad('alliance');
+    st.battles['battle:9'] = {
+      id: 'battle:9',
+      location: 'A',
+      phase: 'ground',
+      attacker: { ref: { kind: 'landing', fleetId: 'X' }, owner: 'p3' },
+      defender: { ref: { kind: 'garrison', planetId: 'A' }, owner: 'p2' },
+      round: 1,
+    };
+    const out = okApply(kernel.applyAction(st, unload('F', 'militia', 2), ctx));
+    expect(out.state.planets.A?.garrison.find((u) => u.unit === 'militia')?.count).toBe(3);
+  });
+
+  it('ДОГОВОР об обмене картами тоже пускает десант — без союза и без общей войны', () => {
+    const st = abroad('peace');
+    setMapShare(st, 'p1', 'p2', true);
+    const out = okApply(kernel.applyAction(st, unload('F', 'militia', 2), ctx));
+    expect(out.state.planets.A?.garrison.find((u) => u.unit === 'militia')?.count).toBe(3);
+    // но поднять чужой гарнизон он по-прежнему не даёт
+    expect(errCode(kernel.applyAction(st, load('F', 'militia', 1), ctx))).toBe('E_FORBIDDEN');
+  });
+
+  it('без модуля дипломатии правило деградирует мягко: читается D1-стойка', () => {
+    const bare = createKernel([armyModule]); // capability `diplomacy` отсутствует
+    okApply(bare.applyAction(abroad('alliance'), unload('F', 'militia', 1), ctx));
+    expect(errCode(bare.applyAction(abroad('peace'), unload('F', 'militia', 1), ctx))).toBe(
+      'E_FORBIDDEN',
+    );
   });
 });

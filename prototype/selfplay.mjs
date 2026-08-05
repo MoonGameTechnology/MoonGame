@@ -209,6 +209,10 @@ console.log(
     `  usage      : ${topUsage || '—'}`,
     zeros.length ? `  мёртвый контент (0 построек за ${N} матчей): ${zeros.join(' ')}` : '  мёртвый контент: нет ✓',
     '━'.repeat(70),
+    // AUD-7: всё, что печатается человеку выше, отдаётся и машине. Раньше половина
+    // показателей — разброс длины, раскладка исходов, первый бой, usage, мёртвый контент —
+    // умирала на границе `console.log`, и скиллу `balance-analysis` приходилось парсить
+    // прозу. Имена существующих полей НЕ трогаем: их уже читают снаружи.
     'SELFPLAY_JSON ' +
       JSON.stringify({
         n: N,
@@ -220,6 +224,14 @@ console.log(
         winsByStart: Object.fromEntries(winsByStart),
         avgLengthDays: avg(lengths) / DAY,
         snowball: decided ? snowballHits / decided : null,
+        lengthMinDays: lengths.length ? Math.min(...lengths) / DAY : null,
+        lengthMaxDays: lengths.length ? Math.max(...lengths) / DAY : null,
+        outcomes: Object.fromEntries(reasons),
+        firstCombatAvgDays: firstCombats.length ? avg(firstCombats) / DAY : null,
+        firstCombatMatches: firstCombats.length,
+        battlesTotal,
+        usage: Object.fromEntries(usageTotal),
+        deadContent: zeros,
       }),
   ].join('\n'),
 );

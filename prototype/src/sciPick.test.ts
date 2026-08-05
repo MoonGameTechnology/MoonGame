@@ -9,7 +9,7 @@ import {
   type SciPickHost,
 } from './sciPick';
 
-// REFM-16: locale pinned RU (see format.test.ts — Node has no browser language, so the
+// REFM-18: locale pinned RU (see format.test.ts — Node has no browser language, so the
 // runtime would fall back to EN and the label assertions would drift).
 beforeAll(() => setLocale('ru'));
 

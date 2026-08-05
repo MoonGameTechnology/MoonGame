@@ -109,6 +109,9 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
     target: id,
     stance: z.enum(['war', 'peace', 'pact', 'alliance']),
   }),
+  // MAPSHARE-1: договор об обмене картами — отдельное соглашение поверх лестницы
+  // стоек (заключение по взаимному согласию, расторжение одностороннее).
+  'diplomacy.mapshare': z.object({ target: id, on: z.boolean() }),
   // --- prototype-host actions (the netserver runs the prototype's kernel) -----------
   // fleet.launch/merge/split/engage: canonical `fleetOpsModule` handles these too
   // (the missing garrison→mobile-fleet link) — not prototype-only anymore, the
@@ -188,3 +191,14 @@ export function isValidActionPayload(type: string, payload: unknown): boolean {
   if (!schema) return false;
   return schema.safeParse(payload).success;
 }
+
+/**
+ * Every wire-reachable client action type — the gate's own catalog, derived from the map
+ * above so the two can never disagree.
+ *
+ * AUD-6: this used to live inside `testkit/arbitraries.ts`, which is not part of the
+ * package's public surface. The enumerated set of legal client actions is the single most
+ * useful artefact for anyone writing a client, and it was reachable only by deep-importing
+ * a test-only file. It belongs next to the schemas it is computed from.
+ */
+export const CLIENT_ACTION_TYPES: readonly string[] = Object.keys(actionPayloadSchemas);

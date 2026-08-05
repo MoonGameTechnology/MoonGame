@@ -154,6 +154,25 @@ describe('дерево технологий — условия узла', () => 
     expect(techCondOk(s, 'p1', { type: 'own_sectors', min: mine + 1 } as never)).toBe(false);
   });
 
+  // RULES-4. Клиент больше не держит СВОЙ перебор типов условий — он форвардит вопрос
+  // в ядро. Раньше перебор покрывал 2 типа из 5, и узел с любым из этих трёх читался бы
+  // как запертый НАВСЕГДА, хотя ядро исследование разрешает. В живом каталоге таких
+  // условий сегодня нет, поэтому баг был латентным — и тем опаснее для автора контента.
+  it('условия, которых прежняя копия не знала, считаются по-настоящему', () => {
+    const s = newGame();
+    const home = Object.values(s.planets).find((p) => p.owner === 'p1')!;
+    const built = home.buildings[0]!.type; // на старте у мира уже есть постройки
+    expect(techCondOk(s, 'p1', { type: 'has_building', building: built, min: 1 } as never)).toBe(
+      true,
+    );
+    expect(techCondOk(s, 'p1', { type: 'has_building', building: built, min: 99 } as never)).toBe(
+      false,
+    );
+    expect(
+      techCondOk(s, 'p1', { type: 'has_unit', unit: 'нет-такого-юнита', min: 1 } as never),
+    ).toBe(false);
+  });
+
   it('techFx перечисляет эффекты и анлоки, пустой узел даёт пустую строку', () => {
     const withFx = Object.values(TECHS).find((td) => Object.keys(td.effects ?? {}).length > 0);
     if (withFx) expect(techFx(withFx)).not.toBe('');
@@ -337,5 +356,65 @@ describe('дерево технологий — окно', () => {
     expect(api.isOpen()).toBe(false);
     api.open();
     expect(body.html()).not.toContain('tt-modal');
+  });
+});
+
+// --- досье без мигания (баг живого плейтеста) ---------------------------------
+// Окно живо ререндерится каждые ~500мс; анимация появления обязана играть ТОЛЬКО
+// на реальном открытии досье (класс .pop), а неизменная разметка — вообще не
+// переприсваиваться (innerHTML пересоздаёт DOM даже на идентичной строке).
+describe('досье технологии — без мигания на живом ререндере', () => {
+  /** fakeBody со счётчиком присваиваний innerHTML и живым .tt-mwin: присваивание
+   *  «пересоздаёт» модалку (сбрасывает её классы) — как настоящий DOM. */
+  function watchedBody() {
+    const scroll = { scrollLeft: 0, scrollTop: 0 };
+    const classes = new Set<string>();
+    const mwin = {
+      classList: { add: (c: string) => classes.add(c), remove: (c: string) => classes.delete(c) },
+    };
+    let html = '';
+    let writes = 0;
+    const el = {
+      get innerHTML() {
+        return html;
+      },
+      set innerHTML(v: string) {
+        html = v;
+        writes += 1;
+        classes.clear(); // innerHTML = пересоздание DOM: прежних классов у модалки нет
+      },
+      querySelector: (sel: string) =>
+        sel === '.tt-scroll' ? scroll : sel === '.tt-mwin' && html.includes('tt-mwin') ? mwin : null,
+      html: () => html,
+      writes: () => writes,
+      popped: () => classes.has('pop'),
+    };
+    return el;
+  }
+
+  it('открытие досье ставит .pop, а кадровый ререндер не трогает DOM вовсе', () => {
+    const body = watchedBody();
+    const { api, win } = wire({ body: () => body as unknown as HTMLElement });
+    api.open();
+    win.fire(ttClick('.tt-node', { tech: firstOf('space') }));
+    expect(body.html()).toContain('tt-mwin');
+    expect(body.popped()).toBe(true); // анимация — на реальном открытии
+    const w = body.writes();
+    api.repaint(); // кадровый цикл: состояние не менялось
+    api.repaint();
+    expect(body.writes()).toBe(w); // разметка та же — innerHTML не переприсвоен
+  });
+
+  it('живое изменение перерисовывает досье БЕЗ повторной анимации появления', () => {
+    const body = watchedBody();
+    const { api, win, s } = wire({ body: () => body as unknown as HTMLElement });
+    api.open();
+    win.fire(ttClick('.tt-node', { tech: firstOf('space') }));
+    const w = body.writes();
+    // казна опустела → чипы цены получают пометку нехватки → разметка другая
+    for (const k of Object.keys(s.players.p1!.resources)) s.players.p1!.resources[k] = 0;
+    api.repaint();
+    expect(body.writes()).toBe(w + 1);
+    expect(body.popped()).toBe(false); // пересозданная модалка НЕ выпрыгивает заново
   });
 });

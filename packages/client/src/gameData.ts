@@ -18,9 +18,19 @@ import sectorKinds from '../../../data/sectorKinds.json';
 import planetTypes from '../../../data/planetTypes.json';
 import technologies from '../../../data/technologies.json';
 import scientists from '../../../data/scientists.json';
+import modules from '../../../data/modules.json';
+import heroes from '../../../data/heroes.json';
+import heroAbilities from '../../../data/heroAbilities.json';
+import heroPassives from '../../../data/heroPassives.json';
+import heroSkillTrees from '../../../data/heroSkillTrees.json';
+import heroFittings from '../../../data/heroFittings.json';
+import rewards from '../../../data/rewards.json';
 import skirmishMap from '../../../data/maps/skirmish-1.json';
 
-const FRAGMENTS: Record<string, unknown> = {
+/** The browser's copy of the composer's fragment list. Exported so `gameData.test.ts`
+ *  can assert it against `composeGameDataBundle` — the two drifting apart is silent
+ *  (missing fragments default to empty records), so only a test catches it. */
+export const FRAGMENTS: Record<string, unknown> = {
   'manifest.json': manifest,
   'resources.json': resources,
   'units.json': units,
@@ -32,6 +42,13 @@ const FRAGMENTS: Record<string, unknown> = {
   'planetTypes.json': planetTypes,
   'technologies.json': technologies,
   'scientists.json': scientists,
+  'modules.json': modules,
+  'heroes.json': heroes,
+  'heroAbilities.json': heroAbilities,
+  'heroPassives.json': heroPassives,
+  'heroSkillTrees.json': heroSkillTrees,
+  'heroFittings.json': heroFittings,
+  'rewards.json': rewards,
 };
 
 /** The validated shipped content bundle, composed in the browser via the shared loader. */

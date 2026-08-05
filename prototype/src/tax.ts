@@ -11,11 +11,10 @@ import type {
   Planet,
   ResourceBag,
 } from '../../packages/shared-core/src/index';
-import { allowedBuildings, hasOrbit } from '../../packages/shared-core/src/index';
+import { allowedBuildings, hasOrbit, creditsBonusOf } from '../../packages/shared-core/src/index';
 import { data } from './prototypeData';
 
 export const TAX_PER_HOUR = 20; // base credits/h from the FIRST inhabited owned world
-export const TAX_OFFICE_BONUS = 0.25; // Tax Office: +25% to that world's credit income
 export const TAX_DIMINISH = 0.06; // civic tax per world tapers as an empire grows
 
 /** An inhabited world — a normal colonisable planet/cloud with an orbital layer
@@ -56,9 +55,10 @@ export const taxModule: GameModule = {
       if (!planet || !isInhabited(planet)) return bag;
       const out: Record<string, number> = { ...bag };
       out.credits = (out.credits ?? 0) + civicTax(inhabitedWorldCount(h.state, planet.owner));
-      if (planet.buildings.some((b) => b.type === 'tax_office')) {
-        out.credits *= 1 + TAX_OFFICE_BONUS;
-      }
+      // RULES-2: бонус объявляет само здание (data), а не константа с его именем —
+      // одно правило на ядро, налоговый модуль прототипа и его экономику.
+      const bonus = creditsBonusOf(data, planet);
+      if (bonus !== 0) out.credits *= 1 + bonus;
       return out;
     });
   },

@@ -316,6 +316,11 @@ export const en: Record<string, string> = {
   'comms.intel.fleets': 'fleets visible on the map <em>{left}</em>',
   'comms.intel.treasury': 'treasury: <b>{bag}</b> <em>{left}</em>',
   'comms.intel.world': 'world <b>{id}</b> revealed <em>{left}</em>',
+  'comms.mapshare': 'Map exchange',
+  'comms.mapshare.drop': 'the treaty stands — tap to tear it up',
+  'comms.mapshare.hint':
+    'Offer a map exchange: you share each other’s intel and may land troops on each other’s worlds. It does not make you allies and does not merge you into a victory coalition.',
+  'comms.mapshare.war': 'you cannot treaty with someone you are at war with — make peace first',
   'comms.offer.incoming': '{who} is offering — tap to accept',
   'comms.offer.sent': 'a proposal is already pending',
   'comms.provinces': 'provinces',
@@ -548,11 +553,6 @@ export const en: Record<string, string> = {
     'A standalone fortress raised in an asteroid field: {d} to defense and {hp} structure HP. Turns a faceless crossroads into a fortified node with orbit and AA.',
   'dossier.building.tax-office':
     "An imperial-style tax office: produces nothing itself, but registers the world's population and lifts its credit take by {b}.",
-  'dossier.divdesign.desc': 'The template editor: slot composition and division doctrine.',
-  'dossier.divdesign.name': 'Division builder',
-  'dossier.division.desc':
-    'A ground formation mobilized from a template. Defends the world; loads onto a fleet from the fleet panel.',
-  'dossier.division.name': 'Division',
   'dossier.fleet.desc':
     'A mobile task force of ships. Select it to give maneuver, orbit and strike orders.',
   'dossier.fleet.name': 'Fleet',
@@ -899,8 +899,11 @@ export const en: Record<string, string> = {
 
   // --- err — Отказы ядра (kernel rejection codes). Ключ выводится из кода: E_NO_CAPACITY → err.no-capacity.
   'err.already': 'already in effect',
+  'err.already-built': 'already built — grow it with an upgrade',
   'err.already-fitted': 'that fitting is already installed',
   'err.already-offered': 'a proposal is already pending',
+  'err.already-paused': 'construction already paused — resume it',
+  'err.already-queued': 'already in the build queue',
   'err.already-unlocked': 'that node is already unlocked',
   'err.bad-effect': 'the ability is misconfigured',
   'err.bad-payload': 'malformed order',
@@ -936,16 +939,20 @@ export const en: Record<string, string> = {
   'err.no-node': 'unknown skill-tree node',
   'err.no-planet': 'world not found',
   'err.no-player': 'player not found',
+  'err.no-right-of-way': 'no right of way: every route crosses a power you are at peace with',
   'err.no-ships': 'no ships',
   'err.no-shipyard': 'needs a shipyard/spaceport',
   'err.no-slots': 'all fitting slots are taken',
   'err.no-target': 'no target',
   'err.no-troops': 'the world is defended — an assault needs troops aboard',
   'err.not-destructible': 'this world cannot be destroyed',
+  'err.not-capturable': 'this sector cannot be captured — there is nothing to hold',
   'err.not-equipped': 'the hero does not have that ability',
   'err.out-of-range': 'out of range',
+  'err.orbit-contested': 'an enemy fleet still holds the orbit — beat it first',
   'err.own-planet': 'this is your own world',
   'err.requires': 'unlock the preceding node first',
+  'err.under-assault': 'a ground battle is already raging on this world',
   'err.research-slots-full': 'all research slots are full',
   'err.respawn-cooldown': 'the hero is still recovering',
   'err.same-location': 'fleet is already here',
@@ -967,7 +974,7 @@ export const en: Record<string, string> = {
   'hero.ability.bulwark.desc': 'A temporary shield: +defense to your fleets near the hero.',
   'hero.ability.bulwark.name': 'Bulwark',
   'hero.ability.corridor.desc':
-    'Opens a temporary corridor lane to a nearby world; your fleets travel it faster.',
+    'Punches a corridor to a nearby world. One-shot: only the army carrying this hero may use it, and it closes the moment that army arrives. Upgrades give it a lifetime, then open it to everyone — the enemy included.',
   'hero.ability.corridor.name': 'Corridor',
   'hero.ability.diplomatic-landing.desc':
     "Allied worlds receive the hero as one of their own: the ship can also rise from an ally's planet. Passive skill: widens the deployment points.",
@@ -1319,6 +1326,13 @@ export const en: Record<string, string> = {
   // --- ping — Композер меток провинции: адресат, описание, отправка.
   'ping.cancel': 'Cancel',
   'ping.desc.ph': 'Marker description (optional)…',
+  'ping.panel.del': 'remove the marker (for everyone)',
+  'ping.panel.edit': 'edit the marker text',
+  'ping.panel.empty': 'No markers yet. Long-press a province to place one.',
+  'ping.panel.go': 'pan the camera to the marker',
+  'ping.panel.hide': 'hide on my screen (your ally keeps theirs)',
+  'ping.panel.show': 'show again',
+  'ping.panel.title': 'COALITION MARKERS',
   'ping.mark': 'marker {loc}',
   'ping.no-desc': 'no description',
   'ping.note': 'Mark a province and send — the marker becomes clickable (↪ jump the camera).',
@@ -1348,6 +1362,8 @@ export const en: Record<string, string> = {
   'rail.market.title': 'Market',
   'rail.msgs.label': 'Mail',
   'rail.msgs.title': 'Messages',
+  'rail.pings.label': 'Markers',
+  'rail.pings.title': 'Coalition markers',
   'rail.settings.label': 'Settings',
   'rail.settings.title': 'Settings',
   'rail.steward.label': 'Sleep',
@@ -1826,7 +1842,6 @@ export const en: Record<string, string> = {
   'welcome.update-check': 'Check for updates',
 
   // --- win — Заголовки окон матча (сводки, технологии, хранитель, конструкторы).
-  'win.divdesign.title': 'DIVISION BUILDER',
   'win.log.recap': 'Return digest',
   'win.log.title': 'DISPATCHES',
   'win.scipick.back': '↩ Menu',

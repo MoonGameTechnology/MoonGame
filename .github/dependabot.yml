@@ -20,6 +20,17 @@ updates:
     groups:
       dev-dependencies:
         dependency-type: development
+        # ТОЛЬКО minor/patch. Без этого ограничения мажор приезжает ВНУТРИ группового PR
+        # с заголовком «bump the dev-dependencies group with 3 updates» — то есть смена
+        # поколения инструмента выглядит как рутина и проходит по диагонали.
+        # Живой случай — PR #489: там между @types/node и eslint лежал TypeScript 6 → 7,
+        # а это переписанный компилятор с нативным Go-бинарём. Гейт его поймал (упал
+        # typecheck, а Trivy нашёл Go-CVE в самом tsc внутри прод-образа), но поймал уже
+        # постфактум. Теперь мажоры приходят отдельными PR — по одному на зависимость,
+        # с собственным заголовком и собственным разбором.
+        update-types:
+          - minor
+          - patch
 
   - package-ecosystem: npm
     directory: /mobile

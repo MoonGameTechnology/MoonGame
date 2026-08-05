@@ -19,8 +19,13 @@ function artilleryPower(fleet: Fleet, data: GameData): number {
 }
 
 /** A fleet's firing radius (map units) = the MAX `range` among its live artillery
- *  units (the longest gun sets the reach). 0 = no artillery aboard / no range. */
-function artilleryRange(fleet: Fleet, data: GameData): number {
+ *  units (the longest gun sets the reach). 0 = no artillery aboard / no range.
+ *
+ *  RANGE-UX: экспортируется, чтобы интерфейс РИСОВАЛ ровно тот радиус, по которому
+ *  ядро стреляет. Своя копия формулы в клиенте разъехалась бы на первой же правке
+ *  (модули корабля идут через `effectiveStats`, и это легко упустить) — игрок целился
+ *  бы по одному кругу, а огонь вёлся по другому. */
+export function artilleryRange(fleet: Fleet, data: GameData): number {
   let r = 0;
   for (const s of fleet.units) {
     if (s.count <= 0) continue;

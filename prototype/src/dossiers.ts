@@ -21,7 +21,6 @@ import {
   buildingLevel,
   thresholdRamp,
   COMBAT_UNIT_CAP,
-  TAX_OFFICE_BONUS,
   type GameState,
 } from '../../packages/shared-core/src/index';
 // Straight from the source modules, not through the `game.ts` barrel — same as
@@ -108,7 +107,9 @@ export function buildingDossier(id: string, level: number): Dossier | null {
     case 'tax_office':
       return {
         name,
-        body: t('dossier.building.tax-office', { b: hl(pct(TAX_OFFICE_BONUS)) }),
+        // RULES-2: цифра в досье берётся из ТОГО ЖЕ поля данных, которое исполняет
+        // экономика — правило и его описание игроку больше не могут разойтись.
+        body: t('dossier.building.tax-office', { b: hl(pct(lv.creditsBonus)) }),
       };
     case 'farm':
       return {
@@ -375,12 +376,6 @@ export function createDossiers(host: DossierHost): {
         body: t('dossier.tab.buildings.desc'),
       };
     }
-    if (key === 'division') {
-      return {
-        name: t('dossier.division.name'),
-        body: t('dossier.division.desc'),
-      };
-    }
     if (key.startsWith('stat:')) {
       const STAT_DOSSIER: Record<string, [string, string]> = {
         atk: [t('dossier.stat.atk.name'), t('dossier.stat.atk.desc')],
@@ -410,12 +405,6 @@ export function createDossiers(host: DossierHost): {
       // Resource glyph → the resource's localized name (data name, e.g. metal/credits).
       const r = key.slice(4);
       return { name: tData(r), body: '' };
-    }
-    if (key === 'act:divdesign') {
-      return {
-        name: t('dossier.divdesign.name'),
-        body: t('dossier.divdesign.desc'),
-      };
     }
     if (key.startsWith('c:')) return constructionDossier(key);
     const [kind, id, lvl] = key.split(':');
