@@ -937,28 +937,10 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #log div::before{content:"> ";color:var(--grn-dim);}
 
 /* technologies + steward + heroes windows (modal, mirror #logwin) */
-#tech,#steward,#hero{position:fixed;inset:0;z-index:47;display:none;align-items:center;justify-content:center;padding:16px;
+#tech,#steward{position:fixed;inset:0;z-index:47;display:none;align-items:center;justify-content:center;padding:16px;
   background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
-#tech.show,#steward.show,#hero.show{display:flex;}
-/* division designer (H4) */
-#divdesign{position:fixed;inset:0;z-index:44;display:none;align-items:center;justify-content:center;background:rgba(2,8,11,.62);}
-#divdesign.show{display:flex;}
-#divdesign .dd-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
-#divdesign .dd-tabs button{padding:7px 10px;border:1px solid var(--line-hi);border-radius:8px;background:transparent;color:var(--ink);font:700 11px ui-monospace,monospace;cursor:pointer;}
-#divdesign .dd-tabs button.on{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.12);}
-#divdesign .dd-name{display:flex;gap:8px;margin-bottom:10px;}
-#divdesign .dd-name input{flex:1;padding:7px 9px;border:1px solid var(--line-hi);border-radius:8px;background:rgba(2,10,14,.6);color:#eafffb;font:700 12px ui-monospace,monospace;}
-#divdesign .dd-slots{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:10px;}
-#divdesign .dd-slots button{padding:10px 6px;border:1px dashed var(--line-hi);border-radius:9px;background:rgba(53,214,230,.04);color:#cfeeea;font:700 11px ui-monospace,monospace;cursor:pointer;}
-#divdesign .dd-slots button:disabled{cursor:default;opacity:.75;border-style:solid;}
-#divdesign .dd-vs{display:flex;flex-direction:column;gap:4px;margin:8px 0;}
-#divdesign .dd-vs .vrow{display:flex;align-items:center;gap:8px;font-size:11px;color:#9fc9c4;}
-#divdesign .dd-vs .vnm{flex:0 0 130px;}
-#divdesign .dd-vs .vtrack{flex:1;height:5px;border-radius:3px;background:rgba(53,214,230,.1);overflow:hidden;}
-#divdesign .dd-vs .vbar{height:100%;background:var(--amber);}
-#divdesign .dd-lock{color:var(--amber);font-size:11px;margin:6px 0;}
-#divdesign .hint2{color:#74b0aa;font-size:11px;line-height:1.5;margin-top:8px;}
-#tech .twbox,#steward .twbox,#hero .twbox,#divdesign .twbox{display:flex;flex-direction:column;width:min(460px,94vw);max-height:82vh;overflow:hidden;
+#tech.show,#steward.show{display:flex;}
+#tech .twbox,#steward .twbox{display:flex;flex-direction:column;width:min(460px,94vw);max-height:82vh;overflow:hidden;
   background:var(--glass);border:1px solid var(--cyan);border-radius:10px;
   box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
 .tw-close{width:28px;height:28px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);cursor:pointer;}
@@ -1122,7 +1104,12 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .tt-modal{position:absolute;inset:0;z-index:8;display:flex;align-items:center;justify-content:center;}
 .tt-mback{position:absolute;inset:0;background:rgba(1,6,8,.72);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
 .tt-mwin{position:relative;width:min(320px,calc(100% - 28px));background:linear-gradient(180deg,#0c2026,#081418);
-  border:1px solid var(--line-hi);border-radius:14px;padding:14px;animation:ttpop .14s ease-out;}
+  border:1px solid var(--line-hi);border-radius:14px;padding:14px;}
+/* Появление анимируется КЛАССОМ, который ставится только на реальное открытие досье
+   (techTree.ts). На самом .tt-mwin анимации быть не должно: окно живо ререндерится
+   innerHTML'ом каждые ~500мс, пересозданный узел проигрывал бы ttpop заново — досье
+   «схлопывалось и выпрыгивало» дважды в секунду (баг живого плейтеста). */
+.tt-mwin.pop{animation:ttpop .14s ease-out;}
 @keyframes ttpop{from{transform:scale(.94);opacity:.4;}to{transform:scale(1);opacity:1;}}
 .tt-mx{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--dim);cursor:pointer;}
 .tt-mhead{display:flex;gap:11px;align-items:center;padding-right:30px;}
@@ -2212,7 +2199,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
      untouched (this whole query is PC-gated). */
   :root{--pcz:1.5;}
   #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#scipick,
-  #divdesign,#market,#constructor,#codex,#codexhub,#intro,#recap,#goals,#playercard,
+  #market,#constructor,#codex,#codexhub,#intro,#recap,#goals,#playercard,
   #settings,#warprompt,#diplo,#splitdlg,#pingmenu,#banner,#endscreen,#connect,#updbar,
   #hub,#emblempick,#corp,#setup,#testmode,#sandbox{zoom:var(--pcz,1.5);}
   /* vw/vh compensations (base values ÷ 1.5 — see the note above) */
@@ -2225,9 +2212,6 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
     pointer-events:none;}
   #railtools::before{content:'▲';top:-6px;background:linear-gradient(180deg,rgba(3,12,16,.95) 55%,transparent);}
   #railtools::after{content:'▼';bottom:-6px;background:linear-gradient(0deg,rgba(3,12,16,.95) 55%,transparent);}
-  /* division-designer window: its body pane had no padding of its own — text sat
-     flush against the frame */
-  #divdesignbody{flex:1;min-height:0;overflow:auto;padding:14px 16px;}
   #goals{max-width:min(230px,40vw);}
   /* content windows widen to ~80% of the screen (53.4vw layout × zoom 1.5) — the
      console windows outgrew their phone-sized boxes (long RU copy overflowed) */
@@ -2242,7 +2226,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   .dp-convo{height:min(41vh,440px);}
   #splitdlg .sbox{width:min(440px,62.5vw);max-height:56vh;}
   #logwin .lwbox{width:53.4vw;max-height:46.5vh;}
-  #tech .twbox,#steward .twbox,#hero .twbox,#divdesign .twbox{width:53.4vw;max-height:54.5vh;}
+  #tech .twbox,#steward .twbox{width:53.4vw;max-height:54.5vh;}
   #scipick .twbox{width:53.4vw;max-height:58.5vh;}
   #market .mkbox{width:53.4vw;max-height:54.5vh;}
   #constructor .cnbox{width:53.4vw;max-height:60vh;}
@@ -2400,7 +2384,6 @@ const page = (js) => `<!doctype html>
 <!-- scientist council picker (setup-time, before the start-point) — rendered by renderSciPick() -->
 <div id="scipick"><div class="twbox"><div class="lw-head"><b data-i18n="win.scipick.title"></b><button class="sp-cancel" type="button" data-i18n="win.scipick.back"></button></div><div id="scipickbody"></div></div></div>
 <!-- division template designer (H4, Stellaris-style) — rendered by renderDivDesign() -->
-<div id="divdesign"><div class="twbox"><div class="lw-head"><b data-i18n="win.divdesign.title"></b><button class="tw-close">✕</button></div><div id="divdesignbody"></div></div></div>
 <!-- session market — whole box rendered by renderMarket() in main.ts -->
 <div id="market"></div>
 <!-- constructor («Верфь») — unified loadout tab; whole box rendered by renderConstructor() -->

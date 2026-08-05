@@ -110,6 +110,9 @@ import {
 // HUD-DOCK: видимость листа и «нижний хаб уезжает» — одна чистая модель на все
 // прицельные режимы; она же держит замер высоты листа для привязки ряда команд.
 import { mapIsWorkspace, panelOpen, sheetHeightVar, type DockState } from './hudDock';
+// Хвост маркера флота (пипсы трюма, «×N») — чистая геометрия с тестом на разворот
+// наружу у стоящего флота (пипсы не должны ложиться на диск планеты).
+import { tailTheta, tailAt as tailPoint } from './markerTail';
 // BACK-1: лестница слоёв Android-Back/Escape — чистая модель + опись, которую держит тест.
 import {
   closeTopLayer as closeTop,
@@ -1542,6 +1545,12 @@ function queuedLabel(q: QueuedBuild): string {
   return `${BUILD_ICON[q.id] ?? '▣'} ${tData(data.buildings[q.id]?.name ?? q.id)}`;
 }
 function enqueueBuild(planetId: string, order: QueuedBuild): void {
+  // Одна точка опоры против дубля одноэкземплярного здания: плитка, кодекс и любой
+  // будущий вход проходят здесь, и серые плитки остаются чистой косметикой.
+  if (order.kind === 'building' && buildingLocked(planetId, order.id)) {
+    note('✖ ' + errText(buildingLocked(planetId, order.id) === 'built' ? 'E_ALREADY_BUILT' : 'E_ALREADY_QUEUED'));
+    return;
+  }
   if (NET) {
     // No local build queue in net mode — the server times construction. Send the
     // order straight away (one tap = one build queued server-side).
@@ -2197,11 +2206,15 @@ function errText(code: string): string {
   const key = `err.${bare.replace(/_/g, '-')}`;
   return hasKey(key) ? t(key) : bare.replace(/_/g, ' ');
 }
-function playerOrder(action: Action) {
+function playerOrder(action: Action): boolean {
+  // Возврат — «приказ не ОТВЕРГНУТ сейчас»: в соло это честный исход редьюсера,
+  // в сети и при реконнекте — true (исход асинхронный). Нужен покадровым циклам
+  // (resolvePendingMerges), чтобы выбрасывать отвергнутый приказ, а не пережимать
+  // его каждый кадр — бесконечные тосты отказа (живой плейтест).
   if (NET && netClient) {
     netClient.sendAction(action); // server is authoritative — await its broadcast
     activeTour?.notifyAction(action.type); // optimistic — server result is async
-    return;
+    return true;
   }
   // Net match, socket temporarily down (auto-reconnecting): DON'T run the local reducer
   // — the order would apply to `s`, look accepted on-screen, then vanish when the
@@ -2209,7 +2222,7 @@ function playerOrder(action: Action) {
   // instead of silently losing it. (Solo/skirmish has `reconnecting === false`.)
   if (reconnecting) {
     note('⟳ ' + t('net.reconnecting-order'));
-    return;
+    return true;
   }
   const before = sandboxBuildSnapshot(action.type);
   const out = order(s, action, s.time);
@@ -2218,6 +2231,7 @@ function playerOrder(action: Action) {
   if (out.error) {
     snd.play('error'); // тёмный сбой — отказ слышен, не только виден
     note('✖ ' + errText(out.error));
+    return false;
   }
   else {
     activeTour?.notifyAction(action.type); // an accepted intent advances `action` steps
@@ -2229,6 +2243,7 @@ function playerOrder(action: Action) {
     if (action.type === 'fleet.retreat' && !activeTour?.active) maybeIntro('retreat');
     if (action.type === 'fleet.barrage' && !activeTour?.active) maybeIntro('artillery');
   }
+  return true;
 }
 
 // --- ONB-1 guide-mark launcher ------------------------------------------------
@@ -2558,11 +2573,21 @@ function troopsInputFor(fleetId: string): TroopsInput | null {
 function blockerName(id: string): string {
   return s.players[id]?.name ?? NAME[id] ?? id;
 }
-/** Distinct PEACE owners a fleet at node `from` would cross or land on reaching `toId`
- *  — each must be at war before the route opens. Empty ⇒ the move is free. */
+/** Distinct PEACE owners that make the move IMPOSSIBLE without a war — mirrors the
+ *  kernel's D2 gate, including its detour: since the right-of-way fix the kernel
+ *  reroutes AROUND peace-locked territory, so a blocker on the shortest path is not
+ *  a blocker if a peaceful detour exists. Prompting war for it anyway (the pre-fix
+ *  behaviour) pushed players into wars the move never needed. Empty ⇒ move is free. */
 function peaceBlockers(from: string | null, toId: string): string[] {
   if (!from || from === toId) return [];
-  const route = planRoute(s, from, toId) ?? [toId]; // hops after `from`, incl. dest
+  const peaceLocked = (id: string): boolean => {
+    const owner = s.planets[id]?.owner ?? null;
+    return owner != null && !canTraverse(s, ME, owner);
+  };
+  // The same veto predicate the kernel replans with; planRoute exempts the
+  // destination, so a reachable-by-detour move reports at most the DESTINATION's
+  // owner (landing on their world genuinely needs the war declaration).
+  const route = planRoute(s, from, toId, peaceLocked) ?? planRoute(s, from, toId) ?? [toId];
   const set = new Set<string>();
   for (const hop of route) {
     const owner = s.planets[hop]?.owner ?? null;
@@ -2810,7 +2835,12 @@ function resolvePendingMerges() {
       return false; // co-located & idle → fused, order complete
     }
     const dest = a.location ?? a.movement?.to ?? null;
-    if (!m.movement && dest && m.location !== dest) playerOrder(moveFleet(ME, mover, dest));
+    if (!m.movement && dest && m.location !== dest) {
+      // Consume-on-reject: отвергнутый догоняющий ход (нет права прохода и т.п.)
+      // выбрасывает слияние, иначе idle-флот пережимал бы его каждый кадр —
+      // бесконечные «✖ …» (второй такой же цикл нашёл скептик bug-hunt'а).
+      if (!playerOrder(moveFleet(ME, mover, dest))) return false;
+    }
     return true;
   });
 }
@@ -3200,6 +3230,11 @@ function autoEngage() {
     if (!sectorTypeOf(f.location)?.capturable) continue; // empty space can't be taken
     const here = s.planets[f.location];
     if (!here || here.owner === f.owner) continue;
+    // Auto-storm only worlds we are AT WAR with — the core rejects a peaceful assault
+    // anyway (E_FORBIDDEN), but this loop runs EVERY FRAME: the doomed order re-pressed
+    // 60 раз в секунду и сыпал «действие запрещено» без остановки (живой плейтест).
+    // Зеркало того же гейта в serverDrivers.ts (auto-storm only at war).
+    if (here.owner !== null && getStance(s, f.owner, here.owner) !== 'war') continue;
     const enemyHere = Object.values(s.fleets).some(
       (g) => g.owner !== f.owner && g.location === f.location && g.units.some((u) => u.count > 0),
     );
@@ -4885,11 +4920,13 @@ function render(now: number) {
     for (const p of loads) (isSquadron(p.unit) ? diaRow : sqRow).push({ kind: 'load', load: p });
     // The same rotation the pyramid uses; local +y = the tail. Pips and the ship
     // count are placed through this, drawn upright at their rotated spots.
-    const th = A.ang + Math.PI / 2;
-    const tailAt = (lx: number, ly: number): { x: number; y: number } => ({
-      x: A.x + lx * Math.cos(th) - ly * Math.sin(th),
-      y: A.y + lx * Math.sin(th) + ly * Math.cos(th),
-    });
+    // Стоящий у мира флот ниже ORBIT_ZOOM_IN стоит РАДИАЛЬНО, и его хвост смотрел
+    // внутрь орбиты — после ужатия кольца пипсы ложились на диск планеты; для этой
+    // позы хвост разворачивается наружу (геометрия и причина — markerTail.ts).
+    const staticDock = !f.movement && f.location !== null && !orbitsLive();
+    const th = tailTheta(A.ang, staticDock);
+    const tailAt = (lx: number, ly: number): { x: number; y: number } =>
+      tailPoint(A.x, A.y, th, lx, ly);
     const CELL = 8,
       SQ = 5,
       DS = 3.1, // squadron pip: a diamond with the footprint of the square
@@ -5153,11 +5190,12 @@ function buildButtons(_planetId: string, ids: string[], kind: 'building' | 'unit
         costText(kind === 'unit' ? data.units[id]?.cost : data.buildings[id]?.cost),
         true,
         // Buildings are one-per-planet — grey out a committed (queued/building/paused)
-        // one so a second order can't be placed. PC only (the mobile build UI is frozen
-        // in this chat); units stack freely so they're never locked.
-        kind === 'building' && pcUi() && !NET
-          ? (buildingLocked(_planetId, id) ?? undefined)
-          : undefined,
+        // one so a second order can't be placed. On EVERY layout and in net play too:
+        // условие `pcUi() && !NET` оставляло плитку кликабельной на телефоне и на
+        // сервере, и налоговую управу можно было заказать дважды (живой плейтест).
+        // buildingLocked читает p.buildings + scheduled + pausedConstruction — всё это
+        // есть и в сетевых снапшотах. Units stack freely so they're never locked.
+        kind === 'building' ? (buildingLocked(_planetId, id) ?? undefined) : undefined,
       ),
     )
     .join('');
@@ -6485,8 +6523,10 @@ function codexBuildBtn(kind: string, id: string): string {
   if (!p || p.owner !== ME) return ''; // only when you're looking at one of your worlds
   if (kind === 'b') {
     const buildable = (sectorTypeOf(p.id)?.allowedBuildings ?? BUILDABLE).includes(id);
-    const built = p.buildings.some((b) => b.type === id);
-    if (!buildable || built) return '';
+    // buildingLocked, а не только «уже стоит»: СТРОЯЩЕЕСЯ здание ещё не в p.buildings
+    // (оно попадает туда на construction.complete), и кодекс предлагал «Построить
+    // здесь» второй экземпляр одноэкземплярного здания всю стройку первого.
+    if (!buildable || buildingLocked(p.id, id)) return '';
     return `<button class="cx-build" data-build="building:${id}">▣ ${t('codex.build-here')} · ${cost(data.buildings[id]?.cost, myRes())}</button>`;
   }
   if (kind === 'u' && data.units[id]) {
@@ -7198,14 +7238,9 @@ side.addEventListener('click', (ev) => {
     // on hover — building/task name, current vs full output, ETA.
     if (MOBILE) {
       const key = (ev.target as HTMLElement).closest<HTMLElement>('[data-desc]')?.dataset.desc ?? null;
-      // stat:/tab:/division dossiers exist for the PC hover tooltip only — the
-      // mobile tap behaviour stays exactly as it was before they were added.
-      if (
-        key !== null &&
-        !key.startsWith('stat:') &&
-        !key.startsWith('tab:') &&
-        key !== 'division'
-      ) {
+      // stat:/tab: dossiers exist for the PC hover tooltip only — the mobile tap
+      // behaviour stays exactly as it was before they were added.
+      if (key !== null && !key.startsWith('stat:') && !key.startsWith('tab:')) {
         openDossier(key);
       }
     }
