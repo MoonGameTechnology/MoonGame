@@ -666,6 +666,27 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
   /* кнопки строки — под палец, как в окне меток */
   .fr-b{padding:11px 12px;}
 }
+/* RANK-1: вкладка «Рейтинги» — доски командиров и корпораций под общими подвкладками */
+.rk-tabs{display:flex;gap:6px;padding:0 0 10px;}
+.rk-tab{flex:1;padding:9px 10px;border:1px solid var(--line-hi);border-radius:9px;background:transparent;
+  color:var(--dim);font:700 11px ui-monospace,monospace;cursor:pointer;letter-spacing:.4px;}
+.rk-tab.on{color:#04231c;background:linear-gradient(180deg,var(--grn),#4fe0b0);border-color:var(--grn);}
+.rk-total{padding:0 2px 8px;font-size:10px;color:var(--dim);}
+.rk-list{display:flex;flex-direction:column;gap:6px;}
+.rk-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--line);
+  border-radius:10px;background:rgba(6,16,20,.6);}
+/* Своя строка подсвечена НА СВОЁМ месте: поднимать её наверх было бы удобнее и лживее */
+.rk-row.me{border-color:var(--cyan);background:rgba(53,214,230,.10);}
+.rk-n{flex:0 0 30px;text-align:center;font:700 12px ui-monospace,monospace;font-style:normal;color:var(--dim);}
+.rk-n.top{font-size:15px;}
+.rk-txt{flex:1;min-width:0;}
+.rk-txt b{display:block;font-size:13px;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.rk-txt span{display:block;font-size:11px;color:var(--dim);}
+.rk-sc{flex:0 0 auto;font:700 13px ui-monospace,monospace;color:var(--grn);font-variant-numeric:tabular-nums;}
+.rk-sc i{margin-left:3px;font-style:normal;font-size:9px;color:var(--dim);font-weight:400;}
+/* Моё место, когда оно вне страницы — прикреплено снизу, с НАСТОЯЩИМ номером */
+.rk-mine{margin-top:10px;padding-top:10px;border-top:1px dashed var(--line-hi);}
+.rk-none{font-size:11px;color:var(--dim);text-align:center;padding:4px 0;}
 /* PING-PANEL: список меток коалиции — своих и союзных */
 #pingpanel{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:60;display:none;
   width:min(520px,92vw);max-height:70vh;overflow:auto;background:rgba(6,16,20,.97);
@@ -2661,9 +2682,7 @@ const page = (js) => `<!doctype html>
     </div>
     <div class="hub-panel" id="hp-meta" style="display:none"></div>
     <div class="hub-panel" id="hp-arsenal" style="display:none"></div>
-    <div class="hub-panel" id="hp-rank" style="display:none">
-      <div class="hub-empty"><span class="he-ic">▤</span><span data-i18n="hub.rank.empty.title"></span><br><span style="font-size:11px;color:var(--cyan-dim)" data-i18n="hub.rank.empty.sub"></span></div>
-    </div>
+    <div class="hub-panel" id="hp-rank" style="display:none"></div>
     <div class="hub-panel" id="hp-friends" style="display:none"></div>
     <div class="hub-panel" id="hp-ally" style="display:none">
       <div class="hub-empty"><span class="he-ic">⚑</span><span data-i18n="hub.ally.empty.title"></span><br><span style="font-size:11px;color:var(--cyan-dim)" data-i18n="hub.ally.empty.sub"></span></div>

@@ -362,6 +362,7 @@ import { resolveIntro, parseSeenIntros, type IntroCard } from './intros';
 import { buildRecap, type RecapEvent } from './recap';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
+import { initRank } from './rankScreen';
 import { combatRanges } from './combatRanges';
 import { corridorLines } from './corridorView';
 import { recapAdmits } from './recapGate';
@@ -8711,6 +8712,7 @@ function hubTab(tab: string): void {
   currentHubTab = tab;
   if (tab === 'meta') renderMetaPanel(); // live numbers every visit (XP may have grown)
   if (tab === 'friends') void friends.refresh(); // roster + presence are server truth
+  if (tab === 'rank') void rank.refresh(); // places are computed server-side (RANK-1)
   if (tab === 'arsenal') void arsenal.refresh(); // cache paints now, server refresh trails
   for (const [k, pid] of Object.entries(HUB_PANELS))
     $(pid).style.display = k === tab ? 'flex' : 'none';
@@ -8769,6 +8771,23 @@ $('hp-meta').addEventListener('click', (ev) => {
 // аккаунтов или нет сохранённой сессии читаются одинаково (гостевое состояние).
 const friends = initFriends({
   root: () => $('hp-friends'),
+  authorizedBase: async () => {
+    const srv = resolveServer();
+    if (!srv) return null;
+    await probeAuthMode(srv.base);
+    if (!authMode) return null;
+    const token = sessionToken(srv.base);
+    return token ? { base: httpBase(srv.base), token } : null;
+  },
+});
+
+// --- «Рейтинги» — commander + corporation boards (hub tab, RANK-1) ----------
+// Доски считает сервер (`leaderboardApi.ts`): своё место — по ВСЕЙ популяции, а не по
+// присланной странице, поэтому клиент его вывести и не смог бы. Доступ — та же
+// политика, что у «Друзей»: переиспользуем добытую входом сессию, пароль ради
+// просмотра не спрашиваем; нет сессии — гостевое состояние с причиной.
+const rank = initRank({
+  root: () => $('hp-rank'),
   authorizedBase: async () => {
     const srv = resolveServer();
     if (!srv) return null;

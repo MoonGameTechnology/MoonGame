@@ -23,6 +23,7 @@ import { registerAuthApi, liveSession } from './authApi';
 import { registerCorpApi } from './corpApi';
 import { MS_PER_DAY } from '@void/shared-core';
 import { registerFriendApi } from './friendApi';
+import { registerLeaderboardApi } from './leaderboardApi';
 import { FriendService } from './friendService';
 import { CorpService } from './corpService';
 import { registerAvaApi, registerAvaFeed } from './avaApi';
@@ -170,6 +171,21 @@ const loadMatch = createMatchLoader({
             const accountId = seatAccount[playerId];
             return accountId ? [{ accountId, reward }] : [];
           });
+          // Commander XP (EC-*): the core already computed the per-seat reward table;
+          // bank it onto the accounts, exactly once per match (creditMatch's durable
+          // marker survives a restart that re-observes the same end). Until RANK-1 this
+          // host rolled drops from `rewards` but banked no XP at all — only the playtest
+          // netserver did — so a production account's lifetime XP never moved.
+          void stores.commanderStore
+            .creditMatch(
+              matchId,
+              entries.map(({ accountId, reward }) => ({ accountId, xp: reward.xp })),
+            )
+            .catch((err) => {
+              process.stderr.write(
+                `commander xp credit failed for ${matchId} — ${err instanceof Error ? err.message : String(err)}\n`,
+              );
+            });
           void awardMatchDrops(
             {
               drops: stores.dropStore,
@@ -462,6 +478,15 @@ const server = createMultiplayerServer({
                 return null;
               },
             },
+          });
+          // Leaderboards (RANK-1) — «Рейтинги» in the hub: commander XP + corp
+          // influence in ONE response, because the screen shows them as tabs and
+          // switching a tab must not cost a round-trip.
+          registerLeaderboardApi(scope, {
+            commanders: stores.commanderStore,
+            users: stores.userStore,
+            corps: stores.corpStore,
+            identify,
           });
           // Web Push subscriptions (ONB-5) — session-gated like the rest; the /push/key
           // route itself is only mounted when VAPID is configured.
