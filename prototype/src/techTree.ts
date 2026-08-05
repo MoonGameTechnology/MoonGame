@@ -358,18 +358,36 @@ export function initTechTree(host: TechHost): {
 } {
   let tab = 'space'; // активная вкладка-ветка
   let modalId: string | null = null; // открытое досье узла
+  // Появление досье анимируется одноразовым классом .pop: живой 500мс-ререндер окна
+  // пересоздаёт DOM, и анимация на самом .tt-mwin переигрывалась бы каждый тик —
+  // досье «схлопывалось и выпрыгивало» дважды в секунду (баг живого плейтеста).
+  let modalPop = false;
+  // Кэш разметки в духе lastCmdHtml/lastPanelHtml из main.ts: одинаковую строку не
+  // переприсваиваем — innerHTML пересоздаёт DOM даже на идентичном тексте (и выбивал
+  // бы элемент из-под пальца между touchstart и click).
+  let lastHtml = '';
 
   function repaint(): void {
     const body = host.body();
-    // A live re-render (innerHTML) would reset the panel's scroll — save and restore it.
-    const before = body.querySelector('.tt-scroll');
-    const sx = before?.scrollLeft ?? 0;
-    const sy = before?.scrollTop ?? 0;
-    body.innerHTML = techTreeHtml(host.state(), host.me(), tab, modalId);
-    const after = body.querySelector('.tt-scroll');
-    if (after) {
-      after.scrollLeft = sx;
-      after.scrollTop = sy;
+    const html = techTreeHtml(host.state(), host.me(), tab, modalId);
+    if (html !== lastHtml) {
+      // A live re-render (innerHTML) would reset the panel's scroll — save and restore it.
+      const before = body.querySelector('.tt-scroll');
+      const sx = before?.scrollLeft ?? 0;
+      const sy = before?.scrollTop ?? 0;
+      body.innerHTML = html;
+      lastHtml = html;
+      const after = body.querySelector('.tt-scroll');
+      if (after) {
+        after.scrollLeft = sx;
+        after.scrollTop = sy;
+      }
+    }
+    if (modalPop) {
+      // Класс мутирует DOM, но кэш сравнивает СТРОКУ разметки, а не живой DOM —
+      // .pop не делает кэш вечно «грязным».
+      body.querySelector('.tt-mwin')?.classList.add('pop');
+      modalPop = false;
     }
   }
 
@@ -403,6 +421,7 @@ export function initTechTree(host: TechHost): {
     const node = (tg.closest('.tt-node') as HTMLElement | null)?.dataset.tech;
     if (node) {
       modalId = node;
+      modalPop = true; // реальное открытие досье — единственный случай с анимацией
       repaint();
     }
   });
