@@ -549,11 +549,6 @@ export const ru: Record<string, string> = {
     'Автономная крепость, возведённая в астероидное поле: {d} к обороне и {hp} прочности. Превращает безликий перекрёсток в укреплённый узел с орбитой и ПКО',
   'dossier.building.tax-office':
     'Налоговая управа имперского образца: сама ничего не добывает, но ставит на учёт население мира и поднимает его кредитный сбор на {b}.',
-  'dossier.divdesign.desc': 'Редактор шаблонов: состав слотов и доктрина дивизий.',
-  'dossier.divdesign.name': 'Конструктор дивизий',
-  'dossier.division.desc':
-    'Наземное соединение, собранное по шаблону. Обороняет мир; грузится на флот из панели флота.',
-  'dossier.division.name': 'Дивизия',
   'dossier.fleet.desc':
     'Мобильное оперативное соединение кораблей. Выберите его, чтобы отдавать приказы на манёвр, орбиту и удар по врагу.',
   'dossier.fleet.name': 'Флот',
@@ -901,8 +896,11 @@ export const ru: Record<string, string> = {
 
   // --- err — Отказы ядра (kernel rejection codes). Ключ выводится из кода: E_NO_CAPACITY → err.no-capacity.
   'err.already': 'уже действует',
+  'err.already-built': 'уже построено — уровень растёт улучшением',
   'err.already-fitted': 'фиттинг уже установлен',
   'err.already-offered': 'предложение уже отправлено',
+  'err.already-paused': 'стройка уже приостановлена — возобновите её',
+  'err.already-queued': 'уже в очереди стройки',
   'err.already-unlocked': 'узел уже изучен',
   'err.bad-effect': 'способность настроена некорректно',
   'err.bad-payload': 'некорректный приказ',
@@ -938,6 +936,7 @@ export const ru: Record<string, string> = {
   'err.no-node': 'неизвестный узел дерева',
   'err.no-planet': 'мир не найден',
   'err.no-player': 'игрок не найден',
+  'err.no-right-of-way': 'нет права прохода: маршрут только через территорию мирной державы',
   'err.no-ships': 'нет кораблей',
   'err.no-shipyard': 'нужна верфь/космопорт',
   'err.no-slots': 'слоты фиттингов заняты',
@@ -1823,7 +1822,6 @@ export const ru: Record<string, string> = {
   'welcome.update-check': 'Проверить обновления',
 
   // --- win — Заголовки окон матча (сводки, технологии, хранитель, конструкторы).
-  'win.divdesign.title': 'КОНСТРУКТОР ДИВИЗИЙ',
   'win.log.recap': 'Сводка возвращения',
   'win.log.title': 'СВОДКИ',
   'win.scipick.back': '↩ В меню',
