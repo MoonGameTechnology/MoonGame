@@ -150,12 +150,20 @@ describe('movement module — orders & validation (OWASP A01)', () => {
     expect(errCode(kernel.applyAction(st, move('F', 'A'), ctx(0)))).toBe('E_SAME_LOCATION');
   });
 
-  it('rejects moving a fleet that is already in transit', () => {
+  it('флот в пути НЕ «занят» для нового курса — занят только бой', () => {
+    // Раньше здесь стояло обратное утверждение — оно документировало жалобу
+    // плейтеста «поменять курс нельзя, пишет флот занят». Полное поведение
+    // переназначения держит блок «movement — RETASK» ниже.
     const kernel = createKernel([movementModule]);
     const moving = fleet('F', 'p1', null, ['scout']);
     moving.movement = { from: 'A', to: 'B', departedAt: 0, arrivesAt: 10 * HOUR };
     const st = baseState(fieldAB(), [moving]);
-    expect(errCode(kernel.applyAction(st, move('F', 'B'), ctx(0)))).toBe('E_FLEET_BUSY');
+    expect(kernel.applyAction(st, move('F', 'B'), ctx(0)).ok).toBe(true);
+    const fighting = fleet('G', 'p1', null, ['scout']);
+    fighting.movement = { from: 'A', to: 'B', departedAt: 0, arrivesAt: 10 * HOUR };
+    fighting.battleId = 'bt-1';
+    const st2 = baseState(fieldAB(), [fighting]);
+    expect(errCode(kernel.applyAction(st2, move('G', 'B'), ctx(0)))).toBe('E_FLEET_BUSY');
   });
 
   it('rejects an immobile (empty) fleet', () => {
@@ -326,6 +334,68 @@ describe('movement — fleet.stop parks the fleet ON the lane (Bytro continuous 
     const r = kernel.applyAction(st, stop('F'), ctx(0));
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.code).toBe('E_FLEET_BUSY');
+  });
+});
+
+describe('movement — RETASK: новый «Курс» флоту, который уже в пути', () => {
+  // Заказ владельца с плейтеста: «даёшь приказ курс — и поменять его нельзя, пишет
+  // флот занят». Переназначение = стоп в текущей точке + новый маршрут ОДНИМ
+  // действием; композиция stop→move и так была доступна двумя тапами, так что ни один
+  // инвариант не может держаться для одной формы и падать для другой.
+
+  it('флот в пути принимает новый курс и заворачивает с ТЕКУЩЕЙ точки', () => {
+    const kernel = createKernel([movementModule]);
+    const st = baseState(lineABC(), [fleet('F', 'p1', 'A', ['scout'])]);
+    const going = okApply(kernel.applyAction(st, move('F', 'C'), ctx(0)));
+    expect(going.state.fleets.F?.movement?.destination).toBe('C');
+
+    // 1ч из 3ч по плечу A→B (треть лейна) — разворачиваем домой на A.
+    const back = okApply(kernel.applyAction(going.state, move('F', 'A'), ctx(HOUR)));
+    const mv = back.state.fleets.F?.movement;
+    expect(mv?.destination).toBe('A');
+    // 10 юнитов до A на скорости 10 → час пути: прибытие в 2ч, а не «с нуля»
+    // (closeTo: точка парковки клампится EPS'ом, отсюда float-пыль).
+    expect(mv?.arrivesAt).toBeCloseTo(2 * HOUR, 3);
+    expect(back.events.map((e) => e.type)).toContain('fleet.departed');
+    // Транзитной парковки не видно снаружи: флот здесь не ОСТАНАВЛИВАЛСЯ.
+    expect(back.events.map((e) => e.type)).not.toContain('fleet.parked');
+
+    const home = okAdvance(kernel.advanceTo(back.state, ctx(2 * HOUR)));
+    expect(home.state.fleets.F?.location).toBe('A');
+  });
+
+  it('брошенное плечо не дострелит: его протухшее прибытие игнорируется', () => {
+    const kernel = createKernel([movementModule]);
+    const st = baseState(lineABC(), [fleet('F', 'p1', 'A', ['scout'])]);
+    const going = okApply(kernel.applyAction(st, move('F', 'C'), ctx(0)));
+    const back = okApply(kernel.applyAction(going.state, move('F', 'A'), ctx(HOUR)));
+    // Старое прибытие A→B стояло на 3ч. Проматываем СКВОЗЬ него: флот обязан
+    // остаться дома на A, а не телепортироваться на B брошенным плечом.
+    const later = okAdvance(kernel.advanceTo(back.state, ctx(4 * HOUR)));
+    expect(later.state.fleets.F?.location).toBe('A');
+    expect(later.state.fleets.F?.movement).toBe(null);
+  });
+
+  it('неудачное переназначение оставляет СТАРЫЙ курс, а не бросает флот посреди лейна', () => {
+    const kernel = createKernel([movementModule]);
+    const island = { ...planet('D', null, 0, 300), links: [] }; // не связан лейнами
+    const st = baseState([...lineABC(), island], [fleet('F', 'p1', 'A', ['scout'])]);
+    const going = okApply(kernel.applyAction(st, move('F', 'C'), ctx(0)));
+    const r = kernel.applyAction(going.state, move('F', 'D'), ctx(HOUR));
+    expect(errCode(r)).toBe('E_NO_ROUTE');
+    // Вход не тронут (чистота), и старый приказ доезжает как ни в чём не бывало.
+    expect(going.state.fleets.F?.movement?.destination).toBe('C');
+    const arrived = okAdvance(kernel.advanceTo(going.state, ctx(6 * HOUR)));
+    expect(arrived.state.fleets.F?.location).toBe('C');
+  });
+
+  it('в бою переназначить курс по-прежнему нельзя', () => {
+    const kernel = createKernel([movementModule]);
+    const st = baseState(lineABC(), [fleet('F', 'p1', 'A', ['scout'])]);
+    const going = okApply(kernel.applyAction(st, move('F', 'C'), ctx(0)));
+    going.state.fleets.F!.battleId = 'bt-1';
+    const r = kernel.applyAction(going.state, move('F', 'A'), ctx(HOUR));
+    expect(errCode(r)).toBe('E_FLEET_BUSY');
   });
 });
 
