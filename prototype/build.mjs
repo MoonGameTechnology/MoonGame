@@ -639,6 +639,23 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 .dp-map.on{color:#8ff0c2;border-color:#8ff0c2;background:rgba(111,214,164,.14);}
 .dp-map.offer{color:#8ff0c2;border-color:#8ff0c2;animation:sppulse 1.6s ease-in-out infinite;}
 .dp-map.pend,.dp-map:disabled{opacity:.5;cursor:default;}
+/* PING-PANEL: список меток коалиции — своих и союзных */
+#pingpanel{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:60;display:none;
+  width:min(520px,92vw);max-height:70vh;overflow:auto;background:rgba(6,16,20,.97);
+  border:1px solid var(--line);border-radius:10px;padding:0;box-shadow:0 10px 40px rgba(0,0,0,.6);}
+#pingpanel.show{display:block;}
+.pp-head{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);}
+.pp-head b{flex:1;letter-spacing:.08em;}
+.pp-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(46,150,160,.14);}
+.pp-row.off{opacity:.45;}
+.pp-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;}
+.pp-txt{flex:1;min-width:0;}
+.pp-txt b{display:block;font-size:12px;}
+.pp-txt span{display:block;font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pp-row button{border:1px solid var(--line);background:transparent;color:var(--dim);border-radius:6px;
+  padding:4px 7px;font:700 11px ui-monospace,monospace;cursor:pointer;}
+.pp-row button:hover{border-color:var(--cyan);color:var(--cyan);}
+.pp-empty{padding:16px 12px;color:var(--dim);font-size:12px;}
 .dp-intel{padding:2px 10px 9px 39px;font-size:11px;color:var(--cyan);}
 .dp-intel b{color:#eafffb;}
 /* SPY-UX: вкладка «Шпионаж» — активные окна интела, операции, сессионный журнал */
@@ -2368,6 +2385,7 @@ const page = (js) => `<!doctype html>
   <div id="railtools">
     <button id="rail-diplo" data-i18n-title="rail.diplo.title">⬡<span class="rlbl" data-i18n="rail.diplo.label"></span></button>
     <button id="rail-msgs" data-i18n-title="rail.msgs.title">✉<span class="rlbl" data-i18n="rail.msgs.label"></span><b id="msgbadge" class="railbadge" style="display:none"></b></button>
+    <button id="rail-pings" data-i18n-title="rail.pings.title">📍<span class="rlbl" data-i18n="rail.pings.label"></span></button>
     <button id="rail-tech" data-i18n-title="rail.tech.title">⚛<span class="rlbl" data-i18n="rail.tech.label"></span></button>
     <button id="rail-constructor" data-i18n-title="rail.constructor.title">⚒<span class="rlbl" data-i18n="rail.constructor.label"></span></button>
     <button id="rail-steward" data-i18n-title="rail.steward.title">😴<span class="rlbl" data-i18n="rail.steward.label"></span></button>
@@ -2419,6 +2437,7 @@ const page = (js) => `<!doctype html>
 <div id="warprompt"></div>
 <div id="diplo"></div>
 <div id="pingpop"></div>
+  <div id="pingpanel"></div>
 <div id="tgted"></div>
 <div id="objtip"></div>
 <div id="splitdlg"></div>
