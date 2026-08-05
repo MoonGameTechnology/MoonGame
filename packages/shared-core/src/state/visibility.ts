@@ -1,6 +1,6 @@
 import { buildingLevel, type GameData } from '../data/schemas';
 import { deepClone } from '../util/clone';
-import { getStance, offerInvolves } from './diplomacy';
+import { getStance, hasMapShare, offerInvolves } from './diplomacy';
 import { fleetNodeAt, fleetPositionAt } from './fleetPosition';
 import type { Fleet, GameState, PlanetId, PlayerId, ScheduledEvent } from './gameState';
 
@@ -188,7 +188,13 @@ interface Coverage {
 function visionBloc(state: GameState, viewerId: PlayerId): PlayerId[] {
   const bloc: PlayerId[] = [viewerId];
   for (const id of Object.keys(state.players)) {
-    if (id !== viewerId && getStance(state, viewerId, id) === 'alliance') bloc.push(id);
+    if (id === viewerId) continue;
+    // MAPSHARE-1: карту делит и СОЮЗ, и отдельный договор об обмене картами. Второй
+    // ортогонален лестнице стоек — его заключают и при мире, и при пакте, — но на
+    // разведку действует ровно так же, поэтому вход в блок зрения один.
+    if (getStance(state, viewerId, id) === 'alliance' || hasMapShare(state, viewerId, id)) {
+      bloc.push(id);
+    }
   }
   return bloc;
 }
@@ -393,6 +399,13 @@ function project(
   // peace with whom. Keep only offers the viewer sends or receives; a map left
   // EMPTY after the strip is removed entirely — otherwise the undefined→{} flip
   // rides a third party's delta and leaks "someone made the match's first offer".
+  if (view.mapShareOffers) {
+    // MAPSHARE-1: предложение обмена картами — переговоры двоих, как и стоечный оффер.
+    for (const key of Object.keys(view.mapShareOffers)) {
+      if (!offerInvolves(key, viewerId)) delete view.mapShareOffers[key];
+    }
+    if (Object.keys(view.mapShareOffers).length === 0) delete view.mapShareOffers;
+  }
   if (view.diplomacyOffers) {
     for (const key of Object.keys(view.diplomacyOffers)) {
       if (!offerInvolves(key, viewerId)) delete view.diplomacyOffers[key];

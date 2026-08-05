@@ -22,6 +22,8 @@ export { HOUR, DAY } from './time';
 // module enforces — one table, no drift) + the Steward reads.
 export {
   STANCE_RANK,
+  hasMapShare,
+  hasMapShareOffer,
   stewardActive,
   STEWARD_POSTURES,
   MAX_STEWARD_HOLD_POINTS,
@@ -162,6 +164,7 @@ export {
   recallSteward,
   setHoldPoint,
   declareWar,
+  shareMap,
   spyOn,
   canTraverse,
   castHeroAbility,

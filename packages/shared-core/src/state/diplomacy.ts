@@ -142,3 +142,48 @@ export function setStance(
   if (a === b) return;
   (state.diplomacy ??= {})[pairKey(a, b)] = stance;
 }
+
+// --- MAPSHARE-1: обмен картами ------------------------------------------------
+// Отдельное соглашение поверх лестницы стоек (см. `GameState.mapShares`). Примитивы
+// зеркалят стоечные: симметричный договор + направленные предложения, обе карты
+// удаляются при опустошении, чтобы состояние без договоров сериализовалось так же,
+// как то, где их никогда не было.
+
+/** Есть ли между игроками действующий договор об обмене картами. */
+export function hasMapShare(state: GameState, a: PlayerId, b: PlayerId): boolean {
+  if (a === b) return false;
+  return state.mapShares?.[pairKey(a, b)] === true;
+}
+
+/** Заключить (`on`) или расторгнуть договор. Draft-мутатор, как {@link setStance}. */
+export function setMapShare(state: GameState, a: PlayerId, b: PlayerId, on: boolean): void {
+  if (a === b) return;
+  if (on) {
+    (state.mapShares ??= {})[pairKey(a, b)] = true;
+    return;
+  }
+  const shares = state.mapShares;
+  if (!shares) return;
+  delete shares[pairKey(a, b)];
+  if (Object.keys(shares).length === 0) delete state.mapShares;
+}
+
+/** Предлагал ли `from` обмен картами игроку `to`. */
+export function hasMapShareOffer(state: GameState, from: PlayerId, to: PlayerId): boolean {
+  return state.mapShareOffers?.[offerKey(from, to)] === true;
+}
+
+/** Записать предложение обмена картами. */
+export function setMapShareOffer(state: GameState, from: PlayerId, to: PlayerId): void {
+  if (from === to) return;
+  (state.mapShareOffers ??= {})[offerKey(from, to)] = true;
+}
+
+/** Снять предложения обмена в ОБЕ стороны (коммит, отказ, объявление войны). */
+export function clearMapShareOffers(state: GameState, a: PlayerId, b: PlayerId): void {
+  const offers = state.mapShareOffers;
+  if (!offers) return;
+  delete offers[offerKey(a, b)];
+  delete offers[offerKey(b, a)];
+  if (Object.keys(offers).length === 0) delete state.mapShareOffers;
+}
