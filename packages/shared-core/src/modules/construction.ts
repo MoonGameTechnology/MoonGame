@@ -77,7 +77,10 @@ function scaleCost(cost: ResourceBag, count: number): ResourceBag {
  *  represents, from data — the exact same lookups used when the order was first
  *  placed. Null for a malformed/unrecognized payload (fail-secure: cancel/resume
  *  reject rather than guess). */
-function orderSpec(data: GameData, p: CompletePayload): { hours: number; cost: ResourceBag } | null {
+function orderSpec(
+  data: GameData,
+  p: CompletePayload,
+): { hours: number; cost: ResourceBag } | null {
   if (p.kind === 'building' && typeof p.building === 'string') {
     const def = data.buildings[p.building];
     if (!def) return null;
@@ -94,7 +97,9 @@ function orderSpec(data: GameData, p: CompletePayload): { hours: number; cost: R
     const def = data.units[p.unit];
     if (!def) return null;
     const perShip =
-      p.modules && p.modules.length > 0 ? sumBags(def.cost, loadoutCost(p.modules, data)) : def.cost;
+      p.modules && p.modules.length > 0
+        ? sumBags(def.cost, loadoutCost(p.modules, data))
+        : def.cost;
     return { hours: def.buildTimeHours, cost: scaleCost(perShip, p.count) };
   }
   return null;
@@ -274,7 +279,11 @@ export const constructionModule: GameModule = {
       if (isQueued(h, 'building', planet.id, payload.building)) {
         return h.reject('E_ALREADY_QUEUED');
       }
-      if (planet.pausedConstruction?.some((s) => s.kind === 'building' && s.building === payload.building)) {
+      if (
+        planet.pausedConstruction?.some(
+          (s) => s.kind === 'building' && s.building === payload.building,
+        )
+      ) {
         return h.reject('E_ALREADY_PAUSED'); // resume it instead of re-ordering fresh
       }
       const level1 = buildingLevel(def, 1);
@@ -320,7 +329,9 @@ export const constructionModule: GameModule = {
       if (isQueued(h, 'upgrade', planet.id, instance.type)) {
         return h.reject('E_ALREADY_QUEUED');
       }
-      if (planet.pausedConstruction?.some((s) => s.kind === 'upgrade' && s.building === instance.type)) {
+      if (
+        planet.pausedConstruction?.some((s) => s.kind === 'upgrade' && s.building === instance.type)
+      ) {
         return h.reject('E_ALREADY_PAUSED'); // resume it instead of re-ordering fresh
       }
       const next = buildingLevel(def, nextLevel);
@@ -487,7 +498,11 @@ export const constructionModule: GameModule = {
         if (isQueued(h, 'building', planet.id, site.building)) {
           return h.reject('E_ALREADY_QUEUED');
         }
-      } else if (site.kind === 'upgrade' && typeof site.building === 'string' && typeof site.level === 'number') {
+      } else if (
+        site.kind === 'upgrade' &&
+        typeof site.building === 'string' &&
+        typeof site.level === 'number'
+      ) {
         const instance = planet.buildings.find((b) => b.type === site.building);
         if (!instance || instance.level !== site.level - 1) {
           return h.reject('E_STALE_CONSTRUCTION'); // building moved on without this upgrade
@@ -535,8 +550,13 @@ export const constructionModule: GameModule = {
         return;
       }
       if (p.kind === 'building' && typeof p.building === 'string') {
-        if (planet.buildings.some((b) => b.type === p.building)) {
-          return; // already present (e.g. a duplicate queued order) → no-op
+        // Same instance cap as the order gate, read from the same data field. This is
+        // the LAST barrier (a duplicate/replayed completion must not double-build), so
+        // it has to move with `maxPerPlanet` too: leaving `some(...)` here would accept
+        // the order for a second instance, take the payment, then silently drop the
+        // result. With the default cap of 1 this is bit-identical to the old check.
+        if (atInstanceCap(h, planet, p.building)) {
+          return; // cap reached (e.g. a duplicate queued order) → no-op
         }
         const def = h.ctx.data.buildings[p.building];
         const hp = def ? buildingLevel(def, 1).hp : 0;
@@ -722,7 +742,10 @@ export const constructionModule: GameModule = {
             const fullShield = stack.count * (effectiveStats(unitDef, stack, data).shield ?? 0);
             if (fullShield <= 0 || stack.shieldHp >= fullShield) stack.shieldHp = undefined;
             else if (shieldHours > 0) {
-              const cur = Math.min(fullShield, stack.shieldHp + SHIELD_REGEN * shieldHours * fullShield);
+              const cur = Math.min(
+                fullShield,
+                stack.shieldHp + SHIELD_REGEN * shieldHours * fullShield,
+              );
               stack.shieldHp = cur >= fullShield ? undefined : cur;
             }
           }
