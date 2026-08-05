@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { setLocale } from '../../localization/runtime';
+import { setLocale, tData } from '../../localization/runtime';
 import { data } from './prototypeData';
 import {
   sciInfluenceText,
@@ -100,7 +100,10 @@ describe('совет учёных — влияние кандидата', () => 
     if (!withGate) return; // в бандле нет гейченных техов — правило проверять не на чем
     const text = sciInfluenceText(withGate, data, branchLabel);
     const mine = gated.filter((td) => td.branch === data.scientists[withGate]!.branch);
-    expect(text).toContain(mine[0]!.name.slice(0, 4)); // имя из каталога попало в строку
+    // Имя из каталога попало в строку — ЛОКАЛИЗОВАННОЕ. Прежде тут стоял кусок
+    // английского `name`, и тест был зелёным ровно потому, что перевода не было:
+    // на TT-4 у технологий завелись ключи `data.*`, и сырое имя перестало доезжать.
+    expect(text).toContain(tData(mine[0]!.name));
   });
 });
 
