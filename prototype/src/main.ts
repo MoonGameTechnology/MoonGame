@@ -477,6 +477,12 @@ const SEAT_META: ReadonlyArray<{ id: string; name: string; faction: string; colo
 ];
 const GRID = 'rgba(46,150,160,0.07)';
 const LOCK = '#7df0d0'; // selection / targeting reticle accent
+// CAST-UX: круги прицела каста. Отдельные имена, а не переиспользование LOCK, потому
+// что дальность и область — РАЗНЫЕ сущности, и игрок должен различать их с одного
+// взгляда: тонкий пунктир «докуда достану» против залитого пятна «что накроет».
+const CAST_REACH = '#7df0d0'; // круг дальности способности
+const CAST_AREA = '#9ad7ff'; // круг области действия (AoE)
+const CAST_FAR = '#ff6b6b'; // цель вне дальности — подсказка, вердикт всё равно за ядром
 const TAU = Math.PI * 2;
 const TOP = 50; // top-bar height
 const RAIL = 50; // left-rail width
@@ -3809,6 +3815,51 @@ function drawAssaultTargets() {
   cx.restore();
 }
 
+/**
+ * CAST-UX — что видно, пока целишься способностью героя: КРУГ ДАЛЬНОСТИ вокруг
+ * кастующего (`def.range`, те же мировые единицы, что у ядра) и, если способность
+ * площадная, КРУГ ОБЛАСТИ под прицелом (`params.radius`).
+ *
+ * Оба радиуса берутся из каталога, а не из констант интерфейса: правило «докуда
+ * достаёт» живёт в данных, и картинка обязана показывать ровно его, иначе игрок
+ * целится по одной границе, а ядро считает по другой.
+ *
+ * Цель за пределами дальности красится отказом — это подсказка, а не запрет: финальный
+ * вердикт всё равно за ядром (`E_OUT_OF_RANGE`).
+ */
+function drawCastAim(): void {
+  if (!heroAim || !aimPointer) return;
+  const hero = (s.heroes ?? {})[heroAim.heroId];
+  const def = data.heroAbilities[heroAim.abilityId];
+  if (!hero || !def) return;
+  const fleet = hero.fleetId ? s.fleets[hero.fleetId] : undefined;
+  const origin = fleet ? fleetAnchor(fleet) : null;
+  if (!origin) return;
+  const reach = def.range ?? 0;
+  const aoe = Number(def.params?.radius ?? 0);
+  const far = reach > 0 && Math.hypot(aimPointer.x - origin.x, aimPointer.y - origin.y) > reach * cam.scale;
+  cx.save();
+  if (reach > 0) {
+    cx.strokeStyle = rgba(far ? CAST_FAR : CAST_REACH, 0.5);
+    cx.lineWidth = 1.2;
+    cx.setLineDash([6, 6]);
+    cx.beginPath();
+    cx.arc(origin.x, origin.y, reach * cam.scale, 0, TAU);
+    cx.stroke();
+  }
+  if (aoe > 0) {
+    cx.setLineDash([]);
+    cx.fillStyle = rgba(CAST_AREA, 0.1);
+    cx.strokeStyle = rgba(CAST_AREA, 0.75);
+    cx.lineWidth = 1.4;
+    cx.beginPath();
+    cx.arc(aimPointer.x, aimPointer.y, aoe * cam.scale, 0, TAU);
+    cx.fill();
+    cx.stroke();
+  }
+  cx.restore();
+}
+
 /** While "Move" is armed: a dashed line from each selected fleet to the world under
  *  the pointer (snaps to the nearest blip) — preview before committing. */
 function drawAimPreview() {
@@ -5098,6 +5149,7 @@ function render(now: number) {
   drawChainOverlay(now); // CHAIN-UX: цепочки планов + черновик режима «Приказ»
   drawAssaultTargets();
   drawAimPreview();
+  drawCastAim(); // CAST-UX: дальность каста + область действия
 }
 
 // --- side panel --------------------------------------------------------------
@@ -6916,6 +6968,13 @@ function renderChainBar(): void {
   if (html !== lastCmdHtml) {
     cmdbar.innerHTML = html;
     lastCmdHtml = html;
+  }
+  // CAST-UX. Пока каст ПРИЦЕЛИВАЕТСЯ, нижний хаб уходит: он занимает ту самую полосу
+  // экрана, по которой целятся на телефоне, и перекрывает круг дальности. Прицел
+  // снимается любым приказом и самим кастом (`heroAim = null`), так что хаб вернётся.
+  if (heroAim) {
+    cmdbar.classList.remove('show');
+    return;
   }
   cmdbar.classList.add('show');
   updateChainDom();
