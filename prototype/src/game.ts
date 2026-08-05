@@ -39,7 +39,7 @@ export {
 } from './matchSetup';
 
 // --- the kernel assembly point (module ORDER = determinism contract) ---------
-export { MODULES, kernel, SCORE_LIMIT, ctx, advance, order, type StepOut } from './protoKernel';
+export { MODULES, kernel, SCORE_LIMIT, ctx, advance, order, canOrder, type StepOut } from './protoKernel';
 
 // --- economy family ----------------------------------------------------------
 export {

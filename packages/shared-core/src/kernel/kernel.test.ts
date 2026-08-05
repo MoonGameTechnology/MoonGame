@@ -387,3 +387,69 @@ describe('kernel — RNG & time (determinism)', () => {
     expect(next.events[0]?.payload).not.toEqual(res.events[0]?.payload);
   });
 });
+
+// --- RULES-1: «можно ли?» ЗАРАНЕЕ ------------------------------------------
+// canApply — тот же applyAction с выброшенным результатом. Тесты держат ровно то,
+// ради чего он заведён: вердикт СОВПАДАЕТ с редьюсером (иначе «единое правило»
+// разъедется на две реализации, как уже было с рукописными зеркалами в UI),
+// спрашивать безопасно сколько угодно раз, и ответ — код причины, а не голое «нет».
+describe('kernel — canApply (RULES-1)', () => {
+  it('легальное действие → null, нелегальное → тот же код, что у applyAction', () => {
+    const kernel = createKernel([bankModule]);
+    const rich = withPlanet(baseState(), makePlanet('p', 'p1', { credits: 100 }));
+    const poor = withPlanet(baseState(), makePlanet('p', 'p1', { credits: 5 }));
+    const a = action('bank.withdraw', { planetId: 'p', amount: 40 });
+
+    expect(kernel.canApply(rich, a, ctx())).toBeNull();
+    expect(kernel.canApply(poor, a, ctx())).toBe('E_INSUFFICIENT');
+    // паритет с редьюсером — главный инвариант кирпича
+    expect(kernel.canApply(poor, a, ctx())).toBe(expectErr(kernel.applyAction(poor, a, ctx())).code);
+  });
+
+  it('вердикт совпадает с редьюсером на ВСЕХ отказах, а не только на бедности', () => {
+    const kernel = createKernel([bankModule, buggyModule]);
+    const own = withPlanet(baseState(), makePlanet('p', 'p1', { credits: 100 }));
+    const foreign = withPlanet(baseState(), makePlanet('p', 'enemy', { credits: 100 }));
+    const cases: Array<[GameState, Action, Context]> = [
+      [foreign, action('bank.withdraw', { planetId: 'p', amount: 1 }), ctx()], // E_FORBIDDEN
+      [own, action('нет.такого', {}), ctx()], // E_UNKNOWN_ACTION
+      [own, action('buggy.boom', {}), ctx()], // E_INTERNAL
+      [{ ...own, time: 5000 }, action('bank.withdraw', { planetId: 'p', amount: 1 }), ctx(1000)], // E_TIME_BACKWARDS
+      [
+        { ...own, match: { ...own.match, status: 'ended' } } as GameState,
+        action('bank.withdraw', { planetId: 'p', amount: 1 }),
+        ctx(),
+      ], // E_MATCH_ENDED
+    ];
+    for (const [st, act, c] of cases) {
+      const applied = kernel.applyAction(st, act, c);
+      expect(kernel.canApply(st, act, c), act.type).toBe(applied.ok ? null : applied.code);
+    }
+  });
+
+  it('спрашивать безопасно: состояние не мутируется (вход заморожен)', () => {
+    const kernel = createKernel([bankModule]);
+    const state = deepFreeze(withPlanet(baseState(), makePlanet('p', 'p1', { credits: 100 })));
+    const a = action('bank.withdraw', { planetId: 'p', amount: 40 });
+    expect(kernel.canApply(state, a, ctx())).toBeNull();
+    expect(kernel.canApply(state, a, ctx())).toBeNull(); // повторный вопрос — тот же ответ
+    expect(state.planets.p?.resources.credits).toBe(100); // казна нетронута
+  });
+
+  it('вопрос не тратит ход: после проверки применение всё ещё проходит', () => {
+    const kernel = createKernel([bankModule]);
+    const state = withPlanet(baseState(), makePlanet('p', 'p1', { credits: 100 }));
+    const a = action('bank.withdraw', { planetId: 'p', amount: 40 });
+    expect(kernel.canApply(state, a, ctx())).toBeNull();
+    const res = expectOk(kernel.applyAction(state, a, ctx()));
+    expect(res.state.planets.p?.resources.credits).toBe(60);
+  });
+
+  it('детерминизм: вопрос из одного состояния всегда даёт один ответ', () => {
+    const kernel = createKernel([diceModule]);
+    const state = baseState();
+    const a = action('dice.roll', {});
+    const first = kernel.canApply(state, a, ctx());
+    for (let i = 0; i < 5; i++) expect(kernel.canApply(state, a, ctx())).toBe(first);
+  });
+});
