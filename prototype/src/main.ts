@@ -5212,7 +5212,8 @@ function buildButtons(_planetId: string, ids: string[], kind: 'building' | 'unit
         id,
         costText(kind === 'unit' ? data.units[id]?.cost : data.buildings[id]?.cost),
         true,
-        // Buildings are one-per-planet — grey out a committed (queued/building/paused)
+        // Buildings are one-per-planet by default (`maxPerPlanet`, RULES-2) — grey out a
+        // committed (queued/building/paused)
         // one so a second order can't be placed. On EVERY layout and in net play too:
         // условие `pcUi() && !NET` оставляло плитку кликабельной на телефоне и на
         // сервере, и налоговую управу можно было заказать дважды (живой плейтест).
@@ -5915,6 +5916,10 @@ function planetPanelHtml(p: Planet): string {
       // Province-centric roster (data-driven): each province type lists what it can
       // raise (SECTOR_TYPES.allowedBuildings); absent = the default BUILDABLE set.
       const buildable = sectorTypeOf(p.id)?.allowedBuildings ?? BUILDABLE;
+      // Показываем то, чего на мире ещё НЕТ. Это допущение «лимит = 1»: при
+      // `maxPerPlanet > 1` плитка второго экземпляра не погаснет, а исчезнет из меню,
+      // хотя ядро такой заказ разрешило бы. Пока весь каталог на дефолте 1, расхождения
+      // нет; поднимать лимит без правки этой строки нельзя (см. `maxPerPlanet` в схеме).
       const missing = buildable.filter((bt) => !p.buildings.some((b) => b.type === bt));
       if (missing.length) blds += buildButtons(p.id, missing, 'building');
     }
@@ -6481,7 +6486,9 @@ function scrollFeedToEnd(): void {
  *  panel — not in a global HUD strip. Identification is the game tooltip only: the
  *  PC cursor dossier (#objtip, via data-desc) and the mobile long-press bubble
  *  (data-name). No native `title` — it duplicated #objtip as a second, uglier popup. */
-/** A building is one-per-planet (the reducer grows it via upgrade, never a 2nd copy).
+/** A building is one-per-planet BY DEFAULT — since RULES-2 the number is the catalogue's
+ *  `maxPerPlanet`, and the core (not this helper) enforces it; the whole shipped catalogue
+ *  is still on the default 1.
  *  Returns why a fresh build order would be refused — so the build tile can grey out
  *  the moment it's committed (built / building / queued / paused), instead of taking
  *  the order and only rejecting it when the queue reaches it. `null` = orderable. */
