@@ -1202,6 +1202,7 @@ function updateRadarContacts(now: number): void {
         contacts.push({ key: f.id, node: fn, size: sigClass(fleetSignature(f)) });
       }
     }
+    let hit = false; // засекла ли рука хоть кого-то в ЭТОМ кадре
     for (const c of contacts) {
       const node = s.planets[c.node];
       if (!node) continue;
@@ -1213,11 +1214,19 @@ function updateRadarContacts(now: number): void {
         return dx * dx + dy * dy <= a.r * a.r && sweptThisFrame(Math.atan2(dy, dx));
       });
       if (painted) {
+        hit = true;
         if (!radarMemory.has(c.key))
           note(t('threat.contact', { size: c.size, at: c.node }), c.node);
         radarMemory.set(c.key, { node: c.node, size: c.size, at: now });
       }
     }
+    // Пинг гидролокатора в момент засечки. ОДИН на кадр, а не на контакт: рука
+    // пересекает несколько целей разом, и «пачка» звучала бы как сбой, а не как радар
+    // (анти-трель зазор в `SOUND_MIN_GAP` прореживает и сами кадры).
+    //
+    // Звук намеренно НЕ смотрит на `sweepOpacity`: тот гасит только хром развёртки, а
+    // засечка — событие механики, у него своя ручка (общий выключатель звука).
+    if (hit) snd.play('radar');
   }
   sweepPrevAng = sweepAng;
 }

@@ -13,17 +13,34 @@ import {
 const IDS = Object.keys(SOUND_PATCHES) as SoundId[];
 
 describe('патчи — инварианты ненавязчивости', () => {
-  it('каталог покрывает все пять жестов, и у каждого есть анти-трель зазор', () => {
-    expect(IDS.sort()).toEqual(['close', 'error', 'send', 'start', 'tap']);
+  it('каталог покрывает все шесть жестов, и у каждого есть анти-трель зазор', () => {
+    expect(IDS.sort()).toEqual(['close', 'error', 'radar', 'send', 'start', 'tap']);
     for (const id of IDS) expect(SOUND_MIN_GAP[id]).toBeGreaterThan(0);
   });
 
-  it('жесты короткие: тап/закрытие < 0.35с, отказ < 0.6с, флориш < 1.6с, фанфара < 2.2с', () => {
+  it('жесты короткие: тап/закрытие/пинг < 0.35с, отказ < 0.6с, флориш < 1.6с, фанфара < 2.2с', () => {
     expect(patchDuration(SOUND_PATCHES.tap)).toBeLessThan(0.35);
     expect(patchDuration(SOUND_PATCHES.close)).toBeLessThan(0.35);
+    expect(patchDuration(SOUND_PATCHES.radar)).toBeLessThan(0.35);
     expect(patchDuration(SOUND_PATCHES.error)).toBeLessThan(0.6);
     expect(patchDuration(SOUND_PATCHES.send)).toBeLessThan(1.6);
     expect(patchDuration(SOUND_PATCHES.start)).toBeLessThan(2.2);
+  });
+
+  it('пинг развёртки — самый тихий в каталоге: игрок его не вызывал', () => {
+    // Единственный звук, который звучит САМ, без жеста игрока. Поэтому его пик обязан
+    // быть ниже любого звука-ответа, а зазор — длиннее: иначе рабочий радар с полудюжиной
+    // контактов превращает фон приборной панели в трель.
+    const radar = patchPeakBudget(SOUND_PATCHES.radar);
+    for (const id of IDS) {
+      if (id === 'radar') continue;
+      expect(radar).toBeLessThan(patchPeakBudget(SOUND_PATCHES[id]));
+    }
+    // Зазор — не меньше, чем у любого звука-ОТВЕТА на жест (фанфару старта не берём:
+    // она звучит раз за матч, её секунда ни с чем не конкурирует).
+    for (const id of ['tap', 'close', 'error', 'send'] as const) {
+      expect(SOUND_MIN_GAP.radar).toBeGreaterThanOrEqual(SOUND_MIN_GAP[id]);
+    }
   });
 
   it('потолок громкости: сумма пиков голосов любого патча ≤ 0.6', () => {
