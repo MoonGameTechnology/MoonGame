@@ -328,6 +328,26 @@ describe('movement — fleet.stop parks the fleet ON the lane (Bytro continuous 
     expect(later.state.fleets.F?.location).toBe(null);
   });
 
+  it('стоп ПОСРЕДИ коридора отвергается: вошёл в прыжок — доезжай', () => {
+    // То же правило, что закрыло парковку цели «Курса» на коридорном ребре
+    // (HERO-CORRIDOR-2): флот, вставший в коридоре, после его закрытия остался бы
+    // стоять на ребре, которого в графе больше нет.
+    const kernel = createKernel([movementModule]);
+    const st = baseState(fieldAB(), [fleet('F', 'p1', 'A', ['scout'])]);
+    st.tempLanes = [
+      // Лейн БЕЗ heroId — legacy-форма, проходимая всеми (mayTraverse), но ребро
+      // добавлено коридором: addedLink и есть признак «дорога временная».
+      { id: 'lane:1', owner: 'p1', from: 'A', to: 'B', speedBonus: 0, expiresAt: 99 * HOUR, addedLink: true },
+    ];
+    const going = okApply(kernel.applyAction(st, move('F', 'B'), ctx(0)));
+    const r = kernel.applyAction(going.state, stop('F'), ctx(HOUR));
+    expect(errCode(r)).toBe('E_NOT_A_LANE');
+    // Приказ отвергнут целиком — флот продолжает ехать и доезжает.
+    expect(going.state.fleets.F?.movement?.to).toBe('B');
+    const arrived = okAdvance(kernel.advanceTo(going.state, ctx(5 * HOUR)));
+    expect(arrived.state.fleets.F?.location).toBe('B');
+  });
+
   it('rejects stopping a fleet that is not under way', () => {
     const kernel = createKernel([movementModule]);
     const st = baseState([{ ...planet('A', 'p1', 0, 0), links: [] }], [fleet('F', 'p1', 'A', ['scout'])]);

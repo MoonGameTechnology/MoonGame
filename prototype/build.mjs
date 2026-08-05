@@ -639,22 +639,51 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 .dp-map.on{color:#8ff0c2;border-color:#8ff0c2;background:rgba(111,214,164,.14);}
 .dp-map.offer{color:#8ff0c2;border-color:#8ff0c2;animation:sppulse 1.6s ease-in-out infinite;}
 .dp-map.pend,.dp-map:disabled{opacity:.5;cursor:default;}
+/* FRIENDS-1: вкладка «Друзья» — поиск, заявки, список с присутствием */
+.fr-find{display:flex;gap:8px;padding:2px 0 10px;}
+.fr-q{flex:1;min-width:0;background:rgba(6,18,22,.9);border:1px solid var(--line);border-radius:8px;
+  color:var(--ink);font:inherit;font-size:12px;padding:9px 11px;}
+.fr-q:focus{outline:none;border-color:var(--cyan);}
+.fr-b{border:1px solid var(--line);background:transparent;color:var(--dim);border-radius:8px;
+  padding:8px 13px;font:600 11px ui-monospace,monospace;cursor:pointer;white-space:nowrap;}
+.fr-b:hover{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.12);}
+.fr-b.ok{border-color:var(--cyan-dim);color:var(--cyan);}
+.fr-note{padding:0 0 8px;font-size:11px;color:var(--amber);}
+.fr-list{display:flex;flex-direction:column;gap:8px;}
+.fr-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);
+  border-radius:10px;background:rgba(6,16,20,.6);}
+.fr-row.req{border-color:var(--cyan-dim);background:rgba(53,214,230,.07);}
+.fr-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:var(--dim);}
+.fr-dot.on{background:var(--grn);}
+.fr-dot.am{background:var(--amber);}
+.fr-dot.off{background:#4a5c62;}
+.fr-txt{flex:1;min-width:0;}
+.fr-txt b{display:block;font-size:13px;color:var(--ink);}
+.fr-txt span{display:block;font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fr-acts{display:flex;align-items:center;gap:6px;flex:0 0 auto;}
+.fr-wait{font-size:10px;color:var(--dim);}
+@media(max-width:640px){
+  /* кнопки строки — под палец, как в окне меток */
+  .fr-b{padding:11px 12px;}
+}
 /* PING-PANEL: список меток коалиции — своих и союзных */
 #pingpanel{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:60;display:none;
   width:min(520px,92vw);max-height:70vh;overflow:auto;background:rgba(6,16,20,.97);
   border:1px solid var(--line);border-radius:10px;padding:0;box-shadow:0 10px 40px rgba(0,0,0,.6);}
 #pingpanel.show{display:block;}
-.pp-head{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);}
-.pp-head b{flex:1;letter-spacing:.08em;}
 .pp-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(46,150,160,.14);}
 .pp-row.off{opacity:.45;}
 .pp-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;}
 .pp-txt{flex:1;min-width:0;}
 .pp-txt b{display:block;font-size:12px;}
 .pp-txt span{display:block;font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.pp-row button{border:1px solid var(--line);background:transparent;color:var(--dim);border-radius:6px;
-  padding:4px 7px;font:700 11px ui-monospace,monospace;cursor:pointer;}
-.pp-row button:hover{border-color:var(--cyan);color:var(--cyan);}
+/* Кнопки строки — стандартные квадратные иконко-кнопки интерфейса (метрика .cw-btn /
+   .lw-close): раньше у них была своя типографика и свои поля. */
+.pp-row button{width:28px;height:28px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid var(--line);background:transparent;color:var(--dim);border-radius:6px;
+  font:700 12px ui-monospace,monospace;cursor:pointer;}
+.pp-row button:hover{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.12);}
+.pp-row button:active{background:rgba(53,214,230,.2);}
 .pp-empty{padding:16px 12px;color:var(--dim);font-size:12px;}
 .dp-intel{padding:2px 10px 9px 39px;font-size:11px;color:var(--cyan);}
 .dp-intel b{color:#eafffb;}
@@ -1073,9 +1102,10 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #stewardbody .st-log-line{padding:4px 6px;border-left:2px solid rgba(53,214,230,.35);background:rgba(53,214,230,.05);border-radius:0 6px 6px 0;}
 #stewardbody .st-log-when{opacity:.55;margin-right:4px;}
 #stewardbody .st-note{margin-top:12px;font-size:11px;color:var(--dim);line-height:1.55;}
-/* TT-3.1: technology tree (mockup v4) — tabs = branches, one shared sticky day
-   rail (rows = epoch day-gates), node states, tap → dossier modal. Fixed-basis
-   columns: the pane scrolls horizontally inside .tt-scroll, the rail stays pinned. */
+/* TT-3.1 + TT-4: technology tree — tabs = branches, the branch's nodes as a
+   tier-grouped LIST (one full-width row per node: name, state, effect, cost, time),
+   tap → dossier modal. Сетка 52-пиксельных иконок вмещала больше узлов,
+   но про каждый молчала: что даёт «⚙», было видно только из досье. */
 #tech .twbox{position:relative;width:min(430px,94vw);}
 #techbody{padding:0;overflow:hidden;display:flex;flex-direction:column;}
 .tt-top{display:flex;align-items:center;justify-content:space-between;padding:9px 12px 0;flex:none;}
@@ -1085,46 +1115,53 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .tt-tabs::-webkit-scrollbar{display:none;}
 .tt-tab{flex:none;padding:6px 11px;border:1px solid var(--line-hi);border-radius:9px;background:transparent;color:var(--ink);font:600 11px ui-monospace,monospace;cursor:pointer;white-space:nowrap;}
 .tt-tab.on{color:#04231c;background:linear-gradient(180deg,var(--grn),#4fe0b0);border-color:var(--grn);}
+/* «готово/всего» на вкладке: где ещё есть что исследовать — видно без обхода веток */
+.tt-cnt{margin-left:6px;font-style:normal;font-size:9px;color:var(--dim);}
+.tt-tab.on .tt-cnt{color:#04231c;opacity:.75;}
 .tt-lead{padding:0 12px 8px;font-size:10px;color:var(--dim);border-bottom:1px solid var(--line);flex:none;}
 .tt-lead b{color:#4fe0b0;}
 .tt-lead.closed{color:var(--amber);}
 .tt-scroll{flex:1;min-height:0;overflow:auto;touch-action:pan-x pan-y;}
-.tt-grid{display:flex;min-width:max-content;}
-.tt-rail{position:sticky;left:0;z-index:6;flex:0 0 44px;background:var(--glass);border-right:1px solid var(--line-hi);}
-.tt-dhead,.tt-chead{height:34px;display:flex;align-items:center;justify-content:center;position:sticky;top:0;z-index:5;
-  background:rgba(3,14,18,.97);border-bottom:1px solid var(--line-hi);
-  font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--cyan-dim);text-align:center;}
-.tt-drow{height:96px;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  border-bottom:1px dashed rgba(29,107,112,.28);color:var(--dim);}
-.tt-drow b{font-size:15px;color:var(--ink);}
-.tt-drow small{font-size:8px;}
-.tt-drow.now{background:linear-gradient(90deg,rgba(95,240,192,.14),rgba(95,240,192,.03));}
-.tt-drow.now b{color:var(--grn);}
-.tt-drow.future{opacity:.55;}
-.tt-col{flex:0 0 112px;border-right:1px solid var(--line);}
-.tt-col.w2{flex:0 0 168px;}
-.tt-cellwrap{position:relative;}
-.tt-cellwrap::before{content:"";position:absolute;left:50%;top:0;bottom:0;width:2px;margin-left:-1px;
-  background:linear-gradient(180deg,var(--line-hi),var(--line));opacity:.6;}
-.tt-cell{position:relative;height:96px;display:flex;align-items:center;justify-content:center;gap:6px;
-  border-bottom:1px dashed rgba(29,107,112,.28);}
-.tt-cell.now{background:linear-gradient(90deg,rgba(95,240,192,.05),transparent);}
-.tt-node{position:relative;z-index:2;width:88px;cursor:pointer;text-align:center;}
-.tt-node:active{transform:scale(.95);}
-.tt-box{position:relative;width:52px;height:52px;margin:0 auto;border-radius:12px;border:2px solid var(--line-hi);
-  background:linear-gradient(180deg,#0f2b31,#0a1a1f);display:grid;place-items:center;
-  font-size:23px;font-variant-emoji:text;color:var(--cyan);}
-.tt-lbl{margin:3px auto 0;max-width:100px;font-size:8.5px;line-height:1.25;color:var(--ink);
-  background:rgba(4,14,17,.92);border-radius:5px;padding:1px 3px;max-height:23px;overflow:hidden;}
-.tt-node.st-done .tt-box{border-color:#4fe0b0;background:linear-gradient(180deg,#0e3b2f,#0a231e);box-shadow:0 0 14px rgba(79,224,176,.25);}
-.tt-node.st-avail .tt-box{border-color:var(--cyan);box-shadow:0 0 12px rgba(53,214,230,.22);}
-.tt-node.st-res .tt-box{border-color:var(--amber);}
-.tt-node.st-gate .tt-box,.tt-node.st-chain .tt-box,.tt-node.st-cond .tt-box{opacity:.55;filter:saturate(.4);}
-.tt-tick{position:absolute;right:-6px;bottom:-6px;font-size:10px;color:#04231c;background:#4fe0b0;border-radius:6px;padding:0 3px;}
-.tt-lock{position:absolute;right:-6px;top:-6px;font-size:10px;}
-.tt-cnd{position:absolute;right:-6px;top:-6px;font-size:10px;color:var(--amber);}
-.tt-prog{position:absolute;left:4px;right:4px;bottom:3px;height:4px;border-radius:2px;background:rgba(255,180,58,.22);overflow:hidden;}
+/* Закреплённая шапка «исследуется сейчас» — единственное, ради чего экран
+   открывают повторно; раньше это приходилось искать глазами по всей сетке. */
+.tt-now{flex:none;margin:0 12px 8px;padding:7px 9px;border:1px solid var(--amber-dim,rgba(255,180,58,.35));
+  border-radius:10px;background:rgba(255,180,58,.07);display:flex;flex-direction:column;gap:6px;}
+.tt-nowrow{position:relative;display:flex;align-items:center;gap:7px;padding-bottom:6px;font-size:11px;color:var(--ink);}
+.tt-nowrow b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;}
+.tt-nowdot{flex:none;width:7px;height:7px;border-radius:50%;background:var(--amber);animation:ttpulse 1.6s ease-in-out infinite;}
+@keyframes ttpulse{0%,100%{opacity:.35;}50%{opacity:1;}}
+.tt-nowt{flex:none;font:700 11px ui-monospace,monospace;color:var(--amber);font-variant-numeric:tabular-nums;}
+.tt-list{padding:0 12px 12px;display:flex;flex-direction:column;gap:7px;}
+/* Ярус вместо рельсы дней: day-гейт не пропал, он стал ПРИЧИНОЙ замка в самой строке */
+.tt-tierh{margin:9px 0 1px;font:800 9px ui-monospace,monospace;letter-spacing:1.4px;color:var(--cyan-dim);}
+.tt-tierh:first-child{margin-top:2px;}
+.tt-item{position:relative;padding:9px 10px 10px;border:1px solid var(--line);border-radius:10px;
+  background:linear-gradient(180deg,rgba(12,32,38,.85),rgba(8,20,24,.85));cursor:pointer;}
+.tt-item:active{transform:scale(.995);}
+.tt-ih{display:flex;align-items:center;gap:8px;}
+.tt-ih b{flex:1;min-width:0;font-size:12.5px;font-weight:700;color:#eafffb;}
+.tt-ifx{margin-top:4px;font-size:10px;line-height:1.45;color:var(--cyan-dim);}
+.tt-ifoot{margin-top:6px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;color:var(--dim);}
+.tt-idur{flex:none;font-variant-numeric:tabular-nums;}
+/* Правое поле строки — РОВНО ОДНО состояние: сделано / идёт / можно / причина замка */
+.tt-st{flex:none;max-width:56%;font-size:9.5px;line-height:1.3;text-align:right;color:var(--dim);}
+.tt-st.done{color:#4fe0b0;}
+.tt-st.run{color:var(--amber);font-weight:700;}
+.tt-take{flex:none;padding:6px 11px;border-radius:8px;border:1px solid var(--grn);cursor:pointer;
+  font:800 10px ui-monospace,monospace;letter-spacing:.6px;text-transform:uppercase;white-space:nowrap;
+  color:#04231c;background:linear-gradient(180deg,var(--grn),#4fe0b0);}
+.tt-take:disabled{background:#0a1a1f;border-color:var(--line-hi);color:var(--dim);opacity:.8;cursor:not-allowed;}
+/* Доступный И оплачиваемый узел дышит — то же правило, что зажигает кнопку в досье */
+.tt-item.st-avail{border-color:var(--cyan);}
+.tt-item.st-res{border-color:var(--amber);}
+.tt-item.st-done{opacity:.7;}
+.tt-item.st-gate,.tt-item.st-chain,.tt-item.st-cond{opacity:.62;}
+@media(hover:hover){
+  :where(.tt-item:hover){border-color:var(--line-hi);}
+}
+.tt-prog{position:absolute;left:9px;right:9px;bottom:4px;height:3px;border-radius:2px;background:rgba(255,180,58,.22);overflow:hidden;}
 .tt-prog i{position:absolute;left:0;top:0;bottom:0;background:var(--amber);}
+.tt-nowrow .tt-prog{left:0;right:0;bottom:0;}
 /* dossier modal over the tree (inside .twbox, so Esc/back close the whole window) */
 .tt-modal{position:absolute;inset:0;z-index:8;display:flex;align-items:center;justify-content:center;}
 .tt-mback{position:absolute;inset:0;background:rgba(1,6,8,.72);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
@@ -1534,6 +1571,8 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   #railtools .rlbl{display:block;}
   /* window close-✕ buttons reach the 44px thumb rule */
   .dp-close,.mk-close,.lw-head button{min-width:44px;min-height:44px;}
+  /* row action buttons (ping panel) get thumb-sized too */
+  .pp-row button{width:40px;height:40px;}
   /* notched phones: controls step inside the safe area instead of under the notch */
   #top{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);
     padding-top:env(safe-area-inset-top,0px);height:calc(var(--tbh) + env(safe-area-inset-top,0px));}
@@ -2625,12 +2664,14 @@ const page = (js) => `<!doctype html>
     <div class="hub-panel" id="hp-rank" style="display:none">
       <div class="hub-empty"><span class="he-ic">▤</span><span data-i18n="hub.rank.empty.title"></span><br><span style="font-size:11px;color:var(--cyan-dim)" data-i18n="hub.rank.empty.sub"></span></div>
     </div>
+    <div class="hub-panel" id="hp-friends" style="display:none"></div>
     <div class="hub-panel" id="hp-ally" style="display:none">
       <div class="hub-empty"><span class="he-ic">⚑</span><span data-i18n="hub.ally.empty.title"></span><br><span style="font-size:11px;color:var(--cyan-dim)" data-i18n="hub.ally.empty.sub"></span></div>
       <button id="ccorp" class="hub-solo" type="button">⬢ <span data-i18n="hub.ally.corp"></span></button>
     </div>
     <div class="hub-panel" id="hp-more" style="display:none">
       <div class="hub-grid">
+        <button class="hub-tile" id="hub-meta" type="button"><span class="ht-ic">★</span><span data-i18n="hub.tile.meta"></span></button>
         <button class="hub-tile" id="hub-tutorial" type="button"><span class="ht-ic">◎</span><span data-i18n="hub.tile.tutorial"></span></button>
         <button class="hub-tile" id="hub-help" type="button"><span class="ht-ic">?</span><span data-i18n="hub.tile.help"></span></button>
         <button class="hub-tile" id="hub-settings" type="button"><span class="ht-ic">⚙</span><span data-i18n="hub.tile.settings"></span></button>
@@ -2649,7 +2690,7 @@ const page = (js) => `<!doctype html>
     <button class="hub-tab active" data-hub="home" type="button"><span class="hn-ic">⌂</span><span data-i18n="hub.nav.home"></span></button>
     <button class="hub-tab" data-hub="games" type="button"><span class="hn-ic">▶</span><span data-i18n="hub.nav.games"></span></button>
     <button class="hub-tab" data-hub="rank" type="button"><span class="hn-ic">▤</span><span data-i18n="hub.nav.rank"></span></button>
-    <button class="hub-tab" data-hub="meta" type="button"><span class="hn-ic">★</span><span data-i18n="hub.nav.meta"></span></button>
+    <button class="hub-tab" data-hub="friends" type="button"><span class="hn-ic">☍</span><span data-i18n="hub.nav.friends"></span></button>
     <button class="hub-tab" data-hub="arsenal" type="button"><span class="hn-ic">⚔</span><span data-i18n="hub.nav.arsenal"></span></button>
     <button class="hub-tab" data-hub="ally" type="button"><span class="hn-ic">⚑</span><span data-i18n="hub.nav.ally"></span></button>
     <button class="hub-tab" data-hub="more" type="button"><span class="hn-ic">≡</span><span data-i18n="hub.nav.more"></span></button>

@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 2570 зелёных** (54 skip, 218 файлов).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 2668 зелёных** (54 skip, 224 файла).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -151,7 +151,7 @@ packages/action-layer/src/
 data/            manifest, resources, units, buildings, factions, events, sectors, sectorKinds, planetTypes, technologies, scientists, rewards, heroes, heroAbilities, heroFittings, heroPassives, heroSkillTrees, modules, medals, dropTables, starterArsenal (.json)
 localization/    ВЕСЬ текст для игрока: index.ts (LOCALES/DEFAULT_LOCALE/dataKey), ru.ts, en.ts (плоские карты ключ→текст, 1553 ключа), runtime.ts (ОДИН на прототип и клиент: t/tData/lookup/hasKey/setLocale/localizeStaticDom, LOC-5) + runtime.test.ts. Мост старых msgid снят вместе с LOC-2 — в коде только ключи
 docs/            architecture, modulesystem, roadmap, deep-technical-roadmap, multiplayer, engineering-risks, gdd, metagame, state(этот)
-prototype/       src/game.ts (чистый index-фасад реэкспортов, REFP-28: 5289→207 строк, логики нет), src/prototypeData.ts, src/map.ts, src/fleetStacks.ts, src/tax.ts, src/botFavour.ts, src/squadron.ts, src/chain.ts, src/hunger.ts, src/botDiplomacy.ts, src/sessionMarket.ts, src/capital.ts, src/fleetLaunch.ts, src/standingOrders.ts, src/forcedMarch.ts, src/instantRepair.ts, src/econScrews.ts, src/economy.ts, src/matchSetup.ts, src/actions.ts, src/patrol.ts, src/serverDrivers.ts, src/protoKernel.ts, src/stewardGuard.ts, src/ai.ts, src/time.ts (вынесены из game.ts; Block REFP закрыт 28/28, обратных рёбер на фасад ноль), src/main.ts (UI), src/format.ts (презентационные форматтеры, REFM-2), src/icons.ts (словарь иконок, REFM-3), src/dossiers.ts + src/buildQueue.ts (досье объектов и кодекс + словарь очереди стройки, REFM-4), src/arsenalScreen.ts (витрина «Арсенал», REFM-5), src/marketScreen.ts (окно рынка, REFM-6), src/stewardScreen.ts (окно «Хранителя», REFM-7), src/techTree.ts (дерево технологий, REFM-9), src/profileScreen.ts (профиль командира, REFM-10), src/corpScreen.ts (корпоративный кабинет, REFM-11), src/chatWindow.ts (плавающее окно чата, REFM-12), src/shipyard.ts (окно «Верфь», REFM-13), src/heroStaff.ts (штаб героев, REFM-14), src/conversations.ts (вкладка сообщений, REFM-15), src/sciPick.ts (выбор совета учёных, REFM-18), src/passwordReset.ts (сброс пароля, REFM-19), src/endScreen.ts (экран итогов матча, REFM-20), src/graphicsPrefs.ts (графические настройки, REFM-21), src/settingsOverlay.ts (оверлей настроек, REFM-22), src/resourceCard.ts (карточка ресурса, RC-1), src/troopsMenu.ts (модель и разметка ⇅-меню десанта, GRND-1), src/chainPlanner.ts (модель режима «Приказ», CHAIN-UX), src/sound.ts (синтезированные звуки интерфейса, SND-1), src/hudDock.ts (низ экрана: видимость листа в прицельных режимах + привязка ряда команд к листу, HUD-DOCK), src/backLayers.ts (лестница слоёв Android-Back/Escape + опись всех оверлеев, BACK-1), src/markerTail.ts (геометрия хвоста маркера флота), src/smoke.ts, tsconfig.json (REFM-0: typecheck в гейте), build.mjs, uitest.mjs, dist/ (артефакт, в .gitignore)```
+prototype/       src/game.ts (чистый index-фасад реэкспортов, REFP-28: 5289→207 строк, логики нет), src/prototypeData.ts, src/map.ts, src/fleetStacks.ts, src/tax.ts, src/botFavour.ts, src/squadron.ts, src/chain.ts, src/hunger.ts, src/botDiplomacy.ts, src/sessionMarket.ts, src/capital.ts, src/fleetLaunch.ts, src/standingOrders.ts, src/forcedMarch.ts, src/instantRepair.ts, src/econScrews.ts, src/economy.ts, src/matchSetup.ts, src/actions.ts, src/patrol.ts, src/serverDrivers.ts, src/protoKernel.ts, src/stewardGuard.ts, src/ai.ts, src/time.ts (вынесены из game.ts; Block REFP закрыт 28/28, обратных рёбер на фасад ноль), src/main.ts (UI), src/format.ts (презентационные форматтеры, REFM-2), src/icons.ts (словарь иконок, REFM-3), src/dossiers.ts + src/buildQueue.ts (досье объектов и кодекс + словарь очереди стройки, REFM-4), src/arsenalScreen.ts (витрина «Арсенал», REFM-5), src/marketScreen.ts (окно рынка, REFM-6), src/stewardScreen.ts (окно «Хранителя», REFM-7), src/techTree.ts (дерево технологий, REFM-9), src/profileScreen.ts (профиль командира, REFM-10), src/corpScreen.ts (корпоративный кабинет, REFM-11), src/chatWindow.ts (плавающее окно чата, REFM-12), src/shipyard.ts (окно «Верфь», REFM-13), src/heroStaff.ts (штаб героев, REFM-14), src/conversations.ts (вкладка сообщений, REFM-15), src/sciPick.ts (выбор совета учёных, REFM-18), src/passwordReset.ts (сброс пароля, REFM-19), src/endScreen.ts (экран итогов матча, REFM-20), src/graphicsPrefs.ts (графические настройки, REFM-21), src/settingsOverlay.ts (оверлей настроек, REFM-22), src/apkUpdate.ts (самообновление APK над `updater.ts`, REFM-23), src/viewport.ts (замер вьюпорта: потолок DPR + признак телефонной раскладки, и детерминированный звёздный фон, REFM-24), src/pingUi.ts (витрина меток: композер, список, попап маркера — поверх модели прав `pingPanel.ts`, REFM-25), src/friendsScreen.ts (вкладка «Друзья»: список и заявки, FRIENDS-1), src/resourceCard.ts (карточка ресурса, RC-1), src/troopsMenu.ts (модель и разметка ⇅-меню десанта, GRND-1), src/chainPlanner.ts (модель режима «Приказ», CHAIN-UX), src/sound.ts (синтезированные звуки интерфейса, SND-1), src/hudDock.ts (низ экрана: видимость листа в прицельных режимах + привязка ряда команд к листу, HUD-DOCK), src/backLayers.ts (лестница слоёв Android-Back/Escape + опись всех оверлеев, BACK-1), src/markerTail.ts (геометрия хвоста маркера флота), src/smoke.ts, tsconfig.json (REFM-0: typecheck в гейте), build.mjs, uitest.mjs, dist/ (артефакт, в .gitignore)```
 ## 4. Модель состояния (`GameState`)
 
 - `version {data, manifest}`, `time`, `rng`.
@@ -1319,13 +1319,27 @@ grants}`), `heroFittings.json` (`{statMods, grants, cost}`). Движок ПОЛ
   также весь каталог `prototypeData.ts` — `tech.node.*`, `sci.*`, `faction.*`,
   `hero.unit/ability/passive/tree/fit.*` (закрытие LOC-2).
 
-Итого **1552 ключа**. Записи в локалях разложены по доменным секциям и отсортированы
+Итого **1592 ключа**. Записи в локалях разложены по доменным секциям и отсортированы
 по ключу внутри каждой. Таблицы-справочники прототипа и игровой каталог
 (`prototypeData.ts`) держат В ЗНАЧЕНИИ ключ, а не русский текст — их подписи уходят в
 `t()` переменной, и раньше именно там английский пропадал незаметно для гейта. Имена
 игровых ДАННЫХ (модули, фитинги, здания, юниты) остаются английскими: `tData()` строит
 из них слаг `dataKey()`, а он вырезает всё кроме `[a-z0-9]`, поэтому русское имя
 схлопнулось бы в ключ `data.` и перевод стал бы недостижим.
+
+**Шипнутый контент приведён к этому правилу (AUD-3).** В `data/*.json` жили **28**
+кириллических `name` (весь геройский слой + `modules` + учёный `Куратор`) — ровно та
+схлопнутая форма, о которой правило и предупреждает: ключ `data.` был недостижим на любой
+локали, включая русскую. Имена переименованы в английские, русский текст уехал в **19**
+новых пар `data.*` (9 из 28 ключей в локалях уже были — просто их нечем было достать).
+Замер после правки одноразовым скриптом на том же `dataKey()`: из 98 именованных
+сущностей бандла **0 схлопнутых**, 38 без ключа (`technologies`, `buildings`, `factions`,
+`scientists`, `sectorKinds`, `planetTypes`) — эти не схлопываются и чинятся дозаведением.
+Один id, `ablative_plating`, живёт в ДВУХ каталогах (`modules` и `heroFittings`), а
+пространство `tData` плоское, поэтому фиттинг назван `Ablative Cladding` — тем же именем,
+которое уже держал `prototypeData.ts`. Постоянного сторожа у этого пока нет:
+`i18n.test.ts` проверяет покрытие по `prototypeData.ts`, а не по `data/*.json` — это
+следующий кирпич (AUD-4 в `backlog.md`).
 
 Статичный узел в разметке ПУСТ, ключ стоит в ЗНАЧЕНИИ атрибута
 (`data-i18n="hub.play"`, аналогично `-title`/`-ph`/`-aria`), и `localizeStaticDom()`

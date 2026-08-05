@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { setLocale } from '../../localization/runtime';
+import { setLocale, tData } from '../../localization/runtime';
 import { newGame, data, DAY, HOUR } from './game';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import {
   TECH_BRANCHES,
-  TECH_COLS,
   branchLabel,
+  fmtClock,
   techCost,
   techCondText,
   techCondOk,
@@ -98,6 +98,12 @@ describe('дерево технологий — подписи', () => {
     expect(branchLabel('нет-такой')).toBe('нет-такой');
   });
 
+  it('обратный отсчёт закреплённой шапки — ч:мм:сс, часы отбрасываются, минус не течёт', () => {
+    expect(fmtClock(5 * 3600_000)).toBe('5:00:00');
+    expect(fmtClock(38 * 60_000 + 12_000)).toBe('38:12'); // «0:38:12» читается хуже
+    expect(fmtClock(-1)).toBe('00:00'); // просроченный срок — ноль, а не «-00:01»
+  });
+
   it('цена — те же чипы cost(), что и на всех других поверхностях', () => {
     expect(techCost({ metal: 40 })).toContain('rc-metal');
     expect(techCost({ metal: 40 })).toContain('<svg'); // единая SVG-иконка, не глиф
@@ -113,16 +119,14 @@ describe('дерево технологий — подписи', () => {
     expect(html).toContain('−25');
   });
 
-  it('раскладка колонок ссылается только на существующие техи', () => {
-    // карта раскладки — презентационная и правится руками; опечатка в id тихо
-    // выкинула бы узел в автоколонку, поэтому проверяем явно
-    for (const [branch, cols] of Object.entries(TECH_COLS)) {
-      for (const col of cols) {
-        for (const id of col.ids) {
-          expect(TECHS[id], `${branch}/${id}`).toBeDefined();
-          expect(TECHS[id]!.branch ?? 'space', id).toBe(branch);
-        }
-      }
+  it('список ветки показывает ВСЕ её узлы — ни один не теряется по дороге', () => {
+    // TT-4: раскладку колонок правили руками, и опечатка в id тихо роняла узел
+    // в автоколонку. Списку карта не нужна — но проверка «все узлы на месте»
+    // нужна тем более: теперь единственный источник строк — сами данные.
+    for (const b of TECH_BRANCHES) {
+      const html = techTreeHtml(newGame(), 'p1', b.key, null);
+      const ids = Object.keys(TECHS).filter((id) => (TECHS[id]!.branch ?? 'space') === b.key);
+      for (const id of ids) expect(html, `${b.key}/${id}`).toContain(`data-tech="${id}"`);
     }
   });
 });
@@ -189,11 +193,57 @@ describe('дерево технологий — разметка', () => {
     expect(html).toContain('<button class="tt-tab on" data-ttab="ground">');
   });
 
-  it('рельса дней общая для всех веток — строки не прыгают при переключении', () => {
-    const rows = (tab: string) =>
-      [...techTreeHtml(s, 'p1', tab, null).matchAll(/class="tt-drow/g)].length;
-    expect(rows('space')).toBe(rows('missile'));
-    expect(rows('space')).toBeGreaterThan(1);
+  it('вкладка несёт счётчик «готово/всего», и он двигается с исследованием', () => {
+    // Навигация без клика: где ещё осталось что исследовать — видно с вкладки.
+    const fresh = techTreeHtml(s, 'p1', 'space', null);
+    const m = fresh.match(/data-ttab="space">[^<]*<i class="tt-cnt">(\d+)\/(\d+)<\/i>/);
+    expect(m).not.toBeNull();
+    expect(m![1]).toBe('0');
+    const total = Number(m![2]);
+    expect(total).toBeGreaterThan(0);
+    const st = newGame();
+    st.players.p1!.technologies = {
+      completed: [firstOf('space')],
+      active: [],
+      points: 0,
+    } as never;
+    const after = techTreeHtml(st, 'p1', 'space', null);
+    expect(after).toContain(`<i class="tt-cnt">1/${total}</i>`);
+  });
+
+  it('узел «ждёт родителя» называет РОДИТЕЛЯ, а не просто «закрыто»', () => {
+    // Причины разные — и лекарства разные: исследовать родителя vs подождать день.
+    // Строка обязана назвать лекарство, иначе игроку снова придётся открывать досье.
+    const chained = Object.entries(data.technologies).find(
+      ([id, td]) => !id.startsWith('meta_') && (td.prerequisites ?? []).length > 0,
+    );
+    expect(chained).toBeDefined();
+    const [cid, ctd] = chained!;
+    const parent = ctd.prerequisites![0]!;
+    const html = techTreeHtml(s, 'p1', ctd.branch ?? 'space', null);
+    const at = html.indexOf(`data-tech="${cid}"`);
+    const node = html.slice(at - 80, at + 400);
+    expect(node).toContain('st-chain');
+    expect(node).toContain(tData(data.technologies[parent]!.name));
+  });
+
+  it('узлы сгруппированы ярусами, и заголовок яруса не повторяется', () => {
+    // TT-4: ярусы заменили рельсу дней. Порядок строк задаёт tier, поэтому дубль
+    // заголовка означал бы, что сортировка разъехалась и узлы одного яруса разбиты.
+    const html = techTreeHtml(s, 'p1', 'space', null);
+    const heads = [...html.matchAll(/<div class="tt-tierh">([^<]*)<\/div>/g)].map((m) => m[1]!);
+    expect(heads.length).toBeGreaterThan(1);
+    expect(new Set(heads).size).toBe(heads.length);
+    expect(heads[0]).toContain('I'); // римская цифра яруса, а не голое число
+  });
+
+  it('day-гейт не пропал вместе с рельсой — он назван ПРИЧИНОЙ замка в строке', () => {
+    const gated = Object.keys(TECHS).find((id) => (TECHS[id]!.dayGate ?? 0) > 0)!;
+    const day = (TECHS[gated]!.dayGate ?? 0) + 1;
+    const html = techTreeHtml(s, 'p1', TECHS[gated]!.branch ?? 'space', null);
+    const row = html.slice(html.indexOf(`data-tech="${gated}"`));
+    expect(row.slice(0, 400)).toContain(String(day));
+    expect(html).toContain('tt-st lock');
   });
 
   it('показывает узлы ТОЛЬКО открытой ветки', () => {
@@ -258,6 +308,31 @@ describe('дерево технологий — разметка', () => {
     expect(html).toContain('width:50%'); // полоса ровно посередине
     expect(html).toContain('tt-mbtn wait'); // повторно запустить нельзя
     expect(html).toContain('5'); // осталось 5 ч
+    // ETA видна прямо в СТРОКЕ, а не только в досье
+    expect(html).toContain('tt-st run');
+    // …и вынесена в закреплённую шапку — ради неё экран и открывают повторно
+    expect(html).toContain('tt-now');
+    expect(html).toContain('5:00:00');
+  });
+
+  it('без идущего исследования закреплённой шапки нет', () => {
+    expect(techTreeHtml(s, 'p1', 'space', null)).not.toContain('tt-now');
+  });
+
+  it('кнопка «исследовать» живёт в самой строке и гаснет без казны', () => {
+    // TT-4: раньше про доступность говорило свечение узла, а взять его можно было
+    // только через досье. Теперь приказ — в один тап из списка.
+    const st = newGame();
+    const id = firstOf('space');
+    const td = data.technologies[id]!;
+    st.players.p1!.resources = Object.fromEntries(
+      Object.entries(td.cost).map(([k, v]) => [k, (v as number) * 2]),
+    );
+    expect(techTreeHtml(st, 'p1', 'space', null)).toMatch(
+      new RegExp(`tt-take" data-go="${id}">`),
+    );
+    st.players.p1!.resources = {};
+    expect(techTreeHtml(st, 'p1', 'space', null)).toContain(`data-go="${id}" disabled`);
   });
 
   it('исчезнувший из данных узел не оставляет висящее досье', () => {
@@ -295,7 +370,7 @@ describe('дерево технологий — окно', () => {
   it('тап по узлу открывает досье, крестик модалки его закрывает', () => {
     const { api, win, body } = wire();
     api.open();
-    win.fire(ttClick('.tt-node', { tech: firstOf('space') }));
+    win.fire(ttClick('.tt-item', { tech: firstOf('space') }));
     expect(body.html()).toContain('tt-modal');
     win.fire(ttClick('[data-mclose]'));
     expect(body.html()).not.toContain('tt-modal');
@@ -304,7 +379,7 @@ describe('дерево технологий — окно', () => {
   it('смена вкладки закрывает открытое досье, повторный тык по той же — нет', () => {
     const { api, win, body } = wire();
     api.open();
-    win.fire(ttClick('.tt-node', { tech: firstOf('space') }));
+    win.fire(ttClick('.tt-item', { tech: firstOf('space') }));
     win.fire(ttClick('.tt-tab', { ttab: 'space' })); // та же вкладка
     expect(body.html()).toContain('tt-modal');
     win.fire(ttClick('.tt-tab', { ttab: 'ground' })); // другая
@@ -319,17 +394,32 @@ describe('дерево технологий — окно', () => {
     );
     const { api, win, sent } = wire({ me: () => 'p1' }, st);
     api.open();
-    win.fire(ttClick('.tt-mbtn', { go: id }));
+    win.fire(ttClick('[data-go]', { go: id }));
     expect(sent).toHaveLength(1);
     expect(sent[0]!.type).toBe('technology.research');
     expect(sent[0]!.playerId).toBe('p1');
     expect(sent[0]!.payload).toMatchObject({ technology: id });
   });
 
+  it('кнопка в СТРОКЕ шлёт приказ и НЕ открывает досье поверх него', () => {
+    // Кнопка лежит внутри кликабельной строки: без раннего выхода тап давал бы и
+    // приказ, и модалку — игрок получал бы окно там, где просил только «взять».
+    const st = newGame();
+    const id = firstOf('space');
+    st.players.p1!.resources = Object.fromEntries(
+      Object.keys(TECHS[id]!.cost as Record<string, number>).map((k) => [k, 9999]),
+    );
+    const { api, win, body, sent } = wire({}, st);
+    api.open();
+    win.fire(ttClick('[data-go]', { go: id }));
+    expect(sent).toHaveLength(1);
+    expect(body.html()).not.toContain('tt-modal');
+  });
+
   it('открытие сбрасывает прошлое досье — новое окно начинается чистым', () => {
     const { api, win, body } = wire();
     api.open();
-    win.fire(ttClick('.tt-node', { tech: firstOf('space') }));
+    win.fire(ttClick('.tt-item', { tech: firstOf('space') }));
     expect(body.html()).toContain('tt-modal');
     api.open();
     expect(body.html()).not.toContain('tt-modal');
@@ -351,7 +441,7 @@ describe('дерево технологий — окно', () => {
   it('крестик окна закрывает и окно, и досье', () => {
     const { api, win, body } = wire();
     api.open();
-    win.fire(ttClick('.tt-node', { tech: firstOf('space') }));
+    win.fire(ttClick('.tt-item', { tech: firstOf('space') }));
     win.fire({ classList: { contains: (c: string) => c === 'tw-close' }, closest: () => null });
     expect(api.isOpen()).toBe(false);
     api.open();
@@ -396,7 +486,7 @@ describe('досье технологии — без мигания на жив�
     const body = watchedBody();
     const { api, win } = wire({ body: () => body as unknown as HTMLElement });
     api.open();
-    win.fire(ttClick('.tt-node', { tech: firstOf('space') }));
+    win.fire(ttClick('.tt-item', { tech: firstOf('space') }));
     expect(body.html()).toContain('tt-mwin');
     expect(body.popped()).toBe(true); // анимация — на реальном открытии
     const w = body.writes();
@@ -409,7 +499,7 @@ describe('досье технологии — без мигания на жив�
     const body = watchedBody();
     const { api, win, s } = wire({ body: () => body as unknown as HTMLElement });
     api.open();
-    win.fire(ttClick('.tt-node', { tech: firstOf('space') }));
+    win.fire(ttClick('.tt-item', { tech: firstOf('space') }));
     const w = body.writes();
     // казна опустела → чипы цены получают пометку нехватки → разметка другая
     for (const k of Object.keys(s.players.p1!.resources)) s.players.p1!.resources[k] = 0;
