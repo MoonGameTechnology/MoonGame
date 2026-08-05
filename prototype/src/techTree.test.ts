@@ -189,6 +189,37 @@ describe('дерево технологий — разметка', () => {
     expect(html).toContain('<button class="tt-tab on" data-ttab="ground">');
   });
 
+  it('вкладка несёт счётчик «готово/всего», и он двигается с исследованием', () => {
+    // Навигация без клика: где ещё осталось что исследовать — видно с вкладки.
+    const fresh = techTreeHtml(s, 'p1', 'space', null);
+    const m = fresh.match(/data-ttab="space">[^<]*<i class="tt-cnt">(\d+)\/(\d+)<\/i>/);
+    expect(m).not.toBeNull();
+    expect(m![1]).toBe('0');
+    const total = Number(m![2]);
+    expect(total).toBeGreaterThan(0);
+    const st = newGame();
+    st.players.p1!.technologies = {
+      completed: [firstOf('space')],
+      active: [],
+      points: 0,
+    } as never;
+    const after = techTreeHtml(st, 'p1', 'space', null);
+    expect(after).toContain(`<i class="tt-cnt">1/${total}</i>`);
+  });
+
+  it('узел «ждёт родителя» несёт СВОЙ значок, отличный от day-гейта', () => {
+    // Причины разные — и лекарства разные: исследовать родителя vs подождать день.
+    const chained = Object.entries(data.technologies).find(
+      ([id, td]) => !id.startsWith('meta_') && (td.prerequisites ?? []).length > 0,
+    );
+    expect(chained).toBeDefined();
+    const [cid, ctd] = chained!;
+    const html = techTreeHtml(s, 'p1', ctd.branch ?? 'space', null);
+    const node = html.slice(html.indexOf(`data-tech="${cid}"`) - 80, html.indexOf(`data-tech="${cid}"`) + 400);
+    expect(node).toContain('st-chain');
+    expect(node).toContain('🔗');
+  });
+
   it('рельса дней общая для всех веток — строки не прыгают при переключении', () => {
     const rows = (tab: string) =>
       [...techTreeHtml(s, 'p1', tab, null).matchAll(/class="tt-drow/g)].length;
@@ -258,6 +289,20 @@ describe('дерево технологий — разметка', () => {
     expect(html).toContain('width:50%'); // полоса ровно посередине
     expect(html).toContain('tt-mbtn wait'); // повторно запустить нельзя
     expect(html).toContain('5'); // осталось 5 ч
+    // ETA видна прямо на СЕТКЕ, а не только в досье
+    expect(html).toContain('tt-eta');
+  });
+
+  it('доступный и оплачиваемый узел помечен can, безденежный — нет', () => {
+    const st = newGame();
+    const id = firstOf('space');
+    const td = data.technologies[id]!;
+    st.players.p1!.resources = Object.fromEntries(
+      Object.entries(td.cost).map(([k, v]) => [k, (v as number) * 2]),
+    );
+    expect(techTreeHtml(st, 'p1', 'space', null)).toContain(`st-avail can" data-tech="${id}"`);
+    st.players.p1!.resources = {};
+    expect(techTreeHtml(st, 'p1', 'space', null)).toContain(`st-avail" data-tech="${id}"`);
   });
 
   it('исчезнувший из данных узел не оставляет висящее досье', () => {
