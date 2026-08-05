@@ -109,6 +109,9 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
     target: id,
     stance: z.enum(['war', 'peace', 'pact', 'alliance']),
   }),
+  // MAPSHARE-1: договор об обмене картами — отдельное соглашение поверх лестницы
+  // стоек (заключение по взаимному согласию, расторжение одностороннее).
+  'diplomacy.mapshare': z.object({ target: id, on: z.boolean() }),
   // --- prototype-host actions (the netserver runs the prototype's kernel) -----------
   // fleet.launch/merge/split/engage: canonical `fleetOpsModule` handles these too
   // (the missing garrison→mobile-fleet link) — not prototype-only anymore, the
