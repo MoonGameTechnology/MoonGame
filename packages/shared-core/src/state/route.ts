@@ -62,6 +62,12 @@ export function planRoute(
   // routes never re-enter their origin. Pure and deterministic: the predicate is a
   // function of (state, player), never of wall-clock or randomness.
   blocked?: (id: PlanetId) => boolean,
+  // HERO-CORRIDOR: вето по РЕБРУ — тем же механизмом, что и вето по узлу выше, а не
+  // вторым маршрутизатором. Нужно для ЛИЧНОГО коридора: ребро физически есть в графе
+  // (иначе не посчитать геометрию), но пройти по нему может не всякий. Предикат
+  // спрашивается на каждом шаге релаксации, поэтому маршрут ОБХОДИТ закрытое ребро,
+  // а не упирается в него. Чист и детерминирован, как и `blocked`.
+  blockedEdge?: (from: PlanetId, to: PlanetId) => boolean,
 ): PlanetId[] | null {
   if (fromId === toId) {
     return [];
@@ -98,6 +104,9 @@ export function planRoute(
       }
       if (blocked !== undefined && v !== toId && blocked(v)) {
         continue; // diplomacy veto: don't enter, detour around
+      }
+      if (blockedEdge !== undefined && blockedEdge(u, v)) {
+        continue; // HERO-CORRIDOR: чужой личный коридор — ребра для нас нет
       }
       const nd = best + distance(planet.position, vp.position);
       const cur = dist.get(v);

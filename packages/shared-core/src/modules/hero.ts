@@ -381,7 +381,7 @@ function castTempLane(
   playerId: PlayerId,
   hero: Hero,
   to: PlanetId,
-  opts: { durationHours: number; speedBonus: number },
+  opts: { durationHours: number; speedBonus: number; tier?: number },
 ): void {
   const from = heroNode(h.state, hero);
   if (to === from) return h.reject('E_SAME_LOCATION');
@@ -400,10 +400,45 @@ function castTempLane(
     speedBonus: opts.speedBonus,
     expiresAt,
     addedLink,
+    // HERO-CORRIDOR. Ступень — из ДАННЫХ способности (`params.tier`), а не из
+    // константы движка: «кому можно ходить» это правило контента, и менять его
+    // должен каталог, а не правка ядра. Дефолт 1 — самый закрытый (fail-secure).
+    tier: opts.tier ?? 1,
+    heroId: hero.id,
   };
   (h.state.tempLanes ??= []).push(lane);
   h.schedule(expiresAt, 'hero.path.expire', { laneId: lane.id });
   h.emit('hero.path.created', { owner: playerId, from, to, laneId: lane.id });
+}
+
+/**
+ * Закрыть коридор: снять лейн, убрать добавленное им ребро и объявить закрытие.
+ *
+ * ОДНА реализация на оба пути закрытия — по сроку (`hero.path.expire`) и по прибытию
+ * армии с героем (одноразовый коридор, ступень 1). Две копии этого кода разошлись бы
+ * на первой правке: ребро снимается только если его добавил ИМЕННО этот лейн и никакой
+ * другой живой лейн ту же пару не держит.
+ */
+function closeTempLane(h: HandlerContext, laneId: string): void {
+  const lanes = h.state.tempLanes;
+  if (!lanes) return;
+  const idx = lanes.findIndex((l) => l.id === laneId);
+  if (idx < 0) return;
+  const lane = lanes[idx]!;
+  lanes.splice(idx, 1);
+  const stillUsed = lanes.some(
+    (l) => (l.from === lane.from && l.to === lane.to) || (l.from === lane.to && l.to === lane.from),
+  );
+  if (lane.addedLink && !stillUsed) {
+    removeLink(h.state, lane.from, lane.to);
+    removeLink(h.state, lane.to, lane.from);
+  }
+  h.state.topology = (h.state.topology ?? 0) + 1;
+  // `owner` — ключ МАРШРУТИЗАЦИИ, не украшение: фог-фильтр комнаты сначала сверяет
+  // `payload.owner === playerId` и лишь потом смотрит список аудитории, поэтому без
+  // него событие не доходило вообще ни до кого — даже до того, чей коридор закрылся
+  // (AUD-2). `from`/`to` не помогают: это id узлов, а не игроков.
+  h.emit('hero.path.expired', { owner: lane.owner, laneId, from: lane.from, to: lane.to });
 }
 
 /** The annihilation TARGET gate: a real, ownable world that isn't already a dead
@@ -473,28 +508,25 @@ export const heroModule: GameModule = {
       hero.cooldowns.path = after(h, PATH_COOLDOWN_HOURS);
     });
 
+    // HERO-CORRIDOR. Одноразовый коридор (ступень 1) закрывается, когда армия с героем
+    // ПРИБЫЛА — не когда вышла: иначе она летела бы по уже закрытому коридору, а
+    // «кто вошёл — доезжает» и есть принятое правило. Прибытие — единственный сигнал
+    // конца прохода, который у нас есть в состоянии.
+    api.on('fleet.arrived', (event, h) => {
+      const fleetId = (event.payload as { fleetId?: string })?.fleetId;
+      if (typeof fleetId !== 'string' || !h.state.tempLanes) return;
+      for (const lane of [...h.state.tempLanes]) {
+        if ((lane.tier ?? 1) !== 1 || lane.heroId === undefined) continue;
+        const hero = (h.state.heroes ?? {})[lane.heroId];
+        if (hero?.fleetId !== fleetId) continue;
+        closeTempLane(h, lane.id);
+      }
+    });
+
     api.on('hero.path.expire', (event, h) => {
       const { laneId } = event.payload as { laneId?: string };
-      if (typeof laneId !== 'string' || !h.state.tempLanes) return;
-      const idx = h.state.tempLanes.findIndex((l) => l.id === laneId);
-      if (idx < 0) return;
-      const lane = h.state.tempLanes[idx]!;
-      h.state.tempLanes.splice(idx, 1);
-      // Remove the link only if THIS lane added it and no other live lane needs the pair.
-      const stillUsed = h.state.tempLanes.some(
-        (l) =>
-          (l.from === lane.from && l.to === lane.to) || (l.from === lane.to && l.to === lane.from),
-      );
-      if (lane.addedLink && !stillUsed) {
-        removeLink(h.state, lane.from, lane.to);
-        removeLink(h.state, lane.to, lane.from);
-      }
-      h.state.topology = (h.state.topology ?? 0) + 1;
-      // `owner` is not decoration: `MatchRoom.eventVisibleTo` short-circuits every `hero.*`
-      // event to `payload.owner === playerId` BEFORE it consults the audience list, so
-      // without this key the event reached nobody — not even the player whose lane just
-      // closed (AUD-2). `from`/`to` do not help: they are node ids, not player ids.
-      h.emit('hero.path.expired', { owner: lane.owner, laneId, from: lane.from, to: lane.to });
+      if (typeof laneId !== 'string') return;
+      closeTempLane(h, laneId);
     });
 
     api.onAction('planet.annihilate', (action, h) => {
@@ -552,6 +584,7 @@ export const heroModule: GameModule = {
         castTempLane(h, action.playerId, hero, target, {
           durationHours: numParam(def.params, 'durationHours', PATH_DURATION_HOURS),
           speedBonus: numParam(def.params, 'speedBonus', PATH_SPEED_BONUS),
+          tier: numParam(def.params, 'tier', 1),
         });
       } else if (def.type === 'annihilate') {
         if (typeof target !== 'string') return h.reject('E_BAD_PAYLOAD');

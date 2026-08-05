@@ -974,7 +974,7 @@ export const en: Record<string, string> = {
   'hero.ability.bulwark.desc': 'A temporary shield: +defense to your fleets near the hero.',
   'hero.ability.bulwark.name': 'Bulwark',
   'hero.ability.corridor.desc':
-    'Opens a temporary corridor lane to a nearby world; your fleets travel it faster.',
+    'Punches a corridor to a nearby world. One-shot: only the army carrying this hero may use it, and it closes the moment that army arrives. Upgrades give it a lifetime, then open it to everyone — the enemy included.',
   'hero.ability.corridor.name': 'Corridor',
   'hero.ability.diplomatic-landing.desc':
     "Allied worlds receive the hero as one of their own: the ship can also rise from an ally's planet. Passive skill: widens the deployment points.",
