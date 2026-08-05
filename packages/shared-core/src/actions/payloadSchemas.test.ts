@@ -30,6 +30,7 @@ const CLIENT_ACTION_TYPES = [
   'technology.research',
   'technology.boost',
   'diplomacy.declare',
+  'diplomacy.mapshare',
   'espionage.spy',
   'market.list',
   'market.buy',
@@ -94,6 +95,8 @@ describe('SV-1.2 · action payload schemas', () => {
       ['technology.boost', { technology: 'railgun' }], // SES-3: premium research sink
       ['diplomacy.declare', { target: 'p2', stance: 'war' }],
       ['diplomacy.declare', { target: 'p2', stance: 'alliance' }], // friendly declare = an offer
+      ['diplomacy.mapshare', { target: 'p2', on: true }], // MAPSHARE-1: предложить/принять
+      ['diplomacy.mapshare', { target: 'p2', on: false }], // расторгнуть / отозвать
       ['espionage.spy', { target: 'p2', kind: 'treasury' }],
       ['espionage.spy', { target: 'p2', kind: 'planet', planetId: 'home_b' }],
       // REL-2 — prototype-host intents
@@ -185,6 +188,8 @@ describe('SV-1.2 · action payload schemas', () => {
       ['diplomacy.declare', { target: 'p2', stance: 'frenemy' }], // not a known stance
       ['diplomacy.declare', { target: 'p2' }], // missing stance
       ['diplomacy.declare', { stance: 'war' }], // missing target
+      ['diplomacy.mapshare', { target: 'p2' }], // MAPSHARE-1: нет `on`
+      ['diplomacy.mapshare', { target: 'p2', on: 'yes' }], // `on` не булев
       ['espionage.spy', { target: 'p2', kind: 'planet' }], // planet theft needs a planetId
       ['espionage.spy', { target: 'p2', kind: 'pings' }], // not a stealable kind (yet)
     ];

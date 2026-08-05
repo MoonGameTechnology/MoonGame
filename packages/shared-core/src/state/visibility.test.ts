@@ -721,6 +721,30 @@ describe('shared vision — allies pool their reconnaissance (союз / коа�
     expect(view.fleets['ally-fleet']).toBeDefined();
   });
 
+  // MAPSHARE-1: карту делит и отдельный ДОГОВОР — без союза, без общей войны.
+  it('обмен картами делит разведку так же, как союз, но стойку не меняет', () => {
+    const base = blocState();
+    const shared: GameState = {
+      ...base,
+      diplomacy: { ...base.diplomacy, [pairKey('p1', 'p3')]: 'peace' },
+      mapShares: { [pairKey('p1', 'p3')]: true },
+    };
+    expect([...identifiedNodes(shared, 'p1', data)].sort()).toEqual(['H1', 'H3', 'X']);
+    const view = visibleState(shared, 'p1', data);
+    expect(view.planets.X?.garrison).toEqual([{ unit: 'cruiser', count: 3 }]);
+    // при этом никакого союза: стойка осталась миром
+    expect(view.diplomacy?.[pairKey('p1', 'p3')]).toBe('peace');
+  });
+
+  it('без договора и без союза чужая карта не видна (сторож обратной стороны)', () => {
+    const base = blocState();
+    const nope: GameState = {
+      ...base,
+      diplomacy: { ...base.diplomacy, [pairKey('p1', 'p3')]: 'pact' },
+    };
+    expect([...identifiedNodes(nope, 'p1', data)].sort()).toEqual(['H1']);
+  });
+
   it('is mutual — the ally gains the viewer’s sight by the same stance', () => {
     const s = ally(blocState(), 'p1', 'p3');
     expect([...identifiedNodes(s, 'p3', data)].sort()).toEqual(['H1', 'H3', 'X']);

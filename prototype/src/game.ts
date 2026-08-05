@@ -22,6 +22,8 @@ export { HOUR, DAY } from './time';
 // module enforces — one table, no drift) + the Steward reads.
 export {
   STANCE_RANK,
+  hasMapShare,
+  hasMapShareOffer,
   stewardActive,
   STEWARD_POSTURES,
   MAX_STEWARD_HOLD_POINTS,
@@ -39,7 +41,17 @@ export {
 } from './matchSetup';
 
 // --- the kernel assembly point (module ORDER = determinism contract) ---------
-export { MODULES, kernel, SCORE_LIMIT, ctx, advance, order, canOrder, type StepOut } from './protoKernel';
+export {
+  MODULES,
+  kernel,
+  SCORE_LIMIT,
+  ctx,
+  advance,
+  order,
+  canOrder,
+  canOrderAll,
+  type StepOut,
+} from './protoKernel';
 
 // --- economy family ----------------------------------------------------------
 export {
@@ -152,6 +164,7 @@ export {
   recallSteward,
   setHoldPoint,
   declareWar,
+  shareMap,
   spyOn,
   canTraverse,
   castHeroAbility,

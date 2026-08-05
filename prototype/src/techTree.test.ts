@@ -154,6 +154,25 @@ describe('дерево технологий — условия узла', () => 
     expect(techCondOk(s, 'p1', { type: 'own_sectors', min: mine + 1 } as never)).toBe(false);
   });
 
+  // RULES-4. Клиент больше не держит СВОЙ перебор типов условий — он форвардит вопрос
+  // в ядро. Раньше перебор покрывал 2 типа из 5, и узел с любым из этих трёх читался бы
+  // как запертый НАВСЕГДА, хотя ядро исследование разрешает. В живом каталоге таких
+  // условий сегодня нет, поэтому баг был латентным — и тем опаснее для автора контента.
+  it('условия, которых прежняя копия не знала, считаются по-настоящему', () => {
+    const s = newGame();
+    const home = Object.values(s.planets).find((p) => p.owner === 'p1')!;
+    const built = home.buildings[0]!.type; // на старте у мира уже есть постройки
+    expect(techCondOk(s, 'p1', { type: 'has_building', building: built, min: 1 } as never)).toBe(
+      true,
+    );
+    expect(techCondOk(s, 'p1', { type: 'has_building', building: built, min: 99 } as never)).toBe(
+      false,
+    );
+    expect(
+      techCondOk(s, 'p1', { type: 'has_unit', unit: 'нет-такого-юнита', min: 1 } as never),
+    ).toBe(false);
+  });
+
   it('techFx перечисляет эффекты и анлоки, пустой узел даёт пустую строку', () => {
     const withFx = Object.values(TECHS).find((td) => Object.keys(td.effects ?? {}).length > 0);
     if (withFx) expect(techFx(withFx)).not.toBe('');

@@ -490,7 +490,11 @@ export const heroModule: GameModule = {
         removeLink(h.state, lane.to, lane.from);
       }
       h.state.topology = (h.state.topology ?? 0) + 1;
-      h.emit('hero.path.expired', { laneId, from: lane.from, to: lane.to });
+      // `owner` is not decoration: `MatchRoom.eventVisibleTo` short-circuits every `hero.*`
+      // event to `payload.owner === playerId` BEFORE it consults the audience list, so
+      // without this key the event reached nobody — not even the player whose lane just
+      // closed (AUD-2). `from`/`to` do not help: they are node ids, not player ids.
+      h.emit('hero.path.expired', { owner: lane.owner, laneId, from: lane.from, to: lane.to });
     });
 
     api.onAction('planet.annihilate', (action, h) => {

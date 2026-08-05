@@ -142,8 +142,15 @@ function countUnit(state: GameState, playerId: string, unit: string): number {
 /** Evaluates one curated unlock condition deterministically from state — each is an
  *  "at least `min`" count. Unknown types fail-secure (never satisfied); the `never`
  *  guard makes adding a schema variant WITHOUT an evaluator case a COMPILE error, so
- *  the catalog stays safe to extend. Composing existing ones to balance is pure data. */
-function conditionMet(
+ *  the catalog stays safe to extend. Composing existing ones to balance is pure data.
+ *
+ *  RULES-4: экспортируется для read-only запроса «выполнено ли ЭТО условие» — дереву
+ *  технологий надо рисовать галочку у каждой строки условий по отдельности, а
+ *  `technologyLock` отвечает только про узел целиком. Своя копия этого перебора в
+ *  клиенте покрывала 2 типа из 5, то есть узел с условием `has_building` /
+ *  `controls_planet_type` / `has_unit` читался бы как запертый НАВСЕГДА, хотя ядро
+ *  исследование разрешает. */
+export function conditionMet(
   cond: TechnologyCondition,
   state: GameState,
   playerId: string,
