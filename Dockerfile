@@ -15,10 +15,10 @@
 # `trivy image` MEDIUM CVEs (audit SD-5.1 / F-15). It has no shell or package manager,
 # which also removes the npm/corepack tooling the old single-stage image had to delete.
 #
-# Runtime note: `prototype/netserver.mjs` transpiles the server with esbuild AT STARTUP
-# (writing packages/server/dist/proto-server.mjs) and the server appends to playtest-logs/.
-# Both dirs are pre-created in the builder and the whole tree is owned by the non-root
-# user, so those writes succeed without a writable top-level /app.
+# Runtime note: the server bundle is BAKED AT BUILD TIME (see the bundle step below) and
+# the runtime stage runs it directly — so the image ships no esbuild and no dev toolchain.
+# The only write the running container needs is playtest-logs/ (event JSONL); that dir is
+# pre-created in the builder and the tree is owned by the non-root user.
 
 # ---- Stage 1: build (full toolchain) ----
 # Both FROM lines are digest-pinned (audit F-15 / CWE-1357): a tag is mutable, a digest
@@ -47,10 +47,29 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 RUN pnpm run prototype # bake dist/void-dominion{,-player}.html (player at /, dev at /dev)
 
-# Pre-create the two dirs the server writes at runtime so they exist (and, after the
-# COPY --chown below, are owned by the non-root user) before the server starts:
-# playtest-logs/ (event JSONL) and packages/server/dist/ (the startup esbuild bundle).
-RUN mkdir -p playtest-logs packages/server/dist
+# Bake the server bundle HERE instead of at container startup. Two reasons, and the
+# second one is the important one:
+#   1. Startup gets shorter and deterministic — no transpile on every boot.
+#   2. It removes esbuild from the RUNTIME requirements, which is what finally lets the
+#      prune below happen. The root package.json has NO production dependencies at all —
+#      esbuild, typescript, eslint, vitest and prettier are all devDependencies — so as
+#      long as the server needed esbuild to boot, the image had to ship the whole dev
+#      toolchain into production.
+# What made this concrete: TypeScript 7 started shipping a NATIVE Go-compiled tsc, and
+# Trivy found Go CVEs inside our production image, in
+# `node_modules/.pnpm/@typescript+typescript-linux-x64/.../tsc` (blocked PR #489). The
+# vulnerability was in a compiler that has no business being in production at all.
+RUN node prototype/bundle-netserver.mjs
+
+# Drop devDependencies from the tree that gets copied into the runtime stage. What
+# survives is what `packages/server` declares as real dependencies — ws, pg and fastify,
+# the three the bundle deliberately leaves external — plus the baked HTML and bundle.
+RUN pnpm prune --prod
+
+# Pre-create the dir the server writes at runtime so it exists (and, after the
+# COPY --chown below, is owned by the non-root user): playtest-logs/ (event JSONL).
+# packages/server/dist/ already exists — the bundle above lives there.
+RUN mkdir -p playtest-logs
 
 # ---- Stage 2: runtime (distroless, no shell, non-root by default) ----
 # The :nonroot tag runs as uid 65532. Base is nodejs22-**debian13** (trixie): upstream
@@ -60,10 +79,10 @@ RUN mkdir -p playtest-logs packages/server/dist
 # Digest-pinned like the build stage (bump procedure in the Stage 1 comment);
 # nodejs22-debian13:nonroot digest refreshed 2026-07.
 FROM gcr.io/distroless/nodejs22-debian13:nonroot@sha256:939d6f1671529d230f50b563578e9b5d206af58f038b10ebd7e1233023d4e167 AS runtime
-# Bring the fully-installed app (source + node_modules incl. esbuild/ws/pg + baked HTML)
-# and hand the whole tree to the non-root user so startup writes (esbuild bundle, logs)
-# succeed. node_modules uses pnpm's relative symlink layout, so copying all of /app keeps
-# the links valid.
+# Bring the PRUNED app (source + prod-only node_modules — ws/pg/fastify — + baked HTML +
+# the pre-built server bundle) and hand the tree to the non-root user so the one runtime
+# write left (playtest-logs) succeeds. node_modules uses pnpm's relative symlink layout,
+# so copying all of /app keeps the links valid.
 COPY --from=build --chown=nonroot:nonroot /app /app
 WORKDIR /app
 USER nonroot
@@ -77,5 +96,7 @@ EXPOSE 8788
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s \
   CMD ["/nodejs/bin/node", "-e", "fetch(`http://127.0.0.1:${process.env.PORT||8788}/health`).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
 # distroless/nodejs ENTRYPOINT is already ["/nodejs/bin/node"], so CMD is just the script.
-# The proto-server reads $PORT (platforms like Render/Fly inject their own).
-CMD ["prototype/netserver.mjs"]
+# Runs the PRE-BUILT bundle, not prototype/netserver.mjs: that one bundles on startup and
+# therefore needs esbuild, which no longer ships in this image. The bundle reads $PORT the
+# same way (platforms like Render/Fly inject their own).
+CMD ["packages/server/dist/proto-server.mjs"]
