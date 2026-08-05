@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 2388 зелёных** (54 skip, 204 файла).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 2442 зелёных** (54 skip, 209 файлов).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -102,6 +102,13 @@ Void Dominion — мобильная/браузерная **real-time** (неп�
   (`partial:true`), а не выбрасывает работу — комната догоняет чанками и детектит
   same-instant runaway (стойло), драйверы делают backoff (отказоустойчивость,
   `infra-sizing-roadmap.md` блокер #3).
+- `runUntil(kernel, state, ctx, opts?)` (AUD-5) — **не третий вход ядра, а общая копия
+  цикла** «звать `advanceTo`, пока `partial:true` и часы двигаются». Раньше этот цикл был
+  переписан от руки трижды (`MatchRoom.computeAdvance`, `protoKernel.advance`,
+  `replay.ts`). Отдаёт `{ok, state, events, failures}` либо стабильный код:
+  `E_ADVANCE_STUCK` (частичный проход без движения часов — стойло) и `E_ADVANCE_BUDGET`
+  (исчерпан необязательный `maxChunks`; без него цикл не ограничен). Переведён пока
+  только `replay.ts`; `MatchRoom` оставлен как есть — там на пути `observe`-хуки.
 
   **Оптимизация:** `scheduled` поддерживается в отсортированном порядке `(at, seq)` —
   вставка через binary search (`O(log N)`), извлечение ближайшего события `O(1)` вместо

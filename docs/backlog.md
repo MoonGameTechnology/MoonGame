@@ -3435,19 +3435,36 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
   кириллическое имя); остаток непокрытых — сжимающийся allowlist известных пробелов, как
   уже сделано с `PINNED_FOR_VERSION` / `GOLDEN_VOID_DOMINION`. Порядок с AUD-3 важен:
   сначала контент, потом гейт, иначе кирпич въезжает красным.
-- **AUD-5** ⏳ `[core]` — **экспортировать `runUntil(kernel, state, ctx)`.** Цикл
-  «звать `advanceTo`, пока он возвращает `partial: true` и есть прогресс» переписан от
+- **AUD-5** ✅ `[core]` — **экспортирован `runUntil(kernel, state, ctx, opts?)`.** Цикл
+  «звать `advanceTo`, пока он возвращает `partial: true` и есть прогресс» был переписан от
   руки трижды: `MatchRoom.computeAdvance`, `prototype/src/protoKernel.ts:advance`,
-  `packages/shared-core/src/replay/replay.ts:93`. Каждый следующий харнес пишет четвёртый.
-  ~30 строк + тест; заменить хотя бы вызов в `replay.ts`.
-- **AUD-6** ⏳ `[core]` — реэкспорт `actionPayloadSchemas` и константы
-  `CLIENT_ACTION_TYPES` из `packages/shared-core/src/index.ts` (сейчас публичен только
-  булев `isValidActionPayload`, строка 183). Перечень легальных клиентских действий —
-  самый полезный артефакт для любого, кто пишет клиент, — существует только как
-  `Object.keys()` внутри неэкспортируемого `testkit/arbitraries.ts`. Мелкий.
-- **AUD-7** ⏳ `[proto]` — расширить `SELFPLAY_JSON` (`prototype/selfplay.mjs:212`). Сейчас
-  отдаёт 9 полей, тогда как usage, мёртвый контент, число боёв, день первого боя, min-max
-  длины и раскладка исходов уже посчитаны выше и выбрасываются на границе `console.log`.
+  `packages/shared-core/src/replay/replay.ts`. **Сделано:** `src/kernel/runUntil.ts` —
+  единственная копия, обычная функция поверх публичного `Kernel` (а не метод: два входа
+  ядра — это детерминированный контракт, обёртке внутри не место). Отдаёт
+  `{ ok, state, events, failures }` либо стабильный код: `E_ADVANCE_STUCK` на частичном
+  проходе без движения часов и `E_ADVANCE_BUDGET` при исчерпании необязательного
+  `maxChunks` (без него цикл не ограничен — ровно как было в реплее). Переведён **только**
+  `replay.ts`: он закреплён золотым тестом, поэтому вынос сделан буквальным, а не
+  «улучшенным», и `replayDeterminism.test.ts` зелёный без единой правки. `MatchRoom` НЕ
+  трогали — там на пути `observe`-хуки (`dead_letter`, runaway) и горячий серверный путь;
+  перевод туда отдельным кирпичом. **5 тестов:** доходит до цели и не мутирует вход;
+  no-op когда часы уже на месте; отказ от прокрутки на самопланирующем событии;
+  соблюдение `maxChunks`; `ctx.now` позади часов — это no-op, а не отказ.
+- **AUD-6** ✅ `[core]` — **`actionPayloadSchemas` и `CLIENT_ACTION_TYPES` публичны.**
+  Из бочки был виден только булев `isValidActionPayload`, а перечень легальных клиентских
+  действий существовал как `Object.keys()` внутри неэкспортируемого
+  `testkit/arbitraries.ts` — самый полезный артефакт для пишущего клиент лежал в тесткит.
+  **Сделано:** константа перенесена в `actions/payloadSchemas.ts`, к карте, из которой она
+  выводится (разойтись теперь не могут); оба имени реэкспортированы из `index.ts`;
+  `arbitraries.ts` реэкспортирует константу для уже импортирующих её property-тестов.
+  Поведение не изменилось — тот же массив.
+- **AUD-7** ✅ `[proto]` — **`SELFPLAY_JSON` отдаёт всё, что печатает человеку.** Было 9
+  полей, стало **17**: добавлены `lengthMinDays`, `lengthMaxDays`, `outcomes`,
+  `firstCombatAvgDays`, `firstCombatMatches`, `battlesTotal`, `usage`, `deadContent` — всё
+  это уже считалось выше и умирало на границе `console.log`, из-за чего скиллу
+  `balance-analysis` приходилось парсить прозу. Имена существующих полей НЕ менялись: их
+  читают снаружи. Проверено прогоном `pnpm run selfplay 2` — все поля заполнены, у
+  `firstCombat*` честный `null`, когда боёв не случилось.
   ~15 строк, помогает и скиллу `balance-analysis`, и CI. Мелкий.
 - **AUD-8** 🔒 `[proto]` — **судьба `prototypeData.ts` как второго каталога контента.**
   `prototype/src/prototypeData.ts:14` держит `version: '0.1.0'` и 2 ресурса против

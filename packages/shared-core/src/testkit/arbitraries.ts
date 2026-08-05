@@ -12,7 +12,7 @@
  *   fixed so movement/combat actions remain meaningful.
  */
 import fc from 'fast-check';
-import { actionPayloadSchemas } from '../actions/payloadSchemas';
+import { CLIENT_ACTION_TYPES } from '../actions/payloadSchemas';
 import { parseGameData, type GameData } from '../data/schemas';
 import {
   createInitialState,
@@ -23,8 +23,9 @@ import {
 } from '../state/gameState';
 import type { Action } from '../action/types';
 
-/** Every wire-reachable client action type (the gate's own catalog). */
-export const CLIENT_ACTION_TYPES: readonly string[] = Object.keys(actionPayloadSchemas);
+/** Re-exported for the property tests that already import it from here; the constant
+ *  itself now lives beside the schema map it is derived from (AUD-6). */
+export { CLIENT_ACTION_TYPES };
 
 /** Compact real-data universe: 3 worlds on a lane, two players with fleets and
  *  ground, a mine + a shipyard-ish economy — enough for movement, combat, capture,

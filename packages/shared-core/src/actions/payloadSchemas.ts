@@ -191,3 +191,14 @@ export function isValidActionPayload(type: string, payload: unknown): boolean {
   if (!schema) return false;
   return schema.safeParse(payload).success;
 }
+
+/**
+ * Every wire-reachable client action type — the gate's own catalog, derived from the map
+ * above so the two can never disagree.
+ *
+ * AUD-6: this used to live inside `testkit/arbitraries.ts`, which is not part of the
+ * package's public surface. The enumerated set of legal client actions is the single most
+ * useful artefact for anyone writing a client, and it was reachable only by deep-importing
+ * a test-only file. It belongs next to the schemas it is computed from.
+ */
+export const CLIENT_ACTION_TYPES: readonly string[] = Object.keys(actionPayloadSchemas);
