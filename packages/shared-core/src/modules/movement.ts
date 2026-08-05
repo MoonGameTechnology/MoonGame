@@ -395,6 +395,14 @@ export const movementModule: GameModule = {
       if (!mv || fleet.battleId) {
         return h.reject('E_FLEET_BUSY'); // not under way (or in a battle) → nothing to halt
       }
+      // HERO-CORRIDOR: остановка ПОСРЕДИ коридора запрещена тем же правилом, что и
+      // парковка цели «Курса» (targetsOf): коридор — прыжок, середины у него нет, а
+      // флот, вставший на коридорном ребре, после закрытия коридора остался бы стоять
+      // на ребре, которого в графе больше нет. Код тот же — с точки зрения игрока
+      // «здесь дороги нет»; вошёл в коридор — доезжай.
+      if (isCorridorEdge(h.state, mv.from, mv.to)) {
+        return h.reject('E_NOT_A_LANE');
+      }
       // Park the fleet at its CURRENT continuous position on the lane — not at the
       // next node: the shared leg interpolation, clamped to the lane interior.
       const frac = Math.min(1 - EPS, Math.max(EPS, legT(mv, h.ctx.now)));
