@@ -237,6 +237,7 @@ import {
 // H4 — конструктор шаблонов дивизий: модель в `formations.ts`, редактор — REFM-8.
 // TT-3.1 — экран дерева технологий (REFM-9); `branchLabel` берёт ещё совет учёных.
 import { initTechTree, branchLabel } from './techTree';
+import { initSciPick } from './sciPick';
 // «Профиль командира» — карьерное досье (REFM-10).
 import { initProfile } from './profileScreen';
 // AVA-C1/C2 — корпоративный кабинет (REFM-11).
@@ -9513,87 +9514,21 @@ function renderSetup(): void {
 // arriving from the hub goes back to the hub, not the raw identity card.
 let setupReturn: 'welcome' | 'hub' = 'welcome';
 // --- scientist council picker: choose your 2 research leaders BEFORE the start-point ----
-// A start consecration (GDD §5.2): snapshotted into the match, immutable in-match. Empty
-// slots pulse to prompt the choice; each pick shows which tech-tree branch (and gated nodes)
-// it opens — the influence the player asked to see up front.
+// Окно живёт в `sciPick.ts` (REFM-16); здесь только проводка. Список выбранных —
+// `setupScientists` — принадлежит сетапу (его читает старт матча), поэтому ходит хуками.
 const sciWin = $('scipick');
-function sciInfluence(id: string): string {
-  const def = data.scientists[id];
-  if (!def) return '';
-  if (!def.branch) return t('scipick.generalist');
-  const opens = Object.values(data.technologies)
-    .filter(
-      (td) =>
-        td.branch === def.branch && (td.conditions ?? []).some((c) => c.type === 'has_scientist'),
-    )
-    .map((td) => tData(td.name));
-  const br = branchLabel(def.branch);
-  return opens.length
-    ? t('scipick.opens', { br, list: opens.join(', ') })
-    : t('scipick.focus', { br });
-}
-function renderSciPick(): void {
-  const chosen = setupScientists;
-  const slots = [0, 1]
-    .map((i) => {
-      const id = chosen[i];
-      if (!id) {
-        return `<div class="sp-slot empty"><div class="sp-plus">＋</div><div class="sp-hint">${t('scipick.pick')}</div></div>`;
-      }
-      const def = data.scientists[id];
-      return (
-        `<div class="sp-slot filled"><button class="sp-rm" data-sprm="${i}" title="${t('ping.remove')}">✕</button>` +
-        `<div class="sp-sn">${esc(t(def?.name ?? id))}</div>` +
-        `<div class="sp-inf">${esc(sciInfluence(id))}</div></div>`
-      );
-    })
-    .join('');
-  const roster = Object.keys(data.scientists)
-    .map((id) => {
-      const def = data.scientists[id]!;
-      const placed = chosen.includes(id);
-      const dis = placed || (chosen.length >= 2 && !placed);
-      return (
-        `<button class="sp-card${placed ? ' picked' : ''}" data-spadd="${id}"${dis ? ' disabled' : ''}>` +
-        `<div class="sp-cn">${esc(t(def.name))}${placed ? '<span class="sp-tick">✓</span>' : ''}</div>` +
-        `<div class="sp-inf">${esc(sciInfluence(id))}</div></button>`
-      );
-    })
-    .join('');
-  const ready = chosen.length >= 2;
-  $('scipickbody').innerHTML =
-    `<div class="sp-slots">${slots}</div>` +
-    `<div class="sp-warn">${t('scipick.note')}</div>` +
-    `<div class="sp-h">${t('scipick.candidates')}</div>` +
-    `<div class="sp-roster">${roster}</div>` +
-    `<button class="sp-go" id="sp-go"${ready ? '' : ' disabled'}>${ready ? t('scipick.confirm') : t('scipick.need-two')}</button>`;
-}
-function openSciPick(): void {
-  sciWin.classList.add('show');
-  renderSciPick();
-}
-sciWin.addEventListener('click', (e) => {
-  const tg = e.target as HTMLElement;
-  if (tg.closest('.sp-cancel')) {
-    sciWin.classList.remove('show');
-    $('setupcancel').click(); // back out of setup entirely
-    return;
-  }
-  const add = tg.closest('[data-spadd]') as HTMLElement | null;
-  if (add && !add.hasAttribute('disabled')) {
-    const id = add.dataset.spadd ?? '';
-    if (id && !setupScientists.includes(id) && setupScientists.length < 2) setupScientists.push(id);
-    renderSciPick();
-    return;
-  }
-  const rm = tg.closest('[data-sprm]') as HTMLElement | null;
-  if (rm) {
-    setupScientists.splice(Number(rm.dataset.sprm), 1);
-    renderSciPick();
-    return;
-  }
-  if (tg.id === 'sp-go' && setupScientists.length >= 2) sciWin.classList.remove('show');
+const sciPick = initSciPick({
+  root: () => sciWin,
+  body: () => $('scipickbody'),
+  data: () => data,
+  branchLabel,
+  chosen: () => setupScientists,
+  setChosen: (ids) => {
+    setupScientists = ids;
+  },
+  onCancel: () => $('setupcancel').click(),
 });
+const openSciPick = (): void => sciPick.open();
 
 function openSetup(from: 'welcome' | 'hub' = 'welcome'): void {
   setupReturn = from;
