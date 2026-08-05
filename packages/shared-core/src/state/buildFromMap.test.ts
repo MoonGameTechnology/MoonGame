@@ -215,7 +215,7 @@ describe('slot-based maps — team-aware start slots (corporation-wars.md §4)',
     // Anchored at the slot's owned world, carrying the archetype loadout, undeployed.
     expect(main.home).toBe('home_a');
     expect(main.location).toBe('home_a');
-    expect(main.name).toBe('Командир');
+    expect(main.name).toBe(data.heroes.commander!.name);
     expect(main.abilities).toEqual(data.heroes.commander!.startAbilities);
     expect(main.passives).toEqual(['rally_beacon']);
     expect(main.fleetId).toBeUndefined(); // no ship yet — hero.spawn raises it
