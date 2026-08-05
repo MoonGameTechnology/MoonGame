@@ -12,6 +12,7 @@ import {
   MemoryDropStore,
   MemoryMatchStore,
   MemoryMedalStore,
+  MemoryFriendStore,
   MemoryPushStore,
   MemoryReceiptStore,
   MemoryUserStore,
@@ -27,6 +28,7 @@ import {
   PostgresDropStore,
   PostgresMatchStore,
   PostgresMedalStore,
+  PostgresFriendStore,
   PostgresPushStore,
   PostgresReceiptStore,
   PostgresUserStore,
@@ -44,6 +46,7 @@ import {
   type MatchSnapshot,
   type MatchStore,
   type MedalStore,
+  type FriendStore,
   type PushStore,
   type ReceiptStore,
   type UserStore,
@@ -90,6 +93,7 @@ export interface Stores {
   /** Drop loop (ARS-4) — per-account pity + salvage shards + exactly-once roll claims. */
   dropStore: DropStore;
   /** Web Push subscriptions (ONB-5) — one per account, durable so it survives a restart. */
+  friendStore: FriendStore;
   pushStore: PushStore;
   /** Which backend is active — for the boot log ('memory' loses state on restart). */
   kind: 'memory' | 'postgres';
@@ -114,6 +118,7 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
       arsenalStore: new MemoryArsenalStore(),
       corpRentStore: new MemoryCorpRentStore(),
       dropStore: new MemoryDropStore(),
+      friendStore: new MemoryFriendStore(),
       pushStore: new MemoryPushStore(),
       kind: 'memory',
       close: () => Promise.resolve(),
@@ -139,6 +144,7 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
     arsenalStore: new PostgresArsenalStore(pool),
     corpRentStore: new PostgresCorpRentStore(pool),
     dropStore: new PostgresDropStore(pool),
+    friendStore: new PostgresFriendStore(pool),
     pushStore: new PostgresPushStore(pool),
     kind: 'postgres',
     close: () => pool.end(),

@@ -639,6 +639,33 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 .dp-map.on{color:#8ff0c2;border-color:#8ff0c2;background:rgba(111,214,164,.14);}
 .dp-map.offer{color:#8ff0c2;border-color:#8ff0c2;animation:sppulse 1.6s ease-in-out infinite;}
 .dp-map.pend,.dp-map:disabled{opacity:.5;cursor:default;}
+/* FRIENDS-1: вкладка «Друзья» — поиск, заявки, список с присутствием */
+.fr-find{display:flex;gap:8px;padding:2px 0 10px;}
+.fr-q{flex:1;min-width:0;background:rgba(6,18,22,.9);border:1px solid var(--line);border-radius:8px;
+  color:var(--ink);font:inherit;font-size:12px;padding:9px 11px;}
+.fr-q:focus{outline:none;border-color:var(--cyan);}
+.fr-b{border:1px solid var(--line);background:transparent;color:var(--dim);border-radius:8px;
+  padding:8px 13px;font:600 11px ui-monospace,monospace;cursor:pointer;white-space:nowrap;}
+.fr-b:hover{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.12);}
+.fr-b.ok{border-color:var(--cyan-dim);color:var(--cyan);}
+.fr-note{padding:0 0 8px;font-size:11px;color:var(--amber);}
+.fr-list{display:flex;flex-direction:column;gap:8px;}
+.fr-row{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);
+  border-radius:10px;background:rgba(6,16,20,.6);}
+.fr-row.req{border-color:var(--cyan-dim);background:rgba(53,214,230,.07);}
+.fr-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;background:var(--dim);}
+.fr-dot.on{background:var(--grn);}
+.fr-dot.am{background:var(--amber);}
+.fr-dot.off{background:#4a5c62;}
+.fr-txt{flex:1;min-width:0;}
+.fr-txt b{display:block;font-size:13px;color:var(--ink);}
+.fr-txt span{display:block;font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fr-acts{display:flex;align-items:center;gap:6px;flex:0 0 auto;}
+.fr-wait{font-size:10px;color:var(--dim);}
+@media(max-width:640px){
+  /* кнопки строки — под палец, как в окне меток */
+  .fr-b{padding:11px 12px;}
+}
 /* PING-PANEL: список меток коалиции — своих и союзных */
 #pingpanel{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:60;display:none;
   width:min(520px,92vw);max-height:70vh;overflow:auto;background:rgba(6,16,20,.97);
@@ -2646,12 +2673,14 @@ const page = (js) => `<!doctype html>
     <div class="hub-panel" id="hp-rank" style="display:none">
       <div class="hub-empty"><span class="he-ic">▤</span><span data-i18n="hub.rank.empty.title"></span><br><span style="font-size:11px;color:var(--cyan-dim)" data-i18n="hub.rank.empty.sub"></span></div>
     </div>
+    <div class="hub-panel" id="hp-friends" style="display:none"></div>
     <div class="hub-panel" id="hp-ally" style="display:none">
       <div class="hub-empty"><span class="he-ic">⚑</span><span data-i18n="hub.ally.empty.title"></span><br><span style="font-size:11px;color:var(--cyan-dim)" data-i18n="hub.ally.empty.sub"></span></div>
       <button id="ccorp" class="hub-solo" type="button">⬢ <span data-i18n="hub.ally.corp"></span></button>
     </div>
     <div class="hub-panel" id="hp-more" style="display:none">
       <div class="hub-grid">
+        <button class="hub-tile" id="hub-meta" type="button"><span class="ht-ic">★</span><span data-i18n="hub.tile.meta"></span></button>
         <button class="hub-tile" id="hub-tutorial" type="button"><span class="ht-ic">◎</span><span data-i18n="hub.tile.tutorial"></span></button>
         <button class="hub-tile" id="hub-help" type="button"><span class="ht-ic">?</span><span data-i18n="hub.tile.help"></span></button>
         <button class="hub-tile" id="hub-settings" type="button"><span class="ht-ic">⚙</span><span data-i18n="hub.tile.settings"></span></button>
@@ -2670,7 +2699,7 @@ const page = (js) => `<!doctype html>
     <button class="hub-tab active" data-hub="home" type="button"><span class="hn-ic">⌂</span><span data-i18n="hub.nav.home"></span></button>
     <button class="hub-tab" data-hub="games" type="button"><span class="hn-ic">▶</span><span data-i18n="hub.nav.games"></span></button>
     <button class="hub-tab" data-hub="rank" type="button"><span class="hn-ic">▤</span><span data-i18n="hub.nav.rank"></span></button>
-    <button class="hub-tab" data-hub="meta" type="button"><span class="hn-ic">★</span><span data-i18n="hub.nav.meta"></span></button>
+    <button class="hub-tab" data-hub="friends" type="button"><span class="hn-ic">☍</span><span data-i18n="hub.nav.friends"></span></button>
     <button class="hub-tab" data-hub="arsenal" type="button"><span class="hn-ic">⚔</span><span data-i18n="hub.nav.arsenal"></span></button>
     <button class="hub-tab" data-hub="ally" type="button"><span class="hn-ic">⚑</span><span data-i18n="hub.nav.ally"></span></button>
     <button class="hub-tab" data-hub="more" type="button"><span class="hn-ic">≡</span><span data-i18n="hub.nav.more"></span></button>

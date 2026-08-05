@@ -72,6 +72,22 @@ export {
   type VerifyKey,
 } from './auth';
 export { registerAuthApi, liveSession, pwFingerprint, type AuthApiDeps, type Mailer } from './authApi';
+// FRIENDS-1 — roster API + rules, exported so the playtest host mounts the SAME slice
+// as production (one implementation of the social graph, not two).
+export {
+  registerFriendApi,
+  ONLINE_MS,
+  type FriendApiDeps,
+  type FriendPresence,
+  type FriendRow,
+  type MatchPresenceSource,
+} from './friendApi';
+export {
+  FriendService,
+  FRIEND_LIMIT,
+  type FriendErrorCode,
+  type FriendServiceDeps,
+} from './friendService';
 export { configFromEnv, type ServerConfig } from './serverConfig';
 export { hashPassword, verifyPassword, type ScryptParams } from './password';
 export type {
@@ -91,6 +107,9 @@ export { parseClientMessage, serializeServerMessage } from './protocol';
 export {
   type AccountStore,
   type CommanderStore,
+  type FriendEdge,
+  type FriendParty,
+  type FriendStore,
   type MatchSnapshot,
   type MatchStore,
   type ReceiptStore,
@@ -102,11 +121,13 @@ export {
   MemoryCommanderStore,
   MemoryMatchStore,
   MemoryReceiptStore,
+  MemoryFriendStore,
   MemoryUserStore,
   migrate,
   PostgresAccountStore,
   PostgresCommanderStore,
   PostgresMatchStore,
+  PostgresFriendStore,
   PostgresReceiptStore,
   PostgresUserStore,
 } from './store';

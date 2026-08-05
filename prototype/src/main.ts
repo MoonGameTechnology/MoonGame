@@ -360,6 +360,8 @@ import { resolveIntro, parseSeenIntros, type IntroCard } from './intros';
 // ONB-5 — return digest ("пока тебя не было"): aggregate the away-window event log.
 import { buildRecap, type RecapEvent } from './recap';
 import { canEditPing, canRemovePing, pingRows, toggleHidden } from './pingPanel';
+// FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
+import { initFriends } from './friendsScreen';
 import { combatRanges } from './combatRanges';
 import { corridorLines } from './corridorView';
 import { recapAdmits } from './recapGate';
@@ -8692,6 +8694,7 @@ const HUB_PANELS: Record<string, string> = {
   home: 'hp-home',
   rank: 'hp-rank',
   meta: 'hp-meta',
+  friends: 'hp-friends',
   arsenal: 'hp-arsenal',
   ally: 'hp-ally',
   more: 'hp-more',
@@ -8707,6 +8710,7 @@ function hubTab(tab: string): void {
   }
   currentHubTab = tab;
   if (tab === 'meta') renderMetaPanel(); // live numbers every visit (XP may have grown)
+  if (tab === 'friends') void friends.refresh(); // roster + presence are server truth
   if (tab === 'arsenal') void arsenal.refresh(); // cache paints now, server refresh trails
   for (const [k, pid] of Object.entries(HUB_PANELS))
     $(pid).style.display = k === tab ? 'flex' : 'none';
@@ -8756,6 +8760,23 @@ $('hp-meta').addEventListener('click', (ev) => {
     saveMeta(next);
     renderMetaPanel();
   }
+});
+
+// --- «Друзья» — the account's roster (hub tab, FRIENDS-1) --------------------
+// Экран живёт в `friendsScreen.ts`; здесь только доступ к серверу. Политика та же,
+// что у «Арсенала»: вкладка ПЕРЕИСПОЛЬЗУЕТ сессию, которую уже добыл вход, но никогда
+// не спрашивает пароль ради того, чтобы просто посмотреть — нет сервера, нет режима
+// аккаунтов или нет сохранённой сессии читаются одинаково (гостевое состояние).
+const friends = initFriends({
+  root: () => $('hp-friends'),
+  authorizedBase: async () => {
+    const srv = resolveServer();
+    if (!srv) return null;
+    await probeAuthMode(srv.base);
+    if (!authMode) return null;
+    const token = sessionToken(srv.base);
+    return token ? { base: httpBase(srv.base), token } : null;
+  },
 });
 
 // --- «Арсенал» — the account's persistent collection (hub tab, ARS-5) --------
@@ -9219,6 +9240,9 @@ $('hub-logout').addEventListener('click', () => {
 for (const b of Array.from(document.querySelectorAll('.hub-tab'))) {
   b.addEventListener('click', () => hubTab((b as HTMLElement).dataset.hub ?? 'home'));
 }
+// «Прокачка» уехала из нижней навигации (там семь вкладок — предел) в «Ещё»: плитка
+// открывает ТУ ЖЕ панель `hp-meta`, а не свою копию экрана.
+document.getElementById('hub-meta')?.addEventListener('click', () => hubTab('meta'));
 for (const tile of Array.from(document.querySelectorAll('#hp-more .hub-tile[data-more]'))) {
   tile.addEventListener('click', () => {
     // The tile's own label span is already localized (localizeStaticDom ran at boot);
