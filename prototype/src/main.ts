@@ -257,6 +257,7 @@ import {
   setCompactPanel,
   applyCompactPanel,
 } from './graphicsPrefs';
+import { initSettings } from './settingsOverlay';
 // «Профиль командира» — карьерное досье (REFM-10).
 import { initProfile } from './profileScreen';
 // AVA-C1/C2 — корпоративный кабинет (REFM-11).
@@ -9256,171 +9257,41 @@ for (const tile of Array.from(document.querySelectorAll('#hp-more .hub-tile[data
 }
 
 // --- settings overlay (hub → «Ещё» → Настройки) -----------------------------
-// Client-only display preferences (localStorage), never sent to the server, grouped into
-// «Интерфейс» (radar-sweep opacity, own ping markers) and «Графика» (glow & haloes,
-// star backdrop). All purely cosmetic — the radar mechanic (contact detection) and the
-// simulation are untouched at every setting.
+// Окно живёт в `settingsOverlay.ts` (REFM-22); здесь проводка. Модуль настройками не
+// владеет — каждая живёт там, где её читают (графика, цвета сторон, звук, развёртка), а
+// оверлей только показывает снимок и отдаёт изменение обратно.
 const settingsEl = $('settings');
-function renderSettings(): void {
-  const pct = Math.round(sweepOpacity * 100);
-  settingsEl.innerHTML =
-    `<div class="setbox">` +
-    `<div class="pc-head"><span class="pc-dia" style="background:var(--cyan)"></span><b>${t('settings.title')}</b><span class="pc-tag">${t('settings.tag')}</span></div>` +
-    `<div class="set-row">` +
-    `<div class="set-lbl">${t('settings.sweep')}<span class="set-sub">${t('settings.sweep.hint')}</span></div>` +
-    `<div class="set-ctl"><input id="set-sweep" type="range" min="0" max="100" step="5" value="${pct}" aria-label="${t('settings.sweep.opacity')}"><span id="set-sweep-val" class="set-val">${pct}%</span></div>` +
-    `</div>` +
-    `<div class="set-row">` +
-    `<div class="set-lbl">${t('settings.own-pins')}<span class="set-sub">${t('settings.own-pins.hint')}</span></div>` +
-    `<div class="set-ctl"><label class="set-switch"><input id="set-ownpings" type="checkbox"${showOwnPings ? ' checked' : ''} aria-label="${t('settings.own-pins')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-ownpings-val" class="set-val">${showOwnPings ? t('settings.on') : t('settings.off')}</span></div>` +
-    `</div>` +
-    (pcUi()
-      ? `<div class="set-row">` +
-        `<div class="set-lbl">${t('settings.compact')}<span class="set-sub">${t('settings.compact.hint')}</span></div>` +
-        `<div class="set-ctl"><label class="set-switch"><input id="set-compact" type="checkbox"${compactPanelOn() ? ' checked' : ''} aria-label="${t('settings.compact')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-compact-val" class="set-val">${compactPanelOn() ? t('settings.on') : t('settings.off')}</span></div>` +
-        `</div>`
-      : '') +
-    `<div class="pc-sec">${t('settings.colors.title')}</div>` +
-    `<div class="set-row">` +
-    `<div class="set-lbl">${t('settings.colors.own')}<span class="set-sub">${t('settings.colors.own.hint')}</span></div>` +
-    `<div class="set-ctl"><input id="set-colyou" type="color" value="${youColor}" aria-label="${t('settings.colors.own')}"></div>` +
-    `</div>` +
-    `<div class="set-row">` +
-    `<div class="set-lbl">${t('settings.colors.neutral')}<span class="set-sub">${t('settings.colors.neutral.hint')}</span></div>` +
-    `<div class="set-ctl"><input id="set-colneutral" type="color" value="${neutralColor}" aria-label="${t('settings.colors.neutral')}"></div>` +
-    `</div>` +
-    `<div class="set-row">` +
-    `<div class="set-lbl">${t('settings.colors.palette')}<span class="set-sub">${t('settings.colors.palette.hint')}</span></div>` +
-    `<div class="set-ctl set-pals">` +
-    (['classic', 'warm', 'cvd'] as const)
-      .map(
-        (p) =>
-          `<button type="button" class="set-pal${rivalPaletteId === p ? ' on' : ''}" data-pal="${p}">${
-            p === 'classic'
-              ? t('settings.palette.classic')
-              : p === 'warm'
-                ? t('settings.palette.warm')
-                : t('settings.palette.colorblind')
-          }</button>`,
-      )
-      .join('') +
-    `<button type="button" class="set-pal" id="set-colreset" title="${t('settings.colors.reset')}">⟲</button>` +
-    `</div>` +
-    `</div>` +
-    `<div class="pc-sec">${t('settings.gfx.title')}</div>` +
-    `<div class="set-row">` +
-    `<div class="set-lbl">${t('settings.gfx.glow')}<span class="set-sub">${t('settings.gfx.glow.hint')}</span></div>` +
-    `<div class="set-ctl"><label class="set-switch"><input id="set-glow" type="checkbox"${glowOn() ? ' checked' : ''} aria-label="${t('settings.gfx.glow')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-glow-val" class="set-val">${glowOn() ? t('settings.on') : t('settings.off')}</span></div>` +
-    `</div>` +
-    `<div class="set-row">` +
-    `<div class="set-lbl">${t('settings.gfx.starfield')}<span class="set-sub">${t('settings.gfx.starfield.hint')}</span></div>` +
-    `<div class="set-ctl"><label class="set-switch"><input id="set-starfield" type="checkbox"${starfieldOn() ? ' checked' : ''} aria-label="${t('settings.gfx.starfield')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-starfield-val" class="set-val">${starfieldOn() ? t('settings.on') : t('settings.off')}</span></div>` +
-    `</div>` +
-    `<div class="set-row">` +
-    `<div class="set-lbl">${t('settings.gfx.fps')}<span class="set-sub">${t('settings.gfx.fps.hint')}</span></div>` +
-    `<div class="set-ctl"><label class="set-switch"><input id="set-fps" type="checkbox"${showFpsOn() ? ' checked' : ''} aria-label="${t('settings.gfx.fps')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-fps-val" class="set-val">${showFpsOn() ? t('settings.on') : t('settings.off')}</span></div>` +
-    `</div>` +
-    // SND-1: секция «Звук» — тумблер синтезированных откликов + громкость.
-    `<div class="pc-sec">${t('settings.snd.title')}</div>` +
-    `<div class="set-row">` +
-    `<div class="set-lbl">${t('settings.snd.ui')}<span class="set-sub">${t('settings.snd.ui.hint')}</span></div>` +
-    `<div class="set-ctl"><label class="set-switch"><input id="set-snd" type="checkbox"${snd.enabled() ? ' checked' : ''} aria-label="${t('settings.snd.ui')}"><span class="sw-track"></span><span class="sw-knob"></span></label><span id="set-snd-val" class="set-val">${snd.enabled() ? t('settings.on') : t('settings.off')}</span></div>` +
-    `</div>` +
-    `<div class="set-row">` +
-    `<div class="set-lbl">${t('settings.snd.vol')}</div>` +
-    `<div class="set-ctl"><input id="set-snd-vol" type="range" min="0" max="100" step="5" value="${Math.round(snd.volume() * 100)}" aria-label="${t('settings.snd.vol')}"><span id="set-snd-vol-val" class="set-val">${Math.round(snd.volume() * 100)}%</span></div>` +
-    `</div>` +
-    // The «управление скоростью» control moved to the sandbox panel (a dev-only corner),
-    // so Settings no longer carries a developer section.
-    `<button class="pc-close" id="set-close" type="button">${t('settings.done')}</button>` +
-    `</div>`;
-  const sndSw = document.getElementById('set-snd') as HTMLInputElement | null;
-  const sndSwVal = document.getElementById('set-snd-val');
-  sndSw?.addEventListener('change', () => {
-    snd.setEnabled(sndSw.checked);
-    if (sndSwVal) sndSwVal.textContent = sndSw.checked ? t('settings.on') : t('settings.off');
-    if (sndSw.checked) snd.play('tap'); // включил — сразу слышно, ЧТО включил
-  });
-  const sndVol = document.getElementById('set-snd-vol') as HTMLInputElement | null;
-  const sndVolVal = document.getElementById('set-snd-vol-val');
-  sndVol?.addEventListener('input', () => {
-    snd.setVolume(Number(sndVol.value) / 100);
-    if (sndVolVal) sndVolVal.textContent = `${Math.round(snd.volume() * 100)}%`;
-    snd.play('tap'); // живой предпросмотр уровня; анти-трель зазор глушит спам
-  });
-  const slider = document.getElementById('set-sweep') as HTMLInputElement | null;
-  const val = document.getElementById('set-sweep-val');
-  slider?.addEventListener('input', () => {
-    setSweepOpacity(Number(slider.value) / 100);
-    if (val) val.textContent = `${Math.round(sweepOpacity * 100)}%`; // 0% reads as hidden
-  });
-  const own = document.getElementById('set-ownpings') as HTMLInputElement | null;
-  const ownVal = document.getElementById('set-ownpings-val');
-  own?.addEventListener('change', () => {
-    setShowOwnPings(own.checked);
-    if (ownVal) ownVal.textContent = own.checked ? t('settings.on') : t('settings.off');
-  });
-  const compact = document.getElementById('set-compact') as HTMLInputElement | null;
-  const compactVal = document.getElementById('set-compact-val');
-  compact?.addEventListener('change', () => {
-    setCompactPanel(compact.checked);
-    if (compactVal) compactVal.textContent = compact.checked ? t('settings.on') : t('settings.off');
-  });
-  const glow = document.getElementById('set-glow') as HTMLInputElement | null;
-  const glowVal = document.getElementById('set-glow-val');
-  glow?.addEventListener('change', () => {
-    setGlowFx(glow.checked);
-    if (glowVal) glowVal.textContent = glow.checked ? t('settings.on') : t('settings.off');
-  });
-  const star = document.getElementById('set-starfield') as HTMLInputElement | null;
-  const starVal = document.getElementById('set-starfield-val');
-  star?.addEventListener('change', () => {
-    setStarfield(star.checked);
-    if (starVal) starVal.textContent = star.checked ? t('settings.on') : t('settings.off');
-  });
-  const fps = document.getElementById('set-fps') as HTMLInputElement | null;
-  const fpsVal = document.getElementById('set-fps-val');
-  fps?.addEventListener('change', () => {
-    setShowFps(fps.checked);
-    if (fpsVal) fpsVal.textContent = fps.checked ? t('settings.on') : t('settings.off');
-  });
-  // Цвета сторон: живые инпуты + пресеты палитры соперников. Карта красится на
-  // следующем кадре сама (ownerColor читается при отрисовке), панель — при
-  // следующей перестройке.
-  const colYou = document.getElementById('set-colyou') as HTMLInputElement | null;
-  const colNeutral = document.getElementById('set-colneutral') as HTMLInputElement | null;
-  colYou?.addEventListener('input', () =>
-    setSideColors(colYou.value, neutralColor, rivalPaletteId),
-  );
-  colNeutral?.addEventListener('input', () =>
-    setSideColors(youColor, colNeutral.value, rivalPaletteId),
-  );
-  for (const b of Array.from(settingsEl.querySelectorAll('.set-pal[data-pal]'))) {
-    b.addEventListener('click', () => {
-      setSideColors(youColor, neutralColor, (b as HTMLElement).dataset.pal ?? 'classic');
-      renderSettings(); // перерисовать активный пресет
-    });
-  }
-  document.getElementById('set-colreset')?.addEventListener('click', () => {
-    setSideColors(COLOR.p1!, COLOR.null!, 'classic');
-    renderSettings();
-  });
-  document
-    .getElementById('set-close')
-    ?.addEventListener('click', () => settingsEl.classList.remove('show'));
-}
-$('hub-settings').addEventListener('click', () => {
-  renderSettings();
-  settingsEl.classList.add('show');
+const settings = initSettings({
+  root: () => settingsEl,
+  view: () => ({
+    sweepOpacity,
+    ownPings: showOwnPings,
+    compact: compactPanelOn(),
+    showCompactRow: pcUi(),
+    glow: glowOn(),
+    starfield: starfieldOn(),
+    fps: showFpsOn(),
+    soundOn: snd.enabled(),
+    volume: snd.volume(),
+    youColor,
+    neutralColor,
+    palette: rivalPaletteId,
+  }),
+  setSweepOpacity,
+  setOwnPings: setShowOwnPings,
+  setCompact: setCompactPanel,
+  setGlow: setGlowFx,
+  setStarfield: setStarfield,
+  setFps: setShowFps,
+  setSound: (v) => snd.setEnabled(v),
+  setVolume: (v) => snd.setVolume(v),
+  previewSound: () => snd.play('tap'),
+  setColors: (you, neutral, palette) => setSideColors(you, neutral, palette),
+  resetColors: () => setSideColors(COLOR.p1!, COLOR.null!, 'classic'),
 });
+$('hub-settings').addEventListener('click', () => settings.open());
 // Rail: settings are reachable mid-match too, not only from the hub's «Ещё» tab.
-document.getElementById('rail-settings')?.addEventListener('click', () => {
-  renderSettings();
-  settingsEl.classList.add('show');
-});
-settingsEl.addEventListener('click', (e) => {
-  if (e.target === settingsEl) settingsEl.classList.remove('show'); // tap the backdrop → close
-});
+document.getElementById('rail-settings')?.addEventListener('click', () => settings.open());
 
 // First-run gate: a returning commander (a saved callsign) skips the identity card
 // and boots straight into the hub — the raw "Новый командир / войти" screen is only
