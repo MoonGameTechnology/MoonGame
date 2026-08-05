@@ -607,6 +607,48 @@ export interface PushSubscriptionRecord {
  *  brick, not this one). Durable so a subscription survives a server restart; the
  *  send path itself (`push.ts`) lives above the store, same split as the other
  *  policy-vs-storage stores here. */
+/** An account as the friend list shows it: id for the wire, login for the eyes. */
+export interface FriendParty {
+  accountId: string;
+  login: string;
+}
+
+/** One social edge, ALWAYS from the asking viewer's point of view: who the other
+ *  account is, and what stands between us right now. */
+export interface FriendEdge extends FriendParty {
+  /** `friend` — accepted; `incoming` — they asked me; `outgoing` — I asked them. */
+  kind: 'friend' | 'incoming' | 'outgoing';
+  /** Wall-clock ms of the last change to this edge (request, or acceptance). */
+  at: number;
+}
+
+/**
+ * FRIENDS-1 · The social graph: ONE row per pair, never two.
+ *
+ * A pending request and a friendship are the SAME row with a different status, which
+ * is what makes the whole store four methods: «отклонить», «отозвать заявку» and
+ * «удалить из друзей» are one operation (`drop`) because all three mean exactly «между
+ * нами больше нет ребра». Two tables (requests + friendships) would have needed a
+ * transaction to keep them consistent on accept, and a rule about what a pair that
+ * appears in both means.
+ *
+ * Direction lives in the row (who asked whom), so `edgesOf` can present the same row
+ * as `incoming` to one side and `outgoing` to the other without storing it twice.
+ */
+export interface FriendStore {
+  /** Every edge touching this account, presented from ITS side. */
+  edgesOf(accountId: string): Promise<FriendEdge[]>;
+  /** Open a pending edge. Fail-secure: a pair that already has ANY row (pending
+   *  either way, or accepted) is `E_EXISTS` — never a second row, never an overwrite. */
+  request(from: FriendParty, to: FriendParty, at: number): Promise<{ ok: true } | { ok: false; code: 'E_EXISTS' }>;
+  /** Accept the pending edge addressed TO `accountId`. Only the ASKED side may accept
+   *  — accepting your own request would be a self-serve friendship. */
+  accept(accountId: string, otherId: string, at: number): Promise<{ ok: true } | { ok: false; code: 'E_NO_EDGE' }>;
+  /** Remove the edge whatever it is: decline, withdraw, or unfriend. Either side may. */
+  drop(accountId: string, otherId: string): Promise<{ ok: true } | { ok: false; code: 'E_NO_EDGE' }>;
+  close?(): Promise<void>;
+}
+
 export interface PushStore {
   save(accountId: string, sub: PushSubscriptionRecord): Promise<void>;
   /** Drop the subscription — an explicit unsubscribe, or the push service reported

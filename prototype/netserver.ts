@@ -30,17 +30,22 @@ import {
   MemoryCommanderStore,
   MemoryMatchStore,
   MemoryReceiptStore,
+  MemoryFriendStore,
   MemoryUserStore,
   PostgresAccountStore,
   PostgresCommanderStore,
   PostgresMatchStore,
   PostgresReceiptStore,
+  PostgresFriendStore,
   PostgresUserStore,
   migrate,
   registerAuthApi,
+  registerFriendApi,
+  FriendService,
   liveSession,
   configFromEnv,
   type AccountStore,
+  type FriendStore,
   type CommanderStore,
   type MatchStore,
   type ReceiptStore,
@@ -69,6 +74,8 @@ import {
 import { ActionGate } from '../packages/action-layer/src/index';
 import { isValidActionPayload } from '../packages/shared-core/src/actions/payloadSchemas';
 import type { PlayerId } from '../packages/shared-core/src/index';
+import { MS_PER_DAY } from '../packages/shared-core/src/index';
+import type { Identity } from '../packages/server/src/matchApi';
 const { Pool } = pgPkg;
 
 // --- M0/M1 playtest log: append room events to a per-run JSONL and feed every one
@@ -171,6 +178,7 @@ let matchStore: MatchStore;
 let accountStore: AccountStore;
 let receiptStore: ReceiptStore;
 let userStore: UserStore;
+let friendStore: FriendStore;
 let commanderStore: CommanderStore;
 if (DATABASE_URL) {
   pool = new Pool({ connectionString: DATABASE_URL });
@@ -179,12 +187,14 @@ if (DATABASE_URL) {
   accountStore = new PostgresAccountStore(pool);
   receiptStore = new PostgresReceiptStore(pool);
   userStore = new PostgresUserStore(pool);
+  friendStore = new PostgresFriendStore(pool);
   commanderStore = new PostgresCommanderStore(pool);
 } else {
   matchStore = new MemoryMatchStore();
   accountStore = new MemoryAccountStore();
   receiptStore = new MemoryReceiptStore();
   userStore = new MemoryUserStore();
+  friendStore = new MemoryFriendStore();
   commanderStore = new MemoryCommanderStore();
 }
 
@@ -740,6 +750,37 @@ const server = createMultiplayerServer({
             }
           : {}),
       });
+      // Одна проверка сессии на оба аккаунтных API: подпись валидна И пароль не менялся
+      // (сброс отзывает старые сессии до того, как они займут место, SE-1.x).
+      const identifySession = async (request: {
+        headers: Record<string, unknown>;
+      }): Promise<Identity | null> => {
+        const header = request.headers.authorization;
+        const bearer =
+          typeof header === 'string' && header.startsWith('Bearer ')
+            ? header.slice('Bearer '.length).trim()
+            : null;
+        const who = bearer ? await authCfg.verifySession!(bearer) : null;
+        return who?.ok ? liveSession(who.claim, userStore) : null;
+      };
+      // Друзья (FRIENDS-1) — тот же слайс, что в проде: список и заявки живут на
+      // аккаунте, поэтому вкладка «Друзья» работает и на плейтест-хосте. Присутствие
+      // читается из ЖИВОГО реестра комнат: занятое место в идущем матче — «в матче».
+      registerFriendApi(app, {
+        service: new FriendService({ friends: friendStore, users: userStore }),
+        identify: identifySession,
+        matches: {
+          seatOf: async (login) => {
+            for (const id of registry.ids()) {
+              if (!(await accountStore.seatOf(id, login))) continue;
+              const room = registry.get(id);
+              if (!room) continue;
+              return { matchId: id, days: Math.floor(room.state.time / MS_PER_DAY) };
+            }
+            return null;
+          },
+        },
+      });
       // Seat + short-lived join token (SES-2.5) through the SHARED match API, so the
       // handshake — per-IP rate-limit, identity gate, error→status mapping — lives in ONE
       // place with the production host (NETA2-7). netserver seeds matches out of band, so it
@@ -747,15 +788,7 @@ const server = createMultiplayerServer({
       registerMatchApi(app, {
         // Identity = a signature-valid session, RE-CHECKED against the current password: a
         // reset revokes older sessions before they can claim/reclaim a seat (SE-1.x).
-        identify: async (request) => {
-          const header = request.headers.authorization;
-          const bearer =
-            typeof header === 'string' && header.startsWith('Bearer ')
-              ? header.slice('Bearer '.length).trim()
-              : null;
-          const who = bearer ? await authCfg.verifySession!(bearer) : null;
-          return who?.ok ? liveSession(who.claim, userStore) : null;
-        },
+        identify: identifySession,
         // The seat belongs to the session's login (nobody joins as someone else). Entry
         // window (SES-2.3): a login that does NOT already hold a seat is a first-time claim —
         // refuse it once the window closed, BEFORE resolveSeat assigns a chair (a refused
