@@ -1104,7 +1104,12 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .tt-modal{position:absolute;inset:0;z-index:8;display:flex;align-items:center;justify-content:center;}
 .tt-mback{position:absolute;inset:0;background:rgba(1,6,8,.72);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
 .tt-mwin{position:relative;width:min(320px,calc(100% - 28px));background:linear-gradient(180deg,#0c2026,#081418);
-  border:1px solid var(--line-hi);border-radius:14px;padding:14px;animation:ttpop .14s ease-out;}
+  border:1px solid var(--line-hi);border-radius:14px;padding:14px;}
+/* Появление анимируется КЛАССОМ, который ставится только на реальное открытие досье
+   (techTree.ts). На самом .tt-mwin анимации быть не должно: окно живо ререндерится
+   innerHTML'ом каждые ~500мс, пересозданный узел проигрывал бы ttpop заново — досье
+   «схлопывалось и выпрыгивало» дважды в секунду (баг живого плейтеста). */
+.tt-mwin.pop{animation:ttpop .14s ease-out;}
 @keyframes ttpop{from{transform:scale(.94);opacity:.4;}to{transform:scale(1);opacity:1;}}
 .tt-mx{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--dim);cursor:pointer;}
 .tt-mhead{display:flex;gap:11px;align-items:center;padding-right:30px;}

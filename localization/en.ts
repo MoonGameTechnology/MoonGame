@@ -894,8 +894,11 @@ export const en: Record<string, string> = {
 
   // --- err — Отказы ядра (kernel rejection codes). Ключ выводится из кода: E_NO_CAPACITY → err.no-capacity.
   'err.already': 'already in effect',
+  'err.already-built': 'already built — grow it with an upgrade',
   'err.already-fitted': 'that fitting is already installed',
   'err.already-offered': 'a proposal is already pending',
+  'err.already-paused': 'construction already paused — resume it',
+  'err.already-queued': 'already in the build queue',
   'err.already-unlocked': 'that node is already unlocked',
   'err.bad-effect': 'the ability is misconfigured',
   'err.bad-payload': 'malformed order',
@@ -931,6 +934,7 @@ export const en: Record<string, string> = {
   'err.no-node': 'unknown skill-tree node',
   'err.no-planet': 'world not found',
   'err.no-player': 'player not found',
+  'err.no-right-of-way': 'no right of way: every route crosses a power you are at peace with',
   'err.no-ships': 'no ships',
   'err.no-shipyard': 'needs a shipyard/spaceport',
   'err.no-slots': 'all fitting slots are taken',

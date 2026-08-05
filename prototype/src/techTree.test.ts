@@ -339,3 +339,63 @@ describe('дерево технологий — окно', () => {
     expect(body.html()).not.toContain('tt-modal');
   });
 });
+
+// --- досье без мигания (баг живого плейтеста) ---------------------------------
+// Окно живо ререндерится каждые ~500мс; анимация появления обязана играть ТОЛЬКО
+// на реальном открытии досье (класс .pop), а неизменная разметка — вообще не
+// переприсваиваться (innerHTML пересоздаёт DOM даже на идентичной строке).
+describe('досье технологии — без мигания на живом ререндере', () => {
+  /** fakeBody со счётчиком присваиваний innerHTML и живым .tt-mwin: присваивание
+   *  «пересоздаёт» модалку (сбрасывает её классы) — как настоящий DOM. */
+  function watchedBody() {
+    const scroll = { scrollLeft: 0, scrollTop: 0 };
+    const classes = new Set<string>();
+    const mwin = {
+      classList: { add: (c: string) => classes.add(c), remove: (c: string) => classes.delete(c) },
+    };
+    let html = '';
+    let writes = 0;
+    const el = {
+      get innerHTML() {
+        return html;
+      },
+      set innerHTML(v: string) {
+        html = v;
+        writes += 1;
+        classes.clear(); // innerHTML = пересоздание DOM: прежних классов у модалки нет
+      },
+      querySelector: (sel: string) =>
+        sel === '.tt-scroll' ? scroll : sel === '.tt-mwin' && html.includes('tt-mwin') ? mwin : null,
+      html: () => html,
+      writes: () => writes,
+      popped: () => classes.has('pop'),
+    };
+    return el;
+  }
+
+  it('открытие досье ставит .pop, а кадровый ререндер не трогает DOM вовсе', () => {
+    const body = watchedBody();
+    const { api, win } = wire({ body: () => body as unknown as HTMLElement });
+    api.open();
+    win.fire(ttClick('.tt-node', { tech: firstOf('space') }));
+    expect(body.html()).toContain('tt-mwin');
+    expect(body.popped()).toBe(true); // анимация — на реальном открытии
+    const w = body.writes();
+    api.repaint(); // кадровый цикл: состояние не менялось
+    api.repaint();
+    expect(body.writes()).toBe(w); // разметка та же — innerHTML не переприсвоен
+  });
+
+  it('живое изменение перерисовывает досье БЕЗ повторной анимации появления', () => {
+    const body = watchedBody();
+    const { api, win, s } = wire({ body: () => body as unknown as HTMLElement });
+    api.open();
+    win.fire(ttClick('.tt-node', { tech: firstOf('space') }));
+    const w = body.writes();
+    // казна опустела → чипы цены получают пометку нехватки → разметка другая
+    for (const k of Object.keys(s.players.p1!.resources)) s.players.p1!.resources[k] = 0;
+    api.repaint();
+    expect(body.writes()).toBe(w + 1);
+    expect(body.popped()).toBe(false); // пересозданная модалка НЕ выпрыгивает заново
+  });
+});
