@@ -1545,6 +1545,12 @@ function queuedLabel(q: QueuedBuild): string {
   return `${BUILD_ICON[q.id] ?? '▣'} ${tData(data.buildings[q.id]?.name ?? q.id)}`;
 }
 function enqueueBuild(planetId: string, order: QueuedBuild): void {
+  // Одна точка опоры против дубля одноэкземплярного здания: плитка, кодекс и любой
+  // будущий вход проходят здесь, и серые плитки остаются чистой косметикой.
+  if (order.kind === 'building' && buildingLocked(planetId, order.id)) {
+    note('✖ ' + errText(buildingLocked(planetId, order.id) === 'built' ? 'E_ALREADY_BUILT' : 'E_ALREADY_QUEUED'));
+    return;
+  }
   if (NET) {
     // No local build queue in net mode — the server times construction. Send the
     // order straight away (one tap = one build queued server-side).
@@ -2200,11 +2206,15 @@ function errText(code: string): string {
   const key = `err.${bare.replace(/_/g, '-')}`;
   return hasKey(key) ? t(key) : bare.replace(/_/g, ' ');
 }
-function playerOrder(action: Action) {
+function playerOrder(action: Action): boolean {
+  // Возврат — «приказ не ОТВЕРГНУТ сейчас»: в соло это честный исход редьюсера,
+  // в сети и при реконнекте — true (исход асинхронный). Нужен покадровым циклам
+  // (resolvePendingMerges), чтобы выбрасывать отвергнутый приказ, а не пережимать
+  // его каждый кадр — бесконечные тосты отказа (живой плейтест).
   if (NET && netClient) {
     netClient.sendAction(action); // server is authoritative — await its broadcast
     activeTour?.notifyAction(action.type); // optimistic — server result is async
-    return;
+    return true;
   }
   // Net match, socket temporarily down (auto-reconnecting): DON'T run the local reducer
   // — the order would apply to `s`, look accepted on-screen, then vanish when the
@@ -2212,7 +2222,7 @@ function playerOrder(action: Action) {
   // instead of silently losing it. (Solo/skirmish has `reconnecting === false`.)
   if (reconnecting) {
     note('⟳ ' + t('net.reconnecting-order'));
-    return;
+    return true;
   }
   const before = sandboxBuildSnapshot(action.type);
   const out = order(s, action, s.time);
@@ -2221,6 +2231,7 @@ function playerOrder(action: Action) {
   if (out.error) {
     snd.play('error'); // тёмный сбой — отказ слышен, не только виден
     note('✖ ' + errText(out.error));
+    return false;
   }
   else {
     activeTour?.notifyAction(action.type); // an accepted intent advances `action` steps
@@ -2232,6 +2243,7 @@ function playerOrder(action: Action) {
     if (action.type === 'fleet.retreat' && !activeTour?.active) maybeIntro('retreat');
     if (action.type === 'fleet.barrage' && !activeTour?.active) maybeIntro('artillery');
   }
+  return true;
 }
 
 // --- ONB-1 guide-mark launcher ------------------------------------------------
@@ -2823,7 +2835,12 @@ function resolvePendingMerges() {
       return false; // co-located & idle → fused, order complete
     }
     const dest = a.location ?? a.movement?.to ?? null;
-    if (!m.movement && dest && m.location !== dest) playerOrder(moveFleet(ME, mover, dest));
+    if (!m.movement && dest && m.location !== dest) {
+      // Consume-on-reject: отвергнутый догоняющий ход (нет права прохода и т.п.)
+      // выбрасывает слияние, иначе idle-флот пережимал бы его каждый кадр —
+      // бесконечные «✖ …» (второй такой же цикл нашёл скептик bug-hunt'а).
+      if (!playerOrder(moveFleet(ME, mover, dest))) return false;
+    }
     return true;
   });
 }
