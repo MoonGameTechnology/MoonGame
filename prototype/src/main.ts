@@ -246,6 +246,7 @@ import {
 // TT-3.1 — экран дерева технологий (REFM-9); `branchLabel` берёт ещё совет учёных.
 import { initTechTree, branchLabel } from './techTree';
 import { initSciPick } from './sciPick';
+import { initPasswordReset } from './passwordReset';
 // «Профиль командира» — карьерное досье (REFM-10).
 import { initProfile } from './profileScreen';
 // AVA-C1/C2 — корпоративный кабинет (REFM-11).
@@ -9303,92 +9304,68 @@ $('crecback').addEventListener('click', () => {
 });
 
 // --- Password reset: spend a mailed «?reset=<token>» link (→ /auth/reset) -------------
-// The reset stage is opened by the boot deep-link (see the first-run gate). On success the
-// server hands back a session (reset IS a login) → straight into the hub.
+// Сцена живёт в `passwordReset.ts` (REFM-19); здесь проводка. Сеть и сессии остаются
+// тут: модуль не знает ни адреса сервера, ни ключа сессии. Успешный сброс И ЕСТЬ вход —
+// сервер отдаёт сессию в ответе, поэтому дальше сразу хаб.
 const cresetPassInput = $('cresetpass') as HTMLInputElement;
 const cresetPass2Input = $('cresetpass2') as HTMLInputElement;
-let resetToken = ''; // the token carried by the ?reset= deep-link
-async function submitReset(): Promise<void> {
-  const pass = cresetPassInput.value;
-  if (pass.length < 8) {
-    statusEl.textContent = t('acc.pass.rule');
-    cresetPassInput.focus();
-    return;
-  }
-  if (pass !== cresetPass2Input.value) {
-    statusEl.textContent = t('auth.pass-mismatch');
-    cresetPass2Input.focus();
-    return;
-  }
-  if (signingIn) return;
-  signingIn = true;
-  try {
+const passwordReset = initPasswordReset({
+  fields: () => ({ pass: cresetPassInput, pass2: cresetPass2Input }),
+  status: (msg) => {
+    statusEl.textContent = msg;
+  },
+  busy: () => signingIn,
+  setBusy: (v) => {
+    signingIn = v;
+  },
+  submit: async (token, password) => {
     const srv = resolveServer();
-    if (!srv) return;
+    if (!srv) return null;
     const res = await fetch(`${httpBase(srv.base)}/auth/reset`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ token: resetToken, password: pass }),
+      body: JSON.stringify({ token, password }),
     }).catch(() => null);
-    const body = ((res && (await res.json().catch(() => ({})))) ?? {}) as {
-      login?: string;
-      token?: string;
-    };
-    if (!res || !res.ok || !body.token || !body.login) {
-      statusEl.textContent = t('auth.reset.bad-link');
-      return;
-    }
-    localStorage.setItem(
-      sessionKey(srv.base),
-      JSON.stringify({ login: body.login, token: body.token }),
-    );
-    localStorage.setItem('void.nick', body.login);
-    nickInput.value = body.login;
-    resetToken = '';
-    cresetPassInput.value = '';
-    cresetPass2Input.value = '';
-    statusEl.textContent = '';
+    if (!res) return null;
+    return { ok: res.ok, body: await res.json().catch(() => ({})) };
+  },
+  onSuccess: (login, token) => {
+    const srv = resolveServer();
+    if (srv) localStorage.setItem(sessionKey(srv.base), JSON.stringify({ login, token }));
+    localStorage.setItem('void.nick', login);
+    nickInput.value = login;
     note('✔ ' + t('auth.reset.done'));
     openHub();
-  } finally {
-    signingIn = false;
-  }
-}
-$('cresetgo').addEventListener('click', () => void submitReset());
+  },
+  showStage: () => {
+    showConnect(true);
+    showHub(false);
+    showStage('reset');
+    // Подсказать менеджеру паролей, К КАКОМУ аккаунту этот новый пароль (скрытое
+    // `autocomplete="username"`); без этого запись сохранится ни к чему не привязанной.
+    const resetUser = document.getElementById('cresetuser');
+    if (resetUser instanceof HTMLInputElement) {
+      resetUser.value = (localStorage.getItem('void.nick') ?? '').trim();
+    }
+  },
+});
+$('cresetgo').addEventListener('click', () => void passwordReset.submit());
 cresetPassInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') cresetPass2Input.focus();
 });
 cresetPass2Input.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') void submitReset();
+  if (e.key === 'Enter') void passwordReset.submit();
 });
 /** Open the reset stage for a «?reset=<token>» deep-link (called from the first-run gate). */
 function openReset(token: string): void {
-  resetToken = token;
-  // Strip ?reset=<token> from the address bar + history: the token is a live 15-minute
-  // account-takeover capability and must not linger in the URL (referer leaks, shoulder
-  // surfing, back/forward, synced history). Remove only `reset`, keep any other params.
+  // Токен — живая 15-минутная возможность угона аккаунта, поэтому он не должен остаться
+  // в адресной строке и истории (referer, «назад», синхронизация между устройствами).
+  const cleaned = passwordReset.open(token, location.href);
   try {
-    const url = new URL(location.href);
-    if (url.searchParams.has('reset')) {
-      url.searchParams.delete('reset');
-      history.replaceState(null, '', url.pathname + url.search + url.hash);
-    }
+    if (cleaned !== location.href) history.replaceState(null, '', cleaned);
   } catch {
     /* history/URL unavailable (non-browser test env) — nothing to scrub */
   }
-  showConnect(true);
-  showHub(false);
-  showStage('reset');
-  // Tell the password manager WHICH account this new password is for (the hidden
-  // `autocomplete="username"` field); without it the entry is saved unattached.
-  const resetUser = document.getElementById('cresetuser');
-  if (resetUser instanceof HTMLInputElement) {
-    resetUser.value = (localStorage.getItem('void.nick') ?? '').trim();
-  }
-  cresetPassInput.value = '';
-  cresetPass2Input.value = '';
-  statusEl.textContent = '';
-  cresetPassInput.focus();
 }
 
 // hub interactions
