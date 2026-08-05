@@ -548,11 +548,6 @@ export const en: Record<string, string> = {
     'A standalone fortress raised in an asteroid field: {d} to defense and {hp} structure HP. Turns a faceless crossroads into a fortified node with orbit and AA.',
   'dossier.building.tax-office':
     "An imperial-style tax office: produces nothing itself, but registers the world's population and lifts its credit take by {b}.",
-  'dossier.divdesign.desc': 'The template editor: slot composition and division doctrine.',
-  'dossier.divdesign.name': 'Division builder',
-  'dossier.division.desc':
-    'A ground formation mobilized from a template. Defends the world; loads onto a fleet from the fleet panel.',
-  'dossier.division.name': 'Division',
   'dossier.fleet.desc':
     'A mobile task force of ships. Select it to give maneuver, orbit and strike orders.',
   'dossier.fleet.name': 'Fleet',
@@ -1826,7 +1821,6 @@ export const en: Record<string, string> = {
   'welcome.update-check': 'Check for updates',
 
   // --- win — Заголовки окон матча (сводки, технологии, хранитель, конструкторы).
-  'win.divdesign.title': 'DIVISION BUILDER',
   'win.log.recap': 'Return digest',
   'win.log.title': 'DISPATCHES',
   'win.scipick.back': '↩ Menu',
