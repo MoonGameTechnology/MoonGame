@@ -11693,9 +11693,13 @@ function renderPingPanel(): void {
         })
         .join('')
     : `<div class="pp-empty">${t('ping.panel.empty')}</div>`;
+  // Шапка — СТАНДАРТНАЯ (.lw-head + ✕), как у лога, технологий и «Хранителя»: до этого
+  // здесь стояла сырая браузерная кнопка с текстом — единственная нестилизованная
+  // кнопка в интерфейсе. Заодно бесплатно достаётся телефонное правило 44px
+  // (мобильный media-блок целится в `.lw-head button`).
   el.innerHTML =
-    `<div class="pp-head"><b>${t('ping.panel.title')}</b>` +
-    `<button data-pact="close">${t('card.close')}</button></div>` +
+    `<div class="lw-head"><b>${t('ping.panel.title')}</b>` +
+    `<button class="lw-close" data-pact="close" aria-label="${t('card.close')}">✕</button></div>` +
     body;
 }
 

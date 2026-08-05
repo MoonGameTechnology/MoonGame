@@ -644,17 +644,19 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
   width:min(520px,92vw);max-height:70vh;overflow:auto;background:rgba(6,16,20,.97);
   border:1px solid var(--line);border-radius:10px;padding:0;box-shadow:0 10px 40px rgba(0,0,0,.6);}
 #pingpanel.show{display:block;}
-.pp-head{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--line);}
-.pp-head b{flex:1;letter-spacing:.08em;}
 .pp-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(46,150,160,.14);}
 .pp-row.off{opacity:.45;}
 .pp-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto;}
 .pp-txt{flex:1;min-width:0;}
 .pp-txt b{display:block;font-size:12px;}
 .pp-txt span{display:block;font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.pp-row button{border:1px solid var(--line);background:transparent;color:var(--dim);border-radius:6px;
-  padding:4px 7px;font:700 11px ui-monospace,monospace;cursor:pointer;}
-.pp-row button:hover{border-color:var(--cyan);color:var(--cyan);}
+/* Кнопки строки — стандартные квадратные иконко-кнопки интерфейса (метрика .cw-btn /
+   .lw-close): раньше у них была своя типографика и свои поля. */
+.pp-row button{width:28px;height:28px;flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;
+  border:1px solid var(--line);background:transparent;color:var(--dim);border-radius:6px;
+  font:700 12px ui-monospace,monospace;cursor:pointer;}
+.pp-row button:hover{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.12);}
+.pp-row button:active{background:rgba(53,214,230,.2);}
 .pp-empty{padding:16px 12px;color:var(--dim);font-size:12px;}
 .dp-intel{padding:2px 10px 9px 39px;font-size:11px;color:var(--cyan);}
 .dp-intel b{color:#eafffb;}
@@ -1085,6 +1087,9 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .tt-tabs::-webkit-scrollbar{display:none;}
 .tt-tab{flex:none;padding:6px 11px;border:1px solid var(--line-hi);border-radius:9px;background:transparent;color:var(--ink);font:600 11px ui-monospace,monospace;cursor:pointer;white-space:nowrap;}
 .tt-tab.on{color:#04231c;background:linear-gradient(180deg,var(--grn),#4fe0b0);border-color:var(--grn);}
+/* «готово/всего» на вкладке: где ещё есть что исследовать — видно без обхода веток */
+.tt-cnt{margin-left:6px;font-style:normal;font-size:9px;color:var(--dim);}
+.tt-tab.on .tt-cnt{color:#04231c;opacity:.75;}
 .tt-lead{padding:0 12px 8px;font-size:10px;color:var(--dim);border-bottom:1px solid var(--line);flex:none;}
 .tt-lead b{color:#4fe0b0;}
 .tt-lead.closed{color:var(--amber);}
@@ -1109,17 +1114,31 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .tt-cell{position:relative;height:96px;display:flex;align-items:center;justify-content:center;gap:6px;
   border-bottom:1px dashed rgba(29,107,112,.28);}
 .tt-cell.now{background:linear-gradient(90deg,rgba(95,240,192,.05),transparent);}
-.tt-node{position:relative;z-index:2;width:88px;cursor:pointer;text-align:center;}
+.tt-node{position:relative;z-index:2;width:100px;cursor:pointer;text-align:center;}
 .tt-node:active{transform:scale(.95);}
 .tt-box{position:relative;width:52px;height:52px;margin:0 auto;border-radius:12px;border:2px solid var(--line-hi);
   background:linear-gradient(180deg,#0f2b31,#0a1a1f);display:grid;place-items:center;
   font-size:23px;font-variant-emoji:text;color:var(--cyan);}
-.tt-lbl{margin:3px auto 0;max-width:100px;font-size:8.5px;line-height:1.25;color:var(--ink);
-  background:rgba(4,14,17,.92);border-radius:5px;padding:1px 3px;max-height:23px;overflow:hidden;}
+.tt-lbl{margin:3px auto 0;max-width:108px;font-size:10px;line-height:1.25;color:var(--ink);
+  background:rgba(4,14,17,.92);border-radius:5px;padding:1px 3px;max-height:27px;overflow:hidden;}
 .tt-node.st-done .tt-box{border-color:#4fe0b0;background:linear-gradient(180deg,#0e3b2f,#0a231e);box-shadow:0 0 14px rgba(79,224,176,.25);}
 .tt-node.st-avail .tt-box{border-color:var(--cyan);box-shadow:0 0 12px rgba(53,214,230,.22);}
+/* Доступный И оплачиваемый узел дышит — то же правило, что зажигает кнопку в досье */
+.tt-node.st-avail.can .tt-box{animation:ttcan 2s ease-in-out infinite;}
+@keyframes ttcan{
+  0%,100%{box-shadow:0 0 10px rgba(53,214,230,.18);}
+  50%{box-shadow:0 0 18px rgba(53,214,230,.45);}
+}
 .tt-node.st-res .tt-box{border-color:var(--amber);}
 .tt-node.st-gate .tt-box,.tt-node.st-chain .tt-box,.tt-node.st-cond .tt-box{opacity:.55;filter:saturate(.4);}
+.tt-eta{margin-top:2px;font-size:9px;color:var(--amber);}
+/* PC: наведение подсвечивает узел — до этого отклик был только у нажатия.
+   :where() роняет специфичность до нуля, чтобы hover НЕ перебивал фильтр-приглушение
+   запертых состояний (st-gate/st-chain/st-cond) — их видимость важнее подсветки. */
+@media(hover:hover){
+  :where(.tt-node:hover) .tt-box{filter:brightness(1.2);}
+  .tt-node:hover .tt-lbl{color:var(--cyan);}
+}
 .tt-tick{position:absolute;right:-6px;bottom:-6px;font-size:10px;color:#04231c;background:#4fe0b0;border-radius:6px;padding:0 3px;}
 .tt-lock{position:absolute;right:-6px;top:-6px;font-size:10px;}
 .tt-cnd{position:absolute;right:-6px;top:-6px;font-size:10px;color:var(--amber);}
@@ -1534,6 +1553,8 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   #railtools .rlbl{display:block;}
   /* window close-✕ buttons reach the 44px thumb rule */
   .dp-close,.mk-close,.lw-head button{min-width:44px;min-height:44px;}
+  /* row action buttons (ping panel) get thumb-sized too */
+  .pp-row button{width:40px;height:40px;}
   /* notched phones: controls step inside the safe area instead of under the notch */
   #top{padding-left:env(safe-area-inset-left);padding-right:env(safe-area-inset-right);
     padding-top:env(safe-area-inset-top,0px);height:calc(var(--tbh) + env(safe-area-inset-top,0px));}

@@ -202,10 +202,14 @@ export function techTreeHtml(
     if ((td.conditions ?? []).some((c) => !techCondOk(state, me, c))) return { st: 'cond', prog: 0, eta: 0 };
     return { st: 'avail', prog: 0, eta: 0 };
   };
-  const tabs = TECH_BRANCHES.map(
-    (b) =>
-      `<button class="tt-tab${b.key === tab ? ' on' : ''}" data-ttab="${b.key}">${t(b.label)}</button>`,
-  ).join('');
+  // Счётчик «готово/всего» на вкладке — навигация без клика: где ещё осталось
+  // что исследовать, видно с одного взгляда, не обходя все пять веток.
+  const tabs = TECH_BRANCHES.map((b) => {
+    const ids = Object.keys(techs).filter((id) => (techs[id]!.branch ?? 'space') === b.key);
+    const n = ids.filter((id) => done.has(id)).length;
+    const cnt = ids.length ? `<i class="tt-cnt">${n}/${ids.length}</i>` : '';
+    return `<button class="tt-tab${b.key === tab ? ' on' : ''}" data-ttab="${b.key}">${t(b.label)}${cnt}</button>`;
+  }).join('');
   // Кто из совета курирует эту ветку — и честное предупреждение, если никто.
   const lead = (seat?.scientists ?? [])
     .map((c) => data.scientists[c.id])
@@ -240,22 +244,35 @@ export function techTreeHtml(
         .map((id) => {
           const td = techs[id]!;
           const st = nodeState(id);
+          // У каждого запертого состояния СВОЙ значок: «ждёт родителя» (🔗) раньше
+          // просто тускнел и был неотличим от day-гейта — а причины-то разные, и
+          // разные у них и лекарства (исследовать родителя vs подождать день).
           const badge =
             st.st === 'done'
               ? `<span class="tt-tick">✓</span>`
               : st.st === 'gate'
                 ? `<span class="tt-lock">🔒</span>`
-                : st.st === 'cond'
-                  ? `<span class="tt-cnd">⚗</span>`
-                  : '';
+                : st.st === 'chain'
+                  ? `<span class="tt-lock">🔗</span>`
+                  : st.st === 'cond'
+                    ? `<span class="tt-cnd">⚗</span>`
+                    : '';
           const prog =
             st.st === 'res'
               ? `<span class="tt-prog"><i style="width:${Math.round(st.prog * 100)}%"></i></span>`
               : '';
+          // ETA идущего исследования — прямо на сетке, а не только в досье.
+          const eta =
+            st.st === 'res' ? `<div class="tt-eta">⏳ ${t('fmt.hours', { n: st.eta })}</div>` : '';
+          // Доступный И оплачиваемый прямо сейчас узел дышит рамкой — то же правило,
+          // которым в досье живёт кнопка «исследовать» (afford по казне места).
+          const can =
+            st.st === 'avail' &&
+            Object.entries(td.cost).every(([k, v]) => (res[k] ?? 0) >= (v as number));
           return (
-            `<div class="tt-node st-${st.st}" data-tech="${id}">` +
+            `<div class="tt-node st-${st.st}${can ? ' can' : ''}" data-tech="${id}">` +
             `<div class="tt-box">${TECH_ICONS[id] ?? '🔬'}${prog}${badge}</div>` +
-            `<div class="tt-lbl">${esc(tData(td.name))}</div></div>`
+            `<div class="tt-lbl">${esc(tData(td.name))}</div>${eta}</div>`
           );
         })
         .join('');
