@@ -67,8 +67,6 @@ import {
   MAX_STEWARD_HOLD_POINTS,
   castHeroAbility,
   spawnHero,
-  unlockHeroSkill,
-  fitHero,
   serverChainActions,
   chainStamp,
   orderChain,
@@ -99,9 +97,25 @@ import { DEFAULT_SHIP_LOADOUTS, type ShipLoadout } from './ships';
 // «Верфь» — вкладка оснащения (REFM-13): окно целиком живёт в `shipyard.ts`, здесь
 // только проводка (host-хуки) и панель героев, которая переедет своим кирпичом.
 import { initShipyard } from './shipyard';
+import { initHeroStaff, HERO_CASTABLE, heroCdKey } from './heroStaff';
+import {
+  initConversations,
+  COALITION,
+  CH_SESSION,
+  CH_GLOBAL,
+  GROUP_CHANNELS,
+  type SessionMsg,
+  type StampOpts,
+} from './conversations';
 // HUD-DOCK: видимость листа и «нижний хаб уезжает» — одна чистая модель на все
 // прицельные режимы; она же держит замер высоты листа для привязки ряда команд.
 import { mapIsWorkspace, panelOpen, sheetHeightVar, type DockState } from './hudDock';
+// BACK-1: лестница слоёв Android-Back/Escape — чистая модель + опись, которую держит тест.
+import {
+  closeTopLayer as closeTop,
+  topLayerOpen as layersOpen,
+  type BackLayer,
+} from './backLayers';
 import {
   buildingLevel,
   buildingMaxLevel,
@@ -179,6 +193,7 @@ import {
   displayUnit,
   buildingName,
   fmtEta,
+  fmtHrs,
 } from './format';
 // REFM-3: the icon vocabulary (glyph tables + menu renderers) lives in `icons.ts`
 import {
@@ -624,21 +639,6 @@ let troopsPlan: { fleetId: string; plan: Record<string, number> } | null = null;
 // `to` is a conversation key: a seat id (a 1:1 DM) or COALITION (the allies' group
 // chat). `ping` (coalition only) carries a province id → a clickable map marker.
 // `pingId` (net only) is the server-assigned id, so a `ping.removed` can find its line.
-type SessionMsg = {
-  at: number;
-  from: string;
-  to: string;
-  text: string;
-  sys: boolean;
-  ping?: string;
-  pingId?: string;
-  chatId?: string; // net only: server-assigned chat id — dedupes live echo vs join replay
-  realAt?: number; // wall-clock ms at creation, for the chat's "real time" stamp
-};
-const COALITION = 'coalition';
-const CH_SESSION = 'session'; // everyone in this match
-const CH_GLOBAL = 'global'; // cross-session lobby (placeholder until a global server)
-const GROUP_CHANNELS = new Set([COALITION, CH_SESSION, CH_GLOBAL]); // group rooms vs 1:1 DMs
 let sessionMessages: SessionMsg[] = [];
 // --- floating chat window (desktop only) -------------------------------------
 // REFM-12: окно уехало в `chatWindow.ts` целиком — состояние, разметка, геометрия и
@@ -665,8 +665,8 @@ const chatWin = initChat(
     seatExists: (id) => !!s.players[id],
     seatLabel: (id) => NAME[id] ?? id,
     seatIcon: (id) => seatBadge(id).icon,
-    convoMessages,
-    lineHtml: (m, stamp) => convoLineHtml(m as SessionMsg, stamp),
+    convoMessages: (key) => conversations.messagesOf(key),
+    lineHtml: (m, stamp) => conversations.lineHtml(m as SessionMsg, stamp),
     dispatch: dispatchChat,
     openSeatCard,
     jumpToPing,
@@ -684,7 +684,6 @@ let diploExpanded: string | null = null; // participant row showing its action b
 // OR within one. A stance filter excludes your own seat (you have no self-stance).
 const diploStanceFilter = new Set<DiplomaticStance>();
 const diploTypeFilter = new Set<'human' | 'ai'>();
-let convoOpen = COALITION; // the open conversation in the messages tab (seat id or COALITION)
 let pingMenuLoc: string | null = null; // province whose ping composer is open (null = closed)
 // Screen hit-boxes for the on-map ping markers, rebuilt every frame by drawPings().
 let pingHits: Array<{ loc: string; x: number; y: number }> = [];
@@ -3310,13 +3309,6 @@ function setScramble(ids: string[], on: boolean): void {
       wingSorties.delete(id);
     }
   }
-}
-/** «≈14ч» / «≈2д 3ч» — plan durations are game-hours, like every duration in the UI. */
-function fmtHrs(h: number): string {
-  const r = Math.max(0, Math.round(h));
-  return r >= 48
-    ? t('browser.left.days', { d: Math.floor(r / 24), h: r % 24 })
-    : t('fmt.hours', { n: r });
 }
 
 // CC-4 reactive auto-scramble driver: each frame, a squadron fleet on "дежурный вылет"
@@ -6034,7 +6026,6 @@ function isAiSeat(id: string): boolean {
 function diploSeats(): string[] {
   return SEAT_META.map((m) => m.id).filter((id) => !!s.players[id]);
 }
-type StampOpts = { day?: boolean; time?: boolean; real?: boolean; realAt?: number };
 /** Message stamp. Defaults to `Day N · HH:MM` (game day + game time, mirrors the status
  *  strip); the chat passes toggles to add/drop fields and append the real wall-clock. */
 function fmtStamp(at: number, opts?: StampOpts): string {
@@ -6311,125 +6302,19 @@ function diploRowsHtml(): string {
 }
 
 // --- conversations (messages tab: list of chats + the open thread) -----------
-/** Your coalition: you + everyone you're at `alliance` with. */
-function coalitionMembers(): string[] {
-  return [ME, ...diploSeats().filter((id) => id !== ME && getStance(s, ME, id) === 'alliance')];
-}
-/** Messages in a conversation: a group channel (coalition / session / global) collects
- *  everything addressed to it; a seat id = the 1:1 DM between you and them (either dir). */
-function convoMessages(key: string): SessionMsg[] {
-  if (GROUP_CHANNELS.has(key)) return sessionMessages.filter((m) => m.to === key);
-  return sessionMessages.filter(
-    (m) =>
-      !GROUP_CHANNELS.has(m.to) &&
-      ((m.from === ME && m.to === key) || (m.from === key && m.to === ME)),
-  );
-}
-function convoLast(key: string): SessionMsg | undefined {
-  const ms = convoMessages(key);
-  return ms[ms.length - 1];
-}
-function fromName(id: string): string {
-  return id === ME ? t('chat.you') : (NAME[id] ?? id);
-}
-/** A chat sender's name. Another live seat's name is clickable — it opens that
- *  player's card (with the diplomacy actions); your own name and system senders
- *  stay plain. */
-function nickHtml(id: string): string {
-  const name = esc(fromName(id));
-  if (id === ME || !s.players[id]) return `<b>${name}</b>`;
-  return `<b class="dp-nick" data-nickseat="${esc(id)}" title="${t('chat.open-card')}">${name}</b>`;
-}
-/** One message line. A ping renders as a clickable marker that flies the camera.
- *  `stamp` overrides which time fields show (the chat passes its cached toggles);
- *  omitted → the default `Day N · HH:MM` used by the diplomacy feed. */
-function convoLineHtml(m: SessionMsg, stamp?: StampOpts): string {
-  const stampTxt = fmtStamp(m.at, stamp && { ...stamp, realAt: m.realAt });
-  if (m.ping) {
-    return (
-      `<div class="dp-line ping" data-ping="${esc(m.ping)}"><span class="dp-when">${stampTxt}</span>` +
-      `📍 ${nickHtml(m.from)} ${esc(m.ping)}: ${esc(m.text)}<span class="dp-jump">${t('chat.jump')}</span></div>`
-    );
-  }
-  if (m.sys)
-    return `<div class="dp-line sys"><span class="dp-when">${stampTxt}</span>${esc(m.text)}</div>`;
-  return `<div class="dp-line${m.from === ME ? ' me' : ''}"><span class="dp-when">${stampTxt}</span>${nickHtml(m.from)}<b>:</b> ${esc(m.text)}</div>`;
-}
-function convoFeedInnerHtml(key: string): string {
-  const msgs = convoMessages(key);
-  if (msgs.length) return msgs.map((m) => convoLineHtml(m)).join('');
-  const hint =
-    key === COALITION
-      ? t('chat.coalition.empty')
-      : key === CH_SESSION
-        ? t('chat.session.note')
-        : t('chat.empty');
-  return `<div class="dp-empty">${hint}</div>`;
-}
-/** Left column: the match-wide session channel + the coalition channel pinned on
- *  top, then a DM per participant (most-recently-active first). Selecting one
- *  opens its thread on the right. Session here is what makes the NET chat fully
- *  reachable from a PHONE — the floating chat window is desktop-only. */
-function convoListHtml(): string {
-  const dms = diploSeats()
-    .filter((id) => id !== ME)
-    .sort(
-      (a, b) =>
-        (convoLast(b)?.at ?? -1) - (convoLast(a)?.at ?? -1) ||
-        (NAME[a] ?? a).localeCompare(NAME[b] ?? b),
-    );
-  const sessLast = convoLast(CH_SESSION);
-  const sessPrev = sessLast
-    ? esc((sessLast.from === ME ? t('chat.you') + ': ' : '') + sessLast.text)
-    : t('chat.members', { n: Object.keys(s.players).length });
-  const sess =
-    `<button class="dp-cv coal${convoOpen === CH_SESSION ? ' on' : ''}" data-convo="${CH_SESSION}">` +
-    `<span class="dp-cv-ic" style="color:var(--cyan)">△</span>` +
-    `<span class="dp-cv-nm">${t('chat.tab.session')}<em>${sessPrev}</em></span></button>`;
-  const coal =
-    `<button class="dp-cv coal${convoOpen === COALITION ? ' on' : ''}" data-convo="${COALITION}">` +
-    `<span class="dp-cv-ic" style="color:var(--amber)">⚡</span>` +
-    `<span class="dp-cv-nm">${t('chat.tab.coalition')}<em>${t('chat.members', { n: coalitionMembers().length })}</em></span></button>`;
-  const items = dms
-    .map((id) => {
-      const last = convoLast(id);
-      const prev = last
-        ? esc(
-            (last.from === ME ? t('chat.you') + ': ' : '') +
-              (last.ping ? '📍 ' + last.ping : last.text),
-          )
-        : '—';
-      return (
-        `<button class="dp-cv${convoOpen === id ? ' on' : ''}" data-convo="${id}">` +
-        `<span class="dp-cv-ic" style="color:${ownerColor(id)}">${seatBadge(id).icon}</span>` +
-        `<span class="dp-cv-nm">${esc(NAME[id] ?? id)}<em>${prev}</em></span></button>`
-      );
-    })
-    .join('');
-  return `<div class="dp-cvlist">${sess}${coal}${items}</div>`;
-}
-/** Right column: header, the open conversation's messages, and the composer (with a
- *  ping button in the coalition channel). */
-function convoThreadHtml(): string {
-  const isCoal = convoOpen === COALITION;
-  const title =
-    convoOpen === CH_SESSION
-      ? t('chat.head.session', { n: Object.keys(s.players).length })
-      : isCoal
-        ? t('chat.head.coalition', { n: coalitionMembers().length })
-        : `${seatBadge(convoOpen).icon} ${esc(NAME[convoOpen] ?? convoOpen)}`;
-  const pingBtn = isCoal ? `<button class="dp-ping" title="${t('chat.ping')}">📍</button>` : '';
-  // The composer is networked (chat.send relay): dispatchChat routes it — NET sends
-  // to the server (rendered from the echo), solo appends locally.
-  const compose = `<div class="dp-compose">${pingBtn}<input id="dp-text" maxlength="160" placeholder="${t('chat.input.ph')}" autocomplete="off"><button class="dp-send">▶</button></div>`;
-  return (
-    `<div class="dp-thread">` +
-    `<div class="dp-thhead">${title}</div>` +
-    `<div class="dp-feed" id="dp-feed">${convoFeedInnerHtml(convoOpen)}</div>` +
-    compose +
-    `</div>`
-  );
-}
+// The tab lives in `conversations.ts` (REFM-15); here it only gets the host state it
+// cannot reach on its own. The message log itself STAYS here — the net writes it and
+// the floating chat window reads it, so the module borrows it through `messages()`.
+const conversations = initConversations({
+  state: () => s,
+  me: () => ME,
+  messages: () => sessionMessages,
+  nameOf: (id) => NAME[id] ?? id,
+  seats: diploSeats,
+  seatBadge,
+  fmtStamp,
+  ownerColor,
+});
 
 /** SPY-UX (плейтест, вариант 1): весь шпионаж в одном месте — активные окна интела
  *  с таймерами, операции по каждому противнику (те же .dp-spy обработчики, что и в
@@ -6509,7 +6394,7 @@ function renderDiplo(): void {
         `<div class="dp-list">${diploRowsHtml()}</div>`
       : diploTab === 'intel'
         ? intelTabHtml()
-        : `<div class="dp-convo">${convoListHtml()}${convoThreadHtml()}</div>`;
+        : `<div class="dp-convo">${conversations.listHtml()}${conversations.threadHtml()}</div>`;
   el.innerHTML =
     `<div class="dpbox">` +
     `<div class="dp-head"><b>${t('diplo.win.title')}</b>${tabBtn('diplo', t('diplo.tab.diplomacy'))}${tabBtn('msgs', t('diplo.tab.messages'))}${tabBtn('intel', t('diplo.tab.espionage'))}<button class="dp-close">✕</button></div>` +
@@ -6521,7 +6406,7 @@ function renderDiplo(): void {
 function renderDiploFeed(): void {
   const feed = document.getElementById('dp-feed');
   if (!feed) return;
-  feed.innerHTML = convoFeedInnerHtml(convoOpen);
+  feed.innerHTML = conversations.feedInnerHtml();
   feed.scrollTop = feed.scrollHeight;
 }
 function scrollFeedToEnd(): void {
@@ -8437,380 +8322,23 @@ document.getElementById('rail-steward')?.addEventListener('click', () => steward
 let stewSnapshot: StewardMetrics | null = null;
 
 
-// --- heroes («штаб героев»): the CORE hero engine over the inline catalogs -----
-// One window for the whole hero loop: deploy reserves (`hero.spawn`), cast abilities
-// (`hero.ability` — built-ins live, typed-but-unwired honestly say «скоро»), walk the
-// skill tree (`hero.skill.unlock`) and install fittings (`hero.fit`). All gates
-// (range/cooldown/cost/slots/branch) are the core's — the window only shows them.
-const HERO_ACTIVE_CAP = 3; // mirrors the core heroModule's active cap (not exported)
-const HERO_BRANCH_RU: Record<string, string> = {
-  transhuman: 'hero.branch.transhuman',
-  psionic: 'hero.branch.psionic',
-};
-/** The cooldown slot an ability occupies — mirrors the core's `cooldownKey`. */
-const heroCdKey = (type: string): string =>
-  type === 'temp_lane' ? 'path' : type === 'annihilate' ? 'annihilate' : `fx:${type}`;
-// Ability types the prototype kernel can actually resolve: the two heroModule
-// built-ins + every `hero.effect.<type>` the kernel's MODULES provide (heroEffects →
-// recall/aura/reveal). Types not here have no engine effect yet → the «скоро» badge.
-const HERO_CASTABLE = new Set(['temp_lane', 'annihilate', 'recall', 'aura', 'reveal']);
-// «Штаб героев» redesign (STAFF-1): one focused hero + tabs (Обзор / Дерево /
-// Способности / Фиттинги), a real branch skill-tree with prereq connectors and
-// per-node states, and a tap-to-open dossier that shows what a node/fitting grants
-// BEFORE you buy it. View state is client-only (like conTab/heroAim).
-type HeroInst = NonNullable<GameState['heroes']>[string];
-type HeroTab = 'overview' | 'tree' | 'abilities' | 'fittings';
-let heroSel: string | null = null; // focused hero id (null → first owned)
-let heroTab: HeroTab = 'tree';
-let heroDossier: string | null = null; // "node:<id>" | "fit:<id>" — the inspected node/fitting
-
-/** Human short labels for a passive's hook (what the bonus actually does). */
-const HERO_HOOK_RU: Record<string, string> = {
-  'fleet.speed': 'hero.hook.fleet-speed',
-  'combat.damage': 'hero.hook.combat-damage',
-};
-/** A passive rendered as a one-line bonus, e.g. «+10% скорость флота» / «+8% урон · r300». */
-function heroPassiveLine(pid: string): string {
-  const p = data.heroPassives[pid];
-  if (!p) return t(pid);
-  const pct = Math.round((p.params.bonus ?? 0) * 100);
-  const r = p.params.radius ? ` · r${p.params.radius}` : '';
-  return `+${pct}% ${t(HERO_HOOK_RU[p.hook] ?? p.hook)}${r}`;
-}
-
-/** The «Герои» pane body: selector chips → identity header → tabs → active tab → dossier. */
-function heroBodyHtml(): string {
-  const mine = Object.keys(s.heroes ?? {})
-    .sort()
-    .map((id) => s.heroes![id]!)
-    .filter((h) => h.owner === ME);
-  if (!mine.length) return `<div class="hx-note">${t('hero.hq.empty')}</div>`;
-  const active = mine.filter((h) => h.alive !== false && h.fleetId && s.fleets[h.fleetId]).length;
-  let hero = mine.find((h) => h.id === heroSel);
-  if (!hero) {
-    hero = mine[0]!;
-    heroSel = hero.id;
-  }
-  const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
-  const dead = hero.alive === false;
-  const fleet = !dead && hero.fleetId !== undefined ? s.fleets[hero.fleetId] : undefined;
-
-  // selector chips (one focused hero at a time)
-  let chips = `<div class="hx-chips">`;
-  for (const h of mine) {
-    const d = h.archetype !== undefined ? data.heroes[h.archetype] : undefined;
-    const dep = h.alive !== false && h.fleetId && s.fleets[h.fleetId];
-    const st =
-      h.alive === false ? t('hero.hq.dead') : dep ? t('hero.hq.deployed') : t('hero.hq.reserve');
-    chips +=
-      `<button class="hx-chip${h.id === hero.id ? ' sel' : ''}${d?.branch === 'psionic' ? ' ps' : ''}" data-hsel="${h.id}">` +
-      `<span class="hx-cr">♔</span>${esc(t(d?.name ?? h.archetype ?? h.id))}` +
-      `<span class="hx-cst${dep ? ' on' : ''}">${st}</span></button>`;
-  }
-  chips += `<span class="hx-cap">${t('hero.hq.deployed-count', { a: active, c: HERO_ACTIVE_CAP })}</span></div>`;
-
-  // identity header — name, branch, deploy state, aggregated build bonuses
-  const deploy = dead
-    ? `<span class="hx-dead">${t('hero.hq.dead')}</span>`
-    : fleet
-      ? `<span class="hx-dep">⚓ ${esc(typeof fleet.location === 'string' ? fleet.location : t('hero.hq.enroute'))}</span>`
-      : `<button class="hx-btn" data-hspawn="${hero.id}" ${active >= HERO_ACTIVE_CAP ? 'disabled' : ''}>${t('hero.hq.deploy')}</button>`;
-  const bonuses = (hero.passives ?? [])
-    .map((p) => `<span class="hx-trait">${esc(heroPassiveLine(p))}</span>`)
-    .join('');
-  const slots = def?.slots ?? 0;
-  const used = (hero.fittings ?? []).length;
-  const fitPips =
-    slots > 0
-      ? `<span class="hx-trait">${t('hero.hq.fittings')} <span class="hx-pips">${'●'.repeat(used)}${'○'.repeat(Math.max(0, slots - used))}</span></span>`
-      : '';
-  const ident =
-    `<div class="hx-ident${def?.branch === 'psionic' ? ' ps' : ''}">` +
-    `<div class="hx-irow"><span class="hx-name">♔ ${esc(hero.name ?? hero.id)}</span>` +
-    (def?.branch
-      ? `<span class="hx-tag">${esc(t(HERO_BRANCH_RU[def.branch] ?? def.branch))}</span>`
-      : '') +
-    `<span class="hx-dstat">${deploy}</span></div>` +
-    (bonuses || fitPips ? `<div class="hx-traits">${bonuses}${fitPips}</div>` : '') +
-    `</div>`;
-
-  // tabs
-  const TABS: [HeroTab, string][] = [
-    ['overview', 'hero.hq.tab.overview'],
-    ['tree', 'hero.hq.tab.tree'],
-    ['abilities', 'hero.hq.tab.abilities'],
-    ['fittings', 'hero.hq.tab.fittings'],
-  ];
-  const tabs =
-    `<div class="hx-tabs">` +
-    TABS.map(
-      ([k, l]) =>
-        `<button class="hx-tab${heroTab === k ? ' on' : ''}" data-htab="${k}">${t(l)}</button>`,
-    ).join('') +
-    `</div>`;
-
-  const body =
-    heroTab === 'tree'
-      ? heroTreeHtml(hero)
-      : heroTab === 'abilities'
-        ? heroAbilitiesHtml(hero)
-        : heroTab === 'fittings'
-          ? heroFittingsHtml(hero)
-          : heroOverviewHtml(hero);
-
-  const dossier = heroDossier ? heroDossierHtml(hero) : '';
-  return chips + ident + tabs + `<div class="hx-view">${body}</div>` + dossier;
-}
-
-/** The skill tree tab — the hero's own rail (own-branch nodes + branch-less «common»
- *  nodes any hero may take) plus a dimmed rail per foreign branch; nodes ordered
- *  roots-first with a prereq connector; tap an own, un-owned node → dossier. */
-function heroTreeHtml(hero: HeroInst): string {
-  const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
-  const skills = hero.skills ?? [];
-  const entries = Object.entries(data.heroSkillTrees);
-  const ownBranch = def?.branch;
-  // The hero's rail carries own-branch AND branch-less common nodes (both unlockable),
-  // so the tree membership matches heroOverviewHtml's node count. Foreign branches get a
-  // dimmed reference rail.
-  const ownNodes = entries.filter(([, n]) => n.branch === ownBranch || n.branch === undefined);
-  const foreignBranches = Array.from(
-    new Set(
-      entries
-        .map(([, n]) => n.branch)
-        .filter((b): b is NonNullable<typeof b> => b !== undefined && b !== ownBranch),
-    ),
-  ).sort();
-  const rails: Array<{ label: string; own: boolean; ps: boolean; nodes: typeof entries }> = [];
-  if (ownNodes.length) {
-    rails.push({
-      label: ownBranch ? (HERO_BRANCH_RU[ownBranch] ?? ownBranch) : 'hero.branch.common',
-      own: true,
-      ps: ownBranch === 'psionic',
-      nodes: ownNodes,
-    });
-  }
-  for (const br of foreignBranches) {
-    rails.push({
-      label: HERO_BRANCH_RU[br] ?? br,
-      own: false,
-      ps: br === 'psionic',
-      nodes: entries.filter(([, n]) => n.branch === br),
-    });
-  }
-  if (!rails.length) return `<div class="hx-note">${t('hero.tree.empty')}</div>`;
-  let html = `<div class="hx-tree">`;
-  for (const rail of rails) {
-    const rn = rail.nodes
-      .slice()
-      .sort((a, b) => a[1].requires.length - b[1].requires.length || a[0].localeCompare(b[0]));
-    html +=
-      `<div class="hx-rail${rail.own ? '' : ' foreign'}${rail.ps ? ' ps' : ''}">` +
-      `<div class="hx-rhd"><span class="hx-dot"></span>${esc(t(rail.label))}` +
-      (rail.own ? '' : `<span class="hx-ftag">${t('hero.tree.not-your-branch')}</span>`) +
-      `</div>`;
-    for (const [nid, nd] of rn) {
-      const owned = skills.includes(nid);
-      const reqMet = nd.requires.every((r) => skills.includes(r));
-      let cls = 'hx-node';
-      let crest: string;
-      let foot: string;
-      if (!rail.own) {
-        cls += ' foreignn';
-        crest = '·';
-        foot = `<span class="hx-st">${t('hero.tree.other-branch')}</span>`;
-      } else if (owned) {
-        cls += ' owned';
-        crest = '✓';
-        foot = `<span class="hx-st on">✓ ${t('hero.tree.unlocked')}</span>`;
-      } else if (!reqMet) {
-        cls += ' locked';
-        crest = '🔒';
-        const need = esc(nd.requires.map((r) => t(data.heroSkillTrees[r]?.name ?? r)).join(', '));
-        foot = `<span class="hx-st">${t('hero.tree.needs', { n: need })}</span>`;
-      } else {
-        cls += ' avail';
-        crest = '◆';
-        foot = `<span class="hx-cost">${cost(nd.cost, myRes())}</span>`;
-      }
-      const conn = nd.requires.length
-        ? `<span class="hx-conn${rail.own && reqMet ? ' lit' : ''}"></span>`
-        : '';
-      const grant = nd.grants.ability
-        ? `<span class="hx-g ab">${t('hero.tree.ability')}</span>`
-        : nd.grants.passive
-          ? `<span class="hx-g pa">${t('hero.tree.passive')}</span>`
-          : '';
-      const tap = rail.own && !owned ? ` data-hnode="${nid}"` : '';
-      html +=
-        `<div class="${cls}"${tap}>${conn}<div class="hx-nn"><span class="hx-crest">${crest}</span>${esc(t(nd.name))}</div>` +
-        `<div class="hx-nd">${esc(t(nd.description ?? ''))}</div>` +
-        `<div class="hx-nf">${grant}${foot}</div></div>`;
-    }
-    html += `</div>`;
-  }
-  return html + `</div>`;
-}
-
-/** The abilities tab — the hero's equipped, castable loadout (cast via the command flow;
- *  ranged casts arm the map, self/aura fire in place). Spawn-markers show as passive perks. */
-function heroAbilitiesHtml(hero: HeroInst): string {
-  const dead = hero.alive === false;
-  const abilities = (hero.abilities ?? []).filter(
-    (a): a is string => a !== null && !!data.heroAbilities[a],
-  );
-  if (!abilities.length) return `<div class="hx-note">${t('hero.abil.empty')}</div>`;
-  let html = '';
-  for (const ab of abilities) {
-    const ad = data.heroAbilities[ab]!;
-    const cdLeft = Math.max(0, (hero.cooldowns?.[heroCdKey(ad.type)] ?? 0) - s.time);
-    const action = ad.type.startsWith('spawn_')
-      ? `<span class="hx-badge">${t('hero.abil.deploy-perk')}</span>`
-      : cdLeft > 0
-        ? `<span class="hx-badge cd">${t('hero.abil.cooldown', { h: fmtHrs(cdLeft / HOUR) })}</span>`
-        : HERO_CASTABLE.has(ad.type)
-          ? `<button class="hx-btn" data-hcast="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${(ad.range ?? 0) > 0 ? t('hero.abil.pick-target') : t('hero.abil.activate')}</button>`
-          : `<span class="hx-badge">${t('hero.abil.soon')}</span>`;
-    html +=
-      `<div class="hx-row"><div class="hx-grow"><span class="hx-an">${esc(t(ad.name))}</span>` +
-      `<div class="hx-note">${esc(t(ad.description ?? ''))}</div></div>${action}</div>`;
-  }
-  return html;
-}
-
-/** The fittings tab — slot budget as pips, each fitting a row; tap an installable one to
- *  open its dossier (with the irreversibility warning) before committing a slot. */
-function heroFittingsHtml(hero: HeroInst): string {
-  const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
-  const slots = def?.slots ?? 0;
-  if (slots <= 0) return `<div class="hx-note">${t('hero.fit.none')}</div>`;
-  const fitted = hero.fittings ?? [];
-  let html = `<div class="hx-h">${t('hero.fit.slots', { u: fitted.length, n: slots })}</div>`;
-  for (const [fid, fd] of Object.entries(data.heroFittings)) {
-    const installed = fitted.includes(fid);
-    const grant = fd.grants.ability
-      ? `<span class="hx-g ab">${t('hero.tree.ability')}</span>`
-      : fd.grants.passive
-        ? `<span class="hx-g pa">${t('hero.tree.passive')}</span>`
-        : fd.statMods
-          ? `<span class="hx-g pa">${t('hero.fit.hull')}</span>`
-          : '';
-    const canFit = !installed && fitted.length < slots;
-    const action = installed
-      ? `<span class="hx-badge on">✓ ${t('hero.fit.installed')}</span>`
-      : canFit
-        ? `<span class="hx-cost">${cost(fd.cost, myRes())}</span>`
-        : `<span class="hx-badge">${t('hero.fit.no-slots')}</span>`;
-    const tap = canFit ? ` data-hfitd="${fid}"` : '';
-    html +=
-      `<div class="hx-row"${tap}><div class="hx-grow"><span class="hx-an">${esc(t(fd.name))}</span>` +
-      `<div class="hx-note">${esc(t(fd.description ?? ''))}</div></div>${grant}${action}</div>`;
-  }
-  return html;
-}
-
-/** The overview tab — archetype line, a stat strip (abilities / tree progress / fittings)
- *  and the hero's live passive bonuses. */
-function heroOverviewHtml(hero: HeroInst): string {
-  const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
-  const learned = (hero.skills ?? []).length;
-  const treeTotal = Object.values(data.heroSkillTrees).filter(
-    (n) => n.branch === undefined || n.branch === def?.branch,
-  ).length;
-  const abil = (hero.abilities ?? []).filter((a) => a !== null).length;
-  let html =
-    `<div class="hx-note" style="margin-bottom:10px;">${esc(t(def?.description ?? ''))}</div>` +
-    `<div class="hx-ov">` +
-    `<div class="hx-ovc"><b>${abil}</b><span>${t('hero.stat.abilities')}</span></div>` +
-    `<div class="hx-ovc"><b>${learned}/${treeTotal}</b><span>${t('hero.stat.tree-nodes')}</span></div>` +
-    `<div class="hx-ovc"><b>${(hero.fittings ?? []).length}/${def?.slots ?? 0}</b><span>${t('hero.stat.fittings')}</span></div>` +
-    `</div>`;
-  const bonuses = (hero.passives ?? [])
-    .map(
-      (p) =>
-        `<div class="hx-row"><span class="hx-grow hx-an">${esc(heroPassiveLine(p))}</span><span class="hx-badge on">${t('hero.stat.active')}</span></div>`,
-    )
-    .join('');
-  if (bonuses) html += `<div class="hx-h">${t('hero.stat.bonuses')}</div>${bonuses}`;
-  return html;
-}
-
-/** The dossier card — what the tapped node/fitting grants, its prereqs and price, and the
- *  commit button (a node's «Изучить», a fitting's irreversible «Установить»). */
-function heroDossierHtml(hero: HeroInst): string {
-  const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
-  const dead = hero.alive === false;
-  const sep = (heroDossier ?? '').indexOf(':');
-  const kind = (heroDossier ?? '').slice(0, sep);
-  const id = (heroDossier ?? '').slice(sep + 1);
-  const close = `<button class="hx-dx" data-hdclose>✕</button>`;
-  if (kind === 'node') {
-    const nd = data.heroSkillTrees[id];
-    if (!nd) return '';
-    const skills = hero.skills ?? [];
-    const gAb = nd.grants.ability ? data.heroAbilities[nd.grants.ability] : undefined;
-    const give = gAb
-      ? `<div class="hx-dgl">${t('hero.tree.grants-ability')}</div><div class="hx-dgv">${esc(t(gAb.name))}${(gAb.range ?? 0) > 0 ? ` · ${t('hero.tree.range', { r: gAb.range })}` : ''}${gAb.cooldownHours ? ` · ${t('hero.tree.cooldown', { h: gAb.cooldownHours })}` : ''}</div><div class="hx-note">${esc(t(gAb.description ?? ''))}</div>`
-      : nd.grants.passive
-        ? `<div class="hx-dgl">${t('hero.tree.grants-passive')}</div><div class="hx-dgv">${esc(heroPassiveLine(nd.grants.passive))}</div>`
-        : '';
-    const branchOk = nd.branch === undefined || nd.branch === def?.branch;
-    const reqMet = nd.requires.every((r) => skills.includes(r));
-    const owned = skills.includes(id);
-    const reqHtml = nd.requires
-      .map(
-        (r) =>
-          `<span class="${skills.includes(r) ? 'hx-ok' : 'hx-no'}">${skills.includes(r) ? '✓' : '✗'} ${esc(t(data.heroSkillTrees[r]?.name ?? r))}</span>`,
-      )
-      .join(' ');
-    const canBuy = branchOk && reqMet && !owned && afford(nd.cost) && !dead;
-    const btn = owned
-      ? `<div class="hx-drow"><span class="hx-ok">✓ ${t('hero.tree.unlocked')}</span></div>`
-      : !branchOk
-        ? `<div class="hx-drow"><span class="hx-no">${t('hero.tree.other-branch')}</span></div>`
-        : `<button class="hx-dbtn" data-hskill="${hero.id}" data-node="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.tree.unlock')} · ${cost(nd.cost, myRes())}</button>`;
-    return (
-      `<div class="hx-dossier">` +
-      `<div class="hx-dh">${def?.branch ? `<span class="hx-tag">${esc(t(HERO_BRANCH_RU[def.branch] ?? def.branch))}</span>` : ''}<span class="hx-dnm">${esc(t(nd.name))}</span>${close}</div>` +
-      (give ? `<div class="hx-give">${give}</div>` : '') +
-      (reqHtml
-        ? `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.requires')}</span><span class="hx-dv">${reqHtml}</span></div>`
-        : '') +
-      `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.cost')}</span><span class="hx-cost">${cost(nd.cost, myRes())}</span></div>` +
-      btn +
-      `</div>`
-    );
-  }
-  if (kind === 'fit') {
-    const fd = data.heroFittings[id];
-    if (!fd) return '';
-    const fitted = hero.fittings ?? [];
-    const slots = def?.slots ?? 0;
-    const gAb = fd.grants.ability ? data.heroAbilities[fd.grants.ability] : undefined;
-    const give = gAb
-      ? `<div class="hx-dgl">${t('hero.tree.grants-ability')}</div><div class="hx-dgv">${esc(t(gAb.name))}</div><div class="hx-note">${esc(t(gAb.description ?? ''))}</div>`
-      : fd.grants.passive
-        ? `<div class="hx-dgl">${t('hero.tree.grants-passive')}</div><div class="hx-dgv">${esc(heroPassiveLine(fd.grants.passive))}</div>`
-        : fd.statMods
-          ? `<div class="hx-dgl">${t('hero.fit.hull-mod')}</div><div class="hx-dgv">${esc(
-              Object.entries(fd.statMods)
-                .map(([k, v]) => `${k} +${v}`)
-                .join(', '),
-            )}</div>`
-          : '';
-    const canBuy = !fitted.includes(id) && fitted.length < slots && afford(fd.cost) && !dead;
-    return (
-      `<div class="hx-dossier">` +
-      `<div class="hx-dh"><span class="hx-dnm">${esc(t(fd.name))}</span>${close}</div>` +
-      (give ? `<div class="hx-give">${give}</div>` : '') +
-      `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.cost')}</span><span class="hx-cost">${cost(fd.cost, myRes())}</span></div>` +
-      `<div class="hx-warn">${t('hero.fit.permanent')}</div>` +
-      `<button class="hx-dbtn danger" data-hfit="${hero.id}" data-fit="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.fit.install')} · ${cost(fd.cost, myRes())}</button>` +
-      `</div>`
-    );
-  }
-  return '';
-}
+// --- heroes («штаб героев») ---------------------------------------------------
+// The hero pane of the Верфь: roster, skill tree, abilities, fittings. The pane
+// itself lives in `heroStaff.ts` (REFM-14); here it only gets the host state it
+// cannot reach on its own. Ranged casts and deploys resolve on the MAP, so the pane
+// arms `heroAim`/`heroSpawnAim` through these two hooks and the world tap fires them.
+const heroStaff = initHeroStaff({
+  state: () => s,
+  me: () => ME,
+  order: playerOrder,
+  note: (msg) => note(msg),
+  armCast: (heroId, abilityId) => {
+    heroAim = { heroId, abilityId };
+  },
+  armSpawn: (heroId) => {
+    heroSpawnAim = heroId;
+  },
+});
 
 // --- session market: a two-sided order book, one tab per tradeable good -------
 // The window itself lives in `marketScreen.ts` (REFM-6); here it gets its hooks and
@@ -8855,79 +8383,11 @@ const shipyard = initShipyard({
   errText,
   arsenalItems: () => arsenal.items(),
   onOpen: () => maybeIntro('constructor'),
-  // The «Герои» pane: the hero roster/штаб (folded from the old #hero window). The
-  // `#herobody` id keeps the `.hx-*` styling; hero clicks route through the yard.
-  heroPaneHtml: () => `<div id="herobody">${heroBodyHtml()}</div>`,
+  // The «Герои» pane: the hero roster/штаб lives in `heroStaff.ts` (REFM-14) — the
+  // yard only asks it for markup and hands its clicks over.
+  heroPaneHtml: heroStaff.paneHtml,
   onHeroTab: () => maybeIntro('hero'),
-  heroClick: (tg) => {
-    // STAFF-1 view state: focus a hero / switch tab / open-close the node·fitting dossier.
-    const selBtn = tg.closest('[data-hsel]') as HTMLElement | null;
-    if (selBtn) {
-      heroSel = selBtn.dataset.hsel!;
-      heroDossier = null;
-      return 'repaint';
-    }
-    const htab = (tg.closest('[data-htab]') as HTMLElement | null)?.dataset.htab;
-    if (htab) {
-      heroTab = htab as HeroTab;
-      heroDossier = null;
-      return 'repaint';
-    }
-    const nodeBtn = tg.closest('[data-hnode]') as HTMLElement | null;
-    if (nodeBtn) {
-      heroDossier = `node:${nodeBtn.dataset.hnode!}`;
-      return 'repaint';
-    }
-    const fitdBtn = tg.closest('[data-hfitd]') as HTMLElement | null;
-    if (fitdBtn) {
-      heroDossier = `fit:${fitdBtn.dataset.hfitd!}`;
-      return 'repaint';
-    }
-    if (tg.closest('[data-hdclose]')) {
-      heroDossier = null;
-      return 'repaint';
-    }
-    const castBtn = tg.closest('[data-hcast]') as HTMLElement | null;
-    if (castBtn) {
-      const heroId = castBtn.dataset.hcast!;
-      const abilityId = castBtn.dataset.ab!;
-      if ((data.heroAbilities[abilityId]?.range ?? 0) > 0) {
-        heroAim = { heroId, abilityId }; // ranged cast → arm the map (next world tap is the target)
-        note(t('yard.pick.target'));
-        return 'close';
-      }
-      playerOrder(castHeroAbility(ME, heroId, abilityId));
-      return 'repaint';
-    }
-    const spawnBtn = tg.closest('[data-hspawn]') as HTMLElement | null;
-    if (spawnBtn) {
-      heroSpawnAim = spawnBtn.dataset.hspawn!;
-      const hero = s.heroes?.[heroSpawnAim];
-      const perks = (hero?.abilities ?? []).map((a) =>
-        a !== null ? data.heroAbilities[a]?.type : undefined,
-      );
-      note(
-        t('yard.pick.hero-world', {
-          fl: perks.includes('spawn_fleet') ? t('yard.pick.own-fleet') : '',
-          al: perks.includes('spawn_allied') ? t('yard.pick.ally-world') : '',
-        }),
-      );
-      return 'close';
-    }
-    const skillBtn = tg.closest('[data-hskill]') as HTMLElement | null;
-    if (skillBtn) {
-      playerOrder(unlockHeroSkill(ME, skillBtn.dataset.hskill!, skillBtn.dataset.node!));
-      heroDossier = null; // the node is bought — dismiss its dossier
-      return 'repaint';
-    }
-    const fitBtn = tg.closest('[data-hfit]') as HTMLElement | null;
-    if (fitBtn) {
-      playerOrder(fitHero(ME, fitBtn.dataset.hfit!, fitBtn.dataset.fit!));
-      heroDossier = null; // the fitting is installed — dismiss its dossier
-      return 'repaint';
-    }
-    return null;
-  },
+  heroClick: heroStaff.click,
 });
 document.getElementById('rail-constructor')?.addEventListener('click', () => shipyard.open());
 
@@ -11500,117 +10960,137 @@ function inMatch(): boolean {
   );
 }
 
-/** Is any layer open that the Back button should close (probe only)? */
-function topLayerOpen(): boolean {
-  return Boolean(
-    chainMode !== null ||
-    aiming ||
-    assaultAim ||
-    merging ||
-    barrageAim ||
-    pingMenuLoc !== null ||
-    pingPopEl?.classList.contains('show') ||
-    splitState !== null ||
-    troopsPlan !== null ||
-    codexEl?.classList.contains('show') ||
-    logWin?.classList.contains('show') ||
-    techWin.classList.contains('show') ||
-    stewWin?.classList.contains('show') ||
-    marketWin.classList.contains('show') ||
-    resCardEl.classList.contains('show') ||
-    diploOpen ||
-    chatWin.isOpen() ||
-    setupEl.style.display !== 'none' ||
-    selFleet !== null ||
-    selPlanet !== null ||
-    selFleets.size > 0,
-  );
+// BACK-1: лестница слоёв — ДАННЫЕ, а не цепочка `if`. Порядок = визуальная стопка
+// сверху вниз (z-index из build.mjs указан у каждой ступени), поэтому Back закрывает
+// ровно то, что игрок видит верхним. Раньше порядок был «взведённые режимы вперёд», и
+// при открытом окне поверх карты первый Back гасил невидимый прицел, а не окно.
+//
+// Полноту держит сторож `backLayers.test.ts`: каждый оверлей из CSS обязан быть в описи
+// `LAYER_INVENTORY` слоем или не-слоем с причиной, а каждый слой описи — ступенью здесь.
+// Опись нашла 37 оверлеев; 29 из них Back не видел вовсе.
+//
+// ЛОВУШКА ПРОБЫ. У экранов с инлайновым display сравниваем строго с 'flex', а НЕ
+// `!== 'none'`: до первого открытия инлайновый стиль пуст (''), и «не none» залипло бы
+// в «открыто» — Back бесконечно «закрывал» бы невидимый слой и никогда не дошёл до
+// выхода из матча. Исключение — #setup: он ставит display явно на обеих ветках.
+const shown = (id: string): boolean => document.getElementById(id)?.classList.contains('show') === true;
+const hide = (id: string): void => document.getElementById(id)?.classList.remove('show');
+const flexed = (id: string): boolean => document.getElementById(id)?.style.display === 'flex';
+
+const BACK_LAYERS: BackLayer[] = [
+  // --- модалки поверх всего (z60…z57) ---
+  { id: 'corp', isOpen: () => flexed('corp'), close: () => corp.close() }, // z60
+  { id: 'scipick', isOpen: () => shown('scipick'), close: () => hide('scipick') }, // z60
+  { id: 'emblempick', isOpen: () => shown('emblempick'), close: () => hide('emblempick') }, // z60
+  { id: 'settings', isOpen: () => shown('settings'), close: () => hide('settings') }, // z59
+  // dev-оверлеи: в плеерной сборке узлов нет, проба просто всегда false
+  { id: 'testmode', isOpen: () => flexed('testmode'), close: () => hideFlex('testmode') }, // z59
+  { id: 'sandbox', isOpen: () => flexed('sandbox'), close: () => hideFlex('sandbox') }, // z59
+  { id: 'intro', isOpen: () => shown('intro'), close: () => hide('intro') }, // z58
+  { id: 'seatpick', isOpen: () => flexed('seatpick'), close: () => seatpickCancelEl?.click() }, // z58
+  { id: 'recap', isOpen: () => shown('recap'), close: () => hide('recap') }, // z57
+  { id: 'profile', isOpen: () => shown('profile'), close: () => profile.close() }, // z57
+  // --- окна и карточки (z51…z44) ---
+  { id: 'rescard', isOpen: () => resCardEl.classList.contains('show'), close: () => resCardEl.classList.remove('show') }, // z51
+  // Обучающий тур (ONB-1): его панели глотают клики, так что без этой ступени игрок в
+  // туре заперт. Проба идёт по ЖИВОСТИ тура, а не только по узлу: если stop() почему-то
+  // не уберёт подсветку, лестница всё равно не залипнет в «открыто».
+  {
+    id: 'spotlight',
+    isOpen: () => activeTour?.active === true && document.getElementById('spotlight') !== null,
+    close: () => activeTour?.stop(), // ровно кнопка «Пропустить»
+  }, // z50
+  {
+    id: 'playercard',
+    isOpen: () => shown('playercard'),
+    close: () => {
+      const el = document.getElementById('playercard');
+      el?.classList.remove('show');
+      // Место чужого игрока обязано уйти вместе с карточкой: делегат кликов читает
+      // dataset.seat, и забытое значение увело бы следующее открытие СВОЕЙ карточки
+      // в ветку дипломатии по чужому месту.
+      if (el) delete el.dataset.seat;
+    },
+  }, // z50
+  { id: 'diplo', isOpen: () => diploOpen, close: () => closeDiplo() }, // z49
+  // Проба по состоянию, а не по классу: `warPrompt` — источник истины, класс лишь его
+  // отражение. Back здесь обязан вести в ОТМЕНУ: подтверждение объявляет войну, и вешать
+  // необратимое действие на аппаратную кнопку нельзя.
+  { id: 'warprompt', isOpen: () => warPrompt !== null, close: () => cancelWarPrompt() }, // z48
+  { id: 'pingmenu', isOpen: () => pingMenuLoc !== null, close: () => closePingMenu() }, // z47
+  { id: 'tech', isOpen: () => techWin.classList.contains('show'), close: () => techWin.classList.remove('show') }, // z47
+  { id: 'steward', isOpen: () => stewWin?.classList.contains('show') === true, close: () => stewWin?.classList.remove('show') }, // z47
+  { id: 'market', isOpen: () => marketWin.classList.contains('show'), close: () => marketWin.classList.remove('show') }, // z47
+  { id: 'constructor', isOpen: () => constructorWin.classList.contains('show'), close: () => shipyard.close() }, // z47 «Верфь»
+  { id: 'codex', isOpen: () => codexEl?.classList.contains('show') === true, close: () => codexEl?.classList.remove('show') }, // z46
+  // Двухступенчатый Back режима «Приказ» (CHAIN-UX): сперва меню точки…
+  {
+    id: 'tgted',
+    isOpen: () => chainMode?.menu != null,
+    close: () => {
+      if (chainMode) chainMode.menu = null;
+      hide('tgted');
+    },
+  }, // z46
+  { id: 'logwin', isOpen: () => logWin?.classList.contains('show') === true, close: () => logWin?.classList.remove('show') }, // z46
+  { id: 'codexhub', isOpen: () => shown('codexhub'), close: () => hide('codexhub') }, // z45
+  { id: 'pingpop', isOpen: () => pingPopEl?.classList.contains('show') === true, close: () => closePingPop() }, // z45
+  { id: 'splitdlg', isOpen: () => splitState !== null, close: () => { splitState = null; lastPanelHtml = ''; } }, // z45
+  // --- низ экрана (z27…z20) ---
+  { id: 'chatwin', isOpen: () => chatWin.isOpen(), close: () => chatWin.close() }, // z27
+  // Поповеры ряда команд живут ВНУТРИ #cmdbar: прячет их ближайший renderCmdBar, но
+  // кэш разметки надо сбить руками, иначе строка не изменится и DOM останется прежним.
+  {
+    id: 'cmdbar',
+    isOpen: () => troopsPlan !== null || fireMenu || castMenu,
+    close: () => {
+      troopsPlan = null;
+      fireMenu = false;
+      castMenu = false;
+      lastCmdHtml = '';
+    },
+  }, // z26
+  // …а вторым Back — сам режим (черновик выбрасывается, живые планы не тронуты).
+  { id: 'chain', isOpen: () => chainMode !== null, close: () => exitChainMode() },
+  {
+    id: 'aim',
+    isOpen: () => aiming || assaultAim || merging || barrageAim,
+    close: () => {
+      aiming = false;
+      assaultAim = false;
+      merging = false;
+      barrageAim = false;
+      lastPanelHtml = '';
+    },
+  },
+  // Раскрытая панель инструментов рельсы: на телефоне она занимает пол-экрана, а CSS-опись
+  // её не видит — узел живёт всегда, раскрытость это класс `.open` (см. EXTRA_LAYERS).
+  { id: 'rail', isOpen: () => railEl.classList.contains('open'), close: () => setRailOpen(false) }, // z26
+  { id: 'side', isOpen: () => selFleet !== null || selPlanet !== null || selFleets.size > 0, close: () => clearSelection() }, // z20
+  // Экран настройки матча — последняя ступень: это не слой поверх матча, а сам экран,
+  // и у него свой путь назад (в хаб / на экран входа).
+  {
+    id: 'setup',
+    isOpen: () => setupEl.style.display !== 'none',
+    close: () => ($('setupcancel') as HTMLButtonElement | null)?.click(),
+  }, // z58
+];
+
+/** Спрятать оверлей с инлайновым display (dev-панели ставят его вручную). */
+function hideFlex(id: string): void {
+  const el = document.getElementById(id);
+  if (el) el.style.display = 'none';
 }
 
-/** Close the TOPMOST open layer; returns false when nothing was open. The order
- *  mirrors visual stacking: armed order modes → popups → windows → menus →
- *  the selection sheet → the setup screen. */
+/** Is any layer open that the Back button should close (probe only)? */
+function topLayerOpen(): boolean {
+  return layersOpen(BACK_LAYERS);
+}
+
+/** Close the TOPMOST open layer; returns false when nothing was open. Порядок —
+ *  в `BACK_LAYERS` выше (визуальная стопка), сама лестница — в `backLayers.ts`. */
 function closeTopLayer(): boolean {
-  // CHAIN-UX двухступенчато: первый Back закрывает меню точки, второй — режим
-  // (черновик выбрасывается, живые планы не тронуты).
-  if (chainMode) {
-    if (chainMode.menu) {
-      chainMode.menu = null;
-      document.getElementById('tgted')?.classList.remove('show');
-      return true;
-    }
-    exitChainMode();
-    return true;
-  }
-  if (aiming || assaultAim || merging || barrageAim) {
-    aiming = false;
-    assaultAim = false;
-    merging = false;
-    barrageAim = false;
-    lastPanelHtml = '';
-    return true;
-  }
-  if (pingMenuLoc !== null) {
-    closePingMenu();
-    return true;
-  }
-  if (pingPopEl?.classList.contains('show')) {
-    closePingPop();
-    return true;
-  }
-  if (splitState !== null) {
-    splitState = null;
-    lastPanelHtml = '';
-    return true;
-  }
-  if (troopsPlan !== null) {
-    // Поповер живёт внутри строки #cmdbar — прячет его ближайший renderCmdBar,
-    // но кэш надо сбить руками, иначе строка не изменится и DOM останется прежним.
-    troopsPlan = null;
-    lastCmdHtml = '';
-    return true;
-  }
-  if (codexEl?.classList.contains('show')) {
-    codexEl.classList.remove('show');
-    return true;
-  }
-  if (logWin?.classList.contains('show')) {
-    logWin.classList.remove('show');
-    return true;
-  }
-  if (techWin.classList.contains('show')) {
-    techWin.classList.remove('show');
-    return true;
-  }
-  if (stewWin?.classList.contains('show')) {
-    stewWin.classList.remove('show');
-    return true;
-  }
-  if (marketWin.classList.contains('show')) {
-    marketWin.classList.remove('show');
-    return true;
-  }
-  if (resCardEl.classList.contains('show')) {
-    resCardEl.classList.remove('show');
-    return true;
-  }
-  if (diploOpen) {
-    closeDiplo();
-    return true;
-  }
-  if (chatWin.isOpen()) {
-    chatWin.close();
-    return true;
-  }
-  if (selFleet !== null || selPlanet !== null || selFleets.size > 0) {
-    clearSelection();
-    return true;
-  }
-  if (setupEl.style.display !== 'none') {
-    ($('setupcancel') as HTMLButtonElement | null)?.click(); // its own Back path (hub/welcome)
-    return true;
-  }
-  return false;
+  return closeTop(BACK_LAYERS) !== null;
 }
 
 window.addEventListener('popstate', () => {
@@ -12023,7 +11503,7 @@ if (playerCardEl) {
       playerCardEl.classList.remove('show');
       delete playerCardEl.dataset.seat;
       openDiplo('msgs'); // hand off to the full message thread
-      convoOpen = msgseat;
+      conversations.open(msgseat);
       renderDiplo();
       document.getElementById('dp-text')?.focus();
     }
@@ -12076,7 +11556,7 @@ function sendDiploMsg(): void {
   const input = document.getElementById('dp-text') as HTMLInputElement | null;
   const text = input?.value.trim();
   if (!text) return;
-  dispatchChat(convoOpen, text); // NET: server relay + echo; solo: local append
+  dispatchChat(conversations.current(), text); // NET: server relay + echo; solo: local append
   if (input) {
     input.value = '';
     input.focus();
@@ -12143,7 +11623,7 @@ function renderPingMenu(): void {
     'var(--amber)',
     '⚡',
     t('chat.tab.coalition'),
-    t('chat.members', { n: coalitionMembers().length }),
+    t('chat.members', { n: conversations.coalition().length }),
     ' coal',
   );
   const dms = diploSeats()
@@ -12870,7 +12350,7 @@ if (diploEl) {
     }
     const msgseat = (tg.closest('.dp-msg') as HTMLElement | null)?.dataset.msgseat;
     if (msgseat) {
-      convoOpen = msgseat;
+      conversations.open(msgseat);
       diploTab = 'msgs';
       renderDiplo();
       document.getElementById('dp-text')?.focus();
@@ -12878,7 +12358,7 @@ if (diploEl) {
     }
     const convo = (tg.closest('.dp-cv') as HTMLElement | null)?.dataset.convo;
     if (convo) {
-      convoOpen = convo;
+      conversations.open(convo);
       renderDiplo();
       document.getElementById('dp-text')?.focus();
       return;
