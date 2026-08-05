@@ -173,6 +173,7 @@ import {
 import { buildLabel, currentBuild } from './updater';
 import { initApkUpdater } from './apkUpdate';
 import { measureViewport, STARS, NEBULAE } from './viewport';
+import { initPingUi } from './pingUi';
 // Localization: one locale = one file (src/locale/*). Msgid = the canonical
 // Russian source string; `t()` wraps every user-visible literal, `tData()` maps
 // English data/*.json names, the static HTML is localized by a boot pass.
@@ -359,7 +360,6 @@ import {
 import { resolveIntro, parseSeenIntros, type IntroCard } from './intros';
 // ONB-5 — return digest ("пока тебя не было"): aggregate the away-window event log.
 import { buildRecap, type RecapEvent } from './recap';
-import { canEditPing, canRemovePing, pingRows, toggleHidden } from './pingPanel';
 import { combatRanges } from './combatRanges';
 import { corridorLines } from './corridorView';
 import { recapAdmits } from './recapGate';
@@ -685,7 +685,6 @@ let diploExpanded: string | null = null; // participant row showing its action b
 // OR within one. A stance filter excludes your own seat (you have no self-stance).
 const diploStanceFilter = new Set<DiplomaticStance>();
 const diploTypeFilter = new Set<'human' | 'ai'>();
-let pingMenuLoc: string | null = null; // province whose ping composer is open (null = closed)
 // Screen hit-boxes for the on-map ping markers, rebuilt every frame by drawPings().
 let pingHits: Array<{ loc: string; x: number; y: number }> = [];
 
@@ -7455,7 +7454,7 @@ side.addEventListener('click', (ev) => {
   } else if (act === 'holdpoint') {
     playerOrder(setHoldPoint(ME, selPlanet!, arg === 'on'));
   } else if (act === 'ping') {
-    openPingMenu();
+    pings.openMenu();
   } else if (act === 'bombard') {
     playerOrder(bombardFleet(ME, selFleet!, arg === 'on'));
   } else if (act === 'assault') {
@@ -7852,7 +7851,7 @@ cmdbar.addEventListener('click', (ev) => {
 
 // Tap/click selection at a screen point (drag-aware — see the pointer handlers).
 function selectAt(mx: number, my: number) {
-  closePingPop(); // any map tap dismisses an open ping popup (a marker tap reopens below)
+  pings.closePop(); // any map tap dismisses an open ping popup (a marker tap reopens below)
   // CHAIN-UX: в режиме «Приказ» карта — рабочая поверхность построения плана.
   // Ветка стоит ПЕРВОЙ: пока режим жив, ни выделение, ни прочие перехваты тапов
   // не работают — тап это всегда «точка плана или закрыть меню».
@@ -7992,7 +7991,7 @@ function selectAt(mx: number, my: number) {
   if (!aiming) {
     const ping = nearestHit(pingHits, (h) => h, mx, my, rPing);
     if (ping) {
-      openPingPop(ping.loc);
+      pings.openPop(ping.loc);
       return;
     }
   }
@@ -8466,7 +8465,8 @@ const techTree = initTechTree({
   order: playerOrder,
   onOpen: () => maybeIntro('tech'),
 });
-wirePingPanel(); // PING-PANEL: кнопка рельсы + обработчики окна меток
+// PING-PANEL: кнопка рельсы (окна ведёт `pingUi.ts`).
+document.getElementById('rail-pings')?.addEventListener('click', () => pings.togglePanel());
 document.getElementById('rail-tech')?.addEventListener('click', () => techTree.open());
 
 
@@ -9951,7 +9951,7 @@ function connect(): void {
       },
       onPingRemoved: (pingId: string) => {
         sessionMessages = sessionMessages.filter((m) => m.pingId !== pingId);
-        closePingPop();
+        pings.closePop();
         if (diploOpen && diploTab === 'msgs') renderDiploFeed();
       },
       // Server-relayed chat (recipients decided server-side, like fog). Our own lines
@@ -10983,7 +10983,7 @@ const BACK_LAYERS: BackLayer[] = [
   // отражение. Back здесь обязан вести в ОТМЕНУ: подтверждение объявляет войну, и вешать
   // необратимое действие на аппаратную кнопку нельзя.
   { id: 'warprompt', isOpen: () => warPrompt !== null, close: () => cancelWarPrompt() }, // z48
-  { id: 'pingmenu', isOpen: () => pingMenuLoc !== null, close: () => closePingMenu() }, // z47
+  { id: 'pingmenu', isOpen: () => pings.menuOpen(), close: () => pings.closeMenu() }, // z47
   { id: 'tech', isOpen: () => techWin.classList.contains('show'), close: () => techWin.classList.remove('show') }, // z47
   { id: 'steward', isOpen: () => stewWin?.classList.contains('show') === true, close: () => stewWin?.classList.remove('show') }, // z47
   { id: 'market', isOpen: () => marketWin.classList.contains('show'), close: () => marketWin.classList.remove('show') }, // z47
@@ -11000,8 +11000,8 @@ const BACK_LAYERS: BackLayer[] = [
   }, // z46
   { id: 'logwin', isOpen: () => logWin?.classList.contains('show') === true, close: () => logWin?.classList.remove('show') }, // z46
   { id: 'codexhub', isOpen: () => shown('codexhub'), close: () => hide('codexhub') }, // z45
-  { id: 'pingpanel', isOpen: () => pingPanelOpen, close: () => closePingPanel() }, // z60
-  { id: 'pingpop', isOpen: () => pingPopEl?.classList.contains('show') === true, close: () => closePingPop() }, // z45
+  { id: 'pingpanel', isOpen: () => pings.panelOpen(), close: () => pings.closePanel() }, // z60
+  { id: 'pingpop', isOpen: () => shown('pingpop'), close: () => pings.closePop() }, // z45
   { id: 'splitdlg', isOpen: () => splitState !== null, close: () => { splitState = null; lastPanelHtml = ''; } }, // z45
   // --- низ экрана (z27…z20) ---
   { id: 'chatwin', isOpen: () => chatWin.isOpen(), close: () => chatWin.close() }, // z27
@@ -11494,22 +11494,6 @@ if (warPromptEl) {
   });
 }
 
-// Ping marker popup: jump the camera to the marker, or (your own) remove it.
-const pingPopEl = document.getElementById('pingpop');
-if (pingPopEl) {
-  pingPopEl.addEventListener('click', (e) => {
-    const tg = e.target as HTMLElement;
-    const jump = (tg.closest('.pp-jump') as HTMLElement | null)?.dataset.loc;
-    if (jump) {
-      closePingPop();
-      jumpToPing(jump);
-      return;
-    }
-    const del = (tg.closest('.pp-del') as HTMLElement | null)?.dataset.loc;
-    if (del) removePing(del);
-  });
-}
-
 // Session menu: the rail's Diplomacy / Dispatches buttons open the roster / message log.
 document.getElementById('rail-diplo')?.addEventListener('click', () => {
   openDiplo('diplo');
@@ -11558,224 +11542,48 @@ function pingSelected(): void {
 }
 
 // --- province ping composer (tap a province → choose where the ping goes) --------
-// A ping marks a province and shares it. Destination is either the coalition channel
-// (a shared on-map marker every ally sees) or a single player's DM (a private jump-to
-// pointer in that thread). Opened from the province panel's 📍 button.
-function openPingMenu(): void {
-  if (!selPlanet || !s.planets[selPlanet]) {
-    note(t('chat.ping.need-province.short'));
-    return;
-  }
-  pingMenuLoc = selPlanet;
-  renderPingMenu();
-  document.getElementById('pingmenu')?.classList.add('show');
-  (document.getElementById('pm-text') as HTMLInputElement | null)?.focus();
-}
-function closePingMenu(): void {
-  pingMenuLoc = null;
-  document.getElementById('pingmenu')?.classList.remove('show');
-}
-function renderPingMenu(): void {
-  const el = document.getElementById('pingmenu');
-  if (!el || !pingMenuLoc) return;
-  const loc = pingMenuLoc;
-  const dstBtn = (
-    dest: string,
-    color: string,
-    ic: string,
-    name: string,
-    tag: string,
-    cls = '',
-  ): string =>
-    `<button class="pm-dst${cls}" data-pmdest="${esc(dest)}">` +
-    `<span class="pm-ic" style="color:${color}">${ic}</span>${esc(name)}` +
-    (tag ? `<em>${esc(tag)}</em>` : '') +
-    `</button>`;
-  const coal = dstBtn(
-    COALITION,
-    'var(--amber)',
-    '⚡',
-    t('chat.tab.coalition'),
-    t('chat.members', { n: conversations.coalition().length }),
-    ' coal',
-  );
-  const dms = diploSeats()
-    .filter((id) => id !== ME)
-    .map((id) => dstBtn(id, ownerColor(id), seatBadge(id).icon, NAME[id] ?? id, seatBadge(id).tag))
-    .join('');
-  el.innerHTML =
-    `<div class="pm-box">` +
-    `<div class="pm-head">📍 ${t('ping.title')} · <b>${esc(loc)}</b></div>` +
-    `<div class="pm-sub">${t('ping.note')}</div>` +
-    `<input id="pm-text" class="pm-text" maxlength="80" placeholder="${t('ping.desc.ph')}" autocomplete="off">` +
-    `<div class="pm-lbl">${t('ping.to.coalition')}</div>${coal}` +
-    (dms ? `<div class="pm-lbl">${t('ping.to.player')}</div>${dms}` : '') +
-    `<button class="pm-cancel" data-pmcancel>${t('ping.cancel')}</button>` +
-    `</div>`;
-}
-/** Place the pending province ping toward `dest`: the coalition channel (shared on-map
- *  marker) or a player's DM (private jump-to pointer). Composer text = the description. */
-function createPingTo(dest: string): void {
-  const loc = pingMenuLoc;
-  if (!loc || !s.planets[loc]) {
-    closePingMenu();
-    return;
-  }
-  const input = document.getElementById('pm-text') as HTMLInputElement | null;
-  const desc = (input?.value.trim() ?? '').slice(0, 80);
-  if (dest === COALITION) {
-    // Same path as the coalition composer's 📍: net → server-stamped marker; solo → local line.
-    if (NET && netClient) netClient.placePing({ kind: 'mark', target: { node: loc }, label: desc });
-    else pushMsg(COALITION, desc || t('ping.mark', { loc }), false, ME, loc);
-    note(t('ping.sent.coalition'));
-  } else {
-    pushMsg(dest, desc || t('ping.mark', { loc }), false, ME, loc);
-    note(t('ping.sent.player', { who: NAME[dest] ?? dest }));
-  }
-  closePingMenu();
-}
-/**
- * PING-PANEL — окно «метки коалиции»: свои и союзные в одном списке.
- *
- * Права разведены в чистой модели (`pingPanel.ts`): свой пинг правится и снимается у
- * всех, чужой — только прячется у меня. Здесь только разметка и обработчики.
- */
-let hiddenPings: ReadonlySet<string> = new Set();
-let pingPanelOpen = false;
-
-function renderPingPanel(): void {
-  const el = document.getElementById('pingpanel');
-  if (!el) return;
-  const rows = pingRows(sessionMessages, ME, hiddenPings);
-  const body = rows.length
-    ? rows
-        .map((r) => {
-          const pl = s.planets[r.loc];
-          const where = pl ? planetName(r.loc) : r.loc;
-          const who = NAME[r.from] ?? r.from;
-          return (
-            `<div class="pp-row${r.hidden ? ' off' : ''}" data-ploc="${esc(r.loc)}">` +
-            `<i class="pp-dot" style="background:${ownerColor(r.from)}"></i>` +
-            `<span class="pp-txt"><b>${esc(where)}</b><span>${esc(r.text || '—')} · ${esc(who)}</span></span>` +
-            `<button data-pact="go" title="${t('ping.panel.go')}">🎯</button>` +
-            `<button data-pact="hide" title="${t(r.hidden ? 'ping.panel.show' : 'ping.panel.hide')}">${r.hidden ? '🙈' : '👁'}</button>` +
-            (canEditPing(r) ? `<button data-pact="edit" title="${t('ping.panel.edit')}">✎</button>` : '') +
-            (canRemovePing(r) ? `<button data-pact="del" title="${t('ping.panel.del')}">✕</button>` : '') +
-            `</div>`
-          );
-        })
-        .join('')
-    : `<div class="pp-empty">${t('ping.panel.empty')}</div>`;
-  // Шапка — СТАНДАРТНАЯ (.lw-head + ✕), как у лога, технологий и «Хранителя»: до этого
-  // здесь стояла сырая браузерная кнопка с текстом — единственная нестилизованная
-  // кнопка в интерфейсе. Заодно бесплатно достаётся телефонное правило 44px
-  // (мобильный media-блок целится в `.lw-head button`).
-  el.innerHTML =
-    `<div class="lw-head"><b>${t('ping.panel.title')}</b>` +
-    `<button class="lw-close" data-pact="close" aria-label="${t('card.close')}">✕</button></div>` +
-    body;
-}
-
-function wirePingPanel(): void {
-  document.getElementById('rail-pings')?.addEventListener('click', () => {
-    if (pingPanelOpen) closePingPanel();
-    else openPingPanel();
-  });
-  document.getElementById('pingpanel')?.addEventListener('click', (ev) => {
-    const btn = (ev.target as HTMLElement).closest('[data-pact]') as HTMLElement | null;
-    if (!btn) return;
-    const act = btn.dataset.pact;
-    if (act === 'close') return void closePingPanel();
-    const loc = btn.closest('[data-ploc]') as HTMLElement | null;
-    const id = loc?.dataset.ploc;
-    if (!id) return;
-    if (act === 'go') {
-      focusWorld(id); // камера — к любому пингу: смотреть не запрещено никому
-      closePingPanel();
-      return;
-    }
-    if (act === 'hide') {
-      hiddenPings = toggleHidden(hiddenPings, id); // ЛОКАЛЬНО — у союзника метка цела
-      renderPingPanel();
-      return;
-    }
-    if (act === 'edit') {
-      const row = pingRows(sessionMessages, ME, hiddenPings).find((r) => r.loc === id);
-      if (!row || !canEditPing(row)) return; // право проверяет модель, не разметка
-      const next = prompt(t('ping.panel.edit'), row.text);
-      if (next === null) return;
-      // Правка = снять и поставить заново: пинг — это СООБЩЕНИЕ, отдельного
-      // «изменить текст» ни у ленты, ни у сервера нет, а изобретать его ради UI
-      // значило бы завести второй путь записи метки.
-      const text = next.trim();
-      removePing(id);
-      if (NET && netClient) netClient.placePing({ kind: 'mark', target: { node: id }, label: text });
-      else pushMsg(COALITION, text || t('ping.mark', { loc: id }), false, ME, id);
-      renderPingPanel();
-      return;
-    }
-    if (act === 'del') {
-      const row = pingRows(sessionMessages, ME, hiddenPings).find((r) => r.loc === id);
-      if (row && canRemovePing(row)) removePing(id);
-      renderPingPanel();
-    }
-  });
-}
-
-function openPingPanel(): void {
-  pingPanelOpen = true;
-  renderPingPanel();
-  document.getElementById('pingpanel')?.classList.add('show');
-}
-function closePingPanel(): void {
-  pingPanelOpen = false;
-  document.getElementById('pingpanel')?.classList.remove('show');
-}
-
-/** Active coalition pings, one marker per province (the latest ping there wins). The
- *  coalition chat log and the map markers share this single source. */
-function activePings(): SessionMsg[] {
-  const byLoc = new Map<string, SessionMsg>();
-  for (const m of sessionMessages) if (m.to === COALITION && m.ping) byLoc.set(m.ping, m);
-  return [...byLoc.values()];
-}
-/** Drop the marker (and its chat lines) for one of YOUR pings. */
-function removePing(loc: string): void {
-  const mine = activePings().find((p) => p.ping === loc && p.from === ME);
-  if (NET && netClient && mine?.pingId) {
-    netClient.clearPing(mine.pingId); // server echoes ping.removed → drops it for everyone
-    closePingPop();
-    return;
-  }
-  sessionMessages = sessionMessages.filter(
-    (m) => !(m.to === COALITION && m.ping === loc && m.from === ME),
-  );
-  closePingPop();
-  if (diploOpen && diploTab === 'msgs') renderDiploFeed();
-}
-/** A tapped map marker → a small popup with who pinged it and their description. */
-function openPingPop(loc: string): void {
-  const m = activePings().find((p) => p.ping === loc);
-  const pl = s.planets[loc];
-  const el = document.getElementById('pingpop');
-  if (!m || !pl || !el) return;
-  const c = world(pl.position);
-  const r = canvas.getBoundingClientRect();
-  const who = m.from === ME ? t('chat.you') : (NAME[m.from] ?? m.from);
-  const mine = m.from === ME;
-  el.innerHTML =
-    `<div class="pp-top"><b style="color:${ownerColor(m.from)}">📍 ${esc(who)}</b><span>${esc(loc)}</span></div>` +
-    `<div class="pp-desc">${m.text ? esc(m.text) : `<i>${t('ping.no-desc')}</i>`}</div>` +
-    `<div class="pp-act"><button class="pp-jump" data-loc="${esc(loc)}">${t('chat.jump')}</button>` +
-    (mine ? `<button class="pp-del" data-loc="${esc(loc)}">${t('ping.remove')}</button>` : '') +
-    `</div>`;
-  el.style.left = `${Math.round(r.left + (c.x / VW) * r.width)}px`;
-  el.style.top = `${Math.round(r.top + (c.y / VH) * r.height)}px`;
-  el.classList.add('show');
-}
-function closePingPop(): void {
-  document.getElementById('pingpop')?.classList.remove('show');
-}
+// Метка отмечает провинцию и делится ею: адресат — либо канал коалиции (общий маркер на
+// карте, который видят все союзники), либо личка одного игрока (приватный указатель «вот
+// сюда» в его ветке). Сама витрина — три окна (композер, список меток, попап маркера) —
+// живёт в `pingUi.ts` (REFM-25) поверх чистой модели прав `pingPanel.ts`; здесь только
+// её хуки. Камера, лента сессии и сетевой клиент остаются у хоста.
+const pings = initPingUi({
+  menuRoot: () => document.getElementById('pingmenu'),
+  panelRoot: () => document.getElementById('pingpanel'),
+  popRoot: () => document.getElementById('pingpop'),
+  me: () => ME,
+  selected: () => selPlanet,
+  hasProvince: (loc) => !!s.planets[loc],
+  messages: () => sessionMessages,
+  setMessages: (next) => {
+    sessionMessages = next;
+  },
+  push: (to, text, loc) => pushMsg(to, text, false, ME, loc),
+  net: () => (NET && netClient ? netClient : null),
+  seats: diploSeats,
+  coalitionSize: () => conversations.coalition().length,
+  name: (id) => NAME[id] ?? id,
+  color: ownerColor,
+  badge: seatBadge,
+  provinceName: planetName,
+  note,
+  focus: focusWorld,
+  jump: jumpToPing,
+  anchor: (loc) => {
+    const pl = s.planets[loc];
+    if (!pl) return null;
+    const c = world(pl.position);
+    const r = canvas.getBoundingClientRect();
+    return {
+      left: Math.round(r.left + (c.x / VW) * r.width),
+      top: Math.round(r.top + (c.y / VH) * r.height),
+    };
+  },
+  ask: (current) => prompt(t('ping.panel.edit'), current),
+  onFeedChanged: () => {
+    if (diploOpen && diploTab === 'msgs') renderDiploFeed();
+  },
+});
 
 // --- TGT-1: target-order composer (CC-1 chains rendered target-side) ---------
 /** BOOST-1: is this fleet on форс-марш? (authoritative map, both modes). */
@@ -12015,9 +11823,9 @@ document.getElementById('tgted')?.addEventListener('click', (ev) => {
  *  own pins can be hidden with the settings switch (allies' are always drawn). */
 function drawPings(now: number): void {
   pingHits = [];
-  for (const m of activePings()) {
+  for (const m of pings.drawable()) {
+    // `drawable()` уже отбросил спрятанные ЛОКАЛЬНО (у союзника метка цела).
     if (m.from === ME && !showOwnPings) continue; // hidden by «Свои метки» switch
-    if (hiddenPings.has(m.ping!)) continue; // PING-PANEL: спрятан ЛОКАЛЬНО (у союзника метка цела)
     const pl = s.planets[m.ping!];
     if (!pl) continue;
     const c = world(pl.position);
@@ -12458,27 +12266,6 @@ if (diploEl) {
     if (ke.key === 'Enter' && (ke.target as HTMLElement).id === 'dp-text') {
       e.preventDefault();
       sendDiploMsg();
-    }
-  });
-}
-
-// Province ping composer: a destination button places the ping; the backdrop or Отмена
-// closes it; Enter in the note field defaults to the coalition channel.
-const pingMenuEl = document.getElementById('pingmenu');
-if (pingMenuEl) {
-  pingMenuEl.addEventListener('click', (e) => {
-    const tg = e.target as HTMLElement;
-    const dest = (tg.closest('.pm-dst') as HTMLElement | null)?.dataset.pmdest;
-    if (dest) return createPingTo(dest);
-    if (tg.closest('[data-pmcancel]') || tg === pingMenuEl) closePingMenu();
-  });
-  pingMenuEl.addEventListener('keydown', (e) => {
-    const ke = e as KeyboardEvent;
-    if (ke.key === 'Enter' && (ke.target as HTMLElement).id === 'pm-text') {
-      e.preventDefault();
-      createPingTo(COALITION);
-    } else if (ke.key === 'Escape') {
-      closePingMenu();
     }
   });
 }
