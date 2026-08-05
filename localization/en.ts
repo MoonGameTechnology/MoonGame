@@ -648,7 +648,7 @@ export const en: Record<string, string> = {
   // --- ground — Наземный бой: офицеры дивизии.
 
   // --- hint — Подсказки режима прицеливания на карте.
-  'hint.aim-cancelled': 'aiming cancelled',
+  'hint.aim-armed': '⤳ pick a target — two fingers move the camera',
   'hint.assault-enemy-only': "⚔ only someone else's world can be stormed",
   'hint.auto-assault':
     '⚔ auto-storm on — the fleet storms the hostile world it arrives at by itself',
