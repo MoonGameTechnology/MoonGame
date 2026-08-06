@@ -1066,9 +1066,14 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #herobody .hx-traits{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;}
 #herobody .hx-trait{font-size:10.5px;color:#cfeee8;border:1px solid var(--line);border-radius:5px;padding:3px 7px;}
 #herobody .hx-pips{letter-spacing:2px;color:var(--cyan);}
-#herobody .hx-tabs{display:flex;gap:2px;border-bottom:1px solid var(--line);margin-bottom:12px;}
-#herobody .hx-tab{flex:1;padding:8px 4px;background:transparent;border:0;border-bottom:2px solid transparent;color:var(--dim);font:inherit;font-size:11.5px;cursor:pointer;}
-#herobody .hx-tab.on{color:var(--cyan);border-bottom-color:var(--cyan);font-weight:700;}
+/* Вкладки штаба героев — СЕТКА 2×2, а не четыре равные ячейки в строку: на четверти
+   ширины телефона «Способности» не помещались, и ряд читался одним серым пятном. */
+#herobody .hx-tabs{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:12px;}
+#herobody .hx-tab{display:flex;align-items:center;justify-content:center;gap:6px;min-height:38px;
+  padding:7px 6px;border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.02);
+  color:var(--dim);font:inherit;font-size:11.5px;cursor:pointer;}
+#herobody .hx-tab i{font-style:normal;font-size:13px;opacity:.85;}
+#herobody .hx-tab.on{color:var(--cyan);border-color:var(--cyan);background:rgba(53,214,230,.12);font-weight:700;}
 #herobody .hx-tree{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 #herobody .hx-rail.foreign{opacity:.5;}
 #herobody .hx-rhd{display:flex;align-items:center;gap:6px;font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--cyan);margin-bottom:10px;}
@@ -1141,12 +1146,16 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .tt-top{display:flex;align-items:center;justify-content:space-between;padding:9px 12px 0;flex:none;}
 .tt-day{font-size:11px;color:var(--grn);border:1px solid var(--grn-dim);border-radius:12px;padding:3px 10px;background:rgba(95,240,192,.06);}
 .tt-slots{font-size:11px;color:var(--cyan);}
-.tt-tabs{display:flex;gap:6px;padding:9px 12px 8px;overflow-x:auto;scrollbar-width:none;flex:none;}
-.tt-tabs::-webkit-scrollbar{display:none;}
-.tt-tab{flex:none;padding:6px 11px;border:1px solid var(--line-hi);border-radius:9px;background:transparent;color:var(--ink);font:600 11px ui-monospace,monospace;cursor:pointer;white-space:nowrap;}
+/* Ветки — СЕТКА 3×2, а не лента с прокруткой: пять веток влезают целиком, и «сколько
+   ещё осталось» видно по всем сразу, не досвайпывая до края. */
+.tt-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:9px 12px 8px;flex:none;}
+.tt-tab{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  min-height:40px;padding:6px 4px;border:1px solid var(--line-hi);border-radius:9px;background:transparent;
+  color:var(--ink);font:600 10.5px ui-monospace,monospace;cursor:pointer;}
+.tt-tab>span{max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .tt-tab.on{color:#04231c;background:linear-gradient(180deg,var(--grn),#4fe0b0);border-color:var(--grn);}
 /* «готово/всего» на вкладке: где ещё есть что исследовать — видно без обхода веток */
-.tt-cnt{margin-left:6px;font-style:normal;font-size:9px;color:var(--dim);}
+.tt-cnt{font-style:normal;font-size:9px;color:var(--dim);}
 .tt-tab.on .tt-cnt{color:#04231c;opacity:.75;}
 .tt-lead{padding:0 12px 8px;font-size:10px;color:var(--dim);border-bottom:1px solid var(--line);flex:none;}
 .tt-lead b{color:#4fe0b0;}

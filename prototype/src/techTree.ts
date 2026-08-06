@@ -182,7 +182,9 @@ export function techTreeHtml(
     const ids = Object.keys(techs).filter((id) => (techs[id]!.branch ?? 'space') === b.key);
     const n = ids.filter((id) => done.has(id)).length;
     const cnt = ids.length ? `<i class="tt-cnt">${n}/${ids.length}</i>` : '';
-    return `<button class="tt-tab${b.key === tab ? ' on' : ''}" data-ttab="${b.key}">${t(b.label)}${cnt}</button>`;
+    // Подпись и счётчик — В СТОЛБИК: в сетке у вкладки треть ширины, и в строку
+    // «Командование 3/7» не помещалось.
+    return `<button class="tt-tab${b.key === tab ? ' on' : ''}" data-ttab="${b.key}"><span>${t(b.label)}</span>${cnt}</button>`;
   }).join('');
   // Кто из совета курирует эту ветку — и честное предупреждение, если никто.
   const lead = (seat?.scientists ?? [])
