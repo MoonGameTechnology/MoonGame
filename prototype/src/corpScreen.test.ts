@@ -1,14 +1,22 @@
 import { describe, it, expect, beforeAll, afterEach, vi } from 'vitest';
 import { setLocale, t } from '../../localization/runtime';
 import {
+  CORP_BATTLE_LABEL,
   CORP_TABS,
   CORP_AUDIT_RU,
   CORP_ROLE_DOT,
+  SHOWCASE_SLOTS,
+  corpBattles,
   corpRoleLabel,
+  hqTile,
   initCorp,
+  medalGalleryHtml,
+  readShowcase,
+  showcaseHtml,
+  writeShowcase,
   type CorpHost,
 } from './corpScreen';
-import type { CorpRole } from './corp';
+import type { AvaFeedEntry, CorpRole, MedalDef } from './corp';
 
 // REFM-11: locale pinned RU (see format.test.ts — Node has no browser language, so the
 // runtime would fall back to EN and the label assertions would drift).
@@ -67,20 +75,24 @@ describe('корпорации — словари', () => {
     expect(new Set(ROLES.map(corpRoleLabel)).size).toBe(4);
   });
 
-  it('у каждой вкладки есть локализованная подпись', () => {
+  it('у каждой вкладки есть локализованная подпись и своя иконка', () => {
     for (const tab of CORP_TABS) {
       expect(tab.label, tab.id).toMatch(/^corp\.tab\./);
       expect(t(tab.label), tab.id).not.toContain('corp.tab');
+      expect(tab.icon, tab.id).not.toBe('');
     }
-    // порядок из corporation-ui.md §7: сначала живые вкладки, заглушки в конце
+    // CORP-HUB: шесть вкладок, и каждая ведёт на живой маршрут — заглушек-вкладок
+    // больше нет (владения и чат стали честными строками в «Настройках»)
     expect(CORP_TABS.map((x) => x.id)).toEqual([
-      'overview',
+      'hq',
       'members',
       'wars',
+      'battles',
       'treasury',
-      'holdings',
-      'comms',
+      'settings',
     ]);
+    // иконки различимы — иначе сетка читается как шесть одинаковых кнопок
+    expect(new Set(CORP_TABS.map((x) => x.icon)).size).toBe(CORP_TABS.length);
   });
 
   it('каждый вид записи аудита переводится — сырой ключ игроку не покажут', () => {
@@ -88,6 +100,97 @@ describe('корпорации — словари', () => {
       expect(key, kind).toMatch(/^corp\.audit\./);
       expect(t(key), kind).not.toContain('corp.audit');
     }
+  });
+});
+
+describe('корпорации — история боёв из публичной ленты', () => {
+  const feed = (over: Partial<AvaFeedEntry>): AvaFeedEntry => ({
+    id: 'f1',
+    at: 1,
+    kind: 'result',
+    challengerCorp: 'me',
+    challengerName: 'Мы',
+    targetCorp: 'them',
+    targetName: 'Они',
+    ...over,
+  });
+
+  it('чужие бои и назначенные матчи в историю не попадают', () => {
+    expect(
+      corpBattles(
+        [
+          feed({ kind: 'matchup', winnerCorp: null }),
+          feed({ challengerCorp: 'x', targetCorp: 'y', winnerCorp: 'x' }),
+        ],
+        'me',
+      ),
+    ).toEqual([]);
+  });
+
+  it('победа, поражение и ничья различаются — null-победитель это НЕ проигрыш', () => {
+    const rows = corpBattles(
+      [
+        feed({ id: 'a', at: 3, winnerCorp: 'me' }),
+        feed({ id: 'b', at: 2, winnerCorp: 'them' }),
+        feed({ id: 'c', at: 1, winnerCorp: null }),
+      ],
+      'me',
+    );
+    expect(rows.map((r) => r.outcome)).toEqual(['win', 'loss', 'draw']);
+    expect(rows.every((r) => r.foe === 'Они')).toBe(true); // противник — всегда ДРУГАЯ сторона
+  });
+
+  it('за сторону цели противником читается вызвавший', () => {
+    const rows = corpBattles([feed({ challengerCorp: 'them', targetCorp: 'me', winnerCorp: 'me' })], 'me');
+    expect(rows).toEqual([{ at: 1, foe: 'Мы', outcome: 'win' }]);
+  });
+
+  it('у каждого исхода своя локализованная плашка', () => {
+    for (const [outcome, key] of Object.entries(CORP_BATTLE_LABEL)) {
+      expect(key, outcome).toMatch(/^corp\.battle\./);
+      expect(t(key), outcome).not.toContain('corp.battle');
+    }
+  });
+});
+
+describe('корпорации — витрина наград', () => {
+  const defs: MedalDef[] = [
+    { id: 'first', name: 'Первая кровь', description: 'первая победа' },
+    { id: 'champ', name: 'Чемпион', description: 'пять побед' },
+  ];
+
+  it('пустое/битое хранилище читается как пустые слоты, а не падает', () => {
+    expect(readShowcase(null)).toEqual(['', '', '']);
+    expect(readShowcase('first')).toEqual(['first', '', '']);
+    expect(readShowcase(readShowcase(null).join(','))).toHaveLength(SHOWCASE_SLOTS);
+  });
+
+  it('запись и чтение — обратимы', () => {
+    expect(readShowcase(writeShowcase(['a', 'b', 'c']))).toEqual(['a', 'b', 'c']);
+  });
+
+  it('в слоте показывается только ЗАРАБОТАННАЯ награда — протухший выбор гаснет', () => {
+    const html = showcaseHtml(['first', 'champ', ''], defs, ['first']);
+    expect(html).toContain('Первая кровь');
+    expect(html).not.toContain('Чемпион'); // не получена — слот пуст, а не «есть»
+    expect((html.match(/data-corpcup=/g) ?? []).length).toBe(SHOWCASE_SLOTS);
+  });
+
+  it('в общей витрине неполученные видны, но не выбираются', () => {
+    const html = medalGalleryHtml(defs, ['first']);
+    expect(html).toContain('data-corppick="first"');
+    expect(html).not.toContain('data-corppick="champ"');
+    expect(html).toContain('Чемпион'); // видна как цель, вместе с условием
+    expect(html).toContain('пять побед');
+  });
+
+  it('пустой каталог не рисует пустой список', () => {
+    expect(medalGalleryHtml([], [])).not.toContain('cmg-list');
+  });
+
+  it('плитка «Штаба» печатает прочерк вместо нуля, когда числа нет', () => {
+    expect(hqTile('Место', null)).toContain('—');
+    expect(hqTile('Место', '#17')).toContain('#17');
   });
 });
 
@@ -131,9 +234,27 @@ describe('корпорации — кабинет', () => {
     const before = body.html();
     tabs.fire({
       closest: (s: string) =>
-        s === '[data-corptab]' ? { dataset: { corptab: 'holdings' } } : null,
+        s === '[data-corptab]' ? { dataset: { corptab: 'wars' } } : null,
     });
     expect(body.html()).not.toBe(before);
+  });
+
+  it('Back закрывает СНАЧАЛА витрину и только потом кабинет', () => {
+    const { api, root, shown } = wire();
+    api.open();
+    root.fire({ closest: (s: string) => (s === '[data-corpcup]' ? { dataset: { corpcup: '1' } } : null) });
+    api.close();
+    expect(shown()).toBe('flex'); // ушла витрина — из корпорации игрока не выбросило
+    api.close();
+    expect(shown()).toBe('none');
+  });
+
+  it('крестик закрывает кабинет целиком, даже из открытой витрины', () => {
+    const { api, root, shown } = wire();
+    api.open();
+    root.fire({ closest: (s: string) => (s === '[data-corpcup]' ? { dataset: { corpcup: '0' } } : null) });
+    root.fire({ id: 'corpclose', closest: () => null });
+    expect(shown()).toBe('none');
   });
 
   it('крестик и фон закрывают кабинет', () => {

@@ -91,6 +91,14 @@ export interface Medal {
   corpId: string | null;
   at: number;
 }
+/** One entry of the medal CATALOG (`GET /medals`) — the award as it is defined, not as
+ *  it was earned. `name`/`description` are display text straight from `data/medals.json`
+ *  (they carry no i18n key), so the screen prints them as-is. */
+export interface MedalDef {
+  id: string;
+  name: string;
+  description: string;
+}
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null;
 const isStr = (v: unknown): v is string => typeof v === 'string';
@@ -263,6 +271,19 @@ export function parseMedals(raw: unknown): Medal[] {
   for (const r of raw) {
     if (isObj(r) && isStr(r.accountId) && isStr(r.medalId) && isNum(r.at) && (r.corpId === null || isStr(r.corpId))) {
       out.push({ accountId: r.accountId, medalId: r.medalId, corpId: r.corpId, at: r.at });
+    }
+  }
+  return out;
+}
+
+export function parseMedalDefs(raw: unknown): MedalDef[] {
+  if (!Array.isArray(raw)) return [];
+  const out: MedalDef[] = [];
+  for (const r of raw) {
+    // A description is optional in practice (an older server may omit it) — the award
+    // is still showable by name, so a missing description degrades to empty text.
+    if (isObj(r) && isStr(r.id) && isStr(r.name)) {
+      out.push({ id: r.id, name: r.name, description: isStr(r.description) ? r.description : '' });
     }
   }
   return out;
