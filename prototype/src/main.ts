@@ -170,6 +170,7 @@ import { initSoloDrivers } from './soloDrivers';
 import { initMatchEnd } from './matchEnd';
 import { STANCES, diffDiplomacy } from './diploEvents';
 import { asteroidsFor, bracketStrokes, polyPoints } from './mapShapes';
+import { conveyorHtml as kitConveyorHtml } from './conveyorView';
 import {
   actionButton,
   cardHeader as kitCardHeader,
@@ -4952,52 +4953,47 @@ function pausedLabel(site: PausedConstructionSite): string {
   return constructionLabel(site);
 }
 function conveyorHtml(planetId: string, lane: BuildLane): string {
+  // Разметку собирает `conveyorView.ts` (REFM-36) — там же правило «живые числа не
+  // входят в подпись панели» и «очередь без денег называет цену».
   const active = activeConstruction(planetId, lane);
   const queued = queueOf(planetId)[lane];
-  const paused = (s.planets[planetId]?.pausedConstruction ?? []).filter(
-    (p) => laneOf(p.kind) === lane,
+  const head = queued[0];
+  return kitConveyorHtml(
+    planetId,
+    lane,
+    {
+      active: active
+        ? {
+            label: constructionLabel(active.payload),
+            at: active.at,
+            durationMs: buildDurationHours(active.payload) * HOUR,
+            seq: active.seq,
+          }
+        : null,
+      queued: queued.map((q) => ({ label: queuedLabel(q) })),
+      paused: (s.planets[planetId]?.pausedConstruction ?? [])
+        .filter((p) => laneOf(p.kind) === lane)
+        .map((p) => ({ id: p.id, label: pausedLabel(p), progress: p.progress })),
+      // Строку «ждём цену» показываем только на ПК: на телефоне место дороже.
+      waitingCost:
+        !active && pcUi() && head && !canStartQueued(planetId, head)
+          ? cost(buildCost(planetId, head), myRes())
+          : null,
+      compact: compactUi(),
+    },
+    {
+      now: t('side.conveyor.now'),
+      cancel: t('side.conveyor.cancel.title'),
+      waiting: (c) => t('side.conveyor.waiting', { c }),
+      idle: t('side.conveyor.idle'),
+      idleTag: t('side.conveyor.idle.tag'),
+      idleSub: t('side.conveyor.idle.sub'),
+      dequeue: t('side.conveyor.dequeue.title'),
+      queueEmpty: t('side.conveyor.queue-empty'),
+      paused: (n) => t('side.conveyor.paused', { n }),
+      resume: t('side.conveyor.resume.title'),
+    },
   );
-  let html = `<div class="conveyor">`;
-  if (active) {
-    // The live % / remaining-time are patched in each frame by updatePanelLive() and
-    // deliberately kept OUT of the panel's HTML signature — otherwise the panel (and its
-    // build buttons) would be rebuilt 60×/s, and a click whose down/up straddle a rebuild
-    // is dropped (the bug where rapid build orders only queued one ship in real time).
-    const dur = buildDurationHours(active.payload) * HOUR;
-    html += `<div class="current" data-desc="c:${planetId}:${lane}:active:${active.seq}"><span>${t('side.conveyor.now')}</span><b>${constructionLabel(active.payload)}</b><em class="conv-time" data-at="${active.at}">—</em>`;
-    html += `<button class="conv-cancel" data-act="cancelbuild" data-arg="${active.seq}" title="${t('side.conveyor.cancel.title')}">✕</button></div>`;
-    html += `<div class="bar"><i class="conv-fill" data-at="${active.at}" data-dur="${dur}" style="width:0%"></i></div>`;
-  } else if (pcUi() && queued[0] && !canStartQueued(planetId, queued[0])) {
-    // The queue is NOT stuck — its head simply can't be paid yet. Say so, with the
-    // price, instead of an idle line that reads like a broken conveyor.
-    html += `<div class="current idle"><b>⏳ ${t('side.conveyor.waiting', { c: cost(buildCost(planetId, queued[0]), myRes()) })}</b></div>`;
-    html += `<div class="bar"><i style="width:0%"></i></div>`;
-  } else if (compactUi()) {
-    html += `<div class="current idle"><b>${t('side.conveyor.idle')}</b></div>`;
-    html += `<div class="bar"><i style="width:0%"></i></div>`;
-  } else {
-    html += `<div class="current idle"><span>${t('side.conveyor.idle.tag')}</span><b>${t('side.conveyor.idle.sub')}</b><em>—</em></div>`;
-    html += `<div class="bar"><i style="width:0%"></i></div>`;
-  }
-  if (queued.length) {
-    html += `<div class="queue">${queued
-      .map(
-        (q, i) =>
-          `<span data-desc="c:${planetId}:${lane}:queued:${i}"><em>${i + 1}</em>${queuedLabel(q)}<button class="q-x" data-act="dequeue" data-arg="${lane}:${i}" title="${t('side.conveyor.dequeue.title')}">✕</button></span>`,
-      )
-      .join('')}</div>`;
-  } else if (!compactUi()) {
-    html += `<div class="queue empty">${t('side.conveyor.queue-empty')}</div>`;
-  }
-  if (paused.length) {
-    html += `<div class="paused">${paused
-      .map(
-        (p) =>
-          `<span data-desc="c:${planetId}:${lane}:paused:${p.id}"><em>${t('side.conveyor.paused', { n: Math.round(p.progress * 100) })}</em>${pausedLabel(p)}<button class="p-go" data-act="resumebuild" data-arg="${p.id}" title="${t('side.conveyor.resume.title')}">▶</button></span>`,
-      )
-      .join('')}</div>`;
-  }
-  return html + `</div>`;
 }
 // Buildable options as codex tiles (icon + cost). Tapping a tile opens the full-info
 // panel, which carries a "Build here" button for the selected province — so browsing
