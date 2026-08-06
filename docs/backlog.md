@@ -3351,7 +3351,7 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
   |---|---|---|---|---|
   | build/unit codex (плитка → попап + «Строить») ✅ REFM-4 | 6331–6445 | 115 | 0 | 1 |
   | in-app APK auto-update ✅ REFM-23 | 14725–14831 | 107 | 0 | 2 |
-  | multiplayer (net mode) | 717–837 | 121 | 42 | 2 |
+  | multiplayer (net mode) — ПЕРЕМЕРЕНО, см. сноску ниже | код 9597–10572 | 441 | 16 | 17 |
   | «Арсенал» (вкладка хаба, ARS-5) ✅ REFM-5 | 10550–10675 | 126 | 2 | 2 |
   | session market (двусторонний стакан) ✅ REFM-6 | 9791–9926 | 136 | 2 | 2 |
   | steward («Хранитель») ✅ REFM-7 | 9257–9415 | 159 | 4 | 2 |
@@ -3386,6 +3386,31 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
   | canvas input | 8140–8370 | 231 | 0 | 19 |
   | TGT-1: target-order composer | 14183–14724 | 542 | 1 | 20 |
   | ONB-5 return digest | 7265–8139 | 875 | 7 | 29 |
+
+  > **Сноска: строка «multiplayer (net mode)» была измерена НЕВЕРНО — и меряла не то.**
+  > Прежние числа (`717–837`, 121 строка, 42 своих, 2 чужих) описывают БЛОК ОБЪЯВЛЕНИЙ
+  > под баннером `// --- multiplayer (net mode)`, а не секцию. Пересчёт по коду
+  > (`main.ts` на c71dcd2):
+  > • под баннером 40 модульных объявлений, из них к сети относятся **16**
+  >   (`NET`…`reconnectTimer`); остальные 24 — посторонняя память файла, которая просто
+  >   стоит рядом: указатель карты, вкладки панели, очереди стройки, счёт потерь, буферы
+  >   эффектов, экран одиночной настройки, песочница;
+  > • сам сетевой КОД — `connect` (244), `connectToMatch` (62), `scheduleReconnect` (41),
+  >   `fetchJoinToken` (41), `resolveServer` (30), `probeAuthMode` (17) и спутники,
+  >   **441 строка** — лежит на девять тысяч строк ниже, под баннером *meta-progression*,
+  >   и баннера своего не имеет;
+  > • настоящая сцепка — **17 чужих модульных `let`** (`s`, `ME`, `authMode`, `banner`,
+  >   `selFleet`, `selFleets`, `lastPanelHtml`, `endScreen`, `chainMode`, `diploOpen`,
+  >   `diploTab`, `unreadMsgs`, `sessionMessages`, `netSignatures`, `pendingLoads`,
+  >   `pendingJoinAfterAuth`, `fpsEma`) плюс 20 чужих `const` (`statusEl`, `showConnect`,
+  >   `snd`, `pings`, `side`, `$`…), а не 2.
+  > **Следствие для порядка.** По честной мере сеть стоит рядом с `diplomacy gate` (17) —
+  > то есть в КОНЦЕ очереди, а не в начале. Следующие по сцепке из незанятых —
+  > `rendering` (10), `side panel` (11), `single-player setup overlay` (12).
+  > **Следствие для формы кирпича.** Это не «вынести секцию», а «вынести живой транспорт
+  > плейтестов» — 441 строка, которая держит сокет, реконнект с бэкоффом, применение
+  > снапшотов в `s`/`ME` и лестницу экранов входа. Брать его стоит отдельным заходом с
+  > проверкой на живом `netserver`, а не в общем потоке REFM.
   | meta-progression (прокачка) | 11809–12275 | 467 | 1 | 52 |
   | Android Back / Escape (закрытие слоёв) | 13107–14060 | 954 | 2 | 56 |
 
@@ -4109,7 +4134,8 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
 > REFM-12 ✅ → REFM-13 ✅ → REFM-14 ✅ → REFM-15 ✅ → REFM-16 ✅ → REFM-17 ✅ → REFM-18 ✅ →
 > REFM-19 ✅ → REFM-20 ✅ → REFM-21 ✅ → REFM-22 ✅ → REFM-23 ✅ → REFM-24 ✅ → REFM-25 ✅ →
 > REFM-26 ✅ → REFM-27 ✅ → REFM-28 ✅ → REFM-29 ✅ → REFM-30 ✅ → REFM-31 ✅ → REFM-32 ✅ → REFM-33+ (по таблице
-> сцепки; дальше — экран сетапа, затем helpers и рендер-слои).
+> сцепки: `rendering` (10) → `side panel` (11) → экран сетапа (12). Сеть НЕ следующая —
+> её строка была измерена неверно, честная сцепка 17, см. сноску под таблицей).
 > Блок REFP закрыт, так что зона `prototype/` теперь целиком за REFM.
 
 ---
