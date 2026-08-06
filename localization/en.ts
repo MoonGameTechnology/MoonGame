@@ -87,6 +87,20 @@ export const en: Record<string, string> = {
   'back.confirm.match': 'Press Back again to leave the match',
 
   // --- callsign — Позывные ботов.
+  'build.action.build': 'Build',
+  'build.action.no-res': 'Not enough resources',
+  'build.cat.defense': 'DEFENSE',
+  'build.cat.economy': 'ECONOMY',
+  'build.cat.infra': 'INFRASTRUCTURE',
+  'build.fx.aa': 'AA: {n} damage',
+  'build.fx.credits': '+{n}% world credits',
+  'build.fx.defense': '+{n}% defense',
+  'build.fx.production': '+{n}% production',
+  'build.fx.radar': 'radar: {n}',
+  'build.fx.shipyard': 'unlocks ship construction',
+  'build.head.built': 'built: {n}',
+  'build.state.done': 'Built',
+  'build.state.queued': 'in progress',
   'callsign.comet': 'Comet',
   'callsign.falcon': 'Falcon',
   'callsign.orion': 'Orion',
@@ -117,6 +131,7 @@ export const en: Record<string, string> = {
   'cargo.under-assault': 'the garrison is locked in battle — no troops can leave',
 
   // --- cost — ценники: единые чипы «иконка + число» на всех поверхностях.
+  'codex.lvl': 'Lv {n}',
   'cost.free': 'free',
   'cost.short': '{n} more needed',
 
@@ -135,6 +150,7 @@ export const en: Record<string, string> = {
   'chat.tab.coalition': 'Coalition',
   'chat.tab.session': 'Session',
   'chat.you': 'You',
+  'side.build.open': 'Build',
   'spy.log.empty': 'no attempts yet',
   'spy.log.title': 'JOURNAL',
   'spy.note':
@@ -877,6 +893,7 @@ export const en: Record<string, string> = {
   'threat.incoming': '⚠ An enemy is heading for {node}: arrival in {dur}',
 
   // --- yard — «Верфь»: корпус и модули, конструктор дивизий, стоимость и заказ.
+  'win.build.title': 'CONSTRUCTION',
   'yard.arsenal.note':
     '⚡ Live arsenal: anything bought during the match shows up here right away, but it only starts working once you BUILD it — construction and logistics, not instant.',
   'yard.build': 'Build ×{n} →',
@@ -1560,7 +1577,6 @@ export const en: Record<string, string> = {
   'side.battle.title': '⚔ Battle — {phase} · round {r}',
   'side.build.conveyor': 'Building conveyor',
   'side.build.enemy-hidden': 'Enemy construction telemetry unavailable',
-  'side.build.hp': 'hp',
   'side.build.upgrade': '▲ Upgrade {c}',
   'side.conveyor.cancel.title': 'Cancel — refunds part of the cost and pauses it',
   'side.conveyor.dequeue.title': 'Remove from the queue',

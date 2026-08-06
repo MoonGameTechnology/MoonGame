@@ -104,6 +104,7 @@ export const LAYER_INVENTORY: ReadonlyMap<string, LayerVerdict> = new Map<string
   ['warprompt', 'layer'], // подтверждение объявления войны, z48
   ['pingmenu', 'layer'], // композер пинга провинции, z47
   ['tech', 'layer'], // дерево технологий, z47
+  ['buildwin', 'layer'], // окно построек мира (BUILD-1), z45 — ниже кодекса
   ['steward', 'layer'], // окно «Хранителя», z47 — тот самый ST-4, чинившийся поштучно
   ['market', 'layer'], // сессионный рынок, z47
   ['constructor', 'layer'], // «Верфь» — оснащение кораблей (REFM-13), z47

@@ -1015,11 +1015,17 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #tech,#steward{position:fixed;inset:0;z-index:47;display:none;align-items:center;justify-content:center;padding:16px;
   background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
 #tech.show,#steward.show{display:flex;}
-#tech .twbox,#steward .twbox{display:flex;flex-direction:column;width:min(460px,94vw);max-height:82vh;overflow:hidden;
+/* Окно построек — тот же каркас, но НИЖЕ кодекса (z46): тап по строке открывает
+   карточку здания, и она обязана лечь ПОВЕРХ окна, а не под ним. */
+#buildwin{position:fixed;inset:0;z-index:45;display:none;align-items:center;justify-content:center;padding:16px;
+  background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
+#buildwin.show{display:flex;}
+#tech .twbox,#steward .twbox,#buildwin .twbox{display:flex;flex-direction:column;width:min(460px,94vw);max-height:82vh;overflow:hidden;
   background:var(--glass);border:1px solid var(--cyan);border-radius:10px;
   box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
 .tw-close{width:28px;height:28px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);cursor:pointer;}
 #techbody,#stewardbody,#herobody{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:12px 14px;}
+#buildwinbody{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;padding:0;}
 /* heroes window: roster cards + abilities / skill tree / fittings */
 #herobody .hx-card{border:1px solid var(--line-hi);border-radius:10px;padding:11px 13px;margin-bottom:12px;background:rgba(53,214,230,.04);}
 #herobody .hx-card.dead{opacity:.55;border-style:dashed;}
@@ -1212,6 +1218,50 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   color:#04231c;background:linear-gradient(180deg,var(--grn),#4fe0b0);}
 .tt-mbtn.wait{background:#0a1a1f;border-color:var(--line-hi);color:var(--dim);cursor:default;}
 .tt-mbtn:disabled{opacity:.75;cursor:not-allowed;}
+/* BUILD-1: окно построек мира — список категориями, строки «имя+уровень / состояние /
+   эффект / цена+срок» в том же языке, что список технологий (TT-4). */
+.bw-top{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;padding:10px 12px 8px;flex:none;border-bottom:1px solid var(--line);}
+.bw-world b{display:block;font-size:13px;font-weight:800;color:#eafffb;}
+.bw-world span{display:block;margin-top:2px;font-size:10px;color:var(--dim);}
+.bw-cnt{flex:none;font-size:10px;color:var(--cyan);border:1px solid var(--line-hi);border-radius:10px;padding:3px 9px;}
+.bw-scroll{flex:1;min-height:0;overflow:auto;touch-action:pan-y;}
+.bw-list{padding:0 12px 12px;display:flex;flex-direction:column;gap:7px;}
+.bw-cath{margin:10px 0 1px;font:800 9px ui-monospace,monospace;letter-spacing:1.4px;color:var(--cyan-dim);}
+.bw-item{position:relative;padding:9px 10px 10px;border:1px solid var(--line);border-radius:10px;
+  background:linear-gradient(180deg,rgba(12,32,38,.85),rgba(8,20,24,.85));cursor:pointer;}
+.bw-item:active{transform:scale(.995);}
+.bw-ih{display:flex;align-items:center;gap:8px;}
+.bw-ic{flex:none;font-size:15px;font-variant-emoji:text;color:var(--cyan);}
+.bw-ih b{flex:1;min-width:0;font-size:12.5px;font-weight:700;color:#eafffb;}
+.bw-lv{font-style:normal;font-size:10px;color:var(--cyan);letter-spacing:1px;}
+.bw-fx{margin-top:4px;font-size:10px;line-height:1.45;color:var(--cyan-dim);}
+.bw-foot{margin-top:6px;display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:10px;color:var(--dim);}
+.bw-dur{flex:none;font-variant-numeric:tabular-nums;}
+.bw-next{font-style:normal;color:var(--amber);font-size:9px;letter-spacing:.5px;}
+/* Правое поле строки — РОВНО ОДНО состояние, как у технологий */
+.bw-st{flex:none;max-width:56%;font-size:9.5px;line-height:1.3;text-align:right;color:var(--dim);}
+.bw-st.done{color:#4fe0b0;}
+.bw-st.run{color:var(--amber);font-weight:700;}
+.bw-take{flex:none;padding:6px 11px;border-radius:8px;border:1px solid var(--grn);cursor:pointer;
+  font:800 10px ui-monospace,monospace;letter-spacing:.6px;text-transform:uppercase;white-space:nowrap;
+  color:#04231c;background:linear-gradient(180deg,var(--grn),#4fe0b0);}
+.bw-take:disabled{background:#0a1a1f;border-color:var(--line-hi);color:var(--dim);opacity:.8;cursor:not-allowed;}
+.bw-item.st-avail{border-color:var(--cyan);}
+.bw-item.st-queued{border-color:var(--amber);}
+.bw-item.st-built{opacity:.75;}
+.bw-item.st-lock{opacity:.62;}
+@media(hover:hover){
+  :where(.bw-item:hover){border-color:var(--line-hi);}
+}
+/* Кнопка панели, открывающая окно, — акцентная, во всю ширину колонки */
+.bw-open{margin-top:8px;width:100%;padding:10px;border-radius:10px;border:1px solid var(--grn);cursor:pointer;
+  font:800 11px ui-monospace,monospace;letter-spacing:1px;text-transform:uppercase;
+  color:#04231c;background:linear-gradient(180deg,var(--grn),#4fe0b0);}
+/* Листалка уровней в карточке кодекса (BUILD-1) */
+.cx-lvls{display:flex;gap:6px;margin:10px 0 0;}
+.cx-lv{flex:1;padding:6px 0;border:1px solid var(--line-hi);border-radius:8px;background:transparent;
+  color:var(--dim);font:700 10px ui-monospace,monospace;cursor:pointer;}
+.cx-lv.on{color:#04231c;background:linear-gradient(180deg,var(--grn),#4fe0b0);border-color:var(--grn);}
 /* scientist council picker (setup-time, over the start-point screen) */
 #scipick{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:16px;
   background:rgba(1,5,9,.74);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);}
@@ -2311,7 +2361,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   .dp-convo{height:min(41vh,440px);}
   #splitdlg .sbox{width:min(440px,62.5vw);max-height:56vh;}
   #logwin .lwbox{width:53.4vw;max-height:46.5vh;}
-  #tech .twbox,#steward .twbox{width:53.4vw;max-height:54.5vh;}
+  #tech .twbox,#steward .twbox,#buildwin .twbox{width:53.4vw;max-height:54.5vh;}
   #scipick .twbox{width:53.4vw;max-height:58.5vh;}
   #market .mkbox{width:53.4vw;max-height:54.5vh;}
   #constructor .cnbox{width:53.4vw;max-height:60vh;}
@@ -2464,6 +2514,7 @@ const page = (js) => `<!doctype html>
 <div id="logwin"><div class="lwbox"><div class="lw-head"><b data-i18n="win.log.title"></b><button class="lw-recap" id="lw-recap" type="button" data-i18n-title="win.log.recap">🛰</button><button class="lw-close">✕</button></div><div id="log"></div></div></div>
 <!-- technologies window — content rendered by renderTech() in main.ts -->
 <div id="tech"><div class="twbox"><div class="lw-head"><b data-i18n="win.tech.title"></b><button class="tw-close">✕</button></div><div id="techbody"></div></div></div>
+<div id="buildwin"><div class="twbox"><div class="lw-head"><b data-i18n="win.build.title"></b><button class="tw-close">✕</button></div><div id="buildwinbody"></div></div></div>
 <!-- steward («Хранитель») window — content rendered by renderSteward() in main.ts -->
 <div id="steward"><div class="twbox"><div class="lw-head"><b data-i18n="win.steward.title"></b><button class="tw-close">✕</button></div><div id="stewardbody"></div></div></div>
 <!-- heroes: the roster/штаб now lives INSIDE the constructor «Верфь» tab (Герои pane) -->
