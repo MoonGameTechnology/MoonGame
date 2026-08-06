@@ -174,6 +174,7 @@ import { LIMP_PCT, fleetSummary, hullPct, stackHullPct } from './fleetSummary';
 import { isGroundUnit, isWingUnit, planetSummary } from './planetSummary';
 import { fleetWhere, groupTotals, pickPanel } from './panelSelect';
 import { buildRoster, garrisonByTab, tabCounts } from './planetTabs';
+import { catalogTileHtml, tileLock, type TileLock } from './catalogTile';
 import {
   actionButton,
   cardHeader as kitCardHeader,
@@ -6204,7 +6205,7 @@ function scrollFeedToEnd(): void {
  *  Returns why a fresh build order would be refused — so the build tile can grey out
  *  the moment it's committed (built / building / queued / paused), instead of taking
  *  the order and only rejecting it when the queue reaches it. `null` = orderable. */
-function buildingLocked(planetId: string, id: string): 'built' | 'queued' | null {
+function buildingLocked(planetId: string, id: string): TileLock {
   const p = s.planets[planetId];
   if (!p) return null;
   // RULES-1: правило «одно здание такого типа на мир» больше НЕ переписано здесь —
@@ -6212,39 +6213,33 @@ function buildingLocked(planetId: string, id: string): 'built' | 'queued' | null
   // держал свою копию (буквально `p.buildings.some(...)` + скан scheduled + paused),
   // и копия разъезжалась: кодекс проверял только «уже стоит» и всю стройку первого
   // экземпляра предлагал заказать второй.
-  const code = canOrder(s, buildBuilding(ME, planetId, id));
-  if (code === 'E_ALREADY_BUILT') return 'built';
-  if (code === 'E_ALREADY_QUEUED' || code === 'E_ALREADY_PAUSED') return 'queued';
-  // Локальная очередь прототипа ядру неизвестна по определению (в сети её нет —
-  // там стройку таймит сервер), поэтому она добавляется здесь ЯВНО, а не как «ещё
-  // одно правило». Это единственная местная добавка к вердикту ядра.
-  if (queueOf(planetId).buildings.some((q) => q.kind === 'building' && q.id === id))
-    return 'queued';
-  // Прочие отказы (E_INSUFFICIENT, E_BOMBARDED, E_WRONG_SECTOR…) плитку НЕ гасят:
-  // нехватку показывает сама цена с дефицитом (UI-RES), и серая кнопка вместо цифры
-  // «сколько не хватает» была бы хуже. Это решение ПОДАЧИ, не правило.
-  return null;
+  // Какие коды означают повтор, а какие плитку НЕ гасят — в `catalogTile.ts`
+  // (REFM-42). Локальная очередь прототипа ядру неизвестна по определению (в сети
+  // её нет — там стройку таймит сервер), поэтому она приходит отдельным флагом.
+  return tileLock(
+    canOrder(s, buildBuilding(ME, planetId, id)),
+    queueOf(planetId).buildings.some((q) => q.kind === 'building' && q.id === id),
+  );
 }
 function codexTile(
   kind: 'b' | 'u',
   id: string,
   label: string,
   orderable = false,
-  lockedFor?: string,
+  lockedFor?: TileLock,
 ): string {
   if (!(kind === 'b' ? data.buildings[id] : data.units[id])) return '';
-  const icon = kind === 'b' ? (BUILD_ICON[id] ?? '▣') : unitIconHtml(id, data, youColor);
-  const name = kind === 'b' ? buildingName(data.buildings[id]?.name, id) : unitTitle(id);
-  if (lockedFor) {
-    // Committed already — a dim, non-ordering tile. Keeps data-desc (hover dossier),
-    // drops data-codex/data-buildorder so neither left- nor right-click builds again.
-    const mark = lockedFor === 'built' ? '✓' : '⏳';
-    return `<button class="ptile locked" data-desc="${kind}:${id}" data-name="${esc(name)}"><span class="pt-ic">${icon}</span><span class="pt-c">${mark} ${esc(label)}</span></button>`;
-  }
-  // Build-menu tiles carry the enqueue order (PC right-click = build w/o the codex
-  // confirmation); composition/garrison tiles don't — right-click is inert there.
-  const order = orderable ? ` data-buildorder="${kind === 'u' ? 'unit' : 'building'}:${id}"` : '';
-  return `<button class="ptile" data-codex="${kind}:${id}" data-desc="${kind}:${id}"${order} data-name="${esc(name)}"><span class="pt-ic">${icon}</span><span class="pt-c">${esc(label)}</span></button>`;
+  // Разметку плитки собирает `catalogTile.ts` (REFM-42) — там же правило «запертая
+  // теряет ОБА якоря заказа, оставляя досье».
+  return catalogTileHtml({
+    kind,
+    id,
+    icon: kind === 'b' ? (BUILD_ICON[id] ?? '▣') : unitIconHtml(id, data, youColor),
+    name: kind === 'b' ? buildingName(data.buildings[id]?.name, id) : unitTitle(id),
+    label,
+    orderable,
+    lock: lockedFor ?? null,
+  });
 }
 /** Ground-garrison tiles (the ЗЕМЛЯ tab): one flowing row of icon·count chips — no
  *  names; the hover dossier (PC) / tap dossier (touch) carries the identification. */
