@@ -130,7 +130,6 @@ import {
   sumUnitStat,
   getStance,
   getOffer,
-  pairHas,
   hashState,
   planRoute,
   previewBattle,
@@ -169,6 +168,7 @@ import { measureViewport, STARS, NEBULAE } from './viewport';
 import { initPingUi } from './pingUi';
 import { initSoloDrivers } from './soloDrivers';
 import { initMatchEnd } from './matchEnd';
+import { STANCES, diffDiplomacy } from './diploEvents';
 import {
   contactAlpha,
   contactLost,
@@ -5942,9 +5942,7 @@ const STANCE_RU: Record<DiplomaticStance, string> = {
 function stanceRu(st: DiplomaticStance): string {
   return t(STANCE_RU[st]);
 }
-// Friendliness rank: war (hostile) < peace < pact < alliance (closest). Warming the
-// relation up a rank needs the other side's consent; cooling it down is unilateral.
-const STANCES: DiplomaticStance[] = ['war', 'peace', 'pact', 'alliance'];
+
 
 function worldsOf(id: string): number {
   let n = 0;
@@ -5988,56 +5986,27 @@ let unreadMsgs = 0;
  *  Returns true when something shifted — the CALLER re-renders the roster after
  *  it assigns the new state (rendering here would paint from the old `s`). */
 function diffNetDiplomacy(prev: GameState, next: GameState): boolean {
-  let shifted = false;
-  const keys = new Set([
-    ...Object.keys(prev.diplomacy ?? {}),
-    ...Object.keys(next.diplomacy ?? {}),
-  ]);
-  for (const key of keys) {
-    if (!pairHas(key, ME)) continue;
-    const before = prev.diplomacy?.[key] ?? 'war';
-    const after = next.diplomacy?.[key] ?? 'war';
-    if (before === after) continue;
-    const [a, b] = key.split('|');
-    const other = a === ME ? b! : a!;
-    const who = NAME[other] ?? other;
-    if (after === 'war') note(t('comms.war-declared', { who }));
-    else note(t('comms.stance-changed', { who, stance: stanceRu(after) }));
-    pushMsg(other, t('comms.stance-changed.short', { stance: stanceRu(after) }), true, other);
-    unreadMsgs++;
-    shifted = true;
-  }
-  const offKeys = new Set([
-    ...Object.keys(prev.diplomacyOffers ?? {}),
-    ...Object.keys(next.diplomacyOffers ?? {}),
-  ]);
-  for (const key of offKeys) {
-    const before = prev.diplomacyOffers?.[key];
-    const after = next.diplomacyOffers?.[key];
-    if (before === after || !after) continue; // withdrawals ride the stance toast above
-    const [from, to] = key.split('>');
-    if (to === ME) {
-      const who = NAME[from!] ?? from!;
+  const events = diffDiplomacy(prev, next, ME);
+  for (const ev of events) {
+    const who = NAME[ev.other] ?? ev.other;
+    const stance = stanceRu(ev.stance);
+    if (ev.kind === 'stance') {
       note(
-        t('log.diplo.offer', {
-          who,
-          stance: stanceRu(after),
-        }),
+        ev.stance === 'war'
+          ? t('comms.war-declared', { who })
+          : t('comms.stance-changed', { who, stance }),
       );
-      pushMsg(from!, t('log.diplo.offer.short', { stance: stanceRu(after) }), true, from!);
+      pushMsg(ev.other, t('comms.stance-changed.short', { stance }), true, ev.other);
       unreadMsgs++;
-      shifted = true;
-    } else if (from === ME) {
-      note(
-        t('log.diplo.sent', {
-          who: NAME[to!] ?? to!,
-          stance: stanceRu(after),
-        }),
-      );
-      shifted = true;
+    } else if (ev.kind === 'offer-in') {
+      note(t('log.diplo.offer', { who, stance }));
+      pushMsg(ev.other, t('log.diplo.offer.short', { stance }), true, ev.other);
+      unreadMsgs++;
+    } else {
+      note(t('log.diplo.sent', { who, stance })); // своё исходящее — только уведомление
     }
   }
-  return shifted;
+  return events.length > 0;
 }
 
 function pushMsg(to: string, text: string, sys: boolean, from = ME, ping?: string): void {
