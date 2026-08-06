@@ -41,6 +41,7 @@ import {
   migrate,
   registerAuthApi,
   registerFriendApi,
+  registerLeaderboardApi,
   FriendService,
   liveSession,
   configFromEnv,
@@ -780,6 +781,14 @@ const server = createMultiplayerServer({
             return null;
           },
         },
+      });
+      // Рейтинги (RANK-1) — тот же слайс, что в проде. Корп-хранилища у плейтест-хоста
+      // нет, поэтому доска корпораций тут пустая: API это предусматривает (`corps`
+      // необязателен), и экрану не приходится знать, какой хост его обслуживает.
+      registerLeaderboardApi(app, {
+        commanders: commanderStore,
+        users: userStore,
+        identify: identifySession,
       });
       // Seat + short-lived join token (SES-2.5) through the SHARED match API, so the
       // handshake — per-IP rate-limit, identity gate, error→status mapping — lives in ONE

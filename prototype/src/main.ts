@@ -32,13 +32,11 @@ import {
   unloadArmy,
   mergeFleet,
   splitFleet,
-  engageFleet,
   buildBuilding,
   upgradeBuilding,
   buildUnit,
   cancelConstruction,
   resumeConstruction,
-  aiOrders,
   declareWar,
   shareMap,
   netIncome,
@@ -61,19 +59,14 @@ import {
   squadronStrikeRange,
   sortieSpec,
   freshSortie,
-  tickRearm,
-  scrambleOrder,
   botFavour,
   FAVOUR_BASE,
   FAVOUR_EMBARGO,
   FAVOUR_WAR,
   setHoldPoint,
-  stewardActive,
   MAX_STEWARD_HOLD_POINTS,
   castHeroAbility,
   spawnHero,
-  serverChainActions,
-  chainStamp,
   orderChain,
   forceMarchFleet,
   FORCED_MARCH_MULT,
@@ -137,7 +130,6 @@ import {
   sumUnitStat,
   getStance,
   getOffer,
-  pairHas,
   hashState,
   planRoute,
   previewBattle,
@@ -174,6 +166,41 @@ import { buildLabel, currentBuild } from './updater';
 import { initApkUpdater } from './apkUpdate';
 import { measureViewport, STARS, NEBULAE } from './viewport';
 import { initPingUi } from './pingUi';
+import { initSoloDrivers } from './soloDrivers';
+import { initMatchEnd } from './matchEnd';
+import { STANCES, diffDiplomacy } from './diploEvents';
+import {
+  afford as coreAfford,
+  emptyQueue,
+  laneOf,
+  queuedAction as coreQueuedAction,
+  queuedCost,
+  waitsForMoney,
+} from './buildOrders';
+import {
+  activeConstruction as coreActiveConstruction,
+  buildDurationHours as coreBuildDurationHours,
+  hoursLeft,
+  progressPct as coreProgressPct,
+} from './buildProgress';
+import {
+  contactAlpha,
+  contactLost,
+  episodeKey,
+  forgetEnded,
+  freshEpisodes,
+  hourBucket,
+  paintedThisFrame,
+} from './alerts';
+import {
+  SPY_COST,
+  grantLeftMs,
+  grantVision,
+  liveGrants,
+  pushSpyEntry,
+  targetsOf,
+  type SpyEntry,
+} from './intel';
 // Localization: one locale = one file (src/locale/*). Msgid = the canonical
 // Russian source string; `t()` wraps every user-visible literal, `tData()` maps
 // English data/*.json names, the static HTML is localized by a boot pass.
@@ -233,7 +260,6 @@ import {
   matchXp,
   metaGrant,
   parseMetaState,
-  recordMatch,
   type MetaState,
   type MetaBranch,
 } from './meta';
@@ -244,7 +270,7 @@ import {
 import { initTechTree, branchLabel } from './techTree';
 import { initSciPick } from './sciPick';
 import { initPasswordReset } from './passwordReset';
-import { initEndScreen } from './endScreen';
+import { initEndScreen, type MatchEnd } from './endScreen';
 import {
   fxBlur,
   pcUi,
@@ -362,6 +388,7 @@ import { resolveIntro, parseSeenIntros, type IntroCard } from './intros';
 import { buildRecap, type RecapEvent } from './recap';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
+import { initRank } from './rankScreen';
 import { combatRanges } from './combatRanges';
 import { corridorLines } from './corridorView';
 import { recapAdmits } from './recapGate';
@@ -555,14 +582,7 @@ let banner: string | null = null;
 // once by checkEnd from the authoritative `match` state. `dismissed` lets the player
 // hide it to look at the final board (the match stays frozen). Reset on a fresh match
 // / reconnect so a new game never opens straight into the old result.
-let endScreen: {
-  won: boolean;
-  draw: boolean;
-  why: string;
-  xp: number;
-  levelUp: number | null;
-  dismissed: boolean;
-} | null = null;
+let endScreen: MatchEnd | null = null;
 let selFleet: string | null = null;
 let selPlanet: string | null = null;
 let selFleets = new Set<string>();
@@ -590,7 +610,6 @@ const patrols = new Map<string, Patrol>();
 // order.scramble path (st.wingSorties in game.ts); without it, toggling free-refuels a
 // dry wing. (NET arms via order.scramble, which does its own stash server-side.)
 const wingSorties = new Map<string, Patrol['sortie']>();
-let lastPatrolTick = 0; // game-time (ms) the rearm cadence last advanced
 // A staged move that would cross territory of a player you're at PEACE with: held
 // until you confirm in the war-prompt (declaring war opens the route) or cancel.
 let warPrompt: {
@@ -730,7 +749,6 @@ let fleetInfoFor: string | null = null;
 let planetInfoFor: string | null = null;
 const buildQueues: Record<string, PlanetBuildQueue> = {};
 const logLines: string[] = [];
-let lastAiAt = 0;
 // Player ids the local sim drives as AI (empty seats become AI). Default solo = p2.
 let AI_PLAYERS = new Set<string>(['p2']);
 // Session war record (from `unit.died` events): enemy units you destroyed vs your own
@@ -1061,7 +1079,7 @@ function drawScanSweep(now: number) {
 const threatMemory = new Set<string>();
 let threatScanAt = -1;
 function updateThreatAlerts(): void {
-  const bucket = Math.floor(s.time / HOUR);
+  const bucket = hourBucket(s.time, HOUR);
   if (bucket === threatScanAt) return;
   threatScanAt = bucket;
   if (s.players[ME]?.status !== 'active') return;
@@ -1071,10 +1089,9 @@ function updateThreatAlerts(): void {
   for (const p of Object.values(s.planets)) {
     if (p.owner !== ME) continue;
     for (const th of scanNodeThreats(s, p.id, ME, c, identified)) {
-      const key = `${p.id}|${th.fleetId}`;
+      const key = episodeKey(p.id, th.fleetId);
       live.add(key);
-      if (threatMemory.has(key)) continue;
-      threatMemory.add(key);
+      if (freshEpisodes(threatMemory, [key]).length === 0) continue; // эпизод уже объявлен
       note(
         th.kind === 'inbound' && th.eta > s.time
           ? t('threat.incoming', {
@@ -1086,17 +1103,7 @@ function updateThreatAlerts(): void {
       );
     }
   }
-  // Episodes that ended are forgotten — a NEW approach to the node re-alerts.
-  for (const k of threatMemory) if (!live.has(k)) threatMemory.delete(k);
-}
-
-/** Did the sweep arm cross screen-angle `target` between last frame and this one? */
-function sweptThisFrame(target: number): boolean {
-  if (sweepPrevAng < 0) return false;
-  const d = (sweepAng - sweepPrevAng + TAU) % TAU; // arc the arm swept this frame
-  if (d <= 0) return false;
-  const t = ((((target % TAU) + TAU) % TAU) - sweepPrevAng + TAU) % TAU;
-  return t > 0 && t <= d;
+  forgetEnded(threatMemory, live); // эпизод кончился → новый подход снова прозвенит
 }
 
 /** Refresh radar contacts the arm crossed this frame: snapshot each radar-only enemy
@@ -1127,12 +1134,8 @@ function updateRadarContacts(now: number): void {
       if (!node) continue;
       const pos = world(node.position);
       // painted only by an arm whose radar disc actually covers the blip
-      const painted = sweepArms.some((a) => {
-        const dx = pos.x - a.x;
-        const dy = pos.y - a.y;
-        return dx * dx + dy * dy <= a.r * a.r && sweptThisFrame(Math.atan2(dy, dx));
-      });
-      if (painted) {
+      // Красит только рука, чей радарный диск реально накрывает отметку (`alerts.ts`).
+      if (paintedThisFrame(sweepArms, pos, sweepPrevAng, sweepAng)) {
         hit = true;
         if (!radarMemory.has(c.key))
           note(t('threat.contact', { size: c.size, at: c.node }), c.node);
@@ -1154,11 +1157,9 @@ function updateRadarContacts(now: number): void {
  *  to a dim last-known ghost held until the next pass repaints it; dropped once a full
  *  rotation passes with no repaint (the contact has moved on / is gone). */
 function drawRadarContacts(now: number): void {
-  const FLOOR = 0.32; // dim ghost level the imprint holds between passes
-  const FLASH = 1400; // ms of bright flash right after the arm paints it
   for (const [id, m] of radarMemory) {
     const age = now - m.at;
-    if (age > SWEEP_PERIOD * 1.25) {
+    if (contactLost(age, SWEEP_PERIOD)) {
       radarMemory.delete(id); // a whole turn with no repaint → contact lost
       continue;
     }
@@ -1169,8 +1170,7 @@ function drawRadarContacts(now: number): void {
     }
     const pos = world(node.position);
     if (!visible(pos, 120)) continue;
-    const bright = FLOOR + (1 - FLOOR) * Math.max(0, 1 - age / FLASH);
-    drawSignatureAt(pos, m.size, bright, now);
+    drawSignatureAt(pos, m.size, contactAlpha(age), now);
   }
 }
 
@@ -1309,45 +1309,21 @@ function myRes(): Record<string, number> {
   return s.players[ME]?.resources ?? {};
 }
 function afford(bag: Record<string, number> | undefined): boolean {
-  const res = s.players[ME]?.resources ?? {};
-  for (const [r, n] of Object.entries(bag ?? {})) if ((res[r] ?? 0) < n) return false;
-  return true;
+  return coreAfford(myRes(), bag);
 }
 /** Локальная (офлайновая) очередь стройки этого мира — ядру она неизвестна: в сети
  *  стройку таймит сервер. Создаётся по первому обращению. */
 function queueOf(planetId: string): PlanetBuildQueue {
-  return (buildQueues[planetId] ??= { buildings: [], units: [] });
+  return (buildQueues[planetId] ??= emptyQueue());
 }
-function laneOf(kind: BuildKind): BuildLane {
-  return kind === 'unit' ? 'units' : 'buildings';
-}
-/** Цена головы очереди — ДЛЯ ПОКАЗА (строка «⏳ ждём: …»). Решение «пора ли пускать»
- *  на неё больше не опирается: его принимает ядро (см. `canStartQueued`). */
+/** Цена головы очереди — ДЛЯ ПОКАЗА (строка «⏳ ждём: …»); правила масштаба и смещения
+ *  уровней живут в `buildOrders.ts` (REFM-32). */
 function buildCost(planetId: string, q: QueuedBuild): Record<string, number> | undefined {
-  if (q.kind === 'unit') {
-    const per = data.units[q.id]?.cost;
-    // Ядро масштабирует цену на count (`scaleCost`), поэтому и подпись обязана: иначе
-    // очередь из пяти корветов показывала бы цену одного.
-    if (!per) return undefined;
-    const n = q.count ?? 1;
-    return n === 1 ? per : Object.fromEntries(Object.entries(per).map(([r, v]) => [r, v * n]));
-  }
-  if (q.kind === 'building') {
-    return data.buildings[q.id]?.cost;
-  }
-  const pl = s.planets[planetId];
-  const inst = pl?.buildings.find((b) => b.type === q.id);
-  return inst ? data.buildings[q.id]?.upgrades[inst.level - 1]?.cost : undefined;
+  return queuedCost(s, data, planetId, q);
 }
-/** Приказ, которым голова очереди уедет в ядро. Один построитель на оба пути —
- *  и на вопрос «можно ли уже», и на само применение (`submitQueued`): иначе
- *  спрашивали бы про одно, а издавали другое. */
+/** Приказ, которым голова очереди уедет в ядро. */
 function queuedAction(planetId: string, q: QueuedBuild): Action {
-  return q.kind === 'unit'
-    ? buildUnit(ME, planetId, q.id, q.count)
-    : q.kind === 'upgrade'
-      ? upgradeBuilding(ME, planetId, q.id)
-      : buildBuilding(ME, planetId, q.id);
+  return coreQueuedAction(ME, planetId, q);
 }
 /**
  * RULES-4. Пора ли пускать голову очереди — ВЕРДИКТ ЯДРА, а не свой прайс-лист.
@@ -1365,31 +1341,12 @@ function queuedAction(planetId: string, q: QueuedBuild): Action {
  * `E_NO_SHIPYARD`, `E_MAX_LEVEL`) — очередь считала «можно», ядро отбивало.
  */
 function canStartQueued(planetId: string, q: QueuedBuild): boolean {
-  return canOrder(s, queuedAction(planetId, q)) !== 'E_INSUFFICIENT';
+  return !waitsForMoney(canOrder(s, queuedAction(planetId, q)));
 }
-function constructionPayload(payload: unknown): ConstructionPayload | null {
-  const p = payload as ConstructionPayload;
-  return typeof p?.planetId === 'string' ? p : null;
-}
+/** Стройка, идущая на мире прямо сейчас (голову по `(at, seq)` выбирает
+ *  `buildProgress.ts`, REFM-31 — там же и правило порядка). */
 function activeConstruction(planetId: string, lane: BuildLane): ActiveBuild | null {
-  let best: ActiveBuild | null = null;
-  for (const event of s.scheduled) {
-    if (event.type !== 'construction.complete') {
-      continue;
-    }
-    const payload = constructionPayload(event.payload);
-    if (!payload || payload.planetId !== planetId) {
-      continue;
-    }
-    const kind = payload.kind === 'unit' ? 'units' : 'buildings';
-    if (kind !== lane) {
-      continue;
-    }
-    if (!best || event.at < best.at || (event.at === best.at && event.seq < best.seq)) {
-      best = { at: event.at, seq: event.seq, payload };
-    }
-  }
-  return best;
+  return coreActiveConstruction(s, planetId, lane);
 }
 function constructionLabel(p: ConstructionPayload): string {
   if (p.kind === 'unit' && p.unit) {
@@ -1404,27 +1361,14 @@ function constructionLabel(p: ConstructionPayload): string {
   return t('queue.unknown');
 }
 function buildDurationHours(p: ConstructionPayload): number {
-  if (p.kind === 'unit' && p.unit) {
-    return data.units[p.unit]?.buildTimeHours ?? 0;
-  }
-  if (p.kind === 'upgrade' && p.building && typeof p.level === 'number') {
-    return data.buildings[p.building]?.upgrades[p.level - 2]?.buildTimeHours ?? 0;
-  }
-  if (p.building) {
-    return data.buildings[p.building]?.buildTimeHours ?? 0;
-  }
-  return 0;
+  return coreBuildDurationHours(p, data);
 }
 function timeLeft(at: number): string {
-  return fmtEta(Math.max(0, (at - s.time) / HOUR));
+  return fmtEta(hoursLeft(at, s.time, HOUR));
 }
 /** Format a travel-time-remaining in hours as `1.4ч` / `35м` (localized suffixes). */
 function progressPct(active: ActiveBuild): number {
-  const duration = buildDurationHours(active.payload) * HOUR;
-  if (duration <= 0) {
-    return 100;
-  }
-  return Math.max(0, Math.min(100, 100 - ((active.at - s.time) / duration) * 100));
+  return coreProgressPct(active, s.time, data, HOUR);
 }
 function queuedLabel(q: QueuedBuild): string {
   if (q.kind === 'unit') {
@@ -1835,28 +1779,20 @@ interface Vision {
 // here the client fog honours them: a `planet` grant identifies that node, a
 // `fleets` grant shows the target's fleets through the fog, a `treasury` grant is
 // read by the diplomacy roster. Mirrors what `visibleState` does server-side.
-/** Base fee of one attempt — mirrors the core module's BASE_COST (UI label only;
- *  the kernel is authoritative and rejects with E_INSUFFICIENT when short). */
-const SPY_COST = 150;
-/** My LIVE intel windows (expired ones are ignored even before the core prunes them). */
+// Окна краденой разведки и журнал шпионажа живут в `intel.ts` (REFM-28) — там же
+// правила «истёкшее окно не видно» и «опознание влечёт радар».
+/** Мои ЖИВЫЕ окна разведки на текущий час мира. */
 function myIntel(): IntelGrant[] {
-  return (s.intel?.[ME] ?? []).filter((g) => g.until > s.time);
+  return liveGrants(s.intel?.[ME], s.time);
 }
-/** Live grants of one kind, as a target-id set (planet ids / player ids). */
-function intelTargets(kind: IntelGrant['kind']): Set<string> {
-  const out = new Set<string>();
-  for (const g of myIntel()) if (g.kind === kind) out.add(g.target);
-  return out;
-}
-// Owners whose fleets are revealed this frame by a live `fleets` grant — rebuilt
-// alongside `vision` each frame so the render path checks a Set, not the grant list.
+// Владельцы, чьи флоты этот кадр показаны живым окном `fleets` — набор пересобирается
+// вместе с `vision`, чтобы отрисовка проверяла Set, а не список грантов.
 let intelFleetOwners = new Set<string>();
-// SPY-UX: bounded session journal of espionage outcomes (mine + counter-intel hits
-// on me) — feeds the «Шпионаж» tab in diplomacy. Stores the final localized line.
-const spyLog: { at: number; text: string }[] = [];
+// SPY-UX: сессионный журнал исходов шпионажа (моих и контрразведки по мне) — питает
+// вкладку «Шпионаж» в дипломатии. Хранит уже локализованную строку.
+const spyLog: SpyEntry[] = [];
 function pushSpyLog(text: string): void {
-  spyLog.push({ at: s.time, text });
-  while (spyLog.length > 30) spyLog.shift();
+  pushSpyEntry(spyLog, { at: s.time, text });
   if (diploOpen && diploTab === 'intel') renderDiplo();
 }
 
@@ -1890,12 +1826,9 @@ function computeVision(): Vision {
   // Stolen `planet` windows identify their node (feeds memory too, so the scan
   // is remembered after the window closes); `fleets` windows fill the owner set
   // that fleet rendering consults.
-  for (const id of intelTargets('planet'))
-    if (s.planets[id]) {
-      identify.add(id);
-      radar.add(id); // identify implies radar
-    }
-  intelFleetOwners = intelTargets('fleets');
+  const grants = myIntel();
+  grantVision({ identify, radar }, targetsOf(grants, 'planet'), (id) => !!s.planets[id]);
+  intelFleetOwners = targetsOf(grants, 'fleets');
   return { identify, radar };
 }
 
@@ -3140,97 +3073,20 @@ function handleEvents(events: DomainEvent[]) {
 // in single-player alike; the resulting `planet.captured` event is noted above.
 
 // --- red AI ------------------------------------------------------------------
-
-function runAI() {
-  if (s.time - lastAiAt < 2 * HOUR) return;
-  lastAiAt = s.time;
-  // Each empty seat's orders come from the shared `aiOrders` (same logic the net
-  // server uses to drive unfilled multiplayer seats). Apply them in sequence.
-  for (const ai of AI_PLAYERS) {
-    for (const a of aiOrders(s, ai)) apply(order(s, a, s.time));
-  }
-  // «Хранитель»: while your own seat is delegated, the local AI plays it too — on its
-  // posture (defend), so solo delegation actually holds the line, not just shows a timer.
-  const myPosture = stewardActive(s, ME, s.time);
-  if (myPosture && !AI_PLAYERS.has(ME)) {
-    for (const a of aiOrders(s, ME, myPosture)) apply(order(s, a, s.time));
-  }
-}
-
-// Enemy (AI) auto-engagement: an idle hostile fleet over a world it doesn't own,
-// with the orbit clear, descends and lands automatically — keeps the AI pressing
-// the capture loop. The player's own fleets are driven by hand (orbit/bombard/
-// assault controls in the fleet panel), so they are skipped here.
-// Память проб авто-штурма: «этот флот в этом часе мира и на этой орбите — обречён».
-// Проба стоит прогона редьюсера, а цикл гоняется каждый кадр; состояние между
-// продвижениями часа меняют только приказы, и они же ключ сбрасывают (см. apply()).
-const autoProbed = new Map<string, string>();
-const autoProbeKey = (f: Fleet): string => `${s.time}|${f.orbit ?? ''}|${f.location ?? ''}`;
-function autoProbeSkip(f: Fleet, here: Planet): boolean {
-  return autoProbed.get(f.id) === autoProbeKey(f) + '|' + (here.owner ?? '');
-}
-function autoProbeMark(f: Fleet): void {
-  const here = s.planets[f.location ?? ''];
-  autoProbed.set(f.id, autoProbeKey(f) + '|' + (here?.owner ?? ''));
-}
-
-function autoEngage() {
-  for (const f of Object.values(s.fleets)) {
-    if (f.location == null || f.movement || f.battleId) continue;
-    const mine = f.owner === ME;
-    // AI fleets always press the capture loop; the player's do so only when opted into
-    // auto-storm (CC-2) — otherwise the player drives assaults by hand.
-    if (mine && !autoAssault.has(f.id)) continue;
-    const here = s.planets[f.location];
-    if (!here || here.owner === f.owner) continue; // свой мир штурмовать нечего
-    const enemyHere = Object.values(s.fleets).some(
-      (g) => g.owner !== f.owner && g.location === f.location && g.units.some((u) => u.count > 0),
-    );
-    if (enemyHere) continue; // ПОЛИТИКА клиента: дать орбитальному бою утихнуть
-    // RULES-1. Выше — только политика (опт-ин авто-штурма, «дай бою утихнуть»);
-    // ПРАВИЛА игры (захватываемая провинция, дипломатия, наличие десанта) больше не
-    // переписываются здесь руками — их называет ядро. Прошлые рукописные копии
-    // разъезжались с редьюсером и сыпали отказами каждый кадр.
-    //
-    // Проверяется вся ПАРА «встать на низкую орбиту → штурм»: штурм нелегален с
-    // дальней орбиты, поэтому проба идёт по состоянию ПОСЛЕ орбиты (order чист —
-    // это черновик, живой мир не трогается). Иначе применилась бы половина обречённой
-    // пары: орбита проходит, штурм отбивается — ровно та болезнь, что описана в
-    // serverDrivers.ts.
-    if (autoProbeSkip(f, here)) continue;
-    const needOrbit = f.orbit !== 'near';
-    const step = needOrbit ? order(s, orbitFleet(f.owner, f.id, 'near'), s.time) : null;
-    if (step?.error) continue;
-    const probe = step ? step.state : s;
-    if (canOrder(probe, assaultFleet(f.owner, f.id)) !== null) {
-      autoProbeMark(f); // обречён в этом часе мира — не пережимать каждый кадр
-      continue;
-    }
-    // Player fleets go through playerOrder (server-authoritative in net play); AI applies locally.
-    const issue = (a: Action) => (mine ? playerOrder(a) : apply(order(s, a, s.time)));
-    if (needOrbit) issue(orbitFleet(f.owner, f.id, 'near'));
-    issue(assaultFleet(f.owner, f.id));
-  }
-}
-
-// Safety-net: detect two docked enemy fleets sharing a sector without a battle
-// and force-engage them. Catches the case where both fleets were in-transit when
-// the other arrived, so the combat module's arrival handler found no enemy.
-function checkFleetClashes() {
-  const fleets = Object.values(s.fleets);
-  for (const f of fleets) {
-    if (!f.location || f.movement || f.battleId) continue;
-    for (const g of fleets) {
-      if (g.id <= f.id) continue; // avoid processing the same pair twice
-      if (!g.location || g.movement || g.battleId) continue;
-      if (f.owner === g.owner || f.location !== g.location) continue;
-      // Two idle enemy fleets in the same sector — start a battle from the ME side
-      const myFleet = f.owner === ME ? f : g.owner === ME ? g : f;
-      const foeFleet = myFleet === f ? g : f;
-      apply(order(s, engageFleet(myFleet.owner, myFleet.id, foeFleet.id), s.time));
-    }
-  }
-}
+// Ходы ИИ, авто-штурм, столкновения флотов, дежурные вылеты и цепочки приказов живут в
+// `soloDrivers.ts` (REFM-26): в сетевом матче всё это делает сервер, в одиночном —
+// подталкивает кадр. Здесь только хуки: состояние, два пути приказов (свой идёт через
+// `playerOrder`, чужой применяется локально) и опт-ин авто-штурма.
+const solo = initSoloDrivers({
+  state: () => s,
+  me: () => ME,
+  aiSeats: () => AI_PLAYERS,
+  applyLocal: (a) => apply(order(s, a, s.time)),
+  playerOrder: (a) => void playerOrder(a),
+  autoAssault: (id) => autoAssault.has(id),
+  patrols: () => patrols,
+  known,
+});
 
 /** The CC-2 auto-storm stance of a fleet — authoritative state in NET, local Set solo. */
 function isAutoAssault(fleetId: string): boolean {
@@ -3289,7 +3145,7 @@ function setScramble(ids: string[], on: boolean): void {
     if (NET) {
       playerOrder(orderScramble(ME, id, true));
     } else {
-      if (patrols.size === 0) lastPatrolTick = s.time; // start the rearm cadence from now
+      if (patrols.size === 0) solo.startPatrolCadence(); // счёт перезарядки — с этого мига
       const spec = sortieSpec(f);
       const stashed = wingSorties.get(id);
       patrols.set(id, {
@@ -3309,132 +3165,19 @@ function setScramble(ids: string[], on: boolean): void {
   }
 }
 
-// CC-4 reactive auto-scramble driver: each frame, a squadron fleet on "дежурный вылет"
-// that's idle auto-sorties at the lowest-id identified, at-war contact inside its strike
-// radius — burning one fuel (SQ-2.1) — and rearms one round per elapsed game-hour. The
-// pure decision is scrambleOrder (tested); this just reads the world (vision + diplomacy)
-// CC-1 chain driver (solo): the same pure core the netserver runs — stamp the chain
-// forward (consume-on-issue), then issue the head step's orders. In net play the
-// server drives chains; this runs only inside the solo sim block of the frame loop.
-function driveChains(): void {
-  for (const c of serverChainActions(s, s.time)) {
-    const issue = (a: Action) => (c.owner === ME ? playerOrder(a) : apply(order(s, a, s.time)));
-    if (c.patch) issue(chainStamp(c.owner, c.fleetId, c.patch.steps, c.patch.waitUntil));
-    for (const a of c.actions) issue(a);
-  }
-}
-
-// and issues the order. Same host-side shape as autoEngage/driveQueues; single-player only
-// (net play → the server owns fleets — promoting this server-side is the CC-server brick).
-function drivePatrols(): void {
-  if (patrols.size === 0) return;
-  const rounds = Math.max(0, Math.floor((s.time - lastPatrolTick) / HOUR));
-  if (rounds > 0) lastPatrolTick += rounds * HOUR;
-  for (const [fid, p] of [...patrols]) {
-    const f = s.fleets[fid];
-    if (!f || f.owner !== ME || !fleetHasSquadron(f)) {
-      patrols.delete(fid);
-      continue;
-    }
-    const spec = sortieSpec(f);
-    for (let i = 0; i < rounds && p.sortie.rearming > 0; i++)
-      p.sortie = tickRearm(p.sortie, spec.maxFuel);
-    if (!fleetIdle(f)) continue; // busy (transit / battle) — let it resolve first
-    // Hostile, identified contacts parked on a node — the wing's legal targets.
-    const targets: Array<{ id: string; location: string; pos: { x: number; y: number } }> = [];
-    for (const g of Object.values(s.fleets)) {
-      if (g.owner === ME || !g.location || g.movement || !g.units.some((u) => u.count > 0))
-        continue;
-      if (g.battleId) continue; // in a battle — engage would reject, yet the sortie fuel is spent (BF-30)
-      if (getStance(s, ME, g.owner) !== 'war') continue; // only declared enemies — never auto-war
-      if (!known(g.location)) continue; // identified only — "опознанная цель в зоне видимости"
-      const pos = s.planets[g.location]?.position;
-      if (pos) targets.push({ id: g.id, location: g.location, pos });
-    }
-    const { action, sortie } = scrambleOrder(ME, f, p, targets, spec.rearmRounds);
-    p.sortie = sortie;
-    if (action) playerOrder(action);
-  }
-}
-
-/** How the match ended, in plain words (perspective comes from the prefix). */
-function endReasonText(reason: string | undefined): string {
-  switch (reason) {
-    case 'domination':
-      return t('ai.end.domination');
-    case 'elimination':
-      return t('ai.end.elimination');
-    case 'score':
-      return t('ai.end.score');
-    case 'timeout':
-      return t('ai.end.timeout');
-    default:
-      return t('ai.end.over');
-  }
-}
-
-/** Terminal banner read from the AUTHORITATIVE `match` state (the victory module
- *  in the kernel — local sim and the net server both run it), not a hand-rolled
- *  guess. Fires once; a draw (no winner on timeout) is its own line. */
-function checkEnd() {
-  // `xpAwarded` marks this match's end as already handled — it survives navigating
-  // away (hub/setup) while the match stays 'ended', so the overlay isn't re-created
-  // over the menu; only a fresh match / reconnect resets it.
-  if (endScreen || xpAwarded) return;
-  if (s.match?.status !== 'ended') return;
-  const why = endReasonText(s.match.reason);
-  // A coalition wins together (SES-1): every member of match.winners is a victor,
-  // not only the top scorer in match.winner.
-  const iWon = s.match.winner === ME || (s.match.winners?.includes(ME) ?? false);
-  const draw = !iWon && s.match.winner === null;
-  // Meta-progression: one XP award per finished match (прокачка командующего).
-  // `xpAwarded` alone is a per-INSTALL latch — a reconnect to an already-ended
-  // match resets it (net welcome handler), so refreshing the page would farm the
-  // award repeatedly. A durable per-match marker (keyed by the match's endedAt,
-  // unique per finished match for this nick) makes the award idempotent; the
-  // recorded amount replays on the end screen instead of a misleading «+0».
-  let gained = 0;
-  let levelUp: number | null = null;
-  const awardKey = 'vd.xpawarded.' + (nickInput.value.trim() || 'guest');
-  const endStamp = String(s.match.endedAt ?? 'ended');
-  let prior: { at: string; xp: number } | null;
-  try {
-    prior = JSON.parse(localStorage.getItem(awardKey) ?? 'null') as { at: string; xp: number } | null;
-  } catch {
-    prior = null; // a corrupt marker never blocks the flow — fail open to a fresh award
-  }
-  if (!xpAwarded) {
-    xpAwarded = true;
-    if (prior?.at === endStamp) {
-      gained = prior.xp; // this match already paid out — just replay the receipt
-    } else {
-      const st = loadMeta();
-      const score = s.match.scores?.[ME]?.total ?? 0;
-      gained = matchXp({ won: iWon, score });
-      const before = metaLevel(st.xp);
-      // Career counters ride the SAME once-per-match marker as the XP (below): they
-      // must not be farmable by reloading a finished match. The place comes from the
-      // kernel's own reward table (victoryModule computes standard competition
-      // ranking) — the client never re-ranks the scoreboard itself. It is absent on
-      // the dev endMatch hook, and `recordMatch` counts such a match without letting
-      // it skew the average.
-      const after = recordMatch(
-        { ...st, xp: st.xp + gained },
-        {
-          won: iWon,
-          score,
-          place: s.match.rewards?.[ME]?.place,
-        },
-      );
-      saveMeta(after);
-      localStorage.setItem(awardKey, JSON.stringify({ at: endStamp, xp: gained }));
-      if (metaLevel(after.xp) > before) levelUp = metaLevel(after.xp);
-    }
-  }
-  // The full end screen (renderEndScreen) reads this — outcome, reason, XP. The old
-  // thin victory `banner` is retired; `banner` now carries only NET-status lines.
-  endScreen = { won: iWon, draw, why, xp: gained, levelUp, dismissed: false };
-}
+// Итог матча и награда за него живут в `matchEnd.ts` (REFM-27): исход берётся из
+// авторитетного `match` (его считает модуль победы в ядре), а награда выдаётся РОВНО
+// один раз за матч — долговечная метка не даёт фармить опыт перезаходом.
+const matchEnd = initMatchEnd({
+  state: () => s,
+  me: () => ME,
+  nick: () => nickInput.value,
+  endShown: () => endScreen !== null,
+  readMarker: (k) => localStorage.getItem(k),
+  writeMarker: (k, v) => localStorage.setItem(k, v),
+  loadMeta,
+  saveMeta,
+});
 
 // --- rendering ---------------------------------------------------------------
 
@@ -6157,9 +5900,7 @@ const STANCE_RU: Record<DiplomaticStance, string> = {
 function stanceRu(st: DiplomaticStance): string {
   return t(STANCE_RU[st]);
 }
-// Friendliness rank: war (hostile) < peace < pact < alliance (closest). Warming the
-// relation up a rank needs the other side's consent; cooling it down is unilateral.
-const STANCES: DiplomaticStance[] = ['war', 'peace', 'pact', 'alliance'];
+
 
 function worldsOf(id: string): number {
   let n = 0;
@@ -6203,56 +5944,27 @@ let unreadMsgs = 0;
  *  Returns true when something shifted — the CALLER re-renders the roster after
  *  it assigns the new state (rendering here would paint from the old `s`). */
 function diffNetDiplomacy(prev: GameState, next: GameState): boolean {
-  let shifted = false;
-  const keys = new Set([
-    ...Object.keys(prev.diplomacy ?? {}),
-    ...Object.keys(next.diplomacy ?? {}),
-  ]);
-  for (const key of keys) {
-    if (!pairHas(key, ME)) continue;
-    const before = prev.diplomacy?.[key] ?? 'war';
-    const after = next.diplomacy?.[key] ?? 'war';
-    if (before === after) continue;
-    const [a, b] = key.split('|');
-    const other = a === ME ? b! : a!;
-    const who = NAME[other] ?? other;
-    if (after === 'war') note(t('comms.war-declared', { who }));
-    else note(t('comms.stance-changed', { who, stance: stanceRu(after) }));
-    pushMsg(other, t('comms.stance-changed.short', { stance: stanceRu(after) }), true, other);
-    unreadMsgs++;
-    shifted = true;
-  }
-  const offKeys = new Set([
-    ...Object.keys(prev.diplomacyOffers ?? {}),
-    ...Object.keys(next.diplomacyOffers ?? {}),
-  ]);
-  for (const key of offKeys) {
-    const before = prev.diplomacyOffers?.[key];
-    const after = next.diplomacyOffers?.[key];
-    if (before === after || !after) continue; // withdrawals ride the stance toast above
-    const [from, to] = key.split('>');
-    if (to === ME) {
-      const who = NAME[from!] ?? from!;
+  const events = diffDiplomacy(prev, next, ME);
+  for (const ev of events) {
+    const who = NAME[ev.other] ?? ev.other;
+    const stance = stanceRu(ev.stance);
+    if (ev.kind === 'stance') {
       note(
-        t('log.diplo.offer', {
-          who,
-          stance: stanceRu(after),
-        }),
+        ev.stance === 'war'
+          ? t('comms.war-declared', { who })
+          : t('comms.stance-changed', { who, stance }),
       );
-      pushMsg(from!, t('log.diplo.offer.short', { stance: stanceRu(after) }), true, from!);
+      pushMsg(ev.other, t('comms.stance-changed.short', { stance }), true, ev.other);
       unreadMsgs++;
-      shifted = true;
-    } else if (from === ME) {
-      note(
-        t('log.diplo.sent', {
-          who: NAME[to!] ?? to!,
-          stance: stanceRu(after),
-        }),
-      );
-      shifted = true;
+    } else if (ev.kind === 'offer-in') {
+      note(t('log.diplo.offer', { who, stance }));
+      pushMsg(ev.other, t('log.diplo.offer.short', { stance }), true, ev.other);
+      unreadMsgs++;
+    } else {
+      note(t('log.diplo.sent', { who, stance })); // своё исходящее — только уведомление
     }
   }
-  return shifted;
+  return events.length > 0;
 }
 
 function pushMsg(to: string, text: string, sys: boolean, from = ME, ping?: string): void {
@@ -6369,7 +6081,7 @@ function favourBarHtml(bot: string): string {
 function intelRowHtml(target: string): string {
   const bits: string[] = [];
   for (const g of myIntel()) {
-    const left = fmtEta(Math.max(0, g.until - s.time) / HOUR);
+    const left = fmtEta(grantLeftMs(g, s.time) / HOUR);
     if (g.kind === 'treasury' && g.target === target) {
       const r = s.players[target]?.resources ?? {};
       const bag = Object.entries(r)
@@ -8711,6 +8423,7 @@ function hubTab(tab: string): void {
   currentHubTab = tab;
   if (tab === 'meta') renderMetaPanel(); // live numbers every visit (XP may have grown)
   if (tab === 'friends') void friends.refresh(); // roster + presence are server truth
+  if (tab === 'rank') void rank.refresh(); // places are computed server-side (RANK-1)
   if (tab === 'arsenal') void arsenal.refresh(); // cache paints now, server refresh trails
   for (const [k, pid] of Object.entries(HUB_PANELS))
     $(pid).style.display = k === tab ? 'flex' : 'none';
@@ -8769,6 +8482,23 @@ $('hp-meta').addEventListener('click', (ev) => {
 // аккаунтов или нет сохранённой сессии читаются одинаково (гостевое состояние).
 const friends = initFriends({
   root: () => $('hp-friends'),
+  authorizedBase: async () => {
+    const srv = resolveServer();
+    if (!srv) return null;
+    await probeAuthMode(srv.base);
+    if (!authMode) return null;
+    const token = sessionToken(srv.base);
+    return token ? { base: httpBase(srv.base), token } : null;
+  },
+});
+
+// --- «Рейтинги» — commander + corporation boards (hub tab, RANK-1) ----------
+// Доски считает сервер (`leaderboardApi.ts`): своё место — по ВСЕЙ популяции, а не по
+// присланной странице, поэтому клиент его вывести и не смог бы. Доступ — та же
+// политика, что у «Друзей»: переиспользуем добытую входом сессию, пароль ради
+// просмотра не спрашиваем; нет сессии — гостевое состояние с причиной.
+const rank = initRank({
+  root: () => $('hp-rank'),
   authorizedBase: async () => {
     const srv = resolveServer();
     if (!srv) return null;
@@ -9610,7 +9340,6 @@ function loadMeta(): MetaState {
 function saveMeta(st: MetaState): void {
   localStorage.setItem(metaKey(), JSON.stringify(st));
 }
-let xpAwarded = false; // one award per installed match
 
 function buildSetupConfig(): SetupConfig {
   // Seats play the HOUSES assigned at setup (H3): you = setupFaction, AI = the rest.
@@ -9691,7 +9420,7 @@ function installMatch(state: GameState, aiPlayers: Set<string>): void {
   syncPlayerNames(s);
   ME = 'p1';
   AI_PLAYERS = aiPlayers;
-  lastAiAt = s.time;
+  solo.reset();
   // ONB-2 (found live): a leftover guide from whatever was on screen before (a
   // tutorial the player exited without finishing/skipping, a stale reconnect) must
   // never survive into this match — #spotlight is a document.body singleton, so an
@@ -9726,7 +9455,7 @@ function installMatch(state: GameState, aiPlayers: Set<string>): void {
   awayFromGameTime = null; // reset the away-window baseline for the new match
   banner = null; // clear any end-banner left by the menu-background match (else it sticks)
   endScreen = null; // a fresh match must not open into the previous result
-  xpAwarded = false; // a fresh match earns its own meta-XP award
+  matchEnd.reset(); // новый матч зарабатывает свою награду
   // The match goal, written AFTER the wipe so it is the first line a player can read.
   // Kept honest against the kernel: victoryModule ends on score (SCORE_LIMIT), on
   // elimination, or on domination — no "capital capture" victory exists.
@@ -9887,7 +9616,7 @@ function connect(): void {
           ME = snap.playerId ?? ME;
           clearSelection();
           endScreen = null; // joining a match must not carry the previous result
-          xpAwarded = false;
+          matchEnd.reset(); // переподключение к матчу считает его конец заново
           pendingLoads = []; // drop any queued loads from a prior/local session
           if (chainMode) exitChainMode(); // черновик прежней сессии не переносится
           chainRouteCache.clear();
@@ -11143,12 +10872,12 @@ function frame(nowReal: number) {
     // A finished match (endScreen set) freezes the world — no advancing a decided game.
     const target = s.time + (dt / 1000) * speed * HOUR;
     apply(advance(s, target));
-    autoEngage();
+    solo.autoEngage();
     pumpAssaultOrders();
-    checkFleetClashes();
-    drivePatrols(); // CC-4: squadrons on дежурный вылет auto-strike contacts in range
-    driveChains(); // CC-1: advance fleet order chains (wait → move → assault/barrage)
-    runAI();
+    solo.checkFleetClashes();
+    solo.drivePatrols(); // CC-4: дежурные вылеты бьют контакты в радиусе
+    solo.driveChains(); // CC-1: продвинуть цепочки приказов (ждать → курс → штурм/обстрел)
+    solo.runAI();
     pumpBuildQueues();
     closeIdleRallies(); // drop the 'rally' tag once a world's build pipeline empties
   }
@@ -11163,7 +10892,9 @@ function frame(nowReal: number) {
   if (dt > 0 && dt < 1000 && (NET || (speed > 0 && !banner))) orbitPhase += dt;
   pumpPendingLoads(); // fire ~1h cargo loads whose hour has elapsed (both modes)
   resolvePendingMerges(); // complete fleet merges whose movers have arrived
-  checkEnd(); // terminal banner from `match` — runs in BOTH modes (net snapshots carry it)
+  // Итог матча приходит в ОБОИХ режимах (сетевые снимки несут его в `match`).
+  const ended = matchEnd.check();
+  if (ended) endScreen = ended;
   // SANDBOX — fenced hook. Hold the "immortal home" + "frozen queues" toggles every
   // solo frame (paused or not); the whole feature no-ops outside a sandboxed solo match.
   // Leading `!__PLAYER_BUILD__` lets esbuild tree-shake the sandbox out of the player bundle.

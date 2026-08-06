@@ -290,6 +290,9 @@ export async function migrate(pool: Pool): Promise<void> {
       account_id  text PRIMARY KEY,
       xp          bigint NOT NULL DEFAULT 0
     );
+    -- RANK-1 leaderboard order (xp desc, account_id asc): the second key is what makes
+    -- equal-XP rows keep one order between refreshes, so the index carries it too.
+    CREATE INDEX IF NOT EXISTS commander_xp_board_idx ON commander_xp (xp DESC, account_id ASC);
     CREATE TABLE IF NOT EXISTS commander_credits (
       match_id     text PRIMARY KEY,
       credited_at  timestamptz NOT NULL DEFAULT now()
@@ -537,6 +540,35 @@ export class PostgresCommanderStore implements CommanderStore {
     );
     return Number(r.rows[0]?.xp ?? 0);
   }
+
+  async topXp(limit: number): Promise<Array<{ accountId: string; xp: number }>> {
+    // account_id is the second ORDER BY key so equal XP keeps one stable order —
+    // rows that shuffle between refreshes read as a broken board.
+    const r = await this.pool.query<{ account_id: string; xp: string }>(
+      `SELECT account_id, xp FROM commander_xp ORDER BY xp DESC, account_id ASC LIMIT $1`,
+      [Math.max(0, limit)],
+    );
+    return r.rows.map((row) => ({ accountId: row.account_id, xp: Number(row.xp) }));
+  }
+
+  async standingOf(accountId: string): Promise<{ rank: number | null; xp: number; total: number }> {
+    // Ties SHARE a rank: «сколько аккаунтов строго выше меня» + 1. Counting rows
+    // before mine instead would make the number depend on the tiebreaker.
+    const r = await this.pool.query<{ xp: string | null; above: string; total: string }>(
+      `SELECT (SELECT xp FROM commander_xp WHERE account_id = $1)              AS xp,
+              (SELECT count(*) FROM commander_xp
+                WHERE xp > (SELECT xp FROM commander_xp WHERE account_id = $1)) AS above,
+              (SELECT count(*) FROM commander_xp)                              AS total`,
+      [accountId],
+    );
+    const row = r.rows[0];
+    const xp = row?.xp === null || row?.xp === undefined ? null : Number(row.xp);
+    return {
+      rank: xp === null ? null : Number(row?.above ?? 0) + 1,
+      xp: xp ?? 0,
+      total: Number(row?.total ?? 0),
+    };
+  }
 }
 
 export class PostgresUserStore implements UserStore {
@@ -591,6 +623,17 @@ export class PostgresUserStore implements UserStore {
       [userId],
     );
     return rowToUser(r.rows[0]);
+  }
+
+  async loginsOf(userIds: readonly string[]): Promise<Record<string, string>> {
+    if (userIds.length === 0) return {};
+    const r = await this.pool.query<{ id: string; login: string }>(
+      `SELECT id, login FROM users WHERE id = ANY($1::text[])`,
+      [[...userIds]],
+    );
+    const out: Record<string, string> = {};
+    for (const row of r.rows) out[row.id] = row.login;
+    return out;
   }
 
   async setPassword(userId: string, passHash: string): Promise<void> {

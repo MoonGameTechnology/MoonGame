@@ -168,6 +168,26 @@ export class MemoryCommanderStore implements CommanderStore {
   xpOf(accountId: string): Promise<number> {
     return Promise.resolve(this.xp.get(accountId) ?? 0);
   }
+
+  topXp(limit: number): Promise<Array<{ accountId: string; xp: number }>> {
+    return Promise.resolve(this.ranked().slice(0, Math.max(0, limit)));
+  }
+
+  standingOf(accountId: string): Promise<{ rank: number | null; xp: number; total: number }> {
+    const all = this.ranked();
+    const xp = this.xp.get(accountId);
+    // Ties SHARE a rank — the index in the sorted array would give «я такой-то по
+    // счёту», which for equal XP depends on the tiebreaker and reads as unfair.
+    const rank = xp === undefined ? null : all.filter((r) => r.xp > xp).length + 1;
+    return Promise.resolve({ rank, xp: xp ?? 0, total: all.length });
+  }
+
+  /** XP desc, then accountId asc — a stable order, so equal rows don't shuffle. */
+  private ranked(): Array<{ accountId: string; xp: number }> {
+    return [...this.xp]
+      .map(([accountId, xp]) => ({ accountId, xp }))
+      .sort((a, b) => b.xp - a.xp || (a.accountId < b.accountId ? -1 : 1));
+  }
 }
 
 /** In-memory user store — accounts keyed by lower-cased login (case-insensitive). */
@@ -203,6 +223,13 @@ export class MemoryUserStore implements UserStore {
       if (rec.userId === userId) return Promise.resolve(rec);
     }
     return Promise.resolve(null);
+  }
+
+  loginsOf(userIds: readonly string[]): Promise<Record<string, string>> {
+    const want = new Set(userIds);
+    const out: Record<string, string> = {};
+    for (const rec of this.byLogin.values()) if (want.has(rec.userId)) out[rec.userId] = rec.login;
+    return Promise.resolve(out);
   }
 
   setPassword(userId: string, passHash: string): Promise<void> {

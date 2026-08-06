@@ -212,6 +212,57 @@ function commanderStoreContract(
       expect(await store.creditMatch(uniq('mz'), [{ accountId: a, xp: 0 }])).toBe(true);
       expect(await store.xpOf(a)).toBe(0);
     });
+
+    // RANK-1. Постгресный прогон идёт по ОБЩЕЙ таблице (чужие аккаунты из соседних
+    // тестов там же), поэтому утверждения относительные: порядок и соотношения мест,
+    // а не абсолютные номера.
+    it('topXp returns the board in descending order, capped by the limit', async () => {
+      const store = make();
+      const [hi, mid, lo] = [uniq('bd-hi'), uniq('bd-mid'), uniq('bd-lo')];
+      await store.creditMatch(uniq('bm'), [
+        { accountId: lo, xp: 1_000_001 },
+        { accountId: hi, xp: 1_000_003 },
+        { accountId: mid, xp: 1_000_002 },
+      ]);
+      const top = await store.topXp(50);
+      // Страница отсортирована по убыванию — это и есть контракт.
+      for (let i = 1; i < top.length; i += 1)
+        expect(top[i - 1]!.xp).toBeGreaterThanOrEqual(top[i]!.xp);
+      // …а мои три идут в правильном относительном порядке (таблица общая: у
+      // постгресного прогона в ней живут аккаунты соседних тестов).
+      const at = (id: string): number => top.findIndex((r) => r.accountId === id);
+      expect(at(hi)).toBeGreaterThanOrEqual(0);
+      expect(at(hi)).toBeLessThan(at(mid));
+      expect(at(mid)).toBeLessThan(at(lo));
+      expect(await store.topXp(1)).toHaveLength(1);
+      expect(await store.topXp(0)).toEqual([]);
+    });
+
+    it('standingOf shares a rank between ties and puts a bigger score strictly above', async () => {
+      const store = make();
+      const [big, t1, t2] = [uniq('st-big'), uniq('st-a'), uniq('st-b')];
+      await store.creditMatch(uniq('sm'), [
+        { accountId: big, xp: 2_000_002 },
+        { accountId: t1, xp: 2_000_001 },
+        { accountId: t2, xp: 2_000_001 },
+      ]);
+      const [a, b, top] = [
+        await store.standingOf(t1),
+        await store.standingOf(t2),
+        await store.standingOf(big),
+      ];
+      expect(a.rank).toBe(b.rank); // равные очки — ОДНО место
+      expect(a.xp).toBe(2_000_001);
+      expect(top.rank!).toBeLessThan(a.rank!); // строго выше по очкам — строго выше местом
+      expect(a.total).toBeGreaterThanOrEqual(3);
+    });
+
+    it('standingOf: an account that never finished a match has NO place, not the last one', async () => {
+      const store = make();
+      const stranger = await store.standingOf(uniq('st-none'));
+      expect(stranger.rank).toBeNull();
+      expect(stranger.xp).toBe(0);
+    });
   });
 }
 
@@ -265,6 +316,19 @@ function userStoreContract(name: string, make: () => UserStore, uniq: (p: string
         code: 'E_LOGIN_TAKEN',
       });
       expect((await store.findUser(login))?.passHash).toBe('hash-1'); // untouched
+    });
+
+    it('loginsOf resolves a batch and simply omits ids with no account (RANK-1)', async () => {
+      const store = make();
+      const [one, two] = [uniq('Cid'), uniq('Dot')];
+      const a = await store.createUser(one, 'h');
+      const b = await store.createUser(two, 'h');
+      if (!a.ok || !b.ok) throw new Error('expected ok');
+      const got = await store.loginsOf([a.userId, b.userId, uniq('нет-такого-id')]);
+      expect(got[a.userId]).toBe(one);
+      expect(got[b.userId]).toBe(two);
+      expect(Object.keys(got)).toHaveLength(2); // осиротевший id просто отсутствует
+      expect(await store.loginsOf([])).toEqual({});
     });
   });
 }

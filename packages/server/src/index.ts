@@ -82,6 +82,15 @@ export {
   type FriendRow,
   type MatchPresenceSource,
 } from './friendApi';
+// RANK-1 — leaderboard API, exported for the same reason as the friends slice.
+export {
+  registerLeaderboardApi,
+  rankCorps,
+  BOARD_PAGE,
+  type BoardRow,
+  type BoardView,
+  type LeaderboardApiDeps,
+} from './leaderboardApi';
 export {
   FriendService,
   FRIEND_LIMIT,
