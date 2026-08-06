@@ -1,8 +1,11 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale } from '../../localization/runtime';
 import { newGame } from './game';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
+import { t } from '../../localization/runtime';
 import {
+  HERO_TABS,
   ownHeroes,
   normalizeHeroView,
   initHeroStaff,
@@ -163,6 +166,25 @@ describe('штаб героев — разметка панели', () => {
     const fittings = staff.paneHtml();
     expect(fittings).not.toBe(tree);
     expect(fittings).toContain('hx-tab on');
+  });
+
+  it('у каждой вкладки штаба своя иконка и локализованная подпись', () => {
+    for (const tab of HERO_TABS) {
+      expect(tab.label, tab.key).toMatch(/^hero\.hq\.tab\./);
+      expect(t(tab.label), tab.key).not.toContain('hero.hq.tab');
+      expect(tab.icon, tab.key).not.toBe('');
+    }
+    expect(new Set(HERO_TABS.map((x) => x.icon)).size).toBe(HERO_TABS.length);
+    expect(initHeroStaff(hostOf()).paneHtml()).toContain('<i>\u22d4</i>'); // «Дерево»
+  });
+
+  it('вкладки идут СЕТКОЙ 2\u00d72, а не четырьмя ячейками в строку', () => {
+    // Сторож над CSS: на четверти ширины телефона «Способности» не помещались.
+    const rule = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8').match(
+      /#herobody \.hx-tabs\{([^}]*)\}/,
+    );
+    expect(rule).not.toBeNull();
+    expect(rule![1]).toContain('grid-template-columns:repeat(2,1fr)');
   });
 });
 
