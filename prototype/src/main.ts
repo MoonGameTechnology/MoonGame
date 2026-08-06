@@ -175,6 +175,7 @@ import { isGroundUnit, isWingUnit, planetSummary } from './planetSummary';
 import { fleetWhere, groupTotals, pickPanel } from './panelSelect';
 import { buildRoster, garrisonByTab, tabCounts } from './planetTabs';
 import { catalogTileHtml, tileLock, type TileLock } from './catalogTile';
+import { createScanMemory, type Snapshot } from './scanMemory';
 import {
   actionButton,
   cardHeader as kitCardHeader,
@@ -1862,22 +1863,12 @@ function fleetSeen(f: Fleet): boolean {
 
 // Per-viewer MEMORY of the last identified state of a node (variant B): once you
 // have seen a system, you remember its last-known state (greyed) when sight lifts.
-interface Snapshot {
-  owner: string | null;
-  garrison: number;
-  buildings: { type: string; level: number }[];
-}
-const memory = new Map<string, Snapshot>();
+// Само хранилище и правила снимка — в `scanMemory.ts` (REFM-43): пишутся только
+// ОПОЗНАННЫЕ узлы (радар состава не выдаёт), снимок — копия, а не ссылка на живой
+// мир, и память принадлежит матчу.
+const memory = createScanMemory();
 function updateMemory(identify: Set<string>): void {
-  for (const id of identify) {
-    const p = s.planets[id];
-    if (p)
-      memory.set(id, {
-        owner: p.owner,
-        garrison: sumUnits(p.garrison),
-        buildings: p.buildings.map((b) => ({ type: b.type, level: b.level })),
-      });
-  }
+  memory.remember(identify, s.planets);
 }
 
 /** True if node `id` is identified (full detail); fog off ⇒ always true. */
@@ -3739,7 +3730,7 @@ let bgCam = { x: 0, y: 0, scale: 1 }; // camera the static layer was last baked 
  *  the map must not repaint a hidden capture (an intel leak the fog exists to stop). */
 function knownOwner(id: string): string | null {
   if (known(id)) return s.planets[id]?.owner ?? null;
-  return memory.get(id)?.owner ?? null;
+  return memory.ownerOf(id);
 }
 function ownersSig(): string {
   let out = '';
