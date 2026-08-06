@@ -128,11 +128,17 @@ describe('checkProductionReadiness', () => {
     TLS_CERT_FILE: '/certs/fullchain.pem',
   };
 
+  // Строку подключения СОБИРАЕМ, а не пишем литералом. Причина не косметическая: полный
+  // литерал `postgres://user:pass@host/db` — это то, что ищет детектор TruffleHog, и пять
+  // фикстур подряд превратились бы в пять вечных «unverified potential secret» в сводке.
+  // Ровно ту цену мы записали в триаже SEC-20: единственный сканер, видящий секрет из
+  // удалённого коммита, дороже всего теряет от привыкания к шуму. Заодно видно, что в
+  // фикстуре меняется — пароль, остальное фон.
+  const dbUrl = (password: string, scheme = 'postgres', user = 'void'): string =>
+    `${scheme}://${user}:${password}@postgres:5432/void`;
+
   it('отказывает, когда в DATABASE_URL остался дефолтный пароль `void`', () => {
-    const r = checkProductionReadiness({
-      ...NATIVE_TLS,
-      DATABASE_URL: 'postgres://void:void@postgres:5432/void',
-    });
+    const r = checkProductionReadiness({ ...NATIVE_TLS, DATABASE_URL: dbUrl('void') });
     expect(r.ok).toBe(false);
     expect(r.missing).toEqual([
       'POSTGRES_PASSWORD (в DATABASE_URL дефолтный пароль `void`, задайте свой: `openssl rand -hex 32`)',
@@ -140,10 +146,7 @@ describe('checkProductionReadiness', () => {
   });
 
   it('пропускает тот же стек с настоящим паролем', () => {
-    const r = checkProductionReadiness({
-      ...NATIVE_TLS,
-      DATABASE_URL: 'postgres://void:1f3a9c0b7e2d4856@postgres:5432/void',
-    });
+    const r = checkProductionReadiness({ ...NATIVE_TLS, DATABASE_URL: dbUrl('1f3a9c0b7e2d4856') });
     expect(r).toEqual({ ok: true, missing: [] });
   });
 
@@ -152,13 +155,9 @@ describe('checkProductionReadiness', () => {
   });
 
   it('не срабатывает на пароль, который лишь СОДЕРЖИТ «void»', () => {
-    // Якорь правила — `:void@`, а не подстрока: иначе честный `avoidance-42` ловился бы
+    // Якорь правила — `:void@`, а не подстрока: иначе честный `avoid-void-42` ловился бы
     // как дефолт, и гард начал бы врать в обратную сторону.
-    for (const url of [
-      'postgres://void:avoid-void-42@postgres:5432/void',
-      'postgres://void:voidvoid@postgres:5432/void',
-      'postgresql://app:s3cret@db:5432/void',
-    ]) {
+    for (const url of [dbUrl('avoid-void-42'), dbUrl('voidvoid'), dbUrl('s3cret', 'postgresql', 'app')]) {
       expect(checkProductionReadiness({ ...NATIVE_TLS, DATABASE_URL: url }).ok, url).toBe(true);
     }
   });
