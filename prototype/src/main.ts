@@ -170,6 +170,15 @@ import { initPingUi } from './pingUi';
 import { initSoloDrivers } from './soloDrivers';
 import { initMatchEnd } from './matchEnd';
 import {
+  contactAlpha,
+  contactLost,
+  episodeKey,
+  forgetEnded,
+  freshEpisodes,
+  hourBucket,
+  paintedThisFrame,
+} from './alerts';
+import {
   SPY_COST,
   grantLeftMs,
   grantVision,
@@ -1056,7 +1065,7 @@ function drawScanSweep(now: number) {
 const threatMemory = new Set<string>();
 let threatScanAt = -1;
 function updateThreatAlerts(): void {
-  const bucket = Math.floor(s.time / HOUR);
+  const bucket = hourBucket(s.time, HOUR);
   if (bucket === threatScanAt) return;
   threatScanAt = bucket;
   if (s.players[ME]?.status !== 'active') return;
@@ -1066,10 +1075,9 @@ function updateThreatAlerts(): void {
   for (const p of Object.values(s.planets)) {
     if (p.owner !== ME) continue;
     for (const th of scanNodeThreats(s, p.id, ME, c, identified)) {
-      const key = `${p.id}|${th.fleetId}`;
+      const key = episodeKey(p.id, th.fleetId);
       live.add(key);
-      if (threatMemory.has(key)) continue;
-      threatMemory.add(key);
+      if (freshEpisodes(threatMemory, [key]).length === 0) continue; // эпизод уже объявлен
       note(
         th.kind === 'inbound' && th.eta > s.time
           ? t('threat.incoming', {
@@ -1081,17 +1089,7 @@ function updateThreatAlerts(): void {
       );
     }
   }
-  // Episodes that ended are forgotten — a NEW approach to the node re-alerts.
-  for (const k of threatMemory) if (!live.has(k)) threatMemory.delete(k);
-}
-
-/** Did the sweep arm cross screen-angle `target` between last frame and this one? */
-function sweptThisFrame(target: number): boolean {
-  if (sweepPrevAng < 0) return false;
-  const d = (sweepAng - sweepPrevAng + TAU) % TAU; // arc the arm swept this frame
-  if (d <= 0) return false;
-  const t = ((((target % TAU) + TAU) % TAU) - sweepPrevAng + TAU) % TAU;
-  return t > 0 && t <= d;
+  forgetEnded(threatMemory, live); // эпизод кончился → новый подход снова прозвенит
 }
 
 /** Refresh radar contacts the arm crossed this frame: snapshot each radar-only enemy
@@ -1122,12 +1120,8 @@ function updateRadarContacts(now: number): void {
       if (!node) continue;
       const pos = world(node.position);
       // painted only by an arm whose radar disc actually covers the blip
-      const painted = sweepArms.some((a) => {
-        const dx = pos.x - a.x;
-        const dy = pos.y - a.y;
-        return dx * dx + dy * dy <= a.r * a.r && sweptThisFrame(Math.atan2(dy, dx));
-      });
-      if (painted) {
+      // Красит только рука, чей радарный диск реально накрывает отметку (`alerts.ts`).
+      if (paintedThisFrame(sweepArms, pos, sweepPrevAng, sweepAng)) {
         hit = true;
         if (!radarMemory.has(c.key))
           note(t('threat.contact', { size: c.size, at: c.node }), c.node);
@@ -1149,11 +1143,9 @@ function updateRadarContacts(now: number): void {
  *  to a dim last-known ghost held until the next pass repaints it; dropped once a full
  *  rotation passes with no repaint (the contact has moved on / is gone). */
 function drawRadarContacts(now: number): void {
-  const FLOOR = 0.32; // dim ghost level the imprint holds between passes
-  const FLASH = 1400; // ms of bright flash right after the arm paints it
   for (const [id, m] of radarMemory) {
     const age = now - m.at;
-    if (age > SWEEP_PERIOD * 1.25) {
+    if (contactLost(age, SWEEP_PERIOD)) {
       radarMemory.delete(id); // a whole turn with no repaint → contact lost
       continue;
     }
@@ -1164,8 +1156,7 @@ function drawRadarContacts(now: number): void {
     }
     const pos = world(node.position);
     if (!visible(pos, 120)) continue;
-    const bright = FLOOR + (1 - FLOOR) * Math.max(0, 1 - age / FLASH);
-    drawSignatureAt(pos, m.size, bright, now);
+    drawSignatureAt(pos, m.size, contactAlpha(age), now);
   }
 }
 
