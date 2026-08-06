@@ -54,6 +54,38 @@ export interface TileView {
   lock?: TileLock;
 }
 
+/** Построенное здание: что показать на его плитке в панели мира. */
+export interface BuiltTileView {
+  type: string;
+  /** Текущий уровень; показывается ВСЕГДА — см. `builtTileHtml`. */
+  level: number;
+  /** Готовая разметка иконки — вставляется как есть. */
+  icon: string;
+  /** Локализованное имя здания — только текстом. */
+  name: string;
+}
+
+/**
+ * Плитка ПОСТРОЕННОГО здания: иконка, имя и уровень.
+ *
+ * Два решения подачи, каждое из которых чинит увиденное на телефоне:
+ * — **имя подписано.** Одна иконка 18-м кеглем не отвечает на вопрос «что это»:
+ *   ряд из четырёх глифов читался как набор значков, и понять, где радар, а где
+ *   космопорт, можно было только тапнув каждый.
+ * — **уровень показан ВСЕГДА.** Раньше здания без апгрейдов помечались галочкой, а
+ *   улучшаемые — «L1», и один ряд говорил на двух языках: галочка читалась как
+ *   «готово», а соседнее «L1» — как уровень, хотя оба построены одинаково.
+ */
+export function builtTileHtml(v: BuiltTileView): string {
+  const desc = `b:${esc(v.type)}:${v.level}`;
+  return (
+    `<button class="ptile built" data-codex="${desc}" data-desc="${desc}" data-name="${esc(v.name)}">` +
+    `<span class="pt-ic">${v.icon}</span>` +
+    `<span class="pt-n">${esc(v.name)}</span>` +
+    `<span class="pt-c">L${v.level}</span></button>`
+  );
+}
+
 /** Разметка одной плитки. Чистая: ни DOM, ни состояния. */
 export function catalogTileHtml(v: TileView): string {
   const desc = `${v.kind}:${esc(v.id)}`;

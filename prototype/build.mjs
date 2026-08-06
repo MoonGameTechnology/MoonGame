@@ -290,6 +290,11 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 .ptile.locked .pt-ic{color:var(--dim);}
 .ptile .pt-ic{font-size:18px;line-height:1;}
 .ptile .pt-c{font-size:9px;color:var(--dim);letter-spacing:.3px;white-space:nowrap;}
+/* подпись построенного здания: имя обязано читаться, поэтому плитка растягивается под
+   него и переносит длинное имя в две строки, а не режет многоточием — обрезанное
+   «Salvage Metal…» отвечает на вопрос «что это» не лучше голой иконки */
+.ptile .pt-n{font-size:9px;line-height:1.15;color:var(--ink);text-align:center;max-width:76px;}
+.ptile.built{min-width:70px;padding-left:6px;padding-right:6px;}
 /* Bytro-карточка: SVG-силуэт в тайле + мини-бар корпуса стека */
 .ptile .pt-ic .uglyph{display:block;}
 /* Силуэт-глиф корабля, встроенный в текстовые/inline-слоты меню (кнопки корпусов,
@@ -1633,6 +1638,12 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   #railtoggle{width:50px;height:50px;font-size:22px;}
   .spd button{min-width:42px;height:44px;font-size:12px;}
   .spd .spdmini{min-width:38px;}
+  /* УЗКИЙ экран: ряд из семи кнопок и двух разделителей шире 360 CSS-px, и последний
+     чип (×100) вытеснялся за край — игрок видел набор, обрывающийся на ×50, и решал,
+     что скорость убрали. Ряд переносится на две строки и жмётся к правому краю: все
+     множители остаются НА экране, а не «почти помещаются». */
+  #speedbar{flex-wrap:wrap;justify-content:flex-end;max-width:calc(100vw - 20px);row-gap:4px;}
+  .spd .spdmini{min-width:34px;}
   .pclose{width:38px;height:38px;font-size:13px;border-radius:8px;}
   .ptab{min-height:42px;}
   /* market listing form: label+input pairs lock together on a grid, the segment

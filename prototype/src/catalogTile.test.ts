@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { catalogTileHtml, tileLock, type TileView } from './catalogTile';
+import { builtTileHtml, catalogTileHtml, tileLock, type TileView } from './catalogTile';
 
 const tile = (over: Partial<TileView> = {}): string =>
   catalogTileHtml({
@@ -94,5 +94,39 @@ describe('плитка каталога — экранирование', () => {
     const html = tile({ id: '"><img src=x>', name: '<b>x</b>', lock: 'queued' });
     expect(html).not.toContain('<img src=x');
     expect(html).not.toContain('<b>x</b>');
+  });
+});
+
+describe('плитка построенного здания', () => {
+  const built = (over: Partial<Parameters<typeof builtTileHtml>[0]> = {}) =>
+    builtTileHtml({ type: 'radar', level: 1, icon: '<i>⊚</i>', name: 'Radar Array', ...over });
+
+  it('ИМЯ ПОДПИСАНО — одна иконка не отвечает на вопрос «что это»', () => {
+    expect(built()).toContain('Radar Array');
+  });
+
+  it('УРОВЕНЬ ПОКАЗАН ВСЕГДА, даже у здания без апгрейдов', () => {
+    expect(built()).toContain('L1');
+    expect(built({ level: 3 })).toContain('L3');
+    expect(built()).not.toContain('✓'); // галочка читалась как «готово», а не как уровень
+  });
+
+  it('плитка ведёт в кодекс с текущим уровнем', () => {
+    expect(built({ level: 2 })).toContain('data-codex="b:radar:2"');
+    expect(built({ level: 2 })).toContain('data-desc="b:radar:2"');
+  });
+
+  it('построенное НЕ заказывается повторно — якоря заказа нет', () => {
+    expect(built()).not.toContain('data-buildorder');
+  });
+
+  it('иконка вставляется разметкой, имя — текстом (CWE-79)', () => {
+    const html = built({ icon: '<svg id="ic"></svg>', name: '<b>злое</b>' });
+    expect(html).toContain('<svg id="ic">');
+    expect(html).not.toContain('<b>злое</b>');
+  });
+
+  it('id здания экранируется — он уходит в атрибуты', () => {
+    expect(built({ type: '"><img src=x>' })).not.toContain('<img src=x');
   });
 });

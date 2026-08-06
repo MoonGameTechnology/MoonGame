@@ -174,7 +174,7 @@ import { LIMP_PCT, fleetSummary, hullPct, stackHullPct } from './fleetSummary';
 import { isGroundUnit, isWingUnit, planetSummary } from './planetSummary';
 import { fleetWhere, groupTotals, pickPanel } from './panelSelect';
 import { buildRoster, garrisonByTab, tabCounts } from './planetTabs';
-import { catalogTileHtml, tileLock, type TileLock } from './catalogTile';
+import { builtTileHtml, catalogTileHtml, tileLock, type TileLock } from './catalogTile';
 import { createScanMemory, type Snapshot } from './scanMemory';
 import {
   factionBonuses,
@@ -5665,12 +5665,18 @@ function planetPanelHtml(p: Planet): string {
     // открывает карточку кодекса с листалкой уровней и кнопкой «Улучшить» —
     // описание, апгрейд и «что даст следующий уровень» переехали туда из строк.
     if (p.buildings.length) {
+      // Разметку плитки собирает `catalogTile.ts` — там же решения подачи: имя
+      // подписано (иконка одна на вопрос «что это» не отвечает) и уровень показан
+      // ВСЕГДА, а не галочкой у зданий без апгрейдов.
       const tiles = p.buildings
-        .map((b) => {
-          const def = data.buildings[b.type];
-          const max = def ? buildingMaxLevel(def) : 1;
-          return `<button class="ptile" data-codex="b:${b.type}:${b.level}" data-desc="b:${b.type}:${b.level}" data-name="${esc(buildingName(def?.name, b.type))}"><span class="pt-ic">${BUILD_ICON[b.type] ?? '▪'}</span><span class="pt-c">${max > 1 ? `L${b.level}` : '✓'}</span></button>`;
-        })
+        .map((b) =>
+          builtTileHtml({
+            type: b.type,
+            level: b.level,
+            icon: BUILD_ICON[b.type] ?? '▪',
+            name: buildingName(data.buildings[b.type]?.name, b.type),
+          }),
+        )
         .join('');
       blds += `<div class="ptiles">${tiles}</div>`;
     }
