@@ -170,6 +170,14 @@ import { initSoloDrivers } from './soloDrivers';
 import { initMatchEnd } from './matchEnd';
 import { STANCES, diffDiplomacy } from './diploEvents';
 import {
+  afford as coreAfford,
+  emptyQueue,
+  laneOf,
+  queuedAction as coreQueuedAction,
+  queuedCost,
+  waitsForMoney,
+} from './buildOrders';
+import {
   activeConstruction as coreActiveConstruction,
   buildDurationHours as coreBuildDurationHours,
   hoursLeft,
@@ -1301,45 +1309,21 @@ function myRes(): Record<string, number> {
   return s.players[ME]?.resources ?? {};
 }
 function afford(bag: Record<string, number> | undefined): boolean {
-  const res = s.players[ME]?.resources ?? {};
-  for (const [r, n] of Object.entries(bag ?? {})) if ((res[r] ?? 0) < n) return false;
-  return true;
+  return coreAfford(myRes(), bag);
 }
 /** Локальная (офлайновая) очередь стройки этого мира — ядру она неизвестна: в сети
  *  стройку таймит сервер. Создаётся по первому обращению. */
 function queueOf(planetId: string): PlanetBuildQueue {
-  return (buildQueues[planetId] ??= { buildings: [], units: [] });
+  return (buildQueues[planetId] ??= emptyQueue());
 }
-function laneOf(kind: BuildKind): BuildLane {
-  return kind === 'unit' ? 'units' : 'buildings';
-}
-/** Цена головы очереди — ДЛЯ ПОКАЗА (строка «⏳ ждём: …»). Решение «пора ли пускать»
- *  на неё больше не опирается: его принимает ядро (см. `canStartQueued`). */
+/** Цена головы очереди — ДЛЯ ПОКАЗА (строка «⏳ ждём: …»); правила масштаба и смещения
+ *  уровней живут в `buildOrders.ts` (REFM-32). */
 function buildCost(planetId: string, q: QueuedBuild): Record<string, number> | undefined {
-  if (q.kind === 'unit') {
-    const per = data.units[q.id]?.cost;
-    // Ядро масштабирует цену на count (`scaleCost`), поэтому и подпись обязана: иначе
-    // очередь из пяти корветов показывала бы цену одного.
-    if (!per) return undefined;
-    const n = q.count ?? 1;
-    return n === 1 ? per : Object.fromEntries(Object.entries(per).map(([r, v]) => [r, v * n]));
-  }
-  if (q.kind === 'building') {
-    return data.buildings[q.id]?.cost;
-  }
-  const pl = s.planets[planetId];
-  const inst = pl?.buildings.find((b) => b.type === q.id);
-  return inst ? data.buildings[q.id]?.upgrades[inst.level - 1]?.cost : undefined;
+  return queuedCost(s, data, planetId, q);
 }
-/** Приказ, которым голова очереди уедет в ядро. Один построитель на оба пути —
- *  и на вопрос «можно ли уже», и на само применение (`submitQueued`): иначе
- *  спрашивали бы про одно, а издавали другое. */
+/** Приказ, которым голова очереди уедет в ядро. */
 function queuedAction(planetId: string, q: QueuedBuild): Action {
-  return q.kind === 'unit'
-    ? buildUnit(ME, planetId, q.id, q.count)
-    : q.kind === 'upgrade'
-      ? upgradeBuilding(ME, planetId, q.id)
-      : buildBuilding(ME, planetId, q.id);
+  return coreQueuedAction(ME, planetId, q);
 }
 /**
  * RULES-4. Пора ли пускать голову очереди — ВЕРДИКТ ЯДРА, а не свой прайс-лист.
@@ -1357,7 +1341,7 @@ function queuedAction(planetId: string, q: QueuedBuild): Action {
  * `E_NO_SHIPYARD`, `E_MAX_LEVEL`) — очередь считала «можно», ядро отбивало.
  */
 function canStartQueued(planetId: string, q: QueuedBuild): boolean {
-  return canOrder(s, queuedAction(planetId, q)) !== 'E_INSUFFICIENT';
+  return !waitsForMoney(canOrder(s, queuedAction(planetId, q)));
 }
 /** Стройка, идущая на мире прямо сейчас (голову по `(at, seq)` выбирает
  *  `buildProgress.ts`, REFM-31 — там же и правило порядка). */
