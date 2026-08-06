@@ -309,6 +309,7 @@ import { initSettings } from './settingsOverlay';
 // «Профиль командира» — карьерное досье (REFM-10).
 import { initProfile } from './profileScreen';
 // AVA-C1/C2 — корпоративный кабинет (REFM-11).
+import { abilityRings } from './abilityRings';
 import { initCorp } from './corpScreen';
 // ECON-4 — session market: the model + orders live next door; the WINDOW is REFM-6.
 import { initMarket } from './marketScreen';
@@ -521,8 +522,10 @@ const CORR_LIVE = '#5ce1d6';
 // что дальность и область — РАЗНЫЕ сущности, и игрок должен различать их с одного
 // взгляда: тонкий пунктир «докуда достану» против залитого пятна «что накроет».
 const CAST_REACH = '#7df0d0'; // круг дальности способности
-const CAST_AREA = '#9ad7ff'; // круг области действия (AoE)
 const CAST_FAR = '#ff6b6b'; // цель вне дальности — подсказка, вердикт всё равно за ядром
+// Радиус способности — всегда этот фиолетовый, и всегда пунктиром: на карте уже есть
+// кольца дальности огня и радара, и способность обязана читаться как ДРУГАЯ сущность.
+const ABILITY_RING = '#b78cff';
 const TAU = Math.PI * 2;
 const TOP = 50; // top-bar height
 const RAIL = 50; // left-rail width
@@ -3614,17 +3617,51 @@ function drawCastAim(): void {
     cx.arc(origin.x, origin.y, reach * cam.scale, 0, TAU);
     cx.stroke();
   }
-  if (aoe > 0) {
-    cx.setLineDash([]);
-    cx.fillStyle = rgba(CAST_AREA, 0.1);
-    cx.strokeStyle = rgba(CAST_AREA, 0.75);
-    cx.lineWidth = 1.4;
-    cx.beginPath();
-    cx.arc(aimPointer.x, aimPointer.y, aoe * cam.scale, 0, TAU);
-    cx.fill();
-    cx.stroke();
-  }
+  if (aoe > 0) drawAbilityCircle(aimPointer.x, aimPointer.y, aoe * cam.scale, 0.14);
   cx.restore();
+}
+
+/**
+ * ОДИН вид у радиуса способности: фиолетовый пунктир (заказ владельца). Он нарочно не
+ * похож ни на дальность огня (`R_ARTY`/`R_WING`), ни на радар — иначе на карте, где
+ * колец и так много, игрок не отличит «докуда бьёт пушка» от «докуда достаёт аура».
+ * Рисуется и под прицелом, и у уже наложенных эффектов — потому и вынесено сюда, а не
+ * скопировано дважды.
+ */
+function drawAbilityCircle(x: number, y: number, rPx: number, fill = 0): void {
+  if (rPx <= 0) return;
+  cx.save();
+  cx.setLineDash([7, 6]);
+  cx.lineWidth = 1.5;
+  cx.strokeStyle = rgba(ABILITY_RING, 0.85);
+  cx.beginPath();
+  cx.arc(x, y, rPx, 0, TAU);
+  if (fill > 0) {
+    cx.fillStyle = rgba(ABILITY_RING, fill);
+    cx.fill();
+  }
+  cx.stroke();
+  cx.setLineDash([]);
+  cx.restore();
+}
+
+/** Уже РАБОТАЮЩИЕ способности: аура следует за героем, скан прибит к своему узлу.
+ *  Модель — `abilityRings.ts`; здесь только холст. Просроченный круг гаснет в тот же
+ *  кадр: срок проверяется по игровому времени, а не по таймеру интерфейса. */
+function drawAbilityRings(): void {
+  const rings = abilityRings(s, ME, s.time, {
+    hero: (heroId) => {
+      const hero = (s.heroes ?? {})[heroId];
+      const f = hero?.fleetId ? s.fleets[hero.fleetId] : undefined;
+      const p = f ? fleetPos(f) : null;
+      return p ? world(p) : null;
+    },
+    node: (planetId) => {
+      const p = s.planets[planetId]?.position;
+      return p ? world(p) : null;
+    },
+  });
+  for (const r of rings) drawAbilityCircle(r.x, r.y, r.radius * cam.scale);
 }
 
 /** While "Move" is armed: a dashed line from each selected fleet to the world under
@@ -4917,6 +4954,7 @@ function render(now: number) {
   drawAssaultTargets();
   drawCorridors(now); // HERO-CORRIDOR: временные коридоры героев
   drawCombatRanges(); // RANGE-UX: артиллерия / эскадрилья / ПВО — до прицельных линий
+  drawAbilityRings(); // ABIL-RING: уже работающие ауры и сканы — фиолетовым пунктиром
   drawAimPreview();
   drawCastAim(); // CAST-UX: дальность каста + область действия
 }
