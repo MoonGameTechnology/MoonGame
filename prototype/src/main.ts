@@ -170,6 +170,15 @@ import { initSoloDrivers } from './soloDrivers';
 import { initMatchEnd } from './matchEnd';
 import { STANCES, diffDiplomacy } from './diploEvents';
 import {
+  boxSelection,
+  insideBox,
+  movedBeyondSlop,
+  nearestHit,
+  pickRadius,
+  pinchOf,
+  pinchStep,
+} from './pointerPick';
+import {
   afford as coreAfford,
   emptyQueue,
   laneOf,
@@ -7792,34 +7801,8 @@ function selectAt(mx: number, my: number) {
 
 // --- camera control: drag-pan, pinch-zoom, wheel-zoom, tap-select ------------
 
-/** A finger wobbles more than a mouse: the pan-vs-tap threshold widens on touch. */
-function tapSlop(ev: PointerEvent): number {
-  return ev.pointerType === 'touch' ? 11 : 6;
-}
 /** Set per tap: hit radii in selectAt widen for a finger (44px-target rule). */
 let tapByTouch = false;
-/** Nearest candidate within `r` of the tap — NOT the first in iteration order, so
- *  overlapping objects (an orbit ring of fleets) resolve to what the player aimed at. */
-function nearestHit<T>(
-  items: Iterable<T>,
-  pos: (t: T) => { x: number; y: number } | null,
-  mx: number,
-  my: number,
-  r: number,
-): T | null {
-  let best: T | null = null;
-  let bd = r;
-  for (const it of items) {
-    const c = pos(it);
-    if (!c) continue;
-    const d = Math.hypot(mx - c.x, my - c.y);
-    if (d < bd) {
-      bd = d;
-      best = it;
-    }
-  }
-  return best;
-}
 
 const pointers = new Map<number, { x: number; y: number }>();
 let dragStart: { x: number; y: number } | null = null;
@@ -7867,7 +7850,7 @@ canvas.addEventListener('pointerdown', (ev) => {
       fleetAnchor,
       p.x,
       p.y,
-      ev.pointerType === 'touch' ? 24 : 16,
+      pickRadius(ev.pointerType === 'touch'),
     );
     additive = ev.ctrlKey || ev.metaKey || ev.shiftKey;
     boxSelecting = ev.shiftKey && !overOwnFleet;
@@ -7909,8 +7892,9 @@ canvas.addEventListener('pointerdown', (ev) => {
     // тап по «Курс») и Back/Escape — обе дороги живы.
     const [a, b] = [...pointers.values()];
     if (a && b) {
-      pinchDist = Math.hypot(a.x - b.x, a.y - b.y);
-      pinchMid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
+      const pinch = pinchOf(a, b);
+      pinchDist = pinch.dist;
+      pinchMid = pinch.mid;
     }
   }
 });
@@ -7919,23 +7903,23 @@ canvas.addEventListener('pointermove', (ev) => {
   if (!prev) return;
   const p = ptXY(ev);
   pointers.set(ev.pointerId, p);
-  const moved = dragStart && Math.hypot(p.x - dragStart.x, p.y - dragStart.y) > tapSlop(ev);
+  const moved = movedBeyondSlop(dragStart, p, ev.pointerType === 'touch');
   if (moved) cancelLongPress(); // a moving finger is a drag, not a long-press
   if (pointers.size >= 2) {
     const [a, b] = [...pointers.values()];
     if (a && b) {
-      const d = Math.hypot(a.x - b.x, a.y - b.y);
-      const mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 };
-      if (pinchDist > 0) zoomAt(mid.x, mid.y, d / pinchDist);
-      // Щипок ведёт камеру за собой: сдвиг середины между пальцами — это панорама.
-      // Масштаб уже удержал точку под пальцами, поэтому одно другому не мешает.
-      if (pinchMid) {
-        cam.x += mid.x - pinchMid.x;
-        cam.y += mid.y - pinchMid.y;
+      const cur = pinchOf(a, b);
+      // Масштаб и перенос середины считает `pointerPick.ts` (REFM-33): щипок и
+      // масштабирует, и ВЕЗЁТ камеру — одно другому не мешает.
+      const step = pinchStep(pinchMid ? { dist: pinchDist, mid: pinchMid } : null, cur);
+      if (step.scale !== 1) zoomAt(cur.mid.x, cur.mid.y, step.scale);
+      if (step.dx || step.dy) {
+        cam.x += step.dx;
+        cam.y += step.dy;
         clampCam();
       }
-      pinchDist = d;
-      pinchMid = mid;
+      pinchDist = cur.dist;
+      pinchMid = cur.mid;
     }
     dragged = true;
   } else if ((aiming || assaultAim) && !pcUi()) {
@@ -7959,22 +7943,17 @@ function endPointer(ev: PointerEvent) {
   const single = pointers.size === 1;
   const p = pointers.get(ev.pointerId);
   if (single && boxSelecting && selectionBox) {
-    const x1 = Math.min(selectionBox.x1, selectionBox.x2);
-    const x2 = Math.max(selectionBox.x1, selectionBox.x2);
-    const y1 = Math.min(selectionBox.y1, selectionBox.y2);
-    const y2 = Math.max(selectionBox.y1, selectionBox.y2);
     const picked: string[] = [];
     for (const f of Object.values(s.fleets)) {
       if (f.owner !== ME) continue;
       const a = fleetAnchor(f);
-      if (a && a.x >= x1 && a.x <= x2 && a.y >= y1 && a.y <= y2) picked.push(f.id);
+      if (a && insideBox(selectionBox, a)) picked.push(f.id);
     }
-    // A modifier-held box ADDS to the running group (Shift-gather is cumulative);
-    // a plain box replaces it. An empty additive box leaves the group untouched.
-    if (picked.length) {
-      if (additive) setFleetSelection([...new Set([...selectedFleetIds(), ...picked])]);
-      else setFleetSelection(picked);
-    } else if (!additive) {
+    // Правило «добрать или заменить» (и «пустая рамка с модификатором не трогает
+    // группу») живёт в `pointerPick.ts`.
+    const next = boxSelection(selectedFleetIds(), picked, additive);
+    if (next.length) setFleetSelection(next);
+    else if (!additive) {
       selFleets = new Set();
       selFleet = null;
       lastPanelHtml = '';
