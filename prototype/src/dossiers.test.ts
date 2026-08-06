@@ -5,7 +5,6 @@ import { buildingLevel, type GameState } from '../../packages/shared-core/src/in
 import {
   buildingDossier,
   unitDossier,
-  producesLine,
   taskDossier,
   cxRow,
   createDossiers,
@@ -80,16 +79,8 @@ describe('dossiers — юниты', () => {
   });
 });
 
-describe('dossiers — строка выработки', () => {
-  it('нули и пустой мешок дают пустую строку (разделитель « · » схлопывается)', () => {
-    expect(producesLine({})).toBe('');
-    expect(producesLine({ metal: 0 })).toBe('');
-  });
-
-  it('перечисляет только положительные ресурсы, по одному знаку после запятой', () => {
-    expect(producesLine({ metal: 10.44, credits: 0 })).toBe('+10.4 металл/ч');
-  });
-});
+// Строка выработки переехала в общий `resLine` (format.ts) — она больше не
+// текстовая, и её правило проверяется там же, где правило ценника.
 
 describe('dossiers — карточка стройки (порог 50%)', () => {
   const { s, homeId } = homeState();
@@ -218,6 +209,23 @@ describe('codex — карточка полной информации', () => {
     expect(html).toContain('cx-stats');
     expect(html).toContain(cxRow('Уровни', '1').slice(0, 20)); // строка-ряд той же формы
     expect(html).toContain(buildingDossier('mine', 1)!.body); // описание = тело досье
+  });
+
+  it('карточка здания листает уровни: цифры и цена — ДЛЯ уровня (BUILD-1)', () => {
+    const l1 = codexHtml('b', 'mine', 1);
+    const l2 = codexHtml('b', 'mine', 2);
+    expect(l1).toContain('cx-lvls'); // у шахты есть прокачка — листалка на месте
+    expect(l1).toContain('data-cx-blvl="mine:2"');
+    expect(l2).toContain('cx-lv on'); // открытый уровень подсвечен
+    expect(l2).not.toBe(l1); // цифры уровня действительно другие
+    expect(l2).toContain('140'); // цена АПГРЕЙДА (L2), а не входа
+    // у одноуровневого здания листалки нет — «I» в одиночестве ничего не листает
+    expect(codexHtml('b', 'barracks', 1)).not.toContain('cx-lvls');
+  });
+
+  it('уровень за пределами каталога клампится, а не ломает карточку', () => {
+    expect(codexHtml('b', 'mine', 99)).toContain('cx-lv on');
+    expect(codexHtml('b', 'mine', 0)).toContain('cx-stats');
   });
 
   it('карточка юнита несёт свой домен тегом и силуэт стороны', () => {

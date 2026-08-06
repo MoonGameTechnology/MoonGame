@@ -327,8 +327,40 @@ export const movementModule: GameModule = {
       if (!fleet || fleet.owner !== action.playerId) {
         return h.reject('E_NO_FLEET');
       }
-      if (fleet.movement || fleet.battleId || (fleet.location === null && !fleet.edge)) {
-        return h.reject('E_FLEET_BUSY'); // in transit / in battle → not free to re-task
+      if (fleet.battleId) {
+        return h.reject('E_FLEET_BUSY'); // in battle → not free to re-task
+      }
+      if (fleet.movement) {
+        // RETASK: a NEW course to a fleet already under way is legal — halt it at its
+        // current continuous position (the exact `fleet.stop` parking) and replan from
+        // there. This is the composition stop→move the player could already issue as
+        // two taps, collapsed into one order; no invariant can hold for one form and
+        // not the other. Two deliberate asymmetries with a real stop:
+        //  · no `fleet.parked` is emitted — the fleet never RESTS here (perimeter
+        //    interception reacts to parked fleets, and this one is gone in the same
+        //    instant);
+        //  · if the replan below rejects (no route / right of way), the kernel drops
+        //    the whole draft — so a FAILED re-task leaves the old course running
+        //    instead of stranding the fleet mid-lane.
+        // The abandoned leg's scheduled arrival stays in the timeline; the arrival
+        // handler ignores it (its departedAt/arrivesAt no longer match).
+        //
+        // …but re-tasking INSIDE a corridor is refused, by the same rule and the same
+        // code as `fleet.stop` (HERO-CORRIDOR / CMD-VIS): a corridor is a jump with no
+        // middle, and a fleet parked on a corridor edge would be left standing on an
+        // edge the graph loses when the corridor closes. The re-task parks the fleet
+        // EXACTLY like a stop does, so the ban has to hold at both doors — otherwise
+        // «Курс» becomes a second way to do the thing «Стоп» refuses.
+        if (isCorridorEdge(h.state, fleet.movement.from, fleet.movement.to)) {
+          return h.reject('E_NOT_A_LANE');
+        }
+        const mv = fleet.movement;
+        const frac = Math.min(1 - EPS, Math.max(EPS, legT(mv, h.ctx.now)));
+        fleet.edge = { from: mv.from, to: mv.to, t: frac };
+        fleet.movement = null;
+        fleet.location = null;
+      } else if (fleet.location === null && !fleet.edge) {
+        return h.reject('E_FLEET_BUSY'); // no anchor at all → nothing to route from
       }
       if (payload.to !== undefined && payload.to === fleet.location) {
         return h.reject('E_SAME_LOCATION');

@@ -75,6 +75,16 @@ export const HERO_CASTABLE = new Set(['temp_lane', 'annihilate', 'recall', 'aura
 // real branch skill-tree with prereq connectors and per-node states, and a tap-to-open
 // dossier that shows what a node/fitting grants BEFORE you buy it.
 
+/** The pane's tabs. A GRID of four pills (2×2), not a strip of equal flex cells: at a
+ *  quarter of a phone's width «Способности» had no room and the row read as one grey
+ *  smear. `icon` is what makes the grid scannable — same shape as the corp cabinet's. */
+export const HERO_TABS: Array<{ key: HeroTab; label: string; icon: string }> = [
+  { key: 'overview', label: 'hero.hq.tab.overview', icon: '◈' },
+  { key: 'tree', label: 'hero.hq.tab.tree', icon: '⋔' },
+  { key: 'abilities', label: 'hero.hq.tab.abilities', icon: '✦' },
+  { key: 'fittings', label: 'hero.hq.tab.fittings', icon: '▣' },
+];
+
 /** Human short labels for a passive's hook (what the bonus actually does). */
 const HERO_HOOK_RU: Record<string, string> = {
   'fleet.speed': 'hero.hook.fleet-speed',
@@ -144,17 +154,12 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
     `</div>`;
 
   // tabs
-  const TABS: [HeroTab, string][] = [
-    ['overview', 'hero.hq.tab.overview'],
-    ['tree', 'hero.hq.tab.tree'],
-    ['abilities', 'hero.hq.tab.abilities'],
-    ['fittings', 'hero.hq.tab.fittings'],
-  ];
   const tabs =
     `<div class="hx-tabs">` +
-    TABS.map(
-      ([k, l]) =>
-        `<button class="hx-tab${view.tab === k ? ' on' : ''}" data-htab="${k}">${t(l)}</button>`,
+    HERO_TABS.map(
+      ({ key, label, icon }) =>
+        `<button class="hx-tab${view.tab === key ? ' on' : ''}" data-htab="${key}">` +
+        `<i>${icon}</i>${t(label)}</button>`,
     ).join('') +
     `</div>`;
 

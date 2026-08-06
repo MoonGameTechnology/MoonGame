@@ -13,11 +13,13 @@
  * ready is worse than one that shows nothing. Every read goes through `corpFetch`,
  * which returns null on ANY failure and surfaces a server-given `E_*` code as a toast.
  *
- * REFM shape: the label tables are pure exports; everything stateful lives inside
- * `initCorp(host)`, which takes its four DOM slots and four host services explicitly.
+ * REFM shape: the label tables and the pure view builders are exports; everything
+ * stateful lives inside `initCorp(host)`, which takes its four DOM slots and four host
+ * services explicitly.
  */
 import { t } from '../../localization/runtime';
 import { esc, nfmt } from './format';
+import { readRaw, writeRaw } from './prefs';
 import {
   canManage,
   parseAccountIds,
@@ -26,6 +28,8 @@ import {
   parseCorpRecord,
   parseCorpSummaries,
   parseFeed,
+  parseMedalDefs,
+  parseMedals,
   parseMembership,
   parseMemberships,
   parseReadyPool,
@@ -40,22 +44,28 @@ import {
   type CorpRecord,
   type CorpRole,
   type CorpSummary,
+  type MedalDef,
 } from './corp';
 
-// The cross-session alliance ("corporation") management screen designed in
-// docs/corporation-ui.md — the REAL screen now, over the live CORP-0/AVA-2..9/
-// MED-1 HTTP API (packages/server/src/corpApi.ts/avaApi.ts/medalApi.ts). Scope
-// follows the doc's own §7 degradation order: Обзор/Участники/Войны/Казна are
-// real; Владения (sector ownership) and Чат (persistent corp chat) have no
-// server counterpart at all (no meta-layer Контур 2 yet) and stay honest "скоро"
-// stubs rather than simulated data.
-export const CORP_TABS: { id: string; label: string }[] = [
-  { id: 'overview', label: 'corp.tab.overview' },
-  { id: 'members', label: 'corp.tab.members' },
-  { id: 'wars', label: 'corp.tab.wars' },
-  { id: 'treasury', label: 'corp.tab.treasury' },
-  { id: 'holdings', label: 'corp.tab.holdings' },
-  { id: 'comms', label: 'corp.tab.comms' },
+// Six tabs, every one backed by a real route (CORP-HUB). The row is a GRID, not a
+// scrolling strip: six tabs fit a phone in two rows, so no tab can hide off-screen
+// behind a swipe. `icon` is what makes that grid readable at a glance — six labels
+// alone read as a wall of text.
+//
+// What the cabinet deliberately does NOT show, because the server has no such data
+// (inventing it is the one unforgivable bug on a screen people plan around): corp
+// buildings, a crafting bench, a parts inventory, weekly tasks, a resource treasury
+// (influence is the only corp currency), squads, member online status, a corp tag /
+// motto / join policy / tax, and per-battle scores. Sector holdings and a persistent
+// corp chat have no server counterpart either (no meta-layer Контур 2 yet) and stay
+// honest "скоро" lines in Настройки rather than simulated tabs.
+export const CORP_TABS: { id: string; label: string; icon: string }[] = [
+  { id: 'hq', label: 'corp.tab.hq', icon: '⬢' },
+  { id: 'members', label: 'corp.tab.members', icon: '▤' },
+  { id: 'wars', label: 'corp.tab.wars', icon: '⚔' },
+  { id: 'battles', label: 'corp.tab.battles', icon: '🏆' },
+  { id: 'treasury', label: 'corp.tab.treasury', icon: '⟡' },
+  { id: 'settings', label: 'corp.tab.settings', icon: '⚙' },
 ];
 export const CORP_ROLE_LABEL: Record<CorpRole, string> = {
   head: 'corp.role.head',
@@ -86,6 +96,117 @@ export const CORP_AUDIT_RU: Record<string, string> = {
   rent_return: 'corp.audit.rent-return',
 };
 
+// --- pure view builders (CORP-HUB) ------------------------------------------------
+
+/** One finished war as the Битвы tab reads it. Built from the PUBLIC AvA feed, which
+ *  is the only history the server exposes — so there is no score line and no rating
+ *  delta here: those simply are not recorded (`AvaResult` is who/whom/winner/when). */
+export interface CorpBattle {
+  at: number;
+  foe: string;
+  outcome: 'win' | 'loss' | 'draw';
+}
+
+/** Таблица, а не сборка ключа из `outcome`: гейт локализации ищет ключ ЛИТЕРАЛОМ, и
+ *  собранный в шаблоне ключ он посчитал бы осиротевшим переводом. */
+export const CORP_BATTLE_LABEL: Record<CorpBattle['outcome'], string> = {
+  win: 'corp.battle.win',
+  loss: 'corp.battle.loss',
+  draw: 'corp.battle.draw',
+};
+
+/** My corp's finished wars, newest first as the feed already is. A `result` entry with
+ *  `winnerCorp === null` is a DRAW — not a loss (the difference is the whole point of
+ *  storing null). Entries my corp is not a party to are skipped: the feed is global. */
+export function corpBattles(feed: readonly AvaFeedEntry[], myCorpId: string): CorpBattle[] {
+  const out: CorpBattle[] = [];
+  for (const f of feed) {
+    if (f.kind !== 'result') continue;
+    const iAmChallenger = f.challengerCorp === myCorpId;
+    if (!iAmChallenger && f.targetCorp !== myCorpId) continue;
+    out.push({
+      at: f.at,
+      foe: iAmChallenger ? f.targetName : f.challengerName,
+      outcome:
+        f.winnerCorp === null || f.winnerCorp === undefined
+          ? 'draw'
+          : f.winnerCorp === myCorpId
+            ? 'win'
+            : 'loss',
+    });
+  }
+  return out;
+}
+
+/** Витрина: how many awards the Штаб pins. Three is what fits a phone row. */
+export const SHOWCASE_SLOTS = 3;
+/** Which awards are pinned is a LOCAL choice (the server has no showcase field), so it
+ *  lives in prefs — and the screen never claims other players see it. */
+export const SHOWCASE_KEY = 'corp.showcase';
+
+/** Stored form is a comma-joined id list; a missing/short/garbled value degrades to
+ *  empty slots rather than throwing. Always exactly `SHOWCASE_SLOTS` entries. */
+export function readShowcase(raw: string | null): string[] {
+  const parts = (raw ?? '').split(',');
+  return Array.from({ length: SHOWCASE_SLOTS }, (_, i) => parts[i] ?? '');
+}
+
+export function writeShowcase(slots: readonly string[]): string {
+  return Array.from({ length: SHOWCASE_SLOTS }, (_, i) => slots[i] ?? '').join(',');
+}
+
+/** Big number + caption — the Штаб's tile shape. `null` prints «—» (нет данных), which
+ *  is honestly different from a zero. */
+export function hqTile(label: string, value: string | null): string {
+  return (
+    `<div class="chq-tile"><b>${value === null ? '—' : esc(value)}</b>` +
+    `<span>${esc(label)}</span></div>`
+  );
+}
+
+/** The three pinned slots. An id that is not in the catalog, or not earned, reads as an
+ *  empty slot — a stale pref must never print a medal the player does not hold. */
+export function showcaseHtml(
+  slots: readonly string[],
+  defs: readonly MedalDef[],
+  owned: readonly string[],
+): string {
+  const cells = Array.from({ length: SHOWCASE_SLOTS }, (_, i) => {
+    const id = slots[i] ?? '';
+    const def = owned.includes(id) ? defs.find((d) => d.id === id) : undefined;
+    return (
+      `<button class="chq-cup${def ? ' on' : ''}" data-corpcup="${i}">` +
+      `<i>${def ? '🏆' : '＋'}</i>` +
+      `<span>${def ? esc(def.name) : t('corp.showcase.empty')}</span></button>`
+    );
+  }).join('');
+  return `<div class="chq-cups">${cells}</div>`;
+}
+
+/** The full award gallery — every medal of the catalog, earned ones tappable, the rest
+ *  shown dim WITH their condition text (a locked award you can read is a goal; a hidden
+ *  one is just an absence). */
+export function medalGalleryHtml(defs: readonly MedalDef[], owned: readonly string[]): string {
+  const rows = defs
+    .map((d) => {
+      const has = owned.includes(d.id);
+      return (
+        `<button class="cmg-row${has ? '' : ' off'}"${has ? ` data-corppick="${esc(d.id)}"` : ' disabled'}>` +
+        `<i>${has ? '🏆' : '🔒'}</i><span><b>${esc(d.name)}</b><em>${esc(d.description)}</em></span>` +
+        `${has ? '' : `<u>${t('corp.medals.locked')}</u>`}</button>`
+      );
+    })
+    .join('');
+  return (
+    `<div class="cmg-head"><button class="cbtn2" data-corpback="1">‹ ${t('corp.medals.back')}</button>` +
+    `<b>${t('corp.medals.title')}</b>` +
+    `<button class="cbtn2 danger" data-corppick="">${t('corp.medals.clear')}</button></div>` +
+    (rows
+      ? `<div class="cmg-list">${rows}</div>`
+      : `<p class="chint">${t('corp.medals.empty')}</p>`)
+  );
+}
+
 /** What the cabinet needs from the shell. */
 export interface CorpHost {
   /** The overlay (`#corp`) — shown/hidden and click-delegated here. */
@@ -115,7 +236,10 @@ export function initCorp(host: CorpHost): {
   close: () => void;
   mine: () => { corp: CorpRecord | null; membership: CorpMembership | null };
 } {
-  let corpTab = 'overview'; // открытая вкладка кабинета
+  let corpTab = 'hq'; // открытая вкладка кабинета
+  // Открытая витрина наград (галерея). Не отдельный слой: она заменяет тело кабинета,
+  // а Back закрывает СНАЧАЛА её — ступень `corp` в лестнице зовёт `close()` ниже.
+  let cupSlot: number | null = null;
 
   // --- live state (fetched via corpFetch — see refreshCorp) --------------------
   let corpMine: { corp: CorpRecord | null; membership: CorpMembership | null } = {
@@ -137,6 +261,12 @@ export function initCorp(host: CorpHost): {
   let corpReadyOptimistic: boolean | null = null;
   let playerReadyOptimistic: boolean | null = null;
   let corpFetchBusy = false;
+  // Место корпорации в общей доске (RANK-1). Считает СЕРВЕР по всей популяции —
+  // `null` значит «места нет» (доска пуста / не в рейтинге), а не «последнее».
+  let corpRank: number | null = null;
+  let medalDefs: MedalDef[] = [];
+  let medalsOwned: string[] = [];
+  let showcase: string[] = readShowcase(readRaw(SHOWCASE_KEY));
 
   /** Shared authenticated call for the corp/AvA/medals APIs — the host resolves the
    *  session exactly as it does for ARS-5's /arsenal/me, but there is no local cache: this data is too volatile (roster windows, challenges)
@@ -209,11 +339,31 @@ export function initCorp(host: CorpHost): {
         corpBrowseList = parseCorpSummaries(listRaw?.corps);
       }
 
+      // Место в общей доске и награды — только когда корпорация есть: у безкорпного
+      // и то и другое пусто по смыслу, а лишний запрос стоит сети.
+      if (corpMine.membership) {
+        const board = (await corpFetch('/leaderboard')) as {
+          corps?: { me?: { rank?: unknown } };
+        } | null;
+        const rank = board?.corps?.me?.rank;
+        corpRank = typeof rank === 'number' ? rank : null;
+        const catRaw = (await corpFetch('/medals')) as { medals?: unknown } | null;
+        medalDefs = parseMedalDefs(catRaw?.medals);
+        const mineMedals = (await corpFetch('/medals/me')) as { medals?: unknown } | null;
+        medalsOwned = parseMedals(mineMedals?.medals).map((m) => m.medalId);
+      } else {
+        corpRank = null;
+        medalDefs = [];
+        medalsOwned = [];
+      }
+
       const challengesRaw = (await corpFetch('/ava/challenges')) as { challenges?: unknown } | null;
       avaChallenges = parseChallenges(challengesRaw?.challenges);
       const poolRaw = (await corpFetch('/ava/pool')) as { pool?: unknown } | null;
       avaPool = parseReadyPool(poolRaw?.pool);
-      const feedRaw = (await corpFetch('/ava/feed?limit=8')) as { feed?: unknown } | null;
+      // Лента ПУБЛИЧНАЯ и общая: вкладка «Битвы» отбирает из неё свои бои, поэтому окно
+      // берётся шире восьми записей — иначе чужие войны вытеснят мои из истории.
+      const feedRaw = (await corpFetch('/ava/feed?limit=40')) as { feed?: unknown } | null;
       avaFeed = parseFeed(feedRaw?.feed);
 
       // A locked-or-accepted matchup my corp is party to: show its roster window.
@@ -284,8 +434,9 @@ export function initCorp(host: CorpHost): {
     );
   }
 
-  function corpOverviewHtml(): string {
+  function corpHqHtml(): string {
     if (!corpMine.corp || !corpMine.membership) return corpNoneHtml();
+    if (cupSlot !== null) return medalGalleryHtml(medalDefs, medalsOwned);
     const c = corpMine.corp;
     const feed = corpAudit
       .slice(0, 6)
@@ -302,15 +453,57 @@ export function initCorp(host: CorpHost): {
     const nextWarHtml = nextWar
       ? `<div class="cwarn">⚔ ${t('corp.war.ava')} vs ${esc(corpNameOf(nextWar.challengerCorp === corpMine.membership.corpId ? nextWar.targetCorp : nextWar.challengerCorp))} — ${t(nextWar.status === 'accepted' ? 'corp.war.roster-open' : 'corp.war.pending')}</div>`
       : '';
+    const members = corpDetail?.members.filter((m) => m.role !== 'recruit').length ?? null;
     return (
       `${nextWarHtml}` +
-      `<div class="ccols">` +
-      `<section class="ccard"><h4>${t('corp.overview.name')}</h4>` +
-      `<div class="cline"><span>${t('corp.influence')}</span><em>${nfmt(c.influence)} ⟡</em></div>` +
-      `<div class="cline"><span>${t('corp.my-role')}</span><em>${corpRoleLabel(corpMine.membership.role)}</em></div>` +
-      `<p class="chint">${t('corp.holdings.note')}</p></section>` +
-      `<section class="ccard"><h4>${t('corp.log')}</h4>${feedHtml}</section>` +
-      `</div>`
+      `<div class="chq-tiles">` +
+      hqTile(t('corp.card.influence'), nfmt(c.influence)) +
+      hqTile(t('corp.hq.place'), corpRank === null ? null : `#${corpRank}`) +
+      hqTile(t('corp.card.members'), members === null ? null : String(members)) +
+      hqTile(t('corp.card.role'), corpRoleLabel(corpMine.membership.role)) +
+      `</div>` +
+      `<h4>${t('corp.showcase')}</h4>` +
+      showcaseHtml(showcase, medalDefs, medalsOwned) +
+      `<p class="chint">${t('corp.showcase.hint')}</p>` +
+      `<h4>${t('corp.log')}</h4>${feedHtml}`
+    );
+  }
+
+  function corpBattlesHtml(): string {
+    if (!corpMine.membership) return corpNoneHtml();
+    const rows = corpBattles(avaFeed, corpMine.membership.corpId)
+      .map(
+        (b) =>
+          `<div class="cbat"><span class="cbat-v v-${b.outcome}">${t(CORP_BATTLE_LABEL[b.outcome])}</span>` +
+          `<span class="cbat-f">vs ${esc(b.foe)}</span>` +
+          `<em class="cwhen">${new Date(b.at).toLocaleDateString('ru-RU')}</em></div>`,
+      )
+      .join('');
+    return (
+      `<h4>${t('corp.battles.title')}</h4>` +
+      (rows ? `<div class="cbats">${rows}</div>` : `<p class="chint">${t('corp.battles.none')}</p>`) +
+      `<p class="chint">${t('corp.battles.note')}</p>`
+    );
+  }
+
+  function corpSettingsHtml(): string {
+    if (!corpMine.corp || !corpMine.membership) return corpNoneHtml();
+    const mine = corpMine.membership;
+    const leave =
+      mine.role === 'head'
+        ? `<button class="cbtn2 danger wide" data-corpact="disband">${t('corp.disband')}</button>`
+        : `<button class="cbtn2 wide" data-corpact="leave">${t('corp.leave')}</button>`;
+    return (
+      `<section class="ccard"><h4>${t('corp.settings.identity')}</h4>` +
+      `<div class="cline"><span>${t('corp.settings.name')}</span><em>${esc(corpMine.corp.name)}</em></div>` +
+      `<div class="cline"><span>${t('corp.my-role')}</span><em>${corpRoleLabel(mine.role)}</em></div>` +
+      `<p class="chint">${t('corp.settings.identity.hint')}</p></section>` +
+      `<section class="ccard"><h4>${t('corp.settings.soon')}</h4>` +
+      `<div class="cline"><span>${t('corp.holdings.soon')}</span></div>` +
+      `<p class="chint">${t('corp.holdings.soon.hint')}</p>` +
+      `<div class="cline"><span>${t('corp.chat.soon')}</span></div>` +
+      `<p class="chint">${t('corp.chat.soon.hint')}</p></section>` +
+      leave
     );
   }
 
@@ -344,22 +537,19 @@ export function initCorp(host: CorpHost): {
           }
           manage = bits.join('');
         }
+        // Карточка, а не строка таблицы: на телефоне имя, роль и управление в один ряд
+        // не помещаются — кнопки уезжали за край и до них было не дотянуться.
         return (
-          `<div class="crow2${isMe ? ' me' : ''}">` +
-          `<span class="cdot" style="color:${CORP_ROLE_DOT[m.role]}"></span>` +
+          `<div class="cmemb${isMe ? ' me' : ''}">` +
+          `<div class="cm-top"><span class="cdot" style="color:${CORP_ROLE_DOT[m.role]}"></span>` +
           `<span class="cnm">${esc(m.login)}${isMe ? ` <i>(${t('corp.you')})</i>` : ''}</span>` +
-          `<span class="crole">${corpRoleLabel(m.role)}</span>` +
-          `<span class="cman">${manage}</span>` +
+          `<span class="cm-role">${corpRoleLabel(m.role)}</span></div>` +
+          (manage ? `<div class="cm-act">${manage}</div>` : '') +
           `</div>`
         );
       })
       .join('');
-    const mine = corpMine.membership;
-    const leave =
-      mine.role === 'head'
-        ? `<button class="cbtn2 danger wide" data-corpact="disband">${t('corp.disband')}</button>`
-        : `<button class="cbtn2 wide" data-corpact="leave">${t('corp.leave')}</button>`;
-    return `<div class="ctable">${rows}</div>${leave}`;
+    return `<div class="ctable">${rows}</div>`;
   }
 
   function corpWarsHtml(): string {
@@ -482,40 +672,35 @@ export function initCorp(host: CorpHost): {
     );
   }
 
-  function corpHoldingsHtml(): string {
-    return `<div class="hub-empty"><span class="he-ic">▦</span>${t('corp.holdings.soon')}<br><span style="font-size:11px;color:var(--cyan-dim)">${t('corp.holdings.soon.hint')}</span></div>`;
-  }
-
-  function corpCommsHtml(): string {
-    return `<div class="hub-empty"><span class="he-ic">▭</span>${t('corp.chat.soon')}<br><span style="font-size:11px;color:var(--cyan-dim)">${t('corp.chat.soon.hint')}</span></div>`;
-  }
-
   function renderCorp(): void {
     const c = corpMine.corp;
-    const mem = corpMine.membership;
+    const members = corpDetail?.members.filter((m) => m.role !== 'recruit').length ?? null;
+    // Шапка: кто мы, сколько нас и какое место — и отдельной плашкой то самое число,
+    // ради которого корпорацию и качают.
     host.head().innerHTML = c
       ? `<div class="chrow"><span class="cemblem">⬢</span>` +
-        `<div class="cident"><b>${esc(c.name)}</b></div>` +
-        `<button id="corpclose" class="cx" title="${t('corp.close')}">✕</button></div>` +
-        `<div class="cmetrics">` +
-        `<span>${t('corp.card.influence')} <b>${nfmt(c.influence)} ⟡</b></span>` +
-        `<span>${t('corp.card.members')} <b>${corpDetail?.members.filter((m) => m.role !== 'recruit').length ?? '—'}</b></span>` +
-        `<span>${t('corp.card.role')} <b>${mem ? corpRoleLabel(mem.role) : '—'}</b></span>` +
-        `</div>`
+        `<div class="cident"><b>${esc(c.name)}</b><span class="csub">` +
+        `${members === null ? '' : t('corp.members.count', { n: String(members) })}` +
+        `${members === null ? '' : ' · '}` +
+        `${corpRank === null ? t('corp.head.rank.none') : t('corp.head.rank', { n: String(corpRank) })}` +
+        `</span></div>` +
+        `<div class="cpoints"><b>${nfmt(c.influence)}</b><span>${t('corp.card.influence')}</span></div>` +
+        `<button id="corpclose" class="cx" title="${t('corp.close')}">✕</button></div>`
       : `<div class="chrow"><span class="cemblem">⬢</span>` +
         `<div class="cident"><b>${t('corp.card.none')}</b></div>` +
         `<button id="corpclose" class="cx" title="${t('corp.close')}">✕</button></div>`;
     host.tabs().innerHTML = CORP_TABS.map(
       (ct) =>
-        `<button class="ctab${ct.id === corpTab ? ' on' : ''}" data-corptab="${ct.id}">${t(ct.label)}</button>`,
+        `<button class="ctab${ct.id === corpTab ? ' on' : ''}" data-corptab="${ct.id}">` +
+        `<i>${ct.icon}</i>${t(ct.label)}</button>`,
     ).join('');
     let body = '';
-    if (corpTab === 'overview') body = corpOverviewHtml();
+    if (corpTab === 'hq') body = corpHqHtml();
     else if (corpTab === 'members') body = corpMembersHtml();
     else if (corpTab === 'wars') body = corpWarsHtml();
+    else if (corpTab === 'battles') body = corpBattlesHtml();
     else if (corpTab === 'treasury') body = corpTreasuryHtml();
-    else if (corpTab === 'holdings') body = corpHoldingsHtml();
-    else if (corpTab === 'comms') body = corpCommsHtml();
+    else if (corpTab === 'settings') body = corpSettingsHtml();
     host.body().innerHTML = body;
   }
 
@@ -525,14 +710,26 @@ export function initCorp(host: CorpHost): {
     void refreshCorp(); // …then refresh from the server
     host.onIntro('corp');
   }
+  /** Ступень Back: сначала закрывается ВИТРИНА, и только потом сам кабинет — иначе
+   *  аппаратная кнопка выбрасывала бы игрока из корпорации целиком с полпути выбора. */
   function closeCorp(): void {
+    if (cupSlot !== null) {
+      cupSlot = null;
+      renderCorp();
+      return;
+    }
+    hideCorp();
+  }
+  function hideCorp(): void {
+    cupSlot = null;
     host.root().style.display = 'none';
   }
 
   host.tabs().addEventListener('click', (e) => {
     const b = (e.target as HTMLElement | null)?.closest('[data-corptab]') as HTMLElement | null;
     if (!b) return;
-    corpTab = b.dataset.corptab ?? 'overview';
+    corpTab = b.dataset.corptab ?? 'hq';
+    cupSlot = null; // витрина живёт только на «Штабе»
     renderCorp();
     if (corpTab === 'wars') host.onIntro('ava');
   });
@@ -540,7 +737,30 @@ export function initCorp(host: CorpHost): {
     const tg = e.target as HTMLElement | null;
     if (!tg) return;
     if (tg.id === 'corpclose' || tg.id === 'corp') {
-      closeCorp();
+      hideCorp();
+      return;
+    }
+    // Витрина наград: тап по кубку открывает общий список, тап по награде — ставит её
+    // в ЭТОТ слот. Выбор локальный (у сервера поля витрины нет), поэтому и живёт в prefs.
+    const cup = tg.closest('[data-corpcup]') as HTMLElement | null;
+    if (cup) {
+      cupSlot = Number(cup.dataset.corpcup);
+      renderCorp();
+      return;
+    }
+    const pick = tg.closest('[data-corppick]') as HTMLElement | null;
+    if (pick) {
+      if (cupSlot !== null) {
+        showcase = showcase.map((id, i) => (i === cupSlot ? (pick.dataset.corppick ?? '') : id));
+        writeRaw(SHOWCASE_KEY, writeShowcase(showcase));
+      }
+      cupSlot = null;
+      renderCorp();
+      return;
+    }
+    if (tg.closest('[data-corpback]')) {
+      cupSlot = null;
+      renderCorp();
       return;
     }
     const btn = tg.closest('[data-corpact]') as HTMLElement | null;

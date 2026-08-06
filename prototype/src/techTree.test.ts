@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale, tData } from '../../localization/runtime';
 import { newGame, data, DAY, HOUR } from './game';
@@ -193,10 +194,20 @@ describe('дерево технологий — разметка', () => {
     expect(html).toContain('<button class="tt-tab on" data-ttab="ground">');
   });
 
+  it('вкладки идут СЕТКОЙ, а не лентой с прокруткой — все пять веток видны сразу', () => {
+    // Сторож над CSS: у ленты вкладки уезжали за край и до дальних веток надо было
+    // досвайпывать. `grid-template-columns` на `.tt-tabs` — то, что это чинит.
+    const css = readFileSync(new URL('../build.mjs', import.meta.url), 'utf8');
+    const rule = css.match(/\n\.tt-tabs\{([^}]*)\}/);
+    expect(rule).not.toBeNull();
+    expect(rule![1]).toContain('grid-template-columns');
+    expect(rule![1]).not.toContain('overflow-x:auto');
+  });
+
   it('вкладка несёт счётчик «готово/всего», и он двигается с исследованием', () => {
     // Навигация без клика: где ещё осталось что исследовать — видно с вкладки.
     const fresh = techTreeHtml(s, 'p1', 'space', null);
-    const m = fresh.match(/data-ttab="space">[^<]*<i class="tt-cnt">(\d+)\/(\d+)<\/i>/);
+    const m = fresh.match(/data-ttab="space"><span>[^<]*<\/span><i class="tt-cnt">(\d+)\/(\d+)<\/i>/);
     expect(m).not.toBeNull();
     expect(m![1]).toBe('0');
     const total = Number(m![2]);
