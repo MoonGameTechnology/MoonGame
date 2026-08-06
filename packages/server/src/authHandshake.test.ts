@@ -135,3 +135,70 @@ describe('SE-0.1 · authenticated handshake', () => {
     }
   });
 });
+
+/**
+ * SEC-21. Origin-allowlist охраняет ТЕПЕРЬ и HTTP-периметр, а не только рукопожатие.
+ * До этого `Access-Control-Allow-Origin: *` стоял безусловно на всех маршрутах, то есть
+ * одна и та же сессия была защищена на WS и открыта на `/auth/*`, `/matches`, `/corps/*`.
+ * Проверяем на `/health` — он не требует ни авторизации, ни состояния, а хук CORS общий
+ * для всех маршрутов (`onRequest`), поэтому поведение заголовка виден на нём в чистом виде.
+ */
+describe('CORS на HTTP-маршрутах (SEC-21)', () => {
+  const httpBase = (wsUrl: string): string => wsUrl.replace(/^ws/, 'http').replace(/\/$/, '');
+
+  it('со списком: эхо разрешённого Origin + Vary, чужой Origin остаётся без заголовка', async () => {
+    const server = createMultiplayerServer({
+      room: createDevMatch(data),
+      allowedOrigins: ['https://play.example'],
+    });
+    const url = httpBase(await server.listen());
+    try {
+      const ok = await fetch(`${url}/health`, { headers: { origin: 'https://play.example' } });
+      expect(ok.headers.get('access-control-allow-origin')).toBe('https://play.example');
+      // Без Vary общий кэш отдаст этот ответ чужому origin'у — ограничение обходится.
+      expect(ok.headers.get('vary')).toBe('Origin');
+
+      const evil = await fetch(`${url}/health`, { headers: { origin: 'https://evil.example' } });
+      // Заголовка НЕТ вовсе: браузер сам заблокирует чтение ответа.
+      expect(evil.headers.get('access-control-allow-origin')).toBeNull();
+      expect(evil.headers.get('vary')).toBe('Origin');
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('без списка: прежний `*` — дев-харнесс и LAN-плейтест не трогаем', async () => {
+    const server = createMultiplayerServer({ room: createDevMatch(data) });
+    const url = httpBase(await server.listen());
+    try {
+      const res = await fetch(`${url}/health`, { headers: { origin: 'https://anything.example' } });
+      expect(res.headers.get('access-control-allow-origin')).toBe('*');
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('preflight OPTIONS отвечает 204 и уважает тот же список', async () => {
+    const server = createMultiplayerServer({
+      room: createDevMatch(data),
+      allowedOrigins: ['https://play.example'],
+    });
+    const url = httpBase(await server.listen());
+    try {
+      const ok = await fetch(`${url}/matches`, {
+        method: 'OPTIONS',
+        headers: { origin: 'https://play.example', 'access-control-request-method': 'GET' },
+      });
+      expect(ok.status).toBe(204);
+      expect(ok.headers.get('access-control-allow-origin')).toBe('https://play.example');
+
+      const evil = await fetch(`${url}/matches`, {
+        method: 'OPTIONS',
+        headers: { origin: 'https://evil.example', 'access-control-request-method': 'GET' },
+      });
+      expect(evil.headers.get('access-control-allow-origin')).toBeNull();
+    } finally {
+      await server.close();
+    }
+  });
+});

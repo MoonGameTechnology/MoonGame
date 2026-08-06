@@ -1071,6 +1071,18 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - name: boot the server (in-memory, no DATABASE_URL — auth/gate default off, F1)
+        # SEC-21: ALLOWED_ORIGINS задан НАМЕРЕННО, хотя остальная прод-поза выключена.
+        # Без него DAST сканировал дев-форму CORS (`Access-Control-Allow-Origin: *`),
+        # которую мы никуда не деплоим, и ZAP-10098 «Cross-Domain Misconfiguration»
+        # висел бы вечно — сканер честно сообщал бы о конфигурации, не существующей
+        # в проде. Ровно эта переменная безопасна для покрытия: она влияет только на
+        # CORS-заголовок и на Origin-проверку WS-рукопожатия, а baseline-скан
+        # WebSocket'ы не трогает и ходит по HTTP как не-браузер. Полную прод-позу
+        # (`PROD=1` + auth + gate) включать НЕЛЬЗЯ: тогда большинство маршрутов
+        # ответит 401 и покрытие скана обвалится — аутентифицированный DAST это
+        # отдельная задача, а не побочный эффект этой.
+        env:
+          ALLOWED_ORIGINS: http://localhost:8787
         run: |
           pnpm run dev:server > server.log 2>&1 &
           echo $! > server.pid

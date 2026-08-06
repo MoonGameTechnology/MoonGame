@@ -182,10 +182,51 @@ export function createMultiplayerServer(
   // /matches/:id/join is blocked by the browser without Access-Control-Allow-Origin.
   // Fastify doesn't add CORS headers by default, so probeAuthMode's fetch fails →
   // authMode stays false → the client dials ?nick= instead of ?token= → WS handshake
-  // fails. Add a permissive CORS header on ALL HTTP routes (playtest server; the
-  // production path is behind a proxy with an explicit Origin allowlist).
+  // fails.
+  //
+  // SEC-21: этот заголовок был БЕЗУСЛОВНЫМ `*` на всех HTTP-маршрутах, и обоснование
+  // рядом («production path is behind a proxy with an explicit Origin allowlist»)
+  // держалось на допущении, которое неверно: `ALLOWED_ORIGINS` — это НАШ список, и до
+  // сих пор он охранял только WS-рукопожатие (см. `upgrade` ниже), а HTTP-периметр —
+  // `/auth/*`, `/matches`, `/corps/*`, `/ava/*`, `/arsenal/me`, `/commander/me` — стоял
+  // открытым для любого сайта. Асимметрия и была дефектом: одна и та же сессия
+  // защищена на одном транспорте и не защищена на другом. Найдено триажем ZAP-10098.
+  //
+  // Теперь HTTP уважает ТОТ ЖЕ список, что и рукопожатие:
+  //   • список задан → эхо Origin'а, если он в списке, иначе заголовка НЕТ вовсе
+  //     (браузер сам заблокирует чтение ответа);
+  //   • список не задан → прежний `*`, потому что это дев-харнесс, и ужесточать его
+  //     значит ломать `pnpm dev:server` и LAN-плейтест ни за что.
+  // `Vary: Origin` обязателен при эхо: без него общий кэш отдаст ответ, выписанный
+  // одному origin'у, другому — и ограничение обходится через прокси.
+  const allowedOrigins = options.allowedOrigins;
   app.addHook('onRequest', async (req, reply) => {
-    void reply.header('access-control-allow-origin', '*');
+    const origin = req.headers.origin;
+    if (!allowedOrigins) {
+      void reply.header('access-control-allow-origin', '*');
+    } else {
+      void reply.header('vary', 'Origin');
+      // Отдаём НАШУ строку из НАШЕГО списка, а не строку из запроса. Значения совпадают
+      // (сверка точная), но провенанс разный, и это не стилистика: заголовок, собранный
+      // из `req.headers.origin`, — классический CORS-reflection, и отличить безопасную
+      // версию от дырявой можно только прочитав сравнение рядом. Здесь читать нечего:
+      // в ответ физически попадает элемент `options.allowedOrigins`. Ровно это и просит
+      // правило Semgrep `cors-misconfiguration` («use literal values»), которое поймало
+      // первую редакцию этой правки на ревью PR #574.
+      const match = allowedOrigins.find((o) => o === origin);
+      // Обоснование отдельной строкой, директива чистая — конвенция репозитория
+      // (см. `wsServer.tls.test.ts`): всё после `nosemgrep:` считается списком rule-id.
+      // Причина: правило требует ЛИТЕРАЛ в `Access-Control-Allow-Origin`, а это
+      // несовместимо с настраиваемым allowlist'ом в принципе — один заголовок несёт
+      // ровно один origin, поэтому при нескольких разрешённых его придётся выбирать
+      // на запрос. Опасная форма правила — отражение `req.headers.origin` без сверки
+      // (или со слабой, вроде `endsWith`); здесь сверка точная и в ответ уходит элемент
+      // НАШЕГО `options.allowedOrigins`, а не строка из запроса. Поведение закреплено
+      // тремя тестами в `authHandshake.test.ts` (эхо только разрешённого, `Vary`,
+      // preflight), и мутация «эхо любого Origin» их роняет.
+      // nosemgrep: javascript.express.security.cors-misconfiguration.cors-misconfiguration
+      if (match) void reply.header('access-control-allow-origin', match);
+    }
     void reply.header('access-control-allow-methods', 'GET, POST, OPTIONS');
     void reply.header('access-control-allow-headers', 'authorization, content-type');
     // Handle CORS preflight (OPTIONS) inline — Fastify 404s unknown methods by
@@ -234,7 +275,6 @@ export function createMultiplayerServer(
 
   const accountStore = options.accountStore;
   const auth = options.auth;
-  const allowedOrigins = options.allowedOrigins;
   app.server.on('upgrade', (request, socket, head) => {
     // Async because auth/nick-login resolve identity through the join-token verifier or
     // the (possibly DB-backed) account store before we accept the upgrade.
