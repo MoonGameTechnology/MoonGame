@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { ru } from '../../localization/ru';
 import { en } from '../../localization/en';
 import { dataKey } from '../../localization';
+import { composeGameDataBundle } from '../../packages/shared-core/src/index';
 import { GLOSSARY } from './codexIndex';
 import { data } from './prototypeData';
 import { INTROS } from './intros';
@@ -112,6 +113,64 @@ function staticMarkupKeys(): Array<string | null> {
         out.push(new RegExp(`${marker}="([^"]*)"`).exec(tag)?.[1] ?? null);
   return out;
 }
+
+/** ШИПНУТЫЙ игровой контент — `data/*.json`, собранные тем же композером, что и в
+ *  проде (`composeGameDataBundle`, CP0.3). Это НЕ каталог прототипа: его читают
+ *  `packages/client` и сервер, а `prototypeData.ts` — только прототип. Пары
+ *  `[«каталог.id», name]` по всем record-каталогам бандла; `units.json` имён не несёт
+ *  вовсе (юниты слагаются из id — это отдельная проверка выше) и честно даёт пусто. */
+function shippedNames(): Array<[string, string]> {
+  const bundle = composeGameDataBundle((name) =>
+    JSON.parse(readFileSync(path.join(repoRoot, 'data', name), 'utf8')),
+  ) as Record<string, unknown>;
+  const out: Array<[string, string]> = [];
+  for (const [table, items] of Object.entries(bundle)) {
+    if (!items || typeof items !== 'object' || Array.isArray(items)) continue;
+    for (const [id, def] of Object.entries(items as Record<string, unknown>)) {
+      const name = (def as { name?: unknown } | null)?.name;
+      if (typeof name === 'string') out.push([`${table}.${id}`, name]);
+    }
+  }
+  return out;
+}
+
+/** Имена шипнутого контента, у которых ключа `data.*` ещё нет. Список ОБЯЗАН
+ *  сокращаться: запись, для которой ключ уже появился, валит тест — иначе allowlist
+ *  тихо зарастает и гейт превращается в декорацию. Две группы, и ни одна не чинится
+ *  «просто дозавести ключ»:
+ *   • здания (11) и фракции (6) — `prototypeData.ts` держит для тех же сущностей
+ *     ДРУГИЕ имена и частью другие id (`Metal Mine` против шипнутого
+ *     `Metal Extractor I`, `Radar Array` против `Sensor Array I`), поэтому «какое имя
+ *     каноническое» — это решение про судьбу второго каталога, AUD-8;
+ *   • учёные (5), `planetTypes` (1), `sectorKinds` (1) — механика, но это правка
+ *     КОНТЕНТА, а не гейта; русский текст для учёных уже написан под `sci.*.name`.
+ *  Заведён 2026-08-06 (AUD-4) на 24 записях. */
+const DATA_KEY_GAPS = new Set([
+  'data.amber-concord',
+  'data.azure-compact',
+  'data.biomass-pit',
+  'data.crimson-hegemony',
+  'data.energy-nexus',
+  'data.field-hospital',
+  'data.fortress',
+  'data.fusion-reactor-i',
+  'data.ground-marshal',
+  'data.metal-extractor-i',
+  'data.metal-extractor-ii',
+  'data.microelectronics-fab-i',
+  'data.missile-chief',
+  'data.orbital-aa-battery',
+  'data.orbital-shipyard',
+  'data.polymath',
+  'data.salvage-metal-rig-i',
+  'data.sensor-array-i',
+  'data.the-swarm',
+  'data.vanguard-coalition',
+  'data.violet-ascendancy',
+  'data.void-admiral',
+  'data.void-station',
+  'data.wing-commander',
+]);
 
 const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
   { prefix: 'err.', built_by: 'errText() — из кода отказа ядра: E_NO_CAPACITY → err.no-capacity' },
@@ -251,11 +310,13 @@ describe('локализация — ключи', () => {
     expect(missing).toEqual([]);
   });
 
-  it('у каждого ИМЕНИ игровых данных есть ключ `data.*`', () => {
+  it('у каждого имени в каталоге ПРОТОТИПА есть ключ `data.*`', () => {
     // Проверка выше смотрит только юнитов — а `tData()` так же показывает здания,
     // модули, фитинги, сектора и типы планет. Промах у них тихий: `tData()` вернёт
     // исходное английское имя, и в русском интерфейсе всплывёт «Spaceport» (именно
     // это здание и жило без ключа с LOC-1).
+    // Каталог здесь — рукописный `prototypeData.ts`, то есть контент играбельного
+    // прототипа. Шипнутый бандл (`data/*.json`) — ДРУГИЕ данные и другие тесты, ниже.
     // `object` вместо `{name?: string}`: у юнитов поля name нет вовсе, и weak-type
     // правило TS не даёт присвоить их таблицу «все-поля-опциональному» типу; имя
     // читается ниже через сужение — таблица без имён честно даёт пустой список.
@@ -278,5 +339,53 @@ describe('локализация — ключи', () => {
       }
     }
     expect(missing.sort()).toEqual([]);
+  });
+
+  // --- шипнутый бандл (`data/*.json`) ------------------------------------------
+  // До AUD-4 гейт смотрел ТОЛЬКО каталог прототипа, поэтому 28 кириллических имён в
+  // `data/*.json` жили годами зелёными (AUD-3). Эти три теста закрывают ту дыру: два
+  // жёстких правила о самом имени (обойти их нечем — allowlist на них не действует) и
+  // покрытие ключами с сокращающимся списком известных пробелов.
+
+  it('имя шипнутого контента не схлопывается в голый `data.`', () => {
+    // `dataKey()` вырезает всё, кроме `[a-z0-9]`. Имя без единого такого символа даёт
+    // ключ `data.` — перевод недостижим на ЛЮБОЙ локали, включая русскую: игрок везде
+    // видит исходную строку. Это тот самый отказ, ради которого кирпич и делался.
+    const names = shippedNames();
+    expect(names.length, 'разбор бандла не должен молча опустеть').toBeGreaterThan(50);
+    const collapsed = names.filter(([, name]) => dataKey(name) === 'data.').map(([at]) => at);
+    expect(collapsed.sort()).toEqual([]);
+  });
+
+  it('в именах шипнутого контента нет кириллицы', () => {
+    // Не дубль проверки выше, а её недостающая половина: `dataKey('Мина II')` даёт
+    // `data.ii` — ключ не голый, но перевод всё равно недостижим, а промах ещё и
+    // маскируется под живой ключ. Правило простое: имя игровых ДАННЫХ английское,
+    // русский текст живёт в локали (CLAUDE.md, раздел «Локализация»).
+    const leaks = shippedNames()
+      .filter(([, name]) => hasCyrillic(name))
+      .map(([at, name]) => `${at}: ${name}`);
+    expect(leaks.sort()).toEqual([]);
+  });
+
+  it('у каждого имени шипнутого контента есть ключ `data.*` — кроме известных пробелов', () => {
+    // Покрытие проверяется по ОБЕИМ локалям: ключ только в `ru` показал бы англоязычному
+    // игроку русский текст (запасной путь рантайма), а это ровно тот тихий промах,
+    // который гейт и обязан ловить.
+    const uncovered = new Set<string>();
+    const named = new Map<string, string>(); // ключ → где встретился (для сообщения)
+    for (const [at, name] of shippedNames()) {
+      const k = dataKey(name);
+      named.set(k, at);
+      if (!(k in ru) || !(k in en)) uncovered.add(k);
+    }
+    const fresh = [...uncovered].filter((k) => !DATA_KEY_GAPS.has(k)).map((k) => `${named.get(k)} → ${k}`);
+    expect(fresh.sort(), 'новая сущность без перевода — заведите ключ в ru.ts и en.ts').toEqual([]);
+
+    // Обратная половина: без неё список никогда не сократится. Запись, для которой ключ
+    // уже появился (или чьё имя переименовали), обязана уйти из DATA_KEY_GAPS в том же
+    // PR — иначе allowlist зарастает мёртвыми строками, как это было с мостом LOC-2.
+    const stale = [...DATA_KEY_GAPS].filter((k) => !uncovered.has(k));
+    expect(stale.sort(), 'ключ появился или имя ушло — снимите запись из DATA_KEY_GAPS').toEqual([]);
   });
 });
