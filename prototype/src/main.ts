@@ -239,7 +239,7 @@ import {
 } from './icons';
 // REFM-4: the object dossiers + the codex card live in `dossiers.ts`; the renderers
 // that read live match state come out of `createDossiers(hooks)` further down.
-import { createDossiers, producesLine, unitTitle, type Dossier } from './dossiers';
+import { buildingDossier, createDossiers, unitTitle, type Dossier } from './dossiers';
 // The client-side build-queue vocabulary, shared with `dossiers.ts`.
 import type {
   ActiveBuild,
@@ -268,6 +268,7 @@ import {
 // H4 — конструктор шаблонов дивизий: модель в `formations.ts`, редактор — REFM-8.
 // TT-3.1 — экран дерева технологий (REFM-9); `branchLabel` берёт ещё совет учёных.
 import { initTechTree, branchLabel } from './techTree';
+import { initBuildScreen } from './buildScreen';
 import { initSciPick } from './sciPick';
 import { initPasswordReset } from './passwordReset';
 import { initEndScreen, type MatchEnd } from './endScreen';
@@ -5729,34 +5730,24 @@ function planetPanelHtml(p: Planet): string {
     );
     let blds = `<div class="sec">${t('side.tab.buildings')}</div>`;
     if (p.buildings.length === 0) blds += `<div class="row dim">${t('side.none')}</div>`;
-    for (const b of p.buildings) {
-      const def = data.buildings[b.type];
-      const max = def ? buildingMaxLevel(def) : 1;
-      const prod = def ? producesLine(buildingLevel(def, b.level).produces) : '';
-      blds += `<div class="asset-row" data-desc="b:${b.type}:${b.level}"><span class="bicon">${BUILD_ICON[b.type] ?? '▪'}</span><b>${buildingName(data.buildings[b.type]?.name, b.type)}</b><span class="dim">L${b.level}/${max} · ${t('side.build.hp')} ${floor(b.hp)}/${hpOfLevel(b.type, b.level)}${prod ? ` · <span class="prod">${prod}</span>` : ''}</span>`;
-      if (mine && b.level < max) {
-        const c = def?.upgrades[b.level - 1]?.cost;
-        // hovering Upgrade previews the NEXT level's dossier (output it will unlock)
-        blds += btn(
-          'upgrade',
-          b.type,
-          compactUi() ? `▲ ${costText(c)}` : t('side.build.upgrade', { c: costText(c) }),
-          afford(c),
-          `b:${b.type}:${b.level + 1}`,
-        );
-      }
-      blds += `</div>`;
+    // BUILD-1 (макет владельца): построенное — ИКОНКАМИ со значком уровня. Тап
+    // открывает карточку кодекса с листалкой уровней и кнопкой «Улучшить» —
+    // описание, апгрейд и «что даст следующий уровень» переехали туда из строк.
+    if (p.buildings.length) {
+      const tiles = p.buildings
+        .map((b) => {
+          const def = data.buildings[b.type];
+          const max = def ? buildingMaxLevel(def) : 1;
+          return `<button class="ptile" data-codex="b:${b.type}:${b.level}" data-desc="b:${b.type}:${b.level}" data-name="${esc(buildingName(def?.name, b.type))}"><span class="pt-ic">${BUILD_ICON[b.type] ?? '▪'}</span><span class="pt-c">${max > 1 ? `L${b.level}` : '✓'}</span></button>`;
+        })
+        .join('');
+      blds += `<div class="ptiles">${tiles}</div>`;
     }
-    if (mine) {
-      // Province-centric roster (data-driven): each province type lists what it can
-      // raise (SECTOR_TYPES.allowedBuildings); absent = the default BUILDABLE set.
-      const buildable = sectorTypeOf(p.id)?.allowedBuildings ?? BUILDABLE;
-      // Показываем то, чего на мире ещё НЕТ. Это допущение «лимит = 1»: при
-      // `maxPerPlanet > 1` плитка второго экземпляра не погаснет, а исчезнет из меню,
-      // хотя ядро такой заказ разрешило бы. Пока весь каталог на дефолте 1, расхождения
-      // нет; поднимать лимит без правки этой строки нельзя (см. `maxPerPlanet` в схеме).
-      const missing = buildable.filter((bt) => !p.buildings.some((b) => b.type === bt));
-      if (missing.length) blds += buildButtons(p.id, missing, 'building');
+    // Каталог непостроенного больше не живёт плитками в панели — его показывает
+    // полноэкранное окно построек. Кнопка есть только там, где строить можно
+    // (свой мир И ростер сектора непуст — CMD-VIS: нет приказа — нет кнопки).
+    if (mine && (sectorTypeOf(p.id)?.allowedBuildings ?? BUILDABLE).length > 0) {
+      blds += `<button class="bw-open" data-act="openbuild">▣ ${t('side.build.open')}</button>`;
     }
     cols.push(blds);
   }
@@ -6379,23 +6370,45 @@ function garrisonTilesHtml(stacks: Array<{ unit: string; count: number }>): stri
     : `<div class="row dim">${t('side.tiles.empty')}</div>`;
 }
 function openCodex(key: string): void {
-  const [kind, id] = key.split(':');
+  const [kind, id, lvl] = key.split(':');
   const el = document.getElementById('codex');
   if (!el || !kind || !id) return;
-  el.innerHTML = `<div class="cxbox">${codexHtml(kind, id)}${codexBuildBtn(kind, id)}<button class="cx-close">${t('codex.close')}</button></div>`;
+  // BUILD-1: карточка здания листает уровни (`b:id:уровень`). Без уровня в ключе
+  // показывается ТЕКУЩИЙ построенный на выбранном мире (если есть) — владелец
+  // открывает свою постройку и видит её, а не абстрактный первый уровень.
+  const builtLvl =
+    kind === 'b' && selPlanet
+      ? s.planets[selPlanet]?.buildings.find((b) => b.type === id)?.level
+      : undefined;
+  const level = Number(lvl) || builtLvl || 1;
+  el.innerHTML = `<div class="cxbox">${codexHtml(kind, id, level)}${codexBuildBtn(kind, id, level)}<button class="cx-close">${t('codex.close')}</button></div>`;
   el.classList.add('show');
 }
 /** A "Build here" action inside the codex when the selected province can raise this
  *  thing — so the codex doubles as the build menu (tap a build tile → specs → build). */
-function codexBuildBtn(kind: string, id: string): string {
+function codexBuildBtn(kind: string, id: string, level = 1): string {
   const p = selPlanet ? s.planets[selPlanet] : null;
   if (!p || p.owner !== ME) return ''; // only when you're looking at one of your worlds
   if (kind === 'b') {
+    // BUILD-1: у ПОСТРОЕННОГО здания карточка предлагает «Улучшить» — той же пробой
+    // ядра, которой решается сам приказ (RULES-1): очередь, казна и потолок уровня
+    // покрыты одним вопросом. Недоступный по любой причине, кроме казны, — без кнопки.
+    const inst = p.buildings.find((b) => b.type === id);
+    if (inst) {
+      const def = data.buildings[id];
+      const max = def ? buildingMaxLevel(def) : 1;
+      if (inst.level >= max) return '';
+      const code = canOrder(s, upgradeBuilding(ME, p.id, id));
+      if (code !== null && code !== 'E_INSUFFICIENT') return '';
+      const c = def ? buildingLevel(def, inst.level + 1).cost : undefined;
+      return `<button class="cx-build" data-cx-upg="${id}"${code ? ' disabled' : ''}>${t('side.build.upgrade', { c: '' })}${cost(c, myRes())}</button>`;
+    }
     const buildable = (sectorTypeOf(p.id)?.allowedBuildings ?? BUILDABLE).includes(id);
     // buildingLocked, а не только «уже стоит»: СТРОЯЩЕЕСЯ здание ещё не в p.buildings
     // (оно попадает туда на construction.complete), и кодекс предлагал «Построить
     // здесь» второй экземпляр одноэкземплярного здания всю стройку первого.
     if (!buildable || buildingLocked(p.id, id)) return '';
+    if (level > 1) return ''; // листаешь будущие уровни — строится всё равно первый
     return `<button class="cx-build" data-build="building:${id}">▣ ${t('codex.build-here')} · ${cost(data.buildings[id]?.cost, myRes())}</button>`;
   }
   if (kind === 'u' && data.units[id]) {
@@ -7144,10 +7157,10 @@ side.addEventListener('click', (ev) => {
     if (arg === 'ground' || arg === 'ships' || arg === 'squadron' || arg === 'buildings') {
       planetTab = arg;
     }
+  } else if (act === 'openbuild') {
+    buildWin.open(selPlanet!);
   } else if (act === 'build') {
     enqueueBuild(selPlanet!, { kind: 'building', id: arg, count: 1 });
-  } else if (act === 'upgrade') {
-    enqueueBuild(selPlanet!, { kind: 'upgrade', id: arg, count: 1 });
   } else if (act === 'unit') {
     enqueueBuild(selPlanet!, { kind: 'unit', id: arg, count: 1 });
   } else if (act === 'cancelbuild') {
@@ -8183,6 +8196,25 @@ const techTree = initTechTree({
 document.getElementById('rail-pings')?.addEventListener('click', () => pings.togglePanel());
 document.getElementById('rail-tech')?.addEventListener('click', () => techTree.open());
 
+// --- BUILD-1: окно построек мира ---------------------------------------------
+// Само окно живёт в `buildScreen.ts`; здесь только его хуки. Ручка `#buildwin`
+// остаётся: её держат реестр слоёв Android-Back и живая перерисовка кадра.
+const buildWinEl = $('buildwin');
+const buildWin = initBuildScreen({
+  root: () => buildWinEl,
+  body: () => $('buildwinbody'),
+  state: () => s,
+  me: () => ME,
+  probe: (a) => canOrder(s, a),
+  // Локальная соло-очередь: ядро о ней не знает, buildingLocked — знает.
+  localQueued: (pid, id) =>
+    queueOf(pid).buildings.some((q) => q.kind === 'building' && q.id === id),
+  build: (pid, id) => enqueueBuild(pid, { kind: 'building', id, count: 1 }),
+  openInfo: (id) => openCodex(`b:${id}`),
+  lockText: errText,
+  dossierBody: (id, level) => buildingDossier(id, level)?.body ?? '',
+});
+
 
 // --- steward («Хранитель»): hand the seat to the AI while you sleep ----------
 // The window lives in `stewardScreen.ts` (REFM-7); here it gets its hooks, the rail
@@ -8191,6 +8223,7 @@ document.getElementById('rail-tech')?.addEventListener('click', () => techTree.o
 // repaint throttle both hold it.
 const stewWin = $('steward');
 let lastStewAt = 0;
+let lastBuildAt = 0;
 let lastIntelAt = 0; // throttle for the live intel-window timers (диплом. вкладка «Шпионаж»)
 const steward = initSteward({
   root: () => stewWin,
@@ -10742,6 +10775,9 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'market', isOpen: () => marketWin.classList.contains('show'), close: () => marketWin.classList.remove('show') }, // z47
   { id: 'constructor', isOpen: () => constructorWin.classList.contains('show'), close: () => shipyard.close() }, // z47 «Верфь»
   { id: 'codex', isOpen: () => codexEl?.classList.contains('show') === true, close: () => codexEl?.classList.remove('show') }, // z46
+  // «Постройки» стоят НИЖЕ кодекса (z45): карточка здания открывается поверх окна,
+  // и Back обязан сначала закрыть её, а уже потом само окно.
+  { id: 'buildwin', isOpen: () => buildWinEl.classList.contains('show'), close: () => buildWinEl.classList.remove('show') }, // z45 «Постройки»
   // Двухступенчатый Back режима «Приказ» (CHAIN-UX): сперва меню точки…
   {
     id: 'tgted',
@@ -11091,6 +11127,11 @@ function frame(nowReal: number) {
     lastTechAt = nowReal;
     techTree.repaint();
   }
+  // Keep the build window live while open (a finished build flips its row), throttled.
+  if (buildWin.isOpen() && nowReal - lastBuildAt > 500) {
+    lastBuildAt = nowReal;
+    buildWin.repaint();
+  }
   // Keep the steward window live while open (countdown to control returning), throttled.
   if (steward.isOpen() && nowReal - lastStewAt > 500) {
     lastStewAt = nowReal;
@@ -11117,6 +11158,22 @@ if (codexEl) {
       codexEl.classList.remove('show');
       lastPanelHtml = '';
       renderPanel();
+      return;
+    }
+    // BUILD-1: листалка уровней в карточке здания — перерисовка той же карточки.
+    const blvl = (tg.closest('[data-cx-blvl]') as HTMLElement | null)?.dataset.cxBlvl;
+    if (blvl) {
+      openCodex(`b:${blvl}`);
+      return;
+    }
+    // «Улучшить» из карточки: хостовый путь заказа (сеть → приказ, соло → очередь);
+    // карточка остаётся открытой и сама показывает «в работе» (проба погасит кнопку).
+    const upg = (tg.closest('[data-cx-upg]') as HTMLElement | null)?.dataset.cxUpg;
+    if (upg && selPlanet) {
+      enqueueBuild(selPlanet, { kind: 'upgrade', id: upg, count: 1 });
+      lastPanelHtml = '';
+      renderPanel();
+      openCodex(`b:${upg}`);
       return;
     }
     if (tg.id === 'codex' || tg.classList.contains('cx-close')) codexEl.classList.remove('show');

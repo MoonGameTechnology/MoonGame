@@ -279,7 +279,7 @@ export function cxRow(k: string, v: string): string {
 export function createDossiers(host: DossierHost): {
   constructionDossier: (key: string) => Dossier | null;
   objDossier: (key: string) => Dossier | null;
-  codexHtml: (kind: string, id: string) => string;
+  codexHtml: (kind: string, id: string, level?: number) => string;
 } {
   const unitDos = (id: string): Dossier | null => unitDossier(id, host.pcUi());
   /** Казна зрителя на момент отрисовки — `have` для ценников карточек. */
@@ -414,8 +414,11 @@ export function createDossiers(host: DossierHost): {
     return null;
   }
 
-  /** Full info card — cost + every stat + the lore blurb — for a building ('b') or unit ('u'). */
-  function codexHtml(kind: string, id: string): string {
+  /** Full info card — cost + every stat + the lore blurb — for a building ('b') or unit
+   *  ('u'). BUILD-1: карточка здания принимает УРОВЕНЬ — цифры и цена считаются для
+   *  него, а листалка уровней (когда их больше одного) даёт посмотреть, что даст
+   *  прокачка, ДО того как за неё заплачено. */
+  function codexHtml(kind: string, id: string, level = 1): string {
     if (kind === 'm') {
       // ONB-4 glossary article — a short mechanic/term explainer (plain text copy).
       const g = GLOSSARY.find((x) => x.id === id);
@@ -428,12 +431,15 @@ export function createDossiers(host: DossierHost): {
     if (kind === 'b') {
       const def = data.buildings[id];
       if (!def) return '';
-      const lv = buildingLevel(def, 1);
       const maxLvl = 1 + (def.upgrades?.length ?? 0);
+      const shown = Math.min(Math.max(1, level), maxLvl);
+      const lv = buildingLevel(def, shown);
+      // Цена и срок — ЭТОГО уровня: вход для L1, апгрейд для L2+ (то же поле, из
+      // которого платит ядро, — buildingLevel сводит их одинаково).
       const rows = [
-        cxRow(t('codex.row.cost'), cost(def.cost, treasury())),
-        cxRow(t('codex.row.build-time'), t('codex.value.hours', { n: def.buildTimeHours ?? 0 })),
-        cxRow(t('codex.row.hp'), String(def.hp ?? 0)),
+        cxRow(t('codex.row.cost'), cost(lv.cost, treasury())),
+        cxRow(t('codex.row.build-time'), t('codex.value.hours', { n: lv.buildTimeHours ?? 0 })),
+        cxRow(t('codex.row.hp'), String(lv.hp ?? 0)),
       ];
       const prod = Object.entries(lv.produces ?? {})
         .filter(([, n]) => (n ?? 0) > 0)
@@ -461,9 +467,19 @@ export function createDossiers(host: DossierHost): {
           maxLvl > 1 ? t('codex.value.levels-upgradable', { n: maxLvl }) : '1',
         ),
       );
-      const dos = buildingDossier(id, 1);
+      const dos = buildingDossier(id, shown);
+      // Листалка уровней: кнопка на каждый уровень, открытый подсвечен. Появляется
+      // только у зданий с прокачкой — «I» в одиночестве ничего не листает.
+      const pager =
+        maxLvl > 1
+          ? `<div class="cx-lvls">${Array.from({ length: maxLvl }, (_, i) => {
+              const n = i + 1;
+              return `<button class="cx-lv${n === shown ? ' on' : ''}" data-cx-blvl="${id}:${n}">${t('codex.lvl', { n })}</button>`;
+            }).join('')}</div>`
+          : '';
       return (
         `<div class="cx-head"><span class="cx-ic">${BUILD_ICON[id] ?? '▣'}</span><b>${esc(tData(def.name))}</b><span class="cx-tag">${t('codex.tag.building')}</span></div>` +
+        pager +
         `<div class="cx-stats">${rows.join('')}</div><div class="cx-desc">${dos?.body ?? ''}</div>`
       );
     }

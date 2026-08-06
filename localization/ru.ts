@@ -89,6 +89,20 @@ export const ru: Record<string, string> = {
   'back.confirm.match': 'Ещё раз «Назад» — выход из матча',
 
   // --- callsign — Позывные ботов.
+  'build.action.build': 'Строить',
+  'build.action.no-res': 'Не хватает ресурсов',
+  'build.cat.defense': 'ОБОРОНА',
+  'build.cat.economy': 'ЭКОНОМИКА',
+  'build.cat.infra': 'ИНФРАСТРУКТУРА',
+  'build.fx.aa': 'ПВО: {n} урона',
+  'build.fx.credits': '+{n}% к кредитам мира',
+  'build.fx.defense': '+{n}% к обороне',
+  'build.fx.production': '+{n}% к производству',
+  'build.fx.radar': 'радар: {n}',
+  'build.fx.shipyard': 'открывает постройку кораблей',
+  'build.head.built': 'построено: {n}',
+  'build.state.done': 'Построено',
+  'build.state.queued': 'строится',
   'callsign.comet': 'Комета',
   'callsign.falcon': 'Сокол',
   'callsign.orion': 'Орион',
@@ -119,6 +133,7 @@ export const ru: Record<string, string> = {
   'cargo.under-assault': 'гарнизон заперт боем — войска не выпустить',
 
   // --- cost — ценники: единые чипы «иконка + число» на всех поверхностях.
+  'codex.lvl': 'Ур. {n}',
   'cost.free': 'бесплатно',
   'cost.short': 'не хватает {n}',
 
@@ -136,6 +151,7 @@ export const ru: Record<string, string> = {
   'chat.tab.coalition': 'Коалиция',
   'chat.tab.session': 'Сессия',
   'chat.you': 'Вы',
+  'side.build.open': 'Построить',
   'spy.log.empty': 'попыток ещё не было',
   'spy.log.title': 'ЖУРНАЛ',
   'spy.note':
@@ -879,6 +895,7 @@ export const ru: Record<string, string> = {
   'threat.incoming': '⚠ Враг идёт к {node}: прибытие через {dur}',
 
   // --- yard — «Верфь»: корпус и модули, конструктор дивизий, стоимость и заказ.
+  'win.build.title': 'ПОСТРОЙКИ',
   'yard.arsenal.note':
     '⚡ Арсенал живой: докупленное в матче видно здесь сразу, но начинает работать только когда вы это ПОСТРОИТЕ — постройка и логистика, не мгновенно.',
   'yard.build': 'Построить ×{n} →',
@@ -1556,7 +1573,6 @@ export const ru: Record<string, string> = {
   'side.battle.title': '⚔ Бой — {phase} · раунд {r}',
   'side.build.conveyor': 'Строительный конвейер',
   'side.build.enemy-hidden': 'Строительная телеметрия врага недоступна',
-  'side.build.hp': 'оз',
   'side.build.upgrade': '▲ Улучшить {c}',
   'side.conveyor.cancel.title': 'Отменить — вернёт часть ресурсов и поставит на паузу',
   'side.conveyor.dequeue.title': 'Убрать из очереди',

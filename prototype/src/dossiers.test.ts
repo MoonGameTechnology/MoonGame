@@ -220,6 +220,23 @@ describe('codex — карточка полной информации', () => {
     expect(html).toContain(buildingDossier('mine', 1)!.body); // описание = тело досье
   });
 
+  it('карточка здания листает уровни: цифры и цена — ДЛЯ уровня (BUILD-1)', () => {
+    const l1 = codexHtml('b', 'mine', 1);
+    const l2 = codexHtml('b', 'mine', 2);
+    expect(l1).toContain('cx-lvls'); // у шахты есть прокачка — листалка на месте
+    expect(l1).toContain('data-cx-blvl="mine:2"');
+    expect(l2).toContain('cx-lv on'); // открытый уровень подсвечен
+    expect(l2).not.toBe(l1); // цифры уровня действительно другие
+    expect(l2).toContain('140'); // цена АПГРЕЙДА (L2), а не входа
+    // у одноуровневого здания листалки нет — «I» в одиночестве ничего не листает
+    expect(codexHtml('b', 'barracks', 1)).not.toContain('cx-lvls');
+  });
+
+  it('уровень за пределами каталога клампится, а не ломает карточку', () => {
+    expect(codexHtml('b', 'mine', 99)).toContain('cx-lv on');
+    expect(codexHtml('b', 'mine', 0)).toContain('cx-stats');
+  });
+
   it('карточка юнита несёт свой домен тегом и силуэт стороны', () => {
     const ship = codexHtml('u', 'cruiser');
     expect(ship).toContain('cx-tag');
