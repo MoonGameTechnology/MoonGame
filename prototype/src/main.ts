@@ -171,6 +171,13 @@ import { initMatchEnd } from './matchEnd';
 import { STANCES, diffDiplomacy } from './diploEvents';
 import { asteroidsFor, bracketStrokes, polyPoints } from './mapShapes';
 import {
+  actionButton,
+  cardHeader as kitCardHeader,
+  pcols,
+  tabButton as kitTabButton,
+  unitRows as kitUnitRows,
+} from './panelKit';
+import {
   boxSelection,
   insideBox,
   movedBeyondSlop,
@@ -4915,49 +4922,28 @@ function render(now: number) {
 
 // --- side panel --------------------------------------------------------------
 
-function btn(act: string, arg: string, label: string, ok: boolean, desc?: string): string {
-  const d = desc ? ` data-desc="${esc(desc)}"` : '';
-  return `<button class="b" data-act="${esc(act)}" data-arg="${esc(arg)}"${d} ${ok ? '' : 'disabled'}>${esc(label)}</button>`;
-}
-/** Wrap a panel section so the desktop multi-column layout never splits it across
- *  columns. Sections are laid out side-by-side on wide screens, stacked on phones. */
-function block(inner: string): string {
-  return `<div class="block">${inner}</div>`;
-}
-/** Lay a set of sections into the responsive multi-column body (see `.pcols` CSS). */
-function pcols(blocks: string[]): string {
-  return `<div class="pcols">${blocks.map(block).join('')}</div>`;
-}
+// Кирпичики панели (кнопка, шапка, вкладка, колонки, строки состава) живут в
+// `panelKit.ts` (REFM-35) — там же правила экранирования и «disabled, а не спрятать».
+const btn = actionButton;
 function cardHeader(color: string, title: string, sub: string, titleAct?: string): string {
-  // PC: the one-line header truncates the subtitle — drop the spaces around the
-  // separator dots so more of it fits. Mobile keeps the airy ' · '.
-  const subFit = pcUi() ? sub.replace(/ · /g, '·') : sub;
-  // Bytro-стиль: тап по ИМЕНИ открывает сводку (армии) — заголовок становится
-  // кнопкой только когда карточка передала действие, прочие панели не меняются.
-  const tt = titleAct
-    ? `<button class="ptitle-btn" data-act="${titleAct}" data-arg="">${esc(title)} ▸</button>`
-    : `<b>${esc(title)}</b>`;
-  return `<div class="phead">
-    <span class="pflag" style="background:${color}"></span>
-    <div class="ptitle">${tt}<span>${esc(subFit)}</span></div>
-    <button class="pclose" data-act="close" data-arg="">✕</button>
-  </div>`;
+  return kitCardHeader(color, title, sub, {
+    compact: pcUi(),
+    ...(titleAct ? { titleAct } : {}),
+  });
 }
 function tabButton(tab: PlanetTab, label: string, count: number, desc?: string): string {
-  const on = planetTab === tab ? ' on' : '';
-  const d = desc ? ` data-desc="${desc}"` : '';
-  return `<button class="ptab${on}" data-act="tab" data-arg="${tab}"${d}>${label}<b>${count}</b></button>`;
+  return kitTabButton(tab, label, count, planetTab === tab, desc);
 }
 function unitRows(stacks: Array<{ unit: string; count: number }>): string {
-  if (!stacks.length) {
-    return `<div class="row dim">${t('side.none')}</div>`;
-  }
-  return stacks
-    .map(
-      (st) =>
-        `<div class="asset-row" data-desc="u:${esc(st.unit)}"><span class="bicon">${unitIconHtml(st.unit, data, youColor, 18)}</span><b>${st.count}× ${displayUnit(st.unit)}</b><span class="dim">${isGround(st.unit) ? t('side.unit.ground') : t('side.unit.space')}</span></div>`,
-    )
-    .join('');
+  return kitUnitRows(
+    stacks,
+    (unit) => ({
+      icon: unitIconHtml(unit, data, youColor, 18),
+      name: displayUnit(unit),
+      domain: isGround(unit) ? t('side.unit.ground') : t('side.unit.space'),
+    }),
+    t('side.none'),
+  );
 }
 /** Localized one-line label for a paused site (shares `ConstructionPayload`'s field
  *  names, so `constructionLabel` reads it directly — the extra `id`/`progress`/
