@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { data } from './game';
-import { fleetSummary, stackHullPct, stackPools } from './fleetSummary';
+import { LIMP_PCT, fleetSummary, hullPct, stackHullPct, stackPools } from './fleetSummary';
+import { fleetBaseSpeed } from '../../packages/shared-core/src/index';
 import type { Fleet, GameData, UnitStack } from '../../packages/shared-core/src/index';
 
 const fleet = (units: UnitStack[], over: Partial<Fleet> = {}): Fleet =>
@@ -195,5 +196,32 @@ describe('сводка армии — пул одного стека', () => {
       shield: { cur: 0, max: 0 },
     });
     expect(sum([{ unit: 'нет-такого', count: 5 }]).hull).toEqual({ cur: 0, max: 0 });
+  });
+});
+
+describe('сводка армии — порог хромоты', () => {
+  const HP = data.units.cruiser!.stats.hp!;
+  const speedAt = (hp: number) => fleetBaseSpeed(fleet([{ unit: 'cruiser', count: 1, hp }]), data);
+
+  it('доля корпуса флота считается по пулу и округляется', () => {
+    expect(hullPct({ cur: 30, max: 120 })).toBe(25);
+    expect(hullPct({ cur: 1, max: 3 })).toBe(33);
+  });
+
+  it('пустому флоту ломаться нечему — он считается целым', () => {
+    expect(hullPct({ cur: 0, max: 0 })).toBe(100);
+  });
+
+  it('ПОРОГ СОВПАДАЕТ С ЯДРОМ: ниже него флот действительно теряет ход', () => {
+    const whole = speedAt(HP);
+    expect(speedAt(Math.ceil(HP * ((LIMP_PCT + 1) / 100)))).toBe(whole); // над порогом — полный ход
+    expect(speedAt(Math.floor(HP * ((LIMP_PCT - 1) / 100)))).toBeLessThan(whole); // под ним — ползёт
+  });
+
+  it('предупреждение зажигается по тому же числу, что и замедление', () => {
+    const hp = Math.floor(HP * ((LIMP_PCT - 1) / 100));
+    const sm = sum([{ unit: 'cruiser', count: 1, hp }]);
+    expect(hullPct(sm.hull)).toBeLessThan(LIMP_PCT);
+    expect(speedAt(hp)).toBeLessThan(speedAt(HP));
   });
 });

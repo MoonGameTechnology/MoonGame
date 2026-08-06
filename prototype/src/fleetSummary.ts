@@ -82,6 +82,19 @@ export function stackHullPct(st: UnitStack, data: GameData): number {
   return hull.max > 0 ? Math.round((hull.cur / hull.max) * 100) : 100;
 }
 
+/**
+ * Порог, ниже которого корабль ХРОМАЕТ — то же число, по которому ядро режет
+ * скорость (`route.ts`: ниже 30% корпуса ход падает). Здесь оно живёт затем, чтобы
+ * предупреждение в карточке зажигалось ровно тогда, когда флот действительно
+ * замедлился, а не «примерно там же».
+ */
+export const LIMP_PCT = 30;
+
+/** Доля целого корпуса ФЛОТА, 0..100. Пустой (нечему ломаться) считается целым. */
+export function hullPct(pool: Pool): number {
+  return pool.max > 0 ? Math.round((pool.cur / pool.max) * 100) : 100;
+}
+
 /** Вся арифметика карточки за один проход. Чистая: ни DOM, ни состояния, ни текста. */
 export function fleetSummary(f: Fleet, data: GameData, now: number): FleetSummary {
   const ships = alive(f.units);

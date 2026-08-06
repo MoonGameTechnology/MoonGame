@@ -119,7 +119,6 @@ import {
 import {
   buildingLevel,
   buildingMaxLevel,
-  cappedUnitStat,
   COMBAT_UNIT_CAP,
   effectiveStats,
   estimateTravelHours,
@@ -170,7 +169,7 @@ import { initMatchEnd } from './matchEnd';
 import { STANCES, diffDiplomacy } from './diploEvents';
 import { asteroidsFor, bracketStrokes, polyPoints } from './mapShapes';
 import { conveyorHtml as kitConveyorHtml } from './conveyorView';
-import { fleetSummary, stackHullPct } from './fleetSummary';
+import { LIMP_PCT, fleetSummary, hullPct, stackHullPct } from './fleetSummary';
 import { isGroundUnit, isShipUnit, isWingUnit, planetSummary } from './planetSummary';
 import { fleetWhere, groupTotals, pickPanel } from './panelSelect';
 import {
@@ -5129,27 +5128,15 @@ function fleetPanelHtml(f: Fleet): string {
   const nShips = sumUnits(f.units);
   const nTr = sumUnits(f.landing ?? []);
   const inOrbit = f.orbit === 'near';
-  // Hull integrity across the squadron (persistent between fights now): a stack's
-  // current hp ?? full — по ЭФФЕКТИВНОМУ hp (обшивка-фитинг считается), корабли +
-  // десант вместе, как в Bytro-карточке. Below 30% the fleet limps (route.ts)
-  // until it repairs. Щит — отдельный пул (регенит бесплатно сам).
-  let curHull = 0,
-    maxHull = 0,
-    curSh = 0,
-    maxSh = 0;
-  for (const st of [...f.units, ...(f.landing ?? [])]) {
-    const u = data.units[st.unit];
-    if (!u || st.count <= 0) continue;
-    const eff = effectiveStats(u, st, data);
-    const m = st.count * (eff.hp ?? 0);
-    maxHull += m;
-    curHull += Math.min(st.hp ?? m, m);
-    const ms = st.count * (eff.shield ?? 0);
-    maxSh += ms;
-    curSh += Math.min(st.shieldHp ?? ms, ms);
-  }
-  const hullPct = maxHull > 0 ? Math.round((curHull / maxHull) * 100) : 100;
-  const hullTag = hullPct < 30 ? ` · ⚠ ${t('side.fleet.hull-tag', { p: hullPct })}` : '';
+  // Пулы, залп и ход считает `fleetSummary.ts` — та же арифметика, что в сводке
+  // армии (REFM-37/40): корпус и щит по ЭФФЕКТИВНОМУ hp (фитинг учтён), корабли и
+  // десант вместе, остаток зажат по максимуму. Порог хромоты `LIMP_PCT` — то же
+  // число, по которому ядро режет скорость, поэтому метка ⚠ зажигается ровно тогда,
+  // когда флот действительно замедлился.
+  const sm = fleetSummary(f, data, s.time);
+  const hull = sm.hull;
+  const pct = hullPct(hull);
+  const hullTag = pct < LIMP_PCT ? ` · ⚠ ${t('side.fleet.hull-tag', { p: pct })}` : '';
   // ECON-1: голодный десант — владелец в food-arrears бьёт на земле на −25%.
   const hungry =
     nTr > 0 && f.owner === ME && (s.players[ME]?.arrears ?? []).includes('food')
@@ -5177,8 +5164,8 @@ function fleetPanelHtml(f: Fleet): string {
   const repairCost = instantRepairCost(f, data);
   const canRepair = f.owner === ME && !f.battleId && repairCost > 0;
   const atDock = canRepair && fleetAtOwnDock(f, s, data);
-  if (maxHull > 0) {
-    h += `<div class="row hullrow" data-desc="stat:hull"><span class="hico">♥</span><span class="hbar${hullPct < 30 ? ' low' : ''}"><i style="width:${hullPct}%"></i></span><b>${kfmt(Math.round(curHull))}/${kfmt(maxHull)}</b>${
+  if (hull.max > 0) {
+    h += `<div class="row hullrow" data-desc="stat:hull"><span class="hico">♥</span><span class="hbar${pct < LIMP_PCT ? ' low' : ''}"><i style="width:${pct}%"></i></span><b>${kfmt(hull.cur)}/${kfmt(hull.max)}</b>${
       atDock
         ? `<button class="chip-metal" data-act="dockrepair" data-arg="${f.id}" title="${t('side.fleet.repair.dock.title')}">🔧 <span class="rc-metal">${dockRepairCost(f, data)}❒</span></button>`
         : ''
@@ -5187,16 +5174,16 @@ function fleetPanelHtml(f: Fleet): string {
         ? `<button class="chip-gold" data-act="instantrepair" data-arg="${f.id}" title="${t('side.fleet.repair.instant.title')}">🔧 ${repairCost}💰</button>`
         : ''
     }</div>`;
-    if (maxSh > 0)
-      h += `<div class="row hullrow" data-desc="stat:shield"><span class="hico">◈</span><span class="hbar sh"><i style="width:${Math.round((curSh / maxSh) * 100)}%"></i></span><b>${kfmt(Math.round(curSh))}/${kfmt(maxSh)}</b></div>`;
+    if (sm.shield.max > 0)
+      h += `<div class="row hullrow" data-desc="stat:shield"><span class="hico">◈</span><span class="hbar sh"><i style="width:${hullPct(sm.shield)}%"></i></span><b>${kfmt(sm.shield.cur)}/${kfmt(sm.shield.max)}</b></div>`;
   }
   // Aggregate combat weight — БОЕВОЙ вес, как его считает ядро: effectiveStats +
   // кап линии огня (топ-10 стволов). Скорость — базовая скорость флота (мин по
   // корпусам, лимп <30% учтён), с меткой форс-марша. The hero aura (+5%, noted
   // below) is not folded into these totals.
-  const atk = Math.round(cappedUnitStat(f.units, data, 'attack'));
-  const def = Math.round(cappedUnitStat(f.units, data, 'defense'));
-  const spd = fleetBaseSpeed(f, data);
+  const atk = sm.attack.capped;
+  const def = sm.defense;
+  const spd = sm.speed;
   const boosted = marchFlagged(f.id);
   const spdTxt =
     spd > 0
