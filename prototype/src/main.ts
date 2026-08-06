@@ -170,8 +170,9 @@ import { STANCES, diffDiplomacy } from './diploEvents';
 import { asteroidsFor, bracketStrokes, polyPoints } from './mapShapes';
 import { conveyorHtml as kitConveyorHtml } from './conveyorView';
 import { LIMP_PCT, fleetSummary, hullPct, stackHullPct } from './fleetSummary';
-import { isGroundUnit, isShipUnit, isWingUnit, planetSummary } from './planetSummary';
+import { isGroundUnit, isWingUnit, planetSummary } from './planetSummary';
 import { fleetWhere, groupTotals, pickPanel } from './panelSelect';
+import { buildRoster, garrisonByTab, tabCounts } from './planetTabs';
 import {
   actionButton,
   cardHeader as kitCardHeader,
@@ -1315,7 +1316,6 @@ const planet = (id: string | null | undefined): Planet | undefined =>
 // Само правило деления по домену живёт в `planetSummary.ts` (REFM-38) — одно место,
 // где «крыло» отделено от корабля линии, иначе авианосец считается дважды.
 const isSquadron = (u: string) => isWingUnit(u, data);
-const isShip = (u: string) => isShipUnit(u, data);
 const isGround = (u: string) => isGroundUnit(u, data);
 const floor = Math.floor;
 /** Compact number like Iron Order's bar: 15.7k, 728, … */
@@ -5460,11 +5460,12 @@ function planetPanelHtml(p: Planet): string {
   const ptName = tData(pt?.name ?? p.planetType ?? '—');
   // Province type (the structural kind) — shown so the map's provinces read clearly.
   const kindName = tData(sectorTypeOf(p.id)?.name ?? SECTOR_OF[p.id] ?? '—');
-  const ground = p.garrison.filter((st) => isGround(st.unit));
-  const ships = p.garrison.filter((st) => isShip(st.unit));
-  const wing = p.garrison.filter((st) => isSquadron(st.unit));
+  // Разбор гарнизона по вкладкам и их счётчики — в `planetTabs.ts` (REFM-41), там же
+  // правило «вкладка флота считает и орбиту»: построенное само уходит в космос.
+  const { ground, ships, wings: wing } = garrisonByTab(p.garrison, data);
   const gcount = sumUnits(p.garrison);
   const here = Object.values(s.fleets).filter((f) => f.location === p.id);
+  const counts = tabCounts(p, data, here);
   // Bytro-стиль: у мира авто-имя (тап → карточка статистики); координата (grid id)
   // остаётся отдельным обозначением в подзаголовке.
   const header = cardHeader(
@@ -5534,12 +5535,12 @@ function planetPanelHtml(p: Planet): string {
     }</div>`;
   }
 
-  h += `<div class="ptabs">${tabButton('ground', t('side.tab.ground'), ground.length, 'tab:ground')}${tabButton(
+  h += `<div class="ptabs">${tabButton('ground', t('side.tab.ground'), counts.ground, 'tab:ground')}${tabButton(
     'ships',
     t('side.tab.fleet'),
-    ships.length + here.length,
+    counts.ships,
     'tab:ships',
-  )}${tabButton('squadron', t('side.tab.wings'), wing.length, 'tab:squadron')}${tabButton('buildings', t('side.tab.buildings'), p.buildings.length, 'tab:buildings')}</div>`;
+  )}${tabButton('squadron', t('side.tab.wings'), counts.squadron, 'tab:squadron')}${tabButton('buildings', t('side.tab.buildings'), counts.buildings, 'tab:buildings')}</div>`;
 
   // Tab content is split into self-contained blocks; on desktop they flow into
   // side-by-side columns (filling the wide panel), on phones they stack vertically.
@@ -5559,7 +5560,7 @@ function planetPanelHtml(p: Planet): string {
         (pcUi() ? garrisonTilesHtml(ground) : unitRows(ground)),
     );
     if (mine) {
-      const groundBuilds = BUILD_UNITS.filter((u) => isGround(u));
+      const groundBuilds = buildRoster('ground', BUILD_UNITS, data);
       cols.push(
         `<div class="sec">${t('side.ground.conveyor')}</div>` +
           conveyorHtml(p.id, 'units') +
@@ -5586,7 +5587,7 @@ function planetPanelHtml(p: Planet): string {
       cols.push(orbit);
     }
     if (mine) {
-      const shipBuilds = BUILD_UNITS.filter((u) => isShip(u));
+      const shipBuilds = buildRoster('ships', BUILD_UNITS, data);
       cols.push(
         `<div class="sec">${t('side.shipyard.conveyor')}</div>` +
           conveyorHtml(p.id, 'units') +
@@ -5602,7 +5603,7 @@ function planetPanelHtml(p: Planet): string {
       cols.push(`<div class="sec">${t('side.garrison.wing')}</div>` + unitRows(wing));
     }
     if (mine) {
-      const wingBuilds = BUILD_UNITS.filter((u) => isSquadron(u));
+      const wingBuilds = buildRoster('squadron', BUILD_UNITS, data);
       cols.push(
         `<div class="sec">${t('side.wing.conveyor')}</div>` +
           conveyorHtml(p.id, 'units') +
