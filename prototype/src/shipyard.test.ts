@@ -247,6 +247,43 @@ describe('верфь — панель конструктора', () => {
     expect(html).toContain('data-cnun="ion_engine"');
   });
 
+  // Радар — роль ОДНОГО корпуса. Правило живёт в данных (`allowed.units`), а верфь
+  // обязана его честно объяснить: на крейсере утилита свободна, и подпись «нужен
+  // слот» читалась бы как враньё.
+  it('радар предлагается на сенсорном фрегате и заперт с внятной причиной на остальных', () => {
+    const frigate = loadoutPaneHtml(
+      s,
+      'p1',
+      normalizeDraft(s, 'p1', draftOf({ hull: 'sensor_frigate' }), YARD_HULLS),
+      YARD_HULLS,
+      view,
+    );
+    expect(frigate).toContain('data-cnmod="radar_module"');
+
+    const cruiser = loadoutPaneHtml(
+      s,
+      'p1',
+      normalizeDraft(s, 'p1', draftOf({ hull: 'cruiser' }), YARD_HULLS),
+      YARD_HULLS,
+      view,
+    );
+    expect(cruiser).not.toContain('data-cnmod="radar_module"'); // поставить нельзя…
+    const at = cruiser.indexOf('cn-mod locked');
+    expect(cruiser.slice(at, at + 400)).toContain('не для этого корпуса'); // …и сказано почему
+  });
+
+  it('новый корпус есть в списке верфи и несёт ровно один отсек', () => {
+    expect(YARD_HULLS).toContain('sensor_frigate');
+    const html = loadoutPaneHtml(
+      s,
+      'p1',
+      normalizeDraft(s, 'p1', draftOf({ hull: 'sensor_frigate' }), YARD_HULLS),
+      YARD_HULLS,
+      view,
+    );
+    expect((html.match(/class="cn-bay/g) ?? []).length).toBe(1);
+  });
+
   it('пустая казна гасит кнопку заказа, а не позволяет отправить отказ', () => {
     const broke = rich();
     broke.players.p1!.resources = { metal: 0, credits: 0, energy: 0, food: 0, microelectronics: 0 };

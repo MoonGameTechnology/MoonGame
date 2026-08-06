@@ -13,7 +13,7 @@
     "tag": "horizontal",
     "effects": { "stats": { "radarRange": 180 } },
     "cost": { "metal": 55 },
-    "allowed": { "domain": "space" }
+    "allowed": { "domain": "space", "units": ["sensor_frigate"] }
   },
   "ion_engine": {
     "name": "Ion Engine",

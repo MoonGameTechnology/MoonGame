@@ -151,7 +151,6 @@ const DATA_KEY_GAPS = new Set([
   'data.biomass-pit',
   'data.crimson-hegemony',
   'data.energy-nexus',
-  'data.field-hospital',
   'data.fortress',
   'data.fusion-reactor-i',
   'data.ground-marshal',

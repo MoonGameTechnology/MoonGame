@@ -1174,7 +1174,7 @@ ad-hoc запрос «видим ли объект на identify-уровне» 
 экран меню (Этап 4), персистентность меты + `MatchStore.list` (Postgres уже под это
 индексирован), лобби/создание матча (MM-1.1).
 
-## 6. Данные (`data/*.json`, версия `0.1.3`)
+## 6. Данные (`data/*.json`, версия `0.1.4`)
 
 > **RULES-2 — правила про КОНТЕНТ живут здесь, а не в коде.** Поля-правила у зданий:
 > `maxPerPlanet` (лимит экземпляров на мире, дефолт 1) и `creditsBonus` (доля прибавки ко
@@ -1189,10 +1189,13 @@ ad-hoc запрос «видим ли объект на identify-уровне» 
 - **units** (схема `UnitDef`): `domain('space'|'ground')`, `stats{attack, defense,
 speed, hp, shield, range, cargoCapacity, cargoSize, aaDamage}` (+ любые доп. числа),
   `line, traits, abilities, cost, buildTimeHours, upkeep`, `signature, radarRange`
-  (армия очков не даёт — см. victory). Есть: `scout_drone,
+  (армия очков не даёт — см. victory). Есть: `scout_drone, sensor_frigate,
 cruiser, siege_lance(artillery,range), dropship(cargoCapacity 12), militia,
-drop_infantry, tank(cargoSize 3), hero, fighter_squadron, strike_carrier` (10 юнитов,
+drop_infantry, tank(cargoSize 3), hero, fighter_squadron, strike_carrier` (11 юнитов,
 все vanguard; `orbital_aa` — защитное здание, не юнит; `infected_cruiser` в контенте нет).
+  `sensor_frigate` — носитель дальнего радара: один `utility`-слот, своя антенна 60, и
+  это ЕДИНСТВЕННЫЙ корпус, куда встаёт `radar_module` (`allowed.units` в `modules.json`,
+  исполняет общий гейт `canEquip` → `E_NOT_ALLOWED`).
   Щиты (аблятивные) у боевых кораблей: cruiser 15, dropship 12, hero 40.
 - **buildings** (`BuildingDef`): `cost, buildTimeHours, produces, hp,
 defenseBonus, upgrades[{…}], traits, scoreValue, radarRange, healRate, shipRepair`. Есть: `mine_t1, mine_t2,
@@ -1236,7 +1239,13 @@ grants}`), `heroFittings.json` (`{statMods, grants, cost}`). Движок ПОЛ
 - **Ещё два фрагмента бандла:** `modules.json` (6 корабельных модулей: `cargo_bay`,
   `radar_module`, `ion_engine`, `targeting_array`, `ablative_plating`, `shield_booster` —
   `ModuleDefSchema`; ядро читает их живьём в `util/loadout.ts`, инлайн-каталог прототипа
-  §7 их ЗЕРКАЛИТ) и `rewards.json` (XP/место по итогам — `RewardsDefSchema`, см. раздел
+  §7 их ЗЕРКАЛИТ). `radar_module` — единственный с именным списком корпусов
+  (`allowed.units: ['sensor_frigate']`): дальнее зрение это роль одного корабля, а не
+  опция для любого крейсера; правило исполняет общий гейт `canEquip` (`E_NOT_ALLOWED`),
+  в коде нет ни одной проверки по id. Радиус радара флота = антенна корпуса ПЛЮС
+  прибавки модулей (`stackRadarRange`/`fleetRadarRange` в `state/visibility.ts`) — до
+  этого читалось только поле корпуса, и установленный радар-модуль не считался нигде.
+  Второй фрагмент — `rewards.json` (XP/место по итогам — `RewardsDefSchema`, см. раздел
   наград SES-2). Оба — обычные строки `composeGameDataBundle` (`data/loadGameData.ts`),
   то есть проходят `parseGameData` вместе с остальным контентом.
 - **Каталоги ВНЕ ядрового бандла (только сервер):** `medals.json` (достижения — свой

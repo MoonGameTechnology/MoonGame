@@ -1,8 +1,9 @@
-import { buildingLevel, type GameData } from '../data/schemas';
+import { buildingLevel, type GameData, type UnitDef } from '../data/schemas';
 import { deepClone } from '../util/clone';
+import { effectiveStats } from '../util/loadout';
 import { getStance, hasMapShare, offerInvolves } from './diplomacy';
 import { fleetNodeAt, fleetPositionAt } from './fleetPosition';
-import type { Fleet, GameState, PlanetId, PlayerId, ScheduledEvent } from './gameState';
+import type { Fleet, GameState, PlanetId, PlayerId, ScheduledEvent, UnitStack } from './gameState';
 
 /** A scheduled event belongs to a player when it clearly references their own planet,
  *  fleet, or is owner-tagged for them. Used to keep a player's OWN pending construction /
@@ -38,7 +39,7 @@ const IDENTIFY_HOPS = 1;
 /** Identify range from a FLEET, in jumps. Ships are near-blind on their own: they
  *  see only the node they occupy (`0` hops). Real reconnaissance comes from RADAR —
  *  a `radar` building/outpost, or a unit/hero carrying a radar module (`radarRange`,
- *  resolved via `fleetRadar`). A radarless fleet is a blind kitten by design. */
+ *  resolved via `fleetRadarRange`). A radarless fleet is a blind kitten by design. */
 const FLEET_IDENTIFY_HOPS = 0;
 
 /** A radar projects TWO concentric ranges: it catches coarse signatures out to its
@@ -76,11 +77,35 @@ function fleetSignature(fleet: Fleet, data: GameData): number {
   return total;
 }
 
-/** Radar reach (distance, in map units) a fleet projects, from its loudest radar-ship. */
-function fleetRadar(fleet: Fleet, data: GameData): number {
+/**
+ * Radar reach one stack projects: the hull's OWN dish plus what its installed
+ * modules add.
+ *
+ * The two live in different places on purpose, and that is the whole subtlety:
+ * `UnitDef.radarRange` is a top-level field, while a module's delta lands in the
+ * `stats` bag. `effectiveStats` seeds itself from `def.stats` — which carries no
+ * `radarRange` — so what it returns for that key IS the module sum. They add up;
+ * neither shadows the other.
+ *
+ * (Before this, radar was read straight off `def.radarRange`, so a radar module
+ * was bought, priced and displayed — and changed nothing.)
+ */
+export function stackRadarRange(
+  def: UnitDef,
+  stack: Pick<UnitStack, 'modules'>,
+  data: GameData,
+): number {
+  return def.radarRange + (effectiveStats(def, stack, data).radarRange ?? 0);
+}
+
+/** Radar reach (distance, in map units) a fleet projects, from its loudest radar-ship.
+ *  Exported so the client draws the same circle the fog computes — a second copy of
+ *  this rule is how a module silently stops counting on one side of the wire. */
+export function fleetRadarRange(fleet: Pick<Fleet, 'units'>, data: GameData): number {
   let reach = 0;
   for (const stack of fleet.units) {
-    if (stack.count > 0) reach = Math.max(reach, data.units[stack.unit]?.radarRange ?? 0);
+    const def = data.units[stack.unit];
+    if (def && stack.count > 0) reach = Math.max(reach, stackRadarRange(def, stack, data));
   }
   return reach;
 }
@@ -234,7 +259,7 @@ function accumulateCoverage(
     const node = fleetNode(state, fleet);
     if (node === null) continue;
     flood(state, node, FLEET_IDENTIFY_HOPS, identify); // own node only — ships are near-blind
-    const reach = fleetRadar(fleet, data) * mult;
+    const reach = fleetRadarRange(fleet, data) * mult;
     if (reach > 0) {
       // Radar is a physical signal from the SHIP — centre it on the fleet's actual
       // continuous position, not the node it is heading to.
