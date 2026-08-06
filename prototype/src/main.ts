@@ -171,6 +171,7 @@ import { initMatchEnd } from './matchEnd';
 import { STANCES, diffDiplomacy } from './diploEvents';
 import { asteroidsFor, bracketStrokes, polyPoints } from './mapShapes';
 import { conveyorHtml as kitConveyorHtml } from './conveyorView';
+import { fleetSummary, stackHullPct } from './fleetSummary';
 import {
   actionButton,
   cardHeader as kitCardHeader,
@@ -5057,8 +5058,7 @@ function fleetTilesHtml(f: Fleet, stacks: UnitStack[]): string {
       if (!def) return '';
       const name = unitTitle(u.unit);
       const eff = effectiveStats(def, u, data);
-      const full = u.count * (eff.hp ?? 0);
-      const pct = full > 0 ? Math.round((Math.min(u.hp ?? full, full) / full) * 100) : 100;
+      const pct = stackHullPct(u, data); // тот же зажим остатка, что в сводке (REFM-37)
       const icon =
         def.domain === 'ground'
           ? `<span class="pt-ic">${unitIcon(u.unit, data)}</span>`
@@ -5073,15 +5073,10 @@ function fleetTilesHtml(f: Fleet, stacks: UnitStack[]): string {
  *  с капом, пулы корпуса/щита, скорость с активными множителями, трюм, радар,
  *  содержание. Обратно — тем же тапом по имени или кнопкой «назад». */
 function fleetSummaryHtml(f: Fleet): string {
+  // Всю арифметику считает `fleetSummary.ts` (REFM-37) — там же правила «огонь
+  // ограничен линией боя», «радар — максимум, а не сумма» и зажим пулов.
+  const sm = fleetSummary(f, data, s.time);
   const rows: string[] = [];
-  // состав по архетипам постера
-  const byArch = new Map<string, number>();
-  for (const st of f.units) {
-    const def = data.units[st.unit];
-    if (!def || st.count <= 0) continue;
-    const a = unitArchetype(def);
-    byArch.set(a, (byArch.get(a) ?? 0) + st.count);
-  }
   const ARCH_LABEL: Record<string, string> = {
     scout: t('side.arch.scout'),
     combat: t('side.arch.combat'),
@@ -5090,76 +5085,36 @@ function fleetSummaryHtml(f: Fleet): string {
     flagship: t('side.arch.flagship'),
     swarm: t('side.arch.swarm'),
   };
-  const comp = [...byArch.entries()].map(([a, n]) => `${ARCH_LABEL[a] ?? a} ×${n}`).join(' · ');
-  const nTr = sumUnits(f.landing ?? []);
+  const comp = sm.composition
+    .map(({ archetype, count }) => `${ARCH_LABEL[archetype] ?? archetype} ×${count}`)
+    .join(' · ');
   rows.push(
-    `<div class="row">${t('side.summary.composition')}: <b>${comp || t('side.none')}</b>${nTr ? ` · ${t('side.summary.troops')} ×${nTr}` : ''}</div>`,
+    `<div class="row">${t('side.summary.composition')}: <b>${comp || t('side.none')}</b>${sm.troops ? ` · ${t('side.summary.troops')} ×${sm.troops}` : ''}</div>`,
   );
   // боевой вес: кап против полной суммы — видно, сколько стволов «за линией»
-  const atkCap = Math.round(cappedUnitStat(f.units, data, 'attack'));
-  const atkAll = Math.round(sumUnitStat(f.units, data, 'attack'));
-  const defCap = Math.round(cappedUnitStat(f.units, data, 'defense'));
   rows.push(
-    `<div class="row">⚔ ${t('side.summary.attack')}: <b>${atkCap}</b>${atkAll > atkCap ? ` <span class="dim">(${t('side.summary.total')} ${atkAll} — ${t('side.summary.firing-cap', { n: COMBAT_UNIT_CAP })})</span>` : ''}</div>`,
+    `<div class="row">⚔ ${t('side.summary.attack')}: <b>${sm.attack.capped}</b>${sm.attack.total > sm.attack.capped ? ` <span class="dim">(${t('side.summary.total')} ${sm.attack.total} — ${t('side.summary.firing-cap', { n: COMBAT_UNIT_CAP })})</span>` : ''}</div>`,
   );
-  rows.push(`<div class="row">🛡 ${t('side.summary.defense')}: <b>${defCap}</b></div>`);
-  // пулы
-  let curHull = 0,
-    maxHull = 0,
-    curSh = 0,
-    maxSh = 0;
-  for (const st of [...f.units, ...(f.landing ?? [])]) {
-    const def = data.units[st.unit];
-    if (!def || st.count <= 0) continue;
-    const eff = effectiveStats(def, st, data);
-    const m = st.count * (eff.hp ?? 0);
-    maxHull += m;
-    curHull += Math.min(st.hp ?? m, m);
-    const ms = st.count * (eff.shield ?? 0);
-    maxSh += ms;
-    curSh += Math.min(st.shieldHp ?? ms, ms);
-  }
+  rows.push(`<div class="row">🛡 ${t('side.summary.defense')}: <b>${sm.defense}</b></div>`);
   rows.push(
-    `<div class="row">♥ ${t('side.summary.hull')}: <b>${kfmt(Math.round(curHull))}/${kfmt(maxHull)}</b>${maxSh > 0 ? ` · ◈ ${t('side.summary.shield')}: <b>${kfmt(Math.round(curSh))}/${kfmt(maxSh)}</b>` : ''}</div>`,
+    `<div class="row">♥ ${t('side.summary.hull')}: <b>${kfmt(sm.hull.cur)}/${kfmt(sm.hull.max)}</b>${sm.shield.max > 0 ? ` · ◈ ${t('side.summary.shield')}: <b>${kfmt(sm.shield.cur)}/${kfmt(sm.shield.max)}</b>` : ''}</div>`,
   );
   // скорость: база (мин по корпусам, лимп учтён) + активные множители
-  const spd = fleetBaseSpeed(f, data);
   const mults: string[] = [];
   if (marchFlagged(f.id)) mults.push(`⚡ ${t('side.summary.forced-march')} ×${FORCED_MARCH_MULT}`);
-  if (
-    (f as { retreatHasteUntil?: number }).retreatHasteUntil != null &&
-    s.time < (f as { retreatHasteUntil?: number }).retreatHasteUntil!
-  )
-    mults.push(`⤺ ${t('side.summary.retreat-haste')} ×1.5`);
+  if (sm.retreatHaste) mults.push(`⤺ ${t('side.summary.retreat-haste')} ×1.5`);
   rows.push(
-    `<div class="row">⚡ ${t('side.summary.speed')}: <b>${spd > 0 ? Math.round(spd) : '—'}</b>${mults.length ? ` <span class="dim">${mults.join(' · ')}</span>` : ''} <span class="dim">· ${t('side.summary.speed.note')}</span></div>`,
+    `<div class="row">⚡ ${t('side.summary.speed')}: <b>${sm.speed > 0 ? Math.round(sm.speed) : '—'}</b>${mults.length ? ` <span class="dim">${mults.join(' · ')}</span>` : ''} <span class="dim">· ${t('side.summary.speed.note')}</span></div>`,
   );
-  // трюм и радар
-  const cargoCap = sumUnitStat(f.units, data, 'cargoCapacity');
-  const cargoUsed = (f.landing ?? []).reduce((n, st) => {
-    const def = data.units[st.unit];
-    return n + (def ? st.count * (effectiveStats(def, st, data).cargoSize ?? 1) : 0);
-  }, 0);
-  if (cargoCap > 0)
+  if (sm.cargo)
     rows.push(
-      `<div class="row">📦 ${t('side.summary.cargo')}: <b>${cargoUsed}/${Math.round(cargoCap)}</b></div>`,
+      `<div class="row">📦 ${t('side.summary.cargo')}: <b>${sm.cargo.used}/${sm.cargo.cap}</b></div>`,
     );
-  const radar = Math.max(
-    0,
-    ...f.units.filter((u) => u.count > 0).map((u) => data.units[u.unit]?.radarRange ?? 0),
-  );
-  if (radar > 0) rows.push(`<div class="row">📡 ${t('side.summary.radar')}: <b>${radar}</b></div>`);
-  // содержание
-  const upkeep: Record<string, number> = {};
-  for (const st of f.units) {
-    const def = data.units[st.unit];
-    if (!def || st.count <= 0) continue;
-    for (const [r, n] of Object.entries(def.upkeep ?? {}))
-      upkeep[r] = (upkeep[r] ?? 0) + st.count * (n ?? 0);
-  }
+  if (sm.radar > 0)
+    rows.push(`<div class="row">📡 ${t('side.summary.radar')}: <b>${sm.radar}</b></div>`);
   // UI-RES2: содержание флота — теми же чипами, что цена и выработка; суффикс «/д»
   // несёт сам чип, поэтому хвост «/день» из строки ушёл.
-  const up = resLine(upkeep, { per: 'd' });
+  const up = resLine(sm.upkeep, { per: 'd' });
   if (up) rows.push(`<div class="row dim">${t('side.summary.upkeep')}: ${up}</div>`);
   return (
     `<div class="sec">${t('side.summary.title')}</div>` +
