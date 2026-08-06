@@ -87,7 +87,6 @@ import {
 } from './unitGlyphs';
 import { fleetCallsign, fleetKindKey } from './fleetName';
 import { planetName } from './planetName';
-import { provinceScore } from '../../packages/shared-core/src/state/sectorKind';
 // GRND-1: гарнизон, запертый живым боем, не отпускает войска (ядро: E_UNDER_ASSAULT).
 import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet';
 import { DEFAULT_HEROES, type HeroLoadout } from './heroes';
@@ -172,6 +171,7 @@ import { STANCES, diffDiplomacy } from './diploEvents';
 import { asteroidsFor, bracketStrokes, polyPoints } from './mapShapes';
 import { conveyorHtml as kitConveyorHtml } from './conveyorView';
 import { fleetSummary, stackHullPct } from './fleetSummary';
+import { isGroundUnit, isShipUnit, isWingUnit, planetSummary } from './planetSummary';
 import {
   actionButton,
   cardHeader as kitCardHeader,
@@ -1312,12 +1312,11 @@ const planet = (id: string | null | undefined): Planet | undefined =>
 // Squadrons/carriers are their own build category (air wing): a carrier (◈) ferries the
 // fighter squadrons (△) it launches, so both live under the Wings tab — apart from line
 // spacecraft (which stay under Ships).
-const isSquadron = (u: string) => {
-  const t = data.units[u]?.traits ?? [];
-  return t.includes('squadron') || t.includes('carrier');
-};
-const isShip = (u: string) => !data.units[u]?.traits.includes('ground') && !isSquadron(u);
-const isGround = (u: string) => data.units[u]?.domain === 'ground';
+// Само правило деления по домену живёт в `planetSummary.ts` (REFM-38) — одно место,
+// где «крыло» отделено от корабля линии, иначе авианосец считается дважды.
+const isSquadron = (u: string) => isWingUnit(u, data);
+const isShip = (u: string) => isShipUnit(u, data);
+const isGround = (u: string) => isGroundUnit(u, data);
 const floor = Math.floor;
 /** Compact number like Iron Order's bar: 15.7k, 728, … */
 
@@ -5401,14 +5400,14 @@ function unknownPlanetHtml(p: Planet): string {
  *  владелец, вид/тип/местность, пассивный выход по ресурсам (ECON-7 перекос),
  *  бонусы типа, гарнизон, постройки, очки победы, флоты на орбите. */
 function planetSummaryHtml(p: Planet): string {
+  // Числа и разбор гарнизона считает `planetSummary.ts` (REFM-38) — там же правила
+  // «крыло не корабль», «выход перечисляет и нули» и «очки победы из ядра».
+  const sm = planetSummary(p, data, Object.values(s.fleets));
   const rows: string[] = [];
   const pt = p.planetType ? data.planetTypes[p.planetType] : undefined;
   const ptName = tData(pt?.name ?? p.planetType ?? '—');
   const kindName = tData(sectorTypeOf(p.id)?.name ?? SECTOR_OF[p.id] ?? '—');
   const sec = tData(data.sectors[p.terrain ?? '']?.name ?? p.terrain ?? '—');
-  const ground = p.garrison.filter((st) => isGround(st.unit));
-  const ships = p.garrison.filter((st) => isShip(st.unit));
-  const wing = p.garrison.filter((st) => isSquadron(st.unit));
   rows.push(`<div class="row">${t('side.world.designation')}: <b>${esc(p.id)}</b></div>`);
   rows.push(
     `<div class="row">${t('side.world.owner')}: <b style="color:${ownerColor(p.owner)}">${p.owner ? esc(NAME[p.owner] ?? p.owner) : t('side.neutral')}</b></div>`,
@@ -5417,48 +5416,40 @@ function planetSummaryHtml(p: Planet): string {
     `<div class="row">${t('side.world.kind')}: <b>${esc(kindName)}</b> · ${esc(ptName)} · ${esc(sec)}</div>`,
   );
   // ECON-7: пассивный базовый выход мира по ресурсам — перекос типа планеты.
-  const base = (pt?.baseOutput ?? {}) as Record<string, number>;
   // UI-RES2: одно правило показа ресурса. Прежняя форма падала на СЛОВО для
   // ресурса без глифа в TECH_CUR — то есть ровно там, где игроку опереться не на что.
-  const baseStr = resLine(
-    Object.fromEntries(['metal', 'credits', 'food', 'energy'].map((r) => [r, base[r] ?? 0])),
-    { per: 'h' },
-  );
+  const baseStr = resLine(sm.baseOutput, { per: 'h' });
   if (baseStr)
     rows.push(
       `<div class="row">${t('side.world.output')}: <b>${baseStr}</b> <span class="dim">${t('side.world.output.note')}</span></div>`,
     );
   const pctf = (n: number) => (n >= 0 ? '+' : '') + Math.round(n * 100) + '%';
   const bonus: string[] = [];
-  if (pt && pt.productionBonus !== 0)
-    bonus.push(`${t('side.world.bonus.production')} ${pctf(pt.productionBonus)}`);
-  if (pt && (pt.defenseBonus ?? 0) !== 0)
-    bonus.push(`${t('side.world.bonus.defense')} ${pctf(pt.defenseBonus ?? 0)}`);
+  if (sm.bonuses.production !== undefined)
+    bonus.push(`${t('side.world.bonus.production')} ${pctf(sm.bonuses.production)}`);
+  if (sm.bonuses.defense !== undefined)
+    bonus.push(`${t('side.world.bonus.defense')} ${pctf(sm.bonuses.defense)}`);
   if (bonus.length)
     rows.push(
       `<div class="row">${t('side.world.type-bonuses')}: <b>${bonus.join(' · ')}</b></div>`,
     );
   rows.push(
-    `<div class="row">⚔ ${t('side.world.garrison')}: <b>${sumUnits(ground)}</b> ${t('side.world.count.ground')} · <b>${sumUnits(ships)}</b> ${t('side.world.count.ships')}${sumUnits(wing) ? ` · <b>${sumUnits(wing)}</b> ${t('side.world.count.squadrons')}` : ''}</div>`,
+    `<div class="row">⚔ ${t('side.world.garrison')}: <b>${sm.garrison.ground}</b> ${t('side.world.count.ground')} · <b>${sm.garrison.ships}</b> ${t('side.world.count.ships')}${sm.garrison.wings ? ` · <b>${sm.garrison.wings}</b> ${t('side.world.count.squadrons')}` : ''}</div>`,
   );
   const blist =
-    p.buildings
+    sm.buildings
       .map(
         (b) =>
           `${BUILD_ICON[b.type] ?? '▣'} ${buildingName(data.buildings[b.type]?.name, b.type)}${b.level > 1 ? ' L' + b.level : ''}`,
       )
       .join(', ') || t('side.none');
   rows.push(
-    `<div class="row">▣ ${t('side.world.buildings')} (${p.buildings.length}): <b>${blist}</b></div>`,
+    `<div class="row">▣ ${t('side.world.buildings')} (${sm.buildings.length}): <b>${blist}</b></div>`,
   );
-  rows.push(
-    `<div class="row">✦ ${t('side.world.vp')}: <b>${Math.round(provinceScore(data, p))}</b></div>`,
-  );
-  const here = Object.values(s.fleets).filter((f) => f.location === p.id);
-  if (here.length) {
-    const fShips = here.reduce((n, f) => n + sumUnits(f.units), 0);
+  rows.push(`<div class="row">✦ ${t('side.world.vp')}: <b>${sm.victoryPoints}</b></div>`);
+  if (sm.orbit.fleets) {
     rows.push(
-      `<div class="row">▲ ${t('side.world.fleets')}: <b>${here.length}</b> <span class="dim">(${t('side.world.fleet-ships', { n: fShips })})</span></div>`,
+      `<div class="row">▲ ${t('side.world.fleets')}: <b>${sm.orbit.fleets}</b> <span class="dim">(${t('side.world.fleet-ships', { n: sm.orbit.ships })})</span></div>`,
     );
   }
   if (p.owner === ME && capitalOf(s, ME) === p.id)
