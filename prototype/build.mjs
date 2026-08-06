@@ -2242,18 +2242,30 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #corp .cemblem{width:40px;height:40px;display:grid;place-items:center;flex:none;font-size:22px;color:var(--cyan);
   border:1px solid var(--line-hi);border-radius:9px;background:rgba(53,214,230,.08);box-shadow:0 0 12px rgba(53,214,230,.15);}
 #corp .cident{flex:1;min-width:0;}
-#corp .cident>b{font-size:17px;letter-spacing:1px;color:var(--ink);}
+/* Длинное имя обрезается многоточием, а не переносится: перенос гнал шапку вниз и
+   отъедал у сетки вкладок целую строку экрана. */
+#corp .cident>b{display:block;font-size:17px;letter-spacing:1px;color:var(--ink);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 #corp .ctag{color:var(--cyan);font-size:12px;letter-spacing:1px;}
 #corp .cmotto{color:var(--dim);font-size:11px;margin-top:2px;font-style:italic;}
 #corp .cx{flex:none;width:32px;height:32px;border-radius:8px;border:1px solid var(--line-hi);background:transparent;
   color:var(--dim);font-size:14px;cursor:pointer;}
 #corp .cx:active{background:rgba(255,90,77,.15);color:var(--red);}
-#corp .cmetrics{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:12px;font-size:11px;color:var(--dim);letter-spacing:.5px;}
-#corp .cmetrics b{color:var(--cyan);font-size:12px;}
-#corp .corptabs{display:flex;gap:2px;padding:8px 10px 0;border-bottom:1px solid var(--line);overflow-x:auto;}
-#corp .ctab{padding:9px 13px;border:none;border-bottom:2px solid transparent;background:transparent;
-  color:var(--dim);font:600 12px ui-monospace,monospace;letter-spacing:.5px;cursor:pointer;white-space:nowrap;}
-#corp .ctab.on{color:var(--cyan);border-bottom-color:var(--cyan);}
+#corp .csub{display:block;margin-top:3px;color:var(--dim);font-size:11px;letter-spacing:.3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+/* Плашка очков корпорации — то самое число, ради которого её и качают. */
+#corp .cpoints{flex:none;text-align:center;padding:6px 12px;border:1px solid var(--line-hi);border-radius:10px;}
+#corp .cpoints b{display:block;color:var(--cyan);font-size:17px;line-height:1.1;}
+#corp .cpoints span{color:var(--dim);font-size:9px;letter-spacing:1px;text-transform:uppercase;}
+/* Вкладки — СЕТКА, а не лента с прокруткой: шесть штук влезают в два ряда, и ни одна
+   не уезжает за край экрана (полоса прокрутки прятала половину вкладок на телефоне). */
+#corp .corptabs{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:10px;
+  border-bottom:1px solid var(--line);}
+#corp .ctab{display:flex;align-items:center;justify-content:center;gap:6px;min-height:40px;padding:7px 6px;
+  border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.02);
+  color:var(--dim);font:600 12px ui-monospace,monospace;letter-spacing:.3px;cursor:pointer;white-space:nowrap;}
+#corp .ctab i{font-style:normal;font-size:13px;opacity:.85;}
+#corp .ctab.on{color:var(--cyan);border-color:var(--cyan);background:rgba(53,214,230,.12);}
 #corp .corpbody{padding:16px 18px;overflow-y:auto;}
 #corp .ccols{display:flex;gap:14px;flex-wrap:wrap;}
 #corp .ccard{flex:1;min-width:230px;border:1px solid var(--line);border-radius:10px;padding:12px 14px;}
@@ -2275,7 +2287,53 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #corp .cdot{width:9px;height:9px;border-radius:50%;flex:none;background:currentColor;box-shadow:0 0 7px currentColor;}
 #corp .cnm{flex:1;min-width:120px;color:var(--ink);}
 #corp .cnm i{color:var(--cyan);font-style:normal;font-size:10px;}
-#corp .crole{color:var(--dim);width:70px;}
+/* Карточка участника: имя и роль сверху, управление — отдельной строкой под ними
+   (в один ряд на телефоне кнопки уезжали за край и до них было не дотянуться). */
+#corp .cmemb{border:1px solid var(--line);border-radius:10px;padding:10px 12px;
+  background:rgba(255,255,255,.02);font-size:12px;}
+#corp .cmemb.me{border-color:var(--cyan-dim);background:rgba(53,214,230,.06);}
+#corp .cm-top{display:flex;align-items:center;gap:10px;}
+#corp .cm-role{flex:none;padding:2px 9px;border:1px solid var(--line-hi);border-radius:999px;
+  color:var(--dim);font-size:10px;letter-spacing:.5px;text-transform:uppercase;}
+#corp .cmemb.me .cm-role{border-color:var(--cyan-dim);color:var(--cyan);}
+#corp .cm-act{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px;}
+/* Плитки «Штаба» — четыре числа, ради которых экран и открывают. */
+#corp .chq-tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:6px;}
+#corp .chq-tile{border:1px solid var(--line);border-radius:10px;padding:10px 12px;
+  background:rgba(255,255,255,.02);}
+#corp .chq-tile b{display:block;color:var(--cyan);font-size:19px;line-height:1.2;}
+#corp .chq-tile span{color:var(--dim);font-size:10px;letter-spacing:.8px;text-transform:uppercase;}
+/* Витрина наград: три кубка, тап по любому открывает общий список. */
+#corp .chq-cups{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+#corp .chq-cup{display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 6px;
+  border:1px dashed var(--line-hi);border-radius:12px;background:transparent;cursor:pointer;
+  color:var(--dim);font:600 10px ui-monospace,monospace;}
+#corp .chq-cup i{font-style:normal;font-size:26px;line-height:1;opacity:.45;}
+#corp .chq-cup span{text-align:center;line-height:1.3;}
+#corp .chq-cup.on{border-style:solid;border-color:var(--amber);color:var(--ink);
+  background:rgba(255,180,60,.08);}
+#corp .chq-cup.on i{opacity:1;}
+#corp .cmg-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px;}
+#corp .cmg-head b{color:var(--cyan);font-size:12px;letter-spacing:1.5px;text-transform:uppercase;}
+#corp .cmg-list{display:flex;flex-direction:column;gap:8px;}
+#corp .cmg-row{display:flex;align-items:center;gap:11px;width:100%;text-align:left;padding:10px 12px;
+  border:1px solid var(--line);border-radius:10px;background:rgba(255,255,255,.02);cursor:pointer;
+  color:var(--ink);font:400 12px ui-monospace,monospace;}
+#corp .cmg-row i{font-style:normal;font-size:20px;flex:none;}
+#corp .cmg-row span{flex:1;min-width:0;}
+#corp .cmg-row b{display:block;color:var(--ink);font-size:12px;}
+#corp .cmg-row em{display:block;margin-top:2px;color:var(--dim);font-size:10px;font-style:normal;line-height:1.4;}
+#corp .cmg-row u{flex:none;color:var(--dim);font-size:9px;text-decoration:none;letter-spacing:.5px;text-transform:uppercase;}
+#corp .cmg-row.off{opacity:.5;cursor:default;}
+/* Строка боя: исход слева заметной плашкой — победы и поражения читаются пролистыванием. */
+#corp .cbats{display:flex;flex-direction:column;gap:8px;}
+#corp .cbat{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line);
+  border-radius:10px;background:rgba(255,255,255,.02);font-size:12px;}
+#corp .cbat-v{flex:none;padding:3px 10px;border:1px solid var(--line-hi);border-radius:999px;
+  font-size:9px;letter-spacing:1px;color:var(--dim);}
+#corp .cbat-v.v-win{border-color:var(--cyan);color:var(--cyan);}
+#corp .cbat-v.v-loss{border-color:var(--red);color:var(--red);}
+#corp .cbat-f{flex:1;min-width:0;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 #corp .cinf{color:var(--grn);width:92px;text-align:right;}
 #corp .cpres{color:var(--dim);width:64px;}
 #corp .cman{display:flex;gap:5px;}
