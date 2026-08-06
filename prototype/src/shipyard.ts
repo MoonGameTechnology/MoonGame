@@ -42,7 +42,7 @@ const YARD_TABS: [YardTab, string][] = [
 ];
 
 /** Buildable space hulls the «Корабли» pane fits; squadron/carrier hulls → «Эскадрильи». */
-export const YARD_HULLS = ['cruiser', 'siege', 'scout', 'dropship'];
+export const YARD_HULLS = ['cruiser', 'siege', 'scout', 'sensor_frigate', 'dropship'];
 export const YARD_SQUAD_HULLS = ['fighter_squadron', 'strike_carrier'];
 
 /** How many hulls one order may queue at once (the ± stepper's range). */
@@ -222,9 +222,16 @@ export function loadoutPaneHtml(
           `<span class="cn-mn">${esc(tData(o.name))}${originTagHtml(view.arsenalItems, o.id)}</span><span class="cn-me">${eff}</span><span class="cn-mc">${bagText(o.cost)}</span></button>`
         );
       }
+      // Причина берётся из КОДА отказа ядра, а не гадается: «нет слота» и «не для
+      // этого корпуса» — разные вещи, и подпись «нужен слот: утилита» на корпусе, у
+      // которого утилита свободна, читалась бы как враньё.
+      const why =
+        o.code === 'E_NOT_ALLOWED'
+          ? t('yard.module.not-allowed')
+          : t('yard.slot.named', { s: t(SLOT_KEY[o.slot] ?? o.slot) });
       return (
         `<div class="cn-mod locked"><span class="cn-mic">${MODULE_ICON[o.id] ?? '▪'}</span>` +
-        `<span class="cn-mn">${esc(tData(o.name))}</span><span class="cn-me">${t('yard.slot.named', { s: t(SLOT_KEY[o.slot] ?? o.slot) })}</span><span class="cn-mc">${bagText(o.cost)}</span></div>`
+        `<span class="cn-mn">${esc(tData(o.name))}</span><span class="cn-me">${why}</span><span class="cn-mc">${bagText(o.cost)}</span></div>`
       );
     })
     .join('');

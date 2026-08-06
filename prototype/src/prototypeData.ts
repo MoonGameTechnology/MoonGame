@@ -331,6 +331,20 @@ export const data: GameData = parseGameData({
       upkeep: { credits: 1 },
       slots: { utility: 1 }, // a lone utility bay — a recon drone flexes its sensors
     },
+    // Сенсорный фрегат — носитель дальнего радара и больше почти ничего. Своя антенна
+    // маленькая: далеко видит именно СВЯЗКА «фрегат + радар-модуль» (60 + 180), и это
+    // единственный корпус, куда модуль встаёт (`modules.radar_module.allowed.units`).
+    // Драться не умеет — теряя его, теряешь глаза, а не огневую мощь.
+    sensor_frigate: {
+      faction: 'blue',
+      stats: { attack: 4, defense: 6, speed: 56, hp: 22, cargoCapacity: 1 },
+      signature: 1, // слушает, а не кричит — читается как разведкорпус
+      radarRange: 60, // своя антенна скромная; дальнее зрение даёт модуль
+      cost: { metal: 55, microelectronics: 2 }, // ECON-7: сенсоры — хай-тек
+      buildTimeHours: 2,
+      upkeep: { credits: 2 },
+      slots: { utility: 1 }, // ровно один отсек — и он же единственный дом радара
+    },
     cruiser: {
       faction: 'blue',
       stats: { attack: 16, defense: 14, speed: 40, hp: 60, cargoCapacity: 5 },
@@ -477,13 +491,17 @@ export const data: GameData = parseGameData({
       cost: { metal: 45 },
       allowed: { domain: 'space' },
     },
+    // Единственный модуль с именным списком корпусов: дальнее зрение — роль ОДНОГО
+    // корабля, а не опция, которую довешивает любой крейсер. Ограничение живёт в
+    // данных (`allowed.units`), ядро исполняет его через общий гейт `canEquip`
+    // (E_NOT_ALLOWED) — в коде нет ни одного `if (unit === …)`.
     radar_module: {
       name: 'Radar Module',
       slot: 'utility',
       tag: 'horizontal',
       effects: { stats: { radarRange: 180 } },
       cost: { metal: 55 },
-      allowed: { domain: 'space' },
+      allowed: { domain: 'space', units: ['sensor_frigate'] },
     },
     ion_engine: {
       name: 'Ion Engine',
@@ -699,6 +717,20 @@ export const data: GameData = parseGameData({
       ],
     },
     barracks: { name: 'Barracks', cost: { metal: 70 }, buildTimeHours: 3, hp: 25, scoreValue: 2 },
+    // Полевой госпиталь — единственный источник восстановления ГАРНИЗОНА: `healRate`
+    // это доля полного HP, которую пехота мира отхиливает за игровой час
+    // (constructionModule, обработчик `time.advanced`). Во время наземного штурма
+    // лечение не идёт — раненых не штопают под огнём. Уже есть в бандле
+    // (`data/buildings.json`), в каталоге прототипа его не было; числа те же, кроме
+    // цены и срока — они приведены к прототипной шкале.
+    hospital: {
+      name: 'Field Hospital',
+      cost: { metal: 120, credits: 40 },
+      buildTimeHours: 4,
+      hp: 22,
+      healRate: 0.15,
+      scoreValue: 4,
+    },
     // spaceport — the yard a space-domain hull needs to be laid down at all
     // (construction.ts `hasShipyard`/`enablesShipConstruction`); every homeworld
     // starts with one (see `newGame`) so turn-1 fleet-building always works.

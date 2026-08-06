@@ -109,6 +109,8 @@ export {
   identifiedNodes,
   sensorCoverage,
   isVisibleTo,
+  fleetRadarRange,
+  stackRadarRange,
   BLACKOUT_MULT,
 } from './state/visibility';
 export type {

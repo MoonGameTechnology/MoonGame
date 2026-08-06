@@ -20,6 +20,31 @@
       "credits": 2
     }
   },
+  "sensor_frigate": {
+    "faction": "vanguard",
+    "stats": {
+      "attack": 3,
+      "defense": 4,
+      "speed": 8,
+      "hp": 18,
+      "cargoCapacity": 1
+    },
+    "line": "rear",
+    "traits": [],
+    "abilities": [],
+    "signature": 1,
+    "radarRange": 60,
+    "cost": {
+      "metal": 120,
+      "microelectronics": 2
+    },
+    "upkeep": {
+      "credits": 4
+    },
+    "slots": {
+      "utility": 1
+    }
+  },
   "cruiser": {
     "faction": "vanguard",
     "stats": {

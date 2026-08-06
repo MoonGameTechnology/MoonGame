@@ -135,6 +135,7 @@ import {
   scanNodeThreats,
   identifiedNodes,
   sensorCoverage,
+  fleetRadarRange,
   type PausedConstructionSite,
 } from '../../packages/shared-core/src/index';
 import {
@@ -170,8 +171,17 @@ import { STANCES, diffDiplomacy } from './diploEvents';
 import { asteroidsFor, bracketStrokes, polyPoints } from './mapShapes';
 import { conveyorHtml as kitConveyorHtml } from './conveyorView';
 import { LIMP_PCT, fleetSummary, hullPct, stackHullPct } from './fleetSummary';
-import { isGroundUnit, isShipUnit, isWingUnit, planetSummary } from './planetSummary';
+import { isGroundUnit, isWingUnit, planetSummary } from './planetSummary';
 import { fleetWhere, groupTotals, pickPanel } from './panelSelect';
+import { buildRoster, garrisonByTab, tabCounts } from './planetTabs';
+import { catalogTileHtml, tileLock, type TileLock } from './catalogTile';
+import { createScanMemory, type Snapshot } from './scanMemory';
+import {
+  factionBonuses,
+  houseNameFor,
+  rivalCount,
+  seatFactionIds as seatSeatFactionIds,
+} from './setupSeats';
 import {
   actionButton,
   cardHeader as kitCardHeader,
@@ -1318,7 +1328,6 @@ const planet = (id: string | null | undefined): Planet | undefined =>
 // Само правило деления по домену живёт в `planetSummary.ts` (REFM-38) — одно место,
 // где «крыло» отделено от корабля линии, иначе авианосец считается дважды.
 const isSquadron = (u: string) => isWingUnit(u, data);
-const isShip = (u: string) => isShipUnit(u, data);
 const isGround = (u: string) => isGroundUnit(u, data);
 const floor = Math.floor;
 /** Compact number like Iron Order's bar: 15.7k, 728, … */
@@ -1775,11 +1784,11 @@ function sigClass(sig: number): 'S' | 'M' | 'L' {
   return sig >= 13 ? 'L' : sig >= 5 ? 'M' : 'S';
 }
 /** Radar reach (distance) a fleet projects, from its loudest radar-ship (0 = none).
- *  Reads `data.units[u].radarRange` — same field the core fog uses. */
+ *  Тонкая обёртка над ЯДРОВЫМ `fleetRadarRange` — не своя копия правила: когда копия
+ *  тут читала только `data.units[u].radarRange`, установленный радар-модуль на карте
+ *  не считался, хотя игрок за него платил. */
 function fleetRadar(f: Fleet): number {
-  let r = 0;
-  for (const st of f.units) if (st.count > 0) r = Math.max(r, data.units[st.unit]?.radarRange ?? 0);
-  return r;
+  return fleetRadarRange(f, data);
 }
 /** Radar reach (distance) a world projects, from its best radar array (grows with
  *  level). Reads `buildingLevel(def, level).radarRange` — same field the core fog uses. */
@@ -1863,22 +1872,12 @@ function fleetSeen(f: Fleet): boolean {
 
 // Per-viewer MEMORY of the last identified state of a node (variant B): once you
 // have seen a system, you remember its last-known state (greyed) when sight lifts.
-interface Snapshot {
-  owner: string | null;
-  garrison: number;
-  buildings: { type: string; level: number }[];
-}
-const memory = new Map<string, Snapshot>();
+// Само хранилище и правила снимка — в `scanMemory.ts` (REFM-43): пишутся только
+// ОПОЗНАННЫЕ узлы (радар состава не выдаёт), снимок — копия, а не ссылка на живой
+// мир, и память принадлежит матчу.
+const memory = createScanMemory();
 function updateMemory(identify: Set<string>): void {
-  for (const id of identify) {
-    const p = s.planets[id];
-    if (p)
-      memory.set(id, {
-        owner: p.owner,
-        garrison: sumUnits(p.garrison),
-        buildings: p.buildings.map((b) => ({ type: b.type, level: b.level })),
-      });
-  }
+  memory.remember(identify, s.planets);
 }
 
 /** True if node `id` is identified (full detail); fog off ⇒ always true. */
@@ -3774,7 +3773,7 @@ let bgCam = { x: 0, y: 0, scale: 1 }; // camera the static layer was last baked 
  *  the map must not repaint a hidden capture (an intel leak the fog exists to stop). */
 function knownOwner(id: string): string | null {
   if (known(id)) return s.planets[id]?.owner ?? null;
-  return memory.get(id)?.owner ?? null;
+  return memory.ownerOf(id);
 }
 function ownersSig(): string {
   let out = '';
@@ -5498,11 +5497,12 @@ function planetPanelHtml(p: Planet): string {
   const ptName = tData(pt?.name ?? p.planetType ?? '—');
   // Province type (the structural kind) — shown so the map's provinces read clearly.
   const kindName = tData(sectorTypeOf(p.id)?.name ?? SECTOR_OF[p.id] ?? '—');
-  const ground = p.garrison.filter((st) => isGround(st.unit));
-  const ships = p.garrison.filter((st) => isShip(st.unit));
-  const wing = p.garrison.filter((st) => isSquadron(st.unit));
+  // Разбор гарнизона по вкладкам и их счётчики — в `planetTabs.ts` (REFM-41), там же
+  // правило «вкладка флота считает и орбиту»: построенное само уходит в космос.
+  const { ground, ships, wings: wing } = garrisonByTab(p.garrison, data);
   const gcount = sumUnits(p.garrison);
   const here = Object.values(s.fleets).filter((f) => f.location === p.id);
+  const counts = tabCounts(p, data, here);
   // Bytro-стиль: у мира авто-имя (тап → карточка статистики); координата (grid id)
   // остаётся отдельным обозначением в подзаголовке.
   const header = cardHeader(
@@ -5572,12 +5572,12 @@ function planetPanelHtml(p: Planet): string {
     }</div>`;
   }
 
-  h += `<div class="ptabs">${tabButton('ground', t('side.tab.ground'), ground.length, 'tab:ground')}${tabButton(
+  h += `<div class="ptabs">${tabButton('ground', t('side.tab.ground'), counts.ground, 'tab:ground')}${tabButton(
     'ships',
     t('side.tab.fleet'),
-    ships.length + here.length,
+    counts.ships,
     'tab:ships',
-  )}${tabButton('squadron', t('side.tab.wings'), wing.length, 'tab:squadron')}${tabButton('buildings', t('side.tab.buildings'), p.buildings.length, 'tab:buildings')}</div>`;
+  )}${tabButton('squadron', t('side.tab.wings'), counts.squadron, 'tab:squadron')}${tabButton('buildings', t('side.tab.buildings'), counts.buildings, 'tab:buildings')}</div>`;
 
   // Tab content is split into self-contained blocks; on desktop they flow into
   // side-by-side columns (filling the wide panel), on phones they stack vertically.
@@ -5597,7 +5597,7 @@ function planetPanelHtml(p: Planet): string {
         (pcUi() ? garrisonTilesHtml(ground) : unitRows(ground)),
     );
     if (mine) {
-      const groundBuilds = BUILD_UNITS.filter((u) => isGround(u));
+      const groundBuilds = buildRoster('ground', BUILD_UNITS, data);
       cols.push(
         `<div class="sec">${t('side.ground.conveyor')}</div>` +
           conveyorHtml(p.id, 'units') +
@@ -5624,7 +5624,7 @@ function planetPanelHtml(p: Planet): string {
       cols.push(orbit);
     }
     if (mine) {
-      const shipBuilds = BUILD_UNITS.filter((u) => isShip(u));
+      const shipBuilds = buildRoster('ships', BUILD_UNITS, data);
       cols.push(
         `<div class="sec">${t('side.shipyard.conveyor')}</div>` +
           conveyorHtml(p.id, 'units') +
@@ -5640,7 +5640,7 @@ function planetPanelHtml(p: Planet): string {
       cols.push(`<div class="sec">${t('side.garrison.wing')}</div>` + unitRows(wing));
     }
     if (mine) {
-      const wingBuilds = BUILD_UNITS.filter((u) => isSquadron(u));
+      const wingBuilds = buildRoster('squadron', BUILD_UNITS, data);
       cols.push(
         `<div class="sec">${t('side.wing.conveyor')}</div>` +
           conveyorHtml(p.id, 'units') +
@@ -6240,7 +6240,7 @@ function scrollFeedToEnd(): void {
  *  Returns why a fresh build order would be refused — so the build tile can grey out
  *  the moment it's committed (built / building / queued / paused), instead of taking
  *  the order and only rejecting it when the queue reaches it. `null` = orderable. */
-function buildingLocked(planetId: string, id: string): 'built' | 'queued' | null {
+function buildingLocked(planetId: string, id: string): TileLock {
   const p = s.planets[planetId];
   if (!p) return null;
   // RULES-1: правило «одно здание такого типа на мир» больше НЕ переписано здесь —
@@ -6248,39 +6248,33 @@ function buildingLocked(planetId: string, id: string): 'built' | 'queued' | null
   // держал свою копию (буквально `p.buildings.some(...)` + скан scheduled + paused),
   // и копия разъезжалась: кодекс проверял только «уже стоит» и всю стройку первого
   // экземпляра предлагал заказать второй.
-  const code = canOrder(s, buildBuilding(ME, planetId, id));
-  if (code === 'E_ALREADY_BUILT') return 'built';
-  if (code === 'E_ALREADY_QUEUED' || code === 'E_ALREADY_PAUSED') return 'queued';
-  // Локальная очередь прототипа ядру неизвестна по определению (в сети её нет —
-  // там стройку таймит сервер), поэтому она добавляется здесь ЯВНО, а не как «ещё
-  // одно правило». Это единственная местная добавка к вердикту ядра.
-  if (queueOf(planetId).buildings.some((q) => q.kind === 'building' && q.id === id))
-    return 'queued';
-  // Прочие отказы (E_INSUFFICIENT, E_BOMBARDED, E_WRONG_SECTOR…) плитку НЕ гасят:
-  // нехватку показывает сама цена с дефицитом (UI-RES), и серая кнопка вместо цифры
-  // «сколько не хватает» была бы хуже. Это решение ПОДАЧИ, не правило.
-  return null;
+  // Какие коды означают повтор, а какие плитку НЕ гасят — в `catalogTile.ts`
+  // (REFM-42). Локальная очередь прототипа ядру неизвестна по определению (в сети
+  // её нет — там стройку таймит сервер), поэтому она приходит отдельным флагом.
+  return tileLock(
+    canOrder(s, buildBuilding(ME, planetId, id)),
+    queueOf(planetId).buildings.some((q) => q.kind === 'building' && q.id === id),
+  );
 }
 function codexTile(
   kind: 'b' | 'u',
   id: string,
   label: string,
   orderable = false,
-  lockedFor?: string,
+  lockedFor?: TileLock,
 ): string {
   if (!(kind === 'b' ? data.buildings[id] : data.units[id])) return '';
-  const icon = kind === 'b' ? (BUILD_ICON[id] ?? '▣') : unitIconHtml(id, data, youColor);
-  const name = kind === 'b' ? buildingName(data.buildings[id]?.name, id) : unitTitle(id);
-  if (lockedFor) {
-    // Committed already — a dim, non-ordering tile. Keeps data-desc (hover dossier),
-    // drops data-codex/data-buildorder so neither left- nor right-click builds again.
-    const mark = lockedFor === 'built' ? '✓' : '⏳';
-    return `<button class="ptile locked" data-desc="${kind}:${id}" data-name="${esc(name)}"><span class="pt-ic">${icon}</span><span class="pt-c">${mark} ${esc(label)}</span></button>`;
-  }
-  // Build-menu tiles carry the enqueue order (PC right-click = build w/o the codex
-  // confirmation); composition/garrison tiles don't — right-click is inert there.
-  const order = orderable ? ` data-buildorder="${kind === 'u' ? 'unit' : 'building'}:${id}"` : '';
-  return `<button class="ptile" data-codex="${kind}:${id}" data-desc="${kind}:${id}"${order} data-name="${esc(name)}"><span class="pt-ic">${icon}</span><span class="pt-c">${esc(label)}</span></button>`;
+  // Разметку плитки собирает `catalogTile.ts` (REFM-42) — там же правило «запертая
+  // теряет ОБА якоря заказа, оставляя досье».
+  return catalogTileHtml({
+    kind,
+    id,
+    icon: kind === 'b' ? (BUILD_ICON[id] ?? '▣') : unitIconHtml(id, data, youColor),
+    name: kind === 'b' ? buildingName(data.buildings[id]?.name, id) : unitTitle(id),
+    label,
+    orderable,
+    lock: lockedFor ?? null,
+  });
 }
 /** Ground-garrison tiles (the ЗЕМЛЯ tab): one flowing row of icon·count chips — no
  *  names; the hover dossier (PC) / tap dossier (touch) carries the identification. */
@@ -9118,29 +9112,28 @@ function renderSetupMap(): void {
 /** H3 — which house each seat plays: seat 0 (you) = `setupFaction`, then the four
  *  passive houses rotate in stable order across the remaining seats. */
 function seatFactionIds(): string[] {
-  const all = Object.keys(data.factions);
-  const ordered = [setupFaction, ...all.filter((f) => f !== setupFaction)];
-  return SEAT_META.map((_, i) => ordered[i % ordered.length]!);
+  // Раздача и нумерация домов — в `setupSeats.ts` (REFM-44): твой первый, остальные
+  // по кругу в стабильном порядке, со второго круга имя получает номер.
+  return seatSeatFactionIds(setupFaction, Object.keys(data.factions), SEAT_META.length);
 }
 function seatHouseName(fid: string, fallback: string, index: number): string {
-  const base = data.factions[fid]?.name ?? fallback;
-  const cycle = Math.floor(index / Math.max(1, Object.keys(data.factions).length)) + 1;
-  return cycle === 1 ? base : `${base} ${cycle}`;
+  return houseNameFor(
+    data.factions[fid]?.name ?? fallback,
+    index,
+    Object.keys(data.factions).length,
+  );
 }
 /** A faction's passive-bonus readout, straight from the data (economy or units). */
 function factionBonusLine(fid: string): string {
-  const p = data.factions[fid]?.passives;
-  if (!p) return '';
-  const parts: string[] = [];
-  if (p.productionBonus)
-    parts.push(t('setup.bonus.economy', { n: Math.round(p.productionBonus * 100) }));
-  if (p.combatDamageBonus)
-    parts.push(t('setup.bonus.damage', { n: Math.round(p.combatDamageBonus * 100) }));
-  if (p.fleetSpeedBonus)
-    parts.push(t('setup.bonus.speed', { n: Math.round(p.fleetSpeedBonus * 100) }));
-  if (p.radarRangeBonus)
-    parts.push(t('setup.bonus.radar', { n: Math.round(p.radarRangeBonus * 100) }));
-  return parts.join(' · ');
+  const BONUS_KEY = {
+    economy: 'setup.bonus.economy',
+    damage: 'setup.bonus.damage',
+    speed: 'setup.bonus.speed',
+    radar: 'setup.bonus.radar',
+  } as const;
+  return factionBonuses(data.factions[fid]?.passives)
+    .map((b) => t(BONUS_KEY[b.kind], { n: b.pct }))
+    .join(' · ');
 }
 
 function renderSetupSlots(): void {
@@ -9199,7 +9192,7 @@ function renderSetup(): void {
   // Seat 1 (you) is always in, so the match can always launch — including with ZERO
   // rivals: a calm solo sandbox to read descriptions, learn the UI and test in peace
   // (the core never ends a one-player match — victory needs ≥2 active sides).
-  const rivals = setupSlots.slice(1).filter((r) => r === 'ai').length;
+  const rivals = rivalCount(setupSlots);
   setupGoEl.disabled = false;
   setupGoEl.textContent = rivals === 0 ? t('setup.start.solo') : t('setup.start');
   setupHintEl.textContent = t(rivals === 0 ? 'setup.home.solo' : 'setup.home.pick', {

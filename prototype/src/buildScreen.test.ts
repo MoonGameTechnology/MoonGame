@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale } from '../../localization/runtime';
 import { newGame, canOrder, data } from './game';
+import { buildingLevel } from '../../packages/shared-core/src/index';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import {
   BUILD_CATEGORIES,
@@ -45,6 +46,15 @@ describe('окно построек — категории из данных', (
   it('каждое здание каталога попадает ровно в одну из трёх категорий', () => {
     const keys = BUILD_CATEGORIES.map((c) => c.key);
     for (const def of Object.values(data.buildings)) expect(keys).toContain(buildCategory(def));
+  });
+
+  // Госпиталь — единственный источник восстановления гарнизона; в каталоге прототипа
+  // его не было вовсе, хотя ядро `healRate` умеет считать с самого начала.
+  it('полевой госпиталь есть в каталоге и лечит гарнизон', () => {
+    const hospital = data.buildings.hospital;
+    expect(hospital).toBeDefined();
+    expect(buildingLevel(hospital!, 1).healRate).toBeGreaterThan(0);
+    expect(buildCategory(hospital!)).toBe('infra'); // не экономика и не оборона
   });
 });
 

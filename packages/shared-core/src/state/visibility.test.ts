@@ -8,7 +8,14 @@ import {
   type Planet,
   type Player,
 } from './gameState';
-import { identifiedNodes, isVisibleTo, visibleState, visibleView } from './visibility';
+import {
+  fleetRadarRange,
+  identifiedNodes,
+  isVisibleTo,
+  stackRadarRange,
+  visibleState,
+  visibleView,
+} from './visibility';
 import type { VisibleState } from './visibility';
 
 const data: GameData = parseGameData({
@@ -17,6 +24,13 @@ const data: GameData = parseGameData({
   units: {
     cruiser: { faction: 'x', stats: { attack: 10, defense: 8, speed: 6, hp: 40 }, signature: 4 },
     scout: { faction: 'x', stats: { attack: 2, defense: 2, speed: 9, hp: 8 }, radarRange: 350 },
+    // Носитель радар-модуля: своя антенна маленькая, дальнее зрение даёт модуль.
+    picket: {
+      faction: 'x',
+      stats: { attack: 2, defense: 2, speed: 9, hp: 8 },
+      radarRange: 60,
+      slots: { utility: 1 },
+    },
   },
   factions: {
     // A2: a faction whose passive stretches every radar the player fields by +50%.
@@ -31,6 +45,15 @@ const data: GameData = parseGameData({
     long_scan: { name: 'Long-range scanning', effects: { radarRangeBonus: 0.5 } },
   },
   events: {},
+  modules: {
+    radar_module: {
+      name: 'Radar Module',
+      slot: 'utility',
+      tag: 'horizontal',
+      effects: { stats: { radarRange: 180 } },
+      allowed: { units: ['picket'] },
+    },
+  },
 });
 
 function player(id: string): Player {
@@ -777,5 +800,39 @@ describe('shared vision — allies pool their reconnaissance (союз / коа�
     expect(view.planets.H3?.owner).toBe('p3'); // vision shared…
     expect(view.players.p3?.resources).toEqual({}); // …economy is not
     expect(view.players.p3?.technologies).toBeUndefined();
+  });
+});
+
+// Радар-модуль ДОЛЖЕН считаться в тумане. Пока радиус читался прямо с поля корпуса,
+// модуль покупался, стоил металла, показывался в верфи — и не делал ничего: его прибавка
+// лежит в мешке `stats`, а поле корпуса живёт снаружи, и одно другое не видело.
+describe('радиус радара = антенна корпуса + модули', () => {
+  const picket = data.units.picket!;
+
+  it('без модуля — ровно своя антенна', () => {
+    expect(stackRadarRange(picket, {}, data)).toBe(60);
+  });
+
+  it('с модулем — сумма, а не подмена', () => {
+    expect(stackRadarRange(picket, { modules: ['radar_module'] }, data)).toBe(240); // 60 + 180
+  });
+
+  it('флот берёт САМЫЙ дальнобойный корпус, и модуль в этот выбор входит', () => {
+    const units = (mods?: string[]) => [
+      { unit: 'cruiser', count: 3 },
+      { unit: 'picket', count: 1, ...(mods ? { modules: mods } : {}) },
+    ];
+    expect(fleetRadarRange({ units: units() }, data)).toBe(60);
+    expect(fleetRadarRange({ units: units(['radar_module']) }, data)).toBe(240);
+  });
+
+  it('пустой стек радар не проецирует (корабль ещё не построен)', () => {
+    expect(
+      fleetRadarRange({ units: [{ unit: 'picket', count: 0, modules: ['radar_module'] }] }, data),
+    ).toBe(0);
+  });
+
+  it('незнакомый корпус пропускается, а не роняет проекцию', () => {
+    expect(fleetRadarRange({ units: [{ unit: 'нет-такого', count: 2 }] }, data)).toBe(0);
   });
 });
