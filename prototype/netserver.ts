@@ -262,6 +262,13 @@ if (PROD_FLAG) {
     missing.push('TLS (TLS_KEY_FILE+TLS_CERT_FILE for native TLS, or TRUST_PROXY=1 behind a TLS-terminating proxy)');
   }
   if (!(process.env.SEAT_LOCK === '1' || process.env.SEAT_LOCK === 'true')) missing.push('SEAT_LOCK=1');
+  // SEC-20, зеркало serverConfig.ts: дефолтный пароль БД из базового compose. Гард `:?`
+  // стоит только в оверлеях, а путь «нативный TLS» (deploy/README.md) поднимается голым
+  // `docker compose up` — там пароль схлопывается в `void`, и раньше стек проходил
+  // проверку прод-готовности целиком.
+  if (/^postgres(?:ql)?:\/\/[^:@/]+:void@/.test(process.env.DATABASE_URL ?? '')) {
+    missing.push('POSTGRES_PASSWORD (в DATABASE_URL дефолтный пароль `void`, задайте свой: `openssl rand -hex 32`)');
+  }
   if (missing.length) {
     process.stderr.write(
       `PROD=1 refuses to start: missing ${missing.join(', ')}. ` +

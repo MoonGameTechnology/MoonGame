@@ -154,6 +154,12 @@ export interface ProdReadiness {
 /** Минимальная длина `AUTH_JWT_SECRET` под `PROD=1` (см. checkProductionReadiness). */
 export const MIN_SECRET_LEN = 32;
 
+/** Дефолтный пароль Postgres из `deploy/docker-compose.yml` (`${POSTGRES_PASSWORD:-void}`).
+ *  Ловим его в СТРОКЕ ПОДКЛЮЧЕНИЯ, а не в отдельной переменной: до сервера доезжает
+ *  именно `DATABASE_URL`, и она может быть собрана мимо compose. Якорь на схему и `@`
+ *  не даёт правилу сработать на пароль, который просто СОДЕРЖИТ «void». */
+const DEFAULT_DB_PASSWORD_RE = /^postgres(?:ql)?:\/\/[^:@/]+:void@/;
+
 /**
  * MP-1: turn the "never leave a public plain port" anti-goal into an enforced check
  * instead of a comment. When `PROD=1`/`PROD=true`, a boot MUST have auth, the action
@@ -189,6 +195,20 @@ export function checkProductionReadiness(env: NodeJS.ProcessEnv): ProdReadiness 
     missing.push('TLS (TLS_KEY_FILE+TLS_CERT_FILE for native TLS, or TRUST_PROXY=1 behind a TLS-terminating proxy)');
   }
   if (!(env.SEAT_LOCK === '1' || env.SEAT_LOCK === 'true')) missing.push('SEAT_LOCK=1');
+  // SEC-20. Пароль БД проверяет ПРОЦЕСС, а не память оператора. Гард `:?` на
+  // POSTGRES_PASSWORD живёт только в двух оверлеях (`docker-compose.tls.yml`,
+  // `.release.yml`), а публичных путей ТРИ: третий — нативный TLS в самом сервере
+  // (`deploy/README.md`, «TLS / wss (RS-5.1)»), и он поднимается голым
+  // `docker compose up` без единого `-f`. На нём база берёт `${POSTGRES_PASSWORD:-void}`
+  // (`docker-compose.yml:139`), сервер слушает `${SERVER_BIND:-0.0.0.0}` — а этот гард
+  // до сих пор считал такой стек прод-готовым, потому что `tlsNative` истинно.
+  // Postgres при этом опубликован на 127.0.0.1:5432, то есть дефолтный пароль отделяет
+  // ЛЮБОЙ локальный процесс хоста от аккаунтов, квитанций и авторитетного состояния мира.
+  // Проверяем сам DATABASE_URL, а не переменную POSTGRES_PASSWORD: потребитель — именно
+  // строка подключения, и она может приехать мимо compose.
+  if (env.DATABASE_URL && DEFAULT_DB_PASSWORD_RE.test(env.DATABASE_URL)) {
+    missing.push('POSTGRES_PASSWORD (в DATABASE_URL дефолтный пароль `void`, задайте свой: `openssl rand -hex 32`)');
+  }
 
   return { ok: missing.length === 0, missing };
 }
