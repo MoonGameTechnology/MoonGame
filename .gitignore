@@ -37,3 +37,7 @@ deploy/server.env
 
 # MCP browser session output (snapshots / console logs / traces)
 .playwright-mcp/
+# Скриншоты браузерной проверки: инструмент кладёт их в КОРЕНЬ репозитория, и
+# `git add -A` уносит их в коммит (так в main уехали три штуки на 440 КБ).
+# Картинки проекта живут в docs/ и prototype/ — в корне их не бывает.
+/*.png
