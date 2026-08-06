@@ -219,7 +219,7 @@ import {
   kfmt,
   hl,
   TECH_CUR,
-  curIc,
+  resLine,
   cost,
   costText,
   displayUnit,
@@ -2784,9 +2784,18 @@ function handleEvents(events: DomainEvent[]) {
           const now = stewMetrics(s, ME);
           const base = stewSnapshot;
           stewSnapshot = null;
-          const sign = (n: number) => (n >= 0 ? `+${n}` : `${n}`);
+          const sign = (n: number) => (n >= 0 ? `+${n}` : `−${Math.abs(n)}`);
+          // Тост печатается textContent (XSS-безопасность: в ленту попадает и чужой
+          // текст) — HTML-чипа тут быть не может, поэтому ресурс несёт свой ГЛИФ
+          // (TECH_CUR), тот же, что стоит на капсулах бара. И русская проза уехала в
+          // локаль: до этого англоязычный игрок читал утренний отчёт по-русски.
           const diff = base
-            ? ` Пока вы спали: планет ${base.planets}→${now.planets}, металл ${sign(now.metal - base.metal)}, кредиты ${sign(now.credits - base.credits)}.`
+            ? ' ' +
+              t('log.steward.diff', {
+                p0: String(base.planets),
+                p1: String(now.planets),
+                bag: `${TECH_CUR.metal}${sign(now.metal - base.metal)} ${TECH_CUR.credits}${sign(now.credits - base.credits)}`,
+              })
             : '';
           const logged = s.players[ME]?.stewardLog?.length ?? 0;
           const sitrep = logged > 0 ? ' ' + t('log.steward.decisions', { n: String(logged) }) : '';
@@ -5198,14 +5207,10 @@ function fleetSummaryHtml(f: Fleet): string {
     for (const [r, n] of Object.entries(def.upkeep ?? {}))
       upkeep[r] = (upkeep[r] ?? 0) + st.count * (n ?? 0);
   }
-  const up = Object.entries(upkeep)
-    .filter(([, n]) => n > 0)
-    .map(([r, n]) => `${n} ${tData(r)}`)
-    .join(', ');
-  if (up)
-    rows.push(
-      `<div class="row dim">${t('side.summary.upkeep')}: ${up}/${t('side.summary.day')}</div>`,
-    );
+  // UI-RES2: содержание флота — теми же чипами, что цена и выработка; суффикс «/д»
+  // несёт сам чип, поэтому хвост «/день» из строки ушёл.
+  const up = resLine(upkeep, { per: 'd' });
+  if (up) rows.push(`<div class="row dim">${t('side.summary.upkeep')}: ${up}</div>`);
   return (
     `<div class="sec">${t('side.summary.title')}</div>` +
     rows.join('') +
@@ -5508,10 +5513,12 @@ function planetSummaryHtml(p: Planet): string {
   );
   // ECON-7: пассивный базовый выход мира по ресурсам — перекос типа планеты.
   const base = (pt?.baseOutput ?? {}) as Record<string, number>;
-  const baseStr = ['metal', 'credits', 'food', 'energy']
-    .filter((r) => (base[r] ?? 0) > 0)
-    .map((r) => `${TECH_CUR[r] ? curIc(r) : esc(tData(r))} ${base[r]}`)
-    .join(' · ');
+  // UI-RES2: одно правило показа ресурса. Прежняя форма падала на СЛОВО для
+  // ресурса без глифа в TECH_CUR — то есть ровно там, где игроку опереться не на что.
+  const baseStr = resLine(
+    Object.fromEntries(['metal', 'credits', 'food', 'energy'].map((r) => [r, base[r] ?? 0])),
+    { per: 'h' },
+  );
   if (baseStr)
     rows.push(
       `<div class="row">${t('side.world.output')}: <b>${baseStr}</b> <span class="dim">${t('side.world.output.note')}</span></div>`,
@@ -5771,7 +5778,7 @@ function panelHtml(): string {
 // --- object dossiers + codex (REFM-4) ----------------------------------------
 // The hover/tap blurbs and the full-info codex card live in `dossiers.ts` now; here
 // they only get their live-state hooks. The pure parts (`buildingDossier`,
-// `producesLine`, the `Dossier` type) are imported at the top of the file.
+// `resLine`, the `Dossier` type) are imported at the top of the file.
 const { objDossier, codexHtml } = createDossiers({
   state: () => s,
   me: () => ME,
@@ -6075,9 +6082,9 @@ function intelRowHtml(target: string): string {
     const left = fmtEta(grantLeftMs(g, s.time) / HOUR);
     if (g.kind === 'treasury' && g.target === target) {
       const r = s.players[target]?.resources ?? {};
-      const bag = Object.entries(r)
-        .map(([k, v]) => `${curIc(k)}${Math.floor(v as number)}`)
-        .join(' ');
+      const bag = resLine(
+        Object.fromEntries(Object.entries(r).map(([k, v]) => [k, Math.floor(v as number)])),
+      );
       bits.push(t('comms.intel.treasury', { bag: bag || '—', left }));
     } else if (g.kind === 'fleets' && g.target === target) {
       bits.push(t('comms.intel.fleets', { left }));

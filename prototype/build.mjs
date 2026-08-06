@@ -151,6 +151,9 @@ body::before{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;mix
 .rcost.short em.lack{font-style:normal;font-size:.86em;opacity:.85;
   text-shadow:0 0 6px rgba(255,90,77,.35);}
 .rcost-free{opacity:.75;}
+/* UI-RES2: суффикс скорости у чипа («/ч», «/д») — приглушён, чтобы громким оставалось
+   ЧИСЛО, а единица читалась как сноска при нём. */
+.rc-per{font-style:normal;font-size:.82em;opacity:.6;margin-left:1px;}
 .res b{color:#e6eeef;font-weight:700;font-size:13px;font-variant-numeric:tabular-nums;
   white-space:nowrap;flex:0 0 auto;}
 /* phones hide the flow digits — a NEGATIVE net income paints the stock itself red */

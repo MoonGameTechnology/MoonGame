@@ -82,6 +82,45 @@ export function cost(
     .join(' ');
 }
 
+/**
+ * ОДНО правило показа ресурса вне ценника: иконка + число в цвете ресурса.
+ *
+ * Ценник (`cost`) уже так и рисуется; всё остальное — добыча зданий, содержание,
+ * доход мира, ряды кодекса — печатало ИМЯ ресурса словом («+12 металл/ч»), и
+ * игроку приходилось читать текст там, где бар и цены он узнаёт по цвету. Теперь
+ * поверхность одна: выучил бар — читаешь всё.
+ *
+ * `sign` ставит явный «+»/«−» (поток, а не запас), `per` дописывает локализованный
+ * суффикс скорости. Неизвестный ресурс не ломается: `curIc` отдаёт букву имени.
+ */
+export function resChip(
+  res: string,
+  n: number | string,
+  opts: { sign?: boolean; per?: 'h' | 'd' } = {},
+): string {
+  const num = typeof n === 'number' ? n : Number(n);
+  // Минус — типографский «−» (U+2212), тот же знак, что у дефицита в ценнике:
+  // дефисный «-» в моноширинном шрифте читается как перенос, а не как «минус».
+  const shown =
+    typeof n === 'number'
+      ? `${opts.sign && num > 0 ? '+' : ''}${String(round1(num)).replace('-', '−')}`
+      : String(n);
+  const per = opts.per ? `<i class="rc-per">${t(opts.per === 'd' ? 'res.per.day' : 'res.per.hour')}</i>` : '';
+  return `<span class="rcost rc-${res}">${curIc(res)}${shown}${per}</span>`;
+}
+
+/** Мешок ресурсов чипами через « · ». Нули опускаются: «+0 энергии» — шум, а не
+ *  информация (то же правило, что у ценника: пустой мешок ничего не печатает). */
+export function resLine(
+  bag: Record<string, number> | undefined,
+  opts: { sign?: boolean; per?: 'h' | 'd' } = {},
+): string {
+  return Object.entries(bag ?? {})
+    .filter(([, n]) => (n ?? 0) !== 0)
+    .map(([r, n]) => resChip(r, n ?? 0, opts))
+    .join(' · ');
+}
+
 /** The same bag as PLAIN TEXT — for `title=` attributes and button labels built with
  *  `esc()`, where the HTML from `cost()` would show the player raw markup. */
 export function costText(bag: Record<string, number> | undefined): string {

@@ -317,8 +317,6 @@ export const ru: Record<string, string> = {
   'codex.term.upkeep.title': 'Содержание (upkeep)',
   'codex.value.hours': '{n} ч',
   'codex.value.levels-upgradable': '{n} (улучшаемо)',
-  'codex.value.per-day': '{n} {r}/день',
-  'codex.value.per-hour': '{n} {r}/ч',
   'codex.value.per-level': '{n} / уровень',
 
   // --- comms — Меню связи: ростер сессии, одобрение ботов, окна интела, предложения.
@@ -797,7 +795,9 @@ export const ru: Record<string, string> = {
   'queue.unknown': 'неизвестный заказ',
   'queue.upgrade': '{b} — улучшение',
 
-  // --- res — Ресурсы в косвенных падежах (для фраз «не хватает …»).
+  // --- res — Ресурсы в косвенных падежах (для фраз «не хватает …») и суффиксы скорости.
+  'res.per.day': '/д',
+  'res.per.hour': '/ч',
   'res.of.credits': 'кредитов',
   'res.of.energy': 'энергии',
   'res.of.food': 'еды',
@@ -1284,6 +1284,7 @@ export const ru: Record<string, string> = {
   'log.spy.what.fleets': 'флоты {who}',
   'log.spy.what.treasury': 'казна {who}',
   'log.spy.what.world': 'мир {at}',
+  'log.steward.diff': 'Пока вы спали: планет {p0}→{p1}, {bag}.',
   'log.steward.decisions': 'Решений за вахту: {n} — журнал в окне Хранителя.',
   'log.steward.handback.active': '🌅 Хранитель вернул вам управление (была «Активная оборона»).',
   'log.steward.handback.defense': '🌅 Хранитель вернул вам управление (была «Оборона»).',
@@ -1656,7 +1657,6 @@ export const ru: Record<string, string> = {
   'side.summary.back': '‹ Назад к карточке',
   'side.summary.cargo': 'Трюм',
   'side.summary.composition': 'Состав',
-  'side.summary.day': 'день',
   'side.summary.defense': 'Защита',
   'side.summary.firing-cap': 'бьют {n} юнитов',
   'side.summary.forced-march': 'форс-марш',
@@ -1708,7 +1708,7 @@ export const ru: Record<string, string> = {
   'side.world.hold.title': 'Точка удержания',
   'side.world.kind': 'Вид / тип / местность',
   'side.world.make-capital': '★ Сделать столицей',
-  'side.world.output': 'Базовый выход/ч',
+  'side.world.output': 'Базовый выход',
   'side.world.output.note': '— перекос типа мира',
   'side.world.owner': 'Владелец',
   'side.world.ping': '📍 Пинг',

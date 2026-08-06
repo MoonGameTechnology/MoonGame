@@ -29,7 +29,7 @@ import { data } from './prototypeData';
 import { HOUR } from './time';
 import { t, tData } from '../../localization/runtime';
 import { GLOSSARY } from './codexIndex';
-import { esc, hl, round1, cost, displayUnit, fmtEta } from './format';
+import { esc, hl, round1, cost, displayUnit, fmtEta, resChip, resLine } from './format';
 import { BUILD_ICON, unitIcon, unitIconHtml } from './icons';
 import type { ActiveBuild, BuildKind, BuildLane, PlanetBuildQueue } from './buildQueue';
 
@@ -196,16 +196,6 @@ export function unitTitle(id: string): string {
   return unitDossier(id, true)?.name ?? displayUnit(id);
 }
 
-/** "+10 металл/ч, +5 кредиты/ч" — the always-visible output readout on a built
- *  building's row (not just on hover). Empty string for a produces-less building
- *  (defense/radar/etc.), so the row's dim-text separator (" · ") is skipped. */
-export function producesLine(produces: Record<string, number>): string {
-  return Object.entries(produces)
-    .filter(([, n]) => (n ?? 0) > 0)
-    .map(([res, n]) => `+${round1(n ?? 0)} ${tData(res)}/ч`)
-    .join(', ');
-}
-
 /** Dossier for an in-flight/queued/paused construction/upgrade/unit order — "what is
  *  this, what does it yield NOW vs once finished". `progress` is 0 for a not-yet-
  *  started queued order, the live 0..1 fraction for an active one, or the frozen
@@ -260,7 +250,9 @@ export function taskDossier(
     const now = b + (f - b) * ramp;
     lines.push(
       t('dossier.task.output', {
-        r: tData(res),
+        // Ресурс — чипом (иконка+цвет), как везде: строка «что даёт сейчас → по
+        // готовности» стоит рядом с ценником и обязана читаться так же.
+        r: resChip(res, ''),
         now: hl(round1(now)),
         final: hl(round1(f)),
       }),
@@ -441,15 +433,11 @@ export function createDossiers(host: DossierHost): {
         cxRow(t('codex.row.build-time'), t('codex.value.hours', { n: lv.buildTimeHours ?? 0 })),
         cxRow(t('codex.row.hp'), String(lv.hp ?? 0)),
       ];
-      const prod = Object.entries(lv.produces ?? {})
-        .filter(([, n]) => (n ?? 0) > 0)
-        .map(([r, n]) => t('codex.value.per-hour', { n: n ?? 0, r: tData(r) }))
-        .join(', ');
+      // Ресурс — иконкой и цветом (UI-RES2): карточка читается так же, как ценник
+      // над ней и капсулы бара, а не переводом слова обратно в ресурс.
+      const prod = resLine(lv.produces ?? {}, { per: 'h' });
       if (prod) rows.push(cxRow(t('codex.row.produces'), prod));
-      const keep = Object.entries(lv.upkeep ?? {})
-        .filter(([, n]) => (n ?? 0) > 0)
-        .map(([r, n]) => t('codex.value.per-day', { n: n ?? 0, r: tData(r) }))
-        .join(', ');
+      const keep = resLine(lv.upkeep ?? {}, { per: 'h' });
       if (keep) rows.push(cxRow(t('codex.row.upkeep'), keep));
       if ((lv.defenseBonus ?? 0) > 0.01)
         rows.push(
@@ -526,9 +514,7 @@ export function createDossiers(host: DossierHost): {
     if ((st.aaDamage ?? 0) > 0) rows.push(cxRow(t('codex.row.aa'), String(st.aaDamage)));
     rows.push(cxRow(t('codex.row.signature'), String(def.signature ?? 1)));
     if ((def.radarRange ?? 0) > 0) rows.push(cxRow(t('codex.row.radar'), String(def.radarRange)));
-    const upkeep = Object.entries(def.upkeep ?? {})
-      .map(([r, n]) => t('codex.value.per-day', { n: n ?? 0, r: tData(r) }))
-      .join(', ');
+    const upkeep = resLine(def.upkeep ?? {}, { per: 'd' });
     if (upkeep) rows.push(cxRow(t('codex.row.upkeep'), upkeep));
     // Домен и трейты могут нести один и тот же ключ (у наземных юнитов domain:
     // 'ground' И трейт 'ground' — два разных механических флага, см. fleetLaunch

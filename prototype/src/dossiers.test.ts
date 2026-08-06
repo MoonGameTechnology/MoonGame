@@ -5,7 +5,6 @@ import { buildingLevel, type GameState } from '../../packages/shared-core/src/in
 import {
   buildingDossier,
   unitDossier,
-  producesLine,
   taskDossier,
   cxRow,
   createDossiers,
@@ -80,16 +79,8 @@ describe('dossiers — юниты', () => {
   });
 });
 
-describe('dossiers — строка выработки', () => {
-  it('нули и пустой мешок дают пустую строку (разделитель « · » схлопывается)', () => {
-    expect(producesLine({})).toBe('');
-    expect(producesLine({ metal: 0 })).toBe('');
-  });
-
-  it('перечисляет только положительные ресурсы, по одному знаку после запятой', () => {
-    expect(producesLine({ metal: 10.44, credits: 0 })).toBe('+10.4 металл/ч');
-  });
-});
+// Строка выработки переехала в общий `resLine` (format.ts) — она больше не
+// текстовая, и её правило проверяется там же, где правило ценника.
 
 describe('dossiers — карточка стройки (порог 50%)', () => {
   const { s, homeId } = homeState();
