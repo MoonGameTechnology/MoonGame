@@ -169,6 +169,15 @@ import { measureViewport, STARS, NEBULAE } from './viewport';
 import { initPingUi } from './pingUi';
 import { initSoloDrivers } from './soloDrivers';
 import { initMatchEnd } from './matchEnd';
+import {
+  SPY_COST,
+  grantLeftMs,
+  grantVision,
+  liveGrants,
+  pushSpyEntry,
+  targetsOf,
+  type SpyEntry,
+} from './intel';
 // Localization: one locale = one file (src/locale/*). Msgid = the canonical
 // Russian source string; `t()` wraps every user-visible literal, `tData()` maps
 // English data/*.json names, the static HTML is localized by a boot pass.
@@ -1821,28 +1830,20 @@ interface Vision {
 // here the client fog honours them: a `planet` grant identifies that node, a
 // `fleets` grant shows the target's fleets through the fog, a `treasury` grant is
 // read by the diplomacy roster. Mirrors what `visibleState` does server-side.
-/** Base fee of one attempt — mirrors the core module's BASE_COST (UI label only;
- *  the kernel is authoritative and rejects with E_INSUFFICIENT when short). */
-const SPY_COST = 150;
-/** My LIVE intel windows (expired ones are ignored even before the core prunes them). */
+// Окна краденой разведки и журнал шпионажа живут в `intel.ts` (REFM-28) — там же
+// правила «истёкшее окно не видно» и «опознание влечёт радар».
+/** Мои ЖИВЫЕ окна разведки на текущий час мира. */
 function myIntel(): IntelGrant[] {
-  return (s.intel?.[ME] ?? []).filter((g) => g.until > s.time);
+  return liveGrants(s.intel?.[ME], s.time);
 }
-/** Live grants of one kind, as a target-id set (planet ids / player ids). */
-function intelTargets(kind: IntelGrant['kind']): Set<string> {
-  const out = new Set<string>();
-  for (const g of myIntel()) if (g.kind === kind) out.add(g.target);
-  return out;
-}
-// Owners whose fleets are revealed this frame by a live `fleets` grant — rebuilt
-// alongside `vision` each frame so the render path checks a Set, not the grant list.
+// Владельцы, чьи флоты этот кадр показаны живым окном `fleets` — набор пересобирается
+// вместе с `vision`, чтобы отрисовка проверяла Set, а не список грантов.
 let intelFleetOwners = new Set<string>();
-// SPY-UX: bounded session journal of espionage outcomes (mine + counter-intel hits
-// on me) — feeds the «Шпионаж» tab in diplomacy. Stores the final localized line.
-const spyLog: { at: number; text: string }[] = [];
+// SPY-UX: сессионный журнал исходов шпионажа (моих и контрразведки по мне) — питает
+// вкладку «Шпионаж» в дипломатии. Хранит уже локализованную строку.
+const spyLog: SpyEntry[] = [];
 function pushSpyLog(text: string): void {
-  spyLog.push({ at: s.time, text });
-  while (spyLog.length > 30) spyLog.shift();
+  pushSpyEntry(spyLog, { at: s.time, text });
   if (diploOpen && diploTab === 'intel') renderDiplo();
 }
 
@@ -1876,12 +1877,9 @@ function computeVision(): Vision {
   // Stolen `planet` windows identify their node (feeds memory too, so the scan
   // is remembered after the window closes); `fleets` windows fill the owner set
   // that fleet rendering consults.
-  for (const id of intelTargets('planet'))
-    if (s.planets[id]) {
-      identify.add(id);
-      radar.add(id); // identify implies radar
-    }
-  intelFleetOwners = intelTargets('fleets');
+  const grants = myIntel();
+  grantVision({ identify, radar }, targetsOf(grants, 'planet'), (id) => !!s.planets[id]);
+  intelFleetOwners = targetsOf(grants, 'fleets');
   return { identify, radar };
 }
 
@@ -6165,7 +6163,7 @@ function favourBarHtml(bot: string): string {
 function intelRowHtml(target: string): string {
   const bits: string[] = [];
   for (const g of myIntel()) {
-    const left = fmtEta(Math.max(0, g.until - s.time) / HOUR);
+    const left = fmtEta(grantLeftMs(g, s.time) / HOUR);
     if (g.kind === 'treasury' && g.target === target) {
       const r = s.players[target]?.resources ?? {};
       const bag = Object.entries(r)
