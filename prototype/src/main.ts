@@ -170,6 +170,12 @@ import { initSoloDrivers } from './soloDrivers';
 import { initMatchEnd } from './matchEnd';
 import { STANCES, diffDiplomacy } from './diploEvents';
 import {
+  activeConstruction as coreActiveConstruction,
+  buildDurationHours as coreBuildDurationHours,
+  hoursLeft,
+  progressPct as coreProgressPct,
+} from './buildProgress';
+import {
   contactAlpha,
   contactLost,
   episodeKey,
@@ -1353,29 +1359,10 @@ function queuedAction(planetId: string, q: QueuedBuild): Action {
 function canStartQueued(planetId: string, q: QueuedBuild): boolean {
   return canOrder(s, queuedAction(planetId, q)) !== 'E_INSUFFICIENT';
 }
-function constructionPayload(payload: unknown): ConstructionPayload | null {
-  const p = payload as ConstructionPayload;
-  return typeof p?.planetId === 'string' ? p : null;
-}
+/** Стройка, идущая на мире прямо сейчас (голову по `(at, seq)` выбирает
+ *  `buildProgress.ts`, REFM-31 — там же и правило порядка). */
 function activeConstruction(planetId: string, lane: BuildLane): ActiveBuild | null {
-  let best: ActiveBuild | null = null;
-  for (const event of s.scheduled) {
-    if (event.type !== 'construction.complete') {
-      continue;
-    }
-    const payload = constructionPayload(event.payload);
-    if (!payload || payload.planetId !== planetId) {
-      continue;
-    }
-    const kind = payload.kind === 'unit' ? 'units' : 'buildings';
-    if (kind !== lane) {
-      continue;
-    }
-    if (!best || event.at < best.at || (event.at === best.at && event.seq < best.seq)) {
-      best = { at: event.at, seq: event.seq, payload };
-    }
-  }
-  return best;
+  return coreActiveConstruction(s, planetId, lane);
 }
 function constructionLabel(p: ConstructionPayload): string {
   if (p.kind === 'unit' && p.unit) {
@@ -1390,27 +1377,14 @@ function constructionLabel(p: ConstructionPayload): string {
   return t('queue.unknown');
 }
 function buildDurationHours(p: ConstructionPayload): number {
-  if (p.kind === 'unit' && p.unit) {
-    return data.units[p.unit]?.buildTimeHours ?? 0;
-  }
-  if (p.kind === 'upgrade' && p.building && typeof p.level === 'number') {
-    return data.buildings[p.building]?.upgrades[p.level - 2]?.buildTimeHours ?? 0;
-  }
-  if (p.building) {
-    return data.buildings[p.building]?.buildTimeHours ?? 0;
-  }
-  return 0;
+  return coreBuildDurationHours(p, data);
 }
 function timeLeft(at: number): string {
-  return fmtEta(Math.max(0, (at - s.time) / HOUR));
+  return fmtEta(hoursLeft(at, s.time, HOUR));
 }
 /** Format a travel-time-remaining in hours as `1.4ч` / `35м` (localized suffixes). */
 function progressPct(active: ActiveBuild): number {
-  const duration = buildDurationHours(active.payload) * HOUR;
-  if (duration <= 0) {
-    return 100;
-  }
-  return Math.max(0, Math.min(100, 100 - ((active.at - s.time) / duration) * 100));
+  return coreProgressPct(active, s.time, data, HOUR);
 }
 function queuedLabel(q: QueuedBuild): string {
   if (q.kind === 'unit') {
