@@ -117,6 +117,52 @@ describe('checkProductionReadiness', () => {
     ]);
   });
 
+  // SEC-20. Ровно тот стек, который гард раньше пропускал: путь «нативный TLS» из
+  // deploy/README.md поднимается голым `docker compose up` без оверлеев, поэтому
+  // `${POSTGRES_PASSWORD:-void}` схлопывается в дефолт — а все остальные переключатели
+  // при этом выставлены, и стек объявлял себя прод-готовым.
+  const NATIVE_TLS = {
+    ...FULL,
+    TRUST_PROXY: undefined,
+    TLS_KEY_FILE: '/certs/privkey.pem',
+    TLS_CERT_FILE: '/certs/fullchain.pem',
+  };
+
+  it('отказывает, когда в DATABASE_URL остался дефолтный пароль `void`', () => {
+    const r = checkProductionReadiness({
+      ...NATIVE_TLS,
+      DATABASE_URL: 'postgres://void:void@postgres:5432/void',
+    });
+    expect(r.ok).toBe(false);
+    expect(r.missing).toEqual([
+      'POSTGRES_PASSWORD (в DATABASE_URL дефолтный пароль `void`, задайте свой: `openssl rand -hex 32`)',
+    ]);
+  });
+
+  it('пропускает тот же стек с настоящим паролем', () => {
+    const r = checkProductionReadiness({
+      ...NATIVE_TLS,
+      DATABASE_URL: 'postgres://void:1f3a9c0b7e2d4856@postgres:5432/void',
+    });
+    expect(r).toEqual({ ok: true, missing: [] });
+  });
+
+  it('без DATABASE_URL молчит — in-memory-стор это законный режим', () => {
+    expect(checkProductionReadiness(NATIVE_TLS)).toEqual({ ok: true, missing: [] });
+  });
+
+  it('не срабатывает на пароль, который лишь СОДЕРЖИТ «void»', () => {
+    // Якорь правила — `:void@`, а не подстрока: иначе честный `avoidance-42` ловился бы
+    // как дефолт, и гард начал бы врать в обратную сторону.
+    for (const url of [
+      'postgres://void:avoid-void-42@postgres:5432/void',
+      'postgres://void:voidvoid@postgres:5432/void',
+      'postgresql://app:s3cret@db:5432/void',
+    ]) {
+      expect(checkProductionReadiness({ ...NATIVE_TLS, DATABASE_URL: url }).ok, url).toBe(true);
+    }
+  });
+
   it('короткий AUTH_JWT_SECRET отвергается так же, как отсутствующий', () => {
     const r = checkProductionReadiness({ ...FULL, AUTH_JWT_SECRET: 'x'.repeat(MIN_SECRET_LEN - 1) });
     expect(r.ok).toBe(false);

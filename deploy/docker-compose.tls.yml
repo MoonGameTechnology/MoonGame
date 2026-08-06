@@ -46,6 +46,19 @@ services:
       - NET_BIND_SERVICE
     mem_limit: 512m
     pids_limit: 256
+    # SEC-20. Единственный смотрящий в интернет сервис был единственным же БЕЗ пробы:
+    # у `server` она приезжает из образа (`Dockerfile` HEALTHCHECK), у `postgres` стоит
+    # здесь же в базовом файле, а у `caddy` не было нигде — то есть «жив ли фронт» не
+    # знали ни docker, ни оператор. Бьём в admin-API Caddy: он включён по умолчанию
+    # (в `deploy/Caddyfile` нет `admin off`), слушает только 127.0.0.1:2019 внутри
+    # контейнера и наружу не публикуется. `/config/` отвечает лишь когда конфиг
+    # загружен, поэтому проба различает «процесс запустился» и «процесс обслуживает».
+    # `curl` в образе штатный — `caddy:2.11-alpine` ставит его apk-пакетом.
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', '-o', '/dev/null', 'http://127.0.0.1:2019/config/']
+      interval: 10s
+      timeout: 5s
+      retries: 5
     depends_on:
       - server
     ports:
