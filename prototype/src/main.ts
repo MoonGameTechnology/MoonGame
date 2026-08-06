@@ -182,6 +182,7 @@ import {
   rivalCount,
   seatFactionIds as seatSeatFactionIds,
 } from './setupSeats';
+import { drawOrder, lanes, mapViewBox } from './setupMap';
 import {
   actionButton,
   cardHeader as kitCardHeader,
@@ -9039,32 +9040,23 @@ const setupShips: ShipLoadout[] = DEFAULT_SHIP_LOADOUTS.map((l) => ({
 // match with the default rosters via buildSetupConfig.
 
 function renderSetupMap(): void {
-  const pad = 60;
-  setupMapEl.setAttribute(
-    'viewBox',
-    `${MINX - pad} ${MINY - pad} ${MAXX - MINX + pad * 2} ${MAXY - MINY + pad * 2}`,
-  );
-  const cand = new Set(START_CANDIDATES);
-  const byId = new Map(MAP.map((n) => [n.id, n]));
+  // Рамка, трассы без повторов и порядок рисования — в `setupMap.ts` (REFM-45):
+  // там же правило «каждое ребро один раз» и «кандидаты рисуются последними».
+  const box = mapViewBox(MAP, 60);
+  setupMapEl.setAttribute('viewBox', `${box.x} ${box.y} ${box.w} ${box.h}`);
+  const order = drawOrder(MAP, START_CANDIDATES);
   let svg = '';
-  for (const n of MAP) {
-    for (const l of n.links) {
-      const m = byId.get(l);
-      if (!m || m.id < n.id) continue; // draw each undirected edge once
-      svg += `<line x1="${n.x}" y1="${n.y}" x2="${m.x}" y2="${m.y}" stroke="#1d3640" stroke-width="3"/>`;
-    }
+  for (const l of lanes(MAP)) {
+    svg += `<line x1="${l.from.x}" y1="${l.from.y}" x2="${l.to.x}" y2="${l.to.y}" stroke="#1d3640" stroke-width="3"/>`;
   }
-  for (const n of MAP) {
-    if (cand.has(n.id)) continue; // candidates drawn last, on top
+  for (const n of order.plain) {
     const planet = n.sector === 'planet';
     svg += `<circle cx="${n.x}" cy="${n.y}" r="${planet ? 16 : 11}" fill="${planet ? '#2c5460' : '#1b2d34'}" stroke="#33555f" stroke-width="2"/>`;
   }
-  for (const id of START_CANDIDATES) {
-    const n = byId.get(id);
-    if (!n) continue;
-    const picked = id === setupStart;
+  for (const n of order.candidates) {
+    const picked = n.id === setupStart;
     svg +=
-      `<circle class="cand" data-cand="${id}" cx="${n.x}" cy="${n.y}" r="${picked ? 30 : 22}" ` +
+      `<circle class="cand" data-cand="${n.id}" cx="${n.x}" cy="${n.y}" r="${picked ? 30 : 22}" ` +
       `fill="${picked ? 'rgba(58,209,122,.35)' : 'rgba(53,214,230,.16)'}" ` +
       `stroke="${picked ? '#3ad17a' : '#35d6e6'}" stroke-width="${picked ? 6 : 4}"/>`;
   }
