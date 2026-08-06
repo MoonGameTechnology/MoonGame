@@ -22,8 +22,7 @@ import { buildingLevel, buildingMaxLevel } from '../../packages/shared-core/src/
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { data } from './prototypeData';
-import { buildingName, cost, esc } from './format';
-import { producesLine } from './dossiers';
+import { buildingName, cost, esc, resLine } from './format';
 import { BUILD_ICON } from './icons';
 import { buildBuilding } from './actions';
 import { planetName } from './planetName';
@@ -59,7 +58,8 @@ export function buildCategory(def: BuildingDef): BuildCategory {
 export function buildFx(def: BuildingDef, level: number): string {
   const lv = buildingLevel(def, Math.max(1, level));
   const fx: string[] = [];
-  const prod = producesLine(lv.produces ?? {});
+  // Ресурс — иконкой и цветом, а не словом: та же чиповая форма, что у ценника.
+  const prod = resLine(lv.produces ?? {}, { sign: true, per: 'h' });
   if (prod) fx.push(prod);
   if ((def.creditsBonus ?? 0) > 0)
     fx.push(t('build.fx.credits', { n: Math.round((def.creditsBonus ?? 0) * 100) }));
@@ -69,10 +69,10 @@ export function buildFx(def: BuildingDef, level: number): string {
   if ((lv.aaDamage ?? 0) > 0) fx.push(t('build.fx.aa', { n: lv.aaDamage ?? 0 }));
   if ((lv.radarRange ?? 0) > 0) fx.push(t('build.fx.radar', { n: lv.radarRange ?? 0 }));
   if (def.enablesShipConstruction) fx.push(t('build.fx.shipyard'));
-  const keep = Object.entries(lv.upkeep ?? {})
-    .filter(([, n]) => (n ?? 0) > 0)
-    .map(([res, n]) => `−${n} ${tData(res)}/ч`)
-    .join(', ');
+  const keep = resLine(
+    Object.fromEntries(Object.entries(lv.upkeep ?? {}).map(([r, n]) => [r, -(n ?? 0)])),
+    { sign: true, per: 'h' },
+  );
   if (keep) fx.push(keep);
   return fx.join(' · ');
 }

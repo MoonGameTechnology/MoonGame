@@ -316,8 +316,6 @@ export const en: Record<string, string> = {
   'codex.term.upkeep.title': 'Upkeep',
   'codex.value.hours': '{n} h',
   'codex.value.levels-upgradable': '{n} (upgradeable)',
-  'codex.value.per-day': '{n} {r}/day',
-  'codex.value.per-hour': '{n} {r}/h',
   'codex.value.per-level': '{n} / level',
 
   // --- comms — Меню связи: ростер сессии, одобрение ботов, окна интела, предложения.
@@ -796,7 +794,9 @@ export const en: Record<string, string> = {
   'queue.unknown': 'unknown order',
   'queue.upgrade': '{b} — upgrade',
 
-  // --- res — Ресурсы в косвенных падежах (для фраз «не хватает …»).
+  // --- res — Ресурсы в косвенных падежах (для фраз «не хватает …») и суффиксы скорости.
+  'res.per.day': '/d',
+  'res.per.hour': '/h',
   'res.of.credits': 'credits',
   'res.of.energy': 'energy',
   'res.of.food': 'food',
@@ -1283,6 +1283,7 @@ export const en: Record<string, string> = {
   'log.spy.what.fleets': "{who}'s fleets",
   'log.spy.what.treasury': "{who}'s treasury",
   'log.spy.what.world': 'world {at}',
+  'log.steward.diff': 'While you slept: worlds {p0}→{p1}, {bag}.',
   'log.steward.decisions': "Decisions this watch: {n} — see the Steward window's journal.",
   'log.steward.handback.active':
     '🌅 The Steward returned control to you (posture was “Active defense”).',
@@ -1658,7 +1659,6 @@ export const en: Record<string, string> = {
   'side.summary.back': '‹ Back to the card',
   'side.summary.cargo': 'Cargo hold',
   'side.summary.composition': 'Composition',
-  'side.summary.day': 'day',
   'side.summary.defense': 'Defense',
   'side.summary.firing-cap': '{n} units firing',
   'side.summary.forced-march': 'forced march',
@@ -1710,7 +1710,7 @@ export const en: Record<string, string> = {
   'side.world.hold.title': 'Hold point',
   'side.world.kind': 'Kind / type / terrain',
   'side.world.make-capital': '★ Make capital',
-  'side.world.output': 'Base output/h',
+  'side.world.output': 'Base output',
   'side.world.output.note': '— world-type lean',
   'side.world.owner': 'Owner',
   'side.world.ping': '📍 Ping',
