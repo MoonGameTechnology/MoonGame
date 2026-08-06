@@ -559,6 +559,54 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+      # SEC-18. Скан ниже читает ссылки из deploy/, а они пинены по ДАЙДЖЕСТУ — значит
+      # он всегда сканирует один и тот же замороженный образ. Апстрим может пересобрать
+      # caddy хоть десять раз: отчёт не изменится ни на строку, и «ждём пересборки»
+      # (запись триажа SEC-14) не наступит никогда само собой. Этот шаг — недостающая
+      # половина: он спрашивает у реестра, на что ТЕГ указывает сейчас, и говорит, когда
+      # пин устарел. Информационный, как и вся джоба: устаревший пин — повод сходить
+      # обновить дайджест (docs/security/image-pinning.md), а не уронить чужой PR.
+      - name: пин против тега — не пересобрал ли апстрим
+        continue-on-error: true
+        run: |
+          set -u
+          refs=$(grep -hE '^[[:space:]]+image: ' deploy/docker-compose.yml deploy/docker-compose.tls.yml |
+            awk '{print $2}' | sort -u)
+          stale=0
+          for ref in $refs; do
+            # Ссылка без дайджеста этот шаг не касается: её «свежесть» бессмысленна,
+            # а вот отсутствие пина — забота A08-правила, а не этой проверки.
+            case "$ref" in *@sha256:*) ;; *) echo "  $ref — без дайджеста, пропуск"; continue ;; esac
+            pinned=${ref#*@}
+            namever=${ref%@*}
+            repo=${namever%:*}
+            tag=${namever##*:}
+            # Официальные образы (`caddy`) живут в library/, остальные — как записаны.
+            case "$repo" in */*) path="$repo" ;; *) path="library/$repo" ;; esac
+            tok=$(curl -s --max-time 30 "https://auth.docker.io/token?service=registry.docker.io&scope=repository:${path}:pull" |
+              sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+            # HEAD по тегу: реестр отдаёт дайджест в Docker-Content-Digest, качать
+            # манифест целиком не нужно. Accept перечисляет и OCI, и docker-схемы —
+            # без него реестр отдаст дайджест другой (legacy) схемы, и сверка соврёт.
+            now=$(curl -sI --max-time 30 -H "Authorization: Bearer $tok" \
+              -H 'Accept: application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json,application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json' \
+              "https://registry-1.docker.io/v2/${path}/manifests/${tag}" |
+              tr -d '\r' | sed -n 's/^[Dd]ocker-[Cc]ontent-[Dd]igest: //p')
+            if [ -z "$now" ]; then
+              # Неразрешившийся тег — НЕ «свежо»: молчание тут читалось бы как успех.
+              echo "::warning::${repo}:${tag} — не удалось разрешить тег в реестре, свежесть пина НЕ проверена"
+              continue
+            fi
+            if [ "$now" = "$pinned" ]; then
+              echo "  ${repo}:${tag} — пин актуален (апстрим не пересобирал)"
+            else
+              echo "  ${repo}:${tag} — ПИН УСТАРЕЛ: тег указывает на ${now}, у нас ${pinned}"
+              stale=1
+            fi
+          done
+          if [ "$stale" = 1 ]; then
+            echo "::warning::Апстрим пересобрал образ прода. Обновите дайджест в deploy/docker-compose*.yml (docs/security/image-pinning.md) и перечитайте запись триажа по caddy в docs/security/pipeline.md — часть открытых CVE могла закрыться."
+          fi
       - name: trivy image — postgres/caddy referenced by deploy/
         id: scan
         continue-on-error: true
