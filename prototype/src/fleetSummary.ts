@@ -21,6 +21,7 @@ import {
   cappedUnitStat,
   effectiveStats,
   fleetBaseSpeed,
+  fleetRadarRange,
   sumUnitStat,
   type Fleet,
   type GameData,
@@ -148,7 +149,10 @@ export function fleetSummary(f: Fleet, data: GameData, now: number): FleetSummar
     speed: fleetBaseSpeed(f, data),
     retreatHaste: hasteUntil != null && now < hasteUntil,
     cargo: cargoCap > 0 ? { used: cargoUsed, cap: Math.round(cargoCap) } : null,
-    radar: Math.max(0, ...ships.map((st) => data.units[st.unit]?.radarRange ?? 0)),
+    // ЯДРОВЫЙ расчёт, не свой: радиус — это антенна корпуса ПЛЮС установленные
+    // модули, и пока здесь читалось только поле корпуса, купленный радар-модуль в
+    // сводке не появлялся (как и в тумане).
+    radar: fleetRadarRange({ units: ships }, data),
     upkeep,
   };
 }

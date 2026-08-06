@@ -545,7 +545,9 @@ export const en: Record<string, string> = {
   'data.salvage-metal-rig': 'Salvage Metal Rig',
   'data.saturation-barrage': 'Saturation Barrage',
   'data.scan': 'Scan',
+  'data.field-hospital': 'Field Hospital',
   'data.scout': 'scout',
+  'data.sensor-frigate': 'sensor frigate',
   'data.shield-booster': 'Shield Booster',
   'data.siege-doctrine': 'Siege Doctrine',
   'data.siege': 'siege',
@@ -926,6 +928,7 @@ export const en: Record<string, string> = {
   'yard.hull.unavailable': 'Hull unavailable.',
   'yard.loadout.note':
     "Loadout locks in on build. A finished ship can't be refitted — build a new one with a different set.",
+  'yard.module.not-allowed': 'not for this hull',
   'yard.module.remove': 'remove module',
   'yard.modules.all-taken': 'Available modules — all slots full',
   'yard.modules.for-slot': 'Available modules — for the «{s}» slot',

@@ -545,7 +545,9 @@ export const ru: Record<string, string> = {
   'data.salvage-metal-rig': 'Утилизационная станция',
   'data.saturation-barrage': 'Заградительный залп',
   'data.scan': 'Разведка',
+  'data.field-hospital': 'Полевой госпиталь',
   'data.scout': 'разведчик',
+  'data.sensor-frigate': 'сенсорный фрегат',
   'data.shield-booster': 'Тяжёлый щит',
   'data.siege-doctrine': 'Осадная доктрина',
   'data.siege': 'осадная платформа',
@@ -927,6 +929,7 @@ export const ru: Record<string, string> = {
   'yard.hull.unavailable': 'Корпус недоступен.',
   'yard.loadout.note':
     'Лоадаут фиксируется при постройке. Готовый корабль не переоснастить — только построить новый с другим набором.',
+  'yard.module.not-allowed': 'не для этого корпуса',
   'yard.module.remove': 'снять модуль',
   'yard.modules.all-taken': 'Доступные модули — все слоты заняты',
   'yard.modules.for-slot': 'Доступные модули — для слота «{s}»',

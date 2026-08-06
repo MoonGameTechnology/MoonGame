@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { parseGameData, safeParseGameData, buildingLevel, buildingMaxLevel } from './schemas';
 import { composeGameDataBundle } from './loadGameData';
+import { canEquip, moduleAllowed } from '../util/loadout';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
 const dataDir = path.join(repoRoot, 'data');
@@ -21,7 +22,7 @@ function loadShippedBundle(): Record<string, unknown> {
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.3');
+    expect(data.version).toBe('0.1.4');
     expect(data.resources).toContain('microelectronics');
     expect(data.units.siege_lance?.stats.range).toBe(300); // artillery firing radius (map units)
     expect(data.units.cruiser?.upkeep.credits).toBe(8); // daily upkeep
@@ -65,6 +66,37 @@ describe('game data schema (docs/architecture.md §2)', () => {
     expect(data.modules.cargo_bay?.tag).toBe('horizontal');
     expect(data.modules.shield_booster?.slot).toBe('defense');
     expect(data.modules.targeting_array?.tag).toBe('vertical');
+  });
+
+  // Дальнее зрение — роль ОДНОГО корабля, а не опция для любого крейсера. Правило
+  // объявлено данными (`allowed.units`) и исполняется общим гейтом `canEquip`; тест
+  // держит и данные, и гейт — чтобы «только сенсорный фрегат» не осталось на словах.
+  it('радар-модуль ставится ТОЛЬКО на сенсорный фрегат, у которого ровно один слот', () => {
+    const data = parseGameData(loadShippedBundle());
+    const radar = data.modules.radar_module!;
+    expect(radar.allowed?.units).toEqual(['sensor_frigate']);
+    const frigate = data.units.sensor_frigate!;
+    expect(frigate.slots).toEqual({ weapon: 0, defense: 0, utility: 1 });
+    expect(moduleAllowed('sensor_frigate', frigate, radar)).toBe(true);
+    expect(canEquip('sensor_frigate', frigate, [], 'radar_module', data)).toEqual({ ok: true });
+    // …и ни на кого больше. Причина ВСЕГДА `E_NOT_ALLOWED`, даже у корпуса без
+    // utility-слота: гейт спрашивает «этому кораблю вообще можно?» раньше, чем «есть
+    // ли место», и это правильный порядок — иначе крейсер со свободным отсеком и
+    // эскадрилья без него объяснялись бы игроку по-разному.
+    for (const id of Object.keys(data.units)) {
+      if (id === 'sensor_frigate') continue;
+      const def = data.units[id]!;
+      expect(moduleAllowed(id, def, radar), id).toBe(false);
+      expect(canEquip(id, def, [], 'radar_module', data), id).toEqual({
+        ok: false,
+        code: 'E_NOT_ALLOWED',
+      });
+    }
+    // Второй модуль в единственный отсек уже не влезет — слот занят радаром.
+    expect(canEquip('sensor_frigate', frigate, ['radar_module'], 'cargo_bay', data)).toEqual({
+      ok: false,
+      code: 'E_NO_SLOT',
+    });
   });
 
   it('rejects a module that expands its own slot capacity (anti self-buff)', () => {

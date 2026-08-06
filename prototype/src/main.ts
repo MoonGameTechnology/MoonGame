@@ -135,6 +135,7 @@ import {
   scanNodeThreats,
   identifiedNodes,
   sensorCoverage,
+  fleetRadarRange,
   type PausedConstructionSite,
 } from '../../packages/shared-core/src/index';
 import {
@@ -1772,11 +1773,11 @@ function sigClass(sig: number): 'S' | 'M' | 'L' {
   return sig >= 13 ? 'L' : sig >= 5 ? 'M' : 'S';
 }
 /** Radar reach (distance) a fleet projects, from its loudest radar-ship (0 = none).
- *  Reads `data.units[u].radarRange` — same field the core fog uses. */
+ *  Тонкая обёртка над ЯДРОВЫМ `fleetRadarRange` — не своя копия правила: когда копия
+ *  тут читала только `data.units[u].radarRange`, установленный радар-модуль на карте
+ *  не считался, хотя игрок за него платил. */
 function fleetRadar(f: Fleet): number {
-  let r = 0;
-  for (const st of f.units) if (st.count > 0) r = Math.max(r, data.units[st.unit]?.radarRange ?? 0);
-  return r;
+  return fleetRadarRange(f, data);
 }
 /** Radar reach (distance) a world projects, from its best radar array (grows with
  *  level). Reads `buildingLevel(def, level).radarRange` — same field the core fog uses. */
