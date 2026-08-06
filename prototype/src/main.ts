@@ -172,6 +172,7 @@ import { asteroidsFor, bracketStrokes, polyPoints } from './mapShapes';
 import { conveyorHtml as kitConveyorHtml } from './conveyorView';
 import { fleetSummary, stackHullPct } from './fleetSummary';
 import { isGroundUnit, isShipUnit, isWingUnit, planetSummary } from './planetSummary';
+import { fleetWhere, groupTotals, pickPanel } from './panelSelect';
 import {
   actionButton,
   cardHeader as kitCardHeader,
@@ -5023,22 +5024,23 @@ function buildButtons(_planetId: string, ids: string[], kind: 'building' | 'unit
 
 /** Side-panel: the multi-fleet TASK-GROUP card (Shift-frame selection). */
 function taskGroupPanelHtml(group: Fleet[]): string {
-  const ships = group.reduce((a, f) => a + sumUnits(f.units), 0);
-  const troops = group.reduce((a, f) => a + sumUnits(f.landing ?? []), 0);
+  const totals = groupTotals(group);
   let h = cardHeader(
     ownerColor(ME),
     t('side.group.title'),
-    t('side.group.sub', { f: group.length, s: ships, tr: troops }),
+    t('side.group.sub', { f: totals.fleets, s: totals.ships, tr: totals.troops }),
   );
   h += `<div class="hint">${t('side.group.hint')}</div>`;
   for (const f of group) {
+    const where = fleetWhere(f);
     const loc =
-      f.location ??
-      (f.movement
-        ? `${f.movement.from}→${f.movement.to}`
-        : f.edge
-          ? `⟜ ${f.edge.from}–${f.edge.to}`
-          : '—');
+      where.kind === 'orbit'
+        ? where.at
+        : where.kind === 'transit'
+          ? `${where.from}→${where.to}`
+          : where.kind === 'lane'
+            ? `⟜ ${where.from}–${where.to}`
+            : '—';
     const nShips = sumUnits(f.units);
     const nTr = sumUnits(f.landing ?? []);
     h += `<div class="row" style="color:${ownerColor(f.owner)}">▲ ${f.id} <span class="dim">${loc}</span> · ${nShips}${nTr ? '+' + nTr : ''}</div>`;
@@ -5659,16 +5661,13 @@ function planetPanelHtml(p: Planet): string {
 
 /** The side-panel dispatcher: task group → single fleet → unknown world → known world. */
 function panelHtml(): string {
-  const group = [...selFleets].map((id) => s.fleets[id]).filter((f): f is Fleet => !!f);
-  if (group.length > 1) return taskGroupPanelHtml(group);
-  if (selFleet) {
-    const f = s.fleets[selFleet];
-    if (f) return fleetPanelHtml(f); // a stale selection falls through to the planet
-  }
-  const p = planet(selPlanet);
-  if (!p) return `<div class="hint">${t('side.empty')}</div>`;
-  if (!seesDetails(p)) return unknownPlanetHtml(p);
-  return planetPanelHtml(p);
+  // Приоритет претендентов и отсев мёртвых ссылок — в `panelSelect.ts` (REFM-39):
+  // устаревший выбор флота проваливается на мир, а не запирает панель пустотой.
+  const pick = pickPanel({ fleets: selFleets, fleet: selFleet, planet: selPlanet }, s, seesDetails);
+  if (pick.kind === 'group') return taskGroupPanelHtml(pick.fleets);
+  if (pick.kind === 'fleet') return fleetPanelHtml(pick.fleet);
+  if (pick.kind === 'empty') return `<div class="hint">${t('side.empty')}</div>`;
+  return pick.known ? planetPanelHtml(pick.planet) : unknownPlanetHtml(pick.planet);
 }
 
 // --- object dossiers + codex (REFM-4) ----------------------------------------
