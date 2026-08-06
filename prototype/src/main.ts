@@ -177,6 +177,12 @@ import { buildRoster, garrisonByTab, tabCounts } from './planetTabs';
 import { catalogTileHtml, tileLock, type TileLock } from './catalogTile';
 import { createScanMemory, type Snapshot } from './scanMemory';
 import {
+  factionBonuses,
+  houseNameFor,
+  rivalCount,
+  seatFactionIds as seatSeatFactionIds,
+} from './setupSeats';
+import {
   actionButton,
   cardHeader as kitCardHeader,
   pcols,
@@ -9068,29 +9074,28 @@ function renderSetupMap(): void {
 /** H3 — which house each seat plays: seat 0 (you) = `setupFaction`, then the four
  *  passive houses rotate in stable order across the remaining seats. */
 function seatFactionIds(): string[] {
-  const all = Object.keys(data.factions);
-  const ordered = [setupFaction, ...all.filter((f) => f !== setupFaction)];
-  return SEAT_META.map((_, i) => ordered[i % ordered.length]!);
+  // Раздача и нумерация домов — в `setupSeats.ts` (REFM-44): твой первый, остальные
+  // по кругу в стабильном порядке, со второго круга имя получает номер.
+  return seatSeatFactionIds(setupFaction, Object.keys(data.factions), SEAT_META.length);
 }
 function seatHouseName(fid: string, fallback: string, index: number): string {
-  const base = data.factions[fid]?.name ?? fallback;
-  const cycle = Math.floor(index / Math.max(1, Object.keys(data.factions).length)) + 1;
-  return cycle === 1 ? base : `${base} ${cycle}`;
+  return houseNameFor(
+    data.factions[fid]?.name ?? fallback,
+    index,
+    Object.keys(data.factions).length,
+  );
 }
 /** A faction's passive-bonus readout, straight from the data (economy or units). */
 function factionBonusLine(fid: string): string {
-  const p = data.factions[fid]?.passives;
-  if (!p) return '';
-  const parts: string[] = [];
-  if (p.productionBonus)
-    parts.push(t('setup.bonus.economy', { n: Math.round(p.productionBonus * 100) }));
-  if (p.combatDamageBonus)
-    parts.push(t('setup.bonus.damage', { n: Math.round(p.combatDamageBonus * 100) }));
-  if (p.fleetSpeedBonus)
-    parts.push(t('setup.bonus.speed', { n: Math.round(p.fleetSpeedBonus * 100) }));
-  if (p.radarRangeBonus)
-    parts.push(t('setup.bonus.radar', { n: Math.round(p.radarRangeBonus * 100) }));
-  return parts.join(' · ');
+  const BONUS_KEY = {
+    economy: 'setup.bonus.economy',
+    damage: 'setup.bonus.damage',
+    speed: 'setup.bonus.speed',
+    radar: 'setup.bonus.radar',
+  } as const;
+  return factionBonuses(data.factions[fid]?.passives)
+    .map((b) => t(BONUS_KEY[b.kind], { n: b.pct }))
+    .join(' · ');
 }
 
 function renderSetupSlots(): void {
@@ -9149,7 +9154,7 @@ function renderSetup(): void {
   // Seat 1 (you) is always in, so the match can always launch — including with ZERO
   // rivals: a calm solo sandbox to read descriptions, learn the UI and test in peace
   // (the core never ends a one-player match — victory needs ≥2 active sides).
-  const rivals = setupSlots.slice(1).filter((r) => r === 'ai').length;
+  const rivals = rivalCount(setupSlots);
   setupGoEl.disabled = false;
   setupGoEl.textContent = rivals === 0 ? t('setup.start.solo') : t('setup.start');
   setupHintEl.textContent = t(rivals === 0 ? 'setup.home.solo' : 'setup.home.pick', {
