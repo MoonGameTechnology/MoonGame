@@ -169,6 +169,7 @@ import { initPingUi } from './pingUi';
 import { initSoloDrivers } from './soloDrivers';
 import { initMatchEnd } from './matchEnd';
 import { STANCES, diffDiplomacy } from './diploEvents';
+import { asteroidsFor, bracketStrokes, polyPoints } from './mapShapes';
 import {
   boxSelection,
   insideBox,
@@ -3200,52 +3201,15 @@ const matchEnd = initMatchEnd({
 
 // --- rendering ---------------------------------------------------------------
 
-/** A regular polygon path centred at (x,y) — fort/station containment marker. */
+/** A regular polygon path centred at (x,y) — fort/station containment marker.
+ *  Точки считает `mapShapes.ts` (REFM-34); здесь только обводка. */
 function poly(x: number, y: number, r: number, sides: number, rot = 0) {
   cx.beginPath();
-  for (let i = 0; i < sides; i++) {
-    const a = rot + (i / sides) * TAU;
-    const px = x + Math.cos(a) * r;
-    const py = y + Math.sin(a) * r;
-    if (i) cx.lineTo(px, py);
-    else cx.moveTo(px, py);
-  }
+  polyPoints(x, y, r, sides, rot).forEach((p, i) => {
+    if (i) cx.lineTo(p.x, p.y);
+    else cx.moveTo(p.x, p.y);
+  });
   cx.closePath();
-}
-
-// Stable asteroid cluster for an asteroid-field junction — built once and seeded
-// by the node position, so the rocks never shimmer or move between frames.
-interface Rock {
-  dx: number;
-  dy: number;
-  r: number;
-  rot: number;
-  sides: number;
-}
-const asteroidCache = new Map<string, Rock[]>();
-function asteroidsFor(id: string, x: number, y: number): Rock[] {
-  const hit = asteroidCache.get(id);
-  if (hit) return hit;
-  let seed = (Math.floor(x * 3457) ^ Math.floor(y * 8761) ^ 0x9e3779b9) >>> 0;
-  const rnd = (): number => {
-    seed = (seed * 1664525 + 1013904223) >>> 0;
-    return seed / 0xffffffff;
-  };
-  const rocks: Rock[] = [];
-  const count = 9 + Math.floor(rnd() * 4);
-  for (let i = 0; i < count; i++) {
-    const ang = rnd() * TAU;
-    const dist = 7 + rnd() * 21;
-    rocks.push({
-      dx: Math.cos(ang) * dist,
-      dy: Math.sin(ang) * dist * 0.72, // slightly flattened → reads as a belt
-      r: 1.5 + rnd() * 2.8,
-      rot: rnd() * TAU,
-      sides: 3 + Math.floor(rnd() * 3),
-    });
-  }
-  asteroidCache.set(id, rocks);
-  return rocks;
 }
 
 /** Four slowly-rotating corner brackets — the "locked target" selection reticle. */
@@ -3257,17 +3221,12 @@ function targetBrackets(x: number, y: number, r: number, t: number) {
   cx.lineWidth = 1.6;
   cx.shadowColor = LOCK;
   cx.shadowBlur = fxBlur(8);
-  const len = 6;
-  for (const [sx, sy] of [
-    [1, 1],
-    [-1, 1],
-    [-1, -1],
-    [1, -1],
-  ] as const) {
+  // Четыре уголка «захваченной цели» — их геометрию считает `mapShapes.ts`.
+  for (const b of bracketStrokes(r, 6)) {
     cx.beginPath();
-    cx.moveTo(sx * r - sx * len, sy * r);
-    cx.lineTo(sx * r, sy * r);
-    cx.lineTo(sx * r, sy * r - sy * len);
+    cx.moveTo(b.from.x, b.from.y);
+    cx.lineTo(b.corner.x, b.corner.y);
+    cx.lineTo(b.to.x, b.to.y);
     cx.stroke();
   }
   cx.restore();
