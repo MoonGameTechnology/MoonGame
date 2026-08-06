@@ -662,11 +662,20 @@ jobs:
             trivy-deps-sarif/*.sarif
             status-trivy-deps.json
           if-no-files-found: warn
+      # SEC-19. Загрузка КАТАЛОГА под одной категорией падала: с 2025-07-21 CodeQL
+      # Action не объединяет несколько `runs` в одной категории («does not support
+      # uploading multiple SARIF runs with the same category»), а джоба пишет по SARIF
+      # на образ. Шаг стоит под `continue-on-error`, поэтому джоба оставалась зелёной,
+      # а находки в Code Scanning не приезжали вообще. Сливаем в один run до загрузки —
+      # почему именно так, а не категория на образ, объяснено в шапке скрипта.
+      - name: merge per-image SARIF into one run
+        continue-on-error: true
+        run: node .github/scripts/merge-sarif.mjs trivy-deps.sarif trivy-deps-sarif/*.sarif
       - name: upload to code scanning
         continue-on-error: true
         uses: github/codeql-action/upload-sarif@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4.37.3
         with:
-          sarif_file: trivy-deps-sarif
+          sarif_file: trivy-deps.sarif
           category: trivy-deps
       - name: report — informational (not yet blocking)
         env:
