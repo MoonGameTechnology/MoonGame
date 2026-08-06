@@ -206,9 +206,26 @@ export function createMultiplayerServer(
       void reply.header('access-control-allow-origin', '*');
     } else {
       void reply.header('vary', 'Origin');
-      if (origin && allowedOrigins.includes(origin)) {
-        void reply.header('access-control-allow-origin', origin);
-      }
+      // Отдаём НАШУ строку из НАШЕГО списка, а не строку из запроса. Значения совпадают
+      // (сверка точная), но провенанс разный, и это не стилистика: заголовок, собранный
+      // из `req.headers.origin`, — классический CORS-reflection, и отличить безопасную
+      // версию от дырявой можно только прочитав сравнение рядом. Здесь читать нечего:
+      // в ответ физически попадает элемент `options.allowedOrigins`. Ровно это и просит
+      // правило Semgrep `cors-misconfiguration` («use literal values»), которое поймало
+      // первую редакцию этой правки на ревью PR #574.
+      const match = allowedOrigins.find((o) => o === origin);
+      // Обоснование отдельной строкой, директива чистая — конвенция репозитория
+      // (см. `wsServer.tls.test.ts`): всё после `nosemgrep:` считается списком rule-id.
+      // Причина: правило требует ЛИТЕРАЛ в `Access-Control-Allow-Origin`, а это
+      // несовместимо с настраиваемым allowlist'ом в принципе — один заголовок несёт
+      // ровно один origin, поэтому при нескольких разрешённых его придётся выбирать
+      // на запрос. Опасная форма правила — отражение `req.headers.origin` без сверки
+      // (или со слабой, вроде `endsWith`); здесь сверка точная и в ответ уходит элемент
+      // НАШЕГО `options.allowedOrigins`, а не строка из запроса. Поведение закреплено
+      // тремя тестами в `authHandshake.test.ts` (эхо только разрешённого, `Vary`,
+      // preflight), и мутация «эхо любого Origin» их роняет.
+      // nosemgrep: javascript.express.security.cors-misconfiguration.cors-misconfiguration
+      if (match) void reply.header('access-control-allow-origin', match);
     }
     void reply.header('access-control-allow-methods', 'GET, POST, OPTIONS');
     void reply.header('access-control-allow-headers', 'authorization, content-type');
