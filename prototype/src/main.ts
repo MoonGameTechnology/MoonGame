@@ -199,6 +199,7 @@ import {
 } from './joinRules';
 import { houseBonusKey, houseChoice, houseColor, houseName, houseRows } from './seatPicker';
 import { createPendingJoin } from './pendingJoin';
+import { syncCommanderXp } from './commanderSync';
 import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from './registerForm';
 import {
   fmtJoinWindow,
@@ -8573,16 +8574,12 @@ async function syncCommanderFromServer(): Promise<void> {
       headers: { authorization: `Bearer ${session}` },
     });
     if (!res.ok) return;
-    const body = (await res.json().catch(() => null)) as { xp?: unknown } | null;
-    if (typeof body?.xp !== 'number') return;
     const cur = loadMeta();
-    // XP only ever grows (accumulated per finished match). Take the max, never a
-    // regression: the server is the durable cross-device total, but if this device
-    // just awarded a match optimistically and the server hasn't credited it yet, we
-    // must NOT drop below the local figure. Both converge once the credit lands.
-    const total = Math.max(cur.xp, body.xp);
-    if (total !== cur.xp) {
-      saveMeta({ ...cur, xp: total }); // local `spent` tree is kept
+    // Merging the two totals is `commanderSync.ts` (REFM-53): XP only ever grows, an
+    // unreadable answer leaves the local figure alone, and only a real change repaints.
+    const sync = syncCommanderXp(cur.xp, await res.json().catch(() => null));
+    if (sync.changed) {
+      saveMeta({ ...cur, xp: sync.xp }); // local `spent` tree is kept
       // repaint the open hub panel so the new level/points show without a manual switch
       if (hubEl.style.display !== 'none' && (currentHubTab === 'home' || currentHubTab === 'meta'))
         hubTab(currentHubTab);
