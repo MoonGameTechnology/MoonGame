@@ -175,6 +175,14 @@ import { isGroundUnit, isWingUnit, planetSummary } from './planetSummary';
 import { fleetWhere, groupTotals, pickPanel } from './panelSelect';
 import { buildRoster, garrisonByTab, tabCounts } from './planetTabs';
 import { builtTileHtml, catalogTileHtml, tileLock, type TileLock } from './catalogTile';
+import {
+  anyToken,
+  clearSession,
+  readSession,
+  saveSession,
+  tokenFor,
+  type SessionRec,
+} from './sessionStore';
 import { createScanMemory, type Snapshot } from './scanMemory';
 import {
   factionBonuses,
@@ -8838,7 +8846,7 @@ const passwordReset = initPasswordReset({
   },
   onSuccess: (login, token) => {
     const srv = resolveServer();
-    if (srv) localStorage.setItem(sessionKey(srv.base), JSON.stringify({ login, token }));
+    if (srv) saveSession(localStorage, srv.base, { login, token });
     localStorage.setItem('void.nick', login);
     nickInput.value = login;
     note('✔ ' + t('auth.reset.done'));
@@ -8892,7 +8900,7 @@ $('hub-logout').addEventListener('click', () => {
   // «Сменить командира» must really switch identity: drop this server's session so
   // the next sign-in authenticates the NEW callsign instead of replaying the old JWT.
   const srv = resolveServer();
-  if (srv) localStorage.removeItem(sessionKey(srv.base));
+  if (srv) clearSession(localStorage, srv.base);
   statusEl.textContent = '';
   showHub(false);
   showConnect(true);
@@ -9780,33 +9788,19 @@ function httpBase(wsBase: string): string {
 // (`authMode` itself is declared ABOVE the boot block — see the TDZ note there.)
 const passRow = document.getElementById('cpassrow') as HTMLElement | null;
 const passInput = document.getElementById('cpass') as HTMLInputElement | null;
-const sessionKey = (base: string): string => `void.session.${base}`;
-/** Session record: the JWT plus WHOSE it is. A cached token must never silently
- *  authenticate a different callsign (family laptop: «Сменить командира» then a
- *  new sign-in really switches the account). Legacy bare-JWT values fail the
- *  parse → treated as absent, one harmless re-login. */
-interface SessionRec {
-  login: string;
-  token: string;
-}
+// Хранилище сессии — в `sessionStore.ts` (REFM-46): там же три правила, каждое из
+// которых стоит за конкретной неприятностью — токен привязан к ПОЗЫВНОМУ (семейный
+// ноутбук), ключ включает адрес сервера, пароль не хранится никогда.
+// Объявления, а не стрелки: обе читаются ВЫШЕ по файлу (boot-блок и рестарт), а
+// `const` дал бы обращение в мёртвой зоне — TDZ.
 function sessionRecord(base: string): SessionRec | null {
-  try {
-    const rec = JSON.parse(localStorage.getItem(sessionKey(base)) ?? 'null') as {
-      login?: unknown;
-      token?: unknown;
-    } | null;
-    return rec && typeof rec.login === 'string' && typeof rec.token === 'string'
-      ? { login: rec.login, token: rec.token }
-      : null;
-  } catch {
-    return null;
-  }
+  return readSession(localStorage, base);
 }
 /** The cached session token for ANY identity on this server (best-effort reads:
  *  arsenal refresh, redial). Auth-critical paths use ensureSession, which checks
  *  the login matches. */
 function sessionToken(base: string): string | null {
-  return sessionRecord(base)?.token ?? null;
+  return anyToken(localStorage, base);
 }
 
 /** Probe the server's identity mode and show/hide the password field. Network
@@ -9860,8 +9854,8 @@ async function ensureSession(
 ): Promise<string | null> {
   // Only OUR OWN cached session counts — a token minted for a different callsign
   // (or a legacy unbound one) is ignored and replaced by a fresh login below.
-  const cachedRec = sessionRecord(base);
-  if (cachedRec && cachedRec.login.toLowerCase() === login.toLowerCase()) return cachedRec.token;
+  const mine = tokenFor(localStorage, base, login);
+  if (mine) return mine;
   // Mirror the server's LOGIN_RE (authApi.ts) so a bad callsign gets a human
   // explanation here instead of the server's uniform rejection.
   if (!/^[\p{L}\p{N}_-]{3,24}$/u.test(login)) {
@@ -9890,14 +9884,14 @@ async function ensureSession(
   try {
     const login1 = await call('/auth/login');
     if (login1.token) {
-      localStorage.setItem(sessionKey(base), JSON.stringify({ login, token: login1.token }));
+      saveSession(localStorage, base, { login, token: login1.token });
       return login1.token;
     }
     if (login1.status === 401) {
       // Registration carries the optional recovery email (login never needs it).
       const reg = await call('/auth/register', emailArg ? { email: emailArg } : {});
       if (reg.token) {
-        localStorage.setItem(sessionKey(base), JSON.stringify({ login, token: reg.token }));
+        saveSession(localStorage, base, { login, token: reg.token });
         note('✔ ' + t('acc.created'));
         return reg.token;
       }
@@ -9943,7 +9937,7 @@ async function fetchJoinToken(
       },
     );
     if (res.status === 401) {
-      localStorage.removeItem(sessionKey(base)); // session expired/revoked — re-login
+      clearSession(localStorage, base); // session expired/revoked — re-login
       statusEl.textContent = t('acc.session-expired');
       return null;
     }
