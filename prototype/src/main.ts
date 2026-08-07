@@ -203,6 +203,7 @@ import { syncCommanderXp } from './commanderSync';
 import { panelSlackFor } from './panelSlack';
 import { longPressAction, pressIntent } from './pressIntent';
 import { assaultMovers, assaultTargetBlocker, collectBlockers, moveMovers } from './warPrompt';
+import { assaultOrderState, dropsOrder } from './assaultQueue';
 import { openingView, pickHome } from './openingView';
 import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from './registerForm';
 import {
@@ -2608,19 +2609,14 @@ function pumpAssaultOrders(): void {
   if (!assaultOnArrival.size) return;
   for (const [id, destId] of [...assaultOnArrival]) {
     const f = s.fleets[id];
-    if (!f) {
+    // Что стало с отложенным приказом — `assaultQueue.ts` (REFM-58): перенаправленный
+    // снимается, бой по прилёте ждут, вставший не в цели протухает.
+    const state = assaultOrderState(f, destId);
+    if (dropsOrder(state)) {
       assaultOnArrival.delete(id);
       continue;
     }
-    if (f.movement) {
-      if ((f.movement.destination ?? f.movement.to) !== destId) assaultOnArrival.delete(id); // re-routed by hand
-      continue;
-    }
-    if (f.battleId) continue; // the arrival battle IS the assault path — wait it out
-    if (f.location !== destId) {
-      assaultOnArrival.delete(id); // parked elsewhere — the order lapsed
-      continue;
-    }
+    if (state !== 'ready' || !f) continue;
     // RULES-4. Флот на месте — приказ издаётся СЕЙЧАС, поэтому решает ядро, а не
     // три рукописных условия («захвачен своими / опустел» + отдельно десант). Оно
     // же покрывает и `E_OWN_PLANET`, и `E_NOT_CAPTURABLE`, и чужой идущий штурм.
