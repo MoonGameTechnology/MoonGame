@@ -204,6 +204,7 @@ import { panelSlackFor } from './panelSlack';
 import { longPressAction, pressIntent } from './pressIntent';
 import { assaultMovers, assaultTargetBlocker, collectBlockers, moveMovers } from './warPrompt';
 import { assaultOrderState, dropsOrder } from './assaultQueue';
+import { laneEnds, warConfirmPlan } from './warOrders';
 import { openingView, pickHome } from './openingView';
 import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from './registerForm';
 import {
@@ -2635,15 +2636,14 @@ function pumpAssaultOrders(): void {
 /** As tryMoveGroup, but the target is a point on a lane (continuous order). Either lane
  *  endpoint sitting on PEACE territory blocks the march until war is declared. */
 function tryMoveEdgeGroup(fleetIds: string[], edge: { from: string; to: string; t: number }): void {
-  const blockers = new Set<string>();
-  for (const id of fleetIds) {
-    if (!peaceBlocked(moveFleetEdge(ME, id, edge))) continue;
+  // Марш упирается в ОБА конца лейна (`warOrders.ts`, REFM-59), а не только в «куда».
+  const blockers = collectBlockers(fleetIds, (id) => {
+    if (!peaceBlocked(moveFleetEdge(ME, id, edge))) return [];
     const node = fleetNode(s.fleets[id]!);
-    for (const end of [edge.from, edge.to])
-      for (const b of peaceBlockers(node, end)) blockers.add(b);
-  }
-  if (blockers.size) {
-    warPrompt = { fleetIds: [...fleetIds], destId: edge.to, edge, blockers: [...blockers] };
+    return laneEnds(edge).flatMap((end) => peaceBlockers(node, end));
+  });
+  if (blockers.length) {
+    warPrompt = { fleetIds: [...fleetIds], destId: edge.to, edge, blockers };
     renderWarPrompt();
     return;
   }
@@ -2657,14 +2657,14 @@ function confirmWarPrompt(): void {
   const wp = warPrompt;
   warPrompt = null;
   hideWarPrompt();
-  for (const b of wp.blockers) playerOrder(declareWar(ME, b));
-  if (wp.assault) {
-    dispatchAssault(wp.fleetIds, wp.destId); // wars are declared → flies + storms on arrival
-  } else {
-    for (const id of wp.fleetIds) {
-      if (wp.edge) playerOrder(moveFleetEdge(ME, id, wp.edge));
-      else playerOrder(moveFleet(ME, id, wp.destId));
-    }
+  // Порядок шагов держит `warOrders.ts` (REFM-59): все объявления войны идут ПЕРВЫМИ,
+  // иначе приказ упрётся в те же запертые лейны и будет отвергнут ядром.
+  for (const step of warConfirmPlan(wp)) {
+    if (step.kind === 'declare-war') playerOrder(declareWar(ME, step.on));
+    else if (step.kind === 'assault') dispatchAssault([...step.fleetIds], step.destId);
+    else if (step.kind === 'move-edge')
+      for (const id of step.fleetIds) playerOrder(moveFleetEdge(ME, id, step.edge));
+    else for (const id of step.fleetIds) playerOrder(moveFleet(ME, id, step.destId));
   }
   note(t('log.war.declared'));
 }
