@@ -201,6 +201,7 @@ import { houseBonusKey, houseChoice, houseColor, houseName, houseRows } from './
 import { createPendingJoin } from './pendingJoin';
 import { syncCommanderXp } from './commanderSync';
 import { panelSlackFor } from './panelSlack';
+import { longPressAction, pressIntent } from './pressIntent';
 import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from './registerForm';
 import {
   fmtJoinWindow,
@@ -7826,10 +7827,8 @@ canvas.addEventListener('pointerdown', (ev) => {
     tapByTouch = ev.pointerType === 'touch'; // preview + commit share the snap radius
     longPressFired = false;
     multiTouched = false; // новый жест — пока однопальцевый
-    // Shift OR Ctrl/⌘ extends the fleet selection (the RTS/Bytro habit — Shift-click
-    // gathers fleets for one group order). Shift over EMPTY space still opens a
-    // box-select; Shift over one of YOUR fleets is an additive click instead, so the
-    // two never fight (a rubber-band from a fleet would eat the click).
+    // Кто из троих претендентов забирает этот жест — решает `pressIntent.ts`
+    // (REFM-55): там же правило «Shift над своим флотом — добор, а не рамка».
     const overOwnFleet = !!nearestHit(
       Object.values(s.fleets).filter((f) => f.owner === ME),
       fleetAnchor,
@@ -7837,15 +7836,22 @@ canvas.addEventListener('pointerdown', (ev) => {
       p.y,
       pickRadius(ev.pointerType === 'touch'),
     );
-    additive = ev.ctrlKey || ev.metaKey || ev.shiftKey;
-    boxSelecting = ev.shiftKey && !overOwnFleet;
+    const intent = pressIntent({
+      touch: ev.pointerType === 'touch',
+      shift: ev.shiftKey,
+      ctrl: ev.ctrlKey,
+      meta: ev.metaKey,
+      overOwnFleet,
+      orderArmed: !!(aiming || merging || barrageAim || chainMode),
+    });
+    additive = intent.additive;
+    boxSelecting = intent.boxSelect;
     selectionBox = boxSelecting ? { x1: p.x, y1: p.y, x2: p.x, y2: p.y } : null;
     dragged = false;
     if (aiming || assaultAim) aimPointer = p; // the aim preview starts under the finger at once
     // Touch long-press: a still finger for ~350ms picks a fleet ADDITIVELY (the
     // Ctrl-click of phones) or opens a BOX-SELECT from empty space (the Shift-drag).
-    // Not while an armed mode (move/merge/barrage/chain) owns the taps.
-    if (ev.pointerType === 'touch' && !aiming && !merging && !barrageAim && !chainMode) {
+    if (intent.longPress) {
       cancelLongPress();
       longPressTimer = window.setTimeout(() => {
         longPressTimer = null;
@@ -7859,8 +7865,8 @@ canvas.addEventListener('pointerdown', (ev) => {
           p.y,
           24,
         );
-        if (mine) {
-          toggleFleetInSelection(mine.id); // add / drop from the group
+        if (longPressAction(!!mine) === 'toggle-fleet') {
+          toggleFleetInSelection(mine!.id); // add / drop from the group
         } else {
           boxSelecting = true; // drag now stretches the selection box
           selectionBox = { x1: p.x, y1: p.y, x2: p.x, y2: p.y };
