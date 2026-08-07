@@ -198,6 +198,14 @@ import {
   type JoinOutcome,
 } from './joinRules';
 import { houseBonusKey, houseChoice, houseColor, houseName, houseRows } from './seatPicker';
+import {
+  fmtJoinWindow,
+  joinWindow,
+  rowAction,
+  ruleSummary,
+  type MatchRules,
+  type MatchTab,
+} from './matchRow';
 
 /** Причина отказа во входе в матч → ключ подписи. Текст живёт в /localization. */
 const JOIN_REASON: Record<Exclude<JoinOutcome, 'ok'>, string> = {
@@ -9981,7 +9989,7 @@ let pendingJoinToken: string | null = null;
 interface MatchRow {
   matchId: string;
   mapId: string;
-  rules: { timeScale?: number; victory?: { dominationPercent?: number; scoreLimit?: number } };
+  rules: MatchRules;
   days: number;
   players: { seated: number; capacity: number };
   status: string;
@@ -9991,30 +9999,8 @@ interface MatchRow {
   entryClosesInMs?: number;
 }
 
-/** A large sentinel from the server (`Number.MAX_SAFE_INTEGER`) means «no entry window»
- *  — anything past a decade of real time counts as unbounded here. */
-const ENTRY_UNBOUNDED_MS = 3650 * 24 * 60 * 60 * 1000;
-
-/** Real-time-left → «Nд Mч» / «Mч» / «<1ч» for the join-window countdown on a row. */
-function fmtJoinWindow(ms: number): string {
-  const hours = Math.max(0, Math.floor(ms / 3_600_000));
-  const d = Math.floor(hours / 24);
-  const h = hours % 24;
-  if (d > 0) return t('browser.left.days', { d, h });
-  if (hours > 0) return t('browser.left.hours', { h: hours });
-  return t('browser.left.soon');
-}
-type MatchTab = 'available' | 'active' | 'archived';
 let matchLists: Record<MatchTab, MatchRow[]> | null = null;
 let activeTab: MatchTab = 'available';
-
-function ruleSummary(r: MatchRow['rules']): string {
-  const parts = [`×${r.timeScale ?? 1}`];
-  if (r.victory?.scoreLimit) parts.push(t('browser.goal.score', { n: r.victory.scoreLimit }));
-  if (r.victory?.dominationPercent)
-    parts.push(t('browser.goal.map', { p: Math.round(r.victory.dominationPercent * 100) }));
-  return parts.join(' · ');
-}
 
 /** Join a chosen match: set it as the (re)connect target, then dial via `connect()`.
  *  Accounts mode (SES-2.5) first exchanges the session for a join token (register/
@@ -10314,14 +10300,12 @@ function renderMatches(): void {
     // countdown reassures, a soon-to-close one nudges. Unbounded (dev / old server) or
     // other tabs: omitted. Own «Активные»/«Архив» rows don't gate a reconnect, so no
     // window there.
+    const win = joinWindow(m, activeTab);
     let windowLine = '';
-    if (activeTab === 'available' && m.entryClosesInMs !== undefined) {
-      if (m.entryOpen === false) {
-        windowLine = ` · <span class="mwin shut">${t('acc.join-closed')}</span>`;
-      } else if (m.entryClosesInMs < ENTRY_UNBOUNDED_MS) {
-        const soon = m.entryClosesInMs < 24 * 60 * 60 * 1000; // under a real day left
-        windowLine = ` · <span class="mwin${soon ? ' soon' : ''}">${t('browser.join-window', { dur: fmtJoinWindow(m.entryClosesInMs) })}</span>`;
-      }
+    if (win.kind === 'closed') {
+      windowLine = ` · <span class="mwin shut">${t('acc.join-closed')}</span>`;
+    } else if (win.kind === 'open') {
+      windowLine = ` · <span class="mwin${win.soon ? ' soon' : ''}">${t('browser.join-window', { dur: fmtJoinWindow(win.left) })}</span>`;
     }
     info.innerHTML =
       `<div class="mname">${esc(m.mapId)} <span class="mid">${esc(m.matchId)}</span></div>` +
@@ -10335,8 +10319,9 @@ function renderMatches(): void {
     join.textContent = t('browser.join');
     join.addEventListener('click', () => openSessionTab(m.matchId));
     btns.appendChild(join);
-    if (activeTab !== 'available') {
-      const restore = activeTab === 'archived';
+    const action = rowAction(activeTab);
+    if (action) {
+      const restore = action === 'restore';
       const arch = document.createElement('button');
       arch.className = 'mbtn ghost';
       arch.textContent = restore ? t('browser.restore') : t('browser.archive');
