@@ -205,6 +205,7 @@ import { longPressAction, pressIntent } from './pressIntent';
 import { assaultMovers, assaultTargetBlocker, collectBlockers, moveMovers } from './warPrompt';
 import { assaultOrderState, dropsOrder } from './assaultQueue';
 import { laneEnds, warConfirmPlan } from './warOrders';
+import { bakeSignature, needsRebake, ownersSignature } from './staticLayerCache';
 import { openingView, pickHome } from './openingView';
 import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from './registerForm';
 import {
@@ -3833,9 +3834,12 @@ function knownOwner(id: string): string | null {
   return memory.ownerOf(id);
 }
 function ownersSig(): string {
-  let out = '';
-  for (const n of MAP) out += (knownOwner(n.id) ?? '·') + ',';
-  return out;
+  // Подпись читает ЗНАНИЕ игрока (`knownOwner`), а не правду — см. `staticLayerCache.ts`
+  // (REFM-60): иначе скрытый захват выдал бы себя самим фактом перерисовки.
+  return ownersSignature(
+    MAP.map((n) => n.id),
+    knownOwner,
+  );
 }
 
 /** Rebuild the cached province map when the camera/ownership/viewport moves. */
@@ -3843,14 +3847,22 @@ function buildStaticLayer(): void {
   // Rebuild only when the content/size changes, or when the camera has SETTLED at a
   // new spot. During an active pan/zoom we skip the O(n²) re-tessellation entirely
   // and let blitStaticLayer follow the camera with the last bake (transformed).
-  const content = `${VW}x${VH}:${DPR.toFixed(2)}|${ME}|${ownersSig()}|${starfieldOn() ? 1 : 0}`;
-  const sizeOk = bg.width === Math.round(VW * DPR);
-  const camSame = cam.x === bgCam.x && cam.y === bgCam.y && cam.scale === bgCam.scale;
   // Re-bake whenever the camera moved. The bake is viewport-sized, so following a pan
   // with a transformed STALE bake left the newly-revealed area uncovered — a smear / a
   // map squeezed into a corner on the wide map. A 52-seed power diagram is cheap enough
   // to re-tile per moved frame; idle frames (camera at rest) still cost one cached blit.
-  if (sizeOk && content === bgContent && camSame) return;
+  // Само решение — в `staticLayerCache.ts` (REFM-60).
+  const content = bakeSignature({
+    vw: VW,
+    vh: VH,
+    dpr: DPR,
+    me: ME,
+    owners: ownersSig(),
+    starfield: starfieldOn(),
+  });
+  const width = Math.round(VW * DPR);
+  const baked = bgContent ? { signature: bgContent, cam: bgCam, width: bg.width } : null;
+  if (!needsRebake(baked, { signature: content, cam, width })) return;
   bgContent = content;
   bgCam = { x: cam.x, y: cam.y, scale: cam.scale };
   bg.width = Math.round(VW * DPR);
