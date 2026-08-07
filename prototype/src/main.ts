@@ -200,6 +200,7 @@ import {
 import { houseBonusKey, houseChoice, houseColor, houseName, houseRows } from './seatPicker';
 import { createPendingJoin } from './pendingJoin';
 import { syncCommanderXp } from './commanderSync';
+import { panelSlackFor } from './panelSlack';
 import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from './registerForm';
 import {
   fmtJoinWindow,
@@ -1321,11 +1322,10 @@ function visible(c: { x: number; y: number }, pad = 80): boolean {
  *  screens (→ slack on the right); measure its live rect so both layouts just work. */
 function panelSlack(): { right?: number; bottom?: number } {
   const el = typeof document !== 'undefined' ? document.getElementById('side') : null;
-  if (!el || getComputedStyle(el).display === 'none') return {};
-  const r = el.getBoundingClientRect();
-  if (r.height <= 0 || r.width <= 0) return {};
-  if (r.width >= VW * 0.7) return { bottom: Math.max(0, VH - r.top) }; // bottom sheet
-  return { right: Math.max(0, VW - r.left) }; // right-hand column
+  const open = el && getComputedStyle(el).display !== 'none';
+  // The arithmetic (which side is covered, and by how much) is `panelSlack.ts`
+  // (REFM-54); measuring the live element stays here.
+  return panelSlackFor(open ? el.getBoundingClientRect() : null, VW, VH);
 }
 
 function zoomAt(fx: number, fy: number, factor: number) {
