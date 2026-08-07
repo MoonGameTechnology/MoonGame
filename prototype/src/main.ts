@@ -211,6 +211,7 @@ import { nodeView, seesDetails as fogSeesDetails } from './fogView';
 import { hasCoverage, identifyRadius, radarSources } from './radarSources';
 import { tapOwner, tapRadius } from './tapPriority';
 import { nextPick, tapCandidates, touchPick, type TapPick } from './tapCycle';
+import { chainTapTarget, nearestOwnWorld as ownWorldNearest } from './chainTarget';
 import { openingView, pickHome } from './openingView';
 import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from './registerForm';
 import {
@@ -11270,27 +11271,18 @@ function chainStepsOf(fid: string): ChainStep[] | null {
   const ch = (s as { orders?: Record<string, { steps: ChainStep[] }> }).orders?.[fid];
   return ch ? ch.steps : null;
 }
-/** The closest OWN world to `fromId` — the «Домой» leg of a composed plan. */
+/** The closest OWN world to `fromId` — the «Домой» leg of a composed plan (REFM-66). */
 function nearestOwnWorld(fromId: string): string | null {
-  const from = s.planets[fromId]?.position;
-  if (!from) return null;
-  let best: string | null = null;
-  let bd = Infinity;
-  for (const p of Object.values(s.planets)) {
-    if (p.owner !== ME || p.id === fromId) continue;
-    const d = Math.hypot(p.position.x - from.x, p.position.y - from.y);
-    if (d < bd) {
-      bd = d;
-      best = p.id;
-    }
-  }
-  return best;
-}
-/** Классифицировать тапнутый мир — «в зависимости от того, что это». */
-function chainWorldKind(id: string): ChainPointKind {
-  const p = s.planets[id];
-  if (!p || p.owner == null) return 'neutral';
-  return p.owner === ME ? 'own' : 'enemy';
+  return ownWorldNearest(
+    fromId,
+    Object.values(s.planets).map((p) => ({
+      id: p.id,
+      owner: p.owner ?? null,
+      x: p.position.x,
+      y: p.position.y,
+    })),
+    ME,
+  );
 }
 /** Способности героя на борту — данные для пунктов меню (CC-1 × HERO-4; та же
  *  фильтрация, что у старого композера: только кастуемые типы). */
@@ -11368,35 +11360,31 @@ function exitChainMode(): void {
   lastPanelHtml = '';
 }
 /** Тап карты в режиме: точка → меню действий по её типу, пустота → закрыть меню.
- *  Радиусы хитов — те же, что у selectAt (рассинхрон рисовал бы одно, слал другое). */
+ *  Радиусы хитов берутся из того же `tapPriority.ts`, что и у selectAt: вторая копия
+ *  чисел рассинхронилась бы и рисовала одно, а слала другое.
+ *  Приоритет цели («мир важнее флота» — наоборот к обычному выделению) — `chainTarget.ts`. */
 function chainMapTap(mx: number, my: number): void {
   if (!chainMode) return;
-  const rFleet = tapByTouch ? 24 : 16;
-  const rNode = tapByTouch ? 30 : 24;
-  // Мир ПРИОРИТЕТНЕЕ флота — в отличие от обычного выделения, где на мобиле
-  // побеждает флот. Здесь план строится по ТОЧКАМ карты, и у вражеского мира почти
-  // всегда стоит его флот: победи он, меню давало бы только «Огонь», а штурм самого
-  // мира стал бы недостижим. Огонь по конкретному флоту остаётся — для флотов, у
-  // которых узла под пальцем нет (в пути, на лейне, на чужой орбите поодаль).
-  const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
-  if (n) {
-    chainMode.menu = { id: n.id, kind: chainWorldKind(n.id) };
-    renderChainMenu();
-    return;
-  }
-  const foe = nearestHit(
-    Object.values(s.fleets).filter((f) => f.owner !== ME),
-    fleetAnchor,
-    mx,
-    my,
-    rFleet,
+  const n = nearestHit(MAP, (nn) => world(nn), mx, my, tapRadius('node', tapByTouch));
+  const foe = n
+    ? null
+    : nearestHit(
+        Object.values(s.fleets).filter((f) => f.owner !== ME),
+        fleetAnchor,
+        mx,
+        my,
+        tapRadius('fleet', tapByTouch),
+      );
+  const target = chainTapTarget(
+    n ? { id: n.id, owner: s.planets[n.id]?.owner ?? null } : null,
+    foe?.id ?? null,
+    ME,
   );
-  if (foe) {
-    chainMode.menu = { id: foe.id, kind: 'fleet' };
+  chainMode.menu = target;
+  if (target) {
     renderChainMenu();
     return;
   }
-  chainMode.menu = null;
   document.getElementById('tgted')?.classList.remove('show');
 }
 /** Экранная позиция точки открытого меню (флот движется — зовётся покадрово). */
