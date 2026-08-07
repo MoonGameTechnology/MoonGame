@@ -210,6 +210,7 @@ import { clipPolygon, clipRect, provinceSeeds } from './provinceMap';
 import { nodeView, seesDetails as fogSeesDetails } from './fogView';
 import { hasCoverage, identifyRadius, radarSources } from './radarSources';
 import { tapOwner, tapRadius } from './tapPriority';
+import { nextPick, tapCandidates, touchPick, type TapPick } from './tapCycle';
 import { openingView, pickHome } from './openingView';
 import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from './registerForm';
 import {
@@ -7748,38 +7749,10 @@ function selectAt(mx: number, my: number) {
     lastPanelHtml = '';
     return;
   }
-  // Plain tap = selection.
+  // Plain tap = selection. Правила выбора и перебора стопки — `tapCycle.ts` (REFM-65).
   const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
-  if (!pcUi()) {
-    // Mobile (frozen in this chat): the original fleet-first behaviour — nearest own
-    // fleet under the tap, else the world, else clear.
-    const mine = nearestHit(
-      Object.values(s.fleets).filter((f) => f.owner === ME),
-      fleetAnchor,
-      mx,
-      my,
-      rFleet,
-    );
-    if (mine) {
-      if (additive)
-        toggleFleetInSelection(mine.id); // Shift / Ctrl / ⌘ → extend the group
-      else setFleetSelection([mine.id]); // (clears any selected planet)
-      return;
-    }
-    if (n) {
-      selPlanet = n.id;
-      selFleet = null;
-      selFleets = new Set();
-      lastPanelHtml = '';
-      return;
-    }
-    clearSelection();
-    return;
-  }
-  // PC — RimWorld-style cycling: gather EVERY selectable object under the tap — your
-  // fleets (nearest first), then the world beneath them — and each repeat tap on the
-  // same spot advances to the next. So a fleet parked on its home world (or a stack of
-  // fleets on one orbit) no longer permanently masks the world / the fleets below it.
+  // Свои флоты под тапом, ближайший первым: и мобильной ветке (ей нужен только
+  // первый), и перебору на ПК (ему нужны все).
   const fleetHits = Object.values(s.fleets)
     .filter((f) => f.owner === ME)
     .map((f) => {
@@ -7788,31 +7761,51 @@ function selectAt(mx: number, my: number) {
     })
     .filter((h): h is { id: string; d: number } => !!h && h.d < rFleet)
     .sort((a, b) => a.d - b.d);
+  const applyPick = (pick: TapPick | null): void => {
+    if (!pick) {
+      clearSelection();
+      return;
+    }
+    if (pick.kind === 'fleet') {
+      setFleetSelection([pick.id]); // (clears any selected planet)
+      return;
+    }
+    selPlanet = pick.id;
+    selFleet = null;
+    selFleets = new Set();
+    lastPanelHtml = '';
+  };
+  if (!pcUi()) {
+    // Mobile (frozen in this chat): the original fleet-first behaviour — nearest own
+    // fleet under the tap, else the world, else clear. Перебора нет.
+    const mine = fleetHits[0]?.id ?? null;
+    // Shift / Ctrl / ⌘ → extend the group instead of replacing it.
+    if (additive && mine) {
+      toggleFleetInSelection(mine);
+      return;
+    }
+    applyPick(touchPick(mine, n?.id ?? null));
+    return;
+  }
+  // PC — RimWorld-style cycling: gather EVERY selectable object under the tap — your
+  // fleets (nearest first), then the world beneath them — and each repeat tap on the
+  // same spot advances to the next. So a fleet parked on its home world (or a stack of
+  // fleets on one orbit) no longer permanently masks the world / the fleets below it.
   if (additive) {
     // Ctrl/⌘ → extend the fleet group with the nearest fleet under the tap (no cycling).
     if (fleetHits[0]) toggleFleetInSelection(fleetHits[0].id);
     return;
   }
-  const cands: string[] = fleetHits.map((h) => 'f:' + h.id);
-  if (n) cands.push('p:' + n.id);
-  if (cands.length === 0) {
-    clearSelection();
-    return;
-  }
-  // Advance from whatever is selected now: a repeat tap on the same cluster steps to
-  // the next candidate; a tap on a fresh spot (current selection not in the cluster)
-  // starts at the topmost (index 0). One candidate → tapping it just keeps it selected.
-  const curKey = selFleet ? 'f:' + selFleet : selPlanet ? 'p:' + selPlanet : null;
-  const at = curKey ? cands.indexOf(curKey) : -1;
-  const pick = cands[(at + 1) % cands.length]!;
-  if (pick.startsWith('f:')) {
-    setFleetSelection([pick.slice(2)]); // (clears any selected planet)
-  } else {
-    selPlanet = pick.slice(2);
-    selFleet = null;
-    selFleets = new Set();
-    lastPanelHtml = '';
-  }
+  const cands = tapCandidates(
+    fleetHits.map((h) => h.id),
+    n?.id ?? null,
+  );
+  const current: TapPick | null = selFleet
+    ? { kind: 'fleet', id: selFleet }
+    : selPlanet
+      ? { kind: 'planet', id: selPlanet }
+      : null;
+  applyPick(nextPick(cands, current));
 }
 
 // --- camera control: drag-pan, pinch-zoom, wheel-zoom, tap-select ------------
