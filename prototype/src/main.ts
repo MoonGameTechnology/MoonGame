@@ -190,6 +190,21 @@ import {
   validPassword,
   type AuthOutcome,
 } from './authRules';
+import {
+  dropsSession,
+  joinOutcome,
+  joinQuery,
+  parseJoinPass,
+  type JoinOutcome,
+} from './joinRules';
+
+/** Причина отказа во входе в матч → ключ подписи. Текст живёт в /localization. */
+const JOIN_REASON: Record<Exclude<JoinOutcome, 'ok'>, string> = {
+  'session-expired': 'acc.session-expired',
+  'entry-closed': 'acc.join-closed',
+  'seats-full': 'acc.seats-full',
+  failed: 'acc.join-failed',
+};
 
 /** Причина отказа → ключ подписи в статусной строке. Текст живёт в /localization. */
 const AUTH_REASON: Record<AuthOutcome, string> = {
@@ -9935,32 +9950,22 @@ async function fetchJoinToken(
   try {
     // REL-7: pass ?slot= to request a specific seat; ?faction= to override the
     // seat's default faction (BF-30: faction decoupled from start point).
-    const params = new URLSearchParams();
-    if (slot) params.set('slot', slot);
-    if (faction) params.set('faction', faction);
-    const queryStr = params.toString() ? `?${params.toString()}` : '';
+    // Сборку запроса и разбор ответа держит `joinRules.ts` (REFM-48) — там же
+    // правило «401 стирает сессию», без которого клиент вечно стучится в дверь
+    // просроченным пропуском.
     const res = await fetch(
-      `${httpBase(base)}/matches/${encodeURIComponent(matchId)}/join${queryStr}`,
+      `${httpBase(base)}/matches/${encodeURIComponent(matchId)}/join${joinQuery(slot, faction)}`,
       {
         headers: { authorization: `Bearer ${session}` },
       },
     );
-    if (res.status === 401) {
-      clearSession(localStorage, base); // session expired/revoked — re-login
-      statusEl.textContent = t('acc.session-expired');
+    const outcome = joinOutcome(res.status);
+    if (outcome !== 'ok') {
+      if (dropsSession(outcome)) clearSession(localStorage, base);
+      statusEl.textContent = t(JOIN_REASON[outcome]);
       return null;
     }
-    if (res.status === 403) {
-      statusEl.textContent = t('acc.join-closed'); // entry window shut (SES-2.3)
-      return null;
-    }
-    if (!res.ok) {
-      statusEl.textContent = res.status === 409 ? t('acc.seats-full') : t('acc.join-failed');
-      return null;
-    }
-    const body = (await res.json()) as { token?: string; playerId?: string };
-    if (!body.token || !body.playerId) return null;
-    return { token: body.token, playerId: body.playerId };
+    return parseJoinPass(await res.json().catch(() => null));
   } catch {
     statusEl.textContent = t('acc.server-down');
     return null;
