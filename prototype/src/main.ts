@@ -207,6 +207,7 @@ import { assaultOrderState, dropsOrder } from './assaultQueue';
 import { laneEnds, warConfirmPlan } from './warOrders';
 import { bakeSignature, needsRebake, ownersSignature } from './staticLayerCache';
 import { clipPolygon, clipRect, provinceSeeds } from './provinceMap';
+import { nodeView, seesDetails as fogSeesDetails } from './fogView';
 import { openingView, pickHome } from './openingView';
 import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from './registerForm';
 import {
@@ -1955,13 +1956,12 @@ function radarHas(id: string | null | undefined): boolean {
   return !!vision && id != null && vision.radar.has(id);
 }
 /** Fog gate: «этот мир игроку вообще видно в деталях?» — опознан или свой.
- *  ОДНО место на весь файл специально: это условие нужно и панели, и отрисовке
- *  радиусов, а когда оно было выписано дважды, второе место про него забыли — тап по
- *  неисследованной системе рисовал её радарные окружности с подписями, выдавая и факт
- *  присутствия владельца, и наличие радара, и его точный радиус. Панель при этом честно
- *  писала «нет телеметрии»: расхождение было видно на одном экране. */
+ *  Правило живёт ОДНОЙ функцией в `fogView.ts` (REFM-62): оно нужно и панели, и
+ *  отрисовке радиусов, а когда было выписано дважды, второе место про него забыло —
+ *  тап по неисследованной системе рисовал её радарные окружности с подписями, выдавая
+ *  и владельца, и наличие радара, и его радиус, пока панель писала «нет телеметрии». */
 function seesDetails(p: Planet): boolean {
-  return known(p.id) || p.owner === ME;
+  return fogSeesDetails({ identified: known(p.id), mine: p.owner === ME });
 }
 
 /** Draw a fogged system: a greyed last-known blip from memory, or an unexplored
@@ -4269,11 +4269,14 @@ function render(now: number) {
     if (!p) continue;
     const c = world(n);
     if (!visible(c, 110)) continue;
-    const kn = known(n.id);
     // Variant B: fog hides capturable systems (void cells stay as pure geometry).
-    // Unknown → a remembered last-known blip, or an "unexplored" marker.
-    if (n.sector !== 'empty' && !kn) {
-      drawFogMarker(c, n.id, memory.get(n.id));
+    // Какой вид у узла — `fogView.ts` (REFM-62): пустой всегда виден, неопознанный
+    // показывается ПАМЯТЬЮ, никогда не виденный — знаком вопроса.
+    const kn = known(n.id);
+    const mem = memory.get(n.id);
+    const view = nodeView({ sector: n.sector, identified: kn, remembered: !!mem });
+    if (view === 'remembered' || view === 'unexplored') {
+      drawFogMarker(c, n.id, mem);
       continue;
     }
     const showOwner = p.owner;
