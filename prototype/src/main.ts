@@ -209,6 +209,7 @@ import { bakeSignature, needsRebake, ownersSignature } from './staticLayerCache'
 import { clipPolygon, clipRect, provinceSeeds } from './provinceMap';
 import { nodeView, seesDetails as fogSeesDetails } from './fogView';
 import { hasCoverage, identifyRadius, radarSources } from './radarSources';
+import { tapOwner, tapRadius } from './tapPriority';
 import { openingView, pickHome } from './openingView';
 import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from './registerForm';
 import {
@@ -7586,12 +7587,25 @@ function selectAt(mx: number, my: number) {
   }
   // Hit radii: widened for a finger (44px-target rule); nearest-in-radius wins, so
   // clustered objects resolve to what the player aimed at, not iteration order.
-  const rFleet = tapByTouch ? 24 : 16;
-  const rPing = tapByTouch ? 18 : 12;
-  const rNode = tapByTouch ? 30 : 24;
+  // Числа и порядок ветвей ниже — `tapPriority.ts` (REFM-64).
+  const rFleet = tapRadius('fleet', tapByTouch);
+  const rPing = tapRadius('ping', tapByTouch);
+  const rNode = tapRadius('node', tapByTouch);
+  // Кто забирает этот тап — решает модуль, а не порядок `if`ов ниже: вооружённый
+  // приказ важнее выделения, а набор группы уступает вооружённому ходу.
+  const owner = tapOwner({
+    chainMode: !!chainMode,
+    merging,
+    barrageAim,
+    heroAim: !!heroAim,
+    heroSpawnAim: !!heroSpawnAim,
+    assaultAim,
+    pickMode,
+    aiming,
+  });
   // Merge armed: the next tap on a friendly fleet (not itself in the selection) is
   // the anchor — the selected fleet(s) fly to it and fuse. Any other tap cancels.
-  if (merging) {
+  if (owner === 'merge') {
     const movers = selectedFleetIds();
     const anchor = nearestHit(
       Object.values(s.fleets).filter((f) => f.owner === ME && !movers.includes(f.id)),
@@ -7609,7 +7623,7 @@ function selectAt(mx: number, my: number) {
   // standoff fire on it; a tap on empty space (no enemy fleet) clears back to
   // auto-targeting the nearest hostile in range. A mis-aimed/peace target is
   // rejected server-side (surfaced as a log note).
-  if (barrageAim) {
+  if (owner === 'barrage') {
     const target = nearestHit(
       Object.values(s.fleets).filter((f) => f.owner !== ME),
       fleetAnchor,
@@ -7629,7 +7643,7 @@ function selectAt(mx: number, my: number) {
   }
   // Hero cast armed: the next tap picks the target world. Range / cooldown / cost
   // are the core's gates — a mis-aim comes back as an honest rejection note.
-  if (heroAim) {
+  if (owner === 'cast' && heroAim) {
     const cast = heroAim;
     heroAim = null;
     const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
@@ -7642,7 +7656,7 @@ function selectAt(mx: number, my: number) {
   // marker perks also one of your fleets (boarding) / an allied world. Own-fleet hits
   // are only considered when the hero actually carries the boarding marker, so a tap
   // on a world under your fleet still means the world.
-  if (heroSpawnAim) {
+  if (owner === 'deploy' && heroSpawnAim) {
     const heroId = heroSpawnAim;
     heroSpawnAim = null;
     const hero = s.heroes?.[heroId];
@@ -7668,7 +7682,7 @@ function selectAt(mx: number, my: number) {
   // ШТУРМ armed (PC): the click picks the target world — someone else's capturable
   // world only. An enemy at war → fly + storm on arrival; a peaceful owner → the
   // "friendly faction — declare war?" dialog. Anything else keeps the aim armed.
-  if (assaultAim) {
+  if (owner === 'assault') {
     const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
     if (!n) {
       assaultAim = false; // empty space — cancel, like an armed move
@@ -7689,7 +7703,7 @@ function selectAt(mx: number, my: number) {
   // SEL-1 «Выбрать+»: while picking, taps only toggle OWN fleets in/out of the
   // group — nothing deselects, worlds don't grab the tap, the map is a picking
   // surface until the mode is left (⊕ again, or any common order).
-  if (pickMode && !aiming) {
+  if (owner === 'pick-group') {
     const mine = nearestHit(
       Object.values(s.fleets).filter((f) => f.owner === ME),
       fleetAnchor,
@@ -7723,7 +7737,7 @@ function selectAt(mx: number, my: number) {
   // Move armed → send the selected fleet(s) to the tapped world (or the nearest lane
   // point if no world is hit). A route crossing a player you're at peace with stages a
   // war prompt instead of dispatching.
-  if (aiming) {
+  if (owner === 'move') {
     const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
     if (n) tryMoveGroup(selectedFleetIds(), n.id);
     else {
