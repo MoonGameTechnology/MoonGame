@@ -198,6 +198,7 @@ import {
   type JoinOutcome,
 } from './joinRules';
 import { houseBonusKey, houseChoice, houseColor, houseName, houseRows } from './seatPicker';
+import { createPendingJoin } from './pendingJoin';
 import {
   fmtJoinWindow,
   joinWindow,
@@ -8672,18 +8673,12 @@ async function welcomeSignIn(nick: string): Promise<void> {
     wPassInput.value = ''; // the session JWT is stored instead — a password never lingers
     statusEl.textContent = '';
     // If we arrived via `?join=<id>` (or the join button opened the welcome card
-    // because no session was cached), resume the join now that we have a JWT.
-    const pendingId = pendingJoinAfterAuth;
-    pendingJoinAfterAuth = null;
-    pendingSlotAfterAuth = null;
-    pendingFactionAfterAuth = null;
-    if (pendingId) {
+    // because no session was cached), resume the join now that we have a JWT — with
+    // the seat and faction the player chose, not just the match id.
+    const pending = pendingJoinAfterAuth.take();
+    if (pending) {
       showStage('browse'); // hide the welcome card
-      connectToMatch(
-        pendingId,
-        pendingSlotAfterAuth ?? undefined,
-        pendingFactionAfterAuth ?? undefined,
-      );
+      connectToMatch(pending.matchId, pending.slot, pending.faction);
     } else {
       openHub();
     }
@@ -8785,17 +8780,10 @@ async function submitRegister(): Promise<void> {
     // no session yet) routes a BRAND-NEW player through the full registration page —
     // this path used to drop straight into the empty hub, silently abandoning the
     // match they were trying to join (the seat never got claimed).
-    const pendingId = pendingJoinAfterAuth;
-    pendingJoinAfterAuth = null;
-    pendingSlotAfterAuth = null;
-    pendingFactionAfterAuth = null;
-    if (pendingId) {
+    const pending = pendingJoinAfterAuth.take();
+    if (pending) {
       showStage('browse');
-      connectToMatch(
-        pendingId,
-        pendingSlotAfterAuth ?? undefined,
-        pendingFactionAfterAuth ?? undefined,
-      );
+      connectToMatch(pending.matchId, pending.slot, pending.faction);
     } else {
       openHub();
     }
@@ -9017,12 +9005,11 @@ document.getElementById('rail-settings')?.addEventListener('click', () => settin
 // silent `undefined` (the httpBase trap; caught by tsc TS2448 when the prototype gained
 // a typecheck).
 let authMode = false;
-/** When `?join=<id>` arrives without a stored session, we show the welcome card;
- *  this holds the id so `welcomeSignIn` can auto-resume the join after login.
- *  Cleared on successful `connectToMatch`, never leaks across sessions. */
-let pendingJoinAfterAuth: string | null = null;
-let pendingSlotAfterAuth: string | null = null;
-let pendingFactionAfterAuth: string | null = null;
+/** When a join is attempted without a stored session, we show the welcome card; this
+ *  holds the match AND the seat/faction the player already chose, so the sign-in can
+ *  resume the join in full. `take()` reads and forgets in one step — see
+ *  `pendingJoin.ts` (REFM-51) for why that matters. */
+const pendingJoinAfterAuth = createPendingJoin();
 const bootParams = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
 const bootReset = (bootParams?.get('reset') ?? '').trim();
 const bootJoinId = (bootParams?.get('join') ?? '').trim();
@@ -9056,9 +9043,7 @@ if (bootReset) {
     }
     // No session — show the welcome card so the player can register/login,
     // then welcomeSignIn auto-resumes the join via pendingJoinAfterAuth.
-    pendingJoinAfterAuth = bootJoinId;
-    pendingSlotAfterAuth = bootSlot || null;
-    pendingFactionAfterAuth = bootFaction || null;
+    pendingJoinAfterAuth.remember(bootJoinId, bootSlot, bootFaction);
     showStage('welcome');
     const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
     wNickInput.value = savedNick || suggestCallsign();
@@ -9983,8 +9968,7 @@ async function fetchJoinToken(
 
 /** The join token for the CURRENT dial attempt (auth mode) — consumed by connect(). */
 let pendingJoinToken: string | null = null;
-// (`pendingJoinAfterAuth`/`pendingSlotAfterAuth`/`pendingFactionAfterAuth` are declared
-// above the boot block — see the TDZ note there.)
+// (`pendingJoinAfterAuth` is declared above the boot block — see the TDZ note there.)
 
 interface MatchRow {
   matchId: string;
@@ -10029,7 +10013,7 @@ function connectToMatch(id: string, slot?: string, faction?: string): void {
     if (!srv) {
       // No server + no nick — show the welcome card so the player can sign in,
       // then auto-resume the join after `welcomeSignIn` succeeds.
-      pendingJoinAfterAuth = id;
+      pendingJoinAfterAuth.remember(id, slot, faction);
       showConnect(false);
       showHub(false);
       showStage('welcome');
@@ -10043,7 +10027,7 @@ function connectToMatch(id: string, slot?: string, faction?: string): void {
     // invalid the join route returns 401 and we re-prompt for password.
     const cached = sessionRecord(srv.base);
     if (!cached) {
-      pendingJoinAfterAuth = id;
+      pendingJoinAfterAuth.remember(id, slot, faction);
       showConnect(false);
       showHub(false);
       showStage('welcome');
@@ -10059,7 +10043,7 @@ function connectToMatch(id: string, slot?: string, faction?: string): void {
       // card so the player can re-login; welcomeSignIn auto-resumes the join.
       // The session was already removed from localStorage by fetchJoinToken.
       if (!sessionRecord(srv.base)) {
-        pendingJoinAfterAuth = id;
+        pendingJoinAfterAuth.remember(id, slot, faction);
         showConnect(false);
         showHub(false);
         showStage('welcome');
