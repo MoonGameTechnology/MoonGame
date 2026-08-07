@@ -26,6 +26,13 @@ export const BUILD_ICON: Record<string, string> = {
   starfort: '✦',
   radar: '⊚',
   orbital_aa: '⌁',
+  spaceport: '⊞', // стапель: без него корабль на мире не заложить
+  metal_station: '⛏', // утилизационная станция — металл из обломков
+  hospital: '✚', // полевой госпиталь: единственный источник лечения гарнизона
+  shipyard: '⊟', // верфь бандла (в прототипе её роль играет spaceport)
+  biomass_pit: '❀', // биомасса бандла
+  mine_t1: '❒', // те же шахты бандла, что и `mine` прототипа
+  mine_t2: '❒',
 };
 
 /** Text glyph per unit — the fallback for ground units and for anything the poster
