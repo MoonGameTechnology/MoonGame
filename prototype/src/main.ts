@@ -197,6 +197,7 @@ import {
   parseJoinPass,
   type JoinOutcome,
 } from './joinRules';
+import { houseBonusKey, houseChoice, houseColor, houseName, houseRows } from './seatPicker';
 
 /** Причина отказа во входе в матч → ключ подписи. Текст живёт в /localization. */
 const JOIN_REASON: Record<Exclude<JoinOutcome, 'ok'>, string> = {
@@ -10133,76 +10134,50 @@ async function openSeatPicker(matchId: string): Promise<void> {
     };
     if (seatpickListEl) {
       seatpickListEl.innerHTML = '';
-      // Group seats by faction — show 4 faction cards, each with free/taken count.
-      // The player picks a FACTION (azure/crimson/amber/violet), not a specific seat.
-      // The server assigns the first free seat of that faction.
-      const factionColors: Record<string, string> = {
-        azure: '#35d6e6',
-        crimson: '#ff5a4d',
-        amber: '#ffb43a',
-        violet: '#b366ff',
-      };
-      const factionPassives: Record<string, string> = {
-        azure: 'seatpick.bonus.azure',
-        crimson: 'seatpick.bonus.crimson',
-        amber: 'seatpick.bonus.amber',
-        violet: 'seatpick.bonus.violet',
-      };
-      const factionNames: Record<string, string> = {
-        azure: 'Azure Compact',
-        crimson: 'Crimson Hegemony',
-        amber: 'Amber Concord',
-        violet: 'Violet Ascendancy',
-      };
-      const byFaction: Record<string, typeof data.seats> = {};
-      for (const seat of data.seats) {
-        const f = seat.faction;
-        if (!byFaction[f]) byFaction[f] = [];
-        byFaction[f].push(seat);
-      }
-      const factions = Object.keys(byFaction);
-      for (const faction of factions) {
-        const seats = byFaction[faction]!;
-        const freeCount = seats.filter((s) => !s.taken).length;
-        const isFull = freeCount === 0;
+      // The player picks a HOUSE, and the seat comes with it: `seatPicker.ts` (REFM-49)
+      // holds the grouping and — importantly — the rule that the slot is the first FREE
+      // seat of that house, not simply the first one.
+      for (const house of houseRows(data.seats)) {
         const row = document.createElement('div');
-        row.className = 'seat-row' + (isFull ? ' taken' : '');
-        row.dataset.faction = faction;
+        row.className = 'seat-row' + (house.full ? ' taken' : '');
+        row.dataset.faction = house.faction;
         const dot = document.createElement('div');
         dot.className = 'seat-dot';
-        dot.style.background = factionColors[faction] ?? 'var(--cyan)';
+        dot.style.background = houseColor(house.faction);
         const info = document.createElement('div');
         info.className = 'seat-info';
         const name = document.createElement('div');
         name.className = 'seat-name';
-        name.textContent = factionNames[faction] ?? faction;
+        name.textContent = houseName(house.faction);
         const passive = document.createElement('div');
         passive.className = 'seat-faction';
-        passive.textContent = factionPassives[faction] ?? '';
+        // The bonus line is a KEY — it has to go through t(), or the player reads
+        // «seatpick.bonus.azure» at the exact moment of choosing a house.
+        const bonusKey = houseBonusKey(house.faction);
+        passive.textContent = bonusKey ? t(bonusKey) : '';
         const slots = document.createElement('div');
         slots.className = 'seat-faction';
         slots.style.fontSize = '10px';
-        slots.textContent = t('browser.slots') + ': ' + freeCount + '/' + seats.length;
+        slots.textContent = t('browser.slots') + ': ' + house.free + '/' + house.total;
         info.appendChild(name);
         info.appendChild(passive);
         if (slots.textContent) info.appendChild(slots);
         const status = document.createElement('div');
-        status.className = 'seat-status' + (isFull ? '' : ' free');
-        status.textContent = isFull ? t('browser.taken') : t('browser.free');
+        status.className = 'seat-status' + (house.full ? '' : ' free');
+        status.textContent = house.full ? t('browser.taken') : t('browser.free');
         row.appendChild(dot);
         row.appendChild(info);
         row.appendChild(status);
-        if (!isFull) {
+        const choice = houseChoice(house);
+        if (choice) {
           row.addEventListener('click', () => {
             for (const r of seatpickListEl.querySelectorAll('.seat-row.selected')) {
               r.classList.remove('selected');
             }
             row.classList.add('selected');
-            // Store the first free seat of this faction as the chosen slot.
-            const firstFree = seats.find((s) => !s.taken);
-            seatpickSelected = firstFree?.playerId ?? null;
-            seatpickFaction = faction; // BF-30: faction chosen independently of start
-            if (seatpickGoEl) seatpickGoEl.disabled = !seatpickSelected;
+            seatpickSelected = choice.slot;
+            seatpickFaction = choice.faction; // BF-30: faction chosen independently of start
+            if (seatpickGoEl) seatpickGoEl.disabled = false;
           });
         }
         seatpickListEl.appendChild(row);
