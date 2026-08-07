@@ -202,6 +202,7 @@ import { createPendingJoin } from './pendingJoin';
 import { syncCommanderXp } from './commanderSync';
 import { panelSlackFor } from './panelSlack';
 import { longPressAction, pressIntent } from './pressIntent';
+import { openingView, pickHome } from './openingView';
 import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from './registerForm';
 import {
   fmtJoinWindow,
@@ -1357,17 +1358,16 @@ function centerOn(p: { x: number; y: number }, scale: number): void {
  *  zoom onto your home region and pan to explore; on a wide screen the whole-map fit
  *  reads fine. The zoom is RELATIVE to the screen-fit, so it autoscales across screens. */
 function defaultView(): void {
-  const home =
-    Object.values(s.planets).find((p) => p.owner === ME && p.buildings.length > 0) ??
-    Object.values(s.planets).find((p) => p.owner === ME);
-  if (MOBILE && home) {
-    centerOn(home.position, 3);
-  } else {
-    cam.scale = 1;
-    cam.x = 0;
-    cam.y = 0;
-    clampCam();
+  // Кого считать домом и когда приближаться к нему — `openingView.ts` (REFM-56).
+  const view = openingView(MOBILE, pickHome(Object.values(s.planets), ME));
+  if (view.kind === 'home') {
+    centerOn(view.at, view.scale);
+    return;
   }
+  cam.scale = 1;
+  cam.x = 0;
+  cam.y = 0;
+  clampCam();
 }
 // Re-validate the camera after a real resize (orientation / window). Attached after
 // `cam` exists so the initial in-module resize() call never touches it (TDZ-safe).
