@@ -199,6 +199,7 @@ import {
 } from './joinRules';
 import { houseBonusKey, houseChoice, houseColor, houseName, houseRows } from './seatPicker';
 import { createPendingJoin } from './pendingJoin';
+import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from './registerForm';
 import {
   fmtJoinWindow,
   joinWindow,
@@ -8353,21 +8354,13 @@ function showStage(stage: 'welcome' | 'register' | 'recover' | 'reset' | 'browse
 }
 
 // A fresh callsign for a brand-new commander. Deterministic on purpose (no random/
-// time even in UI glue): a persisted counter walks a fixed wordlist.
-const CALLSIGNS = [
-  'callsign.rhino',
-  'callsign.comet',
-  'callsign.viper',
-  'callsign.orion',
-  'callsign.vector',
-  'callsign.falcon',
-  'callsign.titan',
-  'callsign.quasar',
-];
+// time even in UI glue) — the wordlist and the counter arithmetic live in
+// `registerForm.ts` (REFM-52); only the storage read/write stays here.
 function suggestCallsign(): string {
-  const n = (Number(localStorage.getItem('void.newcount') ?? '0') || 0) + 1;
+  const n = nextCallsignNumber(localStorage.getItem('void.newcount'));
   localStorage.setItem('void.newcount', String(n));
-  return `${t(CALLSIGNS[(n - 1) % CALLSIGNS.length]!)}-${n}`;
+  const pick = callsignFor(n);
+  return `${t(pick.key)}-${pick.suffix}`;
 }
 function enterBrowse(): void {
   if (!nickInput.value.trim()) nickInput.value = suggestCallsign();
@@ -8741,32 +8734,36 @@ function openRegister(): void {
   crPassInput.focus();
 }
 async function submitRegister(): Promise<void> {
-  const nick = crNickInput.value.trim();
-  const pass = crPassInput.value;
-  const email = crMailInput.value.trim();
-  if (!nick) {
-    statusEl.textContent = t('auth.need-name');
-    crNickInput.focus();
+  // The check ladder and the payload live in `registerForm.ts` (REFM-52): every
+  // problem names its own field, and an empty email never reaches the request.
+  const form = {
+    nick: crNickInput.value,
+    pass: crPassInput.value,
+    pass2: crPass2Input.value,
+    email: crMailInput.value,
+  };
+  const payload = registerPayload(form);
+  if (!payload) {
+    const problem = checkRegister(form)!;
+    statusEl.textContent = t(problem.key);
+    const focusOn = { nick: crNickInput, pass: crPassInput, pass2: crPass2Input };
+    focusOn[problem.field].focus();
     return;
   }
-  if (pass.length < 8) {
-    statusEl.textContent = t('acc.pass.rule');
-    crPassInput.focus();
-    return;
-  }
-  if (pass !== crPass2Input.value) {
-    statusEl.textContent = t('auth.pass-mismatch');
-    crPass2Input.focus();
-    return;
-  }
+  const nick = payload.nick;
   if (signingIn) return; // Enter + click must not double-register
   signingIn = true;
   try {
+    // The callsign the player just typed lives on THIS page (`crnick`), while
+    // resolveServer() reads the match browser's field (`cnick`) — empty for a brand-new
+    // commander who came straight here from «Новый командир». Without this line the
+    // whole registration dead-ended on «введите позывной» and never reached the server.
+    nickInput.value = nick;
     const srv = resolveServer();
     if (!srv) return;
     // Email is OPTIONAL — it exists only so the account can be recovered later; skipping it
     // just means no self-service reset. A malformed one is caught by the server (400).
-    const session = await ensureSession(srv.base, nick, pass, email || undefined);
+    const session = await ensureSession(srv.base, nick, payload.pass, payload.email);
     if (!session) {
       crPassInput.focus(); // ensureSession already explained why in the status line
       return;
