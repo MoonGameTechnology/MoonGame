@@ -208,6 +208,7 @@ import { laneEnds, warConfirmPlan } from './warOrders';
 import { bakeSignature, needsRebake, ownersSignature } from './staticLayerCache';
 import { clipPolygon, clipRect, provinceSeeds } from './provinceMap';
 import { nodeView, seesDetails as fogSeesDetails } from './fogView';
+import { hasCoverage, identifyRadius, radarSources } from './radarSources';
 import { openingView, pickHome } from './openingView';
 import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from './registerForm';
 import {
@@ -3415,23 +3416,28 @@ function drawUnionTier(
 function drawRadarCoverage() {
   // My radar sources (planet arrays + radar-ships), tagged so a SELECTED entity can
   // also show its own precise range on top of the merged frontier.
-  type Src = { x: number; y: number; r: number; sel: boolean };
-  const sources: Src[] = [];
+  // Отбор источников — `radarSources.ts` (REFM-63): только свои, только с
+  // положительным радиусом, кольцо флота — в его ФАКТИЧЕСКОМ месте, а не в узле
+  // назначения (иначе покрытие прыгает вперёд флота).
   const selFleetSet = new Set(selectedFleetIds());
-  for (const p of Object.values(s.planets)) {
-    if (p.owner !== ME) continue;
-    const r = planetRadar(p);
-    if (r > 0) sources.push({ x: p.position.x, y: p.position.y, r, sel: selPlanet === p.id });
-  }
-  for (const f of Object.values(s.fleets)) {
-    if (f.owner !== ME) continue;
-    const r = fleetRadar(f);
-    // Draw the ring at the SHIP's actual position (interpolated for a moving fleet),
-    // so the coverage tracks the fleet instead of sitting on its destination node.
-    const pos = r > 0 ? fleetPos(f) : null;
-    if (pos) sources.push({ x: pos.x, y: pos.y, r, sel: selFleetSet.has(f.id) });
-  }
-  if (!sources.length) return;
+  const sources = radarSources([
+    ...Object.values(s.planets).map((p) => ({
+      mine: p.owner === ME,
+      radius: planetRadar(p),
+      at: p.position,
+      selected: selPlanet === p.id,
+    })),
+    ...Object.values(s.fleets).map((f) => {
+      const r = f.owner === ME ? fleetRadar(f) : 0;
+      return {
+        mine: f.owner === ME,
+        radius: r,
+        at: r > 0 ? fleetPos(f) : null,
+        selected: selFleetSet.has(f.id),
+      };
+    }),
+  ]);
+  if (!hasCoverage(sources)) return;
   // Project map circles to screen circles (uniform projection ⇒ true circles).
   const screen = (x: number, y: number, rr: number): { x: number; y: number; r: number } => {
     const c = world({ x, y });
@@ -3439,7 +3445,7 @@ function drawRadarCoverage() {
   };
   const outer = sources.map((v) => screen(v.x, v.y, v.r)).filter((c) => c.r > 0);
   const inner = sources
-    .map((v) => screen(v.x, v.y, v.r * IDENTIFY_REACH_FRACTION))
+    .map((v) => screen(v.x, v.y, identifyRadius(v.r, IDENTIFY_REACH_FRACTION)))
     .filter((c) => c.r > 0);
   cx.save();
   // The unified visibility frontier: outer (signatures) then inner (full reveal).
@@ -3448,7 +3454,7 @@ function drawRadarCoverage() {
   // A selected planet/fleet additionally shows ITS OWN two rings — crisp + dashed —
   // so you can read one entity's exact reach out of the merged whole.
   for (const v of sources) {
-    if (!v.sel) continue;
+    if (!v.selected) continue;
     const c = world({ x: v.x, y: v.y });
     const ring = (rr: number, dash: number[], a: number): void => {
       const r = world({ x: v.x + rr, y: v.y }).x - c.x;
@@ -3461,7 +3467,7 @@ function drawRadarCoverage() {
       cx.stroke();
     };
     ring(v.r, [3, 6], 0.5); // outer — signatures
-    ring(v.r * IDENTIFY_REACH_FRACTION, [], 0.72); // inner — full reveal
+    ring(identifyRadius(v.r, IDENTIFY_REACH_FRACTION), [], 0.72); // inner — full reveal
   }
   cx.setLineDash([]);
   cx.restore();
