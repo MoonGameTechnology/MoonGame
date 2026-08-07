@@ -183,6 +183,24 @@ import {
   tokenFor,
   type SessionRec,
 } from './sessionStore';
+import {
+  authOutcome,
+  shouldRegister,
+  validLogin,
+  validPassword,
+  type AuthOutcome,
+} from './authRules';
+
+/** Причина отказа → ключ подписи в статусной строке. Текст живёт в /localization. */
+const AUTH_REASON: Record<AuthOutcome, string> = {
+  ok: 'acc.created',
+  created: 'acc.created',
+  'wrong-password': 'acc.bad-pass',
+  'mail-taken': 'acc.mail-taken',
+  'rate-limited': 'acc.rate-limited',
+  'register-refused': 'acc.register-refused',
+  'login-refused': 'acc.login-refused',
+};
 import { createScanMemory, type Snapshot } from './scanMemory';
 import {
   factionBonuses,
@@ -9856,16 +9874,16 @@ async function ensureSession(
   // (or a legacy unbound one) is ignored and replaced by a fresh login below.
   const mine = tokenFor(localStorage, base, login);
   if (mine) return mine;
-  // Mirror the server's LOGIN_RE (authApi.ts) so a bad callsign gets a human
-  // explanation here instead of the server's uniform rejection.
-  if (!/^[\p{L}\p{N}_-]{3,24}$/u.test(login)) {
+  // Правила логина и пароля — в `authRules.ts` (REFM-47): зеркало серверных, чтобы
+  // игрок увидел ПРИЧИНУ, а не сухой одинаковый отказ.
+  if (!validLogin(login)) {
     statusEl.textContent = t('acc.nick.rule');
     return null;
   }
   // The password may come from the welcome card (Bytro-style sign-up) or the match
   // browser's field (custom-server joins) — whichever the player actually filled.
   const password = passwordArg ?? (wPassInput.value || (passInput?.value ?? ''));
-  if (password.length < 8) {
+  if (!validPassword(password)) {
     statusEl.textContent = t('acc.pass.rule');
     return null;
   }
@@ -9883,29 +9901,20 @@ async function ensureSession(
   };
   try {
     const login1 = await call('/auth/login');
-    if (login1.token) {
-      saveSession(localStorage, base, { login, token: login1.token });
-      return login1.token;
+    // Registration carries the optional recovery email (login never needs it).
+    const reg = shouldRegister(login1)
+      ? await call('/auth/register', emailArg ? { email: emailArg } : {})
+      : undefined;
+    // Причину называет `authRules.ts` — там же правило «401 на входе + 409 на
+    // регистрации = неверный пароль», которое иначе свелось бы к «отказу регистрации».
+    const outcome = authOutcome(login1, reg);
+    const token = login1.token ?? reg?.token;
+    if (token) {
+      saveSession(localStorage, base, { login, token });
+      if (outcome === 'created') note('✔ ' + t('acc.created'));
+      return token;
     }
-    if (login1.status === 401) {
-      // Registration carries the optional recovery email (login never needs it).
-      const reg = await call('/auth/register', emailArg ? { email: emailArg } : {});
-      if (reg.token) {
-        saveSession(localStorage, base, { login, token: reg.token });
-        note('✔ ' + t('acc.created'));
-        return reg.token;
-      }
-      statusEl.textContent =
-        reg.error === 'E_EMAIL_TAKEN'
-          ? t('acc.mail-taken')
-          : reg.status === 409
-            ? t('acc.bad-pass') // login 401 + register 409 (E_LOGIN_TAKEN) ⇒ wrong password
-            : reg.status === 429
-              ? t('acc.rate-limited')
-              : t('acc.register-refused');
-      return null;
-    }
-    statusEl.textContent = login1.status === 429 ? t('acc.rate-limited') : t('acc.login-refused');
+    statusEl.textContent = t(AUTH_REASON[outcome]);
     return null;
   } catch {
     statusEl.textContent = t('acc.server-down');
