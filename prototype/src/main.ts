@@ -206,6 +206,7 @@ import { assaultMovers, assaultTargetBlocker, collectBlockers, moveMovers } from
 import { assaultOrderState, dropsOrder } from './assaultQueue';
 import { laneEnds, warConfirmPlan } from './warOrders';
 import { bakeSignature, needsRebake, ownersSignature } from './staticLayerCache';
+import { clipPolygon, clipRect, provinceSeeds } from './provinceMap';
 import { openingView, pickHome } from './openingView';
 import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from './registerForm';
 import {
@@ -3913,27 +3914,19 @@ function buildStaticLayer(): void {
   // map and share borders, so a bigger `size` claims more territory and resizing
   // one shifts the shared borders with its neighbours evenly. Adjacency IS the
   // shared border — no lanes. (Empty void waypoints aren't real provinces → skipped.)
-  const W = 9000 * cam.scale * cam.scale; // size → weight (screen px²), zoom-consistent
-  const seeds: Array<{ x: number; y: number; w: number; owner: string | null; kind: string }> = [];
-  for (const n of MAP) {
-    if (n.sector === 'empty') continue;
+  // Отбор узлов и вес семени — `provinceMap.ts` (REFM-61): пустой узел не провинция,
+  // вес растёт квадратично по масштабу, иначе карта перекраивается при зуме.
+  const seeds = provinceSeeds(MAP, cam.scale, (n) => {
     const p = s.planets[n.id];
-    if (!p) continue;
-    const c = world(n);
-    seeds.push({ x: c.x, y: c.y, w: (p.size ?? 1) * W, owner: knownOwner(n.id), kind: n.sector });
-  }
+    return p ? { size: p.size ?? 1, at: world(n), owner: knownOwner(n.id) } : null;
+  });
   // Clip cells to the MAP boundary (province bounding box + padding), not the
   // viewport — otherwise the outermost provinces stretch to the screen edge. This
   // gives the map a defined edge that pans/zooms with the camera.
-  const padB = Math.max(40, (MAXX - MINX) * 0.05);
-  const tl = world({ x: MINX - padB, y: MINY - padB });
-  const br = world({ x: MAXX + padB, y: MAXY + padB });
-  const clip: Array<[number, number]> = [
-    [tl.x, tl.y],
-    [br.x, tl.y],
-    [br.x, br.y],
-    [tl.x, br.y],
-  ];
+  const frame = clipRect({ minX: MINX, maxX: MAXX, minY: MINY, maxY: MAXY });
+  const tl = world(frame.topLeft);
+  const br = world(frame.bottomRight);
+  const clip = clipPolygon(tl, br);
   // Weighted-Voronoi political fill + classified borders — the shared @void/client
   // territory renderer clamps the weights (so no cell is swallowed), tessellates the
   // power diagram, fills each province in its owner's colour, and draws same-owner
