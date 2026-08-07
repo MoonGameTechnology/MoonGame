@@ -202,6 +202,7 @@ import { createPendingJoin } from './pendingJoin';
 import { syncCommanderXp } from './commanderSync';
 import { panelSlackFor } from './panelSlack';
 import { longPressAction, pressIntent } from './pressIntent';
+import { assaultMovers, assaultTargetBlocker, collectBlockers, moveMovers } from './warPrompt';
 import { openingView, pickHome } from './openingView';
 import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from './registerForm';
 import {
@@ -2493,18 +2494,22 @@ function peaceBlockers(from: string | null, toId: string): string[] {
   }
   return [...set];
 }
+/** Живые флоты из выбора: ссылка могла пережить сам флот (погиб, слился, доставлен). */
+function livingFleets(fleetIds: readonly string[]): Fleet[] {
+  return fleetIds.map((id) => s.fleets[id]).filter((f): f is Fleet => !!f);
+}
 /** Order every selected fleet to a world. If the route crosses PEACE territory, stage
  *  a war-declaration prompt instead of dispatching (confirm → declare war + advance). */
 function tryMoveGroup(fleetIds: string[], destId: string): void {
-  const movers = fleetIds.filter((id) => s.fleets[id] && s.fleets[id]!.location !== destId);
+  // Отсев участников и сбор виновников — `warPrompt.ts` (REFM-57).
+  const movers = moveMovers(livingFleets(fleetIds), destId);
   if (!movers.length) return;
-  const blockers = new Set<string>();
-  for (const id of movers) {
-    if (!peaceBlocked(moveFleet(ME, id, destId))) continue; // ядро пропускает — объезд есть
-    for (const b of peaceBlockers(fleetNode(s.fleets[id]!), destId)) blockers.add(b);
-  }
-  if (blockers.size) {
-    warPrompt = { fleetIds: movers, destId, blockers: [...blockers] };
+  const blockers = collectBlockers(movers, (id) =>
+    // ядро пропускает — объезд есть, виновников по этому флоту нет
+    peaceBlocked(moveFleet(ME, id, destId)) ? peaceBlockers(fleetNode(s.fleets[id]!), destId) : [],
+  );
+  if (blockers.length) {
+    warPrompt = { fleetIds: movers, destId, blockers };
     renderWarPrompt();
     return;
   }
@@ -2514,20 +2519,21 @@ function tryMoveGroup(fleetIds: string[], destId: string): void {
  *  and assault on arrival. A peaceful target/route stages the war prompt first —
  *  worded as "this is a friendly faction's world". */
 function tryAssaultGroup(fleetIds: string[], destId: string): void {
-  const movers = fleetIds.filter((id) => s.fleets[id]);
+  // Штурмуют ВСЕ выбранные: стоящий у цели штурмует с места (`warPrompt.ts`, REFM-57).
+  const movers = assaultMovers(livingFleets(fleetIds));
   if (!movers.length) return;
-  const blockers = new Set<string>();
-  for (const id of movers) {
-    if (!peaceBlocked(moveFleet(ME, id, destId))) continue;
-    for (const b of peaceBlockers(fleetNode(s.fleets[id]!), destId)) blockers.add(b);
-  }
+  const blockers = collectBlockers(movers, (id) =>
+    peaceBlocked(moveFleet(ME, id, destId)) ? peaceBlockers(fleetNode(s.fleets[id]!), destId) : [],
+  );
   // Штурм — не просто ход: даже по свободному маршруту нельзя высадиться на мир
   // НЕвраждебного игрока (ядро: `E_FORBIDDEN`). Спросить об этом ядро нельзя — флот
   // ещё не там, — поэтому владелец цели проверяется здесь и ТОЛЬКО здесь.
-  const owner = s.planets[destId]?.owner;
-  if (owner != null && owner !== ME && !canTraverse(s, ME, owner)) blockers.add(owner);
-  if (blockers.size) {
-    warPrompt = { fleetIds: movers, destId, blockers: [...blockers], assault: true };
+  const target = assaultTargetBlocker(s.planets[destId]?.owner, ME, (owner) =>
+    canTraverse(s, ME, owner),
+  );
+  const all = target && !blockers.includes(target) ? [...blockers, target] : blockers;
+  if (all.length) {
+    warPrompt = { fleetIds: movers, destId, blockers: all, assault: true };
     renderWarPrompt();
     return;
   }
