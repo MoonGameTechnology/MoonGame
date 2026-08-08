@@ -514,6 +514,7 @@ import { buildRecap, type RecapEvent } from './recap';
 import { briefSince, marksAway, splitByAttention, worthShowing } from './awayBrief';
 import { HOLD_TIP_MS, cursorTipPos, holdTipPos, movedTooFar } from './tipPlacement';
 import { canConfirm, normalizeTake, shipCounts, splitTotals, stepTake } from './splitPlan';
+import { canAssaultFromOrbit, canMerge, canSplit, uniformMode } from './cmdAvailability';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -6890,8 +6891,8 @@ function renderCmdBar() {
     { m: 'standard', lbl: t('cmd.fire.standard'), sub: t('cmd.fire.standard.hint') },
     { m: 'aggressive', lbl: t('cmd.fire.aggressive'), sub: t('cmd.fire.aggressive.hint') },
   ];
-  const artModes = new Set(artFleets.map((f) => f.barrageMode ?? 'standard'));
-  const uniMode = artModes.size === 1 ? [...artModes][0] : null;
+  // Единогласие режима, доступность слияния/деления/штурма — `cmdAvailability.ts` (REFM-78).
+  const uniMode = uniformMode(artFleets.map((f) => f.barrageMode ?? 'standard'));
   const fmLabel = uniMode
     ? (FIRE_MODES.find((x) => x.m === uniMode)?.lbl ?? t('cmd.fire.title'))
     : t('cmd.fire.title');
@@ -6901,20 +6902,32 @@ function renderCmdBar() {
   // whenever the selection has ships. Mobile keeps the in-orbit-only button.
   const canAssault = pcUi()
     ? fleets.some((f) => sumUnits(f.units) > 0)
-    : docked.some(
-        (f) =>
-          f.orbit === 'near' &&
-          f.location &&
-          s.planets[f.location]?.owner !== f.owner &&
-          sectorTypeOf(f.location)?.capturable, // empty space can't be taken
+    : docked.some((f) =>
+        canAssaultFromOrbit(
+          {
+            orbit: f.orbit,
+            location: f.location,
+            worldOwner: (f.location ? s.planets[f.location]?.owner : null) ?? null,
+            capturable: !!(f.location && sectorTypeOf(f.location)?.capturable),
+          },
+          f.owner,
+        ),
       );
   // Merge: a group fuses in one tap; a lone fleet arms target-pick (needs a partner).
   const myFleetTotal = Object.values(s.fleets).filter((f) => f.owner === ME).length;
-  const canMerge = ids.length >= 2 || (ids.length === 1 && myFleetTotal >= 2);
+  const mergeOk = canMerge(ids.length, myFleetTotal);
   // Split: only a single docked fleet with ≥2 ships can shed some into a new fleet.
   const lone = ids.length === 1 && fleets[0] ? fleets[0] : null;
-  const canSplit =
-    !!lone && !!lone.location && !lone.movement && !lone.battleId && sumUnits(lone.units) >= 2;
+  const splitOk = canSplit(
+    lone
+      ? {
+          location: lone.location,
+          movement: lone.movement,
+          battleId: lone.battleId,
+          ships: sumUnits(lone.units),
+        }
+      : null,
+  );
   // GRND-1 ⇅ «Десант»: как и split, команда строго ОДНОФЛОТОВАЯ — гарнизон и трюм у
   // каждого свои, один клик на группу разослал бы приказы с разной арифметикой.
   const troopsIn = lone ? troopsInputFor(lone.id) : null;
@@ -6962,10 +6975,10 @@ function renderCmdBar() {
       '⛬',
       ids.length > 1 ? t('cmd.merge') : t('cmd.merge.pick'),
       merging ? 'on' : '',
-      !canMerge,
+      !mergeOk,
       t('cmd.merge.hint'),
     ) +
-    cmdBtn('split', '⊟', t('cmd.split'), splitState ? 'on' : '', !canSplit, t('cmd.split.hint')) +
+    cmdBtn('split', '⊟', t('cmd.split'), splitState ? 'on' : '', !splitOk, t('cmd.split.hint')) +
     cmdBtn(
       'troops',
       '⇅',
