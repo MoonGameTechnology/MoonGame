@@ -212,6 +212,7 @@ import { hasCoverage, identifyRadius, radarSources } from './radarSources';
 import { tapOwner, tapRadius } from './tapPriority';
 import { nextPick, tapCandidates, touchPick, type TapPick } from './tapCycle';
 import { chainTapTarget, nearestOwnWorld as ownWorldNearest } from './chainTarget';
+import { arrivalHours, marchHours, restRouteHours } from './travelEta';
 import { openingView, pickHome } from './openingView';
 import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from './registerForm';
 import {
@@ -5353,8 +5354,8 @@ function fleetPanelHtml(f: Fleet): string {
     // учётом форс-марша (×1.5 с СЛЕДУЮЩЕГО лейна — текущий уже расписан
     // авторитетно в arrivesAt, его не трогаем). Выключил буст — оценка удлиняется.
     const rawRestH =
-      dest !== f.movement.to ? (estimateTravelHours(s, data, f.movement.to, dest, f) ?? 0) : 0;
-    const restH = boosted ? rawRestH / FORCED_MARCH_MULT : rawRestH;
+      dest !== f.movement.to ? estimateTravelHours(s, data, f.movement.to, dest, f) : 0;
+    const restH = restRouteHours(rawRestH, boosted, FORCED_MARCH_MULT);
     h += `<div class="row">${t('side.fleet.enroute', { dest: `<b>${esc(dest)}</b>` })} <b class="pn-eta" data-arrive="${f.movement.arrivesAt}" data-rest="${restH}">…</b>${boosted ? ' <span class="dim">⚡</span>' : ''}</div>`;
   } else if (f.edge) {
     const pct = Math.round(f.edge.t * 100);
@@ -11315,19 +11316,17 @@ function chainStart(f: Fleet): { fromId: string | null; baseH: number } {
   if (f.movement) {
     const mv = f.movement;
     const dest = journeyDestination(mv);
-    const rawRestH = dest !== mv.to ? (estimateTravelHours(s, data, mv.to, dest, f) ?? 0) : 0;
-    const restH = marchFlagged(f.id) ? rawRestH / FORCED_MARCH_MULT : rawRestH;
-    return { fromId: dest, baseH: Math.max(0, (mv.arrivesAt - s.time) / HOUR) + restH };
+    const rawRestH = dest !== mv.to ? estimateTravelHours(s, data, mv.to, dest, f) : 0;
+    const restH = restRouteHours(rawRestH, marchFlagged(f.id), FORCED_MARCH_MULT);
+    return { fromId: dest, baseH: arrivalHours(mv.arrivesAt, s.time, HOUR, restH) };
   }
   return { fromId: fleetNode(f), baseH: 0 };
 }
-/** Оценка перелёта для таймлайна (форс-марш ускоряет, как в pn-eta панели). */
+/** Оценка перелёта для таймлайна (форс-марш ускоряет, как в pn-eta панели: REFM-67). */
 function chainTravelH(f: Fleet): (from: string, to: string) => number | null {
-  const boost = marchFlagged(f.id) ? FORCED_MARCH_MULT : 1;
-  return (from, to) => {
-    const h = estimateTravelHours(s, data, from, to, f);
-    return h == null ? null : h / boost;
-  };
+  const boosted = marchFlagged(f.id);
+  return (from, to) =>
+    marchHours(estimateTravelHours(s, data, from, to, f), boosted, FORCED_MARCH_MULT);
 }
 /** Маршрут для полилинии цепочки. Граф лейнов статичен всю партию — кэш на матч
  *  (Дейкстра на каждый кадр для каждого шага была бы расточительна). */
