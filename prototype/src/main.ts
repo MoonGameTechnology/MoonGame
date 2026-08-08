@@ -516,6 +516,7 @@ import { HOLD_TIP_MS, cursorTipPos, holdTipPos, movedTooFar } from './tipPlaceme
 import { canConfirm, normalizeTake, shipCounts, splitTotals, stepTake } from './splitPlan';
 import { canAssaultFromOrbit, canMerge, canSplit, uniformMode } from './cmdAvailability';
 import { stayingFleets, stripState } from './chainStripState';
+import { IDLE, consumeClick, mature, moveAway, press, release, type HoldState } from './holdPress';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -7363,8 +7364,8 @@ side.addEventListener('contextmenu', (ev) => {
 // document.addEventListener.
 let holdTipEl: HTMLElement | null = null;
 let holdTimer: number | null = null;
-let holdTipShown = false; // the press matured into a bubble → eat the click tail
-let holdStart: { x: number; y: number } | null = null;
+// Жизненный цикл удержания (взвод → созревание → съеденный клик) — `holdPress.ts` (REFM-80).
+let hold: HoldState = IDLE;
 function showHoldTip(btn: HTMLElement): void {
   const name = btn.dataset.name;
   if (!name) return;
@@ -7390,25 +7391,25 @@ function cancelHoldTip(): void {
     clearTimeout(holdTimer);
     holdTimer = null;
   }
-  holdStart = null;
+  hold = release(hold); // право съесть хвостовой клик переживает отпускание
   if (holdTipEl) holdTipEl.style.display = 'none';
 }
 document.addEventListener?.('pointerdown', (ev) => {
   if (!MOBILE) return;
   const btn = (ev.target as HTMLElement).closest?.('.ptile') as HTMLElement | null;
   if (!btn) return;
-  holdTipShown = false;
-  holdStart = { x: ev.clientX, y: ev.clientY };
+  hold = press({ x: ev.clientX, y: ev.clientY });
   if (holdTimer !== null) clearTimeout(holdTimer);
   holdTimer = window.setTimeout(() => {
     holdTimer = null;
-    holdTipShown = true;
+    hold = mature(hold);
     showHoldTip(btn);
   }, HOLD_TIP_MS);
 });
 document.addEventListener?.('pointermove', (ev) => {
-  if (holdTimer === null || !holdStart) return;
-  if (movedTooFar(holdStart, { x: ev.clientX, y: ev.clientY })) {
+  if (holdTimer === null || !hold.from) return;
+  if (movedTooFar(hold.from, { x: ev.clientX, y: ev.clientY })) {
+    hold = moveAway(hold);
     cancelHoldTip(); // the finger is scrolling the panel, not holding the tile
   }
 });
@@ -7417,8 +7418,10 @@ document.addEventListener?.('pointercancel', () => cancelHoldTip());
 document.addEventListener?.(
   'click',
   (ev) => {
-    if (!holdTipShown) return;
-    holdTipShown = false;
+    // Право съесть клик одноразовое: следующий честный тап обязан пройти.
+    const { eat, next } = consumeClick(hold);
+    hold = next;
+    if (!eat) return;
     // the click is the tail of a matured long-press — it must not open the codex
     if ((ev.target as HTMLElement).closest?.('.ptile')) {
       ev.preventDefault();
