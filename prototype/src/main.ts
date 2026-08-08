@@ -517,6 +517,8 @@ import { HOLD_TIP_MS, cursorTipPos, holdTipPos, movedTooFar } from './tipPlaceme
 import { canConfirm, normalizeTake, shipCounts, splitTotals, stepTake } from './splitPlan';
 import { canAssaultFromOrbit, canMerge, canSplit, uniformMode } from './cmdAvailability';
 import { stayingFleets, stripState } from './chainStripState';
+import { IDLE, consumeClick, mature, moveAway, press, release, type HoldState } from './holdPress';
+import { groundTypes, hasTroops, totalOf, troopSources } from './troopsSources';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -2474,23 +2476,17 @@ function troopsInputFor(fleetId: string): TroopsInput | null {
   const guestLanding =
     !mine && carried.length > 0 && canOrder(s, unloadArmy(ME, fleetId, carried[0]!.unit, 1)) === null;
   if (!mine && !guestLanding) return null;
-  const types: string[] = [];
-  // На союзном мире поднимать нечего: чужой гарнизон не твой, ядро отобьёт погрузку.
-  // Поэтому и типы, и «в гарнизоне» берутся только из трюма — счётчик выходит
-  // односторонним (только «высадить») сам собой, без отдельного режима меню.
-  for (const st of mine ? [...here.garrison, ...landing] : landing)
-    if (isGround(st.unit) && !types.includes(st.unit)) types.push(st.unit);
-  if (!types.length) return null;
-  // Стеков одного типа может быть несколько (побитый + целый): «всего» складывает
-  // их все, а поднять/высадить ядро даст только здоровый с дефолтным лоадаутом.
-  const total = (stacks: Array<{ unit: string; count: number }>, unit: string): number =>
-    stacks.reduce((n, st) => (st.unit === unit ? n + st.count : n), 0);
+  // Источники, типы и суммы — `troopsSources.ts` (REFM-81): на союзном мире поднимать
+  // нечего, поэтому счётчик выходит односторонним сам собой, без отдельного режима меню.
+  const types = groundTypes(troopSources(mine, here.garrison, landing), isGround);
+  if (!hasTroops(types)) return null;
   const units: TroopsUnitInput[] = types.map((unit) => ({
     unit,
+    // «Всего» складывает и побитые стопки, а поднять/высадить ядро даст только здоровую.
     garrison: mine ? (findHealthyStack(here.garrison, unit)?.count ?? 0) : 0,
-    garrisonAll: mine ? total(here.garrison, unit) : 0,
+    garrisonAll: mine ? totalOf(here.garrison, unit) : 0,
     hold: findHealthyStack(landing, unit)?.count ?? 0,
-    holdAll: total(landing, unit),
+    holdAll: totalOf(landing, unit),
     queued: pendingLoads.filter((p) => p.fleetId === fleetId && p.unit === unit).length,
     reserved: pendingLoadUnits(here.id, unit),
     cargoSize: data.units[unit]?.stats.cargoSize ?? 1,
@@ -7372,8 +7368,8 @@ side.addEventListener('contextmenu', (ev) => {
 // document.addEventListener.
 let holdTipEl: HTMLElement | null = null;
 let holdTimer: number | null = null;
-let holdTipShown = false; // the press matured into a bubble → eat the click tail
-let holdStart: { x: number; y: number } | null = null;
+// Жизненный цикл удержания (взвод → созревание → съеденный клик) — `holdPress.ts` (REFM-80).
+let hold: HoldState = IDLE;
 function showHoldTip(btn: HTMLElement): void {
   const name = btn.dataset.name;
   if (!name) return;
@@ -7399,25 +7395,25 @@ function cancelHoldTip(): void {
     clearTimeout(holdTimer);
     holdTimer = null;
   }
-  holdStart = null;
+  hold = release(hold); // право съесть хвостовой клик переживает отпускание
   if (holdTipEl) holdTipEl.style.display = 'none';
 }
 document.addEventListener?.('pointerdown', (ev) => {
   if (!MOBILE) return;
   const btn = (ev.target as HTMLElement).closest?.('.ptile') as HTMLElement | null;
   if (!btn) return;
-  holdTipShown = false;
-  holdStart = { x: ev.clientX, y: ev.clientY };
+  hold = press({ x: ev.clientX, y: ev.clientY });
   if (holdTimer !== null) clearTimeout(holdTimer);
   holdTimer = window.setTimeout(() => {
     holdTimer = null;
-    holdTipShown = true;
+    hold = mature(hold);
     showHoldTip(btn);
   }, HOLD_TIP_MS);
 });
 document.addEventListener?.('pointermove', (ev) => {
-  if (holdTimer === null || !holdStart) return;
-  if (movedTooFar(holdStart, { x: ev.clientX, y: ev.clientY })) {
+  if (holdTimer === null || !hold.from) return;
+  if (movedTooFar(hold.from, { x: ev.clientX, y: ev.clientY })) {
+    hold = moveAway(hold);
     cancelHoldTip(); // the finger is scrolling the panel, not holding the tile
   }
 });
@@ -7426,8 +7422,10 @@ document.addEventListener?.('pointercancel', () => cancelHoldTip());
 document.addEventListener?.(
   'click',
   (ev) => {
-    if (!holdTipShown) return;
-    holdTipShown = false;
+    // Право съесть клик одноразовое: следующий честный тап обязан пройти.
+    const { eat, next } = consumeClick(hold);
+    hold = next;
+    if (!eat) return;
     // the click is the tail of a matured long-press — it must not open the codex
     if ((ev.target as HTMLElement).closest?.('.ptile')) {
       ev.preventDefault();
