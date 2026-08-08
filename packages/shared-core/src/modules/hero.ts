@@ -366,7 +366,7 @@ function cooldownKey(type: string): string {
  *  an omitted/zero `range` falls back to the engine constant the legacy action enforces
  *  (fail-secure: a catalog omission must never mean "unlimited reach"); for custom types
  *  0 keeps the schema meaning "self / untargeted". */
-function abilityRange(def: HeroAbilityDef): number {
+export function abilityRange(def: HeroAbilityDef): number {
   if (def.range > 0) return def.range;
   if (def.type === 'temp_lane') return PATH_RANGE;
   if (def.type === 'annihilate') return ANNIHILATE_RANGE;
