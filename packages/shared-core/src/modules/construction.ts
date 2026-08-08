@@ -147,6 +147,17 @@ function hasShipyard(planet: Planet, data: GameData): boolean {
   });
 }
 
+/** True if the planet has at least one standing (undestroyed) building whose data
+ *  marks it `enablesSquadronConstruction` (hangar bay / airbase) — the facility a
+ *  squadron-trait unit needs to be built and based. No limit on how many squadrons
+ *  a planet can base — the building is the gate, not a capacity. */
+function hasHangarBay(planet: Planet, data: GameData): boolean {
+  return planet.buildings.some((b) => {
+    if (b.hp <= 0) return false;
+    return data.buildings[b.type]?.enablesSquadronConstruction === true;
+  });
+}
+
 function requireUnlocked(
   h: HandlerContext,
   playerId: string,
@@ -373,7 +384,11 @@ export const constructionModule: GameModule = {
         return h.reject('E_UNKNOWN_UNIT');
       }
       requireUnlocked(h, action.playerId, 'unit', payload.unit);
-      if (def.domain === 'space' && !hasShipyard(planet, h.ctx.data)) {
+      const isSquadron = def.traits.includes('squadron');
+      if (isSquadron && !hasHangarBay(planet, h.ctx.data)) {
+        return h.reject('E_NO_HANGAR');
+      }
+      if (!isSquadron && def.domain === 'space' && !hasShipyard(planet, h.ctx.data)) {
         return h.reject('E_NO_SHIPYARD');
       }
       // ARS-3 ownership gate: a seat with an arsenal SNAPSHOT builds only what it

@@ -731,6 +731,18 @@ export const data: GameData = parseGameData({
       healRate: 0.15,
       scoreValue: 4,
     },
+    // hangar bay — the facility a squadron-trait unit needs to be built and based
+    // (construction.ts `hasHangarBay`/`enablesSquadronConstruction`); no limit on
+    // how many squadrons a planet can base — the building is the gate, not capacity.
+    hangar_bay: {
+      name: 'Hangar Bay',
+      cost: { metal: 150, credits: 60 },
+      buildTimeHours: 6,
+      hp: 25,
+      enablesSquadronConstruction: true,
+      scoreValue: 5,
+      upkeep: { energy: 6 },
+    },
     // spaceport — the yard a space-domain hull needs to be laid down at all
     // (construction.ts `hasShipyard`/`enablesShipConstruction`); every homeworld
     // starts with one (see `newGame`) so turn-1 fleet-building always works.

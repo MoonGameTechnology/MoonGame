@@ -312,5 +312,20 @@
     "healRate": 0.15,
     "scoreValue": 8,
     "traits": []
+  },
+  "hangar_bay": {
+    "name": "Hangar Bay",
+    "cost": {
+      "metal": 200,
+      "credits": 100
+    },
+    "buildTimeHours": 12,
+    "hp": 25,
+    "enablesSquadronConstruction": true,
+    "scoreValue": 10,
+    "traits": [],
+    "upkeep": {
+      "energy": 10
+    }
   }
 }
