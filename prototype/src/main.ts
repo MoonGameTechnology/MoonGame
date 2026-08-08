@@ -217,6 +217,7 @@ import { chainTapTarget, nearestOwnWorld as ownWorldNearest } from './chainTarge
 import { arrivalHours, marchHours, restRouteHours } from './travelEta';
 import { castOptions, heroAboard, type CastOption } from './heroCasts';
 import { clampMenuLeft, pushBelowChrome, toScreen } from './screenAnchor';
+import { fadeOf, flashDone, flashProgress, growRadius, waveRadius } from './flashFx';
 import { openingView, pickHome } from './openingView';
 import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from './registerForm';
 import {
@@ -11709,29 +11710,31 @@ function drawChainOverlay(now: number): void {
 }
 /** Pan the camera to a world referenced from a plan row (data-goto) — selection stays
  *  untouched (the fleet panel must survive the tap) and a short ring marks the spot. */
-let goFlash: { id: string; until: number } | null = null;
+const GO_FLASH_MS = 1600;
+let goFlash: { id: string; at: number } | null = null;
 function focusWorld(id: string): void {
   const pl = s.planets[id];
   if (!pl) return;
   centerOn(pl.position, Math.max(cam.scale, 2.5));
-  goFlash = { id, until: performance.now() + 1600 };
+  goFlash = { id, at: performance.now() };
 }
 function drawGoFlash(now: number): void {
   if (!goFlash) return;
-  if (now >= goFlash.until) {
+  if (flashDone(now, goFlash.at, GO_FLASH_MS)) {
     goFlash = null;
     return;
   }
   const pl = s.planets[goFlash.id];
   if (!pl) return;
   const c = world(pl.position);
-  const k = (goFlash.until - now) / 1600; // 1 → 0 as it fades
+  // Шкала одна на обе вспышки (`flashFx.ts`): прогресс 0→1, затухание — он же наоборот.
+  const k = fadeOf(flashProgress(now, goFlash.at, GO_FLASH_MS));
   cx.save();
   cx.strokeStyle = rgba(LOCK, 0.25 + 0.55 * k);
   cx.lineWidth = 1.6;
   cx.setLineDash([4, 4]);
   cx.beginPath();
-  cx.arc(c.x, c.y, 14 + (1 - k) * 10, 0, TAU);
+  cx.arc(c.x, c.y, growRadius(14, 10, 1 - k), 0, TAU);
   cx.stroke();
   cx.restore();
 }
@@ -11773,8 +11776,7 @@ function drawCaptureFlashes(now: number): void {
     cx.closePath();
   };
   for (const [node, flash] of captureFlashes) {
-    const age = now - flash.at;
-    if (age >= CAPTURE_FLASH_MS) {
+    if (flashDone(now, flash.at, CAPTURE_FLASH_MS)) {
       captureFlashes.delete(node);
       continue;
     }
@@ -11783,10 +11785,10 @@ function drawCaptureFlashes(now: number): void {
     const cell = computePowerCell(seeds, clip, idx);
     if (!cell) continue;
     const c = { x: seeds[idx]!.x, y: seeds[idx]!.y }; // seeds are already screen-space
-    // rAF's frame timestamp can predate the push by a hair → clamp so k ≥ 0 (a
-    // negative radius throws from cx.arc).
-    const k = Math.max(0, age) / CAPTURE_FLASH_MS; // 0 → 1
-    const fade = 1 - k;
+    // Кламп прогресса и затухание — `flashFx.ts`: метка кадра rAF может опередить
+    // постановку вспышки, а отрицательный радиус роняет cx.arc().
+    const k = flashProgress(now, flash.at, CAPTURE_FLASH_MS); // 0 → 1
+    const fade = fadeOf(k);
     const col = ownerColor(flash.owner);
     // cell radius (centre → farthest vertex) sets how far the wave travels
     let maxR = 0;
@@ -11801,7 +11803,7 @@ function drawCaptureFlashes(now: number): void {
     trace(cell.poly);
     cx.clip();
     cx.globalCompositeOperation = 'lighter';
-    const rr = k * maxR * 1.25;
+    const rr = waveRadius(k, maxR, 1.25);
     cx.strokeStyle = rgba(col, 0.85 * fade);
     cx.lineWidth = 3 + 5 * fade;
     cx.shadowColor = col;
