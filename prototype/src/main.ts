@@ -515,6 +515,7 @@ import { briefSince, marksAway, splitByAttention, worthShowing } from './awayBri
 import { HOLD_TIP_MS, cursorTipPos, holdTipPos, movedTooFar } from './tipPlacement';
 import { canConfirm, normalizeTake, shipCounts, splitTotals, stepTake } from './splitPlan';
 import { canAssaultFromOrbit, canMerge, canSplit, uniformMode } from './cmdAvailability';
+import { stayingFleets, stripState } from './chainStripState';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -6785,7 +6786,8 @@ function cmdBtn(
 function renderChainBar(): void {
   if (!chainMode) return;
   // Самогашение: флоты умерли/перешли к другому — режим не висит над пустотой.
-  chainMode.fleetIds = chainMode.fleetIds.filter((id) => s.fleets[id]?.owner === ME);
+  // Самогашение и состояние кнопок — `chainStripState.ts` (REFM-79).
+  chainMode.fleetIds = stayingFleets(chainMode.fleetIds, (id) => s.fleets[id]?.owner, ME);
   if (!chainMode.fleetIds.length) {
     exitChainMode();
     renderCmdBar();
@@ -6793,19 +6795,20 @@ function renderChainBar(): void {
   }
   document.body.classList.add('chain-mode');
   const plans = chainMode.fleetIds.map((id) => JSON.stringify(chainStepsOf(id) ?? []));
-  const anyPlan = plans.some((p) => p !== '[]');
   const f0 = s.fleets[chainMode.fleetIds[0]!]!;
   const finish = draftFinish(chainMode.steps, chainStart(f0).fromId);
+  const st = stripState({
+    steps: chainMode.steps.length,
+    gestures: chainMode.gestures.length,
+    cap: MAX_CHAIN_STEPS,
+    plans,
+    hasHome: !!finish && !!nearestOwnWorld(finish),
+  });
   const html = chainStripHtml({
     fleets: chainMode.fleetIds.length,
     count: chainMode.steps.length,
     cap: MAX_CHAIN_STEPS,
-    canUndo: chainMode.gestures.length > 0,
-    canHome:
-      chainMode.steps.length < MAX_CHAIN_STEPS && !!finish && !!nearestOwnWorld(finish),
-    clearMode: chainMode.steps.length === 0 && anyPlan,
-    canSend: chainMode.steps.length > 0 || anyPlan,
-    overwrite: plans.some((p) => p !== plans[0]),
+    ...st,
   });
   if (html !== lastCmdHtml) {
     cmdbar.innerHTML = html;
