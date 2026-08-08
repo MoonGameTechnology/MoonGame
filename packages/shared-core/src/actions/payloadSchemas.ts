@@ -126,6 +126,9 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
       .max(32),
   }),
   'fleet.engage': z.object({ fleetId: id, targetId: id }),
+  // squadron free-space movement (squadronModule) — strike/return off the lane graph
+  'squadron.strike': z.object({ fleetId: id, targetFleetId: id }),
+  'squadron.return': z.object({ fleetId: id }),
   // capital (hero respawn / re-fit anchor)
   'capital.designate': z.object({ planetId: id }),
   // steward («Хранитель») — postures are data-driven; the module gates the value

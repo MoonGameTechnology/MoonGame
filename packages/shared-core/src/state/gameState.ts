@@ -374,6 +374,17 @@ export interface Fleet {
    *  `fleet.retreat` — the disengaging fleet flees faster while `now < it`. Absent =
    *  no boost. Read by the `fleet.speed` hook. */
   retreatHasteUntil?: number;
+  /** Free-space position for squadron/missile fleets that move OFF the lane graph.
+   *  Set when the fleet is launched from a carrier/base; the fleet flies freely
+   *  within `strikeRange` of its `homeBase`. Null/absent = a regular lane-bound fleet. */
+  freePosition?: { x: number; y: number } | null;
+  /** Active free-space flight: the fleet is flying from `freePosition` toward
+   *  `targetX,targetY` (a point in space, not a node). Arrives at `arrivesAt`.
+   *  Null/absent = parked at `freePosition` (not currently flying). */
+  freeMovement?: { targetX: number; targetY: number; departedAt: number; arrivesAt: number } | null;
+  /** The fleet this one was launched from (its carrier/base). A squadron must stay
+   *  within `strikeRange` of its home base's position. Absent = not a launched fleet. */
+  homeBase?: FleetId | null;
 }
 
 /**

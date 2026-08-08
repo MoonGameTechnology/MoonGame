@@ -18,6 +18,7 @@ import {
   forcedMarchModule,
   hashGameDataBundle,
   heroModule,
+  squadronModule,
   instantRepairModule,
   interceptModule,
   marketModule,
@@ -128,6 +129,7 @@ export const DEV_MODULES: GameModule[] = [
   marketModule, // session resource bourse: list / buy (15% burn) / cancel
   armyModule,
   fleetOpsModule, // fleet.launch/merge/split: garrison → mobile fleet, the missing link
+  squadronModule, // SQ: free-space movement for squadrons (strike/return off the lane graph)
   capitalModule, // capital.designate: re-point the hero respawn anchor
   standingOrdersModule, // order.auto/order.scramble/order.chain: standing-order intent storage
   instantRepairModule, // fleet.instantRepair: paid-in-credits hull top-up, anywhere
@@ -149,7 +151,7 @@ export const DEV_MODULES: GameModule[] = [
  *  created under an older manifest must not silently resume on a different module
  *  graph (same fail-secure posture as `dataHash`, MP-4). Bump this alongside any
  *  `DEV_MODULES` edit. */
-export const MODULE_MANIFEST_VERSION = '3'; // H4-REVERT: divisionModule removed
+export const MODULE_MANIFEST_VERSION = '4'; // squadronModule added (free-space movement)
 
 export interface DevMatchOptions {
   /** Match/room id (default `'dev'`). Distinct ids let a registry hold many matches. */

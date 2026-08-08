@@ -29,6 +29,7 @@ import {
   espionageModule,
   stewardModule,
   diplomacyModule,
+  squadronModule,
   type GameModule,
   type GameState,
   type Action,
@@ -78,6 +79,7 @@ export const MODULES: GameModule[] = [
   marketModule, // session resource market: two-sided order book (sell/buy lots), embargo-gated
   capitalModule, // designatable capital (hero respawn / module re-fit anchor)
   standingOrdersModule, // CC-2/CC-4 standing orders (auto-storm / дежурный вылет), server-driven
+  squadronModule, // SQ: free-space movement for squadrons (strike/return off the lane graph)
   forcedMarchModule, // BOOST-1 форс-марш: +50% скорости за 5% max-HP износа в час хода
   instantRepairModule, // платный мгновенный ремонт корпуса (кредиты как премиум-валюта)
   econScrewsModule, // ECON-3: экспресс-ремонт корпуса за metal у своего дока
