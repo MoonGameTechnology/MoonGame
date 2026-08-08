@@ -1562,6 +1562,19 @@ function pumpBuildQueues(): void {
   }
 }
 function fleetPos(f: Fleet): { x: number; y: number } | null {
+  // Free-space movement (squadrons / missiles): position is interpolated from
+  // freePosition toward (targetX, targetY) — a straight line in space, not a lane.
+  if (f.freeMovement) {
+    const from = f.freePosition;
+    if (!from) return null;
+    const fm = f.freeMovement;
+    const prog = Math.min(1, Math.max(0, (s.time - fm.departedAt) / (fm.arrivesAt - fm.departedAt)));
+    return {
+      x: from.x + (fm.targetX - from.x) * prog,
+      y: from.y + (fm.targetY - from.y) * prog,
+    };
+  }
+  if (f.freePosition) return f.freePosition;
   if (f.location) return s.planets[f.location]?.position ?? null;
   // Parked at a continuous point ON a lane (stopped mid-march / marched to a point).
   if (f.edge) {

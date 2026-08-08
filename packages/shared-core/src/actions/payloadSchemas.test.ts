@@ -41,6 +41,8 @@ const CLIENT_ACTION_TYPES = [
   'fleet.merge',
   'fleet.split',
   'fleet.engage',
+  'squadron.strike',
+  'squadron.return',
   'capital.designate',
   'steward.delegate',
   'steward.recall',
