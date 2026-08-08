@@ -39,6 +39,13 @@ const data: GameData = parseGameData({
       cost: { metal: 5 },
       buildTimeHours: 0,
     },
+    fighter_squadron: {
+      faction: 'x',
+      stats: { attack: 14, defense: 3, speed: 14, hp: 10, strikeRange: 180, fuel: 3, rearmRounds: 2 },
+      cost: { metal: 90, credits: 40 },
+      buildTimeHours: 2,
+      traits: ['squadron'],
+    },
   },
   factions: {},
   buildings: {
@@ -52,6 +59,13 @@ const data: GameData = parseGameData({
       buildTimeHours: 4,
       hp: 20,
       enablesShipConstruction: true,
+    },
+    hangar_bay: {
+      name: 'Hangar Bay',
+      cost: { metal: 150, credits: 60 },
+      buildTimeHours: 6,
+      hp: 25,
+      enablesSquadronConstruction: true,
     },
     fort: {
       name: 'Fort',
@@ -290,6 +304,55 @@ describe('construction module — a space-domain hull needs a standing shipyard'
     });
     expect(okApply(kernel.applyAction(st, build('cruiser'), ctx(0))).ok).toBe(true);
     expect(okApply(kernel.applyAction(st, build('drone'), ctx(0))).ok).toBe(true);
+  });
+});
+
+describe('construction module — a squadron-trait unit needs a standing hangar bay', () => {
+  it('rejects unit.build for a squadron unit with no hangar bay on the planet', () => {
+    const kernel = createKernel([constructionModule]);
+    const st = stateWith({ players: [player('p1', { metal: 200 })], planets: [planet('A', 'p1', ['shipyard'])] });
+    const r = kernel.applyAction(st, build('fighter_squadron'), ctx(0));
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.code).toBe('E_NO_HANGAR');
+  });
+
+  it('a shipyard alone does not unlock squadrons (they are not regular ships)', () => {
+    const kernel = createKernel([constructionModule]);
+    const st = stateWith({ players: [player('p1', { metal: 200 })], planets: [planet('A', 'p1', ['shipyard'])] });
+    const r = kernel.applyAction(st, build('fighter_squadron'), ctx(0));
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.code).toBe('E_NO_HANGAR');
+  });
+
+  it('a hangar bay unlocks squadron construction on that planet', () => {
+    const kernel = createKernel([constructionModule]);
+    const st = stateWith({
+      players: [player('p1', { metal: 200, credits: 100 })],
+      planets: [planet('A', 'p1', ['hangar_bay'])],
+    });
+    const r = okApply(kernel.applyAction(st, build('fighter_squadron'), ctx(0)));
+    expect(r.ok).toBe(true);
+  });
+
+  it('a hangar bay does NOT unlock regular ship construction (shipyard still needed)', () => {
+    const kernel = createKernel([constructionModule]);
+    const st = stateWith({
+      players: [player('p1', { metal: 200, credits: 100 })],
+      planets: [planet('A', 'p1', ['hangar_bay'])],
+    });
+    const r = kernel.applyAction(st, build('cruiser'), ctx(0));
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.code).toBe('E_NO_SHIPYARD');
+  });
+
+  it('a destroyed (hp<=0) hangar bay does not count as standing', () => {
+    const kernel = createKernel([constructionModule]);
+    const a = planet('A', 'p1', ['hangar_bay']);
+    a.buildings[0]!.hp = 0;
+    const st = stateWith({ players: [player('p1', { metal: 200, credits: 100 })], planets: [a] });
+    const r = kernel.applyAction(st, build('fighter_squadron'), ctx(0));
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.code).toBe('E_NO_HANGAR');
   });
 });
 
