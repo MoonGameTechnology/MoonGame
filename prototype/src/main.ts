@@ -221,6 +221,14 @@ import { clampMenuLeft, pushBelowChrome, toScreen } from './screenAnchor';
 import { fadeOf, flashDone, flashProgress, growRadius, waveRadius } from './flashFx';
 import { capsuleAt, chainPathNodes, lastStepAtPoint, stackIndexes } from './chainPathLayout';
 import {
+  BADGE_DY,
+  badgeCount,
+  badgePulse,
+  groupByAnchor,
+  shownOrders,
+  type AnchoredOrder,
+} from './chainBadges';
+import {
   RING_OFFSETS,
   dropInAlpha,
   pinPulse,
@@ -11651,32 +11659,33 @@ function drawChainPath(
 function drawChainOverlay(now: number): void {
   chainHits = [];
   const col = ownerColor(ME);
-  const pulse = 0.55 + 0.45 * Math.sin(now / 260);
+  // Отбор, группировка и счётчик бейджа — `chainBadges.ts` (REFM-73).
+  const pulse = badgePulse(now);
   const orders = (s as { orders?: Record<string, { steps: ChainStep[]; waitUntil?: number }> })
     .orders;
   const editing = new Set(chainMode?.fleetIds ?? []);
-  const byWorld = new Map<string, string[]>();
+  // Порядок обхода — по id флота: бейджи не должны переставляться между кадрами.
+  const own: Array<{ fleetId: string; owner: string | null; fleet: Fleet }> = [];
   for (const fid of Object.keys(orders ?? {}).sort()) {
     const f = s.fleets[fid];
-    if (!f || f.owner !== ME || editing.has(fid)) continue;
-    const chain = orders![fid]!;
-    const st = chainStart(f);
-    const headRem =
-      chain.waitUntil !== undefined
-        ? Math.max(0, (chain.waitUntil - s.time) / HOUR)
-        : undefined;
-    drawChainPath(f, chain.steps, st.fromId, st.baseH, headRem, 0.5);
-    const anchor = draftFinish(chain.steps, st.fromId);
-    if (!anchor || !s.planets[anchor]) continue;
-    const arr = byWorld.get(anchor) ?? [];
-    if (!arr.length) byWorld.set(anchor, arr);
-    arr.push(fid);
+    if (f) own.push({ fleetId: fid, owner: f.owner, fleet: f });
   }
+  // Якорь считается только для показываемых планов — чужие кадр не нагружают.
+  const anchored: AnchoredOrder[] = shownOrders(own, ME, editing).map((e) => {
+    const chain = orders![e.fleetId]!;
+    const st = chainStart(e.fleet);
+    const headRem =
+      chain.waitUntil !== undefined ? Math.max(0, (chain.waitUntil - s.time) / HOUR) : undefined;
+    drawChainPath(e.fleet, chain.steps, st.fromId, st.baseH, headRem, 0.5);
+    const anchor = draftFinish(chain.steps, st.fromId);
+    return { fleetId: e.fleetId, anchor: anchor && s.planets[anchor] ? anchor : null };
+  });
+  const byWorld = groupByAnchor(anchored);
   for (const [wid, fids] of byWorld) {
     const c = world(s.planets[wid]!.position);
     if (!visible(c)) continue;
     const bx = c.x;
-    const by = c.y - 29;
+    const by = c.y + BADGE_DY;
     cx.save();
     cx.shadowColor = rgba(col, 0.8);
     cx.shadowBlur = fxBlur(3 + 6 * pulse);
@@ -11691,11 +11700,12 @@ function drawChainOverlay(now: number): void {
     cx.beginPath();
     cx.arc(bx, by, 2.6, 0, TAU);
     cx.stroke();
-    if (fids.length > 1) {
+    const count = badgeCount(fids.length);
+    if (count) {
       cx.fillStyle = rgba(col, 0.95);
       cx.font = '700 8px ui-monospace,monospace';
       cx.textAlign = 'center';
-      cx.fillText(String(fids.length), bx + 11, by - 5);
+      cx.fillText(count, bx + 11, by - 5);
     }
     cx.restore();
     chainHits.push({ target: wid, fleetIds: fids, x: bx, y: by });
