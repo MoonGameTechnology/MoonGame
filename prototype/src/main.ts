@@ -517,6 +517,7 @@ import { canConfirm, normalizeTake, shipCounts, splitTotals, stepTake } from './
 import { canAssaultFromOrbit, canMerge, canSplit, uniformMode } from './cmdAvailability';
 import { stayingFleets, stripState } from './chainStripState';
 import { IDLE, consumeClick, mature, moveAway, press, release, type HoldState } from './holdPress';
+import { groundTypes, hasTroops, totalOf, troopSources } from './troopsSources';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -2474,23 +2475,17 @@ function troopsInputFor(fleetId: string): TroopsInput | null {
   const guestLanding =
     !mine && carried.length > 0 && canOrder(s, unloadArmy(ME, fleetId, carried[0]!.unit, 1)) === null;
   if (!mine && !guestLanding) return null;
-  const types: string[] = [];
-  // На союзном мире поднимать нечего: чужой гарнизон не твой, ядро отобьёт погрузку.
-  // Поэтому и типы, и «в гарнизоне» берутся только из трюма — счётчик выходит
-  // односторонним (только «высадить») сам собой, без отдельного режима меню.
-  for (const st of mine ? [...here.garrison, ...landing] : landing)
-    if (isGround(st.unit) && !types.includes(st.unit)) types.push(st.unit);
-  if (!types.length) return null;
-  // Стеков одного типа может быть несколько (побитый + целый): «всего» складывает
-  // их все, а поднять/высадить ядро даст только здоровый с дефолтным лоадаутом.
-  const total = (stacks: Array<{ unit: string; count: number }>, unit: string): number =>
-    stacks.reduce((n, st) => (st.unit === unit ? n + st.count : n), 0);
+  // Источники, типы и суммы — `troopsSources.ts` (REFM-81): на союзном мире поднимать
+  // нечего, поэтому счётчик выходит односторонним сам собой, без отдельного режима меню.
+  const types = groundTypes(troopSources(mine, here.garrison, landing), isGround);
+  if (!hasTroops(types)) return null;
   const units: TroopsUnitInput[] = types.map((unit) => ({
     unit,
+    // «Всего» складывает и побитые стопки, а поднять/высадить ядро даст только здоровую.
     garrison: mine ? (findHealthyStack(here.garrison, unit)?.count ?? 0) : 0,
-    garrisonAll: mine ? total(here.garrison, unit) : 0,
+    garrisonAll: mine ? totalOf(here.garrison, unit) : 0,
     hold: findHealthyStack(landing, unit)?.count ?? 0,
-    holdAll: total(landing, unit),
+    holdAll: totalOf(landing, unit),
     queued: pendingLoads.filter((p) => p.fleetId === fleetId && p.unit === unit).length,
     reserved: pendingLoadUnits(here.id, unit),
     cargoSize: data.units[unit]?.stats.cargoSize ?? 1,
