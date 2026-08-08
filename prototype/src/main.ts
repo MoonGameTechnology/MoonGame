@@ -510,6 +510,7 @@ import {
 import { resolveIntro, parseSeenIntros, type IntroCard } from './intros';
 // ONB-5 — return digest ("пока тебя не было"): aggregate the away-window event log.
 import { buildRecap, type RecapEvent } from './recap';
+import { briefSince, marksAway, splitByAttention, worthShowing } from './awayBrief';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -6568,9 +6569,9 @@ function openRecap(since: number): void {
   const el = document.getElementById('recap');
   if (!el) return;
   const r = buildRecap(eventLog, since);
-  if (!r.count) return; // nothing accrued — don't nag with an empty briefing
-  const hi = r.items.filter((i) => i.high);
-  const lo = r.items.filter((i) => !i.high);
+  // Политика показа — `awayBrief.ts` (REFM-74): пустой брифинг не нагружает, важное выше.
+  if (!worthShowing(r.count)) return;
+  const { hi, lo } = splitByAttention(r.items);
   let body = '';
   if (hi.length)
     body +=
@@ -6603,16 +6604,20 @@ document.getElementById('lw-recap')?.addEventListener('click', () => openRecap(0
 let awayAtRealMs = 0;
 document.addEventListener?.('visibilitychange', () => {
   if (document.hidden) {
-    if (inMatch()) {
+    if (marksAway(true, inMatch())) {
       awayFromGameTime = s.time;
       awayAtRealMs = Date.now();
     }
     return;
   }
-  if (awayFromGameTime == null || !inMatch()) return;
-  const since = awayFromGameTime;
-  awayFromGameTime = null;
-  if (Date.now() - awayAtRealMs < 15000) return; // a quick glance away — no briefing
+  const since = briefSince({
+    awayFromGameTime,
+    inMatch: inMatch(),
+    awayAtRealMs,
+    nowRealMs: Date.now(),
+  });
+  awayFromGameTime = null; // метка одноразовая: иначе второй возврат покажет то же ещё раз
+  if (since === null) return;
   // Give the frame loop a beat to catch the world up before we summarise it.
   window.setTimeout(() => {
     if (inMatch()) openRecap(since);
