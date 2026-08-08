@@ -511,6 +511,7 @@ import { resolveIntro, parseSeenIntros, type IntroCard } from './intros';
 // ONB-5 — return digest ("пока тебя не было"): aggregate the away-window event log.
 import { buildRecap, type RecapEvent } from './recap';
 import { briefSince, marksAway, splitByAttention, worthShowing } from './awayBrief';
+import { HOLD_TIP_MS, cursorTipPos, holdTipPos, movedTooFar } from './tipPlacement';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -7259,15 +7260,14 @@ side.addEventListener('click', (ev) => {
 const objTipEl = document.getElementById('objtip');
 function placeObjTip(ev: PointerEvent): void {
   if (!objTipEl) return;
-  const pad = 14;
-  const w = objTipEl.offsetWidth;
-  const hgt = objTipEl.offsetHeight;
-  let x = ev.clientX + pad;
-  let y = ev.clientY + pad;
-  if (x + w > window.innerWidth - 8) x = ev.clientX - w - pad; // flip left of the cursor
-  if (y + hgt > window.innerHeight - 8) y = ev.clientY - hgt - pad; // flip above
-  objTipEl.style.left = `${Math.max(8, x)}px`;
-  objTipEl.style.top = `${Math.max(8, y)}px`;
+  // Отступ, переворот у края и поле — `tipPlacement.ts` (REFM-75).
+  const at = cursorTipPos(
+    { x: ev.clientX, y: ev.clientY },
+    { width: objTipEl.offsetWidth, height: objTipEl.offsetHeight },
+    { width: window.innerWidth, height: window.innerHeight },
+  );
+  objTipEl.style.left = `${at.x}px`;
+  objTipEl.style.top = `${at.y}px`;
 }
 side.addEventListener('pointermove', (ev) => {
   if (MOBILE) return;
@@ -7352,8 +7352,6 @@ let holdTipEl: HTMLElement | null = null;
 let holdTimer: number | null = null;
 let holdTipShown = false; // the press matured into a bubble → eat the click tail
 let holdStart: { x: number; y: number } | null = null;
-const HOLD_TIP_MS = 400;
-const HOLD_SLOP_PX = 12; // a moving finger is a scroll/drag, not a hold
 function showHoldTip(btn: HTMLElement): void {
   const name = btn.dataset.name;
   if (!name) return;
@@ -7364,12 +7362,15 @@ function showHoldTip(btn: HTMLElement): void {
   }
   holdTipEl.textContent = name;
   holdTipEl.style.display = 'block';
-  // above the tile, clamped to the viewport
+  // По центру над плиткой, зажато по экрану — `tipPlacement.ts`.
   const r = btn.getBoundingClientRect();
-  const w = holdTipEl.offsetWidth;
-  const h = holdTipEl.offsetHeight;
-  holdTipEl.style.left = `${Math.max(6, Math.min(window.innerWidth - w - 6, r.left + r.width / 2 - w / 2))}px`;
-  holdTipEl.style.top = `${Math.max(6, r.top - h - 8)}px`;
+  const at = holdTipPos(
+    { left: r.left, top: r.top, width: r.width },
+    { width: holdTipEl.offsetWidth, height: holdTipEl.offsetHeight },
+    window.innerWidth,
+  );
+  holdTipEl.style.left = `${at.x}px`;
+  holdTipEl.style.top = `${at.y}px`;
 }
 function cancelHoldTip(): void {
   if (holdTimer !== null) {
@@ -7394,7 +7395,7 @@ document.addEventListener?.('pointerdown', (ev) => {
 });
 document.addEventListener?.('pointermove', (ev) => {
   if (holdTimer === null || !holdStart) return;
-  if (Math.hypot(ev.clientX - holdStart.x, ev.clientY - holdStart.y) > HOLD_SLOP_PX) {
+  if (movedTooFar(holdStart, { x: ev.clientX, y: ev.clientY })) {
     cancelHoldTip(); // the finger is scrolling the panel, not holding the tile
   }
 });
