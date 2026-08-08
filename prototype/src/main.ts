@@ -216,6 +216,7 @@ import { nextPick, tapCandidates, touchPick, type TapPick } from './tapCycle';
 import { chainTapTarget, nearestOwnWorld as ownWorldNearest } from './chainTarget';
 import { arrivalHours, marchHours, restRouteHours } from './travelEta';
 import { castOptions, heroAboard, type CastOption } from './heroCasts';
+import { clampMenuLeft, pushBelowChrome, toScreen } from './screenAnchor';
 import { openingView, pickHome } from './openingView';
 import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from './registerForm';
 import {
@@ -10434,10 +10435,7 @@ if (!__PLAYER_BUILD__ && DEV_UI && typeof window !== 'undefined') {
       worlds: Array<{ id: string; x: number; y: number; owner: string | null }>;
     } {
       const r = canvas.getBoundingClientRect();
-      const sx = (p: { x: number; y: number }) => ({
-        x: r.left + (p.x / VW) * r.width,
-        y: r.top + (p.y / VH) * r.height,
-      });
+      const sx = (p: { x: number; y: number }) => toScreen(p, r, VW, VH);
       return {
         fleets: Object.values(s.fleets)
           .filter((f) => f.owner === ME)
@@ -11239,12 +11237,8 @@ const pings = initPingUi({
   anchor: (loc) => {
     const pl = s.planets[loc];
     if (!pl) return null;
-    const c = world(pl.position);
-    const r = canvas.getBoundingClientRect();
-    return {
-      left: Math.round(r.left + (c.x / VW) * r.width),
-      top: Math.round(r.top + (c.y / VH) * r.height),
-    };
+    const at = toScreen(world(pl.position), canvas.getBoundingClientRect(), VW, VH);
+    return { left: Math.round(at.x), top: Math.round(at.y) };
   },
   ask: (current) => prompt(t('ping.panel.edit'), current),
   onFeedChanged: () => {
@@ -11429,14 +11423,17 @@ function renderChainMenu(): void {
 function positionChainMenu(el: HTMLElement): void {
   const a = chainMenuAnchor();
   if (!a) return;
-  const r = canvas.getBoundingClientRect();
-  el.style.left = `${Math.round(r.left + (a.x / VW) * r.width)}px`;
-  el.style.top = `${Math.round(r.top + (a.y / VH) * r.height)}px`;
+  const at = toScreen(a, canvas.getBoundingClientRect(), VW, VH);
+  // Ставим округлённое и от НЕГО же считаем поправки: коробка измерена уже при этом
+  // css-top, поэтому смешивать её с неокруглённой проекцией нельзя — разъедется на пиксель.
+  const left0 = Math.round(at.x);
+  const top0 = Math.round(at.y);
+  el.style.left = `${left0}px`;
+  el.style.top = `${top0}px`;
+  // Зажатие и подъём из-под хрома считаются по ИЗМЕРЕННОЙ коробке (`screenAnchor.ts`).
   const b = el.getBoundingClientRect();
-  const minLeft = b.width / 2 + 6;
-  const maxLeft = window.innerWidth - b.width / 2 - 6;
-  el.style.left = `${Math.round(Math.min(maxLeft, Math.max(minLeft, parseFloat(el.style.left))))}px`;
-  if (b.top < 96) el.style.top = `${Math.round(parseFloat(el.style.top) + (96 - b.top))}px`;
+  el.style.left = `${Math.round(clampMenuLeft(left0, b.width, window.innerWidth))}px`;
+  el.style.top = `${Math.round(pushBelowChrome(top0, b.top))}px`;
 }
 document.getElementById('tgted')?.addEventListener('click', (ev) => {
   const btn = (ev.target as HTMLElement).closest('button');
