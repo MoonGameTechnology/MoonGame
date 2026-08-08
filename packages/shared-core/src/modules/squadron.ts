@@ -13,13 +13,14 @@
  */
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type { Fleet, GameState } from '../state/gameState';
+import type { GameData } from '../data/schemas';
 import { distance, fleetBaseSpeed } from '../state/route';
 import { squadronStrikeRange, fleetHasSquadron } from '../state/squadron';
 import { ownFleet } from '../util/combat';
 
 /** A squadron's free-flight speed (map units / hour). Squadrons are fast — they
  *  use their own `speed` stat, not the fleet's weighted average. */
-function squadronSpeed(fleet: Fleet, data: GameState['version'] extends never ? never : import('../data/schemas').GameData): number {
+function squadronSpeed(fleet: Fleet, data: GameData): number {
   return fleetBaseSpeed(fleet, data);
 }
 
