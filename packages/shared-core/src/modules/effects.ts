@@ -26,8 +26,9 @@
  *     (clamped at 0; negative amounts are penalties).
  * An unknown effect (or malformed params) makes the rule inert, never a crash.
  *
- * Every applied rule emits `effect.applied { ruleId, effect, planetId?, playerId? }`
- * so hosts/UI can narrate dark events without knowing the vocabulary.
+ * Every applied rule emits `effect.applied { ruleId, effect, playerId, planetId? }`
+ * so hosts/UI can narrate dark events without knowing the vocabulary. `playerId` is
+ * unconditional: it is the address the host's fog filter routes this event by.
  */
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type { EffectRule } from '../data/schemas';
@@ -41,8 +42,11 @@ export interface EffectOccurrence {
   rule: EffectRule;
   /** Planet the trigger centred on (present for planet-scoped triggers). */
   planetId?: string;
-  /** Player the effect applies to (the capturer / the rolled player). */
-  playerId?: string;
+  /** Player the effect applies to (the capturer / the rolled player). Mandatory: this is
+   *  also the audience `effect.applied` is addressed to, so an occurrence that scoped to
+   *  nobody would emit an event no fog rule can deliver — invisible to everyone,
+   *  including the player it happened to. Every trigger must name a player. */
+  playerId: string;
 }
 
 /** Contract for a capability-provided effect: `provideCapability('effect.<name>', impl)`. */
@@ -63,7 +67,7 @@ const builtinEffects: Record<string, EffectImpl> = {
   modify_resource(occurrence, h) {
     const resource = occurrence.rule.params['resource'];
     const amount = occurrence.rule.params['amount'];
-    const player = occurrence.playerId ? h.state.players[occurrence.playerId] : undefined;
+    const player = h.state.players[occurrence.playerId];
     if (typeof resource !== 'string' || resource.length === 0) return;
     if (typeof amount !== 'number' || !Number.isFinite(amount) || !player) return;
     const current = player.resources[resource] ?? 0;
@@ -84,11 +88,13 @@ function applyRule(h: HandlerContext, occurrence: EffectOccurrence): void {
     builtinEffects[occurrence.rule.effect];
   if (!impl) return; // unknown effect → the rule is inert, never a crash
   impl(occurrence, h);
+  // `playerId` is spelled out, unlike `planetId`: a key contributed by a conditional
+  // spread is present only sometimes, so the event would be deliverable only sometimes.
   h.emit('effect.applied', {
     ruleId: occurrence.ruleId,
     effect: occurrence.rule.effect,
+    playerId: occurrence.playerId,
     ...(occurrence.planetId !== undefined ? { planetId: occurrence.planetId } : {}),
-    ...(occurrence.playerId !== undefined ? { playerId: occurrence.playerId } : {}),
   });
 }
 

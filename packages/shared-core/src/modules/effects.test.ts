@@ -230,6 +230,33 @@ describe('effectsModule — scheduled dark events (EFX-1)', () => {
   });
 });
 
+describe('effectsModule — `effect.applied` names its audience (AUD-11)', () => {
+  const applied = (events: { type: string; payload: unknown }[]): Record<string, unknown>[] =>
+    events
+      .filter((e) => e.type === 'effect.applied')
+      .map((e) => e.payload as Record<string, unknown>);
+
+  it('a planet-scoped firing addresses the capturer', () => {
+    const payloads = applied(captureB(makeData({ infect_planet: INFECT }), ['plaguebearer']).events);
+    expect(payloads).toHaveLength(1);
+    expect(payloads[0]!['playerId']).toBe('p1');
+    expect(payloads[0]!['planetId']).toBe('B');
+  });
+
+  it('a GLOBAL scheduled firing — no planet anywhere — still addresses the struck player', () => {
+    // The hole AUD-11 closed. A host routes domain events by payload key names; a dark
+    // event that carries no `planetId` (there is no world involved) and no `playerId`
+    // matches no rule at all, so it reaches nobody — not even the player it struck.
+    const data = makeData({ void_anomaly: ANOMALY });
+    const kernel = createKernel([effectsModule]);
+    const state = baseState([], [], [player('p1', 0), player('p2', 0)]);
+    const advanced = okAdvance(kernel.advanceTo(state, { now: 9 * HOUR, data }));
+    const payloads = applied(advanced.events as { type: string; payload: unknown }[]);
+    expect(payloads.map((p) => p['playerId'])).toEqual(['p1', 'p2']);
+    expect(payloads.every((p) => !('planetId' in p))).toBe(true);
+  });
+});
+
 describe('effectsModule — capability extension seam (EFX-1)', () => {
   it('a module-provided `effect.<name>` capability executes (and overrides) the vocabulary', () => {
     const seen: EffectOccurrence[] = [];
@@ -239,7 +266,7 @@ describe('effectsModule — capability extension seam (EFX-1)', () => {
       setup(api) {
         const impl: EffectImpl = (occurrence, h) => {
           seen.push(occurrence);
-          const p = occurrence.playerId ? h.state.players[occurrence.playerId] : undefined;
+          const p = h.state.players[occurrence.playerId];
           if (p) p.resources['energy'] = 999;
         };
         api.provideCapability('effect.quake', impl);

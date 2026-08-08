@@ -48,14 +48,8 @@ const isHeroOnly = (type: string): boolean => type.startsWith('hero.');
  * an entry needs a reason and a date, not just a name.
  */
 const ALLOWLIST = new Map<string, string>([
-  [
-    'effect.applied',
-    // 2026-08-05 (AUD-2): `planetId`/`playerId` ARE emitted, but through a conditional
-    // spread, so they do not count as guaranteed. Left as-is because `effectsModule` is
-    // not in the server's module graph (`DEV_MODULES` in scenario.ts) — the event never
-    // reaches MatchRoom today. Tracked as its own [core] brick.
-    'effectsModule is not in DEV_MODULES; keys come from a conditional spread',
-  ],
+  // Empty by design. The only entry this list ever held (`effect.applied`, 2026-08-05)
+  // was retired by AUD-11: `effectsModule` now names its audience unconditionally.
 ]);
 
 interface EmitSite {
