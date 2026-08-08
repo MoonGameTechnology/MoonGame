@@ -7,6 +7,7 @@ import {
   constructionPayload,
   hoursLeft,
   laneOfPayload,
+  barPct,
   progressPct,
 } from './buildProgress';
 
@@ -168,5 +169,31 @@ describe('стройка — остаток времени', () => {
 
   it('срок прошёл — остаток ноль, а не отрицательное число', () => {
     expect(hoursLeft(1 * HOUR, 5 * HOUR, HOUR)).toBe(0);
+  });
+});
+
+describe('barPct — полоса от готовых чисел (живой патчер панели, REFM-77)', () => {
+  const active = (at: number, payload = build()) => ({ at, seq: 1, payload });
+
+  it('совпадает с progressPct на тех же входах — одна формула, а не две', () => {
+    const a = active(6 * HOUR);
+    const dur = 6 * HOUR;
+    for (const now of [0, 1.5 * HOUR, 3 * HOUR, 6 * HOUR]) {
+      expect(barPct(a.at, dur, now)).toBe(progressPct(a, now, data, HOUR));
+    }
+  });
+
+  it('ПРОСРОЧЕННАЯ РАБОТА НЕ УЕЗЖАЕТ ЗА КРАЙ: кадр мог прийти позже срока', () => {
+    expect(barPct(100, 100, 500)).toBe(100);
+  });
+
+  it('ЕЩЁ НЕ НАЧАТАЯ НЕ УХОДИТ В МИНУС', () => {
+    expect(barPct(100, 10, 0)).toBe(0);
+  });
+
+  it('НУЛЕВАЯ И БИТАЯ ДЛИТЕЛЬНОСТЬ — «ГОТОВО», а не NaN в ширине элемента', () => {
+    expect(barPct(100, 0, 0)).toBe(100);
+    expect(barPct(100, -5, 0)).toBe(100);
+    expect(barPct(100, Number.NaN, 0)).toBe(100);
   });
 });

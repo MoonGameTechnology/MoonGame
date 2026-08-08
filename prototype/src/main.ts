@@ -302,6 +302,7 @@ import {
 } from './buildOrders';
 import {
   activeConstruction as coreActiveConstruction,
+  barPct,
   buildDurationHours as coreBuildDurationHours,
   hoursLeft,
   progressPct as coreProgressPct,
@@ -512,6 +513,10 @@ import { resolveIntro, parseSeenIntros, type IntroCard } from './intros';
 // ONB-5 — return digest ("пока тебя не было"): aggregate the away-window event log.
 import { buildRecap, type RecapEvent } from './recap';
 import { briefSince, marksAway, splitByAttention, worthShowing } from './awayBrief';
+import { HOLD_TIP_MS, cursorTipPos, holdTipPos, movedTooFar } from './tipPlacement';
+import { canConfirm, normalizeTake, shipCounts, splitTotals, stepTake } from './splitPlan';
+import { canAssaultFromOrbit, canMerge, canSplit, uniformMode } from './cmdAvailability';
+import { stayingFleets, stripState } from './chainStripState';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -6749,17 +6754,16 @@ function updatePanelLive(): void {
   const root = side.querySelector('.pscroll');
   if (!root) return;
   for (const el of Array.from(root.querySelectorAll('.conv-fill')) as HTMLElement[]) {
-    const at = Number(el.dataset.at);
-    const dur = Number(el.dataset.dur);
-    const pct = dur > 0 ? Math.max(0, Math.min(100, 100 - ((at - s.time) / dur) * 100)) : 100;
+    // Зажим полосы — `liveMeters.ts` (REFM-77): кадр может прийти позже срока работы.
+    const pct = barPct(Number(el.dataset.at), Number(el.dataset.dur), s.time);
     el.style.width = `${pct.toFixed(0)}%`;
   }
   for (const el of Array.from(root.querySelectorAll('.conv-time')) as HTMLElement[]) {
     el.textContent = timeLeft(Number(el.dataset.at));
   }
   for (const el of Array.from(root.querySelectorAll('.pn-eta')) as HTMLElement[]) {
-    const totalH =
-      Math.max(0, (Number(el.dataset.arrive) - s.time) / HOUR) + Number(el.dataset.rest);
+    // То же правило, что и в карточке флота: `travelEta.ts` (REFM-67), без второй копии.
+    const totalH = arrivalHours(Number(el.dataset.arrive), s.time, HOUR, Number(el.dataset.rest));
     el.textContent = fmtEta(totalH);
   }
   for (const el of Array.from(root.querySelectorAll('.pn-timer')) as HTMLElement[]) {
@@ -6791,7 +6795,8 @@ function cmdBtn(
 function renderChainBar(): void {
   if (!chainMode) return;
   // Самогашение: флоты умерли/перешли к другому — режим не висит над пустотой.
-  chainMode.fleetIds = chainMode.fleetIds.filter((id) => s.fleets[id]?.owner === ME);
+  // Самогашение и состояние кнопок — `chainStripState.ts` (REFM-79).
+  chainMode.fleetIds = stayingFleets(chainMode.fleetIds, (id) => s.fleets[id]?.owner, ME);
   if (!chainMode.fleetIds.length) {
     exitChainMode();
     renderCmdBar();
@@ -6799,19 +6804,20 @@ function renderChainBar(): void {
   }
   document.body.classList.add('chain-mode');
   const plans = chainMode.fleetIds.map((id) => JSON.stringify(chainStepsOf(id) ?? []));
-  const anyPlan = plans.some((p) => p !== '[]');
   const f0 = s.fleets[chainMode.fleetIds[0]!]!;
   const finish = draftFinish(chainMode.steps, chainStart(f0).fromId);
+  const st = stripState({
+    steps: chainMode.steps.length,
+    gestures: chainMode.gestures.length,
+    cap: MAX_CHAIN_STEPS,
+    plans,
+    hasHome: !!finish && !!nearestOwnWorld(finish),
+  });
   const html = chainStripHtml({
     fleets: chainMode.fleetIds.length,
     count: chainMode.steps.length,
     cap: MAX_CHAIN_STEPS,
-    canUndo: chainMode.gestures.length > 0,
-    canHome:
-      chainMode.steps.length < MAX_CHAIN_STEPS && !!finish && !!nearestOwnWorld(finish),
-    clearMode: chainMode.steps.length === 0 && anyPlan,
-    canSend: chainMode.steps.length > 0 || anyPlan,
-    overwrite: plans.some((p) => p !== plans[0]),
+    ...st,
   });
   if (html !== lastCmdHtml) {
     cmdbar.innerHTML = html;
@@ -6897,8 +6903,8 @@ function renderCmdBar() {
     { m: 'standard', lbl: t('cmd.fire.standard'), sub: t('cmd.fire.standard.hint') },
     { m: 'aggressive', lbl: t('cmd.fire.aggressive'), sub: t('cmd.fire.aggressive.hint') },
   ];
-  const artModes = new Set(artFleets.map((f) => f.barrageMode ?? 'standard'));
-  const uniMode = artModes.size === 1 ? [...artModes][0] : null;
+  // Единогласие режима, доступность слияния/деления/штурма — `cmdAvailability.ts` (REFM-78).
+  const uniMode = uniformMode(artFleets.map((f) => f.barrageMode ?? 'standard'));
   const fmLabel = uniMode
     ? (FIRE_MODES.find((x) => x.m === uniMode)?.lbl ?? t('cmd.fire.title'))
     : t('cmd.fire.title');
@@ -6908,20 +6914,32 @@ function renderCmdBar() {
   // whenever the selection has ships. Mobile keeps the in-orbit-only button.
   const canAssault = pcUi()
     ? fleets.some((f) => sumUnits(f.units) > 0)
-    : docked.some(
-        (f) =>
-          f.orbit === 'near' &&
-          f.location &&
-          s.planets[f.location]?.owner !== f.owner &&
-          sectorTypeOf(f.location)?.capturable, // empty space can't be taken
+    : docked.some((f) =>
+        canAssaultFromOrbit(
+          {
+            orbit: f.orbit,
+            location: f.location,
+            worldOwner: (f.location ? s.planets[f.location]?.owner : null) ?? null,
+            capturable: !!(f.location && sectorTypeOf(f.location)?.capturable),
+          },
+          f.owner,
+        ),
       );
   // Merge: a group fuses in one tap; a lone fleet arms target-pick (needs a partner).
   const myFleetTotal = Object.values(s.fleets).filter((f) => f.owner === ME).length;
-  const canMerge = ids.length >= 2 || (ids.length === 1 && myFleetTotal >= 2);
+  const mergeOk = canMerge(ids.length, myFleetTotal);
   // Split: only a single docked fleet with ≥2 ships can shed some into a new fleet.
   const lone = ids.length === 1 && fleets[0] ? fleets[0] : null;
-  const canSplit =
-    !!lone && !!lone.location && !lone.movement && !lone.battleId && sumUnits(lone.units) >= 2;
+  const splitOk = canSplit(
+    lone
+      ? {
+          location: lone.location,
+          movement: lone.movement,
+          battleId: lone.battleId,
+          ships: sumUnits(lone.units),
+        }
+      : null,
+  );
   // GRND-1 ⇅ «Десант»: как и split, команда строго ОДНОФЛОТОВАЯ — гарнизон и трюм у
   // каждого свои, один клик на группу разослал бы приказы с разной арифметикой.
   const troopsIn = lone ? troopsInputFor(lone.id) : null;
@@ -6969,10 +6987,10 @@ function renderCmdBar() {
       '⛬',
       ids.length > 1 ? t('cmd.merge') : t('cmd.merge.pick'),
       merging ? 'on' : '',
-      !canMerge,
+      !mergeOk,
       t('cmd.merge.hint'),
     ) +
-    cmdBtn('split', '⊟', t('cmd.split'), splitState ? 'on' : '', !canSplit, t('cmd.split.hint')) +
+    cmdBtn('split', '⊟', t('cmd.split'), splitState ? 'on' : '', !splitOk, t('cmd.split.hint')) +
     cmdBtn(
       'troops',
       '⇅',
@@ -7065,9 +7083,7 @@ function renderCmdBar() {
 
 /** Ship counts (by type) of a fleet — the rows of the split dialog. */
 function fleetShipCounts(f: Fleet): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const st of f.units) out[st.unit] = (out[st.unit] ?? 0) + st.count;
-  return out;
+  return shipCounts(f.units); // арифметика деления — `splitPlan.ts` (REFM-76)
 }
 
 /** The "Split fleet" modal: per ship type, +1 / +10 / All (and −1) move ships into
@@ -7083,15 +7099,13 @@ function renderSplitDialog() {
     return;
   }
   const counts = fleetShipCounts(f);
-  let takeTotal = 0;
-  let total = 0;
+  // Состав живой: отбор пересчитывается под него на каждой перерисовке (`splitPlan.ts`).
+  splitState.take = normalizeTake(splitState.take, counts);
+  const { takeTotal, total } = splitTotals(counts, splitState.take);
   let rows = '';
   for (const unit of Object.keys(counts)) {
     const have = counts[unit] ?? 0;
-    total += have;
-    const tk = Math.min(splitState.take[unit] ?? 0, have);
-    splitState.take[unit] = tk;
-    takeTotal += tk;
+    const tk = splitState.take[unit] ?? 0;
     rows += `<div class="srow">
       <span class="sname"><span class="bicon">${unitIconHtml(unit, data, youColor, 18)}</span>${esc(displayUnit(unit))}</span>
       <b class="scur">${have - tk}</b>
@@ -7104,7 +7118,7 @@ function renderSplitDialog() {
       <b class="snew">→ ${tk}</b>
     </div>`;
   }
-  const valid = takeTotal > 0 && takeTotal < total;
+  const valid = canConfirm(takeTotal, total);
   const html = `<div class="sbox">
     <div class="shead">${t('split.title')} <b>${esc(splitState.fleetId)}</b></div>
     <div class="ssub">${t('split.note')}</div>
@@ -7159,9 +7173,9 @@ splitdlg.addEventListener('click', (ev) => {
   if (!f) return;
   const have = fleetShipCounts(f)[unit] ?? 0;
   const cur = splitState.take[unit] ?? 0;
-  if (sx === 'inc') splitState.take[unit] = Math.min(have, cur + Number(bEl.dataset.n));
-  else if (sx === 'dec') splitState.take[unit] = Math.max(0, cur - Number(bEl.dataset.n));
-  else if (sx === 'all') splitState.take[unit] = have;
+  if (sx === 'inc' || sx === 'dec' || sx === 'all') {
+    splitState.take[unit] = stepTake(cur, have, sx, Number(bEl.dataset.n));
+  }
   renderSplitDialog();
 });
 
@@ -7268,15 +7282,14 @@ side.addEventListener('click', (ev) => {
 const objTipEl = document.getElementById('objtip');
 function placeObjTip(ev: PointerEvent): void {
   if (!objTipEl) return;
-  const pad = 14;
-  const w = objTipEl.offsetWidth;
-  const hgt = objTipEl.offsetHeight;
-  let x = ev.clientX + pad;
-  let y = ev.clientY + pad;
-  if (x + w > window.innerWidth - 8) x = ev.clientX - w - pad; // flip left of the cursor
-  if (y + hgt > window.innerHeight - 8) y = ev.clientY - hgt - pad; // flip above
-  objTipEl.style.left = `${Math.max(8, x)}px`;
-  objTipEl.style.top = `${Math.max(8, y)}px`;
+  // Отступ, переворот у края и поле — `tipPlacement.ts` (REFM-75).
+  const at = cursorTipPos(
+    { x: ev.clientX, y: ev.clientY },
+    { width: objTipEl.offsetWidth, height: objTipEl.offsetHeight },
+    { width: window.innerWidth, height: window.innerHeight },
+  );
+  objTipEl.style.left = `${at.x}px`;
+  objTipEl.style.top = `${at.y}px`;
 }
 side.addEventListener('pointermove', (ev) => {
   if (MOBILE) return;
@@ -7361,8 +7374,6 @@ let holdTipEl: HTMLElement | null = null;
 let holdTimer: number | null = null;
 let holdTipShown = false; // the press matured into a bubble → eat the click tail
 let holdStart: { x: number; y: number } | null = null;
-const HOLD_TIP_MS = 400;
-const HOLD_SLOP_PX = 12; // a moving finger is a scroll/drag, not a hold
 function showHoldTip(btn: HTMLElement): void {
   const name = btn.dataset.name;
   if (!name) return;
@@ -7373,12 +7384,15 @@ function showHoldTip(btn: HTMLElement): void {
   }
   holdTipEl.textContent = name;
   holdTipEl.style.display = 'block';
-  // above the tile, clamped to the viewport
+  // По центру над плиткой, зажато по экрану — `tipPlacement.ts`.
   const r = btn.getBoundingClientRect();
-  const w = holdTipEl.offsetWidth;
-  const h = holdTipEl.offsetHeight;
-  holdTipEl.style.left = `${Math.max(6, Math.min(window.innerWidth - w - 6, r.left + r.width / 2 - w / 2))}px`;
-  holdTipEl.style.top = `${Math.max(6, r.top - h - 8)}px`;
+  const at = holdTipPos(
+    { left: r.left, top: r.top, width: r.width },
+    { width: holdTipEl.offsetWidth, height: holdTipEl.offsetHeight },
+    window.innerWidth,
+  );
+  holdTipEl.style.left = `${at.x}px`;
+  holdTipEl.style.top = `${at.y}px`;
 }
 function cancelHoldTip(): void {
   if (holdTimer !== null) {
@@ -7403,7 +7417,7 @@ document.addEventListener?.('pointerdown', (ev) => {
 });
 document.addEventListener?.('pointermove', (ev) => {
   if (holdTimer === null || !holdStart) return;
-  if (Math.hypot(ev.clientX - holdStart.x, ev.clientY - holdStart.y) > HOLD_SLOP_PX) {
+  if (movedTooFar(holdStart, { x: ev.clientX, y: ev.clientY })) {
     cancelHoldTip(); // the finger is scrolling the panel, not holding the tile
   }
 });
