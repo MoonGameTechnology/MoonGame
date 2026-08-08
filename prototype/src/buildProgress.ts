@@ -80,9 +80,18 @@ export function progressPct(
   data: GameData,
   hourMs: number,
 ): number {
-  const duration = buildDurationHours(active.payload, data) * hourMs;
-  if (duration <= 0) return 100; // длительности нет — показываем «готово», а не NaN
-  return Math.max(0, Math.min(100, 100 - ((active.at - now) / duration) * 100));
+  return barPct(active.at, buildDurationHours(active.payload, data) * hourMs, now);
+}
+
+/**
+ * Та же полоса, но от ГОТОВЫХ чисел «когда закончится» и «сколько всего длится» —
+ * живой патчер боковой панели держит их в data-атрибутах и своей копии формулы иметь
+ * не должен (REFM-77). Длительности нет (ноль, минус, NaN) — «готово», а не NaN в
+ * ширине элемента.
+ */
+export function barPct(at: number, dur: number, now: number): number {
+  if (!(dur > 0)) return 100;
+  return Math.max(0, Math.min(100, 100 - ((at - now) / dur) * 100));
 }
 
 /** Остаток до завершения в игровых часах (никогда не отрицательный). */
