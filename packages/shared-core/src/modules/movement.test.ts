@@ -6,6 +6,7 @@ import { economyModule } from './economy';
 import { combatModule } from './combat';
 import { createInitialState, type Fleet, type GameState, type Planet } from '../state/gameState';
 import { parseGameData, type GameData } from '../data/schemas';
+import { setStance } from '../state/diplomacy';
 import type { Action, AdvanceResult, ApplyResult, Context } from '../action/types';
 import { deepFreeze } from '../util/clone';
 
@@ -218,6 +219,20 @@ describe('movement — routing along lanes (the map graph)', () => {
     const atC = okAdvance(kernel.advanceTo(atB.state, ctx(6 * HOUR)));
     expect(atC.state.fleets.F?.location).toBe('C');
     expect(atC.state.fleets.F?.movement).toBe(null);
+  });
+
+  it('rejects a move that would pass through peace territory', () => {
+    const kernel = createKernel([movementModule]);
+    const a = planet('A', 'p1', 0, 0);
+    const b = planet('B', 'p2', 30, 0);
+    const c = planet('C', 'p2', 60, 0);
+    a.links = ['B'];
+    b.links = ['A', 'C'];
+    c.links = ['B'];
+    const st = baseState([a, b, c], [fleet('F', 'p1', 'A', ['scout'])]);
+    setStance(st, 'p1', 'p2', 'peace');
+
+    expect(errCode(kernel.applyAction(st, move('F', 'C'), ctx(0)))).toBe('E_NO_RIGHT_OF_WAY');
   });
 
   it('rejects a destination with no lane route', () => {
