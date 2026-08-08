@@ -512,6 +512,7 @@ import { resolveIntro, parseSeenIntros, type IntroCard } from './intros';
 import { buildRecap, type RecapEvent } from './recap';
 import { briefSince, marksAway, splitByAttention, worthShowing } from './awayBrief';
 import { HOLD_TIP_MS, cursorTipPos, holdTipPos, movedTooFar } from './tipPlacement';
+import { canConfirm, normalizeTake, shipCounts, splitTotals, stepTake } from './splitPlan';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -7057,9 +7058,7 @@ function renderCmdBar() {
 
 /** Ship counts (by type) of a fleet — the rows of the split dialog. */
 function fleetShipCounts(f: Fleet): Record<string, number> {
-  const out: Record<string, number> = {};
-  for (const st of f.units) out[st.unit] = (out[st.unit] ?? 0) + st.count;
-  return out;
+  return shipCounts(f.units); // арифметика деления — `splitPlan.ts` (REFM-76)
 }
 
 /** The "Split fleet" modal: per ship type, +1 / +10 / All (and −1) move ships into
@@ -7075,15 +7074,13 @@ function renderSplitDialog() {
     return;
   }
   const counts = fleetShipCounts(f);
-  let takeTotal = 0;
-  let total = 0;
+  // Состав живой: отбор пересчитывается под него на каждой перерисовке (`splitPlan.ts`).
+  splitState.take = normalizeTake(splitState.take, counts);
+  const { takeTotal, total } = splitTotals(counts, splitState.take);
   let rows = '';
   for (const unit of Object.keys(counts)) {
     const have = counts[unit] ?? 0;
-    total += have;
-    const tk = Math.min(splitState.take[unit] ?? 0, have);
-    splitState.take[unit] = tk;
-    takeTotal += tk;
+    const tk = splitState.take[unit] ?? 0;
     rows += `<div class="srow">
       <span class="sname"><span class="bicon">${unitIconHtml(unit, data, youColor, 18)}</span>${esc(displayUnit(unit))}</span>
       <b class="scur">${have - tk}</b>
@@ -7096,7 +7093,7 @@ function renderSplitDialog() {
       <b class="snew">→ ${tk}</b>
     </div>`;
   }
-  const valid = takeTotal > 0 && takeTotal < total;
+  const valid = canConfirm(takeTotal, total);
   const html = `<div class="sbox">
     <div class="shead">${t('split.title')} <b>${esc(splitState.fleetId)}</b></div>
     <div class="ssub">${t('split.note')}</div>
@@ -7151,9 +7148,9 @@ splitdlg.addEventListener('click', (ev) => {
   if (!f) return;
   const have = fleetShipCounts(f)[unit] ?? 0;
   const cur = splitState.take[unit] ?? 0;
-  if (sx === 'inc') splitState.take[unit] = Math.min(have, cur + Number(bEl.dataset.n));
-  else if (sx === 'dec') splitState.take[unit] = Math.max(0, cur - Number(bEl.dataset.n));
-  else if (sx === 'all') splitState.take[unit] = have;
+  if (sx === 'inc' || sx === 'dec' || sx === 'all') {
+    splitState.take[unit] = stepTake(cur, have, sx, Number(bEl.dataset.n));
+  }
   renderSplitDialog();
 });
 
