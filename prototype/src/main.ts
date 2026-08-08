@@ -220,6 +220,16 @@ import { castOptions, heroAboard, type CastOption } from './heroCasts';
 import { clampMenuLeft, pushBelowChrome, toScreen } from './screenAnchor';
 import { fadeOf, flashDone, flashProgress, growRadius, waveRadius } from './flashFx';
 import { capsuleAt, chainPathNodes, lastStepAtPoint, stackIndexes } from './chainPathLayout';
+import {
+  RING_OFFSETS,
+  dropInAlpha,
+  pinPulse,
+  pingPhase,
+  ringAlpha,
+  ringProgress,
+  ringRadius,
+  ringWidth,
+} from './pingPulse';
 import { openingView, pickHome } from './openingView';
 import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from './registerForm';
 import {
@@ -11513,27 +11523,26 @@ function drawPings(now: number): void {
     const x = c.x;
     const y = c.y - 22; // pin head floats above the node (плейтест: пинги крупнее)
     const col = ownerColor(m.from);
-    const phase = x * 0.05; // de-syncs neighbouring pins so they don't blink in unison
-    const pulse = 0.7 + 0.3 * Math.sin(now / 360 + phase);
+    // Фазы, дыхание и жизнь колец — `pingPulse.ts` (REFM-72).
+    const phase = pingPhase(x);
+    const pulse = pinPulse(now, phase);
     cx.save();
     // sonar waves: rings born at the node, growing and thinning out as they fade;
     // a newborn ring flashes a soft filled core so each wave visibly "drops in"
     cx.shadowColor = rgba(col, 0.7);
-    for (const off of [0, 0.5]) {
-      // 0 → 1 over one 2.2s period; double-mod keeps k positive when phase is
-      // negative (a pin near the screen's left edge has x < 0 → JS % keeps sign,
-      // and a negative k would feed cx.arc a negative radius = a thrown frame)
-      const k = (((now / 2200 + off + phase) % 1) + 1) % 1;
-      const rr = 6 + k * 40;
-      if (k < 0.18) {
-        cx.fillStyle = rgba(col, (1 - k / 0.18) * 0.28); // the drop-in flash
+    for (const off of RING_OFFSETS) {
+      const k = ringProgress(now, phase, off);
+      const rr = ringRadius(k);
+      const drop = dropInAlpha(k);
+      if (drop > 0) {
+        cx.fillStyle = rgba(col, drop); // the drop-in flash
         cx.beginPath();
         cx.arc(c.x, c.y, rr, 0, TAU);
         cx.fill();
       }
       cx.shadowBlur = fxBlur(6 * (1 - k));
-      cx.strokeStyle = rgba(col, (1 - k) * 0.8);
-      cx.lineWidth = 3.2 - k * 2.2;
+      cx.strokeStyle = rgba(col, ringAlpha(k));
+      cx.lineWidth = ringWidth(k);
       cx.beginPath();
       cx.arc(c.x, c.y, rr, 0, TAU);
       cx.stroke();
