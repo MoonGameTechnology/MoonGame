@@ -18,6 +18,8 @@
  * интерфейсная константа, иначе он разойдётся с тем, что считает ядро.
  */
 
+import { tData } from '../../localization/runtime';
+
 /** Роль места: ты, ИИ или выключено. */
 export type SeatRole = 'human' | 'ai' | 'off';
 
@@ -35,6 +37,25 @@ export function seatFactionIds(mine: string, factions: readonly string[], seats:
 export function houseNameFor(base: string, index: number, houses: number): string {
   const cycle = Math.floor(index / Math.max(1, houses)) + 1;
   return cycle === 1 ? base : `${base} ${cycle}`;
+}
+
+/**
+ * Имя дома в том виде, в каком его читает ИГРОК (AUD-14).
+ *
+ * Хранится и передаётся имя ДАННЫХ (`data/factions.json`, английское) — состояние одно
+ * на всех, а локаль у каждого своя, поэтому перевод делается на месте показа. Две
+ * тонкости, ради которых это отдельная функция, а не голый `tData()`:
+ *
+ * 1. **Номер круга отделяется ДО поиска ключа.** `houseNameFor` даёт «Azure Compact 2»,
+ *    а слаг `dataKey()` вырезал бы пробелы в `data.azurecompact2` — ключа нет, и игрок
+ *    получил бы английское имя целиком. Переводится база, номер остаётся цифрой рядом.
+ * 2. **Позывной живого игрока проходит насквозь.** В сетевом матче в имени места стоит
+ *    ник, а не дом; `tData()` по нему промахивается и отдаёт строку как есть — это и есть
+ *    нужное поведение, переводить ник нельзя.
+ */
+export function houseDisplayName(name: string): string {
+  const numbered = /^(.+) (\d+)$/.exec(name);
+  return numbered ? `${tData(numbered[1]!)} ${numbered[2]!}` : tData(name);
 }
 
 /** Пассивы дома в том виде, в каком их держат данные. */

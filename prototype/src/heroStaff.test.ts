@@ -154,6 +154,32 @@ describe('штаб героев — разметка панели', () => {
     expect(JSON.stringify(s)).toBe(before); // состояние матча не тронуто
   });
 
+  /** Текст внутри `.hx-name` — шапка досье, единственное место, где героя НАЗЫВАЮТ. */
+  const identName = (html: string): string =>
+    html.match(/<span class="hx-name">♔ ([^<]*)<\/span>/)?.[1] ?? '';
+
+  it('ШАПКА досье называет роту переводом, а не ключом локали', () => {
+    // `hero:p1:2` носит в состоянии `HeroLoadout.name` — то есть КЛЮЧ
+    // `hero.arch.destroyer`. Сырой рендер показывал игроку сам ключ.
+    const staff = initHeroStaff(hostOf());
+    staff.click(click('[data-hsel]', { hsel: 'hero:p1:2' }));
+    const html = staff.paneHtml();
+    expect(identName(html)).toBe('Разрушитель');
+    expect(html).not.toContain('hero.arch.');
+  });
+
+  it('ГЛАВНЫЙ герой носит имя места, и имя ДОМА в нём переводится', () => {
+    // Главному `matchSetup` кладёт `seat.name`: в соло это имя дома из данных
+    // («Azure Compact»), в сети — позывной живого игрока. Ключ роты тут не при чём.
+    expect(identName(initHeroStaff(hostOf()).paneHtml())).toBe('Лазурный пакт');
+  });
+
+  it('ПОЗЫВНОЙ игрока в шапке не переводится и не теряется', () => {
+    const s = staffed();
+    s.heroes!['hero:p1:1']!.name = 'Вульфакс';
+    expect(identName(initHeroStaff(hostOf({ state: () => s })).paneHtml())).toBe('Вульфакс');
+  });
+
   it('вкладка «Дерево» открыта по умолчанию и показывает узлы', () => {
     const html = initHeroStaff(hostOf()).paneHtml();
     expect(html).toContain('hx-tree');
