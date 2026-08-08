@@ -215,6 +215,7 @@ import { tapOwner, tapRadius } from './tapPriority';
 import { nextPick, tapCandidates, touchPick, type TapPick } from './tapCycle';
 import { chainTapTarget, nearestOwnWorld as ownWorldNearest } from './chainTarget';
 import { arrivalHours, marchHours, restRouteHours } from './travelEta';
+import { castOptions, heroAboard, type CastOption } from './heroCasts';
 import { openingView, pickHome } from './openingView';
 import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from './registerForm';
 import {
@@ -509,6 +510,7 @@ import {
 import type {
   GameState,
   Fleet,
+  Hero,
   Battle,
   Planet,
   Action,
@@ -6872,14 +6874,9 @@ function renderCmdBar() {
   const anyArtillery = fleets.some(fleetHasArtillery);
   // Hero-flagship aboard a selected fleet → its castable abilities become a ✨ popover
   // (the map-tap targeting reuses the same heroAim flow as the hero window).
+  // Флагман группы и его кастуемые способности — правила в `heroCasts.ts` (REFM-68).
   const castHero = Object.values(s.heroes ?? {}).find(
-    (hh) =>
-      hh.alive !== false &&
-      hh.fleetId !== undefined &&
-      ids.includes(hh.fleetId) &&
-      (hh.abilities ?? []).some(
-        (a) => a !== null && HERO_CASTABLE.has(data.heroAbilities[a]?.type ?? ''),
-      ),
+    (hh) => heroAboard([hh], ids) !== null && castOptionsOf(hh).length > 0,
   );
   if (!castHero) castMenu = false;
   const html =
@@ -6982,20 +6979,16 @@ function renderCmdBar() {
     // ✨ поповер: способности героя-флагмана — каст прямо с ряда (дальняя → цель на карте).
     (castMenu && castHero
       ? `<div class="cmdpop">` +
-        (castHero.abilities ?? [])
-          .filter(
-            (a): a is string => a !== null && HERO_CASTABLE.has(data.heroAbilities[a]?.type ?? ''),
-          )
-          .map((ab) => {
-            const ad = data.heroAbilities[ab]!;
-            const cdLeft = Math.max(0, (castHero.cooldowns?.[heroCdKey(ad.type)] ?? 0) - s.time);
+        castOptionsOf(castHero)
+          .map((opt) => {
+            const ad = data.heroAbilities[opt.id]!;
             const sub =
-              cdLeft > 0
-                ? t('cmd.cast.cooldown', { h: fmtHrs(cdLeft / HOUR) })
-                : (ad.range ?? 0) > 0
+              opt.cdH > 0
+                ? t('cmd.cast.cooldown', { h: fmtHrs(opt.cdH) })
+                : opt.ranged
                   ? t('cmd.cast.needs-target')
                   : t('cmd.cast.self');
-            return `<button data-cmd="castdo" data-ab="${ab}" data-hero="${castHero.id}"${cdLeft > 0 ? ' disabled' : ''}><b>${esc(t(ad.name))}</b><span>${sub}</span></button>`;
+            return `<button data-cmd="castdo" data-ab="${opt.id}" data-hero="${castHero.id}"${opt.cdH > 0 ? ' disabled' : ''}><b>${esc(t(ad.name))}</b><span>${sub}</span></button>`;
           })
           .join('') +
         `</div>`
@@ -11285,22 +11278,30 @@ function nearestOwnWorld(fromId: string): string | null {
 /** Способности героя на борту — данные для пунктов меню (CC-1 × HERO-4; та же
  *  фильтрация, что у старого композера: только кастуемые типы). */
 function chainAbilitiesFor(fleetIds: string[]): ChainAbility[] {
-  const hero = Object.values(s.heroes ?? {}).find(
-    (h) => h.alive !== false && h.fleetId !== undefined && fleetIds.includes(h.fleetId),
-  );
+  const hero = heroAboard(Object.values(s.heroes ?? {}), fleetIds);
   if (!hero) return [];
-  const out: ChainAbility[] = [];
-  for (const ab of hero.abilities ?? []) {
+  return castOptionsOf(hero).map((opt) => ({
+    id: opt.id,
+    name: t(data.heroAbilities[opt.id]!.name),
+    cdH: opt.cdH,
+    ranged: opt.ranged,
+  }));
+}
+/** Слоты героя, разрешённые по игровым данным → пункты каста (`heroCasts.ts`, REFM-68).
+ *  Одна точка разрешения на все три места, которые спрашивают «что можно применить»:
+ *  кнопка ✨ командной полосы, её поповер и меню точки режима «Приказ». */
+function castOptionsOf(hero: Hero): CastOption[] {
+  const specs = (hero.abilities ?? []).map((ab) => {
     const ad = ab !== null ? data.heroAbilities[ab] : undefined;
-    if (!ad || !ab || !HERO_CASTABLE.has(ad.type)) continue;
-    out.push({
+    if (!ab || !ad) return null;
+    return {
       id: ab,
-      name: t(ad.name),
-      cdH: Math.max(0, (hero.cooldowns?.[heroCdKey(ad.type)] ?? 0) - s.time) / HOUR,
-      ranged: (ad.range ?? 0) > 0,
-    });
-  }
-  return out;
+      type: ad.type,
+      range: ad.range,
+      readyAt: hero.cooldowns?.[heroCdKey(ad.type)],
+    };
+  });
+  return castOptions(specs, HERO_CASTABLE, s.time, HOUR);
 }
 /** Остаток кулдауна способности — единственный реальный холд драйвера цепочек. */
 function chainAbilityHoldH(fleetIds: string[]): (abilityId: string) => number {
