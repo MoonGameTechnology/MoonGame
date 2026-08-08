@@ -218,6 +218,7 @@ import { arrivalHours, marchHours, restRouteHours } from './travelEta';
 import { castOptions, heroAboard, type CastOption } from './heroCasts';
 import { clampMenuLeft, pushBelowChrome, toScreen } from './screenAnchor';
 import { fadeOf, flashDone, flashProgress, growRadius, waveRadius } from './flashFx';
+import { capsuleAt, chainPathNodes, lastStepAtPoint, stackIndexes } from './chainPathLayout';
 import { openingView, pickHome } from './openingView';
 import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from './registerForm';
 import {
@@ -11564,15 +11565,9 @@ function drawChainPath(
   const tl = chainTimeline(steps, fromId, baseH, chainTravelH(f), chainAbilityHoldH([f.id]), headRemH);
   // Полилиния: от якоря флота по маршруту каждого перелёта (стиль drawFleetRoutes).
   const pts: Array<{ x: number; y: number }> = [start];
-  let cur = fromId;
-  for (const st of steps) {
-    if (st.kind !== 'move' || st.to === cur) continue;
-    const hops = chainRoute(cur, st.to) ?? [st.to];
-    for (const hop of hops) {
-      const pl = s.planets[hop];
-      if (pl) pts.push(world(pl.position));
-    }
-    cur = st.to;
+  for (const hop of chainPathNodes(steps, fromId, chainRoute)) {
+    const pl = s.planets[hop];
+    if (pl) pts.push(world(pl.position));
   }
   cx.save();
   cx.globalAlpha = alpha;
@@ -11590,19 +11585,19 @@ function drawChainPath(
     cx.shadowBlur = 0;
   }
   // Капсулы шагов: стопка вправо от точки; «~T» — под последней капсулой точки.
-  const seen = new Map<string, number>();
+  // Стопка капсул и место подписи «~T» — правила в `chainPathLayout.ts` (REFM-71).
+  const stack = stackIndexes(tl.map((r) => r.pointId));
+  const lastAt = lastStepAtPoint(tl.map((r) => r.pointId));
   const last = new Map<string, { x: number; y: number; endH: number | null }>();
   cx.textAlign = 'center';
   for (let i = 0; i < steps.length; i++) {
     const pid = tl[i]!.pointId;
     const pl = pid ? s.planets[pid] : undefined;
-    if (!pid || !pl) continue;
+    const k = stack[i];
+    if (!pid || !pl || k === null || k === undefined) continue;
     const c = world(pl.position);
-    const k = seen.get(pid) ?? 0;
-    seen.set(pid, k + 1);
     if (!visible(c)) continue;
-    const bx = c.x + 16 + k * 20;
-    const by = c.y - 16;
+    const { x: bx, y: by } = capsuleAt(c, k);
     cx.fillStyle = 'rgba(6,18,22,.92)';
     cx.strokeStyle = rgba(LOCK, 0.85);
     cx.lineWidth = 1.2;
@@ -11618,7 +11613,8 @@ function drawChainPath(
       cx.font = '600 8px ui-monospace,Menlo,monospace';
       cx.fillText(hrs, bx, by - 12);
     }
-    last.set(pid, { x: bx, y: by, endH: tl[i]!.endH });
+    // «~T» — под ПОСЛЕДНЕЙ капсулой точки: время точки это когда она отработана целиком.
+    if (lastAt.get(pid) === i) last.set(pid, { x: bx, y: by, endH: tl[i]!.endH });
   }
   cx.font = '600 9px ui-monospace,Menlo,monospace';
   for (const p of last.values()) {
