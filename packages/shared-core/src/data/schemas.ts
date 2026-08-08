@@ -213,6 +213,10 @@ export const BuildingDefSchema = z.object({
    *  at least one standing (undestroyed) building with this flag to build any
    *  space-domain unit (`unit.build`). Not per-level: the capability doesn't scale. */
   enablesShipConstruction: z.boolean().default(false),
+  /** True for a building that can build and base squadrons (a hangar bay /
+   *  airbase). A planet needs at least one standing building with this flag
+   *  to build any unit with the `squadron` trait (`unit.build`). Not per-level. */
+  enablesSquadronConstruction: z.boolean().default(false),
   /** RULES-2. Сколько экземпляров этого здания может стоять на ОДНОМ мире.
    *
    *  Правило «одно здание такого типа на мир, уровень растят улучшением» жило

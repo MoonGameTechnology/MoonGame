@@ -136,6 +136,8 @@ import {
   identifiedNodes,
   sensorCoverage,
   fleetRadarRange,
+  artilleryRange,
+  abilityRange,
   type PausedConstructionSite,
 } from '../../packages/shared-core/src/index';
 import {
@@ -1616,17 +1618,12 @@ function fleetCanLaunchSquadron(f: Fleet | undefined): boolean {
   return wing > 0 && total > wing;
 }
 
-/** A fleet's standoff firing radius (map units) — the longest gun among its live
- *  artillery units sets the reach (mirrors combat.ts artilleryRange). 0 = none. */
+/** A fleet's standoff firing radius (map units) — delegates to the CORE
+ *  `artilleryRange` (which uses `effectiveStats`, so module bonuses are reflected).
+ *  The old local copy read `stats.range` directly and ignored modules — the shown
+ *  circle diverged from the real reach. 0 = none. */
 function artilleryRangeOf(f: Fleet | undefined): number {
-  if (!f) return 0;
-  let r = 0;
-  for (const u of f.units) {
-    if (u.count > 0 && data.units[u.unit]?.traits.includes('artillery')) {
-      r = Math.max(r, data.units[u.unit]?.stats.range ?? 0);
-    }
-  }
-  return r;
+  return f ? artilleryRange(f, data) : 0;
 }
 
 
@@ -3673,7 +3670,7 @@ function drawCastAim(): void {
   const fleet = hero.fleetId ? s.fleets[hero.fleetId] : undefined;
   const origin = fleet ? fleetAnchor(fleet) : null;
   if (!origin) return;
-  const reach = def.range ?? 0;
+  const reach = abilityRange(def);
   const aoe = Number(def.params?.radius ?? 0);
   const far = reach > 0 && Math.hypot(aimPointer.x - origin.x, aimPointer.y - origin.y) > reach * cam.scale;
   cx.save();
