@@ -407,7 +407,7 @@ export { fleetRepairModule } from './modules/fleetRepair';
 export { forcedMarchModule, FORCED_MARCH_MULT, FORCED_MARCH_WEAR } from './modules/forcedMarch';
 export { victoryModule } from './modules/victory';
 export { visibilityModule } from './modules/visibility';
-export { heroModule } from './modules/hero';
+export { heroModule, abilityRange } from './modules/hero';
 export type { HeroEffect, HeroEffectArgs } from './modules/hero';
 export { heroEffectsModule } from './modules/heroEffects';
 export {
