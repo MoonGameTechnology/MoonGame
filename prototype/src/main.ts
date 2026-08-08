@@ -301,6 +301,7 @@ import {
 } from './buildOrders';
 import {
   activeConstruction as coreActiveConstruction,
+  barPct,
   buildDurationHours as coreBuildDurationHours,
   hoursLeft,
   progressPct as coreProgressPct,
@@ -6742,17 +6743,16 @@ function updatePanelLive(): void {
   const root = side.querySelector('.pscroll');
   if (!root) return;
   for (const el of Array.from(root.querySelectorAll('.conv-fill')) as HTMLElement[]) {
-    const at = Number(el.dataset.at);
-    const dur = Number(el.dataset.dur);
-    const pct = dur > 0 ? Math.max(0, Math.min(100, 100 - ((at - s.time) / dur) * 100)) : 100;
+    // Зажим полосы — `liveMeters.ts` (REFM-77): кадр может прийти позже срока работы.
+    const pct = barPct(Number(el.dataset.at), Number(el.dataset.dur), s.time);
     el.style.width = `${pct.toFixed(0)}%`;
   }
   for (const el of Array.from(root.querySelectorAll('.conv-time')) as HTMLElement[]) {
     el.textContent = timeLeft(Number(el.dataset.at));
   }
   for (const el of Array.from(root.querySelectorAll('.pn-eta')) as HTMLElement[]) {
-    const totalH =
-      Math.max(0, (Number(el.dataset.arrive) - s.time) / HOUR) + Number(el.dataset.rest);
+    // То же правило, что и в карточке флота: `travelEta.ts` (REFM-67), без второй копии.
+    const totalH = arrivalHours(Number(el.dataset.arrive), s.time, HOUR, Number(el.dataset.rest));
     el.textContent = fmtEta(totalH);
   }
   for (const el of Array.from(root.querySelectorAll('.pn-timer')) as HTMLElement[]) {
