@@ -519,6 +519,7 @@ import { canAssaultFromOrbit, canMerge, canSplit, uniformMode } from './cmdAvail
 import { stayingFleets, stripState } from './chainStripState';
 import { IDLE, consumeClick, mature, moveAway, press, release, type HoldState } from './holdPress';
 import { groundTypes, hasTroops, totalOf, troopSources } from './troopsSources';
+import { dossierLevel, nextHover, showsBody } from './dossierHover';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -6650,7 +6651,7 @@ document.addEventListener?.('visibilitychange', () => {
 /** A `b:<id>:<lvl>` key embeds its building level in the title (as `hl(lvl)`) — shared
  *  by the desktop hover pane and the mobile tap modal so both read identically. */
 function dossierTitleHtml(key: string, d: Dossier): string {
-  const lvl = key.startsWith('b:') ? Number(key.split(':')[2]) || 0 : 0;
+  const lvl = dossierLevel(key); // разбор ключа — `dossierHover.ts` (REFM-82)
   return lvl ? `${esc(d.name)} ${hl(lvl)}` : esc(d.name);
 }
 
@@ -6750,7 +6751,7 @@ function updatePanelLive(): void {
   const root = side.querySelector('.pscroll');
   if (!root) return;
   for (const el of Array.from(root.querySelectorAll('.conv-fill')) as HTMLElement[]) {
-    // Зажим полосы — `liveMeters.ts` (REFM-77): кадр может прийти позже срока работы.
+    // Зажим полосы — `buildProgress.ts` (REFM-77): кадр может прийти позже срока работы.
     const pct = barPct(Number(el.dataset.at), Number(el.dataset.dur), s.time);
     el.style.width = `${pct.toFixed(0)}%`;
   }
@@ -7294,14 +7295,15 @@ side.addEventListener('pointermove', (ev) => {
   const key = (t.closest('[data-desc]') as HTMLElement | null)?.dataset.desc ?? null;
   if (pcUi() && objTipEl) {
     // Cursor tooltip: shown only while an object is actually under the pointer.
-    if (key !== hoverObj) {
-      hoverObj = key;
+    const step = nextHover('cursor', key, hoverObj);
+    if (step.changed) {
+      hoverObj = step.hover;
       const d = key ? objDossier(key) : null;
       if (d) {
         // A body-less dossier (bare names — resources, plain units) shows just the title.
         objTipEl.innerHTML =
           `<div class="pd-title">${dossierTitleHtml(key!, d)}</div>` +
-          (d.body ? `<div class="pd-body">${d.body}</div>` : '');
+          (showsBody(d.body) ? `<div class="pd-body">${d.body}</div>` : '');
         objTipEl.style.display = 'block';
       } else {
         objTipEl.style.display = 'none';
@@ -7310,11 +7312,12 @@ side.addEventListener('pointermove', (ev) => {
     if (objTipEl.style.display === 'block') placeObjTip(ev);
     return;
   }
-  // Docked-pane path (narrow desktop windows): only swap when landing on a DIFFERENT
-  // object; passing over a gap (key === null) keeps the last dossier shown, so the pane
-  // never flashes empty while the cursor travels between rows. pointerleave clears it.
-  if (key !== null && key !== hoverObj) {
-    hoverObj = key;
+  // Docked-pane path (narrow desktop windows): переход наведения — `dossierHover.ts`
+  // (REFM-82). Здесь промежуток показанное НЕ гасит: курсор идёт между строками через
+  // пустоту, и панель мигала бы пустой на каждом переходе. pointerleave clears it.
+  const step = nextHover('docked', key, hoverObj);
+  if (step.changed) {
+    hoverObj = step.hover;
     renderObjDesc();
   }
 });
