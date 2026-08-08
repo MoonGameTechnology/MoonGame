@@ -152,6 +152,7 @@ import {
   zoomAt as camZoomAt,
   clampCam as camClampCam,
   centerOn as camCenterOn,
+  fitTransform as camFitTransform,
 } from '../../packages/client/src/camera';
 import {
   rgba,
@@ -1331,6 +1332,13 @@ function sectorTypeOf(id: string) {
 }
 function world(p: { x: number; y: number }): { x: number; y: number } {
   return camWorldToScreen(p, cam, insets(), mapBounds());
+}
+/** Convert a world-space distance (map units) to screen pixels at the current
+ *  camera. `worldToScreen` scales by `fitScale * cam.scale`, so a world-space
+ *  radius must be multiplied by the SAME factor to match on screen — using just
+ *  `cam.scale` (as the old code did) made circles too small by the fit-scale factor. */
+function worldDist(d: number): number {
+  return d * camFitTransform(insets(), mapBounds()).scale * cam.scale;
 }
 function visible(c: { x: number; y: number }, pad = 80): boolean {
   return c.x >= -pad && c.x <= VW + pad && c.y >= -pad && c.y <= VH + pad;
@@ -3628,7 +3636,7 @@ function drawCombatRanges(): void {
     if (ring.radius > 0) {
       cx.setLineDash([5, 7]);
       cx.beginPath();
-      cx.arc(c.x, c.y, ring.radius * cam.scale, 0, TAU);
+      cx.arc(c.x, c.y, worldDist(ring.radius), 0, TAU);
       cx.stroke();
     } else {
       // ПВО: у него нет области — только «у этого мира есть зубы».
@@ -3677,17 +3685,17 @@ function drawCastAim(): void {
   if (!origin) return;
   const reach = abilityRange(def);
   const aoe = Number(def.params?.radius ?? 0);
-  const far = reach > 0 && Math.hypot(aimPointer.x - origin.x, aimPointer.y - origin.y) > reach * cam.scale;
+  const far = reach > 0 && Math.hypot(aimPointer.x - origin.x, aimPointer.y - origin.y) > worldDist(reach);
   cx.save();
   if (reach > 0) {
     cx.strokeStyle = rgba(far ? CAST_FAR : CAST_REACH, 0.5);
     cx.lineWidth = 1.2;
     cx.setLineDash([6, 6]);
     cx.beginPath();
-    cx.arc(origin.x, origin.y, reach * cam.scale, 0, TAU);
+    cx.arc(origin.x, origin.y, worldDist(reach), 0, TAU);
     cx.stroke();
   }
-  if (aoe > 0) drawAbilityCircle(aimPointer.x, aimPointer.y, aoe * cam.scale, 0.14);
+  if (aoe > 0) drawAbilityCircle(aimPointer.x, aimPointer.y, worldDist(aoe), 0.14);
   cx.restore();
 }
 
@@ -3731,7 +3739,7 @@ function drawAbilityRings(): void {
       return p ? world(p) : null;
     },
   });
-  for (const r of rings) drawAbilityCircle(r.x, r.y, r.radius * cam.scale);
+  for (const r of rings) drawAbilityCircle(r.x, r.y, worldDist(r.radius));
 }
 
 /** While "Move" is armed: a dashed line from each selected fleet to the world under
@@ -4983,7 +4991,7 @@ function render(now: number) {
         cx.lineWidth = 1;
         cx.setLineDash([5, 5]);
         cx.beginPath();
-        cx.arc(A.x, A.y, aRange * cam.scale, 0, TAU);
+        cx.arc(A.x, A.y, worldDist(aRange), 0, TAU);
         cx.stroke();
         cx.setLineDash([]);
         const tf = f.barrageTarget ? s.fleets[f.barrageTarget] : undefined;
