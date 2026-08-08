@@ -152,6 +152,7 @@ import {
   zoomAt as camZoomAt,
   clampCam as camClampCam,
   centerOn as camCenterOn,
+  fitTransform as camFitTransform,
 } from '../../packages/client/src/camera';
 import {
   rgba,
@@ -218,6 +219,25 @@ import { arrivalHours, marchHours, restRouteHours } from './travelEta';
 import { castOptions, heroAboard, type CastOption } from './heroCasts';
 import { clampMenuLeft, pushBelowChrome, toScreen } from './screenAnchor';
 import { fadeOf, flashDone, flashProgress, growRadius, waveRadius } from './flashFx';
+import { capsuleAt, chainPathNodes, lastStepAtPoint, stackIndexes } from './chainPathLayout';
+import {
+  BADGE_DY,
+  badgeCount,
+  badgePulse,
+  groupByAnchor,
+  shownOrders,
+  type AnchoredOrder,
+} from './chainBadges';
+import {
+  RING_OFFSETS,
+  dropInAlpha,
+  pinPulse,
+  pingPhase,
+  ringAlpha,
+  ringProgress,
+  ringRadius,
+  ringWidth,
+} from './pingPulse';
 import { openingView, pickHome } from './openingView';
 import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from './registerForm';
 import {
@@ -491,6 +511,7 @@ import {
 import { resolveIntro, parseSeenIntros, type IntroCard } from './intros';
 // ONB-5 — return digest ("пока тебя не было"): aggregate the away-window event log.
 import { buildRecap, type RecapEvent } from './recap';
+import { briefSince, marksAway, splitByAttention, worthShowing } from './awayBrief';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -1332,6 +1353,13 @@ function sectorTypeOf(id: string) {
 function world(p: { x: number; y: number }): { x: number; y: number } {
   return camWorldToScreen(p, cam, insets(), mapBounds());
 }
+/** Convert a world-space distance (map units) to screen pixels at the current
+ *  camera. `worldToScreen` scales by `fitScale * cam.scale`, so a world-space
+ *  radius must be multiplied by the SAME factor to match on screen — using just
+ *  `cam.scale` (as the old code did) made circles too small by the fit-scale factor. */
+function worldDist(d: number): number {
+  return d * camFitTransform(insets(), mapBounds()).scale * cam.scale;
+}
 function visible(c: { x: number; y: number }, pad = 80): boolean {
   return c.x >= -pad && c.x <= VW + pad && c.y >= -pad && c.y <= VH + pad;
 }
@@ -1554,6 +1582,19 @@ function pumpBuildQueues(): void {
   }
 }
 function fleetPos(f: Fleet): { x: number; y: number } | null {
+  // Free-space movement (squadrons / missiles): position is interpolated from
+  // freePosition toward (targetX, targetY) — a straight line in space, not a lane.
+  if (f.freeMovement) {
+    const from = f.freePosition;
+    if (!from) return null;
+    const fm = f.freeMovement;
+    const prog = Math.min(1, Math.max(0, (s.time - fm.departedAt) / (fm.arrivesAt - fm.departedAt)));
+    return {
+      x: from.x + (fm.targetX - from.x) * prog,
+      y: from.y + (fm.targetY - from.y) * prog,
+    };
+  }
+  if (f.freePosition) return f.freePosition;
   if (f.location) return s.planets[f.location]?.position ?? null;
   // Parked at a continuous point ON a lane (stopped mid-march / marched to a point).
   if (f.edge) {
@@ -3636,7 +3677,7 @@ function drawCombatRanges(): void {
     if (ring.radius > 0) {
       cx.setLineDash([5, 7]);
       cx.beginPath();
-      cx.arc(c.x, c.y, ring.radius * cam.scale, 0, TAU);
+      cx.arc(c.x, c.y, worldDist(ring.radius), 0, TAU);
       cx.stroke();
     } else {
       // ПВО: у него нет области — только «у этого мира есть зубы».
@@ -3685,17 +3726,17 @@ function drawCastAim(): void {
   if (!origin) return;
   const reach = abilityRange(def);
   const aoe = Number(def.params?.radius ?? 0);
-  const far = reach > 0 && Math.hypot(aimPointer.x - origin.x, aimPointer.y - origin.y) > reach * cam.scale;
+  const far = reach > 0 && Math.hypot(aimPointer.x - origin.x, aimPointer.y - origin.y) > worldDist(reach);
   cx.save();
   if (reach > 0) {
     cx.strokeStyle = rgba(far ? CAST_FAR : CAST_REACH, 0.5);
     cx.lineWidth = 1.2;
     cx.setLineDash([6, 6]);
     cx.beginPath();
-    cx.arc(origin.x, origin.y, reach * cam.scale, 0, TAU);
+    cx.arc(origin.x, origin.y, worldDist(reach), 0, TAU);
     cx.stroke();
   }
-  if (aoe > 0) drawAbilityCircle(aimPointer.x, aimPointer.y, aoe * cam.scale, 0.14);
+  if (aoe > 0) drawAbilityCircle(aimPointer.x, aimPointer.y, worldDist(aoe), 0.14);
   cx.restore();
 }
 
@@ -3739,7 +3780,7 @@ function drawAbilityRings(): void {
       return p ? world(p) : null;
     },
   });
-  for (const r of rings) drawAbilityCircle(r.x, r.y, r.radius * cam.scale);
+  for (const r of rings) drawAbilityCircle(r.x, r.y, worldDist(r.radius));
 }
 
 /** While "Move" is armed: a dashed line from each selected fleet to the world under
@@ -4991,7 +5032,7 @@ function render(now: number) {
         cx.lineWidth = 1;
         cx.setLineDash([5, 5]);
         cx.beginPath();
-        cx.arc(A.x, A.y, aRange * cam.scale, 0, TAU);
+        cx.arc(A.x, A.y, worldDist(aRange), 0, TAU);
         cx.stroke();
         cx.setLineDash([]);
         const tf = f.barrageTarget ? s.fleets[f.barrageTarget] : undefined;
@@ -6550,9 +6591,9 @@ function openRecap(since: number): void {
   const el = document.getElementById('recap');
   if (!el) return;
   const r = buildRecap(eventLog, since);
-  if (!r.count) return; // nothing accrued — don't nag with an empty briefing
-  const hi = r.items.filter((i) => i.high);
-  const lo = r.items.filter((i) => !i.high);
+  // Политика показа — `awayBrief.ts` (REFM-74): пустой брифинг не нагружает, важное выше.
+  if (!worthShowing(r.count)) return;
+  const { hi, lo } = splitByAttention(r.items);
   let body = '';
   if (hi.length)
     body +=
@@ -6585,16 +6626,20 @@ document.getElementById('lw-recap')?.addEventListener('click', () => openRecap(0
 let awayAtRealMs = 0;
 document.addEventListener?.('visibilitychange', () => {
   if (document.hidden) {
-    if (inMatch()) {
+    if (marksAway(true, inMatch())) {
       awayFromGameTime = s.time;
       awayAtRealMs = Date.now();
     }
     return;
   }
-  if (awayFromGameTime == null || !inMatch()) return;
-  const since = awayFromGameTime;
-  awayFromGameTime = null;
-  if (Date.now() - awayAtRealMs < 15000) return; // a quick glance away — no briefing
+  const since = briefSince({
+    awayFromGameTime,
+    inMatch: inMatch(),
+    awayAtRealMs,
+    nowRealMs: Date.now(),
+  });
+  awayFromGameTime = null; // метка одноразовая: иначе второй возврат покажет то же ещё раз
+  if (since === null) return;
   // Give the frame loop a beat to catch the world up before we summarise it.
   window.setTimeout(() => {
     if (inMatch()) openRecap(since);
@@ -11500,27 +11545,26 @@ function drawPings(now: number): void {
     const x = c.x;
     const y = c.y - 22; // pin head floats above the node (плейтест: пинги крупнее)
     const col = ownerColor(m.from);
-    const phase = x * 0.05; // de-syncs neighbouring pins so they don't blink in unison
-    const pulse = 0.7 + 0.3 * Math.sin(now / 360 + phase);
+    // Фазы, дыхание и жизнь колец — `pingPulse.ts` (REFM-72).
+    const phase = pingPhase(x);
+    const pulse = pinPulse(now, phase);
     cx.save();
     // sonar waves: rings born at the node, growing and thinning out as they fade;
     // a newborn ring flashes a soft filled core so each wave visibly "drops in"
     cx.shadowColor = rgba(col, 0.7);
-    for (const off of [0, 0.5]) {
-      // 0 → 1 over one 2.2s period; double-mod keeps k positive when phase is
-      // negative (a pin near the screen's left edge has x < 0 → JS % keeps sign,
-      // and a negative k would feed cx.arc a negative radius = a thrown frame)
-      const k = (((now / 2200 + off + phase) % 1) + 1) % 1;
-      const rr = 6 + k * 40;
-      if (k < 0.18) {
-        cx.fillStyle = rgba(col, (1 - k / 0.18) * 0.28); // the drop-in flash
+    for (const off of RING_OFFSETS) {
+      const k = ringProgress(now, phase, off);
+      const rr = ringRadius(k);
+      const drop = dropInAlpha(k);
+      if (drop > 0) {
+        cx.fillStyle = rgba(col, drop); // the drop-in flash
         cx.beginPath();
         cx.arc(c.x, c.y, rr, 0, TAU);
         cx.fill();
       }
       cx.shadowBlur = fxBlur(6 * (1 - k));
-      cx.strokeStyle = rgba(col, (1 - k) * 0.8);
-      cx.lineWidth = 3.2 - k * 2.2;
+      cx.strokeStyle = rgba(col, ringAlpha(k));
+      cx.lineWidth = ringWidth(k);
       cx.beginPath();
       cx.arc(c.x, c.y, rr, 0, TAU);
       cx.stroke();
@@ -11573,15 +11617,9 @@ function drawChainPath(
   const tl = chainTimeline(steps, fromId, baseH, chainTravelH(f), chainAbilityHoldH([f.id]), headRemH);
   // Полилиния: от якоря флота по маршруту каждого перелёта (стиль drawFleetRoutes).
   const pts: Array<{ x: number; y: number }> = [start];
-  let cur = fromId;
-  for (const st of steps) {
-    if (st.kind !== 'move' || st.to === cur) continue;
-    const hops = chainRoute(cur, st.to) ?? [st.to];
-    for (const hop of hops) {
-      const pl = s.planets[hop];
-      if (pl) pts.push(world(pl.position));
-    }
-    cur = st.to;
+  for (const hop of chainPathNodes(steps, fromId, chainRoute)) {
+    const pl = s.planets[hop];
+    if (pl) pts.push(world(pl.position));
   }
   cx.save();
   cx.globalAlpha = alpha;
@@ -11599,19 +11637,19 @@ function drawChainPath(
     cx.shadowBlur = 0;
   }
   // Капсулы шагов: стопка вправо от точки; «~T» — под последней капсулой точки.
-  const seen = new Map<string, number>();
+  // Стопка капсул и место подписи «~T» — правила в `chainPathLayout.ts` (REFM-71).
+  const stack = stackIndexes(tl.map((r) => r.pointId));
+  const lastAt = lastStepAtPoint(tl.map((r) => r.pointId));
   const last = new Map<string, { x: number; y: number; endH: number | null }>();
   cx.textAlign = 'center';
   for (let i = 0; i < steps.length; i++) {
     const pid = tl[i]!.pointId;
     const pl = pid ? s.planets[pid] : undefined;
-    if (!pid || !pl) continue;
+    const k = stack[i];
+    if (!pid || !pl || k === null || k === undefined) continue;
     const c = world(pl.position);
-    const k = seen.get(pid) ?? 0;
-    seen.set(pid, k + 1);
     if (!visible(c)) continue;
-    const bx = c.x + 16 + k * 20;
-    const by = c.y - 16;
+    const { x: bx, y: by } = capsuleAt(c, k);
     cx.fillStyle = 'rgba(6,18,22,.92)';
     cx.strokeStyle = rgba(LOCK, 0.85);
     cx.lineWidth = 1.2;
@@ -11627,7 +11665,8 @@ function drawChainPath(
       cx.font = '600 8px ui-monospace,Menlo,monospace';
       cx.fillText(hrs, bx, by - 12);
     }
-    last.set(pid, { x: bx, y: by, endH: tl[i]!.endH });
+    // «~T» — под ПОСЛЕДНЕЙ капсулой точки: время точки это когда она отработана целиком.
+    if (lastAt.get(pid) === i) last.set(pid, { x: bx, y: by, endH: tl[i]!.endH });
   }
   cx.font = '600 9px ui-monospace,Menlo,monospace';
   for (const p of last.values()) {
@@ -11647,32 +11686,33 @@ function drawChainPath(
 function drawChainOverlay(now: number): void {
   chainHits = [];
   const col = ownerColor(ME);
-  const pulse = 0.55 + 0.45 * Math.sin(now / 260);
+  // Отбор, группировка и счётчик бейджа — `chainBadges.ts` (REFM-73).
+  const pulse = badgePulse(now);
   const orders = (s as { orders?: Record<string, { steps: ChainStep[]; waitUntil?: number }> })
     .orders;
   const editing = new Set(chainMode?.fleetIds ?? []);
-  const byWorld = new Map<string, string[]>();
+  // Порядок обхода — по id флота: бейджи не должны переставляться между кадрами.
+  const own: Array<{ fleetId: string; owner: string | null; fleet: Fleet }> = [];
   for (const fid of Object.keys(orders ?? {}).sort()) {
     const f = s.fleets[fid];
-    if (!f || f.owner !== ME || editing.has(fid)) continue;
-    const chain = orders![fid]!;
-    const st = chainStart(f);
-    const headRem =
-      chain.waitUntil !== undefined
-        ? Math.max(0, (chain.waitUntil - s.time) / HOUR)
-        : undefined;
-    drawChainPath(f, chain.steps, st.fromId, st.baseH, headRem, 0.5);
-    const anchor = draftFinish(chain.steps, st.fromId);
-    if (!anchor || !s.planets[anchor]) continue;
-    const arr = byWorld.get(anchor) ?? [];
-    if (!arr.length) byWorld.set(anchor, arr);
-    arr.push(fid);
+    if (f) own.push({ fleetId: fid, owner: f.owner, fleet: f });
   }
+  // Якорь считается только для показываемых планов — чужие кадр не нагружают.
+  const anchored: AnchoredOrder[] = shownOrders(own, ME, editing).map((e) => {
+    const chain = orders![e.fleetId]!;
+    const st = chainStart(e.fleet);
+    const headRem =
+      chain.waitUntil !== undefined ? Math.max(0, (chain.waitUntil - s.time) / HOUR) : undefined;
+    drawChainPath(e.fleet, chain.steps, st.fromId, st.baseH, headRem, 0.5);
+    const anchor = draftFinish(chain.steps, st.fromId);
+    return { fleetId: e.fleetId, anchor: anchor && s.planets[anchor] ? anchor : null };
+  });
+  const byWorld = groupByAnchor(anchored);
   for (const [wid, fids] of byWorld) {
     const c = world(s.planets[wid]!.position);
     if (!visible(c)) continue;
     const bx = c.x;
-    const by = c.y - 29;
+    const by = c.y + BADGE_DY;
     cx.save();
     cx.shadowColor = rgba(col, 0.8);
     cx.shadowBlur = fxBlur(3 + 6 * pulse);
@@ -11687,11 +11727,12 @@ function drawChainOverlay(now: number): void {
     cx.beginPath();
     cx.arc(bx, by, 2.6, 0, TAU);
     cx.stroke();
-    if (fids.length > 1) {
+    const count = badgeCount(fids.length);
+    if (count) {
       cx.fillStyle = rgba(col, 0.95);
       cx.font = '700 8px ui-monospace,monospace';
       cx.textAlign = 'center';
-      cx.fillText(String(fids.length), bx + 11, by - 5);
+      cx.fillText(count, bx + 11, by - 5);
     }
     cx.restore();
     chainHits.push({ target: wid, fleetIds: fids, x: bx, y: by });
