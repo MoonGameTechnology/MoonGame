@@ -524,6 +524,9 @@ import { dossierLevel, nextHover, showsBody } from './dossierHover';
 import { liftBy, opensNow } from './sheetLift';
 import { barStays, popoverLife } from './popoverLife';
 import { parseBuildAnchor, quickBuildOrder } from './quickBuild';
+import { isMine, seen, seenArc, seenTail } from './eventVisibility';
+import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from './simClock';
+import { armedTap } from './armedTap';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -2853,9 +2856,15 @@ function handleEvents(events: DomainEvent[]) {
     const p = e.payload as Record<string, unknown>;
     switch (e.type) {
       case 'battle.started':
-        // Fogged: a bots' brawl behind the fog is not our intel (NET already fogs
-        // events server-side; this matches it for the local sim).
-        if (p.attacker === ME || p.defender === ME || known(p.location as string))
+        // Видимость события — `eventVisibility.ts` (REFM-86): своё всегда, чужое только
+        // на опознанном узле. Сеть фогует события на сервере, и местная симуляция обязана
+        // повторять тот же фильтр — иначе соло показывает больше, чем сеть.
+        if (
+          seen(
+            isMine([p.attacker as string, p.defender as string], ME),
+            known(p.location as string),
+          )
+        )
           note(
             t('log.battle.start', {
               at: p.location as string,
@@ -2864,11 +2873,14 @@ function handleEvents(events: DomainEvent[]) {
             }),
             p.location as string,
           );
-        if (p.attacker === ME || p.defender === ME) myBattleLocs.add(p.location as string);
+        // Свой бой запоминается: его исход обязан доехать до журнала, даже если узел
+        // уйдёт под туман по ходу схватки (правило 3).
+        if (isMine([p.attacker as string, p.defender as string], ME))
+          myBattleLocs.add(p.location as string);
         break;
       case 'battle.resolved': {
         const loc = p.location as string;
-        if (myBattleLocs.has(loc) || known(loc)) {
+        if (seenTail(myBattleLocs.has(loc), known(loc))) {
           const losses = battleLosses.get(loc);
           const tally = losses
             ? Object.entries(losses)
@@ -3000,7 +3012,7 @@ function handleEvents(events: DomainEvent[]) {
         break;
       }
       case 'planet.captured':
-        if (p.owner === ME || known(p.planetId as string)) {
+        if (seen(isMine([p.owner as string], ME), known(p.planetId as string))) {
           note(
             t('log.capture', {
               who: NAME[p.owner as string] ?? (p.owner as string),
@@ -3168,7 +3180,9 @@ function handleEvents(events: DomainEvent[]) {
         // Fog: show the exchange only if either end sits on a node we can see.
         const shooterNode = shooter.location ?? shooter.edge?.from;
         const nearNode = (p.near as string) ?? '';
-        if (!(shooterNode && known(shooterNode)) && !known(nearNode)) break;
+        // Хватит опознанного конца — любого: залп по видимой цели замечаешь, даже не
+        // зная, откуда бьют (`eventVisibility.ts`, правило 4).
+        if (!seenArc(!!shooterNode && known(shooterNode), known(nearNode))) break;
         siegeShots.push({
           from: { ...from },
           to: { x: to.x, y: to.y },
@@ -3207,7 +3221,7 @@ function handleEvents(events: DomainEvent[]) {
           else killStats.destroyed += n;
         }
         // Ledger for the battle-result card (visible fights only).
-        if (myBattleLocs.has(p.at as string) || known(p.at as string)) {
+        if (seenTail(myBattleLocs.has(p.at as string), known(p.at as string))) {
           const at = p.at as string;
           const owner = (p.owner as string) ?? '?';
           const perOwner = battleLosses.get(at) ?? {};
@@ -7830,18 +7844,18 @@ function selectAt(mx: number, my: number) {
   // "friendly faction — declare war?" dialog. Anything else keeps the aim armed.
   if (owner === 'assault') {
     const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
-    if (!n) {
-      assaultAim = false; // empty space — cancel, like an armed move
-      lastPanelHtml = '';
+    const target = n ? s.planets[n.id] : undefined;
+    const capturable = !!n && (sectorTypeOf(n.id)?.capturable ?? false);
+    const ok = !!target && capturable && target.owner != null && target.owner !== ME;
+    // Судьба прицела — `armedTap.ts` (REFM-88). ШТУРМ единственный ПРОЩАЕТ неподходящую
+    // цель: промах по цели это не отказ от приказа, и переармировать после каждого
+    // неточного тыка в скопление миров — наказание за меткость пальца.
+    const fate = armedTap(!n ? 'none' : ok ? 'valid' : 'wrong', true);
+    if (fate === 'keep') {
+      note(t('hint.assault-enemy-only'));
       return;
     }
-    const target = s.planets[n.id];
-    const capturable = sectorTypeOf(n.id)?.capturable ?? false;
-    if (!target || !capturable || target.owner == null || target.owner === ME) {
-      note(t('hint.assault-enemy-only'));
-      return; // stay armed — pick another target
-    }
-    tryAssaultGroup(selectedFleetIds(), n.id);
+    if (fate === 'fire') tryAssaultGroup(selectedFleetIds(), n!.id);
     assaultAim = false;
     lastPanelHtml = '';
     return;
@@ -10904,14 +10918,17 @@ function frame(nowReal: number) {
   if (!backArmed && (topLayerOpen() || matchGuard)) armBack();
   const dt = nowReal - lastReal;
   lastReal = nowReal;
+  // Правдоподобие разрыва, ход мира и сдвиг времени — `simClock.ts` (REFM-87).
   // smooth FPS; ignore absurd gaps (tab backgrounded) so the readout stays sane
-  if (dt > 0 && dt < 1000) fpsEma = fpsEma * 0.9 + (1000 / dt) * 0.1;
-  if (!NET && speed > 0 && !banner && !endScreen) {
+  if (saneGap(dt)) fpsEma = fpsNext(fpsEma, dt);
+  if (simRuns(NET, speed, !!banner, !!endScreen)) {
     // Local single-player sim. In net mode the server owns the clock, combat,
     // construction and every rival — a connected human, or the server-side AI for
     // an empty seat — so we only render its snapshots (no local AI runs here).
     // A finished match (endScreen set) freezes the world — no advancing a decided game.
-    const target = s.time + (dt / 1000) * speed * HOUR;
+    // Время растёт от РЕАЛЬНОГО, помноженного на скорость: при просадке FPS мир идёт
+    // с той же быстротой, а не медленнее (правило 3).
+    const target = advanceTarget(s.time, dt, speed, HOUR);
     apply(advance(s, target));
     solo.autoEngage();
     pumpAssaultOrders();
@@ -10930,7 +10947,7 @@ function frame(nowReal: number) {
   updateGoals(); // ONB-7: tick the first-session checklist off live state (no-op when idle)
   // The orbit spin only advances while the world is actually running (sim ticking, or a
   // live net match), so pausing freezes the ships on their rings instead of drifting on.
-  if (dt > 0 && dt < 1000 && (NET || (speed > 0 && !banner))) orbitPhase += dt;
+  if (saneGap(dt) && spinRuns(NET, speed, !!banner)) orbitPhase += dt;
   pumpPendingLoads(); // fire ~1h cargo loads whose hour has elapsed (both modes)
   resolvePendingMerges(); // complete fleet merges whose movers have arrived
   // Итог матча приходит в ОБОИХ режимах (сетевые снимки несут его в `match`).
