@@ -520,6 +520,7 @@ import { stayingFleets, stripState } from './chainStripState';
 import { IDLE, consumeClick, mature, moveAway, press, release, type HoldState } from './holdPress';
 import { groundTypes, hasTroops, totalOf, troopSources } from './troopsSources';
 import { dossierLevel, nextHover, showsBody } from './dossierHover';
+import { liftBy, opensNow } from './sheetLift';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -6712,14 +6713,18 @@ function renderPanel() {
   document.body.classList.toggle('aim-mode', mapIsWorkspace(dock));
   // Phone: the bottom sheet covers ~50vh — when it OPENS, pan the camera so the
   // selected object is not the one thing the panel talks about yet hides.
-  if (open && !sheetWasOpen && MOBILE) {
+  // Момент открытия и величина подъёма — `sheetLift.ts` (REFM-83).
+  if (opensNow(open, sheetWasOpen, MOBILE)) {
+    // Выбран флот — якорь только его: лист говорит про флот, и уезжать к миру под ним
+    // неправильно. Негде нарисовать флот — камера остаётся на месте.
     const anchor = selFleet
       ? (s.fleets[selFleet] && fleetAnchor(s.fleets[selFleet]!)) || null
       : selPlanet && s.planets[selPlanet]
         ? world(s.planets[selPlanet]!.position)
         : null;
-    if (anchor && anchor.y > VH * 0.42) {
-      cam.y -= anchor.y - VH * 0.3; // lift it into the visible upper half
+    const dy = liftBy(anchor ? anchor.y : null, VH);
+    if (dy) {
+      cam.y -= dy;
       clampCam();
     }
   }
