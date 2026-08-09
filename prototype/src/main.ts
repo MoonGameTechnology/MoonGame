@@ -79,6 +79,7 @@ import {
   type ChainStep,
   type Patrol,
 } from './game';
+import { act as makeAction } from './actions';
 import {
   dominantUnit,
   unitArchetype,
@@ -733,6 +734,8 @@ let barrageAim = false; // "Обстрел" armed → next tap picks the artille
 // point the hero's ship rises at (own world / own fleet / allied world by markers).
 let heroAim: { heroId: string; abilityId: string } | null = null;
 let heroSpawnAim: string | null = null;
+// Squadron free-space strike armed → next tap on an enemy fleet sends squadron.strike
+let squadronStrikeAim: string | null = null;
 // CC-2 standing order: fleets whose owner opted into AUTO-STORM — they descend and assault
 // a hostile world on arrival by themselves (the AI's autoEngage capture loop, opted-in).
 const autoAssault = new Set<string>();
@@ -5378,6 +5381,18 @@ function fleetPanelHtml(f: Fleet): string {
     }
   }
 
+  // Squadron strike wing (a fleet split off from a carrier with homeBase) — free-space
+  // movement: strike an enemy in range, return to base, or toggle patrol (CC-4).
+  if (f.owner === ME && f.homeBase && fleetHasSquadron(f)) {
+    const isPatrol = !!patrolOf(f.id);
+    const canAct = !f.battleId && !f.freeMovement;
+    h += `<div class="sec">${t('side.wing.title')}</div><div class="row">`;
+    h += btn('squadronstrike', '', t('side.wing.strike'), canAct);
+    h += btn('squadronreturn', '', t('side.wing.return'), canAct && !!f.freePosition);
+    h += btn('squadronpatrol', '', isPatrol ? t('side.wing.patrol-on') : t('side.wing.patrol'), canAct);
+    h += `</div>`;
+  }
+
   // The player's projection hero rides here → name it and flag its fleet aura.
   if (f.units.some((u) => u.count > 0 && data.units[u.unit]?.traits.includes('hero'))) {
     const hero = Object.values(s.heroes ?? {}).find((x) => x.owner === f.owner);
@@ -6869,6 +6884,7 @@ function renderCmdBar() {
     if (aiming) aiming = false;
     if (assaultAim) assaultAim = false;
     if (merging) merging = false;
+    squadronStrikeAim = null;
     fireMenu = false; // пустое выделение — 🔥-меню не должно всплыть при новом выборе
     troopsPlan = null; // ⇵-меню тоже: иначе всплывёт над СЛЕДУЮЩИМ выбранным флотом
     cmdbar.classList.remove('show');
@@ -7258,6 +7274,26 @@ side.addEventListener('click', (ev) => {
       playerOrder(splitFleet(ME, f!.id, squadronTake(f!)));
       note(t('hint.squadron-launched'));
     }
+  } else if (act === 'squadronstrike') {
+    // Squadron free-space strike: arm the aim mode to pick an enemy fleet in range.
+    const f = selFleet ? s.fleets[selFleet] : undefined;
+    if (f && f.homeBase && !f.battleId && !f.freeMovement) {
+      squadronStrikeAim = selFleet;
+      note(t('hint.squadron-strike-aim'));
+    }
+  } else if (act === 'squadronreturn') {
+    // Squadron return to base: fly back to the carrier in free space.
+    const f = selFleet ? s.fleets[selFleet] : undefined;
+    if (f && f.homeBase && !f.battleId && !f.freeMovement) {
+      playerOrder(makeAction(ME, 'squadron.return', { fleetId: f.id }));
+      note(t('hint.squadron-returning'));
+    }
+  } else if (act === 'squadronpatrol') {
+    // Toggle CC-4 standing patrol for this squadron fleet.
+    const f = selFleet ? s.fleets[selFleet] : undefined;
+    if (f && f.homeBase && !f.battleId && !f.freeMovement) {
+      setScramble([f.id], !patrolOf(f.id));
+    }
   }
   lastPanelHtml = '';
   renderPanel();
@@ -7457,6 +7493,7 @@ cmdbar.addEventListener('click', (ev) => {
   if (cmd !== 'pick' && cmd !== 'more') pickMode = false;
   heroAim = null; // any command disarms a pending hero cast / deploy
   heroSpawnAim = null;
+  squadronStrikeAim = null; // any command disarms a pending squadron strike
   if (cmd === 'move') {
     aiming = !aiming; // arm / disarm the move order
     assaultAim = false;
@@ -7657,6 +7694,7 @@ function selectAt(mx: number, my: number) {
     assaultAim,
     pickMode,
     aiming,
+    squadronStrikeAim: !!squadronStrikeAim,
   });
   // Merge armed: the next tap on a friendly fleet (not itself in the selection) is
   // the anchor — the selected fleet(s) fly to it and fuse. Any other tap cancels.
@@ -7693,6 +7731,26 @@ function selectAt(mx: number, my: number) {
     if (targetId) note(t('hint.barrage-set'));
     else note(t('hint.barrage-auto'));
     barrageAim = false;
+    lastPanelHtml = '';
+    return;
+  }
+  // Squadron strike armed: the next tap on an enemy fleet sends squadron.strike
+  // (free-space flight to the target). A tap on empty space disarms.
+  if (owner === 'squadron-strike' && squadronStrikeAim) {
+    const target = nearestHit(
+      Object.values(s.fleets).filter((f) => f.owner !== ME),
+      fleetAnchor,
+      mx,
+      my,
+      rFleet,
+    );
+    if (target) {
+      playerOrder(makeAction(ME, 'squadron.strike', { fleetId: squadronStrikeAim, targetFleetId: target.id }));
+      note(t('hint.squadron-strike-sent'));
+    } else {
+      note(t('hint.squadron-strike-cancel'));
+    }
+    squadronStrikeAim = null;
     lastPanelHtml = '';
     return;
   }

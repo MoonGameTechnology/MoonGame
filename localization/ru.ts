@@ -731,6 +731,10 @@ export const ru: Record<string, string> = {
   'hint.pick-merge': '⛬ выберите флот для объединения',
   'hint.pick-order': 'тапните точку на карте — каждый тап добавляет приказ',
   'hint.squadron-launched': '🛩 эскадрилья запущена — ведите её на цель',
+  'hint.squadron-strike-aim': '🎯 тапните вражеский флот для удара эскадрильи',
+  'hint.squadron-strike-sent': '🎯 эскадрилья пошла на цель',
+  'hint.squadron-strike-cancel': 'удар отменён',
+  'hint.squadron-returning': '↩ эскадрилья возвращается на базу',
   'hint.standing-sortie': '🛩 дежурный вылет включён — эскадрилья бьёт врага в радиусе',
 
   // --- loadout — Оснащение корабля (packages/client): подписи характеристик в превью.
@@ -1706,6 +1710,9 @@ export const ru: Record<string, string> = {
   'side.wing.hint':
     'Отделяет эскадрильи в отдельный быстрый флот — уводите его на удар, а носитель остаётся в строю. Нужен хотя бы один не-эскадрильный корабль. Контрится орбитальным ПВО.',
   'side.wing.launch': '🛩 Запустить эскадрилью ({n})',
+  'side.wing.strike': '🎯 Удар',
+  'side.wing.return': '↩ Возврат',
+  'side.wing.patrol': '🛩 Патруль',
   'side.wing.patrol-on': '🛩 дежурный вылет: ВКЛ',
   'side.wing.radius': 'радиус {r}',
   'side.wing.rearming': 'перезарядка {n}',

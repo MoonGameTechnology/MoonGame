@@ -732,6 +732,10 @@ export const en: Record<string, string> = {
   'hint.pick-merge': '⛬ pick a fleet to merge with',
   'hint.pick-order': 'tap a point on the map — each tap adds an order',
   'hint.squadron-launched': '🛩 squadron launched — steer it onto the target',
+  'hint.squadron-strike-aim': '🎯 tap an enemy fleet to strike with the squadron',
+  'hint.squadron-strike-sent': '🎯 squadron is heading to the target',
+  'hint.squadron-strike-cancel': 'strike cancelled',
+  'hint.squadron-returning': '↩ squadron returning to base',
   'hint.standing-sortie': '🛩 standing patrol on — the wing strikes any enemy in range',
 
   // --- loadout — Ship loadout editor (packages/client): stat-preview labels.
@@ -1709,6 +1713,9 @@ export const en: Record<string, string> = {
   'side.wing.hint':
     'Splits the wing off into its own fast strike fleet — send it in while the carrier stays put. Needs at least one non-squadron ship left behind. Countered by orbital AA.',
   'side.wing.launch': '🛩 Launch squadron ({n})',
+  'side.wing.strike': '🎯 Strike',
+  'side.wing.return': '↩ Return',
+  'side.wing.patrol': '🛩 Patrol',
   'side.wing.patrol-on': '🛩 standing patrol: ON',
   'side.wing.radius': 'radius {r}',
   'side.wing.rearming': 'rearming {n}',
