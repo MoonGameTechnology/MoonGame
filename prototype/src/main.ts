@@ -5352,6 +5352,42 @@ function fleetPanelHtml(f: Fleet): string {
       : '—';
   // Fleet-card blurb removed (feedback: compact panel) — the header + stat chips carry it.
   h += `<div class="pstats"><span data-desc="stat:atk">⚔ ${t('side.stat.atk')} ${atk}</span><span data-desc="stat:def">🛡 ${t('side.stat.def')} ${def}</span><span data-desc="stat:cap">Ⅹ ${Math.min(nShips, COMBAT_UNIT_CAP)}/${COMBAT_UNIT_CAP}</span><span data-desc="stat:spd">⚡ ${t('side.stat.spd')} ${spdTxt}</span></div>`;
+
+  // Active effects (RPG-style buffs/debuffs) — a compact row of tags showing
+  // what's currently affecting this fleet: combat, forced march, patrol, flak,
+  // blackout, hunger, bombardment, point defense, free flight, barrage focus.
+  const effects: string[] = [];
+  if (f.battleId) effects.push(`⚔️ ${t('effect.in-battle')}`);
+  if (boosted) effects.push(`⚡ ${t('effect.forced-march')}`);
+  if (f.bombarding) effects.push(`⊗ ${t('effect.bombarding')}`);
+  if (f.barrageTarget) effects.push(`🎯 ${t('effect.barrage-focus')}`);
+  if (f.freeMovement) effects.push(`🛬 ${t('effect.free-flight')}`);
+  const pt = patrolOf(f.id);
+  if (pt) {
+    const fuel = pt.sortie.rearming > 0
+      ? t('effect.rearming', { n: pt.sortie.rearming })
+      : t('effect.fuel', { n: pt.sortie.fuel });
+    effects.push(`🛩 ${t('effect.patrol')} · ${fuel}`);
+  }
+  if (f.owner === ME) {
+    const arrears = s.players[ME]?.arrears ?? [];
+    if (arrears.includes('energy')) effects.push(`🌫 ${t('effect.blackout')}`);
+    if (arrears.includes('food') && nTr > 0) effects.push(`🍽 ${t('effect.hunger')}`);
+  }
+  // Point defense (from modules) — show if any ship has it
+  const pd = f.units.reduce((sum, st) => {
+    const def = data.units[st.unit];
+    if (!def || st.count <= 0) return sum;
+    const eff = effectiveStats(def, st, data);
+    return sum + (eff.pointDefense ?? 0) * st.count;
+  }, 0);
+  if (pd > 0) effects.push(`🛡 ${t('effect.point-defense', { n: pd })}`);
+  if (effects.length > 0) {
+    h += `<div class="sec">${t('effect.title')}</div><div class="row effects">`;
+    for (const e of effects) h += `<span class="effect-tag">${e}</span>`;
+    h += `</div>`;
+  }
+
   h += nShips ? `<div class="sec">${t('side.fleet.ships')}</div>` + fleetTilesHtml(f, f.units) : '';
   if (nTr > 0)
     h += `<div class="sec">${t('side.fleet.troops')}</div>` + fleetTilesHtml(f, f.landing ?? []);

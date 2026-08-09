@@ -924,6 +924,8 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
   background:transparent;border:1px solid #7a221c;color:var(--red);}
 .pstats{display:flex;gap:7px;flex-wrap:wrap;margin:2px 0 4px;}
 .pstats span{background:rgba(53,214,230,.06);border:1px solid var(--line);padding:4px 9px;font-size:11px;color:var(--ink);}
+.effects{display:flex;gap:5px;flex-wrap:wrap;margin:2px 0 4px;}
+.effect-tag{background:rgba(53,214,230,.04);border:1px solid var(--line-hi);padding:3px 8px;font-size:10px;color:var(--cyan-dim);border-radius:3px;white-space:nowrap;}
 .ptabs{display:flex;gap:6px;margin:10px 0 4px;flex-wrap:wrap;}
 .ptab{cursor:pointer;background:rgba(53,214,230,.04);border:1px solid var(--line);color:var(--cyan-dim);
   padding:6px 10px;font:700 10px ui-monospace,monospace;letter-spacing:1px;text-transform:uppercase;border-radius:2px;}
