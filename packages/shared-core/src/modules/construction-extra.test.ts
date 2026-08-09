@@ -362,8 +362,9 @@ describe('construction module — combat.damage hook phase guard', () => {
     return (r.events.find((e) => e.type === 'probe.result')?.payload as { dmg: number }).dmg;
   };
 
-  it('reduces GROUND damage by the standing defenseBonus (fort 0.5 → ÷1.5)', () => {
-    expect(damageVia('ground')).toBeCloseTo(100 / 1.5, 10);
+  it('reduces GROUND damage by the standing defenseBonus (fort 0.5 → ÷1.5) and per-building reduction (1 building = 1%)', () => {
+    // defenseBonus: 100 / 1.5 = 66.667; then 1 building = 1% reduction: 66.667 * 0.99 = 66.0
+    expect(damageVia('ground')).toBeCloseTo((100 / 1.5) * 0.99, 5);
   });
 
   it('does not apply the defense bonus in the orbital phase', () => {

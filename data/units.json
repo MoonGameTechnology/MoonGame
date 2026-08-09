@@ -188,6 +188,50 @@
       "credits": 4
     }
   },
+  "heavy_infantry": {
+    "faction": "vanguard",
+    "domain": "ground",
+    "stats": {
+      "attack": 20,
+      "defense": 16,
+      "speed": 0,
+      "hp": 35,
+      "cargoSize": 1
+    },
+    "line": "front",
+    "traits": [],
+    "abilities": [],
+    "signature": 1,
+    "cost": {
+      "metal": 90,
+      "credits": 30
+    },
+    "upkeep": {
+      "credits": 3
+    }
+  },
+  "special_forces": {
+    "faction": "vanguard",
+    "domain": "ground",
+    "stats": {
+      "attack": 30,
+      "defense": 12,
+      "speed": 0,
+      "hp": 28,
+      "cargoSize": 1
+    },
+    "line": "front",
+    "traits": [],
+    "abilities": [],
+    "signature": 1,
+    "cost": {
+      "metal": 120,
+      "credits": 50
+    },
+    "upkeep": {
+      "credits": 4
+    }
+  },
   "hero": {
     "faction": "vanguard",
     "stats": {

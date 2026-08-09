@@ -716,7 +716,19 @@ export const data: GameData = parseGameData({
         },
       ],
     },
-    barracks: { name: 'Barracks', cost: { metal: 70 }, buildTimeHours: 3, hp: 25, scoreValue: 2 },
+    barracks: {
+      name: 'Barracks',
+      cost: { metal: 70 },
+      buildTimeHours: 3,
+      hp: 25,
+      enablesGroundConstruction: true,
+      scoreValue: 2,
+      upgrades: [
+        { cost: { metal: 100, credits: 30 }, buildTimeHours: 6, hp: 35, enablesGroundConstruction: true, upkeep: { energy: 3 } },
+        { cost: { metal: 150, credits: 60 }, buildTimeHours: 9, hp: 45, enablesGroundConstruction: true, upkeep: { energy: 5 } },
+        { cost: { metal: 200, credits: 90 }, buildTimeHours: 12, hp: 60, enablesGroundConstruction: true, buildSpeedBonus: 0.05, upkeep: { energy: 7 } },
+      ],
+    },
     // Полевой госпиталь — единственный источник восстановления ГАРНИЗОНА: `healRate`
     // это доля полного HP, которую пехота мира отхиливает за игровой час
     // (constructionModule, обработчик `time.advanced`). Во время наземного штурма
@@ -731,17 +743,21 @@ export const data: GameData = parseGameData({
       healRate: 0.15,
       scoreValue: 4,
     },
-    // hangar bay — the facility a squadron-trait unit needs to be built and based
-    // (construction.ts `hasHangarBay`/`enablesSquadronConstruction`); no limit on
-    // how many squadrons a planet can base — the building is the gate, not capacity.
-    hangar_bay: {
-      name: 'Hangar Bay',
+    // Factory — builds ground vehicles (tank) and squadrons (fighter_squadron).
+    // enablesGroundConstruction + enablesSquadronConstruction: the gate for
+    // vehicle/squadron unit.build on this planet.
+    factory: {
+      name: 'Vehicle Factory',
       cost: { metal: 150, credits: 60 },
       buildTimeHours: 6,
       hp: 25,
-      enablesSquadronConstruction: true,
+      enablesGroundConstruction: true,
       scoreValue: 5,
       upkeep: { energy: 6 },
+      upgrades: [
+        { cost: { metal: 180, credits: 80 }, buildTimeHours: 8, hp: 35, enablesGroundConstruction: true, enablesSquadronConstruction: true, upkeep: { energy: 10 } },
+        { cost: { metal: 250, credits: 120 }, buildTimeHours: 12, hp: 45, enablesGroundConstruction: true, enablesSquadronConstruction: true, buildSpeedBonus: 0.5, upkeep: { energy: 14 } },
+      ],
     },
     // spaceport — the yard a space-domain hull needs to be laid down at all
     // (construction.ts `hasShipyard`/`enablesShipConstruction`); every homeworld
