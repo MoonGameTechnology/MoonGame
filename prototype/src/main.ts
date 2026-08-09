@@ -522,6 +522,8 @@ import { IDLE, consumeClick, mature, moveAway, press, release, type HoldState } 
 import { groundTypes, hasTroops, totalOf, troopSources } from './troopsSources';
 import { dossierLevel, nextHover, showsBody } from './dossierHover';
 import { liftBy, opensNow } from './sheetLift';
+import { barStays, popoverLife } from './popoverLife';
+import { parseBuildAnchor, quickBuildOrder } from './quickBuild';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -5808,9 +5810,9 @@ function planetPanelHtml(p: Planet): string {
     // открывает карточку кодекса с листалкой уровней и кнопкой «Улучшить» —
     // описание, апгрейд и «что даст следующий уровень» переехали туда из строк.
     if (p.buildings.length) {
-      // Разметку плитки собирает `catalogTile.ts` — там же решения подачи: имя
-      // подписано (иконка одна на вопрос «что это» не отвечает) и уровень показан
-      // ВСЕГДА, а не галочкой у зданий без апгрейдов.
+      // Разметку строки собирает `catalogTile.ts` — там же решения подачи: список идёт
+      // СТОЛБИКОМ (строка на здание), имя подписано (иконка одна на вопрос «что это» не
+      // отвечает) и уровень показан ВСЕГДА, коротким `L1`, а не галочкой.
       const tiles = p.buildings
         .map((b) =>
           builtTileHtml({
@@ -5821,7 +5823,7 @@ function planetPanelHtml(p: Planet): string {
           }),
         )
         .join('');
-      blds += `<div class="ptiles">${tiles}</div>`;
+      blds += `<div class="blist">${tiles}</div>`;
     }
     // Каталог непостроенного больше не живёт плитками в панели — его показывает
     // полноэкранное окно построек. Кнопка есть только там, где строить можно
@@ -6892,15 +6894,17 @@ function renderCmdBar() {
   }
   document.body.classList.remove('chain-mode');
   const ids = selectedFleetIds();
-  if (ids.length === 0 && !pickMode) {
-    // (pickMode keeps the bar alive at zero selection — the ⊕ toggle must stay
-    // reachable, or an emptied group would strand the player in the mode.)
+  // Время жизни ряда и поповеров — `popoverLife.ts` (REFM-84). Набор группы держит ряд
+  // живым и на нуле выделенных: ⊕ обязана остаться достижимой, иначе опустевшая группа
+  // запирает игрока в режиме без выхода.
+  if (!barStays(ids.length, pickMode)) {
     if (aiming) aiming = false;
     if (assaultAim) assaultAim = false;
     if (merging) merging = false;
     squadronStrikeAim = null;
     fireMenu = false; // пустое выделение — 🔥-меню не должно всплыть при новом выборе
     troopsPlan = null; // ⇵-меню тоже: иначе всплывёт над СЛЕДУЮЩИМ выбранным флотом
+    castMenu = false; // и ✨: оно тут забывалось, и повторный выбор открывал его сам
     cmdbar.classList.remove('show');
     lastCmdHtml = '';
     return;
@@ -6926,7 +6930,6 @@ function renderCmdBar() {
   const fmLabel = uniMode
     ? (FIRE_MODES.find((x) => x.m === uniMode)?.lbl ?? t('cmd.fire.title'))
     : t('cmd.fire.title');
-  if (artFleets.length === 0) fireMenu = false; // выделение без артиллерии — меню гаснет
   const docked = fleets.filter((f) => f.location && !f.movement && !f.battleId);
   // PC: ШТУРМ is a targeting command (fly there + storm on arrival) — armable
   // whenever the selection has ships. Mobile keeps the in-orbit-only button.
@@ -6961,7 +6964,6 @@ function renderCmdBar() {
   // GRND-1 ⇅ «Десант»: как и split, команда строго ОДНОФЛОТОВАЯ — гарнизон и трюм у
   // каждого свои, один клик на группу разослал бы приказы с разной арифметикой.
   const troopsIn = lone ? troopsInputFor(lone.id) : null;
-  if (troopsPlan && (!troopsIn || troopsPlan.fleetId !== lone?.id)) troopsPlan = null;
   // Artillery in the selection → offer the standoff-fire focus order.
   const anyArtillery = fleets.some(fleetHasArtillery);
   // Hero-flagship aboard a selected fleet → its castable abilities become a ✨ popover
@@ -6970,7 +6972,23 @@ function renderCmdBar() {
   const castHero = Object.values(s.heroes ?? {}).find(
     (hh) => heroAboard([hh], ids) !== null && castOptionsOf(hh).length > 0,
   );
-  if (!castHero) castMenu = false;
+  // Каждый поповер живёт ровно пока живо его основание — `popoverLife.ts` (REFM-84).
+  // Три проверки стояли порознь и только на вид были одинаковы: ⇅ привязан к КОНКРЕТНОМУ
+  // флоту, а не к «какому-нибудь одиночному», иначе он отправит чужой гарнизон.
+  const life = popoverLife(
+    {
+      selected: ids.length,
+      picking: pickMode,
+      artillery: artFleets.length,
+      castHero: !!castHero,
+      troopsInput: !!troopsIn,
+      loneId: lone?.id ?? null,
+    },
+    { fire: fireMenu, cast: castMenu, troopsFleetId: troopsPlan?.fleetId ?? null },
+  );
+  fireMenu = life.fire;
+  castMenu = life.cast;
+  if (!life.troops) troopsPlan = null;
   const html =
     `<span class="cmdlabel">${ids.length > 1 ? t('cmd.selection.many', { n: ids.length }) : t('cmd.selection.one')}</span>` +
     cmdBtn('move', '⤳', t('cmd.move'), aiming ? 'on' : '', false, t('cmd.move.hint')) +
@@ -7387,18 +7405,19 @@ side.addEventListener('contextmenu', (ev) => {
   const tile = (ev.target as HTMLElement).closest('[data-buildorder]') as HTMLElement | null;
   if (!tile) return;
   ev.preventDefault();
-  const [kind, id] = (tile.dataset.buildorder ?? '').split(':');
-  if (!kind || !id || !selPlanet) return;
-  const p = s.planets[selPlanet];
-  if (!p || p.owner !== ME) return;
-  if (kind === 'building') {
-    // mirror codexBuildBtn's gates: the sector must allow it, one copy per world —
-    // AND already-committed (built/building/queued/paused), to stop a fast double
-    // right-click from queueing a second copy before the tile re-renders locked.
-    const buildable = (sectorTypeOf(p.id)?.allowedBuildings ?? BUILDABLE).includes(id);
-    if (!buildable || buildingLocked(p.id, id)) return;
-  }
-  enqueueBuild(selPlanet, { kind: kind as BuildKind, id, count: 1 });
+  // Гейты быстрого заказа — `quickBuild.ts` (REFM-85). Они зеркалят те же проверки, что
+  // делает кнопка «Построить здесь»: правый клик обходит окно подтверждения, но не их.
+  const p = selPlanet ? s.planets[selPlanet] : undefined;
+  const anchorId = parseBuildAnchor(tile.dataset.buildorder)?.id;
+  const order = quickBuildOrder(tile.dataset.buildorder, {
+    worldOwner: p?.owner ?? null,
+    me: ME,
+    sectorAllows:
+      !!p && !!anchorId && (sectorTypeOf(p.id)?.allowedBuildings ?? BUILDABLE).includes(anchorId),
+    locked: !!p && !!anchorId && !!buildingLocked(p.id, anchorId),
+  });
+  if (!order || !selPlanet) return;
+  enqueueBuild(selPlanet, { kind: order.kind as BuildKind, id: order.id, count: 1 });
   lastPanelHtml = '';
   renderPanel();
 });

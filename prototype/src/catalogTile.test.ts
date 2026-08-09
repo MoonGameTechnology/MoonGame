@@ -97,12 +97,25 @@ describe('плитка каталога — экранирование', () => {
   });
 });
 
-describe('плитка построенного здания', () => {
+describe('строка построенного здания', () => {
   const built = (over: Partial<Parameters<typeof builtTileHtml>[0]> = {}) =>
     builtTileHtml({ type: 'radar', level: 1, icon: '<i>⊚</i>', name: 'Radar Array', ...over });
 
   it('ИМЯ ПОДПИСАНО — одна иконка не отвечает на вопрос «что это»', () => {
     expect(built()).toContain('Radar Array');
+  });
+
+  it('ЭТО СТРОКА СПИСКА, А НЕ ПЛИТКА СЕТКИ: столбик не переносится и не растёт вширь', () => {
+    expect(built()).toContain('class="asset-row built"');
+    expect(built()).not.toContain('ptile');
+  });
+
+  it('иконка, имя и уровень идут одной строкой — уровень последний', () => {
+    // `Radar Array` встречается и в атрибуте `data-name`, поэтому сравниваем позиции
+    // ВИДИМОГО текста, а не первого вхождения подстроки.
+    const html = built();
+    expect(html.indexOf('bicon')).toBeLessThan(html.indexOf('<b>Radar Array</b>'));
+    expect(html.indexOf('<b>Radar Array</b>')).toBeLessThan(html.indexOf('>L1<'));
   });
 
   it('УРОВЕНЬ ПОКАЗАН ВСЕГДА, даже у здания без апгрейдов', () => {
@@ -111,7 +124,7 @@ describe('плитка построенного здания', () => {
     expect(built()).not.toContain('✓'); // галочка читалась как «готово», а не как уровень
   });
 
-  it('плитка ведёт в кодекс с текущим уровнем', () => {
+  it('строка ведёт в кодекс с текущим уровнем', () => {
     expect(built({ level: 2 })).toContain('data-codex="b:radar:2"');
     expect(built({ level: 2 })).toContain('data-desc="b:radar:2"');
   });
