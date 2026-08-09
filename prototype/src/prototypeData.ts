@@ -347,7 +347,7 @@ export const data: GameData = parseGameData({
     },
     cruiser: {
       faction: 'blue',
-      stats: { attack: 16, defense: 14, speed: 40, hp: 60, cargoCapacity: 5, pointDefense: 8 },
+      stats: { attack: 16, defense: 14, speed: 40, hp: 60, cargoCapacity: 5 },
       line: 'front',
       signature: 4, // big warship — broadcasts
       // ECON-7: modern warships need microelectronics — the hi-tech good gates a
@@ -533,6 +533,14 @@ export const data: GameData = parseGameData({
       tag: 'vertical',
       effects: { stats: { shield: 15 } },
       cost: { metal: 80 },
+      allowed: { domain: 'space' },
+    },
+    point_defense_array: {
+      name: 'Point Defense Array',
+      slot: 'defense',
+      tag: 'vertical',
+      effects: { stats: { pointDefense: 8 } },
+      cost: { metal: 50 },
       allowed: { domain: 'space' },
     },
   },

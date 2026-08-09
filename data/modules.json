@@ -46,5 +46,13 @@
     "effects": { "stats": { "shield": 15 } },
     "cost": { "metal": 80 },
     "allowed": { "domain": "space" }
+  },
+  "point_defense_array": {
+    "name": "Point Defense Array",
+    "slot": "defense",
+    "tag": "vertical",
+    "effects": { "stats": { "pointDefense": 8 } },
+    "cost": { "metal": 65 },
+    "allowed": { "domain": "space" }
   }
 }

@@ -550,6 +550,7 @@ export const ru: Record<string, string> = {
   'data.scout': 'разведчик',
   'data.sensor-frigate': 'сенсорный фрегат',
   'data.shield-booster': 'Тяжёлый щит',
+  'data.point-defense-array': 'Точечная оборона',
   'data.siege-doctrine': 'Осадная доктрина',
   'data.siege': 'осадная платформа',
   'data.signal-corps': 'Войска связи',

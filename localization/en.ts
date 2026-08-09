@@ -550,6 +550,7 @@ export const en: Record<string, string> = {
   'data.scout': 'scout',
   'data.sensor-frigate': 'sensor frigate',
   'data.shield-booster': 'Shield Booster',
+  'data.point-defense-array': 'Point Defense Array',
   'data.siege-doctrine': 'Siege Doctrine',
   'data.siege': 'siege',
   'data.signal-corps': 'Signal Corps',
