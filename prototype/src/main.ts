@@ -525,6 +525,7 @@ import { barStays, popoverLife } from './popoverLife';
 import { parseBuildAnchor, quickBuildOrder } from './quickBuild';
 import { isMine, seen, seenArc, seenTail } from './eventVisibility';
 import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from './simClock';
+import { armedTap } from './armedTap';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -7834,18 +7835,18 @@ function selectAt(mx: number, my: number) {
   // "friendly faction — declare war?" dialog. Anything else keeps the aim armed.
   if (owner === 'assault') {
     const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
-    if (!n) {
-      assaultAim = false; // empty space — cancel, like an armed move
-      lastPanelHtml = '';
+    const target = n ? s.planets[n.id] : undefined;
+    const capturable = !!n && (sectorTypeOf(n.id)?.capturable ?? false);
+    const ok = !!target && capturable && target.owner != null && target.owner !== ME;
+    // Судьба прицела — `armedTap.ts` (REFM-88). ШТУРМ единственный ПРОЩАЕТ неподходящую
+    // цель: промах по цели это не отказ от приказа, и переармировать после каждого
+    // неточного тыка в скопление миров — наказание за меткость пальца.
+    const fate = armedTap(!n ? 'none' : ok ? 'valid' : 'wrong', true);
+    if (fate === 'keep') {
+      note(t('hint.assault-enemy-only'));
       return;
     }
-    const target = s.planets[n.id];
-    const capturable = sectorTypeOf(n.id)?.capturable ?? false;
-    if (!target || !capturable || target.owner == null || target.owner === ME) {
-      note(t('hint.assault-enemy-only'));
-      return; // stay armed — pick another target
-    }
-    tryAssaultGroup(selectedFleetIds(), n.id);
+    if (fate === 'fire') tryAssaultGroup(selectedFleetIds(), n!.id);
     assaultAim = false;
     lastPanelHtml = '';
     return;
