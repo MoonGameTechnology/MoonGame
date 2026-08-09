@@ -521,6 +521,7 @@ import { IDLE, consumeClick, mature, moveAway, press, release, type HoldState } 
 import { groundTypes, hasTroops, totalOf, troopSources } from './troopsSources';
 import { dossierLevel, nextHover, showsBody } from './dossierHover';
 import { liftBy, opensNow } from './sheetLift';
+import { barStays, popoverLife } from './popoverLife';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -6883,15 +6884,17 @@ function renderCmdBar() {
   }
   document.body.classList.remove('chain-mode');
   const ids = selectedFleetIds();
-  if (ids.length === 0 && !pickMode) {
-    // (pickMode keeps the bar alive at zero selection — the ⊕ toggle must stay
-    // reachable, or an emptied group would strand the player in the mode.)
+  // Время жизни ряда и поповеров — `popoverLife.ts` (REFM-84). Набор группы держит ряд
+  // живым и на нуле выделенных: ⊕ обязана остаться достижимой, иначе опустевшая группа
+  // запирает игрока в режиме без выхода.
+  if (!barStays(ids.length, pickMode)) {
     if (aiming) aiming = false;
     if (assaultAim) assaultAim = false;
     if (merging) merging = false;
     squadronStrikeAim = null;
     fireMenu = false; // пустое выделение — 🔥-меню не должно всплыть при новом выборе
     troopsPlan = null; // ⇵-меню тоже: иначе всплывёт над СЛЕДУЮЩИМ выбранным флотом
+    castMenu = false; // и ✨: оно тут забывалось, и повторный выбор открывал его сам
     cmdbar.classList.remove('show');
     lastCmdHtml = '';
     return;
@@ -6917,7 +6920,6 @@ function renderCmdBar() {
   const fmLabel = uniMode
     ? (FIRE_MODES.find((x) => x.m === uniMode)?.lbl ?? t('cmd.fire.title'))
     : t('cmd.fire.title');
-  if (artFleets.length === 0) fireMenu = false; // выделение без артиллерии — меню гаснет
   const docked = fleets.filter((f) => f.location && !f.movement && !f.battleId);
   // PC: ШТУРМ is a targeting command (fly there + storm on arrival) — armable
   // whenever the selection has ships. Mobile keeps the in-orbit-only button.
@@ -6952,7 +6954,6 @@ function renderCmdBar() {
   // GRND-1 ⇅ «Десант»: как и split, команда строго ОДНОФЛОТОВАЯ — гарнизон и трюм у
   // каждого свои, один клик на группу разослал бы приказы с разной арифметикой.
   const troopsIn = lone ? troopsInputFor(lone.id) : null;
-  if (troopsPlan && (!troopsIn || troopsPlan.fleetId !== lone?.id)) troopsPlan = null;
   // Artillery in the selection → offer the standoff-fire focus order.
   const anyArtillery = fleets.some(fleetHasArtillery);
   // Hero-flagship aboard a selected fleet → its castable abilities become a ✨ popover
@@ -6961,7 +6962,23 @@ function renderCmdBar() {
   const castHero = Object.values(s.heroes ?? {}).find(
     (hh) => heroAboard([hh], ids) !== null && castOptionsOf(hh).length > 0,
   );
-  if (!castHero) castMenu = false;
+  // Каждый поповер живёт ровно пока живо его основание — `popoverLife.ts` (REFM-84).
+  // Три проверки стояли порознь и только на вид были одинаковы: ⇅ привязан к КОНКРЕТНОМУ
+  // флоту, а не к «какому-нибудь одиночному», иначе он отправит чужой гарнизон.
+  const life = popoverLife(
+    {
+      selected: ids.length,
+      picking: pickMode,
+      artillery: artFleets.length,
+      castHero: !!castHero,
+      troopsInput: !!troopsIn,
+      loneId: lone?.id ?? null,
+    },
+    { fire: fireMenu, cast: castMenu, troopsFleetId: troopsPlan?.fleetId ?? null },
+  );
+  fireMenu = life.fire;
+  castMenu = life.cast;
+  if (!life.troops) troopsPlan = null;
   const html =
     `<span class="cmdlabel">${ids.length > 1 ? t('cmd.selection.many', { n: ids.length }) : t('cmd.selection.one')}</span>` +
     cmdBtn('move', '⤳', t('cmd.move'), aiming ? 'on' : '', false, t('cmd.move.hint')) +
