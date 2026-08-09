@@ -526,6 +526,7 @@ import { parseBuildAnchor, quickBuildOrder } from './quickBuild';
 import { isMine, seen, seenArc, seenTail } from './eventVisibility';
 import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from './simClock';
 import { armedTap } from './armedTap';
+import { showsBlackout, showsStarving } from './arrearsWarnings';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -5314,10 +5315,11 @@ function fleetPanelHtml(f: Fleet): string {
   const pct = hullPct(hull);
   const hullTag = pct < LIMP_PCT ? ` · ⚠ ${t('side.fleet.hull-tag', { p: pct })}` : '';
   // ECON-1: голодный десант — владелец в food-arrears бьёт на земле на −25%.
-  const hungry =
-    nTr > 0 && f.owner === ME && (s.players[ME]?.arrears ?? []).includes('food')
-      ? ` · 🍽 ${t('side.fleet.hunger')}`
-      : '';
+  // Правила пометок о долгах — `arrearsWarnings.ts` (REFM-89): только своё и только
+  // там, где есть кому голодать.
+  const hungry = showsStarving(f.owner === ME, nTr, s.players[ME]?.arrears)
+    ? ` · 🍽 ${t('side.fleet.hunger')}`
+    : '';
   // Bytro-стиль: авто-имя соединения (тип по размеру + позывной), тап → сводка.
   const fleetTitle = `${t(fleetKindKey(nShips))} «${fleetCallsign(f.id)}»`;
   let h = cardHeader(
@@ -5668,7 +5670,8 @@ function planetPanelHtml(p: Planet): string {
     header +
     `<div class="pstats"><span data-desc="stat:garrison">⚔ ${gcount} <span class="pl">${t('side.world.stat.garrison')}</span></span><span data-desc="stat:ground">${unitIcon('heavy_infantry', data)} ${sumUnits(ground)} <span class="pl">${t('side.world.count.ground')}</span></span><span data-desc="stat:gships">${unitIcon('cruiser', data)} ${sumUnits(ships)} <span class="pl">${t('side.world.count.ships')}</span></span><span data-desc="stat:pbuild">▣ ${p.buildings.length} <span class="pl">${t('side.world.count.buildings')}</span></span></div>`;
   // ECON-2: блэкаут — неоплаченная энергия глушит радары и ПВО этого владельца вдвое.
-  if (mine && (s.players[ME]?.arrears ?? []).includes('energy')) {
+  // Блэкаут — свойство ВЛАДЕЛЬЦА, а не этого мира (`arrearsWarnings.ts`, REFM-89).
+  if (showsBlackout(mine, s.players[ME]?.arrears)) {
     h += `<div class="row" style="color:var(--red)">⚡ ${t('side.world.blackout')}</div>`;
   }
   if (pt && (pt.productionBonus !== 0 || pt.defenseBonus !== 0)) {
@@ -5738,10 +5741,9 @@ function planetPanelHtml(p: Planet): string {
     // ЗЕМЛЯ tab's hover dossier, 'tab:ground'). Mobile keeps the original row list
     // and bottom hint untouched.
     // ECON-1: голодный гарнизон — владелец мира в food-arrears теряет 25% на земле.
-    const starving =
-      p.owner === ME && ground.length > 0 && (s.players[ME]?.arrears ?? []).includes('food')
-        ? `<div class="row" style="color:var(--red)">🍽 ${t('side.fleet.hunger')}</div>`
-        : '';
+    const starving = showsStarving(p.owner === ME, ground.length, s.players[ME]?.arrears)
+      ? `<div class="row" style="color:var(--red)">🍽 ${t('side.fleet.hunger')}</div>`
+      : '';
     cols.push(
       `<div class="sec">${t('side.ground.units')}</div>` +
         starving +
