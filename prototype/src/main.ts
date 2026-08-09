@@ -527,6 +527,8 @@ import { parseBuildAnchor, quickBuildOrder } from './quickBuild';
 import { isMine, seen, seenArc, seenTail } from './eventVisibility';
 import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from './simClock';
 import { armedTap } from './armedTap';
+import { showsBlackout, showsStarving } from './arrearsWarnings';
+import { canDockRepair, canRepair } from './repairOffer';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -5323,10 +5325,11 @@ function fleetPanelHtml(f: Fleet): string {
   const pct = hullPct(hull);
   const hullTag = pct < LIMP_PCT ? ` · ⚠ ${t('side.fleet.hull-tag', { p: pct })}` : '';
   // ECON-1: голодный десант — владелец в food-arrears бьёт на земле на −25%.
-  const hungry =
-    nTr > 0 && f.owner === ME && (s.players[ME]?.arrears ?? []).includes('food')
-      ? ` · 🍽 ${t('side.fleet.hunger')}`
-      : '';
+  // Правила пометок о долгах — `arrearsWarnings.ts` (REFM-89): только своё и только
+  // там, где есть кому голодать.
+  const hungry = showsStarving(f.owner === ME, nTr, s.players[ME]?.arrears)
+    ? ` · 🍽 ${t('side.fleet.hunger')}`
+    : '';
   // Bytro-стиль: авто-имя соединения (тип по размеру + позывной), тап → сводка.
   const fleetTitle = `${t(fleetKindKey(nShips))} «${fleetCallsign(f.id)}»`;
   let h = cardHeader(
@@ -5346,16 +5349,18 @@ function fleetPanelHtml(f: Fleet): string {
   // ХП-бар Bytro-стиля + два ремонта: ECON-3а — экспресс за METAL у своего дока
   // (дешёвый, основной), и ненавязчивый платный за кредиты — где угодно вне боя
   // (цены — те же формулы, что в гейте).
+  // Условия обеих кнопок — `repairOffer.ts` (REFM-90): общая часть «свой, вне боя, есть
+  // что чинить» одна на два ремонта, а привязка к доку — только у экспресса за металл.
   const repairCost = instantRepairCost(f, data);
-  const canRepair = f.owner === ME && !f.battleId && repairCost > 0;
-  const atDock = canRepair && fleetAtOwnDock(f, s, data);
+  const repairable = canRepair(f.owner === ME, !!f.battleId, repairCost);
+  const atDock = canDockRepair(repairable, fleetAtOwnDock(f, s, data));
   if (hull.max > 0) {
     h += `<div class="row hullrow" data-desc="stat:hull"><span class="hico">♥</span><span class="hbar${pct < LIMP_PCT ? ' low' : ''}"><i style="width:${pct}%"></i></span><b>${kfmt(hull.cur)}/${kfmt(hull.max)}</b>${
       atDock
         ? `<button class="chip-metal" data-act="dockrepair" data-arg="${f.id}" title="${t('side.fleet.repair.dock.title')}">🔧 <span class="rc-metal">${dockRepairCost(f, data)}❒</span></button>`
         : ''
     }${
-      canRepair
+      repairable
         ? `<button class="chip-gold" data-act="instantrepair" data-arg="${f.id}" title="${t('side.fleet.repair.instant.title')}">🔧 ${repairCost}💰</button>`
         : ''
     }</div>`;
@@ -5677,7 +5682,8 @@ function planetPanelHtml(p: Planet): string {
     header +
     `<div class="pstats"><span data-desc="stat:garrison">⚔ ${gcount} <span class="pl">${t('side.world.stat.garrison')}</span></span><span data-desc="stat:ground">${unitIcon('heavy_infantry', data)} ${sumUnits(ground)} <span class="pl">${t('side.world.count.ground')}</span></span><span data-desc="stat:gships">${unitIcon('cruiser', data)} ${sumUnits(ships)} <span class="pl">${t('side.world.count.ships')}</span></span><span data-desc="stat:pbuild">▣ ${p.buildings.length} <span class="pl">${t('side.world.count.buildings')}</span></span></div>`;
   // ECON-2: блэкаут — неоплаченная энергия глушит радары и ПВО этого владельца вдвое.
-  if (mine && (s.players[ME]?.arrears ?? []).includes('energy')) {
+  // Блэкаут — свойство ВЛАДЕЛЬЦА, а не этого мира (`arrearsWarnings.ts`, REFM-89).
+  if (showsBlackout(mine, s.players[ME]?.arrears)) {
     h += `<div class="row" style="color:var(--red)">⚡ ${t('side.world.blackout')}</div>`;
   }
   if (pt && (pt.productionBonus !== 0 || pt.defenseBonus !== 0)) {
@@ -5747,10 +5753,9 @@ function planetPanelHtml(p: Planet): string {
     // ЗЕМЛЯ tab's hover dossier, 'tab:ground'). Mobile keeps the original row list
     // and bottom hint untouched.
     // ECON-1: голодный гарнизон — владелец мира в food-arrears теряет 25% на земле.
-    const starving =
-      p.owner === ME && ground.length > 0 && (s.players[ME]?.arrears ?? []).includes('food')
-        ? `<div class="row" style="color:var(--red)">🍽 ${t('side.fleet.hunger')}</div>`
-        : '';
+    const starving = showsStarving(p.owner === ME, ground.length, s.players[ME]?.arrears)
+      ? `<div class="row" style="color:var(--red)">🍽 ${t('side.fleet.hunger')}</div>`
+      : '';
     cols.push(
       `<div class="sec">${t('side.ground.units')}</div>` +
         starving +
