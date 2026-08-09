@@ -529,6 +529,7 @@ import { armedTap } from './armedTap';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
 import { canDockRepair, canRepair } from './repairOffer';
 import { capitalOffer, holdOffer } from './worldOrders';
+import { spyOffer, windowLeftH } from './spyOffer';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -5720,18 +5721,17 @@ function planetPanelHtml(p: Planet): string {
 
   // Espionage: steal a 24h intel window on this enemy world (SPY-1). While a
   // window lives its countdown replaces the button — the node stays identified.
-  if (!mine && p.owner) {
+  {
     const live = myIntel().find((g) => g.kind === 'planet' && g.target === p.id);
-    h += `<div class="row">${
-      live
-        ? `<b style="color:var(--cyan)">${t('side.world.spy-window')}</b> <span class="dim">${t('side.world.spy-window.left', { left: fmtEta(Math.max(0, live.until - s.time) / HOUR) })}</span>`
-        : btn(
-            'spyplanet',
-            p.owner,
-            t('side.scan.spy', { c: SPY_COST }),
-            afford({ credits: SPY_COST }),
-          )
-    }</div>`;
+    // Кому и что предлагаем — `spyOffer.ts` (REFM-92): свой и ничейный мир не шпионят,
+    // живое окно показывает отсчёт вместо кнопки, а нехватка кредитов кнопку гасит, но
+    // не прячет — цена должна остаться на виду.
+    const spy = spyOffer(mine, !!p.owner, !!live, afford({ credits: SPY_COST }));
+    if (spy === 'window' && live) {
+      h += `<div class="row"><b style="color:var(--cyan)">${t('side.world.spy-window')}</b> <span class="dim">${t('side.world.spy-window.left', { left: fmtEta(windowLeftH(live.until, s.time, HOUR)) })}</span></div>`;
+    } else if (spy !== 'none') {
+      h += `<div class="row">${btn('spyplanet', p.owner ?? '', t('side.scan.spy', { c: SPY_COST }), spy === 'buy')}</div>`;
+    }
   }
 
   h += `<div class="ptabs">${tabButton('ground', t('side.tab.ground'), counts.ground, 'tab:ground')}${tabButton(
