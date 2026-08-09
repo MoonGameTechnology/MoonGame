@@ -523,6 +523,7 @@ import { dossierLevel, nextHover, showsBody } from './dossierHover';
 import { liftBy, opensNow } from './sheetLift';
 import { barStays, popoverLife } from './popoverLife';
 import { parseBuildAnchor, quickBuildOrder } from './quickBuild';
+import { isMine, seen, seenArc, seenTail } from './eventVisibility';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -2844,9 +2845,15 @@ function handleEvents(events: DomainEvent[]) {
     const p = e.payload as Record<string, unknown>;
     switch (e.type) {
       case 'battle.started':
-        // Fogged: a bots' brawl behind the fog is not our intel (NET already fogs
-        // events server-side; this matches it for the local sim).
-        if (p.attacker === ME || p.defender === ME || known(p.location as string))
+        // Видимость события — `eventVisibility.ts` (REFM-86): своё всегда, чужое только
+        // на опознанном узле. Сеть фогует события на сервере, и местная симуляция обязана
+        // повторять тот же фильтр — иначе соло показывает больше, чем сеть.
+        if (
+          seen(
+            isMine([p.attacker as string, p.defender as string], ME),
+            known(p.location as string),
+          )
+        )
           note(
             t('log.battle.start', {
               at: p.location as string,
@@ -2855,11 +2862,14 @@ function handleEvents(events: DomainEvent[]) {
             }),
             p.location as string,
           );
-        if (p.attacker === ME || p.defender === ME) myBattleLocs.add(p.location as string);
+        // Свой бой запоминается: его исход обязан доехать до журнала, даже если узел
+        // уйдёт под туман по ходу схватки (правило 3).
+        if (isMine([p.attacker as string, p.defender as string], ME))
+          myBattleLocs.add(p.location as string);
         break;
       case 'battle.resolved': {
         const loc = p.location as string;
-        if (myBattleLocs.has(loc) || known(loc)) {
+        if (seenTail(myBattleLocs.has(loc), known(loc))) {
           const losses = battleLosses.get(loc);
           const tally = losses
             ? Object.entries(losses)
@@ -2991,7 +3001,7 @@ function handleEvents(events: DomainEvent[]) {
         break;
       }
       case 'planet.captured':
-        if (p.owner === ME || known(p.planetId as string)) {
+        if (seen(isMine([p.owner as string], ME), known(p.planetId as string))) {
           note(
             t('log.capture', {
               who: NAME[p.owner as string] ?? (p.owner as string),
@@ -3159,7 +3169,9 @@ function handleEvents(events: DomainEvent[]) {
         // Fog: show the exchange only if either end sits on a node we can see.
         const shooterNode = shooter.location ?? shooter.edge?.from;
         const nearNode = (p.near as string) ?? '';
-        if (!(shooterNode && known(shooterNode)) && !known(nearNode)) break;
+        // Хватит опознанного конца — любого: залп по видимой цели замечаешь, даже не
+        // зная, откуда бьют (`eventVisibility.ts`, правило 4).
+        if (!seenArc(!!shooterNode && known(shooterNode), known(nearNode))) break;
         siegeShots.push({
           from: { ...from },
           to: { x: to.x, y: to.y },
@@ -3198,7 +3210,7 @@ function handleEvents(events: DomainEvent[]) {
           else killStats.destroyed += n;
         }
         // Ledger for the battle-result card (visible fights only).
-        if (myBattleLocs.has(p.at as string) || known(p.at as string)) {
+        if (seenTail(myBattleLocs.has(p.at as string), known(p.at as string))) {
           const at = p.at as string;
           const owner = (p.owner as string) ?? '?';
           const perOwner = battleLosses.get(at) ?? {};
