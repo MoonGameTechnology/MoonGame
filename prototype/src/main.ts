@@ -522,6 +522,7 @@ import { groundTypes, hasTroops, totalOf, troopSources } from './troopsSources';
 import { dossierLevel, nextHover, showsBody } from './dossierHover';
 import { liftBy, opensNow } from './sheetLift';
 import { barStays, popoverLife } from './popoverLife';
+import { parseBuildAnchor, quickBuildOrder } from './quickBuild';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -7395,18 +7396,19 @@ side.addEventListener('contextmenu', (ev) => {
   const tile = (ev.target as HTMLElement).closest('[data-buildorder]') as HTMLElement | null;
   if (!tile) return;
   ev.preventDefault();
-  const [kind, id] = (tile.dataset.buildorder ?? '').split(':');
-  if (!kind || !id || !selPlanet) return;
-  const p = s.planets[selPlanet];
-  if (!p || p.owner !== ME) return;
-  if (kind === 'building') {
-    // mirror codexBuildBtn's gates: the sector must allow it, one copy per world —
-    // AND already-committed (built/building/queued/paused), to stop a fast double
-    // right-click from queueing a second copy before the tile re-renders locked.
-    const buildable = (sectorTypeOf(p.id)?.allowedBuildings ?? BUILDABLE).includes(id);
-    if (!buildable || buildingLocked(p.id, id)) return;
-  }
-  enqueueBuild(selPlanet, { kind: kind as BuildKind, id, count: 1 });
+  // Гейты быстрого заказа — `quickBuild.ts` (REFM-85). Они зеркалят те же проверки, что
+  // делает кнопка «Построить здесь»: правый клик обходит окно подтверждения, но не их.
+  const p = selPlanet ? s.planets[selPlanet] : undefined;
+  const anchorId = parseBuildAnchor(tile.dataset.buildorder)?.id;
+  const order = quickBuildOrder(tile.dataset.buildorder, {
+    worldOwner: p?.owner ?? null,
+    me: ME,
+    sectorAllows:
+      !!p && !!anchorId && (sectorTypeOf(p.id)?.allowedBuildings ?? BUILDABLE).includes(anchorId),
+    locked: !!p && !!anchorId && !!buildingLocked(p.id, anchorId),
+  });
+  if (!order || !selPlanet) return;
+  enqueueBuild(selPlanet, { kind: order.kind as BuildKind, id: order.id, count: 1 });
   lastPanelHtml = '';
   renderPanel();
 });
