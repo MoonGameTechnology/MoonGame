@@ -351,7 +351,33 @@
     "hp": 20,
     "healRate": 0.15,
     "scoreValue": 8,
-    "traits": []
+    "traits": [],
+    "upgrades": [
+      {
+        "cost": {
+          "metal": 220,
+          "credits": 80
+        },
+        "buildTimeHours": 12,
+        "hp": 30,
+        "healRate": 0.25,
+        "upkeep": {
+          "energy": 6
+        }
+      },
+      {
+        "cost": {
+          "metal": 300,
+          "credits": 120
+        },
+        "buildTimeHours": 18,
+        "hp": 40,
+        "healRate": 0.40,
+        "upkeep": {
+          "energy": 10
+        }
+      }
+    ]
   },
   "factory": {
     "name": "Vehicle Factory",

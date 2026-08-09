@@ -220,7 +220,7 @@ describe('codex — карточка полной информации', () => {
     expect(l2).not.toBe(l1); // цифры уровня действительно другие
     expect(l2).toContain('140'); // цена АПГРЕЙДА (L2), а не входа
     // у одноуровневого здания листалки нет — «I» в одиночестве ничего не листает
-    expect(codexHtml('b', 'hospital', 1)).not.toContain('cx-lvls');
+    expect(codexHtml('b', 'spaceport', 1)).not.toContain('cx-lvls');
   });
 
   it('уровень за пределами каталога клампится, а не ломает карточку', () => {

@@ -750,6 +750,10 @@ export const data: GameData = parseGameData({
       hp: 22,
       healRate: 0.15,
       scoreValue: 4,
+      upgrades: [
+        { cost: { metal: 160, credits: 60 }, buildTimeHours: 6, hp: 32, healRate: 0.25, upkeep: { energy: 4 } },
+        { cost: { metal: 220, credits: 90 }, buildTimeHours: 9, hp: 42, healRate: 0.40, upkeep: { energy: 7 } },
+      ],
     },
     // Factory — builds ground vehicles (tank) and squadrons (fighter_squadron).
     // enablesGroundConstruction + enablesSquadronConstruction: the gate for
