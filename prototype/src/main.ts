@@ -528,6 +528,7 @@ import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from './simClock';
 import { armedTap } from './armedTap';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
 import { canDockRepair, canRepair } from './repairOffer';
+import { capitalOffer, holdOffer } from './worldOrders';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -5687,26 +5688,30 @@ function planetPanelHtml(p: Planet): string {
   }
 
   // Capital marker / designate — heroes respawn here (and re-fit modules, Phase C).
-  if (mine) {
-    if (capitalOf(s, ME) === p.id) {
+  // Что панель предлагает сделать с миром — `worldOrders.ts` (REFM-91).
+  {
+    const cap = capitalOffer(mine, capitalOf(s, ME) === p.id, isInhabited(p));
+    if (cap === 'marked') {
       h += `<div class="row"><b style="color:var(--grn)">★ ${t('side.world.capital')}</b>${compactUi() ? '' : ` <span class="dim">${t('side.world.capital.note')}</span>`}</div>`;
-    } else if (isInhabited(p)) {
+    } else if (cap === 'designate') {
       h += `<div class="row">${btn('capital', '', t('side.world.make-capital'), true)}</div>`;
     }
     // Hold point (ST-2.1): a standing order for the Steward — the anchor is never
     // auto-evacuated and gets reinforced under threat. Same tech gate as delegation.
-    if (stewardTechDone(s, ME)) {
-      const points = s.players[ME]?.stewardHoldPoints ?? [];
-      h += `<div class="row">${
-        points.includes(p.id)
-          ? `<b style="color:var(--cyan)">🚩 ${t('side.world.hold.title')}</b> ${btn('holdpoint', 'off', t('side.world.hold.clear'), true)}`
-          : btn(
-              'holdpoint',
-              'on',
-              compactUi() ? t('side.world.hold') : t('side.world.hold.set'),
-              points.length < MAX_STEWARD_HOLD_POINTS,
-            )
-      }</div>`;
+    const points = s.players[ME]?.stewardHoldPoints ?? [];
+    // Лимит ГАСИТ кнопку, но не прячет её, а снять точку можно всегда — иначе игрок,
+    // исчерпавший лимит, запрётся: ни поставить новую, ни убрать старую (правило 6).
+    const hold = holdOffer(
+      mine,
+      stewardTechDone(s, ME),
+      points.includes(p.id),
+      points.length,
+      MAX_STEWARD_HOLD_POINTS,
+    );
+    if (hold === 'clear') {
+      h += `<div class="row"><b style="color:var(--cyan)">🚩 ${t('side.world.hold.title')}</b> ${btn('holdpoint', 'off', t('side.world.hold.clear'), true)}</div>`;
+    } else if (hold !== 'none') {
+      h += `<div class="row">${btn('holdpoint', 'on', compactUi() ? t('side.world.hold') : t('side.world.hold.set'), hold === 'set')}</div>`;
     }
   }
 
