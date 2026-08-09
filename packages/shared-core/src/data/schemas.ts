@@ -43,6 +43,11 @@ export const UnitStatsSchema = z
     /** Orbital-AA damage per hour a (ground) unit deals to a hostile fleet on the
      *  NEAR orbit while the planet is not under a ground assault. 0 = no AA. */
     aaDamage: z.number().nonnegative().default(0),
+    /** Point-defense damage per hour — anti-squadron/anti-missile flak that a
+     *  SHIP (not just a planet) carries. Distinct from `aaDamage` (which is
+     *  planet-side orbital AA): `pointDefense` fires on incoming squadron/missile
+     *  strikes, NOT on regular fleets. 0 = no point defense. */
+    pointDefense: z.number().nonnegative().default(0),
     /** Squadron reach (squadrons-roadmap SQ-3.1): the Euclidean distance in MAP
      *  UNITS a launched `squadron` may strike from its carrier. 0 = no reach. */
     strikeRange: z.number().nonnegative().default(0),
@@ -173,6 +178,9 @@ export const BuildingLevelSchema = z.object({
   /** Anti-ship orbital-AA firepower this level fires per game hour at a hostile fleet on the
    *  near orbit (an emplacement building). Summed alongside garrison `aaDamage` in combat. */
   aaDamage: z.number().nonnegative().default(0),
+  /** Point-defense (anti-squadron/anti-missile) firepower per game hour at this level.
+   *  Distinct from `aaDamage`: intercepts squadron/missile strikes, not regular fleets. */
+  pointDefense: z.number().nonnegative().default(0),
   /** Доля, на которую здание поднимает ВЕСЬ кредитный доход своего мира на этом
    *  уровне (0.25 = +25%). См. одноимённое поле в `BuildingDefSchema`. */
   creditsBonus: z.number().default(0),
@@ -209,6 +217,10 @@ export const BuildingDefSchema = z.object({
   /** Anti-ship orbital-AA firepower per game hour (an emplacement building like an
    *  orbital-AA battery). Fires on hostile near-orbit fleets, summed with garrison AA. */
   aaDamage: z.number().nonnegative().default(0),
+  /** Point-defense (anti-squadron/anti-missile) firepower per game hour. Distinct
+   *  from `aaDamage` (anti-ship orbital AA): `pointDefense` intercepts incoming
+   *  squadron/missile strikes, not regular fleets. 0 = no point defense. */
+  pointDefense: z.number().nonnegative().default(0),
   /** True for a building that can lay down hulls (shipyard/spaceport) — a planet needs
    *  at least one standing (undestroyed) building with this flag to build any
    *  space-domain unit (`unit.build`). Not per-level: the capability doesn't scale. */
@@ -701,8 +713,8 @@ export type GameData = z.infer<typeof GameDataSchema>;
  *  levels 2..N come from `upgrades`. Out-of-range levels fall back to level 1. */
 export function buildingLevel(def: BuildingDef, level: number): BuildingLevel {
   if (level <= 1) {
-    const { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage, creditsBonus } = def;
-    return { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage, creditsBonus };
+    const { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage, pointDefense, creditsBonus } = def;
+    return { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage, pointDefense, creditsBonus };
   }
   return def.upgrades[level - 2] ?? buildingLevel(def, 1);
 }

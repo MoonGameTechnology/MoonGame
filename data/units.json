@@ -53,7 +53,8 @@
       "speed": 6,
       "hp": 40,
       "shield": 15,
-      "cargoCapacity": 2
+      "cargoCapacity": 2,
+      "pointDefense": 8
     },
     "line": "front",
     "traits": [],

@@ -347,7 +347,7 @@ export const data: GameData = parseGameData({
     },
     cruiser: {
       faction: 'blue',
-      stats: { attack: 16, defense: 14, speed: 40, hp: 60, cargoCapacity: 5 },
+      stats: { attack: 16, defense: 14, speed: 40, hp: 60, cargoCapacity: 5, pointDefense: 8 },
       line: 'front',
       signature: 4, // big warship — broadcasts
       // ECON-7: modern warships need microelectronics — the hi-tech good gates a
