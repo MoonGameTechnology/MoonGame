@@ -29,6 +29,7 @@ export type TapOwner =
   | 'assault' // штурм с ПК
   | 'pick-group' // набор группы «Выбрать+»
   | 'move' // вооружённый ход
+  | 'squadron-strike' // удар эскадрильи (свободный полёт к цели)
   | 'select'; // обычное выделение
 
 /** Какие режимы сейчас включены. */
@@ -42,6 +43,8 @@ export interface TapModes {
   pickMode: boolean;
   /** Вооружён ход («Курс»). */
   aiming: boolean;
+  /** Вооружён удар эскадрильи (squadron.strike). */
+  squadronStrikeAim: boolean;
 }
 
 /** Решить, кто забирает тап. Порядок ветвей — и есть правила 1–4. */
@@ -52,6 +55,7 @@ export function tapOwner(m: TapModes): TapOwner {
   if (m.heroAim) return 'cast';
   if (m.heroSpawnAim) return 'deploy';
   if (m.assaultAim) return 'assault';
+  if (m.squadronStrikeAim) return 'squadron-strike';
   if (m.pickMode && !m.aiming) return 'pick-group'; // правило 4
   if (m.aiming) return 'move'; // правило 2
   return 'select'; // правило 3

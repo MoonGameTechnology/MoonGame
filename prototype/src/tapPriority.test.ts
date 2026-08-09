@@ -10,6 +10,7 @@ const modes = (over: Partial<TapModes> = {}): TapModes => ({
   assaultAim: false,
   pickMode: false,
   aiming: false,
+  squadronStrikeAim: false,
   ...over,
 });
 

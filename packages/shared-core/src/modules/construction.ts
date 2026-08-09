@@ -148,13 +148,23 @@ function hasShipyard(planet: Planet, data: GameData): boolean {
 }
 
 /** True if the planet has at least one standing (undestroyed) building whose data
- *  marks it `enablesSquadronConstruction` (hangar bay / airbase) — the facility a
+ *  marks it `enablesSquadronConstruction` (factory / airbase) — the facility a
  *  squadron-trait unit needs to be built and based. No limit on how many squadrons
  *  a planet can base — the building is the gate, not a capacity. */
 function hasHangarBay(planet: Planet, data: GameData): boolean {
   return planet.buildings.some((b) => {
     if (b.hp <= 0) return false;
     return data.buildings[b.type]?.enablesSquadronConstruction === true;
+  });
+}
+
+/** True if the planet has at least one standing (undestroyed) building whose data
+ *  marks it `enablesGroundConstruction` (barracks for infantry, factory for
+ *  vehicles) — the facility a ground-domain unit needs to be built. */
+function hasGroundFacility(planet: Planet, data: GameData): boolean {
+  return planet.buildings.some((b) => {
+    if (b.hp <= 0) return false;
+    return data.buildings[b.type]?.enablesGroundConstruction === true;
   });
 }
 
@@ -391,6 +401,9 @@ export const constructionModule: GameModule = {
       if (!isSquadron && def.domain === 'space' && !hasShipyard(planet, h.ctx.data)) {
         return h.reject('E_NO_SHIPYARD');
       }
+      if (def.domain === 'ground' && !hasGroundFacility(planet, h.ctx.data)) {
+        return h.reject('E_NO_GROUND_FACILITY');
+      }
       // ARS-3 ownership gate: a seat with an arsenal SNAPSHOT builds only what it
       // owns — the hull and every module must be listed (fail-secure E_NOT_OWNED).
       // No snapshot on the player ⇒ no restriction (regular/dev matches unchanged).
@@ -625,6 +638,28 @@ export const constructionModule: GameModule = {
       }
       const bonus = totalDefenseBonus(planet, h.ctx.data);
       return bonus > 0 ? dmg / (1 + bonus) : dmg;
+    });
+
+    // Each standing building on the planet reduces incoming ground-unit damage
+    // by 1% (flat reduction, not multiplicative with defenseBonus). Max 90% —
+    // a heavily fortified world is tough but not invincible. This is a SEPARATE
+    // parameter from `defenseBonus` (which is a per-building stat); this one
+    // counts ALL buildings: 10 buildings = 10% damage reduction.
+    const GROUND_DAMAGE_REDUCTION_PER_BUILDING = 0.01;
+    const GROUND_DAMAGE_REDUCTION_MAX = 0.90;
+    api.hook<number>('combat.damage', (dmg, args, h) => {
+      const a = args as { phase?: string; location?: string; defender?: string };
+      if (a.phase !== 'ground' || !a.location) {
+        return dmg;
+      }
+      const planet = h.state.planets[a.location];
+      if (!planet || planet.owner !== a.defender) {
+        return dmg;
+      }
+      const standing = planet.buildings.filter((b) => b.hp > 0).length;
+      if (standing <= 0) return dmg;
+      const reduction = Math.min(standing * GROUND_DAMAGE_REDUCTION_PER_BUILDING, GROUND_DAMAGE_REDUCTION_MAX);
+      return dmg * (1 - reduction);
     });
 
     // The ground assault wears down the contested planet's structures each round
