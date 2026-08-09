@@ -60,12 +60,20 @@ const data: GameData = parseGameData({
       hp: 20,
       enablesShipConstruction: true,
     },
-    hangar_bay: {
-      name: 'Hangar Bay',
+    factory: {
+      name: 'Factory',
       cost: { metal: 150, credits: 60 },
       buildTimeHours: 6,
       hp: 25,
+      enablesGroundConstruction: true,
       enablesSquadronConstruction: true,
+    },
+    barracks: {
+      name: 'Barracks',
+      cost: { metal: 70 },
+      buildTimeHours: 3,
+      hp: 25,
+      enablesGroundConstruction: true,
     },
     fort: {
       name: 'Fort',
@@ -289,9 +297,9 @@ describe('construction module — a space-domain hull needs a standing shipyard'
     expect(!r.ok && r.code).toBe('E_NO_SHIPYARD');
   });
 
-  it('ground-domain units never need a shipyard', () => {
+  it('ground-domain units never need a shipyard (but DO need a ground facility)', () => {
     const kernel = createKernel([constructionModule]);
-    const st = stateWith({ players: [player('p1', { metal: 100 })], planets: [planet('A', 'p1')] });
+    const st = stateWith({ players: [player('p1', { metal: 100 })], planets: [planet('A', 'p1', ['barracks'])] });
     const r = okApply(kernel.applyAction(st, build('militia'), ctx(0)));
     expect(r.ok).toBe(true);
   });
@@ -328,7 +336,7 @@ describe('construction module — a squadron-trait unit needs a standing hangar 
     const kernel = createKernel([constructionModule]);
     const st = stateWith({
       players: [player('p1', { metal: 200, credits: 100 })],
-      planets: [planet('A', 'p1', ['hangar_bay'])],
+      planets: [planet('A', 'p1', ['factory'])],
     });
     const r = okApply(kernel.applyAction(st, build('fighter_squadron'), ctx(0)));
     expect(r.ok).toBe(true);
@@ -338,7 +346,7 @@ describe('construction module — a squadron-trait unit needs a standing hangar 
     const kernel = createKernel([constructionModule]);
     const st = stateWith({
       players: [player('p1', { metal: 200, credits: 100 })],
-      planets: [planet('A', 'p1', ['hangar_bay'])],
+      planets: [planet('A', 'p1', ['factory'])],
     });
     const r = kernel.applyAction(st, build('cruiser'), ctx(0));
     expect(r.ok).toBe(false);
@@ -347,7 +355,7 @@ describe('construction module — a squadron-trait unit needs a standing hangar 
 
   it('a destroyed (hp<=0) hangar bay does not count as standing', () => {
     const kernel = createKernel([constructionModule]);
-    const a = planet('A', 'p1', ['hangar_bay']);
+    const a = planet('A', 'p1', ['factory']);
     a.buildings[0]!.hp = 0;
     const st = stateWith({ players: [player('p1', { metal: 200, credits: 100 })], planets: [a] });
     const r = kernel.applyAction(st, build('fighter_squadron'), ctx(0));
@@ -548,7 +556,8 @@ describe('construction module — buildings in combat (GDD §7.4)', () => {
       ctx(HOUR),
     );
     expect(roundDamage(plain)).toBeCloseTo(20); // 4 × attack 5, no reduction
-    expect(roundDamage(fortified)).toBeCloseTo(20 / 1.5); // ÷ (1 + 0.5 defense bonus)
+    // ÷ (1 + 0.5 defenseBonus) × (1 − 0.01 per-building reduction, 1 building)
+    expect(roundDamage(fortified)).toBeCloseTo((20 / 1.5) * 0.99, 5);
   });
 
   it('wears down and destroys buildings under assault', () => {

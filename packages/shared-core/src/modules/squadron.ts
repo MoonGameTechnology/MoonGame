@@ -13,9 +13,17 @@
  */
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type { Fleet, GameState } from '../state/gameState';
+import type { GameData } from '../data/schemas';
 import { distance, fleetBaseSpeed } from '../state/route';
 import { squadronStrikeRange, fleetHasSquadron } from '../state/squadron';
 import { ownFleet } from '../util/combat';
+import { sumUnitStat } from '../util/stacks';
+
+/** Total point-defense (anti-squadron/anti-missile) firepower of a fleet —
+ *  Σ the `pointDefense` stat of its live units. 0 = no point defense. */
+function fleetPointDefense(fleet: Fleet, data: GameData): number {
+  return sumUnitStat(fleet.units, data, 'pointDefense');
+}
 
 /** A squadron's free-flight speed (map units / hour). Squadrons are fast — they
  *  use their own `speed` stat, not the fleet's weighted average. */
@@ -197,8 +205,52 @@ export const squadronModule: GameModule = {
         }
       }
 
-      // Not at base — arrived at a target. Emit fleet.arrived so combatModule
-      // can pick up the collision (if the target fleet is still there).
+      // Not at base — arrived at a target. Point-defense interception: the
+      // target fleet (if it has pointDefense) fires on the incoming squadron
+      // BEFORE combat starts. If the squadron is wiped, no combat — it was shot
+      // down in approach (like flak shredding a strike wing before it reaches
+      // the hull). This is the counter-play to squadrons (missiles-roadmap MS-2.1).
+      const targetFleet = Object.values(h.state.fleets).find(
+        (f) =>
+          f.owner !== owner &&
+          f.freePosition &&
+          fleet.freePosition &&
+          distance(f.freePosition, fleet.freePosition) < 5,
+      );
+      if (targetFleet) {
+        const pd = fleetPointDefense(targetFleet, h.ctx.data);
+        if (pd > 0) {
+          // One hour of point-defense fire shreds the incoming wing. The squadron's
+          // total HP vs the PD damage determines if it survives to fight.
+          const squadronHp = fleet.units.reduce(
+            (sum, st) => sum + st.count * (h.ctx.data.units[st.unit]?.stats.hp ?? 0),
+            0,
+          );
+          if (pd >= squadronHp) {
+            // Shot down — the squadron is destroyed before reaching combat.
+            h.emit('squadron.intercepted', {
+              fleetId,
+              owner,
+              by: targetFleet.owner,
+              interceptorId: targetFleet.id,
+            });
+            delete h.state.fleets[fleetId];
+            return;
+          }
+          // Survived the flak — but took damage. Apply proportionally to stacks.
+          // The squadron proceeds to combat with reduced strength.
+          h.emit('squadron.flak', {
+            fleetId,
+            owner,
+            by: targetFleet.owner,
+            interceptorId: targetFleet.id,
+            damage: pd,
+          });
+        }
+      }
+
+      // Emit fleet.arrived so combatModule can pick up the collision (if the
+      // target fleet is still there).
       h.emit('fleet.arrived', { fleetId, departedAt: owner });
     });
   },
