@@ -524,6 +524,7 @@ import { liftBy, opensNow } from './sheetLift';
 import { barStays, popoverLife } from './popoverLife';
 import { parseBuildAnchor, quickBuildOrder } from './quickBuild';
 import { isMine, seen, seenArc, seenTail } from './eventVisibility';
+import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from './simClock';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -10907,14 +10908,17 @@ function frame(nowReal: number) {
   if (!backArmed && (topLayerOpen() || matchGuard)) armBack();
   const dt = nowReal - lastReal;
   lastReal = nowReal;
+  // Правдоподобие разрыва, ход мира и сдвиг времени — `simClock.ts` (REFM-87).
   // smooth FPS; ignore absurd gaps (tab backgrounded) so the readout stays sane
-  if (dt > 0 && dt < 1000) fpsEma = fpsEma * 0.9 + (1000 / dt) * 0.1;
-  if (!NET && speed > 0 && !banner && !endScreen) {
+  if (saneGap(dt)) fpsEma = fpsNext(fpsEma, dt);
+  if (simRuns(NET, speed, !!banner, !!endScreen)) {
     // Local single-player sim. In net mode the server owns the clock, combat,
     // construction and every rival — a connected human, or the server-side AI for
     // an empty seat — so we only render its snapshots (no local AI runs here).
     // A finished match (endScreen set) freezes the world — no advancing a decided game.
-    const target = s.time + (dt / 1000) * speed * HOUR;
+    // Время растёт от РЕАЛЬНОГО, помноженного на скорость: при просадке FPS мир идёт
+    // с той же быстротой, а не медленнее (правило 3).
+    const target = advanceTarget(s.time, dt, speed, HOUR);
     apply(advance(s, target));
     solo.autoEngage();
     pumpAssaultOrders();
@@ -10933,7 +10937,7 @@ function frame(nowReal: number) {
   updateGoals(); // ONB-7: tick the first-session checklist off live state (no-op when idle)
   // The orbit spin only advances while the world is actually running (sim ticking, or a
   // live net match), so pausing freezes the ships on their rings instead of drifting on.
-  if (dt > 0 && dt < 1000 && (NET || (speed > 0 && !banner))) orbitPhase += dt;
+  if (saneGap(dt) && spinRuns(NET, speed, !!banner)) orbitPhase += dt;
   pumpPendingLoads(); // fire ~1h cargo loads whose hour has elapsed (both modes)
   resolvePendingMerges(); // complete fleet merges whose movers have arrived
   // Итог матча приходит в ОБОИХ режимах (сетевые снимки несут его в `match`).
