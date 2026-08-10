@@ -539,6 +539,7 @@ import {
   slotAngle,
 } from './orbitRing';
 import { routeShown, routeStops, routeStroke } from './fleetRoute';
+import { netContacts, soloContacts } from './radarContacts';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -1272,20 +1273,18 @@ function updateRadarContacts(now: number): void {
     // What the sweep may paint. Solo scans the full state for radar-only enemy
     // fleets; in NET those fleets are physically ABSENT from the fogged state —
     // the server ships them as coarse contacts (snapshot.signatures, BF-18).
-    const contacts: Array<{ key: string; node: string; size: 'S' | 'M' | 'L' }> = [];
-    if (NET) {
-      netSignatures.forEach((c, i) => {
-        if (!known(c.location))
-          contacts.push({ key: `sig:${c.location}:${i}`, node: c.location, size: c.size });
-      });
-    } else {
-      for (const f of Object.values(s.fleets)) {
-        if (f.owner === ME) continue;
-        const fn = fleetNode(f);
-        if (!fn || known(fn) || !radarHas(fn)) continue; // identified or out of radar → not a signature
-        contacts.push({ key: f.id, node: fn, size: sigClass(fleetSignature(f)) });
-      }
-    }
+    // Кто может стать отметкой — `radarContacts.ts` (REFM-96): в соло тот же отбор
+    // делается вручную, иначе одиночная игра покажет больше сетевой.
+    const contacts = NET
+      ? netContacts(netSignatures, known)
+      : soloContacts(
+          Object.values(s.fleets),
+          ME,
+          (f) => fleetNode(f),
+          known,
+          radarHas,
+          (f) => sigClass(fleetSignature(f)),
+        );
     let hit = false; // засекла ли рука хоть кого-то в ЭТОМ кадре
     for (const c of contacts) {
       const node = s.planets[c.node];
