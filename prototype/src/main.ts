@@ -541,6 +541,7 @@ import {
 import { routeShown, routeStops, routeStroke } from './fleetRoute';
 import { netContacts, soloContacts } from './radarContacts';
 import { autoStance, scrambleStance } from './stanceToggle';
+import { fleetCount, goalBaseline, grew, mineLevels } from './goalTally';
 import {
   loadStep,
   makeLoads,
@@ -2304,27 +2305,20 @@ let goalsCollapsed = false;
 let goalsRewarded = false;
 let goalsDone: string[] = [];
 let goalBase = { worlds: 0, mineLevel: 0, fleets: 0 };
-// Sum of mine LEVELS (not a count of buildings) — the homeworld's Mine starts
-// already built, so "progress" is its level growing via upgrade, and this also
-// keeps working if a captured world adds a second mine somewhere down the line.
-const myMineLevel = (): number =>
-  Object.values(s.planets)
-    .filter((p) => p.owner === ME)
-    .reduce(
-      (n, p) => n + p.buildings.filter((b) => b.type === 'mine').reduce((m, b) => m + b.level, 0),
-      0,
-    );
-const myFleetCount = (): number => Object.values(s.fleets).filter((f) => f.owner === ME).length;
+// Чем меряется прогресс — `goalTally.ts` (REFM-99): от базы на момент запуска списка,
+// а шахты суммой УРОВНЕЙ, потому что домашняя шахта уже стоит.
+const myMineLevel = (): number => mineLevels(Object.values(s.planets), ME);
+const myFleetCount = (): number => fleetCount(Object.values(s.fleets), ME);
 function goalSignals(): GoalSignals {
   return {
-    builtMine: myMineLevel() > goalBase.mineLevel,
-    launchedFleet: myFleetCount() > goalBase.fleets,
-    capturedWorld: myWorldCount() > goalBase.worlds,
+    builtMine: grew(myMineLevel(), goalBase.mineLevel),
+    launchedFleet: grew(myFleetCount(), goalBase.fleets),
+    capturedWorld: grew(myWorldCount(), goalBase.worlds),
     score: myScore(),
   };
 }
 function startFirstGoals(): void {
-  goalBase = { worlds: myWorldCount(), mineLevel: myMineLevel(), fleets: myFleetCount() };
+  goalBase = goalBaseline(Object.values(s.planets), Object.values(s.fleets), ME);
   goalsDone = [];
   goalsRewarded = false;
   goalsCollapsed = false;
