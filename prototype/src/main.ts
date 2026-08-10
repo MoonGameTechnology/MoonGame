@@ -544,6 +544,7 @@ import { autoStance, scrambleStance } from './stanceToggle';
 import { fleetCount, goalBaseline, grew, mineLevels } from './goalTally';
 import { introFor } from './introTrigger';
 import { EVENT_LOG_MAX, LOG_LINES, isRepeat, pushBounded, stamp } from './noteLog';
+import { pruneGroup, refSurvives } from './selectionPrune';
 import {
   loadStep,
   makeLoads,
@@ -2117,12 +2118,15 @@ function sandboxBuildRestore(snap: Record<string, number> | null, ok: boolean): 
 
 function apply(out: StepOut) {
   s = out.state;
-  if (selFleet && !s.fleets[selFleet]) selFleet = null;
-  if (splitState && !s.fleets[splitState.fleetId]) splitState = null; // fleet gone → close
-  if (troopsPlan && !s.fleets[troopsPlan.fleetId]) troopsPlan = null; // ⇅-меню тоже
+  // Что теряет силу вместе с флотом — `selectionPrune.ts` (REFM-102): одиночная ссылка
+  // спрашивает только «существует ли», а группа чистится дважды — живые И свои.
+  const alive = (id: string): boolean => !!s.fleets[id];
+  if (!refSurvives(selFleet, alive)) selFleet = null;
+  if (splitState && !refSurvives(splitState.fleetId, alive)) splitState = null;
+  if (troopsPlan && !refSurvives(troopsPlan.fleetId, alive)) troopsPlan = null; // ⇅-меню тоже
   // Режим «Приказ»: пропавшие флоты выбрасываются покадрово в renderChainBar; здесь
   // достаточно ничего не делать — режим сам гаснет, когда fleetIds опустеет.
-  selFleets = new Set([...selFleets].filter((id) => s.fleets[id]?.owner === ME));
+  selFleets = pruneGroup(selFleets, (id) => s.fleets[id]?.owner, ME);
   handleEvents(out.events);
 }
 
