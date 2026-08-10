@@ -529,6 +529,8 @@ import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from './simClock';
 import { armedTap } from './armedTap';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
 import { canDockRepair, canRepair } from './repairOffer';
+import { capitalOffer, holdOffer } from './worldOrders';
+import { spyOffer, windowLeftH } from './spyOffer';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -5696,26 +5698,30 @@ function planetPanelHtml(p: Planet): string {
   }
 
   // Capital marker / designate — heroes respawn here (and re-fit modules, Phase C).
-  if (mine) {
-    if (capitalOf(s, ME) === p.id) {
+  // Что панель предлагает сделать с миром — `worldOrders.ts` (REFM-91).
+  {
+    const cap = capitalOffer(mine, capitalOf(s, ME) === p.id, isInhabited(p));
+    if (cap === 'marked') {
       h += `<div class="row"><b style="color:var(--grn)">★ ${t('side.world.capital')}</b>${compactUi() ? '' : ` <span class="dim">${t('side.world.capital.note')}</span>`}</div>`;
-    } else if (isInhabited(p)) {
+    } else if (cap === 'designate') {
       h += `<div class="row">${btn('capital', '', t('side.world.make-capital'), true)}</div>`;
     }
     // Hold point (ST-2.1): a standing order for the Steward — the anchor is never
     // auto-evacuated and gets reinforced under threat. Same tech gate as delegation.
-    if (stewardTechDone(s, ME)) {
-      const points = s.players[ME]?.stewardHoldPoints ?? [];
-      h += `<div class="row">${
-        points.includes(p.id)
-          ? `<b style="color:var(--cyan)">🚩 ${t('side.world.hold.title')}</b> ${btn('holdpoint', 'off', t('side.world.hold.clear'), true)}`
-          : btn(
-              'holdpoint',
-              'on',
-              compactUi() ? t('side.world.hold') : t('side.world.hold.set'),
-              points.length < MAX_STEWARD_HOLD_POINTS,
-            )
-      }</div>`;
+    const points = s.players[ME]?.stewardHoldPoints ?? [];
+    // Лимит ГАСИТ кнопку, но не прячет её, а снять точку можно всегда — иначе игрок,
+    // исчерпавший лимит, запрётся: ни поставить новую, ни убрать старую (правило 6).
+    const hold = holdOffer(
+      mine,
+      stewardTechDone(s, ME),
+      points.includes(p.id),
+      points.length,
+      MAX_STEWARD_HOLD_POINTS,
+    );
+    if (hold === 'clear') {
+      h += `<div class="row"><b style="color:var(--cyan)">🚩 ${t('side.world.hold.title')}</b> ${btn('holdpoint', 'off', t('side.world.hold.clear'), true)}</div>`;
+    } else if (hold !== 'none') {
+      h += `<div class="row">${btn('holdpoint', 'on', compactUi() ? t('side.world.hold') : t('side.world.hold.set'), hold === 'set')}</div>`;
     }
   }
 
@@ -5724,18 +5730,17 @@ function planetPanelHtml(p: Planet): string {
 
   // Espionage: steal a 24h intel window on this enemy world (SPY-1). While a
   // window lives its countdown replaces the button — the node stays identified.
-  if (!mine && p.owner) {
+  {
     const live = myIntel().find((g) => g.kind === 'planet' && g.target === p.id);
-    h += `<div class="row">${
-      live
-        ? `<b style="color:var(--cyan)">${t('side.world.spy-window')}</b> <span class="dim">${t('side.world.spy-window.left', { left: fmtEta(Math.max(0, live.until - s.time) / HOUR) })}</span>`
-        : btn(
-            'spyplanet',
-            p.owner,
-            t('side.scan.spy', { c: SPY_COST }),
-            afford({ credits: SPY_COST }),
-          )
-    }</div>`;
+    // Кому и что предлагаем — `spyOffer.ts` (REFM-92): свой и ничейный мир не шпионят,
+    // живое окно показывает отсчёт вместо кнопки, а нехватка кредитов кнопку гасит, но
+    // не прячет — цена должна остаться на виду.
+    const spy = spyOffer(mine, !!p.owner, !!live, afford({ credits: SPY_COST }));
+    if (spy === 'window' && live) {
+      h += `<div class="row"><b style="color:var(--cyan)">${t('side.world.spy-window')}</b> <span class="dim">${t('side.world.spy-window.left', { left: fmtEta(windowLeftH(live.until, s.time, HOUR)) })}</span></div>`;
+    } else if (spy !== 'none') {
+      h += `<div class="row">${btn('spyplanet', p.owner ?? '', t('side.scan.spy', { c: SPY_COST }), spy === 'buy')}</div>`;
+    }
   }
 
   h += `<div class="ptabs">${tabButton('ground', t('side.tab.ground'), counts.ground, 'tab:ground')}${tabButton(
