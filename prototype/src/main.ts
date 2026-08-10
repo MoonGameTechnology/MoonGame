@@ -531,6 +531,13 @@ import { canDockRepair, canRepair } from './repairOffer';
 import { capitalOffer, holdOffer } from './worldOrders';
 import { spyOffer, windowLeftH } from './spyOffer';
 import { artScale, calloutAlpha, chevronAlpha, detailAt, sphereBloom } from './semanticZoom';
+import {
+  chevronAngle,
+  orbitBloom,
+  orbitRadius,
+  orbitsLive as ringsLive,
+  slotAngle,
+} from './orbitRing';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -1698,28 +1705,17 @@ function artilleryRangeOf(f: Fleet | undefined): number {
  *  player's garrisoning divisions (if they fit the free hold) and unload the ones it
  *  carries (onto an enemy world = a landing). Empty string when there's nothing to do. */
 
-const ORBIT_R = 31; // single orbit-ring radius in screen px (before the zoom bloom) — was 44, −30%
-// Past this camera zoom the orbital layer "opens up": rings widen and stationed
-// fleets start to circle their planet. Below it everything stays static (and
-// fixed-size), exactly as before — cheap at the whole-map view where it'd be invisible.
-const ORBIT_ZOOM_IN = 1.6;
+// Порог открытия слоя, раздутие радиуса, потолок по соседу и веер слотов — правила
+// `orbitRing.ts` (REFM-94); здесь остаётся только замер зазора на экране.
 let orbitPhase = 0; // accumulated sim-time ms (frozen on pause) — drives the orbit spin
 /** Ring/animation are gated on the same close-zoom threshold. */
 function orbitsLive(): boolean {
-  return cam.scale >= ORBIT_ZOOM_IN;
+  return ringsLive(cam.scale);
 }
-/** Orbit-ring radius scale at the current zoom: compact (half-size) at the far view —
- *  full rings read as bulky there — blooming open to ~2.4× once zoomed in close so
- *  stationed fleets get room to circle. */
-function orbitZoom(): number {
-  if (cam.scale <= ORBIT_ZOOM_IN) return 0.5;
-  return clamp(0.5 + (cam.scale - ORBIT_ZOOM_IN) * 1.2, 0.5, 2.4);
-}
-/** Orbit-ring radius for a planet at the current zoom, in screen px. The base radius
- *  blooms with zoom (orbitZoom), but is capped to a fraction of the on-screen gap to the
- *  nearest LINKED neighbour so the ring never spills onto the adjacent sectors — zoomed in
- *  tight on a phone the un-capped ring reached its neighbours and looked messy. Fleets sit
- *  on this same radius (so a chevron never floats off the ring). */
+/** Orbit-ring radius for a planet at the current zoom, in screen px. The ring blooms with
+ *  zoom but is capped to a fraction of the on-screen gap to the nearest LINKED neighbour,
+ *  so it never spills onto the adjacent sectors. Fleets sit on this same radius (so a
+ *  chevron never floats off the ring). */
 function orbitRingRadius(pl: { position: { x: number; y: number }; links?: string[] }): number {
   const pc = world(pl.position);
   let nearest = Infinity;
@@ -1729,18 +1725,12 @@ function orbitRingRadius(pl: { position: { x: number; y: number }; links?: strin
     const npc = world(np.position);
     nearest = Math.min(nearest, Math.hypot(npc.x - pc.x, npc.y - pc.y));
   }
-  // cap the ring at ~40% of the gap to the nearest neighbour, then scale by zoom (so two
-  // adjacent rings keep a gap and the ring never covers a neighbouring node).
-  const scale =
-    nearest === Infinity ? orbitZoom() : Math.min(orbitZoom(), (nearest * 0.4) / ORBIT_R);
-  return ORBIT_R * scale;
+  return orbitRadius(orbitBloom(cam.scale), nearest);
 }
 /** Angular position (radians) of a stationed fleet's orbit slot at index `idx` of
  *  `nPeers` sharing the ring — fanned out, and spinning when zoomed in close. */
 function orbitAngle(idx: number, nPeers: number): number {
-  let a = -Math.PI / 2 + (idx - (nPeers - 1) / 2) * 0.55;
-  if (orbitsLive()) a += orbitPhase * 0.00052; // the single ring's steady sweep (rad/ms)
-  return a;
+  return slotAngle(idx, nPeers, orbitPhase, orbitsLive());
 }
 
 /** Screen anchor (+ heading) for a fleet's chevron: the interpolated lane
@@ -1776,7 +1766,7 @@ function fleetAnchor(f: Fleet): { x: number; y: number; ang: number } | null {
   const a0 = orbitAngle(idx, peers.length);
   const r = orbitRingRadius(pl);
   // when circling, the chevron faces along its travel (tangent); static = radial as before
-  const ang = orbitsLive() ? a0 + Math.PI / 2 : a0;
+  const ang = chevronAngle(a0, orbitsLive());
   return { x: pc.x + Math.cos(a0) * r, y: pc.y + Math.sin(a0) * r, ang };
 }
 // ONB-5: a structured, bounded mirror of the event log — feeds the return digest.
