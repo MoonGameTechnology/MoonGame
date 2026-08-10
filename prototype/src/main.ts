@@ -543,6 +543,7 @@ import { netContacts, soloContacts } from './radarContacts';
 import { autoStance, scrambleStance } from './stanceToggle';
 import { fleetCount, goalBaseline, grew, mineLevels } from './goalTally';
 import { introFor } from './introTrigger';
+import { EVENT_LOG_MAX, LOG_LINES, isRepeat, pushBounded, stamp } from './noteLog';
 import {
   loadStep,
   makeLoads,
@@ -1786,18 +1787,14 @@ let lastNoteMsg = '';
 let lastNoteAtMs = 0;
 /** Append a line to the session log (bounded). Patches the feed if it's on screen. */
 function note(msg: string, at?: string) {
-  // Dedupe guard: an order loop re-rejecting every frame must not machine-gun the
-  // same toast/log line — an identical message within 2s (real time) is dropped.
+  // Защита от повторов, метка времени и пределы лент — `noteLog.ts` (REFM-101):
+  // повтор глушится по РЕАЛЬНОМУ времени, а метка ставится ИГРОВОЕ.
   const nowMs = Date.now();
-  if (msg === lastNoteMsg && nowMs - lastNoteAtMs < 2000) return;
+  if (isRepeat(msg, lastNoteMsg, nowMs, lastNoteAtMs)) return;
   lastNoteMsg = msg;
   lastNoteAtMs = nowMs;
-  const d = floor(s.time / DAY) + 1;
-  const h = floor((s.time % DAY) / HOUR);
-  logLines.push(`D${d} ${String(h).padStart(2, '0')}h · ${msg}`);
-  while (logLines.length > 9) logLines.shift();
-  eventLog.push({ at: s.time, text: msg, anchor: at });
-  while (eventLog.length > 80) eventLog.shift();
+  pushBounded(logLines, `${stamp(s.time, DAY, HOUR)} · ${msg}`, LOG_LINES);
+  pushBounded(eventLog, { at: s.time, text: msg, anchor: at }, EVENT_LOG_MAX);
   toast(msg, at);
 }
 
