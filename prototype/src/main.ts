@@ -541,6 +541,18 @@ import {
 } from './orbitRing';
 import { routeShown, routeStops, routeStroke } from './fleetRoute';
 import { netContacts, soloContacts } from './radarContacts';
+import { autoStance, scrambleStance } from './stanceToggle';
+import { fleetCount, goalBaseline, grew, mineLevels } from './goalTally';
+import { introFor } from './introTrigger';
+import { EVENT_LOG_MAX, LOG_LINES, isRepeat, pushBounded, stamp } from './noteLog';
+import {
+  loadStep,
+  makeLoads,
+  queuedCargo,
+  queuedFromWorld,
+  queuedOf,
+  type PendingLoad,
+} from './loadQueue';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -1776,18 +1788,14 @@ let lastNoteMsg = '';
 let lastNoteAtMs = 0;
 /** Append a line to the session log (bounded). Patches the feed if it's on screen. */
 function note(msg: string, at?: string) {
-  // Dedupe guard: an order loop re-rejecting every frame must not machine-gun the
-  // same toast/log line — an identical message within 2s (real time) is dropped.
+  // Защита от повторов, метка времени и пределы лент — `noteLog.ts` (REFM-101):
+  // повтор глушится по РЕАЛЬНОМУ времени, а метка ставится ИГРОВОЕ.
   const nowMs = Date.now();
-  if (msg === lastNoteMsg && nowMs - lastNoteAtMs < 2000) return;
+  if (isRepeat(msg, lastNoteMsg, nowMs, lastNoteAtMs)) return;
   lastNoteMsg = msg;
   lastNoteAtMs = nowMs;
-  const d = floor(s.time / DAY) + 1;
-  const h = floor((s.time % DAY) / HOUR);
-  logLines.push(`D${d} ${String(h).padStart(2, '0')}h · ${msg}`);
-  while (logLines.length > 9) logLines.shift();
-  eventLog.push({ at: s.time, text: msg, anchor: at });
-  while (eventLog.length > 80) eventLog.shift();
+  pushBounded(logLines, `${stamp(s.time, DAY, HOUR)} · ${msg}`, LOG_LINES);
+  pushBounded(eventLog, { at: s.time, text: msg, anchor: at }, EVENT_LOG_MAX);
   toast(msg, at);
 }
 
@@ -2169,13 +2177,10 @@ function playerOrder(action: Action): boolean {
   }
   else {
     activeTour?.notifyAction(action.type); // an accepted intent advances `action` steps
-    // ONB-5: the first fleet leaving on a course is when "the world runs offline"
-    // becomes real — teach it once (but not mid-guide, where the tour owns the screen).
-    if (action.type === 'fleet.move' && !activeTour?.active) maybeIntro('asyncDelay');
-    // ONB-3 remainder: first retreat/barrage order — same "teach on first real use"
-    // pattern as asyncDelay, not mid-guide (the tour's own steps own the screen).
-    if (action.type === 'fleet.retreat' && !activeTour?.active) maybeIntro('retreat');
-    if (action.type === 'fleet.barrage' && !activeTour?.active) maybeIntro('artillery');
+    // Какой ПРИНЯТЫЙ приказ какую вставку поднимает и почему во время тура молчат все —
+    // `introTrigger.ts` (REFM-100).
+    const intro = introFor(action.type, !!activeTour?.active);
+    if (intro) maybeIntro(intro);
   }
   return true;
 }
@@ -2296,27 +2301,20 @@ let goalsCollapsed = false;
 let goalsRewarded = false;
 let goalsDone: string[] = [];
 let goalBase = { worlds: 0, mineLevel: 0, fleets: 0 };
-// Sum of mine LEVELS (not a count of buildings) — the homeworld's Mine starts
-// already built, so "progress" is its level growing via upgrade, and this also
-// keeps working if a captured world adds a second mine somewhere down the line.
-const myMineLevel = (): number =>
-  Object.values(s.planets)
-    .filter((p) => p.owner === ME)
-    .reduce(
-      (n, p) => n + p.buildings.filter((b) => b.type === 'mine').reduce((m, b) => m + b.level, 0),
-      0,
-    );
-const myFleetCount = (): number => Object.values(s.fleets).filter((f) => f.owner === ME).length;
+// Чем меряется прогресс — `goalTally.ts` (REFM-99): от базы на момент запуска списка,
+// а шахты суммой УРОВНЕЙ, потому что домашняя шахта уже стоит.
+const myMineLevel = (): number => mineLevels(Object.values(s.planets), ME);
+const myFleetCount = (): number => fleetCount(Object.values(s.fleets), ME);
 function goalSignals(): GoalSignals {
   return {
-    builtMine: myMineLevel() > goalBase.mineLevel,
-    launchedFleet: myFleetCount() > goalBase.fleets,
-    capturedWorld: myWorldCount() > goalBase.worlds,
+    builtMine: grew(myMineLevel(), goalBase.mineLevel),
+    launchedFleet: grew(myFleetCount(), goalBase.fleets),
+    capturedWorld: grew(myWorldCount(), goalBase.worlds),
     score: myScore(),
   };
 }
 function startFirstGoals(): void {
-  goalBase = { worlds: myWorldCount(), mineLevel: myMineLevel(), fleets: myFleetCount() };
+  goalBase = goalBaseline(Object.values(s.planets), Object.values(s.fleets), ME);
   goalsDone = [];
   goalsRewarded = false;
   goalsCollapsed = false;
@@ -2400,42 +2398,25 @@ document.getElementById('hub-tutorial')?.addEventListener('click', beginOnboardi
 // advanced LOAD_TIME, while the fleet marker animates the hold filling up. This is
 // prototype-only client state; the deterministic core is untouched.
 const LOAD_TIME = HOUR; // ~1 game-hour to lift one ground unit into the hold
-interface PendingLoad {
-  fleetId: string;
-  unit: string;
-  startAt: number; // world time the load was ordered
-  doneAt: number; // world time it completes
-}
+// Правила очереди — `loadQueue.ts` (REFM-97): поштучные записи, резерв трюма заранее,
+// резерв гарнизона по МИРУ и отмена вслед за носителем.
 let pendingLoads: PendingLoad[] = [];
 
 /** Hold footprint (cargoSize) already reserved by this fleet's in-progress loads. */
 function pendingLoadCargo(fleetId: string): number {
-  let n = 0;
-  for (const p of pendingLoads)
-    if (p.fleetId === fleetId) n += data.units[p.unit]?.stats.cargoSize ?? 1;
-  return n;
+  return queuedCargo(pendingLoads, fleetId, (u) => data.units[u]?.stats.cargoSize ?? 1);
 }
 
 /** How many of `unit` are already promised to in-progress loads lifting from the
- *  SAME garrison (planet), so a queued load never over-draws a world's stock. Any
- *  fleet docked at `planetId` shares that garrison, so reservations span fleets. */
+ *  SAME garrison (planet), so a queued load never over-draws a world's stock. */
 function pendingLoadUnits(planetId: string, unit: string): number {
-  let n = 0;
-  for (const p of pendingLoads) {
-    if (p.unit !== unit) continue;
-    if (s.fleets[p.fleetId]?.location === planetId) n++;
-  }
-  return n;
+  return queuedFromWorld(pendingLoads, planetId, unit, (id) => s.fleets[id]?.location);
 }
 
 /** Положить в очередь `count` часовых погрузок БЕЗ проверок — вызывающий уже
- *  посчитал и место, и запас гарнизона (меню десанта делает это своей моделью).
- *  Записи по одной единице, а не одна на партию, СОЗНАТЕЛЬНО: ядро грузит «всё или
- *  ничего», поэтому N отдельных `army.load` доедут частично, если за этот час
- *  гарнизон обмелел, — партия одним действием отскочила бы целиком. */
+ *  посчитал и место, и запас гарнизона (меню десанта делает это своей моделью). */
 function pushLoads(fleetId: string, unit: string, count: number): void {
-  for (let i = 0; i < count; i++)
-    pendingLoads.push({ fleetId, unit, startAt: s.time, doneAt: s.time + LOAD_TIME });
+  pendingLoads.push(...makeLoads(fleetId, unit, count, s.time, LOAD_TIME));
 }
 
 /** Fail-secure: ядро не выпускает войска из гарнизона, запертого живым боем
@@ -2450,17 +2431,9 @@ function troopsLiftable(planetId: string): boolean {
  *  (load cancelled), and fire the real `army.load` once a load's hour has elapsed. */
 function pumpPendingLoads(): void {
   if (!pendingLoads.length) return;
-  const keep: PendingLoad[] = [];
-  for (const p of pendingLoads) {
-    const f = s.fleets[p.fleetId];
-    if (!f || f.movement || f.battleId || !f.location) continue; // cancelled
-    if (s.time >= p.doneAt) {
-      playerOrder(loadArmy(ME, p.fleetId, p.unit, 1)); // kernel moves garrison → hold
-      continue;
-    }
-    keep.push(p);
-  }
+  const { fire, keep } = loadStep(pendingLoads, s.time, (id) => s.fleets[id]);
   pendingLoads = keep;
+  for (const p of fire) playerOrder(loadArmy(ME, p.fleetId, p.unit, 1)); // garrison → hold
 }
 
 /** GRND-1: собрать вход меню десанта для флота. `null` — показывать нечего: флот не
@@ -2492,7 +2465,7 @@ function troopsInputFor(fleetId: string): TroopsInput | null {
     garrisonAll: mine ? totalOf(here.garrison, unit) : 0,
     hold: findHealthyStack(landing, unit)?.count ?? 0,
     holdAll: totalOf(landing, unit),
-    queued: pendingLoads.filter((p) => p.fleetId === fleetId && p.unit === unit).length,
+    queued: queuedOf(pendingLoads, fleetId, unit),
     reserved: pendingLoadUnits(here.id, unit),
     cargoSize: data.units[unit]?.stats.cargoSize ?? 1,
   }));
@@ -3267,8 +3240,8 @@ function patrolOf(fleetId: string): Patrol | undefined {
  *  (order.auto — the server presses the storm while you're offline), local Set solo. */
 function setAutoAssault(ids: string[], on: boolean): void {
   for (const id of ids) {
-    if (!s.fleets[id] || s.fleets[id]!.owner !== ME) continue;
-    if (isAutoAssault(id) === on) continue;
+    // Кому стойка положена — `stanceToggle.ts` (REFM-98).
+    if (autoStance(s.fleets[id]?.owner === ME, isAutoAssault(id), on) === 'skip') continue;
     if (NET) playerOrder(orderAuto(ME, id, on));
     else if (on) autoAssault.add(id);
     else autoAssault.delete(id);
@@ -3280,9 +3253,26 @@ function setAutoAssault(ids: string[], on: boolean): void {
 function setScramble(ids: string[], on: boolean): void {
   for (const id of ids) {
     const f = s.fleets[id];
-    if (!f || f.owner !== ME || !fleetHasSquadron(f)) continue;
-    if (!!patrolOf(id) === on) continue;
-    if (!on) {
+    const pos0 = f?.location ? s.planets[f.location]?.position : undefined;
+    // Кому дежурство положено и почему отказ — `stanceToggle.ts` (REFM-98).
+    const want = scrambleStance(
+      !!f && f.owner === ME,
+      !!f && fleetHasSquadron(f),
+      !!patrolOf(id),
+      on,
+      !!pos0,
+      !!f && fleetIdle(f),
+    );
+    if (want === 'skip' || !f) continue;
+    if (want === 'need-dock') {
+      note(t('ai.sortie.docked-only'));
+      continue;
+    }
+    if (want === 'need-idle') {
+      note(t('ai.sortie.idle-only'));
+      continue;
+    }
+    if (want === 'clear') {
       if (NET) playerOrder(orderScramble(ME, id, false));
       else {
         // Stash the wing's sortie so OFF→ON resumes it (BF-26) instead of a free full tank.
@@ -3292,18 +3282,7 @@ function setScramble(ids: string[], on: boolean): void {
       }
       continue;
     }
-    const pos = f.location ? s.planets[f.location]?.position : undefined;
-    if (!pos) {
-      note(t('ai.sortie.docked-only'));
-      continue;
-    }
-    // Mirror the reducer's order.scramble gate (game.ts): a patrol only stands from a
-    // parked, out-of-combat wing. Without this, solo would arm a patrol the net path
-    // rejects (E_CONDITIONS_UNMET), and the UI would offer an action the server refuses.
-    if (!fleetIdle(f)) {
-      note(t('ai.sortie.idle-only'));
-      continue;
-    }
+    const pos = pos0!;
     if (NET) {
       playerOrder(orderScramble(ME, id, true));
     } else {
