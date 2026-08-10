@@ -538,6 +538,7 @@ import {
   orbitsLive as ringsLive,
   slotAngle,
 } from './orbitRing';
+import { routeShown, routeStops, routeStroke } from './fleetRoute';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -3539,40 +3540,22 @@ function drawRadarCoverage() {
 /** The planned route of every moving fleet of mine — dashed, brighter if selected. */
 function drawFleetRoutes() {
   for (const f of Object.values(s.fleets)) {
-    if (f.owner !== ME || !f.movement) continue;
+    // Чей маршрут виден, где он кончается и как выглядит — `fleetRoute.ts` (REFM-95);
+    // здесь остаётся проекция мировых точек на экран.
+    if (!routeShown(f.owner, ME, !!f.movement) || !f.movement) continue;
     const start = fleetAnchor(f);
     if (!start) continue;
     const sel = selFleet === f.id || selFleets.has(f.id);
-    const mv = f.movement;
-    const nodes = [mv.to, ...(mv.path ?? [])];
-    // If the journey ends at a POINT on the final lane (`toEdge` order), the last
-    // route point must be that point — not the destination node it would latch to.
-    const parkFrac = mv.parkT ?? mv.endT ?? 1;
-    const pts = [{ x: start.x, y: start.y }];
-    for (let i = 0; i < nodes.length; i++) {
-      const pl = s.planets[nodes[i]!];
-      if (!pl) continue;
-      if (i === nodes.length - 1 && parkFrac < 1) {
-        const prev = s.planets[i === 0 ? mv.from : nodes[i - 1]!]?.position;
-        if (prev) {
-          pts.push(
-            world({
-              x: prev.x + (pl.position.x - prev.x) * parkFrac,
-              y: prev.y + (pl.position.y - prev.y) * parkFrac,
-            }),
-          );
-          continue;
-        }
-      }
-      pts.push(world(pl.position));
-    }
+    const stops = routeStops(f.movement, (id) => s.planets[id]?.position);
+    const pts = [{ x: start.x, y: start.y }, ...stops.map((p) => world(p))];
     if (pts.length < 2) continue;
+    const stroke = routeStroke(sel);
     cx.save();
     cx.setLineDash([4, 6]);
-    cx.strokeStyle = rgba(LOCK, sel ? 0.85 : 0.32);
-    cx.lineWidth = sel ? 1.8 : 1.1;
+    cx.strokeStyle = rgba(LOCK, stroke.alpha);
+    cx.lineWidth = stroke.width;
     cx.shadowColor = LOCK;
-    cx.shadowBlur = fxBlur(sel ? 8 : 2);
+    cx.shadowBlur = fxBlur(stroke.blur);
     cx.beginPath();
     cx.moveTo(pts[0]!.x, pts[0]!.y);
     for (let i = 1; i < pts.length; i++) cx.lineTo(pts[i]!.x, pts[i]!.y);
