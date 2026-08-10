@@ -530,6 +530,7 @@ import { showsBlackout, showsStarving } from './arrearsWarnings';
 import { canDockRepair, canRepair } from './repairOffer';
 import { capitalOffer, holdOffer } from './worldOrders';
 import { spyOffer, windowLeftH } from './spyOffer';
+import { artScale, calloutAlpha, chevronAlpha, detailAt, sphereBloom } from './semanticZoom';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -4120,7 +4121,8 @@ function render(now: number) {
   // schematic below), leaving territories, node art, fleet chevrons, battle
   // pulses and pings. Skipping those draws over the widest views — where the
   // most nodes are on screen at once — is also the frame-time win.
-  const detail = clamp((cam.scale - 1.2) / 0.25, 0, 1);
+  // Сам закон и его следствия — `semanticZoom.ts` (REFM-93).
+  const detail = detailAt(cam.scale);
   blitStaticLayer(); // backdrop + province political map (re-baked on camera move, else cached)
   drawCaptureFlashes(now); // wave over a just-flipped province, over the political fill
   drawScanSweep(now); // slow radar sweep — pure console chrome
@@ -4209,7 +4211,7 @@ function render(now: number) {
     // LOD: the volley stays visible on the schematic view (a battle is a signal),
     // but compact — arcs/bursts shrink with the node art so they can't swallow a
     // zoomed-out province.
-    const sk = 0.45 + 0.55 * detail;
+    const sk = artScale(detail);
     cx.save();
     for (let i = siegeShots.length - 1; i >= 0; i--) {
       const shot = siegeShots[i]!;
@@ -4340,7 +4342,7 @@ function render(now: number) {
   // provinces aren't swallowed by their own markers (owner-reported APK pile-up
   // at min zoom: node art + badges + fx stacked on top of each other).
   cx.textAlign = 'left';
-  const ns = 0.45 + 0.55 * detail; // node scale: schematic → detail
+  const ns = artScale(detail); // node scale: schematic → detail (тот же закон, что у залпа)
   const R = 13 * ns;
   for (const n of MAP) {
     const p = s.planets[n.id];
@@ -4566,7 +4568,7 @@ function render(now: number) {
     if (n.sector === 'planet') {
       // Planet: holographic volume — a lit sphere inside the ring, subtle at far view,
       // blooming to full once you zoom into a region
-      blitSphere(col, c.x, c.y, R, clamp(0.3 + (cam.scale - 1) * 0.7, 0.3, 1));
+      blitSphere(col, c.x, c.y, R, sphereBloom(cam.scale));
 
       // wireframe body + bright core (glow comes from the cached aura/bloom discs,
       // not shadowBlur — shadowBlur per node per frame is a major CPU cost)
@@ -4733,9 +4735,10 @@ function render(now: number) {
     // which stay labelled like city names on a globe (your anchor at any zoom).
     const isWorld = n.sector === 'planet';
     const mineWorld = isWorld && p.owner === ME;
-    if (detail === 0 && !mineWorld) continue;
+    const callout = calloutAlpha(detail, mineWorld);
+    if (callout === 0) continue;
     cx.save();
-    cx.globalAlpha = mineWorld ? Math.max(detail, 0.9) : detail;
+    cx.globalAlpha = callout;
     cx.shadowColor = 'rgba(0,0,0,0.85)';
     cx.shadowBlur = fxBlur(3);
     if (isWorld) {
@@ -4865,7 +4868,7 @@ function render(now: number) {
     // cargo pips and ship count cross-fade away (schematic view keeps who/where).
     if (detail < 1) {
       cx.save();
-      cx.globalAlpha = 1 - detail;
+      cx.globalAlpha = chevronAlpha(detail);
       cx.translate(A.x, A.y);
       cx.rotate(A.ang + Math.PI / 2);
       cx.shadowColor = col;
