@@ -540,6 +540,7 @@ import {
 } from './orbitRing';
 import { routeShown, routeStops, routeStroke } from './fleetRoute';
 import { netContacts, soloContacts } from './radarContacts';
+import { autoStance, scrambleStance } from './stanceToggle';
 import {
   loadStep,
   makeLoads,
@@ -3241,8 +3242,8 @@ function patrolOf(fleetId: string): Patrol | undefined {
  *  (order.auto — the server presses the storm while you're offline), local Set solo. */
 function setAutoAssault(ids: string[], on: boolean): void {
   for (const id of ids) {
-    if (!s.fleets[id] || s.fleets[id]!.owner !== ME) continue;
-    if (isAutoAssault(id) === on) continue;
+    // Кому стойка положена — `stanceToggle.ts` (REFM-98).
+    if (autoStance(s.fleets[id]?.owner === ME, isAutoAssault(id), on) === 'skip') continue;
     if (NET) playerOrder(orderAuto(ME, id, on));
     else if (on) autoAssault.add(id);
     else autoAssault.delete(id);
@@ -3254,9 +3255,26 @@ function setAutoAssault(ids: string[], on: boolean): void {
 function setScramble(ids: string[], on: boolean): void {
   for (const id of ids) {
     const f = s.fleets[id];
-    if (!f || f.owner !== ME || !fleetHasSquadron(f)) continue;
-    if (!!patrolOf(id) === on) continue;
-    if (!on) {
+    const pos0 = f?.location ? s.planets[f.location]?.position : undefined;
+    // Кому дежурство положено и почему отказ — `stanceToggle.ts` (REFM-98).
+    const want = scrambleStance(
+      !!f && f.owner === ME,
+      !!f && fleetHasSquadron(f),
+      !!patrolOf(id),
+      on,
+      !!pos0,
+      !!f && fleetIdle(f),
+    );
+    if (want === 'skip' || !f) continue;
+    if (want === 'need-dock') {
+      note(t('ai.sortie.docked-only'));
+      continue;
+    }
+    if (want === 'need-idle') {
+      note(t('ai.sortie.idle-only'));
+      continue;
+    }
+    if (want === 'clear') {
       if (NET) playerOrder(orderScramble(ME, id, false));
       else {
         // Stash the wing's sortie so OFF→ON resumes it (BF-26) instead of a free full tank.
@@ -3266,18 +3284,7 @@ function setScramble(ids: string[], on: boolean): void {
       }
       continue;
     }
-    const pos = f.location ? s.planets[f.location]?.position : undefined;
-    if (!pos) {
-      note(t('ai.sortie.docked-only'));
-      continue;
-    }
-    // Mirror the reducer's order.scramble gate (game.ts): a patrol only stands from a
-    // parked, out-of-combat wing. Without this, solo would arm a patrol the net path
-    // rejects (E_CONDITIONS_UNMET), and the UI would offer an action the server refuses.
-    if (!fleetIdle(f)) {
-      note(t('ai.sortie.idle-only'));
-      continue;
-    }
+    const pos = pos0!;
     if (NET) {
       playerOrder(orderScramble(ME, id, true));
     } else {
