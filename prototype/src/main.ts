@@ -531,6 +531,16 @@ import { showsBlackout, showsStarving } from './arrearsWarnings';
 import { canDockRepair, canRepair } from './repairOffer';
 import { capitalOffer, holdOffer } from './worldOrders';
 import { spyOffer, windowLeftH } from './spyOffer';
+import { artScale, calloutAlpha, chevronAlpha, detailAt, sphereBloom } from './semanticZoom';
+import {
+  chevronAngle,
+  orbitBloom,
+  orbitRadius,
+  orbitsLive as ringsLive,
+  slotAngle,
+} from './orbitRing';
+import { routeShown, routeStops, routeStroke } from './fleetRoute';
+import { netContacts, soloContacts } from './radarContacts';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -1264,20 +1274,18 @@ function updateRadarContacts(now: number): void {
     // What the sweep may paint. Solo scans the full state for radar-only enemy
     // fleets; in NET those fleets are physically ABSENT from the fogged state —
     // the server ships them as coarse contacts (snapshot.signatures, BF-18).
-    const contacts: Array<{ key: string; node: string; size: 'S' | 'M' | 'L' }> = [];
-    if (NET) {
-      netSignatures.forEach((c, i) => {
-        if (!known(c.location))
-          contacts.push({ key: `sig:${c.location}:${i}`, node: c.location, size: c.size });
-      });
-    } else {
-      for (const f of Object.values(s.fleets)) {
-        if (f.owner === ME) continue;
-        const fn = fleetNode(f);
-        if (!fn || known(fn) || !radarHas(fn)) continue; // identified or out of radar → not a signature
-        contacts.push({ key: f.id, node: fn, size: sigClass(fleetSignature(f)) });
-      }
-    }
+    // Кто может стать отметкой — `radarContacts.ts` (REFM-96): в соло тот же отбор
+    // делается вручную, иначе одиночная игра покажет больше сетевой.
+    const contacts = NET
+      ? netContacts(netSignatures, known)
+      : soloContacts(
+          Object.values(s.fleets),
+          ME,
+          (f) => fleetNode(f),
+          known,
+          radarHas,
+          (f) => sigClass(fleetSignature(f)),
+        );
     let hit = false; // засекла ли рука хоть кого-то в ЭТОМ кадре
     for (const c of contacts) {
       const node = s.planets[c.node];
@@ -1698,28 +1706,17 @@ function artilleryRangeOf(f: Fleet | undefined): number {
  *  player's garrisoning divisions (if they fit the free hold) and unload the ones it
  *  carries (onto an enemy world = a landing). Empty string when there's nothing to do. */
 
-const ORBIT_R = 31; // single orbit-ring radius in screen px (before the zoom bloom) — was 44, −30%
-// Past this camera zoom the orbital layer "opens up": rings widen and stationed
-// fleets start to circle their planet. Below it everything stays static (and
-// fixed-size), exactly as before — cheap at the whole-map view where it'd be invisible.
-const ORBIT_ZOOM_IN = 1.6;
+// Порог открытия слоя, раздутие радиуса, потолок по соседу и веер слотов — правила
+// `orbitRing.ts` (REFM-94); здесь остаётся только замер зазора на экране.
 let orbitPhase = 0; // accumulated sim-time ms (frozen on pause) — drives the orbit spin
 /** Ring/animation are gated on the same close-zoom threshold. */
 function orbitsLive(): boolean {
-  return cam.scale >= ORBIT_ZOOM_IN;
+  return ringsLive(cam.scale);
 }
-/** Orbit-ring radius scale at the current zoom: compact (half-size) at the far view —
- *  full rings read as bulky there — blooming open to ~2.4× once zoomed in close so
- *  stationed fleets get room to circle. */
-function orbitZoom(): number {
-  if (cam.scale <= ORBIT_ZOOM_IN) return 0.5;
-  return clamp(0.5 + (cam.scale - ORBIT_ZOOM_IN) * 1.2, 0.5, 2.4);
-}
-/** Orbit-ring radius for a planet at the current zoom, in screen px. The base radius
- *  blooms with zoom (orbitZoom), but is capped to a fraction of the on-screen gap to the
- *  nearest LINKED neighbour so the ring never spills onto the adjacent sectors — zoomed in
- *  tight on a phone the un-capped ring reached its neighbours and looked messy. Fleets sit
- *  on this same radius (so a chevron never floats off the ring). */
+/** Orbit-ring radius for a planet at the current zoom, in screen px. The ring blooms with
+ *  zoom but is capped to a fraction of the on-screen gap to the nearest LINKED neighbour,
+ *  so it never spills onto the adjacent sectors. Fleets sit on this same radius (so a
+ *  chevron never floats off the ring). */
 function orbitRingRadius(pl: { position: { x: number; y: number }; links?: string[] }): number {
   const pc = world(pl.position);
   let nearest = Infinity;
@@ -1729,18 +1726,12 @@ function orbitRingRadius(pl: { position: { x: number; y: number }; links?: strin
     const npc = world(np.position);
     nearest = Math.min(nearest, Math.hypot(npc.x - pc.x, npc.y - pc.y));
   }
-  // cap the ring at ~40% of the gap to the nearest neighbour, then scale by zoom (so two
-  // adjacent rings keep a gap and the ring never covers a neighbouring node).
-  const scale =
-    nearest === Infinity ? orbitZoom() : Math.min(orbitZoom(), (nearest * 0.4) / ORBIT_R);
-  return ORBIT_R * scale;
+  return orbitRadius(orbitBloom(cam.scale), nearest);
 }
 /** Angular position (radians) of a stationed fleet's orbit slot at index `idx` of
  *  `nPeers` sharing the ring — fanned out, and spinning when zoomed in close. */
 function orbitAngle(idx: number, nPeers: number): number {
-  let a = -Math.PI / 2 + (idx - (nPeers - 1) / 2) * 0.55;
-  if (orbitsLive()) a += orbitPhase * 0.00052; // the single ring's steady sweep (rad/ms)
-  return a;
+  return slotAngle(idx, nPeers, orbitPhase, orbitsLive());
 }
 
 /** Screen anchor (+ heading) for a fleet's chevron: the interpolated lane
@@ -1776,7 +1767,7 @@ function fleetAnchor(f: Fleet): { x: number; y: number; ang: number } | null {
   const a0 = orbitAngle(idx, peers.length);
   const r = orbitRingRadius(pl);
   // when circling, the chevron faces along its travel (tangent); static = radial as before
-  const ang = orbitsLive() ? a0 + Math.PI / 2 : a0;
+  const ang = chevronAngle(a0, orbitsLive());
   return { x: pc.x + Math.cos(a0) * r, y: pc.y + Math.sin(a0) * r, ang };
 }
 // ONB-5: a structured, bounded mirror of the event log — feeds the return digest.
@@ -3557,40 +3548,22 @@ function drawRadarCoverage() {
 /** The planned route of every moving fleet of mine — dashed, brighter if selected. */
 function drawFleetRoutes() {
   for (const f of Object.values(s.fleets)) {
-    if (f.owner !== ME || !f.movement) continue;
+    // Чей маршрут виден, где он кончается и как выглядит — `fleetRoute.ts` (REFM-95);
+    // здесь остаётся проекция мировых точек на экран.
+    if (!routeShown(f.owner, ME, !!f.movement) || !f.movement) continue;
     const start = fleetAnchor(f);
     if (!start) continue;
     const sel = selFleet === f.id || selFleets.has(f.id);
-    const mv = f.movement;
-    const nodes = [mv.to, ...(mv.path ?? [])];
-    // If the journey ends at a POINT on the final lane (`toEdge` order), the last
-    // route point must be that point — not the destination node it would latch to.
-    const parkFrac = mv.parkT ?? mv.endT ?? 1;
-    const pts = [{ x: start.x, y: start.y }];
-    for (let i = 0; i < nodes.length; i++) {
-      const pl = s.planets[nodes[i]!];
-      if (!pl) continue;
-      if (i === nodes.length - 1 && parkFrac < 1) {
-        const prev = s.planets[i === 0 ? mv.from : nodes[i - 1]!]?.position;
-        if (prev) {
-          pts.push(
-            world({
-              x: prev.x + (pl.position.x - prev.x) * parkFrac,
-              y: prev.y + (pl.position.y - prev.y) * parkFrac,
-            }),
-          );
-          continue;
-        }
-      }
-      pts.push(world(pl.position));
-    }
+    const stops = routeStops(f.movement, (id) => s.planets[id]?.position);
+    const pts = [{ x: start.x, y: start.y }, ...stops.map((p) => world(p))];
     if (pts.length < 2) continue;
+    const stroke = routeStroke(sel);
     cx.save();
     cx.setLineDash([4, 6]);
-    cx.strokeStyle = rgba(LOCK, sel ? 0.85 : 0.32);
-    cx.lineWidth = sel ? 1.8 : 1.1;
+    cx.strokeStyle = rgba(LOCK, stroke.alpha);
+    cx.lineWidth = stroke.width;
     cx.shadowColor = LOCK;
-    cx.shadowBlur = fxBlur(sel ? 8 : 2);
+    cx.shadowBlur = fxBlur(stroke.blur);
     cx.beginPath();
     cx.moveTo(pts[0]!.x, pts[0]!.y);
     for (let i = 1; i < pts.length; i++) cx.lineTo(pts[i]!.x, pts[i]!.y);
@@ -4129,7 +4102,8 @@ function render(now: number) {
   // schematic below), leaving territories, node art, fleet chevrons, battle
   // pulses and pings. Skipping those draws over the widest views — where the
   // most nodes are on screen at once — is also the frame-time win.
-  const detail = clamp((cam.scale - 1.2) / 0.25, 0, 1);
+  // Сам закон и его следствия — `semanticZoom.ts` (REFM-93).
+  const detail = detailAt(cam.scale);
   blitStaticLayer(); // backdrop + province political map (re-baked on camera move, else cached)
   drawCaptureFlashes(now); // wave over a just-flipped province, over the political fill
   drawScanSweep(now); // slow radar sweep — pure console chrome
@@ -4218,7 +4192,7 @@ function render(now: number) {
     // LOD: the volley stays visible on the schematic view (a battle is a signal),
     // but compact — arcs/bursts shrink with the node art so they can't swallow a
     // zoomed-out province.
-    const sk = 0.45 + 0.55 * detail;
+    const sk = artScale(detail);
     cx.save();
     for (let i = siegeShots.length - 1; i >= 0; i--) {
       const shot = siegeShots[i]!;
@@ -4349,7 +4323,7 @@ function render(now: number) {
   // provinces aren't swallowed by their own markers (owner-reported APK pile-up
   // at min zoom: node art + badges + fx stacked on top of each other).
   cx.textAlign = 'left';
-  const ns = 0.45 + 0.55 * detail; // node scale: schematic → detail
+  const ns = artScale(detail); // node scale: schematic → detail (тот же закон, что у залпа)
   const R = 13 * ns;
   for (const n of MAP) {
     const p = s.planets[n.id];
@@ -4575,7 +4549,7 @@ function render(now: number) {
     if (n.sector === 'planet') {
       // Planet: holographic volume — a lit sphere inside the ring, subtle at far view,
       // blooming to full once you zoom into a region
-      blitSphere(col, c.x, c.y, R, clamp(0.3 + (cam.scale - 1) * 0.7, 0.3, 1));
+      blitSphere(col, c.x, c.y, R, sphereBloom(cam.scale));
 
       // wireframe body + bright core (glow comes from the cached aura/bloom discs,
       // not shadowBlur — shadowBlur per node per frame is a major CPU cost)
@@ -4742,9 +4716,10 @@ function render(now: number) {
     // which stay labelled like city names on a globe (your anchor at any zoom).
     const isWorld = n.sector === 'planet';
     const mineWorld = isWorld && p.owner === ME;
-    if (detail === 0 && !mineWorld) continue;
+    const callout = calloutAlpha(detail, mineWorld);
+    if (callout === 0) continue;
     cx.save();
-    cx.globalAlpha = mineWorld ? Math.max(detail, 0.9) : detail;
+    cx.globalAlpha = callout;
     cx.shadowColor = 'rgba(0,0,0,0.85)';
     cx.shadowBlur = fxBlur(3);
     if (isWorld) {
@@ -4874,7 +4849,7 @@ function render(now: number) {
     // cargo pips and ship count cross-fade away (schematic view keeps who/where).
     if (detail < 1) {
       cx.save();
-      cx.globalAlpha = 1 - detail;
+      cx.globalAlpha = chevronAlpha(detail);
       cx.translate(A.x, A.y);
       cx.rotate(A.ang + Math.PI / 2);
       cx.shadowColor = col;
