@@ -542,6 +542,7 @@ import { routeShown, routeStops, routeStroke } from './fleetRoute';
 import { netContacts, soloContacts } from './radarContacts';
 import { autoStance, scrambleStance } from './stanceToggle';
 import { fleetCount, goalBaseline, grew, mineLevels } from './goalTally';
+import { introFor } from './introTrigger';
 import {
   loadStep,
   makeLoads,
@@ -2178,13 +2179,10 @@ function playerOrder(action: Action): boolean {
   }
   else {
     activeTour?.notifyAction(action.type); // an accepted intent advances `action` steps
-    // ONB-5: the first fleet leaving on a course is when "the world runs offline"
-    // becomes real — teach it once (but not mid-guide, where the tour owns the screen).
-    if (action.type === 'fleet.move' && !activeTour?.active) maybeIntro('asyncDelay');
-    // ONB-3 remainder: first retreat/barrage order — same "teach on first real use"
-    // pattern as asyncDelay, not mid-guide (the tour's own steps own the screen).
-    if (action.type === 'fleet.retreat' && !activeTour?.active) maybeIntro('retreat');
-    if (action.type === 'fleet.barrage' && !activeTour?.active) maybeIntro('artillery');
+    // Какой ПРИНЯТЫЙ приказ какую вставку поднимает и почему во время тура молчат все —
+    // `introTrigger.ts` (REFM-100).
+    const intro = introFor(action.type, !!activeTour?.active);
+    if (intro) maybeIntro(intro);
   }
   return true;
 }
