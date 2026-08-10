@@ -546,6 +546,7 @@ import { fleetCount, goalBaseline, grew, mineLevels } from './goalTally';
 import { introFor } from './introTrigger';
 import { EVENT_LOG_MAX, LOG_LINES, isRepeat, pushBounded, stamp } from './noteLog';
 import { pruneGroup, refSurvives } from './selectionPrune';
+import { restoresWallet, snapshotWallet } from './freeBuild';
 import {
   loadStep,
   makeLoads,
@@ -2108,13 +2109,18 @@ function drawSignatureAt(
 // snapshotting the treasury before and restoring it after makes the build free.
 // Leading `__PLAYER_BUILD__` guard keeps the sandbox tree-shaken from the player bundle.
 function sandboxBuildSnapshot(type: string): Record<string, number> | null {
-  if (__PLAYER_BUILD__) return null;
-  if (!sandboxConfig.enabled || !sandboxConfig.freeBuild || !isBuildAction(type)) return null;
-  return { ...(s.players[ME]?.resources ?? {}) };
+  // Когда песочница возвращает ресурсы — `freeBuild.ts` (REFM-104).
+  const armed = snapshotWallet(
+    __PLAYER_BUILD__,
+    sandboxConfig.enabled,
+    sandboxConfig.freeBuild,
+    isBuildAction(type),
+  );
+  return armed ? { ...(s.players[ME]?.resources ?? {}) } : null;
 }
 function sandboxBuildRestore(snap: Record<string, number> | null, ok: boolean): void {
   const me = s.players[ME];
-  if (snap && ok && me) me.resources = snap;
+  if (me && restoresWallet(!!snap, ok)) me.resources = snap!;
 }
 
 function apply(out: StepOut) {
