@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { nodeView, seesDetails, type NodeSight } from './fogView';
+import { fleetVisible, nodeView, seesDetails, type NodeSight } from './fogView';
 
 const sight = (over: Partial<NodeSight> = {}): NodeSight => ({
   sector: 'core',
@@ -53,5 +53,28 @@ describe('туман — виден ли мир в деталях', () => {
 
   it('свой и опознанный одновременно — тоже виден', () => {
     expect(seesDetails({ identified: true, mine: true })).toBe(true);
+  });
+});
+
+describe('туман — видимость флота', () => {
+  it('СВОЙ ФЛОТ ВИДЕН ВСЕГДА: туман прячет чужое, а не свои силы', () => {
+    expect(fleetVisible(true, false, false)).toBe(true);
+  });
+
+  it('чужой флот виден на ОПОЗНАННОМ узле', () => {
+    expect(fleetVisible(false, true, false)).toBe(true);
+  });
+
+  it('ПО ОДНОМУ РАДАРУ ФЛОТ НЕ ПОКАЗЫВАЮТ: засечка это не состав эскадры', () => {
+    // радар сюда не входит вовсе: неопознанный узел без окна разведки — не видно
+    expect(fleetVisible(false, false, false)).toBe(false);
+  });
+
+  it('ОКНО РАЗВЕДКИ ПОКАЗЫВАЕТ ФЛОТЫ ВЛАДЕЛЬЦА, где бы они ни стояли', () => {
+    expect(fleetVisible(false, false, true)).toBe(true);
+  });
+
+  it('окно и опознание не спорят — любого достаточно', () => {
+    expect(fleetVisible(false, true, true)).toBe(true);
   });
 });

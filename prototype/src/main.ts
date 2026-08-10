@@ -211,7 +211,7 @@ import { assaultOrderState, dropsOrder } from './assaultQueue';
 import { laneEnds, warConfirmPlan } from './warOrders';
 import { bakeSignature, needsRebake, ownersSignature } from './staticLayerCache';
 import { clipPolygon, clipRect, provinceSeeds } from './provinceMap';
-import { nodeView, seesDetails as fogSeesDetails } from './fogView';
+import { fleetVisible, nodeView, seesDetails as fogSeesDetails } from './fogView';
 import { hasCoverage, identifyRadius, radarSources } from './radarSources';
 import { tapOwner, tapRadius } from './tapPriority';
 import { nextPick, tapCandidates, touchPick, type TapPick } from './tapCycle';
@@ -1995,8 +1995,8 @@ function computeVision(): Vision {
 /** Is this fleet visible? Own always; enemy — when its node is identified OR a
  *  live `fleets` intel window covers its owner. */
 function fleetSeen(f: Fleet): boolean {
-  if (f.owner === ME) return true;
-  return known(fleetNode(f)) || intelFleetOwners.has(f.owner);
+  // Правила 5–7 «видимости под туманом» — `fogView.ts` (REFM-103), там же, где мир.
+  return fleetVisible(f.owner === ME, known(fleetNode(f)), intelFleetOwners.has(f.owner));
 }
 
 // Per-viewer MEMORY of the last identified state of a node (variant B): once you
