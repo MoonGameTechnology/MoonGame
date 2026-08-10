@@ -540,6 +540,14 @@ import {
 } from './orbitRing';
 import { routeShown, routeStops, routeStroke } from './fleetRoute';
 import { netContacts, soloContacts } from './radarContacts';
+import {
+  loadStep,
+  makeLoads,
+  queuedCargo,
+  queuedFromWorld,
+  queuedOf,
+  type PendingLoad,
+} from './loadQueue';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -2399,42 +2407,25 @@ document.getElementById('hub-tutorial')?.addEventListener('click', beginOnboardi
 // advanced LOAD_TIME, while the fleet marker animates the hold filling up. This is
 // prototype-only client state; the deterministic core is untouched.
 const LOAD_TIME = HOUR; // ~1 game-hour to lift one ground unit into the hold
-interface PendingLoad {
-  fleetId: string;
-  unit: string;
-  startAt: number; // world time the load was ordered
-  doneAt: number; // world time it completes
-}
+// Правила очереди — `loadQueue.ts` (REFM-97): поштучные записи, резерв трюма заранее,
+// резерв гарнизона по МИРУ и отмена вслед за носителем.
 let pendingLoads: PendingLoad[] = [];
 
 /** Hold footprint (cargoSize) already reserved by this fleet's in-progress loads. */
 function pendingLoadCargo(fleetId: string): number {
-  let n = 0;
-  for (const p of pendingLoads)
-    if (p.fleetId === fleetId) n += data.units[p.unit]?.stats.cargoSize ?? 1;
-  return n;
+  return queuedCargo(pendingLoads, fleetId, (u) => data.units[u]?.stats.cargoSize ?? 1);
 }
 
 /** How many of `unit` are already promised to in-progress loads lifting from the
- *  SAME garrison (planet), so a queued load never over-draws a world's stock. Any
- *  fleet docked at `planetId` shares that garrison, so reservations span fleets. */
+ *  SAME garrison (planet), so a queued load never over-draws a world's stock. */
 function pendingLoadUnits(planetId: string, unit: string): number {
-  let n = 0;
-  for (const p of pendingLoads) {
-    if (p.unit !== unit) continue;
-    if (s.fleets[p.fleetId]?.location === planetId) n++;
-  }
-  return n;
+  return queuedFromWorld(pendingLoads, planetId, unit, (id) => s.fleets[id]?.location);
 }
 
 /** Положить в очередь `count` часовых погрузок БЕЗ проверок — вызывающий уже
- *  посчитал и место, и запас гарнизона (меню десанта делает это своей моделью).
- *  Записи по одной единице, а не одна на партию, СОЗНАТЕЛЬНО: ядро грузит «всё или
- *  ничего», поэтому N отдельных `army.load` доедут частично, если за этот час
- *  гарнизон обмелел, — партия одним действием отскочила бы целиком. */
+ *  посчитал и место, и запас гарнизона (меню десанта делает это своей моделью). */
 function pushLoads(fleetId: string, unit: string, count: number): void {
-  for (let i = 0; i < count; i++)
-    pendingLoads.push({ fleetId, unit, startAt: s.time, doneAt: s.time + LOAD_TIME });
+  pendingLoads.push(...makeLoads(fleetId, unit, count, s.time, LOAD_TIME));
 }
 
 /** Fail-secure: ядро не выпускает войска из гарнизона, запертого живым боем
@@ -2449,17 +2440,9 @@ function troopsLiftable(planetId: string): boolean {
  *  (load cancelled), and fire the real `army.load` once a load's hour has elapsed. */
 function pumpPendingLoads(): void {
   if (!pendingLoads.length) return;
-  const keep: PendingLoad[] = [];
-  for (const p of pendingLoads) {
-    const f = s.fleets[p.fleetId];
-    if (!f || f.movement || f.battleId || !f.location) continue; // cancelled
-    if (s.time >= p.doneAt) {
-      playerOrder(loadArmy(ME, p.fleetId, p.unit, 1)); // kernel moves garrison → hold
-      continue;
-    }
-    keep.push(p);
-  }
+  const { fire, keep } = loadStep(pendingLoads, s.time, (id) => s.fleets[id]);
   pendingLoads = keep;
+  for (const p of fire) playerOrder(loadArmy(ME, p.fleetId, p.unit, 1)); // garrison → hold
 }
 
 /** GRND-1: собрать вход меню десанта для флота. `null` — показывать нечего: флот не
@@ -2491,7 +2474,7 @@ function troopsInputFor(fleetId: string): TroopsInput | null {
     garrisonAll: mine ? totalOf(here.garrison, unit) : 0,
     hold: findHealthyStack(landing, unit)?.count ?? 0,
     holdAll: totalOf(landing, unit),
-    queued: pendingLoads.filter((p) => p.fleetId === fleetId && p.unit === unit).length,
+    queued: queuedOf(pendingLoads, fleetId, unit),
     reserved: pendingLoadUnits(here.id, unit),
     cargoSize: data.units[unit]?.stats.cargoSize ?? 1,
   }));
