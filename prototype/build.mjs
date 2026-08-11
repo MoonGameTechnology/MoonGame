@@ -1691,10 +1691,16 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
      замер --sheeth годится как есть; 50vh — тот же фолбэк до первого замера */
   body.sheet-open #cmdbar{bottom:calc(var(--sheeth,50vh) + 8px);}
 }
-/* connect overlay — entry screen (single-player vs join a live session) */
+/* connect overlay — entry screen (sign in, then join a live session) */
 /* Identity is its OWN page, not an overlay: an OPAQUE full-screen backdrop so the live
    map/skirmish never shows through behind the welcome / registration / browser cards. */
-#connect{position:fixed;inset:0;z-index:50;display:flex;align-items:center;justify-content:center;
+/* align-items:flex-start + margin:auto on .cwrap (NOT align-items:center): a centered
+   flex item that outgrows its container is clipped at the TOP with no way to scroll to
+   it, and the welcome card is taller than a laptop viewport once the browser's own
+   chrome (tab strip + bookmarks bar) eats the height. Auto margins center it while it
+   fits and collapse to a scrollable overflow when it does not. */
+#connect{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-start;justify-content:center;
+  overflow-y:auto;-webkit-overflow-scrolling:touch;
   padding:20px;background:radial-gradient(125% 105% at 50% 38%,#04141c 0%,#02080e 58%,#01040a 100%);}
 #connect .cbox{width:min(520px,94vw);background:var(--glass);border:1px solid var(--line-hi);
   border-radius:12px;padding:22px 20px;box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
@@ -1749,9 +1755,13 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   color:var(--cyan);font-size:11px;cursor:pointer;white-space:nowrap;}
 #connect .mbtn.ghost{border-color:var(--line-hi);background:transparent;color:var(--dim);}
 #connect .mbtn:active{background:rgba(53,214,230,.24);}
-/* welcome stage — first-launch identity screen (new commander / sign-in / single-player) */
-#connect .cwrap{position:relative;width:min(520px,94vw);}
-#connect .clang{position:absolute;top:-46px;right:0;display:flex;align-items:center;gap:7px;
+/* welcome stage — first-launch identity screen (new commander / sign-in) */
+/* The chip above the card and the legal footer below it are absolutely positioned, so
+   they carry no height of their own — the padding here RESERVES their strip inside the
+   wrap. Without it they hang outside the scroll area and get cut off (the chip slid
+   under the browser's bookmarks bar). Same pixels as the old top:-46px / bottom:-50px. */
+#connect .cwrap{position:relative;width:min(520px,94vw);margin:auto;padding:46px 0 50px;}
+#connect .clang{position:absolute;top:0;right:0;display:flex;align-items:center;gap:7px;
   padding:7px 13px;background:rgba(3,12,16,.72);border:1px solid var(--line-hi);border-radius:7px;
   color:var(--dim);font:11px ui-monospace,monospace;letter-spacing:2px;cursor:pointer;}
 #connect .clang:hover{border-color:var(--cyan-dim);color:var(--ink);}
@@ -1780,7 +1790,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #connect .cback{align-self:flex-start;background:none;border:none;color:var(--dim);
   font:12px ui-monospace,monospace;letter-spacing:1px;cursor:pointer;padding:0;margin-bottom:8px;}
 #connect .cback:hover{color:var(--cyan);}
-#connect .cfoot{position:absolute;left:0;right:0;bottom:-50px;display:flex;flex-wrap:wrap;
+#connect .cfoot{position:absolute;left:0;right:0;bottom:0;display:flex;flex-wrap:wrap;
   justify-content:center;gap:6px 16px;padding:0 8px;}
 #connect .cfoot a{color:var(--cyan-dim);font-size:10px;letter-spacing:.5px;text-decoration:none;cursor:pointer;opacity:.85;}
 #connect .cfoot a:hover{color:var(--cyan);opacity:1;}
@@ -2061,12 +2071,22 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   #speedbar,body.sheet-open #speedbar{right:calc(min(380px,40vw) + 14px);}
 }
 /* --- short viewports (landscape phones, split-screen): overlays scroll instead of
-   clipping off-screen; the welcome card compacts and stacks its chip/footer in-flow --- */
+   clipping off-screen (#connect already does, see its base rule) --- */
 @media (max-height:680px){
-  #connect,#setup,#codex,#playercard,#settings,#warprompt,#diplo,#splitdlg,#pingmenu,#constructor,#market{
+  #setup,#codex,#playercard,#settings,#warprompt,#diplo,#splitdlg,#pingmenu,#constructor,#market{
     align-items:flex-start;overflow-y:auto;-webkit-overflow-scrolling:touch;}
+}
+/* --- the welcome card is the tallest overlay we have: the roomy version needs ~930px
+   of viewport with its language chip and legal footer, which no laptop browser window
+   has (a 900px-tall Chrome leaves ~700px of page once the tab strip and bookmarks bar
+   take their cut). So it compacts far above the phone-sized breakpoint above — the
+   login screen is the first thing anyone sees and must not need scrolling. Below the
+   threshold the chip and the footer stack in-flow instead of hanging off the card. --- */
+@media (max-height:940px){
   #connect{padding:14px 18px;}
-  #connect .cwrap{display:flex;flex-direction:column;margin:auto;}
+  /* chip + footer go back in-flow here, so drop the strip the base rule reserved for
+     their absolute boxes — otherwise it shows up as dead space above and below. */
+  #connect .cwrap{display:flex;flex-direction:column;margin:auto;padding:0;}
   #connect .clang{position:static;align-self:flex-end;margin:0 0 10px;top:auto;right:auto;}
   #connect .cfoot{position:static;bottom:auto;margin-top:14px;}
   #connect .ccrest{margin:2px 0 14px;gap:6px;}
@@ -2661,9 +2681,11 @@ const page = (js) => `<!doctype html>
           <button id="cgoogle" class="csoc" type="button" data-i18n-title="welcome.google" data-i18n-aria="welcome.google">G</button>
           <button id="capple" class="csoc" type="button" data-i18n-title="welcome.apple" data-i18n-aria="welcome.apple"><svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor"><path d="M16.4 12.9c0-2.3 1.9-3.4 2-3.4-1.1-1.6-2.8-1.8-3.4-1.8-1.5-.1-2.8.8-3.5.8s-1.8-.8-3-.8c-1.5 0-2.9.9-3.7 2.3-1.6 2.7-.4 6.8 1.1 9 .7 1.1 1.6 2.3 2.8 2.2 1.1 0 1.5-.7 2.9-.7s1.7.7 2.9.7c1.2 0 2-1.1 2.7-2.1.8-1.2 1.2-2.4 1.2-2.4s-2.3-.9-2.3-3zM14.3 6.3c.6-.8 1-1.8.9-2.9-.9 0-2 .6-2.6 1.3-.6.7-1.1 1.7-.9 2.7 1 .1 2-.5 2.6-1.1z"/></svg></button>
         </div>
+        <!-- No single-player entry here: the welcome card is the pre-auth screen, and
+             an unauthenticated visitor must not be able to start matches from it. The
+             skirmish setup lives behind the login, in the hub. -->
         <div class="cstack">
           <button id="clogin" class="cbtn ghost" type="button" data-i18n="welcome.login"></button>
-          <!--dev-only--><button id="csolo" class="cbtn ghost" type="button" data-i18n="welcome.solo"></button><!--/dev-only-->
         </div>
         <form class="authform" onsubmit="return false">
           <div id="cwlogin" class="cwlogin" style="display:none">

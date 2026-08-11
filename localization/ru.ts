@@ -78,7 +78,6 @@ export const ru: Record<string, string> = {
   'auth.google.soon': 'Вход через Google — скоро · вы вошли гостем',
   'auth.need-mail': 'Введите почту',
   'auth.need-name': 'Введите имя командира',
-  'auth.need-nick': 'Введите позывной',
   'auth.pass-mismatch': 'Пароли не совпадают',
   'auth.recover.sent': 'Если такая почта есть — прислали ссылку для сброса',
   'auth.reset.bad-link': 'Ссылка недействительна или устарела',
@@ -203,7 +202,6 @@ export const ru: Record<string, string> = {
   'client.status.new-commander': '→ Обзор матчей · новый командир «{nick}»{notice}',
   'client.status.returning': '→ Обзор матчей · {nick}',
   'client.status.returning-fallback': 'возвращение',
-  'client.status.single': '▶ Одиночная игра — запуск песочницы… (движок в браузере)',
 
   // --- chain — Режим «Приказ»: полоска плана, меню точки, отказы.
   'chain.add-wait6': '⏱ +6ч',
@@ -1014,7 +1012,6 @@ export const ru: Record<string, string> = {
   'err.no-fleet': 'флот не найден',
   'err.no-funds': 'не хватает средств',
   'err.no-hero': 'герой не найден',
-  'err.no-nick': 'Введите позывной.',
   'err.no-node': 'неизвестный узел дерева',
   'err.no-planet': 'мир не найден',
   'err.no-player': 'игрок не найден',
@@ -1941,7 +1938,6 @@ export const ru: Record<string, string> = {
   'welcome.reset.pass2': 'Повтор пароля',
   'welcome.reset.sub': 'Придумайте новый пароль для входа.',
   'welcome.reset.title': 'Новый пароль',
-  'welcome.solo': 'Одиночная игра',
   'welcome.sub': 'Добро пожаловать, командир. Флот ждёт приказа.',
   'welcome.support': 'Поддержка',
   'welcome.tagline': 'Грань пустоты',
