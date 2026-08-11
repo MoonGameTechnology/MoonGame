@@ -1729,6 +1729,10 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #connect .cwlogin input:focus{outline:none;border-color:var(--cyan);box-shadow:0 0 0 2px rgba(53,214,230,.2);}
 #connect .cwlogin .cbtn{flex:0 0 auto;min-width:92px;}
 #connect .cstat{margin-top:14px;min-height:16px;font-size:12px;color:var(--amber);text-align:center;}
+/* The status line reserves its row so an appearing message doesn't shove the card's
+   buttons down. On a freshly opened welcome card there IS no message, and the reserved
+   row read as a dead strip under the last button — collapse it while it is empty. */
+#connect .cstat:empty{margin-top:0;min-height:0;}
 #connect .clink{display:block;width:100%;margin-top:14px;padding:4px;background:none;border:none;cursor:pointer;
   color:var(--cyan-dim);font:12px ui-monospace,monospace;letter-spacing:.5px;text-align:center;}
 #connect .clink:hover{color:var(--cyan);text-decoration:underline;}
