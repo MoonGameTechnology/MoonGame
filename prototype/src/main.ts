@@ -549,6 +549,7 @@ import { pruneGroup, refSurvives } from './selectionPrune';
 import { restoresWallet, snapshotWallet } from './freeBuild';
 import { TOAST_FADE_MS, TOAST_LIFE_MS, toastClass, toastOverflow, toastText } from './toastView';
 import { ringed, ringsShown } from './assaultRings';
+import { mergeStep } from './mergeChase';
 import {
   loadStep,
   makeLoads,
@@ -2815,20 +2816,17 @@ function mergeGroup(ids: string[]) {
 function resolvePendingMerges() {
   if (!pendingMerges.length) return;
   pendingMerges = pendingMerges.filter(({ mover, into }) => {
-    const m = s.fleets[mover];
-    const a = s.fleets[into];
-    if (!m || !a) return false; // a fleet is gone (already merged / destroyed) → drop
-    if (m.battleId || a.battleId) return true; // hold the order through combat
-    if (m.location && a.location && m.location === a.location && !m.movement && !a.movement) {
+    // Судьба приказа в этом кадре — `mergeChase.ts` (REFM-107).
+    const step = mergeStep(s.fleets[mover], s.fleets[into]);
+    if (step.do === 'drop') return false;
+    if (step.do === 'fuse') {
       playerOrder(mergeFleet(ME, mover, into));
-      return false; // co-located & idle → fused, order complete
+      return false; // слились — приказ исполнен
     }
-    const dest = a.location ?? a.movement?.to ?? null;
-    if (!m.movement && dest && m.location !== dest) {
-      // Consume-on-reject: отвергнутый догоняющий ход (нет права прохода и т.п.)
-      // выбрасывает слияние, иначе idle-флот пережимал бы его каждый кадр —
-      // бесконечные «✖ …» (второй такой же цикл нашёл скептик bug-hunt'а).
-      if (!playerOrder(moveFleet(ME, mover, dest))) return false;
+    if (step.do === 'chase') {
+      // Consume-on-reject (правило 5): отвергнутый догоняющий ход выбрасывает слияние,
+      // иначе idle-флот пережимал бы его каждый кадр — бесконечные «✖ …».
+      if (!playerOrder(moveFleet(ME, mover, step.to))) return false;
     }
     return true;
   });
