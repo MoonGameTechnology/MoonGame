@@ -2459,7 +2459,14 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
     pointer-events:none;}
   #railtools::before{content:'▲';top:-6px;background:linear-gradient(180deg,rgba(3,12,16,.95) 55%,transparent);}
   #railtools::after{content:'▼';bottom:-6px;background:linear-gradient(0deg,rgba(3,12,16,.95) 55%,transparent);}
-  #goals{max-width:min(230px,40vw);}
+  /* ONB-7 goals checklist. The phone anchor (top:52px, right edge) is wrong on PC twice
+     over: 52px is INSIDE the 84px top bar, and the right edge is where the sector panel
+     docks — the box sat on top of both. Park it in the free left column instead: flush
+     under the devline, and pushed past the tool rail (left:10px + a 50px-wide tool list)
+     so the rail menu stays uncovered when it is OPEN. The clearance is horizontal on
+     purpose — the rail grows UP from the bottom corner and on a short window its tool
+     list reaches the devline, so no vertical anchor can stay clear of it. */
+  #goals{top:calc(var(--tbh) + 28px);right:auto;left:70px;max-width:min(230px,40vw);}
   /* content windows widen to ~80% of the screen (53.4vw layout × zoom 1.5) — the
      console windows outgrew their phone-sized boxes (long RU copy overflowed) */
   #codex .cxbox{width:53.4vw;max-height:56vh;}
