@@ -131,4 +131,29 @@ describe('панель — строки состава', () => {
     const html = unitRows(stacks, view, 'никого');
     expect(html.indexOf('CRUISER')).toBeLessThan(html.indexOf('SCOUT'));
   });
+
+  it('СТРОКА СОСТАВА — КНОПКА, как строка здания: по ней есть куда нажать', () => {
+    const html = unitRows(stacks, view, 'никого');
+    expect(html).toContain('<button class="asset-row unit"');
+    expect(html).not.toContain('<div class="asset-row"');
+  });
+
+  it('ТАП ВЕДЁТ В КАРТОЧКУ, УДЕРЖАНИЕ ПОКАЗЫВАЕТ ИМЯ — те же якоря, что у зданий', () => {
+    const html = unitRows(stacks, view, 'никого');
+    expect(html).toContain('data-codex="u:cruiser"');
+    expect(html).toContain('data-name="CRUISER"');
+  });
+
+  it('список идёт ОДНИМ СТОЛБИКОМ — тем же контейнером, что у зданий', () => {
+    expect(unitRows(stacks, view, 'никого')).toContain('<div class="blist">');
+  });
+
+  it('пустой состав столбика не заводит — сообщать нечего', () => {
+    expect(unitRows([], view, 'никого')).not.toContain('blist');
+  });
+
+  it('имя из данных не протекает в якорь удержания', () => {
+    const html = unitRows([{ unit: 'x', count: 1 }], () => ({ icon: '', name: '"><b>злое', domain: 'з' }), 'никого');
+    expect(html).not.toContain('data-name=""><b>злое"');
+  });
 });

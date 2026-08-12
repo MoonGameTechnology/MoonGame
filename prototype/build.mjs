@@ -945,8 +945,8 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
    имена ломались надвое, и секция съедала пол-листа. Строка — кнопка, поэтому ей нужны
    ширина на всю колонку, курсор и сброс кнопочных умолчаний шрифта. */
 .blist{display:flex;flex-direction:column;margin:4px 0 8px;}
-.asset-row.built{width:100%;margin:3px 0;cursor:pointer;font:inherit;color:inherit;text-align:left;}
-.asset-row.built .dim{margin-left:auto;font-size:11px;white-space:nowrap;}
+.asset-row.built,.asset-row.unit{width:100%;margin:3px 0;cursor:pointer;font:inherit;color:inherit;text-align:left;}
+.asset-row.built .dim,.asset-row.unit .dim{margin-left:auto;font-size:11px;white-space:nowrap;}
 .bicon{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;margin-right:7px;
   border:1px solid var(--line-hi);background:rgba(53,214,230,.07);color:var(--cyan);font-size:12px;}
 .asset-row .bicon{margin-right:0;flex:0 0 auto;}

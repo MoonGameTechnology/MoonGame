@@ -1761,7 +1761,6 @@ export const en: Record<string, string> = {
   'side.world.type.long': 'A {pt} world — {mods}',
   'side.world.vp': 'Victory points',
 
-  'side.tiles.empty': 'none',
 
   // --- speed — Панель времени: подсказки множителей, перезапуска и выхода.
   'speed.exit': 'Exit to menu',
