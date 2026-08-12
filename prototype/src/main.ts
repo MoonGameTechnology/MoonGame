@@ -550,6 +550,7 @@ import { restoresWallet, snapshotWallet } from './freeBuild';
 import { TOAST_FADE_MS, TOAST_LIFE_MS, toastClass, toastOverflow, toastText } from './toastView';
 import { ringed, ringsShown } from './assaultRings';
 import { mergeStep } from './mergeChase';
+import { jumpStep, type JumpKind } from './mapJump';
 import {
   loadStep,
   makeLoads,
@@ -11845,15 +11846,28 @@ function drawChainOverlay(now: number): void {
     }
   }
 }
-/** Pan the camera to a world referenced from a plan row (data-goto) — selection stays
- *  untouched (the fleet panel must survive the tap) and a short ring marks the spot. */
 const GO_FLASH_MS = 1600;
 let goFlash: { id: string; at: number } | null = null;
-function focusWorld(id: string): void {
+/** Обе дороги к точке карты. Чем прыжок из текста отличается от перехода по ссылке из
+ *  панели (масштаб, выделение, диплоокно, вспышка) — `mapJump.ts` (REFM-108). */
+function jumpTo(id: string, kind: JumpKind): void {
   const pl = s.planets[id];
-  if (!pl) return;
-  centerOn(pl.position, Math.max(cam.scale, 2.5));
-  goFlash = { id, at: performance.now() };
+  const step = jumpStep(kind, !!pl, cam.scale);
+  if (!pl || step.do !== 'jump') return;
+  centerOn(pl.position, step.scale);
+  if (step.select) {
+    selPlanet = id;
+    selFleet = null;
+    selFleets = new Set();
+    lastPanelHtml = '';
+  }
+  if (step.closeDiplo) closeDiplo();
+  if (step.ring) goFlash = { id, at: performance.now() };
+}
+/** Pan the camera to a world referenced from a plan row (data-goto) — selection stays
+ *  untouched (the fleet panel must survive the tap) and a short ring marks the spot. */
+function focusWorld(id: string): void {
+  jumpTo(id, 'goto');
 }
 function drawGoFlash(now: number): void {
   if (!goFlash) return;
@@ -11960,15 +11974,10 @@ function drawCaptureFlashes(now: number): void {
     cx.restore();
   }
 }
+/** Fly to a world referenced from TEXT (toast / recap row / diplo ping): the map is not
+ *  in front of the player yet, so this one zooms in and takes over the selection. */
 function jumpToPing(id: string): void {
-  const pl = s.planets[id];
-  if (!pl) return;
-  centerOn(pl.position, 3);
-  selPlanet = id;
-  selFleet = null;
-  selFleets = new Set();
-  lastPanelHtml = '';
-  closeDiplo();
+  jumpTo(id, 'ping');
 }
 const diploEl = document.getElementById('diplo');
 if (diploEl) {
