@@ -221,7 +221,14 @@ import { laneEnds, warConfirmPlan } from './warOrders';
 import { bakeSignature, needsRebake, ownersSignature } from './staticLayerCache';
 import { clipPolygon, clipRect, provinceSeeds } from './provinceMap';
 import { fleetVisible, nodeView, seesDetails as fogSeesDetails } from './fogView';
-import { hasCoverage, identifyRadius, radarSources, rangeRings } from './radarSources';
+import {
+  hasCoverage,
+  identifyRadius,
+  mergeArms,
+  radarSources,
+  rangeRings,
+  sweepChromeShown,
+} from './radarSources';
 import { tapOwner, tapRadius } from './tapPriority';
 import { nextPick, tapCandidates, touchPick, type TapPick } from './tapCycle';
 import { chainTapTarget, nearestOwnWorld as ownWorldNearest } from './chainTarget';
@@ -1201,14 +1208,11 @@ function drawScanSweep(now: number) {
   // One arm per OWN radar source, pivoted on the array / the ship itself (a moving
   // ship carries its arm along). Sources sharing a pivot (a radar world with a
   // radar ship docked) merge — only the farthest radius is shown.
-  const merged = new Map<string, SweepArm>();
+  const raw: SweepArm[] = [];
   const add = (at: { x: number; y: number }, reach: number): void => {
     const c = world(at);
     const r = world({ x: at.x + reach, y: at.y }).x - c.x; // uniform projection ⇒ true circle
-    if (r <= 0) return;
-    const key = `${Math.round(c.x)}:${Math.round(c.y)}`;
-    const cur = merged.get(key);
-    if (!cur || r > cur.r) merged.set(key, { x: c.x, y: c.y, r });
+    raw.push({ x: c.x, y: c.y, r });
   };
   for (const p of Object.values(s.planets)) {
     if (p.owner !== ME) continue;
@@ -1221,15 +1225,19 @@ function drawScanSweep(now: number) {
     const pos = r > 0 ? fleetPos(f) : null;
     if (pos) add(pos, r);
   }
-  sweepArms = [...merged.values()];
+  // Слияние совпавших по месту источников (остаётся ДАЛЬНИЙ) — `radarSources.ts`
+  // (REFM-119): радарный корабль у радарного мира иначе дал бы два луча из одной точки.
+  sweepArms = mergeArms(raw);
   sweepAng = (now / SWEEP_DIV) % TAU;
   sweepOn = sweepArms.length > 0;
   if (!sweepOn) return;
   // Visual gate (player preference). Everything above — arms, angle, sweepOn — is the
   // MECHANIC and always runs; only the chrome below is skipped/dimmed. At 0 the sweep is
   // invisible yet still snapshots contacts and lights blips exactly as before.
+  // Механика (лучи, угол, `sweepOn`) уже посчитана выше и от настройки не зависит —
+  // прозрачность гасит только ХРОМ (`radarSources.ts`, правило 10).
   const op = sweepOpacity;
-  if (op <= 0) return;
+  if (!sweepChromeShown(op)) return;
   cx.save();
   cx.globalCompositeOperation = 'lighter';
   for (const a of sweepArms) {
