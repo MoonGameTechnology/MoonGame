@@ -553,6 +553,7 @@ import { mergeStep } from './mergeChase';
 import { gridGap, gridLines, gridOffset } from './backdropGrid';
 import { burstK, shellT, sparkAngle, volleyLife, type VolleySpec } from './volleyFx';
 import { FLAK_LIFE_MS, flakBurstRadius, flakDashOffset, flakLook, flakTier } from './flakTiers';
+import { sweepGlow as armsGlow, sweepPaint, sweepShows } from './sweepFx';
 import { jumpStep, type JumpKind } from './mapJump';
 import {
   loadStep,
@@ -1168,18 +1169,9 @@ let netSignatures: Array<{ location: string; size: 'S' | 'M' | 'L' }> = [];
  *  the arm crosses it, fading linearly back to 0 just before the next pass (so the
  *  imprint lingers a whole rotation). 0 when the sweep is inactive. */
 function sweepGlow(c: { x: number; y: number }): number {
-  if (!sweepOn) return 0;
-  let best = 0;
-  for (const a of sweepArms) {
-    const dx = c.x - a.x;
-    const dy = c.y - a.y;
-    if (dx * dx + dy * dy > a.r * a.r) continue; // outside this arm's reach
-    let delta = (sweepAng - Math.atan2(dy, dx)) % TAU; // canvas-clockwise, matches the conic
-    if (delta < 0) delta += TAU;
-    const t = 1 - delta / TAU;
-    if (t * t > best) best = t * t; // ease so the just-crossed flash reads
-  }
-  return best;
+  // Сама засветка (угол отставания, приведение знака, кривая, максимум по лучам) —
+  // `sweepFx.ts` (REFM-113). Здесь остаётся только «есть ли развёртка вообще».
+  return sweepOn ? armsGlow(sweepArms, c, sweepAng, TAU) : 0;
 }
 
 function drawScanSweep(now: number) {
@@ -4301,16 +4293,20 @@ function render(now: number) {
     cx.save();
     cx.globalCompositeOperation = 'lighter';
     for (const n of MAP) {
-      if (n.sector === 'empty') continue;
       const p = s.planets[n.id];
       if (!p) continue;
       const c = world(n);
       if (!visible(c, 60)) continue;
-      const seen = known(n.id) || memory.has(n.id);
-      if (!seen) continue;
+      // Кого подсвечивать и каким цветом — `sweepFx.ts` (REFM-113) поверх вида узла из
+      // `fogView.ts`: помнимый горит НЕЙТРАЛЬНО, потому что владелец в памяти может быть
+      // устаревшим, а никогда не виденный не выдаёт себя засветкой вовсе.
+      const paint = sweepPaint(
+        nodeView({ sector: n.sector, identified: known(n.id), remembered: memory.has(n.id) }),
+      );
+      if (paint.do !== 'paint') continue;
       const g = sweepGlow(c);
-      if (g <= 0.03) continue;
-      const col = known(n.id) ? ownerColor(p.owner) : '#6f8a93';
+      if (!sweepShows(g)) continue;
+      const col = paint.ownerColored ? ownerColor(p.owner) : '#6f8a93';
       blitGlow(col, c.x, c.y, 24, 0.42 * g); // cached glow disc (no per-node gradient)
     }
     cx.restore();
