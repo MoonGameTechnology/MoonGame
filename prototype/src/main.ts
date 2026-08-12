@@ -555,6 +555,7 @@ import { gridGap, gridLines, gridOffset } from './backdropGrid';
 import { burstK, shellT, sparkAngle, volleyLife, type VolleySpec } from './volleyFx';
 import { FLAK_LIFE_MS, flakBurstRadius, flakDashOffset, flakLook, flakTier } from './flakTiers';
 import { sweepGlow as armsGlow, sweepPaint, sweepShows } from './sweepFx';
+import { emblemTally } from './fleetTally';
 import { jumpStep, type JumpKind } from './mapJump';
 import {
   loadStep,
@@ -4805,12 +4806,9 @@ function render(now: number) {
     // Squadrons ABOARD a carrier live in the hold, not in the battle line: with any
     // non-squadron hull present they leave the triangle pyramid and ride the cargo
     // tail as diamonds. A pure strike wing in flight IS its squadrons — triangles.
-    const allUnits = sumUnits(f.units);
-    const wingAboard = sumUnits(f.units.filter((st) => isSquadron(st.unit)));
-    const hulls = allUnits - wingAboard;
-    const ships = hulls > 0 ? hulls : allUnits;
-    const wingPips = hulls > 0 ? wingAboard : 0;
-    const troops = sumUnits(f.landing ?? []);
+    // Три числа эмблемы — `fleetTally.ts` (REFM-115). Развилка там же: пока есть хоть
+    // один КОРПУС, крыло едет грузом; корпусов нет — крыло и есть флот.
+    const { ships, wingPips, troops } = emblemTally(f.units, f.landing ?? [], isSquadron);
     const engine = 0.55 + 0.45 * Math.sin(now / 120 + f.id.length);
 
     // bombardment beam down to the planet
