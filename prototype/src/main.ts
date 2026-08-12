@@ -547,6 +547,7 @@ import { introFor } from './introTrigger';
 import { EVENT_LOG_MAX, LOG_LINES, isRepeat, pushBounded, stamp } from './noteLog';
 import { pruneGroup, refSurvives } from './selectionPrune';
 import { restoresWallet, snapshotWallet } from './freeBuild';
+import { TOAST_FADE_MS, TOAST_LIFE_MS, toastClass, toastOverflow, toastText } from './toastView';
 import {
   loadStep,
   makeLoads,
@@ -1807,19 +1808,21 @@ function note(msg: string, at?: string) {
 function toast(msg: string, at?: string): void {
   const host = document.getElementById('toasts');
   if (!host) return;
+  // Вид, предел стопки и время жизни — `toastView.ts` (REFM-105).
   const el = document.createElement('div');
-  el.className = at ? 'toast jump' : 'toast';
-  el.textContent = at ? `${msg} ↪` : msg;
+  el.className = toastClass(!!at);
+  el.textContent = toastText(msg, !!at);
   el.addEventListener('click', () => {
     if (at) jumpToPing(at);
     el.remove();
   });
   host.appendChild(el);
-  while (host.children.length > 3) host.firstElementChild?.remove();
+  for (let extra = toastOverflow(host.children.length); extra > 0; extra--)
+    host.firstElementChild?.remove();
   window.setTimeout(() => {
     el.classList.add('out');
-    window.setTimeout(() => el.remove(), 450);
-  }, 5200);
+    window.setTimeout(() => el.remove(), TOAST_FADE_MS);
+  }, TOAST_LIFE_MS);
 }
 
 /** The map node a fleet occupies / is travelling over / is parked nearest to. */
