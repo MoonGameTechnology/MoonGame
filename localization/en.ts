@@ -76,7 +76,6 @@ export const en: Record<string, string> = {
   'auth.google.soon': 'Sign in with Google — coming soon · you entered as a guest',
   'auth.need-mail': 'Enter an email',
   'auth.need-name': 'Enter a commander name',
-  'auth.need-nick': 'Enter a callsign',
   'auth.pass-mismatch': 'Passwords do not match',
   'auth.recover.sent': 'If that email exists, a reset link is on its way',
   'auth.reset.bad-link': 'The link is invalid or expired',
@@ -202,7 +201,6 @@ export const en: Record<string, string> = {
   'client.status.new-commander': '→ Browse matches · new commander "{nick}"{notice}',
   'client.status.returning': '→ Browse matches · {nick}',
   'client.status.returning-fallback': 'returning',
-  'client.status.single': '▶ Solo game — starting sandbox… (engine in the browser)',
 
   // --- chain — Режим «Приказ»: полоска плана, меню точки, отказы.
   'chain.add-wait6': '⏱ +6h',
@@ -1019,7 +1017,6 @@ export const en: Record<string, string> = {
   'err.no-fleet': 'fleet not found',
   'err.no-funds': 'insufficient funds',
   'err.no-hero': 'hero not found',
-  'err.no-nick': 'Enter a callsign.',
   'err.no-node': 'unknown skill-tree node',
   'err.no-planet': 'world not found',
   'err.no-player': 'player not found',
@@ -1951,7 +1948,6 @@ export const en: Record<string, string> = {
   'welcome.reset.pass2': 'Repeat password',
   'welcome.reset.sub': 'Choose a new password to sign in.',
   'welcome.reset.title': 'New password',
-  'welcome.solo': 'Solo game',
   'welcome.sub': 'Welcome, commander. The fleet awaits your orders.',
   'welcome.support': 'Support',
   'welcome.tagline': 'Edge of the Void',
