@@ -8447,17 +8447,11 @@ srvInput.value =
 // faction (nick-login; full accounts in docs/persistence-accounts-roadmap.md).
 nickInput.value = localStorage.getItem('void.nick') ?? '';
 
-// Local skirmish + dev test mode are DEV-CLIENT features: the player build compiles
-// them out (and build.mjs strips their buttons/markup), so a regular player's client
-// has no single-player entry and no test overlay at all.
+// The dev test mode is a DEV-CLIENT feature: the player build compiles it out (and
+// build.mjs strips its button/markup), so a regular player's client has no test overlay
+// at all. The welcome card carries NO single-player entry in either build — starting a
+// match is behind the login, so an unauthenticated visitor cannot spin up sessions.
 if (!__PLAYER_BUILD__) {
-  $('csolo').addEventListener('click', () => {
-    userClosed = true; // intentional leave → don't auto-reconnect
-    NET = false;
-    netAdmitted = false;
-    openSetup(); // pick start + rivals before the skirmish begins
-  });
-
   // DEV TEST MODE — fenced hook. The "Тесты" button opens the dev test overlay;
   // initTestMode wires it to the host with two tiny callbacks. Cut this whole block
   // (and the import + #testmode HTML/CSS) to remove the feature without a trace.
@@ -8788,8 +8782,7 @@ const wPassInput = $('cwpass') as HTMLInputElement;
 function signInByCallsign(): void {
   const nick = wNickInput.value.trim();
   if (!nick) {
-    statusEl.textContent = t('auth.need-nick');
-    wNickInput.focus();
+    wNickInput.focus(); // the empty field IS the message — no status line for it
     return;
   }
   // Same race guard as «Новый командир»: never pick the guest branch while the
@@ -9943,7 +9936,9 @@ function resolveServer(): { base: string; nick: string } | null {
   }
   const nick = nickInput.value.trim();
   if (!nick) {
-    statusEl.textContent = t('auth.need-nick');
+    // Silent: the boot block calls this BEFORE anyone has typed anything (to probe
+    // /auth/status), so painting a complaint here left «введите позывной» sitting under
+    // a freshly opened welcome card. The null return still blocks the caller.
     return null;
   }
   return { base, nick };

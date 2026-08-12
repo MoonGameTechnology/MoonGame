@@ -16,7 +16,6 @@ import { createWelcomeModel, resolveWelcomeAction, nextCallsign } from './welcom
 import type { WelcomeModel, WelcomeOutcome, AuthProviderId } from './welcomeScreen';
 import { clampCam, zoomAt, type Cam, type Viewport, type Bounds } from './camera';
 import { renderMap } from './mapRender';
-import { shippedGameData, skirmishState } from './gameData';
 import { openLiveMatch } from './net';
 import { nearestPlanet, myFleetAt, moveAction } from './matchInput';
 
@@ -50,16 +49,16 @@ const esc = (v: string): string => v.replace(/[&<>"']/g, (c) => ENTITIES[c] ?? c
 /** Host owns the callsign sequence (welcomeScreen.ts) — persisted for real later. */
 let callsignSeq = 0;
 
+// E_NO_NICK has no entry on purpose: an empty callsign is answered by focusing the
+// field, not by a sentence under the card (the reducer still rejects it fail-secure).
 const REJECTIONS: Record<string, string> = {
-  E_NO_NICK: t('err.no-nick'),
   E_UNKNOWN_PROVIDER: t('err.unknown-provider'),
 };
 
 /** Turn a routing outcome into a human status line. Routes are stubbed until the
- *  match browser (CP) and single-player sandbox land — this proves the wiring. */
+ *  match browser (CP) lands — this proves the wiring. */
 function statusText(outcome: WelcomeOutcome): string {
   if (!outcome.ok) return t('client.status.error', { text: REJECTIONS[outcome.code] ?? outcome.code });
-  if (outcome.route === 'single') return t('client.status.single');
   if (outcome.mode === 'new') {
     const nick = nextCallsign(callsignSeq++);
     const notice =
@@ -94,7 +93,6 @@ function render(model: WelcomeModel): void {
     `</div>` +
     `<div class="login"><input id="nick" maxlength="24" placeholder="${esc(model.loginLabel)}" autocomplete="off" />` +
     `<button class="btn" data-act="login">${esc(model.loginLabel)}</button></div>` +
-    `<button class="btn ghost" data-act="singlePlayer">${esc(model.singlePlayerLabel)}</button>` +
     `<footer>${model.legal.map((l) => `<a data-legal="${l.id}">${esc(l.label)}</a>`).join('<span>·</span>')}</footer>` +
     `<div id="status" class="status" role="status" aria-live="polite"></div>` +
     `<div class="engine" id="engine"></div>` +
@@ -110,6 +108,17 @@ function loginNick(): string {
   return (document.getElementById('nick') as HTMLInputElement | null)?.value ?? '';
 }
 
+/** Sign in with whatever is typed. An empty callsign just puts the cursor back in the
+ *  field — the blank input is the message, so no complaint is printed under the card. */
+function submitLogin(model: WelcomeModel): void {
+  const nick = loginNick();
+  if (!nick.trim()) {
+    document.getElementById('nick')?.focus();
+    return;
+  }
+  setStatus(statusText(resolveWelcomeAction({ kind: 'login', nick }, model)));
+}
+
 function wire(model: WelcomeModel): void {
   const app = document.getElementById('app');
   if (!app) return;
@@ -120,12 +129,6 @@ function wire(model: WelcomeModel): void {
       case 'newPlayer':
         setStatus(statusText(resolveWelcomeAction({ kind: 'newPlayer' }, model)));
         break;
-      case 'singlePlayer': {
-        const outcome = resolveWelcomeAction({ kind: 'singlePlayer' }, model);
-        setStatus(statusText(outcome));
-        if (outcome.ok && outcome.route === 'single') startMatch();
-        break;
-      }
       case 'signIn': {
         const provider = target.dataset.provider;
         if (provider) {
@@ -134,15 +137,13 @@ function wire(model: WelcomeModel): void {
         break;
       }
       case 'login':
-        setStatus(statusText(resolveWelcomeAction({ kind: 'login', nick: loginNick() }, model)));
+        submitLogin(model);
         break;
     }
   });
   app.addEventListener('keydown', (e) => {
     const ke = e as KeyboardEvent;
-    if (ke.key === 'Enter' && (ke.target as HTMLElement).id === 'nick') {
-      setStatus(statusText(resolveWelcomeAction({ kind: 'login', nick: loginNick() }, model)));
-    }
+    if (ke.key === 'Enter' && (ke.target as HTMLElement).id === 'nick') submitLogin(model);
   });
 }
 
@@ -262,15 +263,10 @@ function runMatch(getState: () => GameState, bounds: Bounds, interact?: MatchInt
   requestAnimationFrame(loop);
 }
 
-/** Single-player: build a real GameState from the shipped skirmish map (via the shared
- *  loader + buildStateFromMap) and draw it — the first time the client shows the actual
- *  game, not just the menu. Static; the live server path is {@link connectLive}. */
-function startMatch(): void {
-  if (matchStarted) return;
-  matchStarted = true;
-  const state = skirmishState(shippedGameData());
-  runMatch(() => state, boundsOf(state));
-}
+// No offline-skirmish entry point: the welcome screen is pre-auth, so nothing there may
+// start a match. The only way into the map is {@link connectLive} — an authenticated,
+// server-hosted session (`?join=`). `gameData.ts` keeps the shipped-map loader for the
+// tests and for the match browser to reuse once it lands.
 
 /** A small fixed overlay for the live-match connection status + a one-line hint (the
  *  welcome-screen #status is hidden once the map canvas takes over). */

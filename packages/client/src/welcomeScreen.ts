@@ -8,8 +8,8 @@
  * Why a view-model and not a rendered screen: real accounts/OIDC are not built yet
  * (the decision is an external provider — docs/accounts-roadmap.md AC-1.1), and the
  * RN client shell is still a placeholder. So this lands the screen's *logic* — the
- * social-sign-in stub, nick validation, single-player route — as shared, tested code
- * the future RN view binds to, without pulling a UI runtime in speculatively.
+ * social-sign-in stub and nick validation — as shared, tested code the future RN view
+ * binds to, without pulling a UI runtime in speculatively.
  *
  * Invariants (mirrors the core's discipline): pure + deterministic (no Date/random),
  * outputs are JSON-serialisable, and validation is **fail-secure** — a bad action
@@ -51,7 +51,6 @@ export interface WelcomeStrings {
   newPlayer: string;
   signInWith: string;
   login: string;
-  singlePlayer: string;
   providerLabels: Record<AuthProviderId, string>;
   legal: LegalLink[];
 }
@@ -64,7 +63,6 @@ export const defaultStrings: WelcomeStrings = {
   newPlayer: t('welcome.new'),
   signInWith: t('welcome.divider'),
   login: t('welcome.login'),
-  singlePlayer: t('welcome.solo'),
   providerLabels: { google: t('welcome.google'), apple: t('welcome.apple') },
   legal: [
     { id: 'imprint', label: t('welcome.imprint') },
@@ -84,7 +82,6 @@ export interface WelcomeModel {
   signInWithLabel: string;
   providers: AuthProvider[];
   loginLabel: string;
-  singlePlayerLabel: string;
   legal: LegalLink[];
 }
 
@@ -104,17 +101,17 @@ export function createWelcomeModel(strings: WelcomeStrings = defaultStrings): We
       { id: 'apple', label: strings.providerLabels.apple, available: false },
     ],
     loginLabel: strings.login,
-    singlePlayerLabel: strings.singlePlayer,
     legal: strings.legal,
   };
 }
 
-/** What the player did on the welcome screen. */
+/** What the player did on the welcome screen. There is deliberately NO single-player
+ *  action: this screen sits in front of authentication, and an unauthenticated visitor
+ *  must not be able to start matches from it. Play routes live behind the login. */
 export type WelcomeAction =
   | { kind: 'newPlayer' }
   | { kind: 'signIn'; provider: AuthProviderId }
-  | { kind: 'login'; nick: string }
-  | { kind: 'singlePlayer' };
+  | { kind: 'login'; nick: string };
 
 /** Where the host should route next. `noticeKey` is a *key*, not a sentence — the
  *  renderer localises it (i18n seam); `provider` lets it name which stub was used. */
@@ -128,7 +125,6 @@ export type WelcomeOutcome =
       noticeKey?: 'guest_stub';
       provider?: AuthProviderId;
     }
-  | { ok: true; route: 'single' }
   | { ok: false; code: string };
 
 /** Pure reducer: map a welcome action to a routing outcome. Fail-secure — unknown
@@ -137,8 +133,6 @@ export function resolveWelcomeAction(action: WelcomeAction, model: WelcomeModel)
   switch (action.kind) {
     case 'newPlayer':
       return { ok: true, route: 'browse', mode: 'new' };
-    case 'singlePlayer':
-      return { ok: true, route: 'single' };
     case 'signIn': {
       const provider = model.providers.find((p) => p.id === action.provider);
       if (!provider) {
