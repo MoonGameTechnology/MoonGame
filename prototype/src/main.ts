@@ -212,7 +212,7 @@ import { laneEnds, warConfirmPlan } from './warOrders';
 import { bakeSignature, needsRebake, ownersSignature } from './staticLayerCache';
 import { clipPolygon, clipRect, provinceSeeds } from './provinceMap';
 import { fleetVisible, nodeView, seesDetails as fogSeesDetails } from './fogView';
-import { hasCoverage, identifyRadius, radarSources } from './radarSources';
+import { hasCoverage, identifyRadius, radarSources, rangeRings } from './radarSources';
 import { tapOwner, tapRadius } from './tapPriority';
 import { nextPick, tapCandidates, touchPick, type TapPick } from './tapCycle';
 import { chainTapTarget, nearestOwnWorld as ownWorldNearest } from './chainTarget';
@@ -4036,15 +4036,18 @@ function blitStaticLayer(): void {
  *  Nothing is drawn for a sector with no radar. (Complements `drawRadarCoverage` —
  *  that shows ALL my sources persistently; this labels the selected one on tap.) */
 function drawRadarRange(now: number): void {
-  if (!selPlanet) return;
-  const p = s.planets[selPlanet];
+  // Слой крепится к ВЫБРАННОМУ миру — нет выбора, нет и дальномера (REFM-109, правило 5).
+  const p = selPlanet ? s.planets[selPlanet] : undefined;
   if (!p) return;
-  // Туман войны. `planetRadar` читает ПОСТРОЙКИ выбранного мира, поэтому без этого
-  // гейта тап по чужой неисследованной системе рисовал её окружности и подписи —
-  // мгновенная разведка одним касанием, мимо сенсоров и без единого корабля.
-  if (!seesDetails(p)) return;
-  const reach = planetRadar(p);
-  if (reach <= 0) return;
+  // Рисовать ли слой и с какими радиусами — `radarSources.ts`, там же причина гейта
+  // тумана: `planetRadar` читает ПОСТРОЙКИ мира, и без гейта тап по чужой
+  // неисследованной системе был бы мгновенной разведкой одним касанием.
+  const rings = rangeRings(
+    { detailed: seesDetails(p), reach: planetRadar(p) },
+    IDENTIFY_REACH_FRACTION,
+  );
+  if (rings.do !== 'draw') return;
+  const reach = rings.signature;
   const c = world(p.position);
   const pulse = 0.5 + 0.5 * Math.sin(now / 600);
   const radiusPx = (rr: number): { rx: number; ry: number } => ({
@@ -4072,7 +4075,7 @@ function drawRadarRange(now: number): void {
   cx.fillText(`◌ SIGNATURE ${reach}`, c.x + o.rx + 7, c.y + 3);
 
   // inner — full-reveal reach (contacts fully identified)
-  const inner = reach * IDENTIFY_REACH_FRACTION;
+  const inner = rings.reveal; // та же доля, что у сводного покрытия (REFM-63, правило 4)
   const i = radiusPx(inner);
   cx.fillStyle = rgba('#5ff0c0', 0.06);
   cx.beginPath();
