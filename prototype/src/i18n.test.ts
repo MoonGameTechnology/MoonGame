@@ -138,18 +138,16 @@ function shippedNames(): Array<[string, string]> {
  *  сокращаться: запись, для которой ключ уже появился, валит тест — иначе allowlist
  *  тихо зарастает и гейт превращается в декорацию. Две группы, и ни одна не чинится
  *  «просто дозавести ключ»:
- *   • здания (11) и фракции (6) — `prototypeData.ts` держит для тех же сущностей
- *     ДРУГИЕ имена и частью другие id (`Metal Mine` против шипнутого
- *     `Metal Extractor I`, `Radar Array` против `Sensor Array I`), поэтому «какое имя
- *     каноническое» — это решение про судьбу второго каталога, AUD-8;
+ *   • здания (11) — `prototypeData.ts` держит для тех же сущностей ДРУГИЕ имена и частью
+ *     другие id (`Metal Mine` против шипнутого `Metal Extractor I`, `Radar Array` против
+ *     `Sensor Array I`), поэтому «какое имя каноническое» — это решение про судьбу
+ *     второго каталога, AUD-8;
  *   • учёные (5), `planetTypes` (1), `sectorKinds` (1) — механика, но это правка
  *     КОНТЕНТА, а не гейта; русский текст для учёных уже написан под `sci.*.name`.
- *  Заведён 2026-08-06 (AUD-4) на 24 записях. */
+ *  Заведён 2026-08-06 (AUD-4) на 24 записях; фракции (6) сняты в AUD-14 — у них с обоими
+ *  каталогами имена совпадали, так что «какое каноническое» решать было нечего. */
 const DATA_KEY_GAPS = new Set([
-  'data.amber-concord',
-  'data.azure-compact',
   'data.biomass-pit',
-  'data.crimson-hegemony',
   'data.energy-nexus',
   'data.fortress',
   'data.fusion-reactor-i',
@@ -163,9 +161,6 @@ const DATA_KEY_GAPS = new Set([
   'data.polymath',
   'data.salvage-metal-rig-i',
   'data.sensor-array-i',
-  'data.the-swarm',
-  'data.vanguard-coalition',
-  'data.violet-ascendancy',
   'data.void-admiral',
   'data.void-station',
   'data.wing-commander',

@@ -18,6 +18,8 @@
  *    (где начинаешь) и `faction` (кем играешь); сводить их в одно нельзя.
  */
 
+import { houseDisplayName } from './setupSeats';
+
 /** Кресло в матче в том виде, в каком его отдаёт сервер. */
 export interface MatchSeat {
   playerId: string;
@@ -76,9 +78,10 @@ export function houseColor(faction: string): string {
   return HOUSE_COLOR[faction] ?? 'var(--cyan)';
 }
 
-/** Имя дома для показа; незнакомый дом называется собственным идентификатором. */
+/** Имя дома для показа; незнакомый дом называется собственным идентификатором. Имена в
+ *  `HOUSE_NAME` — английские имена ДАННЫХ, перевод берётся из локали (AUD-14). */
 export function houseName(faction: string): string {
-  return HOUSE_NAME[faction] ?? faction;
+  return houseDisplayName(HOUSE_NAME[faction] ?? faction);
 }
 
 const HOUSE_BONUS_KEY: Record<string, string> = {
