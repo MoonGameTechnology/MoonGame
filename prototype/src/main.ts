@@ -543,6 +543,14 @@ import { spyOffer, windowLeftH } from './spyOffer';
 import { artScale, calloutAlpha, chevronAlpha, detailAt, sphereBloom } from './semanticZoom';
 import { calloutInk, calloutLine, calloutTier } from './nodeCallout';
 import {
+  BATTLE_RINGS,
+  battleMark,
+  clashPoint,
+  phaseLook,
+  ringPhase,
+  ringRadiusAt,
+} from './battleMark';
+import {
   chevronAngle,
   orbitBloom,
   orbitRadius,
@@ -1674,13 +1682,12 @@ function fleetPos(f: Fleet): { x: number; y: number } | null {
  *  intercept renders at the crossing point, not the nearest node), falling back to
  *  the battle's node when no participant is in view. */
 function battleAnchor(b: Battle): { x: number; y: number } | null {
-  for (const f of Object.values(s.fleets)) {
-    if (f.battleId === b.id) {
-      const p = fleetPos(f);
-      if (p) return p;
-    }
-  }
-  return s.planets[b.location]?.position ?? null;
+  // Точка схватки — у ВОЮЮЩЕГО флота, и только если её нет — узел (`battleMark.ts`,
+  // REFM-118): перехват идёт там, где корабли встретились, а не в ближайшем мире.
+  const fighting = Object.values(s.fleets)
+    .filter((f) => f.battleId === b.id)
+    .map((f) => fleetPos(f));
+  return clashPoint(fighting, s.planets[b.location]?.position ?? null);
 }
 
 /** The fleets the command bar / move order currently act on (mine only). */
@@ -3382,24 +3389,23 @@ function drawBattlePulse(
   // Two DIFFERENT pictures for the two battle phases (the audit found them
   // indistinguishable): orbital = the familiar red expanding rings (a dogfight in
   // space); ground = an amber pulse hugging the surface + a flat "front line" bar.
-  const col = phase === 'ground' ? '#f0b429' : '#ff5a4d';
+  // Вид фазы и волна колец — `battleMark.ts` (REFM-118): фазы обязаны быть НЕПОХОЖИМИ,
+  // а три кольца со сдвигом на треть читаются как расходящаяся волна, а не как мигание.
+  const look = phaseLook(phase);
+  const col = look.color;
   cx.save();
   cx.shadowColor = col;
   cx.shadowBlur = fxBlur(12);
-  for (let i = 0; i < 3; i++) {
-    const k = (pulse + i / 3) % 1;
+  for (let i = 0; i < BATTLE_RINGS; i++) {
+    const k = ringPhase(pulse, i);
     cx.strokeStyle = rgba(col, 0.55 * (1 - k));
     cx.lineWidth = 1.2 + i * 0.25;
     cx.beginPath();
-    if (phase === 'ground') {
-      cx.setLineDash([5, 4]);
-      cx.arc(x, y, 14 + k * 12, 0, TAU); // tight, dashed — clamped to the world
-    } else {
-      cx.arc(x, y, 18 + k * 24, 0, TAU);
-    }
+    if (look.dash) cx.setLineDash([...look.dash]);
+    cx.arc(x, y, ringRadiusAt(look, k), 0, TAU);
     cx.stroke();
   }
-  if (phase === 'ground') {
+  if (look.frontLine) {
     cx.setLineDash([]);
     cx.strokeStyle = rgba(col, 0.85);
     cx.lineWidth = 2;
@@ -4122,20 +4128,29 @@ function render(now: number) {
   // live countdown to the next hourly damage round (the battle timer).
   const wave = (now / 900) % 1;
   for (const b of Object.values(s.battles)) {
-    if (!known(b.location)) continue;
     const anchor = battleAnchor(b);
-    if (!anchor) continue;
+    // Показывать ли бой и его таймер — `battleMark.ts` (REFM-118): под туманом отметки
+    // нет вовсе, а отсчёт живёт только по назначенному ядром раунду.
+    const roundAt = typeof b.nextRoundAt === 'number' ? b.nextRoundAt : undefined;
+    const mark = battleMark({
+      identified: known(b.location),
+      hasPoint: !!anchor,
+      detail,
+      nextRoundAt: roundAt,
+    });
+    if (mark.do !== 'draw' || !anchor) continue;
     const c = world(anchor);
     if (!visible(c, 120)) continue;
     drawBattlePulse(c.x, c.y, wave, b.phase);
-    if (typeof b.nextRoundAt === 'number' && detail > 0) {
+    if (mark.timer) {
+      // `mark.timer` истинно только при назначенном раунде — отсюда и `!` ниже.
       cx.save();
       cx.globalAlpha = detail; // LOD: the timer text dissolves on the schematic view
       cx.font = '700 10px ui-monospace,Menlo,monospace';
       cx.textAlign = 'center';
       cx.fillStyle = b.phase === 'ground' ? '#f5cf6b' : '#ff8a7d';
       cx.fillText(
-        `${b.phase === 'ground' ? t('map.badge.landing') : t('map.badge.orbit')} · ${timeLeft(b.nextRoundAt)}`,
+        `${b.phase === 'ground' ? t('map.badge.landing') : t('map.badge.orbit')} · ${timeLeft(roundAt!)}`,
         c.x,
         c.y - 28,
       );
