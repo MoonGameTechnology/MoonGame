@@ -10,6 +10,9 @@
 # from the old node:22-slim single-stage image) no longer apply to the distroless
 # runtime and were removed after the trivy-image scan came back to life (the
 # corepack build break had silently disabled it — caught by the SEC-1 gate).
+#
+# Reviewed 2026-08-11 (SEC-22): +2 glibc wordexp entries below. The rest were re-checked
+# against the same base image digest and all still apply.
 
 # libc6 2.41-12+deb13u3 — MEDIUM, no fixed version published for trixie yet.
 CVE-2026-5435
@@ -29,3 +32,16 @@ CVE-2019-9192
 
 # zlib1g 1:1.3.dfsg+really1.3.1-1+b1 — MEDIUM, no fixed version for trixie.
 CVE-2026-27171
+
+# libc6 2.41-12+deb13u3 — LOW, both in glibc's wordexp(): CVE-2026-6368 (calling wordexp
+# with WRDE_APPEND returns uninitialized memory, a later wordfree may abort the process),
+# CVE-2026-6791 (expanding a path that begins with «~username»). Published to the feed
+# between 2026-08-10 and 2026-08-11 and, because `trivy image` runs without --severity,
+# these two LOW findings alone closed the merge queue for the whole repository.
+# Not reachable here: the runtime is distroless (no shell) and the server is Node —
+# wordexp()/wordfree() is a C API for shell-style word expansion that neither our code
+# nor the Node runtime calls. No fix as of this review: the base image tag `nonroot`
+# still resolves to the very sha256:939d6f16… pinned in the Dockerfile, so no rebuilt
+# base exists to bump to. Re-review when that digest is bumped.
+CVE-2026-6368
+CVE-2026-6791
