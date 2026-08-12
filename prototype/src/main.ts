@@ -541,6 +541,7 @@ import { canDockRepair, canRepair } from './repairOffer';
 import { capitalOffer, holdOffer } from './worldOrders';
 import { spyOffer, windowLeftH } from './spyOffer';
 import { artScale, calloutAlpha, chevronAlpha, detailAt, sphereBloom } from './semanticZoom';
+import { calloutInk, calloutLine, calloutTier } from './nodeCallout';
 import {
   chevronAngle,
   orbitBloom,
@@ -4720,40 +4721,47 @@ function render(now: number) {
     // smaller coordinate so the map reads "worlds first" (fogged → no telemetry).
     // LOD: callout text dissolves on the schematic view — except YOUR OWN worlds,
     // which stay labelled like city names on a globe (your anchor at any zoom).
-    const isWorld = n.sector === 'planet';
+    // Тир подписи, её чернила и судьба второй строки — `nodeCallout.ts` (REFM-117):
+    // мир подписан ярче транзитного сектора, цвет владельца несёт РАЗВЕДДАННЫЕ, а
+    // пустой тихий сектор молчит, чтобы не сорить «G:0 B:—» вдоль всего маршрута.
+    const tier = calloutTier(n.sector);
+    const isWorld = tier === 'world';
     const mineWorld = isWorld && p.owner === ME;
     const callout = calloutAlpha(detail, mineWorld);
     if (callout === 0) continue;
+    const g = p.garrison.reduce((a, st) => a + st.count, 0);
+    const line = calloutLine({
+      identified: kn,
+      detail,
+      tier,
+      garrison: g,
+      buildings: p.buildings.length,
+    });
+    const ink = calloutInk(kn, !!p.owner);
     cx.save();
     cx.globalAlpha = callout;
     cx.shadowColor = 'rgba(0,0,0,0.85)';
     cx.shadowBlur = fxBlur(3);
     if (isWorld) {
-      cx.fillStyle = kn ? (p.owner ? col : '#9fc9c4') : 'rgba(120,140,150,0.55)';
+      cx.fillStyle =
+        ink === 'owner' ? col : ink === 'neutral' ? '#9fc9c4' : 'rgba(120,140,150,0.55)';
       cx.font = '700 12px ui-monospace,Menlo,monospace';
     } else {
-      cx.fillStyle = kn
-        ? p.owner
+      cx.fillStyle =
+        ink === 'owner'
           ? rgba(col, 0.72)
-          : 'rgba(150,190,196,0.5)'
-        : 'rgba(120,140,150,0.4)';
+          : ink === 'neutral'
+            ? 'rgba(150,190,196,0.5)'
+            : 'rgba(120,140,150,0.4)';
       cx.font = '600 10px ui-monospace,Menlo,monospace';
     }
     cx.fillText(n.id, c.x + R + 12, c.y - 1);
-    // the telemetry line is detail-only — on the schematic view a labelled own
-    // world keeps just its name
-    if (kn && detail > 0) {
-      const g = p.garrison.reduce((a, st) => a + st.count, 0);
+    if (line.do === 'stats') {
       const icons = p.buildings.map((b) => BUILD_ICON[b.type] ?? '▪').join('');
-      // worlds always show telemetry; a quiet sector only when it holds something
-      if (isWorld || g > 0 || p.buildings.length) {
-        cx.fillStyle = rgba('#96d2cd', isWorld ? 0.6 : 0.42);
-        cx.font = isWorld
-          ? '10px ui-monospace,Menlo,monospace'
-          : '9px ui-monospace,Menlo,monospace';
-        cx.fillText(`G:${g}  B:${icons || '—'}`, c.x + R + 12, c.y + (isWorld ? 12 : 11));
-      }
-    } else if (!kn && detail > 0) {
+      cx.fillStyle = rgba('#96d2cd', isWorld ? 0.6 : 0.42);
+      cx.font = isWorld ? '10px ui-monospace,Menlo,monospace' : '9px ui-monospace,Menlo,monospace';
+      cx.fillText(`G:${g}  B:${icons || '—'}`, c.x + R + 12, c.y + (isWorld ? 12 : 11));
+    } else if (line.do === 'unknown') {
       cx.fillStyle = 'rgba(110,130,140,0.5)';
       cx.font = '10px ui-monospace,Menlo,monospace';
       cx.fillText('· no telemetry', c.x + R + 12, c.y + 12);
