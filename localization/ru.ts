@@ -1758,7 +1758,6 @@ export const ru: Record<string, string> = {
   'side.world.type.long': 'Мир типа «{pt}» — {mods}',
   'side.world.vp': 'Очки победы',
 
-  'side.tiles.empty': 'нет',
 
   // --- speed — Панель времени: подсказки множителей, перезапуска и выхода.
   'speed.exit': 'Выход в меню',

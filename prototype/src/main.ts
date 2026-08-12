@@ -5730,9 +5730,9 @@ function planetPanelHtml(p: Planet): string {
   // side-by-side columns (filling the wide panel), on phones they stack vertically.
   const cols: string[] = [];
   if (planetTab === 'ground') {
-    // PC: one tile row of icon·count chips (the tab's old bottom hint lives in the
-    // ЗЕМЛЯ tab's hover dossier, 'tab:ground'). Mobile keeps the original row list
-    // and bottom hint untouched.
+    // Состав ЗЕМЛИ показывается списком на ВСЕХ раскладках — тем же столбиком строк, что
+    // и здания. Плитки на ПК давали только иконку и число: имя приходилось угадывать, и
+    // одна и та же группа читалась на телефоне и на ПК по-разному.
     // ECON-1: голодный гарнизон — владелец мира в food-arrears теряет 25% на земле.
     const starving = showsStarving(p.owner === ME, ground.length, s.players[ME]?.arrears)
       ? `<div class="row" style="color:var(--red)">🍽 ${t('side.fleet.hunger')}</div>`
@@ -5740,7 +5740,7 @@ function planetPanelHtml(p: Planet): string {
     cols.push(
       `<div class="sec">${t('side.ground.units')}</div>` +
         starving +
-        (pcUi() ? garrisonTilesHtml(ground) : unitRows(ground)),
+        unitRows(ground),
     );
     if (mine) {
       const groundBuilds = buildRoster('ground', BUILD_UNITS, data);
@@ -5756,9 +5756,10 @@ function planetPanelHtml(p: Planet): string {
   } else if (planetTab === 'ships') {
     // Built ships now auto-rally to orbit (see fleetLaunchModule), so the garrison
     // normally holds no spacecraft — only surface the section if some linger.
-    if (ships.length) {
-      cols.push(`<div class="sec">${t('side.garrison.ships')}</div>` + unitRows(ships));
-    }
+    // Состав показывается ВСЕГДА, даже пустой, — как у земли и зданий. Скрытая секция
+    // читается как поломка панели: игрок не понимает, пуст гарнизон или вкладка не
+    // прогрузилась. Пустой список говорит об этом словами (`unitRows`).
+    cols.push(`<div class="sec">${t('side.garrison.ships')}</div>` + unitRows(ships));
     if (here.length) {
       let orbit = `<div class="sec">${t('side.world.fleets')}</div>`;
       for (const f of here) {
@@ -5782,9 +5783,7 @@ function planetPanelHtml(p: Planet): string {
       cols.push(`<div class="hint">${t('side.shipyard.hint')}</div>`);
     }
   } else if (planetTab === 'squadron') {
-    if (wing.length) {
-      cols.push(`<div class="sec">${t('side.garrison.wing')}</div>` + unitRows(wing));
-    }
+    cols.push(`<div class="sec">${t('side.garrison.wing')}</div>` + unitRows(wing)); // всегда, см. выше
     if (mine) {
       const wingBuilds = buildRoster('squadron', BUILD_UNITS, data);
       cols.push(
@@ -6430,18 +6429,6 @@ function codexTile(
 }
 /** Ground-garrison tiles (the ЗЕМЛЯ tab): one flowing row of icon·count chips — no
  *  names; the hover dossier (PC) / tap dossier (touch) carries the identification. */
-function garrisonTilesHtml(stacks: Array<{ unit: string; count: number }>): string {
-  const tiles = stacks
-    .filter((u) => u.count > 0)
-    .map((u) => {
-      const name = unitTitle(u.unit);
-      return `<button class="ptile mini" data-codex="u:${esc(u.unit)}" data-desc="u:${esc(u.unit)}" data-name="${esc(name)}"><span class="pt-ic">${unitIcon(u.unit, data)}</span><span class="pt-c">${u.count}</span></button>`;
-    })
-    .join('');
-  return tiles
-    ? `<div class="ptiles">${tiles}</div>`
-    : `<div class="row dim">${t('side.tiles.empty')}</div>`;
-}
 function openCodex(key: string): void {
   const [kind, id, lvl] = key.split(':');
   const el = document.getElementById('codex');
@@ -7463,14 +7450,20 @@ function cancelHoldTip(): void {
 }
 document.addEventListener?.('pointerdown', (ev) => {
   if (!MOBILE) return;
-  const btn = (ev.target as HTMLElement).closest?.('.ptile') as HTMLElement | null;
+  // Удержание работает и на ПЛИТКЕ каталога, и на ВКЛАДКЕ карточки мира. Исход разный:
+  // плитка знает только своё имя и показывает подпись, а у вкладки есть досье целой
+  // группы (`dossier.tab.*`), и держать её стоит ради него. На ПК то же досье приходит
+  // наведением — тапу оно было недоступно вовсе, хотя текст для него давно написан.
+  const btn = (ev.target as HTMLElement).closest?.('.ptile, .ptab') as HTMLElement | null;
   if (!btn) return;
   hold = press({ x: ev.clientX, y: ev.clientY });
   if (holdTimer !== null) clearTimeout(holdTimer);
   holdTimer = window.setTimeout(() => {
     holdTimer = null;
     hold = mature(hold);
-    showHoldTip(btn);
+    const group = btn.classList.contains('ptab') ? btn.dataset.desc : null;
+    if (group) openDossier(group);
+    else showHoldTip(btn);
   }, HOLD_TIP_MS);
 });
 document.addEventListener?.('pointermove', (ev) => {
@@ -7489,8 +7482,9 @@ document.addEventListener?.(
     const { eat, next } = consumeClick(hold);
     hold = next;
     if (!eat) return;
-    // the click is the tail of a matured long-press — it must not open the codex
-    if ((ev.target as HTMLElement).closest?.('.ptile')) {
+    // Хвостовой клик созревшего удержания не должен ни открыть кодекс плитки, ни
+    // ПЕРЕКЛЮЧИТЬ вкладку: игрок держал её ради описания, а не чтобы уйти с текущей.
+    if ((ev.target as HTMLElement).closest?.('.ptile, .ptab')) {
       ev.preventDefault();
       ev.stopPropagation();
     }

@@ -79,6 +79,13 @@ export interface UnitRowView {
 /**
  * Строки состава (гарнизон, трюм, десант). Пустой список говорит об этом СЛОВАМИ:
  * пустое место в панели читается как поломка, а не как «здесь никого».
+ *
+ * Строка — КНОПКА той же формы, что и строка здания (`catalogTile.builtTileHtml`), и это
+ * решение подачи, а не совпадение вёрстки: у зданий тап по строке открывает карточку
+ * кодекса, а удержание — подпись. Состав раньше был мёртвым `div`, и игрок, привыкший
+ * тыкать в здание, по флоту и земле не получал ничего. Общий контейнер `blist` держит их
+ * одним столбиком; `data-codex` — путь к карточке, `data-name` — то, что покажет
+ * удержание.
  */
 export function unitRows(
   stacks: ReadonlyArray<{ unit: string; count: number }>,
@@ -86,16 +93,18 @@ export function unitRows(
   emptyLabel: string,
 ): string {
   if (!stacks.length) return `<div class="row dim">${esc(emptyLabel)}</div>`;
-  return stacks
+  const rows = stacks
     .map((st) => {
       const v = view(st.unit);
+      const key = `u:${esc(st.unit)}`;
       return (
-        `<div class="asset-row" data-desc="u:${esc(st.unit)}">` +
+        `<button class="asset-row unit" data-codex="${key}" data-desc="${key}" data-name="${esc(v.name)}">` +
         `<span class="bicon">${v.icon}</span>` +
         `<b>${st.count}× ${esc(v.name)}</b>` +
         `<span class="dim">${esc(v.domain)}</span>` +
-        `</div>`
+        `</button>`
       );
     })
     .join('');
+  return `<div class="blist">${rows}</div>`;
 }
