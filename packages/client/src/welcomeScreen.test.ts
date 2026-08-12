@@ -52,11 +52,15 @@ describe('resolveWelcomeAction', () => {
     });
   });
 
-  it('routes single-player to the local skirmish', () => {
-    expect(resolveWelcomeAction({ kind: 'singlePlayer' }, model)).toEqual({
-      ok: true,
-      route: 'single',
-    });
+  it('offers no route that starts a match before sign-in', () => {
+    // The welcome screen sits in front of authentication: nothing on it may spin up a
+    // session. Every successful outcome must land in the match browser, never in play.
+    const outcomes = [
+      resolveWelcomeAction({ kind: 'newPlayer' }, model),
+      resolveWelcomeAction({ kind: 'signIn', provider: 'google' }, model),
+      resolveWelcomeAction({ kind: 'login', nick: 'Alice' }, model),
+    ];
+    for (const out of outcomes) expect(out.ok && out.route).toBe('browse');
   });
 
   it('treats a stubbed provider as guest entry with a localisable notice', () => {

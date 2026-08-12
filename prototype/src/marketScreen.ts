@@ -16,6 +16,7 @@ import { t } from '../../localization/runtime';
 import { esc, curIc } from './format';
 import { marketLots, MARKET_FEE } from './sessionMarket';
 import { marketList, marketTake, marketCancel } from './actions';
+import { houseDisplayName } from './setupSeats';
 
 /** Credits are the currency, so they are not themselves a tradeable good. */
 export type MarketGood = 'metal' | 'food' | 'energy' | 'microelectronics';
@@ -50,7 +51,9 @@ export function marketBoxHtml(
   formSide: MarketSide,
 ): string {
   const res = (state.players[me]?.resources ?? {}) as Record<string, number>;
-  const nameOf = (id: string): string => esc(state.players[id]?.name ?? id);
+  // Имя дома в состоянии — английское имя ДАННЫХ (одно на всех, локаль у каждого своя),
+  // поэтому переводится на месте показа; ник живого игрока проходит насквозь (AUD-14).
+  const nameOf = (id: string): string => esc(houseDisplayName(state.players[id]?.name ?? id));
   const lots = marketLots(state);
   const asks = lots
     .filter((l) => l.side === 'sell' && l.resource === tab)

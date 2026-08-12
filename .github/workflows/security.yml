@@ -501,6 +501,16 @@ jobs:
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/out" -w /out \
             aquasec/trivy@sha256:665030f4d33a82c1e8d9d5e0453365842236723c1ee5cc3becca698268e66a56 image --exit-code 1 --format sarif --output trivy-image.sarif void-dominion:scan
           rc=$?
+          # Печатаем находки В ЛОГ, когда гейт красный. SARIF уезжает артефактом, и без
+          # этого «почему упало» читается только скачиванием артефакта прогона — а он
+          # доступен не всем и не всегда. Тот же образ, та же база, тот же .trivyignore;
+          # без --exit-code, поэтому на rc не влияет (шаг гейта ниже смотрит только на $rc).
+          if [ "$rc" != "0" ]; then
+            echo "::group::trivy image — что именно нашлось"
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/out" -w /out \
+              aquasec/trivy@sha256:665030f4d33a82c1e8d9d5e0453365842236723c1ee5cc3becca698268e66a56 image --format table void-dominion:scan
+            echo "::endgroup::"
+          fi
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/out" -w /out \
             anchore/syft@sha256:b46e597614ddc78621e560af3fabf9346e35462ea1c886a38b30bcc7ca601a73 scan void-dominion:scan -o cyclonedx-json=sbom-image.cdx.json
           set -e

@@ -1,4 +1,5 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { setLocale } from '../../localization/runtime';
 import {
   houseBonusKey,
   houseChoice,
@@ -7,6 +8,10 @@ import {
   houseRows,
   type MatchSeat,
 } from './seatPicker';
+
+// REFM-14: локаль прибита к RU (Node не сообщает язык браузера — рантайм ушёл бы в EN,
+// и «имя дома переведено» проверялось бы английским текстом, то есть никак).
+beforeAll(() => setLocale('ru'));
 
 const seat = (playerId: string, faction: string, taken = false): MatchSeat => ({
   playerId,
@@ -88,8 +93,10 @@ describe('выбор дома — подписи строки', () => {
     expect(houseName('teal')).toBe('teal');
   });
 
-  it('знакомый дом называется своим именем и красится своим цветом', () => {
-    expect(houseName('violet')).toBe('Violet Ascendancy');
+  it('знакомый дом называется своим именем ПО-РУССКИ и красится своим цветом', () => {
+    // AUD-14: в `HOUSE_NAME` лежит английское имя ДАННЫХ, на экран оно обязано выйти
+    // переводом — иначе русский игрок выбирает дом по надписи «Violet Ascendancy».
+    expect(houseName('violet')).toBe('Пурпурное владычество');
     expect(houseColor('violet')).toBe('#b366ff');
   });
 });

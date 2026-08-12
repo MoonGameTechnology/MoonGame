@@ -21,6 +21,7 @@ import { data } from './prototypeData';
 import { esc, cost, fmtHrs } from './format';
 import { HOUR } from './time';
 import { castHeroAbility, unlockHeroSkill, fitHero } from './actions';
+import { houseDisplayName } from './setupSeats';
 
 type HeroInst = NonNullable<GameState['heroes']>[string];
 export type HeroTab = 'overview' | 'tree' | 'abilities' | 'fittings';
@@ -40,6 +41,25 @@ export function ownHeroes(state: GameState, me: string): HeroInst[] {
     .sort()
     .map((id) => state.heroes![id]!)
     .filter((h) => h.owner === me);
+}
+
+/**
+ * What to CALL a hero on screen (AUD-12). One state field, `name`, carries two
+ * different things, and telling them apart is the whole job:
+ *
+ * - the MAIN hero is named after its seat (`matchSetup`): the commander's callsign in a
+ *   network match, the house name in a solo one. Neither is a localization key —
+ *   `houseDisplayName` translates the house and lets a callsign through untouched;
+ * - every other hero carries the roster KEY (`hero.arch.destroyer`), so it must be
+ *   translated — rendered raw, the player reads the key itself. The archetype's catalog
+ *   name is the same text and is what the selector chips already show, so the header
+ *   takes it from there and the two can't drift.
+ */
+export function heroDisplayName(hero: HeroInst): string {
+  const fallback = hero.name ?? hero.id;
+  if (hero.grade === 'main') return houseDisplayName(fallback);
+  const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
+  return t(def?.name ?? fallback);
 }
 
 /** Can this purse cover the price? (The core decides for real — this only dims a button.) */
@@ -145,7 +165,7 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
       : '';
   const ident =
     `<div class="hx-ident${def?.branch === 'psionic' ? ' ps' : ''}">` +
-    `<div class="hx-irow"><span class="hx-name">♔ ${esc(hero.name ?? hero.id)}</span>` +
+    `<div class="hx-irow"><span class="hx-name">♔ ${esc(heroDisplayName(hero))}</span>` +
     (def?.branch
       ? `<span class="hx-tag">${esc(t(HERO_BRANCH_RU[def.branch] ?? def.branch))}</span>`
       : '') +

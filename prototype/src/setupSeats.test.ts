@@ -1,6 +1,8 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
+import { setLocale } from '../../localization/runtime';
 import {
   factionBonuses,
+  houseDisplayName,
   houseNameFor,
   rivalCount,
   seatFactionIds,
@@ -8,6 +10,10 @@ import {
 } from './setupSeats';
 
 const HOUSES = ['azure', 'crimson', 'amber', 'violet'];
+
+// REFM-14: локаль прибита к RU (Node не сообщает язык браузера, рантайм ушёл бы в EN
+// и утверждения про русские имена домов разъехались бы).
+beforeAll(() => setLocale('ru'));
 
 describe('сетап — раздача домов по местам', () => {
   it('ТВОЙ дом первый, остальные идут следом', () => {
@@ -56,6 +62,24 @@ describe('сетап — имя дома на втором круге', () => {
 
   it('ноль домов не делит на ноль', () => {
     expect(houseNameFor('Azure', 3, 0)).toBe('Azure 4');
+  });
+});
+
+describe('сетап — имя дома на экране игрока', () => {
+  it('имя ДАННЫХ переводится: русский игрок не читает «Azure Compact»', () => {
+    expect(houseDisplayName('Azure Compact')).toBe('Лазурный пакт');
+    expect(houseDisplayName('The Swarm')).toBe('Рой');
+  });
+
+  it('НОМЕР КРУГА не мешает переводу — переводится база, номер остаётся рядом', () => {
+    // Слаг `data.azurecompact2` не существует, поэтому `tData()` целиком промахнулся бы
+    // и отдал английское имя — номер надо отделить ДО поиска ключа.
+    expect(houseDisplayName('Crimson Hegemony 2')).toBe('Багровая гегемония 2');
+  });
+
+  it('ПОЗЫВНОЙ живого игрока проходит насквозь — его переводить нельзя', () => {
+    expect(houseDisplayName('Вульфакс')).toBe('Вульфакс');
+    expect(houseDisplayName('Nomad 7')).toBe('Nomad 7');
   });
 });
 

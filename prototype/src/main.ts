@@ -95,7 +95,7 @@ import { DEFAULT_SHIP_LOADOUTS, type ShipLoadout } from './ships';
 // «Верфь» — вкладка оснащения (REFM-13): окно целиком живёт в `shipyard.ts`, здесь
 // только проводка (host-хуки) и панель героев, которая переедет своим кирпичом.
 import { initShipyard } from './shipyard';
-import { initHeroStaff, HERO_CASTABLE, heroCdKey } from './heroStaff';
+import { initHeroStaff, HERO_CASTABLE, heroCdKey, heroDisplayName } from './heroStaff';
 import {
   initConversations,
   COALITION,
@@ -271,6 +271,7 @@ const AUTH_REASON: Record<AuthOutcome, string> = {
 import { createScanMemory, type Snapshot } from './scanMemory';
 import {
   factionBonuses,
+  houseDisplayName,
   houseNameFor,
   rivalCount,
   seatFactionIds as seatSeatFactionIds,
@@ -2733,9 +2734,17 @@ function hideWarPrompt(): void {
   document.getElementById('warprompt')?.classList.remove('show');
 }
 
-const NAME: Record<string, string> = Object.fromEntries(SEAT_META.map((m) => [m.id, m.name]));
+/** Как места НАЗЫВАЮТСЯ на экране. Единственная воронка показа: в состоянии имя места —
+ *  это имя дома из данных (английское, одно на всех игроков), а перевод у каждого свой,
+ *  поэтому локализация происходит здесь, при переносе в карту показа (AUD-14). Всё, что
+ *  читает `NAME[id]`, получает уже готовый к показу текст; ник живого игрока проходит
+ *  насквозь — `houseDisplayName` переводит только известное имя дома. */
+const NAME: Record<string, string> = Object.fromEntries(
+  SEAT_META.map((m) => [m.id, houseDisplayName(m.name)]),
+);
 function syncPlayerNames(state: GameState): void {
-  for (const [id, player] of Object.entries(state.players)) NAME[id] = player.name;
+  for (const [id, player] of Object.entries(state.players))
+    NAME[id] = houseDisplayName(player.name);
 }
 function setFleetSelection(ids: string[]) {
   const picked = ids.filter((id) => s.fleets[id]?.owner === ME);
@@ -5387,7 +5396,7 @@ function fleetPanelHtml(f: Fleet): string {
   // The player's projection hero rides here → name it and flag its fleet aura.
   if (f.units.some((u) => u.count > 0 && data.units[u.unit]?.traits.includes('hero'))) {
     const hero = Object.values(s.heroes ?? {}).find((x) => x.owner === f.owner);
-    const heroName = hero?.name ?? s.players[f.owner]?.name ?? f.owner;
+    const heroName = hero ? heroDisplayName(hero) : (NAME[f.owner] ?? f.owner);
     h += `<div class="row"><b>♔ ${esc(heroName)}</b> <span class="dim">${t('side.fleet.hero-aura')}</span></div>`;
   }
 
@@ -5848,7 +5857,7 @@ const { objDossier, codexHtml } = createDossiers({
  *  Opened by tapping the crest in the top-left corner. */
 function playerCardHtml(): string {
   const pl = s.players[ME];
-  const name = pl?.name ?? NAME[ME] ?? ME;
+  const name = NAME[ME] ?? houseDisplayName(pl?.name ?? ME);
   // H3: the LIVE faction (chosen at setup, stamped on the player) — name + its passive.
   const fid = pl?.faction ?? SEAT_META.find((m) => m.id === ME)?.faction ?? '';
   const fdef = data.factions[fid];
@@ -8441,17 +8450,11 @@ srvInput.value =
 // faction (nick-login; full accounts in docs/persistence-accounts-roadmap.md).
 nickInput.value = localStorage.getItem('void.nick') ?? '';
 
-// Local skirmish + dev test mode are DEV-CLIENT features: the player build compiles
-// them out (and build.mjs strips their buttons/markup), so a regular player's client
-// has no single-player entry and no test overlay at all.
+// The dev test mode is a DEV-CLIENT feature: the player build compiles it out (and
+// build.mjs strips its button/markup), so a regular player's client has no test overlay
+// at all. The welcome card carries NO single-player entry in either build — starting a
+// match is behind the login, so an unauthenticated visitor cannot spin up sessions.
 if (!__PLAYER_BUILD__) {
-  $('csolo').addEventListener('click', () => {
-    userClosed = true; // intentional leave → don't auto-reconnect
-    NET = false;
-    netAdmitted = false;
-    openSetup(); // pick start + rivals before the skirmish begins
-  });
-
   // DEV TEST MODE — fenced hook. The "Тесты" button opens the dev test overlay;
   // initTestMode wires it to the host with two tiny callbacks. Cut this whole block
   // (and the import + #testmode HTML/CSS) to remove the feature without a trace.
@@ -8782,8 +8785,7 @@ const wPassInput = $('cwpass') as HTMLInputElement;
 function signInByCallsign(): void {
   const nick = wNickInput.value.trim();
   if (!nick) {
-    statusEl.textContent = t('auth.need-nick');
-    wNickInput.focus();
+    wNickInput.focus(); // the empty field IS the message — no status line for it
     return;
   }
   // Same race guard as «Новый командир»: never pick the guest branch while the
@@ -9350,7 +9352,7 @@ function renderSetupSlots(): void {
   for (let i = 0; i < SEAT_META.length; i++) {
     const m = SEAT_META[i]!;
     const role = setupSlots[i]!;
-    const house = esc(tData(seatHouseName(fids[i]!, m.name, i)));
+    const house = esc(houseDisplayName(seatHouseName(fids[i]!, m.name, i)));
     if (i === 0) {
       h +=
         `<div class="srow"><span class="dot" style="background:${m.color};color:${m.color}"></span>` +
@@ -9937,7 +9939,9 @@ function resolveServer(): { base: string; nick: string } | null {
   }
   const nick = nickInput.value.trim();
   if (!nick) {
-    statusEl.textContent = t('auth.need-nick');
+    // Silent: the boot block calls this BEFORE anyone has typed anything (to probe
+    // /auth/status), so painting a complaint here left «введите позывной» sitting under
+    // a freshly opened welcome card. The null return still blocks the caller.
     return null;
   }
   return { base, nick };
@@ -10968,7 +10972,7 @@ function frame(nowReal: number) {
   const myPlace = ranked.indexOf(ME) + 1;
   // identity line = the commander's callsign; solo seats are named after the HOUSE
   // (buildSetupConfig), so an empty callsign falls back to that seat name
-  const nick = nickInput.value.trim() || s.players[ME]?.name || '';
+  const nick = nickInput.value.trim() || NAME[ME] || '';
   const rem = DAY - (s.time % DAY);
   const eta =
     `${floor(rem / HOUR)}:${String(floor((rem % HOUR) / 60000)).padStart(2, '0')}:` +
