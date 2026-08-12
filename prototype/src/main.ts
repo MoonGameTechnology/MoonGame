@@ -551,6 +551,7 @@ import { TOAST_FADE_MS, TOAST_LIFE_MS, toastClass, toastOverflow, toastText } fr
 import { ringed, ringsShown } from './assaultRings';
 import { mergeStep } from './mergeChase';
 import { gridGap, gridLines, gridOffset } from './backdropGrid';
+import { burstK, shellT, sparkAngle, volleyLife, type VolleySpec } from './volleyFx';
 import { jumpStep, type JumpKind } from './mapJump';
 import {
   loadStep,
@@ -4181,11 +4182,11 @@ function render(now: number) {
   // frame so the volley tracks pan/zoom.
   if (siegeShots.length) {
     const nowMs = performance.now();
-    const SHELLS = 3; // shells per volley, launched in a stagger
-    const FLIGHT = 780; // ms a shell spends on the arc
-    const STAGGER = 130; // ms between shell launches
-    const BURST = 520; // ms an impact burst lives
-    const LIFE = FLIGHT + STAGGER * (SHELLS - 1) + BURST;
+    // Расписание залпа (жизнь, окно полёта каждого снаряда, окно его разрыва, углы
+    // искр) — `volleyFx.ts` (REFM-111): фазы сцеплены, и врозь они разъезжаются.
+    const VOLLEY: VolleySpec = { shells: 3, flightMs: 780, staggerMs: 130, burstMs: 520 };
+    const { shells: SHELLS, flightMs: FLIGHT } = VOLLEY;
+    const LIFE = volleyLife(VOLLEY);
     // LOD: the volley stays visible on the schematic view (a battle is a signal),
     // but compact — arcs/bursts shrink with the node art so they can't swallow a
     // zoomed-out province.
@@ -4229,8 +4230,8 @@ function render(now: number) {
       // 2) the shells — bright tracer dots with a short glowing tail.
       cx.shadowColor = '#ffb066';
       for (let sh = 0; sh < SHELLS; sh++) {
-        const t = (age - sh * STAGGER) / FLIGHT;
-        if (t <= 0 || t >= 1) continue;
+        const t = shellT(age, sh, VOLLEY);
+        if (t === null) continue;
         const pt = q(t);
         const tail = q(Math.max(0, t - 0.06));
         cx.strokeStyle = rgba('#ffd29b', 0.85);
@@ -4249,9 +4250,8 @@ function render(now: number) {
       // 3) impacts — each landed shell pops an expanding ring + sparks on stable
       // per-volley angles (seeded — no per-frame randomness, replays stay clean).
       for (let sh = 0; sh < SHELLS; sh++) {
-        const landed = age - (sh * STAGGER + FLIGHT);
-        if (landed < 0 || landed > BURST) continue;
-        const k = landed / BURST;
+        const k = burstK(age, sh, VOLLEY);
+        if (k === null) continue;
         const burstFade = 1 - k;
         // Hot core flash first — the «попал!» read — then the expanding ring.
         if (k < 0.45) {
@@ -4270,7 +4270,7 @@ function render(now: number) {
         cx.stroke();
         cx.fillStyle = rgba('#ffd29b', 0.85 * burstFade);
         for (let spk = 0; spk < 5; spk++) {
-          const ang = ((shot.seed * 7 + sh * 5 + spk) % 12) * (TAU / 12) + 0.35;
+          const ang = sparkAngle(shot.seed, sh, spk, 12);
           const r = (4 + k * 14) * sk;
           cx.beginPath();
           cx.arc(
