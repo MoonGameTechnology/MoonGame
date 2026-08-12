@@ -550,6 +550,7 @@ import { restoresWallet, snapshotWallet } from './freeBuild';
 import { TOAST_FADE_MS, TOAST_LIFE_MS, toastClass, toastOverflow, toastText } from './toastView';
 import { ringed, ringsShown } from './assaultRings';
 import { mergeStep } from './mergeChase';
+import { gridGap, gridLines, gridOffset } from './backdropGrid';
 import { jumpStep, type JumpKind } from './mapJump';
 import {
   loadStep,
@@ -3942,17 +3943,16 @@ function buildStaticLayer(): void {
       g.fillStyle = grd;
       g.fillRect(0, 0, VW, VH);
     }
-  const gap = Math.max(28, 56 * cam.scale);
-  const ox = ((cam.x % gap) + gap) % gap;
-  const oy = ((cam.y % gap) + gap) % gap;
+  // Шаг, смещение под камерой и куда лечь линиям — `backdropGrid.ts` (REFM-110).
+  const gap = gridGap(cam.scale);
   g.lineWidth = 1;
   g.strokeStyle = GRID;
   g.beginPath();
-  for (let x = ox; x <= VW; x += gap) {
+  for (const x of gridLines(gridOffset(cam.x, gap), VW, gap)) {
     g.moveTo(x, 0);
     g.lineTo(x, VH);
   }
-  for (let y = oy; y <= VH; y += gap) {
+  for (const y of gridLines(gridOffset(cam.y, gap), VH, gap)) {
     g.moveTo(0, y);
     g.lineTo(VW, y);
   }
