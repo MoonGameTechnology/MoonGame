@@ -552,6 +552,7 @@ import { ringed, ringsShown } from './assaultRings';
 import { mergeStep } from './mergeChase';
 import { gridGap, gridLines, gridOffset } from './backdropGrid';
 import { burstK, shellT, sparkAngle, volleyLife, type VolleySpec } from './volleyFx';
+import { FLAK_LIFE_MS, flakBurstRadius, flakDashOffset, flakLook, flakTier } from './flakTiers';
 import { jumpStep, type JumpKind } from './mapJump';
 import {
   loadStep,
@@ -4145,32 +4146,33 @@ function render(now: number) {
     cx.save();
     for (let i = aaShots.length - 1; i >= 0; i--) {
       const shot = aaShots[i]!;
-      const age = nowMs - shot.at;
-      if (age > 700) {
+      // Жизнь и затухание трассы — `flashFx.ts` (REFM-70): своей шкалы у неё нет.
+      if (flashDone(nowMs, shot.at, FLAK_LIFE_MS)) {
         aaShots.splice(i, 1);
         continue;
       }
       const a = world(shot.from);
       const b = world(shot.to);
       if (!visible(a, 160) && !visible(b, 160)) continue;
-      const fade = 1 - age / 700;
-      // Two tiers, two looks: the hourly ORBITAL volley is a heavy orange lance;
-      // the 15-minute CLOSE flak is a thinner, paler stitch with a smaller burst.
-      const col = shot.close ? '#9adfe8' : '#ff8a3d';
-      cx.strokeStyle = rgba(col, (shot.close ? 0.55 : 0.7) * fade);
-      cx.lineWidth = shot.close ? 0.8 : 1.1;
-      cx.setLineDash(shot.close ? [2, 4] : [3, 5]);
-      cx.lineDashOffset = -age / 12; // the tracer visibly climbs from the surface
-      cx.shadowColor = col;
-      cx.shadowBlur = fxBlur(shot.close ? 5 : 8);
+      const k = flashProgress(nowMs, shot.at, FLAK_LIFE_MS);
+      const fade = fadeOf(k);
+      // Два тира, два вида — таблицей в `flakTiers.ts` (REFM-112): часовой ОРБИТАЛЬНЫЙ
+      // залп тяжелее и заметнее, чем 15-минутная БЛИЖНЯЯ зенитка, по всем осям сразу.
+      const look = flakLook(flakTier(shot.close));
+      cx.strokeStyle = rgba(look.color, look.alpha * fade);
+      cx.lineWidth = look.width;
+      cx.setLineDash([...look.dash]);
+      cx.lineDashOffset = flakDashOffset(nowMs - shot.at); // трасса ползёт от поверхности
+      cx.shadowColor = look.color;
+      cx.shadowBlur = fxBlur(look.blur);
       cx.beginPath();
       cx.moveTo(a.x, a.y);
       cx.lineTo(b.x, b.y);
       cx.stroke();
       cx.setLineDash([]);
-      cx.fillStyle = rgba(shot.close ? '#d9f4f7' : '#ffd29b', 0.8 * fade);
+      cx.fillStyle = rgba(look.burstColor, 0.8 * fade);
       cx.beginPath();
-      cx.arc(b.x, b.y, (shot.close ? 1.5 : 2) + (age / 700) * (shot.close ? 3 : 5), 0, TAU);
+      cx.arc(b.x, b.y, flakBurstRadius(look, k), 0, TAU);
       cx.fill();
     }
     cx.restore();
