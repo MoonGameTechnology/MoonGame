@@ -4,10 +4,13 @@ import {
   ORBIT_SPIN,
   ORBIT_ZOOM_IN,
   chevronAngle,
+  fortified,
   orbitBloom,
   orbitsLive,
   orbitRadius,
+  ringShown,
   slotAngle,
+  type RingHost,
 } from './orbitRing';
 
 describe('орбита — порог открытия слоя', () => {
@@ -104,5 +107,78 @@ describe('орбита — разворот шеврона', () => {
 
   it('на неподвижной орбите нос радиальный — движения нет', () => {
     expect(chevronAngle(0.7, false)).toBe(0.7);
+  });
+});
+
+const узел = (over: Partial<RingHost> = {}): RingHost => ({
+  typeHasOrbit: true,
+  starfort: false,
+  garrison: [],
+  parked: 1,
+  ...over,
+});
+
+describe('орбитальное кольцо — у кого оно вообще есть', () => {
+  it('у типа-ГОРОДА кольцо есть', () => {
+    expect(ringShown(узел(), 1)).toBe(true);
+  });
+
+  it('РАЗВЯЗКА БЕЗ УКРЕПЛЕНИЙ КОЛЬЦА НЕ ПОЛУЧАЕТ: её берут простым прибытием', () => {
+    expect(ringShown(узел({ typeHasOrbit: false }), 1)).toBe(false);
+  });
+
+  it('КРЕПОСТЬ ДАЁТ КОЛЬЦО РАЗВЯЗКЕ: такой узел приходится штурмовать с орбиты', () => {
+    expect(ringShown(узел({ typeHasOrbit: false, starfort: true }), 1)).toBe(true);
+  });
+
+  it('живой гарнизон тоже даёт кольцо развязке', () => {
+    expect(ringShown(узел({ typeHasOrbit: false, garrison: [{ count: 3 }] }), 1)).toBe(true);
+  });
+
+  it('ГАРНИЗОН ИЗ НУЛЕЙ — НЕ УКРЕПЛЕНИЕ: записи остаются в состоянии после потерь', () => {
+    expect(fortified(false, [{ count: 0 }, { count: 0 }])).toBe(false);
+    expect(ringShown(узел({ typeHasOrbit: false, garrison: [{ count: 0 }] }), 1)).toBe(false);
+  });
+
+  it('хотя бы одна живая единица среди нулей укрепляет узел', () => {
+    expect(fortified(false, [{ count: 0 }, { count: 1 }, { count: 0 }])).toBe(true);
+  });
+
+  it('пустой гарнизон не укрепляет', () => {
+    expect(fortified(false, [])).toBe(false);
+  });
+});
+
+describe('орбитальное кольцо — когда его рисовать', () => {
+  it('ПУСТАЯ ОРБИТА НЕ РИСУЕТСЯ: кольцо — сведение «здесь стоят», а не украшение', () => {
+    expect(ringShown(узел({ parked: 0 }), 1)).toBe(false);
+    expect(ringShown(узел({ parked: 1 }), 1)).toBe(true);
+  });
+
+  it('НА СХЕМАТИЧНОМ ВИДЕ КОЛЕЦ НЕТ ВОВСЕ: вдали они сливаются с узлом в пятно', () => {
+    expect(ringShown(узел(), 0)).toBe(false);
+    expect(ringShown(узел({ starfort: true, garrison: [{ count: 9 }] }), 0)).toBe(false);
+  });
+
+  it('ИСЧЕРПЫВАЮЩЕ: кольцо ровно там, где есть где встать, кто стоит и на чём смотреть', () => {
+    let рисуем = 0;
+    for (const typeHasOrbit of [true, false])
+      for (const starfort of [true, false])
+        for (const живой of [true, false])
+          for (const parked of [0, 2])
+            for (const detail of [0, 0.5, 1]) {
+              const host: RingHost = {
+                typeHasOrbit,
+                starfort,
+                garrison: [{ count: живой ? 4 : 0 }],
+                parked,
+              };
+              const ждём = detail > 0 && parked > 0 && (typeHasOrbit || starfort || живой);
+              expect(ringShown(host, detail)).toBe(ждём);
+              if (ждём) рисуем++;
+            }
+    // 48 наборов; кольцо живёт при parked > 0 (1 из 2) × detail > 0 (2 из 3) ×
+    // «есть где встать» (7 из 8) = 14
+    expect(рисуем).toBe(14);
   });
 });

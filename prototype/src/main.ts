@@ -537,6 +537,7 @@ import {
   orbitBloom,
   orbitRadius,
   orbitsLive as ringsLive,
+  ringShown,
   slotAngle,
 } from './orbitRing';
 import { routeShown, routeStops, routeStroke } from './fleetRoute';
@@ -4758,15 +4759,22 @@ function render(now: number) {
       if (!fleetSeen(f)) continue; // hidden enemy orbit (no identify, no intel window)
       (stationed[f.location] ??= []).push(f);
     }
-  // LOD: stationed-orbit rings are gone entirely on the schematic view
-  for (const pid of detail > 0 ? Object.keys(stationed) : []) {
+  for (const pid of Object.keys(stationed)) {
     const pl = s.planets[pid];
     if (!pl) continue;
-    // orbit only on types that have one (cities); a fortress gives a junction one too
-    const fortified =
-      pl.buildings.some((b) => b.type === 'starfort') ||
-      (pl.garrison ?? []).some((u) => u.count > 0);
-    if (!sectorTypeOf(pid)?.orbit && !fortified) continue;
+    // У кого кольцо ЕСТЬ — `orbitRing.ts` (REFM-114), там же и его геометрия: город имеет
+    // орбиту по типу, а узел-развязка получает её только УКРЕПЛЁННЫМ (крепость или живой
+    // гарнизон) — такой узел приходится штурмовать, а штурм идёт с орбиты.
+    const shown = ringShown(
+      {
+        typeHasOrbit: !!sectorTypeOf(pid)?.orbit,
+        starfort: pl.buildings.some((b) => b.type === 'starfort'),
+        garrison: pl.garrison ?? [],
+        parked: stationed[pid]?.length ?? 0,
+      },
+      detail,
+    );
+    if (!shown) continue;
     const pc = world(pl.position);
     if (!visible(pc, 80)) continue;
     // A single orbit ring (GDD §7.4) — one orbit, so no N/F labels cluttering the map.
