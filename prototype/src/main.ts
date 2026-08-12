@@ -548,6 +548,7 @@ import { EVENT_LOG_MAX, LOG_LINES, isRepeat, pushBounded, stamp } from './noteLo
 import { pruneGroup, refSurvives } from './selectionPrune';
 import { restoresWallet, snapshotWallet } from './freeBuild';
 import { TOAST_FADE_MS, TOAST_LIFE_MS, toastClass, toastOverflow, toastText } from './toastView';
+import { ringed, ringsShown } from './assaultRings';
 import {
   loadStep,
   makeLoads,
@@ -3572,7 +3573,8 @@ function drawFleetRoutes() {
 /** While ШТУРМ is armed (PC): ring every valid target — someone else's capturable
  *  world (enemy or friendly faction alike; the friendly path asks to declare war). */
 function drawAssaultTargets() {
-  if (!assaultAim) return;
+  // Кого обводим и почему — `assaultRings.ts` (REFM-106).
+  if (!ringsShown(!!assaultAim)) return;
   cx.save();
   cx.strokeStyle = 'rgba(255,90,77,.85)';
   cx.lineWidth = 1.6;
@@ -3581,8 +3583,9 @@ function drawAssaultTargets() {
   cx.shadowBlur = fxBlur(8);
   for (const n of MAP) {
     const p = s.planets[n.id];
-    if (!p || p.owner == null || p.owner === ME) continue;
-    if (!(sectorTypeOf(n.id)?.capturable ?? false)) continue;
+    if (!p) continue;
+    if (!ringed({ owner: p.owner, capturable: sectorTypeOf(n.id)?.capturable ?? false }, ME))
+      continue;
     const c = world(n);
     cx.beginPath();
     cx.arc(c.x, c.y, 16, 0, TAU);
