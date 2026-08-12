@@ -110,7 +110,16 @@ import {
 import { mapIsWorkspace, panelOpen, sheetHeightVar, type DockState } from './hudDock';
 // Хвост маркера флота (пипсы трюма, «×N») — чистая геометрия с тестом на разворот
 // наружу у стоящего флота (пипсы не должны ложиться на диск планеты).
-import { tailTheta, tailAt as tailPoint } from './markerTail';
+import {
+  CARGO_CELL,
+  cargoRowLayout,
+  cargoRows,
+  loadFill,
+  squareRowY,
+  tailAt as tailPoint,
+  tailTheta,
+  tallyY,
+} from './markerTail';
 // BACK-1: лестница слоёв Android-Back/Escape — чистая модель + опись, которую держит тест.
 import {
   closeTopLayer as closeTop,
@@ -4917,12 +4926,10 @@ function render(now: number) {
     // troops). A loading pip (~1h) fills up in place inside its shape's row. Cell
     // centres ride the rotated baseline, the pips themselves stay upright.
     const loads = pendingLoads.filter((p) => p.fleetId === f.id); // empty for enemy/idle fleets
-    type CargoPip = { kind: 'wing' | 'troop' | 'load'; load?: PendingLoad };
-    const diaRow: CargoPip[] = []; // ромбы: эскадрильи в трюме
-    const sqRow: CargoPip[] = []; // квадраты: десант
-    for (let i = 0; i < wingPips; i++) diaRow.push({ kind: 'wing' });
-    for (let i = 0; i < troops; i++) sqRow.push({ kind: 'troop' });
-    for (const p of loads) (isSquadron(p.unit) ? diaRow : sqRow).push({ kind: 'load', load: p });
+    // Кто в каком ряду — `markerTail.ts` (REFM-116): ряды делятся по ФОРМЕ, и
+    // грузящаяся единица встаёт в ряд своей формы, а не отдельным рядом «в пути».
+    const { diamonds: diaRow, squares: sqRow } = cargoRows(wingPips, troops, loads, isSquadron);
+    type CargoPip = (typeof diaRow)[number];
     // The same rotation the pyramid uses; local +y = the tail. Pips and the ship
     // count are placed through this, drawn upright at their rotated spots.
     // Стоящий у мира флот ниже ORBIT_ZOOM_IN стоит РАДИАЛЬНО, и его хвост смотрел
@@ -4932,10 +4939,9 @@ function render(now: number) {
     const th = tailTheta(A.ang, staticDock);
     const tailAt = (lx: number, ly: number): { x: number; y: number } =>
       tailPoint(A.x, A.y, th, lx, ly);
-    const CELL = 8,
+    const CELL = CARGO_CELL,
       SQ = 5,
-      DS = 3.1, // squadron pip: a diamond with the footprint of the square
-      MAX = 8; // per-row cap; rare overflow gets a "+N" tail
+      DS = 3.1; // squadron pip: a diamond with the footprint of the square
     const diamond = (cxr: number, cyr: number, r: number, fill: boolean): void => {
       cx.beginPath();
       cx.moveTo(cxr, cyr - r);
@@ -4948,10 +4954,9 @@ function render(now: number) {
     };
     const drawCargoRow = (row: CargoPip[], ly: number): void => {
       if (!row.length) return;
-      const n = Math.min(row.length, MAX);
-      const over = row.length - n;
-      const rowW = n * CELL + (over > 0 ? 12 : 0);
-      let lx = -rowW / 2 + CELL / 2; // local x of the first cell centre
+      // Обрезка по пределу и центровка (с учётом «+N») — `markerTail.ts`.
+      const { shown: n, over, firstX } = cargoRowLayout(row.length);
+      let lx = firstX;
       cx.save();
       cx.shadowColor = col;
       cx.shadowBlur = fxBlur(3);
@@ -4976,7 +4981,7 @@ function render(now: number) {
           // loading pip → fills in place over ~1h (squadron = growing diamond,
           // ground troop = empty square filling bottom-up)
           const p = pip.load!;
-          const prog = clamp((s.time - p.startAt) / (p.doneAt - p.startAt), 0, 1);
+          const prog = loadFill(s.time, p.startAt, p.doneAt); // зажат — `markerTail.ts`
           if (isSquadron(p.unit)) {
             cx.strokeStyle = rgba(col, 0.85);
             diamond(c0.x, c0.y, DS, false);
@@ -5008,7 +5013,7 @@ function render(now: number) {
       }
     };
     drawCargoRow(diaRow, 5); // ромбы — ближний к базе ряд
-    drawCargoRow(sqRow, diaRow.length ? 5 + CELL : 5); // квадраты — своим рядом ниже
+    drawCargoRow(sqRow, squareRowY(5, diaRow.length)); // квадраты — ниже, если ромбы есть
 
     if (f.owner === ME && chainStepsOf(f.id)) {
       // TGT-1: an army carrying a standing plan breathes a dashed accent ring —
@@ -5052,7 +5057,7 @@ function render(now: number) {
 
     // ship count («×N» — счёт при доминанте, как на постере), small, past the
     // cargo tail — placed along the heading like the pips, glyph upright.
-    const cnt = tailAt(0, diaRow.length && sqRow.length ? 21 + CELL : 21);
+    const cnt = tailAt(0, tallyY(21, diaRow.length, sqRow.length));
     cx.fillStyle = rgba(col, 0.95);
     cx.font = '700 10px ui-monospace,Menlo,monospace';
     cx.fillText(`×${ships}`, cnt.x, cnt.y);
