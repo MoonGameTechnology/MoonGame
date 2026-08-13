@@ -605,6 +605,7 @@ import { TOAST_FADE_MS, TOAST_LIFE_MS, toastClass, toastOverflow, toastText } fr
 import { ringed, ringsShown } from './assaultRings';
 import { mergeStep } from './mergeChase';
 import { gridGap, gridLines, gridOffset } from './backdropGrid';
+import { mapScale, screenRadius } from './mapRadius';
 import {
   arcLift,
   arcPoint,
@@ -1248,7 +1249,7 @@ function drawScanSweep(now: number) {
   const raw: SweepArm[] = [];
   const add = (at: { x: number; y: number }, reach: number): void => {
     const c = world(at);
-    const r = world({ x: at.x + reach, y: at.y }).x - c.x; // uniform projection ⇒ true circle
+    const r = worldDist(reach); // uniform projection ⇒ true circle (`mapRadius.ts`)
     raw.push({ x: c.x, y: c.y, r });
   };
   for (const p of Object.values(s.planets)) {
@@ -1460,12 +1461,11 @@ function sectorTypeOf(id: string) {
 function world(p: { x: number; y: number }): { x: number; y: number } {
   return camWorldToScreen(p, cam, insets(), mapBounds());
 }
-/** Convert a world-space distance (map units) to screen pixels at the current
- *  camera. `worldToScreen` scales by `fitScale * cam.scale`, so a world-space
- *  radius must be multiplied by the SAME factor to match on screen — using just
- *  `cam.scale` (as the old code did) made circles too small by the fit-scale factor. */
+/** Дальность карты в пикселях — ЕДИНСТВЕННЫЙ перевод на весь рендер (`mapRadius.ts`,
+ *  REFM-132). Там же причина, почему множитель — подгон карты под экран × зум камеры:
+ *  взять один зум (как когда-то) значит рисовать круг меньше настоящей дальности. */
 function worldDist(d: number): number {
-  return d * camFitTransform(insets(), mapBounds()).scale * cam.scale;
+  return screenRadius(d, mapScale(camFitTransform(insets(), mapBounds()).scale, cam.scale));
 }
 function visible(c: { x: number; y: number }, pad = 80): boolean {
   return c.x >= -pad && c.x <= VW + pad && c.y >= -pad && c.y <= VH + pad;
@@ -3536,10 +3536,12 @@ function drawRadarCoverage() {
     }),
   ]);
   if (!hasCoverage(sources)) return;
-  // Project map circles to screen circles (uniform projection ⇒ true circles).
+  // Project map circles to screen circles (uniform projection ⇒ true circles) — радиус
+  // считает `worldDist`, а не проекция смещённой точки: это тот же множитель окольным
+  // путём (`mapRadius.ts`, правило 3).
   const screen = (x: number, y: number, rr: number): { x: number; y: number; r: number } => {
     const c = world({ x, y });
-    return { x: c.x, y: c.y, r: world({ x: x + rr, y }).x - c.x };
+    return { x: c.x, y: c.y, r: worldDist(rr) };
   };
   const outer = sources.map((v) => screen(v.x, v.y, v.r));
   const inner = sources.map((v) => screen(v.x, v.y, identifyRadius(v.r, IDENTIFY_REACH_FRACTION)));
@@ -3554,7 +3556,7 @@ function drawRadarCoverage() {
     const c = world({ x: v.x, y: v.y });
     // Пунктир внешнего и сплошная внутреннего — `sightFrontier.ts` (REFM-120, правило 6).
     const ring = (rr: number, tier: SightTier): void => {
-      const r = world({ x: v.x + rr, y: v.y }).x - c.x;
+      const r = worldDist(rr);
       if (!ownRingShown(r)) return;
       const look = ownRingLook(tier);
       cx.beginPath();
@@ -4073,10 +4075,9 @@ function drawRadarRange(now: number): void {
   const reach = rings.signature;
   const c = world(p.position);
   const pulse = 0.5 + 0.5 * Math.sin(now / 600);
-  const radiusPx = (rr: number): { rx: number; ry: number } => ({
-    rx: Math.abs(world({ x: p.position.x + rr, y: p.position.y }).x - c.x),
-    ry: Math.abs(world({ x: p.position.x, y: p.position.y + rr }).y - c.y),
-  });
+  // Радиус — ОДНО число, а не пара полуосей: проекция равномерна по осям, это обещание
+  // камеры (`mapRadius.ts`, правило 2). Эллипс здесь обещал неравномерность, которой нет.
+  const radiusPx = (rr: number): number => worldDist(rr);
   cx.save();
   cx.shadowColor = '#5ff0c0';
   cx.textAlign = 'left';
@@ -4086,7 +4087,7 @@ function drawRadarRange(now: number): void {
   const o = radiusPx(reach);
   cx.fillStyle = rgba('#5ff0c0', 0.04);
   cx.beginPath();
-  cx.ellipse(c.x, c.y, o.rx, o.ry, 0, 0, TAU);
+  cx.arc(c.x, c.y, o, 0, TAU);
   cx.fill();
   cx.setLineDash([6, 7]);
   cx.lineDashOffset = -now / 60;
@@ -4095,14 +4096,14 @@ function drawRadarRange(now: number): void {
   cx.shadowBlur = fxBlur(6);
   cx.stroke();
   cx.fillStyle = rgba('#aef6e6', 0.85);
-  cx.fillText(`◌ SIGNATURE ${reach}`, c.x + o.rx + 7, c.y + 3);
+  cx.fillText(`◌ SIGNATURE ${reach}`, c.x + o + 7, c.y + 3);
 
   // inner — full-reveal reach (contacts fully identified)
   const inner = rings.reveal; // та же доля, что у сводного покрытия (REFM-63, правило 4)
   const i = radiusPx(inner);
   cx.fillStyle = rgba('#5ff0c0', 0.06);
   cx.beginPath();
-  cx.ellipse(c.x, c.y, i.rx, i.ry, 0, 0, TAU);
+  cx.arc(c.x, c.y, i, 0, TAU);
   cx.fill();
   cx.setLineDash([]);
   cx.strokeStyle = rgba('#7df0d0', 0.6 + 0.2 * pulse);
@@ -4110,7 +4111,7 @@ function drawRadarRange(now: number): void {
   cx.shadowBlur = fxBlur(7);
   cx.stroke();
   cx.fillStyle = rgba('#aef6e6', 0.9);
-  cx.fillText(`● REVEAL ${Math.round(inner)}`, c.x + i.rx + 7, c.y - 7);
+  cx.fillText(`● REVEAL ${Math.round(inner)}`, c.x + i + 7, c.y - 7);
   cx.restore();
 }
 
