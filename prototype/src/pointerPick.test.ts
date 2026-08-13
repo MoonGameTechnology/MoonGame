@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
   boxSelection,
+  closestOnSegment,
   insideBox,
   movedBeyondSlop,
   nearestHit,
+  nearestSegment,
   normalizeBox,
   pickRadius,
   pinchOf,
@@ -72,6 +74,73 @@ describe('ввод — ближайшая цель', () => {
 
   it('пустой список — попадать не во что', () => {
     expect(nearestHit([], at, 0, 0, 100)).toBeNull();
+  });
+});
+
+describe('ввод — точка на трассе', () => {
+  const a = { x: 0, y: 0 };
+  const b = { x: 100, y: 0 };
+
+  it('точка напротив середины падает на середину', () => {
+    const at = closestOnSegment(a, b, 50, 20);
+    expect(at).toEqual({ t: 0.5, x: 50, y: 0, d: 20 });
+  });
+
+  it('ПРОЕКЦИЯ ПРИЖИМАЕТСЯ К ОТРЕЗКУ — за конец дороги точка не уезжает', () => {
+    expect(closestOnSegment(a, b, 400, 0)).toMatchObject({ t: 1, x: 100, y: 0, d: 300 });
+    expect(closestOnSegment(a, b, -70, 0)).toMatchObject({ t: 0, x: 0, y: 0, d: 70 });
+  });
+
+  it('расстояние меряется до ТОЧКИ НА ОТРЕЗКЕ, а не до ближайшего конца', () => {
+    // Конец `b` в 51 px, а сама дорога — в 20: приказ ставится на дорогу.
+    expect(closestOnSegment(a, b, 50, 20)?.d).toBe(20);
+  });
+
+  it('ВЫРОЖДЕННАЯ ТРАССА пропускается — деление на нуль дало бы NaN и тихий промах', () => {
+    expect(closestOnSegment({ x: 7, y: 7 }, { x: 7, y: 7 }, 7, 8)).toBeNull();
+  });
+
+  it('наклонная трасса считается так же честно', () => {
+    const at = closestOnSegment({ x: 0, y: 0 }, { x: 10, y: 10 }, 10, 0);
+    expect(at?.t).toBeCloseTo(0.5);
+    expect(at?.d).toBeCloseTo(Math.hypot(5, 5));
+  });
+});
+
+describe('ввод — ближайшая трасса под пальцем', () => {
+  const ends = (l: { a: { x: number; y: number }; b: { x: number; y: number } }) => l;
+  const near = { id: 'близкая', a: { x: 0, y: 10 }, b: { x: 100, y: 10 } };
+  const far = { id: 'дальняя', a: { x: 0, y: 60 }, b: { x: 100, y: 60 } };
+
+  it('БЛИЖАЙШАЯ, а не первая в радиусе — дороги сходятся пучками', () => {
+    expect(nearestSegment([far, near], ends, 50, 0, 100)?.seg.id).toBe('близкая');
+  });
+
+  it('за радиусом — ни одной', () => {
+    expect(nearestSegment([near, far], ends, 50, 0, 9)).toBeNull();
+  });
+
+  it('ровно на радиусе не считается — граница строгая, как у nearestHit', () => {
+    expect(nearestSegment([near], ends, 50, 0, 10)).toBeNull();
+  });
+
+  it('вырожденные трассы не мешают выбрать живую', () => {
+    const dead = { id: 'точка', a: { x: 50, y: 1 }, b: { x: 50, y: 1 } };
+    expect(nearestSegment([dead, near], ends, 50, 0, 100)?.seg.id).toBe('близкая');
+  });
+
+  it('вместе с отрезком возвращается и место попадания на нём', () => {
+    const hit = nearestSegment([near], ends, 25, 0, 100);
+    expect(hit?.at).toMatchObject({ t: 0.25, x: 25, y: 10 });
+  });
+
+  it('равные расстояния достаются ПЕРВОМУ встреченному — порядок обхода задаёт вызывающий', () => {
+    const twin = { ...near, id: 'близнец' };
+    expect(nearestSegment([near, twin], ends, 50, 0, 100)?.seg.id).toBe('близкая');
+  });
+
+  it('пустой список — попадать не во что', () => {
+    expect(nearestSegment([], ends, 0, 0, 100)).toBeNull();
   });
 });
 

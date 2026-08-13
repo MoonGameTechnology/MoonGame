@@ -321,6 +321,7 @@ import {
   insideBox,
   movedBeyondSlop,
   nearestHit,
+  nearestSegment,
   pickRadius,
   pinchOf,
   pinchStep,
@@ -1882,31 +1883,20 @@ function nearestLanePoint(
   my: number,
   maxPx = 14,
 ): { from: string; to: string; t: number; x: number; y: number } | null {
-  let best = maxPx;
-  let found: { from: string; to: string; t: number; x: number; y: number } | null = null;
-  for (const p of Object.values(s.planets)) {
-    const a = world(p.position);
-    for (const mId of p.links ?? []) {
-      if (p.id >= mId) continue; // each undirected lane once
-      const mp = s.planets[mId];
-      if (!mp) continue;
-      const b = world(mp.position);
-      const vx = b.x - a.x;
-      const vy = b.y - a.y;
-      const len2 = vx * vx + vy * vy;
-      if (!len2) continue;
-      let t = ((mx - a.x) * vx + (my - a.y) * vy) / len2;
-      t = Math.min(1, Math.max(0, t));
-      const px = a.x + vx * t;
-      const py = a.y + vy * t;
-      const d = Math.hypot(mx - px, my - py);
-      if (d < best) {
-        best = d;
-        found = { from: p.id, to: mId, t, x: px, y: py };
-      }
-    }
-  }
-  return found;
+  // Перечень трасс — `lanes()` (`setupMap.ts`, правило 7): «каждая трасса ровно один
+  // раз» здесь стояло СВОЕЙ копией сравнения идентификаторов, третьей в файле после
+  // мини-карты и печати статического слоя. Разъедься копии — и игрок целился бы в
+  // дорогу, которой в списке заказа нет: нарисована, а марш на неё не встаёт.
+  // Узлы сразу в ЭКРАННЫХ координатах: попадание пальца считается там же, где палец.
+  const nodes = Object.values(s.planets).map((p) => ({
+    id: p.id,
+    ...world(p.position),
+    links: p.links ?? [],
+  }));
+  // Прижатие к отрезку и выбор ближайшей трассы — `pointerPick.ts` (REFM-128).
+  const hit = nearestSegment(lanes(nodes), (l) => ({ a: l.from, b: l.to }), mx, my, maxPx);
+  if (!hit) return null;
+  return { from: hit.seg.from.id, to: hit.seg.to.id, t: hit.at.t, x: hit.at.x, y: hit.at.y };
 }
 
 /** For a march to a lane point: which endpoint the fleet routes through and the
