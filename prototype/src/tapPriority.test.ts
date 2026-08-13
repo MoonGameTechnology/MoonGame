@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { TAP_RADIUS, tapOwner, tapRadius, type TapModes } from './tapPriority';
 
 const modes = (over: Partial<TapModes> = {}): TapModes => ({
@@ -82,5 +84,27 @@ describe('тап по карте — радиус попадания', () => {
       expect(pair).toHaveLength(2);
       expect(pair[0]).toBeGreaterThan(0);
     }
+  });
+});
+
+
+// Правило 5: по узлу целится не только тап — превью вооружённого приказа каждый кадр
+// ищет мир под указателем. Пока оба берут радиус ОТСЮДА, линия превью не может обещать
+// путь, которого отпускание не отправит.
+describe('тап по карте — радиус ОДИН на прицел и на коммит (REFM-125)', () => {
+  it('ПРИЦЕЛ И КОММИТ БЕРУТ ОДНО ЧИСЛО: иначе превью рисует путь, который не отправится', () => {
+    for (const touch of [true, false])
+      expect(tapRadius('node', touch)).toBe(tapRadius('node', touch));
+  });
+
+  it('вынос НЕ поменял числа: копия в превью стояла ровно на этих значениях', () => {
+    expect(tapRadius('node', false)).toBe(24); // мышь
+    expect(tapRadius('node', true)).toBe(30); // палец
+  });
+
+  it('КОПИЯ НЕ ВЕРНЁТСЯ МОЛЧА: в отрисовке не должно быть своих радиусов под палец', () => {
+    const src = readFileSync(fileURLToPath(new URL('./main.ts', import.meta.url)), 'utf8');
+    // именно та форма, что и стояла: `tapByTouch ? 30 : 24`
+    expect(src).not.toMatch(/tapByTouch\s*\?\s*\d+\s*:\s*\d+/);
   });
 });

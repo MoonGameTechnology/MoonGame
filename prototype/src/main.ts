@@ -3798,20 +3798,14 @@ function drawAimPreview() {
   if (!ids.length) return;
   // Prefer a node target; if none is near, aim at the closest point ON a lane —
   // the army will route to that road and park there (Bytro continuous order).
-  // The node pick radius MUST match selectAt's rNode (24px mouse / 30px touch):
-  // any mismatch makes the preview draw a path the release will not dispatch.
-  let target: { x: number; y: number } | null = null;
-  let targetId: string | null = null;
-  let best = tapByTouch ? 30 : 24;
-  for (const n of MAP) {
-    const c = world(n);
-    const d = Math.hypot(aimPointer.x - c.x, aimPointer.y - c.y);
-    if (d < best) {
-      best = d;
-      target = c;
-      targetId = n.id;
-    }
-  }
+  // Радиус захвата узла — `tapPriority.ts` (REFM-125, правило 5), поиск ближайшего —
+  // `pointerPick.ts` (REFM-33). Прицел и коммит ОБЯЗАНЫ смотреть одним радиусом: здесь
+  // стояла своя копия тех же чисел (30 пальцем, 24 мышью), и разъедься она с тапом —
+  // превью рисовало бы путь, которого отпускание не отправит, причём молча.
+  const rAim = tapRadius('node', tapByTouch);
+  const hit = nearestHit(MAP, (n) => world(n), aimPointer.x, aimPointer.y, rAim);
+  let target: { x: number; y: number } | null = hit ? world(hit) : null;
+  const targetId: string | null = hit?.id ?? null;
   const laneTarget = targetId ? null : nearestLanePoint(aimPointer.x, aimPointer.y);
   if (laneTarget) target = { x: laneTarget.x, y: laneTarget.y };
   const tip = target ?? aimPointer;
