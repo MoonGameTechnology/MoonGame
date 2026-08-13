@@ -301,7 +301,7 @@ import {
   rivalCount,
   seatFactionIds as seatSeatFactionIds,
 } from './setupSeats';
-import { drawOrder, lanes, mapViewBox } from './setupMap';
+import { SNAP_REACH, drawOrder, lanes, mapViewBox, viewBoxPoint } from './setupMap';
 import {
   actionButton,
   cardHeader as kitCardHeader,
@@ -9609,25 +9609,29 @@ setupMapEl.addEventListener('click', (ev) => {
   const direct = (ev.target as Element).closest('[data-cand]');
   let pick: string | null = direct?.getAttribute('data-cand') ?? null;
   if (!pick) {
-    // The candidate circles are ~8px on a phone — a near miss still counts. Map the
-    // tap into viewBox space (preserveAspectRatio=meet: uniform scale, centred) and
-    // snap to the nearest start world within a generous reach.
-    const r = setupMapEl.getBoundingClientRect();
-    const vb = (setupMapEl as unknown as SVGSVGElement).viewBox.baseVal;
-    if (vb.width > 0 && r.width > 0) {
-      const scale = Math.min(r.width / vb.width, r.height / vb.height);
-      const x = vb.x + (ev.clientX - r.left - (r.width - vb.width * scale) / 2) / scale;
-      const y = vb.y + (ev.clientY - r.top - (r.height - vb.height * scale) / 2) / scale;
-      let best = 90; // viewBox units — roughly three candidate radii
-      for (const id of START_CANDIDATES) {
-        const n = MAP.find((m) => m.id === id);
-        if (!n) continue;
-        const d = Math.hypot(n.x - x, n.y - y);
-        if (d < best) {
-          best = d;
-          pick = id;
-        }
-      }
+    // The candidate circles are ~8px on a phone — a near miss still counts.
+    // Перевод тапа в координаты viewBox и радиус снапа — `setupMap.ts` (REFM-126,
+    // правила 4–5): SVG растянут с `preserveAspectRatio=meet`, и в экранных пикселях
+    // снап промахивался бы тем сильнее, чем сильнее вытянуто окно. Ближайший кандидат —
+    // `pointerPick.ts`, тот же поиск, что и на карте матча.
+    const at = viewBoxPoint(
+      setupMapEl.getBoundingClientRect(),
+      (setupMapEl as unknown as SVGSVGElement).viewBox.baseVal,
+      ev.clientX,
+      ev.clientY,
+    );
+    if (at) {
+      const hit = nearestHit(
+        START_CANDIDATES.flatMap((id) => {
+          const n = MAP.find((m) => m.id === id);
+          return n ? [n] : [];
+        }),
+        (n) => n,
+        at.x,
+        at.y,
+        SNAP_REACH,
+      );
+      pick = hit?.id ?? null;
     }
   }
   if (!pick) return;

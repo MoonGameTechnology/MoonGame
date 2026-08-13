@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { drawOrder, lanes, mapViewBox, type MapNodeLike } from './setupMap';
+import {
+  SNAP_REACH,
+  drawOrder,
+  lanes,
+  mapViewBox,
+  viewBoxPoint,
+  type MapNodeLike,
+} from './setupMap';
 import { MAP, START_CANDIDATES } from './map';
 
 const node = (id: string, x: number, y: number, links: string[] = []): MapNodeLike => ({
@@ -96,5 +103,59 @@ describe('мини-карта сетапа — порядок рисования
 
   it('на настоящей карте все стартовые точки находятся', () => {
     expect(drawOrder(MAP, START_CANDIDATES).candidates).toHaveLength(START_CANDIDATES.length);
+  });
+});
+
+describe('тап по мини-карте — перевод в координаты viewBox (REFM-126)', () => {
+  const vb = { x: 0, y: 0, width: 100, height: 100 };
+
+  it('карта ещё не разложена — переводить нечего', () => {
+    expect(viewBoxPoint({ left: 0, top: 0, width: 0, height: 0 }, vb, 5, 5)).toBeNull();
+    expect(
+      viewBoxPoint({ left: 0, top: 0, width: 200, height: 200 }, { ...vb, width: 0 }, 5, 5),
+    ).toBeNull();
+  });
+
+  it('квадрат в квадрат: центр экрана — центр рамки', () => {
+    const p = viewBoxPoint({ left: 0, top: 0, width: 200, height: 200 }, vb, 100, 100);
+    expect(p).toEqual({ x: 50, y: 50 });
+  });
+
+  it('МАСШТАБ ПО МЕНЬШЕЙ СТОРОНЕ: на широком экране карта не растягивается', () => {
+    // 400×200 под рамку 100×100: масштаб 2, карта шириной 200 стоит по центру
+    const p = viewBoxPoint({ left: 0, top: 0, width: 400, height: 200 }, vb, 200, 100);
+    expect(p).toEqual({ x: 50, y: 50 }); // центр экрана — всё ещё центр карты
+  });
+
+  it('ЛИШНЕЕ МЕСТО ДЕЛИТСЯ ПОПОЛАМ: без центрирования тап уезжал бы на полполосы', () => {
+    // тот же широкий экран: левый край КАРТЫ лежит на 100px экрана, а не на нуле
+    const p = viewBoxPoint({ left: 0, top: 0, width: 400, height: 200 }, vb, 100, 0);
+    expect(p).toEqual({ x: 0, y: 0 });
+  });
+
+  it('на узком экране лишнее место уходит по вертикали', () => {
+    const p = viewBoxPoint({ left: 0, top: 0, width: 200, height: 400 }, vb, 0, 100);
+    expect(p).toEqual({ x: 0, y: 0 });
+  });
+
+  it('положение элемента на странице учитывается', () => {
+    const p = viewBoxPoint({ left: 40, top: 25, width: 200, height: 200 }, vb, 140, 125);
+    expect(p).toEqual({ x: 50, y: 50 });
+  });
+
+  it('сдвиг рамки не забыт: viewBox может начинаться не в нуле', () => {
+    const p = viewBoxPoint(
+      { left: 0, top: 0, width: 200, height: 200 },
+      { x: -30, y: 70, width: 100, height: 100 },
+      100,
+      100,
+    );
+    expect(p).toEqual({ x: 20, y: 120 });
+  });
+
+  it('РАДИУС СНАПА — В ЕДИНИЦАХ VIEWBOX: в экранных он плыл бы с размером окна', () => {
+    expect(SNAP_REACH).toBeGreaterThan(0);
+    // примерно три радиуса кружка кандидата (кружок ~26 единиц в поперечнике)
+    expect(SNAP_REACH).toBeGreaterThan(30);
   });
 });
