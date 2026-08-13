@@ -252,7 +252,7 @@ import { nextPick, tapCandidates, touchPick, type TapPick } from './tapCycle';
 import { chainTapTarget, nearestOwnWorld as ownWorldNearest } from './chainTarget';
 import { arrivalHours, marchHours, restRouteHours } from './travelEta';
 import { castOptions, heroAboard, type CastOption } from './heroCasts';
-import { clampMenuLeft, pushBelowChrome, toScreen } from './screenAnchor';
+import { stickToPoint, toScreen } from './screenAnchor';
 import { fadeOf, flashDone, flashProgress, growRadius, waveRadius } from './flashFx';
 import { capsuleAt, chainPathNodes, lastStepAtPoint, stackIndexes } from './chainPathLayout';
 import {
@@ -11456,6 +11456,7 @@ const pings = initPingUi({
     const at = toScreen(world(pl.position), canvas.getBoundingClientRect(), VW, VH);
     return { left: Math.round(at.x), top: Math.round(at.y) };
   },
+  viewportW: () => window.innerWidth,
   ask: (current) => prompt(t('ping.panel.edit'), current),
   onFeedChanged: () => {
     if (diploOpen && diploTab === 'msgs') renderDiploFeed();
@@ -11646,10 +11647,16 @@ function positionChainMenu(el: HTMLElement): void {
   const top0 = Math.round(at.y);
   el.style.left = `${left0}px`;
   el.style.top = `${top0}px`;
-  // Зажатие и подъём из-под хрома считаются по ИЗМЕРЕННОЙ коробке (`screenAnchor.ts`).
+  // Поставили в округлённое → измерили → поправили: зажатие по экрану и подъём из-под
+  // хрома считает `screenAnchor.ts` (правило 5, REFM-133), общий с всплывашкой метки.
   const b = el.getBoundingClientRect();
-  el.style.left = `${Math.round(clampMenuLeft(left0, b.width, window.innerWidth))}px`;
-  el.style.top = `${Math.round(pushBelowChrome(top0, b.top))}px`;
+  const at2 = stickToPoint(
+    { x: left0, y: top0 },
+    { width: b.width, top: b.top },
+    window.innerWidth,
+  );
+  el.style.left = `${at2.x}px`;
+  el.style.top = `${at2.y}px`;
 }
 document.getElementById('tgted')?.addEventListener('click', (ev) => {
   const btn = (ev.target as HTMLElement).closest('button');
