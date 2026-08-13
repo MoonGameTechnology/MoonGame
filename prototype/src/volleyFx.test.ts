@@ -1,5 +1,18 @@
 import { describe, it, expect } from 'vitest';
-import { burstK, shellT, sparkAngle, volleyLife, type VolleySpec } from './volleyFx';
+import {
+  ARC_MAX_LIFT,
+  ARC_MIN_LIFT,
+  ARC_RISE,
+  ARC_STEPS,
+  arcLift,
+  arcPoint,
+  arcPolyline,
+  burstK,
+  shellT,
+  sparkAngle,
+  volleyLife,
+  type VolleySpec,
+} from './volleyFx';
 
 const SPEC: VolleySpec = { shells: 3, flightMs: 780, staggerMs: 130, burstMs: 520 };
 
@@ -83,5 +96,60 @@ describe('залп — искры', () => {
         expect(ang).toBeGreaterThanOrEqual(0.35);
         expect(ang).toBeLessThan(Math.PI * 2 + 0.35);
       }
+  });
+});
+
+describe('залп — дуга', () => {
+  const A = { x: 0, y: 100 };
+  const B = { x: 200, y: 100 };
+
+  it('ЛОБ РАСТЁТ С ДАЛЬНОСТЬЮ — навесной огонь тем круче, чем дальше бьют', () => {
+    expect(arcLift(200, 1)).toBeCloseTo(200 * ARC_RISE);
+    expect(arcLift(150, 1)).toBeLessThan(arcLift(250, 1));
+  });
+
+  it('У ЛБА ЕСТЬ ПОЛ: выстрел в упор не вырождается в прямую', () => {
+    expect(arcLift(0, 1)).toBe(ARC_MIN_LIFT);
+    expect(arcLift(10, 1)).toBe(ARC_MIN_LIFT);
+  });
+
+  it('У ЛБА ЕСТЬ ПОТОЛОК: дальний залп не выгибается за край экрана', () => {
+    expect(arcLift(10_000, 1)).toBe(ARC_MAX_LIFT);
+  });
+
+  it('пол и потолок ужимаются вместе с артом узла (правило 7)', () => {
+    expect(arcLift(0, 0.5)).toBe(ARC_MIN_LIFT * 0.5);
+    expect(arcLift(10_000, 0.5)).toBe(ARC_MAX_LIFT * 0.5);
+    expect(arcLift(500, 0.5)).toBeLessThan(arcLift(500, 1));
+  });
+
+  it('концы дуги — это стреляющий и цель, а лоб поднят НАД хордой', () => {
+    expect(arcPoint(A, B, 40, 0)).toEqual(A);
+    expect(arcPoint(A, B, 40, 1)).toEqual(B);
+    const mid = arcPoint(A, B, 40, 0.5);
+    expect(mid.x).toBeCloseTo(100);
+    expect(mid.y).toBeCloseTo(100 - 40 / 2); // подъём опорной точки даёт половину на кривой
+    expect(mid.y).toBeLessThan(A.y); // «вверх» на экране — это меньший y
+  });
+
+  it('без подъёма дуга — прямая между концами', () => {
+    expect(arcPoint(A, B, 0, 0.25)).toEqual({ x: 50, y: 100 });
+  });
+
+  it('СЛЕД ИДЁТ ТОЛЬКО ДО ГОЛОВНОГО СНАРЯДА, а не до цели', () => {
+    const half = arcPolyline(A, B, 40, 0.5);
+    expect(half.length).toBe(Math.ceil(ARC_STEPS * 0.5));
+    expect(half.at(-1)).toEqual(arcPoint(A, B, 40, 0.5));
+    expect(half.at(-1)!.x).toBeLessThan(B.x); // до цели он ещё не дошёл
+  });
+
+  it('снаряд не ушёл — рисовать нечего', () => {
+    expect(arcPolyline(A, B, 40, 0)).toEqual([]);
+  });
+
+  it('долетел — след кончается РОВНО в цели', () => {
+    const full = arcPolyline(A, B, 40, 1);
+    expect(full.length).toBe(ARC_STEPS);
+    expect(full.at(-1)).toEqual(B);
   });
 });

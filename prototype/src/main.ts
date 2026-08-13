@@ -596,7 +596,16 @@ import { TOAST_FADE_MS, TOAST_LIFE_MS, toastClass, toastOverflow, toastText } fr
 import { ringed, ringsShown } from './assaultRings';
 import { mergeStep } from './mergeChase';
 import { gridGap, gridLines, gridOffset } from './backdropGrid';
-import { burstK, shellT, sparkAngle, volleyLife, type VolleySpec } from './volleyFx';
+import {
+  arcLift,
+  arcPoint,
+  arcPolyline,
+  burstK,
+  shellT,
+  sparkAngle,
+  volleyLife,
+  type VolleySpec,
+} from './volleyFx';
 import { FLAK_LIFE_MS, flakBurstRadius, flakDashOffset, flakLook, flakTier } from './flakTiers';
 import { sweepGlow as armsGlow, sweepPaint, sweepShows } from './sweepFx';
 import { emblemTally } from './fleetTally';
@@ -4216,15 +4225,11 @@ function render(now: number) {
       const a = world(shot.from);
       const b = world(shot.to);
       if (!visible(a, 200) && !visible(b, 200)) continue;
-      // Ballistic lob: the mid-point lifts straight up in screen space, scaled by
-      // the span — long-range fire arches higher, point-blank stays flat-ish.
-      const dist = Math.hypot(b.x - a.x, b.y - a.y);
-      const lift = Math.min(64 * sk, Math.max(16 * sk, dist * 0.24));
-      const c = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 - lift };
-      const q = (t: number) => ({
-        x: (1 - t) * (1 - t) * a.x + 2 * (1 - t) * t * c.x + t * t * b.x,
-        y: (1 - t) * (1 - t) * a.y + 2 * (1 - t) * t * c.y + t * t * b.y,
-      });
+      // Форма дуги — `volleyFx.ts` (REFM-130, правила 6–8) там же, где её расписание:
+      // навесной огонь читается только пока лоб дуги зажат полом и потолком, а сам
+      // подъём ужимается вместе с артом узла.
+      const lift = arcLift(Math.hypot(b.x - a.x, b.y - a.y), sk);
+      const q = (t: number) => arcPoint(a, b, lift, t);
       // 1) the traced arc — a faint amber dashed path up to the lead shell.
       const lead = Math.min(1, age / FLIGHT);
       const pathFade = Math.max(0, 1 - age / LIFE);
@@ -4234,11 +4239,9 @@ function render(now: number) {
       cx.lineDashOffset = -age / 16;
       cx.beginPath();
       cx.moveTo(a.x, a.y);
-      const STEPS = 18;
-      for (let sgm = 1; sgm <= Math.ceil(STEPS * lead); sgm++) {
-        const pt = q(Math.min(lead, sgm / STEPS));
-        cx.lineTo(pt.x, pt.y);
-      }
+      // След идёт только ДО головного снаряда (правило 8): дорисованный до цели, он
+      // читался бы как линия связи, обещающая ещё не случившееся попадание.
+      for (const pt of arcPolyline(a, b, lift, lead)) cx.lineTo(pt.x, pt.y);
       cx.stroke();
       cx.setLineDash([]);
       // 2) the shells — bright tracer dots with a short glowing tail.
