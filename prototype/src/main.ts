@@ -237,6 +237,7 @@ import {
   unionArcs,
   type SightTier,
 } from './sightFrontier';
+import { BADGE_R, badgeBob, badgeCenterY, badgeLook, badgeShown, badgeTether } from './kindBadge';
 import { tapOwner, tapRadius } from './tapPriority';
 import { nextPick, tapCandidates, touchPick, type TapPick } from './tapCycle';
 import { chainTapTarget, nearestOwnWorld as ownWorldNearest } from './chainTarget';
@@ -4402,45 +4403,49 @@ function render(now: number) {
     // a projected hologram (soft glow halo + holo capsule ring + a faint projector
     // tether down to the node), gently bobbing in the sector-type colour so the type
     // reads at a glance regardless of the bespoke art below (planet / asteroid / …).
-    if (KIND_ICON[n.sector] && detail > 0) {
+    // Висит ли бейдж, где именно и как выглядит — `kindBadge.ts` (REFM-121): он оторван
+    // от узла, чтобы не слиться с искусством сектора, и потому обязан тянуть к нему луч
+    // проектора; покачивание фазируется координатами узла, иначе вся карта дрожит в такт.
+    if (badgeShown(!!KIND_ICON[n.sector], detail)) {
       const kc = sectorTypeOf(n.id)?.color ?? '#9fb6bd';
-      const bob = Math.sin(now / 700 + n.x * 0.021 + n.y * 0.017) * 2.4;
-      const brad = 11;
+      const look = badgeLook();
+      const nodeTop = c.y - R;
       const bx = c.x;
-      const by = c.y - R - 6 - brad - 6 + bob; // badge centre floats above, softly bobbing
+      const by = badgeCenterY(nodeTop, badgeBob(now, n.x, n.y));
+      const tether = badgeTether(nodeTop, by);
       cx.save();
       cx.globalAlpha = detail; // LOD: the hologram dissolves on the schematic view
-      blitGlow(kc, bx, by, brad + 9, 0.5); // holographic bloom (cached disc)
+      blitGlow(kc, bx, by, look.glowRadius, look.glowAlpha); // holographic bloom (cached disc)
       // projector tether — a faint dashed beam from the node up to the badge
-      cx.strokeStyle = rgba(kc, 0.16);
-      cx.setLineDash([2, 3]);
+      cx.strokeStyle = rgba(kc, look.tetherAlpha);
+      cx.setLineDash([...look.tetherDash]);
       cx.lineWidth = 1;
       cx.beginPath();
-      cx.moveTo(bx, c.y - R);
-      cx.lineTo(bx, by + brad);
+      cx.moveTo(bx, tether.from);
+      cx.lineTo(bx, tether.to);
       cx.stroke();
       cx.setLineDash([]);
       // holo capsule: translucent disc + bright rim + inner scanline ring
-      cx.fillStyle = rgba(kc, 0.12);
+      cx.fillStyle = rgba(kc, look.fillAlpha);
       cx.beginPath();
-      cx.arc(bx, by, brad, 0, TAU);
+      cx.arc(bx, by, BADGE_R, 0, TAU);
       cx.fill();
-      cx.strokeStyle = rgba(kc, 0.6);
-      cx.lineWidth = 1.2;
+      cx.strokeStyle = rgba(kc, look.rimAlpha);
+      cx.lineWidth = look.rimWidth;
       cx.beginPath();
-      cx.arc(bx, by, brad, 0, TAU);
+      cx.arc(bx, by, BADGE_R, 0, TAU);
       cx.stroke();
-      cx.strokeStyle = rgba(kc, 0.26);
+      cx.strokeStyle = rgba(kc, look.scanAlpha);
       cx.beginPath();
-      cx.arc(bx, by, brad - 3, 0, TAU);
+      cx.arc(bx, by, BADGE_R - look.scanInset, 0, TAU);
       cx.stroke();
       // the type glyph, glowing in the sector colour
       cx.font = '700 15px ui-monospace,Menlo,monospace';
       cx.textAlign = 'center';
       cx.textBaseline = 'middle';
       cx.shadowColor = kc;
-      cx.shadowBlur = fxBlur(5);
-      cx.fillStyle = rgba(kc, 0.95);
+      cx.shadowBlur = fxBlur(look.glyphBlur);
+      cx.fillStyle = rgba(kc, look.glyphAlpha);
       cx.fillText(KIND_ICON[n.sector]!, bx, by + 0.5);
       cx.restore();
     }
