@@ -16,11 +16,26 @@
  * сектор) плитку НЕ гасит: нехватку игроку показывает сама цена с дефицитом, а серая
  * кнопка вместо цифры «сколько не хватает» была бы хуже. Это решение подачи, и его
  * легко потерять, «упростив» условие до «любой отказ = замок».
+ *
+ * **3. У каталога ДВЕ подачи, и обе живут здесь: плитка и СТРОКА.** Заказ по просьбе
+ * владельца читается списком там же, где списком показан состав («флот и крылья …
+ * тоже списком, как здания»). Разница чисто в подаче: якоря заказа, замок и досье у
+ * строки ТЕ ЖЕ, что у плитки, — иначе список принимал бы заказы по другим правилам,
+ * чем сетка, и правило 1 пришлось бы держать в двух местах.
+ *
+ * **4. У построенного здания видно, СКОЛЬКО оно приносит.** Список построек отвечал
+ * только на вопрос «что стоит», а игрок решает «что строить дальше» по доходу —
+ * и шёл за ним в кодекс, по одной постройке за тап. Доход приходит сюда ГОТОВОЙ
+ * разметкой (`resLine`): здесь нет ни данных, ни локали, а собирать вторую копию
+ * форматтера ради строчки — та же ошибка, что и вторая копия правил заказа.
  */
 import { esc } from './format';
 
 /** Состояние плитки: уже построено, уже заказано, или заказывать можно. */
 export type TileLock = 'built' | 'queued' | null;
+
+/** Подача каталога: сетка плиток или столбик строк — см. правило 3. */
+export type CatalogShape = 'tile' | 'row';
 
 /** Коды ядра, которые означают ПОВТОР заказа — и только они гасят плитку. */
 const BUILT = 'E_ALREADY_BUILT';
@@ -63,6 +78,8 @@ export interface BuiltTileView {
   icon: string;
   /** Локализованное имя здания — только текстом. */
   name: string;
+  /** Доход в час ГОТОВОЙ разметкой (`resLine`); пустая строка — здание не доходное. */
+  income?: string;
 }
 
 /**
@@ -82,11 +99,40 @@ export interface BuiltTileView {
  */
 export function builtTileHtml(v: BuiltTileView): string {
   const desc = `b:${esc(v.type)}:${v.level}`;
+  // Доход стоит ПЕРЕД уровнем: «сколько приносит» — то, ради чего в этот список смотрят,
+  // а уровень отвечает на «насколько улучшено» и держится с краю (правило 4).
+  const income = v.income ? `<span class="prod">${v.income}</span>` : '';
   return (
     `<button class="asset-row built" data-codex="${desc}" data-desc="${desc}" data-name="${esc(v.name)}">` +
     `<span class="bicon">${v.icon}</span>` +
     `<b>${esc(v.name)}</b>` +
+    income +
     `<span class="dim">L${v.level}</span></button>`
+  );
+}
+
+/**
+ * СТРОКА каталога — та же плитка, но списком (правило 3). Якоря заказа и замок
+ * повторяют `catalogTileHtml` один в один: подача разная, правила одни.
+ */
+export function catalogRowHtml(v: TileView): string {
+  const desc = `${v.kind}:${esc(v.id)}`;
+  if (v.lock) {
+    // Ни `data-codex`, ни `data-buildorder` — оба пути заказа закрыты (правило 1).
+    const mark = v.lock === 'built' ? '✓' : '⏳';
+    return (
+      `<button class="asset-row cat locked" data-desc="${desc}" data-name="${esc(v.name)}">` +
+      `<span class="bicon">${v.icon}</span><b>${esc(v.name)}</b>` +
+      `<span class="dim">${mark} ${esc(v.label)}</span></button>`
+    );
+  }
+  const order = v.orderable
+    ? ` data-buildorder="${v.kind === 'u' ? 'unit' : 'building'}:${esc(v.id)}"`
+    : '';
+  return (
+    `<button class="asset-row cat" data-codex="${desc}" data-desc="${desc}"${order} data-name="${esc(v.name)}">` +
+    `<span class="bicon">${v.icon}</span><b>${esc(v.name)}</b>` +
+    `<span class="dim">${esc(v.label)}</span></button>`
   );
 }
 

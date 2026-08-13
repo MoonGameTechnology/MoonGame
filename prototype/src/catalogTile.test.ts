@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { builtTileHtml, catalogTileHtml, tileLock, type TileView } from './catalogTile';
+import {
+  builtTileHtml,
+  catalogRowHtml,
+  catalogTileHtml,
+  tileLock,
+  type TileView,
+} from './catalogTile';
 
 const tile = (over: Partial<TileView> = {}): string =>
   catalogTileHtml({
@@ -141,5 +147,69 @@ describe('строка построенного здания', () => {
 
   it('id здания экранируется — он уходит в атрибуты', () => {
     expect(built({ type: '"><img src=x>' })).not.toContain('<img src=x');
+  });
+
+  it('ДОХОД ПОКАЗАН — ради него в этот список и смотрят; стоит ПЕРЕД уровнем', () => {
+    const html = built({ income: '<span class="rcost">+20</span>' });
+    expect(html).toContain('class="prod"');
+    expect(html).toContain('+20');
+    expect(html.indexOf('class="prod"')).toBeLessThan(html.indexOf('>L1<'));
+  });
+
+  it('недоходное здание не печатает пустую колонку', () => {
+    expect(built()).not.toContain('class="prod"');
+    expect(built({ income: '' })).not.toContain('class="prod"');
+  });
+});
+
+describe('строка каталога', () => {
+  const row = (over: Partial<TileView> = {}): string =>
+    catalogRowHtml({
+      kind: 'u',
+      id: 'cruiser',
+      icon: '<i>▲</i>',
+      name: 'Крейсер',
+      label: '20❒',
+      ...over,
+    });
+
+  it('ЭТО СТРОКА, А НЕ ПЛИТКА: та же подача, что у списка построенного', () => {
+    expect(row()).toContain('class="asset-row cat"');
+    expect(row()).not.toContain('ptile');
+  });
+
+  it('ИМЯ ПОДПИСАНО и цена стоит рядом — тапать ради опознания больше не нужно', () => {
+    const html = row();
+    expect(html).toContain('<b>Крейсер</b>');
+    expect(html.indexOf('<b>Крейсер</b>')).toBeLessThan(html.indexOf('20❒'));
+  });
+
+  it('ПРАВИЛА ЗАКАЗА ТЕ ЖЕ, ЧТО У ПЛИТКИ: оба якоря на месте', () => {
+    const html = row({ orderable: true });
+    expect(html).toContain('data-codex="u:cruiser"');
+    expect(html).toContain('data-buildorder="unit:cruiser"');
+    expect(html).toContain('data-desc="u:cruiser"'); // сводка по удержанию
+  });
+
+  it('ЗАПЕРТАЯ СТРОКА теряет ОБА пути заказа, сохраняя досье', () => {
+    const html = row({ kind: 'b', id: 'mine', lock: 'built', orderable: true });
+    expect(html).not.toContain('data-codex');
+    expect(html).not.toContain('data-buildorder');
+    expect(html).toContain('data-desc="b:mine"');
+    expect(html).toContain('class="asset-row cat locked"');
+    expect(html).toContain('✓');
+    expect(row({ lock: 'queued' })).toContain('⏳');
+  });
+
+  it('иконка вставляется разметкой, а имя и подпись — текстом (CWE-79)', () => {
+    const html = row({ icon: '<svg id="ic"></svg>', name: '<b>злое</b>', label: '<i>цена</i>' });
+    expect(html).toContain('<svg id="ic">');
+    expect(html).not.toContain('<b>злое</b>');
+    expect(html).not.toContain('<i>цена</i>');
+  });
+
+  it('id экранируется в обоих состояниях — он уходит в атрибуты', () => {
+    expect(row({ id: '"><img src=x>', orderable: true })).not.toContain('<img src=x');
+    expect(row({ id: '"><img src=x>', lock: 'built' })).not.toContain('<img src=x');
   });
 });
