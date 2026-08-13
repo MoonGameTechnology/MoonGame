@@ -4,6 +4,7 @@ import {
   TOP_CHROME,
   clampMenuLeft,
   pushBelowChrome,
+  stickToPoint,
   toScreen,
   type CanvasBox,
 } from './screenAnchor';
@@ -68,5 +69,37 @@ describe('якорь на экране — из-под верхнего хром
 
   it('кромка выше экрана — опускаем и её', () => {
     expect(pushBelowChrome(10, -40)).toBe(10 + TOP_CHROME + 40);
+  });
+});
+
+// ── Общая посадка коробки (REFM-133) ─────────────────────────────────────────
+describe('коробка над точкой карты — обе поправки разом', () => {
+  const ЭКРАН = 1280;
+  const КОРОБКА = { width: 172, top: 300 };
+
+  it('в середине экрана и ниже хрома не двигается никуда', () => {
+    expect(stickToPoint({ x: 640, y: 300 }, КОРОБКА, ЭКРАН)).toEqual({ x: 640, y: 300 });
+  });
+
+  it('У КРАЯ ЗАЖИМАЕТ: коробка центрирована по точке, иначе её срезало бы', () => {
+    expect(stickToPoint({ x: 1270, y: 300 }, КОРОБКА, ЭКРАН).x).toBe(1280 - (172 / 2 + 6));
+    expect(stickToPoint({ x: 4, y: 300 }, КОРОБКА, ЭКРАН).x).toBe(172 / 2 + 6);
+  });
+
+  it('ИЗ-ПОД ХРОМА ОПУСКАЕТ НА РАЗНИЦУ, а не ставит в абсолютные 96', () => {
+    expect(stickToPoint({ x: 640, y: 110 }, { width: 172, top: 20 }, ЭКРАН).y).toBe(110 + 76);
+  });
+
+  it('обе поправки применяются в одном жесте', () => {
+    expect(stickToPoint({ x: 1270, y: 110 }, { width: 172, top: 20 }, ЭКРАН)).toEqual({
+      x: 1280 - (172 / 2 + 6),
+      y: 186,
+    });
+  });
+
+  it('положение выдаётся целыми пикселями — коробку ставят в них же (правило 5)', () => {
+    const at = stickToPoint({ x: 33, y: 111 }, { width: 171, top: 21 }, ЭКРАН);
+    expect(Number.isInteger(at.x)).toBe(true);
+    expect(Number.isInteger(at.y)).toBe(true);
   });
 });

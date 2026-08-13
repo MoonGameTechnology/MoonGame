@@ -37,6 +37,13 @@ function fakeWin() {
     innerHTML: '',
     style: { left: '', top: '' } as Record<string, string>,
     shown: false,
+    // Измеренная коробка: ширина как у #pingpop в разметке, верхняя кромка — та, что
+    // задал тест (у настоящей коробки она уже сдвинута трансформом вверх).
+    rect: { width: 172, top: 0 } as { width: number; top: number },
+    getBoundingClientRect: () => ({
+      width: el.rect.width,
+      top: el.rect.top || Number.parseFloat(el.style.top ?? '0') || 0,
+    }),
     classList: {
       add: (c: string) => c === 'show' && (el.shown = true),
       remove: (c: string) => c === 'show' && (el.shown = false),
@@ -107,6 +114,7 @@ function wired(over: Partial<PingHost> = {}, seed: SessionMsg[] = []) {
     focus: (loc) => camera.push(['focus', loc]),
     jump: (loc) => camera.push(['jump', loc]),
     anchor: (loc) => (loc === 'C1R1' ? { left: 120, top: 240 } : null),
+    viewportW: () => 1280,
     ask: () => answer,
     onFeedChanged: () => feeds++,
     ...over,
@@ -394,6 +402,22 @@ describe('метки — попап на карте', () => {
     expect(w.pop.raw.shown).toBe(true);
     expect(w.pop.raw.style.left).toBe('120px');
     expect(w.pop.raw.style.top).toBe('240px');
+  });
+
+  it('У КРАЯ ЭКРАНА ВСПЛЫВАШКУ ЗАЖИМАЕТ: без этого её просто срезало бы', () => {
+    const w = wired({ anchor: () => ({ left: 1270, top: 300 }) }, [msg()]);
+    w.api.openPop('C1R1');
+    // центр коробки не ближе полуширины + зазор к краю: 1280 − (172/2 + 6)
+    expect(w.pop.raw.style.left).toBe('1188px');
+    expect(w.pop.raw.style.top).toBe('300px'); // по вертикали трогать нечего
+  });
+
+  it('ПОД ВЕРХНИМ ХРОМОМ ВСПЛЫВАШКА ОПУСКАЕТСЯ: иначе она прячется за ним', () => {
+    const w = wired({ anchor: () => ({ left: 400, top: 110 }) }, [msg()]);
+    w.pop.raw.rect = { width: 172, top: 20 }; // измеренная кромка залезла под хром
+    w.api.openPop('C1R1');
+    // опускается ровно на разницу (96 − 20), а не ставится в абсолютные 96
+    expect(w.pop.raw.style.top).toBe('186px');
   });
 
   it('метки на этой провинции нет — попапа тоже нет', () => {

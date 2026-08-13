@@ -17,6 +17,7 @@ import { t } from '../../localization/runtime';
 import { COALITION, type SessionMsg } from './conversations';
 import { esc } from './format';
 import { canEditPing, canRemovePing, pingRows, toggleHidden, type PingRow } from './pingPanel';
+import { stickToPoint } from './screenAnchor';
 
 /** Длина описания метки — столько же стоит в `maxlength` поля ввода. */
 export const PING_DESC_MAX = 80;
@@ -169,6 +170,8 @@ export interface PingHost {
   jump(loc: string): void;
   /** Экранная позиция узла для попапа (уже в координатах страницы). */
   anchor(loc: string): { left: number; top: number } | null;
+  /** Ширина окна: по ней всплывашка зажимается, чтобы не уехать за край (REFM-133). */
+  viewportW(): number;
   /** Спросить новый текст метки (в клиенте — `prompt`). `null` = передумал. */
   ask(current: string): string | null;
   /** Лента видна — перерисовать её после снятия метки. */
@@ -306,6 +309,18 @@ export function initPingUi(host: PingHost): PingUi {
     el.style.left = `${at.left}px`;
     el.style.top = `${at.top}px`;
     el.classList.add('show');
+    // Всплывашка висит над точкой так же, как меню «Приказа», значит и поправки у неё те
+    // же (`screenAnchor.ts`, REFM-133): без них у края экрана её срезало, а под верхним
+    // хромом она пряталась за ним. Считать можно только по ПОКАЗАННОЙ коробке — у скрытой
+    // ширина нулевая.
+    const b = el.getBoundingClientRect();
+    const at2 = stickToPoint(
+      { x: at.left, y: at.top },
+      { width: b.width, top: b.top },
+      host.viewportW(),
+    );
+    el.style.left = `${at2.x}px`;
+    el.style.top = `${at2.y}px`;
   }
 
   /** Снять СВОЮ метку. В сети это делает сервер (эхо `ping.removed` уберёт её у всех),
