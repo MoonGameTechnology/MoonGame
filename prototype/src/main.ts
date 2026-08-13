@@ -11913,28 +11913,21 @@ const CAPTURE_FLASH_MS = 1500;
  *  (captures are rare), so the O(n) recompute costs nothing on a quiet frame. */
 function drawCaptureFlashes(now: number): void {
   if (captureFlashes.size === 0) return;
-  // Same seeds + clip the political fill uses, projected THIS frame so the wave
-  // tracks the camera. Built once, shared by every concurrent flash.
-  const W = 9000 * cam.scale * cam.scale;
-  const seeds: TerritorySeed[] = [];
+  // ТЕ ЖЕ семена и рамка, что у политической заливки — `provinceMap.ts` (REFM-61,
+  // правило 6): волна обрезается по клетке, и разъедься копия формул хоть на пиксель,
+  // волна потекла бы за границу провинции или не дошла бы до неё. Здесь своя копия и
+  // стояла: `9000 * scale²` и `max(40, ширина × 0.05)` литералами прямо в кадре.
+  // Проекция — этим кадром, чтобы волна ехала вместе с камерой.
   const idxByNode = new Map<string, number>();
-  for (const n of MAP) {
-    if (n.sector === 'empty') continue;
+  let seedIdx = 0;
+  const seeds: TerritorySeed[] = provinceSeeds(MAP, cam.scale, (n) => {
     const p = s.planets[n.id];
-    if (!p) continue;
-    const c = world(n);
-    idxByNode.set(n.id, seeds.length);
-    seeds.push({ x: c.x, y: c.y, w: (p.size ?? 1) * W, owner: knownOwner(n.id), kind: n.sector });
-  }
-  const padB = Math.max(40, (MAXX - MINX) * 0.05);
-  const tl = world({ x: MINX - padB, y: MINY - padB });
-  const br = world({ x: MAXX + padB, y: MAXY + padB });
-  const clip: Array<[number, number]> = [
-    [tl.x, tl.y],
-    [br.x, tl.y],
-    [br.x, br.y],
-    [tl.x, br.y],
-  ];
+    if (!p) return null;
+    idxByNode.set(n.id, seedIdx++);
+    return { size: p.size ?? 1, at: world(n), owner: knownOwner(n.id) };
+  });
+  const frameB = clipRect({ minX: MINX, maxX: MAXX, minY: MINY, maxY: MAXY });
+  const clip = clipPolygon(world(frameB.topLeft), world(frameB.bottomRight));
   const trace = (poly: Array<[number, number]>): void => {
     cx.beginPath();
     cx.moveTo(poly[0]![0], poly[0]![1]);
