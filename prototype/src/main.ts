@@ -82,6 +82,8 @@ import {
 import { act as makeAction } from './actions';
 import {
   dominantUnit,
+  glyphHalo,
+  glyphScale,
   unitArchetype,
   unitGlyphSvg,
   unitSizeClass,
@@ -4911,7 +4913,10 @@ function render(now: number) {
     // карго-хвост и счётчик едут по тому же курсу.
     const dom = dominantUnit(f.units, data);
     const arch = dom ? unitArchetype(dom.def) : 'combat';
-    const domK = dom ? { S: 0.62, M: 0.8, L: 1 }[unitSizeClass(dom.def.stats.hp ?? 0)] : 0.62;
+    // Размер — из ЕДИНОЙ таблицы постера (`unitGlyphs.ts`, правило 1). Здесь стояла
+    // своя (S 0.62 · M 0.8), и один и тот же разведчик был в панели заметно крупнее,
+    // чем на карте: «размер = hp» переставал быть шкалой ровно там, где ею пользуются.
+    const domK = glyphScale(dom ? unitSizeClass(dom.def.stats.hp ?? 0) : 'S');
     const domStack = dom ? f.units.find((st) => st.unit === dom.unit && st.count > 0) : undefined;
     const domShield =
       dom && domStack ? (effectiveStats(dom.def, domStack, data).shield ?? 0) > 0 : false;
@@ -4920,8 +4925,10 @@ function render(now: number) {
     cx.rotate(A.ang + Math.PI / 2);
     cx.shadowColor = col;
     cx.shadowBlur = fxBlur(6 + 6 * engine);
-    if (domShield || arch === 'flagship') {
-      // модификатор «есть щит»: пунктирная орбита вокруг силуэта
+    if (glyphHalo(arch, domShield)) {
+      // Модификатор «есть щит» (у флагмана — всегда): пунктирная орбита вокруг силуэта.
+      // Само правило — в `unitGlyphs.ts` (правило 2); РАДИУС здесь свой и намеренно:
+      // на карте бокса нет, кольцо обязано ехать за силуэтом (правило 3).
       cx.strokeStyle = rgba(col, 0.7);
       cx.lineWidth = 1.1;
       cx.setLineDash([2.6, 2.8]);
