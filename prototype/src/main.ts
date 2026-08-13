@@ -553,7 +553,16 @@ import { HOLD_TIP_MS, cursorTipPos, holdTipPos, movedTooFar } from './tipPlaceme
 import { canConfirm, normalizeTake, shipCounts, splitTotals, stepTake } from './splitPlan';
 import { canAssaultFromOrbit, canMerge, canSplit, uniformMode } from './cmdAvailability';
 import { stayingFleets, stripState } from './chainStripState';
-import { IDLE, consumeClick, mature, moveAway, press, release, type HoldState } from './holdPress';
+import {
+  IDLE,
+  MAP_HOLD_MS,
+  consumeClick,
+  mature,
+  moveAway,
+  press,
+  release,
+  type HoldState,
+} from './holdPress';
 import { groundTypes, hasTroops, totalOf, troopSources } from './troopsSources';
 import { dossierLevel, nextHover, showsBody } from './dossierHover';
 import { liftBy, opensNow } from './sheetLift';
@@ -8005,15 +8014,18 @@ let tapByTouch = false;
 const pointers = new Map<number, { x: number; y: number }>();
 let dragStart: { x: number; y: number } | null = null;
 let dragged = false;
-// Long-press (touch): ~350ms still finger = additive fleet pick on a fleet, or a
-// box-select anywhere else — the touch stand-ins for Ctrl-click and Shift-drag.
+// Long-press (touch): a still finger = additive fleet pick on a fleet, or a box-select
+// anywhere else — the touch stand-ins for Ctrl-click and Shift-drag. Фазы удержания
+// (взвод → созревание → съеденный тап) — общие с плиткой каталога, `holdPress.ts`
+// (REFM-131): своя копия этой жизни расходилась бы с панельной.
 let longPressTimer: number | null = null;
-let longPressFired = false;
+let mapHold: HoldState = IDLE;
 function cancelLongPress(): void {
   if (longPressTimer !== null) {
     clearTimeout(longPressTimer);
     longPressTimer = null;
   }
+  mapHold = release(mapHold); // право съесть отпускание переживает снятие ожидания
 }
 let pinchDist = 0;
 // Середина щипка: два пальца не только МАСШТАБИРУЮТ, но и ВЕЗУТ камеру. Нужно это
@@ -8037,7 +8049,7 @@ canvas.addEventListener('pointerdown', (ev) => {
   if (pointers.size === 1) {
     dragStart = p;
     tapByTouch = ev.pointerType === 'touch'; // preview + commit share the snap radius
-    longPressFired = false;
+    mapHold = IDLE; // новый жест начинается с чистой жизни удержания
     multiTouched = false; // новый жест — пока однопальцевый
     // Кто из троих претендентов забирает этот жест — решает `pressIntent.ts`
     // (REFM-55): там же правило «Shift над своим флотом — добор, а не рамка».
@@ -8065,10 +8077,14 @@ canvas.addEventListener('pointerdown', (ev) => {
     // Ctrl-click of phones) or opens a BOX-SELECT from empty space (the Shift-drag).
     if (intent.longPress) {
       cancelLongPress();
+      mapHold = press(p);
       longPressTimer = window.setTimeout(() => {
         longPressTimer = null;
+        // Условия перепроверяются В МОМЕНТ СОЗРЕВАНИЯ (правило 6): за это время палец
+        // мог поехать, а на карте — прийти второй.
         if (pointers.size !== 1 || dragged) return;
-        longPressFired = true;
+        mapHold = mature(mapHold);
+        if (!mapHold.matured) return;
         navigator.vibrate?.(25);
         const mine = nearestHit(
           Object.values(s.fleets).filter((f) => f.owner === ME),
@@ -8083,7 +8099,7 @@ canvas.addEventListener('pointerdown', (ev) => {
           boxSelecting = true; // drag now stretches the selection box
           selectionBox = { x1: p.x, y1: p.y, x2: p.x, y2: p.y };
         }
-      }, 350);
+      }, MAP_HOLD_MS);
     }
   } else if (pointers.size === 2) {
     cancelLongPress();
@@ -8170,10 +8186,11 @@ function endPointer(ev: PointerEvent) {
     pinchMid = null;
   }
   cancelLongPress();
-  if (longPressFired) {
-    longPressFired = false; // the long-press already acted; this release is spent
-    return;
-  }
+  // Созревшее удержание СЪЕДАЕТ это отпускание (правила 4–5): оно уже сделало своё дело,
+  // и пропусти мы его дальше — за один жест игрок получил бы ещё и выбор/приказ.
+  const spent = consumeClick(mapHold);
+  mapHold = spent.next;
+  if (spent.eat) return;
   // Коммитит ли это отпускание вооружённый приказ — правило целиком в `aimGesture.ts`
   // (там же его сторож): на нём ввод ломался дважды и оба раза молча.
   const commits = releaseCommits({
@@ -8190,7 +8207,7 @@ function endPointer(ev: PointerEvent) {
 canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', (ev) => {
   cancelLongPress();
-  longPressFired = false;
+  mapHold = IDLE; // жест отменён системой — отпускания не будет, и съедать нечего
   pointers.delete(ev.pointerId);
   pinchDist = 0;
   selectionBox = null;
