@@ -229,6 +229,14 @@ import {
   rangeRings,
   sweepChromeShown,
 } from './radarSources';
+import {
+  frontierLook,
+  frontierShown,
+  ownRingLook,
+  ownRingShown,
+  unionArcs,
+  type SightTier,
+} from './sightFrontier';
 import { tapOwner, tapRadius } from './tapPriority';
 import { nextPick, tapCandidates, touchPick, type TapPick } from './tapCycle';
 import { chainTapTarget, nearestOwnWorld as ownWorldNearest } from './chainTarget';
@@ -3452,21 +3460,17 @@ function unionCtx(): CanvasRenderingContext2D {
 /** Paint a set of screen circles as ONE merged region: a faint union fill plus a
  *  crisp union outline. A circle fully inside another contributes nothing; an
  *  outlier extends the frontier — exactly one "border of visibility". */
-function drawUnionTier(
-  circles: Array<{ x: number; y: number; r: number }>,
-  lineW: number,
-  fillA: number,
-  strokeA: number,
-): void {
-  if (!circles.length) return;
+function drawUnionTier(circles: Array<{ x: number; y: number; r: number }>, tier: SightTier): void {
+  // Вид тира и отбор дуг — `sightFrontier.ts` (REFM-120): внутренний тир обязан читаться
+  // сильнее внешнего, а сжатая копия не может съесть круг целиком (иначе вывернутая дуга
+  // выест дыру в уже собранной заливке).
+  const { lineWidth: lineW, fillAlpha: fillA, strokeAlpha: strokeA } = frontierLook(tier);
+  if (!frontierShown(circles)) return;
   const arcs = (g: CanvasRenderingContext2D, inset: number): void => {
     g.beginPath();
-    for (const c of circles) {
-      const r = c.r - inset;
-      if (r > 0) {
-        g.moveTo(c.x + r, c.y); // moveTo each ⇒ separate subpaths, no joining lines
-        g.arc(c.x, c.y, r, 0, TAU);
-      }
+    for (const c of unionArcs(circles, inset)) {
+      g.moveTo(c.x + c.r, c.y); // moveTo each ⇒ separate subpaths, no joining lines
+      g.arc(c.x, c.y, c.r, 0, TAU);
     }
   };
   // Filled union, drawn as ONE path straight onto the map — overlaps merge under
@@ -3528,31 +3532,31 @@ function drawRadarCoverage() {
     const c = world({ x, y });
     return { x: c.x, y: c.y, r: world({ x: x + rr, y }).x - c.x };
   };
-  const outer = sources.map((v) => screen(v.x, v.y, v.r)).filter((c) => c.r > 0);
-  const inner = sources
-    .map((v) => screen(v.x, v.y, identifyRadius(v.r, IDENTIFY_REACH_FRACTION)))
-    .filter((c) => c.r > 0);
+  const outer = sources.map((v) => screen(v.x, v.y, v.r));
+  const inner = sources.map((v) => screen(v.x, v.y, identifyRadius(v.r, IDENTIFY_REACH_FRACTION)));
   cx.save();
   // The unified visibility frontier: outer (signatures) then inner (full reveal).
-  drawUnionTier(outer, 1.2, 0.03, 0.16);
-  drawUnionTier(inner, 1.4, 0.05, 0.3);
+  drawUnionTier(outer, 'signature');
+  drawUnionTier(inner, 'reveal');
   // A selected planet/fleet additionally shows ITS OWN two rings — crisp + dashed —
   // so you can read one entity's exact reach out of the merged whole.
   for (const v of sources) {
     if (!v.selected) continue;
     const c = world({ x: v.x, y: v.y });
-    const ring = (rr: number, dash: number[], a: number): void => {
+    // Пунктир внешнего и сплошная внутреннего — `sightFrontier.ts` (REFM-120, правило 6).
+    const ring = (rr: number, tier: SightTier): void => {
       const r = world({ x: v.x + rr, y: v.y }).x - c.x;
-      if (!(r > 0)) return;
+      if (!ownRingShown(r)) return;
+      const look = ownRingLook(tier);
       cx.beginPath();
       cx.arc(c.x, c.y, r, 0, TAU);
-      cx.setLineDash(dash);
+      cx.setLineDash([...look.dash]);
       cx.lineWidth = 1.3;
-      cx.strokeStyle = rgba(LOCK, a);
+      cx.strokeStyle = rgba(LOCK, look.alpha);
       cx.stroke();
     };
-    ring(v.r, [3, 6], 0.5); // outer — signatures
-    ring(identifyRadius(v.r, IDENTIFY_REACH_FRACTION), [], 0.72); // inner — full reveal
+    ring(v.r, 'signature'); // outer — signatures
+    ring(identifyRadius(v.r, IDENTIFY_REACH_FRACTION), 'reveal'); // inner — full reveal
   }
   cx.setLineDash([]);
   cx.restore();
