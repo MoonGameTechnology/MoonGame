@@ -3,6 +3,8 @@ import type { GameData, UnitDef, UnitStack } from '../../packages/shared-core/sr
 import {
   ARCHETYPE_PATH,
   dominantUnit,
+  glyphHalo,
+  glyphScale,
   unitArchetype,
   unitGlyphSvg,
   unitSizeClass,
@@ -10,7 +12,9 @@ import {
 
 // Компактные unit-def'ы под прототип-ростер: только поля, которые читает
 // система силуэтов (traits/faction/stats/signature/radarRange/domain).
-const U = (over: Omit<Partial<UnitDef>, 'stats'> & { stats?: Partial<UnitDef['stats']> }): UnitDef =>
+const U = (
+  over: Omit<Partial<UnitDef>, 'stats'> & { stats?: Partial<UnitDef['stats']> },
+): UnitDef =>
   ({
     faction: 'x',
     domain: 'space',
@@ -63,6 +67,40 @@ describe('unitGlyphSvg — модификаторы поверх силуэта'
   });
 
   it('флагман всегда с пунктирной орбитой, без щита гало нет', () => {
+    expect(unitGlyphSvg(U({ traits: ['hero'] }), { color: '#fff' })).toContain('stroke-dasharray');
+    expect(unitGlyphSvg(U({}), { color: '#fff' })).not.toContain('stroke-dasharray');
+  });
+});
+
+describe('модификаторы постера — ОДНИ на панель и карту', () => {
+  it('ТАБЛИЦА РАЗМЕРОВ ОДНА: класс → множитель, и он же уходит в маркер карты', () => {
+    expect(glyphScale('L')).toBe(1);
+    expect(glyphScale('M')).toBe(0.84);
+    expect(glyphScale('S')).toBe(0.68);
+  });
+
+  it('размер растёт по классу — иначе «размер = hp» перестаёт быть шкалой', () => {
+    expect(glyphScale('S')).toBeLessThan(glyphScale('M'));
+    expect(glyphScale('M')).toBeLessThan(glyphScale('L'));
+  });
+
+  it('тайл панели масштабируется ТОЙ ЖЕ таблицей, что и маркер', () => {
+    // Крейсер (hp 60) — класс M: в разметке тайла стоит ровно glyphScale('M').
+    const svg = unitGlyphSvg(U({ stats: { hp: 60 } }), { color: '#fff' });
+    expect(unitSizeClass(60)).toBe('M');
+    expect(svg).toContain(`scale(${glyphScale('M')})`);
+  });
+
+  it('ГАЛО — ОДНО ПРАВИЛО: щит или флагман, и больше ничего', () => {
+    expect(glyphHalo('combat', true)).toBe(true);
+    expect(glyphHalo('flagship', false)).toBe(true); // у флагмана орбита есть всегда
+    expect(glyphHalo('combat', false)).toBe(false);
+    expect(glyphHalo('scout', false)).toBe(false);
+    expect(glyphHalo('artillery', false)).toBe(false);
+  });
+
+  it('тайл панели спрашивает про гало то же правило', () => {
+    expect(unitGlyphSvg(U({}), { color: '#fff', shield: true })).toContain('stroke-dasharray');
     expect(unitGlyphSvg(U({ traits: ['hero'] }), { color: '#fff' })).toContain('stroke-dasharray');
     expect(unitGlyphSvg(U({}), { color: '#fff' })).not.toContain('stroke-dasharray');
   });
