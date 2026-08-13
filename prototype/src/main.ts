@@ -4006,19 +4006,18 @@ function buildStaticLayer(): void {
   // its route (drawAimPreview / drawFleetRoutes) traces them.
   g.strokeStyle = 'rgba(150,185,195,0.34)';
   g.lineWidth = 1.1;
-  for (const n of MAP) {
-    if (!s.planets[n.id]) continue;
-    const a = world(n);
-    for (const l of n.links) {
-      if (n.id >= l) continue; // each undirected road once
-      const B = s.planets[l];
-      if (!B) continue;
-      const b = world(B.position);
-      g.beginPath();
-      g.moveTo(a.x, a.y);
-      g.lineTo(b.x, b.y);
-      g.stroke();
-    }
+  // Каждая дорога рисуется ОДИН раз — `setupMap.ts` (правило 1, REFM-127), та же
+  // функция, что раскладывает трассы мини-карты сетапа. Здесь стоял свой цикл с тем же
+  // сравнением идентификаторов: штрих полупрозрачный, и дважды нарисованная дорога
+  // просто светлее соседних — «магистраль», которой в данных нет. Узлы без мира
+  // отсеиваются до вызова, поэтому ссылка в никуда не даёт дороги.
+  for (const road of lanes(MAP.filter((n) => !!s.planets[n.id]))) {
+    const a = world(road.from);
+    const b = world(road.to);
+    g.beginPath();
+    g.moveTo(a.x, a.y);
+    g.lineTo(b.x, b.y);
+    g.stroke();
   }
 
   // map boundary — a faint frame so the edge of the sector reads as intentional
