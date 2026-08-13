@@ -186,7 +186,14 @@ import { LIMP_PCT, fleetSummary, hullPct, stackHullPct } from './fleetSummary';
 import { isGroundUnit, isWingUnit, planetSummary } from './planetSummary';
 import { fleetWhere, groupTotals, pickPanel } from './panelSelect';
 import { buildRoster, garrisonByTab, tabCounts } from './planetTabs';
-import { builtTileHtml, catalogTileHtml, tileLock, type TileLock } from './catalogTile';
+import {
+  builtTileHtml,
+  catalogRowHtml,
+  catalogTileHtml,
+  tileLock,
+  type CatalogShape,
+  type TileLock,
+} from './catalogTile';
 import {
   anyToken,
   clearSession,
@@ -5170,7 +5177,12 @@ function conveyorHtml(planetId: string, lane: BuildLane): string {
 // Buildable options as codex tiles (icon + cost). Tapping a tile opens the full-info
 // panel, which carries a "Build here" button for the selected province — so browsing
 // specs and committing the build share one control (no separate text button row).
-function buildButtons(_planetId: string, ids: string[], kind: 'building' | 'unit'): string {
+function buildButtons(
+  _planetId: string,
+  ids: string[],
+  kind: 'building' | 'unit',
+  as: CatalogShape = 'tile',
+): string {
   const k = kind === 'unit' ? 'u' : 'b';
   const tiles = ids
     .map((id) =>
@@ -5187,10 +5199,14 @@ function buildButtons(_planetId: string, ids: string[], kind: 'building' | 'unit
         // buildingLocked читает p.buildings + scheduled + pausedConstruction — всё это
         // есть и в сетевых снапшотах. Units stack freely so they're never locked.
         kind === 'building' ? (buildingLocked(_planetId, id) ?? undefined) : undefined,
+        as,
       ),
     )
     .join('');
-  return tiles ? `<div class="ptiles">${tiles}</div>` : '';
+  if (!tiles) return '';
+  // Столбик строк живёт в том же `blist`, что и список построенного: на телефоне у
+  // каталога и у состава одна ширина колонки, и разъехаться им нечем.
+  return as === 'row' ? `<div class="blist">${tiles}</div>` : `<div class="ptiles">${tiles}</div>`;
 }
 
 /** Side-panel: the multi-fleet TASK-GROUP card (Shift-frame selection). */
@@ -5779,10 +5795,14 @@ function planetPanelHtml(p: Planet): string {
     }
     if (mine) {
       const shipBuilds = buildRoster('ships', BUILD_UNITS, data);
+      // Каталог заказа — СТРОКАМИ, как состав над ним и как список зданий (заказ
+      // владельца). Сетка плиток давала одну иконку и цену: что за корабль под глифом,
+      // игрок узнавал только тапнув, а состав рядом уже называл те же корабли по имени —
+      // одна вкладка говорила о своём ростере на двух языках.
       cols.push(
         `<div class="sec">${t('side.shipyard.conveyor')}</div>` +
           conveyorHtml(p.id, 'units') +
-          buildButtons(p.id, shipBuilds, 'unit'),
+          buildButtons(p.id, shipBuilds, 'unit', 'row'),
       );
     }
     if (!pcUi()) {
@@ -5796,7 +5816,7 @@ function planetPanelHtml(p: Planet): string {
       cols.push(
         `<div class="sec">${t('side.wing.conveyor')}</div>` +
           conveyorHtml(p.id, 'units') +
-          buildButtons(p.id, wingBuilds, 'unit'),
+          buildButtons(p.id, wingBuilds, 'unit', 'row'), // строками — см. вкладку ФЛОТ
       );
     }
     if (!pcUi()) {
@@ -5826,6 +5846,10 @@ function planetPanelHtml(p: Planet): string {
             level: b.level,
             icon: BUILD_ICON[b.type] ?? '▪',
             name: buildingName(data.buildings[b.type]?.name, b.type),
+            // Доход ТЕКУЩЕГО уровня — тем же `resLine`, что и в кодексе: игрок решает,
+            // что строить дальше, по цифре дохода, и раньше шёл за ней в карточку по
+            // одной постройке за тап (`catalogTile.ts`, правило 4).
+            income: incomeOf(b.type, b.level),
           }),
         )
         .join('');
@@ -6414,17 +6438,25 @@ function buildingLocked(planetId: string, id: string): TileLock {
     queueOf(planetId).buildings.some((q) => q.kind === 'building' && q.id === id),
   );
 }
+/** Доход ПОСТРОЕННОГО здания за час — готовой разметкой; у недоходного пусто. Цифра
+ *  считается тем же `buildingLevel`, что и строка «производит» в карточке кодекса:
+ *  список и карточка обязаны называть одно число, иначе список врёт про доход. */
+function incomeOf(type: string, level: number): string {
+  const def = data.buildings[type];
+  return def ? resLine(buildingLevel(def, level).produces, { per: 'h' }) : '';
+}
 function codexTile(
   kind: 'b' | 'u',
   id: string,
   label: string,
   orderable = false,
   lockedFor?: TileLock,
+  as: CatalogShape = 'tile',
 ): string {
   if (!(kind === 'b' ? data.buildings[id] : data.units[id])) return '';
   // Разметку плитки собирает `catalogTile.ts` (REFM-42) — там же правило «запертая
-  // теряет ОБА якоря заказа, оставляя досье».
-  return catalogTileHtml({
+  // теряет ОБА якоря заказа, оставляя досье» и обе подачи одного каталога.
+  const v = {
     kind,
     id,
     icon: kind === 'b' ? (BUILD_ICON[id] ?? '▣') : unitIconHtml(id, data, youColor),
@@ -6432,7 +6464,8 @@ function codexTile(
     label,
     orderable,
     lock: lockedFor ?? null,
-  });
+  };
+  return as === 'row' ? catalogRowHtml(v) : catalogTileHtml(v);
 }
 /** Ground-garrison tiles (the ЗЕМЛЯ tab): one flowing row of icon·count chips — no
  *  names; the hover dossier (PC) / tap dossier (touch) carries the identification. */
@@ -6678,12 +6711,13 @@ function objDescHtml(): string {
 
 /** Touch has no hover — a tap on a `[data-desc]` object opens the SAME dossier in the
  *  codex overlay instead (reuses its box/close chrome; no "Build here" button here). */
-function openDossier(key: string): void {
+function openDossier(key: string): boolean {
   const d = objDossier(key);
   const el = document.getElementById('codex');
-  if (!el || !d) return;
+  if (!el || !d) return false;
   el.innerHTML = `<div class="cxbox"><div class="cx-head"><b>${dossierTitleHtml(key, d)}</b></div><div class="cx-desc">${d.body}</div><button class="cx-close">${t('codex.close')}</button></div>`;
   el.classList.add('show');
+  return true;
 }
 
 function renderObjDesc(): void {
@@ -7423,6 +7457,10 @@ side.addEventListener('contextmenu', (ev) => {
 // tap action (opening the full codex). A plain tap keeps opening the codex as
 // before. Listeners are optional-called: the headless harness DOM has no
 // document.addEventListener.
+/** Что принимает удержание. Один селектор на оба слушателя: взводит удержание и
+ *  съедает хвостовой клик ровно один и тот же набор кнопок — разъедься они, и на
+ *  «забытой» кнопке удержание срабатывало бы, а её тап проходил бы следом. */
+const HOLD_TARGETS = '.ptile, .ptab, .asset-row';
 let holdTipEl: HTMLElement | null = null;
 let holdTimer: number | null = null;
 // Жизненный цикл удержания (взвод → созревание → съеденный клик) — `holdPress.ts` (REFM-80).
@@ -7457,20 +7495,23 @@ function cancelHoldTip(): void {
 }
 document.addEventListener?.('pointerdown', (ev) => {
   if (!MOBILE) return;
-  // Удержание работает и на ПЛИТКЕ каталога, и на ВКЛАДКЕ карточки мира. Исход разный:
-  // плитка знает только своё имя и показывает подпись, а у вкладки есть досье целой
-  // группы (`dossier.tab.*`), и держать её стоит ради него. На ПК то же досье приходит
-  // наведением — тапу оно было недоступно вовсе, хотя текст для него давно написан.
-  const btn = (ev.target as HTMLElement).closest?.('.ptile, .ptab') as HTMLElement | null;
+  // Удержание работает на ПЛИТКЕ каталога, на ВКЛАДКЕ карточки мира и на СТРОКЕ списка.
+  // Исход решает то, что на кнопке уже написано: у плитки видна одна иконка, поэтому она
+  // показывает подпись с именем; у вкладки и у строки имя уже подписано, и подсказка с
+  // тем же именем была бы пустым ходом — они дают КРАТКУЮ СВОДКУ по `data-desc` (заказ
+  // владельца: «по нажатию и удержанию открывалась краткая сводка»). На ПК та же сводка
+  // приходит наведением — тапу она была недоступна вовсе, хотя текст давно написан.
+  const btn = (ev.target as HTMLElement).closest?.(HOLD_TARGETS) as HTMLElement | null;
   if (!btn) return;
   hold = press({ x: ev.clientX, y: ev.clientY });
   if (holdTimer !== null) clearTimeout(holdTimer);
   holdTimer = window.setTimeout(() => {
     holdTimer = null;
     hold = mature(hold);
-    const group = btn.classList.contains('ptab') ? btn.dataset.desc : null;
-    if (group) openDossier(group);
-    else showHoldTip(btn);
+    // Сводки может не быть (у строки чужого флота её текст не написан) — тогда удержание
+    // всё равно обязано ответить хоть чем-то, иначе читается как мёртвая кнопка.
+    const key = btn.classList.contains('ptile') ? null : btn.dataset.desc;
+    if (!key || !openDossier(key)) showHoldTip(btn);
   }, HOLD_TIP_MS);
 });
 document.addEventListener?.('pointermove', (ev) => {
@@ -7491,7 +7532,9 @@ document.addEventListener?.(
     if (!eat) return;
     // Хвостовой клик созревшего удержания не должен ни открыть кодекс плитки, ни
     // ПЕРЕКЛЮЧИТЬ вкладку: игрок держал её ради описания, а не чтобы уйти с текущей.
-    if ((ev.target as HTMLElement).closest?.('.ptile, .ptab')) {
+    // Строка списка — там же: её тап заказывает постройку, и «сводка + заказ» одним
+    // движением была бы покупкой, которую игрок не собирался делать.
+    if ((ev.target as HTMLElement).closest?.(HOLD_TARGETS)) {
       ev.preventDefault();
       ev.stopPropagation();
     }
