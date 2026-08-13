@@ -252,7 +252,7 @@ import { nextPick, tapCandidates, touchPick, type TapPick } from './tapCycle';
 import { chainTapTarget, nearestOwnWorld as ownWorldNearest } from './chainTarget';
 import { arrivalHours, marchHours, restRouteHours } from './travelEta';
 import { castOptions, heroAboard, type CastOption } from './heroCasts';
-import { stickToPoint, toScreen } from './screenAnchor';
+import { fromScreen, stickToPoint, toScreen } from './screenAnchor';
 import { fadeOf, flashDone, flashProgress, growRadius, waveRadius } from './flashFx';
 import { capsuleAt, chainPathNodes, lastStepAtPoint, stackIndexes } from './chainPathLayout';
 import {
@@ -8039,10 +8039,11 @@ let pinchMid: { x: number; y: number } | null = null;
 // приказом в точке, где палец просто оторвался.
 let multiTouched = false;
 let boxSelecting = false;
-const ptXY = (ev: PointerEvent) => {
-  const r = canvas.getBoundingClientRect();
-  return { x: ((ev.clientX - r.left) / r.width) * VW, y: ((ev.clientY - r.top) / r.height) * VH };
-};
+// Пиксели страницы → координаты холста. Перевод один на палец и на колесо
+// (`screenAnchor.ts`, REFM-134, правила 6–7): две копии одной формулы — это два зума,
+// которые начнут целиться в разные места, стоит поправить одну.
+const ptXY = (ev: { clientX: number; clientY: number }) =>
+  fromScreen({ x: ev.clientX, y: ev.clientY }, canvas.getBoundingClientRect(), VW, VH);
 canvas.addEventListener('pointerdown', (ev) => {
   canvas.setPointerCapture?.(ev.pointerId);
   const p = ptXY(ev);
@@ -8218,10 +8219,8 @@ canvas.addEventListener(
   'wheel',
   (ev) => {
     ev.preventDefault();
-    const r = canvas.getBoundingClientRect();
-    const x = ((ev.clientX - r.left) / r.width) * VW;
-    const y = ((ev.clientY - r.top) / r.height) * VH;
-    zoomAt(x, y, ev.deltaY < 0 ? 1.12 : 1 / 1.12);
+    const at = ptXY(ev); // тот же перевод, что у пальца (правило 7)
+    zoomAt(at.x, at.y, ev.deltaY < 0 ? 1.12 : 1 / 1.12);
   },
   { passive: false },
 );
