@@ -6,7 +6,7 @@
 import { describe, it, expect } from 'vitest';
 import { artilleryRange, squadronStrikeRange } from '../../packages/shared-core/src/index';
 import { newGame, data } from './game';
-import { combatRanges } from './combatRanges';
+import { combatRanges, ringLook, type RangeKind } from './combatRanges';
 import type { Fleet, GameState } from '../../packages/shared-core/src/index';
 
 const ME = 'p1';
@@ -100,5 +100,52 @@ describe('RANGE-UX — ПВО: отметка, а не область; и оно
     // под полным туманом остаются ТОЛЬКО свои миры
     expect(fogged.length).toBeLessThan(visible.length);
     for (const r of fogged) expect(s.planets[r.sourceId]?.owner).toBe(ME);
+  });
+});
+
+describe('RANGE-UX — заметность кольца (REFM-123)', () => {
+  it('ВЗВЕДЁННЫЙ ОБСТРЕЛ ДЕЛАЕТ ГРАНИЦУ ЯРЧЕ: пока целятся, «дострелю или нет» — главный вопрос', () => {
+    expect(ringLook('artillery', true).alpha).toBeGreaterThan(ringLook('artillery', false).alpha);
+  });
+
+  it('в покое кольцо артиллерии уходит в фон, но остаётся видимым', () => {
+    const idle = ringLook('artillery', false);
+    expect(idle.alpha).toBeGreaterThan(0);
+    expect(idle.alpha).toBeLessThan(0.5);
+  });
+
+  it('ПРИЦЕЛ — ТОЛЬКО ПРО АРТИЛЛЕРИЮ: у эскадрильи и ПВО вид от него не зависит', () => {
+    expect(ringLook('squadron', true)).toEqual(ringLook('squadron', false));
+    expect(ringLook('aa', true)).toEqual(ringLook('aa', false));
+  });
+
+  it('ПВО ЗАМЕТНЕЕ РАДИУСОВ: это отметка на мире, и утонуть в фоне ей нельзя', () => {
+    expect(ringLook('aa', false).alpha).toBeGreaterThan(ringLook('artillery', false).alpha);
+    expect(ringLook('aa', false).alpha).toBeGreaterThan(ringLook('squadron', false).alpha);
+  });
+
+  it('у ПВО СВОЙ пунктир — отметка не должна читаться как обрезанный радиус', () => {
+    expect(ringLook('aa', false).dash).not.toEqual(ringLook('artillery', false).dash);
+  });
+
+  it('ПРОЗРАЧНОСТЬ ДУБЛЯ НЕ ПОТЕРЯНА: слитое кольцо не тусклее того, что рисовал маркер', () => {
+    // маркер выбранного флота рисовал своё кольцо на 0.42 в покое и 0.7 при прицеле
+    expect(ringLook('artillery', false).alpha).toBeGreaterThanOrEqual(0.42);
+    expect(ringLook('artillery', true).alpha).toBeGreaterThanOrEqual(0.7);
+  });
+
+  it('все виды рисуются видимой линией', () => {
+    for (const kind of ['artillery', 'squadron', 'aa'] as RangeKind[])
+      for (const aiming of [true, false]) {
+        const look = ringLook(kind, aiming);
+        expect(look.alpha).toBeGreaterThan(0);
+        expect(look.width).toBeGreaterThan(0);
+        expect(look.dash[0]).toBeGreaterThan(0);
+        expect(look.dash[1]).toBeGreaterThan(0);
+      }
+  });
+
+  it('вид стабилен', () => {
+    expect(ringLook('artillery', true)).toEqual(ringLook('artillery', true));
   });
 });

@@ -146,7 +146,6 @@ import {
   identifiedNodes,
   sensorCoverage,
   fleetRadarRange,
-  artilleryRange,
   abilityRange,
   type PausedConstructionSite,
 } from '../../packages/shared-core/src/index';
@@ -603,7 +602,7 @@ import {
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
-import { combatRanges } from './combatRanges';
+import { combatRanges, ringLook } from './combatRanges';
 import { corridorLines } from './corridorView';
 import { recapAdmits } from './recapGate';
 // ONB-7 — first-session goals checklist (mine/fleet/capture/score, ticked from state).
@@ -1742,15 +1741,6 @@ function fleetCanLaunchSquadron(f: Fleet | undefined): boolean {
   const wing = squadronTake(f!).reduce((n, u) => n + u.count, 0);
   return wing > 0 && total > wing;
 }
-
-/** A fleet's standoff firing radius (map units) — delegates to the CORE
- *  `artilleryRange` (which uses `effectiveStats`, so module bonuses are reflected).
- *  The old local copy read `stats.range` directly and ignored modules — the shown
- *  circle diverged from the real reach. 0 = none. */
-function artilleryRangeOf(f: Fleet | undefined): number {
-  return f ? artilleryRange(f, data) : 0;
-}
-
 
 /** Division ⇄ hold transport for a docked fleet `f` over world `here`: load the
  *  player's garrisoning divisions (if they fit the free hold) and unload the ones it
@@ -3692,20 +3682,17 @@ function drawCombatRanges(): void {
   cx.save();
   for (const ring of rings) {
     const c = world({ x: ring.x, y: ring.y } as never);
-    cx.strokeStyle = rgba(tint[ring.kind] ?? R_ARTY, ring.kind === 'aa' ? 0.7 : 0.32);
-    cx.lineWidth = 1.2;
-    if (ring.radius > 0) {
-      cx.setLineDash([5, 7]);
-      cx.beginPath();
-      cx.arc(c.x, c.y, worldDist(ring.radius), 0, TAU);
-      cx.stroke();
-    } else {
-      // ПВО: у него нет области — только «у этого мира есть зубы».
-      cx.setLineDash([2, 3]);
-      cx.beginPath();
-      cx.arc(c.x, c.y, 13, 0, TAU);
-      cx.stroke();
-    }
+    // Заметность кольца — `combatRanges.ts` (REFM-123): при взведённом обстреле граница
+    // дострела выходит на первый план, а ПВО заметнее радиусов, потому что это отметка.
+    const look = ringLook(ring.kind, !!barrageAim);
+    cx.strokeStyle = rgba(tint[ring.kind] ?? R_ARTY, look.alpha);
+    cx.lineWidth = look.width;
+    cx.setLineDash([...look.dash]);
+    cx.beginPath();
+    if (ring.radius > 0) cx.arc(c.x, c.y, worldDist(ring.radius), 0, TAU);
+    // ПВО: у него нет области — только «у этого мира есть зубы».
+    else cx.arc(c.x, c.y, 13, 0, TAU);
+    cx.stroke();
   }
   cx.setLineDash([]);
   for (const line of lines) {
@@ -5071,32 +5058,11 @@ function render(now: number) {
       cx.stroke();
       cx.restore();
     }
-    if (selFleet === f.id || selFleets.has(f.id)) {
-      targetBrackets(A.x, A.y, 15, now);
-      // Artillery: show the standoff firing radius (and a focus line to a chosen
-      // target) so the player can read the reach — "радиус не очень большой".
-      const aRange = artilleryRangeOf(f);
-      if (aRange > 0) {
-        cx.save();
-        cx.strokeStyle = rgba('#ff7a3a', barrageAim ? 0.7 : 0.42);
-        cx.lineWidth = 1;
-        cx.setLineDash([5, 5]);
-        cx.beginPath();
-        cx.arc(A.x, A.y, worldDist(aRange), 0, TAU);
-        cx.stroke();
-        cx.setLineDash([]);
-        const tf = f.barrageTarget ? s.fleets[f.barrageTarget] : undefined;
-        const ta = tf ? fleetAnchor(tf) : null;
-        if (ta) {
-          cx.strokeStyle = rgba('#ff7a3a', 0.8);
-          cx.beginPath();
-          cx.moveTo(A.x, A.y);
-          cx.lineTo(ta.x, ta.y);
-          cx.stroke();
-        }
-        cx.restore();
-      }
-    }
+    // Радиус артиллерии и линию огня рисует слой RANGE-UX (`drawCombatRanges` поверх
+    // `combatRanges.ts`) — ровно для тех же выбранных флотов. Здесь стояла ВТОРАЯ копия
+    // того же кольца, другим цветом и пунктиром: два кольца одного радиуса каждый кадр
+    // (REFM-123). Осталась только рамка выбора.
+    if (selFleet === f.id || selFleets.has(f.id)) targetBrackets(A.x, A.y, 15, now);
 
     // ship count («×N» — счёт при доминанте, как на постере), small, past the
     // cargo tail — placed along the heading like the pips, glyph upright.
