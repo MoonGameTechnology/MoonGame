@@ -159,3 +159,24 @@ describe('тап по мини-карте — перевод в координа
     expect(SNAP_REACH).toBeGreaterThan(30);
   });
 });
+
+// Правило 7: та же `lanes()` раскладывает трассы БОЛЬШОЙ карты матча, где сеть путей
+// печётся в статический слой. Эти тесты держат один дом на обе карты.
+describe('трассы: одна функция на обе карты (REFM-127)', () => {
+  it('НА РЕАЛЬНОЙ КАРТЕ СЕТЬ ТА ЖЕ, что давал ручной цикл большой карты', () => {
+    const manual: string[] = [];
+    for (const n of MAP) for (const l of n.links) if (n.id < l) manual.push(`${n.id}|${l}`);
+    const got = lanes(MAP).map((r) => `${r.from.id}|${r.to.id}`);
+    expect(got).toEqual(manual); // совпадает и по составу, и по ПОРЯДКУ обхода
+    expect(got.length).toBeGreaterThan(100); // сеть не выродилась
+  });
+
+  it('УЗЕЛ БЕЗ МИРА ОТСЕИВАЕТСЯ ДО ВЫЗОВА: ссылка в никуда дороги не даёт', () => {
+    const nodes = [node('a', 0, 0, ['b', 'нет-такого']), node('b', 10, 0, ['a'])];
+    expect(lanes(nodes).map((r) => `${r.from.id}|${r.to.id}`)).toEqual(['a|b']);
+  });
+
+  it('САМОССЫЛОК НА КАРТЕ НЕТ — единственное место, где два сравнения разошлись бы', () => {
+    expect(MAP.filter((n) => n.links.includes(n.id))).toEqual([]);
+  });
+});
