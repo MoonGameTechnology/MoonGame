@@ -96,3 +96,57 @@ describe('политическая карта — рамка обрезки', ()
     ]);
   });
 });
+
+// Правило 6: клетку строит не только политическая заливка — вспышка захвата
+// пересобирает её каждый кадр, чтобы обрезать по ней волну. Эти тесты держат ОДИН дом
+// формул: пока вспышка зовёт те же функции, её клетка не может разъехаться с заливкой.
+describe('мозаика ОДНА на всех, кто её строит (REFM-124)', () => {
+  const nodes = [
+    { id: 'a', sector: 'planet' },
+    { id: 'пустой', sector: 'empty' },
+    { id: 'b', sector: 'asteroid' },
+    { id: 'нет-мира', sector: 'planet' },
+    { id: 'c', sector: 'nebula' },
+  ];
+  const sizes: Record<string, number> = { a: 1, b: 2, c: 3 };
+  const at: Record<string, { x: number; y: number }> = {
+    a: { x: 10, y: 10 },
+    b: { x: 200, y: 40 },
+    c: { x: 90, y: 300 },
+  };
+  const source = (n: { id: string }) =>
+    sizes[n.id] === undefined ? null : { size: sizes[n.id]!, at: at[n.id]!, owner: null };
+
+  it('ВСПЫШКА И ЗАЛИВКА БЕРУТ ОДНИ СЕМЕНА: иначе волна течёт мимо границы провинции', () => {
+    // «заливка» и «вспышка» — два независимых вызова одних и тех же функций
+    expect(provinceSeeds(nodes, 1.7, source)).toEqual(provinceSeeds(nodes, 1.7, source));
+  });
+
+  it('ИНДЕКС КЛЕТКИ СЧИТАЕТСЯ ПО ТЕМ ЖЕ ПРОПУСКАМ: вспышке нужен номер её семени', () => {
+    // вспышка нумерует семена в порядке добавления — пустые узлы и узлы без мира
+    // выпадают у обеих сторон одинаково, поэтому номер сходится
+    const order: string[] = [];
+    const seeds = provinceSeeds(nodes, 1, (n) => {
+      const src = source(n);
+      if (src) order.push(n.id);
+      return src;
+    });
+    expect(order).toEqual(['a', 'b', 'c']);
+    expect(seeds).toHaveLength(order.length);
+    expect(seeds[order.indexOf('b')]!.x).toBe(at.b!.x);
+  });
+
+  it('ВЕС ЗАВИСИТ ОТ МАСШТАБА: клетка вспышки обязана ехать вместе с камерой', () => {
+    const near = provinceSeeds(nodes, 2, source);
+    const far = provinceSeeds(nodes, 1, source);
+    expect(near[0]!.w).toBe(far[0]!.w * 4); // квадратично — правило 3
+  });
+
+  it('РАМКА У ОБЕИХ ОДНА: своя копия отступа развела бы края клеток', () => {
+    const b = { minX: 0, maxX: 1000, minY: 0, maxY: 600 };
+    const fill = clipPolygon(clipRect(b).topLeft, clipRect(b).bottomRight);
+    const flash = clipPolygon(clipRect(b).topLeft, clipRect(b).bottomRight);
+    expect(flash).toEqual(fill);
+    expect(fill[0]).toEqual([-clipPad(b), -clipPad(b)]);
+  });
+});
