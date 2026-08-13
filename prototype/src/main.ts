@@ -238,6 +238,7 @@ import {
   type SightTier,
 } from './sightFrontier';
 import { BADGE_R, badgeBob, badgeCenterY, badgeLook, badgeShown, badgeTether } from './kindBadge';
+import { chipFontPx, chipGlyph, chipMetrics, chipXs, chipY, chipsShown } from './buildChips';
 import { tapOwner, tapRadius } from './tapPriority';
 import { nextPick, tapCandidates, touchPick, type TapPick } from './tapCycle';
 import { chainTapTarget, nearestOwnWorld as ownWorldNearest } from './chainTarget';
@@ -4558,20 +4559,22 @@ function render(now: number) {
     // building badges are detail-only: on the schematic view the province colour
     // and score already tell the story — a row of 10px chips just piles onto the
     // shrunken blip (the APK min-zoom overlap).
-    if (kn && p.buildings.length && detail > 0) {
+    // Раскладку ряда считает `buildChips.ts` (REFM-122): ряд ЦЕНТРИРОВАН под узлом (иначе
+    // мир будто съезжает вбок при каждой достройке), сжимается вместе с маркером, а у
+    // кегля есть пол — буква мельче семи пикселей читается как сор, а не как значок.
+    if (chipsShown(kn, p.buildings.length, detail)) {
       cx.save();
       cx.globalAlpha = detail;
-      cx.font = `${Math.max(7, Math.round(11 * ns))}px ui-monospace,Menlo,monospace`;
+      cx.font = `${chipFontPx(ns)}px ui-monospace,Menlo,monospace`;
       cx.textAlign = 'center';
       cx.textBaseline = 'middle';
-      const step = 13 * ns;
-      const half = 5 * ns;
-      const start = c.x - ((p.buildings.length - 1) * step) / 2;
+      const { half } = chipMetrics(ns);
+      const xs = chipXs(p.buildings.length, c.x, ns);
+      const by = chipY(c.y, R, ns);
       for (let i = 0; i < p.buildings.length; i++) {
         const b = p.buildings[i];
         if (!b) continue;
-        const bx = start + i * step;
-        const by = c.y + R + 19 * ns;
+        const bx = xs[i]!;
         cx.fillStyle = 'rgba(2,9,13,.78)';
         cx.strokeStyle = rgba(col, 0.55);
         cx.lineWidth = 1;
@@ -4580,7 +4583,7 @@ function render(now: number) {
         cx.fill();
         cx.stroke();
         cx.fillStyle = rgba(col, 0.9);
-        cx.fillText(BUILD_ICON[b.type] ?? '▪', bx, by + 0.5);
+        cx.fillText(chipGlyph(BUILD_ICON[b.type]), bx, by + 0.5);
       }
       cx.restore();
     }
