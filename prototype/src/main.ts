@@ -623,6 +623,14 @@ import { dialIdentity, dialUrl, seatTicketKey } from './netDial';
 import { closeAction, isCurrentSocket } from './socketFate';
 import { welcomePlan } from './netWelcome';
 import {
+  WAIT_MARK,
+  desyncVerdict,
+  keepFocus,
+  keepGroup,
+  radarContacts,
+  waitingBanner,
+} from './snapshotIngest';
+import {
   arcLift,
   arcPoint,
   arcPolyline,
@@ -9846,7 +9854,11 @@ function connect(): void {
         // Radar picture (BF-18): detected-but-unidentified enemy fleets are absent
         // from the fogged state — the server sends them as coarse contacts beside
         // each frame. The sweep paints THESE in NET (see updateRadarContacts).
-        netSignatures = snap.signatures ?? [];
+        // Что снимок делает с миром — `snapshotIngest.ts` (REFM-146): контакты живут
+        // ровно один снимок (иначе на карте остаётся призрак), десинк считается только
+        // при присланном хеше, выбор чистится по-разному для одиночного и группового,
+        // а баннер ожидания снимает тот, кто его поставил.
+        netSignatures = [...radarContacts(snap.signatures)];
         // Re-render the open roster only NOW — the new state is in place, so the
         // stance chips and offer affordances (✓ accept / ⏳ pending) paint fresh.
         if (diploShift && diploOpen && diploTab === 'diplo') renderDiplo();
@@ -9854,21 +9866,20 @@ function connect(): void {
         // Desync check (M0): the server tags each snapshot with hashState(view); we
         // hash our just-reconstructed view and compare. Mismatch ⇒ the client and
         // server disagree — the core invariant we most want to catch on a playtest.
-        if (snap.hash !== undefined) {
-          netDesync = hashState(snap.state) !== snap.hash;
+        const verdict = desyncVerdict(snap.hash, () => hashState(snap.state));
+        if (verdict !== null) {
+          netDesync = verdict;
           if (netDesync) netDesyncCount++;
         }
         // mirror apply()'s selection cleanup (we replace `s` directly here)
-        if (selFleet && !s.fleets[selFleet]) selFleet = null;
-        selFleets = new Set([...selFleets].filter((id) => s.fleets[id]?.owner === ME));
+        selFleet = keepFocus(selFleet, !!(selFleet && s.fleets[selFleet]));
+        selFleets = new Set(keepGroup(selFleets, (id) => s.fleets[id]?.owner, ME));
         // No lobby (SES-2.1): sessions run from creation, a join lands in a live
         // world. `waiting` survives only for the transport's waitForPlayers mode
         // (unused by our hosts) — show the banner, clear it once the clock runs.
-        if (snap.waiting) {
-          banner = '⏳ ' + t('net.waiting-host');
-        } else if (banner && banner.startsWith('⏳')) {
-          banner = null;
-        }
+        const wait = waitingBanner(!!snap.waiting, banner);
+        if (wait === 'show') banner = WAIT_MARK + ' ' + t('net.waiting-host');
+        else if (wait === 'clear') banner = null;
         lastPanelHtml = '';
       },
       onRejection: (_id, code) => {
