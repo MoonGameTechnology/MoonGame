@@ -57,6 +57,10 @@ import {
   fleetIdle,
   squadronTake,
   squadronStrikeRange,
+  fleetHasSquadron,
+  isWing,
+  wingCanAct,
+  wingCanReturn,
   sortieSpec,
   freshSortie,
   botFavour,
@@ -1747,15 +1751,6 @@ function fleetHasArtillery(f: Fleet | undefined): boolean {
   return (
     !!f &&
     f.units.some((u) => u.count > 0 && (data.units[u.unit]?.traits.includes('artillery') ?? false))
-  );
-}
-
-/** Does this fleet carry a launchable strike wing (squadron-trait ships)? The carrier
- *  can split them off as a fast, short-range fleet (squadrons-roadmap SQ-1.1). */
-function fleetHasSquadron(f: Fleet | undefined): boolean {
-  return (
-    !!f &&
-    f.units.some((u) => u.count > 0 && (data.units[u.unit]?.traits.includes('squadron') ?? false))
   );
 }
 
@@ -5425,12 +5420,14 @@ function fleetPanelHtml(f: Fleet): string {
 
   // Squadron strike wing (a fleet split off from a carrier with homeBase) — free-space
   // movement: strike an enemy in range, return to base, or toggle patrol (CC-4).
-  if (f.owner === ME && f.homeBase && fleetHasSquadron(f)) {
+  // Что такое действующее крыло — `squadron.ts` (REFM-135): панель и обработчики
+  // приказов обязаны отвечать на это одинаково, иначе кнопка обещает то, чего нет.
+  if (isWing(f, ME)) {
     const isPatrol = !!patrolOf(f.id);
-    const canAct = !f.battleId && !f.freeMovement;
+    const canAct = wingCanAct(f);
     h += `<div class="sec">${t('side.wing.title')}</div><div class="row">`;
     h += btn('squadronstrike', '', t('side.wing.strike'), canAct);
-    h += btn('squadronreturn', '', t('side.wing.return'), canAct && !!f.freePosition);
+    h += btn('squadronreturn', '', t('side.wing.return'), wingCanReturn(f));
     h += btn('squadronpatrol', '', isPatrol ? t('side.wing.patrol-on') : t('side.wing.patrol'), canAct);
     h += `</div>`;
   }
@@ -7347,22 +7344,22 @@ side.addEventListener('click', (ev) => {
   } else if (act === 'squadronstrike') {
     // Squadron free-space strike: arm the aim mode to pick an enemy fleet in range.
     const f = selFleet ? s.fleets[selFleet] : undefined;
-    if (f && f.homeBase && !f.battleId && !f.freeMovement) {
+    if (isWing(f, ME) && wingCanAct(f)) {
       squadronStrikeAim = selFleet;
       note(t('hint.squadron-strike-aim'));
     }
   } else if (act === 'squadronreturn') {
     // Squadron return to base: fly back to the carrier in free space.
     const f = selFleet ? s.fleets[selFleet] : undefined;
-    if (f && f.homeBase && !f.battleId && !f.freeMovement) {
-      playerOrder(makeAction(ME, 'squadron.return', { fleetId: f.id }));
+    if (isWing(f, ME) && wingCanReturn(f)) {
+      playerOrder(makeAction(ME, 'squadron.return', { fleetId: f!.id }));
       note(t('hint.squadron-returning'));
     }
   } else if (act === 'squadronpatrol') {
     // Toggle CC-4 standing patrol for this squadron fleet.
     const f = selFleet ? s.fleets[selFleet] : undefined;
-    if (f && f.homeBase && !f.battleId && !f.freeMovement) {
-      setScramble([f.id], !patrolOf(f.id));
+    if (isWing(f, ME) && wingCanAct(f)) {
+      setScramble([f!.id], !patrolOf(f!.id));
     }
   }
   lastPanelHtml = '';

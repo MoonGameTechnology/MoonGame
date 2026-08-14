@@ -7,6 +7,9 @@ import {
   spendSortie,
   tickRearm,
   squadronStrikeRange,
+  isWing,
+  wingCanAct,
+  wingCanReturn,
   withinRange,
   squadronReaches,
   patrolTarget,
@@ -31,8 +34,13 @@ describe('sortieSpec (reads the wing unit stats, SQ-2.1)', () => {
   });
 
   it('is zeros for a fleet with no squadron aboard', () => {
-    const nonSquad = Object.keys(data.units).find((u) => !data.units[u]!.traits.includes('squadron'))!;
-    expect(sortieSpec(fleet([{ unit: nonSquad, count: 3 }]))).toEqual({ maxFuel: 0, rearmRounds: 0 });
+    const nonSquad = Object.keys(data.units).find(
+      (u) => !data.units[u]!.traits.includes('squadron'),
+    )!;
+    expect(sortieSpec(fleet([{ unit: nonSquad, count: 3 }]))).toEqual({
+      maxFuel: 0,
+      rearmRounds: 0,
+    });
   });
 });
 
@@ -79,15 +87,22 @@ describe('sortie / rearm counter (SQ-2.1)', () => {
   });
 
   it('full cycle: N sorties → rearm → back in the fight (roadmap "готово, когда")', () => {
-    const max = 3, rearm = 2;
+    const max = 3,
+      rearm = 2;
     let s = freshSortie(max);
     let sorties = 0;
     // Fly until dry.
-    while (canSortie(s)) { s = spendSortie(s, rearm); sorties++; }
+    while (canSortie(s)) {
+      s = spendSortie(s, rearm);
+      sorties++;
+    }
     expect(sorties).toBe(max); // exactly maxFuel strikes before grounding
     expect(s.rearming).toBe(rearm);
     // Rearm to completion.
-    for (let i = 0; i < rearm; i++) { expect(canSortie(s)).toBe(false); s = tickRearm(s, max); }
+    for (let i = 0; i < rearm; i++) {
+      expect(canSortie(s)).toBe(false);
+      s = tickRearm(s, max);
+    }
     expect(canSortie(s)).toBe(true); // returned, ready to fly the next N
     expect(s.fuel).toBe(max);
   });
@@ -103,7 +118,9 @@ describe('sortie / rearm counter (SQ-2.1)', () => {
 
 describe('squadron strike radius (SQ-3.1)', () => {
   const squad = Object.keys(data.units).find((u) => data.units[u]!.traits.includes('squadron'))!;
-  const nonSquad = Object.keys(data.units).find((u) => !data.units[u]!.traits.includes('squadron'))!;
+  const nonSquad = Object.keys(data.units).find(
+    (u) => !data.units[u]!.traits.includes('squadron'),
+  )!;
   const range = data.units[squad]!.stats.strikeRange;
 
   it('reads the longest strikeRange among live squadron ships', () => {
@@ -129,7 +146,9 @@ describe('squadron strike radius (SQ-3.1)', () => {
   });
 
   it('a non-strike fleet never reaches (range 0)', () => {
-    expect(squadronReaches(fleet([{ unit: nonSquad, count: 3 }]), { x: 0, y: 0 }, { x: 0, y: 0 })).toBe(false);
+    expect(
+      squadronReaches(fleet([{ unit: nonSquad, count: 3 }]), { x: 0, y: 0 }, { x: 0, y: 0 }),
+    ).toBe(false);
   });
 });
 
@@ -156,7 +175,8 @@ describe('squadron patrol (SQ-4.1)', () => {
   });
 
   it('full loop: enemy in zone → strike each round until dry → rearm → active again', () => {
-    const max = 3, rearm = 2;
+    const max = 3,
+      rearm = 2;
     let p = patrol(freshSortie(max));
     const enemy = [{ id: 'raider', pos: { x: 540, y: 500 } }]; // parked inside the zone
     // Burns exactly maxFuel sorties while the raider loiters.
@@ -212,5 +232,49 @@ describe('reactive auto-scramble order (CC-4)', () => {
     const r = scrambleOrder('green', wing('p2'), patrol({ fuel: 0, rearming: 2 }), targets, 2);
     expect(r.action).toBeNull();
     expect(r.sortie).toEqual({ fuel: 0, rearming: 2 });
+  });
+});
+
+// ── Действующее крыло (REFM-135) ─────────────────────────────────────────────
+describe('крыло — кто может отдавать приказы', () => {
+  const ЭСК = Object.keys(data.units).find((u) => data.units[u]!.traits.includes('squadron'))!;
+  const ОБЫЧНЫЙ = Object.keys(data.units).find((u) => !data.units[u]!.traits.includes('squadron'))!;
+  const крыло = (over: Partial<Fleet> = {}): Fleet =>
+    ({
+      id: 'w1',
+      owner: 'p1',
+      homeBase: 'carrier',
+      units: [{ unit: ЭСК, count: 2 }],
+      ...over,
+    }) as Fleet;
+
+  it('КРЫЛО — ЭТО БАЗА И ЭСКАДРИЛЬИ: одной базы мало, опустевшее крыло получит отказ ядра', () => {
+    expect(isWing(крыло(), 'p1')).toBe(true);
+    expect(isWing(крыло({ units: [{ unit: ОБЫЧНЫЙ, count: 3 }] }), 'p1')).toBe(false);
+    expect(isWing(крыло({ units: [{ unit: ЭСК, count: 0 }] }), 'p1')).toBe(false);
+  });
+
+  it('без базы это обычный флот, а не крыло', () => {
+    expect(isWing(крыло({ homeBase: undefined }), 'p1')).toBe(false);
+  });
+
+  it('ЧУЖИМ КРЫЛОМ НЕ КОМАНДУЮТ: тап по чужому флоту тоже выделяет его', () => {
+    expect(isWing(крыло({ owner: 'p2' }), 'p1')).toBe(false);
+  });
+
+  it('нет флота — нет и крыла', () => {
+    expect(isWing(undefined, 'p1')).toBe(false);
+  });
+
+  it('В БОЮ И В ПЕРЕЛЁТЕ КРЫЛО ЗАНЯТО: второй приказ отменил бы первый незаметно', () => {
+    expect(wingCanAct(крыло())).toBe(true);
+    expect(wingCanAct(крыло({ battleId: 'b1' }))).toBe(false);
+    expect(wingCanAct(крыло({ freeMovement: { targetX: 1, targetY: 2 } as never }))).toBe(false);
+  });
+
+  it('ВОЗВРАЩАЮТСЯ ТОЛЬКО ИЗ СВОБОДНОГО ПРОСТРАНСТВА: стоящему у носителя лететь некуда', () => {
+    expect(wingCanReturn(крыло({ freePosition: { x: 10, y: 20 } }))).toBe(true);
+    expect(wingCanReturn(крыло())).toBe(false); // уже у базы
+    expect(wingCanReturn(крыло({ freePosition: { x: 1, y: 1 }, battleId: 'b1' }))).toBe(false);
   });
 });
