@@ -618,6 +618,7 @@ import { breath, phaseAt, phaseOfId } from './pulseFx';
 import { authorizedBase } from './hubAuth';
 import { diploIntent } from './diploClick';
 import { afterTokenRefused, joinStep } from './joinGate';
+import { assaultSteps } from './assaultOrder';
 import {
   arcLift,
   arcPoint,
@@ -2664,6 +2665,16 @@ function assaultVerdict(fleetId: string, f: Fleet): string | null {
       : [orbitFleet(ME, fleetId, 'near'), assaultFleet(ME, fleetId)],
   );
 }
+/**
+ * Издать связку приказов штурма для флота, стоящего у цели (`assaultOrder.ts`, REFM-141):
+ * штурмуют с БЛИЖНЕЙ орбиты, поэтому перевод на неё идёт в паре со штурмом и только если
+ * флот не там. Годность самого штурма к этому моменту уже подтвердило ядро (правило 1).
+ */
+function issueAssault(id: string, orbit: string | undefined): void {
+  for (const step of assaultSteps(orbit))
+    playerOrder(step === 'orbit-near' ? orbitFleet(ME, id, 'near') : assaultFleet(ME, id));
+}
+
 function dispatchAssault(fleetIds: string[], destId: string): void {
   let warnedNoTroops = false;
   for (const id of fleetIds) {
@@ -2681,8 +2692,7 @@ function dispatchAssault(fleetIds: string[], destId: string): void {
         continue;
       }
       // already parked at the target — storm right away (orbit first if needed)
-      if (f.orbit !== 'near') playerOrder(orbitFleet(ME, id, 'near'));
-      playerOrder(assaultFleet(ME, id));
+      issueAssault(id, f.orbit);
     } else {
       if (!warnedNoTroops && assaultNeedsTroops(f, destId)) {
         warnedNoTroops = true;
@@ -2717,8 +2727,7 @@ function pumpAssaultOrders(): void {
       assaultOnArrival.delete(id);
       continue;
     }
-    if (f.orbit !== 'near') playerOrder(orbitFleet(ME, id, 'near'));
-    playerOrder(assaultFleet(ME, id));
+    issueAssault(id, f.orbit);
     assaultOnArrival.delete(id);
   }
 }
