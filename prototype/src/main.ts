@@ -652,7 +652,7 @@ import { corridorLines } from './corridorView';
 import { recapAdmits } from './recapGate';
 // ONB-7 — first-session goals checklist (mine/fleet/capture/score, ticked from state).
 import { FIRST_GOALS, metGoals, mergeDone, goalsComplete, type GoalSignals } from './firstGoals';
-import { reconnectDelayMs } from './reconnect';
+import { nextCycleStep, redialPlan } from './reconnectCycle';
 // ONB-0 — first-run onboarding state + funnel (per-callsign localStorage). Pure
 // model; main.ts persists it and drives the hub offer / «Ещё → Обучение» replay.
 import {
@@ -10612,10 +10612,13 @@ if (__PLAYER_BUILD__) {
 // old socket frees the seat (else it loses the race with `E_SLOT_TAKEN`). Same saved
 // server + nick → same side.
 function scheduleReconnect(): void {
-  if (reconnectTimer) return;
+  // Политика цикла — `reconnectCycle.ts` (REFM-145): одна назначенная попытка за раз (к
+  // одному обрыву приходит несколько сигналов), счётчик растёт сквозь дозвоны, а
+  // исчерпанный бюджет заканчивается честной сдачей, а не молчанием.
+  const step = nextCycleStep({ timerPending: !!reconnectTimer, attempts: reconnectAttempts });
+  if (step.kind === 'busy') return;
   reconnectAttempts++;
-  const delay = reconnectDelayMs(reconnectAttempts);
-  if (delay === null) {
+  if (step.kind === 'give-up') {
     reconnecting = false;
     reconnectAttempts = 0;
     banner = null;
@@ -10626,31 +10629,32 @@ function scheduleReconnect(): void {
   banner = t('acc.reconnecting');
   reconnectTimer = setTimeout(() => {
     reconnectTimer = null;
-    if (!authMode) {
-      connect(); // reuse the saved server + nick; don't reset the attempt counter
-      return;
-    }
     // Accounts mode (SES-2.5): the join token is short-lived (15 min), so a redial
     // mints a fresh one off the long-lived session first; an expired session drops
     // the redial to the connect screen with «введите пароль» (fail-explicit).
-    void (async () => {
-      const srv = resolveServer();
-      const session = srv ? sessionToken(srv.base) : null;
-      if (!srv || !session) {
-        reconnecting = false;
-        banner = null;
-        showConnect(true);
-        return;
-      }
-      const join = await fetchJoinToken(srv.base, currentMatchId, session);
-      if (!join) {
-        scheduleReconnect(); // transient (or session expired — status line explains)
-        return;
-      }
-      pendingJoinToken = join.token;
-      connect();
-    })();
-  }, delay);
+    const srv = authMode ? resolveServer() : null;
+    const session = srv ? sessionToken(srv.base) : null;
+    const plan = redialPlan(authMode, !!session);
+    if (plan === 'dial') {
+      connect(); // reuse the saved server + nick; don't reset the attempt counter
+      return;
+    }
+    if (plan === 'mint-token' && srv && session) {
+      void (async () => {
+        const join = await fetchJoinToken(srv.base, currentMatchId, session);
+        if (!join) {
+          scheduleReconnect(); // transient (or session expired — status line explains)
+          return;
+        }
+        pendingJoinToken = join.token;
+        connect();
+      })();
+      return;
+    }
+    reconnecting = false; // сессии нет — на экран входа, а не в новый круг попыток
+    banner = null;
+    showConnect(true);
+  }, step.delayMs);
 }
 
 // --- loop --------------------------------------------------------------------
