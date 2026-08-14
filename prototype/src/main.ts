@@ -616,6 +616,7 @@ import { gridGap, gridLines, gridOffset } from './backdropGrid';
 import { mapScale, screenRadius } from './mapRadius';
 import { breath, phaseAt, phaseOfId } from './pulseFx';
 import { authorizedBase } from './hubAuth';
+import { diploIntent } from './diploClick';
 import {
   arcLift,
   arcPoint,
@@ -11328,30 +11329,21 @@ if (playerCardEl) {
     // same intents as the roster; we repaint the card (and the roster / chat feed) after.
     const seat = playerCardEl.dataset.seat;
     if (!seat) return;
-    const actBtn = tg.closest('.dp-act') as HTMLElement | null;
-    if (actBtn) {
-      proposeStance(actBtn.dataset.seat!, actBtn.dataset.stance as DiplomaticStance);
+    // ЧТО попросил игрок — `diploClick.ts` (REFM-139), общий с окном дипломатии; ЧТО
+    // перерисовать после — дело экрана, и здесь это сама карточка (правило 1).
+    const intent = diploIntent(tg);
+    if (intent && intent.kind !== 'message') {
+      if (intent.kind === 'stance') proposeStance(intent.seat, intent.stance as DiplomaticStance);
+      else if (intent.kind === 'map') toggleMapShare(intent.seat);
+      else playerOrder(spyOn(ME, intent.seat, intent.what as 'treasury' | 'fleets'));
       refreshSeatCard(seat);
       return;
     }
-    const mapBtn = tg.closest('.dp-map') as HTMLElement | null;
-    if (mapBtn) {
-      toggleMapShare(mapBtn.dataset.mapseat!);
-      refreshSeatCard(seat);
-      return;
-    }
-    const spyBtn = tg.closest('.dp-spy') as HTMLElement | null;
-    if (spyBtn) {
-      playerOrder(spyOn(ME, spyBtn.dataset.seat!, spyBtn.dataset.spy as 'treasury' | 'fleets'));
-      refreshSeatCard(seat);
-      return;
-    }
-    const msgseat = (tg.closest('.dp-msg') as HTMLElement | null)?.dataset.msgseat;
-    if (msgseat) {
+    if (intent?.kind === 'message') {
       playerCardEl.classList.remove('show');
       delete playerCardEl.dataset.seat;
       openDiplo('msgs'); // hand off to the full message thread
-      conversations.open(msgseat);
+      conversations.open(intent.seat);
       renderDiplo();
       document.getElementById('dp-text')?.focus();
     }
@@ -12081,21 +12073,14 @@ if (diploEl) {
       renderDiplo();
       return;
     }
-    const actBtn = tg.closest('.dp-act') as HTMLElement | null;
-    if (actBtn) {
-      proposeStance(actBtn.dataset.seat!, actBtn.dataset.stance as DiplomaticStance);
-      renderDiplo();
-      return;
-    }
-    const mapBtn = tg.closest('.dp-map') as HTMLElement | null;
-    if (mapBtn) {
-      toggleMapShare(mapBtn.dataset.mapseat!);
-      renderDiplo();
-      return;
-    }
-    const spyBtn = tg.closest('.dp-spy') as HTMLElement | null;
-    if (spyBtn) {
-      playerOrder(spyOn(ME, spyBtn.dataset.seat!, spyBtn.dataset.spy as 'treasury' | 'fleets'));
+    // Тот же разбор, что и у карточки игрока (`diploClick.ts`, REFM-139) — а перерисовку
+    // здесь делает окно целиком. Письмо ниже: между ним и шпионом стоит окно интела, и
+    // порядок ветвей сохранён (правило 3).
+    const intent = diploIntent(tg);
+    if (intent && intent.kind !== 'message') {
+      if (intent.kind === 'stance') proposeStance(intent.seat, intent.stance as DiplomaticStance);
+      else if (intent.kind === 'map') toggleMapShare(intent.seat);
+      else playerOrder(spyOn(ME, intent.seat, intent.what as 'treasury' | 'fleets'));
       renderDiplo(); // the intel row (or the rejection note) reflects the outcome
       return;
     }
@@ -12105,9 +12090,8 @@ if (diploEl) {
       focusWorld(iw);
       return;
     }
-    const msgseat = (tg.closest('.dp-msg') as HTMLElement | null)?.dataset.msgseat;
-    if (msgseat) {
-      conversations.open(msgseat);
+    if (intent?.kind === 'message') {
+      conversations.open(intent.seat);
       diploTab = 'msgs';
       renderDiplo();
       document.getElementById('dp-text')?.focus();
