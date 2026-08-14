@@ -619,6 +619,7 @@ import { authorizedBase } from './hubAuth';
 import { diploIntent } from './diploClick';
 import { afterTokenRefused, joinStep } from './joinGate';
 import { assaultSteps } from './assaultOrder';
+import { dialIdentity, dialUrl, seatTicketKey } from './netDial';
 import {
   arcLift,
   arcPoint,
@@ -9754,17 +9755,17 @@ function connect(): void {
   // Seat lock (REL-5): the ticket the server minted for this seat on first join —
   // presented back on every reconnect so nobody else can take the seat by typing
   // our nick. Keyed per server+match+nick (the ticket is seat-scoped).
-  const ticketKey = `void.ticket.${base}|${currentMatchId}|${nick}`;
+  const ticketKey = seatTicketKey(base, currentMatchId, nick);
   const seatTicket = localStorage.getItem(ticketKey);
-  // Identity on the wire: accounts mode (SES-2.5) dials with the short-lived join
-  // token minted by /matches/:id/join — nick/ticket are refused by the server there.
-  // Nick mode: the server maps the name → a fixed side and hands it back, so we
-  // learn our seat from the welcome (snap.playerId), not from a side picker.
-  const url =
-    authMode && pendingJoinToken
-      ? `${base}/matches/${encodeURIComponent(currentMatchId)}?token=${encodeURIComponent(pendingJoinToken)}`
-      : `${base}/matches/${encodeURIComponent(currentMatchId)}?nick=${encodeURIComponent(nick)}` +
-        (seatTicket ? `&ticket=${encodeURIComponent(seatTicket)}` : '');
+  // Чем представляемся и как это ложится в адрес — `netDial.ts` (REFM-142). Там же
+  // причины: два способа не смешиваются (в режиме аккаунтов ник и билет сервер
+  // отвергнет), билет привязан к тройке «сервер + матч + позывной», а всё уходящее в
+  // адрес экранируется — позывной вводит человек.
+  const url = dialUrl(
+    base,
+    currentMatchId,
+    dialIdentity(authMode, pendingJoinToken, nick, seatTicket),
+  );
   pendingJoinToken = null; // one dial per token fetch — a reconnect mints a fresh one
   statusEl.textContent = t('net.connecting', { nick });
   localStorage.setItem('void.server', base);
