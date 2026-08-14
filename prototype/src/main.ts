@@ -620,6 +620,7 @@ import { diploIntent } from './diploClick';
 import { afterTokenRefused, joinStep } from './joinGate';
 import { assaultSteps } from './assaultOrder';
 import { dialIdentity, dialUrl, seatTicketKey } from './netDial';
+import { closeAction, isCurrentSocket } from './socketFate';
 import {
   arcLift,
   arcPoint,
@@ -9795,7 +9796,9 @@ function connect(): void {
         rttEma = rttEma === null ? rtt : rttEma * 0.7 + rtt * 0.3;
       },
       onSnapshot: (snap) => {
-        if (sock !== netSock) return; // a superseded socket must not touch globals
+        // Устаревший сокет не трогает общее состояние (`socketFate.ts`, REFM-143):
+        // его снимок переписал бы игру чужой, уже закрытой сессией.
+        if (!isCurrentSocket(sock, netSock)) return;
         if (!admitted) {
           // Server accepted us — NOW we're really in the match.
           admitted = true;
@@ -9955,10 +9958,17 @@ function connect(): void {
   sock.onopen = () => client.open();
   sock.onmessage = (ev) => client.receive(String(ev.data));
   sock.onclose = () => {
-    // A superseded socket (the user clicked Connect again) must NOT tear down the
-    // fresh session — its late close would kill the new socket's ping timer and
-    // pop the overlay back over a healthy connection.
-    if (sock !== netSock) return;
+    // Что значит это закрытие — `socketFate.ts` (REFM-143): устаревший сокет (игрок
+    // нажал «Подключиться» ещё раз) НЕ должен рушить свежую сессию — его позднее
+    // закрытие погасило бы её таймеры и выбросило оверлей поверх живой игры.
+    const fate = closeAction({
+      current: isCurrentSocket(sock, netSock),
+      inMatch: NET,
+      userClosed,
+      reconnecting,
+      admitted,
+    });
+    if (fate === 'ignore') return;
     if (pingTimer) {
       clearInterval(pingTimer);
       pingTimer = null;
@@ -9968,27 +9978,27 @@ function connect(): void {
       perfTimer = null;
     }
     rttEma = null;
-    if (NET) {
+    if (fate === 'closed-by-user' || fate === 'reconnect') {
       NET = false;
       netAdmitted = false;
-      if (userClosed) {
-        statusEl.textContent = 'disconnected';
-        note(t('net.disconnected'));
-        showConnect(true);
-      } else {
-        // unexpected drop → auto-rejoin our seat (the match keeps running server-side)
-        note(t('net.reconnecting'));
-        reconnecting = true;
-        scheduleReconnect();
-      }
-    } else if (reconnecting && !admitted) {
+    }
+    if (fate === 'closed-by-user') {
+      statusEl.textContent = 'disconnected';
+      note(t('net.disconnected'));
+      showConnect(true);
+    } else if (fate === 'reconnect') {
+      // unexpected drop → auto-rejoin our seat (the match keeps running server-side)
+      note(t('net.reconnecting'));
+      reconnecting = true;
+      scheduleReconnect();
+    } else if (fate === 'retry-admit') {
       scheduleReconnect(); // a reconnect attempt failed to admit → back off and retry
     }
-    // If we were never admitted (a normal rejected join), leave the rejection
-    // message in the status line; the overlay is already showing.
+    // `keep-reason`: нас не впустили — ответ сервера уже в строке статуса, и стирать
+    // его нечем (правило 4); оверлей и так показан.
   };
   sock.onerror = () => {
-    if (sock !== netSock) return; // ignore errors from a superseded socket
+    if (!isCurrentSocket(sock, netSock)) return; // ошибка устаревшего сокета — не наша
     statusEl.textContent = 'connection failed — is the server running / URL right?';
   };
 }
