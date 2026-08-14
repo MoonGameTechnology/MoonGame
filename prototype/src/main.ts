@@ -622,6 +622,7 @@ import { assaultSteps } from './assaultOrder';
 import { dialIdentity, dialUrl, seatTicketKey } from './netDial';
 import { closeAction, isCurrentSocket } from './socketFate';
 import { welcomePlan } from './netWelcome';
+import { orderPlan } from './orderRoute';
 import {
   WAIT_MARK,
   desyncVerdict,
@@ -2225,16 +2226,17 @@ function playerOrder(action: Action): boolean {
   // в сети и при реконнекте — true (исход асинхронный). Нужен покадровым циклам
   // (resolvePendingMerges), чтобы выбрасывать отвергнутый приказ, а не пережимать
   // его каждый кадр — бесконечные тосты отказа (живой плейтест).
-  if (NET && netClient) {
-    netClient.sendAction(action); // server is authoritative — await its broadcast
-    activeTour?.notifyAction(action.type); // optimistic — server result is async
+  // Куда уходит приказ — `orderRoute.ts` (REFM-147): в сети клиент шлёт НАМЕРЕНИЕ и не
+  // трогает локальный редьюсер (иначе следующий снимок сотрёт «принятый» приказ), при
+  // оборванной связи приказ честно отвергается (сервер о нём не узнает), а обучение
+  // учится в сети на намерении, в соло — только на принятом приказе.
+  const plan = orderPlan({ net: NET, hasClient: !!netClient, reconnecting });
+  if (plan.route === 'send') {
+    netClient?.sendAction(action); // server is authoritative — await its broadcast
+    if (plan.tour === 'now') activeTour?.notifyAction(action.type); // ответ сервера асинхронен
     return true;
   }
-  // Net match, socket temporarily down (auto-reconnecting): DON'T run the local reducer
-  // — the order would apply to `s`, look accepted on-screen, then vanish when the
-  // reconnect `welcome` overwrites state (the server never saw it). Refuse with feedback
-  // instead of silently losing it. (Solo/skirmish has `reconnecting === false`.)
-  if (reconnecting) {
+  if (plan.route === 'refuse') {
     note('⟳ ' + t('net.reconnecting-order'));
     return true;
   }
@@ -2248,7 +2250,8 @@ function playerOrder(action: Action): boolean {
     return false;
   }
   else {
-    activeTour?.notifyAction(action.type); // an accepted intent advances `action` steps
+    // an accepted intent advances `action` steps
+    if (plan.tour === 'on-accept') activeTour?.notifyAction(action.type);
     // Какой ПРИНЯТЫЙ приказ какую вставку поднимает и почему во время тура молчат все —
     // `introTrigger.ts` (REFM-100).
     const intro = introFor(action.type, !!activeTour?.active);
