@@ -358,6 +358,12 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
    overrides an ancestor's :none. */
 #spotlight.sl-passthrough{pointer-events:none;}
 #spotlight.sl-passthrough .sl-dim{pointer-events:none;background:transparent;}
+/* Запертый шаг (.sl-gate, src/tourGate.ts): нажать можно ТОЛЬКО подсвеченное место.
+   Корень пропускает нажатия (иначе он же, как box inset:0, съел бы тап в самом окне —
+   см. разбор выше), а четыре затемняющие панели вокруг цели их ГЛУШАТ и остаются
+   видимыми: тёмный экран с одним светлым окном и есть сообщение «жать сюда». */
+#spotlight.sl-gate{pointer-events:none;}
+#spotlight.sl-gate .sl-dim{pointer-events:auto;}
 /* Gold blink, not the theme's usual cyan: the ring marks "tap HERE" specifically —
    it needs to read as a distinct call-to-action against the cyan HUD, not blend into
    it as one more glowing panel. */

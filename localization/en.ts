@@ -1416,13 +1416,17 @@ export const en: Record<string, string> = {
   'onb.tour.first.done':
     'First fight won! You ran the whole loop: produce → build → move → capture → score. Next up — a real match.',
   'onb.tour.first.fleet':
-    'Now build a warship — the «Ships» tab of the same panel. A finished ship flies to orbit on its own and forms a fleet — wait for a «▲» to appear next to your world.',
+    'Order placed — the ship is under construction. A finished ship flies to orbit on its own and forms a fleet: wait for a «▲» to appear next to your world.',
   'onb.tour.first.home':
     'Down here is your homeworld panel: buildings, garrison and construction. Tap your world to open it.',
   'onb.tour.first.mine':
-    'Start with economy: upgrade your Metal Mine — its output funds everything else you build.',
+    'Start with economy. Tap «Metal Extractor» in the buildings list — it is highlighted in gold — and press «Upgrade» on its card: metal income funds everything else you build.',
   'onb.tour.first.scan':
     "Want a ship or fleet's stats? Tap it (hover on PC) — a card opens with damage, armor, speed and troop capacity.",
+  'onb.tour.first.ship':
+    'These are the ships you can order here. Tap the top one — the cruiser: its card opens, then press «Build here».',
+  'onb.tour.first.ships-tab':
+    'Ships are ordered on the «Fleet» tab of this panel. Open it — the tab is highlighted in gold.',
   'onb.tour.first.score':
     'World taken — and the score moves! Points come from worlds and sectors; reach the threshold to win.',
   'onb.tour.first.spy':

@@ -53,6 +53,11 @@ export interface SpotlightStep {
    *  tour. No effect on `action`/`state` steps — those always wait for their
    *  condition (their highlight is best-effort regardless). */
   optional?: boolean;
+  /** Запереть экран на цели этого шага: нажать можно ТОЛЬКО подсвеченное место.
+   *  Ставится там, где цель и есть то, что просят нажать; шаги, где до места ещё надо
+   *  добраться (выбрать флот, открыть панель), оставляют HUD свободным. Правила и
+   *  причины — `tourGate.ts`. */
+  gate?: boolean;
 }
 
 /** The snapshot the host paints for the current step. */

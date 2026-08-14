@@ -29,6 +29,8 @@ import type { SpotlightStep } from './spotlight';
 export interface FirstMatchDeps {
   /** True once the player has tapped their homeworld and its panel is open. */
   homeOpened: () => boolean;
+  /** True while the world panel shows its «Корабли» tab (where ships are ordered). */
+  shipsTabOpen: () => boolean;
   /** True once the player has raised a mobile fleet (a built ship auto-rallies to orbit). */
   hasFleet: () => boolean;
   /** True once the player owns a world beyond their start (a neutral was taken). */
@@ -58,13 +60,45 @@ export function buildFirstMatchTour(deps: FirstMatchDeps): SpotlightStep[] {
       // fresh `building.construct` order for it is never possible, so the first
       // economy beat is its upgrade instead (still `mine`, still the first thing
       // worth spending on): a distinct `building.upgrade` order (construction.ts).
+      // Улучшение переехало в КАРТОЧКУ постройки (BUILD-1): в панели стоит строка
+      // построенного, тап по ней открывает карточку с «Улучшить». Прежняя цель
+      // `[data-act="upgrade"][data-arg="mine"]` не совпадала уже ни с чем — подсветка
+      // молча не находила её, и шаг «улучшите Металлодобычу» не показывал КУДА жать.
+      // Уровень входит в значение (`b:mine:1`), поэтому цель ищется по префиксу.
       id: 'mine',
-      target: '[data-act="upgrade"][data-arg="mine"]',
+      target: '[data-codex^="b:mine:"]',
       copy: 'onb.tour.first.mine',
       advance: { on: 'action', type: 'building.upgrade' },
       placement: 'top',
+      gate: true,
     },
     {
+      // «Постройте корабль» само по себе НЕ инструкция: заказ живёт на отдельной вкладке
+      // панели, и шаг без цели оставлял новичка перед экраном, где нажимать нечего (живой
+      // отзыв: «там построй корабль — какой, у нас же их нет»). Сначала показываем ВКЛАДКУ,
+      // потом СТРОКУ заказа — оба места запираем, чтобы «нажмите сюда» было шагом, а не
+      // советом.
+      id: 'ships-tab',
+      target: '[data-act="tab"][data-arg="ships"]',
+      copy: 'onb.tour.first.ships-tab',
+      advance: { on: 'state', when: deps.shipsTabOpen },
+      placement: 'top',
+      gate: true,
+    },
+    {
+      // Первая строка заказа кораблей, какой бы корабль в ростере ни стоял первым: ростер
+      // собирается из данных (`buildRoster`), и зашитый сюда идентификатор устарел бы
+      // молча — подсветка просто перестала бы находить цель.
+      id: 'ship',
+      target: '[data-buildorder^="unit:"]',
+      copy: 'onb.tour.first.ship',
+      advance: { on: 'action', type: 'unit.build' },
+      placement: 'top',
+      gate: true,
+    },
+    {
+      // Ждём, пока корабль достроится и сам выйдет на орбиту: нажимать здесь нечего,
+      // поэтому ни цели, ни запрета — только объяснение, чего ждать.
       id: 'fleet',
       target: null,
       copy: 'onb.tour.first.fleet',
