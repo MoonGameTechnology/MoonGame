@@ -614,6 +614,7 @@ import { ringed, ringsShown } from './assaultRings';
 import { mergeStep } from './mergeChase';
 import { gridGap, gridLines, gridOffset } from './backdropGrid';
 import { mapScale, screenRadius } from './mapRadius';
+import { breath, phaseAt, phaseOfId } from './pulseFx';
 import {
   arcLift,
   arcPoint,
@@ -2127,7 +2128,9 @@ function drawSignatureAt(
   now: number,
 ): void {
   const r = cls === 'L' ? 9 : cls === 'M' ? 7 : 5;
-  const pulse = 0.5 + 0.5 * Math.sin(now / 200 + pos.x * 0.05);
+  // Дыхание слоя — `pulseFx.ts` (REFM-137): фаза от места контакта, иначе все метки
+  // мигают в такт и читаются как один щёлкающий слой.
+  const pulse = breath(now, { period: 200, base: 0.5, amp: 0.5, phase: pos.x * 0.05 });
   cx.save();
   cx.translate(pos.x, pos.y);
   cx.strokeStyle = rgba('#ffb43a', (0.5 + 0.3 * pulse) * fade); // amber = unidentified contact
@@ -4369,7 +4372,12 @@ function render(now: number) {
     }
     const showOwner = p.owner;
     const col = ownerColor(p.owner);
-    const ownerPulse = 0.64 + 0.36 * Math.sin(now / 620 + n.x * 0.011 + n.y * 0.017);
+    const ownerPulse = breath(now, {
+      period: 620,
+      base: 0.64,
+      amp: 0.36,
+      phase: phaseAt(n.x, n.y),
+    });
 
     // empty-space sector: just a faint survey marker at its centre (no city, no
     // capture) — it is only a node you travel through.
@@ -4852,14 +4860,16 @@ function render(now: number) {
     // Три числа эмблемы — `fleetTally.ts` (REFM-115). Развилка там же: пока есть хоть
     // один КОРПУС, крыло едет грузом; корпусов нет — крыло и есть флот.
     const { ships, wingPips, troops } = emblemTally(f.units, f.landing ?? [], isSquadron);
-    const engine = 0.55 + 0.45 * Math.sin(now / 120 + f.id.length);
+    // Фаза от ХЭША идентификатора, а не от его длины (`pulseFx.ts`, правило 2): у
+    // «p1-1» и «p2-3» длина одна, и все флоты матча заводили двигатели в такт.
+    const engine = breath(now, { period: 120, base: 0.55, amp: 0.45, phase: phaseOfId(f.id) });
 
     // bombardment beam down to the planet
     if (f.bombarding && f.location) {
       const target = s.planets[f.location];
       if (target) {
         const pc = world(target.position);
-        const spark = 0.45 + 0.55 * Math.sin(now / 90);
+        const spark = breath(now, { period: 90, base: 0.45, amp: 0.55, phase: phaseOfId(f.id) });
         cx.save();
         cx.strokeStyle = rgba('#ffb15f', 0.3 + 0.3 * spark);
         cx.lineWidth = 1.2 + spark;
@@ -5057,7 +5067,7 @@ function render(now: number) {
     if (f.owner === ME && chainStepsOf(f.id)) {
       // TGT-1: an army carrying a standing plan breathes a dashed accent ring —
       // one glance tells which fleets are already "spoken for".
-      const pu = 0.5 + 0.5 * Math.sin(now / 300);
+      const pu = breath(now, { period: 300, base: 0.5, amp: 0.5, phase: phaseOfId(f.id) });
       cx.save();
       cx.strokeStyle = rgba(ownerColor(ME), 0.3 + 0.4 * pu);
       cx.lineWidth = 1.3;
