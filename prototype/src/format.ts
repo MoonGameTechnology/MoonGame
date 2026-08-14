@@ -11,6 +11,7 @@
  */
 import { t, tData } from '../../localization/runtime';
 import { RES_SVG } from './icons';
+import { DAY, HOUR } from './time';
 
 /** HTML-escape for text AND attribute values (CWE-79). Covers both quote styles: the
  *  file uses double-quoted attributes today, escaping `'` too keeps this complete if a
@@ -76,7 +77,8 @@ export function cost(
   return entries
     .map(([r, n]) => {
       const lack = have ? Math.max(0, Math.ceil(n - (have[r] ?? 0))) : 0;
-      const gap = lack > 0 ? `<em class="lack" title="${t('cost.short', { n: lack })}">−${lack}</em>` : '';
+      const gap =
+        lack > 0 ? `<em class="lack" title="${t('cost.short', { n: lack })}">−${lack}</em>` : '';
       return `<span class="rcost rc-${r}${lack > 0 ? ' short' : ''}">${curIc(r)}${n}${gap}</span>`;
     })
     .join(' ');
@@ -105,7 +107,9 @@ export function resChip(
     typeof n === 'number'
       ? `${opts.sign && num > 0 ? '+' : ''}${String(round1(num)).replace('-', '−')}`
       : String(n);
-  const per = opts.per ? `<i class="rc-per">${t(opts.per === 'd' ? 'res.per.day' : 'res.per.hour')}</i>` : '';
+  const per = opts.per
+    ? `<i class="rc-per">${t(opts.per === 'd' ? 'res.per.day' : 'res.per.hour')}</i>`
+    : '';
   return `<span class="rcost rc-${res}">${curIc(res)}${shown}${per}</span>`;
 }
 
@@ -152,4 +156,46 @@ export function fmtHrs(h: number): string {
   return r >= 48
     ? t('browser.left.days', { d: Math.floor(r / 24), h: r % 24 })
     : t('fmt.hours', { n: r });
+}
+
+/**
+ * ЧАСЫ ИГРОВОГО ВРЕМЕНИ (REFM-136). Время мира — миллисекунды от нуля матча, а игрок
+ * читает его как «день такой-то, столько-то часов». Перевод стоял четырьмя разными
+ * выражениями по экрану: штамп журнала, строка разведки, часы в статусной полосе и
+ * обратный отсчёт до конца суток — каждое со своим набором `%`, `/` и дополнений нулём.
+ *
+ * 1. **День игрока начинается с ЕДИНИЦЫ.** `+1` дописывался руками в каждом месте;
+ *    забудь его в одном — и в журнале появится «D0», которого у игрока не бывает.
+ * 2. **Часы и минуты — от ОСТАТКА суток и часа.** Без `% DAY` часы растут неограниченно
+ *    (25:00, 300:00): это уже не время суток, а прожитые часы.
+ * 3. **Минуты считаются в МИЛЛИСЕКУНДАХ**, потому что единица времени мира —
+ *    миллисекунда: делить остаток часа на `HOUR` вместо 60000 значит получить долю часа
+ *    вместо минут.
+ * 4. **Время суток дополняется нулём до двух цифр** — `09:07`, а не `9:7`: строки стоят
+ *    в колонках журнала и в статусной полосе, и прыгающая ширина дёргает всю строку.
+ * 5. **Обратный отсчёт — НЕ время суток, и часы в нём без ведущего нуля** (`2:05:30`):
+ *    это остаток, а не показание часов, и час там бывает однозначным по смыслу.
+ */
+
+/** Игровые сутки, как их читает игрок: с единицы (правило 1). */
+export function gameDay(at: number): number {
+  return Math.floor(at / DAY) + 1;
+}
+
+/** Час суток, 0–23 (правило 2). */
+export function dayHour(at: number): number {
+  return Math.floor((at % DAY) / HOUR);
+}
+
+/** Время суток «ЧЧ:ММ» (правила 2–4). */
+export function clockHM(at: number): string {
+  const p2 = (n: number) => String(n).padStart(2, '0');
+  return `${p2(dayHour(at))}:${p2(Math.floor((at % HOUR) / 60000))}`;
+}
+
+/** Обратный отсчёт «Ч:ММ:СС» — остаток, а не показание часов (правило 5). */
+export function countdownHMS(ms: number): string {
+  const left = Math.max(0, ms);
+  const p2 = (n: number) => String(n).padStart(2, '0');
+  return `${Math.floor(left / HOUR)}:${p2(Math.floor((left % HOUR) / 60000))}:${p2(Math.floor((left % 60000) / 1000))}`;
 }
