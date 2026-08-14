@@ -615,6 +615,7 @@ import { mergeStep } from './mergeChase';
 import { gridGap, gridLines, gridOffset } from './backdropGrid';
 import { mapScale, screenRadius } from './mapRadius';
 import { breath, phaseAt, phaseOfId } from './pulseFx';
+import { authorizedBase } from './hubAuth';
 import {
   arcLift,
   arcPoint,
@@ -8698,16 +8699,23 @@ $('hp-meta').addEventListener('click', (ev) => {
 // что у «Арсенала»: вкладка ПЕРЕИСПОЛЬЗУЕТ сессию, которую уже добыл вход, но никогда
 // не спрашивает пароль ради того, чтобы просто посмотреть — нет сервера, нет режима
 // аккаунтов или нет сохранённой сессии читаются одинаково (гостевое состояние).
+/**
+ * Авторизованный адрес для вкладок хаба — ОДИН на все пять (`hubAuth.ts`, REFM-138).
+ * Там же причины: три условия обязательны, режим аккаунтов пробуется у сервера, а ради
+ * просмотра пароль не спрашивают — любой отказ это гостевое состояние.
+ */
+async function hubAuthorizedBase(): Promise<{ base: string; token: string } | null> {
+  const srv = resolveServer();
+  if (srv) await probeAuthMode(srv.base); // проба режима — только когда есть у кого
+  return authorizedBase(
+    { server: srv, accountsMode: authMode, token: srv ? sessionToken(srv.base) : null },
+    httpBase,
+  );
+}
+
 const friends = initFriends({
   root: () => $('hp-friends'),
-  authorizedBase: async () => {
-    const srv = resolveServer();
-    if (!srv) return null;
-    await probeAuthMode(srv.base);
-    if (!authMode) return null;
-    const token = sessionToken(srv.base);
-    return token ? { base: httpBase(srv.base), token } : null;
-  },
+  authorizedBase: hubAuthorizedBase,
 });
 
 // --- «Рейтинги» — commander + corporation boards (hub tab, RANK-1) ----------
@@ -8717,14 +8725,7 @@ const friends = initFriends({
 // просмотра не спрашиваем; нет сессии — гостевое состояние с причиной.
 const rank = initRank({
   root: () => $('hp-rank'),
-  authorizedBase: async () => {
-    const srv = resolveServer();
-    if (!srv) return null;
-    await probeAuthMode(srv.base);
-    if (!authMode) return null;
-    const token = sessionToken(srv.base);
-    return token ? { base: httpBase(srv.base), token } : null;
-  },
+  authorizedBase: hubAuthorizedBase,
 });
 
 // --- «Арсенал» — the account's persistent collection (hub tab, ARS-5) --------
@@ -8744,14 +8745,7 @@ const arsenal = initArsenal({
   },
   writeCache: (items) => localStorage.setItem(arsenalKey(), JSON.stringify(items)),
   openCodex,
-  authorizedBase: async () => {
-    const srv = resolveServer();
-    if (!srv) return null;
-    await probeAuthMode(srv.base);
-    if (!authMode) return null;
-    const token = sessionToken(srv.base);
-    return token ? { base: httpBase(srv.base), token } : null;
-  },
+  authorizedBase: hubAuthorizedBase,
 });
 function arsenalKey(): string {
   return 'vd.arsenal.' + (nickInput.value.trim() || 'guest');
@@ -8785,14 +8779,7 @@ const profile = initProfile({
     }
   },
   writeCache: (value) => localStorage.setItem(medalsKey(), JSON.stringify(value)),
-  authorizedBase: async () => {
-    const srv = resolveServer();
-    if (!srv) return null;
-    await probeAuthMode(srv.base);
-    if (!authMode) return null;
-    const token = sessionToken(srv.base);
-    return token ? { base: httpBase(srv.base), token } : null;
-  },
+  authorizedBase: hubAuthorizedBase,
 });
 const medalsKey = (): string => 'vd.medals.' + (nickInput.value.trim() || 'guest');
 
@@ -12174,14 +12161,7 @@ const corp = initCorp({
   note,
   errText,
   onIntro: maybeIntro,
-  authorizedBase: async () => {
-    const srv = resolveServer();
-    if (!srv) return null;
-    await probeAuthMode(srv.base);
-    if (!authMode) return null;
-    const token = sessionToken(srv.base);
-    return token ? { base: httpBase(srv.base), token } : null;
-  },
+  authorizedBase: hubAuthorizedBase,
 });
 $('ccorp').addEventListener('click', () => corp.open());
 $('railcorp').addEventListener('click', () => corp.open());
