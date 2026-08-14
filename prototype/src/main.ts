@@ -621,6 +621,7 @@ import { afterTokenRefused, joinStep } from './joinGate';
 import { assaultSteps } from './assaultOrder';
 import { dialIdentity, dialUrl, seatTicketKey } from './netDial';
 import { closeAction, isCurrentSocket } from './socketFate';
+import { welcomePlan } from './netWelcome';
 import {
   arcLift,
   arcPoint,
@@ -9799,16 +9800,18 @@ function connect(): void {
         // Устаревший сокет не трогает общее состояние (`socketFate.ts`, REFM-143):
         // его снимок переписал бы игру чужой, уже закрытой сессией.
         if (!isCurrentSocket(sock, netSock)) return;
-        if (!admitted) {
+        // Что значит этот снимок — `netWelcome.ts` (REFM-144): вход подтверждает первый
+        // снимок и ровно один раз на сокет, переподключение входит молча (это не новый
+        // матч), и вход снимает только СВОЙ баннер.
+        const plan = welcomePlan({ admitted, reconnecting, banner });
+        banner = plan.banner;
+        if (plan.admit) {
           // Server accepted us — NOW we're really in the match.
           admitted = true;
           netAdmitted = true; // BF-30: ME is now the server-assigned seat — safe to render
-          // Фанфара только на ПЕРВЫЙ вход: каждый реконнект заново проходит эту
-          // ветку (admitted обнуляется с сокетом), а флаг reconnecting ещё жив.
-          if (!reconnecting) snd.play('start');
+          if (plan.fanfare) snd.play('start');
           reconnecting = false; // a fresh welcome ends any reconnect cycle
           reconnectAttempts = 0;
-          if (banner && banner.startsWith('⟳')) banner = null;
           NET = true;
           ME = snap.playerId ?? ME;
           clearSelection();
