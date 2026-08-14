@@ -2,20 +2,24 @@ import { readFileSync } from 'node:fs';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale } from '../../localization/runtime';
 import {
-  esc,
-  kfmt,
-  nfmt,
-  round1,
-  hl,
   TECH_CUR,
-  curIc,
+  buildingName,
+  clockHM,
   cost,
   costText,
+  countdownHMS,
+  curIc,
+  dayHour,
+  displayUnit,
+  esc,
+  fmtEta,
+  gameDay,
+  hl,
+  kfmt,
+  nfmt,
   resChip,
   resLine,
-  displayUnit,
-  buildingName,
-  fmtEta,
+  round1,
 } from './format';
 
 // REFM-2: the first tests over code that used to live inside `main.ts` — 15k lines
@@ -229,5 +233,41 @@ describe('UI-RES2 — сторож: ресурс не печатается сл�
     // Прежняя форма «TECH_CUR[r] ? curIc(r) : tData(r)» падала на слово ровно там,
     // где у игрока нет опоры — у ресурса без глифа.
     expect(read('main.ts')).not.toMatch(/TECH_CUR\[r\] \? curIc\(r\)/);
+  });
+});
+
+// ── Часы игрового времени (REFM-136) ─────────────────────────────────────────
+describe('игровое время на экране', () => {
+  const ЧАС = 3_600_000;
+  const СУТКИ = 24 * ЧАС;
+
+  it('ДЕНЬ ИГРОКА НАЧИНАЕТСЯ С ЕДИНИЦЫ: «D0» игрок бы не понял', () => {
+    expect(gameDay(0)).toBe(1);
+    expect(gameDay(СУТКИ - 1)).toBe(1);
+    expect(gameDay(СУТКИ)).toBe(2);
+    expect(gameDay(9 * СУТКИ + 5 * ЧАС)).toBe(10);
+  });
+
+  it('ЧАСЫ — ОТ ОСТАТКА СУТОК: без этого выйдет 25:00 и дальше', () => {
+    expect(dayHour(0)).toBe(0);
+    expect(dayHour(23 * ЧАС)).toBe(23);
+    expect(dayHour(СУТКИ + ЧАС)).toBe(1); // вторые сутки, а не 25-й час
+  });
+
+  it('время суток дополняется нулём — иначе колонка журнала прыгает', () => {
+    expect(clockHM(9 * ЧАС + 7 * 60_000)).toBe('09:07');
+    expect(clockHM(0)).toBe('00:00');
+    expect(clockHM(23 * ЧАС + 59 * 60_000)).toBe('23:59');
+  });
+
+  it('МИНУТЫ СЧИТАЮТСЯ В МИЛЛИСЕКУНДАХ: доля часа вместо минут дала бы «09:00»', () => {
+    expect(clockHM(9 * ЧАС + 30 * 60_000)).toBe('09:30');
+    expect(clockHM(2 * СУТКИ + 9 * ЧАС + 30 * 60_000)).toBe('09:30'); // сутки не влияют
+  });
+
+  it('ОБРАТНЫЙ ОТСЧЁТ — НЕ ЧАСЫ: часы без ведущего нуля, минуты и секунды с ним', () => {
+    expect(countdownHMS(2 * ЧАС + 5 * 60_000 + 30_000)).toBe('2:05:30');
+    expect(countdownHMS(0)).toBe('0:00:00');
+    expect(countdownHMS(-5)).toBe('0:00:00'); // отрицательного остатка не показываем
   });
 });

@@ -390,6 +390,10 @@ import {
   buildingName,
   fmtEta,
   fmtHrs,
+  gameDay,
+  dayHour,
+  clockHM,
+  countdownHMS,
 } from './format';
 // REFM-3: the icon vocabulary (glyph tables + menu renderers) lives in `icons.ts`
 import {
@@ -6032,8 +6036,10 @@ function fmtStamp(at: number, opts?: StampOpts): string {
   const o = opts ?? { day: true, time: true };
   const p2 = (n: number) => String(n).padStart(2, '0');
   const parts: string[] = [];
-  if (o.day) parts.push(`D${floor(at / DAY) + 1}`);
-  if (o.time) parts.push(`${p2(floor((at % DAY) / HOUR))}:${p2(floor((at % HOUR) / 60000))}`);
+  // День и время суток — `format.ts` (REFM-136): счёт дней с единицы и остатки суток/часа
+  // одинаковы во всех четырёх местах, где игрок читает игровое время.
+  if (o.day) parts.push(`D${gameDay(at)}`);
+  if (o.time) parts.push(clockHM(at));
   if (o.real && o.realAt != null) {
     const dt = new Date(o.realAt);
     parts.push(`⌚${p2(dt.getHours())}:${p2(dt.getMinutes())}`);
@@ -6353,8 +6359,8 @@ function intelTabHtml(): string {
   const log = [...spyLog]
     .reverse()
     .map((e) => {
-      const d = floor(e.at / DAY) + 1;
-      const h = floor((e.at % DAY) / HOUR);
+      const d = gameDay(e.at);
+      const h = dayHour(e.at);
       return `<div class="in-log">D${d} ${String(h).padStart(2, '0')}ч · ${esc(e.text)}</div>`;
     })
     .join('');
@@ -11022,10 +11028,8 @@ function frame(nowReal: number) {
   // (Суверены ◆) pushed to the right end — one level down from the resource row.
   // Day + countdown live in the #daycard, victory progress in the #tbscore chip
   // (row 1 of the bar, below). (World/fleet counts stay on the player card.)
-  const h = floor((s.time % DAY) / HOUR);
-  const min = floor((s.time % HOUR) / 60000);
   const statusHtml =
-    `<span id="clock">${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}</span>` +
+    `<span id="clock">${clockHM(s.time)}</span>` +
     `<span class="dl-donate" title="${t('hub.sovereigns')}"><i>${SOV_SVG}</i>${kfmt(SOVEREIGNS)}</span>`;
   if (statusHtml !== lastClockText) {
     devlineEl.innerHTML = statusHtml;
@@ -11044,10 +11048,7 @@ function frame(nowReal: number) {
   // identity line = the commander's callsign; solo seats are named after the HOUSE
   // (buildSetupConfig), so an empty callsign falls back to that seat name
   const nick = nickInput.value.trim() || NAME[ME] || '';
-  const rem = DAY - (s.time % DAY);
-  const eta =
-    `${floor(rem / HOUR)}:${String(floor((rem % HOUR) / 60000)).padStart(2, '0')}:` +
-    String(floor((rem % 60000) / 1000)).padStart(2, '0');
+  const eta = countdownHMS(DAY - (s.time % DAY));
   const topText = `${nick}${myPlace}/${ranked.length}${score}${d}${eta}`;
   if (topText !== lastTopText) {
     tbName.textContent = nick;
