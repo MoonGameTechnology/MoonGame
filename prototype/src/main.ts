@@ -617,6 +617,7 @@ import { mapScale, screenRadius } from './mapRadius';
 import { breath, phaseAt, phaseOfId } from './pulseFx';
 import { authorizedBase } from './hubAuth';
 import { diploIntent } from './diploClick';
+import { afterTokenRefused, joinStep } from './joinGate';
 import {
   arcLift,
   arcPoint,
@@ -10233,58 +10234,54 @@ function connectToMatch(id: string, slot?: string, faction?: string): void {
     clearTimeout(reconnectTimer);
     reconnectTimer = null;
   }
+  // Развилка «пустить или послать на вход» — `joinGate.ts` (REFM-140); там же причины,
+  // почему просьбу запоминают, почему пароль спрашивают только при известном сервере и
+  // почему сессия проверяется наличием, а не совпадением позывного.
   if (!authMode) {
     connect();
     return;
   }
   void (async () => {
     const srv = resolveServer();
-    if (!srv) {
-      // No server + no nick — show the welcome card so the player can sign in,
-      // then auto-resume the join after `welcomeSignIn` succeeds.
-      pendingJoinAfterAuth.remember(id, slot, faction);
-      showConnect(false);
-      showHub(false);
-      showStage('welcome');
+    const cached = srv ? sessionRecord(srv.base) : null;
+    const next = joinStep({ accountsMode: authMode, serverKnown: !!srv, hasSession: !!cached });
+    if (next.step === 'sign-in') {
+      askSignIn(id, slot, faction, next.password ? srv : null);
       return;
     }
-    // Use the cached session JWT if present. Previously this checked that the
-    // session's login matched `srv.nick` (read from `nickInput.value`), but
-    // that input could be stale or empty after a fresh login — the check
-    // silently fell through to the welcome card even with a valid JWT cached.
-    // The token is already scoped to the authenticated account; if it's
-    // invalid the join route returns 401 and we re-prompt for password.
-    const cached = sessionRecord(srv.base);
-    if (!cached) {
-      pendingJoinAfterAuth.remember(id, slot, faction);
-      showConnect(false);
-      showHub(false);
-      showStage('welcome');
-      wNickInput.value = srv.nick || suggestCallsign();
-      wPassRowEl.style.display = 'flex';
-      wPassInput.focus();
-      return;
-    }
-    const join = await fetchJoinToken(srv.base, id, cached.token, slot, faction);
+    const join = await fetchJoinToken(srv!.base, id, cached!.token, slot, faction);
     if (!join) {
-      // fetchJoinToken returned null — either 401 (session expired, it cleared
-      // the cache) or 403/409 (entry closed / full). For 401, show the welcome
-      // card so the player can re-login; welcomeSignIn auto-resumes the join.
-      // The session was already removed from localStorage by fetchJoinToken.
-      if (!sessionRecord(srv.base)) {
-        pendingJoinAfterAuth.remember(id, slot, faction);
-        showConnect(false);
-        showHub(false);
-        showStage('welcome');
-        wNickInput.value = srv.nick || suggestCallsign();
-        wPassRowEl.style.display = 'flex';
-        wPassInput.focus();
-      }
+      // Токен не выдан: сессии больше нет — вход просрочен, зовём войти заново; сессия на
+      // месте — закрыт сам матч, и карточка входа тут ни при чём (правило 4).
+      if (afterTokenRefused(!!sessionRecord(srv!.base)) === 'sign-in')
+        askSignIn(id, slot, faction, srv);
       return;
     }
     pendingJoinToken = join.token;
     connect();
   })();
+}
+
+/**
+ * Отправить игрока на карточку входа, ЗАПОМНИВ его просьбу вступить (`joinGate.ts`,
+ * правило 1): после успешного входа `welcomeSignIn` доиграет её сам. Строка пароля
+ * показывается только при известном сервере (правило 2) — `srv === null` значит «сначала
+ * выбери, куда входишь».
+ */
+function askSignIn(
+  id: string,
+  slot: string | undefined,
+  faction: string | undefined,
+  srv: { nick?: string } | null,
+): void {
+  pendingJoinAfterAuth.remember(id, slot, faction);
+  showConnect(false);
+  showHub(false);
+  showStage('welcome');
+  if (!srv) return;
+  wNickInput.value = srv.nick || suggestCallsign();
+  wPassRowEl.style.display = 'flex';
+  wPassInput.focus();
 }
 
 // Open a session in its OWN browser tab (deep-link «?join=<id>»): the hub/browser stays in
