@@ -25,6 +25,7 @@ import {
   type SpotlightView,
   type TourEnd,
 } from './spotlight';
+import { overlayMode } from './tourGate';
 
 interface Overlay {
   root: HTMLElement;
@@ -97,8 +98,13 @@ function paint(o: Overlay, view: SpotlightView | null): void {
   }
   o.root.style.display = 'block';
   const vp = { width: window.innerWidth, height: window.innerHeight };
-  const interactive = view.step.advance.on !== 'tap'; // action/state → let the HUD through
-  o.root.classList.toggle('sl-passthrough', interactive);
+  // Что можно нажимать на этом шаге — `tourGate.ts`: модально («Далее» — единственный
+  // ход), заперто на цели (нажимается только подсвеченное окно) или свободно. Запертым
+  // шаг остаётся только пока цель НАЙДЕНА: в кадре без прямоугольника запертый экран
+  // запер бы игрока насмерть.
+  const mode = overlayMode(view.step, !!view.target);
+  o.root.classList.toggle('sl-passthrough', mode === 'free');
+  o.root.classList.toggle('sl-gate', mode === 'gate');
 
   if (view.target) {
     const frame = frameRects(view.target, vp, 6);

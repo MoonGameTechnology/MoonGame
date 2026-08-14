@@ -2330,6 +2330,7 @@ function startGuidedMatch(): void {
     launchTour(
       buildFirstMatchTour({
         homeOpened: () => selPlanet !== null && s.planets[selPlanet]?.owner === ME,
+        shipsTabOpen: () => planetTab === 'ships',
         hasFleet: () => myFleetCount() > startFleets,
         capturedWorld: () => myWorldCount() > startWorlds,
         scoreRose: () => myScore() > startScore + 1,
