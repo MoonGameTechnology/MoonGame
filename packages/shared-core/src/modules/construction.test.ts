@@ -214,7 +214,7 @@ describe('construction module — buildings paid from the treasury', () => {
 
     // Due at +4h: the building lands and is announced.
     const done = okAdvance(kernel.advanceTo(early.state, ctx(4 * HOUR)));
-    expect(done.state.planets.A?.buildings).toEqual([{ type: 'mine', level: 1, hp: 0 }]);
+    expect(done.state.planets.A?.buildings).toEqual([expect.objectContaining({ type: 'mine', level: 1, hp: 0 })]);
     expect(done.events.map((e) => e.type)).toContain('building.constructed');
   });
 
@@ -447,7 +447,7 @@ describe('construction module — real-time integrity', () => {
     const early = okAdvance(kernel.advanceTo(ordered.state, ctx(2 * HOUR - 1, 2)));
     expect(early.state.planets.A?.buildings).toEqual([]);
     const done = okAdvance(kernel.advanceTo(early.state, ctx(2 * HOUR, 2)));
-    expect(done.state.planets.A?.buildings).toEqual([{ type: 'mine', level: 1, hp: 0 }]);
+    expect(done.state.planets.A?.buildings).toEqual([expect.objectContaining({ type: 'mine', level: 1, hp: 0 })]);
   });
 });
 
@@ -464,10 +464,10 @@ describe('construction module — building levels and upgrades', () => {
 
     const ordered = okApply(kernel.applyAction(st, upgrade('fort'), ctx(0)));
     expect(ordered.state.players.p1?.resources.metal).toBe(60); // −40 (level-2 cost)
-    expect(ordered.state.planets.A?.buildings).toEqual([{ type: 'fort', level: 1, hp: 30 }]); // not yet
+    expect(ordered.state.planets.A?.buildings).toEqual([expect.objectContaining({ type: 'fort', level: 1, hp: 30 })]); // not yet
 
     const done = okAdvance(kernel.advanceTo(ordered.state, ctx(2 * HOUR))); // level-2 takes 2h
-    expect(done.state.planets.A?.buildings).toEqual([{ type: 'fort', level: 2, hp: 60 }]);
+    expect(done.state.planets.A?.buildings).toEqual([expect.objectContaining({ type: 'fort', level: 2, hp: 60 })]);
     expect(done.events.map((e) => e.type)).toContain('building.upgraded');
   });
 
@@ -538,6 +538,31 @@ describe('construction module — building levels and upgrades', () => {
     ];
     const st = stateWith({ players: [player('p1', { metal: 100 })], planets: [a] });
     expect(errCode(kernel.applyAction(st, construct('turret'), ctx(0)))).toBe('E_ALREADY_BUILT');
+  });
+
+  // RULES-2.1: upgrade addresses a SPECIFIC instance by uid when maxPerPlanet > 1.
+  it('upgrade по uid адресует конкретный экземпляр (maxPerPlanet > 1)', () => {
+    const kernel = createKernel([constructionModule]);
+    const a = planet('A', 'p1');
+    // f1 is level 2 (max), f2 is level 1 (can upgrade to 2).
+    // Without uid, find-by-type hits f1 first → E_MAX_LEVEL.
+    // With uid='f2', it finds f2 → upgrade succeeds.
+    a.buildings = [
+      { uid: 'f1', type: 'fort', level: 2, hp: 60 },
+      { uid: 'f2', type: 'fort', level: 1, hp: 30 },
+    ];
+    const st = stateWith({ players: [player('p1', { metal: 100, credits: 50 })], planets: [a] });
+    const r = kernel.applyAction(
+      st,
+      { id: 's:p1:1', type: 'building.upgrade', playerId: 'p1', payload: { planetId: 'A', building: 'fort', uid: 'f2' }, issuedAt: 0 },
+      ctx(0),
+    );
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      // The scheduled completion should target uid 'f2', not 'f1'
+      const upgradeEvent = r.state.scheduled.find((e) => e.type === 'construction.complete');
+      expect(upgradeEvent?.payload).toMatchObject({ uid: 'f2', level: 2 });
+    }
   });
 });
 
