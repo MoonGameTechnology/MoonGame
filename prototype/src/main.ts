@@ -624,6 +624,7 @@ import { closeAction, isCurrentSocket } from './socketFate';
 import { welcomePlan } from './netWelcome';
 import { orderPlan } from './orderRoute';
 import { errorTarget, refusalKey } from './errorRoute';
+import { clearStatusLine, fallbackFor, showServerRow } from './browserFallback';
 import { archiveUrl, httpBase, matchesUrl, queryOutcome, seatsUrl } from './matchQuery';
 import { pingRoute, relayIntake } from './relayIntake';
 import {
@@ -10533,14 +10534,19 @@ async function toggleArchive(id: string, restore: boolean): Promise<void> {
 function renderMatches(): void {
   const el = $('mlist');
   const failed = statusEl.textContent === t('acc.server-down');
+  // Что показать вместо списка — `browserFallback.ts` (REFM-151): никогда не тупик
+  // (соло предлагается всегда — это путь без сервера), «сервер не ответил» и «ещё не
+  // спрашивали» — разные сообщения, у сборки игрока свои тексты, а строка адреса
+  // всплывает ровно пока список не загрузился.
+  const состояние = { loaded: !!matchLists, failed, playerBuild: __PLAYER_BUILD__ };
   if (__PLAYER_BUILD__) {
     // The player screen is ONLY the three tabs + the list. The hidden server row
     // resurfaces exactly while the list can't be loaded (an APK has no useful page
     // origin — the player types the host's address once, then it hides again), and
     // the status line is not duplicated under the list's own message.
     const srvRow = srvInput.closest('.cfield') as HTMLElement | null;
-    if (srvRow) srvRow.style.display = matchLists ? 'none' : '';
-    if (failed) statusEl.textContent = '';
+    if (srvRow) srvRow.style.display = showServerRow(true, состояние.loaded) ? '' : 'none';
+    if (clearStatusLine(true, failed)) statusEl.textContent = '';
   }
   // Never a dead end: whatever the server says (unreachable / empty list), the dev
   // client offers the path that ALWAYS works — a solo skirmish offline. The player
@@ -10557,21 +10563,10 @@ function renderMatches(): void {
       openSetup('hub');
     });
   };
-  if (!matchLists) {
-    soloCard(
-      failed
-        ? __PLAYER_BUILD__
-          ? t('browser.server-down')
-          : t('acc.server-down')
-        : __PLAYER_BUILD__
-          ? t('browser.loading')
-          : t('browser.refresh-hint'),
-    );
-    return;
-  }
-  const rows = matchLists[activeTab] ?? [];
-  if (rows.length === 0) {
-    soloCard(t('browser.empty'));
+  const rows = matchLists?.[activeTab] ?? [];
+  const план = fallbackFor({ ...состояние, rows: rows.length });
+  if (план.kind === 'empty') {
+    soloCard(t(план.message));
     return;
   }
   el.textContent = '';
