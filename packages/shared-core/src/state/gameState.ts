@@ -48,6 +48,11 @@ export interface UnitStack {
  *  carry structural HP that orbital bombardment / ground assault wear down
  *  (GDD §7.4); a destroyed building is removed and stops granting its bonus. */
 export interface BuildingInstance {
+  /** Unique instance id (RULES-2.1): allows `building.upgrade` to address a
+   *  SPECIFIC instance when `maxPerPlanet > 1`. Without it, `find(b => b.type === …)`
+   *  always hits the first instance. Auto-assigned at construction time;
+   *  optional for back-compat (old state without uid → find-by-type). */
+  uid?: string;
   type: BuildingId;
   level: number;
   hp: number;
@@ -69,6 +74,8 @@ export interface PausedConstructionSite {
   unit?: UnitId;
   count?: number;
   modules?: ModuleId[];
+  /** RULES-2.1: instance uid for upgrade resume (when maxPerPlanet > 1). */
+  uid?: string;
   /** Fraction (0..1) already complete at the moment of the pause. */
   progress: number;
   /** Game-hours still needed to finish, same units as `buildTimeHours`. */

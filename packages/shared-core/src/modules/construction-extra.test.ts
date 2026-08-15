@@ -208,7 +208,7 @@ describe('construction module — deferred completion under bombardment', () => 
     // Remove bombardment and advance 1h further → now it completes.
     const cleared: GameState = { ...deferred.state, fleets: {} };
     const done = okAdvance(kernel.advanceTo(cleared, ctx(5 * HOUR)));
-    expect(done.state.planets.A?.buildings).toEqual([{ type: 'mine', level: 1, hp: 0 }]);
+    expect(done.state.planets.A?.buildings).toEqual([expect.objectContaining({ type: 'mine', level: 1, hp: 0 })]);
   });
 });
 
@@ -284,7 +284,7 @@ describe('construction module — planet.bombarded event damages buildings', () 
     ];
     st.scheduleSeq = 1;
     const r = okAdvance(kernel.advanceTo(st, ctx(HOUR)));
-    expect(r.state.planets.A?.buildings).toEqual([{ type: 'mine', level: 1, hp: 0 }]);
+    expect(r.state.planets.A?.buildings).toEqual([expect.objectContaining({ type: 'mine', level: 1, hp: 0 })]);
   });
 
   it('carries overflow damage to the next building', () => {

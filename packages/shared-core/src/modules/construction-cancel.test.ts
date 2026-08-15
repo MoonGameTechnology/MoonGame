@@ -180,7 +180,7 @@ describe('construction module — resume continues from the paused progress', ()
     const early = okAdvance(kernel.advanceTo(resumed.state, ctx(10 * HOUR + HOUR - 1)));
     expect(early.state.planets.A?.buildings).toEqual([]);
     const done = okAdvance(kernel.advanceTo(early.state, ctx(10 * HOUR + HOUR)));
-    expect(done.state.planets.A?.buildings).toEqual([{ type: 'mine', level: 1, hp: 0 }]);
+    expect(done.state.planets.A?.buildings).toEqual([expect.objectContaining({ type: 'mine', level: 1, hp: 0 })]);
   });
 
   it('resumes an upgrade from its paused progress, landing at the target level', () => {
@@ -312,6 +312,6 @@ describe('construction module — cancel/resume under timeScale', () => {
     const resumed = okApply(kernel.applyAction(paused.state, resume(seq), ctx(HOUR, 2)));
     // Remaining 2h of game-time at ×2 = 1h of wall time.
     const done = okAdvance(kernel.advanceTo(resumed.state, ctx(2 * HOUR, 2)));
-    expect(done.state.planets.A?.buildings).toEqual([{ type: 'mine', level: 1, hp: 0 }]);
+    expect(done.state.planets.A?.buildings).toEqual([expect.objectContaining({ type: 'mine', level: 1, hp: 0 })]);
   });
 });

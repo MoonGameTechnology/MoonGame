@@ -40,6 +40,10 @@ interface CompletePayload {
   count?: number;
   level?: number;
   modules?: string[];
+  /** RULES-2.1: instance uid for upgrade completion (when maxPerPlanet > 1). */
+  uid?: string;
+  /** Scheduled event seq (for uid generation). */
+  seq?: number;
 }
 interface ConstructionRequirement {
   allowed: boolean;
@@ -327,7 +331,7 @@ export const constructionModule: GameModule = {
     });
 
     api.onAction('building.upgrade', (action, h) => {
-      const payload = action.payload as Partial<ConstructBuildingPayload>;
+      const payload = action.payload as Partial<ConstructBuildingPayload & { uid?: string }>;
       if (typeof payload?.planetId !== 'string' || typeof payload?.building !== 'string') {
         return h.reject('E_BAD_PAYLOAD');
       }
@@ -335,7 +339,11 @@ export const constructionModule: GameModule = {
       if (isBombarded(h.state, planet.id)) {
         return h.reject('E_BOMBARDED');
       }
-      const instance = planet.buildings.find((b) => b.type === payload.building);
+      // RULES-2.1: address a SPECIFIC instance by uid when maxPerPlanet > 1.
+      // Without uid (old client / maxPerPlanet=1), fall back to find-by-type.
+      const instance = payload.uid
+        ? planet.buildings.find((b) => b.uid === payload.uid)
+        : planet.buildings.find((b) => b.type === payload.building);
       if (!instance) {
         return h.reject('E_NO_BUILDING'); // nothing of that type to upgrade
       }
@@ -366,6 +374,7 @@ export const constructionModule: GameModule = {
         playerId: action.playerId,
         building: instance.type,
         level: nextLevel,
+        uid: instance.uid,
       });
       h.emit('construction.started', {
         kind: 'upgrade',
@@ -531,7 +540,9 @@ export const constructionModule: GameModule = {
         typeof site.building === 'string' &&
         typeof site.level === 'number'
       ) {
-        const instance = planet.buildings.find((b) => b.type === site.building);
+        const instance = site.uid
+          ? planet.buildings.find((b) => b.uid === site.uid)
+          : planet.buildings.find((b) => b.type === site.building);
         if (!instance || instance.level !== site.level - 1) {
           return h.reject('E_STALE_CONSTRUCTION'); // building moved on without this upgrade
         }
@@ -588,7 +599,8 @@ export const constructionModule: GameModule = {
         }
         const def = h.ctx.data.buildings[p.building];
         const hp = def ? buildingLevel(def, 1).hp : 0;
-        planet.buildings.push({ type: p.building, level: 1, hp });
+        const uid = `b:${planet.id}:${p.building}:${h.ctx.now}:${p.seq ?? 0}`;
+        planet.buildings.push({ uid, type: p.building, level: 1, hp });
         h.emit('building.constructed', {
           planetId: planet.id,
           building: p.building,
@@ -599,7 +611,9 @@ export const constructionModule: GameModule = {
         typeof p.building === 'string' &&
         typeof p.level === 'number'
       ) {
-        const instance = planet.buildings.find((b) => b.type === p.building);
+        const instance = p.uid
+          ? planet.buildings.find((b) => b.uid === p.uid)
+          : planet.buildings.find((b) => b.type === p.building);
         const def = h.ctx.data.buildings[p.building];
         if (!instance || !def || instance.level !== p.level - 1) {
           return; // building gone or already changed → drop
