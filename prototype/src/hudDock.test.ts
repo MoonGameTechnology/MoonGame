@@ -78,3 +78,35 @@ describe('CSS: ряд привязан к ЗАМЕРУ листа, а не к д
     }
   });
 });
+
+// ПК-зум и высота экрана — та же болезнь с другой стороны. Правила «влезь в окно»
+// носили в себе константу 66.7vh («100vh ÷ 1.5»), а зум давно не всегда 1.5: лестница
+// --pcz ставит 1.4…1.1, и на 1920×935 докованная панель уезжала на 36px ПОД нижний край
+// окна вместе с концом очереди стройки. Живой браузер это ловит, гейт — нет, поэтому
+// формулы сторожит скан.
+describe('CSS: докованные слои ПК считают потолок от ВИДИМОГО окна', () => {
+  const css = readFileSync(fileURLToPath(new URL('../build.mjs', import.meta.url)), 'utf8');
+  // Селектор повторяется (телефонный базовый + ПК-докованный), поэтому ищем не «первое
+  // правило про #side», а именно те, что считают от --vph.
+  const vphRules = css.split('\n').filter((l) => l.includes('var(--vph)') && l.includes('{'));
+
+  it('--vph выведена из живого зума, а не из зашитых «полутора»', () => {
+    const decl = css.split('\n').find((l) => /--vph:/.test(l));
+    expect(decl).toBeDefined();
+    expect(decl).toMatch(/100dvh/);
+    expect(decl).toMatch(/var\(--pcz\)/);
+  });
+
+  it('панель и список рейла упираются в --vph', () => {
+    for (const sel of ['#side{', '#railtools{']) {
+      const rule = vphRules.find((r) => r.includes(sel));
+      expect(rule, sel).toBeDefined();
+      expect(rule, sel).toMatch(/max-height:/);
+    }
+  });
+
+  it('ни одно ПРАВИЛО больше не считает от 66.7vh (в комментариях — история, там можно)', () => {
+    const live = css.split('\n').filter((l) => /66\.7vh/.test(l) && l.includes('{'));
+    expect(live).toEqual([]);
+  });
+});
