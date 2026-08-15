@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 4354 зелёных** (58 skip, 338 файлов).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 4363 зелёных** (58 skip, 338 файлов).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
