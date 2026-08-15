@@ -11,8 +11,8 @@
  * «Свечение и ореолы: выкл» убирало картинку, но не стоимость кадра. `fxBlur` — тот
  * единственный кран, через который теперь проходят ВСЕ размытия.
  *
- * Форма REFM: имена функций сохранены (`fxBlur`, `pcUi`, `compactUi`), поэтому их вызовы
- * в рендере не изменились — переехало только объявление.
+ * Форма REFM: имена функций сохранены (`fxBlur`, `pcUi`), поэтому их вызовы в рендере не
+ * изменились — переехало только объявление.
  */
 import { readBool, writeBool } from './prefs';
 
@@ -48,20 +48,6 @@ export function setShowFps(v: boolean): void {
   writeBool('void.showFps', v);
 }
 
-/** Компактный режим меню (только ПК): плотнее отступы, мельче типографика. По умолчанию
- *  ВЫКЛ. Едет классом на `body` — саму панель переверстывает CSS, разметка не меняется. */
-let compactPanel = readBool('void.compactPanel', false);
-export const compactPanelOn = (): boolean => compactPanel;
-export function setCompactPanel(v: boolean): void {
-  compactPanel = v;
-  writeBool('void.compactPanel', v);
-}
-
-/** Повесить/снять класс компактного режима. Зовётся на старте и при переключении. */
-export function applyCompactPanel(doc: Document = document): void {
-  doc.body.classList.toggle('compact-panel', compactPanel);
-}
-
 /** Медиа-запрос ПК-раскладки — тот же, на котором висит ПК-часть CSS. */
 const PC_FINE =
   typeof matchMedia !== 'undefined'
@@ -72,11 +58,4 @@ const PC_FINE =
  *  гейте — мобильная сборка заморожена. */
 export function pcUi(): boolean {
   return PC_FINE?.matches ?? false;
-}
-
-/** Компактная подача включена И мы на ПК. Сокращение строк на стороне JS должно идти по
- *  тому же гейту, что и CSS: иначе телефон с включённой настройкой получил бы ПК-тексты
- *  под телефонной вёрсткой. */
-export function compactUi(): boolean {
-  return compactPanel && pcUi();
 }

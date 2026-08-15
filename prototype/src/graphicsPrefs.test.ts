@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import {
   fxBlur,
   glowOn,
@@ -78,6 +80,28 @@ describe('графика — счётчик кадров', () => {
       setShowFps(false);
       expect(showFpsOn()).toBe(false);
     });
+  });
+});
+
+// ПК-раскладка увеличивает интерфейс одним списком селекторов `zoom:var(--pcz)`. Окно,
+// забытое в этом списке, едет 1× посреди 1.5× — игрок видит в нём чужой мелкий шрифт и
+// никакой тест этого не замечает (`#buildwin` так и прожил). Окна-братья по оболочке
+// `.twbox` объявлены в разметке одинаково, поэтому список сверяется с ней.
+describe('CSS: ни одно окно не забыто в списке ПК-зума', () => {
+  const css = readFileSync(fileURLToPath(new URL('../build.mjs', import.meta.url)), 'utf8');
+  // Комментарии вырезаются ПЕРЕД разбором: они называют те же id (в т.ч. «#buildwin
+  // здесь забыли»), и сканер, читающий их наравне с селекторами, охранял бы сам себя.
+  const zoomList = css.slice(0, css.indexOf('{zoom:var(--pcz')).replace(/\/\*[\s\S]*?\*\//g, '');
+  const zoomed = new Set(zoomList.slice(zoomList.lastIndexOf('@media')).match(/#[\w-]+/g) ?? []);
+
+  it('список вообще найден — иначе сканер охраняет пустоту', () => {
+    expect(zoomed.size).toBeGreaterThan(20);
+  });
+
+  it('каждое окно с оболочкой .twbox зумится вместе с остальным интерфейсом', () => {
+    const windows = [...css.matchAll(/id="([\w-]+)"><div class="twbox"/g)].map((m) => m[1]);
+    expect(windows.length).toBeGreaterThanOrEqual(4);
+    for (const id of windows) expect(zoomed.has(`#${id}`), id).toBe(true);
   });
 });
 

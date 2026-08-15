@@ -443,16 +443,12 @@ import { initEndScreen, type MatchEnd } from './endScreen';
 import {
   fxBlur,
   pcUi,
-  compactUi,
   glowOn,
   setGlowFx,
   starfieldOn,
   setStarfield,
   showFpsOn,
   setShowFps,
-  compactPanelOn,
-  setCompactPanel,
-  applyCompactPanel,
 } from './graphicsPrefs';
 import { initSettings } from './settingsOverlay';
 // «Профиль командира» — карьерное досье (REFM-10).
@@ -1232,9 +1228,8 @@ function setShowOwnPings(v: boolean): void {
 }
 // --- graphics preferences (client-only, localStorage) ------------------------
 // Тумблеры косметики и режима вёрстки живут в `graphicsPrefs.ts` (REFM-21): свечение,
-// звёздное поле, счётчик кадров, компактная подача и ПК-гейт. Здесь остаётся только то,
-// что завязано на сборку и на панель времени.
-applyCompactPanel();
+// звёздное поле, счётчик кадров и ПК-гейт. Здесь остаётся только то, что завязано на
+// сборку и на панель времени.
 // SND-1 — звуки интерфейса: синтезатор целиком в sound.ts, здесь только фабрика.
 // AudioContext создаётся лениво при первом play() (всегда внутри клика — autoplay
 // доволен); среда без WebAudio/localStorage — молча беззвучна, UI живёт как жил.
@@ -5209,7 +5204,7 @@ function conveyorHtml(planetId: string, lane: BuildLane): string {
         !active && pcUi() && head && !canStartQueued(planetId, head)
           ? cost(buildCost(planetId, head), myRes())
           : null,
-      compact: compactUi(),
+      compact: pcUi(),
     },
     {
       now: t('side.conveyor.now'),
@@ -5790,7 +5785,7 @@ function planetPanelHtml(p: Planet): string {
   {
     const cap = capitalOffer(mine, capitalOf(s, ME) === p.id, isInhabited(p));
     if (cap === 'marked') {
-      h += `<div class="row"><b style="color:var(--grn)">★ ${t('side.world.capital')}</b>${compactUi() ? '' : ` <span class="dim">${t('side.world.capital.note')}</span>`}</div>`;
+      h += `<div class="row"><b style="color:var(--grn)">★ ${t('side.world.capital')}</b>${pcUi() ? '' : ` <span class="dim">${t('side.world.capital.note')}</span>`}</div>`;
     } else if (cap === 'designate') {
       h += `<div class="row">${btn('capital', '', t('side.world.make-capital'), true)}</div>`;
     }
@@ -5809,12 +5804,12 @@ function planetPanelHtml(p: Planet): string {
     if (hold === 'clear') {
       h += `<div class="row"><b style="color:var(--cyan)">🚩 ${t('side.world.hold.title')}</b> ${btn('holdpoint', 'off', t('side.world.hold.clear'), true)}</div>`;
     } else if (hold !== 'none') {
-      h += `<div class="row">${btn('holdpoint', 'on', compactUi() ? t('side.world.hold') : t('side.world.hold.set'), hold === 'set')}</div>`;
+      h += `<div class="row">${btn('holdpoint', 'on', pcUi() ? t('side.world.hold') : t('side.world.hold.set'), hold === 'set')}</div>`;
     }
   }
 
   // Tactical ping — mark this province and share it (coalition chat, or a player's DM).
-  h += `<div class="row">${btn('ping', '', compactUi() ? t('side.world.ping') : t('side.world.ping.long'), true)}</div>`;
+  h += `<div class="row">${btn('ping', '', pcUi() ? t('side.world.ping') : t('side.world.ping.long'), true)}</div>`;
 
   // Espionage: steal a 24h intel window on this enemy world (SPY-1). While a
   // window lives its countdown replaces the button — the node stays identified.
@@ -9251,8 +9246,6 @@ const settings = initSettings({
   view: () => ({
     sweepOpacity,
     ownPings: showOwnPings,
-    compact: compactPanelOn(),
-    showCompactRow: pcUi(),
     glow: glowOn(),
     starfield: starfieldOn(),
     fps: showFpsOn(),
@@ -9264,7 +9257,6 @@ const settings = initSettings({
   }),
   setSweepOpacity,
   setOwnPings: setShowOwnPings,
-  setCompact: setCompactPanel,
   setGlow: setGlowFx,
   setStarfield: setStarfield,
   setFps: setShowFps,
