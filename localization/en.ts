@@ -1424,6 +1424,10 @@ export const en: Record<string, string> = {
     'Down here is your homeworld panel: buildings, garrison and construction. Tap your world to open it.',
   'onb.tour.first.mine':
     'Start with economy. Tap «Metal Extractor» in the buildings list — it is highlighted in gold — and press «Upgrade» on its card: metal income funds everything else you build.',
+  'onb.tour.first.nav.mouse':
+    'First, the map. Mouse wheel zooms in and out, drag moves the view, double-click returns to the overview. Ctrl+click adds a fleet to the selection, Shift+drag box-selects several. Try it right now — the map stays live.',
+  'onb.tour.first.nav.touch':
+    'First, the map. Pinch with two fingers to zoom (it moves the view too), drag with one finger to pan, double-tap returns to the overview. A long press adds a fleet to the selection or box-selects. Try it right now — the map stays live.',
   'onb.tour.first.scan':
     "Want a ship or fleet's stats? Tap it (hover on PC) — a card opens with damage, armor, speed and troop capacity.",
   'onb.tour.first.ship':

@@ -24,9 +24,13 @@
  * (localization/runtime.ts). Predicates come from the host so this stays pure
  * and unit-testable.
  */
+import { navHintKey } from './navHint';
 import type { SpotlightStep } from './spotlight';
 
 export interface FirstMatchDeps {
+  /** ПК-раскладка: настоящая мышь и широкий экран (`pcUi`) — от неё зависит текст про
+   *  управление картой (`navHint.ts`, правило 1). */
+  mouse: () => boolean;
   /** True once the player has tapped their homeworld and its panel is open. */
   homeOpened: () => boolean;
   /** True while the world panel shows its «Корабли» tab (where ships are ordered). */
@@ -47,6 +51,15 @@ export function buildFirstMatchTour(deps: FirstMatchDeps): SpotlightStep[] {
       target: null,
       copy: 'onb.tour.first.welcome',
       advance: { on: 'tap' },
+    },
+    {
+      // Как вообще смотреть на мир: колесо/щипок, перетаскивание, двойной тап. Без
+      // проверок и без запрета экрана — эту подсказку пробуют руками (`navHint.ts`).
+      id: 'nav',
+      target: null,
+      copy: navHintKey(deps.mouse()),
+      advance: { on: 'tap' },
+      hands: true,
     },
     {
       id: 'home',

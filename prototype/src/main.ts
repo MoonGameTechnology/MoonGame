@@ -2333,6 +2333,7 @@ function startGuidedMatch(): void {
     startFirstGoals(); // ONB-7: the first-session checklist rides alongside the guide
     launchTour(
       buildFirstMatchTour({
+        mouse: pcUi,
         homeOpened: () => selPlanet !== null && s.planets[selPlanet]?.owner === ME,
         shipsTabOpen: () => planetTab === 'ships',
         hasFleet: () => myFleetCount() > startFleets,

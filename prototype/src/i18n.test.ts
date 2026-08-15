@@ -15,6 +15,7 @@ import { buildFirstMatchTour } from './firstMatchTour';
 
 /** Тур первого матча строится из предикатов хоста — для разбора копии они не важны. */
 const TOUR_DEPS_STUB = {
+  mouse: () => true,
   homeOpened: () => false,
   shipsTabOpen: () => false,
   hasFleet: () => false,

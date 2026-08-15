@@ -12,6 +12,7 @@ function anyHost(): SpotlightHost {
 describe('buildFirstMatchTour — shape', () => {
   it('walks produce → build → move → capture → score → done', () => {
     const tour = buildFirstMatchTour({
+      mouse: () => true,
       homeOpened: () => false,
       shipsTabOpen: () => false,
       hasFleet: () => false,
@@ -20,6 +21,7 @@ describe('buildFirstMatchTour — shape', () => {
     });
     expect(tour.map((s) => s.id)).toEqual([
       'welcome',
+      'nav',
       'home',
       'mine',
       'ships-tab',
@@ -43,6 +45,11 @@ describe('buildFirstMatchTour — shape', () => {
       type: 'fleet.move',
     });
     expect(tour.find((s) => s.id === 'home')?.advance.on).toBe('state');
+    // подсказка про карту: без проверок («Далее») и БЕЗ запрета экрана — её пробуют руками
+    const nav = tour.find((s) => s.id === 'nav');
+    expect(nav?.advance).toEqual({ on: 'tap' });
+    expect(nav?.hands).toBe(true);
+    expect(nav?.gate).toBeUndefined();
     // «постройте корабль» — это ДВА нажатия по реальным местам панели, а не пустой шаг:
     // сперва вкладка заказа, потом строка корабля (живой отзыв: «нажимать нечего»)
     // цели должны существовать в реальной разметке: старый селектор улучшения
@@ -78,6 +85,7 @@ describe('buildFirstMatchTour — capture is gated on real state', () => {
     let captured = false;
     let scored = false;
     const tour = buildFirstMatchTour({
+      mouse: () => true,
       homeOpened: () => homeOpen,
       shipsTabOpen: () => shipsTab,
       hasFleet: () => fleetRaised,
@@ -88,56 +96,58 @@ describe('buildFirstMatchTour — capture is gated on real state', () => {
     const t = new SpotlightTour(tour, anyHost(), (r) => (result = r));
     t.start();
 
-    t.tap(); // welcome → home
+    t.tap(); // welcome → nav (подсказка про карту)
+    t.tap(); // nav → home
     for (let f = 0; f < 30; f++) t.refresh(); // panel not opened yet — stays put
-    expect(t.index).toBe(1);
+    expect(t.index).toBe(2);
 
     homeOpen = true;
     t.refresh(); // homeworld panel opened → home advances to mine
     t.notifyAction('building.upgrade'); // mine → ships-tab
 
     for (let f = 0; f < 30; f++) t.refresh(); // вкладка заказа не открыта — стоим на месте
-    expect(t.index).toBe(3);
+    expect(t.index).toBe(4);
 
     shipsTab = true;
     t.refresh(); // вкладка «Корабли» открыта → шаг заказа корабля
-    expect(t.index).toBe(4);
+    expect(t.index).toBe(5);
     t.notifyAction('unit.build'); // заказ отдан → ждём, пока корабль выйдет на орбиту
-    expect(t.index).toBe(5); // parked on the fleet step — a ship must actually auto-rally
+    expect(t.index).toBe(6); // parked on the fleet step — a ship must actually auto-rally
 
     for (let f = 0; f < 30; f++) t.refresh(); // no fleet yet — stays put
-    expect(t.index).toBe(5);
+    expect(t.index).toBe(6);
 
     fleetRaised = true;
     t.refresh(); // a built ship auto-rallied → fleet advances to the (informational) scan step
-    expect(t.index).toBe(6);
+    expect(t.index).toBe(7);
     t.tap(); // scan → troops
-    expect(t.index).toBe(7); // parked on the (informational) troops step
+    expect(t.index).toBe(8); // parked on the (informational) troops step
     t.tap(); // troops → spy
     t.tap(); // spy → course
     t.notifyAction('fleet.move'); // course → capture
-    expect(t.index).toBe(10); // parked on the capture step
+    expect(t.index).toBe(11); // parked on the capture step
 
     for (let f = 0; f < 30; f++) t.refresh(); // world not yet taken — stays put
-    expect(t.index).toBe(10);
+    expect(t.index).toBe(11);
     expect(result).toBeNull();
 
     captured = true;
     t.refresh(); // world taken → capture advances to score
-    expect(t.index).toBe(11);
+    expect(t.index).toBe(12);
 
     scored = true;
     t.refresh(); // score moved → score advances to the final beat
     t.tap(); // done → finish
     expect(result).not.toBeNull();
     expect(result!.completed).toBe(true);
-    expect(result!.reachedStep).toBe(12);
+    expect(result!.reachedStep).toBe(13);
   });
 });
 
 describe('buildFirstMatchTour — skippable', () => {
   it('a skip mid-guide ends the whole chain as skipped', () => {
     const tour = buildFirstMatchTour({
+      mouse: () => true,
       homeOpened: () => true, // already open — walk straight onto mine
       shipsTabOpen: () => false,
       hasFleet: () => false,
@@ -147,7 +157,8 @@ describe('buildFirstMatchTour — skippable', () => {
     let result: TourResult | null = null;
     const t = new SpotlightTour(tour, anyHost(), (r) => (result = r));
     t.start();
-    t.tap(); // welcome → home → (state already true) → mine
+    t.tap(); // welcome → nav
+    t.tap(); // nav → home → (state already true) → mine
     t.skip();
     expect(result).not.toBeNull();
     expect(result!.skipped).toBe(true);
