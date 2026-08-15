@@ -105,6 +105,9 @@ function paint(o: Overlay, view: SpotlightView | null): void {
   const mode = overlayMode(view.step, !!view.target);
   o.root.classList.toggle('sl-passthrough', mode === 'free');
   o.root.classList.toggle('sl-gate', mode === 'gate');
+  // Шаг «попробуй руками»: тело подсказки не должно ловить жест — без цели она стоит по
+  // центру карты, то есть там же, где игрок крутит колесо (`tourGate.ts`, правило 5).
+  o.root.classList.toggle('sl-hands', mode === 'free' && !!view.step.hands);
 
   if (view.target) {
     const frame = frameRects(view.target, vp, 6);

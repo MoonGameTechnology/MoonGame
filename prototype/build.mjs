@@ -362,6 +362,11 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
    Корень пропускает нажатия (иначе он же, как box inset:0, съел бы тап в самом окне —
    см. разбор выше), а четыре затемняющие панели вокруг цели их ГЛУШАТ и остаются
    видимыми: тёмный экран с одним светлым окном и есть сообщение «жать сюда». */
+/* Шаг-подсказка про жесты (.sl-hands, src/tourGate.ts, правило 5): без цели пузырёк
+   встаёт по центру экрана — ровно туда, где игрок и будет крутить колесо. Тело пузырька
+   пропускает жест на карту, кликабельными остаются только его кнопки. */
+#spotlight.sl-hands .sl-bubble{pointer-events:none;}
+#spotlight.sl-hands .sl-btns{pointer-events:auto;}
 #spotlight.sl-gate{pointer-events:none;}
 #spotlight.sl-gate .sl-dim{pointer-events:auto;}
 /* Gold blink, not the theme's usual cyan: the ring marks "tap HERE" specifically —
