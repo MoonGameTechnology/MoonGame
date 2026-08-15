@@ -624,6 +624,7 @@ import { closeAction, isCurrentSocket } from './socketFate';
 import { welcomePlan } from './netWelcome';
 import { orderPlan } from './orderRoute';
 import { errorTarget, refusalKey } from './errorRoute';
+import { archiveUrl, httpBase, matchesUrl, queryOutcome, seatsUrl } from './matchQuery';
 import { pingRoute, relayIntake } from './relayIntake';
 import {
   WAIT_MARK,
@@ -10109,9 +10110,6 @@ function resolveServer(): { base: string; nick: string } | null {
 // deployed bundle as `TypeError: Kn is not a function`, which rejected the whole boot
 // chain: the welcome card never revealed its password field and a `?join=<id>` deep-link
 // never reached connectToMatch (the seat was never claimed).
-function httpBase(wsBase: string): string {
-  return wsBase.replace(/^ws/, 'http');
-}
 
 // --- accounts (SES-2.5) -------------------------------------------------------
 // With AUTH on the server, the playable path runs the full account flow: the nick
@@ -10395,7 +10393,7 @@ async function openSeatPicker(matchId: string): Promise<void> {
     seatpickListEl.innerHTML = `<p style="color:var(--dim);text-align:center">${t('seatpick.loading')}</p>`;
   if (seatpickEl) seatpickEl.style.display = 'flex';
   try {
-    const res = await fetch(`${httpBase(srv.base)}/matches/${encodeURIComponent(matchId)}/seats`);
+    const res = await fetch(seatsUrl(srv.base, matchId));
     if (!res.ok) throw new Error('http ' + res.status);
     const data = (await res.json()) as {
       seats: Array<{
@@ -10501,8 +10499,8 @@ async function refreshMatches(quiet = false): Promise<void> {
   // BEFORE the player clicks «Войти» on a row — no surprise prompt mid-join.
   await probeAuthMode(srv.base);
   try {
-    const res = await fetch(`${httpBase(srv.base)}/matches?nick=${encodeURIComponent(srv.nick)}`);
-    if (!res.ok) throw new Error('http ' + res.status);
+    const res = await fetch(matchesUrl(srv.base, srv.nick));
+    if (queryOutcome(res) !== 'ok') throw new Error('http ' + res.status);
     matchLists = (await res.json()) as Record<MatchTab, MatchRow[]>;
     localStorage.setItem('void.server', srv.base);
     localStorage.setItem('void.nick', srv.nick);
@@ -10517,13 +10515,12 @@ async function refreshMatches(quiet = false): Promise<void> {
 async function toggleArchive(id: string, restore: boolean): Promise<void> {
   const srv = resolveServer();
   if (!srv) return;
-  const op = restore ? 'unarchive' : 'archive';
+  // Адреса и разбор исхода — `matchQuery.ts` (REFM-150): всё уходящее в адрес
+  // экранируется, а «сервер ОТВЕТИЛ отказом» и «до сервера не дошли» — разные беды и
+  // разные сообщения: первую повторять бессмысленно, вторую как раз стоит.
   try {
-    const res = await fetch(
-      `${httpBase(srv.base)}/matches/${encodeURIComponent(id)}/${op}?nick=${encodeURIComponent(srv.nick)}`,
-      { method: 'POST' },
-    );
-    if (!res.ok) {
+    const res = await fetch(archiveUrl(srv.base, id, srv.nick, restore), { method: 'POST' });
+    if (queryOutcome(res) === 'refused') {
       statusEl.textContent = restore ? t('browser.restore-failed') : t('browser.archive-failed');
       return;
     }
