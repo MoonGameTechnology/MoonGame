@@ -623,6 +623,7 @@ import { dialIdentity, dialUrl, seatTicketKey } from './netDial';
 import { closeAction, isCurrentSocket } from './socketFate';
 import { welcomePlan } from './netWelcome';
 import { orderPlan } from './orderRoute';
+import { pingRoute, relayIntake } from './relayIntake';
 import {
   WAIT_MARK,
   desyncVerdict,
@@ -9901,9 +9902,15 @@ function connect(): void {
       // Server-relayed ally pings (own + allies, hidden from enemies): merge them into
       // the coalition channel so they render as map markers + chat lines, same as solo.
       onPingAdded: (ping: MultiplayerPing) => {
+        // Что делать с ретранслированной строкой — `relayIntake.ts` (REFM-148): личность
+        // строки назначает сервер, своё эхо (и повтор при входе) не удваивает её, а
+        // строку, которую нечем показать, не берём вовсе.
         const node = ping.target.node;
-        if (!node) return; // prototype markers are province-anchored
-        if (sessionMessages.some((m) => m.pingId === ping.id)) return; // dedup the echo
+        const intake = relayIntake({
+          known: sessionMessages.some((m) => m.pingId === ping.id),
+          showable: !!node, // prototype markers are province-anchored
+        });
+        if (intake !== 'add' || !node) return; // `!node` — сужение типа, решает intake
         sessionMessages.push({
           at: ping.createdAt,
           from: ping.owner,
@@ -9926,7 +9933,10 @@ function connect(): void {
       // render from this echo too; the id dedupes a live line vs the join replay.
       onChatMessage: (m: MultiplayerChatMessage) => {
         if (sock !== netSock) return;
-        if (sessionMessages.some((x) => x.chatId === m.id)) return;
+        // Тот же разбор, что у меток (`relayIntake.ts`): реплика всегда показуема, но
+        // дедуп по серверному id обязателен — эхо своей строки и повтор при входе.
+        const known = sessionMessages.some((x) => x.chatId === m.id);
+        if (relayIntake({ known, showable: true }) !== 'add') return;
         // Group lines carry the channel key in `to`; a DM keeps its true addressee —
         // convoMessages derives the thread from (from, to) like the solo path.
         const to =
@@ -11434,10 +11444,10 @@ function pingSelected(): void {
   }
   const input = document.getElementById('dp-text') as HTMLInputElement | null;
   const desc = (input?.value.trim() ?? '').slice(0, 80);
-  if (NET && netClient) {
+  if (pingRoute(NET, !!netClient) === 'server') {
     // The server is authoritative for pings: it stamps the marker and relays a
     // `ping.added` back to us + allies — that echo is what adds it (see onPingAdded).
-    netClient.placePing({ kind: 'mark', target: { node: selPlanet }, label: desc });
+    netClient?.placePing({ kind: 'mark', target: { node: selPlanet }, label: desc });
   } else {
     pushMsg(COALITION, desc || t('chat.ping.mark', { node: selPlanet }), false, ME, selPlanet);
   }
