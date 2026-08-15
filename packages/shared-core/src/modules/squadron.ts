@@ -16,19 +16,55 @@ import type { Fleet, GameState } from '../state/gameState';
 import type { GameData } from '../data/schemas';
 import { distance, fleetBaseSpeed } from '../state/route';
 import { squadronStrikeRange, fleetHasSquadron } from '../state/squadron';
-import { ownFleet } from '../util/combat';
+import { ownFleet, applyDamageToSide, removeIfWiped } from '../util/combat';
 import { sumUnitStat } from '../util/stacks';
+import { timeScaleOf } from '../action/types';
+import { MS_PER_HOUR } from '../util/time';
 
 /** Total point-defense (anti-squadron/anti-missile) firepower of a fleet —
- *  Σ the `pointDefense` stat of its live units. 0 = no point defense. */
+ *  Σ the `pointDefense` stat of its live units (via effectiveStats, so modules
+ *  are included). 0 = no point defense. */
 function fleetPointDefense(fleet: Fleet, data: GameData): number {
   return sumUnitStat(fleet.units, data, 'pointDefense');
 }
 
-/** A squadron's free-flight speed (map units / hour). Squadrons are fast — they
- *  use their own `speed` stat, not the fleet's weighted average. */
-function squadronSpeed(fleet: Fleet, data: GameState['version'] extends never ? never : import('../data/schemas').GameData): number {
+/** Default PD engagement range (map units) when the unit's `pointDefenseRange` is 0. */
+const PD_RANGE = 120;
+/** PD cooldown after a volley (game-minutes). Reducible by module upgrades + tech. */
+const PD_COOLDOWN_MINUTES = 20;
+
+/** PD range for a fleet — from its units' `pointDefenseRange` stat, or the default. */
+function fleetPDRange(fleet: Fleet, data: GameData): number {
+  let r = 0;
+  for (const s of fleet.units) {
+    if (s.count <= 0) continue;
+    const def = data.units[s.unit];
+    if (def) r = Math.max(r, (def.stats as Record<string, number>).pointDefenseRange ?? 0);
+  }
+  return r > 0 ? r : PD_RANGE;
+}
+
+/** A squadron's free-flight speed (map units / hour). */
+function squadronSpeed(fleet: Fleet, data: GameData): number {
   return fleetBaseSpeed(fleet, data);
+}
+
+/** Get the current world position of a fleet (freePosition, location, or edge). */
+function fleetWorldPos(fleet: Fleet, state: GameState): { x: number; y: number } | null {
+  if (fleet.freePosition) return fleet.freePosition;
+  if (fleet.location) return state.planets[fleet.location]?.position ?? null;
+  if (fleet.edge) {
+    const a = state.planets[fleet.edge.from]?.position;
+    const b = state.planets[fleet.edge.to]?.position;
+    if (!a || !b) return null;
+    return { x: a.x + (b.x - a.x) * fleet.edge.t, y: a.y + (b.y - a.y) * fleet.edge.t };
+  }
+  return null;
+}
+
+/** Is this fleet a squadron (free-space mover with homeBase and squadron-trait units)? */
+function isSquadronFleet(fleet: Fleet, data: GameData): boolean {
+  return !!fleet.homeBase && fleetHasSquadron(fleet, data);
 }
 
 export const squadronModule: GameModule = {
@@ -205,53 +241,68 @@ export const squadronModule: GameModule = {
         }
       }
 
-      // Not at base — arrived at a target. Point-defense interception: the
-      // target fleet (if it has pointDefense) fires on the incoming squadron
-      // BEFORE combat starts. If the squadron is wiped, no combat — it was shot
-      // down in approach (like flak shredding a strike wing before it reaches
-      // the hull). This is the counter-play to squadrons (missiles-roadmap MS-2.1).
-      const targetFleet = Object.values(h.state.fleets).find(
-        (f) =>
-          f.owner !== owner &&
-          f.freePosition &&
-          fleet.freePosition &&
-          distance(f.freePosition, fleet.freePosition) < 5,
-      );
-      if (targetFleet) {
-        const pd = fleetPointDefense(targetFleet, h.ctx.data);
-        if (pd > 0) {
-          // One hour of point-defense fire shreds the incoming wing. The squadron's
-          // total HP vs the PD damage determines if it survives to fight.
-          const squadronHp = fleet.units.reduce(
-            (sum, st) => sum + st.count * (h.ctx.data.units[st.unit]?.stats.hp ?? 0),
-            0,
-          );
-          if (pd >= squadronHp) {
-            // Shot down — the squadron is destroyed before reaching combat.
-            h.emit('squadron.intercepted', {
-              fleetId,
-              owner,
-              by: targetFleet.owner,
-              interceptorId: targetFleet.id,
-            });
-            delete h.state.fleets[fleetId];
-            return;
-          }
-          // Survived the flak — but took damage. Apply proportionally to stacks.
-          // The squadron proceeds to combat with reduced strength.
-          h.emit('squadron.flak', {
-            fleetId,
-            owner,
-            by: targetFleet.owner,
-            interceptorId: targetFleet.id,
-            damage: pd,
-          });
-        }
-      }
-
-      // Emit fleet.arrived so combatModule can pick up the collision (if the
-      // target fleet is still there).
+      // Not at base — arrived at a target. Emit fleet.arrived so combatModule
+      // can pick up the collision (if the target fleet is still there).
+      // Point-defense is handled reactively on time.advanced (see below), not
+      // as a one-shot check here — PD fires whenever an enemy squadron is in
+      // range, not just on arrival.
       h.emit('fleet.arrived', { fleetId, departedAt: owner });
+    });
+
+    /** Reactive point-defense on time.advanced: for each fleet with PD > 0 that
+     *  is NOT on cooldown, find all enemy squadrons in PD range. If any — fire
+     *  one volley (full PD damage distributed evenly across all targets), then
+     *  start the 20-minute cooldown. If none — PD stays ready (no cooldown).
+     *
+     *  This is REACTIVE, not periodic: PD fires the moment an enemy squadron
+     *  enters range (detected on the next time.advanced tick), then recharges.
+     *  The cooldown gates how fast a single PD system can respond to waves. */
+    api.on('time.advanced', (_event, h: HandlerContext) => {
+      const data = h.ctx.data;
+      const cooldownMs = (PD_COOLDOWN_MINUTES / 60) * MS_PER_HOUR * timeScaleOf(h.ctx);
+
+      for (const fleet of Object.values(h.state.fleets)) {
+        // Skip fleets with no PD, or on cooldown
+        const pd = fleetPointDefense(fleet, data);
+        if (pd <= 0) continue;
+        if (fleet.battleId) continue; // in combat — PD is part of the battle
+        const cooldownUntil = fleet.pdCooldownUntil ?? 0;
+        if (h.ctx.now < cooldownUntil) continue; // still recharging
+
+        const myPos = fleetWorldPos(fleet, h.state);
+        if (!myPos) continue;
+        const range = fleetPDRange(fleet, data);
+
+        // Find all enemy squadrons in PD range
+        const targets: Fleet[] = [];
+        for (const target of Object.values(h.state.fleets)) {
+          if (target.owner === fleet.owner) continue;
+          if (target.battleId) continue; // already in combat
+          if (!isSquadronFleet(target, data)) continue; // PD only hits squadrons
+          const tp = fleetWorldPos(target, h.state);
+          if (!tp) continue;
+          if (distance(myPos, tp) <= range) targets.push(target);
+        }
+
+        if (targets.length === 0) continue; // no one in range — PD stays ready
+
+        // Distribute damage evenly across all targets
+        const damagePerTarget = pd / targets.length;
+        for (const target of targets) {
+          h.emit('pd.fired', {
+            fleetId: fleet.id,
+            owner: fleet.owner,
+            targetId: target.id,
+            targetOwner: target.owner,
+            damage: damagePerTarget,
+          });
+          applyDamageToSide(h, { kind: 'fleet', fleetId: target.id }, damagePerTarget, data, '');
+          removeIfWiped(h, target.id);
+        }
+
+        // Start cooldown
+        fleet.pdCooldownUntil = h.ctx.now + cooldownMs;
+      }
     });
   },
 };

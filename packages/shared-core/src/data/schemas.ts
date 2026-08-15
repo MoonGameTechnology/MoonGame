@@ -48,6 +48,9 @@ export const UnitStatsSchema = z
      *  planet-side orbital AA): `pointDefense` fires on incoming squadron/missile
      *  strikes, NOT on regular fleets. 0 = no point defense. */
     pointDefense: z.number().nonnegative().default(0),
+    /** Range (Euclidean, map units) at which point-defense engages enemy
+     *  squadrons/missiles. 0 = use the default PD_RANGE (120). */
+    pointDefenseRange: z.number().nonnegative().default(0),
     /** Squadron reach (squadrons-roadmap SQ-3.1): the Euclidean distance in MAP
      *  UNITS a launched `squadron` may strike from its carrier. 0 = no reach. */
     strikeRange: z.number().nonnegative().default(0),
