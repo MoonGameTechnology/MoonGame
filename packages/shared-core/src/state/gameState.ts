@@ -392,6 +392,10 @@ export interface Fleet {
   /** The fleet this one was launched from (its carrier/base). A squadron must stay
    *  within `strikeRange` of its home base's position. Absent = not a launched fleet. */
   homeBase?: FleetId | null;
+  /** Point-defense cooldown: world-time (ms) until which this fleet's PD system
+   *  is recharging after a volley. Absent/0 = ready to fire. PD fires reactively
+   *  when an enemy squadron enters range, then cools down for 20 game-minutes. */
+  pdCooldownUntil?: number;
 }
 
 /**
