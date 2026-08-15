@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import {
   FIRST_GOALS,
   goalsComplete,
@@ -70,5 +72,27 @@ describe('goalsComplete', () => {
       metGoals({ builtMine: true, launchedFleet: true, capturedWorld: true, score: 150 }),
     );
     expect(goalsComplete(done)).toBe(true);
+  });
+});
+
+// The PC placement is one CSS line in build.mjs with no other guard: the phone anchor
+// (top:52px, right edge) put the box on the top bar and on the right-docked panel, and
+// the left column only works while the box also clears the tool rail horizontally.
+describe('CSS: the PC checklist is docked left, below the bar and clear of the rail', () => {
+  const css = readFileSync(fileURLToPath(new URL('../build.mjs', import.meta.url)), 'utf8');
+  const pcRule = css.split('\n').find((l) => /^\s*#goals\{.*left:/.test(l));
+
+  it('has a PC rule at all — otherwise this test guards nothing', () => {
+    expect(pcRule).toBeDefined();
+  });
+
+  it('drops the right anchor and starts below the top bar + devline', () => {
+    expect(pcRule).toMatch(/right:auto/);
+    expect(pcRule).toMatch(/top:calc\(var\(--tbh\)/);
+  });
+
+  it('sits right of the tool rail (left:10px + its ~50px tool list)', () => {
+    const left = Number(/left:(\d+)px/.exec(pcRule ?? '')?.[1]);
+    expect(left).toBeGreaterThanOrEqual(60);
   });
 });
