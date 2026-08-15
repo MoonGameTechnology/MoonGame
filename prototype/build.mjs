@@ -2445,7 +2445,10 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
    here: (1) vw/vh units inside a zoomed element are ALSO scaled visually (67vw
    renders as the full screen; calc(100vh - N) overflows it), so every vw/vh used
    inside a zoomed layer is re-declared below at 1/1.5 of its base value — keep
-   this list in sync when adding vw/vh rules; (2) layers whose position/size is
+   this list in sync when adding vw/vh rules. Для ВЫСОТЫ этой ручной поправки мало:
+   зум не всегда 1.5 (лестница --pcz ниже), поэтому всё, что обязано ВЛЕЗТЬ в экран
+   (докованная панель, список инструментов рейла), считает не от 66.7vh, а от --vph
+   — видимой высоты окна в координатах зумленного слоя; (2) layers whose position/size is
    set in px from JS (#map canvas, #chatwin drag geometry, #pingpop / #holdtip /
    the #spotlight ring anchored to getBoundingClientRect) must stay UNZOOMED, or
    the JS px and the visual px disagree by 1.5× — they are deliberately absent
@@ -2457,7 +2460,14 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
      OS scale) until the interface clipped off the top and bottom. --pcz steps the zoom
      down with the viewport HEIGHT (ladder below) so the HUD always fits; mobile is
      untouched (this whole query is PC-gated). */
-  :root{--pcz:1.5;}
+  :root{--pcz:1.5;
+    /* ВИДИМАЯ высота окна, выраженная в тех же px, которыми мерит зумленный слой.
+       Без неё каждое правило «влезь в экран» несло собственную копию догадки
+       «100vh ÷ 1.5» (66.7vh) — и разъезжалось, как только лестница ниже ставила
+       зум 1.4/1.3/1.2/1.1: при zoom:1.2 те же 66.7vh — это уже 80% экрана, и низ
+       HUD уезжал под край окна (игроку кажется, что интерфейс съела панель задач).
+       Считаем от живого зума, а не от «полутора». */
+    --vph:calc(100dvh / var(--pcz));}
   #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#scipick,
   #market,#constructor,#codex,#codexhub,#intro,#recap,#goals,#playercard,
   #settings,#warprompt,#diplo,#splitdlg,#pingmenu,#banner,#endscreen,#connect,#updbar,
@@ -2466,7 +2476,12 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   #toasts{max-width:min(61vw,520px);}
   /* rail tool list: cap at ~7 items and scroll; the sticky ▲/▾ ticks (not buttons)
      hint that the list scrolls both ways */
-  #railtools{max-height:min(330px,calc(66.7vh - 120px));}
+  /* Список растёт ВВЕРХ от нижнего угла, поэтому его потолок — видимое окно минус
+     шапка с devline (--tbh + 28) и минус собственный низ рейла (14 отступ + 44
+     кнопка-гамбургер + 8 зазор) и те же 14px воздуха: --tbh + 108. Прежние «-120px»
+     этой чехарды не знали и на низком окне (1280×600, зум 1.2) сажали список на
+     devline — те же 9px «интерфейс уехал», что и у панели справа. */
+  #railtools{max-height:min(330px,calc(var(--vph) - var(--tbh) - 108px));}
   #railtools::before,#railtools::after{display:block;position:sticky;z-index:1;flex:0 0 auto;
     text-align:center;font-size:8px;line-height:1;padding:1px 0;color:var(--cyan-dim);
     pointer-events:none;}
@@ -2562,7 +2577,12 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
    vw/vh ÷ 1.5 for the zoomed PC HUD — those base rules would otherwise scale
    to 60vw-wide panels and off-screen heights */
 @media (min-width:900px) and (hover:hover) and (pointer:fine) and (orientation:landscape){
-  #side{width:min(380px,26.7vw);max-height:calc(66.7vh - 88px);}
+  /* Панель докована сверху (top: --tbh + 28px), поэтому её потолок — ровно остаток
+     ВИДИМОГО окна под шапкой и devline, минус те же 14px воздуха, что у нижнего ряда.
+     Прежняя формула (66.7vh - 88px) вычитала «на глазок» 88px вместо реальных 112 и
+     считала зум всегда полуторным: на 1920×935 панель уезжала на 36px под нижний край
+     окна, унося с собой конец очереди стройки (и подсвеченную цель обучения). */
+  #side{width:min(380px,26.7vw);max-height:calc(var(--vph) - var(--tbh) - 42px);}
   #cmdbar{left:calc((100% - min(380px,26.7vw)) / 2);}
   /* time controls hug the right edge — clear of the (now shorter) sector panel and
      of the fleet command bar centred over the map */
