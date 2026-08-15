@@ -1552,8 +1552,6 @@ export const en: Record<string, string> = {
     '«colourblind» — hues distinguishable with colour vision deficiency',
   'settings.colors.reset': 'Reset colours to defaults',
   'settings.colors.title': 'Side colours',
-  'settings.compact': 'Compact panel mode',
-  'settings.compact.hint': 'a denser sector panel — smaller paddings and type (PC)',
   'settings.done': 'DONE',
   'settings.gfx.fps': 'FPS counter',
   'settings.gfx.fps.hint': 'show frames per second in the corner — to check performance',

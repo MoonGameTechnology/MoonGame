@@ -18,9 +18,6 @@ export interface SettingsView {
   sweepOpacity: number;
   /** Показывать ли СВОИ метки на карте (чужие видны всегда). */
   ownPings: boolean;
-  /** Компактная подача меню; строка показывается только в ПК-раскладке. */
-  compact: boolean;
-  showCompactRow: boolean;
   glow: boolean;
   starfield: boolean;
   fps: boolean;
@@ -87,10 +84,6 @@ export function settingsBoxHtml(view: SettingsView): string {
       t('settings.sweep.opacity'),
     ) +
     switchRow('ownpings', t('settings.own-pins'), t('settings.own-pins.hint'), view.ownPings) +
-    // Компактная подача — только ПК: на телефоне этой раскладки нет, и строка бы врала.
-    (view.showCompactRow
-      ? switchRow('compact', t('settings.compact'), t('settings.compact.hint'), view.compact)
-      : '') +
     `<div class="pc-sec">${t('settings.colors.title')}</div>` +
     `<div class="set-row">` +
     `<div class="set-lbl">${t('settings.colors.own')}<span class="set-sub">${t('settings.colors.own.hint')}</span></div>` +
@@ -130,7 +123,6 @@ export interface SettingsHost {
   view(): SettingsView;
   setSweepOpacity(v: number): void;
   setOwnPings(v: boolean): void;
-  setCompact(v: boolean): void;
   setGlow(v: boolean): void;
   setStarfield(v: boolean): void;
   setFps(v: boolean): void;
@@ -169,7 +161,6 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
       });
     };
     toggle('ownpings', host.setOwnPings);
-    toggle('compact', host.setCompact);
     toggle('glow', host.setGlow);
     toggle('starfield', host.setStarfield);
     toggle('fps', host.setFps);
