@@ -623,6 +623,7 @@ import { dialIdentity, dialUrl, seatTicketKey } from './netDial';
 import { closeAction, isCurrentSocket } from './socketFate';
 import { welcomePlan } from './netWelcome';
 import { orderPlan } from './orderRoute';
+import { errorTarget, refusalKey } from './errorRoute';
 import { pingRoute, relayIntake } from './relayIntake';
 import {
   WAIT_MARK,
@@ -9960,26 +9961,19 @@ function connect(): void {
         chatWin.refreshIfVisible();
       },
       onError: (code) => {
-        if (sock !== netSock) return; // ignore errors from a superseded socket
-        // In-match relay refusals (chat flood/target/…) belong in a toast — the
-        // connect overlay's status line is hidden once we're admitted.
-        if (admitted && code.startsWith('E_CHAT')) {
+        // Где игрок увидит отказ — `errorRoute.ts` (REFM-149): отказ устаревшего сокета
+        // не наш, отказ после входа идёт тостом (экран подключения уже скрыт), отказ до
+        // входа — в строку этого экрана, и причина называется словами, а не кодом.
+        const target = errorTarget({ current: sock === netSock, admitted, code });
+        if (target === 'ignore') return;
+        if (target === 'toast') {
           note('✖ ' + errText(code));
           return;
         }
-        if (!admitted && code === 'E_SLOT_TAKEN') {
-          statusEl.textContent = 'that name is already playing (another tab or device?)';
-        } else if (!admitted && code === 'E_UNKNOWN_PLAYER') {
-          statusEl.textContent = 'could not get a seat';
-        } else if (!admitted && code === 'E_MATCH_FULL') {
-          // NETA2-1: the server COMPLETED the handshake just to tell us why — a real
-          // refusal, not "server down". Say it plainly instead of a generic error.
-          statusEl.textContent = t('net.match-full');
-        } else if (!admitted && code === 'E_ENTRY_CLOSED') {
-          statusEl.textContent = t('net.join-closed');
-        } else {
-          statusEl.textContent = 'error: ' + code;
-        }
+        // NETA2-1: the server COMPLETED the handshake just to tell us why — a real
+        // refusal, not "server down". Say it plainly instead of a generic error.
+        const key = admitted ? null : refusalKey(code);
+        statusEl.textContent = key ? t(key) : t('net.error', { code });
       },
     },
   ));
