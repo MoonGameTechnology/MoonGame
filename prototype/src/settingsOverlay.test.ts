@@ -15,8 +15,6 @@ beforeAll(() => setLocale('ru'));
 const viewOf = (over: Partial<SettingsView> = {}): SettingsView => ({
   sweepOpacity: 1,
   ownPings: true,
-  compact: false,
-  showCompactRow: true,
   glow: true,
   starfield: true,
   fps: false,
@@ -101,7 +99,6 @@ function wired(over: Partial<SettingsHost> = {}, view: SettingsView = viewOf()) 
     view: () => view,
     setSweepOpacity: (v) => calls.push(['sweep', v]),
     setOwnPings: (v) => calls.push(['ownpings', v]),
-    setCompact: (v) => calls.push(['compact', v]),
     setGlow: (v) => calls.push(['glow', v]),
     setStarfield: (v) => calls.push(['starfield', v]),
     setFps: (v) => calls.push(['fps', v]),
@@ -146,9 +143,10 @@ describe('настройки — разметка', () => {
     expect(html).toContain('37%');
   });
 
-  it('строка компактного режима есть только в ПК-раскладке', () => {
-    expect(settingsBoxHtml(viewOf({ showCompactRow: true }))).toContain('id="set-compact"');
-    expect(settingsBoxHtml(viewOf({ showCompactRow: false }))).not.toContain('id="set-compact"');
+  // Тумблера компактного режима тут больше нет: плотная подача стала единственной,
+  // поэтому окно настроек не должно снова обзавестись строкой-призраком.
+  it('строки компактного режима в окне нет вовсе', () => {
+    expect(settingsBoxHtml(viewOf())).not.toContain('set-compact');
   });
 
   it('выбранная палитра подсвечена, остальные — нет', () => {

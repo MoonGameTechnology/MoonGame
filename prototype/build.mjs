@@ -2471,7 +2471,12 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#scipick,
   #market,#constructor,#codex,#codexhub,#intro,#recap,#goals,#playercard,
   #settings,#warprompt,#diplo,#splitdlg,#pingmenu,#banner,#endscreen,#connect,#updbar,
-  #hub,#emblempick,#corp,#setup,#testmode,#sandbox{zoom:var(--pcz,1.5);}
+  #hub,#emblempick,#corp,#setup,#testmode,#sandbox,
+  /* #buildwin («Здания → Построить») в этом списке не было: окно ехало 1×, пока
+     весь остальной интерфейс шёл в 1.5× — игрок видел мелкий чужой шрифт ровно в
+     одном окне. Его коробка (.twbox) при этом уже была подогнана под ПК ниже, что
+     и маскировало пропажу. Соседи по разметке (#tech, #steward) тут с самого начала. */
+  #buildwin{zoom:var(--pcz,1.5);}
   /* vw/vh compensations (base values ÷ 1.5 — see the note above) */
   #toasts{max-width:min(61vw,520px);}
   /* rail tool list: cap at ~7 items and scroll; the sticky ▲/▾ ticks (not buttons)
@@ -2589,35 +2594,36 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   #speedbar,body.sheet-open #speedbar{right:14px;}
   body.sheet-open #cmdbar,body.sheet-open #speedbar{bottom:14px;}
 }
-/* «Компактный режим меню» (settings toggle, PC only): a denser sector panel — the
-   same content with the air squeezed out: tighter paddings, smaller chips/rows/tiles,
-   the head subtitle inlined after the world's name, a lower bottom dossier strip.
-   Pure restyle over body.compact-panel — panel markup and behaviour untouched. */
+/* Плотная подача секторной панели на ПК — единственная: тесные отступы, мельче
+   чипы/строки/плитки, подпись шапки в строку с именем мира. Раньше это жило под
+   тумблером «Компактный режим меню» (класс body.compact-panel, выкл по умолчанию);
+   тумблер снят, правила стали обычной ПК-раскладкой. Чистый рестайл — разметка и
+   поведение панели не при чём. */
 @media (min-width:900px) and (hover:hover) and (pointer:fine){
-  body.compact-panel #side .pscroll{padding:8px 10px;}
-  body.compact-panel #side .phead{gap:8px;margin:0 0 6px;padding-bottom:6px;}
-  body.compact-panel #side .phead .pflag{width:12px;height:12px;}
-  body.compact-panel #side .ptitle{display:flex;align-items:baseline;gap:8px;min-width:0;}
-  body.compact-panel #side .ptitle b{display:inline;font-size:13px;letter-spacing:1.5px;flex:0 0 auto;}
-  body.compact-panel #side .ptitle span{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+  #side .pscroll{padding:8px 10px;}
+  #side .phead{gap:8px;margin:0 0 6px;padding-bottom:6px;}
+  #side .phead .pflag{width:12px;height:12px;}
+  #side .ptitle{display:flex;align-items:baseline;gap:8px;min-width:0;}
+  #side .ptitle b{display:inline;font-size:13px;letter-spacing:1.5px;flex:0 0 auto;}
+  #side .ptitle span{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
     white-space:nowrap;font-size:8px;}
-  body.compact-panel #side .pclose{width:22px;height:22px;font-size:10px;}
-  body.compact-panel #side .pstats{gap:5px;margin:2px 0 3px;}
-  body.compact-panel #side .pstats span{padding:2px 7px;font-size:10px;}
-  body.compact-panel #side .pstats .pl{display:none;} /* icon+number chips, as mocked */
-  body.compact-panel #side .sec{margin:8px 0 4px;font-size:9px;padding-bottom:3px;}
-  body.compact-panel #side .row{margin:2px 0;}
-  body.compact-panel #side .asset-row{gap:6px;margin:3px 0;min-height:20px;padding:3px 7px;}
-  body.compact-panel #side .asset-row b{min-width:80px;font-size:11px;}
-  body.compact-panel #side .bicon{width:17px;height:17px;font-size:11px;}
-  body.compact-panel #side button.b{padding:3px 8px;font-size:10px;}
-  body.compact-panel #side .ptabs{gap:5px;margin:7px 0 3px;}
-  body.compact-panel #side .ptab{padding:4px 8px;}
-  body.compact-panel #side .ptiles{gap:5px;margin:3px 0 6px;}
-  body.compact-panel #side .ptile{min-width:46px;min-height:40px;padding:4px 5px;}
-  body.compact-panel #side .ptile .pt-ic{font-size:15px;}
-  body.compact-panel #side .conveyor{margin:4px 0 6px;padding:6px;}
-  body.compact-panel #side .hint{font-size:10px;margin-top:6px;}
+  #side .pclose{width:22px;height:22px;font-size:10px;}
+  #side .pstats{gap:5px;margin:2px 0 3px;}
+  #side .pstats span{padding:2px 7px;font-size:10px;}
+  #side .pstats .pl{display:none;} /* icon+number chips, as mocked */
+  #side .sec{margin:8px 0 4px;font-size:9px;padding-bottom:3px;}
+  #side .row{margin:2px 0;}
+  #side .asset-row{gap:6px;margin:3px 0;min-height:20px;padding:3px 7px;}
+  #side .asset-row b{min-width:80px;font-size:11px;}
+  #side .bicon{width:17px;height:17px;font-size:11px;}
+  #side button.b{padding:3px 8px;font-size:10px;}
+  #side .ptabs{gap:5px;margin:7px 0 3px;}
+  #side .ptab{padding:4px 8px;}
+  #side .ptiles{gap:5px;margin:3px 0 6px;}
+  #side .ptile{min-width:46px;min-height:40px;padding:4px 5px;}
+  #side .ptile .pt-ic{font-size:15px;}
+  #side .conveyor{margin:4px 0 6px;padding:6px;}
+  #side .hint{font-size:10px;margin-top:6px;}
 }
 `;
 

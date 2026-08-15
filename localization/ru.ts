@@ -1547,8 +1547,6 @@ export const ru: Record<string, string> = {
   'settings.colors.palette.hint': '«дальтоник» — оттенки, различимые при цветослепоте',
   'settings.colors.reset': 'Вернуть цвета по умолчанию',
   'settings.colors.title': 'Цвета сторон',
-  'settings.compact': 'Компактный режим меню',
-  'settings.compact.hint': 'плотная панель сектора — меньше отступов, мельче шрифт (на ПК)',
   'settings.done': 'ГОТОВО',
   'settings.gfx.fps': 'Счётчик FPS',
   'settings.gfx.fps.hint': 'показывать кадры в секунду в углу — для проверки производительности',
