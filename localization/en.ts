@@ -797,11 +797,14 @@ export const en: Record<string, string> = {
   'net.connected': '● connected as {who}',
   'net.connecting': 'Connecting: {nick}…',
   'net.disconnected': '● disconnected from server',
+  'net.error': 'Error: {code}',
   'net.join-closed': 'this match is closed to new players (the entry window has elapsed)',
   'net.match-full': 'match is full — every seat is taken',
   'net.need-address': 'Enter the server address',
+  'net.no-seat': 'Could not get a seat',
   'net.reconnecting': '● connection lost — reconnecting…',
   'net.reconnecting-order': 'reconnecting — order not sent, try again shortly',
+  'net.slot-taken': 'That name is already playing — another tab or device?',
   'net.waiting-host': 'Waiting for the host to start…',
 
   // --- queue — Очередь стройки: постановка, улучшение, отказы.
