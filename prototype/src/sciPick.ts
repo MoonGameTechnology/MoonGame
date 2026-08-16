@@ -87,6 +87,21 @@ export function sciPickBodyHtml(
   );
 }
 
+/** Строка совета НА экране настройки: кого посвятили и вход в окно (REFM-126.1).
+ *  Окно открывается ровно раз за вход в настройку и закрывается в том числе Back'ом
+ *  мимо запертого подтверждения, поэтому без этой строки выбор пропадал с глаз
+ *  насовсем — а пустой совет было ничем не отличить от полного. */
+export function sciCouncilRowHtml(chosen: readonly string[], data: GameData): string {
+  const names = chosen.map((id) => esc(t(data.scientists[id]?.name ?? id)));
+  const full = names.length >= COUNCIL_SIZE;
+  return (
+    `<button class="scouncil${full ? '' : ' partial'}" type="button" data-council="open">` +
+    `<span class="sc-h">${t('setup.council.label')}</span>` +
+    `<span class="sc-n">${names.length ? names.join(' · ') : t('setup.council.empty')}</span>` +
+    `<span class="sc-go">${t('setup.council.change')}</span></button>`
+  );
+}
+
 /** Что окно берёт у экрана настройки матча. */
 export interface SciPickHost {
   /** Окно (`#scipick`) — показывается и слушает клики здесь. */

@@ -437,7 +437,7 @@ import {
 // TT-3.1 — экран дерева технологий (REFM-9); `branchLabel` берёт ещё совет учёных.
 import { initTechTree, branchLabel } from './techTree';
 import { initBuildScreen } from './buildScreen';
-import { initSciPick } from './sciPick';
+import { initSciPick, sciCouncilRowHtml } from './sciPick';
 import { initPasswordReset } from './passwordReset';
 import { initEndScreen, type MatchEnd } from './endScreen';
 import {
@@ -9513,6 +9513,7 @@ function renderSetupSlots(): void {
 function renderSetup(): void {
   renderSetupMap();
   renderSetupSlots();
+  renderSetupCouncil();
   // Seat 1 (you) is always in, so the match can always launch — including with ZERO
   // rivals: a calm solo sandbox to read descriptions, learn the UI and test in peace
   // (the core never ends a one-player match — victory needs ≥2 active sides).
@@ -9533,6 +9534,10 @@ let setupReturn: 'welcome' | 'hub' = 'welcome';
 // Окно живёт в `sciPick.ts` (REFM-18); здесь только проводка. Список выбранных —
 // `setupScientists` — принадлежит сетапу (его читает старт матча), поэтому ходит хуками.
 const sciWin = $('scipick');
+const setupCouncilEl = $('setupcouncil');
+function renderSetupCouncil(): void {
+  setupCouncilEl.innerHTML = sciCouncilRowHtml(setupScientists, data);
+}
 const sciPick = initSciPick({
   root: () => sciWin,
   body: () => $('scipickbody'),
@@ -9541,10 +9546,15 @@ const sciPick = initSciPick({
   chosen: () => setupScientists,
   setChosen: (ids) => {
     setupScientists = ids;
+    // Строка настройки идёт следом за КАЖДЫМ выбором, а не за закрытием окна: Back
+    // закрывает окно мимо кода окна (лестница `BACK_LAYERS`), так что «дорисую при
+    // закрытии» разошлось бы с состоянием ровно на этом пути.
+    renderSetupCouncil();
   },
   onCancel: () => $('setupcancel').click(),
 });
 const openSciPick = (): void => sciPick.open();
+setupCouncilEl.addEventListener('click', openSciPick);
 
 function openSetup(from: 'welcome' | 'hub' = 'welcome'): void {
   setupReturn = from;

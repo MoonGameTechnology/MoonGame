@@ -1,9 +1,10 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { setLocale, tData } from '../../localization/runtime';
+import { setLocale, t, tData } from '../../localization/runtime';
 import { data } from './prototypeData';
 import {
   sciInfluenceText,
   sciPickBodyHtml,
+  sciCouncilRowHtml,
   initSciPick,
   COUNCIL_SIZE,
   type SciPickHost,
@@ -240,5 +241,32 @@ describe('совет учёных — клики', () => {
     w.win.fire(click('.что-то-другое'));
     expect(w.chosen).toEqual([ids()[0]!]);
     expect(w.win.shown()).toBe(true);
+  });
+});
+
+describe('совет учёных — строка на экране настройки (REFM-126.1)', () => {
+  it('показывает обоих посвящённых по именам', () => {
+    const two = ids().slice(0, COUNCIL_SIZE);
+    const html = sciCouncilRowHtml(two, data);
+    for (const id of two) expect(html).toContain(t(data.scientists[id]!.name));
+  });
+
+  it('пустой совет назван пустым, а не пустотой', () => {
+    const html = sciCouncilRowHtml([], data);
+    expect(html).toContain(t('setup.council.empty'));
+  });
+
+  it('строка — кнопка, открывающая окно заново', () => {
+    expect(sciCouncilRowHtml([], data)).toContain(`data-council="open"`);
+    expect(sciCouncilRowHtml(ids().slice(0, COUNCIL_SIZE), data)).toContain(`data-council="open"`);
+  });
+
+  it('неполный совет виден как неполный — иначе игрок не заметит потерю', () => {
+    expect(sciCouncilRowHtml([ids()[0]!], data)).toContain('partial');
+    expect(sciCouncilRowHtml(ids().slice(0, COUNCIL_SIZE), data)).not.toContain('partial');
+  });
+
+  it('неизвестный id не роняет строку', () => {
+    expect(() => sciCouncilRowHtml(['нет-такого'], data)).not.toThrow();
   });
 });
