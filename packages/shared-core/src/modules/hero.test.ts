@@ -44,7 +44,7 @@ const data: GameData = parseGameData({
   // HERO-4 catalog: the two built-in effect types, a costly custom type, an unwired type,
   // and a params-tuned lane with NO range (falls back to the engine constant, never ∞).
   heroAbilities: {
-    corridor: { name: 'Коридор', type: 'temp_lane', cooldownHours: 12, range: 600 },
+    corridor: { name: 'Коридор', type: 'temp_lane', cooldownHours: 12, range: 300 },
     annihilate: { name: 'Аннигиляция', type: 'annihilate', cooldownHours: 48, range: 500 },
     burst: { name: 'Burst', type: 'test_burst', cooldownHours: 10, cost: { metal: 50 } },
     ghost: { name: 'Ghost', type: 'unwired_type' },
@@ -176,7 +176,7 @@ function world(): GameState {
     planets: {
       A: planet('A', 'p1', 0, 0, ['B'], 'planet'),
       B: planet('B', 'p1', 30, 0, ['A'], 'planet'),
-      C: planet('C', 'p2', 400, 0, [], 'planet'),
+      C: planet('C', 'p2', 250, 0, [], 'planet'),
       F: planet('F', 'p2', 700, 0, [], 'planet'),
     },
     // Deployed (BF-24): an undeployed reserve can no longer act from the bench.
@@ -288,9 +288,9 @@ describe('hero — temp lane speed bonus (fleet.speed hook)', () => {
     const heroId = laned.state.tempLanes![0]!.heroId!;
     laned.state.heroes![heroId]!.fleetId = 'F1';
 
-    // Owner's fleet: 400 units at speed 10 × 1.5 = 15 → 96 000 000 ms.
+    // Owner's fleet: 250 units at speed 10 × 1.5 = 15 → 60 000 000 ms.
     const own = okApply(kernel.applyAction(laned.state, act('fleet.move', 'p1', { fleetId: 'F1', to: 'C' }), ctx(0)));
-    expect(own.state.fleets.F1?.movement?.arrivesAt).toBeCloseTo((400 / 15) * HOUR, 0);
+    expect(own.state.fleets.F1?.movement?.arrivesAt).toBeCloseTo((250 / 15) * HOUR, 0);
 
     // Врагу ребра просто нет: A↔C соединял ТОЛЬКО этот личный коридор.
     const enemy = kernel.applyAction(laned.state, act('fleet.move', 'p2', { fleetId: 'E1', to: 'C' }), ctx(0));
@@ -353,7 +353,7 @@ describe('hero — temp lane speed bonus (fleet.speed hook)', () => {
     laned.state.tempLanes![0]!.tier = 3; // третья ступень: идут все
 
     const enemy = okApply(kernel.applyAction(laned.state, act('fleet.move', 'p2', { fleetId: 'E1', to: 'C' }), ctx(0)));
-    expect(enemy.state.fleets.E1?.movement?.arrivesAt).toBeCloseTo((400 / 10) * HOUR, 0);
+    expect(enemy.state.fleets.E1?.movement?.arrivesAt).toBeCloseTo((250 / 10) * HOUR, 0);
   });
 });
 
