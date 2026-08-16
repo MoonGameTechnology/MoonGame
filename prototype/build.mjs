@@ -1839,6 +1839,15 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #setup .fchip span{font:10.5px ui-monospace,monospace;color:var(--grn);}
 #setup .fchip.on{border-color:var(--cyan);background:rgba(53,214,230,.1);}
 #setup .fchip.on b{color:var(--cyan);}
+#setup .scouncil{display:flex;align-items:center;gap:10px;width:100%;margin-bottom:14px;padding:10px 12px;
+  border:1px solid var(--line-hi);border-radius:9px;background:rgba(255,255,255,.02);cursor:pointer;font:inherit;text-align:left;}
+#setup .scouncil .sc-h{font:10px ui-monospace,monospace;letter-spacing:2px;text-transform:uppercase;color:var(--cyan-dim);flex:none;}
+#setup .scouncil .sc-n{flex:1;font:12px ui-monospace,monospace;color:#eafffb;}
+#setup .scouncil .sc-go{font:10.5px ui-monospace,monospace;letter-spacing:1px;color:var(--cyan);flex:none;}
+/* Неполный совет должен ЧИТАТЬСЯ как незаконченный: Back закрывает окно мимо запертого
+   подтверждения, и без этой пометки потеря выбора выглядит как норма. */
+#setup .scouncil.partial{border-color:var(--amber);}
+#setup .scouncil.partial .sc-n{color:var(--amber);}
 #setup .srow{display:flex;align-items:center;gap:10px;padding:10px 12px;border:1px solid var(--line-hi);
   border-radius:8px;font:13px ui-monospace,monospace;color:var(--ink);}
 #setup .srow .dot{width:10px;height:10px;border-radius:50%;flex:none;box-shadow:0 0 8px currentColor;}
@@ -2955,6 +2964,7 @@ const page = (js) => `<!doctype html>
         <svg id="setupmap" class="smap" preserveAspectRatio="xMidYMid meet"></svg>
         <p class="smaphint" id="setuphint" data-i18n="setup.map-hint"></p>
         <div id="setupfactions"></div>
+        <div id="setupcouncil"></div>
       </div>
       <div class="scol">
         <div id="setupslots" class="sslots"></div>
