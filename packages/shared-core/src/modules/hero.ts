@@ -85,7 +85,7 @@ import { canAfford, payCost } from '../util/treasury';
 
 const PATH_SPEED_BONUS = 0.5; // +50% for the owner's fleets along the lane
 const PATH_DURATION_HOURS = 6;
-const PATH_RANGE = 600; // max Euclidean span the hero can bridge
+const PATH_RANGE = 300; // max Euclidean span the hero can bridge (−50% from 600)
 const PATH_COOLDOWN_HOURS = 12;
 const ANNIHILATE_RANGE = 500;
 const ANNIHILATE_COOLDOWN_HOURS = 48;

@@ -1014,7 +1014,7 @@ export const data: GameData = parseGameData({
       description: 'hero.ability.corridor.desc',
       type: 'temp_lane',
       cooldownHours: 12,
-      range: 600,
+      range: 300,
       params: {},
     },
     annihilate: {
