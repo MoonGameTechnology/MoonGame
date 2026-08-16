@@ -290,6 +290,8 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 .ptile.locked .pt-ic{color:var(--dim);}
 .ptile .pt-ic{font-size:18px;line-height:1;}
 .ptile .pt-c{font-size:9px;color:var(--dim);letter-spacing:.3px;white-space:nowrap;}
+.pt-mods{display:flex;flex-wrap:wrap;gap:1px;justify-content:center;max-width:70px;}
+.pt-mod{font-size:7px;line-height:1.1;padding:0 2px;border-radius:2px;background:rgba(53,214,230,.12);color:var(--cyan);white-space:nowrap;}
 /* подпись построенного здания: имя обязано читаться, поэтому плитка растягивается под
    него и переносит длинное имя в две строки, а не режет многоточием — обрезанное
    «Salvage Metal…» отвечает на вопрос «что это» не лучше голой иконки */
