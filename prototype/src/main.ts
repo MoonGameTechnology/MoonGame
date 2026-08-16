@@ -5297,7 +5297,17 @@ function fleetTilesHtml(f: Fleet, stacks: UnitStack[]): string {
         def.domain === 'ground'
           ? `<span class="pt-ic">${unitIcon(u.unit, data)}</span>`
           : `<span class="pt-ic">${unitGlyphSvg(def, { color: ownerColor(f.owner), shield: (eff.shield ?? 0) > 0 })}</span>`;
-      return `<button class="ptile" data-codex="u:${esc(u.unit)}" data-desc="u:${esc(u.unit)}" data-name="${esc(name)}" title="${esc(name)} — ${t('side.fleet.tile.hint')}">${icon}<span class="pt-c">×${u.count}</span><span class="pt-hp${pct < 30 ? ' low' : ''}"><i style="width:${pct}%"></i></span></button>`;
+      // Show installed modules as small tags under the count (RULES-2.1 / SM-0.3):
+      // two cruisers with different modules are separate stacks — the tags make
+      // the difference visible at a glance, without opening the codex.
+      const modTags = u.modules && u.modules.length > 0
+        ? `<span class="pt-mods">${u.modules.map((m) => {
+            const mdef = data.modules[m];
+            const mname = mdef ? tData(mdef.name) : m;
+            return `<span class="pt-mod" title="${esc(mname)}">${esc(mname)}</span>`;
+          }).join('')}</span>`
+        : '';
+      return `<button class="ptile" data-codex="u:${esc(u.unit)}" data-desc="u:${esc(u.unit)}" data-name="${esc(name)}" title="${esc(name)} — ${t('side.fleet.tile.hint')}">${icon}<span class="pt-c">×${u.count}</span>${modTags}<span class="pt-hp${pct < 30 ? ' low' : ''}"><i style="width:${pct}%"></i></span></button>`;
     })
     .join('');
   return tiles ? `<div class="ptiles">${tiles}</div>` : '';
