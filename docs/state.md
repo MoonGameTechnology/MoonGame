@@ -147,7 +147,7 @@ packages/action-layer/src/
   data/          schemas.ts (zod-схемы + parseGameData, buildingLevel/buildingMaxLevel)
   rng/           rng.ts (sfc32)
   util/          clone.ts (deepClone/deepFreeze), treasury.ts (canAfford/payCost — shared by construction & technology), fitting.ts (генерик-гейт «слоты+предметы», SHIP-4) + loadout.ts (ship-обёртка над ним)
-  modules/       army, arsenalSync, artillery, capital, captureOnArrival, combat, construction, diplomacy, economy, effects, espionage, faction, fleetOps, fleetRepair, forcedMarch, hero, heroEffects, instantRepair, intercept, market, movement, orbital, planetType, scientist, sector, standingOrders, station, steward, tax, technology, victory, visibility  (32 модуля, + *.test.ts)
+  modules/       army, arsenalSync, artillery, capital, captureOnArrival, combat, construction, diplomacy, economy, effects, espionage, faction, fleetOps, fleetRepair, forcedMarch, hero, heroEffects, instantRepair, intercept, market, movement, orbital, planetType, scientist, sector, squadron, standingOrders, station, steward, tax, technology, victory, visibility  (33 модуля, + *.test.ts)
   examples/      skirmish.test.ts (демо-сценарий + SVG)
   index.ts       баррель (экспорт публичного API)
 data/            manifest, resources, units, buildings, factions, events, sectors, sectorKinds, planetTypes, technologies, scientists, rewards, heroes, heroAbilities, heroFittings, heroPassives, heroSkillTrees, modules, medals, dropTables, starterArsenal (.json)
@@ -1419,7 +1419,7 @@ APK собирается в двух лейнах (matrix в `android.yml`): д�
 economy, movement, hero, heroEffects, orbital, combat, artillery, intercept, captureOnArrival,
 construction, arsenalSync, technology, steward, army, victory, fleetLaunch, diplomacy, espionage,
 botDiplomacy, market, capital, standingOrders, forcedMarch, instantRepair, econScrews,
-effects])` (31 модуль), тик в реальном
+effects])` (33 модуля), тик в реальном
   времени (скорость ⏸/▶/⏩). Концовка матча — из авторитетного `state.match` (`victoryModule`),
   полноэкранный экран итогов победы/поражения/ничьи (счёт+место+статы+XP, рематч; см.
   раздел victory) — а не хардкод по узлам.

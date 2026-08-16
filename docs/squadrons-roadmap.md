@@ -60,8 +60,13 @@ standingOrderDriver.ts` (`autoAssaultActions`/`patrolActions`), кто имен�
 «крыло свободно и видит цель — скремблировать»; живёт в `packages/server` (не в
 `shared-core` — многократно вызывает `applyAction`/`submitServerAction` СНАРУЖИ одного
 прохода событий, поэтому не функция ядра), подключён в `clockDriver`'s `onTick` через
-`serverWiring.ts`. **Всё ещё не портировано:** удар+ПВО-counter трекинг (SQ-1.2 как петля,
-не только «бой уже умеет драться»).
+`serverWiring.ts`. **Портировано полностью (PR #612/#621/#715):**
+- `squadronModule` (`modules/squadron.ts`) — свободный полёт: `squadron.strike`/`return`/`arrived`,
+  `homeBase`/`freePosition`/`freeMovement` на `Fleet`, `fleet.split` ставит `homeBase`.
+- `pointDefense` — реактивное ПВО: залп по эскадрильям в радиусе (`pointDefenseRange`),
+  перезарядка 20 мин (`pdCooldownUntil`), урон распределяется между всеми целями.
+  Модуль `point_defense_array` (slot: defense, +8 PD) — устанавливается в верфи.
+- UI: кнопки Удар/Возврат/Патруль + прицел `squadronStrikeAim` + RPG-панель эффектов.
 
 ---
 
