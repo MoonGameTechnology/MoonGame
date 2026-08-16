@@ -5476,9 +5476,18 @@ function fleetPanelHtml(f: Fleet): string {
     h += `</div>`;
   }
 
-  h += nShips ? `<div class="sec">${t('side.fleet.ships')}</div>` + fleetTilesHtml(f, f.units) : '';
-  if (nTr > 0)
-    h += `<div class="sec">${t('side.fleet.troops')}</div>` + fleetTilesHtml(f, f.landing ?? []);
+  // Enemy fleet: show composition only if identified (known node). An
+  // unidentified radar contact shows just the signature (ship count), not
+  // the exact unit breakdown — fog of war hides the details.
+  const enemyKnown = f.owner === ME || known(fleetNode(f));
+  if (enemyKnown) {
+    h += nShips ? `<div class="sec">${t('side.fleet.ships')}</div>` + fleetTilesHtml(f, f.units) : '';
+    if (nTr > 0)
+      h += `<div class="sec">${t('side.fleet.troops')}</div>` + fleetTilesHtml(f, f.landing ?? []);
+  } else if (nShips > 0) {
+    // Radar contact: show only the signature (coarse size), not the composition
+    h += `<div class="sec">${t('side.fleet.ships')}</div><div class="row dim">${t('side.fleet.signature', { n: nShips })}</div>`;
+  }
 
   // Artillery rules of engagement moved to the ☰ command bar («🔥 Режим огня»
   // button + popover menu) — the bottom sheet keeps information, not controls.
@@ -8038,8 +8047,10 @@ function selectAt(mx: number, my: number) {
   const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
   // Свои флоты под тапом, ближайший первым: и мобильной ветке (ей нужен только
   // первый), и перебору на ПК (ему нужны все).
+  // Также — ВИДИМЫЕ чужие флоты (опознанные или радарные): их можно выделить
+  // и просмотреть состав в панели (без кнопок управления — только информация).
   const fleetHits = Object.values(s.fleets)
-    .filter((f) => f.owner === ME)
+    .filter((f) => f.owner === ME || fleetVisible(f.owner === ME, known(fleetNode(f)), intelFleetOwners.has(f.owner)))
     .map((f) => {
       const a = fleetAnchor(f);
       return a ? { id: f.id, d: Math.hypot(mx - a.x, my - a.y) } : null;

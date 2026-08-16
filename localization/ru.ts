@@ -1652,6 +1652,7 @@ export const ru: Record<string, string> = {
   'side.fleet.repair.dock.title': 'Экспресс-ремонт у своего дока за металл',
   'side.fleet.repair.instant.title': 'Мгновенный ремонт всего корпуса за кредиты',
   'side.fleet.ships': 'Корабли — тап для характеристик',
+  'side.fleet.signature': 'радарный контакт: ~{n} кораблей',
   'side.fleet.sub': '{s} кораблей · {tr} десанта',
   'side.fleet.sub.pc': 'Корабли: {s} · Десант: {tr}',
   'side.fleet.tile.hint': 'тап — полное досье',

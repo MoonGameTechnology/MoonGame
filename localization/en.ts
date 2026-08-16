@@ -1657,6 +1657,7 @@ export const en: Record<string, string> = {
   'side.fleet.repair.dock.title': 'Express repair at your own dock for metal',
   'side.fleet.repair.instant.title': 'Instant full-hull repair for credits',
   'side.fleet.ships': 'Ships — tap for specs',
+  'side.fleet.signature': 'radar contact: ~{n} ships',
   'side.fleet.sub': '{s} ships · {tr} troops',
   'side.fleet.sub.pc': 'Ships: {s} · Landing: {tr}',
   'side.fleet.tile.hint': 'tap for full specs',
