@@ -13,6 +13,9 @@
 #
 # Reviewed 2026-08-11 (SEC-22): +2 glibc wordexp entries below. The rest were re-checked
 # against the same base image digest and all still apply.
+#
+# Reviewed 2026-08-17: +1 libssl3t64 QUIC-server entry below. Same base image digest,
+# so the earlier entries were not re-verified individually this time.
 
 # libc6 2.41-12+deb13u3 — MEDIUM, no fixed version published for trixie yet.
 CVE-2026-5435
@@ -45,3 +48,15 @@ CVE-2026-27171
 # base exists to bump to. Re-review when that digest is bumped.
 CVE-2026-6368
 CVE-2026-6791
+
+# libssl3t64 3.5.6-1~deb13u2 — MEDIUM, Debian status `fix_deferred` (no fixed version).
+# OpenSSL flaw on the QUIC SERVER path ("When an OpenSSL QUIC server (Listener SSL object)
+# proce…"). Not reachable here: this image serves HTTP/1.1 + WebSocket over TCP (Fastify,
+# `packages/server/src/wsServer.ts` builds an http.Server — or an https.Server when RS-5.1
+# native TLS is configured, still TLS-over-TCP), never QUIC/HTTP-3; in the deployed stack
+# TLS is normally terminated by Caddy in front. Node exposes no OpenSSL QUIC listener API,
+# and the runtime is distroless — no shell and no `openssl` CLI to reach it another way.
+# No fix to bump to: the base image tag `nonroot` still resolves to the very
+# sha256:939d6f16… pinned in the Dockerfile (checked against gcr.io on 2026-08-17).
+# Re-review when that digest is bumped or Debian publishes a fix.
+CVE-2026-14456
