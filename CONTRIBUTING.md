@@ -66,6 +66,15 @@
 | `sync-state-doc` | привести `docs/state.md` в соответствие с кодом |
 | `determinism-audit` · `balance-analysis` · `render-profile` · `security-triage` | четыре тяжёлые задачи из списка выше |
 | `playtest-report` · `refresh-scanner-digests` | периодика: журнал плейтеста, ежемесячный ре-пин образов |
+| `thermo-nuclear-code-quality-review` | максимально жёсткий разбор качества структуры диффа (только явным вызовом) |
+
+Последний — внешний скилл из [`cursor/plugins`](https://github.com/cursor/plugins/blob/main/cursor-team-kit/skills/thermo-nuclear-code-quality-review/SKILL.md),
+скопированный в репозиторий как есть плюс местная секция «Как это ложится на Void Dominion»
+(инварианты ядра сильнее любого «code judo», правило 1000 строк на фоне унаследованных
+крупных файлов, текст только через `/localization`). Это markdown, а не код: ничего не
+ставится и не запускается, так что правило «без неприпиннутого внешнего кода» выше не
+нарушено. У него `disable-model-invocation: true` — сам он не включается, только
+`/thermo-nuclear-code-quality-review`.
 
 Claude Code подхватывает их сам; можно позвать и явно — `/brick`, `/new-module`, ….
 Скилл — это **инструкция, а не гарантия**: `.claude/` исключён из `docs-check`
