@@ -88,6 +88,7 @@ export const en: Record<string, string> = {
   // --- callsign — Позывные ботов.
   'build.action.build': 'Build',
   'build.action.no-res': 'Not enough resources',
+  'build.cat.all': 'ALL',
   'build.cat.defense': 'DEFENSE',
   'build.cat.economy': 'ECONOMY',
   'build.cat.infra': 'INFRASTRUCTURE',
