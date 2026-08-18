@@ -153,11 +153,9 @@ const DATA_KEY_GAPS = new Set([
   'data.energy-nexus',
   'data.fortress',
   'data.fusion-reactor-i',
-  'data.ground-marshal',
   'data.metal-extractor-i',
   'data.metal-extractor-ii',
   'data.microelectronics-fab-i',
-  'data.missile-chief',
   'data.orbital-aa-battery',
   'data.orbital-shipyard',
   'data.polymath',
@@ -165,7 +163,6 @@ const DATA_KEY_GAPS = new Set([
   'data.sensor-array-i',
   'data.void-admiral',
   'data.void-station',
-  'data.wing-commander',
 ]);
 
 const DYNAMIC: Array<{ prefix: string; built_by: string }> = [

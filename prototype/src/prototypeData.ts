@@ -299,21 +299,6 @@ export const data: GameData = parseGameData({
       description: 'sci.void-admiral.desc',
       branch: 'space',
     },
-    ground_marshal: {
-      name: 'sci.ground-marshal.name',
-      description: 'sci.ground-marshal.desc',
-      branch: 'ground',
-    },
-    wing_commander: {
-      name: 'sci.wing-commander.name',
-      description: 'sci.wing-commander.desc',
-      branch: 'squadron',
-    },
-    missile_chief: {
-      name: 'sci.missile-chief.name',
-      description: 'sci.missile-chief.desc',
-      branch: 'missile',
-    },
     polymath: {
       name: 'sci.polymath.name',
       description: 'sci.polymath.desc',
