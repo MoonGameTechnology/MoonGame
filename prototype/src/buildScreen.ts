@@ -115,7 +115,8 @@ export function buildRowState(
 }
 
 /** Всё тело окна для одного мира. Чистая функция — `initBuildScreen` кормит её живым
- *  состоянием; `lockText` переводит незнакомый код отказа в слова (errText хоста). */
+ *  состоянием; `lockText` переводит незнакомый код отказа в слова (errText хоста).
+ *  `activeCat` — какая вкладка открыта (рисуются только её строки); `null` = все. */
 export function buildScreenHtml(
   state: GameState,
   me: string,
@@ -124,6 +125,7 @@ export function buildScreenHtml(
   localQueued: (planetId: string, id: string) => boolean,
   lockText: (code: string) => string,
   dossierBody?: (id: string, level: number) => string,
+  activeCat: BuildCategory | null = null,
 ): string {
   const p = state.planets[planetId];
   if (!p) return '';
@@ -185,13 +187,30 @@ export function buildScreenHtml(
     groups.set(cat, [...(groups.get(cat) ?? []), row]);
   }
 
+  // Вкладки категорий: только непустые (пустая вкладка лжёт). Активная подсвечена,
+  // её строки рисуются ниже; «все» (activeCat=null) показывает все категории сразу
+  // с заголовками-секциями — как было до вкладок.
+  const present = BUILD_CATEGORIES.filter((c) => groups.has(c.key));
+  const tabs =
+    `<div class="bw-tabs">` +
+    `<button class="bw-tab${activeCat === null ? ' on' : ''}" data-bwtab="*">${t('build.cat.all')}</button>` +
+    present
+      .map(
+        (c) =>
+          `<button class="bw-tab${activeCat === c.key ? ' on' : ''}" data-bwtab="${c.key}">${t(c.label)}</button>`,
+      )
+      .join('') +
+    `</div>`;
+
   let list = '';
   for (const c of BUILD_CATEGORIES) {
     const rows = groups.get(c.key);
     if (!rows?.length) continue; // пустую категорию не рисуем — заголовок без строк лжёт
-    list += `<div class="bw-cath">${t(c.label)}</div>` + rows.join('');
+    if (activeCat !== null && c.key !== activeCat) continue; // чужая вкладка скрыта
+    if (activeCat === null) list += `<div class="bw-cath">${t(c.label)}</div>`; // «все» — с заголовками
+    list += rows.join('');
   }
-  return head + `<div class="bw-scroll"><div class="bw-list">${list}</div></div>`;
+  return head + `<div class="bw-scroll"><div class="bw-list">${tabs}${list}</div></div>`;
 }
 
 /** Что окну нужно от матч-экрана. */
@@ -222,6 +241,7 @@ export function initBuildScreen(host: BuildHost): {
   isOpen: () => boolean;
 } {
   let planetId: string | null = null;
+  let activeCat: BuildCategory | null = null;
   // Кэш разметки как у techTree: одинаковую строку не переприсваиваем — innerHTML
   // пересоздаёт DOM даже на идентичном тексте и выбивал бы кнопку из-под пальца.
   let lastHtml = '';
@@ -236,6 +256,7 @@ export function initBuildScreen(host: BuildHost): {
       (pid, id) => host.localQueued(pid, id),
       (code) => host.lockText(code),
       (id, level) => host.dossierBody(id, level),
+      activeCat,
     );
     if (html === lastHtml) return;
     const body = host.body();
@@ -253,6 +274,14 @@ export function initBuildScreen(host: BuildHost): {
       host.root().classList.remove('show');
       return;
     }
+    // Вкладка категории — переключает фильтр и перерисовывает список.
+    const tab = (tg.closest('[data-bwtab]') as HTMLElement | null)?.dataset.bwtab;
+    if (tab !== undefined) {
+      activeCat = tab === '*' ? null : (tab as BuildCategory);
+      lastHtml = ''; // вкладка сменилась — прошлая разметка не годится
+      repaint();
+      return;
+    }
     // Кнопка «Строить» лежит ВНУТРИ кликабельной строки — спрашиваем по самому
     // приказу (data-bw-go) и выходим рано, иначе тап дал бы и заказ, и карточку.
     const go = (tg.closest('[data-bw-go]') as HTMLElement | null)?.dataset.bwGo;
@@ -268,6 +297,7 @@ export function initBuildScreen(host: BuildHost): {
   return {
     open: (pid: string) => {
       planetId = pid;
+      activeCat = null; // новый мир открывается на «все»
       lastHtml = ''; // другой мир — прошлая разметка не годится даже совпав строкой
       host.root().classList.add('show');
       repaint();

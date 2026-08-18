@@ -1270,6 +1270,11 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .bw-cnt{flex:none;font-size:10px;color:var(--cyan);border:1px solid var(--line-hi);border-radius:10px;padding:3px 9px;}
 .bw-scroll{flex:1;min-height:0;overflow:auto;touch-action:pan-y;}
 .bw-list{padding:0 12px 12px;display:flex;flex-direction:column;gap:7px;}
+.bw-tabs{display:flex;gap:5px;padding:10px 0 2px;flex:none;overflow-x:auto;touch-action:pan-x;scrollbar-width:none;}
+.bw-tabs::-webkit-scrollbar{display:none;}
+.bw-tab{flex:none;padding:7px 12px;border:1px solid var(--line-hi);border-radius:8px;background:transparent;
+  color:var(--dim);font:700 10px ui-monospace,monospace;cursor:pointer;letter-spacing:.6px;white-space:nowrap;}
+.bw-tab.on{color:#04231c;background:linear-gradient(180deg,var(--cyan),#4fe0b0);border-color:var(--cyan);}
 .bw-cath{margin:10px 0 1px;font:800 9px ui-monospace,monospace;letter-spacing:1.4px;color:var(--cyan-dim);}
 .bw-item{position:relative;padding:9px 10px 10px;border:1px solid var(--line);border-radius:10px;
   background:linear-gradient(180deg,rgba(12,32,38,.85),rgba(8,20,24,.85));cursor:pointer;}

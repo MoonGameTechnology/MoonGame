@@ -122,6 +122,30 @@ describe('окно построек — разметка', () => {
     expect((out.match(/bw-cath/g) ?? []).length).toBeGreaterThanOrEqual(2);
   });
 
+  it('вкладки категорий рисуются, активна — «все»', () => {
+    const out = html(s, pid);
+    expect(out).toContain('bw-tabs');
+    expect(out).toContain('data-bwtab="*"');
+    expect(out).toContain('data-bwtab="economy"');
+    expect(out).toContain('data-bwtab="defense"');
+    // «все» активна по умолчанию — подсвечена
+    const at = out.indexOf('data-bwtab="*"');
+    expect(out.slice(at - 20, at + 20)).toContain('on');
+  });
+
+  it('активная вкладка фильтрует строки — только её категория', () => {
+    const out = buildScreenHtml(s, 'p1', pid, probe(s), noQueue, lockText, undefined, 'defense');
+    expect(out).toContain('data-bwtab="defense"');
+    // в режиме одной вкладки заголовки-секции не рисуются
+    expect(out).not.toContain('bw-cath');
+    // экономика скрыта — её здания не попадают в вывод
+    const atMine = out.indexOf('data-bw="mine"');
+    // mine — экономика, при активной «обороне» её не должно быть
+    expect(atMine).toBe(-1);
+    // fort — оборона, должен быть
+    expect(out).toContain('data-bw="fort"');
+  });
+
   it('построенное — галочкой без кнопки, доступное — кнопкой с приказом', () => {
     const out = html(s, pid);
     const built = s.planets[pid]!.buildings[0]!.type;
@@ -241,6 +265,21 @@ describe('окно построек — проводка', () => {
     api.open(home(s));
     root.fire({ classList: { contains: (c: string) => c === 'tw-close' }, closest: () => null });
     expect(api.isOpen()).toBe(false);
+  });
+
+  it('тап по вкладке переключает фильтр категорий', () => {
+    const { api, root, s, body } = wire();
+    api.open(home(s));
+    // по умолчанию «все» — шахта (экономика) видна
+    expect(body.html()).toContain('data-bw="mine"');
+    // тап по вкладке «оборона»
+    root.fire(tap('[data-bwtab]', { bwtab: 'defense' }));
+    expect(body.html()).toContain('data-bwtab="defense"');
+    // экономика скрыта на активной вкладке обороны
+    expect(body.html()).not.toContain('data-bw="mine"');
+    // тап по «все» возвращает экономику
+    root.fire(tap('[data-bwtab]', { bwtab: '*' }));
+    expect(body.html()).toContain('data-bw="mine"');
   });
 });
 
