@@ -1,12 +1,12 @@
 import { describe, it, expect } from 'vitest';
 import {
+  SIGHT_TIERS,
   frontierLook,
   frontierShown,
   ownRingLook,
   ownRingShown,
   unionArcs,
   type ScreenCircle,
-  type SightTier,
 } from './sightFrontier';
 
 const круг = (x: number, y: number, r: number): ScreenCircle => ({ x, y, r });
@@ -70,8 +70,12 @@ describe('граница видимости — два тира', () => {
     expect(опознание.lineWidth).toBeGreaterThan(засечка.lineWidth);
   });
 
-  it('оба тира видимы — прозрачный тир был бы работой впустую', () => {
-    for (const t of ['signature', 'reveal'] as SightTier[]) {
+  // ЭТОТ тест заменяет гейты «прозрачность > 0» и «толщина > 0» в самой отрисовке
+  // (REFM-120.1): невидимый тир — это работа впустую, и ловить её надо здесь, на сборке,
+  // а не молчаливым `if` в кадре. Перечень берётся из `SIGHT_TIERS`, поэтому третий тир
+  // попадёт под проверку сам — в отличие от гейта, который его молча пропустил бы.
+  it('КАЖДЫЙ тир видим по всем трём числам — иначе кадр работает впустую', () => {
+    for (const t of SIGHT_TIERS) {
       const l = frontierLook(t);
       expect(l.fillAlpha).toBeGreaterThan(0);
       expect(l.strokeAlpha).toBeGreaterThan(0);
@@ -79,9 +83,13 @@ describe('граница видимости — два тира', () => {
     }
   });
 
+  it('ПЕРЕЧЕНЬ ТИРОВ НЕ ПУСТ И БЕЗ ПОВТОРОВ: из него выведен тип, по нему идут проверки', () => {
+    expect(SIGHT_TIERS.length).toBeGreaterThan(0);
+    expect(new Set(SIGHT_TIERS).size).toBe(SIGHT_TIERS.length);
+  });
+
   it('вид тира стабилен', () => {
-    for (const t of ['signature', 'reveal'] as SightTier[])
-      expect(frontierLook(t)).toEqual(frontierLook(t));
+    for (const t of SIGHT_TIERS) expect(frontierLook(t)).toEqual(frontierLook(t));
   });
 
   it('заливка остаётся дымкой: даже внутренний тир не закрашивает карту', () => {
@@ -103,8 +111,7 @@ describe('граница видимости — собственные коль�
   });
 
   it('вид кольца стабилен', () => {
-    for (const t of ['signature', 'reveal'] as SightTier[])
-      expect(ownRingLook(t)).toEqual(ownRingLook(t));
+    for (const t of SIGHT_TIERS) expect(ownRingLook(t)).toEqual(ownRingLook(t));
   });
 
   it('СХЛОПНУВШЕЕСЯ КОЛЬЦО НЕ РИСУЕМ: дуга отрицательного радиуса бросает', () => {
