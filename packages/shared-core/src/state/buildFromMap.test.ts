@@ -171,14 +171,14 @@ describe('slot-based maps — team-aware start slots (corporation-wars.md §4)',
       slots: {
         slot_a: {
           playerId: 'p1',
-          scientists: [{ id: 'void_admiral', level: 3 }, { id: 'ground_marshal' }],
+          scientists: [{ id: 'void_admiral', level: 3 }, { id: 'polymath' }],
         },
         slot_b: { playerId: 'p2' },
       },
     });
     expect(state.players.p1!.scientists).toEqual([
       { id: 'void_admiral', level: 3 },
-      { id: 'ground_marshal', level: 1 }, // level defaults to 1
+      { id: 'polymath', level: 1 }, // level defaults to 1
     ]);
     // Distinct + capped at two — fail-secure at boot.
     expect(() =>
@@ -194,7 +194,7 @@ describe('slot-based maps — team-aware start slots (corporation-wars.md §4)',
         slots: {
           slot_a: {
             playerId: 'p1',
-            scientists: [{ id: 'void_admiral' }, { id: 'ground_marshal' }, { id: 'polymath' }],
+            scientists: [{ id: 'void_admiral' }, { id: 'polymath' }, { id: 'overseer' }],
           },
           slot_b: { playerId: 'p2' },
         },

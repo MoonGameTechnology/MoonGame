@@ -99,14 +99,13 @@
   },
   "planetary_bastions": {
     "name": "Planetary Bastions",
-    "description": "Full-cycle defense industry: +8% damage. Ground marshal capstone.",
+    "description": "Full-cycle defense industry: +8% damage.",
     "branch": "ground",
     "tier": 3,
     "cost": { "credits": 480, "metal": 360, "microelectronics": 40 },
     "researchTimeHours": 18,
     "dayGate": 12,
     "prerequisites": ["fortified_infrastructure"],
-    "conditions": [{ "type": "has_scientist", "branch": "ground" }],
     "effects": { "combatDamageBonus": 0.08 }
   },
   "flight_decks": {
@@ -132,14 +131,13 @@
   },
   "ace_programs": {
     "name": "Ace Programs",
-    "description": "Elite flight crews: +6% damage and fleet speed. Wing commander capstone.",
+    "description": "Elite flight crews: +6% damage and fleet speed.",
     "branch": "squadron",
     "tier": 3,
     "cost": { "credits": 500, "metal": 380, "microelectronics": 60 },
     "researchTimeHours": 20,
     "dayGate": 12,
     "prerequisites": ["strike_vectors"],
-    "conditions": [{ "type": "has_scientist", "branch": "squadron" }],
     "effects": { "combatDamageBonus": 0.06, "fleetSpeedBonus": 0.06 }
   },
   "guidance_arrays": {
@@ -165,14 +163,13 @@
   },
   "saturation_barrage": {
     "name": "Saturation Barrage",
-    "description": "Overwhelms any missile defense: +10% damage. Missile chief capstone.",
+    "description": "Overwhelms any missile defense: +10% damage.",
     "branch": "missile",
     "tier": 3,
     "cost": { "credits": 520, "metal": 400, "microelectronics": 80 },
     "researchTimeHours": 20,
     "dayGate": 12,
     "prerequisites": ["warhead_miniaturization"],
-    "conditions": [{ "type": "has_scientist", "branch": "missile" }],
     "effects": { "combatDamageBonus": 0.1 }
   },
   "signal_corps": {
@@ -197,13 +194,13 @@
   },
   "ai_stewardship": {
     "name": "Steward Protocol",
-    "description": "Command-automation doctrine: delegate your seat to a trusted AI while you are offline (asleep). It holds the line on a chosen posture and hands control back at a set time. Powerful — so it is gated behind choosing the command leader and only opens mid-session.",
+    "description": "Command-automation doctrine: delegate your seat to a trusted AI while you are offline (asleep). It holds the line on a chosen posture and hands control back at a set time. Powerful — so it only opens mid-session.",
     "branch": "command",
     "tier": 3,
     "cost": { "credits": 400, "metal": 260 },
     "researchTimeHours": 14,
     "dayGate": 15,
-    "conditions": [{ "type": "has_scientist", "branch": "command" }],
+    "prerequisites": ["logistics_command"],
     "unlocks": { "abilities": ["steward"] }
   }
 }
