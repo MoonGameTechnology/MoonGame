@@ -939,7 +939,9 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 .pstats span{background:rgba(53,214,230,.06);border:1px solid var(--line);padding:4px 9px;font-size:11px;color:var(--ink);}
 .effects{display:flex;gap:5px;flex-wrap:wrap;margin:2px 0 4px;}
 .effect-tag{background:rgba(53,214,230,.04);border:1px solid var(--line-hi);padding:3px 8px;font-size:10px;color:var(--cyan-dim);border-radius:3px;white-space:nowrap;}
-.ptabs{display:flex;gap:6px;margin:10px 0 4px;flex-wrap:wrap;}
+.ptabs{display:flex;gap:6px;margin:10px 0 4px;flex-wrap:wrap;
+  position:sticky;top:-13px;z-index:5;padding-top:13px;margin-top:-13px;
+  background:rgba(3,14,18,.92);backdrop-filter:blur(4px);}
 .ptab{cursor:pointer;background:rgba(53,214,230,.04);border:1px solid var(--line);color:var(--cyan-dim);
   padding:6px 10px;font:700 10px ui-monospace,monospace;letter-spacing:1px;text-transform:uppercase;border-radius:2px;}
 .ptab b{margin-left:7px;color:var(--ink);}
@@ -2638,7 +2640,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   #side .asset-row b{min-width:80px;font-size:11px;}
   #side .bicon{width:17px;height:17px;font-size:11px;}
   #side button.b{padding:3px 8px;font-size:10px;}
-  #side .ptabs{gap:5px;margin:7px 0 3px;}
+  #side .ptabs{gap:5px;margin:7px 0 3px;top:-8px;padding-top:8px;margin-top:-8px;}
   #side .ptab{padding:4px 8px;}
   #side .ptiles{gap:5px;margin:3px 0 6px;}
   #side .ptile{min-width:46px;min-height:40px;padding:4px 5px;}
