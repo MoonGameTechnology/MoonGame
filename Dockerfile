@@ -29,7 +29,7 @@
 # The dates live in these comments, not inline: a `#` after FROM's args would be parsed
 # as extra arguments (Dockerfile comments only count at line start) and break the build.
 # node:26-slim digest refreshed 2026-07.
-FROM node:26-slim@sha256:715e55e4b84e4bb0ff48e49b398a848f08e55daed8eb6a0ea1839ae53bc57583 AS build
+FROM node:26-slim@sha256:4ebb5ace66f15a24c14c492e01a8beeed4fddf970a856109f5126e703e5fe503 AS build
 WORKDIR /app
 # Node ≥25 no longer ships corepack in the distribution (the 22→26 bump, PR #106,
 # silently broke this line — caught by the SEC-1 blocking trivy-image gate), so install
