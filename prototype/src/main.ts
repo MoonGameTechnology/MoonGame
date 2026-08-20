@@ -623,6 +623,7 @@ import { errorTarget, refusalKey } from './errorRoute';
 import { clearStatusLine, fallbackFor, showServerRow } from './browserFallback';
 import { joinHref, startEnabled } from './seatJoin';
 import { archiveUrl, httpBase, matchesUrl, queryOutcome, seatsUrl } from './matchQuery';
+import { pollLine, pollTick, type PollPhase } from './matchPoll';
 import { pingRoute, relayIntake } from './relayIntake';
 import {
   WAIT_MARK,
@@ -10520,9 +10521,15 @@ function openSessionTab(id: string): void {
 async function refreshMatches(quiet = false): Promise<void> {
   const srv = resolveServer();
   if (!srv) return;
-  // quiet = a background re-poll (player build): don't flash «загрузка…» over a
-  // list that is already on screen — only a real state change repaints.
-  if (!quiet) statusEl.textContent = t('browser.loading');
+  // Что переопрос пишет в строку статуса — `matchPoll.ts` (REFM-153): тихий фоновый
+  // не мигает «загрузкой» над уже показанным списком, но о беде молчать не имеет
+  // права — эту строку читает `renderMatches` как признак «сервер не ответил».
+  const line = (phase: PollPhase): void => {
+    const upd = pollLine(phase, quiet);
+    if (upd.kind === 'clear') statusEl.textContent = '';
+    else if (upd.kind === 'text') statusEl.textContent = t(upd.key);
+  };
+  line('start');
   // Identity mode first (SES-2.5): accounts servers get the password row shown
   // BEFORE the player clicks «Войти» on a row — no surprise prompt mid-join.
   await probeAuthMode(srv.base);
@@ -10532,10 +10539,10 @@ async function refreshMatches(quiet = false): Promise<void> {
     matchLists = (await res.json()) as Record<MatchTab, MatchRow[]>;
     localStorage.setItem('void.server', srv.base);
     localStorage.setItem('void.nick', srv.nick);
-    statusEl.textContent = '';
+    line('loaded');
   } catch {
     matchLists = null;
-    statusEl.textContent = t('acc.server-down');
+    line('failed');
   }
   renderMatches();
 }
@@ -10671,8 +10678,11 @@ if (__PLAYER_BUILD__) {
   hide($('cgo').closest('.crow'));
   srvInput.addEventListener('change', () => void refreshMatches());
   setInterval(() => {
-    if (connectEl.style.display === 'none') return; // overlay closed (hub / in match)
-    if (browseEl.style.display === 'none') return; // welcome stage, not the browser
+    // Уместен ли переопрос прямо сейчас — `matchPoll.ts` (REFM-153): тикает только
+    // список НА ЭКРАНЕ. Поверх закрытого оверлея (матч / ставка) и на приветственном
+    // шаге фоновая неудача написала бы «сервер недоступен» в чужую строку статуса.
+    const shown = (n: HTMLElement): boolean => n.style.display !== 'none';
+    if (pollTick({ overlay: shown(connectEl), browser: shown(browseEl) }) === 'skip') return;
     void refreshMatches(true);
   }, 10_000);
 }
