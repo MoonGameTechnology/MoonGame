@@ -625,6 +625,7 @@ import { joinHref, startEnabled } from './seatJoin';
 import { archiveUrl, httpBase, matchesUrl, queryOutcome, seatsUrl } from './matchQuery';
 import { archiveEffect, type ArchiveEffect } from './archiveOutcome';
 import { mintedToken, passwordFrom, registerExtra } from './authRequest';
+import { carryEmail, recoverAnswer, recoverStep } from './recoverForm';
 import { authStatusUrl, identityMode, revealSignup } from './identityProbe';
 import { houseLine, seatView, type SeatView } from './seatList';
 import { pollLine, pollTick, type PollPhase } from './matchPoll';
@@ -9124,28 +9125,34 @@ $('crback').addEventListener('click', () => {
 // email is on file. «Восстановить доступ» on the registration page opens this stage.
 const crecMailInput = $('crecmail') as HTMLInputElement;
 async function submitRecover(): Promise<void> {
-  const email = crecMailInput.value.trim();
-  if (!email) {
-    statusEl.textContent = t('auth.need-mail');
+  // Правила формы — `recoverForm.ts` (REFM-158): пустое поле не запрос, а подсказка
+  // полю; ответ игроку ОДИН И ТОТ ЖЕ, что бы ни случилось (зеркало анти-перечисления
+  // на сервере: разный текст превратил бы форму в проверку «есть ли тут такая учётка»).
+  const step = recoverStep(crecMailInput.value);
+  if (step.kind === 'need-mail') {
+    statusEl.textContent = t(step.key);
     crecMailInput.focus();
     return;
   }
   const srv = resolveServer();
   if (!srv) return;
+  let outcome: 'answered' | 'unreachable' = 'answered';
   try {
     await fetch(`${httpBase(srv.base)}/auth/recover`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({ email: step.email }),
     });
   } catch {
-    /* swallow — never reveal a delivery/lookup outcome */
+    outcome = 'unreachable'; // и это НИЧЕГО не меняет — правило 1
   }
-  statusEl.textContent = t('auth.recover.sent');
+  statusEl.textContent = t(recoverAnswer(outcome));
 }
 $('crrecover').addEventListener('click', () => {
   showStage('recover');
-  crecMailInput.value = crMailInput.value.trim();
+  // Адрес переносим с экрана регистрации (`recoverForm.ts`, правило 3): он его уже
+  // вводил строкой выше, а печатать второй раз ровно сейчас — повод бросить.
+  crecMailInput.value = carryEmail(crMailInput.value);
   statusEl.textContent = '';
   crecMailInput.focus();
 });
