@@ -623,6 +623,7 @@ import { errorTarget, refusalKey } from './errorRoute';
 import { clearStatusLine, fallbackFor, showServerRow } from './browserFallback';
 import { joinHref, startEnabled } from './seatJoin';
 import { archiveUrl, httpBase, matchesUrl, queryOutcome, seatsUrl } from './matchQuery';
+import { authStatusUrl, identityMode, revealSignup } from './identityProbe';
 import { pollLine, pollTick, type PollPhase } from './matchPoll';
 import { pingRoute, relayIntake } from './relayIntake';
 import {
@@ -10162,24 +10163,14 @@ function sessionToken(base: string): string | null {
   return anyToken(localStorage, base);
 }
 
-/** Probe the server's identity mode and show/hide the password field. Network
- *  failure ⇒ assume nick mode (the old handshake) — the join itself will surface
- *  a real error if the server actually wants accounts. */
+/** Probe the server's identity mode and show/hide the password field. */
 async function probeAuthMode(base: string): Promise<void> {
-  const url = `${httpBase(base)}/auth/status`;
-  try {
-    const res = await fetch(url);
-    // A non-OK answer is a normal outcome (a plain static host, an old build, a
-    // 404 page): it means «no accounts here», NOT an error to report. Parsing it
-    // as JSON is what used to throw — a bare `res.json()` on an HTML 404 body
-    // raised an unhandled SyntaxError into the console on the most ordinary path
-    // («opened the game off a static server»), drowning out real errors.
-    authMode = res.ok && ((await res.json()) as { enabled?: unknown }).enabled === true;
-  } catch {
-    // Network failure or a non-JSON body ⇒ assume nick mode; the join itself will
-    // surface a real error if the server actually wants accounts.
-    authMode = false;
-  }
+  // Что означает ответ пробы — `identityProbe.ts` (REFM-154): ответ «не 2xx» это не
+  // беда, а «аккаунтов тут нет» (игру часто открывают с обычной раздачи файлов); тело
+  // разбирают только у 2xx (голый `res.json()` на HTML-404 бросал SyntaxError в
+  // консоль); не дошли до сервера — считаем режим позывных, вход и так выдаст
+  // настоящую ошибку. Режим аккаунтов включает ровно живое «да».
+  authMode = (await identityMode(() => fetch(authStatusUrl(base)))) === 'accounts';
   if (passRow) passRow.style.display = authMode ? '' : 'none';
 }
 
@@ -10194,8 +10185,12 @@ const authProbe: Promise<void> = (async () => {
   const base = srvInput.value.trim();
   if (!base) return;
   await probeAuthMode(base);
-  if (!authMode) return;
-  if ((localStorage.getItem('void.nick') ?? '').trim()) return; // welcome card was skipped
+  // Кому раскрывать форму — `identityProbe.ts` (REFM-154, правило 4): только новичку.
+  // Запомненный позывной значит, что карточку пропустили: форму никто не увидит, а
+  // `suggestCallsign()` затёр бы уже введённое имя.
+  if (!revealSignup(authMode ? 'accounts' : 'nicks', localStorage.getItem('void.nick') ?? '')) {
+    return;
+  }
   if (!wNickInput.value.trim()) wNickInput.value = suggestCallsign();
   wLoginEl.style.display = 'flex';
   wPassRowEl.style.display = 'flex';
