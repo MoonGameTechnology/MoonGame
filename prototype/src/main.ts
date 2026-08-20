@@ -623,6 +623,7 @@ import { errorTarget, refusalKey } from './errorRoute';
 import { clearStatusLine, fallbackFor, showServerRow } from './browserFallback';
 import { joinHref, startEnabled } from './seatJoin';
 import { archiveUrl, httpBase, matchesUrl, queryOutcome, seatsUrl } from './matchQuery';
+import { archiveEffect, type ArchiveEffect } from './archiveOutcome';
 import { mintedToken, passwordFrom, registerExtra } from './authRequest';
 import { authStatusUrl, identityMode, revealSignup } from './identityProbe';
 import { houseLine, seatView, type SeatView } from './seatList';
@@ -10566,17 +10567,21 @@ async function toggleArchive(id: string, restore: boolean): Promise<void> {
   const srv = resolveServer();
   if (!srv) return;
   // Адреса и разбор исхода — `matchQuery.ts` (REFM-150): всё уходящее в адрес
-  // экранируется, а «сервер ОТВЕТИЛ отказом» и «до сервера не дошли» — разные беды и
-  // разные сообщения: первую повторять бессмысленно, вторую как раз стоит.
+  // экранируется, а «сервер ОТВЕТИЛ отказом» и «до сервера не дошли» — разные беды.
+  // Что из этого следует для экрана — `archiveOutcome.ts` (REFM-157): удача это
+  // молчаливая перерисовка (строка меняет ВКЛАДКУ, и список — единственный честный
+  // ответ), отказ называет действие, которое не прошло, а обрыв связи действий не
+  // различает: беда в канале, а не в кнопке.
+  const op = restore ? 'restore' : 'archive';
+  const apply = async (effect: ArchiveEffect): Promise<void> => {
+    if (effect.kind === 'refresh') await refreshMatches();
+    else statusEl.textContent = t(effect.key);
+  };
   try {
     const res = await fetch(archiveUrl(srv.base, id, srv.nick, restore), { method: 'POST' });
-    if (queryOutcome(res) === 'refused') {
-      statusEl.textContent = restore ? t('browser.restore-failed') : t('browser.archive-failed');
-      return;
-    }
-    await refreshMatches();
+    await apply(archiveEffect(op, queryOutcome(res) === 'refused' ? 'refused' : 'ok'));
   } catch {
-    statusEl.textContent = t('browser.archive-error');
+    await apply(archiveEffect(op, 'unreachable'));
   }
 }
 
