@@ -624,6 +624,7 @@ import { clearStatusLine, fallbackFor, showServerRow } from './browserFallback';
 import { joinHref, startEnabled } from './seatJoin';
 import { archiveUrl, httpBase, matchesUrl, queryOutcome, seatsUrl } from './matchQuery';
 import { authStatusUrl, identityMode, revealSignup } from './identityProbe';
+import { houseLine, seatView, type SeatView } from './seatList';
 import { pollLine, pollTick, type PollPhase } from './matchPoll';
 import { pingRoute, relayIntake } from './relayIntake';
 import {
@@ -10412,12 +10413,24 @@ async function openSeatPicker(matchId: string): Promise<void> {
   seatpickSelected = null;
   seatpickFaction = null;
   if (seatpickGoEl) seatpickGoEl.disabled = !startEnabled(seatpickSelected);
-  if (seatpickListEl)
-    seatpickListEl.innerHTML = `<p style="color:var(--dim);text-align:center">${t('seatpick.loading')}</p>`;
+  // Что стоит вместо списка домов — `seatList.ts` (REFM-155): окно поднимается СРАЗУ с
+  // заглушкой «Загрузка…» (иначе тап по «Войти» выглядит проваленным), каждый заход
+  // начинается с неё, а не с домов прошлого матча, и беда отличается от ожидания ещё и
+  // цветом.
+  const показать = (view: SeatView): void => {
+    if (!seatpickListEl || view.kind !== 'placeholder') return;
+    const style = view.tone === 'dim' ? 'color:var(--dim);text-align:center' : 'color:var(--red)';
+    seatpickListEl.innerHTML = `<p style="${style}">${t(view.key)}</p>`;
+  };
+  показать(seatView('opening'));
   if (seatpickEl) seatpickEl.style.display = 'flex';
   try {
     const res = await fetch(seatsUrl(srv.base, matchId));
-    if (!res.ok) throw new Error('http ' + res.status);
+    // Отказ и обрыв это окно показывает одинаково — см. оговорку в шапке `seatList.ts`.
+    if (queryOutcome(res) !== 'ok') {
+      показать(seatView('refused'));
+      return;
+    }
     const data = (await res.json()) as {
       seats: Array<{
         playerId: string;
@@ -10450,16 +10463,19 @@ async function openSeatPicker(matchId: string): Promise<void> {
         // «seatpick.bonus.azure» at the exact moment of choosing a house.
         const bonusKey = houseBonusKey(house.faction);
         passive.textContent = bonusKey ? t(bonusKey) : '';
+        // Подписи строки — `seatList.ts` (REFM-155, правило 4): слово о занятости
+        // отвечает «пустят ли», счёт — «сколько там уже сидит».
+        const подписи = houseLine(house);
         const slots = document.createElement('div');
         slots.className = 'seat-faction';
         slots.style.fontSize = '10px';
-        slots.textContent = t('browser.slots') + ': ' + house.free + '/' + house.total;
+        slots.textContent = t('browser.slots') + ': ' + подписи.count;
         info.appendChild(name);
         info.appendChild(passive);
         if (slots.textContent) info.appendChild(slots);
         const status = document.createElement('div');
         status.className = 'seat-status' + (house.full ? '' : ' free');
-        status.textContent = house.full ? t('browser.taken') : t('browser.free');
+        status.textContent = t(подписи.statusKey);
         row.appendChild(dot);
         row.appendChild(info);
         row.appendChild(status);
@@ -10479,8 +10495,7 @@ async function openSeatPicker(matchId: string): Promise<void> {
       }
     }
   } catch {
-    if (seatpickListEl)
-      seatpickListEl.innerHTML = `<p style="color:var(--red)">${t('seatpick.load-failed')}</p>`;
+    показать(seatView('unreachable'));
   }
 }
 
