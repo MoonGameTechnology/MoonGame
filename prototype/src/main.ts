@@ -623,6 +623,7 @@ import { errorTarget, refusalKey } from './errorRoute';
 import { clearStatusLine, fallbackFor, showServerRow } from './browserFallback';
 import { joinHref, startEnabled } from './seatJoin';
 import { archiveUrl, httpBase, matchesUrl, queryOutcome, seatsUrl } from './matchQuery';
+import { mintedToken, passwordFrom, registerExtra } from './authRequest';
 import { authStatusUrl, identityMode, revealSignup } from './identityProbe';
 import { houseLine, seatView, type SeatView } from './seatList';
 import { pollLine, pollTick, type PollPhase } from './matchPoll';
@@ -10217,9 +10218,11 @@ async function ensureSession(
     statusEl.textContent = t('acc.nick.rule');
     return null;
   }
-  // The password may come from the welcome card (Bytro-style sign-up) or the match
-  // browser's field (custom-server joins) — whichever the player actually filled.
-  const password = passwordArg ?? (wPassInput.value || (passInput?.value ?? ''));
+  // Откуда берётся пароль — `authRequest.ts` (REFM-156, правила 1–2): полей ДВА
+  // (приветственная карточка и строка браузера матчей), и оба в разметке сразу —
+  // берём заполненное. Явно переданный пароль не перебивается полями даже пустой:
+  // он обязан дойти до проверки и получить внятную причину.
+  const password = passwordFrom(passwordArg, wPassInput.value, passInput?.value ?? '');
   if (!validPassword(password)) {
     statusEl.textContent = t('acc.pass.rule');
     return null;
@@ -10239,13 +10242,15 @@ async function ensureSession(
   try {
     const login1 = await call('/auth/login');
     // Registration carries the optional recovery email (login never needs it).
-    const reg = shouldRegister(login1)
-      ? await call('/auth/register', emailArg ? { email: emailArg } : {})
-      : undefined;
+    // Почта уходит только в регистрацию и только если её ввели (`authRequest.ts`,
+    // правило 3): `email: ''` записал бы на учётку пустой адрес.
+    const extra = registerExtra(emailArg);
+    const reg = shouldRegister(login1) ? await call('/auth/register', extra) : undefined;
     // Причину называет `authRules.ts` — там же правило «401 на входе + 409 на
     // регистрации = неверный пароль», которое иначе свелось бы к «отказу регистрации».
     const outcome = authOutcome(login1, reg);
-    const token = login1.token ?? reg?.token;
+    // Пропуск — у входа, регистрация вторая (`authRequest.ts`, правило 4).
+    const token = mintedToken(login1, reg);
     if (token) {
       saveSession(localStorage, base, { login, token });
       if (outcome === 'created') note('✔ ' + t('acc.created'));
