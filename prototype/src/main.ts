@@ -621,6 +621,7 @@ import { welcomePlan } from './netWelcome';
 import { orderPlan } from './orderRoute';
 import { errorTarget, refusalKey } from './errorRoute';
 import { clearStatusLine, fallbackFor, showServerRow } from './browserFallback';
+import { joinHref, startEnabled } from './seatJoin';
 import { archiveUrl, httpBase, matchesUrl, queryOutcome, seatsUrl } from './matchQuery';
 import { pingRoute, relayIntake } from './relayIntake';
 import {
@@ -10410,9 +10411,11 @@ async function openSeatPicker(matchId: string): Promise<void> {
   const srv = resolveServer();
   if (!srv) return;
   seatpickMatchId = matchId;
+  // Чистый выбор на каждый заход и запертая кнопка, пока дом не выбран — `seatJoin.ts`
+  // (REFM-152, правила 1–2): уцелевший выбор прошлого матча увёл бы игрока не туда.
   seatpickSelected = null;
   seatpickFaction = null;
-  if (seatpickGoEl) seatpickGoEl.disabled = true;
+  if (seatpickGoEl) seatpickGoEl.disabled = !startEnabled(seatpickSelected);
   if (seatpickListEl)
     seatpickListEl.innerHTML = `<p style="color:var(--dim);text-align:center">${t('seatpick.loading')}</p>`;
   if (seatpickEl) seatpickEl.style.display = 'flex';
@@ -10473,7 +10476,7 @@ async function openSeatPicker(matchId: string): Promise<void> {
             row.classList.add('selected');
             seatpickSelected = choice.slot;
             seatpickFaction = choice.faction; // BF-30: faction chosen independently of start
-            if (seatpickGoEl) seatpickGoEl.disabled = false;
+            if (seatpickGoEl) seatpickGoEl.disabled = !startEnabled(seatpickSelected);
           });
         }
         seatpickListEl.appendChild(row);
@@ -10502,8 +10505,9 @@ if (seatpickGoEl) {
     // Navigate to ?join=<id>&slot=<slotId>&faction=<faction> — the boot block picks
     // up ?join and connectToMatch fetches the join token with ?slot=&faction= to
     // reserve the chosen seat AND override its faction (BF-30: decoupled from start).
-    const factionParam = faction ? `&faction=${encodeURIComponent(faction)}` : '';
-    location.href = `${location.pathname}?join=${encodeURIComponent(id)}&slot=${encodeURIComponent(slot)}${factionParam}`;
+    // Склейку и экранирование держит `seatJoin.ts` (REFM-152): в адрес уходит выбор
+    // игрока, а фракции может не быть — тогда её нет и в ссылке.
+    location.href = joinHref(location.pathname, id, slot, faction);
   });
 }
 
