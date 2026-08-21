@@ -556,6 +556,7 @@ import { briefSince, marksAway, splitByAttention, worthShowing } from './awayBri
 import { HOLD_TIP_MS, cursorTipPos, holdTipPos, movedTooFar } from './tipPlacement';
 import { canConfirm, normalizeTake, shipCounts, splitTotals, stepTake } from './splitPlan';
 import { canAssaultFromOrbit, canMerge, canSplit, uniformMode } from './cmdAvailability';
+import { DEFAULT_FIRE_MODE, fireMenuHtml, fireModeLabel, fireModeTargets } from './fireMode';
 import { stayingFleets, stripState } from './chainStripState';
 import {
   IDLE,
@@ -7040,20 +7041,13 @@ function renderCmdBar() {
   // (E_NOT_A_LANE — у прыжка нет середины), в бою. Правило переиспользуемое: любую
   // командную кнопку можно вешать на ту же пробу её настоящего приказа.
   const anyStoppable = fleets.some((f) => canOrder(s, stopFleet(ME, f.id)) === null);
-  // Режим огня артиллерии (одна кнопка + меню): на кнопке — общий режим арт-флотов
-  // выделения, при разнобое — нейтральная подпись.
+  // Режим огня артиллерии — `fireMode.ts` (REFM-158): это СТОЯЧЕЕ ПРАВИЛО, а не
+  // выстрел, поэтому у каждого режима в меню стоит вторая строка-правило, а подпись
+  // кнопки несёт режим только при единогласии — иначе она соврала бы про часть группы.
   const artFleets = fleets.filter((f) => f.owner === ME && fleetHasArtillery(f));
-  const FIRE_MODES: Array<{ m: string; lbl: string; sub: string }> = [
-    { m: 'passive', lbl: t('cmd.fire.passive'), sub: t('cmd.fire.passive.hint') },
-    { m: 'return', lbl: t('cmd.fire.return'), sub: t('cmd.fire.return.hint') },
-    { m: 'standard', lbl: t('cmd.fire.standard'), sub: t('cmd.fire.standard.hint') },
-    { m: 'aggressive', lbl: t('cmd.fire.aggressive'), sub: t('cmd.fire.aggressive.hint') },
-  ];
   // Единогласие режима, доступность слияния/деления/штурма — `cmdAvailability.ts` (REFM-78).
-  const uniMode = uniformMode(artFleets.map((f) => f.barrageMode ?? 'standard'));
-  const fmLabel = uniMode
-    ? (FIRE_MODES.find((x) => x.m === uniMode)?.lbl ?? t('cmd.fire.title'))
-    : t('cmd.fire.title');
+  const uniMode = uniformMode(artFleets.map((f) => f.barrageMode ?? DEFAULT_FIRE_MODE));
+  const fmLabel = fireModeLabel(uniMode);
   const docked = fleets.filter((f) => f.location && !f.movement && !f.battleId);
   // PC: ШТУРМ is a targeting command (fly there + storm on arrival) — armable
   // whenever the selection has ships. Mobile keeps the in-orbit-only button.
@@ -7202,14 +7196,7 @@ function renderCmdBar() {
           : '')
       : '') +
     // 🔥 поповер над баром: четыре режима с подписью-правилом; ● — текущий.
-    (fireMenu && artFleets.length > 0
-      ? `<div class="cmdpop">` +
-        FIRE_MODES.map(
-          (x) =>
-            `<button data-cmd="fmset" data-mode="${x.m}"${uniMode === x.m ? ' class="on"' : ''}><b>${uniMode === x.m ? '● ' : ''}${x.lbl}</b><span>${x.sub}</span></button>`,
-        ).join('') +
-        `</div>`
-      : '') +
+    (fireMenu && artFleets.length > 0 ? fireMenuHtml(uniMode) : '') +
     // ✨ поповер: способности героя-флагмана — каст прямо с ряда (дальняя → цель на карте).
     (castMenu && castHero
       ? `<div class="cmdpop">` +
@@ -7800,14 +7787,24 @@ cmdbar.addEventListener('click', (ev) => {
     fireMenu = !fireMenu; // 🔥 — открыть/закрыть меню выбора режима огня
     aiming = false;
   } else if (cmd === 'fmset') {
-    // Выбор в 🔥-меню: единый режим всем выделенным флотам с артиллерией.
-    const mode = bEl.dataset.mode ?? 'standard';
-    for (const id of ids) {
-      const f = s.fleets[id];
-      if (f && f.owner === ME && fleetHasArtillery(f) && (f.barrageMode ?? 'standard') !== mode) {
-        playerOrder(barrageModeFleet(ME, id, mode));
-      }
-    }
+    // Выбор в 🔥-меню: единый режим всем выделенным флотам с артиллерией. Кому именно
+    // слать — `fireMode.ts` (REFM-158, правила 5–7): приказ уходит только тем, у кого
+    // режим ДРУГОЙ, иначе платим кругом через ядро за отсутствие изменений.
+    const mode = bEl.dataset.mode ?? DEFAULT_FIRE_MODE;
+    const targets = fireModeTargets(
+      ids.map((id) => {
+        const f = s.fleets[id];
+        return {
+          id,
+          owner: f?.owner ?? '',
+          artillery: !!f && fleetHasArtillery(f),
+          mode: f?.barrageMode,
+        };
+      }),
+      ME,
+      mode,
+    );
+    for (const id of targets) playerOrder(barrageModeFleet(ME, id, mode));
     fireMenu = false;
   } else if (cmd === 'boost') {
     // BOOST-1 форс-марш: toggle for the whole selection — ON unless everyone
