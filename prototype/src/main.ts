@@ -554,7 +554,8 @@ import { resolveIntro, parseSeenIntros, type IntroCard } from './intros';
 import { buildRecap, type RecapEvent } from './recap';
 import { briefSince, marksAway, splitByAttention, worthShowing } from './awayBrief';
 import { HOLD_TIP_MS, cursorTipPos, holdTipPos, movedTooFar } from './tipPlacement';
-import { canConfirm, normalizeTake, shipCounts, splitTotals, stepTake } from './splitPlan';
+import { normalizeTake, shipCounts, stepTake } from './splitPlan';
+import { splitDialogHtml, splitDialogLives, splitRows } from './splitDialog';
 import { canAssaultFromOrbit, canMerge, canSplit, uniformMode } from './cmdAvailability';
 import { DEFAULT_FIRE_MODE, fireMenuHtml, fireModeLabel, fireModeTargets } from './fireMode';
 import { stayingFleets, stripState } from './chainStripState';
@@ -7237,9 +7238,20 @@ function fleetShipCounts(f: Fleet): Record<string, number> {
  *  a new fleet; Confirm peels them off into the same sector. Closes itself if the
  *  fleet is deselected, vanishes, or starts moving. */
 function renderSplitDialog() {
-  if (splitState && splitState.fleetId !== selFleet) splitState = null; // selection moved on
-  const f = splitState ? s.fleets[splitState.fleetId] : undefined;
-  if (!splitState || !f || f.movement || f.battleId) {
+  // Жизнь окна и его разметка — `splitDialog.ts` (REFM-159): план привязан к ОДНОМУ
+  // флоту, а мир под окном идёт дальше — флот летит, гибнет, дерётся, выделение уходит.
+  const plan = splitState;
+  const f = plan ? s.fleets[plan.fleetId] : undefined;
+  const lives = splitDialogLives({
+    planFleetId: plan?.fleetId ?? null,
+    selectedFleetId: selFleet,
+    fleetExists: !!f,
+    moving: !!f?.movement,
+    inBattle: !!f?.battleId,
+  });
+  // `|| !plan || !f` — это не второе правило, а хвост для компилятора: их наличие уже
+  // гарантировано `lives`, но через вызов функции TS этого не видит.
+  if (!lives || !plan || !f) {
     splitState = null;
     if (splitdlg.style.display !== 'none') splitdlg.style.display = 'none';
     lastSplitHtml = '';
@@ -7247,35 +7259,11 @@ function renderSplitDialog() {
   }
   const counts = fleetShipCounts(f);
   // Состав живой: отбор пересчитывается под него на каждой перерисовке (`splitPlan.ts`).
-  splitState.take = normalizeTake(splitState.take, counts);
-  const { takeTotal, total } = splitTotals(counts, splitState.take);
-  let rows = '';
-  for (const unit of Object.keys(counts)) {
-    const have = counts[unit] ?? 0;
-    const tk = splitState.take[unit] ?? 0;
-    rows += `<div class="srow">
-      <span class="sname"><span class="bicon">${unitIconHtml(unit, data, youColor, 18)}</span>${esc(displayUnit(unit))}</span>
-      <b class="scur">${have - tk}</b>
-      <span class="sbtns">
-        <button data-sx="dec" data-unit="${esc(unit)}" data-n="1" ${tk <= 0 ? 'disabled' : ''}>−1</button>
-        <button data-sx="inc" data-unit="${esc(unit)}" data-n="1" ${tk >= have ? 'disabled' : ''}>+1</button>
-        <button data-sx="inc" data-unit="${esc(unit)}" data-n="10" ${tk >= have ? 'disabled' : ''}>+10</button>
-        <button data-sx="all" data-unit="${esc(unit)}" ${tk >= have ? 'disabled' : ''}>${t('split.all')}</button>
-      </span>
-      <b class="snew">→ ${tk}</b>
-    </div>`;
-  }
-  const valid = canConfirm(takeTotal, total);
-  const html = `<div class="sbox">
-    <div class="shead">${t('split.title')} <b>${esc(splitState.fleetId)}</b></div>
-    <div class="ssub">${t('split.note')}</div>
-    <div class="srows">${rows}</div>
-    <div class="sfoot">${t('split.preview', { a: `<b>${takeTotal}</b>`, b: `<b>${total - takeTotal}</b>` })}</div>
-    <div class="sactions">
-      <button data-sx="confirm" class="cbtn" ${valid ? '' : 'disabled'}>${t('split.confirm')}</button>
-      <button data-sx="cancel" class="cbtn ghost">${t('ping.cancel')}</button>
-    </div>
-  </div>`;
+  plan.take = normalizeTake(plan.take, counts);
+  const html = splitDialogHtml(
+    { fleetId: plan.fleetId, rows: splitRows(counts, plan.take) },
+    { icon: (u) => unitIconHtml(u, data, youColor, 18), name: displayUnit },
+  );
   if (html !== lastSplitHtml) {
     splitdlg.innerHTML = html;
     lastSplitHtml = html;
