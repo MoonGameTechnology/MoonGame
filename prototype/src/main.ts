@@ -4796,29 +4796,17 @@ function render(now: number) {
     const callout = calloutAlpha(detail, mineWorld);
     if (callout === 0) continue;
     const g = p.garrison.reduce((a, st) => a + st.count, 0);
-    const line = calloutLine({
-      identified: kn,
-      detail,
-      tier,
-      garrison: g,
-      buildings: p.buildings.length,
-    });
-    const ink = calloutInk(kn, !!p.owner);
+    const line = calloutLine({ detail, tier, garrison: g, buildings: p.buildings.length });
+    const ink = calloutInk(!!p.owner);
     cx.save();
     cx.globalAlpha = callout;
     cx.shadowColor = 'rgba(0,0,0,0.85)';
     cx.shadowBlur = fxBlur(3);
     if (isWorld) {
-      cx.fillStyle =
-        ink === 'owner' ? col : ink === 'neutral' ? '#9fc9c4' : 'rgba(120,140,150,0.55)';
+      cx.fillStyle = ink === 'owner' ? col : '#9fc9c4';
       cx.font = '700 12px ui-monospace,Menlo,monospace';
     } else {
-      cx.fillStyle =
-        ink === 'owner'
-          ? rgba(col, 0.72)
-          : ink === 'neutral'
-            ? 'rgba(150,190,196,0.5)'
-            : 'rgba(120,140,150,0.4)';
+      cx.fillStyle = ink === 'owner' ? rgba(col, 0.72) : 'rgba(150,190,196,0.5)';
       cx.font = '600 10px ui-monospace,Menlo,monospace';
     }
     cx.fillText(n.id, c.x + R + 12, c.y - 1);
@@ -4827,10 +4815,6 @@ function render(now: number) {
       cx.fillStyle = rgba('#96d2cd', isWorld ? 0.6 : 0.42);
       cx.font = isWorld ? '10px ui-monospace,Menlo,monospace' : '9px ui-monospace,Menlo,monospace';
       cx.fillText(`G:${g}  B:${icons || '—'}`, c.x + R + 12, c.y + (isWorld ? 12 : 11));
-    } else if (line.do === 'unknown') {
-      cx.fillStyle = 'rgba(110,130,140,0.5)';
-      cx.font = '10px ui-monospace,Menlo,monospace';
-      cx.fillText('· no telemetry', c.x + R + 12, c.y + 12);
     }
     cx.restore();
   }

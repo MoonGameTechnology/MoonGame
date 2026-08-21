@@ -8,7 +8,6 @@ import {
 } from './nodeCallout';
 
 const вид = (over: Partial<CalloutSight> = {}): CalloutSight => ({
-  identified: true,
   detail: 1,
   tier: 'world',
   garrison: 0,
@@ -27,26 +26,23 @@ describe('подпись узла — мир или транзит', () => {
   });
 });
 
+// Подпись достаётся ТОЛЬКО опознанному узлу: неопознанный перехвачен фог-маркером
+// выше по циклу отрисовки (REFM-117.1, см. шапку модуля), поэтому «туманных» чернил
+// здесь больше нет — вопрос «а если не опознан» решается не тут.
 describe('подпись узла — чем красить имя', () => {
-  it('ЦВЕТ ВЛАДЕЛЬЦА — ТОЛЬКО У ОПОЗНАННОГО: иначе туман перестал бы скрывать', () => {
-    expect(calloutInk(false, true)).toBe('fogged');
-    expect(calloutInk(true, true)).toBe('owner');
+  it('ЦВЕТ ВЛАДЕЛЬЦА — ЭТО РАЗВЕДДАННЫЕ: у опознанного узла имя носит его хозяина', () => {
+    expect(calloutInk(true)).toBe('owner');
   });
 
-  it('НИЧЕЙНЫЙ ОПОЗНАННЫЙ — СВОЙ ОТТЕНОК: «здесь никого» это тоже сведение', () => {
-    expect(calloutInk(true, false)).toBe('neutral');
-    expect(calloutInk(true, false)).not.toBe(calloutInk(false, false));
+  it('НИЧЕЙНЫЙ — СВОЙ ОТТЕНОК: «здесь никого» это тоже сведение, а не «не знаем»', () => {
+    expect(calloutInk(false)).toBe('neutral');
+    expect(calloutInk(false)).not.toBe(calloutInk(true));
   });
 
-  it('ИСЧЕРПЫВАЮЩЕ: три чернил на четыре сочетания, туман съедает владельца', () => {
-    const свод = [true, false].flatMap((id) =>
-      [true, false].map((own) => `${id}/${own}→${calloutInk(id, own)}`),
-    );
-    expect(свод).toEqual([
-      'true/true→owner',
-      'true/false→neutral',
-      'false/true→fogged',
-      'false/false→fogged',
+  it('ИСЧЕРПЫВАЮЩЕ: чернил ровно два, и оба про опознанный узел', () => {
+    expect([true, false].map((own) => `${own}→${calloutInk(own)}`)).toEqual([
+      'true→owner',
+      'false→neutral',
     ]);
   });
 });
@@ -54,7 +50,7 @@ describe('подпись узла — чем красить имя', () => {
 describe('подпись узла — вторая строка', () => {
   it('НА СХЕМАТИЧНОМ ВИДЕ ТЕЛЕМЕТРИИ НЕТ: там она нечитаема, а место занимает', () => {
     expect(calloutLine(вид({ detail: 0 }))).toEqual({ do: 'none' });
-    expect(calloutLine(вид({ detail: 0, identified: false }))).toEqual({ do: 'none' });
+    expect(calloutLine(вид({ detail: 0, tier: 'sector' }))).toEqual({ do: 'none' });
   });
 
   it('МИР ОТЧИТЫВАЕТСЯ ВСЕГДА — по нему принимают решения', () => {
@@ -70,32 +66,33 @@ describe('подпись узла — вторая строка', () => {
     expect(calloutLine(вид({ tier: 'sector', buildings: 1 }))).toEqual({ do: 'stats' });
   });
 
-  // Ветка недостижима в нынешнем порядке отрисовки (фог-маркер перехватывает узел
-  // выше по циклу) — правило перенесено дословно, тест держит его контракт.
-  it('НЕОПОЗНАННЫЙ ГОВОРИТ СЛОВАМИ: пустота читалась бы как «разведан и пуст»', () => {
-    expect(calloutLine(вид({ identified: false }))).toEqual({ do: 'unknown' });
-    expect(calloutLine(вид({ identified: false, tier: 'sector' }))).toEqual({ do: 'unknown' });
-  });
-
   it('ИСЧЕРПЫВАЮЩЕ по всем сочетаниям признаков', () => {
     const исходы: Record<string, number> = {};
-    for (const identified of [true, false])
-      for (const detail of [0, 0.5, 1])
-        for (const tier of ['world', 'sector'] as CalloutTier[])
-          for (const garrison of [0, 3])
-            for (const buildings of [0, 2]) {
-              const r = calloutLine({ identified, detail, tier, garrison, buildings });
-              const ждём =
-                detail <= 0
-                  ? 'none'
-                  : !identified
-                    ? 'unknown'
-                    : tier === 'world' || garrison > 0 || buildings > 0
-                      ? 'stats'
-                      : 'none';
-              expect(r.do).toBe(ждём);
-              исходы[r.do] = (исходы[r.do] ?? 0) + 1;
-            }
-    expect(исходы).toEqual({ none: 18, unknown: 16, stats: 14 });
+    for (const detail of [0, 0.5, 1])
+      for (const tier of ['world', 'sector'] as CalloutTier[])
+        for (const garrison of [0, 3])
+          for (const buildings of [0, 2]) {
+            const r = calloutLine({ detail, tier, garrison, buildings });
+            const ждём =
+              detail <= 0
+                ? 'none'
+                : tier === 'world' || garrison > 0 || buildings > 0
+                  ? 'stats'
+                  : 'none';
+            expect(r.do).toBe(ждём);
+            исходы[r.do] = (исходы[r.do] ?? 0) + 1;
+          }
+    // 24 сочетания: 8 схематичных (detail 0) + 2 пустых тихих сектора → none; прочее — stats.
+    expect(исходы).toEqual({ none: 10, stats: 14 });
+  });
+
+  it('ИСХОДОВ РОВНО ДВА: «нет телеметрии» здесь больше не живёт', () => {
+    const все = new Set<string>();
+    for (const detail of [0, 1])
+      for (const tier of ['world', 'sector'] as CalloutTier[])
+        for (const garrison of [0, 3])
+          for (const buildings of [0, 2])
+            все.add(calloutLine({ detail, tier, garrison, buildings }).do);
+    expect([...все].sort()).toEqual(['none', 'stats']);
   });
 });
