@@ -4784,12 +4784,14 @@ function render(now: number) {
 
     // callout: id + garrison/buildings, monospace. Worlds (planets — the capturable
     // prize) get a BRIGHT designation; every other sector is de-emphasised to a dim,
-    // smaller coordinate so the map reads "worlds first" (fogged → no telemetry).
+    // smaller coordinate so the map reads "worlds first".
     // LOD: callout text dissolves on the schematic view — except YOUR OWN worlds,
     // which stay labelled like city names on a globe (your anchor at any zoom).
     // Тир подписи, её чернила и судьба второй строки — `nodeCallout.ts` (REFM-117):
     // мир подписан ярче транзитного сектора, цвет владельца несёт РАЗВЕДДАННЫЕ, а
     // пустой тихий сектор молчит, чтобы не сорить «G:0 B:—» вдоль всего маршрута.
+    // Сюда доходит только ОПОЗНАННЫЙ узел — неопознанный забрал `drawFogMarker` выше
+    // по циклу (REFM-117.1), поэтому ветки «нет телеметрии» здесь больше нет.
     const tier = calloutTier(n.sector);
     const isWorld = tier === 'world';
     const mineWorld = isWorld && p.owner === ME;
