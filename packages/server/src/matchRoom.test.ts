@@ -1255,3 +1255,68 @@ describe('MatchRoom — режим матча консервируется пр�
     );
   });
 });
+
+describe('MatchRoom — серверные приказы (PVE-5.2)', () => {
+  /** Модуль, у которого есть действие, наблюдаемое снаружи: приказ переименовывает
+   *  игрока, поэтому «дошёл ли серверный приказ до редьюсера» видно по состоянию. */
+  function orderRoom(
+    serverOrders?: (state: GameState, seq: number) => Action[],
+  ): MatchRoom {
+    return new MatchRoom({
+      id: 'orders-room',
+      initialState: testState(),
+      kernel: createKernel([renameModule]),
+      data: testData(),
+      now: () => 10,
+      initiallyStarted: true,
+      ...(serverOrders ? { serverOrders } : {}),
+    });
+  }
+
+  /** Приказы подаются fire-and-forget (tick синхронный), поэтому тесту нужно отдать
+   *  цикл событий — иначе он проверит состояние до того, как приказ применится. */
+  const settle = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+
+  it('приказ, выданный источником, доезжает до редьюсера обычным путём действий', async () => {
+    const calls: number[] = [];
+    const r = orderRoom((_state, seq) => {
+      calls.push(seq);
+      // Один приказ на первый вызов: дальше источник молчит, как реальный
+      // оркестратор молчит про уже летящий флот.
+      return calls.length > 1 ? [] : [action('srv:p1:0', 'p1', 'Renamed')];
+    });
+    r.tick();
+    await settle();
+    expect(r.state.players.p1?.name).toBe('Renamed');
+  });
+
+  it('seq растёт на число выданных приказов — два тика не минтят один id', async () => {
+    const seen: number[] = [];
+    const r = orderRoom((_state, seq) => {
+      seen.push(seq);
+      return seen.length === 1
+        ? [action(`srv:p1:${seq}`, 'p1', 'A'), action(`srv:p1:${seq + 1}`, 'p1', 'B')]
+        : [];
+    });
+    r.tick();
+    await settle();
+    r.tick();
+    await settle();
+    // Повтори комната прежний seq — вторая волна приказов была бы съедена кэшем
+    // квитанций как ретрай, и NPC замер бы навсегда.
+    expect(seen).toEqual([0, 2]);
+  });
+
+  it('источник, который бросает, НЕ роняет комнату (тактика не несущая)', () => {
+    const r = orderRoom(() => {
+      throw new Error('bad tactic');
+    });
+    expect(() => r.tick()).not.toThrow();
+  });
+
+  it('без источника комната ведёт себя как раньше', () => {
+    const r = orderRoom();
+    expect(() => r.tick()).not.toThrow();
+    expect(r.state.players.p1?.name).toBe('One');
+  });
+});

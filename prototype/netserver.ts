@@ -18,6 +18,7 @@ import pgPkg from 'pg';
 import {
   MatchRoom,
   MatchRegistry,
+  pveOrders,
   MetricsAggregator,
   createMultiplayerServer,
   tlsFromEnv,
@@ -415,6 +416,10 @@ async function createHostedMatch(id: string): Promise<HostedMatch> {
     emitStateHash: true, // attach hashState(view) so the client overlay can flag desync
     observe, // M0: log every room event to JSONL + count for the on-exit summary
     initialReceipts, // rehydrated idempotency (deduped action stays deduped after restart)
+    // PVE-5.2: тактика Роя. Для PvP-сессии `pveOrders` возвращает пустой список
+    // (нет `state.pve`), поэтому провод безусловный — режим решают ДАННЫЕ, а не
+    // условие здесь. Без этой строки волны спавнились бы у логова и стояли.
+    serverOrders: (state, seq) => pveOrders(state, data, { session: id, seq }),
     // The kernel context config must match what the local sim (and the HUD) promise:
     // without it victory falls back to its 600 default while the HUD counts to 450.
     config: { timeScale: 1, victory: { scoreLimit: SCORE_LIMIT } },
