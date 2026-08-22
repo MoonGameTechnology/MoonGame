@@ -162,6 +162,7 @@ import {
   createBattleModel,
   type BattleSideView,
 } from '../../packages/client/src/index';
+import { pveState } from '../../packages/client/src/gameData';
 import {
   worldToScreen as camWorldToScreen,
   zoomAt as camZoomAt,
@@ -9504,9 +9505,11 @@ function renderSetupSlots(): void {
   setupFactionsEl.innerHTML = f2;
   // Team-battle toggle: sides fight as allies. Only meaningful with ≥2 rivals (a 2v2
   // needs three AI seats on); shown always so the player can arm it before adding them.
+  // PvE button: starts a match on the PvE map (2 players vs 1 strong AI).
   let h =
     `<div class="tmrow"><button class="tmtog${setupTeams ? ' on' : ''}" data-teamtog="1">` +
     `${setupTeams ? '⚔ ' + t('setup.teams.on') : t('setup.teams.off')}</button>` +
+    `<button class="tmtog pve-btn" data-pvestart="1">🤖 ${t('setup.pve')}</button>` +
     (setupTeams ? `<span class="tmhint">${t('setup.teams.note')}</span>` : '') +
     `</div>`;
   const fids = seatFactionIds();
@@ -9759,6 +9762,19 @@ function startMatch(setup: SetupConfig): void {
   }
 }
 
+/** Start a PvE match: load the PvE map (2 players vs 1 strong AI) via
+ *  buildStateFromMap, then install it like a regular match. The AI seat
+ *  is determined from the map's player slots. */
+function startPvEMatch(): void {
+  const st = pveState(data);
+  // AI seats = all players except p1 (the human host).
+  const aiSeats = new Set(Object.keys(st.players).filter((id) => id !== 'p1'));
+  installMatch(st, aiSeats);
+  applyTimeSpeed(setupSpeed);
+  openSetup('hub'); // close setup screen — returns to hub
+  note(t('setup.pve.started'));
+}
+
 setupMapEl.addEventListener('click', (ev) => {
   const direct = (ev.target as Element).closest('[data-cand]');
   let pick: string | null = direct?.getAttribute('data-cand') ?? null;
@@ -9802,6 +9818,10 @@ setupSlotsEl.addEventListener('click', (ev) => {
   if ((ev.target as Element).closest('[data-teamtog]')) {
     setupTeams = !setupTeams;
     renderSetup();
+    return;
+  }
+  if ((ev.target as Element).closest('[data-pvestart]')) {
+    startPvEMatch();
     return;
   }
   const ts = (ev.target as Element).closest('[data-teamseat]');
