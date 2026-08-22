@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 4612 зелёных** (58 skip, 358 файлов).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 4621 зелёных** (58 skip, 359 файлов).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -895,6 +895,12 @@ standingOrderDriver.ts` (`autoAssaultActions`/`patrolActions`/`standingOrderTick
   это правка JSON, а не кода.
 - В `DEV_MODULES` стоит перед `victoryModule` — тот читает `state.pve` и судит
   кооп-исход (см. ниже); `MODULE_MANIFEST_VERSION` поднят `'4'` → `'5'`.
+- **Тактика NPC живёт на СЕРВЕРЕ, не здесь** (ADR 05): `pveOrders(state, data,
+  {session, seq})` в `packages/server/src/pveOrchestrator.ts` — чистая функция,
+  возвращающая `Action[]` (ближайший человеческий мир, иначе ближайший нейтральный
+  захватываемый; занятые флоты пропускаются). Сортировка по id и сравнение
+  КВАДРАТОВ расстояний — приказы не зависят от порядка ключей в состоянии.
+  **Её пока никто не зовёт (PVE-5.2):** волны спавнятся и стоят на месте.
 
 ### victory (`victory`) — победа и счёт
 
