@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 4587 зелёных** (58 skip, 356 файлов).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 4597 зелёных** (58 skip, 357 файлов).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -143,7 +143,7 @@ packages/shared-core/src/
 packages/action-layer/src/
   kernel/        kernel.ts (createKernel/applyAction/advanceTo, шина/хуки/расписание), module.ts (контракт)
   state/         gameState.ts (типы GameState), orbit.ts (isBombarded, bombardedPlanets), visibility.ts (visibleState — туман войны + общая видимость союза), previewBattle.ts (ONB-6 — чистый прогноз боя + hullPool/damageFraction), threat.ts (ST-3.1 — fog-honest скан угроз узлу), groundCombat.ts (FND-4 движок — тип-матрица наземного боя, порт прототипа, ПОКА не подключён к живому combat.ts), squadron.ts (CA-1 чистая математика — sortie/rearm/strikeRange, порт прототипа, ПОКА не подключён к action/reducer)
-  action/        types.ts (Action, Context, MatchConfig.timeScale/victory, ApplyResult/AdvanceResult, Rejection, timeScaleOf)
+  action/        types.ts (Action, Context, MatchConfig.timeScale/victory/modeId, ApplyResult/AdvanceResult, Rejection, timeScaleOf), matchMode.ts (resolveMatchConfig — пресет режима → правила матча, E_UNKNOWN_MODE)
   data/          schemas.ts (zod-схемы + parseGameData, buildingLevel/buildingMaxLevel)
   rng/           rng.ts (sfc32)
   util/          clone.ts (deepClone/deepFreeze), treasury.ts (canAfford/payCost — shared by construction & technology), fitting.ts (генерик-гейт «слоты+предметы», SHIP-4) + loadout.ts (ship-обёртка над ним)
@@ -877,7 +877,16 @@ standingOrderDriver.ts` (`autoAssaultActions`/`patrolActions`/`standingOrderTick
 `defeated` + флот распускается), **счёт** (порог `scoreLimit`, **по умолчанию 600**
 — GDD §3.2) и **тайм-аут** (`endsAt`, **по умолчанию** кап сессии по скорости:
 ×1→100 / ×2→60 / ×4→30 игровых дней; победитель = лучший счёт, ничья = `winner:null`).
-Все пороги переопределяются через `MatchConfig.victory`. **Коалиции (SES-1, GDD §3.3):**
+Все пороги переопределяются через `MatchConfig.victory`. **Через режим матча (PVE-0.2):**
+`MatchConfig.modeId` называет запись в `data.modes`, и `resolveMatchConfig`
+(`action/matchMode.ts`) разворачивает её `victory`-пресет в правила ОДИН раз — в
+конструкторе `MatchRoom`, до того как комната существует. Слоями: базовые правила
+`victoryModule` ← пресет режима ← явный `MatchConfig.victory` матча (последний бьёт
+поле-в-поле). Консервация структурная, а не проверкой: `MatchRoom.config` приватное
+`readonly`, менять режим на лету нечем. Неизвестный `modeId` — `Rejection`
+`E_UNKNOWN_MODE`, комната не рождается (тихий откат на базовые правила = матч,
+который считает себя PvE-волнами и играет обычными — класс отказа MP-4); матч БЕЗ
+`modeId` проходит насквозь нетронутым. **Коалиции (SES-1, GDD §3.3):**
 score-гонка идёт по «юнитам победы» — соло-игрок или alliance-компонента активных
 (коалиция — только люди), порог коалиции = `scoreLimit × N × coalitionFactor` (деф. 0.7,
 сублинейный) и **замещает** соло-порог участникам; коалиция побеждает вместе —

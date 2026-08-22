@@ -46,6 +46,11 @@ export interface MatchConfig {
   timeScale: number;
   /** Optional terminal-state rules (domination / score / timeout). */
   victory?: VictoryConfig;
+  /** Game mode this match runs (→ `data.modes`). Pinned at creation and never
+   *  swapped afterwards — `resolveMatchConfig` (`action/matchMode.ts`) folds the
+   *  mode's preset into `victory` once, before the room exists. Absent ⇒ no mode,
+   *  the base rules (every match created before PVE-0.2). */
+  modeId?: string;
 }
 
 /**

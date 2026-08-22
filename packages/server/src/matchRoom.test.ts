@@ -9,6 +9,7 @@ import {
   type Action,
   type GameData,
   type GameModule,
+  type MatchConfig,
   type GameState,
   type Player,
 } from '@void/shared-core';
@@ -1177,5 +1178,80 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
     expect(lastEvents(p1)).toContain('hero.spawned');
     expect(lastEvents(p2)).not.toContain('hero.spawned'); // the leak BF-16 plugged
     expect(lastEvents(p3)).not.toContain('hero.spawned');
+  });
+});
+
+/** Пишет в имя игрока то, что редьюсер РЕАЛЬНО видит в `ctx.config` — правила комнаты
+ *  наружу не выставлены (`config` приватный), а смотреть надо именно на них: между
+ *  конструктором и `context()` резолв режима мог бы и потеряться. */
+const rulesProbeModule: GameModule = {
+  id: 'rules-probe',
+  version: '1.0.0',
+  setup(api) {
+    api.onAction('test.rules', (act, h) => {
+      const p = h.state.players[act.playerId];
+      if (!p) return h.reject('E_FORBIDDEN');
+      p.name = String(h.ctx.config?.victory?.scoreLimit ?? 'none');
+    });
+  },
+};
+
+describe('MatchRoom — режим матча консервируется при рождении (PVE-0.2)', () => {
+  /** `testData()` не несёт режимов вовсе, поэтому режим приходится посадить — и это
+   *  ровно то, что проверяется: комната читает `data.modes`, а не зашитый список. */
+  function dataWithMode(): GameData {
+    return {
+      ...testData(),
+      modes: {
+        brisk: { name: 'Brisk', victory: { scoreLimit: 120 }, teamFormat: 'ffa', modules: [] },
+      },
+    };
+  }
+
+  function modeRoom(config: MatchConfig): MatchRoom {
+    return new MatchRoom({
+      id: 'mode-room',
+      initialState: testState(),
+      kernel: createKernel([rulesProbeModule]),
+      data: dataWithMode(),
+      now: () => 10,
+      config,
+    });
+  }
+
+  /** Правила глазами редьюсера: `scoreLimit` или 'none', если его не задал никто. */
+  async function seenScoreLimit(config: MatchConfig): Promise<string | undefined> {
+    const r = modeRoom(config);
+    await r.submitServerAction('p1', {
+      id: 'r1',
+      type: 'test.rules',
+      playerId: 'p1',
+      issuedAt: 1,
+      payload: {},
+    });
+    return r.state.players.p1?.name;
+  }
+
+  it('пресет режима доезжает до правил, по которым комната судит матч', async () => {
+    expect(await seenScoreLimit({ timeScale: 1, modeId: 'brisk' })).toBe('120');
+  });
+
+  it('явное правило матча бьёт пресет', async () => {
+    expect(await seenScoreLimit({ timeScale: 1, modeId: 'brisk', victory: { scoreLimit: 777 } })).toBe(
+      '777',
+    );
+  });
+
+  it('матч без режима поднимается как раньше (обратная совместимость)', async () => {
+    expect(await seenScoreLimit({ timeScale: 1 })).toBe('none');
+  });
+
+  it('неизвестный режим — комната НЕ рождается (fail-secure, E_UNKNOWN_MODE)', () => {
+    // Ставка кирпича: обойти резолв нечем. Комнату поднимают из трёх мест
+    // (`createDevMatch`, прото-хост, тесты), и все три идут через конструктор —
+    // поэтому отказ живёт там, а не в одной из фабрик, которую легко обойти.
+    expect(() => modeRoom({ timeScale: 1, modeId: 'no_such_mode' })).toThrowError(
+      expect.objectContaining({ code: 'E_UNKNOWN_MODE' }),
+    );
   });
 });
