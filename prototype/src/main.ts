@@ -631,6 +631,7 @@ import { mintedToken, passwordFrom, registerExtra } from './authRequest';
 import { carryEmail, recoverAnswer, recoverStep } from './recoverForm';
 import { selectFleets, toggleInSelection } from './fleetSelection';
 import { mergePlan } from './mergeOrders';
+import { pickEffect } from './pickApply';
 import { fleetsUnderTap } from './tapTargets';
 import { resolveAddress } from './serverAddress';
 import { authStatusUrl, identityMode, revealSignup } from './identityProbe';
@@ -8060,16 +8061,21 @@ function selectAt(mx: number, my: number) {
     my,
     rFleet,
   );
+  // Что следует из выбора — `pickApply.ts` (REFM-166): пустой тап это «отменить», и он
+  // гасит НЕ только выделение, но и незавершённые намерения (слияние, деление, десант) —
+  // иначе они применились бы к следующему выбранному флоту, молча. Выбор мира гасит
+  // флоты, но намерения оставляет: записано как есть, вопрос владельцу в карточке.
   const applyPick = (pick: TapPick | null): void => {
-    if (!pick) {
+    const effect = pickEffect(pick);
+    if (effect.kind === 'clear-all') {
       clearSelection();
       return;
     }
-    if (pick.kind === 'fleet') {
-      setFleetSelection([pick.id]); // (clears any selected planet)
+    if (effect.kind === 'fleet') {
+      setFleetSelection([effect.id]); // (clears any selected planet)
       return;
     }
-    selPlanet = pick.id;
+    selPlanet = effect.id;
     selFleet = null;
     selFleets = new Set();
     lastPanelHtml = '';
