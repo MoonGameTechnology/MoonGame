@@ -561,6 +561,7 @@ export const ru: Record<string, string> = {
   'data.spaceport': 'Космопорт',
   'data.special-forces': 'спецназ',
   'data.squadron': 'эскадрилья',
+  'data.standard': 'Стандартный',
   'data.steward-protocol': 'Протокол «Хранитель»',
   'data.strike-carrier': 'ударный носитель',
   'data.strike-vectors': 'Ударные векторы',

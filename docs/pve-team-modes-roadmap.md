@@ -29,13 +29,17 @@
 - **`schedule(at, type, payload)`** (`kernel/module.ts`) — планирование
   детерминированных будущих событий (реплеируемо).
 - **`events.json`** — тёмные события (аналог PvE-воздействий по шаблону).
-- **`DEV_FACTIONS = ['vanguard','swarm']`** (`scenario.ts:205`) — swarm
-  упоминается, но в `data/factions.json` его нет (4 лор-дома: azure/crimson/
-  amber/violet).
+- **`swarm` УЖЕ в `data/factions.json`** — шесть фракций: четыре лор-дома
+  (azure/crimson/amber/violet) плюс `vanguard` и `swarm` (`The Swarm`, трейт
+  `consume_biomass`, `productionBonus` 0.15, полный `startingLoadout`,
+  `uniqueUnits` пуст). Первая редакция этого документа утверждала обратное —
+  проверено 2026-08-22 чтением файла, Фаза 2 от этого схлопывается (см. ниже).
+- **`modes` в `GameData`** (`data/modes.json`, `GameModeDefSchema`) — каталог
+  режимов-пресетов загружается и валидируется вместе с остальным контентом.
 
-**Чего нет:** `GameModeDef`/`modeId` (GM-0.1 ⏳), 1v1/3v3/4v4 в
-`NetworkMatchMode`, NPC-фракции «Рой» в данных, `pveModule`, механики волн,
-кооп-условия победы, AI-оркестратора PvE.
+**Чего нет:** `modeId` в `MatchConfig` и консервации режима (PVE-0.2), 1v1/3v3/4v4 в
+`NetworkMatchMode`, `pveModule`, механики волн, кооп-условия победы,
+AI-оркестратора PvE.
 
 ## Принципы (из `CLAUDE.md` + ADR)
 
@@ -60,19 +64,35 @@
 > Фундамент, без которого PvE и командные форматы = частные случаи. См.
 > `docs/game-modes-roadmap.md` GM-0.1.
 
-### PVE-0.1 · `GameModeDef` zod-схема + `modes` в `GameData` `[core]` ⏳ — M
-**Цель:** режим — именованный пресет: `victory`-конфиг + список активных
-mode-модулей + требования к карте + опц. `teamFormat` + опц. `pve`-секция.
-**Подзадачи:**
-- `GameModeDefSchema` в `packages/shared-core/src/data/schemas.ts`: `id`,
-  `name` (i18n-ключ), `victory` (пресет `VictoryConfig`), `requiredMap?`
-  (теги), `modules?` (id mode-модулей), `teamFormat?` (`'1v1'|'2v2'|'3v3'|
-  '4v4'|'5v5'|'ffa'`), `pve?` (`{ waves, npcFaction, waveIntervalHours }`).
-- `modes` в `GameDataSchema` (`z.record(z.string(), GameModeDefSchema).
-  default({})`).
-- `parseGameData` валидирует; матч-манифест несёт `modeId`.
-**Готово, когда:** `GameModeDef` валидируется, `data/modes/*.json` загружаются,
-`modeId` доезжает до манифеста. Тест в `schemas.test.ts`.
+### PVE-0.1 · `GameModeDef` zod-схема + `modes` в `GameData` `[core]` `[data]` ✅ — M
+**Сделано:** `GameModeDefSchema` в `packages/shared-core/src/data/schemas.ts` —
+`name` (английское ИМЯ данных, локализуется `tData()` → `data.<слаг>`, как весь
+остальной каталог; отдельного `mode.*`-ключа нет), `description?`, `victory`
+(`ModeVictorySchema`), `teamFormat` (`TeamFormatSchema`, дефолт `'ffa'`),
+`modules: string[]` (id опциональных mode-модулей), `pve?` (`ModePveSchema`).
+`modes: z.record(z.string(), GameModeDefSchema).default({})` в `GameDataSchema`,
+фрагмент `data/modes.json` в `composeGameDataBundle` + в браузерном `FRAGMENTS`
+(`packages/client/src/gameData.ts`), версия бандла `0.1.5` → `0.1.6`.
+
+**Три решения, разошедшиеся с первой редакцией плана — и почему:**
+- **`id` поля нет:** id режима — КЛЮЧ записи, как у любого каталога здесь.
+- **`requiredMap` не заведён.** Тегов карт нет, а значит и проверки нет: поле,
+  которое объявляет требование и ничего не исполняет, — это отказ с виду
+  настроенного режима (нарушение fail-secure), а не задел. Завести вместе с
+  инфраструктурой тегов карт (см. «Открытые вопросы»).
+- **`victory` — это `VictoryConfig` МИНУС `endsAt`, и схема `.strict()`.**
+  `endsAt` — абсолютная метка времени матча, контентом она быть не может. Без
+  `.strict()` zod молча срезал бы её, оставив режим, который читается как
+  настроенный и таковым не является; теперь это громкий отказ валидации.
+
+**Заодно закрыт PVE-0.3** (пресет `standard`) — не по желанию, а вынужденно:
+`packages/client/src/gameData.test.ts` («composes catalogues that are actually
+populated») роняет гейт на ЛЮБОМ пустом record-каталоге бандла, поэтому фрагмент
+`modes.json` физически не мог приехать пустым. См. PVE-0.3 ниже.
+
+**Тесты:** 7 в `schemas.test.ts` (шипнутый каталог, дефолты, PvE-секция во всех
+шести форматах, referential integrity по `pve.npcFaction`, отказ на неизвестном
+`teamFormat`/кривой `pve`, отказ на `endsAt` и `scoreLimit: 0`).
 
 ### PVE-0.2 · `modeId` в `MatchConfig` + консервация `[core]` ⏳ — S
 **Цель:** матч стартует с `modeId`, конфиг победы берётся из пресета, смена
@@ -85,12 +105,18 @@ mode-модулей + требования к карте + опц. `teamFormat` 
 **Готово, когда:** матч стартует с `modeId`, конфиг победы из пресета, смена
 отклоняется. Тест.
 
-### PVE-0.3 · Пресет `standard` `[data]` ⏳ — S
-**Цель:** оформить уже работающее в явный режим-пресет (GM-1.1).
-**Подзадачи:** `data/modes/standard.json` = текущие дефолты (`scoreLimit` 600,
-`dominationPercent` 0.6, timeout по скорости). Ничего в ядре не меняем.
-**Готово, когда:** режим `standard` = сегодняшнее поведение, покрыт
-тестом-эквивалентом.
+### PVE-0.3 · Пресет `standard` `[data]` ✅ — S
+**Сделано (вместе с PVE-0.1 — иначе гейт красный, см. выше):** запись `standard`
+в `data/modes.json` — `teamFormat: 'ffa'`, `victory` = сегодняшние базовые правила
+(`dominationPercent` 0.6, `scoreLimit` 600, `coalitionFactor` 0.7; timeout остаётся
+за скоростью сессии, потому что `endsAt` в контенте не живёт). Ключ локали
+`data.standard` заведён в `ru.ts` + `en.ts`.
+
+Один факт теперь лежит в двух местах — в данных и константами в `victory.ts`, — и
+удержать их вместе может только пин: `DEFAULT_DOMINATION_PERCENT`/
+`DEFAULT_SCORE_LIMIT`/`DEFAULT_COALITION_FACTOR` **экспортированы**, тест сверяет
+пресет с ними, а не со списанными литералами. Больше в `victoryModule` ничего не
+менялось. Пресет пока НИКУДА не подключён — это PVE-0.2.
 
 ---
 
@@ -124,40 +150,40 @@ mode-модулей + требования к карте + опц. `teamFormat` 
 
 ### PVE-1.3 · Локализация режимов `[data]` ⏳ — S
 **Цель:** ключи имён режимов в обеих локалях.
-**Подзадачи:** `mode.standard`, `mode.duel`, `mode.team-2v2`, `mode.team-3v3`,
-`mode.team-4v4`, `mode.team-5v5`, `mode.pve-waves` в `/localization/ru.ts` +
-`en.ts`.
+**Ключи НЕ `mode.*`** (правка PVE-0.1): режим — обычный игровой каталог, поэтому
+имя в JSON английское, а ключ строит `tData()` слагом от ИМЕНИ — `data.duel`,
+`data.team-2v2`, … Своего механизма заводить нельзя: гейт (`i18n.test.ts`, тест
+«у каждого имени шипнутого контента есть ключ `data.*`») обходит ВСЕ
+record-каталоги бандла и потребует именно `data.<слаг>`.
+**Подзадачи:** `data.duel`, `data.team-2v2`, `data.team-3v3`, `data.team-4v4`,
+`data.team-5v5`, `data.pve-waves` (`data.standard` уже заведён в PVE-0.3) в
+`/localization/ru.ts` + `en.ts` — в ТОМ ЖЕ PR, что и пресеты PVE-1.2, иначе гейт
+красный на первом же новом имени.
 **Готово, когда:** гейт `prototype/src/i18n.test.ts` зелёный (ключи в обеих
 локалях).
 
 ---
 
-## Фаза 2 · NPC-фракция «Рой» `[data]`
+## Фаза 2 · NPC-фракция «Рой» `[data]` — фазы фактически нет
 
-> GDD черновик: Рой — общий враг для PvE. Переиспользует базовые юниты (без
-> `uniqueUnits` в первой итерации).
+> Вся фаза держалась на утверждении «`swarm` в данных нет». Утверждение было
+> ложным (проверено 2026-08-22): фракция, её локализация и версия бандла уже на
+> месте. Ничего писать не нужно — остаётся только не написать это второй раз.
 
-### PVE-2.1 · `swarm` в `data/factions.json` `[data]` ⏳ — S
-**Цель:** NPC-фракция с лором и агрессивным лоадаутом.
-**Подзадачи:**
-- `swarm`: `name: 'Swarm'`, `description` (тёмный космос/чужие),
-  `traits: ['swarm']`, `uniqueUnits: []`, `startingLoadout` (больше флотов,
-  меньше экономики), `passives: { combatDamageBonus: 0.15, productionBonus:
-  0.05 }`.
-**Готово, когда:** `factions.json` валидируется `FactionDefSchema`, `swarm`
-присутствует, `uniqueUnits` пуст (ссылок на несуществующих юнитов нет). Тест.
+### PVE-2.1 · `swarm` в `data/factions.json` `[data]` ✅ — уже в контенте
+`swarm` = `The Swarm`, `traits: ['consume_biomass']`, `passives:
+{ productionBonus: 0.15 }`, полный `startingLoadout`, `uniqueUnits: []` (ссылок
+на несуществующих юнитов нет — держит `factions.test.ts`). Балансировать лоадаут
+под волны — это тюнинг контента (Фаза 3+), а не заведение фракции.
 
-### PVE-2.2 · Локализация Роя `[data]` ⏳ — S
-**Цель:** имя и описание Роя в обеих локалях.
-**Подзадачи:** `data.swarm` (имя) + `data.swarm.desc` (описание) в
-`/localization/ru.ts` + `en.ts`. Имя данных остаётся английским (`Swarm`) —
-`tData()` строит слаг `data.swarm`.
-**Готово, когда:** гейт `i18n.test.ts` зелёный.
+### PVE-2.2 · Локализация Роя `[data]` ✅ — уже в обеих локалях
+`data.the-swarm` → «Рой» / “The Swarm”. Ключ строится слагом от ИМЕНИ (`The
+Swarm`), а не от id, поэтому он `data.the-swarm`, а не `data.swarm`. Описания у
+фракции нет вовсе, так что и ключа `*.desc` не нужно.
 
-### PVE-2.3 · Bump `data/manifest.json` `[data]` ⏳ — S
-**Цель:** версия контент-бандла обновлена (контент изменился).
-**Подзадачи:** bump `version` в `data/manifest.json` (с `0.1.4`).
-**Готово, когда:** `manifest.json` version bumped, `pnpm run check` зелёный.
+### PVE-2.3 · Bump `data/manifest.json` `[data]` ✅ — сделано в PVE-0.1
+`0.1.5` → `0.1.6` (контент изменился — появился `modes.json`). Исходное «с
+`0.1.4`» было устаревшим: до этого кирпича бандл уже стоял на `0.1.5`.
 
 ---
 
@@ -303,21 +329,17 @@ wave-spawn-via-schedule.md` — статус `accepted`, сверить текс
 ## Зависимости и последовательность
 
 ```
-PVE-0.1 GameModeDef схема          ← каркас, разблокирует всё
-PVE-0.2 modeId в MatchConfig       ← консервация
-PVE-0.3 пресет standard            ← оформляет существующее
+PVE-0.1 GameModeDef схема          ✅ каркас — разблокировал всё
+PVE-0.3 пресет standard            ✅ (пришлось в том же PR — гейт пустых каталогов)
+PVE-2.* NPC-фракция Рой            ✅ фракция и локаль были в контенте с самого начала
+PVE-0.2 modeId в MatchConfig       ← СЛЕДУЮЩИЙ: консервация режима в матче
    │
    ├─ PVE-1.* Командные форматы    ← teamFormat, networkSeats, пресеты
    │     PVE-1.1 TeamFormat тип
    │     PVE-1.2 пресеты 1v1..5v5
-   │     PVE-1.3 локализация
+   │     PVE-1.3 локализация (в одном PR с 1.2)
    │
-   ├─ PVE-2.* NPC-фракция Рой      ← параллельно с Фазой 1
-   │     PVE-2.1 swarm в factions.json
-   │     PVE-2.2 локализация Роя
-   │     PVE-2.3 bump manifest
-   │
-   ├─ PVE-3.* pveModule            ← 🔒 PVE-0.1, PVE-2.1
+   ├─ PVE-3.* pveModule            ← 🔒 PVE-0.2
    │     PVE-3.1 state.pve
    │     PVE-3.2 спавн волн
    │     PVE-3.3 регистрация + bump манифеста
@@ -339,9 +361,9 @@ PVE-0.3 пресет standard            ← оформляет существу
          PVE-6.4 ADR 05/06 → accepted
 ```
 
-**Порядок сборки:** PVE-0.1/0.2/0.3 (каркас) → PVE-1.* + PVE-2.* (параллельно:
-форматы + Рой) → PVE-3.* (pveModule) → PVE-4.* (победа) → PVE-5.* (AI, опц.) →
-PVE-6.* (доки).
+**Порядок сборки (остаток):** PVE-0.2 (консервация `modeId`) → PVE-1.*
+(командные форматы) → PVE-3.* (`pveModule`) → PVE-4.* (победа) → PVE-5.*
+(AI, опц.) → PVE-6.* (доки).
 
 ## Что НЕ трогаем (surgical changes — `CLAUDE.md:241`)
 
@@ -350,7 +372,9 @@ PVE-6.* (доки).
 - **`buildFromMap.ts` / `seedTeamDiplomacy`** — team-aware slots уже работают.
   Не переписываем.
 - **`victoryModule` существующие исходы** — score/domination/elimination/
-  timeout не переписываем; только добавляем PvE-чек в начало.
+  timeout не переписываем; только добавляем PvE-чек в начало. _Единственная
+  правка на сегодня (PVE-0.3): три константы базовых правил получили `export`,
+  чтобы тест пинил к ним пресет `standard`. Логика не тронута._
 - **`NetworkMatchMode` существующие значения** — `'ffa'|'2v2'|'5v5'` не меняем;
   только расширяем enum.
 - **`mapSchema.ts` / `avaShape`** — уже team-aware; не трогаем.
@@ -376,8 +400,9 @@ PVE-6.* (доки).
   конфликтующими исходами.
 □ AI-тактика — Фаза 5 опциональна; без неё волны спавнятся, но не атакуют.
   Рекомендация: скелет в этой итерации, тактику — следующей.
-□ requiredMap — завести поле в GameModeDef, валидацию — когда карта-инфра
-  созреет (теги карт).
+□ requiredMap — поле НЕ заведено (PVE-0.1): пока нет тегов карт, объявленное и
+  никем не проверяемое требование хуже отсутствующего. Заводить поле и валидацию
+  ОДНИМ кирпичом, когда теги карт появятся.
 □ Баланс волн (N, intervalHours, сила спавна) — данные, тюнятся плейтестами,
   не код.
 □ Награды по режиму: одинаковая ли мета-отдача за PvE и PvP (иначе фарм
