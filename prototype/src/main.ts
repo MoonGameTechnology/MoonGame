@@ -597,6 +597,13 @@ import {
 import { routeShown, routeStops, routeStroke } from './fleetRoute';
 import { netContacts, soloContacts } from './radarContacts';
 import { buildLogLine, type BuildLogKind } from './buildLog';
+import {
+  decisionsField,
+  diffFields,
+  stewardMine,
+  stewardReport,
+  type StewardEvent,
+} from './stewardLog';
 import { diploDelivery } from './diploDelivery';
 import { garrisonSide, planFor, troopsGate } from './troopsScene';
 import {
@@ -2968,6 +2975,25 @@ function resolvePendingMerges() {
     return true;
   });
 }
+/** Рассказать игроку о событии вахты — правила в `stewardLog.ts` (REFM-176). */
+function tellSteward(kind: StewardEvent, p: Record<string, unknown>): void {
+  const r = stewardReport(kind, (p as { posture?: string }).posture);
+  const base = stewSnapshot;
+  stewSnapshot = r.snapshot === 'take' ? stewMetrics(s, ME) : null;
+  if (kind === 'expired') {
+    const d = diffFields(base, stewMetrics(s, ME), TECH_CUR);
+    const dec = decisionsField(s.players[ME]?.stewardLog?.length ?? 0);
+    note(
+      t(r.key) +
+        (d ? ' ' + t('log.steward.diff', d) : '') +
+        (dec ? ' ' + t('log.steward.decisions', dec) : ''),
+    );
+  } else {
+    note(t(r.key));
+  }
+  if (steward.isOpen()) steward.repaint();
+}
+
 /** Рассказать игроку о событии стройки — правила в `buildLog.ts` (REFM-175). */
 function tellBuild(kind: BuildLogKind, p: Record<string, unknown>): void {
   const line = buildLogLine(kind, p.building as string);
@@ -3045,53 +3071,19 @@ function handleEvents(events: DomainEvent[]) {
         if (techTree.isOpen()) techTree.repaint();
         break;
       // «Хранитель» lifecycle: snapshot at delegation, diff on expiry (the morning report).
+      // Что печатает каждое событие вахты и что делается с опорным снимком —
+      // `stewardLog.ts` (REFM-176): всё только про СЕБЯ, поза меняет текст, снимок
+      // берётся при постановке и гаснет и при снятии, и при возврате, ночная разница
+      // печатается только если есть от чего считать, а ресурс несёт ГЛИФ, а не
+      // HTML-чип (тост идёт через textContent, в ленту попадает и чужой текст).
       case 'steward.delegated':
-        if (p.playerId === ME) {
-          stewSnapshot = stewMetrics(s, ME);
-          note(
-            (p as { posture?: string }).posture === 'active_defend'
-              ? t('log.steward.on.active')
-              : t('log.steward.on.defense'),
-          );
-          if (steward.isOpen()) steward.repaint();
-        }
+        if (stewardMine(p.playerId, ME)) tellSteward('delegated', p);
         break;
       case 'steward.recalled':
-        if (p.playerId === ME) {
-          stewSnapshot = null;
-          note(t('log.steward.off'));
-          if (steward.isOpen()) steward.repaint();
-        }
+        if (stewardMine(p.playerId, ME)) tellSteward('recalled', p);
         break;
       case 'steward.expired':
-        if (p.playerId === ME) {
-          const now = stewMetrics(s, ME);
-          const base = stewSnapshot;
-          stewSnapshot = null;
-          const sign = (n: number) => (n >= 0 ? `+${n}` : `−${Math.abs(n)}`);
-          // Тост печатается textContent (XSS-безопасность: в ленту попадает и чужой
-          // текст) — HTML-чипа тут быть не может, поэтому ресурс несёт свой ГЛИФ
-          // (TECH_CUR), тот же, что стоит на капсулах бара. И русская проза уехала в
-          // локаль: до этого англоязычный игрок читал утренний отчёт по-русски.
-          const diff = base
-            ? ' ' +
-              t('log.steward.diff', {
-                p0: String(base.planets),
-                p1: String(now.planets),
-                bag: `${TECH_CUR.metal}${sign(now.metal - base.metal)} ${TECH_CUR.credits}${sign(now.credits - base.credits)}`,
-              })
-            : '';
-          const logged = s.players[ME]?.stewardLog?.length ?? 0;
-          const sitrep = logged > 0 ? ' ' + t('log.steward.decisions', { n: String(logged) }) : '';
-          note(
-            ((p as { posture?: string }).posture === 'active_defend'
-              ? t('log.steward.handback.active')
-              : t('log.steward.handback.defense')) +
-              diff +
-              sitrep,
-          );
-          if (steward.isOpen()) steward.repaint();
-        }
+        if (stewardMine(p.playerId, ME)) tellSteward('expired', p);
         break;
       // Both espionage events are addressed to the ACTOR (`owner`); in NET play the
       // server's fog filter already withholds them from the victim — mirror it here.
