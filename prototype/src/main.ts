@@ -630,6 +630,7 @@ import { archiveEffect, type ArchiveEffect } from './archiveOutcome';
 import { mintedToken, passwordFrom, registerExtra } from './authRequest';
 import { carryEmail, recoverAnswer, recoverStep } from './recoverForm';
 import { selectFleets, toggleInSelection } from './fleetSelection';
+import { fleetsUnderTap } from './tapTargets';
 import { resolveAddress } from './serverAddress';
 import { authStatusUrl, identityMode, revealSignup } from './identityProbe';
 import { houseLine, seatView, type SeatView } from './seatList';
@@ -8035,14 +8036,21 @@ function selectAt(mx: number, my: number) {
   // первый), и перебору на ПК (ему нужны все).
   // Также — ВИДИМЫЕ чужие флоты (опознанные или радарные): их можно выделить
   // и просмотреть состав в панели (без кнопок управления — только информация).
-  const fleetHits = Object.values(s.fleets)
-    .filter((f) => f.owner === ME || fleetVisible(f.owner === ME, known(fleetNode(f)), intelFleetOwners.has(f.owner)))
-    .map((f) => {
-      const a = fleetAnchor(f);
-      return a ? { id: f.id, d: Math.hypot(mx - a.x, my - a.y) } : null;
-    })
-    .filter((h): h is { id: string; d: number } => !!h && h.d < rFleet)
-    .sort((a, b) => a.d - b.d);
+  // Кто вообще может попасть под тап — `tapTargets.ts` (REFM-164): свои и ВИДИМЫЕ
+  // чужие (чужого выделяют для осмотра, но невидимый выдал бы туман войны), флот без
+  // рисуемой точки не претендент, радиус — «в пределах», а порядок — ближайший первым
+  // (иначе он зависел бы от порядка создания флотов, а не от прицела).
+  const fleetIds = fleetsUnderTap(
+    Object.values(s.fleets).map((f) => ({
+      id: f.id,
+      mine: f.owner === ME,
+      visible: fleetVisible(f.owner === ME, known(fleetNode(f)), intelFleetOwners.has(f.owner)),
+      anchor: fleetAnchor(f),
+    })),
+    mx,
+    my,
+    rFleet,
+  );
   const applyPick = (pick: TapPick | null): void => {
     if (!pick) {
       clearSelection();
@@ -8060,7 +8068,7 @@ function selectAt(mx: number, my: number) {
   if (!pcUi()) {
     // Mobile (frozen in this chat): the original fleet-first behaviour — nearest own
     // fleet under the tap, else the world, else clear. Перебора нет.
-    const mine = fleetHits[0]?.id ?? null;
+    const mine = fleetIds[0] ?? null;
     // Shift / Ctrl / ⌘ → extend the group instead of replacing it.
     if (additive && mine) {
       toggleFleetInSelection(mine);
@@ -8075,13 +8083,10 @@ function selectAt(mx: number, my: number) {
   // fleets on one orbit) no longer permanently masks the world / the fleets below it.
   if (additive) {
     // Ctrl/⌘ → extend the fleet group with the nearest fleet under the tap (no cycling).
-    if (fleetHits[0]) toggleFleetInSelection(fleetHits[0].id);
+    if (fleetIds[0]) toggleFleetInSelection(fleetIds[0]);
     return;
   }
-  const cands = tapCandidates(
-    fleetHits.map((h) => h.id),
-    n?.id ?? null,
-  );
+  const cands = tapCandidates(fleetIds, n?.id ?? null);
   const current: TapPick | null = selFleet
     ? { kind: 'fleet', id: selFleet }
     : selPlanet
