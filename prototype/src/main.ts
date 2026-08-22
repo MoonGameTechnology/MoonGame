@@ -632,6 +632,7 @@ import { carryEmail, recoverAnswer, recoverStep } from './recoverForm';
 import { selectFleets, toggleInSelection } from './fleetSelection';
 import { mergePlan } from './mergeOrders';
 import { assaultPlan } from './assaultDispatch';
+import { warPromptText, warReason } from './warPromptView';
 import { pickEffect } from './pickApply';
 import { fleetsUnderTap } from './tapTargets';
 import { resolveAddress } from './serverAddress';
@@ -2816,16 +2817,18 @@ function cancelWarPrompt(): void {
 function renderWarPrompt(): void {
   const el = document.getElementById('warprompt');
   if (!el || !warPrompt) return;
+  // Что написано и что на кнопках — `warPromptView.ts` (REFM-168): у штурма война и есть
+  // цель (прямой вопрос ДА/НЕТ), у транзита она попутная, поэтому кнопка называет
+  // ПОСЛЕДСТВИЕ («объявить войну») — «ДА» тут читалось бы как «да, лететь».
+  // Имена виновников — чужой ввод в разметке, поэтому экранируются (правило 4).
   const names = warPrompt.blockers.map((b) => esc(blockerName(b))).join(', ');
-  const body = warPrompt.assault
-    ? t('war.confirm.friendly', { names })
-    : t('war.confirm.transit', { names });
+  const text = warPromptText(warReason(warPrompt.assault));
   el.innerHTML =
     `<div class="wpbox">` +
-    `<div class="wp-head">⚔ ${t('war.confirm.title')}</div>` +
-    `<div class="wp-body">${body}</div>` +
-    `<div class="wp-actions"><button class="wp-no">${warPrompt.assault ? t('war.confirm.no') : t('war.confirm.cancel')}</button>` +
-    `<button class="wp-yes">${warPrompt.assault ? t('war.confirm.yes') : t('war.confirm.go')}</button></div>` +
+    `<div class="wp-head">⚔ ${t(text.title)}</div>` +
+    `<div class="wp-body">${t(text.body, { names })}</div>` +
+    `<div class="wp-actions"><button class="wp-no">${t(text.no)}</button>` +
+    `<button class="wp-yes">${t(text.yes)}</button></div>` +
     `</div>`;
   el.classList.add('show');
 }
