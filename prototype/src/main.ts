@@ -348,15 +348,8 @@ import {
   hoursLeft,
   progressPct as coreProgressPct,
 } from './buildProgress';
-import {
-  contactAlpha,
-  contactLost,
-  episodeKey,
-  forgetEnded,
-  freshEpisodes,
-  hourBucket,
-  paintedThisFrame,
-} from './alerts';
+import { contactAlpha, contactLost, hourBucket, paintedThisFrame } from './alerts';
+import { threatAlerts, threatScanDue, threatsHeard, type ThreatSighting } from './threatAlerts';
 import {
   SPY_COST,
   grantLeftMs,
@@ -1359,31 +1352,29 @@ function drawScanSweep(now: number) {
 const threatMemory = new Set<string>();
 let threatScanAt = -1;
 function updateThreatAlerts(): void {
-  const bucket = hourBucket(s.time, HOUR);
-  if (bucket === threatScanAt) return;
-  threatScanAt = bucket;
-  if (s.players[ME]?.status !== 'active') return;
+  // РЕЖИМ звонка — `threatAlerts.ts` (REFM-169): дроссель на игровой час (соло двигает
+  // время каждый кадр, поэтому сторож «время изменилось» пустой), один звонок на эпизод
+  // «мир + флот», забывание кончившегося и правило «срок обещается, только пока не истёк».
+  if (!threatScanDue(hourBucket(s.time, HOUR), threatScanAt)) return;
+  threatScanAt = hourBucket(s.time, HOUR);
+  if (!threatsHeard(s.players[ME]?.status)) return;
   const c = ctx(s.time);
   const identified = identifiedNodes(s, ME, data);
-  const live = new Set<string>();
+  const sightings: ThreatSighting[] = [];
   for (const p of Object.values(s.planets)) {
     if (p.owner !== ME) continue;
     for (const th of scanNodeThreats(s, p.id, ME, c, identified)) {
-      const key = episodeKey(p.id, th.fleetId);
-      live.add(key);
-      if (freshEpisodes(threatMemory, [key]).length === 0) continue; // эпизод уже объявлен
-      note(
-        th.kind === 'inbound' && th.eta > s.time
-          ? t('threat.incoming', {
-              node: p.id,
-              dur: stewFmtDur(th.eta - s.time),
-            })
-          : t('threat.here', { node: p.id }),
-        p.id,
-      );
+      sightings.push({ node: p.id, fleetId: th.fleetId, kind: th.kind, eta: th.eta });
     }
   }
-  forgetEnded(threatMemory, live); // эпизод кончился → новый подход снова прозвенит
+  for (const a of threatAlerts(sightings, s.time, threatMemory)) {
+    note(
+      a.left === null
+        ? t('threat.here', { node: a.node })
+        : t('threat.incoming', { node: a.node, dur: stewFmtDur(a.left) }),
+      a.node,
+    );
+  }
 }
 
 /** Refresh radar contacts the arm crossed this frame: snapshot each radar-only enemy
