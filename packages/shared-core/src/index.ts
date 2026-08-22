@@ -189,6 +189,7 @@ export {
   type AdvanceFailure,
   type ActionIdParts,
 } from './action/types';
+export { resolveMatchConfig, type ModeResolution } from './action/matchMode';
 // AUD-6: the schema map and the catalog of legal client action types are public now —
 // the boolean alone forced anyone writing a client to deep-import a test-only file.
 export {

@@ -10,7 +10,15 @@ import type {
   PlayerReward,
   SignatureContact,
 } from '@void/shared-core';
-import { diffState, getStance, hashState, identifiedNodes, visibleView } from '@void/shared-core';
+import {
+  diffState,
+  getStance,
+  hashState,
+  identifiedNodes,
+  resolveMatchConfig,
+  Rejection,
+  visibleView,
+} from '@void/shared-core';
 import type { AcceptedAction, ActionGate } from '@void/action-layer';
 import {
   parseClientMessage,
@@ -422,7 +430,19 @@ export class MatchRoom {
     this.stateValue = options.initialState;
     this.kernel = options.kernel;
     this.data = options.data;
-    this.config = options.config ?? { timeScale: 1 };
+    // PVE-0.2 — the mode is consumed HERE, once, and never again: `config` is private
+    // and readonly, so a resolved match has nothing left to swap mid-flight (GDD §2,
+    // «режим фиксируется при старте»). Putting it in the constructor rather than in
+    // one factory is deliberate — every path that can raise a room (createDevMatch,
+    // the prototype host, tests) goes through this line, so an unknown mode cannot
+    // slip in through a path someone forgot to guard. An unknown mode is fatal by
+    // design: a room that believes it runs PvE waves while the engine applies the
+    // base rules is worse than a room that refuses to exist (fail-secure, A10).
+    const resolved = resolveMatchConfig(options.data, options.config ?? { timeScale: 1 });
+    if (!resolved.ok) {
+      throw new Rejection(resolved.code);
+    }
+    this.config = resolved.config;
     this.now = options.now ?? (() => Date.now());
     this.maxPayloadBytes = options.maxPayloadBytes ?? 32_768;
     this.waitFor =
