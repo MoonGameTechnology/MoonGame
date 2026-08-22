@@ -596,6 +596,7 @@ import {
 } from './orbitRing';
 import { routeShown, routeStops, routeStroke } from './fleetRoute';
 import { netContacts, soloContacts } from './radarContacts';
+import { diploDelivery } from './diploDelivery';
 import { garrisonSide, planFor, troopsGate } from './troopsScene';
 import {
   BUILD_LANES,
@@ -6203,22 +6204,15 @@ function diffNetDiplomacy(prev: GameState, next: GameState): boolean {
   for (const ev of events) {
     const who = NAME[ev.other] ?? ev.other;
     const stance = stanceRu(ev.stance);
-    if (ev.kind === 'stance') {
-      note(
-        ev.stance === 'war'
-          ? t('comms.war-declared', { who })
-          : t('comms.stance-changed', { who, stance }),
-      );
-      pushMsg(ev.other, t('comms.stance-changed.short', { stance }), true, ev.other);
-      unreadMsgs++;
-    } else if (ev.kind === 'offer-in') {
-      note(t('log.diplo.offer', { who, stance }));
-      pushMsg(ev.other, t('log.diplo.offer.short', { stance }), true, ev.other);
-      unreadMsgs++;
-    } else {
-      note(t('log.diplo.sent', { who, stance })); // своё исходящее — только уведомление
-    }
+    // Куда уходит событие и какими словами — `diploDelivery.ts` (REFM-174): война зовётся
+    // своим текстом, сдвиг и ВХОДЯЩЕЕ предложение идут в ленту, в тред и в счётчик
+    // непрочитанных, а своё ИСХОДЯЩЕЕ — только в ленту.
+    const d = diploDelivery(ev.kind, ev.stance, ev.other);
+    note(d.noteNeedsStance ? t(d.noteKey, { who, stance }) : t(d.noteKey, { who }));
+    if (d.message) pushMsg(ev.other, t(d.message.key, { stance }), true, d.message.from);
+    if (d.unread) unreadMsgs++;
   }
+  // Перерисовку ростера решает вызывающий — ОДИН раз на всю пачку, а не на событие.
   return events.length > 0;
 }
 
