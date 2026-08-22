@@ -7,5 +7,17 @@
       "scoreLimit": 600,
       "coalitionFactor": 0.7
     }
+  },
+  "pve_waves": {
+    "name": "PvE Waves",
+    "teamFormat": "ffa",
+    "modules": [
+      "pve"
+    ],
+    "pve": {
+      "waves": 10,
+      "npcFaction": "swarm",
+      "waveIntervalHours": 6
+    }
   }
 }

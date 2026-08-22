@@ -234,7 +234,16 @@ export interface IntelGrant {
 }
 
 export type MatchStatus = 'ongoing' | 'ended';
-export type MatchEndReason = 'domination' | 'elimination' | 'score' | 'timeout';
+export type MatchEndReason =
+  | 'domination'
+  | 'elimination'
+  | 'score'
+  | 'timeout'
+  /** PVE-4: the wave assault was survived and the enemy cleared — everyone still
+   *  standing wins TOGETHER (`match.winners`), there is no single champion. */
+  | 'pve-cleared'
+  /** PVE-4: every human seat fell. The NPC is the formal winner. */
+  | 'pve-failed';
 
 export interface MatchScore {
   /** Map control: owned planet/sectors. */

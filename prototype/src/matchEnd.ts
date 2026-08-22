@@ -36,6 +36,12 @@ export function endReasonText(reason: string | undefined): string {
       return t('ai.end.score');
     case 'timeout':
       return t('ai.end.timeout');
+    // PVE-4. Без этих двух веток кооп-финал уезжал бы к игроку невнятным «матч
+    // завершён» — деградация есть, но она врёт про то, чем всё кончилось.
+    case 'pve-cleared':
+      return t('ai.end.pve-cleared');
+    case 'pve-failed':
+      return t('ai.end.pve-failed');
     default:
       return t('ai.end.over');
   }
