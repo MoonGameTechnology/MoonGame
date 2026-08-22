@@ -223,6 +223,40 @@ function evaluateVictory(h: HandlerContext): void {
   const activeBefore = playerIds.filter(
     (playerId) => h.state.players[playerId]?.status === 'active',
   );
+  // PvE (PVE-4) is decided FIRST, and — importantly — before the `< 2 active` guard
+  // below. That guard exists for the PvP race (a one-player board has no race to
+  // decide), but in PvE it is exactly the losing position: the Swarm alone on the
+  // board means every human seat fell, and returning early there would leave the
+  // match running forever with nobody in it.
+  //
+  // Nothing here touches the PvP outcomes; the whole block is skipped unless
+  // `pveModule` seeded `state.pve`, so a PvP match cannot reach it at all.
+  if (h.state.pve) {
+    const { npcPlayerId, waveNumber, totalWaves } = h.state.pve;
+    // "Alive" uses the SAME rule as elimination below — holding at least one
+    // province — rather than the `status` flag, which this pass may not have
+    // stamped yet. One definition of death for the whole module.
+    const holding = (playerId: PlayerId): boolean =>
+      (scores[playerId]?.controlledPlanets ?? 0) > 0;
+    const humans = playerIds.filter((id) => id !== npcPlayerId);
+    const humansAlive = humans.filter((id) => activeBefore.includes(id) && holding(id));
+
+    if (humansAlive.length === 0 && humans.length > 0) {
+      endMatch(h, npcPlayerId, 'pve-failed');
+      return;
+    }
+    // Cleared: every wave has landed AND the enemy holds nothing. Order matters —
+    // wiping the hive early does not end the match, it only starves later waves
+    // (`pveModule` skips a spawn with nowhere to stage), so the counter still runs
+    // to its end and the match cannot deadlock on an early clear.
+    if (waveNumber >= totalWaves && !holding(npcPlayerId)) {
+      // A coalition win with no single champion: the survivors won together, so
+      // `winner` is the top scorer among them and every one of them is in `winners`.
+      endMatch(h, highestScore(scores, humansAlive), 'pve-cleared', humansAlive);
+      return;
+    }
+  }
+
   if (activeBefore.length < 2) {
     return;
   }
