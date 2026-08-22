@@ -596,6 +596,7 @@ import {
 } from './orbitRing';
 import { routeShown, routeStops, routeStroke } from './fleetRoute';
 import { netContacts, soloContacts } from './radarContacts';
+import { standingPatrol, stashOnStandDown } from './sortieResume';
 import {
   fleetSignature as coreFleetSignature,
   planetRadar as corePlanetRadar,
@@ -3390,9 +3391,10 @@ function setScramble(ids: string[], on: boolean): void {
     if (want === 'clear') {
       if (NET) playerOrder(orderScramble(ME, id, false));
       else {
-        // Stash the wing's sortie so OFF→ON resumes it (BF-26) instead of a free full tank.
-        const pt = patrols.get(id);
-        if (pt) wingSorties.set(id, pt.sortie);
+        // Бухгалтерия вылета через выключение — `sortieResume.ts` (REFM-171): снятое крыло
+        // ПОМНИТ свой вылет, иначе «выключить и включить» было бы бесплатной дозаправкой.
+        const stash = stashOnStandDown(patrols.get(id));
+        if (stash) wingSorties.set(id, stash);
         patrols.delete(id);
       }
       continue;
@@ -3402,21 +3404,19 @@ function setScramble(ids: string[], on: boolean): void {
       playerOrder(orderScramble(ME, id, true));
     } else {
       if (patrols.size === 0) solo.startPatrolCadence(); // счёт перезарядки — с этого мига
-      const spec = sortieSpec(f);
-      const stashed = wingSorties.get(id);
-      patrols.set(id, {
-        center: { x: pos.x, y: pos.y },
-        radius: squadronStrikeRange(f),
-        // Resume the stashed sortie (clamped to the current wing spec), like the server;
-        // only a never-flown wing starts on a fresh full tank.
-        sortie: stashed
-          ? {
-              fuel: Math.min(stashed.fuel, spec.maxFuel),
-              rearming: Math.min(stashed.rearming, spec.rearmRounds),
-            }
-          : freshSortie(spec.maxFuel),
-      });
-      wingSorties.delete(id);
+      // Продолжение отложенного вылета, зажатое нынешней спецификацией крыла (правила 1–3
+      // и 5 в `sortieResume.ts`): усиление поднимает потолок, но не подливает топлива.
+      patrols.set(
+        id,
+        standingPatrol(
+          pos,
+          squadronStrikeRange(f),
+          wingSorties.get(id),
+          sortieSpec(f),
+          freshSortie,
+        ),
+      );
+      wingSorties.delete(id); // правило 4: надкушенный бак не предъявляют дважды
     }
   }
 }
