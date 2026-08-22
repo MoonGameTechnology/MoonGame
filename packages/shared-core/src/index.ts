@@ -49,6 +49,7 @@ export {
   type MatchStatus,
   type MatchEndReason,
   type MatchScore,
+  type PveState,
   type MatchState,
   type PlayerArsenal,
   type PlayerReward,
@@ -385,6 +386,7 @@ export { interceptModule } from './modules/intercept';
 export { captureOnArrivalModule } from './modules/captureOnArrival';
 export { sectorModule } from './modules/sector';
 export { planetTypeModule } from './modules/planetType';
+export { pveModule } from './modules/pve';
 export {
   taxModule,
   civicTax,
