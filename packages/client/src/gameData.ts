@@ -24,6 +24,7 @@ import heroAbilities from '../../../data/heroAbilities.json';
 import heroPassives from '../../../data/heroPassives.json';
 import heroSkillTrees from '../../../data/heroSkillTrees.json';
 import heroFittings from '../../../data/heroFittings.json';
+import modes from '../../../data/modes.json';
 import rewards from '../../../data/rewards.json';
 import skirmishMap from '../../../data/maps/skirmish-1.json';
 import pveMap from '../../../data/maps/pve-1.json';
@@ -49,6 +50,7 @@ export const FRAGMENTS: Record<string, unknown> = {
   'heroPassives.json': heroPassives,
   'heroSkillTrees.json': heroSkillTrees,
   'heroFittings.json': heroFittings,
+  'modes.json': modes,
   'rewards.json': rewards,
 };
 

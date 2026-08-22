@@ -10,15 +10,18 @@ import { MS_PER_DAY } from '../util/time';
 import { isCapturable, provinceScore } from '../state/sectorKind';
 import { getStance } from '../state/diplomacy';
 
-const DEFAULT_DOMINATION_PERCENT = 0.6;
+/** The base rules, exported so the `standard` mode preset (`data/modes.json`) can be
+ *  pinned to them by test instead of to copied literals — the same fact now lives in
+ *  content as well as here, and only that pin keeps the pair from drifting. */
+export const DEFAULT_DOMINATION_PERCENT = 0.6;
 /** Solo score threshold — the genre's core win race (GDD §3.2). Config may override
  *  it (e.g. a higher coalition threshold). Tuned so a board of ~1000 base points
  *  (12 planets × 50 + the rest × 10) needs a clear majority to win. */
-const DEFAULT_SCORE_LIMIT = 600;
+export const DEFAULT_SCORE_LIMIT = 600;
 /** Coalition threshold per member as a share of the solo limit (GDD §3.3):
  *  порог коалиции = scoreLimit × N × 0.7 — sub-linear in N, so allying is cheaper
  *  per player than winning solo, but it REPLACES the solo threshold for members. */
-const DEFAULT_COALITION_FACTOR = 0.7;
+export const DEFAULT_COALITION_FACTOR = 0.7;
 /** Session-length cap (game days) by speed — the time-crisis backstop that forces a
  *  finale ranked by score (GDD §3.1/§3.2). Any other speed falls back to the ×1 cap. */
 const SESSION_MAX_DAYS: Record<number, number> = { 1: 100, 2: 60, 4: 30 };

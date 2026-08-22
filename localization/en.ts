@@ -561,6 +561,7 @@ export const en: Record<string, string> = {
   'data.spaceport': 'Spaceport',
   'data.special-forces': 'special forces',
   'data.squadron': 'squadron',
+  'data.standard': 'Standard',
   'data.steward-protocol': 'Steward Protocol',
   'data.strike-carrier': 'strike carrier',
   'data.strike-vectors': 'Strike Vectors',

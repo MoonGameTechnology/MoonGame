@@ -285,6 +285,11 @@ export {
   ShipSlotsSchema,
   ShipSlotTypeSchema,
   SHIP_SLOT_TYPES,
+  GameModeDefSchema,
+  ModeVictorySchema,
+  ModePveSchema,
+  TeamFormatSchema,
+  TEAM_FORMATS,
   type GameData,
   type UnitDef,
   type ModuleDef,
@@ -318,6 +323,10 @@ export {
   type UnitStats,
   type RewardsDef,
   type ResearchBoostDef,
+  type GameModeDef,
+  type ModeVictory,
+  type ModePve,
+  type TeamFormat,
 } from './data/schemas';
 export {
   composeGameDataBundle,
