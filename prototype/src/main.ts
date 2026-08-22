@@ -631,6 +631,7 @@ import { mintedToken, passwordFrom, registerExtra } from './authRequest';
 import { carryEmail, recoverAnswer, recoverStep } from './recoverForm';
 import { selectFleets, toggleInSelection } from './fleetSelection';
 import { mergePlan } from './mergeOrders';
+import { assaultPlan } from './assaultDispatch';
 import { pickEffect } from './pickApply';
 import { fleetsUnderTap } from './tapTargets';
 import { resolveAddress } from './serverAddress';
@@ -2706,31 +2707,43 @@ function issueAssault(id: string, orbit: string | undefined): void {
 }
 
 function dispatchAssault(fleetIds: string[], destId: string): void {
-  let warnedNoTroops = false;
-  for (const id of fleetIds) {
+  // Правила штурма группой — `assaultDispatch.ts` (REFM-167): стоящий у цели штурмует
+  // СЕЙЧАС и получает вердикт ЯДРА (RULES-4: приказ издаётся сейчас, значит ядро знает
+  // всю связку запретов), летящему ядро ответить не может — ему только предупреждение,
+  // приказ всё равно уходит (десант можно погрузить в пути). Жалоба ОДНА на группу:
+  // пять флотов без десанта высыпали бы пять одинаковых строк, и журнал утонул бы.
+  const views = fleetIds.flatMap((id) => {
     const f = s.fleets[id];
-    if (!f) continue;
-    if (f.location === destId && !f.movement) {
-      // RULES-4: приказ издаётся СЕЙЧАС — спрашиваем ядро про всю связку, а не
-      // проверяем один десант руками.
-      const code = assaultVerdict(id, f);
-      if (code !== null) {
-        if (!warnedNoTroops) {
-          warnedNoTroops = true;
-          note(code === 'E_NO_TROOPS' ? t('log.assault.no-troops') : '✖ ' + errText(code), destId);
-        }
-        continue;
-      }
+    if (!f) return []; // правило 5: погибших в списке нет
+    const parked = f.location === destId && !f.movement;
+    return [
+      {
+        id,
+        parked,
+        refusal: parked ? assaultVerdict(id, f) : null,
+        lacksTroops: !parked && assaultNeedsTroops(f, destId),
+      },
+    ];
+  });
+  const plan = assaultPlan(views);
+  const warnText = (w: NonNullable<typeof plan.warn>): string =>
+    w.kind === 'no-troops'
+      ? t('log.assault.warn-no-troops')
+      : w.code === 'E_NO_TROOPS'
+        ? t('log.assault.no-troops')
+        : '✖ ' + errText(w.code);
+  for (const [i, step] of plan.steps.entries()) {
+    // Жалоба встаёт ПЕРЕД действием вызвавшего её флота (правило 4): иначе в журнале
+    // «не смог» оказалось бы раньше приказов, которые ушли до него.
+    if (i === plan.warnAt && plan.warn) note(warnText(plan.warn), destId);
+    if (step.kind === 'refused') continue;
+    if (step.kind === 'storm') {
       // already parked at the target — storm right away (orbit first if needed)
-      issueAssault(id, f.orbit);
-    } else {
-      if (!warnedNoTroops && assaultNeedsTroops(f, destId)) {
-        warnedNoTroops = true;
-        note(t('log.assault.warn-no-troops'), destId);
-      }
-      playerOrder(moveFleet(ME, id, destId));
-      assaultOnArrival.set(id, destId);
+      issueAssault(step.id, s.fleets[step.id]?.orbit);
+      continue;
     }
+    playerOrder(moveFleet(ME, step.id, destId));
+    assaultOnArrival.set(step.id, destId);
   }
 }
 /** Fire the one-shot assault orders of fleets that reached their ШТУРМ target
