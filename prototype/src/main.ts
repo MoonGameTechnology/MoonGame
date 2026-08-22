@@ -596,6 +596,7 @@ import {
 } from './orbitRing';
 import { routeShown, routeStops, routeStroke } from './fleetRoute';
 import { netContacts, soloContacts } from './radarContacts';
+import { garrisonSide, planFor, troopsGate } from './troopsScene';
 import {
   BUILD_LANES,
   headStarts,
@@ -2547,19 +2548,23 @@ function pumpPendingLoads(): void {
  *  Здесь и только здесь живая сцена превращается в числа — дальше меню чистое. */
 function troopsInputFor(fleetId: string): TroopsInput | null {
   const f = s.fleets[fleetId];
-  if (!f || f.movement || f.battleId || !f.location) return null;
+  if (!f || !f.location) return null;
   const here = s.planets[f.location];
   if (!here) return null;
   const landing = f.landing ?? [];
   const mine = here.owner === ME;
-  // ALLY-LAND. Над ЧУЖИМ миром меню открывается только на ВЫСАДКУ и только если ядро
-  // её примет. Правило («свой мир или мир союзника») здесь не переписывается — задаётся
-  // вопрос про настоящий приказ, поэтому если ядро когда-нибудь расширит круг (скажем,
-  // на пакт), клиент поедет за ним сам, без правки этой строки.
   const carried = landing.filter((st) => isGround(st.unit) && st.count > 0);
-  const guestLanding =
-    !mine && carried.length > 0 && canOrder(s, unloadArmy(ME, fleetId, carried[0]!.unit, 1)) === null;
-  if (!mine && !guestLanding) return null;
+  // Судьба меню — `troopsScene.ts` (REFM-173). ALLY-LAND: круг «свой мир или мир
+  // союзника» здесь НЕ переписывается — задаётся вопрос про НАСТОЯЩИЙ приказ, поэтому
+  // расширение круга ядром клиент подхватит сам. Вердикт ЛЕНИВЫЙ: на своём мире он не
+  // нужен, а с пустым трюмом приказ не из чего собрать.
+  const gate = troopsGate({
+    docked: !f.movement && !f.battleId,
+    worldMine: mine,
+    carriesGround: carried.length > 0,
+    landingAllowed: () => canOrder(s, unloadArmy(ME, fleetId, carried[0]!.unit, 1)) === null,
+  });
+  if (gate === 'closed') return null;
   // Источники, типы и суммы — `troopsSources.ts` (REFM-81): на союзном мире поднимать
   // нечего, поэтому счётчик выходит односторонним сам собой, без отдельного режима меню.
   const types = groundTypes(troopSources(mine, here.garrison, landing), isGround);
@@ -2567,8 +2572,11 @@ function troopsInputFor(fleetId: string): TroopsInput | null {
   const units: TroopsUnitInput[] = types.map((unit) => ({
     unit,
     // «Всего» складывает и побитые стопки, а поднять/высадить ядро даст только здоровую.
-    garrison: mine ? (findHealthyStack(here.garrison, unit)?.count ?? 0) : 0,
-    garrisonAll: mine ? totalOf(here.garrison, unit) : 0,
+    ...garrisonSide(
+      mine,
+      findHealthyStack(here.garrison, unit)?.count ?? 0,
+      totalOf(here.garrison, unit),
+    ),
     hold: findHealthyStack(landing, unit)?.count ?? 0,
     holdAll: totalOf(landing, unit),
     queued: queuedOf(pendingLoads, fleetId, unit),
@@ -2580,7 +2588,7 @@ function troopsInputFor(fleetId: string): TroopsInput | null {
     capacity: sumUnitStat(f.units, data, 'cargoCapacity'),
     used: sumUnitStat(landing, data, 'cargoSize'),
     reservedCargo: pendingLoadCargo(fleetId),
-    plan: troopsPlan?.fleetId === fleetId ? troopsPlan.plan : {},
+    plan: planFor(troopsPlan?.fleetId, fleetId, troopsPlan?.plan),
   };
 }
 
