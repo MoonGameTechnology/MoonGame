@@ -27,7 +27,7 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 
 /** Версия манифеста, для которой закреплён список ниже. Разъехалась с
  *  `MODULE_MANIFEST_VERSION` → список устарел, его надо перезакрепить. */
-const PINNED_FOR_VERSION = '4';
+const PINNED_FOR_VERSION = '5';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */
@@ -61,6 +61,7 @@ const PINNED_MODULE_IDS = [
   'instant-repair',
   'fleet-repair',
   'forced-march',
+  'pve',
   'victory',
   'visibility',
   // 'division' СНЯТ ОСОЗНАННО (H4-REVERT, 2026-07-31), не потерян при правке.
