@@ -597,6 +597,7 @@ import {
 import { routeShown, routeStops, routeStroke } from './fleetRoute';
 import { netContacts, soloContacts } from './radarContacts';
 import { buildLogLine, type BuildLogKind } from './buildLog';
+import { bootyKind, bootyText, counterLine, spyRepaint } from './spyLog';
 import {
   decisionsField,
   diffFields,
@@ -3087,18 +3088,21 @@ function handleEvents(events: DomainEvent[]) {
         break;
       // Both espionage events are addressed to the ACTOR (`owner`); in NET play the
       // server's fog filter already withholds them from the victim — mirror it here.
+      // Кому адресовано событие, что оно говорит и когда перерисовывается ростер —
+      // `spyLog.ts` (REFM-177). SPY-2: успех и провал читает ИСПОЛНИТЕЛЬ, замеченную
+      // операцию — ЖЕРТВА; пойманный вор называется по имени, неустановленный нет; у
+      // кражи ростер перерисовывается ПОСЛЕ проверки адресата (появилась своя строка
+      // разведки), у обнаружения — ДО неё (расположение бота двигается в любом случае).
       case 'intel.stolen': {
         if (p.owner !== ME) break;
-        const whoT = NAME[p.target as string] ?? (p.target as string);
+        const b = bootyText(p.kind as string);
         const what =
-          p.kind === 'treasury'
-            ? t('log.spy.what.treasury', { who: whoT })
-            : p.kind === 'fleets'
-              ? t('log.spy.what.fleets', { who: whoT })
-              : t('log.spy.what.world', { at: String(p.intelPlanet ?? p.target) });
+          b.field === 'who'
+            ? t(b.key, { who: NAME[p.target as string] ?? (p.target as string) })
+            : t(b.key, { at: String(p.intelPlanet ?? p.target) });
         note(t('log.spy.success', { what }));
         pushSpyLog(t('log.spy.success.short', { what }));
-        if (diploOpen && diploTab === 'diplo') renderDiplo(); // the intel row appeared
+        if (spyRepaint('stolen') === 'after' && diploOpen && diploTab === 'diplo') renderDiplo();
         break;
       }
       case 'espionage.failed':
@@ -3108,28 +3112,16 @@ function handleEvents(events: DomainEvent[]) {
           pushSpyLog(t('log.spy.fail.short', { who: whoF }));
         }
         break;
-      // Counter-intel (SPY-2): addressed to the VICTIM. A failed attempt names the
-      // spy (caught red-handed); a noticed clean theft only says WHAT leaked.
       case 'espionage.detected': {
-        // A caught spy shifts the victim-bot's favour meter — repaint the roster.
-        if (diploOpen && diploTab === 'diplo') renderDiplo();
+        if (spyRepaint('detected') === 'before' && diploOpen && diploTab === 'diplo') renderDiplo();
         if (p.owner !== ME) break;
-        const what =
-          p.kind === 'treasury'
-            ? t('log.spy.kind.treasury')
-            : p.kind === 'fleets'
-              ? t('log.spy.kind.fleets')
-              : t('log.spy.kind.world');
-        {
-          const line = p.spy
-            ? t('log.spy.caught', {
-                who: NAME[p.spy as string] ?? (p.spy as string),
-                what,
-              })
-            : t('log.spy.leak', { what });
-          note(line);
-          pushSpyLog(line);
-        }
+        const what = t(bootyKind(p.kind as string));
+        const c = counterLine(p.spy as string | undefined);
+        const line = c.named
+          ? t(c.key, { who: NAME[p.spy as string] ?? (p.spy as string), what })
+          : t(c.key, { what });
+        note(line);
+        pushSpyLog(line);
         break;
       }
       case 'planet.captured':
