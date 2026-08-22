@@ -90,3 +90,40 @@ export function factionBonuses(p: FactionPassives | undefined): FactionBonus[] {
 export function rivalCount(slots: readonly SeatRole[]): number {
   return slots.slice(1).filter((r) => r === 'ai').length;
 }
+
+/** Одно место, реально идущее в матч, и мир, с которого оно стартует. */
+export interface SeatAssignment {
+  index: number;
+  start: string;
+}
+
+/**
+ * Кто из мест реально играет и с какого мира стартует (REFM-160).
+ *
+ * 1. **Место 0 — всегда ты**, своим миром, независимо от того, что записано в
+ *    `slots[0]`: экран не даёт эту роль сменить, а раздача не обязана её перепроверять.
+ * 2. **AI-места забирают кандидатов ПО ПОРЯДКУ индекса**, минуя выключенные — стабильный
+ *    порядок нужен затем же, зачем и в `seatFactionIds`: одинаковый выбор игрока даёт
+ *    одинаковую расстановку.
+ * 3. **Свой мир из кандидатов исключён заранее** — иначе AI сел бы на уже занятый старт.
+ * 4. **Кандидаты кончились — раздача останавливается, а не зацикливается на пропуске.**
+ *    Дальние AI-места остаются без места (их не будет в матче): лучше меньше соперников,
+ *    чем два на одном старте.
+ */
+export function assignSeats(
+  seatCount: number,
+  slots: readonly SeatRole[],
+  playerStart: string,
+  startCandidates: readonly string[],
+): SeatAssignment[] {
+  const out: SeatAssignment[] = [{ index: 0, start: playerStart }];
+  const free = startCandidates.filter((c) => c !== playerStart);
+  let fi = 0;
+  for (let i = 1; i < seatCount; i++) {
+    if (slots[i] !== 'ai') continue;
+    const start = free[fi++];
+    if (!start) break;
+    out.push({ index: i, start });
+  }
+  return out;
+}

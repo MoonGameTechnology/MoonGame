@@ -7846,21 +7846,51 @@ requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psion
   (grep обрывался на переводе строки и на одноимённом классе статической разметки экрана
   настройки — `.sbox` носит и она). **+13 тестов** в `splitDialog.test.ts`. Гейт: 4452
   теста (+13), 346 файлов; `smoke:browser` чист.
-- **REFM-160+** ⏳ `[proto]` — выносы по карте REFM-1, один кирпич = одна секция = один
+- **REFM-160** ✅ `[proto]` — выносы по карте REFM-1, один кирпич = одна секция = один
   PR, в порядке роста сцепки. Форма выноса — `init*(hooks)` / чистые функции (см.
   вывод о методе выше), а НЕ «перенос + реэкспорт»: экспортной поверхности у `main.ts`
   нет. Приёмка кирпича: гейт зелёный, число тестов не падает, сборка + `smoke:browser`
   чистые, ✅ + `state.md` в том же PR.
+  **Сверка перед кодом: TGT-1/ONB-5 исчерпаны.** Дочитал обе секции целиком (`renderCmdBar`,
+  `selectAt`, обработчик `cmdbar.click`) — весь инлайн там уже дозвон к вынесенным модулям
+  (`tapPriority.ts`, `armedTap.ts`, `tapCycle.ts`, `fireMode.ts`, `splitDialog.ts`,
+  `chainStripState.ts`…), то есть DOM-проводка, а не логика; выносить больше нечего. По
+  таблице сцепки следующая незанятая секция — `meta-progression` (467 строк, сцепка 52) —
+  и её тоже сверил живьём: `Android Back` (56, последняя) там же прямо подписана «не
+  выносить вовсе, а свести к реестру» — не трогал по той же причине.
+  **Взято: раздача мест сетапа.** `buildSetupConfig()` внутри `meta-progression` собирала
+  `SeatConfig[]` инлайновым циклом — место 0 всегда игрок своим миром, AI-места забирают
+  кандидатов по порядку мимо выключенных, раздача останавливается, когда кандидаты
+  кончились. Вынесено в `assignSeats()` (`setupSeats.ts`, рядом с REFM-44-механикой раздачи
+  домов — та же форма «твой первый, остальные по кругу», только для стартовых миров).
+  **Живая проверка, не только тесты.** Собрал прототип, довёл до сетапа, включил ВТОРОЕ
+  AI-место (первое — дефолтное) и стартовал: `#tbplace` показал «#1 of 3» — оба AI получили
+  РАЗНЫЕ старты (иначе ядро не создало бы матч, playerов на одном мире не бывает), консоль
+  чистая. `smoke:browser` тоже чист.
+  **Остаток `meta-progression` — НЕ этот кирпич.** `installMatch`/`startMatch`/`connect`/
+  `resolveServer` — тяжёлая оркестрация, которая напрямую трогает 20+ модульных `let`
+  (сокет, реконнект, камера, выделение, очереди); ровно то, что таблица просила «трогать
+  последними». +6 тестов (`setupSeats.test.ts`), гейт 4458 тестов (+6), 346 файлов.
+- **REFM-161+** ⏳ `[proto]` — остаток `meta-progression` (`installMatch`/`startMatch`/
+  `connect`/`resolveServer`, секция 9575–10066 в `main.ts`) — тяжёлая оркестрация матч-
+  лайфцикла, а не «вынос секции» одним заходом: 20+ модульных `let`, сокет, реконнект,
+  камера. Брать частями, с живой проверкой на реальном старте/переподключении матча, а не
+  одним PR. `Android Back` (сцепка 56, последняя в таблице) — НЕ брать вовсе, см. правку
+  REFM-160: там прямо предложено свести к реестру «слой → как закрыть», а не выносить.
 
 > **Порядок:** REFM-0 ✅ → REFM-0.1 ✅ → REFM-1 ✅ → REFM-2 ✅ → REFM-3 ✅ → REFM-4 ✅ →
 > REFM-5 ✅ → REFM-6 ✅ → REFM-7 ✅ → REFM-8 ✅ → REFM-9 ✅ → REFM-10 ✅ → REFM-11 ✅ →
 > REFM-12 ✅ → REFM-13 ✅ → REFM-14 ✅ → REFM-15 ✅ → REFM-16 ✅ → REFM-17 ✅ → REFM-18 ✅ →
 > REFM-19 ✅ → REFM-20 ✅ → REFM-21 ✅ → REFM-22 ✅ → REFM-23 ✅ → REFM-24 ✅ → REFM-25 ✅ →
 > REFM-26 ✅ → REFM-27 ✅ → REFM-28 ✅ → REFM-29 ✅ → REFM-30 ✅ → REFM-31 ✅ → REFM-32 ✅ →
-> REFM-33 ✅ → REFM-34 ✅ → REFM-35 ✅ → REFM-36 ✅ → REFM-37 ✅ → REFM-38 ✅ → REFM-39 ✅ → REFM-40 ✅ → REFM-41 ✅ → REFM-42 ✅ → REFM-43 ✅ → REFM-44 ✅ → REFM-45 ✅ → REFM-46 ✅ → REFM-47 ✅ → REFM-48 ✅ → REFM-49 ✅ → REFM-50 ✅ → REFM-51 ✅ → REFM-52 ✅ → REFM-53 ✅ → REFM-54 ✅ → REFM-55 ✅ → REFM-56 ✅ → REFM-57 ✅ → REFM-58 ✅ → REFM-59 ✅ → REFM-60 ✅ → REFM-61 ✅ → REFM-62 ✅ → REFM-63 ✅ → REFM-64 ✅ → REFM-65 ✅ → REFM-66 ✅ → REFM-67 ✅ → REFM-68 ✅ → REFM-69 ✅ → REFM-70 ✅ → REFM-71 ✅ → REFM-72 ✅ → REFM-73 ✅ → REFM-74 ✅ → REFM-75 ✅ → REFM-76 ✅ → REFM-77 ✅ → REFM-78 ✅ → REFM-79 ✅ → REFM-80 ✅ → REFM-81 ✅ → REFM-82 ✅ → REFM-83 ✅ → REFM-84 ✅ → REFM-85 ✅ → REFM-86 ✅ → REFM-87 ✅ → REFM-88 ✅ → REFM-89 ✅ → REFM-90 ✅ → REFM-91 ✅ → REFM-92 ✅ → REFM-93 ✅ → REFM-94 ✅ → REFM-95 ✅ → REFM-96 ✅ → REFM-97 ✅ → REFM-98 ✅ → REFM-99 ✅ → REFM-100 ✅ → REFM-101 ✅ → REFM-102 ✅ → REFM-103 ✅ → REFM-104 ✅ → REFM-105 ✅ → REFM-106 ✅ → REFM-107 ✅ → REFM-108 ✅ → REFM-109 ✅ → REFM-110 ✅ → REFM-111 ✅ → REFM-112 ✅ → REFM-113 ✅ → REFM-114 ✅ → REFM-115 ✅ → REFM-116 ✅ → REFM-117 ✅ → REFM-118 ✅ → REFM-119 ✅ → REFM-120 ✅ → REFM-121 ✅ → REFM-122 ✅ → REFM-123 ✅ → REFM-124 ✅ → REFM-125 ✅ → REFM-126 ✅ → REFM-127 ✅ → REFM-128 ✅ → REFM-129 ✅ → REFM-130 ✅ → REFM-131 ✅ → REFM-132 ✅ → REFM-133 ✅ → REFM-134 ✅ → REFM-135 ✅ → REFM-136 ✅ → REFM-137 ✅ → REFM-138 ✅ → REFM-139 ✅ → REFM-140 ✅ → REFM-141 ✅ → REFM-142 ✅ → REFM-143 ✅ → REFM-144 ✅ → REFM-145 ✅ → REFM-146 ✅ → REFM-147 ✅ → REFM-148 ✅ → REFM-149 ✅ → REFM-150 ✅ → REFM-151 ✅ → REFM-152 ✅ → REFM-153 ✅ → REFM-154 ✅ → REFM-155 ✅ → REFM-156 ✅ → REFM-157 ✅ → REFM-158 ✅ → REFM-159 ✅ → REFM-160+ (по таблице сцепки: секции
+> REFM-33 ✅ → REFM-34 ✅ → REFM-35 ✅ → REFM-36 ✅ → REFM-37 ✅ → REFM-38 ✅ → REFM-39 ✅ → REFM-40 ✅ → REFM-41 ✅ → REFM-42 ✅ → REFM-43 ✅ → REFM-44 ✅ → REFM-45 ✅ → REFM-46 ✅ → REFM-47 ✅ → REFM-48 ✅ → REFM-49 ✅ → REFM-50 ✅ → REFM-51 ✅ → REFM-52 ✅ → REFM-53 ✅ → REFM-54 ✅ → REFM-55 ✅ → REFM-56 ✅ → REFM-57 ✅ → REFM-58 ✅ → REFM-59 ✅ → REFM-60 ✅ → REFM-61 ✅ → REFM-62 ✅ → REFM-63 ✅ → REFM-64 ✅ → REFM-65 ✅ → REFM-66 ✅ → REFM-67 ✅ → REFM-68 ✅ → REFM-69 ✅ → REFM-70 ✅ → REFM-71 ✅ → REFM-72 ✅ → REFM-73 ✅ → REFM-74 ✅ → REFM-75 ✅ → REFM-76 ✅ → REFM-77 ✅ → REFM-78 ✅ → REFM-79 ✅ → REFM-80 ✅ → REFM-81 ✅ → REFM-82 ✅ → REFM-83 ✅ → REFM-84 ✅ → REFM-85 ✅ → REFM-86 ✅ → REFM-87 ✅ → REFM-88 ✅ → REFM-89 ✅ → REFM-90 ✅ → REFM-91 ✅ → REFM-92 ✅ → REFM-93 ✅ → REFM-94 ✅ → REFM-95 ✅ → REFM-96 ✅ → REFM-97 ✅ → REFM-98 ✅ → REFM-99 ✅ → REFM-100 ✅ → REFM-101 ✅ → REFM-102 ✅ → REFM-103 ✅ → REFM-104 ✅ → REFM-105 ✅ → REFM-106 ✅ → REFM-107 ✅ → REFM-108 ✅ → REFM-109 ✅ → REFM-110 ✅ → REFM-111 ✅ → REFM-112 ✅ → REFM-113 ✅ → REFM-114 ✅ → REFM-115 ✅ → REFM-116 ✅ → REFM-117 ✅ → REFM-118 ✅ → REFM-119 ✅ → REFM-120 ✅ → REFM-121 ✅ → REFM-122 ✅ → REFM-123 ✅ → REFM-124 ✅ → REFM-125 ✅ → REFM-126 ✅ → REFM-127 ✅ → REFM-128 ✅ → REFM-129 ✅ → REFM-130 ✅ → REFM-131 ✅ → REFM-132 ✅ → REFM-133 ✅ → REFM-134 ✅ → REFM-135 ✅ → REFM-136 ✅ → REFM-137 ✅ → REFM-138 ✅ → REFM-139 ✅ → REFM-140 ✅ → REFM-141 ✅ → REFM-142 ✅ → REFM-143 ✅ → REFM-144 ✅ → REFM-145 ✅ → REFM-146 ✅ → REFM-147 ✅ → REFM-148 ✅ → REFM-149 ✅ → REFM-150 ✅ → REFM-151 ✅ → REFM-152 ✅ → REFM-153 ✅ → REFM-154 ✅ → REFM-155 ✅ → REFM-156 ✅ → REFM-157 ✅ → REFM-158 ✅ → REFM-159 ✅ → REFM-160 ✅ → REFM-161+ (по таблице сцепки: секции
 > `accounts` и камера вычерпаны, диплогейт (17) закрыт, голографический слой (18) и
-> канвас-ввод (19) начаты, TGT-1 (20) начат; REFM-158 забрал из остатка режим огня
-> артиллерии (🔥 в `renderCmdBar`), дальше — оставшийся хвост TGT-1 и ONB-5 (29).
+> канвас-ввод (19) начаты; TGT-1 (20) и ONB-5 (29) ИСЧЕРПАНЫ — весь их инлайн уже
+> дозвон к вынесенным модулям, выносить больше нечего (сверено REFM-160). Следующая
+> незанятая секция по росту сцепки — `meta-progression` (52): REFM-160 забрал из неё
+> раздачу мест сетапа (`assignSeats`), дальше — тяжёлая оркестрация матч-лайфцикла
+> (`installMatch`/`startMatch`/`connect`/`resolveServer`), брать частями. `Android
+> Back` (56, последняя) — не выносить вовсе, см. REFM-161+.
 > Сеть НЕ следующая — её строка была измерена неверно, честная сцепка 17, см. сноску
 > под таблицей).
 > Блок REFP закрыт, так что зона `prototype/` теперь целиком за REFM.

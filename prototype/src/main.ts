@@ -308,6 +308,7 @@ const AUTH_REASON: Record<AuthOutcome, string> = {
 };
 import { createScanMemory, type Snapshot } from './scanMemory';
 import {
+  assignSeats,
   factionBonuses,
   houseDisplayName,
   houseNameFor,
@@ -9589,33 +9590,22 @@ function buildSetupConfig(): SetupConfig {
   // Seats play the HOUSES assigned at setup (H3): you = setupFaction, AI = the rest.
   // Seat name follows the house (its canonical data name); color stays per-seat.
   const fids = seatFactionIds();
-  const seats: SeatConfig[] = [
-    {
-      id: SEAT_META[0]!.id,
-      name: seatHouseName(fids[0]!, SEAT_META[0]!.name, 0),
-      faction: fids[0]!,
-      start: setupStart,
-      ai: false,
-      ...(setupTeams ? { team: setupSeatTeam[0] } : {}),
+  // Кто реально играет и с какого мира стартует — `setupSeats.ts` (REFM-160): место 0
+  // всегда твоё, AI-места забирают кандидатов по порядку мимо выключенных, свой мир из
+  // кандидатов уже исключён, а закончившиеся кандидаты останавливают раздачу.
+  const seats: SeatConfig[] = assignSeats(SEAT_META.length, setupSlots, setupStart, START_CANDIDATES).map(
+    ({ index: i, start }) => {
+      const m = SEAT_META[i]!;
+      return {
+        id: m.id,
+        name: seatHouseName(fids[i]!, m.name, i),
+        faction: fids[i]!,
+        start,
+        ai: i !== 0,
+        ...(setupTeams ? { team: setupSeatTeam[i] } : {}),
+      };
     },
-  ];
-  // Hand each active AI seat one of the remaining candidate worlds, in order.
-  const free = START_CANDIDATES.filter((c) => c !== setupStart);
-  let fi = 0;
-  for (let i = 1; i < SEAT_META.length; i++) {
-    if (setupSlots[i] !== 'ai') continue;
-    const start = free[fi++];
-    if (!start) break; // ran out of candidate worlds
-    const m = SEAT_META[i]!;
-    seats.push({
-      id: m.id,
-      name: seatHouseName(fids[i]!, m.name, i),
-      faction: fids[i]!,
-      start,
-      ai: true,
-      ...(setupTeams ? { team: setupSeatTeam[i] } : {}),
-    });
-  }
+  );
   // Carry the player's division templates + hero roster into the match (deep-cloned),
   // plus the meta-progression grant (snapshot — no live account reads mid-match).
   return {
