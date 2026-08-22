@@ -70,12 +70,9 @@ describe('подпись узла — вторая строка', () => {
     expect(calloutLine(вид({ tier: 'sector', buildings: 1 }))).toEqual({ do: 'stats' });
   });
 
-  // Ветка недостижима в нынешнем порядке отрисовки (фог-маркер перехватывает узел
-  // выше по циклу) — правило перенесено дословно, тест держит его контракт.
-  it('НЕОПОЗНАННЫЙ ГОВОРИТ СЛОВАМИ: пустота читалась бы как «разведан и пуст»', () => {
-    expect(calloutLine(вид({ identified: false }))).toEqual({ do: 'unknown' });
-    expect(calloutLine(вид({ identified: false, tier: 'sector' }))).toEqual({ do: 'unknown' });
-  });
+  // REFM-117.1: ветка 'unknown' ('· no telemetry') снята — мёртвый код.
+  // Неопознанный узел перехватывается фог-маркером выше по циклу отрисовки,
+  // поэтому calloutLine никогда не получает identified: false. Тест убран.
 
   it('ИСЧЕРПЫВАЮЩЕ по всем сочетаниям признаков', () => {
     const исходы: Record<string, number> = {};
@@ -88,14 +85,12 @@ describe('подпись узла — вторая строка', () => {
               const ждём =
                 detail <= 0
                   ? 'none'
-                  : !identified
-                    ? 'unknown'
-                    : tier === 'world' || garrison > 0 || buildings > 0
-                      ? 'stats'
-                      : 'none';
+                  : tier === 'world' || garrison > 0 || buildings > 0
+                    ? 'stats'
+                    : 'none';
               expect(r.do).toBe(ждём);
               исходы[r.do] = (исходы[r.do] ?? 0) + 1;
             }
-    expect(исходы).toEqual({ none: 18, unknown: 16, stats: 14 });
+    expect(исходы).toEqual({ none: 20, stats: 28 });
   });
 });

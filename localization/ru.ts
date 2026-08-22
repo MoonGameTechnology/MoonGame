@@ -90,7 +90,7 @@ export const ru: Record<string, string> = {
   // --- callsign — Позывные ботов.
   'build.action.build': 'Строить',
   'build.action.no-res': 'Не хватает ресурсов',
-  'build.cat.all': 'ВСЕ',
+  'build.cat.all': 'ВСЁ',
   'build.cat.defense': 'ОБОРОНА',
   'build.cat.economy': 'ЭКОНОМИКА',
   'build.cat.infra': 'ИНФРАСТРУКТУРА',
@@ -868,6 +868,10 @@ export const ru: Record<string, string> = {
   'sandbox.wars-ended': 'Войны прекращены: {n} — отношения нейтральные',
 
   // --- sci — Учёные совета: имя и что даёт ветка.
+  'sci.ground-marshal.desc': 'Лидер наземной ветки: крепости и оборона фронтира.',
+  'sci.ground-marshal.name': 'Наземный маршал',
+  'sci.missile-chief.desc': 'Лидер ракетной ветки: дальнобойные системы.',
+  'sci.missile-chief.name': 'Ракетный шеф',
   'sci.overseer.desc':
     'Лидер ветки командования (C2): доктрины автоматизации и делегирования. Открывает «Протокол Хранитель» — передачу места ИИ на время сна.',
   'sci.overseer.name': 'Куратор',
@@ -875,6 +879,8 @@ export const ru: Record<string, string> = {
   'sci.polymath.name': 'Полимат',
   'sci.void-admiral.desc': 'Лидер космической ветки: верфи, логистика, осадные доктрины.',
   'sci.void-admiral.name': 'Космоадмирал',
+  'sci.wing-commander.desc': 'Лидер ветки эскадрилий: авианосные ударные крылья.',
+  'sci.wing-commander.name': 'Командир крыла',
 
   // --- scipick — Совет учёных: кандидаты, фокус ветки, закрепление.
   'scipick.candidates': 'Кандидаты · нажмите, чтобы занять слот',

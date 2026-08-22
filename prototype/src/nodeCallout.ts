@@ -54,9 +54,10 @@ export type CalloutLine =
   /** Ничего (правила 4–5). */
   | { do: 'none' }
   /** Гарнизон и постройки. */
-  | { do: 'stats' }
-  /** «Нет телеметрии» словами (правило 6). */
-  | { do: 'unknown' };
+  | { do: 'stats' };
+  // REFM-117.1: `{ do: 'unknown' }` removed — dead code. Unidentified nodes are
+  // intercepted by the fog marker before the callout, so `identified` is always
+  // true here. The '· no telemetry' literal was never localised either.
 
 /** Что известно про узел, когда рисуется его подпись. */
 export interface CalloutSight {
@@ -82,10 +83,10 @@ export function calloutInk(identified: boolean, hasOwner: boolean): CalloutInk {
   return hasOwner ? 'owner' : 'neutral';
 }
 
-/** Что писать второй строкой (правила 4–6; `unknown` сейчас недостижим — см. шапку). */
+/** Что писать второй строкой (правила 4–5). */
 export function calloutLine(sight: CalloutSight): CalloutLine {
   if (sight.detail <= 0) return { do: 'none' }; // правило 4
-  if (!sight.identified) return { do: 'unknown' }; // правило 6
+  // REFM-117.1: правило 6 ('unknown' / 'no telemetry') снято — мёртвая ветка.
   // правило 5: мир отчитывается всегда, тихий сектор — только когда есть о чём
   if (sight.tier === 'world' || sight.garrison > 0 || sight.buildings > 0) return { do: 'stats' };
   return { do: 'none' };

@@ -867,6 +867,10 @@ export const en: Record<string, string> = {
   'sandbox.wars-ended': 'Wars ended: {n} — relations are neutral',
 
   // --- sci — Учёные совета: имя и что даёт ветка.
+  'sci.ground-marshal.desc': 'Leader of the ground branch: strongholds and frontier defence.',
+  'sci.ground-marshal.name': 'Ground Marshal',
+  'sci.missile-chief.desc': 'Leader of the missile branch: long-range systems.',
+  'sci.missile-chief.name': 'Missile Chief',
   'sci.overseer.desc':
     'Leader of the command branch (C2): doctrines of automation and delegation. Unlocks the «Steward Protocol» — handing your seat to an AI while you sleep.',
   'sci.overseer.name': 'Overseer',
@@ -874,6 +878,8 @@ export const en: Record<string, string> = {
   'sci.polymath.name': 'Polymath',
   'sci.void-admiral.desc': 'Leader of the space branch: shipyards, logistics, siege doctrines.',
   'sci.void-admiral.name': 'Void Admiral',
+  'sci.wing-commander.desc': 'Leader of the squadron branch: carrier strike wings.',
+  'sci.wing-commander.name': 'Wing Commander',
 
   // --- scipick — Совет учёных: кандидаты, фокус ветки, закрепление.
   'scipick.candidates': 'Candidates · tap to fill a slot',

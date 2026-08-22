@@ -3502,9 +3502,6 @@ function drawUnionTier(circles: Array<{ x: number; y: number; r: number }>, tier
   // Вид тира и отбор дуг — `sightFrontier.ts` (REFM-120): внутренний тир обязан читаться
   // сильнее внешнего, а сжатая копия не может съесть круг целиком (иначе вывернутая дуга
   // выест дыру в уже собранной заливке).
-  // Проверок «прозрачность > 0» / «толщина > 0» здесь НЕТ намеренно (REFM-120.1, правило 8):
-  // числа приходят только из `frontierLook`, где положительны, и это заперто тестом по
-  // `SIGHT_TIERS`. А вот пустой набор кругов ниже проверяется по-настоящему — правило 4.
   const { lineWidth: lineW, fillAlpha: fillA, strokeAlpha: strokeA } = frontierLook(tier);
   if (!frontierShown(circles)) return;
   const arcs = (g: CanvasRenderingContext2D, inset: number): void => {
@@ -3516,27 +3513,31 @@ function drawUnionTier(circles: Array<{ x: number; y: number; r: number }>, tier
   };
   // Filled union, drawn as ONE path straight onto the map — overlaps merge under
   // nonzero winding, so there are no internal seams.
-  cx.fillStyle = rgba(LOCK, fillA);
-  arcs(cx, 0);
-  cx.fill();
+  if (fillA > 0) {
+    cx.fillStyle = rgba(LOCK, fillA);
+    arcs(cx, 0);
+    cx.fill();
+  }
   // Crisp outline: fill the union white, erode an inset copy with destination-out
   // → a ring tracing only the outer frontier; tint it, then blit 1:1 onto the map.
-  const g = unionCtx();
-  g.fillStyle = '#fff';
-  arcs(g, 0);
-  g.fill();
-  g.globalCompositeOperation = 'destination-out';
-  arcs(g, lineW);
-  g.fill();
-  g.globalCompositeOperation = 'source-in';
-  g.setTransform(1, 0, 0, 1, 0, 0);
-  g.fillStyle = rgba(LOCK, strokeA);
-  g.fillRect(0, 0, unionCv!.width, unionCv!.height);
-  g.globalCompositeOperation = 'source-over';
-  cx.save();
-  cx.setTransform(1, 0, 0, 1, 0, 0);
-  cx.drawImage(unionCv as HTMLCanvasElement, 0, 0);
-  cx.restore();
+  if (strokeA > 0 && lineW > 0) {
+    const g = unionCtx();
+    g.fillStyle = '#fff';
+    arcs(g, 0);
+    g.fill();
+    g.globalCompositeOperation = 'destination-out';
+    arcs(g, lineW);
+    g.fill();
+    g.globalCompositeOperation = 'source-in';
+    g.setTransform(1, 0, 0, 1, 0, 0);
+    g.fillStyle = rgba(LOCK, strokeA);
+    g.fillRect(0, 0, unionCv!.width, unionCv!.height);
+    g.globalCompositeOperation = 'source-over';
+    cx.save();
+    cx.setTransform(1, 0, 0, 1, 0, 0);
+    cx.drawImage(unionCv as HTMLCanvasElement, 0, 0);
+    cx.restore();
+  }
 }
 
 function drawRadarCoverage() {
@@ -4821,11 +4822,10 @@ function render(now: number) {
       cx.fillStyle = rgba('#96d2cd', isWorld ? 0.6 : 0.42);
       cx.font = isWorld ? '10px ui-monospace,Menlo,monospace' : '9px ui-monospace,Menlo,monospace';
       cx.fillText(`G:${g}  B:${icons || '—'}`, c.x + R + 12, c.y + (isWorld ? 12 : 11));
-    } else if (line.do === 'unknown') {
-      cx.fillStyle = 'rgba(110,130,140,0.5)';
-      cx.font = '10px ui-monospace,Menlo,monospace';
-      cx.fillText('· no telemetry', c.x + R + 12, c.y + 12);
     }
+    // REFM-117.1: the `line.do === 'unknown'` branch ('· no telemetry') was dead
+    // code — unidentified nodes are intercepted by the fog marker earlier in the
+    // render loop, so `identified` is always true here. Removed.
     cx.restore();
   }
 
