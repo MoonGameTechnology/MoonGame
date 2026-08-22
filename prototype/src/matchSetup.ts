@@ -107,7 +107,7 @@ export const DEFAULT_SETUP: SetupConfig = {
   ],
 };
 
-export type NetworkMatchMode = 'ffa' | '2v2' | '5v5';
+export type NetworkMatchMode = 'ffa' | '2v2' | '5v5' | 'pve';
 
 const NETWORK_HOUSES = [
   { name: 'Azure Compact', faction: 'azure' },
@@ -118,12 +118,21 @@ const NETWORK_HOUSES = [
 
 export function parseNetworkMatchMode(value: string | undefined): NetworkMatchMode {
   if (value === undefined) return 'ffa';
-  if (value === '2v2' || value === '5v5') return value;
-  throw new Error(`TEAMS must be 2v2 or 5v5, got: ${value}`);
+  if (value === '2v2' || value === '5v5' || value === 'pve') return value;
+  throw new Error(`TEAMS must be 2v2, 5v5 or pve, got: ${value}`);
 }
 
 /** Claimable human chairs for the prototype host. Empty chairs are driven by server AI. */
 export function networkSeats(mode: NetworkMatchMode = 'ffa'): SeatConfig[] {
+  if (mode === 'pve') {
+    // PvE: 2 human players (team A) vs 1 strong AI (team B).
+    // Players start near each other in the centre; the AI starts at the edge.
+    return [
+      { id: 'p1', name: 'Azure Compact', faction: 'azure', start: START_CANDIDATES[0]!, ai: false, team: 'A' },
+      { id: 'p2', name: 'Amber Concord', faction: 'amber', start: START_CANDIDATES[1]!, ai: false, team: 'A' },
+      { id: 'p3', name: 'Crimson Hegemony', faction: 'crimson', start: START_CANDIDATES[2]!, ai: true, team: 'B' },
+    ];
+  }
   const startIndexes = mode === '2v2' ? [9, 8, 3, 4] : START_CANDIDATES.map((_, i) => i);
   return startIndexes.map((startIndex, i) => {
     const house = NETWORK_HOUSES[i % NETWORK_HOUSES.length]!;

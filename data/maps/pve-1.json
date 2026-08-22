@@ -1,0 +1,95 @@
+{
+  "id": "pve-1",
+  "seed": "pve-1",
+  "time": 0,
+  "sectors": {
+    "nexus": { "position": { "x": 0, "y": 0 }, "kind": "nebula", "terrain": "nebula" },
+    "home_a": {
+      "position": { "x": -200, "y": -100 },
+      "kind": "planet",
+      "planetType": "terran",
+      "owner": "p1",
+      "buildings": [{ "type": "mine_t1" }, { "type": "spaceport" }, { "type": "radar" }],
+      "garrison": [{ "unit": "militia", "count": 3 }]
+    },
+    "home_b": {
+      "position": { "x": 200, "y": -100 },
+      "kind": "planet",
+      "planetType": "terran",
+      "owner": "p2",
+      "buildings": [{ "type": "mine_t1" }, { "type": "spaceport" }, { "type": "radar" }],
+      "garrison": [{ "unit": "militia", "count": 3 }]
+    },
+    "hive": {
+      "position": { "x": 0, "y": 300 },
+      "kind": "planet",
+      "planetType": "volcanic",
+      "owner": "p3",
+      "buildings": [
+        { "type": "mine_t2" },
+        { "type": "spaceport" },
+        { "type": "orbital_aa" },
+        { "type": "barracks" },
+        { "type": "factory" }
+      ],
+      "garrison": [
+        { "unit": "militia", "count": 5 },
+        { "unit": "heavy_infantry", "count": 3 }
+      ]
+    },
+    "drift": { "position": { "x": -150, "y": 100 }, "kind": "asteroid", "terrain": "asteroid_field" },
+    "veil": { "position": { "x": 150, "y": 100 }, "kind": "nebula", "terrain": "nebula" },
+    "ridge": { "position": { "x": 0, "y": 150 }, "kind": "asteroid", "terrain": "asteroid_field" }
+  },
+  "paths": [
+    ["home_a", "nexus"],
+    ["home_b", "nexus"],
+    ["nexus", "ridge"],
+    ["ridge", "hive"],
+    ["home_a", "drift"],
+    ["drift", "nexus"],
+    ["home_b", "veil"],
+    ["veil", "nexus"],
+    ["drift", "ridge"],
+    ["veil", "ridge"]
+  ],
+  "players": {
+    "p1": {
+      "name": "Azure Compact",
+      "faction": "vanguard",
+      "resources": { "credits": 400, "metal": 400 }
+    },
+    "p2": {
+      "name": "Amber Concord",
+      "faction": "vanguard",
+      "resources": { "credits": 400, "metal": 400 }
+    },
+    "p3": {
+      "name": "Swarm Collective",
+      "faction": "swarm",
+      "resources": { "credits": 800, "metal": 800 }
+    }
+  },
+  "fleets": {
+    "p1_1": {
+      "owner": "p1",
+      "location": "home_a",
+      "units": [{ "unit": "cruiser", "count": 2 }, { "unit": "scout_drone", "count": 1 }]
+    },
+    "p2_1": {
+      "owner": "p2",
+      "location": "home_b",
+      "units": [{ "unit": "cruiser", "count": 2 }, { "unit": "scout_drone", "count": 1 }]
+    },
+    "p3_1": {
+      "owner": "p3",
+      "location": "hive",
+      "units": [{ "unit": "cruiser", "count": 3 }, { "unit": "scout_drone", "count": 2 }]
+    },
+    "p3_2": {
+      "owner": "p3",
+      "location": "hive",
+      "units": [{ "unit": "cruiser", "count": 2 }]
+    }
+  }
+}
