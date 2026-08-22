@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale } from '../../localization/runtime';
 import {
+  assignSeats,
   factionBonuses,
   houseDisplayName,
   houseNameFor,
@@ -132,5 +133,54 @@ describe('сетап — соперники', () => {
 
   it('выключенные места не считаются', () => {
     expect(rivalCount(slots('human', 'off', 'ai', 'off', 'ai', 'off'))).toBe(2);
+  });
+});
+
+describe('сетап — кто реально играет и с какого мира стартует (REFM-160)', () => {
+  const slots = (...r: SeatRole[]): SeatRole[] => r;
+  const CANDS = ['w1', 'w2', 'w3', 'w4'];
+
+  it('МЕСТО 0 — ВСЕГДА ТЫ: свой мир, независимо от собственной роли в slots[0]', () => {
+    expect(assignSeats(3, slots('off', 'off', 'off'), 'home', CANDS)).toEqual([
+      { index: 0, start: 'home' },
+    ]);
+  });
+
+  it('AI-МЕСТА ЗАБИРАЮТ КАНДИДАТОВ ПО ПОРЯДКУ, минуя выключенные', () => {
+    expect(assignSeats(4, slots('human', 'ai', 'off', 'ai'), 'home', CANDS)).toEqual([
+      { index: 0, start: 'home' },
+      { index: 1, start: 'w1' },
+      { index: 3, start: 'w2' },
+    ]);
+  });
+
+  it('СВОЙ МИР ИЗ КАНДИДАТОВ ИСКЛЮЧЁН: AI не сядет на уже занятый старт', () => {
+    const out = assignSeats(2, slots('human', 'ai'), 'w2', CANDS);
+    expect(out).toEqual([
+      { index: 0, start: 'w2' },
+      { index: 1, start: 'w1' },
+    ]);
+  });
+
+  it('КАНДИДАТЫ КОНЧИЛИСЬ — раздача ОСТАНАВЛИВАЕТСЯ: дальние AI-места остаются без места', () => {
+    const out = assignSeats(4, slots('human', 'ai', 'ai', 'ai'), 'home', ['w1']);
+    expect(out).toEqual([
+      { index: 0, start: 'home' },
+      { index: 1, start: 'w1' },
+    ]);
+  });
+
+  it('нет AI-мест — только своё', () => {
+    expect(assignSeats(3, slots('human', 'off', 'off'), 'home', CANDS)).toEqual([
+      { index: 0, start: 'home' },
+    ]);
+  });
+
+  it('входные массивы не мутируются', () => {
+    const sl = slots('human', 'ai', 'ai');
+    const cands = [...CANDS];
+    assignSeats(3, sl, 'home', cands);
+    expect(sl).toEqual(['human', 'ai', 'ai']);
+    expect(cands).toEqual(CANDS);
   });
 });
