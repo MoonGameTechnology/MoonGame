@@ -629,6 +629,7 @@ import { archiveUrl, httpBase, matchesUrl, queryOutcome, seatsUrl } from './matc
 import { archiveEffect, type ArchiveEffect } from './archiveOutcome';
 import { mintedToken, passwordFrom, registerExtra } from './authRequest';
 import { carryEmail, recoverAnswer, recoverStep } from './recoverForm';
+import { resolveAddress } from './serverAddress';
 import { authStatusUrl, identityMode, revealSignup } from './identityProbe';
 import { houseLine, seatView, type SeatView } from './seatList';
 import { pollLine, pollTick, type PollPhase } from './matchPoll';
@@ -10068,36 +10069,19 @@ function connect(): void {
  *  null (and sets the status line) when either is missing/invalid. Shared by the
  *  match browser and `connect()`. */
 function resolveServer(): { base: string; nick: string } | null {
-  let raw = srvInput.value.trim();
-  if (!raw) {
-    statusEl.textContent = t('net.need-address');
-    return null;
-  }
-  // Accept http(s)://, ws(s)://, or a bare host:port and normalize. Kills three
-  // silent failures: https page + ws:// (mixed content) → wss://; a pasted /matches
-  // path → 404; a bare host with no scheme can't open.
-  raw = raw.replace(/^http(s?):\/\//i, 'ws$1://');
-  if (!/^wss?:\/\//i.test(raw)) {
-    raw = (location.protocol === 'https:' ? 'wss://' : 'ws://') + raw;
-  }
-  if (location.protocol === 'https:' && raw.startsWith('ws://')) {
-    raw = 'wss://' + raw.slice('ws://'.length);
-  }
-  let base: string;
-  try {
-    base = `${new URL(raw).protocol}//${new URL(raw).host}`; // drop any path/query
-  } catch {
-    statusEl.textContent = t('net.bad-address');
-    return null;
-  }
-  const nick = nickInput.value.trim();
-  if (!nick) {
-    // Silent: the boot block calls this BEFORE anyone has typed anything (to probe
-    // /auth/status), so painting a complaint here left «введите позывной» sitting under
-    // a freshly opened welcome card. The null return still blocks the caller.
-    return null;
-  }
-  return { base, nick };
+  // Разбор набранного — `serverAddress.ts` (REFM-162): схема правится (скопированный из
+  // браузера `https://` → `wss://`, голый хост дополняется схемой страницы, а на
+  // HTTPS-странице `ws://` поднимается до `wss://` — иначе браузер молча режет сокет),
+  // путь отбрасывается, а пустой ПОЗЫВНОЙ не пускает дальше МОЛЧА: пробу режима
+  // аккаунтов зовут из загрузочного блока, до того как игрок что-то напечатал.
+  const step = resolveAddress({
+    server: srvInput.value,
+    nick: nickInput.value,
+    pageHttps: location.protocol === 'https:',
+  });
+  if (step.kind === 'ok') return { base: step.base, nick: step.nick };
+  if (step.kind !== 'need-nick') statusEl.textContent = t(step.key);
+  return null;
 }
 
 // MUST stay a hoisted function declaration — NOT a `const` arrow. The boot block
