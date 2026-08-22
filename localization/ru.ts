@@ -1538,6 +1538,8 @@ export const ru: Record<string, string> = {
   'setup.teams.note': 'одна сторона — союзники',
   'setup.teams.off': 'Командный бой: выкл',
   'setup.teams.on': 'Командный бой: ВКЛ',
+  'setup.pve': 'PvE',
+  'setup.pve.started': 'PvE матч начат — объединитесь против ИИ!',
   'setup.title': 'НАСТРОЙКА СХВАТКИ',
 
   // --- settings — Экран настроек: интерфейс, цвета сторон, графика.

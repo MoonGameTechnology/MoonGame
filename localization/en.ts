@@ -1541,6 +1541,8 @@ export const en: Record<string, string> = {
   'setup.teams.note': 'one side = allies',
   'setup.teams.off': 'Team battle: off',
   'setup.teams.on': 'Team battle: ON',
+  'setup.pve': 'PvE',
+  'setup.pve.started': 'PvE match started — team up against the AI!',
   'setup.title': 'SKIRMISH SETUP',
 
   // --- settings — Экран настроек: интерфейс, цвета сторон, графика.

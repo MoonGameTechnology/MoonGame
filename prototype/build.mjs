@@ -1868,6 +1868,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #setup .tmtog{flex:1;padding:9px 12px;border-radius:8px;border:1px solid var(--line-hi);background:transparent;
   color:var(--dim);font:700 12px ui-monospace,monospace;letter-spacing:.5px;cursor:pointer;text-align:left;}
 #setup .tmtog.on{border-color:var(--amber);color:var(--amber);background:rgba(232,178,74,.12);}
+#setup .pve-btn{flex:0 0 auto;padding:9px 12px;border-radius:8px;border:1px solid var(--cyan);background:rgba(53,214,230,.12);color:var(--cyan);}
 #setup .tmhint{font-size:10px;color:var(--dim);letter-spacing:.3px;}
 #setup .srow .tmchip{width:30px;height:30px;flex:none;border-radius:7px;border:1px solid var(--line-hi);
   background:transparent;font:800 13px ui-monospace,monospace;cursor:pointer;color:var(--dim);}
