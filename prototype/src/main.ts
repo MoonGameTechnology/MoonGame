@@ -598,6 +598,7 @@ import { routeShown, routeStops, routeStroke } from './fleetRoute';
 import { netContacts, soloContacts } from './radarContacts';
 import { buildLogLine, type BuildLogKind } from './buildLog';
 import { bootyKind, bootyText, counterLine, spyRepaint } from './spyLog';
+import { AA_SHOTS_MAX, SIEGE_SHOTS_MAX, aaImpact, capShots, siegeImpact } from './fireEffects';
 import {
   decisionsField,
   diffFields,
@@ -3251,18 +3252,17 @@ function handleEvents(events: DomainEvent[]) {
       case 'aa.fired': {
         const planet = s.planets[p.planetId as string];
         if (!planet || !known(p.planetId as string)) break; // fogged flak stays unseen
+        // Концы дуги и предел очереди — `fireEffects.ts` (REFM-178): жертва могла погибнуть
+        // ЭТИМ же залпом (ядро издаёт событие после урона), и тогда вспышка встаёт над
+        // своей орбитой — беззвучно пропавший залп читался бы как «ПВО не сработало».
         const target = s.fleets[p.fleetId as string];
-        const to = (target && fleetPos(target)) ?? {
-          x: planet.position.x + 6,
-          y: planet.position.y - 14, // the victim died this volley — burst over the orbit
-        };
         aaShots.push({
           from: { ...planet.position },
-          to,
+          to: aaImpact(target && fleetPos(target), planet.position),
           at: performance.now(),
           close: p.tier === 'close',
         });
-        while (aaShots.length > 40) aaShots.shift();
+        capShots(aaShots, AA_SHOTS_MAX);
         break;
       }
       case 'artillery.fired': {
@@ -3275,7 +3275,9 @@ function handleEvents(events: DomainEvent[]) {
         const anchorNode = (id: string | null | undefined) =>
           id ? (s.planets[id]?.position ?? null) : null;
         const victim = s.fleets[p.target as string];
-        const to = (victim && fleetPos(victim)) ?? anchorNode(p.near as string);
+        // Запасной конец присылает САМО событие: ядро знает, во что целились, даже когда
+        // цели уже нет; нет ни одного конца — выстрела нет (правила 3–4 в `fireEffects.ts`).
+        const to = siegeImpact(victim && fleetPos(victim), anchorNode(p.near as string));
         if (!to) break;
         // Fog: show the exchange only if either end sits on a node we can see.
         const shooterNode = shooter.location ?? shooter.edge?.from;
@@ -3289,7 +3291,7 @@ function handleEvents(events: DomainEvent[]) {
           at: performance.now(),
           seed: siegeSeed++,
         });
-        while (siegeShots.length > 24) siegeShots.shift();
+        capShots(siegeShots, SIEGE_SHOTS_MAX);
         break;
       }
       case 'market.bought':
