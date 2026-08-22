@@ -234,7 +234,16 @@ export interface IntelGrant {
 }
 
 export type MatchStatus = 'ongoing' | 'ended';
-export type MatchEndReason = 'domination' | 'elimination' | 'score' | 'timeout';
+export type MatchEndReason =
+  | 'domination'
+  | 'elimination'
+  | 'score'
+  | 'timeout'
+  /** PVE-4: the wave assault was survived and the enemy cleared — everyone still
+   *  standing wins TOGETHER (`match.winners`), there is no single champion. */
+  | 'pve-cleared'
+  /** PVE-4: every human seat fell. The NPC is the formal winner. */
+  | 'pve-failed';
 
 export interface MatchScore {
   /** Map control: owned planet/sectors. */
@@ -596,6 +605,27 @@ export interface GameState {
   /** BOOST-1 форс-марш: fleet ids currently marching at +50% speed for 5% max-hp
    *  wear per game-hour in transit (`forcedMarchModule`, `fleet.forcemarch`). */
   forcedMarch?: Record<FleetId, true>;
+  /** PVE-3: the wave counter of a PvE match (`pveModule`). Present only once the
+   *  module has recognised the match as PvE (its mode carries a `pve` section) AND
+   *  found the NPC seat; absent everywhere else, so a PvP match carries no trace of
+   *  the mechanic. The next wave's time lives in `scheduled`, like every other future
+   *  occurrence — `nextWaveAt` is a READ-ONLY echo for the HUD, never the source of
+   *  truth about when the wave fires. */
+  pve?: PveState;
+}
+
+/** PvE wave progress (`pveModule`, docs/pve-team-modes-roadmap.md Фаза 3). */
+export interface PveState {
+  /** Waves that have already landed. 0 until the first one fires. */
+  waveNumber: number;
+  /** Waves this match must survive, copied from the mode's `pve.waves` at seed —
+   *  the match keeps running under the rules it started with even if content changes. */
+  totalWaves: number;
+  /** The seat the NPC enemy plays (resolved once, by the mode's `npcFaction`). */
+  npcPlayerId: PlayerId;
+  /** World time the next wave is due — an echo of the scheduled event, for the HUD.
+   *  Absent once the last wave has landed. */
+  nextWaveAt?: number;
 }
 
 /** A standing patrol's launch anchor + reach + current sortie budget (CC-4). */

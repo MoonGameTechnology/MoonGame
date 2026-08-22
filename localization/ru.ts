@@ -53,6 +53,8 @@ export const ru: Record<string, string> = {
   'ai.end.domination': 'доминированием в галактике',
   'ai.end.elimination': 'уничтожением соперников',
   'ai.end.over': 'матч завершён',
+  'ai.end.pve-cleared': 'все волны отражены',
+  'ai.end.pve-failed': 'оборона пала',
   'ai.end.score': 'достижением лимита очков',
   'ai.end.timeout': 'истечением времени',
   'ai.sortie.docked-only': '🛩 дежурный вылет — только со стоянки в узле',
@@ -533,6 +535,7 @@ export const ru: Record<string, string> = {
   'data.overseer': 'Куратор',
   'data.planet': 'Планета',
   'data.planetary-bastions': 'Планетарные бастионы',
+  'data.pve-waves': 'Волны Роя',
   'data.psi-amplifier': 'Пси-усилитель',
   'data.psi-veil': 'Пси-вуаль',
   'data.radar-array': 'Радарный массив',
@@ -561,6 +564,7 @@ export const ru: Record<string, string> = {
   'data.spaceport': 'Космопорт',
   'data.special-forces': 'спецназ',
   'data.squadron': 'эскадрилья',
+  'data.standard': 'Стандартный',
   'data.steward-protocol': 'Протокол «Хранитель»',
   'data.strike-carrier': 'ударный носитель',
   'data.strike-vectors': 'Ударные векторы',
@@ -1538,6 +1542,8 @@ export const ru: Record<string, string> = {
   'setup.teams.note': 'одна сторона — союзники',
   'setup.teams.off': 'Командный бой: выкл',
   'setup.teams.on': 'Командный бой: ВКЛ',
+  'setup.pve': 'PvE',
+  'setup.pve.started': 'PvE матч начат — объединитесь против ИИ!',
   'setup.title': 'НАСТРОЙКА СХВАТКИ',
 
   // --- settings — Экран настроек: интерфейс, цвета сторон, графика.

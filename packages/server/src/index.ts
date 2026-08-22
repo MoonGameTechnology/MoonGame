@@ -12,6 +12,7 @@ export {
   type MultiplayerServerHandle,
   type MultiplayerServerOptions,
 } from './wsServer';
+export { pveOrders, type PveOrdersOptions } from './pveOrchestrator';
 export {
   MatchRegistry,
   type MatchMeta,

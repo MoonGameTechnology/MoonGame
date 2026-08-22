@@ -50,6 +50,8 @@ export const en: Record<string, string> = {
   'ai.end.domination': 'by galactic domination',
   'ai.end.elimination': 'by eliminating rivals',
   'ai.end.over': 'the match has ended',
+  'ai.end.pve-cleared': 'every wave repelled',
+  'ai.end.pve-failed': 'the defence fell',
   'ai.end.score': 'by score limit',
   'ai.end.timeout': 'on the clock',
   'ai.sortie.docked-only': '🛩 standing patrol — only from a parked node',
@@ -533,6 +535,7 @@ export const en: Record<string, string> = {
   'data.overseer': 'Overseer',
   'data.planet': 'Planet',
   'data.planetary-bastions': 'Planetary Bastions',
+  'data.pve-waves': 'Swarm Waves',
   'data.psi-amplifier': 'Psi Amplifier',
   'data.psi-veil': 'Psi Veil',
   'data.radar-array': 'Radar Array',
@@ -561,6 +564,7 @@ export const en: Record<string, string> = {
   'data.spaceport': 'Spaceport',
   'data.special-forces': 'special forces',
   'data.squadron': 'squadron',
+  'data.standard': 'Standard',
   'data.steward-protocol': 'Steward Protocol',
   'data.strike-carrier': 'strike carrier',
   'data.strike-vectors': 'Strike Vectors',
@@ -1541,6 +1545,8 @@ export const en: Record<string, string> = {
   'setup.teams.note': 'one side = allies',
   'setup.teams.off': 'Team battle: off',
   'setup.teams.on': 'Team battle: ON',
+  'setup.pve': 'PvE',
+  'setup.pve.started': 'PvE match started — team up against the AI!',
   'setup.title': 'SKIRMISH SETUP',
 
   // --- settings — Экран настроек: интерфейс, цвета сторон, графика.

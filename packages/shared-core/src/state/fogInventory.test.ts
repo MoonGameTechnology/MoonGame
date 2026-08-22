@@ -46,6 +46,11 @@ type Exposure = 'public' | 'stripped' | 'filtered';
  * решить, что с ним делает проекция. Это и есть весь смысл файла.
  */
 const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
+  // PVE-3: волны — общий враг и общая угроза. Скрывать «идёт волна 3 из 10, следующая
+  // через N» не от кого: в кооп-режиме это ровно тот факт, вокруг которого игроки
+  // сговариваются, а NPC-место и так публично (оно сидит за столом). Приватного тут
+  // нет — состав будущей волны в поле не лежит, он выводится из контента.
+  pve: 'public',
   version: 'public', // правила матча — общий факт
   time: 'public',
   startedAt: 'public',
@@ -290,6 +295,9 @@ function maximalState(): GameState {
       CANARY_fleet: { steps: [{ kind: 'move', to: 'CANARY_dest' }] },
     },
     forcedMarch: { mine: true, CANARY_fleet: true },
+    // Ни одной канарейки: волны публичны целиком (см. опись), и подсадить сюда чужой
+    // секрет было бы неправдой о поле — оно его не носит.
+    pve: { waveNumber: 3, totalWaves: 10, npcPlayerId: 'swarm', nextWaveAt: 7 },
   };
 }
 

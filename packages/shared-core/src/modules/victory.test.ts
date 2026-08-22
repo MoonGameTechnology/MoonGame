@@ -745,3 +745,113 @@ describe('session-end rewards (SES-2 first slice, GDD §3.4)', () => {
     });
   });
 });
+
+describe('victory — PvE-исход (PVE-4)', () => {
+  const kernel = createKernel([victoryModule]);
+
+  /** Мир PvE: двое людей и Рой. `state.pve` сажаем руками — `pveModule` сюда не
+   *  подмешан НАРОЧНО: исход обязан считаться по состоянию, а не по соседству модулей. */
+  function pveWorld(over: Partial<GameState> = {}): GameState {
+    return {
+      ...baseState(),
+      players: { p1: player('p1'), p2: player('p2'), swarm: player('swarm') },
+      planets: {
+        A: planet('A', 'p1'),
+        B: planet('B', 'p2'),
+        H: planet('H', 'swarm'),
+      },
+      pve: { waveNumber: 3, totalWaves: 3, npcPlayerId: 'swarm' },
+      ...over,
+    };
+  }
+
+  it('волны пережиты и логово зачищено → победа ВСЕХ выживших вместе', () => {
+    // У p1 два мира, у p2 один: счёт неравный, поэтому `winner` — предсказуемо верхний,
+    // а `winners` несёт обоих. Заодно расклад ЛОВИТ порядок проверок: p1 держит 2 из 3
+    // капчурных миров, то есть проходит и порог доминирования (0.6) — но PvE-исход
+    // считается раньше, и матч кончается кооп-победой, а не личной.
+    const state = pveWorld({
+      planets: {
+        A: planet('A', 'p1'),
+        A2: planet('A2', 'p1'),
+        B: planet('B', 'p2'),
+        H: planet('H', null),
+      },
+    });
+    const r = okAdvance(kernel.advanceTo(state, ctx(HOUR)));
+    expect(r.state.match).toMatchObject({
+      status: 'ended',
+      reason: 'pve-cleared',
+      winner: 'p1',
+    });
+    expect(r.state.match.winners).toEqual(['p1', 'p2']);
+  });
+
+  it('равный счёт выживших — победа общая, персонального чемпиона нет', () => {
+    // `winner: null` здесь не «ничья вместо победы»: `winners` полон, а прототип
+    // считает победителем каждого из них (`outcomeOf`). Чемпиона просто не из кого
+    // выбрать — и врать, назначив алфавитно первого, модуль не станет.
+    const state = pveWorld({
+      planets: { A: planet('A', 'p1'), B: planet('B', 'p2'), H: planet('H', null) },
+    });
+    const r = okAdvance(kernel.advanceTo(state, ctx(HOUR)));
+    expect(r.state.match).toMatchObject({ status: 'ended', reason: 'pve-cleared', winner: null });
+    expect(r.state.match.winners).toEqual(['p1', 'p2']);
+  });
+
+  it('все люди пали → поражение, формальный победитель — Рой', () => {
+    const state = pveWorld({
+      planets: { A: planet('A', 'swarm'), B: planet('B', 'swarm'), H: planet('H', 'swarm') },
+    });
+    const r = okAdvance(kernel.advanceTo(state, ctx(HOUR)));
+    expect(r.state.match).toMatchObject({
+      status: 'ended',
+      winner: 'swarm',
+      reason: 'pve-failed',
+    });
+  });
+
+  it('поражение объявляется, даже когда на доске остался ОДИН активный (Рой)', () => {
+    // Ровно тот случай, ради которого PvE-чек стоит ДО отсечки «активных меньше двух»:
+    // в PvP один игрок на доске значит «гонки нет», а в PvE — «людей не осталось».
+    const state = pveWorld({
+      players: { p1: { ...player('p1'), status: 'defeated' }, swarm: player('swarm') },
+      planets: { H: planet('H', 'swarm') },
+    });
+    const r = okAdvance(kernel.advanceTo(state, ctx(HOUR)));
+    expect(r.state.match).toMatchObject({ status: 'ended', reason: 'pve-failed' });
+  });
+
+  it('волны ещё идут — матч продолжается, даже если Рой уже без миров', () => {
+    // Ранняя зачистка логова не заканчивает матч: она лишь лишает будущие волны места
+    // спавна, а счётчик всё равно доходит до конца — тупика нет.
+    const state = pveWorld({
+      pve: { waveNumber: 1, totalWaves: 3, npcPlayerId: 'swarm' },
+      planets: { A: planet('A', 'p1'), B: planet('B', 'p2'), H: planet('H', null) },
+    });
+    const r = okAdvance(kernel.advanceTo(state, ctx(HOUR)));
+    expect(r.state.match.status).toBe('ongoing');
+  });
+
+  it('РЕГРЕССИЯ: без `state.pve` PvP-исходы считаются ровно как раньше', () => {
+    // Тот же расклад, что в тесте доминирования выше, но прогнанный ПОСЛЕ вставки
+    // PvE-чека: блок обязан быть невидимым для матча без режима волн.
+    const state: GameState = {
+      ...baseState(),
+      planets: { A: planet('A', 'p1'), B: planet('B', 'p1'), C: planet('C', 'p2') },
+    };
+    const r = okAdvance(kernel.advanceTo(state, ctx(HOUR)));
+    expect(r.state.match).toMatchObject({ status: 'ended', winner: 'p1', reason: 'domination' });
+  });
+
+  it('РЕГРЕССИЯ: в PvE-матче обычные исходы не перехватываются раньше времени', () => {
+    // Люди живы, волны не кончились — PvE-блок молчит, и доминирование Роя считается
+    // обычным путём (Рой держит 2 из 3 миров при пороге 0.6).
+    const state = pveWorld({
+      pve: { waveNumber: 1, totalWaves: 3, npcPlayerId: 'swarm' },
+      planets: { A: planet('A', 'p1'), B: planet('B', 'swarm'), H: planet('H', 'swarm') },
+    });
+    const r = okAdvance(kernel.advanceTo(state, ctx(HOUR)));
+    expect(r.state.match).toMatchObject({ status: 'ended', winner: 'swarm', reason: 'domination' });
+  });
+});

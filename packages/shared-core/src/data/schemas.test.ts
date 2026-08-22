@@ -5,6 +5,11 @@ import path from 'node:path';
 import { parseGameData, safeParseGameData, buildingLevel, buildingMaxLevel } from './schemas';
 import { composeGameDataBundle } from './loadGameData';
 import { canEquip, moduleAllowed } from '../util/loadout';
+import {
+  DEFAULT_COALITION_FACTOR,
+  DEFAULT_DOMINATION_PERCENT,
+  DEFAULT_SCORE_LIMIT,
+} from '../modules/victory';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
 const dataDir = path.join(repoRoot, 'data');
@@ -22,7 +27,7 @@ function loadShippedBundle(): Record<string, unknown> {
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.5');
+    expect(data.version).toBe('0.1.7');
     expect(data.resources).toContain('microelectronics');
     expect(data.units.siege_lance?.stats.range).toBe(300); // artillery firing radius (map units)
     expect(data.units.cruiser?.upkeep.credits).toBe(8); // daily upkeep
@@ -429,5 +434,82 @@ describe('hero archetypes + abilities (HERO-1, docs/heroes.md)', () => {
         heroAbilities: { void: { name: 'X' } },
       }).success,
     ).toBe(false);
+  });
+});
+
+describe('game modes (PVE-0.1, docs/pve-team-modes-roadmap.md)', () => {
+  /** A shipped bundle with `modes` swapped for the given catalog — the same
+   *  "tweak one fragment, re-parse" shape the fail-closed tests above use. */
+  const withModes = (modes: unknown): ReturnType<typeof safeParseGameData> =>
+    safeParseGameData({ ...loadShippedBundle(), modes });
+
+  it('validates the shipped mode catalog', () => {
+    const data = parseGameData(loadShippedBundle());
+    const standard = data.modes.standard;
+    expect(standard?.name).toBe('Standard');
+    expect(standard?.teamFormat).toBe('ffa');
+    expect(standard?.modules).toEqual([]); // no optional mode-module — the base rules
+    expect(standard?.pve).toBeUndefined(); // PvP: no NPC enemy
+  });
+
+  it('the `standard` preset restates the victory module\'s base rules, verbatim', () => {
+    // PVE-0.3 makes today's implicit defaults an explicit preset, which puts the same
+    // fact in two places (data and `victory.ts`). Pinning the preset TO the constants
+    // — instead of to copied literals — is what keeps the pair from drifting once
+    // PVE-0.2 starts merging the preset into `config.victory`.
+    const { victory } = parseGameData(loadShippedBundle()).modes.standard!;
+    expect(victory).toEqual({
+      dominationPercent: DEFAULT_DOMINATION_PERCENT,
+      scoreLimit: DEFAULT_SCORE_LIMIT,
+      coalitionFactor: DEFAULT_COALITION_FACTOR,
+    });
+  });
+
+  it('applies defaults for omitted optional mode fields', () => {
+    const parsed = withModes({ bare: { name: 'Bare' } });
+    expect(parsed.success).toBe(true);
+    const mode = parsed.success ? parsed.data.modes.bare : undefined;
+    expect(mode).toEqual({ name: 'Bare', victory: {}, teamFormat: 'ffa', modules: [] });
+  });
+
+  it('accepts a PvE mode (waves + NPC faction) across every team format', () => {
+    for (const teamFormat of ['1v1', '2v2', '3v3', '4v4', '5v5', 'ffa']) {
+      const parsed = withModes({
+        waves: {
+          name: 'Waves',
+          teamFormat,
+          modules: ['pve'],
+          pve: { waves: 10, npcFaction: 'swarm', waveIntervalHours: 6 },
+        },
+      });
+      expect({ teamFormat, ok: parsed.success }).toEqual({ teamFormat, ok: true });
+    }
+  });
+
+  it('every mode references a known faction and only known team formats (referential integrity)', () => {
+    const data = parseGameData(loadShippedBundle());
+    const unknown = Object.entries(data.modes)
+      .filter(([, mode]) => mode.pve && !(mode.pve.npcFaction in data.factions))
+      .map(([id, mode]) => `${id}: ${mode.pve?.npcFaction}`);
+    expect(unknown.sort()).toEqual([]);
+  });
+
+  it('rejects an unknown team format and a malformed PvE section (fail-closed)', () => {
+    expect(withModes({ m: { name: 'M', teamFormat: '6v6' } }).success).toBe(false);
+    expect(withModes({ m: { name: 'M', pve: { waves: 0, npcFaction: 'swarm', waveIntervalHours: 6 } } }).success).toBe(
+      false,
+    );
+    expect(withModes({ m: { name: 'M', pve: { waves: 5, waveIntervalHours: 6 } } }).success).toBe(false);
+    expect(withModes({ m: { name: 'M', pve: { waves: 5, npcFaction: 'swarm', waveIntervalHours: 0 } } }).success).toBe(
+      false,
+    );
+  });
+
+  it('rejects a per-match timestamp in a mode victory preset (content pins rules, not a clock)', () => {
+    // `VictoryConfig.endsAt` is an absolute match timestamp — it cannot be shipped
+    // content. Without `.strict()` zod would silently DROP it, leaving a mode that
+    // reads as configured and is not; the loud rejection is the fail-secure half.
+    expect(withModes({ m: { name: 'M', victory: { endsAt: 42 } } }).success).toBe(false);
+    expect(withModes({ m: { name: 'M', victory: { scoreLimit: 0 } } }).success).toBe(false);
   });
 });

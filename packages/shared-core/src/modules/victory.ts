@@ -10,15 +10,18 @@ import { MS_PER_DAY } from '../util/time';
 import { isCapturable, provinceScore } from '../state/sectorKind';
 import { getStance } from '../state/diplomacy';
 
-const DEFAULT_DOMINATION_PERCENT = 0.6;
+/** The base rules, exported so the `standard` mode preset (`data/modes.json`) can be
+ *  pinned to them by test instead of to copied literals — the same fact now lives in
+ *  content as well as here, and only that pin keeps the pair from drifting. */
+export const DEFAULT_DOMINATION_PERCENT = 0.6;
 /** Solo score threshold — the genre's core win race (GDD §3.2). Config may override
  *  it (e.g. a higher coalition threshold). Tuned so a board of ~1000 base points
  *  (12 planets × 50 + the rest × 10) needs a clear majority to win. */
-const DEFAULT_SCORE_LIMIT = 600;
+export const DEFAULT_SCORE_LIMIT = 600;
 /** Coalition threshold per member as a share of the solo limit (GDD §3.3):
  *  порог коалиции = scoreLimit × N × 0.7 — sub-linear in N, so allying is cheaper
  *  per player than winning solo, but it REPLACES the solo threshold for members. */
-const DEFAULT_COALITION_FACTOR = 0.7;
+export const DEFAULT_COALITION_FACTOR = 0.7;
 /** Session-length cap (game days) by speed — the time-crisis backstop that forces a
  *  finale ranked by score (GDD §3.1/§3.2). Any other speed falls back to the ×1 cap. */
 const SESSION_MAX_DAYS: Record<number, number> = { 1: 100, 2: 60, 4: 30 };
@@ -220,6 +223,40 @@ function evaluateVictory(h: HandlerContext): void {
   const activeBefore = playerIds.filter(
     (playerId) => h.state.players[playerId]?.status === 'active',
   );
+  // PvE (PVE-4) is decided FIRST, and — importantly — before the `< 2 active` guard
+  // below. That guard exists for the PvP race (a one-player board has no race to
+  // decide), but in PvE it is exactly the losing position: the Swarm alone on the
+  // board means every human seat fell, and returning early there would leave the
+  // match running forever with nobody in it.
+  //
+  // Nothing here touches the PvP outcomes; the whole block is skipped unless
+  // `pveModule` seeded `state.pve`, so a PvP match cannot reach it at all.
+  if (h.state.pve) {
+    const { npcPlayerId, waveNumber, totalWaves } = h.state.pve;
+    // "Alive" uses the SAME rule as elimination below — holding at least one
+    // province — rather than the `status` flag, which this pass may not have
+    // stamped yet. One definition of death for the whole module.
+    const holding = (playerId: PlayerId): boolean =>
+      (scores[playerId]?.controlledPlanets ?? 0) > 0;
+    const humans = playerIds.filter((id) => id !== npcPlayerId);
+    const humansAlive = humans.filter((id) => activeBefore.includes(id) && holding(id));
+
+    if (humansAlive.length === 0 && humans.length > 0) {
+      endMatch(h, npcPlayerId, 'pve-failed');
+      return;
+    }
+    // Cleared: every wave has landed AND the enemy holds nothing. Order matters —
+    // wiping the hive early does not end the match, it only starves later waves
+    // (`pveModule` skips a spawn with nowhere to stage), so the counter still runs
+    // to its end and the match cannot deadlock on an early clear.
+    if (waveNumber >= totalWaves && !holding(npcPlayerId)) {
+      // A coalition win with no single champion: the survivors won together, so
+      // `winner` is the top scorer among them and every one of them is in `winners`.
+      endMatch(h, highestScore(scores, humansAlive), 'pve-cleared', humansAlive);
+      return;
+    }
+  }
+
   if (activeBefore.length < 2) {
     return;
   }

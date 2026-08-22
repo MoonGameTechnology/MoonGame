@@ -27,6 +27,7 @@ import {
   parseMatchMap,
   orbitalModule,
   planetTypeModule,
+  pveModule,
   scientistModule,
   sectorModule,
   standingOrdersModule,
@@ -135,6 +136,7 @@ export const DEV_MODULES: GameModule[] = [
   instantRepairModule, // fleet.instantRepair: paid-in-credits hull top-up, anywhere
   fleetRepairModule, // fleet.repair: paid-in-metal hull top-up, at an owned dock
   forcedMarchModule, // fleet.forcemarch: +50% speed for hull wear while in transit
+  pveModule, // PVE-3: NPC wave assault, armed by the mode's `pve` section (inert in PvP)
   victoryModule,
   visibilityModule, // fog-of-war memory (variant B): records last-seen worlds
   // H4's `divisionModule` used to sit here, at the END. It is GONE (H4-REVERT): the
@@ -151,7 +153,7 @@ export const DEV_MODULES: GameModule[] = [
  *  created under an older manifest must not silently resume on a different module
  *  graph (same fail-secure posture as `dataHash`, MP-4). Bump this alongside any
  *  `DEV_MODULES` edit. */
-export const MODULE_MANIFEST_VERSION = '4'; // squadronModule added (free-space movement)
+export const MODULE_MANIFEST_VERSION = '5'; // pveModule added (PVE-3 wave assault)
 
 export interface DevMatchOptions {
   /** Match/room id (default `'dev'`). Distinct ids let a registry hold many matches. */

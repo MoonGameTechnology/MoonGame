@@ -24,8 +24,10 @@ import heroAbilities from '../../../data/heroAbilities.json';
 import heroPassives from '../../../data/heroPassives.json';
 import heroSkillTrees from '../../../data/heroSkillTrees.json';
 import heroFittings from '../../../data/heroFittings.json';
+import modes from '../../../data/modes.json';
 import rewards from '../../../data/rewards.json';
 import skirmishMap from '../../../data/maps/skirmish-1.json';
+import pveMap from '../../../data/maps/pve-1.json';
 
 /** The browser's copy of the composer's fragment list. Exported so `gameData.test.ts`
  *  can assert it against `composeGameDataBundle` — the two drifting apart is silent
@@ -48,6 +50,7 @@ export const FRAGMENTS: Record<string, unknown> = {
   'heroPassives.json': heroPassives,
   'heroSkillTrees.json': heroSkillTrees,
   'heroFittings.json': heroFittings,
+  'modes.json': modes,
   'rewards.json': rewards,
 };
 
@@ -59,4 +62,9 @@ export function shippedGameData(): GameData {
 /** A ready-to-render single-player `GameState` built from the shipped skirmish map. */
 export function skirmishState(data: GameData): GameState {
   return buildStateFromMap(parseMatchMap(skirmishMap), data);
+}
+
+/** A ready-to-render PvE `GameState` built from the shipped PvE map. */
+export function pveState(data: GameData): GameState {
+  return buildStateFromMap(parseMatchMap(pveMap), data);
 }

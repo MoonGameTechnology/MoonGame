@@ -664,6 +664,65 @@ export const ResearchBoostDefSchema = z.object({
   decay: z.number().gt(0).lt(1).default(0.5),
 });
 
+/** How a match is seated: N against N in two teams, or every player for themselves.
+ *  A mode names the format; the lobby turns it into concrete seats (PVE-1.1). */
+export const TEAM_FORMATS = ['1v1', '2v2', '3v3', '4v4', '5v5', 'ffa'] as const;
+export const TeamFormatSchema = z.enum(TEAM_FORMATS);
+
+/**
+ * The victory rules a mode pins — `VictoryConfig` MINUS `endsAt`. `endsAt` is an
+ * absolute match timestamp, so it belongs to the match, never to shipped content;
+ * `.strict()` turns writing it here into a loud validation error instead of a field
+ * zod would silently drop, which would leave a mode that reads as configured and
+ * isn't (A08 — validate before use, fail-closed). Every field is optional: an
+ * omitted one falls back to the victory module's base rule, which is how a preset
+ * says "standard rules here".
+ */
+export const ModeVictorySchema = z
+  .object({
+    dominationPercent: z.number().gt(0).max(1).optional(),
+    scoreLimit: z.number().positive().optional(),
+    coalitionFactor: z.number().positive().optional(),
+  })
+  .strict();
+
+/**
+ * The PvE section of a mode: one common NPC enemy attacking in scheduled waves
+ * (docs/game-modes-roadmap.md GM-4.6). Present ⇒ the mode is PvE. The numbers are
+ * the balance knobs — waves and their spacing are tuned in content, never in code.
+ */
+export const ModePveSchema = z
+  .object({
+    /** Waves the players must survive to clear the mode. */
+    waves: z.number().int().positive(),
+    /** Faction the NPC seat plays (→ `data.factions`). */
+    npcFaction: z.string(),
+    /** Game-hours between waves — a real-time duration, timeScale-scaled like every other. */
+    waveIntervalHours: z.number().positive(),
+  })
+  .strict();
+
+/**
+ * A game mode — the named preset of rules a match runs under (docs/game-modes-roadmap.md
+ * GM-0.1). A mode is DATA: "3v3 against the Swarm" is a JSON entry plus an optional
+ * module, not a kernel change. The record key is the mode id (`standard`), as in
+ * every other catalog here.
+ */
+export const GameModeDefSchema = z.object({
+  /** English display name, localized through `tData()` → `data.<slug>`. */
+  name: z.string(),
+  description: z.string().optional(),
+  /** Victory rules this mode pins; omitted fields keep the base rules. */
+  victory: ModeVictorySchema.prefault({}),
+  /** How the match is seated. */
+  teamFormat: TeamFormatSchema.default('ffa'),
+  /** Ids of the OPTIONAL core modules the mode wants (e.g. `pve`). A kernel built
+   *  without one degrades to base behaviour rather than crashing (invariant #3). */
+  modules: z.array(z.string()).default([]),
+  /** Present ⇒ PvE mode (a common NPC enemy attacking in waves). */
+  pve: ModePveSchema.optional(),
+});
+
 export const GameDataSchema = z.object({
   version: z.string(),
   resources: z.array(z.string()).min(1),
@@ -682,6 +741,7 @@ export const GameDataSchema = z.object({
   heroPassives: z.record(z.string(), HeroPassiveDefSchema).default({}),
   heroSkillTrees: z.record(z.string(), HeroSkillNodeSchema).default({}),
   heroFittings: z.record(z.string(), HeroFittingDefSchema).default({}),
+  modes: z.record(z.string(), GameModeDefSchema).default({}),
   // `.prefault({})` pipes the empty object through the nested schema, so its
   // per-field defaults stay the single source of truth (no literal to drift).
   rewards: RewardsDefSchema.prefault({}),
@@ -718,6 +778,10 @@ export type HeroPassiveDef = z.infer<typeof HeroPassiveDefSchema>;
 export type HeroSkillNode = z.infer<typeof HeroSkillNodeSchema>;
 export type HeroFittingDef = z.infer<typeof HeroFittingDefSchema>;
 export type HeroSkillGrants = z.infer<typeof HeroSkillGrantsSchema>;
+export type TeamFormat = z.infer<typeof TeamFormatSchema>;
+export type ModeVictory = z.infer<typeof ModeVictorySchema>;
+export type ModePve = z.infer<typeof ModePveSchema>;
+export type GameModeDef = z.infer<typeof GameModeDefSchema>;
 export type RewardsDef = z.infer<typeof RewardsDefSchema>;
 export type ResearchBoostDef = z.infer<typeof ResearchBoostDefSchema>;
 export type GameData = z.infer<typeof GameDataSchema>;

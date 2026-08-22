@@ -1,4 +1,4 @@
-import { MS_PER_DAY, type MatchConfig } from '@void/shared-core';
+import { MS_PER_DAY, type GameData, type MatchConfig } from '@void/shared-core';
 import type { MatchRoom } from './matchRoom';
 import type { AccountStore } from './store';
 
@@ -19,6 +19,11 @@ export interface MatchMeta {
   mapId: string;
   /** The ruleset this match runs under (time scale + victory conditions). */
   rules: MatchConfig;
+  /** BRW-1: the game mode this match was created with (→ `data.modes`), copied from
+   *  the match's own `MatchConfig.modeId` (PVE-0.2) rather than invented here — the
+   *  browser must show the mode the room actually runs, not a label beside it. Absent
+   *  ⇒ no mode (every session created before modes existed). */
+  modeId?: string;
   /** Wall-clock ms the match was created — for ordering and (later) honest age. */
   createdAt: number;
   /** The world-time (`GameState.time`) the match's clock began at. "Days running" is
@@ -39,11 +44,31 @@ export interface MatchMeta {
   archivedBy?: Set<string>;
 }
 
+/** Whether a session is played against other people or against the game (BRW-1).
+ *  Decided by the SERVER from the mode preset — a client must not re-derive the rule,
+ *  or two surfaces would disagree about what "PvE" means. */
+export type MatchKind = 'pvp' | 'pve';
+
+/** The mode's kind, or undefined when the match has no mode / the mode is unknown.
+ *  «PvE» is defined exactly once, here: the preset carries a `pve` section. */
+export function matchKind(data: GameData | undefined, modeId: string | undefined): MatchKind | undefined {
+  if (!data || modeId === undefined) return undefined;
+  const mode = data.modes[modeId];
+  if (!mode) return undefined; // unknown mode: say nothing rather than guess "pvp"
+  return mode.pve ? 'pve' : 'pvp';
+}
+
 /** One row of the match browser: a server projection (read-model), not live state. */
 export interface MatchSummary {
   matchId: string;
   mapId: string;
   rules: MatchConfig;
+  /** Mode id this session runs (BRW-1). Absent ⇒ the match has no mode. */
+  modeId?: string;
+  /** PvP or PvE, derived from the mode preset by the server. Absent when the mode is
+   *  absent or unknown — the browser must read that as «режим неизвестен» and leave
+   *  the row unfiltered, NOT as «PvP» (the same fail-open reading `entryOpen` needs). */
+  kind?: MatchKind;
   /** In-game days elapsed (`state.time / MS_PER_DAY`, floored) — "Day N" of the match. */
   days: number;
   /** Occupied vs total seats, e.g. { seated: 1, capacity: 2 }. */
@@ -78,7 +103,13 @@ interface Entry {
 export class MatchRegistry {
   private readonly entries = new Map<string, Entry>();
 
-  constructor(readonly accounts: AccountStore) {}
+  /** `data` is optional so every existing caller keeps working: without it the feed
+   *  simply carries no `kind` (graceful degradation), which the browser already has
+   *  to handle for an older server. */
+  constructor(
+    readonly accounts: AccountStore,
+    private readonly data?: GameData,
+  ) {}
 
   /** Add a match (room + its meta). Re-registering the same id replaces the entry. */
   register(room: MatchRoom, meta: MatchMeta): void {
@@ -125,10 +156,13 @@ export class MatchRegistry {
     const st = entry.room.state;
     const window = entry.meta.entryWindowMs;
     const open = window === undefined || this.realAgeMs(entry) < window;
+    const kind = matchKind(this.data, entry.meta.modeId);
     return {
       matchId: entry.room.id,
       mapId: entry.meta.mapId,
       rules: entry.meta.rules,
+      ...(entry.meta.modeId !== undefined ? { modeId: entry.meta.modeId } : {}),
+      ...(kind !== undefined ? { kind } : {}),
       days: Math.max(0, Math.floor((st.time - (entry.meta.startedAt ?? 0)) / MS_PER_DAY)),
       players: {
         seated: await this.accounts.occupiedSeats(entry.room.id),

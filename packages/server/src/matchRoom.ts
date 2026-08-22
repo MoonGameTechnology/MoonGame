@@ -10,7 +10,15 @@ import type {
   PlayerReward,
   SignatureContact,
 } from '@void/shared-core';
-import { diffState, getStance, hashState, identifiedNodes, visibleView } from '@void/shared-core';
+import {
+  diffState,
+  getStance,
+  hashState,
+  identifiedNodes,
+  resolveMatchConfig,
+  Rejection,
+  visibleView,
+} from '@void/shared-core';
 import type { AcceptedAction, ActionGate } from '@void/action-layer';
 import {
   parseClientMessage,
@@ -161,6 +169,25 @@ export interface MatchRoomOptions {
    *  a silent state patch. No `arsenalStore`, no `accountId`, or no snapshot on the
    *  seat ⇒ unchanged ARS-3 behaviour (graceful degradation). */
   arsenalStore?: ArsenalStore;
+  /**
+   * PVE-5.2 — server-side orders (an AI / orchestrator) the room submits for itself
+   * after each clock tick. Given the current state and the next free action sequence,
+   * it returns INTENTS; the room feeds them through `submitServerAction`, so they take
+   * the ordinary path — gate, reducer, receipts, broadcast — and the engine never
+   * learns an AI exists.
+   *
+   * The room owns the call site on purpose. `tick()` is synchronous while
+   * `submitServerAction` is not (on a durable room it serialises through the actor
+   * mailbox, commit-before-broadcast), so a caller doing this from outside would be
+   * racing the room's own commit — the exact shape of the silent-state-loss bug the
+   * mailbox exists to prevent. Here the submit rides that same mailbox, and a
+   * re-entrancy flag keeps a second batch from being computed on a state whose first
+   * batch has not landed yet.
+   *
+   * Returning `[]` costs nothing, so a host can wire this unconditionally: a PvP match
+   * simply produces no orders.
+   */
+  serverOrders?: (state: GameState, seq: number) => Action[];
 }
 
 export interface ActionReceipt {
@@ -363,6 +390,14 @@ export class MatchRoom {
   private readonly denyPlayerActions?: (type: string) => string | null | undefined;
   /** LARS-1 live ownership read (see options.arsenalStore). */
   private readonly arsenalStore?: ArsenalStore;
+  /** PVE-5.2 server-side order source (see options.serverOrders). */
+  private readonly serverOrders?: (state: GameState, seq: number) => Action[];
+  /** Action-id sequence for server orders — OWNED HERE so two ticks can never mint
+   *  the same id (a repeat would be swallowed by the receipt cache as a retry). */
+  private serverOrderSeq = 0;
+  /** True while a batch of server orders is in flight: without it a tick could read a
+   *  state whose previous batch has not been applied yet and re-issue the same moves. */
+  private serverOrdersBusy = false;
   /** playerId → accountId for the room's life (see `addPeer`'s `accountId` param).
    *  Only ever set, never cleared on disconnect — the same seat is always the same
    *  account for a given match. */
@@ -422,7 +457,20 @@ export class MatchRoom {
     this.stateValue = options.initialState;
     this.kernel = options.kernel;
     this.data = options.data;
-    this.config = options.config ?? { timeScale: 1 };
+    this.serverOrders = options.serverOrders;
+    // PVE-0.2 — the mode is consumed HERE, once, and never again: `config` is private
+    // and readonly, so a resolved match has nothing left to swap mid-flight (GDD §2,
+    // «режим фиксируется при старте»). Putting it in the constructor rather than in
+    // one factory is deliberate — every path that can raise a room (createDevMatch,
+    // the prototype host, tests) goes through this line, so an unknown mode cannot
+    // slip in through a path someone forgot to guard. An unknown mode is fatal by
+    // design: a room that believes it runs PvE waves while the engine applies the
+    // base rules is worse than a room that refuses to exist (fail-secure, A10).
+    const resolved = resolveMatchConfig(options.data, options.config ?? { timeScale: 1 });
+    if (!resolved.ok) {
+      throw new Rejection(resolved.code);
+    }
+    this.config = resolved.config;
     this.now = options.now ?? (() => Date.now());
     this.maxPayloadBytes = options.maxPayloadBytes ?? 32_768;
     this.waitFor =
@@ -1098,9 +1146,49 @@ export class MatchRoom {
         seq: this.seq,
       });
     }
+    // PVE-5.2: after the world has caught up, let the server's own orchestrator act on
+    // the fresh state. Deliberately AFTER the advance and the broadcast — orders are a
+    // reaction to what just happened, not a participant in it.
+    this.runServerOrders();
     // Whether the world clock moved forward — a wakeup driver uses this to tell a
     // legit (progressing) catch-up from a same-instant runaway (stalled) and back off.
     return this.stateValue.time > before;
+  }
+
+  /**
+   * Compute and submit one batch of server orders (PVE-5.2). Fire-and-forget by
+   * design — `tick()` must stay synchronous for its driver — but NOT a race: every
+   * order goes through `submitServerAction`, which on a durable room queues behind the
+   * same actor mailbox as everything else. What the flag guards is different and
+   * subtler: without it the next tick would read a state whose orders are still in
+   * flight and issue them a SECOND time under fresh ids, which the receipt cache
+   * cannot dedupe (different id = different action).
+   *
+   * A throwing orchestrator must never take the room down — tactics are not load-
+   * bearing. It is swallowed the same way a throwing observer is.
+   */
+  private runServerOrders(): void {
+    if (!this.serverOrders || this.serverOrdersBusy) return;
+    let orders: Action[];
+    try {
+      orders = this.serverOrders(this.stateValue, this.serverOrderSeq);
+    } catch {
+      return; // a broken tactic costs the NPC its turn, nothing else
+    }
+    if (orders.length === 0) return;
+    this.serverOrderSeq += orders.length;
+    this.serverOrdersBusy = true;
+    void (async () => {
+      try {
+        for (const action of orders) {
+          await this.submitServerAction(action.playerId, action);
+        }
+      } catch {
+        /* a rejected order is a normal outcome — the reducer said no, that is all */
+      } finally {
+        this.serverOrdersBusy = false;
+      }
+    })();
   }
 
   /** Wall-ms until the soonest scheduled event comes due — what an offline wakeup

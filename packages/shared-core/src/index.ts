@@ -49,6 +49,7 @@ export {
   type MatchStatus,
   type MatchEndReason,
   type MatchScore,
+  type PveState,
   type MatchState,
   type PlayerArsenal,
   type PlayerReward,
@@ -189,6 +190,7 @@ export {
   type AdvanceFailure,
   type ActionIdParts,
 } from './action/types';
+export { resolveMatchConfig, type ModeResolution } from './action/matchMode';
 // AUD-6: the schema map and the catalog of legal client action types are public now —
 // the boolean alone forced anyone writing a client to deep-import a test-only file.
 export {
@@ -285,6 +287,11 @@ export {
   ShipSlotsSchema,
   ShipSlotTypeSchema,
   SHIP_SLOT_TYPES,
+  GameModeDefSchema,
+  ModeVictorySchema,
+  ModePveSchema,
+  TeamFormatSchema,
+  TEAM_FORMATS,
   type GameData,
   type UnitDef,
   type ModuleDef,
@@ -318,6 +325,10 @@ export {
   type UnitStats,
   type RewardsDef,
   type ResearchBoostDef,
+  type GameModeDef,
+  type ModeVictory,
+  type ModePve,
+  type TeamFormat,
 } from './data/schemas';
 export {
   composeGameDataBundle,
@@ -375,6 +386,7 @@ export { interceptModule } from './modules/intercept';
 export { captureOnArrivalModule } from './modules/captureOnArrival';
 export { sectorModule } from './modules/sector';
 export { planetTypeModule } from './modules/planetType';
+export { pveModule } from './modules/pve';
 export {
   taxModule,
   civicTax,

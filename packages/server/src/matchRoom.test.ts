@@ -9,6 +9,7 @@ import {
   type Action,
   type GameData,
   type GameModule,
+  type MatchConfig,
   type GameState,
   type Player,
 } from '@void/shared-core';
@@ -1177,5 +1178,145 @@ describe('MatchRoom — event fog (personal/bilateral audiences, hero privacy)',
     expect(lastEvents(p1)).toContain('hero.spawned');
     expect(lastEvents(p2)).not.toContain('hero.spawned'); // the leak BF-16 plugged
     expect(lastEvents(p3)).not.toContain('hero.spawned');
+  });
+});
+
+/** Пишет в имя игрока то, что редьюсер РЕАЛЬНО видит в `ctx.config` — правила комнаты
+ *  наружу не выставлены (`config` приватный), а смотреть надо именно на них: между
+ *  конструктором и `context()` резолв режима мог бы и потеряться. */
+const rulesProbeModule: GameModule = {
+  id: 'rules-probe',
+  version: '1.0.0',
+  setup(api) {
+    api.onAction('test.rules', (act, h) => {
+      const p = h.state.players[act.playerId];
+      if (!p) return h.reject('E_FORBIDDEN');
+      p.name = String(h.ctx.config?.victory?.scoreLimit ?? 'none');
+    });
+  },
+};
+
+describe('MatchRoom — режим матча консервируется при рождении (PVE-0.2)', () => {
+  /** `testData()` не несёт режимов вовсе, поэтому режим приходится посадить — и это
+   *  ровно то, что проверяется: комната читает `data.modes`, а не зашитый список. */
+  function dataWithMode(): GameData {
+    return {
+      ...testData(),
+      modes: {
+        brisk: { name: 'Brisk', victory: { scoreLimit: 120 }, teamFormat: 'ffa', modules: [] },
+      },
+    };
+  }
+
+  function modeRoom(config: MatchConfig): MatchRoom {
+    return new MatchRoom({
+      id: 'mode-room',
+      initialState: testState(),
+      kernel: createKernel([rulesProbeModule]),
+      data: dataWithMode(),
+      now: () => 10,
+      config,
+    });
+  }
+
+  /** Правила глазами редьюсера: `scoreLimit` или 'none', если его не задал никто. */
+  async function seenScoreLimit(config: MatchConfig): Promise<string | undefined> {
+    const r = modeRoom(config);
+    await r.submitServerAction('p1', {
+      id: 'r1',
+      type: 'test.rules',
+      playerId: 'p1',
+      issuedAt: 1,
+      payload: {},
+    });
+    return r.state.players.p1?.name;
+  }
+
+  it('пресет режима доезжает до правил, по которым комната судит матч', async () => {
+    expect(await seenScoreLimit({ timeScale: 1, modeId: 'brisk' })).toBe('120');
+  });
+
+  it('явное правило матча бьёт пресет', async () => {
+    expect(await seenScoreLimit({ timeScale: 1, modeId: 'brisk', victory: { scoreLimit: 777 } })).toBe(
+      '777',
+    );
+  });
+
+  it('матч без режима поднимается как раньше (обратная совместимость)', async () => {
+    expect(await seenScoreLimit({ timeScale: 1 })).toBe('none');
+  });
+
+  it('неизвестный режим — комната НЕ рождается (fail-secure, E_UNKNOWN_MODE)', () => {
+    // Ставка кирпича: обойти резолв нечем. Комнату поднимают из трёх мест
+    // (`createDevMatch`, прото-хост, тесты), и все три идут через конструктор —
+    // поэтому отказ живёт там, а не в одной из фабрик, которую легко обойти.
+    expect(() => modeRoom({ timeScale: 1, modeId: 'no_such_mode' })).toThrowError(
+      expect.objectContaining({ code: 'E_UNKNOWN_MODE' }),
+    );
+  });
+});
+
+describe('MatchRoom — серверные приказы (PVE-5.2)', () => {
+  /** Модуль, у которого есть действие, наблюдаемое снаружи: приказ переименовывает
+   *  игрока, поэтому «дошёл ли серверный приказ до редьюсера» видно по состоянию. */
+  function orderRoom(
+    serverOrders?: (state: GameState, seq: number) => Action[],
+  ): MatchRoom {
+    return new MatchRoom({
+      id: 'orders-room',
+      initialState: testState(),
+      kernel: createKernel([renameModule]),
+      data: testData(),
+      now: () => 10,
+      initiallyStarted: true,
+      ...(serverOrders ? { serverOrders } : {}),
+    });
+  }
+
+  /** Приказы подаются fire-and-forget (tick синхронный), поэтому тесту нужно отдать
+   *  цикл событий — иначе он проверит состояние до того, как приказ применится. */
+  const settle = (): Promise<void> => new Promise((resolve) => setImmediate(resolve));
+
+  it('приказ, выданный источником, доезжает до редьюсера обычным путём действий', async () => {
+    const calls: number[] = [];
+    const r = orderRoom((_state, seq) => {
+      calls.push(seq);
+      // Один приказ на первый вызов: дальше источник молчит, как реальный
+      // оркестратор молчит про уже летящий флот.
+      return calls.length > 1 ? [] : [action('srv:p1:0', 'p1', 'Renamed')];
+    });
+    r.tick();
+    await settle();
+    expect(r.state.players.p1?.name).toBe('Renamed');
+  });
+
+  it('seq растёт на число выданных приказов — два тика не минтят один id', async () => {
+    const seen: number[] = [];
+    const r = orderRoom((_state, seq) => {
+      seen.push(seq);
+      return seen.length === 1
+        ? [action(`srv:p1:${seq}`, 'p1', 'A'), action(`srv:p1:${seq + 1}`, 'p1', 'B')]
+        : [];
+    });
+    r.tick();
+    await settle();
+    r.tick();
+    await settle();
+    // Повтори комната прежний seq — вторая волна приказов была бы съедена кэшем
+    // квитанций как ретрай, и NPC замер бы навсегда.
+    expect(seen).toEqual([0, 2]);
+  });
+
+  it('источник, который бросает, НЕ роняет комнату (тактика не несущая)', () => {
+    const r = orderRoom(() => {
+      throw new Error('bad tactic');
+    });
+    expect(() => r.tick()).not.toThrow();
+  });
+
+  it('без источника комната ведёт себя как раньше', () => {
+    const r = orderRoom();
+    expect(() => r.tick()).not.toThrow();
+    expect(r.state.players.p1?.name).toBe('One');
   });
 });
