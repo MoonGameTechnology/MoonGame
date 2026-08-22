@@ -599,6 +599,7 @@ import { netContacts, soloContacts } from './radarContacts';
 import { buildLogLine, type BuildLogKind } from './buildLog';
 import { bootyKind, bootyText, counterLine, spyRepaint } from './spyLog';
 import { AA_SHOTS_MAX, SIEGE_SHOTS_MAX, aaImpact, capShots, siegeImpact } from './fireEffects';
+import { battleOutcome, battlePhaseKey, lossTally } from './battleLog';
 import {
   decisionsField,
   diffFields,
@@ -3022,11 +3023,12 @@ function handleEvents(events: DomainEvent[]) {
             known(p.location as string),
           )
         )
+          // Чем названы строки боя — `battleLog.ts` (REFM-179): фаза называется ВСЕГДА,
+          // потому что орбита и десант — разные бои с разными войсками.
           note(
             t('log.battle.start', {
               at: p.location as string,
-              phase:
-                p.phase === 'ground' ? t('log.battle.phase.ground') : t('log.battle.phase.orbit'),
+              phase: t(battlePhaseKey(p.phase as string | undefined)),
             }),
             p.location as string,
           );
@@ -3038,21 +3040,16 @@ function handleEvents(events: DomainEvent[]) {
       case 'battle.resolved': {
         const loc = p.location as string;
         if (seenTail(myBattleLocs.has(loc), known(loc))) {
-          const losses = battleLosses.get(loc);
-          const tally = losses
-            ? Object.entries(losses)
-                .map(([who, units]) => {
-                  const total = Object.values(units).reduce((a, b) => a + b, 0);
-                  return `${NAME[who] ?? who} −${total}`;
-                })
-                .join(', ')
-            : '';
+          // Потери сводятся ПО ИГРОКУ и приписываются, только если они есть (правила
+          // 3–5 в `battleLog.ts`): пустой хвост «· потери:» — строка ни о чём.
+          const tally = lossTally(battleLosses.get(loc), (who) => NAME[who] ?? who);
+          const out = battleOutcome(p.winner as string | undefined);
           note(
             t('log.battle.end', {
               at: loc,
-              res: p.winner
-                ? t('log.battle.win', { who: NAME[p.winner as string] ?? (p.winner as string) })
-                : t('log.battle.draw'),
+              res: out.named
+                ? t(out.key, { who: NAME[p.winner as string] ?? (p.winner as string) })
+                : t(out.key),
             }) + (tally ? t('log.battle.losses', { tally }) : ''),
             loc,
           );
