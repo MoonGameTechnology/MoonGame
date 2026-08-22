@@ -228,3 +228,65 @@ describe('MatchRegistry — entry window (SES-2.3)', () => {
     expect(unbounded.entryClosesInMs).toBe(Number.MAX_SAFE_INTEGER);
   });
 });
+
+describe('MatchRegistry — режим на строке ленты (BRW-1)', () => {
+  it('modeId и kind доезжают до строки: pve_waves = pve, standard = pvp', async () => {
+    const reg = new MatchRegistry(new MemoryAccountStore(), data);
+    reg.register(room('pvp', { config: { timeScale: 1, modeId: 'standard' } }), {
+      mapId: 'duel',
+      rules: { timeScale: 1 },
+      modeId: 'standard',
+      createdAt: 2,
+    });
+    reg.register(room('pve', { config: { timeScale: 1, modeId: 'pve_waves' } }), {
+      mapId: 'duel',
+      rules: { timeScale: 1 },
+      modeId: 'pve_waves',
+      createdAt: 1,
+    });
+    const rows = (await reg.list(null)).available;
+    // «PvE» определяется ОДНИМ правилом и на СЕРВЕРЕ: у пресета есть секция `pve`.
+    expect(rows.map((r) => [r.matchId, r.modeId, r.kind])).toEqual([
+      ['pvp', 'standard', 'pvp'],
+      ['pve', 'pve_waves', 'pve'],
+    ]);
+  });
+
+  it('матч без режима не получает ни modeId, ни kind (а не «pvp» по умолчанию)', async () => {
+    // Молчание честнее догадки: строка со старого сервера или сессия, созданная до
+    // режимов, обязана читаться как «режим неизвестен» и НЕ отсеиваться фильтром.
+    const reg = new MatchRegistry(new MemoryAccountStore(), data);
+    reg.register(room('plain'), { mapId: 'duel', rules: { timeScale: 1 }, createdAt: 1 });
+    const row = (await reg.list(null)).available[0];
+    expect(row?.modeId).toBeUndefined();
+    expect(row?.kind).toBeUndefined();
+  });
+
+  it('неизвестный режим в мете — kind молчит, а не врёт', async () => {
+    const reg = new MatchRegistry(new MemoryAccountStore(), data);
+    reg.register(room('odd'), {
+      mapId: 'duel',
+      rules: { timeScale: 1 },
+      modeId: 'no_such_mode',
+      createdAt: 1,
+    });
+    const row = (await reg.list(null)).available[0];
+    expect(row?.modeId).toBe('no_such_mode'); // что записано, то и показываем
+    expect(row?.kind).toBeUndefined(); // но выводить из этого нечего
+  });
+
+  it('реестр без GameData отдаёт ленту как раньше — kind просто нет', async () => {
+    // Мягкая деградация: существующие вызывающие (`new MatchRegistry(accounts)`) не
+    // ломаются, лента остаётся валидной, а браузер и так умеет жить без поля.
+    const reg = new MatchRegistry(new MemoryAccountStore());
+    reg.register(room('m'), {
+      mapId: 'duel',
+      rules: { timeScale: 1 },
+      modeId: 'pve_waves',
+      createdAt: 1,
+    });
+    const row = (await reg.list(null)).available[0];
+    expect(row?.modeId).toBe('pve_waves');
+    expect(row?.kind).toBeUndefined();
+  });
+});
