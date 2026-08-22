@@ -629,6 +629,7 @@ import { archiveUrl, httpBase, matchesUrl, queryOutcome, seatsUrl } from './matc
 import { archiveEffect, type ArchiveEffect } from './archiveOutcome';
 import { mintedToken, passwordFrom, registerExtra } from './authRequest';
 import { carryEmail, recoverAnswer, recoverStep } from './recoverForm';
+import { selectFleets, toggleInSelection } from './fleetSelection';
 import { resolveAddress } from './serverAddress';
 import { authStatusUrl, identityMode, revealSignup } from './identityProbe';
 import { houseLine, seatView, type SeatView } from './seatList';
@@ -2829,9 +2830,12 @@ function syncPlayerNames(state: GameState): void {
     NAME[id] = houseDisplayName(player.name);
 }
 function setFleetSelection(ids: string[]) {
-  const picked = ids.filter((id) => s.fleets[id]?.owner === ME);
-  selFleets = new Set(picked);
-  selFleet = picked.length === 1 ? (picked[0] ?? null) : null;
+  // Что значит выделение — `fleetSelection.ts` (REFM-163): выделяется только СВОЁ
+  // (чужой флот в наборе — приказ, который ядро всё равно отклонит), а «ровно один» и
+  // «несколько» это разные состояния: у одиночного своя карточка со всеми приказами.
+  const sel = selectFleets(ids, (id) => s.fleets[id]?.owner === ME);
+  selFleets = new Set(sel.picked);
+  selFleet = sel.single;
   selPlanet = null; // a fleet selection never co-selects a planet (mutually exclusive)
   lastPanelHtml = '';
 }
@@ -2847,12 +2851,15 @@ function clearSelection() {
 
 /** Ctrl/⌘-click toggle: fold the current selection into a group and add/remove one. */
 function toggleFleetInSelection(id: string) {
-  if (s.fleets[id]?.owner !== ME) return;
-  const next = new Set(selFleets);
-  if (selFleet) next.add(selFleet);
-  if (next.has(id)) next.delete(id);
-  else next.add(id);
-  setFleetSelection([...next]);
+  // Ctrl-клик — `fleetSelection.ts` (правила 4–5): текущий одиночный СКЛАДЫВАЕТСЯ в
+  // группу (иначе он терялся бы ровно в момент сбора группы), а промах по чужому не
+  // трогает набор вовсе — иначе он молча схлопнул бы одиночный в группу из одного.
+  const next = toggleInSelection(
+    { picked: [...selFleets], single: selFleet },
+    id,
+    (fid) => s.fleets[fid]?.owner === ME,
+  );
+  if (next) setFleetSelection(next);
 }
 
 /** Order `movers` to merge into `anchorId`. Co-located & idle fleets fuse at once;
