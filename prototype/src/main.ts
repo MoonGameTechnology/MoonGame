@@ -596,6 +596,7 @@ import {
 } from './orbitRing';
 import { routeShown, routeStops, routeStroke } from './fleetRoute';
 import { netContacts, soloContacts } from './radarContacts';
+import { buildLogLine, type BuildLogKind } from './buildLog';
 import { diploDelivery } from './diploDelivery';
 import { garrisonSide, planFor, troopsGate } from './troopsScene';
 import {
@@ -2967,6 +2968,18 @@ function resolvePendingMerges() {
     return true;
   });
 }
+/** Рассказать игроку о событии стройки — правила в `buildLog.ts` (REFM-175). */
+function tellBuild(kind: BuildLogKind, p: Record<string, unknown>): void {
+  const line = buildLogLine(kind, p.building as string);
+  const b = buildingName(data.buildings[p.building as string]?.name, p.building as string);
+  const at = p.planetId as string;
+  const text = line.needsLevel
+    ? t(line.key, { b, lvl: String(p.level), at })
+    : t(line.key, { b, at });
+  if (line.anchored) note(text, at);
+  else note(text);
+  if (line.installsFortressAA) installFortressAA(at);
+}
 function handleEvents(events: DomainEvent[]) {
   for (const e of events) {
     const p = e.payload as Record<string, unknown>;
@@ -3216,38 +3229,25 @@ function handleEvents(events: DomainEvent[]) {
       // а журнал и есть источник сводки возвращения (`buildRecap`), так что чужая
       // экономика утекала и в дайджест, и в пуш. Сводка — про МОЮ империю; чужое
       // строительство я узнаю разведкой, а не уведомлением.
+      // Что говорит каждое из трёх событий стройки — `buildLog.ts` (REFM-175): «улучшено»
+      // называет УРОВЕНЬ, якорь на мир несёт только РАЗРУШЕНИЕ (взрыв — происшествие, к
+      // которому игрок прыгнет камерой), а зенитки включает только готовая крепость.
+      // Гейт `admits('<тип>')` намеренно стоит В КАЖДОМ case отдельной строкой: его
+      // сторожит опись в `recapGate.test.ts`, и общий `admits(e.type, …)` её обходит.
       case 'building.constructed':
         if (!admits('building.constructed', p)) break;
-        note(
-          t('log.build.done', {
-            b: buildingName(data.buildings[p.building as string]?.name, p.building as string),
-            at: p.planetId as string,
-          }),
-        );
-        if (p.building === 'starfort') installFortressAA(p.planetId as string);
+        tellBuild('constructed', p);
         break;
       case 'building.upgraded':
         if (!admits('building.upgraded', p)) break;
-        note(
-          t('log.build.upgraded', {
-            b: buildingName(data.buildings[p.building as string]?.name, p.building as string),
-            lvl: String(p.level),
-            at: p.planetId as string,
-          }),
-        );
+        tellBuild('upgraded', p);
         break;
+      // Разрушение — исключение по туману: своё узнаю всегда, чужое лишь там, где ВИЖУ
+      // (тот же фог-гейт, что у `aa.fired`). Взрыв на наблюдаемом мире — наблюдение, а
+      // не раскрытие.
       case 'building.destroyed':
-        // Разрушение — исключение: своё узнаю всегда, чужое лишь там, где ВИЖУ
-        // (тот же фог-гейт, что у `aa.fired`). Взрыв на наблюдаемом мире — это
-        // наблюдение, а не раскрытие.
         if (!admits('building.destroyed', p)) break;
-        note(
-          t('log.build.destroyed', {
-            b: buildingName(data.buildings[p.building as string]?.name, p.building as string),
-            at: p.planetId as string,
-          }),
-          p.planetId as string,
-        );
+        tellBuild('destroyed', p);
         break;
       case 'unit.built':
         if (!admits('unit.built', p)) break;
