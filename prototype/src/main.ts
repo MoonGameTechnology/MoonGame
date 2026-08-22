@@ -595,6 +595,11 @@ import {
 } from './orbitRing';
 import { routeShown, routeStops, routeStroke } from './fleetRoute';
 import { netContacts, soloContacts } from './radarContacts';
+import {
+  fleetSignature as coreFleetSignature,
+  planetRadar as corePlanetRadar,
+  sigClass,
+} from './sensorScale';
 import { autoStance, scrambleStance } from './stanceToggle';
 import { fleetCount, goalBaseline, grew, mineLevels } from './goalTally';
 import { introFor } from './introTrigger';
@@ -1973,14 +1978,12 @@ function laneAim(
 const IDENTIFY_REACH_FRACTION = 0.5;
 
 /** Total radar signature of a fleet = Σ count × per-unit signature (from content). */
+// ШКАЛА датчиков — `sensorScale.ts` (REFM-170): шум это сумма `count × signature`, а не
+// число кораблей; неизвестный клиенту тип шумит за 1, а неизвестное здание слышит на 0 —
+// обе подстановки повторяют умолчания схемы и идут в осторожную сторону (незнание не
+// прячет твой флот и не выдаёт дальности); ступеней три и пороги абсолютные.
 function fleetSignature(f: Fleet): number {
-  let sig = 0;
-  for (const st of f.units) sig += st.count * (data.units[st.unit]?.signature ?? 1);
-  return sig;
-}
-/** Coarse size bucket shown for a radar contact (reuses the count-label idea). */
-function sigClass(sig: number): 'S' | 'M' | 'L' {
-  return sig >= 13 ? 'L' : sig >= 5 ? 'M' : 'S';
+  return coreFleetSignature(f.units, (u) => data.units[u]);
 }
 /** Radar reach (distance) a fleet projects, from its loudest radar-ship (0 = none).
  *  Тонкая обёртка над ЯДРОВЫМ `fleetRadarRange` — не своя копия правила: когда копия
@@ -1989,15 +1992,9 @@ function sigClass(sig: number): 'S' | 'M' | 'L' {
 function fleetRadar(f: Fleet): number {
   return fleetRadarRange(f, data);
 }
-/** Radar reach (distance) a world projects, from its best radar array (grows with
- *  level). Reads `buildingLevel(def, level).radarRange` — same field the core fog uses. */
+/** Слух мира: лучший из его массивов и по УРОВНЮ — правила 5–6 в `sensorScale.ts`. */
 function planetRadar(p: Planet): number {
-  let r = 0;
-  for (const b of p.buildings) {
-    const def = data.buildings[b.type];
-    if (def) r = Math.max(r, buildingLevel(def, b.level).radarRange);
-  }
-  return r;
+  return corePlanetRadar(p.buildings, (t) => data.buildings[t]);
 }
 interface Vision {
   identify: Set<string>;
