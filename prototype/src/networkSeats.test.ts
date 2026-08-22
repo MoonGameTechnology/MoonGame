@@ -59,7 +59,8 @@ describe('prototype network seats', () => {
     expect(parseNetworkMatchMode(undefined)).toBe('ffa');
     expect(parseNetworkMatchMode('2v2')).toBe('2v2');
     expect(parseNetworkMatchMode('5v5')).toBe('5v5');
-    expect(() => parseNetworkMatchMode('3v3')).toThrow('TEAMS must be 2v2 or 5v5');
+    expect(parseNetworkMatchMode('pve')).toBe('pve');
+    expect(() => parseNetworkMatchMode('3v3')).toThrow('TEAMS must be 2v2, 5v5 or pve');
   });
 });
 
