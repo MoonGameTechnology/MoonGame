@@ -630,6 +630,7 @@ import { archiveEffect, type ArchiveEffect } from './archiveOutcome';
 import { mintedToken, passwordFrom, registerExtra } from './authRequest';
 import { carryEmail, recoverAnswer, recoverStep } from './recoverForm';
 import { selectFleets, toggleInSelection } from './fleetSelection';
+import { mergePlan } from './mergeOrders';
 import { fleetsUnderTap } from './tapTargets';
 import { resolveAddress } from './serverAddress';
 import { authStatusUrl, identityMode, revealSignup } from './identityProbe';
@@ -2866,27 +2867,35 @@ function toggleFleetInSelection(id: string) {
 /** Order `movers` to merge into `anchorId`. Co-located & idle fleets fuse at once;
  *  distant ones are sent to the anchor's sector and finish on arrival (pending). */
 function orderMerge(movers: string[], anchorId: string) {
-  const anchor = s.fleets[anchorId];
-  if (!anchor || anchor.owner !== ME) return;
-  const dest = anchor.location ?? anchor.movement?.to ?? null;
-  let queued = 0;
-  for (const moverId of movers) {
-    if (moverId === anchorId) continue;
-    const m = s.fleets[moverId];
-    if (!m || m.owner !== ME) continue;
-    const coLocated =
-      !!m.location && m.location === anchor.location && !m.movement && !anchor.movement;
-    if (coLocated) {
-      playerOrder(mergeFleet(ME, moverId, anchorId));
-    } else {
-      pendingMerges = pendingMerges.filter((pm) => pm.mover !== moverId);
-      pendingMerges.push({ mover: moverId, into: anchorId });
-      if (dest && m.location !== dest) playerOrder(moveFleet(ME, moverId, dest));
-      queued++;
+  // Правила приказа — `mergeOrders.ts` (REFM-165): якорь только свой и живой (иначе приказ
+  // отскочит, а игрок уже увидит «слито»), сам в себя не сливается, чужие и погибшие среди
+  // сливаемых пропускаются молча, стоящие вместе сливаются СРАЗУ, остальные летят к якорю —
+  // и точка встречи берётся у него (где стоит, а если он уже в пути — конец пути).
+  const plan = mergePlan(
+    Object.fromEntries(
+      Object.entries(s.fleets).map(([id, f]) => [
+        id,
+        { owner: f.owner, location: f.location ?? null, movingTo: f.movement?.to ?? null },
+      ]),
+    ),
+    movers,
+    anchorId,
+    ME,
+  );
+  if (!plan) return;
+  for (const step of plan.steps) {
+    if (step.kind === 'now') {
+      playerOrder(mergeFleet(ME, step.mover, anchorId));
+      continue;
     }
+    // Новое намерение вытесняет прежнее (правило 6): игрок передумал, и старая запись
+    // слила бы флот не туда — молча, уже по прибытии.
+    pendingMerges = pendingMerges.filter((pm) => pm.mover !== step.mover);
+    pendingMerges.push({ mover: step.mover, into: anchorId });
+    if (step.sendTo) playerOrder(moveFleet(ME, step.mover, step.sendTo));
   }
   setFleetSelection([anchorId]); // keep the surviving fleet selected for follow-up
-  note(queued ? `⛬ ${queued} fleet(s) en route to merge` : '⛬ fleets merged');
+  note(plan.queued ? `⛬ ${plan.queued} fleet(s) en route to merge` : '⛬ fleets merged');
 }
 
 /** Merge button on a multi-selection: pick a docked anchor, fold the rest into it. */
