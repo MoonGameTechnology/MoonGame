@@ -308,6 +308,7 @@ const AUTH_REASON: Record<AuthOutcome, string> = {
 };
 import { createScanMemory, type Snapshot } from './scanMemory';
 import {
+  assignSeats,
   factionBonuses,
   houseDisplayName,
   houseNameFor,
@@ -554,8 +555,10 @@ import { resolveIntro, parseSeenIntros, type IntroCard } from './intros';
 import { buildRecap, type RecapEvent } from './recap';
 import { briefSince, marksAway, splitByAttention, worthShowing } from './awayBrief';
 import { HOLD_TIP_MS, cursorTipPos, holdTipPos, movedTooFar } from './tipPlacement';
-import { canConfirm, normalizeTake, shipCounts, splitTotals, stepTake } from './splitPlan';
+import { normalizeTake, shipCounts, stepTake } from './splitPlan';
+import { splitDialogHtml, splitDialogLives, splitRows } from './splitDialog';
 import { canAssaultFromOrbit, canMerge, canSplit, uniformMode } from './cmdAvailability';
+import { DEFAULT_FIRE_MODE, fireMenuHtml, fireModeLabel, fireModeTargets } from './fireMode';
 import { stayingFleets, stripState } from './chainStripState';
 import {
   IDLE,
@@ -4785,41 +4788,31 @@ function render(now: number) {
 
     // callout: id + garrison/buildings, monospace. Worlds (planets — the capturable
     // prize) get a BRIGHT designation; every other sector is de-emphasised to a dim,
-    // smaller coordinate so the map reads "worlds first" (fogged → no telemetry).
+    // smaller coordinate so the map reads "worlds first".
     // LOD: callout text dissolves on the schematic view — except YOUR OWN worlds,
     // which stay labelled like city names on a globe (your anchor at any zoom).
     // Тир подписи, её чернила и судьба второй строки — `nodeCallout.ts` (REFM-117):
     // мир подписан ярче транзитного сектора, цвет владельца несёт РАЗВЕДДАННЫЕ, а
     // пустой тихий сектор молчит, чтобы не сорить «G:0 B:—» вдоль всего маршрута.
+    // Сюда доходит только ОПОЗНАННЫЙ узел — неопознанный забрал `drawFogMarker` выше
+    // по циклу (REFM-117.1), поэтому ветки «нет телеметрии» здесь больше нет.
     const tier = calloutTier(n.sector);
     const isWorld = tier === 'world';
     const mineWorld = isWorld && p.owner === ME;
     const callout = calloutAlpha(detail, mineWorld);
     if (callout === 0) continue;
     const g = p.garrison.reduce((a, st) => a + st.count, 0);
-    const line = calloutLine({
-      identified: kn,
-      detail,
-      tier,
-      garrison: g,
-      buildings: p.buildings.length,
-    });
-    const ink = calloutInk(kn, !!p.owner);
+    const line = calloutLine({ detail, tier, garrison: g, buildings: p.buildings.length });
+    const ink = calloutInk(!!p.owner);
     cx.save();
     cx.globalAlpha = callout;
     cx.shadowColor = 'rgba(0,0,0,0.85)';
     cx.shadowBlur = fxBlur(3);
     if (isWorld) {
-      cx.fillStyle =
-        ink === 'owner' ? col : ink === 'neutral' ? '#9fc9c4' : 'rgba(120,140,150,0.55)';
+      cx.fillStyle = ink === 'owner' ? col : '#9fc9c4';
       cx.font = '700 12px ui-monospace,Menlo,monospace';
     } else {
-      cx.fillStyle =
-        ink === 'owner'
-          ? rgba(col, 0.72)
-          : ink === 'neutral'
-            ? 'rgba(150,190,196,0.5)'
-            : 'rgba(120,140,150,0.4)';
+      cx.fillStyle = ink === 'owner' ? rgba(col, 0.72) : 'rgba(150,190,196,0.5)';
       cx.font = '600 10px ui-monospace,Menlo,monospace';
     }
     cx.fillText(n.id, c.x + R + 12, c.y - 1);
@@ -4828,10 +4821,6 @@ function render(now: number) {
       cx.fillStyle = rgba('#96d2cd', isWorld ? 0.6 : 0.42);
       cx.font = isWorld ? '10px ui-monospace,Menlo,monospace' : '9px ui-monospace,Menlo,monospace';
       cx.fillText(`G:${g}  B:${icons || '—'}`, c.x + R + 12, c.y + (isWorld ? 12 : 11));
-    } else if (line.do === 'unknown') {
-      cx.fillStyle = 'rgba(110,130,140,0.5)';
-      cx.font = '10px ui-monospace,Menlo,monospace';
-      cx.fillText('· no telemetry', c.x + R + 12, c.y + 12);
     }
     cx.restore();
   }
@@ -7055,20 +7044,13 @@ function renderCmdBar() {
   // (E_NOT_A_LANE — у прыжка нет середины), в бою. Правило переиспользуемое: любую
   // командную кнопку можно вешать на ту же пробу её настоящего приказа.
   const anyStoppable = fleets.some((f) => canOrder(s, stopFleet(ME, f.id)) === null);
-  // Режим огня артиллерии (одна кнопка + меню): на кнопке — общий режим арт-флотов
-  // выделения, при разнобое — нейтральная подпись.
+  // Режим огня артиллерии — `fireMode.ts` (REFM-158): это СТОЯЧЕЕ ПРАВИЛО, а не
+  // выстрел, поэтому у каждого режима в меню стоит вторая строка-правило, а подпись
+  // кнопки несёт режим только при единогласии — иначе она соврала бы про часть группы.
   const artFleets = fleets.filter((f) => f.owner === ME && fleetHasArtillery(f));
-  const FIRE_MODES: Array<{ m: string; lbl: string; sub: string }> = [
-    { m: 'passive', lbl: t('cmd.fire.passive'), sub: t('cmd.fire.passive.hint') },
-    { m: 'return', lbl: t('cmd.fire.return'), sub: t('cmd.fire.return.hint') },
-    { m: 'standard', lbl: t('cmd.fire.standard'), sub: t('cmd.fire.standard.hint') },
-    { m: 'aggressive', lbl: t('cmd.fire.aggressive'), sub: t('cmd.fire.aggressive.hint') },
-  ];
   // Единогласие режима, доступность слияния/деления/штурма — `cmdAvailability.ts` (REFM-78).
-  const uniMode = uniformMode(artFleets.map((f) => f.barrageMode ?? 'standard'));
-  const fmLabel = uniMode
-    ? (FIRE_MODES.find((x) => x.m === uniMode)?.lbl ?? t('cmd.fire.title'))
-    : t('cmd.fire.title');
+  const uniMode = uniformMode(artFleets.map((f) => f.barrageMode ?? DEFAULT_FIRE_MODE));
+  const fmLabel = fireModeLabel(uniMode);
   const docked = fleets.filter((f) => f.location && !f.movement && !f.battleId);
   // PC: ШТУРМ is a targeting command (fly there + storm on arrival) — armable
   // whenever the selection has ships. Mobile keeps the in-orbit-only button.
@@ -7217,14 +7199,7 @@ function renderCmdBar() {
           : '')
       : '') +
     // 🔥 поповер над баром: четыре режима с подписью-правилом; ● — текущий.
-    (fireMenu && artFleets.length > 0
-      ? `<div class="cmdpop">` +
-        FIRE_MODES.map(
-          (x) =>
-            `<button data-cmd="fmset" data-mode="${x.m}"${uniMode === x.m ? ' class="on"' : ''}><b>${uniMode === x.m ? '● ' : ''}${x.lbl}</b><span>${x.sub}</span></button>`,
-        ).join('') +
-        `</div>`
-      : '') +
+    (fireMenu && artFleets.length > 0 ? fireMenuHtml(uniMode) : '') +
     // ✨ поповер: способности героя-флагмана — каст прямо с ряда (дальняя → цель на карте).
     (castMenu && castHero
       ? `<div class="cmdpop">` +
@@ -7265,9 +7240,20 @@ function fleetShipCounts(f: Fleet): Record<string, number> {
  *  a new fleet; Confirm peels them off into the same sector. Closes itself if the
  *  fleet is deselected, vanishes, or starts moving. */
 function renderSplitDialog() {
-  if (splitState && splitState.fleetId !== selFleet) splitState = null; // selection moved on
-  const f = splitState ? s.fleets[splitState.fleetId] : undefined;
-  if (!splitState || !f || f.movement || f.battleId) {
+  // Жизнь окна и его разметка — `splitDialog.ts` (REFM-159): план привязан к ОДНОМУ
+  // флоту, а мир под окном идёт дальше — флот летит, гибнет, дерётся, выделение уходит.
+  const plan = splitState;
+  const f = plan ? s.fleets[plan.fleetId] : undefined;
+  const lives = splitDialogLives({
+    planFleetId: plan?.fleetId ?? null,
+    selectedFleetId: selFleet,
+    fleetExists: !!f,
+    moving: !!f?.movement,
+    inBattle: !!f?.battleId,
+  });
+  // `|| !plan || !f` — это не второе правило, а хвост для компилятора: их наличие уже
+  // гарантировано `lives`, но через вызов функции TS этого не видит.
+  if (!lives || !plan || !f) {
     splitState = null;
     if (splitdlg.style.display !== 'none') splitdlg.style.display = 'none';
     lastSplitHtml = '';
@@ -7275,35 +7261,11 @@ function renderSplitDialog() {
   }
   const counts = fleetShipCounts(f);
   // Состав живой: отбор пересчитывается под него на каждой перерисовке (`splitPlan.ts`).
-  splitState.take = normalizeTake(splitState.take, counts);
-  const { takeTotal, total } = splitTotals(counts, splitState.take);
-  let rows = '';
-  for (const unit of Object.keys(counts)) {
-    const have = counts[unit] ?? 0;
-    const tk = splitState.take[unit] ?? 0;
-    rows += `<div class="srow">
-      <span class="sname"><span class="bicon">${unitIconHtml(unit, data, youColor, 18)}</span>${esc(displayUnit(unit))}</span>
-      <b class="scur">${have - tk}</b>
-      <span class="sbtns">
-        <button data-sx="dec" data-unit="${esc(unit)}" data-n="1" ${tk <= 0 ? 'disabled' : ''}>−1</button>
-        <button data-sx="inc" data-unit="${esc(unit)}" data-n="1" ${tk >= have ? 'disabled' : ''}>+1</button>
-        <button data-sx="inc" data-unit="${esc(unit)}" data-n="10" ${tk >= have ? 'disabled' : ''}>+10</button>
-        <button data-sx="all" data-unit="${esc(unit)}" ${tk >= have ? 'disabled' : ''}>${t('split.all')}</button>
-      </span>
-      <b class="snew">→ ${tk}</b>
-    </div>`;
-  }
-  const valid = canConfirm(takeTotal, total);
-  const html = `<div class="sbox">
-    <div class="shead">${t('split.title')} <b>${esc(splitState.fleetId)}</b></div>
-    <div class="ssub">${t('split.note')}</div>
-    <div class="srows">${rows}</div>
-    <div class="sfoot">${t('split.preview', { a: `<b>${takeTotal}</b>`, b: `<b>${total - takeTotal}</b>` })}</div>
-    <div class="sactions">
-      <button data-sx="confirm" class="cbtn" ${valid ? '' : 'disabled'}>${t('split.confirm')}</button>
-      <button data-sx="cancel" class="cbtn ghost">${t('ping.cancel')}</button>
-    </div>
-  </div>`;
+  plan.take = normalizeTake(plan.take, counts);
+  const html = splitDialogHtml(
+    { fleetId: plan.fleetId, rows: splitRows(counts, plan.take) },
+    { icon: (u) => unitIconHtml(u, data, youColor, 18), name: displayUnit },
+  );
   if (html !== lastSplitHtml) {
     splitdlg.innerHTML = html;
     lastSplitHtml = html;
@@ -7815,14 +7777,24 @@ cmdbar.addEventListener('click', (ev) => {
     fireMenu = !fireMenu; // 🔥 — открыть/закрыть меню выбора режима огня
     aiming = false;
   } else if (cmd === 'fmset') {
-    // Выбор в 🔥-меню: единый режим всем выделенным флотам с артиллерией.
-    const mode = bEl.dataset.mode ?? 'standard';
-    for (const id of ids) {
-      const f = s.fleets[id];
-      if (f && f.owner === ME && fleetHasArtillery(f) && (f.barrageMode ?? 'standard') !== mode) {
-        playerOrder(barrageModeFleet(ME, id, mode));
-      }
-    }
+    // Выбор в 🔥-меню: единый режим всем выделенным флотам с артиллерией. Кому именно
+    // слать — `fireMode.ts` (REFM-158, правила 5–7): приказ уходит только тем, у кого
+    // режим ДРУГОЙ, иначе платим кругом через ядро за отсутствие изменений.
+    const mode = bEl.dataset.mode ?? DEFAULT_FIRE_MODE;
+    const targets = fireModeTargets(
+      ids.map((id) => {
+        const f = s.fleets[id];
+        return {
+          id,
+          owner: f?.owner ?? '',
+          artillery: !!f && fleetHasArtillery(f),
+          mode: f?.barrageMode,
+        };
+      }),
+      ME,
+      mode,
+    );
+    for (const id of targets) playerOrder(barrageModeFleet(ME, id, mode));
     fireMenu = false;
   } else if (cmd === 'boost') {
     // BOOST-1 форс-марш: toggle for the whole selection — ON unless everyone
@@ -9625,33 +9597,22 @@ function buildSetupConfig(): SetupConfig {
   // Seats play the HOUSES assigned at setup (H3): you = setupFaction, AI = the rest.
   // Seat name follows the house (its canonical data name); color stays per-seat.
   const fids = seatFactionIds();
-  const seats: SeatConfig[] = [
-    {
-      id: SEAT_META[0]!.id,
-      name: seatHouseName(fids[0]!, SEAT_META[0]!.name, 0),
-      faction: fids[0]!,
-      start: setupStart,
-      ai: false,
-      ...(setupTeams ? { team: setupSeatTeam[0] } : {}),
+  // Кто реально играет и с какого мира стартует — `setupSeats.ts` (REFM-160): место 0
+  // всегда твоё, AI-места забирают кандидатов по порядку мимо выключенных, свой мир из
+  // кандидатов уже исключён, а закончившиеся кандидаты останавливают раздачу.
+  const seats: SeatConfig[] = assignSeats(SEAT_META.length, setupSlots, setupStart, START_CANDIDATES).map(
+    ({ index: i, start }) => {
+      const m = SEAT_META[i]!;
+      return {
+        id: m.id,
+        name: seatHouseName(fids[i]!, m.name, i),
+        faction: fids[i]!,
+        start,
+        ai: i !== 0,
+        ...(setupTeams ? { team: setupSeatTeam[i] } : {}),
+      };
     },
-  ];
-  // Hand each active AI seat one of the remaining candidate worlds, in order.
-  const free = START_CANDIDATES.filter((c) => c !== setupStart);
-  let fi = 0;
-  for (let i = 1; i < SEAT_META.length; i++) {
-    if (setupSlots[i] !== 'ai') continue;
-    const start = free[fi++];
-    if (!start) break; // ran out of candidate worlds
-    const m = SEAT_META[i]!;
-    seats.push({
-      id: m.id,
-      name: seatHouseName(fids[i]!, m.name, i),
-      faction: fids[i]!,
-      start,
-      ai: true,
-      ...(setupTeams ? { team: setupSeatTeam[i] } : {}),
-    });
-  }
+  );
   // Carry the player's division templates + hero roster into the match (deep-cloned),
   // plus the meta-progression grant (snapshot — no live account reads mid-match).
   return {
