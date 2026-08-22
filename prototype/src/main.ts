@@ -596,6 +596,14 @@ import {
 } from './orbitRing';
 import { routeShown, routeStops, routeStroke } from './fleetRoute';
 import { netContacts, soloContacts } from './radarContacts';
+import {
+  BUILD_LANES,
+  headStarts,
+  queueRuns,
+  rallyCloses,
+  shipsPending,
+  withoutRally,
+} from './buildPipeline';
 import { standingPatrol, stashOnStandDown } from './sortieResume';
 import {
   fleetSignature as coreFleetSignature,
@@ -1700,23 +1708,38 @@ function submitQueued(planetId: string, queued: QueuedBuild): StepOut {
 // — ships only pool together if you queue the next batch before the current one finishes.
 // Single-player only: in net mode the server owns the fleets and their tags.
 function closeIdleRallies(): void {
+  // Условия конвейера — `buildPipeline.ts` (REFM-172): сбор закрывается, когда мир не
+  // строит корабли НИ сейчас, НИ по очереди; закрытие снимает МЕТКУ, а не распускает
+  // флот, иначе одна эскадра росла бы весь матч; о летящем флоте не решают вовсе.
+  const строит = (planetId: string): boolean =>
+    shipsPending(!!activeConstruction(planetId, 'units'), buildQueues[planetId]?.units.length ?? 0);
   for (const f of Object.values(s.fleets)) {
-    if (f.owner !== ME || !f.location || f.movement || !f.traits?.includes('rally')) continue;
-    const pending =
-      !!activeConstruction(f.location, 'units') || (buildQueues[f.location]?.units.length ?? 0) > 0;
-    if (!pending) f.traits = f.traits.filter((t) => t !== 'rally');
+    const view = {
+      mine: f.owner === ME,
+      location: f.location ?? null,
+      moving: !!f.movement,
+      traits: f.traits,
+    };
+    if (rallyCloses(view, строит)) f.traits = withoutRally(f.traits ?? []);
   }
 }
 function pumpBuildQueues(): void {
   for (const planetId of Object.keys(buildQueues)) {
     const q = buildQueues[planetId];
     const p = s.planets[planetId];
-    if (!q || !p || p.owner !== ME) {
+    if (!queueRuns(!!q && !!p, p?.owner === ME) || !q) {
       continue;
     }
-    for (const lane of ['buildings', 'units'] as const) {
+    // Полосы решаются ПО ОЧЕРЕДИ, а не единым планом (правило 5 в `buildPipeline.ts`):
+    // пуск головы тратит ресурсы, и вердикт по второй полосе зависит от уже применённой.
+    for (const lane of BUILD_LANES) {
       const next = q[lane][0];
-      if (!next || activeConstruction(planetId, lane) || !canStartQueued(planetId, next)) {
+      // Вердикт ядра — ЛЕНИВО (правило 9): у пустой полосы его спрашивать не про что, у
+      // занятой незачем, а лишний `canOrder` на каждом кадре — плата ни за что.
+      if (
+        !next ||
+        !headStarts(!!activeConstruction(planetId, lane), () => !canStartQueued(planetId, next))
+      ) {
         continue;
       }
       q[lane].shift();
