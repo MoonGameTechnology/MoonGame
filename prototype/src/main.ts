@@ -9097,7 +9097,7 @@ $('crback').addEventListener('click', () => {
 // email is on file. «Восстановить доступ» on the registration page opens this stage.
 const crecMailInput = $('crecmail') as HTMLInputElement;
 async function submitRecover(): Promise<void> {
-  // Правила формы — `recoverForm.ts` (REFM-158): пустое поле не запрос, а подсказка
+  // Правила формы — `recoverForm.ts` (REFM-161): пустое поле не запрос, а подсказка
   // полю; ответ игроку ОДИН И ТОТ ЖЕ, что бы ни случилось (зеркало анти-перечисления
   // на сервере: разный текст превратил бы форму в проверку «есть ли тут такая учётка»).
   const step = recoverStep(crecMailInput.value);
