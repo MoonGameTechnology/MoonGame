@@ -644,6 +644,7 @@ import { closeAction, isCurrentSocket } from './socketFate';
 import { welcomePlan } from './netWelcome';
 import { orderPlan } from './orderRoute';
 import { errorTarget, refusalKey } from './errorRoute';
+import { joinLanding } from './joinLanding';
 import { clearStatusLine, fallbackFor, showServerRow } from './browserFallback';
 import { joinHref, startEnabled } from './seatJoin';
 import { archiveUrl, httpBase, matchesUrl, queryOutcome, seatsUrl } from './matchQuery';
@@ -8621,6 +8622,10 @@ const statusEl = $('cstatus');
 const showConnect = (show: boolean): void => {
   connectEl.style.display = show ? 'flex' : 'none';
 };
+/** Виден ли экран подключения. Нужен там, где решение зависит от того, ПРОЧИТАЕТ ли
+ *  игрок написанное в его строку статуса: по ссылке на сессию оверлей скрыт с самого
+ *  начала загрузочной ветки, и текст отказа в нём равен молчанию (ADDR-5). */
+const connectShown = (): boolean => connectEl.style.display !== 'none';
 srvInput.value =
   localStorage.getItem('void.server') ??
   // Default to the SAME ORIGIN so a served page needs no typing: deployed https →
@@ -9353,17 +9358,17 @@ if (bootReset) {
   void (async () => {
     const srv = resolveServer();
     if (srv) await probeAuthMode(srv.base);
-    // If auth-off LAN, just dial in (no login needed).
-    if (!authMode) {
-      showStage('browse');
-      connectToMatch(bootJoinId, bootSlot || undefined, bootFaction || undefined);
-      return;
-    }
-    // Auth-on: if we have a cached session JWT, go straight to the match.
+    // Куда ведёт ссылка — `joinLanding.ts` (ADDR-5): сервер без аккаунтов пускает сразу,
+    // живая сессия ведёт в матч, её отсутствие — на стартовый экран.
     // NEVER log the record — even a prefix of `cached.token` is a session-JWT leak
     // into the browser console (and into any screen recording of a playtest).
     const cached = srv ? sessionRecord(srv.base) : null;
-    if (cached) {
+    const where = joinLanding({
+      authRequired: !!authMode,
+      hasSession: !!cached,
+      refused: false,
+    });
+    if (where === 'match') {
       showStage('browse');
       connectToMatch(bootJoinId, bootSlot || undefined, bootFaction || undefined);
       return;
@@ -9371,6 +9376,9 @@ if (bootReset) {
     // No session — show the welcome card so the player can register/login,
     // then welcomeSignIn auto-resumes the join via pendingJoinAfterAuth.
     pendingJoinAfterAuth.remember(bootJoinId, bootSlot, bootFaction);
+    // ADDR-5: ветка началась с showConnect(false), и без этой строки карточка входа
+    // выставлялась ВНУТРИ скрытого оверлея — игрок получал пустой экран вместо входа.
+    showConnect(true);
     showStage('welcome');
     const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
     wNickInput.value = savedNick || suggestCallsign();
@@ -10112,7 +10120,25 @@ function connect(): void {
       scheduleReconnect(); // a reconnect attempt failed to admit → back off and retry
     }
     // `keep-reason`: нас не впустили — ответ сервера уже в строке статуса, и стирать
-    // его нечем (правило 4); оверлей и так показан.
+    // его нечем (правило 4). Оверлей ПОКАЗАН, если игрок пришёл через экран подключения,
+    // — но не когда он пришёл по ссылке на сессию: там ветка началась с showConnect(false),
+    // и строка статуса, как и весь экран, невидима. Тогда сажаем его на видимый экран
+    // (ADDR-5): причина уезжает с ним, а решение о том, куда именно, не зависит от кода
+    // отказа — иначе ссылка стала бы оракулом существования партий.
+    if (!connectShown()) {
+      const reason = statusEl.textContent ?? '';
+      const srv = resolveServer();
+      const landing = joinLanding({
+        authRequired: !!authMode,
+        hasSession: srv ? !!sessionRecord(srv.base) : false,
+        refused: true,
+      });
+      if (landing === 'hub') openHub(reason);
+      else {
+        showConnect(true);
+        showStage('welcome');
+      }
+    }
   };
   sock.onerror = () => {
     if (!isCurrentSocket(sock, netSock)) return; // ошибка устаревшего сокета — не наша
