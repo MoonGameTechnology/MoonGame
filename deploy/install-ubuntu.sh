@@ -330,16 +330,35 @@ fi
 echo "[!] Путь без гейта: сборка на хосте — образ не сканирован и не подписан."
 echo "[!] Проверяемый путь: VOID_IMAGE=ghcr.io/moongametechnology/moongame@sha256:... moongame update"
 
-echo "[*] Обновляем код из репозитория..."
-cd "$INSTALL_DIR"
-git pull origin main
+# Каталог установки принадлежит служебному пользователю, а `moongame update` набирают
+# из-под своей учётки. git на такое отвечает «detected dubious ownership» и не делает
+# НИЧЕГО — обновление тихо останавливается на первом же шаге (поймано на живой машине).
+# Поэтому git и docker зовём ОТ ВЛАДЕЛЬЦА каталога, а не от того, кто набрал команду.
+# Глобальный `safe.directory` тут не годится: он маскирует ту же ошибку в следующий раз
+# и засоряет ~/.gitconfig у root.
+OWNER="$(stat -c %U "$INSTALL_DIR")"
+run_as_owner() {
+  if [ "$(id -un)" = "$OWNER" ]; then "$@"; else sudo -u "$OWNER" "$@"; fi
+}
+
+# Обновляемся по ТЕКУЩЕЙ ветке, а не по прибитому гвоздями main: плейтест-хост
+# регулярно стоит на ветке с ещё не примёрженным фиксом, и `git pull origin main`
+# на нём молча привозит не то, что просили. Переопределяется явно: BRANCH=... moongame update.
+BRANCH="${BRANCH:-$(run_as_owner git -C "$INSTALL_DIR" rev-parse --abbrev-ref HEAD)}"
+echo "[*] Обновляем код из репозитория (ветка $BRANCH)..."
+run_as_owner git -C "$INSTALL_DIR" fetch origin "$BRANCH"
+# --ff-only: деплой-хост не место для сюрпризных merge-коммитов. Разошлось — пусть
+# падает здесь, до пересборки, а не оставляет полугибрид в проде.
+run_as_owner git -C "$INSTALL_DIR" merge --ff-only "origin/$BRANCH"
 
 # Образ, на котором сервер работает ПРЯМО СЕЙЧАС — единственная точка отката.
 PREV_IMAGE_ID="$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" ps -q server 2>/dev/null \
   | head -1 | xargs -r docker inspect --format '{{.Image}}' 2>/dev/null || true)"
 
 echo "[*] Пересобираем образ (сервер пока работает, ~1-3 мин)..."
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" build
+# Тоже от владельца: в группе docker состоит служебный пользователь (его туда завёл
+# установщик), а не тот, кто набрал `moongame update`.
+run_as_owner docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" build
 
 echo "[*] Перезапускаем сервер на новом образе..."
 sudo systemctl restart "$SERVICE_NAME"
