@@ -51,6 +51,25 @@ export interface Identity {
   login: string;
 }
 
+/** Что игрок принёс на вход: кто он и что выбрал на экране входа (ENTRY-2/3).
+ *
+ *  ИМЕНОВАННЫЙ объект, а не позиционные параметры — и это не стиль. На позиционных
+ *  реализация с МЕНЬШИМ числом аргументов совместима с более широкой сигнатурой, поэтому
+ *  канонический сервер полгода принимал три параметра из пяти и молча ронял `slot` с
+ *  `faction`, а TypeScript этого не видел (ENTRY-1). С объектом реализация получает вход
+ *  целиком; забыть поле всё ещё можно, но это видно в коде, а не прячется в сигнатуре. */
+export interface JoinRequest {
+  /** Ник места. На аутентифицированном пути — логин сессии, чужим им не назовёшься. */
+  nick: string;
+  accountId?: string | undefined;
+  /** Выбранный стартовый мир (кресло). */
+  preferredSlot?: string | undefined;
+  /** Выбранный дом. */
+  preferredFaction?: string | undefined;
+  /** Совет учёных в ЭТУ сессию (≤2 — предел держат схема и модуль). */
+  preferredScientists?: readonly string[] | undefined;
+}
+
 export interface MatchApiDeps {
   /** Seed + persist a new match; returns its id and seat player ids. Optional: when absent
    *  the `POST /matches` route is not registered — a host that only seeds matches out of band
@@ -61,7 +80,7 @@ export interface MatchApiDeps {
    *  `accountId` is stamped into the join token when the caller is authenticated.
    *  `preferredSlot` (REL-7): the player's chosen slot id (e.g. "p3"); the server
    *  reserves it if free, falls back to any free slot if not. */
-  join(matchId: string, nick: string, accountId?: string, preferredSlot?: string, preferredFaction?: string): Promise<JoinResult | JoinFailure>;
+  join(matchId: string, req: JoinRequest): Promise<JoinResult | JoinFailure>;
   /** Resolve the caller's identity from the request (session token), or null when the
    *  request carries no valid session. Wired ⇒ create/join REQUIRE identity (401 E_AUTH)
    *  and the session's login IS the nick. Absent ⇒ legacy `?nick=` dev behaviour. */
@@ -135,9 +154,23 @@ export function registerMatchApi(app: FastifyInstance, deps: MatchApiDeps): void
         void reply.code(401);
         return { error: 'E_AUTH' as const };
       }
-      const slot = (request.query as { slot?: string }).slot;
-      const faction = (request.query as { faction?: string }).faction;
-      const result = await deps.join(id, who.login, who.accountId, slot, faction);
+      const q = request.query as { slot?: string; faction?: string; sci?: string };
+      const result = await deps.join(id, {
+        nick: who.login,
+        accountId: who.accountId,
+        preferredSlot: q.slot,
+        preferredFaction: q.faction,
+        // Совет едет одной строкой через запятую: два id, и отдельные повторяющиеся
+        // параметры ради двух значений — лишняя форма, которую пришлось бы разбирать
+        // и на клиенте, и здесь. Пустые куски отбрасываем, чтобы `sci=` и `sci=,`
+        // читались как «не выбрал», а не как учёный с пустым идентификатором.
+        preferredScientists: q.sci
+          ? q.sci
+              .split(',')
+              .map((x) => x.trim())
+              .filter((x) => x !== '')
+          : undefined,
+      });
       if ('error' in result) void reply.code(STATUS[result.error]);
       return result;
     }
@@ -146,7 +179,7 @@ export function registerMatchApi(app: FastifyInstance, deps: MatchApiDeps): void
       void reply.code(400);
       return { error: 'E_NICK_REQUIRED' as const };
     }
-    const result = await deps.join(id, nick.trim());
+    const result = await deps.join(id, { nick: nick.trim() });
     if ('error' in result) void reply.code(STATUS[result.error]);
     return result;
   });

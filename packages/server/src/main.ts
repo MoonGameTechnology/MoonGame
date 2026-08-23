@@ -315,7 +315,7 @@ const matchApi: MatchApiDeps = {
   // широкой сигнатурой, поэтому TypeScript такое пропускает. Прототипный хост
   // (`prototype/netserver.ts`) BF-30 реализовывал, канонический — нет, и разъезд не
   // проявлялся ровно потому, что играли на прототипном.
-  join: async (matchId, nick, accountId, preferredSlot, preferredFaction) => {
+  join: async (matchId, { nick, accountId, preferredSlot, preferredFaction, preferredScientists }) => {
     const snap = await stores.store.load(matchId);
     if (!snap) return { error: 'E_NO_MATCH' };
     if (!signToken) return { error: 'E_AUTH_DISABLED' }; // no token auth configured
@@ -355,7 +355,10 @@ const matchApi: MatchApiDeps = {
       if (room) {
         await room.submitServerAction(
           claim.playerId,
-          seatClaimAction(matchId, claim.playerId, room.state.time, claim.claim),
+          seatClaimAction(matchId, claim.playerId, room.state.time, {
+            ...claim.claim,
+            ...(preferredScientists !== undefined ? { scientists: preferredScientists } : {}),
+          }),
         );
         await stores.store.save(snapshotOf(room));
       }

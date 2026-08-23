@@ -202,7 +202,7 @@ describe('SE-1.x · session gate on the match API', () => {
     });
     const deps: MatchApiDeps = {
       createMatch: () => Promise.resolve({ matchId: 'm1', seats: ['green', 'red'] }),
-      join: (matchId, nick, accountId) =>
+      join: (matchId, { nick, accountId }) =>
         Promise.resolve({ playerId: 'green', token: `join:${matchId}:${nick}:${accountId}` }),
       // Mirrors production (main.ts / netserver.ts): signature verify THEN a live re-check
       // against the current password, so a reset revokes older sessions at the seat gate.

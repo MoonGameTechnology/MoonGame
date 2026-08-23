@@ -826,7 +826,7 @@ const server = createMultiplayerServer({
         // BF-30: `preferredFaction` decouples faction from the slot's start point —
         // the player picks a faction independently; the server overrides the seat's
         // default faction after assigning it.
-        join: async (id, login, accountId, preferredSlot, preferredFaction) => {
+        join: async (id, { nick: login, accountId, preferredSlot, preferredFaction, preferredScientists }) => {
           const room = registry.get(id);
           if (!room) return { error: 'E_NO_MATCH' as const };
           const held = await accountStore.seatOf(id, login);
@@ -855,7 +855,10 @@ const server = createMultiplayerServer({
           if (claim.claim) {
             await room.submitServerAction(
               claim.playerId,
-              seatClaimAction(id, claim.playerId, room.state.time, claim.claim),
+              seatClaimAction(id, claim.playerId, room.state.time, {
+                ...claim.claim,
+                ...(preferredScientists !== undefined ? { scientists: preferredScientists } : {}),
+              }),
             );
           }
           return {
