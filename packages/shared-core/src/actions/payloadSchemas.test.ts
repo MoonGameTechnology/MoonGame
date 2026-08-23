@@ -22,6 +22,7 @@ const CLIENT_ACTION_TYPES = [
   'hero.fit',
   'planet.annihilate',
   'station.deploy',
+  'seat.claim',
   'building.construct',
   'building.upgrade',
   'unit.build',

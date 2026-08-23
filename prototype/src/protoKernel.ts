@@ -10,6 +10,7 @@ import {
   createKernel,
   economyModule,
   effectsModule,
+  seatClaimModule,
   movementModule,
   factionModule,
   heroModule,
@@ -84,6 +85,10 @@ export const MODULES: GameModule[] = [
   instantRepairModule, // платный мгновенный ремонт корпуса (кредиты как премиум-валюта)
   econScrewsModule, // ECON-3: экспресс-ремонт корпуса за metal у своего дока
   effectsModule, // EFX-1: интерпретатор data.events (trigger→effect); инертен, пока events: {} пуст
+  seatClaimModule, // ENTRY-3: заявка на место (дом + совет учёных) действием, а не мутацией
+  // мимо редьюсера — иначе выбор не попадает в лог и реплей воспроизводит партию иначе.
+  // В КОНЕЦ намеренно: модуль не вешает ни хуков, ни подписок на чужие события, поэтому
+  // относительный порядок всех остальных остаётся нетронутым (инвариант #6).
 ];
 
 export const kernel = createKernel(MODULES);

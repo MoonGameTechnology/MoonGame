@@ -54,6 +54,11 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   'hero.fit': z.object({ heroId: id, fitting: id }),
   // station.ts
   'station.deploy': z.object({ planetId: id }),
+  // seatClaim.ts (ENTRY-3). Оба поля необязательны: заявка без выбора законна —
+  // игрок берёт место с домом из расклада и пустым советом. Совет капается двумя
+  // и здесь, и в обработчике: схема режет явную чушь до редьюсера, обработчик
+  // остаётся самодостаточным (схема не строже handler'а — она его не заменяет).
+  'seat.claim': z.object({ faction: id.optional(), scientists: z.array(id).max(2).optional() }),
   // construction.ts
   'building.construct': z.object({ planetId: id, building: id }),
   'building.upgrade': z.object({ planetId: id, building: id }),

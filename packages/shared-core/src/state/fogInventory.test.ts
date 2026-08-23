@@ -90,6 +90,9 @@ const PLAYER_EXPOSURE: Record<keyof Player, 'public' | 'owner-private'> = {
   faction: 'public',
   status: 'public', // выбыл или играет — видно всем
   ai: 'public',
+  // Заявлено ли место живым игроком (ENTRY-3). Публично по существу: занятость мест
+  // и так видна в ленте матчей и на экране входа — прятать нечего.
+  claimed: 'public',
   resources: 'owner-private', // казна (кроме украденного окна `intel`)
   arrears: 'owner-private', // долги читаются как состояние казны
   technologies: 'owner-private',
@@ -170,6 +173,7 @@ function maximalState(): GameState {
         faction: 'x',
         status: 'active',
         ai: false,
+        claimed: true,
         resources: { metal: 10, credits: 20 },
         arrears: ['metal'],
         technologies: { completed: ['own_tech'], active: [] },
@@ -187,6 +191,7 @@ function maximalState(): GameState {
         faction: 'x',
         status: 'active',
         ai: true,
+        claimed: true,
         resources: { metal: 777, credits: 888 },
         arrears: ['CANARY_arrear'],
         technologies: { completed: ['CANARY_completed'], active: [] },

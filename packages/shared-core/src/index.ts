@@ -399,6 +399,7 @@ export {
 export { constructionModule } from './modules/construction';
 export { arsenalSyncModule } from './modules/arsenalSync';
 export { stationModule } from './modules/station';
+export { seatClaimModule } from './modules/seatClaim';
 export { technologyModule, technologyLock, conditionMet } from './modules/technology';
 export { scientistModule } from './modules/scientist';
 export { factionModule } from './modules/faction';
