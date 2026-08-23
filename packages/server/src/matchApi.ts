@@ -30,9 +30,19 @@ export interface JoinResult {
 /** A stable failure from `join`, mapped to an HTTP status by the route. `E_NOT_ROSTERED`
  *  is the AvA path (AVA-7): the match is an AvA session and the caller is not on its roster.
  *  `E_ENTRY_CLOSED` is the SES-2.3 entry window: a login that does not already hold a seat is
- *  refused once the window has closed (the join impl checks `seatOf` before assigning a chair). */
+ *  refused once the window has closed (the join impl checks `seatOf` before assigning a chair).
+ *  `E_UNKNOWN_FACTION` (ENTRY-1) is the `faction` query param naming a house the shipped data
+ *  does not have: the id is a DATA KEY (`data.factions[...]` feeds passives, starting loadout
+ *  and radar range), so an unknown one would silently zero every house bonus instead of
+ *  failing — the player would think they play that house while playing none. */
 export type JoinFailure = {
-  error: 'E_NO_MATCH' | 'E_MATCH_FULL' | 'E_AUTH_DISABLED' | 'E_NOT_ROSTERED' | 'E_ENTRY_CLOSED';
+  error:
+    | 'E_NO_MATCH'
+    | 'E_MATCH_FULL'
+    | 'E_AUTH_DISABLED'
+    | 'E_NOT_ROSTERED'
+    | 'E_ENTRY_CLOSED'
+    | 'E_UNKNOWN_FACTION';
 };
 
 /** An authenticated caller, as resolved by the `identify` hook. */
@@ -67,6 +77,10 @@ const STATUS: Record<JoinFailure['error'], number> = {
   E_MATCH_FULL: 409,
   E_NOT_ROSTERED: 403,
   E_ENTRY_CLOSED: 403,
+  // 400, а не 403: это не «нельзя», а «в запросе чушь» — клиент прислал дом, которого
+  // в данных нет. Отличать важно, иначе экран выбора покажет «вас не пускают» там, где
+  // на деле разъехались данные клиента и сервера.
+  E_UNKNOWN_FACTION: 400,
   E_AUTH_DISABLED: 501,
 };
 

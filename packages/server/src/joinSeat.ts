@@ -23,6 +23,24 @@
  * 3. **Нет свободного места — отказ, а не «посадим куда-нибудь».** Резолвер уже учёл
  *    пожелание по слоту (и сам откатился на любое свободное, если занято); если он
  *    вернул пусто — сажать некуда.
+ * 4. **Принимаем ровно тот дом, который сами и предложили.** Строка приходит от клиента
+ *    и уходит прямо в авторитетное состояние матча, а дом — это КЛЮЧ ДАННЫХ:
+ *    `data.factions[player.faction]` читают и пассивки (`faction.ts`), и стартовый
+ *    набор (`factionStart.ts`), и радиус радара (`visibility.ts`). Неизвестный id
+ *    ничего не роняет — он МОЛЧА обнуляет игроку все бонусы дома: лукапы вернут
+ *    undefined, и человек будет думать, что играет за выбранный дом, не играя ни за
+ *    какой. Поэтому неизвестный дом — отказ (`E_UNKNOWN_FACTION`), а не «посадим с
+ *    домом по умолчанию»: тихая подмена хуже честного отказа (инвариант fail-secure).
+ *
+ *    Сверяем со списком домов ЭТОГО матча, а не с каталогом данных: сервер отдаёт
+ *    ровно этот список в `GET /matches/:id/seats`, из него клиент и рисует выбор —
+ *    значит проверка совпадает с предложением по построению, и разъехаться им негде.
+ *    Каталог данных был бы шире предложенного, и дом, которого в матче нет, прошёл бы
+ *    проверку, дав игроку дом без единого места в раскладе.
+ *
+ *    Сверяем только там, где дом ПРИМЕНЯЕТСЯ (новый захват вне AvA) — иначе стухший
+ *    `&faction=` в закладке запирал бы игрока в его же матче на реконнекте, а по
+ *    правилам 1–2 он там всё равно игнорируется.
  */
 
 /** Что известно к моменту решения. */
@@ -33,25 +51,28 @@ export interface JoinSeatInput {
   resolved?: { playerId: string; isNew: boolean } | null | undefined;
   /** Дом, который выбрал игрок (`faction` из запроса). */
   preferredFaction?: string | undefined;
+  /** Дома, которые есть В ЭТОМ МАТЧЕ — тот же список, что уходит в `/seats` (правило 4). */
+  knownFactions: readonly string[];
 }
 
-/** Чем кончается вход. */
-export interface SeatClaim {
-  /** Место, которое достаётся игроку. */
-  playerId: string;
-  /** Переписать ли дом этого места выбором игрока (правила 1–2). */
-  applyFaction: boolean;
-}
+/** Чем кончается вход: место (и надо ли переписать дом) либо стабильный код отказа. */
+export type SeatClaim =
+  | { ok: true; playerId: string; applyFaction: boolean }
+  | { ok: false; code: 'E_MATCH_FULL' | 'E_UNKNOWN_FACTION' };
 
-/** Какое место достаётся и переписывать ли дом (правила 1–3). `null` — сажать некуда. */
-export function seatClaim(input: JoinSeatInput): SeatClaim | null {
+/** Какое место достаётся и переписывать ли дом (правила 1–4). */
+export function seatClaim(input: JoinSeatInput): SeatClaim {
   if (input.avaPlayerId !== undefined) {
-    return { playerId: input.avaPlayerId, applyFaction: false };
+    return { ok: true, playerId: input.avaPlayerId, applyFaction: false };
   }
   const resolved = input.resolved;
-  if (!resolved) return null;
-  return {
-    playerId: resolved.playerId,
-    applyFaction: Boolean(input.preferredFaction) && resolved.isNew,
-  };
+  if (!resolved) return { ok: false, code: 'E_MATCH_FULL' };
+  const wanted = input.preferredFaction;
+  if (!wanted || !resolved.isNew) {
+    return { ok: true, playerId: resolved.playerId, applyFaction: false };
+  }
+  if (!input.knownFactions.includes(wanted)) {
+    return { ok: false, code: 'E_UNKNOWN_FACTION' };
+  }
+  return { ok: true, playerId: resolved.playerId, applyFaction: true };
 }

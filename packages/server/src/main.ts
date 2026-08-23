@@ -335,8 +335,16 @@ const matchApi: MatchApiDeps = {
         );
     // Какое место достаётся и переписывать ли дом — `joinSeat.ts` (там же причины, по
     // которым AvA-ростер и возврат в свой матч выбор дома не применяют).
-    const claim = seatClaim({ avaPlayerId: ava?.playerId, resolved, preferredFaction });
-    if (!claim) return { error: 'E_MATCH_FULL' };
+    const claim = seatClaim({
+      avaPlayerId: ava?.playerId,
+      resolved,
+      preferredFaction,
+      // Дома ЭТОГО матча — ровно то, что сервер отдаёт в `/matches/:id/seats` и из чего
+      // клиент рисует выбор. Проверять по каталогу данных было бы шире предложенного
+      // (см. правило 4 в joinSeat.ts).
+      knownFactions: [...new Set(Object.values(snap.state.players).map((p) => p.faction))],
+    });
+    if (!claim.ok) return { error: claim.code };
     if (claim.applyFaction && preferredFaction) {
       // Дом живёт в состоянии матча, поэтому переписывается на ЖИВОЙ комнате
       // (гибернированная просыпается через реестр) и тут же персистится — тот же путь,

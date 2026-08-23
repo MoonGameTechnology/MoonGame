@@ -78,6 +78,7 @@ import { isValidActionPayload } from '../packages/shared-core/src/actions/payloa
 import type { PlayerId } from '../packages/shared-core/src/index';
 import { MS_PER_DAY } from '../packages/shared-core/src/index';
 import type { Identity } from '../packages/server/src/matchApi';
+import { seatClaim } from '../packages/server/src/joinSeat';
 const { Pool } = pgPkg;
 
 // --- M0/M1 playtest log: append room events to a per-run JSONL and feed every one
@@ -823,19 +824,33 @@ const server = createMultiplayerServer({
           if (!room) return { error: 'E_NO_MATCH' as const };
           const held = await accountStore.seatOf(id, login);
           if (!held && !registry.entryOpen(id)) return { error: 'E_ENTRY_CLOSED' as const };
-          const seat = held
-            ? { playerId: held }
-            : await accountStore.resolveSeat(id, login, Object.keys(room.state.players), preferredSlot as PlayerId | undefined);
-          if (!seat) return { error: 'E_MATCH_FULL' as const };
-          // BF-30: override the seat's faction with the player's choice — faction is
-          // no longer bound to the start point. Only on a NEW claim (not reconnect).
-          if (preferredFaction && !held) {
-            const player = room.state.players[seat.playerId];
+          // Что достаётся игроку и переписывать ли дом — ОБЩЕЕ решение с боевым сервером
+          // (`packages/server/src/joinSeat.ts`). Паритет двух хостов держится одним
+          // модулем, а не двумя похожими лесенками условий: ровно на такой лесенке
+          // канонический сервер и потерял `slot`/`faction` (ENTRY-1).
+          const resolved = held
+            ? { playerId: held, isNew: false }
+            : await accountStore.resolveSeat(
+                id,
+                login,
+                Object.keys(room.state.players),
+                preferredSlot as PlayerId | undefined,
+              );
+          const claim = seatClaim({
+            resolved,
+            preferredFaction,
+            // Дома ЭТОГО матча — тот же список, что уходит в `/matches/:id/seats`.
+            knownFactions: [...new Set(Object.values(room.state.players).map((p) => p.faction))],
+          });
+          if (!claim.ok) return { error: claim.code };
+          // BF-30: дом переопределяется выбором игрока — он не привязан к стартовой точке.
+          if (claim.applyFaction && preferredFaction) {
+            const player = room.state.players[claim.playerId];
             if (player) player.faction = preferredFaction;
           }
           return {
-            playerId: seat.playerId,
-            token: await authCfg.signToken!(id, seat.playerId, accountId),
+            playerId: claim.playerId,
+            token: await authCfg.signToken!(id, claim.playerId, accountId),
           };
         },
       });
