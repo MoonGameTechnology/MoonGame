@@ -44,7 +44,6 @@ export const ru: Record<string, string> = {
   'browser.restore-failed': 'не удалось восстановить',
   'browser.running': 'идёт',
   'browser.server-down': 'сервер недоступен — укажите адрес сервера',
-  'browser.slots': 'слотов',
   'browser.solo': 'Одиночный режим',
   'browser.solo.hint': 'Сервер не нужен — свободные места займут боты.',
   'browser.taken': 'занято',
@@ -1512,7 +1511,10 @@ export const ru: Record<string, string> = {
   'seatpick.go': 'ВЫБРАТЬ',
   'seatpick.load-failed': 'Не удалось загрузить слоты',
   'seatpick.loading': 'Загрузка…',
+  'seatpick.lost': 'Это место успели занять — выберите другое',
+  'seatpick.none-free': 'Свободных мест нет',
   'seatpick.sub': 'Выберите фракцию и стартовую позицию. Занятые места отмечены серым.',
+  'seatpick.taken': 'занято',
   'seatpick.title': 'Выбор фракции',
 
   // --- setup — Экран «Настройка схватки»: домашний мир, боты, скорость времени.
