@@ -78,7 +78,7 @@ import { isValidActionPayload } from '../packages/shared-core/src/actions/payloa
 import type { PlayerId } from '../packages/shared-core/src/index';
 import { MS_PER_DAY } from '../packages/shared-core/src/index';
 import type { Identity } from '../packages/server/src/matchApi';
-import { seatClaim } from '../packages/server/src/joinSeat';
+import { seatClaim, seatClaimAction } from '../packages/server/src/joinSeat';
 const { Pool } = pgPkg;
 
 // --- M0/M1 playtest log: append room events to a per-run JSONL and feed every one
@@ -843,10 +843,13 @@ const server = createMultiplayerServer({
             knownFactions: [...new Set(Object.values(room.state.players).map((p) => p.faction))],
           });
           if (!claim.ok) return { error: claim.code };
-          // BF-30: дом переопределяется выбором игрока — он не привязан к стартовой точке.
-          if (claim.applyFaction && preferredFaction) {
-            const player = room.state.players[claim.playerId];
-            if (player) player.faction = preferredFaction;
+          // ENTRY-3: заявка идёт ДЕЙСТВИЕМ через редьюсер, а не записью в состояние —
+          // мутация мимо редьюсера не попадает в лог и ломает реплей (см. joinSeat.ts).
+          if (claim.claim) {
+            await room.submitServerAction(
+              claim.playerId,
+              seatClaimAction(id, claim.playerId, room.state.time, claim.claim),
+            );
           }
           return {
             playerId: claim.playerId,

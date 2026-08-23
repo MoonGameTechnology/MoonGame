@@ -11,7 +11,7 @@ import { arsenalSnapshotOf, grantStarterArsenal } from './arsenal';
 import { awardMatchDrops, salvageFromEvents } from './dropRoller';
 import { createMultiplayerServer, tlsFromEnv } from './wsServer';
 import { createStores, snapshotOf } from './persistence';
-import { seatClaim } from './joinSeat';
+import { seatClaim, seatClaimAction } from './joinSeat';
 import { checkProductionReadiness, configFromEnv } from './serverConfig';
 import { createMatchLoader } from './serverWiring';
 import {
@@ -345,16 +345,18 @@ const matchApi: MatchApiDeps = {
       knownFactions: [...new Set(Object.values(snap.state.players).map((p) => p.faction))],
     });
     if (!claim.ok) return { error: claim.code };
-    if (claim.applyFaction && preferredFaction) {
-      // Дом живёт в состоянии матча, поэтому переписывается на ЖИВОЙ комнате
-      // (гибернированная просыпается через реестр) и тут же персистится — тот же путь,
-      // которым выше открывается война: подняли через `registry.resolve`, изменили,
-      // сохранили снимок. Комнату могло не поднять (снимок недоступен) — тогда вход
-      // всё равно состоится, просто с домом кресла по умолчанию.
+    if (claim.claim) {
+      // ENTRY-3: заявка идёт ДЕЙСТВИЕМ через редьюсер, а не записью в состояние.
+      // Мутация мимо редьюсера не попадает в лог реплея — воспроизведение выдавало бы
+      // дом из стартового снимка, то есть другие пассивки и другой радиус радара.
+      // Комнату могло не поднять (снимок недоступен) — тогда вход всё равно состоится,
+      // просто без применённого выбора: отказывать во входе из-за этого нельзя.
       const room = await registry.resolve?.(matchId);
-      const player = room?.state.players[claim.playerId];
-      if (room && player) {
-        player.faction = preferredFaction;
+      if (room) {
+        await room.submitServerAction(
+          claim.playerId,
+          seatClaimAction(matchId, claim.playerId, room.state.time, claim.claim),
+        );
         await stores.store.save(snapshotOf(room));
       }
     }

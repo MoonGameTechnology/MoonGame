@@ -1,3 +1,5 @@
+import type { Action } from '@void/shared-core';
+
 /**
  * Что вход делает с МЕСТОМ и ДОМОМ игрока (ENTRY-1).
  *
@@ -41,6 +43,12 @@
  *    Сверяем только там, где дом ПРИМЕНЯЕТСЯ (новый захват вне AvA) — иначе стухший
  *    `&faction=` в закладке запирал бы игрока в его же матче на реконнекте, а по
  *    правилам 1–2 он там всё равно игнорируется.
+ * 5. **Заявка подаётся и тогда, когда игрок ничего не выбрал.** Иначе место осталось бы
+ *    НЕЗАЯВЛЕННЫМ, и тот же игрок прислал бы `seat.claim` позже — то есть сменил бы дом
+ *    посреди партии, ровно то, что правило 1 и запрещает. Пустая заявка законна
+ *    (`seatClaim.ts`, правило 4) и служит замком: место помечено занятым, переиграть
+ *    его больше нельзя. По той же причине заявка идёт и на AvA-месте — пустая, потому
+ *    что там решает ростер.
  */
 
 /** Что известно к моменту решения. */
@@ -55,24 +63,56 @@ export interface JoinSeatInput {
   knownFactions: readonly string[];
 }
 
-/** Чем кончается вход: место (и надо ли переписать дом) либо стабильный код отказа. */
+/** Чем кончается вход: место (и заявка, если её надо подать) либо код отказа. */
 export type SeatClaim =
-  | { ok: true; playerId: string; applyFaction: boolean }
+  | {
+      ok: true;
+      playerId: string;
+      /** Подать `seat.claim` этим выбором. `null` — заявка не нужна (возврат в свой матч). */
+      claim: { faction?: string } | null;
+    }
   | { ok: false; code: 'E_MATCH_FULL' | 'E_UNKNOWN_FACTION' };
 
-/** Какое место достаётся и переписывать ли дом (правила 1–4). */
+/** Какое место достаётся и надо ли подать заявку (правила 1–5). */
 export function seatClaim(input: JoinSeatInput): SeatClaim {
+  // AvA: место фиксировано ростером, выбор игрока не применяется — но заявку подаём
+  // ПУСТОЙ, чтобы место было помечено занятым и его нельзя было переиграть позже.
   if (input.avaPlayerId !== undefined) {
-    return { ok: true, playerId: input.avaPlayerId, applyFaction: false };
+    return { ok: true, playerId: input.avaPlayerId, claim: {} };
   }
   const resolved = input.resolved;
   if (!resolved) return { ok: false, code: 'E_MATCH_FULL' };
+  if (!resolved.isNew) return { ok: true, playerId: resolved.playerId, claim: null };
   const wanted = input.preferredFaction;
-  if (!wanted || !resolved.isNew) {
-    return { ok: true, playerId: resolved.playerId, applyFaction: false };
-  }
+  if (!wanted) return { ok: true, playerId: resolved.playerId, claim: {} };
   if (!input.knownFactions.includes(wanted)) {
     return { ok: false, code: 'E_UNKNOWN_FACTION' };
   }
-  return { ok: true, playerId: resolved.playerId, applyFaction: true };
+  return { ok: true, playerId: resolved.playerId, claim: { faction: wanted } };
+}
+
+/** Заявка как ДЕЙСТВИЕ, а не запись в состояние.
+ *
+ *  Идентификатор детерминирован по (матч, место): повторный вход не создаёт вторую
+ *  заявку — квитанции комнаты дедупят её по `id` (та же дисциплина, что у AvA-объявлений
+ *  войны), а модуль отклонил бы её и так. Две страховки на разных уровнях, и обе дешёвые.
+ *
+ *  `issuedAt` берётся из игрового времени матча, а не из часов машины: время в действии
+ *  попадает в лог реплея, и `Date.now()` сделал бы воспроизведение невоспроизводимым. */
+export function seatClaimAction(
+  matchId: string,
+  playerId: string,
+  gameTime: number,
+  choice: { faction?: string; scientists?: readonly string[] },
+): Action {
+  const payload: { faction?: string; scientists?: string[] } = {};
+  if (choice.faction !== undefined) payload.faction = choice.faction;
+  if (choice.scientists !== undefined) payload.scientists = [...choice.scientists];
+  return {
+    id: `seat-claim:${matchId}:${playerId}`,
+    type: 'seat.claim',
+    playerId,
+    payload,
+    issuedAt: gameTime,
+  };
 }
