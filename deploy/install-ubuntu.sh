@@ -39,6 +39,16 @@ EXTERNAL_PORT="${EXTERNAL_PORT:-}"
 INTERNAL_PORT="${INTERNAL_PORT:-8788}"
 TIME_SCALE="${TIME_SCALE:-100}"
 POSTGRES_PASSWORD="moongame_dev_$(openssl rand -hex 8)"
+# Секрет подписи join-токенов. Гард checkProductionReadiness требует ≥32 символов
+# (MIN_SECRET_LEN), поэтому 32 байта hex = 64 символа — с запасом.
+AUTH_JWT_SECRET="$(openssl rand -hex 32)"
+# Origin, по которому игроки открывают игру — идёт в ALLOWED_ORIGINS (CSWSH-allowlist).
+# Браузер присылает РОВНО тот origin, на котором открыта страница, поэтому внешний
+# адрес (если он задан) добавляется вторым: через роутер это другой хост:порт.
+ALLOWED_ORIGINS="http://$INTERNAL_IP:$INTERNAL_PORT"
+if [ -n "$EXTERNAL_IP" ]; then
+    ALLOWED_ORIGINS="$ALLOWED_ORIGINS,http://$EXTERNAL_IP:${EXTERNAL_PORT:-$INTERNAL_PORT}"
+fi
 
 # Функции для вывода
 log_info() {
@@ -77,29 +87,36 @@ log_info "Обновление пакетов системы..."
 apt-get update
 apt-get upgrade -y
 
-# Проверка и установка Docker
+# Проверка и установка Docker.
+# ВАЖНО: ключ репозитория ставится файлом в /etc/apt/keyrings + `signed-by`, а НЕ через
+# `apt-key add`. apt-key объявлен устаревшим и УДАЛЁН начиная с Ubuntu 24.04, поэтому
+# старый путь ронял установку на 24.04/26.04 ещё до первого apt-get install. Кодовое имя
+# берём из VERSION_CODENAME (lsb_release может отсутствовать на минимальном образе).
 if ! command -v docker &> /dev/null; then
     log_info "Установка Docker..."
-    apt-get install -y apt-transport-https ca-certificates curl software-properties-common
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
-    add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+    apt-get install -y ca-certificates curl gnupg
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    chmod a+r /etc/apt/keyrings/docker.asc
+    UBUNTU_CODENAME="$(. /etc/os-release && echo "$VERSION_CODENAME")"
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $UBUNTU_CODENAME stable" \
+        > /etc/apt/sources.list.d/docker.list
     apt-get update
-    apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     log_success "Docker установлен"
 else
     log_success "Docker уже установлен"
 fi
 
-# Проверка и установка Docker Compose (standalone)
-if ! command -v docker-compose &> /dev/null; then
-    log_info "Установка Docker Compose..."
-    DOCKER_COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep 'tag_name' | cut -d'"' -f4)
-    curl -L "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    chmod +x /usr/local/bin/docker-compose
-    log_success "Docker Compose установлен"
-else
-    log_success "Docker Compose уже установлен"
+# Compose нужен как ПЛАГИН (`docker compose`) — именно его зовут и systemd-юнит, и
+# update-dev.sh. Standalone-бинарь `docker-compose` здесь не используется нигде, поэтому
+# он больше не качается: тот блок дёргал api.github.com без токена и при исчерпании
+# лимита молча клал битый файл в /usr/local/bin.
+if ! docker compose version &> /dev/null; then
+    log_error "Плагин 'docker compose' недоступен — установи docker-compose-plugin и повтори"
+    exit 1
 fi
+log_success "Docker Compose (плагин) на месте"
 
 # Включение Docker демона при старте
 systemctl enable docker
@@ -165,6 +182,29 @@ POSTGRES_PASSWORD=$POSTGRES_PASSWORD
 # Для локальной отладки можно временно выставить 0/0 — но не на плейтесте с людьми.
 GATE=1
 SEAT_LOCK=1
+
+# Секрет подписи join-токенов (сгенерирован установщиком, уникален для этой машины).
+# Держи его СТАБИЛЬНЫМ: смена секрета обесценивает выданные билеты, и все игроки
+# логинятся заново.
+AUTH_JWT_SECRET=$AUTH_JWT_SECRET
+
+# Origin-allowlist против CSWSH: без него браузер отдаст сессию на wss:// с чужой
+# страницы. Значение — ровно тот адрес, с которого игроки открывают игру.
+ALLOWED_ORIGINS=$ALLOWED_ORIGINS
+
+# ПОСТУРА. PROD=1 — это fail-secure гард (checkProductionReadiness): под ним сервер
+# ОТКАЗЫВАЕТСЯ стартовать, пока не включены auth + gate + seat-lock + TLS. Этот
+# установщик поднимает стек по ПЛАЙНОМУ HTTP в локальной сети, TLS здесь нет — значит
+# под PROD=1 сервер честно падал бы в цикл перезапуска. Поэтому здесь явный dev-режим.
+#
+# GATE и SEAT_LOCK выше при этом ОСТАЮТСЯ включёнными — они не зависят от PROD.
+# Отключается только загрузочная проверка, а не валидация действий и билеты на места.
+#
+# ПЕРЕД ВЫХОДОМ В ИНТЕРНЕТ: подними TLS (deploy/docker-compose.tls.yml + DOMAIN),
+# поставь ALLOWED_ORIGINS=https://<домен> и верни PROD=1.
+# Не выставляй TRUST_PROXY=1 «чтобы гард замолчал» без реального прокси перед сервером:
+# тогда сервер поверит заголовку X-Forwarded-For от клиента, и лимиты по IP обойдёт кто угодно.
+PROD=0
 EOF
 
 chown $SERVICE_USER:$SERVICE_USER "$ENV_FILE"
@@ -290,16 +330,35 @@ fi
 echo "[!] Путь без гейта: сборка на хосте — образ не сканирован и не подписан."
 echo "[!] Проверяемый путь: VOID_IMAGE=ghcr.io/moongametechnology/moongame@sha256:... moongame update"
 
-echo "[*] Обновляем код из репозитория..."
-cd "$INSTALL_DIR"
-git pull origin main
+# Каталог установки принадлежит служебному пользователю, а `moongame update` набирают
+# из-под своей учётки. git на такое отвечает «detected dubious ownership» и не делает
+# НИЧЕГО — обновление тихо останавливается на первом же шаге (поймано на живой машине).
+# Поэтому git и docker зовём ОТ ВЛАДЕЛЬЦА каталога, а не от того, кто набрал команду.
+# Глобальный `safe.directory` тут не годится: он маскирует ту же ошибку в следующий раз
+# и засоряет ~/.gitconfig у root.
+OWNER="$(stat -c %U "$INSTALL_DIR")"
+run_as_owner() {
+  if [ "$(id -un)" = "$OWNER" ]; then "$@"; else sudo -u "$OWNER" "$@"; fi
+}
+
+# Обновляемся по ТЕКУЩЕЙ ветке, а не по прибитому гвоздями main: плейтест-хост
+# регулярно стоит на ветке с ещё не примёрженным фиксом, и `git pull origin main`
+# на нём молча привозит не то, что просили. Переопределяется явно: BRANCH=... moongame update.
+BRANCH="${BRANCH:-$(run_as_owner git -C "$INSTALL_DIR" rev-parse --abbrev-ref HEAD)}"
+echo "[*] Обновляем код из репозитория (ветка $BRANCH)..."
+run_as_owner git -C "$INSTALL_DIR" fetch origin "$BRANCH"
+# --ff-only: деплой-хост не место для сюрпризных merge-коммитов. Разошлось — пусть
+# падает здесь, до пересборки, а не оставляет полугибрид в проде.
+run_as_owner git -C "$INSTALL_DIR" merge --ff-only "origin/$BRANCH"
 
 # Образ, на котором сервер работает ПРЯМО СЕЙЧАС — единственная точка отката.
 PREV_IMAGE_ID="$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" ps -q server 2>/dev/null \
   | head -1 | xargs -r docker inspect --format '{{.Image}}' 2>/dev/null || true)"
 
 echo "[*] Пересобираем образ (сервер пока работает, ~1-3 мин)..."
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" build
+# Тоже от владельца: в группе docker состоит служебный пользователь (его туда завёл
+# установщик), а не тот, кто набрал `moongame update`.
+run_as_owner docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" build
 
 echo "[*] Перезапускаем сервер на новом образе..."
 sudo systemctl restart "$SERVICE_NAME"
