@@ -11,6 +11,7 @@ import { arsenalSnapshotOf, grantStarterArsenal } from './arsenal';
 import { awardMatchDrops, salvageFromEvents } from './dropRoller';
 import { createMultiplayerServer, tlsFromEnv } from './wsServer';
 import { createStores, snapshotOf } from './persistence';
+import { seatClaim } from './joinSeat';
 import { checkProductionReadiness, configFromEnv } from './serverConfig';
 import { createMatchLoader } from './serverWiring';
 import {
@@ -308,7 +309,13 @@ const createMatch = async (): Promise<CreatedMatch> => {
 };
 const matchApi: MatchApiDeps = {
   createMatch,
-  join: async (matchId, nick, accountId) => {
+  // ENTRY-1: `preferredSlot`/`preferredFaction` доезжают до резолвера и до состояния.
+  // Раньше эта реализация принимала ТРИ параметра из пяти, объявленных `MatchApiDeps`, и
+  // два последних молча роняла: функция с меньшим числом параметров совместима с более
+  // широкой сигнатурой, поэтому TypeScript такое пропускает. Прототипный хост
+  // (`prototype/netserver.ts`) BF-30 реализовывал, канонический — нет, и разъезд не
+  // проявлялся ровно потому, что играли на прототипном.
+  join: async (matchId, nick, accountId, preferredSlot, preferredFaction) => {
     const snap = await stores.store.load(matchId);
     if (!snap) return { error: 'E_NO_MATCH' };
     if (!signToken) return { error: 'E_AUTH_DISABLED' }; // no token auth configured
@@ -316,11 +323,37 @@ const matchApi: MatchApiDeps = {
     // refused. `null` ⇒ an ordinary match → the normal first-come seat resolver.
     const ava = accountId ? await avaOrchestrator.resolveAvaSeat(matchId, accountId) : null;
     if (ava && !ava.ok) return { error: 'E_NOT_ROSTERED' };
-    const playerId = ava
-      ? ava.playerId
-      : (await accountStore.resolveSeat(matchId, nick, Object.keys(snap.state.players)))?.playerId;
-    if (playerId === undefined) return { error: 'E_MATCH_FULL' };
-    return { playerId, token: await signToken(matchId, playerId, accountId) };
+    // Резолвер зовём ТОЛЬКО вне AvA: у рострованного место фиксировано, а лишний вызов
+    // занял бы ему второе кресло.
+    const resolved = ava
+      ? undefined
+      : await accountStore.resolveSeat(
+          matchId,
+          nick,
+          Object.keys(snap.state.players),
+          preferredSlot,
+        );
+    // Какое место достаётся и переписывать ли дом — `joinSeat.ts` (там же причины, по
+    // которым AvA-ростер и возврат в свой матч выбор дома не применяют).
+    const claim = seatClaim({ avaPlayerId: ava?.playerId, resolved, preferredFaction });
+    if (!claim) return { error: 'E_MATCH_FULL' };
+    if (claim.applyFaction && preferredFaction) {
+      // Дом живёт в состоянии матча, поэтому переписывается на ЖИВОЙ комнате
+      // (гибернированная просыпается через реестр) и тут же персистится — тот же путь,
+      // которым выше открывается война: подняли через `registry.resolve`, изменили,
+      // сохранили снимок. Комнату могло не поднять (снимок недоступен) — тогда вход
+      // всё равно состоится, просто с домом кресла по умолчанию.
+      const room = await registry.resolve?.(matchId);
+      const player = room?.state.players[claim.playerId];
+      if (room && player) {
+        player.faction = preferredFaction;
+        await stores.store.save(snapshotOf(room));
+      }
+    }
+    return {
+      playerId: claim.playerId,
+      token: await signToken(matchId, claim.playerId, accountId),
+    };
   },
   // Wired ⇒ create/join require a session from /auth/login — the session's login IS
   // the seat nick, so nobody claims a seat as somebody else.
