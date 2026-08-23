@@ -64,7 +64,7 @@ describe('seatClaimModule (ENTRY-3)', () => {
       { id: 'overseer', level: 1 },
       { id: 'polymath', level: 1 },
     ]);
-    expect(s.players['p1']?.claimed).toBe(true);
+    expect(s.players['p1']?.claimedAt).toBe(0);
   });
 
   it('не мутирует вход (чистота)', () => {
@@ -72,13 +72,13 @@ describe('seatClaimModule (ENTRY-3)', () => {
     const r = apply(input, { faction: 'crimson', scientists: ['overseer'] });
     expect(r.ok).toBe(true);
     expect(input.players['p1']?.faction).toBe('azure');
-    expect(input.players['p1']?.claimed).toBeUndefined();
+    expect(input.players['p1']?.claimedAt).toBeUndefined();
   });
 
   it('трогает только своё место', () => {
     const s = okState(apply(world(), { faction: 'crimson' }));
     expect(s.players['p2']?.faction).toBe('crimson'); // p2 и был crimson
-    expect(s.players['p2']?.claimed).toBeUndefined();
+    expect(s.players['p2']?.claimedAt).toBeUndefined();
   });
 
   describe('правило 1 — заявить можно один раз', () => {
@@ -139,7 +139,7 @@ describe('seatClaimModule (ENTRY-3)', () => {
   describe('правило 4 — пустая заявка законна', () => {
     it('без выбора место просто занимается', () => {
       const s = okState(apply(world(), {}));
-      expect(s.players['p1']?.claimed).toBe(true);
+      expect(s.players['p1']?.claimedAt).toBe(0);
       expect(s.players['p1']?.faction).toBe('azure'); // дом места из расклада
       expect(s.players['p1']?.scientists).toBeUndefined();
     });
@@ -163,7 +163,7 @@ describe('seatClaimModule (ENTRY-3)', () => {
     const r = apply(s, { faction: 'crimson', scientists: ['nosuch'] });
     expect(r.ok).toBe(false);
     expect(s.players['p1']?.faction).toBe('azure');
-    expect(s.players['p1']?.claimed).toBeUndefined();
+    expect(s.players['p1']?.claimedAt).toBeUndefined();
   });
 
   it('без модуля тип действия неизвестен ядру — изоляция', () => {
@@ -171,5 +171,63 @@ describe('seatClaimModule (ENTRY-3)', () => {
     const r = bare.applyAction(world(), claim({ faction: 'azure' }), ctx());
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.code).toBe('E_UNKNOWN_ACTION');
+  });
+});
+
+describe('seat.confirm / seat.release (правила 6–7)', () => {
+  const confirm = (playerId = 'p1'): Action => ({
+    id: `k:${playerId}`,
+    type: 'seat.confirm',
+    playerId,
+    payload: {},
+    issuedAt: 0,
+  });
+  const release = (playerId = 'p1'): Action => ({
+    id: `r:${playerId}`,
+    type: 'seat.release',
+    playerId,
+    payload: {},
+    issuedAt: 0,
+  });
+  const claimed = (): GameState => okState(apply(world(), { faction: 'crimson' }));
+
+  it('подтверждение закрепляет место', () => {
+    const r = kernel.applyAction(claimed(), confirm(), ctx());
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.state.players['p1']?.seated).toBe(true);
+  });
+
+  it('подтверждать нечего, если места не заявляли', () => {
+    const r = kernel.applyAction(world(), confirm(), ctx());
+    expect(code(r)).toBe('E_SEAT_UNCLAIMED');
+  });
+
+  it('повторное подтверждение безвредно — не отказ', () => {
+    const once = okState(kernel.applyAction(claimed(), confirm(), ctx()));
+    expect(kernel.applyAction(once, confirm(), ctx()).ok).toBe(true);
+  });
+
+  it('неподтверждённая заявка отпускается, и выбор снимается вместе с ней', () => {
+    const r = kernel.applyAction(claimed(), release(), ctx());
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.state.players['p1']?.claimedAt).toBeUndefined();
+      expect(r.state.players['p1']?.scientists).toBeUndefined();
+    }
+  });
+
+  it('после отпускания место можно заявить заново — оно вернулось в оборот', () => {
+    const freed = okState(kernel.applyAction(claimed(), release(), ctx()));
+    expect(apply(freed, { faction: 'azure' }).ok).toBe(true);
+  });
+
+  // Смысл правила 6: дошёл до карты — место твоё, и отобрать его нечем.
+  it('ЗАКРЕПЛЁННОЕ место не отпускается', () => {
+    const seated = okState(kernel.applyAction(claimed(), confirm(), ctx()));
+    expect(code(kernel.applyAction(seated, release(), ctx()))).toBe('E_SEAT_SEATED');
+  });
+
+  it('отпускать нечего, если места не заявляли', () => {
+    expect(code(kernel.applyAction(world(), release(), ctx()))).toBe('E_SEAT_UNCLAIMED');
   });
 });

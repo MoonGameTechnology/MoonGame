@@ -116,3 +116,19 @@ export function seatClaimAction(
     issuedAt: gameTime,
   };
 }
+
+/** Подтверждение места: игрок дошёл до карты (ENTRY-3, правило 6).
+ *
+ *  Серверное действие — у него нет payload-схемы, поэтому шлюз не пропустит его от
+ *  клиента: закрепить за собой место в обход прихода на карту нельзя. Идентификатор
+ *  детерминирован по (матч, место), так что реконнекты не плодят заявок — квитанции
+ *  дедупят их по `id`, а модуль на повторе просто ничего не делает. */
+export function seatConfirmAction(matchId: string, playerId: string, gameTime: number): Action {
+  return {
+    id: `seat-confirm:${matchId}:${playerId}`,
+    type: 'seat.confirm',
+    playerId,
+    payload: {},
+    issuedAt: gameTime,
+  };
+}

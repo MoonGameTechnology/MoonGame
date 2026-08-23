@@ -35,6 +35,20 @@ import type { GameModule, HandlerContext } from '../kernel/module';
  * 5. **Заявляется только СВОЁ место.** Действие применяется к `action.playerId` —
  *    к тому месту, которое авторизовал шлюз. Чужое место здесь недостижимо в принципе:
  *    идентификатор места не читается из payload.
+ * 6. **Место закрепляется не заявкой, а ПОПАДАНИЕМ НА КАРТУ.** Заявка временная:
+ *    человек может открыть ссылку, выбрать дом и не прийти — и кресло стояло бы
+ *    занятым до конца партии, а в матче на десять мест это убивает сессию. Поэтому
+ *    `seat.confirm` (сервер подаёт его, когда игрок дошёл до карты) ставит `seated`,
+ *    и только с этого момента место неотзывное.
+ * 7. **Неподтверждённая заявка истекает по РЕАЛЬНОМУ времени.** Окно живёт снаружи —
+ *    сервер решает, когда пора, и подаёт `seat.release`; модуль лишь следит, чтобы
+ *    отпускалось ровно неподтверждённое. Реальное время выводится из игрового делением
+ *    на `timeScale` (так же считает окно входа, `MatchRegistry.entryOpen`): настенных
+ *    часов в состоянии нет, иначе реплей стал бы невоспроизводимым.
+ *
+ * `seat.confirm` и `seat.release` — СЕРВЕРНЫЕ: у них намеренно нет payload-схемы,
+ * поэтому шлюз не пропустит их от клиента (`isValidActionPayload`). Игрок не должен
+ * уметь ни закрепить за собой место в обход прихода на карту, ни отпустить чужое.
  */
 
 /** Максимум учёных в совете — зеркалит `resolveScientists` в `buildFromMap.ts`. */
@@ -49,7 +63,7 @@ export const seatClaimModule: GameModule = {
 
       const player = h.state.players[action.playerId];
       if (!player) return h.reject('E_UNKNOWN_PLAYER'); // правило 5
-      if (player.claimed) return h.reject('E_SEAT_CLAIMED'); // правило 1
+      if (player.claimedAt !== undefined) return h.reject('E_SEAT_CLAIMED'); // правило 1
 
       // --- дом (правила 2, 4) ---
       const faction = payload.faction;
@@ -81,7 +95,7 @@ export const seatClaimModule: GameModule = {
       // отказа: место числилось бы заявленным с половиной выбора.
       if (typeof faction === 'string') player.faction = faction;
       if (council !== undefined) player.scientists = council;
-      player.claimed = true;
+      player.claimedAt = h.ctx.now;
 
       // Адресат назван `playerId` — ключ из фог-фильтра сервера (`eventVisibleTo`),
       // иначе событие молча не дойдёт до самого заявителя.
@@ -90,6 +104,32 @@ export const seatClaimModule: GameModule = {
         faction: player.faction,
         scientists: (player.scientists ?? []).map((s) => s.id),
       });
+    });
+
+    // Правило 6. Серверное: подаётся, когда игрок дошёл до карты.
+    api.onAction('seat.confirm', (action, h: HandlerContext) => {
+      const player = h.state.players[action.playerId];
+      if (!player) return h.reject('E_UNKNOWN_PLAYER');
+      // Подтверждать нечего, если места не заявляли: иначе `seated` можно было бы
+      // поставить месту, за которое никто не садился, и оно перестало бы истекать.
+      if (player.claimedAt === undefined) return h.reject('E_SEAT_UNCLAIMED');
+      if (player.seated) return; // уже за столом — повтор безвреден, не отказ
+      player.seated = true;
+      h.emit('seat.seated', { playerId: action.playerId });
+    });
+
+    // Правило 7. Серверное: окно истекло, место возвращается в оборот.
+    api.onAction('seat.release', (action, h: HandlerContext) => {
+      const player = h.state.players[action.playerId];
+      if (!player) return h.reject('E_UNKNOWN_PLAYER');
+      if (player.claimedAt === undefined) return h.reject('E_SEAT_UNCLAIMED');
+      // Закреплённое место не отзывается ничем — это и есть смысл правила 6.
+      if (player.seated) return h.reject('E_SEAT_SEATED');
+      delete player.claimedAt;
+      // Выбор снимается вместе с заявкой: место возвращается в оборот таким, каким его
+      // застанет следующий игрок, а не с чужим советом и чужим домом.
+      delete player.scientists;
+      h.emit('seat.released', { playerId: action.playerId });
     });
   },
 };

@@ -110,12 +110,21 @@ export interface Player {
   /** @deprecated Legacy single-leader field (snapshots from before the 2-slot council).
    *  Never written now; still READ through {@link scientistsOf} for old persisted state. */
   scientist?: { id: string; level: number };
-  /** Место заявлено живым игроком (`seat.claim`, ENTRY-3): дом и совет уже выбраны и
+  /** ИГРОВОЕ время заявки на место (`seat.claim`, ENTRY-3): дом и совет выбраны и
    *  больше не меняются. Отсутствует — место ещё никем не занималось, за него играет
    *  серверный ИИ. Держать маркер В СОСТОЯНИИ обязательно: `seat.claim` — КЛИЕНТСКИЙ
    *  тип, игрок может прислать его сам, поэтому «заявить можно один раз» обязан
-   *  проверять редьюсер, а не память сервера. */
-  claimed?: true;
+   *  проверять редьюсер, а не память сервера.
+   *
+   *  Время игровое, а РЕАЛЬНОЕ из него выводится делением на `timeScale` — та же
+   *  дисциплина, что у окна входа (`MatchRegistry.entryOpen`). Настенных часов в
+   *  `GameState` нет и быть не должно: они сделали бы реплей невоспроизводимым. */
+  claimedAt?: number;
+  /** Игрок ДОШЁЛ до карты (`seat.confirm`): с этого момента место закреплено за ним
+   *  насовсем. До подтверждения заявка временная — место, взятое по ссылке и брошенное,
+   *  освобождается по истечении окна (`seat.release`), иначе один не пришедший человек
+   *  запирал бы кресло до конца партии. */
+  seated?: true;
   /** Steward delegation ("hand the seat to the AI while I sleep"): while set and the
    *  world clock is before `until`, the server AI plays this seat with `posture`. The
    *  server-side driver reads it via `stewardActive`; it auto-expires on the clock

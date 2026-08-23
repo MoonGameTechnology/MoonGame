@@ -79,6 +79,7 @@ import type { PlayerId } from '../packages/shared-core/src/index';
 import { MS_PER_DAY } from '../packages/shared-core/src/index';
 import type { Identity } from '../packages/server/src/matchApi';
 import { seatClaim, seatClaimAction } from '../packages/server/src/joinSeat';
+import { expiredSeatClaims } from '../packages/server/src/seatExpiry';
 const { Pool } = pgPkg;
 
 // --- M0/M1 playtest log: append room events to a per-run JSONL and feed every one
@@ -588,6 +589,12 @@ async function createHostedMatch(id: string): Promise<HostedMatch> {
           try {
             await runServerAI(); // drive any empty seat once the clock has moved
             await runServerStanding(); // CC-2/CC-4: standing orders (auto-storm / дежурный вылет)
+            // ENTRY-3 (правило 7): вернуть в оборот места, заявленные и не подтверждённые
+            // дольше окна. Тот же вызов, что у канонического сервера (`serverWiring.ts`) —
+            // паритет держится общей функцией, а не двумя похожими циклами.
+            for (const { playerId, action } of expiredSeatClaims(room.state, room.clockScale)) {
+              await room.submitServerAction(playerId, action);
+            }
           } finally {
             driversBusy = false;
           }
