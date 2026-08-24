@@ -23,8 +23,11 @@
 - **Team-aware карты** (`data/mapSchema.ts`): `MatchMap.slots` с полем `team`,
   `avaShape(map)` → `{sides, slotsPerSide}`. `buildStateFromMap` сеет
   `alliance` внутри команды, `war`/`peace` между (`seedTeamDiplomacy`).
-- **`NetworkMatchMode`** (`prototype/src/matchSetup.ts:110`): `'ffa'|'2v2'|
-  '5v5'` + `networkSeats(mode)`. Нет 1v1/3v3/4v4.
+- **`NetworkMatchMode`** (`prototype/src/matchSetup.ts:110`): `'ffa'|'2v2'|'5v5'|'pve'`
+  + `networkSeats(mode)`. Значение `'pve'` добавил чужой PR #759 — и это ДРУГАЯ ось,
+  чем `modeId`: `networkSeats('pve')` сажает 2 человек против одного сильного бота
+  (фракция `crimson`, `ai: true`), тогда как режим `pve_waves` — это волны Роя из
+  `data/modes.json`. Два разных «PvE» с одним именем; свести их — часть Фазы 1.
 - **Серверный AI** (`prototype/src/ai.ts`): `seatAiDecision`/`aiOrders` —
   pure-функция, генерирует действия, подаёт через `applyAction`.
 - **`schedule(at, type, payload)`** (`kernel/module.ts`) — планирование
@@ -38,9 +41,15 @@
 - **`modes` в `GameData`** (`data/modes.json`, `GameModeDefSchema`) — каталог
   режимов-пресетов загружается и валидируется вместе с остальным контентом.
 
-**Чего нет:** 1v1/3v3/4v4 в `NetworkMatchMode` — это вся оставшаяся Фаза 1.
-Фазы 0, 2, 3, 4 и 5 закрыты: волны спавнятся, летят на людей, матч можно выиграть
-и проиграть.
+**Чего нет:** 1v1/3v3/4v4 в `NetworkMatchMode` — это вся оставшаяся Фаза 1. Фазы 0,
+2, 3, 4 и 5 закрыты: волны спавнятся, летят на людей, матч можно выиграть и проиграть.
+
+**Но играть в PvE-режим пока негде, и это НЕ дыра в этих фазах.** Всё сделанное живёт
+в шипнутом бандле (`data/modes.json`), а прото-хост — на котором играют — считает мир
+по своему инлайн-каталогу `prototype/src/prototypeData.ts`, где `modes` пуст (проверено
+прогоном). Назначить сессии `modeId` там нельзя: `resolveMatchConfig` честно отклонит
+неизвестный режим и комната не родится. Это AUD-8 (судьба второго каталога), и он же
+запирает фильтр «Режим» в браузере матчей (блок `BRW` в `backlog.md`).
 
 ## Принципы (из `CLAUDE.md` + ADR)
 
@@ -163,12 +172,10 @@ matchMode.ts`: `victory` пресета ложится ПОД `victory` матч
 
 ### PVE-1.2 · Пресеты командных режимов `[data]` ⏳ — S
 **Цель:** пресет на каждый командный формат.
-**Подзадачи:**
-- `data/modes/duel.json` (1v1, `teamFormat: '1v1'`, victory = standard).
-- `data/modes/team_2v2.json` (2v2, `teamFormat: '2v2'`, victory = coalition).
-- `data/modes/team_3v3.json` (3v3).
-- `data/modes/team_4v4.json` (4v4).
-- `data/modes/team_5v5.json` (5v5).
+**Подзадачи:** пять записей в `data/modes.json` (ОДИН фрагмент-каталог, а не
+`data/modes/*.json` — так лёг PVE-0.1): `duel` (1v1), `team_2v2`, `team_3v3`,
+`team_4v4`, `team_5v5`; у каждой свой `teamFormat`, `victory` пустой = базовые правила.
+Bump `data/manifest.json` (контент изменился).
 **Готово, когда:** все 5 пресетов валидируются `GameModeDefSchema`, `teamFormat`
 корректный. Тест в `schemas.test.ts`.
 
