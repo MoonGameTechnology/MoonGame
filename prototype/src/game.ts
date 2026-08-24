@@ -60,7 +60,7 @@ export {
   isInhabited,
   civicTax,
   inhabitedWorldCount,
-} from './tax';
+} from '../../packages/shared-core/src/index';
 export { HUNGER_MULT, hungerModule } from './hunger';
 export { economySnapshot, netIncome, hpOfLevel } from './economy';
 export {
@@ -141,7 +141,7 @@ export {
 
 // --- heroes + capital --------------------------------------------------------
 export { heroRosterOf } from './heroes';
-export { capitalOf } from './capital';
+export { capitalOf } from '../../packages/shared-core/src/index';
 
 // --- the player-order action builders ----------------------------------------
 export {

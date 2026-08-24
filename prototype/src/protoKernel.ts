@@ -34,6 +34,8 @@ import {
   forcedMarchModule,
   instantRepairModule,
   fleetRepairModule,
+  taxModule,
+  capitalModule,
   type GameModule,
   type GameState,
   type Action,
@@ -41,12 +43,10 @@ import {
   type DomainEvent,
 } from '../../packages/shared-core/src/index';
 import { data } from './prototypeData';
-import { taxModule } from './tax';
 import { hungerModule } from './hunger';
 import { fleetLaunchModule } from './fleetLaunch';
 import { botDiplomacyModule } from './botDiplomacy';
 import { marketModule } from './sessionMarket';
-import { capitalModule } from './capital';
 import { standingOrdersModule } from './standingOrders';
 
 export const MODULES: GameModule[] = [

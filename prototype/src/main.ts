@@ -5844,7 +5844,7 @@ function planetPanelHtml(p: Planet): string {
   // Capital marker / designate — heroes respawn here (and re-fit modules, Phase C).
   // Что панель предлагает сделать с миром — `worldOrders.ts` (REFM-91).
   {
-    const cap = capitalOffer(mine, capitalOf(s, ME) === p.id, isInhabited(p));
+    const cap = capitalOffer(mine, capitalOf(s, ME) === p.id, isInhabited(data, p));
     if (cap === 'marked') {
       h += `<div class="row"><b style="color:var(--grn)">★ ${t('side.world.capital')}</b>${pcUi() ? '' : ` <span class="dim">${t('side.world.capital.note')}</span>`}</div>`;
     } else if (cap === 'designate') {
