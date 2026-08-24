@@ -283,6 +283,7 @@ import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from 
 import {
   fmtJoinWindow,
   joinWindow,
+  modeLabel,
   rowAction,
   ruleSummary,
   type MatchRules,
@@ -10352,6 +10353,10 @@ interface MatchRow {
    *  long is left. Absent on an older server ⇒ treat as always open. */
   entryOpen?: boolean;
   entryClosesInMs?: number;
+  /** Game mode (BRW-1): the preset id the session runs, and whether the server judged
+   *  it PvP or PvE. Either may be absent — see rule 5 in `matchRow.ts`. */
+  modeId?: string;
+  kind?: 'pvp' | 'pve';
 }
 
 let matchLists: Record<MatchTab, MatchRow[]> | null = null;
@@ -10678,9 +10683,24 @@ function renderMatches(): void {
     } else if (win.kind === 'open') {
       windowLine = ` · <span class="mwin${win.soon ? ' soon' : ''}">${t('browser.join-window', { dur: fmtJoinWindow(win.left) })}</span>`;
     }
+    // Режим партии (BRW-4): значок вида + имя пресета. Имя приходит НЕ со строки —
+    // сервер шлёт только id, а человеческое имя даёт `tData()` по тому же слагу
+    // (`pve_waves` → `data.pve-waves`). Что именно печатать, решает `modeLabel()`:
+    // значка нет, пока сервер сам не назвал вид, а без `modeId` строки нет вовсе.
+    const mode = modeLabel(m);
+    let modeLine = '';
+    if (mode.kind === 'shown') {
+      const badge =
+        mode.badge === 'pve'
+          ? `<span class="mmode pve">${t('browser.mode.pve')}</span> `
+          : mode.badge === 'pvp'
+            ? `<span class="mmode pvp">${t('browser.mode.pvp')}</span> `
+            : '';
+      modeLine = `${badge}${esc(tData(mode.modeId))} · `;
+    }
     info.innerHTML =
       `<div class="mname">${esc(m.mapId)} <span class="mid">${esc(m.matchId)}</span></div>` +
-      `<div class="mmeta">${t('browser.day', { n: m.days })} · ${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
+      `<div class="mmeta">${modeLine}${t('browser.day', { n: m.days })} · ${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
       `${esc(ruleSummary(m.rules))} · ${m.status === 'ended' ? t('browser.finished') : t('browser.running')}${windowLine}</div>`;
     row.appendChild(info);
     const btns = document.createElement('div');

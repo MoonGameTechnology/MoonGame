@@ -17,6 +17,12 @@
  * 4. **Меньше суток — это «скоро».** Отдельный признак, потому что «осталось 3ч» и
  *    «осталось 3д» набраны одинаково, а решают для игрока разное.
  *
+ * 5. **Режим (BRW-4) знает ДВА разных «не знаю».** Нет `modeId` — сервер про режим не
+ *    сказал ничего (или он старый), строка молчит целиком. Есть `modeId`, но нет `kind`
+ *    — режим назван, а вид (PvP/PvE) сервер не посчитал: имя показывается, значок нет.
+ *    Достроить значок самим нельзя: `kind` пуст и когда режим НЕИЗВЕСТЕН серверу, так
+ *    что «раз не PvE, значит PvP» — это ровно та ложь, от которой BRW-1 и уводил.
+ *
  * Счётчик времени НИКОГДА не печатает отрицательное: просроченное окно — это «вот-вот»,
  * а не «осталось −3ч».
  */
@@ -85,4 +91,23 @@ export type RowAction = 'archive' | 'restore' | null;
 export function rowAction(tab: MatchTab): RowAction {
   if (tab === 'archived') return 'restore';
   return tab === 'active' ? 'archive' : null;
+}
+
+/** Поля строки, от которых зависит подпись режима. Оба необязательны: сервер до BRW-1
+ *  их не слал вовсе, а `kind` не считается и на новом сервере без каталога данных. */
+export interface ModeFields {
+  modeId?: string;
+  kind?: 'pvp' | 'pve';
+}
+
+/** Что строка говорит про режим. `modeId` отдаётся сырым: имя из него делает `tData()`
+ *  у хозяина разметки — здесь решение, а не текст (как у {@link joinWindow}). */
+export type ModeLabel = { kind: 'none' } | { kind: 'shown'; modeId: string; badge?: 'pvp' | 'pve' };
+
+/** Решить, что строка говорит про режим партии (правило 5). */
+export function modeLabel(row: ModeFields): ModeLabel {
+  if (row.modeId === undefined) return { kind: 'none' };
+  return row.kind === undefined
+    ? { kind: 'shown', modeId: row.modeId }
+    : { kind: 'shown', modeId: row.modeId, badge: row.kind };
 }
