@@ -12,7 +12,12 @@
  * label helpers are plain exports (the scientist-council picker imports `branchLabel`),
  * and only `initTechTree(host)` touches the host, through explicit hooks.
  */
-import { conditionMet } from '../../packages/shared-core/src/index';
+import {
+  conditionMet,
+  clampResearchSlots,
+  scientistSlotBonus,
+  BASE_RESEARCH_SLOTS,
+} from '../../packages/shared-core/src/index';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { data } from './prototypeData';
@@ -151,12 +156,12 @@ export function techTreeHtml(
   const res = (seat?.resources ?? {}) as Record<string, number>;
   const started = state.startedAt ?? 0;
   const hudDay = Math.floor(state.time / DAY) + 1; // счёт статус-бара: день 1 — первый
-  // Пилюля слотов зеркалит кламп ядра: 2 базовых, +1 от учёного, максимум 3.
-  const slotBonus = (seat?.scientists ?? []).reduce(
-    (n, c) => n + (data.scientists[c.id]?.slotBonus ?? 0),
-    0,
-  );
-  const slots = Math.min(3, Math.max(2, 2 + slotBonus));
+  // Пилюля слотов считается ФОРМУЛОЙ ЯДРА, а не её копией (CONV-5). Копия здесь
+  // рисовала бонус Полимата, которого редьюсер прототипа не давал вовсе: модуля
+  // `scientistModule` в его сборке не было, хук `research.slots` оставался пустым, и
+  // третье исследование отклонялось `E_RESEARCH_SLOTS_FULL` — интерфейс обещал слот,
+  // которого нет. Модуль теперь загружен, а число берётся из одного места.
+  const slots = clampResearchSlots(BASE_RESEARCH_SLOTS + scientistSlotBonus(seat, data));
   // Состояние узла в порядке проверок ядра (technologyLock): prereq → день → условия.
   const nodeState = (id: string): { st: string; prog: number; eta: number } => {
     const td = techs[id]!;

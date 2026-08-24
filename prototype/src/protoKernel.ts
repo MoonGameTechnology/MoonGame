@@ -36,6 +36,7 @@ import {
   fleetRepairModule,
   taxModule,
   capitalModule,
+  scientistModule,
   type GameModule,
   type GameState,
   type Action,
@@ -70,6 +71,12 @@ export const MODULES: GameModule[] = [
   constructionModule,
   arsenalSyncModule, // LARS-1: server-driver refresh of live build-catalog ownership (bypasses gate)
   technologyModule, // session research: branch/day-gated techs → effect bonuses + content unlocks
+  // CONV-5: совет учёных наконец влияет на партию, а не только на пилюлю слотов.
+  // Врезка в `techTree.ts` рисовала «+1 слот» от Полимата, но модуля, который его
+  // даёт, в этом ядре не было — редьюсер отказывал третьему исследованию
+  // (`E_RESEARCH_SLOTS_FULL`). Сразу за technologyModule, как в `DEV_MODULES`:
+  // модуль вешает только хук `research.slots`, других рёбер у него нет.
+  scientistModule,
   stewardModule, // «Хранитель»: delegate the seat to the AI while you sleep (gated by the Steward tech)
   armyModule,
   victoryModule, // terminal match state from authoritative state (domination / elimination / score / timeout)

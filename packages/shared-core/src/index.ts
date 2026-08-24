@@ -396,12 +396,17 @@ export {
   creditsBonusOf,
   TAX_DIMINISH,
 } from './modules/tax';
+export {
+  BASE_RESEARCH_SLOTS,
+  MAX_RESEARCH_SLOTS,
+  clampResearchSlots,
+} from './modules/technology';
 export { constructionModule } from './modules/construction';
 export { arsenalSyncModule } from './modules/arsenalSync';
 export { stationModule } from './modules/station';
 export { seatClaimModule } from './modules/seatClaim';
 export { technologyModule, technologyLock, conditionMet } from './modules/technology';
-export { scientistModule } from './modules/scientist';
+export { scientistModule, scientistSlotBonus } from './modules/scientist';
 export { factionModule } from './modules/faction';
 export { armyModule } from './modules/army';
 export { fleetOpsModule } from './modules/fleetOps';

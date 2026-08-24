@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 4838 зелёных** (58 skip, 371 файл).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 4840 зелёных** (58 skip, 371 файл).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -1395,8 +1395,14 @@ grants}`), `heroFittings.json` (`{statMods, grants, cost}`). Движок ПОЛ
 интерфейс брал `Math.hypot`, авторитетный гейт удара — `Math.sqrt(dx²+dy²)`, и на границе
 радиуса они дают разный ответ. Предикаты «действующего крыла» уехали в
 `decisions/wingOrders.ts` — это сторона клиента, в ядро им нельзя.
-Осталось: `sessionMarket`, `fleetLaunch`, `standingOrders` и врезка про совет учёных в
-`techTree.ts`.
+**CONV-5 вскрыл настоящий баг, а не дубль:** прототип НЕ грузил `scientistModule`, хук
+`research.slots` оставался без вкладчиков, редьюсер давал базовые 2 слота — а пилюля
+`techTree.ts` считала бонус своей копией формулы и рисовала 3 (у `polymath` в данных
+`slotBonus: 1`, и он же в предзаполненном совете соло-экрана). Игрок читал «слоты 0/3» и
+получал `E_RESEARCH_SLOTS_FULL` на третьем исследовании. Измерено: 2 без модуля, 3 с ним.
+Модуль загружен, а зажим слотов теперь одна экспортируемая функция ядра
+(`clampResearchSlots` + `scientistSlotBonus`), которой пользуются и редьюсер, и экран.
+Осталось: `sessionMarket`, `fleetLaunch`, `standingOrders`.
 Заголовки соответствующих модулей ядра называют себя портами этих самых файлов
 («Port of the prototype's `taxModule`», REFP-14/-15/-16/-17/-18) — порт написали,
 оригинал не убрали. Часть копий совпадает построчно (налог, форс-марш, оба ремонта),
