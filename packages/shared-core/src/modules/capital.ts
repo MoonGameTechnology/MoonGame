@@ -1,8 +1,9 @@
 /**
  * Capital — a designatable home world, the hero respawn anchor (`heroModule`
  * already falls back to `[hero.home, hero.location]` on respawn, but nothing
- * let a player CHANGE `hero.home` after match seed). Port of the prototype's
- * `capitalModule` (`prototype/src/capital.ts`, REFP-14's extraction).
+ * let a player CHANGE `hero.home` after match seed). Was a port of the prototype's
+ * `capitalModule` (REFP-14's extraction); since CONV-4 it is the ONLY implementation —
+ * the prototype deleted its copy and drives this module through `protoKernel`.
  *
  * Reimplements the tiny `isInhabited` check inline (`hasOrbit` + no building
  * restriction) rather than importing it from `modules/tax.ts` — modules don't

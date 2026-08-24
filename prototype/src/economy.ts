@@ -17,7 +17,11 @@ import {
   thresholdRamp,
   creditsBonusOf,
 } from '../../packages/shared-core/src/index';
-import { isInhabited, civicTax, inhabitedWorldCount } from './tax';
+import {
+  isInhabited,
+  civicTax,
+  inhabitedWorldCount,
+} from '../../packages/shared-core/src/index';
 import { data } from './prototypeData';
 import { HOUR } from './time';
 
@@ -52,7 +56,7 @@ export function economySnapshot(state: GameState): {
 export function netIncome(state: GameState, playerId: string): Record<string, number> {
   const out: Record<string, number> = {};
   const arrears = state.players[playerId]?.arrears ?? [];
-  const inhabited = inhabitedWorldCount(state, playerId); // for the diminishing civic tax
+  const inhabited = inhabitedWorldCount(data, state, playerId); // for the diminishing civic tax
   // BF-35: mirror the faction + tech `economy.production` hooks (factionModule /
   // technologyModule) — the HUD `+/h` used to apply only the planetType bonus, so a
   // production-boosted player (e.g. a +12% faction) saw a low readout from minute one.
@@ -189,7 +193,7 @@ export function netIncome(state: GameState, playerId: string): Record<string, nu
         }
       }
     }
-    if (isInhabited(p)) {
+    if (isInhabited(data, p)) {
       credits += civicTax(inhabited) * bonusMult; // civic tax is post-tax income → also boosted (BF-35)
       const taxBonus = creditsBonusOf(data, p); // RULES-2: правило из данных здания
       if (taxBonus !== 0) credits *= 1 + taxBonus;
@@ -226,7 +230,7 @@ export function incomeBreakdown(
     return result[res]!;
   };
   const arrears = state.players[playerId]?.arrears ?? [];
-  const inhabited = inhabitedWorldCount(state, playerId);
+  const inhabited = inhabitedWorldCount(data, state, playerId);
   const me = state.players[playerId];
   const factionBonus = me?.faction ? (data.factions[me.faction]?.passives?.productionBonus ?? 0) : 0;
   let techBonus = 0;
@@ -265,7 +269,7 @@ export function incomeBreakdown(
         else { cell(res).buildingUpkeep += v; }
       }
     }
-    if (isInhabited(p)) {
+    if (isInhabited(data, p)) {
       credits += civicTax(inhabited) * bonusMult;
       const taxBonus = creditsBonusOf(data, p); // RULES-2: правило из данных здания
       if (taxBonus !== 0) credits *= 1 + taxBonus;

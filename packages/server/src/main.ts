@@ -11,6 +11,7 @@ import { arsenalSnapshotOf, grantStarterArsenal } from './arsenal';
 import { awardMatchDrops, salvageFromEvents } from './dropRoller';
 import { createMultiplayerServer, tlsFromEnv } from './wsServer';
 import { createStores, snapshotOf } from './persistence';
+import { seatClaim, seatClaimAction } from './joinSeat';
 import { checkProductionReadiness, configFromEnv } from './serverConfig';
 import { createMatchLoader } from './serverWiring';
 import {
@@ -308,7 +309,13 @@ const createMatch = async (): Promise<CreatedMatch> => {
 };
 const matchApi: MatchApiDeps = {
   createMatch,
-  join: async (matchId, nick, accountId) => {
+  // ENTRY-1: `preferredSlot`/`preferredFaction` доезжают до резолвера и до состояния.
+  // Раньше эта реализация принимала ТРИ параметра из пяти, объявленных `MatchApiDeps`, и
+  // два последних молча роняла: функция с меньшим числом параметров совместима с более
+  // широкой сигнатурой, поэтому TypeScript такое пропускает. Прототипный хост
+  // (`prototype/netserver.ts`) BF-30 реализовывал, канонический — нет, и разъезд не
+  // проявлялся ровно потому, что играли на прототипном.
+  join: async (matchId, { nick, accountId, preferredSlot, preferredFaction, preferredScientists }) => {
     const snap = await stores.store.load(matchId);
     if (!snap) return { error: 'E_NO_MATCH' };
     if (!signToken) return { error: 'E_AUTH_DISABLED' }; // no token auth configured
@@ -316,11 +323,50 @@ const matchApi: MatchApiDeps = {
     // refused. `null` ⇒ an ordinary match → the normal first-come seat resolver.
     const ava = accountId ? await avaOrchestrator.resolveAvaSeat(matchId, accountId) : null;
     if (ava && !ava.ok) return { error: 'E_NOT_ROSTERED' };
-    const playerId = ava
-      ? ava.playerId
-      : (await accountStore.resolveSeat(matchId, nick, Object.keys(snap.state.players)))?.playerId;
-    if (playerId === undefined) return { error: 'E_MATCH_FULL' };
-    return { playerId, token: await signToken(matchId, playerId, accountId) };
+    // Резолвер зовём ТОЛЬКО вне AvA: у рострованного место фиксировано, а лишний вызов
+    // занял бы ему второе кресло.
+    const resolved = ava
+      ? undefined
+      : await accountStore.resolveSeat(
+          matchId,
+          nick,
+          Object.keys(snap.state.players),
+          preferredSlot,
+        );
+    // Какое место достаётся и переписывать ли дом — `joinSeat.ts` (там же причины, по
+    // которым AvA-ростер и возврат в свой матч выбор дома не применяют).
+    const claim = seatClaim({
+      avaPlayerId: ava?.playerId,
+      resolved,
+      preferredFaction,
+      // Дома ЭТОГО матча — ровно то, что сервер отдаёт в `/matches/:id/seats` и из чего
+      // клиент рисует выбор. Проверять по каталогу данных было бы шире предложенного
+      // (см. правило 4 в joinSeat.ts).
+      knownFactions: [...new Set(Object.values(snap.state.players).map((p) => p.faction))],
+    });
+    if (!claim.ok) return { error: claim.code };
+    if (claim.claim) {
+      // ENTRY-3: заявка идёт ДЕЙСТВИЕМ через редьюсер, а не записью в состояние.
+      // Мутация мимо редьюсера не попадает в лог реплея — воспроизведение выдавало бы
+      // дом из стартового снимка, то есть другие пассивки и другой радиус радара.
+      // Комнату могло не поднять (снимок недоступен) — тогда вход всё равно состоится,
+      // просто без применённого выбора: отказывать во входе из-за этого нельзя.
+      const room = await registry.resolve?.(matchId);
+      if (room) {
+        await room.submitServerAction(
+          claim.playerId,
+          seatClaimAction(matchId, claim.playerId, room.state.time, {
+            ...claim.claim,
+            ...(preferredScientists !== undefined ? { scientists: preferredScientists } : {}),
+          }),
+        );
+        await stores.store.save(snapshotOf(room));
+      }
+    }
+    return {
+      playerId: claim.playerId,
+      token: await signToken(matchId, claim.playerId, accountId),
+    };
   },
   // Wired ⇒ create/join require a session from /auth/login — the session's login IS
   // the seat nick, so nobody claims a seat as somebody else.

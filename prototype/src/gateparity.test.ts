@@ -41,6 +41,9 @@ import {
   fitHero,
   freshSortie,
   orderChain,
+  forceMarchFleet,
+  instantRepairFleet,
+  repairFleet,
 } from './game';
 
 // RELEASE gate parity (REL-2): every intent the prototype UI can emit must clear the
@@ -82,6 +85,13 @@ const CLIENT_ACTIONS: Action[] = [
   setHoldPoint(P, 'C1R1', false),
   orderAuto(P, 'f1', true),
   orderScramble(P, 'f1', false),
+  // CONV-1: обе кнопки после сведения обслуживает МОДУЛЬ ЯДРА, а билдеры остались
+  // прототипными — значит разъехаться payload'у и схеме теперь есть где, и ловить
+  // это должен гейт-паритет, а не удалённые дубли модульных тестов.
+  forceMarchFleet(P, 'f1', true),
+  forceMarchFleet(P, 'f1', false),
+  instantRepairFleet(P, 'f1'),
+  repairFleet(P, 'f1'), // CONV-2, та же причина
   castHeroAbility(P, 'hero:p1:1', 'scan', 'B2'),
   spawnHero(P, 'hero:p1:2', 'C1R1'),
   unlockHeroSkill(P, 'hero:p1:1', 'neural_lace'),

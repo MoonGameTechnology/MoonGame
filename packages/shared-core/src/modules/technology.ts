@@ -49,8 +49,19 @@ interface DamageArgs {
 
 /** Concurrent research slots: 2 by the base rule, raised via the `research.slots`
  *  hook (e.g. a "+1 slot" scientist) up to a design maximum of 3. */
-const BASE_RESEARCH_SLOTS = 2;
-const MAX_RESEARCH_SLOTS = 3;
+export const BASE_RESEARCH_SLOTS = 2;
+export const MAX_RESEARCH_SLOTS = 3;
+
+/** Clamp a raw `research.slots` hook result into the design range. Exported because
+ *  the CLIENT shows the same number on its research screen: a hand-copied
+ *  `Math.min(3, Math.max(2, …))` there drifted from this one (CONV-5) — the prototype's
+ *  pill promised a slot the reducer then refused. A misbehaving hook (non-finite /
+ *  out of range) falls back to the base rather than fail-open to unlimited slots. */
+export function clampResearchSlots(raw: number): number {
+  return Number.isFinite(raw)
+    ? Math.min(MAX_RESEARCH_SLOTS, Math.max(BASE_RESEARCH_SLOTS, Math.floor(raw)))
+    : BASE_RESEARCH_SLOTS;
+}
 
 function technologyState(player: Player): PlayerTechnologyState {
   const tech = player.technologies ?? (player.technologies = { completed: [] });
@@ -233,11 +244,7 @@ function startResearch(action: Action, h: HandlerContext): void {
     return h.reject('E_ALREADY_RESEARCHED'); // already completed or in progress
   }
   const raw = h.hook<number>('research.slots', BASE_RESEARCH_SLOTS, { playerId: action.playerId });
-  // Clamp to the design range [2, 3]; a misbehaving hook (non-finite / out of range)
-  // falls back to the base rather than fail-open to unlimited slots.
-  const slots = Number.isFinite(raw)
-    ? Math.min(MAX_RESEARCH_SLOTS, Math.max(BASE_RESEARCH_SLOTS, Math.floor(raw)))
-    : BASE_RESEARCH_SLOTS;
+  const slots = clampResearchSlots(raw);
   if (active.length >= slots) {
     return h.reject('E_RESEARCH_SLOTS_FULL'); // every research slot is occupied
   }

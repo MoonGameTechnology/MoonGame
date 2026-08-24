@@ -1,7 +1,10 @@
 /**
  * Dock repair ("экспресс-ремонт за металл") — instant hull top-up paid in metal,
- * only at an owned dock (a live building with `shipRepair > 0`). Port of the
- * prototype's `econScrewsModule` (`prototype/src/econScrews.ts`, REFP-18).
+ * only at an owned dock (a live building with `shipRepair > 0`).
+ *
+ * Was a port of the prototype's `econScrewsModule` (REFP-18); since CONV-2 it is
+ * the ONLY implementation — the prototype deleted its copy and drives this module
+ * through `protoKernel`. Both hosts now repair by the same rules.
  */
 import type { GameModule } from '../kernel/module';
 import { missingHull, dockRepairCost, fleetAtOwnDock } from '../util/repair';

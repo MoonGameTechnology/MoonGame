@@ -43,7 +43,6 @@ export const en: Record<string, string> = {
   'browser.restore-failed': 'restore failed',
   'browser.running': 'active',
   'browser.server-down': 'server unreachable — enter the server address',
-  'browser.slots': 'slots',
   'browser.solo': 'Solo mode',
   'browser.solo.hint': 'No server needed — bots fill the open seats.',
   'browser.taken': 'taken',
@@ -1517,7 +1516,10 @@ export const en: Record<string, string> = {
   'seatpick.go': 'CHOOSE',
   'seatpick.load-failed': 'Could not load the seats',
   'seatpick.loading': 'Loading…',
+  'seatpick.lost': 'That seat was just taken — pick another',
+  'seatpick.none-free': 'No free seats',
   'seatpick.sub': 'Choose your faction and starting position. Taken seats are marked grey.',
+  'seatpick.taken': 'taken',
   'seatpick.title': 'Choose Faction',
 
   // --- setup — Экран «Настройка схватки»: домашний мир, боты, скорость времени.

@@ -30,3 +30,20 @@ describe('ссылка входа с выбранным местом', () => {
     expect(joinHref('/i', 'm', 's', '')).toBe('/i?join=m&slot=s');
   });
 });
+
+describe('совет учёных в адресе входа (правило 5)', () => {
+  it('выбранный совет уходит строкой через запятую', () => {
+    expect(joinHref('/', 'm1', 'p2', 'azure', ['overseer', 'polymath'])).toBe(
+      '/?join=m1&slot=p2&faction=azure&sci=overseer,polymath',
+    );
+  });
+
+  it('пустой совет параметра не даёт — «не выбирал» и «выбрал пусто» это разное', () => {
+    expect(joinHref('/', 'm1', 'p2', 'azure', [])).toBe('/?join=m1&slot=p2&faction=azure');
+    expect(joinHref('/', 'm1', 'p2', 'azure')).toBe('/?join=m1&slot=p2&faction=azure');
+  });
+
+  it('идентификаторы экранируются, как и всё остальное в адресе', () => {
+    expect(joinHref('/', 'm1', 'p2', null, ['a b'])).toBe('/?join=m1&slot=p2&sci=a%20b');
+  });
+});
