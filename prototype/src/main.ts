@@ -10542,6 +10542,25 @@ function askSignIn(
 const seatpickEl = $('seatpick') as HTMLElement | null;
 const seatpickListEl = $('seatpick-list') as HTMLElement | null;
 
+/** Запрос расклада мест, назвавшись (ADDR-6).
+ *
+ *  Идущую партию сервер отдаёт только её участникам, поэтому запрос обязан сказать, кто
+ *  спрашивает. На хосте с учётками это сессионный JWT (через `tokenFor` — «кто ты» ходит
+ *  только им, правило 1 `sessionStore.ts`), на безаккаунтном — `?nick=` внутри адреса.
+ *  Токена нет — идём как аноним: открытую для входа партию сервер покажет и так, а на
+ *  закрытую нам и правда нечего смотреть.
+ *
+ *  ОДНА точка на оба захода — открытие экрана и его тихий переопрос. Разъехавшись, они
+ *  отличались бы правами: переопрос молча слеп бы там, где открытие работает, и игрок
+ *  видел бы застывший список вместо живого. */
+function fetchSeats(base: string, matchId: string, nick: string): Promise<Response> {
+  const pass = tokenFor(localStorage, base, nick);
+  return fetch(
+    seatsUrl(base, matchId, nick),
+    pass ? { headers: { authorization: `Bearer ${pass}` } } : {},
+  );
+}
+
 /** Опрос мест, пока открыт сетевой экран (ENTRY-2, правило 5).
  *
  *  Партия живая: пока игрок выбирает, соседний мир могут занять. Узнать об этом на
@@ -10560,13 +10579,13 @@ function stopNetSetupPoll(): void {
   netSetupPoll = null;
 }
 
-function startNetSetupPoll(base: string, matchId: string): void {
+function startNetSetupPoll(base: string, matchId: string, nick: string): void {
   stopNetSetupPoll();
   netSetupPoll = setInterval(() => {
     if (!netSetup) return stopNetSetupPoll();
     void (async () => {
       try {
-        const res = await fetch(seatsUrl(base, matchId));
+        const res = await fetchSeats(base, matchId, nick);
         if (queryOutcome(res) !== 'ok') return;
         const body = (await res.json()) as { seats: EntrySeat[] };
         if (!netSetup) return;
@@ -10606,7 +10625,7 @@ async function openSeatPicker(matchId: string): Promise<void> {
   показать(seatView('opening'));
   if (seatpickEl) seatpickEl.style.display = 'flex';
   try {
-    const res = await fetch(seatsUrl(srv.base, matchId));
+    const res = await fetchSeats(srv.base, matchId, srv.nick);
     // Отказ и обрыв это окно показывает одинаково — см. оговорку в шапке `seatList.ts`.
     if (queryOutcome(res) !== 'ok') {
       показать(seatView('refused'));
@@ -10617,7 +10636,7 @@ async function openSeatPicker(matchId: string): Promise<void> {
     if (seatpickEl) seatpickEl.style.display = 'none';
     openSetup('hub'); // сбрасывает режим — сетевой ставим сразу после
     netSetup = { matchId, offer };
-    startNetSetupPoll(srv.base, matchId);
+    startNetSetupPoll(srv.base, matchId, srv.nick);
     // Стартовый мир не подставляем: правило 4 `entrySetup.ts` — кнопка заперта, пока
     // игрок сам не ткнул в свободный мир. Иначе выбор превратился бы в пожелание.
     setupStart = '';
