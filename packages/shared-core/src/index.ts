@@ -367,7 +367,7 @@ export {
   type FittingSpec,
   type InstallFailure,
 } from './util/fitting';
-export { requireOwnedIdleFleet, type IdleFleet } from './util/fleet';
+export { requireOwnedIdleFleet, nextFleetSeq, type IdleFleet, type FleetSeqState } from './util/fleet';
 export { buildProgress, thresholdRamp } from './util/construction';
 export {
   buildRecap,
@@ -410,7 +410,8 @@ export { technologyModule, technologyLock, conditionMet } from './modules/techno
 export { scientistModule, scientistSlotBonus } from './modules/scientist';
 export { factionModule } from './modules/faction';
 export { armyModule } from './modules/army';
-export { fleetOpsModule, nextFleetSeq, type FleetSeqState } from './modules/fleetOps';
+export { fleetOpsModule } from './modules/fleetOps';
+export { autoRallyModule } from './modules/autoRally';
 export { squadronModule } from './modules/squadron';
 export { capitalModule, capitalsOf, capitalOf } from './modules/capital';
 export { standingOrdersModule } from './modules/standingOrders';

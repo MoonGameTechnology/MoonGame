@@ -12,10 +12,10 @@
  * module closes that gap, the one missing link between "built" and
  * "playable". Was a port of the prototype's proven `fleetLaunchModule`
  * (REFP-10); since CONV-8 that copy is gone and this is the only implementation —
- * the prototype loads this module. What did NOT come along is the prototype's
- * auto-rally (`unit.built` → a built ship joins the world's RALLY fleet, BF-29):
- * it exists only there, so it is a gap in the canon rather than a duplicate, and
- * lives on as `prototype/src/autoRally.ts` (backlog CONV-10). Adapted for the
+ * the prototype loads this module. Auto-rally (`unit.built` → a built ship joins
+ * the world's RALLY fleet, BF-29) stayed behind at CONV-8 because it was a gap in
+ * the canon rather than a duplicate; CONV-10 brought it in as its own module
+ * (`autoRally.ts`), so a ship now reaches orbit either way. Adapted for the
  * multiplayer server: fleet
  * lookups from untrusted payload use `ownFleet` (own-key, A06/A08 — a poisoned
  * id like `__proto__` reads as no-fleet); `fleet.engage`'s battle creation is
@@ -31,25 +31,8 @@ import type { Battle, UnitStack } from '../state/gameState';
 import { hoursToMs } from '../action/types';
 import { defHasTrait } from '../data/traits';
 import { isHostile, ownFleet } from '../util/combat';
-import { garrisonUnderAssault } from '../util/fleet';
+import { garrisonUnderAssault, nextFleetSeq } from '../util/fleet';
 import { sumUnitStat, takeFromStacks, mergeStacks } from '../util/stacks';
-
-/** Monotonic fleet-id counter extension (mirrors `battleSeq`). Prototype-state-
- *  style optional field: absent on old saves, seeded from the live fleet count
- *  so pre-counter matches keep minting unique ids (BF-25 in the prototype). */
-export interface FleetSeqState {
-  fleetSeq?: number;
-}
-
-/** Exported because a host may mint fleets outside these four actions (the prototype's
- *  auto-rally does, CONV-8). Two counters over one `fleetSeq` field would be fine; two
- *  IMPLEMENTATIONS of the seeding rule would not — that is exactly the BF-25 bug this
- *  function exists to prevent. */
-export function nextFleetSeq(state: FleetSeqState & { fleets: Record<string, unknown> }): number {
-  const seq = (state.fleetSeq ?? Object.keys(state.fleets).length) + 1;
-  state.fleetSeq = seq;
-  return seq;
-}
 
 export const fleetOpsModule: GameModule = {
   id: 'fleet-ops',

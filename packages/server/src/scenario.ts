@@ -3,6 +3,7 @@ import {
   type Action,
   armyModule,
   arsenalSyncModule,
+  autoRallyModule,
   artilleryModule,
   captureOnArrivalModule,
   combatModule,
@@ -131,6 +132,7 @@ export const DEV_MODULES: GameModule[] = [
   marketModule, // session resource bourse: list / buy (15% burn) / cancel
   armyModule,
   fleetOpsModule, // fleet.launch/merge/split: garrison → mobile fleet, the missing link
+  autoRallyModule, // CONV-10: построенный корабль сам уходит на орбиту в RALLY-флот (BF-29)
   squadronModule, // SQ: free-space movement for squadrons (strike/return off the lane graph)
   capitalModule, // capital.designate: re-point the hero respawn anchor
   standingOrdersModule, // order.auto/order.scramble/order.chain: standing-order intent storage
@@ -164,7 +166,7 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '7'; // marketModule: двусторонняя книга (CONV-9)
+export const MODULE_MANIFEST_VERSION = '8'; // autoRallyModule внесён в граф (CONV-10)
 
 export interface DevMatchOptions {
   /** Match/room id (default `'dev'`). Distinct ids let a registry hold many matches. */
