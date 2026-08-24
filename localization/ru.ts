@@ -38,6 +38,8 @@ export const ru: Record<string, string> = {
   'browser.left.hours': '{h}ч',
   'browser.left.soon': '<1ч',
   'browser.loading': 'загрузка матчей…',
+  'browser.mode.pve': 'PVE',
+  'browser.mode.pvp': 'PVP',
   'browser.players': '{s}/{c} игроков',
   'browser.refresh-hint': 'нажмите «Обновить список»',
   'browser.restore': 'Восстановить',

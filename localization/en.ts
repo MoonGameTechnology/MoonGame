@@ -35,6 +35,8 @@ export const en: Record<string, string> = {
   'browser.left.hours': '{h}h',
   'browser.left.soon': '<1h',
   'browser.loading': 'loading matches…',
+  'browser.mode.pve': 'PVE',
+  'browser.mode.pvp': 'PVP',
   'browser.players': '{s}/{c} players',
   'browser.refresh-hint': 'press "Refresh list"',
   'browser.restore': 'Restore',
