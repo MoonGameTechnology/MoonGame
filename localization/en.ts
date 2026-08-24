@@ -529,6 +529,7 @@ export const en: Record<string, string> = {
   'data.nebula': 'Nebula',
   'data.neural-lace': 'Neural Lace',
   'data.oceanic': 'Oceanic',
+  'data.open-corridor': 'Open Corridor',
   'data.open-space': 'Open space',
   'data.orbital-aa': 'Orbital AA',
   'data.orbital-logistics': 'Orbital Logistics',
@@ -567,6 +568,7 @@ export const en: Record<string, string> = {
   'data.squadron': 'squadron',
   'data.standard': 'Standard',
   'data.steward-protocol': 'Steward Protocol',
+  'data.sustained-corridor': 'Sustained Corridor',
   'data.strike-carrier': 'strike carrier',
   'data.strike-vectors': 'Strike Vectors',
   'data.tank': 'tank',
@@ -1096,6 +1098,12 @@ export const en: Record<string, string> = {
   'hero.passive.vanguard-impulse.desc':
     "The hero's ship drives its fleet at full burn: +10% speed for the hero's fleet.",
   'hero.passive.vanguard-impulse.name': 'Vanguard Impulse',
+  'hero.tree.corridor-open.desc':
+    'The corridor goes public: everyone walks it — your own fleets, an ally, a neutral and the enemy.',
+  'hero.tree.corridor-open.name': 'Open Corridor',
+  'hero.tree.corridor-sustained.desc':
+    "The corridor lives on a clock instead of closing behind the hero's army.",
+  'hero.tree.corridor-sustained.name': 'Sustained Corridor',
   'hero.tree.neural-lace.desc': "A direct brain-to-helm implant: the hero's ship gains +10% speed.",
   'hero.tree.neural-lace.name': 'Neural Lace',
   'hero.tree.overclocked-helm.desc':

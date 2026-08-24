@@ -79,6 +79,39 @@ describe('hero actions — the core engine over the prototype catalogs', () => {
     );
   });
 
+  it('лестница коридора доходит до игрока: узлы дерева поднимают ступень каста', () => {
+    // HERO-CORRIDOR-СПЕКА: ступени 2 и 3 были недостижимы — ступень стояла числом в
+    // каталоге, а поднять её было нечем. Теперь это узлы дерева навыков.
+    let s = newGame();
+    // Узлы стоят денег — казна пополнена, иначе тест мерил бы цену, а не лестницу.
+    s.players.p1!.resources = { ...s.players.p1!.resources, microelectronics: 9000, credits: 9000 };
+    const main = mainOf(s, 'p1'); // commander → transhuman, стартует с коридором
+    const origin = s.planets[s.fleets[main.fleetId!]!.location!]!;
+    const near = Object.values(s.planets).find(
+      (p) =>
+        p.id !== origin.id &&
+        Math.hypot(p.position.x - origin.position.x, p.position.y - origin.position.y) <=
+          (data.heroAbilities.corridor!.range ?? 0),
+    )!;
+    const tierOfCast = (st: GameState): number => {
+      const r = order(st, castHeroAbility('p1', main.id, 'corridor', near.id), st.time);
+      expect(r.error).toBeUndefined();
+      return r.state.tempLanes![0]!.tier!;
+    };
+    expect(tierOfCast(s)).toBe(1); // без узлов — одноразовый личный коридор
+
+    for (const node of ['neural_lace', 'overclocked_helm', 'corridor_sustained']) {
+      const r = order(s, unlockHeroSkill('p1', main.id, node), s.time);
+      expect(r.error).toBeUndefined();
+      s = r.state;
+    }
+    expect(tierOfCast(s)).toBe(2); // со сроком жизни
+
+    const opened = order(s, unlockHeroSkill('p1', main.id, 'corridor_open'), s.time);
+    expect(opened.error).toBeUndefined();
+    expect(tierOfCast(opened.state)).toBe(3); // общий: идут все, включая врага
+  });
+
   it('hero.fit installs a fitting within the archetype slot budget', () => {
     const s = newGame();
     const main = mainOf(s, 'p1'); // commander: 4 slots

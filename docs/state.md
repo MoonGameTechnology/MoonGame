@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 4871 зелёный** (58 skip, 372 файла).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 4875 зелёных** (58 skip, 372 файла).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -1075,14 +1075,24 @@ home?, fleetId?}` — `grade` (редкость, число слотов в кл
 
 - Действие **`hero.move {to}`** — передислокация героя в **свой** мир. Коды:
   `E_BAD_PAYLOAD, E_NO_HERO, E_NO_PLANET, E_FORBIDDEN`.
-- Действие **`hero.path.create {to}`** — открыть **временную публичную трассу** от узла
-  героя к ближайшему (≤ `PATH_RANGE` = 600): **реальное ребро графа** (добавляется в
-  `Planet.links` в обе стороны, маршрутизируемо всеми) на `PATH_DURATION_HOURS` = 6 ч, по
-  которому **флоты владельца** идут с бонусом скорости `PATH_SPEED_BONUS` = +50%. Лейн
-  лежит в `GameState.tempLanes[]`, истечение — отложенный `hero.path.expire`; кэш
-  маршрутов инвалидируется через **`GameState.topology`** (версия топологии, бампится при
-  любой смене `links`). Кулдаун `PATH_COOLDOWN_HOURS` = 12 ч. Коды: `E_BAD_PAYLOAD,
-E_NO_HERO, E_SAME_LOCATION, E_NO_PLANET, E_OUT_OF_RANGE, E_COOLDOWN`.
+- **Коридор** открывается ТОЛЬКО способностью (`hero.ability` с типом `temp_lane`,
+  каталожный `corridor`): легаси-действие `hero.path.create` снято
+  (HERO-CORRIDOR-СПЕКА) — оно читало константы движка, пока способность читала каталог,
+  и на один коридор было два набора чисел. Эффект прежний: **ребро графа** (в
+  `Planet.links` в обе стороны) на `durationHours` (по умолчанию 6 ч), по которому флоты
+  владельца идут с `speedBonus` (+50%); лейн лежит в `GameState.tempLanes[]`, истечение —
+  отложенный `hero.path.expire`, кэш маршрутов инвалидируется через **`GameState.topology`**.
+  Числа берутся из `data/heroAbilities.json` (`range` 300, `cooldownHours` 12); константы
+  `PATH_*` в `hero.ts` остались ФОЛБЭКОМ на случай, когда данные молчат.
+- **Ступени коридора — прогрессия ОДНОЙ способности**, а не три кнопки в ростере.
+  Лестница описана в данных: `heroAbilities.corridor.tiers[] = {skill, params}`, и каждая
+  ступень берётся узлом дерева навыков (`data/heroSkillTrees.json`:
+  `corridor_sustained` → ступень 2, `corridor_open` → ступень 3; ветка transhuman, цепочка
+  от `overclocked_helm`). Движок при касте накладывает params всех ВЗЯТЫХ героем ступеней
+  поверх базовых — второй копии этого знания в `GameState` нет, потому что `Hero.skills`
+  уже хранит взятое. Ступени: **1** — одноразовый личный (закрывается прибытием армии
+  героя), **2** — личный со сроком жизни, **3** — общий (идут все, включая врага; право
+  прохода судит `state/corridor.ts`).
 - Событие **`hero.path.expire`** снимает лейн и **убирает ребро только если его добавил
   именно этот лейн** (`addedLink`) и его не держит другой живой лейн; бампит `topology`.
 - Действие **`planet.annihilate {planetId}`** — уничтожение мира в радиусе
@@ -1167,8 +1177,8 @@ params{bonus, radius}}`, хуки — enum `fleet.speed|combat.damage` (fail-clo
   стоимость `cost` из казны (nonnegative в схеме — каталог не может минтить)
   (`E_NO_PLAYER`/`E_INSUFFICIENT`, `payCost` на драфте — реджект отменяет всё).
   Диспетчеризация по `type`: встроенные **`temp_lane`** / **`annihilate`** исполняются
-  **теми же телами эффектов** (`castTempLane`/`castAnnihilate`), что и legacy-действия
-  `hero.path.create`/`planet.annihilate` (поведение последних сохранено 1:1); прочие
+  телами эффектов `castTempLane`/`castAnnihilate` (тем же телом пользуется оставшееся
+  legacy-действие `planet.annihilate`; парное ему `hero.path.create` снято, см. выше); прочие
   типы — через **capability `hero.effect.<type>`** (контракт `HeroEffect`, экспортирован
   из пакета; impl обязан `h.reject` на своих отказах); тип без capability →
   `E_NO_EFFECT` (fail-secure: данные обещают только то, что движок умеет).
@@ -1191,11 +1201,12 @@ params{bonus, radius}}`, хуки — enum `fleet.speed|combat.damage` (fail-clo
   `MS_PER_HOUR` — на сжатом матче аура переживала бы собственный кулдаун).
   Эффекты приходят добавлением провайдера, ядро/диспетчер не трогаются — трилогия
   recall/aura/reveal закрывает все не-встроенные эффекты (спавн-маркеры не кастуются).
-  **Кулдаун-ключи**: встроенные типы делят ключ с legacy (`path`/`annihilate`) — generic
-  и legacy маршруты нельзя скомбинировать в double-fire; кастомные типы — ключ `fx:<type>`
-  (два каталожных id одного эффекта делят кулдаун; префикс не коллидирует с `respawn`).
-  Гейт живости распространён и на legacy-действия (`hero.move`/`hero.path.create`/
-  `planet.annihilate` мёртвым героем → `E_HERO_DEAD` — обход через legacy закрыт). `params`-оверрайды `durationHours`/`speedBonus` (числовые, с движковыми
+  **Кулдаун-ключи**: встроенные типы кулдаунятся по ЭФФЕКТУ (`path`/`annihilate`), а не
+  по id способности — два каталожных id одного эффекта делят кулдаун и не дают выстрелить
+  дважды (тот же ключ и у оставшегося legacy-`planet.annihilate`); кастомные типы — ключ
+  `fx:<type>` (префикс не коллидирует с `respawn`).
+  Гейт живости распространён и на legacy-действия (`hero.move`/`planet.annihilate`
+  мёртвым героем → `E_HERO_DEAD` — обход через legacy закрыт). `params`-оверрайды `durationHours`/`speedBonus` (числовые, с движковыми
   фолбэками). Успех → кулдаун + событие `hero.ability.used {heroId, owner, abilityId,
 type, target?}`. Payload-схема `hero.ability` добавлена в гейт (SV-1.2). 7 тестов; дифф прошёл 4-линзовый состязательный ревью (все находки закрыты).
 

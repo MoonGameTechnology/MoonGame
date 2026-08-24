@@ -529,6 +529,7 @@ export const ru: Record<string, string> = {
   'data.nebula': 'Туманность',
   'data.neural-lace': 'Нейрокружево',
   'data.oceanic': 'Океанический',
+  'data.open-corridor': 'Открытый коридор',
   'data.open-space': 'Открытый космос',
   'data.orbital-aa': 'Орбитальное ПВО',
   'data.orbital-logistics': 'Орбитальная логистика',
@@ -567,6 +568,7 @@ export const ru: Record<string, string> = {
   'data.squadron': 'эскадрилья',
   'data.standard': 'Стандартный',
   'data.steward-protocol': 'Протокол «Хранитель»',
+  'data.sustained-corridor': 'Устойчивый коридор',
   'data.strike-carrier': 'ударный носитель',
   'data.strike-vectors': 'Ударные векторы',
   'data.tank': 'танк',
@@ -1097,6 +1099,12 @@ export const ru: Record<string, string> = {
   'hero.passive.vanguard-impulse.desc':
     'Корабль героя ведёт свой флот на форсаже: +10% к скорости флота героя.',
   'hero.passive.vanguard-impulse.name': 'Импульс авангарда',
+  'hero.tree.corridor-open.desc':
+    'Коридор становится общим: по нему идут все — свои, союзник, нейтрал и враг.',
+  'hero.tree.corridor-open.name': 'Открытый коридор',
+  'hero.tree.corridor-sustained.desc':
+    'Коридор держится по часам, а не гаснет с первым же проходом армии героя.',
+  'hero.tree.corridor-sustained.name': 'Устойчивый коридор',
   'hero.tree.neural-lace.desc':
     'Имплант прямого канала «мозг—штурвал»: корабль героя разгоняется на +10%.',
   'hero.tree.neural-lace.name': 'Нейрокружево',

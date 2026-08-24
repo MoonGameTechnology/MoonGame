@@ -44,7 +44,19 @@ const data: GameData = parseGameData({
   // HERO-4 catalog: the two built-in effect types, a costly custom type, an unwired type,
   // and a params-tuned lane with NO range (falls back to the engine constant, never ∞).
   heroAbilities: {
-    corridor: { name: 'Коридор', type: 'temp_lane', cooldownHours: 12, range: 300 },
+    corridor: {
+      name: 'Коридор',
+      type: 'temp_lane',
+      cooldownHours: 12,
+      range: 300,
+      params: { tier: 1 },
+      // Лестница ступеней (HERO-CORRIDOR-СПЕКА): узел дерева поднимает ступень ТОЙ ЖЕ
+      // способности, а не выдаёт вторую кнопку.
+      tiers: [
+        { skill: 'corridor_sustained', params: { tier: 2 } },
+        { skill: 'corridor_open', params: { tier: 3 } },
+      ],
+    },
     annihilate: { name: 'Аннигиляция', type: 'annihilate', cooldownHours: 48, range: 500 },
     burst: { name: 'Burst', type: 'test_burst', cooldownHours: 10, cost: { metal: 50 } },
     ghost: { name: 'Ghost', type: 'unwired_type' },
@@ -81,6 +93,10 @@ const data: GameData = parseGameData({
     },
     void_gift: { name: 'Void Gift', branch: 'psionic', grants: { ability: 'ghost' } },
     common_core: { name: 'Core', grants: {} },
+    // Ступени коридора: узлы ничего не «выдают» — они и ЕСТЬ ступень (лестница
+    // описана со стороны способности, `heroAbilities.corridor.tiers`).
+    corridor_sustained: { name: 'Sustained', branch: 'transhuman', requires: ['neural_lace'] },
+    corridor_open: { name: 'Open', branch: 'transhuman', requires: ['corridor_sustained'] },
     // Fan-in node: BOTH parents must be unlocked (multi-parent requires).
     synthesis: {
       name: 'Synthesis',
@@ -184,6 +200,23 @@ function world(): GameState {
   };
 }
 
+/**
+ * The same world where p1's hero CARRIES the corridor ability — the only way to open a
+ * corridor since HERO-CORRIDOR-СПЕКА retired the legacy `hero.path.create` action (it
+ * read the engine constants while `hero.ability` read the catalogue: two sets of numbers
+ * for one corridor). `skills` unlocks ladder steps up front.
+ */
+function corridorWorld(skills: string[] = []): GameState {
+  const s = world();
+  const hero = s.heroes!['hero:p1']!;
+  hero.abilities = ['corridor'];
+  hero.archetype = 'raider'; // transhuman — the branch the ladder nodes belong to
+  if (skills.length > 0) hero.skills = skills;
+  return s;
+}
+const corridor = (to: string, seq = 1): Action =>
+  act('hero.ability', 'p1', { heroId: 'hero:p1', abilityId: 'corridor', target: to }, seq);
+
 describe('hero — move (redeploy)', () => {
   const kernel = createKernel([heroModule]);
 
@@ -218,7 +251,7 @@ describe('hero — temp public lane (path.create / expire)', () => {
   const kernel = createKernel([heroModule]);
 
   it('opens a routable lane: links both ways, bumps topology, schedules expiry', () => {
-    const r = okApply(kernel.applyAction(world(), act('hero.path.create', 'p1', { to: 'C' }), ctx(0)));
+    const r = okApply(kernel.applyAction(corridorWorld(), corridor('C'), ctx(0)));
     const s = r.state;
     expect(s.planets.A?.links).toContain('C');
     expect(s.planets.C?.links).toContain('A');
@@ -235,24 +268,24 @@ describe('hero — temp public lane (path.create / expire)', () => {
   it('rejects same-location, out-of-range and cooldown', () => {
     // Same location: hero is at A, target A.
     expect(
-      errCode(kernel.applyAction(world(), act('hero.path.create', 'p1', { to: 'A' }), ctx(0))),
+      errCode(kernel.applyAction(corridorWorld(), corridor('A'), ctx(0))),
     ).toBe('E_SAME_LOCATION');
     // F is 700 units away (> 600).
     expect(
-      errCode(kernel.applyAction(world(), act('hero.path.create', 'p1', { to: 'F' }), ctx(0))),
+      errCode(kernel.applyAction(corridorWorld(), corridor('F'), ctx(0))),
     ).toBe('E_OUT_OF_RANGE');
     // A second lane while still on cooldown.
     const first = okApply(
-      kernel.applyAction(world(), act('hero.path.create', 'p1', { to: 'C' }), ctx(0)),
+      kernel.applyAction(corridorWorld(), corridor('C'), ctx(0)),
     );
     expect(
-      errCode(kernel.applyAction(first.state, act('hero.path.create', 'p1', { to: 'B' }, 2), ctx(0))),
+      errCode(kernel.applyAction(first.state, corridor('B', 2), ctx(0))),
     ).toBe('E_COOLDOWN');
   });
 
   it('expires on schedule: removes the lane and the link it added, bumps topology', () => {
     const created = okApply(
-      kernel.applyAction(world(), act('hero.path.create', 'p1', { to: 'C' }), ctx(0)),
+      kernel.applyAction(corridorWorld(), corridor('C'), ctx(0)),
     );
     const expired = okAdvance(kernel.advanceTo(created.state, ctx(6 * HOUR)));
     expect(expired.state.tempLanes).toHaveLength(0);
@@ -265,7 +298,7 @@ describe('hero — temp public lane (path.create / expire)', () => {
   it('on a pre-existing lane the link survives expiry (only owner-added links are withdrawn)', () => {
     // A↔B are already linked: the lane grants a bonus but adds no edge.
     const created = okApply(
-      kernel.applyAction(world(), act('hero.path.create', 'p1', { to: 'B' }), ctx(0)),
+      kernel.applyAction(corridorWorld(), corridor('B'), ctx(0)),
     );
     expect(created.state.tempLanes![0]!.addedLink).toBe(false);
     const expired = okAdvance(kernel.advanceTo(created.state, ctx(6 * HOUR)));
@@ -281,9 +314,9 @@ describe('hero — temp lane speed bonus (fleet.speed hook)', () => {
   // Теперь ступень решает, кому можно, и тест держит обе стороны правила.
   it('ЛИЧНЫЙ коридор (ступень 1): свой летит с ускорением, врагу маршрута НЕТ', () => {
     const kernel = createKernel([heroModule, movementModule]);
-    const base = world();
+    const base = corridorWorld();
     base.fleets = { F1: fleet('F1', 'p1', 'A'), E1: fleet('E1', 'p2', 'A') };
-    const laned = okApply(kernel.applyAction(base, act('hero.path.create', 'p1', { to: 'C' }), ctx(0)));
+    const laned = okApply(kernel.applyAction(base, corridor('C'), ctx(0)));
     // Право прохода — у флота, который несёт героя коридора.
     const heroId = laned.state.tempLanes![0]!.heroId!;
     laned.state.heroes![heroId]!.fleetId = 'F1';
@@ -299,9 +332,9 @@ describe('hero — temp lane speed bonus (fleet.speed hook)', () => {
 
   it('ОДНОРАЗОВЫЙ коридор закрывается, когда армия с героем ПРИБЫЛА', () => {
     const kernel = createKernel([heroModule, movementModule]);
-    const base = world();
+    const base = corridorWorld();
     base.fleets = { F1: fleet('F1', 'p1', 'A') };
-    const laned = okApply(kernel.applyAction(base, act('hero.path.create', 'p1', { to: 'C' }), ctx(0)));
+    const laned = okApply(kernel.applyAction(base, corridor('C'), ctx(0)));
     const heroId = laned.state.tempLanes![0]!.heroId!;
     laned.state.heroes![heroId]!.fleetId = 'F1';
     expect(laned.state.tempLanes).toHaveLength(1);
@@ -321,9 +354,9 @@ describe('hero — temp lane speed bonus (fleet.speed hook)', () => {
 
   it('встать ПОСРЕДИ коридора нельзя — это прыжок, середины у него нет', () => {
     const kernel = createKernel([heroModule, movementModule]);
-    const base = world();
+    const base = corridorWorld();
     base.fleets = { F1: fleet('F1', 'p1', 'A') };
-    const laned = okApply(kernel.applyAction(base, act('hero.path.create', 'p1', { to: 'C' }), ctx(0)));
+    const laned = okApply(kernel.applyAction(base, corridor('C'), ctx(0)));
     const heroId = laned.state.tempLanes![0]!.heroId!;
     laned.state.heroes![heroId]!.fleetId = 'F1';
     expect(laned.state.tempLanes![0]!.addedLink).toBe(true); // ребра A↔C до коридора не было
@@ -347,13 +380,64 @@ describe('hero — temp lane speed bonus (fleet.speed hook)', () => {
 
   it('ОБЩИЙ коридор (ступень 3): враг проезжает, но БЕЗ ускорения', () => {
     const kernel = createKernel([heroModule, movementModule]);
-    const base = world();
+    // Ступень взята ЧЕСТНО — через дерево навыков героя, а не правкой лейна в тесте.
+    const base = corridorWorld(['neural_lace', 'corridor_sustained', 'corridor_open']);
     base.fleets = { F1: fleet('F1', 'p1', 'A'), E1: fleet('E1', 'p2', 'A') };
-    const laned = okApply(kernel.applyAction(base, act('hero.path.create', 'p1', { to: 'C' }), ctx(0)));
-    laned.state.tempLanes![0]!.tier = 3; // третья ступень: идут все
+    const laned = okApply(kernel.applyAction(base, corridor('C'), ctx(0)));
+    expect(laned.state.tempLanes![0]!.tier).toBe(3);
 
     const enemy = okApply(kernel.applyAction(laned.state, act('fleet.move', 'p2', { fleetId: 'E1', to: 'C' }), ctx(0)));
     expect(enemy.state.fleets.E1?.movement?.arrivesAt).toBeCloseTo((250 / 10) * HOUR, 0);
+  });
+
+  // HERO-CORRIDOR-СПЕКА. Ступени — это ПРОГРЕССИЯ ОДНОЙ способности: их выдаёт дерево
+  // навыков героя, а не отдельные кнопки в ростере. Лестница описана в данных
+  // (`heroAbilities.corridor.tiers`), поэтому «кому можно ходить» правит каталог, а
+  // не движок.
+  describe('лестница ступеней коридора (дерево навыков)', () => {
+    const kernel = createKernel([heroModule]);
+    const tierOf = (skills: string[]): number => {
+      const r = okApply(kernel.applyAction(corridorWorld(skills), corridor('C'), ctx(0)));
+      return r.state.tempLanes![0]!.tier!;
+    };
+
+    it('без узлов — первая ступень; узел поднимает ступень ТОЙ ЖЕ способности', () => {
+      expect(tierOf([])).toBe(1);
+      expect(tierOf(['neural_lace', 'corridor_sustained'])).toBe(2);
+      expect(tierOf(['neural_lace', 'corridor_sustained', 'corridor_open'])).toBe(3);
+      // Ростер не растёт: способность одна, кнопка одна.
+      expect(corridorWorld(['neural_lace', 'corridor_sustained']).heroes!['hero:p1']!.abilities)
+        .toEqual(['corridor']);
+    });
+
+    it('ступень берётся живьём из дерева: разблокировал узел — следующий каст выше', () => {
+      const start = corridorWorld(['neural_lace']);
+      const unlocked = okApply(
+        kernel.applyAction(
+          start,
+          act('hero.skill.unlock', 'p1', { heroId: 'hero:p1', node: 'corridor_sustained' }),
+          ctx(0),
+        ),
+      );
+      const laned = okApply(kernel.applyAction(unlocked.state, corridor('C'), ctx(0)));
+      expect(laned.state.tempLanes![0]!.tier).toBe(2);
+    });
+
+    it('чужие/непройденные узлы ступень не поднимают (fail-secure)', () => {
+      // Узел ЕСТЬ в дереве, но герой его не брал — коридор остаётся личным одноразовым.
+      expect(tierOf(['neural_lace'])).toBe(1);
+      // Ступень 3 без ступени 2 не «перепрыгивается» мимо дерева: `requires` держит
+      // цепочку на входе (`hero.skill.unlock`), а сам список — то, что реально взято.
+      expect(
+        errCode(
+          kernel.applyAction(
+            corridorWorld(['neural_lace']),
+            act('hero.skill.unlock', 'p1', { heroId: 'hero:p1', node: 'corridor_open' }),
+            ctx(0),
+          ),
+        ),
+      ).toBe('E_REQUIRES');
+    });
   });
 });
 
@@ -434,18 +518,15 @@ describe('hero — generic data-driven ability (hero.ability, HERO-4)', () => {
     const types = r.events.map((e) => e.type);
     expect(types).toContain('hero.path.created');
     expect(types).toContain('hero.ability.used');
-    // The generic route cools down under the LEGACY key, so the legacy action
-    // cannot be used to double-fire the same effect…
+    // Кулдаун лежит под ключом ЭФФЕКТА (`path`), а не под id способности: две
+    // катологовые способности одного типа делят один кулдаун и не дают выстрелить
+    // одним эффектом дважды.
     expect(heroOf(r.state, 'p1')?.cooldowns.path).toBeGreaterThan(0);
-    expect(
-      errCode(kernel.applyAction(r.state, act('hero.path.create', 'p1', { to: 'B' }, 2), ctx(HOUR))),
-    ).toBe('E_COOLDOWN');
-    // …and vice versa: a legacy cast blocks the generic route.
-    const viaLegacy = okApply(
-      kernel.applyAction(abilityWorld(), act('hero.path.create', 'p1', { to: 'C' }), ctx(0)),
-    );
-    expect(errCode(kernel.applyAction(viaLegacy.state, cast('corridor', 'B', 2), ctx(HOUR)))).toBe(
+    expect(errCode(kernel.applyAction(r.state, cast('corridor', 'B', 2), ctx(HOUR)))).toBe(
       'E_COOLDOWN',
+    );
+    expect(errCode(kernel.applyAction(r.state, cast('warp', 'B', 3), ctx(HOUR)))).toBe(
+      'E_COOLDOWN', // другой id, тот же тип эффекта — тот же ключ кулдауна
     );
   });
 
@@ -534,7 +615,7 @@ describe('hero — generic data-driven ability (hero.ability, HERO-4)', () => {
     // …and the legacy sibling actions honor the SAME liveness gate — a dead hero
     // cannot act through any route (review finding: gate must not be bypassable).
     expect(
-      errCode(kernel.applyAction(dead, act('hero.path.create', 'p1', { to: 'C' }), ctx(0))),
+      errCode(kernel.applyAction(dead, corridor('C'), ctx(0))),
     ).toBe('E_HERO_DEAD');
     expect(
       errCode(kernel.applyAction(dead, act('planet.annihilate', 'p1', { planetId: 'C' }), ctx(0))),

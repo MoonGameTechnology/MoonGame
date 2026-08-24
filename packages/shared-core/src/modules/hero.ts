@@ -25,10 +25,6 @@ import { canAfford, payCost } from '../util/treasury';
  * abilities through the bus, plus the `fleet.speed` bonus for its temp lanes:
  *
  *   - `hero.move {to}` — redeploy the hero to a node the player owns.
- *   - `hero.path.create {to}` — open a TEMPORARY PUBLIC LANE from the hero's node to
- *     a nearby node: a real, routable graph edge (added to `Planet.links`) for a
- *     limited time, that the owner's fleets traverse with a speed bonus. Expiry is a
- *     scheduled `hero.path.expire`; the route cache invalidates via `state.topology`.
  *   - `planet.annihilate {planetId}` — destroy a planet in range: it stays a node
  *     (you can still fly through) but its `kind`/`planetType` flip to an uncapturable
  *     `dead_world`, garrison + buildings are gone, ownership drops. Victory recomputes
@@ -83,10 +79,15 @@ import { canAfford, payCost } from '../util/treasury';
  * through `schedule`; the speed bonus through the `fleet.speed` hook. No kernel change.
  */
 
+// Corridor defaults. NOT a second truth beside the catalogue (that was the legacy
+// `hero.path.create` action, retired by HERO-CORRIDOR-СПЕКА — it read these constants
+// while `hero.ability` read the data, so the same corridor had two sets of numbers).
+// They are what the engine falls back to when the ability's data says nothing, which
+// is the module's usual graceful-degradation posture: content decides, the engine
+// still works without it.
 const PATH_SPEED_BONUS = 0.5; // +50% for the owner's fleets along the lane
 const PATH_DURATION_HOURS = 6;
 const PATH_RANGE = 300; // max Euclidean span the hero can bridge (−50% from 600)
-const PATH_COOLDOWN_HOURS = 12;
 const ANNIHILATE_RANGE = 500;
 const ANNIHILATE_COOLDOWN_HOURS = 48;
 const DEAD_KIND = 'dead_world';
@@ -154,10 +155,10 @@ function gateLiveDeployed(h: HandlerContext, hero: Hero): void {
   if (hero.alive !== true) h.reject('E_HERO_NOT_DEPLOYED');
 }
 
-/** The legacy casters' shared gate tail (`hero.path.create`, `planet.annihilate`):
- *  the same origin/target/range/cooldown sequence `hero.ability` derives from a
- *  `HeroAbilityDef`, hand-rolled ONCE — per-action copies drifted before and
- *  opened a bypass. Origin is the hero's node; every failed gate rejects. */
+/** The legacy caster's gate tail (`planet.annihilate`): the same origin/target/
+ *  range/cooldown sequence `hero.ability` derives from a `HeroAbilityDef`, hand-rolled
+ *  ONCE — per-action copies drifted before and opened a bypass. Origin is the hero's
+ *  node; every failed gate rejects. */
 function gateRangedCast(
   h: HandlerContext,
   hero: Hero,
@@ -350,6 +351,24 @@ function numParam(params: Record<string, unknown>, key: string, fallback: number
   return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
 }
 
+/** The ability's params AS THIS HERO HAS IT (HERO-CORRIDOR-СПЕКА). One ability can
+ *  carry a ladder of steps (`def.tiers`), each earned by a skill-tree node; every
+ *  step the hero has unlocked overrides the base params, in array order. A hero who
+ *  unlocked nothing sees the base params — the pre-ladder behaviour, unchanged.
+ *
+ *  The ladder is read from DATA rather than stored on the instance on purpose: which
+ *  node upgrades what is content, and `Hero.skills` already records what was unlocked
+ *  (`hero.skill.unlock`), so no second copy of that truth enters `GameState`. */
+function abilityParams(def: HeroAbilityDef, hero: Hero): Record<string, unknown> {
+  if (def.tiers.length === 0) return def.params;
+  const skills = hero.skills ?? [];
+  let out = def.params;
+  for (const step of def.tiers) {
+    if (skills.includes(step.skill)) out = { ...out, ...step.params };
+  }
+  return out;
+}
+
 /** Cooldown-ledger key for an ability. Built-in types share the legacy actions' keys
  *  (`path` / `annihilate`) so the generic and legacy routes can never be combined to
  *  double-fire the same effect; a custom type cools down per effect TYPE for the same
@@ -490,24 +509,6 @@ export const heroModule: GameModule = {
       h.emit('hero.moved', { owner: action.playerId, to });
     });
 
-    api.onAction('hero.path.create', (action, h) => {
-      const { to } = action.payload as { to?: string };
-      if (typeof to !== 'string') return h.reject('E_BAD_PAYLOAD');
-      const hero = heroOf(h.state, action.playerId);
-      if (!hero) return h.reject('E_NO_HERO');
-      gateLiveDeployed(h, hero);
-      // The hero acts from its ship's node when deployed.
-      if (to === heroNode(h.state, hero)) return h.reject('E_SAME_LOCATION');
-      gateRangedCast(h, hero, to, PATH_RANGE, 'path');
-
-      castTempLane(h, action.playerId, hero, to, {
-        durationHours: PATH_DURATION_HOURS,
-        speedBonus: PATH_SPEED_BONUS,
-      });
-      hero.cooldowns = hero.cooldowns ?? {};
-      hero.cooldowns.path = after(h, PATH_COOLDOWN_HOURS);
-    });
-
     // HERO-CORRIDOR. Одноразовый коридор (ступень 1) закрывается, когда армия с героем
     // ПРИБЫЛА — не когда вышла: иначе она летела бы по уже закрытому коридору, а
     // «кто вошёл — доезжает» и есть принятое правило. Прибытие — единственный сигнал
@@ -581,10 +582,11 @@ export const heroModule: GameModule = {
 
       if (def.type === 'temp_lane') {
         if (typeof target !== 'string') return h.reject('E_BAD_PAYLOAD');
+        const params = abilityParams(def, hero); // ступень героя, а не голый каталог
         castTempLane(h, action.playerId, hero, target, {
-          durationHours: numParam(def.params, 'durationHours', PATH_DURATION_HOURS),
-          speedBonus: numParam(def.params, 'speedBonus', PATH_SPEED_BONUS),
-          tier: numParam(def.params, 'tier', 1),
+          durationHours: numParam(params, 'durationHours', PATH_DURATION_HOURS),
+          speedBonus: numParam(params, 'speedBonus', PATH_SPEED_BONUS),
+          tier: numParam(params, 'tier', 1),
         });
       } else if (def.type === 'annihilate') {
         if (typeof target !== 'string') return h.reject('E_BAD_PAYLOAD');
