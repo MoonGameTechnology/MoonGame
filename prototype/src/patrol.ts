@@ -3,14 +3,20 @@
  * core: a wing left on patrol auto-strikes an enemy that enters its radius, burning
  * a sortie (SQ-2.1) each time; when it runs dry it rearms and then resumes — no live
  * player in the moment, fully deterministic. Extracted from `game.ts` (REFP-23):
- * depends on `SortieState`/`canSortie`/`spendSortie`/`withinRange` (`squadron.ts`,
+ * depends on `SortieState`/`canSortie`/`spendSortie`/`withinRange` (ядро,
+ * `state/squadron.ts` — CONV-5,
  * REFP-7) and `engageFleet`/`moveFleet` (`actions.ts`, REFP-22). The frame-loop
  * driver (`main.ts`, mirrors `autoEngage`/`driveQueues`) issues the strike order,
  * burns the sortie, and ticks the rearm on a game-hour cadence; the server-side
  * driver (`serverPatrolActions`, REFP-24) does the same for NET matches.
  * `game.ts` imports this for the server driver and re-exports for `main.ts` / tests.
  */
-import { canSortie, spendSortie, withinRange, type SortieState } from './squadron';
+import {
+  canSortie,
+  spendSortie,
+  withinRange,
+  type SortieState,
+} from '../../packages/shared-core/src/index';
 import { engageFleet, moveFleet } from './actions';
 import type { Action, Fleet } from '../../packages/shared-core/src/index';
 

@@ -2,16 +2,17 @@
  * CC-server standing orders (CC-2 auto-storm / CC-4 дежурный вылет) —
  * AUTHORITATIVE state so the server drives them. Extracted from `game.ts`
  * (REFP-15): depends on `fleetHasSquadron`/`sortieSpec`/`squadronStrikeRange`/
- * `freshSortie` (squadron.ts), `fleetIdle`/`validateChainSteps` (chain.ts).
+ * `freshSortie` (ядро, `state/squadron.ts` — CONV-5), `fleetIdle`/`validateChainSteps`
+ * (chain.ts).
  */
-import type { Fleet, GameModule } from '../../packages/shared-core/src/index';
+import type { Fleet, GameData, GameModule } from '../../packages/shared-core/src/index';
 import {
   fleetHasSquadron,
   sortieSpec,
   squadronStrikeRange,
   freshSortie,
   type SortieState,
-} from './squadron';
+} from '../../packages/shared-core/src/index';
 import { fleetIdle, validateChainSteps, type FleetChain } from './chain';
 
 const HOUR = 3_600_000;
@@ -20,7 +21,7 @@ const HOUR = 3_600_000;
  *  prototype's esbuild bundle doesn't resolve it, only shared-core's index). */
 interface HCtx {
   state: { fleets: Record<string, Fleet>; planets: Record<string, { position: { x: number; y: number } }> };
-  ctx: { now: number; data: unknown };
+  ctx: { now: number; data: GameData };
   reject(code: string): never;
 }
 
@@ -76,14 +77,14 @@ export const standingOrdersModule: GameModule = {
         }
         return;
       }
-      if (!fleetHasSquadron(f)) return h.reject('E_NO_SHIPS');
+      if (!fleetHasSquadron(f, h.ctx.data)) return h.reject('E_NO_SHIPS');
       const pos = f.location !== null ? h.state.planets[f.location]?.position : undefined;
       if (!pos || !fleetIdle(f)) return h.reject('E_CONDITIONS_UNMET');
-      const spec = sortieSpec(f);
+      const spec = sortieSpec(f, h.ctx.data);
       const stashed = st.wingSorties?.[f.id];
       (st.patrols ??= {})[f.id] = {
         center: { x: pos.x, y: pos.y },
-        radius: squadronStrikeRange(f),
+        radius: squadronStrikeRange(f, h.ctx.data),
         sortie: stashed
           ? {
               fuel: Math.min(stashed.fuel, spec.maxFuel),
@@ -104,7 +105,7 @@ export const standingOrdersModule: GameModule = {
       const patrol = (h.state as unknown as StandingOrdersState).patrols?.[f.id];
       if (!patrol) return h.reject('E_NO_TARGET');
       const s = p.sortie as { fuel?: unknown; rearming?: unknown } | undefined;
-      const spec = sortieSpec(f);
+      const spec = sortieSpec(f, h.ctx.data);
       if (
         typeof s?.fuel !== 'number' ||
         !Number.isInteger(s.fuel) ||

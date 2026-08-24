@@ -1838,9 +1838,9 @@ function fleetHasArtillery(f: Fleet | undefined): boolean {
  *  so the launch is offered only when a non-squadron ship stays behind and the carrier is
  *  parked and out of combat (squadrons-roadmap SQ-1.1). */
 function fleetCanLaunchSquadron(f: Fleet | undefined): boolean {
-  if (!fleetHasSquadron(f) || f!.movement || !f!.location || f!.battleId) return false;
+  if (!fleetHasSquadron(f, data) || f!.movement || !f!.location || f!.battleId) return false;
   const total = f!.units.reduce((n, u) => n + u.count, 0);
-  const wing = squadronTake(f!).reduce((n, u) => n + u.count, 0);
+  const wing = squadronTake(f!, data).reduce((n, u) => n + u.count, 0);
   return wing > 0 && total > wing;
 }
 
@@ -3396,7 +3396,7 @@ function setScramble(ids: string[], on: boolean): void {
     // Кому дежурство положено и почему отказ — `stanceToggle.ts` (REFM-98).
     const want = scrambleStance(
       !!f && f.owner === ME,
-      !!f && fleetHasSquadron(f),
+      !!f && fleetHasSquadron(f, data),
       !!patrolOf(id),
       on,
       !!pos0,
@@ -3433,9 +3433,9 @@ function setScramble(ids: string[], on: boolean): void {
         id,
         standingPatrol(
           pos,
-          squadronStrikeRange(f),
+          squadronStrikeRange(f, data),
           wingSorties.get(id),
-          sortieSpec(f),
+          sortieSpec(f, data),
           freshSortie,
         ),
       );
@@ -5537,8 +5537,8 @@ function fleetPanelHtml(f: Fleet): string {
   // Carrier air wing (squadrons-roadmap SQ-1.1) — launch the squadron ships as a
   // separate fast strike fleet. Needs a non-squadron ship left behind (fleet.split
   // refuses to take the whole stack), so an all-fighter fleet just flies itself.
-  if (f.owner === ME && fleetHasSquadron(f)) {
-    const wing = squadronTake(f).reduce((n, u) => n + u.count, 0);
+  if (f.owner === ME && fleetHasSquadron(f, data)) {
+    const wing = squadronTake(f, data).reduce((n, u) => n + u.count, 0);
     h += `<div class="sec">${t('side.wing.title')}</div><div class="row">`;
     h += btn('launchsquad', '', t('side.wing.launch', { n: wing }), fleetCanLaunchSquadron(f));
     h += `</div>`;
@@ -5560,7 +5560,7 @@ function fleetPanelHtml(f: Fleet): string {
   // movement: strike an enemy in range, return to base, or toggle patrol (CC-4).
   // Что такое действующее крыло — `squadron.ts` (REFM-135): панель и обработчики
   // приказов обязаны отвечать на это одинаково, иначе кнопка обещает то, чего нет.
-  if (isWing(f, ME)) {
+  if (isWing(f, ME, fleetHasSquadron(f, data))) {
     const isPatrol = !!patrolOf(f.id);
     const canAct = wingCanAct(f);
     h += `<div class="sec">${t('side.wing.title')}</div><div class="row">`;
@@ -7227,12 +7227,12 @@ function renderCmdBar() {
           ids.length === 0,
           t('cmd.auto-assault.hint'),
         ) +
-        (fleets.some(fleetHasSquadron)
+        (fleets.some((f) => fleetHasSquadron(f, data))
           ? cmdBtn(
               'qscramble',
               '🛩',
               t('cmd.standing-sortie'),
-              fleets.filter(fleetHasSquadron).every((fl) => patrolOf(fl.id)) ? 'on' : '',
+              fleets.filter((fl) => fleetHasSquadron(fl, data)).every((fl) => patrolOf(fl.id)) ? 'on' : '',
               false,
               t('cmd.standing-sortie.hint'),
             )
@@ -7444,27 +7444,27 @@ side.addEventListener('click', (ev) => {
     // Split the squadron stack off into its own fast strike fleet (SQ-1.1).
     const f = selFleet ? s.fleets[selFleet] : undefined;
     if (fleetCanLaunchSquadron(f)) {
-      playerOrder(splitFleet(ME, f!.id, squadronTake(f!)));
+      playerOrder(splitFleet(ME, f!.id, squadronTake(f!, data)));
       note(t('hint.squadron-launched'));
     }
   } else if (act === 'squadronstrike') {
     // Squadron free-space strike: arm the aim mode to pick an enemy fleet in range.
     const f = selFleet ? s.fleets[selFleet] : undefined;
-    if (isWing(f, ME) && wingCanAct(f)) {
+    if (isWing(f, ME, fleetHasSquadron(f, data)) && wingCanAct(f)) {
       squadronStrikeAim = selFleet;
       note(t('hint.squadron-strike-aim'));
     }
   } else if (act === 'squadronreturn') {
     // Squadron return to base: fly back to the carrier in free space.
     const f = selFleet ? s.fleets[selFleet] : undefined;
-    if (isWing(f, ME) && wingCanReturn(f)) {
+    if (isWing(f, ME, fleetHasSquadron(f, data)) && wingCanReturn(f)) {
       playerOrder(makeAction(ME, 'squadron.return', { fleetId: f!.id }));
       note(t('hint.squadron-returning'));
     }
   } else if (act === 'squadronpatrol') {
     // Toggle CC-4 standing patrol for this squadron fleet.
     const f = selFleet ? s.fleets[selFleet] : undefined;
-    if (isWing(f, ME) && wingCanAct(f)) {
+    if (isWing(f, ME, fleetHasSquadron(f, data)) && wingCanAct(f)) {
       setScramble([f!.id], !patrolOf(f!.id));
     }
   }
@@ -7849,7 +7849,7 @@ cmdbar.addEventListener('click', (ev) => {
     if (on) note(t('hint.auto-assault'));
   } else if (cmd === 'qscramble') {
     // SO-UI: the CC-4 «дежурный вылет», group-uniform over the squadron fleets.
-    const wings = ids.filter((id) => fleetHasSquadron(s.fleets[id]));
+    const wings = ids.filter((id) => fleetHasSquadron(s.fleets[id], data));
     const on = !wings.every((id) => patrolOf(id));
     setScramble(wings, on);
     if (on) note(t('hint.standing-sortie'));

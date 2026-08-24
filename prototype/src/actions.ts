@@ -173,7 +173,7 @@ export const marketList = (
 // REFP-22 (остаток): the second, scattered builder batch — the state it was
 // interleaved with in game.ts has since been extracted (patrol REFP-23, chains
 // REFP-8, divisions REFP-13, market REFP-12), leaving pure leaf builders.
-import type { SortieState } from './squadron';
+import type { SortieState } from '../../packages/shared-core/src/index';
 import type { ChainStep } from './chain';
 /** The patrol driver's runtime stamp: burned fuel / ticked rearm / next cadence mark. */
 export const patrolStamp = (

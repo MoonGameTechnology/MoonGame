@@ -93,14 +93,14 @@ export {
   spendSortie,
   tickRearm,
   fleetHasSquadron,
-  isWing,
-  wingCanAct,
-  wingCanReturn,
   squadronStrikeRange,
   withinRange,
   squadronReaches,
   type SortieState,
-} from './squadron';
+} from '../../packages/shared-core/src/index';
+// Предикаты «действующего крыла» — сторона КЛИЕНТА, а не правило мира, поэтому они
+// не в ядре, а в общем пакете решений, откуда их видит и `packages/client` (CONV-5).
+export { isWing, wingCanAct, wingCanReturn, type WingFleet } from '../../decisions/wingOrders';
 export {
   fleetIdle,
   validateChainSteps,

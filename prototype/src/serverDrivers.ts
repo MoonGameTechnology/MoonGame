@@ -3,7 +3,8 @@
  * auto-storm, CC-1 order chains, and CC-4 reactive patrols. Extracted from
  * `game.ts` (REFP-24): depends on `fleetIdle`/`ChainStep`/`FleetChain`
  * (`chain.ts`, REFP-8), `Patrol`/`scrambleOrder` (`patrol.ts`, REFP-23),
- * `SortieState`/`sortieSpec`/`tickRearm`/`fleetHasSquadron` (`squadron.ts`,
+ * `SortieState`/`sortieSpec`/`tickRearm`/`fleetHasSquadron` (ядро,
+ * `state/squadron.ts` — CONV-5,
  * REFP-7), and the action builders `moveFleet`/`orbitFleet`/`assaultFleet`/
  * `barrageFleet`/`castHeroAbility` (`actions.ts`, REFP-22/24). Pure — a host
  * (`main.ts`'s frame loop, or NET's `standingOrders`/`chain` modules) applies
@@ -22,7 +23,12 @@ import { data } from './prototypeData';
 import { canOrderAll } from './protoKernel';
 import { fleetIdle, type ChainStep, type FleetChain } from './chain';
 import { scrambleOrder, type Patrol } from './patrol';
-import { sortieSpec, tickRearm, fleetHasSquadron, type SortieState } from './squadron';
+import {
+  sortieSpec,
+  tickRearm,
+  fleetHasSquadron,
+  type SortieState,
+} from '../../packages/shared-core/src/index';
 import { moveFleet, orbitFleet, assaultFleet, barrageFleet, castHeroAbility } from './actions';
 
 const HOUR = 3_600_000;
@@ -242,11 +248,11 @@ export function serverPatrolActions(
   for (const fid of Object.keys(patrols).sort()) {
     const p = patrols[fid]!;
     const f = state.fleets[fid];
-    if (!f || !fleetHasSquadron(f)) {
+    if (!f || !fleetHasSquadron(f, data)) {
       out.push({ fleetId: fid, owner: f?.owner ?? '', actions: [], drop: true });
       continue;
     }
-    const spec = sortieSpec(f);
+    const spec = sortieSpec(f, data);
     // Rearm cadence: one round per game-hour past `rearmAt` (absolute stamps — no
     // wall-clock drift, works however rarely the offline room wakes).
     let sortie = p.sortie;
