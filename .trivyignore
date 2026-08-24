@@ -20,6 +20,16 @@
 #
 # Reviewed 2026-08-20: +1 libssl3t64 EVP_Cipher/AEAD entry below (CVE-2026-75803). Same
 # base image digest again, so the earlier entries were not re-verified individually.
+#
+# Reviewed 2026-08-24 (SEC-24): +1 libc6 tdelete entry below (CVE-2026-19542). The FIRST
+# review at which the base image digest actually MOVED: the `nonroot` tag now resolves to
+# sha256:22d2f048…, no longer to the sha256:939d6f16… pinned in the Dockerfile. That rebuild
+# is NOT a remediation — both images ship the same libc6 2.41-12+deb13u3, libssl3t64
+# 3.5.6-1~deb13u2 and zlib1g 1:1.3.dfsg+really1.3.1-1+b1 (read straight out of
+# /var/lib/dpkg/status.d in both amd64 manifests, pulled from gcr.io on 2026-08-24). So the
+# "nothing to bump to" verdict of every entry below still holds on substance — but their
+# wording "the tag still resolves to the pinned digest" no longer does. Bumping the pin and
+# re-verifying the suppressions against the new base is separate work (SEC-25).
 
 # libc6 2.41-12+deb13u3 — MEDIUM, no fixed version published for trixie yet.
 CVE-2026-5435
@@ -87,3 +97,27 @@ CVE-2026-14456
 # Re-review 2026-09-03 — or sooner, as soon as Debian publishes a fix or the base image
 # digest is bumped. If a fix appears, this entry is REMOVED, not extended.
 CVE-2026-75803
+
+# libc6 2.41-12+deb13u3 — severity UNKNOWN (Debian has not scored it) and "(no fixed
+# version)". glibc, "Out-of-bounds stack array access in tdelete" — the POSIX binary-search-
+# tree API (<search.h>: tsearch/tfind/tdelete/twalk).
+# `main` went red WITHOUT a code change, and this time that is provable without a re-run:
+# the very same commit 671c03f6 was scanned GREEN by the push run 32628248009 (2026-08-23
+# 08:26 UTC) and RED by the weekly scheduled run 32695151718 (2026-08-24 05:53 UTC). Only
+# the CVE feed moved between them — which is exactly what the weekly re-scan of `main`
+# exists to catch. Because `trivy image` runs without --severity, this single unscored row
+# closed the merge queue for the whole repository again (#777, a docs-only PR, was the one
+# left blocked).
+# Suppressed NOT because the finding was judged harmless, but because there is nothing to
+# fix: no fixed libc6 is published for trixie (Trivy's Fixed Version column is empty), and
+# the rebuilt base image does not carry one either — see the 2026-08-24 review note above.
+# What was verified directly: nothing in this repo uses the tsearch/tdelete family (it is a
+# C API, and there is no reference to it anywhere in packages/ or prototype/), and the
+# runtime is distroless — no shell, no C tooling to reach it another way. What could NOT be
+# verified: the advisory text itself (security-tracker.debian.org, api.osv.dev and
+# avd.aquasec.com are all blocked by the dev environment's egress proxy), so a glibc-
+# INTERNAL caller of tdelete cannot be ruled out from here. The risk is therefore accepted
+# for a SHORT window, not open-endedly.
+# Re-review 2026-09-07 — or sooner, as soon as Debian publishes a fix. If a fix appears,
+# this entry is REMOVED, not extended.
+CVE-2026-19542
