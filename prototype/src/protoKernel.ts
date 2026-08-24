@@ -37,6 +37,7 @@ import {
   taxModule,
   capitalModule,
   scientistModule,
+  standingOrdersModule,
   type GameModule,
   type GameState,
   type Action,
@@ -48,7 +49,6 @@ import { hungerModule } from './hunger';
 import { fleetLaunchModule } from './fleetLaunch';
 import { botDiplomacyModule } from './botDiplomacy';
 import { marketModule } from './sessionMarket';
-import { standingOrdersModule } from './standingOrders';
 
 export const MODULES: GameModule[] = [
   sectorModule,

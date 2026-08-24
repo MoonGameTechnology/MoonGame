@@ -2,7 +2,8 @@
  * Standing orders — CC-2 auto-storm (`order.auto`) and CC-4 дежурный вылет
  * (`order.scramble` + the server-only `patrol.stamp`), plus CC-1 order chains
  * (`order.chain` + the server-only `chain.stamp`). Port of the prototype's
- * `standingOrdersModule` (`prototype/src/standingOrders.ts`, REFP-15).
+ * `standingOrdersModule` (REFP-15); since CONV-7 that copy is gone and this is the
+ * only implementation — the prototype loads this module and keeps only its DRIVERS.
  *
  * This module only stores/validates the player's INTENT and garbage-collects it
  * for dead fleets (`time.advanced`). The actual driver — scrambling a patrol wing

@@ -106,7 +106,10 @@ describe('order.chain — setting the plan (fail-secure)', () => {
 
   it('rejects foreign and unknown fleets with opaque codes', () => {
     const s = stateWith([fleet('F', { owner: 'red' })]);
-    expect(rej(kernel.applyAction(s, orderChain('green', 'F', []), ctx()))).toBe('E_FORBIDDEN');
+    // Код ОДИН на оба случая — иначе он же и есть ответ на «а есть ли у соседа флот
+    // с таким id» (A06). Копия прототипа отдавала `E_FORBIDDEN` на чужой флот, то есть
+    // была не такой опаковой, как обещало название теста; CONV-7 снял копию.
+    expect(rej(kernel.applyAction(s, orderChain('green', 'F', []), ctx()))).toBe('E_NO_FLEET');
     expect(rej(kernel.applyAction(s, orderChain('green', 'NOPE', []), ctx()))).toBe('E_NO_FLEET');
   });
 
@@ -300,17 +303,22 @@ describe('serverChainActions — the pure driver core', () => {
 
   it('validateChainSteps is the single gate both actions share', () => {
     const s = stateWith([fleet('F')]);
-    expect(validateChainSteps([{ kind: 'move', to: 'B' }], s)).toEqual([{ kind: 'move', to: 'B' }]);
-    expect(validateChainSteps([{ kind: 'move', to: 'GHOST' }], s)).toBeNull();
+    // CONV-7: каталог способностей приходит АРГУМЕНТОМ (`ctx.data.heroAbilities`), а не
+    // замыканием на `prototypeData` — копии прототипа больше нет.
+    const ab = data.heroAbilities;
+    expect(validateChainSteps([{ kind: 'move', to: 'B' }], s, ab)).toEqual([
+      { kind: 'move', to: 'B' },
+    ]);
+    expect(validateChainSteps([{ kind: 'move', to: 'GHOST' }], s, ab)).toBeNull();
     // ability: a catalog id is kept (+ optional target, smuggled keys stripped);
     // an unknown ability id is garbage — the same gate as an unknown world.
-    expect(validateChainSteps([{ kind: 'ability', abilityId: 'corridor' }], s)).toEqual([
+    expect(validateChainSteps([{ kind: 'ability', abilityId: 'corridor' }], s, ab)).toEqual([
       { kind: 'ability', abilityId: 'corridor' },
     ]);
     expect(
-      validateChainSteps([{ kind: 'ability', abilityId: 'corridor', target: 'B', hack: 1 }], s),
+      validateChainSteps([{ kind: 'ability', abilityId: 'corridor', target: 'B', hack: 1 }], s, ab),
     ).toEqual([{ kind: 'ability', abilityId: 'corridor', target: 'B' }]);
-    expect(validateChainSteps([{ kind: 'ability', abilityId: 'ghost_skill' }], s)).toBeNull();
+    expect(validateChainSteps([{ kind: 'ability', abilityId: 'ghost_skill' }], s, ab)).toBeNull();
   });
 });
 

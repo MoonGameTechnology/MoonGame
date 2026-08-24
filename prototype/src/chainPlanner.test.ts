@@ -16,7 +16,11 @@ import {
   type ChainDraft,
   type ChainPoint,
 } from './chainPlanner';
-import { MAX_CHAIN_STEPS, MAX_CHAIN_WAIT_HOURS, type ChainStep } from './chain';
+import {
+  MAX_CHAIN_STEPS,
+  MAX_CHAIN_WAIT_HOURS,
+  type ChainStep,
+} from '../../packages/shared-core/src/index';
 
 beforeAll(() => setLocale('ru')); // под Node рантайм иначе фолбэчится в EN
 

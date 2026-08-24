@@ -174,7 +174,7 @@ export const marketList = (
 // interleaved with in game.ts has since been extracted (patrol REFP-23, chains
 // REFP-8, divisions REFP-13, market REFP-12), leaving pure leaf builders.
 import type { SortieState } from '../../packages/shared-core/src/index';
-import type { ChainStep } from './chain';
+import type { ChainStep } from '../../packages/shared-core/src/index';
 /** The patrol driver's runtime stamp: burned fuel / ticked rearm / next cadence mark. */
 export const patrolStamp = (
   playerId: string,

@@ -108,9 +108,9 @@ export {
   MAX_CHAIN_WAIT_HOURS,
   type ChainStep,
   type FleetChain,
-} from './chain';
+} from '../../packages/shared-core/src/index';
 export { patrolTarget, scrambleOrder, type Patrol } from './patrol';
-export { standingOrdersModule } from './standingOrders';
+export { standingOrdersModule } from '../../packages/shared-core/src/index';
 export {
   FORCED_MARCH_MULT,
   FORCED_MARCH_WEAR,

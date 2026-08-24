@@ -21,7 +21,7 @@ import {
 } from '../../packages/shared-core/src/index';
 import { data } from './prototypeData';
 import { canOrderAll } from './protoKernel';
-import { fleetIdle, type ChainStep, type FleetChain } from './chain';
+import { fleetIdle, type ChainStep, type FleetChain } from '../../packages/shared-core/src/index';
 import { scrambleOrder, type Patrol } from './patrol';
 import {
   sortieSpec,
