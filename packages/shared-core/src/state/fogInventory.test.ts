@@ -289,7 +289,7 @@ function maximalState(): GameState {
       [VIEWER]: [{ kind: 'planet', target: 'A', until: 900 }],
       [RIVAL]: [{ kind: 'planet', target: 'CANARY_target', until: 900 }],
     },
-    market: [{ id: 'm1', seller: RIVAL, resource: 'metal', amount: 5, price: 3 }],
+    market: [{ id: 'm1', side: 'sell', owner: RIVAL, resource: 'metal', amount: 5, price: 3 }],
     marketSeq: 1,
     capital: { [VIEWER]: 'A', [RIVAL]: 'Z' },
     autoAssault: { mine: true, CANARY_fleet: true },

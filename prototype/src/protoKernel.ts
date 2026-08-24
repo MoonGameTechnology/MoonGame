@@ -39,6 +39,7 @@ import {
   scientistModule,
   standingOrdersModule,
   fleetOpsModule,
+  marketModule,
   type GameModule,
   type GameState,
   type Action,
@@ -49,7 +50,6 @@ import { data } from './prototypeData';
 import { hungerModule } from './hunger';
 import { autoRallyModule } from './autoRally';
 import { botDiplomacyModule } from './botDiplomacy';
-import { marketModule } from './sessionMarket';
 
 export const MODULES: GameModule[] = [
   sectorModule,

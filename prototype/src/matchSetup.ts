@@ -311,8 +311,10 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
     shipLoadouts[seat.id] = !seat.ai && setup.ships ? setup.ships : DEFAULT_SHIP_LOADOUTS;
     capital[seat.id] = seat.start; // capital defaults to the homeworld; re-designatable in-match
   }
-  // `heroRoster` / `shipLoadouts` / `approval` / `sessionMarket` are prototype-only
-  // state (preserved by deepClone); cast past GameState's shape.
+  // `heroRoster` / `shipLoadouts` / `approval` are prototype-only state (preserved by
+  // deepClone); cast past GameState's shape. The market's own keys are NOT seeded here
+  // anymore: с CONV-9 книга — это ядерный `state.market`, и модуль заводит её сам при
+  // первой заявке (`??= []`), как и до сведения делало ядро.
   return {
     ...base,
     players,
@@ -321,8 +323,6 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
     heroes,
     diplomacy,
     approval,
-    sessionMarket: [],
-    sessionMarketSeq: 0,
     heroRoster,
     shipLoadouts,
     capital,

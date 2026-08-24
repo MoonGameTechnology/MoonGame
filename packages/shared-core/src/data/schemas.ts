@@ -723,6 +723,22 @@ export const GameModeDefSchema = z.object({
   pve: ModePveSchema.optional(),
 });
 
+/** Session-market rules that belong to CONTENT, not to the mechanic (CONV-9).
+ *
+ *  `goods` — what may be listed at all. The prototype kept this whitelist as a
+ *  `MARKET_GOODS` constant inside its module, which made "what is tradable" a code
+ *  change; the core traded any declared resource, which on the prototype's catalog
+ *  would have opened credits-for-credits trading. Declaring it here settles both:
+ *  a new tradable good is a data edit, and the currency simply isn't on the list.
+ *
+ *  An EMPTY list means "no whitelist" — every declared resource is tradable. That is
+ *  the core's historical behaviour, so catalogs that say nothing keep working. */
+export const MarketDefSchema = z
+  .object({
+    goods: z.array(z.string()).default([]),
+  })
+  .strict();
+
 export const GameDataSchema = z.object({
   version: z.string(),
   resources: z.array(z.string()).min(1),
@@ -746,8 +762,10 @@ export const GameDataSchema = z.object({
   // per-field defaults stay the single source of truth (no literal to drift).
   rewards: RewardsDefSchema.prefault({}),
   researchBoost: ResearchBoostDefSchema.prefault({}),
+  market: MarketDefSchema.prefault({}),
 });
 
+export type MarketDef = z.infer<typeof MarketDefSchema>;
 export type ResourceBag = z.infer<typeof ResourceBagSchema>;
 export type UnitStats = z.infer<typeof UnitStatsSchema>;
 export type UnitDef = z.infer<typeof UnitDefSchema>;

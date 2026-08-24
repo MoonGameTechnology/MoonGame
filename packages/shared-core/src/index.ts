@@ -21,6 +21,7 @@ export {
   type Hero,
   type TempLane,
   type MarketOrder,
+  type MarketSide,
   type Fleet,
   type FleetMovement,
   type FleetEdge,
@@ -440,6 +441,11 @@ export {
 } from './modules/steward';
 export { effectsModule, type EffectImpl, type EffectOccurrence } from './modules/effects';
 export { defHasTrait, unitHasTrait, stacksHaveTrait } from './data/traits';
-export { marketModule } from './modules/market';
+export {
+  marketModule,
+  isTradable,
+  MARKET_COMMISSION,
+  type MarketEmbargoCapability,
+} from './modules/market';
 export { espionageModule } from './modules/espionage';
 export { diplomacyModule } from './modules/diplomacy';

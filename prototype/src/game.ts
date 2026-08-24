@@ -64,12 +64,11 @@ export {
 export { HUNGER_MULT, hungerModule } from './hunger';
 export { economySnapshot, netIncome, hpOfLevel } from './economy';
 export {
-  MARKET_GOODS,
-  MARKET_FEE,
-  marketLots,
+  MARKET_COMMISSION,
+  isTradable,
   type MarketSide,
-  type MarketLot,
-} from './sessionMarket';
+  type MarketOrder,
+} from '../../packages/shared-core/src/index';
 export {
   REPAIR_HP_PER_METAL,
   dockRepairCost,

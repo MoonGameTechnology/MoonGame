@@ -26,6 +26,7 @@ import heroSkillTrees from '../../../data/heroSkillTrees.json';
 import heroFittings from '../../../data/heroFittings.json';
 import modes from '../../../data/modes.json';
 import rewards from '../../../data/rewards.json';
+import market from '../../../data/market.json';
 import skirmishMap from '../../../data/maps/skirmish-1.json';
 import pveMap from '../../../data/maps/pve-1.json';
 
@@ -52,6 +53,7 @@ export const FRAGMENTS: Record<string, unknown> = {
   'heroFittings.json': heroFittings,
   'modes.json': modes,
   'rewards.json': rewards,
+  'market.json': market,
 };
 
 /** The validated shipped content bundle, composed in the browser via the shared loader. */

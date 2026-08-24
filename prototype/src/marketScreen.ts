@@ -3,7 +3,7 @@
  * lots (asks) and buy lots (bids) per tradeable good, one tab each. You place your
  * own, or take a rival's.
  *
- * `sessionMarket.ts` next door is the MODEL (the kernel module, escrow, the fee);
+ * `marketModule` ядра — это МОДЕЛЬ (эскроу, комиссия, книга; CONV-9 снял копию);
  * `actions.ts` builds the orders. This is the window: markup + the two bits of view
  * state the box owns (which good is open, which side the form is composing).
  *
@@ -14,7 +14,7 @@
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { t } from '../../localization/runtime';
 import { esc, curIc } from './format';
-import { marketLots, MARKET_FEE } from './sessionMarket';
+import { MARKET_COMMISSION } from '../../packages/shared-core/src/index';
 import { marketList, marketTake, marketCancel } from './actions';
 import { houseDisplayName } from './setupSeats';
 
@@ -35,9 +35,9 @@ export type MarketSide = 'sell' | 'buy';
  *  escrow you post now). Pure — the wiring only feeds it the two input values. */
 export function netNoteText(side: MarketSide, amount: number, price: number): string {
   const gross = amount * price;
-  const pct = Math.round(MARKET_FEE * 100);
+  const pct = Math.round(MARKET_COMMISSION * 100);
   return side === 'sell'
-    ? t('market.net-after-fee', { p: pct, n: Math.floor(gross * (1 - MARKET_FEE)) })
+    ? t('market.net-after-fee', { p: pct, n: Math.floor(gross * (1 - MARKET_COMMISSION)) })
     : t('market.escrow-note', { n: Math.ceil(gross), p: pct });
 }
 
@@ -54,7 +54,7 @@ export function marketBoxHtml(
   // Имя дома в состоянии — английское имя ДАННЫХ (одно на всех, локаль у каждого своя),
   // поэтому переводится на месте показа; ник живого игрока проходит насквозь (AUD-14).
   const nameOf = (id: string): string => esc(houseDisplayName(state.players[id]?.name ?? id));
-  const lots = marketLots(state);
+  const lots = state.market ?? [];
   const asks = lots
     .filter((l) => l.side === 'sell' && l.resource === tab)
     .sort((a, b) => a.price - b.price);
@@ -64,7 +64,7 @@ export function marketBoxHtml(
   const lotRow = (l: (typeof lots)[number], bid: boolean): string => {
     const mine = l.owner === me;
     // ECON-4: получатель кредитов получает net (5% сгорает) — в биде это исполнитель.
-    const takerNet = Math.floor(l.amount * l.price * (1 - MARKET_FEE));
+    const takerNet = Math.floor(l.amount * l.price * (1 - MARKET_COMMISSION));
     const qp = `<span class="mk-qp"><b>${l.amount}</b> ${curIc(l.resource)} @ ${l.price} ${curIc('credits')}${
       bid && !mine
         ? ` <span class="mk-net">→ ${takerNet} ${curIc('credits')}</span>`

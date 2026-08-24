@@ -36,7 +36,7 @@ describe('MetricsAggregator (M1)', () => {
         kind: 'action',
         actionId: 'a3',
         playerId: 'p1',
-        type: 'market.buy',
+        type: 'market.take',
         ok: false,
         seq: 3,
         code: 'E_FORBIDDEN',
@@ -48,7 +48,7 @@ describe('MetricsAggregator (M1)', () => {
       total: 3,
       ok: 2,
       rejected: 1,
-      byType: { 'fleet.move': 2, 'market.buy': 1 },
+      byType: { 'fleet.move': 2, 'market.take': 1 },
       rejectByCode: { E_FORBIDDEN: 1 },
     });
   });

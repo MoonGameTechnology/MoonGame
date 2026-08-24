@@ -157,8 +157,14 @@ export const DEV_MODULES: GameModule[] = [
  *  match's `version.manifest` and checked back on load (`serverWiring.ts`) — a match
  *  created under an older manifest must not silently resume on a different module
  *  graph (same fail-secure posture as `dataHash`, MP-4). Bump this alongside any
- *  `DEV_MODULES` edit. */
-export const MODULE_MANIFEST_VERSION = '6'; // seatClaimModule added (ENTRY-3 — заявка на место)
+ *  `DEV_MODULES` edit.
+ *
+ *  Bump it ALSO when a module changes the SHAPE it persists, even though membership
+ *  and order are untouched: the guard exists so a match cannot resume on rules that
+ *  differ from the ones it started with, and a reducer that now reads `owner` where
+ *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
+ *  cheap, honest outcome; silently misreading the book is not. */
+export const MODULE_MANIFEST_VERSION = '7'; // marketModule: двусторонняя книга (CONV-9)
 
 export interface DevMatchOptions {
   /** Match/room id (default `'dev'`). Distinct ids let a registry hold many matches. */

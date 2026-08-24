@@ -160,7 +160,7 @@ export const orderScramble = (playerId: string, fleetId: string, on: boolean) =>
 // Market listing, pulled ahead of the REFP-22 remainder for the same reason as the
 // standing-order toggles above: `aiOrders` (ai.ts, REFP-26) places lots and must not
 // import the facade back. Leaf builder — only the `MarketSide` type rides along.
-import type { MarketSide } from './sessionMarket';
+import type { MarketSide } from '../../packages/shared-core/src/index';
 /** List an open lot on the session market (sell `amount` at `price`, or a buy bid). */
 export const marketList = (
   playerId: string,

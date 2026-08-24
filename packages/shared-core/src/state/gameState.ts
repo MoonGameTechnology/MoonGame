@@ -652,12 +652,23 @@ export interface PatrolEntry {
   rearmAt?: number;
 }
 
-/** A standing sell order on the session market: the `seller` has escrowed `amount`
- *  of `resource` (deducted from their treasury) and offers it at `price` money per
- *  unit. Filled (partially) by `market.buy`; the remainder is refunded on cancel. */
+/** Which side of the book a standing order sits on (CONV-9). */
+export type MarketSide = 'sell' | 'buy';
+
+/** A standing order on the session market. Both sides ESCROW up front, so nothing
+ *  on the book can be double-spent:
+ *
+ *   - `sell` — the owner escrowed `amount` of `resource` and wants credits for it;
+ *   - `buy`  — the owner escrowed `amount × price` credits and wants the goods.
+ *
+ *  Filled (partially) by `market.take`; the remainder is refunded on cancel. The
+ *  book used to be sell-only here and two-sided in the prototype's copy — CONV-9
+ *  merged them, taking the richer shape. */
 export interface MarketOrder {
   id: string;
-  seller: PlayerId;
+  side: MarketSide;
+  /** Who placed it and whose escrow is held (was `seller` while the book was sell-only). */
+  owner: PlayerId;
   resource: ResourceId;
   /** Remaining units on offer (escrowed). */
   amount: number;
