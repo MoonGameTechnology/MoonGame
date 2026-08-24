@@ -44,16 +44,16 @@ export function ownHeroes(state: GameState, me: string): HeroInst[] {
 }
 
 /**
- * What to CALL a hero on screen (AUD-12). One state field, `name`, carries two
- * different things, and telling them apart is the whole job:
+ * What to CALL a hero on screen (AUD-12, tightened by AUD-13). The two kinds of hero
+ * are named from two different places, and telling them apart is the whole job:
  *
- * - the MAIN hero is named after its seat (`matchSetup`): the commander's callsign in a
- *   network match, the house name in a solo one. Neither is a localization key —
- *   `houseDisplayName` translates the house and lets a callsign through untouched;
- * - every other hero carries the roster KEY (`hero.arch.destroyer`), so it must be
- *   translated — rendered raw, the player reads the key itself. The archetype's catalog
- *   name is the same text and is what the selector chips already show, so the header
- *   takes it from there and the two can't drift.
+ * - the MAIN hero is named after its SEAT (`matchSetup` writes `name`): the commander's
+ *   callsign in a network match, the house id in a solo one. Neither is a localization
+ *   key — `houseDisplayName` translates the house and lets a callsign through untouched;
+ * - every other hero is nameless in the state (AUD-13: display text can't live in
+ *   `GameState` — one state, one locale per viewer) and is named from its ARCHETYPE,
+ *   the same catalog text the selector chips show, so header and chips can't drift.
+ *   The `hero.id` fallback below is the broken-data path only.
  */
 export function heroDisplayName(hero: HeroInst): string {
   const fallback = hero.name ?? hero.id;
