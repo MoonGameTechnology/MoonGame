@@ -1778,6 +1778,9 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #connect .mname{font-size:13px;color:var(--txt,#dfeef2);text-transform:capitalize;}
 #connect .mname .mid{font-size:10px;color:var(--dim);letter-spacing:.5px;text-transform:none;margin-left:6px;}
 #connect .mmeta{margin-top:3px;font-size:11px;color:var(--dim);}
+#connect .mmeta .mmode{font-size:10px;letter-spacing:.06em;padding:1px 5px;border-radius:3px;border:1px solid currentColor;}
+#connect .mmeta .mmode.pve{color:var(--amber,#e0a942);}
+#connect .mmeta .mmode.pvp{color:var(--cyan-dim,#6cc);}
 #connect .mmeta .mwin{color:var(--cyan-dim,#6cc);}
 #connect .mmeta .mwin.soon{color:var(--amber,#e0a942);}
 #connect .mmeta .mwin.shut{color:var(--dim);text-decoration:line-through;}

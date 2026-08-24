@@ -3,10 +3,12 @@ import {
   ENTRY_UNBOUNDED_MS,
   fmtJoinWindow,
   joinWindow,
+  modeLabel,
   rowAction,
   ruleSummary,
   type MatchTab,
 } from './matchRow';
+import { tData } from '../../localization/runtime';
 
 const HOUR = 3_600_000;
 const DAY = 24 * HOUR;
@@ -96,5 +98,39 @@ describe('строка матча — вторая кнопка', () => {
   it('свой активный прячут, архивный возвращают', () => {
     expect(rowAction('active')).toBe('archive');
     expect(rowAction('archived')).toBe('restore');
+  });
+});
+
+describe('строка матча — режим партии', () => {
+  it('СТАРЫЙ СЕРВЕР (режима нет) — строка молчит, а не выдумывает', () => {
+    expect(modeLabel({})).toEqual({ kind: 'none' });
+  });
+
+  it('режим со значком вида: PvE и PvP различимы', () => {
+    expect(modeLabel({ modeId: 'pve_waves', kind: 'pve' })).toEqual({
+      kind: 'shown',
+      modeId: 'pve_waves',
+      badge: 'pve',
+    });
+    expect(modeLabel({ modeId: 'standard', kind: 'pvp' })).toEqual({
+      kind: 'shown',
+      modeId: 'standard',
+      badge: 'pvp',
+    });
+  });
+
+  it('НЕИЗВЕСТНЫЙ ВИД НЕ ВРЁТ «PVP»: режим назван, значка нет', () => {
+    // Живой случай, а не теория: прото-хост зовёт `new MatchRegistry(accountStore)`
+    // БЕЗ каталога, поэтому `kind` не считается вовсе (BRW-1). Имя режима сервер при
+    // этом прислал — прятать его было бы потерей того, что он честно сказал.
+    expect(modeLabel({ modeId: 'pve_waves' })).toEqual({ kind: 'shown', modeId: 'pve_waves' });
+  });
+
+  it('ИМЯ РЕЖИМА БЕРЁТСЯ ПО id ЧЕРЕЗ tData — сцепка id→ключ локали держится', () => {
+    // На строке нет `name` — сервер шлёт только id. Работает это лишь потому, что
+    // `dataKey()` превращает `pve_waves` в тот же `data.pve-waves`, что и имя
+    // «PvE Waves» из data/modes.json. Разъедется — игрок увидит сырой id.
+    expect(tData('pve_waves')).not.toBe('pve_waves');
+    expect(tData('standard')).not.toBe('standard');
   });
 });
