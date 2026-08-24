@@ -409,7 +409,7 @@ export { technologyModule, technologyLock, conditionMet } from './modules/techno
 export { scientistModule, scientistSlotBonus } from './modules/scientist';
 export { factionModule } from './modules/faction';
 export { armyModule } from './modules/army';
-export { fleetOpsModule } from './modules/fleetOps';
+export { fleetOpsModule, nextFleetSeq, type FleetSeqState } from './modules/fleetOps';
 export { squadronModule } from './modules/squadron';
 export { capitalModule, capitalsOf, capitalOf } from './modules/capital';
 export { standingOrdersModule } from './modules/standingOrders';

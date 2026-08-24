@@ -16,7 +16,7 @@ import type { Action, ApplyResult, Context } from '../action/types';
 // fleetOps — the missing link between "built" (constructionModule fills a
 // planet's garrison) and "playable" (a fleet that can move/fight): the core
 // had no handler for fleet.launch/merge/split at all before this module.
-// Port of the prototype's proven `fleetLaunchModule` (prototype/src/fleetLaunch.ts),
+// Был портом прототипного `fleetLaunchModule` (REFP-10); с CONV-8 копии нет,
 // adapted for canon: `domain: 'ground'` (not a trait, unlike the prototype's
 // data), `ownFleet` (own-key lookup, A06/A08) for untrusted payload ids, no
 // division-carrier re-pointing on merge (canon has no division concept).
@@ -56,20 +56,37 @@ const data: GameData = parseGameData({
   factions: {},
   buildings: {},
   events: {},
+  modules: {
+    plating: {
+      name: 'P',
+      slot: 'defense',
+      tag: 'vertical',
+      effects: { stats: { hp: 12 } },
+      cost: { metal: 50 },
+    },
+  },
 });
 const ctx: Context = { now: 0, data };
 
 function player(id: string): Player {
   return { id, name: id, faction: 'x', status: 'active', resources: {} };
 }
-function planet(id: string, owner: string | null, garrison: Array<[string, number]> = []): Planet {
+function planet(
+  id: string,
+  owner: string | null,
+  garrison: Array<[string, number, string[]?]> = [],
+): Planet {
   return {
     id,
     owner,
     position: { x: 0, y: 0 },
     resources: {},
     buildings: [],
-    garrison: garrison.map(([unit, count]) => ({ unit, count })),
+    garrison: garrison.map(([unit, count, modules]) => ({
+      unit,
+      count,
+      ...(modules ? { modules } : {}),
+    })),
     traits: [],
   };
 }
@@ -191,6 +208,21 @@ describe('fleetOps — fleet.launch (scramble a garrison into a mobile fleet)', 
       ]),
     );
     expect(r.events.map((e) => e.type)).toContain('fleet.launched');
+  });
+
+  // Оснащение куплено за металл при постройке и приварено к стеку. Подъём гарнизона —
+  // перенос тех же кораблей в новый флот, а не перековка: копия прототипа собирала стек
+  // заново из `unit`+`count` и молча теряла `modules`, то есть корабли выходили на орбиту
+  // без того, за что игрок заплатил (CONV-8).
+  it('carries the paid loadout aboard — launch moves ships, it does not re-forge them', () => {
+    const kernel = createKernel([fleetOpsModule]);
+    const s = stateWith({
+      players: [player('p1')],
+      planets: [planet('A', 'p1', [['cruiser', 2, ['plating']]])],
+    });
+    const r = okApply(kernel.applyAction(s, launch('A'), ctx));
+    const f = r.state.fleets[Object.keys(r.state.fleets)[0]!]!;
+    expect(f.units).toEqual([{ unit: 'cruiser', count: 2, modules: ['plating'] }]);
   });
 
   it('rejects a bad payload, a foreign/missing planet, and someone else\'s world', () => {

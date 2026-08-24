@@ -84,7 +84,8 @@ export {
 } from '../../packages/shared-core/src/index';
 
 // --- fleets, squadrons, standing orders --------------------------------------
-export { fleetLaunchModule } from './fleetLaunch';
+export { fleetOpsModule } from '../../packages/shared-core/src/index';
+export { autoRallyModule } from './autoRally';
 export {
   squadronTake,
   sortieSpec,

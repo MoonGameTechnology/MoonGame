@@ -38,6 +38,7 @@ import {
   capitalModule,
   scientistModule,
   standingOrdersModule,
+  fleetOpsModule,
   type GameModule,
   type GameState,
   type Action,
@@ -46,7 +47,7 @@ import {
 } from '../../packages/shared-core/src/index';
 import { data } from './prototypeData';
 import { hungerModule } from './hunger';
-import { fleetLaunchModule } from './fleetLaunch';
+import { autoRallyModule } from './autoRally';
 import { botDiplomacyModule } from './botDiplomacy';
 import { marketModule } from './sessionMarket';
 
@@ -80,7 +81,10 @@ export const MODULES: GameModule[] = [
   stewardModule, // «Хранитель»: delegate the seat to the AI while you sleep (gated by the Steward tech)
   armyModule,
   victoryModule, // terminal match state from authoritative state (domination / elimination / score / timeout)
-  fleetLaunchModule,
+  fleetOpsModule, // fleet.launch/merge/split/engage — модуль ЯДРА (CONV-8)
+  // CONV-8: авто-сбор построенного (BF-29) — механика прототипа, в ядре её нет,
+  // поэтому она осталась отдельным модулем рядом, а не уехала вместе с четвёркой.
+  autoRallyModule,
   diplomacyModule, // CORE D2+D3 (D4): escalation/consent offers; combat reads state.diplomacy
   espionageModule, // SPY-1 core module: espionage.spy → time-boxed intel windows (state.intel)
   botDiplomacyModule, // bots: friendly-by-default favour meter → embargo/war only when provoked
