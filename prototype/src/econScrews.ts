@@ -1,12 +1,12 @@
 /**
  * ECON-3 экспресс-ремонт за металл — сток металла: экспресс-ремонт за METAL у
  * своего дока. Extracted from `game.ts` (REFP-18): depends on `missingHull`
- * (REFP-17), `canAfford`, `payCost`, `buildingLevel`.
+ * (ядро, `util/repair.ts` — CONV-1), `canAfford`, `payCost`, `buildingLevel`.
  */
 import type { Fleet, GameData, GameModule, GameState } from '../../packages/shared-core/src/index';
 import { buildingLevel } from '../../packages/shared-core/src/index';
 import { canAfford, payCost } from '../../packages/shared-core/src/util/treasury';
-import { missingHull } from './instantRepair';
+import { missingHull } from '../../packages/shared-core/src/index';
 
 export const REPAIR_HP_PER_METAL = 2;
 

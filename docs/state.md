@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 4862 зелёных** (58 skip, 373 файла).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 4856 зелёных** (58 skip, 371 файл).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -1376,9 +1376,12 @@ grants}`), `heroFittings.json` (`{statMods, grants, cost}`). Движок ПОЛ
 **Десять механик прототип считает СВОЕЙ копией, а канонический сервер — версией ядра**
 (сверено 2026-08-24: `protoKernel.ts` `MODULES` против `scenario.ts` `DEV_MODULES`).
 Прототип уже собран на ядре `createKernel(MODULES)` и большую часть модулей берёт из
-`shared-core`, но `tax`, `capital`, `standingOrders`, `forcedMarch`, `instantRepair`,
-`sessionMarket`, `fleetLaunch`, `econScrews` и хелперы `squadron.ts` — свои (1129 строк),
-а слоты совета учёных посчитаны врезкой в `techTree.ts` вместо `scientistModule`.
+`shared-core`, но `tax`, `capital`, `standingOrders`, `sessionMarket`, `fleetLaunch`,
+`econScrews` и хелперы `squadron.ts` — свои, а слоты совета учёных посчитаны врезкой в
+`techTree.ts` вместо `scientistModule`. **CONV-1 закрыт:** `forcedMarch` и `instantRepair`
+сведены — копии удалены, оба хоста на модулях ядра; все 14 тестов прототипа прошли по
+ядру без правок (версии совпадали), а сама смена закрыла у прототипа дыру с `__proto__`
+в идентификаторе флота (`ownFleet` вместо сырого индекса).
 Заголовки соответствующих модулей ядра называют себя портами этих самых файлов
 («Port of the prototype's `taxModule`», REFP-14/-15/-16/-17/-18) — порт написали,
 оригинал не убрали. Часть копий совпадает построчно (налог, форс-марш, оба ремонта),

@@ -81,7 +81,7 @@ export {
   missingHull,
   instantRepairCost,
   instantRepairModule,
-} from './instantRepair';
+} from '../../packages/shared-core/src/index';
 
 // --- fleets, squadrons, standing orders --------------------------------------
 export { fleetLaunchModule } from './fleetLaunch';
@@ -111,7 +111,11 @@ export {
 } from './chain';
 export { patrolTarget, scrambleOrder, type Patrol } from './patrol';
 export { standingOrdersModule } from './standingOrders';
-export { FORCED_MARCH_MULT, FORCED_MARCH_WEAR, forcedMarchModule } from './forcedMarch';
+export {
+  FORCED_MARCH_MULT,
+  FORCED_MARCH_WEAR,
+  forcedMarchModule,
+} from '../../packages/shared-core/src/index';
 export {
   serverAutoAssaultActions,
   serverChainActions,

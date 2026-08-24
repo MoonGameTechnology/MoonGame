@@ -31,6 +31,8 @@ import {
   stewardModule,
   diplomacyModule,
   squadronModule,
+  forcedMarchModule,
+  instantRepairModule,
   type GameModule,
   type GameState,
   type Action,
@@ -45,8 +47,6 @@ import { botDiplomacyModule } from './botDiplomacy';
 import { marketModule } from './sessionMarket';
 import { capitalModule } from './capital';
 import { standingOrdersModule } from './standingOrders';
-import { forcedMarchModule } from './forcedMarch';
-import { instantRepairModule } from './instantRepair';
 import { econScrewsModule } from './econScrews';
 
 export const MODULES: GameModule[] = [
