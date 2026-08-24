@@ -10473,7 +10473,16 @@ async function openSeatPicker(matchId: string): Promise<void> {
   показать(seatView('opening'));
   if (seatpickEl) seatpickEl.style.display = 'flex';
   try {
-    const res = await fetch(seatsUrl(srv.base, matchId));
+    // ADDR-6: расклад идущей партии сервер отдаёт только её участникам, поэтому запрос
+    // обязан назвать, кто спрашивает. На хосте с учётками это сессионный JWT (через
+    // `tokenFor` — «кто ты» ходит только им, правило 1 `sessionStore.ts`), на
+    // безаккаунтном — `?nick=` внутри адреса. Токена нет — идём как аноним: открытую
+    // для входа партию сервер покажет и так, а на закрытую нам и правда нечего смотреть.
+    const pass = tokenFor(localStorage, srv.base, srv.nick);
+    const res = await fetch(
+      seatsUrl(srv.base, matchId, srv.nick),
+      pass ? { headers: { authorization: `Bearer ${pass}` } } : {},
+    );
     // Отказ и обрыв это окно показывает одинаково — см. оговорку в шапке `seatList.ts`.
     if (queryOutcome(res) !== 'ok') {
       показать(seatView('refused'));

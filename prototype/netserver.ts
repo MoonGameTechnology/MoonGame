@@ -24,6 +24,7 @@ import {
   tlsFromEnv,
   registerBrowserApi,
   registerMatchApi,
+  registerSeatsApi,
   startClockDriver,
   HEARTBEAT_MS,
   type ClockDriverHandle,
@@ -714,33 +715,59 @@ const server = createMultiplayerServer({
         return { file: logFile, total: 0, recent: [] };
       }
     });
+    // Одна проверка сессии на все аккаунтные API: подпись валидна И пароль не менялся
+    // (сброс отзывает старые сессии до того, как они займут место, SE-1.x). Стоит ВЫШЕ
+    // первого потребителя намеренно: `const` в TDZ, прочитанный при регистрации роутов,
+    // — та же ловушка, что уже ловили на `authMode` (REFM-0).
+    const identifySession = async (request: {
+      headers: Record<string, unknown>;
+    }): Promise<Identity | null> => {
+      const header = request.headers.authorization;
+      const bearer =
+        typeof header === 'string' && header.startsWith('Bearer ')
+          ? header.slice('Bearer '.length).trim()
+          : null;
+      const who = bearer ? await authCfg.verifySession!(bearer) : null;
+      return who?.ok ? liveSession(who.claim, userStore) : null;
+    };
     // REL-7: seat selection — list the match's slots (faction, name, start planet,
     // taken) so the client can render a faction picker BEFORE joining. The player
-    // chooses a slot, then POST /matches/:id/join with {slotId} reserves it.
-    app.get('/matches/:id/seats', async (request, reply) => {
-      const { id } = request.params as { id: string };
-      // Load-on-demand mirror of wsServer's pattern: a LAZY registry reloads an
-      // evicted match here; this eager MatchRegistry has no `resolve`, so the
-      // optional call is a typed no-op (kept so a lazy registry can slot in).
-      const lazyRegistry = registry as { resolve?: (id: string) => Promise<MatchRoom | undefined> };
-      const room = registry.get(id) ?? (await lazyRegistry.resolve?.(id));
-      if (!room) {
-        void reply.code(404);
-        return { error: 'E_NO_MATCH' as const };
-      }
-      const taken = new Set((await accountStore.seatedNicks(id)).map((s) => s.playerId));
-      const seats = Object.values(room.state.players).map((p) => {
-        // Find the start planet (owner === playerId, the homeworld).
-        const startPlanet = Object.values(room.state.planets).find((pl) => pl.owner === p.id);
-        return {
-          playerId: p.id,
-          name: p.name,
-          faction: p.faction,
-          start: startPlanet?.id ?? null,
-          taken: taken.has(p.id),
+    // chooses a slot, then GET /matches/:id/join?slot= reserves it.
+    // ADDR-6: WHO may read that layout is the shared route's rule (`registerSeatsApi`) —
+    // a match still open for entry serves anyone, a closed session only its own players,
+    // because `start` is the homeworld the fog hides in game. Same move as the join
+    // handshake (NETA2-7): one authorization rule, both hosts.
+    registerSeatsApi(app, {
+      seats: async (id) => {
+        // Load-on-demand mirror of wsServer's pattern: a LAZY registry reloads an
+        // evicted match here; this eager MatchRegistry has no `resolve`, so the
+        // optional call is a typed no-op (kept so a lazy registry can slot in).
+        const lazyRegistry = registry as {
+          resolve?: (id: string) => Promise<MatchRoom | undefined>;
         };
-      });
-      return { seats };
+        const room = registry.get(id) ?? (await lazyRegistry.resolve?.(id));
+        if (!room) return null;
+        const taken = new Set((await accountStore.seatedNicks(id)).map((s) => s.playerId));
+        return {
+          ended: room.state.match.status === 'ended',
+          seats: Object.values(room.state.players).map((p) => {
+            // Find the start planet (owner === playerId, the homeworld).
+            const startPlanet = Object.values(room.state.planets).find((pl) => pl.owner === p.id);
+            return {
+              playerId: p.id,
+              name: p.name,
+              faction: p.faction,
+              start: startPlanet?.id ?? null,
+              taken: taken.has(p.id),
+            };
+          }),
+        };
+      },
+      entryOpen: (id) => registry.entryOpen(id),
+      seatOf: (id, login) => accountStore.seatOf(id, login),
+      // Accounts host ⇒ a verified session names the reader; nick host ⇒ `?nick=`,
+      // which is participation, not proof (that host has no sessions to check).
+      ...(AUTH ? { identify: identifySession } : {}),
     });
     // The client self-configures: accounts mode shows the password field + goes
     // через register/login+join-token; nick mode keeps the old handshake.
@@ -763,19 +790,6 @@ const server = createMultiplayerServer({
             }
           : {}),
       });
-      // Одна проверка сессии на оба аккаунтных API: подпись валидна И пароль не менялся
-      // (сброс отзывает старые сессии до того, как они займут место, SE-1.x).
-      const identifySession = async (request: {
-        headers: Record<string, unknown>;
-      }): Promise<Identity | null> => {
-        const header = request.headers.authorization;
-        const bearer =
-          typeof header === 'string' && header.startsWith('Bearer ')
-            ? header.slice('Bearer '.length).trim()
-            : null;
-        const who = bearer ? await authCfg.verifySession!(bearer) : null;
-        return who?.ok ? liveSession(who.claim, userStore) : null;
-      };
       // Друзья (FRIENDS-1) — тот же слайс, что в проде: список и заявки живут на
       // аккаунте, поэтому вкладка «Друзья» работает и на плейтест-хосте. Присутствие
       // читается из ЖИВОГО реестра комнат: занятое место в идущем матче — «в матче».

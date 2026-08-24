@@ -173,19 +173,100 @@ export function registerOpenMatchesFeed(app: FastifyInstance, deps: OpenMatchesF
   });
 }
 
+/** One seat of a match, as the pre-join picker reads it (REL-7). */
+export interface SeatView {
+  playerId: string;
+  name: string;
+  faction: string;
+  /** The seat's homeworld id — the fog-sensitive field, see {@link registerSeatsApi}. */
+  start: string | null;
+  taken: boolean;
+}
+
+/** A match's seating, as the host knows it — independent of who is asking. */
+export interface SeatLayout {
+  seats: SeatView[];
+  /** The simulation is over: no chair here is claimable any more. */
+  ended: boolean;
+}
+
+export interface SeatsApiDeps {
+  /** The match's seat layout, or null when there is no such match. */
+  seats(matchId: string): Promise<SeatLayout | null>;
+  /** SES-2.3 entry window: may a NEWCOMER still claim a seat in this match? Unknown
+   *  match ⇒ false (fail-secure), mirroring `MatchRegistry.entryOpen`. */
+  entryOpen(matchId: string): boolean | Promise<boolean>;
+  /** The seat this login already holds in the match, or null when it holds none. */
+  seatOf(matchId: string, login: string): Promise<string | null>;
+  /** The same identity hook `registerMatchApi` takes: a verified session, or null.
+   *  Absent ⇒ the legacy `?nick=` host (see the authorization note below). */
+  identify?(request: FastifyRequest): Promise<Identity | null>;
+}
+
+/**
+ * ADDR-6 — `GET /matches/:id/seats`: the seat layout, and who may read it.
+ *
+ * The layout exists for pre-join seat picking (REL-7): before entering, a player needs
+ * to see which chairs are free, which house each belongs to and which world it starts
+ * on. For a match still open to newcomers that is public information — anyone reading it
+ * could simply join and see the same thing.
+ *
+ * Once a session is closed to newcomers the very same payload becomes intel about
+ * strangers: every player's callsign and faction, and `start` — the homeworld ids that
+ * `visibleState()` keeps behind fog in the game itself. A match id is not a secret (it
+ * rides in the `?join=` deep link, stays in the address bar during play and is listed by
+ * `GET /matches/open`), so gating on «did you know the id» gated nothing. CORS does not
+ * help either: it constrains a browser on a foreign page and is ignored by `curl`.
+ *
+ * So the route asks whether the caller may enter, and failing that, whether they are
+ * already in: a match open for entry serves anyone; a closed one serves only a caller
+ * who holds a seat in it. Open means a chair is really claimable — the entry window is
+ * still up (SES-2.3), the session has not ended and some seat is free.
+ *
+ * Identity is the `identify` hook, exactly as in {@link registerMatchApi}. Without it
+ * (the nick-only host, which has no authentication to offer) participation falls back to
+ * `?nick=` — the posture `registerBrowserApi`'s archive intents already take. That is a
+ * participation check, not proof of identity, and it is what keeps a seated player able
+ * to read their own running session where sessions do not exist.
+ */
+export function registerSeatsApi(app: FastifyInstance, deps: SeatsApiDeps): void {
+  const participates = async (request: FastifyRequest, matchId: string): Promise<boolean> => {
+    const login = deps.identify ? (await deps.identify(request))?.login : nickOf(request);
+    if (!login) return false;
+    return (await deps.seatOf(matchId, login)) !== null;
+  };
+
+  app.get('/matches/:id/seats', async (request: FastifyRequest, reply: FastifyReply) => {
+    const { id } = request.params as { id: string };
+    const layout = await deps.seats(id);
+    if (!layout) {
+      void reply.code(404);
+      return { error: 'E_NO_MATCH' as const };
+    }
+    const claimable =
+      !layout.ended && layout.seats.some((seat) => !seat.taken) && (await deps.entryOpen(id));
+    if (!claimable && !(await participates(request, id))) {
+      void reply.code(403);
+      return { error: 'E_FORBIDDEN' as const };
+    }
+    return { seats: layout.seats };
+  });
+}
+
+/** A repeated `?nick=a&nick=b` parses to an array and `?nick=` to an empty string —
+ *  treat anything but a non-blank string as absent (fail-secure: anonymous view /
+ *  E_FORBIDDEN), like the join route's check. */
+function nickOf(request: FastifyRequest): string | null {
+  const nick = (request.query as { nick?: unknown }).nick;
+  return typeof nick === 'string' && nick.trim() !== '' ? nick : null;
+}
+
 /**
  * The match-browser read-model + archive intents (docs/main-menu.md §2), served beside
  * the create/join API. A server projection — the client only reads it (A10/fog rule);
  * archive is fail-secure per-player (participants only, stable codes).
  */
 export function registerBrowserApi(app: FastifyInstance, registry: MatchRegistry): void {
-  // A repeated `?nick=a&nick=b` parses to an array — treat anything non-string as
-  // absent (fail-secure: anonymous view / E_FORBIDDEN), like the join route's check.
-  const nickOf = (request: FastifyRequest): string | null => {
-    const nick = (request.query as { nick?: unknown }).nick;
-    return typeof nick === 'string' ? nick : null;
-  };
-
   // The three tabs (available/active/archived) for one viewer (`?nick=`).
   app.get('/matches', (request: FastifyRequest) => registry.list(nickOf(request)));
 

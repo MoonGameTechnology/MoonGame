@@ -31,12 +31,16 @@ export {
   registerBrowserApi,
   registerMatchApi,
   registerOpenMatchesFeed,
+  registerSeatsApi,
   type CreatedMatch,
   type JoinFailure,
   type JoinResult,
   type MatchApiDeps,
   type OpenMatch,
   type OpenMatchesFeedDeps,
+  type SeatLayout,
+  type SeatView,
+  type SeatsApiDeps,
 } from './matchApi';
 export { MatchKeeper, type MatchKeeperOptions } from './matchFactory';
 export {
