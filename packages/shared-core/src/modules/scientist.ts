@@ -8,8 +8,13 @@ interface SlotArgs {
 }
 
 /** Extra research slots the player's chosen leaders grant, summed across the council (0 if
- *  none / unknown ids). The technology module clamps the resulting total to the design max. */
-function scientistSlotBonus(player: Player | undefined, data: GameData): number {
+ *  none / unknown ids). The technology module clamps the resulting total to the design max.
+ *
+ *  Exported for the CLIENT's research screen, which shows the resulting slot count:
+ *  `clampResearchSlots(BASE_RESEARCH_SLOTS + scientistSlotBonus(player, data))`. It used
+ *  to sum this by hand (CONV-5), which is how the prototype came to promise a third slot
+ *  its own kernel never granted — it drew the bonus without loading this module. */
+export function scientistSlotBonus(player: Player | undefined, data: GameData): number {
   let bonus = 0;
   for (const chosen of scientistsOf(player)) {
     bonus += data.scientists[chosen.id]?.slotBonus ?? 0;

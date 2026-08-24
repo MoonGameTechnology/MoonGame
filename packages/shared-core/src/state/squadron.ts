@@ -1,9 +1,12 @@
 /**
  * Squadron mechanics (squadrons-roadmap SQ-1.1/SQ-2.1/SQ-3.1) — the carrier-borne
  * strike wing's pure math: which stacks a fleet can launch, the sortie fuel/rearm
- * counter, and the strike-radius reach check. 1:1 port of the prototype's
- * `prototype/src/squadron.ts` (already `Fleet`-typed against this package) — no
- * numbers or semantics changed. NOT wired into a `fleet.launch` action or any
+ * counter, and the strike-radius reach check. Was a 1:1 port of the prototype's
+ * `squadron.ts` — no numbers or semantics changed; since CONV-6 that copy is gone and
+ * this is the only one, called by both hosts with an explicit `data`. The prototype's
+ * client-side wing predicates (`isWing`/`wingCanAct`/`wingCanReturn`, REFM-135) did NOT
+ * come here — they decide what to offer the player, not what the world does, and live
+ * in `/decisions/wingOrders.ts`. NOT wired into a `fleet.launch` action or any
  * kernel module yet: that needs new GameState shape (where a launched wing's
  * `SortieState` lives) and touches the action/reducer pipeline, a separate,
  * riskier pass. `patrolTarget`/`scrambleOrder` (the auto-scramble driver, CC-4)

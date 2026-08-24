@@ -56,6 +56,13 @@ const srcFiles = (): string[] => [
   ...readdirSync(path.join(repoRoot, 'packages/client/src'))
     .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
     .map((f) => `packages/client/src/${f}`),
+  // Общие решения обоих клиентов (`decisions/README.md`): текста они не хранят, но
+  // ключи `t(...)` в них законны — значит папка обязана быть видна и проверке на
+  // русские литералы, и учёту используемых ключей, иначе ключ отсюда прочтётся как
+  // мёртвый, а забытая строка проедет мимо гейта.
+  ...readdirSync(path.join(repoRoot, 'decisions'))
+    .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+    .map((f) => `decisions/${f}`),
 ];
 
 /** Первый строковый аргумент каждого `t(…)` / `tData(…)`. Идём посимвольно (regex

@@ -31,7 +31,7 @@ import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet'
 import { act, moveFleet, loadArmy, engageFleet, orderScramble } from './actions';
 import { data } from './prototypeData';
 import { ctx } from './protoKernel';
-import { fleetHasSquadron } from './squadron';
+import { fleetHasSquadron } from '../../packages/shared-core/src/index';
 import type { Patrol } from './patrol';
 
 /** The guard's narrow view of the prototype state extension it reads (the standing
@@ -398,7 +398,7 @@ export function stewardGuardOrders(
   if (posture === 'active_defend') {
     const patrols = (state as GuardState).patrols;
     for (const f of Object.values(state.fleets)) {
-      if (!idleOwn(f) || !fleetHasSquadron(f) || patrols?.[f.id]) continue;
+      if (!idleOwn(f) || !fleetHasSquadron(f, data) || patrols?.[f.id]) continue;
       if (state.planets[f.location!]?.owner !== ai) continue;
       out.push(orderScramble(ai, f.id, true));
       report.push({ at: state.time, kind: 'watch', node: f.location!, fleetId: f.id });

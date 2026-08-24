@@ -29,7 +29,7 @@ import {
 import { netIncome } from './economy';
 import { SECTOR_TYPES } from './map';
 import { data } from './prototypeData';
-import { marketLots, type MarketSide } from './sessionMarket';
+import type { MarketSide } from '../../packages/shared-core/src/index';
 import { stewardGuardOrders } from './stewardGuard';
 
 /** The two server-side AIs that can play a seat, kept explicitly DISTINCT
@@ -308,7 +308,7 @@ export function aiOrders(
   // soured player from filling the bot's lots (botEmbargoes), so the bot simply won't
   // trade with anyone it has soured on.
   if (pl) {
-    const lots = marketLots(state);
+    const lots = state.market ?? [];
     const hasLot = (side: MarketSide, resource: string): boolean =>
       lots.some((l) => l.owner === ai && l.side === side && l.resource === resource);
     for (const good of ['food', 'energy', 'microelectronics']) {

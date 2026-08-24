@@ -7,6 +7,7 @@ import type { LoadedMatch } from './roomRegistry';
 import type { RoomObservation } from './matchRoom';
 import type { ArsenalStore, MatchSnapshot, StoredReceipt } from './store';
 import { standingOrderTickActions } from './standingOrderDriver';
+import { expiredSeatClaims } from './seatExpiry';
 
 /**
  * The match-loading wiring `main.ts` hands to the LazyRoomRegistry, extracted
@@ -155,6 +156,16 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
                 data,
                 room.state.time,
                 (state, actions) => room.canApplyAll(state, actions, room.state.time),
+              )) {
+                await room.submitServerAction(playerId, action);
+              }
+              // ENTRY-3 (правило 7): вернуть в оборот места, заявленные и не
+              // подтверждённые дольше окна. Едет в той же пачке, что стоячие приказы —
+              // отдельный таймер тут не нужен, а `standingOrdersBusy` уже страхует от
+              // реэнтерабельности на durable-комнате.
+              for (const { playerId, action } of expiredSeatClaims(
+                room.state,
+                room.clockScale,
               )) {
                 await room.submitServerAction(playerId, action);
               }

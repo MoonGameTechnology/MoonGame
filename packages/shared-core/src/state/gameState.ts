@@ -110,6 +110,21 @@ export interface Player {
   /** @deprecated Legacy single-leader field (snapshots from before the 2-slot council).
    *  Never written now; still READ through {@link scientistsOf} for old persisted state. */
   scientist?: { id: string; level: number };
+  /** ИГРОВОЕ время заявки на место (`seat.claim`, ENTRY-3): дом и совет выбраны и
+   *  больше не меняются. Отсутствует — место ещё никем не занималось, за него играет
+   *  серверный ИИ. Держать маркер В СОСТОЯНИИ обязательно: `seat.claim` — КЛИЕНТСКИЙ
+   *  тип, игрок может прислать его сам, поэтому «заявить можно один раз» обязан
+   *  проверять редьюсер, а не память сервера.
+   *
+   *  Время игровое, а РЕАЛЬНОЕ из него выводится делением на `timeScale` — та же
+   *  дисциплина, что у окна входа (`MatchRegistry.entryOpen`). Настенных часов в
+   *  `GameState` нет и быть не должно: они сделали бы реплей невоспроизводимым. */
+  claimedAt?: number;
+  /** Игрок ДОШЁЛ до карты (`seat.confirm`): с этого момента место закреплено за ним
+   *  насовсем. До подтверждения заявка временная — место, взятое по ссылке и брошенное,
+   *  освобождается по истечении окна (`seat.release`), иначе один не пришедший человек
+   *  запирал бы кресло до конца партии. */
+  seated?: true;
   /** Steward delegation ("hand the seat to the AI while I sleep"): while set and the
    *  world clock is before `until`, the server AI plays this seat with `posture`. The
    *  server-side driver reads it via `stewardActive`; it auto-expires on the clock
@@ -637,12 +652,23 @@ export interface PatrolEntry {
   rearmAt?: number;
 }
 
-/** A standing sell order on the session market: the `seller` has escrowed `amount`
- *  of `resource` (deducted from their treasury) and offers it at `price` money per
- *  unit. Filled (partially) by `market.buy`; the remainder is refunded on cancel. */
+/** Which side of the book a standing order sits on (CONV-9). */
+export type MarketSide = 'sell' | 'buy';
+
+/** A standing order on the session market. Both sides ESCROW up front, so nothing
+ *  on the book can be double-spent:
+ *
+ *   - `sell` — the owner escrowed `amount` of `resource` and wants credits for it;
+ *   - `buy`  — the owner escrowed `amount × price` credits and wants the goods.
+ *
+ *  Filled (partially) by `market.take`; the remainder is refunded on cancel. The
+ *  book used to be sell-only here and two-sided in the prototype's copy — CONV-9
+ *  merged them, taking the richer shape. */
 export interface MarketOrder {
   id: string;
-  seller: PlayerId;
+  side: MarketSide;
+  /** Who placed it and whose escrow is held (was `seller` while the book was sell-only). */
+  owner: PlayerId;
   resource: ResourceId;
   /** Remaining units on offer (escrowed). */
   amount: number;

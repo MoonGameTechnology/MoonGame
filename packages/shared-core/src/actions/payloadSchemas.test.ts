@@ -22,6 +22,7 @@ const CLIENT_ACTION_TYPES = [
   'hero.fit',
   'planet.annihilate',
   'station.deploy',
+  'seat.claim',
   'building.construct',
   'building.upgrade',
   'unit.build',
@@ -33,7 +34,6 @@ const CLIENT_ACTION_TYPES = [
   'diplomacy.mapshare',
   'espionage.spy',
   'market.list',
-  'market.buy',
   'market.cancel',
   // REL-2 — the prototype-host intents (the netserver runs the prototype's kernel):
   'market.take',
@@ -73,9 +73,11 @@ describe('SV-1.2 · action payload schemas', () => {
       ['fleet.barrage', { fleetId: 'f1' }], // absent target also clears
       ['fleet.barrageMode', { fleetId: 'f1', mode: 'aggressive' }],
       ['fleet.retreat', { fleetId: 'f1' }],
-      ['market.list', { resource: 'metal', amount: 12.5, price: 3 }], // fractional amount is legal
-      ['market.buy', { orderId: 'market:1', amount: 5 }],
-      ['market.cancel', { orderId: 'market:1' }],
+      // CONV-9: книга двусторонняя, поэтому `side` обязателен; дробное количество
+      // по-прежнему законно (ресурсы копятся непрерывно). `market.buy` и отмена по
+      // `orderId` принадлежали односторонней версии и ушли вместе с ней.
+      ['market.list', { side: 'sell', resource: 'metal', amount: 12.5, price: 3 }],
+      ['market.cancel', { id: 'market:1' }],
       ['army.load', { fleetId: 'f1', unit: 'marine' }],
       ['army.unload', { fleetId: 'f1', unit: 'marine', count: 3 }],
       ['hero.move', { to: 'p1' }],

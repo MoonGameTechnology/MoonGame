@@ -2977,7 +2977,7 @@ const page = (js) => `<!doctype html>
         <div id="setupfactions"></div>
         <div id="setupcouncil"></div>
       </div>
-      <div class="scol">
+      <div class="scol" id="setup-solo-col">
         <div id="setupslots" class="sslots"></div>
         <div class="sspeedlabel" data-i18n="setup.speed.label"></div>
         <p class="sspeedhint" data-i18n="setup.speed.hint"></p>

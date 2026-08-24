@@ -79,6 +79,8 @@ import { isValidActionPayload } from '../packages/shared-core/src/actions/payloa
 import type { PlayerId } from '../packages/shared-core/src/index';
 import { MS_PER_DAY } from '../packages/shared-core/src/index';
 import type { Identity } from '../packages/server/src/matchApi';
+import { seatClaim, seatClaimAction } from '../packages/server/src/joinSeat';
+import { expiredSeatClaims } from '../packages/server/src/seatExpiry';
 const { Pool } = pgPkg;
 
 // --- M0/M1 playtest log: append room events to a per-run JSONL and feed every one
@@ -588,6 +590,12 @@ async function createHostedMatch(id: string): Promise<HostedMatch> {
           try {
             await runServerAI(); // drive any empty seat once the clock has moved
             await runServerStanding(); // CC-2/CC-4: standing orders (auto-storm / дежурный вылет)
+            // ENTRY-3 (правило 7): вернуть в оборот места, заявленные и не подтверждённые
+            // дольше окна. Тот же вызов, что у канонического сервера (`serverWiring.ts`) —
+            // паритет держится общей функцией, а не двумя похожими циклами.
+            for (const { playerId, action } of expiredSeatClaims(room.state, room.clockScale)) {
+              await room.submitServerAction(playerId, action);
+            }
           } finally {
             driversBusy = false;
           }
@@ -832,24 +840,44 @@ const server = createMultiplayerServer({
         // BF-30: `preferredFaction` decouples faction from the slot's start point —
         // the player picks a faction independently; the server overrides the seat's
         // default faction after assigning it.
-        join: async (id, login, accountId, preferredSlot, preferredFaction) => {
+        join: async (id, { nick: login, accountId, preferredSlot, preferredFaction, preferredScientists }) => {
           const room = registry.get(id);
           if (!room) return { error: 'E_NO_MATCH' as const };
           const held = await accountStore.seatOf(id, login);
           if (!held && !registry.entryOpen(id)) return { error: 'E_ENTRY_CLOSED' as const };
-          const seat = held
-            ? { playerId: held }
-            : await accountStore.resolveSeat(id, login, Object.keys(room.state.players), preferredSlot as PlayerId | undefined);
-          if (!seat) return { error: 'E_MATCH_FULL' as const };
-          // BF-30: override the seat's faction with the player's choice — faction is
-          // no longer bound to the start point. Only on a NEW claim (not reconnect).
-          if (preferredFaction && !held) {
-            const player = room.state.players[seat.playerId];
-            if (player) player.faction = preferredFaction;
+          // Что достаётся игроку и переписывать ли дом — ОБЩЕЕ решение с боевым сервером
+          // (`packages/server/src/joinSeat.ts`). Паритет двух хостов держится одним
+          // модулем, а не двумя похожими лесенками условий: ровно на такой лесенке
+          // канонический сервер и потерял `slot`/`faction` (ENTRY-1).
+          const resolved = held
+            ? { playerId: held, isNew: false }
+            : await accountStore.resolveSeat(
+                id,
+                login,
+                Object.keys(room.state.players),
+                preferredSlot as PlayerId | undefined,
+              );
+          const claim = seatClaim({
+            resolved,
+            preferredFaction,
+            // Дома ЭТОГО матча — тот же список, что уходит в `/matches/:id/seats`.
+            knownFactions: [...new Set(Object.values(room.state.players).map((p) => p.faction))],
+          });
+          if (!claim.ok) return { error: claim.code };
+          // ENTRY-3: заявка идёт ДЕЙСТВИЕМ через редьюсер, а не записью в состояние —
+          // мутация мимо редьюсера не попадает в лог и ломает реплей (см. joinSeat.ts).
+          if (claim.claim) {
+            await room.submitServerAction(
+              claim.playerId,
+              seatClaimAction(id, claim.playerId, room.state.time, {
+                ...claim.claim,
+                ...(preferredScientists !== undefined ? { scientists: preferredScientists } : {}),
+              }),
+            );
           }
           return {
-            playerId: seat.playerId,
-            token: await authCfg.signToken!(id, seat.playerId, accountId),
+            playerId: claim.playerId,
+            token: await authCfg.signToken!(id, claim.playerId, accountId),
           };
         },
       });

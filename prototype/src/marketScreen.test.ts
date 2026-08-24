@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale } from '../../localization/runtime';
-import { newGame, order, marketList, MARKET_FEE } from './game';
+import { newGame, order, marketList, MARKET_COMMISSION } from './game';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import {
   netNoteText,
@@ -95,10 +95,10 @@ function hostOf(over: Partial<MarketHost> = {}): MarketHost {
 
 describe('рынок — «к получению» под формой', () => {
   it('продажа показывает NET после сгорающей комиссии', () => {
-    // 10 × 4 = 40 gross, 5% сгорает → 38
+    // 10 × 4 = 40 gross, 15% сгорает → 34 (CONV-9: комиссия сведена к одной, 15%)
     const text = netNoteText('sell', 10, 4);
-    expect(text).toContain('38');
-    expect(text).toContain(String(Math.round(MARKET_FEE * 100)));
+    expect(text).toContain('34');
+    expect(text).toContain(String(Math.round(MARKET_COMMISSION * 100)));
   });
 
   it('покупка показывает ЭСКРОУ — сумму, которая замораживается сейчас', () => {
@@ -106,8 +106,8 @@ describe('рынок — «к получению» под формой', () => {
   });
 
   it('дробные суммы: продавец округляется вниз, эскроу — вверх', () => {
-    // 3 × 7 = 21 → продавцу floor(19.95) = 19, а в эскроу ceil(21) = 21
-    expect(netNoteText('sell', 3, 7)).toContain('19');
+    // 3 × 7 = 21 → продавцу floor(17.85) = 17, а в эскроу ceil(21) = 21
+    expect(netNoteText('sell', 3, 7)).toContain('17');
     expect(netNoteText('buy', 3, 7)).toContain('21');
   });
 
@@ -148,8 +148,8 @@ describe('рынок — книга заявок', () => {
 
   it('в биде видно, сколько исполнитель получит ЧИСТЫМИ', () => {
     const html = marketBoxHtml(s, 'p1', 'metal', 'sell');
-    // бид p2 на 5 @ 7 = 35 gross → исполнителю floor(33.25) = 33
-    expect(html).toContain('→ 33 ');
+    // бид p2 на 5 @ 7 = 35 gross → исполнителю floor(29.75) = 29
+    expect(html).toContain('→ 29 ');
   });
 
   it('пустая книга по товару читается как «нет заявок», а не как пустота', () => {
@@ -189,8 +189,8 @@ describe('рынок — окно', () => {
     const win = fakeWin();
     const { open } = initMarket(hostOf({ root: () => win }));
     open();
-    // значения формы по умолчанию 10 × 3 = 30 → продавцу floor(28.5) = 28
-    expect(win.net()).toContain('28');
+    // значения формы по умолчанию 10 × 3 = 30 → продавцу floor(25.5) = 25
+    expect(win.net()).toContain('25');
     win.fire(click('.mk-seg button', { mkside: 'buy' }));
     expect(win.net()).toContain('30'); // в эскроу уходит вся сумма
   });

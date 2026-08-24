@@ -35,7 +35,7 @@ describe('SV-2.4 · match API', () => {
   it('GET /matches/:id/join returns a seat + token for a nick', async () => {
     const app = appWith({
       createMatch: () => Promise.resolve({ matchId: 'm-1', seats: [] }),
-      join: (matchId, nick) => Promise.resolve({ playerId: 'green', token: `tok:${matchId}:${nick}` }),
+      join: (matchId, { nick }) => Promise.resolve({ playerId: 'green', token: `tok:${matchId}:${nick}` }),
     });
     const res = await app.inject({ method: 'GET', url: '/matches/m-1/join?nick=alice' });
     expect(res.statusCode).toBe(200);
@@ -77,7 +77,7 @@ describe('SV-2.4 · match API', () => {
   it('omitting createMatch leaves POST /matches unmounted, but join still serves', async () => {
     // A host that seeds matches out of band (netserver, NETA2-7) exposes join alone.
     const app = appWith({
-      join: (matchId, nick) => Promise.resolve({ playerId: 'green', token: `tok:${matchId}:${nick}` }),
+      join: (matchId, { nick }) => Promise.resolve({ playerId: 'green', token: `tok:${matchId}:${nick}` }),
     });
     expect((await app.inject({ method: 'POST', url: '/matches' })).statusCode).toBe(404); // not mounted
     const res = await app.inject({ method: 'GET', url: '/matches/m/join?nick=a' });

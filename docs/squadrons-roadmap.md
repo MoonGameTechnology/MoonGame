@@ -40,9 +40,11 @@
 (рендер зоны патруля), Фазы 5–7 (постройка/крепость, модули/оружие, десантная эскадрилья).
 
 **Каноническое ядро (`packages/shared-core`) — отдельный статус.** Все ✅-пункты выше
-про ПРОТОТИП (`prototype/src/squadron.ts`); в каноне этой механики не было вовсе — как
-и с экономикой (FND-1/2), обнаружено при разведке `docs/game-vision-roadmap.md`'s CA-1.
-Портирован (без изменения чисел/семантики) чистый математический слой:
+делались на ПРОТОТИПЕ, где механика и жила; в каноне её не было вовсе — как и с
+экономикой (FND-1/2), обнаружено при разведке `docs/game-vision-roadmap.md`'s CA-1.
+Портирован (без изменения чисел/семантики) чистый математический слой, и **с CONV-6
+копии прототипа больше нет** — оба хоста зовут этот слой, а клиентские предикаты
+«действующего крыла» (REFM-135) живут в `/decisions/wingOrders.ts`:
 `packages/shared-core/src/state/squadron.ts` — `squadronTake`/`sortieSpec`/`freshSortie`/
 `canSortie`/`spendSortie`/`tickRearm`/`fleetHasSquadron`/`squadronStrikeRange`/
 `withinRange`/`squadronReaches`, 20 тестов на РЕАЛЬНОМ шипованном `fighter_squadron`

@@ -223,7 +223,6 @@ import {
   parseJoinPass,
   type JoinOutcome,
 } from './joinRules';
-import { houseBonusKey, houseChoice, houseColor, houseName, houseRows } from './seatPicker';
 import { createPendingJoin } from './pendingJoin';
 import { syncCommanderXp } from './commanderSync';
 import { panelSlackFor } from './panelSlack';
@@ -645,9 +644,16 @@ import { closeAction, isCurrentSocket } from './socketFate';
 import { welcomePlan } from './netWelcome';
 import { orderPlan } from './orderRoute';
 import { errorTarget, refusalKey } from './errorRoute';
-import { joinLanding } from './joinLanding';
+import { joinLanding } from '../../decisions/joinLanding';
+import {
+  entryOffer,
+  reconcileSelection,
+  startEnabled as netStartEnabled,
+  type EntryOffer,
+  type MatchSeat as EntrySeat,
+} from '../../decisions/entrySetup';
 import { clearStatusLine, fallbackFor, showServerRow } from './browserFallback';
-import { joinHref, startEnabled } from './seatJoin';
+import { joinHref } from './seatJoin';
 import { archiveUrl, httpBase, matchesUrl, queryOutcome, seatsUrl } from './matchQuery';
 import { archiveEffect, type ArchiveEffect } from './archiveOutcome';
 import { mintedToken, passwordFrom, registerExtra } from './authRequest';
@@ -660,7 +666,7 @@ import { pickEffect } from './pickApply';
 import { fleetsUnderTap } from './tapTargets';
 import { resolveAddress } from './serverAddress';
 import { authStatusUrl, identityMode, revealSignup } from './identityProbe';
-import { houseLine, seatView, type SeatView } from './seatList';
+import { seatView, type SeatView } from './seatList';
 import { pollLine, pollTick, type PollPhase } from './matchPoll';
 import { pingRoute, relayIntake } from './relayIntake';
 import {
@@ -1832,9 +1838,9 @@ function fleetHasArtillery(f: Fleet | undefined): boolean {
  *  so the launch is offered only when a non-squadron ship stays behind and the carrier is
  *  parked and out of combat (squadrons-roadmap SQ-1.1). */
 function fleetCanLaunchSquadron(f: Fleet | undefined): boolean {
-  if (!fleetHasSquadron(f) || f!.movement || !f!.location || f!.battleId) return false;
+  if (!fleetHasSquadron(f, data) || f!.movement || !f!.location || f!.battleId) return false;
   const total = f!.units.reduce((n, u) => n + u.count, 0);
-  const wing = squadronTake(f!).reduce((n, u) => n + u.count, 0);
+  const wing = squadronTake(f!, data).reduce((n, u) => n + u.count, 0);
   return wing > 0 && total > wing;
 }
 
@@ -3390,7 +3396,7 @@ function setScramble(ids: string[], on: boolean): void {
     // Кому дежурство положено и почему отказ — `stanceToggle.ts` (REFM-98).
     const want = scrambleStance(
       !!f && f.owner === ME,
-      !!f && fleetHasSquadron(f),
+      !!f && fleetHasSquadron(f, data),
       !!patrolOf(id),
       on,
       !!pos0,
@@ -3427,9 +3433,9 @@ function setScramble(ids: string[], on: boolean): void {
         id,
         standingPatrol(
           pos,
-          squadronStrikeRange(f),
+          squadronStrikeRange(f, data),
           wingSorties.get(id),
-          sortieSpec(f),
+          sortieSpec(f, data),
           freshSortie,
         ),
       );
@@ -5531,8 +5537,8 @@ function fleetPanelHtml(f: Fleet): string {
   // Carrier air wing (squadrons-roadmap SQ-1.1) — launch the squadron ships as a
   // separate fast strike fleet. Needs a non-squadron ship left behind (fleet.split
   // refuses to take the whole stack), so an all-fighter fleet just flies itself.
-  if (f.owner === ME && fleetHasSquadron(f)) {
-    const wing = squadronTake(f).reduce((n, u) => n + u.count, 0);
+  if (f.owner === ME && fleetHasSquadron(f, data)) {
+    const wing = squadronTake(f, data).reduce((n, u) => n + u.count, 0);
     h += `<div class="sec">${t('side.wing.title')}</div><div class="row">`;
     h += btn('launchsquad', '', t('side.wing.launch', { n: wing }), fleetCanLaunchSquadron(f));
     h += `</div>`;
@@ -5554,7 +5560,7 @@ function fleetPanelHtml(f: Fleet): string {
   // movement: strike an enemy in range, return to base, or toggle patrol (CC-4).
   // Что такое действующее крыло — `squadron.ts` (REFM-135): панель и обработчики
   // приказов обязаны отвечать на это одинаково, иначе кнопка обещает то, чего нет.
-  if (isWing(f, ME)) {
+  if (isWing(f, ME, fleetHasSquadron(f, data))) {
     const isPatrol = !!patrolOf(f.id);
     const canAct = wingCanAct(f);
     h += `<div class="sec">${t('side.wing.title')}</div><div class="row">`;
@@ -5838,7 +5844,7 @@ function planetPanelHtml(p: Planet): string {
   // Capital marker / designate — heroes respawn here (and re-fit modules, Phase C).
   // Что панель предлагает сделать с миром — `worldOrders.ts` (REFM-91).
   {
-    const cap = capitalOffer(mine, capitalOf(s, ME) === p.id, isInhabited(p));
+    const cap = capitalOffer(mine, capitalOf(s, ME) === p.id, isInhabited(data, p));
     if (cap === 'marked') {
       h += `<div class="row"><b style="color:var(--grn)">★ ${t('side.world.capital')}</b>${pcUi() ? '' : ` <span class="dim">${t('side.world.capital.note')}</span>`}</div>`;
     } else if (cap === 'designate') {
@@ -7221,12 +7227,12 @@ function renderCmdBar() {
           ids.length === 0,
           t('cmd.auto-assault.hint'),
         ) +
-        (fleets.some(fleetHasSquadron)
+        (fleets.some((f) => fleetHasSquadron(f, data))
           ? cmdBtn(
               'qscramble',
               '🛩',
               t('cmd.standing-sortie'),
-              fleets.filter(fleetHasSquadron).every((fl) => patrolOf(fl.id)) ? 'on' : '',
+              fleets.filter((fl) => fleetHasSquadron(fl, data)).every((fl) => patrolOf(fl.id)) ? 'on' : '',
               false,
               t('cmd.standing-sortie.hint'),
             )
@@ -7438,27 +7444,27 @@ side.addEventListener('click', (ev) => {
     // Split the squadron stack off into its own fast strike fleet (SQ-1.1).
     const f = selFleet ? s.fleets[selFleet] : undefined;
     if (fleetCanLaunchSquadron(f)) {
-      playerOrder(splitFleet(ME, f!.id, squadronTake(f!)));
+      playerOrder(splitFleet(ME, f!.id, squadronTake(f!, data)));
       note(t('hint.squadron-launched'));
     }
   } else if (act === 'squadronstrike') {
     // Squadron free-space strike: arm the aim mode to pick an enemy fleet in range.
     const f = selFleet ? s.fleets[selFleet] : undefined;
-    if (isWing(f, ME) && wingCanAct(f)) {
+    if (isWing(f, ME, fleetHasSquadron(f, data)) && wingCanAct(f)) {
       squadronStrikeAim = selFleet;
       note(t('hint.squadron-strike-aim'));
     }
   } else if (act === 'squadronreturn') {
     // Squadron return to base: fly back to the carrier in free space.
     const f = selFleet ? s.fleets[selFleet] : undefined;
-    if (isWing(f, ME) && wingCanReturn(f)) {
+    if (isWing(f, ME, fleetHasSquadron(f, data)) && wingCanReturn(f)) {
       playerOrder(makeAction(ME, 'squadron.return', { fleetId: f!.id }));
       note(t('hint.squadron-returning'));
     }
   } else if (act === 'squadronpatrol') {
     // Toggle CC-4 standing patrol for this squadron fleet.
     const f = selFleet ? s.fleets[selFleet] : undefined;
-    if (isWing(f, ME) && wingCanAct(f)) {
+    if (isWing(f, ME, fleetHasSquadron(f, data)) && wingCanAct(f)) {
       setScramble([f!.id], !patrolOf(f!.id));
     }
   }
@@ -7843,7 +7849,7 @@ cmdbar.addEventListener('click', (ev) => {
     if (on) note(t('hint.auto-assault'));
   } else if (cmd === 'qscramble') {
     // SO-UI: the CC-4 «дежурный вылет», group-uniform over the squadron fleets.
-    const wings = ids.filter((id) => fleetHasSquadron(s.fleets[id]));
+    const wings = ids.filter((id) => fleetHasSquadron(s.fleets[id], data));
     const on = !wings.every((id) => patrolOf(id));
     setScramble(wings, on);
     if (on) note(t('hint.standing-sortie'));
@@ -9426,6 +9432,9 @@ const setupSlotsEl = $('setupslots');
 const setupFactionsEl = $('setupfactions');
 const setupSpeedEl = $('setupspeed');
 const setupHintEl = $('setuphint');
+/** Правая колонка сетапа — боты, команды, скорость времени. В сетевом матче это
+ *  решения сервера, а не игрока, поэтому там она прячется целиком. */
+const soloColEl = document.getElementById('setup-solo-col');
 const setupGoEl = $('setupgo') as HTMLButtonElement;
 
 // The player's division templates / hero roster / ship blueprints. Pre-match loadout
@@ -9454,12 +9463,37 @@ const setupShips: ShipLoadout[] = DEFAULT_SHIP_LOADOUTS.map((l) => ({
 // were removed. `setupTemplates` / `setupHeroes` / `setupShips` above keep seeding the
 // match with the default rosters via buildSetupConfig.
 
+/** Сетевой режим экрана настройки (ENTRY-2). `null` — обычная одиночная схватка.
+ *
+ *  Экран ОДИН на оба режима намеренно: игрок просил «как в одиночке, но в сетевой», и
+ *  второй экран с той же картой и теми же карточками разошёлся бы с первым на первой же
+ *  правке. Меняется не разметка, а источник данных: кандидаты приходят от сервера, а не
+ *  из `START_CANDIDATES`, занятые миры видны и не выбираются, правая колонка (боты,
+ *  команды, скорость времени) скрыта — в сетевом матче это не твои решения. */
+let netSetup: { matchId: string; offer: EntryOffer } | null = null;
+
+/** Стартовые миры, которые сейчас предлагает экран. */
+function setupCandidateIds(): string[] {
+  if (!netSetup) return [...START_CANDIDATES];
+  return netSetup.offer.worlds.flatMap((w) => (w.planetId ? [w.planetId] : []));
+}
+
+/** Кресло, которое достанется вместе с этим миром (только в сетевом режиме). */
+function slotForWorld(planetId: string): string | null {
+  return netSetup?.offer.worlds.find((w) => w.planetId === planetId)?.slot ?? null;
+}
+
+/** Занят ли этот мир живым игроком. */
+function worldTaken(planetId: string): boolean {
+  return netSetup?.offer.worlds.find((w) => w.planetId === planetId)?.taken === true;
+}
+
 function renderSetupMap(): void {
   // Рамка, трассы без повторов и порядок рисования — в `setupMap.ts` (REFM-45):
   // там же правило «каждое ребро один раз» и «кандидаты рисуются последними».
   const box = mapViewBox(MAP, 60);
   setupMapEl.setAttribute('viewBox', `${box.x} ${box.y} ${box.w} ${box.h}`);
-  const order = drawOrder(MAP, START_CANDIDATES);
+  const order = drawOrder(MAP, setupCandidateIds());
   let svg = '';
   for (const l of lanes(MAP)) {
     svg += `<line x1="${l.from.x}" y1="${l.from.y}" x2="${l.to.x}" y2="${l.to.y}" stroke="#1d3640" stroke-width="3"/>`;
@@ -9470,10 +9504,22 @@ function renderSetupMap(): void {
   }
   for (const n of order.candidates) {
     const picked = n.id === setupStart;
+    // Занятый мир ОСТАЁТСЯ на карте и гаснет (`entrySetup.ts`, правило 2): карта — это
+    // расклад матча, и дырка на месте соперника читалась бы как «там пусто».
+    const taken = worldTaken(n.id);
+    const fill = taken
+      ? 'rgba(120,140,146,.12)'
+      : picked
+        ? 'rgba(58,209,122,.35)'
+        : 'rgba(53,214,230,.16)';
+    const stroke = taken ? '#4a6169' : picked ? '#3ad17a' : '#35d6e6';
+    // У занятого мира — подпись прямо на кружке: цвет один читают мельком и не всегда
+    // верно, а «занято» отвечает на вопрос сразу.
     svg +=
-      `<circle class="cand" data-cand="${n.id}" cx="${n.x}" cy="${n.y}" r="${picked ? 30 : 22}" ` +
-      `fill="${picked ? 'rgba(58,209,122,.35)' : 'rgba(53,214,230,.16)'}" ` +
-      `stroke="${picked ? '#3ad17a' : '#35d6e6'}" stroke-width="${picked ? 6 : 4}"/>`;
+      `<circle class="cand${taken ? ' taken' : ''}" data-cand="${n.id}"` +
+      `${taken ? ' data-taken="1"' : ''} cx="${n.x}" cy="${n.y}" r="${picked ? 30 : 22}" ` +
+      `fill="${fill}" stroke="${stroke}" stroke-width="${picked ? 6 : 4}">` +
+      `${taken ? `<title>${esc(t('seatpick.taken'))}</title>` : ''}</circle>`;
   }
   setupMapEl.innerHTML = svg;
 }
@@ -9564,6 +9610,26 @@ function renderSetup(): void {
   // Seat 1 (you) is always in, so the match can always launch — including with ZERO
   // rivals: a calm solo sandbox to read descriptions, learn the UI and test in peace
   // (the core never ends a one-player match — victory needs ≥2 active sides).
+  // Сетевой режим (ENTRY-2): решения — в `decisions/entrySetup.ts`, здесь только показ.
+  // Правая колонка скрыта: боты, команды и скорость времени в сетевом матче не твои
+  // решения, а сервера. Кнопка заперта, пока не выбран СВОБОДНЫЙ мир — пустой выбор
+  // отправил бы игрока на сервер без места, и тот посадил бы куда-нибудь.
+  if (soloColEl) soloColEl.style.display = netSetup ? 'none' : '';
+  if (netSetup) {
+    const free = netSetup.offer.free;
+    const ready = netStartEnabled(slotForWorld(setupStart), netSetup.offer.worlds);
+    setupGoEl.disabled = !ready;
+    setupGoEl.textContent = t('seatpick.go');
+    setupHintEl.textContent =
+      free === 0
+        ? t('seatpick.none-free')
+        : ready
+          ? t('setup.home.pick', { home: setupStart })
+          : t('setup.map-hint');
+    for (const c of Array.from(setupSpeedEl.querySelectorAll('[data-spd]')))
+      c.classList.toggle('on', Number((c as HTMLElement).dataset.spd) === setupSpeed);
+    return;
+  }
   const rivals = rivalCount(setupSlots);
   setupGoEl.disabled = false;
   setupGoEl.textContent = rivals === 0 ? t('setup.start.solo') : t('setup.start');
@@ -9605,6 +9671,11 @@ setupCouncilEl.addEventListener('click', openSciPick);
 
 function openSetup(from: 'welcome' | 'hub' = 'welcome'): void {
   setupReturn = from;
+  // Каждый заход начинается ОДИНОЧНЫМ: сетевой режим ставит `openSeatPicker`
+  // сразу после этого вызова. Иначе брошенный сетевой заход утёк бы в следующую
+  // одиночную схватку — тот же довод, что у чистого выбора в `seatJoin.ts`.
+  netSetup = null;
+  stopNetSetupPoll();
   setupSlots = freshSetupSlots();
   setupTeams = false; // a fresh setup opens on the classic free-for-all
   setupSeatTeam = [...DEFAULT_TEAM_SIDES];
@@ -9809,7 +9880,7 @@ setupMapEl.addEventListener('click', (ev) => {
     );
     if (at) {
       const hit = nearestHit(
-        START_CANDIDATES.flatMap((id) => {
+        setupCandidateIds().flatMap((id) => {
           const n = MAP.find((m) => m.id === id);
           return n ? [n] : [];
         }),
@@ -9822,6 +9893,13 @@ setupMapEl.addEventListener('click', (ev) => {
     }
   }
   if (!pick) return;
+  // Занятый мир виден, но не выбирается (`entrySetup.ts`, правило 2). Молча
+  // проигнорировать тап нельзя — это выглядит как непрожатая кнопка, поэтому говорим,
+  // что случилось.
+  if (worldTaken(pick)) {
+    setupHintEl.textContent = t('seatpick.lost');
+    return;
+  }
   setupStart = pick;
   renderSetup();
 });
@@ -9861,7 +9939,24 @@ setupSpeedEl.addEventListener('click', (ev) => {
   localStorage.setItem('void.setupSpeed', String(setupSpeed));
   renderSetup();
 });
-setupGoEl.addEventListener('click', () => startMatch(buildSetupConfig()));
+setupGoEl.addEventListener('click', () => {
+  // В сетевом режиме экран не запускает матч — он собирает выбор в адрес входа
+  // (`seatJoin.ts`), а мир приходит от сервера. Тот же переход, что раньше делало окно
+  // выбора дома: `location.href`, а не новая вкладка (её блокирует браузер).
+  if (netSetup) {
+    const slot = slotForWorld(setupStart);
+    if (!slot) return; // кнопка и так заперта, но выбор мог протухнуть между рендерами
+    location.href = joinHref(
+      location.pathname,
+      netSetup.matchId,
+      slot,
+      setupFaction || null,
+      setupScientists,
+    );
+    return;
+  }
+  startMatch(buildSetupConfig());
+});
 $('setupcancel').addEventListener('click', () => {
   setupEl.style.display = 'none';
   if (setupReturn === 'hub') openHub();
@@ -10446,25 +10541,82 @@ function askSignIn(
 // and the server auto-assigned the first free seat (no choice).
 const seatpickEl = $('seatpick') as HTMLElement | null;
 const seatpickListEl = $('seatpick-list') as HTMLElement | null;
-const seatpickGoEl = $('seatpick-go') as HTMLButtonElement | null;
-const seatpickCancelEl = $('seatpick-cancel') as HTMLButtonElement | null;
-let seatpickMatchId: string | null = null;
-let seatpickSelected: string | null = null;
-let seatpickFaction: string | null = null; // BF-30: chosen faction (decoupled from slot)
 
+/** Запрос расклада мест, назвавшись (ADDR-6).
+ *
+ *  Идущую партию сервер отдаёт только её участникам, поэтому запрос обязан сказать, кто
+ *  спрашивает. На хосте с учётками это сессионный JWT (через `tokenFor` — «кто ты» ходит
+ *  только им, правило 1 `sessionStore.ts`), на безаккаунтном — `?nick=` внутри адреса.
+ *  Токена нет — идём как аноним: открытую для входа партию сервер покажет и так, а на
+ *  закрытую нам и правда нечего смотреть.
+ *
+ *  ОДНА точка на оба захода — открытие экрана и его тихий переопрос. Разъехавшись, они
+ *  отличались бы правами: переопрос молча слеп бы там, где открытие работает, и игрок
+ *  видел бы застывший список вместо живого. */
+function fetchSeats(base: string, matchId: string, nick: string): Promise<Response> {
+  const pass = tokenFor(localStorage, base, nick);
+  return fetch(
+    seatsUrl(base, matchId, nick),
+    pass ? { headers: { authorization: `Bearer ${pass}` } } : {},
+  );
+}
+
+/** Опрос мест, пока открыт сетевой экран (ENTRY-2, правило 5).
+ *
+ *  Партия живая: пока игрок выбирает, соседний мир могут занять. Узнать об этом на
+ *  попытке входа — поздно: игрок уже нажал «Выбрать» и получил отказ вместо мира.
+ *  Поэтому список обновляется, а судьбу выбора решает `reconcileSelection`: занятый
+ *  мир СБРАСЫВАЕТ выбор, а не переезжает на соседний — иначе человек улетел бы играть
+ *  не туда, куда смотрел.
+ *
+ *  Тихий: неудачный запрос ничего не трогает. Список мест не критичен настолько, чтобы
+ *  из-за одного сетевого чиха стирать игроку выбор. */
+let netSetupPoll: ReturnType<typeof setInterval> | null = null;
+const NET_SETUP_POLL_MS = 5000;
+
+function stopNetSetupPoll(): void {
+  if (netSetupPoll !== null) clearInterval(netSetupPoll);
+  netSetupPoll = null;
+}
+
+function startNetSetupPoll(base: string, matchId: string, nick: string): void {
+  stopNetSetupPoll();
+  netSetupPoll = setInterval(() => {
+    if (!netSetup) return stopNetSetupPoll();
+    void (async () => {
+      try {
+        const res = await fetchSeats(base, matchId, nick);
+        if (queryOutcome(res) !== 'ok') return;
+        const body = (await res.json()) as { seats: EntrySeat[] };
+        if (!netSetup) return;
+        netSetup = { matchId, offer: entryOffer(body.seats ?? []) };
+        const fate = reconcileSelection(slotForWorld(setupStart), netSetup.offer.worlds);
+        if (fate.kind === 'lost') {
+          setupStart = '';
+          renderSetup();
+          setupHintEl.textContent = t('seatpick.lost');
+          return;
+        }
+        renderSetup();
+      } catch {
+        /* тихий опрос: связь моргнула — выбор игрока не трогаем */
+      }
+    })();
+  }, NET_SETUP_POLL_MS);
+}
+
+/** Открыть экран настройки под КОНКРЕТНУЮ сетевую сессию (ENTRY-2).
+ *
+ *  Экран тот же, что в одиночной игре — игрок просил «как в одиночке, но в сетевой», и
+ *  второй экран с той же картой разошёлся бы с первым на первой же правке. Меняется
+ *  источник: кандидаты и дома приходят от сервера (`GET /matches/:id/seats`), занятые
+ *  миры видны и не выбираются, правая колонка скрыта.
+ *
+ *  Пока места едут, на экране стоит честная заглушка (`seatList.ts`, правило 1): окно,
+ *  которое ждёт ответа за кулисами, выглядит как проваленный тап, и игрок жмёт ещё раз. */
 async function openSeatPicker(matchId: string): Promise<void> {
   const srv = resolveServer();
   if (!srv) return;
-  seatpickMatchId = matchId;
-  // Чистый выбор на каждый заход и запертая кнопка, пока дом не выбран — `seatJoin.ts`
-  // (REFM-152, правила 1–2): уцелевший выбор прошлого матча увёл бы игрока не туда.
-  seatpickSelected = null;
-  seatpickFaction = null;
-  if (seatpickGoEl) seatpickGoEl.disabled = !startEnabled(seatpickSelected);
-  // Что стоит вместо списка домов — `seatList.ts` (REFM-155): окно поднимается СРАЗУ с
-  // заглушкой «Загрузка…» (иначе тап по «Войти» выглядит проваленным), каждый заход
-  // начинается с неё, а не с домов прошлого матча, и беда отличается от ожидания ещё и
-  // цветом.
   const показать = (view: SeatView): void => {
     if (!seatpickListEl || view.kind !== 'placeholder') return;
     const style = view.tone === 'dim' ? 'color:var(--dim);text-align:center' : 'color:var(--red)';
@@ -10473,111 +10625,27 @@ async function openSeatPicker(matchId: string): Promise<void> {
   показать(seatView('opening'));
   if (seatpickEl) seatpickEl.style.display = 'flex';
   try {
-    // ADDR-6: расклад идущей партии сервер отдаёт только её участникам, поэтому запрос
-    // обязан назвать, кто спрашивает. На хосте с учётками это сессионный JWT (через
-    // `tokenFor` — «кто ты» ходит только им, правило 1 `sessionStore.ts`), на
-    // безаккаунтном — `?nick=` внутри адреса. Токена нет — идём как аноним: открытую
-    // для входа партию сервер покажет и так, а на закрытую нам и правда нечего смотреть.
-    const pass = tokenFor(localStorage, srv.base, srv.nick);
-    const res = await fetch(
-      seatsUrl(srv.base, matchId, srv.nick),
-      pass ? { headers: { authorization: `Bearer ${pass}` } } : {},
-    );
+    const res = await fetchSeats(srv.base, matchId, srv.nick);
     // Отказ и обрыв это окно показывает одинаково — см. оговорку в шапке `seatList.ts`.
     if (queryOutcome(res) !== 'ok') {
       показать(seatView('refused'));
       return;
     }
-    const data = (await res.json()) as {
-      seats: Array<{
-        playerId: string;
-        name: string;
-        faction: string;
-        start: string | null;
-        taken: boolean;
-      }>;
-    };
-    if (seatpickListEl) {
-      seatpickListEl.innerHTML = '';
-      // The player picks a HOUSE, and the seat comes with it: `seatPicker.ts` (REFM-49)
-      // holds the grouping and — importantly — the rule that the slot is the first FREE
-      // seat of that house, not simply the first one.
-      for (const house of houseRows(data.seats)) {
-        const row = document.createElement('div');
-        row.className = 'seat-row' + (house.full ? ' taken' : '');
-        row.dataset.faction = house.faction;
-        const dot = document.createElement('div');
-        dot.className = 'seat-dot';
-        dot.style.background = houseColor(house.faction);
-        const info = document.createElement('div');
-        info.className = 'seat-info';
-        const name = document.createElement('div');
-        name.className = 'seat-name';
-        name.textContent = houseName(house.faction);
-        const passive = document.createElement('div');
-        passive.className = 'seat-faction';
-        // The bonus line is a KEY — it has to go through t(), or the player reads
-        // «seatpick.bonus.azure» at the exact moment of choosing a house.
-        const bonusKey = houseBonusKey(house.faction);
-        passive.textContent = bonusKey ? t(bonusKey) : '';
-        // Подписи строки — `seatList.ts` (REFM-155, правило 4): слово о занятости
-        // отвечает «пустят ли», счёт — «сколько там уже сидит».
-        const подписи = houseLine(house);
-        const slots = document.createElement('div');
-        slots.className = 'seat-faction';
-        slots.style.fontSize = '10px';
-        slots.textContent = t('browser.slots') + ': ' + подписи.count;
-        info.appendChild(name);
-        info.appendChild(passive);
-        if (slots.textContent) info.appendChild(slots);
-        const status = document.createElement('div');
-        status.className = 'seat-status' + (house.full ? '' : ' free');
-        status.textContent = t(подписи.statusKey);
-        row.appendChild(dot);
-        row.appendChild(info);
-        row.appendChild(status);
-        const choice = houseChoice(house);
-        if (choice) {
-          row.addEventListener('click', () => {
-            for (const r of seatpickListEl.querySelectorAll('.seat-row.selected')) {
-              r.classList.remove('selected');
-            }
-            row.classList.add('selected');
-            seatpickSelected = choice.slot;
-            seatpickFaction = choice.faction; // BF-30: faction chosen independently of start
-            if (seatpickGoEl) seatpickGoEl.disabled = !startEnabled(seatpickSelected);
-          });
-        }
-        seatpickListEl.appendChild(row);
-      }
-    }
+    const body = (await res.json()) as { seats: EntrySeat[] };
+    const offer = entryOffer(body.seats ?? []);
+    if (seatpickEl) seatpickEl.style.display = 'none';
+    openSetup('hub'); // сбрасывает режим — сетевой ставим сразу после
+    netSetup = { matchId, offer };
+    startNetSetupPoll(srv.base, matchId, srv.nick);
+    // Стартовый мир не подставляем: правило 4 `entrySetup.ts` — кнопка заперта, пока
+    // игрок сам не ткнул в свободный мир. Иначе выбор превратился бы в пожелание.
+    setupStart = '';
+    renderSetup();
   } catch {
     показать(seatView('unreachable'));
   }
 }
 
-if (seatpickCancelEl) {
-  seatpickCancelEl.addEventListener('click', () => {
-    if (seatpickEl) seatpickEl.style.display = 'none';
-    seatpickMatchId = null;
-  });
-}
-if (seatpickGoEl) {
-  seatpickGoEl.addEventListener('click', () => {
-    if (!seatpickMatchId || !seatpickSelected) return;
-    const id = seatpickMatchId;
-    const slot = seatpickSelected;
-    const faction = seatpickFaction;
-    if (seatpickEl) seatpickEl.style.display = 'none';
-    seatpickMatchId = null;
-    // Navigate to ?join=<id>&slot=<slotId>&faction=<faction> — the boot block picks
-    // up ?join and connectToMatch fetches the join token with ?slot=&faction= to
-    // reserve the chosen seat AND override its faction (BF-30: decoupled from start).
-    // Склейку и экранирование держит `seatJoin.ts` (REFM-152): в адрес уходит выбор
-    // игрока, а фракции может не быть — тогда её нет и в ссылке.
-    location.href = joinHref(location.pathname, id, slot, faction);
-  });
-}
 
 function openSessionTab(id: string): void {
   // REL-7: show the seat/faction picker first (if the server supports it),
@@ -10999,7 +11067,15 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'testmode', isOpen: () => flexed('testmode'), close: () => hideFlex('testmode') }, // z59
   { id: 'sandbox', isOpen: () => flexed('sandbox'), close: () => hideFlex('sandbox') }, // z59
   { id: 'intro', isOpen: () => shown('intro'), close: () => hide('intro') }, // z58
-  { id: 'seatpick', isOpen: () => flexed('seatpick'), close: () => seatpickCancelEl?.click() }, // z58
+  // Оверлей мест остался только заглушкой на время загрузки и на отказ (ENTRY-2):
+  // выбор переехал на экран настройки, поэтому закрывать его нечем, кроме как скрыть.
+  {
+    id: 'seatpick',
+    isOpen: () => flexed('seatpick'),
+    close: () => {
+      if (seatpickEl) seatpickEl.style.display = 'none';
+    },
+  }, // z58
   { id: 'recap', isOpen: () => shown('recap'), close: () => hide('recap') }, // z57
   { id: 'profile', isOpen: () => shown('profile'), close: () => profile.close() }, // z57
   // --- окна и карточки (z51…z44) ---

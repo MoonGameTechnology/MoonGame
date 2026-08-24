@@ -5,9 +5,10 @@ import type { GameState, Planet } from '../state/gameState';
 import { allowedBuildings, hasOrbit } from '../state/sectorKind';
 
 /**
- * FND-2 (game-vision-roadmap.md) · Civic tax — port of the prototype's obcatanный
- * `taxModule` (`prototype/src/game.ts`), which already builds on shared-core's own
- * `hasOrbit`/`allowedBuildings` accessors. Armies cost credits in upkeep, but the
+ * FND-2 (game-vision-roadmap.md) · Civic tax — was a port of the prototype's
+ * `taxModule`, which already built on shared-core's own `hasOrbit`/`allowedBuildings`
+ * accessors; since CONV-3 the prototype's copy is gone and this is the only
+ * implementation, driven by both hosts. Armies cost credits in upkeep, but the
  * canonical path had nothing minting credits at scale (FND-1 added the passive
  * `planetType.baseOutput` faucet; this adds the second one the tuned economy
  * relies on) — every inhabited world of yours levies a flat civic tax that

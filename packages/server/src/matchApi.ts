@@ -30,15 +30,44 @@ export interface JoinResult {
 /** A stable failure from `join`, mapped to an HTTP status by the route. `E_NOT_ROSTERED`
  *  is the AvA path (AVA-7): the match is an AvA session and the caller is not on its roster.
  *  `E_ENTRY_CLOSED` is the SES-2.3 entry window: a login that does not already hold a seat is
- *  refused once the window has closed (the join impl checks `seatOf` before assigning a chair). */
+ *  refused once the window has closed (the join impl checks `seatOf` before assigning a chair).
+ *  `E_UNKNOWN_FACTION` (ENTRY-1) is the `faction` query param naming a house the shipped data
+ *  does not have: the id is a DATA KEY (`data.factions[...]` feeds passives, starting loadout
+ *  and radar range), so an unknown one would silently zero every house bonus instead of
+ *  failing — the player would think they play that house while playing none. */
 export type JoinFailure = {
-  error: 'E_NO_MATCH' | 'E_MATCH_FULL' | 'E_AUTH_DISABLED' | 'E_NOT_ROSTERED' | 'E_ENTRY_CLOSED';
+  error:
+    | 'E_NO_MATCH'
+    | 'E_MATCH_FULL'
+    | 'E_AUTH_DISABLED'
+    | 'E_NOT_ROSTERED'
+    | 'E_ENTRY_CLOSED'
+    | 'E_UNKNOWN_FACTION';
 };
 
 /** An authenticated caller, as resolved by the `identify` hook. */
 export interface Identity {
   accountId: string;
   login: string;
+}
+
+/** Что игрок принёс на вход: кто он и что выбрал на экране входа (ENTRY-2/3).
+ *
+ *  ИМЕНОВАННЫЙ объект, а не позиционные параметры — и это не стиль. На позиционных
+ *  реализация с МЕНЬШИМ числом аргументов совместима с более широкой сигнатурой, поэтому
+ *  канонический сервер полгода принимал три параметра из пяти и молча ронял `slot` с
+ *  `faction`, а TypeScript этого не видел (ENTRY-1). С объектом реализация получает вход
+ *  целиком; забыть поле всё ещё можно, но это видно в коде, а не прячется в сигнатуре. */
+export interface JoinRequest {
+  /** Ник места. На аутентифицированном пути — логин сессии, чужим им не назовёшься. */
+  nick: string;
+  accountId?: string | undefined;
+  /** Выбранный стартовый мир (кресло). */
+  preferredSlot?: string | undefined;
+  /** Выбранный дом. */
+  preferredFaction?: string | undefined;
+  /** Совет учёных в ЭТУ сессию (≤2 — предел держат схема и модуль). */
+  preferredScientists?: readonly string[] | undefined;
 }
 
 export interface MatchApiDeps {
@@ -51,7 +80,7 @@ export interface MatchApiDeps {
    *  `accountId` is stamped into the join token when the caller is authenticated.
    *  `preferredSlot` (REL-7): the player's chosen slot id (e.g. "p3"); the server
    *  reserves it if free, falls back to any free slot if not. */
-  join(matchId: string, nick: string, accountId?: string, preferredSlot?: string, preferredFaction?: string): Promise<JoinResult | JoinFailure>;
+  join(matchId: string, req: JoinRequest): Promise<JoinResult | JoinFailure>;
   /** Resolve the caller's identity from the request (session token), or null when the
    *  request carries no valid session. Wired ⇒ create/join REQUIRE identity (401 E_AUTH)
    *  and the session's login IS the nick. Absent ⇒ legacy `?nick=` dev behaviour. */
@@ -67,6 +96,10 @@ const STATUS: Record<JoinFailure['error'], number> = {
   E_MATCH_FULL: 409,
   E_NOT_ROSTERED: 403,
   E_ENTRY_CLOSED: 403,
+  // 400, а не 403: это не «нельзя», а «в запросе чушь» — клиент прислал дом, которого
+  // в данных нет. Отличать важно, иначе экран выбора покажет «вас не пускают» там, где
+  // на деле разъехались данные клиента и сервера.
+  E_UNKNOWN_FACTION: 400,
   E_AUTH_DISABLED: 501,
 };
 
@@ -121,9 +154,23 @@ export function registerMatchApi(app: FastifyInstance, deps: MatchApiDeps): void
         void reply.code(401);
         return { error: 'E_AUTH' as const };
       }
-      const slot = (request.query as { slot?: string }).slot;
-      const faction = (request.query as { faction?: string }).faction;
-      const result = await deps.join(id, who.login, who.accountId, slot, faction);
+      const q = request.query as { slot?: string; faction?: string; sci?: string };
+      const result = await deps.join(id, {
+        nick: who.login,
+        accountId: who.accountId,
+        preferredSlot: q.slot,
+        preferredFaction: q.faction,
+        // Совет едет одной строкой через запятую: два id, и отдельные повторяющиеся
+        // параметры ради двух значений — лишняя форма, которую пришлось бы разбирать
+        // и на клиенте, и здесь. Пустые куски отбрасываем, чтобы `sci=` и `sci=,`
+        // читались как «не выбрал», а не как учёный с пустым идентификатором.
+        preferredScientists: q.sci
+          ? q.sci
+              .split(',')
+              .map((x) => x.trim())
+              .filter((x) => x !== '')
+          : undefined,
+      });
       if ('error' in result) void reply.code(STATUS[result.error]);
       return result;
     }
@@ -132,7 +179,7 @@ export function registerMatchApi(app: FastifyInstance, deps: MatchApiDeps): void
       void reply.code(400);
       return { error: 'E_NICK_REQUIRED' as const };
     }
-    const result = await deps.join(id, nick.trim());
+    const result = await deps.join(id, { nick: nick.trim() });
     if ('error' in result) void reply.code(STATUS[result.error]);
     return result;
   });

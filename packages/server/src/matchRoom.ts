@@ -451,6 +451,12 @@ export class MatchRoom {
   private readonly lastPerfAt = new Map<PlayerId, number>();
   /** Wall→game clock multiplier (1 = real-time; >1 fast-forwards the match). */
   private readonly timeScale: number;
+  /** Множитель игрового времени к реальному. Нужен снаружи там, где окно измеряется в
+   *  РЕАЛЬНЫХ часах (истечение заявки на место, ENTRY-3): игровую длительность делят на
+   *  него, как это делает окно входа. */
+  get clockScale(): number {
+    return this.timeScale;
+  }
 
   constructor(options: MatchRoomOptions) {
     this.id = options.id;

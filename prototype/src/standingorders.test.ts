@@ -72,8 +72,12 @@ describe('standingOrdersModule — CC-2 auto-storm stance (authoritative)', () =
 
   it('is fail-secure: unknown fleet / not yours / non-boolean payload reject', () => {
     const s = stateWith([fleet('F'), fleet('E', { owner: 'red' })]);
+    // Чужой флот и несуществующий отвечают ОДИНАКОВО (A06 — по коду отказа нельзя
+    // выяснить, есть ли такой флот у соседа). Копия прототипа различала их
+    // `E_FORBIDDEN`/`E_NO_FLEET` и тем самым отвечала на вопрос, которого не задавали;
+    // CONV-7 снял копию, и остался ужесточённый ответ ядра.
     expect(rej(kernel.applyAction(s, orderAuto('green', 'ghost', true), ctx()))).toBe('E_NO_FLEET');
-    expect(rej(kernel.applyAction(s, orderAuto('green', 'E', true), ctx()))).toBe('E_FORBIDDEN');
+    expect(rej(kernel.applyAction(s, orderAuto('green', 'E', true), ctx()))).toBe('E_NO_FLEET');
     const bad = { ...orderAuto('green', 'F', true), payload: { fleetId: 'F', on: 'yes' } };
     expect(rej(kernel.applyAction(s, bad, ctx()))).toBe('E_BAD_PAYLOAD');
   });
