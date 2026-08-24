@@ -2,9 +2,10 @@
  * Fleet hull-repair math — shared by `modules/instantRepair.ts` (paid-in-credits,
  * anywhere) and `modules/fleetRepair.ts` (paid-in-metal, at an owned dock). A pure
  * utility (not a `GameModule`) so both action modules can share it without
- * importing each other (invariant #3). Port of the prototype's
- * `prototype/src/instantRepair.ts` (`missingHull`/`instantRepairCost`, REFP-17)
- * and `prototype/src/econScrews.ts` (`dockRepairCost`/`fleetAtOwnDock`, REFP-18).
+ * importing each other (invariant #3). Was ported from the prototype's
+ * `instantRepair.ts` (`missingHull`/`instantRepairCost`, REFP-17) and
+ * `econScrews.ts` (`dockRepairCost`/`fleetAtOwnDock`, REFP-18); since CONV-1/CONV-2
+ * those files are gone and this is the only copy of the math.
  */
 import type { Fleet, GameState } from '../state/gameState';
 import type { GameData } from '../data/schemas';

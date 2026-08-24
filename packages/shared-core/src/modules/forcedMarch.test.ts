@@ -9,8 +9,9 @@ import { parseGameData, type GameData } from '../data/schemas';
 import type { Action, ApplyResult, Context } from '../action/types';
 
 // forcedMarch — BOOST-1 "Ускорить": +50% скорость флота ценой 5% max-hp износа в
-// час хода. Порт прототипного forcedMarchModule (prototype/src/forcedMarch.ts,
-// REFP-16). Ни один тест не завязан на ИИ/бота.
+// час хода. Был портом прототипного forcedMarchModule (REFP-16); с CONV-1 копии
+// прототипа нет, и это единственные тесты механики — сюда перенесены его случаи:
+// пол износа и подметание погибшего флота. Ни один тест не завязан на ИИ/бота.
 
 const data: GameData = parseGameData({
   version: '0.1.0',

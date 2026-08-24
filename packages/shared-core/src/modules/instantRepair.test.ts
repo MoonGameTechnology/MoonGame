@@ -6,8 +6,10 @@ import { parseGameData, type GameData } from '../data/schemas';
 import type { Action, ApplyResult, Context } from '../action/types';
 
 // instantRepair — "золотой ремонт": мгновенный топ-ап корпуса за кредиты, из
-// любого места. Порт прототипного instantRepairModule (prototype/src/instantRepair.ts,
-// REFP-17). Ни один тест не завязан на ИИ/бота — только явные фикстуры.
+// любого места. Был портом прототипного instantRepairModule (REFP-17); с CONV-1
+// копии прототипа нет, и это единственные тесты механики — сюда перенесены его
+// случаи: щит, фитинговый корпус, десант в трюме. Ни один тест не завязан на
+// ИИ/бота — только явные фикстуры.
 
 const data: GameData = parseGameData({
   version: '0.1.0',

@@ -74,8 +74,8 @@ export {
   REPAIR_HP_PER_METAL,
   dockRepairCost,
   fleetAtOwnDock,
-  econScrewsModule,
-} from './econScrews';
+  fleetRepairModule,
+} from '../../packages/shared-core/src/index';
 export {
   INSTANT_REPAIR_CREDITS_PER_HP,
   missingHull,
