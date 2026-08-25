@@ -957,11 +957,17 @@ const server = createMultiplayerServer({
       });
     }
     if (playerHtml !== undefined && devHtml !== undefined) {
-      app.get('/dev', async (_request, reply) => {
-        void reply.header('content-type', 'text/html; charset=utf-8');
-        void reply.header('cache-control', 'no-store, must-revalidate');
-        return devHtml;
-      });
+      // ADDR-3: адрес партии живёт ВНУТРИ той сборки, из которой в неё вошли, поэтому
+      // дев-клиент отдаётся и на `/dev/game/<id>`. Без второго маршрута вход с дев-клиента
+      // уводил бы на `/game/<id>`, то есть на игроцкую сборку без дев-оверлея — тихая
+      // подмена клиента прямо посреди сессии.
+      for (const route of ['/dev', '/dev/game/:matchId']) {
+        app.get(route, async (_request, reply) => {
+          void reply.header('content-type', 'text/html; charset=utf-8');
+          void reply.header('cache-control', 'no-store, must-revalidate');
+          return devHtml;
+        });
+      }
     }
   },
 });

@@ -268,6 +268,12 @@ export function createMultiplayerServer(
     };
     app.get('/', serveIndex);
     app.get('/index.html', serveIndex);
+    // ADDR-3: партия адресуется ПУТЁМ (`/game/<id>`), а не хвостом (`/?join=<id>`), —
+    // такой адрес игрок копирует целиком и кладёт в закладку. Клиентской маршрутизации
+    // для этого мало: первая — холодная — загрузка по скопированному адресу приходит
+    // сюда, и без этого маршрута она упирается в 404. Отдаём тот же клиент, а какую
+    // партию открыть, он читает из своего же пути (`decisions/matchAddress.ts`).
+    app.get('/game/:matchId', serveIndex);
   }
 
   // Caller-supplied routes (the match create/join API, SV-2.4) — registered after the
