@@ -288,6 +288,16 @@ import {
   type MatchRules,
   type MatchTab,
 } from './matchRow';
+import {
+  clampFilter,
+  mapsOf,
+  matchesFilter,
+  playerBounds,
+  restoreFilter,
+  serializeFilter,
+  FILTER_STORE_KEY,
+  type FilterState,
+} from './matchFilter';
 
 /** Причина отказа во входе в матч → ключ подписи. Текст живёт в /localization. */
 const JOIN_REASON: Record<Exclude<JoinOutcome, 'ok'>, string> = {
@@ -10456,6 +10466,10 @@ interface MatchRow {
 
 let matchLists: Record<MatchTab, MatchRow[]> | null = null;
 let activeTab: MatchTab = 'available';
+/** Выбор фильтров (BRW-3). Живёт в модуле, поэтому тихий переопрос раз в десять секунд
+ *  его не сбрасывает — перерисовка читает то же состояние. Между заходами он лежит в
+ *  `localStorage` рядом с `void.server`/`void.nick`; `null` — ещё не восстанавливали. */
+let matchFilter: FilterState | null = null;
 
 /** Join a chosen match: set it as the (re)connect target, then dial via `connect()`.
  *  Accounts mode (SES-2.5) first exchanges the session for a join token (register/
@@ -10704,6 +10718,53 @@ async function toggleArchive(id: string, restore: boolean): Promise<void> {
   }
 }
 
+/** Запомнить выбор между заходами — рядом с `void.server` / `void.nick`. */
+function saveMatchFilter(): void {
+  if (matchFilter) localStorage.setItem(FILTER_STORE_KEY, serializeFilter(matchFilter));
+}
+
+/**
+ * Отрисовать панель фильтров ПО ЛЕНТЕ (BRW-3). Галочки карт и границы ползунка берутся
+ * из самой ленты (`matchFilter.ts`, правило 6) — каталога карт в read-model нет. Что
+ * значит выбор, решает тот же модуль; здесь только разметка и обработчики.
+ */
+function renderFilterPanel(rows: MatchRow[], f: FilterState): void {
+  for (const b of Array.from(document.querySelectorAll('#mf-mode .mfbtn')))
+    b.classList.toggle('active', (b as HTMLElement).dataset.mode === f.mode);
+  const btn = $('mf-map');
+  btn.textContent =
+    f.maps.size === 0 ? t('browser.filter.map.all') : t('browser.filter.map.some', { n: f.maps.size });
+  const menu = $('mf-maps');
+  menu.textContent = '';
+  for (const id of mapsOf(rows)) {
+    const label = document.createElement('label');
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.checked = f.maps.has(id);
+    box.addEventListener('change', () => {
+      if (box.checked) f.maps.add(id);
+      else f.maps.delete(id);
+      saveMatchFilter();
+      renderMatches();
+    });
+    label.appendChild(box);
+    label.appendChild(document.createTextNode(id));
+    menu.appendChild(label);
+  }
+  const bounds = playerBounds(rows);
+  const lo = $('mf-min') as HTMLInputElement;
+  const hi = $('mf-max') as HTMLInputElement;
+  for (const [input, value] of [
+    [lo, f.players.min],
+    [hi, f.players.max],
+  ] as const) {
+    input.min = String(bounds.min);
+    input.max = String(bounds.max);
+    input.value = String(value);
+  }
+  $('mf-range').textContent = t('browser.filter.range', { min: f.players.min, max: f.players.max });
+}
+
 function renderMatches(): void {
   const el = $('mlist');
   const failed = statusEl.textContent === t('acc.server-down');
@@ -10736,10 +10797,35 @@ function renderMatches(): void {
       openSetup('hub');
     });
   };
-  const rows = matchLists?.[activeTab] ?? [];
-  const план = fallbackFor({ ...состояние, rows: rows.length });
+  const все = matchLists?.[activeTab] ?? [];
+  // Фильтр — это ПОИСК сессии, поэтому он живёт только на «Доступных» (решение владельца,
+  // `matchFilter.ts`, правило 1): свои матчи на двух других вкладках он не трогает, и
+  // панель там не показывается. Состояние приводится к сегодняшней ленте на каждой
+  // перерисовке (правило 7) — иначе сохранённая галочка на ушедшей карте вычистила бы
+  // список, не показавшись в панели.
+  let rows = все;
+  let hiddenByFilter = 0;
+  if (activeTab === 'available') {
+    matchFilter = matchFilter
+      ? clampFilter(matchFilter, все)
+      : restoreFilter(localStorage.getItem(FILTER_STORE_KEY), все);
+    rows = все.filter((m) => matchesFilter(m, matchFilter as FilterState));
+    hiddenByFilter = все.length - rows.length;
+  }
+  const план = fallbackFor({ ...состояние, rows: rows.length, hiddenByFilter });
+  // Панель нужна только там, где есть что фильтровать: без загруженной ленты она
+  // предлагала бы крутить контролы вместо того, чтобы починить связь.
+  const панель = $('mfilter');
+  панель.style.display = activeTab === 'available' && план.kind !== 'empty' ? '' : 'none';
+  if (activeTab === 'available' && план.kind !== 'empty') renderFilterPanel(все, matchFilter as FilterState);
   if (план.kind === 'empty') {
     soloCard(t(план.message));
+    return;
+  }
+  if (план.kind === 'filtered') {
+    // Правило 6 `browserFallback.ts`: это НЕ тупик — путь у игрока прямо над списком,
+    // поэтому одно сообщение и никакой кнопки «в соло».
+    el.innerHTML = `<div class="mempty">${t(план.message)}</div>`;
     return;
   }
   el.textContent = '';
@@ -10799,6 +10885,34 @@ function renderMatches(): void {
     row.appendChild(btns);
     el.appendChild(row);
   }
+}
+
+// Контролы фильтра (BRW-3). Обработчики вешаются ОДИН раз: живой пересчёт — это
+// перерисовка уже лежащей в памяти ленты, без похода на сервер.
+$('mf-mode').addEventListener('click', (e) => {
+  const btn = (e.target as HTMLElement).closest('.mfbtn') as HTMLElement | null;
+  const mode = btn?.dataset.mode;
+  if (!matchFilter || (mode !== 'all' && mode !== 'pvp' && mode !== 'pve')) return;
+  matchFilter.mode = mode;
+  saveMatchFilter();
+  renderMatches();
+});
+$('mf-map').addEventListener('click', () => {
+  const menu = $('mf-maps');
+  menu.style.display = menu.style.display === 'none' ? '' : 'none';
+});
+for (const id of ['mf-min', 'mf-max']) {
+  $(id).addEventListener('input', () => {
+    if (!matchFilter) return;
+    // Концы намеренно НЕ разводятся: перевёрнутый ползунок — законное состояние,
+    // предикат меняет их местами сам (`matchFilter.ts`, правило 4).
+    matchFilter.players = {
+      min: Number(($('mf-min') as HTMLInputElement).value),
+      max: Number(($('mf-max') as HTMLInputElement).value),
+    };
+    saveMatchFilter();
+    renderMatches();
+  });
 }
 
 for (const btn of Array.from(document.querySelectorAll('.mtab'))) {
