@@ -196,6 +196,29 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
   return chips + ident + tabs + `<div class="hx-view">${body}</div>` + dossier;
 }
 
+/**
+ * Глубина узла в цепочке `requires` — длина САМОГО ДЛИННОГО пути до корня.
+ *
+ * По ней рейка и упорядочивается: игрок читает ветку сверху вниз в том порядке, в
+ * котором её и качают. Сортировать по ЧИСЛУ родителей (как было) нельзя: у всей
+ * цепочки коридора по одному родителю, поэтому дальше вступал алфавит и «Общий
+ * коридор» (`corridor_open`) всплывал выше «Разогнанного шлема», который ему дед.
+ *
+ * `seen` — защита от цикла в данных: каталог редактируется руками, а зациклённый
+ * `requires` иначе увёл бы рендер в бесконечную рекурсию. Цикл считается корнем
+ * (глубина 0) — узел просто встанет наверх, но UI не повесится.
+ */
+export function nodeDepth(
+  id: string,
+  trees: Record<string, { requires: readonly string[] } | undefined>,
+  seen: ReadonlySet<string> = new Set(),
+): number {
+  const node = trees[id];
+  if (!node || node.requires.length === 0 || seen.has(id)) return 0;
+  const next = new Set([...seen, id]);
+  return 1 + Math.max(...node.requires.map((r) => nodeDepth(r, trees, next)));
+}
+
 /** The skill tree tab — the hero's own rail (own-branch nodes + branch-less «common»
  *  nodes any hero may take) plus a dimmed rail per foreign branch; nodes ordered
  *  roots-first with a prereq connector; tap an own, un-owned node → dossier. */
@@ -237,7 +260,11 @@ function heroTreeHtml(hero: HeroInst, res: Bag): string {
   for (const rail of rails) {
     const rn = rail.nodes
       .slice()
-      .sort((a, b) => a[1].requires.length - b[1].requires.length || a[0].localeCompare(b[0]));
+      .sort(
+        (a, b) =>
+          nodeDepth(a[0], data.heroSkillTrees) - nodeDepth(b[0], data.heroSkillTrees) ||
+          a[0].localeCompare(b[0]),
+      );
     html +=
       `<div class="hx-rail${rail.own ? '' : ' foreign'}${rail.ps ? ' ps' : ''}">` +
       `<div class="hx-rhd"><span class="hx-dot"></span>${esc(t(rail.label))}` +

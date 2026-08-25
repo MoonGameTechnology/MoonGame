@@ -11,6 +11,7 @@ import {
   initHeroStaff,
   HERO_CASTABLE,
   heroCdKey,
+  nodeDepth,
   type HeroView,
   type HeroStaffHost,
 } from './heroStaff';
@@ -200,6 +201,40 @@ describe('штаб героев — разметка панели', () => {
       expect(html, node).toContain(t(node));
     }
     expect(html).toContain('🔒'); // ступени заперты, пока не взят родитель
+  });
+
+  it('ветка читается сверху вниз В ПОРЯДКЕ ПРОКАЧКИ, а не по алфавиту', () => {
+    // Жалоба владельца: «Общий коридор» стоял выше «Разогнанного шлема», хотя качается
+    // последним. Причина — сортировка по ЧИСЛУ родителей: у всей цепочки коридора его
+    // по одному, дальше вступал алфавит (`corridor_open` < `corridor_sustained` <
+    // `overclocked_helm`). Теперь порядок задаёт ГЛУБИНА цепочки.
+    const html = initHeroStaff(hostOf()).paneHtml();
+    const order = ['neural-lace', 'overclocked-helm', 'corridor-sustained', 'corridor-open'].map(
+      (k) => html.indexOf(t(`hero.tree.${k}.name`)),
+    );
+    expect(order.every((i) => i >= 0)).toBe(true); // все четыре на экране
+    expect(order).toEqual([...order].sort((a, b) => a - b)); // и именно в этом порядке
+  });
+
+  it('глубина узла — длина самого длинного пути до корня, цикл в данных не вешает UI', () => {
+    const trees = {
+      root: { requires: [] },
+      mid: { requires: ['root'] },
+      leaf: { requires: ['mid'] },
+      // Две дороги до корня: считается ДЛИННАЯ, иначе узел встанет выше своего же деда.
+      forked: { requires: ['root', 'leaf'] },
+      loopA: { requires: ['loopB'] },
+      loopB: { requires: ['loopA'] },
+    };
+    expect(nodeDepth('root', trees)).toBe(0);
+    expect(nodeDepth('mid', trees)).toBe(1);
+    expect(nodeDepth('leaf', trees)).toBe(2);
+    expect(nodeDepth('forked', trees)).toBe(3);
+    // Цикл обрывается на повторе узла В ТЕКУЩЕМ пути, а не рекурсирует вечно: обход
+    // проходит loopA → loopB и упирается в loopA, то есть длину самого цикла. Важно не
+    // конкретное число, а что оно конечно и рендер не виснет.
+    expect(nodeDepth('loopA', trees)).toBe(2);
+    expect(nodeDepth('unknown', trees)).toBe(0); // нет в каталоге — корень (fail-secure)
   });
 
   it('переключение вкладки меняет тело панели', () => {
