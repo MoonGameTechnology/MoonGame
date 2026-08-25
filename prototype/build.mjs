@@ -2221,6 +2221,16 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   background:rgba(53,214,230,.1);color:var(--cyan);font-size:18px;}
 #hub .hub-card .hc-t{font-size:13px;color:#dfeef2;}
 #hub .hub-card .hc-s{font-size:11px;color:var(--dim);margin-top:4px;line-height:1.45;}
+/* ADDR-4 «Мои партии» — свои партии прямо на главном экране */
+#hub .hm-list{display:flex;flex-direction:column;gap:8px;}
+#hub .hm-row .hm-body{flex:1;min-width:0;}
+#hub .hm-row .hm-addr{font-size:10px;color:var(--cyan-dim);margin-top:6px;
+  overflow-wrap:anywhere;user-select:all;-webkit-user-select:all;}
+#hub .hm-row .hm-btns{display:flex;flex-direction:column;gap:6px;flex:0 0 auto;}
+#hub .hm-row .hm-btns .mbtn{white-space:nowrap;}
+#hub .hm-more{font-size:11px;color:var(--dim);background:transparent;border:none;padding:2px 0;
+  cursor:pointer;text-align:left;text-decoration:underline;}
+#hub .hm-empty{font-size:11px;color:var(--dim);line-height:1.45;}
 /* ONB-0 first-run offer card (hub home) */
 #hub .ob-nudge{border-color:var(--cyan);background:rgba(53,214,230,.06);}
 #hub .ob-nudge .ob-body{flex:1;}
@@ -2949,6 +2959,9 @@ const page = (js) => `<!doctype html>
           </div>
         </div>
       </div>
+      <!-- ADDR-4: свои партии — главный экран, а не вкладка обозревателя. -->
+      <div class="hub-sec" data-i18n="hub.mine.section"></div>
+      <div class="hm-list" id="hub-mine"></div>
       <div class="hub-sec" data-i18n="hub.digest.section"></div>
       <div class="hub-card">
         <div class="hc-ic">◷</div>

@@ -5,6 +5,7 @@ import {
   matchAddress,
   matchIdFrom,
   settledAddress,
+  shareAddress,
 } from './matchAddress';
 
 describe('appRoot — куда смонтирован клиент (ADDR-3)', () => {
@@ -100,6 +101,22 @@ describe('settledAddress — что остаётся в строке после 
 
   it('мусор вместо адреса возвращается как есть, а не роняет вход', () => {
     expect(settledAddress('не адрес', 'm-1')).toBe('не адрес');
+  });
+});
+
+describe('shareAddress — адрес, который можно ОТДАТЬ (ADDR-4)', () => {
+  it('строится на адресе СЕРВЕРА, а не страницы', () => {
+    // В APK страница приходит с локального сервера Capacitor: адрес, собранный из
+    // `location.origin`, привёл бы получателя в его собственный телефон.
+    expect(shareAddress('http://10.0.0.5:8788', 'm-1')).toBe('http://10.0.0.5:8788/game/m-1');
+  });
+
+  it('лишний слэш на конце базы не удваивается', () => {
+    expect(shareAddress('https://void.example/', 'm-1')).toBe('https://void.example/game/m-1');
+  });
+
+  it('идентификатор экранируется — он приходит от сервера, а не из кода', () => {
+    expect(shareAddress('https://s', 'm a&b')).toBe('https://s/game/m%20a%26b');
   });
 });
 
