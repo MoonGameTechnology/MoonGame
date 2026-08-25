@@ -23,7 +23,8 @@
 
 > Перечень ниже — что в каталоге, а не что гоняет конкретное ядро. Канонический сервер
 > (`DEV_MODULES`) и прототип (`MODULES`) берут РАЗНЫЕ подмножества, и в перечне не
-> отражены новые `pve` и `seatClaim`. Точный состав обеих сборок — `state.md` §9.
+> отражены новые `pve`, `seatClaim` и `autoRally` (CONV-10). Точный состав обеих сборок —
+> `state.md` §9.
 
 kernel + `advanceTo` · movement (Дейкстра по лейнам) · **combat / orbital / artillery / intercept** (распил монолита, PR #100) · construction + buildings (уровни/HP/оборона/разрушение, **RULES-2.1: `maxPerPlanet > 1` + апгрейд по `uid`**) · economy (+содержание) · tax (гражданский налог) · army (domain, load/unload, десант) · **fleetOps** (`fleet.launch`/`merge`/`split`/`engage`) · victory/счёт · technology (сессионное древо) · planetType · sector · faction · hero · **heroEffects** (recall/aura/reveal) · capital · market · scientist · station · **espionage** (SPY-1/SPY-2, PR #102) · **steward** («Хранитель» — делегирование места ИИ, PR #105) · **standingOrders** (order.auto/scramble/chain) · instantRepair · fleetRepair · forcedMarch · arsenalSync (LARS-1) · visibility (туман: identify + radar + память + anti-leak) · diplomacy (war/peace/pact/alliance + consent-офферы) · captureOnArrival · **effects** (EFX-1: интерпретатор `data.events` trigger→effect, generic-чтение трейтов) · **squadron** (свободный полёт эскадрилий/ракет: `squadron.strike`/`return`/`arrived`, `homeBase`/`freePosition`/`freeMovement`, `pointDefense` — реактивное ПВО: залп по эскадрильям в радиусе, перезарядка 20 мин, `pdCooldownUntil`).
 

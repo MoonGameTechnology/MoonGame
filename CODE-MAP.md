@@ -36,7 +36,7 @@
 | 3 | `tax` | `tax.ts` | — | — | `economy.production` | — |
 | 4 | `economy` | `economy.ts` | — | `time.advanced` | — | — |
 | 5 | `movement` | `movement.ts` | `fleet.move`, `fleet.stop` | — | — | `fleet.leg`, `fleet.departed` |
-| 6 | `hero` | `hero.ts` | `hero.move`, `hero.path.create`, `planet.annihilate`, `hero.ability` | `fleet.arrived`, `hero.path.expire` | `fleet.speed`, `combat.damage` | `hero.died`, `hero.path.created`, `hero.path.expired`, `planet.destroyed`, `hero.moved`, `hero.ability.used` |
+| 6 | `hero` | `hero.ts` | `hero.move`, `planet.annihilate`, `hero.ability` | `fleet.arrived`, `hero.path.expire` | `fleet.speed`, `combat.damage` | `hero.died`, `hero.path.created`, `hero.path.expired`, `planet.destroyed`, `hero.moved`, `hero.ability.used` |
 | 7 | `diplomacy` | `diplomacy.ts` | `diplomacy.declare` | — | — | `diplomacy.changed`, `diplomacy.offered` |
 | 8 | `orbital` | `orbital.ts` | — | `fleet.arrived` | — | `aa.fired`, `planet.bombarded` |
 | 9 | `combat` | `combat.ts` | — | `fleet.arrived`, `fleet.transit` | `fleet.speed` | `battle.started`, `planet.captured`, `fleet.destroyed`, `battle.resolved` |

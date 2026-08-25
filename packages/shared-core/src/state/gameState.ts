@@ -683,8 +683,16 @@ export interface Hero {
    *  Identifies the hero across events (death/respawn) independently of `owner`. */
   id: string;
   owner: PlayerId;
-  /** Display name — the player's projection of themselves (their nick). Cosmetic;
-   *  set at match seed. Absent ⇒ the client falls back to the owner's name. */
+  /** SEAT identity of a main hero — the callsign the player signed in with, or the
+   *  house id of the seat in a solo match. Written only where a seat exists (the
+   *  prototype's `matchSetup`); a roster hero carries none.
+   *
+   *  NOT a display name (AUD-13): human-readable text must never be stored in
+   *  `GameState`, because the state is shared by every player while the locale is
+   *  per-viewer — anything written here reaches the screen untranslated. A hero's
+   *  NAME is built by the renderer from `archetype` (→ `data.heroes[a].name`);
+   *  what lives here is an identity that has no translation (a nick) or that the
+   *  renderer localises by key (a house). */
   name?: string;
   /** The node the hero currently occupies / respawns at (abilities act from here,
    *  the projection hero returns here after dying). */

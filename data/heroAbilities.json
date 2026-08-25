@@ -7,7 +7,21 @@
     "range": 300,
     "params": {
       "tier": 1
-    }
+    },
+    "tiers": [
+      {
+        "skill": "corridor_sustained",
+        "params": {
+          "tier": 2
+        }
+      },
+      {
+        "skill": "corridor_open",
+        "params": {
+          "tier": 3
+        }
+      }
+    ]
   },
   "annihilate": {
     "name": "Annihilate",

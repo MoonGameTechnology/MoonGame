@@ -113,11 +113,15 @@ export interface HeroLoadout {
 }
 
 /** The default roster: the main hero (renamed to the player's callsign) + one of each
- *  other grade, so all four rarities are represented until hero acquisition lands. */
+ *  other grade, so all four rarities are represented until hero acquisition lands.
+ *
+ *  У трансгуманистов (командир, авангард) ОДИН слот намеренно пуст: «Коридор» больше не
+ *  выдаётся на старте, его открывает узел дерева `overclocked_helm`, и грант ложится
+ *  ровно в этот слот. Так бюджет слотов сходится: прокачал — заполнил. */
 export const DEFAULT_HEROES: HeroLoadout[] = [
-  { name: 'hero.arch.commander', grade: 'main', abilities: ['corridor', 'rally', 'scan', 'bulwark'] },
+  { name: 'hero.arch.commander', grade: 'main', abilities: ['rally', 'scan', 'bulwark', null] },
   { name: 'hero.arch.destroyer', grade: 'legendary', abilities: ['annihilate', 'scan', 'recall'] },
-  { name: 'hero.arch.vanguard', grade: 'rare', abilities: ['corridor', 'rally'] },
+  { name: 'hero.arch.vanguard', grade: 'rare', abilities: ['rally', null] },
   { name: 'hero.arch.warden', grade: 'common', abilities: ['bulwark'] },
 ];
 

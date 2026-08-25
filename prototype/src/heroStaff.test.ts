@@ -185,6 +185,23 @@ describe('штаб героев — разметка панели', () => {
     expect(html).toContain('hx-tree');
   });
 
+  it('в дереве трансгуманиста видны ВСЕ ЧЕТЫРЕ узла ветки, включая запертые', () => {
+    // Жалоба владельца с живой игры: «не наблюдаю 3 и 4 узлов». Рейка ветки рисует
+    // весь каталог, а не только доступное — запертый узел показывается с замком и
+    // рассказывает в досье, чего ему не хватает. Сторож держит именно это: добавили
+    // узел в данные — он обязан появиться игроку, а не потеряться в UI.
+    const html = initHeroStaff(hostOf()).paneHtml();
+    for (const node of [
+      'hero.tree.neural-lace.name',
+      'hero.tree.overclocked-helm.name',
+      'hero.tree.corridor-sustained.name',
+      'hero.tree.corridor-open.name',
+    ]) {
+      expect(html, node).toContain(t(node));
+    }
+    expect(html).toContain('🔒'); // ступени заперты, пока не взят родитель
+  });
+
   it('переключение вкладки меняет тело панели', () => {
     const staff = initHeroStaff(hostOf());
     const tree = staff.paneHtml();

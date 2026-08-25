@@ -15,7 +15,6 @@ const CLIENT_ACTION_TYPES = [
   'army.load',
   'army.unload',
   'hero.move',
-  'hero.path.create',
   'hero.ability',
   'hero.spawn',
   'hero.skill.unlock',
@@ -81,7 +80,6 @@ describe('SV-1.2 · action payload schemas', () => {
       ['army.load', { fleetId: 'f1', unit: 'marine' }],
       ['army.unload', { fleetId: 'f1', unit: 'marine', count: 3 }],
       ['hero.move', { to: 'p1' }],
-      ['hero.path.create', { to: 'p1' }],
       ['hero.ability', { heroId: 'hero:p1', abilityId: 'corridor', target: 'p2' }],
       ['hero.ability', { heroId: 'hero:p1', abilityId: 'recall' }], // untargeted cast
       ['hero.spawn', { heroId: 'hero:p1', at: 'home_a' }],
