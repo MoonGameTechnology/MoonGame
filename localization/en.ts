@@ -369,7 +369,8 @@ export const en: Record<string, string> = {
   'corp.battle.loss': 'DEFEAT',
   'corp.battle.win': 'VICTORY',
   'corp.battles.none': 'No battles yet.',
-  'corp.battles.note': 'These are wars from the public AvA feed — the server keeps a recent window, not the corp’s full archive.',
+  'corp.battles.note':
+    'These are wars from the public AvA feed — the server keeps a recent window, not the corp’s full archive.',
   'corp.battles.title': 'Recent battles',
   'corp.browse.empty': 'No other corporations yet.',
   'corp.browse.title': 'Find and apply',
@@ -421,12 +422,14 @@ export const en: Record<string, string> = {
   'corp.role.officer': 'Officer',
   'corp.role.recruit': 'Applicant',
   'corp.settings.identity': 'Identity',
-  'corp.settings.identity.hint': 'The name is set at creation; a tag, motto, join policy and tax are not stored by the server yet.',
+  'corp.settings.identity.hint':
+    'The name is set at creation; a tag, motto, join policy and tax are not stored by the server yet.',
   'corp.settings.name': 'Name',
   'corp.settings.soon': 'Coming soon',
   'corp.showcase': 'Award showcase',
   'corp.showcase.empty': 'empty',
-  'corp.showcase.hint': 'Tap a cup — the full award showcase opens. The pick is stored on this device.',
+  'corp.showcase.hint':
+    'Tap a cup — the full award showcase opens. The pick is stored on this device.',
   'corp.tab.battles': 'Battles',
   'corp.tab.hq': 'HQ',
   'corp.tab.members': 'Members',
@@ -830,7 +833,8 @@ export const en: Record<string, string> = {
   'profile.season': 'Season points',
   'profile.streak': 'Win streak',
   'profile.medals': 'Medal showcase',
-  'profile.medals.empty': 'Medals show up here once your corporation goes to war. Sign in on a server with the meta layer to see the showcase.',
+  'profile.medals.empty':
+    'Medals show up here once your corporation goes to war. Sign in on a server with the meta layer to see the showcase.',
   'queue.added': 'queued: {what} at {at}',
   'queue.failed': '{what} — failed: {err}',
   'queue.unknown': 'unknown order',
@@ -1099,7 +1103,7 @@ export const en: Record<string, string> = {
     "The hero's ship drives its fleet at full burn: +10% speed for the hero's fleet.",
   'hero.passive.vanguard-impulse.name': 'Vanguard Impulse',
   'hero.tree.corridor-open.desc':
-    'Opens the corridor to your ALLIES: their fleets use your passage as their own. It becomes a shared road, so a neutral — or the enemy — can step in as well.',
+    'Opens the corridor to your ALLIES: their fleets use your passage as their own, at the same speed bonus. It becomes a shared road, so a neutral — or the enemy — can step in as well, but for them it is only a road: no bonus.',
   'hero.tree.corridor-open.name': 'Shared Corridor',
   'hero.tree.corridor-sustained.desc':
     "The corridor lives on a clock instead of closing behind the hero's army.",
@@ -1798,7 +1802,6 @@ export const en: Record<string, string> = {
   'side.world.type-bonuses': 'Type bonuses',
   'side.world.type.long': 'A {pt} world — {mods}',
   'side.world.vp': 'Victory points',
-
 
   // --- speed — Панель времени: подсказки множителей, перезапуска и выхода.
   'speed.exit': 'Exit to menu',

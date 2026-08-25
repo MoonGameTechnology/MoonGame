@@ -406,6 +406,9 @@ describe('hero — temp lane speed bonus (fleet.speed hook)', () => {
       kernel.applyAction(laned.state, act('fleet.move', 'p2', { fleetId: 'A1', to: 'C' }), ctx(0)),
     );
     expect(ally.state.fleets.A1?.movement?.to).toBe('C'); // маршрут построился по коридору
+    // Союзник едет С УСКОРЕНИЕМ, как сам владелец: 250 юнитов на скорости 10 × 1.5.
+    // Врагу тот же коридор даёт только проход (соседний тест: 250 / 10).
+    expect(ally.state.fleets.A1?.movement?.arrivesAt).toBeCloseTo((250 / 15) * HOUR, 0);
 
     // А на ЛИЧНОЙ ступени союзнику хода нет — коридор ещё не общий.
     const priv = okApply(kernel.applyAction(corridorWorld(), corridor('C'), ctx(0)));

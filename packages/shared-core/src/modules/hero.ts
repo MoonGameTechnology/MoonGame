@@ -15,6 +15,7 @@ import { getStance, stanceToRelation } from '../state/diplomacy';
 import { fleetSideDealingHit, heroNode } from '../state/heroes';
 import { distance } from '../state/route';
 import { isCapturable } from '../state/sectorKind';
+import { isAllied } from '../util/combat';
 import { canInstall } from '../util/fitting';
 import { addUnits } from '../util/stacks';
 import { canAfford, payCost } from '../util/treasury';
@@ -620,11 +621,17 @@ export const heroModule: GameModule = {
       const owner = h.state.fleets[fleetId]?.owner;
       if (owner === undefined) return speed;
       let out = speed;
+      // Ускорение коридора принадлежит БЛОКУ его владельца: своим флотам и флотам
+      // союзников (заказ владельца). Противник по общему коридору пройти может, но
+      // едет на своей скорости — проход открыт, подарка нет. Союзность спрашивается
+      // через `isAllied` (capability `diplomacy`, без модуля — честное чтение D1),
+      // а не переписывается здесь второй копией правила (MAPSHARE-1).
+      // Порядок условий: сперва дешёвая геометрия и срок, потом дипломатия.
       const lane = h.state.tempLanes?.find(
         (l) =>
-          l.owner === owner &&
           l.expiresAt > h.ctx.now &&
-          ((l.from === from && l.to === to) || (l.from === to && l.to === from)),
+          ((l.from === from && l.to === to) || (l.from === to && l.to === from)) &&
+          (l.owner === owner || isAllied(h, l.owner, owner)),
       );
       if (lane) out *= 1 + lane.speedBonus;
       const passives = passiveBonus(h, 'fleet.speed', owner, { fleetId, node: from });
