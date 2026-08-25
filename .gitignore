@@ -19,6 +19,8 @@ prototype/econ-playtest-result.json
 
 # VPS server config — holds a token; never commit (see deploy/server.env.example)
 deploy/server.env
+# Rollback point written by deploy/update.sh on the prod host (runtime state, not code)
+.last-good-image
 
 # Env / secrets (never commit — see docs/architecture.md A04)
 .env

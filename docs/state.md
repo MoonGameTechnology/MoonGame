@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 4906 зелёных** (58 skip, 374 файла).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 4917 зелёных** (58 skip, 375 файлов).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -2369,7 +2369,13 @@ GHCR → подпись cosign по дайджесту; смоук — SEC-17, �
 `CONTRIBUTING.md`).
 Прод-деплой из подписанного образа: `deploy/verify-image.sh` + оверлей
 `docker-compose.release.yml` (runbook — `deploy/README.md`, разбор слоёв —
-`docs/security/pipeline.md`).
+`docs/security/pipeline.md`). Обновление живого хоста (`moongame update`) исполняет
+`deploy/update.sh` — **файл репозитория** (OPS-1): гейт подписи → pull/build → рестарт →
+проверка `/health` → откат; пути считаются от самого скрипта, поэтому клон может лежать
+где угодно. Раньше скрипт генерировался heredoc'ом установщика и писался на диск один
+раз, при установке, — починка самого механизма обновления до развёрнутой машины не
+доезжала. Покрыт `deploy/update.test.mjs` (внешние команды — заглушки на `PATH`,
+проверяются набор и порядок вызовов); `vitest.config.ts` видит `deploy/**/*.test.mjs`.
 
 Тесты лежат рядом с кодом (`*.test.ts`) — и в пакетах, и в `prototype/src` (Vitest
 их видит). **Прототип типизируется в гейте (REFM-0):** `prototype/tsconfig.json`
