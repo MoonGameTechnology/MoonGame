@@ -19,6 +19,11 @@
  * 4. **Фракции может не быть — и тогда её нет и в адресе.** Пустой параметр `faction=`
  *    сервер прочитал бы как «фракция задана и она пустая»; отсутствие параметра честно
  *    значит «оставь ту, что идёт с местом».
+ * 5. **Совет учёных едет тем же правилом** (ENTRY-4): выбран — уходит строкой через
+ *    запятую, не выбран — параметра нет вовсе. Совет выбирается В ЭТУ сессию и попадает
+ *    в заявку на месте (`seat.claim`), поэтому он часть адреса входа, а не отдельного
+ *    запроса: иначе между «сел» и «выбрал» появилось бы окно, в котором место уже занято,
+ *    а состав ещё нет.
  */
 
 /** Можно ли уже входить (правило 1). */
@@ -26,13 +31,20 @@ export function startEnabled(selectedSlot: string | null): boolean {
   return selectedSlot !== null;
 }
 
-/** Ссылка входа с выбранным местом (правила 3–4). */
+/** Ссылка входа с выбранным местом (правила 3–5). */
 export function joinHref(
   pathname: string,
   matchId: string,
   slot: string,
   faction: string | null,
+  scientists: readonly string[] = [],
 ): string {
   const factionParam = faction ? `&faction=${encodeURIComponent(faction)}` : '';
-  return `${pathname}?join=${encodeURIComponent(matchId)}&slot=${encodeURIComponent(slot)}${factionParam}`;
+  // Совет — одной строкой через запятую (сервер её так и разбирает). Пустой совет
+  // параметра не даёт вовсе: `sci=` сервер прочитал бы как «выбор сделан и он пуст»,
+  // а это другое утверждение, чем «не выбирал» (тот же довод, что у faction в правиле 4).
+  const sciParam = scientists.length
+    ? `&sci=${scientists.map((s) => encodeURIComponent(s)).join(',')}`
+    : '';
+  return `${pathname}?join=${encodeURIComponent(matchId)}&slot=${encodeURIComponent(slot)}${factionParam}${sciParam}`;
 }

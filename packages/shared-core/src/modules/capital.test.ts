@@ -12,7 +12,7 @@ import { parseGameData, type GameData } from '../data/schemas';
 import type { Action, ApplyResult, Context } from '../action/types';
 
 // capital — a designatable respawn anchor. Port of the prototype's proven
-// capitalModule (prototype/src/capital.ts, REFP-14). heroModule already reads
+// capitalModule (REFP-14); с CONV-4 копии прототипа нет. heroModule already reads
 // hero.home as a respawn fallback; nothing let a player CHANGE it post-seed.
 
 const data: GameData = parseGameData({

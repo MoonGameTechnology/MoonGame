@@ -21,6 +21,7 @@ export {
   type Hero,
   type TempLane,
   type MarketOrder,
+  type MarketSide,
   type Fleet,
   type FleetMovement,
   type FleetEdge,
@@ -396,14 +397,20 @@ export {
   creditsBonusOf,
   TAX_DIMINISH,
 } from './modules/tax';
+export {
+  BASE_RESEARCH_SLOTS,
+  MAX_RESEARCH_SLOTS,
+  clampResearchSlots,
+} from './modules/technology';
 export { constructionModule } from './modules/construction';
 export { arsenalSyncModule } from './modules/arsenalSync';
 export { stationModule } from './modules/station';
+export { seatClaimModule } from './modules/seatClaim';
 export { technologyModule, technologyLock, conditionMet } from './modules/technology';
-export { scientistModule } from './modules/scientist';
+export { scientistModule, scientistSlotBonus } from './modules/scientist';
 export { factionModule } from './modules/faction';
 export { armyModule } from './modules/army';
-export { fleetOpsModule } from './modules/fleetOps';
+export { fleetOpsModule, nextFleetSeq, type FleetSeqState } from './modules/fleetOps';
 export { squadronModule } from './modules/squadron';
 export { capitalModule, capitalsOf, capitalOf } from './modules/capital';
 export { standingOrdersModule } from './modules/standingOrders';
@@ -434,6 +441,11 @@ export {
 } from './modules/steward';
 export { effectsModule, type EffectImpl, type EffectOccurrence } from './modules/effects';
 export { defHasTrait, unitHasTrait, stacksHaveTrait } from './data/traits';
-export { marketModule } from './modules/market';
+export {
+  marketModule,
+  isTradable,
+  MARKET_COMMISSION,
+  type MarketEmbargoCapability,
+} from './modules/market';
 export { espionageModule } from './modules/espionage';
 export { diplomacyModule } from './modules/diplomacy';

@@ -6,7 +6,11 @@
  * diplomacy helpers + `timeScaleOf`/`DAY`. `game.ts` imports `botDiplomacyModule`
  * for `MODULES`.
  */
-import type { GameModule, GameState } from '../../packages/shared-core/src/index';
+import type {
+  GameModule,
+  GameState,
+  MarketEmbargoCapability,
+} from '../../packages/shared-core/src/index';
 import {
   clearOffers,
   getStance,
@@ -25,6 +29,7 @@ import {
   FAVOUR_WAR_DECAY_PER_DAY,
   FAVOUR_HEAL_PER_DAY,
   botFavour,
+  botEmbargoes,
 } from './botFavour';
 
 /** Minimal view of the prototype's state extension for the approval meter. */
@@ -38,6 +43,13 @@ export const botDiplomacyModule: GameModule = {
   id: 'bot-diplomacy',
   version: '0.1.0',
   setup(api) {
+    // CONV-9: рынок ядра спрашивает эмбарго через капабилити, а не лезет в чужое
+    // состояние. Владелец правила — этот модуль: счётчик расположения ботов живёт
+    // здесь. Хост без него (канонический сервер) получает базовый ответ «эмбарго нет».
+    api.provideCapability<MarketEmbargoCapability>('market.embargo', {
+      embargoed: (state, a, b) => botEmbargoes(state, a, b),
+    });
+
     // A bot ANSWERS negotiations by the favour meter: an offered peace/pact from a
     // seat it doesn't resent is accepted on the spot (the bot files the matching
     // declaration — the same consent path a human would take); a soured bot turns

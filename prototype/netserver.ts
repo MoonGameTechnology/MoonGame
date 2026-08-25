@@ -24,6 +24,7 @@ import {
   tlsFromEnv,
   registerBrowserApi,
   registerMatchApi,
+  registerSeatsApi,
   startClockDriver,
   HEARTBEAT_MS,
   type ClockDriverHandle,
@@ -78,6 +79,8 @@ import { isValidActionPayload } from '../packages/shared-core/src/actions/payloa
 import type { PlayerId } from '../packages/shared-core/src/index';
 import { MS_PER_DAY } from '../packages/shared-core/src/index';
 import type { Identity } from '../packages/server/src/matchApi';
+import { seatClaim, seatClaimAction } from '../packages/server/src/joinSeat';
+import { expiredSeatClaims } from '../packages/server/src/seatExpiry';
 const { Pool } = pgPkg;
 
 // --- M0/M1 playtest log: append room events to a per-run JSONL and feed every one
@@ -587,6 +590,12 @@ async function createHostedMatch(id: string): Promise<HostedMatch> {
           try {
             await runServerAI(); // drive any empty seat once the clock has moved
             await runServerStanding(); // CC-2/CC-4: standing orders (auto-storm / дежурный вылет)
+            // ENTRY-3 (правило 7): вернуть в оборот места, заявленные и не подтверждённые
+            // дольше окна. Тот же вызов, что у канонического сервера (`serverWiring.ts`) —
+            // паритет держится общей функцией, а не двумя похожими циклами.
+            for (const { playerId, action } of expiredSeatClaims(room.state, room.clockScale)) {
+              await room.submitServerAction(playerId, action);
+            }
           } finally {
             driversBusy = false;
           }
@@ -714,33 +723,59 @@ const server = createMultiplayerServer({
         return { file: logFile, total: 0, recent: [] };
       }
     });
+    // Одна проверка сессии на все аккаунтные API: подпись валидна И пароль не менялся
+    // (сброс отзывает старые сессии до того, как они займут место, SE-1.x). Стоит ВЫШЕ
+    // первого потребителя намеренно: `const` в TDZ, прочитанный при регистрации роутов,
+    // — та же ловушка, что уже ловили на `authMode` (REFM-0).
+    const identifySession = async (request: {
+      headers: Record<string, unknown>;
+    }): Promise<Identity | null> => {
+      const header = request.headers.authorization;
+      const bearer =
+        typeof header === 'string' && header.startsWith('Bearer ')
+          ? header.slice('Bearer '.length).trim()
+          : null;
+      const who = bearer ? await authCfg.verifySession!(bearer) : null;
+      return who?.ok ? liveSession(who.claim, userStore) : null;
+    };
     // REL-7: seat selection — list the match's slots (faction, name, start planet,
     // taken) so the client can render a faction picker BEFORE joining. The player
-    // chooses a slot, then POST /matches/:id/join with {slotId} reserves it.
-    app.get('/matches/:id/seats', async (request, reply) => {
-      const { id } = request.params as { id: string };
-      // Load-on-demand mirror of wsServer's pattern: a LAZY registry reloads an
-      // evicted match here; this eager MatchRegistry has no `resolve`, so the
-      // optional call is a typed no-op (kept so a lazy registry can slot in).
-      const lazyRegistry = registry as { resolve?: (id: string) => Promise<MatchRoom | undefined> };
-      const room = registry.get(id) ?? (await lazyRegistry.resolve?.(id));
-      if (!room) {
-        void reply.code(404);
-        return { error: 'E_NO_MATCH' as const };
-      }
-      const taken = new Set((await accountStore.seatedNicks(id)).map((s) => s.playerId));
-      const seats = Object.values(room.state.players).map((p) => {
-        // Find the start planet (owner === playerId, the homeworld).
-        const startPlanet = Object.values(room.state.planets).find((pl) => pl.owner === p.id);
-        return {
-          playerId: p.id,
-          name: p.name,
-          faction: p.faction,
-          start: startPlanet?.id ?? null,
-          taken: taken.has(p.id),
+    // chooses a slot, then GET /matches/:id/join?slot= reserves it.
+    // ADDR-6: WHO may read that layout is the shared route's rule (`registerSeatsApi`) —
+    // a match still open for entry serves anyone, a closed session only its own players,
+    // because `start` is the homeworld the fog hides in game. Same move as the join
+    // handshake (NETA2-7): one authorization rule, both hosts.
+    registerSeatsApi(app, {
+      seats: async (id) => {
+        // Load-on-demand mirror of wsServer's pattern: a LAZY registry reloads an
+        // evicted match here; this eager MatchRegistry has no `resolve`, so the
+        // optional call is a typed no-op (kept so a lazy registry can slot in).
+        const lazyRegistry = registry as {
+          resolve?: (id: string) => Promise<MatchRoom | undefined>;
         };
-      });
-      return { seats };
+        const room = registry.get(id) ?? (await lazyRegistry.resolve?.(id));
+        if (!room) return null;
+        const taken = new Set((await accountStore.seatedNicks(id)).map((s) => s.playerId));
+        return {
+          ended: room.state.match.status === 'ended',
+          seats: Object.values(room.state.players).map((p) => {
+            // Find the start planet (owner === playerId, the homeworld).
+            const startPlanet = Object.values(room.state.planets).find((pl) => pl.owner === p.id);
+            return {
+              playerId: p.id,
+              name: p.name,
+              faction: p.faction,
+              start: startPlanet?.id ?? null,
+              taken: taken.has(p.id),
+            };
+          }),
+        };
+      },
+      entryOpen: (id) => registry.entryOpen(id),
+      seatOf: (id, login) => accountStore.seatOf(id, login),
+      // Accounts host ⇒ a verified session names the reader; nick host ⇒ `?nick=`,
+      // which is participation, not proof (that host has no sessions to check).
+      ...(AUTH ? { identify: identifySession } : {}),
     });
     // The client self-configures: accounts mode shows the password field + goes
     // через register/login+join-token; nick mode keeps the old handshake.
@@ -763,19 +798,6 @@ const server = createMultiplayerServer({
             }
           : {}),
       });
-      // Одна проверка сессии на оба аккаунтных API: подпись валидна И пароль не менялся
-      // (сброс отзывает старые сессии до того, как они займут место, SE-1.x).
-      const identifySession = async (request: {
-        headers: Record<string, unknown>;
-      }): Promise<Identity | null> => {
-        const header = request.headers.authorization;
-        const bearer =
-          typeof header === 'string' && header.startsWith('Bearer ')
-            ? header.slice('Bearer '.length).trim()
-            : null;
-        const who = bearer ? await authCfg.verifySession!(bearer) : null;
-        return who?.ok ? liveSession(who.claim, userStore) : null;
-      };
       // Друзья (FRIENDS-1) — тот же слайс, что в проде: список и заявки живут на
       // аккаунте, поэтому вкладка «Друзья» работает и на плейтест-хосте. Присутствие
       // читается из ЖИВОГО реестра комнат: занятое место в идущем матче — «в матче».
@@ -818,24 +840,44 @@ const server = createMultiplayerServer({
         // BF-30: `preferredFaction` decouples faction from the slot's start point —
         // the player picks a faction independently; the server overrides the seat's
         // default faction after assigning it.
-        join: async (id, login, accountId, preferredSlot, preferredFaction) => {
+        join: async (id, { nick: login, accountId, preferredSlot, preferredFaction, preferredScientists }) => {
           const room = registry.get(id);
           if (!room) return { error: 'E_NO_MATCH' as const };
           const held = await accountStore.seatOf(id, login);
           if (!held && !registry.entryOpen(id)) return { error: 'E_ENTRY_CLOSED' as const };
-          const seat = held
-            ? { playerId: held }
-            : await accountStore.resolveSeat(id, login, Object.keys(room.state.players), preferredSlot as PlayerId | undefined);
-          if (!seat) return { error: 'E_MATCH_FULL' as const };
-          // BF-30: override the seat's faction with the player's choice — faction is
-          // no longer bound to the start point. Only on a NEW claim (not reconnect).
-          if (preferredFaction && !held) {
-            const player = room.state.players[seat.playerId];
-            if (player) player.faction = preferredFaction;
+          // Что достаётся игроку и переписывать ли дом — ОБЩЕЕ решение с боевым сервером
+          // (`packages/server/src/joinSeat.ts`). Паритет двух хостов держится одним
+          // модулем, а не двумя похожими лесенками условий: ровно на такой лесенке
+          // канонический сервер и потерял `slot`/`faction` (ENTRY-1).
+          const resolved = held
+            ? { playerId: held, isNew: false }
+            : await accountStore.resolveSeat(
+                id,
+                login,
+                Object.keys(room.state.players),
+                preferredSlot as PlayerId | undefined,
+              );
+          const claim = seatClaim({
+            resolved,
+            preferredFaction,
+            // Дома ЭТОГО матча — тот же список, что уходит в `/matches/:id/seats`.
+            knownFactions: [...new Set(Object.values(room.state.players).map((p) => p.faction))],
+          });
+          if (!claim.ok) return { error: claim.code };
+          // ENTRY-3: заявка идёт ДЕЙСТВИЕМ через редьюсер, а не записью в состояние —
+          // мутация мимо редьюсера не попадает в лог и ломает реплей (см. joinSeat.ts).
+          if (claim.claim) {
+            await room.submitServerAction(
+              claim.playerId,
+              seatClaimAction(id, claim.playerId, room.state.time, {
+                ...claim.claim,
+                ...(preferredScientists !== undefined ? { scientists: preferredScientists } : {}),
+              }),
+            );
           }
           return {
-            playerId: seat.playerId,
-            token: await authCfg.signToken!(id, seat.playerId, accountId),
+            playerId: claim.playerId,
+            token: await authCfg.signToken!(id, claim.playerId, accountId),
           };
         },
       });

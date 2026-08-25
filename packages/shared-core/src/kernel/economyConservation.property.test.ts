@@ -155,7 +155,10 @@ describe('economy-conservation property (MP-3)', () => {
     const before = economyFixtureState('dupe-market');
     const after: GameState = {
       ...before,
-      market: [...(before.market ?? []), { id: 'phantom', seller: 'p1', resource: 'metal', amount: 500, price: 1 }],
+      market: [
+        ...(before.market ?? []),
+        { id: 'phantom', side: 'sell', owner: 'p1', resource: 'metal', amount: 500, price: 1 },
+      ],
     };
     expect(totalValue(after)).toBeGreaterThan(totalValue(before));
   });

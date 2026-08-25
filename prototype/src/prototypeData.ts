@@ -13,6 +13,10 @@ import { parseGameData, type GameData } from '../../packages/shared-core/src/ind
 export const data: GameData = parseGameData({
   version: '0.1.0',
   resources: ['credits', 'metal'],
+  // CONV-9: что можно торговать — теперь ДАННЫЕ, а не константа `MARKET_GOODS` внутри
+  // модуля рынка. Список тот же, что был у копии, поэтому поведение не меняется.
+  // Кредиты сюда не входят намеренно: валюта не торгуется сама за себя.
+  market: { goods: ['metal', 'food', 'energy', 'microelectronics'] },
   // Session tech tree (technologyModule). Effect bonuses only in the prototype — no
   // `unlocks`, so researching never locks the content you can already build. Branch /
   // tier / prerequisite / day-gating all apply. Costs use the prototype's 2 resources.

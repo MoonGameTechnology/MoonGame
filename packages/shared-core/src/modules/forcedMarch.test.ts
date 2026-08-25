@@ -9,8 +9,9 @@ import { parseGameData, type GameData } from '../data/schemas';
 import type { Action, ApplyResult, Context } from '../action/types';
 
 // forcedMarch — BOOST-1 "Ускорить": +50% скорость флота ценой 5% max-hp износа в
-// час хода. Порт прототипного forcedMarchModule (prototype/src/forcedMarch.ts,
-// REFP-16). Ни один тест не завязан на ИИ/бота.
+// час хода. Был портом прототипного forcedMarchModule (REFP-16); с CONV-1 копии
+// прототипа нет, и это единственные тесты механики — сюда перенесены его случаи:
+// пол износа и подметание погибшего флота. Ни один тест не завязан на ИИ/бота.
 
 const data: GameData = parseGameData({
   version: '0.1.0',
@@ -146,6 +147,50 @@ describe('forcedMarch — fleet.speed hook', () => {
     expect(r.state.fleets.f1?.movement?.arrivesAt).toBeCloseTo(baseHours * 3_600_000, -1);
     const advanced = okAdvance(kernel.advanceTo(r.state, { ...ctx, now: baseHours * 3_600_000 * 0.5 }));
     expect(advanced.state.fleets.f1?.units[0]?.hp).toBe(200);
+  });
+
+  // Износ — цена скорости, а не способ потерять корабли: пул пола́гается на один
+  // полный корпус выше гибели (`minPool`). Без пола длинный перелёт стирал бы флот
+  // в ноль, и «Ускорить» стало бы кнопкой самоубийства, а не тактическим выбором.
+  it('wear cripples but never kills — the pool floors one hull above loss', () => {
+    const kernel = createKernel([sectorModule, planetTypeModule, movementModule, forcedMarchModule]);
+    // Трасса намеренно ДЛИННАЯ: на коротком перелёте износ (5%/ч от 200) не успевает
+    // дойти до пола, и тест прошёл бы, даже если пола в модуле нет вовсе.
+    const s = stateWith({
+      players: [player('p1')],
+      planets: [planet('A', 0, 0, ['B']), planet('B', 100_000, 0, ['A'])],
+      fleets: [fleet('f1', 'p1', 'A', [['cruiser', 2, 200]])],
+    });
+    let r = okApply(kernel.applyAction(s, act('f1', true), ctx));
+    r = okApply(
+      kernel.applyAction(
+        r.state,
+        { id: 'a:p1:2', type: 'fleet.move', playerId: 'p1', payload: { fleetId: 'f1', to: 'B' }, issuedAt: 0 },
+        ctx,
+      ),
+    );
+    // Изнашиваем ДО прибытия: иначе флаг снимется приходом и износ прекратится.
+    const arrivesAt = r.state.fleets.f1!.movement!.arrivesAt;
+    const advanced = okAdvance(kernel.advanceTo(r.state, { ...ctx, now: arrivesAt - 1 }));
+    const stack = advanced.state.fleets.f1?.units[0];
+    expect(stack?.count).toBe(2); // износ сам по себе корпусов не отнимает
+    // Ровно пол: (count-1)×per + 1 — один целый корпус и один хит поверх него.
+    expect(stack?.hp).toBe(100 + 1);
+  });
+
+  // Флот мог погибнуть в бою, пока шёл: запись о марше пережила бы его и осталась
+  // в состоянии навсегда, а `state` обязан быть сериализуемым и конечным.
+  it('sweeps a dead fleet off the march map on advance', () => {
+    const kernel = createKernel([forcedMarchModule]);
+    const s = stateWith({
+      players: [player('p1')],
+      planets: [planet('A', 0, 0)],
+      fleets: [fleet('f1', 'p1', 'A', [['cruiser', 1]])],
+    });
+    const armed = okApply(kernel.applyAction(s, act('f1', true), ctx)).state;
+    const orphaned: GameState = { ...armed, fleets: {} };
+    const advanced = okAdvance(kernel.advanceTo(orphaned, { ...ctx, now: 3_600_000 }));
+    expect(advanced.state.forcedMarch).toBeUndefined();
   });
 
   it('clears the flag on arrival', () => {

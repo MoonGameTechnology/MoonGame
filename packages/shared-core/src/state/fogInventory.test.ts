@@ -90,6 +90,10 @@ const PLAYER_EXPOSURE: Record<keyof Player, 'public' | 'owner-private'> = {
   faction: 'public',
   status: 'public', // выбыл или играет — видно всем
   ai: 'public',
+  // Заявка на место и её подтверждение (ENTRY-3). Публично по существу: занятость
+  // мест и так видна в ленте матчей и на экране входа — прятать нечего.
+  claimedAt: 'public',
+  seated: 'public',
   resources: 'owner-private', // казна (кроме украденного окна `intel`)
   arrears: 'owner-private', // долги читаются как состояние казны
   technologies: 'owner-private',
@@ -170,6 +174,8 @@ function maximalState(): GameState {
         faction: 'x',
         status: 'active',
         ai: false,
+        claimedAt: 0,
+        seated: true,
         resources: { metal: 10, credits: 20 },
         arrears: ['metal'],
         technologies: { completed: ['own_tech'], active: [] },
@@ -187,6 +193,8 @@ function maximalState(): GameState {
         faction: 'x',
         status: 'active',
         ai: true,
+        claimedAt: 0,
+        seated: true,
         resources: { metal: 777, credits: 888 },
         arrears: ['CANARY_arrear'],
         technologies: { completed: ['CANARY_completed'], active: [] },
@@ -281,7 +289,7 @@ function maximalState(): GameState {
       [VIEWER]: [{ kind: 'planet', target: 'A', until: 900 }],
       [RIVAL]: [{ kind: 'planet', target: 'CANARY_target', until: 900 }],
     },
-    market: [{ id: 'm1', seller: RIVAL, resource: 'metal', amount: 5, price: 3 }],
+    market: [{ id: 'm1', side: 'sell', owner: RIVAL, resource: 'metal', amount: 5, price: 3 }],
     marketSeq: 1,
     capital: { [VIEWER]: 'A', [RIVAL]: 'Z' },
     autoAssault: { mine: true, CANARY_fleet: true },

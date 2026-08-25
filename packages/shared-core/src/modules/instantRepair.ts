@@ -1,7 +1,10 @@
 /**
  * Instant hull repair ("платный мгновенный ремонт") — a Bytro-style paid button:
- * instant hull top-up for every stack, paid in credits, from anywhere. Port of
- * the prototype's `instantRepairModule` (`prototype/src/instantRepair.ts`, REFP-17).
+ * instant hull top-up for every stack, paid in credits, from anywhere.
+ *
+ * Was a port of the prototype's `instantRepairModule` (REFP-17); since CONV-1 it is
+ * the ONLY implementation — the prototype deleted its copy and drives this module
+ * through `protoKernel`.
  */
 import type { GameModule } from '../kernel/module';
 import { missingHull, INSTANT_REPAIR_CREDITS_PER_HP } from '../util/repair';

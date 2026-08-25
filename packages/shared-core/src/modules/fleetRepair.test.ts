@@ -13,8 +13,10 @@ import { parseGameData, type GameData } from '../data/schemas';
 import type { Action, ApplyResult, Context } from '../action/types';
 
 // fleetRepair — "экспресс-ремонт за металл": мгновенный топ-ап корпуса, только у
-// СВОЕГО дока (здание с shipRepair > 0). Порт прототипного econScrewsModule
-// (prototype/src/econScrews.ts, REFP-18). Ни один тест не завязан на ИИ/бота.
+// СВОЕГО дока (здание с shipRepair > 0). Был портом прототипного econScrewsModule
+// (REFP-18); с CONV-2 копии прототипа нет, и это единственные тесты механики —
+// сюда же перенесён случай «разбитая верфь доком не считается». Ни один тест не
+// завязан на ИИ/бота.
 
 const data: GameData = parseGameData({
   version: '0.1.0',
@@ -115,6 +117,15 @@ describe('fleetRepair — fleet.repair', () => {
       ],
     });
     expect(errCode(kernel.applyAction(inTransit, act('f1'), ctx))).toBe('E_NO_DOCK');
+
+    // Разбитая верфь доком не считается: здание стоит в списке, но `hp <= 0` —
+    // чинить у руин нельзя, иначе бомбардировка дока ничего бы не давала (CONV-2).
+    const ruinedDock = stateWith({
+      players: [player('p1', 100)],
+      planets: [planet('A', 'p1', [{ type: 'spaceport', level: 1, hp: 0 }])],
+      fleets: [fleet('f1', 'p1', 'A', [['cruiser', 2, 40]])],
+    });
+    expect(errCode(kernel.applyAction(ruinedDock, act('f1'), ctx))).toBe('E_NO_DOCK');
   });
 
   it('rejects nothing-to-repair and insufficient funds', () => {

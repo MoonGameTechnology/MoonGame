@@ -15,7 +15,15 @@ describe('адреса запросов', () => {
   });
 
   it('идентификатор матча тоже экранируется — он приходит по ссылке', () => {
-    expect(seatsUrl('ws://s', 'a/b c')).toBe('http://s/matches/a%2Fb%20c/seats');
+    expect(seatsUrl('ws://s', 'a/b c', 'ник')).toBe(
+      'http://s/matches/a%2Fb%20c/seats?nick=%D0%BD%D0%B8%D0%BA',
+    );
+  });
+
+  it('позывной едет и к местам: идущую партию видят только её участники (ADDR-6)', () => {
+    expect(seatsUrl('ws://s', 'm1', 'Ко & Ма?')).toBe(
+      'http://s/matches/m1/seats?nick=%D0%9A%D0%BE%20%26%20%D0%9C%D0%B0%3F',
+    );
   });
 
   it('архив и разархив — один адрес с разной операцией', () => {
