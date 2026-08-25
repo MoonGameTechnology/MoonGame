@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import rateLimit from '@fastify/rate-limit';
 import {
   createDevMatch,
@@ -14,6 +13,7 @@ import { createStores, snapshotOf } from './persistence';
 import { seatClaim, seatClaimAction } from './joinSeat';
 import { checkProductionReadiness, configFromEnv } from './serverConfig';
 import { createMatchLoader } from './serverWiring';
+import { newMatchId } from './matchId';
 import {
   registerMatchApi,
   registerOpenMatchesFeed,
@@ -301,7 +301,7 @@ const identify: MatchApiDeps['identify'] = verifySession
 // optional (a host may seed out of band), so the deps field alone reads as possibly-undefined.
 const createMatch = async (): Promise<CreatedMatch> => {
   if (matchCount >= MAX_MATCHES) throw new Error('match capacity reached'); // → 500, bounded
-  const matchId = `m-${randomUUID()}`;
+  const matchId = newMatchId();
   const seed = createDevMatch(data, { id: matchId, time: Date.now() });
   await stores.store.save(snapshotOf(seed));
   matchCount += 1;

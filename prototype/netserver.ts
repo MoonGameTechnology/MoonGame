@@ -18,6 +18,8 @@ import pgPkg from 'pg';
 import {
   MatchRoom,
   MatchRegistry,
+  type MatchMeta,
+  newMatchId,
   pveOrders,
   MetricsAggregator,
   createMultiplayerServer,
@@ -632,16 +634,39 @@ const hosted: HostedMatch[] = [];
 for (const id of matchIds) hosted.push(await createHostedMatch(id));
 const restoredCount = hosted.filter((h) => h.restored).length;
 const registry = new MatchRegistry(accountStore);
-for (const h of hosted) {
-  registry.register(h.room, {
-    mapId: 'nexus',
-    rules: { timeScale: TIME_SCALE },
-    createdAt: Date.now(),
-    startedAt: h.room.state.time,
-    entryWindowMs: ENTRY_WINDOW_MS, // SES-2.3: a NEW player may claim a free seat only
-    // within this real-time window from the session's creation (see AI note below).
-  });
+/** Метаданные браузера для одной сессии этого хоста. Пока все партии поднимаются по
+ *  одному шаблону (одна карта, один режим, одна вместимость) — это и есть BRW-0, и он
+ *  ждёт AUD-8; ADDR-1 добавляет только МОМЕНТ рождения и собственный id. */
+const browserMeta = (room: MatchRoom): MatchMeta => ({
+  mapId: 'nexus',
+  rules: { timeScale: TIME_SCALE },
+  createdAt: Date.now(),
+  startedAt: room.state.time,
+  entryWindowMs: ENTRY_WINDOW_MS, // SES-2.3: a NEW player may claim a free seat only
+  // within this real-time window from the session's creation (see AI note below).
+});
+
+for (const h of hosted) registry.register(h.room, browserMeta(h.room));
+/**
+ * ADDR-1: поднять НОВУЮ партию по требованию, а не на старте процесса.
+ *
+ * До этого сессии существовали только как «комнаты» из `MATCHES=N`, поэтому `?join=proto`
+ * значил «первая комната ЭТОГО сервера», а не «партия #4821»: перезапуск отдал бы то же
+ * имя другому миру, и закладка игрока указала бы не туда. Здесь партия рождается в момент
+ * запроса и получает собственный id (`newMatchId()` — то же правило, что у канонического
+ * хоста), а `hosted` пополняется, иначе её таймеры не остановит и состояние не сбросит на
+ * диск выход по SIGINT (см. конец файла).
+ */
+const MAX_HOSTED = 64; // потолок сессий в одном процессе: создание ограничено сверху,
+// а не только per-IP лимитом маршрута — иначе память процесса растёт по запросу.
+async function hostNewMatch(): Promise<HostedMatch> {
+  if (hosted.length >= MAX_HOSTED) throw new Error('match capacity reached'); // → 500, bounded
+  const h = await createHostedMatch(newMatchId());
+  hosted.push(h);
+  registry.register(h.room, browserMeta(h.room));
+  return h;
 }
+
 const server = createMultiplayerServer({
   registry,
   host,
@@ -826,9 +851,18 @@ const server = createMultiplayerServer({
       });
       // Seat + short-lived join token (SES-2.5) through the SHARED match API, so the
       // handshake — per-IP rate-limit, identity gate, error→status mapping — lives in ONE
-      // place with the production host (NETA2-7). netserver seeds matches out of band, so it
-      // omits `createMatch` (no public `POST /matches`) and wires only join + identity.
+      // place with the production host (NETA2-7).
       registerMatchApi(app, {
+        // ADDR-1: `POST /matches` поднимает НОВУЮ партию. Раньше этот хост его намеренно
+        // не выставлял и жил только пачкой сессий из `MATCHES=N` — тогда «адрес партии»
+        // физически не существовал: id был номером комнаты в процессе. Открытость
+        // маршрута держат три границы, те же, что у канонического хоста: identity-гейт
+        // (`identify` ниже — с AUTH=1 создать может только вошедший), per-IP лимит
+        // самого `registerMatchApi` и потолок `MAX_HOSTED` на процесс.
+        createMatch: async () => {
+          const h = await hostNewMatch();
+          return { matchId: h.id, seats: Object.keys(h.room.state.players) };
+        },
         // Identity = a signature-valid session, RE-CHECKED against the current password: a
         // reset revokes older sessions before they can claim/reclaim a seat (SE-1.x).
         identify: identifySession,
