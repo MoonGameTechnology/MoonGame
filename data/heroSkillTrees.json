@@ -32,7 +32,7 @@
     "name": "Void Attunement",
     "description": "Пси-резонанс героя воодушевляет флоты рядом: +8% к урону в радиусе 300.",
     "branch": "psionic",
-    "cost": { "energy": 60 },
+    "cost": { "energy": 56 },
     "grants": { "passive": "rally_beacon" }
   },
   "psi_veil": {
@@ -40,7 +40,21 @@
     "description": "Отточенное пси-зрение: герой учится вскрывать туман разведкой.",
     "branch": "psionic",
     "requires": ["void_attunement"],
-    "cost": { "energy": 90, "credits": 100 },
+    "cost": { "energy": 126, "credits": 100 },
     "grants": { "ability": "scan" }
+  },
+  "psi_weak_points": {
+    "name": "Weak Points",
+    "description": "Радар не просто светит: он читает бреши в чужой броне. Флоты противника внутри просвеченной зоны получают на 5% больше урона. Свои, союзные и нейтральные флоты не задеты.",
+    "branch": "psionic",
+    "requires": ["psi_veil"],
+    "cost": { "energy": 196, "credits": 150 }
+  },
+  "psi_evasion": {
+    "name": "Evasive Vectors",
+    "description": "Картинка радара идёт и своим: ваши флоты и флоты союзников внутри просвеченной зоны получают на 5% меньше входящего урона.",
+    "branch": "psionic",
+    "requires": ["psi_weak_points"],
+    "cost": { "energy": 308, "credits": 250 }
   }
 }

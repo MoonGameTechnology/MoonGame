@@ -45,14 +45,28 @@
   },
   "scan": {
     "name": "Scan",
-    "description": "Раскрывает зону вокруг цели сквозь туман на время.",
+    "description": "Раскрывает зону вокруг цели сквозь туман на время. Улучшения превращают просвеченную зону в боевую: сперва подсвечивают бреши в броне врага, затем ведут по радару свои и союзные флоты.",
     "type": "reveal",
     "cooldownHours": 10,
     "range": 400,
     "params": {
       "radius": 250,
       "durationHours": 3
-    }
+    },
+    "tiers": [
+      {
+        "skill": "psi_weak_points",
+        "params": {
+          "weakPointBonus": 0.05
+        }
+      },
+      {
+        "skill": "psi_evasion",
+        "params": {
+          "evasionBonus": 0.05
+        }
+      }
+    ]
   },
   "recall": {
     "name": "Recall",

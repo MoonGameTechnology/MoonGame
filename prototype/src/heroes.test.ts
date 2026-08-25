@@ -10,6 +10,7 @@ import {
   type HeroGrade,
   type HeroLoadout,
 } from './heroes';
+import { data } from './prototypeData';
 
 const load = (grade: HeroGrade, abilities: (string | null)[]): HeroLoadout => ({ name: 'h', grade, abilities });
 
@@ -83,6 +84,58 @@ describe('hero roster model — loadout = grade slots ("modules") + base aura', 
       expect(a.icon.length).toBeGreaterThan(0);
       expect(a.desc.length).toBeGreaterThan(0);
       expect(a.cooldownHours).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('дерево героя — две ветки стоят одинаково (PSI-ЛЕСТНИЦА, заказ владельца)', () => {
+  // Ветки берут РАЗНЫЕ ресурсы (трансгуманизм — микроэлектронику с фабрикатора,
+  // психионика — энергию с электростанции), поэтому сравнивать их в лоб по числу
+  // бессмысленно: 245 мкэл и 245 энергии — это совершенно разные деньги. Общая мера —
+  // ЧАСЫ ПРОИЗВОДИТЕЛЯ: сколько времени здание первого уровня набивает эту цену.
+  //
+  // Замер, из которого выросло решение: микроэлектроника — узкое горлышко (её ест ещё
+  // и верх техдерева), энергия — самый профицитный ресурс. До правки психионика стоила
+  // ~10,7 станция-часов за ДВЕ ступени против 49 фабрикатор-часов за четыре, то есть
+  // вдвое дешевле за узел. Теперь обе лестницы — 4 + 9 + 14 + 22 часа.
+  const perHour = (b: string, res: string): number => {
+    const def = data.buildings[b];
+    const out = def?.produces?.[res];
+    expect(out, `${b} должен производить ${res}`).toBeGreaterThan(0);
+    return out!;
+  };
+  /** Цена ветки в часах её производителя, узел за узлом, СНИЗУ ВВЕРХ по прокачке. */
+  const ladderHours = (ids: string[], res: string, producer: string): number[] =>
+    ids.map((id) => {
+      const cost = data.heroSkillTrees[id]?.cost ?? {};
+      expect(Object.keys(cost).sort(), `${id}: ветка платит только своим ресурсом + кредитами`)
+        .toEqual([...new Set([res, ...(cost.credits ? ['credits'] : [])])].sort());
+      return (cost[res] ?? 0) / perHour(producer, res);
+    });
+
+  const TRANSHUMAN = ['neural_lace', 'overclocked_helm', 'corridor_sustained', 'corridor_open'];
+  const PSIONIC = ['void_attunement', 'psi_veil', 'psi_weak_points', 'psi_evasion'];
+
+  it('поузлово обе лестницы стоят одни и те же часы производителя', () => {
+    const hours = [4, 9, 14, 22]; // 20/45/70/110 мкэл ÷ 5/ч  ==  56/126/196/308 энергии ÷ 14/ч
+    expect(ladderHours(TRANSHUMAN, 'microelectronics', 'fabricator')).toEqual(hours);
+    expect(ladderHours(PSIONIC, 'energy', 'power_plant')).toEqual(hours);
+    expect(hours.reduce((a, b) => a + b)).toBe(49); // вся ветка — двое суток одного здания
+  });
+
+  it('кредитная часть лестниц совпадает узел в узел', () => {
+    const credits = (ids: string[]): number[] =>
+      ids.map((id) => data.heroSkillTrees[id]?.cost.credits ?? 0);
+    expect(credits(PSIONIC)).toEqual(credits(TRANSHUMAN));
+    expect(credits(PSIONIC)).toEqual([0, 100, 150, 250]);
+  });
+
+  it('лестницы — цепочки: каждый узел требует ровно предыдущий', () => {
+    for (const ids of [TRANSHUMAN, PSIONIC]) {
+      expect(data.heroSkillTrees[ids[0]!]?.requires).toEqual([]); // корень
+      for (let i = 1; i < ids.length; i++) {
+        expect(data.heroSkillTrees[ids[i]!]?.requires, ids[i]).toEqual([ids[i - 1]]);
+      }
     }
   });
 });

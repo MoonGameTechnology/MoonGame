@@ -733,8 +733,23 @@ export interface Hero {
   /** Active time-boxed fog reveals cast via `hero.effect.reveal` (scan) — each lifts the
    *  fog to full-identify detail for every world within `radius` of `center` until `until`
    *  (ms), but only in the OWNER's own visibility projection. Filtered by `until` at read
-   *  time; pruned on cast. */
-  activeReveals?: { center: PlanetId; radius: number; until: number }[];
+   *  time; pruned on cast.
+   *
+   *  PSI-LADDER. The scan's upper steps turn the same lit zone into a combat zone, so a
+   *  reveal also carries what it does to a battle fought inside it. Both are stamped AT
+   *  CAST from the hero's own ability step (`abilityParams`), never re-read from the
+   *  catalogue afterwards: a live scan keeps the numbers it was cast with, exactly like
+   *  `activeAuras.bonus`. Absent ⇒ the pre-ladder scan, which only lifts fog.
+   *  · `weakPoints` — extra damage taken by fleets HOSTILE to the owner (`psi_weak_points`);
+   *  · `evasion` — incoming damage divided for the owner's and its ALLIES' fleets
+   *    (`psi_evasion`). Everyone else (neutral, at peace, in a pact) is untouched. */
+  activeReveals?: {
+    center: PlanetId;
+    radius: number;
+    until: number;
+    weakPoints?: number;
+    evasion?: number;
+  }[];
 }
 
 /** A temporary lane a hero opened: a real, routable graph edge between two nodes for

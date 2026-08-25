@@ -511,6 +511,7 @@ export const en: Record<string, string> = {
   'data.dropship': 'dropship',
   'data.empty-space': 'Empty Space',
   'data.energy': 'energy',
+  'data.evasive-vectors': 'Evasive Vectors',
   'data.fighter-squadron': 'fighter squadron',
   'data.flight-decks': 'Flight Decks',
   'data.food': 'food',
@@ -597,6 +598,7 @@ export const en: Record<string, string> = {
   'data.volcanic': 'Volcanic',
   'data.warden': 'Warden',
   'data.warhead-miniaturization': 'Warhead Miniaturization',
+  'data.weak-points': 'Weak Points',
 
   // --- diplo — Дипломатия: окно, вкладки, фильтр и сортировка ростера, названия отношений.
   'diplo.filter': 'Filter',
@@ -1084,7 +1086,8 @@ export const en: Record<string, string> = {
   'hero.ability.rally.name': 'Rally',
   'hero.ability.recall.desc': 'Instantly recalls the hero ship to the capital.',
   'hero.ability.recall.name': 'Recall',
-  'hero.ability.scan.desc': 'Reveals an area around the target through the fog for a while.',
+  'hero.ability.scan.desc':
+    'Reveals an area around the target through the fog for a while. Upgrades turn the lit zone into a combat zone: first it marks the gaps in enemy armour, then it flies your own and allied fleets by the radar picture.',
   'hero.ability.scan.name': 'Scan',
   'hero.arch.commander': 'Commander',
   'hero.arch.destroyer': 'Destroyer',
@@ -1121,8 +1124,14 @@ export const en: Record<string, string> = {
   'hero.tree.overclocked-helm.desc':
     'Overclocking the neural interface lets the hero lay corridors.',
   'hero.tree.overclocked-helm.name': 'Overclocked Helm',
+  'hero.tree.psi-evasion.desc':
+    'The radar picture reaches your own too: your fleets and allied fleets inside the lit zone take 5% less incoming damage.',
+  'hero.tree.psi-evasion.name': 'Evasive Vectors',
   'hero.tree.psi-veil.desc': 'Honed psi-sight: the hero learns to tear the fog open with a scan.',
   'hero.tree.psi-veil.name': 'Psi Veil',
+  'hero.tree.psi-weak-points.desc':
+    'The radar does more than light the dark: it reads the gaps in hostile armour. Enemy fleets inside the lit zone take 5% more damage. Your own, allied and neutral fleets are untouched.',
+  'hero.tree.psi-weak-points.name': 'Weak Points',
   'hero.tree.void-attunement.desc':
     "The hero's psi resonance inspires nearby fleets: +8% damage within 300.",
   'hero.tree.void-attunement.name': 'Void Attunement',

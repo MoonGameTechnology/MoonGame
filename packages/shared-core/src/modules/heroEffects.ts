@@ -14,8 +14,9 @@
 import { hoursToMs } from '../action/types';
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type { PlanetId } from '../state/gameState';
-import { fleetSideDealingHit, heroNode } from '../state/heroes';
+import { fleetSideDealingHit, fleetSideTakingHit, heroNode } from '../state/heroes';
 import { distance } from '../state/route';
+import { isAllied, isHostile } from '../util/combat';
 import type { HeroEffect } from './hero';
 
 const num = (v: unknown): number => (typeof v === 'number' ? v : 0);
@@ -55,8 +56,8 @@ const recall: HeroEffect = ({ heroId, hero, owner }, h) => {
  * `defenseBonus` (both feed the single `combat.damage` hook the combat model exposes),
  * `radius`, `durationHours`.
  */
-const aura: HeroEffect = ({ heroId, hero, ability, owner }, h) => {
-  const p = ability.params;
+const aura: HeroEffect = ({ heroId, hero, params, owner }, h) => {
+  const p = params;
   const bonus = num(p.combatBonus) || num(p.defenseBonus);
   const radius = num(p.radius);
   const durationHours = num(p.durationHours);
@@ -104,28 +105,86 @@ function auraBonus(h: HandlerContext, owner: string, at: PlanetId): number {
  * `{center, radius, until}` reveal on the hero. While live it lifts the fog to
  * full-identify detail for every world within `radius` of `center` — but only in the
  * OWNER's own visibility projection (`coverageFor` reads it per-viewer, so it never
- * leaks to rivals). `params`: `radius`, `durationHours`. Malformed / no-op → reject so
- * the cooldown isn't wasted.
+ * leaks to rivals). `params`: `radius`, `durationHours`, plus the ladder's optional
+ * `weakPointBonus` / `evasionBonus` (see {@link revealZoneFactor}). Malformed / no-op →
+ * reject so the cooldown isn't wasted — "no-op" is judged on the FOG lift alone, since
+ * that is what every step of the scan still does.
  */
-const reveal: HeroEffect = ({ heroId, hero, ability, owner, target }, h) => {
+const reveal: HeroEffect = ({ heroId, hero, params, owner, target }, h) => {
   // The range gate guarantees a valid in-range node for a ranged ability; guard anyway.
   if (typeof target !== 'string' || !h.state.planets[target]) return h.reject('E_BAD_PAYLOAD');
-  const p = ability.params;
+  const p = params;
   const radius = num(p.radius);
   const durationHours = num(p.durationHours);
   if (radius <= 0 || durationHours <= 0) return h.reject('E_BAD_EFFECT');
   // Same timeScale rule as the aura window above.
   const until = h.ctx.now + hoursToMs(h.ctx, durationHours);
+  // PSI-LADDER: the hero's own step decides whether this scan also fights. Strictly
+  // positive knobs only — a zero one is just an unladdered scan, and a NEGATIVE one is
+  // dropped rather than stored: a "bonus" must never help the wrong side. Built once so
+  // the stored zone and the event announcing it can't disagree.
+  const weakPoints = num(p.weakPointBonus);
+  const evasion = num(p.evasionBonus);
+  const ladder = {
+    ...(weakPoints > 0 ? { weakPoints } : {}),
+    ...(evasion > 0 ? { evasion } : {}),
+  };
   // Prune expired reveals on cast (cooldown > duration ⇒ the list stays tiny), then add.
   const live = (hero.activeReveals ?? []).filter((r) => r.until > h.ctx.now);
-  live.push({ center: target, radius, until });
+  live.push({ center: target, radius, until, ...ladder });
   hero.activeReveals = live;
-  h.emit('hero.revealed', { owner, heroId, center: target, radius, until });
+  h.emit('hero.revealed', { owner, heroId, center: target, radius, until, ...ladder });
 };
+
+/**
+ * PSI-LADDER — what the lit zone does to a battle fought inside it, for the fleet side
+ * TAKING the hit. Returns the multiplier to apply to that incoming damage.
+ *
+ * Two independent steps of one ability, both scoped to the same zone and both read from
+ * the side taking the hit, so they are the two halves of one question — "who is this,
+ * to the hero who lit this zone?":
+ *   · `weakPoints` (step 2) — the target is HOSTILE to the scan's owner ⇒ ×(1 + w).
+ *   · `evasion`    (step 3) — the target is the owner itself or an ALLY ⇒ ÷(1 + e).
+ * Anyone else — neutral, at peace, in a pact — is untouched, which is the point of the
+ * step: a scan is not an area attack, it tells YOUR side where to aim.
+ *
+ * Deterministic: heroes walked in sorted key order, factors multiplied (× commutes, so
+ * float order is stable anyway). Reveals of DEAD heroes stop counting — the zone is the
+ * hero's live radar picture, exactly like `auraBonus`.
+ */
+function revealZoneFactor(h: HandlerContext, taking: string, at: PlanetId): number {
+  const heroes = h.state.heroes;
+  if (heroes === undefined) return 1;
+  const here = h.state.planets[at]?.position;
+  if (here === undefined) return 1;
+  const now = h.ctx.now;
+  let factor = 1;
+  // Sorted (BF-13): float composition order must not follow JSONB key order.
+  for (const id of Object.keys(heroes).sort()) {
+    const hero = heroes[id]!;
+    if (hero.alive !== true) continue;
+    const reveals = hero.activeReveals;
+    if (reveals === undefined || reveals.length === 0) continue;
+    const owner = hero.owner;
+    // Asked ONCE per hero, not per reveal: the relation can't differ between two scans
+    // of the same hero. Neither flag ⇒ neutral to this scan (at peace, in a pact, a
+    // bystander), and both steps below simply fall through.
+    const hostile = isHostile(h, owner, taking);
+    const friendly = owner === taking || isAllied(h, owner, taking);
+    for (const r of reveals) {
+      if (r.until <= now) continue;
+      const center = h.state.planets[r.center]?.position;
+      if (center === undefined || distance(center, here) > r.radius) continue;
+      if (hostile && r.weakPoints !== undefined) factor *= 1 + r.weakPoints;
+      if (friendly && r.evasion !== undefined) factor /= 1 + r.evasion;
+    }
+  }
+  return factor;
+}
 
 export const heroEffectsModule: GameModule = {
   id: 'heroEffects',
-  version: '1.0.0',
+  version: '1.1.0',
   setup(api) {
     api.provideCapability<HeroEffect>('hero.effect.recall', recall);
     api.provideCapability<HeroEffect>('hero.effect.aura', aura);
@@ -141,6 +200,19 @@ export const heroEffectsModule: GameModule = {
       if (!hit || typeof attacker !== 'string') return base;
       const bonus = auraBonus(h, attacker, hit.battle.location);
       return bonus !== 0 ? base * (1 + bonus) : base;
+    });
+
+    // PSI-LADDER → `combat.damage`, keyed off the side TAKING the hit (`args.defender`)
+    // rather than the one dealing it: both steps are about what happens to a fleet
+    // standing in a lit zone. A separate registrant from the aura hook above on purpose
+    // — different side, different question; ×-factors commute, so the two compose in
+    // any order.
+    api.hook<number>('combat.damage', (base, args, h) => {
+      const { battleId, defender } = (args ?? {}) as { battleId?: string; defender?: string };
+      const hit = fleetSideTakingHit(h.state, battleId, defender);
+      if (!hit || typeof defender !== 'string') return base;
+      const factor = revealZoneFactor(h, defender, hit.battle.location);
+      return factor !== 1 ? base * factor : base;
     });
   },
 };

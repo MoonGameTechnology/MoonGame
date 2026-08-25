@@ -43,7 +43,28 @@ const data: GameData = parseGameData({
     // a malformed aura (no bonus / no duration) — the provider must reject it.
     dud: { name: 'Dud', type: 'aura', cooldownHours: 5, range: 0, params: {} },
     // scan: a ranged (400) fog reveal — full-identify within radius 250 of the target for 3h.
-    scan: { name: 'Разведка', type: 'reveal', cooldownHours: 10, range: 400, params: { radius: 250, durationHours: 3 } },
+    // scan: a ranged (400) fog reveal — plus the PSI ladder, whose two steps turn the
+    // lit zone into a combat zone (`psi_weak_points` / `psi_evasion` in the skill tree).
+    scan: {
+      name: 'Разведка',
+      type: 'reveal',
+      cooldownHours: 10,
+      range: 400,
+      params: { radius: 250, durationHours: 3 },
+      tiers: [
+        { skill: 'psi_weak_points', params: { weakPointBonus: 0.05 } },
+        { skill: 'psi_evasion', params: { evasionBonus: 0.05 } },
+      ],
+    },
+    // a step with a NEGATIVE knob — a "bonus" must never be able to help the wrong side.
+    badscan: {
+      name: 'BadScan',
+      type: 'reveal',
+      cooldownHours: 5,
+      range: 400,
+      params: { radius: 250, durationHours: 3 },
+      tiers: [{ skill: 'broken', params: { weakPointBonus: -0.5, evasionBonus: -0.5 } }],
+    },
     // a malformed reveal (ranged so a target is supplied, but no radius/duration) — reject.
     dudscan: { name: 'DudScan', type: 'reveal', cooldownHours: 5, range: 400, params: {} },
   },
@@ -349,5 +370,148 @@ describe('heroEffects — reveal (scan → time-boxed fog lift, owner-only)', ()
   it('an out-of-range target is refused by the dispatcher (E_OUT_OF_RANGE) before the effect', () => {
     const far = act('hero.ability', 'p1', { heroId: 'hero:p1:1', abilityId: 'scan', target: 'FARW' }); // 900 > 400
     expect(errCode(kernel.applyAction(revealWorld(), far, ctx(0)))).toBe('E_OUT_OF_RANGE');
+  });
+});
+
+describe('heroEffects — the PSI ladder (scan steps 2–3 → combat inside the lit zone)', () => {
+  const kernel = createKernel([heroModule, heroEffectsModule]);
+  const scan = act('hero.ability', 'p1', { heroId: 'hero:p1:1', abilityId: 'scan', target: 'T' });
+
+  /** p1's hero at H(0,0), scanning T(300,0). `skills` = the tree nodes it has unlocked. */
+  function castWorld(skills: string[], abilities = ['scan']): GameState {
+    const s = createInitialState({ seed: 'psi', version: { data: '0.1.0', manifest: '1' } });
+    return {
+      ...s,
+      players: { p1: player('p1') },
+      planets: { H: planet('H', 'p1', 0), T: planet('T', null, 300) },
+      fleets: {
+        f1: { id: 'f1', owner: 'p1', location: 'H', movement: null, traits: [], units: [{ unit: 'hero', count: 1 }] },
+      },
+      heroes: {
+        'hero:p1:1': { id: 'hero:p1:1', owner: 'p1', location: 'H', home: 'H', cooldowns: {}, alive: true, fleetId: 'f1', abilities, skills },
+      },
+    };
+  }
+  const cast = (skills: string[]): GameState['heroes'] =>
+    okApply(kernel.applyAction(castWorld(skills), scan, ctx(0))).state.heroes;
+
+  // --- what the cast stamps on the reveal (the ladder reaching a CAPABILITY effect) ---
+
+  it('an unladdered hero stamps a plain reveal — no combat numbers at all', () => {
+    expect(cast([])!['hero:p1:1']?.activeReveals).toEqual([{ center: 'T', radius: 250, until: 3 * HOUR }]);
+  });
+
+  it('step 2 stamps weakPoints; step 3 adds evasion — both from the hero`s own skills', () => {
+    expect(cast(['psi_weak_points'])!['hero:p1:1']?.activeReveals).toEqual([
+      { center: 'T', radius: 250, until: 3 * HOUR, weakPoints: 0.05 },
+    ]);
+    expect(cast(['psi_weak_points', 'psi_evasion'])!['hero:p1:1']?.activeReveals).toEqual([
+      { center: 'T', radius: 250, until: 3 * HOUR, weakPoints: 0.05, evasion: 0.05 },
+    ]);
+  });
+
+  it('the numbers are stamped AT CAST: a later unlock does not upgrade a live scan', () => {
+    const after = cast(['psi_weak_points'])!['hero:p1:1']!;
+    after.skills = ['psi_weak_points', 'psi_evasion']; // unlocked while the scan is still up
+    expect(after.activeReveals).toEqual([{ center: 'T', radius: 250, until: 3 * HOUR, weakPoints: 0.05 }]);
+  });
+
+  it('a NEGATIVE knob is dropped, not inverted (a bonus never helps the wrong side)', () => {
+    const st = castWorld(['broken'], ['badscan']);
+    const bad = act('hero.ability', 'p1', { heroId: 'hero:p1:1', abilityId: 'badscan', target: 'T' });
+    const r = okApply(kernel.applyAction(st, bad, ctx(0)));
+    expect(r.state.heroes!['hero:p1:1']?.activeReveals).toEqual([{ center: 'T', radius: 250, until: 3 * HOUR }]);
+  });
+
+  // --- what a lit zone does to a battle fought inside it -----------------------
+
+  const battleKernel = createKernel([heroModule, heroEffectsModule, combatModule, arriveModule]);
+  const LIT = [{ center: 'P', radius: 250, until: 10 * HOUR, weakPoints: 0.05, evasion: 0.05 }];
+
+  /** p1's fleet A fights p2's D over P(0,0). The scan belongs to `owner` (a THIRD party
+   *  by default is not what we want, so it defaults to p1) and sits at H, off the field —
+   *  the zone is the radar picture, not the hero's position. */
+  function zoneWorld(over?: {
+    owner?: string;
+    reveals?: Hero['activeReveals'];
+    diplomacy?: GameState['diplomacy'];
+  }): GameState {
+    const s = createInitialState({ seed: 'psiz', version: { data: '0.1.0', manifest: '1' } });
+    const owner = over?.owner ?? 'p1';
+    return {
+      ...s,
+      players: { p1: player('p1'), p2: player('p2'), p3: player('p3') },
+      planets: { P: planet('P', null, 0), H: planet('H', owner, 900) },
+      fleets: {
+        A: { id: 'A', owner: 'p1', location: 'P', movement: null, traits: [], units: [{ unit: 'warship', count: 1 }] },
+        D: { id: 'D', owner: 'p2', location: 'P', movement: null, traits: [], units: [{ unit: 'warship', count: 1 }] },
+      },
+      heroes: {
+        'hero:x:1': { id: 'hero:x:1', owner, location: 'H', home: 'H', cooldowns: {}, alive: true, abilities: ['scan'], activeReveals: over?.reveals ?? LIT },
+      },
+      ...(over?.diplomacy ? { diplomacy: over.diplomacy } : {}),
+    };
+  }
+  function round(st: GameState): { dmgToDefender: number; dmgToAttacker: number } {
+    const started = okApply(battleKernel.applyAction(st, act('arrive', 'p1', { fleetId: 'A' }), ctx(0)));
+    const r = okAdvance(battleKernel.advanceTo(started.state, ctx(HOUR)));
+    return r.events.find((e) => e.type === 'combat.round')?.payload as {
+      dmgToDefender: number;
+      dmgToAttacker: number;
+    };
+  }
+
+  it('the scan`s owner: the enemy in the zone takes MORE, the owner`s own fleet takes LESS', () => {
+    const r = round(zoneWorld()); // p1 owns the scan; p2 is hostile by the FFA default
+    expect(r.dmgToDefender).toBeCloseTo(20 * 1.05, 6); // p2 takes 20 → 21
+    expect(r.dmgToAttacker).toBeCloseTo(20 / 1.05, 6); // p1 takes 20 → 19.05
+  });
+
+  it('step 2 alone touches only the enemy — the owner`s own fleet is not yet protected', () => {
+    const r = round(zoneWorld({ reveals: [{ center: 'P', radius: 250, until: 10 * HOUR, weakPoints: 0.05 }] }));
+    expect(r.dmgToDefender).toBeCloseTo(20 * 1.05, 6);
+    expect(r.dmgToAttacker).toBe(20);
+  });
+
+  it('an ALLY of the scan`s owner is covered too, and the ally`s enemy is exposed', () => {
+    // The scan belongs to p3, who is nowhere near the battle: p1 is its ally, p2 its enemy.
+    const r = round(zoneWorld({ owner: 'p3', diplomacy: { 'p1|p3': 'alliance' } }));
+    expect(r.dmgToDefender).toBeCloseTo(20 * 1.05, 6); // p2 — hostile to p3 (FFA default)
+    expect(r.dmgToAttacker).toBeCloseTo(20 / 1.05, 6); // p1 — p3's ally
+  });
+
+  it('a NEUTRAL is untouched by either step — a scan is not an area attack', () => {
+    // p3 owns the scan and is at peace with BOTH sides: nothing applies to anyone.
+    const r = round(zoneWorld({ owner: 'p3', diplomacy: { 'p1|p3': 'peace', 'p2|p3': 'peace' } }));
+    expect(r.dmgToDefender).toBe(20);
+    expect(r.dmgToAttacker).toBe(20);
+  });
+
+  it('a battle OUTSIDE the lit zone is ordinary combat', () => {
+    const r = round(zoneWorld({ reveals: [{ center: 'H', radius: 250, until: 10 * HOUR, weakPoints: 0.05, evasion: 0.05 }] })); // H is 900 away
+    expect(r.dmgToDefender).toBe(20);
+    expect(r.dmgToAttacker).toBe(20);
+  });
+
+  it('an EXPIRED scan stops fighting, exactly as it stops lifting fog', () => {
+    const r = round(zoneWorld({ reveals: [{ center: 'P', radius: 250, until: 0, weakPoints: 0.05, evasion: 0.05 }] }));
+    expect(r.dmgToDefender).toBe(20);
+    expect(r.dmgToAttacker).toBe(20);
+  });
+
+  it('a DEAD hero`s zone goes dark — the radar picture dies with its hero (BF-24)', () => {
+    const st = zoneWorld();
+    delete st.heroes!['hero:x:1']!.alive;
+    const r = round(st);
+    expect(r.dmgToDefender).toBe(20);
+    expect(r.dmgToAttacker).toBe(20);
+  });
+
+  it('composes with the aura hook instead of replacing it (both registrants fire)', () => {
+    const st = zoneWorld();
+    st.heroes!['hero:x:1']!.activeAuras = [{ bonus: 0.1, radius: 1000, until: 10 * HOUR }]; // p1's own aura, reaching P
+    const r = round(st);
+    expect(r.dmgToDefender).toBeCloseTo(20 * 1.1 * 1.05, 6); // aura (dealing side) × weak points (taking side)
+    expect(r.dmgToAttacker).toBeCloseTo(20 / 1.05, 6); // p2 deals: no aura, but p1 evades
   });
 });

@@ -197,6 +197,11 @@ export interface HeroEffectArgs {
   hero: Hero;
   abilityId: string;
   ability: HeroAbilityDef;
+  /** The ability's params AS THIS HERO HAS THEM — `ability.params` with every step of
+   *  the ladder this hero unlocked already overlaid (see {@link abilityParams}). Read
+   *  these, not `ability.params`: the raw catalogue entry is the tier-1 ability, so a
+   *  provider reading it would silently ignore the skill tree. */
+  params: Record<string, unknown>;
   owner: PlayerId;
   target?: string;
 }
@@ -596,7 +601,21 @@ export const heroModule: GameModule = {
       } else {
         const impl = h.capability<HeroEffect>(`hero.effect.${def.type}`);
         if (!impl) return h.reject('E_NO_EFFECT'); // typed in data, absent in the engine
-        impl({ heroId, hero, abilityId, ability: def, owner: action.playerId, target }, h);
+        // The ladder is resolved HERE, once, for every effect type — the built-in
+        // `temp_lane` above does the same. A provider must not have to know that
+        // `def.tiers` exists to honour it.
+        impl(
+          {
+            heroId,
+            hero,
+            abilityId,
+            ability: def,
+            params: abilityParams(def, hero),
+            owner: action.playerId,
+            target,
+          },
+          h,
+        );
       }
 
       if (def.cooldownHours > 0) {

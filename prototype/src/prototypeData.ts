@@ -1035,6 +1035,12 @@ export const data: GameData = parseGameData({
       cooldownHours: 10,
       range: 400,
       params: { radius: 250, durationHours: 3 },
+      // Вторая лестница ступеней (PSI-ЛЕСТНИЦА, зеркало коридорной): узлы дерева
+      // превращают просвеченную зону в боевую, а не выдают вторую кнопку в ростере.
+      tiers: [
+        { skill: 'psi_weak_points', params: { weakPointBonus: 0.05 } },
+        { skill: 'psi_evasion', params: { evasionBonus: 0.05 } },
+      ],
     },
     recall: {
       name: 'hero.ability.recall.name',
@@ -1119,7 +1125,7 @@ export const data: GameData = parseGameData({
       name: 'hero.tree.void-attunement.name',
       description: 'hero.tree.void-attunement.desc',
       branch: 'psionic',
-      cost: { energy: 60 },
+      cost: { energy: 56 },
       grants: { passive: 'rally_beacon' },
     },
     psi_veil: {
@@ -1127,8 +1133,22 @@ export const data: GameData = parseGameData({
       description: 'hero.tree.psi-veil.desc',
       branch: 'psionic',
       requires: ['void_attunement'],
-      cost: { energy: 90, credits: 100 },
+      cost: { energy: 126, credits: 100 },
       grants: { ability: 'scan' },
+    },
+    psi_weak_points: {
+      name: 'hero.tree.psi-weak-points.name',
+      description: 'hero.tree.psi-weak-points.desc',
+      branch: 'psionic',
+      requires: ['psi_veil'],
+      cost: { energy: 196, credits: 150 },
+    },
+    psi_evasion: {
+      name: 'hero.tree.psi-evasion.name',
+      description: 'hero.tree.psi-evasion.desc',
+      branch: 'psionic',
+      requires: ['psi_weak_points'],
+      cost: { energy: 308, credits: 250 },
     },
   },
   heroFittings: {
