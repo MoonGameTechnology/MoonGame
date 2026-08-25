@@ -14,6 +14,7 @@ import {
 import { parseGameData, type GameData } from '../data/schemas';
 import type { Action, AdvanceResult, ApplyResult, Context } from '../action/types';
 import { deepFreeze } from '../util/clone';
+import { setStance } from '../state/diplomacy';
 
 const data: GameData = parseGameData({
   version: '0.1.0',
@@ -388,6 +389,34 @@ describe('hero — temp lane speed bonus (fleet.speed hook)', () => {
 
     const enemy = okApply(kernel.applyAction(laned.state, act('fleet.move', 'p2', { fleetId: 'E1', to: 'C' }), ctx(0)));
     expect(enemy.state.fleets.E1?.movement?.arrivesAt).toBeCloseTo((250 / 10) * HOUR, 0);
+  });
+
+  // Ради чего третья ступень и заведена (заказ владельца): по общему коридору должен
+  // пройти СОЮЗНИК. Отдельный тест рядом с «врагом», потому что это разные намерения:
+  // проход врага — принятая цена, проход союзника — сама цель.
+  it('ОБЩИЙ коридор пускает СОЮЗНИКА — ради этого ступень и берут', () => {
+    const kernel = createKernel([heroModule, movementModule]);
+    const base = corridorWorld(['neural_lace', 'corridor_sustained', 'corridor_open']);
+    base.fleets = { F1: fleet('F1', 'p1', 'A'), A1: fleet('A1', 'p2', 'A') };
+    setStance(base, 'p1', 'p2', 'alliance');
+    const laned = okApply(kernel.applyAction(base, corridor('C'), ctx(0)));
+    expect(laned.state.tempLanes![0]!.tier).toBe(3);
+
+    const ally = okApply(
+      kernel.applyAction(laned.state, act('fleet.move', 'p2', { fleetId: 'A1', to: 'C' }), ctx(0)),
+    );
+    expect(ally.state.fleets.A1?.movement?.to).toBe('C'); // маршрут построился по коридору
+
+    // А на ЛИЧНОЙ ступени союзнику хода нет — коридор ещё не общий.
+    const priv = okApply(kernel.applyAction(corridorWorld(), corridor('C'), ctx(0)));
+    priv.state.fleets = { A1: fleet('A1', 'p2', 'A') };
+    setStance(priv.state, 'p1', 'p2', 'alliance');
+    const blocked = kernel.applyAction(
+      priv.state,
+      act('fleet.move', 'p2', { fleetId: 'A1', to: 'C' }),
+      ctx(0),
+    );
+    expect(blocked.ok ? null : blocked.code).toBe('E_NO_ROUTE');
   });
 
   // HERO-CORRIDOR-СПЕКА. Ступени — это ПРОГРЕССИЯ ОДНОЙ способности: их выдаёт дерево

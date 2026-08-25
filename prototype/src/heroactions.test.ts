@@ -20,6 +20,17 @@ function heroesOf(s: GameState, pid: string): Hero[] {
 const mainOf = (s: GameState, pid: string): Hero => heroesOf(s, pid).find((h) => h.fleetId)!;
 const benched = (s: GameState, pid: string): Hero[] => heroesOf(s, pid).filter((h) => !h.fleetId);
 
+/** Ближайший мир в радиусе коридора от корабля героя — цель для каста. */
+function corridorTarget(s: GameState, hero: Hero): string {
+  const origin = s.planets[s.fleets[hero.fleetId!]!.location!]!;
+  return Object.values(s.planets).find(
+    (p) =>
+      p.id !== origin.id &&
+      Math.hypot(p.position.x - origin.position.x, p.position.y - origin.position.y) <=
+        (data.heroAbilities.corridor!.range ?? 0),
+  )!.id;
+}
+
 describe('hero actions — the core engine over the prototype catalogs', () => {
   it('hero.spawn raises an undeployed roster hero at an owned world', () => {
     const s = newGame();
@@ -35,18 +46,26 @@ describe('hero actions — the core engine over the prototype catalogs', () => {
     expect(r.state.fleets[raised.fleetId!]?.units.some((u) => u.unit === 'hero')).toBe(true);
   });
 
-  it('hero.ability casts a built-in (corridor → temp lane) and starts its cooldown', () => {
-    const s = newGame();
+  it('«Коридор» заперт до узла дерева, а после него кастуется и уходит в кулдаун', () => {
+    let s = newGame();
+    s.players.p1!.resources = { ...s.players.p1!.resources, microelectronics: 9000, credits: 9000 };
     const main = mainOf(s, 'p1');
-    expect(main.abilities).toContain('corridor');
-    const origin = s.planets[s.fleets[main.fleetId!]!.location!]!;
-    const near = Object.values(s.planets).find(
-      (p) =>
-        p.id !== origin.id &&
-        Math.hypot(p.position.x - origin.position.x, p.position.y - origin.position.y) <=
-          (data.heroAbilities.corridor!.range ?? 0),
-    )!;
-    const r = order(s, castHeroAbility('p1', main.id, 'corridor', near.id), s.time);
+    // Заказ владельца: способности нет, пока не прокачан навык. Раньше она стояла в
+    // стартовом ростере, и узел `overclocked_helm` выдавал то, что уже есть.
+    expect(main.abilities).not.toContain('corridor');
+    const near = corridorTarget(s, main);
+    expect(order(s, castHeroAbility('p1', main.id, 'corridor', near), s.time).error).toBe(
+      'E_NOT_EQUIPPED',
+    );
+
+    for (const node of ['neural_lace', 'overclocked_helm']) {
+      const r = order(s, unlockHeroSkill('p1', main.id, node), s.time);
+      expect(r.error).toBeUndefined();
+      s = r.state;
+    }
+    expect(s.heroes![main.id]!.abilities).toContain('corridor'); // грант лёг в пустой слот
+
+    const r = order(s, castHeroAbility('p1', main.id, 'corridor', near), s.time);
     expect(r.error).toBeUndefined();
     expect((r.state.tempLanes ?? []).length).toBe(1);
     expect(r.state.heroes![main.id]!.cooldowns?.path).toBeGreaterThan(s.time);
@@ -85,31 +104,28 @@ describe('hero actions — the core engine over the prototype catalogs', () => {
     let s = newGame();
     // Узлы стоят денег — казна пополнена, иначе тест мерил бы цену, а не лестницу.
     s.players.p1!.resources = { ...s.players.p1!.resources, microelectronics: 9000, credits: 9000 };
-    const main = mainOf(s, 'p1'); // commander → transhuman, стартует с коридором
-    const origin = s.planets[s.fleets[main.fleetId!]!.location!]!;
-    const near = Object.values(s.planets).find(
-      (p) =>
-        p.id !== origin.id &&
-        Math.hypot(p.position.x - origin.position.x, p.position.y - origin.position.y) <=
-          (data.heroAbilities.corridor!.range ?? 0),
-    )!;
+    const main = mainOf(s, 'p1'); // commander → transhuman
+    const near = corridorTarget(s, main);
     const tierOfCast = (st: GameState): number => {
-      const r = order(st, castHeroAbility('p1', main.id, 'corridor', near.id), st.time);
+      const r = order(st, castHeroAbility('p1', main.id, 'corridor', near), st.time);
       expect(r.error).toBeUndefined();
       return r.state.tempLanes![0]!.tier!;
     };
-    expect(tierOfCast(s)).toBe(1); // без узлов — одноразовый личный коридор
-
-    for (const node of ['neural_lace', 'overclocked_helm', 'corridor_sustained']) {
+    const unlock = (node: string): void => {
       const r = order(s, unlockHeroSkill('p1', main.id, node), s.time);
       expect(r.error).toBeUndefined();
       s = r.state;
-    }
+    };
+
+    unlock('neural_lace');
+    unlock('overclocked_helm'); // сам коридор — тоже узел дерева
+    expect(tierOfCast(s)).toBe(1); // одноразовый личный коридор
+
+    unlock('corridor_sustained');
     expect(tierOfCast(s)).toBe(2); // со сроком жизни
 
-    const opened = order(s, unlockHeroSkill('p1', main.id, 'corridor_open'), s.time);
-    expect(opened.error).toBeUndefined();
-    expect(tierOfCast(opened.state)).toBe(3); // общий: идут все, включая врага
+    unlock('corridor_open');
+    expect(tierOfCast(s)).toBe(3); // общий: проходят союзники — и все остальные заодно
   });
 
   it('hero.fit installs a fitting within the archetype slot budget', () => {

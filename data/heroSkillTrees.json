@@ -22,8 +22,8 @@
     "cost": { "microelectronics": 70, "credits": 150 }
   },
   "corridor_open": {
-    "name": "Open Corridor",
-    "description": "Коридор становится общим: по нему идут все — свои, союзник, нейтрал и враг.",
+    "name": "Shared Corridor",
+    "description": "Открывает коридор союзникам: их флоты идут вашим проходом. Проход становится общим — войти сможет и нейтрал, и противник.",
     "branch": "transhuman",
     "requires": ["corridor_sustained"],
     "cost": { "microelectronics": 110, "credits": 250 }

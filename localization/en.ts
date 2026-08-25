@@ -529,7 +529,6 @@ export const en: Record<string, string> = {
   'data.nebula': 'Nebula',
   'data.neural-lace': 'Neural Lace',
   'data.oceanic': 'Oceanic',
-  'data.open-corridor': 'Open Corridor',
   'data.open-space': 'Open space',
   'data.orbital-aa': 'Orbital AA',
   'data.orbital-logistics': 'Orbital Logistics',
@@ -569,6 +568,7 @@ export const en: Record<string, string> = {
   'data.standard': 'Standard',
   'data.steward-protocol': 'Steward Protocol',
   'data.sustained-corridor': 'Sustained Corridor',
+  'data.shared-corridor': 'Shared Corridor',
   'data.strike-carrier': 'strike carrier',
   'data.strike-vectors': 'Strike Vectors',
   'data.tank': 'tank',
@@ -1062,7 +1062,7 @@ export const en: Record<string, string> = {
   'hero.ability.bulwark.desc': 'A temporary shield: +defense to your fleets near the hero.',
   'hero.ability.bulwark.name': 'Bulwark',
   'hero.ability.corridor.desc':
-    'Punches a corridor to a nearby world. One-shot: only the army carrying this hero may use it, and it closes the moment that army arrives. Upgrades give it a lifetime, then open it to everyone — the enemy included.',
+    'Punches a corridor to a nearby world. One-shot: only the army carrying this hero may use it, and it closes the moment that army arrives. Upgrades give it a lifetime, then open it to your allies — an open corridor is shared, so the enemy may walk in too.',
   'hero.ability.corridor.name': 'Corridor',
   'hero.ability.diplomatic-landing.desc':
     "Allied worlds receive the hero as one of their own: the ship can also rise from an ally's planet. Passive skill: widens the deployment points.",
@@ -1099,8 +1099,8 @@ export const en: Record<string, string> = {
     "The hero's ship drives its fleet at full burn: +10% speed for the hero's fleet.",
   'hero.passive.vanguard-impulse.name': 'Vanguard Impulse',
   'hero.tree.corridor-open.desc':
-    'The corridor goes public: everyone walks it — your own fleets, an ally, a neutral and the enemy.',
-  'hero.tree.corridor-open.name': 'Open Corridor',
+    'Opens the corridor to your ALLIES: their fleets use your passage as their own. It becomes a shared road, so a neutral — or the enemy — can step in as well.',
+  'hero.tree.corridor-open.name': 'Shared Corridor',
   'hero.tree.corridor-sustained.desc':
     "The corridor lives on a clock instead of closing behind the hero's army.",
   'hero.tree.corridor-sustained.name': 'Sustained Corridor',

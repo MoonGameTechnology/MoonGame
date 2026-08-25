@@ -962,7 +962,7 @@ export const data: GameData = parseGameData({
       branch: 'transhuman',
       ship: { unit: 'hero' },
       slots: 4,
-      startAbilities: ['corridor', 'rally', 'scan', 'bulwark', 'diplomatic_landing'],
+      startAbilities: ['rally', 'scan', 'bulwark', 'diplomatic_landing'],
       startPassives: ['rally_beacon'],
     },
     ravager: {
@@ -980,7 +980,7 @@ export const data: GameData = parseGameData({
       branch: 'transhuman',
       ship: { unit: 'hero' },
       slots: 2,
-      startAbilities: ['corridor', 'rally'],
+      startAbilities: ['rally'],
       startPassives: ['vanguard_impulse'],
     },
     warden: {
