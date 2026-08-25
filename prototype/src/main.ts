@@ -655,7 +655,7 @@ import { welcomePlan } from './netWelcome';
 import { orderPlan } from './orderRoute';
 import { errorTarget, refusalKey } from './errorRoute';
 import { joinLanding } from '../../decisions/joinLanding';
-import { claimIntent, scrubClaimParams } from '../../decisions/matchAddress';
+import { claimIntent, matchIdFrom, settledAddress } from '../../decisions/matchAddress';
 import {
   entryOffer,
   reconcileSelection,
@@ -9362,7 +9362,9 @@ let authMode = false;
 const pendingJoinAfterAuth = createPendingJoin();
 const bootParams = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
 const bootReset = (bootParams?.get('reset') ?? '').trim();
-const bootJoinId = (bootParams?.get('join') ?? '').trim();
+// ADDR-3: партия адресуется ПУТЁМ (`/game/<id>`), но старый хвост (`?join=<id>`) уже
+// роздан игрокам и лежит в закладках — читаем обе формы, пишем только новую.
+const bootJoinId = bootParams ? matchIdFrom(location.pathname, bootParams) : '';
 // ADDR-2: что ссылка просит СВЕРХ адреса партии. Отдельный вопрос от «куда вести» —
 // решение в `decisions/matchAddress.ts` (правила: адрес несёт только id, параметры
 // захвата одноразовы, сидящему в партии они не адресованы вовсе).
@@ -10505,7 +10507,7 @@ function connectToMatch(
   // почему просьбу запоминают, почему пароль спрашивают только при известном сервере и
   // почему сессия проверяется наличием, а не совпадением позывного.
   if (!authMode) {
-    claimDone();
+    claimDone(id);
     connect();
     return;
   }
@@ -10526,25 +10528,29 @@ function connectToMatch(
       return;
     }
     pendingJoinToken = join.token;
-    claimDone();
+    claimDone(id);
     connect();
   })();
 }
 
 /**
- * Захват состоялся — вычистить его параметры из адресной строки (ADDR-2).
+ * Захват состоялся — свести строку к адресу партии (ADDR-2 + ADDR-3).
  *
- * В строке остаётся АДРЕС ПАРТИИ (`?join=<id>`), а не просьба занять место: именно её
+ * В строке остаётся АДРЕС ПАРТИИ (`/game/<id>`), а не просьба занять место: именно её
  * игрок копирует и отдаёт другому, и именно она попадает в закладку. Со `slot`/`faction`
  * внутри отданная ссылка навязывала бы получателю чужой выбор — место ему сервер не
  * отдаст (резолвер откатится на свободное), а вот дом отдаст: для него это НОВЫЙ захват.
  * Чистим ПОСЛЕ захвата, а не до: пока вход не удался, параметры ещё нужны — игрок может
  * уйти логиниться и вернуться доигрывать заход. Тот же приём, что у `?reset=<token>`.
+ *
+ * `replaceState`, а не `pushState`: аппаратный Back в APK завязан на `history.back()`
+ * (см. блок про сигнальную запись ниже), и лишняя запись в истории превратила бы первый
+ * Back из выхода в возврат на то же место.
  */
-function claimDone(): void {
+function claimDone(matchId: string): void {
   try {
-    const cleaned = scrubClaimParams(location.href);
-    if (cleaned !== location.href) history.replaceState(null, '', cleaned);
+    const settled = settledAddress(location.href, matchId);
+    if (settled !== location.href) history.replaceState(null, '', settled);
   } catch {
     /* history/URL недоступны (не браузер) — чистить нечего */
   }

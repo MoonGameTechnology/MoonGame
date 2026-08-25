@@ -13,9 +13,11 @@
  *    заходами, и уцелевший выбор оставил бы «Играть» включённой с местом из ПРОШЛОГО
  *    матча: один тап — и игрок улетел бы не туда.
  * 3. **Выбор уходит в АДРЕС, поэтому экранируется.** Идентификатор матча, слот и фракция
- *    склеиваются в ссылку `?join=…&slot=…&faction=…`, которую разбирает загрузочный блок;
+ *    склеиваются в ссылку `/game/<id>?slot=…&faction=…`, которую разбирает загрузочный блок;
  *    любой из них может нести символ, ломающий запрос (тот же довод, что у `matchQuery.ts`
- *    и `netDial.ts`).
+ *    и `netDial.ts`). Сам адрес партии строит `decisions/matchAddress.ts` (ADDR-3): партия
+ *    живёт в ПУТИ, а выбор места — в хвосте, потому что путь копируется как постоянный
+ *    адрес, а хвост описывает одноразовое намерение.
  * 4. **Фракции может не быть — и тогда её нет и в адресе.** Пустой параметр `faction=`
  *    сервер прочитал бы как «фракция задана и она пустая»; отсутствие параметра честно
  *    значит «оставь ту, что идёт с местом».
@@ -25,6 +27,8 @@
  *    запроса: иначе между «сел» и «выбрал» появилось бы окно, в котором место уже занято,
  *    а состав ещё нет.
  */
+
+import { matchAddress } from '../../decisions/matchAddress';
 
 /** Можно ли уже входить (правило 1). */
 export function startEnabled(selectedSlot: string | null): boolean {
@@ -46,5 +50,5 @@ export function joinHref(
   const sciParam = scientists.length
     ? `&sci=${scientists.map((s) => encodeURIComponent(s)).join(',')}`
     : '';
-  return `${pathname}?join=${encodeURIComponent(matchId)}&slot=${encodeURIComponent(slot)}${factionParam}${sciParam}`;
+  return `${matchAddress(pathname, matchId)}?slot=${encodeURIComponent(slot)}${factionParam}${sciParam}`;
 }
