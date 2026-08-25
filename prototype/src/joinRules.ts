@@ -43,10 +43,20 @@ export function dropsSession(outcome: JoinOutcome): boolean {
  * умолчания кресла (BF-30, дом отвязан от стартовой точки). Пустые значения
  * опускаются целиком (правило 3), непустые экранируются.
  */
-export function joinQuery(slot?: string, faction?: string): string {
+export function joinQuery(
+  slot?: string,
+  faction?: string,
+  scientists?: readonly string[],
+): string {
   const params = new URLSearchParams();
   if (slot) params.set('slot', slot);
   if (faction) params.set('faction', faction);
+  // Совет учёных — одной строкой через запятую, ровно как его кладёт в ссылку
+  // `seatJoin.ts` и как разбирает роут (`matchApi.ts`). Раньше этого куска здесь не было:
+  // оба конца цепочки существовали, а перенос между ними — нет, и состав, выбранный на
+  // экране входа, до партии не доезжал (ADDR-2, найдено при разводе адреса и приглашения).
+  // Пустой совет параметра не даёт: «не выбирал» и «выбрал пусто» — разные утверждения.
+  if (scientists && scientists.length > 0) params.set('sci', scientists.join(','));
   const s = params.toString();
   return s ? `?${s}` : '';
 }

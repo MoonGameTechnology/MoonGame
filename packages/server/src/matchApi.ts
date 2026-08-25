@@ -140,6 +140,35 @@ export function registerMatchApi(app: FastifyInstance, deps: MatchApiDeps): void
     });
   }
 
+  /** Что игрок выбрал ДО входа, из строки запроса (REL-7 место, BF-30 дом, ENTRY-4 совет).
+ *
+ *  Одна функция на обе ветки роута — аутентифицированную и ник-овую. Копия здесь стоила
+ *  бы того же, что стоила везде: ветки разъехались бы, и половина игроков теряла бы выбор
+ *  молча (ровно это и было — ник-ветка звала `join` с одним ником).
+ *
+ *  Совет едет одной строкой через запятую: отдельные повторяющиеся параметры ради двух
+ *  значений — лишняя форма, которую пришлось бы разбирать и на клиенте, и здесь. Пустые
+ *  куски отбрасываются, чтобы `sci=` и `sci=,` читались как «не выбирал», а не как учёный
+ *  с пустым идентификатором. */
+function preferencesFrom(query: unknown): {
+  preferredSlot?: string;
+  preferredFaction?: string;
+  preferredScientists?: string[];
+} {
+  const q = (query ?? {}) as { slot?: string; faction?: string; sci?: string };
+  const scientists = q.sci
+    ? q.sci
+        .split(',')
+        .map((x) => x.trim())
+        .filter((x) => x !== '')
+    : [];
+  return {
+    ...(q.slot ? { preferredSlot: q.slot } : {}),
+    ...(q.faction ? { preferredFaction: q.faction } : {}),
+    ...(scientists.length > 0 ? { preferredScientists: scientists } : {}),
+  };
+}
+
   app.get('/matches/:id/join', async (request: FastifyRequest, reply: FastifyReply) => {
     if (rateLimited(request.ip)) {
       void reply.code(429);
@@ -154,22 +183,10 @@ export function registerMatchApi(app: FastifyInstance, deps: MatchApiDeps): void
         void reply.code(401);
         return { error: 'E_AUTH' as const };
       }
-      const q = request.query as { slot?: string; faction?: string; sci?: string };
       const result = await deps.join(id, {
         nick: who.login,
         accountId: who.accountId,
-        preferredSlot: q.slot,
-        preferredFaction: q.faction,
-        // Совет едет одной строкой через запятую: два id, и отдельные повторяющиеся
-        // параметры ради двух значений — лишняя форма, которую пришлось бы разбирать
-        // и на клиенте, и здесь. Пустые куски отбрасываем, чтобы `sci=` и `sci=,`
-        // читались как «не выбрал», а не как учёный с пустым идентификатором.
-        preferredScientists: q.sci
-          ? q.sci
-              .split(',')
-              .map((x) => x.trim())
-              .filter((x) => x !== '')
-          : undefined,
+        ...preferencesFrom(request.query),
       });
       if ('error' in result) void reply.code(STATUS[result.error]);
       return result;
@@ -179,7 +196,12 @@ export function registerMatchApi(app: FastifyInstance, deps: MatchApiDeps): void
       void reply.code(400);
       return { error: 'E_NICK_REQUIRED' as const };
     }
-    const result = await deps.join(id, { nick: nick.trim() });
+    // Предпочтения применяются и здесь. Ник-путь — это LAN/дев-рукопожатие без аккаунтов,
+    // но выбор игрока от способа опознания не зависит: REL-7 (`?slot=`) старше учёток.
+    // Раньше эта ветка звала `join` с одним ником, молча теряя место, дом и совет — ровно
+    // тот класс ошибки, на котором погорел ENTRY-1 (реализация принимала меньше, чем ей
+    // передавали, и разъезд не проявлялся, пока играли на другом пути).
+    const result = await deps.join(id, { nick: nick.trim(), ...preferencesFrom(request.query) });
     if ('error' in result) void reply.code(STATUS[result.error]);
     return result;
   });
