@@ -527,6 +527,23 @@ export const HeroAbilityDefSchema = z.object({
   cost: NonnegativeCostSchema.default({}),
   /** Effect-specific parameters, interpreted by the type's handler. */
   params: z.record(z.string(), z.unknown()).default({}),
+  /** Progression steps of ONE ability (HERO-CORRIDOR-СПЕКА: «три ступени вместо
+   *  одной»). A step is earned by unlocking its skill-tree node (`Hero.skills` →
+   *  `data.heroSkillTrees`), and its `params` override the base `params` for that
+   *  hero. Every unlocked step applies IN ARRAY ORDER, so the ladder is written
+   *  top-down in data and the last unlocked step wins on a shared key. No steps ⇒
+   *  the ability behaves exactly as its base `params` say (fail-secure default:
+   *  an unknown/unreachable node grants nothing). */
+  tiers: z
+    .array(
+      z.object({
+        /** Node id in `data.heroSkillTrees` that unlocks this step. */
+        skill: z.string(),
+        /** Params replacing the base ones once the step is unlocked. */
+        params: z.record(z.string(), z.unknown()).default({}),
+      }),
+    )
+    .default([]),
 });
 
 /** The hook pipelines a hero passive may feed (HERO-5). A curated enum, not an open

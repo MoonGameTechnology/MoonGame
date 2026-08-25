@@ -57,6 +57,13 @@ export function mayTraverse(state: GameState, lane: TempLane, fleetId: string): 
  * узлов соединяет ТОЛЬКО чужой личный коридор: если между ними есть и обычная лейна,
  * ехать можно — просто без коридорного ускорения.
  *
+ * Право прохода ищется среди ВСЕХ живых коридоров на этой паре, а не только среди тех,
+ * что добавили ребро. Иначе личный коридор соседа менял бы чужое движение: игрок,
+ * проложивший СВОЙ коридор поверх уже существующего (его `addedLink` = false — ребро
+ * было), оказывался бы заперт чужим вето и не мог пройти по собственному проходу.
+ * Личный коридор не существует для чужих — но и не отбирает у них того, что они
+ * открыли себе сами.
+ *
  * `fleetId === undefined` (планирование без конкретного флота — например, превью) даёт
  * самый строгий ответ: чужие личные коридоры не учитываются как дорога.
  */
@@ -67,11 +74,11 @@ export function corridorVeto(
   const lanes = state.tempLanes?.filter(lanePrivate);
   if (!lanes || lanes.length === 0) return undefined; // нет личных коридоров — нет и вето
   return (from, to) => {
-    const here = lanes.filter((l) => laneJoins(l, from, to));
-    if (here.length === 0) return false;
-    // Ребро существует только благодаря этим коридорам. Открыто, если хотя бы один
-    // из них пускает меня.
-    return !here.some((l) => fleetId !== undefined && mayTraverse(state, l, fleetId));
+    if (!lanes.some((l) => laneJoins(l, from, to))) return false; // ребро держит не коридор
+    if (fleetId === undefined) return true;
+    return !(state.tempLanes ?? []).some(
+      (l) => laneJoins(l, from, to) && mayTraverse(state, l, fleetId),
+    );
   };
 }
 

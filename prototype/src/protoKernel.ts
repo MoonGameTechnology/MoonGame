@@ -39,6 +39,7 @@ import {
   scientistModule,
   standingOrdersModule,
   fleetOpsModule,
+  autoRallyModule,
   marketModule,
   type GameModule,
   type GameState,
@@ -48,7 +49,6 @@ import {
 } from '../../packages/shared-core/src/index';
 import { data } from './prototypeData';
 import { hungerModule } from './hunger';
-import { autoRallyModule } from './autoRally';
 import { botDiplomacyModule } from './botDiplomacy';
 
 export const MODULES: GameModule[] = [
@@ -82,8 +82,8 @@ export const MODULES: GameModule[] = [
   armyModule,
   victoryModule, // terminal match state from authoritative state (domination / elimination / score / timeout)
   fleetOpsModule, // fleet.launch/merge/split/engage — модуль ЯДРА (CONV-8)
-  // CONV-8: авто-сбор построенного (BF-29) — механика прототипа, в ядре её нет,
-  // поэтому она осталась отдельным модулем рядом, а не уехала вместе с четвёркой.
+  // CONV-10: авто-сбор построенного (BF-29) переехал В ЯДРО — это последняя
+  // механика, которую прототип держал один; канон её теперь тоже грузит.
   autoRallyModule,
   diplomacyModule, // CORE D2+D3 (D4): escalation/consent offers; combat reads state.diplomacy
   espionageModule, // SPY-1 core module: espionage.spy → time-boxed intel windows (state.intel)

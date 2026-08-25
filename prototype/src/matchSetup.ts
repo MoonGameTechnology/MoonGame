@@ -262,7 +262,10 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
       heroes[heroId] = {
         id: heroId,
         owner: seat.id,
-        name: main ? seat.name : loadout.name,
+        // Имя МЕСТА — только главному (позывной игрока / дом в соло). Ростерному
+        // герою имя собирает рендер из архетипа: текст в состоянии не локализуется
+        // (AUD-13), а `loadout.name` здесь и был ключом роты, уехавшим в состояние.
+        ...(main ? { name: seat.name } : {}),
         location: seat.start,
         cooldowns: {},
         grade: loadout.grade,

@@ -265,7 +265,10 @@ describe('hero archetypes + abilities (HERO-1, docs/heroes.md)', () => {
     expect(commander!.branch).toBe('transhuman');
     expect(commander!.ship.unit).toBe('hero');
     expect(commander!.slots).toBe(4);
-    expect(commander!.startAbilities).toContain('corridor');
+    // «Коридор» больше НЕ стартовая способность (заказ владельца): его открывает узел
+    // дерева `overclocked_helm`, иначе узел выдавал бы то, что у героя и так есть.
+    expect(commander!.startAbilities).not.toContain('corridor');
+    expect(data.heroSkillTrees.overclocked_helm?.grants.ability).toBe('corridor');
     // A hero branch is its OWN axis (transhuman/psionic), not a tech branch.
     expect(data.heroes.ravager?.branch).toBe('psionic');
     // Abilities are data-driven effects: a dispatch type + cooldown/range/params.

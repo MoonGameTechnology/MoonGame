@@ -358,7 +358,9 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
         heroes[id] = {
           id,
           owner: a.playerId,
-          name: def.name,
+          // No `name`: `def.name` is catalogue PROSE, and prose in `GameState` can
+          // never be localised (one state, one locale per viewer — AUD-13). The
+          // archetype below is the name's source; the renderer resolves it.
           location: home,
           home,
           cooldowns: {},
