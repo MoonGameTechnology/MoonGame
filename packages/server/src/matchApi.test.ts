@@ -43,6 +43,46 @@ describe('SV-2.4 · match API', () => {
     await app.close();
   });
 
+  // ADDR-2/ENTRY-4: выбор с экрана входа едет в АДРЕСЕ, а роут обязан донести его до
+  // резолвера мест. Цепочка «ссылка → клиент → роут → заявка» была собрана с обоих концов
+  // и не проверена ни разу посередине: клиент `sci` не переносил вовсе, а этот разбор не
+  // покрывал ни один тест.
+  it('доносит выбор из адреса до резолвера: место, дом и совет учёных', async () => {
+    let seen: unknown = null;
+    const app = appWith({
+      createMatch: () => Promise.resolve({ matchId: 'm-1', seats: [] }),
+      join: (_matchId, req) => {
+        seen = req;
+        return Promise.resolve({ playerId: 'p2', token: 'tok' });
+      },
+    });
+    const res = await app.inject({
+      method: 'GET',
+      url: '/matches/m-1/join?nick=alice&slot=p2&faction=azure&sci=overseer,polymath',
+    });
+    expect(res.statusCode).toBe(200);
+    expect(seen).toMatchObject({
+      preferredSlot: 'p2',
+      preferredFaction: 'azure',
+      preferredScientists: ['overseer', 'polymath'],
+    });
+    await app.close();
+  });
+
+  it('пустой sci — это «не выбирал», а не «выбрал пусто»', async () => {
+    const seen: Array<Record<string, unknown>> = [];
+    const app = appWith({
+      createMatch: () => Promise.resolve({ matchId: 'm-1', seats: [] }),
+      join: (_matchId, req) => {
+        seen.push(req as unknown as Record<string, unknown>);
+        return Promise.resolve({ playerId: 'p2', token: 'tok' });
+      },
+    });
+    await app.inject({ method: 'GET', url: '/matches/m-1/join?nick=alice&sci=' });
+    expect(seen[0]).not.toHaveProperty('preferredScientists');
+    await app.close();
+  });
+
   it('rejects a join with no nick (400)', async () => {
     const app = appWith({
       createMatch: () => Promise.resolve({ matchId: 'm', seats: [] }),

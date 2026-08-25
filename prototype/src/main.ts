@@ -655,6 +655,7 @@ import { welcomePlan } from './netWelcome';
 import { orderPlan } from './orderRoute';
 import { errorTarget, refusalKey } from './errorRoute';
 import { joinLanding } from '../../decisions/joinLanding';
+import { claimIntent, scrubClaimParams } from '../../decisions/matchAddress';
 import {
   entryOffer,
   reconcileSelection,
@@ -9020,7 +9021,7 @@ async function welcomeSignIn(nick: string): Promise<void> {
     const pending = pendingJoinAfterAuth.take();
     if (pending) {
       showStage('browse'); // hide the welcome card
-      connectToMatch(pending.matchId, pending.slot, pending.faction);
+      connectToMatch(pending.matchId, pending.slot, pending.faction, pending.scientists);
     } else {
       openHub();
     }
@@ -9129,7 +9130,7 @@ async function submitRegister(): Promise<void> {
     const pending = pendingJoinAfterAuth.take();
     if (pending) {
       showStage('browse');
-      connectToMatch(pending.matchId, pending.slot, pending.faction);
+      connectToMatch(pending.matchId, pending.slot, pending.faction, pending.scientists);
     } else {
       openHub();
     }
@@ -9362,8 +9363,13 @@ const pendingJoinAfterAuth = createPendingJoin();
 const bootParams = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
 const bootReset = (bootParams?.get('reset') ?? '').trim();
 const bootJoinId = (bootParams?.get('join') ?? '').trim();
-const bootSlot = (bootParams?.get('slot') ?? '').trim();
-const bootFaction = (bootParams?.get('faction') ?? '').trim();
+// ADDR-2: что ссылка просит СВЕРХ адреса партии. Отдельный вопрос от «куда вести» —
+// решение в `decisions/matchAddress.ts` (правила: адрес несёт только id, параметры
+// захвата одноразовы, сидящему в партии они не адресованы вовсе).
+const bootClaim = bootParams ? claimIntent(bootParams, false) : null;
+const bootSlot = bootClaim?.slot ?? '';
+const bootFaction = bootClaim?.faction ?? '';
+const bootScientists = bootClaim?.scientists ?? [];
 if (bootReset) {
   openReset(bootReset);
 } else if (bootJoinId) {
@@ -9387,12 +9393,12 @@ if (bootReset) {
     });
     if (where === 'match') {
       showStage('browse');
-      connectToMatch(bootJoinId, bootSlot || undefined, bootFaction || undefined);
+      connectToMatch(bootJoinId, bootSlot || undefined, bootFaction || undefined, bootScientists);
       return;
     }
     // No session — show the welcome card so the player can register/login,
     // then welcomeSignIn auto-resumes the join via pendingJoinAfterAuth.
-    pendingJoinAfterAuth.remember(bootJoinId, bootSlot, bootFaction);
+    pendingJoinAfterAuth.remember(bootJoinId, bootSlot, bootFaction, bootScientists);
     // ADDR-5: ветка началась с showConnect(false), и без этой строки карточка входа
     // выставлялась ВНУТРИ скрытого оверлея — игрок получал пустой экран вместо входа.
     showConnect(true);
@@ -10417,6 +10423,7 @@ async function fetchJoinToken(
   session: string,
   slot?: string,
   faction?: string,
+  scientists?: readonly string[],
 ): Promise<{ token: string; playerId: string } | null> {
   try {
     // REL-7: pass ?slot= to request a specific seat; ?faction= to override the
@@ -10425,7 +10432,7 @@ async function fetchJoinToken(
     // правило «401 стирает сессию», без которого клиент вечно стучится в дверь
     // просроченным пропуском.
     const res = await fetch(
-      `${httpBase(base)}/matches/${encodeURIComponent(matchId)}/join${joinQuery(slot, faction)}`,
+      `${httpBase(base)}/matches/${encodeURIComponent(matchId)}/join${joinQuery(slot, faction, scientists)}`,
       {
         headers: { authorization: `Bearer ${session}` },
       },
@@ -10480,7 +10487,12 @@ let matchFilter: FilterState | null = null;
  *  which isn't shown by default. Fix: stash the id in `pendingJoinAfterAuth`, show
  *  the welcome card so the player can register/login, and `welcomeSignIn` resumes
  *  the join automatically on success. */
-function connectToMatch(id: string, slot?: string, faction?: string): void {
+function connectToMatch(
+  id: string,
+  slot?: string,
+  faction?: string,
+  scientists: readonly string[] = [],
+): void {
   currentMatchId = id;
   reconnecting = false;
   reconnectAttempts = 0;
@@ -10493,6 +10505,7 @@ function connectToMatch(id: string, slot?: string, faction?: string): void {
   // почему просьбу запоминают, почему пароль спрашивают только при известном сервере и
   // почему сессия проверяется наличием, а не совпадением позывного.
   if (!authMode) {
+    claimDone();
     connect();
     return;
   }
@@ -10501,20 +10514,40 @@ function connectToMatch(id: string, slot?: string, faction?: string): void {
     const cached = srv ? sessionRecord(srv.base) : null;
     const next = joinStep({ accountsMode: authMode, serverKnown: !!srv, hasSession: !!cached });
     if (next.step === 'sign-in') {
-      askSignIn(id, slot, faction, next.password ? srv : null);
+      askSignIn(id, slot, faction, next.password ? srv : null, scientists);
       return;
     }
-    const join = await fetchJoinToken(srv!.base, id, cached!.token, slot, faction);
+    const join = await fetchJoinToken(srv!.base, id, cached!.token, slot, faction, scientists);
     if (!join) {
       // Токен не выдан: сессии больше нет — вход просрочен, зовём войти заново; сессия на
       // месте — закрыт сам матч, и карточка входа тут ни при чём (правило 4).
       if (afterTokenRefused(!!sessionRecord(srv!.base)) === 'sign-in')
-        askSignIn(id, slot, faction, srv);
+        askSignIn(id, slot, faction, srv, scientists);
       return;
     }
     pendingJoinToken = join.token;
+    claimDone();
     connect();
   })();
+}
+
+/**
+ * Захват состоялся — вычистить его параметры из адресной строки (ADDR-2).
+ *
+ * В строке остаётся АДРЕС ПАРТИИ (`?join=<id>`), а не просьба занять место: именно её
+ * игрок копирует и отдаёт другому, и именно она попадает в закладку. Со `slot`/`faction`
+ * внутри отданная ссылка навязывала бы получателю чужой выбор — место ему сервер не
+ * отдаст (резолвер откатится на свободное), а вот дом отдаст: для него это НОВЫЙ захват.
+ * Чистим ПОСЛЕ захвата, а не до: пока вход не удался, параметры ещё нужны — игрок может
+ * уйти логиниться и вернуться доигрывать заход. Тот же приём, что у `?reset=<token>`.
+ */
+function claimDone(): void {
+  try {
+    const cleaned = scrubClaimParams(location.href);
+    if (cleaned !== location.href) history.replaceState(null, '', cleaned);
+  } catch {
+    /* history/URL недоступны (не браузер) — чистить нечего */
+  }
 }
 
 /**
@@ -10528,8 +10561,9 @@ function askSignIn(
   slot: string | undefined,
   faction: string | undefined,
   srv: { nick?: string } | null,
+  scientists: readonly string[] = [],
 ): void {
-  pendingJoinAfterAuth.remember(id, slot, faction);
+  pendingJoinAfterAuth.remember(id, slot, faction, scientists);
   showConnect(false);
   showHub(false);
   showStage('welcome');
