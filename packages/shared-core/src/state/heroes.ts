@@ -37,3 +37,20 @@ export function fleetSideDealingHit(
   if (side.ref.kind !== 'fleet') return null;
   return { battle, side: side as BattleSide & { ref: { kind: 'fleet'; fleetId: string } } };
 }
+
+/** The FLEET side TAKING this `combat.damage` hit, or null when the args don't resolve
+ *  to one. The mirror of {@link fleetSideDealingHit}: `args.defender` is the owner the
+ *  damage lands on, so a modifier keyed off this side is INCOMING damage for it. Fleet
+ *  sides only, same reason as its twin — the hero family buffs fleets, not garrisons. */
+export function fleetSideTakingHit(
+  state: GameState,
+  battleId: unknown,
+  defender: unknown,
+): { battle: Battle; side: BattleSide & { ref: { kind: 'fleet'; fleetId: string } } } | null {
+  if (typeof battleId !== 'string' || typeof defender !== 'string') return null;
+  const battle = state.battles[battleId];
+  if (!battle) return null;
+  const side = battle.defender.owner === defender ? battle.defender : battle.attacker;
+  if (side.owner !== defender || side.ref.kind !== 'fleet') return null;
+  return { battle, side: side as BattleSide & { ref: { kind: 'fleet'; fleetId: string } } };
+}

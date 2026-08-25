@@ -27,7 +27,7 @@ function loadShippedBundle(): Record<string, unknown> {
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.7');
+    expect(data.version).toBe('0.1.8');
     expect(data.resources).toContain('microelectronics');
     expect(data.units.siege_lance?.stats.range).toBe(300); // artillery firing radius (map units)
     expect(data.units.cruiser?.upkeep.credits).toBe(8); // daily upkeep
@@ -352,6 +352,23 @@ describe('hero archetypes + abilities (HERO-1, docs/heroes.md)', () => {
     expect(data.heroAbilities.annihilate?.type).toBe('annihilate');
   });
 
+  it('every ability STEP names a real tree node — otherwise the step is unreachable', () => {
+    // `HeroAbilityDef.tiers[].skill` is the ONE link between an ability's ladder and the
+    // tree that sells it, and nothing else validates it: a typo there parses fine and
+    // simply never fires, so the node the player paid for does nothing. Both ladders
+    // (corridor, scan) ride this link.
+    const data = parseGameData(loadShippedBundle());
+    const nodes = new Set(Object.keys(data.heroSkillTrees));
+    const laddered: string[] = [];
+    for (const [id, def] of Object.entries(data.heroAbilities)) {
+      for (const step of def.tiers) {
+        expect(nodes.has(step.skill), `ability ${id} has a step keyed to unknown node "${step.skill}"`).toBe(true);
+        laddered.push(id);
+      }
+    }
+    expect([...new Set(laddered)].sort()).toEqual(['corridor', 'scan']);
+  });
+
   it('the shipped skill tree is internally consistent (HERO-7 referential integrity)', () => {
     const data = parseGameData(loadShippedBundle());
     const nodes = data.heroSkillTrees;
@@ -371,6 +388,27 @@ describe('hero archetypes + abilities (HERO-1, docs/heroes.md)', () => {
     // Both design branches ship a root node.
     expect(nodes.neural_lace?.branch).toBe('transhuman');
     expect(nodes.void_attunement?.branch).toBe('psionic');
+    // Both ship a full LADDER of four: `corridor` up the transhuman side, `scan` up the
+    // psionic one. A branch is a progression, not a pair of perks — and the owner's
+    // complaint that started this ("I don't see nodes 3 and 4") is only ever answered
+    // by a check, never by looking.
+    const ladder = (branch: string): string[] =>
+      Object.entries(nodes)
+        .filter(([, n]) => n.branch === branch)
+        .map(([id]) => id)
+        .sort();
+    expect(ladder('transhuman')).toEqual([
+      'corridor_open',
+      'corridor_sustained',
+      'neural_lace',
+      'overclocked_helm',
+    ]);
+    expect(ladder('psionic')).toEqual([
+      'psi_evasion',
+      'psi_veil',
+      'psi_weak_points',
+      'void_attunement',
+    ]);
     // Fail-closed: an unknown branch or a negative cost never parses.
     expect(
       safeParseGameData({

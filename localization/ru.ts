@@ -511,6 +511,7 @@ export const ru: Record<string, string> = {
   'data.dropship': 'носитель',
   'data.empty-space': 'Пустое пространство',
   'data.energy': 'энергия',
+  'data.evasive-vectors': 'Манёвренность',
   'data.fighter-squadron': 'истребительная эскадрилья',
   'data.flight-decks': 'Полётные палубы',
   'data.food': 'пища',
@@ -597,6 +598,7 @@ export const ru: Record<string, string> = {
   'data.volcanic': 'Вулканический',
   'data.warden': 'Страж',
   'data.warhead-miniaturization': 'Миниатюризация боеголовок',
+  'data.weak-points': 'Слабые места',
 
   // --- diplo — Дипломатия: окно, вкладки, фильтр и сортировка ростера, названия отношений.
   'diplo.filter': 'Фильтр',
@@ -1084,7 +1086,8 @@ export const ru: Record<string, string> = {
   'hero.ability.rally.name': 'Сбор',
   'hero.ability.recall.desc': 'Мгновенно отзывает корабль-героя в столицу.',
   'hero.ability.recall.name': 'Отзыв',
-  'hero.ability.scan.desc': 'Раскрывает зону вокруг цели сквозь туман на время.',
+  'hero.ability.scan.desc':
+    'Раскрывает зону вокруг цели сквозь туман на время. Улучшения превращают просвеченную зону в боевую: сперва подсвечивают бреши в броне врага, затем ведут по радару свои и союзные флоты.',
   'hero.ability.scan.name': 'Разведка',
   'hero.arch.commander': 'Командир',
   'hero.arch.destroyer': 'Разрушитель',
@@ -1121,8 +1124,14 @@ export const ru: Record<string, string> = {
   'hero.tree.neural-lace.name': 'Нейрокружево',
   'hero.tree.overclocked-helm.desc': 'Форсаж нейроинтерфейса открывает герою прокладку коридоров.',
   'hero.tree.overclocked-helm.name': 'Разогнанный шлем',
+  'hero.tree.psi-evasion.desc':
+    'Картинка радара идёт и своим: ваши флоты и флоты союзников внутри просвеченной зоны получают на 5% меньше входящего урона.',
+  'hero.tree.psi-evasion.name': 'Манёвренность',
   'hero.tree.psi-veil.desc': 'Отточенное пси-зрение: герой учится вскрывать туман разведкой.',
   'hero.tree.psi-veil.name': 'Пси-вуаль',
+  'hero.tree.psi-weak-points.desc':
+    'Радар не просто светит: он читает бреши в чужой броне. Флоты противника внутри просвеченной зоны получают на 5% больше урона. Свои, союзные и нейтральные флоты не задеты.',
+  'hero.tree.psi-weak-points.name': 'Слабые места',
   'hero.tree.void-attunement.desc':
     'Пси-резонанс героя воодушевляет флоты рядом: +8% к урону в радиусе 300.',
   'hero.tree.void-attunement.name': 'Сонастройка с Пустотой',
