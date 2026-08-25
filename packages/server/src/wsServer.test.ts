@@ -163,3 +163,38 @@ describe('createMultiplayerServer', () => {
     }
   });
 });
+
+describe('адрес партии как путь (ADDR-3)', () => {
+  const CLIENT = '<!doctype html><title>client</title>';
+
+  /** http-origin сервера: `listen()` отдаёт ws-адрес матча, здесь нужен корень. */
+  const httpBase = (wsUrl: string): string =>
+    wsUrl.replace(/^ws/, 'http').replace(/\/matches(\/.*)?$/, '');
+
+  it('КЛИЕНТ ОТДАЁТСЯ И НА /game/<id>: иначе скопированный адрес партии — 404', async () => {
+    // Смысл ADDR-3 в том, что адрес копируется целиком и открывается в новой вкладке.
+    // Клиентская маршрутизация без серверного маршрута этого не даёт: первая же
+    // холодная загрузка по такому адресу упрётся в «страница не найдена».
+    const server = createMultiplayerServer({ room: makeRoom(), indexHtml: CLIENT });
+    const base = httpBase(await server.listen());
+    try {
+      for (const path of ['/', '/index.html', '/game/proto', '/game/m-9f2c4b']) {
+        const res = await fetch(`${base}${path}`);
+        expect([path, res.status]).toEqual([path, 200]);
+        expect(await res.text()).toBe(CLIENT);
+      }
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('без клиента в сборке маршрута нет вовсе — сервер не выдумывает страницу', async () => {
+    const server = createMultiplayerServer({ room: makeRoom() });
+    const base = httpBase(await server.listen());
+    try {
+      expect((await fetch(`${base}/game/proto`)).status).toBe(404);
+    } finally {
+      await server.close();
+    }
+  });
+});
