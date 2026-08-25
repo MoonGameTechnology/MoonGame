@@ -83,6 +83,7 @@ import { MS_PER_DAY } from '../packages/shared-core/src/index';
 import type { Identity } from '../packages/server/src/matchApi';
 import { seatClaim, seatClaimAction } from '../packages/server/src/joinSeat';
 import { expiredSeatClaims } from '../packages/server/src/seatExpiry';
+import { bootRoster, MAX_HOSTED_MATCHES } from '../packages/server/src/matchRoster';
 const { Pool } = pgPkg;
 
 // --- M0/M1 playtest log: append room events to a per-run JSONL and feed every one
@@ -299,12 +300,12 @@ if (!AUTH && HOST_BIND === '0.0.0.0' && !PROD_FLAG) {
 // chair is claimable by a human, while the server AI stands in after the reconnect grace.
 const NETWORK_MODE = parseNetworkMatchMode(process.env.TEAMS);
 const NET_SEATS = networkSeats(NETWORK_MODE);
-// MATCHES=N hosts N independent sessions in THIS one process (default 1) — same mode
-// and time scale for all; the match browser lists every one, players pick a row. Ids:
-// `proto`, `proto-2`, … `proto-N` (the first keeps its historic id so an existing
-// durable snapshot / saved seat tickets keep working across the upgrade).
-const MATCHES = Math.max(1, Math.min(16, Number(process.env.MATCHES ?? 1) || 1));
-const matchIds = Array.from({ length: MATCHES }, (_, i) => (i === 0 ? 'proto' : `proto-${i + 1}`));
+// MATCHES=N — сколько партий ЗАСЕЯТЬ на пустом сторе (default 1); тот же режим и та же
+// шкала времени у всех, браузер матчей показывает каждую. Это НЕ список партий хоста:
+// список приходит из стора (ADDR-1, `matchRoster.ts`). Первая засеянная сохраняет
+// исторический id `proto`, чтобы уже выданные билеты на места и durable-снапшот пережили
+// обновление; остальные получают настоящие идентификаторы, а не порядковые номера.
+const MATCHES = Math.max(1, Math.min(MAX_HOSTED_MATCHES, Number(process.env.MATCHES ?? 1) || 1));
 
 // Wakeup-driver tuning. NETA2-6: the arm/fire/stall loop + the live-player HEARTBEAT_MS
 // beat now live in the shared `startClockDriver` (packages/server) — one scheduler for
@@ -630,9 +631,14 @@ async function createHostedMatch(id: string): Promise<HostedMatch> {
 // Raise every hosted session, then expose them ALL through the registry so the
 // client's match browser (GET /matches) lists each with its real status
 // (map / rules / day / players) and joins go to `/matches/<id>`.
+//
+// ADDR-1: набор партий больше НЕ выводится из `MATCHES=N`. Живые партии перечисляет
+// стор (`ongoingMatchIds` — нормализованный `status`, не JSONB), а переменная окружения
+// описывает лишь первый запуск на пустом сторе. Иначе рестарт добавлял бы ещё N комнат
+// к уже существующим, а `?join=proto` навсегда означал бы «комната №1 этого процесса».
+// Само решение — в `matchRoster.ts` рядом с каноническим сервером, чтобы хосты не
+// разъезжались в том, как называется партия.
 const hosted: HostedMatch[] = [];
-for (const id of matchIds) hosted.push(await createHostedMatch(id));
-const restoredCount = hosted.filter((h) => h.restored).length;
 const registry = new MatchRegistry(accountStore);
 /** Метаданные браузера для одной сессии этого хоста. Пока все партии поднимаются по
  *  одному шаблону (одна карта, один режим, одна вместимость) — это и есть BRW-0, и он
@@ -646,7 +652,19 @@ const browserMeta = (room: MatchRoom): MatchMeta => ({
   // within this real-time window from the session's creation (see AI note below).
 });
 
-for (const h of hosted) registry.register(h.room, browserMeta(h.room));
+// Список партий на старте приходит из СТОРА, а не из `MATCHES=N`: `bootRoster` поднимает
+// всё, что стор считает живым, и засевает только пустой стор (иначе каждый рестарт
+// добавлял бы ещё N комнат). Без этого партия, созданная через `POST /matches`, жила бы
+// лишь до перезапуска процесса — id уникален, но поднять её было бы некому.
+const roster = bootRoster({ stored: await matchStore.ongoingMatchIds(), seedCount: MATCHES });
+for (const id of roster.raise) {
+  const h = await createHostedMatch(id);
+  hosted.push(h);
+  registry.register(h.room, browserMeta(h.room));
+  if (!h.restored) await h.flush(); // засеянная партия тоже durable сразу, а не после хода
+}
+const matchIds = roster.raise;
+const restoredCount = hosted.filter((h) => h.restored).length;
 /**
  * ADDR-1: поднять НОВУЮ партию по требованию, а не на старте процесса.
  *
@@ -664,6 +682,11 @@ async function hostNewMatch(): Promise<HostedMatch> {
   const h = await createHostedMatch(newMatchId());
   hosted.push(h);
   registry.register(h.room, browserMeta(h.room));
+  // Свежая партия ложится в стор СРАЗУ, а не при первой активности. Иначе её нет в
+  // `ongoingMatchIds()` — а именно оттуда следующий старт берёт список (см. `bootRoster`
+  // выше), — и рестарт до первого хода стёр бы партию вместе с уже розданным адресом.
+  // Восстановленную трогать незачем: она в сторе по определению.
+  if (!h.restored) await h.flush();
   return h;
 }
 
