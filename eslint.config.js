@@ -85,7 +85,13 @@ export default tseslint.config(
     // kind of Node glue. The zone's TypeScript is linted by the shared config above —
     // typescript-eslint turns `no-undef` off for .ts (tsc owns that check), so the
     // browser client needs no globals list here.
-    files: ['.github/**/*.{mjs,js}', 'scripts/**/*.{mjs,js}', 'prototype/**/*.{mjs,js}'],
+    files: [
+      '.github/**/*.{mjs,js}',
+      'scripts/**/*.{mjs,js}',
+      'prototype/**/*.{mjs,js}',
+      // `deploy/*.mjs` — тесты скриптов эксплуатации (OPS-1), та же Node-глюкода.
+      'deploy/**/*.{mjs,js}',
+    ],
     languageOptions: {
       globals: {
         process: 'readonly',

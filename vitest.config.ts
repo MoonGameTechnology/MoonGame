@@ -13,6 +13,9 @@ export default defineConfig({
       // тихая по своей природе: шаг под `continue-on-error` падает, гейт зелёный, а
       // сертифицирует он ничего — ровно так и потерялась загрузка находок trivy-deps.
       '.github/scripts/**/*.test.mjs',
+      // Скрипты эксплуатации (OPS-1). Механизм обновления прода переехал из heredoc
+      // установщика в `deploy/update.sh` — файл репозитория можно наконец проверить.
+      'deploy/**/*.test.mjs',
     ],
     coverage: {
       provider: 'v8',

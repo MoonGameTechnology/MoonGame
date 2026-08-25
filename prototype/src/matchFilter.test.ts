@@ -1,8 +1,11 @@
 import { describe, it, expect } from 'vitest';
 import {
+  clampFilter,
   mapsOf,
   matchesFilter,
   playerBounds,
+  restoreFilter,
+  serializeFilter,
   type FilterRow,
   type FilterState,
 } from './matchFilter';
@@ -96,5 +99,56 @@ describe('фильтр браузера — число игроков', () => {
   it('ПУСТАЯ ЛЕНТА НЕ ДАЁТ БЕСКОНЕЧНОСТЕЙ: границы схлопнуты в ноль', () => {
     // `Math.min()` без аргументов вернул бы Infinity, и ползунок уехал бы в бесконечность.
     expect(playerBounds([])).toEqual({ min: 0, max: 0 });
+  });
+});
+
+describe('фильтр браузера — память выбора', () => {
+  const feed = [
+    row({ mapId: 'nexus', players: { seated: 0, capacity: 2 } }),
+    row({ mapId: 'rift', players: { seated: 0, capacity: 8 } }),
+  ];
+
+  it('ПУСТОЕ ИЛИ БИТОЕ ХРАНИЛИЩЕ НЕ РОНЯЕТ ЭКРАН — молча даём фильтр по умолчанию', () => {
+    for (const raw of [null, '', '{', 'null', '[]', '"строка"', '{"mode":"пвп"}']) {
+      const f = restoreFilter(raw, feed);
+      expect(f.mode, String(raw)).toBe('all');
+      expect(f.maps.size, String(raw)).toBe(0);
+      expect(f.players, String(raw)).toEqual({ min: 2, max: 8 });
+    }
+  });
+
+  it('круговорот: что сохранили, то и вернулось (Set переживает JSON)', () => {
+    const f = filter({ mode: 'pve', maps: new Set(['rift']), players: { min: 2, max: 8 } });
+    const back = restoreFilter(serializeFilter(f), feed);
+    expect(back.mode).toBe('pve');
+    expect([...back.maps]).toEqual(['rift']);
+    expect(back.players).toEqual({ min: 2, max: 8 });
+  });
+
+  it('КАРТА, КОТОРОЙ В ЛЕНТЕ НЕТ, ВЫБРАСЫВАЕТСЯ: невидимый фильтр не прячет список', () => {
+    // Галочки строятся из ленты, поэтому карту, которой в ленте больше нет, игрок не
+    // увидит и не снимет — а она бы вычистила весь список. Пустой остаток = «все».
+    const saved = serializeFilter(filter({ maps: new Set(['ancient-map']) }));
+    expect(restoreFilter(saved, feed).maps.size).toBe(0);
+    const mixed = serializeFilter(filter({ maps: new Set(['ancient-map', 'rift']) }));
+    expect([...restoreFilter(mixed, feed).maps]).toEqual(['rift']);
+  });
+
+  it('сохранённый диапазон зажимается в границы сегодняшней ленты', () => {
+    const saved = serializeFilter(filter({ players: { min: 1, max: 99 } }));
+    expect(restoreFilter(saved, feed).players).toEqual({ min: 2, max: 8 });
+  });
+
+  it('ДИАПАЗОН, НЕ ПЕРЕСЕКАЮЩИЙСЯ С ЛЕНТОЙ, РАСКРЫВАЕТСЯ ЦЕЛИКОМ, А НЕ ПРЯЧЕТ ВСЁ', () => {
+    // Сохранён поиск партии на 30 человек, а сегодня в ленте двойки и восьмёрки:
+    // fail-open — лучше показать лишнее, чем пустой экран без видимой причины.
+    const saved = serializeFilter(filter({ players: { min: 30, max: 40 } }));
+    expect(restoreFilter(saved, feed).players).toEqual({ min: 2, max: 8 });
+  });
+
+  it('приведение к ленте работает и без хранилища — на живом состоянии', () => {
+    const f = clampFilter(filter({ maps: new Set(['nexus', 'ушедшая']), players: { min: 0, max: 4 } }), feed);
+    expect([...f.maps]).toEqual(['nexus']);
+    expect(f.players).toEqual({ min: 2, max: 4 });
   });
 });

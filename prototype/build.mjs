@@ -1767,6 +1767,24 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #connect .mtab{flex:1;padding:8px 6px;border-radius:7px;border:1px solid var(--line-hi);background:transparent;
   color:var(--dim);font-size:11px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;}
 #connect .mtab.active{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.10);}
+/* Панель фильтров над списком (BRW-3) — только на вкладке «Доступные». */
+#connect .mfilter{margin-top:10px;padding:8px 10px;border:1px solid var(--line-hi);border-radius:8px;
+  display:flex;flex-direction:column;gap:7px;}
+#connect .mfrow{display:flex;align-items:center;gap:8px;}
+#connect .mflabel{flex:none;width:64px;color:var(--dim);font-size:11px;letter-spacing:.5px;}
+#connect .mfseg{display:flex;gap:4px;}
+#connect .mfbtn{padding:5px 10px;border-radius:6px;border:1px solid var(--line-hi);background:transparent;
+  color:var(--dim);font-size:11px;letter-spacing:.5px;cursor:pointer;}
+#connect .mfbtn.active{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.10);}
+#connect .mfdrop{position:relative;flex:1;min-width:0;}
+#connect .mfwide{width:100%;text-align:left;}
+#connect .mfmenu{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:5;max-height:38vh;overflow-y:auto;
+  padding:6px;border:1px solid var(--line-hi);border-radius:7px;background:rgba(3,12,16,.97);}
+#connect .mfmenu label{display:flex;align-items:center;gap:7px;padding:5px 6px;border-radius:5px;
+  color:var(--txt,#dfeef2);font-size:12px;text-transform:capitalize;cursor:pointer;}
+#connect .mfmenu label:hover{background:rgba(53,214,230,.08);}
+#connect .mfrange{flex:1;min-width:0;accent-color:var(--cyan,#35d6e6);}
+#connect .mfval{flex:none;min-width:52px;text-align:right;color:var(--cyan-dim,#6cc);font-size:11px;}
 #connect .mlist{margin-top:10px;max-height:46vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;}
 #connect .mempty{padding:18px 8px 8px;text-align:center;color:var(--dim);font-size:12px;}
 #connect .msolo{padding:6px 8px 16px;text-align:center;}
@@ -2850,6 +2868,29 @@ const page = (js) => `<!doctype html>
           <button class="mtab active" data-tab="available" data-i18n="welcome.browse.tab.available"></button>
           <button class="mtab" data-tab="active" data-i18n="welcome.browse.tab.active"></button>
           <button class="mtab" data-tab="archived" data-i18n="welcome.browse.tab.archived"></button>
+        </div>
+        <div id="mfilter" class="mfilter" style="display:none">
+          <div class="mfrow">
+            <span class="mflabel" data-i18n="browser.filter.mode"></span>
+            <div class="mfseg" id="mf-mode">
+              <button class="mfbtn active" type="button" data-mode="all" data-i18n="browser.filter.all"></button>
+              <button class="mfbtn" type="button" data-mode="pvp" data-i18n="browser.mode.pvp"></button>
+              <button class="mfbtn" type="button" data-mode="pve" data-i18n="browser.mode.pve"></button>
+            </div>
+          </div>
+          <div class="mfrow">
+            <span class="mflabel" data-i18n="browser.filter.map"></span>
+            <div class="mfdrop">
+              <button class="mfbtn mfwide" type="button" id="mf-map"></button>
+              <div class="mfmenu" id="mf-maps" style="display:none"></div>
+            </div>
+          </div>
+          <div class="mfrow">
+            <span class="mflabel" data-i18n="browser.filter.players"></span>
+            <input id="mf-min" class="mfrange" type="range" min="0" max="0" value="0">
+            <input id="mf-max" class="mfrange" type="range" min="0" max="0" value="0">
+            <span class="mfval" id="mf-range"></span>
+          </div>
         </div>
         <div id="mlist" class="mlist"></div>
       </div>

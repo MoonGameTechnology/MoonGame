@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { bootRoster, newMatchId, MAX_HOSTED_MATCHES } from './matchRoster';
+import { bootRoster, MAX_HOSTED_MATCHES } from './matchRoster';
+import { newMatchId } from './matchId';
 import { MemoryMatchStore } from './store/memory';
 import { createInitialState } from '@void/shared-core';
 
@@ -49,19 +50,6 @@ describe('bootRoster — какие партии хост поднимает н�
       const many = Array.from({ length: MAX_HOSTED_MATCHES + 4 }, (_, i) => `m-${i}`);
       expect(bootRoster({ stored: many, seedCount: 1 }).raise).toEqual(many);
     });
-  });
-});
-
-describe('newMatchId — идентификатор новой партии (ADDR-1)', () => {
-  it('не выводится из порядкового номера в процессе', () => {
-    const a = newMatchId();
-    const b = newMatchId();
-    expect(a).not.toBe(b);
-    expect(a).not.toMatch(/^proto(-\d+)?$/);
-  });
-
-  it('той же формы, что у канонического сервера — хосты не расходятся в адресах', () => {
-    expect(newMatchId()).toMatch(/^m-[0-9a-f-]{36}$/);
   });
 });
 

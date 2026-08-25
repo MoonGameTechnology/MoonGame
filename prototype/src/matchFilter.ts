@@ -26,6 +26,17 @@
  * 6. **Контролы собираются ИЗ ЛЕНТЫ.** Каталога карт в read-model нет, и заводить его
  *    ради фильтра не нужно: список карт и границы ползунка выводятся из того же ответа
  *    сервера, что и сам список.
+ * 7. **Выбор переживает перезагрузку, но НИКОГДА не остаётся невидимым** (BRW-3). Лента
+ *    у другого сервера — или у того же назавтра — другая, а галочки и границы ползунка
+ *    строятся из НЕЁ. Поэтому сохранённое состояние приводится к сегодняшней ленте:
+ *    карты, которых в ней нет, выбрасываются, диапазон зажимается в её границы. Иначе
+ *    фильтр, которого игрок не видит в панели, вычистил бы список, и причина пустого
+ *    экрана была бы ему недоступна.
+ * 8. **Приведение fail-open.** Если от выбора ничего не осталось — ни одной знакомой
+ *    карты, диапазон мимо ленты, — берётся ВЕСЬ доступный набор, а не пустой. Показать
+ *    лишнее не страшно; показать пустоту без объяснимой причины — потерять игрока.
+ *    Битое или чужое содержимое хранилища читается так же: молча даём умолчание, экран
+ *    не роняем (в `localStorage` может лежать что угодно — это ввод, а не наше поле).
  */
 
 /** Значения сегмента «Режим». */
@@ -68,4 +79,51 @@ export function matchesFilter(row: FilterRow, f: FilterState): boolean {
   const lo = Math.min(f.players.min, f.players.max);
   const hi = Math.max(f.players.min, f.players.max);
   return row.players.capacity >= lo && row.players.capacity <= hi;
+}
+
+/** Ключ хранилища выбора — рядом с `void.server` / `void.nick` (BRW-3). */
+export const FILTER_STORE_KEY = 'void.filter';
+
+/** Фильтр «ничего не выбрано»: все режимы, все карты, весь диапазон ленты. */
+function defaultFilter(rows: readonly FilterRow[]): FilterState {
+  return { mode: 'all', maps: new Set(), players: playerBounds(rows) };
+}
+
+/** Привести выбор к сегодняшней ленте (правила 7, 8). */
+export function clampFilter(f: FilterState, rows: readonly FilterRow[]): FilterState {
+  const known = new Set(mapsOf(rows));
+  const bounds = playerBounds(rows);
+  const lo = Math.max(bounds.min, Math.min(f.players.min, f.players.max));
+  const hi = Math.min(bounds.max, Math.max(f.players.min, f.players.max));
+  return {
+    mode: f.mode,
+    maps: new Set([...f.maps].filter((m) => known.has(m))),
+    // Пустое пересечение — не «ничего не подходит», а «выбор устарел»: раскрываем целиком.
+    players: lo <= hi ? { min: lo, max: hi } : bounds,
+  };
+}
+
+/** Выбор → строка для `localStorage` (`Set` в JSON не сериализуется сам). */
+export function serializeFilter(f: FilterState): string {
+  return JSON.stringify({ mode: f.mode, maps: [...f.maps], players: f.players });
+}
+
+/** Строка из `localStorage` → выбор, приведённый к ленте. Любой мусор — умолчание. */
+export function restoreFilter(raw: string | null, rows: readonly FilterRow[]): FilterState {
+  const base = defaultFilter(rows);
+  if (!raw) return base;
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return base;
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return base;
+  const o = parsed as { mode?: unknown; maps?: unknown; players?: unknown };
+  const mode: ModeFilter = o.mode === 'pvp' || o.mode === 'pve' ? o.mode : 'all';
+  const maps = Array.isArray(o.maps) ? o.maps.filter((m): m is string => typeof m === 'string') : [];
+  const p = typeof o.players === 'object' && o.players !== null ? (o.players as Record<string, unknown>) : {};
+  const min = typeof p.min === 'number' && Number.isFinite(p.min) ? p.min : base.players.min;
+  const max = typeof p.max === 'number' && Number.isFinite(p.max) ? p.max : base.players.max;
+  return clampFilter({ mode, maps: new Set(maps), players: { min, max } }, rows);
 }
