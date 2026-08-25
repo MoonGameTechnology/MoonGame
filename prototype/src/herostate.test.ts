@@ -14,7 +14,7 @@ describe('hero state seed — the roster rides in as core hero instances (HERO-9
       expect(main.grade).toBe('main');
       expect(main.archetype).toBe('commander');
       expect(main.alive).toBe(true);
-      expect(main.name && main.name.length).toBeTruthy(); // named by the commander's nick
+      expect(main.name && main.name.length).toBeTruthy(); // имя МЕСТА: позывной / дом
       expect(main.fleetId).toBe(`${pid}-1`); // rides the home fleet
       expect(s.fleets[main.fleetId!]?.units.some((u) => u.unit === 'hero')).toBe(true);
       for (const h of mine) {
@@ -25,6 +25,25 @@ describe('hero state seed — the roster rides in as core hero instances (HERO-9
         // `abilities` — (string | null)[]: null = пустой слот, каталог сверяем по занятым
         for (const a of h.abilities ?? []) if (a) expect(data.heroAbilities[a]).toBeTruthy(); // known ids
       }
+    }
+  });
+
+  it('текста для игрока в состоянии героев НЕТ: имя носит только место (AUD-13)', () => {
+    const s = newGame();
+    const mine = Object.values(s.heroes ?? {}).filter((h) => h.owner === 'p1');
+    for (const h of mine) {
+      if (h.grade === 'main') {
+        // Имя МЕСТА: позывной живого игрока или дом сиденья. Из архетипа его не
+        // собрать — поэтому оно и остаётся единственным `name` в состоянии.
+        expect(h.name).toBe(s.players.p1!.name);
+      } else {
+        // Ростерный герой безымянен: рендер называет его по архетипу
+        // (`heroDisplayName`), а ключ роты в состояние больше не уезжает.
+        expect(h.name).toBeUndefined();
+      }
+      // Ни ключа локали, ни прозы каталога — что бы ни лежало в имени, это не текст.
+      expect(h.name ?? '').not.toContain('hero.arch.');
+      expect(h.name ?? '').not.toBe(data.heroes[h.archetype!]!.name);
     }
   });
 

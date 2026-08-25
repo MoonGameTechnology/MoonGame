@@ -14,6 +14,20 @@
     "cost": { "microelectronics": 45, "credits": 100 },
     "grants": { "ability": "corridor" }
   },
+  "corridor_sustained": {
+    "name": "Sustained Corridor",
+    "description": "Коридор держится по часам, а не гаснет с первым же проходом армии героя.",
+    "branch": "transhuman",
+    "requires": ["overclocked_helm"],
+    "cost": { "microelectronics": 70, "credits": 150 }
+  },
+  "corridor_open": {
+    "name": "Shared Corridor",
+    "description": "Открывает коридор союзникам: их флоты идут вашим проходом с тем же ускорением. Проход становится общим — войти сможет и нейтрал, и противник, но им коридор даёт только дорогу.",
+    "branch": "transhuman",
+    "requires": ["corridor_sustained"],
+    "cost": { "microelectronics": 110, "credits": 250 }
+  },
   "void_attunement": {
     "name": "Void Attunement",
     "description": "Пси-резонанс героя воодушевляет флоты рядом: +8% к урону в радиусе 300.",

@@ -141,7 +141,7 @@ interface Hero {
 |---|---|
 | `Hero {owner, location, cooldowns}`, ключ = `PlayerId` | `Hero {id, owner, archetype, fleetId, fittings, skills, cooldowns, respawnAt}`, ключ = инстанс; до 3 на игрока |
 | `location: PlanetId` (телепорт-сущность) | корабль-`Fleet` (`fleetId`), движение/гибель через `movement`/`combat` |
-| хардкод `hero.path.create` / `planet.annihilate` / `hero.move` | типы-эффекты в `data/heroAbilities.json`, диспетчер `hero.ability` |
+| хардкод `hero.path.create` / `planet.annihilate` / `hero.move` | типы-эффекты в `data/heroAbilities.json`, диспетчер `hero.ability` (коридор переехал целиком — `hero.path.create` снято HERO-CORRIDOR-СПЕКА) |
 | фиксированные константы в `hero.ts` | поля данных (cooldown/range/params) |
 
 `tempLanes` / `topology` / `dead_world` / приватность героя в `visibleState` —

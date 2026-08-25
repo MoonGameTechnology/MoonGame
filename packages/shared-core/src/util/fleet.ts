@@ -42,3 +42,22 @@ export function garrisonUnderAssault(state: GameState, planetId: PlanetId): bool
     ),
   );
 }
+
+/** Monotonic fleet-id counter extension (mirrors `battleSeq`). Prototype-state-
+ *  style optional field: absent on old saves, seeded from the live fleet count
+ *  so pre-counter matches keep minting unique ids (BF-25 in the prototype). */
+export interface FleetSeqState {
+  fleetSeq?: number;
+}
+
+/** Shared because fleets are minted by more than one module (`fleet-ops` forms
+ *  them from a garrison, `auto-rally` opens one for freshly built ships) and a
+ *  host may mint them outside actions too. Two counters over one `fleetSeq` field
+ *  would be fine; two IMPLEMENTATIONS of the seeding rule would not — that is
+ *  exactly the BF-25 bug this function exists to prevent. It lives here rather
+ *  than in a module because a module never imports another module (invariant #3). */
+export function nextFleetSeq(state: FleetSeqState & { fleets: Record<string, unknown> }): number {
+  const seq = (state.fleetSeq ?? Object.keys(state.fleets).length) + 1;
+  state.fleetSeq = seq;
+  return seq;
+}

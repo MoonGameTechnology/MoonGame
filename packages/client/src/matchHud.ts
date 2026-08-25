@@ -142,7 +142,15 @@ export interface SelectionStack {
  *  fogged out of the viewer's `state.heroes`. `grade` is the rarity tier the core
  *  carries; there is no numeric commander level. */
 export interface SelectionCommander {
-  name: string;
+  /** SEAT identity when the hero carries one (a main hero: the player's callsign,
+   *  or the house id of a solo seat — the renderer localises a house by key and
+   *  leaves a callsign alone). Absent for a roster hero: its NAME comes from
+   *  `archetype`, because human-readable text is never stored in the state
+   *  (AUD-13). Falls back to the owner's callsign only when neither is known. */
+  name?: string;
+  /** Archetype id (`data.heroes`) — the renderer resolves it into the hero's
+   *  name (`tData(data.heroes[archetype].name)`). */
+  archetype?: string;
   grade?: string;
 }
 
@@ -254,8 +262,12 @@ function fleetCommander(
   if (!state.heroes) return undefined;
   for (const hero of Object.values(state.heroes)) {
     if (hero.fleetId !== fleet.id || hero.owner !== viewerId || hero.alive === false) continue;
-    const name = hero.name ?? state.players[fleet.owner]?.name ?? fleet.owner;
-    const out: SelectionCommander = { name };
+    const out: SelectionCommander = {};
+    if (hero.name !== undefined) out.name = hero.name;
+    else if (hero.archetype === undefined) {
+      out.name = state.players[fleet.owner]?.name ?? fleet.owner; // nothing else to draw
+    }
+    if (hero.archetype !== undefined) out.archetype = hero.archetype;
     if (hero.grade) out.grade = hero.grade;
     return out;
   }

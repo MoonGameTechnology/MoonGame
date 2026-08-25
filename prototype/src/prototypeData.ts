@@ -962,7 +962,7 @@ export const data: GameData = parseGameData({
       branch: 'transhuman',
       ship: { unit: 'hero' },
       slots: 4,
-      startAbilities: ['corridor', 'rally', 'scan', 'bulwark', 'diplomatic_landing'],
+      startAbilities: ['rally', 'scan', 'bulwark', 'diplomatic_landing'],
       startPassives: ['rally_beacon'],
     },
     ravager: {
@@ -980,7 +980,7 @@ export const data: GameData = parseGameData({
       branch: 'transhuman',
       ship: { unit: 'hero' },
       slots: 2,
-      startAbilities: ['corridor', 'rally'],
+      startAbilities: ['rally'],
       startPassives: ['vanguard_impulse'],
     },
     warden: {
@@ -1004,7 +1004,13 @@ export const data: GameData = parseGameData({
       type: 'temp_lane',
       cooldownHours: 12,
       range: 300,
-      params: {},
+      params: { tier: 1 },
+      // Лестница ступеней одной способности (HERO-CORRIDOR-СПЕКА): узел дерева
+      // поднимает ступень коридора, а не выдаёт вторую кнопку в ростере.
+      tiers: [
+        { skill: 'corridor_sustained', params: { tier: 2 } },
+        { skill: 'corridor_open', params: { tier: 3 } },
+      ],
     },
     annihilate: {
       name: 'hero.ability.annihilate.name',
@@ -1094,6 +1100,20 @@ export const data: GameData = parseGameData({
       requires: ['neural_lace'],
       cost: { microelectronics: 45, credits: 100 },
       grants: { ability: 'corridor' },
+    },
+    corridor_sustained: {
+      name: 'hero.tree.corridor-sustained.name',
+      description: 'hero.tree.corridor-sustained.desc',
+      branch: 'transhuman',
+      requires: ['overclocked_helm'],
+      cost: { microelectronics: 70, credits: 150 },
+    },
+    corridor_open: {
+      name: 'hero.tree.corridor-open.name',
+      description: 'hero.tree.corridor-open.desc',
+      branch: 'transhuman',
+      requires: ['corridor_sustained'],
+      cost: { microelectronics: 110, credits: 250 },
     },
     void_attunement: {
       name: 'hero.tree.void-attunement.name',

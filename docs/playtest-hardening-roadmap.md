@@ -158,8 +158,8 @@ BF-22 coarse/fine-шаги) — точечными фиксами, без сис
   (sync `applyAndBroadcast` + durable `commitApply`) и серверные драйверы
   (`submitServerAction` — ИИ, Хранитель).
 - **RPL-3 · CI-тест record→replay→hash** `[srv]` — M · ✅ (2026-07-21).
-  `replayDeterminism.test.ts`: живой `MatchRoom` на ПОЛНОМ dev-стеке (27 модулей,
-  шипнутые данные), pinned-часы, 48 игровых часов тиков + действия по обоим путям
+  `replayDeterminism.test.ts`: живой `MatchRoom` на ПОЛНОМ dev-стеке (весь
+  `DEV_MODULES`, шипнутые данные), pinned-часы, 48 игровых часов тиков + действия по обоим путям
   (sync + durable `submitServerAction`) → запись → `runReplay` → хэш **бит-в-бит**;
   плюс JSON-round-trip всего лога (паритет гибернации/durable-лога). Самосогласован
   (live vs его же реплей) — баланс-правки его не инвалидируют; попал в `pnpm test`

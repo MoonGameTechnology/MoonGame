@@ -55,14 +55,24 @@ describe('hero roster model — loadout = grade slots ("modules") + base aura', 
     expect(live).toEqual(['annihilate', 'bulwark', 'corridor', 'rally', 'recall', 'scan']);
   });
 
-  it('the default roster is the main hero + 3 others, each filled to its grade', () => {
+  it('the default roster is the main hero + 3 others; the corridor slot waits for the tree', () => {
     expect(DEFAULT_HEROES).toHaveLength(HERO_ROSTER_COUNT);
     expect(DEFAULT_HEROES.filter((h) => h.grade === 'main')).toHaveLength(1); // exactly one main
     for (const h of DEFAULT_HEROES) {
       expect(h.abilities).toHaveLength(heroSlots(h.grade)); // one entry per grade slot
       for (const id of h.abilities) if (id !== null) expect(HERO_ABILITIES[id]).toBeDefined();
-      expect(heroLoadoutInfo(h).count).toBe(heroSlots(h.grade)); // defaults are fully filled
+      expect(h.abilities).not.toContain('corridor'); // «Коридор» открывает узел дерева, не старт
+      // Слоты заполнены, КРОМЕ одного пустого у трансгуманистов: туда ляжет грант
+      // `overclocked_helm`, и бюджет слотов сойдётся ровно.
+      const empty = h.abilities.filter((a) => a === null).length;
+      expect(empty).toBeLessThanOrEqual(1);
+      expect(heroLoadoutInfo(h).count).toBe(heroSlots(h.grade) - empty);
     }
+    // Пустой слот есть ровно у тех двоих, кому дерево выдаёт коридор.
+    expect(DEFAULT_HEROES.filter((h) => h.abilities.includes(null)).map((h) => h.name)).toEqual([
+      'hero.arch.commander',
+      'hero.arch.vanguard',
+    ]);
   });
 
   it('every ability in the pool carries complete, displayable metadata', () => {
