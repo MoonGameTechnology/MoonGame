@@ -655,7 +655,13 @@ import { welcomePlan } from './netWelcome';
 import { orderPlan } from './orderRoute';
 import { errorTarget, refusalKey } from './errorRoute';
 import { joinLanding } from '../../decisions/joinLanding';
-import { claimIntent, matchIdFrom, settledAddress } from '../../decisions/matchAddress';
+import {
+  claimIntent,
+  matchIdFrom,
+  settledAddress,
+  shareAddress,
+} from '../../decisions/matchAddress';
+import { HUB_MY_MATCHES, myMatches } from '../../decisions/myMatches';
 import {
   entryOffer,
   reconcileSelection,
@@ -8765,6 +8771,9 @@ function hubTab(tab: string): void {
     return;
   }
   currentHubTab = tab;
+  // ADDR-4: свои партии — главный экран, а не вкладка обозревателя, поэтому лента
+  // переспрашивается при каждом заходе домой (день и число игроков успевают устареть).
+  if (tab === 'home') void refreshMyMatches();
   if (tab === 'meta') renderMetaPanel(); // live numbers every visit (XP may have grown)
   if (tab === 'friends') void friends.refresh(); // roster + presence are server truth
   if (tab === 'rank') void rank.refresh(); // places are computed server-side (RANK-1)
@@ -10719,6 +10728,20 @@ async function refreshMatches(quiet = false): Promise<void> {
     else if (upd.kind === 'text') statusEl.textContent = t(upd.key);
   };
   line('start');
+  line((await loadMatchLists(srv)) ? 'loaded' : 'failed');
+  renderMatches();
+}
+
+/**
+ * Забрать ленту матчей в `matchLists`. Возвращает, удалось ли.
+ *
+ * Отдельно от `refreshMatches`, потому что СТРОКА СТАТУСА тут ни при чём: её пишет
+ * обозреватель, и писать в неё, когда игрок смотрит на хаб, нельзя — это ровно тот
+ * вред, от которого предостерегает правило 1 `matchPoll.ts` (фоновая неудача штампует
+ * «сервер недоступен» поверх экрана, где про сервер не спрашивали). Хабу нужна лента,
+ * а не строка, поэтому он зовёт эту половину (ADDR-4).
+ */
+async function loadMatchLists(srv: { base: string; nick: string }): Promise<boolean> {
   // Identity mode first (SES-2.5): accounts servers get the password row shown
   // BEFORE the player clicks «Войти» on a row — no surprise prompt mid-join.
   await probeAuthMode(srv.base);
@@ -10728,12 +10751,11 @@ async function refreshMatches(quiet = false): Promise<void> {
     matchLists = (await res.json()) as Record<MatchTab, MatchRow[]>;
     localStorage.setItem('void.server', srv.base);
     localStorage.setItem('void.nick', srv.nick);
-    line('loaded');
+    return true;
   } catch {
     matchLists = null;
-    line('failed');
+    return false;
   }
-  renderMatches();
 }
 
 async function toggleArchive(id: string, restore: boolean): Promise<void> {
@@ -10925,6 +10947,102 @@ function renderMatches(): void {
     row.appendChild(btns);
     el.appendChild(row);
   }
+}
+
+/**
+ * «Мои партии» на главном экране хаба (ADDR-4).
+ *
+ * Обозреватель отвечает на «куда пойти играть», этот список — на «где я уже играю и куда
+ * вернуться». Какие партии сюда попадают, в каком порядке и что значит пустота — решает
+ * `decisions/myMatches.ts`; здесь только разметка, адрес и переходы.
+ *
+ * Адрес строится на адресе СЕРВЕРА (`shareAddress`, правило 7 `matchAddress.ts`): в APK
+ * страница приходит с локального сервера Capacitor, и адрес из `location.origin` привёл
+ * бы получателя в его собственный телефон.
+ */
+function renderMyMatches(serverHttp: string): void {
+  const el = document.getElementById('hub-mine');
+  if (!el) return;
+  const view = myMatches(matchLists, HUB_MY_MATCHES);
+  // Правило 5: ленты нет — молчим. «У вас нет партий» поверх трёх идущих отправило бы
+  // игрока заводить четвёртую.
+  if (view.kind === 'unknown') {
+    el.textContent = '';
+    return;
+  }
+  // Правило 6: пустота — нормальное начало, и она зовёт туда, где партии берут.
+  if (view.kind === 'none') {
+    el.innerHTML = `<div class="hm-empty">${t('hub.mine.empty')}</div>`;
+    return;
+  }
+  el.textContent = '';
+  for (const m of view.rows) {
+    const addr = serverHttp ? shareAddress(serverHttp, m.matchId) : '';
+    const card = document.createElement('div');
+    card.className = 'hub-card hm-row';
+    card.innerHTML =
+      `<div class="hc-ic">${m.status === 'ended' ? '◼' : '▶'}</div>` +
+      `<div class="hm-body">` +
+      // Идентификатора в заголовке нет намеренно: он целиком стоит ниже, В АДРЕСЕ —
+      // а `m-<uuid>` в заголовке отъедал три строки и вытеснял то, ради чего сюда
+      // смотрят (какая партия, какой день, сколько игроков).
+      `<div class="hc-t">${esc(m.mapId)}</div>` +
+      `<div class="hc-s">${t('browser.day', { n: m.days })} · ` +
+      `${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
+      `${m.status === 'ended' ? t('browser.finished') : t('browser.running')}</div>` +
+      (addr ? `<div class="hm-addr">${esc(addr)}</div>` : '') +
+      `</div>`;
+    const btns = document.createElement('div');
+    btns.className = 'hm-btns';
+    const open = document.createElement('button');
+    open.className = 'mbtn';
+    open.textContent = t('browser.join');
+    open.addEventListener('click', () => openSessionTab(m.matchId));
+    btns.appendChild(open);
+    if (addr) {
+      const copy = document.createElement('button');
+      copy.className = 'mbtn ghost';
+      copy.textContent = t('hub.mine.copy');
+      copy.addEventListener('click', () => {
+        // Буфер обмена может быть недоступен (нет разрешения, небезопасный контекст) —
+        // тогда честно зовём скопировать из строки: адрес в ней и написан, целиком.
+        void (navigator.clipboard?.writeText(addr) ?? Promise.reject(new Error('no clipboard')))
+          .then(() => {
+            hubNote.textContent = t('hub.mine.copied');
+          })
+          .catch(() => {
+            hubNote.textContent = t('hub.mine.copy-manual');
+          });
+      });
+      btns.appendChild(copy);
+    }
+    card.appendChild(btns);
+    el.appendChild(card);
+  }
+  if (view.more > 0) {
+    // Правило 4: остаток — не строки, а один переход в обозреватель.
+    const more = document.createElement('button');
+    more.className = 'hm-more';
+    more.type = 'button';
+    more.textContent = t('hub.mine.more', { n: view.more });
+    more.addEventListener('click', () => {
+      // Остаток лежит на «Активных», а обозреватель открывается на «Доступных» — и своих
+      // партий там нет ПО ПОСТРОЕНИЮ: сервер не кладёт в `available` матч, где у тебя уже
+      // есть место (`MatchRegistry.list`). Без переключения вкладки «ещё 2» приводило бы
+      // на заведомо пустой список — проверено вживую.
+      (document.querySelector('.mtab[data-tab="active"]') as HTMLElement | null)?.click();
+      hubTab('games');
+    });
+    el.appendChild(more);
+  }
+}
+
+/** Переспросить ленту и перерисовать «Мои партии» (ADDR-4). Строку статуса обозревателя
+ *  не трогает — этим и отличается `loadMatchLists` от `refreshMatches`. */
+async function refreshMyMatches(): Promise<void> {
+  const srv = resolveServer();
+  if (srv) await loadMatchLists(srv);
+  renderMyMatches(srv ? httpBase(srv.base) : '');
 }
 
 // Контролы фильтра (BRW-3). Обработчики вешаются ОДИН раз: живой пересчёт — это
