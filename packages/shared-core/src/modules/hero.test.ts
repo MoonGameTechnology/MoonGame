@@ -422,6 +422,78 @@ describe('hero — temp lane speed bonus (fleet.speed hook)', () => {
     expect(blocked.ok ? null : blocked.code).toBe('E_NO_ROUTE');
   });
 
+  // Правило владельца целиком: «до общей ступени коридора для чужих НЕ СУЩЕСТВУЕТ».
+  // Значит личный коридор не должен менять чужое движение ничем — ни правом прохода,
+  // ни скоростью, — даже когда лежит поверх обычной дороги или поверх чужого коридора.
+  describe('личный коридор не трогает чужое движение', () => {
+    const kernel = createKernel([heroModule, movementModule]);
+
+    it('поверх ОБЫЧНОЙ дороги: союзник едет как ехал, ускорение только у владельца', () => {
+      // A↔B — настоящая лейна (30 юнитов), поэтому коридор её не добавляет: он лишь
+      // ускоряет владельца. Союзник тут ездил и до коридора — и должен ездить так же.
+      const base = corridorWorld();
+      base.fleets = { F1: fleet('F1', 'p1', 'A'), A1: fleet('A1', 'p2', 'A') };
+      setStance(base, 'p1', 'p2', 'alliance');
+      const laned = okApply(kernel.applyAction(base, corridor('B'), ctx(0)));
+      expect(laned.state.tempLanes![0]!.addedLink).toBe(false); // дорога была и без нас
+      const heroId = laned.state.tempLanes![0]!.heroId!;
+      laned.state.heroes![heroId]!.fleetId = 'F1';
+
+      const ally = okApply(
+        kernel.applyAction(laned.state, act('fleet.move', 'p2', { fleetId: 'A1', to: 'B' }), ctx(0)),
+      );
+      expect(ally.state.fleets.A1?.movement?.arrivesAt).toBeCloseTo((30 / 10) * HOUR, 0); // без бонуса
+
+      const own = okApply(
+        kernel.applyAction(laned.state, act('fleet.move', 'p1', { fleetId: 'F1', to: 'B' }), ctx(0)),
+      );
+      expect(own.state.fleets.F1?.movement?.arrivesAt).toBeCloseTo((30 / 15) * HOUR, 0); // +50%
+    });
+
+    it('поверх ЧУЖОГО коридора: сосед ходит своим проходом, а не упирается в вето', () => {
+      // p1 прокладывает личный коридор A↔C — ребра тут не было, значит его держит он.
+      // p2 прокладывает СВОЙ коридор по той же паре: `addLink` вернёт false (ребро уже
+      // есть), и раньше это запирало p2 в чужом вето — свой же проход не работал.
+      const base = corridorWorld();
+      base.fleets = { F1: fleet('F1', 'p1', 'A'), E1: fleet('E1', 'p2', 'A') };
+      base.heroes!['hero:p2'] = {
+        id: 'hero:p2',
+        owner: 'p2',
+        location: 'A',
+        cooldowns: {},
+        alive: true,
+        abilities: ['corridor'],
+      };
+      const first = okApply(kernel.applyAction(base, corridor('C'), ctx(0)));
+      expect(first.state.tempLanes![0]!.addedLink).toBe(true);
+      const second = okApply(
+        kernel.applyAction(
+          first.state,
+          act('hero.ability', 'p2', { heroId: 'hero:p2', abilityId: 'corridor', target: 'C' }, 2),
+          ctx(0),
+        ),
+      );
+      const mine = second.state.tempLanes!.find((l) => l.owner === 'p2')!;
+      expect(mine.addedLink).toBe(false); // ребро уже держал сосед
+      second.state.heroes!['hero:p2']!.fleetId = 'E1';
+
+      const moved = okApply(
+        kernel.applyAction(second.state, act('fleet.move', 'p2', { fleetId: 'E1', to: 'C' }), ctx(0)),
+      );
+      expect(moved.state.fleets.E1?.movement?.to).toBe('C');
+
+      // А посторонний (без своего коридора) по-прежнему заперт: p1 открыл проход себе.
+      const outsider = { ...second.state, fleets: { ...second.state.fleets, X1: fleet('X1', 'p3', 'A') } };
+      outsider.players = { ...outsider.players, p3: player('p3') };
+      const blocked = kernel.applyAction(
+        outsider,
+        act('fleet.move', 'p3', { fleetId: 'X1', to: 'C' }),
+        ctx(0),
+      );
+      expect(blocked.ok ? null : blocked.code).toBe('E_NO_ROUTE');
+    });
+  });
+
   // HERO-CORRIDOR-СПЕКА. Ступени — это ПРОГРЕССИЯ ОДНОЙ способности: их выдаёт дерево
   // навыков героя, а не отдельные кнопки в ростере. Лестница описана в данных
   // (`heroAbilities.corridor.tiers`), поэтому «кому можно ходить» правит каталог, а
