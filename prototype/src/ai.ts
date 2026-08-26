@@ -104,6 +104,68 @@ const SQUADRON_CAP = 3;
 /** Запас казны сверх цены заказа (мера та же, что у построек бота). */
 const ORDER_RESERVE: Record<string, number> = { metal: 60, credits: 60 };
 
+/**
+ * ДЕТЕРМИНИРОВАННЫЙ ШУМ РЕШЕНИЯ (AI-BAL-5) — [0, 1), только для тест-профиля.
+ *
+ * Зачем. Прогоны баланса не давали статистики: семьи сидов `base` и `alt` совпадали до
+ * последней цифры, то есть 300 матчей были 4 конфигурациями (слот × фракция) по 75
+ * повторов. Разброс терялся НЕ в карте и не в ядре, а здесь: `aiOrders` выбирала строго
+ * ближайшую цель, держала фиксированные пороги и обходила миры в порядке раскладки
+ * объекта — при одинаковых стартах два матча просто не могли разойтись.
+ *
+ * Откуда берётся энтропия. Из `state.rng` — того самого потока ядра, который seedRng
+ * развёл по сидам ЕЩЁ НА СТАРТЕ матча и который дальше движется от каждого броска в бою.
+ * Мы его только ЧИТАЕМ: мутировать поток снаружи ядра нельзя (это сдвинуло бы бои и
+ * сломало реплей), поэтому четыре слова состояния смешиваются в отдельный хеш вместе с
+ * часом мира, местом и «солью» конкретного решения.
+ *
+ * Почему это не ломает инвариант #1. Здесь нет ни `Math.random`, ни `Date.now`: результат
+ * — чистая функция от (сид матча, история бросков, время, место, соль), то есть один сид
+ * по-прежнему разыгрывается байт-в-байт одинаково. Арифметика та же, что в `rng.ts`
+ * (`Math.imul` + сдвиги), — bit-exact на любом движке.
+ *
+ * Это НЕ «случайная игра»: бот остаётся жадным и предсказуемым, шум лишь разводит
+ * равноценные ветки — вторая по близости цель вместо первой, порог войны в коридоре
+ * ±20%, точка входа в обход миров. Игрового бота не касается вовсе (профиль `test`).
+ */
+function decisionNoise(state: GameState, ai: string, salt: string): number {
+  const r = state.rng;
+  let h = (r.a ^ r.b ^ r.c ^ r.d) >>> 0;
+  h = Math.imul(h ^ Math.floor(state.time / 3_600_000), 2246822507) >>> 0;
+  const key = `${ai}|${salt}`;
+  for (let i = 0; i < key.length; i++) {
+    h = Math.imul(h ^ key.charCodeAt(i), 3432918353) >>> 0;
+    h = ((h << 13) | (h >>> 19)) >>> 0;
+  }
+  h = Math.imul(h ^ (h >>> 16), 2246822507) >>> 0;
+  h = (h ^ (h >>> 13)) >>> 0;
+  return h / 4294967296;
+}
+
+/**
+ * Порядок обхода миров, ПОВЁРНУТЫЙ на seeded смещение (AI-BAL-5, точка разброса №3).
+ *
+ * Блоки развития выписывают одну стройку за тик и выходят по `break`, поэтому решает не
+ * весь список, а его ПЕРВЫЙ подходящий элемент — а он до сих пор определялся раскладкой
+ * объекта `state.planets`, одинаковой во всех матчах. Ротация сохраняет относительный
+ * порядок (это не перемешивание: жадность бота не страдает), но сдвигает точку входа,
+ * так что развиваться первым начинает разный мир. Игровой профиль обходит как раньше.
+ */
+function worldsInOrder(state: GameState, ai: string, salt: string, profile: AiProfile): Planet[] {
+  const all = Object.values(state.planets);
+  if (profile !== 'test') return all;
+  // Ротируются именно СВОИ миры, а не весь список: чужих и нейтральных на карте вчетверо
+  // больше, и они лежат вперемешку, так что поворот всего массива почти всегда возвращал
+  // к тем же двум-трём своим в его начале — точка входа не менялась. Прочие миры едут
+  // следом нетронутым хвостом: вызывающие всё равно фильтруют по владельцу.
+  const own: Planet[] = [];
+  const rest: Planet[] = [];
+  for (const p of all) (p.owner === ai ? own : rest).push(p);
+  if (own.length < 2) return all;
+  const shift = Math.floor(decisionNoise(state, ai, `order:${salt}`) * own.length) % own.length;
+  return own.slice(shift).concat(own.slice(0, shift), rest);
+}
+
 /** Стоит ли на мире ЖИВОЕ здание, открывающее наземное производство (казарма/завод).
  *  Зеркало ядерного `hasGroundFacility` (`construction.ts`) — того самого гейта, который
  *  отбивает `unit.build` кодом `E_NO_GROUND_FACILITY`. */
@@ -328,14 +390,34 @@ export function aiOrders(
     if (!here) continue;
     let best: Planet | null = null;
     let bestD = Infinity;
+    let second: Planet | null = null;
+    let secondD = Infinity;
     for (const p of Object.values(state.planets)) {
       if (p.owner === ai || !capturable(p)) continue;
       if (!canTraverse(state, ai, p.owner)) continue; // a peace-locked target — leave it be
       const dd = d(here.position, p.position);
       if (dd < bestD) {
+        secondD = bestD;
+        second = best;
         bestD = dd;
         best = p;
+      } else if (dd < secondD) {
+        secondD = dd;
+        second = p;
       }
+    }
+    // AI-BAL-5, точка разброса №1: ТЕСТ-бот иногда идёт ко ВТОРОЙ по близости цели.
+    // Строгий выбор ближайшей — главная причина, по которой два матча с разных сидов
+    // разыгрывались одинаково: пути флотов совпадали с первого тика. Вторая цель берётся
+    // только если она сопоставима по дальности (не дальше 2×), то есть бот остаётся
+    // жадным — расходятся лишь РАВНОЦЕННЫЕ ветки, а не качество игры.
+    if (
+      profile === 'test' &&
+      second &&
+      secondD <= bestD * 2 &&
+      decisionNoise(state, ai, `target:${f.id}`) < 0.35
+    ) {
+      best = second;
     }
     if (best) out.push(moveFleet(ai, f.id, best.id));
   }
@@ -366,7 +448,13 @@ export function aiOrders(
       }
     }
     const neutralLeft = Object.values(state.planets).some((p) => p.owner === null && capturable(p));
-    const losingRace = leaderScore - mine >= 50 || (!neutralLeft && leaderScore >= mine);
+    // AI-BAL-5, точка разброса №2: порог войны у ТЕСТ-бота плавает в коридоре ±20%
+    // (50 → 40..60 очков отставания). Фиксированные 50 означали, что война объявляется
+    // в один и тот же игровой час при одинаковых стартах — а момент объявления решает,
+    // кто успел развернуться. Коридор узкий: бот по-прежнему воюет, когда проигрывает
+    // гонку, просто не секунда-в-секунду с самим собой из другого матча.
+    const warGap = profile === 'test' ? 50 * (0.8 + 0.4 * decisionNoise(state, ai, 'war')) : 50;
+    const losingRace = leaderScore - mine >= warGap || (!neutralLeft && leaderScore >= mine);
     if (leader && losingRace && getStance(state, ai, leader) === 'peace') {
       out.push(declareWar(ai, leader));
     }
@@ -415,7 +503,7 @@ export function aiOrders(
       if (affordable(b) && !pendingBuild(base.id, b)) out.push(buildBuilding(ai, base.id, b));
       break; // one link at a time — wait out the current one either way
     }
-    for (const p of Object.values(state.planets)) {
+    for (const p of worldsInOrder(state, ai, 'mine', profile)) {
       if (p.owner !== ai || p.kind !== 'planet' || p.id === base.id) continue;
       if (p.buildings.some((x) => x.type === 'mine') || pendingBuild(p.id, 'mine')) continue;
       if (!affordable('mine')) break;
@@ -489,7 +577,7 @@ export function aiOrders(
     // is exactly what lets it assault a garrisoned world back.
     if (warFooting) {
       let garrisonOrders = 0;
-      for (const p of Object.values(state.planets)) {
+      for (const p of worldsInOrder(state, ai, 'garrison', profile)) {
         if (garrisonOrders >= 2 || (pl.resources.metal ?? 0) < 90) break;
         if (p.owner !== ai || p.kind !== 'planet') continue;
         if (p.garrison.some((s) => s.count > 0)) continue;
@@ -567,7 +655,7 @@ export function aiOrders(
       // 3. Призовые миры: сперва казарма, потом ополчение в пустой гарнизон. Мир с
       //    гарнизоном нельзя забрать прилётом — за него придётся высаживаться, и
       //    ровно этого измерению не хватало.
-      for (const p of Object.values(state.planets)) {
+      for (const p of worldsInOrder(state, ai, 'barracks', profile)) {
         if (p.owner !== ai || p.kind !== 'planet' || p.id === base.id) continue;
         if (!hasGroundYard(p)) {
           if (pendingBuild(p.id, 'barracks')) continue;
@@ -588,7 +676,7 @@ export function aiOrders(
       //    мир дорог сам по себе. Только призовые миры: провинций вчетверо больше, и
       //    застраивать их — разорить казну на десятую долю территории.
       const DEFENSE_CHAIN = ['fort', 'hospital', 'orbital_aa'] as const;
-      for (const p of warFooting ? Object.values(state.planets) : []) {
+      for (const p of warFooting ? worldsInOrder(state, ai, 'defense', profile) : []) {
         if (p.owner !== ai || p.kind !== 'planet') continue;
         const missing = DEFENSE_CHAIN.find(
           (b) => !p.buildings.some((x) => x.type === b) && !pendingBuild(p.id, b),
