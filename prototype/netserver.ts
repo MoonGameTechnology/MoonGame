@@ -295,8 +295,9 @@ if (!AUTH && HOST_BIND === '0.0.0.0' && !PROD_FLAG) {
       'before exposing this beyond a trusted network.\n',
   );
 }
-// The prototype host defaults to a ten-chair FFA. `TEAMS=5v5` keeps all ten chairs and
-// seeds two allied flanks; `TEAMS=2v2` preserves the smaller four-chair playtest. Every
+// The prototype host defaults to a ten-chair FFA. `TEAMS=<format>` seeds two allied
+// flanks instead: 1v1/2v2/3v3/4v4/5v5 give 2/4/6/8/10 chairs (PVE-1.1), and `TEAMS=pve`
+// keeps its own layout — two humans against one strong bot. Every
 // chair is claimable by a human, while the server AI stands in after the reconnect grace.
 const NETWORK_MODE = parseNetworkMatchMode(process.env.TEAMS);
 const NET_SEATS = networkSeats(NETWORK_MODE);
@@ -1027,11 +1028,12 @@ const lines = [
   `  matches: ${MATCHES} session${MATCHES > 1 ? 's' : ''} in this process (${matchIds.join(', ')}) — set MATCHES=N for more; all listed in the in-game browser`,
   `  ai     : substitute bot takes an abandoned chair after ${(AI_GRACE_MS / 3_600_000).toFixed(1)}h offline (real time; set AI_GRACE_MS); a delegated Steward runs instantly`,
   `  join   : a NEW player may claim a free seat for ${(ENTRY_WINDOW_MS / 86_400_000).toFixed(1)} real days from a session's creation (set ENTRY_WINDOW_MS); a seated player reconnects any time`,
-  NETWORK_MODE === '2v2'
-    ? '  mode   : 2v2 team battle — 4 claimable chairs each; empty chairs are AI-driven'
-    : NETWORK_MODE === '5v5'
-      ? '  mode   : 5v5 team battle — 10 claimable chairs each; empty chairs are AI-driven'
-      : '  mode   : 10-player FFA — empty chairs are AI-driven (set TEAMS=5v5 for teams)',
+  // Строка выводится ИЗ РАСКЛАДА, а не из списка режимов: перечисление вручную
+  // устаревало на каждом новом формате (PVE-1.1 добавил 1v1/3v3/4v4, и лесенка
+  // тернарников напечатала бы им «10-player FFA»).
+  NETWORK_MODE === 'ffa'
+    ? `  mode   : ${NET_SEATS.length}-player FFA — empty chairs are AI-driven (set TEAMS=3v3 for teams)`
+    : `  mode   : ${NETWORK_MODE} — ${NET_SEATS.length} claimable chairs; empty chairs are AI-driven`,
   '',
   '  Multiplayer test:',
   `   • You:     open ${localHttp}/  → enter a callsign → join`,

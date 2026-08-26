@@ -107,7 +107,37 @@ export const DEFAULT_SETUP: SetupConfig = {
   ],
 };
 
-export type NetworkMatchMode = 'ffa' | '2v2' | '5v5' | 'pve';
+/**
+ * Что раздаёт переменная `TEAMS` прото-хосту — РАСКЛАД КРЕСЕЛ, а не «правила партии».
+ *
+ * Пять командных форматов (PVE-1.1) описывают ЧИСЛО сторон и людей в них; `ffa` — стол
+ * без сторон; `pve` — свой расклад, двое людей против одного сильного бота. Последний
+ * назван по цели, а не по форме, и это единственная запись такого рода: волны Роя — это
+ * НЕ здесь, а `modeId: 'pve_waves'` из `data/modes.json` (PVE-0.1/4). Две разные вещи с
+ * похожим именем: тут «кто за столом», там «во что играем».
+ */
+export type NetworkMatchMode = 'ffa' | '1v1' | '2v2' | '3v3' | '4v4' | '5v5' | 'pve';
+
+/** Форматы со сторонами: половина кресел за A, половина за B. */
+const TEAM_MODES = ['1v1', '2v2', '3v3', '4v4', '5v5'] as const;
+type TeamMatchMode = (typeof TEAM_MODES)[number];
+
+/**
+ * Стартовые миры по формату, индексами в `START_CANDIDATES`.
+ *
+ * Каталог обходит периметр ПО ЧАСОВОЙ СТРЕЛКЕ, поэтому соседние индексы — соседние
+ * миры, а сдвиг на половину круга (+5 из десяти) — противоположная сторона доски.
+ * Отсюда правило: сторона занимает дугу подряд, а вторая — диаметрально ей отвечающую.
+ * Союзники стартуют рядом (иначе союз — только подпись, помогать некому), соперники
+ * далеко. `2v2` и `5v5` оставлены ровно теми, что были: их расклад уже роздан игрокам.
+ */
+const TEAM_STARTS: Record<TeamMatchMode, number[]> = {
+  '1v1': [9, 4],
+  '2v2': [9, 8, 3, 4],
+  '3v3': [9, 8, 7, 4, 3, 2],
+  '4v4': [9, 8, 7, 6, 4, 3, 2, 1],
+  '5v5': START_CANDIDATES.map((_, i) => i),
+};
 
 const NETWORK_HOUSES = [
   { name: 'Azure Compact', faction: 'azure' },
@@ -116,10 +146,18 @@ const NETWORK_HOUSES = [
   { name: 'Violet Ascendancy', faction: 'violet' },
 ] as const;
 
+const NETWORK_MODES: readonly NetworkMatchMode[] = ['ffa', ...TEAM_MODES, 'pve'];
+
 export function parseNetworkMatchMode(value: string | undefined): NetworkMatchMode {
-  if (value === undefined) return 'ffa';
-  if (value === '2v2' || value === '5v5' || value === 'pve') return value;
-  throw new Error(`TEAMS must be 2v2, 5v5 or pve, got: ${value}`);
+  // Пусто — это «не задано», а не «неизвестный режим»: в `.env` докер-компоуза
+  // незаполненная переменная приезжает ПУСТОЙ СТРОКОЙ, и хост отказывался стартовать
+  // там, где `deploy/README.md` обещает FFA. Незаданное значение никогда не должно
+  // ронять процесс — падать положено на ОШИБОЧНОМ, а его видно по тексту.
+  const raw = (value ?? '').trim();
+  if (raw === '') return 'ffa';
+  const mode = NETWORK_MODES.find((m) => m === raw);
+  if (mode) return mode;
+  throw new Error(`TEAMS must be one of ${NETWORK_MODES.join(', ')}, got: ${raw}`);
 }
 
 /** Claimable human chairs for the prototype host. Empty chairs are driven by server AI. */
@@ -133,7 +171,10 @@ export function networkSeats(mode: NetworkMatchMode = 'ffa'): SeatConfig[] {
       { id: 'p3', name: 'Crimson Hegemony', faction: 'crimson', start: START_CANDIDATES[2]!, ai: true, team: 'B' },
     ];
   }
-  const startIndexes = mode === '2v2' ? [9, 8, 3, 4] : START_CANDIDATES.map((_, i) => i);
+  const teamStarts = (TEAM_STARTS as Partial<Record<NetworkMatchMode, number[]>>)[mode];
+  const startIndexes = teamStarts ?? START_CANDIDATES.map((_, i) => i);
+  // Половина мест — сторона A, половина — B; у `ffa` сторон нет вовсе.
+  const half = startIndexes.length / 2;
   return startIndexes.map((startIndex, i) => {
     const house = NETWORK_HOUSES[i % NETWORK_HOUSES.length]!;
     const cycle = Math.floor(i / NETWORK_HOUSES.length) + 1;
@@ -144,8 +185,7 @@ export function networkSeats(mode: NetworkMatchMode = 'ffa'): SeatConfig[] {
       faction: house.faction,
       start: START_CANDIDATES[startIndex]!,
       ai: false,
-      ...(mode === '2v2' ? { team: i < 2 ? 'A' : 'B' } : {}),
-      ...(mode === '5v5' ? { team: i < 5 ? 'A' : 'B' } : {}),
+      ...(teamStarts ? { team: i < half ? 'A' : 'B' } : {}),
     };
   });
 }
