@@ -25,6 +25,12 @@
 # Reviewed 2026-08-20: +1 libssl3t64 EVP_Cipher/AEAD entry below (CVE-2026-75803). Same
 # base image digest again, so the earlier entries were not re-verified individually.
 #
+# Reviewed 2026-08-26 (AI-BAL-4 CI): +1 libc6 strfmon entry below (CVE-2026-19499). Тот же
+# сценарий, что у SEC-24/SEC-25: находка пришла в ленту Trivy МЕЖДУ прогонами — последний
+# `main` (13:35 UTC, мерж #809) был зелёным, а прогон в 14:01 уже красный, — и, поскольку
+# `trivy image` работает без --severity, одна MEDIUM-строка закрывает очередь всем веткам
+# сразу. Дифф PR при этом не касался ни базы, ни Dockerfile, ни зависимостей.
+#
 # Reviewed 2026-08-24 (SEC-24): +1 libc6 tdelete entry below (CVE-2026-19542). The FIRST
 # review at which the base image digest actually MOVED: the `nonroot` tag stopped resolving
 # to the sha256:939d6f16… then pinned in the Dockerfile and moved to sha256:22d2f048…. That
@@ -186,3 +192,29 @@ CVE-2026-54874
 CVE-2026-63073
 CVE-2026-63074
 CVE-2026-63075
+
+# --- 2026-08-26, libc6 strfmon (AI-BAL-4 CI) -------------------------------------------
+# CVE-2026-19499 — libc6 2.41-12+deb13u3, MEDIUM, "glibc: Buffer Overflow in strfmon
+# right-justification padding". Fixed Version в отчёте ПУСТ: исправления для trixie ещё нет,
+# бампать нечего — это ожидание Debian, а не нашей сборки.
+#
+# Почему недостижимо здесь, и это ПРОВЕРЕНО, а не выведено из общих соображений:
+#   · `strfmon()`/`strfmon_l()` — POSIX-форматирование ДЕНЕЖНЫХ величин по локали, C API.
+#     Её надо вызвать явно из нативного кода; из JS к ней хода нет.
+#   · Единственный потребитель libc в этом образе — сам `node` (runtime distroless: ни
+#     шелла, ни утилит, ни пакетного менеджера). Проверка на бинарнике той же мажорной
+#     версии: `nm -D $(command -v node) | grep strfmon` — пусто, и `strings` не находит
+#     символа вовсе. Node её не импортирует и не может позвать.
+#   · Денежное форматирование в JS (`Intl.NumberFormat` со `style: 'currency'`) реализовано
+#     в ICU поверх данных CLDR — оно не ходит в локали glibc и не трогает strfmon.
+#   · В нашем коде нативных аддонов нет: сервер — чистый JS (Fastify + ws), сборка не
+#     компилирует C/C++ (`pnpm install --ignore-scripts` в образе).
+#
+# Что НЕ удалось проверить: текст самого advisory — security-tracker.debian.org и
+# avd.aquasec.com закрыты egress-прокси среды разработки, как и в прошлый раз. Аргумент
+# опирается на заголовок находки (функция названа прямо) плюс проверку бинарника, а не на
+# чтение анализа апстрима.
+#
+# Re-review 2026-09-02 — вместе с openssl-группой выше, одним заходом. Как только Debian
+# выпустит исправленный libc6 и distroless-база будет пересобрана, запись УДАЛЯЕТСЯ.
+CVE-2026-19499
