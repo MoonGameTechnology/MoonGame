@@ -27,6 +27,7 @@ import {
   marketList,
   mergeFleet,
   loadArmy,
+  unloadArmy,
   researchTech,
   assaultFleet,
 } from './actions';
@@ -263,6 +264,22 @@ export function aiOrders(
             spare -= take;
           }
         }
+      }
+      // (а2) ГАРНИЗОН НА ЗАНЯТОМ МИРЕ (AI-BAL-2). Мир без войск берётся ПРИЛЁТОМ —
+      //      `captureOnArrival` не смотрит ни на здания, ни на их оборонный бонус, только
+      //      на `garrison.some(count > 0)`. Отсюда карусель базовой линии: 113 захватов
+      //      прилётом за матч, миры перекидываются без единого выстрела. Флот, стоящий на
+      //      СВОЁМ пустом мире, оставляет одного бойца — дальше этот мир нужно штурмовать.
+      //      По одному: остальной десант нужен самому флоту, иначе он разоружится в дороге.
+      if (
+        here0 &&
+        here0.owner === ai &&
+        here0.id !== base.id &&
+        groundCount(here0) === 0 &&
+        capturable(here0)
+      ) {
+        const carried = (f.landing ?? []).find((st) => st.count > 0);
+        if (carried) out.push(unloadArmy(ai, f.id, carried.unit, 1));
       }
       // (б) Штурм с орбиты. Правила штурма называет ЯДРО (`assaultPlanet`), здесь
       //     только повод не сыпать заведомо отбиваемым приказом: чужой захватываемый
@@ -547,6 +564,24 @@ export function aiOrders(
         if (!affordableUnit('militia', 2)) break;
         out.push(buildUnit(ai, p.id, 'militia', 2));
         break;
+      }
+      // 5. ОБОРОНА (AI-BAL-2): форт → госпиталь → орбитальная ПВО. Порядок — по тому,
+      //    что каждое здание делает для УДЕРЖАНИЯ: форт даёт гарнизону +30% обороны
+      //    (`defenseBonus` через хук `combat.damage`), госпиталь его лечит между
+      //    штурмами (`healRate`), ПВО бьёт флот на орбите (`aaDamage`). Плюс любое
+      //    стоящее здание снимает 1% наземного урона (потолок 90%), поэтому застроенный
+      //    мир дорог сам по себе. Только призовые миры: провинций вчетверо больше, и
+      //    застраивать их — разорить казну на десятую долю территории.
+      const DEFENSE_CHAIN = ['fort', 'hospital', 'orbital_aa'] as const;
+      for (const p of warFooting ? Object.values(state.planets) : []) {
+        if (p.owner !== ai || p.kind !== 'planet') continue;
+        const missing = DEFENSE_CHAIN.find(
+          (b) => !p.buildings.some((x) => x.type === b) && !pendingBuild(p.id, b),
+        );
+        if (!missing) continue;
+        if (!affordable(missing)) break;
+        out.push(buildBuilding(ai, p.id, missing));
+        break; // одна стройка за тик — как в экономической цепочке
       }
       // 4. Десантный корпус: трюм 8 против 5 у крейсера — без него ударная группа
       //    везёт горстку и штурм захлёбывается на первом же гарнизоне.
