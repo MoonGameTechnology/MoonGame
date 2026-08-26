@@ -84,6 +84,14 @@ function runMatch(i) {
   ];
   let state = newGame({ seats, seed: `${BASE_SEED}-${i}` });
 
+  // Юниты, которые матч РАЗДАЁТ на старте, а не строит. Без этого отчёт врал: `hero`
+  // числился «мёртвым контентом» — притом что герой у каждого места стоит во флоте с
+  // первой секунды (`matchSetup`: флагман домашнего флота) и исправно воюет. Он просто
+  // не проходит через `unit.built`, а `usage` считает именно постройки.
+  const seeded = new Set();
+  for (const f of Object.values(state.fleets)) for (const st of f.units) seeded.add(st.unit);
+  for (const p of Object.values(state.planets)) for (const st of p.garrison) seeded.add(st.unit);
+
   const usage = new Map(); // built unit/building -> count
   const techUsage = new Map(); // researched technology -> count
   let battles = 0;
@@ -190,6 +198,7 @@ function runMatch(i) {
     midLeader,
     usage,
     techUsage,
+    seeded,
   };
 }
 
@@ -201,6 +210,7 @@ const winsByFaction = new Map();
 const winsByStart = new Map();
 const reasons = new Map();
 const usageTotal = new Map();
+const seededTotal = new Set();
 const techTotal = new Map();
 const lengths = [];
 const firstCombats = [];
@@ -265,6 +275,7 @@ for (let i = 0; i < N; i++) {
       margins.push(totals[0][1] - totals[totals.length - 1][1]);
     }
   }
+  for (const k of r.seeded) seededTotal.add(k);
   for (const [k, v] of r.usage) bump(usageTotal, k, v);
   for (const [k, v] of r.techUsage) bump(techTotal, k, v);
   if ((i + 1) % 10 === 0) process.stderr.write(`  … ${i + 1}/${N}\r`);
@@ -290,7 +301,14 @@ const topUsage = [...usageTotal.entries()]
   .slice(0, 12)
   .map(([k, v]) => `${k}=${v}`)
   .join(' ');
-const zeros = Object.keys({ ...data.units, ...data.buildings }).filter((k) => !usageTotal.has(k));
+// «Мёртвый контент» — то, что не построено НИ РАЗУ и при этом не раздаётся на старте:
+// посеянный юнит без построек не мёртв, он просто не строится (герой), и мешать эти два
+// случая — значит гнать балансную правку туда, где всё работает.
+const neverBuilt = Object.keys({ ...data.units, ...data.buildings }).filter(
+  (k) => !usageTotal.has(k),
+);
+const zeros = neverBuilt.filter((k) => !seededTotal.has(k));
+const seededOnly = neverBuilt.filter((k) => seededTotal.has(k));
 const topTech = [...techTotal.entries()]
   .sort((a, b) => b[1] - a[1])
   .slice(0, 12)
@@ -316,6 +334,7 @@ console.log(
     `  snowball   : ${pct(snowballHits, decided)} лидеров середины выиграли  ← высокий % = снежный ком, камбэков нет`,
     `  usage      : ${topUsage || '—'}`,
     zeros.length ? `  мёртвый контент (0 построек за ${N} матчей): ${zeros.join(' ')}` : '  мёртвый контент: нет ✓',
+    seededOnly.length ? `  посеяны, не строятся (в мёртвый контент НЕ входят): ${seededOnly.join(' ')}` : null,
     `  техи       : ${techTotalCount} исследовано · ${topTech || '—'}`,
     techZeros.length
       ? `  не исследованы ни разу (${techZeros.length}/${Object.keys(data.technologies ?? {}).length}): ${techZeros.join(' ')}`
@@ -363,6 +382,9 @@ console.log(
         capturesByAssault: assaultCaptures,
         usage: Object.fromEntries(usageTotal),
         deadContent: zeros,
+        seededOnly,
       }),
-  ].join('\n'),
+  ]
+    .filter((line) => line !== null)
+    .join('\n'),
 );

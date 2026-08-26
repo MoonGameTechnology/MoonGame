@@ -75,6 +75,20 @@ const data: GameData = parseGameData({
       hp: 25,
       enablesGroundConstruction: true,
     },
+    // Ангар открывается ТОЛЬКО апгрейдом — ровно так, как это записано в реальных
+    // данных для завода (`data/buildings.json`): база строит технику, второй уровень
+    // добавляет эскадрильи.
+    airbase: {
+      name: 'Airbase',
+      cost: { metal: 100 },
+      buildTimeHours: 4,
+      hp: 25,
+      enablesGroundConstruction: true,
+      upgrades: [
+        { cost: { metal: 120 }, buildTimeHours: 5, hp: 35, enablesSquadronConstruction: true },
+        { cost: { metal: 160 }, buildTimeHours: 6, hp: 45 },
+      ],
+    },
     fort: {
       name: 'Fort',
       cost: { metal: 20, credits: 5 },
@@ -312,6 +326,39 @@ describe('construction module — a space-domain hull needs a standing shipyard'
     });
     expect(okApply(kernel.applyAction(st, build('cruiser'), ctx(0))).ok).toBe(true);
     expect(okApply(kernel.applyAction(st, build('drone'), ctx(0))).ok).toBe(true);
+  });
+});
+
+describe('construction module — способность может открываться АПГРЕЙДОМ', () => {
+  // Регрессия: данные (и `data/buildings.json`, и каталог прототипа) объявляют
+  // `enablesSquadronConstruction` в апгрейдах завода, но схема знала флаг только у
+  // самого здания, zod его в уровне отбрасывал, а гейт читал базовый def. Итог:
+  // `fighter_squadron` был непостроим НА ЛЮБОМ уровне — приказ всегда отбивался
+  // `E_NO_HANGAR`, и вся ветка эскадрилий не играла.
+  const yard = (level: number): Planet => ({
+    ...planet('A', 'p1'),
+    buildings: [{ type: 'airbase', level, hp: 100 }],
+  });
+  const order = (level: number) =>
+    createKernel([constructionModule]).applyAction(
+      stateWith({ players: [player('p1', { metal: 400, credits: 200 })], planets: [yard(level)] }),
+      build('fighter_squadron'),
+      ctx(0),
+    );
+
+  it('первый уровень ангара НЕ открывает — способности там ещё нет', () => {
+    const r = order(1);
+    expect(r.ok).toBe(false);
+    expect(!r.ok && r.code).toBe('E_NO_HANGAR');
+  });
+
+  it('второй уровень открывает эскадрильи', () => {
+    expect(order(2).ok).toBe(true);
+  });
+
+  it('третий уровень её НЕ отнимает — способность накапливается, а не переопределяется', () => {
+    // У третьего уровня флага нет вовсе; «уровень открывает» не значит «уровень умеет».
+    expect(order(3).ok).toBe(true);
   });
 });
 
