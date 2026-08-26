@@ -27,7 +27,7 @@ function loadShippedBundle(): Record<string, unknown> {
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.8');
+    expect(data.version).toBe('0.1.9');
     expect(data.resources).toContain('microelectronics');
     expect(data.units.siege_lance?.stats.range).toBe(300); // artillery firing radius (map units)
     expect(data.units.cruiser?.upkeep.credits).toBe(8); // daily upkeep
@@ -491,6 +491,35 @@ describe('game modes (PVE-0.1, docs/pve-team-modes-roadmap.md)', () => {
     expect(standard?.teamFormat).toBe('ffa');
     expect(standard?.modules).toEqual([]); // no optional mode-module — the base rules
     expect(standard?.pve).toBeUndefined(); // PvP: no NPC enemy
+  });
+
+  it('КАЖДЫЙ КОМАНДНЫЙ ФОРМАТ ИМЕЕТ СВОЙ ПРЕСЕТ, И ФОРМАТ В НЁМ — ТОТ, ЧТО В ИМЕНИ', () => {
+    // PVE-1.2. Пресет с именем «Team 3v3» и `teamFormat: '2v2'` схема пропустит: оба
+    // поля валидны по отдельности. Разъедутся — игрок выберет «трое на трое» и сядет
+    // за стол на четверых, поэтому пару проверяем именно вместе.
+    const data = parseGameData(loadShippedBundle());
+    expect(data.modes.duel?.teamFormat).toBe('1v1');
+    for (const n of [2, 3, 4, 5]) {
+      const mode = data.modes[`team_${n}v${n}`];
+      expect({ id: `team_${n}v${n}`, format: mode?.teamFormat }).toEqual({
+        id: `team_${n}v${n}`,
+        format: `${n}v${n}`,
+      });
+    }
+  });
+
+  it('КОМАНДНЫЕ ПРЕСЕТЫ НЕ ПЕРЕОПРЕДЕЛЯЮТ ПОБЕДУ — формат это модификатор, а не правила', () => {
+    // Пустой `victory` значит «базовые правила»; вписать туда числа значило бы, что
+    // дуэль и 5v5 незаметно играются по РАЗНЫМ условиям победы.
+    const data = parseGameData(loadShippedBundle());
+    for (const id of ['duel', 'team_2v2', 'team_3v3', 'team_4v4', 'team_5v5']) {
+      expect({ id, victory: data.modes[id]?.victory, modules: data.modes[id]?.modules }).toEqual({
+        id,
+        victory: {},
+        modules: [],
+      });
+      expect(data.modes[id]?.pve).toBeUndefined(); // командный формат сам по себе PvP
+    }
   });
 
   it('the `standard` preset restates the victory module\'s base rules, verbatim', () => {
