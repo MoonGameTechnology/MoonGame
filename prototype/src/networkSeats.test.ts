@@ -57,10 +57,84 @@ describe('prototype network seats', () => {
 
   it('accepts supported TEAMS values and rejects unsupported ones', () => {
     expect(parseNetworkMatchMode(undefined)).toBe('ffa');
-    expect(parseNetworkMatchMode('2v2')).toBe('2v2');
-    expect(parseNetworkMatchMode('5v5')).toBe('5v5');
-    expect(parseNetworkMatchMode('pve')).toBe('pve');
-    expect(() => parseNetworkMatchMode('3v3')).toThrow('TEAMS must be 2v2, 5v5 or pve');
+    for (const mode of ['ffa', '1v1', '2v2', '3v3', '4v4', '5v5', 'pve'] as const) {
+      expect(parseNetworkMatchMode(mode), mode).toBe(mode);
+    }
+    expect(() => parseNetworkMatchMode('6v6')).toThrow('TEAMS must be');
+  });
+
+  it('ПУСТОЙ `TEAMS=` — ЭТО FFA, А НЕ ПАДЕНИЕ ХОСТА', () => {
+    // `deploy/README.md` обещает «пусто = FFA на 10», а в `.env` докер-компоуза
+    // незаполненная строка приезжает пустой, НЕ отсутствующей. До этого хост на такой
+    // отказывался стартовать — обещание доки и поведение кода разъезжались.
+    expect(parseNetworkMatchMode('')).toBe('ffa');
+    expect(parseNetworkMatchMode('   ')).toBe('ffa');
+  });
+});
+
+describe('командные форматы 1v1..5v5 (PVE-1.1)', () => {
+  it('КАЖДЫЙ ФОРМАТ ДАЁТ СВОЁ ЧИСЛО КРЕСЕЛ, ПОРОВНУ НА СТОРОНУ', () => {
+    for (const [mode, chairs] of [
+      ['1v1', 2],
+      ['2v2', 4],
+      ['3v3', 6],
+      ['4v4', 8],
+      ['5v5', 10],
+    ] as const) {
+      const seats = networkSeats(mode);
+      expect(seats, mode).toHaveLength(chairs);
+      const half = chairs / 2;
+      expect(seats.slice(0, half).every((s) => s.team === 'A'), mode).toBe(true);
+      expect(seats.slice(half).every((s) => s.team === 'B'), mode).toBe(true);
+    }
+  });
+
+  it('СТАРТЫ НЕ ПОВТОРЯЮТСЯ И ВСЕ ИЗ КАТАЛОГА КАРТЫ — два дома на одном мире невозможны', () => {
+    for (const mode of ['1v1', '3v3', '4v4'] as const) {
+      const starts = networkSeats(mode).map((s) => s.start);
+      expect(new Set(starts).size, mode).toBe(starts.length);
+      expect(starts.every((st) => START_CANDIDATES.includes(st)), mode).toBe(true);
+    }
+  });
+
+  it('СОЮЗНИКИ СТАРТУЮТ РЯДОМ, СОПЕРНИКИ — НАПРОТИВ: сторона это дуга периметра', () => {
+    // START_CANDIDATES обходит периметр по часовой стрелке, поэтому «рядом» — это
+    // соседние индексы, а «напротив» — сдвиг на половину круга (+5 из десяти точек).
+    // Иначе команда рассыпана по карте, и союз не даёт ничего, кроме подписи.
+    const idx = (mode: '3v3' | '4v4'): number[] =>
+      networkSeats(mode).map((s) => START_CANDIDATES.indexOf(s.start));
+    for (const mode of ['3v3', '4v4'] as const) {
+      const half = networkSeats(mode).length / 2;
+      const a = idx(mode).slice(0, half);
+      const b = idx(mode).slice(half);
+      // дуга: индексы внутри стороны идут подряд
+      for (let i = 1; i < a.length; i++) expect(Math.abs(a[i]! - a[i - 1]!), mode).toBe(1);
+      for (let i = 1; i < b.length; i++) expect(Math.abs(b[i]! - b[i - 1]!), mode).toBe(1);
+      // напротив: каждому месту A отвечает диаметрально противоположное место B
+      expect(b, mode).toEqual(a.map((i) => (i + 5) % 10));
+    }
+  });
+
+  it('в бою 3v3 свои в союзе, чужие в войне', () => {
+    const state = newGame({ seats: networkSeats('3v3') });
+    expect(Object.keys(state.players)).toHaveLength(6);
+    expect(getStance(state, 'p1', 'p3')).toBe('alliance');
+    expect(getStance(state, 'p4', 'p6')).toBe('alliance');
+    expect(getStance(state, 'p1', 'p6')).toBe('war');
+  });
+
+  it('ДУЭЛЬ 1v1 — ЭТО ТОЖЕ КОМАНДЫ, а не ffa на двоих: стороны названы, значит война', () => {
+    const state = newGame({ seats: networkSeats('1v1') });
+    expect(getStance(state, 'p1', 'p2')).toBe('war');
+  });
+
+  it('«pve» осталось прежним раскладом: двое людей против сильного бота', () => {
+    // Отдельная ось: `TEAMS=pve` описывает СОСТАВ кресел (кто за столом), а волны Роя —
+    // это `modeId: pve_waves` из data/modes.json. Командные форматы её не трогают.
+    const seats = networkSeats('pve');
+    expect(seats).toHaveLength(3);
+    expect(seats.map((s) => s.ai)).toEqual([false, false, true]);
+    expect(seats.map((s) => s.team)).toEqual(['A', 'A', 'B']);
   });
 });
 
