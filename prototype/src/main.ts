@@ -605,6 +605,7 @@ import {
   slotAngle,
 } from './orbitRing';
 import { routeShown, routeStops, routeStroke } from './fleetRoute';
+import { fleetOrigin } from './fleetOrigin';
 import { netContacts, soloContacts } from './radarContacts';
 import { buildLogLine, type BuildLogKind } from './buildLog';
 import { bootyKind, bootyText, counterLine, spyRepaint } from './spyLog';
@@ -1788,40 +1789,20 @@ function pumpBuildQueues(): void {
     }
   }
 }
+/** Где флот НАХОДИТСЯ по правилам, в МИРОВЫХ координатах — правила и вся интерполяция
+ *  живут чистой моделью `fleetOrigin.ts`; здесь остаётся подстановка живого состояния. */
 function fleetPos(f: Fleet): { x: number; y: number } | null {
-  // Free-space movement (squadrons / missiles): position is interpolated from
-  // freePosition toward (targetX, targetY) — a straight line in space, not a lane.
-  if (f.freeMovement) {
-    const from = f.freePosition;
-    if (!from) return null;
-    const fm = f.freeMovement;
-    const prog = Math.min(1, Math.max(0, (s.time - fm.departedAt) / (fm.arrivesAt - fm.departedAt)));
-    return {
-      x: from.x + (fm.targetX - from.x) * prog,
-      y: from.y + (fm.targetY - from.y) * prog,
-    };
-  }
-  if (f.freePosition) return f.freePosition;
-  if (f.location) return s.planets[f.location]?.position ?? null;
-  // Parked at a continuous point ON a lane (stopped mid-march / marched to a point).
-  if (f.edge) {
-    const a = s.planets[f.edge.from]?.position;
-    const b = s.planets[f.edge.to]?.position;
-    if (!a || !b) return null;
-    return { x: a.x + (b.x - a.x) * f.edge.t, y: a.y + (b.y - a.y) * f.edge.t };
-  }
-  const m = f.movement;
-  if (!m) return null;
-  const a = s.planets[m.from]?.position;
-  const b = s.planets[m.to]?.position;
-  if (!a || !b) return null;
-  // The leg only covers the sub-segment [startT, endT] of the lane (a partial leg
-  // out of / into a parked position), so interpolate within those bounds.
-  const s0 = m.startT ?? 0;
-  const e0 = m.endT ?? 1;
-  const prog = Math.min(1, Math.max(0, (s.time - m.departedAt) / (m.arrivesAt - m.departedAt)));
-  const t = s0 + (e0 - s0) * prog;
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+  return fleetOrigin(f, s.time, (id) => s.planets[id]?.position ?? null);
+}
+/** Та же точка отсчёта, спроецированная НА ЭКРАН.
+ *
+ *  Отсюда меряют дальности способностей и отсюда выходят линии маршрутов — потому что
+ *  ровно эту точку знает ядро (`hero.ability` меряет `E_OUT_OF_RANGE` от позиции узла).
+ *  Не путать с `fleetAnchor`: тот отдаёт слот на орбитальном кольце — он кружит вокруг
+ *  планеты и годится ТОЛЬКО чтобы нарисовать шеврон и поймать по нему тап. */
+function fleetOriginPx(f: Fleet): { x: number; y: number } | null {
+  const p = fleetPos(f);
+  return p ? world(p) : null;
 }
 /** Where to draw a battle: the position of a fleet engaged in it (so a mid-lane
  *  intercept renders at the crossing point, not the nearest node), falling back to
@@ -1895,7 +1876,12 @@ function orbitAngle(idx: number, nPeers: number): number {
 
 /** Screen anchor (+ heading) for a fleet's chevron: the interpolated lane
  *  position while moving, or a slot on the orbit ring while stationed
- *  (fleets sharing the ring are fanned out so they don't overlap). */
+ *  (fleets sharing the ring are fanned out so they don't overlap).
+ *
+ *  ТОЛЬКО КАРТИНКА И ПАЛЕЦ. Слот на кольце кружит вокруг планеты (`orbitRing.ts`),
+ *  поэтому мерить отсюда нельзя ничего: дальности способностей и начала маршрутов
+ *  берут `fleetOriginPx` — точку, которую знает ядро. Здесь же остаются отрисовка
+ *  шеврона, попадание тапом/рамкой по нему и привязка меню к его картинке. */
 function fleetAnchor(f: Fleet): { x: number; y: number; ang: number } | null {
   if (f.movement || !f.location) {
     const mp = fleetPos(f);
@@ -3681,7 +3667,7 @@ function drawFleetRoutes() {
     // Чей маршрут виден, где он кончается и как выглядит — `fleetRoute.ts` (REFM-95);
     // здесь остаётся проекция мировых точек на экран.
     if (!routeShown(f.owner, ME, !!f.movement) || !f.movement) continue;
-    const start = fleetAnchor(f);
+    const start = fleetOriginPx(f);
     if (!start) continue;
     const sel = selFleet === f.id || selFleets.has(f.id);
     const stops = routeStops(f.movement, (id) => s.planets[id]?.position);
@@ -3850,7 +3836,10 @@ function drawCastAim(): void {
   const def = data.heroAbilities[heroAim.abilityId];
   if (!hero || !def) return;
   const fleet = hero.fleetId ? s.fleets[hero.fleetId] : undefined;
-  const origin = fleet ? fleetAnchor(fleet) : null;
+  // Круг досягаемости — от ТОЧКИ ОТСЧЁТА, а не от кружащей модельки: ядро меряет
+  // `E_OUT_OF_RANGE` от позиции узла, и граница обязана совпадать с той, по которой
+  // придёт отказ (иначе прицел врёт на радиус орбитального кольца, и каждый кадр иначе).
+  const origin = fleet ? fleetOriginPx(fleet) : null;
   if (!origin) return;
   const reach = abilityRange(def);
   const aoe = Number(def.params?.radius ?? 0);
@@ -3900,8 +3889,7 @@ function drawAbilityRings(): void {
     hero: (heroId) => {
       const hero = (s.heroes ?? {})[heroId];
       const f = hero?.fleetId ? s.fleets[hero.fleetId] : undefined;
-      const p = f ? fleetPos(f) : null;
-      return p ? world(p) : null;
+      return f ? fleetOriginPx(f) : null;
     },
     node: (planetId) => {
       const p = s.planets[planetId]?.position;
@@ -3939,7 +3927,7 @@ function drawAimPreview() {
   for (const id of ids) {
     const f = s.fleets[id];
     if (!f) continue;
-    const anchor = fleetAnchor(f);
+    const anchor = fleetOriginPx(f);
     if (!anchor) continue;
     // draw the ROUTED march path through province centres (Bytro-style), so you
     // see the actual road the army will take — not a straight line to the target.
@@ -11174,11 +11162,15 @@ const fpsEl = $('fps');
 // without staging a real standoff duel — for design review and the FX screenshot
 // tests. Compiled out of the player build (dev tooling, not diagnostics).
 if (!__PLAYER_BUILD__ && DEV_UI && typeof window !== 'undefined') {
+  const oxy = (p: { x: number; y: number }): { ox: number; oy: number } => ({
+    ox: p.x,
+    oy: p.y,
+  });
   (window as unknown as { __vdFx?: object }).__vdFx = {
     // e2e probe: page-space anchors of own fleets and all worlds — lets a browser
     // test tap real map objects without guessing coordinates. Dev chrome, read-only.
     probe(): {
-      fleets: Array<{ id: string; x: number; y: number }>;
+      fleets: Array<{ id: string; x: number; y: number; ox: number; oy: number }>;
       worlds: Array<{ id: string; x: number; y: number; owner: string | null }>;
     } {
       const r = canvas.getBoundingClientRect();
@@ -11188,8 +11180,11 @@ if (!__PLAYER_BUILD__ && DEV_UI && typeof window !== 'undefined') {
           .filter((f) => f.owner === ME)
           // fleetAnchor is null for a fleet with no drawable position — skip it
           .flatMap((f) => {
+            // Обе точки флота: `x,y` — моделька (по ней тапают, она кружит по кольцу),
+            // `ox,oy` — точка отсчёта (её знает ядро, она неподвижна на стоянке).
             const a = fleetAnchor(f);
-            return a ? [{ id: f.id, ...sx(a) }] : [];
+            const o = fleetOriginPx(f);
+            return a && o ? [{ id: f.id, ...sx(a), ...oxy(sx(o)) }] : [];
           }),
         worlds: Object.values(s.planets).map((p) => ({
           id: p.id,
@@ -12308,7 +12303,7 @@ function drawChainPath(
   alpha: number,
 ): void {
   if (!steps.length || !fromId) return;
-  const start = fleetAnchor(f);
+  const start = fleetOriginPx(f);
   if (!start) return;
   const tl = chainTimeline(steps, fromId, baseH, chainTravelH(f), chainAbilityHoldH([f.id]), headRemH);
   // Полилиния: от якоря флота по маршруту каждого перелёта (стиль drawFleetRoutes).
