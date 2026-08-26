@@ -1,6 +1,6 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type { BuildingInstance, Planet, PausedConstructionSite, Player } from '../state/gameState';
-import type { GameData, ResourceBag } from '../data/schemas';
+import type { BuildingDef, GameData, ResourceBag } from '../data/schemas';
 import { buildingLevel, buildingMaxLevel } from '../data/schemas';
 import { isBombarded } from '../state/orbit';
 import { allowedBuildings } from '../state/sectorKind';
@@ -141,35 +141,55 @@ function isQueued(
   });
 }
 
-/** True if the planet has at least one standing (undestroyed) building whose data
- *  marks it `enablesShipConstruction` (shipyard/spaceport) — the yard a space-domain
- *  hull needs to be laid down. Ground units never check this. */
+/** Строительные способности здания — те, что гейтят `unit.build`. */
+type ConstructionCapability =
+  | 'enablesShipConstruction'
+  | 'enablesSquadronConstruction'
+  | 'enablesGroundConstruction';
+
+/** Открыта ли способность у здания ЭТОГО уровня. База — флаг самого здания; дальше
+ *  способность может открыть любой ПРОЙДЕННЫЙ апгрейд, и назад она не выключается
+ *  (см. `BuildingLevelSchema`: «уровень открывает», а не «уровень умеет»).
+ *
+ *  Раньше здесь читался только базовый def, и это делало данные немой опечаткой:
+ *  завод объявляет `enablesSquadronConstruction` в апгрейдах — «второй уровень
+ *  открывает эскадрильи», — а гейт этого не видел, поэтому `fighter_squadron`
+ *  отбивался `E_NO_HANGAR` на любом уровне завода, то есть был непостроим вовсе. */
+function capabilityAt(def: BuildingDef, level: number, key: ConstructionCapability): boolean {
+  if (def[key]) return true;
+  for (let l = 2; l <= level; l++) {
+    if (def.upgrades[l - 2]?.[key]) return true;
+  }
+  return false;
+}
+
+/** True if some standing (undestroyed) building on the planet has the capability at
+ *  its current level. */
+function hasCapability(planet: Planet, data: GameData, key: ConstructionCapability): boolean {
+  return planet.buildings.some((b) => {
+    if (b.hp <= 0) return false;
+    const def = data.buildings[b.type];
+    return def ? capabilityAt(def, b.level, key) : false;
+  });
+}
+
+/** The yard a space-domain hull needs to be laid down (shipyard/spaceport). Ground
+ *  units never check this. */
 function hasShipyard(planet: Planet, data: GameData): boolean {
-  return planet.buildings.some((b) => {
-    if (b.hp <= 0) return false;
-    return data.buildings[b.type]?.enablesShipConstruction === true;
-  });
+  return hasCapability(planet, data, 'enablesShipConstruction');
 }
 
-/** True if the planet has at least one standing (undestroyed) building whose data
- *  marks it `enablesSquadronConstruction` (factory / airbase) — the facility a
- *  squadron-trait unit needs to be built and based. No limit on how many squadrons
- *  a planet can base — the building is the gate, not a capacity. */
+/** The facility a squadron-trait unit needs to be built and based (factory / airbase).
+ *  No limit on how many squadrons a planet can base — the building is the gate, not a
+ *  capacity. */
 function hasHangarBay(planet: Planet, data: GameData): boolean {
-  return planet.buildings.some((b) => {
-    if (b.hp <= 0) return false;
-    return data.buildings[b.type]?.enablesSquadronConstruction === true;
-  });
+  return hasCapability(planet, data, 'enablesSquadronConstruction');
 }
 
-/** True if the planet has at least one standing (undestroyed) building whose data
- *  marks it `enablesGroundConstruction` (barracks for infantry, factory for
- *  vehicles) — the facility a ground-domain unit needs to be built. */
+/** The facility a ground-domain unit needs to be built (barracks for infantry,
+ *  factory for vehicles). */
 function hasGroundFacility(planet: Planet, data: GameData): boolean {
-  return planet.buildings.some((b) => {
-    if (b.hp <= 0) return false;
-    return data.buildings[b.type]?.enablesGroundConstruction === true;
-  });
+  return hasCapability(planet, data, 'enablesGroundConstruction');
 }
 
 function requireUnlocked(

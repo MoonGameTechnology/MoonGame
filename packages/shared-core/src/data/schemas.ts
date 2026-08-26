@@ -191,6 +191,24 @@ export const BuildingLevelSchema = z.object({
    *  buildTime × (1 − 0.5)). Применяется к `unit.build` на планете, где стоит это
    *  здание. 0 = нет бонуса. */
   buildSpeedBonus: z.number().nonnegative().default(0),
+  /** Строительные способности, ОТКРЫВАЕМЫЕ этим уровнем (верфь / ангар / наземное
+   *  производство). Ровно те же флаги, что у `BuildingDefSchema`, только здесь они
+   *  означают «уровень открывает», а не «здание умеет с постройки».
+   *
+   *  Способность НАКАПЛИВАЕТСЯ и обратно не выключается: раз открыв ангар апгрейдом,
+   *  здание остаётся ангаром и на следующих уровнях, даже если те флага не повторяют.
+   *  Поэтому поля опциональные — `undefined` значит «этот уровень ничего не добавляет»,
+   *  а не «отнимает».
+   *
+   *  Почему они здесь появились: данные (и `data/buildings.json`, и каталог прототипа)
+   *  давно писали `enablesSquadronConstruction` в АПГРЕЙДАХ завода — «завод второго
+   *  уровня открывает эскадрильи». Схема этих полей на уровне не знала, zod их молча
+   *  отбрасывал, и гейт `unit.build` читал только базовый def — где флага нет. Итог:
+   *  `fighter_squadron` (единственный `squadron`-юнит) нельзя было построить НИ НА
+   *  КАКОМ уровне завода, приказ отбивался `E_NO_HANGAR` всегда. */
+  enablesShipConstruction: z.boolean().optional(),
+  enablesSquadronConstruction: z.boolean().optional(),
+  enablesGroundConstruction: z.boolean().optional(),
 });
 
 export const BuildingDefSchema = z.object({
@@ -230,11 +248,13 @@ export const BuildingDefSchema = z.object({
   pointDefense: z.number().nonnegative().default(0),
   /** True for a building that can lay down hulls (shipyard/spaceport) — a planet needs
    *  at least one standing (undestroyed) building with this flag to build any
-   *  space-domain unit (`unit.build`). Not per-level: the capability doesn't scale. */
+   *  space-domain unit (`unit.build`). Уровень МОЖЕТ открыть способность позже — см.
+   *  одноимённое поле в `BuildingLevelSchema`. */
   enablesShipConstruction: z.boolean().default(false),
   /** True for a building that can build and base squadrons (a hangar bay /
    *  airbase). A planet needs at least one standing building with this flag
-   *  to build any unit with the `squadron` trait (`unit.build`). Not per-level. */
+   *  to build any unit with the `squadron` trait (`unit.build`). Уровень МОЖЕТ
+   *  открыть способность позже — см. `BuildingLevelSchema`. */
   enablesSquadronConstruction: z.boolean().default(false),
   /** True for a building that enables ground-unit construction (barracks for
    *  infantry, factory for vehicles). A planet needs at least one standing

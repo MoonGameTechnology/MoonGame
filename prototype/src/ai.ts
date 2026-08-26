@@ -21,6 +21,7 @@ import {
   moveFleet,
   launchFleet,
   buildBuilding,
+  upgradeBuilding,
   buildUnit,
   declareWar,
   canTraverse,
@@ -92,6 +93,14 @@ const GROUND_STOCK = 8;
 const HOME_GUARD = 3;
 /** Верхний предел десантных корпусов — трюм 8 против 5 у крейсера, больше не нужно. */
 const DROPSHIP_CAP = 2;
+/** Сколько артиллерийских корпусов держит тест-бот (AI-BAL-4): дальний огонь — не
+ *  замена флоту, а добавка к нему; стеклянная пушка гибнет от первого же сближения. */
+const SIEGE_CAP = 2;
+/** Уровень завода, на котором открывается ангар (`enablesSquadronConstruction`). */
+const SQUADRON_FACTORY_LEVEL = 2;
+/** Предел ударных крыльев — картонные, дорогие по микроэлектронике, конкурируют с
+ *  крейсерами за тот же дефицитный ресурс. */
+const SQUADRON_CAP = 3;
 /** Запас казны сверх цены заказа (мера та же, что у построек бота). */
 const ORDER_RESERVE: Record<string, number> = { metal: 60, credits: 60 };
 
@@ -516,6 +525,12 @@ export function aiOrders(
     // Порядок здесь и есть цепочка захвата: казарма → войска → гарнизон на призовых
     // мирах (он-то и превращает «прилетел и забрал» в ШТУРМ) → десантный корпус.
     if (profile === 'test') {
+      const pendingUpgrade = (planetId: string, building: string): boolean =>
+        state.scheduled.some((e) => {
+          if (e.type !== 'construction.complete') return false;
+          const q = e.payload as { kind?: string; planetId?: string; building?: string };
+          return q.kind === 'upgrade' && q.planetId === planetId && q.building === building;
+        });
       const pendingUnit = (planetId: string, unit: string): boolean =>
         state.scheduled.some((e) => {
           if (e.type !== 'construction.complete') return false;
@@ -583,20 +598,59 @@ export function aiOrders(
         out.push(buildBuilding(ai, p.id, missing));
         break; // одна стройка за тик — как в экономической цепочке
       }
-      // 4. Десантный корпус: трюм 8 против 5 у крейсера — без него ударная группа
-      //    везёт горстку и штурм захлёбывается на первом же гарнизоне.
-      const dropships =
+      // Сколько таких корпусов у места ВСЕГО: во флотах плюс ещё не поднятые в
+      //    гарнизоне дома (авто-рандеву кладёт новый корабль именно туда).
+      const shipsOwned = (unit: string): number =>
         Object.values(state.fleets).reduce(
           (n, fl) =>
-            n + (fl.owner === ai ? fl.units.reduce((k, st) => k + (st.unit === 'dropship' ? st.count : 0), 0) : 0),
+            n + (fl.owner === ai ? fl.units.reduce((k, st) => k + (st.unit === unit ? st.count : 0), 0) : 0),
           0,
-        ) + base.garrison.reduce((n, st) => n + (st.unit === 'dropship' ? st.count : 0), 0);
+        ) + base.garrison.reduce((n, st) => n + (st.unit === unit ? st.count : 0), 0);
+      // 4. Десантный корпус: трюм 8 против 5 у крейсера — без него ударная группа
+      //    везёт горстку и штурм захлёбывается на первом же гарнизоне.
       if (
-        dropships < DROPSHIP_CAP &&
+        shipsOwned('dropship') < DROPSHIP_CAP &&
         !pendingUnit(base.id, 'dropship') &&
         affordableUnit('dropship', 1)
       ) {
         out.push(buildUnit(ai, base.id, 'dropship', 1));
+      }
+      // ═══ 6. АРТИЛЛЕРИЯ И АВИАЦИЯ (AI-BAL-4) ═══
+      // Артиллерия стреляет САМА: `artilleryModule` каждым пролётом времени заставляет
+      // свободный стоящий флот с `artillery`-корпусом обстрелять ближайший враждебный
+      // стоящий флот в радиусе `range` — без приказа, без ответного огня и без входа в
+      // бой. То есть `siege` не требует от бота ни одной новой команды: достаточно его
+      // ПОСТРОИТЬ, и целый пласт боя (дальний огонь) входит в измерение.
+      if (
+        warFooting &&
+        shipsOwned('siege') < SIEGE_CAP &&
+        !pendingUnit(base.id, 'siege') &&
+        affordableUnit('siege', 1)
+      ) {
+        out.push(buildUnit(ai, base.id, 'siege', 1));
+      }
+      // Эскадрильи. Ворота — здание с `enablesSquadronConstruction`; у завода эта
+      // способность появляется ВТОРЫМ уровнем, поэтому цепочка длинная: построить завод
+      // → апгрейдить → строить крылья. Дальше эскадрилья дерётся как обычный ударный
+      // корпус в составе флота (быстрая, больно бьёт, картонная — её счётчик орбитальная
+      // ПВО). СВОБОДНОГО ВЫЛЕТА у неё пока нет ни у кого: `squadron.strike` требует
+      // `fleet.homeBase`, а это поле в игре не выставляет ни один модуль (`fleet.split`
+      // в том числе) — механика вылета не достроена, это отдельный кирпич, не задача бота.
+      const factory = base.buildings.find((b) => b.type === 'factory' && b.hp > 0);
+      if (!factory) {
+        if (affordable('factory') && !pendingBuild(base.id, 'factory')) {
+          out.push(buildBuilding(ai, base.id, 'factory'));
+        }
+      } else if (factory.level < SQUADRON_FACTORY_LEVEL) {
+        if (affordable('factory') && !pendingUpgrade(base.id, 'factory')) {
+          out.push(upgradeBuilding(ai, base.id, 'factory'));
+        }
+      } else if (
+        shipsOwned('fighter_squadron') < SQUADRON_CAP &&
+        !pendingUnit(base.id, 'fighter_squadron') &&
+        affordableUnit('fighter_squadron', 1)
+      ) {
+        out.push(buildUnit(ai, base.id, 'fighter_squadron', 1));
       }
     }
     // (marine retired: the AI no longer cheap-builds a ground trooper. Its home keeps its
