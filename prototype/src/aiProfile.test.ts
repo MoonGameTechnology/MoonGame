@@ -24,6 +24,9 @@ const PLAYER_PATHS = [
   'prototype/src/ai.ts', // сам модуль: дефолт обязан быть 'basic'
 ];
 
+/** Пути, ЗАДАЮЩИЕ правила победы живому игроку: соло-контекст и прото-хост. */
+const PLAYER_VICTORY_PATHS = ['prototype/src/protoKernel.ts', 'prototype/netserver.ts'];
+
 const read = (p: string): string => readFileSync(new URL(`../../${p}`, import.meta.url), 'utf8');
 
 function game2(): GameState {
@@ -96,5 +99,35 @@ describe('профиль бота — тест-бот только в прого
     expect(JSON.stringify(s)).not.toContain('"test"');
     const payloads = read('packages/shared-core/src/actions/payloadSchemas.ts');
     expect(payloads).not.toContain('aiProfile');
+  });
+});
+
+// НЕДЕЛЬНАЯ СЕССИЯ — ТОЛЬКО ЛАБОРАТОРИЯ (заказ владельца 2026-08-26).
+//
+// Прогоны баланса идут ровно 7 игровых дней и БЕЗ досрочной победы по очкам: так у всех
+// матчей одинаковая длина, и сравнивать можно итоговый СЧЁТ, а не бинарное «выиграл».
+// Живого игрока это не касается вовсе — у него прежняя гонка к порогу очков.
+//
+// Держится это тем же способом, что и профиль бота: разными файлами. Недельный конфиг
+// живёт в headless-харнесах, которые в игре не исполняются; правила победы игрока задают
+// `protoKernel.ts` (соло) и `netserver.ts` (прото-хост). Тесты ниже стерегут обе стороны
+// границы — чтобы «лабораторная» неделя не переехала в игру незамеченной.
+describe('правила победы — недельная сессия только в прогонах баланса', () => {
+  it('ИГРОВЫЕ пути не обрезают сессию и не глушат победу по очкам', () => {
+    for (const path of PLAYER_VICTORY_PATHS) {
+      const src = read(path);
+      expect(src, `${path}: сессия игрока не ограничивается лабораторной неделей`).not.toContain(
+        'endsAt',
+      );
+      expect(src, `${path}: порог очков игрока должен быть достижимым`).not.toContain('100_000_000');
+    }
+  });
+
+  it('харнесы баланса: сессия ограничена и порог очков недостижим', () => {
+    const selfplay = read('prototype/selfplay.mjs');
+    expect(selfplay).toContain('const SESSION_DAYS = 7');
+    expect(selfplay).toMatch(/endsAt: SESSION_DAYS \* DAY/);
+    expect(selfplay).toContain('scoreLimit: 100_000_000');
+    expect(read('prototype/econplaytest.mjs')).toContain('scoreLimit: 100_000_000');
   });
 });

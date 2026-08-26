@@ -24,14 +24,33 @@ const res = await build({
 });
 const mod = { exports: {} };
 new Function('module', 'exports', 'require', res.outputFiles[0].text)(mod, mod.exports, () => ({}));
-const { newGame, kernel, data, SCORE_LIMIT, aiOrders, HOUR, DAY, START_CANDIDATES } = mod.exports;
+const { newGame, kernel, data, aiOrders, HOUR, DAY, START_CANDIDATES } = mod.exports;
 
 const STEP = 2 * HOUR; // the AI decision cadence (mirrors the netserver driver)
-const CAP = 90 * DAY; // harness safety net — victory's own timeout fires first (below)
 
-// `endsAt` = the session's forced finale ranked by score (victory module 'timeout') —
-// a stalemated war ends with a winner instead of a harness draw, like a real session.
-const config = { timeScale: 1, victory: { scoreLimit: SCORE_LIMIT, endsAt: 60 * DAY } };
+// НЕДЕЛЬНАЯ СЕССИЯ БЕЗ ДОСРОЧНОЙ ПОБЕДЫ (заказ владельца 2026-08-26). Раньше прогон
+// кончался порогом очков — и кончался на 4-м дне: `score` был исходом 100% матчей, а
+// поскольку `scoreValue` есть и у провинций, и у зданий, вперёд вырывался тот, кто
+// раньше занял территорию, после чего партия просто добегала до порога. Измерение от
+// этого было БИНАРНЫМ: «выиграл/проиграл» и ничего про то, НАСКОЛЬКО.
+//
+// Теперь у каждого матча одинаковая длина — 7 игровых дней, — и в конце ранжирование по
+// очкам (`victory` завершает матч причиной `timeout`, победитель = высший счёт). Это
+// делает сравнимыми условия: одна и та же неделя у всех, разный итоговый счёт.
+//
+// Как это выражено: досрочные концовки заглушены не отдельным флагом (его в ядре нет), а
+// НЕДОСТИЖИМЫМИ порогами — тем же приёмом, что и в `econplaytest.mjs`. Победа выбыванием
+// остаётся: если сторона потеряла всё, добивать неделю нечего.
+const SESSION_DAYS = 7;
+const CAP = (SESSION_DAYS + 3) * DAY; // harness safety net — `endsAt` срабатывает первым
+const config = {
+  timeScale: 1,
+  victory: {
+    endsAt: SESSION_DAYS * DAY,
+    scoreLimit: 100_000_000, // порог очков недостижим ⇒ досрочной победы по очкам нет
+    dominationPercent: 1, // только полная карта — иначе неделя обрывалась бы на 60%
+  },
+};
 const ctx = (now) => ({ now, data, config });
 
 function leaderByPlanets(state) {
@@ -149,7 +168,15 @@ function runMatch(i) {
     else break;
   }
   const seatMeta = Object.fromEntries(seats.map((s) => [s.id, s]));
+  // Итоговый счёт каждого места. `victoryModule` пересчитывает его при каждой оценке и
+  // кладёт в состояние (`match.scores`), поэтому на финале там уже финальные числа —
+  // харнесу не нужна своя копия формулы (и она не разъедется с ядром).
+  const finalScores = Object.fromEntries(
+    Object.entries(state.match.scores ?? {}).map(([seat, sc]) => [seat, sc?.total ?? 0]),
+  );
   return {
+    finalScores,
+    seatMeta,
     winner,
     winnerFaction: winner ? seatMeta[winner]?.faction : null,
     winnerStart: winner ? seatMeta[winner]?.start : null,
@@ -182,6 +209,18 @@ let errors = 0;
 let decided = 0;
 let snowballHits = 0;
 let battlesTotal = 0;
+// РЕЙТИНГ ПО ОЧКАМ (заказ владельца): бинарное «кто выиграл» ничего не говорит о том,
+// НАСКОЛЬКО. Средний счёт по слоту/фракции/старту отвечает на вопрос прямо: какие условия
+// приводят тест-бота к большему счёту за одинаковую неделю.
+const scoreBySlot = new Map();
+const scoreByFaction = new Map();
+const scoreByStart = new Map();
+const seenBySlot = new Map();
+const seenByFaction = new Map();
+const seenByStart = new Map();
+const winnerScores = [];
+const loserScores = [];
+const margins = [];
 let groundBattlesTotal = 0;
 let arrivalCaptures = 0;
 let assaultCaptures = 0;
@@ -207,6 +246,25 @@ for (let i = 0; i < N; i++) {
     decided++;
     if (r.midLeader !== null && r.midLeader === r.winner) snowballHits++;
   }
+  for (const [seat, total] of Object.entries(r.finalScores)) {
+    const meta = r.seatMeta[seat];
+    bump(scoreBySlot, seat, total);
+    bump(seenBySlot, seat);
+    if (meta) {
+      bump(scoreByFaction, meta.faction, total);
+      bump(seenByFaction, meta.faction);
+      bump(scoreByStart, meta.start, total);
+      bump(seenByStart, meta.start);
+    }
+  }
+  {
+    const totals = Object.entries(r.finalScores).sort((a, b) => b[1] - a[1]);
+    if (totals.length >= 2) {
+      winnerScores.push(totals[0][1]);
+      loserScores.push(totals[totals.length - 1][1]);
+      margins.push(totals[0][1] - totals[totals.length - 1][1]);
+    }
+  }
   for (const [k, v] of r.usage) bump(usageTotal, k, v);
   for (const [k, v] of r.techUsage) bump(techTotal, k, v);
   if ((i + 1) % 10 === 0) process.stderr.write(`  … ${i + 1}/${N}\r`);
@@ -219,6 +277,13 @@ const fmtWins = (m) =>
   [...m.entries()]
     .sort((a, b) => b[1] - a[1])
     .map(([k, v]) => `${k} ${v} (${pct(v, decided)})`)
+    .join(' · ') || '—';
+/** «ключ среднее» по убыванию — рейтинг, а не сырые суммы: матчей у ключей разное число. */
+const fmtAvg = (sums, seen) =>
+  [...sums.entries()]
+    .map(([k, v]) => [k, v / (seen.get(k) || 1)])
+    .sort((a, b) => b[1] - a[1])
+    .map(([k, v]) => `${k} ${v.toFixed(0)}`)
     .join(' · ') || '—';
 const topUsage = [...usageTotal.entries()]
   .sort((a, b) => b[1] - a[1])
@@ -244,6 +309,10 @@ console.log(
     `  длина      : avg ${days(avg(lengths))}д · min ${days(Math.min(...lengths))}д · max ${days(Math.max(...lengths))}д · исходы: ${fmtWins(reasons)}`,
     `  1-й бой    : avg ${days(avg(firstCombats))}д (в ${firstCombats.length}/${N} матчах) · боёв всего ${battlesTotal}`,
     `  наземная   : ${groundBattlesTotal} наземных боёв из ${battlesTotal} · захваты: прилётом ${arrivalCaptures} · штурмом ${assaultCaptures}  ← «штурмом» и есть вторая фаза захвата (GDD §7.4); 0 = она не играется`,
+    `  очки       : лидер ${avg(winnerScores).toFixed(0)} · отставший ${avg(loserScores).toFixed(0)} · разрыв ${avg(margins).toFixed(0)}  ← сессия одинаковая (${SESSION_DAYS}д), разный только счёт`,
+    `  очки/слот    : ${fmtAvg(scoreBySlot, seenBySlot)}`,
+    `  очки/фракция : ${fmtAvg(scoreByFaction, seenByFaction)}`,
+    `  очки/старт   : ${fmtAvg(scoreByStart, seenByStart)}`,
     `  snowball   : ${pct(snowballHits, decided)} лидеров середины выиграли  ← высокий % = снежный ком, камбэков нет`,
     `  usage      : ${topUsage || '—'}`,
     zeros.length ? `  мёртвый контент (0 построек за ${N} матчей): ${zeros.join(' ')}` : '  мёртвый контент: нет ✓',
@@ -275,6 +344,19 @@ console.log(
         outcomes: Object.fromEntries(reasons),
         firstCombatAvgDays: firstCombats.length ? avg(firstCombats) / DAY : null,
         firstCombatMatches: firstCombats.length,
+        sessionDays: SESSION_DAYS,
+        avgWinnerScore: avg(winnerScores),
+        avgLoserScore: avg(loserScores),
+        avgMargin: avg(margins),
+        avgScoreBySlot: Object.fromEntries(
+          [...scoreBySlot].map(([k, v]) => [k, v / (seenBySlot.get(k) || 1)]),
+        ),
+        avgScoreByFaction: Object.fromEntries(
+          [...scoreByFaction].map(([k, v]) => [k, v / (seenByFaction.get(k) || 1)]),
+        ),
+        avgScoreByStart: Object.fromEntries(
+          [...scoreByStart].map(([k, v]) => [k, v / (seenByStart.get(k) || 1)]),
+        ),
         battlesTotal,
         groundBattlesTotal,
         capturesByArrival: arrivalCaptures,
