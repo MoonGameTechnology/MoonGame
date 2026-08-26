@@ -66,6 +66,7 @@ function runMatch(i) {
   let state = newGame({ seats, seed: `${BASE_SEED}-${i}` });
 
   const usage = new Map(); // built unit/building -> count
+  const techUsage = new Map(); // researched technology -> count
   let battles = 0;
   let firstCombatAt = null;
   const consume = (events, now) => {
@@ -76,6 +77,9 @@ function runMatch(i) {
       } else if (e.type === 'building.constructed') {
         const p = e.payload ?? {};
         usage.set(p.building, (usage.get(p.building) ?? 0) + 1);
+      } else if (e.type === 'technology.researched') {
+        const p = e.payload ?? {};
+        if (p.technology) techUsage.set(p.technology, (techUsage.get(p.technology) ?? 0) + 1);
       } else if (e.type === 'battle.resolved') battles++;
       else if (e.type === 'battle.started' && firstCombatAt === null) firstCombatAt = now;
     }
@@ -110,7 +114,9 @@ function runMatch(i) {
     if (reversedAt(stepIdx)) seatsInOrder.reverse();
     stepIdx += 1;
     for (const seat of seatsInOrder) {
-      for (const a of aiOrders(state, seat, 'expand')) {
+      // 'test' — лабораторный профиль (AI-BAL-1.1). Живой игрок такого бота не встречает:
+      // соло и прото-хост зовут aiOrders без профиля, и выставить его в игре нечем.
+      for (const a of aiOrders(state, seat, 'expand', 'test')) {
         const r = kernel.applyAction(state, a, ctx(now));
         if (r.ok) {
           state = r.state;
@@ -140,6 +146,7 @@ function runMatch(i) {
     firstCombatAt,
     midLeader,
     usage,
+    techUsage,
   };
 }
 
@@ -151,6 +158,7 @@ const winsByFaction = new Map();
 const winsByStart = new Map();
 const reasons = new Map();
 const usageTotal = new Map();
+const techTotal = new Map();
 const lengths = [];
 const firstCombats = [];
 let draws = 0;
@@ -178,6 +186,7 @@ for (let i = 0; i < N; i++) {
     if (r.midLeader !== null && r.midLeader === r.winner) snowballHits++;
   }
   for (const [k, v] of r.usage) bump(usageTotal, k, v);
+  for (const [k, v] of r.techUsage) bump(techTotal, k, v);
   if ((i + 1) % 10 === 0) process.stderr.write(`  … ${i + 1}/${N}\r`);
 }
 
@@ -195,6 +204,13 @@ const topUsage = [...usageTotal.entries()]
   .map(([k, v]) => `${k}=${v}`)
   .join(' ');
 const zeros = Object.keys({ ...data.units, ...data.buildings }).filter((k) => !usageTotal.has(k));
+const topTech = [...techTotal.entries()]
+  .sort((a, b) => b[1] - a[1])
+  .slice(0, 12)
+  .map(([k, v]) => `${k}=${v}`)
+  .join(' ');
+const techZeros = Object.keys(data.technologies ?? {}).filter((k) => !techTotal.has(k));
+const techTotalCount = [...techTotal.values()].reduce((s, v) => s + v, 0);
 
 console.log(
   [
@@ -208,6 +224,10 @@ console.log(
     `  snowball   : ${pct(snowballHits, decided)} лидеров середины выиграли  ← высокий % = снежный ком, камбэков нет`,
     `  usage      : ${topUsage || '—'}`,
     zeros.length ? `  мёртвый контент (0 построек за ${N} матчей): ${zeros.join(' ')}` : '  мёртвый контент: нет ✓',
+    `  техи       : ${techTotalCount} исследовано · ${topTech || '—'}`,
+    techZeros.length
+      ? `  не исследованы ни разу (${techZeros.length}/${Object.keys(data.technologies ?? {}).length}): ${techZeros.join(' ')}`
+      : '  дерево технологий пройдено целиком ✓',
     '━'.repeat(70),
     // AUD-7: всё, что печатается человеку выше, отдаётся и машине. Раньше половина
     // показателей — разброс длины, раскладка исходов, первый бой, usage, мёртвый контент —
@@ -223,6 +243,9 @@ console.log(
         winsByFaction: Object.fromEntries(winsByFaction),
         winsByStart: Object.fromEntries(winsByStart),
         avgLengthDays: avg(lengths) / DAY,
+        techResearched: techTotalCount,
+        techUsage: Object.fromEntries(techTotal),
+        deadTech: techZeros,
         snowball: decided ? snowballHits / decided : null,
         lengthMinDays: lengths.length ? Math.min(...lengths) / DAY : null,
         lengthMaxDays: lengths.length ? Math.max(...lengths) / DAY : null,
