@@ -28,6 +28,7 @@ import {
   mergeFleet,
   loadArmy,
   researchTech,
+  assaultFleet,
 } from './actions';
 import { netIncome } from './economy';
 import { SECTOR_TYPES } from './map';
@@ -69,6 +70,58 @@ export type SeatAiKind = 'steward' | 'substitute' | 'none';
  * если `'test'` просочился в игровой путь.
  */
 export type AiProfile = 'basic' | 'test';
+
+/**
+ * Наземный ростер В ФИКСИРОВАННОМ порядке «тяжёлое → дешёвое» (AI-BAL-3).
+ *
+ * Порядок здесь — не вкус, а требование инварианта #1: перебор `data.units` дал бы
+ * порядок, зависящий от раскладки объекта, и один сид разыгрался бы по-разному.
+ * Тест-бот берёт ПЕРВОЕ, что по карману, поэтому список заодно задаёт приоритет:
+ * ранняя казна тянет только ополчение, поздняя — танки.
+ */
+const GROUND_ROSTER = ['tank', 'special_forces', 'heavy_infantry', 'militia'] as const;
+
+/** То же для ОБОРОНЫ: гарнизон держит тот, у кого выше `defense`, а не `attack` —
+ *  тяжёлая пехота (20) стоит насмерть лучше танка (14) и втрое дешевле. */
+const GROUND_DEFENDERS = ['heavy_infantry', 'tank', 'militia'] as const;
+
+/** Сколько наземных юнитов тест-бот держит дома: гарнизон + запас на десант. */
+const GROUND_STOCK = 8;
+/** Столько войск НЕ грузится в трюм: иначе дом остаётся пустым и берётся прилётом. */
+const HOME_GUARD = 3;
+/** Верхний предел десантных корпусов — трюм 8 против 5 у крейсера, больше не нужно. */
+const DROPSHIP_CAP = 2;
+/** Запас казны сверх цены заказа (мера та же, что у построек бота). */
+const ORDER_RESERVE: Record<string, number> = { metal: 60, credits: 60 };
+
+/** Стоит ли на мире ЖИВОЕ здание, открывающее наземное производство (казарма/завод).
+ *  Зеркало ядерного `hasGroundFacility` (`construction.ts`) — того самого гейта, который
+ *  отбивает `unit.build` кодом `E_NO_GROUND_FACILITY`. */
+function hasGroundYard(p: Planet): boolean {
+  return p.buildings.some(
+    (b) => b.hp > 0 && data.buildings[b.type]?.enablesGroundConstruction === true,
+  );
+}
+
+/** Сколько НАЗЕМНЫХ юнитов стоит в гарнизоне мира (корабли в гарнизоне не в счёт). */
+function groundCount(p: Planet): number {
+  return p.garrison.reduce((n, s) => n + (data.units[s.unit]?.domain === 'ground' ? s.count : 0), 0);
+}
+
+/** Свободный трюм флота: Σ cargoCapacity кораблей − Σ cargoSize уже погруженного
+ *  десанта. Та же формула, что у ядра (`army.ts`), иначе погрузка сыпала бы
+ *  `E_NO_CAPACITY`. */
+function liftFree(f: Fleet): number {
+  const cap = f.units.reduce(
+    (n, s) => n + (data.units[s.unit]?.stats.cargoCapacity ?? 0) * s.count,
+    0,
+  );
+  const used = (f.landing ?? []).reduce(
+    (n, s) => n + (data.units[s.unit]?.stats.cargoSize ?? 1) * s.count,
+    0,
+  );
+  return cap - used;
+}
 
 /** What drives a seat this tick + the posture to hand `aiOrders`. */
 export interface SeatAiDecision {
@@ -135,7 +188,21 @@ export function aiOrders(
       pid !== ai && state.players[pid]?.status === 'active' && getStance(state, ai, pid) === 'war',
   );
   // The home base (build/launch anchor, and the rally point ships pool at during war).
+  //
+  // ЯКОРЬ — ВЕРФЬ, а не «первый застроенный мир» (баг, найденный при AI-BAL-3, чинится
+  // ОБОИМ профилям). Стоило боту поставить шахту на призовом мире — и `find` начинал
+  // возвращать ЕГО: «дом» переезжал на мир без космопорта. Дальше каждый заказ корабля
+  // отбивался `E_NO_SHIPYARD` (в пробном матче — 102 отказа за матч), экономическая
+  // цепочка строилась не дома, а на призовом мире, и флот переставал пополняться вовсе.
+  // Обе прежние ветки оставлены запасными: у мира без верфи якорь тот же, что и был.
   const base =
+    Object.values(state.planets).find(
+      (p) =>
+        p.owner === ai &&
+        p.buildings.some(
+          (b) => b.hp > 0 && data.buildings[b.type]?.enablesShipConstruction === true,
+        ),
+    ) ??
     Object.values(state.planets).find((p) => p.owner === ai && p.buildings.length > 0) ??
     Object.values(state.planets).find((p) => p.owner === ai);
   const shipCount = (f: Fleet): number =>
@@ -167,6 +234,52 @@ export function aiOrders(
   for (const f of expandFleets) {
     if (f.owner !== ai || f.location == null || f.movement || f.battleId) continue;
     if (skipMove.has(f.id)) continue;
+    // ═══ ТЕСТ-БОТ (AI-BAL-3): десант и штурм ═══
+    // Игровой бот не делает НИ ТОГО, НИ ДРУГОГО, и вот почему вторая фаза захвата
+    // (орбита → высадка, GDD §7.4) в измерении баланса не участвовала вовсе:
+    //   • приказ `fleet.assault` бот не отдавал НИКОГДА. В сети штурм ведёт драйвер
+    //     `serverAutoAssaultActions`, а тот ходит только по флотам, которым ИГРОК
+    //     включил авто-штурм (`order.auto`) — у бота такого флага нет ни одного;
+    //   • трюм он грузил только на войне и только двумя ополченцами.
+    // Итог в батче: гарнизонный мир для бота просто НЕПРОХОДИМ — флот прилетает,
+    // `captureOnArrival` пропускает защищённый мир, и флот стоит на орбите до конца
+    // матча. Игровой профиль не тронут: это лаборатория.
+    if (profile === 'test' && base) {
+      const here0 = state.planets[f.location];
+      // (а) Погрузка ДОМА и в мирное время: пустой трюм у стены гарнизона означает,
+      //     что флот долетит и встанет. Дома остаётся `HOME_GUARD` — иначе бот
+      //     вывозит собственную оборону и его столицу берут прилётом.
+      if (here0 && here0.id === base.id) {
+        let free = liftFree(f);
+        let spare = groundCount(here0) - HOME_GUARD;
+        for (const u of GROUND_ROSTER) {
+          if (free <= 0 || spare <= 0) break;
+          const size = data.units[u]?.stats.cargoSize ?? 1;
+          const have = here0.garrison.reduce((n, st) => n + (st.unit === u ? st.count : 0), 0);
+          const take = Math.min(have, spare, Math.floor(free / size));
+          if (take > 0) {
+            out.push(loadArmy(ai, f.id, u, take));
+            free -= take * size;
+            spare -= take;
+          }
+        }
+      }
+      // (б) Штурм с орбиты. Правила штурма называет ЯДРО (`assaultPlanet`), здесь
+      //     только повод не сыпать заведомо отбиваемым приказом: чужой захватываемый
+      //     мир, война/нейтралитет, живой гарнизон и десант в трюме.
+      if (
+        here0 &&
+        f.orbit === 'near' &&
+        here0.owner !== ai &&
+        capturable(here0) &&
+        canTraverse(state, ai, here0.owner) &&
+        here0.garrison.some((st) => st.count > 0) &&
+        (f.landing ?? []).some((st) => st.count > 0)
+      ) {
+        out.push(assaultFleet(ai, f.id));
+        continue; // берём ЭТОТ мир, а не улетаем к следующему
+      }
+    }
     // Strike groups, not dribbles (self-play M4): auto-rally pools each new ship into
     // the IDLE rally fleet at its build world — but only while one is parked there.
     // Sending every single-ship fleet out at once therefore orphaned the rally point,
@@ -354,6 +467,10 @@ export function aiOrders(
         if (garrisonOrders >= 2 || (pl.resources.metal ?? 0) < 90) break;
         if (p.owner !== ai || p.kind !== 'planet') continue;
         if (p.garrison.some((s) => s.count > 0)) continue;
+        // Без казармы ядро отобьёт заказ (`E_NO_GROUND_FACILITY`) — раньше этот блок
+        // сыпал такими отказами весь матч (60 за пробный матч). Поведение не меняется:
+        // отсеиваются ровно те приказы, которые всё равно ничего не делали.
+        if (!hasGroundYard(p)) continue;
         out.push(buildUnit(ai, p.id, 'militia', 2));
         garrisonOrders += 1;
       }
@@ -362,11 +479,89 @@ export function aiOrders(
       const baseMilitia = base.garrison
         .filter((s) => s.unit === 'militia')
         .reduce((n, s) => n + s.count, 0);
-      if (baseMilitia < 4 && (pl.resources.metal ?? 0) > 120) {
+      if (baseMilitia < 4 && (pl.resources.metal ?? 0) > 120 && hasGroundYard(base)) {
         out.push(buildUnit(ai, base.id, 'militia', 2));
       }
       if (aiFleets < 8 && (pl.resources.metal ?? 0) > 140) {
         out.push(buildUnit(ai, base.id, 'scout', 1));
+      }
+    }
+    // ═══ ТЕСТ-БОТ (AI-BAL-3): наземная кампания ═══
+    // Диагноз, ради которого этот блок и появился: в батче на 300 матчей ВСЕ четыре
+    // наземных юнита показывались «мёртвым контентом» — и не потому, что бот их не
+    // заказывал (на войне он заказывал ополчение), а потому, что каждый такой заказ
+    // ядро отбивало кодом `E_NO_GROUND_FACILITY`: наземное производство открывает
+    // казарма (`enablesGroundConstruction`), а бот не строил её никогда — стартовый
+    // мир получает только космопорт (`matchSetup.ts`). Отказ тихий: `applyAction`
+    // возвращает `{ ok: false }`, харнес его пропускает, и в отчёте это выглядело как
+    // «бот не хочет пехоту», а не как «пехота ему запрещена».
+    //
+    // Порядок здесь и есть цепочка захвата: казарма → войска → гарнизон на призовых
+    // мирах (он-то и превращает «прилетел и забрал» в ШТУРМ) → десантный корпус.
+    if (profile === 'test') {
+      const pendingUnit = (planetId: string, unit: string): boolean =>
+        state.scheduled.some((e) => {
+          if (e.type !== 'construction.complete') return false;
+          const q = e.payload as { kind?: string; planetId?: string; unit?: string };
+          return q.kind === 'unit' && q.planetId === planetId && q.unit === unit;
+        });
+      const affordableUnit = (unit: string, count: number): boolean => {
+        const cost = data.units[unit]?.cost ?? {};
+        return Object.keys(cost).every(
+          (r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) * count + (ORDER_RESERVE[r] ?? 0),
+        );
+      };
+      // 1. Казарма дома — ворота ко ВСЕМУ наземному ростеру.
+      if (!hasGroundYard(base)) {
+        if (affordable('barracks') && !pendingBuild(base.id, 'barracks')) {
+          out.push(buildBuilding(ai, base.id, 'barracks'));
+        }
+      } else {
+        // 2. Запас войск дома: гарнизон столицы + то, что увезёт десант. Берётся самое
+        //    тяжёлое по карману, поэтому ростер отыгрывается весь: ранняя казна тянет
+        //    ополчение, поздняя — спецназ и танки.
+        const pendingHome = GROUND_ROSTER.reduce(
+          (n, u) => n + (pendingUnit(base.id, u) ? 2 : 0),
+          0,
+        );
+        if (groundCount(base) + pendingHome < GROUND_STOCK) {
+          // Пока дома нет даже домашней стражи — заказывается ОБОРОНИТЕЛЬНЫЙ род войск;
+          // всё сверх неё уедет в трюме, поэтому там нужен ударный.
+          const list = groundCount(base) < HOME_GUARD ? GROUND_DEFENDERS : GROUND_ROSTER;
+          const pick = list.find((u) => affordableUnit(u, 2));
+          if (pick) out.push(buildUnit(ai, base.id, pick, 2));
+        }
+      }
+      // 3. Призовые миры: сперва казарма, потом ополчение в пустой гарнизон. Мир с
+      //    гарнизоном нельзя забрать прилётом — за него придётся высаживаться, и
+      //    ровно этого измерению не хватало.
+      for (const p of Object.values(state.planets)) {
+        if (p.owner !== ai || p.kind !== 'planet' || p.id === base.id) continue;
+        if (!hasGroundYard(p)) {
+          if (pendingBuild(p.id, 'barracks')) continue;
+          if (!affordable('barracks')) break;
+          out.push(buildBuilding(ai, p.id, 'barracks'));
+          break; // одна стройка за тик — как и с шахтой
+        }
+        if (groundCount(p) > 0 || pendingUnit(p.id, 'militia')) continue;
+        if (!affordableUnit('militia', 2)) break;
+        out.push(buildUnit(ai, p.id, 'militia', 2));
+        break;
+      }
+      // 4. Десантный корпус: трюм 8 против 5 у крейсера — без него ударная группа
+      //    везёт горстку и штурм захлёбывается на первом же гарнизоне.
+      const dropships =
+        Object.values(state.fleets).reduce(
+          (n, fl) =>
+            n + (fl.owner === ai ? fl.units.reduce((k, st) => k + (st.unit === 'dropship' ? st.count : 0), 0) : 0),
+          0,
+        ) + base.garrison.reduce((n, st) => n + (st.unit === 'dropship' ? st.count : 0), 0);
+      if (
+        dropships < DROPSHIP_CAP &&
+        !pendingUnit(base.id, 'dropship') &&
+        affordableUnit('dropship', 1)
+      ) {
+        out.push(buildUnit(ai, base.id, 'dropship', 1));
       }
     }
     // (marine retired: the AI no longer cheap-builds a ground trooper. Its home keeps its

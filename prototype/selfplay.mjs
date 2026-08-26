@@ -68,6 +68,14 @@ function runMatch(i) {
   const usage = new Map(); // built unit/building -> count
   const techUsage = new Map(); // researched technology -> count
   let battles = 0;
+  // AI-BAL-3: двухфазный захват (орбита → десант, GDD §7.4) отдельной строкой. До этой
+  // правки батч показывал только «боёв всего», и наземная фаза, которой в матче не было
+  // ВООБЩЕ, ничем не отличалась от наземной фазы, которая была: обе давали один и тот же
+  // счётчик. Захваты разделены по способу: `via: 'arrival'` — прилетел и забрал
+  // (`captureOnArrival`), без `via` — взял штурмом (`combat.capturePlanet`).
+  let groundBattles = 0;
+  let capturesByArrival = 0;
+  let capturesByAssault = 0;
   let firstCombatAt = null;
   const consume = (events, now) => {
     for (const e of events) {
@@ -80,8 +88,13 @@ function runMatch(i) {
       } else if (e.type === 'technology.researched') {
         const p = e.payload ?? {};
         if (p.technology) techUsage.set(p.technology, (techUsage.get(p.technology) ?? 0) + 1);
-      } else if (e.type === 'battle.resolved') battles++;
-      else if (e.type === 'battle.started' && firstCombatAt === null) firstCombatAt = now;
+      } else if (e.type === 'battle.resolved') {
+        battles++;
+        if ((e.payload ?? {}).phase === 'ground') groundBattles++;
+      } else if (e.type === 'planet.captured') {
+        if ((e.payload ?? {}).via === 'arrival') capturesByArrival++;
+        else capturesByAssault++;
+      } else if (e.type === 'battle.started' && firstCombatAt === null) firstCombatAt = now;
     }
   };
 
@@ -143,6 +156,9 @@ function runMatch(i) {
     lengthMs: state.time,
     reason: state.match.reason,
     battles,
+    groundBattles,
+    capturesByArrival,
+    capturesByAssault,
     firstCombatAt,
     midLeader,
     usage,
@@ -166,6 +182,9 @@ let errors = 0;
 let decided = 0;
 let snowballHits = 0;
 let battlesTotal = 0;
+let groundBattlesTotal = 0;
+let arrivalCaptures = 0;
+let assaultCaptures = 0;
 
 for (let i = 0; i < N; i++) {
   const r = runMatch(i);
@@ -174,6 +193,9 @@ for (let i = 0; i < N; i++) {
     continue;
   }
   battlesTotal += r.battles;
+  groundBattlesTotal += r.groundBattles;
+  arrivalCaptures += r.capturesByArrival;
+  assaultCaptures += r.capturesByAssault;
   lengths.push(r.lengthMs);
   if (r.firstCombatAt !== null) firstCombats.push(r.firstCombatAt);
   if (r.winner === null) draws++;
@@ -221,6 +243,7 @@ console.log(
     `  win by start   : ${fmtWins(winsByStart)}`,
     `  длина      : avg ${days(avg(lengths))}д · min ${days(Math.min(...lengths))}д · max ${days(Math.max(...lengths))}д · исходы: ${fmtWins(reasons)}`,
     `  1-й бой    : avg ${days(avg(firstCombats))}д (в ${firstCombats.length}/${N} матчах) · боёв всего ${battlesTotal}`,
+    `  наземная   : ${groundBattlesTotal} наземных боёв из ${battlesTotal} · захваты: прилётом ${arrivalCaptures} · штурмом ${assaultCaptures}  ← «штурмом» и есть вторая фаза захвата (GDD §7.4); 0 = она не играется`,
     `  snowball   : ${pct(snowballHits, decided)} лидеров середины выиграли  ← высокий % = снежный ком, камбэков нет`,
     `  usage      : ${topUsage || '—'}`,
     zeros.length ? `  мёртвый контент (0 построек за ${N} матчей): ${zeros.join(' ')}` : '  мёртвый контент: нет ✓',
@@ -253,6 +276,9 @@ console.log(
         firstCombatAvgDays: firstCombats.length ? avg(firstCombats) / DAY : null,
         firstCombatMatches: firstCombats.length,
         battlesTotal,
+        groundBattlesTotal,
+        capturesByArrival: arrivalCaptures,
+        capturesByAssault: assaultCaptures,
         usage: Object.fromEntries(usageTotal),
         deadContent: zeros,
       }),
