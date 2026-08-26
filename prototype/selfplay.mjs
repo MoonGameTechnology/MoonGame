@@ -114,7 +114,9 @@ function runMatch(i) {
     if (reversedAt(stepIdx)) seatsInOrder.reverse();
     stepIdx += 1;
     for (const seat of seatsInOrder) {
-      for (const a of aiOrders(state, seat, 'expand')) {
+      // 'test' — лабораторный профиль (AI-BAL-1.1). Живой игрок такого бота не встречает:
+      // соло и прото-хост зовут aiOrders без профиля, и выставить его в игре нечем.
+      for (const a of aiOrders(state, seat, 'expand', 'test')) {
         const r = kernel.applyAction(state, a, ctx(now));
         if (r.ok) {
           state = r.state;

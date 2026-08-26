@@ -46,6 +46,30 @@ import { stewardGuardOrders } from './stewardGuard';
  *  one is still inside their reconnect grace). */
 export type SeatAiKind = 'steward' | 'substitute' | 'none';
 
+/**
+ * ЧЕЙ это бот — игровой или лабораторный (AI-BAL-1.1).
+ *
+ * `basic` — тот бот, которого встречает ЖИВОЙ игрок: соло-режим и прото-хост зовут
+ * `aiOrders` без профиля, то есть всегда здесь. Он намеренно остаётся простым — игрок
+ * изучает мир, ищет баги и щупает механики против предсказуемого соперника, а не против
+ * оптимизатора.
+ *
+ * `test` — бот балансных ПРОГОНОВ (`selfplay.mjs`, `econplaytest.mjs`). Ему включены
+ * эвристики, которые нужны, чтобы измерение вообще что-то мерило: без них батч показывает
+ * не баланс игры, а гонку двух построек (базовая линия — блок AI-BAL в `backlog.md`).
+ *
+ * Почему это ПАРАМЕТР ФУНКЦИИ, а не поле состояния, не настройка матча и не сообщение
+ * протокола: так у игрока физически нет способа получить тест-бота ни себе в союзники,
+ * ни в противники. Нечего выставить в лобби, нечего прислать в `action`-конверте, нечего
+ * подделать в снапшоте — профиль не пересекает границу процесса и не попадает ни в
+ * `GameState`, ни в сеть, ни в сохранение. Тест-ботов не существует в игре; они существуют
+ * только внутри headless-харнеса, который их и создаёт.
+ *
+ * Сторож `aiProfile.test.ts` держит это структурно: он читает исходники и роняет гейт,
+ * если `'test'` просочился в игровой путь.
+ */
+export type AiProfile = 'basic' | 'test';
+
 /** What drives a seat this tick + the posture to hand `aiOrders`. */
 export interface SeatAiDecision {
   kind: SeatAiKind;
@@ -84,6 +108,7 @@ export function aiOrders(
   state: GameState,
   ai: string,
   posture: StewardPosture | 'expand' = 'expand',
+  profile: AiProfile = 'basic',
 ): Action[] {
   const out: Action[] = [];
   if (!state.players[ai]) return out; // seat not in play / eliminated
@@ -258,7 +283,11 @@ export function aiOrders(
       out.push(buildBuilding(ai, p.id, 'mine'));
       break; // spread the economy one world per tick
     }
-    // Технологии: до этого бот не исследовал НИ ОДНОЙ из 25 (self-play: 0 за 300 матчей),
+    // ТЕСТ-БОТ ТОЛЬКО (AI-BAL-1.1): технологии исследует лабораторный профиль, игровой —
+    // нет. Живому игроку достаётся прежний простой соперник; прогон баланса получает
+    // соперника, у которого работает ветка эффектов.
+    //
+    // Технологии: игровой бот не исследует НИ ОДНОЙ из 25 (self-play: 0 за 300 матчей),
     // поэтому вся ветка эффектов — бонусы к добыче, скорости и урону, гейты контента —
     // не участвовала в измерении баланса вовсе. Правило намеренно минимальное: бот не
     // «строит билд», он просто не оставляет исследовательские слоты пустыми.
@@ -272,7 +301,7 @@ export function aiOrders(
     const techState = pl.technologies;
     const activeTech = techState?.active ?? [];
     const doneTech = techState?.completed ?? [];
-    if (activeTech.length < BASE_RESEARCH_SLOTS) {
+    if (profile === 'test' && activeTech.length < BASE_RESEARCH_SLOTS) {
       const affordableTech = (cost: Record<string, number>): boolean =>
         Object.keys(cost).every((r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + 60);
       const candidates = Object.keys(data.technologies)
