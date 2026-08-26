@@ -1,7 +1,8 @@
 /**
- * The prototype's sector-type registry and the generated match map — a square,
- * mirror-symmetric 11×11 lattice of provinces wired by a relative-neighbourhood
- * graph. Extracted from `game.ts` (REFP-2): the block depended only on `data`
+ * The prototype's sector-type registry and the generated match map — a rotationally
+ * symmetric «wheel» of ten 36° sectors around a shared hub, wired by an index
+ * template so every start position maps onto every other one (BAL-1; the long
+ * rationale sits above `HUB`). Extracted from `game.ts` (REFP-2): the block depended only on `data`
  * (for `SECTOR_TYPES` derivation) and the core `sectorKind` helpers, none of the
  * rest of `game.ts`. `game.ts` re-exports the public surface (`SECTOR_TYPES`,
  * `MapNode`, `SectorType`, `START_CANDIDATES`, `MAP`) for back-compat.

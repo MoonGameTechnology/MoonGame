@@ -99,6 +99,37 @@ describe('AI-BAL-5 — разброс есть', () => {
   });
 });
 
+describe('BAL-1 — равные цели разводит шум, а не порядок объекта', () => {
+  it('при РАВНОМ расстоянии тест-бот не всегда берёт первую цель в переборе', () => {
+    // Карта-«колесо» симметрична, поэтому равенство расстояний стало обычным делом, а
+    // скрытый тай-брейк «кто первый в `Object.values(state.planets)`» превратился в фору
+    // сектору 0: при идентичных по метрикам стартах он брал 70% побед. Проверяем, что
+    // среди РАВНЫХ целей выбор зависит от сида — иначе перекос вернётся молча.
+    const s = midgame('sp-0');
+    const home = Object.values(s.planets).find(
+      (p) => p.owner === 'p2' && p.buildings.some((b) => b.type === 'spaceport'),
+    )!;
+    // Две одинаково удалённые цели по разные стороны от дома: расстояния равны точно.
+    const equidistant: GameState = {
+      ...s,
+      planets: {
+        ...s.planets,
+        FAR_A: { ...home, id: 'FAR_A', owner: null, kind: 'planet', buildings: [], garrison: [],
+          position: { x: home.position.x + 300, y: home.position.y } },
+        FAR_B: { ...home, id: 'FAR_B', owner: null, kind: 'planet', buildings: [], garrison: [],
+          position: { x: home.position.x - 300, y: home.position.y } },
+      },
+    };
+    const picks = new Set(
+      SEEDS.map((seed) => {
+        const st = { ...equidistant, rng: game(seed).rng };
+        return moveTarget(st, 'test');
+      }),
+    );
+    expect(picks.size).toBeGreaterThan(1);
+  });
+});
+
 describe('AI-BAL-5 — детерминизм цел (инвариант #1)', () => {
   it('один сид разыгрывается ОДИНАКОВО, сколько ни повторяй', () => {
     const shape = (s: GameState): string =>
