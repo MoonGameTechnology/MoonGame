@@ -392,10 +392,22 @@ export function aiOrders(
     let bestD = Infinity;
     let second: Planet | null = null;
     let secondD = Infinity;
+    // ТАЙ-БРЕЙК ПРИ РАВНЫХ ЦЕЛЯХ (BAL-1). На прежней, кривой карте равные расстояния были
+    // редкостью, и «кто первый в переборе, тот и цель» ничего не решало. Карта-«колесо»
+    // симметрична, поэтому равенство стало ОБЫЧНЫМ делом — и скрытый тай-брейк по порядку
+    // `Object.values(state.planets)` превратился в систематическую фору: узлы сектора 0
+    // лежат в этом порядке первыми, так что место, стартующее в нулевом секторе, всегда
+    // забирало спорную цель. Замер: при идентичных по метрикам стартах сектор 0 брал 70%
+    // побед. Идеальная карта не создала перекос, она ОБНАЖИЛА его в боте.
+    // Лечение — seeded тай-брейк (только тест-профиль, как и весь разброс AI-BAL-5):
+    // среди равных целей выбор идёт по шуму, а не по раскладке объекта.
+    const tieBreak = (p: Planet): number =>
+      profile === 'test' ? decisionNoise(state, ai, `tie:${f.id}:${p.id}`) : 0;
     for (const p of Object.values(state.planets)) {
       if (p.owner === ai || !capturable(p)) continue;
       if (!canTraverse(state, ai, p.owner)) continue; // a peace-locked target — leave it be
-      const dd = d(here.position, p.position);
+      // Равные цели (в пределах пикселя) разводятся шумом, а не порядком перебора.
+      const dd = d(here.position, p.position) + tieBreak(p);
       if (dd < bestD) {
         secondD = bestD;
         second = best;

@@ -74,9 +74,17 @@ function leaderByPlanets(state) {
 function runMatch(i) {
   const swapStart = i % 2 === 1;
   const swapFaction = (i >> 1) % 2 === 1;
+  // Дуэлянты садятся ДИАМЕТРАЛЬНО (сектор 0 и сектор 5 из десяти), а не в соседние.
+  // На карте-«колесе» (BAL-1) поворот на пять секторов переводит одного игрока точно в
+  // другого вместе со всем его двором, соседями и расстояниями — то есть противоположная
+  // пара честна ПО ПОСТРОЕНИЮ. Соседняя пара тоже равнозначна по метрикам старта, но у
+  // неё разные соседи слева и справа (террейны в секторе не зеркальны), и фронт упирается
+  // друг в друга с первого часа: замер давал первый бой на 1.4-й день и 28% добиваний.
+  // Формат `1v1` в игре сажает игроков так же — противоположными индексами.
+  const HALF = Math.floor(START_CANDIDATES.length / 2);
   const starts = swapStart
-    ? [START_CANDIDATES[1], START_CANDIDATES[0]]
-    : [START_CANDIDATES[0], START_CANDIDATES[1]];
+    ? [START_CANDIDATES[HALF], START_CANDIDATES[0]]
+    : [START_CANDIDATES[0], START_CANDIDATES[HALF]];
   const factions = swapFaction ? ['crimson', 'azure'] : ['azure', 'crimson'];
   const seats = [
     { id: 'p1', name: 'Bot One', faction: factions[0], start: starts[0], ai: true },
