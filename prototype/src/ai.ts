@@ -7,7 +7,9 @@
  * re-exports for main.ts / netserver.ts / tests (until REFP-28).
  */
 import {
+  BASE_RESEARCH_SLOTS,
   getStance,
+  technologyLock,
   type GameState,
   type Action,
   type StewardPosture,
@@ -25,6 +27,7 @@ import {
   marketList,
   mergeFleet,
   loadArmy,
+  researchTech,
 } from './actions';
 import { netIncome } from './economy';
 import { SECTOR_TYPES } from './map';
@@ -254,6 +257,47 @@ export function aiOrders(
       if (!affordable('mine')) break;
       out.push(buildBuilding(ai, p.id, 'mine'));
       break; // spread the economy one world per tick
+    }
+    // Технологии: до этого бот не исследовал НИ ОДНОЙ из 25 (self-play: 0 за 300 матчей),
+    // поэтому вся ветка эффектов — бонусы к добыче, скорости и урону, гейты контента —
+    // не участвовала в измерении баланса вовсе. Правило намеренно минимальное: бот не
+    // «строит билд», он просто не оставляет исследовательские слоты пустыми.
+    //
+    // Что можно взять, решает САМО ЯДРО — `technologyLock` (prerequisites / day-gate /
+    // conditions), а не копия правил здесь: разъедься копия с модулем, бот начал бы
+    // спамить отказами, и первым признаком была бы не ошибка, а тихо изменившийся баланс.
+    // Слоты считаем по базовой константе, а не по хуку `research.slots` (хук живёт внутри
+    // ядра и снаружи не вызывается): с учёным слотов может быть больше, тогда бот
+    // недоиспользует лишний — это честный недобор, а не отказ.
+    const techState = pl.technologies;
+    const activeTech = techState?.active ?? [];
+    const doneTech = techState?.completed ?? [];
+    if (activeTech.length < BASE_RESEARCH_SLOTS) {
+      const affordableTech = (cost: Record<string, number>): boolean =>
+        Object.keys(cost).every((r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + 60);
+      const candidates = Object.keys(data.technologies)
+        .filter((id) => {
+          const def = data.technologies[id];
+          if (!def) return false;
+          if (doneTech.includes(id) || activeTech.some((a) => a.technology === id)) return false;
+          if (technologyLock(def, state, ai, data) !== null) return false;
+          return affordableTech(def.cost ?? {});
+        })
+        // Дешёвое и быстрое вперёд — это не «оптимальный порядок», а ДЕТЕРМИНИРОВАННЫЙ:
+        // id последним ключом сортировки, чтобы порядок не зависел от перебора объекта
+        // (иначе один и тот же сид разыгрался бы по-разному, инвариант #1).
+        .sort((a, b) => {
+          const da = data.technologies[a]!;
+          const db = data.technologies[b]!;
+          const sum = (c: Record<string, number> = {}): number =>
+            Object.values(c).reduce((n, v) => n + v, 0);
+          return (
+            sum(da.cost) - sum(db.cost) ||
+            (da.researchTimeHours ?? 0) - (db.researchTimeHours ?? 0) ||
+            (a < b ? -1 : a > b ? 1 : 0)
+          );
+        });
+      if (candidates[0]) out.push(researchTech(ai, candidates[0]));
     }
     // Ship production is CAPPED by the fleet count (self-play M4: endless building
     // fed an ever-growing swarm — hundreds of fleets by mid-match). Enough fleets
