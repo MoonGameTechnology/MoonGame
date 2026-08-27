@@ -102,9 +102,7 @@ describe('BAL-1 — карта не даёт форы ни одному стар
     // Сравниваем со ВСЕМИ, а не с первым по кругу: так падение покажет, какой именно
     // старт выбился, а не «первый не равен второму».
     for (let i = 1; i < profiles.length; i++) {
-      expect(profiles[i], `${START_CANDIDATES[i]} против ${START_CANDIDATES[0]}`).toBe(
-        profiles[0],
-      );
+      expect(profiles[i], `${START_CANDIDATES[i]} против ${START_CANDIDATES[0]}`).toBe(profiles[0]);
     }
   });
 
@@ -131,10 +129,16 @@ describe('BAL-1 — карта не даёт форы ни одному стар
     expect(spread(px)).toBeLessThan(0.12);
   });
 
-  it('пара нейтральных миров стоит одинаково: сумма бонусов и добыча металла', () => {
+  it('типы в одном СЛОТЕ совпадают по решающим полям — металл, производство, оборона', () => {
+    // Критерий добыт тремя замерами по 600 матчей, и каждый более слабый вариант проваливался:
+    // равная сумма `productionBonus` + сырой металл — 340:258 (3.4σ); равная сумма
+    // ЭФФЕКТИВНОГО металла (`metal × (1 + productionBonus)`) + оборона — 331:266 (2.7σ);
+    // то же послотово — 316:279 (1.5σ); совпадение по всем трём полям — 309:287 (0.9σ, шум).
+    // Причина: множитель производства разгоняет не только пассивную добычу типа, но и ВСЁ
+    // построенное на мире, поэтому уравнять его косвенно невозможно.
     const kinds = data.planetTypes as Record<
       string,
-      { productionBonus: number; baseOutput: Record<string, number> }
+      { productionBonus: number; defenseBonus: number; baseOutput: Record<string, number> }
     >;
     const pairs = Array.from({ length: SECTORS }, (_, k) =>
       sectorNodes(k)
@@ -142,10 +146,28 @@ describe('BAL-1 — карта не даёт форы ни одному стар
         .map((n) => kinds[n.type!]!),
     );
     expect(pairs.every((p) => p.length === 2)).toBe(true);
-    const bonus = pairs.map((p) => p.reduce((sum, t) => sum + t.productionBonus, 0));
-    expect(new Set(bonus.map((b) => b.toFixed(4))).size).toBe(1);
-    expect(spread(pairs.map((p) => p.reduce((sum, t) => sum + (t.baseOutput.metal ?? 0), 0)))).
-      toBeLessThan(0.15);
+    // Слот 0 — ближний приз (один прыжок, держат весь матч), слот 1 — дальний тупик.
+    for (const slot of [0, 1]) {
+      const decisive = pairs.map((p) =>
+        JSON.stringify([
+          p[slot]!.baseOutput.metal ?? 0,
+          p[slot]!.productionBonus,
+          p[slot]!.defenseBonus,
+        ]),
+      );
+      expect(new Set(decisive).size, `решающие поля слота ${slot}`).toBe(1);
+    }
+  });
+
+  it('нейтральные миры несут РАЗНЫЕ типы — карта не однотипна по содержимому', () => {
+    // Обратная сторона теста выше: равенство не должно достигаться тем, что у всех один и
+    // тот же тип. Если этот тест покраснел, чередование пар молча свернулось обратно.
+    const kinds = new Set(
+      MAP.filter((n) => n.sector === 'planet' && !START_CANDIDATES.includes(n.id)).map(
+        (n) => n.type,
+      ),
+    );
+    expect(kinds.size).toBeGreaterThanOrEqual(4);
   });
 
   it('стартов десять — на них стоит формат 5v5', () => {
@@ -195,7 +217,10 @@ describe('BAL-9 — карта неровная: тупики, коридоры,
       const planets = sectorNodes(k).filter(
         (n) => n.sector === 'planet' && n.id !== START_CANDIDATES[k],
       );
-      expect(planets.filter((p) => p.links.length === 1), `тупиковый мир в C${k}`).toHaveLength(1);
+      expect(
+        planets.filter((p) => p.links.length === 1),
+        `тупиковый мир в C${k}`,
+      ).toHaveLength(1);
     }
   });
 
