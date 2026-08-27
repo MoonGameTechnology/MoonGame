@@ -1375,6 +1375,19 @@ ad-hoc запрос «видим ли объект на identify-уровне» 
 > превратятся в украшение. Константы АЛГОРИТМА и глобальный тюнинг механик остаются в
 > коде до отдельного кирпича.
 
+> **КАТАЛОГОВ ДВА, и они разошлись.** Здесь описан ШИПНУТЫЙ бандл (`data/*.json`, 23 файла,
+> версия пинуется на матч) — его читают `packages/server/scenario.ts`, `packages/client` и
+> тесты ядра. Играбельный прототип, прото-хост и ОБА харнеса замера (`selfplay.mjs`,
+> `econplaytest.mjs`) читают ДРУГОЙ каталог — `prototype/src/prototypeData.ts` (1232 строки).
+> Ядро контента не знает (принимает `GameData` как данные), поэтому один движок гоняет оба
+> набора, и совпадают у них практически только идентификаторы: из 10 общих юнитов различаются
+> все 10, из 19 общих технологий — все 19, у зданий расходится даже структура (`mine` с
+> лестницей `upgrades` против отдельных `mine_t1`/`mine_t2`). Теста паритета НЕТ — дрейф
+> ничем не остановлен, и правку контента приходится делать дважды (так было в BAL-8).
+> Практическое следствие: **числа отсюда не влияют на замер баланса**, его меряет только
+> прототипный каталог. Заведено кирпичами CONV-11 (остановить дрейф) и CONV-12 (свести к
+> одному источнику, с развилкой «какой каталог канон»).
+
 - **resources:** `credits` (деньги), `metal`, `food`, `energy`, `microelectronics` —
   внутриматчевый набор из 5. Торгуются на сессионной бирже (модуль `market`).
 - **units** (схема `UnitDef`): `domain('space'|'ground')`, `stats{attack, defense,
@@ -1382,8 +1395,9 @@ speed, hp, shield, range, cargoCapacity, cargoSize, aaDamage}` (+ любые д�
   `line, traits, abilities, cost, buildTimeHours, upkeep`, `signature, radarRange`
   (армия очков не даёт — см. victory). Есть: `scout_drone, sensor_frigate,
 cruiser, siege_lance(artillery,range), dropship(cargoCapacity 12), militia,
-drop_infantry, tank(cargoSize 3), hero, fighter_squadron, strike_carrier` (11 юнитов,
-все vanguard; `orbital_aa` — защитное здание, не юнит; `infected_cruiser` в контенте нет).
+drop_infantry, tank(cargoSize 3), heavy_infantry, special_forces, hero, fighter_squadron,
+strike_carrier` (13 юнитов, все vanguard; `orbital_aa` — защитное здание, не юнит;
+`infected_cruiser` в контенте нет).
   `sensor_frigate` — носитель дальнего радара: один `utility`-слот, своя антенна 60, и
   это ЕДИНСТВЕННЫЙ корпус, куда встаёт `radar_module` (`allowed.units` в `modules.json`,
   исполняет общий гейт `canEquip` → `E_NOT_ALLOWED`).
