@@ -721,9 +721,28 @@ export const data: GameData = parseGameData({
       enablesGroundConstruction: true,
       scoreValue: 2,
       upgrades: [
-        { cost: { metal: 100, credits: 30 }, buildTimeHours: 6, hp: 35, enablesGroundConstruction: true, upkeep: { energy: 3 } },
-        { cost: { metal: 150, credits: 60 }, buildTimeHours: 9, hp: 45, enablesGroundConstruction: true, upkeep: { energy: 5 } },
-        { cost: { metal: 200, credits: 90 }, buildTimeHours: 12, hp: 60, enablesGroundConstruction: true, buildSpeedBonus: 0.05, upkeep: { energy: 7 } },
+        {
+          cost: { metal: 100, credits: 30 },
+          buildTimeHours: 6,
+          hp: 35,
+          enablesGroundConstruction: true,
+          upkeep: { energy: 3 },
+        },
+        {
+          cost: { metal: 150, credits: 60 },
+          buildTimeHours: 9,
+          hp: 45,
+          enablesGroundConstruction: true,
+          upkeep: { energy: 5 },
+        },
+        {
+          cost: { metal: 200, credits: 90 },
+          buildTimeHours: 12,
+          hp: 60,
+          enablesGroundConstruction: true,
+          buildSpeedBonus: 0.05,
+          upkeep: { energy: 7 },
+        },
       ],
     },
     // Полевой госпиталь — единственный источник восстановления ГАРНИЗОНА: `healRate`
@@ -740,8 +759,20 @@ export const data: GameData = parseGameData({
       healRate: 0.15,
       scoreValue: 4,
       upgrades: [
-        { cost: { metal: 160, credits: 60 }, buildTimeHours: 6, hp: 32, healRate: 0.25, upkeep: { energy: 4 } },
-        { cost: { metal: 220, credits: 90 }, buildTimeHours: 9, hp: 42, healRate: 0.40, upkeep: { energy: 7 } },
+        {
+          cost: { metal: 160, credits: 60 },
+          buildTimeHours: 6,
+          hp: 32,
+          healRate: 0.25,
+          upkeep: { energy: 4 },
+        },
+        {
+          cost: { metal: 220, credits: 90 },
+          buildTimeHours: 9,
+          hp: 42,
+          healRate: 0.4,
+          upkeep: { energy: 7 },
+        },
       ],
     },
     // Factory — builds ground vehicles (tank) and squadrons (fighter_squadron).
@@ -756,8 +787,23 @@ export const data: GameData = parseGameData({
       scoreValue: 5,
       upkeep: { energy: 6 },
       upgrades: [
-        { cost: { metal: 180, credits: 80 }, buildTimeHours: 8, hp: 35, enablesGroundConstruction: true, enablesSquadronConstruction: true, upkeep: { energy: 10 } },
-        { cost: { metal: 250, credits: 120 }, buildTimeHours: 12, hp: 45, enablesGroundConstruction: true, enablesSquadronConstruction: true, buildSpeedBonus: 0.5, upkeep: { energy: 14 } },
+        {
+          cost: { metal: 180, credits: 80 },
+          buildTimeHours: 8,
+          hp: 35,
+          enablesGroundConstruction: true,
+          enablesSquadronConstruction: true,
+          upkeep: { energy: 10 },
+        },
+        {
+          cost: { metal: 250, credits: 120 },
+          buildTimeHours: 12,
+          hp: 45,
+          enablesGroundConstruction: true,
+          enablesSquadronConstruction: true,
+          buildSpeedBonus: 0.5,
+          upkeep: { energy: 14 },
+        },
       ],
     },
     // spaceport — the yard a space-domain hull needs to be laid down at all
@@ -926,23 +972,24 @@ export const data: GameData = parseGameData({
     },
     relic_world: {
       name: 'Relic World',
-      // BAL-8: металл 4→3, оборона 0→+0.40. Роль ДАЛЬНЕГО приза второй пары — двойник
-      // `fortress_world` по эффективному металлу (3 × 1.05 = 3.15 против 4 × 0.85 = 3.4) и
-      // обороне (+0.40 у обоих). Древние укрепления реликта держат штурм, а добывать в
-      // руинах почти нечего — кроме артефактов, за которые и идут 12 кредитов. Кредиты в
-      // критерий равноценности не входят: пока они ничего не ограничивают (BAL-3), они и
-      // не дают преимущества.
+      // BAL-8: производство 0.05→−0.15, оборона 0→+0.40. Роль ДАЛЬНЕГО приза второй пары —
+      // двойник `fortress_world` по трём решающим полям (металл 4, производство −0.15,
+      // оборона +0.40). Древние укрепления реликта держат штурм, а добывать в руинах почти
+      // нечего — кроме артефактов, за которые и идут 12 кредитов. Кредиты в критерий
+      // равноценности не входят: пока они ничего не ограничивают (BAL-3), они и не дают
+      // преимущества — этим и куплено право типу отличаться.
       baseOutput: { credits: 12, energy: 4, metal: 4, food: 3 },
       productionBonus: -0.15,
       defenseBonus: 0.4,
     },
     irradiated: {
       name: 'Irradiated',
-      // BAL-8: металл 8→16, оборона 0.15→−0.25. Тип занял роль БЛИЖНЕГО приза второй пары
-      // карты — двойника `crystalline` по тому, что решает: эффективный металл
-      // (16 × 1.2 = 19.2 против 13 × 1.45 = 18.85) и оборона (−0.25 у обоих). Читается по
-      // смыслу: радиоактивные породы — богатая руда, но гарнизон под облучением не держится.
-      // Почему именно ПОСЛОТОВО, а не по сумме пары — см. `PLANET_PAIRS` в `map.ts`.
+      // BAL-8: металл 8→13, производство 0.2→0.45, оборона 0.15→−0.25. Тип занял роль
+      // БЛИЖНЕГО приза второй пары карты, а равняться с `crystalline` пришлось по ВСЕМ трём
+      // решающим полям — эффективного металла и обороны не хватило (замер: `PLANET_PAIRS`
+      // в `map.ts`), потому что множитель производства разгоняет ещё и застройку мира.
+      // Читается по смыслу: радиоактивные породы — богатая руда, но под облучением
+      // гарнизон не держится. Своё у типа осталось в энергии и кредитах.
       baseOutput: { energy: 6, metal: 13, credits: 4, food: 1 },
       productionBonus: 0.45,
       defenseBonus: -0.25,
