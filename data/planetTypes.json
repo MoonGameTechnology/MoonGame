@@ -51,15 +51,15 @@
   "relic_world": {
     "name": "Relic World",
     "baseOutput": { "credits": 12, "energy": 4, "metal": 4, "food": 3 },
-    "productionBonus": 0.05,
-    "defenseBonus": 0,
+    "productionBonus": -0.15,
+    "defenseBonus": 0.4,
     "scoreValue": 75
   },
   "irradiated": {
     "name": "Irradiated",
-    "baseOutput": { "energy": 6, "metal": 8, "credits": 4, "food": 1 },
-    "productionBonus": 0.2,
-    "defenseBonus": 0.15,
+    "baseOutput": { "energy": 6, "metal": 13, "credits": 4, "food": 1 },
+    "productionBonus": 0.45,
+    "defenseBonus": -0.25,
     "scoreValue": 12
   },
   "ringworld": {

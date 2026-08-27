@@ -926,15 +926,26 @@ export const data: GameData = parseGameData({
     },
     relic_world: {
       name: 'Relic World',
+      // BAL-8: металл 4→3, оборона 0→+0.40. Роль ДАЛЬНЕГО приза второй пары — двойник
+      // `fortress_world` по эффективному металлу (3 × 1.05 = 3.15 против 4 × 0.85 = 3.4) и
+      // обороне (+0.40 у обоих). Древние укрепления реликта держат штурм, а добывать в
+      // руинах почти нечего — кроме артефактов, за которые и идут 12 кредитов. Кредиты в
+      // критерий равноценности не входят: пока они ничего не ограничивают (BAL-3), они и
+      // не дают преимущества.
       baseOutput: { credits: 12, energy: 4, metal: 4, food: 3 },
-      productionBonus: 0.05,
-      defenseBonus: 0,
+      productionBonus: -0.15,
+      defenseBonus: 0.4,
     },
     irradiated: {
       name: 'Irradiated',
-      baseOutput: { energy: 6, metal: 8, credits: 4, food: 1 },
-      productionBonus: 0.2,
-      defenseBonus: 0.15,
+      // BAL-8: металл 8→16, оборона 0.15→−0.25. Тип занял роль БЛИЖНЕГО приза второй пары
+      // карты — двойника `crystalline` по тому, что решает: эффективный металл
+      // (16 × 1.2 = 19.2 против 13 × 1.45 = 18.85) и оборона (−0.25 у обоих). Читается по
+      // смыслу: радиоактивные породы — богатая руда, но гарнизон под облучением не держится.
+      // Почему именно ПОСЛОТОВО, а не по сумме пары — см. `PLANET_PAIRS` в `map.ts`.
+      baseOutput: { energy: 6, metal: 13, credits: 4, food: 1 },
+      productionBonus: 0.45,
+      defenseBonus: -0.25,
     },
     ringworld: {
       name: 'Ringworld',
