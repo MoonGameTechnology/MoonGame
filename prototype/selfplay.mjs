@@ -114,6 +114,13 @@ function runMatch(i) {
   let groundBattles = 0;
   let capturesByArrival = 0;
   let capturesByAssault = 0;
+  // AI-BAL-7: ПОЛНЫЙ ли размен. Пока бот не умел выходить из боя, флот дрался до нуля, и
+  // единственным исходом проигранной драки была `fleet.destroyed`. Три счётчика делят
+  // судьбу проигравшего флота: сгинул целиком, вышел живым (`escaped: true`) или не
+  // донёс — пошлина за выход (−40% корпуса и щита) добила его сама (`escaped: false`).
+  let fleetsDestroyed = 0;
+  let retreatsEscaped = 0;
+  let retreatsFatal = 0;
   let firstCombatAt = null;
   const consume = (events, now) => {
     for (const e of events) {
@@ -129,6 +136,11 @@ function runMatch(i) {
       } else if (e.type === 'battle.resolved') {
         battles++;
         if ((e.payload ?? {}).phase === 'ground') groundBattles++;
+      } else if (e.type === 'fleet.destroyed') {
+        fleetsDestroyed++;
+      } else if (e.type === 'fleet.retreated') {
+        if ((e.payload ?? {}).escaped) retreatsEscaped++;
+        else retreatsFatal++;
       } else if (e.type === 'planet.captured') {
         if ((e.payload ?? {}).via === 'arrival') capturesByArrival++;
         else capturesByAssault++;
@@ -233,6 +245,9 @@ function runMatch(i) {
     groundBattles,
     capturesByArrival,
     capturesByAssault,
+    fleetsDestroyed,
+    retreatsEscaped,
+    retreatsFatal,
     firstCombatAt,
     midLeader,
     usage,
@@ -273,6 +288,9 @@ const margins = [];
 let groundBattlesTotal = 0;
 let arrivalCaptures = 0;
 let assaultCaptures = 0;
+let fleetsDestroyedTotal = 0;
+let retreatsEscapedTotal = 0;
+let retreatsFatalTotal = 0;
 // BAL-5 — ЧТО разгоняет лидера. Флот отпадает по коду (в `total` он не входит вовсе),
 // поэтому меряются два слагаемых и ДИНАМИКА разрыва: разрыв, поставленный рано и просто
 // удержанный, — это фора позиции, а разрыв, растущий во второй половине, — снежный ком.
@@ -301,6 +319,9 @@ for (let i = 0; i < N; i++) {
   groundBattlesTotal += r.groundBattles;
   arrivalCaptures += r.capturesByArrival;
   assaultCaptures += r.capturesByAssault;
+  fleetsDestroyedTotal += r.fleetsDestroyed;
+  retreatsEscapedTotal += r.retreatsEscaped;
+  retreatsFatalTotal += r.retreatsFatal;
   lengths.push(r.lengthMs);
   if (r.firstCombatAt !== null) firstCombats.push(r.firstCombatAt);
   if (r.winner === null) draws++;
@@ -462,6 +483,7 @@ console.log(
     `  длина      : avg ${days(avg(lengths))}д · min ${days(Math.min(...lengths))}д · max ${days(Math.max(...lengths))}д · исходы: ${fmtWins(reasons)}`,
     `  1-й бой    : avg ${days(avg(firstCombats))}д (в ${firstCombats.length}/${N} матчах) · боёв всего ${battlesTotal}`,
     `  наземная   : ${groundBattlesTotal} наземных боёв из ${battlesTotal} · захваты: прилётом ${arrivalCaptures} · штурмом ${assaultCaptures}  ← «штурмом» и есть вторая фаза захвата (GDD §7.4); 0 = она не играется`,
+    `  размен     : флотов погибло ${fleetsDestroyedTotal} · отступлений ${retreatsEscapedTotal + retreatsFatalTotal} (ушло ${retreatsEscapedTotal} · не донесло ${retreatsFatalTotal})  ← 0 отступлений = размен всегда полный, бот дерётся до нуля (AI-BAL-7)`,
     `  очки       : лидер ${avg(winnerScores).toFixed(0)} · отставший ${avg(loserScores).toFixed(0)} · разрыв ${avg(margins).toFixed(0)}  ← сессия одинаковая (${SESSION_DAYS}д), разный только счёт`,
     `  очки/слот    : ${fmtAvg(scoreBySlot, seenBySlot)}`,
     `  очки/фракция : ${fmtAvg(scoreByFaction, seenByFaction)}`,
@@ -562,6 +584,9 @@ console.log(
         ),
         battlesTotal,
         groundBattlesTotal,
+        fleetsDestroyedTotal,
+        retreatsEscapedTotal,
+        retreatsFatalTotal,
         capturesByArrival: arrivalCaptures,
         capturesByAssault: assaultCaptures,
         usage: Object.fromEntries(usageTotal),
