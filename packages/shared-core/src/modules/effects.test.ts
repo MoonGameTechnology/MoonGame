@@ -29,6 +29,10 @@ function makeData(events: Record<string, unknown>): GameData {
         stats: { attack: 1, defense: 1, speed: 10, hp: 6 },
         traits: ['infect_planet'],
       },
+      // BAL-4: захват прилётом требует десанта в трюме. Триггер этих тестов — сам факт
+      // захвата, поэтому фикстуре нужен наземный юнит; трейт правила по-прежнему несут
+      // КОРАБЛИ (`effectsModule` читает `fleet.units`), и смысл тестов не смещается.
+      trooper: { faction: 'x', domain: 'ground', stats: { attack: 1, defense: 1, speed: 1, hp: 4 } },
     },
     factions: {},
     buildings: {},
@@ -71,6 +75,7 @@ function fleet(id: string, owner: string, location: string | null, units: string
     location,
     movement: null,
     units: units.map((u) => ({ unit: u, count: 1 })),
+    landing: [{ unit: 'trooper', count: 1 }], // BAL-4
     traits: [],
   };
 }
