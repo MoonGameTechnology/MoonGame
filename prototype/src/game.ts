@@ -63,6 +63,8 @@ export {
 } from '../../packages/shared-core/src/index';
 export { HUNGER_MULT, hungerModule } from './hunger';
 export { economySnapshot, netIncome, hpOfLevel } from './economy';
+// BAL-5: разложение счёта на слагаемые — читает харнес замера (`selfplay.mjs`).
+export { scoreParts, type ScoreParts } from './scoreParts';
 export {
   MARKET_COMMISSION,
   isTradable,
