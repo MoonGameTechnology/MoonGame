@@ -114,6 +114,14 @@ function runMatch(i) {
   let groundBattles = 0;
   let capturesByArrival = 0;
   let capturesByAssault = 0;
+  // AI-BAL-7: тактический репертуар отдельными счётчиками. Без них правка «бот умеет
+  // отступать» не проверяема: отступление РАСПУСКАЕТ бой, а не завершает его, поэтому
+  // `battle.resolved` про него молчит, и в отчёте оно выглядело бы просто как убыль
+  // боёв — то есть неотличимо от «бот стал меньше воевать».
+  let retreats = 0;
+  let sieges = 0;
+  let splits = 0;
+  let bombardSpans = 0;
   let firstCombatAt = null;
   const consume = (events, now) => {
     for (const e of events) {
@@ -132,6 +140,14 @@ function runMatch(i) {
       } else if (e.type === 'planet.captured') {
         if ((e.payload ?? {}).via === 'arrival') capturesByArrival++;
         else capturesByAssault++;
+      } else if (e.type === 'fleet.retreated') {
+        retreats++;
+      } else if (e.type === 'fleet.bombard') {
+        if ((e.payload ?? {}).on === true) sieges++;
+      } else if (e.type === 'fleet.split') {
+        splits++;
+      } else if (e.type === 'planet.bombarded') {
+        bombardSpans++;
       } else if (e.type === 'battle.started' && firstCombatAt === null) firstCombatAt = now;
     }
   };
@@ -231,6 +247,10 @@ function runMatch(i) {
     reason: state.match.reason,
     battles,
     groundBattles,
+    retreats,
+    sieges,
+    splits,
+    bombardSpans,
     capturesByArrival,
     capturesByAssault,
     firstCombatAt,
@@ -271,6 +291,10 @@ const winnerScores = [];
 const loserScores = [];
 const margins = [];
 let groundBattlesTotal = 0;
+let retreatsTotal = 0;
+let siegesTotal = 0;
+let splitsTotal = 0;
+let bombardSpansTotal = 0;
 let arrivalCaptures = 0;
 let assaultCaptures = 0;
 // BAL-5 — ЧТО разгоняет лидера. Флот отпадает по коду (в `total` он не входит вовсе),
@@ -299,6 +323,10 @@ for (let i = 0; i < N; i++) {
   }
   battlesTotal += r.battles;
   groundBattlesTotal += r.groundBattles;
+  retreatsTotal += r.retreats;
+  siegesTotal += r.sieges;
+  splitsTotal += r.splits;
+  bombardSpansTotal += r.bombardSpans;
   arrivalCaptures += r.capturesByArrival;
   assaultCaptures += r.capturesByAssault;
   lengths.push(r.lengthMs);
@@ -462,6 +490,7 @@ console.log(
     `  длина      : avg ${days(avg(lengths))}д · min ${days(Math.min(...lengths))}д · max ${days(Math.max(...lengths))}д · исходы: ${fmtWins(reasons)}`,
     `  1-й бой    : avg ${days(avg(firstCombats))}д (в ${firstCombats.length}/${N} матчах) · боёв всего ${battlesTotal}`,
     `  наземная   : ${groundBattlesTotal} наземных боёв из ${battlesTotal} · захваты: прилётом ${arrivalCaptures} · штурмом ${assaultCaptures}  ← «штурмом» и есть вторая фаза захвата (GDD §7.4); 0 = она не играется`,
+    `  тактика    : отступлений ${retreatsTotal} · осад ${siegesTotal} (обстрелов ${bombardSpansTotal}) · расколов флота ${splitsTotal}  ← AI-BAL-7; 0 в строке = механика вне измерения`,
     `  очки       : лидер ${avg(winnerScores).toFixed(0)} · отставший ${avg(loserScores).toFixed(0)} · разрыв ${avg(margins).toFixed(0)}  ← сессия одинаковая (${SESSION_DAYS}д), разный только счёт`,
     `  очки/слот    : ${fmtAvg(scoreBySlot, seenBySlot)}`,
     `  очки/фракция : ${fmtAvg(scoreByFaction, seenByFaction)}`,
@@ -564,6 +593,10 @@ console.log(
         groundBattlesTotal,
         capturesByArrival: arrivalCaptures,
         capturesByAssault: assaultCaptures,
+        retreats: retreatsTotal,
+        sieges: siegesTotal,
+        bombardSpans: bombardSpansTotal,
+        splits: splitsTotal,
         usage: Object.fromEntries(usageTotal),
         deadContent: zeros,
         seededOnly,

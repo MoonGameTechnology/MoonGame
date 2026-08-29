@@ -9,12 +9,16 @@
 import {
   BASE_RESEARCH_SLOTS,
   getStance,
+  previewBattle,
   technologyLock,
   type GameState,
   type Action,
+  type Battle,
+  type CombatantRef,
   type StewardPosture,
   type Planet,
   type Fleet,
+  type UnitStack,
 } from '../../packages/shared-core/src/index';
 import { provinceScore } from '../../packages/shared-core/src/state/sectorKind';
 import {
@@ -31,6 +35,9 @@ import {
   unloadArmy,
   researchTech,
   assaultFleet,
+  retreatFleet,
+  bombardFleet,
+  splitFleet,
 } from './actions';
 import { netIncome } from './economy';
 import { SECTOR_TYPES } from './map';
@@ -103,6 +110,12 @@ const SQUADRON_FACTORY_LEVEL = 2;
 const SQUADRON_CAP = 3;
 /** Запас казны сверх цены заказа (мера та же, что у построек бота). */
 const ORDER_RESERVE: Record<string, number> = { metal: 60, credits: 60 };
+/** С какого размера кулак тест-бота делится надвое при отплытии (AI-BAL-7). Ниже —
+ *  ударная группа и так на пределе: её порог выхода в рейд равен трём корпусам. */
+const SPLIT_MIN = 6;
+/** …и до какого числа флотов у места это вообще разрешено. Потолок ниже боевого предела
+ *  постройки (8): деление не должно возвращать рой одиночек, вылеченный в self-play M4. */
+const SPLIT_FLEET_CAP = 6;
 
 /**
  * ДЕТЕРМИНИРОВАННЫЙ ШУМ РЕШЕНИЯ (AI-BAL-5) — [0, 1), только для тест-профиля.
@@ -280,6 +293,9 @@ export function aiOrders(
   const shipCount = (f: Fleet): number =>
     f.units.reduce((n, s) => n + (isShipUnit(s.unit) ? s.count : 0), 0);
   const expandFleets: Fleet[] = defensive ? [] : Object.values(state.fleets);
+  // Сколько флотов у места СЕЙЧАС — потолок и на постройку кораблей, и на деление кулака
+  // (AI-BAL-7). Считается один раз: `state` внутри `aiOrders` не меняется (чистый builder).
+  const ownFleets = Object.values(state.fleets).filter((fl) => fl.owner === ai).length;
   // Consolidate BEFORE moving (self-play M4): two idle fleets sharing a location fuse
   // into one — without this, battle remnants and rally leftovers accumulate into a
   // hundreds-strong swarm of one-ship fleets that grinds the whole sim (and feeds
@@ -301,6 +317,74 @@ export function aiOrders(
         skipMove.add(group[k]!.id);
       }
       skipMove.add(group[0]!.id); // it grows this tick, sorties the next
+    }
+  }
+  // ═══ ТЕСТ-БОТ (AI-BAL-7): ФЛОТ УМЕЕТ ПРОИГРАТЬ БОЙ ═══
+  // Диагноз кирпича: из боевого репертуара ядра бот звал только `fleet.engage` и
+  // `fleet.assault`, а `fleet.retreat` — НИКОГДА. Значит каждый бой в измерении шёл до
+  // полного уничтожения одной из сторон: размен всегда полный, «потрёпанный флот» как
+  // состояние не существовал, и вся ветка ядра вокруг отступления (пошлина в 40%
+  // ТЕКУЩЕГО корпуса, скоростная фора беглеца `retreatHasteUntil`, освобождение
+  // противника) не участвовала в балансе ни одной цифрой.
+  //
+  // Правило одно и БЕЗ порога-настройки: проигрываю — ухожу. Пошлина забирает 40% того,
+  // что осталось, и по построению никого не добивает (`applyRetreatToll`: 0.6 × живой
+  // пул остаётся живым), а проигранный бой забирает 100% — выбор между ними не требует
+  // ни коэффициента, ни калибровки. Выигранный бой держится даже дорогой ценой: размен,
+  // который заканчивается взятым узлом, это и есть плата за узел.
+  //
+  // Прогноз — тот самый `previewBattle`, которым уже судит «Хранитель»
+  // (`stewardGuard.ts`), а не вторая копия правила: базовая модель без хуков
+  // `combat.damage`, то есть эвристика, а не оракул. Роли в прогнозе сохраняются
+  // (атакующий бьёт `attack`, стоящая сторона отвечает `defense`) — перепутать их
+  // значило бы прогнозировать другой бой.
+  //
+  // Уход в том же тике ОБЯЗАТЕЛЕН, и это не украшение. `fleet.retreat` только распускает
+  // бой: флот остаётся стоять там же, рядом с тем же противником, который в тот же миг
+  // освобождён. Оставшийся стоять беглец был бы втянут заново и платил бы пошлину каждые
+  // два часа, пока не сточится в ноль, — ровно та «драка до нуля», от которой уводит
+  // кирпич, только медленнее. Скоростная фора беглеца выдана ядром именно под этот шаг.
+  if (profile === 'test') {
+    const sideUnits = (ref: CombatantRef): UnitStack[] => {
+      if (ref.kind === 'garrison') return state.planets[ref.planetId]?.garrison ?? [];
+      const other = state.fleets[ref.fleetId];
+      if (!other) return [];
+      return ref.kind === 'landing' ? (other.landing ?? []) : other.units;
+    };
+    const isThisFleet = (ref: CombatantRef, fleetId: string): boolean =>
+      ref.kind === 'fleet' && ref.fleetId === fleetId;
+    for (const f of Object.values(state.fleets)) {
+      if (f.owner !== ai || f.battleId == null) continue;
+      const battle: Battle | undefined = state.battles[f.battleId];
+      if (!battle) continue;
+      // Отступить может только ОРБИТАЛЬНАЯ сторона: сошедший на грунт десант ядро не
+      // выпускает (`E_CANNOT_RETREAT`), так что приказ был бы чистым отказом.
+      const weAttack = isThisFleet(battle.attacker.ref, f.id);
+      if (!weAttack && !isThisFleet(battle.defender.ref, f.id)) continue;
+      const foe = sideUnits(weAttack ? battle.defender.ref : battle.attacker.ref);
+      if (!foe.some((s) => s.count > 0)) continue; // добивать уже некого — бой наш
+      const forecast = weAttack
+        ? previewBattle(f.units, foe, data)
+        : previewBattle(foe, f.units, data);
+      if (forecast.outcome !== (weAttack ? 'defender' : 'attacker')) continue;
+      out.push(retreatFleet(ai, f.id));
+      // Куда бежать: ближайший СВОЙ мир, а при перехвате на лейне (узла под флотом нет)
+      // — домой. Некуда — флот всё равно выходит из боя: пошлина дешевле уничтожения.
+      const from = f.location != null ? state.planets[f.location] : undefined;
+      let haven: Planet | null = null;
+      let havenD = Infinity;
+      if (from) {
+        for (const p of Object.values(state.planets)) {
+          if (p.owner !== ai || p.id === from.id) continue;
+          const dd = d(from.position, p.position);
+          if (dd < havenD) {
+            havenD = dd;
+            haven = p;
+          }
+        }
+      }
+      const refuge = haven ?? (base && base.id !== f.location ? base : null);
+      if (refuge) out.push(moveFleet(ai, f.id, refuge.id));
     }
   }
   for (const f of expandFleets) {
@@ -354,18 +438,50 @@ export function aiOrders(
       }
       // (б) Штурм с орбиты. Правила штурма называет ЯДРО (`assaultPlanet`), здесь
       //     только повод не сыпать заведомо отбиваемым приказом: чужой захватываемый
-      //     мир, война/нейтралитет, живой гарнизон и десант в трюме.
+      //     мир, война/нейтралитет и чем его брать.
+      //     «Чем брать» — ДВА разных случая, и раньше учитывался только первый:
+      //     живой гарнизон берётся десантом из трюма, а ПУСТОЙ занимается и без него
+      //     (`assaultPlanet`: `undefined → occupy`). Второй случай не выдумка — мир
+      //     пустеет уже под флотом (гарнизон добит наземным боем или ПВО-разменом), а
+      //     `captureOnArrival` больше не сработает: он судит по ПРИЛЁТУ, а флот давно
+      //     прилетел. Без этой ветки такой мир не берёт никто, и осада ниже подменила
+      //     бы собой бесплатный захват.
       if (
         here0 &&
         f.orbit === 'near' &&
         here0.owner !== ai &&
         capturable(here0) &&
         canTraverse(state, ai, here0.owner) &&
-        here0.garrison.some((st) => st.count > 0) &&
-        (f.landing ?? []).some((st) => st.count > 0)
+        (!here0.garrison.some((st) => st.count > 0) ||
+          (f.landing ?? []).some((st) => st.count > 0))
       ) {
         out.push(assaultFleet(ai, f.id));
         continue; // берём ЭТОТ мир, а не улетаем к следующему
+      }
+      // (в) ОСАДА (AI-BAL-7). Мир под флотом взять нечем — но стоять над ним МОЛЧА
+      //     нельзя: ПВО бьёт по всему враждебному в near-орбите независимо от того,
+      //     бомбит гость или нет (`runOrbital` — залп ищет `nearOrbitHostile`, а не
+      //     бомбардировщика), так что молчащий флот платит ту же цену и не получает
+      //     ничего. Бомбардировка — единственное, что он может сделать имеющимся
+      //     оружием: она крошит постройки под собой (`planet.bombarded` →
+      //     `damageBuildings`) и морозит владельцу производство и стройку
+      //     (`bombardedPlanets`). Целый пласт ядра — осада — до сих пор не участвовал
+      //     в измерении ни разу.
+      //     Это не НОВАЯ стоянка, а смысл уже существующей: флоту, которому нечем взять
+      //     мир, целеуказание и раньше выдавало ближайшую чужую цель — ту самую, под
+      //     которой он стоит (расстояние 0), — и `fleet.move` в собственную клетку
+      //     возвращался `E_SAME_LOCATION` каждые два часа до конца матча.
+      if (
+        here0 &&
+        f.orbit === 'near' &&
+        here0.owner !== null &&
+        here0.owner !== ai &&
+        capturable(here0) &&
+        getStance(state, ai, here0.owner) === 'war' && // ядро бомбит только врага
+        f.units.some((st) => st.count > 0)
+      ) {
+        if (f.bombarding !== true) out.push(bombardFleet(ai, f.id, true));
+        continue; // осада — это стоянка НАД целью, а не пауза перед перелётом
       }
     }
     // Strike groups, not dribbles (self-play M4): auto-rally pools each new ship into
@@ -430,6 +546,40 @@ export function aiOrders(
       decisionNoise(state, ai, `target:${f.id}`) < 0.35
     ) {
       best = second;
+    }
+    // ═══ ТЕСТ-БОТ (AI-BAL-7): КУЛАК УМЕЕТ ДЕЛИТЬСЯ ═══
+    // `fleet.split` бот не звал никогда, и следствие было структурным, а не «забыли
+    // правило»: блок слияния выше сводит всё стоящее на узле в ОДИН флот (без него рой
+    // одиночек кладёт симуляцию — self-play M4), а обратной операции у бота не
+    // существовало. Поэтому вся тактика измерения свелась к одному кулаку: сколько бы
+    // кораблей у места ни было, они ходили одной стопкой на одну цель, а вторая,
+    // равноценная по дальности, ждала своей очереди.
+    //
+    // Делить осмысленно ровно в один момент — когда кулак ОТЧАЛИВАЕТ со своего мира и
+    // целей у него две. Тогда отделённая половина остаётся стоять, исходный флот в этом
+    // же тике уходит, и слить их обратно в следующем тике уже некому: слияние берёт
+    // только стоящие рядом флоты, а первый из них в пути. Половина, оставшаяся дома,
+    // выберет цель сама — расстояния для неё считаются заново.
+    // Обе границы стоят против роя, который лечил M4: делится только КРУПНЫЙ кулак и
+    // только пока флотов у места немного.
+    if (
+      profile === 'test' &&
+      best &&
+      here.owner === ai &&
+      second &&
+      shipCount(f) >= SPLIT_MIN &&
+      ownFleets < SPLIT_FLEET_CAP
+    ) {
+      const take: Array<{ unit: string; count: number }> = [];
+      for (const st of f.units) {
+        // Флагман героя не отделяется: сущность героя привязана к ИСХОДНОМУ флоту по
+        // `fleetId`, и ядро такой раскол отбивает (`E_HERO_UNIT`). Одиночный корпус
+        // тоже остаётся — делить нечего.
+        if (st.count < 2 || !isShipUnit(st.unit)) continue;
+        if (data.units[st.unit]?.traits.includes('hero')) continue;
+        take.push({ unit: st.unit, count: Math.floor(st.count / 2) });
+      }
+      if (take.length > 0) out.push(splitFleet(ai, f.id, take));
     }
     if (best) out.push(moveFleet(ai, f.id, best.id));
   }
@@ -570,9 +720,8 @@ export function aiOrders(
     // Ship production is CAPPED by the fleet count (self-play M4: endless building
     // fed an ever-growing swarm — hundreds of fleets by mid-match). Enough fleets
     // out ⇒ the metal flows to economy/garrisons instead.
-    const aiFleets = Object.values(state.fleets).filter((f) => f.owner === ai).length;
     if (
-      aiFleets < (warFooting ? 8 : 4) &&
+      ownFleets < (warFooting ? 8 : 4) &&
       (pl.resources.metal ?? 0) > 220 &&
       (pl.resources.credits ?? 0) > 120 &&
       (pl.resources.microelectronics ?? 0) >= 3 // ECON-7: warships need the hi-tech good
@@ -608,7 +757,7 @@ export function aiOrders(
       if (baseMilitia < 4 && (pl.resources.metal ?? 0) > 120 && hasGroundYard(base)) {
         out.push(buildUnit(ai, base.id, 'militia', 2));
       }
-      if (aiFleets < 8 && (pl.resources.metal ?? 0) > 140) {
+      if (ownFleets < 8 && (pl.resources.metal ?? 0) > 140) {
         out.push(buildUnit(ai, base.id, 'scout', 1));
       }
     }
@@ -756,7 +905,7 @@ export function aiOrders(
     // (marine retired: the AI no longer cheap-builds a ground trooper. Its home keeps its
     //  seeded infantry garrison + orbital-AA building for defence; mobile ground via divisions.)
     const baseHasShip = base.garrison.some((st) => isShipUnit(st.unit));
-    if (aiFleets < (warFooting ? 4 : 2) && baseHasShip) out.push(launchFleet(ai, base.id));
+    if (ownFleets < (warFooting ? 4 : 2) && baseHasShip) out.push(launchFleet(ai, base.id));
   }
   // Trade on the session market: a passive bot liquidates the surplus goods it never
   // uses (food/energy/microelectronics) into the credits it always needs, and — when
