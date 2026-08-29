@@ -9,7 +9,11 @@ import type { Action, AdvanceResult, ApplyResult, Context } from '../action/type
 const data: GameData = parseGameData({
   version: '0.1.0',
   resources: ['metal'],
-  units: { scout: { faction: 'x', stats: { attack: 1, defense: 1, speed: 10, hp: 6 } } },
+  units: {
+    scout: { faction: 'x', stats: { attack: 1, defense: 1, speed: 10, hp: 6 } },
+    // BAL-4: десант — юнит с `domain: 'ground'`; провинцию берут войска, а не корабль.
+    militia: { faction: 'x', domain: 'ground', stats: { attack: 1, defense: 1, speed: 1, hp: 4 } },
+  },
   factions: {},
   buildings: {},
   events: {},
@@ -39,8 +43,22 @@ function planet(
   if (opts.kind) p.kind = opts.kind;
   return p;
 }
-function fleet(id: string, owner: string, location: string | null, units: string[] = ['scout']): Fleet {
-  return { id, owner, location, movement: null, units: units.map((u) => ({ unit: u, count: 1 })), traits: [] };
+function fleet(
+  id: string,
+  owner: string,
+  location: string | null,
+  units: string[] = ['scout'],
+  landing: string[] = ['militia'], // BAL-4: по умолчанию флот идёт с десантом
+): Fleet {
+  return {
+    id,
+    owner,
+    location,
+    movement: null,
+    units: units.map((u) => ({ unit: u, count: 1 })),
+    landing: landing.map((u) => ({ unit: u, count: 1 })),
+    traits: [],
+  };
 }
 function baseState(planets: Planet[], fleets: Fleet[]): GameState {
   const s = createInitialState({ seed: 'cap', version: { data: '0.1.0', manifest: '1' } });
@@ -89,6 +107,64 @@ describe('captureOnArrival module (map-roadmap.md M2.2)', () => {
     const { state, events } = arriveAt(planet('B', null, 30, { kind: 'planet' }));
     expect(state.planets.B!.owner).toBe('p1');
     expect(events.some((e) => e.type === 'planet.captured')).toBe(true);
+  });
+
+  it('ПУСТОЙ ТРЮМ НЕ БЕРЁТ ПРОВИНЦИЮ: прилёт перестал быть бесплатным (BAL-4)', () => {
+    // Замер BAL-5: карта делилась за 4 дня из 14 ровно потому, что присутствия корабля
+    // хватало для захвата — армия была нужна лишь для призовых миров, а остальная карта
+    // перекидывалась каруселью (88% переходов без выстрела).
+    const b = planet('B', null, 30, { kind: 'planet' });
+    const empty = fleet('F', 'p1', 'A', ['scout'], []);
+    const a = planet('A', 'p1', 0, { kind: 'planet' });
+    a.links = ['B'];
+    b.links = ['A'];
+    const kernel = createKernel([movementModule, captureOnArrivalModule]);
+    const state = baseState([a, b], [empty]);
+    const dep = okApply(kernel.applyAction(state, move('F', 'B'), ctx(0)));
+    const arr = okAdvance(kernel.advanceTo(dep.state, ctx(3 * HOUR)));
+    expect(arr.state.planets.B!.owner).toBeNull();
+    expect(arr.events.some((e) => e.type === 'planet.captured')).toBe(false);
+  });
+
+  it('десант из НУЛЯ — не десант', () => {
+    const a = planet('A', 'p1', 0, { kind: 'planet' });
+    const b = planet('B', null, 30, { kind: 'planet' });
+    a.links = ['B'];
+    b.links = ['A'];
+    const f = fleet('F', 'p1', 'A', ['scout'], []);
+    f.landing = [{ unit: 'militia', count: 0 }];
+    const kernel = createKernel([movementModule, captureOnArrivalModule]);
+    const dep = okApply(kernel.applyAction(baseState([a, b], [f]), move('F', 'B'), ctx(0)));
+    const arr = okAdvance(kernel.advanceTo(dep.state, ctx(3 * HOUR)));
+    expect(arr.state.planets.B!.owner).toBeNull();
+  });
+
+  it('НЕИЗВЕСТНЫЙ юнит в трюме десантом не считается (fail-secure)', () => {
+    // Не знаем, что это, — значит не высаживаем. Иначе правило обходилось бы опечаткой
+    // в данных: любой незнакомый id в трюме возвращал бы бесплатный прилёт.
+    const a = planet('A', 'p1', 0, { kind: 'planet' });
+    const b = planet('B', null, 30, { kind: 'planet' });
+    a.links = ['B'];
+    b.links = ['A'];
+    const f = fleet('F', 'p1', 'A', ['scout'], []);
+    f.landing = [{ unit: 'no_such_unit', count: 3 }];
+    const kernel = createKernel([movementModule, captureOnArrivalModule]);
+    const dep = okApply(kernel.applyAction(baseState([a, b], [f]), move('F', 'B'), ctx(0)));
+    const arr = okAdvance(kernel.advanceTo(dep.state, ctx(3 * HOUR)));
+    expect(arr.state.planets.B!.owner).toBeNull();
+  });
+
+  it('КОРАБЛЬ в трюме десантом не считается — нужен именно наземный юнит', () => {
+    const a = planet('A', 'p1', 0, { kind: 'planet' });
+    const b = planet('B', null, 30, { kind: 'planet' });
+    a.links = ['B'];
+    b.links = ['A'];
+    const f = fleet('F', 'p1', 'A', ['scout'], []);
+    f.landing = [{ unit: 'scout', count: 2 }]; // space domain
+    const kernel = createKernel([movementModule, captureOnArrivalModule]);
+    const dep = okApply(kernel.applyAction(baseState([a, b], [f]), move('F', 'B'), ctx(0)));
+    const arr = okAdvance(kernel.advanceTo(dep.state, ctx(3 * HOUR)));
+    expect(arr.state.planets.B!.owner).toBeNull();
   });
 
   it('does NOT capture an empty sector (kind not capturable)', () => {
