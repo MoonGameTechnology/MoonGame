@@ -122,6 +122,13 @@ function runMatch(i) {
   let sieges = 0;
   let splits = 0;
   let bombardSpans = 0;
+  // Судьба проигравшего флота — прямая проверка утверждения «размен перестал быть полным».
+  // Само число отступлений её не даёт: выход стоит 40% ТЕКУЩЕГО корпуса и щита, и если бы
+  // пошлина добивала, отступления считались бы, а флоты гибли бы по-прежнему. Поэтому
+  // отдельно: сколько флотов ушло из измерения совсем (`fleet.destroyed` — и разгром, и
+  // добитый пошлиной) и сколько выходов не донесло (`escaped: false`).
+  let fleetsDestroyed = 0;
+  let retreatsFatal = 0;
   let firstCombatAt = null;
   const consume = (events, now) => {
     for (const e of events) {
@@ -140,8 +147,11 @@ function runMatch(i) {
       } else if (e.type === 'planet.captured') {
         if ((e.payload ?? {}).via === 'arrival') capturesByArrival++;
         else capturesByAssault++;
+      } else if (e.type === 'fleet.destroyed') {
+        fleetsDestroyed++;
       } else if (e.type === 'fleet.retreated') {
         retreats++;
+        if ((e.payload ?? {}).escaped === false) retreatsFatal++;
       } else if (e.type === 'fleet.bombard') {
         if ((e.payload ?? {}).on === true) sieges++;
       } else if (e.type === 'fleet.split') {
@@ -248,6 +258,8 @@ function runMatch(i) {
     battles,
     groundBattles,
     retreats,
+    retreatsFatal,
+    fleetsDestroyed,
     sieges,
     splits,
     bombardSpans,
@@ -292,6 +304,8 @@ const loserScores = [];
 const margins = [];
 let groundBattlesTotal = 0;
 let retreatsTotal = 0;
+let retreatsFatalTotal = 0;
+let fleetsDestroyedTotal = 0;
 let siegesTotal = 0;
 let splitsTotal = 0;
 let bombardSpansTotal = 0;
@@ -324,6 +338,8 @@ for (let i = 0; i < N; i++) {
   battlesTotal += r.battles;
   groundBattlesTotal += r.groundBattles;
   retreatsTotal += r.retreats;
+  retreatsFatalTotal += r.retreatsFatal;
+  fleetsDestroyedTotal += r.fleetsDestroyed;
   siegesTotal += r.sieges;
   splitsTotal += r.splits;
   bombardSpansTotal += r.bombardSpans;
@@ -491,6 +507,7 @@ console.log(
     `  1-й бой    : avg ${days(avg(firstCombats))}д (в ${firstCombats.length}/${N} матчах) · боёв всего ${battlesTotal}`,
     `  наземная   : ${groundBattlesTotal} наземных боёв из ${battlesTotal} · захваты: прилётом ${arrivalCaptures} · штурмом ${assaultCaptures}  ← «штурмом» и есть вторая фаза захвата (GDD §7.4); 0 = она не играется`,
     `  тактика    : отступлений ${retreatsTotal} · осад ${siegesTotal} (обстрелов ${bombardSpansTotal}) · расколов флота ${splitsTotal}  ← AI-BAL-7; 0 в строке = механика вне измерения`,
+    `  размен     : флотов погибло ${fleetsDestroyedTotal} · из отступлений не донесло ${retreatsFatalTotal}  ← полный размен = флот гибнет всегда; отступления без падения этого числа ничего не меняют`,
     `  очки       : лидер ${avg(winnerScores).toFixed(0)} · отставший ${avg(loserScores).toFixed(0)} · разрыв ${avg(margins).toFixed(0)}  ← сессия одинаковая (${SESSION_DAYS}д), разный только счёт`,
     `  очки/слот    : ${fmtAvg(scoreBySlot, seenBySlot)}`,
     `  очки/фракция : ${fmtAvg(scoreByFaction, seenByFaction)}`,
@@ -594,6 +611,8 @@ console.log(
         capturesByArrival: arrivalCaptures,
         capturesByAssault: assaultCaptures,
         retreats: retreatsTotal,
+        retreatsFatalTotal,
+        fleetsDestroyedTotal,
         sieges: siegesTotal,
         bombardSpans: bombardSpansTotal,
         splits: splitsTotal,
