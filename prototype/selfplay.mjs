@@ -185,8 +185,14 @@ function runMatch(i) {
     // и не раздувает прогон.
     while (state.time >= nextSampleDay * DAY) {
       const parts = scoreParts(state, data);
+      // Сколько провинций ещё НИЧЬИ. Плато счёта во второй половине объясняется либо
+      // «карта поделена, брать больше нечего», либо «экономика насытилась» — это разные
+      // диагнозы и разные лечения, поэтому механизм меряется, а не додумывается.
+      let neutral = 0;
+      for (const p2 of Object.values(state.planets)) if (p2.owner === null) neutral += 1;
       partsTrail.push({
         day: nextSampleDay,
+        neutral,
         bySeat: Object.fromEntries(
           Object.entries(parts).map(([seat, p]) => [
             seat,
@@ -278,6 +284,7 @@ const gapBuildingsByDay = new Map();
 const gapSeenByDay = new Map();
 const winnerScoreByDay = new Map(); // абсолютная кривая — без неё «разрыв растёт» двусмысленно
 const loserScoreByDay = new Map();
+const neutralByDay = new Map(); // ничьи провинции по дням — механизм плато
 const growthFirstHalf = []; // прирост счёта победителя за 1..7 день
 const growthSecondHalf = []; // …и за 8..14
 const loserGrowthFirstHalf = [];
@@ -360,6 +367,7 @@ for (let i = 0; i < N; i++) {
         bump(gapBuildingsByDay, sample.day, wd.buildings - ld.buildings);
         bump(winnerScoreByDay, sample.day, wd.total);
         bump(loserScoreByDay, sample.day, ld.total);
+        bump(neutralByDay, sample.day, sample.neutral ?? 0);
         bump(gapSeenByDay, sample.day);
       }
     }
@@ -388,6 +396,16 @@ const scoreLine = () => {
       const n = gapSeenByDay.get(d) || 1;
       return `д${d} ${(winnerScoreByDay.get(d) / n).toFixed(0)}/${(loserScoreByDay.get(d) / n).toFixed(0)}`;
     })
+    .join(' · ');
+};
+/** Сколько провинций ещё ничьи, по дням: день, когда это доходит до нуля, и есть конец
+ *  раздела карты — дальше счёт не создаётся, а перетекает. */
+const neutralLine = () => {
+  const ds = [...gapSeenByDay.keys()].sort((a, b) => a - b);
+  if (ds.length === 0) return '—';
+  const picked = ds.filter((d) => d === 1 || d === ds[ds.length - 1] || d % 2 === 0);
+  return picked
+    .map((d) => `д${d} ${(neutralByDay.get(d) / (gapSeenByDay.get(d) || 1)).toFixed(0)}`)
     .join(' · ');
 };
 /** Разрыв по дням одной строкой: «д1 12 · д4 58 · д7 96 · д10 128 · д14 171». */
@@ -456,6 +474,7 @@ console.log(
       `  (${pctShare(avg(marginTerritory), avg(marginBuildings))})  ← чем именно победитель обошёл`,
     `  разрыв/день: ${gapLine()}  ← растёт во второй половине = ком; ровный = фора позиции`,
     `  счёт/день  : ${scoreLine()}  ← победитель/проигравший; расходится вверх = разгон, вниз = обвал отстающего`,
+    `  ничьих/день: ${neutralLine()}  ← когда кончается свободная карта: после этого счёт может только ПЕРЕТЕКАТЬ`,
     `  прирост    : победитель ${avg(growthFirstHalf).toFixed(0)}→${avg(growthSecondHalf).toFixed(0)}` +
       ` · проигравший ${avg(loserGrowthFirstHalf).toFixed(0)}→${avg(loserGrowthSecondHalf).toFixed(0)}` +
       `  ← 1-я половина → 2-я, очков за половину`,
@@ -511,6 +530,11 @@ console.log(
                 loser: loserScoreByDay.get(d) / gapSeenByDay.get(d),
               },
             ]),
+        ),
+        neutralByDay: Object.fromEntries(
+          [...gapSeenByDay.keys()]
+            .sort((a, b) => a - b)
+            .map((d) => [d, neutralByDay.get(d) / gapSeenByDay.get(d)]),
         ),
         winnerGrowth: { firstHalf: avg(growthFirstHalf), secondHalf: avg(growthSecondHalf) },
         loserGrowth: {
