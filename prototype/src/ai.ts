@@ -37,6 +37,7 @@ import { SECTOR_TYPES } from './map';
 import { data } from './prototypeData';
 import type { MarketSide } from '../../packages/shared-core/src/index';
 import { stewardGuardOrders } from './stewardGuard';
+import { retreatOrders } from './aiRetreat';
 
 /** The two server-side AIs that can play a seat, kept explicitly DISTINCT
  *  (SES-2.2). `steward` — «Хранитель»: the player's OWN autopilot, a defensive
@@ -245,6 +246,13 @@ export function aiOrders(
   // evacuates a wing the forecast says it would lose ≥ STEWARD_LOSS_LIMIT of, and —
   // under «Активная оборона» — counterstrikes what it beats cheaply on own soil.
   if (defensive) out.push(...stewardGuardOrders(state, ai, posture as StewardPosture));
+  // AI-BAL-7: выйти из боя, который уже проигран. Порядок в массиве здесь роли не играет —
+  // весь тик строится по ОДНОМУ снимку состояния, а флот в бою мимо остальных проходов и так
+  // не идёт: и наступательный сбор, и Хранитель берут только свободный флот
+  // (`!f.movement && !f.battleId`), так что одному флоту два приказа за тик не уйдёт.
+  // Умение достаётся ОБОИМ профилям (как якорь верфи из AI-BAL-3): «не гибнуть зря» — не
+  // лабораторное умение, живому игроку тоже незачем встречать соперника, дерущегося до нуля.
+  out.push(...retreatOrders(state, ai));
   const isShipUnit = (u: string): boolean => !data.units[u]?.traits.includes('ground');
   const capturable = (p: Planet): boolean => SECTOR_TYPES[p.kind ?? '']?.capturable ?? false;
   const d = (a: { x: number; y: number }, b: { x: number; y: number }): number =>
