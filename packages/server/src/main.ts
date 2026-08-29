@@ -13,6 +13,11 @@ import { createStores, snapshotOf } from './persistence';
 import { seatClaim, seatClaimAction } from './joinSeat';
 import { checkProductionReadiness, configFromEnv } from './serverConfig';
 import { createMatchLoader } from './serverWiring';
+import {
+  creditCommanderXp,
+  ordinaryMatchExtras,
+  type SeatAccounts,
+} from './commanderCredit';
 import { newMatchId } from './matchId';
 import {
   registerMatchApi,
@@ -22,7 +27,7 @@ import {
 } from './matchApi';
 import { registerAuthApi, liveSession } from './authApi';
 import { registerCorpApi } from './corpApi';
-import { MS_PER_DAY } from '@void/shared-core';
+import { MS_PER_DAY, type PlayerReward } from '@void/shared-core';
 import { registerFriendApi } from './friendApi';
 import { registerLeaderboardApi } from './leaderboardApi';
 import { FriendService } from './friendService';
@@ -128,8 +133,26 @@ const loadMatch = createMatchLoader({
   // a replayed `end` no-ops). `avaOrchestrator` is initialized below, before any
   // connection can trigger a load.
   matchExtras: async (matchId) => {
+    // SES-2 (остаток кирпича): опыт командира банкуется на КАЖДОМ матче, а не только на
+    // AvA. Раньше начисление жило внутри этой ветки, а у обычного матча `extras` = null —
+    // рядовая партия заканчивалась, и пожизненный опыт аккаунта не двигался (прототипный
+    // хост при этом начислял всегда). Правила банковки — `commanderCredit.ts`, один на
+    // оба пути; отличается только резолвер «кто сидит за местом».
+    const bankXp = (seatAccounts: SeatAccounts, rewards?: Record<string, PlayerReward>): void => {
+      void creditCommanderXp(stores.commanderStore, seatAccounts, matchId, rewards).catch(
+        (err: unknown) => {
+          process.stderr.write(
+            `commander xp credit failed for ${matchId} — ${err instanceof Error ? err.message : String(err)}\n`,
+          );
+        },
+      );
+    };
     const avaSession = await stores.sessionStore.byMatch(matchId);
-    if (!avaSession) return null;
+    if (!avaSession) {
+      // Обычный матч: личность места — позывной (в режиме учёток он и есть логин).
+      // Функция вынесена и покрыта тестом — `null` отсюда больше не возвращается.
+      return ordinaryMatchExtras(stores, matchId, (m) => process.stderr.write(`${m}\n`));
+    }
     // ARS-4: seat (slotId) → account, for the drop roll and the salvage credit.
     const seatAccount: Record<string, string> = {};
     for (const [accountId, slotId] of Object.entries(avaSession.seats)) {
@@ -172,21 +195,11 @@ const loadMatch = createMatchLoader({
             const accountId = seatAccount[playerId];
             return accountId ? [{ accountId, reward }] : [];
           });
-          // Commander XP (EC-*): the core already computed the per-seat reward table;
-          // bank it onto the accounts, exactly once per match (creditMatch's durable
-          // marker survives a restart that re-observes the same end). Until RANK-1 this
-          // host rolled drops from `rewards` but banked no XP at all — only the playtest
-          // netserver did — so a production account's lifetime XP never moved.
-          void stores.commanderStore
-            .creditMatch(
-              matchId,
-              entries.map(({ accountId, reward }) => ({ accountId, xp: reward.xp })),
-            )
-            .catch((err) => {
-              process.stderr.write(
-                `commander xp credit failed for ${matchId} — ${err instanceof Error ? err.message : String(err)}\n`,
-              );
-            });
+          // Commander XP (SES-2): та же банковка, что у обычного матча, но карта мест —
+          // РОСТЕР сессии, а не посадочные записи: AvA-игрок, ни разу не подключившийся,
+          // кресло в матче держит, а посадочной записи не оставил, и по позывному его
+          // не найти.
+          bankXp(async () => seatAccount, rewards);
           void awardMatchDrops(
             {
               drops: stores.dropStore,
