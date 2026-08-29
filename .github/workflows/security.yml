@@ -567,7 +567,7 @@ jobs:
             fail=1
           fi
           if [ "$RC" != "0" ]; then
-            echo "::error::Trivy image is a blocking scanner (SEC-1): a FIXABLE finding or a scan/build failure (exit $RC). Fix the image — bump the base pin or the dependency. Findings with no published fix no longer gate (SEC-27); they are still reported to Code Scanning. Suppress ONLY via .trivyignore WITH CVE-id, reason and review date."
+            echo "::error::Trivy image is a blocking scanner (SEC-1): a FIXABLE finding or a scan/build failure (exit $RC). Fix the image — bump the base pin or the dependency. Findings with no published fix no longer gate (SEC-27); they are still reported to Code Scanning and must NOT be added to .trivyignore (SEC-28) — suppressing one only hides it from the report. .trivyignore is for a finding whose fix EXISTS but cannot be installed here: CVE-id, reason, review date."
             fail=1
           fi
           exit $fail
