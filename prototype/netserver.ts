@@ -84,6 +84,10 @@ import type { Identity } from '../packages/server/src/matchApi';
 import { seatClaim, seatClaimAction } from '../packages/server/src/joinSeat';
 import { expiredSeatClaims } from '../packages/server/src/seatExpiry';
 import { bootRoster, MAX_HOSTED_MATCHES } from '../packages/server/src/matchRoster';
+import {
+  creditCommanderXp,
+  nickSeatAccounts,
+} from '../packages/server/src/commanderCredit';
 const { Pool } = pgPkg;
 
 // --- M0/M1 playtest log: append room events to a per-run JSONL and feed every one
@@ -209,21 +213,21 @@ if (DATABASE_URL) {
 /** Account crediting (EC-*): the core already computed `match.rewards` (place + XP per
  *  seat, deterministic). At match end, map each seat's nick → account and bank the XP
  *  durably, EXACTLY ONCE (creditMatch's idempotency marker survives a restart that
- *  re-observes the same end). Nick-mode servers have no accounts → nothing to credit. */
-async function creditCommanderXp(
+ *  re-observes the same end). Nick-mode servers have no accounts → nothing to credit.
+ *
+ *  Правила банковки живут в `packages/server/src/commanderCredit.ts` — общие с боевым
+ *  входом (SES-2). Своя копия тут была ровно до тех пор, пока боевой вход начислял
+ *  только AvA-матчам; сведена, чтобы два хоста не разъезжались и здесь. */
+async function creditMatchXp(
   matchId: string,
   rewards: Record<string, { xp: number }> | undefined,
 ): Promise<void> {
-  if (!rewards) return;
-  const seats = await accountStore.seatedNicks(matchId);
-  const rows: Array<{ accountId: string; xp: number }> = [];
-  for (const { playerId, nick } of seats) {
-    const xp = rewards[playerId]?.xp ?? 0;
-    if (xp <= 0) continue;
-    const user = await userStore.findUser(nick); // nick === account login in AUTH mode
-    if (user) rows.push({ accountId: user.userId, xp });
-  }
-  if (rows.length) await commanderStore.creditMatch(matchId, rows);
+  await creditCommanderXp(
+    commanderStore,
+    nickSeatAccounts(accountStore, userStore, matchId),
+    matchId,
+    rewards,
+  );
 }
 
 // Accounts on the PLAYABLE path (SES-2.5): with AUTH_JWT_SECRET set, the full account
@@ -377,7 +381,7 @@ async function createHostedMatch(id: string): Promise<HostedMatch> {
       });
     } else if (ev.kind === 'end' && AUTH) {
       // Bank each seated commander's match XP onto their account (idempotent).
-      void creditCommanderXp(id, ev.rewards);
+      void creditMatchXp(id, ev.rewards);
     }
     // Persist after anything that changes the world (debounced below), and re-arm
     // the offline wakeup: an action may schedule or consume events — both move the
