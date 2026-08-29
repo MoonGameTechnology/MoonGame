@@ -24,7 +24,7 @@ const res = await build({
 });
 const mod = { exports: {} };
 new Function('module', 'exports', 'require', res.outputFiles[0].text)(mod, mod.exports, () => ({}));
-const { newGame, kernel, data, aiOrders, HOUR, DAY, START_CANDIDATES } = mod.exports;
+const { newGame, kernel, data, aiOrders, scoreParts, HOUR, DAY, START_CANDIDATES } = mod.exports;
 
 const STEP = 2 * HOUR; // the AI decision cadence (mirrors the netserver driver)
 
@@ -137,6 +137,11 @@ function runMatch(i) {
   };
 
   const leaderTrail = []; // sampled (t, leader-by-planets) — the snowball input
+  // BAL-5: слагаемые счёта по дням. Кирпич спрашивает, ЧТО разгоняет лидера; ответ по
+  // коду («флот в счёт не входит вовсе», GDD §8.1) сужает вопрос до двух слагаемых —
+  // территория против построек, — и вот их трасса по времени.
+  const partsTrail = []; // [{ day, bySeat: { p1: {territory, buildings, total}, … } }]
+  let nextSampleDay = 1;
   let now = 0;
   // Seat-order coin, seeded per match (first-mover fairness WITH variance): a fixed
   // order handed p1 75% of matches, and a strict alternation is still one global
@@ -176,6 +181,27 @@ function runMatch(i) {
       }
     }
     leaderTrail.push({ t: now, leader: leaderByPlanets(state) });
+    // Снимок раз в игровой день (14 точек на матч) — этого хватает на трассу разрыва
+    // и не раздувает прогон.
+    while (state.time >= nextSampleDay * DAY) {
+      const parts = scoreParts(state, data);
+      // Сколько провинций ещё НИЧЬИ. Плато счёта во второй половине объясняется либо
+      // «карта поделена, брать больше нечего», либо «экономика насытилась» — это разные
+      // диагнозы и разные лечения, поэтому механизм меряется, а не додумывается.
+      let neutral = 0;
+      for (const p2 of Object.values(state.planets)) if (p2.owner === null) neutral += 1;
+      partsTrail.push({
+        day: nextSampleDay,
+        neutral,
+        bySeat: Object.fromEntries(
+          Object.entries(parts).map(([seat, p]) => [
+            seat,
+            { territory: p.territory, buildings: p.buildings, total: p.total },
+          ]),
+        ),
+      });
+      nextSampleDay += 1;
+    }
   }
 
   const winner = state.match.status === 'ended' ? (state.match.winner ?? null) : null;
@@ -195,6 +221,8 @@ function runMatch(i) {
   );
   return {
     finalScores,
+    finalParts: scoreParts(state, data),
+    partsTrail,
     seatMeta,
     winner,
     winnerFaction: winner ? seatMeta[winner]?.faction : null,
@@ -245,6 +273,23 @@ const margins = [];
 let groundBattlesTotal = 0;
 let arrivalCaptures = 0;
 let assaultCaptures = 0;
+// BAL-5 — ЧТО разгоняет лидера. Флот отпадает по коду (в `total` он не входит вовсе),
+// поэтому меряются два слагаемых и ДИНАМИКА разрыва: разрыв, поставленный рано и просто
+// удержанный, — это фора позиции, а разрыв, растущий во второй половине, — снежный ком.
+const marginTerritory = []; // (победитель − проигравший) по территории, на финале
+const marginBuildings = []; // то же по постройкам
+const gapByDay = new Map(); // день → сумма разрывов по total (для среднего)
+const gapTerritoryByDay = new Map();
+const gapBuildingsByDay = new Map();
+const gapSeenByDay = new Map();
+const winnerScoreByDay = new Map(); // абсолютная кривая — без неё «разрыв растёт» двусмысленно
+const loserScoreByDay = new Map();
+const neutralByDay = new Map(); // ничьи провинции по дням — механизм плато
+const growthFirstHalf = []; // прирост счёта победителя за 1..7 день
+const growthSecondHalf = []; // …и за 8..14
+const loserGrowthFirstHalf = [];
+const loserGrowthSecondHalf = [];
+let leadHeldFromDay = []; // с какого дня будущий победитель уже вёл и больше не отдавал
 
 for (let i = 0; i < N; i++) {
   const r = runMatch(i);
@@ -286,6 +331,47 @@ for (let i = 0; i < N; i++) {
       margins.push(totals[0][1] - totals[totals.length - 1][1]);
     }
   }
+  // BAL-5: разложение исхода. Считаем только решённые матчи — «кто разогнался» без
+  // победителя не определено.
+  if (r.winner !== null && r.partsTrail.length > 0) {
+    const seats = Object.keys(r.finalParts);
+    const loser = seats.find((s2) => s2 !== r.winner);
+    if (loser) {
+      const w = r.finalParts[r.winner];
+      const l = r.finalParts[loser];
+      marginTerritory.push(w.territory - l.territory);
+      marginBuildings.push(w.buildings - l.buildings);
+      const at = (day, seat, field) => {
+        const s2 = r.partsTrail.find((x) => x.day === day);
+        return s2?.bySeat?.[seat]?.[field] ?? 0;
+      };
+      const lastDay = r.partsTrail[r.partsTrail.length - 1].day;
+      const mid = Math.floor(lastDay / 2);
+      growthFirstHalf.push(at(mid, r.winner, 'total') - at(1, r.winner, 'total'));
+      growthSecondHalf.push(at(lastDay, r.winner, 'total') - at(mid, r.winner, 'total'));
+      loserGrowthFirstHalf.push(at(mid, loser, 'total') - at(1, loser, 'total'));
+      loserGrowthSecondHalf.push(at(lastDay, loser, 'total') - at(mid, loser, 'total'));
+      // С какого дня победитель ведёт и больше не отдаёт лидерство — «рано и навсегда»
+      // против «перехватил в конце».
+      let held = null;
+      for (let d = lastDay; d >= 1; d--) {
+        if (at(d, r.winner, 'total') > at(d, loser, 'total')) held = d;
+        else break;
+      }
+      if (held !== null) leadHeldFromDay.push(held);
+      for (const sample of r.partsTrail) {
+        const wd = sample.bySeat[r.winner] ?? { territory: 0, buildings: 0, total: 0 };
+        const ld = sample.bySeat[loser] ?? { territory: 0, buildings: 0, total: 0 };
+        bump(gapByDay, sample.day, wd.total - ld.total);
+        bump(gapTerritoryByDay, sample.day, wd.territory - ld.territory);
+        bump(gapBuildingsByDay, sample.day, wd.buildings - ld.buildings);
+        bump(winnerScoreByDay, sample.day, wd.total);
+        bump(loserScoreByDay, sample.day, ld.total);
+        bump(neutralByDay, sample.day, sample.neutral ?? 0);
+        bump(gapSeenByDay, sample.day);
+      }
+    }
+  }
   for (const k of r.seeded) seededTotal.add(k);
   for (const [k, v] of r.usage) bump(usageTotal, k, v);
   for (const [k, v] of r.techUsage) bump(techTotal, k, v);
@@ -293,6 +379,44 @@ for (let i = 0; i < N; i++) {
 }
 
 const days = (ms) => (ms / DAY).toFixed(1);
+/** Доли двух слагаемых отрыва в процентах — «территория 71% / постройки 29%». */
+const pctShare = (a, b) => {
+  const sum = a + b;
+  if (sum === 0) return '—';
+  return `территория ${Math.round((a / sum) * 100)}% / постройки ${Math.round((b / sum) * 100)}%`;
+};
+/** Абсолютные кривые счёта по дням — «разрыв растёт» без них двусмысленно: это может
+ *  быть и разгон лидера, и падение отстающего. */
+const scoreLine = () => {
+  const ds = [...gapSeenByDay.keys()].sort((a, b) => a - b);
+  if (ds.length === 0) return '—';
+  const picked = ds.filter((d) => d === 1 || d === ds[ds.length - 1] || d % 3 === 0);
+  return picked
+    .map((d) => {
+      const n = gapSeenByDay.get(d) || 1;
+      return `д${d} ${(winnerScoreByDay.get(d) / n).toFixed(0)}/${(loserScoreByDay.get(d) / n).toFixed(0)}`;
+    })
+    .join(' · ');
+};
+/** Сколько провинций ещё ничьи, по дням: день, когда это доходит до нуля, и есть конец
+ *  раздела карты — дальше счёт не создаётся, а перетекает. */
+const neutralLine = () => {
+  const ds = [...gapSeenByDay.keys()].sort((a, b) => a - b);
+  if (ds.length === 0) return '—';
+  const picked = ds.filter((d) => d === 1 || d === ds[ds.length - 1] || d % 2 === 0);
+  return picked
+    .map((d) => `д${d} ${(neutralByDay.get(d) / (gapSeenByDay.get(d) || 1)).toFixed(0)}`)
+    .join(' · ');
+};
+/** Разрыв по дням одной строкой: «д1 12 · д4 58 · д7 96 · д10 128 · д14 171». */
+const gapLine = () => {
+  const days = [...gapSeenByDay.keys()].sort((a, b) => a - b);
+  if (days.length === 0) return '—';
+  const picked = days.filter((d) => d === 1 || d === days[days.length - 1] || d % 3 === 0);
+  return picked
+    .map((d) => `д${d} ${(gapByDay.get(d) / (gapSeenByDay.get(d) || 1)).toFixed(0)}`)
+    .join(' · ');
+};
 const avg = (a) => (a.length ? a.reduce((s, v) => s + v, 0) / a.length : 0);
 const pct = (n, d) => (d === 0 ? '—' : `${((n / d) * 100).toFixed(0)}%`);
 const fmtWins = (m) =>
@@ -343,6 +467,18 @@ console.log(
     `  очки/фракция : ${fmtAvg(scoreByFaction, seenByFaction)}`,
     `  очки/старт   : ${fmtAvg(scoreByStart, seenByStart)}`,
     `  snowball   : ${pct(snowballHits, decided)} лидеров середины выиграли  ← высокий % = снежный ком, камбэков нет`,
+    // BAL-5: из ЧЕГО сложился отрыв и КОГДА он сложился. Флот в счёт не входит вовсе
+    // (GDD §8.1), поэтому слагаемых два — территория и постройки.
+    `  отрыв      : территория ${avg(marginTerritory).toFixed(0)} + постройки ${avg(marginBuildings).toFixed(0)}` +
+      ` = ${(avg(marginTerritory) + avg(marginBuildings)).toFixed(0)}` +
+      `  (${pctShare(avg(marginTerritory), avg(marginBuildings))})  ← чем именно победитель обошёл`,
+    `  разрыв/день: ${gapLine()}  ← растёт во второй половине = ком; ровный = фора позиции`,
+    `  счёт/день  : ${scoreLine()}  ← победитель/проигравший; расходится вверх = разгон, вниз = обвал отстающего`,
+    `  ничьих/день: ${neutralLine()}  ← когда кончается свободная карта: после этого счёт может только ПЕРЕТЕКАТЬ`,
+    `  прирост    : победитель ${avg(growthFirstHalf).toFixed(0)}→${avg(growthSecondHalf).toFixed(0)}` +
+      ` · проигравший ${avg(loserGrowthFirstHalf).toFixed(0)}→${avg(loserGrowthSecondHalf).toFixed(0)}` +
+      `  ← 1-я половина → 2-я, очков за половину`,
+    `  лидерство  : с ${avg(leadHeldFromDay).toFixed(1)}-го дня победитель ведёт и не отдаёт (из ${(avg(lengths) / DAY).toFixed(0)})`,
     `  usage      : ${topUsage || '—'}`,
     zeros.length ? `  мёртвый контент (0 построек за ${N} матчей): ${zeros.join(' ')}` : '  мёртвый контент: нет ✓',
     seededOnly.length ? `  посеяны, не строятся (в мёртвый контент НЕ входят): ${seededOnly.join(' ')}` : null,
@@ -369,6 +505,43 @@ console.log(
         techUsage: Object.fromEntries(techTotal),
         deadTech: techZeros,
         snowball: decided ? snowballHits / decided : null,
+        // BAL-5: разложение отрыва и его динамика.
+        marginTerritory: avg(marginTerritory),
+        marginBuildings: avg(marginBuildings),
+        gapByDay: Object.fromEntries(
+          [...gapSeenByDay.keys()]
+            .sort((a, b) => a - b)
+            .map((d) => [
+              d,
+              {
+                total: gapByDay.get(d) / gapSeenByDay.get(d),
+                territory: gapTerritoryByDay.get(d) / gapSeenByDay.get(d),
+                buildings: gapBuildingsByDay.get(d) / gapSeenByDay.get(d),
+              },
+            ]),
+        ),
+        scoreByDay: Object.fromEntries(
+          [...gapSeenByDay.keys()]
+            .sort((a, b) => a - b)
+            .map((d) => [
+              d,
+              {
+                winner: winnerScoreByDay.get(d) / gapSeenByDay.get(d),
+                loser: loserScoreByDay.get(d) / gapSeenByDay.get(d),
+              },
+            ]),
+        ),
+        neutralByDay: Object.fromEntries(
+          [...gapSeenByDay.keys()]
+            .sort((a, b) => a - b)
+            .map((d) => [d, neutralByDay.get(d) / gapSeenByDay.get(d)]),
+        ),
+        winnerGrowth: { firstHalf: avg(growthFirstHalf), secondHalf: avg(growthSecondHalf) },
+        loserGrowth: {
+          firstHalf: avg(loserGrowthFirstHalf),
+          secondHalf: avg(loserGrowthSecondHalf),
+        },
+        leadHeldFromDay: avg(leadHeldFromDay),
         lengthMinDays: lengths.length ? Math.min(...lengths) / DAY : null,
         lengthMaxDays: lengths.length ? Math.max(...lengths) / DAY : null,
         outcomes: Object.fromEntries(reasons),

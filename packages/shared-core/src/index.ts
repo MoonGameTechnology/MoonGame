@@ -66,6 +66,7 @@ export {
 } from './state/buildFromMap';
 export {
   sectorKindDef,
+  provinceScore,
   isCapturable,
   isBuildable,
   hasOrbit,
