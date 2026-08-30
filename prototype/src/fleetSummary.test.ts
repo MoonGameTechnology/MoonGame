@@ -154,7 +154,7 @@ describe('сводка армии — трюм, радар, содержание
       { unit: 'cruiser', count: 2 },
       { unit: 'scout', count: 3 },
     ]);
-    expect(s.upkeep).toEqual({ credits: 2 * 4 + 3 * 1 });
+    expect(s.upkeep).toEqual({ credits: 2 * 32 + 3 * 8 }); // BAL-3 scale: cruiser 32/д, scout 8/д
   });
 
   it('бесплатный флот отдаёт пустое содержание, а не мусор', () => {

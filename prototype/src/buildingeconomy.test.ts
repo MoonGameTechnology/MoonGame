@@ -100,3 +100,31 @@ describe('building economy — the prototype resource loop', () => {
     expect((twelve - plain) / (five - plain)).toBeCloseTo(0.12 / 0.05, 6);
   });
 });
+
+// BAL-3. `upkeep` is settled per DAY, `produces` / `baseOutput` per HOUR (economy.ts:
+// `days` vs `hours`). The catalogue used to be written as if both ran on one scale, so
+// the daily bill came out 8–26× under the daily faucet: credits / food / energy could
+// only pile up, nobody ever fell into arrears, and the brownout rule never fired once.
+// These lock the SCALE, not the individual numbers — each one flips if a future edit
+// re-authors upkeep back onto the hourly scale.
+describe('BAL-3 — содержание живёт на той же шкале, что и доход', () => {
+  const terran = data.planetTypes.terran!.baseOutput;
+  const perDay = (res: string): number => (terran[res] ?? 0) * 24;
+
+  it('дневной доход мира не содержит целый флот: крейсеров меньше восьми', () => {
+    // Было: 144 кредита в день против 4 за крейсер — один мир кормил 36 корпусов.
+    expect(perDay('credits') / data.units.cruiser!.upkeep.credits!).toBeLessThan(8);
+  });
+
+  it('энергии одного мира не хватает на рафинерию с фабрикатором — нужен реактор', () => {
+    const bill =
+      data.buildings.refinery!.upkeep.energy! + data.buildings.fabricator!.upkeep.energy!;
+    // Было 38 против 72 — мир питал оба здания сам, поэтому `power_plant` не строился.
+    expect(bill).toBeGreaterThan(perDay('energy'));
+  });
+
+  it('еды одного мира не хватает на полк: ополченцев меньше тридцати', () => {
+    // Было: 120 еды в день против 1 за ополченца — один мир кормил 120 душ.
+    expect(perDay('food') / data.units.militia!.upkeep.food!).toBeLessThan(30);
+  });
+});
