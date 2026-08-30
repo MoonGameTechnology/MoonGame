@@ -1316,3 +1316,36 @@ describe('combat — bug-hunt batch: assault guards, stalemate, ground chain-eng
     expect(r.events.some((e) => e.type === 'planet.bombarded')).toBe(false);
   });
 });
+
+describe('planet.captured — СПОСОБ захвата различается (AI-BAL-10)', () => {
+  const kernel = createKernel([...combatFamily, arrivalModule]);
+  /** `via` последнего события захвата в результате. */
+  const capturedVia = (events: { type: string; payload?: unknown }[]): string | undefined => {
+    const e = events.filter((x) => x.type === 'planet.captured').at(-1);
+    return (e?.payload as { via?: string } | undefined)?.via;
+  };
+
+  it('занятие НЕОБОРОНЯЕМОГО чужого мира с орбиты — `occupy`, а не «штурм»', () => {
+    // Ровно этот способ стал массовым после AI-BAL-7, и пока он попадал в ту же корзину,
+    // что и высадка, строка отчёта «захваты штурмом» читалась наоборот происходящему:
+    // росла вчетверо при том, что наземных боёв становилось МЕНЬШЕ.
+    const f = fleet('A', 'p1', 'P', [['fighter', 1]], [['marine', 2]]);
+    f.orbit = 'near';
+    const st = baseState([f], [planet('P', 'p2')]); // чужой мир, гарнизона нет
+    const r = okApply(kernel.applyAction(st, assault('A'), ctx(0)));
+    expect(capturedVia(r.events)).toBe('occupy');
+    // Десант остаётся на борту — гарнизона он не оставляет, потому что боя не было.
+    expect(r.state.planets.P?.garrison ?? []).toHaveLength(0);
+    expect(r.state.fleets.A?.landing?.[0]?.count).toBe(2);
+  });
+
+  it('победа над ЖИВЫМ гарнизоном — `assault`, и десант становится гарнизоном', () => {
+    const f = fleet('A', 'p1', 'P', [['fighter', 1]], [['marine', 5]]);
+    f.orbit = 'near';
+    const st = baseState([f], [planet('P', 'p2', 0, 0, [['militia', 1]])]);
+    const started = okApply(kernel.applyAction(st, assault('A'), ctx(0)));
+    const done = okAdvance(kernel.advanceTo(started.state, ctx(50 * HOUR)));
+    expect(capturedVia(done.events)).toBe('assault');
+    expect(done.state.planets.P?.garrison?.[0]?.unit).toBe('marine');
+  });
+});

@@ -123,7 +123,12 @@ function runMatch(i) {
   // счётчик. Захваты разделены по способу: `via: 'arrival'` — прилетел и забрал
   // (`captureOnArrival`), без `via` — взял штурмом (`combat.capturePlanet`).
   let groundBattles = 0;
+  // AI-BAL-10: способов взять мир ТРИ, и раньше отчёт знал два. Прилёт на ничей мир,
+  // занятие необороняемого чужого с орбиты и выигранный наземный бой лечатся по-разному,
+  // а пока два последних лежали в одной корзине, строка читалась наоборот происходящему:
+  // после AI-BAL-7 «штурмы» выросли вчетверо при том, что наземных боёв стало МЕНЬШЕ.
   let capturesByArrival = 0;
+  let capturesByOccupy = 0;
   let capturesByAssault = 0;
   // AI-BAL-7: тактический репертуар отдельными счётчиками. Без них правка «бот умеет
   // отступать» не проверяема: отступление РАСПУСКАЕТ бой, а не завершает его, поэтому
@@ -172,7 +177,9 @@ function runMatch(i) {
         battles++;
         if ((e.payload ?? {}).phase === 'ground') groundBattles++;
       } else if (e.type === 'planet.captured') {
-        if ((e.payload ?? {}).via === 'arrival') capturesByArrival++;
+        const via = (e.payload ?? {}).via;
+        if (via === 'arrival') capturesByArrival++;
+        else if (via === 'occupy') capturesByOccupy++;
         else capturesByAssault++;
       } else if (e.type === 'fleet.destroyed') {
         fleetsDestroyed++;
@@ -312,6 +319,7 @@ function runMatch(i) {
     tradeCredits,
     tradeFees,
     capturesByArrival,
+    capturesByOccupy,
     capturesByAssault,
     firstCombatAt,
     midLeader,
@@ -368,6 +376,7 @@ let tradesTotal = 0;
 let tradeCreditsTotal = 0;
 let tradeFeesTotal = 0;
 let arrivalCaptures = 0;
+let occupyCaptures = 0;
 let assaultCaptures = 0;
 // BAL-5 — ЧТО разгоняет лидера. Флот отпадает по коду (в `total` он не входит вовсе),
 // поэтому меряются два слагаемых и ДИНАМИКА разрыва: разрыв, поставленный рано и просто
@@ -409,6 +418,7 @@ for (let i = 0; i < N; i++) {
   tradeCreditsTotal += r.tradeCredits;
   tradeFeesTotal += r.tradeFees;
   arrivalCaptures += r.capturesByArrival;
+  occupyCaptures += r.capturesByOccupy;
   assaultCaptures += r.capturesByAssault;
   lengths.push(r.lengthMs);
   if (r.firstCombatAt !== null) firstCombats.push(r.firstCombatAt);
@@ -580,7 +590,7 @@ console.log(
     `  win by start   : ${fmtWins(winsByStart)}`,
     `  длина      : avg ${days(avg(lengths))}д · min ${days(Math.min(...lengths))}д · max ${days(Math.max(...lengths))}д · исходы: ${fmtWins(reasons)}`,
     `  1-й бой    : avg ${days(avg(firstCombats))}д (в ${firstCombats.length}/${N} матчах) · боёв всего ${battlesTotal}`,
-    `  наземная   : ${groundBattlesTotal} наземных боёв из ${battlesTotal} · захваты: прилётом ${arrivalCaptures} · штурмом ${assaultCaptures}  ← «штурмом» и есть вторая фаза захвата (GDD §7.4); 0 = она не играется`,
+    `  наземная   : ${groundBattlesTotal} наземных боёв из ${battlesTotal} · захваты: прилётом ${arrivalCaptures} · занято с орбиты ${occupyCaptures} · штурмом ${assaultCaptures}  ← «штурмом» и есть вторая фаза захвата (GDD §7.4); 0 = она не играется. «Занято с орбиты» боя НЕ требует — это чужой мир без гарнизона (AI-BAL-10)`,
     `  тактика    : отступлений ${retreatsTotal} · осад ${siegesTotal} (обстрелов ${bombardSpansTotal}) · расколов флота ${splitsTotal}  ← AI-BAL-7; 0 в строке = механика вне измерения`,
     `  рынок      : сделок ${tradesTotal} на ${tradeCreditsTotal.toFixed(0)} credits (сгорело комиссией ${tradeFeesTotal.toFixed(0)})  ← AI-BAL-9; лоты выставлялись и раньше, доказывают только СДЕЛКИ`,
     `  герои      : подъёмов ${heroSpawnsTotal} · узлов дерева ${heroSkillsTotal} · фитингов ${heroFitsTotal} · кастов ${
@@ -689,6 +699,7 @@ console.log(
         battlesTotal,
         groundBattlesTotal,
         capturesByArrival: arrivalCaptures,
+        capturesByOccupy: occupyCaptures,
         capturesByAssault: assaultCaptures,
         trades: tradesTotal,
         tradeCredits: tradeCreditsTotal,
