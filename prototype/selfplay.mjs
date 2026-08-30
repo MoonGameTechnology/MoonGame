@@ -7,8 +7,8 @@
 //   pnpm run selfplay 200        # 200 matches
 //   pnpm run selfplay 200 tag7   # 200 matches, another seed family
 //
-// Fairness controls per match index i: starts swap on i%2, factions swap on
-// (i>>1)%2 — so "win rate by slot", "by faction" and "by start" separate cleanly.
+// Fairness controls per match index i: starts swap on i%2, the ORDERED faction pair
+// cycles on (i>>1)%12 — so "win rate by slot", "by faction" and "by start" separate cleanly.
 import { build } from 'esbuild';
 
 const N = Math.max(1, Number(process.argv[2] ?? 20) || 20);
@@ -27,6 +27,18 @@ new Function('module', 'exports', 'require', res.outputFiles[0].text)(mod, mod.e
 const { newGame, kernel, data, aiOrders, scoreParts, HOUR, DAY, START_CANDIDATES } = mod.exports;
 
 const STEP = 2 * HOUR; // the AI decision cadence (mirrors the netserver driver)
+
+// AI-BAL-12: ЧЕТЫРЕ дома вместо двух. До этого кресла занимала константа azure/crimson,
+// поэтому `amber` (+15% скорости флота) и `violet` (+5%/+5%) не участвовали ни в одном
+// прогоне ни разу — про них не было ни одной цифры, а «фракции сравнимы» (BAL-2) было
+// сказано ровно про двух из четырёх.
+//
+// Пара берётся ПЕРЕБОРОМ по индексу матча, а не хешем сида: перебор равномерен по
+// построению, хеш — лишь в пределе, а на 300 матчах предел ещё не наступил. Пары
+// УПОРЯДОЧЕННЫЕ (4×3 = 12): порядок решает, кто садится в p1, а слотовый перекос —
+// самостоятельная величина отчёта, и смешивать его с фракционным нельзя.
+const FACTION_IDS = Object.keys(data.factions ?? {});
+const FACTION_PAIRS = FACTION_IDS.flatMap((a) => FACTION_IDS.filter((b) => b !== a).map((b) => [a, b]));
 
 // ДВУХНЕДЕЛЬНАЯ СЕССИЯ БЕЗ ДОСРОЧНОЙ ПОБЕДЫ (заказ владельца 2026-08-26). Раньше прогон
 // кончался порогом очков — и кончался на 4-м дне: `score` был исходом 100% матчей, а
@@ -73,7 +85,6 @@ function leaderByPlanets(state) {
 
 function runMatch(i) {
   const swapStart = i % 2 === 1;
-  const swapFaction = (i >> 1) % 2 === 1;
   // Дуэлянты садятся ДИАМЕТРАЛЬНО (сектор k и сектор k+5 из десяти), а не в соседние.
   // Противоположная пара честна по построению: у неё общий бюджет двора и одинаковый
   // профиль по прыжкам (BAL-1). Соседняя пара тоже равнозначна по метрикам, но фронт
@@ -88,7 +99,7 @@ function runMatch(i) {
   const home = Math.floor(i / 4) % HALF;
   const pair = [START_CANDIDATES[home], START_CANDIDATES[home + HALF]];
   const starts = swapStart ? [pair[1], pair[0]] : [pair[0], pair[1]];
-  const factions = swapFaction ? ['crimson', 'azure'] : ['azure', 'crimson'];
+  const factions = FACTION_PAIRS[(i >> 1) % FACTION_PAIRS.length];
   const seats = [
     { id: 'p1', name: 'Bot One', faction: factions[0], start: starts[0], ai: true },
     { id: 'p2', name: 'Bot Two', faction: factions[1], start: starts[1], ai: true },
@@ -320,6 +331,9 @@ const scoreByFaction = new Map();
 const scoreByStart = new Map();
 const seenBySlot = new Map();
 const seenByFaction = new Map();
+// Появления в РЕШЁННЫХ матчах — знаменатель доли побед. `seenByFaction` считает и ничьи,
+// а делить победы на матчи, где победителя не было, значит занижать долю у всех сразу.
+const decidedByFaction = new Map();
 const seenByStart = new Map();
 const winnerScores = [];
 const loserScores = [];
@@ -393,6 +407,7 @@ for (let i = 0; i < N; i++) {
     if (meta) {
       bump(scoreByFaction, meta.faction, total);
       bump(seenByFaction, meta.faction);
+      if (r.winner !== null) bump(decidedByFaction, meta.faction);
       bump(scoreByStart, meta.start, total);
       bump(seenByStart, meta.start);
     }
@@ -498,6 +513,15 @@ const fmtWins = (m) =>
     .sort((a, b) => b[1] - a[1])
     .map(([k, v]) => `${k} ${v} (${pct(v, decided)})`)
     .join(' · ') || '—';
+/** «ключ победы/партии (доля)» — для ключей, которые участвуют НЕ в каждом матче.
+ *  С двумя фракциями доля от общего числа матчей была той же величиной; с четырьмя дом
+ *  садится примерно в половину партий, и деление на `decided` занизило бы всех вдвое. */
+const fmtRate = (wins, played) =>
+  [...played.entries()]
+    .map(([k, n]) => [k, wins.get(k) ?? 0, n])
+    .sort((a, b) => b[1] / b[2] - a[1] / a[2])
+    .map(([k, w, n]) => `${k} ${w}/${n} (${pct(w, n)})`)
+    .join(' · ') || '—';
 /** «ключ среднее» по убыванию — рейтинг, а не сырые суммы: матчей у ключей разное число. */
 const fmtAvg = (sums, seen) =>
   [...sums.entries()]
@@ -531,7 +555,7 @@ console.log(
     `━━ self-play balance ━━ ${N} матчей · seed "${BASE_SEED}-*" · ${((Date.now() - t0) / 1000).toFixed(1)}s`,
     `  decided   : ${decided} · draws ${draws} (кап ${days(CAP)}д)${errors ? ` · ERRORS ${errors}` : ''}`,
     `  win by slot    : ${fmtWins(winsBySlot)}   ← цель ~50/50`,
-    `  win by faction : ${fmtWins(winsByFaction)}`,
+    `  win by faction : ${fmtRate(winsByFaction, decidedByFaction)}   ← побед/партий; дом садится примерно в половину матчей (AI-BAL-12)`,
     `  win by start   : ${fmtWins(winsByStart)}`,
     `  длина      : avg ${days(avg(lengths))}д · min ${days(Math.min(...lengths))}д · max ${days(Math.max(...lengths))}д · исходы: ${fmtWins(reasons)}`,
     `  1-й бой    : avg ${days(avg(firstCombats))}д (в ${firstCombats.length}/${N} матчах) · боёв всего ${battlesTotal}`,
@@ -578,6 +602,7 @@ console.log(
         errors,
         winsBySlot: Object.fromEntries(winsBySlot),
         winsByFaction: Object.fromEntries(winsByFaction),
+        playedByFaction: Object.fromEntries(decidedByFaction),
         winsByStart: Object.fromEntries(winsByStart),
         avgLengthDays: avg(lengths) / DAY,
         techResearched: techTotalCount,
