@@ -48,7 +48,7 @@
       "garrison": [{ "unit": "militia", "count": 2 }],
       "homeBuildings": ["mine_t1"]
     },
-    "passives": { "fleetSpeedBonus": 0.15 }
+    "passives": { "fleetSpeedBonus": 0.05 }
   },
   "violet": {
     "name": "Violet Ascendancy",

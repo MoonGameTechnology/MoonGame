@@ -566,7 +566,13 @@ export const data: GameData = parseGameData({
     amber: {
       name: 'Amber Concord',
       description: 'faction.amber.desc',
-      passives: { fleetSpeedBonus: 0.15 },
+      // BAL-11: 0.15 → 0.05. Fleet speed was by far the strongest of the four passives —
+      // 60.3% of its matches (+5.01σ) over 4 seed families × 300, and above 57% in every
+      // single family, while the other three sat at 45.8–47.9%. The map is what the match
+      // is decided by (BAL-5: 82% of the margin is territory), and speed converts into the
+      // tempo of dividing it directly, whereas production and damage only do so through
+      // intermediaries — so a point of speed simply buys more than a point of either.
+      passives: { fleetSpeedBonus: 0.05 },
     },
     violet: {
       name: 'Violet Ascendancy',
