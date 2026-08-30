@@ -8,18 +8,23 @@
  */
 import {
   BASE_RESEARCH_SLOTS,
+  HERO_ACTIVE_CAP,
+  abilityRange,
   getStance,
+  heroCooldownKey,
   previewBattle,
   technologyLock,
   type GameState,
   type Action,
   type Battle,
   type CombatantRef,
+  type Hero,
   type StewardPosture,
   type Planet,
   type Fleet,
   type UnitStack,
 } from '../../packages/shared-core/src/index';
+import { heroNode } from '../../packages/shared-core/src/state/heroes';
 import { provinceScore } from '../../packages/shared-core/src/state/sectorKind';
 import {
   moveFleet,
@@ -38,6 +43,10 @@ import {
   retreatFleet,
   bombardFleet,
   splitFleet,
+  spawnHero,
+  unlockHeroSkill,
+  fitHero,
+  castHeroAbility,
 } from './actions';
 import { netIncome } from './economy';
 import { SECTOR_TYPES } from './map';
@@ -672,6 +681,27 @@ export function aiOrders(
       out.push(buildBuilding(ai, p.id, 'mine'));
       break; // spread the economy one world per tick
     }
+    // МЁРТВЫЙ МИР — тоже экономика (AI-BAL-8). До аннигиляции ни одного `dead_world` на
+    // карте прототипа не существовало, поэтому `metal_station` числилась мёртвым
+    // контентом «по УСЛОВИЮ» (AI-BAL-10, случай «в»). Теперь герой их создаёт — но обычная
+    // шахта на пустыре запрещена (`allowedBuildings: ['metal_station']`), а правило шахты
+    // выше берёт только `kind === 'planet'`, так что без этой ветки аннигиляция оставляла
+    // бы после себя ровно пустырь. Салвага и есть плата за разрушенный мир: 30 металла в
+    // час против 10 базовых.
+    if (profile === 'test') {
+      for (const p of worldsInOrder(state, ai, 'salvage', profile)) {
+        if (p.owner !== ai || p.kind !== 'dead_world') continue;
+        if (
+          p.buildings.some((x) => x.type === 'metal_station') ||
+          pendingBuild(p.id, 'metal_station')
+        ) {
+          continue;
+        }
+        if (!affordable('metal_station')) break;
+        out.push(buildBuilding(ai, p.id, 'metal_station'));
+        break; // одна стройка за тик — как и с шахтой
+      }
+    }
     // ТЕСТ-БОТ ТОЛЬКО (AI-BAL-1.1): технологии исследует лабораторный профиль, игровой —
     // нет. Живому игроку достаётся прежний простой соперник; прогон баланса получает
     // соперника, у которого работает ветка эффектов.
@@ -906,6 +936,159 @@ export function aiOrders(
     //  seeded infantry garrison + orbital-AA building for defence; mobile ground via divisions.)
     const baseHasShip = base.garrison.some((st) => isShipUnit(st.unit));
     if (ownFleets < (warFooting ? 4 : 2) && baseHasShip) out.push(launchFleet(ai, base.id));
+  }
+  // ═══ ТЕСТ-БОТ (AI-BAL-8): ГЕРОЙ ВХОДИТ В ИЗМЕРЕНИЕ ═══
+  // Диагноз кирпича: герой ПОСЕЯН во флоте каждого места (`matchSetup`) и исправно
+  // дерётся как корпус — но это и всё, что он делал. Бот не звал ни `hero.spawn`, ни
+  // `hero.skill.unlock`, ни `hero.fit`, ни `hero.ability`, поэтому целая ветка контента
+  // — три спящих героя ростера, два дерева навыков по четыре узла, три фитинга и весь
+  // диспетчер способностей — не участвовала в балансе НИ ОДНОЙ цифрой.
+  //
+  // Правила ниже намеренно минимальные, той же формы, что и правило технологий
+  // (AI-BAL-1): бот не «строит билд» — он просто не оставляет пустыми слоты, которые
+  // матч ему выдал. Что именно можно взять, решает САМО ЯДРО (ветка архетипа, `requires`,
+  // казна, кэп активных, кулдаун) — копии этих правил здесь нет, иначе первая же
+  // расходимость с модулем обернулась бы не ошибкой, а тихо изменившимся балансом.
+  if (profile === 'test' && pl) {
+    // Порядок обхода — по id инстанса, а не по раскладке объекта: `hero:{место}:{n}`
+    // сеет `matchSetup`, так что сортировка стабильна и один сид разыгрывается
+    // одинаково (инвариант #1).
+    const roster = Object.values(state.heroes ?? {})
+      .filter((x) => x.owner === ai)
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    // «Развёрнут» ровно в том смысле, в каком это считает ядро (`activeHeroCount`):
+    // жив И командует ЖИВЫМ кораблём. Протухший `fleetId` не считается — иначе бот
+    // держал бы место в кэпе за героем, которого нет.
+    const deployed = (x: Hero): boolean =>
+      x.alive !== false && x.fleetId !== undefined && state.fleets[x.fleetId] !== undefined;
+    const affordableCost = (cost: Record<string, number> = {}): boolean =>
+      Object.keys(cost).every((r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + 60);
+    // Дешёвое вперёд, id последним ключом — тот же ДЕТЕРМИНИРОВАННЫЙ (а не «оптимальный»)
+    // порядок, что у выбора технологии: перебор объекта дал бы разный порядок на разных
+    // движках.
+    const byPrice = (costOf: (id: string) => Record<string, number> | undefined) =>
+      (a: string, b: string): number => {
+        const sum = (c: Record<string, number> = {}): number =>
+          Object.values(c).reduce((n, v) => n + v, 0);
+        return sum(costOf(a)) - sum(costOf(b)) || (a < b ? -1 : a > b ? 1 : 0);
+      };
+
+    // 1. ПОДЪЁМ РОСТЕРА. Матч раздаёт каждому месту четырёх героев, но кораблём
+    //    командует только главный — остальные лежат неразвёрнутыми и ждут `hero.spawn`.
+    //    Кэп активных берётся из ядра (`HERO_ACTIVE_CAP`), а не переписывается числом:
+    //    иначе бот либо держал бы вторую копию правила, либо сыпал `E_HERO_CAP` каждые
+    //    два часа. Респаун-кулдаун читается по тому же гроссбуху, что и гейт.
+    if (base) {
+      let room = HERO_ACTIVE_CAP - roster.filter(deployed).length;
+      for (const x of roster) {
+        if (room <= 0) break;
+        if (deployed(x) || (x.cooldowns?.respawn ?? 0) > state.time) continue;
+        out.push(spawnHero(ai, x.id, base.id));
+        room -= 1;
+      }
+    }
+
+    // 2. ДЕРЕВО НАВЫКОВ — один узел за тик, как одна стройка за тик в экономике.
+    //    Ветку узла против ветки архетипа и цепочку `requires` судит ядро; здесь их
+    //    ЗЕРКАЛО ровно в той мере, чтобы не отдавать заведомо отбиваемый приказ.
+    for (const x of roster) {
+      if (x.alive === false) continue;
+      const branch = x.archetype !== undefined ? data.heroes[x.archetype]?.branch : undefined;
+      const taken = x.skills ?? [];
+      const node = Object.keys(data.heroSkillTrees)
+        .filter((id) => {
+          const def = data.heroSkillTrees[id];
+          if (!def || taken.includes(id)) return false;
+          if (def.branch !== undefined && def.branch !== branch) return false;
+          if (!(def.requires ?? []).every((parent) => taken.includes(parent))) return false;
+          return affordableCost(def.cost);
+        })
+        .sort(byPrice((id) => data.heroSkillTrees[id]?.cost))[0];
+      if (node !== undefined) {
+        out.push(unlockHeroSkill(ai, x.id, node));
+        break;
+      }
+    }
+
+    // 3. ФИТИНГИ — тоже по одному за тик. Слоты считает архетип; ставится навсегда
+    //    (рефита нет), поэтому порядок «дешёвое вперёд» заодно и есть приоритет.
+    for (const x of roster) {
+      if (x.alive === false) continue;
+      const slots = x.archetype !== undefined ? (data.heroes[x.archetype]?.slots ?? 0) : 0;
+      const fitted = x.fittings ?? [];
+      if (fitted.length >= slots) continue;
+      const fit = Object.keys(data.heroFittings)
+        .filter((id) => !fitted.includes(id) && affordableCost(data.heroFittings[id]?.cost))
+        .sort(byPrice((id) => data.heroFittings[id]?.cost))[0];
+      if (fit !== undefined) {
+        out.push(fitHero(ai, x.id, fit));
+        break;
+      }
+    }
+
+    // 4. СПОСОБНОСТИ. Диспетчер ядра data-driven — значит и правило каста здесь по
+    //    ТИПУ способности, а не по её id: новая способность того же типа поедет сама.
+    //    Одна способность на героя за тик.
+    for (const x of roster) {
+      if (!deployed(x) || x.alive !== true) continue;
+      const fleet = x.fleetId !== undefined ? state.fleets[x.fleetId] : undefined;
+      const node = fleet ? state.planets[heroNode(state, x)] : undefined;
+      if (!fleet || !node) continue;
+      const fighting = fleet.battleId != null;
+      for (const id of x.abilities ?? []) {
+        if (typeof id !== 'string') continue;
+        const def = data.heroAbilities[id];
+        if (!def) continue;
+        // Кулдаун читается ТЕМ ЖЕ ключом, что ведёт гейт (`heroCooldownKey`): ключ
+        // общий на ТИП, поэтому rally и bulwark делят одно окно — и бот, не зная
+        // этого, спамил бы `E_COOLDOWN` второй аурой каждый тик.
+        if ((x.cooldowns?.[heroCooldownKey(def.type)] ?? 0) > state.time) continue;
+        if (!affordableCost(def.cost)) continue;
+        const reach = abilityRange(def);
+        // Куда кастовать — решает ТИП:
+        //  · `aura` (rally/bulwark) и `reveal` (scan) — боевые: они стоят чего-то
+        //    только пока рядом дерутся, и оба бьют по узлу героя. У скана это не про
+        //    туман (бот читает состояние целиком — та же причина, по которой ему не
+        //    нужен `radar`, AI-BAL-2), а про ПСИ-ЛЕСТНИЦУ: взятые ступени превращают
+        //    просвеченную зону в боевую (+урон врагу, −урон себе);
+        //  · `annihilate` — по миру, который бот ОСАЖДАЕТ и всё равно не может взять
+        //    (AI-BAL-7): размен «мир противника на мёртвый мир, богатый металлом» —
+        //    единственный способ, которым в матче вообще появляется `dead_world`;
+        //  · `temp_lane` — дорога туда, куда дороги нет: коридор к захватываемой цели
+        //    в радиусе, не связанной с узлом героя ребром графа;
+        //  · `recall` (домой) и маркеры `spawn_*` — НЕ кастуются. Отзыв выдёргивает
+        //    героя с фронта ровно тогда, когда он нужнее всего, а маркеры вообще не
+        //    кастуемы: ядро читает их наличием (`hero.spawn`), и каст ответил бы
+        //    `E_NO_EFFECT`.
+        let target: string | undefined;
+        if (def.type === 'aura' || def.type === 'reveal') {
+          if (!fighting) continue;
+          target = reach > 0 ? node.id : undefined;
+        } else if (def.type === 'annihilate') {
+          if (!fleet.bombarding || node.owner === null || node.owner === ai) continue;
+          target = node.id;
+        } else if (def.type === 'temp_lane') {
+          const linked = new Set(node.links ?? []);
+          const to = Object.values(state.planets)
+            .filter(
+              (p) =>
+                p.id !== node.id &&
+                p.owner !== ai &&
+                capturable(p) &&
+                !linked.has(p.id) &&
+                canTraverse(state, ai, p.owner) &&
+                d(node.position, p.position) <= reach,
+            )
+            .sort((a, b) => d(node.position, a.position) - d(node.position, b.position))[0];
+          if (!to) continue;
+          target = to.id;
+        } else {
+          continue;
+        }
+        out.push(castHeroAbility(ai, x.id, id, target));
+        break;
+      }
+    }
   }
   // Trade on the session market: a passive bot liquidates the surplus goods it never
   // uses (food/energy/microelectronics) into the credits it always needs, and — when

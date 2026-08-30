@@ -103,8 +103,11 @@ const HERO_COMBAT_BONUS = 0.05;
 /** Game-hours before a slain projection hero respawns at its home world. */
 const HERO_RESPAWN_HOURS = 24;
 /** Max heroes a player may have DEPLOYED (commanding a live ship) at once —
- *  docs/heroes.md: «игрок может выставить до трёх одновременно». */
-const HERO_ACTIVE_CAP = 3;
+ *  docs/heroes.md: «игрок может выставить до трёх одновременно». Exported because
+ *  a caller that decides WHETHER to raise a hero has to know the ceiling: without
+ *  it the prototype's test bot would either hold a second copy of the number or
+ *  spam `hero.spawn` into `E_HERO_CAP` every tick (AI-BAL-8). */
+export const HERO_ACTIVE_CAP = 3;
 /** Ability TYPES that passively relax the `hero.spawn` target gate (HERO-8): a hero
  *  CARRYING an ability of the type may form its ship aboard one of the player's own
  *  fleets / at an allied world. Markers read by `hero.spawn`, not castable effects
@@ -381,8 +384,11 @@ function abilityParams(def: HeroAbilityDef, hero: Hero): Record<string, unknown>
  *  double-fire the same effect; a custom type cools down per effect TYPE for the same
  *  reason (two catalog abilities dispatching to one `hero.effect.<x>` share a cooldown).
  *  The `fx:` prefix keeps custom keys clear of the reserved `path`/`annihilate`/`respawn`
- *  ledger slots. */
-function cooldownKey(type: string): string {
+ *  ledger slots. Exported (as `heroCooldownKey`) for the same reason as
+ *  {@link HERO_ACTIVE_CAP}: a caller deciding WHETHER to cast has to read the ledger the
+ *  gate reads, and a second copy of this mapping would drift into silent `E_COOLDOWN`
+ *  spam (AI-BAL-8). */
+export function cooldownKey(type: string): string {
   if (type === 'temp_lane') return 'path';
   if (type === 'annihilate') return 'annihilate';
   return `fx:${type}`;
