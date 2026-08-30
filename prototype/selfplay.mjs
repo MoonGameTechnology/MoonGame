@@ -154,6 +154,13 @@ function runMatch(i) {
   let heroSkills = 0;
   let heroFits = 0;
   const heroCasts = new Map(); // тип способности → сколько раз кастовали
+  // AI-BAL-9: рынок. Лоты выставлялись и раньше, поэтому «книга не пуста» ничего не
+  // доказывает — считаются именно СДЕЛКИ (`market.traded`), их объём в кредитах и
+  // сгоревшая комиссия: она главный кредитный сток сессии, и до первой сделки её не
+  // существовало вовсе.
+  let trades = 0;
+  let tradeCredits = 0;
+  let tradeFees = 0;
   let firstCombatAt = null;
   const consume = (events, now) => {
     for (const e of events) {
@@ -176,6 +183,11 @@ function runMatch(i) {
         else capturesByAssault++;
       } else if (e.type === 'fleet.destroyed') {
         fleetsDestroyed++;
+      } else if (e.type === 'market.traded') {
+        const p = e.payload ?? {};
+        trades++;
+        tradeCredits += (p.amount ?? 0) * (p.price ?? 0);
+        tradeFees += p.fee ?? 0;
       } else if (e.type === 'hero.spawned') {
         heroSpawns++;
       } else if (e.type === 'hero.skill.unlocked') {
@@ -303,6 +315,9 @@ function runMatch(i) {
     heroSkills,
     heroFits,
     heroCasts,
+    trades,
+    tradeCredits,
+    tradeFees,
     capturesByArrival,
     capturesByOccupy,
     capturesByAssault,
@@ -357,6 +372,9 @@ let heroSpawnsTotal = 0;
 let heroSkillsTotal = 0;
 let heroFitsTotal = 0;
 const heroCastsTotal = new Map();
+let tradesTotal = 0;
+let tradeCreditsTotal = 0;
+let tradeFeesTotal = 0;
 let arrivalCaptures = 0;
 let occupyCaptures = 0;
 let assaultCaptures = 0;
@@ -396,6 +414,9 @@ for (let i = 0; i < N; i++) {
   heroSkillsTotal += r.heroSkills;
   heroFitsTotal += r.heroFits;
   for (const [t, n] of r.heroCasts) heroCastsTotal.set(t, (heroCastsTotal.get(t) ?? 0) + n);
+  tradesTotal += r.trades;
+  tradeCreditsTotal += r.tradeCredits;
+  tradeFeesTotal += r.tradeFees;
   arrivalCaptures += r.capturesByArrival;
   occupyCaptures += r.capturesByOccupy;
   assaultCaptures += r.capturesByAssault;
@@ -571,6 +592,7 @@ console.log(
     `  1-й бой    : avg ${days(avg(firstCombats))}д (в ${firstCombats.length}/${N} матчах) · боёв всего ${battlesTotal}`,
     `  наземная   : ${groundBattlesTotal} наземных боёв из ${battlesTotal} · захваты: прилётом ${arrivalCaptures} · занято с орбиты ${occupyCaptures} · штурмом ${assaultCaptures}  ← «штурмом» и есть вторая фаза захвата (GDD §7.4); 0 = она не играется. «Занято с орбиты» боя НЕ требует — это чужой мир без гарнизона (AI-BAL-10)`,
     `  тактика    : отступлений ${retreatsTotal} · осад ${siegesTotal} (обстрелов ${bombardSpansTotal}) · расколов флота ${splitsTotal}  ← AI-BAL-7; 0 в строке = механика вне измерения`,
+    `  рынок      : сделок ${tradesTotal} на ${tradeCreditsTotal.toFixed(0)} credits (сгорело комиссией ${tradeFeesTotal.toFixed(0)})  ← AI-BAL-9; лоты выставлялись и раньше, доказывают только СДЕЛКИ`,
     `  герои      : подъёмов ${heroSpawnsTotal} · узлов дерева ${heroSkillsTotal} · фитингов ${heroFitsTotal} · кастов ${
       [...heroCastsTotal.entries()].sort().map(([t, n]) => `${t}=${n}`).join(' ') || '0'
     }  ← AI-BAL-8; каст СЧИТАЕТСЯ ПО ТИПУ, потому что правило бота тоже по типу, а не по id`,
@@ -679,6 +701,9 @@ console.log(
         capturesByArrival: arrivalCaptures,
         capturesByOccupy: occupyCaptures,
         capturesByAssault: assaultCaptures,
+        trades: tradesTotal,
+        tradeCredits: tradeCreditsTotal,
+        tradeFees: tradeFeesTotal,
         heroSpawns: heroSpawnsTotal,
         heroSkills: heroSkillsTotal,
         heroFits: heroFitsTotal,
