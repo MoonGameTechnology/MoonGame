@@ -309,6 +309,16 @@ export const data: GameData = parseGameData({
       slotBonus: 1,
     },
   },
+  // BAL-3: `upkeep` is quoted per DAY, while `produces` / `planetTypes.baseOutput`
+  // are quoted per HOUR (economy.ts settles the first over `days`, the second over
+  // `hours`). The catalogue had been authored as if both ran on one scale, so the
+  // daily bill came out 8–26× smaller than the daily faucet and credits / food /
+  // energy could only pile up — nobody was ever in arrears, so the brownout rule
+  // never fired and farm / power_plant stayed dead content.
+  // The bills below are scaled to the faucet they are actually charged against
+  // (credits ×8, food ×5, energy ×5 over the pre-BAL-3 numbers), which lands the
+  // mid-game bill at roughly a half to two thirds of income: a standing army and a
+  // full building set now cost something, and losing worlds can put you in debt.
   units: {
     scout: {
       faction: 'blue',
@@ -317,7 +327,7 @@ export const data: GameData = parseGameData({
       radarRange: 105, // projects fleet radar — read by both the core fog and the prototype view (плейтест 2026-07-18: −50%)
       cost: { metal: 20 },
       buildTimeHours: 1,
-      upkeep: { credits: 1 },
+      upkeep: { credits: 8 },
       slots: { utility: 1 }, // a lone utility bay — a recon drone flexes its sensors
     },
     // Сенсорный фрегат — носитель дальнего радара и больше почти ничего. Своя антенна
@@ -331,7 +341,7 @@ export const data: GameData = parseGameData({
       radarRange: 60, // своя антенна скромная; дальнее зрение даёт модуль
       cost: { metal: 55, microelectronics: 2 }, // ECON-7: сенсоры — хай-тек
       buildTimeHours: 2,
-      upkeep: { credits: 2 },
+      upkeep: { credits: 16 },
       slots: { utility: 1 }, // ровно один отсек — и он же единственный дом радара
     },
     cruiser: {
@@ -343,7 +353,7 @@ export const data: GameData = parseGameData({
       // real fleet, so you must run fabricators to keep building (Bytro model).
       cost: { metal: 60, credits: 20, microelectronics: 3 },
       buildTimeHours: 3,
-      upkeep: { credits: 4 },
+      upkeep: { credits: 32 },
       slots: { weapon: 1, defense: 1, utility: 1 }, // the balanced warship: one of each bay
     },
     siege: {
@@ -356,7 +366,7 @@ export const data: GameData = parseGameData({
       signature: 5, // huge siege platform — loudest
       cost: { metal: 90, credits: 40, microelectronics: 4 }, // ECON-7: guided munitions
       buildTimeHours: 5,
-      upkeep: { credits: 6 },
+      upkeep: { credits: 48 },
       slots: { weapon: 1, utility: 1 }, // a gun bay + a utility bay — a glass cannon
     },
     dropship: {
@@ -367,7 +377,7 @@ export const data: GameData = parseGameData({
       signature: 3, // a fat hauler — easy to spot
       cost: { metal: 70, credits: 20 },
       buildTimeHours: 4,
-      upkeep: { credits: 3 },
+      upkeep: { credits: 24 },
       slots: { defense: 1, utility: 2 }, // no guns — it armours up and carries утилиту
     },
     fighter_squadron: {
@@ -387,7 +397,7 @@ export const data: GameData = parseGameData({
       signature: 2,
       cost: { metal: 90, credits: 40, microelectronics: 10 },
       buildTimeHours: 2,
-      upkeep: { credits: 4 },
+      upkeep: { credits: 32 },
       slots: { weapon: 1 }, // a single gun mount — upgun the paper-thin strike wing
     },
     strike_carrier: {
@@ -398,7 +408,7 @@ export const data: GameData = parseGameData({
       signature: 6,
       cost: { metal: 320, credits: 160 },
       buildTimeHours: 6,
-      upkeep: { credits: 12 },
+      upkeep: { credits: 96 },
       slots: { defense: 1, utility: 2 }, // a flat-top: armour + sensor/cargo bays
     },
     // (Orbital AA is not a unit: it's a defensive *building* — anti-ship, immobile,
@@ -421,7 +431,7 @@ export const data: GameData = parseGameData({
       signature: 1,
       cost: { metal: 15 },
       buildTimeHours: 1,
-      upkeep: { credits: 1, food: 1 },
+      upkeep: { credits: 8, food: 5 },
     },
     heavy_infantry: {
       faction: 'blue',
@@ -431,7 +441,7 @@ export const data: GameData = parseGameData({
       signature: 1,
       cost: { metal: 55, credits: 15 },
       buildTimeHours: 2,
-      upkeep: { credits: 2, food: 1 },
+      upkeep: { credits: 16, food: 5 },
     },
     special_forces: {
       faction: 'blue',
@@ -441,7 +451,7 @@ export const data: GameData = parseGameData({
       signature: 1,
       cost: { metal: 60, credits: 45, microelectronics: 5 },
       buildTimeHours: 3,
-      upkeep: { credits: 4, food: 1 },
+      upkeep: { credits: 32, food: 5 },
     },
     // Танк — heavy front line: high attack and hull, but pricey and bulky to lift.
     tank: {
@@ -452,7 +462,7 @@ export const data: GameData = parseGameData({
       signature: 2,
       cost: { metal: 120, credits: 30 },
       buildTimeHours: 4,
-      upkeep: { credits: 4, food: 2 },
+      upkeep: { credits: 32, food: 10 },
     },
     // The player's projection hero — cruiser-tier guns but TRIPLE the hull, and the
     // +5% attack/defense aura it grants its fleet (heroModule). Seeded, not built.
@@ -464,7 +474,7 @@ export const data: GameData = parseGameData({
       signature: 6, // a flagship — loud on radar
       cost: { metal: 400, credits: 200 },
       buildTimeHours: 10,
-      upkeep: { credits: 8 },
+      upkeep: { credits: 64 },
     },
   },
   // Ship modules (mirror of data/modules.json) — the «Оснащение корабля» loadout
@@ -587,7 +597,7 @@ export const data: GameData = parseGameData({
       cost: { metal: 110 },
       buildTimeHours: 4,
       produces: { credits: 8 },
-      upkeep: { energy: 8 }, // refined credit production runs on grid power
+      upkeep: { energy: 40 }, // refined credit production runs on grid power
       hp: 20,
       scoreValue: 3,
     },
@@ -602,7 +612,7 @@ export const data: GameData = parseGameData({
       cost: { metal: 90 },
       buildTimeHours: 3,
       produces: { food: 10 },
-      upkeep: { energy: 6 },
+      upkeep: { energy: 30 },
       hp: 18,
       scoreValue: 3,
       upgrades: [
@@ -610,14 +620,14 @@ export const data: GameData = parseGameData({
           cost: { metal: 160, credits: 40 },
           buildTimeHours: 4,
           produces: { food: 16 },
-          upkeep: { energy: 10 },
+          upkeep: { energy: 50 },
           hp: 24,
         },
         {
           cost: { metal: 260, credits: 90 },
           buildTimeHours: 6,
           produces: { food: 24 },
-          upkeep: { energy: 16 },
+          upkeep: { energy: 80 },
           hp: 30,
         },
       ],
@@ -627,7 +637,7 @@ export const data: GameData = parseGameData({
       cost: { metal: 110, credits: 30 },
       buildTimeHours: 4,
       produces: { energy: 14 },
-      upkeep: { credits: 6 },
+      upkeep: { credits: 48 },
       hp: 20,
       scoreValue: 4,
       upgrades: [
@@ -635,14 +645,14 @@ export const data: GameData = parseGameData({
           cost: { metal: 240, credits: 100 },
           buildTimeHours: 6,
           produces: { energy: 26 },
-          upkeep: { credits: 12 },
+          upkeep: { credits: 96 },
           hp: 28,
         },
         {
           cost: { metal: 400, credits: 190 },
           buildTimeHours: 8,
           produces: { energy: 42 },
-          upkeep: { credits: 20 },
+          upkeep: { credits: 160 },
           hp: 36,
         },
       ],
@@ -654,7 +664,7 @@ export const data: GameData = parseGameData({
       cost: { metal: 180, credits: 100 },
       buildTimeHours: 6,
       produces: { microelectronics: 5 },
-      upkeep: { energy: 30, food: 8 },
+      upkeep: { energy: 150, food: 40 },
       hp: 22,
       scoreValue: 6,
       upgrades: [
@@ -662,14 +672,14 @@ export const data: GameData = parseGameData({
           cost: { metal: 320, credits: 200, microelectronics: 30 },
           buildTimeHours: 8,
           produces: { microelectronics: 11 },
-          upkeep: { energy: 55, food: 14 },
+          upkeep: { energy: 275, food: 70 },
           hp: 32,
         },
         {
           cost: { metal: 520, credits: 340, microelectronics: 80 },
           buildTimeHours: 10,
           produces: { microelectronics: 19 },
-          upkeep: { energy: 90, food: 22 },
+          upkeep: { energy: 450, food: 110 },
           hp: 42,
         },
       ],
@@ -693,7 +703,7 @@ export const data: GameData = parseGameData({
       cost: { metal: 80, credits: 30 },
       buildTimeHours: 4,
       produces: { metal: 30 },
-      upkeep: { energy: 8 },
+      upkeep: { energy: 40 },
       hp: 20,
       scoreValue: 5,
       upgrades: [
@@ -701,14 +711,14 @@ export const data: GameData = parseGameData({
           cost: { metal: 220, credits: 90 },
           buildTimeHours: 6,
           produces: { metal: 60 },
-          upkeep: { energy: 14 },
+          upkeep: { energy: 70 },
           hp: 30,
         },
         {
           cost: { metal: 380, credits: 170 },
           buildTimeHours: 8,
           produces: { metal: 100 },
-          upkeep: { energy: 22 },
+          upkeep: { energy: 110 },
           hp: 40,
         },
       ],
@@ -726,14 +736,14 @@ export const data: GameData = parseGameData({
           buildTimeHours: 6,
           hp: 35,
           enablesGroundConstruction: true,
-          upkeep: { energy: 3 },
+          upkeep: { energy: 15 },
         },
         {
           cost: { metal: 150, credits: 60 },
           buildTimeHours: 9,
           hp: 45,
           enablesGroundConstruction: true,
-          upkeep: { energy: 5 },
+          upkeep: { energy: 25 },
         },
         {
           cost: { metal: 200, credits: 90 },
@@ -741,7 +751,7 @@ export const data: GameData = parseGameData({
           hp: 60,
           enablesGroundConstruction: true,
           buildSpeedBonus: 0.05,
-          upkeep: { energy: 7 },
+          upkeep: { energy: 35 },
         },
       ],
     },
@@ -764,14 +774,14 @@ export const data: GameData = parseGameData({
           buildTimeHours: 6,
           hp: 32,
           healRate: 0.25,
-          upkeep: { energy: 4 },
+          upkeep: { energy: 20 },
         },
         {
           cost: { metal: 220, credits: 90 },
           buildTimeHours: 9,
           hp: 42,
           healRate: 0.4,
-          upkeep: { energy: 7 },
+          upkeep: { energy: 35 },
         },
       ],
     },
@@ -785,7 +795,7 @@ export const data: GameData = parseGameData({
       hp: 25,
       enablesGroundConstruction: true,
       scoreValue: 5,
-      upkeep: { energy: 6 },
+      upkeep: { energy: 30 },
       upgrades: [
         {
           cost: { metal: 180, credits: 80 },
@@ -793,7 +803,7 @@ export const data: GameData = parseGameData({
           hp: 35,
           enablesGroundConstruction: true,
           enablesSquadronConstruction: true,
-          upkeep: { energy: 10 },
+          upkeep: { energy: 50 },
         },
         {
           cost: { metal: 250, credits: 120 },
@@ -802,7 +812,7 @@ export const data: GameData = parseGameData({
           enablesGroundConstruction: true,
           enablesSquadronConstruction: true,
           buildSpeedBonus: 0.5,
-          upkeep: { energy: 14 },
+          upkeep: { energy: 70 },
         },
       ],
     },
@@ -832,7 +842,7 @@ export const data: GameData = parseGameData({
       // border to the next ring of worlds — on the current map neighbours sit ~205 out
       // (auto-identified, 1 hop) and the next ring ~349, so only L3 (420) reaches past 349.
       radarRange: 240,
-      upkeep: { energy: 6 },
+      upkeep: { energy: 30 },
       scoreValue: 2,
       upgrades: [
         {
@@ -840,14 +850,14 @@ export const data: GameData = parseGameData({
           buildTimeHours: 5,
           hp: 28,
           radarRange: 330,
-          upkeep: { energy: 10 },
+          upkeep: { energy: 50 },
         },
         {
           cost: { metal: 300, credits: 140 },
           buildTimeHours: 7,
           hp: 38,
           radarRange: 420,
-          upkeep: { energy: 16 },
+          upkeep: { energy: 80 },
         },
       ],
     },
@@ -871,7 +881,7 @@ export const data: GameData = parseGameData({
       buildTimeHours: 5,
       hp: 30,
       aaDamage: 12,
-      upkeep: { energy: 6 },
+      upkeep: { energy: 30 },
       scoreValue: 3,
     },
     fort: {

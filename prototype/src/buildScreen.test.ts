@@ -61,7 +61,7 @@ describe('окно построек — категории из данных', (
 describe('окно построек — строка эффекта', () => {
   it('производство и содержание читаются с одного взгляда', () => {
     expect(buildFx(data.buildings.mine!, 1)).toContain('+12');
-    expect(buildFx(data.buildings.refinery!, 1)).toContain('−8'); // upkeep — со знаком минус
+    expect(buildFx(data.buildings.refinery!, 1)).toContain('−40'); // upkeep — со знаком минус (BAL-3)
     expect(buildFx(data.buildings.fort!, 1)).toContain('к обороне');
     expect(buildFx(data.buildings.spaceport!, 1)).toContain('кораблей');
   });

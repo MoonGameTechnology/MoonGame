@@ -30,7 +30,7 @@ describe('game data schema (docs/architecture.md §2)', () => {
     expect(data.version).toBe('0.1.9');
     expect(data.resources).toContain('microelectronics');
     expect(data.units.siege_lance?.stats.range).toBe(300); // artillery firing radius (map units)
-    expect(data.units.cruiser?.upkeep.credits).toBe(8); // daily upkeep
+    expect(data.units.cruiser?.upkeep.credits).toBe(64); // daily upkeep, BAL-3 scale
     // fleet ⊕ ground-army separation: domains + transport capacity.
     expect(data.units.cruiser?.domain).toBe('space'); // schema default
     expect(data.units.tank?.domain).toBe('ground');

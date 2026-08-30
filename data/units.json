@@ -17,7 +17,7 @@
       "metal": 40
     },
     "upkeep": {
-      "credits": 2
+      "credits": 16
     }
   },
   "sensor_frigate": {
@@ -39,7 +39,7 @@
       "microelectronics": 2
     },
     "upkeep": {
-      "credits": 4
+      "credits": 32
     },
     "slots": {
       "utility": 1
@@ -64,7 +64,7 @@
       "credits": 80
     },
     "upkeep": {
-      "credits": 8
+      "credits": 64
     },
     "slots": {
       "weapon": 1,
@@ -92,7 +92,7 @@
       "credits": 140
     },
     "upkeep": {
-      "credits": 12
+      "credits": 96
     }
   },
   "dropship": {
@@ -115,7 +115,7 @@
       "credits": 40
     },
     "upkeep": {
-      "credits": 5
+      "credits": 40
     },
     "slots": {
       "defense": 1,
@@ -140,7 +140,7 @@
       "metal": 40
     },
     "upkeep": {
-      "credits": 1
+      "credits": 8
     }
   },
   "drop_infantry": {
@@ -162,7 +162,7 @@
       "credits": 20
     },
     "upkeep": {
-      "credits": 2
+      "credits": 16
     }
   },
   "tank": {
@@ -184,7 +184,7 @@
       "credits": 40
     },
     "upkeep": {
-      "credits": 4
+      "credits": 32
     }
   },
   "heavy_infantry": {
@@ -206,7 +206,7 @@
       "credits": 30
     },
     "upkeep": {
-      "credits": 3
+      "credits": 24
     }
   },
   "special_forces": {
@@ -228,7 +228,7 @@
       "credits": 50
     },
     "upkeep": {
-      "credits": 4
+      "credits": 32
     }
   },
   "hero": {
@@ -251,7 +251,7 @@
       "credits": 200
     },
     "upkeep": {
-      "credits": 10
+      "credits": 80
     }
   },
   "fighter_squadron": {
@@ -277,7 +277,7 @@
       "credits": 40
     },
     "upkeep": {
-      "credits": 4
+      "credits": 32
     }
   },
   "strike_carrier": {
@@ -301,7 +301,7 @@
       "credits": 160
     },
     "upkeep": {
-      "credits": 12
+      "credits": 96
     }
   }
 }
