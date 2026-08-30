@@ -9,6 +9,7 @@
 //
 // Fairness controls per match index i: starts swap on i%2, the ORDERED faction pair
 // cycles on (i>>1)%12 — so "win rate by slot", "by faction" and "by start" separate cleanly.
+import { readFileSync } from 'node:fs';
 import { build } from 'esbuild';
 
 const N = Math.max(1, Number(process.argv[2] ?? 20) || 20);
@@ -24,7 +25,17 @@ const res = await build({
 });
 const mod = { exports: {} };
 new Function('module', 'exports', 'require', res.outputFiles[0].text)(mod, mod.exports, () => ({}));
-const { newGame, kernel, data, aiOrders, scoreParts, HOUR, DAY, START_CANDIDATES } = mod.exports;
+const {
+  newGame,
+  kernel,
+  data,
+  aiOrders,
+  scoreParts,
+  splitDeadContent,
+  HOUR,
+  DAY,
+  START_CANDIDATES,
+} = mod.exports;
 
 const STEP = 2 * HOUR; // the AI decision cadence (mirrors the netserver driver)
 
@@ -38,7 +49,9 @@ const STEP = 2 * HOUR; // the AI decision cadence (mirrors the netserver driver)
 // УПОРЯДОЧЕННЫЕ (4×3 = 12): порядок решает, кто садится в p1, а слотовый перекос —
 // самостоятельная величина отчёта, и смешивать его с фракционным нельзя.
 const FACTION_IDS = Object.keys(data.factions ?? {});
-const FACTION_PAIRS = FACTION_IDS.flatMap((a) => FACTION_IDS.filter((b) => b !== a).map((b) => [a, b]));
+const FACTION_PAIRS = FACTION_IDS.flatMap((a) =>
+  FACTION_IDS.filter((b) => b !== a).map((b) => [a, b]),
+);
 
 // ДВУХНЕДЕЛЬНАЯ СЕССИЯ БЕЗ ДОСРОЧНОЙ ПОБЕДЫ (заказ владельца 2026-08-26). Раньше прогон
 // кончался порогом очков — и кончался на 4-м дне: `score` был исходом 100% матчей, а
@@ -573,6 +586,15 @@ const neverBuilt = Object.keys({ ...data.units, ...data.buildings }).filter(
 );
 const zeros = neverBuilt.filter((k) => !seededTotal.has(k));
 const seededOnly = neverBuilt.filter((k) => seededTotal.has(k));
+// AI-BAL-10 (остаток): ноль построек — симптом, а не диагноз. Делим по ПРОВЕРЯЕМОМУ
+// признаку — упоминает ли исходник бота эту сущность строковым литералом, — потому что
+// «бот не умеет» и «бот умеет, но условие не наступает» лечатся в разных местах: первое
+// в `ai.ts` (или нигде — механики нет), второе в контенте. Список в харнесе устарел бы
+// молча, исходник — нет.
+const { offRepertoire, unbuilt } = splitDeadContent(
+  zeros,
+  readFileSync('prototype/src/ai.ts', 'utf8'),
+);
 const topTech = [...techTotal.entries()]
   .sort((a, b) => b[1] - a[1])
   .slice(0, 12)
@@ -594,7 +616,10 @@ console.log(
     `  тактика    : отступлений ${retreatsTotal} · осад ${siegesTotal} (обстрелов ${bombardSpansTotal}) · расколов флота ${splitsTotal}  ← AI-BAL-7; 0 в строке = механика вне измерения`,
     `  рынок      : сделок ${tradesTotal} на ${tradeCreditsTotal.toFixed(0)} credits (сгорело комиссией ${tradeFeesTotal.toFixed(0)})  ← AI-BAL-9; лоты выставлялись и раньше, доказывают только СДЕЛКИ`,
     `  герои      : подъёмов ${heroSpawnsTotal} · узлов дерева ${heroSkillsTotal} · фитингов ${heroFitsTotal} · кастов ${
-      [...heroCastsTotal.entries()].sort().map(([t, n]) => `${t}=${n}`).join(' ') || '0'
+      [...heroCastsTotal.entries()]
+        .sort()
+        .map(([t, n]) => `${t}=${n}`)
+        .join(' ') || '0'
     }  ← AI-BAL-8; каст СЧИТАЕТСЯ ПО ТИПУ, потому что правило бота тоже по типу, а не по id`,
     `  размен     : флотов погибло ${fleetsDestroyedTotal} · из отступлений не донесло ${retreatsFatalTotal}  ← полный размен = флот гибнет всегда; отступления без падения этого числа ничего не меняют`,
     `  очки       : лидер ${avg(winnerScores).toFixed(0)} · отставший ${avg(loserScores).toFixed(0)} · разрыв ${avg(margins).toFixed(0)}  ← сессия одинаковая (${SESSION_DAYS}д), разный только счёт`,
@@ -615,8 +640,18 @@ console.log(
       `  ← 1-я половина → 2-я, очков за половину`,
     `  лидерство  : с ${avg(leadHeldFromDay).toFixed(1)}-го дня победитель ведёт и не отдаёт (из ${(avg(lengths) / DAY).toFixed(0)})`,
     `  usage      : ${topUsage || '—'}`,
-    zeros.length ? `  мёртвый контент (0 построек за ${N} матчей): ${zeros.join(' ')}` : '  мёртвый контент: нет ✓',
-    seededOnly.length ? `  посеяны, не строятся (в мёртвый контент НЕ входят): ${seededOnly.join(' ')}` : null,
+    zeros.length
+      ? `  мёртвый контент (0 построек за ${N} матчей): ${zeros.length} позиц. — диагнозы ниже`
+      : '  мёртвый контент: нет ✓',
+    unbuilt.length
+      ? `    ├ бот УМЕЕТ, но не построил ни разу: ${unbuilt.join(' ')}  ← про БАЛАНС: условие постройки недостижимо`
+      : null,
+    offRepertoire.length
+      ? `    └ вне репертуара бота (нет в ai.ts): ${offRepertoire.join(' ')}  ← про ПРИБОР: механика не покрыта, крутить числа бессмысленно`
+      : null,
+    seededOnly.length
+      ? `  посеяны, не строятся (в мёртвый контент НЕ входят): ${seededOnly.join(' ')}`
+      : null,
     `  техи       : ${techTotalCount} исследовано · ${topTech || '—'}`,
     techZeros.length
       ? `  не исследованы ни разу (${techZeros.length}/${Object.keys(data.technologies ?? {}).length}): ${techZeros.join(' ')}`
@@ -716,6 +751,8 @@ console.log(
         splits: splitsTotal,
         usage: Object.fromEntries(usageTotal),
         deadContent: zeros,
+        deadUnbuilt: unbuilt,
+        deadOffRepertoire: offRepertoire,
         seededOnly,
       }),
   ]
