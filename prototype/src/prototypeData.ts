@@ -1052,9 +1052,12 @@ export const data: GameData = parseGameData({
     },
   },
   // Способности: `temp_lane`/`annihilate` — встроенные эффекты heroModule (кастуются),
-  // `spawn_*` — пассивные маркеры точек развёртывания (читает `hero.spawn`), остальные
-  // типы (`aura`/`reveal`/`recall`) типизированы в данных, но эффекта в движке ещё нет —
-  // `hero.ability` на них честно отвечает `E_NO_EFFECT` (UI показывает «скоро»).
+  // `spawn_*` — пассивные маркеры точек развёртывания (читает `hero.spawn`), а
+  // `aura`/`reveal`/`recall` исполняет `heroEffectsModule` через capability
+  // `hero.effect.<type>` — он стоит в `MODULES` прототипа, так что живы ВСЕ типы этого
+  // каталога (сверено прогоном при AI-BAL-8: касты `aura`/`reveal` доходят до эффекта, а
+  // `hero.ability.used` эмитится только после его применения). `E_NO_EFFECT` остаётся
+  // fail-secure ответом на тип, которому провайдера нет, — но такого типа тут больше нет.
   heroAbilities: {
     corridor: {
       name: 'hero.ability.corridor.name',

@@ -129,6 +129,15 @@ function runMatch(i) {
   // добитый пошлиной) и сколько выходов не донесло (`escaped: false`).
   let fleetsDestroyed = 0;
   let retreatsFatal = 0;
+  // AI-BAL-8: ветка героев отдельными счётчиками. Герой ПОСЕЯН в каждом матче и дерётся
+  // как корпус, поэтому «мёртвым контентом» он не числился ни разу — а всё, что вокруг
+  // него (ростер, дерево навыков, фитинги, диспетчер способностей), в измерении не
+  // участвовало. Одна общая строка это скрывала: без счётчиков «герой играет» и «герой
+  // просто стоит во флоте» выглядят одинаково.
+  let heroSpawns = 0;
+  let heroSkills = 0;
+  let heroFits = 0;
+  const heroCasts = new Map(); // тип способности → сколько раз кастовали
   let firstCombatAt = null;
   const consume = (events, now) => {
     for (const e of events) {
@@ -149,6 +158,15 @@ function runMatch(i) {
         else capturesByAssault++;
       } else if (e.type === 'fleet.destroyed') {
         fleetsDestroyed++;
+      } else if (e.type === 'hero.spawned') {
+        heroSpawns++;
+      } else if (e.type === 'hero.skill.unlocked') {
+        heroSkills++;
+      } else if (e.type === 'hero.fitted') {
+        heroFits++;
+      } else if (e.type === 'hero.ability.used') {
+        const t = (e.payload ?? {}).type ?? '?';
+        heroCasts.set(t, (heroCasts.get(t) ?? 0) + 1);
       } else if (e.type === 'fleet.retreated') {
         retreats++;
         if ((e.payload ?? {}).escaped === false) retreatsFatal++;
@@ -263,6 +281,10 @@ function runMatch(i) {
     sieges,
     splits,
     bombardSpans,
+    heroSpawns,
+    heroSkills,
+    heroFits,
+    heroCasts,
     capturesByArrival,
     capturesByAssault,
     firstCombatAt,
@@ -309,6 +331,10 @@ let fleetsDestroyedTotal = 0;
 let siegesTotal = 0;
 let splitsTotal = 0;
 let bombardSpansTotal = 0;
+let heroSpawnsTotal = 0;
+let heroSkillsTotal = 0;
+let heroFitsTotal = 0;
+const heroCastsTotal = new Map();
 let arrivalCaptures = 0;
 let assaultCaptures = 0;
 // BAL-5 — ЧТО разгоняет лидера. Флот отпадает по коду (в `total` он не входит вовсе),
@@ -343,6 +369,10 @@ for (let i = 0; i < N; i++) {
   siegesTotal += r.sieges;
   splitsTotal += r.splits;
   bombardSpansTotal += r.bombardSpans;
+  heroSpawnsTotal += r.heroSpawns;
+  heroSkillsTotal += r.heroSkills;
+  heroFitsTotal += r.heroFits;
+  for (const [t, n] of r.heroCasts) heroCastsTotal.set(t, (heroCastsTotal.get(t) ?? 0) + n);
   arrivalCaptures += r.capturesByArrival;
   assaultCaptures += r.capturesByAssault;
   lengths.push(r.lengthMs);
@@ -507,6 +537,9 @@ console.log(
     `  1-й бой    : avg ${days(avg(firstCombats))}д (в ${firstCombats.length}/${N} матчах) · боёв всего ${battlesTotal}`,
     `  наземная   : ${groundBattlesTotal} наземных боёв из ${battlesTotal} · захваты: прилётом ${arrivalCaptures} · штурмом ${assaultCaptures}  ← «штурмом» и есть вторая фаза захвата (GDD §7.4); 0 = она не играется`,
     `  тактика    : отступлений ${retreatsTotal} · осад ${siegesTotal} (обстрелов ${bombardSpansTotal}) · расколов флота ${splitsTotal}  ← AI-BAL-7; 0 в строке = механика вне измерения`,
+    `  герои      : подъёмов ${heroSpawnsTotal} · узлов дерева ${heroSkillsTotal} · фитингов ${heroFitsTotal} · кастов ${
+      [...heroCastsTotal.entries()].sort().map(([t, n]) => `${t}=${n}`).join(' ') || '0'
+    }  ← AI-BAL-8; каст СЧИТАЕТСЯ ПО ТИПУ, потому что правило бота тоже по типу, а не по id`,
     `  размен     : флотов погибло ${fleetsDestroyedTotal} · из отступлений не донесло ${retreatsFatalTotal}  ← полный размен = флот гибнет всегда; отступления без падения этого числа ничего не меняют`,
     `  очки       : лидер ${avg(winnerScores).toFixed(0)} · отставший ${avg(loserScores).toFixed(0)} · разрыв ${avg(margins).toFixed(0)}  ← сессия одинаковая (${SESSION_DAYS}д), разный только счёт`,
     `  очки/слот    : ${fmtAvg(scoreBySlot, seenBySlot)}`,
@@ -610,6 +643,10 @@ console.log(
         groundBattlesTotal,
         capturesByArrival: arrivalCaptures,
         capturesByAssault: assaultCaptures,
+        heroSpawns: heroSpawnsTotal,
+        heroSkills: heroSkillsTotal,
+        heroFits: heroFitsTotal,
+        heroCasts: Object.fromEntries(heroCastsTotal),
         retreats: retreatsTotal,
         retreatsFatalTotal,
         fleetsDestroyedTotal,
