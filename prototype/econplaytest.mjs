@@ -73,6 +73,7 @@ function runMatch(seed, n) {
   const series = Object.fromEntries(ids.map((id) => [id, []])); // [{d, res...}]
   const arrearsHours = Object.fromEntries(ids.map((id) => [id, 0]));
   const spend = Object.fromEntries(ids.map((id) => [id, { building: {}, unit: {}, marketPaid: 0 }]));
+  const listedByKind = {};
   const built = Object.fromEntries(ids.map((id) => [id, {}])); // building/unit -> count
   let battles = 0;
 
@@ -96,6 +97,9 @@ function runMatch(seed, n) {
             spend[owner].unit[r] = (spend[owner].unit[r] ?? 0) + v * cnt;
           built[owner][p.unit] = (built[owner][p.unit] ?? 0) + cnt;
         }
+      } else if (e.type === 'market.listed') {
+        listedByKind[(e.payload.side ?? '?') + ' ' + (e.payload.resource ?? '?')] =
+          (listedByKind[(e.payload.side ?? '?') + ' ' + (e.payload.resource ?? '?')] ?? 0) + 1;
       } else if (e.type === 'market.traded') {
         // Buyer (taker of a sell lot) pays credits; record the gross spend.
         if (spend[p.taker]) spend[p.taker].marketPaid += (p.amount ?? 0) * (p.price ?? 0);
@@ -154,6 +158,7 @@ function runMatch(seed, n) {
     series,
     arrearsHours,
     spend,
+    listedByKind,
     built,
     finalPlanets: Object.fromEntries(
       ids.map((id) => [id, Object.values(state.planets).filter((pp) => pp.owner === id).length]),
@@ -168,6 +173,7 @@ function ownerOfPlanet(state, planetId) {
 // --- run ---------------------------------------------------------------------
 const t0 = Date.now();
 const runs = [];
+const listedTotal = {};
 for (let s = 0; s < SEEDS; s++) {
   const r = runMatch(`sp-${s}`, SEATS_N);
   if (r.error) {
@@ -175,6 +181,7 @@ for (let s = 0; s < SEEDS; s++) {
     continue;
   }
   runs.push(r);
+  for (const [k, v] of Object.entries(r.listedByKind ?? {})) listedTotal[k] = (listedTotal[k] ?? 0) + v;
   process.stderr.write(`  … seed ${s + 1}/${SEEDS} (${r.lengthDays.toFixed(1)}d)\r`);
 }
 
@@ -262,6 +269,13 @@ for (const r of RES) {
   lines.push(`    ${r.padEnd(17)} постройки ${fmt(b).padStart(7)} · юниты ${fmt(u).padStart(7)}`);
 }
 lines.push(`    market (куплено за credits): ${fmt(agg.marketPaid)}`);
+lines.push(
+  `    market (выставлено лотов): ${
+    Object.entries(listedTotal)
+      .map(([k, v]) => k + ' ' + v)
+      .join(' · ') || 'ни одного'
+  }`,
+);
 lines.push('');
 lines.push(`  arrears-часы на игрока: med ${med(anyArrearsHours)} · max ${Math.max(...anyArrearsHours, 0)} (из ~${Math.round(agg.totalHours / Math.max(1, agg.playerCount))}ч)`);
 lines.push('');

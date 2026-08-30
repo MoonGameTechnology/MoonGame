@@ -35,6 +35,7 @@ import {
   declareWar,
   canTraverse,
   marketList,
+  marketTake,
   mergeFleet,
   loadArmy,
   unloadArmy,
@@ -53,6 +54,28 @@ import { SECTOR_TYPES } from './map';
 import { data } from './prototypeData';
 import type { MarketSide } from '../../packages/shared-core/src/index';
 import { stewardGuardOrders } from './stewardGuard';
+import { botEmbargoes } from './botFavour';
+
+/** ЦЕНЫ, КОТОРЫМИ БОТ ТОРГУЕТ САМ — и они же его пороги при взятии чужого лота
+ *  (AI-BAL-9). Держать их одним числом обязательно: разъедься выставление и взятие, и бот
+ *  начал бы покупать дороже, чем просит за то же самое. */
+const BID = 3; // за столько бот сам просит металл — дороже не платит
+const ASK = 2; // за столько сам отдаёт излишек — дешевле не отдаёт
+/** Металла меньше этого — бот считает себя в нужде (и выставляет заявку, и покупает). */
+const METAL_LOW = 80;
+/** Ресурсы, которые бот не тратит сам и потому ВЫСТАВЛЯЕТ на продажу. */
+const SURPLUS_GOODS = ['food', 'energy', 'microelectronics'] as const;
+/** Ресурсы, которые бот готов ОТДАТЬ в чужую заявку. Металл здесь есть, а в списке выше
+ *  его нет, и это не описка: сам бот металл не продаёт (он его жжёт), но чужую заявку
+ *  закрывает — иначе торга не бывает вовсе. Оба места просят металл и предлагают еду с
+ *  энергией, то есть спрос и предложение НИКОГДА не встречаются: за прогон 48 лотов и 0
+ *  сделок (AI-BAL-9). Металл — единственный ресурс, который кому-то нужен, значит и
+ *  единственный, на котором рынок может сойтись. */
+const DELIVERABLE_GOODS = ['metal', ...SURPLUS_GOODS] as const;
+/** Рабочий запас, ниже которого излишек не считается излишком. Для металла это та же
+ *  граница нужды `METAL_LOW`: бот не продаёт себя в дефицит, который сам же и объявляет. */
+const surplusReserve = (good: string): number =>
+  good === 'metal' ? METAL_LOW : good === 'microelectronics' ? 40 : 120;
 
 /** The two server-side AIs that can play a seat, kept explicitly DISTINCT
  *  (SES-2.2). `steward` — «Хранитель»: the player's OWN autopilot, a defensive
@@ -1100,18 +1123,54 @@ export function aiOrders(
     const lots = state.market ?? [];
     const hasLot = (side: MarketSide, resource: string): boolean =>
       lots.some((l) => l.owner === ai && l.side === side && l.resource === resource);
-    for (const good of ['food', 'energy', 'microelectronics']) {
+    for (const good of SURPLUS_GOODS) {
       const have = pl.resources[good] ?? 0;
-      const reserve = good === 'microelectronics' ? 40 : 120; // the working stock it keeps
-      if (have >= reserve + 40 && !hasLot('sell', good))
-        out.push(marketList(ai, 'sell', good, Math.floor((have - reserve) / 2), 2));
+      if (have >= surplusReserve(good) + 40 && !hasLot('sell', good))
+        out.push(marketList(ai, 'sell', good, Math.floor((have - surplusReserve(good)) / 2), ASK));
     }
     if (
-      (pl.resources.metal ?? 0) < 80 &&
+      (pl.resources.metal ?? 0) < METAL_LOW &&
       (pl.resources.credits ?? 0) > 300 &&
       !hasLot('buy', 'metal')
     ) {
-      out.push(marketList(ai, 'buy', 'metal', 30, 3));
+      out.push(marketList(ai, 'buy', 'metal', 30, BID));
+    }
+    // AI-BAL-9: ЗАБРАТЬ чужой лот — вторая половина торга. Без неё за прогон случалось
+    // ровно 0 сделок: оба места выставляли лоты и оба ждали покупателя, которого в
+    // измерении не существовало, так что межигроковая экономика не мерялась ни одной
+    // цифрой. Порогов НОВЫХ здесь нет намеренно — бот платит не больше собственной заявки
+    // (`BID`) и отдаёт не дешевле собственной цены (`ASK`): свои же числа, иначе половины
+    // торга разъедутся и бот начнёт покупать дороже, чем просит.
+    //
+    // Эмбарго проверяется ЗДЕСЬ, хотя ядро тоже отказало бы (`E_EMBARGO`): заведомо
+    // отклоняемый приказ — это мусор в редьюсере и порча статистики реджектов, по которой
+    // читают здоровье прогона.
+    const takeable = lots
+      .filter((l) => l.owner !== ai && l.amount > 0 && !botEmbargoes(state, l.owner, ai))
+      // Порядок детерминирован (инвариант #1): дешевле — раньше, при равной цене по id.
+      .slice()
+      .sort((a, b) => a.price - b.price || (a.id < b.id ? -1 : 1));
+
+    if ((pl.resources.metal ?? 0) < METAL_LOW) {
+      const offer = takeable.find(
+        (l) => l.side === 'sell' && l.resource === 'metal' && l.price <= BID,
+      );
+      if (offer) {
+        // Просить больше, чем можешь оплатить, значит не купить НИЧЕГО: ядро отклоняет
+        // сделку целиком (`E_INSUFFICIENT`), а не подрезает её до кошелька.
+        const qty = Math.min(offer.amount, Math.floor((pl.resources.credits ?? 0) / offer.price));
+        if (qty > 0) out.push(marketTake(ai, offer.id, qty));
+      }
+    }
+    for (const good of DELIVERABLE_GOODS) {
+      const surplus = (pl.resources[good] ?? 0) - surplusReserve(good);
+      if (surplus <= 0) continue;
+      const bid = takeable.find(
+        (l) => l.side === 'buy' && l.resource === good && l.price >= ASK,
+      );
+      if (!bid) continue;
+      const qty = Math.min(bid.amount, surplus);
+      if (qty > 0) out.push(marketTake(ai, bid.id, qty));
     }
   }
   return out;
