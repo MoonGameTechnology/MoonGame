@@ -18,12 +18,15 @@ import pgPkg from 'pg';
 import {
   MatchRoom,
   MatchRegistry,
+  type MatchMeta,
+  newMatchId,
   pveOrders,
   MetricsAggregator,
   createMultiplayerServer,
   tlsFromEnv,
   registerBrowserApi,
   registerMatchApi,
+  registerSeatsApi,
   startClockDriver,
   HEARTBEAT_MS,
   type ClockDriverHandle,
@@ -78,6 +81,13 @@ import { isValidActionPayload } from '../packages/shared-core/src/actions/payloa
 import type { PlayerId } from '../packages/shared-core/src/index';
 import { MS_PER_DAY } from '../packages/shared-core/src/index';
 import type { Identity } from '../packages/server/src/matchApi';
+import { seatClaim, seatClaimAction } from '../packages/server/src/joinSeat';
+import { expiredSeatClaims } from '../packages/server/src/seatExpiry';
+import { bootRoster, MAX_HOSTED_MATCHES } from '../packages/server/src/matchRoster';
+import {
+  creditCommanderXp,
+  nickSeatAccounts,
+} from '../packages/server/src/commanderCredit';
 const { Pool } = pgPkg;
 
 // --- M0/M1 playtest log: append room events to a per-run JSONL and feed every one
@@ -203,21 +213,21 @@ if (DATABASE_URL) {
 /** Account crediting (EC-*): the core already computed `match.rewards` (place + XP per
  *  seat, deterministic). At match end, map each seat's nick → account and bank the XP
  *  durably, EXACTLY ONCE (creditMatch's idempotency marker survives a restart that
- *  re-observes the same end). Nick-mode servers have no accounts → nothing to credit. */
-async function creditCommanderXp(
+ *  re-observes the same end). Nick-mode servers have no accounts → nothing to credit.
+ *
+ *  Правила банковки живут в `packages/server/src/commanderCredit.ts` — общие с боевым
+ *  входом (SES-2). Своя копия тут была ровно до тех пор, пока боевой вход начислял
+ *  только AvA-матчам; сведена, чтобы два хоста не разъезжались и здесь. */
+async function creditMatchXp(
   matchId: string,
   rewards: Record<string, { xp: number }> | undefined,
 ): Promise<void> {
-  if (!rewards) return;
-  const seats = await accountStore.seatedNicks(matchId);
-  const rows: Array<{ accountId: string; xp: number }> = [];
-  for (const { playerId, nick } of seats) {
-    const xp = rewards[playerId]?.xp ?? 0;
-    if (xp <= 0) continue;
-    const user = await userStore.findUser(nick); // nick === account login in AUTH mode
-    if (user) rows.push({ accountId: user.userId, xp });
-  }
-  if (rows.length) await commanderStore.creditMatch(matchId, rows);
+  await creditCommanderXp(
+    commanderStore,
+    nickSeatAccounts(accountStore, userStore, matchId),
+    matchId,
+    rewards,
+  );
 }
 
 // Accounts on the PLAYABLE path (SES-2.5): with AUTH_JWT_SECRET set, the full account
@@ -289,17 +299,18 @@ if (!AUTH && HOST_BIND === '0.0.0.0' && !PROD_FLAG) {
       'before exposing this beyond a trusted network.\n',
   );
 }
-// The prototype host defaults to a ten-chair FFA. `TEAMS=5v5` keeps all ten chairs and
-// seeds two allied flanks; `TEAMS=2v2` preserves the smaller four-chair playtest. Every
+// The prototype host defaults to a ten-chair FFA. `TEAMS=<format>` seeds two allied
+// flanks instead: 1v1/2v2/3v3/4v4/5v5 give 2/4/6/8/10 chairs (PVE-1.1), and `TEAMS=pve`
+// keeps its own layout — two humans against one strong bot. Every
 // chair is claimable by a human, while the server AI stands in after the reconnect grace.
 const NETWORK_MODE = parseNetworkMatchMode(process.env.TEAMS);
 const NET_SEATS = networkSeats(NETWORK_MODE);
-// MATCHES=N hosts N independent sessions in THIS one process (default 1) — same mode
-// and time scale for all; the match browser lists every one, players pick a row. Ids:
-// `proto`, `proto-2`, … `proto-N` (the first keeps its historic id so an existing
-// durable snapshot / saved seat tickets keep working across the upgrade).
-const MATCHES = Math.max(1, Math.min(16, Number(process.env.MATCHES ?? 1) || 1));
-const matchIds = Array.from({ length: MATCHES }, (_, i) => (i === 0 ? 'proto' : `proto-${i + 1}`));
+// MATCHES=N — сколько партий ЗАСЕЯТЬ на пустом сторе (default 1); тот же режим и та же
+// шкала времени у всех, браузер матчей показывает каждую. Это НЕ список партий хоста:
+// список приходит из стора (ADDR-1, `matchRoster.ts`). Первая засеянная сохраняет
+// исторический id `proto`, чтобы уже выданные билеты на места и durable-снапшот пережили
+// обновление; остальные получают настоящие идентификаторы, а не порядковые номера.
+const MATCHES = Math.max(1, Math.min(MAX_HOSTED_MATCHES, Number(process.env.MATCHES ?? 1) || 1));
 
 // Wakeup-driver tuning. NETA2-6: the arm/fire/stall loop + the live-player HEARTBEAT_MS
 // beat now live in the shared `startClockDriver` (packages/server) — one scheduler for
@@ -370,7 +381,7 @@ async function createHostedMatch(id: string): Promise<HostedMatch> {
       });
     } else if (ev.kind === 'end' && AUTH) {
       // Bank each seated commander's match XP onto their account (idempotent).
-      void creditCommanderXp(id, ev.rewards);
+      void creditMatchXp(id, ev.rewards);
     }
     // Persist after anything that changes the world (debounced below), and re-arm
     // the offline wakeup: an action may schedule or consume events — both move the
@@ -587,6 +598,12 @@ async function createHostedMatch(id: string): Promise<HostedMatch> {
           try {
             await runServerAI(); // drive any empty seat once the clock has moved
             await runServerStanding(); // CC-2/CC-4: standing orders (auto-storm / дежурный вылет)
+            // ENTRY-3 (правило 7): вернуть в оборот места, заявленные и не подтверждённые
+            // дольше окна. Тот же вызов, что у канонического сервера (`serverWiring.ts`) —
+            // паритет держится общей функцией, а не двумя похожими циклами.
+            for (const { playerId, action } of expiredSeatClaims(room.state, room.clockScale)) {
+              await room.submitServerAction(playerId, action);
+            }
           } finally {
             driversBusy = false;
           }
@@ -619,20 +636,65 @@ async function createHostedMatch(id: string): Promise<HostedMatch> {
 // Raise every hosted session, then expose them ALL through the registry so the
 // client's match browser (GET /matches) lists each with its real status
 // (map / rules / day / players) and joins go to `/matches/<id>`.
+//
+// ADDR-1: набор партий больше НЕ выводится из `MATCHES=N`. Живые партии перечисляет
+// стор (`ongoingMatchIds` — нормализованный `status`, не JSONB), а переменная окружения
+// описывает лишь первый запуск на пустом сторе. Иначе рестарт добавлял бы ещё N комнат
+// к уже существующим, а `?join=proto` навсегда означал бы «комната №1 этого процесса».
+// Само решение — в `matchRoster.ts` рядом с каноническим сервером, чтобы хосты не
+// разъезжались в том, как называется партия.
 const hosted: HostedMatch[] = [];
-for (const id of matchIds) hosted.push(await createHostedMatch(id));
-const restoredCount = hosted.filter((h) => h.restored).length;
 const registry = new MatchRegistry(accountStore);
-for (const h of hosted) {
-  registry.register(h.room, {
-    mapId: 'nexus',
-    rules: { timeScale: TIME_SCALE },
-    createdAt: Date.now(),
-    startedAt: h.room.state.time,
-    entryWindowMs: ENTRY_WINDOW_MS, // SES-2.3: a NEW player may claim a free seat only
-    // within this real-time window from the session's creation (see AI note below).
-  });
+/** Метаданные браузера для одной сессии этого хоста. Пока все партии поднимаются по
+ *  одному шаблону (одна карта, один режим, одна вместимость) — это и есть BRW-0, и он
+ *  ждёт AUD-8; ADDR-1 добавляет только МОМЕНТ рождения и собственный id. */
+const browserMeta = (room: MatchRoom): MatchMeta => ({
+  mapId: 'nexus',
+  rules: { timeScale: TIME_SCALE },
+  createdAt: Date.now(),
+  startedAt: room.state.time,
+  entryWindowMs: ENTRY_WINDOW_MS, // SES-2.3: a NEW player may claim a free seat only
+  // within this real-time window from the session's creation (see AI note below).
+});
+
+// Список партий на старте приходит из СТОРА, а не из `MATCHES=N`: `bootRoster` поднимает
+// всё, что стор считает живым, и засевает только пустой стор (иначе каждый рестарт
+// добавлял бы ещё N комнат). Без этого партия, созданная через `POST /matches`, жила бы
+// лишь до перезапуска процесса — id уникален, но поднять её было бы некому.
+const roster = bootRoster({ stored: await matchStore.ongoingMatchIds(), seedCount: MATCHES });
+for (const id of roster.raise) {
+  const h = await createHostedMatch(id);
+  hosted.push(h);
+  registry.register(h.room, browserMeta(h.room));
+  if (!h.restored) await h.flush(); // засеянная партия тоже durable сразу, а не после хода
 }
+const matchIds = roster.raise;
+const restoredCount = hosted.filter((h) => h.restored).length;
+/**
+ * ADDR-1: поднять НОВУЮ партию по требованию, а не на старте процесса.
+ *
+ * До этого сессии существовали только как «комнаты» из `MATCHES=N`, поэтому `?join=proto`
+ * значил «первая комната ЭТОГО сервера», а не «партия #4821»: перезапуск отдал бы то же
+ * имя другому миру, и закладка игрока указала бы не туда. Здесь партия рождается в момент
+ * запроса и получает собственный id (`newMatchId()` — то же правило, что у канонического
+ * хоста), а `hosted` пополняется, иначе её таймеры не остановит и состояние не сбросит на
+ * диск выход по SIGINT (см. конец файла).
+ */
+const MAX_HOSTED = 64; // потолок сессий в одном процессе: создание ограничено сверху,
+// а не только per-IP лимитом маршрута — иначе память процесса растёт по запросу.
+async function hostNewMatch(): Promise<HostedMatch> {
+  if (hosted.length >= MAX_HOSTED) throw new Error('match capacity reached'); // → 500, bounded
+  const h = await createHostedMatch(newMatchId());
+  hosted.push(h);
+  registry.register(h.room, browserMeta(h.room));
+  // Свежая партия ложится в стор СРАЗУ, а не при первой активности. Иначе её нет в
+  // `ongoingMatchIds()` — а именно оттуда следующий старт берёт список (см. `bootRoster`
+  // выше), — и рестарт до первого хода стёр бы партию вместе с уже розданным адресом.
+  // Восстановленную трогать незачем: она в сторе по определению.
+  if (!h.restored) await h.flush();
+  return h;
+}
+
 const server = createMultiplayerServer({
   registry,
   host,
@@ -714,33 +776,59 @@ const server = createMultiplayerServer({
         return { file: logFile, total: 0, recent: [] };
       }
     });
+    // Одна проверка сессии на все аккаунтные API: подпись валидна И пароль не менялся
+    // (сброс отзывает старые сессии до того, как они займут место, SE-1.x). Стоит ВЫШЕ
+    // первого потребителя намеренно: `const` в TDZ, прочитанный при регистрации роутов,
+    // — та же ловушка, что уже ловили на `authMode` (REFM-0).
+    const identifySession = async (request: {
+      headers: Record<string, unknown>;
+    }): Promise<Identity | null> => {
+      const header = request.headers.authorization;
+      const bearer =
+        typeof header === 'string' && header.startsWith('Bearer ')
+          ? header.slice('Bearer '.length).trim()
+          : null;
+      const who = bearer ? await authCfg.verifySession!(bearer) : null;
+      return who?.ok ? liveSession(who.claim, userStore) : null;
+    };
     // REL-7: seat selection — list the match's slots (faction, name, start planet,
     // taken) so the client can render a faction picker BEFORE joining. The player
-    // chooses a slot, then POST /matches/:id/join with {slotId} reserves it.
-    app.get('/matches/:id/seats', async (request, reply) => {
-      const { id } = request.params as { id: string };
-      // Load-on-demand mirror of wsServer's pattern: a LAZY registry reloads an
-      // evicted match here; this eager MatchRegistry has no `resolve`, so the
-      // optional call is a typed no-op (kept so a lazy registry can slot in).
-      const lazyRegistry = registry as { resolve?: (id: string) => Promise<MatchRoom | undefined> };
-      const room = registry.get(id) ?? (await lazyRegistry.resolve?.(id));
-      if (!room) {
-        void reply.code(404);
-        return { error: 'E_NO_MATCH' as const };
-      }
-      const taken = new Set((await accountStore.seatedNicks(id)).map((s) => s.playerId));
-      const seats = Object.values(room.state.players).map((p) => {
-        // Find the start planet (owner === playerId, the homeworld).
-        const startPlanet = Object.values(room.state.planets).find((pl) => pl.owner === p.id);
-        return {
-          playerId: p.id,
-          name: p.name,
-          faction: p.faction,
-          start: startPlanet?.id ?? null,
-          taken: taken.has(p.id),
+    // chooses a slot, then GET /matches/:id/join?slot= reserves it.
+    // ADDR-6: WHO may read that layout is the shared route's rule (`registerSeatsApi`) —
+    // a match still open for entry serves anyone, a closed session only its own players,
+    // because `start` is the homeworld the fog hides in game. Same move as the join
+    // handshake (NETA2-7): one authorization rule, both hosts.
+    registerSeatsApi(app, {
+      seats: async (id) => {
+        // Load-on-demand mirror of wsServer's pattern: a LAZY registry reloads an
+        // evicted match here; this eager MatchRegistry has no `resolve`, so the
+        // optional call is a typed no-op (kept so a lazy registry can slot in).
+        const lazyRegistry = registry as {
+          resolve?: (id: string) => Promise<MatchRoom | undefined>;
         };
-      });
-      return { seats };
+        const room = registry.get(id) ?? (await lazyRegistry.resolve?.(id));
+        if (!room) return null;
+        const taken = new Set((await accountStore.seatedNicks(id)).map((s) => s.playerId));
+        return {
+          ended: room.state.match.status === 'ended',
+          seats: Object.values(room.state.players).map((p) => {
+            // Find the start planet (owner === playerId, the homeworld).
+            const startPlanet = Object.values(room.state.planets).find((pl) => pl.owner === p.id);
+            return {
+              playerId: p.id,
+              name: p.name,
+              faction: p.faction,
+              start: startPlanet?.id ?? null,
+              taken: taken.has(p.id),
+            };
+          }),
+        };
+      },
+      entryOpen: (id) => registry.entryOpen(id),
+      seatOf: (id, login) => accountStore.seatOf(id, login),
+      // Accounts host ⇒ a verified session names the reader; nick host ⇒ `?nick=`,
+      // which is participation, not proof (that host has no sessions to check).
+      ...(AUTH ? { identify: identifySession } : {}),
     });
     // The client self-configures: accounts mode shows the password field + goes
     // через register/login+join-token; nick mode keeps the old handshake.
@@ -763,19 +851,6 @@ const server = createMultiplayerServer({
             }
           : {}),
       });
-      // Одна проверка сессии на оба аккаунтных API: подпись валидна И пароль не менялся
-      // (сброс отзывает старые сессии до того, как они займут место, SE-1.x).
-      const identifySession = async (request: {
-        headers: Record<string, unknown>;
-      }): Promise<Identity | null> => {
-        const header = request.headers.authorization;
-        const bearer =
-          typeof header === 'string' && header.startsWith('Bearer ')
-            ? header.slice('Bearer '.length).trim()
-            : null;
-        const who = bearer ? await authCfg.verifySession!(bearer) : null;
-        return who?.ok ? liveSession(who.claim, userStore) : null;
-      };
       // Друзья (FRIENDS-1) — тот же слайс, что в проде: список и заявки живут на
       // аккаунте, поэтому вкладка «Друзья» работает и на плейтест-хосте. Присутствие
       // читается из ЖИВОГО реестра комнат: занятое место в идущем матче — «в матче».
@@ -804,9 +879,18 @@ const server = createMultiplayerServer({
       });
       // Seat + short-lived join token (SES-2.5) through the SHARED match API, so the
       // handshake — per-IP rate-limit, identity gate, error→status mapping — lives in ONE
-      // place with the production host (NETA2-7). netserver seeds matches out of band, so it
-      // omits `createMatch` (no public `POST /matches`) and wires only join + identity.
+      // place with the production host (NETA2-7).
       registerMatchApi(app, {
+        // ADDR-1: `POST /matches` поднимает НОВУЮ партию. Раньше этот хост его намеренно
+        // не выставлял и жил только пачкой сессий из `MATCHES=N` — тогда «адрес партии»
+        // физически не существовал: id был номером комнаты в процессе. Открытость
+        // маршрута держат три границы, те же, что у канонического хоста: identity-гейт
+        // (`identify` ниже — с AUTH=1 создать может только вошедший), per-IP лимит
+        // самого `registerMatchApi` и потолок `MAX_HOSTED` на процесс.
+        createMatch: async () => {
+          const h = await hostNewMatch();
+          return { matchId: h.id, seats: Object.keys(h.room.state.players) };
+        },
         // Identity = a signature-valid session, RE-CHECKED against the current password: a
         // reset revokes older sessions before they can claim/reclaim a seat (SE-1.x).
         identify: identifySession,
@@ -818,24 +902,44 @@ const server = createMultiplayerServer({
         // BF-30: `preferredFaction` decouples faction from the slot's start point —
         // the player picks a faction independently; the server overrides the seat's
         // default faction after assigning it.
-        join: async (id, login, accountId, preferredSlot, preferredFaction) => {
+        join: async (id, { nick: login, accountId, preferredSlot, preferredFaction, preferredScientists }) => {
           const room = registry.get(id);
           if (!room) return { error: 'E_NO_MATCH' as const };
           const held = await accountStore.seatOf(id, login);
           if (!held && !registry.entryOpen(id)) return { error: 'E_ENTRY_CLOSED' as const };
-          const seat = held
-            ? { playerId: held }
-            : await accountStore.resolveSeat(id, login, Object.keys(room.state.players), preferredSlot as PlayerId | undefined);
-          if (!seat) return { error: 'E_MATCH_FULL' as const };
-          // BF-30: override the seat's faction with the player's choice — faction is
-          // no longer bound to the start point. Only on a NEW claim (not reconnect).
-          if (preferredFaction && !held) {
-            const player = room.state.players[seat.playerId];
-            if (player) player.faction = preferredFaction;
+          // Что достаётся игроку и переписывать ли дом — ОБЩЕЕ решение с боевым сервером
+          // (`packages/server/src/joinSeat.ts`). Паритет двух хостов держится одним
+          // модулем, а не двумя похожими лесенками условий: ровно на такой лесенке
+          // канонический сервер и потерял `slot`/`faction` (ENTRY-1).
+          const resolved = held
+            ? { playerId: held, isNew: false }
+            : await accountStore.resolveSeat(
+                id,
+                login,
+                Object.keys(room.state.players),
+                preferredSlot as PlayerId | undefined,
+              );
+          const claim = seatClaim({
+            resolved,
+            preferredFaction,
+            // Дома ЭТОГО матча — тот же список, что уходит в `/matches/:id/seats`.
+            knownFactions: [...new Set(Object.values(room.state.players).map((p) => p.faction))],
+          });
+          if (!claim.ok) return { error: claim.code };
+          // ENTRY-3: заявка идёт ДЕЙСТВИЕМ через редьюсер, а не записью в состояние —
+          // мутация мимо редьюсера не попадает в лог и ломает реплей (см. joinSeat.ts).
+          if (claim.claim) {
+            await room.submitServerAction(
+              claim.playerId,
+              seatClaimAction(id, claim.playerId, room.state.time, {
+                ...claim.claim,
+                ...(preferredScientists !== undefined ? { scientists: preferredScientists } : {}),
+              }),
+            );
           }
           return {
-            playerId: seat.playerId,
-            token: await authCfg.signToken!(id, seat.playerId, accountId),
+            playerId: claim.playerId,
+            token: await authCfg.signToken!(id, claim.playerId, accountId),
           };
         },
       });
@@ -858,11 +962,17 @@ const server = createMultiplayerServer({
       });
     }
     if (playerHtml !== undefined && devHtml !== undefined) {
-      app.get('/dev', async (_request, reply) => {
-        void reply.header('content-type', 'text/html; charset=utf-8');
-        void reply.header('cache-control', 'no-store, must-revalidate');
-        return devHtml;
-      });
+      // ADDR-3: адрес партии живёт ВНУТРИ той сборки, из которой в неё вошли, поэтому
+      // дев-клиент отдаётся и на `/dev/game/<id>`. Без второго маршрута вход с дев-клиента
+      // уводил бы на `/game/<id>`, то есть на игроцкую сборку без дев-оверлея — тихая
+      // подмена клиента прямо посреди сессии.
+      for (const route of ['/dev', '/dev/game/:matchId']) {
+        app.get(route, async (_request, reply) => {
+          void reply.header('content-type', 'text/html; charset=utf-8');
+          void reply.header('cache-control', 'no-store, must-revalidate');
+          return devHtml;
+        });
+      }
     }
   },
 });
@@ -922,11 +1032,12 @@ const lines = [
   `  matches: ${MATCHES} session${MATCHES > 1 ? 's' : ''} in this process (${matchIds.join(', ')}) — set MATCHES=N for more; all listed in the in-game browser`,
   `  ai     : substitute bot takes an abandoned chair after ${(AI_GRACE_MS / 3_600_000).toFixed(1)}h offline (real time; set AI_GRACE_MS); a delegated Steward runs instantly`,
   `  join   : a NEW player may claim a free seat for ${(ENTRY_WINDOW_MS / 86_400_000).toFixed(1)} real days from a session's creation (set ENTRY_WINDOW_MS); a seated player reconnects any time`,
-  NETWORK_MODE === '2v2'
-    ? '  mode   : 2v2 team battle — 4 claimable chairs each; empty chairs are AI-driven'
-    : NETWORK_MODE === '5v5'
-      ? '  mode   : 5v5 team battle — 10 claimable chairs each; empty chairs are AI-driven'
-      : '  mode   : 10-player FFA — empty chairs are AI-driven (set TEAMS=5v5 for teams)',
+  // Строка выводится ИЗ РАСКЛАДА, а не из списка режимов: перечисление вручную
+  // устаревало на каждом новом формате (PVE-1.1 добавил 1v1/3v3/4v4, и лесенка
+  // тернарников напечатала бы им «10-player FFA»).
+  NETWORK_MODE === 'ffa'
+    ? `  mode   : ${NET_SEATS.length}-player FFA — empty chairs are AI-driven (set TEAMS=3v3 for teams)`
+    : `  mode   : ${NETWORK_MODE} — ${NET_SEATS.length} claimable chairs; empty chairs are AI-driven`,
   '',
   '  Multiplayer test:',
   `   • You:     open ${localHttp}/  → enter a callsign → join`,

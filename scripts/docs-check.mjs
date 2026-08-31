@@ -113,6 +113,64 @@ for (const m of backlog.matchAll(/`\[([a-z/+-]+)\]`/g)) {
   }
 }
 
+// 4. счётчики модулей в docs/state.md §9 против КОДА.
+//
+// Числа модулей уже разъезжались молча: доки говорили 33/34, `DEV_MODULES` — 29, а в
+// каталоге лежало 35. Ссылка на файл проверяема, а число — нет, поэтому оно и гниёт.
+// Здесь число становится проверяемым: §9 объявлен единственным домом счётчика, а
+// соседние доки ссылаются на него вместо своей копии.
+//
+// Источники правды берём максимально дёшево и без парсинга TS:
+//   - каталог модулей — просто список файлов;
+//   - `DEV_MODULES` — через ЗАКРЕПЛЁННЫЙ список id в moduleManifest.test.ts; сам он
+//     сверяется с настоящим `DEV_MODULES` витестом (инвариант #6), так что цепочка
+//     замкнута: код → сторож манифеста → этот скрипт → state.md;
+//   - `MODULES` прототипа — массив в protoKernel.ts (своего сторожа у него нет:
+//     поматчево он не версионируется).
+const counts = (() => {
+  const modDir = join(ROOT, 'packages/shared-core/src/modules');
+  const files = readdirSync(modDir).filter((f) => f.endsWith('.ts') && !f.includes('.test.')).length;
+
+  const guard = readFileSync(join(ROOT, 'packages/server/src/moduleManifest.test.ts'), 'utf8');
+  const pinned = guard.match(/const PINNED_MODULE_IDS = \[([\s\S]*?)\n\];/);
+  // Только строки-элементы: комментарии внутри массива элементами не являются.
+  const dev = pinned
+    ? pinned[1].split('\n').filter((l) => l.trim().startsWith("'")).length
+    : null;
+
+  const proto = readFileSync(join(ROOT, 'prototype/src/protoKernel.ts'), 'utf8');
+  const arr = proto.match(/export const MODULES: GameModule\[\] = \[([\s\S]*?)\n\];/);
+  const protoCount = arr
+    ? arr[1].split('\n').filter((l) => /^[a-zA-Z]+Module,/.test(l.trim())).length
+    : null;
+
+  return { files, dev, proto: protoCount };
+})();
+
+const state = readFileSync(join(ROOT, 'docs/state.md'), 'utf8');
+/** Достать число из §9 по метке, которой оно подписано в таблице/тексте. */
+const claim = (re) => {
+  const m = state.match(re);
+  return m ? Number(m[1]) : null;
+};
+const CLAIMS = [
+  // Форма слова зависит от числа (35 модулей / 34 модуля / 31 модуль) — если её не
+  // допустить, подмена числа выглядела бы как «счётчик удалили», и сообщение об ошибке
+  // отправило бы чинить не то.
+  ['модулей в каталоге', claim(/\*\*(\d+) модул(?:ь|я|ей)\*\* на микроядре/), counts.files],
+  ['DEV_MODULES', claim(/`scenario\.ts`\) \| \*\*(\d+)\*\*/), counts.dev],
+  ['MODULES прототипа', claim(/`protoKernel\.ts`\) \| \*\*(\d+)\*\*/), counts.proto],
+];
+for (const [what, said, real] of CLAIMS) {
+  if (real === null) {
+    problems.push(`docs-check: не удалось прочитать из кода счётчик «${what}» — проверка счётчиков сломана, почини её`);
+  } else if (said === null) {
+    problems.push(`docs/state.md §9: счётчик «${what}» не найден — он объявлен единственным домом этого числа, не удаляй его`);
+  } else if (said !== real) {
+    problems.push(`docs/state.md §9: «${what}» — в доке ${said}, в коде ${real}`);
+  }
+}
+
 // --- вердикт ---------------------------------------------------------------------
 
 if (problems.length > 0) {

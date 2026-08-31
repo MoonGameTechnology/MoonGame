@@ -13,6 +13,12 @@ name: Security scan
 # suppressions are the justified base-image CVEs in .trivyignore). Their gate step
 # fails the job on ANY non-zero scanner exit — findings AND scanner/infra failures
 # both block (fail-secure, OWASP A10): a scanner that couldn't run can't certify.
+# ONE carve-out, about FIXABILITY and not severity (SEC-27): in `trivy-image` the
+# report and the gate decision are two separate runs — everything lands in the SARIF,
+# only findings WITH a published fix gate the merge (`--ignore-unfixed`; same flag in
+# image.yml before the GHCR push). A finding nobody can fix produced .trivyignore
+# paperwork, not remediation, while holding the whole repo's merge queue — eight times
+# in two and a half weeks. No severity threshold: a fixable LOW is work, not noise.
 # New suppressions go to .semgrepignore / .gitleaks.toml / .trivyignore WITH a
 # reason + date (see docs/security/pipeline.md).
 # Still informational (not yet triaged as bricks): codeql, trufflehog, trivy-deps,
@@ -497,20 +503,37 @@ jobs:
         run: |
           set +e
           # Pinned by digest: aquasec/trivy (= 0.58.2) + anchore/syft (= v1.20.0).
-          # --exit-code 1 → exit 1 on findings (blocking, SEC-1); .trivyignore applies
-          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/out" -w /out \
-            aquasec/trivy@sha256:665030f4d33a82c1e8d9d5e0453365842236723c1ee5cc3becca698268e66a56 image --exit-code 1 --format sarif --output trivy-image.sarif void-dominion:scan
+          # Кэш БД уязвимостей разделён между прогонами: иначе каждый тянет свои 110 МБ.
+          scan() {
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "$PWD:/out" -v /tmp/trivy-cache:/root/.cache/trivy -w /out \
+              aquasec/trivy@sha256:665030f4d33a82c1e8d9d5e0453365842236723c1ee5cc3becca698268e66a56 image "$@" void-dominion:scan
+          }
+          # SEC-27: ОТЧЁТ и РЕШЕНИЕ ГЕЙТА — два разных вопроса, а отвечал на них один
+          # прогон. Отсюда шла поломка процесса: находка в базовом образе БЕЗ
+          # опубликованного фикса закрывала очередь мержа всему репозиторию, хотя
+          # сделать с ней нечего — за две с половиной недели так случилось восемь раз, и
+          # каждый раз «ремедиацией» была запись в .trivyignore, то есть бумага.
+          #
+          # 1. ОТЧЁТ — полный, без --exit-code: в SARIF (→ артефакт + Code Scanning +
+          #    сводный комментарий) уезжает ВСЁ, включая находки без фикса. Видимость не
+          #    режется — режется только право блокировать мерж.
+          scan --format sarif --output trivy-image.sarif
+          # 2. ГЕЙТ — только то, с чем можно что-то сделать (--ignore-unfixed). Порог по
+          #    severity намеренно НЕ ставится: фиксируемый MEDIUM — это работа, а не шум.
+          #    Таблица печатается ВСЕГДА: на зелёном она пустая, на красном сразу видно,
+          #    что чинить, без скачивания артефакта.
+          echo "::group::trivy image — блокирующие находки (только с доступным фиксом)"
+          scan --ignore-unfixed --exit-code 1 --format table
           rc=$?
-          # Печатаем находки В ЛОГ, когда гейт красный. SARIF уезжает артефактом, и без
-          # этого «почему упало» читается только скачиванием артефакта прогона — а он
-          # доступен не всем и не всегда. Тот же образ, та же база, тот же .trivyignore;
-          # без --exit-code, поэтому на rc не влияет (шаг гейта ниже смотрит только на $rc).
-          if [ "$rc" != "0" ]; then
-            echo "::group::trivy image — что именно нашлось"
-            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/out" -w /out \
-              aquasec/trivy@sha256:665030f4d33a82c1e8d9d5e0453365842236723c1ee5cc3becca698268e66a56 image --format table void-dominion:scan
-            echo "::endgroup::"
-          fi
+          echo "::endgroup::"
+          # Fail-secure не ослаблен: гейт читает rc ИМЕННО этого прогона, поэтому
+          # сканер, который не смог отработать, по-прежнему валит джобу (A10).
+          #
+          # Счётчик — чтобы «не блокирует» никогда не читалось как «ничего нет»: в логе
+          # всегда стоит, сколько находок ВСЕГО легло в отчёт.
+          total=$(jq '[.runs[].results[]] | length' trivy-image.sarif 2>/dev/null || echo '?')
+          echo "trivy image: находок в отчёте всего — $total; блокирующих (фикс доступен) — см. таблицу выше."
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/out" -w /out \
             anchore/syft@sha256:b46e597614ddc78621e560af3fabf9346e35462ea1c886a38b30bcc7ca601a73 scan void-dominion:scan -o cyclonedx-json=sbom-image.cdx.json
           set -e
@@ -544,7 +567,7 @@ jobs:
             fail=1
           fi
           if [ "$RC" != "0" ]; then
-            echo "::error::Trivy image is a blocking scanner (SEC-1): finding or scan/build failure (exit $RC). Fix the image; suppress ONLY via .trivyignore WITH CVE-id, reason and review date."
+            echo "::error::Trivy image is a blocking scanner (SEC-1): a FIXABLE finding or a scan/build failure (exit $RC). Fix the image — bump the base pin or the dependency. Findings with no published fix no longer gate (SEC-27); they are still reported to Code Scanning and must NOT be added to .trivyignore (SEC-28) — suppressing one only hides it from the report. .trivyignore is for a finding whose fix EXISTS but cannot be installed here: CVE-id, reason, review date."
             fail=1
           fi
           exit $fail

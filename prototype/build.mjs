@@ -1767,6 +1767,24 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #connect .mtab{flex:1;padding:8px 6px;border-radius:7px;border:1px solid var(--line-hi);background:transparent;
   color:var(--dim);font-size:11px;letter-spacing:1px;text-transform:uppercase;cursor:pointer;}
 #connect .mtab.active{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.10);}
+/* Панель фильтров над списком (BRW-3) — только на вкладке «Доступные». */
+#connect .mfilter{margin-top:10px;padding:8px 10px;border:1px solid var(--line-hi);border-radius:8px;
+  display:flex;flex-direction:column;gap:7px;}
+#connect .mfrow{display:flex;align-items:center;gap:8px;}
+#connect .mflabel{flex:none;width:64px;color:var(--dim);font-size:11px;letter-spacing:.5px;}
+#connect .mfseg{display:flex;gap:4px;}
+#connect .mfbtn{padding:5px 10px;border-radius:6px;border:1px solid var(--line-hi);background:transparent;
+  color:var(--dim);font-size:11px;letter-spacing:.5px;cursor:pointer;}
+#connect .mfbtn.active{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.10);}
+#connect .mfdrop{position:relative;flex:1;min-width:0;}
+#connect .mfwide{width:100%;text-align:left;}
+#connect .mfmenu{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:5;max-height:38vh;overflow-y:auto;
+  padding:6px;border:1px solid var(--line-hi);border-radius:7px;background:rgba(3,12,16,.97);}
+#connect .mfmenu label{display:flex;align-items:center;gap:7px;padding:5px 6px;border-radius:5px;
+  color:var(--txt,#dfeef2);font-size:12px;text-transform:capitalize;cursor:pointer;}
+#connect .mfmenu label:hover{background:rgba(53,214,230,.08);}
+#connect .mfrange{flex:1;min-width:0;accent-color:var(--cyan,#35d6e6);}
+#connect .mfval{flex:none;min-width:52px;text-align:right;color:var(--cyan-dim,#6cc);font-size:11px;}
 #connect .mlist{margin-top:10px;max-height:46vh;overflow-y:auto;display:flex;flex-direction:column;gap:8px;}
 #connect .mempty{padding:18px 8px 8px;text-align:center;color:var(--dim);font-size:12px;}
 #connect .msolo{padding:6px 8px 16px;text-align:center;}
@@ -1778,6 +1796,9 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #connect .mname{font-size:13px;color:var(--txt,#dfeef2);text-transform:capitalize;}
 #connect .mname .mid{font-size:10px;color:var(--dim);letter-spacing:.5px;text-transform:none;margin-left:6px;}
 #connect .mmeta{margin-top:3px;font-size:11px;color:var(--dim);}
+#connect .mmeta .mmode{font-size:10px;letter-spacing:.06em;padding:1px 5px;border-radius:3px;border:1px solid currentColor;}
+#connect .mmeta .mmode.pve{color:var(--amber,#e0a942);}
+#connect .mmeta .mmode.pvp{color:var(--cyan-dim,#6cc);}
 #connect .mmeta .mwin{color:var(--cyan-dim,#6cc);}
 #connect .mmeta .mwin.soon{color:var(--amber,#e0a942);}
 #connect .mmeta .mwin.shut{color:var(--dim);text-decoration:line-through;}
@@ -2200,6 +2221,16 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   background:rgba(53,214,230,.1);color:var(--cyan);font-size:18px;}
 #hub .hub-card .hc-t{font-size:13px;color:#dfeef2;}
 #hub .hub-card .hc-s{font-size:11px;color:var(--dim);margin-top:4px;line-height:1.45;}
+/* ADDR-4 «Мои партии» — свои партии прямо на главном экране */
+#hub .hm-list{display:flex;flex-direction:column;gap:8px;}
+#hub .hm-row .hm-body{flex:1;min-width:0;}
+#hub .hm-row .hm-addr{font-size:10px;color:var(--cyan-dim);margin-top:6px;
+  overflow-wrap:anywhere;user-select:all;-webkit-user-select:all;}
+#hub .hm-row .hm-btns{display:flex;flex-direction:column;gap:6px;flex:0 0 auto;}
+#hub .hm-row .hm-btns .mbtn{white-space:nowrap;}
+#hub .hm-more{font-size:11px;color:var(--dim);background:transparent;border:none;padding:2px 0;
+  cursor:pointer;text-align:left;text-decoration:underline;}
+#hub .hm-empty{font-size:11px;color:var(--dim);line-height:1.45;}
 /* ONB-0 first-run offer card (hub home) */
 #hub .ob-nudge{border-color:var(--cyan);background:rgba(53,214,230,.06);}
 #hub .ob-nudge .ob-body{flex:1;}
@@ -2848,6 +2879,29 @@ const page = (js) => `<!doctype html>
           <button class="mtab" data-tab="active" data-i18n="welcome.browse.tab.active"></button>
           <button class="mtab" data-tab="archived" data-i18n="welcome.browse.tab.archived"></button>
         </div>
+        <div id="mfilter" class="mfilter" style="display:none">
+          <div class="mfrow">
+            <span class="mflabel" data-i18n="browser.filter.mode"></span>
+            <div class="mfseg" id="mf-mode">
+              <button class="mfbtn active" type="button" data-mode="all" data-i18n="browser.filter.all"></button>
+              <button class="mfbtn" type="button" data-mode="pvp" data-i18n="browser.mode.pvp"></button>
+              <button class="mfbtn" type="button" data-mode="pve" data-i18n="browser.mode.pve"></button>
+            </div>
+          </div>
+          <div class="mfrow">
+            <span class="mflabel" data-i18n="browser.filter.map"></span>
+            <div class="mfdrop">
+              <button class="mfbtn mfwide" type="button" id="mf-map"></button>
+              <div class="mfmenu" id="mf-maps" style="display:none"></div>
+            </div>
+          </div>
+          <div class="mfrow">
+            <span class="mflabel" data-i18n="browser.filter.players"></span>
+            <input id="mf-min" class="mfrange" type="range" min="0" max="0" value="0">
+            <input id="mf-max" class="mfrange" type="range" min="0" max="0" value="0">
+            <span class="mfval" id="mf-range"></span>
+          </div>
+        </div>
         <div id="mlist" class="mlist"></div>
       </div>
       <div id="cstatus" class="cstat"></div>
@@ -2905,6 +2959,9 @@ const page = (js) => `<!doctype html>
           </div>
         </div>
       </div>
+      <!-- ADDR-4: свои партии — главный экран, а не вкладка обозревателя. -->
+      <div class="hub-sec" data-i18n="hub.mine.section"></div>
+      <div class="hm-list" id="hub-mine"></div>
       <div class="hub-sec" data-i18n="hub.digest.section"></div>
       <div class="hub-card">
         <div class="hc-ic">◷</div>
@@ -2974,7 +3031,7 @@ const page = (js) => `<!doctype html>
         <div id="setupfactions"></div>
         <div id="setupcouncil"></div>
       </div>
-      <div class="scol">
+      <div class="scol" id="setup-solo-col">
         <div id="setupslots" class="sslots"></div>
         <div class="sspeedlabel" data-i18n="setup.speed.label"></div>
         <p class="sspeedhint" data-i18n="setup.speed.hint"></p>

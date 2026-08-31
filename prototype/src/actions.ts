@@ -160,7 +160,7 @@ export const orderScramble = (playerId: string, fleetId: string, on: boolean) =>
 // Market listing, pulled ahead of the REFP-22 remainder for the same reason as the
 // standing-order toggles above: `aiOrders` (ai.ts, REFP-26) places lots and must not
 // import the facade back. Leaf builder — only the `MarketSide` type rides along.
-import type { MarketSide } from './sessionMarket';
+import type { MarketSide } from '../../packages/shared-core/src/index';
 /** List an open lot on the session market (sell `amount` at `price`, or a buy bid). */
 export const marketList = (
   playerId: string,
@@ -173,8 +173,8 @@ export const marketList = (
 // REFP-22 (остаток): the second, scattered builder batch — the state it was
 // interleaved with in game.ts has since been extracted (patrol REFP-23, chains
 // REFP-8, divisions REFP-13, market REFP-12), leaving pure leaf builders.
-import type { SortieState } from './squadron';
-import type { ChainStep } from './chain';
+import type { SortieState } from '../../packages/shared-core/src/index';
+import type { ChainStep } from '../../packages/shared-core/src/index';
 /** The patrol driver's runtime stamp: burned fuel / ticked rearm / next cadence mark. */
 export const patrolStamp = (
   playerId: string,

@@ -25,6 +25,14 @@ export const en: Record<string, string> = {
   'browser.archive-failed': 'archiving failed',
   'browser.day': 'Day {n}',
   'browser.empty': "it's empty here",
+  'browser.filter.all': 'All',
+  'browser.filter.map': 'Map',
+  'browser.filter.map.all': 'All maps',
+  'browser.filter.map.some': 'maps: {n}',
+  'browser.filter.mode': 'Mode',
+  'browser.filter.none': 'nothing found — loosen the filter',
+  'browser.filter.players': 'Players',
+  'browser.filter.range': '{min}–{max}',
   'browser.finished': 'ended',
   'browser.free': 'free',
   'browser.goal.map': '{p}% of the map',
@@ -35,13 +43,14 @@ export const en: Record<string, string> = {
   'browser.left.hours': '{h}h',
   'browser.left.soon': '<1h',
   'browser.loading': 'loading matches…',
+  'browser.mode.pve': 'PVE',
+  'browser.mode.pvp': 'PVP',
   'browser.players': '{s}/{c} players',
   'browser.refresh-hint': 'press "Refresh list"',
   'browser.restore': 'Restore',
   'browser.restore-failed': 'restore failed',
   'browser.running': 'active',
   'browser.server-down': 'server unreachable — enter the server address',
-  'browser.slots': 'slots',
   'browser.solo': 'Solo mode',
   'browser.solo.hint': 'No server needed — bots fill the open seats.',
   'browser.taken': 'taken',
@@ -368,7 +377,8 @@ export const en: Record<string, string> = {
   'corp.battle.loss': 'DEFEAT',
   'corp.battle.win': 'VICTORY',
   'corp.battles.none': 'No battles yet.',
-  'corp.battles.note': 'These are wars from the public AvA feed — the server keeps a recent window, not the corp’s full archive.',
+  'corp.battles.note':
+    'These are wars from the public AvA feed — the server keeps a recent window, not the corp’s full archive.',
   'corp.battles.title': 'Recent battles',
   'corp.browse.empty': 'No other corporations yet.',
   'corp.browse.title': 'Find and apply',
@@ -420,12 +430,14 @@ export const en: Record<string, string> = {
   'corp.role.officer': 'Officer',
   'corp.role.recruit': 'Applicant',
   'corp.settings.identity': 'Identity',
-  'corp.settings.identity.hint': 'The name is set at creation; a tag, motto, join policy and tax are not stored by the server yet.',
+  'corp.settings.identity.hint':
+    'The name is set at creation; a tag, motto, join policy and tax are not stored by the server yet.',
   'corp.settings.name': 'Name',
   'corp.settings.soon': 'Coming soon',
   'corp.showcase': 'Award showcase',
   'corp.showcase.empty': 'empty',
-  'corp.showcase.hint': 'Tap a cup — the full award showcase opens. The pick is stored on this device.',
+  'corp.showcase.hint':
+    'Tap a cup — the full award showcase opens. The pick is stored on this device.',
   'corp.tab.battles': 'Battles',
   'corp.tab.hq': 'HQ',
   'corp.tab.members': 'Members',
@@ -499,6 +511,7 @@ export const en: Record<string, string> = {
   'data.dropship': 'dropship',
   'data.empty-space': 'Empty Space',
   'data.energy': 'energy',
+  'data.evasive-vectors': 'Evasive Vectors',
   'data.fighter-squadron': 'fighter squadron',
   'data.flight-decks': 'Flight Decks',
   'data.food': 'food',
@@ -535,6 +548,11 @@ export const en: Record<string, string> = {
   'data.overseer': 'Overseer',
   'data.planet': 'Planet',
   'data.planetary-bastions': 'Planetary Bastions',
+  'data.duel': 'Duel',
+  'data.team-2v2': 'Team 2v2',
+  'data.team-3v3': 'Team 3v3',
+  'data.team-4v4': 'Team 4v4',
+  'data.team-5v5': 'Team 5v5',
   'data.pve-waves': 'Swarm Waves',
   'data.psi-amplifier': 'Psi Amplifier',
   'data.psi-veil': 'Psi Veil',
@@ -566,6 +584,8 @@ export const en: Record<string, string> = {
   'data.squadron': 'squadron',
   'data.standard': 'Standard',
   'data.steward-protocol': 'Steward Protocol',
+  'data.sustained-corridor': 'Sustained Corridor',
+  'data.shared-corridor': 'Shared Corridor',
   'data.strike-carrier': 'strike carrier',
   'data.strike-vectors': 'Strike Vectors',
   'data.tank': 'tank',
@@ -583,6 +603,7 @@ export const en: Record<string, string> = {
   'data.volcanic': 'Volcanic',
   'data.warden': 'Warden',
   'data.warhead-miniaturization': 'Warhead Miniaturization',
+  'data.weak-points': 'Weak Points',
 
   // --- diplo — Дипломатия: окно, вкладки, фильтр и сортировка ростера, названия отношений.
   'diplo.filter': 'Filter',
@@ -827,7 +848,8 @@ export const en: Record<string, string> = {
   'profile.season': 'Season points',
   'profile.streak': 'Win streak',
   'profile.medals': 'Medal showcase',
-  'profile.medals.empty': 'Medals show up here once your corporation goes to war. Sign in on a server with the meta layer to see the showcase.',
+  'profile.medals.empty':
+    'Medals show up here once your corporation goes to war. Sign in on a server with the meta layer to see the showcase.',
   'queue.added': 'queued: {what} at {at}',
   'queue.failed': '{what} — failed: {err}',
   'queue.unknown': 'unknown order',
@@ -1059,7 +1081,7 @@ export const en: Record<string, string> = {
   'hero.ability.bulwark.desc': 'A temporary shield: +defense to your fleets near the hero.',
   'hero.ability.bulwark.name': 'Bulwark',
   'hero.ability.corridor.desc':
-    'Punches a corridor to a nearby world. One-shot: only the army carrying this hero may use it, and it closes the moment that army arrives. Upgrades give it a lifetime, then open it to everyone — the enemy included.',
+    'Punches a corridor to a nearby world. One-shot: only the army carrying this hero may use it, and it closes the moment that army arrives. Upgrades give it a lifetime, then open it to your allies — an open corridor is shared, so the enemy may walk in too.',
   'hero.ability.corridor.name': 'Corridor',
   'hero.ability.diplomatic-landing.desc':
     "Allied worlds receive the hero as one of their own: the ship can also rise from an ally's planet. Passive skill: widens the deployment points.",
@@ -1069,7 +1091,8 @@ export const en: Record<string, string> = {
   'hero.ability.rally.name': 'Rally',
   'hero.ability.recall.desc': 'Instantly recalls the hero ship to the capital.',
   'hero.ability.recall.name': 'Recall',
-  'hero.ability.scan.desc': 'Reveals an area around the target through the fog for a while.',
+  'hero.ability.scan.desc':
+    'Reveals an area around the target through the fog for a while. Upgrades turn the lit zone into a combat zone: first it marks the gaps in enemy armour, then it flies your own and allied fleets by the radar picture.',
   'hero.ability.scan.name': 'Scan',
   'hero.arch.commander': 'Commander',
   'hero.arch.destroyer': 'Destroyer',
@@ -1095,13 +1118,25 @@ export const en: Record<string, string> = {
   'hero.passive.vanguard-impulse.desc':
     "The hero's ship drives its fleet at full burn: +10% speed for the hero's fleet.",
   'hero.passive.vanguard-impulse.name': 'Vanguard Impulse',
+  'hero.tree.corridor-open.desc':
+    'Opens the corridor to your ALLIES: their fleets use your passage as their own, at the same speed bonus. It becomes a shared road, so a neutral — or the enemy — can step in as well, but for them it is only a road: no bonus.',
+  'hero.tree.corridor-open.name': 'Shared Corridor',
+  'hero.tree.corridor-sustained.desc':
+    "The corridor lives on a clock instead of closing behind the hero's army.",
+  'hero.tree.corridor-sustained.name': 'Sustained Corridor',
   'hero.tree.neural-lace.desc': "A direct brain-to-helm implant: the hero's ship gains +10% speed.",
   'hero.tree.neural-lace.name': 'Neural Lace',
   'hero.tree.overclocked-helm.desc':
     'Overclocking the neural interface lets the hero lay corridors.',
   'hero.tree.overclocked-helm.name': 'Overclocked Helm',
+  'hero.tree.psi-evasion.desc':
+    'The radar picture reaches your own too: your fleets and allied fleets inside the lit zone take 5% less incoming damage.',
+  'hero.tree.psi-evasion.name': 'Evasive Vectors',
   'hero.tree.psi-veil.desc': 'Honed psi-sight: the hero learns to tear the fog open with a scan.',
   'hero.tree.psi-veil.name': 'Psi Veil',
+  'hero.tree.psi-weak-points.desc':
+    'The radar does more than light the dark: it reads the gaps in hostile armour. Enemy fleets inside the lit zone take 5% more damage. Your own, allied and neutral fleets are untouched.',
+  'hero.tree.psi-weak-points.name': 'Weak Points',
   'hero.tree.void-attunement.desc':
     "The hero's psi resonance inspires nearby fleets: +8% damage within 300.",
   'hero.tree.void-attunement.name': 'Void Attunement',
@@ -1217,6 +1252,12 @@ export const en: Record<string, string> = {
   'hub.emblem.close': 'Close',
   'hub.emblem.title': 'CHOOSE AN EMBLEM',
   'hub.messages.soon': 'Messages — coming soon',
+  'hub.mine.copied': 'Address copied',
+  'hub.mine.copy': 'Copy address',
+  'hub.mine.copy-manual': 'Copy the address from the row by hand',
+  'hub.mine.empty': 'No matches yet. Start with "PLAY NOW" — or browse the games list.',
+  'hub.mine.more': '{n} more — in the games list',
+  'hub.mine.section': 'My matches',
   'hub.msgs.aria': 'Messages',
   'hub.nav.ally': 'Alliances',
   'hub.nav.arsenal': 'Arsenal',
@@ -1515,7 +1556,10 @@ export const en: Record<string, string> = {
   'seatpick.go': 'CHOOSE',
   'seatpick.load-failed': 'Could not load the seats',
   'seatpick.loading': 'Loading…',
+  'seatpick.lost': 'That seat was just taken — pick another',
+  'seatpick.none-free': 'No free seats',
   'seatpick.sub': 'Choose your faction and starting position. Taken seats are marked grey.',
+  'seatpick.taken': 'taken',
   'seatpick.title': 'Choose Faction',
 
   // --- setup — Экран «Настройка схватки»: домашний мир, боты, скорость времени.
@@ -1786,7 +1830,6 @@ export const en: Record<string, string> = {
   'side.world.type-bonuses': 'Type bonuses',
   'side.world.type.long': 'A {pt} world — {mods}',
   'side.world.vp': 'Victory points',
-
 
   // --- speed — Панель времени: подсказки множителей, перезапуска и выхода.
   'speed.exit': 'Exit to menu',

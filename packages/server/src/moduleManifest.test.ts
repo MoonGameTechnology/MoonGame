@@ -27,7 +27,7 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
 
 /** Версия манифеста, для которой закреплён список ниже. Разъехалась с
  *  `MODULE_MANIFEST_VERSION` → список устарел, его надо перезакрепить. */
-const PINNED_FOR_VERSION = '5';
+const PINNED_FOR_VERSION = '9';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */
@@ -38,7 +38,11 @@ const PINNED_MODULE_IDS = [
   'economy',
   'movement',
   'hero',
+  // CORE-PARITY: провайдеры `hero.effect.<type>` стоят сразу за героем — они вешают
+  // хуки `combat.damage` (аура), а место в конвейере значений и есть предмет договора.
+  'heroEffects',
   'diplomacy',
+  'espionage',
   // Боевая семья, разложенная по швам шины: orbital штампует орбиту до combat,
   // а свой залп отрабатывает до artillery.
   'orbital',
@@ -51,10 +55,12 @@ const PINNED_MODULE_IDS = [
   'station',
   'technology',
   'scientist',
+  'steward',
   'faction',
   'market',
   'army',
   'fleet-ops',
+  'auto-rally',
   'squadron',
   'capital',
   'standing-orders',
@@ -69,7 +75,9 @@ const PINNED_MODULE_IDS = [
   // между гарнизоном и трюмом, combatModule разрешает десант — этот путь никогда не
   // исчезал, дивизии стояли ПАРАЛЛЕЛЬНО ему. Прежде чем вписывать 'division' обратно,
   // прочти причину отката в docs/backlog.md: возврат строки откатывает решение
-  // владельца, а не чинит опечатку.
+  // владельца, а не чинит опечатку.,
+  'effects',
+  'seatClaim',
 ];
 
 describe('сторож манифеста', () => {

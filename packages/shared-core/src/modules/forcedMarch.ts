@@ -1,7 +1,10 @@
 /**
  * BOOST-1 форс-марш ("Ускорить") — +50% fleet speed at the cost of 5% max-hp wear
- * per game-hour IN TRANSIT. Port of the prototype's `forcedMarchModule`
- * (`prototype/src/forcedMarch.ts`, REFP-16).
+ * per game-hour IN TRANSIT.
+ *
+ * Was a port of the prototype's `forcedMarchModule` (REFP-16); since CONV-1 it is
+ * the ONLY implementation — the prototype deleted its copy and drives this module
+ * through `protoKernel`.
  */
 import type { GameModule } from '../kernel/module';
 import { effectiveStats } from '../util/loadout';

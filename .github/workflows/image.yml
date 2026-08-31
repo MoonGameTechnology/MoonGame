@@ -82,9 +82,16 @@ jobs:
           # Пин по дайджесту (= 0.58.2), тот же, что у trivy-fs/trivy-image/trivy-deps в
           # security.yml — бампить их надо вместе. Тег mutable, а этот скан решает, уедет
           # ли образ в GHCR.
+          #
+          # --ignore-unfixed (SEC-27) — то же правило, что у джобы `trivy-image` в
+          # security.yml, и по той же причине: находка без опубликованного фикса не
+          # чинится ничем, а здесь она запрещала бы ВЫПУСК образа вовсе — то есть держала
+          # бы прод на старой сборке из-за уязвимости, которой в новой ровно столько же.
+          # Полный список (включая нефиксируемое) считает и грузит в Code Scanning
+          # security.yml на том же Dockerfile; здесь решается только «пускать ли в GHCR».
           docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/out" -w /out \
             aquasec/trivy@sha256:665030f4d33a82c1e8d9d5e0453365842236723c1ee5cc3becca698268e66a56 \
-            image --exit-code 1 --format table "$IMAGE:ci"
+            image --ignore-unfixed --exit-code 1 --format table "$IMAGE:ci"
 
       # ВТОРОЙ блокирующий гейт перед пушем, к сканеру ортогональный. Trivy отвечает на
       # «что внутри», смоук — на «работает ли оно вообще»: сканер читает файловую

@@ -1,12 +1,14 @@
 /**
  * CC-1 fleet order queue (command chains) — the chain step vocabulary, the fleet's
  * queued plan shape, and the payload validator. Port of the prototype's
- * `prototype/src/chain.ts` (REFP-8's extraction), carrying the full step vocabulary —
+ * `chain.ts` (REFP-8's extraction), carrying the full step vocabulary —
  * `move`/`wait`/`assault`/`barrage`/`strike`/`ability` — in lockstep with the gate
  * schema (`order.chain` in `actions/payloadSchemas.ts`). The `ability` kind was
  * initially left out of this port ("no matching schema entry yet"), which silently
  * diverged the three copies: solo accepted the step, a gated server rejected the
- * whole plan with E_BAD_PAYLOAD. Keep all three in sync. A state utility (not a
+ * whole plan with E_BAD_PAYLOAD. **CONV-7 removed the prototype's copy** — that
+ * particular drift can no longer happen; the vocabulary here and the gate schema
+ * still have to be kept in sync with each other. A state utility (not a
  * `GameModule`) — `standingOrders.ts` and any future chain-driver both need this
  * shape without importing each other (invariant #3).
  */

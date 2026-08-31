@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale, tData } from '../../localization/runtime';
-import { newGame, data, DAY, HOUR } from './game';
+import { newGame, data, DAY, HOUR, order, researchTech } from './game';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import {
   TECH_BRANCHES,
@@ -86,6 +86,62 @@ function wire(over: Partial<TechHost> = {}, state?: GameState) {
   });
   return { api, win, body, sent, s, intros: () => intros };
 }
+
+// CONV-5: пилюля слотов и редьюсер должны называть ОДНО число. Раньше пилюля считала
+// бонус совета своей копией формулы, а `scientistModule` в сборке прототипа не было —
+// хук `research.slots` оставался пустым, редьюсер выдавал два слота, а игрок с Полиматом
+// читал на экране «слоты 0/3» и получал отказ на третьем исследовании.
+describe('дерево технологий — слоты исследования (CONV-5)', () => {
+  /** Партия, где место p1 держит в совете учёного с `slotBonus`. Казна набита
+   *  намеренно: без неё цикл ниже упирается в `E_INSUFFICIENT` на втором же узле и
+   *  меряет не слоты, а стоимость исследований — обе ветки дали бы «2» и тест прошёл
+   *  бы, ничего не проверив. */
+  function withCouncil(ids: string[]): GameState {
+    const s = newGame();
+    const seat = s.players['p1'];
+    if (seat) {
+      seat.scientists = ids.map((id) => ({ id, level: 1 }));
+      for (const r of data.resources) seat.resources[r] = 1_000_000;
+    }
+    return s;
+  }
+  const polymath = Object.keys(data.scientists).find(
+    (id) => (data.scientists[id]?.slotBonus ?? 0) > 0,
+  )!;
+  /** Сколько слотов НАЗЫВАЕТ интерфейс — читаем из отрисованной пилюли. */
+  const shownSlots = (s: GameState): number => {
+    const { api, body } = wire({}, s);
+    api.open();
+    const m = /слоты \d+\/(\d+)/.exec(body.html());
+    if (!m) throw new Error('пилюля слотов не найдена в разметке');
+    return Number(m[1]);
+  };
+  /** Сколько слотов ДАЁТ редьюсер — заводим исследования, пока не откажет. */
+  const grantedSlots = (s: GameState): number => {
+    let cur = s;
+    let n = 0;
+    for (const id of Object.keys(data.technologies).filter((i) => !i.startsWith('meta_'))) {
+      const r = order(cur, researchTech('p1', id), cur.time);
+      if (r.error === 'E_RESEARCH_SLOTS_FULL') break;
+      if (r.error) continue; // узел закрыт по другой причине (prereq, day-гейт) — не про слоты
+      cur = r.state;
+      n++;
+    }
+    return n;
+  };
+
+  it('без бонусного учёного — базовые два, и обещание совпадает с выдачей', () => {
+    const s = withCouncil([]);
+    expect(shownSlots(s)).toBe(2);
+    expect(grantedSlots(s)).toBe(2);
+  });
+
+  it('с учёным на +слот интерфейс обещает три — и редьюсер их даёт', () => {
+    const s = withCouncil([polymath]);
+    expect(shownSlots(s)).toBe(3);
+    expect(grantedSlots(s)).toBe(3); // до CONV-5 здесь было 2 — обещанный слот не выдавался
+  });
+});
 
 describe('дерево технологий — подписи', () => {
   it('у каждой ветки есть локализованная подпись, ключ наружу не течёт', () => {

@@ -104,7 +104,9 @@ BF-22 coarse/fine-шаги) — точечными фиксами, без сис
   `GATE=1, SEAT_LOCK=1` (как в compose). README-тексты про «10–15 сек без
   пересборки» заменены честными. ⚠️ На уже установленном сервере владельца новый
   `update-dev.sh` появится после однократного ручного `git pull` + пересоздания
-  скрипта (или пере-прогона установщика) — сам себя он не обновит.
+  скрипта (или пере-прогона установщика) — сам себя он не обновит. **Структурно снято
+  OPS-1:** скрипт больше не генерируется, а живёт в репозитории (`deploy/update.sh`) и
+  приезжает обычным обновлением; разовая миграция старых хостов — в `deploy/README-UBUNTU.md`.
 - **ADEP-1 · CI публикует образ в GHCR** `[sec]` — M.
   Новый `.github/workflows/deploy.yml`: push в main → build → push
   `ghcr.io/moonwuk/nygame-server:latest` + `:<sha>`; логин через `GITHUB_TOKEN`
@@ -158,8 +160,8 @@ BF-22 coarse/fine-шаги) — точечными фиксами, без сис
   (sync `applyAndBroadcast` + durable `commitApply`) и серверные драйверы
   (`submitServerAction` — ИИ, Хранитель).
 - **RPL-3 · CI-тест record→replay→hash** `[srv]` — M · ✅ (2026-07-21).
-  `replayDeterminism.test.ts`: живой `MatchRoom` на ПОЛНОМ dev-стеке (27 модулей,
-  шипнутые данные), pinned-часы, 48 игровых часов тиков + действия по обоим путям
+  `replayDeterminism.test.ts`: живой `MatchRoom` на ПОЛНОМ dev-стеке (весь
+  `DEV_MODULES`, шипнутые данные), pinned-часы, 48 игровых часов тиков + действия по обоим путям
   (sync + durable `submitServerAction`) → запись → `runReplay` → хэш **бит-в-бит**;
   плюс JSON-round-trip всего лога (паритет гибернации/durable-лога). Самосогласован
   (live vs его же реплей) — баланс-правки его не инвалидируют; попал в `pnpm test`

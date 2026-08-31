@@ -46,7 +46,6 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   'army.unload': z.object({ fleetId: id, unit: id, count: count.optional() }),
   // hero.ts
   'hero.move': z.object({ to: id }),
-  'hero.path.create': z.object({ to: id }),
   'planet.annihilate': z.object({ planetId: id }),
   'hero.ability': z.object({ heroId: id, abilityId: id, target: id.optional() }),
   'hero.spawn': z.object({ heroId: id, at: id }),
@@ -54,6 +53,11 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   'hero.fit': z.object({ heroId: id, fitting: id }),
   // station.ts
   'station.deploy': z.object({ planetId: id }),
+  // seatClaim.ts (ENTRY-3). Оба поля необязательны: заявка без выбора законна —
+  // игрок берёт место с домом из расклада и пустым советом. Совет капается двумя
+  // и здесь, и в обработчике: схема режет явную чушь до редьюсера, обработчик
+  // остаётся самодостаточным (схема не строже handler'а — она его не заменяет).
+  'seat.claim': z.object({ faction: id.optional(), scientists: z.array(id).max(2).optional() }),
   // construction.ts
   'building.construct': z.object({ planetId: id, building: id }),
   'building.upgrade': z.object({ planetId: id, building: id }),
@@ -89,20 +93,18 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   // anti-wash-trade guard (SEC-A06-5): a `price: 0` listing is a free resource
   // transfer, the documented vehicle once alts exist. `.min(1)` rejects both 0
   // and negatives (the old `.nonnegative()` allowed 0, which the audit flagged).
+  // CONV-9 свёл книгу в одну реализацию, и схема перестала быть объединением двух
+  // диалектов: `side` теперь ОБЯЗАТЕЛЕН (книга двусторонняя), заполнение называется
+  // `market.take`, отмена адресуется `id`. Прежний `market.buy` и вариант отмены по
+  // `orderId` принадлежали односторонней версии ядра и ушли вместе с ней.
   'market.list': z.object({
-    // `side` is the prototype's two-sided order book (sell lot / buy bid); the core
-    // marketModule ignores it (sell-only) — optional so ONE schema serves both hosts.
-    side: z.enum(['sell', 'buy']).optional(),
+    side: z.enum(['sell', 'buy']),
     resource: id,
     amount: z.number().finite().positive(),
     price: z.number().finite().min(1),
   }),
-  'market.buy': z.object({ orderId: id, amount: z.number().finite().positive() }),
-  // The prototype's fill action (take up to `amount` from an open lot).
   'market.take': z.object({ id: id, amount: z.number().finite().positive().optional() }),
-  // The core cancels by `orderId`; the prototype's book cancels by `id` — one schema
-  // serves both hosts (the reducer that owns the action reads its own key).
-  'market.cancel': z.union([z.object({ orderId: id }), z.object({ id: id })]),
+  'market.cancel': z.object({ id: id }),
   // diplomacy.ts — one action for the whole protocol (D2+D3): escalation applies
   // at once, a friendlier declaration records/commits a mutual-consent offer
   'diplomacy.declare': z.object({

@@ -60,31 +60,35 @@ export {
   isInhabited,
   civicTax,
   inhabitedWorldCount,
-} from './tax';
+} from '../../packages/shared-core/src/index';
 export { HUNGER_MULT, hungerModule } from './hunger';
 export { economySnapshot, netIncome, hpOfLevel } from './economy';
+// BAL-5: разложение счёта на слагаемые — читает харнес замера (`selfplay.mjs`).
+export { scoreParts, type ScoreParts } from './scoreParts';
+// AI-BAL-10: диагноз мёртвого контента для харнеса замера. Чистая функция (исходник бота
+// приходит строкой), поэтому фасад её реэкспортирует, а `node:fs` остаётся у вызывающего.
+export { splitDeadContent, type DeadContentSplit } from './deadContent';
 export {
-  MARKET_GOODS,
-  MARKET_FEE,
-  marketLots,
+  MARKET_COMMISSION,
+  isTradable,
   type MarketSide,
-  type MarketLot,
-} from './sessionMarket';
+  type MarketOrder,
+} from '../../packages/shared-core/src/index';
 export {
   REPAIR_HP_PER_METAL,
   dockRepairCost,
   fleetAtOwnDock,
-  econScrewsModule,
-} from './econScrews';
+  fleetRepairModule,
+} from '../../packages/shared-core/src/index';
 export {
   INSTANT_REPAIR_CREDITS_PER_HP,
   missingHull,
   instantRepairCost,
   instantRepairModule,
-} from './instantRepair';
+} from '../../packages/shared-core/src/index';
 
 // --- fleets, squadrons, standing orders --------------------------------------
-export { fleetLaunchModule } from './fleetLaunch';
+export { fleetOpsModule, autoRallyModule } from '../../packages/shared-core/src/index';
 export {
   squadronTake,
   sortieSpec,
@@ -93,14 +97,14 @@ export {
   spendSortie,
   tickRearm,
   fleetHasSquadron,
-  isWing,
-  wingCanAct,
-  wingCanReturn,
   squadronStrikeRange,
   withinRange,
   squadronReaches,
   type SortieState,
-} from './squadron';
+} from '../../packages/shared-core/src/index';
+// Предикаты «действующего крыла» — сторона КЛИЕНТА, а не правило мира, поэтому они
+// не в ядре, а в общем пакете решений, откуда их видит и `packages/client` (CONV-5).
+export { isWing, wingCanAct, wingCanReturn, type WingFleet } from '../../decisions/wingOrders';
 export {
   fleetIdle,
   validateChainSteps,
@@ -108,15 +112,15 @@ export {
   MAX_CHAIN_WAIT_HOURS,
   type ChainStep,
   type FleetChain,
-} from './chain';
+} from '../../packages/shared-core/src/index';
 export { patrolTarget, scrambleOrder, type Patrol } from './patrol';
-export { standingOrdersModule } from './standingOrders';
-export { FORCED_MARCH_MULT, FORCED_MARCH_WEAR, forcedMarchModule } from './forcedMarch';
+export { standingOrdersModule } from '../../packages/shared-core/src/index';
 export {
-  serverAutoAssaultActions,
-  serverChainActions,
-  serverPatrolActions,
-} from './serverDrivers';
+  FORCED_MARCH_MULT,
+  FORCED_MARCH_WEAR,
+  forcedMarchModule,
+} from '../../packages/shared-core/src/index';
+export { serverAutoAssaultActions, serverChainActions, serverPatrolActions } from './serverDrivers';
 
 // --- ground war --------------------------------------------------------------
 
@@ -137,7 +141,7 @@ export {
 
 // --- heroes + capital --------------------------------------------------------
 export { heroRosterOf } from './heroes';
-export { capitalOf } from './capital';
+export { capitalOf } from '../../packages/shared-core/src/index';
 
 // --- the player-order action builders ----------------------------------------
 export {

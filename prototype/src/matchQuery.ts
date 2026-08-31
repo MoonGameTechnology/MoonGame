@@ -32,9 +32,16 @@ export function matchesUrl(wsBase: string, nick: string): string {
   return `${httpBase(wsBase)}/matches?nick=${encodeURIComponent(nick)}`;
 }
 
-/** Места матча — кто какой стороной играет (правила 1–2). */
-export function seatsUrl(wsBase: string, matchId: string): string {
-  return `${httpBase(wsBase)}/matches/${encodeURIComponent(matchId)}/seats`;
+/**
+ * Места матча — кто какой стороной играет (правила 1–2).
+ *
+ * Позывной уходит в адрес не для вида: идущую партию сервер показывает только её
+ * участникам (ADDR-6), а на безаккаунтном хосте `?nick=` — единственное, чем игрок
+ * может назваться. На хосте с учётками личность приезжает заголовком `Authorization`,
+ * и этот параметр там просто не смотрят.
+ */
+export function seatsUrl(wsBase: string, matchId: string, nick: string): string {
+  return `${httpBase(wsBase)}/matches/${encodeURIComponent(matchId)}/seats?nick=${encodeURIComponent(nick)}`;
 }
 
 /** Убрать матч из списка или вернуть обратно (правила 1–2). */

@@ -23,6 +23,7 @@ import {
   assaultFleet,
   canOrder,
   chainStamp,
+  data,
   engageFleet,
   fleetHasSquadron,
   fleetIdle,
@@ -199,11 +200,11 @@ export function initSoloDrivers(host: SoloHost): SoloDrivers {
     if (rounds > 0) lastPatrolTick += rounds * HOUR;
     for (const [fid, p] of [...patrols]) {
       const f = s.fleets[fid];
-      if (!f || f.owner !== me || !fleetHasSquadron(f)) {
+      if (!f || f.owner !== me || !fleetHasSquadron(f, data)) {
         patrols.delete(fid);
         continue;
       }
-      const spec = sortieSpec(f);
+      const spec = sortieSpec(f, data);
       for (let i = 0; i < rounds && p.sortie.rearming > 0; i++)
         p.sortie = tickRearm(p.sortie, spec.maxFuel);
       if (!fleetIdle(f)) continue; // занят (перелёт / бой) — сперва пусть разрешится

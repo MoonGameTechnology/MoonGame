@@ -27,10 +27,10 @@ function loadShippedBundle(): Record<string, unknown> {
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.7');
+    expect(data.version).toBe('0.1.9');
     expect(data.resources).toContain('microelectronics');
     expect(data.units.siege_lance?.stats.range).toBe(300); // artillery firing radius (map units)
-    expect(data.units.cruiser?.upkeep.credits).toBe(8); // daily upkeep
+    expect(data.units.cruiser?.upkeep.credits).toBe(64); // daily upkeep, BAL-3 scale
     // fleet ⊕ ground-army separation: domains + transport capacity.
     expect(data.units.cruiser?.domain).toBe('space'); // schema default
     expect(data.units.tank?.domain).toBe('ground');
@@ -265,7 +265,10 @@ describe('hero archetypes + abilities (HERO-1, docs/heroes.md)', () => {
     expect(commander!.branch).toBe('transhuman');
     expect(commander!.ship.unit).toBe('hero');
     expect(commander!.slots).toBe(4);
-    expect(commander!.startAbilities).toContain('corridor');
+    // «Коридор» больше НЕ стартовая способность (заказ владельца): его открывает узел
+    // дерева `overclocked_helm`, иначе узел выдавал бы то, что у героя и так есть.
+    expect(commander!.startAbilities).not.toContain('corridor');
+    expect(data.heroSkillTrees.overclocked_helm?.grants.ability).toBe('corridor');
     // A hero branch is its OWN axis (transhuman/psionic), not a tech branch.
     expect(data.heroes.ravager?.branch).toBe('psionic');
     // Abilities are data-driven effects: a dispatch type + cooldown/range/params.
@@ -349,6 +352,23 @@ describe('hero archetypes + abilities (HERO-1, docs/heroes.md)', () => {
     expect(data.heroAbilities.annihilate?.type).toBe('annihilate');
   });
 
+  it('every ability STEP names a real tree node — otherwise the step is unreachable', () => {
+    // `HeroAbilityDef.tiers[].skill` is the ONE link between an ability's ladder and the
+    // tree that sells it, and nothing else validates it: a typo there parses fine and
+    // simply never fires, so the node the player paid for does nothing. Both ladders
+    // (corridor, scan) ride this link.
+    const data = parseGameData(loadShippedBundle());
+    const nodes = new Set(Object.keys(data.heroSkillTrees));
+    const laddered: string[] = [];
+    for (const [id, def] of Object.entries(data.heroAbilities)) {
+      for (const step of def.tiers) {
+        expect(nodes.has(step.skill), `ability ${id} has a step keyed to unknown node "${step.skill}"`).toBe(true);
+        laddered.push(id);
+      }
+    }
+    expect([...new Set(laddered)].sort()).toEqual(['corridor', 'scan']);
+  });
+
   it('the shipped skill tree is internally consistent (HERO-7 referential integrity)', () => {
     const data = parseGameData(loadShippedBundle());
     const nodes = data.heroSkillTrees;
@@ -368,6 +388,27 @@ describe('hero archetypes + abilities (HERO-1, docs/heroes.md)', () => {
     // Both design branches ship a root node.
     expect(nodes.neural_lace?.branch).toBe('transhuman');
     expect(nodes.void_attunement?.branch).toBe('psionic');
+    // Both ship a full LADDER of four: `corridor` up the transhuman side, `scan` up the
+    // psionic one. A branch is a progression, not a pair of perks — and the owner's
+    // complaint that started this ("I don't see nodes 3 and 4") is only ever answered
+    // by a check, never by looking.
+    const ladder = (branch: string): string[] =>
+      Object.entries(nodes)
+        .filter(([, n]) => n.branch === branch)
+        .map(([id]) => id)
+        .sort();
+    expect(ladder('transhuman')).toEqual([
+      'corridor_open',
+      'corridor_sustained',
+      'neural_lace',
+      'overclocked_helm',
+    ]);
+    expect(ladder('psionic')).toEqual([
+      'psi_evasion',
+      'psi_veil',
+      'psi_weak_points',
+      'void_attunement',
+    ]);
     // Fail-closed: an unknown branch or a negative cost never parses.
     expect(
       safeParseGameData({
@@ -450,6 +491,35 @@ describe('game modes (PVE-0.1, docs/pve-team-modes-roadmap.md)', () => {
     expect(standard?.teamFormat).toBe('ffa');
     expect(standard?.modules).toEqual([]); // no optional mode-module — the base rules
     expect(standard?.pve).toBeUndefined(); // PvP: no NPC enemy
+  });
+
+  it('КАЖДЫЙ КОМАНДНЫЙ ФОРМАТ ИМЕЕТ СВОЙ ПРЕСЕТ, И ФОРМАТ В НЁМ — ТОТ, ЧТО В ИМЕНИ', () => {
+    // PVE-1.2. Пресет с именем «Team 3v3» и `teamFormat: '2v2'` схема пропустит: оба
+    // поля валидны по отдельности. Разъедутся — игрок выберет «трое на трое» и сядет
+    // за стол на четверых, поэтому пару проверяем именно вместе.
+    const data = parseGameData(loadShippedBundle());
+    expect(data.modes.duel?.teamFormat).toBe('1v1');
+    for (const n of [2, 3, 4, 5]) {
+      const mode = data.modes[`team_${n}v${n}`];
+      expect({ id: `team_${n}v${n}`, format: mode?.teamFormat }).toEqual({
+        id: `team_${n}v${n}`,
+        format: `${n}v${n}`,
+      });
+    }
+  });
+
+  it('КОМАНДНЫЕ ПРЕСЕТЫ НЕ ПЕРЕОПРЕДЕЛЯЮТ ПОБЕДУ — формат это модификатор, а не правила', () => {
+    // Пустой `victory` значит «базовые правила»; вписать туда числа значило бы, что
+    // дуэль и 5v5 незаметно играются по РАЗНЫМ условиям победы.
+    const data = parseGameData(loadShippedBundle());
+    for (const id of ['duel', 'team_2v2', 'team_3v3', 'team_4v4', 'team_5v5']) {
+      expect({ id, victory: data.modes[id]?.victory, modules: data.modes[id]?.modules }).toEqual({
+        id,
+        victory: {},
+        modules: [],
+      });
+      expect(data.modes[id]?.pve).toBeUndefined(); // командный формат сам по себе PvP
+    }
   });
 
   it('the `standard` preset restates the victory module\'s base rules, verbatim', () => {

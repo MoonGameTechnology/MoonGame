@@ -1,3 +1,4 @@
+import { seatConfirmAction } from './joinSeat';
 import { readFileSync } from 'node:fs';
 import type { IncomingMessage, Server as HttpServer } from 'node:http';
 import { createHash, randomBytes, randomUUID, timingSafeEqual } from 'node:crypto';
@@ -267,6 +268,12 @@ export function createMultiplayerServer(
     };
     app.get('/', serveIndex);
     app.get('/index.html', serveIndex);
+    // ADDR-3: партия адресуется ПУТЁМ (`/game/<id>`), а не хвостом (`/?join=<id>`), —
+    // такой адрес игрок копирует целиком и кладёт в закладку. Клиентской маршрутизации
+    // для этого мало: первая — холодная — загрузка по скопированному адресу приходит
+    // сюда, и без этого маршрута она упирается в 404. Отдаём тот же клиент, а какую
+    // партию открыть, он читает из своего же пути (`decisions/matchAddress.ts`).
+    app.get('/game/:matchId', serveIndex);
   }
 
   // Caller-supplied routes (the match create/join API, SV-2.4) — registered after the
@@ -494,6 +501,20 @@ export function createMultiplayerServer(
         )
       ) {
         registry.retain?.(room.id); // keep the match resident while this socket is connected
+        // ENTRY-3 (правило 6): место закрепляется не заявкой, а ПОПАДАНИЕМ НА КАРТУ —
+        // `addPeer` вернул true, значит игрок принят и получил мир. До этого момента
+        // заявка временная и истекает, иначе взявший место по ссылке и не пришедший
+        // запирал бы кресло до конца партии.
+        //
+        // Подтверждаем только заявленное место: на дев/LAN-пути (вход по нику, без
+        // HTTP-джойна) заявки нет вовсе, и слать подтверждение значило бы сыпать
+        // отказами на каждом коннекте.
+        if (room.state.players[playerId]?.claimedAt !== undefined) {
+          void room.submitServerAction(
+            playerId,
+            seatConfirmAction(room.id, playerId, room.state.time),
+          );
+        }
       }
       ws.on('message', (data) => {
         const now = Date.now();

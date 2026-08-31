@@ -7,29 +7,54 @@
  * re-exports for main.ts / netserver.ts / tests (until REFP-28).
  */
 import {
+  BASE_RESEARCH_SLOTS,
+  HERO_ACTIVE_CAP,
+  abilityRange,
   getStance,
+  heroCooldownKey,
+  MARKET_COMMISSION,
+  previewBattle,
+  technologyLock,
   type GameState,
   type Action,
+  type Battle,
+  type CombatantRef,
+  type Hero,
   type StewardPosture,
   type Planet,
   type Fleet,
+  type UnitStack,
 } from '../../packages/shared-core/src/index';
+import { heroNode } from '../../packages/shared-core/src/state/heroes';
 import { provinceScore } from '../../packages/shared-core/src/state/sectorKind';
 import {
   moveFleet,
   launchFleet,
   buildBuilding,
+  upgradeBuilding,
   buildUnit,
   declareWar,
   canTraverse,
   marketList,
+  marketTake,
   mergeFleet,
   loadArmy,
+  unloadArmy,
+  researchTech,
+  assaultFleet,
+  retreatFleet,
+  bombardFleet,
+  splitFleet,
+  spawnHero,
+  unlockHeroSkill,
+  fitHero,
+  castHeroAbility,
 } from './actions';
+import { botEmbargoes } from './botFavour';
 import { netIncome } from './economy';
 import { SECTOR_TYPES } from './map';
 import { data } from './prototypeData';
-import { marketLots, type MarketSide } from './sessionMarket';
+import type { MarketSide } from '../../packages/shared-core/src/index';
 import { stewardGuardOrders } from './stewardGuard';
 
 /** The two server-side AIs that can play a seat, kept explicitly DISTINCT
@@ -42,6 +67,182 @@ import { stewardGuardOrders } from './stewardGuard';
  *  no AI drives the seat this tick (a present player commands it, or an absent
  *  one is still inside their reconnect grace). */
 export type SeatAiKind = 'steward' | 'substitute' | 'none';
+
+/**
+ * ЧЕЙ это бот — игровой или лабораторный (AI-BAL-1.1).
+ *
+ * `basic` — тот бот, которого встречает ЖИВОЙ игрок: соло-режим и прото-хост зовут
+ * `aiOrders` без профиля, то есть всегда здесь. Он намеренно остаётся простым — игрок
+ * изучает мир, ищет баги и щупает механики против предсказуемого соперника, а не против
+ * оптимизатора.
+ *
+ * `test` — бот балансных ПРОГОНОВ (`selfplay.mjs`, `econplaytest.mjs`). Ему включены
+ * эвристики, которые нужны, чтобы измерение вообще что-то мерило: без них батч показывает
+ * не баланс игры, а гонку двух построек (базовая линия — блок AI-BAL в `backlog.md`).
+ *
+ * Почему это ПАРАМЕТР ФУНКЦИИ, а не поле состояния, не настройка матча и не сообщение
+ * протокола: так у игрока физически нет способа получить тест-бота ни себе в союзники,
+ * ни в противники. Нечего выставить в лобби, нечего прислать в `action`-конверте, нечего
+ * подделать в снапшоте — профиль не пересекает границу процесса и не попадает ни в
+ * `GameState`, ни в сеть, ни в сохранение. Тест-ботов не существует в игре; они существуют
+ * только внутри headless-харнеса, который их и создаёт.
+ *
+ * Сторож `aiProfile.test.ts` держит это структурно: он читает исходники и роняет гейт,
+ * если `'test'` просочился в игровой путь.
+ */
+export type AiProfile = 'basic' | 'test';
+
+/**
+ * Наземный ростер В ФИКСИРОВАННОМ порядке «тяжёлое → дешёвое» (AI-BAL-3).
+ *
+ * Порядок здесь — не вкус, а требование инварианта #1: перебор `data.units` дал бы
+ * порядок, зависящий от раскладки объекта, и один сид разыгрался бы по-разному.
+ * Тест-бот берёт ПЕРВОЕ, что по карману, поэтому список заодно задаёт приоритет:
+ * ранняя казна тянет только ополчение, поздняя — танки.
+ */
+const GROUND_ROSTER = ['tank', 'special_forces', 'heavy_infantry', 'militia'] as const;
+
+/** То же для ОБОРОНЫ: гарнизон держит тот, у кого выше `defense`, а не `attack` —
+ *  тяжёлая пехота (20) стоит насмерть лучше танка (14) и втрое дешевле. */
+const GROUND_DEFENDERS = ['heavy_infantry', 'tank', 'militia'] as const;
+
+/** Сколько наземных юнитов тест-бот держит дома: гарнизон + запас на десант. */
+const GROUND_STOCK = 8;
+/** Столько войск НЕ грузится в трюм: иначе дом остаётся пустым и берётся прилётом. */
+const HOME_GUARD = 3;
+/** Верхний предел десантных корпусов — трюм 8 против 5 у крейсера, больше не нужно. */
+const DROPSHIP_CAP = 2;
+/** Сколько артиллерийских корпусов держит тест-бот (AI-BAL-4): дальний огонь — не
+ *  замена флоту, а добавка к нему; стеклянная пушка гибнет от первого же сближения. */
+const SIEGE_CAP = 2;
+/** Уровень завода, на котором открывается ангар (`enablesSquadronConstruction`). */
+const SQUADRON_FACTORY_LEVEL = 2;
+/** Предел ударных крыльев — картонные, дорогие по микроэлектронике, конкурируют с
+ *  крейсерами за тот же дефицитный ресурс. */
+const SQUADRON_CAP = 3;
+/** Запас казны сверх цены заказа (мера та же, что у построек бота). */
+const ORDER_RESERVE: Record<string, number> = { metal: 60, credits: 60 };
+/**
+ * Что ТЕСТ-БОТ думает про каждый торгуемый товар (AI-BAL-9): сколько держит про запас
+ * (`keep`), почём готов купить (`bid`) и почём отдать (`ask`).
+ *
+ * Одна таблица на ВСЮ торговлю — и на выставление своих лотов, и на снятие чужих.
+ * Держать оценку в двух местах нельзя: бот, который выставляет лот по одной цене, а
+ * чужой снимает по другой, торгует сам против себя, и первым признаком была бы не
+ * ошибка, а тихо изменившийся баланс.
+ *
+ * Товар без `ask` бот не продаёт (металл он тратит быстрее всех и отдавать его незачем),
+ * товар без `bid` — не покупает (еда и энергия ему не нужны вовсе, BAL-3). Микроэлектроника
+ * единственная торгуется в обе стороны, и это не прихоть: она гейтит крейсера и артиллерию
+ * (`ECON-7`), но производится фабрикатором, которого у соперника может не быть, — то есть
+ * ровно тот случай, когда у одного излишек, а у другого нехватка.
+ */
+const TRADE_BOOK: Record<string, { keep: number; bid?: number; ask?: number }> = {
+  metal: { keep: 80, bid: 3 },
+  microelectronics: { keep: 40, bid: 3, ask: 2 },
+  food: { keep: 120, ask: 2 },
+  energy: { keep: 120, ask: 2 },
+};
+/** Столько кредитов бот НЕ тратит на рынке — казна нужна стройке и войскам. */
+const TRADE_CREDIT_FLOOR = 300;
+
+/** С какого размера кулак тест-бота делится надвое при отплытии (AI-BAL-7). Ниже —
+ *  ударная группа и так на пределе: её порог выхода в рейд равен трём корпусам. */
+const SPLIT_MIN = 6;
+/** …и до какого числа флотов у места это вообще разрешено. Потолок ниже боевого предела
+ *  постройки (8): деление не должно возвращать рой одиночек, вылеченный в self-play M4. */
+const SPLIT_FLEET_CAP = 6;
+
+/**
+ * ДЕТЕРМИНИРОВАННЫЙ ШУМ РЕШЕНИЯ (AI-BAL-5) — [0, 1), только для тест-профиля.
+ *
+ * Зачем. Прогоны баланса не давали статистики: семьи сидов `base` и `alt` совпадали до
+ * последней цифры, то есть 300 матчей были 4 конфигурациями (слот × фракция) по 75
+ * повторов. Разброс терялся НЕ в карте и не в ядре, а здесь: `aiOrders` выбирала строго
+ * ближайшую цель, держала фиксированные пороги и обходила миры в порядке раскладки
+ * объекта — при одинаковых стартах два матча просто не могли разойтись.
+ *
+ * Откуда берётся энтропия. Из `state.rng` — того самого потока ядра, который seedRng
+ * развёл по сидам ЕЩЁ НА СТАРТЕ матча и который дальше движется от каждого броска в бою.
+ * Мы его только ЧИТАЕМ: мутировать поток снаружи ядра нельзя (это сдвинуло бы бои и
+ * сломало реплей), поэтому четыре слова состояния смешиваются в отдельный хеш вместе с
+ * часом мира, местом и «солью» конкретного решения.
+ *
+ * Почему это не ломает инвариант #1. Здесь нет ни `Math.random`, ни `Date.now`: результат
+ * — чистая функция от (сид матча, история бросков, время, место, соль), то есть один сид
+ * по-прежнему разыгрывается байт-в-байт одинаково. Арифметика та же, что в `rng.ts`
+ * (`Math.imul` + сдвиги), — bit-exact на любом движке.
+ *
+ * Это НЕ «случайная игра»: бот остаётся жадным и предсказуемым, шум лишь разводит
+ * равноценные ветки — вторая по близости цель вместо первой, порог войны в коридоре
+ * ±20%, точка входа в обход миров. Игрового бота не касается вовсе (профиль `test`).
+ */
+function decisionNoise(state: GameState, ai: string, salt: string): number {
+  const r = state.rng;
+  let h = (r.a ^ r.b ^ r.c ^ r.d) >>> 0;
+  h = Math.imul(h ^ Math.floor(state.time / 3_600_000), 2246822507) >>> 0;
+  const key = `${ai}|${salt}`;
+  for (let i = 0; i < key.length; i++) {
+    h = Math.imul(h ^ key.charCodeAt(i), 3432918353) >>> 0;
+    h = ((h << 13) | (h >>> 19)) >>> 0;
+  }
+  h = Math.imul(h ^ (h >>> 16), 2246822507) >>> 0;
+  h = (h ^ (h >>> 13)) >>> 0;
+  return h / 4294967296;
+}
+
+/**
+ * Порядок обхода миров, ПОВЁРНУТЫЙ на seeded смещение (AI-BAL-5, точка разброса №3).
+ *
+ * Блоки развития выписывают одну стройку за тик и выходят по `break`, поэтому решает не
+ * весь список, а его ПЕРВЫЙ подходящий элемент — а он до сих пор определялся раскладкой
+ * объекта `state.planets`, одинаковой во всех матчах. Ротация сохраняет относительный
+ * порядок (это не перемешивание: жадность бота не страдает), но сдвигает точку входа,
+ * так что развиваться первым начинает разный мир. Игровой профиль обходит как раньше.
+ */
+function worldsInOrder(state: GameState, ai: string, salt: string, profile: AiProfile): Planet[] {
+  const all = Object.values(state.planets);
+  if (profile !== 'test') return all;
+  // Ротируются именно СВОИ миры, а не весь список: чужих и нейтральных на карте вчетверо
+  // больше, и они лежат вперемешку, так что поворот всего массива почти всегда возвращал
+  // к тем же двум-трём своим в его начале — точка входа не менялась. Прочие миры едут
+  // следом нетронутым хвостом: вызывающие всё равно фильтруют по владельцу.
+  const own: Planet[] = [];
+  const rest: Planet[] = [];
+  for (const p of all) (p.owner === ai ? own : rest).push(p);
+  if (own.length < 2) return all;
+  const shift = Math.floor(decisionNoise(state, ai, `order:${salt}`) * own.length) % own.length;
+  return own.slice(shift).concat(own.slice(0, shift), rest);
+}
+
+/** Стоит ли на мире ЖИВОЕ здание, открывающее наземное производство (казарма/завод).
+ *  Зеркало ядерного `hasGroundFacility` (`construction.ts`) — того самого гейта, который
+ *  отбивает `unit.build` кодом `E_NO_GROUND_FACILITY`. */
+function hasGroundYard(p: Planet): boolean {
+  return p.buildings.some(
+    (b) => b.hp > 0 && data.buildings[b.type]?.enablesGroundConstruction === true,
+  );
+}
+
+/** Сколько НАЗЕМНЫХ юнитов стоит в гарнизоне мира (корабли в гарнизоне не в счёт). */
+function groundCount(p: Planet): number {
+  return p.garrison.reduce((n, s) => n + (data.units[s.unit]?.domain === 'ground' ? s.count : 0), 0);
+}
+
+/** Свободный трюм флота: Σ cargoCapacity кораблей − Σ cargoSize уже погруженного
+ *  десанта. Та же формула, что у ядра (`army.ts`), иначе погрузка сыпала бы
+ *  `E_NO_CAPACITY`. */
+function liftFree(f: Fleet): number {
+  const cap = f.units.reduce(
+    (n, s) => n + (data.units[s.unit]?.stats.cargoCapacity ?? 0) * s.count,
+    0,
+  );
+  const used = (f.landing ?? []).reduce(
+    (n, s) => n + (data.units[s.unit]?.stats.cargoSize ?? 1) * s.count,
+    0,
+  );
+  return cap - used;
+}
 
 /** What drives a seat this tick + the posture to hand `aiOrders`. */
 export interface SeatAiDecision {
@@ -81,6 +282,7 @@ export function aiOrders(
   state: GameState,
   ai: string,
   posture: StewardPosture | 'expand' = 'expand',
+  profile: AiProfile = 'basic',
 ): Action[] {
   const out: Action[] = [];
   if (!state.players[ai]) return out; // seat not in play / eliminated
@@ -107,12 +309,29 @@ export function aiOrders(
       pid !== ai && state.players[pid]?.status === 'active' && getStance(state, ai, pid) === 'war',
   );
   // The home base (build/launch anchor, and the rally point ships pool at during war).
+  //
+  // ЯКОРЬ — ВЕРФЬ, а не «первый застроенный мир» (баг, найденный при AI-BAL-3, чинится
+  // ОБОИМ профилям). Стоило боту поставить шахту на призовом мире — и `find` начинал
+  // возвращать ЕГО: «дом» переезжал на мир без космопорта. Дальше каждый заказ корабля
+  // отбивался `E_NO_SHIPYARD` (в пробном матче — 102 отказа за матч), экономическая
+  // цепочка строилась не дома, а на призовом мире, и флот переставал пополняться вовсе.
+  // Обе прежние ветки оставлены запасными: у мира без верфи якорь тот же, что и был.
   const base =
+    Object.values(state.planets).find(
+      (p) =>
+        p.owner === ai &&
+        p.buildings.some(
+          (b) => b.hp > 0 && data.buildings[b.type]?.enablesShipConstruction === true,
+        ),
+    ) ??
     Object.values(state.planets).find((p) => p.owner === ai && p.buildings.length > 0) ??
     Object.values(state.planets).find((p) => p.owner === ai);
   const shipCount = (f: Fleet): number =>
     f.units.reduce((n, s) => n + (isShipUnit(s.unit) ? s.count : 0), 0);
   const expandFleets: Fleet[] = defensive ? [] : Object.values(state.fleets);
+  // Сколько флотов у места СЕЙЧАС — потолок и на постройку кораблей, и на деление кулака
+  // (AI-BAL-7). Считается один раз: `state` внутри `aiOrders` не меняется (чистый builder).
+  const ownFleets = Object.values(state.fleets).filter((fl) => fl.owner === ai).length;
   // Consolidate BEFORE moving (self-play M4): two idle fleets sharing a location fuse
   // into one — without this, battle remnants and rally leftovers accumulate into a
   // hundreds-strong swarm of one-ship fleets that grinds the whole sim (and feeds
@@ -136,9 +355,171 @@ export function aiOrders(
       skipMove.add(group[0]!.id); // it grows this tick, sorties the next
     }
   }
+  // ═══ ТЕСТ-БОТ (AI-BAL-7): ФЛОТ УМЕЕТ ПРОИГРАТЬ БОЙ ═══
+  // Диагноз кирпича: из боевого репертуара ядра бот звал только `fleet.engage` и
+  // `fleet.assault`, а `fleet.retreat` — НИКОГДА. Значит каждый бой в измерении шёл до
+  // полного уничтожения одной из сторон: размен всегда полный, «потрёпанный флот» как
+  // состояние не существовал, и вся ветка ядра вокруг отступления (пошлина в 40%
+  // ТЕКУЩЕГО корпуса, скоростная фора беглеца `retreatHasteUntil`, освобождение
+  // противника) не участвовала в балансе ни одной цифрой.
+  //
+  // Правило одно и БЕЗ порога-настройки: проигрываю — ухожу. Пошлина забирает 40% того,
+  // что осталось, и по построению никого не добивает (`applyRetreatToll`: 0.6 × живой
+  // пул остаётся живым), а проигранный бой забирает 100% — выбор между ними не требует
+  // ни коэффициента, ни калибровки. Выигранный бой держится даже дорогой ценой: размен,
+  // который заканчивается взятым узлом, это и есть плата за узел.
+  //
+  // Прогноз — тот самый `previewBattle`, которым уже судит «Хранитель»
+  // (`stewardGuard.ts`), а не вторая копия правила: базовая модель без хуков
+  // `combat.damage`, то есть эвристика, а не оракул. Роли в прогнозе сохраняются
+  // (атакующий бьёт `attack`, стоящая сторона отвечает `defense`) — перепутать их
+  // значило бы прогнозировать другой бой.
+  //
+  // Уход в том же тике ОБЯЗАТЕЛЕН, и это не украшение. `fleet.retreat` только распускает
+  // бой: флот остаётся стоять там же, рядом с тем же противником, который в тот же миг
+  // освобождён. Оставшийся стоять беглец был бы втянут заново и платил бы пошлину каждые
+  // два часа, пока не сточится в ноль, — ровно та «драка до нуля», от которой уводит
+  // кирпич, только медленнее. Скоростная фора беглеца выдана ядром именно под этот шаг.
+  if (profile === 'test') {
+    const sideUnits = (ref: CombatantRef): UnitStack[] => {
+      if (ref.kind === 'garrison') return state.planets[ref.planetId]?.garrison ?? [];
+      const other = state.fleets[ref.fleetId];
+      if (!other) return [];
+      return ref.kind === 'landing' ? (other.landing ?? []) : other.units;
+    };
+    const isThisFleet = (ref: CombatantRef, fleetId: string): boolean =>
+      ref.kind === 'fleet' && ref.fleetId === fleetId;
+    for (const f of Object.values(state.fleets)) {
+      if (f.owner !== ai || f.battleId == null) continue;
+      const battle: Battle | undefined = state.battles[f.battleId];
+      if (!battle) continue;
+      // Отступить может только ОРБИТАЛЬНАЯ сторона: сошедший на грунт десант ядро не
+      // выпускает (`E_CANNOT_RETREAT`), так что приказ был бы чистым отказом.
+      const weAttack = isThisFleet(battle.attacker.ref, f.id);
+      if (!weAttack && !isThisFleet(battle.defender.ref, f.id)) continue;
+      const foe = sideUnits(weAttack ? battle.defender.ref : battle.attacker.ref);
+      if (!foe.some((s) => s.count > 0)) continue; // добивать уже некого — бой наш
+      const forecast = weAttack
+        ? previewBattle(f.units, foe, data)
+        : previewBattle(foe, f.units, data);
+      if (forecast.outcome !== (weAttack ? 'defender' : 'attacker')) continue;
+      out.push(retreatFleet(ai, f.id));
+      // Куда бежать: ближайший СВОЙ мир, а при перехвате на лейне (узла под флотом нет)
+      // — домой. Некуда — флот всё равно выходит из боя: пошлина дешевле уничтожения.
+      const from = f.location != null ? state.planets[f.location] : undefined;
+      let haven: Planet | null = null;
+      let havenD = Infinity;
+      if (from) {
+        for (const p of Object.values(state.planets)) {
+          if (p.owner !== ai || p.id === from.id) continue;
+          const dd = d(from.position, p.position);
+          if (dd < havenD) {
+            havenD = dd;
+            haven = p;
+          }
+        }
+      }
+      const refuge = haven ?? (base && base.id !== f.location ? base : null);
+      if (refuge) out.push(moveFleet(ai, f.id, refuge.id));
+    }
+  }
   for (const f of expandFleets) {
     if (f.owner !== ai || f.location == null || f.movement || f.battleId) continue;
     if (skipMove.has(f.id)) continue;
+    // ═══ ТЕСТ-БОТ (AI-BAL-3): десант и штурм ═══
+    // Игровой бот не делает НИ ТОГО, НИ ДРУГОГО, и вот почему вторая фаза захвата
+    // (орбита → высадка, GDD §7.4) в измерении баланса не участвовала вовсе:
+    //   • приказ `fleet.assault` бот не отдавал НИКОГДА. В сети штурм ведёт драйвер
+    //     `serverAutoAssaultActions`, а тот ходит только по флотам, которым ИГРОК
+    //     включил авто-штурм (`order.auto`) — у бота такого флага нет ни одного;
+    //   • трюм он грузил только на войне и только двумя ополченцами.
+    // Итог в батче: гарнизонный мир для бота просто НЕПРОХОДИМ — флот прилетает,
+    // `captureOnArrival` пропускает защищённый мир, и флот стоит на орбите до конца
+    // матча. Игровой профиль не тронут: это лаборатория.
+    if (profile === 'test' && base) {
+      const here0 = state.planets[f.location];
+      // (а) Погрузка ДОМА и в мирное время: пустой трюм у стены гарнизона означает,
+      //     что флот долетит и встанет. Дома остаётся `HOME_GUARD` — иначе бот
+      //     вывозит собственную оборону и его столицу берут прилётом.
+      if (here0 && here0.id === base.id) {
+        let free = liftFree(f);
+        let spare = groundCount(here0) - HOME_GUARD;
+        for (const u of GROUND_ROSTER) {
+          if (free <= 0 || spare <= 0) break;
+          const size = data.units[u]?.stats.cargoSize ?? 1;
+          const have = here0.garrison.reduce((n, st) => n + (st.unit === u ? st.count : 0), 0);
+          const take = Math.min(have, spare, Math.floor(free / size));
+          if (take > 0) {
+            out.push(loadArmy(ai, f.id, u, take));
+            free -= take * size;
+            spare -= take;
+          }
+        }
+      }
+      // (а2) ГАРНИЗОН НА ЗАНЯТОМ МИРЕ (AI-BAL-2). Мир без войск берётся ПРИЛЁТОМ —
+      //      `captureOnArrival` не смотрит ни на здания, ни на их оборонный бонус, только
+      //      на `garrison.some(count > 0)`. Отсюда карусель базовой линии: 113 захватов
+      //      прилётом за матч, миры перекидываются без единого выстрела. Флот, стоящий на
+      //      СВОЁМ пустом мире, оставляет одного бойца — дальше этот мир нужно штурмовать.
+      //      По одному: остальной десант нужен самому флоту, иначе он разоружится в дороге.
+      if (
+        here0 &&
+        here0.owner === ai &&
+        here0.id !== base.id &&
+        groundCount(here0) === 0 &&
+        capturable(here0)
+      ) {
+        const carried = (f.landing ?? []).find((st) => st.count > 0);
+        if (carried) out.push(unloadArmy(ai, f.id, carried.unit, 1));
+      }
+      // (б) Штурм с орбиты. Правила штурма называет ЯДРО (`assaultPlanet`), здесь
+      //     только повод не сыпать заведомо отбиваемым приказом: чужой захватываемый
+      //     мир, война/нейтралитет и чем его брать.
+      //     «Чем брать» — ДВА разных случая, и раньше учитывался только первый:
+      //     живой гарнизон берётся десантом из трюма, а ПУСТОЙ занимается и без него
+      //     (`assaultPlanet`: `undefined → occupy`). Второй случай не выдумка — мир
+      //     пустеет уже под флотом (гарнизон добит наземным боем или ПВО-разменом), а
+      //     `captureOnArrival` больше не сработает: он судит по ПРИЛЁТУ, а флот давно
+      //     прилетел. Без этой ветки такой мир не берёт никто, и осада ниже подменила
+      //     бы собой бесплатный захват.
+      if (
+        here0 &&
+        f.orbit === 'near' &&
+        here0.owner !== ai &&
+        capturable(here0) &&
+        canTraverse(state, ai, here0.owner) &&
+        (!here0.garrison.some((st) => st.count > 0) ||
+          (f.landing ?? []).some((st) => st.count > 0))
+      ) {
+        out.push(assaultFleet(ai, f.id));
+        continue; // берём ЭТОТ мир, а не улетаем к следующему
+      }
+      // (в) ОСАДА (AI-BAL-7). Мир под флотом взять нечем — но стоять над ним МОЛЧА
+      //     нельзя: ПВО бьёт по всему враждебному в near-орбите независимо от того,
+      //     бомбит гость или нет (`runOrbital` — залп ищет `nearOrbitHostile`, а не
+      //     бомбардировщика), так что молчащий флот платит ту же цену и не получает
+      //     ничего. Бомбардировка — единственное, что он может сделать имеющимся
+      //     оружием: она крошит постройки под собой (`planet.bombarded` →
+      //     `damageBuildings`) и морозит владельцу производство и стройку
+      //     (`bombardedPlanets`). Целый пласт ядра — осада — до сих пор не участвовал
+      //     в измерении ни разу.
+      //     Это не НОВАЯ стоянка, а смысл уже существующей: флоту, которому нечем взять
+      //     мир, целеуказание и раньше выдавало ближайшую чужую цель — ту самую, под
+      //     которой он стоит (расстояние 0), — и `fleet.move` в собственную клетку
+      //     возвращался `E_SAME_LOCATION` каждые два часа до конца матча.
+      if (
+        here0 &&
+        f.orbit === 'near' &&
+        here0.owner !== null &&
+        here0.owner !== ai &&
+        capturable(here0) &&
+        getStance(state, ai, here0.owner) === 'war' && // ядро бомбит только врага
+        f.units.some((st) => st.count > 0)
+      ) {
+        if (f.bombarding !== true) out.push(bombardFleet(ai, f.id, true));
+        continue; // осада — это стоянка НАД целью, а не пауза перед перелётом
+      }
+    }
     // Strike groups, not dribbles (self-play M4): auto-rally pools each new ship into
     // the IDLE rally fleet at its build world — but only while one is parked there.
     // Sending every single-ship fleet out at once therefore orphaned the rally point,
@@ -161,14 +542,80 @@ export function aiOrders(
     if (!here) continue;
     let best: Planet | null = null;
     let bestD = Infinity;
+    let second: Planet | null = null;
+    let secondD = Infinity;
+    // ТАЙ-БРЕЙК ПРИ РАВНЫХ ЦЕЛЯХ (BAL-1). На прежней, кривой карте равные расстояния были
+    // редкостью, и «кто первый в переборе, тот и цель» ничего не решало. Карта-«колесо»
+    // симметрична, поэтому равенство стало ОБЫЧНЫМ делом — и скрытый тай-брейк по порядку
+    // `Object.values(state.planets)` превратился в систематическую фору: узлы сектора 0
+    // лежат в этом порядке первыми, так что место, стартующее в нулевом секторе, всегда
+    // забирало спорную цель. Замер: при идентичных по метрикам стартах сектор 0 брал 70%
+    // побед. Идеальная карта не создала перекос, она ОБНАЖИЛА его в боте.
+    // Лечение — seeded тай-брейк (только тест-профиль, как и весь разброс AI-BAL-5):
+    // среди равных целей выбор идёт по шуму, а не по раскладке объекта.
+    const tieBreak = (p: Planet): number =>
+      profile === 'test' ? decisionNoise(state, ai, `tie:${f.id}:${p.id}`) : 0;
     for (const p of Object.values(state.planets)) {
       if (p.owner === ai || !capturable(p)) continue;
       if (!canTraverse(state, ai, p.owner)) continue; // a peace-locked target — leave it be
-      const dd = d(here.position, p.position);
+      // Равные цели (в пределах пикселя) разводятся шумом, а не порядком перебора.
+      const dd = d(here.position, p.position) + tieBreak(p);
       if (dd < bestD) {
+        secondD = bestD;
+        second = best;
         bestD = dd;
         best = p;
+      } else if (dd < secondD) {
+        secondD = dd;
+        second = p;
       }
+    }
+    // AI-BAL-5, точка разброса №1: ТЕСТ-бот иногда идёт ко ВТОРОЙ по близости цели.
+    // Строгий выбор ближайшей — главная причина, по которой два матча с разных сидов
+    // разыгрывались одинаково: пути флотов совпадали с первого тика. Вторая цель берётся
+    // только если она сопоставима по дальности (не дальше 2×), то есть бот остаётся
+    // жадным — расходятся лишь РАВНОЦЕННЫЕ ветки, а не качество игры.
+    if (
+      profile === 'test' &&
+      second &&
+      secondD <= bestD * 2 &&
+      decisionNoise(state, ai, `target:${f.id}`) < 0.35
+    ) {
+      best = second;
+    }
+    // ═══ ТЕСТ-БОТ (AI-BAL-7): КУЛАК УМЕЕТ ДЕЛИТЬСЯ ═══
+    // `fleet.split` бот не звал никогда, и следствие было структурным, а не «забыли
+    // правило»: блок слияния выше сводит всё стоящее на узле в ОДИН флот (без него рой
+    // одиночек кладёт симуляцию — self-play M4), а обратной операции у бота не
+    // существовало. Поэтому вся тактика измерения свелась к одному кулаку: сколько бы
+    // кораблей у места ни было, они ходили одной стопкой на одну цель, а вторая,
+    // равноценная по дальности, ждала своей очереди.
+    //
+    // Делить осмысленно ровно в один момент — когда кулак ОТЧАЛИВАЕТ со своего мира и
+    // целей у него две. Тогда отделённая половина остаётся стоять, исходный флот в этом
+    // же тике уходит, и слить их обратно в следующем тике уже некому: слияние берёт
+    // только стоящие рядом флоты, а первый из них в пути. Половина, оставшаяся дома,
+    // выберет цель сама — расстояния для неё считаются заново.
+    // Обе границы стоят против роя, который лечил M4: делится только КРУПНЫЙ кулак и
+    // только пока флотов у места немного.
+    if (
+      profile === 'test' &&
+      best &&
+      here.owner === ai &&
+      second &&
+      shipCount(f) >= SPLIT_MIN &&
+      ownFleets < SPLIT_FLEET_CAP
+    ) {
+      const take: Array<{ unit: string; count: number }> = [];
+      for (const st of f.units) {
+        // Флагман героя не отделяется: сущность героя привязана к ИСХОДНОМУ флоту по
+        // `fleetId`, и ядро такой раскол отбивает (`E_HERO_UNIT`). Одиночный корпус
+        // тоже остаётся — делить нечего.
+        if (st.count < 2 || !isShipUnit(st.unit)) continue;
+        if (data.units[st.unit]?.traits.includes('hero')) continue;
+        take.push({ unit: st.unit, count: Math.floor(st.count / 2) });
+      }
+      if (take.length > 0) out.push(splitFleet(ai, f.id, take));
     }
     if (best) out.push(moveFleet(ai, f.id, best.id));
   }
@@ -199,7 +646,13 @@ export function aiOrders(
       }
     }
     const neutralLeft = Object.values(state.planets).some((p) => p.owner === null && capturable(p));
-    const losingRace = leaderScore - mine >= 50 || (!neutralLeft && leaderScore >= mine);
+    // AI-BAL-5, точка разброса №2: порог войны у ТЕСТ-бота плавает в коридоре ±20%
+    // (50 → 40..60 очков отставания). Фиксированные 50 означали, что война объявляется
+    // в один и тот же игровой час при одинаковых стартах — а момент объявления решает,
+    // кто успел развернуться. Коридор узкий: бот по-прежнему воюет, когда проигрывает
+    // гонку, просто не секунда-в-секунду с самим собой из другого матча.
+    const warGap = profile === 'test' ? 50 * (0.8 + 0.4 * decisionNoise(state, ai, 'war')) : 50;
+    const losingRace = leaderScore - mine >= warGap || (!neutralLeft && leaderScore >= mine);
     if (leader && losingRace && getStance(state, ai, leader) === 'peace') {
       out.push(declareWar(ai, leader));
     }
@@ -248,19 +701,84 @@ export function aiOrders(
       if (affordable(b) && !pendingBuild(base.id, b)) out.push(buildBuilding(ai, base.id, b));
       break; // one link at a time — wait out the current one either way
     }
-    for (const p of Object.values(state.planets)) {
+    for (const p of worldsInOrder(state, ai, 'mine', profile)) {
       if (p.owner !== ai || p.kind !== 'planet' || p.id === base.id) continue;
       if (p.buildings.some((x) => x.type === 'mine') || pendingBuild(p.id, 'mine')) continue;
       if (!affordable('mine')) break;
       out.push(buildBuilding(ai, p.id, 'mine'));
       break; // spread the economy one world per tick
     }
+    // МЁРТВЫЙ МИР — тоже экономика (AI-BAL-8). До аннигиляции ни одного `dead_world` на
+    // карте прототипа не существовало, поэтому `metal_station` числилась мёртвым
+    // контентом «по УСЛОВИЮ» (AI-BAL-10, случай «в»). Теперь герой их создаёт — но обычная
+    // шахта на пустыре запрещена (`allowedBuildings: ['metal_station']`), а правило шахты
+    // выше берёт только `kind === 'planet'`, так что без этой ветки аннигиляция оставляла
+    // бы после себя ровно пустырь. Салвага и есть плата за разрушенный мир: 30 металла в
+    // час против 10 базовых.
+    if (profile === 'test') {
+      for (const p of worldsInOrder(state, ai, 'salvage', profile)) {
+        if (p.owner !== ai || p.kind !== 'dead_world') continue;
+        if (
+          p.buildings.some((x) => x.type === 'metal_station') ||
+          pendingBuild(p.id, 'metal_station')
+        ) {
+          continue;
+        }
+        if (!affordable('metal_station')) break;
+        out.push(buildBuilding(ai, p.id, 'metal_station'));
+        break; // одна стройка за тик — как и с шахтой
+      }
+    }
+    // ТЕСТ-БОТ ТОЛЬКО (AI-BAL-1.1): технологии исследует лабораторный профиль, игровой —
+    // нет. Живому игроку достаётся прежний простой соперник; прогон баланса получает
+    // соперника, у которого работает ветка эффектов.
+    //
+    // Технологии: игровой бот не исследует НИ ОДНОЙ из 25 (self-play: 0 за 300 матчей),
+    // поэтому вся ветка эффектов — бонусы к добыче, скорости и урону, гейты контента —
+    // не участвовала в измерении баланса вовсе. Правило намеренно минимальное: бот не
+    // «строит билд», он просто не оставляет исследовательские слоты пустыми.
+    //
+    // Что можно взять, решает САМО ЯДРО — `technologyLock` (prerequisites / day-gate /
+    // conditions), а не копия правил здесь: разъедься копия с модулем, бот начал бы
+    // спамить отказами, и первым признаком была бы не ошибка, а тихо изменившийся баланс.
+    // Слоты считаем по базовой константе, а не по хуку `research.slots` (хук живёт внутри
+    // ядра и снаружи не вызывается): с учёным слотов может быть больше, тогда бот
+    // недоиспользует лишний — это честный недобор, а не отказ.
+    const techState = pl.technologies;
+    const activeTech = techState?.active ?? [];
+    const doneTech = techState?.completed ?? [];
+    if (profile === 'test' && activeTech.length < BASE_RESEARCH_SLOTS) {
+      const affordableTech = (cost: Record<string, number>): boolean =>
+        Object.keys(cost).every((r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + 60);
+      const candidates = Object.keys(data.technologies)
+        .filter((id) => {
+          const def = data.technologies[id];
+          if (!def) return false;
+          if (doneTech.includes(id) || activeTech.some((a) => a.technology === id)) return false;
+          if (technologyLock(def, state, ai, data) !== null) return false;
+          return affordableTech(def.cost ?? {});
+        })
+        // Дешёвое и быстрое вперёд — это не «оптимальный порядок», а ДЕТЕРМИНИРОВАННЫЙ:
+        // id последним ключом сортировки, чтобы порядок не зависел от перебора объекта
+        // (иначе один и тот же сид разыгрался бы по-разному, инвариант #1).
+        .sort((a, b) => {
+          const da = data.technologies[a]!;
+          const db = data.technologies[b]!;
+          const sum = (c: Record<string, number> = {}): number =>
+            Object.values(c).reduce((n, v) => n + v, 0);
+          return (
+            sum(da.cost) - sum(db.cost) ||
+            (da.researchTimeHours ?? 0) - (db.researchTimeHours ?? 0) ||
+            (a < b ? -1 : a > b ? 1 : 0)
+          );
+        });
+      if (candidates[0]) out.push(researchTech(ai, candidates[0]));
+    }
     // Ship production is CAPPED by the fleet count (self-play M4: endless building
     // fed an ever-growing swarm — hundreds of fleets by mid-match). Enough fleets
     // out ⇒ the metal flows to economy/garrisons instead.
-    const aiFleets = Object.values(state.fleets).filter((f) => f.owner === ai).length;
     if (
-      aiFleets < (warFooting ? 8 : 4) &&
+      ownFleets < (warFooting ? 8 : 4) &&
       (pl.resources.metal ?? 0) > 220 &&
       (pl.resources.credits ?? 0) > 120 &&
       (pl.resources.microelectronics ?? 0) >= 3 // ECON-7: warships need the hi-tech good
@@ -277,10 +795,14 @@ export function aiOrders(
     // is exactly what lets it assault a garrisoned world back.
     if (warFooting) {
       let garrisonOrders = 0;
-      for (const p of Object.values(state.planets)) {
+      for (const p of worldsInOrder(state, ai, 'garrison', profile)) {
         if (garrisonOrders >= 2 || (pl.resources.metal ?? 0) < 90) break;
         if (p.owner !== ai || p.kind !== 'planet') continue;
         if (p.garrison.some((s) => s.count > 0)) continue;
+        // Без казармы ядро отобьёт заказ (`E_NO_GROUND_FACILITY`) — раньше этот блок
+        // сыпал такими отказами весь матч (60 за пробный матч). Поведение не меняется:
+        // отсеиваются ровно те приказы, которые всё равно ничего не делали.
+        if (!hasGroundYard(p)) continue;
         out.push(buildUnit(ai, p.id, 'militia', 2));
         garrisonOrders += 1;
       }
@@ -289,41 +811,388 @@ export function aiOrders(
       const baseMilitia = base.garrison
         .filter((s) => s.unit === 'militia')
         .reduce((n, s) => n + s.count, 0);
-      if (baseMilitia < 4 && (pl.resources.metal ?? 0) > 120) {
+      if (baseMilitia < 4 && (pl.resources.metal ?? 0) > 120 && hasGroundYard(base)) {
         out.push(buildUnit(ai, base.id, 'militia', 2));
       }
-      if (aiFleets < 8 && (pl.resources.metal ?? 0) > 140) {
+      if (ownFleets < 8 && (pl.resources.metal ?? 0) > 140) {
         out.push(buildUnit(ai, base.id, 'scout', 1));
+      }
+    }
+    // ═══ ТЕСТ-БОТ (AI-BAL-3): наземная кампания ═══
+    // Диагноз, ради которого этот блок и появился: в батче на 300 матчей ВСЕ четыре
+    // наземных юнита показывались «мёртвым контентом» — и не потому, что бот их не
+    // заказывал (на войне он заказывал ополчение), а потому, что каждый такой заказ
+    // ядро отбивало кодом `E_NO_GROUND_FACILITY`: наземное производство открывает
+    // казарма (`enablesGroundConstruction`), а бот не строил её никогда — стартовый
+    // мир получает только космопорт (`matchSetup.ts`). Отказ тихий: `applyAction`
+    // возвращает `{ ok: false }`, харнес его пропускает, и в отчёте это выглядело как
+    // «бот не хочет пехоту», а не как «пехота ему запрещена».
+    //
+    // Порядок здесь и есть цепочка захвата: казарма → войска → гарнизон на призовых
+    // мирах (он-то и превращает «прилетел и забрал» в ШТУРМ) → десантный корпус.
+    if (profile === 'test') {
+      const pendingUpgrade = (planetId: string, building: string): boolean =>
+        state.scheduled.some((e) => {
+          if (e.type !== 'construction.complete') return false;
+          const q = e.payload as { kind?: string; planetId?: string; building?: string };
+          return q.kind === 'upgrade' && q.planetId === planetId && q.building === building;
+        });
+      const pendingUnit = (planetId: string, unit: string): boolean =>
+        state.scheduled.some((e) => {
+          if (e.type !== 'construction.complete') return false;
+          const q = e.payload as { kind?: string; planetId?: string; unit?: string };
+          return q.kind === 'unit' && q.planetId === planetId && q.unit === unit;
+        });
+      const affordableUnit = (unit: string, count: number): boolean => {
+        const cost = data.units[unit]?.cost ?? {};
+        return Object.keys(cost).every(
+          (r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) * count + (ORDER_RESERVE[r] ?? 0),
+        );
+      };
+      // 1. Казарма дома — ворота ко ВСЕМУ наземному ростеру.
+      if (!hasGroundYard(base)) {
+        if (affordable('barracks') && !pendingBuild(base.id, 'barracks')) {
+          out.push(buildBuilding(ai, base.id, 'barracks'));
+        }
+      } else {
+        // 2. Запас войск дома: гарнизон столицы + то, что увезёт десант. Берётся самое
+        //    тяжёлое по карману, поэтому ростер отыгрывается весь: ранняя казна тянет
+        //    ополчение, поздняя — спецназ и танки.
+        const pendingHome = GROUND_ROSTER.reduce(
+          (n, u) => n + (pendingUnit(base.id, u) ? 2 : 0),
+          0,
+        );
+        if (groundCount(base) + pendingHome < GROUND_STOCK) {
+          // Пока дома нет даже домашней стражи — заказывается ОБОРОНИТЕЛЬНЫЙ род войск;
+          // всё сверх неё уедет в трюме, поэтому там нужен ударный.
+          const list = groundCount(base) < HOME_GUARD ? GROUND_DEFENDERS : GROUND_ROSTER;
+          const pick = list.find((u) => affordableUnit(u, 2));
+          if (pick) out.push(buildUnit(ai, base.id, pick, 2));
+        }
+      }
+      // 3. Призовые миры: сперва казарма, потом ополчение в пустой гарнизон. Мир с
+      //    гарнизоном нельзя забрать прилётом — за него придётся высаживаться, и
+      //    ровно этого измерению не хватало.
+      for (const p of worldsInOrder(state, ai, 'barracks', profile)) {
+        if (p.owner !== ai || p.kind !== 'planet' || p.id === base.id) continue;
+        if (!hasGroundYard(p)) {
+          if (pendingBuild(p.id, 'barracks')) continue;
+          if (!affordable('barracks')) break;
+          out.push(buildBuilding(ai, p.id, 'barracks'));
+          break; // одна стройка за тик — как и с шахтой
+        }
+        if (groundCount(p) > 0 || pendingUnit(p.id, 'militia')) continue;
+        if (!affordableUnit('militia', 2)) break;
+        out.push(buildUnit(ai, p.id, 'militia', 2));
+        break;
+      }
+      // 5. ОБОРОНА (AI-BAL-2): форт → госпиталь → орбитальная ПВО. Порядок — по тому,
+      //    что каждое здание делает для УДЕРЖАНИЯ: форт даёт гарнизону +30% обороны
+      //    (`defenseBonus` через хук `combat.damage`), госпиталь его лечит между
+      //    штурмами (`healRate`), ПВО бьёт флот на орбите (`aaDamage`). Плюс любое
+      //    стоящее здание снимает 1% наземного урона (потолок 90%), поэтому застроенный
+      //    мир дорог сам по себе. Только призовые миры: провинций вчетверо больше, и
+      //    застраивать их — разорить казну на десятую долю территории.
+      const DEFENSE_CHAIN = ['fort', 'hospital', 'orbital_aa'] as const;
+      for (const p of warFooting ? worldsInOrder(state, ai, 'defense', profile) : []) {
+        if (p.owner !== ai || p.kind !== 'planet') continue;
+        const missing = DEFENSE_CHAIN.find(
+          (b) => !p.buildings.some((x) => x.type === b) && !pendingBuild(p.id, b),
+        );
+        if (!missing) continue;
+        if (!affordable(missing)) break;
+        out.push(buildBuilding(ai, p.id, missing));
+        break; // одна стройка за тик — как в экономической цепочке
+      }
+      // Сколько таких корпусов у места ВСЕГО: во флотах плюс ещё не поднятые в
+      //    гарнизоне дома (авто-рандеву кладёт новый корабль именно туда).
+      const shipsOwned = (unit: string): number =>
+        Object.values(state.fleets).reduce(
+          (n, fl) =>
+            n + (fl.owner === ai ? fl.units.reduce((k, st) => k + (st.unit === unit ? st.count : 0), 0) : 0),
+          0,
+        ) + base.garrison.reduce((n, st) => n + (st.unit === unit ? st.count : 0), 0);
+      // 4. Десантный корпус: трюм 8 против 5 у крейсера — без него ударная группа
+      //    везёт горстку и штурм захлёбывается на первом же гарнизоне.
+      if (
+        shipsOwned('dropship') < DROPSHIP_CAP &&
+        !pendingUnit(base.id, 'dropship') &&
+        affordableUnit('dropship', 1)
+      ) {
+        out.push(buildUnit(ai, base.id, 'dropship', 1));
+      }
+      // ═══ 6. АРТИЛЛЕРИЯ И АВИАЦИЯ (AI-BAL-4) ═══
+      // Артиллерия стреляет САМА: `artilleryModule` каждым пролётом времени заставляет
+      // свободный стоящий флот с `artillery`-корпусом обстрелять ближайший враждебный
+      // стоящий флот в радиусе `range` — без приказа, без ответного огня и без входа в
+      // бой. То есть `siege` не требует от бота ни одной новой команды: достаточно его
+      // ПОСТРОИТЬ, и целый пласт боя (дальний огонь) входит в измерение.
+      if (
+        warFooting &&
+        shipsOwned('siege') < SIEGE_CAP &&
+        !pendingUnit(base.id, 'siege') &&
+        affordableUnit('siege', 1)
+      ) {
+        out.push(buildUnit(ai, base.id, 'siege', 1));
+      }
+      // Эскадрильи. Ворота — здание с `enablesSquadronConstruction`; у завода эта
+      // способность появляется ВТОРЫМ уровнем, поэтому цепочка длинная: построить завод
+      // → апгрейдить → строить крылья. Дальше эскадрилья дерётся как обычный ударный
+      // корпус в составе флота (быстрая, больно бьёт, картонная — её счётчик орбитальная
+      // ПВО). СВОБОДНОГО ВЫЛЕТА у неё пока нет ни у кого: `squadron.strike` требует
+      // `fleet.homeBase`, а это поле в игре не выставляет ни один модуль (`fleet.split`
+      // в том числе) — механика вылета не достроена, это отдельный кирпич, не задача бота.
+      const factory = base.buildings.find((b) => b.type === 'factory' && b.hp > 0);
+      if (!factory) {
+        if (affordable('factory') && !pendingBuild(base.id, 'factory')) {
+          out.push(buildBuilding(ai, base.id, 'factory'));
+        }
+      } else if (factory.level < SQUADRON_FACTORY_LEVEL) {
+        if (affordable('factory') && !pendingUpgrade(base.id, 'factory')) {
+          out.push(upgradeBuilding(ai, base.id, 'factory'));
+        }
+      } else if (
+        shipsOwned('fighter_squadron') < SQUADRON_CAP &&
+        !pendingUnit(base.id, 'fighter_squadron') &&
+        affordableUnit('fighter_squadron', 1)
+      ) {
+        out.push(buildUnit(ai, base.id, 'fighter_squadron', 1));
       }
     }
     // (marine retired: the AI no longer cheap-builds a ground trooper. Its home keeps its
     //  seeded infantry garrison + orbital-AA building for defence; mobile ground via divisions.)
     const baseHasShip = base.garrison.some((st) => isShipUnit(st.unit));
-    if (aiFleets < (warFooting ? 4 : 2) && baseHasShip) out.push(launchFleet(ai, base.id));
+    if (ownFleets < (warFooting ? 4 : 2) && baseHasShip) out.push(launchFleet(ai, base.id));
+  }
+  // ═══ ТЕСТ-БОТ (AI-BAL-8): ГЕРОЙ ВХОДИТ В ИЗМЕРЕНИЕ ═══
+  // Диагноз кирпича: герой ПОСЕЯН во флоте каждого места (`matchSetup`) и исправно
+  // дерётся как корпус — но это и всё, что он делал. Бот не звал ни `hero.spawn`, ни
+  // `hero.skill.unlock`, ни `hero.fit`, ни `hero.ability`, поэтому целая ветка контента
+  // — три спящих героя ростера, два дерева навыков по четыре узла, три фитинга и весь
+  // диспетчер способностей — не участвовала в балансе НИ ОДНОЙ цифрой.
+  //
+  // Правила ниже намеренно минимальные, той же формы, что и правило технологий
+  // (AI-BAL-1): бот не «строит билд» — он просто не оставляет пустыми слоты, которые
+  // матч ему выдал. Что именно можно взять, решает САМО ЯДРО (ветка архетипа, `requires`,
+  // казна, кэп активных, кулдаун) — копии этих правил здесь нет, иначе первая же
+  // расходимость с модулем обернулась бы не ошибкой, а тихо изменившимся балансом.
+  if (profile === 'test' && pl) {
+    // Порядок обхода — по id инстанса, а не по раскладке объекта: `hero:{место}:{n}`
+    // сеет `matchSetup`, так что сортировка стабильна и один сид разыгрывается
+    // одинаково (инвариант #1).
+    const roster = Object.values(state.heroes ?? {})
+      .filter((x) => x.owner === ai)
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+    // «Развёрнут» ровно в том смысле, в каком это считает ядро (`activeHeroCount`):
+    // жив И командует ЖИВЫМ кораблём. Протухший `fleetId` не считается — иначе бот
+    // держал бы место в кэпе за героем, которого нет.
+    const deployed = (x: Hero): boolean =>
+      x.alive !== false && x.fleetId !== undefined && state.fleets[x.fleetId] !== undefined;
+    const affordableCost = (cost: Record<string, number> = {}): boolean =>
+      Object.keys(cost).every((r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) + 60);
+    // Дешёвое вперёд, id последним ключом — тот же ДЕТЕРМИНИРОВАННЫЙ (а не «оптимальный»)
+    // порядок, что у выбора технологии: перебор объекта дал бы разный порядок на разных
+    // движках.
+    const byPrice = (costOf: (id: string) => Record<string, number> | undefined) =>
+      (a: string, b: string): number => {
+        const sum = (c: Record<string, number> = {}): number =>
+          Object.values(c).reduce((n, v) => n + v, 0);
+        return sum(costOf(a)) - sum(costOf(b)) || (a < b ? -1 : a > b ? 1 : 0);
+      };
+
+    // 1. ПОДЪЁМ РОСТЕРА. Матч раздаёт каждому месту четырёх героев, но кораблём
+    //    командует только главный — остальные лежат неразвёрнутыми и ждут `hero.spawn`.
+    //    Кэп активных берётся из ядра (`HERO_ACTIVE_CAP`), а не переписывается числом:
+    //    иначе бот либо держал бы вторую копию правила, либо сыпал `E_HERO_CAP` каждые
+    //    два часа. Респаун-кулдаун читается по тому же гроссбуху, что и гейт.
+    if (base) {
+      let room = HERO_ACTIVE_CAP - roster.filter(deployed).length;
+      for (const x of roster) {
+        if (room <= 0) break;
+        if (deployed(x) || (x.cooldowns?.respawn ?? 0) > state.time) continue;
+        out.push(spawnHero(ai, x.id, base.id));
+        room -= 1;
+      }
+    }
+
+    // 2. ДЕРЕВО НАВЫКОВ — один узел за тик, как одна стройка за тик в экономике.
+    //    Ветку узла против ветки архетипа и цепочку `requires` судит ядро; здесь их
+    //    ЗЕРКАЛО ровно в той мере, чтобы не отдавать заведомо отбиваемый приказ.
+    for (const x of roster) {
+      if (x.alive === false) continue;
+      const branch = x.archetype !== undefined ? data.heroes[x.archetype]?.branch : undefined;
+      const taken = x.skills ?? [];
+      const node = Object.keys(data.heroSkillTrees)
+        .filter((id) => {
+          const def = data.heroSkillTrees[id];
+          if (!def || taken.includes(id)) return false;
+          if (def.branch !== undefined && def.branch !== branch) return false;
+          if (!(def.requires ?? []).every((parent) => taken.includes(parent))) return false;
+          return affordableCost(def.cost);
+        })
+        .sort(byPrice((id) => data.heroSkillTrees[id]?.cost))[0];
+      if (node !== undefined) {
+        out.push(unlockHeroSkill(ai, x.id, node));
+        break;
+      }
+    }
+
+    // 3. ФИТИНГИ — тоже по одному за тик. Слоты считает архетип; ставится навсегда
+    //    (рефита нет), поэтому порядок «дешёвое вперёд» заодно и есть приоритет.
+    for (const x of roster) {
+      if (x.alive === false) continue;
+      const slots = x.archetype !== undefined ? (data.heroes[x.archetype]?.slots ?? 0) : 0;
+      const fitted = x.fittings ?? [];
+      if (fitted.length >= slots) continue;
+      const fit = Object.keys(data.heroFittings)
+        .filter((id) => !fitted.includes(id) && affordableCost(data.heroFittings[id]?.cost))
+        .sort(byPrice((id) => data.heroFittings[id]?.cost))[0];
+      if (fit !== undefined) {
+        out.push(fitHero(ai, x.id, fit));
+        break;
+      }
+    }
+
+    // 4. СПОСОБНОСТИ. Диспетчер ядра data-driven — значит и правило каста здесь по
+    //    ТИПУ способности, а не по её id: новая способность того же типа поедет сама.
+    //    Одна способность на героя за тик.
+    for (const x of roster) {
+      if (!deployed(x) || x.alive !== true) continue;
+      const fleet = x.fleetId !== undefined ? state.fleets[x.fleetId] : undefined;
+      const node = fleet ? state.planets[heroNode(state, x)] : undefined;
+      if (!fleet || !node) continue;
+      const fighting = fleet.battleId != null;
+      for (const id of x.abilities ?? []) {
+        if (typeof id !== 'string') continue;
+        const def = data.heroAbilities[id];
+        if (!def) continue;
+        // Кулдаун читается ТЕМ ЖЕ ключом, что ведёт гейт (`heroCooldownKey`): ключ
+        // общий на ТИП, поэтому rally и bulwark делят одно окно — и бот, не зная
+        // этого, спамил бы `E_COOLDOWN` второй аурой каждый тик.
+        if ((x.cooldowns?.[heroCooldownKey(def.type)] ?? 0) > state.time) continue;
+        if (!affordableCost(def.cost)) continue;
+        const reach = abilityRange(def);
+        // Куда кастовать — решает ТИП:
+        //  · `aura` (rally/bulwark) и `reveal` (scan) — боевые: они стоят чего-то
+        //    только пока рядом дерутся, и оба бьют по узлу героя. У скана это не про
+        //    туман (бот читает состояние целиком — та же причина, по которой ему не
+        //    нужен `radar`, AI-BAL-2), а про ПСИ-ЛЕСТНИЦУ: взятые ступени превращают
+        //    просвеченную зону в боевую (+урон врагу, −урон себе);
+        //  · `annihilate` — по миру, который бот ОСАЖДАЕТ и всё равно не может взять
+        //    (AI-BAL-7): размен «мир противника на мёртвый мир, богатый металлом» —
+        //    единственный способ, которым в матче вообще появляется `dead_world`;
+        //  · `temp_lane` — дорога туда, куда дороги нет: коридор к захватываемой цели
+        //    в радиусе, не связанной с узлом героя ребром графа;
+        //  · `recall` (домой) и маркеры `spawn_*` — НЕ кастуются. Отзыв выдёргивает
+        //    героя с фронта ровно тогда, когда он нужнее всего, а маркеры вообще не
+        //    кастуемы: ядро читает их наличием (`hero.spawn`), и каст ответил бы
+        //    `E_NO_EFFECT`.
+        let target: string | undefined;
+        if (def.type === 'aura' || def.type === 'reveal') {
+          if (!fighting) continue;
+          target = reach > 0 ? node.id : undefined;
+        } else if (def.type === 'annihilate') {
+          if (!fleet.bombarding || node.owner === null || node.owner === ai) continue;
+          target = node.id;
+        } else if (def.type === 'temp_lane') {
+          const linked = new Set(node.links ?? []);
+          const to = Object.values(state.planets)
+            .filter(
+              (p) =>
+                p.id !== node.id &&
+                p.owner !== ai &&
+                capturable(p) &&
+                !linked.has(p.id) &&
+                canTraverse(state, ai, p.owner) &&
+                d(node.position, p.position) <= reach,
+            )
+            .sort((a, b) => d(node.position, a.position) - d(node.position, b.position))[0];
+          if (!to) continue;
+          target = to.id;
+        } else {
+          continue;
+        }
+        out.push(castHeroAbility(ai, x.id, id, target));
+        break;
+      }
+    }
   }
   // Trade on the session market: a passive bot liquidates the surplus goods it never
   // uses (food/energy/microelectronics) into the credits it always needs, and — when
-  // flush — bids for the metal it burns fastest. One open lot per resource so it doesn't
-  // spam. Embargo needs no check here: the book is anonymous and market.take rejects a
-  // soured player from filling the bot's lots (botEmbargoes), so the bot simply won't
-  // trade with anyone it has soured on.
+  // flush — bids for the goods it burns fastest. One open lot per resource so it doesn't
+  // spam. Prices and working stocks come from ONE table (`TRADE_BOOK`).
   if (pl) {
-    const lots = marketLots(state);
+    const lots = state.market ?? [];
     const hasLot = (side: MarketSide, resource: string): boolean =>
       lots.some((l) => l.owner === ai && l.side === side && l.resource === resource);
-    for (const good of ['food', 'energy', 'microelectronics']) {
-      const have = pl.resources[good] ?? 0;
-      const reserve = good === 'microelectronics' ? 40 : 120; // the working stock it keeps
-      if (have >= reserve + 40 && !hasLot('sell', good))
-        out.push(marketList(ai, 'sell', good, Math.floor((have - reserve) / 2), 2));
+    const stock = (good: string): number => pl.resources[good] ?? 0;
+    // Порядок обхода — по ключам таблицы, а не по перебору казны: раскладка объекта
+    // `resources` зависит от истории начислений, и один сид разыгрался бы по-разному.
+    const goods = Object.keys(TRADE_BOOK);
+    for (const good of goods) {
+      const book = TRADE_BOOK[good]!;
+      const have = stock(good);
+      // ИГРОВОМУ боту достаётся ровно прежний набор лотов: излишки на продажу и заявка на
+      // металл. Заявка на микроэлектронику — новинка, а всё новое в блоке AI-BAL достаётся
+      // лаборатории (AI-BAL-1.1), поэтому живой игрок встречает прежнего соперника.
+      const bid = profile === 'test' || good === 'metal' ? book.bid : undefined;
+      if (book.ask !== undefined && have >= book.keep + 40 && !hasLot('sell', good)) {
+        out.push(marketList(ai, 'sell', good, Math.floor((have - book.keep) / 2), book.ask));
+      }
+      if (
+        bid !== undefined &&
+        have < book.keep &&
+        stock('credits') > TRADE_CREDIT_FLOOR &&
+        !hasLot('buy', good)
+      ) {
+        out.push(marketList(ai, 'buy', good, 30, bid));
+      }
     }
-    if (
-      (pl.resources.metal ?? 0) < 80 &&
-      (pl.resources.credits ?? 0) > 300 &&
-      !hasLot('buy', 'metal')
-    ) {
-      out.push(marketList(ai, 'buy', 'metal', 30, 3));
+    // ═══ ТЕСТ-БОТ (AI-BAL-9): БОТ СНИМАЕТ ЧУЖИЕ ЛОТЫ ═══
+    // Диагноз кирпича: `market.take` не звал НИКТО — за прогон ровно ноль сделок. Лоты
+    // выставлялись, книга наполнялась и умирала нетронутой, а значит межигроковая
+    // экономика (торговля, ценовое давление, эмбарго, комиссия-сток) не меряется вовсе.
+    //
+    // Правило симметрично собственным лотам и берёт цены из той же таблицы: чужой `sell`
+    // снимается, когда товар нужен и просят не дороже своего `bid`; чужой `buy`
+    // исполняется, когда товар в излишке и ЧИСТАЯ выручка не ниже своего `ask`. «Чистая»
+    // тут не педантизм: комиссия ядра (`MARKET_COMMISSION`, 15% и она СГОРАЕТ) снимается
+    // с получателя кредитов, поэтому сравнение с валовой ценой систематически завышало бы
+    // выгоду — бот отдавал бы товар дешевле, чем сам его оценивает.
+    //
+    // Эмбарго зеркалится ЗДЕСЬ, хотя судит его ядро: `market.take` от игрока, на которого
+    // владелец лота обиделся, отбивается `E_EMBARGO` — и без проверки бот сыпал бы этим
+    // отказом каждые два часа на один и тот же лот. Правило то же самое (`botEmbargoes`),
+    // взятое из общего места, а не переписанное здесь второй копией.
+    let best: { id: string; qty: number; gain: number } | null = null;
+    for (const lot of profile === 'test' ? lots : []) {
+      if (lot.owner === ai || lot.amount <= 0) continue;
+      if (botEmbargoes(state, lot.owner, ai)) continue;
+      const book = TRADE_BOOK[lot.resource];
+      if (!book) continue;
+      const have = stock(lot.resource);
+      let qty: number;
+      let gain: number;
+      if (lot.side === 'sell') {
+        if (book.bid === undefined || lot.price > book.bid || have >= book.keep) continue;
+        const affordable = Math.floor((stock('credits') - TRADE_CREDIT_FLOOR) / lot.price);
+        qty = Math.min(lot.amount, book.keep - have, affordable);
+        gain = (book.bid - lot.price) * qty;
+      } else {
+        if (book.ask === undefined) continue;
+        const net = lot.price * (1 - MARKET_COMMISSION);
+        if (net < book.ask) continue;
+        qty = Math.min(lot.amount, have - book.keep);
+        gain = (net - book.ask) * qty;
+      }
+      if (qty <= 0) continue;
+      // Одна сделка за тик — как одна стройка за тик. Тай-брейк по id: выгода легко
+      // совпадает у двух лотов, а порядок массива книги зависит от истории заказов.
+      if (best === null || gain > best.gain || (gain === best.gain && lot.id < best.id)) {
+        best = { id: lot.id, qty, gain };
+      }
     }
+    if (best !== null) out.push(marketTake(ai, best.id, best.qty));
   }
   return out;
 }

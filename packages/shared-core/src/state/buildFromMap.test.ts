@@ -215,7 +215,12 @@ describe('slot-based maps — team-aware start slots (corporation-wars.md §4)',
     // Anchored at the slot's owned world, carrying the archetype loadout, undeployed.
     expect(main.home).toBe('home_a');
     expect(main.location).toBe('home_a');
-    expect(main.name).toBe(data.heroes.commander!.name);
+    // AUD-13: НИКАКОГО отображаемого текста в состоянии — имя героя собирает рендер
+    // из `archetype`. Состояние одно на всех игроков, а локаль у каждого своя, поэтому
+    // проза из каталога, попавшая сюда, доехала бы до экрана непереведённой.
+    expect(main.name).toBeUndefined();
+    expect(main.archetype).toBe('commander');
+    expect(JSON.stringify(state.heroes)).not.toContain(data.heroes.commander!.name);
     expect(main.abilities).toEqual(data.heroes.commander!.startAbilities);
     expect(main.passives).toEqual(['rally_beacon']);
     expect(main.fleetId).toBeUndefined(); // no ship yet — hero.spawn raises it

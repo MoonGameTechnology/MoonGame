@@ -30,15 +30,44 @@ export interface JoinResult {
 /** A stable failure from `join`, mapped to an HTTP status by the route. `E_NOT_ROSTERED`
  *  is the AvA path (AVA-7): the match is an AvA session and the caller is not on its roster.
  *  `E_ENTRY_CLOSED` is the SES-2.3 entry window: a login that does not already hold a seat is
- *  refused once the window has closed (the join impl checks `seatOf` before assigning a chair). */
+ *  refused once the window has closed (the join impl checks `seatOf` before assigning a chair).
+ *  `E_UNKNOWN_FACTION` (ENTRY-1) is the `faction` query param naming a house the shipped data
+ *  does not have: the id is a DATA KEY (`data.factions[...]` feeds passives, starting loadout
+ *  and radar range), so an unknown one would silently zero every house bonus instead of
+ *  failing — the player would think they play that house while playing none. */
 export type JoinFailure = {
-  error: 'E_NO_MATCH' | 'E_MATCH_FULL' | 'E_AUTH_DISABLED' | 'E_NOT_ROSTERED' | 'E_ENTRY_CLOSED';
+  error:
+    | 'E_NO_MATCH'
+    | 'E_MATCH_FULL'
+    | 'E_AUTH_DISABLED'
+    | 'E_NOT_ROSTERED'
+    | 'E_ENTRY_CLOSED'
+    | 'E_UNKNOWN_FACTION';
 };
 
 /** An authenticated caller, as resolved by the `identify` hook. */
 export interface Identity {
   accountId: string;
   login: string;
+}
+
+/** Что игрок принёс на вход: кто он и что выбрал на экране входа (ENTRY-2/3).
+ *
+ *  ИМЕНОВАННЫЙ объект, а не позиционные параметры — и это не стиль. На позиционных
+ *  реализация с МЕНЬШИМ числом аргументов совместима с более широкой сигнатурой, поэтому
+ *  канонический сервер полгода принимал три параметра из пяти и молча ронял `slot` с
+ *  `faction`, а TypeScript этого не видел (ENTRY-1). С объектом реализация получает вход
+ *  целиком; забыть поле всё ещё можно, но это видно в коде, а не прячется в сигнатуре. */
+export interface JoinRequest {
+  /** Ник места. На аутентифицированном пути — логин сессии, чужим им не назовёшься. */
+  nick: string;
+  accountId?: string | undefined;
+  /** Выбранный стартовый мир (кресло). */
+  preferredSlot?: string | undefined;
+  /** Выбранный дом. */
+  preferredFaction?: string | undefined;
+  /** Совет учёных в ЭТУ сессию (≤2 — предел держат схема и модуль). */
+  preferredScientists?: readonly string[] | undefined;
 }
 
 export interface MatchApiDeps {
@@ -51,7 +80,7 @@ export interface MatchApiDeps {
    *  `accountId` is stamped into the join token when the caller is authenticated.
    *  `preferredSlot` (REL-7): the player's chosen slot id (e.g. "p3"); the server
    *  reserves it if free, falls back to any free slot if not. */
-  join(matchId: string, nick: string, accountId?: string, preferredSlot?: string, preferredFaction?: string): Promise<JoinResult | JoinFailure>;
+  join(matchId: string, req: JoinRequest): Promise<JoinResult | JoinFailure>;
   /** Resolve the caller's identity from the request (session token), or null when the
    *  request carries no valid session. Wired ⇒ create/join REQUIRE identity (401 E_AUTH)
    *  and the session's login IS the nick. Absent ⇒ legacy `?nick=` dev behaviour. */
@@ -67,6 +96,10 @@ const STATUS: Record<JoinFailure['error'], number> = {
   E_MATCH_FULL: 409,
   E_NOT_ROSTERED: 403,
   E_ENTRY_CLOSED: 403,
+  // 400, а не 403: это не «нельзя», а «в запросе чушь» — клиент прислал дом, которого
+  // в данных нет. Отличать важно, иначе экран выбора покажет «вас не пускают» там, где
+  // на деле разъехались данные клиента и сервера.
+  E_UNKNOWN_FACTION: 400,
   E_AUTH_DISABLED: 501,
 };
 
@@ -107,6 +140,35 @@ export function registerMatchApi(app: FastifyInstance, deps: MatchApiDeps): void
     });
   }
 
+  /** Что игрок выбрал ДО входа, из строки запроса (REL-7 место, BF-30 дом, ENTRY-4 совет).
+ *
+ *  Одна функция на обе ветки роута — аутентифицированную и ник-овую. Копия здесь стоила
+ *  бы того же, что стоила везде: ветки разъехались бы, и половина игроков теряла бы выбор
+ *  молча (ровно это и было — ник-ветка звала `join` с одним ником).
+ *
+ *  Совет едет одной строкой через запятую: отдельные повторяющиеся параметры ради двух
+ *  значений — лишняя форма, которую пришлось бы разбирать и на клиенте, и здесь. Пустые
+ *  куски отбрасываются, чтобы `sci=` и `sci=,` читались как «не выбирал», а не как учёный
+ *  с пустым идентификатором. */
+function preferencesFrom(query: unknown): {
+  preferredSlot?: string;
+  preferredFaction?: string;
+  preferredScientists?: string[];
+} {
+  const q = (query ?? {}) as { slot?: string; faction?: string; sci?: string };
+  const scientists = q.sci
+    ? q.sci
+        .split(',')
+        .map((x) => x.trim())
+        .filter((x) => x !== '')
+    : [];
+  return {
+    ...(q.slot ? { preferredSlot: q.slot } : {}),
+    ...(q.faction ? { preferredFaction: q.faction } : {}),
+    ...(scientists.length > 0 ? { preferredScientists: scientists } : {}),
+  };
+}
+
   app.get('/matches/:id/join', async (request: FastifyRequest, reply: FastifyReply) => {
     if (rateLimited(request.ip)) {
       void reply.code(429);
@@ -121,9 +183,11 @@ export function registerMatchApi(app: FastifyInstance, deps: MatchApiDeps): void
         void reply.code(401);
         return { error: 'E_AUTH' as const };
       }
-      const slot = (request.query as { slot?: string }).slot;
-      const faction = (request.query as { faction?: string }).faction;
-      const result = await deps.join(id, who.login, who.accountId, slot, faction);
+      const result = await deps.join(id, {
+        nick: who.login,
+        accountId: who.accountId,
+        ...preferencesFrom(request.query),
+      });
       if ('error' in result) void reply.code(STATUS[result.error]);
       return result;
     }
@@ -132,7 +196,12 @@ export function registerMatchApi(app: FastifyInstance, deps: MatchApiDeps): void
       void reply.code(400);
       return { error: 'E_NICK_REQUIRED' as const };
     }
-    const result = await deps.join(id, nick.trim());
+    // Предпочтения применяются и здесь. Ник-путь — это LAN/дев-рукопожатие без аккаунтов,
+    // но выбор игрока от способа опознания не зависит: REL-7 (`?slot=`) старше учёток.
+    // Раньше эта ветка звала `join` с одним ником, молча теряя место, дом и совет — ровно
+    // тот класс ошибки, на котором погорел ENTRY-1 (реализация принимала меньше, чем ей
+    // передавали, и разъезд не проявлялся, пока играли на другом пути).
+    const result = await deps.join(id, { nick: nick.trim(), ...preferencesFrom(request.query) });
     if ('error' in result) void reply.code(STATUS[result.error]);
     return result;
   });
@@ -173,19 +242,100 @@ export function registerOpenMatchesFeed(app: FastifyInstance, deps: OpenMatchesF
   });
 }
 
+/** One seat of a match, as the pre-join picker reads it (REL-7). */
+export interface SeatView {
+  playerId: string;
+  name: string;
+  faction: string;
+  /** The seat's homeworld id — the fog-sensitive field, see {@link registerSeatsApi}. */
+  start: string | null;
+  taken: boolean;
+}
+
+/** A match's seating, as the host knows it — independent of who is asking. */
+export interface SeatLayout {
+  seats: SeatView[];
+  /** The simulation is over: no chair here is claimable any more. */
+  ended: boolean;
+}
+
+export interface SeatsApiDeps {
+  /** The match's seat layout, or null when there is no such match. */
+  seats(matchId: string): Promise<SeatLayout | null>;
+  /** SES-2.3 entry window: may a NEWCOMER still claim a seat in this match? Unknown
+   *  match ⇒ false (fail-secure), mirroring `MatchRegistry.entryOpen`. */
+  entryOpen(matchId: string): boolean | Promise<boolean>;
+  /** The seat this login already holds in the match, or null when it holds none. */
+  seatOf(matchId: string, login: string): Promise<string | null>;
+  /** The same identity hook `registerMatchApi` takes: a verified session, or null.
+   *  Absent ⇒ the legacy `?nick=` host (see the authorization note below). */
+  identify?(request: FastifyRequest): Promise<Identity | null>;
+}
+
+/**
+ * ADDR-6 — `GET /matches/:id/seats`: the seat layout, and who may read it.
+ *
+ * The layout exists for pre-join seat picking (REL-7): before entering, a player needs
+ * to see which chairs are free, which house each belongs to and which world it starts
+ * on. For a match still open to newcomers that is public information — anyone reading it
+ * could simply join and see the same thing.
+ *
+ * Once a session is closed to newcomers the very same payload becomes intel about
+ * strangers: every player's callsign and faction, and `start` — the homeworld ids that
+ * `visibleState()` keeps behind fog in the game itself. A match id is not a secret (it
+ * rides in the `?join=` deep link, stays in the address bar during play and is listed by
+ * `GET /matches/open`), so gating on «did you know the id» gated nothing. CORS does not
+ * help either: it constrains a browser on a foreign page and is ignored by `curl`.
+ *
+ * So the route asks whether the caller may enter, and failing that, whether they are
+ * already in: a match open for entry serves anyone; a closed one serves only a caller
+ * who holds a seat in it. Open means a chair is really claimable — the entry window is
+ * still up (SES-2.3), the session has not ended and some seat is free.
+ *
+ * Identity is the `identify` hook, exactly as in {@link registerMatchApi}. Without it
+ * (the nick-only host, which has no authentication to offer) participation falls back to
+ * `?nick=` — the posture `registerBrowserApi`'s archive intents already take. That is a
+ * participation check, not proof of identity, and it is what keeps a seated player able
+ * to read their own running session where sessions do not exist.
+ */
+export function registerSeatsApi(app: FastifyInstance, deps: SeatsApiDeps): void {
+  const participates = async (request: FastifyRequest, matchId: string): Promise<boolean> => {
+    const login = deps.identify ? (await deps.identify(request))?.login : nickOf(request);
+    if (!login) return false;
+    return (await deps.seatOf(matchId, login)) !== null;
+  };
+
+  app.get('/matches/:id/seats', async (request: FastifyRequest, reply: FastifyReply) => {
+    const { id } = request.params as { id: string };
+    const layout = await deps.seats(id);
+    if (!layout) {
+      void reply.code(404);
+      return { error: 'E_NO_MATCH' as const };
+    }
+    const claimable =
+      !layout.ended && layout.seats.some((seat) => !seat.taken) && (await deps.entryOpen(id));
+    if (!claimable && !(await participates(request, id))) {
+      void reply.code(403);
+      return { error: 'E_FORBIDDEN' as const };
+    }
+    return { seats: layout.seats };
+  });
+}
+
+/** A repeated `?nick=a&nick=b` parses to an array and `?nick=` to an empty string —
+ *  treat anything but a non-blank string as absent (fail-secure: anonymous view /
+ *  E_FORBIDDEN), like the join route's check. */
+function nickOf(request: FastifyRequest): string | null {
+  const nick = (request.query as { nick?: unknown }).nick;
+  return typeof nick === 'string' && nick.trim() !== '' ? nick : null;
+}
+
 /**
  * The match-browser read-model + archive intents (docs/main-menu.md §2), served beside
  * the create/join API. A server projection — the client only reads it (A10/fog rule);
  * archive is fail-secure per-player (participants only, stable codes).
  */
 export function registerBrowserApi(app: FastifyInstance, registry: MatchRegistry): void {
-  // A repeated `?nick=a&nick=b` parses to an array — treat anything non-string as
-  // absent (fail-secure: anonymous view / E_FORBIDDEN), like the join route's check.
-  const nickOf = (request: FastifyRequest): string | null => {
-    const nick = (request.query as { nick?: unknown }).nick;
-    return typeof nick === 'string' ? nick : null;
-  };
-
   // The three tabs (available/active/archived) for one viewer (`?nick=`).
   app.get('/matches', (request: FastifyRequest) => registry.list(nickOf(request)));
 

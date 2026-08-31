@@ -191,6 +191,24 @@ export const BuildingLevelSchema = z.object({
    *  buildTime × (1 − 0.5)). Применяется к `unit.build` на планете, где стоит это
    *  здание. 0 = нет бонуса. */
   buildSpeedBonus: z.number().nonnegative().default(0),
+  /** Строительные способности, ОТКРЫВАЕМЫЕ этим уровнем (верфь / ангар / наземное
+   *  производство). Ровно те же флаги, что у `BuildingDefSchema`, только здесь они
+   *  означают «уровень открывает», а не «здание умеет с постройки».
+   *
+   *  Способность НАКАПЛИВАЕТСЯ и обратно не выключается: раз открыв ангар апгрейдом,
+   *  здание остаётся ангаром и на следующих уровнях, даже если те флага не повторяют.
+   *  Поэтому поля опциональные — `undefined` значит «этот уровень ничего не добавляет»,
+   *  а не «отнимает».
+   *
+   *  Почему они здесь появились: данные (и `data/buildings.json`, и каталог прототипа)
+   *  давно писали `enablesSquadronConstruction` в АПГРЕЙДАХ завода — «завод второго
+   *  уровня открывает эскадрильи». Схема этих полей на уровне не знала, zod их молча
+   *  отбрасывал, и гейт `unit.build` читал только базовый def — где флага нет. Итог:
+   *  `fighter_squadron` (единственный `squadron`-юнит) нельзя было построить НИ НА
+   *  КАКОМ уровне завода, приказ отбивался `E_NO_HANGAR` всегда. */
+  enablesShipConstruction: z.boolean().optional(),
+  enablesSquadronConstruction: z.boolean().optional(),
+  enablesGroundConstruction: z.boolean().optional(),
 });
 
 export const BuildingDefSchema = z.object({
@@ -230,11 +248,13 @@ export const BuildingDefSchema = z.object({
   pointDefense: z.number().nonnegative().default(0),
   /** True for a building that can lay down hulls (shipyard/spaceport) — a planet needs
    *  at least one standing (undestroyed) building with this flag to build any
-   *  space-domain unit (`unit.build`). Not per-level: the capability doesn't scale. */
+   *  space-domain unit (`unit.build`). Уровень МОЖЕТ открыть способность позже — см.
+   *  одноимённое поле в `BuildingLevelSchema`. */
   enablesShipConstruction: z.boolean().default(false),
   /** True for a building that can build and base squadrons (a hangar bay /
    *  airbase). A planet needs at least one standing building with this flag
-   *  to build any unit with the `squadron` trait (`unit.build`). Not per-level. */
+   *  to build any unit with the `squadron` trait (`unit.build`). Уровень МОЖЕТ
+   *  открыть способность позже — см. `BuildingLevelSchema`. */
   enablesSquadronConstruction: z.boolean().default(false),
   /** True for a building that enables ground-unit construction (barracks for
    *  infantry, factory for vehicles). A planet needs at least one standing
@@ -527,6 +547,23 @@ export const HeroAbilityDefSchema = z.object({
   cost: NonnegativeCostSchema.default({}),
   /** Effect-specific parameters, interpreted by the type's handler. */
   params: z.record(z.string(), z.unknown()).default({}),
+  /** Progression steps of ONE ability (HERO-CORRIDOR-СПЕКА: «три ступени вместо
+   *  одной»). A step is earned by unlocking its skill-tree node (`Hero.skills` →
+   *  `data.heroSkillTrees`), and its `params` override the base `params` for that
+   *  hero. Every unlocked step applies IN ARRAY ORDER, so the ladder is written
+   *  top-down in data and the last unlocked step wins on a shared key. No steps ⇒
+   *  the ability behaves exactly as its base `params` say (fail-secure default:
+   *  an unknown/unreachable node grants nothing). */
+  tiers: z
+    .array(
+      z.object({
+        /** Node id in `data.heroSkillTrees` that unlocks this step. */
+        skill: z.string(),
+        /** Params replacing the base ones once the step is unlocked. */
+        params: z.record(z.string(), z.unknown()).default({}),
+      }),
+    )
+    .default([]),
 });
 
 /** The hook pipelines a hero passive may feed (HERO-5). A curated enum, not an open
@@ -723,6 +760,22 @@ export const GameModeDefSchema = z.object({
   pve: ModePveSchema.optional(),
 });
 
+/** Session-market rules that belong to CONTENT, not to the mechanic (CONV-9).
+ *
+ *  `goods` — what may be listed at all. The prototype kept this whitelist as a
+ *  `MARKET_GOODS` constant inside its module, which made "what is tradable" a code
+ *  change; the core traded any declared resource, which on the prototype's catalog
+ *  would have opened credits-for-credits trading. Declaring it here settles both:
+ *  a new tradable good is a data edit, and the currency simply isn't on the list.
+ *
+ *  An EMPTY list means "no whitelist" — every declared resource is tradable. That is
+ *  the core's historical behaviour, so catalogs that say nothing keep working. */
+export const MarketDefSchema = z
+  .object({
+    goods: z.array(z.string()).default([]),
+  })
+  .strict();
+
 export const GameDataSchema = z.object({
   version: z.string(),
   resources: z.array(z.string()).min(1),
@@ -746,8 +799,10 @@ export const GameDataSchema = z.object({
   // per-field defaults stay the single source of truth (no literal to drift).
   rewards: RewardsDefSchema.prefault({}),
   researchBoost: ResearchBoostDefSchema.prefault({}),
+  market: MarketDefSchema.prefault({}),
 });
 
+export type MarketDef = z.infer<typeof MarketDefSchema>;
 export type ResourceBag = z.infer<typeof ResourceBagSchema>;
 export type UnitStats = z.infer<typeof UnitStatsSchema>;
 export type UnitDef = z.infer<typeof UnitDefSchema>;

@@ -96,7 +96,10 @@ Match modes are selected when starting the host:
 ```bash
 pnpm host                    # 10-player FFA
 TEAMS=5v5 pnpm host          # ten chairs: p1–p5 vs p6–p10
+TEAMS=3v3 pnpm host          # six chairs: p1–p3 vs p4–p6
 TEAMS=2v2 pnpm host          # compact four-chair team test
+TEAMS=1v1 pnpm host          # duel — two chairs, opposite sides of the board
+TEAMS=pve pnpm host          # two humans against one strong bot
 MATCHES=3 pnpm host          # three independent sessions in ONE process
 ```
 

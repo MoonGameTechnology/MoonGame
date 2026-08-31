@@ -25,12 +25,21 @@ export interface PendingJoin {
   slot?: string;
   /** Дом, выбранный отдельно от стартовой точки (BF-30). */
   faction?: string;
+  /** Совет учёных В ЭТУ сессию (ENTRY-4). Хранится по той же причине, что место и дом:
+   *  игрок уходит логиниться уже ПОСЛЕ выбора, и потеряй мы состав — он сел бы играть
+   *  без совета, который только что собрал. */
+  scientists?: string[];
 }
 
 /** Хранилище одноразового намерения войти в матч. */
 export interface PendingJoinStore {
   /** Запомнить намерение. Пустой матч не запоминается, пустой выбор не хранится. */
-  remember(matchId: string, slot?: string | null, faction?: string | null): void;
+  remember(
+    matchId: string,
+    slot?: string | null,
+    faction?: string | null,
+    scientists?: readonly string[] | null,
+  ): void;
   /** Забрать намерение и сразу забыть его — правило 1. */
   take(): PendingJoin | null;
   /** Есть ли намерение. Не забывает — это вопрос, а не выдача. */
@@ -40,11 +49,12 @@ export interface PendingJoinStore {
 export function createPendingJoin(): PendingJoinStore {
   let pending: PendingJoin | null = null;
   return {
-    remember(matchId, slot, faction) {
+    remember(matchId, slot, faction, scientists) {
       if (!matchId) return;
       pending = { matchId };
       if (slot) pending.slot = slot;
       if (faction) pending.faction = faction;
+      if (scientists && scientists.length > 0) pending.scientists = [...scientists];
     },
     take() {
       const taken = pending;

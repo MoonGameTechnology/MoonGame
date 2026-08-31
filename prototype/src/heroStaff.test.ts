@@ -11,6 +11,7 @@ import {
   initHeroStaff,
   HERO_CASTABLE,
   heroCdKey,
+  nodeDepth,
   type HeroView,
   type HeroStaffHost,
 } from './heroStaff';
@@ -183,6 +184,69 @@ describe('штаб героев — разметка панели', () => {
   it('вкладка «Дерево» открыта по умолчанию и показывает узлы', () => {
     const html = initHeroStaff(hostOf()).paneHtml();
     expect(html).toContain('hx-tree');
+  });
+
+  it('в дереве трансгуманиста видны ВСЕ ЧЕТЫРЕ узла ветки, включая запертые', () => {
+    // Жалоба владельца с живой игры: «не наблюдаю 3 и 4 узлов». Рейка ветки рисует
+    // весь каталог, а не только доступное — запертый узел показывается с замком и
+    // рассказывает в досье, чего ему не хватает. Сторож держит именно это: добавили
+    // узел в данные — он обязан появиться игроку, а не потеряться в UI.
+    const html = initHeroStaff(hostOf()).paneHtml();
+    for (const node of [
+      'hero.tree.neural-lace.name',
+      'hero.tree.overclocked-helm.name',
+      'hero.tree.corridor-sustained.name',
+      'hero.tree.corridor-open.name',
+    ]) {
+      expect(html, node).toContain(t(node));
+    }
+    expect(html).toContain('🔒'); // ступени заперты, пока не взят родитель
+  });
+
+  it('в дереве психионика видны ВСЕ ЧЕТЫРЕ узла ветки — и в порядке прокачки', () => {
+    // Психионная лестница — близнец коридорной (PSI-ЛЕСТНИЦА): «Разведка» растёт до
+    // «Слабых мест», затем до «Манёвренности». Чужая ветка рисуется приглушённой рейкой,
+    // поэтому все её узлы обязаны быть на экране у ЛЮБОГО героя, а не только у психионика.
+    const html = initHeroStaff(hostOf()).paneHtml();
+    const order = ['void-attunement', 'psi-veil', 'psi-weak-points', 'psi-evasion'].map((k) =>
+      html.indexOf(t(`hero.tree.${k}.name`)),
+    );
+    expect(order.every((i) => i >= 0)).toBe(true); // все четыре на экране
+    expect(order).toEqual([...order].sort((a, b) => a - b)); // и сверху вниз по прокачке
+  });
+
+  it('ветка читается сверху вниз В ПОРЯДКЕ ПРОКАЧКИ, а не по алфавиту', () => {
+    // Жалоба владельца: «Общий коридор» стоял выше «Разогнанного шлема», хотя качается
+    // последним. Причина — сортировка по ЧИСЛУ родителей: у всей цепочки коридора его
+    // по одному, дальше вступал алфавит (`corridor_open` < `corridor_sustained` <
+    // `overclocked_helm`). Теперь порядок задаёт ГЛУБИНА цепочки.
+    const html = initHeroStaff(hostOf()).paneHtml();
+    const order = ['neural-lace', 'overclocked-helm', 'corridor-sustained', 'corridor-open'].map(
+      (k) => html.indexOf(t(`hero.tree.${k}.name`)),
+    );
+    expect(order.every((i) => i >= 0)).toBe(true); // все четыре на экране
+    expect(order).toEqual([...order].sort((a, b) => a - b)); // и именно в этом порядке
+  });
+
+  it('глубина узла — длина самого длинного пути до корня, цикл в данных не вешает UI', () => {
+    const trees = {
+      root: { requires: [] },
+      mid: { requires: ['root'] },
+      leaf: { requires: ['mid'] },
+      // Две дороги до корня: считается ДЛИННАЯ, иначе узел встанет выше своего же деда.
+      forked: { requires: ['root', 'leaf'] },
+      loopA: { requires: ['loopB'] },
+      loopB: { requires: ['loopA'] },
+    };
+    expect(nodeDepth('root', trees)).toBe(0);
+    expect(nodeDepth('mid', trees)).toBe(1);
+    expect(nodeDepth('leaf', trees)).toBe(2);
+    expect(nodeDepth('forked', trees)).toBe(3);
+    // Цикл обрывается на повторе узла В ТЕКУЩЕМ пути, а не рекурсирует вечно: обход
+    // проходит loopA → loopB и упирается в loopA, то есть длину самого цикла. Важно не
+    // конкретное число, а что оно конечно и рендер не виснет.
+    expect(nodeDepth('loopA', trees)).toBe(2);
+    expect(nodeDepth('unknown', trees)).toBe(0); // нет в каталоге — корень (fail-secure)
   });
 
   it('переключение вкладки меняет тело панели', () => {

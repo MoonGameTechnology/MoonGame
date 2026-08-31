@@ -15,6 +15,8 @@ import { getStance, stanceToRelation } from '../state/diplomacy';
 import { fleetSideDealingHit, heroNode } from '../state/heroes';
 import { distance } from '../state/route';
 import { isCapturable } from '../state/sectorKind';
+import { laneIsPublic } from '../state/corridor';
+import { isAllied } from '../util/combat';
 import { canInstall } from '../util/fitting';
 import { addUnits } from '../util/stacks';
 import { canAfford, payCost } from '../util/treasury';
@@ -25,10 +27,6 @@ import { canAfford, payCost } from '../util/treasury';
  * abilities through the bus, plus the `fleet.speed` bonus for its temp lanes:
  *
  *   - `hero.move {to}` — redeploy the hero to a node the player owns.
- *   - `hero.path.create {to}` — open a TEMPORARY PUBLIC LANE from the hero's node to
- *     a nearby node: a real, routable graph edge (added to `Planet.links`) for a
- *     limited time, that the owner's fleets traverse with a speed bonus. Expiry is a
- *     scheduled `hero.path.expire`; the route cache invalidates via `state.topology`.
  *   - `planet.annihilate {planetId}` — destroy a planet in range: it stays a node
  *     (you can still fly through) but its `kind`/`planetType` flip to an uncapturable
  *     `dead_world`, garrison + buildings are gone, ownership drops. Victory recomputes
@@ -83,10 +81,15 @@ import { canAfford, payCost } from '../util/treasury';
  * through `schedule`; the speed bonus through the `fleet.speed` hook. No kernel change.
  */
 
+// Corridor defaults. NOT a second truth beside the catalogue (that was the legacy
+// `hero.path.create` action, retired by HERO-CORRIDOR-СПЕКА — it read these constants
+// while `hero.ability` read the data, so the same corridor had two sets of numbers).
+// They are what the engine falls back to when the ability's data says nothing, which
+// is the module's usual graceful-degradation posture: content decides, the engine
+// still works without it.
 const PATH_SPEED_BONUS = 0.5; // +50% for the owner's fleets along the lane
 const PATH_DURATION_HOURS = 6;
 const PATH_RANGE = 300; // max Euclidean span the hero can bridge (−50% from 600)
-const PATH_COOLDOWN_HOURS = 12;
 const ANNIHILATE_RANGE = 500;
 const ANNIHILATE_COOLDOWN_HOURS = 48;
 const DEAD_KIND = 'dead_world';
@@ -100,8 +103,11 @@ const HERO_COMBAT_BONUS = 0.05;
 /** Game-hours before a slain projection hero respawns at its home world. */
 const HERO_RESPAWN_HOURS = 24;
 /** Max heroes a player may have DEPLOYED (commanding a live ship) at once —
- *  docs/heroes.md: «игрок может выставить до трёх одновременно». */
-const HERO_ACTIVE_CAP = 3;
+ *  docs/heroes.md: «игрок может выставить до трёх одновременно». Exported because
+ *  a caller that decides WHETHER to raise a hero has to know the ceiling: without
+ *  it the prototype's test bot would either hold a second copy of the number or
+ *  spam `hero.spawn` into `E_HERO_CAP` every tick (AI-BAL-8). */
+export const HERO_ACTIVE_CAP = 3;
 /** Ability TYPES that passively relax the `hero.spawn` target gate (HERO-8): a hero
  *  CARRYING an ability of the type may form its ship aboard one of the player's own
  *  fleets / at an allied world. Markers read by `hero.spawn`, not castable effects
@@ -154,10 +160,10 @@ function gateLiveDeployed(h: HandlerContext, hero: Hero): void {
   if (hero.alive !== true) h.reject('E_HERO_NOT_DEPLOYED');
 }
 
-/** The legacy casters' shared gate tail (`hero.path.create`, `planet.annihilate`):
- *  the same origin/target/range/cooldown sequence `hero.ability` derives from a
- *  `HeroAbilityDef`, hand-rolled ONCE — per-action copies drifted before and
- *  opened a bypass. Origin is the hero's node; every failed gate rejects. */
+/** The legacy caster's gate tail (`planet.annihilate`): the same origin/target/
+ *  range/cooldown sequence `hero.ability` derives from a `HeroAbilityDef`, hand-rolled
+ *  ONCE — per-action copies drifted before and opened a bypass. Origin is the hero's
+ *  node; every failed gate rejects. */
 function gateRangedCast(
   h: HandlerContext,
   hero: Hero,
@@ -194,6 +200,11 @@ export interface HeroEffectArgs {
   hero: Hero;
   abilityId: string;
   ability: HeroAbilityDef;
+  /** The ability's params AS THIS HERO HAS THEM — `ability.params` with every step of
+   *  the ladder this hero unlocked already overlaid (see {@link abilityParams}). Read
+   *  these, not `ability.params`: the raw catalogue entry is the tier-1 ability, so a
+   *  provider reading it would silently ignore the skill tree. */
+  params: Record<string, unknown>;
   owner: PlayerId;
   target?: string;
 }
@@ -350,13 +361,34 @@ function numParam(params: Record<string, unknown>, key: string, fallback: number
   return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
 }
 
+/** The ability's params AS THIS HERO HAS IT (HERO-CORRIDOR-СПЕКА). One ability can
+ *  carry a ladder of steps (`def.tiers`), each earned by a skill-tree node; every
+ *  step the hero has unlocked overrides the base params, in array order. A hero who
+ *  unlocked nothing sees the base params — the pre-ladder behaviour, unchanged.
+ *
+ *  The ladder is read from DATA rather than stored on the instance on purpose: which
+ *  node upgrades what is content, and `Hero.skills` already records what was unlocked
+ *  (`hero.skill.unlock`), so no second copy of that truth enters `GameState`. */
+function abilityParams(def: HeroAbilityDef, hero: Hero): Record<string, unknown> {
+  if (def.tiers.length === 0) return def.params;
+  const skills = hero.skills ?? [];
+  let out = def.params;
+  for (const step of def.tiers) {
+    if (skills.includes(step.skill)) out = { ...out, ...step.params };
+  }
+  return out;
+}
+
 /** Cooldown-ledger key for an ability. Built-in types share the legacy actions' keys
  *  (`path` / `annihilate`) so the generic and legacy routes can never be combined to
  *  double-fire the same effect; a custom type cools down per effect TYPE for the same
  *  reason (two catalog abilities dispatching to one `hero.effect.<x>` share a cooldown).
  *  The `fx:` prefix keeps custom keys clear of the reserved `path`/`annihilate`/`respawn`
- *  ledger slots. */
-function cooldownKey(type: string): string {
+ *  ledger slots. Exported (as `heroCooldownKey`) for the same reason as
+ *  {@link HERO_ACTIVE_CAP}: a caller deciding WHETHER to cast has to read the ledger the
+ *  gate reads, and a second copy of this mapping would drift into silent `E_COOLDOWN`
+ *  spam (AI-BAL-8). */
+export function cooldownKey(type: string): string {
   if (type === 'temp_lane') return 'path';
   if (type === 'annihilate') return 'annihilate';
   return `fx:${type}`;
@@ -490,24 +522,6 @@ export const heroModule: GameModule = {
       h.emit('hero.moved', { owner: action.playerId, to });
     });
 
-    api.onAction('hero.path.create', (action, h) => {
-      const { to } = action.payload as { to?: string };
-      if (typeof to !== 'string') return h.reject('E_BAD_PAYLOAD');
-      const hero = heroOf(h.state, action.playerId);
-      if (!hero) return h.reject('E_NO_HERO');
-      gateLiveDeployed(h, hero);
-      // The hero acts from its ship's node when deployed.
-      if (to === heroNode(h.state, hero)) return h.reject('E_SAME_LOCATION');
-      gateRangedCast(h, hero, to, PATH_RANGE, 'path');
-
-      castTempLane(h, action.playerId, hero, to, {
-        durationHours: PATH_DURATION_HOURS,
-        speedBonus: PATH_SPEED_BONUS,
-      });
-      hero.cooldowns = hero.cooldowns ?? {};
-      hero.cooldowns.path = after(h, PATH_COOLDOWN_HOURS);
-    });
-
     // HERO-CORRIDOR. Одноразовый коридор (ступень 1) закрывается, когда армия с героем
     // ПРИБЫЛА — не когда вышла: иначе она летела бы по уже закрытому коридору, а
     // «кто вошёл — доезжает» и есть принятое правило. Прибытие — единственный сигнал
@@ -581,10 +595,11 @@ export const heroModule: GameModule = {
 
       if (def.type === 'temp_lane') {
         if (typeof target !== 'string') return h.reject('E_BAD_PAYLOAD');
+        const params = abilityParams(def, hero); // ступень героя, а не голый каталог
         castTempLane(h, action.playerId, hero, target, {
-          durationHours: numParam(def.params, 'durationHours', PATH_DURATION_HOURS),
-          speedBonus: numParam(def.params, 'speedBonus', PATH_SPEED_BONUS),
-          tier: numParam(def.params, 'tier', 1),
+          durationHours: numParam(params, 'durationHours', PATH_DURATION_HOURS),
+          speedBonus: numParam(params, 'speedBonus', PATH_SPEED_BONUS),
+          tier: numParam(params, 'tier', 1),
         });
       } else if (def.type === 'annihilate') {
         if (typeof target !== 'string') return h.reject('E_BAD_PAYLOAD');
@@ -592,7 +607,21 @@ export const heroModule: GameModule = {
       } else {
         const impl = h.capability<HeroEffect>(`hero.effect.${def.type}`);
         if (!impl) return h.reject('E_NO_EFFECT'); // typed in data, absent in the engine
-        impl({ heroId, hero, abilityId, ability: def, owner: action.playerId, target }, h);
+        // The ladder is resolved HERE, once, for every effect type — the built-in
+        // `temp_lane` above does the same. A provider must not have to know that
+        // `def.tiers` exists to honour it.
+        impl(
+          {
+            heroId,
+            hero,
+            abilityId,
+            ability: def,
+            params: abilityParams(def, hero),
+            owner: action.playerId,
+            target,
+          },
+          h,
+        );
       }
 
       if (def.cooldownHours > 0) {
@@ -618,11 +647,22 @@ export const heroModule: GameModule = {
       const owner = h.state.fleets[fleetId]?.owner;
       if (owner === undefined) return speed;
       let out = speed;
+      // Кому достаётся ускорение коридора (заказ владельца):
+      //  · владельцу — всегда, на любой ступени;
+      //  · СОЮЗНИКУ — только на ОБЩЕЙ ступени (`laneIsPublic`, ступень 3). Ниже неё
+      //    коридора для чужих не существует вовсе: пройти по нему союзник не может,
+      //    так что и ускорять было бы нечего — а на коридоре поверх УЖЕ существующей
+      //    дороги подарок соседу менял бы чужое движение, чего личный коридор делать
+      //    не должен;
+      //  · противнику — никогда: общий коридор даёт ему дорогу, но не скорость.
+      // Союзность спрашивается через `isAllied` (capability `diplomacy`, без модуля —
+      // честное чтение D1), а не переписывается здесь второй копией правила (MAPSHARE-1).
+      // Порядок условий: сперва дешёвая геометрия и срок, потом дипломатия.
       const lane = h.state.tempLanes?.find(
         (l) =>
-          l.owner === owner &&
           l.expiresAt > h.ctx.now &&
-          ((l.from === from && l.to === to) || (l.from === to && l.to === from)),
+          ((l.from === from && l.to === to) || (l.from === to && l.to === from)) &&
+          (l.owner === owner || (laneIsPublic(l) && isAllied(h, l.owner, owner))),
       );
       if (lane) out *= 1 + lane.speedBonus;
       const passives = passiveBonus(h, 'fleet.speed', owner, { fleetId, node: from });

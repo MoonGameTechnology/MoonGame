@@ -1,7 +1,8 @@
 /**
- * The prototype's sector-type registry and the generated match map — a square,
- * mirror-symmetric 11×11 lattice of provinces wired by a relative-neighbourhood
- * graph. Extracted from `game.ts` (REFP-2): the block depended only on `data`
+ * The prototype's sector-type registry and the generated match map — a rotationally
+ * symmetric «wheel» of ten 36° sectors around a shared hub, wired by an index
+ * template so every start position maps onto every other one (BAL-1; the long
+ * rationale sits above `HUB`). Extracted from `game.ts` (REFP-2): the block depended only on `data`
  * (for `SECTOR_TYPES` derivation) and the core `sectorKind` helpers, none of the
  * rest of `game.ts`. `game.ts` re-exports the public surface (`SECTOR_TYPES`,
  * `MapNode`, `SectorType`, `START_CANDIDATES`, `MAP`) for back-compat.
@@ -106,161 +107,271 @@ export interface MapNode {
 
 type KeyNode = Omit<MapNode, 'links'>;
 
-// A SQUARE, ORGANIC contested field: a jittered 11×11 lattice (equal cell spacing, no rigid
-// grid look) wired to neighbours by a relative-neighbourhood graph. EXACTLY 30 are 'planet'
-// kind — 10 START candidates around the perimeter (where players & AI spawn) + 20 neutral
-// worlds — and the other 91 are non-planet provinces, so the board totals ~2410 base points
-// (30×50 + 91×10); a solo win needs 1100 (SCORE_LIMIT). All planets start NEUTRAL; newGame()
-// seeds owners + homes at the chosen starts. The jitter is deterministic (seeded sine hash)
-// → reproducible. Square aspect so it reads well in portrait (fills width, pans vertically).
+// «КОЛЕСО» — десять секторов вокруг ступицы, ни один старт не даёт форы (BAL-1 → BAL-9).
 //
-// FAIRNESS (self-play M4 finding): the field is mirror-symmetric in BOTH axes — jitter,
-// terrain kinds and planet types are computed for the canonical quadrant cell and
-// mirrored out. The ten starts form three mirrored orbits (4 + 2 + 4), keeping opposite
-// seats equivalent while fitting ten evenly-spaced homes on a square perimeter. The first
-// asymmetric layout gave one corner ~6× the nearby province value (70 vs 410 points
-// within 3 hops) and that start won 100% of seeded bot matches regardless of slot
-// or faction. Competitive skirmish maps are symmetric for exactly this reason; the
-// per-quadrant jitter keeps the organic look.
-const FIELD = { cols: 11, rows: 11, x0: 150, dx: 145, y0: 150, dy: 145, jitter: 0.4 };
-const NON_PLANET_KINDS = [
-  'asteroid',
-  'nebula',
-  'graveyard',
-  'ion_storm',
-  'dense_nebula',
-  'solar_flare',
+// Откуда конструкция. Поле было квадратной сеткой 11×11, зеркальной по обеим осям, а старты
+// стояли по периметру. Зеркало уравнивает ПРОТИВОПОЛОЖНЫЕ клетки, но не клетки РАЗНОГО РОДА:
+// на квадрате позиция у середины стороны и позиция у угла структурно различны, сколько их ни
+// отражай. Замер это и показал: у `C5R1` в радиусе 500 лежало десять призовых миров, у `C2R1`
+// — шесть, и первый выигрывал 77–80% матчей, давая +62…83% очков (BAL-1). Колесо это вылечило:
+// десять секторов по 36° вокруг общей ступицы, и старт переводится в старт поворотом.
+//
+// Почему конструкция изменилась ВТОРОЙ раз (BAL-9, заказ владельца). Равнозначность-по-повороту
+// покупалась ценой того, что все секторы БУКВАЛЬНО одинаковы: одна и та же решётка «четыре
+// кольца по три», у каждого узла 3–4 связи, ни одного тупика, все расстояния равны. Карта
+// стала честной и — плоской. Теперь бюджет и рисунок разведены:
+//
+//   • БЮДЖЕТ у секторов общий. Один и тот же граф-шаблон (те же 14 рёбер по индексам, те же
+//     роли узлов) ⟹ все графовые инварианты старта совпадают ТОЧНО: миры в 1/2/3 прыжках,
+//     очки вокруг, число выходов, дистанция до ближайшего соперника. Плюс одинаковая СУММА
+//     длин путей от старта до всех своих провинций (см. калибровку ниже) и одинаковая сумма
+//     производственных бонусов пары нейтральных миров.
+//   • РИСУНОК у каждого свой. Радиусы и углы узлов джиттерятся детерминированным хешем от
+//     номера сектора, поэтому у одного ближний приз в 64 px от старта, у другого — в 155;
+//     террейны разложены по узлам циклическим сдвигом (мультимножество то же). Третьей осью
+//     различия пробовали типы планет — не выдержала замера, см. `NEUTRAL_PLANET_TYPES`.
+//
+// Калибровка — гомотетия. Джиттер меняет суммарную длину путей внутри сектора, а это и есть
+// «сколько времени стоит владеть своим двором». Поэтому радиусы сектора умножаются на `m`,
+// подобранный так, чтобы сумма сошлась с эталонной. Узлы заданы полярно от ступицы, значит
+// умножение радиусов — гомотетия относительно неё: ВСЕ внутрисекторные длины растут ровно в
+// `m` раз, и `m = эталон / сумма(k)` считается одной формулой, без поиска. Бюджет сходится
+// точно, а рисунок остаётся кривым.
+//
+// Хаос связности задан самим шаблоном, а не случайностью: у каждого сектора два ТУПИКА (узел
+// с единственным входом) — внешний выступ и глубокая планета `P2`, два коридора со степенью 2,
+// и один перекрёсток со степенью 5. Соседние по геометрии узлы связаны не всегда: маршрутная
+// сеть — это граф, а не «всё со всем поблизости». Стык соседних секторов — ДВА прохода
+// (внешний и глубинный), а не четыре, как было в решётке.
+//
+// Что осталось от старого колеса: 121 узел, 30 миров вида `planet` (10 стартов + 20
+// нейтральных, по два на сектор), ~2410 базовых очков при `SCORE_LIMIT` 1100, порядок
+// `START_CANDIDATES` по кругу (поэтому «+5 из десяти» — буквально напротив) и профиль старта
+// по прыжкам (приз в одном прыжке, второй мир в трёх, ближайший соперник в трёх).
+//
+// ЦЕНА, заплаченная осознанно: нейтральные миры несут ДВА типа планет из девяти (BAL-8 остаётся
+// открытым). Тип задаёт не только производство от −0.25 до +0.45, но и оборону, и СОСТАВ добычи,
+// а ресурсы не равноценны — поэтому «равная сумма бонусов» равноценности не даёт, что и показал
+// замер чередующихся пар.
+const HUB = { x: 800, y: 800 };
+const SECTORS = 10;
+const SECTOR_ARC = (Math.PI * 2) / SECTORS;
+/** Ступица — мёртвый мир в центре: равноудалён от всех десяти стартов, поэтому не даёт
+ *  никому форы, и это единственное место, где строится `metal_station`. */
+const HUB_ID = 'C0R0';
+
+/** Роль узла в шаблоне сектора. Позиция в массиве = индекс узла, он же номер в `C{k}R{i+1}`. */
+type Role = 'start' | 'planet' | 'terrain';
+/** Шаблон сектора: 12 узлов. Радиус — от ступицы, угол — от оси сектора (радианы).
+ *  Раскладка НЕ решётка: узлы стоят слоями с разным вылетом, `7` торчит наружу тупиком,
+ *  `2` (вторая планета) сидит тупиком в глубине. */
+const SLOTS: Array<{ r: number; a: number; role: Role }> = [
+  { r: 640, a: 0.0, role: 'start' }, //  0 — стартовый мир, по оси сектора
+  { r: 560, a: 0.13, role: 'planet' }, //  1 — приз у порога (один прыжок)
+  { r: 200, a: -0.02, role: 'planet' }, //  2 — глубокий приз, ТУПИК
+  { r: 600, a: -0.21, role: 'terrain' }, //  3 — левый край, стык с соседом
+  { r: 615, a: 0.21, role: 'terrain' }, //  4 — правый край, стык с соседом
+  { r: 405, a: -0.19, role: 'terrain' }, //  5 — коридор (степень 2)
+  { r: 470, a: 0.21, role: 'terrain' }, //  6
+  { r: 700, a: 0.09, role: 'terrain' }, //  7 — выступ наружу, ТУПИК
+  { r: 450, a: -0.06, role: 'terrain' }, //  8
+  { r: 330, a: 0.1, role: 'terrain' }, //  9
+  { r: 240, a: 0.2, role: 'terrain' }, // 10 — глубинный стык + ступица
+  { r: 300, a: -0.2, role: 'terrain' }, // 11 — перекрёсток (степень 5)
 ];
-const NEUTRAL_PLANET_TYPES = [
-  'oceanic',
-  'volcanic',
-  'fortress_world',
-  'relic_world',
-  'gas_giant',
-  'irradiated',
-  'ringworld',
-  'crystalline',
+/** Маршрутная сеть внутри сектора — 14 рёбер по ИНДЕКСАМ, поэтому одна и та же у всех
+ *  десяти секторов независимо от того, как разъехалась их геометрия. */
+const SECTOR_EDGES: Array<[number, number]> = [
+  [0, 1],
+  [0, 3],
+  [0, 4],
+  [4, 7],
+  [4, 6],
+  [1, 6],
+  [3, 11],
+  [5, 8],
+  [6, 8],
+  [5, 11],
+  [11, 9],
+  [8, 9],
+  [9, 10],
+  [11, 2],
 ];
-// 10 start candidates around the inset perimeter: three along the top/bottom and two
-// along each side. Ordering follows the perimeter clockwise so automatic seat placement
-// spreads through the board predictably.
-const START_CELLS = ['2,1', '5,1', '8,1', '9,3', '9,7', '8,9', '5,9', '2,9', '1,7', '1,3'];
-// 20 neutral 'planet' worlds in five four-cell axis-symmetric orbits. Combined with the
-// ten starts this preserves the old density: three planet provinces per maximum seat.
-const NEUTRAL_PLANET_CELLS = [
-  '3,3',
-  '7,3',
-  '3,7',
-  '7,7',
-  '2,0',
-  '8,0',
-  '2,10',
-  '8,10',
-  '4,2',
-  '6,2',
-  '4,8',
-  '6,8',
-  '2,4',
-  '8,4',
-  '2,6',
-  '8,6',
-  '4,4',
-  '6,4',
-  '4,6',
-  '6,6',
+/** Террейны девяти непланетных узлов — мультимножество одно на все секторы (иначе разъедутся
+ *  бонусы скорости/HP), а раскладка по узлам частично своя. Порядок соответствует обходу
+ *  непланетных слотов: 3, 4, 5, 6, 7, 8, 9, 10, 11. */
+const SECTOR_TERRAIN = [
+  'asteroid', // слот 3 — внешний стык, ЗАКРЕПЛЁН
+  'nebula', // слот 4 — внешний стык, ЗАКРЕПЛЁН
+  'graveyard', // слот 5 ┐
+  'ion_storm', // слот 6 │
+  'dense_nebula', // слот 7 ├ рядовые: перемешиваются сдвигом на номер сектора
+  'solar_flare', // слот 8 │
+  'asteroid', // слот 9 ┘
+  'nebula', // слот 10 — глубинный стык + ступица, ЗАКРЕПЛЁН
+  'graveyard', // слот 11 — перекрёсток степени 5, ЗАКРЕПЛЁН
+];
+/** Позиции в `SECTOR_TERRAIN`, которые крутятся от сектора к сектору. Остальные четыре стоят
+ *  на структурно ВЛИЯТЕЛЬНЫХ узлах — двух внешних стыках, глубинном стыке и перекрёстке, —
+ *  и закреплены замером: пока крутились все девять, бонусы скорости и обороны на этих узлах
+ *  разъезжались, и секторы расходились по очкам на ±5% (устойчиво в обеих семьях сидов,
+ *  корреляция 0.83). Мультимножество от перестановки не меняется, поэтому «набор одинаков,
+ *  раскладка разная» продолжает выполняться — просто разница ушла с несущих узлов. */
+const ROTATING_TERRAIN = [2, 3, 4, 5, 6];
+/** Пары типов для двух нейтральных миров сектора — чередуются через сектор (BAL-8).
+ *
+ *  Порядок в паре ЗНАЧИМ: `[0]` едет в слот 1 (ближний приз, один прыжок от старта), `[1]` — в
+ *  слот 2 (глубокий тупик в трёх прыжках). Критерий равноценности выведен тремя замерами по
+ *  600 матчей (две семьи сидов), и каждый предыдущий критерий оказывался НЕДОСТАТОЧНЫМ:
+ *
+ *   | чем равняли пары                                  | победы A:B | значимость |
+ *   |---------------------------------------------------|------------|------------|
+ *   | сумма `productionBonus` + сырой металл (BAL-9)     |   340:258  |    3.4σ    |
+ *   | сумма эффективного металла + оборона               |   331:266  |    2.7σ    |
+ *   | то же ПОСЛОТОВО (ближний ↔ ближний)                |   316:279  |    1.5σ    |
+ *   | ВСЕ решающие поля послотово                        |   309:287  |    0.9σ    |
+ *
+ *  Почему так вышло: `productionBonus` умножает не только пассивную добычу типа, но и ВСЁ,
+ *  что на мире построено (`planetTypeModule` скейлит весь bag). Поэтому мир с +0.45 растёт
+ *  быстрее мира с +0.20 даже при равной эффективной добыче на старте — разницу доедает
+ *  застройка. Уравнять это, не уравняв сам множитель, нельзя.
+ *
+ *  Действующее правило: типы в одном СЛОТЕ совпадают по трём решающим полям — `metal`,
+ *  `productionBonus`, `defenseBonus, — и различаются только кредитами, энергией и едой. Эти
+ *  ресурсы пока ничего не ограничивают (BAL-3: кредитов 64k к 11-му дню при нулевых
+ *  arrears), поэтому различие в них баланс не двигает — но и содержательным его не назвать.
+ *  Отсюда честная формулировка того, что тут достигнуто: РАЗНООБРАЗИЕ ТИПОВ СЕЙЧАС
+ *  КОСМЕТИЧЕСКОЕ, и оно станет настоящим ровно тогда, когда BAL-3 даст вторичным ресурсам
+ *  цену. Тогда же придётся перемерить: различия начнут влиять, и критерий расширится. */
+const PLANET_PAIRS: Array<[string, string]> = [
+  ['crystalline', 'fortress_world'], // рудная жила + крепость
+  ['irradiated', 'relic_world'], // облучённый рудник + реликтовая крепость
 ];
 
-const cellId = (cell: string): string => {
-  const [c, r] = cell.split(',');
-  return `C${c}R${r}`;
-};
-/** Deterministic 0..1 hash for the organic jitter (no Math.random → reproducible map). */
-function jhash(n: number): number {
-  const x = Math.sin(n * 127.1 + 311.7) * 43758.5453;
-  return x - Math.floor(x);
+/** Детерминированный шум в [0,1) от (сектор, узел, соль) — целочисленный хеш, без RNG и без
+ *  состояния: карта обязана быть одинаковой у клиента, прото-хоста и харнесов. */
+function noise(k: number, i: number, salt: number): number {
+  let h = Math.imul(k + 1, 73856093) ^ Math.imul(i + 1, 19349663) ^ Math.imul(salt, 83492791);
+  h = Math.imul(h, 2654435761);
+  h ^= h >>> 13;
+  h = Math.imul(h, 1274126177);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
 }
+/** Смещения слотов для сектора `k`, ЦЕНТРИРОВАННЫЕ (среднее ровно 0), чтобы джиттер кривил
+ *  рисунок, но не раздувал и не сжимал сектор целиком — этим занимается только калибровка. */
+function offsets(k: number, salt: number, amp: number): number[] {
+  const raw = SLOTS.map((_, i) => amp * (noise(k, i, salt) * 2 - 1));
+  const mean = raw.reduce((sum, v) => sum + v, 0) / raw.length;
+  return raw.map((v) => v - mean);
+}
+const JITTER_R = 0.09; // ±9% радиуса
+const JITTER_A = 0.03; // ±0.03 рад — узлы остаются внутри своего клина в 36°
 
-function buildField(): KeyNode[] {
-  const starts = new Set(START_CELLS);
-  const neutralP = new Set(NEUTRAL_PLANET_CELLS);
-  const maxCol = FIELD.cols - 1;
-  const maxRow = FIELD.rows - 1;
-  const midCol = maxCol / 2;
-  const midRow = maxRow / 2;
-  // Canonical quadrant cell: fold (col,row) around the two centre axes. Jitter, terrain and
-  // planet type are decided ONCE per canonical cell and mirrored to its orbit, which
-  // is what makes opposite regions exactly equivalent (see the FIELD comment).
-  const canon = (c: number, r: number): string =>
-    `${Math.min(c, maxCol - c)},${Math.min(r, maxRow - r)}`;
-  const jx = new Map<string, number>();
-  const jy = new Map<string, number>();
-  const kindOf = new Map<string, string>();
-  const typeOf = new Map<string, string>();
-  let ptIdx = 0; // cycles neutral planet types (per orbit)
-  let npIdx = 0; // cycles non-planet terrains (per orbit)
-  let i = 0; // jitter index (per canonical cell)
-  for (let row = 0; row <= midRow; row += 1) {
-    for (let col = 0; col <= midCol; col += 1) {
-      const key = `${col},${row}`;
-      jx.set(key, (jhash(i * 2) - 0.5) * 2 * FIELD.jitter * FIELD.dx);
-      jy.set(key, (jhash(i * 2 + 1) - 0.5) * 2 * FIELD.jitter * FIELD.dy);
-      i += 1;
-      if (starts.has(key)) continue; // start orbit — always the terran home
-      if (neutralP.has(key)) {
-        typeOf.set(key, NEUTRAL_PLANET_TYPES[ptIdx++ % NEUTRAL_PLANET_TYPES.length]!);
-      } else {
-        kindOf.set(key, NON_PLANET_KINDS[npIdx++ % NON_PLANET_KINDS.length]!);
-      }
+/** Полярные координаты узлов сектора `k` при масштабе `m`. */
+function sectorPolar(k: number, m: number): Array<{ x: number; y: number }> {
+  const axis = k * SECTOR_ARC - Math.PI / 2; // сектор 0 смотрит вверх
+  const dr = offsets(k, 1, JITTER_R);
+  const da = offsets(k, 2, JITTER_A);
+  return SLOTS.map((slot, i) => {
+    const r = slot.r * (1 + dr[i]!) * m;
+    const angle = axis + slot.a + da[i]!;
+    return { x: HUB.x + Math.cos(angle) * r, y: HUB.y + Math.sin(angle) * r };
+  });
+}
+/** Сумма длин кратчайших путей от старта до всех прочих узлов сектора — «во что обходится
+ *  собственный двор». Это и есть выравниваемый бюджет; считается по рёбрам шаблона. */
+function travelBudget(points: Array<{ x: number; y: number }>): number {
+  const len = (a: number, b: number): number =>
+    Math.hypot(points[a]!.x - points[b]!.x, points[a]!.y - points[b]!.y);
+  const dist = SLOTS.map(() => Infinity);
+  const done = SLOTS.map(() => false);
+  dist[0] = 0;
+  for (;;) {
+    let at = -1;
+    for (let i = 0; i < SLOTS.length; i += 1)
+      if (!done[i] && dist[i]! < (dist[at] ?? Infinity)) at = i;
+    if (at < 0) break;
+    done[at] = true;
+    for (const [a, b] of SECTOR_EDGES) {
+      if (a !== at && b !== at) continue;
+      const to = a === at ? b : a;
+      const via = dist[at]! + len(at, to);
+      if (via < dist[to]!) dist[to] = via;
     }
   }
-  const nodes: KeyNode[] = [];
-  for (let row = 0; row < FIELD.rows; row += 1) {
-    for (let col = 0; col < FIELD.cols; col += 1) {
-      const cell = `${col},${row}`;
-      const key = canon(col, row);
-      // Mirror the canonical jitter: flip its sign across each centre axis; a cell ON
-      // a centre axis is its own mirror there, so that component stays unjittered.
-      const sx = col < midCol ? 1 : col > midCol ? -1 : 0;
-      const sy = row < midRow ? 1 : row > midRow ? -1 : 0;
-      const x = Math.round(FIELD.x0 + col * FIELD.dx + sx * jx.get(key)!);
-      const y = Math.round(FIELD.y0 + row * FIELD.dy + sy * jy.get(key)!);
-      const id = cellId(cell);
-      if (starts.has(cell)) {
-        nodes.push({ id, owner: null, x, y, sector: 'planet', type: 'terran' });
-      } else if (neutralP.has(cell)) {
-        nodes.push({ id, owner: null, x, y, sector: 'planet', type: typeOf.get(key)! });
-      } else {
-        nodes.push({ id, owner: null, x, y, sector: kindOf.get(key)! });
-      }
-    }
+  return dist.slice(1).reduce((sum, v) => sum + v, 0);
+}
+/** Эталон бюджета — сектор без джиттера. К нему гомотетией подтягиваются все десять. */
+const BASE_BUDGET = travelBudget(
+  SLOTS.map((slot) => ({
+    x: HUB.x + Math.cos(-Math.PI / 2 + slot.a) * slot.r,
+    y: HUB.y + Math.sin(-Math.PI / 2 + slot.a) * slot.r,
+  })),
+);
+
+/** Террейн `idx`-го по счёту непланетного узла сектора `k`: закреплённые позиции стоят на
+ *  месте, рядовые едут по кругу внутри своей пятёрки. */
+function terrainAt(idx: number, k: number): string {
+  const rotating = ROTATING_TERRAIN.indexOf(idx);
+  if (rotating < 0) return SECTOR_TERRAIN[idx]!;
+  return SECTOR_TERRAIN[ROTATING_TERRAIN[(rotating + k) % ROTATING_TERRAIN.length]!]!;
+}
+
+/** id узла: сектор k, позиция i в шаблоне. Формат тот же `C{n}R{m}`, что и у прежней
+ *  сетки, — его читают имена миров (`planetName.ts`) и множество фикстур. */
+const nodeId = (k: number, i: number): string => `C${k}R${i + 1}`;
+
+function buildField(): KeyNode[] {
+  const nodes: KeyNode[] = [
+    // Ступица: мёртвый мир, общий для всех секторов.
+    { id: HUB_ID, owner: null, x: HUB.x, y: HUB.y, sector: 'dead_world' },
+  ];
+  for (let k = 0; k < SECTORS; k += 1) {
+    const points = sectorPolar(k, BASE_BUDGET / travelBudget(sectorPolar(k, 1)));
+    const pair = PLANET_PAIRS[k % PLANET_PAIRS.length]!;
+    let terrainIdx = 0;
+    let planetIdx = 0;
+    SLOTS.forEach((slot, i) => {
+      const node: KeyNode = {
+        id: nodeId(k, i),
+        owner: null,
+        x: Math.round(points[i]!.x),
+        y: Math.round(points[i]!.y),
+        sector: slot.role === 'terrain' ? terrainAt(terrainIdx++, k) : 'planet',
+      };
+      if (slot.role === 'start') node.type = 'terran';
+      if (slot.role === 'planet') node.type = pair[planetIdx++]!;
+      nodes.push(node);
+    });
   }
   return nodes;
 }
 
 const KEY: KeyNode[] = buildField();
-/** The 10 worlds players spawn on — the start picker offers these. */
-export const START_CANDIDATES: string[] = START_CELLS.map(cellId);
+/** Десять миров, на которых появляются игроки, по кругу — сектор за сектором. */
+export const START_CANDIDATES: string[] = Array.from({ length: SECTORS }, (_, k) => nodeId(k, 0));
 
-// Wire sectors up as a Relative Neighbourhood Graph: a sector links to another
-// ONLY if no third sector lies "between" them (closer to both than they are to
-// each other). That gives each sector paths to its immediate neighbours only —
-// no long criss-crossing lanes — while the map stays one fully-connected graph
-// (an RNG always contains the Euclidean minimum spanning tree). Links are
-// symmetric. O(n³), trivial for a few dozen sectors.
+/**
+ * Маршрутная сеть — ШАБЛОН в индексах, одинаковый для каждого сектора и потому не зависящий
+ * от того, как разъехалась его геометрия. Три вида рёбер:
+ *   • внутрисекторные — `SECTOR_EDGES`;
+ *   • межсекторные — ДВА прохода на стык: внешний (правый край k ↔ левый край k+1) и
+ *     глубинный (узел 10 ↔ узел 11 соседа);
+ *   • ступица — связана с глубинным узлом 10 каждого сектора.
+ */
 function withNeighborLinks(nodes: KeyNode[]): MapNode[] {
-  const dist = (a: KeyNode, b: KeyNode): number => Math.hypot(a.x - b.x, a.y - b.y);
   const adj = new Map<string, Set<string>>(nodes.map((n) => [n.id, new Set<string>()]));
-  for (let i = 0; i < nodes.length; i++) {
-    for (let j = i + 1; j < nodes.length; j++) {
-      const a = nodes[i]!;
-      const b = nodes[j]!;
-      const dab = dist(a, b);
-      const between = nodes.some((c) => c !== a && c !== b && dist(a, c) < dab && dist(b, c) < dab);
-      if (!between) {
-        adj.get(a.id)!.add(b.id);
-        adj.get(b.id)!.add(a.id);
-      }
-    }
+  const link = (a: string, b: string): void => {
+    adj.get(a)!.add(b);
+    adj.get(b)!.add(a);
+  };
+  for (let k = 0; k < SECTORS; k += 1) {
+    const next = (k + 1) % SECTORS;
+    for (const [a, b] of SECTOR_EDGES) link(nodeId(k, a), nodeId(k, b));
+    link(nodeId(k, 4), nodeId(next, 3)); // внешний проход к соседу
+    link(nodeId(k, 10), nodeId(next, 11)); // глубинный проход к соседу
+    link(HUB_ID, nodeId(k, 10)); // ступица
   }
   return nodes.map((n) => ({ ...n, links: [...adj.get(n.id)!] }));
 }

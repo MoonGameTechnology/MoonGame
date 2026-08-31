@@ -28,6 +28,14 @@ export const ru: Record<string, string> = {
   'browser.archive-failed': 'не удалось в архив',
   'browser.day': 'День {n}',
   'browser.empty': 'здесь пусто',
+  'browser.filter.all': 'Все',
+  'browser.filter.map': 'Карта',
+  'browser.filter.map.all': 'Все карты',
+  'browser.filter.map.some': 'Карт: {n}',
+  'browser.filter.mode': 'Режим',
+  'browser.filter.none': 'ничего не найдено — ослабьте фильтр',
+  'browser.filter.players': 'Игроков',
+  'browser.filter.range': '{min}–{max}',
   'browser.finished': 'завершён',
   'browser.free': 'свободно',
   'browser.goal.map': '{p}% карты',
@@ -38,13 +46,14 @@ export const ru: Record<string, string> = {
   'browser.left.hours': '{h}ч',
   'browser.left.soon': '<1ч',
   'browser.loading': 'загрузка матчей…',
+  'browser.mode.pve': 'PVE',
+  'browser.mode.pvp': 'PVP',
   'browser.players': '{s}/{c} игроков',
   'browser.refresh-hint': 'нажмите «Обновить список»',
   'browser.restore': 'Восстановить',
   'browser.restore-failed': 'не удалось восстановить',
   'browser.running': 'идёт',
   'browser.server-down': 'сервер недоступен — укажите адрес сервера',
-  'browser.slots': 'слотов',
   'browser.solo': 'Одиночный режим',
   'browser.solo.hint': 'Сервер не нужен — свободные места займут боты.',
   'browser.taken': 'занято',
@@ -369,7 +378,8 @@ export const ru: Record<string, string> = {
   'corp.battle.loss': 'ПОРАЖЕНИЕ',
   'corp.battle.win': 'ПОБЕДА',
   'corp.battles.none': 'Битв ещё не было.',
-  'corp.battles.note': 'Здесь бои из публичной ленты AvA — сервер хранит окно последних, а не весь архив корпорации.',
+  'corp.battles.note':
+    'Здесь бои из публичной ленты AvA — сервер хранит окно последних, а не весь архив корпорации.',
   'corp.battles.title': 'Последние битвы',
   'corp.browse.empty': 'Пока нет других корпораций.',
   'corp.browse.title': 'Найти и подать заявку',
@@ -420,12 +430,14 @@ export const ru: Record<string, string> = {
   'corp.role.officer': 'Офицер',
   'corp.role.recruit': 'Заявка',
   'corp.settings.identity': 'Идентичность',
-  'corp.settings.identity.hint': 'Название задаётся при создании; тег, девиз, набор и взнос сервер пока не хранит.',
+  'corp.settings.identity.hint':
+    'Название задаётся при создании; тег, девиз, набор и взнос сервер пока не хранит.',
   'corp.settings.name': 'Название',
   'corp.settings.soon': 'Скоро',
   'corp.showcase': 'Витрина наград',
   'corp.showcase.empty': 'пусто',
-  'corp.showcase.hint': 'Нажми на кубок — откроется общая витрина всех наград. Выбор витрины хранится на этом устройстве.',
+  'corp.showcase.hint':
+    'Нажми на кубок — откроется общая витрина всех наград. Выбор витрины хранится на этом устройстве.',
   'corp.tab.battles': 'Битвы',
   'corp.tab.hq': 'Штаб',
   'corp.tab.members': 'Участники',
@@ -499,6 +511,7 @@ export const ru: Record<string, string> = {
   'data.dropship': 'носитель',
   'data.empty-space': 'Пустое пространство',
   'data.energy': 'энергия',
+  'data.evasive-vectors': 'Манёвренность',
   'data.fighter-squadron': 'истребительная эскадрилья',
   'data.flight-decks': 'Полётные палубы',
   'data.food': 'пища',
@@ -535,6 +548,11 @@ export const ru: Record<string, string> = {
   'data.overseer': 'Куратор',
   'data.planet': 'Планета',
   'data.planetary-bastions': 'Планетарные бастионы',
+  'data.duel': 'Дуэль',
+  'data.team-2v2': 'Двое на двое',
+  'data.team-3v3': 'Трое на трое',
+  'data.team-4v4': 'Четверо на четверо',
+  'data.team-5v5': 'Пятеро на пятеро',
   'data.pve-waves': 'Волны Роя',
   'data.psi-amplifier': 'Пси-усилитель',
   'data.psi-veil': 'Пси-вуаль',
@@ -566,6 +584,8 @@ export const ru: Record<string, string> = {
   'data.squadron': 'эскадрилья',
   'data.standard': 'Стандартный',
   'data.steward-protocol': 'Протокол «Хранитель»',
+  'data.sustained-corridor': 'Устойчивый коридор',
+  'data.shared-corridor': 'Общий коридор',
   'data.strike-carrier': 'ударный носитель',
   'data.strike-vectors': 'Ударные векторы',
   'data.tank': 'танк',
@@ -583,6 +603,7 @@ export const ru: Record<string, string> = {
   'data.volcanic': 'Вулканический',
   'data.warden': 'Страж',
   'data.warhead-miniaturization': 'Миниатюризация боеголовок',
+  'data.weak-points': 'Слабые места',
 
   // --- diplo — Дипломатия: окно, вкладки, фильтр и сортировка ростера, названия отношений.
   'diplo.filter': 'Фильтр',
@@ -1060,7 +1081,7 @@ export const ru: Record<string, string> = {
   'hero.ability.bulwark.desc': 'Временный щит: +оборона своим флотам рядом с героем.',
   'hero.ability.bulwark.name': 'Бастион',
   'hero.ability.corridor.desc':
-    'Пробивает коридор до близкого мира. Одноразовый: пройти по нему может только армия с этим героем, и он закрывается, как только она прибыла. Улучшения продлевают ему жизнь, а затем открывают проход всем — включая противника.',
+    'Пробивает коридор до близкого мира. Одноразовый: пройти по нему может только армия с этим героем, и он закрывается, как только она прибыла. Улучшения продлевают ему жизнь, а затем открывают проход союзникам — но открытый проход общий, и враг войдёт в него тоже.',
   'hero.ability.corridor.name': 'Коридор',
   'hero.ability.diplomatic-landing.desc':
     'Союзные миры принимают героя как своего: корабль может подняться и на планете союзника. Пассивный навык: расширяет точки развёртывания.',
@@ -1070,7 +1091,8 @@ export const ru: Record<string, string> = {
   'hero.ability.rally.name': 'Сбор',
   'hero.ability.recall.desc': 'Мгновенно отзывает корабль-героя в столицу.',
   'hero.ability.recall.name': 'Отзыв',
-  'hero.ability.scan.desc': 'Раскрывает зону вокруг цели сквозь туман на время.',
+  'hero.ability.scan.desc':
+    'Раскрывает зону вокруг цели сквозь туман на время. Улучшения превращают просвеченную зону в боевую: сперва подсвечивают бреши в броне врага, затем ведут по радару свои и союзные флоты.',
   'hero.ability.scan.name': 'Разведка',
   'hero.arch.commander': 'Командир',
   'hero.arch.destroyer': 'Разрушитель',
@@ -1096,13 +1118,25 @@ export const ru: Record<string, string> = {
   'hero.passive.vanguard-impulse.desc':
     'Корабль героя ведёт свой флот на форсаже: +10% к скорости флота героя.',
   'hero.passive.vanguard-impulse.name': 'Импульс авангарда',
+  'hero.tree.corridor-open.desc':
+    'Открывает коридор СОЮЗНИКАМ: их флоты идут вашим проходом, как своим, — с тем же ускорением. Проход при этом становится общим: войти сможет и нейтрал, и противник, но им коридор даёт только дорогу, без ускорения.',
+  'hero.tree.corridor-open.name': 'Общий коридор',
+  'hero.tree.corridor-sustained.desc':
+    'Коридор держится по часам, а не гаснет с первым же проходом армии героя.',
+  'hero.tree.corridor-sustained.name': 'Устойчивый коридор',
   'hero.tree.neural-lace.desc':
     'Имплант прямого канала «мозг—штурвал»: корабль героя разгоняется на +10%.',
   'hero.tree.neural-lace.name': 'Нейрокружево',
   'hero.tree.overclocked-helm.desc': 'Форсаж нейроинтерфейса открывает герою прокладку коридоров.',
   'hero.tree.overclocked-helm.name': 'Разогнанный шлем',
+  'hero.tree.psi-evasion.desc':
+    'Картинка радара идёт и своим: ваши флоты и флоты союзников внутри просвеченной зоны получают на 5% меньше входящего урона.',
+  'hero.tree.psi-evasion.name': 'Манёвренность',
   'hero.tree.psi-veil.desc': 'Отточенное пси-зрение: герой учится вскрывать туман разведкой.',
   'hero.tree.psi-veil.name': 'Пси-вуаль',
+  'hero.tree.psi-weak-points.desc':
+    'Радар не просто светит: он читает бреши в чужой броне. Флоты противника внутри просвеченной зоны получают на 5% больше урона. Свои, союзные и нейтральные флоты не задеты.',
+  'hero.tree.psi-weak-points.name': 'Слабые места',
   'hero.tree.void-attunement.desc':
     'Пси-резонанс героя воодушевляет флоты рядом: +8% к урону в радиусе 300.',
   'hero.tree.void-attunement.name': 'Сонастройка с Пустотой',
@@ -1218,6 +1252,12 @@ export const ru: Record<string, string> = {
   'hub.emblem.close': 'Закрыть',
   'hub.emblem.title': 'ВЫБОР ЭМБЛЕМЫ',
   'hub.messages.soon': 'Сообщения — скоро',
+  'hub.mine.copied': 'Адрес скопирован',
+  'hub.mine.copy': 'Скопировать адрес',
+  'hub.mine.copy-manual': 'Скопируйте адрес из строки вручную',
+  'hub.mine.empty': 'Пока ни одной партии. Начните с «ИГРАТЬ СЕЙЧАС» — или загляните в список игр.',
+  'hub.mine.more': 'Ещё {n} — в списке игр',
+  'hub.mine.section': 'Мои партии',
   'hub.msgs.aria': 'Сообщения',
   'hub.nav.ally': 'Альянсы',
   'hub.nav.arsenal': 'Арсенал',
@@ -1451,7 +1491,8 @@ export const ru: Record<string, string> = {
     'Короткий тур по интерфейсу — на нём держится весь мир. «Пропустить обучение» доступно всегда.',
   'onb.tour.next': 'Далее',
   'onb.tour.skip': 'Пропустить обучение',
-  'onb.tour.speed': '⏩ Обучение идёт в ускоренном времени, чтобы не ждать стройку и путь флота вживую.',
+  'onb.tour.speed':
+    '⏩ Обучение идёт в ускоренном времени, чтобы не ждать стройку и путь флота вживую.',
   'onb.tour.step': 'шаг {k} из {n}',
 
   // --- ping — Композер меток провинции: адресат, описание, отправка.
@@ -1512,7 +1553,10 @@ export const ru: Record<string, string> = {
   'seatpick.go': 'ВЫБРАТЬ',
   'seatpick.load-failed': 'Не удалось загрузить слоты',
   'seatpick.loading': 'Загрузка…',
+  'seatpick.lost': 'Это место успели занять — выберите другое',
+  'seatpick.none-free': 'Свободных мест нет',
   'seatpick.sub': 'Выберите фракцию и стартовую позицию. Занятые места отмечены серым.',
+  'seatpick.taken': 'занято',
   'seatpick.title': 'Выбор фракции',
 
   // --- setup — Экран «Настройка схватки»: домашний мир, боты, скорость времени.
@@ -1783,7 +1827,6 @@ export const ru: Record<string, string> = {
   'side.world.type-bonuses': 'Бонусы типа',
   'side.world.type.long': 'Мир типа «{pt}» — {mods}',
   'side.world.vp': 'Очки победы',
-
 
   // --- speed — Панель времени: подсказки множителей, перезапуска и выхода.
   'speed.exit': 'Выход в меню',

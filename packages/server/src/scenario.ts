@@ -3,6 +3,7 @@ import {
   type Action,
   armyModule,
   arsenalSyncModule,
+  autoRallyModule,
   artilleryModule,
   captureOnArrivalModule,
   combatModule,
@@ -12,12 +13,15 @@ import {
   diplomacyModule,
   capitalModule,
   economyModule,
+  effectsModule,
+  espionageModule,
   factionModule,
   fleetOpsModule,
   fleetRepairModule,
   forcedMarchModule,
   hashGameDataBundle,
   heroModule,
+  heroEffectsModule,
   squadronModule,
   instantRepairModule,
   interceptModule,
@@ -32,6 +36,8 @@ import {
   sectorModule,
   standingOrdersModule,
   stationModule,
+  stewardModule,
+  seatClaimModule,
   taxModule,
   technologyModule,
   victoryModule,
@@ -111,7 +117,12 @@ export const DEV_MODULES: GameModule[] = [
   economyModule,
   movementModule,
   heroModule, // per-player hero: redeploy, temp public lanes, planet annihilation
+  // Сразу за героем, как в прототипе: провайдеры `hero.effect.<type>` (recall/aura/reveal)
+  // + два хука `combat.damage` (аура). Без него dispatcher `hero.ability` отвечает
+  // `E_NO_EFFECT` на всё, что не встроено в heroModule (`temp_lane`/`annihilate`).
+  heroEffectsModule,
   diplomacyModule, // declarations + consent offers + the `diplomacy` capability combat consults
+  espionageModule, // SPY-1/2: espionage.spy → окна краденого intel + контрразведка
   // The combat family, split along the bus seams. Order matters (invariant #6):
   // `orbital` stamps orbit on `fleet.arrived` BEFORE `combat` engages, and runs
   // its AA/bombard span BEFORE `artillery`'s standoff span — the exact sequence
@@ -126,10 +137,12 @@ export const DEV_MODULES: GameModule[] = [
   stationModule, // deploy void stations on empty nodes (then build radar/fort there)
   technologyModule,
   scientistModule, // per-player research leader: +slot via research.slots + has_scientist gates
+  stewardModule, // «Хранитель»: место играет серверный ИИ, пока игрок офлайн (гейт — техно ai_stewardship)
   factionModule, // always-on faction passives (production / speed / combat) via hooks
   marketModule, // session resource bourse: list / buy (15% burn) / cancel
   armyModule,
   fleetOpsModule, // fleet.launch/merge/split: garrison → mobile fleet, the missing link
+  autoRallyModule, // CONV-10: построенный корабль сам уходит на орбиту в RALLY-флот (BF-29)
   squadronModule, // SQ: free-space movement for squadrons (strike/return off the lane graph)
   capitalModule, // capital.designate: re-point the hero respawn anchor
   standingOrdersModule, // order.auto/order.scramble/order.chain: standing-order intent storage
@@ -145,6 +158,11 @@ export const DEV_MODULES: GameModule[] = [
   // path never went away; divisions were a PARALLEL ground system layered beside it,
   // and the seam was documented as such in `gameState.ts`. Removing the layer is the
   // whole change — no mechanic is being rewritten.
+  effectsModule, // EFX-1: интерпретатор `data.events` (trigger→effect); инертен, пока events пуст
+  seatClaimModule, // ENTRY-3: заявка на место (дом + совет учёных) действием, а не мутацией
+  // мимо редьюсера — иначе выбор не попадает в лог и реплей воспроизводит партию иначе.
+  // В КОНЕЦ намеренно: модуль не вешает ни хуков, ни подписок на чужие события, поэтому
+  // относительный порядок всех остальных остаётся нетронутым (инвариант #6).
 ];
 
 /** Bumped whenever `DEV_MODULES`' membership or order changes (invariant #6: module
@@ -152,8 +170,15 @@ export const DEV_MODULES: GameModule[] = [
  *  match's `version.manifest` and checked back on load (`serverWiring.ts`) — a match
  *  created under an older manifest must not silently resume on a different module
  *  graph (same fail-secure posture as `dataHash`, MP-4). Bump this alongside any
- *  `DEV_MODULES` edit. */
-export const MODULE_MANIFEST_VERSION = '5'; // pveModule added (PVE-3 wave assault)
+ *  `DEV_MODULES` edit.
+ *
+ *  Bump it ALSO when a module changes the SHAPE it persists, even though membership
+ *  and order are untouched: the guard exists so a match cannot resume on rules that
+ *  differ from the ones it started with, and a reducer that now reads `owner` where
+ *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
+ *  cheap, honest outcome; silently misreading the book is not. */
+export const MODULE_MANIFEST_VERSION = '9'; // CORE-PARITY: heroEffects/steward/espionage/
+// effects внесены в граф — канонический сервер их не грузил, хотя прототип грузил.
 
 export interface DevMatchOptions {
   /** Match/room id (default `'dev'`). Distinct ids let a registry hold many matches. */

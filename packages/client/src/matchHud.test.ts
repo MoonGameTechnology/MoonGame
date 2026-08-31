@@ -349,8 +349,28 @@ describe('createSelectionModel', () => {
     s.heroes = { h1: hero };
     const res = createSelectionModel(s, 'f1', 'p1', DATA);
     if (!res.ok) throw new Error('expected ok');
-    // No hero.name → falls back to the owner's callsign.
+    // Neither a seat name nor an archetype → the owner's callsign is all there is.
     expect(res.commander).toEqual({ name: 'Носорог-1', grade: 'legendary' });
+  });
+
+  it('names a commander by ARCHETYPE, not by a string baked into the state (AUD-13)', () => {
+    const s = baseState();
+    s.fleets = { f1: fleet({ id: 'f1', owner: 'p1' }) };
+    s.heroes = {
+      // A roster hero: the state carries its archetype, and the renderer builds the
+      // name from it — display text never lives in `GameState` (one state, one
+      // locale per viewer).
+      h1: { id: 'h1', owner: 'p1', location: 'A', cooldowns: {}, archetype: 'warden', fleetId: 'f1' },
+    };
+    const res = createSelectionModel(s, 'f1', 'p1', DATA);
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.commander).toEqual({ archetype: 'warden' });
+    // The seat identity of a MAIN hero (a callsign) still rides through as `name`.
+    s.heroes.h1!.name = 'Носорог-1';
+    s.heroes.h1!.grade = 'main';
+    const main = createSelectionModel(s, 'f1', 'p1', DATA);
+    if (!main.ok) throw new Error('expected ok');
+    expect(main.commander).toEqual({ name: 'Носорог-1', archetype: 'warden', grade: 'main' });
   });
 
   it('ignores a dead hero and a hero commanding another fleet', () => {

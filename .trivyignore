@@ -1,89 +1,110 @@
 # Trivy ignore list — base-OS CVEs in the RUNTIME image base
 # gcr.io/distroless/nodejs22-debian13:nonroot (Debian 13 "trixie"), i.e. what
 # `trivy image` actually scans (the node:26-slim build stage is not shipped).
-# Every entry: NO fixed version available in trixie — there is literally nothing to
-# bump to — and, for all but the one noted below, no runtime path in our Node-only
-# proto server (distroless: no shell, no perl, nothing but node + libs).
-# Each is an accepted, documented risk; re-review whenever the base image digest
-# is bumped (SEC-1 baseline discipline; ties to audit SD-5.1 / F-15).
 #
-# Reviewed 2026-07-10 (SEC-1): previous entries (bookworm perl/ncurses/zlib-minizip
-# from the old node:22-slim single-stage image) no longer apply to the distroless
-# runtime and were removed after the trivy-image scan came back to life (the
-# corepack build break had silently disabled it — caught by the SEC-1 gate).
+# ЧТО СЮДА ПОПАДАЕТ (правило переписано в SEC-28, 2026-08-29 — читай, прежде чем добавлять).
 #
-# Reviewed 2026-08-11 (SEC-22): +2 glibc wordexp entries below. The rest were re-checked
-# against the same base image digest and all still apply.
+# Только находка, у которой ФИКС ОПУБЛИКОВАН, но поставить его мы не можем. И всё.
 #
-# Reviewed 2026-08-17: +1 libssl3t64 QUIC-server entry below. Same base image digest,
-# so the earlier entries were not re-verified individually this time.
+# Раньше файл был свалкой из двух разных вещей, и большая половина держалась на «фикса не
+# существует». Такие записи больше НЕ НУЖНЫ и, что важнее, ВРЕДНЫ:
 #
-# Reviewed 2026-08-20: +1 libssl3t64 EVP_Cipher/AEAD entry below (CVE-2026-75803). Same
-# base image digest again, so the earlier entries were not re-verified individually.
+#   · не нужны — потому что после SEC-27 блокирующий гейт `trivy image` фильтрует по
+#     ЧИНИМОСТИ (`--ignore-unfixed`, второй прогон в джобе `trivy-image` и тот же флаг в
+#     `image.yml`). Находка без опубликованного фикса очередь мержа больше не закрывает,
+#     подавлять её незачем;
+#   · вредны — потому что подавление режет находку из ОТЧЁТА тоже: она исчезает из SARIF,
+#     из Code Scanning и из сводного комментария. То есть ради зелёного цвета мы прятали
+#     от себя же реальный список того, что едет в проде. Теперь эти находки видны и НЕ
+#     блокируют — ровно то, чего мы и хотели.
+#
+# Поэтому 2026-08-29 из файла удалено 19 «нефиксируемых» подавителей: группы libc6 (включая
+# древние disputed LOW, wordexp, strfmon, tdelete, SHIFT_JISX0213 и пару `,ccs=`), zlib1g и
+# две libssl3t64 (QUIC `fix_deferred` и EVP_Cipher/AEAD). Ничего из этого не «прощено»:
+# находки никуда не делись, они теперь ВИДНЫ в Code Scanning, а разбор достижимости каждой
+# сохранён — `docs/security/pipeline.md`, раздел «Нефиксируемые находки» и записи триажа
+# SEC-22/24/25/26. Файл перестал быть их архивом, потому что архив у них есть получше.
+#
+# КАК ДОБАВЛЯТЬ (если фикс есть, а поставить нельзя):
+#   1. Убедись, что у находки НЕПУСТАЯ колонка `Fixed Version` — иначе ей здесь не место,
+#      гейт её и так пропустит.
+#   2. Комментарий с: пакетом и версией, почему путь недостижим (проверенно, а не «наверное»),
+#      что именно мешает поставить фикс, и ДАТОЙ ре-ревью.
+#   3. Такая запись — самая короткоживущая в файле: она умирает вместе с пересборкой базы,
+#      её надо УДАЛИТЬ, а не продлить.
+#
+# Ре-ревью — при каждом бампе дайджеста базы (SEC-1, аудит SD-5.1 / F-15).
+#
+# История ревью (2026-07-10 SEC-1, 2026-08-11 SEC-22, 08-17, 08-20, 08-24 SEC-24,
+# 08-26 SEC-25 с бампом пина на sha256:22d2f048…, 08-28 SEC-26) — в `docs/security/pipeline.md`;
+# здесь она больше не дублируется, чтобы правило не тонуло в журнале.
 
-# libc6 2.41-12+deb13u3 — MEDIUM, no fixed version published for trixie yet.
-CVE-2026-5435
-CVE-2026-5450
-CVE-2026-5928
-CVE-2026-6238
+# libssl3t64 3.5.6-1~deb13u2 — 3×MEDIUM + 5×LOW, and the FIRST group in this file with a
+# published fix: Debian ships 3.5.7-1~deb13u2 (Trivy's "Fixed Version" column, unlike every
+# entry above). It is suppressed anyway because we cannot install it: the runtime is
+# distroless — the base image IS the package set, there is no apt/apk to upgrade inside it,
+# and the rebuilt base pinned in the Dockerfile (sha256:22d2f048…) still carries 3.5.6-1~deb13u2
+# (read from /var/lib/dpkg/status.d in its amd64 manifest, pulled from gcr.io on 2026-08-26).
+# So the fix is real, reachable only by an upstream distroless rebuild, and not by us.
+#
+# Why this closed the merge queue: the finding reached the feed after the last green `main`
+# push run (2026-08-25 21:02 UTC) and, because `trivy image` runs without --severity, all 8
+# rows — 5 of them LOW — turned the blocking job red on every branch at once, including 8
+# dependabot PRs and #803.
+#
+# Not reachable here, protocol by protocol — none of these code paths exists in this image:
+#   · QUIC (CVE-2026-18798 server INITIAL-packet double free, CVE-2026-63075 ACK-only packet
+#     retention → memory exhaustion): the server is HTTP/1.1 + WebSocket over TCP (Fastify
+#     `http.Server`, or `https.Server` under RS-5.1 native TLS — still TLS-over-TCP). Node's
+#     QUIC binding is behind `--experimental-quic`, and the image's CMD passes no such flag.
+#   · CMP — Certificate Management Protocol (CVE-2026-63076 invalid pointer deref via crafted
+#     protectionAlg, CVE-2026-63073 sender DN used as format string, CVE-2026-63074 ExtraCerts
+#     cache growth): Node exposes no CMP API at all, and nothing here speaks it.
+#   · CMS — Cryptographic Message Syntax (CVE-2026-63072 heap overflow in key unwrapping):
+#     likewise unexposed by Node; no PKCS#7/CMS anywhere in the tree.
+#   · DTLS (CVE-2026-54874 memory buffering records for a future epoch): no datagram TLS —
+#     verified by grep, the tree has no DTLS and no UDP transport.
+#   · RPK — RFC 7250 raw public keys (CVE-2026-14457 signature-algorithm selection can
+#     dereference a missing certificate): not enabled; the server presents ordinary X.509.
+# And, as for every entry above, the runtime is distroless: no shell and no `openssl` CLI to
+# reach any of it another way.
+#
+# What could NOT be verified: the advisory texts themselves — security-tracker.debian.org and
+# avd.aquasec.com are blocked by the dev environment's egress proxy, so the reachability
+# argument rests on the protocol each CVE names (from Trivy's own titles) plus this repo's
+# code, not on reading upstream's analysis. The risk is therefore accepted for a SHORT window.
+# Re-review 2026-09-02 — or sooner, the moment the distroless base is rebuilt with
+# 3.5.7-1~deb13u2. When it is, this whole group is REMOVED, not extended: unlike the entries
+# above, it has a fix waiting, and a suppression outliving its fix is exactly the debt this
+# file's discipline exists to prevent.
+CVE-2026-18798
+CVE-2026-63072
+CVE-2026-63076
+CVE-2026-14457
+CVE-2026-54874
+CVE-2026-63073
+CVE-2026-63074
+CVE-2026-63075
 
-# libc6 — ancient LOW, disputed/won't-fix upstream (Debian marks them minor/unimportant),
-# no fixed version; carried by every glibc-based image.
-CVE-2010-4756
-CVE-2018-20796
-CVE-2019-1010022
-CVE-2019-1010023
-CVE-2019-1010024
-CVE-2019-1010025
-CVE-2019-9192
-
-# zlib1g 1:1.3.dfsg+really1.3.1-1+b1 — MEDIUM, no fixed version for trixie.
-CVE-2026-27171
-
-# libc6 2.41-12+deb13u3 — LOW, both in glibc's wordexp(): CVE-2026-6368 (calling wordexp
-# with WRDE_APPEND returns uninitialized memory, a later wordfree may abort the process),
-# CVE-2026-6791 (expanding a path that begins with «~username»). Published to the feed
-# between 2026-08-10 and 2026-08-11 and, because `trivy image` runs without --severity,
-# these two LOW findings alone closed the merge queue for the whole repository.
-# Not reachable here: the runtime is distroless (no shell) and the server is Node —
-# wordexp()/wordfree() is a C API for shell-style word expansion that neither our code
-# nor the Node runtime calls. No fix as of this review: the base image tag `nonroot`
-# still resolves to the very sha256:939d6f16… pinned in the Dockerfile, so no rebuilt
-# base exists to bump to. Re-review when that digest is bumped.
-CVE-2026-6368
-CVE-2026-6791
-
-# libssl3t64 3.5.6-1~deb13u2 — MEDIUM, Debian status `fix_deferred` (no fixed version).
-# OpenSSL flaw on the QUIC SERVER path ("When an OpenSSL QUIC server (Listener SSL object)
-# proce…"). Not reachable here: this image serves HTTP/1.1 + WebSocket over TCP (Fastify,
-# `packages/server/src/wsServer.ts` builds an http.Server — or an https.Server when RS-5.1
-# native TLS is configured, still TLS-over-TCP), never QUIC/HTTP-3; in the deployed stack
-# TLS is normally terminated by Caddy in front. Node exposes no OpenSSL QUIC listener API,
-# and the runtime is distroless — no shell and no `openssl` CLI to reach it another way.
-# No fix to bump to: the base image tag `nonroot` still resolves to the very
-# sha256:939d6f16… pinned in the Dockerfile (checked against gcr.io on 2026-08-17).
-# Re-review when that digest is bumped or Debian publishes a fix.
+# --- 2026-08-29 (SEC-28): ДВЕ записи вернулись в эту же группу ------------------------
+# `CVE-2026-14456` (QUIC-сервер, теперь HIGH) и `CVE-2026-75803` (ChaCha20-Poly1305 / AES-OCB,
+# LOW) были сняты как «фикса не существует» — таким был их статус на момент триажа
+# (2026-08-17 `fix_deferred` и 2026-08-20 «(no fixed version)» соответственно). Снятие и
+# показало, что оценка УСТАРЕЛА: гейт на PR #824 покраснел и назвал обе, у обеих в отчёте
+# теперь `Status: fixed`, `Fixed Version: 3.5.7-1~deb13u2` — та же версия, которой ждёт вся
+# группа выше. Так что это не «мы ошиблись, подавляя», а «Debian выпустил фикс, а мы узнали
+# об этом от гейта» — ровно то, ради чего снятие и делалось вслепую, а не по памяти.
+# Ставим сюда по правилу файла: фикс ЕСТЬ, поставить нельзя (distroless без пакетного
+# менеджера, база всё ещё несёт 3.5.6-1~deb13u2).
+#
+# Достижимость — прежняя, разбор не изменился (полный текст — в `docs/security/pipeline.md`,
+# записи триажа 2026-08-17 и 2026-08-20):
+#   · CVE-2026-14456 — путь QUIC-СЕРВЕРА. Здесь HTTP/1.1 + WebSocket поверх TCP (Fastify
+#     `http.Server`, под RS-5.1 — `https.Server`, всё равно TLS-over-TCP); QUIC-биндинг Node
+#     живёт за `--experimental-quic`, которого в `CMD` образа нет.
+#   · CVE-2026-75803 — ChaCha20-Poly1305 / AES-OCB на finalize-пути одноразового AEAD API.
+#     Ни в пакетах, ни в прототипе нет ни `createCipheriv`, ни упоминания этих шифров;
+#     рантайм distroless — ни шелла, ни `openssl` CLI.
+# Уходят вместе со всей группой при пересборке базы. Ре-ревью — то же, 2026-09-02.
 CVE-2026-14456
-
-# libssl3t64 3.5.6-1~deb13u2 — severity UNKNOWN (the feed carries no score yet), and
-# "(no fixed version)". OpenSSL, "Check the tag on EVP_Cipher() finalize: Poly1305 and
-# OCB AEADs": on the finalize path of the one-shot AEAD API the authentication tag could
-# go unchecked.
-# Reached the feed AFTER the last green `main` run (2026-08-19 15:50 UTC, security-scan
-# run 2716), so it is not something a PR introduced: it turned `trivy image` red on every
-# branch at once, and the next weekly run will redden `main` itself. Because the scan runs
-# without --severity, this single unscored row closes the merge queue for the whole repo.
-# Suppressed NOT because the finding was judged harmless, but because there is nothing to
-# fix: no fixed libssl3t64 is published for trixie, and the base image tag `nonroot` still
-# resolves to the very sha256:939d6f16… pinned in the Dockerfile (queried against gcr.io
-# on 2026-08-20) — no rebuilt base exists to bump to.
-# What was verified directly: neither our packages nor the prototype use ChaCha20-Poly1305
-# or OCB (no `createCipheriv` and no mention of those ciphers anywhere in the tree), and
-# the runtime is distroless — no shell, no `openssl` CLI; in the deployed stack TLS is
-# normally terminated by Caddy in front. What could NOT be verified: the advisory text
-# itself (security-tracker.debian.org and avd.aquasec.com are unreachable from the dev
-# environment), so a path through OpenSSL's own ChaCha20-Poly1305 TLS ciphersuite cannot
-# be ruled out. The risk is therefore accepted for a SHORT window, not open-endedly.
-# Re-review 2026-09-03 — or sooner, as soon as Debian publishes a fix or the base image
-# digest is bumped. If a fix appears, this entry is REMOVED, not extended.
 CVE-2026-75803

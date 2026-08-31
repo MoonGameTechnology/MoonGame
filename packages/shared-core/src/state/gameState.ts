@@ -110,6 +110,21 @@ export interface Player {
   /** @deprecated Legacy single-leader field (snapshots from before the 2-slot council).
    *  Never written now; still READ through {@link scientistsOf} for old persisted state. */
   scientist?: { id: string; level: number };
+  /** ИГРОВОЕ время заявки на место (`seat.claim`, ENTRY-3): дом и совет выбраны и
+   *  больше не меняются. Отсутствует — место ещё никем не занималось, за него играет
+   *  серверный ИИ. Держать маркер В СОСТОЯНИИ обязательно: `seat.claim` — КЛИЕНТСКИЙ
+   *  тип, игрок может прислать его сам, поэтому «заявить можно один раз» обязан
+   *  проверять редьюсер, а не память сервера.
+   *
+   *  Время игровое, а РЕАЛЬНОЕ из него выводится делением на `timeScale` — та же
+   *  дисциплина, что у окна входа (`MatchRegistry.entryOpen`). Настенных часов в
+   *  `GameState` нет и быть не должно: они сделали бы реплей невоспроизводимым. */
+  claimedAt?: number;
+  /** Игрок ДОШЁЛ до карты (`seat.confirm`): с этого момента место закреплено за ним
+   *  насовсем. До подтверждения заявка временная — место, взятое по ссылке и брошенное,
+   *  освобождается по истечении окна (`seat.release`), иначе один не пришедший человек
+   *  запирал бы кресло до конца партии. */
+  seated?: true;
   /** Steward delegation ("hand the seat to the AI while I sleep"): while set and the
    *  world clock is before `until`, the server AI plays this seat with `posture`. The
    *  server-side driver reads it via `stewardActive`; it auto-expires on the clock
@@ -637,12 +652,23 @@ export interface PatrolEntry {
   rearmAt?: number;
 }
 
-/** A standing sell order on the session market: the `seller` has escrowed `amount`
- *  of `resource` (deducted from their treasury) and offers it at `price` money per
- *  unit. Filled (partially) by `market.buy`; the remainder is refunded on cancel. */
+/** Which side of the book a standing order sits on (CONV-9). */
+export type MarketSide = 'sell' | 'buy';
+
+/** A standing order on the session market. Both sides ESCROW up front, so nothing
+ *  on the book can be double-spent:
+ *
+ *   - `sell` — the owner escrowed `amount` of `resource` and wants credits for it;
+ *   - `buy`  — the owner escrowed `amount × price` credits and wants the goods.
+ *
+ *  Filled (partially) by `market.take`; the remainder is refunded on cancel. The
+ *  book used to be sell-only here and two-sided in the prototype's copy — CONV-9
+ *  merged them, taking the richer shape. */
 export interface MarketOrder {
   id: string;
-  seller: PlayerId;
+  side: MarketSide;
+  /** Who placed it and whose escrow is held (was `seller` while the book was sell-only). */
+  owner: PlayerId;
   resource: ResourceId;
   /** Remaining units on offer (escrowed). */
   amount: number;
@@ -657,8 +683,16 @@ export interface Hero {
    *  Identifies the hero across events (death/respawn) independently of `owner`. */
   id: string;
   owner: PlayerId;
-  /** Display name — the player's projection of themselves (their nick). Cosmetic;
-   *  set at match seed. Absent ⇒ the client falls back to the owner's name. */
+  /** SEAT identity of a main hero — the callsign the player signed in with, or the
+   *  house id of the seat in a solo match. Written only where a seat exists (the
+   *  prototype's `matchSetup`); a roster hero carries none.
+   *
+   *  NOT a display name (AUD-13): human-readable text must never be stored in
+   *  `GameState`, because the state is shared by every player while the locale is
+   *  per-viewer — anything written here reaches the screen untranslated. A hero's
+   *  NAME is built by the renderer from `archetype` (→ `data.heroes[a].name`);
+   *  what lives here is an identity that has no translation (a nick) or that the
+   *  renderer localises by key (a house). */
   name?: string;
   /** The node the hero currently occupies / respawns at (abilities act from here,
    *  the projection hero returns here after dying). */
@@ -699,8 +733,23 @@ export interface Hero {
   /** Active time-boxed fog reveals cast via `hero.effect.reveal` (scan) — each lifts the
    *  fog to full-identify detail for every world within `radius` of `center` until `until`
    *  (ms), but only in the OWNER's own visibility projection. Filtered by `until` at read
-   *  time; pruned on cast. */
-  activeReveals?: { center: PlanetId; radius: number; until: number }[];
+   *  time; pruned on cast.
+   *
+   *  PSI-LADDER. The scan's upper steps turn the same lit zone into a combat zone, so a
+   *  reveal also carries what it does to a battle fought inside it. Both are stamped AT
+   *  CAST from the hero's own ability step (`abilityParams`), never re-read from the
+   *  catalogue afterwards: a live scan keeps the numbers it was cast with, exactly like
+   *  `activeAuras.bonus`. Absent ⇒ the pre-ladder scan, which only lifts fog.
+   *  · `weakPoints` — extra damage taken by fleets HOSTILE to the owner (`psi_weak_points`);
+   *  · `evasion` — incoming damage divided for the owner's and its ALLIES' fleets
+   *    (`psi_evasion`). Everyone else (neutral, at peace, in a pact) is untouched. */
+  activeReveals?: {
+    center: PlanetId;
+    radius: number;
+    until: number;
+    weakPoints?: number;
+    evasion?: number;
+  }[];
 }
 
 /** A temporary lane a hero opened: a real, routable graph edge between two nodes for

@@ -1,4 +1,3 @@
-import { randomUUID } from 'node:crypto';
 import rateLimit from '@fastify/rate-limit';
 import {
   createDevMatch,
@@ -11,8 +10,15 @@ import { arsenalSnapshotOf, grantStarterArsenal } from './arsenal';
 import { awardMatchDrops, salvageFromEvents } from './dropRoller';
 import { createMultiplayerServer, tlsFromEnv } from './wsServer';
 import { createStores, snapshotOf } from './persistence';
+import { seatClaim, seatClaimAction } from './joinSeat';
 import { checkProductionReadiness, configFromEnv } from './serverConfig';
 import { createMatchLoader } from './serverWiring';
+import {
+  creditCommanderXp,
+  ordinaryMatchExtras,
+  type SeatAccounts,
+} from './commanderCredit';
+import { newMatchId } from './matchId';
 import {
   registerMatchApi,
   registerOpenMatchesFeed,
@@ -21,7 +27,7 @@ import {
 } from './matchApi';
 import { registerAuthApi, liveSession } from './authApi';
 import { registerCorpApi } from './corpApi';
-import { MS_PER_DAY } from '@void/shared-core';
+import { MS_PER_DAY, type PlayerReward } from '@void/shared-core';
 import { registerFriendApi } from './friendApi';
 import { registerLeaderboardApi } from './leaderboardApi';
 import { FriendService } from './friendService';
@@ -127,8 +133,26 @@ const loadMatch = createMatchLoader({
   // a replayed `end` no-ops). `avaOrchestrator` is initialized below, before any
   // connection can trigger a load.
   matchExtras: async (matchId) => {
+    // SES-2 (остаток кирпича): опыт командира банкуется на КАЖДОМ матче, а не только на
+    // AvA. Раньше начисление жило внутри этой ветки, а у обычного матча `extras` = null —
+    // рядовая партия заканчивалась, и пожизненный опыт аккаунта не двигался (прототипный
+    // хост при этом начислял всегда). Правила банковки — `commanderCredit.ts`, один на
+    // оба пути; отличается только резолвер «кто сидит за местом».
+    const bankXp = (seatAccounts: SeatAccounts, rewards?: Record<string, PlayerReward>): void => {
+      void creditCommanderXp(stores.commanderStore, seatAccounts, matchId, rewards).catch(
+        (err: unknown) => {
+          process.stderr.write(
+            `commander xp credit failed for ${matchId} — ${err instanceof Error ? err.message : String(err)}\n`,
+          );
+        },
+      );
+    };
     const avaSession = await stores.sessionStore.byMatch(matchId);
-    if (!avaSession) return null;
+    if (!avaSession) {
+      // Обычный матч: личность места — позывной (в режиме учёток он и есть логин).
+      // Функция вынесена и покрыта тестом — `null` отсюда больше не возвращается.
+      return ordinaryMatchExtras(stores, matchId, (m) => process.stderr.write(`${m}\n`));
+    }
     // ARS-4: seat (slotId) → account, for the drop roll and the salvage credit.
     const seatAccount: Record<string, string> = {};
     for (const [accountId, slotId] of Object.entries(avaSession.seats)) {
@@ -171,21 +195,11 @@ const loadMatch = createMatchLoader({
             const accountId = seatAccount[playerId];
             return accountId ? [{ accountId, reward }] : [];
           });
-          // Commander XP (EC-*): the core already computed the per-seat reward table;
-          // bank it onto the accounts, exactly once per match (creditMatch's durable
-          // marker survives a restart that re-observes the same end). Until RANK-1 this
-          // host rolled drops from `rewards` but banked no XP at all — only the playtest
-          // netserver did — so a production account's lifetime XP never moved.
-          void stores.commanderStore
-            .creditMatch(
-              matchId,
-              entries.map(({ accountId, reward }) => ({ accountId, xp: reward.xp })),
-            )
-            .catch((err) => {
-              process.stderr.write(
-                `commander xp credit failed for ${matchId} — ${err instanceof Error ? err.message : String(err)}\n`,
-              );
-            });
+          // Commander XP (SES-2): та же банковка, что у обычного матча, но карта мест —
+          // РОСТЕР сессии, а не посадочные записи: AvA-игрок, ни разу не подключившийся,
+          // кресло в матче держит, а посадочной записи не оставил, и по позывному его
+          // не найти.
+          bankXp(async () => seatAccount, rewards);
           void awardMatchDrops(
             {
               drops: stores.dropStore,
@@ -300,7 +314,7 @@ const identify: MatchApiDeps['identify'] = verifySession
 // optional (a host may seed out of band), so the deps field alone reads as possibly-undefined.
 const createMatch = async (): Promise<CreatedMatch> => {
   if (matchCount >= MAX_MATCHES) throw new Error('match capacity reached'); // → 500, bounded
-  const matchId = `m-${randomUUID()}`;
+  const matchId = newMatchId();
   const seed = createDevMatch(data, { id: matchId, time: Date.now() });
   await stores.store.save(snapshotOf(seed));
   matchCount += 1;
@@ -308,7 +322,13 @@ const createMatch = async (): Promise<CreatedMatch> => {
 };
 const matchApi: MatchApiDeps = {
   createMatch,
-  join: async (matchId, nick, accountId) => {
+  // ENTRY-1: `preferredSlot`/`preferredFaction` доезжают до резолвера и до состояния.
+  // Раньше эта реализация принимала ТРИ параметра из пяти, объявленных `MatchApiDeps`, и
+  // два последних молча роняла: функция с меньшим числом параметров совместима с более
+  // широкой сигнатурой, поэтому TypeScript такое пропускает. Прототипный хост
+  // (`prototype/netserver.ts`) BF-30 реализовывал, канонический — нет, и разъезд не
+  // проявлялся ровно потому, что играли на прототипном.
+  join: async (matchId, { nick, accountId, preferredSlot, preferredFaction, preferredScientists }) => {
     const snap = await stores.store.load(matchId);
     if (!snap) return { error: 'E_NO_MATCH' };
     if (!signToken) return { error: 'E_AUTH_DISABLED' }; // no token auth configured
@@ -316,11 +336,50 @@ const matchApi: MatchApiDeps = {
     // refused. `null` ⇒ an ordinary match → the normal first-come seat resolver.
     const ava = accountId ? await avaOrchestrator.resolveAvaSeat(matchId, accountId) : null;
     if (ava && !ava.ok) return { error: 'E_NOT_ROSTERED' };
-    const playerId = ava
-      ? ava.playerId
-      : (await accountStore.resolveSeat(matchId, nick, Object.keys(snap.state.players)))?.playerId;
-    if (playerId === undefined) return { error: 'E_MATCH_FULL' };
-    return { playerId, token: await signToken(matchId, playerId, accountId) };
+    // Резолвер зовём ТОЛЬКО вне AvA: у рострованного место фиксировано, а лишний вызов
+    // занял бы ему второе кресло.
+    const resolved = ava
+      ? undefined
+      : await accountStore.resolveSeat(
+          matchId,
+          nick,
+          Object.keys(snap.state.players),
+          preferredSlot,
+        );
+    // Какое место достаётся и переписывать ли дом — `joinSeat.ts` (там же причины, по
+    // которым AvA-ростер и возврат в свой матч выбор дома не применяют).
+    const claim = seatClaim({
+      avaPlayerId: ava?.playerId,
+      resolved,
+      preferredFaction,
+      // Дома ЭТОГО матча — ровно то, что сервер отдаёт в `/matches/:id/seats` и из чего
+      // клиент рисует выбор. Проверять по каталогу данных было бы шире предложенного
+      // (см. правило 4 в joinSeat.ts).
+      knownFactions: [...new Set(Object.values(snap.state.players).map((p) => p.faction))],
+    });
+    if (!claim.ok) return { error: claim.code };
+    if (claim.claim) {
+      // ENTRY-3: заявка идёт ДЕЙСТВИЕМ через редьюсер, а не записью в состояние.
+      // Мутация мимо редьюсера не попадает в лог реплея — воспроизведение выдавало бы
+      // дом из стартового снимка, то есть другие пассивки и другой радиус радара.
+      // Комнату могло не поднять (снимок недоступен) — тогда вход всё равно состоится,
+      // просто без применённого выбора: отказывать во входе из-за этого нельзя.
+      const room = await registry.resolve?.(matchId);
+      if (room) {
+        await room.submitServerAction(
+          claim.playerId,
+          seatClaimAction(matchId, claim.playerId, room.state.time, {
+            ...claim.claim,
+            ...(preferredScientists !== undefined ? { scientists: preferredScientists } : {}),
+          }),
+        );
+        await stores.store.save(snapshotOf(room));
+      }
+    }
+    return {
+      playerId: claim.playerId,
+      token: await signToken(matchId, claim.playerId, accountId),
+    };
   },
   // Wired ⇒ create/join require a session from /auth/login — the session's login IS
   // the seat nick, so nobody claims a seat as somebody else.

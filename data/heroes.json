@@ -8,7 +8,6 @@
     },
     "slots": 4,
     "startAbilities": [
-      "corridor",
       "rally",
       "scan",
       "bulwark",
@@ -43,7 +42,6 @@
     },
     "slots": 2,
     "startAbilities": [
-      "corridor",
       "rally"
     ],
     "startPassives": [

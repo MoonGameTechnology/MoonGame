@@ -6,7 +6,7 @@ import { parseGameData, type GameData } from '../data/schemas';
 import type { Action, ApplyResult, Context } from '../action/types';
 
 // standingOrders — CC-1 order chains + CC-2 auto-storm + CC-4 дежурный вылет.
-// Port of the prototype's proven `standingOrdersModule` (prototype/src/standingOrders.ts,
+// Был портом прототипного `standingOrdersModule` (REFP-15; с CONV-7 копии нет,
 // REFP-15). Only the client-facing intent (order.auto/order.scramble/order.chain) and
 // the two server-driver-only runtime stamps (patrol.stamp/chain.stamp — no gate schema,
 // a client can never reach them); the actual scramble/chain driver stays out of scope

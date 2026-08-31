@@ -39,6 +39,16 @@ EXTERNAL_PORT="${EXTERNAL_PORT:-}"
 INTERNAL_PORT="${INTERNAL_PORT:-8788}"
 TIME_SCALE="${TIME_SCALE:-100}"
 POSTGRES_PASSWORD="moongame_dev_$(openssl rand -hex 8)"
+# Секрет подписи join-токенов. Гард checkProductionReadiness требует ≥32 символов
+# (MIN_SECRET_LEN), поэтому 32 байта hex = 64 символа — с запасом.
+AUTH_JWT_SECRET="$(openssl rand -hex 32)"
+# Origin, по которому игроки открывают игру — идёт в ALLOWED_ORIGINS (CSWSH-allowlist).
+# Браузер присылает РОВНО тот origin, на котором открыта страница, поэтому внешний
+# адрес (если он задан) добавляется вторым: через роутер это другой хост:порт.
+ALLOWED_ORIGINS="http://$INTERNAL_IP:$INTERNAL_PORT"
+if [ -n "$EXTERNAL_IP" ]; then
+    ALLOWED_ORIGINS="$ALLOWED_ORIGINS,http://$EXTERNAL_IP:${EXTERNAL_PORT:-$INTERNAL_PORT}"
+fi
 
 # Функции для вывода
 log_info() {
@@ -77,29 +87,36 @@ log_info "Обновление пакетов системы..."
 apt-get update
 apt-get upgrade -y
 
-# Проверка и установка Docker
+# Проверка и установка Docker.
+# ВАЖНО: ключ репозитория ставится файлом в /etc/apt/keyrings + `signed-by`, а НЕ через
+# `apt-key add`. apt-key объявлен устаревшим и УДАЛЁН начиная с Ubuntu 24.04, поэтому
+# старый путь ронял установку на 24.04/26.04 ещё до первого apt-get install. Кодовое имя
+# берём из VERSION_CODENAME (lsb_release может отсутствовать на минимальном образе).
 if ! command -v docker &> /dev/null; then
     log_info "Установка Docker..."
-    apt-get install -y apt-transport-https ca-certificates curl software-properties-common
-    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
-    add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable"
+    apt-get install -y ca-certificates curl gnupg
+    install -m 0755 -d /etc/apt/keyrings
+    curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /etc/apt/keyrings/docker.asc
+    chmod a+r /etc/apt/keyrings/docker.asc
+    UBUNTU_CODENAME="$(. /etc/os-release && echo "$VERSION_CODENAME")"
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.asc] https://download.docker.com/linux/ubuntu $UBUNTU_CODENAME stable" \
+        > /etc/apt/sources.list.d/docker.list
     apt-get update
-    apt-get install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
+    apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
     log_success "Docker установлен"
 else
     log_success "Docker уже установлен"
 fi
 
-# Проверка и установка Docker Compose (standalone)
-if ! command -v docker-compose &> /dev/null; then
-    log_info "Установка Docker Compose..."
-    DOCKER_COMPOSE_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | grep 'tag_name' | cut -d'"' -f4)
-    curl -L "https://github.com/docker/compose/releases/download/${DOCKER_COMPOSE_VERSION}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
-    chmod +x /usr/local/bin/docker-compose
-    log_success "Docker Compose установлен"
-else
-    log_success "Docker Compose уже установлен"
+# Compose нужен как ПЛАГИН (`docker compose`) — именно его зовут и systemd-юнит, и
+# deploy/update.sh. Standalone-бинарь `docker-compose` здесь не используется нигде, поэтому
+# он больше не качается: тот блок дёргал api.github.com без токена и при исчерпании
+# лимита молча клал битый файл в /usr/local/bin.
+if ! docker compose version &> /dev/null; then
+    log_error "Плагин 'docker compose' недоступен — установи docker-compose-plugin и повтори"
+    exit 1
 fi
+log_success "Docker Compose (плагин) на месте"
 
 # Включение Docker демона при старте
 systemctl enable docker
@@ -165,6 +182,29 @@ POSTGRES_PASSWORD=$POSTGRES_PASSWORD
 # Для локальной отладки можно временно выставить 0/0 — но не на плейтесте с людьми.
 GATE=1
 SEAT_LOCK=1
+
+# Секрет подписи join-токенов (сгенерирован установщиком, уникален для этой машины).
+# Держи его СТАБИЛЬНЫМ: смена секрета обесценивает выданные билеты, и все игроки
+# логинятся заново.
+AUTH_JWT_SECRET=$AUTH_JWT_SECRET
+
+# Origin-allowlist против CSWSH: без него браузер отдаст сессию на wss:// с чужой
+# страницы. Значение — ровно тот адрес, с которого игроки открывают игру.
+ALLOWED_ORIGINS=$ALLOWED_ORIGINS
+
+# ПОСТУРА. PROD=1 — это fail-secure гард (checkProductionReadiness): под ним сервер
+# ОТКАЗЫВАЕТСЯ стартовать, пока не включены auth + gate + seat-lock + TLS. Этот
+# установщик поднимает стек по ПЛАЙНОМУ HTTP в локальной сети, TLS здесь нет — значит
+# под PROD=1 сервер честно падал бы в цикл перезапуска. Поэтому здесь явный dev-режим.
+#
+# GATE и SEAT_LOCK выше при этом ОСТАЮТСЯ включёнными — они не зависят от PROD.
+# Отключается только загрузочная проверка, а не валидация действий и билеты на места.
+#
+# ПЕРЕД ВЫХОДОМ В ИНТЕРНЕТ: подними TLS (deploy/docker-compose.tls.yml + DOMAIN),
+# поставь ALLOWED_ORIGINS=https://<домен> и верни PROD=1.
+# Не выставляй TRUST_PROXY=1 «чтобы гард замолчал» без реального прокси перед сервером:
+# тогда сервер поверит заголовку X-Forwarded-For от клиента, и лимиты по IP обойдёт кто угодно.
+PROD=0
 EOF
 
 chown $SERVICE_USER:$SERVICE_USER "$ENV_FILE"
@@ -213,122 +253,13 @@ systemctl daemon-reload
 systemctl enable $SERVICE_NAME.service
 log_success "Systemd сервис настроен"
 
-# Создание скрипта обновления
-log_info "Создание скрипта быстрого обновления..."
-cat > "$INSTALL_DIR/update-dev.sh" << 'UPDATEEOF'
-#!/bin/bash
-#
-# Обновление живого прода. Три вещи, которых здесь раньше не было и без которых
-# «обновление» было прыжком с завязанными глазами:
-#   1. ПРОВЕРКА ПОДПИСИ на образном пути — верификация обязательна, а не по желанию
-#      оператора: непроверенный образ до рестарта не доходит.
-#   2. ПРОВЕРКА ЗДОРОВЬЯ после рестарта — раньше скрипт печатал «Обновление
-#      завершено!» ровно после `systemctl restart`, то есть радостно рапортовал об
-#      успехе, даже если сервер немедленно падал в цикл перезапуска.
-#   3. ОТКАТ на предыдущий образ, если здоровье не поднялось.
-set -euo pipefail
-
-INSTALL_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SERVICE_NAME="moongame"
-COMPOSE_BASE="$INSTALL_DIR/deploy/docker-compose.yml"
-RELEASE_OVERLAY="$INSTALL_DIR/deploy/docker-compose.release.yml"
-LAST_GOOD="$INSTALL_DIR/.last-good-image"
-# Тот же файл, что EnvironmentFile у systemd-юнита. Прямые вызовы compose (в отличие
-# от `systemctl restart`) его не видят — передаём явно, иначе POSTGRES_PASSWORD
-# схлопнется в дефолт `void`.
-ENV_FILE="$INSTALL_DIR/deploy/server.env"
-HEALTH_PORT="${PORT:-8788}"
-HEALTH_TRIES="${HEALTH_TRIES:-30}"
-
-health_ok() {
-  local i
-  for ((i = 1; i <= HEALTH_TRIES; i++)); do
-    if curl -fsS --max-time 3 "http://127.0.0.1:${HEALTH_PORT}/health" >/dev/null 2>&1; then
-      return 0
-    fi
-    sleep 2
-  done
-  return 1
-}
-
-# ---- путь 1: подписанный образ из реестра (VOID_IMAGE=ghcr.io/...@sha256:...) ----
-if [ -n "${VOID_IMAGE:-}" ]; then
-  echo "[*] Проверяем подпись образа (гейт — без неё дальше не идём)..."
-  if ! "$INSTALL_DIR/deploy/verify-image.sh" "$VOID_IMAGE"; then
-    echo "[✗] Подпись не подтверждена — обновление ОТМЕНЕНО, сервер не тронут." >&2
-    exit 1
-  fi
-
-  PREV_IMAGE="$(cat "$LAST_GOOD" 2>/dev/null || true)"
-
-  echo "[*] Забираем образ и поднимаем на нём стек..."
-  docker pull "$VOID_IMAGE"
-  VOID_IMAGE="$VOID_IMAGE" docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" -f "$RELEASE_OVERLAY" up -d --no-build
-
-  if health_ok; then
-    echo "$VOID_IMAGE" > "$LAST_GOOD"
-    echo "[✓] Обновление завершено, /health отвечает."
-    exit 0
-  fi
-
-  echo "[✗] Сервер не поднялся после обновления." >&2
-  if [ -n "$PREV_IMAGE" ]; then
-    echo "[*] Откатываемся на предыдущий проверенный образ: $PREV_IMAGE" >&2
-    VOID_IMAGE="$PREV_IMAGE" docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" -f "$RELEASE_OVERLAY" up -d --no-build
-    health_ok && echo "[✓] Откат удался, работает предыдущая версия." >&2 \
-      || echo "[✗] Откат НЕ помог — смотри логи: moongame logs" >&2
-  else
-    echo "[!] Отката нет: предыдущий образ неизвестен ($LAST_GOOD пуст)." >&2
-  fi
-  exit 1
-fi
-
-# ---- путь 2: сборка из исходников (историческое поведение) ----
-# У этого пути нет ни сканирования, ни подписи: в прод уезжает то, что собралось на
-# этой машине из текущего main. Оставлен рабочим для плейтест-хостов, но теперь честно
-# об этом говорит и хотя бы проверяет здоровье с откатом.
-echo "[!] Путь без гейта: сборка на хосте — образ не сканирован и не подписан."
-echo "[!] Проверяемый путь: VOID_IMAGE=ghcr.io/moongametechnology/moongame@sha256:... moongame update"
-
-echo "[*] Обновляем код из репозитория..."
-cd "$INSTALL_DIR"
-git pull origin main
-
-# Образ, на котором сервер работает ПРЯМО СЕЙЧАС — единственная точка отката.
-PREV_IMAGE_ID="$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" ps -q server 2>/dev/null \
-  | head -1 | xargs -r docker inspect --format '{{.Image}}' 2>/dev/null || true)"
-
-echo "[*] Пересобираем образ (сервер пока работает, ~1-3 мин)..."
-docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" build
-
-echo "[*] Перезапускаем сервер на новом образе..."
-sudo systemctl restart "$SERVICE_NAME"
-
-if health_ok; then
-  echo "[✓] Обновление завершено, /health отвечает."
-  echo "[*] Логи: sudo journalctl -u $SERVICE_NAME -f"
-  exit 0
-fi
-
-echo "[✗] Сервер не отвечает на /health после обновления." >&2
-if [ -n "$PREV_IMAGE_ID" ]; then
-  IMAGE_NAME="$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" config --images 2>/dev/null | head -1)"
-  if [ -n "$IMAGE_NAME" ]; then
-    echo "[*] Откатываемся на предыдущий образ ($PREV_IMAGE_ID)..." >&2
-    docker tag "$PREV_IMAGE_ID" "$IMAGE_NAME"
-    sudo systemctl restart "$SERVICE_NAME"
-    health_ok && echo "[✓] Откат удался, работает предыдущая версия." >&2 \
-      || echo "[✗] Откат НЕ помог — смотри логи: moongame logs" >&2
-  fi
-else
-  echo "[!] Отката нет: не удалось определить предыдущий образ." >&2
-fi
-exit 1
-UPDATEEOF
-
-chmod +x "$INSTALL_DIR/update-dev.sh"
-chown $SERVICE_USER:$SERVICE_USER "$INSTALL_DIR/update-dev.sh"
-log_success "Скрипт обновления создан"
+# Скрипта обновления здесь НЕТ — и не должно быть (OPS-1). Раньше `update-dev.sh`
+# генерировался тут heredoc'ом и писался на диск ОДИН раз, при установке: починка
+# самого механизма обновления до развёрнутой машины не доезжала — `moongame update`
+# тянул свежий код, но продолжал исполнять свою старую копию (так на живой машине
+# остался сломанный на «dubious ownership» скрипт уже после того, как фикс влился).
+# Теперь механизм обновления — обычный файл репозитория `deploy/update.sh`, приезжает
+# клоном выше и обновляется вместе с остальным кодом. Хелпер ниже только зовёт его.
 
 # Создание хелпера для управления
 log_info "Создание управляющих команд..."
@@ -358,7 +289,7 @@ case "$1" in
         sudo journalctl -u $SERVICE_NAME -f
         ;;
     update)
-        bash $INSTALL_DIR/update-dev.sh
+        bash $INSTALL_DIR/deploy/update.sh
         ;;
     shell)
         cd $INSTALL_DIR

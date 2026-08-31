@@ -91,8 +91,12 @@ RUN mkdir -p playtest-logs
 # tags; last rebuild 2026-02), so debian12 is frozen with the libssl3/libc6 CVEs Trivy
 # flags — debian13 is the actively rebuilt line with current trixie-security packages.
 # Digest-pinned like the build stage (bump procedure in the Stage 1 comment);
-# nodejs22-debian13:nonroot digest refreshed 2026-07.
-FROM gcr.io/distroless/nodejs22-debian13:nonroot@sha256:939d6f1671529d230f50b563578e9b5d206af58f038b10ebd7e1233023d4e167 AS runtime
+# nodejs22-debian13:nonroot digest refreshed 2026-08-26 (SEC-25).
+# The bump is HYGIENE, not remediation: upstream rebuilt the tag, but the new image ships
+# the SAME libssl3t64 3.5.6-1~deb13u2 / libc6 2.41-12+deb13u3 / zlib1g 1.3.dfsg… as the
+# digest it replaces (read out of /var/lib/dpkg/status.d in the amd64 manifest, pulled
+# from gcr.io on 2026-08-26). It closes no `.trivyignore` entry — see that file's header.
+FROM gcr.io/distroless/nodejs22-debian13:nonroot@sha256:22d2f0480e59548ad14cf10d8921b24ef809780e7a61b162838f3d15a4a92e3d AS runtime
 # Bring the app (source + prod-only node_modules + baked HTML + the pre-built server
 # bundle) and hand the tree to the non-root user so the one runtime write left
 # (playtest-logs) succeeds. node_modules uses pnpm's relative symlink layout, so copying

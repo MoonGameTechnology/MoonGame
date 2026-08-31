@@ -75,7 +75,7 @@
         "hp": 30,
         "enablesGroundConstruction": true,
         "upkeep": {
-          "energy": 4
+          "energy": 20
         }
       },
       {
@@ -87,7 +87,7 @@
         "hp": 40,
         "enablesGroundConstruction": true,
         "upkeep": {
-          "energy": 6
+          "energy": 30
         }
       },
       {
@@ -100,7 +100,7 @@
         "enablesGroundConstruction": true,
         "buildSpeedBonus": 0.05,
         "upkeep": {
-          "energy": 8
+          "energy": 40
         }
       }
     ]
@@ -139,7 +139,7 @@
         "hp": 26,
         "radarRange": 300,
         "upkeep": {
-          "energy": 16
+          "energy": 80
         }
       },
       {
@@ -151,13 +151,13 @@
         "hp": 34,
         "radarRange": 420,
         "upkeep": {
-          "energy": 24
+          "energy": 120
         }
       }
     ],
     "traits": [],
     "upkeep": {
-      "energy": 10
+      "energy": 50
     }
   },
   "fort": {
@@ -203,7 +203,7 @@
     "scoreValue": 6,
     "traits": [],
     "upkeep": {
-      "energy": 8
+      "energy": 40
     }
   },
   "metal_station": {
@@ -268,7 +268,7 @@
         },
         "hp": 26,
         "upkeep": {
-          "credits": 12
+          "credits": 96
         }
       },
       {
@@ -282,13 +282,13 @@
         },
         "hp": 36,
         "upkeep": {
-          "credits": 20
+          "credits": 160
         }
       }
     ],
     "traits": [],
     "upkeep": {
-      "credits": 6
+      "credits": 48
     }
   },
   "fabricator": {
@@ -317,7 +317,7 @@
         },
         "hp": 32,
         "upkeep": {
-          "energy": 55
+          "energy": 275
         }
       },
       {
@@ -332,13 +332,13 @@
         },
         "hp": 44,
         "upkeep": {
-          "energy": 90
+          "energy": 450
         }
       }
     ],
     "traits": [],
     "upkeep": {
-      "energy": 30
+      "energy": 150
     }
   },
   "hospital": {
@@ -362,7 +362,7 @@
         "hp": 30,
         "healRate": 0.25,
         "upkeep": {
-          "energy": 6
+          "energy": 30
         }
       },
       {
@@ -374,7 +374,7 @@
         "hp": 40,
         "healRate": 0.40,
         "upkeep": {
-          "energy": 10
+          "energy": 50
         }
       }
     ]
@@ -391,7 +391,7 @@
     "scoreValue": 10,
     "traits": [],
     "upkeep": {
-      "energy": 10
+      "energy": 50
     },
     "upgrades": [
       {
@@ -404,7 +404,7 @@
         "enablesGroundConstruction": true,
         "enablesSquadronConstruction": true,
         "upkeep": {
-          "energy": 14
+          "energy": 70
         }
       },
       {
@@ -418,7 +418,7 @@
         "enablesSquadronConstruction": true,
         "buildSpeedBonus": 0.5,
         "upkeep": {
-          "energy": 20
+          "energy": 100
         }
       }
     ]

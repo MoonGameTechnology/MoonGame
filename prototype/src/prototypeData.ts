@@ -13,6 +13,10 @@ import { parseGameData, type GameData } from '../../packages/shared-core/src/ind
 export const data: GameData = parseGameData({
   version: '0.1.0',
   resources: ['credits', 'metal'],
+  // CONV-9: что можно торговать — теперь ДАННЫЕ, а не константа `MARKET_GOODS` внутри
+  // модуля рынка. Список тот же, что был у копии, поэтому поведение не меняется.
+  // Кредиты сюда не входят намеренно: валюта не торгуется сама за себя.
+  market: { goods: ['metal', 'food', 'energy', 'microelectronics'] },
   // Session tech tree (technologyModule). Effect bonuses only in the prototype — no
   // `unlocks`, so researching never locks the content you can already build. Branch /
   // tier / prerequisite / day-gating all apply. Costs use the prototype's 2 resources.
@@ -305,6 +309,16 @@ export const data: GameData = parseGameData({
       slotBonus: 1,
     },
   },
+  // BAL-3: `upkeep` is quoted per DAY, while `produces` / `planetTypes.baseOutput`
+  // are quoted per HOUR (economy.ts settles the first over `days`, the second over
+  // `hours`). The catalogue had been authored as if both ran on one scale, so the
+  // daily bill came out 8–26× smaller than the daily faucet and credits / food /
+  // energy could only pile up — nobody was ever in arrears, so the brownout rule
+  // never fired and farm / power_plant stayed dead content.
+  // The bills below are scaled to the faucet they are actually charged against
+  // (credits ×8, food ×5, energy ×5 over the pre-BAL-3 numbers), which lands the
+  // mid-game bill at roughly a half to two thirds of income: a standing army and a
+  // full building set now cost something, and losing worlds can put you in debt.
   units: {
     scout: {
       faction: 'blue',
@@ -313,7 +327,7 @@ export const data: GameData = parseGameData({
       radarRange: 105, // projects fleet radar — read by both the core fog and the prototype view (плейтест 2026-07-18: −50%)
       cost: { metal: 20 },
       buildTimeHours: 1,
-      upkeep: { credits: 1 },
+      upkeep: { credits: 8 },
       slots: { utility: 1 }, // a lone utility bay — a recon drone flexes its sensors
     },
     // Сенсорный фрегат — носитель дальнего радара и больше почти ничего. Своя антенна
@@ -327,7 +341,7 @@ export const data: GameData = parseGameData({
       radarRange: 60, // своя антенна скромная; дальнее зрение даёт модуль
       cost: { metal: 55, microelectronics: 2 }, // ECON-7: сенсоры — хай-тек
       buildTimeHours: 2,
-      upkeep: { credits: 2 },
+      upkeep: { credits: 16 },
       slots: { utility: 1 }, // ровно один отсек — и он же единственный дом радара
     },
     cruiser: {
@@ -339,7 +353,7 @@ export const data: GameData = parseGameData({
       // real fleet, so you must run fabricators to keep building (Bytro model).
       cost: { metal: 60, credits: 20, microelectronics: 3 },
       buildTimeHours: 3,
-      upkeep: { credits: 4 },
+      upkeep: { credits: 32 },
       slots: { weapon: 1, defense: 1, utility: 1 }, // the balanced warship: one of each bay
     },
     siege: {
@@ -352,7 +366,7 @@ export const data: GameData = parseGameData({
       signature: 5, // huge siege platform — loudest
       cost: { metal: 90, credits: 40, microelectronics: 4 }, // ECON-7: guided munitions
       buildTimeHours: 5,
-      upkeep: { credits: 6 },
+      upkeep: { credits: 48 },
       slots: { weapon: 1, utility: 1 }, // a gun bay + a utility bay — a glass cannon
     },
     dropship: {
@@ -363,7 +377,7 @@ export const data: GameData = parseGameData({
       signature: 3, // a fat hauler — easy to spot
       cost: { metal: 70, credits: 20 },
       buildTimeHours: 4,
-      upkeep: { credits: 3 },
+      upkeep: { credits: 24 },
       slots: { defense: 1, utility: 2 }, // no guns — it armours up and carries утилиту
     },
     fighter_squadron: {
@@ -383,7 +397,7 @@ export const data: GameData = parseGameData({
       signature: 2,
       cost: { metal: 90, credits: 40, microelectronics: 10 },
       buildTimeHours: 2,
-      upkeep: { credits: 4 },
+      upkeep: { credits: 32 },
       slots: { weapon: 1 }, // a single gun mount — upgun the paper-thin strike wing
     },
     strike_carrier: {
@@ -394,7 +408,7 @@ export const data: GameData = parseGameData({
       signature: 6,
       cost: { metal: 320, credits: 160 },
       buildTimeHours: 6,
-      upkeep: { credits: 12 },
+      upkeep: { credits: 96 },
       slots: { defense: 1, utility: 2 }, // a flat-top: armour + sensor/cargo bays
     },
     // (Orbital AA is not a unit: it's a defensive *building* — anti-ship, immobile,
@@ -417,7 +431,7 @@ export const data: GameData = parseGameData({
       signature: 1,
       cost: { metal: 15 },
       buildTimeHours: 1,
-      upkeep: { credits: 1, food: 1 },
+      upkeep: { credits: 8, food: 5 },
     },
     heavy_infantry: {
       faction: 'blue',
@@ -427,7 +441,7 @@ export const data: GameData = parseGameData({
       signature: 1,
       cost: { metal: 55, credits: 15 },
       buildTimeHours: 2,
-      upkeep: { credits: 2, food: 1 },
+      upkeep: { credits: 16, food: 5 },
     },
     special_forces: {
       faction: 'blue',
@@ -437,7 +451,7 @@ export const data: GameData = parseGameData({
       signature: 1,
       cost: { metal: 60, credits: 45, microelectronics: 5 },
       buildTimeHours: 3,
-      upkeep: { credits: 4, food: 1 },
+      upkeep: { credits: 32, food: 5 },
     },
     // Танк — heavy front line: high attack and hull, but pricey and bulky to lift.
     tank: {
@@ -448,7 +462,7 @@ export const data: GameData = parseGameData({
       signature: 2,
       cost: { metal: 120, credits: 30 },
       buildTimeHours: 4,
-      upkeep: { credits: 4, food: 2 },
+      upkeep: { credits: 32, food: 10 },
     },
     // The player's projection hero — cruiser-tier guns but TRIPLE the hull, and the
     // +5% attack/defense aura it grants its fleet (heroModule). Seeded, not built.
@@ -460,7 +474,7 @@ export const data: GameData = parseGameData({
       signature: 6, // a flagship — loud on radar
       cost: { metal: 400, credits: 200 },
       buildTimeHours: 10,
-      upkeep: { credits: 8 },
+      upkeep: { credits: 64 },
     },
   },
   // Ship modules (mirror of data/modules.json) — the «Оснащение корабля» loadout
@@ -552,7 +566,13 @@ export const data: GameData = parseGameData({
     amber: {
       name: 'Amber Concord',
       description: 'faction.amber.desc',
-      passives: { fleetSpeedBonus: 0.15 },
+      // BAL-11: 0.15 → 0.05. Fleet speed was by far the strongest of the four passives —
+      // 60.3% of its matches (+5.01σ) over 4 seed families × 300, and above 57% in every
+      // single family, while the other three sat at 45.8–47.9%. The map is what the match
+      // is decided by (BAL-5: 82% of the margin is territory), and speed converts into the
+      // tempo of dividing it directly, whereas production and damage only do so through
+      // intermediaries — so a point of speed simply buys more than a point of either.
+      passives: { fleetSpeedBonus: 0.05 },
     },
     violet: {
       name: 'Violet Ascendancy',
@@ -583,7 +603,7 @@ export const data: GameData = parseGameData({
       cost: { metal: 110 },
       buildTimeHours: 4,
       produces: { credits: 8 },
-      upkeep: { energy: 8 }, // refined credit production runs on grid power
+      upkeep: { energy: 40 }, // refined credit production runs on grid power
       hp: 20,
       scoreValue: 3,
     },
@@ -598,7 +618,7 @@ export const data: GameData = parseGameData({
       cost: { metal: 90 },
       buildTimeHours: 3,
       produces: { food: 10 },
-      upkeep: { energy: 6 },
+      upkeep: { energy: 30 },
       hp: 18,
       scoreValue: 3,
       upgrades: [
@@ -606,14 +626,14 @@ export const data: GameData = parseGameData({
           cost: { metal: 160, credits: 40 },
           buildTimeHours: 4,
           produces: { food: 16 },
-          upkeep: { energy: 10 },
+          upkeep: { energy: 50 },
           hp: 24,
         },
         {
           cost: { metal: 260, credits: 90 },
           buildTimeHours: 6,
           produces: { food: 24 },
-          upkeep: { energy: 16 },
+          upkeep: { energy: 80 },
           hp: 30,
         },
       ],
@@ -623,7 +643,7 @@ export const data: GameData = parseGameData({
       cost: { metal: 110, credits: 30 },
       buildTimeHours: 4,
       produces: { energy: 14 },
-      upkeep: { credits: 6 },
+      upkeep: { credits: 48 },
       hp: 20,
       scoreValue: 4,
       upgrades: [
@@ -631,14 +651,14 @@ export const data: GameData = parseGameData({
           cost: { metal: 240, credits: 100 },
           buildTimeHours: 6,
           produces: { energy: 26 },
-          upkeep: { credits: 12 },
+          upkeep: { credits: 96 },
           hp: 28,
         },
         {
           cost: { metal: 400, credits: 190 },
           buildTimeHours: 8,
           produces: { energy: 42 },
-          upkeep: { credits: 20 },
+          upkeep: { credits: 160 },
           hp: 36,
         },
       ],
@@ -650,7 +670,7 @@ export const data: GameData = parseGameData({
       cost: { metal: 180, credits: 100 },
       buildTimeHours: 6,
       produces: { microelectronics: 5 },
-      upkeep: { energy: 30, food: 8 },
+      upkeep: { energy: 150, food: 40 },
       hp: 22,
       scoreValue: 6,
       upgrades: [
@@ -658,14 +678,14 @@ export const data: GameData = parseGameData({
           cost: { metal: 320, credits: 200, microelectronics: 30 },
           buildTimeHours: 8,
           produces: { microelectronics: 11 },
-          upkeep: { energy: 55, food: 14 },
+          upkeep: { energy: 275, food: 70 },
           hp: 32,
         },
         {
           cost: { metal: 520, credits: 340, microelectronics: 80 },
           buildTimeHours: 10,
           produces: { microelectronics: 19 },
-          upkeep: { energy: 90, food: 22 },
+          upkeep: { energy: 450, food: 110 },
           hp: 42,
         },
       ],
@@ -689,7 +709,7 @@ export const data: GameData = parseGameData({
       cost: { metal: 80, credits: 30 },
       buildTimeHours: 4,
       produces: { metal: 30 },
-      upkeep: { energy: 8 },
+      upkeep: { energy: 40 },
       hp: 20,
       scoreValue: 5,
       upgrades: [
@@ -697,14 +717,14 @@ export const data: GameData = parseGameData({
           cost: { metal: 220, credits: 90 },
           buildTimeHours: 6,
           produces: { metal: 60 },
-          upkeep: { energy: 14 },
+          upkeep: { energy: 70 },
           hp: 30,
         },
         {
           cost: { metal: 380, credits: 170 },
           buildTimeHours: 8,
           produces: { metal: 100 },
-          upkeep: { energy: 22 },
+          upkeep: { energy: 110 },
           hp: 40,
         },
       ],
@@ -717,9 +737,28 @@ export const data: GameData = parseGameData({
       enablesGroundConstruction: true,
       scoreValue: 2,
       upgrades: [
-        { cost: { metal: 100, credits: 30 }, buildTimeHours: 6, hp: 35, enablesGroundConstruction: true, upkeep: { energy: 3 } },
-        { cost: { metal: 150, credits: 60 }, buildTimeHours: 9, hp: 45, enablesGroundConstruction: true, upkeep: { energy: 5 } },
-        { cost: { metal: 200, credits: 90 }, buildTimeHours: 12, hp: 60, enablesGroundConstruction: true, buildSpeedBonus: 0.05, upkeep: { energy: 7 } },
+        {
+          cost: { metal: 100, credits: 30 },
+          buildTimeHours: 6,
+          hp: 35,
+          enablesGroundConstruction: true,
+          upkeep: { energy: 15 },
+        },
+        {
+          cost: { metal: 150, credits: 60 },
+          buildTimeHours: 9,
+          hp: 45,
+          enablesGroundConstruction: true,
+          upkeep: { energy: 25 },
+        },
+        {
+          cost: { metal: 200, credits: 90 },
+          buildTimeHours: 12,
+          hp: 60,
+          enablesGroundConstruction: true,
+          buildSpeedBonus: 0.05,
+          upkeep: { energy: 35 },
+        },
       ],
     },
     // Полевой госпиталь — единственный источник восстановления ГАРНИЗОНА: `healRate`
@@ -736,8 +775,20 @@ export const data: GameData = parseGameData({
       healRate: 0.15,
       scoreValue: 4,
       upgrades: [
-        { cost: { metal: 160, credits: 60 }, buildTimeHours: 6, hp: 32, healRate: 0.25, upkeep: { energy: 4 } },
-        { cost: { metal: 220, credits: 90 }, buildTimeHours: 9, hp: 42, healRate: 0.40, upkeep: { energy: 7 } },
+        {
+          cost: { metal: 160, credits: 60 },
+          buildTimeHours: 6,
+          hp: 32,
+          healRate: 0.25,
+          upkeep: { energy: 20 },
+        },
+        {
+          cost: { metal: 220, credits: 90 },
+          buildTimeHours: 9,
+          hp: 42,
+          healRate: 0.4,
+          upkeep: { energy: 35 },
+        },
       ],
     },
     // Factory — builds ground vehicles (tank) and squadrons (fighter_squadron).
@@ -750,10 +801,25 @@ export const data: GameData = parseGameData({
       hp: 25,
       enablesGroundConstruction: true,
       scoreValue: 5,
-      upkeep: { energy: 6 },
+      upkeep: { energy: 30 },
       upgrades: [
-        { cost: { metal: 180, credits: 80 }, buildTimeHours: 8, hp: 35, enablesGroundConstruction: true, enablesSquadronConstruction: true, upkeep: { energy: 10 } },
-        { cost: { metal: 250, credits: 120 }, buildTimeHours: 12, hp: 45, enablesGroundConstruction: true, enablesSquadronConstruction: true, buildSpeedBonus: 0.5, upkeep: { energy: 14 } },
+        {
+          cost: { metal: 180, credits: 80 },
+          buildTimeHours: 8,
+          hp: 35,
+          enablesGroundConstruction: true,
+          enablesSquadronConstruction: true,
+          upkeep: { energy: 50 },
+        },
+        {
+          cost: { metal: 250, credits: 120 },
+          buildTimeHours: 12,
+          hp: 45,
+          enablesGroundConstruction: true,
+          enablesSquadronConstruction: true,
+          buildSpeedBonus: 0.5,
+          upkeep: { energy: 70 },
+        },
       ],
     },
     // spaceport — the yard a space-domain hull needs to be laid down at all
@@ -782,7 +848,7 @@ export const data: GameData = parseGameData({
       // border to the next ring of worlds — on the current map neighbours sit ~205 out
       // (auto-identified, 1 hop) and the next ring ~349, so only L3 (420) reaches past 349.
       radarRange: 240,
-      upkeep: { energy: 6 },
+      upkeep: { energy: 30 },
       scoreValue: 2,
       upgrades: [
         {
@@ -790,14 +856,14 @@ export const data: GameData = parseGameData({
           buildTimeHours: 5,
           hp: 28,
           radarRange: 330,
-          upkeep: { energy: 10 },
+          upkeep: { energy: 50 },
         },
         {
           cost: { metal: 300, credits: 140 },
           buildTimeHours: 7,
           hp: 38,
           radarRange: 420,
-          upkeep: { energy: 16 },
+          upkeep: { energy: 80 },
         },
       ],
     },
@@ -821,7 +887,7 @@ export const data: GameData = parseGameData({
       buildTimeHours: 5,
       hp: 30,
       aaDamage: 12,
-      upkeep: { energy: 6 },
+      upkeep: { energy: 30 },
       scoreValue: 3,
     },
     fort: {
@@ -922,15 +988,27 @@ export const data: GameData = parseGameData({
     },
     relic_world: {
       name: 'Relic World',
+      // BAL-8: производство 0.05→−0.15, оборона 0→+0.40. Роль ДАЛЬНЕГО приза второй пары —
+      // двойник `fortress_world` по трём решающим полям (металл 4, производство −0.15,
+      // оборона +0.40). Древние укрепления реликта держат штурм, а добывать в руинах почти
+      // нечего — кроме артефактов, за которые и идут 12 кредитов. Кредиты в критерий
+      // равноценности не входят: пока они ничего не ограничивают (BAL-3), они и не дают
+      // преимущества — этим и куплено право типу отличаться.
       baseOutput: { credits: 12, energy: 4, metal: 4, food: 3 },
-      productionBonus: 0.05,
-      defenseBonus: 0,
+      productionBonus: -0.15,
+      defenseBonus: 0.4,
     },
     irradiated: {
       name: 'Irradiated',
-      baseOutput: { energy: 6, metal: 8, credits: 4, food: 1 },
-      productionBonus: 0.2,
-      defenseBonus: 0.15,
+      // BAL-8: металл 8→13, производство 0.2→0.45, оборона 0.15→−0.25. Тип занял роль
+      // БЛИЖНЕГО приза второй пары карты, а равняться с `crystalline` пришлось по ВСЕМ трём
+      // решающим полям — эффективного металла и обороны не хватило (замер: `PLANET_PAIRS`
+      // в `map.ts`), потому что множитель производства разгоняет ещё и застройку мира.
+      // Читается по смыслу: радиоактивные породы — богатая руда, но под облучением
+      // гарнизон не держится. Своё у типа осталось в энергии и кредитах.
+      baseOutput: { energy: 6, metal: 13, credits: 4, food: 1 },
+      productionBonus: 0.45,
+      defenseBonus: -0.25,
     },
     ringworld: {
       name: 'Ringworld',
@@ -958,7 +1036,7 @@ export const data: GameData = parseGameData({
       branch: 'transhuman',
       ship: { unit: 'hero' },
       slots: 4,
-      startAbilities: ['corridor', 'rally', 'scan', 'bulwark', 'diplomatic_landing'],
+      startAbilities: ['rally', 'scan', 'bulwark', 'diplomatic_landing'],
       startPassives: ['rally_beacon'],
     },
     ravager: {
@@ -976,7 +1054,7 @@ export const data: GameData = parseGameData({
       branch: 'transhuman',
       ship: { unit: 'hero' },
       slots: 2,
-      startAbilities: ['corridor', 'rally'],
+      startAbilities: ['rally'],
       startPassives: ['vanguard_impulse'],
     },
     warden: {
@@ -990,9 +1068,12 @@ export const data: GameData = parseGameData({
     },
   },
   // Способности: `temp_lane`/`annihilate` — встроенные эффекты heroModule (кастуются),
-  // `spawn_*` — пассивные маркеры точек развёртывания (читает `hero.spawn`), остальные
-  // типы (`aura`/`reveal`/`recall`) типизированы в данных, но эффекта в движке ещё нет —
-  // `hero.ability` на них честно отвечает `E_NO_EFFECT` (UI показывает «скоро»).
+  // `spawn_*` — пассивные маркеры точек развёртывания (читает `hero.spawn`), а
+  // `aura`/`reveal`/`recall` исполняет `heroEffectsModule` через capability
+  // `hero.effect.<type>` — он стоит в `MODULES` прототипа, так что живы ВСЕ типы этого
+  // каталога (сверено прогоном при AI-BAL-8: касты `aura`/`reveal` доходят до эффекта, а
+  // `hero.ability.used` эмитится только после его применения). `E_NO_EFFECT` остаётся
+  // fail-secure ответом на тип, которому провайдера нет, — но такого типа тут больше нет.
   heroAbilities: {
     corridor: {
       name: 'hero.ability.corridor.name',
@@ -1000,7 +1081,13 @@ export const data: GameData = parseGameData({
       type: 'temp_lane',
       cooldownHours: 12,
       range: 300,
-      params: {},
+      params: { tier: 1 },
+      // Лестница ступеней одной способности (HERO-CORRIDOR-СПЕКА): узел дерева
+      // поднимает ступень коридора, а не выдаёт вторую кнопку в ростере.
+      tiers: [
+        { skill: 'corridor_sustained', params: { tier: 2 } },
+        { skill: 'corridor_open', params: { tier: 3 } },
+      ],
     },
     annihilate: {
       name: 'hero.ability.annihilate.name',
@@ -1025,6 +1112,12 @@ export const data: GameData = parseGameData({
       cooldownHours: 10,
       range: 400,
       params: { radius: 250, durationHours: 3 },
+      // Вторая лестница ступеней (PSI-ЛЕСТНИЦА, зеркало коридорной): узлы дерева
+      // превращают просвеченную зону в боевую, а не выдают вторую кнопку в ростере.
+      tiers: [
+        { skill: 'psi_weak_points', params: { weakPointBonus: 0.05 } },
+        { skill: 'psi_evasion', params: { evasionBonus: 0.05 } },
+      ],
     },
     recall: {
       name: 'hero.ability.recall.name',
@@ -1091,11 +1184,25 @@ export const data: GameData = parseGameData({
       cost: { microelectronics: 45, credits: 100 },
       grants: { ability: 'corridor' },
     },
+    corridor_sustained: {
+      name: 'hero.tree.corridor-sustained.name',
+      description: 'hero.tree.corridor-sustained.desc',
+      branch: 'transhuman',
+      requires: ['overclocked_helm'],
+      cost: { microelectronics: 70, credits: 150 },
+    },
+    corridor_open: {
+      name: 'hero.tree.corridor-open.name',
+      description: 'hero.tree.corridor-open.desc',
+      branch: 'transhuman',
+      requires: ['corridor_sustained'],
+      cost: { microelectronics: 110, credits: 250 },
+    },
     void_attunement: {
       name: 'hero.tree.void-attunement.name',
       description: 'hero.tree.void-attunement.desc',
       branch: 'psionic',
-      cost: { energy: 60 },
+      cost: { energy: 56 },
       grants: { passive: 'rally_beacon' },
     },
     psi_veil: {
@@ -1103,8 +1210,22 @@ export const data: GameData = parseGameData({
       description: 'hero.tree.psi-veil.desc',
       branch: 'psionic',
       requires: ['void_attunement'],
-      cost: { energy: 90, credits: 100 },
+      cost: { energy: 126, credits: 100 },
       grants: { ability: 'scan' },
+    },
+    psi_weak_points: {
+      name: 'hero.tree.psi-weak-points.name',
+      description: 'hero.tree.psi-weak-points.desc',
+      branch: 'psionic',
+      requires: ['psi_veil'],
+      cost: { energy: 196, credits: 150 },
+    },
+    psi_evasion: {
+      name: 'hero.tree.psi-evasion.name',
+      description: 'hero.tree.psi-evasion.desc',
+      branch: 'psionic',
+      requires: ['psi_weak_points'],
+      cost: { energy: 308, credits: 250 },
     },
   },
   heroFittings: {

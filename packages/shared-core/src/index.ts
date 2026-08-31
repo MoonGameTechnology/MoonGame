@@ -21,6 +21,7 @@ export {
   type Hero,
   type TempLane,
   type MarketOrder,
+  type MarketSide,
   type Fleet,
   type FleetMovement,
   type FleetEdge,
@@ -65,6 +66,7 @@ export {
 } from './state/buildFromMap';
 export {
   sectorKindDef,
+  provinceScore,
   isCapturable,
   isBuildable,
   hasOrbit,
@@ -366,7 +368,7 @@ export {
   type FittingSpec,
   type InstallFailure,
 } from './util/fitting';
-export { requireOwnedIdleFleet, type IdleFleet } from './util/fleet';
+export { requireOwnedIdleFleet, nextFleetSeq, type IdleFleet, type FleetSeqState } from './util/fleet';
 export { buildProgress, thresholdRamp } from './util/construction';
 export {
   buildRecap,
@@ -396,14 +398,21 @@ export {
   creditsBonusOf,
   TAX_DIMINISH,
 } from './modules/tax';
+export {
+  BASE_RESEARCH_SLOTS,
+  MAX_RESEARCH_SLOTS,
+  clampResearchSlots,
+} from './modules/technology';
 export { constructionModule } from './modules/construction';
 export { arsenalSyncModule } from './modules/arsenalSync';
 export { stationModule } from './modules/station';
+export { seatClaimModule } from './modules/seatClaim';
 export { technologyModule, technologyLock, conditionMet } from './modules/technology';
-export { scientistModule } from './modules/scientist';
+export { scientistModule, scientistSlotBonus } from './modules/scientist';
 export { factionModule } from './modules/faction';
 export { armyModule } from './modules/army';
 export { fleetOpsModule } from './modules/fleetOps';
+export { autoRallyModule } from './modules/autoRally';
 export { squadronModule } from './modules/squadron';
 export { capitalModule, capitalsOf, capitalOf } from './modules/capital';
 export { standingOrdersModule } from './modules/standingOrders';
@@ -420,7 +429,12 @@ export { fleetRepairModule } from './modules/fleetRepair';
 export { forcedMarchModule, FORCED_MARCH_MULT, FORCED_MARCH_WEAR } from './modules/forcedMarch';
 export { victoryModule } from './modules/victory';
 export { visibilityModule } from './modules/visibility';
-export { heroModule, abilityRange } from './modules/hero';
+export {
+  heroModule,
+  abilityRange,
+  HERO_ACTIVE_CAP,
+  cooldownKey as heroCooldownKey,
+} from './modules/hero';
 export type { HeroEffect, HeroEffectArgs } from './modules/hero';
 export { heroEffectsModule } from './modules/heroEffects';
 export {
@@ -434,6 +448,11 @@ export {
 } from './modules/steward';
 export { effectsModule, type EffectImpl, type EffectOccurrence } from './modules/effects';
 export { defHasTrait, unitHasTrait, stacksHaveTrait } from './data/traits';
-export { marketModule } from './modules/market';
+export {
+  marketModule,
+  isTradable,
+  MARKET_COMMISSION,
+  type MarketEmbargoCapability,
+} from './modules/market';
 export { espionageModule } from './modules/espionage';
 export { diplomacyModule } from './modules/diplomacy';

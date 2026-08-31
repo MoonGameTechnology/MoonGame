@@ -223,7 +223,6 @@ import {
   parseJoinPass,
   type JoinOutcome,
 } from './joinRules';
-import { houseBonusKey, houseChoice, houseColor, houseName, houseRows } from './seatPicker';
 import { createPendingJoin } from './pendingJoin';
 import { syncCommanderXp } from './commanderSync';
 import { panelSlackFor } from './panelSlack';
@@ -283,11 +282,22 @@ import { callsignFor, checkRegister, nextCallsignNumber, registerPayload } from 
 import {
   fmtJoinWindow,
   joinWindow,
+  modeLabel,
   rowAction,
   ruleSummary,
   type MatchRules,
   type MatchTab,
 } from './matchRow';
+import {
+  clampFilter,
+  mapsOf,
+  matchesFilter,
+  playerBounds,
+  restoreFilter,
+  serializeFilter,
+  FILTER_STORE_KEY,
+  type FilterState,
+} from './matchFilter';
 
 /** Причина отказа во входе в матч → ключ подписи. Текст живёт в /localization. */
 const JOIN_REASON: Record<Exclude<JoinOutcome, 'ok'>, string> = {
@@ -596,6 +606,7 @@ import {
   slotAngle,
 } from './orbitRing';
 import { routeShown, routeStops, routeStroke } from './fleetRoute';
+import { fleetOrigin } from './fleetOrigin';
 import { netContacts, soloContacts } from './radarContacts';
 import { buildLogLine, type BuildLogKind } from './buildLog';
 import { bootyKind, bootyText, counterLine, spyRepaint } from './spyLog';
@@ -645,8 +656,23 @@ import { closeAction, isCurrentSocket } from './socketFate';
 import { welcomePlan } from './netWelcome';
 import { orderPlan } from './orderRoute';
 import { errorTarget, refusalKey } from './errorRoute';
+import { joinLanding } from '../../decisions/joinLanding';
+import {
+  claimIntent,
+  matchIdFrom,
+  settledAddress,
+  shareAddress,
+} from '../../decisions/matchAddress';
+import { HUB_MY_MATCHES, myMatches } from '../../decisions/myMatches';
+import {
+  entryOffer,
+  reconcileSelection,
+  startEnabled as netStartEnabled,
+  type EntryOffer,
+  type MatchSeat as EntrySeat,
+} from '../../decisions/entrySetup';
 import { clearStatusLine, fallbackFor, showServerRow } from './browserFallback';
-import { joinHref, startEnabled } from './seatJoin';
+import { joinHref } from './seatJoin';
 import { archiveUrl, httpBase, matchesUrl, queryOutcome, seatsUrl } from './matchQuery';
 import { archiveEffect, type ArchiveEffect } from './archiveOutcome';
 import { mintedToken, passwordFrom, registerExtra } from './authRequest';
@@ -659,7 +685,7 @@ import { pickEffect } from './pickApply';
 import { fleetsUnderTap } from './tapTargets';
 import { resolveAddress } from './serverAddress';
 import { authStatusUrl, identityMode, revealSignup } from './identityProbe';
-import { houseLine, seatView, type SeatView } from './seatList';
+import { seatView, type SeatView } from './seatList';
 import { pollLine, pollTick, type PollPhase } from './matchPoll';
 import { pingRoute, relayIntake } from './relayIntake';
 import {
@@ -1764,40 +1790,20 @@ function pumpBuildQueues(): void {
     }
   }
 }
+/** Где флот НАХОДИТСЯ по правилам, в МИРОВЫХ координатах — правила и вся интерполяция
+ *  живут чистой моделью `fleetOrigin.ts`; здесь остаётся подстановка живого состояния. */
 function fleetPos(f: Fleet): { x: number; y: number } | null {
-  // Free-space movement (squadrons / missiles): position is interpolated from
-  // freePosition toward (targetX, targetY) — a straight line in space, not a lane.
-  if (f.freeMovement) {
-    const from = f.freePosition;
-    if (!from) return null;
-    const fm = f.freeMovement;
-    const prog = Math.min(1, Math.max(0, (s.time - fm.departedAt) / (fm.arrivesAt - fm.departedAt)));
-    return {
-      x: from.x + (fm.targetX - from.x) * prog,
-      y: from.y + (fm.targetY - from.y) * prog,
-    };
-  }
-  if (f.freePosition) return f.freePosition;
-  if (f.location) return s.planets[f.location]?.position ?? null;
-  // Parked at a continuous point ON a lane (stopped mid-march / marched to a point).
-  if (f.edge) {
-    const a = s.planets[f.edge.from]?.position;
-    const b = s.planets[f.edge.to]?.position;
-    if (!a || !b) return null;
-    return { x: a.x + (b.x - a.x) * f.edge.t, y: a.y + (b.y - a.y) * f.edge.t };
-  }
-  const m = f.movement;
-  if (!m) return null;
-  const a = s.planets[m.from]?.position;
-  const b = s.planets[m.to]?.position;
-  if (!a || !b) return null;
-  // The leg only covers the sub-segment [startT, endT] of the lane (a partial leg
-  // out of / into a parked position), so interpolate within those bounds.
-  const s0 = m.startT ?? 0;
-  const e0 = m.endT ?? 1;
-  const prog = Math.min(1, Math.max(0, (s.time - m.departedAt) / (m.arrivesAt - m.departedAt)));
-  const t = s0 + (e0 - s0) * prog;
-  return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+  return fleetOrigin(f, s.time, (id) => s.planets[id]?.position ?? null);
+}
+/** Та же точка отсчёта, спроецированная НА ЭКРАН.
+ *
+ *  Отсюда меряют дальности способностей и отсюда выходят линии маршрутов — потому что
+ *  ровно эту точку знает ядро (`hero.ability` меряет `E_OUT_OF_RANGE` от позиции узла).
+ *  Не путать с `fleetAnchor`: тот отдаёт слот на орбитальном кольце — он кружит вокруг
+ *  планеты и годится ТОЛЬКО чтобы нарисовать шеврон и поймать по нему тап. */
+function fleetOriginPx(f: Fleet): { x: number; y: number } | null {
+  const p = fleetPos(f);
+  return p ? world(p) : null;
 }
 /** Where to draw a battle: the position of a fleet engaged in it (so a mid-lane
  *  intercept renders at the crossing point, not the nearest node), falling back to
@@ -1831,9 +1837,9 @@ function fleetHasArtillery(f: Fleet | undefined): boolean {
  *  so the launch is offered only when a non-squadron ship stays behind and the carrier is
  *  parked and out of combat (squadrons-roadmap SQ-1.1). */
 function fleetCanLaunchSquadron(f: Fleet | undefined): boolean {
-  if (!fleetHasSquadron(f) || f!.movement || !f!.location || f!.battleId) return false;
+  if (!fleetHasSquadron(f, data) || f!.movement || !f!.location || f!.battleId) return false;
   const total = f!.units.reduce((n, u) => n + u.count, 0);
-  const wing = squadronTake(f!).reduce((n, u) => n + u.count, 0);
+  const wing = squadronTake(f!, data).reduce((n, u) => n + u.count, 0);
   return wing > 0 && total > wing;
 }
 
@@ -1871,7 +1877,12 @@ function orbitAngle(idx: number, nPeers: number): number {
 
 /** Screen anchor (+ heading) for a fleet's chevron: the interpolated lane
  *  position while moving, or a slot on the orbit ring while stationed
- *  (fleets sharing the ring are fanned out so they don't overlap). */
+ *  (fleets sharing the ring are fanned out so they don't overlap).
+ *
+ *  ТОЛЬКО КАРТИНКА И ПАЛЕЦ. Слот на кольце кружит вокруг планеты (`orbitRing.ts`),
+ *  поэтому мерить отсюда нельзя ничего: дальности способностей и начала маршрутов
+ *  берут `fleetOriginPx` — точку, которую знает ядро. Здесь же остаются отрисовка
+ *  шеврона, попадание тапом/рамкой по нему и привязка меню к его картинке. */
 function fleetAnchor(f: Fleet): { x: number; y: number; ang: number } | null {
   if (f.movement || !f.location) {
     const mp = fleetPos(f);
@@ -3384,7 +3395,7 @@ function setScramble(ids: string[], on: boolean): void {
     // Кому дежурство положено и почему отказ — `stanceToggle.ts` (REFM-98).
     const want = scrambleStance(
       !!f && f.owner === ME,
-      !!f && fleetHasSquadron(f),
+      !!f && fleetHasSquadron(f, data),
       !!patrolOf(id),
       on,
       !!pos0,
@@ -3421,9 +3432,9 @@ function setScramble(ids: string[], on: boolean): void {
         id,
         standingPatrol(
           pos,
-          squadronStrikeRange(f),
+          squadronStrikeRange(f, data),
           wingSorties.get(id),
-          sortieSpec(f),
+          sortieSpec(f, data),
           freshSortie,
         ),
       );
@@ -3652,7 +3663,7 @@ function drawFleetRoutes() {
     // Чей маршрут виден, где он кончается и как выглядит — `fleetRoute.ts` (REFM-95);
     // здесь остаётся проекция мировых точек на экран.
     if (!routeShown(f.owner, ME, !!f.movement) || !f.movement) continue;
-    const start = fleetAnchor(f);
+    const start = fleetOriginPx(f);
     if (!start) continue;
     const sel = selFleet === f.id || selFleets.has(f.id);
     const stops = routeStops(f.movement, (id) => s.planets[id]?.position);
@@ -3821,7 +3832,10 @@ function drawCastAim(): void {
   const def = data.heroAbilities[heroAim.abilityId];
   if (!hero || !def) return;
   const fleet = hero.fleetId ? s.fleets[hero.fleetId] : undefined;
-  const origin = fleet ? fleetAnchor(fleet) : null;
+  // Круг досягаемости — от ТОЧКИ ОТСЧЁТА, а не от кружащей модельки: ядро меряет
+  // `E_OUT_OF_RANGE` от позиции узла, и граница обязана совпадать с той, по которой
+  // придёт отказ (иначе прицел врёт на радиус орбитального кольца, и каждый кадр иначе).
+  const origin = fleet ? fleetOriginPx(fleet) : null;
   if (!origin) return;
   const reach = abilityRange(def);
   const aoe = Number(def.params?.radius ?? 0);
@@ -3871,8 +3885,7 @@ function drawAbilityRings(): void {
     hero: (heroId) => {
       const hero = (s.heroes ?? {})[heroId];
       const f = hero?.fleetId ? s.fleets[hero.fleetId] : undefined;
-      const p = f ? fleetPos(f) : null;
-      return p ? world(p) : null;
+      return f ? fleetOriginPx(f) : null;
     },
     node: (planetId) => {
       const p = s.planets[planetId]?.position;
@@ -3910,7 +3923,7 @@ function drawAimPreview() {
   for (const id of ids) {
     const f = s.fleets[id];
     if (!f) continue;
-    const anchor = fleetAnchor(f);
+    const anchor = fleetOriginPx(f);
     if (!anchor) continue;
     // draw the ROUTED march path through province centres (Bytro-style), so you
     // see the actual road the army will take — not a straight line to the target.
@@ -5525,8 +5538,8 @@ function fleetPanelHtml(f: Fleet): string {
   // Carrier air wing (squadrons-roadmap SQ-1.1) — launch the squadron ships as a
   // separate fast strike fleet. Needs a non-squadron ship left behind (fleet.split
   // refuses to take the whole stack), so an all-fighter fleet just flies itself.
-  if (f.owner === ME && fleetHasSquadron(f)) {
-    const wing = squadronTake(f).reduce((n, u) => n + u.count, 0);
+  if (f.owner === ME && fleetHasSquadron(f, data)) {
+    const wing = squadronTake(f, data).reduce((n, u) => n + u.count, 0);
     h += `<div class="sec">${t('side.wing.title')}</div><div class="row">`;
     h += btn('launchsquad', '', t('side.wing.launch', { n: wing }), fleetCanLaunchSquadron(f));
     h += `</div>`;
@@ -5548,7 +5561,7 @@ function fleetPanelHtml(f: Fleet): string {
   // movement: strike an enemy in range, return to base, or toggle patrol (CC-4).
   // Что такое действующее крыло — `squadron.ts` (REFM-135): панель и обработчики
   // приказов обязаны отвечать на это одинаково, иначе кнопка обещает то, чего нет.
-  if (isWing(f, ME)) {
+  if (isWing(f, ME, fleetHasSquadron(f, data))) {
     const isPatrol = !!patrolOf(f.id);
     const canAct = wingCanAct(f);
     h += `<div class="sec">${t('side.wing.title')}</div><div class="row">`;
@@ -5832,7 +5845,7 @@ function planetPanelHtml(p: Planet): string {
   // Capital marker / designate — heroes respawn here (and re-fit modules, Phase C).
   // Что панель предлагает сделать с миром — `worldOrders.ts` (REFM-91).
   {
-    const cap = capitalOffer(mine, capitalOf(s, ME) === p.id, isInhabited(p));
+    const cap = capitalOffer(mine, capitalOf(s, ME) === p.id, isInhabited(data, p));
     if (cap === 'marked') {
       h += `<div class="row"><b style="color:var(--grn)">★ ${t('side.world.capital')}</b>${pcUi() ? '' : ` <span class="dim">${t('side.world.capital.note')}</span>`}</div>`;
     } else if (cap === 'designate') {
@@ -7215,12 +7228,12 @@ function renderCmdBar() {
           ids.length === 0,
           t('cmd.auto-assault.hint'),
         ) +
-        (fleets.some(fleetHasSquadron)
+        (fleets.some((f) => fleetHasSquadron(f, data))
           ? cmdBtn(
               'qscramble',
               '🛩',
               t('cmd.standing-sortie'),
-              fleets.filter(fleetHasSquadron).every((fl) => patrolOf(fl.id)) ? 'on' : '',
+              fleets.filter((fl) => fleetHasSquadron(fl, data)).every((fl) => patrolOf(fl.id)) ? 'on' : '',
               false,
               t('cmd.standing-sortie.hint'),
             )
@@ -7432,27 +7445,27 @@ side.addEventListener('click', (ev) => {
     // Split the squadron stack off into its own fast strike fleet (SQ-1.1).
     const f = selFleet ? s.fleets[selFleet] : undefined;
     if (fleetCanLaunchSquadron(f)) {
-      playerOrder(splitFleet(ME, f!.id, squadronTake(f!)));
+      playerOrder(splitFleet(ME, f!.id, squadronTake(f!, data)));
       note(t('hint.squadron-launched'));
     }
   } else if (act === 'squadronstrike') {
     // Squadron free-space strike: arm the aim mode to pick an enemy fleet in range.
     const f = selFleet ? s.fleets[selFleet] : undefined;
-    if (isWing(f, ME) && wingCanAct(f)) {
+    if (isWing(f, ME, fleetHasSquadron(f, data)) && wingCanAct(f)) {
       squadronStrikeAim = selFleet;
       note(t('hint.squadron-strike-aim'));
     }
   } else if (act === 'squadronreturn') {
     // Squadron return to base: fly back to the carrier in free space.
     const f = selFleet ? s.fleets[selFleet] : undefined;
-    if (isWing(f, ME) && wingCanReturn(f)) {
+    if (isWing(f, ME, fleetHasSquadron(f, data)) && wingCanReturn(f)) {
       playerOrder(makeAction(ME, 'squadron.return', { fleetId: f!.id }));
       note(t('hint.squadron-returning'));
     }
   } else if (act === 'squadronpatrol') {
     // Toggle CC-4 standing patrol for this squadron fleet.
     const f = selFleet ? s.fleets[selFleet] : undefined;
-    if (isWing(f, ME) && wingCanAct(f)) {
+    if (isWing(f, ME, fleetHasSquadron(f, data)) && wingCanAct(f)) {
       setScramble([f!.id], !patrolOf(f!.id));
     }
   }
@@ -7837,7 +7850,7 @@ cmdbar.addEventListener('click', (ev) => {
     if (on) note(t('hint.auto-assault'));
   } else if (cmd === 'qscramble') {
     // SO-UI: the CC-4 «дежурный вылет», group-uniform over the squadron fleets.
-    const wings = ids.filter((id) => fleetHasSquadron(s.fleets[id]));
+    const wings = ids.filter((id) => fleetHasSquadron(s.fleets[id], data));
     const on = !wings.every((id) => patrolOf(id));
     setScramble(wings, on);
     if (on) note(t('hint.standing-sortie'));
@@ -8617,6 +8630,10 @@ const statusEl = $('cstatus');
 const showConnect = (show: boolean): void => {
   connectEl.style.display = show ? 'flex' : 'none';
 };
+/** Виден ли экран подключения. Нужен там, где решение зависит от того, ПРОЧИТАЕТ ли
+ *  игрок написанное в его строку статуса: по ссылке на сессию оверлей скрыт с самого
+ *  начала загрузочной ветки, и текст отказа в нём равен молчанию (ADDR-5). */
+const connectShown = (): boolean => connectEl.style.display !== 'none';
 srvInput.value =
   localStorage.getItem('void.server') ??
   // Default to the SAME ORIGIN so a served page needs no typing: deployed https →
@@ -8738,6 +8755,9 @@ function hubTab(tab: string): void {
     return;
   }
   currentHubTab = tab;
+  // ADDR-4: свои партии — главный экран, а не вкладка обозревателя, поэтому лента
+  // переспрашивается при каждом заходе домой (день и число игроков успевают устареть).
+  if (tab === 'home') void refreshMyMatches();
   if (tab === 'meta') renderMetaPanel(); // live numbers every visit (XP may have grown)
   if (tab === 'friends') void friends.refresh(); // roster + presence are server truth
   if (tab === 'rank') void rank.refresh(); // places are computed server-side (RANK-1)
@@ -8994,7 +9014,7 @@ async function welcomeSignIn(nick: string): Promise<void> {
     const pending = pendingJoinAfterAuth.take();
     if (pending) {
       showStage('browse'); // hide the welcome card
-      connectToMatch(pending.matchId, pending.slot, pending.faction);
+      connectToMatch(pending.matchId, pending.slot, pending.faction, pending.scientists);
     } else {
       openHub();
     }
@@ -9103,7 +9123,7 @@ async function submitRegister(): Promise<void> {
     const pending = pendingJoinAfterAuth.take();
     if (pending) {
       showStage('browse');
-      connectToMatch(pending.matchId, pending.slot, pending.faction);
+      connectToMatch(pending.matchId, pending.slot, pending.faction, pending.scientists);
     } else {
       openHub();
     }
@@ -9335,9 +9355,16 @@ let authMode = false;
 const pendingJoinAfterAuth = createPendingJoin();
 const bootParams = typeof location !== 'undefined' ? new URLSearchParams(location.search) : null;
 const bootReset = (bootParams?.get('reset') ?? '').trim();
-const bootJoinId = (bootParams?.get('join') ?? '').trim();
-const bootSlot = (bootParams?.get('slot') ?? '').trim();
-const bootFaction = (bootParams?.get('faction') ?? '').trim();
+// ADDR-3: партия адресуется ПУТЁМ (`/game/<id>`), но старый хвост (`?join=<id>`) уже
+// роздан игрокам и лежит в закладках — читаем обе формы, пишем только новую.
+const bootJoinId = bootParams ? matchIdFrom(location.pathname, bootParams) : '';
+// ADDR-2: что ссылка просит СВЕРХ адреса партии. Отдельный вопрос от «куда вести» —
+// решение в `decisions/matchAddress.ts` (правила: адрес несёт только id, параметры
+// захвата одноразовы, сидящему в партии они не адресованы вовсе).
+const bootClaim = bootParams ? claimIntent(bootParams, false) : null;
+const bootSlot = bootClaim?.slot ?? '';
+const bootFaction = bootClaim?.faction ?? '';
+const bootScientists = bootClaim?.scientists ?? [];
 if (bootReset) {
   openReset(bootReset);
 } else if (bootJoinId) {
@@ -9349,24 +9376,27 @@ if (bootReset) {
   void (async () => {
     const srv = resolveServer();
     if (srv) await probeAuthMode(srv.base);
-    // If auth-off LAN, just dial in (no login needed).
-    if (!authMode) {
-      showStage('browse');
-      connectToMatch(bootJoinId, bootSlot || undefined, bootFaction || undefined);
-      return;
-    }
-    // Auth-on: if we have a cached session JWT, go straight to the match.
+    // Куда ведёт ссылка — `joinLanding.ts` (ADDR-5): сервер без аккаунтов пускает сразу,
+    // живая сессия ведёт в матч, её отсутствие — на стартовый экран.
     // NEVER log the record — even a prefix of `cached.token` is a session-JWT leak
     // into the browser console (and into any screen recording of a playtest).
     const cached = srv ? sessionRecord(srv.base) : null;
-    if (cached) {
+    const where = joinLanding({
+      authRequired: !!authMode,
+      hasSession: !!cached,
+      refused: false,
+    });
+    if (where === 'match') {
       showStage('browse');
-      connectToMatch(bootJoinId, bootSlot || undefined, bootFaction || undefined);
+      connectToMatch(bootJoinId, bootSlot || undefined, bootFaction || undefined, bootScientists);
       return;
     }
     // No session — show the welcome card so the player can register/login,
     // then welcomeSignIn auto-resumes the join via pendingJoinAfterAuth.
-    pendingJoinAfterAuth.remember(bootJoinId, bootSlot, bootFaction);
+    pendingJoinAfterAuth.remember(bootJoinId, bootSlot, bootFaction, bootScientists);
+    // ADDR-5: ветка началась с showConnect(false), и без этой строки карточка входа
+    // выставлялась ВНУТРИ скрытого оверлея — игрок получал пустой экран вместо входа.
+    showConnect(true);
     showStage('welcome');
     const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
     wNickInput.value = savedNick || suggestCallsign();
@@ -9413,6 +9443,9 @@ const setupSlotsEl = $('setupslots');
 const setupFactionsEl = $('setupfactions');
 const setupSpeedEl = $('setupspeed');
 const setupHintEl = $('setuphint');
+/** Правая колонка сетапа — боты, команды, скорость времени. В сетевом матче это
+ *  решения сервера, а не игрока, поэтому там она прячется целиком. */
+const soloColEl = document.getElementById('setup-solo-col');
 const setupGoEl = $('setupgo') as HTMLButtonElement;
 
 // The player's division templates / hero roster / ship blueprints. Pre-match loadout
@@ -9441,12 +9474,37 @@ const setupShips: ShipLoadout[] = DEFAULT_SHIP_LOADOUTS.map((l) => ({
 // were removed. `setupTemplates` / `setupHeroes` / `setupShips` above keep seeding the
 // match with the default rosters via buildSetupConfig.
 
+/** Сетевой режим экрана настройки (ENTRY-2). `null` — обычная одиночная схватка.
+ *
+ *  Экран ОДИН на оба режима намеренно: игрок просил «как в одиночке, но в сетевой», и
+ *  второй экран с той же картой и теми же карточками разошёлся бы с первым на первой же
+ *  правке. Меняется не разметка, а источник данных: кандидаты приходят от сервера, а не
+ *  из `START_CANDIDATES`, занятые миры видны и не выбираются, правая колонка (боты,
+ *  команды, скорость времени) скрыта — в сетевом матче это не твои решения. */
+let netSetup: { matchId: string; offer: EntryOffer } | null = null;
+
+/** Стартовые миры, которые сейчас предлагает экран. */
+function setupCandidateIds(): string[] {
+  if (!netSetup) return [...START_CANDIDATES];
+  return netSetup.offer.worlds.flatMap((w) => (w.planetId ? [w.planetId] : []));
+}
+
+/** Кресло, которое достанется вместе с этим миром (только в сетевом режиме). */
+function slotForWorld(planetId: string): string | null {
+  return netSetup?.offer.worlds.find((w) => w.planetId === planetId)?.slot ?? null;
+}
+
+/** Занят ли этот мир живым игроком. */
+function worldTaken(planetId: string): boolean {
+  return netSetup?.offer.worlds.find((w) => w.planetId === planetId)?.taken === true;
+}
+
 function renderSetupMap(): void {
   // Рамка, трассы без повторов и порядок рисования — в `setupMap.ts` (REFM-45):
   // там же правило «каждое ребро один раз» и «кандидаты рисуются последними».
   const box = mapViewBox(MAP, 60);
   setupMapEl.setAttribute('viewBox', `${box.x} ${box.y} ${box.w} ${box.h}`);
-  const order = drawOrder(MAP, START_CANDIDATES);
+  const order = drawOrder(MAP, setupCandidateIds());
   let svg = '';
   for (const l of lanes(MAP)) {
     svg += `<line x1="${l.from.x}" y1="${l.from.y}" x2="${l.to.x}" y2="${l.to.y}" stroke="#1d3640" stroke-width="3"/>`;
@@ -9457,10 +9515,22 @@ function renderSetupMap(): void {
   }
   for (const n of order.candidates) {
     const picked = n.id === setupStart;
+    // Занятый мир ОСТАЁТСЯ на карте и гаснет (`entrySetup.ts`, правило 2): карта — это
+    // расклад матча, и дырка на месте соперника читалась бы как «там пусто».
+    const taken = worldTaken(n.id);
+    const fill = taken
+      ? 'rgba(120,140,146,.12)'
+      : picked
+        ? 'rgba(58,209,122,.35)'
+        : 'rgba(53,214,230,.16)';
+    const stroke = taken ? '#4a6169' : picked ? '#3ad17a' : '#35d6e6';
+    // У занятого мира — подпись прямо на кружке: цвет один читают мельком и не всегда
+    // верно, а «занято» отвечает на вопрос сразу.
     svg +=
-      `<circle class="cand" data-cand="${n.id}" cx="${n.x}" cy="${n.y}" r="${picked ? 30 : 22}" ` +
-      `fill="${picked ? 'rgba(58,209,122,.35)' : 'rgba(53,214,230,.16)'}" ` +
-      `stroke="${picked ? '#3ad17a' : '#35d6e6'}" stroke-width="${picked ? 6 : 4}"/>`;
+      `<circle class="cand${taken ? ' taken' : ''}" data-cand="${n.id}"` +
+      `${taken ? ' data-taken="1"' : ''} cx="${n.x}" cy="${n.y}" r="${picked ? 30 : 22}" ` +
+      `fill="${fill}" stroke="${stroke}" stroke-width="${picked ? 6 : 4}">` +
+      `${taken ? `<title>${esc(t('seatpick.taken'))}</title>` : ''}</circle>`;
   }
   setupMapEl.innerHTML = svg;
 }
@@ -9551,6 +9621,26 @@ function renderSetup(): void {
   // Seat 1 (you) is always in, so the match can always launch — including with ZERO
   // rivals: a calm solo sandbox to read descriptions, learn the UI and test in peace
   // (the core never ends a one-player match — victory needs ≥2 active sides).
+  // Сетевой режим (ENTRY-2): решения — в `decisions/entrySetup.ts`, здесь только показ.
+  // Правая колонка скрыта: боты, команды и скорость времени в сетевом матче не твои
+  // решения, а сервера. Кнопка заперта, пока не выбран СВОБОДНЫЙ мир — пустой выбор
+  // отправил бы игрока на сервер без места, и тот посадил бы куда-нибудь.
+  if (soloColEl) soloColEl.style.display = netSetup ? 'none' : '';
+  if (netSetup) {
+    const free = netSetup.offer.free;
+    const ready = netStartEnabled(slotForWorld(setupStart), netSetup.offer.worlds);
+    setupGoEl.disabled = !ready;
+    setupGoEl.textContent = t('seatpick.go');
+    setupHintEl.textContent =
+      free === 0
+        ? t('seatpick.none-free')
+        : ready
+          ? t('setup.home.pick', { home: setupStart })
+          : t('setup.map-hint');
+    for (const c of Array.from(setupSpeedEl.querySelectorAll('[data-spd]')))
+      c.classList.toggle('on', Number((c as HTMLElement).dataset.spd) === setupSpeed);
+    return;
+  }
   const rivals = rivalCount(setupSlots);
   setupGoEl.disabled = false;
   setupGoEl.textContent = rivals === 0 ? t('setup.start.solo') : t('setup.start');
@@ -9592,6 +9682,11 @@ setupCouncilEl.addEventListener('click', openSciPick);
 
 function openSetup(from: 'welcome' | 'hub' = 'welcome'): void {
   setupReturn = from;
+  // Каждый заход начинается ОДИНОЧНЫМ: сетевой режим ставит `openSeatPicker`
+  // сразу после этого вызова. Иначе брошенный сетевой заход утёк бы в следующую
+  // одиночную схватку — тот же довод, что у чистого выбора в `seatJoin.ts`.
+  netSetup = null;
+  stopNetSetupPoll();
   setupSlots = freshSetupSlots();
   setupTeams = false; // a fresh setup opens on the classic free-for-all
   setupSeatTeam = [...DEFAULT_TEAM_SIDES];
@@ -9796,7 +9891,7 @@ setupMapEl.addEventListener('click', (ev) => {
     );
     if (at) {
       const hit = nearestHit(
-        START_CANDIDATES.flatMap((id) => {
+        setupCandidateIds().flatMap((id) => {
           const n = MAP.find((m) => m.id === id);
           return n ? [n] : [];
         }),
@@ -9809,6 +9904,13 @@ setupMapEl.addEventListener('click', (ev) => {
     }
   }
   if (!pick) return;
+  // Занятый мир виден, но не выбирается (`entrySetup.ts`, правило 2). Молча
+  // проигнорировать тап нельзя — это выглядит как непрожатая кнопка, поэтому говорим,
+  // что случилось.
+  if (worldTaken(pick)) {
+    setupHintEl.textContent = t('seatpick.lost');
+    return;
+  }
   setupStart = pick;
   renderSetup();
 });
@@ -9848,7 +9950,24 @@ setupSpeedEl.addEventListener('click', (ev) => {
   localStorage.setItem('void.setupSpeed', String(setupSpeed));
   renderSetup();
 });
-setupGoEl.addEventListener('click', () => startMatch(buildSetupConfig()));
+setupGoEl.addEventListener('click', () => {
+  // В сетевом режиме экран не запускает матч — он собирает выбор в адрес входа
+  // (`seatJoin.ts`), а мир приходит от сервера. Тот же переход, что раньше делало окно
+  // выбора дома: `location.href`, а не новая вкладка (её блокирует браузер).
+  if (netSetup) {
+    const slot = slotForWorld(setupStart);
+    if (!slot) return; // кнопка и так заперта, но выбор мог протухнуть между рендерами
+    location.href = joinHref(
+      location.pathname,
+      netSetup.matchId,
+      slot,
+      setupFaction || null,
+      setupScientists,
+    );
+    return;
+  }
+  startMatch(buildSetupConfig());
+});
 $('setupcancel').addEventListener('click', () => {
   setupEl.style.display = 'none';
   if (setupReturn === 'hub') openHub();
@@ -10108,7 +10227,25 @@ function connect(): void {
       scheduleReconnect(); // a reconnect attempt failed to admit → back off and retry
     }
     // `keep-reason`: нас не впустили — ответ сервера уже в строке статуса, и стирать
-    // его нечем (правило 4); оверлей и так показан.
+    // его нечем (правило 4). Оверлей ПОКАЗАН, если игрок пришёл через экран подключения,
+    // — но не когда он пришёл по ссылке на сессию: там ветка началась с showConnect(false),
+    // и строка статуса, как и весь экран, невидима. Тогда сажаем его на видимый экран
+    // (ADDR-5): причина уезжает с ним, а решение о том, куда именно, не зависит от кода
+    // отказа — иначе ссылка стала бы оракулом существования партий.
+    if (!connectShown()) {
+      const reason = statusEl.textContent ?? '';
+      const srv = resolveServer();
+      const landing = joinLanding({
+        authRequired: !!authMode,
+        hasSession: srv ? !!sessionRecord(srv.base) : false,
+        refused: true,
+      });
+      if (landing === 'hub') openHub(reason);
+      else {
+        showConnect(true);
+        showStage('welcome');
+      }
+    }
   };
   sock.onerror = () => {
     if (!isCurrentSocket(sock, netSock)) return; // ошибка устаревшего сокета — не наша
@@ -10281,6 +10418,7 @@ async function fetchJoinToken(
   session: string,
   slot?: string,
   faction?: string,
+  scientists?: readonly string[],
 ): Promise<{ token: string; playerId: string } | null> {
   try {
     // REL-7: pass ?slot= to request a specific seat; ?faction= to override the
@@ -10289,7 +10427,7 @@ async function fetchJoinToken(
     // правило «401 стирает сессию», без которого клиент вечно стучится в дверь
     // просроченным пропуском.
     const res = await fetch(
-      `${httpBase(base)}/matches/${encodeURIComponent(matchId)}/join${joinQuery(slot, faction)}`,
+      `${httpBase(base)}/matches/${encodeURIComponent(matchId)}/join${joinQuery(slot, faction, scientists)}`,
       {
         headers: { authorization: `Bearer ${session}` },
       },
@@ -10322,10 +10460,18 @@ interface MatchRow {
    *  long is left. Absent on an older server ⇒ treat as always open. */
   entryOpen?: boolean;
   entryClosesInMs?: number;
+  /** Game mode (BRW-1): the preset id the session runs, and whether the server judged
+   *  it PvP or PvE. Either may be absent — see rule 5 in `matchRow.ts`. */
+  modeId?: string;
+  kind?: 'pvp' | 'pve';
 }
 
 let matchLists: Record<MatchTab, MatchRow[]> | null = null;
 let activeTab: MatchTab = 'available';
+/** Выбор фильтров (BRW-3). Живёт в модуле, поэтому тихий переопрос раз в десять секунд
+ *  его не сбрасывает — перерисовка читает то же состояние. Между заходами он лежит в
+ *  `localStorage` рядом с `void.server`/`void.nick`; `null` — ещё не восстанавливали. */
+let matchFilter: FilterState | null = null;
 
 /** Join a chosen match: set it as the (re)connect target, then dial via `connect()`.
  *  Accounts mode (SES-2.5) first exchanges the session for a join token (register/
@@ -10336,7 +10482,12 @@ let activeTab: MatchTab = 'available';
  *  which isn't shown by default. Fix: stash the id in `pendingJoinAfterAuth`, show
  *  the welcome card so the player can register/login, and `welcomeSignIn` resumes
  *  the join automatically on success. */
-function connectToMatch(id: string, slot?: string, faction?: string): void {
+function connectToMatch(
+  id: string,
+  slot?: string,
+  faction?: string,
+  scientists: readonly string[] = [],
+): void {
   currentMatchId = id;
   reconnecting = false;
   reconnectAttempts = 0;
@@ -10349,6 +10500,7 @@ function connectToMatch(id: string, slot?: string, faction?: string): void {
   // почему просьбу запоминают, почему пароль спрашивают только при известном сервере и
   // почему сессия проверяется наличием, а не совпадением позывного.
   if (!authMode) {
+    claimDone(id);
     connect();
     return;
   }
@@ -10357,20 +10509,44 @@ function connectToMatch(id: string, slot?: string, faction?: string): void {
     const cached = srv ? sessionRecord(srv.base) : null;
     const next = joinStep({ accountsMode: authMode, serverKnown: !!srv, hasSession: !!cached });
     if (next.step === 'sign-in') {
-      askSignIn(id, slot, faction, next.password ? srv : null);
+      askSignIn(id, slot, faction, next.password ? srv : null, scientists);
       return;
     }
-    const join = await fetchJoinToken(srv!.base, id, cached!.token, slot, faction);
+    const join = await fetchJoinToken(srv!.base, id, cached!.token, slot, faction, scientists);
     if (!join) {
       // Токен не выдан: сессии больше нет — вход просрочен, зовём войти заново; сессия на
       // месте — закрыт сам матч, и карточка входа тут ни при чём (правило 4).
       if (afterTokenRefused(!!sessionRecord(srv!.base)) === 'sign-in')
-        askSignIn(id, slot, faction, srv);
+        askSignIn(id, slot, faction, srv, scientists);
       return;
     }
     pendingJoinToken = join.token;
+    claimDone(id);
     connect();
   })();
+}
+
+/**
+ * Захват состоялся — свести строку к адресу партии (ADDR-2 + ADDR-3).
+ *
+ * В строке остаётся АДРЕС ПАРТИИ (`/game/<id>`), а не просьба занять место: именно её
+ * игрок копирует и отдаёт другому, и именно она попадает в закладку. Со `slot`/`faction`
+ * внутри отданная ссылка навязывала бы получателю чужой выбор — место ему сервер не
+ * отдаст (резолвер откатится на свободное), а вот дом отдаст: для него это НОВЫЙ захват.
+ * Чистим ПОСЛЕ захвата, а не до: пока вход не удался, параметры ещё нужны — игрок может
+ * уйти логиниться и вернуться доигрывать заход. Тот же приём, что у `?reset=<token>`.
+ *
+ * `replaceState`, а не `pushState`: аппаратный Back в APK завязан на `history.back()`
+ * (см. блок про сигнальную запись ниже), и лишняя запись в истории превратила бы первый
+ * Back из выхода в возврат на то же место.
+ */
+function claimDone(matchId: string): void {
+  try {
+    const settled = settledAddress(location.href, matchId);
+    if (settled !== location.href) history.replaceState(null, '', settled);
+  } catch {
+    /* history/URL недоступны (не браузер) — чистить нечего */
+  }
 }
 
 /**
@@ -10384,8 +10560,9 @@ function askSignIn(
   slot: string | undefined,
   faction: string | undefined,
   srv: { nick?: string } | null,
+  scientists: readonly string[] = [],
 ): void {
-  pendingJoinAfterAuth.remember(id, slot, faction);
+  pendingJoinAfterAuth.remember(id, slot, faction, scientists);
   showConnect(false);
   showHub(false);
   showStage('welcome');
@@ -10411,25 +10588,82 @@ function askSignIn(
 // and the server auto-assigned the first free seat (no choice).
 const seatpickEl = $('seatpick') as HTMLElement | null;
 const seatpickListEl = $('seatpick-list') as HTMLElement | null;
-const seatpickGoEl = $('seatpick-go') as HTMLButtonElement | null;
-const seatpickCancelEl = $('seatpick-cancel') as HTMLButtonElement | null;
-let seatpickMatchId: string | null = null;
-let seatpickSelected: string | null = null;
-let seatpickFaction: string | null = null; // BF-30: chosen faction (decoupled from slot)
 
+/** Запрос расклада мест, назвавшись (ADDR-6).
+ *
+ *  Идущую партию сервер отдаёт только её участникам, поэтому запрос обязан сказать, кто
+ *  спрашивает. На хосте с учётками это сессионный JWT (через `tokenFor` — «кто ты» ходит
+ *  только им, правило 1 `sessionStore.ts`), на безаккаунтном — `?nick=` внутри адреса.
+ *  Токена нет — идём как аноним: открытую для входа партию сервер покажет и так, а на
+ *  закрытую нам и правда нечего смотреть.
+ *
+ *  ОДНА точка на оба захода — открытие экрана и его тихий переопрос. Разъехавшись, они
+ *  отличались бы правами: переопрос молча слеп бы там, где открытие работает, и игрок
+ *  видел бы застывший список вместо живого. */
+function fetchSeats(base: string, matchId: string, nick: string): Promise<Response> {
+  const pass = tokenFor(localStorage, base, nick);
+  return fetch(
+    seatsUrl(base, matchId, nick),
+    pass ? { headers: { authorization: `Bearer ${pass}` } } : {},
+  );
+}
+
+/** Опрос мест, пока открыт сетевой экран (ENTRY-2, правило 5).
+ *
+ *  Партия живая: пока игрок выбирает, соседний мир могут занять. Узнать об этом на
+ *  попытке входа — поздно: игрок уже нажал «Выбрать» и получил отказ вместо мира.
+ *  Поэтому список обновляется, а судьбу выбора решает `reconcileSelection`: занятый
+ *  мир СБРАСЫВАЕТ выбор, а не переезжает на соседний — иначе человек улетел бы играть
+ *  не туда, куда смотрел.
+ *
+ *  Тихий: неудачный запрос ничего не трогает. Список мест не критичен настолько, чтобы
+ *  из-за одного сетевого чиха стирать игроку выбор. */
+let netSetupPoll: ReturnType<typeof setInterval> | null = null;
+const NET_SETUP_POLL_MS = 5000;
+
+function stopNetSetupPoll(): void {
+  if (netSetupPoll !== null) clearInterval(netSetupPoll);
+  netSetupPoll = null;
+}
+
+function startNetSetupPoll(base: string, matchId: string, nick: string): void {
+  stopNetSetupPoll();
+  netSetupPoll = setInterval(() => {
+    if (!netSetup) return stopNetSetupPoll();
+    void (async () => {
+      try {
+        const res = await fetchSeats(base, matchId, nick);
+        if (queryOutcome(res) !== 'ok') return;
+        const body = (await res.json()) as { seats: EntrySeat[] };
+        if (!netSetup) return;
+        netSetup = { matchId, offer: entryOffer(body.seats ?? []) };
+        const fate = reconcileSelection(slotForWorld(setupStart), netSetup.offer.worlds);
+        if (fate.kind === 'lost') {
+          setupStart = '';
+          renderSetup();
+          setupHintEl.textContent = t('seatpick.lost');
+          return;
+        }
+        renderSetup();
+      } catch {
+        /* тихий опрос: связь моргнула — выбор игрока не трогаем */
+      }
+    })();
+  }, NET_SETUP_POLL_MS);
+}
+
+/** Открыть экран настройки под КОНКРЕТНУЮ сетевую сессию (ENTRY-2).
+ *
+ *  Экран тот же, что в одиночной игре — игрок просил «как в одиночке, но в сетевой», и
+ *  второй экран с той же картой разошёлся бы с первым на первой же правке. Меняется
+ *  источник: кандидаты и дома приходят от сервера (`GET /matches/:id/seats`), занятые
+ *  миры видны и не выбираются, правая колонка скрыта.
+ *
+ *  Пока места едут, на экране стоит честная заглушка (`seatList.ts`, правило 1): окно,
+ *  которое ждёт ответа за кулисами, выглядит как проваленный тап, и игрок жмёт ещё раз. */
 async function openSeatPicker(matchId: string): Promise<void> {
   const srv = resolveServer();
   if (!srv) return;
-  seatpickMatchId = matchId;
-  // Чистый выбор на каждый заход и запертая кнопка, пока дом не выбран — `seatJoin.ts`
-  // (REFM-152, правила 1–2): уцелевший выбор прошлого матча увёл бы игрока не туда.
-  seatpickSelected = null;
-  seatpickFaction = null;
-  if (seatpickGoEl) seatpickGoEl.disabled = !startEnabled(seatpickSelected);
-  // Что стоит вместо списка домов — `seatList.ts` (REFM-155): окно поднимается СРАЗУ с
-  // заглушкой «Загрузка…» (иначе тап по «Войти» выглядит проваленным), каждый заход
-  // начинается с неё, а не с домов прошлого матча, и беда отличается от ожидания ещё и
-  // цветом.
   const показать = (view: SeatView): void => {
     if (!seatpickListEl || view.kind !== 'placeholder') return;
     const style = view.tone === 'dim' ? 'color:var(--dim);text-align:center' : 'color:var(--red)';
@@ -10438,102 +10672,27 @@ async function openSeatPicker(matchId: string): Promise<void> {
   показать(seatView('opening'));
   if (seatpickEl) seatpickEl.style.display = 'flex';
   try {
-    const res = await fetch(seatsUrl(srv.base, matchId));
+    const res = await fetchSeats(srv.base, matchId, srv.nick);
     // Отказ и обрыв это окно показывает одинаково — см. оговорку в шапке `seatList.ts`.
     if (queryOutcome(res) !== 'ok') {
       показать(seatView('refused'));
       return;
     }
-    const data = (await res.json()) as {
-      seats: Array<{
-        playerId: string;
-        name: string;
-        faction: string;
-        start: string | null;
-        taken: boolean;
-      }>;
-    };
-    if (seatpickListEl) {
-      seatpickListEl.innerHTML = '';
-      // The player picks a HOUSE, and the seat comes with it: `seatPicker.ts` (REFM-49)
-      // holds the grouping and — importantly — the rule that the slot is the first FREE
-      // seat of that house, not simply the first one.
-      for (const house of houseRows(data.seats)) {
-        const row = document.createElement('div');
-        row.className = 'seat-row' + (house.full ? ' taken' : '');
-        row.dataset.faction = house.faction;
-        const dot = document.createElement('div');
-        dot.className = 'seat-dot';
-        dot.style.background = houseColor(house.faction);
-        const info = document.createElement('div');
-        info.className = 'seat-info';
-        const name = document.createElement('div');
-        name.className = 'seat-name';
-        name.textContent = houseName(house.faction);
-        const passive = document.createElement('div');
-        passive.className = 'seat-faction';
-        // The bonus line is a KEY — it has to go through t(), or the player reads
-        // «seatpick.bonus.azure» at the exact moment of choosing a house.
-        const bonusKey = houseBonusKey(house.faction);
-        passive.textContent = bonusKey ? t(bonusKey) : '';
-        // Подписи строки — `seatList.ts` (REFM-155, правило 4): слово о занятости
-        // отвечает «пустят ли», счёт — «сколько там уже сидит».
-        const подписи = houseLine(house);
-        const slots = document.createElement('div');
-        slots.className = 'seat-faction';
-        slots.style.fontSize = '10px';
-        slots.textContent = t('browser.slots') + ': ' + подписи.count;
-        info.appendChild(name);
-        info.appendChild(passive);
-        if (slots.textContent) info.appendChild(slots);
-        const status = document.createElement('div');
-        status.className = 'seat-status' + (house.full ? '' : ' free');
-        status.textContent = t(подписи.statusKey);
-        row.appendChild(dot);
-        row.appendChild(info);
-        row.appendChild(status);
-        const choice = houseChoice(house);
-        if (choice) {
-          row.addEventListener('click', () => {
-            for (const r of seatpickListEl.querySelectorAll('.seat-row.selected')) {
-              r.classList.remove('selected');
-            }
-            row.classList.add('selected');
-            seatpickSelected = choice.slot;
-            seatpickFaction = choice.faction; // BF-30: faction chosen independently of start
-            if (seatpickGoEl) seatpickGoEl.disabled = !startEnabled(seatpickSelected);
-          });
-        }
-        seatpickListEl.appendChild(row);
-      }
-    }
+    const body = (await res.json()) as { seats: EntrySeat[] };
+    const offer = entryOffer(body.seats ?? []);
+    if (seatpickEl) seatpickEl.style.display = 'none';
+    openSetup('hub'); // сбрасывает режим — сетевой ставим сразу после
+    netSetup = { matchId, offer };
+    startNetSetupPoll(srv.base, matchId, srv.nick);
+    // Стартовый мир не подставляем: правило 4 `entrySetup.ts` — кнопка заперта, пока
+    // игрок сам не ткнул в свободный мир. Иначе выбор превратился бы в пожелание.
+    setupStart = '';
+    renderSetup();
   } catch {
     показать(seatView('unreachable'));
   }
 }
 
-if (seatpickCancelEl) {
-  seatpickCancelEl.addEventListener('click', () => {
-    if (seatpickEl) seatpickEl.style.display = 'none';
-    seatpickMatchId = null;
-  });
-}
-if (seatpickGoEl) {
-  seatpickGoEl.addEventListener('click', () => {
-    if (!seatpickMatchId || !seatpickSelected) return;
-    const id = seatpickMatchId;
-    const slot = seatpickSelected;
-    const faction = seatpickFaction;
-    if (seatpickEl) seatpickEl.style.display = 'none';
-    seatpickMatchId = null;
-    // Navigate to ?join=<id>&slot=<slotId>&faction=<faction> — the boot block picks
-    // up ?join and connectToMatch fetches the join token with ?slot=&faction= to
-    // reserve the chosen seat AND override its faction (BF-30: decoupled from start).
-    // Склейку и экранирование держит `seatJoin.ts` (REFM-152): в адрес уходит выбор
-    // игрока, а фракции может не быть — тогда её нет и в ссылке.
-    location.href = joinHref(location.pathname, id, slot, faction);
-  });
-}
 
 function openSessionTab(id: string): void {
   // REL-7: show the seat/faction picker first (if the server supports it),
@@ -10553,6 +10712,20 @@ async function refreshMatches(quiet = false): Promise<void> {
     else if (upd.kind === 'text') statusEl.textContent = t(upd.key);
   };
   line('start');
+  line((await loadMatchLists(srv)) ? 'loaded' : 'failed');
+  renderMatches();
+}
+
+/**
+ * Забрать ленту матчей в `matchLists`. Возвращает, удалось ли.
+ *
+ * Отдельно от `refreshMatches`, потому что СТРОКА СТАТУСА тут ни при чём: её пишет
+ * обозреватель, и писать в неё, когда игрок смотрит на хаб, нельзя — это ровно тот
+ * вред, от которого предостерегает правило 1 `matchPoll.ts` (фоновая неудача штампует
+ * «сервер недоступен» поверх экрана, где про сервер не спрашивали). Хабу нужна лента,
+ * а не строка, поэтому он зовёт эту половину (ADDR-4).
+ */
+async function loadMatchLists(srv: { base: string; nick: string }): Promise<boolean> {
   // Identity mode first (SES-2.5): accounts servers get the password row shown
   // BEFORE the player clicks «Войти» on a row — no surprise prompt mid-join.
   await probeAuthMode(srv.base);
@@ -10562,12 +10735,11 @@ async function refreshMatches(quiet = false): Promise<void> {
     matchLists = (await res.json()) as Record<MatchTab, MatchRow[]>;
     localStorage.setItem('void.server', srv.base);
     localStorage.setItem('void.nick', srv.nick);
-    line('loaded');
+    return true;
   } catch {
     matchLists = null;
-    line('failed');
+    return false;
   }
-  renderMatches();
 }
 
 async function toggleArchive(id: string, restore: boolean): Promise<void> {
@@ -10590,6 +10762,53 @@ async function toggleArchive(id: string, restore: boolean): Promise<void> {
   } catch {
     await apply(archiveEffect(op, 'unreachable'));
   }
+}
+
+/** Запомнить выбор между заходами — рядом с `void.server` / `void.nick`. */
+function saveMatchFilter(): void {
+  if (matchFilter) localStorage.setItem(FILTER_STORE_KEY, serializeFilter(matchFilter));
+}
+
+/**
+ * Отрисовать панель фильтров ПО ЛЕНТЕ (BRW-3). Галочки карт и границы ползунка берутся
+ * из самой ленты (`matchFilter.ts`, правило 6) — каталога карт в read-model нет. Что
+ * значит выбор, решает тот же модуль; здесь только разметка и обработчики.
+ */
+function renderFilterPanel(rows: MatchRow[], f: FilterState): void {
+  for (const b of Array.from(document.querySelectorAll('#mf-mode .mfbtn')))
+    b.classList.toggle('active', (b as HTMLElement).dataset.mode === f.mode);
+  const btn = $('mf-map');
+  btn.textContent =
+    f.maps.size === 0 ? t('browser.filter.map.all') : t('browser.filter.map.some', { n: f.maps.size });
+  const menu = $('mf-maps');
+  menu.textContent = '';
+  for (const id of mapsOf(rows)) {
+    const label = document.createElement('label');
+    const box = document.createElement('input');
+    box.type = 'checkbox';
+    box.checked = f.maps.has(id);
+    box.addEventListener('change', () => {
+      if (box.checked) f.maps.add(id);
+      else f.maps.delete(id);
+      saveMatchFilter();
+      renderMatches();
+    });
+    label.appendChild(box);
+    label.appendChild(document.createTextNode(id));
+    menu.appendChild(label);
+  }
+  const bounds = playerBounds(rows);
+  const lo = $('mf-min') as HTMLInputElement;
+  const hi = $('mf-max') as HTMLInputElement;
+  for (const [input, value] of [
+    [lo, f.players.min],
+    [hi, f.players.max],
+  ] as const) {
+    input.min = String(bounds.min);
+    input.max = String(bounds.max);
+    input.value = String(value);
+  }
+  $('mf-range').textContent = t('browser.filter.range', { min: f.players.min, max: f.players.max });
 }
 
 function renderMatches(): void {
@@ -10624,10 +10843,35 @@ function renderMatches(): void {
       openSetup('hub');
     });
   };
-  const rows = matchLists?.[activeTab] ?? [];
-  const план = fallbackFor({ ...состояние, rows: rows.length });
+  const все = matchLists?.[activeTab] ?? [];
+  // Фильтр — это ПОИСК сессии, поэтому он живёт только на «Доступных» (решение владельца,
+  // `matchFilter.ts`, правило 1): свои матчи на двух других вкладках он не трогает, и
+  // панель там не показывается. Состояние приводится к сегодняшней ленте на каждой
+  // перерисовке (правило 7) — иначе сохранённая галочка на ушедшей карте вычистила бы
+  // список, не показавшись в панели.
+  let rows = все;
+  let hiddenByFilter = 0;
+  if (activeTab === 'available') {
+    matchFilter = matchFilter
+      ? clampFilter(matchFilter, все)
+      : restoreFilter(localStorage.getItem(FILTER_STORE_KEY), все);
+    rows = все.filter((m) => matchesFilter(m, matchFilter as FilterState));
+    hiddenByFilter = все.length - rows.length;
+  }
+  const план = fallbackFor({ ...состояние, rows: rows.length, hiddenByFilter });
+  // Панель нужна только там, где есть что фильтровать: без загруженной ленты она
+  // предлагала бы крутить контролы вместо того, чтобы починить связь.
+  const панель = $('mfilter');
+  панель.style.display = activeTab === 'available' && план.kind !== 'empty' ? '' : 'none';
+  if (activeTab === 'available' && план.kind !== 'empty') renderFilterPanel(все, matchFilter as FilterState);
   if (план.kind === 'empty') {
     soloCard(t(план.message));
+    return;
+  }
+  if (план.kind === 'filtered') {
+    // Правило 6 `browserFallback.ts`: это НЕ тупик — путь у игрока прямо над списком,
+    // поэтому одно сообщение и никакой кнопки «в соло».
+    el.innerHTML = `<div class="mempty">${t(план.message)}</div>`;
     return;
   }
   el.textContent = '';
@@ -10648,9 +10892,24 @@ function renderMatches(): void {
     } else if (win.kind === 'open') {
       windowLine = ` · <span class="mwin${win.soon ? ' soon' : ''}">${t('browser.join-window', { dur: fmtJoinWindow(win.left) })}</span>`;
     }
+    // Режим партии (BRW-4): значок вида + имя пресета. Имя приходит НЕ со строки —
+    // сервер шлёт только id, а человеческое имя даёт `tData()` по тому же слагу
+    // (`pve_waves` → `data.pve-waves`). Что именно печатать, решает `modeLabel()`:
+    // значка нет, пока сервер сам не назвал вид, а без `modeId` строки нет вовсе.
+    const mode = modeLabel(m);
+    let modeLine = '';
+    if (mode.kind === 'shown') {
+      const badge =
+        mode.badge === 'pve'
+          ? `<span class="mmode pve">${t('browser.mode.pve')}</span> `
+          : mode.badge === 'pvp'
+            ? `<span class="mmode pvp">${t('browser.mode.pvp')}</span> `
+            : '';
+      modeLine = `${badge}${esc(tData(mode.modeId))} · `;
+    }
     info.innerHTML =
       `<div class="mname">${esc(m.mapId)} <span class="mid">${esc(m.matchId)}</span></div>` +
-      `<div class="mmeta">${t('browser.day', { n: m.days })} · ${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
+      `<div class="mmeta">${modeLine}${t('browser.day', { n: m.days })} · ${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
       `${esc(ruleSummary(m.rules))} · ${m.status === 'ended' ? t('browser.finished') : t('browser.running')}${windowLine}</div>`;
     row.appendChild(info);
     const btns = document.createElement('div');
@@ -10672,6 +10931,130 @@ function renderMatches(): void {
     row.appendChild(btns);
     el.appendChild(row);
   }
+}
+
+/**
+ * «Мои партии» на главном экране хаба (ADDR-4).
+ *
+ * Обозреватель отвечает на «куда пойти играть», этот список — на «где я уже играю и куда
+ * вернуться». Какие партии сюда попадают, в каком порядке и что значит пустота — решает
+ * `decisions/myMatches.ts`; здесь только разметка, адрес и переходы.
+ *
+ * Адрес строится на адресе СЕРВЕРА (`shareAddress`, правило 7 `matchAddress.ts`): в APK
+ * страница приходит с локального сервера Capacitor, и адрес из `location.origin` привёл
+ * бы получателя в его собственный телефон.
+ */
+function renderMyMatches(serverHttp: string): void {
+  const el = document.getElementById('hub-mine');
+  if (!el) return;
+  const view = myMatches(matchLists, HUB_MY_MATCHES);
+  // Правило 5: ленты нет — молчим. «У вас нет партий» поверх трёх идущих отправило бы
+  // игрока заводить четвёртую.
+  if (view.kind === 'unknown') {
+    el.textContent = '';
+    return;
+  }
+  // Правило 6: пустота — нормальное начало, и она зовёт туда, где партии берут.
+  if (view.kind === 'none') {
+    el.innerHTML = `<div class="hm-empty">${t('hub.mine.empty')}</div>`;
+    return;
+  }
+  el.textContent = '';
+  for (const m of view.rows) {
+    const addr = serverHttp ? shareAddress(serverHttp, m.matchId) : '';
+    const card = document.createElement('div');
+    card.className = 'hub-card hm-row';
+    card.innerHTML =
+      `<div class="hc-ic">${m.status === 'ended' ? '◼' : '▶'}</div>` +
+      `<div class="hm-body">` +
+      // Идентификатора в заголовке нет намеренно: он целиком стоит ниже, В АДРЕСЕ —
+      // а `m-<uuid>` в заголовке отъедал три строки и вытеснял то, ради чего сюда
+      // смотрят (какая партия, какой день, сколько игроков).
+      `<div class="hc-t">${esc(m.mapId)}</div>` +
+      `<div class="hc-s">${t('browser.day', { n: m.days })} · ` +
+      `${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
+      `${m.status === 'ended' ? t('browser.finished') : t('browser.running')}</div>` +
+      (addr ? `<div class="hm-addr">${esc(addr)}</div>` : '') +
+      `</div>`;
+    const btns = document.createElement('div');
+    btns.className = 'hm-btns';
+    const open = document.createElement('button');
+    open.className = 'mbtn';
+    open.textContent = t('browser.join');
+    open.addEventListener('click', () => openSessionTab(m.matchId));
+    btns.appendChild(open);
+    if (addr) {
+      const copy = document.createElement('button');
+      copy.className = 'mbtn ghost';
+      copy.textContent = t('hub.mine.copy');
+      copy.addEventListener('click', () => {
+        // Буфер обмена может быть недоступен (нет разрешения, небезопасный контекст) —
+        // тогда честно зовём скопировать из строки: адрес в ней и написан, целиком.
+        void (navigator.clipboard?.writeText(addr) ?? Promise.reject(new Error('no clipboard')))
+          .then(() => {
+            hubNote.textContent = t('hub.mine.copied');
+          })
+          .catch(() => {
+            hubNote.textContent = t('hub.mine.copy-manual');
+          });
+      });
+      btns.appendChild(copy);
+    }
+    card.appendChild(btns);
+    el.appendChild(card);
+  }
+  if (view.more > 0) {
+    // Правило 4: остаток — не строки, а один переход в обозреватель.
+    const more = document.createElement('button');
+    more.className = 'hm-more';
+    more.type = 'button';
+    more.textContent = t('hub.mine.more', { n: view.more });
+    more.addEventListener('click', () => {
+      // Остаток лежит на «Активных», а обозреватель открывается на «Доступных» — и своих
+      // партий там нет ПО ПОСТРОЕНИЮ: сервер не кладёт в `available` матч, где у тебя уже
+      // есть место (`MatchRegistry.list`). Без переключения вкладки «ещё 2» приводило бы
+      // на заведомо пустой список — проверено вживую.
+      (document.querySelector('.mtab[data-tab="active"]') as HTMLElement | null)?.click();
+      hubTab('games');
+    });
+    el.appendChild(more);
+  }
+}
+
+/** Переспросить ленту и перерисовать «Мои партии» (ADDR-4). Строку статуса обозревателя
+ *  не трогает — этим и отличается `loadMatchLists` от `refreshMatches`. */
+async function refreshMyMatches(): Promise<void> {
+  const srv = resolveServer();
+  if (srv) await loadMatchLists(srv);
+  renderMyMatches(srv ? httpBase(srv.base) : '');
+}
+
+// Контролы фильтра (BRW-3). Обработчики вешаются ОДИН раз: живой пересчёт — это
+// перерисовка уже лежащей в памяти ленты, без похода на сервер.
+$('mf-mode').addEventListener('click', (e) => {
+  const btn = (e.target as HTMLElement).closest('.mfbtn') as HTMLElement | null;
+  const mode = btn?.dataset.mode;
+  if (!matchFilter || (mode !== 'all' && mode !== 'pvp' && mode !== 'pve')) return;
+  matchFilter.mode = mode;
+  saveMatchFilter();
+  renderMatches();
+});
+$('mf-map').addEventListener('click', () => {
+  const menu = $('mf-maps');
+  menu.style.display = menu.style.display === 'none' ? '' : 'none';
+});
+for (const id of ['mf-min', 'mf-max']) {
+  $(id).addEventListener('input', () => {
+    if (!matchFilter) return;
+    // Концы намеренно НЕ разводятся: перевёрнутый ползунок — законное состояние,
+    // предикат меняет их местами сам (`matchFilter.ts`, правило 4).
+    matchFilter.players = {
+      min: Number(($('mf-min') as HTMLInputElement).value),
+      max: Number(($('mf-max') as HTMLInputElement).value),
+    };
+    saveMatchFilter();
+    renderMatches();
+  });
 }
 
 for (const btn of Array.from(document.querySelectorAll('.mtab'))) {
@@ -10775,11 +11158,15 @@ const fpsEl = $('fps');
 // without staging a real standoff duel — for design review and the FX screenshot
 // tests. Compiled out of the player build (dev tooling, not diagnostics).
 if (!__PLAYER_BUILD__ && DEV_UI && typeof window !== 'undefined') {
+  const oxy = (p: { x: number; y: number }): { ox: number; oy: number } => ({
+    ox: p.x,
+    oy: p.y,
+  });
   (window as unknown as { __vdFx?: object }).__vdFx = {
     // e2e probe: page-space anchors of own fleets and all worlds — lets a browser
     // test tap real map objects without guessing coordinates. Dev chrome, read-only.
     probe(): {
-      fleets: Array<{ id: string; x: number; y: number }>;
+      fleets: Array<{ id: string; x: number; y: number; ox: number; oy: number }>;
       worlds: Array<{ id: string; x: number; y: number; owner: string | null }>;
     } {
       const r = canvas.getBoundingClientRect();
@@ -10789,8 +11176,11 @@ if (!__PLAYER_BUILD__ && DEV_UI && typeof window !== 'undefined') {
           .filter((f) => f.owner === ME)
           // fleetAnchor is null for a fleet with no drawable position — skip it
           .flatMap((f) => {
+            // Обе точки флота: `x,y` — моделька (по ней тапают, она кружит по кольцу),
+            // `ox,oy` — точка отсчёта (её знает ядро, она неподвижна на стоянке).
             const a = fleetAnchor(f);
-            return a ? [{ id: f.id, ...sx(a) }] : [];
+            const o = fleetOriginPx(f);
+            return a && o ? [{ id: f.id, ...sx(a), ...oxy(sx(o)) }] : [];
           }),
         worlds: Object.values(s.planets).map((p) => ({
           id: p.id,
@@ -10940,7 +11330,15 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'testmode', isOpen: () => flexed('testmode'), close: () => hideFlex('testmode') }, // z59
   { id: 'sandbox', isOpen: () => flexed('sandbox'), close: () => hideFlex('sandbox') }, // z59
   { id: 'intro', isOpen: () => shown('intro'), close: () => hide('intro') }, // z58
-  { id: 'seatpick', isOpen: () => flexed('seatpick'), close: () => seatpickCancelEl?.click() }, // z58
+  // Оверлей мест остался только заглушкой на время загрузки и на отказ (ENTRY-2):
+  // выбор переехал на экран настройки, поэтому закрывать его нечем, кроме как скрыть.
+  {
+    id: 'seatpick',
+    isOpen: () => flexed('seatpick'),
+    close: () => {
+      if (seatpickEl) seatpickEl.style.display = 'none';
+    },
+  }, // z58
   { id: 'recap', isOpen: () => shown('recap'), close: () => hide('recap') }, // z57
   { id: 'profile', isOpen: () => shown('profile'), close: () => profile.close() }, // z57
   // --- окна и карточки (z51…z44) ---
@@ -11901,7 +12299,7 @@ function drawChainPath(
   alpha: number,
 ): void {
   if (!steps.length || !fromId) return;
-  const start = fleetAnchor(f);
+  const start = fleetOriginPx(f);
   if (!start) return;
   const tl = chainTimeline(steps, fromId, baseH, chainTravelH(f), chainAbilityHoldH([f.id]), headRemH);
   // Полилиния: от якоря флота по маршруту каждого перелёта (стиль drawFleetRoutes).

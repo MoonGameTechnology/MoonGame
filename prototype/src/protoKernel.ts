@@ -10,6 +10,7 @@ import {
   createKernel,
   economyModule,
   effectsModule,
+  seatClaimModule,
   movementModule,
   factionModule,
   heroModule,
@@ -30,6 +31,16 @@ import {
   stewardModule,
   diplomacyModule,
   squadronModule,
+  forcedMarchModule,
+  instantRepairModule,
+  fleetRepairModule,
+  taxModule,
+  capitalModule,
+  scientistModule,
+  standingOrdersModule,
+  fleetOpsModule,
+  autoRallyModule,
+  marketModule,
   type GameModule,
   type GameState,
   type Action,
@@ -37,16 +48,8 @@ import {
   type DomainEvent,
 } from '../../packages/shared-core/src/index';
 import { data } from './prototypeData';
-import { taxModule } from './tax';
 import { hungerModule } from './hunger';
-import { fleetLaunchModule } from './fleetLaunch';
 import { botDiplomacyModule } from './botDiplomacy';
-import { marketModule } from './sessionMarket';
-import { capitalModule } from './capital';
-import { standingOrdersModule } from './standingOrders';
-import { forcedMarchModule } from './forcedMarch';
-import { instantRepairModule } from './instantRepair';
-import { econScrewsModule } from './econScrews';
 
 export const MODULES: GameModule[] = [
   sectorModule,
@@ -69,10 +72,19 @@ export const MODULES: GameModule[] = [
   constructionModule,
   arsenalSyncModule, // LARS-1: server-driver refresh of live build-catalog ownership (bypasses gate)
   technologyModule, // session research: branch/day-gated techs → effect bonuses + content unlocks
+  // CONV-5: совет учёных наконец влияет на партию, а не только на пилюлю слотов.
+  // Врезка в `techTree.ts` рисовала «+1 слот» от Полимата, но модуля, который его
+  // даёт, в этом ядре не было — редьюсер отказывал третьему исследованию
+  // (`E_RESEARCH_SLOTS_FULL`). Сразу за technologyModule, как в `DEV_MODULES`:
+  // модуль вешает только хук `research.slots`, других рёбер у него нет.
+  scientistModule,
   stewardModule, // «Хранитель»: delegate the seat to the AI while you sleep (gated by the Steward tech)
   armyModule,
   victoryModule, // terminal match state from authoritative state (domination / elimination / score / timeout)
-  fleetLaunchModule,
+  fleetOpsModule, // fleet.launch/merge/split/engage — модуль ЯДРА (CONV-8)
+  // CONV-10: авто-сбор построенного (BF-29) переехал В ЯДРО — это последняя
+  // механика, которую прототип держал один; канон её теперь тоже грузит.
+  autoRallyModule,
   diplomacyModule, // CORE D2+D3 (D4): escalation/consent offers; combat reads state.diplomacy
   espionageModule, // SPY-1 core module: espionage.spy → time-boxed intel windows (state.intel)
   botDiplomacyModule, // bots: friendly-by-default favour meter → embargo/war only when provoked
@@ -82,8 +94,12 @@ export const MODULES: GameModule[] = [
   squadronModule, // SQ: free-space movement for squadrons (strike/return off the lane graph)
   forcedMarchModule, // BOOST-1 форс-марш: +50% скорости за 5% max-HP износа в час хода
   instantRepairModule, // платный мгновенный ремонт корпуса (кредиты как премиум-валюта)
-  econScrewsModule, // ECON-3: экспресс-ремонт корпуса за metal у своего дока
+  fleetRepairModule, // ECON-3: экспресс-ремонт корпуса за metal у своего дока
   effectsModule, // EFX-1: интерпретатор data.events (trigger→effect); инертен, пока events: {} пуст
+  seatClaimModule, // ENTRY-3: заявка на место (дом + совет учёных) действием, а не мутацией
+  // мимо редьюсера — иначе выбор не попадает в лог и реплей воспроизводит партию иначе.
+  // В КОНЕЦ намеренно: модуль не вешает ни хуков, ни подписок на чужие события, поэтому
+  // относительный порядок всех остальных остаётся нетронутым (инвариант #6).
 ];
 
 export const kernel = createKernel(MODULES);

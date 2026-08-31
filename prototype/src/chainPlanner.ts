@@ -25,7 +25,11 @@
  */
 import { t } from '../../localization/runtime';
 import { esc } from './format';
-import { MAX_CHAIN_STEPS, MAX_CHAIN_WAIT_HOURS, type ChainStep } from './chain';
+import {
+  MAX_CHAIN_STEPS,
+  MAX_CHAIN_WAIT_HOURS,
+  type ChainStep,
+} from '../../packages/shared-core/src/index';
 
 /** Что за точка под пальцем. `fleet` — вражеский флот; остальное — миры. */
 export type ChainPointKind = 'own' | 'enemy' | 'neutral' | 'fleet';

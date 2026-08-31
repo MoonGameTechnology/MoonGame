@@ -19,5 +19,25 @@
       "npcFaction": "swarm",
       "waveIntervalHours": 6
     }
+  },
+  "duel": {
+    "name": "Duel",
+    "teamFormat": "1v1"
+  },
+  "team_2v2": {
+    "name": "Team 2v2",
+    "teamFormat": "2v2"
+  },
+  "team_3v3": {
+    "name": "Team 3v3",
+    "teamFormat": "3v3"
+  },
+  "team_4v4": {
+    "name": "Team 4v4",
+    "teamFormat": "4v4"
+  },
+  "team_5v5": {
+    "name": "Team 5v5",
+    "teamFormat": "5v5"
   }
 }
