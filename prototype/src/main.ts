@@ -590,6 +590,13 @@ import {
   stanceKey,
   stanceThread,
 } from './diploAudience';
+import {
+  GOALS_BONUS_XP,
+  goalsChanged,
+  goalsListHtml,
+  goalsTrayHtml,
+  rewardDue,
+} from './goalsPanel';
 import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from './simClock';
 import { armedTap } from './armedTap';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
@@ -2469,17 +2476,19 @@ function stopFirstGoals(): void {
 function updateGoals(): void {
   if (!goalsActive) return;
   const next = mergeDone(goalsDone, metGoals(goalSignals()));
-  if (next.length === goalsDone.length) return; // nothing new
+  // Перерисовка только при СДВИГЕ списка — `goalsPanel.ts` (REFM-183): панель
+  // собирается через innerHTML, и перезапись каждый кадр рвала бы тап по кнопке.
+  if (!goalsChanged(goalsDone.length, next.length)) return;
   goalsDone = next;
   renderGoals();
-  if (goalsComplete(goalsDone) && !goalsRewarded) {
+  // Награда ровно ОДИН раз: «список выполнен» остаётся истиной навсегда, защёлка — нет.
+  if (rewardDue(goalsComplete(goalsDone), goalsRewarded)) {
     goalsRewarded = true;
     const cur = loadMeta();
-    const bonus = 40;
-    saveMeta({ ...cur, xp: cur.xp + bonus });
+    saveMeta({ ...cur, xp: cur.xp + GOALS_BONUS_XP });
     note(
       t('onb.goals.all-done', {
-        n: bonus,
+        n: GOALS_BONUS_XP,
       }),
     );
   }
@@ -2490,20 +2499,19 @@ function renderGoals(): void {
   // Collapsed = a small tappable tray badge (icon + count), not just the list hidden
   // under a still-full-width header — the whole point is to give the map its room
   // back, not just the four rows.
+  // Свёрнутая подача — ЛОТОК, а не спрятанные строки: смысл сворачивания вернуть карте
+  // место, а шапка во всю ширину этого не даёт (`goalsPanel.ts`, правило 3).
   if (goalsCollapsed) {
-    el.innerHTML = `<button class="gl-tray" id="gl-tray" type="button" title="${esc(t('onb.goal.tray.title'))}">◎ <span class="gl-count">${goalsDone.length}/${FIRST_GOALS.length}</span></button>`;
+    el.innerHTML = goalsTrayHtml(t('onb.goal.tray.title'), goalsDone.length, FIRST_GOALS.length);
     el.classList.add('show');
     return;
   }
-  const items = FIRST_GOALS.map((g) => {
-    const done = goalsDone.includes(g.id);
-    return `<div class="gl-item${done ? ' done' : ''}"><span class="gl-ck">${done ? '✓' : '○'}</span><span>${esc(t(g.labelKey))}</span></div>`;
-  }).join('');
-  el.innerHTML =
-    `<div class="gl-box"><div class="gl-head"><b>${t('onb.goals.title')}</b>` +
-    `<span class="gl-count">${goalsDone.length}/${FIRST_GOALS.length}</span>` +
-    `<button class="gl-tg" id="gl-tg" type="button" title="${esc(t('onb.goal.collapse.title'))}">▾</button></div>` +
-    `<div class="gl-list">${items}</div>`;
+  el.innerHTML = goalsListHtml(
+    t('onb.goals.title'),
+    t('onb.goal.collapse.title'),
+    FIRST_GOALS.map((g) => ({ label: t(g.labelKey), done: goalsDone.includes(g.id) })),
+    goalsDone.length,
+  );
   el.classList.add('show');
 }
 document.getElementById('goals')?.addEventListener('click', (ev) => {
