@@ -597,6 +597,7 @@ import {
   goalsTrayHtml,
   rewardDue,
 } from './goalsPanel';
+import { gainRepaint, researchHeard } from './gainNews';
 import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from './simClock';
 import { armedTap } from './armedTap';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
@@ -3088,7 +3089,9 @@ function handleEvents(events: DomainEvent[]) {
         break;
       }
       case 'technology.researched':
-        if (p.playerId === ME)
+        // Открытие слышит ТОЛЬКО исследователь — `gainNews.ts` (REFM-184): чужие
+        // технологии это разведданные, за них в игре платят шпионажем.
+        if (researchHeard(p.playerId, ME))
           note(
             t('log.tech.done', {
               tech: tData(
@@ -3096,7 +3099,9 @@ function handleEvents(events: DomainEvent[]) {
               ),
             }),
           );
-        if (techTree.isOpen()) techTree.repaint();
+        // Перерисовка ВНЕ проверки адресата (правило 5): доступность узлов сдвинулась
+        // оттого, что событие случилось, а не оттого, что игрок о нём услышал.
+        if (gainRepaint('research').techTree && techTree.isOpen()) techTree.repaint();
         break;
       // «Хранитель» lifecycle: snapshot at delegation, diff on expiry (the morning report).
       // Что печатает каждое событие вахты и что делается с опорным снимком —
@@ -3167,7 +3172,9 @@ function handleEvents(events: DomainEvent[]) {
             at: performance.now(),
           });
         }
-        if (diploOpen && diploTab === 'diplo') renderDiplo(); // province counts shifted
+        // Тоже ВНЕ проверки видимости (`gainNews.ts`, правило 5): захват за туманом
+        // всё равно сдвигает счёт держав, и ростер обязан сходиться с состоянием.
+        if (gainRepaint('capture').roster && diploOpen && diploTab === 'diplo') renderDiplo();
         break;
       case 'diplomacy.changed': {
         const a = p.a as string;
