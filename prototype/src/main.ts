@@ -601,6 +601,7 @@ import { gainRepaint, researchHeard } from './gainNews';
 import { cmdShown } from './cmdPresence';
 import { allOn } from './cmdHighlight';
 import { assaultTargetOk, deployPick, hostileFleets, mergeAnchors, ownFleets } from './aimTargets';
+import { FORGOTTEN, afterRebuild, keepScroll, panelChanged } from './panelCache';
 import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from './simClock';
 import { armedTap } from './armedTap';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
@@ -6951,13 +6952,14 @@ function renderPanel() {
   }
   sheetWasOpen = open;
   if (!open) {
-    lastPanelHtml = '';
-    lastObjDescHtml = '';
+    // Закрытый лист забывает ВСЁ — `panelCache.ts` (REFM-188): иначе при следующем
+    // открытии кэш скажет «уже нарисовано», а DOM пуст, и лист откроется пустым.
+    ({ panel: lastPanelHtml, objDesc: lastObjDescHtml } = FORGOTTEN);
     hoverObj = null;
     return;
   }
   const html = panelHtml();
-  if (html !== lastPanelHtml) {
+  if (panelChanged(html, lastPanelHtml)) {
     // Scrollable content on the left, a fixed dossier pane glued to the right edge
     // (filling the panel's empty space — see #side / .pdesc CSS). Re-rendering the
     // content rebuilds #pdesc, so force the dossier to repaint against the new DOM.
@@ -6967,9 +6969,10 @@ function renderPanel() {
     const prevScroll = (side.querySelector('.pscroll') as HTMLElement | null)?.scrollTop ?? 0;
     side.innerHTML = `<div class="pscroll">${html}</div><aside class="pdesc" id="pdesc"></aside>`;
     const ps = side.querySelector('.pscroll') as HTMLElement | null;
-    if (ps && prevScroll > 0) ps.scrollTop = prevScroll;
-    lastPanelHtml = html;
-    lastObjDescHtml = '';
+    if (ps && keepScroll(prevScroll)) ps.scrollTop = prevScroll;
+    // Тронули DOM листа — кэш досье гаснет ВМЕСТЕ с ним (правило 2): `innerHTML`
+    // пересоздал `#pdesc`, и старое «уже нарисовано» врало бы про новый пустой узел.
+    ({ panel: lastPanelHtml, objDesc: lastObjDescHtml } = afterRebuild(html));
   }
   renderObjDesc();
   updatePanelLive(); // patch live countdowns in place — never rebuild the panel for them
