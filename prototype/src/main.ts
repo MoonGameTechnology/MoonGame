@@ -581,6 +581,7 @@ import { barStays, popoverLife } from './popoverLife';
 import { parseBuildAnchor, quickBuildOrder } from './quickBuild';
 import { isMine, seen, seenArc, seenTail } from './eventVisibility';
 import { recordLoss, tallyDeath } from './warTally';
+import { destroyHeard, reorgHeard, reorgKey, tradeHeard, tradeSide } from './fleetNews';
 import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from './simClock';
 import { armedTap } from './armedTap';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
@@ -3304,24 +3305,32 @@ function handleEvents(events: DomainEvent[]) {
         break;
       }
       case 'market.bought':
-        if (p.seller === ME || p.buyer === ME)
+        // Сделка слышна обеим сторонам, и сторона выбирает СЛОВО, а не знак числа —
+        // `fleetNews.ts` (REFM-181): «купил» и «продал» это разные события в голове.
+        if (tradeHeard(p.buyer, p.seller, ME))
           note(
             t('log.market.trade', {
               n: String(p.amount),
               res: TECH_CUR[p.resource as string] ?? tData(p.resource as string),
               paid: String(p.paid ?? '?'),
-              side: p.buyer === ME ? t('log.market.buy') : t('log.market.sell'),
+              side: t(tradeSide(p.buyer, ME)),
             }),
           );
         break;
       case 'fleet.merged':
-        if (p.owner === ME) note(t('log.fleet.merged', { at: p.at as string }));
+        if (reorgHeard(p.owner, ME)) note(t(reorgKey('merged'), { at: p.at as string }));
         break;
       case 'fleet.split':
-        if (p.owner === ME) note(t('log.fleet.split', { at: p.at as string }));
+        // Чужую реорганизацию наблюдать нечем — на карте виден значок, а не то, что
+        // два соединения свели в одно (`fleetNews.ts`, правило 2).
+        if (reorgHeard(p.owner, ME)) note(t(reorgKey('split'), { at: p.at as string }));
         break;
       case 'fleet.destroyed':
-        note(t('log.fleet.destroyed', { who: NAME[p.owner as string] ?? (p.owner as string) }));
+        // Слышно ВСЕМ — так работает сегодня. Расхождение с доктриной `eventVisibility`
+        // разобрано в шапке `fleetNews.ts`: в сети событие едет без места, и сервер
+        // отдаёт его только владельцу. Поведение НЕ меняю, вопрос владельцу.
+        if (destroyHeard())
+          note(t('log.fleet.destroyed', { who: NAME[p.owner as string] ?? (p.owner as string) }));
         break;
       case 'unit.died': {
         // Счёт и ведомость наполняются по РАЗНЫМ условиям — `warTally.ts` (REFM-180):
