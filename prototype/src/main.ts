@@ -582,6 +582,14 @@ import { parseBuildAnchor, quickBuildOrder } from './quickBuild';
 import { isMine, seen, seenArc, seenTail } from './eventVisibility';
 import { recordLoss, tallyDeath } from './warTally';
 import { destroyHeard, reorgHeard, reorgKey, tradeHeard, tradeSide } from './fleetNews';
+import {
+  declineHeard,
+  diploConcernsMe,
+  offerAudience,
+  offerUnread,
+  stanceKey,
+  stanceThread,
+} from './diploAudience';
 import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from './simClock';
 import { armedTap } from './armedTap';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
@@ -3159,16 +3167,18 @@ function handleEvents(events: DomainEvent[]) {
         const st = p.stance as DiplomaticStance;
         const na = NAME[a] ?? a;
         const nb = NAME[b] ?? b;
-        // Only events that involve YOU land in a conversation (your DM with the other
-        // party); two AIs re-stancing each other isn't part of any of your chats.
-        if (a === ME || b === ME) {
+        // Кому адресована дипломатия — `diploAudience.ts` (REFM-182): у треда две
+        // стороны, и чужой паре в нём места нет; у войны свой текст. Адрес треда
+        // сохранён как есть — расхождение 2 в шапке модуля.
+        if (diploConcernsMe(a, b, ME)) {
+          const thread = stanceThread(a, b);
           pushMsg(
-            b,
+            thread.key,
             st === 'war'
-              ? t('log.diplo.war', { a: na, b: nb })
-              : t('log.diplo.stance', { a: na, b: nb, stance: stanceRu(st).toLowerCase() }),
+              ? t(stanceKey(st), { a: na, b: nb })
+              : t(stanceKey(st), { a: na, b: nb, stance: stanceRu(st).toLowerCase() }),
             true,
-            a,
+            thread.from,
           );
           note(`${na} → ${nb}: ${stanceRu(st)}`);
         }
@@ -3179,7 +3189,11 @@ function handleEvents(events: DomainEvent[]) {
         const from = p.from as string;
         const to = p.to as string;
         const st = p.stance as DiplomaticStance;
-        if (to === ME) {
+        // Кому адресовано предложение — `diploAudience.ts` (REFM-182): своё исходящее
+        // объявляется, только если ответа надо ЖДАТЬ (бот отвечает в той же пачке, и
+        // строка «отправлено» у него живёт долю секунды и читается как сбой).
+        const heard = offerAudience(from, to, ME, isAiSeat(to));
+        if (heard === 'incoming') {
           note(
             t('log.diplo.offer', {
               who: NAME[from] ?? from,
@@ -3187,10 +3201,7 @@ function handleEvents(events: DomainEvent[]) {
             }),
           );
           pushMsg(from, t('log.diplo.offer.short', { stance: stanceRu(st) }), true, from);
-          unreadMsgs++;
-        } else if (from === ME && !isAiSeat(to)) {
-          // A bot answers inside the same order (accept/decline follows in this very
-          // batch) — the "sent" line is only worth showing when a human must reply.
+        } else if (heard === 'sent') {
           note(
             t('log.diplo.sent', {
               who: NAME[to] ?? to,
@@ -3198,6 +3209,7 @@ function handleEvents(events: DomainEvent[]) {
             }),
           );
         }
+        if (offerUnread(heard)) unreadMsgs++;
         if (diploOpen && diploTab === 'diplo') renderDiplo();
         break;
       }
@@ -3205,7 +3217,9 @@ function handleEvents(events: DomainEvent[]) {
         const from = p.from as string;
         const to = p.to as string;
         const st = p.stance as DiplomaticStance;
-        if (from === ME) {
+        // Отказ читает только предлагавший (`diploAudience.ts`, правило 5): отклонившему
+        // сообщать нечего — он сам только что нажал «отказать».
+        if (declineHeard(from, ME)) {
           pushMsg(
             to,
             t('log.diplo.rejected', {
