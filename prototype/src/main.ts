@@ -580,6 +580,7 @@ import { liftBy, opensNow } from './sheetLift';
 import { barStays, popoverLife } from './popoverLife';
 import { parseBuildAnchor, quickBuildOrder } from './quickBuild';
 import { isMine, seen, seenArc, seenTail } from './eventVisibility';
+import { recordLoss, tallyDeath } from './warTally';
 import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from './simClock';
 import { armedTap } from './armedTap';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
@@ -3323,21 +3324,16 @@ function handleEvents(events: DomainEvent[]) {
         note(t('log.fleet.destroyed', { who: NAME[p.owner as string] ?? (p.owner as string) }));
         break;
       case 'unit.died': {
-        // War record — only count casualties in battles you're part of, so the AI's
-        // fights elsewhere don't pad your numbers. Your dead = lost; the rest = destroyed.
-        if (myBattleLocs.has(p.at as string)) {
-          const n = (p.count as number) ?? 0;
-          if (p.owner === ME) killStats.lost += n;
-          else killStats.destroyed += n;
-        }
-        // Ledger for the battle-result card (visible fights only).
-        if (seenTail(myBattleLocs.has(p.at as string), known(p.at as string))) {
-          const at = p.at as string;
-          const owner = (p.owner as string) ?? '?';
-          const perOwner = battleLosses.get(at) ?? {};
-          const perUnit = (perOwner[owner] ??= {});
-          perUnit[p.unit as string] = (perUnit[p.unit as string] ?? 0) + ((p.count as number) ?? 0);
-          battleLosses.set(at, perOwner);
+        // Счёт и ведомость наполняются по РАЗНЫМ условиям — `warTally.ts` (REFM-180):
+        // счёт это личная статистика (только мои бои), ведомость питает строку ленты,
+        // а чужой бой на опознанном узле игрок видит и о цене исхода читает.
+        const at = p.at as string;
+        if (myBattleLocs.has(at)) killStats = tallyDeath(killStats, p.owner, ME, p.count);
+        if (seenTail(myBattleLocs.has(at), known(at))) {
+          battleLosses.set(
+            at,
+            recordLoss(battleLosses.get(at), p.owner, p.unit as string, p.count),
+          );
         }
         break;
       }
