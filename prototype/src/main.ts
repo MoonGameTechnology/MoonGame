@@ -600,6 +600,7 @@ import {
 import { gainRepaint, researchHeard } from './gainNews';
 import { cmdShown } from './cmdPresence';
 import { allOn } from './cmdHighlight';
+import { assaultTargetOk, deployPick, hostileFleets, mergeAnchors, ownFleets } from './aimTargets';
 import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from './simClock';
 import { armedTap } from './armedTap';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
@@ -7963,8 +7964,10 @@ function selectAt(mx: number, my: number) {
   // the anchor — the selected fleet(s) fly to it and fuse. Any other tap cancels.
   if (owner === 'merge') {
     const movers = selectedFleetIds();
+    // Якорь — свой флот НЕ из выделения (`aimTargets.ts`, REFM-187): иначе ближайшим
+    // окажется сам выделенный, и приказ уйдёт «слить себя с собой».
     const anchor = nearestHit(
-      Object.values(s.fleets).filter((f) => f.owner === ME && !movers.includes(f.id)),
+      mergeAnchors(Object.values(s.fleets), ME, movers),
       fleetAnchor,
       mx,
       my,
@@ -7981,7 +7984,7 @@ function selectAt(mx: number, my: number) {
   // rejected server-side (surfaced as a log note).
   if (owner === 'barrage') {
     const target = nearestHit(
-      Object.values(s.fleets).filter((f) => f.owner !== ME),
+      hostileFleets(Object.values(s.fleets), ME),
       fleetAnchor,
       mx,
       my,
@@ -8001,7 +8004,7 @@ function selectAt(mx: number, my: number) {
   // (free-space flight to the target). A tap on empty space disarms.
   if (owner === 'squadron-strike' && squadronStrikeAim) {
     const target = nearestHit(
-      Object.values(s.fleets).filter((f) => f.owner !== ME),
+      hostileFleets(Object.values(s.fleets), ME),
       fleetAnchor,
       mx,
       my,
@@ -8040,17 +8043,14 @@ function selectAt(mx: number, my: number) {
       (a) => a !== null && data.heroAbilities[a]?.type === 'spawn_fleet',
     );
     const host = canBoard
-      ? nearestHit(
-          Object.values(s.fleets).filter((f) => f.owner === ME),
-          fleetAnchor,
-          mx,
-          my,
-          rFleet,
-        )
+      ? nearestHit(ownFleets(Object.values(s.fleets), ME), fleetAnchor, mx, my, rFleet)
       : null;
     const n = host ? null : nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
-    if (host) playerOrder(spawnHero(ME, heroId, host.id));
-    else if (n) playerOrder(spawnHero(ME, heroId, n.id));
+    // Корабль важнее мира ТОЛЬКО с абордажным перком — `aimTargets.ts` (правило 3):
+    // без него мир под своим флотом обязан остаться миром.
+    const pick = deployPick(canBoard, !!host, !!n);
+    if (pick === 'fleet') playerOrder(spawnHero(ME, heroId, host!.id));
+    else if (pick === 'world') playerOrder(spawnHero(ME, heroId, n!.id));
     else note(t('hint.deploy-cancelled'));
     lastPanelHtml = '';
     return;
@@ -8062,7 +8062,9 @@ function selectAt(mx: number, my: number) {
     const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
     const target = n ? s.planets[n.id] : undefined;
     const capturable = !!n && (sectorTypeOf(n.id)?.capturable ?? false);
-    const ok = !!target && capturable && target.owner != null && target.owner !== ME;
+    // Годится только ЧУЖОЙ ЗАХВАТЫВАЕМЫЙ мир (`aimTargets.ts`, правило 4): от этого
+    // зависит судьба прицела, а не только отказ ядра.
+    const ok = !!target && assaultTargetOk(target.owner, capturable, ME);
     // Судьба прицела — `armedTap.ts` (REFM-88). ШТУРМ единственный ПРОЩАЕТ неподходящую
     // цель: промах по цели это не отказ от приказа, и переармировать после каждого
     // неточного тыка в скопление миров — наказание за меткость пальца.
@@ -8080,13 +8082,7 @@ function selectAt(mx: number, my: number) {
   // group — nothing deselects, worlds don't grab the tap, the map is a picking
   // surface until the mode is left (⊕ again, or any common order).
   if (owner === 'pick-group') {
-    const mine = nearestHit(
-      Object.values(s.fleets).filter((f) => f.owner === ME),
-      fleetAnchor,
-      mx,
-      my,
-      rFleet,
-    );
+    const mine = nearestHit(ownFleets(Object.values(s.fleets), ME), fleetAnchor, mx, my, rFleet);
     if (mine) toggleFleetInSelection(mine.id);
     return;
   }
