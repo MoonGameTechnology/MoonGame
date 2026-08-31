@@ -598,6 +598,7 @@ import {
   rewardDue,
 } from './goalsPanel';
 import { gainRepaint, researchHeard } from './gainNews';
+import { cmdShown } from './cmdPresence';
 import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from './simClock';
 import { armedTap } from './armedTap';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
@@ -7189,10 +7190,23 @@ function renderCmdBar() {
   fireMenu = life.fire;
   castMenu = life.cast;
   if (!life.troops) troopsPlan = null;
+  // Состав ряда — `cmdPresence.ts` (REFM-185): серая кнопка и ОТСУТСТВУЮЩАЯ значат
+  // разное. Отсутствием показывается то, чего у выделения нет по природе (нечего
+  // останавливать, нет флагмана, нет артиллерии), гашением — то, что есть, но сейчас
+  // не складывается. Кнопка набора видна и при свёрнутом ☰, пока набор включён:
+  // иначе из режима нечем выйти.
+  const shown = cmdShown({
+    stoppable: anyStoppable,
+    anyArtillery,
+    ownArtillery: artFleets.length,
+    castHero: !!castHero,
+    more: cmdMore,
+    picking: pickMode,
+  });
   const html =
     `<span class="cmdlabel">${ids.length > 1 ? t('cmd.selection.many', { n: ids.length }) : t('cmd.selection.one')}</span>` +
     cmdBtn('move', '⤳', t('cmd.move'), aiming ? 'on' : '', false, t('cmd.move.hint')) +
-    (anyStoppable ? cmdBtn('stop', '■', t('cmd.stop'), 'danger', false, t('cmd.stop.hint')) : '') +
+    (shown.stop ? cmdBtn('stop', '■', t('cmd.stop'), 'danger', false, t('cmd.stop.hint')) : '') +
     cmdBtn(
       'attack',
       '⚔',
@@ -7202,10 +7216,10 @@ function renderCmdBar() {
       t('cmd.assault.hint'),
     ) +
     cmdBtn('target', '◎', t('cmd.target'), '', false, t('cmd.target.hint')) +
-    (castHero
+    (shown.cast
       ? cmdBtn('cast', '✨', t('cmd.cast'), castMenu ? 'on' : '', false, t('cmd.cast.hint'))
       : '') +
-    (anyArtillery
+    (shown.barrage
       ? cmdBtn(
           'barrage',
           '🎯',
@@ -7215,7 +7229,7 @@ function renderCmdBar() {
           t('cmd.barrage.hint'),
         )
       : '') +
-    (artFleets.length > 0
+    (shown.firemode
       ? cmdBtn('firemode', '🔥', fmLabel, fireMenu ? 'on' : '', false, t('cmd.fire.hint'))
       : '') +
     cmdBtn(
@@ -7238,7 +7252,7 @@ function renderCmdBar() {
     // ☰ — the extras row (hamburger, NOT «...» — референс не копируем дословно):
     // «Выбрать+» и будущие Ускорить/Задержка живут здесь, базовый ряд не пухнет.
     cmdBtn('more', '☰', t('cmd.more'), cmdMore ? 'on' : '', false, t('cmd.more.hint')) +
-    (cmdMore || pickMode
+    (shown.pick
       ? cmdBtn(
           'pick',
           '⊕',
@@ -7248,7 +7262,7 @@ function renderCmdBar() {
           t('cmd.multiselect.hint'),
         )
       : '') +
-    (cmdMore
+    (shown.extras
       ? cmdBtn(
           'boost',
           '⚡',
