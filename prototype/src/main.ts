@@ -599,6 +599,7 @@ import {
 } from './goalsPanel';
 import { gainRepaint, researchHeard } from './gainNews';
 import { cmdShown } from './cmdPresence';
+import { allOn } from './cmdHighlight';
 import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from './simClock';
 import { armedTap } from './armedTap';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
@@ -7267,7 +7268,9 @@ function renderCmdBar() {
           'boost',
           '⚡',
           t('cmd.forced-march'),
-          ids.length > 0 && ids.every((id) => marchFlagged(id)) ? 'on' : '',
+          // Единогласие, а не «хоть у кого-то» — `cmdHighlight.ts` (REFM-186): один
+          // разогнанный из десяти покрасил бы кнопку, и игрок прочёл бы «вся группа».
+          allOn(ids, (id) => marchFlagged(id)) ? 'on' : '',
           ids.length === 0,
           t('cmd.forced-march.hint'),
         ) +
@@ -7276,7 +7279,7 @@ function renderCmdBar() {
           'qauto',
           '⚔',
           t('cmd.auto-assault'),
-          ids.length > 0 && ids.every((id) => isAutoAssault(id)) ? 'on' : '',
+          allOn(ids, (id) => isAutoAssault(id)) ? 'on' : '',
           ids.length === 0,
           t('cmd.auto-assault.hint'),
         ) +
@@ -7285,7 +7288,14 @@ function renderCmdBar() {
               'qscramble',
               '🛩',
               t('cmd.standing-sortie'),
-              fleets.filter((fl) => fleetHasSquadron(fl, data)).every((fl) => patrolOf(fl.id)) ? 'on' : '',
+              // Через ту же проверку: здесь пустого множества не бывает (кнопки нет без
+              // крыльев), но защита не должна держаться на соседнем условии.
+              allOn(
+                fleets.filter((fl) => fleetHasSquadron(fl, data)),
+                (fl) => !!patrolOf(fl.id),
+              )
+                ? 'on'
+                : '',
               false,
               t('cmd.standing-sortie.hint'),
             )
