@@ -132,6 +132,16 @@ import {
   topLayerOpen as layersOpen,
   type BackLayer,
 } from './backLayers';
+// REFM-198: что ЗНАЧИТ нажатие — вердикты Back, Escape и шеврона.
+import {
+  backAction,
+  chevronAction,
+  escapeConsultsLadder,
+  rearmAfterClose,
+  rearmAfterHint,
+  selfHealArm,
+  typingTarget,
+} from './backGesture';
 import {
   buildingLevel,
   buildingMaxLevel,
@@ -11422,10 +11432,7 @@ const BUILD_TAG = (() => {
 // the hint guarantees a real second `popstate` to catch, so the exit never depends
 // on the platform's fallback. Browser Back is the same.
 let backArmed = false;
-// Double-back-to-leave window: a second Back within this long of the hint leaves the
-// match; after it lapses, a bare Back is the first press again (a fresh hint).
-// `performance.now()` is fine here (prototype UI, not the deterministic core).
-const BACK_EXIT_WINDOW_MS = 2500;
+// Окно двойного нажатия и сами вердикты Back — `backGesture.ts` (REFM-198).
 let backHintAt = -Infinity;
 
 /** In a live match (the map backdrop), i.e. none of the chrome SCREENS is up. The
@@ -11585,27 +11592,26 @@ function closeTopLayer(): boolean {
   return closeTop(BACK_LAYERS) !== null;
 }
 
+// Что ЗНАЧИТ нажатие «Назад» — `backGesture.ts` (REFM-198): пока есть что закрыть, Back
+// разбирает стопку; в матче первое нажатие только предупреждает (аппаратный Back жмут
+// вслепую, и матч не должен теряться от одного случайного касания), второе в пределах
+// окна выходит по-настоящему, а вне матча ступень истории не ставится вовсе — там
+// следующий Back и обязан закрыть приложение.
 window.addEventListener('popstate', () => {
   backArmed = false;
-  if (closeTopLayer()) {
+  const act = backAction(closeTopLayer(), inMatch(), performance.now(), backHintAt);
+  if (act === 'closed') {
     snd.play('close'); // обратный блип: слой закрылся аппаратным Back
-    if (topLayerOpen() || inMatch()) armBack(); // more layers / still in a match — stay
+    if (rearmAfterClose(topLayerOpen(), inMatch())) armBack();
     return;
   }
-  if (inMatch()) {
-    // Nothing left to close but a match is live — don't let one stray Back drop it.
-    // A second Back within the window leaves for real; re-arm so THAT press always
-    // fires its own popstate here rather than possibly running out of history.
-    if (performance.now() - backHintAt <= BACK_EXIT_WINDOW_MS) {
-      $('tomenu').click();
-      return;
-    }
-    backHintAt = performance.now();
-    note(t('back.confirm.match'));
-    armBack();
+  if (act === 'exit') {
+    $('tomenu').click();
     return;
   }
-  note(t('back.confirm')); // at the hub/welcome — the next Back exits
+  if (act === 'hint') backHintAt = performance.now();
+  note(t(act === 'hint' ? 'back.confirm.match' : 'back.confirm'));
+  if (rearmAfterHint(act)) armBack();
 });
 function armBack(): void {
   if (backArmed) return;
@@ -11616,9 +11622,9 @@ function armBack(): void {
 // Desktop parity: Escape closes the topmost layer, exactly like Back. Ignored while
 // typing (chat / nick / server inputs) so Escape still blurs a field the native way.
 window.addEventListener('keydown', (e) => {
-  if (e.key !== 'Escape' && e.key !== 'Esc') return;
   const el = e.target as HTMLElement | null;
-  if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+  const typing = !!el && typingTarget(el.tagName, el.isContentEditable);
+  if (!escapeConsultsLadder(e.key, typing)) return;
   if (closeTopLayer()) {
     snd.play('close');
     e.preventDefault();
@@ -11631,8 +11637,7 @@ function frame(nowReal: number) {
   // popstate handler re-arms itself right after a hint (so a genuine second Back
   // always has its own sentinel to pop) — this is the initial arm / self-healing net,
   // not the steady-state path, hence gating on being past the exit window.
-  const matchGuard = inMatch() && performance.now() - backHintAt > BACK_EXIT_WINDOW_MS;
-  if (!backArmed && (topLayerOpen() || matchGuard)) armBack();
+  if (selfHealArm(backArmed, topLayerOpen(), inMatch(), performance.now(), backHintAt)) armBack();
   const dt = nowReal - lastReal;
   lastReal = nowReal;
   // Правдоподобие разрыва, ход мира и сдвиг времени — `simClock.ts` (REFM-87).
@@ -11916,16 +11921,15 @@ document.querySelector('.crest')?.addEventListener('click', () => openPlayerCard
 // or leave the match straight to the hub if none are (a visible button should act
 // in one tap, not require the double-back hint that hardware Back uses).
 $('topback').addEventListener('click', () => {
-  if (closeTopLayer()) {
+  const act = chevronAction(closeTopLayer(), inMatch());
+  if (act === 'closed') {
     snd.play('close'); // ложится поверх тапа шеврона — осознанное наложение
-    if (topLayerOpen() || inMatch()) armBack();
+    if (rearmAfterClose(topLayerOpen(), inMatch())) armBack();
     return;
   }
-  if (inMatch()) {
-    $('tomenu').click(); // no layers + in match → straight to the hub
-    return;
-  }
-  history.back(); // at the hub/welcome → system Back
+  // no layers + in match → straight to the hub; на хабе/входе — системный Back
+  if (act === 'exit') $('tomenu').click();
+  else history.back();
 });
 
 // mirror the chosen emblem into the top-left corner + the hub avatar
