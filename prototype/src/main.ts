@@ -504,6 +504,8 @@ import {
   groundSummaryShown,
   strikeOffered,
 } from './dockedActions';
+// REFM-201: чей сейчас ход в переговорах — одна формула на оба чипа.
+import { offerAffordance, offerClass, offerDisabled, offerMark } from './offerAffordance';
 // REFM-17 — палитра и правило «цвет = отношение»: одна таблица на карту и на экран
 // дипломатии (раньше их было две, и настройку палитры знала только карта).
 import {
@@ -6494,22 +6496,25 @@ function intelRowHtml(target: string): string {
  * расторгает). При войне заключить нельзя — ядро отобьёт, поэтому и кнопка заперта.
  */
 function mapShareBtnHtml(id: string): string {
+  // Чей ход — `offerAffordance.ts` (REFM-201). ЗДЕСЬ подавитель — действующий договор:
+  // висящее предложение при нём уже прошлое, и «✓ принять» предложило бы заключить
+  // заключённое. Война же только ЗАПИРАЕТ кнопку, не гася пометок (так было и до выноса).
   const live = hasMapShare(s, ME, id);
-  const theirs = !live && hasMapShareOffer(s, id, ME);
-  const mine = !live && !theirs && hasMapShareOffer(s, ME, id);
   const atWar = !live && getStance(s, ME, id) === 'war';
-  const label = theirs ? `✓ ${t('comms.mapshare')}` : mine ? `⏳ ${t('comms.mapshare')}` : t('comms.mapshare');
+  const aff = offerAffordance(live, hasMapShareOffer(s, id, ME), hasMapShareOffer(s, ME, id));
+  const mark = offerMark(aff);
+  const label = mark ? `${mark} ${t('comms.mapshare')}` : t('comms.mapshare');
   const title = atWar
     ? t('comms.mapshare.war')
     : live
       ? t('comms.mapshare.drop')
-      : theirs
+      : aff === 'accept'
         ? t('comms.offer.incoming', { who: NAME[id] ?? id })
-        : mine
+        : aff === 'waiting'
           ? t('comms.offer.sent')
           : t('comms.mapshare.hint');
-  const cls = `dp-map${live ? ' on' : ''}${theirs ? ' offer' : ''}${mine ? ' pend' : ''}`;
-  return `<button class="${cls}" data-mapseat="${id}"${atWar || mine ? ' disabled' : ''} title="${esc(title)}">🗺 ${label}</button>`;
+  const cls = offerClass('dp-map', live, aff);
+  return `<button class="${cls}" data-mapseat="${id}"${offerDisabled(aff, atWar) ? ' disabled' : ''} title="${esc(title)}">🗺 ${label}</button>`;
 }
 function seatDiploActionsHtml(id: string): string {
   const st = getStance(s, ME, id);
@@ -6517,20 +6522,21 @@ function seatDiploActionsHtml(id: string): string {
     `<div class="dp-actions">` +
     STANCES.map((sk) => {
       const barred = sk === 'alliance' && isAiSeat(id); // боты не вступают в коалиции
-      // Consent affordances: THEIR pending offer of this stance → tapping accepts
-      // (✓, pulsing); MY pending offer → sent, waiting on them (⏳, disabled).
-      const theirs = !barred && getOffer(s, id, ME) === sk;
-      const mine = !barred && !theirs && getOffer(s, ME, id) === sk;
-      const cls = `dp-act${sk === st ? ' on' : ''}${theirs ? ' offer' : ''}${mine ? ' pend' : ''}`;
-      const label = theirs ? `✓ ${stanceRu(sk)}` : mine ? `⏳ ${stanceRu(sk)}` : stanceRu(sk);
+      // Чей ход — `offerAffordance.ts` (REFM-201), та же формула, что у кнопки карт.
+      // ЗДЕСЬ подавитель — запрет: предложить коалицию боту нельзя вовсе, поэтому и
+      // аффорданса быть не должно. Текущая стойка помечается ОТДЕЛЬНО (`sk === st`).
+      const aff = offerAffordance(barred, getOffer(s, id, ME) === sk, getOffer(s, ME, id) === sk);
+      const mark = offerMark(aff);
+      const cls = offerClass('dp-act', sk === st, aff);
+      const label = mark ? `${mark} ${stanceRu(sk)}` : stanceRu(sk);
       const title = barred
         ? t('comms.bots-no-coalition')
-        : theirs
+        : aff === 'accept'
           ? t('comms.offer.incoming', { who: NAME[id] ?? id })
-          : mine
+          : aff === 'waiting'
             ? t('comms.offer.sent')
             : '';
-      return `<button class="${cls}" data-stance="${sk}" data-seat="${id}" style="--sc:${stanceCol(sk)}"${barred || mine ? ' disabled' : ''}${title ? ` title="${esc(title)}"` : ''}>${label}</button>`;
+      return `<button class="${cls}" data-stance="${sk}" data-seat="${id}" style="--sc:${stanceCol(sk)}"${offerDisabled(aff, barred) ? ' disabled' : ''}${title ? ` title="${esc(title)}"` : ''}>${label}</button>`;
     }).join('') +
     mapShareBtnHtml(id) +
     `<button class="dp-spy" data-spy="treasury" data-seat="${id}" title="${t('comms.spy.treasury', { c: SPY_COST })}">🕵 ${t('log.spy.kind.treasury')}</button>` +
