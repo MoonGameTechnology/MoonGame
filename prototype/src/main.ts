@@ -495,6 +495,15 @@ import { prefStore, readBool, readNum, readRaw, writeBool, writeRaw } from './pr
 import { releaseCommits } from './aimGesture';
 // REFM-199: что означает ЕДУЩИЙ палец — брат `aimGesture.ts` (тот про отпускание).
 import { cameraFollows, dragIntent, marksDragged } from './dragIntent';
+// REFM-200: что карточка пришвартованного флота ПРЕДЛАГАЕТ сделать.
+import {
+  assaultEnabled,
+  bombardEnabled,
+  docked as fleetDocked,
+  forecastShown,
+  groundSummaryShown,
+  strikeOffered,
+} from './dockedActions';
 // REFM-17 — палитра и правило «цвет = отношение»: одна таблица на карту и на экран
 // дипломатии (раньше их было две, и настройку палитры знала только карта).
 import {
@@ -5726,7 +5735,10 @@ function fleetPanelHtml(f: Fleet): string {
   }
 
   const here = planet(f.location);
-  const docked = !!here && !f.movement && !f.battleId;
+  // Что эта карточка ПРЕДЛАГАЕТ сделать — `dockedActions.ts` (REFM-200). Ошибка здесь
+  // не падает, а предлагает: живая кнопка, на которую ядро ответит отказом, снаружи
+  // выглядит как «ничего не произошло», а прогноз пустого боя читается как расклад.
+  const docked = fleetDocked(!!here, !!f.movement, !!f.battleId);
   if (f.battleId) {
     // The battle card (framework-agnostic view-model from @void/client): both
     // sides, hull bars, phase, live round countdown — and the one action, retreat.
@@ -5756,8 +5768,12 @@ function fleetPanelHtml(f: Fleet): string {
   }
   if (docked) {
     // enemy/neutral world you can act on — empty space is pass-through only
-    const hostile =
-      here!.owner !== f.owner && (sectorTypeOf(here!.id)?.capturable ?? false);
+    // Нейтральная точка считается чужой: она не моя, и взять её можно.
+    const hostile = strikeOffered(
+      here!.owner,
+      f.owner,
+      sectorTypeOf(here!.id)?.capturable ?? false,
+    );
     const cols: string[] = [];
     if (hostile) {
       let at = `<div class="sec">${t('side.strike.title')}</div><div class="row">`;
@@ -5765,9 +5781,10 @@ function fleetPanelHtml(f: Fleet): string {
         'bombard',
         f.bombarding ? 'off' : 'on',
         f.bombarding ? t('side.strike.bombard.stop') : t('side.strike.bombard'),
-        inOrbit && nShips > 0,
+        bombardEnabled(inOrbit, nShips),
       );
-      at += btn('assault', '', t('side.strike.assault'), inOrbit);
+      // Штурм не спрашивает состав: высаживается десант, а не корпуса.
+      at += btn('assault', '', t('side.strike.assault'), assaultEnabled(inOrbit));
       at += `</div>`;
       at += `<div class="hint">${t('side.strike.hint')}</div>`;
       // Combat forecast (ONB-6): «если атакую — что будет?» — the pure base-model
@@ -5777,7 +5794,7 @@ function fleetPanelHtml(f: Fleet): string {
       // in — the hedge in the copy says so.
       const landing = f.landing ?? [];
       const garrison = here!.garrison;
-      if (landing.some((u) => u.count > 0) && garrison.some((u) => u.count > 0)) {
+      if (forecastShown(landing, garrison)) {
         const pv = previewBattle(landing, garrison, data);
         const verdict =
           pv.outcome === 'attacker'
@@ -5800,7 +5817,8 @@ function fleetPanelHtml(f: Fleet): string {
     // Ground army at your own world — СВОДКА, без кнопок: сама погрузка/выгрузка
     // переехала в ⇅-меню ряда команд (GRND-1), где есть выбор «кого и сколько».
     // Панель осталась информационной ровно как у стоячих приказов (SO-UI ниже).
-    if (here!.owner === ME) {
+    // Только на СВОЕЙ точке: на чужой сводка перечислила бы гарнизон противника.
+    if (groundSummaryShown(here!.owner, ME)) {
       let ga = `<div class="sec">${t('side.ground.title')}</div>`;
       const groundHere = here!.garrison.filter((st) => isGround(st.unit));
       const carried = f.landing ?? [];
