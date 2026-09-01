@@ -603,6 +603,7 @@ import { allOn } from './cmdHighlight';
 import { assaultTargetOk, deployPick, hostileFleets, mergeAnchors, ownFleets } from './aimTargets';
 import { FORGOTTEN, afterRebuild, keepScroll, panelChanged } from './panelCache';
 import { attentionTotal, countShown, myBattleCount, railBadge } from './attentionBadges';
+import { atLimit, callsign, liveStanding, standingShown, topSignature } from './standingLine';
 import {
   chipDead,
   chipShort,
@@ -11643,22 +11644,25 @@ function frame(nowReal: number) {
   // with a countdown to the next game day. Fixed nodes are patched by textContent
   // (no innerHTML rebuild — the crest/who/dstat click targets stay put).
   const d = floor(s.time / DAY) + 1;
-  const score = Math.round(s.match?.scores?.[ME]?.total ?? 0);
-  const need = Math.max(0, SCORE_LIMIT - score);
-  const sc = s.match?.scores ?? {};
-  const ranked = Object.keys(sc).sort((a, b) => (sc[b]?.total ?? 0) - (sc[a]?.total ?? 0));
-  const myPlace = ranked.indexOf(ME) + 1;
-  // identity line = the commander's callsign; solo seats are named after the HOUSE
-  // (buildSetupConfig), so an empty callsign falls back to that seat name
-  const nick = nickInput.value.trim() || NAME[ME] || '';
+  // Живое положение в таблице — `standingLine.ts` (REFM-191): место берётся ТОЙ ЖЕ
+  // формулой, что и на итоговом экране (`placementOf`), иначе две рукописные копии
+  // сортировки молча разойдутся; пустая таблица даёт место 0, и печатать его нельзя —
+  // вышло бы «1-е из 0» до старта; подпись перерисовки несёт КАЖДОЕ видимое поле через
+  // разделитель, недостижимый в тексте, иначе строка застынет на прошлом значении.
+  const {
+    place: myPlace,
+    of: seats,
+    score,
+    need,
+  } = liveStanding(s.match?.scores ?? {}, ME, SCORE_LIMIT);
+  const nick = callsign(nickInput.value, NAME[ME]);
   const eta = countdownHMS(DAY - (s.time % DAY));
-  const topText = `${nick}${myPlace}/${ranked.length}${score}${d}${eta}`;
+  const topText = topSignature(nick, myPlace, seats, score, d, eta);
   if (topText !== lastTopText) {
     tbName.textContent = nick;
-    // no scored seats yet (match module absent / pre-start) → no standing line
-    tbPlace.textContent = myPlace >= 1 ? t('hud.place', { p: myPlace, n: ranked.length }) : '';
+    tbPlace.textContent = standingShown(myPlace) ? t('hud.place', { p: myPlace, n: seats }) : '';
     tbScore.textContent = `✦ ${score}/${SCORE_LIMIT}`;
-    tbScore.classList.toggle('win', need === 0);
+    tbScore.classList.toggle('win', atLimit(need));
     tbDay.textContent = t('browser.day', { n: d });
     tbEta.textContent = t('hud.next-day', { t: eta });
     lastTopText = topText;
