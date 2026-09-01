@@ -604,6 +604,7 @@ import { assaultTargetOk, deployPick, hostileFleets, mergeAnchors, ownFleets } f
 import { FORGOTTEN, afterRebuild, keepScroll, panelChanged } from './panelCache';
 import { attentionTotal, countShown, myBattleCount, railBadge } from './attentionBadges';
 import { atLimit, callsign, liveStanding, standingShown, topSignature } from './standingLine';
+import { CLEARED, needsClearing, overlayAlarm, overlayShown, overlayText } from './netOverlay';
 import {
   chipDead,
   chipShort,
@@ -11668,26 +11669,21 @@ function frame(nowReal: number) {
     lastTopText = topText;
   }
 
-  // FPS + net overlay: FPS; when connected, append round-trip latency and a
-  // desync flag (✓ in sync with the server, ✗ + running mismatch count if not).
-  // Shown when the player opts in (Settings → FPS), forced on for dev chrome
-  // (DEV_UI) and on a live desync — which everyone must be able to see and report.
-  if (showFpsOn() || DEV_UI || (NET && netDesync)) {
-    let fpsText = `${Math.round(fpsEma)} FPS`;
-    if (NET) {
-      const rtt = rttEma === null ? '· · ms' : `${Math.round(rttEma)} ms`;
-      const sync = netDesync ? `desync ✗ ${netDesyncCount}` : 'sync ✓';
-      fpsText += ` · ${rtt} · ${sync}`;
-    }
-    if (BUILD_TAG) fpsText += ` · ${BUILD_TAG}`; // running build, visible in dev
+  // Служебное наложение (FPS, задержка, десинк) — `netOverlay.ts` (REFM-192): десинк
+  // ПОКАЗЫВАЕТ строку сам, помимо галочки игрока, потому что иначе о нём некому сообщить;
+  // задержка и признак синхронизации есть только в СЕТИ («0 ms · sync ✓» в соло — выдумка
+  // про несуществующий канал); неизмеренная задержка пишется многоточием, а не нулём; и
+  // условие ушло — строка ОЧИЩАЕТСЯ, иначе мёртвое показание висит поверх карты как живое.
+  if (overlayShown(showFpsOn(), DEV_UI, NET, netDesync)) {
+    const fpsText = overlayText(fpsEma, NET, rttEma, netDesync, netDesyncCount, BUILD_TAG);
     if (fpsText !== lastFpsText) {
       fpsEl.textContent = fpsText;
-      fpsEl.style.color = NET && netDesync ? 'var(--red, #ff5a4d)' : '';
+      fpsEl.style.color = overlayAlarm(NET, netDesync) ? 'var(--red, #ff5a4d)' : '';
       lastFpsText = fpsText;
     }
-  } else if (lastFpsText !== '') {
-    fpsEl.textContent = '';
-    lastFpsText = '';
+  } else if (needsClearing(lastFpsText)) {
+    fpsEl.textContent = CLEARED;
+    lastFpsText = CLEARED;
   }
   // Top bar = the five session resources (icon + amount). The donate currency (Суверены ◆)
   // is rendered separately on the status line right under this bar (see statusHtml above).
