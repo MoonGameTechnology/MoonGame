@@ -493,6 +493,8 @@ import { initSound } from './sound';
 import { prefStore, readBool, readNum, readRaw, writeBool, writeRaw } from './prefs';
 // AIM-PAN — «коммитит ли отпускание вооружённый приказ»: правило со сторожем.
 import { releaseCommits } from './aimGesture';
+// REFM-199: что означает ЕДУЩИЙ палец — брат `aimGesture.ts` (тот про отпускание).
+import { cameraFollows, dragIntent, marksDragged } from './dragIntent';
 // REFM-17 — палитра и правило «цвет = отношение»: одна таблица на карту и на экран
 // дипломатии (раньше их было две, и настройку палитры знала только карта).
 import {
@@ -8398,7 +8400,19 @@ canvas.addEventListener('pointermove', (ev) => {
   pointers.set(ev.pointerId, p);
   const moved = movedBeyondSlop(dragStart, p, ev.pointerType === 'touch');
   if (moved) cancelLongPress(); // a moving finger is a drag, not a long-press
-  if (pointers.size >= 2) {
+  // Чем занят этот жест — `dragIntent.ts` (REFM-199). Два пальца всегда щипок (второй
+  // палец ВЕЗЁТ камеру, а не отменяет приказ: раньше отменял, и цель за краем экрана
+  // становилась недостижимой); на тач вооружённый приказ забирает протяжку себе — это
+  // починка «слепого приказа», когда панорама съедала прицеливание и приказ не доходил
+  // вовсе; на PC мышь целится наведением, поэтому там протяжка остаётся панорамой.
+  const intent = dragIntent({
+    pointers: pointers.size,
+    armed: aiming || assaultAim,
+    pc: pcUi(),
+    boxing: boxSelecting,
+    hasStart: !!dragStart,
+  });
+  if (intent === 'pinch') {
     const [a, b] = [...pointers.values()];
     if (a && b) {
       const cur = pinchOf(a, b);
@@ -8414,23 +8428,14 @@ canvas.addEventListener('pointermove', (ev) => {
       pinchDist = cur.dist;
       pinchMid = cur.mid;
     }
-    dragged = true;
-  } else if ((aiming || assaultAim) && !pcUi()) {
-    // TOUCH with Move/ШТУРМ armed: the finger DRAGS THE AIM (live preview via
-    // aimPointer), the camera stays put — releasing commits. Panning used to hijack
-    // this drag and silently swallow the order (the audit's blind-order finding).
-    // On PC the mouse hovers to aim, so an LMB drag stays a normal camera pan and
-    // the armed order survives it (commit is a clean click).
-    void 0;
-  } else if (boxSelecting && dragStart) {
+  } else if (intent === 'box' && dragStart) {
     selectionBox = { x1: dragStart.x, y1: dragStart.y, x2: p.x, y2: p.y };
-    if (moved) dragged = true;
-  } else {
+  } else if (cameraFollows(intent)) {
     cam.x += p.x - prev.x;
     cam.y += p.y - prev.y;
     clampCam(); // keep the map from being dragged entirely off-screen
-    if (moved) dragged = true;
   }
+  if (marksDragged(intent, moved)) dragged = true;
 });
 function endPointer(ev: PointerEvent) {
   const single = pointers.size === 1;
