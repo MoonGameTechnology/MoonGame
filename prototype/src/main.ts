@@ -614,6 +614,7 @@ import {
   timeControlsShown,
 } from './matchExits';
 import { INTEL_MS, PROGRESS_MS, intelVisible, repaintDue } from './liveWindows';
+import { disarms } from './armDisarm';
 import {
   chipDead,
   chipShort,
@@ -7758,21 +7759,25 @@ cmdbar.addEventListener('click', (ev) => {
   if (!bEl || bEl.disabled) return;
   const cmd = bEl.dataset.cmd;
   const ids = selectedFleetIds();
-  if (cmd !== 'merge') merging = false; // any other command disarms merge-targeting
-  if (cmd !== 'barrage') barrageAim = false; // any other command disarms barrage-targeting
-  if (cmd !== 'firemode' && cmd !== 'fmset') fireMenu = false; // другой приказ закрывает 🔥-меню
-  if (cmd !== 'cast' && cmd !== 'castdo') castMenu = false; // другой приказ закрывает ✨-меню
-  // другой приказ закрывает ⇅-меню (иначе два absolute-поповера легли бы друг на друга)
-  if (cmd !== 'troops' && cmd !== 'tstep' && cmd !== 'tmax' && cmd !== 'tok') troopsPlan = null;
-  if (cmd !== 'attack') assaultAim = false; // any other command disarms assault-targeting
-  // chainMode не в этой преамбуле: в режиме полоска ЗАМЕНЯЕТ ряд — других команд
-  // физически нет; выход только своими кнопками (chexit/chsend), Back/Escape.
+  // Что гаснет от СОСЕДНЕЙ команды — `armDisarm.ts` (REFM-195): у каждого взводимого
+  // состояния свой список «своих» команд, и в нём же подкоманды поповера (иначе ⇅-меню
+  // закрывалось бы от собственной кнопки «+1»); кнопка без команды гасит ВСЁ; а
+  // `chainMode` в таблицу не входит намеренно — в режиме цепочки полоска ЗАМЕНЯЕТ ряд,
+  // других команд там физически нет, и выход только своими кнопками (chexit/chsend),
+  // Back и Escape.
+  if (disarms('merge', cmd)) merging = false;
+  if (disarms('barrage', cmd)) barrageAim = false;
+  if (disarms('firemode', cmd)) fireMenu = false;
+  if (disarms('cast', cmd)) castMenu = false;
+  if (disarms('troops', cmd)) troopsPlan = null;
+  if (disarms('assault', cmd)) assaultAim = false;
   // A real order leaves «Выбрать+» (the group stays selected and takes it);
   // ☰ and the ⊕ toggle itself keep the picking session alive.
-  if (cmd !== 'pick' && cmd !== 'more') pickMode = false;
-  heroAim = null; // any command disarms a pending hero cast / deploy
+  if (disarms('pick', cmd)) pickMode = false;
+  // ALWAYS_DISARMED: подтверждаются тапом по КАРТЕ, своей команды в ряду у них нет.
+  heroAim = null;
   heroSpawnAim = null;
-  squadronStrikeAim = null; // any command disarms a pending squadron strike
+  squadronStrikeAim = null;
   if (cmd === 'move') {
     aiming = !aiming; // arm / disarm the move order
     assaultAim = false;
