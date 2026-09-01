@@ -616,6 +616,16 @@ import {
 import { INTEL_MS, PROGRESS_MS, intelVisible, repaintDue } from './liveWindows';
 import { disarms } from './armDisarm';
 import {
+  aimPath,
+  aimTip,
+  etaShown,
+  etaText,
+  laneSought,
+  routeNeeded,
+  routeViaLane,
+  targetPipRadius,
+} from './aimPreview';
+import {
   chipDead,
   chipShort,
   flowDigits,
@@ -3976,9 +3986,13 @@ function drawAimPreview() {
   const hit = nearestHit(MAP, (n) => world(n), aimPointer.x, aimPointer.y, rAim);
   let target: { x: number; y: number } | null = hit ? world(hit) : null;
   const targetId: string | null = hit?.id ?? null;
-  const laneTarget = targetId ? null : nearestLanePoint(aimPointer.x, aimPointer.y);
+  // Из чего складывается линия и что она обещает — `aimPreview.ts` (REFM-196): мир важнее
+  // дороги (дорога ищется, только если узла рядом НЕТ), остриё падает на сам палец, путь
+  // идёт по МАРШРУТУ через центры провинций, а не прямой, и без маршрута всё равно
+  // дотягивается до острия — иначе не рисуется ничего, и игрок читает это как «не взведено».
+  const laneTarget = laneSought(targetId) ? nearestLanePoint(aimPointer.x, aimPointer.y) : null;
   if (laneTarget) target = { x: laneTarget.x, y: laneTarget.y };
-  const tip = target ?? aimPointer;
+  const tip = aimTip(target, aimPointer);
   cx.save();
   cx.strokeStyle = rgba(LOCK, 0.6);
   cx.lineWidth = 1.4;
@@ -3996,18 +4010,19 @@ function drawAimPreview() {
     const a: { x: number; y: number } = anchor;
     // For a lane target, route to the endpoint the army enters through, then a
     // final segment to the point on the road.
-    const routeEndId = laneTarget && from ? laneAim(f, from, laneTarget).endId : targetId;
-    const pts: Array<{ x: number; y: number }> = [a];
-    if (from && routeEndId && routeEndId !== from) {
-      const route = planRoute(s, from, routeEndId);
+    const routeEndId = routeViaLane(!!laneTarget, from)
+      ? laneAim(f, from!, laneTarget!).endId
+      : targetId;
+    const hops: Array<{ x: number; y: number }> = [];
+    if (routeNeeded(from, routeEndId)) {
+      const route = planRoute(s, from!, routeEndId!);
       if (route)
         for (const hop of route) {
           const pl = s.planets[hop];
-          if (pl) pts.push(world(pl.position));
+          if (pl) hops.push(world(pl.position));
         }
     }
-    if (laneTarget) pts.push({ x: laneTarget.x, y: laneTarget.y });
-    if (pts.length === 1) pts.push(tip);
+    const pts = aimPath(a, hops, laneTarget ? { x: laneTarget.x, y: laneTarget.y } : null, tip);
     cx.beginPath();
     cx.moveTo(pts[0]!.x, pts[0]!.y);
     for (let i = 1; i < pts.length; i++) cx.lineTo(pts[i]!.x, pts[i]!.y);
@@ -4016,7 +4031,7 @@ function drawAimPreview() {
   if (target) {
     cx.setLineDash([]);
     cx.beginPath();
-    cx.arc(tip.x, tip.y, laneTarget ? 9 : 16, 0, TAU); // smaller pip for a road point
+    cx.arc(tip.x, tip.y, targetPipRadius(!!laneTarget), 0, TAU);
     cx.stroke();
     // travel-time estimate to this target for the first selected fleet (longer
     // route → more hours; the authoritative time is computed by the server).
@@ -4027,11 +4042,11 @@ function drawAimPreview() {
       if (laneTarget) hrs = laneAim(f0, from, laneTarget).hrs;
       else if (targetId) hrs = estimateTravelHours(s, data, from, targetId, f0);
     }
-    if (hrs != null && Number.isFinite(hrs)) {
+    if (etaShown(hrs)) {
       cx.font = '11px ui-monospace,Menlo,monospace';
       cx.textAlign = 'center';
       cx.fillStyle = rgba(LOCK, 0.95);
-      cx.fillText(hrs >= 1 ? `~${hrs.toFixed(1)}h` : `~${Math.ceil(hrs * 60)}m`, tip.x, tip.y - 22);
+      cx.fillText(etaText(hrs!), tip.x, tip.y - 22);
     }
   }
   cx.restore();
