@@ -606,6 +606,14 @@ import { attentionTotal, countShown, myBattleCount, railBadge } from './attentio
 import { atLimit, callsign, liveStanding, standingShown, topSignature } from './standingLine';
 import { CLEARED, needsClearing, overlayAlarm, overlayShown, overlayText } from './netOverlay';
 import {
+  BANNER_FORGOTTEN,
+  bannerOffersRestart,
+  displayOf,
+  speedbarRestartShown,
+  speedbarShown,
+  timeControlsShown,
+} from './matchExits';
+import {
   chipDead,
   chipShort,
   flowDigits,
@@ -11753,11 +11761,13 @@ function frame(nowReal: number) {
     logEl.innerHTML = logHtml;
     lastLogHtml = logHtml;
   }
+  // Пути НАРУЖУ из матча — `matchExits.ts` (REFM-193): кнопка перезапуска в баннере только
+  // на настоящем конце СОЛО-матча (на сетевом «переподключаюсь» она увела бы из живой
+  // партии), убранный баннер ЗАБЫВАЕТ разметку (иначе следующий такой же не нарисуется), а
+  // на ТЕЛЕФОНЕ полоса скорости показывается всегда: выход ⌂ живёт в ней, и спрятать её
+  // значит запереть игрока в матче.
   if (banner) {
-    // On a genuine single-player match END, offer a restart straight from the banner
-    // (back to bot selection). Net-status banners (reconnecting / waiting) get no button.
-    const ended = !NET && s.match?.status === 'ended';
-    const html = ended
+    const html = bannerOffersRestart(NET, s.match?.status)
       ? `<div class="bn-text">${esc(banner)}</div><button class="bn-btn" data-restart>${t('hub.back-to-bots')}</button>`
       : `<div class="bn-text">${esc(banner)}</div>`;
     if (html !== lastBannerHtml) {
@@ -11767,29 +11777,19 @@ function frame(nowReal: number) {
     bannerEl.style.display = 'block';
   } else if (bannerEl.style.display !== 'none') {
     bannerEl.style.display = 'none'; // banner cleared (e.g. a fresh match) → hide it
-    lastBannerHtml = '';
+    lastBannerHtml = BANNER_FORGOTTEN;
   }
   renderEndScreen();
-  // Speedbar restart — only the no-bots sandbox (no match end to restart from); other
-  // modes use the end-banner button instead. Toggle each frame as the mode can change.
   // Player build: the button (and the skirmish it restarts into) doesn't exist.
   if (!__PLAYER_BUILD__) {
-    const soloNoBots = !NET && AI_PLAYERS.size === 0;
-    restartBtn.style.display = soloNoBots ? '' : 'none';
-    restartSep.style.display = soloNoBots ? '' : 'none';
+    const restart = displayOf(speedbarRestartShown(NET, AI_PLAYERS.size));
+    restartBtn.style.display = restart;
+    restartSep.style.display = restart;
   }
-  // Speedbar time controls. PC: gated by the developer «speed control» toggle — off
-  // for a normal player, so the whole bar (its ⌂/▶▶ are PC-hidden in CSS) disappears.
-  // Mobile is frozen: the exit ⌂ lives in the bar there (the rail exit is PC-only), so
-  // the bar always shows and the controls follow the old solo/NET rule.
-  const showSpdCtl = pcUi() ? devSpeedControl : !NET || !__PLAYER_BUILD__;
-  if (spdCtl && spdCtl.style.display !== (showSpdCtl ? '' : 'none')) {
-    spdCtl.style.display = showSpdCtl ? '' : 'none';
-  }
-  const showBar = pcUi() ? devSpeedControl : true;
-  if (speedbarEl && speedbarEl.style.display !== (showBar ? '' : 'none')) {
-    speedbarEl.style.display = showBar ? '' : 'none';
-  }
+  const showSpdCtl = displayOf(timeControlsShown(pcUi(), devSpeedControl, NET, __PLAYER_BUILD__));
+  if (spdCtl && spdCtl.style.display !== showSpdCtl) spdCtl.style.display = showSpdCtl;
+  const showBar = displayOf(speedbarShown(pcUi(), devSpeedControl));
+  if (speedbarEl && speedbarEl.style.display !== showBar) speedbarEl.style.display = showBar;
   // Keep the tech window live while open (research progress bar / eta), throttled.
   if (techTree.isOpen() && nowReal - lastTechAt > 500) {
     lastTechAt = nowReal;
