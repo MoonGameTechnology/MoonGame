@@ -603,6 +603,16 @@ import { allOn } from './cmdHighlight';
 import { assaultTargetOk, deployPick, hostileFleets, mergeAnchors, ownFleets } from './aimTargets';
 import { FORGOTTEN, afterRebuild, keepScroll, panelChanged } from './panelCache';
 import { attentionTotal, countShown, myBattleCount, railBadge } from './attentionBadges';
+import {
+  chipDead,
+  chipShort,
+  flowDigits,
+  flowPrefix,
+  flowRounded,
+  flowShown,
+  flowSign,
+  stockBleeds,
+} from './resourceChip';
 import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from './simClock';
 import { armedTap } from './armedTap';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
@@ -11685,23 +11695,19 @@ function frame(nowReal: number) {
   // it plays no part in the current match yet.
   const inc = netIncome(s, ME);
   const myArrears = s.players[ME]?.arrears ?? [];
+  // Как число на фишке говорит правду — `resourceChip.ts` (REFM-190): поток меньше
+  // единицы округляется до ДЕСЯТОЙ (содержание даёт доли за час, и целое врало бы «0»),
+  // фишка гаснет только когда пусто И не течёт, долг вытесняет скорость (при долге она
+  // считает производство, которое уже не доходит), а телефон уносит скорость в цвет.
   const chip = (icon: string, key: string) => {
     const stock = r[key] ?? 0;
-    const raw = inc[key] ?? 0;
-    // Building/army upkeep makes sub-1/h drains common — one decimal keeps a slow
-    // bleed visible instead of rounding it to a lying zero.
-    const flow = Math.abs(raw) >= 1 ? Math.round(raw) : Math.round(raw * 10) / 10;
-    // A phone bar has no room for flow digits: the chip carries only the stock, a
-    // negative net flow paints that stock red, and the exact rate lives behind a tap
-    // (the #purse click handler). Desktop keeps the inline ±N/ч readout.
-    const flowTxt =
-      !MOBILE && flow !== 0
-        ? `<em class="${flow > 0 ? 'up' : 'dn'}">${flow > 0 ? '+' : ''}${Math.abs(flow) >= 1 ? kfmt(flow) : flow}/ч</em>`
-        : '';
-    const dead = stock === 0 && flow === 0 ? ' dead' : '';
-    // Unpaid upkeep on this resource → the chip flags the brownout (tap it for words).
-    const short = myArrears.includes(key) ? ' short' : '';
-    const bleed = MOBILE && flow < 0 ? ' class="neg"' : '';
+    const flow = flowRounded(inc[key] ?? 0);
+    const flowTxt = flowShown(MOBILE, flow)
+      ? `<em class="${flowSign(flow)}">${flowPrefix(flow)}${flowDigits(flow, kfmt)}/ч</em>`
+      : '';
+    const dead = chipDead(stock, flow) ? ' dead' : '';
+    const short = chipShort(myArrears, key) ? ' short' : '';
+    const bleed = stockBleeds(MOBILE, flow) ? ' class="neg"' : '';
     return `<span class="res${dead}${short}" title="${t(`hud.resource.${key}`)}" data-res="${key}"><i>${icon}</i><span class="rv"><b${bleed}>${kfmt(stock)}</b>${short ? '<em class="dn">⚠</em>' : flowTxt}</span></span>`;
   };
   // Capsule icons = RES_SVG (line art traced from the mock; TECH_CUR keeps the text
