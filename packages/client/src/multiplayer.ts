@@ -1,5 +1,14 @@
 import { applyDelta, hashState, type Action, type DomainEvent, type GameState, type PlayerId, type SignatureContact, type StateDelta } from '@void/shared-core';
 import { createActionEnvelope, type ActionEnvelope } from '@void/action-layer';
+// NETA2-4: формы wire-контракта приходят из общего пакета. Импорт type-only — в бандл не
+// едет ничего, рантайм-половина `@void/protocol` вытряхивается tree-shaking'ом.
+import type {
+  ChatChannel,
+  ChatMessage as MultiplayerChatMessage,
+  Ping as MultiplayerPing,
+  PingAnchor,
+  PingKind,
+} from '@void/protocol';
 
 // BF-2 (bug-hunt CRIT): the gate's sequence cursor is strict (1,2,3…) and a throttled
 // (`E_RATE_LIMIT`) or out-of-order action does NOT consume its clientSeq — the server
@@ -44,46 +53,18 @@ export interface LobbyRoster {
   started: boolean;
 }
 
-// Tactical ally pings — mirrors the server's `@void/server` protocol wire shape. They
-// are ephemeral coordination markers (never part of GameState); the server stamps the
-// id/timestamps and relays only to the owner + allies.
-export type PingKind = 'mark' | 'move' | 'attack' | 'defend' | 'build';
-export interface PingAnchor {
-  /** A planet/sector id (snapped). */
-  node?: string;
-  /** A free position in map space. */
-  point?: { x: number; y: number };
-}
-export interface MultiplayerPing {
-  id: string;
-  owner: PlayerId;
-  kind: PingKind;
-  target: PingAnchor;
-  to?: PingAnchor;
-  payload?: { building?: string };
-  /** Short label written by the placer (server-clamped). */
-  label?: string;
-  createdAt: number;
-  expiresAt: number;
-}
+// Тактические пинги и чат сессии больше НЕ объявляются здесь (NETA2-4): их форма — часть
+// wire-контракта, а он теперь один на оба конца, в `@void/protocol`. Раньше на этом месте
+// лежали рукописные копии серверных типов, и держал их от расхождения только компилятор
+// (`wireParity.test.ts` с Mutual-ассертами) — то есть дрейф ловился, но сами копии
+// оставались. Импорт ТИПОВ (`import type`) не тянет в бандл ничего: рантайм-половина
+// пакета (`parseClientMessage`/`serializeServerMessage`) вытряхивается tree-shaking'ом.
+//
+// Клиентские имена сохранены как алиасы: `MultiplayerPing`/`MultiplayerChatMessage` —
+// публичная поверхность клиента, и переименование протянулось бы по всему UI без пользы.
+export type { ChatChannel, MultiplayerChatMessage, MultiplayerPing, PingAnchor, PingKind };
 /** A ping to place — the server fills in id/createdAt/expiresAt. */
 export type PingDraft = Pick<MultiplayerPing, 'kind' | 'target' | 'to' | 'payload' | 'label'>;
-
-// Session chat — mirrors the server's wire shape. Ephemeral relay (never part of
-// GameState): the server stamps id/at, clamps the text and decides recipients
-// (`session` = everyone, `coalition` = live allies, `dm` = the two parties).
-export type ChatChannel = 'session' | 'coalition' | 'dm';
-export interface MultiplayerChatMessage {
-  /** `chat:<from>:<seq>` (server-assigned) — dedupe key across live + join replay. */
-  id: string;
-  from: PlayerId;
-  channel: ChatChannel;
-  /** DM addressee (present iff `channel === 'dm'`). */
-  to?: PlayerId;
-  text: string;
-  /** Match-clock stamp. */
-  at: number;
-}
 
 export interface MultiplayerClientHandlers {
   onStatus?(status: MultiplayerStatus): void;

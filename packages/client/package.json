@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@void/action-layer": "workspace:*",
+    "@void/protocol": "workspace:*",
     "@void/shared-core": "workspace:*"
   },
   "devDependencies": {

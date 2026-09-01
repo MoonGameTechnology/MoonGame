@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "noEmit": true,
+    // Только ради `wireParity.test.ts`: сторож читает исходник клиента через `node:fs`,
+    // потому что структурная типизация не отличит копию контракта от импорта, пока они
+    // совпадают. Сам контракт (`index.ts`) Node-API не касается и едет в браузерный
+    // бандл клиента как type-only импорт — та же оговорка, что у `shared-core`.
+    "types": ["node"]
+  },
+  "include": ["src/**/*.ts"]
+}

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseClientMessage } from './protocol';
+import { parseClientMessage } from './index';
 
 // parseClientMessage is the validation boundary: a malformed field must be REJECTED
 // (→ E_BAD_MESSAGE at the caller), never silently coerced into a different, broader op.
