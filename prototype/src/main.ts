@@ -602,6 +602,7 @@ import { cmdShown } from './cmdPresence';
 import { allOn } from './cmdHighlight';
 import { assaultTargetOk, deployPick, hostileFleets, mergeAnchors, ownFleets } from './aimTargets';
 import { FORGOTTEN, afterRebuild, keepScroll, panelChanged } from './panelCache';
+import { attentionTotal, countShown, myBattleCount, railBadge } from './attentionBadges';
 import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from './simClock';
 import { armedTap } from './armedTap';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
@@ -11715,24 +11716,27 @@ function frame(nowReal: number) {
     purse.innerHTML = hudHtml;
     lastHudHtml = hudHtml;
   }
+  // Кого зовут значки внимания и куда ложится цифра — `attentionBadges.ts` (REFM-189):
+  // ноль ПРЯЧЕТ значок (значок с «0» гонит игрока в пустоту), бой считается моим и когда
+  // я его лишь ВИЖУ, а зеркало на гамбургере молчит при открытой панели — там свои значки.
   const msgBadge = document.getElementById('msgbadge');
   if (msgBadge) {
-    msgBadge.style.display = unreadMsgs > 0 ? '' : 'none';
+    msgBadge.style.display = countShown(unreadMsgs) ? '' : 'none';
     msgBadge.textContent = String(unreadMsgs);
   }
-  const battles = Object.values(s.battles).filter(
-    (b) => b.attacker.owner === ME || b.defender.owner === ME || known(b.location),
-  ).length;
+  const battles = myBattleCount(Object.values(s.battles), ME, known);
   const alertText = String(battles);
   if (alertText !== lastAlertText) {
-    alertBadge.style.display = battles > 0 ? 'grid' : 'none';
+    alertBadge.style.display = countShown(battles) ? 'grid' : 'none';
     alertBadge.textContent = alertText;
     lastAlertText = alertText;
   }
   // collapsed rail mirrors unread/battle attention onto the hamburger, so notifications
   // still surface while the tool panel (with its per-tool badges) is closed.
-  const attn = battles + unreadMsgs;
-  const railAlertText = attn > 0 && !railEl.classList.contains('open') ? String(attn) : '';
+  const railAlertText = railBadge(
+    attentionTotal(battles, unreadMsgs),
+    railEl.classList.contains('open'),
+  );
   if (railAlertText !== lastRailAlert) {
     railAlert.style.display = railAlertText ? 'grid' : 'none';
     if (railAlertText) railAlert.textContent = railAlertText;
