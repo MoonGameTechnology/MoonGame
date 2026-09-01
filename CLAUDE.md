@@ -45,6 +45,11 @@ Monorepo (pnpm workspaces):
   shared render kit + `?join=` deep-link speaking `action.v1`) — the full in-match HUD is
   still ahead, so the players' playable client remains `prototype/`. `mobile/` is the thin
   Capacitor wrapper (APK).
+- `packages/protocol` — the wire contract between server and client, declared ONCE and imported
+  by both (NETA2-4). Each side used to hand-write its own copy; a type-only parity test caught
+  the drift but could not remove the mirror. The client depends on this package and NOT on
+  `@void/server`, so no server code reaches the browser bundle — it imports types only, and the
+  runtime half (`parseClientMessage`/`serializeServerMessage`) tree-shakes away.
 - `data/` — game content as JSON. `docs/` — design docs.
 
 ## Commands
