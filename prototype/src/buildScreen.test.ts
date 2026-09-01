@@ -294,14 +294,20 @@ describe('окно построек — подключение к main.ts', () =
   });
 
   it('окно стоит в лестнице Android-Back', () => {
-    expect(src).toMatch(/id: 'buildwin',\s*isOpen: \(\) => buildWinEl\.classList\.contains\('show'\)/);
+    expect(src).toMatch(
+      /id: 'buildwin',\s*isOpen: \(\) => buildWinEl\.classList\.contains\('show'\)/,
+    );
   });
 
   it('кадровый цикл держит открытое окно живым (стройка достраивается на глазах)', () => {
-    expect(src).toContain('buildWin.isOpen() && nowReal - lastBuildAt > 500');
+    // Дроссель вынесен в `liveWindows.ts` (REFM-194); сторож проверяет ту же связку —
+    // окно открыто, отметка СВОЯ (`lastBuildAt`), срок — полсекунды окон с прогрессом.
+    expect(src).toContain('repaintDue(buildWin.isOpen(), nowReal, lastBuildAt, PROGRESS_MS)');
   });
 
   it('заказ идёт хостовым путём enqueueBuild — сеть и соло не разъезжаются', () => {
-    expect(src).toMatch(/build: \(pid, id\) => enqueueBuild\(pid, \{ kind: 'building', id, count: 1 \}\)/);
+    expect(src).toMatch(
+      /build: \(pid, id\) => enqueueBuild\(pid, \{ kind: 'building', id, count: 1 \}\)/,
+    );
   });
 });
