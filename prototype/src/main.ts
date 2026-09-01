@@ -506,6 +506,7 @@ import {
 } from './dockedActions';
 // REFM-201: чей сейчас ход в переговорах — одна формула на оба чипа.
 import { offerAffordance, offerClass, offerDisabled, offerMark } from './offerAffordance';
+import { seatBadgeOf, seatKind } from './seatBadge';
 // REFM-17 — палитра и правило «цвет = отношение»: одна таблица на карту и на экран
 // дипломатии (раньше их было две, и настройку палитры знала только карта).
 import {
@@ -6414,11 +6415,11 @@ function closeDiplo(): void {
   document.getElementById('diplo')?.classList.remove('show');
 }
 
-/** Roster icon + tag for a seat: a human commander vs a synthetic (AI) one. */
+/** Значок и ГОТОВАЯ подпись места — `seatBadge.ts` (REFM-202). Подпись приходит текстом,
+ *  а не ключом: раньше отсюда выходил ключ, и три места печатали его напрямую, минуя
+ *  `t()`, — игрок видел буквально «comms.you» вместо «ВЫ». */
 function seatBadge(id: string): { icon: string; tag: string } {
-  if (id === ME) return { icon: '☻', tag: 'comms.you' };
-  if (isAiSeat(id)) return { icon: '⌬', tag: 'diplo.filter.ai' };
-  return { icon: '☻', tag: 'comms.tag.player' };
+  return seatBadgeOf(seatKind(id === ME, isAiSeat(id)));
 }
 
 /** Does a seat pass the active roster filters? Stance filter never matches ME (no
