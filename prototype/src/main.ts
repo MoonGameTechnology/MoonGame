@@ -626,6 +626,12 @@ import {
   targetPipRadius,
 } from './aimPreview';
 import {
+  type EffectTag,
+  effectsShown,
+  fleetEffects,
+  pointDefenseTotal,
+} from './fleetEffects';
+import {
   chipDead,
   chipShort,
   flowDigits,
@@ -5491,6 +5497,35 @@ function fleetSummaryHtml(f: Fleet): string {
 }
 
 /** Side-panel: a single selected fleet — combat stats, orders, docking. */
+/** Подпись метки эффекта: решение о наборе принимает `fleetEffects.ts`, текст — локаль. */
+function effectTagText(tag: EffectTag): string {
+  switch (tag.kind) {
+    case 'in-battle':
+      return `⚔️ ${t('effect.in-battle')}`;
+    case 'forced-march':
+      return `⚡ ${t('effect.forced-march')}`;
+    case 'bombarding':
+      return `⊗ ${t('effect.bombarding')}`;
+    case 'barrage-focus':
+      return `🎯 ${t('effect.barrage-focus')}`;
+    case 'free-flight':
+      return `🛬 ${t('effect.free-flight')}`;
+    case 'patrol': {
+      const fuel =
+        'rearming' in tag
+          ? t('effect.rearming', { n: tag.rearming })
+          : t('effect.fuel', { n: tag.fuel });
+      return `🛩 ${t('effect.patrol')} · ${fuel}`;
+    }
+    case 'blackout':
+      return `🌫 ${t('effect.blackout')}`;
+    case 'hunger':
+      return `🍽 ${t('effect.hunger')}`;
+    case 'point-defense':
+      return `🛡 ${t('effect.point-defense', { n: tag.n })}`;
+  }
+}
+
 function fleetPanelHtml(f: Fleet): string {
   const nShips = sumUnits(f.units);
   const nTr = sumUnits(f.landing ?? []);
@@ -5567,35 +5602,34 @@ function fleetPanelHtml(f: Fleet): string {
   // Active effects (RPG-style buffs/debuffs) — a compact row of tags showing
   // what's currently affecting this fleet: combat, forced march, patrol, flak,
   // blackout, hunger, bombardment, point defense, free flight, barrage focus.
-  const effects: string[] = [];
-  if (f.battleId) effects.push(`⚔️ ${t('effect.in-battle')}`);
-  if (boosted) effects.push(`⚡ ${t('effect.forced-march')}`);
-  if (f.bombarding) effects.push(`⊗ ${t('effect.bombarding')}`);
-  if (f.barrageTarget) effects.push(`🎯 ${t('effect.barrage-focus')}`);
-  if (f.freeMovement) effects.push(`🛬 ${t('effect.free-flight')}`);
+  // О чём карточка говорит и о чём МОЛЧИТ — `fleetEffects.ts` (REFM-197): долговые метки
+  // только на СВОЁМ флоте (иначе мои долги показались бы бедой противника), голод — лишь
+  // когда на борту есть десант, точечная оборона не считает пустые стопки (они остаются
+  // в составе, но стволов у них нет) и не пишется нулём, а пустая полоса не рисуется
+  // совсем — заголовок без меток выглядит поломкой, а не спокойствием.
   const pt = patrolOf(f.id);
-  if (pt) {
-    const fuel = pt.sortie.rearming > 0
-      ? t('effect.rearming', { n: pt.sortie.rearming })
-      : t('effect.fuel', { n: pt.sortie.fuel });
-    effects.push(`🛩 ${t('effect.patrol')} · ${fuel}`);
-  }
-  if (f.owner === ME) {
-    const arrears = s.players[ME]?.arrears ?? [];
-    if (arrears.includes('energy')) effects.push(`🌫 ${t('effect.blackout')}`);
-    if (arrears.includes('food') && nTr > 0) effects.push(`🍽 ${t('effect.hunger')}`);
-  }
-  // Point defense (from modules) — show if any ship has it
-  const pd = f.units.reduce((sum, st) => {
+  const pd = pointDefenseTotal(f.units, (st) => {
     const def = data.units[st.unit];
-    if (!def || st.count <= 0) return sum;
-    const eff = effectiveStats(def, st, data);
-    return sum + (eff.pointDefense ?? 0) * st.count;
-  }, 0);
-  if (pd > 0) effects.push(`🛡 ${t('effect.point-defense', { n: pd })}`);
-  if (effects.length > 0) {
+    return def ? (effectiveStats(def, st, data).pointDefense ?? 0) : null;
+  });
+  const tags = fleetEffects(
+    {
+      owner: f.owner,
+      inBattle: !!f.battleId,
+      forcedMarch: boosted,
+      bombarding: !!f.bombarding,
+      barrageFocus: !!f.barrageTarget,
+      freeFlight: !!f.freeMovement,
+      patrol: pt ? { rearming: pt.sortie.rearming, fuel: pt.sortie.fuel } : null,
+      troops: nTr,
+      pointDefense: pd,
+    },
+    ME,
+    s.players[ME]?.arrears ?? [],
+  );
+  if (effectsShown(tags)) {
     h += `<div class="sec">${t('effect.title')}</div><div class="row effects">`;
-    for (const e of effects) h += `<span class="effect-tag">${e}</span>`;
+    for (const tag of tags) h += `<span class="effect-tag">${effectTagText(tag)}</span>`;
     h += `</div>`;
   }
 
