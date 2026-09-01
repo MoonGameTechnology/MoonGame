@@ -613,6 +613,7 @@ import {
   speedbarShown,
   timeControlsShown,
 } from './matchExits';
+import { INTEL_MS, PROGRESS_MS, intelVisible, repaintDue } from './liveWindows';
 import {
   chipDead,
   chipShort,
@@ -11790,23 +11791,27 @@ function frame(nowReal: number) {
   if (spdCtl && spdCtl.style.display !== showSpdCtl) spdCtl.style.display = showSpdCtl;
   const showBar = displayOf(speedbarShown(pcUi(), devSpeedControl));
   if (speedbarEl && speedbarEl.style.display !== showBar) speedbarEl.style.display = showBar;
+  // Как часто живёт открытое окно — `liveWindows.ts` (REFM-194): дроссель считает РЕАЛЬНОЕ
+  // время (по игровому он на разгоне ×7200 пробивался бы каждым кадром, а на паузе — никогда),
+  // отметка у каждого окна СВОЯ (с общей два открытых окна обновлялись бы вдвое реже), и
+  // сроки разные: полсекунды там, где идёт прогресс, пять секунд у разведки, чьи таймеры
+  // тикают часами и за полсекунды не меняются вовсе.
   // Keep the tech window live while open (research progress bar / eta), throttled.
-  if (techTree.isOpen() && nowReal - lastTechAt > 500) {
+  if (repaintDue(techTree.isOpen(), nowReal, lastTechAt, PROGRESS_MS)) {
     lastTechAt = nowReal;
     techTree.repaint();
   }
   // Keep the build window live while open (a finished build flips its row), throttled.
-  if (buildWin.isOpen() && nowReal - lastBuildAt > 500) {
+  if (repaintDue(buildWin.isOpen(), nowReal, lastBuildAt, PROGRESS_MS)) {
     lastBuildAt = nowReal;
     buildWin.repaint();
   }
   // Keep the steward window live while open (countdown to control returning), throttled.
-  if (steward.isOpen() && nowReal - lastStewAt > 500) {
+  if (repaintDue(steward.isOpen(), nowReal, lastStewAt, PROGRESS_MS)) {
     lastStewAt = nowReal;
     steward.repaint();
   }
-  // Intel windows tick in hours — a lazy 5s refresh keeps the «Шпионаж» timers honest.
-  if (diploOpen && diploTab === 'intel' && nowReal - lastIntelAt > 5000) {
+  if (repaintDue(intelVisible(diploOpen, diploTab), nowReal, lastIntelAt, INTEL_MS)) {
     lastIntelAt = nowReal;
     renderDiplo();
   }
