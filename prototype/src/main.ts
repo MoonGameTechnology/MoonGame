@@ -739,6 +739,7 @@ import { dialIdentity, dialUrl, seatTicketKey } from './netDial';
 import { closeAction, isCurrentSocket } from './socketFate';
 import { welcomePlan } from './netWelcome';
 import { orderPlan } from './orderRoute';
+import { clientPlan, liveSocket, seatKey } from './netClientReuse';
 import { errorTarget, refusalKey } from './errorRoute';
 import { joinLanding } from '../../decisions/joinLanding';
 import {
@@ -1143,6 +1144,16 @@ let netAdmitted = false;
 let currentMatchId = 'proto';
 let netClient: MultiplayerClient | null = null;
 let netSock: WebSocket | null = null;
+/** Место (сервер+матч+позывной), к которому привязан живой `netClient` — `netClientReuse.ts`
+ *  (NETA2-5). Клиент переживает дозвоны в ЭТО место вместе со своей очередью приказов;
+ *  дозвон в другое начинается с чистого клиента. */
+let netSeat: string | null = null;
+/** Ключ билета места для текущего клиента: его обработчик `onSeatTicket` живёт дольше
+ *  одного сокета, поэтому ключ читается отсюда, а не из замыкания дозвона. */
+let netTicketKey = '';
+/** Текущий сокет получил приветственный снимок (нас впустили). Было локальной переменной
+ *  дозвона; переехало наверх, потому что обработчики клиента теперь переживают сокет. */
+let socketAdmitted = false;
 // M0 net telemetry (dev overlay): smoothed round-trip ms, and a desync check that
 // compares our reconstructed view to the server's hash on every snapshot.
 let rttEma: number | null = null;
@@ -2369,9 +2380,13 @@ function playerOrder(action: Action): boolean {
   // оборванной связи приказ честно отвергается (сервер о нём не узнает), а обучение
   // учится в сети на намерении, в соло — только на принятом приказе.
   const plan = orderPlan({ net: NET, hasClient: !!netClient, reconnecting });
-  if (plan.route === 'send') {
+  if (plan.route === 'send' || plan.route === 'queue') {
+    // Один и тот же вызов: живой провод отправляет сразу, оборванный — кладёт в очередь
+    // транспорта (NETA2-5), и она уйдёт на реконнектном welcome. Разница только в том,
+    // что игроку про очередь говорят — иначе он не поймёт, почему исполнения ещё нет.
     netClient?.sendAction(action); // server is authoritative — await its broadcast
     if (plan.tour === 'now') activeTour?.notifyAction(action.type); // ответ сервера асинхронен
+    if (plan.route === 'queue') note('⏳ ' + t('net.queued-order'));
     return true;
   }
   if (plan.route === 'refuse') {
@@ -10151,38 +10166,29 @@ $('setupcancel').addEventListener('click', () => {
   else showConnect(true);
 });
 
-function connect(): void {
-  const srv = resolveServer();
-  if (!srv) return;
-  const { base, nick } = srv;
-  // Seat lock (REL-5): the ticket the server minted for this seat on first join —
-  // presented back on every reconnect so nobody else can take the seat by typing
-  // our nick. Keyed per server+match+nick (the ticket is seat-scoped).
-  const ticketKey = seatTicketKey(base, currentMatchId, nick);
-  const seatTicket = localStorage.getItem(ticketKey);
-  // Чем представляемся и как это ложится в адрес — `netDial.ts` (REFM-142). Там же
-  // причины: два способа не смешиваются (в режиме аккаунтов ник и билет сервер
-  // отвергнет), билет привязан к тройке «сервер + матч + позывной», а всё уходящее в
-  // адрес экранируется — позывной вводит человек.
-  const url = dialUrl(
-    base,
-    currentMatchId,
-    dialIdentity(authMode, pendingJoinToken, nick, seatTicket),
-  );
-  pendingJoinToken = null; // one dial per token fetch — a reconnect mints a fresh one
-  statusEl.textContent = t('net.connecting', { nick });
-  localStorage.setItem('void.server', base);
-  localStorage.setItem('void.nick', nick); // resume this seat next visit
+/** Забыть клиента вместе с его очередью приказов (NETA2-5). Зовётся там, где очередь
+ *  становится недоставимой по существу: игрок вышел сам или цикл переподключения
+ *  сдался. Копить приказы дальше значило бы доставить их в чужую партию. */
+function dropNetClient(): void {
+  netClient = null;
+  netSeat = null;
+}
 
-  // WS "open" only means the socket connected, not that the server admitted us — it
-  // may still reject (slot taken / unknown player). Flip to "in the match" only on
-  // the first welcome snapshot, so a rejected join never flashes the map.
-  let admitted = false;
-  if (netSock) netSock.close();
-  const sock = (netSock = new WebSocket(url));
-  const client = (netClient = new MultiplayerClient(
-    { send: (d: string) => sock.send(d), close: () => sock.close() },
-    {
+/**
+ * Транспортный клиент для этого места — прежний со своей очередью или новый
+ * (`netClientReuse.ts`, NETA2-5).
+ *
+ * Обработчики регистрируются ОДИН РАЗ на клиента и переживают дозвоны, поэтому здесь их
+ * больше не замыкают на конкретный сокет: устаревший провод отсекается один раз, во
+ * входной точке `sock.onmessage`, а «нас впустили» переехало в `socketAdmitted`.
+ */
+function netClientFor(seat: string): MultiplayerClient {
+  const existing = netClient;
+  if (existing && clientPlan({ hasClient: true, sameSeat: netSeat === seat }) === 'reuse') {
+    return existing;
+  }
+  netSeat = seat;
+  const client = new MultiplayerClient(liveSocket(() => netSock), {
       onStatus: () => {
         // Intentionally no-op on "open": admission is confirmed by the first
         // welcome snapshot (see onSnapshot), not by the socket opening.
@@ -10190,7 +10196,7 @@ function connect(): void {
       onSeatTicket: (ticket) => {
         // The server minted our seat ticket (first join of this nick) — persist it;
         // every later join must present it, and the server can't re-issue (hash-only).
-        localStorage.setItem(ticketKey, ticket);
+        localStorage.setItem(netTicketKey, ticket);
       },
       onPong: (_serverTime, clientTime) => {
         if (clientTime === undefined) return;
@@ -10198,17 +10204,14 @@ function connect(): void {
         rttEma = rttEma === null ? rtt : rttEma * 0.7 + rtt * 0.3;
       },
       onSnapshot: (snap) => {
-        // Устаревший сокет не трогает общее состояние (`socketFate.ts`, REFM-143):
-        // его снимок переписал бы игру чужой, уже закрытой сессией.
-        if (!isCurrentSocket(sock, netSock)) return;
         // Что значит этот снимок — `netWelcome.ts` (REFM-144): вход подтверждает первый
         // снимок и ровно один раз на сокет, переподключение входит молча (это не новый
         // матч), и вход снимает только СВОЙ баннер.
-        const plan = welcomePlan({ admitted, reconnecting, banner });
+        const plan = welcomePlan({ admitted: socketAdmitted, reconnecting, banner });
         banner = plan.banner;
         if (plan.admit) {
           // Server accepted us — NOW we're really in the match.
-          admitted = true;
+          socketAdmitted = true;
           netAdmitted = true; // BF-30: ME is now the server-assigned seat — safe to render
           if (plan.fanfare) snd.play('start');
           reconnecting = false; // a fresh welcome ends any reconnect cycle
@@ -10226,22 +10229,22 @@ function connect(): void {
           note(t('net.connected', { who: NAME[ME] ?? ME }));
           // Latency probe: ping every 2s with a client timestamp the pong echoes.
           if (pingTimer) clearInterval(pingTimer);
-          pingTimer = setInterval(() => client.ping(performance.now()), 2000);
-          client.ping(performance.now()); // seed an RTT reading immediately
+          pingTimer = setInterval(() => netClient?.ping(performance.now()), 2000);
+          netClient?.ping(performance.now()); // seed an RTT reading immediately
           // Perf sample (M2): smoothed fps + rtt + JS-heap (Chrome-only field),
           // every 30s — cheap enough to never matter, useful on every playtest.
           if (perfTimer) clearInterval(perfTimer);
           perfTimer = setInterval(() => {
             const mem = (performance as unknown as { memory?: { usedJSHeapSize?: number } }).memory
               ?.usedJSHeapSize;
-            client.sendPerf({
+            netClient?.sendPerf({
               fps: Math.round(fpsEma),
               ...(rttEma !== null ? { rttMs: Math.round(rttEma) } : {}),
               ...(mem !== undefined ? { memMb: Math.round(mem / 1048576) } : {}),
             });
           }, PERF_SAMPLE_MS);
         }
-        const diploShift = admitted && s !== snap.state && diffNetDiplomacy(s, snap.state);
+        const diploShift = socketAdmitted && s !== snap.state && diffNetDiplomacy(s, snap.state);
         s = snap.state;
         syncPlayerNames(s);
         // Radar picture (BF-18): detected-but-unidentified enemy fleets are absent
@@ -10284,7 +10287,6 @@ function connect(): void {
       // toasts, AA tracers, siege arcs, loss tallies and the victory banner all work
       // in a network match too. Fired after onSnapshot — `s` is already up to date.
       onEvents: (events) => {
-        if (sock !== netSock) return; // a superseded socket must not touch globals
         handleEvents(events);
       },
       // Server-relayed ally pings (own + allies, hidden from enemies): merge them into
@@ -10320,7 +10322,6 @@ function connect(): void {
       // Server-relayed chat (recipients decided server-side, like fog). Our own lines
       // render from this echo too; the id dedupes a live line vs the join replay.
       onChatMessage: (m: MultiplayerChatMessage) => {
-        if (sock !== netSock) return;
         // Тот же разбор, что у меток (`relayIntake.ts`): реплика всегда показуема, но
         // дедуп по серверному id обязателен — эхо своей строки и повтор при входе.
         const known = sessionMessages.some((x) => x.chatId === m.id);
@@ -10351,7 +10352,10 @@ function connect(): void {
         // Где игрок увидит отказ — `errorRoute.ts` (REFM-149): отказ устаревшего сокета
         // не наш, отказ после входа идёт тостом (экран подключения уже скрыт), отказ до
         // входа — в строку этого экрана, и причина называется словами, а не кодом.
-        const target = errorTarget({ current: sock === netSock, admitted, code });
+        // Устаревший сокет отсечён раньше — в `sock.onmessage` (клиент теперь один на
+        // всё присутствие, и до него доходит только текущий провод), поэтому здесь
+        // отказ всегда наш; отказ из самого клиента (`E_OUTBOX_FULL`) — тем более.
+        const target = errorTarget({ current: true, admitted: socketAdmitted, code });
         if (target === 'ignore') return;
         if (target === 'toast') {
           note('✖ ' + errText(code));
@@ -10359,13 +10363,56 @@ function connect(): void {
         }
         // NETA2-1: the server COMPLETED the handshake just to tell us why — a real
         // refusal, not "server down". Say it plainly instead of a generic error.
-        const key = admitted ? null : refusalKey(code);
+        const key = socketAdmitted ? null : refusalKey(code);
         statusEl.textContent = key ? t(key) : t('net.error', { code });
       },
-    },
-  ));
+  });
+  netClient = client;
+  return client;
+}
+
+function connect(): void {
+  const srv = resolveServer();
+  if (!srv) return;
+  const { base, nick } = srv;
+  // Seat lock (REL-5): the ticket the server minted for this seat on first join —
+  // presented back on every reconnect so nobody else can take the seat by typing
+  // our nick. Keyed per server+match+nick (the ticket is seat-scoped).
+  const ticketKey = seatTicketKey(base, currentMatchId, nick);
+  const seatTicket = localStorage.getItem(ticketKey);
+  // Чем представляемся и как это ложится в адрес — `netDial.ts` (REFM-142). Там же
+  // причины: два способа не смешиваются (в режиме аккаунтов ник и билет сервер
+  // отвергнет), билет привязан к тройке «сервер + матч + позывной», а всё уходящее в
+  // адрес экранируется — позывной вводит человек.
+  const url = dialUrl(
+    base,
+    currentMatchId,
+    dialIdentity(authMode, pendingJoinToken, nick, seatTicket),
+  );
+  pendingJoinToken = null; // one dial per token fetch — a reconnect mints a fresh one
+  statusEl.textContent = t('net.connecting', { nick });
+  localStorage.setItem('void.server', base);
+  localStorage.setItem('void.nick', nick); // resume this seat next visit
+
+  // WS "open" only means the socket connected, not that the server admitted us — it
+  // may still reject (slot taken / unknown player). Flip to "in the match" only on
+  // the first welcome snapshot, so a rejected join never flashes the map.
+  socketAdmitted = false;
+  if (netSock) netSock.close();
+  const sock = (netSock = new WebSocket(url));
+  // Клиент привязан к МЕСТУ, а не к сокету (NETA2-5): дозвон в то же место берёт прежнего
+  // вместе с его очередью приказов, дозвон в другое — заводит чистого.
+  netTicketKey = ticketKey;
+  const client = netClientFor(seatKey(base, currentMatchId, nick));
   sock.onopen = () => client.open();
-  sock.onmessage = (ev) => client.receive(String(ev.data));
+  // Устаревший сокет не трогает общее состояние (`socketFate.ts`, REFM-143): его снимок
+  // переписал бы игру чужой, уже закрытой сессией. Проверка стоит ЗДЕСЬ, а не в каждом
+  // обработчике: клиент теперь один на всё присутствие в матче (NETA2-5), и это
+  // единственная дверь, через которую в него входят чужие сообщения.
+  sock.onmessage = (ev) => {
+    if (!isCurrentSocket(sock, netSock)) return;
+    client.receive(String(ev.data));
+  };
   sock.onclose = () => {
     // Что значит это закрытие — `socketFate.ts` (REFM-143): устаревший сокет (игрок
     // нажал «Подключиться» ещё раз) НЕ должен рушить свежую сессию — его позднее
@@ -10375,7 +10422,7 @@ function connect(): void {
       inMatch: NET,
       userClosed,
       reconnecting,
-      admitted,
+      admitted: socketAdmitted,
     });
     if (fate === 'ignore') return;
     if (pingTimer) {
@@ -10394,10 +10441,17 @@ function connect(): void {
     if (fate === 'closed-by-user') {
       statusEl.textContent = 'disconnected';
       note(t('net.disconnected'));
+      // Игрок вышел сам — вместе с клиентом умирает и его очередь (NETA2-5): приказ,
+      // выданный перед выходом, не должен догнать игрока в следующем матче.
+      dropNetClient();
       showConnect(true);
     } else if (fate === 'reconnect') {
       // unexpected drop → auto-rejoin our seat (the match keeps running server-side)
       note(t('net.reconnecting'));
+      // Клиент переживает обрыв (NETA2-5): с этой секунды приказы копятся у него в
+      // очереди и уйдут сами на реконнектном `welcome` — под свежей сессией и свежим
+      // `clientSeq`, поэтому подделать их обрывом нельзя.
+      netClient?.connectionLost();
       reconnecting = true;
       scheduleReconnect();
     } else if (fate === 'retry-admit') {
@@ -11293,6 +11347,7 @@ function scheduleReconnect(): void {
     reconnecting = false;
     reconnectAttempts = 0;
     banner = null;
+    dropNetClient(); // бюджет исчерпан — доставлять очередь больше некуда (NETA2-5)
     statusEl.textContent = t('acc.reconnect-failed');
     showConnect(true);
     return;
