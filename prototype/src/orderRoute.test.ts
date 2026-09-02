@@ -10,8 +10,12 @@ describe('куда уходит приказ игрока', () => {
     expect(orderPlan(сеть).route).toBe('send');
   });
 
-  it('СВЯЗЬ ОБОРВАНА — ОТКАЗ: локально применённый приказ исчез бы на первом welcome', () => {
-    expect(orderPlan(обрыв).route).toBe('refuse');
+  it('СВЯЗЬ ОБОРВАНА, КЛИЕНТ ЖИВ — В ОЧЕРЕДЬ: он досылает её сам на реконнектном welcome', () => {
+    expect(orderPlan(обрыв).route).toBe('queue');
+  });
+
+  it('СВЯЗЬ ОБОРВАНА И КЛИЕНТА НЕТ — ОТКАЗ: очередить некуда, приказ не уйдёт никогда', () => {
+    expect(orderPlan({ net: false, hasClient: false, reconnecting: true }).route).toBe('refuse');
   });
 
   it('соло — локальный редьюсер и есть истина', () => {
@@ -37,7 +41,11 @@ describe('чему учится обучение', () => {
     expect(orderPlan(соло).tour).toBe('on-accept');
   });
 
+  it('ОЧЕРЕДЬ УЧИТ КАК ОТПРАВКА: намерение выражено, доставка — вопрос времени', () => {
+    expect(orderPlan(обрыв).tour).toBe('now');
+  });
+
   it('ОТКАЗ НЕ УЧИТ НИЧЕМУ: приказ не ушёл никуда', () => {
-    expect(orderPlan(обрыв).tour).toBe('never');
+    expect(orderPlan({ net: false, hasClient: false, reconnecting: true }).tour).toBe('never');
   });
 });
