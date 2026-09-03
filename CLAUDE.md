@@ -65,7 +65,8 @@ pnpm run format       # Prettier --write
 
 Run the gate locally before committing — `pnpm run check` = lint + typecheck + test +
 docs-check (`scripts/docs-check.mjs`: целостность `.md`-ссылок в docs/, словарь зон
-backlog'а, словарь статусов кирпичей + живость их блокировок `🔒(ID)` — исполняемая
+backlog'а, словарь статусов кирпичей + живость их блокировок `🔒(ID)` в бэклоге И в
+роадмапах (общий индекс) — исполняемая
 часть правила «verify docs against reality»)
 (CI additionally runs an OSV-Scanner SCA pass over the lockfiles; `pnpm audit` is
 retired — npm shut down its audit endpoints, 2026-07). CI mirrors it on every push:

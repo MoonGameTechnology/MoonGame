@@ -72,7 +72,7 @@ Node слушает loopback plain-HTTP; in-process TLS — только зап�
 - ✅ **Origin-allowlist** на upgrade (закрывает F-06/CSWSH, это часть SE-6.1) — `ALLOWED_ORIGINS` из env (`serverConfig.ts`), несовпадение → `rejectUpgrade` 403 (`wsServer.ts`).
   **Готово, когда:** за прокси сервер видит верный протокол/хост; cross-origin upgrade отбивается; без прокси форвард-заголовки игнорируются.
 
-### HTTPS-1.2 · (Опц.) In-process TLS как запасной путь `[srv]` ⏳ 🔒(HTTPS-1.1) — S → SE-1.2
+### HTTPS-1.2 · (Опц.) In-process TLS как запасной путь `[srv]` ⏳ — S → SE-1.2
 
 **Цель:** дать `https.createServer` для сценариев без прокси (изолированный хост).
 **Подзадачи:** если заданы `TLS_CERT`/`TLS_KEY` — поднимать `https`+`wss`, иначе как сейчас
@@ -149,7 +149,7 @@ Cloudflare Tunnel/mTLS край→origin (SE-1.3), чтобы origin не све
 
 ## Фаза 5 · Мобильная обёртка (Capacitor) `[cli]`
 
-### HTTPS-5.1 · Убрать cleartext в release, отделить debug-LAN профиль `[cli][sec]` ⏳ 🔒(HTTPS-2.1/3.x) — M → SE-7.2
+### HTTPS-5.1 · Убрать cleartext в release, отделить debug-LAN профиль `[cli][sec]` 🔒(фаза HTTPS-3) — M → SE-7.2
 
 **Цель:** APK по умолчанию ходит только по `https`/`wss`.
 **Подзадачи:**
