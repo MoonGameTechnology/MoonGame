@@ -296,6 +296,8 @@ export const squadronModule: GameModule = {
             targetOwner: target.owner,
             damage: damagePerTarget,
           });
+          // RAW on purpose (CORE-DMG-1): point-defense is not a melee round, so it
+          // skips the `combat.damage` hook. Pinned by `damageHookScope.test.ts`.
           applyDamageToSide(h, { kind: 'fleet', fleetId: target.id }, damagePerTarget, data, '');
           removeIfWiped(h, target.id);
         }
