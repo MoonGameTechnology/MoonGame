@@ -293,6 +293,35 @@ type CommitVerdict =
   | { ok: false; code: string; durable: false };
 const TRANSIENT_VERDICT: CommitVerdict = { ok: false, code: 'E_UNAVAILABLE', durable: false };
 
+/**
+ * Что случится, если применить это действие СЕЙЧАС (NETA2-8) — вычислено, но ещё не
+ * случилось. Оркестрация подачи одна на оба пути коммита, и различаются они ровно тем,
+ * что durable вставляет `await persist` между планом и его коммитом; чтобы это осталось
+ * единственным различием, вычисление вынесено в чистый `planApply`, а фиксация — в
+ * `commitPlan`. Раньше здесь стояли ДВЕ полные реализации, и это была структурная
+ * причина дрейфа (NETA2-0a, расхождение `seq`).
+ */
+type ApplyPlan =
+  /** Мир не удалось догнать: состояние не меняется вовсе, дальше — только отказ. */
+  | { kind: 'advance-failed'; code: string }
+  /** Ядро отвергло действие, но догон УЖЕ посчитан: коммитится он один (SRV-1). */
+  | { kind: 'rejected'; code: string; state: GameState; events: DomainEvent[] }
+  /** Действие принято: коммитится итоговое состояние и события догона + применения. */
+  | { kind: 'applied'; state: GameState; events: DomainEvent[]; at: number };
+/** План, у которого есть что коммитить (всё, кроме несостоявшегося догона). */
+type CommittablePlan = Extract<ApplyPlan, { kind: 'rejected' | 'applied' }>;
+
+/** Вердикт фронта подачи — дедупа и лимита (NETA2-8). Стоял тремя копиями: у голого
+ *  sync-submit, у голого durable-submit и у серверного submit; расходились они молча
+ *  (гейтованный путь имеет свой фронт — там дедуп живёт в `ActionGate`). */
+type FrontDecision =
+  /** Такой `actionId` уже применялся: отвечаем кэшем, повторно НЕ применяем. */
+  | { kind: 'cached'; receipt: ActionReceipt }
+  /** Игрок превысил лимит подач: отказ ТРАНЗИЕНТНЫЙ, квитанции нет — повтор доедет. */
+  | { kind: 'rate-limited' }
+  /** Проходи. */
+  | { kind: 'pass' };
+
 const OPEN = 1;
 /** Backpressure cap: drop a peer whose unflushed outbound buffer exceeds this (it
  *  isn't draining — a fast sender outrunning a slow receiver). Deltas are KB-sized,
@@ -991,28 +1020,12 @@ export class MatchRoom {
   }
 
   submitAction(playerId: PlayerId, action: Action, peer?: RoomPeer): SubmitResult {
-    const cached = this.receipts.get(action.id);
-    if (cached) {
-      if (peer) {
-        if (cached.ok) this.send(peer, this.stateMessageFor(playerId));
-        else this.sendRejection(peer, cached);
-      }
-      return { ok: cached.ok, seq: cached.seq, events: [], code: cached.code };
+    const front = this.frontGate(playerId, action.id, peer);
+    if (front.kind === 'cached') {
+      const { receipt } = front;
+      return { ok: receipt.ok, seq: receipt.seq, events: [], code: receipt.code };
     }
-
-    // Rate limit (F-03): cap submits per player per window. A flood past the cap is
-    // rejected TRANSIENTLY — no receipt is recorded, so a genuine retry after backoff
-    // still lands (idempotency must never turn a rate-limit into a permanent reject).
-    if (this.rateLimited(playerId)) {
-      if (peer) {
-        this.send(peer, {
-          type: 'rejection',
-          matchId: this.id,
-          seq: this.seq,
-          actionId: action.id,
-          code: 'E_RATE_LIMIT',
-        });
-      }
+    if (front.kind === 'rate-limited') {
       return { ok: false, seq: this.seq, events: [], code: 'E_RATE_LIMIT' };
     }
 
@@ -1041,12 +1054,13 @@ export class MatchRoom {
     }
     let out: { ok: boolean; code?: string } = { ok: false, code: 'E_INTERNAL' };
     await this.enqueue(async () => {
-      const cached = this.receipts.get(action.id);
-      if (cached) {
-        out = { ok: cached.ok, ...(cached.code !== undefined ? { code: cached.code } : {}) };
+      const front = this.frontGate(playerId, action.id); // без пира: у драйвера нет сокета
+      if (front.kind === 'cached') {
+        const { receipt } = front;
+        out = { ok: receipt.ok, ...(receipt.code !== undefined ? { code: receipt.code } : {}) };
         return;
       }
-      if (this.rateLimited(playerId)) {
+      if (front.kind === 'rate-limited') {
         out = { ok: false, code: 'E_RATE_LIMIT' }; // transient — the driver's next pass retries
         return;
       }
@@ -1059,48 +1073,101 @@ export class MatchRoom {
   }
 
   /**
-   * The reducer core, AFTER the front gates (dedup, rate-limit, ownership): catch the
-   * world up to now, apply the action, commit + broadcast. Shared by the bare
-   * `submitAction` and the gated `admitEnvelope` (which pre-clears the gates via the
-   * ActionGate), so neither re-runs a gate the other already applied.
+   * Фронт подачи (NETA2-8): дедуп по квитанции и per-player лимит — общий для всех трёх
+   * голых путей (sync `submitAction`, durable `doCommittedSubmit`, серверный
+   * `submitServerAction`). Отвечает пиру сам, потому что ответ — часть решения: успешная
+   * квитанция переигрывается ПОЛНЫМ снимком (клиент мог потерять дельту), отказная —
+   * тем же отказом, а лимит — отказом без квитанции, чтобы повтор после бэкоффа не
+   * встретил идемпотентный «уже отвергнуто».
+   */
+  private frontGate(playerId: PlayerId, actionId: string, peer?: RoomPeer): FrontDecision {
+    const cached = this.receipts.get(actionId);
+    if (cached) {
+      if (peer) {
+        if (cached.ok) this.send(peer, this.stateMessageFor(playerId));
+        else this.sendRejection(peer, cached);
+      }
+      return { kind: 'cached', receipt: cached };
+    }
+    // F-03: лимит подач на игрока. Перебор отвергается ТРАНЗИЕНТНО — квитанция не
+    // пишется, поэтому честный повтор после бэкоффа применяется (идемпотентность не
+    // должна превращать лимит в вечный отказ).
+    if (this.rateLimited(playerId)) {
+      if (peer) this.sendReject(peer, actionId, 'E_RATE_LIMIT');
+      return { kind: 'rate-limited' };
+    }
+    return { kind: 'pass' };
+  }
+
+  /**
+   * ЧИСТАЯ половина подачи (NETA2-8): догнать мир и применить действие, НИЧЕГО не
+   * фиксируя — ни `stateValue`, ни `seq`, ни рассылки. Ровно это позволяет durable-пути
+   * дождаться записи перед коммитом (мир, ещё не ставший долговечным, снаружи не виден),
+   * а sync-пути — закоммитить сразу: разница между путями сжимается до одного `await`.
+   */
+  private planApply(action: Action, serverNow: number): ApplyPlan {
+    const advanced = this.computeAdvance(this.stateValue, serverNow);
+    if (!advanced.ok) return { kind: 'advance-failed', code: advanced.code };
+    const at = Math.max(serverNow, advanced.state.time);
+    const result = this.kernel.applyAction(advanced.state, action, this.context(at));
+    if (!result.ok) {
+      // SRV-1: действие отвергнуто, но догон уже посчитан и его события (прилёты, бои,
+      // захваты) терять нельзя — коммитится и рассылается ОН, без результата действия.
+      return { kind: 'rejected', code: result.code, state: advanced.state, events: advanced.events };
+    }
+    return {
+      kind: 'applied',
+      state: result.state,
+      events: [...advanced.events, ...result.events],
+      at,
+    };
+  }
+
+  /**
+   * ФИКСИРУЮЩАЯ половина подачи (NETA2-8): принять посчитанный план в мир — состояние,
+   * журнал реплея, рассылку, банк наград, отказ игроку. Квитанцию делает вызывающий
+   * (sync — сразу через `recordReceipt`, durable — только после ack записи), потому что
+   * именно в ней сидит разница путей; всё остальное здесь общее и потому не дрейфует.
+   */
+  private commitPlan(
+    plan: CommittablePlan,
+    action: Action,
+    receipt: ActionReceipt,
+    peer?: RoomPeer,
+  ): void {
+    // RPL-2: граница, которой мир ДЕЙСТВИТЕЛЬНО достиг (throttled-догон не доходит до
+    // `now`) — пустой догон границей не считается, чтобы журнал не пух.
+    if (plan.state.time > this.stateValue.time) this.record?.({ at: plan.state.time });
+    this.stateValue = plan.state;
+    if (plan.kind === 'applied') this.record?.({ at: plan.at, action }); // RPL-2: только УСПЕШНЫЕ
+    if (plan.events.length > 0 || plan.kind === 'applied') this.broadcastState(plan.events);
+    // Догон мог ЗАВЕРШИТЬ матч (порог очков/доминирования перейден на span'е
+    // `time.advanced`) — тогда действие отвергается с E_MATCH_ENDED, но награды всё
+    // равно банкуются. Идемпотентно, поэтому зовётся на каждом коммите.
+    this.observeEndIfNeeded();
+    if (plan.kind === 'rejected' && peer) this.sendRejection(peer, receipt);
+  }
+
+  /**
+   * Sync-путь: план → коммит без ожидания. AFTER the front gates (dedup, rate-limit,
+   * ownership) — shared by the bare `submitAction` and the gated `admitEnvelope` (which
+   * pre-clears the gates via the ActionGate), so neither re-runs a gate the other applied.
    */
   private applyAndBroadcast(playerId: PlayerId, action: Action, peer?: RoomPeer): SubmitResult {
     const startedAt = this.observe ? performance.now() : 0;
     try {
-      const serverNow = this.clock();
-      const advanced = this.advance(serverNow);
-      if (!advanced.ok) {
-        const receipt = this.recordReceipt(action, playerId, false, advanced.code);
+      const plan = this.planApply(action, this.clock());
+      if (plan.kind === 'advance-failed') {
+        const receipt = this.recordReceipt(action, playerId, false, plan.code);
         if (peer) this.sendRejection(peer, receipt);
         return { ok: false, seq: receipt.seq, events: [], code: receipt.code };
       }
-
-      const effectiveNow = Math.max(serverNow, this.stateValue.time);
-      const context = this.context(effectiveNow);
-      const result = this.kernel.applyAction(this.stateValue, action, context);
-      if (!result.ok) {
-        // SRV-1: the action is rejected, but `advance` above already COMMITTED the
-        // world forward and produced events (arrivals, battles, captures). Flush them
-        // so peers see the advanced world instead of losing it until the next accepted
-        // action — without a tick loop, that could be hours of game time.
-        if (advanced.events.length > 0) this.broadcastState(advanced.events);
-        // The advance itself may have ENDED the match (a score/domination threshold
-        // crossed on a `time.advanced` span) — the triggering action then rejects with
-        // E_MATCH_ENDED, but rewards must still be banked. observeEndIfNeeded is
-        // idempotent, so calling it on every advanced-reject is safe (EC-* banking bug).
-        this.observeEndIfNeeded();
-        const receipt = this.recordReceipt(action, playerId, false, result.code);
-        if (peer) this.sendRejection(peer, receipt);
-        return { ok: false, seq: receipt.seq, events: [], code: receipt.code };
-      }
-
-      this.stateValue = result.state;
-      this.record?.({ at: effectiveNow, action }); // RPL-2: only SUCCESSFUL applies
-      const receipt = this.recordReceipt(action, playerId, true);
-      const events = [...advanced.events, ...result.events];
-      this.broadcastState(events);
-      this.observeEndIfNeeded();
-      return { ok: true, seq: receipt.seq, events };
+      const ok = plan.kind === 'applied';
+      const receipt = this.recordReceipt(action, playerId, ok, ok ? undefined : plan.code);
+      this.commitPlan(plan, action, receipt, peer);
+      return ok
+        ? { ok: true, seq: receipt.seq, events: plan.events }
+        : { ok: false, seq: receipt.seq, events: [], code: receipt.code };
     } finally {
       // M1 submit timing: the whole advance→apply→broadcast span (the doc's
       // "submit → broadcast" latency; target p95 < 20 ms on the sync path).
@@ -1404,20 +1471,7 @@ export class MatchRoom {
     action: Action,
     peer?: RoomPeer,
   ): Promise<void> {
-    // Idempotent replay of a prior result (dedup) — mirrors submitAction, sync/no-await.
-    const cached = this.receipts.get(action.id);
-    if (cached) {
-      if (peer) {
-        if (cached.ok) this.send(peer, this.stateMessageFor(playerId));
-        else this.sendRejection(peer, cached);
-      }
-      return;
-    }
-    // Rate limit — transient reject, NO receipt (a genuine retry after backoff lands).
-    if (this.rateLimited(playerId)) {
-      if (peer) this.sendReject(peer, action.id, 'E_RATE_LIMIT');
-      return;
-    }
+    if (this.frontGate(playerId, action.id, peer).kind !== 'pass') return;
     await this.maybeSyncArsenal(playerId, action);
     await this.commitApply(playerId, action, peer);
   }
@@ -1492,69 +1546,33 @@ export class MatchRoom {
         return { ok: false, code: 'E_FORBIDDEN', durable: true };
       }
 
-      // Catch the world up PURELY — without touching `this.stateValue` — so an external
-      // read during the persist await (a new peer's `welcome`, a ping handler) never sees
-      // a not-yet-durable world. We commit the advance only after the write acks.
-      const serverNow = this.clock();
-      const advanced = this.computeAdvance(this.stateValue, serverNow);
-      if (!advanced.ok) {
-        const receipt = await this.commitReject(playerId, action, advanced.code, peer);
+      // Тот же план, что и на sync-пути (NETA2-8) — считается ЧИСТО, без касания
+      // `this.stateValue`: внешнее чтение во время ожидания записи (welcome нового пира,
+      // обработчик пинга) не должно увидеть ещё не долговечный мир.
+      const plan = this.planApply(action, this.clock());
+      if (plan.kind === 'advance-failed') {
+        const receipt = await this.commitReject(playerId, action, plan.code, peer);
         if (!receipt) return TRANSIENT_VERDICT;
         observeCommitted = () => this.observeAction(receipt, action.type, true); // durable: persist already wrote the receipt
-        return { ok: false, code: advanced.code, durable: true };
+        return { ok: false, code: plan.code, durable: true };
       }
 
-      const effectiveNow = Math.max(serverNow, advanced.state.time);
-      const context = this.context(effectiveNow);
-      const result = this.kernel.applyAction(advanced.state, action, context);
+      // ЕДИНСТВЕННОЕ отличие durable-пути от sync: запись ждётся ДО коммита плана.
+      // Провал записи не коммитит ничего — повтор пересчитает план заново (в том числе
+      // догон и его события), поэтому терять здесь нечего.
+      const ok = plan.kind === 'applied';
       const seq = this.seq + 1;
-
-      if (!result.ok) {
-        // Reject-but-advanced: persist the advanced state + failure receipt, and only on a
-        // durable ack commit the recomputable catch-up and broadcast its events (SRV-1). A
-        // failed write commits nothing → the retry re-derives and re-broadcasts the advance.
-        const receipt: ActionReceipt = {
-          actionId: action.id,
-          playerId,
-          seq,
-          ok: false,
-          code: result.code,
-        };
-        if (
-          !(await this.persistGuarded(this.snapshot(advanced.state, seq), receipt, action.id, peer))
-        ) {
-          return TRANSIENT_VERDICT;
-        }
-        if (advanced.state.time > this.stateValue.time) this.record?.({ at: advanced.state.time });
-        this.stateValue = advanced.state;
-        this.seq = seq;
-        this.retainReceipt(receipt);
-        observeCommitted = () => this.observeAction(receipt, action.type, true); // durable: persist already wrote the receipt
-        if (advanced.events.length > 0) this.broadcastState(advanced.events);
-        // Same as the sync path: the durable catch-up advance may have ended the match
-        // while THIS action rejects (E_MATCH_ENDED) — bank rewards regardless (idempotent).
-        this.observeEndIfNeeded();
-        if (peer) this.sendRejection(peer, receipt);
-        return { ok: false, code: result.code, durable: true };
-      }
-
-      // Success: persist the final state + receipt, and ONLY on a durable ack commit the
-      // new state, the receipt and the broadcast. A failed write commits nothing.
-      const receipt: ActionReceipt = { actionId: action.id, playerId, seq, ok: true };
-      if (
-        !(await this.persistGuarded(this.snapshot(result.state, seq), receipt, action.id, peer))
-      ) {
+      const receipt: ActionReceipt = ok
+        ? { actionId: action.id, playerId, seq, ok: true }
+        : { actionId: action.id, playerId, seq, ok: false, code: plan.code };
+      if (!(await this.persistGuarded(this.snapshot(plan.state, seq), receipt, action.id, peer))) {
         return TRANSIENT_VERDICT;
       }
-      if (advanced.state.time > this.stateValue.time) this.record?.({ at: advanced.state.time });
-      this.stateValue = result.state;
-      this.record?.({ at: effectiveNow, action }); // RPL-2: only SUCCESSFUL applies
       this.seq = seq;
       this.retainReceipt(receipt);
       observeCommitted = () => this.observeAction(receipt, action.type, true); // durable: persist already wrote the receipt
-      this.broadcastState([...advanced.events, ...result.events]);
-      this.observeEndIfNeeded();
-      return { ok: true };
+      this.commitPlan(plan, action, receipt, peer);
+      return ok ? { ok: true } : { ok: false, code: plan.code, durable: true };
     } finally {
       this.committing = false;
       observeCommitted?.(); // now that committing is false, the driver re-arm sees the real next event
