@@ -48,9 +48,17 @@
 - **TT-4 учёный** — `ScientistDef`-каталог (`data/scientists.json`) + `Player.scientists[]` — совет из 0–2 лидеров (снапшот при сборке через слот-ассайнмент; `E_UNKNOWN_SCIENTIST` fail-secure на старте; приватен в тумане). **TT-4.3 +слот**: `scientist`-модуль → хук `research.slots`. **TT-4.1/4.2 фокус+капстоун**: data-driven условие `has_scientist {branch?, minLevel?}` (качественный доступ, **НЕ % скорости**); `+слот` — INSTEAD-of-фокус opportunity-cost (полимат — branchless).
 
 **✅ Контент-пас эпох + TT-3.1 UI (2026-07-17):** дерево выросло с 6 до **19 видимых нод**
-(все 5 веток живые, у squadron/missile/ground/space появились капстоуны с
-`has_scientist{branch}`; `void_armadas` — первый узел на `own_sectors`); день-гейты
-`2/3/5/8/12/15` проставлены в обоих бандлах. Экран — `renderTech()` в
+(размечены все 5 веток; капстоуны на `has_scientist{branch}` — у ground/squadron/missile/
+command, `void_armadas` — первый узел на `own_sectors`); день-гейты
+`2/3/5/8/12/15` проставлены в обоих бандлах.
+⚠️ **«Все 5 веток живые» — это утверждение оказалось неверным** (разбор BAL-6, замер
+`selfplay 300`): каталог учёных несёт три записи на пять веток (`overseer:command`,
+`void_admiral:space`, `polymath` без ветки), поэтому капстоуны `planetary_bastions`
+(ground), `ace_programs` (squadron) и `saturation_barrage` (missile) гейтятся учёным
+ветки, которого НЕТ в каталоге, и недостижимы ни для кого. Достроить ростер — **BAL-13**
+в `backlog.md`; там же **BAL-12** про то, почему замер этот слой вообще не видит.
+
+Экран — `renderTech()` в
 `prototype/src/main.ts`: вкладки=ветки, общая липкая рельса дней (строки = гейты эпох),
 состояния узлов `done/res/avail/gate/chain/cond`, тап → досье-модалка (цена/эффект/
 день/prereq/условия, кнопка исследования); раскладка — client-side карта `TECH_COLS`
