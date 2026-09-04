@@ -258,6 +258,38 @@ a real kernel rule so MP and single-player share one capture mechanic.
 
 ## Preparing for a live multiplayer test
 
+### Automated production-like rehearsal (no public IP required)
+
+Before inviting people, run the real WebSocket/action-gate path locally:
+
+```bash
+pnpm run rehearsal
+```
+
+The rehearsal starts an ephemeral authoritative server, connects four JWT-authenticated
+clients, submits their gated actions concurrently with configurable outbound latency,
+re-delivers one action to verify idempotency, reconnects a seat, and sends one schema-valid
+sample of **every** `CLIENT_ACTION_TYPES` entry through WebSocket → envelope parser → gate →
+authoritative reducer. Both a successful apply and a game-rule rejection prove traversal;
+`E_BAD_PAYLOAD`/`E_UNKNOWN_ACTION` or catalog drift fail the run. It then recreates the server
+from the snapshot and receipts accepted by a delayed commit-before-broadcast persistence
+seam. Every live client reconstructs the whole catalog's successful changes from deltas;
+before and after restart, the rehearsal compares all client states with their authoritative
+fog views and fails on a leaked enemy fleet or state-hash mismatch.
+
+```bash
+PLAYERS=10 LATENCY_MS=200 PERSIST_DELAY_MS=50 TIMEOUT_MS=20000 pnpm run rehearsal
+```
+
+`PLAYERS` is 2–10. All delay values are non-negative milliseconds. This is deliberately
+self-contained: it needs neither a white IP nor Docker/Postgres and therefore verifies the
+**wire/persistence protocols**, not every mechanic's successful game-state setup, the
+PostgreSQL adapter or a real process crash. Focused module tests remain the source of truth for
+success semantics of each rule. The ordinary CI
+suite exercises the PostgreSQL store when `DATABASE_URL` is present; the manual checklist
+below remains the acceptance test for an actual database restart, mobile backgrounding and
+an internet tunnel.
+
 **Seat more than two players.** `createDevMatch(data, { players: ['green', 'red', 'blue', 'gold'] })`
 seats N players — each gets a homeworld (spread around the neutral `nexus`) and an idle fleet
 `<id>_1`. The default is `['green', 'red']`.

@@ -28,6 +28,7 @@
     "perf": "node prototype/perf.mjs",
     "metrics": "node prototype/report.mjs",
     "selfplay": "node prototype/selfplay.mjs",
+    "rehearsal": "node prototype/rehearsal.mjs",
     "dev:client": "node testclient/build.mjs",
     "mcp:browser": "node scripts/mcp-browser.mjs",
     "smoke:browser": "node prototype/browsertest.mjs",
@@ -42,6 +43,7 @@
     "@eslint/js": "^10.0.1",
     "@playwright/mcp": "0.0.79",
     "@types/node": "^26.2.0",
+    "@types/ws": "8.18.1",
     "@vitest/coverage-v8": "^4.1.11",
     "esbuild": "^0.28.2",
     "eslint": "^10.9.1",
@@ -49,7 +51,8 @@
     "prettier": "^3.9.6",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.68.0",
-    "vitest": "^4.1.11"
+    "vitest": "^4.1.11",
+    "ws": "8.21.3"
   },
   "pnpm": {
     "overrides": {
