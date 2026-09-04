@@ -54,7 +54,11 @@ const DEFAULTS: RehearsalOptions = {
 /** One schema-valid payload for every action type exposed to an untrusted client.
  * The scenarios are intentionally not all legal in the compact dev state: this matrix
  * proves the complete wire path reaches the authoritative reducer (a rule rejection is
- * acceptable), while the modules' focused tests own each mechanic's success semantics. */
+ * acceptable), while the modules' focused tests own each mechanic's success semantics.
+ * Sibling catalog, different question: `gateparity.test.ts` samples the prototype's REAL
+ * builders against the schemas (builder↔schema drift). This one is keyed on the schema
+ * catalog itself and is checked for completeness below, so a new action type cannot ship
+ * without a wire sample. */
 const WIRE_PAYLOADS: Record<string, unknown> = {
   'fleet.move': { fleetId: 'p1_1', to: 'nexus' },
   'fleet.stop': { fleetId: 'p1_1' },
@@ -236,6 +240,9 @@ export async function runRehearsal(
   let durableWrites = 0;
   let hashMismatches = 0;
   let fogViolations = 0;
+  let duplicatesPrevented = 0;
+  let reconnects = 0;
+  let serverRestarts = 0;
   const persist = async (next: { state: GameState; seq: number }, receipt: StoredReceipt) => {
     await sleep(options.persistDelayMs);
     snapshot = { state: next.state, seq: next.seq };
@@ -279,6 +286,7 @@ export async function runRehearsal(
       );
     }
 
+    const beforeConcurrency = room.sequence;
     const envelopes = await Promise.all(
       clients.map((client) =>
         client.send('fleet.orbit', { fleetId: `${client.playerId}_1`, orbit: 'near' }),
@@ -286,18 +294,22 @@ export async function runRehearsal(
     );
     await withTimeout(
       (async () => {
-        while (room.sequence !== options.players) await sleep(1);
+        while (room.sequence < beforeConcurrency + options.players) await sleep(1);
       })(),
       options.timeoutMs,
       'concurrent actions',
     );
+    const actionsAccepted = room.sequence - beforeConcurrency;
 
+    const beforeDuplicate = room.sequence;
     await clients[0]!.send('fleet.orbit', { fleetId: 'p1_1', orbit: 'near' }, envelopes[0]);
     const duplicateReply = await clients[0]!.nextUntil((message) => message.type === 'state');
-    if (duplicateReply.type !== 'state' || room.sequence !== options.players) {
+    if (duplicateReply.type !== 'state' || room.sequence !== beforeDuplicate) {
       throw new Error('duplicate action was not replayed idempotently');
     }
+    duplicatesPrevented += 1;
 
+    const closedSession = clients[0]!.welcome.sessionId;
     await clients[0]!.close();
     clients[0] = await WireClient.connect(
       `${url}?token=${await tokenFor('p1')}`,
@@ -305,6 +317,10 @@ export async function runRehearsal(
       options.latencyMs,
       options.timeoutMs,
     );
+    if (clients[0]!.welcome.sessionId === closedSession) {
+      throw new Error('reconnect did not mint a fresh session');
+    }
+    reconnects += 1;
 
     const missingPayloads = CLIENT_ACTION_TYPES.filter((type) => !(type in WIRE_PAYLOADS));
     const extraPayloads = Object.keys(WIRE_PAYLOADS).filter(
@@ -361,6 +377,7 @@ export async function runRehearsal(
     room = makeRoom();
     server = createMultiplayerServer({ room, auth });
     url = await server.listen();
+    serverRestarts += 1;
     for (let i = 0; i < playerIds.length; i += 1) {
       const playerId = playerIds[i]!;
       clients[i] = await WireClient.connect(
@@ -385,10 +402,10 @@ export async function runRehearsal(
 
     return {
       players: options.players,
-      actionsAccepted: options.players,
-      duplicatesPrevented: 1,
-      reconnects: 1,
-      serverRestarts: 1,
+      actionsAccepted,
+      duplicatesPrevented,
+      reconnects,
+      serverRestarts,
       durableWrites,
       wireActionTypes: CLIENT_ACTION_TYPES.length,
       wireActionsApplied,

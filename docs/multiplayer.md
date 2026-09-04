@@ -275,7 +275,9 @@ authoritative reducer. Both a successful apply and a game-rule rejection prove t
 from the snapshot and receipts accepted by a delayed commit-before-broadcast persistence
 seam. Every live client reconstructs the whole catalog's successful changes from deltas;
 before and after restart, the rehearsal compares all client states with their authoritative
-fog views and fails on a leaked enemy fleet or state-hash mismatch.
+fog views and fails on a leaked enemy fleet or state-hash mismatch. Every counter in the
+printed report is measured, not assumed; a broken invariant prints `result … FAIL` with the
+reason and exits `1`.
 
 ```bash
 PLAYERS=10 LATENCY_MS=200 PERSIST_DELAY_MS=50 TIMEOUT_MS=20000 pnpm run rehearsal
@@ -313,6 +315,9 @@ seats N players — each gets a homeworld (spread around the neutral `nexus`) an
 - `soak.test.ts` — N clients fire K actions concurrently; the room serializes all N×K and every
   client converges on the same authoritative state. (This caught a real JSON-stability bug: a `-0`
   coordinate desynced reconstruction, since JSON has no `-0`.)
+- `rehearsal.test.ts` — the rehearsal above on two seats. The three tests above speak the **bare**
+  `{type:'action'}` wire; this one is the gated `action.v1` path (envelope → `ActionGate` →
+  per-session `clientSeq`), so a reconnect there mints a fresh session and restarts the sequence.
 
 **Manual checklist for a human two-player test:**
 

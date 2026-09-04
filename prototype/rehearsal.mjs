@@ -24,20 +24,36 @@ await build({
 });
 const { runRehearsal } = await import(`${pathToFileURL(outfile).href}?run=${Date.now()}`);
 
-const report = await runRehearsal({
-  players: integer('PLAYERS', 4),
-  latencyMs: integer('LATENCY_MS', 75),
-  persistDelayMs: integer('PERSIST_DELAY_MS', 15),
-  timeoutMs: integer('TIMEOUT_MS', 10_000),
-});
+// A broken invariant throws from inside the rehearsal; report it as FAIL rather than
+// letting a stack trace stand in for the verdict.
+let report;
+let failure;
+try {
+  report = await runRehearsal({
+    players: integer('PLAYERS', 4),
+    latencyMs: integer('LATENCY_MS', 75),
+    persistDelayMs: integer('PERSIST_DELAY_MS', 15),
+    timeoutMs: integer('TIMEOUT_MS', 10_000),
+  });
+} catch (error) {
+  failure = error instanceof Error ? error.message : String(error);
+}
 
-const pass = report.hashMismatches === 0 && report.fogViolations === 0;
-process.stdout.write(`
+if (!report) {
+  process.stdout.write(`
+Void Dominion — multiplayer rehearsal
+
+  result ............... FAIL (${failure})
+`);
+  process.exitCode = 1;
+} else {
+  const pass = report.hashMismatches === 0 && report.fogViolations === 0;
+  process.stdout.write(`
 Void Dominion — multiplayer rehearsal
 
   players .............. ${report.players}
   actions accepted ..... ${report.actionsAccepted}
-  duplicates prevented  ${report.duplicatesPrevented}
+  duplicates prevented . ${report.duplicatesPrevented}
   reconnects ........... ${report.reconnects}
   server restarts ...... ${report.serverRestarts}
   durable writes ....... ${report.durableWrites}
@@ -51,4 +67,5 @@ Void Dominion — multiplayer rehearsal
 
   result ............... ${pass ? 'PASS' : 'FAIL'}
 `);
-if (!pass) process.exitCode = 1;
+  if (!pass) process.exitCode = 1;
+}
