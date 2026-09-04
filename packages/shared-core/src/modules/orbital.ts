@@ -131,6 +131,9 @@ function runOrbital(h: HandlerContext, from: number, to: number, hours: number):
             damage,
             tier,
           });
+          // RAW on purpose (CORE-DMG-1): flak is not an admiral's doing, so it skips
+          // the `combat.damage` hook — no tech/faction/hero scaling. Pinned by
+          // `damageHookScope.test.ts`; routing it through the hook moves the balance.
           applyDamageToSide(h, { kind: 'fleet', fleetId: target.id }, damage, data, planetId);
           removeIfWiped(h, target.id);
           return true;
@@ -157,6 +160,8 @@ function runOrbital(h: HandlerContext, from: number, to: number, hours: number):
         if (isActivelyBombarding(h.state, f, hostile)) {
           const power = bombardPower(f, data) * hours;
           if (power > 0) {
+            // RAW on purpose (CORE-DMG-1), like the flak above: the shelling power
+            // reaches `construction` unscaled by the `combat.damage` hook.
             h.emit('planet.bombarded', { planetId, power, owner: planet.owner, by: f.owner });
           }
         }

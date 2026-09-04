@@ -395,9 +395,15 @@ function finishBattle(h: HandlerContext, battle: Battle, stalemate = false): voi
  * nodes (a `fleet.transit` mid-journey or a `fleet.arrived` at the destination)
  * or at a lane crossing (`fleet.intercept`, scheduled by the `intercept`
  * module); capture is two sequential phases — orbital then ground (§7.4).
- * Damage runs through the `combat.damage` hook (admiral / tactic / bombardment
- * extension point, with `phase` in its args); deaths publish `unit.died`;
- * outcomes publish `battle.resolved` and `planet.captured`.
+ * Damage runs through the `combat.damage` hook — the PER-ROUND MELEE extension
+ * point (admiral / tactic, with `phase` in its args), and deliberately nothing
+ * wider: planetary AA and bombardment (`orbital`), standoff fire (`artillery`)
+ * and ship point-defense (`squadron`) deal their damage RAW, so a technology
+ * bonus, faction passive or hero aura never reaches them. That scope is an owner
+ * decision (CORE-DMG-1) and is pinned by `damageHookScope.test.ts` — wiring a new
+ * firing channel through the hook is a balance change, not a cleanup.
+ * Deaths publish `unit.died`; outcomes publish `battle.resolved` and
+ * `planet.captured`.
  *
  * The former monolith is split along the bus seams: the near-orbit layer
  * (AA / bombardment) lives in `orbital`, standoff fire in `artillery`, and the

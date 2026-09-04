@@ -153,6 +153,8 @@ function runArtillery(h: HandlerContext, hours: number): void {
   }
   // Pass 2 — apply all shots in deterministic order, then resolve wiped targets.
   for (const shot of shots) {
+    // RAW on purpose (CORE-DMG-1): standoff fire is outside the melee round, so it
+    // skips the `combat.damage` hook. Pinned by `damageHookScope.test.ts`.
     applyDamageToSide(h, { kind: 'fleet', fleetId: shot.targetId }, shot.dmg, data, shot.at);
     h.emit('artillery.fired', {
       fleetId: shot.shooterId,
