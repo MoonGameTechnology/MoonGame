@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 5518 зелёных** (58 skip, 418 файлов).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 5519 зелёных** (58 skip, 419 файлов).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -2566,9 +2566,25 @@ pnpm install
 pnpm run check       # lint + typecheck + test + docs-check (гейт)
 pnpm test            # vitest
 pnpm run prototype   # собрать prototype/dist/void-dominion{,-player}.html
+pnpm run rehearsal   # 4 gated WS-клиента: конкурентность → дубль → reconnect → restart
 pnpm run selfplay 300 base   # батч AI-vs-AI на реальном ядре (баланс), сессия 14 дней (AI-BAL-6)
 pnpm run metrics             # разбор JSONL живого плейтеста
 ```
+
+`rehearsal` — самодостаточная production-like репетиция мультиплеерного протокола без
+белого IP, браузера и Postgres: настоящий WebSocket-сервер, JWT join-токены, action gate,
+задержанная commit-before-broadcast запись, конкурентные клиенты, повтор доставки,
+переподключение, полный `CLIENT_ACTION_TYPES`-каталог через wire/gate/reducer, пересоздание
+сервера из снапшота/receipts, реконструкция успешных действий из delta и проверка fog/hash
+для всех клиентов до и после рестарта.
+Задержки и число мест задаются `PLAYERS`, `LATENCY_MS`, `PERSIST_DELAY_MS`, `TIMEOUT_MS`;
+все счётчики отчёта — замеры, сломанный инвариант печатает `result … FAIL` и выходит с `1`.
+Честная граница каталога: на дефолтном прогоне (4 места) из 47 типов **11 применяются, 36
+отклоняются игровыми правилами** — компактное дев-состояние не даёт им законной обстановки.
+То есть каталог доказывает достижимость редьюсера через провод и гейт, а не корректность
+механик: за успех каждого правила отвечают его модульные тесты (`gateparity.test.ts` рядом
+держит другую половину — паритет РЕАЛЬНЫХ билдеров прототипа со схемами). Реальный
+Postgres/process crash и мобильный lifecycle остаются ручной приёмкой.
 
 **Чем меряется баланс и чего это измерение сейчас НЕ видит.** `selfplay.mjs` гоняет два
 ИИ-места на настоящем ядре и печатает win-rate по слоту/фракции/старту, длину матча,
