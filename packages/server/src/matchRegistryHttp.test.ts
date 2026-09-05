@@ -36,7 +36,54 @@ const getJson = async <T>(url: string, init?: RequestInit): Promise<{ status: nu
   return { status: r.status, body: (await r.json()) as T };
 };
 
+/** Start the server with an `identify` hook standing in for a verified session:
+ *  the login rides in an `authorization: Bearer <login>` header, exactly where the real
+ *  session JWT rides. */
+async function startHttpWithSession(registry: MatchRegistry): Promise<string> {
+  handle = createMultiplayerServer({
+    registry,
+    accountStore: registry.accounts,
+    httpRoutes: (app) =>
+      registerBrowserApi(app, registry, (request) => {
+        const raw = request.headers.authorization;
+        const login = typeof raw === 'string' ? raw.replace(/^Bearer /, '') : '';
+        return Promise.resolve(login ? { accountId: `acct:${login}`, login } : null);
+      }),
+  });
+  const wsUrl = await handle.listen();
+  return wsUrl.replace(/^ws/, 'http').replace(/\/matches(\/.*)?$/, '');
+}
+
 describe('match-browser over HTTP (read-model + archive intent)', () => {
+  // С включёнными аккаунтами клиент ходит СЕССИЕЙ, а не `?nick=` — и до этого теста
+  // маршрут читал только query, поэтому у севшего игрока вкладка «мои матчи» была
+  // пуста всегда, а не только после рестарта: полный матч уходит из «доступных», и
+  // вернуться в него из интерфейса становилось нечем.
+  it('с сессией: севший игрок видит СВОЙ матч, и архив работает от той же личности', async () => {
+    const accounts = new MemoryAccountStore();
+    const reg = new MatchRegistry(accounts);
+    reg.register(createDevMatch(data, { id: 'm1' }), { mapId: 'nexus-duel', rules: { timeScale: 1 }, createdAt: 2 });
+    await accounts.resolveSeat('m1', 'alice', ['green', 'red']);
+    const base = await startHttpWithSession(reg);
+    const auth = { headers: { authorization: 'Bearer alice' } };
+
+    const { body: mine } = await getJson<MatchLists>(`${base}/matches`, auth);
+    expect(mine.active.map((s) => s.matchId)).toEqual(['m1']);
+
+    // Аноним тем же запросом своего ничего не видит — личность берётся из сессии.
+    const { body: anon } = await getJson<MatchLists>(`${base}/matches`);
+    expect(anon.active).toHaveLength(0);
+
+    // Архив — та же личность, тоже без `?nick=`.
+    const arch = await getJson<{ ok: boolean }>(`${base}/matches/m1/archive`, {
+      method: 'POST',
+      ...auth,
+    });
+    expect(arch.status).toBe(200);
+    const { body: after } = await getJson<MatchLists>(`${base}/matches`, auth);
+    expect(after.archived.map((s) => s.matchId)).toEqual(['m1']);
+  });
+
   it('GET /matches buckets by nick and carries the status line; POST archive moves it', async () => {
     const accounts = new MemoryAccountStore();
     const reg = new MatchRegistry(accounts);

@@ -345,9 +345,15 @@ only the session JWT per server, and re-fetches a fresh join token on every reco
 Unset ⇒ the zero-setup nick+ticket flow below stays as-is.
 
 **Known constraints before this is "real" multiplayer** (see limitations below): auth and the
-action gate are opt-in (env-switched, default off for dev), the client does not yet send
-`action.v1` envelopes on the production entry, identity is login+password (no OIDC), and the
-scheduler is single-process (pg-boss v2 is the multi-process step).
+action gate are opt-in (env-switched, default off for dev), identity is login+password (no
+OIDC), and the scheduler is single-process (pg-boss v2 is the multi-process step).
+
+> The line "the client does not yet send `action.v1` envelopes on the production entry" used
+> to stand here and was WRONG — a stale claim that argued against ever turning `GATE=1` on.
+> Verified by running it: with `AUTH_JWT_SECRET` + `GATE=1` + `SEAT_LOCK=1` the bundled client
+> detects the gate from `welcome.gated`, seats itself and plays; the server counted 19 actions,
+> 19 accepted, 0 rejected, 0 desyncs across ten browsers, while a bare `?player=` handshake was
+> refused with HTTP 403. The release posture is usable today.
 
 ## Protocol
 

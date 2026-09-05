@@ -38,6 +38,7 @@ export const en: Record<string, string> = {
   'browser.goal.map': '{p}% of the map',
   'browser.goal.score': 'up to {n} pts.',
   'browser.join': 'Join',
+  'browser.resume': 'Continue',
   'browser.join-window': 'joinable {dur}',
   'browser.left.days': '{d}d {h}h',
   'browser.left.hours': '{h}h',

@@ -335,13 +335,31 @@ function nickOf(request: FastifyRequest): string | null {
  * the create/join API. A server projection — the client only reads it (A10/fog rule);
  * archive is fail-secure per-player (participants only, stable codes).
  */
-export function registerBrowserApi(app: FastifyInstance, registry: MatchRegistry): void {
-  // The three tabs (available/active/archived) for one viewer (`?nick=`).
-  app.get('/matches', (request: FastifyRequest) => registry.list(nickOf(request)));
+export function registerBrowserApi(
+  app: FastifyInstance,
+  registry: MatchRegistry,
+  identify?: (request: FastifyRequest) => Promise<Identity | null>,
+): void {
+  /**
+   * Кто смотрит. С включёнными аккаунтами личность живёт в СЕССИИ, а не в `?nick=`:
+   * подставить чужой ник в query нельзя, и читать его как личность значит не узнать
+   * никого. Пока этой развилки здесь не было, `list()` всегда получал `null`, а по её
+   * собственному правилу «без ника осмысленны только Доступные» вкладка «мои матчи»
+   * была пуста ВСЕГДА — не только после рестарта. Полный матч уходит из «доступных»,
+   * и вернуться в свой матч из интерфейса становилось нечем.
+   *
+   * Это ровно та же развилка, что у join-роута выше (`identify` ? сессия : `?nick=`);
+   * без `identify` (дев-харнесс, LAN без аккаунтов) остаётся прежнее поведение.
+   */
+  const viewerOf = async (request: FastifyRequest): Promise<string | null> =>
+    identify ? ((await identify(request))?.login ?? null) : nickOf(request);
+
+  // The three tabs (available/active/archived) for one viewer.
+  app.get('/matches', async (request: FastifyRequest) => registry.list(await viewerOf(request)));
 
   const archive = async (request: FastifyRequest, reply: FastifyReply): Promise<unknown> => {
     const { id, intent } = request.params as { id: string; intent: string };
-    const nick = nickOf(request) ?? '';
+    const nick = (await viewerOf(request)) ?? '';
     const result =
       intent === 'archive'
         ? await registry.archive(id, nick)
