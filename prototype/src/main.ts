@@ -10925,7 +10925,17 @@ async function openSeatPicker(matchId: string): Promise<void> {
 }
 
 
-function openSessionTab(id: string): void {
+function openSessionTab(id: string, seated = false): void {
+  // Место УЖЕ твоё — возвращаемся в партию, а не заводим её заново. Без этой развилки
+  // игрок, вернувшийся после обрыва или рестарта сервера, попадал на «Совет учёных» и
+  // выбор родного мира, то есть в создание персонажа поверх идущей партии; при этом
+  // вход по ПРЯМОМУ адресу `/game/<id>` всё это время делал правильно. Признак берётся
+  // не из догадки клиента, а из ответа сервера: вкладка «Активные» — это ровно те
+  // партии, где `seatOf` вернул место (`MatchRegistry.list`).
+  if (seated) {
+    connectToMatch(id);
+    return;
+  }
   // REL-7: show the seat/faction picker first (if the server supports it),
   // otherwise fall back to the direct join (no slot).
   void openSeatPicker(id);
@@ -10961,7 +10971,15 @@ async function loadMatchLists(srv: { base: string; nick: string }): Promise<bool
   // BEFORE the player clicks «Войти» on a row — no surprise prompt mid-join.
   await probeAuthMode(srv.base);
   try {
-    const res = await fetch(matchesUrl(srv.base, srv.nick));
+    // Личность — тем же способом, что и у запроса мест (`fetchSeats` выше): на хосте с
+    // учётками это сессионный JWT в заголовке, `?nick=` там не смотрят. Без него сервер
+    // видел анонима, вкладка «мои матчи» приходила пустой, и вернуться в собственную
+    // партию из интерфейса было нечем — полный матч уходит и из «Доступных».
+    const pass = tokenFor(localStorage, srv.base, srv.nick);
+    const res = await fetch(
+      matchesUrl(srv.base, srv.nick),
+      pass ? { headers: { authorization: `Bearer ${pass}` } } : {},
+    );
     if (queryOutcome(res) !== 'ok') throw new Error('http ' + res.status);
     matchLists = (await res.json()) as Record<MatchTab, MatchRow[]>;
     localStorage.setItem('void.server', srv.base);
@@ -11147,8 +11165,11 @@ function renderMatches(): void {
     btns.className = 'mbtns';
     const join = document.createElement('button');
     join.className = 'mbtn';
-    join.textContent = t('browser.join');
-    join.addEventListener('click', () => openSessionTab(m.matchId));
+    // «Войти» на партии, где ты уже сидишь, обещает не то: место занято тобой, и речь
+    // о возвращении, а не о вступлении.
+    const seated = activeTab === 'active';
+    join.textContent = t(seated ? 'browser.resume' : 'browser.join');
+    join.addEventListener('click', () => openSessionTab(m.matchId, seated));
     btns.appendChild(join);
     const action = rowAction(activeTab);
     if (action) {
@@ -11211,8 +11232,10 @@ function renderMyMatches(serverHttp: string): void {
     btns.className = 'hm-btns';
     const open = document.createElement('button');
     open.className = 'mbtn';
-    open.textContent = t('browser.join');
-    open.addEventListener('click', () => openSessionTab(m.matchId));
+    // Лента хаба — это СВОИ партии (`myMatches` читает `lists.active`), поэтому здесь
+    // всегда возвращение.
+    open.textContent = t('browser.resume');
+    open.addEventListener('click', () => openSessionTab(m.matchId, true));
     btns.appendChild(open);
     if (addr) {
       const copy = document.createElement('button');

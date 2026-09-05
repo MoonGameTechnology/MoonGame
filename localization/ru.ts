@@ -41,6 +41,7 @@ export const ru: Record<string, string> = {
   'browser.goal.map': '{p}% карты',
   'browser.goal.score': 'до {n} очк.',
   'browser.join': 'Войти',
+  'browser.resume': 'Продолжить',
   'browser.join-window': 'вход ещё {dur}',
   'browser.left.days': '{d}д {h}ч',
   'browser.left.hours': '{h}ч',

@@ -724,7 +724,12 @@ const server = createMultiplayerServer({
   // plus the dev client at `/dev` when the player build owns `/` (same no-store
   // headers as `/` — a stale dev client is as confusing as a stale player one).
   httpRoutes: (app) => {
-    registerBrowserApi(app, registry);
+    // Личность зрителя — из СЕССИИ, когда аккаунты включены: иначе полный матч уходит
+    // из «Доступных», а во вкладку «мои» не попадает, и вернуться в свою партию из
+    // интерфейса нечем. Ссылка на `identifySession` намеренно ЛЕНИВАЯ (стрелка): этот
+    // колбэк выполняется внутри `createMultiplayerServer` выше по файлу, а сам хук
+    // объявлен ниже — прямая ссылка упала бы в TDZ ещё на старте.
+    registerBrowserApi(app, registry, AUTH ? (request) => identifySession(request) : undefined);
     // NETA2-mon: the aggregator's FAILURE signals, live over HTTP — glance at desyncs /
     // rejects-by-code / dead-letters / advance-overflows / worst fps without waiting for
     // the on-exit JSONL summary. Process-wide aggregates only, no match ids (F-13), no
