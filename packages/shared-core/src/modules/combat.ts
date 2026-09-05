@@ -395,13 +395,14 @@ function finishBattle(h: HandlerContext, battle: Battle, stalemate = false): voi
  * nodes (a `fleet.transit` mid-journey or a `fleet.arrived` at the destination)
  * or at a lane crossing (`fleet.intercept`, scheduled by the `intercept`
  * module); capture is two sequential phases — orbital then ground (§7.4).
- * Damage runs through the `combat.damage` hook — the PER-ROUND MELEE extension
- * point (admiral / tactic, with `phase` in its args), and deliberately nothing
- * wider: planetary AA and bombardment (`orbital`), standoff fire (`artillery`)
- * and ship point-defense (`squadron`) deal their damage RAW, so a technology
- * bonus, faction passive or hero aura never reaches them. That scope is an owner
- * decision (CORE-DMG-1) and is pinned by `damageHookScope.test.ts` — wiring a new
- * firing channel through the hook is a balance change, not a cleanup.
+ * Damage runs through the `combat.damage` hook — the shared damage extension point
+ * (admiral / tactic / bombardment), carrying `phase` in its args. EVERY firing channel
+ * uses it (CORE-DMG-1): the melee round here, planetary AA and bombardment in
+ * `orbital`, standoff fire in `artillery`, point-defense in `squadron` — so a
+ * technology bonus or faction passive reaches all of them alike. Only `phase: 'ground'`
+ * opens the defender-side mitigations (fort, standing buildings, planet type), so the
+ * other channels are scaled by the attacker's bonuses and nothing else. A new firing
+ * channel that skips the hook is a bug, and `damageHookScope.test.ts` fails on it.
  * Deaths publish `unit.died`; outcomes publish `battle.resolved` and
  * `planet.captured`.
  *

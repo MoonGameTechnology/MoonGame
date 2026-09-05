@@ -153,14 +153,19 @@ function runArtillery(h: HandlerContext, hours: number): void {
   }
   // Pass 2 — apply all shots in deterministic order, then resolve wiped targets.
   for (const shot of shots) {
-    // RAW on purpose (CORE-DMG-1): standoff fire is outside the melee round, so it
-    // skips the `combat.damage` hook. Pinned by `damageHookScope.test.ts`.
-    applyDamageToSide(h, { kind: 'fleet', fleetId: shot.targetId }, shot.dmg, data, shot.at);
+    // CORE-DMG-1: standoff fire is scaled by the same extension point as a melee round.
+    const dealt = h.hook<number>('combat.damage', shot.dmg, {
+      phase: 'standoff',
+      location: shot.at,
+      attacker: shot.owner,
+      defender: h.state.fleets[shot.targetId]?.owner,
+    });
+    applyDamageToSide(h, { kind: 'fleet', fleetId: shot.targetId }, dealt, data, shot.at);
     h.emit('artillery.fired', {
       fleetId: shot.shooterId,
       owner: shot.owner,
       target: shot.targetId,
-      power: shot.dmg,
+      power: dealt, // what actually landed, not the pre-hook figure
       at: h.ctx.now,
       // A node anchor near the exchange (shooter's node, else a lane endpoint) — the
       // client's tracer needs a map position even when the victim died to this very
