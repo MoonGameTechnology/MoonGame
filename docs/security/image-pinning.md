@@ -109,7 +109,7 @@ curl -sS -o /dev/null -D - -H "Authorization: Bearer $tok" \
 
 | Образ | Дайджест | Снят | Файл |
 |-------|----------|------|------|
-| `postgres:16-alpine` | `sha256:57c72fd2a128e416c7fcc499958864df5301e940bca0a56f58fddf30ffc07777` | 2026-07 | `docker-compose.yml` |
+| `postgres:16-alpine` | `sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685` | 2026-09 | `docker-compose.yml` |
 | `caddy:2-alpine` | `sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648` | 2026-07 | `docker-compose.tls.yml` |
 
 Бамп: снять дайджест (Способ 4), заменить `image:` в compose, задеплоить, убедиться, что
