@@ -289,16 +289,22 @@ export const squadronModule: GameModule = {
         // Distribute damage evenly across all targets
         const damagePerTarget = pd / targets.length;
         for (const target of targets) {
+          // CORE-DMG-1: point-defense is scaled by the same extension point as a melee
+          // round; scaled before the announcement so `pd.fired` carries what really landed.
+          const dealt = h.hook<number>('combat.damage', damagePerTarget, {
+            phase: 'pointDefense',
+            location: fleet.location ?? '',
+            attacker: fleet.owner,
+            defender: target.owner,
+          });
           h.emit('pd.fired', {
             fleetId: fleet.id,
             owner: fleet.owner,
             targetId: target.id,
             targetOwner: target.owner,
-            damage: damagePerTarget,
+            damage: dealt,
           });
-          // RAW on purpose (CORE-DMG-1): point-defense is not a melee round, so it
-          // skips the `combat.damage` hook. Pinned by `damageHookScope.test.ts`.
-          applyDamageToSide(h, { kind: 'fleet', fleetId: target.id }, damagePerTarget, data, '');
+          applyDamageToSide(h, { kind: 'fleet', fleetId: target.id }, dealt, data, '');
           removeIfWiped(h, target.id);
         }
 

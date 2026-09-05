@@ -121,6 +121,18 @@ function runOrbital(h: HandlerContext, from: number, to: number, hours: number):
           // for the next hostile still hanging in orbit.
           const target = nearOrbitHostile(h, planetId, planet.owner!, localFleets);
           if (!target) return false;
+          // CORE-DMG-1: flak runs through the SAME extension point as a melee round, so
+          // a technology bonus or faction passive reaches it. `phase` names the near-orbit
+          // layer and is never 'ground', so the fort / planet-type mitigations (which
+          // guard on the ground phase) stay out of the flak exchange.
+          // Scaled BEFORE the announcement: the tracer must carry the number that really
+          // lands, or the client draws one volley and the hull loses another.
+          const dealt = h.hook<number>('combat.damage', damage, {
+            phase: 'orbital',
+            location: planetId,
+            attacker: planet.owner,
+            defender: target.owner,
+          });
           // Announce BEFORE applying: the client draws the flak burst planet→fleet
           // even when this very volley destroys the target (H2 — visible AA fire).
           h.emit('aa.fired', {
@@ -128,13 +140,10 @@ function runOrbital(h: HandlerContext, from: number, to: number, hours: number):
             owner: planet.owner,
             fleetId: target.id,
             by: target.owner,
-            damage,
+            damage: dealt,
             tier,
           });
-          // RAW on purpose (CORE-DMG-1): flak is not an admiral's doing, so it skips
-          // the `combat.damage` hook — no tech/faction/hero scaling. Pinned by
-          // `damageHookScope.test.ts`; routing it through the hook moves the balance.
-          applyDamageToSide(h, { kind: 'fleet', fleetId: target.id }, damage, data, planetId);
+          applyDamageToSide(h, { kind: 'fleet', fleetId: target.id }, dealt, data, planetId);
           removeIfWiped(h, target.id);
           return true;
         };
@@ -160,9 +169,21 @@ function runOrbital(h: HandlerContext, from: number, to: number, hours: number):
         if (isActivelyBombarding(h.state, f, hostile)) {
           const power = bombardPower(f, data) * hours;
           if (power > 0) {
-            // RAW on purpose (CORE-DMG-1), like the flak above: the shelling power
-            // reaches `construction` unscaled by the `combat.damage` hook.
-            h.emit('planet.bombarded', { planetId, power, owner: planet.owner, by: f.owner });
+            // CORE-DMG-1: the shelling power is scaled at the SOURCE, before it leaves
+            // on the bus — `construction` applies whatever arrives, so hooking here is
+            // the only place that knows who is firing.
+            const shelling = h.hook<number>('combat.damage', power, {
+              phase: 'bombard',
+              location: planetId,
+              attacker: f.owner,
+              defender: planet.owner,
+            });
+            h.emit('planet.bombarded', {
+              planetId,
+              power: shelling,
+              owner: planet.owner,
+              by: f.owner,
+            });
           }
         }
       }

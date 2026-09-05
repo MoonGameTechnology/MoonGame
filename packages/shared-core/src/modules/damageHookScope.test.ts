@@ -14,24 +14,26 @@ import {
   type Player,
 } from '../state/gameState';
 import { buildingLevel, parseGameData, type GameData } from '../data/schemas';
-import type { Action, AdvanceResult, ApplyResult, Context, DomainEvent } from '../action/types';
+import type { Action, AdvanceResult, ApplyResult, Context } from '../action/types';
 
 /**
- * CORE-DMG-1 — the SCOPE of the `combat.damage` hook, pinned by test.
+ * CORE-DMG-1 — the REACH of the `combat.damage` hook, pinned by test.
  *
- * The hook is the per-round MELEE extension point and nothing more: only the
- * `combat` module's simultaneous round runs its damage through it. The other
- * firing channels deal their damage raw, on purpose — planetary AA, standoff
- * artillery, ship point-defense and orbital bombardment are NOT scaled by an
- * admiral's tactics, a faction passive, a technology bonus or a hero aura.
+ * Every firing channel runs its damage through the hook: the melee round, planetary
+ * AA, standoff artillery, ship point-defense and orbital bombardment alike. An owner
+ * decision (reversed once — the earlier reading called the melee-only scope deliberate),
+ * so it needs a guard in the direction it now holds: a channel that stops consulting
+ * the hook silently drops the whole extension point for its share of the damage, which
+ * is exactly how three of them drifted out in the first place.
  *
- * That is an owner decision, not an oversight, so it needs a guard: without one
- * the next channel is a coin flip, and `combat.ts` already carried a comment
- * promising the hook covered bombardment while `orbital` never called it. Each
- * test below therefore proves TWO things at once — the channel really fired
- * (its event is in the stream, its target really took damage), and the hook was
- * never consulted while it did. A count of zero alone would also pass for a
- * scenario that quietly did nothing.
+ * Each test proves TWO things at once — the channel really fired (its event is in the
+ * stream) and the hook scaled what landed. Asserting the hook was merely CALLED would
+ * also pass for a channel that consulted it and threw the answer away, so every case
+ * reads the number that reached the target.
+ *
+ * The probe multiplies by a factor no channel could reach on its own, and the tests
+ * measure the announced damage as well as the hull loss: an event carrying the pre-hook
+ * figure while a bigger number lands is a lying tracer, and that is a bug of its own.
  */
 
 const data: GameData = parseGameData({
@@ -74,8 +76,11 @@ const data: GameData = parseGameData({
 const HOUR = 3_600_000;
 const ctx = (now: number): Context => ({ now, data });
 
-/** Records every `combat.damage` invocation and boosts it beyond recognition:
- *  a channel routed through the hook cannot hide behind rounding. */
+/** Scales every `combat.damage` invocation by a fixed factor and records its args.
+ *  Each test runs its scenario twice — with and without this module — and compares:
+ *  that needs no knowledge of the channel's internal constants, so a balance edit to
+ *  the fixture can never turn the guard into a tautology. */
+const BOOST = 3;
 function probeModule(calls: unknown[]): GameModule {
   return {
     id: 'damage-probe',
@@ -83,7 +88,7 @@ function probeModule(calls: unknown[]): GameModule {
     setup(api) {
       api.hook<number>('combat.damage', (dmg, args) => {
         calls.push(args);
-        return dmg * 1000;
+        return dmg * BOOST;
       });
     },
   };
@@ -172,100 +177,179 @@ function okAdvance(r: AdvanceResult): AdvanceResult & { ok: true } {
   if (!r.ok) throw new Error(`advance failed: ${r.code}`);
   return r;
 }
-const types = (events: DomainEvent[]): string[] => events.map((e) => e.type);
 const hullOf = (state: GameState, fleetId: string, unit: string): number | undefined =>
   state.fleets[fleetId]?.units.find((u) => u.unit === unit)?.hp;
 
-describe('combat.damage — the hook covers the melee round and nothing else (CORE-DMG-1)', () => {
-  it('scales the melee round: the extension point works where it is meant to', () => {
+describe('combat.damage — every firing channel goes through the hook (CORE-DMG-1)', () => {
+  it('scales the melee round', () => {
+    const melee = (mods: GameModule[]): number => {
+      const kernel = createKernel([orbitalModule, combatModule, arrivalModule, ...mods]);
+      const st = stateWith(
+        [planet('P', null)],
+        [fleet('A', 'p1', 'P', [['cruiser', 1]]), fleet('D', 'p2', 'P', [['hulk', 1]])],
+      );
+      const started = okApply(kernel.applyAction(st, arrive('A'), ctx(0)));
+      const r = okAdvance(kernel.advanceTo(started.state, ctx(HOUR)));
+      const round = r.events.find((e) => e.type === 'combat.round');
+      expect(round).toBeDefined();
+      return (round?.payload as { dmgToDefender: number }).dmgToDefender;
+    };
+
     const calls: unknown[] = [];
+    const raw = melee([]);
+    expect(raw).toBeGreaterThan(0);
+    expect(melee([probeModule(calls)])).toBe(raw * BOOST);
+    expect(calls.length).toBeGreaterThan(0);
+  });
+
+  it('scales planetary AA, and the flak tracer announces what it really fired', () => {
+    const aa = (mods: GameModule[]) => {
+      const kernel = createKernel([orbitalModule, ...mods]);
+      const st = stateWith(
+        [planet('P', 'p2', { buildings: [['flak', 1]] })],
+        [fleet('R', 'p1', 'P', [['hulk', 1]], { orbit: 'near' })],
+      );
+      const r = okAdvance(kernel.advanceTo(st, ctx(HOUR)));
+      const fired = r.events.filter((e) => e.type === 'aa.fired');
+      expect(fired.length).toBeGreaterThan(0);
+      const announced = fired.reduce(
+        (sum, e) => sum + (e.payload as { damage: number }).damage,
+        0,
+      );
+      const lost = 4000 - (hullOf(r.state, 'R', 'hulk') ?? 0);
+      return { announced, lost };
+    };
+
+    const calls: unknown[] = [];
+    const raw = aa([]);
+    const boosted = aa([probeModule(calls)]);
+    expect(raw.announced).toBeGreaterThan(0);
+    expect(boosted.announced).toBe(raw.announced * BOOST);
+    // The tracer and the hull must agree: an event carrying the pre-hook figure is a lie.
+    expect(boosted.lost).toBeCloseTo(boosted.announced, 6);
+    expect(calls.length).toBeGreaterThan(0);
+  });
+
+  it('scales standoff artillery, and the barrage reports what it really landed', () => {
+    const barrage = (mods: GameModule[]) => {
+      const kernel = createKernel([artilleryModule, ...mods]);
+      const st = stateWith(
+        [planet('A', 'p1', { at: { x: 0, y: 0 } }), planet('B', 'p2', { at: { x: 100, y: 0 } })],
+        [fleet('S', 'p1', 'A', [['siege', 1]]), fleet('T', 'p2', 'B', [['hulk', 1]])],
+      );
+      const r = okAdvance(kernel.advanceTo(st, ctx(HOUR)));
+      const fired = r.events.find((e) => e.type === 'artillery.fired');
+      expect(fired).toBeDefined();
+      return {
+        announced: (fired?.payload as { power: number }).power,
+        lost: 4000 - (hullOf(r.state, 'T', 'hulk') ?? 0),
+      };
+    };
+
+    const calls: unknown[] = [];
+    const raw = barrage([]);
+    const boosted = barrage([probeModule(calls)]);
+    expect(raw.announced).toBeGreaterThan(0);
+    expect(boosted.announced).toBe(raw.announced * BOOST);
+    expect(boosted.lost).toBeCloseTo(boosted.announced, 6);
+    expect(calls.length).toBeGreaterThan(0);
+  });
+
+  it('scales ship point-defense, and the intercept reports what it really landed', () => {
+    const pd = (mods: GameModule[]) => {
+      const kernel = createKernel([squadronModule, ...mods]);
+      const st = stateWith(
+        [planet('P', null), planet('H', 'p2')],
+        [
+          fleet('E', 'p1', 'P', [['escort', 1]]),
+          fleet('W', 'p2', 'P', [['wing', 1]], { homeBase: 'H' }),
+        ],
+      );
+      const r = okAdvance(kernel.advanceTo(st, ctx(HOUR)));
+      const fired = r.events.find((e) => e.type === 'pd.fired');
+      expect(fired).toBeDefined();
+      return {
+        announced: (fired?.payload as { damage: number }).damage,
+        lost: 300 - (hullOf(r.state, 'W', 'wing') ?? 0),
+      };
+    };
+
+    const calls: unknown[] = [];
+    const raw = pd([]);
+    const boosted = pd([probeModule(calls)]);
+    expect(raw.announced).toBeGreaterThan(0);
+    expect(boosted.announced).toBe(raw.announced * BOOST);
+    expect(boosted.lost).toBeCloseTo(boosted.announced, 6);
+    expect(calls.length).toBeGreaterThan(0);
+  });
+
+  it('scales orbital bombardment at the source, before the power leaves on the bus', () => {
+    const shell = (mods: GameModule[]) => {
+      const kernel = createKernel([orbitalModule, constructionModule, ...mods]);
+      const st = stateWith(
+        [planet('P', 'p2', { buildings: [['depot', 1]] })],
+        [fleet('B', 'p1', 'P', [['cruiser', 1]], { orbit: 'near', bombarding: true })],
+      );
+      const r = okAdvance(kernel.advanceTo(st, ctx(HOUR)));
+      const shelled = r.events.find((e) => e.type === 'planet.bombarded');
+      expect(shelled).toBeDefined();
+      const depot = r.state.planets.P?.buildings.find((b) => b.type === 'depot');
+      return {
+        announced: (shelled?.payload as { power: number }).power,
+        lost: 400 - (depot?.hp ?? 0),
+      };
+    };
+
+    const calls: unknown[] = [];
+    const raw = shell([]);
+    const boosted = shell([probeModule(calls)]);
+    expect(raw.announced).toBeGreaterThan(0);
+    // `construction` applies whatever arrives, so scaling at the source is the only
+    // way a bonus reaches the structures — and the event must already carry it.
+    expect(boosted.announced).toBe(raw.announced * BOOST);
+    expect(boosted.lost).toBeGreaterThan(raw.lost);
+    expect(calls.length).toBeGreaterThan(0);
+  });
+
+  it('keeps the defender-side mitigations on the ground phase only', () => {
+    // The fort / standing-buildings / planet-type hooks guard on `phase === 'ground'`.
+    // None of the newly wired channels claims that phase, so widening the hook's reach
+    // moved the ATTACKER's bonuses and nothing else.
+    const phases = new Set<string>();
     const kernel = createKernel([
       orbitalModule,
-      combatModule,
       artilleryModule,
-      arrivalModule,
-      probeModule(calls),
+      squadronModule,
+      {
+        id: 'phase-probe',
+        version: '1.0.0',
+        setup(api) {
+          api.hook<number>('combat.damage', (dmg, args) => {
+            phases.add(String((args as { phase?: string }).phase));
+            return dmg;
+          });
+        },
+      },
     ]);
     const st = stateWith(
-      [planet('P', null)],
-      [fleet('A', 'p1', 'P', [['cruiser', 1]]), fleet('D', 'p2', 'P', [['hulk', 1]])],
-    );
-
-    const started = okApply(kernel.applyAction(st, arrive('A'), ctx(0)));
-    const r = okAdvance(kernel.advanceTo(started.state, ctx(HOUR)));
-
-    const round = r.events.find((e) => e.type === 'combat.round');
-    expect(round).toBeDefined();
-    expect(calls.length).toBeGreaterThan(0);
-    // 10 attack × 1000 — the boost landed, so this channel really is hooked.
-    expect((round?.payload as { dmgToDefender: number }).dmgToDefender).toBe(10_000);
-  });
-
-  it('leaves planetary AA raw: the flak volley lands unscaled', () => {
-    const calls: unknown[] = [];
-    const kernel = createKernel([orbitalModule, probeModule(calls)]);
-    const st = stateWith(
-      [planet('P', 'p2', { buildings: [['flak', 1]] })],
-      [fleet('R', 'p1', 'P', [['hulk', 1]], { orbit: 'near' })],
-    );
-
-    const r = okAdvance(kernel.advanceTo(st, ctx(4 * HOUR)));
-
-    expect(types(r.events)).toContain('aa.fired');
-    // The raider really was shot at — 25 aaDamage per hourly volley, boost-free.
-    expect(hullOf(r.state, 'R', 'hulk')).toBeLessThan(4000);
-    expect(hullOf(r.state, 'R', 'hulk')).toBeGreaterThan(3000);
-    expect(calls).toEqual([]);
-  });
-
-  it('leaves standoff artillery raw: the barrage lands unscaled', () => {
-    const calls: unknown[] = [];
-    const kernel = createKernel([artilleryModule, probeModule(calls)]);
-    const st = stateWith(
-      [planet('A', 'p1', { at: { x: 0, y: 0 } }), planet('B', 'p2', { at: { x: 100, y: 0 } })],
-      [fleet('S', 'p1', 'A', [['siege', 1]]), fleet('T', 'p2', 'B', [['hulk', 1]])],
-    );
-
-    const r = okAdvance(kernel.advanceTo(st, ctx(HOUR)));
-
-    expect(types(r.events)).toContain('artillery.fired');
-    expect(hullOf(r.state, 'T', 'hulk')).toBeLessThan(4000);
-    expect(hullOf(r.state, 'T', 'hulk')).toBeGreaterThan(3000);
-    expect(calls).toEqual([]);
-  });
-
-  it('leaves ship point-defense raw: the intercept lands unscaled', () => {
-    const calls: unknown[] = [];
-    const kernel = createKernel([squadronModule, probeModule(calls)]);
-    const st = stateWith(
-      [planet('P', null), planet('H', 'p2')],
       [
-        fleet('E', 'p1', 'P', [['escort', 1]]),
-        fleet('W', 'p2', 'P', [['wing', 1]], { homeBase: 'H' }),
+        planet('P', 'p2', { buildings: [['flak', 1]] }),
+        planet('A', 'p1', { at: { x: 0, y: 0 } }),
+        planet('B', 'p2', { at: { x: 100, y: 0 } }),
+        planet('H', 'p2'),
+      ],
+      [
+        fleet('R', 'p1', 'P', [['hulk', 1]], { orbit: 'near' }),
+        fleet('Z', 'p1', 'P', [['cruiser', 1]], { orbit: 'near', bombarding: true }),
+        fleet('S', 'p1', 'A', [['siege', 1]]),
+        fleet('T', 'p2', 'B', [['hulk', 1]]),
+        fleet('E', 'p1', 'A', [['escort', 1]]),
+        fleet('W', 'p2', 'A', [['wing', 1]], { homeBase: 'H' }),
       ],
     );
+    okAdvance(kernel.advanceTo(st, ctx(HOUR)));
 
-    const r = okAdvance(kernel.advanceTo(st, ctx(HOUR)));
-
-    expect(types(r.events)).toContain('pd.fired');
-    expect(hullOf(r.state, 'W', 'wing')).toBeLessThan(300);
-    expect(calls).toEqual([]);
-  });
-
-  it('leaves orbital bombardment raw: the structures wear down unscaled', () => {
-    const calls: unknown[] = [];
-    const kernel = createKernel([orbitalModule, constructionModule, probeModule(calls)]);
-    const st = stateWith(
-      [planet('P', 'p2', { buildings: [['depot', 1]] })],
-      [fleet('B', 'p1', 'P', [['cruiser', 1]], { orbit: 'near', bombarding: true })],
-    );
-
-    const r = okAdvance(kernel.advanceTo(st, ctx(HOUR)));
-
-    expect(types(r.events)).toContain('planet.bombarded');
-    const depot = r.state.planets.P?.buildings.find((b) => b.type === 'depot');
-    expect(depot?.hp).toBeLessThan(400);
-    expect(depot?.hp).toBeGreaterThan(0);
-    expect(calls).toEqual([]);
+    expect(phases).toEqual(new Set(['orbital', 'bombard', 'standoff', 'pointDefense']));
+    expect(phases.has('ground')).toBe(false);
   });
 });
