@@ -16,6 +16,7 @@
     "cost": {
       "metal": 40
     },
+    "buildTimeHours": 1,
     "upkeep": {
       "credits": 16
     }
@@ -38,6 +39,7 @@
       "metal": 120,
       "microelectronics": 2
     },
+    "buildTimeHours": 2,
     "upkeep": {
       "credits": 32
     },
@@ -63,6 +65,7 @@
       "metal": 220,
       "credits": 80
     },
+    "buildTimeHours": 3,
     "upkeep": {
       "credits": 64
     },
@@ -91,6 +94,7 @@
       "metal": 260,
       "credits": 140
     },
+    "buildTimeHours": 5,
     "upkeep": {
       "credits": 96
     }
@@ -114,6 +118,7 @@
       "metal": 180,
       "credits": 40
     },
+    "buildTimeHours": 4,
     "upkeep": {
       "credits": 40
     },
@@ -139,6 +144,7 @@
     "cost": {
       "metal": 40
     },
+    "buildTimeHours": 1,
     "upkeep": {
       "credits": 8
     }
@@ -161,6 +167,7 @@
       "metal": 60,
       "credits": 20
     },
+    "buildTimeHours": 2,
     "upkeep": {
       "credits": 16
     }
@@ -183,6 +190,7 @@
       "metal": 140,
       "credits": 40
     },
+    "buildTimeHours": 4,
     "upkeep": {
       "credits": 32
     }
@@ -205,6 +213,7 @@
       "metal": 90,
       "credits": 30
     },
+    "buildTimeHours": 2,
     "upkeep": {
       "credits": 24
     }
@@ -227,6 +236,7 @@
       "metal": 120,
       "credits": 50
     },
+    "buildTimeHours": 3,
     "upkeep": {
       "credits": 32
     }
@@ -250,6 +260,7 @@
       "metal": 400,
       "credits": 200
     },
+    "buildTimeHours": 10,
     "upkeep": {
       "credits": 80
     }
@@ -276,8 +287,12 @@
       "metal": 90,
       "credits": 40
     },
+    "buildTimeHours": 2,
     "upkeep": {
       "credits": 32
+    },
+    "slots": {
+      "weapon": 1
     }
   },
   "strike_carrier": {
@@ -300,8 +315,13 @@
       "metal": 320,
       "credits": 160
     },
+    "buildTimeHours": 6,
     "upkeep": {
       "credits": 96
+    },
+    "slots": {
+      "defense": 1,
+      "utility": 2
     }
   }
 }

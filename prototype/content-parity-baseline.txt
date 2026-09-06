@@ -19,7 +19,10 @@
 # полевая намеренно: иначе новое поле у уже разошедшегося юнита спряталось бы за строкой
 # про эту сущность.
 #
-# Снят 2026-08-27 (CONV-11) с `prototypeData.ts` против бандла `data/*.json` версии 0.1.9.
+# Снят 2026-08-27 (CONV-11) с `prototypeData.ts` против бандла `data/*.json` версии 0.1.9:
+# 274 строки. Пересчитан 2026-09-06 (CONV-15) против бандла 0.1.10 — 261 строка:
+# закрыты 13 расхождений, которые расхождениями чисел не были, а были пропущенными
+# в каноне полями (дефолт схемы подставлял 0 и молча менял правила).
 buildings/barracks field:buildTimeHours
 buildings/barracks field:cost
 buildings/barracks field:hp
@@ -55,7 +58,6 @@ buildings/metal_station field:buildTimeHours
 buildings/metal_station field:name
 buildings/metal_station field:scoreValue
 buildings/metal_station field:upgrades
-buildings/metal_station field:upkeep
 buildings/mine only-in-prototype
 buildings/mine_t1 only-in-canon
 buildings/mine_t2 only-in-canon
@@ -233,35 +235,28 @@ technologies/signal_corps field:description
 technologies/strike_vectors field:description
 technologies/void_armadas field:description
 technologies/warhead_miniaturization field:description
-units/cruiser field:buildTimeHours
 units/cruiser field:cost
 units/cruiser field:faction
 units/cruiser field:stats
 units/cruiser field:upkeep
 units/drop_infantry only-in-canon
-units/dropship field:buildTimeHours
 units/dropship field:cost
 units/dropship field:faction
 units/dropship field:line
 units/dropship field:signature
 units/dropship field:stats
 units/dropship field:upkeep
-units/fighter_squadron field:buildTimeHours
 units/fighter_squadron field:cost
 units/fighter_squadron field:faction
-units/fighter_squadron field:slots
 units/fighter_squadron field:stats
-units/heavy_infantry field:buildTimeHours
 units/heavy_infantry field:cost
 units/heavy_infantry field:faction
 units/heavy_infantry field:stats
 units/heavy_infantry field:traits
 units/heavy_infantry field:upkeep
-units/hero field:buildTimeHours
 units/hero field:faction
 units/hero field:stats
 units/hero field:upkeep
-units/militia field:buildTimeHours
 units/militia field:cost
 units/militia field:faction
 units/militia field:stats
@@ -269,7 +264,6 @@ units/militia field:traits
 units/militia field:upkeep
 units/scout only-in-prototype
 units/scout_drone only-in-canon
-units/sensor_frigate field:buildTimeHours
 units/sensor_frigate field:cost
 units/sensor_frigate field:faction
 units/sensor_frigate field:line
@@ -277,18 +271,14 @@ units/sensor_frigate field:stats
 units/sensor_frigate field:upkeep
 units/siege only-in-prototype
 units/siege_lance only-in-canon
-units/special_forces field:buildTimeHours
 units/special_forces field:cost
 units/special_forces field:faction
 units/special_forces field:stats
 units/special_forces field:traits
 units/special_forces field:upkeep
-units/strike_carrier field:buildTimeHours
 units/strike_carrier field:faction
 units/strike_carrier field:signature
-units/strike_carrier field:slots
 units/strike_carrier field:stats
-units/tank field:buildTimeHours
 units/tank field:cost
 units/tank field:faction
 units/tank field:stats

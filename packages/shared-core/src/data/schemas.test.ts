@@ -27,7 +27,7 @@ function loadShippedBundle(): Record<string, unknown> {
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.9');
+    expect(data.version).toBe('0.1.10');
     expect(data.resources).toContain('microelectronics');
     expect(data.units.siege_lance?.stats.range).toBe(300); // artillery firing radius (map units)
     expect(data.units.cruiser?.upkeep.credits).toBe(64); // daily upkeep, BAL-3 scale
@@ -122,6 +122,22 @@ describe('game data schema (docs/architecture.md §2)', () => {
       },
     });
     expect(res.success).toBe(false);
+  });
+
+  // Пробел, который прятался за дефолтом схемы. `buildTimeHours` необязателен и по
+  // умолчанию 0 (`UnitSchema`), а `constructionModule` планирует завершение заказа
+  // ровно на это число — юнит без поля сходит со стапеля В ТОТ ЖЕ МИГ. В шипнутом
+  // бандле поля не было НИ У ОДНОГО из 13 юнитов, то есть производство флота не
+  // стоило времени вовсе, и увидеть это можно было только так: валидация проходила,
+  // потому что дефолт — легальное значение. Здания такой дыры не знали (у всех 14
+  // поле задано), поэтому сторож смотрит на юниты.
+  it('ни один шипнутый юнит не строится мгновенно (дефолт схемы не подменяет правила)', () => {
+    const data = parseGameData(loadShippedBundle());
+    const instant = Object.entries(data.units)
+      .filter(([, def]) => def.buildTimeHours <= 0)
+      .map(([id]) => id)
+      .sort();
+    expect(instant, 'buildTimeHours не задан в data/units.json — заказ выполняется мгновенно').toEqual([]);
   });
 
   it('ships producers for every economy resource (ECON-3: energy + microelectronics)', () => {
