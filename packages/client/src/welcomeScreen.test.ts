@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { LOCALE, LOCALE_IDS, LOCALE_LABEL } from '../../../localization/core';
 import {
   createWelcomeModel,
   resolveWelcomeAction,
@@ -9,12 +10,21 @@ import {
 } from './welcomeScreen';
 
 describe('createWelcomeModel', () => {
-  it('describes the screen from the default (RU) strings', () => {
+  it('describes the screen from the default strings', () => {
     const m = createWelcomeModel();
     expect(m.title).toBe('VOID DOMINION');
     expect(m.tagline).toBe(defaultStrings.tagline);
-    expect(m.language).toBe('ru');
+    expect(m.language).toBe(LOCALE);
     expect(m.legal.map((l) => l.id)).toEqual(['imprint', 'terms', 'privacy', 'support']);
+  });
+
+  it('offers every known language as a chip, exactly one of them active', () => {
+    // Data-driven from `/localization`: a new locale file must appear in the picker
+    // without touching this screen, and the active one is the locale actually loaded.
+    const m = createWelcomeModel();
+    expect(m.languages.map((l) => l.id)).toEqual(LOCALE_IDS);
+    expect(m.languages.map((l) => l.label)).toEqual(LOCALE_IDS.map((id) => LOCALE_LABEL[id]));
+    expect(m.languages.filter((l) => l.active).map((l) => l.id)).toEqual([LOCALE]);
   });
 
   it('exposes Google + Apple as not-yet-available stubs (no Facebook)', () => {

@@ -10,7 +10,7 @@
  * layer are later bricks (CP0.2 / CP1.x). No forked copy of the core or its data.
  */
 import { createInitialState, type GameState } from '@void/shared-core';
-import { t } from '../../../localization/runtime';
+import { t, LOCALE, isLocaleId, setLocale } from '../../../localization/core';
 import { theme } from './theme';
 import { createWelcomeModel, resolveWelcomeAction, nextCallsign } from './welcomeScreen';
 import type { WelcomeModel, WelcomeOutcome, AuthProviderId } from './welcomeScreen';
@@ -94,6 +94,17 @@ function render(model: WelcomeModel): void {
     `<div class="login"><input id="nick" maxlength="24" placeholder="${esc(model.loginLabel)}" autocomplete="off" />` +
     `<button class="btn" data-act="login">${esc(model.loginLabel)}</button></div>` +
     `<footer>${model.legal.map((l) => `<a data-legal="${l.id}">${esc(l.label)}</a>`).join('<span>·</span>')}</footer>` +
+    // Language picker: the ids come from `/localization`, so a new locale file shows up
+    // here on its own. Switching persists the choice and reloads — the whole UI is built
+    // from `t()` at import time, so a live re-render would leave the old language behind.
+    `<div class="langs">` +
+    model.languages
+      .map(
+        (l) =>
+          `<button class="lang${l.active ? ' on' : ''}" data-act="lang" data-lang="${l.id}" aria-pressed="${l.active}">${esc(l.label)}</button>`,
+      )
+      .join('') +
+    `</div>` +
     `<div id="status" class="status" role="status" aria-live="polite"></div>` +
     `<div class="engine" id="engine"></div>` +
     `</main>`;
@@ -139,6 +150,16 @@ function wire(model: WelcomeModel): void {
       case 'login':
         submitLogin(model);
         break;
+      case 'lang': {
+        // Fail-secure: only a known locale id is accepted, and the current one is a no-op
+        // (a reload would just throw away what the player typed).
+        const id = target.dataset.lang;
+        if (isLocaleId(id) && id !== LOCALE) {
+          setLocale(id);
+          location.reload();
+        }
+        break;
+      }
     }
   });
   app.addEventListener('keydown', (e) => {
