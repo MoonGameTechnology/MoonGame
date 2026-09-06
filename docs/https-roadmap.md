@@ -60,7 +60,7 @@ Node слушает loopback plain-HTTP; in-process TLS — только зап�
 
 ## Фаза 1 · Сервер готов жить за TLS-прокси `[srv]`
 
-### HTTPS-1.1 · Доверие прокси: `X-Forwarded-Proto`/`Host` + Origin `[srv][sec]` ✅ (в основном) / ⏳ (остался `x-forwarded-proto`) — M → SE-6.1, SE-1.2
+### HTTPS-1.1 · Доверие прокси: `X-Forwarded-Proto`/`Host` + Origin `[srv][sec]` ✅ — M → SE-6.1, SE-1.2
 
 **Цель:** корректно работать за терминирующим прокси, не доверяя заголовкам от кого попало.
 **Подзадачи:**
@@ -68,7 +68,22 @@ Node слушает loopback plain-HTTP; in-process TLS — только зап�
 - ✅ флаг `TRUST_PROXY` (env, `main.ts` → `trustProxy` Fastify в `wsServer.ts`); только при нём
   доверять форвард-заголовкам, иначе игнорировать (анти-spoofing, увязать с F-04: `baseUrl()`
   в `wsServer.ts`);
-- ⏳ отклонять upgrade, если за прокси пришёл не-`https` форвард (`x-forwarded-proto !== 'https'`) — единственный оставшийся шаг;
+- ✅ отклонять upgrade, если за прокси пришёл не-`https` форвард — `forwardedHttps()` в
+  `wsServer.ts`: при `trustProxy` upgrade с `x-forwarded-proto`, отличным от `https`, отбивается
+  403 ещё до Origin-проверки, с причиной в stderr (иначе оператор видит «не подключается» и не
+  понимает, что виноват прокси). У цепочки смотрится ПЕРВЫЙ хоп — протокол самого клиента
+  (`https, http` — норма для схемы «край + локальный прокси»). **Отсутствие заголовка — тоже
+  отказ:** `TRUST_PROXY=1` обещает прокси впереди, а обе прокси репозитория его ставят
+  (`deploy/Caddyfile`, `deploy/setup-proxy.sh`), значит запрос без него либо обошёл прокси, либо
+  прокси недонастроен. Без `trustProxy` форвард-заголовки по-прежнему игнорируются целиком —
+  иначе клиент решал бы за сервер, защищено ли его соединение. 4 теста в `authHandshake.test.ts`;
+- ✅ **граница доверия названа вслух.** Гвардия закрывает недонастроенный прокси и наивный
+  обход, но ПОДДЕЛАННЫЙ `X-Forwarded-Proto: https` от неотличим от настоящего по построению —
+  проверено на стенде: прямой запрос в plain-порт с подделанным заголовком проходит. Значит
+  реальная защита одна — plain-порт не должен торчать наружу (`SERVER_BIND=127.0.0.1`, DoD
+  HTTPS-2.1). `netserver.ts` предупреждает на старте, если `TRUST_PROXY=1` стоит вместе с
+  непетлевой привязкой; не отказывает, потому что прокси на соседней машине частной сети —
+  законная топология;
 - ✅ **Origin-allowlist** на upgrade (закрывает F-06/CSWSH, это часть SE-6.1) — `ALLOWED_ORIGINS` из env (`serverConfig.ts`), несовпадение → `rejectUpgrade` 403 (`wsServer.ts`).
   **Готово, когда:** за прокси сервер видит верный протокол/хост; cross-origin upgrade отбивается; без прокси форвард-заголовки игнорируются.
 
@@ -205,8 +220,9 @@ PWA/secure-context на LAN — опциональный рецепт `mkcert` (
 ## Точечный список правок в коде/конфиге
 
 - `packages/server/src/wsServer.ts` — Fastify слушает plain-HTTP (upgrade на `app.server`);
-  `baseUrl()` host-header; анонс `ws://` в `listen()`; Origin-allowlist на upgrade уже есть
-  (`rejectUpgrade` 403 + `ALLOWED_ORIGINS`). → HTTPS-1.1 (остаток)/1.2, HTTPS-4.1.
+  `baseUrl()` host-header; анонс `ws://` в `listen()` (при `tls` — `wss://`, RS-5.1);
+  Origin-allowlist на upgrade (`rejectUpgrade` 403 + `ALLOWED_ORIGINS`) и проверка
+  форвард-протокола (`forwardedHttps`, HTTPS-1.1) — обе на месте. → остаётся HTTPS-4.1.
 - `Dockerfile:71-73` `ENV HOST=0.0.0.0`, `EXPOSE 8788` plain → за прокси (HTTPS-2.1).
 - `deploy/serve.sh` — бинд `0.0.0.0` напрямую → `127.0.0.1` + прокси (HTTPS-2.1); + новый `deploy/Caddyfile`.
 - `render.yaml` — добавить комментарий про edge-TLS, health по https (HTTPS-3.1).
