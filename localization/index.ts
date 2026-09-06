@@ -10,22 +10,31 @@
 //      непереведённая строка видна по-русски, а не как голый `err.no-capacity`.
 //   5. Нет ключа нигде → показывается сам ключ. Это заметно и означает опечатку.
 //
-// Добавить язык: положить рядом `<код>.ts` той же формы и дописать его в LOCALES
-// и LOCALE_LABEL ниже. Больше ничего трогать не нужно.
-import { ru } from './ru';
-import { en } from './en';
+// Соседи по папке: `bundles.ts` — статический список локалей и «запекание» фолбэка,
+// `core.ts` — рантайм (`t`/`tData`) поверх подключённых таблиц, `runtime.ts` — точка
+// входа для потребителей, которым нужны сразу все локали (прототип, тесты).
+//
+// Добавить язык: положить рядом `<код>.ts` той же формы, дописать его в `LocaleId`,
+// `LOCALE_IDS` и `LOCALE_LABEL` здесь, в `LOCALE_SOURCES` (`bundles.ts`) и в карту
+// загрузки клиента (`packages/client/src/locale.ts`). Больше ничего трогать не нужно —
+// расхождение этих списков валит гейт (`bundles.test.ts`, `locale.test.ts`).
+
+/** Плоская карта одной локали: ключ → готовый текст. */
+export type Messages = Record<string, string>;
 
 export type LocaleId = 'ru' | 'en';
 
 /** Язык-источник: его текст показывается, когда в выбранной локали ключа нет. */
 export const DEFAULT_LOCALE: LocaleId = 'ru';
 
-export const LOCALES: Record<LocaleId, Record<string, string>> = { ru, en };
+/** Список языков — литералом, а не из таблицы текстов: этот модуль обязан оставаться
+ *  лёгким (его читает и клиент, который качает РОВНО ОДНУ локаль — LOC-6), поэтому
+ *  импортировать отсюда `ru.ts`/`en.ts` нельзя. Синхронность с реальными файлами
+ *  держит тест `bundles.test.ts`. */
+export const LOCALE_IDS: LocaleId[] = ['ru', 'en'];
 
 /** Подпись языка в переключателе — на самом языке, не в переводе. */
 export const LOCALE_LABEL: Record<LocaleId, string> = { ru: 'РУССКИЙ', en: 'ENGLISH' };
-
-export const LOCALE_IDS = Object.keys(LOCALES) as LocaleId[];
 
 export const isLocaleId = (v: unknown): v is LocaleId =>
   typeof v === 'string' && (LOCALE_IDS as string[]).includes(v);

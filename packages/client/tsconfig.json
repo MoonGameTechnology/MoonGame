@@ -5,5 +5,5 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "resolveJsonModule": true
   },
-  "include": ["src/**/*.ts"]
+  "include": ["src/**/*.ts", "vite.config.ts"]
 }

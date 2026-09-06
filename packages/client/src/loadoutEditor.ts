@@ -12,7 +12,7 @@
  */
 import type { GameData, ResourceBag, ShipSlotType, UnitDef } from '@void/shared-core';
 import { canEquip, effectiveStats, hullSlotTypes, loadoutCost } from '@void/shared-core';
-import { t } from '../../../localization/runtime';
+import { t } from '../../../localization/core';
 
 /** One capacity slot on the hull — its category and the module in it (if any). */
 export interface LoadoutSlotView {

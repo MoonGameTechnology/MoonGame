@@ -23,14 +23,19 @@ tData('Metal Mine')             // ИМЯ игровых данных → клю
 | --- | --- |
 | `localization/ru.ts` | **источник.** Плоская карта `ключ → текст`, разбита на доменные секции |
 | `localization/en.ts` | английская локаль, тот же набор ключей (паритет держит тест) |
-| `localization/index.ts` | `LOCALES` / `DEFAULT_LOCALE` / `LOCALE_LABEL` / `dataKey()` |
-| `localization/runtime.ts` | **один рантайм на всех** (LOC-5): `t`, `tData`, `lookup`, `hasKey`, `setLocale`, `localizeStaticDom` |
-| `localization/runtime.test.ts` | тест самого рантайма (поиск, подстановка, фолбэки) |
+| `localization/index.ts` | метаданные без текстов: `LocaleId` / `LOCALE_IDS` / `DEFAULT_LOCALE` / `LOCALE_LABEL` / `dataKey()` |
+| `localization/bundles.ts` | единственный статический импорт локалей: `LOCALE_SOURCES` + запекание фолбэка (`bakeMessages`/`bakedLocale`, LOC-6) |
+| `localization/core.ts` | **один рантайм на всех** (LOC-5): `t`, `tData`, `lookup`, `hasKey`, `setLocale`, `localizeStaticDom` + `registerMessages` |
+| `localization/runtime.ts` | точка входа «все языки сразу»: регистрирует локали и реэкспортирует `core.ts` |
+| `localization/core.test.ts` · `bundles.test.ts` · `runtime.test.ts` | тесты рантайма, подключения текстов и запекания фолбэка |
 | `prototype/src/i18n.test.ts` | **гейт ключей** — 11 тестов, см. §5 |
 
-Потребители импортируют рантайм напрямую: `from '../../localization/runtime'`
-(прототип) и `from '../../../localization/runtime'` (`packages/client`). Своей копии
+Прототип импортирует `from '../../localization/runtime'` — ему нужны все языки сразу
+(его сборка — самодостаточный HTML, открываемый с диска). `packages/client` импортирует
+`from '../../../localization/core'` и подключает РОВНО ОДНУ локаль на старте
+(`src/boot.ts` → `src/locale.ts`, LOC-6): вторая — это 30% лишней загрузки. Своей копии
 рантайма ни у кого нет и заводить её не надо — до LOC-5 копий было две, и они разошлись.
+В тестах все локали подключает общая преамбула `localization/vitest.setup.ts`.
 
 Порядок поиска: выбранная локаль → **русский как источник** (непереведённый ключ виден
 по-русски, а не пустотой) → сам ключ (значит, опечатка — она и должна быть заметна).
@@ -133,9 +138,12 @@ tData('Metal Mine')             // ИМЯ игровых данных → клю
 
 ## 6. Новый язык
 
-Положить `/localization/<код>.ts` той же формы и дописать его в `LOCALES` и
-`LOCALE_LABEL` в `index.ts` (подпись — на самом языке). Больше ничего. Непереведённые
-ключи автоматически покажутся по-русски.
+Положить `/localization/<код>.ts` той же формы и дописать его в `LocaleId`,
+`LOCALE_IDS` и `LOCALE_LABEL` (`index.ts`, подпись — на самом языке), в `LOCALE_SOURCES`
+(`bundles.ts`) и в карту чанков `packages/client/src/locale.ts`. Больше ничего:
+разъехавшиеся списки валит гейт (`bundles.test.ts`, `locale.test.ts`). Непереведённые
+ключи автоматически покажутся по-русски — фолбэк запекается в файл языка на сборке
+клиента, поэтому игрок всё равно качает один файл.
 
 ## 7. Что намеренно НЕ локализовано
 
