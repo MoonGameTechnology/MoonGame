@@ -121,13 +121,13 @@ export const en: Record<string, string> = {
   'arsenal.origin.starter': 'starter',
 
   // --- auth — Вход и регистрация: позывной, сторонние провайдеры.
-  'auth.apple.soon': 'Sign in with Apple — coming soon · you entered as a guest',
+  'auth.apple.soon': 'Sign in with Apple — coming soon · (guest)',
   'auth.commander': 'Commander',
-  'auth.google.soon': 'Sign in with Google — coming soon · you entered as a guest',
+  'auth.google.soon': 'Sign in with Google — coming soon · (guest)',
   'auth.need-mail': 'Enter an email',
   'auth.need-name': 'Enter a commander name',
   'auth.pass-mismatch': 'Passwords do not match',
-  'auth.recover.sent': 'If that email exists, a reset link is on its way',
+  'auth.recover.sent': 'Check your email',
   'auth.reset.bad-link': 'The link is invalid or expired',
   'auth.reset.done': 'Password changed',
 
@@ -248,7 +248,7 @@ export const en: Record<string, string> = {
   'client.net.waiting-you': ' · you are {me}',
   'client.provider.soon': 'soon',
   'client.status.error': '✖ {text}',
-  'client.status.guest-notice': ' · sign in with {provider} soon — guest for now',
+  'client.status.guest-notice': ' · sign in with {provider} soon (guest)',
   'client.status.new-commander': '→ Browse matches · new commander "{nick}"{notice}',
   'client.status.returning': '→ Browse matches · {nick}',
   'client.status.returning-fallback': 'returning',
