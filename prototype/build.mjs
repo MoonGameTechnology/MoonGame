@@ -2342,6 +2342,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 /* arsenal cards carry a third line (badges + origin) — a touch taller than a hub tile */
 .ar-grid .ar-card{min-height:76px;}
 .ar-meta{color:var(--dim);font-size:9px;letter-spacing:.3px;}
+#hp-auction{overflow-y:auto;gap:10px}.mm-head{display:flex;justify-content:space-between;align-items:center;padding:12px;border:1px solid var(--line);background:rgba(53,214,230,.05)}.mm-head div{display:flex;flex-direction:column;gap:3px}.mm-head strong{color:var(--cyan);font-size:18px}.mm-head small,.mm-fee,.mm-card span,.mm-card label{color:var(--dim);font-size:11px}.mm-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:8px}.mm-card{display:flex;flex-direction:column;gap:7px;padding:11px;border:1px solid var(--line);background:var(--panel)}.mm-card button{border:1px solid var(--cyan-dim);background:rgba(53,214,230,.08);color:var(--cyan);padding:7px}.mm-card input{width:76px;background:#07131b;border:1px solid var(--line);color:var(--text);padding:5px}
 #hub .hub-nav{flex:0 0 auto;display:flex;border-top:1px solid var(--line-hi);background:rgba(2,9,13,.94);
   padding-bottom:env(safe-area-inset-bottom,0);}
 #hub .hub-tab{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:9px 2px 8px;cursor:pointer;
@@ -2974,6 +2975,7 @@ const page = (js) => `<!doctype html>
     </div>
     <div class="hub-panel" id="hp-meta" style="display:none"></div>
     <div class="hub-panel" id="hp-arsenal" style="display:none"></div>
+    <div class="hub-panel" id="hp-auction" style="display:none"></div>
     <div class="hub-panel" id="hp-rank" style="display:none"></div>
     <div class="hub-panel" id="hp-friends" style="display:none"></div>
     <div class="hub-panel" id="hp-ally" style="display:none">
@@ -2983,6 +2985,7 @@ const page = (js) => `<!doctype html>
     <div class="hub-panel" id="hp-more" style="display:none">
       <div class="hub-grid">
         <button class="hub-tile" id="hub-meta" type="button"><span class="ht-ic">★</span><span data-i18n="hub.tile.meta"></span></button>
+        <button class="hub-tile" id="hub-auction" type="button"><span class="ht-ic">⌖</span><span data-i18n="auction.title"></span></button>
         <button class="hub-tile" id="hub-tutorial" type="button"><span class="ht-ic">◎</span><span data-i18n="hub.tile.tutorial"></span></button>
         <button class="hub-tile" id="hub-help" type="button"><span class="ht-ic">?</span><span data-i18n="hub.tile.help"></span></button>
         <button class="hub-tile" id="hub-settings" type="button"><span class="ht-ic">⚙</span><span data-i18n="hub.tile.settings"></span></button>

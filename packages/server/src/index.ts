@@ -77,7 +77,13 @@ export {
   type SessionTokenResult,
   type VerifyKey,
 } from './auth';
-export { registerAuthApi, liveSession, pwFingerprint, type AuthApiDeps, type Mailer } from './authApi';
+export {
+  registerAuthApi,
+  liveSession,
+  pwFingerprint,
+  type AuthApiDeps,
+  type Mailer,
+} from './authApi';
 // FRIENDS-1 — roster API + rules, exported so the playtest host mounts the SAME slice
 // as production (one implementation of the social graph, not two).
 export {
@@ -104,6 +110,9 @@ export {
   type FriendServiceDeps,
 } from './friendService';
 export { configFromEnv, type ServerConfig } from './serverConfig';
+export { MemoryMetaMarket, PostgresMetaMarket } from './metaMarket';
+export { registerMetaMarketApi } from './metaMarketApi';
+export { MemoryArsenalStore, PostgresArsenalStore } from './store';
 export { hashPassword, verifyPassword, type ScryptParams } from './password';
 export type {
   ClientActionMessage,

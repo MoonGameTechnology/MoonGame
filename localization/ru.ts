@@ -1290,6 +1290,18 @@ export const ru: Record<string, string> = {
   'hub.tile.support': 'Поддержка',
   'hub.tile.tutorial': 'Обучение',
   'hub.tile.updates': 'Обновления',
+  'auction.title': 'Аукцион',
+  'auction.subtitle': 'Торговля заработанным снаряжением между матчами',
+  'auction.browse': 'Открытые лоты',
+  'auction.sell': 'Продать из арсенала',
+  'auction.buy': 'Купить',
+  'auction.cancel': 'Снять лот',
+  'auction.list': 'Выставить',
+  'auction.price': 'Цена',
+  'auction.fee': 'Комиссия биржи {n}% сжигается при каждой сделке.',
+  'auction.empty': 'Открытых лотов пока нет.',
+  'auction.no-items':
+    'Нет торгуемых экземпляров. Привязанные предметы и чертежи выставлять нельзя.',
 
   // --- hud — Постоянный интерфейс матча: верхняя панель ресурсов.
   'hud.back.title': 'Назад',

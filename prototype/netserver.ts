@@ -56,6 +56,10 @@ import {
   type ReceiptStore,
   type RoomObservation,
   type UserStore,
+  MemoryArsenalStore,
+  MemoryMetaMarket,
+  PostgresMetaMarket,
+  registerMetaMarketApi,
 } from '../packages/server/src/index';
 import {
   newGame,
@@ -192,6 +196,7 @@ let receiptStore: ReceiptStore;
 let userStore: UserStore;
 let friendStore: FriendStore;
 let commanderStore: CommanderStore;
+let metaMarket: MemoryMetaMarket | PostgresMetaMarket;
 if (DATABASE_URL) {
   pool = new Pool({ connectionString: DATABASE_URL });
   await migrate(pool);
@@ -201,6 +206,7 @@ if (DATABASE_URL) {
   userStore = new PostgresUserStore(pool);
   friendStore = new PostgresFriendStore(pool);
   commanderStore = new PostgresCommanderStore(pool);
+  metaMarket = new PostgresMetaMarket(pool);
 } else {
   matchStore = new MemoryMatchStore();
   accountStore = new MemoryAccountStore();
@@ -208,6 +214,8 @@ if (DATABASE_URL) {
   userStore = new MemoryUserStore();
   friendStore = new MemoryFriendStore();
   commanderStore = new MemoryCommanderStore();
+  const arsenalStore = new MemoryArsenalStore();
+  metaMarket = new MemoryMetaMarket(arsenalStore);
 }
 
 /** Account crediting (EC-*): the core already computed `match.rewards` (place + XP per
@@ -877,6 +885,7 @@ const server = createMultiplayerServer({
         users: userStore,
         identify: identifySession,
       });
+      registerMetaMarketApi(app, { market: metaMarket, identify: identifySession });
       // Seat + short-lived join token (SES-2.5) through the SHARED match API, so the
       // handshake — per-IP rate-limit, identity gate, error→status mapping — lives in ONE
       // place with the production host (NETA2-7).

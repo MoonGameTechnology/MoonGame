@@ -257,6 +257,29 @@ export async function migrate(pool: Pool): Promise<void> {
     );
     CREATE INDEX IF NOT EXISTS arsenal_account_idx ON arsenal (account_id);
 
+    CREATE TABLE IF NOT EXISTS meta_wallets (
+      account_id text PRIMARY KEY,
+      warrants bigint NOT NULL CHECK (warrants >= 0)
+    );
+    CREATE TABLE IF NOT EXISTS meta_market_listings (
+      id text PRIMARY KEY,
+      seller_id text NOT NULL,
+      seller_login text NOT NULL,
+      item_id text NOT NULL UNIQUE,
+      price bigint NOT NULL CHECK (price > 0),
+      created_at bigint NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS meta_market_price_idx ON meta_market_listings(price, created_at);
+    CREATE TABLE IF NOT EXISTS meta_market_ledger (
+      id text PRIMARY KEY,
+      account_id text NOT NULL,
+      delta bigint NOT NULL,
+      reason text NOT NULL,
+      listing_id text,
+      at bigint NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS meta_market_ledger_account_idx ON meta_market_ledger(account_id, at DESC);
+
     -- Corp-arsenal rentals (ARS-6): a corp-owned item (a row in the arsenal table
     -- with account_id = the corp's id) lent to a rostered fighter for one war. item_id PK
     -- is the "one war at a time" invariant; DELETE-on-return is the exactly-once
@@ -412,9 +435,10 @@ export class PostgresAccountStore implements AccountStore {
     );
     const taken = new Set(takenR.rows.map((r) => r.player_id));
     // Preferred slot first (REL-7 seat selection): try it before the default order.
-    const order = preferred && seats.includes(preferred) && !taken.has(preferred)
-      ? [preferred, ...seats.filter((s) => s !== preferred)]
-      : seats;
+    const order =
+      preferred && seats.includes(preferred) && !taken.has(preferred)
+        ? [preferred, ...seats.filter((s) => s !== preferred)]
+        : seats;
     for (const candidate of order) {
       if (taken.has(candidate)) continue;
       try {
@@ -594,7 +618,10 @@ export class PostgresUserStore implements UserStore {
       // account (the constraint name is on the pg error). Any other cause is treated as a
       // taken login too — fail-secure, no account is overwritten.
       const constraint = (e as { constraint?: string }).constraint;
-      return { ok: false, code: constraint === 'users_email_idx' ? 'E_EMAIL_TAKEN' : 'E_LOGIN_TAKEN' };
+      return {
+        ok: false,
+        code: constraint === 'users_email_idx' ? 'E_EMAIL_TAKEN' : 'E_LOGIN_TAKEN',
+      };
     }
   }
 
@@ -1588,7 +1615,8 @@ export class PostgresArsenalStore implements ArsenalStore {
   constructor(private readonly pool: Pool) {}
 
   async grant(item: OwnedArsenalItem): Promise<void> {
-    await this.pool.query( // nosemgrep: no-sql-string-interpolation -- ARSENAL_COLS is a fixed column-list constant, not user input
+    await this.pool.query(
+      // nosemgrep: no-sql-string-interpolation -- ARSENAL_COLS is a fixed column-list constant, not user input
       `INSERT INTO arsenal (${ARSENAL_COLS})
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
        ON CONFLICT (item_id) DO NOTHING`,
@@ -1648,10 +1676,10 @@ export class PostgresArsenalStore implements ArsenalStore {
   }
 
   async consume(itemId: string, accountId: string): Promise<boolean> {
-    const r = await this.pool.query(
-      `DELETE FROM arsenal WHERE item_id = $1 AND account_id = $2`,
-      [itemId, accountId],
-    );
+    const r = await this.pool.query(`DELETE FROM arsenal WHERE item_id = $1 AND account_id = $2`, [
+      itemId,
+      accountId,
+    ]);
     return (r.rowCount ?? 0) > 0;
   }
 
@@ -1867,6 +1895,8 @@ export class PostgresPushStore implements PushStore {
       [accountId],
     );
     const row = r.rows[0];
-    return row ? { endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } } : undefined;
+    return row
+      ? { endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } }
+      : undefined;
   }
 }
