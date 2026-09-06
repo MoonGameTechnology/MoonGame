@@ -1,7 +1,7 @@
 {
   "industrial_automation": {
     "name": "Industrial Automation",
-    "description": "Session research that upgrades planetary logistics and unlocks higher-output extractors.",
+    "description": "tech.node.industrial-automation.desc",
     "branch": "space",
     "tier": 1,
     "cost": { "credits": 120, "metal": 80 },
@@ -11,7 +11,7 @@
   },
   "orbital_logistics": {
     "name": "Orbital Logistics",
-    "description": "Standardizes dropship operations and makes fleets faster across the session map.",
+    "description": "tech.node.orbital-logistics.desc",
     "branch": "space",
     "tier": 1,
     "cost": { "credits": 160, "metal": 120 },
@@ -21,7 +21,7 @@
   },
   "siege_doctrine": {
     "name": "Siege Doctrine",
-    "description": "Advanced assault calculations for long-range siege lances.",
+    "description": "tech.node.siege-doctrine.desc",
     "branch": "space",
     "tier": 2,
     "cost": { "credits": 260, "metal": 220 },
@@ -33,7 +33,7 @@
   },
   "fortified_infrastructure": {
     "name": "Fortified Infrastructure",
-    "description": "Session doctrine for hardened frontier worlds and formal fortress construction.",
+    "description": "tech.node.fortified-infrastructure.desc",
     "branch": "ground",
     "tier": 2,
     "cost": { "credits": 180, "metal": 240 },
@@ -44,7 +44,7 @@
   },
   "microelectronics_fabrication": {
     "name": "Microelectronics Fabrication",
-    "description": "Cleanroom doctrine that unlocks orbital fabs turning energy and metal into microelectronics.",
+    "description": "tech.node.microelectronics-fabrication.desc",
     "branch": "space",
     "tier": 2,
     "cost": { "credits": 220, "metal": 180, "energy": 120 },
@@ -56,7 +56,7 @@
   },
   "deep_survey": {
     "name": "Deep-Space Survey",
-    "description": "Long-range sensor lattices: +15% radar range.",
+    "description": "tech.node.deep-survey.desc",
     "branch": "space",
     "tier": 2,
     "cost": { "credits": 200, "metal": 140 },
@@ -67,7 +67,7 @@
   },
   "void_armadas": {
     "name": "Void Armadas",
-    "description": "Large-formation doctrine: +6% damage and fleet speed. Requires 5 owned sectors.",
+    "description": "tech.node.void-armadas.desc",
     "branch": "space",
     "tier": 3,
     "cost": { "credits": 420, "metal": 300, "microelectronics": 60 },
@@ -79,7 +79,7 @@
   },
   "combined_arms": {
     "name": "Combined Arms",
-    "description": "Infantry and armor operating as one: +5% damage.",
+    "description": "tech.node.combined-arms.desc",
     "branch": "ground",
     "tier": 1,
     "cost": { "credits": 140, "metal": 100 },
@@ -88,7 +88,7 @@
   },
   "garrison_networks": {
     "name": "Garrison Networks",
-    "description": "Self-supplying rear echelons: +5% production.",
+    "description": "tech.node.garrison-networks.desc",
     "branch": "ground",
     "tier": 2,
     "cost": { "credits": 240, "metal": 200 },
@@ -99,7 +99,7 @@
   },
   "planetary_bastions": {
     "name": "Planetary Bastions",
-    "description": "Full-cycle defense industry: +8% damage.",
+    "description": "tech.node.planetary-bastions.desc",
     "branch": "ground",
     "tier": 3,
     "cost": { "credits": 480, "metal": 360, "microelectronics": 40 },
@@ -110,7 +110,7 @@
   },
   "flight_decks": {
     "name": "Flight Decks",
-    "description": "Fast sortie cycles: +6% fleet speed.",
+    "description": "tech.node.flight-decks.desc",
     "branch": "squadron",
     "tier": 1,
     "cost": { "credits": 160, "metal": 120 },
@@ -120,7 +120,7 @@
   },
   "strike_vectors": {
     "name": "Strike Vectors",
-    "description": "Computed squadron attack runs: +8% damage.",
+    "description": "tech.node.strike-vectors.desc",
     "branch": "squadron",
     "tier": 2,
     "cost": { "credits": 280, "metal": 220, "microelectronics": 30 },
@@ -131,7 +131,7 @@
   },
   "ace_programs": {
     "name": "Ace Programs",
-    "description": "Elite flight crews: +6% damage and fleet speed.",
+    "description": "tech.node.ace-programs.desc",
     "branch": "squadron",
     "tier": 3,
     "cost": { "credits": 500, "metal": 380, "microelectronics": 60 },
@@ -142,7 +142,7 @@
   },
   "guidance_arrays": {
     "name": "Guidance Arrays",
-    "description": "Long-range targeting telemetry: +10% radar range.",
+    "description": "tech.node.guidance-arrays.desc",
     "branch": "missile",
     "tier": 1,
     "cost": { "credits": 150, "metal": 110 },
@@ -152,7 +152,7 @@
   },
   "warhead_miniaturization": {
     "name": "Warhead Miniaturization",
-    "description": "Denser salvos per ton: +6% damage.",
+    "description": "tech.node.warhead-miniaturization.desc",
     "branch": "missile",
     "tier": 2,
     "cost": { "credits": 260, "metal": 240, "microelectronics": 30 },
@@ -163,7 +163,7 @@
   },
   "saturation_barrage": {
     "name": "Saturation Barrage",
-    "description": "Overwhelms any missile defense: +10% damage.",
+    "description": "tech.node.saturation-barrage.desc",
     "branch": "missile",
     "tier": 3,
     "cost": { "credits": 520, "metal": 400, "microelectronics": 80 },
@@ -174,7 +174,7 @@
   },
   "signal_corps": {
     "name": "Signal Corps",
-    "description": "One shared battle picture: +8% radar range.",
+    "description": "tech.node.signal-corps.desc",
     "branch": "command",
     "tier": 1,
     "cost": { "credits": 130, "metal": 90 },
@@ -183,7 +183,7 @@
   },
   "logistics_command": {
     "name": "Logistics Command",
-    "description": "Convoys on schedule: +5% production and fleet speed.",
+    "description": "tech.node.logistics-command.desc",
     "branch": "command",
     "tier": 2,
     "cost": { "credits": 300, "metal": 220 },
@@ -194,7 +194,7 @@
   },
   "ai_stewardship": {
     "name": "Steward Protocol",
-    "description": "Command-automation doctrine: delegate your seat to a trusted AI while you are offline (asleep). It holds the line on a chosen posture and hands control back at a set time. Powerful — so it only opens mid-session.",
+    "description": "tech.node.ai-stewardship.desc",
     "branch": "command",
     "tier": 3,
     "cost": { "credits": 400, "metal": 260 },

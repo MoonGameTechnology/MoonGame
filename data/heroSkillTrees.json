@@ -1,14 +1,14 @@
 {
   "neural_lace": {
     "name": "Neural Lace",
-    "description": "Имплант прямого канала «мозг—штурвал»: корабль героя разгоняется на +10%.",
+    "description": "hero.tree.neural-lace.desc",
     "branch": "transhuman",
     "cost": { "microelectronics": 20 },
     "grants": { "passive": "vanguard_impulse" }
   },
   "overclocked_helm": {
     "name": "Overclocked Helm",
-    "description": "Форсаж нейроинтерфейса открывает герою прокладку коридоров.",
+    "description": "hero.tree.overclocked-helm.desc",
     "branch": "transhuman",
     "requires": ["neural_lace"],
     "cost": { "microelectronics": 45, "credits": 100 },
@@ -16,28 +16,28 @@
   },
   "corridor_sustained": {
     "name": "Sustained Corridor",
-    "description": "Коридор держится по часам, а не гаснет с первым же проходом армии героя.",
+    "description": "hero.tree.corridor-sustained.desc",
     "branch": "transhuman",
     "requires": ["overclocked_helm"],
     "cost": { "microelectronics": 70, "credits": 150 }
   },
   "corridor_open": {
     "name": "Shared Corridor",
-    "description": "Открывает коридор союзникам: их флоты идут вашим проходом с тем же ускорением. Проход становится общим — войти сможет и нейтрал, и противник, но им коридор даёт только дорогу.",
+    "description": "hero.tree.corridor-open.desc",
     "branch": "transhuman",
     "requires": ["corridor_sustained"],
     "cost": { "microelectronics": 110, "credits": 250 }
   },
   "void_attunement": {
     "name": "Void Attunement",
-    "description": "Пси-резонанс героя воодушевляет флоты рядом: +8% к урону в радиусе 300.",
+    "description": "hero.tree.void-attunement.desc",
     "branch": "psionic",
     "cost": { "energy": 56 },
     "grants": { "passive": "rally_beacon" }
   },
   "psi_veil": {
     "name": "Psi Veil",
-    "description": "Отточенное пси-зрение: герой учится вскрывать туман разведкой.",
+    "description": "hero.tree.psi-veil.desc",
     "branch": "psionic",
     "requires": ["void_attunement"],
     "cost": { "energy": 126, "credits": 100 },
@@ -45,14 +45,14 @@
   },
   "psi_weak_points": {
     "name": "Weak Points",
-    "description": "Радар не просто светит: он читает бреши в чужой броне. Флоты противника внутри просвеченной зоны получают на 5% больше урона. Свои, союзные и нейтральные флоты не задеты.",
+    "description": "hero.tree.psi-weak-points.desc",
     "branch": "psionic",
     "requires": ["psi_veil"],
     "cost": { "energy": 196, "credits": 150 }
   },
   "psi_evasion": {
     "name": "Evasive Vectors",
-    "description": "Картинка радара идёт и своим: ваши флоты и флоты союзников внутри просвеченной зоны получают на 5% меньше входящего урона.",
+    "description": "hero.tree.psi-evasion.desc",
     "branch": "psionic",
     "requires": ["psi_weak_points"],
     "cost": { "energy": 308, "credits": 250 }

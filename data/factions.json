@@ -1,7 +1,7 @@
 {
   "azure": {
     "name": "Azure Compact",
-    "description": "Дисциплинированный ремнант человечества, держит строй закалёнными флотами и жёсткой доктриной.",
+    "description": "faction.azure.desc",
     "traits": ["disciplined"],
     "abilities": [],
     "uniqueUnits": [],
@@ -18,7 +18,7 @@
   },
   "crimson": {
     "name": "Crimson Hegemony",
-    "description": "Воинственная гегемония, сокрушающая соперников мощью огня и решительными атаками.",
+    "description": "faction.crimson.desc",
     "traits": ["aggressive"],
     "abilities": [],
     "uniqueUnits": [],
@@ -35,7 +35,7 @@
   },
   "amber": {
     "name": "Amber Concord",
-    "description": "Конкорд торговцев и первопроходцев — быстрые флоты, широкие коридоры, молниеносные рейды.",
+    "description": "faction.amber.desc",
     "traits": ["swift"],
     "abilities": [],
     "uniqueUnits": [],
@@ -52,7 +52,7 @@
   },
   "violet": {
     "name": "Violet Ascendancy",
-    "description": "Восходящая династия учёных и стратегов — сбалансированный подход: крепкая экономика и точный удар.",
+    "description": "faction.violet.desc",
     "traits": ["balanced"],
     "abilities": [],
     "uniqueUnits": [],

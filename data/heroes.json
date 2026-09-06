@@ -1,7 +1,7 @@
 {
   "commander": {
     "name": "Commander",
-    "description": "Главный герой-флагман: командный трансгуманист, усиливает флот и открывает коридоры.",
+    "description": "hero.unit.commander.desc",
     "branch": "transhuman",
     "ship": {
       "unit": "hero"
@@ -19,7 +19,7 @@
   },
   "ravager": {
     "name": "Ravager",
-    "description": "Псионик-разрушитель: аннигилирует миры и вскрывает туман.",
+    "description": "hero.unit.ravager.desc",
     "branch": "psionic",
     "ship": {
       "unit": "hero"
@@ -35,7 +35,7 @@
   },
   "vanguard": {
     "name": "Vanguard",
-    "description": "Трансгуманист-манёвренник: коридоры и боевой клич для передовых флотов.",
+    "description": "hero.unit.vanguard.desc",
     "branch": "transhuman",
     "ship": {
       "unit": "hero"
@@ -50,7 +50,7 @@
   },
   "warden": {
     "name": "Warden",
-    "description": "Псионик-защитник: держит рубеж бастионным щитом.",
+    "description": "hero.unit.warden.desc",
     "branch": "psionic",
     "ship": {
       "unit": "hero"

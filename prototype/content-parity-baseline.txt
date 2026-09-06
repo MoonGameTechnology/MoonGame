@@ -20,9 +20,13 @@
 # про эту сущность.
 #
 # Снят 2026-08-27 (CONV-11) с `prototypeData.ts` против бандла `data/*.json` версии 0.1.9:
-# 274 строки. Пересчитан 2026-09-06 (CONV-15) против бандла 0.1.10 — 261 строка:
-# закрыты 13 расхождений, которые расхождениями чисел не были, а были пропущенными
-# в каноне полями (дефолт схемы подставлял 0 и молча менял правила).
+# 274 строки. Дальше сокращался только теми правками, что закрывают ДЕФЕКТ канона, а не
+# выбирают сторону в развилке CONV-12:
+#   · 2026-09-06 (CONV-15), бандл 0.1.10 — 274 → 261: тринадцать полей, которых в сыром
+#     `data/*.json` не было вовсе; дефолт схемы подставлял 0 и молча менял правила.
+#   · 2026-09-06 (CONV-17), бандл 0.1.11 — 261 → 210: пятьдесят одно `description`,
+#     где канон держал готовую прозу (29 из них — по-русски) вместо ключа локализации,
+#     хотя потребители зовут `t(description)`. Ключи уже существовали в обеих локалях.
 buildings/barracks field:buildTimeHours
 buildings/barracks field:cost
 buildings/barracks field:hp
@@ -87,66 +91,37 @@ buildings/starfort only-in-prototype
 buildings/tax_office only-in-prototype
 events/infect_planet only-in-canon
 events/void_anomaly only-in-canon
-factions/amber field:description
 factions/amber field:startingLoadout
 factions/amber field:traits
-factions/azure field:description
 factions/azure field:startingLoadout
 factions/azure field:traits
-factions/crimson field:description
 factions/crimson field:startingLoadout
 factions/crimson field:traits
 factions/swarm only-in-canon
 factions/vanguard only-in-canon
-factions/violet field:description
 factions/violet field:startingLoadout
 factions/violet field:traits
-heroAbilities/annihilate field:description
 heroAbilities/annihilate field:name
-heroAbilities/boarding_translocation field:description
 heroAbilities/boarding_translocation field:name
-heroAbilities/bulwark field:description
 heroAbilities/bulwark field:name
-heroAbilities/corridor field:description
 heroAbilities/corridor field:name
-heroAbilities/diplomatic_landing field:description
 heroAbilities/diplomatic_landing field:name
-heroAbilities/rally field:description
 heroAbilities/rally field:name
-heroAbilities/recall field:description
 heroAbilities/recall field:name
-heroAbilities/scan field:description
 heroAbilities/scan field:name
-heroFittings/ablative_plating field:description
-heroFittings/aegis_matrix field:description
-heroFittings/psi_amplifier field:description
-heroPassives/rally_beacon field:description
 heroPassives/rally_beacon field:name
-heroPassives/vanguard_impulse field:description
 heroPassives/vanguard_impulse field:name
-heroSkillTrees/corridor_open field:description
 heroSkillTrees/corridor_open field:name
-heroSkillTrees/corridor_sustained field:description
 heroSkillTrees/corridor_sustained field:name
-heroSkillTrees/neural_lace field:description
 heroSkillTrees/neural_lace field:name
-heroSkillTrees/overclocked_helm field:description
 heroSkillTrees/overclocked_helm field:name
-heroSkillTrees/psi_evasion field:description
 heroSkillTrees/psi_evasion field:name
-heroSkillTrees/psi_veil field:description
 heroSkillTrees/psi_veil field:name
-heroSkillTrees/psi_weak_points field:description
 heroSkillTrees/psi_weak_points field:name
-heroSkillTrees/void_attunement field:description
 heroSkillTrees/void_attunement field:name
-heroes/commander field:description
 heroes/commander field:name
-heroes/ravager field:description
 heroes/ravager field:name
-heroes/vanguard field:description
 heroes/vanguard field:name
-heroes/warden field:description
 heroes/warden field:name
 modes/duel only-in-canon
 modes/pve_waves only-in-canon
@@ -170,11 +145,8 @@ planetTypes/volcanic field:scoreValue
 resources/energy only-in-canon
 resources/food only-in-canon
 resources/microelectronics only-in-canon
-scientists/overseer field:description
 scientists/overseer field:name
-scientists/polymath field:description
 scientists/polymath field:name
-scientists/void_admiral field:description
 scientists/void_admiral field:name
 sectorKinds/asteroid field:allowedBuildings
 sectorKinds/asteroid field:appearance
@@ -199,20 +171,10 @@ sectors/ion_storm field:scoreValue
 sectors/nebula field:scoreValue
 sectors/solar_flare_zone field:scoreValue
 technologies/ace_programs field:conditions
-technologies/ace_programs field:description
 technologies/ai_stewardship field:conditions
-technologies/ai_stewardship field:description
 technologies/ai_stewardship field:prerequisites
-technologies/combined_arms field:description
-technologies/deep_survey field:description
-technologies/flight_decks field:description
-technologies/fortified_infrastructure field:description
 technologies/fortified_infrastructure field:unlocks
-technologies/garrison_networks field:description
-technologies/guidance_arrays field:description
-technologies/industrial_automation field:description
 technologies/industrial_automation field:unlocks
-technologies/logistics_command field:description
 technologies/meta_drill_combat only-in-prototype
 technologies/meta_drill_radar only-in-prototype
 technologies/meta_drill_speed only-in-prototype
@@ -220,21 +182,12 @@ technologies/meta_drill_veteran only-in-prototype
 technologies/meta_industry only-in-prototype
 technologies/meta_industry_2 only-in-prototype
 technologies/microelectronics_fabrication field:cost
-technologies/microelectronics_fabrication field:description
 technologies/microelectronics_fabrication field:unlocks
-technologies/orbital_logistics field:description
 technologies/orbital_logistics field:unlocks
 technologies/planetary_bastions field:conditions
-technologies/planetary_bastions field:description
 technologies/saturation_barrage field:conditions
-technologies/saturation_barrage field:description
 technologies/siege_doctrine field:cost
-technologies/siege_doctrine field:description
 technologies/siege_doctrine field:unlocks
-technologies/signal_corps field:description
-technologies/strike_vectors field:description
-technologies/void_armadas field:description
-technologies/warhead_miniaturization field:description
 units/cruiser field:cost
 units/cruiser field:faction
 units/cruiser field:stats
