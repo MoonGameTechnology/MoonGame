@@ -374,10 +374,10 @@ describe('fleetOps — fleet.split (peel ships off a fleet into a fresh one)', (
   });
 
   // SQ-1.1: splitting squadron-trait ships off a carrier creates a strike WING —
-  // it must carry homeBase (the carrier) + freePosition (the carrier's position),
-  // or squadronModule's free flight (squadron.strike/return) rejects with
-  // E_NOT_SQUADRON and the whole free-flight path is dead code.
-  it('a squadron split gets homeBase + freePosition (the strike wing contract)', () => {
+  // it must carry homeBase (the carrier), or squadronModule's free flight
+  // (squadron.strike/return) rejects with E_NOT_SQUADRON and the whole
+  // free-flight path is dead code.
+  it('a squadron split gets homeBase (the strike wing contract)', () => {
     const kernel = createKernel([fleetOpsModule]);
     const s = stateWith({
       players: [player('p1')],
@@ -393,8 +393,42 @@ describe('fleetOps — fleet.split (peel ships off a fleet into a fresh one)', (
     const newId = Object.keys(r.state.fleets).find((id) => id !== 'F1')!;
     const wing = r.state.fleets[newId]!;
     expect(wing.homeBase).toBe('F1'); // the carrier is the base
-    expect(wing.freePosition).toEqual({ x: 0, y: 0 }); // the carrier's position
-    expect(wing.freeMovement).toBeNull();
+    // ВТОРОЙ координаты у пристыкованного крыла нет — и не должно быть. `location`
+    // у него есть (без него split отказал бы с E_IN_TRANSIT), а `squadron.strike`
+    // берёт начало полёта как `freePosition ?? позиция location`. Выставленная здесь
+    // `freePosition` не обновляется при обычном ходе по лейну, и уведённое `fleet.move`
+    // крыло навсегда осталось бы для эскадрильной логики у точки вылета.
+    expect(wing.freePosition).toBeUndefined();
+    expect(wing.location).toBe('A'); // пристыковано: обычное место в графе линий
+  });
+
+  // Смешанный split — не крыло. Свободный полёт уносит ВЕСЬ флот, поэтому «хотя бы
+  // один истребитель» позволяло бы увести крейсер мимо графа линий, подцепив его к
+  // отделяемым эскадрильям. Крыло — это ровно squadron-стеки (`squadronTake`).
+  it('a MIXED split is not a wing — a regular ship can not smuggle itself off the lanes', () => {
+    const kernel = createKernel([fleetOpsModule]);
+    const s = stateWith({
+      players: [player('p1')],
+      planets: [planet('A', 'p1')],
+      fleets: [
+        fleet('F1', 'p1', 'A', [
+          ['cruiser', 3],
+          ['fighter_squadron', 2],
+        ]),
+      ],
+    });
+    const r = okApply(
+      kernel.applyAction(
+        s,
+        split('F1', [
+          { unit: 'cruiser', count: 1 },
+          { unit: 'fighter_squadron', count: 2 },
+        ]),
+        ctx,
+      ),
+    );
+    const newId = Object.keys(r.state.fleets).find((id) => id !== 'F1')!;
+    expect(r.state.fleets[newId]?.homeBase).toBeUndefined();
   });
 
   // The inverse: a NON-squadron split must NOT get homeBase — a regular fleet

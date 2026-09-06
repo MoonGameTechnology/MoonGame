@@ -914,6 +914,8 @@ export const en: Record<string, string> = {
   'sandbox.res.food': 'Food',
   'sandbox.res.metal': 'Metal',
   'sandbox.res.microelectronics': 'Microelectronics',
+  'sandbox.techs-all': 'Every technology is already unlocked',
+  'sandbox.techs-unlocked': 'Technologies unlocked: {n}',
   'sandbox.title': 'SANDBOX',
   'sandbox.tog.fog': 'Fog of war',
   'sandbox.tog.fog.hint': 'Turn off to reveal the whole map',
@@ -929,6 +931,7 @@ export const en: Record<string, string> = {
   'sandbox.tog.instant-cooldown.hint': 'Commander abilities are always ready',
   'sandbox.tog.speed': 'Speed control',
   'sandbox.tog.speed.hint': 'the in-match time bar — pause and speed multipliers (1× is real time)',
+  'sandbox.unlock-techs': 'Unlock every technology',
   'sandbox.toggles': 'Toggles',
   'sandbox.wars-ended': 'Wars ended: {n} — relations are neutral',
 

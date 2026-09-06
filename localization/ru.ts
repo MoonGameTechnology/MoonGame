@@ -913,6 +913,8 @@ export const ru: Record<string, string> = {
   'sandbox.res.food': 'Пища',
   'sandbox.res.metal': 'Металл',
   'sandbox.res.microelectronics': 'Микроэлектроника',
+  'sandbox.techs-all': 'Все технологии уже открыты',
+  'sandbox.techs-unlocked': 'Технологии открыты: {n}',
   'sandbox.title': 'ПЕСОЧНИЦА',
   'sandbox.tog.fog': 'Туман войны',
   'sandbox.tog.fog.hint': 'Выключите, чтобы открыть всю карту',
@@ -929,6 +931,7 @@ export const ru: Record<string, string> = {
   'sandbox.tog.speed': 'Управление скоростью',
   'sandbox.tog.speed.hint':
     'панель времени в матче — пауза и множители ускорения (1× — реальное время)',
+  'sandbox.unlock-techs': 'Открыть все технологии',
   'sandbox.toggles': 'Переключатели',
   'sandbox.wars-ended': 'Войны прекращены: {n} — отношения нейтральные',
 
