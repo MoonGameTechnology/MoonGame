@@ -129,7 +129,7 @@ export const ru: Record<string, string> = {
   'auth.need-mail': 'Введите почту',
   'auth.need-name': 'Введите имя командира',
   'auth.pass-mismatch': 'Пароли не совпадают',
-  'auth.recover.sent': 'Ссылка для сброса отправлена',
+  'auth.recover.sent': 'Проверьте почту',
   'auth.reset.bad-link': 'Ссылка недействительна или устарела',
   'auth.reset.done': 'Пароль изменён',
 
