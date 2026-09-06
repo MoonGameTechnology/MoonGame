@@ -109,10 +109,12 @@ describe('captureOnArrival module (map-roadmap.md M2.2)', () => {
     expect(events.some((e) => e.type === 'planet.captured')).toBe(true);
   });
 
-  it('ПУСТОЙ ТРЮМ НЕ БЕРЁТ ПРОВИНЦИЮ: прилёт перестал быть бесплатным (BAL-4)', () => {
-    // Замер BAL-5: карта делилась за 4 дня из 14 ровно потому, что присутствия корабля
-    // хватало для захвата — армия была нужна лишь для призовых миров, а остальная карта
-    // перекидывалась каруселью (88% переходов без выстрела).
+  it('ПУСТАЯ ПРОВИНЦИЯ БЕРЁТСЯ ЛЮБЫМ ФЛОТОМ (обращение BAL-4, решение владельца 2026-09-06)', () => {
+    // BAL-4 требовал живого десанта в трюме — «пустой трюм не берёт провинцию».
+    // Обращено владельцем: правило было контринтуитивным («мой флот стоит на пустой
+    // планете, а она всё ещё не моя — почему?»). Новое правило Iron-Order-стиль:
+    // ПУСТАЯ провинция (нет гарнизона) берётся прилётом любого флота, без десанта;
+    // провинция с ≥1 юнитом гарнизона — только штурмом.
     const b = planet('B', null, 30, { kind: 'planet' });
     const empty = fleet('F', 'p1', 'A', ['scout'], []);
     const a = planet('A', 'p1', 0, { kind: 'planet' });
@@ -122,11 +124,11 @@ describe('captureOnArrival module (map-roadmap.md M2.2)', () => {
     const state = baseState([a, b], [empty]);
     const dep = okApply(kernel.applyAction(state, move('F', 'B'), ctx(0)));
     const arr = okAdvance(kernel.advanceTo(dep.state, ctx(3 * HOUR)));
-    expect(arr.state.planets.B!.owner).toBeNull();
-    expect(arr.events.some((e) => e.type === 'planet.captured')).toBe(false);
+    expect(arr.state.planets.B!.owner).toBe('p1');
+    expect(arr.events.some((e) => e.type === 'planet.captured')).toBe(true);
   });
 
-  it('десант из НУЛЯ — не десант', () => {
+  it('десант из НУЛЯ — не десант (но пустая провинция всё равно берётся прилётом)', () => {
     const a = planet('A', 'p1', 0, { kind: 'planet' });
     const b = planet('B', null, 30, { kind: 'planet' });
     a.links = ['B'];
@@ -136,12 +138,10 @@ describe('captureOnArrival module (map-roadmap.md M2.2)', () => {
     const kernel = createKernel([movementModule, captureOnArrivalModule]);
     const dep = okApply(kernel.applyAction(baseState([a, b], [f]), move('F', 'B'), ctx(0)));
     const arr = okAdvance(kernel.advanceTo(dep.state, ctx(3 * HOUR)));
-    expect(arr.state.planets.B!.owner).toBeNull();
+    expect(arr.state.planets.B!.owner).toBe('p1');
   });
 
-  it('НЕИЗВЕСТНЫЙ юнит в трюме десантом не считается (fail-secure)', () => {
-    // Не знаем, что это, — значит не высаживаем. Иначе правило обходилось бы опечаткой
-    // в данных: любой незнакомый id в трюме возвращал бы бесплатный прилёт.
+  it('НЕИЗВЕСТНЫЙ юнит в трюме десантом не считается (fail-secure) — но пустая провинция берётся прилётом', () => {
     const a = planet('A', 'p1', 0, { kind: 'planet' });
     const b = planet('B', null, 30, { kind: 'planet' });
     a.links = ['B'];
@@ -151,10 +151,10 @@ describe('captureOnArrival module (map-roadmap.md M2.2)', () => {
     const kernel = createKernel([movementModule, captureOnArrivalModule]);
     const dep = okApply(kernel.applyAction(baseState([a, b], [f]), move('F', 'B'), ctx(0)));
     const arr = okAdvance(kernel.advanceTo(dep.state, ctx(3 * HOUR)));
-    expect(arr.state.planets.B!.owner).toBeNull();
+    expect(arr.state.planets.B!.owner).toBe('p1');
   });
 
-  it('КОРАБЛЬ в трюме десантом не считается — нужен именно наземный юнит', () => {
+  it('КОРАБЛЬ в трюме десантом не считается — но пустая провинция берётся прилётом', () => {
     const a = planet('A', 'p1', 0, { kind: 'planet' });
     const b = planet('B', null, 30, { kind: 'planet' });
     a.links = ['B'];
@@ -164,7 +164,7 @@ describe('captureOnArrival module (map-roadmap.md M2.2)', () => {
     const kernel = createKernel([movementModule, captureOnArrivalModule]);
     const dep = okApply(kernel.applyAction(baseState([a, b], [f]), move('F', 'B'), ctx(0)));
     const arr = okAdvance(kernel.advanceTo(dep.state, ctx(3 * HOUR)));
-    expect(arr.state.planets.B!.owner).toBeNull();
+    expect(arr.state.planets.B!.owner).toBe('p1');
   });
 
   it('does NOT capture an empty sector (kind not capturable)', () => {
