@@ -35,6 +35,12 @@ const data: GameData = parseGameData({
       domain: 'space',
       stats: { attack: 1, defense: 1, speed: 10, hp: 10 },
     },
+    fighter_squadron: {
+      faction: 'x',
+      domain: 'space',
+      traits: ['squadron'],
+      stats: { attack: 14, defense: 3, speed: 14, hp: 10, strikeRange: 180, fuel: 3, rearmRounds: 2 },
+    },
     hero: {
       faction: 'x',
       domain: 'space',
@@ -365,6 +371,44 @@ describe('fleetOps — fleet.split (peel ships off a fleet into a fresh one)', (
     expect(r.state.fleets[newId]?.units).toEqual([{ unit: 'cruiser', count: 1, hp: 40 }]);
     expect(r.state.fleets[newId]?.location).toBe('A');
     expect(r.events.map((e) => e.type)).toContain('fleet.split');
+  });
+
+  // SQ-1.1: splitting squadron-trait ships off a carrier creates a strike WING —
+  // it must carry homeBase (the carrier) + freePosition (the carrier's position),
+  // or squadronModule's free flight (squadron.strike/return) rejects with
+  // E_NOT_SQUADRON and the whole free-flight path is dead code.
+  it('a squadron split gets homeBase + freePosition (the strike wing contract)', () => {
+    const kernel = createKernel([fleetOpsModule]);
+    const s = stateWith({
+      players: [player('p1')],
+      planets: [planet('A', 'p1')],
+      fleets: [
+        fleet('F1', 'p1', 'A', [
+          ['cruiser', 1],
+          ['fighter_squadron', 2],
+        ]),
+      ],
+    });
+    const r = okApply(kernel.applyAction(s, split('F1', [{ unit: 'fighter_squadron', count: 2 }]), ctx));
+    const newId = Object.keys(r.state.fleets).find((id) => id !== 'F1')!;
+    const wing = r.state.fleets[newId]!;
+    expect(wing.homeBase).toBe('F1'); // the carrier is the base
+    expect(wing.freePosition).toEqual({ x: 0, y: 0 }); // the carrier's position
+    expect(wing.freeMovement).toBeNull();
+  });
+
+  // The inverse: a NON-squadron split must NOT get homeBase — a regular fleet
+  // stays lane-bound and squadron.strike must keep rejecting it.
+  it('a non-squadron split does NOT get homeBase (stays lane-bound)', () => {
+    const kernel = createKernel([fleetOpsModule]);
+    const s = stateWith({
+      players: [player('p1')],
+      planets: [planet('A', 'p1')],
+      fleets: [fleet('F1', 'p1', 'A', [['cruiser', 2]])],
+    });
+    const r = okApply(kernel.applyAction(s, split('F1', [{ unit: 'cruiser', count: 1 }]), ctx));
+    const newId = Object.keys(r.state.fleets).find((id) => id !== 'F1')!;
+    expect(r.state.fleets[newId]?.homeBase).toBeUndefined();
   });
 
   it('rejects splitting off a hero unit, more than the fleet has, all of it, or none', () => {

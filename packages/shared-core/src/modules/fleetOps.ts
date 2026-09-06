@@ -201,6 +201,18 @@ export const fleetOpsModule: GameModule = {
       fleet.units = fleet.units.filter((st) => st.count > 0);
       const seq = nextFleetSeq(h.state);
       const id = `fleet:${action.playerId}:${h.ctx.now}:${seq}`;
+      // SQ-1.1 (squadrons-roadmap): if the split-off ships are squadron-trait
+      // units, the new fleet is a strike WING — it gets homeBase (the carrier it
+      // was launched from) and a freePosition (the carrier's current position),
+      // so squadronModule can fly it freely in space (squadron.strike/return),
+      // not bound to the lane graph. Without homeBase, squadron.strike rejects
+      // with E_NOT_SQUADRON and the free flight is dead code.
+      const isSquadronWing = taken.some((st) =>
+        defHasTrait(h.ctx.data.units[st.unit], 'squadron'),
+      );
+      const basePos = fleet.location
+        ? h.state.planets[fleet.location]?.position
+        : (fleet.freePosition ?? null);
       h.state.fleets[id] = {
         id,
         owner: action.playerId,
@@ -211,6 +223,9 @@ export const fleetOpsModule: GameModule = {
         traits: [],
         battleId: null,
         ...(fleet.orbit ? { orbit: fleet.orbit } : {}),
+        ...(isSquadronWing
+          ? { homeBase: fleet.id, freePosition: basePos ? { ...basePos } : null, freeMovement: null }
+          : {}),
       };
       h.emit('fleet.split', {
         from: payload.fleetId,
