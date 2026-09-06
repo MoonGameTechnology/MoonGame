@@ -21,7 +21,7 @@
  *      the whole map) · instant construction · free construction · immortal home world ·
  *      frozen build queues (everyone) · time-speed controls (the in-match speedbar);
  *    - one-shot commands: instant commander cooldowns · +2000 of a resource ·
- *      end every war (back to neutral).
+ *      end every war (back to neutral) · unlock every technology.
  */
 import { setStance, getStance } from '../../packages/shared-core/src/index';
 import type { GameState } from '../../packages/shared-core/src/index';
@@ -114,6 +114,38 @@ export function sbReadyCommanders(s: GameState, me: string): boolean {
   return changed;
 }
 
+/**
+ * Открыть игроку ВСЕ технологии сразу — иначе проверка поздней механики стоит часа
+ * кликов по дереву исследований.
+ *
+ * Пишем прямо в `completed`, как и остальные команды песочницы: эффекты технологий
+ * ВЫВОДЯТСЯ из этого списка (бонусы, разблокировки построек — всё читает `completed`
+ * в момент применения), поэтому проигрывать `technology.complete` по одному незачем.
+ *
+ * Каталог приходит параметром, а не импортом: песочница не должна знать про
+ * `prototypeData` — она вырезается целиком одним файлом (см. шапку).
+ *
+ * Идущие исследования снимаем: технология уже открыта, и панель иначе показывала бы
+ * прогресс по завершённому. Запланированные `technology.complete` безвредны — их
+ * обработчик не найдёт свой слот и ничего не сделает.
+ */
+export function sbUnlockTechs(s: GameState, me: string, techIds: readonly string[]): string {
+  const p = s.players[me];
+  if (!p) return t('sandbox.no-player');
+  const tech = p.technologies ?? (p.technologies = { completed: [] });
+  const have = new Set(tech.completed);
+  let added = 0;
+  // Порядок стабильный (как обход каталога в `technologyModule`): состояние уходит
+  // в снапшот и в хэш, и перетасованный список читался бы как расхождение.
+  for (const id of [...techIds].sort()) {
+    if (have.has(id)) continue;
+    tech.completed.push(id);
+    added += 1;
+  }
+  tech.active = [];
+  return added > 0 ? t('sandbox.techs-unlocked', { n: added }) : t('sandbox.techs-all');
+}
+
 /** End every war the player is in — pairs at `war` return to `peace` (neutral). */
 export function sbEndWars(s: GameState, me: string): string {
   let ended = 0;
@@ -191,6 +223,9 @@ export interface SandboxHooks {
    *  outside `sandboxConfig` because it persists across matches (localStorage). */
   getSpeedControl: () => boolean;
   setSpeedControl: (on: boolean) => void;
+  /** Идентификаторы всех технологий каталога — для команды «открыть все». Хук, а не
+   *  импорт: песочница не знает про игровые данные (см. шапку файла). */
+  techIds: () => readonly string[];
 }
 
 const TOGGLES: Array<{ key: keyof SandboxConfig; label: string; hint: string }> = [
@@ -244,6 +279,7 @@ export function initSandbox(hooks: SandboxHooks): void {
       <div class="sbx-togs">${togs}${speedRow}</div>
       <div class="sbx-label">${t('sandbox.commands')}</div>
       <div class="sbx-cmds">${resBtns}</div>
+      <button class="sbx-cmd" data-sbx="techs">${t('sandbox.unlock-techs')}</button>
       <button class="sbx-cmd" data-sbx="peace">${t('sandbox.end-wars')}</button>
       <button class="sbx-close" data-sbx="close">${t('hub.emblem.close')}</button>
     </div>`;
@@ -274,6 +310,8 @@ export function initSandbox(hooks: SandboxHooks): void {
       show(false);
     } else if (act === 'res') {
       hooks.note('🧪 ' + sbAddResource(hooks.getState(), hooks.me(), tgt.dataset.k ?? ''));
+    } else if (act === 'techs') {
+      hooks.note('🧪 ' + sbUnlockTechs(hooks.getState(), hooks.me(), hooks.techIds()));
     } else if (act === 'peace') {
       hooks.note('🧪 ' + sbEndWars(hooks.getState(), hooks.me()));
     }

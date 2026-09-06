@@ -8867,6 +8867,7 @@ if (!__PLAYER_BUILD__) {
     note: (msg) => note(msg),
     getSpeedControl: () => devSpeedControl,
     setSpeedControl: (on) => setDevSpeedControl(on),
+    techIds: () => Object.keys(data.technologies),
   });
   initTestMode({
     startScenario: (state, resumeSpeed) => {

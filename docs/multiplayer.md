@@ -344,6 +344,27 @@ logs in (or auto-registers a fresh login — registration IS the first login), s
 only the session JWT per server, and re-fetches a fresh join token on every reconnect.
 Unset ⇒ the zero-setup nick+ticket flow below stays as-is.
 
+The per-IP attempt budget is sized for a whole lobby arriving from ONE address (shared
+Wi-Fi, carrier NAT): a first-time player costs TWO requests — the client tries login first,
+because the uniform 401 is what tells it to register, and there is deliberately no
+"does this login exist" oracle — so ten seats is twenty requests. The default is 40 per
+minute; `AUTH_RATE_MAX` / `AUTH_RATE_WINDOW_MS` retune it if a proxy collapses everyone
+onto one source address. (It used to be 10, which stopped the fifth new player of a
+ten-browser run — measured, not theorised.)
+
+### Admin console — the roster and the kick (ADM-1)
+
+A seat becomes permanent the moment its player reaches the map (`seat.confirm`), and
+`seat.release` refuses to break that promise. That is right for a player and wrong for
+whoever is running a live session with real people in it, so the power to undo it is
+named and narrow. Set `ADMIN_LOGINS=alice,bob` (alongside `AUTH_JWT_SECRET`) and the host
+serves a SEPARATE admin client at `/admin`: sign in with a normal account, see who holds
+each seat (callsign, confirmed, online), and take a seat back. The kicked player's socket
+closes with an `E_KICKED` frame instead of a silent drop, their empire stays on the map
+under the substitute AI, and the freed chair is claimable again — a newcomer who takes it
+inherits the empire. Every kick is logged with the admin's login. With `ADMIN_LOGINS`
+unset, none of those routes and no `/admin` page exist at all.
+
 **Known constraints before this is "real" multiplayer** (see limitations below): auth and the
 action gate are opt-in (env-switched, default off for dev), identity is login+password (no
 OIDC), and the scheduler is single-process (pg-boss v2 is the multi-process step).

@@ -113,9 +113,47 @@ function parseEmail(v: unknown): string | null | undefined {
   return v;
 }
 
-const RATE_MAX = 10; // attempts per IP per window (register+login share the budget)
+/**
+ * Per-IP attempt budget for the auth routes (register/login/recover/reset SHARE it).
+ *
+ * The number is derived, not picked: it has to fit ONE lobby arriving at once from ONE
+ * address. A whole match is 10 seats; a first-time player costs TWO requests (login
+ * first — the uniform 401 is what tells the client to register, there is deliberately
+ * no "does this login exist" oracle), so a full lobby behind a single NAT is 20; double
+ * it for mistyped passwords and reloads. Below that the brake stops the honest lobby
+ * instead of the attacker: at the previous value of 10 the fifth player to register
+ * from a shared address got a 429 (measured — ten browsers, 0.7 s apart, 4 got in).
+ *
+ * It remains a real brake: every attempt costs one scrypt derivation, failures are
+ * uniform, and 40/min against an 8-char minimum is nowhere near a feasible online
+ * guess. Deployments that terminate at a proxy for many players (or want it tighter)
+ * override both numbers — see `AUTH_RATE_MAX` / `AUTH_RATE_WINDOW_MS` in the hosts.
+ */
+const RATE_MAX = 40;
 const RATE_WINDOW_MS = 60_000;
 const RATE_MAX_IPS = 10_000; // bounded tracker: oldest window evicted first
+
+/**
+ * Auth rate limit from the environment, for hosts that want to retune it (both do).
+ *
+ * Two knobs, both optional: `AUTH_RATE_MAX` (attempts per window) and
+ * `AUTH_RATE_WINDOW_MS`. An absent, unparseable or non-positive value leaves the
+ * default in place rather than disabling the brake — a typo in an env var must never
+ * be the thing that removes an online-guessing limit (invariant #4, fail-secure).
+ * Returns a partial `AuthApiDeps` slice so a host can spread it into the call.
+ */
+export function authRateFromEnv(env: Record<string, string | undefined>): {
+  rateMax?: number;
+  rateWindowMs?: number;
+} {
+  const positive = (raw: string | undefined): number | undefined => {
+    const n = Number(raw);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : undefined;
+  };
+  const rateMax = positive(env.AUTH_RATE_MAX);
+  const rateWindowMs = positive(env.AUTH_RATE_WINDOW_MS);
+  return { ...(rateMax !== undefined ? { rateMax } : {}), ...(rateWindowMs !== undefined ? { rateWindowMs } : {}) };
+}
 
 interface Creds {
   login: string;

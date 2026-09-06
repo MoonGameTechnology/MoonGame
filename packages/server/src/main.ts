@@ -25,7 +25,9 @@ import {
   type MatchApiDeps,
   type CreatedMatch,
 } from './matchApi';
-import { registerAuthApi, liveSession } from './authApi';
+import { registerAuthApi, liveSession, authRateFromEnv } from './authApi';
+import { registerAdminApi, adminLoginsFromEnv } from './adminApi';
+import { kickSeat } from './seatKick';
 import { registerCorpApi } from './corpApi';
 import { MS_PER_DAY, type PlayerReward } from '@void/shared-core';
 import { registerFriendApi } from './friendApi';
@@ -368,10 +370,18 @@ const matchApi: MatchApiDeps = {
       if (room) {
         await room.submitServerAction(
           claim.playerId,
-          seatClaimAction(matchId, claim.playerId, room.state.time, {
-            ...claim.claim,
-            ...(preferredScientists !== undefined ? { scientists: preferredScientists } : {}),
-          }),
+          seatClaimAction(
+            matchId,
+            claim.playerId,
+            room.state.time,
+            {
+              ...claim.claim,
+              ...(preferredScientists !== undefined ? { scientists: preferredScientists } : {}),
+            },
+            // Поколение кресла: без него заявка нового владельца дедуплится квитанцией
+            // предыдущего и молча не применяется (см. joinSeat.ts).
+            room.state.players[claim.playerId]?.freedAt,
+          ),
         );
         await stores.store.save(snapshotOf(room));
       }
@@ -418,6 +428,10 @@ const medalService = new MedalService({
 // never empty — when one fills or ends, seed another. The open count is read from the
 // durable store, so a restart reconciles instead of over-creating. OPEN_MATCHES=0 off.
 const OPEN_MATCHES = Number(process.env.OPEN_MATCHES ?? '3') || 0;
+// ADM-1: logins that may command a match roster (`ADMIN_LOGINS=alice,bob`). Authority
+// sits on the ACCOUNT, not on a shared token: the log names who kicked whom, and a
+// password reset revokes it along with the session. Empty ⇒ no admin routes at all.
+const ADMIN_LOGINS = adminLoginsFromEnv(process.env.ADMIN_LOGINS);
 const MATCH_CAPACITY = 2; // createDevMatch seats green/red — a match is full at 2
 const keeper =
   OPEN_MATCHES > 0
@@ -477,6 +491,10 @@ const server = createMultiplayerServer({
         registerAuthApi(scope, {
           users: stores.userStore,
           signSession,
+          // Retunable per deployment (`AUTH_RATE_MAX` / `AUTH_RATE_WINDOW_MS`): behind a
+          // proxy every player shares one source address, so the default budget — sized
+          // for one lobby — is the thing a bigger deployment raises first.
+          ...authRateFromEnv(process.env),
           // Recovery (SE-1.x): mounts /auth/recover + /auth/reset only when RESET_BASE_URL
           // is set. No mailer wired here → the default logs the reset link (a real SMTP/API
           // transport is a `sendMail` the deployment injects when it has one).
@@ -547,6 +565,56 @@ const server = createMultiplayerServer({
             corps: stores.corpStore,
             identify,
           });
+          // ADM-1 — the operator's roster + kick, the SAME module the playtest host
+          // mounts. Authority is a login in ADMIN_LOGINS; empty ⇒ nothing is mounted
+          // at all (no admins named is an absent surface, not an open door).
+          registerAdminApi(scope, {
+            identify,
+            admins: ADMIN_LOGINS,
+            roster: async (matchId) => {
+              // Load-on-demand: a hibernated match still has a roster to command —
+              // an admin asking about it is exactly a reason to wake it.
+              const room = registry.get(matchId) ?? (await registry.resolve?.(matchId));
+              if (!room) return null;
+              const bySeat = new Map(
+                (await stores.accountStore.seatedNicks(matchId)).map(
+                  (s) => [s.playerId, s.nick] as const,
+                ),
+              );
+              const online = new Set(room.connectedPlayers());
+              const ended = room.state.match.status === 'ended';
+              const occupied = await stores.accountStore.occupiedSeats(matchId);
+              return {
+                matchId,
+                day: Math.floor(room.state.time / MS_PER_DAY),
+                ended,
+                // No entry window on this host (SES-2.3 lives on the playtest one):
+                // a newcomer can take a freed chair while the match runs and has room.
+                entryOpen: !ended && occupied < MATCH_CAPACITY,
+                seats: Object.values(room.state.players).map((p) => ({
+                  playerId: p.id,
+                  name: p.name,
+                  faction: p.faction,
+                  nick: bySeat.get(p.id) ?? null,
+                  seated: p.seated === true,
+                  connected: online.has(p.id),
+                })),
+              };
+            },
+            kick: async (matchId, nick) => {
+              const room = registry.get(matchId) ?? (await registry.resolve?.(matchId));
+              const out = await kickSeat(
+                { matchId, room, accounts: stores.accountStore },
+                nick,
+              );
+              // The freed chair has to survive a restart: without this the room could
+              // hibernate (or the process die) with the kick living only in memory,
+              // and the player would come back to a seat the store no longer gives
+              // them and the state still holds.
+              if (out.ok && room) await stores.store.save(snapshotOf(room));
+              return out;
+            },
+          });
           // Web Push subscriptions (ONB-5) — session-gated like the rest; the /push/key
           // route itself is only mounted when VAPID is configured.
           registerPushApi(scope, {
@@ -615,6 +683,9 @@ process.stdout.write(
           `           (the session's login is your nick; the seat is claimed for YOUR account)`,
           `  corps  : GET/POST ${httpUrl}/corps  ·  POST ${httpUrl}/corps/:id/<intent>  (session required)`,
           `  ava    : GET ${httpUrl}/ava/pool  ·  POST ${httpUrl}/ava/ready/{corp,player}  ·  POST ${httpUrl}/ava/challenge  (session required)`,
+          ADMIN_LOGINS.size > 0
+            ? `  admin  : GET ${httpUrl}/admin/matches/:id/roster  ·  POST …/kick {nick}  (commanded by: ${[...ADMIN_LOGINS].join(', ')})`
+            : '  admin  : off — set ADMIN_LOGINS=<login,...> to command a match roster (kick)',
         ]
       : [`  dev    : ${wsBase}/dev?player=green  ·  ${wsBase}/dev?player=red`]),
     host === '0.0.0.0'

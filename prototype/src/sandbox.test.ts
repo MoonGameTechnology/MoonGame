@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { createInitialState, setStance, getStance } from '../../packages/shared-core/src/index';
 import type { GameState, Hero, Planet } from '../../packages/shared-core/src/index';
+import { t } from '../../localization/runtime';
 import {
   sandboxConfig,
   resetSandboxConfig,
@@ -8,6 +9,7 @@ import {
   sbAddResource,
   sbReadyCommanders,
   sbEndWars,
+  sbUnlockTechs,
   enforceSandbox,
   isBuildAction,
 } from './sandbox';
@@ -51,6 +53,29 @@ describe('sandbox — one-shot commands', () => {
     expect(sbReadyCommanders(s, 'p1')).toBe(true); // cleared a pending ability
     expect(s.heroes.h1!.cooldowns).toEqual({ respawn: 9000 }); // ability cleared, death timer kept
     expect(s.heroes.h2!.cooldowns).toEqual({ strike: 5000 }); // the rival's hero is untouched
+  });
+
+  it('sbUnlockTechs открывает весь каталог разом и не трогает соседа', () => {
+    const s = base();
+    s.players.p1!.technologies = { completed: ['mining'], active: [{ technology: 'lasers', startedAt: 0, completesAt: 9_000 }] };
+    const msg = sbUnlockTechs(s, 'p1', ['lasers', 'mining', 'shields']);
+    // Уже открытая не дублируется, порядок стабильный (сортировка каталога).
+    expect(s.players.p1!.technologies!.completed).toEqual(['mining', 'lasers', 'shields']);
+    // Идущее исследование снято: технология уже открыта, прогресс по ней — вранье.
+    expect(s.players.p1!.technologies!.active).toEqual([]);
+    expect(msg).toContain('2'); // добавлены две, а не три
+    expect(s.players.p2!.technologies).toBeUndefined();
+  });
+
+  it('sbUnlockTechs на пустом состоянии заводит список, на повторе честно говорит «уже всё»', () => {
+    const s = base();
+    sbUnlockTechs(s, 'p1', ['shields', 'lasers']);
+    expect(s.players.p1!.technologies!.completed).toEqual(['lasers', 'shields']);
+    // Сверяем с ключом, а не с текстом: локаль в тестах не русская, и литерал
+    // сломался бы от смены языка, а не от смены поведения.
+    const again = sbUnlockTechs(s, 'p1', ['shields', 'lasers']);
+    expect(again).toBe(t('sandbox.techs-all'));
+    expect(s.players.p1!.technologies!.completed).toEqual(['lasers', 'shields']); // без дублей
   });
 
   it('sbEndWars returns every war I am in to neutral (peace), including the FFA default', () => {

@@ -77,7 +77,14 @@ export {
   type SessionTokenResult,
   type VerifyKey,
 } from './auth';
-export { registerAuthApi, liveSession, pwFingerprint, type AuthApiDeps, type Mailer } from './authApi';
+export {
+  registerAuthApi,
+  liveSession,
+  pwFingerprint,
+  authRateFromEnv,
+  type AuthApiDeps,
+  type Mailer,
+} from './authApi';
 // FRIENDS-1 — roster API + rules, exported so the playtest host mounts the SAME slice
 // as production (one implementation of the social graph, not two).
 export {
@@ -97,6 +104,18 @@ export {
   type BoardView,
   type LeaderboardApiDeps,
 } from './leaderboardApi';
+// ADM-1 — админский слайс (состав матча + кик), экспортируется по той же причине,
+// что и остальные: оба хоста монтируют ОДИН модуль, а не два похожих.
+export {
+  registerAdminApi,
+  adminLoginsFromEnv,
+  isAdmin,
+  type AdminApiDeps,
+  type AdminKickRefusal,
+  type AdminRoster,
+  type AdminSeatRow,
+} from './adminApi';
+export { kickSeat, seatKickAction, type KickSeatDeps } from './seatKick';
 export {
   FriendService,
   FRIEND_LIMIT,

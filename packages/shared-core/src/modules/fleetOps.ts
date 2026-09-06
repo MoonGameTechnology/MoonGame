@@ -201,18 +201,27 @@ export const fleetOpsModule: GameModule = {
       fleet.units = fleet.units.filter((st) => st.count > 0);
       const seq = nextFleetSeq(h.state);
       const id = `fleet:${action.playerId}:${h.ctx.now}:${seq}`;
-      // SQ-1.1 (squadrons-roadmap): if the split-off ships are squadron-trait
-      // units, the new fleet is a strike WING — it gets homeBase (the carrier it
-      // was launched from) and a freePosition (the carrier's current position),
-      // so squadronModule can fly it freely in space (squadron.strike/return),
-      // not bound to the lane graph. Without homeBase, squadron.strike rejects
-      // with E_NOT_SQUADRON and the free flight is dead code.
-      const isSquadronWing = taken.some((st) =>
+      // SQ-1.1 (squadrons-roadmap): a split of squadron-trait ships is a strike
+      // WING — it gets `homeBase` (the carrier it launched from), and that is what
+      // lets squadronModule fly it off the lane graph (`squadron.strike`/`return`).
+      // Without it `squadron.strike` rejects with E_NOT_SQUADRON and the whole
+      // free-flight path is unreachable.
+      //
+      // ВСЕ отделяемые корабли обязаны быть эскадрильями, а не хотя бы один. Крыло —
+      // это ровно squadron-стеки (`squadronTake` в `state/squadron.ts` так его и
+      // определяет), и «хотя бы один» позволяло увести крейсер мимо графа линий,
+      // подцепив его к отделяемым истребителям: свободный полёт уносит ВЕСЬ флот.
+      //
+      // Позицию здесь НЕ выставляем намеренно. `squadron.strike` берёт начало полёта
+      // как `freePosition ?? позиция location` — у пристыкованного крыла `location`
+      // есть (иначе split отказал бы выше с E_IN_TRANSIT), так что вторая координата
+      // не нужна. А выставленная — вредна: она не мутирует при обычном ходе по лейну,
+      // и крыло, которое увели `fleet.move`, для всей эскадрильной логики
+      // (`fleetWorldPos` предпочитает `freePosition`) навсегда осталось бы у точки
+      // вылета — с неверным временем полёта и неверной проверкой радиуса ПВО.
+      const isSquadronWing = taken.every((st) =>
         defHasTrait(h.ctx.data.units[st.unit], 'squadron'),
       );
-      const basePos = fleet.location
-        ? h.state.planets[fleet.location]?.position
-        : (fleet.freePosition ?? null);
       h.state.fleets[id] = {
         id,
         owner: action.playerId,
@@ -223,9 +232,7 @@ export const fleetOpsModule: GameModule = {
         traits: [],
         battleId: null,
         ...(fleet.orbit ? { orbit: fleet.orbit } : {}),
-        ...(isSquadronWing
-          ? { homeBase: fleet.id, freePosition: basePos ? { ...basePos } : null, freeMovement: null }
-          : {}),
+        ...(isSquadronWing ? { homeBase: fleet.id } : {}),
       };
       h.emit('fleet.split', {
         from: payload.fleetId,

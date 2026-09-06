@@ -72,6 +72,15 @@ export interface AccountStore {
    *  lock recovery runbook. A nick holding no seat, or already unbound, is a
    *  no-op (idempotent; nothing to fail on twice). */
   resetSeatTicket(room: string, nick: string): Promise<void>;
+  /** ADM-1: unbind (room, nick) — the seat returns to the pool and its ticket goes
+   *  with it, so the next player to take that chair mints a fresh lock. This is the
+   *  ADMIN kick's store half; there is deliberately no self-service route to it (a
+   *  player must not be able to evict anyone, themselves included — the seat is the
+   *  identity, and releasing your own would hand it to the next comer mid-match).
+   *  Returns the seat that was freed, or null when the nick held none — so the
+   *  caller can tell "kicked" from "already gone" instead of reporting success for
+   *  a stale roster. Idempotent: a second call on the same nick returns null. */
+  releaseSeat(room: string, nick: string): Promise<PlayerId | null>;
   /** Read-only: how many seats are currently claimed in a room (occupied count), for
    *  the browser's "players X/Y" status line. */
   occupiedSeats(room: string): Promise<number>;

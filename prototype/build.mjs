@@ -23,6 +23,22 @@ const bundle = async (playerBuild) => {
   return res.outputFiles[0].text;
 };
 
+/** Пульт администратора (ADM-1) — свой вход, без `__PLAYER_BUILD__`: этой странице
+ *  нечего вырезать, она и так не знает про игру ничего. */
+const bundleAdmin = async () => {
+  const res = await build({
+    entryPoints: ['prototype/src/admin.ts'],
+    bundle: true,
+    format: 'iife',
+    platform: 'browser',
+    target: 'es2020',
+    minify: true,
+    legalComments: 'none',
+    write: false,
+  });
+  return res.outputFiles[0].text;
+};
+
 // --- Tactical command-console chrome (DEFCON vibe): vector/wireframe, neon
 // --- glow, monospace, minimalist HUD on near-black. Responsive. -------------
 const css = `
@@ -3077,6 +3093,66 @@ const page = (js) => `<!doctype html>
 // JS is already compiled out by the define, so no handler is left pointing at a hole.
 const stripDevMarkup = (html) => html.replace(/<!--dev-only-->[\s\S]*?<!--\/dev-only-->/g, '');
 
+// --- ADM-1: пульт администратора — ОТДЕЛЬНАЯ страница -----------------------
+// Отдельный артефакт, а не вкладка в игре: то, что раздаётся игрокам, не должно
+// возить в себе админскую разметку. Оформление намеренно спартанское — это
+// инструмент того, кто ведёт плейтест, а не витрина.
+const adminCss = `
+:root{color-scheme:dark;--ink:#bfeee6;--dim:#5f8f8c;--cyan:#35d6e6;--line:#0e3b40;--red:#ff5a4d;}
+body{margin:0;padding:18px;background:#02080e;color:var(--ink);
+  font:13px/1.5 ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;}
+h1{font-size:16px;letter-spacing:2px;margin:0;color:var(--cyan);}
+p.sub{margin:2px 0 16px;color:var(--dim);}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:10px;}
+input,select,button{font:inherit;color:var(--ink);background:#041016;
+  border:1px solid var(--line);border-radius:2px;padding:6px 9px;}
+input:focus,select:focus{outline:1px solid var(--cyan);}
+button{cursor:pointer;border-color:var(--cyan);}
+button:hover{background:#062028;}
+button.kick{border-color:var(--red);color:var(--red);}
+button.kick:hover{background:#2a0d0b;}
+#a-status{min-height:20px;color:var(--dim);}
+#a-meta{color:var(--dim);margin:10px 0;}
+table{border-collapse:collapse;width:100%;max-width:760px;}
+th,td{text-align:left;padding:6px 10px;border-bottom:1px solid var(--line);}
+th{color:var(--dim);font-weight:normal;text-transform:uppercase;letter-spacing:1px;}
+`;
+const adminPage = (js) => `<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#061318"/><rect x="9" y="9" width="14" height="14" rx="2" transform="rotate(45 16 16)" fill="none" stroke="#35d6e6" stroke-width="2.5"/></svg>')}">
+<title>Void Dominion — Admin</title><style>${adminCss}</style></head>
+<body>
+<h1 data-i18n="admin.title"></h1>
+<p class="sub" data-i18n="admin.subtitle"></p>
+<!-- Учётные поля живут в <form>: иначе браузер не считает их парой «логин+пароль»,
+     менеджер паролей их не предлагает, а Enter в поле пароля ничего не отправляет. -->
+<form id="a-gate">
+  <div class="row">
+    <label for="a-server" data-i18n="admin.server"></label>
+    <input id="a-server" data-i18n-ph="admin.server.ph" autocomplete="off">
+  </div>
+  <div class="row">
+    <input id="a-login" data-i18n-ph="admin.login.ph" autocomplete="username">
+    <input id="a-pass" type="password" data-i18n-ph="admin.pass.ph" autocomplete="current-password">
+    <button id="a-signin" type="submit" data-i18n="admin.signin"></button>
+  </div>
+</form>
+<div id="a-panel" style="display:none">
+  <div class="row">
+    <span id="a-who"></span>
+    <label for="a-match" data-i18n="admin.match"></label>
+    <select id="a-match"></select>
+    <button id="a-refresh" type="button" data-i18n="admin.refresh"></button>
+    <button id="a-signout" type="button" data-i18n="admin.signout"></button>
+  </div>
+  <div id="a-meta"></div>
+  <div id="a-roster"></div>
+</div>
+<div id="a-status"></div>
+<script>${js}</script>
+</body></html>`;
+
 mkdirSync('prototype/dist', { recursive: true });
 const devHtml = page(await bundle(false));
 const playerHtml = stripDevMarkup(page(await bundle(true)));
@@ -3089,4 +3165,9 @@ console.log(
   'wrote prototype/dist/void-dominion-player.html (' +
     (playerHtml.length / 1024).toFixed(0) +
     ' KB)',
+);
+const adminHtml = adminPage(await bundleAdmin());
+writeFileSync('prototype/dist/void-dominion-admin.html', adminHtml);
+console.log(
+  'wrote prototype/dist/void-dominion-admin.html (' + (adminHtml.length / 1024).toFixed(0) + ' KB)',
 );

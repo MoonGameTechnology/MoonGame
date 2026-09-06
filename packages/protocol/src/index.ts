@@ -49,7 +49,11 @@ export type ServerErrorCode =
   | 'E_PING_RATE'
   | 'E_CHAT_RATE'
   | 'E_CHAT_TARGET'
-  | 'E_CHAT_TEXT';
+  | 'E_CHAT_TEXT'
+  // ADM-1: администратор снял игрока с места. Приезжает ОТДЕЛЬНЫМ кодом, а не молчаливым
+  // закрытием сокета: иначе клиент показал бы «связь потеряна» и вечно переподключался бы
+  // в кресло, которого у него больше нет.
+  | 'E_KICKED';
 
 /**
  * Ally ping — a tactical marker one player drops to propose a plan to allies

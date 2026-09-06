@@ -29,6 +29,7 @@ import {
   type ClientPingPlaceMessage,
   type LobbyInfo,
   type Ping,
+  type ServerErrorCode,
   type ServerMessage,
   type ServerRejectionMessage,
 } from './protocol';
@@ -791,6 +792,44 @@ export class MatchRoom {
     // Broadcast on a waitForPlayers freeze, or on any pre-start manual-start roster
     // change, so the remaining lobby screens update.
     if (this.syncLobbyClock() || (this.manualStart && !this.started)) this.broadcastState([]);
+  }
+
+  /** Места, за которыми ПРЯМО СЕЙЧАС открыт хотя бы один сокет (ADM-1).
+   *  Админскому составу нужно отличать «ушёл» от «сидит и мешает»: это разные
+   *  поводы для кика, и по состоянию мира их не различить. */
+  connectedPlayers(): PlayerId[] {
+    return [...this.peers.keys()];
+  }
+
+  /**
+   * ADM-1: снять игрока с места — закрыть ЕГО сокеты, назвав причину.
+   *
+   * Кик состоит из трёх шагов, и этот — последний: ядро уже освободило кресло, стор уже
+   * отвязал позывной, а клиент об этом ещё не знает и продолжает играть за сторону,
+   * которая ему больше не принадлежит. Молча оборвать связь нельзя: клиент прочитал бы
+   * это как «сеть моргнула» и переподключался бы в цикле. Поэтому сперва кадр `error`
+   * с кодом, потом закрытие.
+   *
+   * Отсоединение — НЕ выход из партии: место в мире остаётся, за ним доигрывает ИИ, и
+   * следующий вошедший садится в это кресло. Уборку `peers` делает обычный путь
+   * `removePeer` по событию закрытия сокета — дублировать её здесь значило бы посчитать
+   * `leave` дважды в метриках.
+   *
+   * Возвращает число закрытых соединений (0 — игрока сейчас нет на связи; кик от этого
+   * не перестаёт быть выполненным, он про кресло, а не про сокет).
+   */
+  evict(playerId: PlayerId, code: ServerErrorCode = 'E_KICKED'): number {
+    const playerPeers = this.peers.get(playerId);
+    if (!playerPeers) return 0;
+    let closed = 0;
+    for (const peer of [...playerPeers]) {
+      this.send(peer, { type: 'error', matchId: this.id, code });
+      // 1000 «normal closure»: это не сбой связи, и клиенту не за что цепляться
+      // авто-переподключением — причину он уже получил кадром выше.
+      peer.close?.(1000, code);
+      closed += 1;
+    }
+    return closed;
   }
 
   async receive(

@@ -231,3 +231,63 @@ describe('seat.confirm / seat.release (правила 6–7)', () => {
     expect(code(kernel.applyAction(world(), release(), ctx()))).toBe('E_SEAT_UNCLAIMED');
   });
 });
+
+describe('seat.kick (правило 8) — власть администратора', () => {
+  const confirm = (playerId = 'p1'): Action => ({
+    id: `k:${playerId}`,
+    type: 'seat.confirm',
+    playerId,
+    payload: {},
+    issuedAt: 0,
+  });
+  const kick = (playerId = 'p1'): Action => ({
+    id: `x:${playerId}`,
+    type: 'seat.kick',
+    playerId,
+    payload: {},
+    issuedAt: 0,
+  });
+  const claimed = (): GameState => okState(apply(world(), { faction: 'crimson' }));
+  const seated = (): GameState => okState(kernel.applyAction(claimed(), confirm(), ctx()));
+
+  // Ровно то, чем кик отличается от `seat.release`: закреплённое место снимается.
+  it('снимает ЗАКРЕПЛЁННОЕ место — там, где release отказывает', () => {
+    const r = kernel.applyAction(seated(), kick(), ctx());
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.state.players['p1']?.seated).toBeUndefined();
+      expect(r.state.players['p1']?.claimedAt).toBeUndefined();
+      expect(r.state.players['p1']?.scientists).toBeUndefined();
+    }
+  });
+
+  it('освобождённое кресло снова заявляется — следующий садится в него как в свободное', () => {
+    const freed = okState(kernel.applyAction(seated(), kick(), ctx()));
+    expect(apply(freed, { faction: 'azure' }).ok).toBe(true);
+  });
+
+  // Империя остаётся на карте: снимается человек с кресла, а не сторона из партии.
+  it('сторона остаётся в состоянии — снимается только человек', () => {
+    const freed = okState(kernel.applyAction(seated(), kick(), ctx()));
+    expect(freed.players['p1']).toBeDefined();
+  });
+
+  it('событие СВОЁ, адресовано снятому — по логу видно, что это власть, а не окно', () => {
+    const r = kernel.applyAction(seated(), kick(), ctx());
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      const kicked = r.events.filter((e) => e.type === 'seat.kicked');
+      expect(kicked).toHaveLength(1);
+      expect(kicked[0]?.payload).toEqual({ playerId: 'p1' });
+      expect(r.events.some((e) => e.type === 'seat.released')).toBe(false);
+    }
+  });
+
+  it('пустое кресло выкинуть нельзя — у администратора устаревший состав', () => {
+    expect(code(kernel.applyAction(world(), kick(), ctx()))).toBe('E_SEAT_UNCLAIMED');
+  });
+
+  it('неизвестное место — отказ', () => {
+    expect(code(kernel.applyAction(seated(), kick('p9'), ctx()))).toBe('E_UNKNOWN_PLAYER');
+  });
+});

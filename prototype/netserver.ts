@@ -44,6 +44,10 @@ import {
   PostgresUserStore,
   migrate,
   registerAuthApi,
+  authRateFromEnv,
+  registerAdminApi,
+  adminLoginsFromEnv,
+  kickSeat,
   registerFriendApi,
   registerLeaderboardApi,
   FriendService,
@@ -156,6 +160,9 @@ const playerHtmlPath = 'prototype/dist/void-dominion-player.html';
 const devHtml = existsSync(devHtmlPath) ? readFileSync(devHtmlPath, 'utf8') : undefined;
 const playerHtml = existsSync(playerHtmlPath) ? readFileSync(playerHtmlPath, 'utf8') : undefined;
 const indexHtml = playerHtml ?? devHtml;
+// ADM-1: пульт администратора — отдельный артефакт того же `pnpm run prototype`.
+const adminHtmlPath = 'prototype/dist/void-dominion-admin.html';
+const adminHtml = existsSync(adminHtmlPath) ? readFileSync(adminHtmlPath, 'utf8') : undefined;
 
 // Every non-internal IPv4 this host owns (the candidates other devices could dial).
 function ipv4s(): string[] {
@@ -239,6 +246,10 @@ async function creditMatchXp(
 // One env, both worlds; the client self-configures via GET /auth/status.
 const authCfg = configFromEnv(process.env);
 const AUTH = authCfg.auth !== undefined;
+// ADM-1: кто может командовать составом партии (`ADMIN_LOGINS=alice,bob`). Полномочие —
+// на УЧЁТКЕ, а не общий токен: в логе видно, кто снял игрока, а смена пароля отзывает
+// доступ вместе с сессией. Пусто ⇒ админских маршрутов на хосте нет вообще.
+const ADMIN_LOGINS = adminLoginsFromEnv(process.env.ADMIN_LOGINS);
 // Same guard as packages/server/src/main.ts: auth without an Origin allowlist leaves
 // the WS handshake open to cross-site hijack (CSWSH) — warn loudly, don't silently run.
 if (AUTH && !authCfg.allowedOrigins) {
@@ -845,6 +856,10 @@ const server = createMultiplayerServer({
       registerAuthApi(app, {
         users: userStore,
         signSession: authCfg.signSession!,
+        // Плейтест на десять человек часто приходит с ОДНОГО адреса (общий Wi-Fi, NAT
+        // оператора), а первый вход стоит двух запросов — поэтому потолок задаётся
+        // окружением, а не только дефолтом (`AUTH_RATE_MAX`/`AUTH_RATE_WINDOW_MS`).
+        ...authRateFromEnv(process.env),
         // Recovery (/auth/recover + /auth/reset) mounts only when RESET_BASE_URL points the
         // emailed link at this deployment's origin. No mailer wired → the default logs the
         // link to stderr (a playtest admin can read it; a real transport is a later env).
@@ -881,6 +896,37 @@ const server = createMultiplayerServer({
         commanders: commanderStore,
         users: userStore,
         identify: identifySession,
+      });
+      // ADM-1: админский слайс — состав живой партии и снятие игрока с места. Тот же
+      // модуль, что у канонического хоста. Без `ADMIN_LOGINS` не монтируется вовсе:
+      // «администраторов не задали» — это ОТСУТСТВИЕ поверхности, а не открытая дверь.
+      registerAdminApi(app, {
+        identify: identifySession,
+        admins: ADMIN_LOGINS,
+        roster: async (id) => {
+          const room = registry.get(id);
+          if (!room) return null;
+          const bySeat = new Map(
+            (await accountStore.seatedNicks(id)).map((s) => [s.playerId, s.nick] as const),
+          );
+          const online = new Set(room.connectedPlayers());
+          return {
+            matchId: id,
+            day: Math.floor(room.state.time / MS_PER_DAY),
+            ended: room.state.match.status === 'ended',
+            entryOpen: registry.entryOpen(id),
+            seats: Object.values(room.state.players).map((p) => ({
+              playerId: p.id,
+              name: p.name,
+              faction: p.faction,
+              nick: bySeat.get(p.id) ?? null,
+              seated: p.seated === true,
+              connected: online.has(p.id),
+            })),
+          };
+        },
+        kick: (id, nick) =>
+          kickSeat({ matchId: id, room: registry.get(id), accounts: accountStore }, nick),
       });
       // Seat + short-lived join token (SES-2.5) through the SHARED match API, so the
       // handshake — per-IP rate-limit, identity gate, error→status mapping — lives in ONE
@@ -936,10 +982,18 @@ const server = createMultiplayerServer({
           if (claim.claim) {
             await room.submitServerAction(
               claim.playerId,
-              seatClaimAction(id, claim.playerId, room.state.time, {
-                ...claim.claim,
-                ...(preferredScientists !== undefined ? { scientists: preferredScientists } : {}),
-              }),
+              seatClaimAction(
+                id,
+                claim.playerId,
+                room.state.time,
+                {
+                  ...claim.claim,
+                  ...(preferredScientists !== undefined ? { scientists: preferredScientists } : {}),
+                },
+                // Поколение кресла: без него заявка нового владельца дедуплится
+                // квитанцией предыдущего и молча не применяется (см. joinSeat.ts).
+                room.state.players[claim.playerId]?.freedAt,
+              ),
             );
           }
           return {
@@ -964,6 +1018,17 @@ const server = createMultiplayerServer({
           return { error: 'E_AUTH' as const };
         }
         return { xp: await commanderStore.xpOf(live.accountId) };
+      });
+    }
+    // ADM-1: страница пульта. Отдаётся только там, где администратор вообще назван —
+    // иначе это была бы форма входа, за которой гарантированно нет ни одной двери.
+    // `no-store`, как у остальных клиентов: устаревший пульт так же вреден, как
+    // устаревшая игра, и показывал бы состав, которого уже нет.
+    if (adminHtml !== undefined && AUTH && ADMIN_LOGINS.size > 0) {
+      app.get('/admin', async (_request, reply) => {
+        void reply.header('content-type', 'text/html; charset=utf-8');
+        void reply.header('cache-control', 'no-store, must-revalidate');
+        return adminHtml;
       });
     }
     if (playerHtml !== undefined && devHtml !== undefined) {
@@ -1031,6 +1096,11 @@ const lines = [
     : SEAT_LOCK
       ? '  seats  : LOCKED — a nick’s first join mints a ticket its client must present to reconnect'
       : '  seats  : open — any nick takes any free seat (set SEAT_LOCK=1 for the release posture)',
+  AUTH
+    ? ADMIN_LOGINS.size > 0
+      ? `  admin  : ${localHttp}/admin   (roster + kick; commanded by: ${[...ADMIN_LOGINS].join(', ')})`
+      : '  admin  : off — set ADMIN_LOGINS=<login,...> to command the roster (kick) from /admin'
+    : '  admin  : off — needs accounts (AUTH_JWT_SECRET) before an admin can be named',
   TIME_SCALE > 1
     ? `  time   : ×${TIME_SCALE} fast-forward (1 real min ≈ ${(TIME_SCALE / 60).toFixed(1)} game-hours) — playtest mode`
     : '  time   : ×1 real-time (set TIME_SCALE=100 to fast-forward a playtest)',

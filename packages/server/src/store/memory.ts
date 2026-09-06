@@ -135,6 +135,16 @@ export class MemoryAccountStore implements AccountStore {
     return Promise.resolve();
   }
 
+  releaseSeat(room: string, nick: string): Promise<PlayerId | null> {
+    const seat = this.rooms.get(room)?.get(nick) ?? null;
+    if (seat === null) return Promise.resolve(null);
+    this.rooms.get(room)?.delete(nick);
+    // Билет уходит вместе с местом: оставленный хэш запер бы кресло для того, кто
+    // сядет в него следующим (`bindSeatTicket` — «первый связавший выигрывает»).
+    this.tickets.get(room)?.delete(nick);
+    return Promise.resolve(seat);
+  }
+
   occupiedSeats(room: string): Promise<number> {
     return Promise.resolve(this.rooms.get(room)?.size ?? 0);
   }
