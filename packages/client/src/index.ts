@@ -91,5 +91,5 @@ export {
   type AuthProvider,
   type AuthProviderId,
   type LegalLink,
-  type LanguageCode,
+  type LanguageOption,
 } from './welcomeScreen';

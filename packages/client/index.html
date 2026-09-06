@@ -163,6 +163,26 @@
       footer span {
         opacity: 0.5;
       }
+      /* Language picker (one chip per locale in /localization). */
+      .langs {
+        display: flex;
+        gap: 8px;
+      }
+      .langs .lang {
+        padding: 4px 10px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: transparent;
+        color: var(--dim);
+        font: inherit;
+        font-size: 10px;
+        letter-spacing: 1px;
+        cursor: pointer;
+      }
+      .langs .lang.on {
+        border-color: var(--cyan-dim);
+        color: var(--cyan);
+      }
       .status {
         min-height: 1.4em;
         width: 100%;

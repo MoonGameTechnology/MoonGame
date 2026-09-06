@@ -23,7 +23,7 @@ import type { LocaleId, Messages } from './index';
 // Потребителю рантайма нужны и подписи языков в переключателе — чтобы ему хватало
 // одного импорта, а не двух из соседних файлов.
 export type { LocaleId, Messages };
-export { LOCALE_LABEL, LOCALE_IDS, DEFAULT_LOCALE } from './index';
+export { LOCALE_LABEL, LOCALE_IDS, DEFAULT_LOCALE, isLocaleId } from './index';
 
 const STORE_KEY = 'vd.locale';
 

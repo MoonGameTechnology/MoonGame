@@ -15,7 +15,8 @@
  * outputs are JSON-serialisable, and validation is **fail-secure** — a bad action
  * yields `{ ok: false, code }` with a stable code only, never a thrown detail.
  */
-import { t } from '../../../localization/core';
+import { t, LOCALE, LOCALE_IDS, LOCALE_LABEL } from '../../../localization/core';
+import type { LocaleId } from '../../../localization/core';
 
 /** External sign-in providers we plan to support (docs/accounts-roadmap.md AC-1.1:
  *  Google / Apple via OIDC). Facebook from the genre reference is intentionally
@@ -37,9 +38,15 @@ export interface LegalLink {
   label: string;
 }
 
-/** Languages the menu offers. Only Russian ships today; the field exists so the
- *  language chip is data-driven (docs/main-menu.md §5.4). */
-export type LanguageCode = 'ru';
+/** A language the menu offers, ready to render as a chip: the id the host switches
+ *  to, the label in that language itself, and whether it is the one being shown. The
+ *  list is data-driven — it comes from `/localization`, never from a literal here, so
+ *  a new locale file appears in the picker on its own. */
+export interface LanguageOption {
+  id: LocaleId;
+  label: string;
+  active: boolean;
+}
 
 /** Localised text for the welcome screen. Keeping strings in a bundle (not hardcoded
  *  in the model) honours the i18n seam (docs/main-menu.md §5.4 — "не хардкодить
@@ -76,8 +83,9 @@ export const defaultStrings: WelcomeStrings = {
 export interface WelcomeModel {
   title: string;
   tagline: string;
-  language: LanguageCode;
-  languages: LanguageCode[];
+  /** The locale the screen is currently drawn in. */
+  language: LocaleId;
+  languages: LanguageOption[];
   newPlayerLabel: string;
   signInWithLabel: string;
   providers: AuthProvider[];
@@ -92,8 +100,8 @@ export function createWelcomeModel(strings: WelcomeStrings = defaultStrings): We
   return {
     title: strings.title,
     tagline: strings.tagline,
-    language: 'ru',
-    languages: ['ru'],
+    language: LOCALE,
+    languages: LOCALE_IDS.map((id) => ({ id, label: LOCALE_LABEL[id], active: id === LOCALE })),
     newPlayerLabel: strings.newPlayer,
     signInWithLabel: strings.signInWith,
     providers: [
