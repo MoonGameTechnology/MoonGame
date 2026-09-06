@@ -1,6 +1,6 @@
 import { describe, expect, it, afterEach } from 'vitest';
 import Fastify, { type FastifyInstance } from 'fastify';
-import { registerAuthApi, liveSession, pwFingerprint } from './authApi';
+import { registerAuthApi, liveSession, pwFingerprint, authRateFromEnv } from './authApi';
 import {
   signSessionToken,
   verifySessionToken,
@@ -162,6 +162,43 @@ describe('SE-1.x · /auth/register + /auth/login', () => {
     clock += 60_001; // backoff past the window → attempts admit again
     const after = await post(server, '/auth/login', creds);
     expect(after.statusCode).toBe(200);
+  });
+
+  // Регрессия живого прогона: на прежнем потолке (10) пятый по счёту НОВЫЙ игрок с
+  // общего адреса получал 429 — первый вход стоит двух запросов (вход, потом
+  // регистрация), а весь плейтест сидит за одним NAT. Тест держит именно то число,
+  // ради которого потолок поднимали: целая партия успевает зарегистрироваться.
+  it('admits a whole lobby registering at once from one address (default budget)', async () => {
+    const server = authApp();
+    for (let i = 0; i < 10; i += 1) {
+      const creds = { login: `recruit_${i}`, password: 'longenough' };
+      // Ровно клиентский порядок: сперва вход (уйдёт в 401 — оракула «есть ли логин»
+      // на сервере нет), затем регистрация.
+      const login = await post(server, '/auth/login', creds);
+      expect(login.statusCode, `игрок ${i}: вход`).toBe(401);
+      const reg = await post(server, '/auth/register', creds);
+      expect(reg.statusCode, `игрок ${i}: регистрация`).toBe(201);
+    }
+  });
+
+  it('takes the budget from the environment, and a broken value keeps the default', () => {
+    expect(authRateFromEnv({ AUTH_RATE_MAX: '5', AUTH_RATE_WINDOW_MS: '1000' })).toEqual({
+      rateMax: 5,
+      rateWindowMs: 1000,
+    });
+    // Опечатка в env НЕ снимает тормоз: неразобранное значение = «дефолт», а не
+    // «без лимита» (fail-secure).
+    expect(authRateFromEnv({ AUTH_RATE_MAX: 'many', AUTH_RATE_WINDOW_MS: '0' })).toEqual({});
+    expect(authRateFromEnv({})).toEqual({});
+    expect(authRateFromEnv({ AUTH_RATE_MAX: '-1' })).toEqual({});
+  });
+
+  it('honours an env-tightened budget end to end', async () => {
+    const server = authApp(authRateFromEnv({ AUTH_RATE_MAX: '2' }));
+    const creds = { login: 'busy_bee', password: 'longenough' };
+    await post(server, '/auth/register', creds);
+    await post(server, '/auth/login', creds);
+    expect((await post(server, '/auth/login', creds)).statusCode).toBe(429);
   });
 
   it('calls onRegistered once per successful registration (ARS-2 starter hook)', async () => {

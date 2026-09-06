@@ -477,6 +477,18 @@ export class PostgresAccountStore implements AccountStore {
     ]);
   }
 
+  async releaseSeat(room: string, nick: string): Promise<PlayerId | null> {
+    // Одним запросом: DELETE ... RETURNING — читать место отдельным SELECT значило бы
+    // окно, в котором соседний вход успел бы занять его между чтением и удалением, и
+    // администратор увидел бы «снят» про уже другого человека. Билет лежит в той же
+    // строке, поэтому уходит вместе с ней.
+    const r = await this.pool.query<{ player_id: string }>(
+      `DELETE FROM seats WHERE room = $1 AND nick = $2 RETURNING player_id`,
+      [room, nick],
+    );
+    return (r.rows[0]?.player_id as PlayerId | undefined) ?? null;
+  }
+
   async occupiedSeats(room: string): Promise<number> {
     const r = await this.pool.query<{ n: string }>(
       `SELECT count(*) AS n FROM seats WHERE room = $1`,

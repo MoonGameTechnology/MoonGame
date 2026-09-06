@@ -159,6 +159,29 @@ function accountStoreContract(name: string, make: () => AccountStore, uniq: (p: 
       await store.resetSeatTicket(uniq('r7'), 'nobody');
     });
 
+    it('releaseSeat (ADM-1) frees the chair with its ticket, and says which one', async () => {
+      const store = make();
+      await store.resolveSeat(uniq('r8'), 'alice', seats);
+      await store.bindSeatTicket(uniq('r8'), 'alice', 'hash-A');
+      expect(await store.releaseSeat(uniq('r8'), 'alice')).toBe('p1'); // назвало снятое место
+      expect(await store.seatOf(uniq('r8'), 'alice')).toBeNull();
+      expect(await store.occupiedSeats(uniq('r8'))).toBe(0);
+      // Билет ушёл вместе с местом: следующий в этом кресле связывает свой, а не
+      // упирается в чужой хэш («первый связавший выигрывает»).
+      expect(await store.seatTicket(uniq('r8'), 'alice')).toBeNull();
+      expect((await store.resolveSeat(uniq('r8'), 'bob', seats))?.playerId).toBe('p1');
+      expect(await store.bindSeatTicket(uniq('r8'), 'bob', 'hash-B')).toBe('hash-B');
+    });
+
+    it('releaseSeat отличает снятого от отсутствующего — состав администратора мог устареть', async () => {
+      const store = make();
+      await store.resolveSeat(uniq('r9'), 'alice', seats);
+      expect(await store.releaseSeat(uniq('r9'), 'alice')).toBe('p1');
+      expect(await store.releaseSeat(uniq('r9'), 'alice')).toBeNull(); // повтор — идемпотентно
+      expect(await store.releaseSeat(uniq('r9'), 'nobody')).toBeNull();
+      expect(await store.releaseSeat(uniq('r10'), 'alice')).toBeNull(); // и комнаты такой нет
+    });
+
     it('seatedNicks lists every claimed (playerId, nick) — the match-end credit read', async () => {
       const store = make();
       expect(await store.seatedNicks(uniq('r5'))).toEqual([]);

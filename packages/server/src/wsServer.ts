@@ -509,10 +509,14 @@ export function createMultiplayerServer(
         // Подтверждаем только заявленное место: на дев/LAN-пути (вход по нику, без
         // HTTP-джойна) заявки нет вовсе, и слать подтверждение значило бы сыпать
         // отказами на каждом коннекте.
-        if (room.state.players[playerId]?.claimedAt !== undefined) {
+        const claimedAt = room.state.players[playerId]?.claimedAt;
+        if (claimedAt !== undefined) {
+          // `claimedAt` уходит в идентификатор действия: после смены владельца кресла
+          // подтверждение нового игрока иначе дедуплится квитанцией предыдущего, и
+          // место не закрепляется никогда (см. `seatConfirmAction`).
           void room.submitServerAction(
             playerId,
-            seatConfirmAction(room.id, playerId, room.state.time),
+            seatConfirmAction(room.id, playerId, room.state.time, claimedAt),
           );
         }
       }

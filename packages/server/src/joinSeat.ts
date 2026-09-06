@@ -97,6 +97,16 @@ export function seatClaim(input: JoinSeatInput): SeatClaim {
  *  заявку — квитанции комнаты дедупят её по `id` (та же дисциплина, что у AvA-объявлений
  *  войны), а модуль отклонил бы её и так. Две страховки на разных уровнях, и обе дешёвые.
  *
+ *  …но ровно до СМЕНЫ ВЛАДЕЛЬЦА кресла. Место возвращается в оборот двумя путями —
+ *  истечением заявки (`seat.release`) и киком администратора (`seat.kick`), — и заявка
+ *  СЛЕДУЮЩЕГО игрока совпала бы по id с квитанцией предыдущего: комната вернула бы
+ *  кэшированный успех, не применив её. Игрок при этом сидит в кресле по стору, но в
+ *  состоянии оно незаявлено — `seat.confirm` отказывает, место не закрепляется и снова
+ *  истекает по окну. Поэтому в id входит `freedAt` — отметка последнего освобождения
+ *  (см. `gameState.ts`): у каждого владельца кресла свой идентификатор, а повтор
+ *  ОДНОГО И ТОГО ЖЕ входа по-прежнему дедуплится. Кресло, которое никто не освобождал,
+ *  даёт прежний id — старые матчи и их квитанции не ломаются.
+ *
  *  `issuedAt` берётся из игрового времени матча, а не из часов машины: время в действии
  *  попадает в лог реплея, и `Date.now()` сделал бы воспроизведение невоспроизводимым. */
 export function seatClaimAction(
@@ -104,12 +114,13 @@ export function seatClaimAction(
   playerId: string,
   gameTime: number,
   choice: { faction?: string; scientists?: readonly string[] },
+  freedAt?: number,
 ): Action {
   const payload: { faction?: string; scientists?: string[] } = {};
   if (choice.faction !== undefined) payload.faction = choice.faction;
   if (choice.scientists !== undefined) payload.scientists = [...choice.scientists];
   return {
-    id: `seat-claim:${matchId}:${playerId}`,
+    id: seatActionId('seat-claim', matchId, playerId, freedAt),
     type: 'seat.claim',
     playerId,
     payload,
@@ -117,15 +128,37 @@ export function seatClaimAction(
   };
 }
 
+/** Идентификатор действия места: (матч, место) плюс метка поколения, если она есть.
+ *  Без метки — прежняя форма, чтобы квитанции уже идущих матчей остались валидными. */
+function seatActionId(
+  kind: 'seat-claim' | 'seat-confirm',
+  matchId: string,
+  playerId: string,
+  generation?: number,
+): string {
+  const base = `${kind}:${matchId}:${playerId}`;
+  return generation === undefined ? base : `${base}:${generation}`;
+}
+
 /** Подтверждение места: игрок дошёл до карты (ENTRY-3, правило 6).
  *
  *  Серверное действие — у него нет payload-схемы, поэтому шлюз не пропустит его от
  *  клиента: закрепить за собой место в обход прихода на карту нельзя. Идентификатор
  *  детерминирован по (матч, место), так что реконнекты не плодят заявок — квитанции
- *  дедупят их по `id`, а модуль на повторе просто ничего не делает. */
-export function seatConfirmAction(matchId: string, playerId: string, gameTime: number): Action {
+ *  дедупят их по `id`, а модуль на повторе просто ничего не делает.
+ *
+ *  Поколение здесь — момент ЗАЯВКИ (`claimedAt`), по той же причине, что у заявки выше:
+ *  после смены владельца кресла подтверждение нового игрока иначе дедуплилось бы
+ *  квитанцией предыдущего и место не закрепилось бы никогда. У одного владельца
+ *  `claimedAt` не меняется, поэтому реконнекты по-прежнему дедуплятся. */
+export function seatConfirmAction(
+  matchId: string,
+  playerId: string,
+  gameTime: number,
+  claimedAt?: number,
+): Action {
   return {
-    id: `seat-confirm:${matchId}:${playerId}`,
+    id: seatActionId('seat-confirm', matchId, playerId, claimedAt),
     type: 'seat.confirm',
     playerId,
     payload: {},

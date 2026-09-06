@@ -208,6 +208,19 @@ describe('SV-1.2 · action payload schemas', () => {
     expect(isValidActionPayload('nonsense.type', {})).toBe(false);
   });
 
+  // Серверные действия места (`seatClaim.ts`, правила 6–8). Схемы у них нет НАМЕРЕННО:
+  // это и есть замок. Игрок не должен уметь закрепить за собой место в обход прихода
+  // на карту, отпустить чужое — и тем более выкинуть соседа властью администратора.
+  it('seat.confirm / seat.release / seat.kick — серверные, от клиента не принимаются', () => {
+    for (const type of ['seat.confirm', 'seat.release', 'seat.kick']) {
+      expect(isValidActionPayload(type, {})).toBe(false);
+      expect(isValidActionPayload(type, { playerId: 'p1' })).toBe(false);
+    }
+    // А заявка — клиентская, её принимать надо: иначе тест выше проходил бы и на
+    // сломанном реестре схем.
+    expect(isValidActionPayload('seat.claim', {})).toBe(true);
+  });
+
   it('H4-REVERT: division.* больше не client-submittable', () => {
     // Надгробие сноса H4. Схемы действий — это ВНЕШНЯЯ дверь: пока тип здесь описан,
     // гейтованный сервер принимает его от клиента и несёт в редьюсер, где обработчика
