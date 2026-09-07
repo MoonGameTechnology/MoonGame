@@ -14,17 +14,21 @@ seed воспроизводит матч байт-в-байт, а сотня м�
 В репозитории **два** набора контента, и это первое, что надо развести:
 
 - **`prototype/src/prototypeData.ts`** — каталог прототипа, `parseGameData({ ... })`.
-  Секции: `technologies` (~23), `units` (~312), `modules` (~474), `factions` (~545),
-  `buildings` (~567), `sectors` (~845), `sectorKinds` (~857), `planetTypes` (~881),
-  `heroes` (~958). (Исторически он лежал инлайном в `game.ts`; после REFP вынесен в
-  отдельный файл — `game.ts` его только re-export'ит.) **Именно его гоняют все харнесы** (`selfplay.mjs`, `econplaytest.mjs`,
+  Секции: `technologies`, `units`, `modules`, `factions`, `buildings`, `sectors`,
+  `sectorKinds`, `planetTypes`, `heroes` — ищи по имени (`rg '^  units: \{'`), номера
+  строк здесь намеренно не приводятся: файл растёт с каждым контентным PR, и любое
+  записанное число протухает за неделю. (Исторически каталог лежал инлайном в
+  `game.ts`; после REFP вынесен в отдельный файл — `game.ts` его только re-export'ит.)
+  **Именно его гоняют все харнесы** (`selfplay.mjs`, `econplaytest.mjs`,
   `netserver.ts`) и играбельный клиент `prototype/dist/void-dominion.html` (артефакт
   сборки — в git его нет, собирается `pnpm run prototype`). Дома здесь —
-  `blue/red/amber/violet` с чистыми пассивками.
+  `azure/crimson/amber/violet` с чистыми пассивками.
 - **`data/*.json`** — shipped-бандл (`data/manifest.json` + фрагменты, собираются
   `packages/shared-core/src/data/loadGameData.ts`). Его читают `packages/server/src/scenario.ts`,
-  `packages/client/src/gameData.ts` и тесты `shared-core`. Фракции здесь другие —
-  `vanguard` / `swarm`.
+  `packages/client/src/gameData.ts` и тесты `shared-core`. Фракций здесь ШЕСТЬ: те же
+  четыре дома плюс легаси-пара `vanguard` / `swarm` (закреплено списком в
+  `factions.test.ts`), поэтому наборы не «разные», а вложенные — прототип гоняет
+  четыре, бандл несёт шесть.
 
 Правь то, что меряешь. Цифра, покрученная в `data/units.json`, **не изменит вывод
 `pnpm run selfplay`** — харнес её просто не видит. Если вывод обязан измениться, а не

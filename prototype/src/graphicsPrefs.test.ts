@@ -9,6 +9,9 @@ import {
   setStarfield,
   showFpsOn,
   setShowFps,
+  motionOn,
+  setMotion,
+  fxBreath,
 } from './graphicsPrefs';
 
 // REFM-21. Модуль читает окружающее хранилище на импорте, поэтому тесты работают с ЖИВЫМ
@@ -115,5 +118,30 @@ describe('графика — независимость тумблеров', () 
         expect(fxBlur(4)).toBe(0);
       }),
     );
+  });
+});
+
+// Движение: кран `fxBreath` — аналог `fxBlur`, но для колебания слоёв.
+describe('движение слоёв', () => {
+  const b = { period: 200, base: 0.5, amp: 0.5 };
+
+  it('включённое движение колеблет значение вокруг середины', () => {
+    around(motionOn, setMotion, () => {
+      setMotion(true);
+      // Четверть периода от нуля — синус в максимуме: середина + весь размах.
+      expect(fxBreath((Math.PI / 2) * b.period, b)).toBeCloseTo(1, 6);
+      expect(fxBreath(0, b)).toBeCloseTo(0.5, 6);
+    });
+  });
+
+  it('выключенное движение ЗАМОРАЖИВАЕТ слой в середине, а не прячет его', () => {
+    around(motionOn, setMotion, () => {
+      setMotion(false);
+      // Ключевое: значение не ноль. Слой остаётся видимым — уходит только качание,
+      // иначе «поддержка reduced motion» отнимала бы у игрока сигнал вместе с движением.
+      for (const now of [0, 137, (Math.PI / 2) * b.period, 99_999]) {
+        expect(fxBreath(now, b)).toBe(b.base);
+      }
+    });
   });
 });

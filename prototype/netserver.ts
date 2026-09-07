@@ -49,6 +49,11 @@ import {
   adminLoginsFromEnv,
   kickSeat,
   registerFriendApi,
+  registerMetaMarketApi,
+  MemoryMetaMarket,
+  PostgresMetaMarket,
+  MemoryArsenalStore,
+  type MetaMarket,
   registerLeaderboardApi,
   FriendService,
   liveSession,
@@ -199,6 +204,11 @@ let receiptStore: ReceiptStore;
 let userStore: UserStore;
 let friendStore: FriendStore;
 let commanderStore: CommanderStore;
+// EC-3: аукцион на прото-хосте — тот же слайс, что в проде. Фаусет Варрантов читается
+// из окружения ЗДЕСЬ (композиционный корень), а по умолчанию выключен: торгуемая выдача
+// на аккаунт превращает регистрацию в монетный двор (ARS-0 anti-RMT).
+const metaFaucet = Number(process.env.META_MARKET_FAUCET ?? 0) || 0;
+let metaMarket: MetaMarket;
 if (DATABASE_URL) {
   pool = new Pool({ connectionString: DATABASE_URL });
   await migrate(pool);
@@ -208,6 +218,7 @@ if (DATABASE_URL) {
   userStore = new PostgresUserStore(pool);
   friendStore = new PostgresFriendStore(pool);
   commanderStore = new PostgresCommanderStore(pool);
+  metaMarket = new PostgresMetaMarket(pool, undefined, metaFaucet);
 } else {
   matchStore = new MemoryMatchStore();
   accountStore = new MemoryAccountStore();
@@ -215,6 +226,7 @@ if (DATABASE_URL) {
   userStore = new MemoryUserStore();
   friendStore = new MemoryFriendStore();
   commanderStore = new MemoryCommanderStore();
+  metaMarket = new MemoryMetaMarket(new MemoryArsenalStore(), undefined, metaFaucet);
 }
 
 /** Account crediting (EC-*): the core already computed `match.rewards` (place + XP per
@@ -909,6 +921,9 @@ const server = createMultiplayerServer({
       // Рейтинги (RANK-1) — тот же слайс, что в проде. Корп-хранилища у плейтест-хоста
       // нет, поэтому доска корпораций тут пустая: API это предусматривает (`corps`
       // необязателен), и экрану не приходится знать, какой хост его обслуживает.
+      // MetaMarket (EC-3) — тот же слайс аукциона, что в проде: прото-хост не заводит
+      // свою торговлю. Фаусет — из окружения, по умолчанию выключен.
+      registerMetaMarketApi(app, { market: metaMarket, identify: identifySession });
       registerLeaderboardApi(app, {
         commanders: commanderStore,
         users: userStore,

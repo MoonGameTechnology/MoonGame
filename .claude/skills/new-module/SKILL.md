@@ -49,7 +49,7 @@ export const myModule: GameModule = { id: 'my', version: '1.0.0', setup(api) { �
 превращает опциональный модуль в обязательный и ломает манифесты режимов игры.
 
 Ядро подстраховывает это само: `hook` без контрибьюторов возвращает `base`
-(`kernel.ts:312`), событие без подписчиков гаснет. Дубликаты запрещены — второй
+(`kernel.ts:369`), событие без подписчиков гаснет. Дубликаты запрещены — второй
 `onAction` на тот же тип или второй `provideCapability` на то же имя бросают
 исключение при сборке ядра (см. конструктор `Kernel`). Один тип действия — один
 обработчик; расширяют его хуками и событиями, а не вторым обработчиком.
@@ -111,7 +111,7 @@ export const beaconModule: GameModule = {
   кладут только JSON: без `Map`, `Set`, `Date`, классов и функций.
 - **Fail-secure.** Любая проверка не прошла → `h.reject('E_…')` со стабильным кодом
   и без деталей: код уходит клиенту, подробности — в лог сервера. Неожиданный throw
-  ядро превратит в `E_INTERNAL` (`kernel.ts:355`) — это страховка, а не рабочий путь.
+  ядро превратит в `E_INTERNAL` (`kernel.ts:409`) — это страховка, а не рабочий путь.
   Отложенное событие, чей обработчик бросил, dead-letter'ится в `failures`, поэтому
   таймлайн не встаёт: пиши обработчики событий терпимыми к исчезнувшим сущностям.
 
@@ -127,7 +127,7 @@ export const beaconModule: GameModule = {
 ## 7. Имена ключей в payload события — это контракт фога
 
 Сервер решает, кому показать событие, **по именам ключей payload**
-(`MatchRoom.eventVisibleTo`, `packages/server/src/matchRoom.ts:1575`):
+(`MatchRoom.eventVisibleTo`, `packages/server/src/matchRoom.ts:1751`):
 адресат — `owner`/`playerId`/`a`/`b`/`from`/`to`/`buyer`/`seller`; место —
 `location`/`planetId`/`at`; владение флотом — `fleetId`. Назовёшь адресата `target`
 или `recipient` — событие молча скроется от игрока (fail-closed: утечки нет, но и
@@ -150,8 +150,10 @@ export const beaconModule: GameModule = {
 Экспортируй модуль из `packages/shared-core/src/index.ts` (секция «Base modules»),
 затем добавь в списки, которые собирают ядро:
 
-- `packages/server/src/scenario.ts` → `DEV_MODULES` (~строка 97);
-- `prototype/src/game.ts` → `MODULES` (~строка 3791) — играбельный прототип.
+- `packages/server/src/scenario.ts` → `DEV_MODULES` (`scenario.ts:113`);
+- `prototype/src/protoKernel.ts` → `MODULES` (`protoKernel.ts:54`) — играбельный
+  прототип. (В `game.ts` этот список только РЕЭКСПОРТИРУЕТСЯ: после REFP он стал
+  фасадом и собственной логики не несёт — правь `protoKernel.ts`.)
 
 Позиция в массиве = приоритет исполнения (инвариант #6): в этом порядке идут
 подписчики событий и звенья хук-конвейера, и он же записан в `kernel.manifest`.

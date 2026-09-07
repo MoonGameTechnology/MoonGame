@@ -85,6 +85,16 @@ export {
   type AuthApiDeps,
   type Mailer,
 } from './authApi';
+// EC-3 · MetaMarket — аукцион мета-предметов. Экспортируется, чтобы прото-хост монтировал
+// ТОТ ЖЕ слой, что прод (одна реализация торговли, а не две — как у friends/corp).
+export {
+  MemoryMetaMarket,
+  PostgresMetaMarket,
+  DEFAULT_FAUCET,
+  META_MARKET_FEE,
+  type MetaMarket,
+} from './metaMarket';
+export { registerMetaMarketApi, type MetaMarketApiDeps } from './metaMarketApi';
 // FRIENDS-1 — roster API + rules, exported so the playtest host mounts the SAME slice
 // as production (one implementation of the social graph, not two).
 export {
@@ -152,6 +162,7 @@ export {
   type UserRecord,
   type UserStore,
   MemoryAccountStore,
+  MemoryArsenalStore,
   MemoryCommanderStore,
   MemoryMatchStore,
   MemoryReceiptStore,
@@ -159,6 +170,7 @@ export {
   MemoryUserStore,
   migrate,
   PostgresAccountStore,
+  PostgresArsenalStore,
   PostgresCommanderStore,
   PostgresMatchStore,
   PostgresFriendStore,
