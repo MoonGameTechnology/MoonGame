@@ -120,12 +120,19 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   // section header above is stale for this group specifically.
   'fleet.launch': z.object({ planetId: id }),
   'fleet.merge': z.object({ from: id, into: id }),
+  // FSPLIT-1/2: `modules` адресует КОНКРЕТНЫЙ стек (лоадаут — часть его идентичности,
+  // SM-0.3), `takeLanding` делит трюм. Оба поля необязательны: без них payload прежний,
+  // и старые отправители (бот, крылья эскадрилий) валидируются как раньше.
   'fleet.split': z.object({
     fleetId: id,
     take: z
-      .array(z.object({ unit: id, count }))
+      .array(z.object({ unit: id, modules: z.array(id).max(8).optional(), count }))
       .min(1)
       .max(32),
+    takeLanding: z
+      .array(z.object({ unit: id, count }))
+      .max(32)
+      .optional(),
   }),
   'fleet.engage': z.object({ fleetId: id, targetId: id }),
   // squadron free-space movement (squadronModule) — strike/return off the lane graph

@@ -32,7 +32,7 @@ import { hoursToMs } from '../action/types';
 import { defHasTrait } from '../data/traits';
 import { isHostile, ownFleet } from '../util/combat';
 import { garrisonUnderAssault, nextFleetSeq } from '../util/fleet';
-import { sumUnitStat, takeFromStacks, mergeStacks } from '../util/stacks';
+import { sumUnitStat, takeFromStacks, mergeStacks, loadoutKey } from '../util/stacks';
 
 export const fleetOpsModule: GameModule = {
   id: 'fleet-ops',
@@ -146,14 +146,27 @@ export const fleetOpsModule: GameModule = {
     });
 
     // Peel a chosen set of ships off a docked, idle fleet into a fresh fleet in
-    // the same sector (same orbit). Must keep ≥1 ship behind and move ≥1 out;
-    // carried ground troops stay with the original.
+    // the same sector (same orbit). Must keep ≥1 ship behind and move ≥1 out.
+    //
+    // FSPLIT-1/2 (заказ владельца): раскол адресует СТЕК, а не тип, и делит трюм.
+    //   · `take[i].modules` сужает отбор до одного лоадаута — без него «два крейсера»
+    //     двусмысленно, как только один корпус летает и фиттованным, и голым, а
+    //     `takeFromStacks` брала первый попавшийся стек. Поле необязательное: без него
+    //     поведение прежнее (любой лоадаут), и старые вызовы — бот, `squadronTake` —
+    //     работают как работали.
+    //   · `takeLanding` уводит часть десанта с новым флотом. Раньше он ВСЕГДА оставался
+    //     у исходного, и разделить десант можно было только через планету (выгрузить и
+    //     загрузить заново), чего в полёте нет вовсе.
     api.onAction('fleet.split', (action, h) => {
       const payload = action.payload as {
         fleetId?: string;
-        take?: Array<{ unit?: string; count?: number }>;
+        take?: Array<{ unit?: string; count?: number; modules?: unknown }>;
+        takeLanding?: Array<{ unit?: string; count?: number }>;
       };
       if (typeof payload?.fleetId !== 'string' || !Array.isArray(payload.take)) {
+        return h.reject('E_BAD_PAYLOAD');
+      }
+      if (payload.takeLanding !== undefined && !Array.isArray(payload.takeLanding)) {
         return h.reject('E_BAD_PAYLOAD');
       }
       const fleet = ownFleet(h.state, payload.fleetId);
@@ -169,10 +182,19 @@ export const fleetOpsModule: GameModule = {
       if (fleet.movement || !fleet.location) {
         return h.reject('E_IN_TRANSIT');
       }
-      const want = new Map<string, number>();
+      // Ключ отбора — «юнит + лоадаут»: два стека одного корпуса с разной начинкой
+      // адресуются по отдельности, а запись без `modules` берёт по-старому, любой.
+      const want = new Map<string, { unit: string; modules?: string[]; count: number }>();
       for (const t of payload.take) {
         if (typeof t?.unit !== 'string' || typeof t?.count !== 'number' || t.count <= 0) {
           return h.reject('E_BAD_PAYLOAD');
+        }
+        let modules: string[] | undefined;
+        if (t.modules !== undefined) {
+          if (!Array.isArray(t.modules) || t.modules.some((m) => typeof m !== 'string')) {
+            return h.reject('E_BAD_PAYLOAD');
+          }
+          modules = t.modules as string[];
         }
         // The hero flagship can't be peeled off by a split: the hero ENTITY is
         // bound to the source fleet by fleetId, and moving its UNIT without the
@@ -180,14 +202,23 @@ export const fleetOpsModule: GameModule = {
         if (h.ctx.data.units[t.unit]?.traits.includes('hero')) {
           return h.reject('E_HERO_UNIT');
         }
-        want.set(t.unit, (want.get(t.unit) ?? 0) + Math.floor(t.count));
+        const key = `${t.unit}\u0000${modules === undefined ? '*' : loadoutKey(modules)}`;
+        const prev = want.get(key);
+        const count = (prev?.count ?? 0) + Math.floor(t.count);
+        want.set(key, { unit: t.unit, ...(modules ? { modules } : {}), count });
       }
-      const have = (unit: string) =>
-        fleet.units.filter((st) => st.unit === unit).reduce((a, st) => a + st.count, 0);
+      const have = (unit: string, modules?: readonly string[]) =>
+        fleet.units
+          .filter(
+            (st) =>
+              st.unit === unit &&
+              (modules === undefined || loadoutKey(st.modules) === loadoutKey(modules)),
+          )
+          .reduce((a, st) => a + st.count, 0);
       let takeTotal = 0;
-      for (const [unit, n] of want) {
-        if (n > have(unit)) return h.reject('E_NOT_ENOUGH');
-        takeTotal += n;
+      for (const w of want.values()) {
+        if (w.count > have(w.unit, w.modules)) return h.reject('E_NOT_ENOUGH');
+        takeTotal += w.count;
       }
       const shipsTotal = fleet.units.reduce((a, st) => a + st.count, 0);
       if (takeTotal <= 0) {
@@ -196,9 +227,76 @@ export const fleetOpsModule: GameModule = {
       if (takeTotal >= shipsTotal) {
         return h.reject('E_SPLIT_ALL'); // must leave at least one ship behind
       }
+      // Заказ трюма разбирается ДО того, как что-либо сдвинуто: раскол — одно
+      // действие, и половинчатый исход (корабли ушли, десант нет) был бы хуже отказа.
+      const wantLanding = new Map<string, number>();
+      for (const t of payload.takeLanding ?? []) {
+        if (typeof t?.unit !== 'string' || typeof t?.count !== 'number' || t.count <= 0) {
+          return h.reject('E_BAD_PAYLOAD');
+        }
+        wantLanding.set(t.unit, (wantLanding.get(t.unit) ?? 0) + Math.floor(t.count));
+      }
+      const landing = fleet.landing ?? [];
+      for (const [unit, n] of wantLanding) {
+        const aboard = landing.filter((st) => st.unit === unit).reduce((a, st) => a + st.count, 0);
+        if (n > aboard) return h.reject('E_NO_ARMY');
+      }
+      // Обе половины обязаны увезти свой десант: вместимость даёт КОРПУС, поэтому увод
+      // транспортов без войск — такой же перегруз, как заказ войск без транспортов.
+      // Считается до мутации, по будущим составам (`army.load` энфорсит ровно это же).
+      const cargoOf = (stacks: readonly UnitStack[]) => sumUnitStat(stacks, h.ctx.data, 'cargoSize');
+      const capacityOf = (stacks: readonly UnitStack[]) =>
+        sumUnitStat(stacks, h.ctx.data, 'cargoCapacity');
+      const takenShipsPreview: UnitStack[] = [];
+      for (const w of want.values()) {
+        takenShipsPreview.push({ unit: w.unit, count: w.count, ...(w.modules ? { modules: w.modules } : {}) });
+      }
+      const takenLandingPreview: UnitStack[] = [...wantLanding].map(([unit, count]) => ({
+        unit,
+        count,
+      }));
+      const keptShipsPreview: UnitStack[] = fleet.units.map((st) => ({ ...st }));
+      for (const w of want.values()) {
+        let left = w.count;
+        for (const st of keptShipsPreview) {
+          if (left <= 0) break;
+          if (st.unit !== w.unit) continue;
+          if (w.modules !== undefined && loadoutKey(st.modules) !== loadoutKey(w.modules)) continue;
+          const move = Math.min(st.count, left);
+          st.count -= move;
+          left -= move;
+        }
+      }
+      const keptLandingPreview: UnitStack[] = landing.map((st) => ({ ...st }));
+      for (const [unit, n] of wantLanding) {
+        let left = n;
+        for (const st of keptLandingPreview) {
+          if (left <= 0) break;
+          if (st.unit !== unit) continue;
+          const move = Math.min(st.count, left);
+          st.count -= move;
+          left -= move;
+        }
+      }
+      if (cargoOf(takenLandingPreview) > capacityOf(takenShipsPreview)) {
+        return h.reject('E_NO_CAPACITY');
+      }
+      if (cargoOf(keptLandingPreview) > capacityOf(keptShipsPreview)) {
+        return h.reject('E_NO_CAPACITY');
+      }
+
       let taken: UnitStack[] = [];
-      for (const [unit, n] of want) taken = taken.concat(takeFromStacks(fleet.units, unit, n));
+      for (const w of want.values()) {
+        taken = taken.concat(takeFromStacks(fleet.units, w.unit, w.count, w.modules));
+      }
       fleet.units = fleet.units.filter((st) => st.count > 0);
+      let takenLanding: UnitStack[] = [];
+      if (wantLanding.size > 0) {
+        for (const [unit, n] of wantLanding) {
+          takenLanding = takenLanding.concat(takeFromStacks(landing, unit, n));
+        }
+        fleet.landing = landing.filter((st) => st.count > 0);
+      }
       const seq = nextFleetSeq(h.state);
       const id = `fleet:${action.playerId}:${h.ctx.now}:${seq}`;
       // SQ-1.1 (squadrons-roadmap): a split of squadron-trait ships is a strike
@@ -228,7 +326,7 @@ export const fleetOpsModule: GameModule = {
         location: fleet.location,
         movement: null,
         units: taken,
-        landing: [],
+        landing: takenLanding,
         traits: [],
         battleId: null,
         ...(fleet.orbit ? { orbit: fleet.orbit } : {}),
