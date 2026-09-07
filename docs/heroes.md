@@ -87,7 +87,15 @@ interface Hero {
   владение/живость/дальность/кулдаун/стоимость и диспатчит по `type`.
 - **`data/heroPassives.json`** — пассивки: `{ hook, scope, params }` (напр.
   `hook:'fleet.speed', scope:'ownFleetsNear', params:{bonus:0.1}}` — баф усиления флота).
-- **`data/heroFittings.json`** — компоненты корабля: `{ statMods{}, grants?{ ability?|passive? } }` (без отдельного `slot` — общий слот-бюджет архетипа; `grants` — объект)
+- **`data/heroFittings.json`** — компоненты корабля: `{ statMods{}, grants?{ ability?|passive? } }` (без отдельного `slot` — общий слот-бюджет архетипа; `grants` — объект).
+  ⚠️ **Резолюция владельца 2026-09-07: этот каталог сводится и уходит.** У героя есть
+  КОРАБЛЬ (железо) — это обычные **модули корабля** (`data/modules.json`, живой шов
+  `effectiveStats` с `SHIP-3`), и есть ОН САМ (что умеет) — это **скиллы**. `heroFittings`
+  стоял между двумя осями и дублировал обе: его `statMods` — второй, неподключённый шов
+  статов рядом с работающим, а `grants` — способность в обёртке. Дошло до того, что
+  `ablative_plating` живёт в ОБОИХ каталогах, и работает только тот, что в `modules.json`.
+  Разбор и порядок сноса — [`hero-progression-roadmap.md`](hero-progression-roadmap.md)
+  §0.35 и фаза `HPR-1.5`.
   (настройка самого корабля: статы / выдаёт способность).
 - **`data/heroSkillTrees.json`** — две ветки (`transhuman` / `psionic`): узлы
   `{ requires[], grants: { ability? | passive? } }` —
