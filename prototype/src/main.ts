@@ -80,6 +80,7 @@ import {
   dockRepairCost,
   fleetAtOwnDock,
   MAX_CHAIN_STEPS,
+  type AiProfile,
   type ChainStep,
   type Patrol,
 } from './game';
@@ -333,8 +334,12 @@ import {
   factionBonuses,
   houseDisplayName,
   houseNameFor,
+  isAiSeat as isAiRole,
+  nextSeatRole,
   rivalCount,
+  seatAiProfile,
   seatFactionIds as seatSeatFactionIds,
+  type SeatRole,
 } from './setupSeats';
 import { SNAP_REACH, drawOrder, lanes, mapViewBox, viewBoxPoint } from './setupMap';
 import {
@@ -1191,8 +1196,10 @@ let fleetInfoFor: string | null = null;
 let planetInfoFor: string | null = null;
 const buildQueues: Record<string, PlanetBuildQueue> = {};
 const logLines: string[] = [];
-// Player ids the local sim drives as AI (empty seats become AI). Default solo = p2.
-let AI_PLAYERS = new Set<string>(['p2']);
+// Player ids the local sim drives as AI (empty seats become AI), each with the
+// DIFFICULTY chosen on the setup screen (AIDIFF-1: «слабый» = the old simple bot,
+// «сильный» = the full-heuristics one). Default solo = p2 on weak.
+let AI_PLAYERS = new Map<string, AiProfile>([['p2', 'weak']]);
 // Session war record (from `unit.died` events): enemy units you destroyed vs your own
 // units lost. Cumulative since the match started; reset on a new match. Only battles
 // YOU take part in are counted (tracked by location via battle.started/resolved), so
@@ -1227,9 +1234,9 @@ const captureFlashes = new Map<string, { owner: string; at: number }>();
 const battleLosses = new Map<string, Record<string, Record<string, number>>>();
 // Single-player setup screen state: per-seat role (seat 0 is always you) + your
 // chosen homeworld. Seats 2-10 toggle 'ai'/'off'; an 'ai' seat spawns a rival.
-const freshSetupSlots = (): Array<'human' | 'ai' | 'off'> =>
+const freshSetupSlots = (): SeatRole[] =>
   SEAT_META.map((_, i) => (i === 0 ? 'human' : i === 1 ? 'ai' : 'off'));
-let setupSlots: Array<'human' | 'ai' | 'off'> = freshSetupSlots();
+let setupSlots: SeatRole[] = freshSetupSlots();
 // Team battle (2v2 etc.): when on, seats fight in sides — same side ALLIED (win
 // together, no friendly fire), across sides at WAR from the first hour. Seat 0 (you)
 // is always side A; the default when enabling pairs you with seat 1 vs seats 2-3.
@@ -8914,7 +8921,7 @@ if (!__PLAYER_BUILD__) {
   });
   initTestMode({
     startScenario: (state, resumeSpeed) => {
-      installMatch(state, new Set()); // scenarios drive themselves — no AI
+      installMatch(state, new Map()); // scenarios drive themselves — no AI
       speed = 0; // start paused at t=0
       // prime the fast-forward (▶▶) control to the chosen multiplier and show paused
       const spd = Array.from(document.querySelectorAll('[data-speed]')) as HTMLElement[];
@@ -9855,12 +9862,17 @@ function renderSetupSlots(): void {
         (setupTeams ? teamChip(0, true) : '') +
         `<span class="you">${t('comms.you')}</span></div>`;
     } else {
-      const aiOn = role === 'ai';
+      // Кнопка строки гоняет место по кругу «выкл → слабый → сильный» (AIDIFF-1) —
+      // подпись называет ИМЕННО то, что будет играть, а не «вкл/выкл»: иначе выбранная
+      // сложность не видна, и игрок не знает, кого позвал.
+      const aiOn = isAiRole(role);
+      const strong = role === 'ai-strong';
+      const label = strong ? t('setup.ai.strong') : aiOn ? t('setup.ai.weak') : t('setup.off');
       h +=
         `<div class="srow ${aiOn ? '' : 'off'}"><span class="dot" style="background:${m.color};color:${m.color}"></span>` +
         `<span class="nm">${house}</span>` +
         (setupTeams && aiOn ? teamChip(i, false) : '') +
-        `<button class="stog ${aiOn ? 'ai' : ''}" data-slot="${i}">${aiOn ? t('diplo.filter.ai') : t('setup.off')}</button></div>`;
+        `<button class="stog ${aiOn ? 'ai' : ''}${strong ? ' strong' : ''}" data-slot="${i}" title="${esc(t('setup.ai.hint'))}">${label}</button></div>`;
     }
   }
   setupSlotsEl.innerHTML = h;
@@ -10042,7 +10054,7 @@ topEl.addEventListener('click', (ev) => {
   );
 });
 
-function installMatch(state: GameState, aiPlayers: Set<string>): void {
+function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>): void {
   s = state;
   syncPlayerNames(s);
   ME = 'p1';
@@ -10102,7 +10114,16 @@ function installMatch(state: GameState, aiPlayers: Set<string>): void {
 }
 function startMatch(setup: SetupConfig): void {
   const st = newGame(setup);
-  installMatch(st, new Set(setup.seats.filter((x) => x.ai).map((x) => x.id)));
+  // Сложность каждого соперника берётся из его строки на экране настройки (AIDIFF-1).
+  // Она НЕ едет в `SetupConfig` и, значит, не попадает ни в состояние, ни в сохранение:
+  // это политика локального хоста, как и всё остальное в `soloDrivers`.
+  const profiles = new Map<string, AiProfile>();
+  for (const seat of setup.seats) {
+    if (!seat.ai) continue;
+    const i = SEAT_META.findIndex((m) => m.id === seat.id);
+    profiles.set(seat.id, (i >= 0 ? seatAiProfile(setupSlots[i]) : null) ?? 'weak');
+  }
+  installMatch(st, profiles);
   applyTimeSpeed(setupSpeed); // launch running at the chosen time-flow multiplier
   // SANDBOX — fenced hook. Arm the practice tools for this match from the setup
   // checkbox; remember the home world for the immortal-home toggle and show the opener.
@@ -10118,8 +10139,14 @@ function startMatch(setup: SetupConfig): void {
  *  is determined from the map's player slots. */
 function startPvEMatch(): void {
   const st = pveState(data);
-  // AI seats = all players except p1 (the human host).
-  const aiSeats = new Set(Object.keys(st.players).filter((id) => id !== 'p1'));
+  // AI seats = all players except p1 (the human host). Карта PvE своей строки настройки
+  // не имеет, поэтому её боты остаются прежними, слабыми — выбор сложности живёт на
+  // экране настройки (AIDIFF-1).
+  const aiSeats = new Map<string, AiProfile>(
+    Object.keys(st.players)
+      .filter((id) => id !== 'p1')
+      .map((id) => [id, 'weak' as const]),
+  );
   installMatch(st, aiSeats);
   applyTimeSpeed(setupSpeed);
   openSetup('hub'); // close setup screen — returns to hub
@@ -10192,7 +10219,7 @@ setupSlotsEl.addEventListener('click', (ev) => {
   const t = (ev.target as Element).closest('[data-slot]');
   if (!t) return;
   const i = Number(t.getAttribute('data-slot'));
-  setupSlots[i] = setupSlots[i] === 'ai' ? 'off' : 'ai';
+  setupSlots[i] = nextSeatRole(setupSlots[i]!); // выкл → слабый → сильный → выкл
   renderSetup();
 });
 setupSpeedEl.addEventListener('click', (ev) => {

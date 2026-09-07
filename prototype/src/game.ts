@@ -194,4 +194,10 @@ export {
 
 // --- server-side seat AIs ----------------------------------------------------
 export { stewardGuardOrders } from './stewardGuard';
-export { seatAiDecision, aiOrders, type SeatAiKind, type SeatAiDecision } from './ai';
+export {
+  seatAiDecision,
+  aiOrders,
+  type AiProfile,
+  type SeatAiKind,
+  type SeatAiDecision,
+} from './ai';

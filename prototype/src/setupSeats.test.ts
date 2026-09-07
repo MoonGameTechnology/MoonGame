@@ -5,7 +5,10 @@ import {
   factionBonuses,
   houseDisplayName,
   houseNameFor,
+  isAiSeat,
+  nextSeatRole,
   rivalCount,
+  seatAiProfile,
   seatFactionIds,
   type SeatRole,
 } from './setupSeats';
@@ -182,5 +185,42 @@ describe('сетап — кто реально играет и с какого �
     assignSeats(3, sl, 'home', cands);
     expect(sl).toEqual(['human', 'ai', 'ai']);
     expect(cands).toEqual(CANDS);
+  });
+});
+
+describe('сетап — сложность бота в строке места (AIDIFF-1)', () => {
+  it('КНОПКА ГОНЯЕТ ПО КРУГУ: выкл → слабый → сильный → выкл', () => {
+    expect(nextSeatRole('off')).toBe('ai');
+    expect(nextSeatRole('ai')).toBe('ai-strong');
+    expect(nextSeatRole('ai-strong')).toBe('off');
+  });
+
+  it('СВОЁ МЕСТО ЦИКЛОМ НЕ СЛОМАТЬ: `human` возвращается как есть', () => {
+    expect(nextSeatRole('human')).toBe('human');
+  });
+
+  it('бот на месте — любой силы; выключенное и своё — не бот', () => {
+    expect(isAiSeat('ai')).toBe(true);
+    expect(isAiSeat('ai-strong')).toBe(true);
+    expect(isAiSeat('off')).toBe(false);
+    expect(isAiSeat('human')).toBe(false);
+    expect(isAiSeat(undefined)).toBe(false);
+  });
+
+  it('СИЛА МЕСТА — ЭТО ПРОФИЛЬ `aiOrders`, а у не-бота её нет вовсе', () => {
+    expect(seatAiProfile('ai')).toBe('weak');
+    expect(seatAiProfile('ai-strong')).toBe('strong');
+    expect(seatAiProfile('off')).toBeNull();
+    expect(seatAiProfile('human')).toBeNull();
+  });
+
+  it('СИЛЬНЫЙ БОТ — ТОЖЕ СОПЕРНИК: он считается и получает старт', () => {
+    // Иначе «сильный» тихо выпал бы из матча: строка на экране горит, а места нет.
+    expect(rivalCount(['human', 'ai-strong', 'off', 'ai'])).toBe(2);
+    expect(assignSeats(3, ['human', 'ai-strong', 'ai'], 'home', ['w1', 'w2'])).toEqual([
+      { index: 0, start: 'home' },
+      { index: 1, start: 'w1' },
+      { index: 2, start: 'w2' },
+    ]);
   });
 });

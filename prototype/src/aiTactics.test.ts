@@ -118,7 +118,7 @@ describe('AI-BAL-7 — флот умеет проиграть бой (`fleet.ret
     // до нуля», только медленнее.
     const s = game2();
     const staged = battleState(s, homeOf(s, 'p1'), HOPELESS, OVERWHELMING);
-    const orders = aiOrders(staged, 'p2', 'expand', 'test');
+    const orders = aiOrders(staged, 'p2', 'expand', 'strong');
     const retreat = payloads<{ fleetId: string }>(orders, 'fleet.retreat');
     expect(retreat).toHaveLength(1);
     expect(retreat[0]!.fleetId).toBe('f:ours');
@@ -137,7 +137,7 @@ describe('AI-BAL-7 — флот умеет проиграть бой (`fleet.ret
       battleState(s, homeOf(s, 'p1'), HOPELESS, OVERWHELMING),
       'p2',
       'expand',
-      'test',
+      'strong',
     );
     const ourMove = orders.findIndex(
       (a) => a.type === 'fleet.move' && (a.payload as { fleetId: string }).fleetId === 'f:ours',
@@ -149,7 +149,7 @@ describe('AI-BAL-7 — флот умеет проиграть бой (`fleet.ret
     // Размен, который заканчивается взятым узлом, — это плата за узел, а не убыток.
     const s = game2();
     const staged = battleState(s, homeOf(s, 'p1'), OVERWHELMING, HOPELESS);
-    expect(only(aiOrders(staged, 'p2', 'expand', 'test'), 'fleet.retreat')).toHaveLength(0);
+    expect(only(aiOrders(staged, 'p2', 'expand', 'strong'), 'fleet.retreat')).toHaveLength(0);
   });
 
   it('роль в бою учитывается: тот же состав ОБОРОНЯЯСЬ решается иначе', () => {
@@ -158,8 +158,8 @@ describe('AI-BAL-7 — флот умеет проиграть бой (`fleet.ret
     const s = game2();
     const asAttacker = battleState(s, homeOf(s, 'p1'), HOPELESS, OVERWHELMING, true);
     const asDefender = battleState(s, homeOf(s, 'p1'), OVERWHELMING, HOPELESS, false);
-    expect(only(aiOrders(asAttacker, 'p2', 'expand', 'test'), 'fleet.retreat')).toHaveLength(1);
-    expect(only(aiOrders(asDefender, 'p2', 'expand', 'test'), 'fleet.retreat')).toHaveLength(0);
+    expect(only(aiOrders(asAttacker, 'p2', 'expand', 'strong'), 'fleet.retreat')).toHaveLength(1);
+    expect(only(aiOrders(asDefender, 'p2', 'expand', 'strong'), 'fleet.retreat')).toHaveLength(0);
   });
 
   it('НАЗЕМНЫЙ бой не бросает — ядро десант из боя не выпускает', () => {
@@ -185,7 +185,7 @@ describe('AI-BAL-7 — флот умеет проиграть бой (`fleet.ret
         }),
       },
     };
-    expect(only(aiOrders(staged, 'p2', 'expand', 'test'), 'fleet.retreat')).toHaveLength(0);
+    expect(only(aiOrders(staged, 'p2', 'expand', 'strong'), 'fleet.retreat')).toHaveLength(0);
   });
 
   it('ИГРОВОЙ бот не отступает — весь репертуар AI-BAL достаётся лаборатории', () => {
@@ -209,7 +209,7 @@ describe('AI-BAL-7 — осада (`fleet.bombard`)', () => {
 
   it('над вражеским миром, который нечем взять, ОТКРЫВАЕТ огонь по постройкам', () => {
     const s = game2();
-    const orders = aiOrders(siegeState(s), 'p2', 'expand', 'test');
+    const orders = aiOrders(siegeState(s), 'p2', 'expand', 'strong');
     const bombard = payloads<{ fleetId: string; on: boolean }>(orders, 'fleet.bombard');
     expect(bombard).toEqual([{ fleetId: 'f:siege', on: true }]);
   });
@@ -218,7 +218,7 @@ describe('AI-BAL-7 — осада (`fleet.bombard`)', () => {
     // Повтор был бы бессмысленным действием каждые два часа до конца матча, а курс с
     // осаждаемого узла — возвратом к `E_SAME_LOCATION`, от которого осада и уводит.
     const s = game2();
-    const orders = aiOrders(siegeState(s, { bombarding: true }), 'p2', 'expand', 'test');
+    const orders = aiOrders(siegeState(s, { bombarding: true }), 'p2', 'expand', 'strong');
     expect(only(orders, 'fleet.bombard')).toHaveLength(0);
     expect(
       payloads<{ fleetId: string }>(orders, 'fleet.move').filter((p) => p.fleetId === 'f:siege'),
@@ -232,7 +232,7 @@ describe('AI-BAL-7 — осада (`fleet.bombard`)', () => {
       siegeState(s, { landing: [{ unit: 'militia', count: 2 }] }),
       'p2',
       'expand',
-      'test',
+      'strong',
     );
     expect(only(orders, 'fleet.assault')).toHaveLength(1);
     expect(only(orders, 'fleet.bombard')).toHaveLength(0);
@@ -248,8 +248,8 @@ describe('AI-BAL-7 — осада (`fleet.bombard`)', () => {
       ...siegeState(s),
       planets: { ...s.planets, [target]: { ...s.planets[target]!, garrison: [] } },
     };
-    expect(only(aiOrders(staged, 'p2', 'expand', 'test'), 'fleet.assault')).toHaveLength(1);
-    expect(only(aiOrders(staged, 'p2', 'expand', 'test'), 'fleet.bombard')).toHaveLength(0);
+    expect(only(aiOrders(staged, 'p2', 'expand', 'strong'), 'fleet.assault')).toHaveLength(1);
+    expect(only(aiOrders(staged, 'p2', 'expand', 'strong'), 'fleet.bombard')).toHaveLength(0);
   });
 
   it('ИГРОВОЙ бот не осаждает', () => {
@@ -269,7 +269,7 @@ describe('AI-BAL-7 — кулак делится (`fleet.split`)', () => {
 
   it('крупный кулак отчаливает ПОЛОВИНОЙ, вторая остаётся дома', () => {
     const s = game2();
-    const orders = aiOrders(fistState(s, 8), 'p2', 'expand', 'test');
+    const orders = aiOrders(fistState(s, 8), 'p2', 'expand', 'strong');
     const split = payloads<{ fleetId: string; take: Array<{ unit: string; count: number }> }>(
       orders,
       'fleet.split',
@@ -287,14 +287,14 @@ describe('AI-BAL-7 — кулак делится (`fleet.split`)', () => {
   it('порядок приказов: сперва раскол, потом курс', () => {
     // `fleet.split` требует стоящий флот (`E_IN_TRANSIT`), так что после курса он был бы
     // отбит ядром.
-    const orders = aiOrders(fistState(game2(), 8), 'p2', 'expand', 'test');
+    const orders = aiOrders(fistState(game2(), 8), 'p2', 'expand', 'strong');
     const split = orders.findIndex((a) => a.type === 'fleet.split');
     expect(split).toBeGreaterThanOrEqual(0);
     expect(split).toBeLessThan(orders.findIndex((a) => a.type === 'fleet.move'));
   });
 
   it('малая группа не делится — это вернуло бы рой одиночек', () => {
-    expect(only(aiOrders(fistState(game2(), 4), 'p2', 'expand', 'test'), 'fleet.split')).toHaveLength(
+    expect(only(aiOrders(fistState(game2(), 4), 'p2', 'expand', 'strong'), 'fleet.split')).toHaveLength(
       0,
     );
   });
@@ -314,7 +314,7 @@ describe('AI-BAL-7 — кулак делится (`fleet.split`)', () => {
       },
     };
     const take = payloads<{ take: Array<{ unit: string }> }>(
-      aiOrders(staged, 'p2', 'expand', 'test'),
+      aiOrders(staged, 'p2', 'expand', 'strong'),
       'fleet.split',
     )[0]!.take;
     expect(take.some((t) => t.unit === 'hero')).toBe(false);
@@ -330,7 +330,7 @@ describe('AI-BAL-7 — инвариант #1 цел', () => {
     const s = game2();
     const staged = battleState(s, homeOf(s, 'p1'), HOPELESS, OVERWHELMING);
     const shape = (st: GameState): string =>
-      JSON.stringify(aiOrders(st, 'p2', 'expand', 'test').map((a) => [a.type, a.payload]));
+      JSON.stringify(aiOrders(st, 'p2', 'expand', 'strong').map((a) => [a.type, a.payload]));
     expect(shape(staged)).toBe(shape(staged));
   });
 
@@ -340,7 +340,7 @@ describe('AI-BAL-7 — инвариант #1 цел', () => {
     const s = game2();
     const staged = battleState(s, homeOf(s, 'p1'), HOPELESS, OVERWHELMING);
     const before = JSON.stringify(staged.rng);
-    aiOrders(staged, 'p2', 'expand', 'test');
+    aiOrders(staged, 'p2', 'expand', 'strong');
     expect(JSON.stringify(staged.rng)).toBe(before);
   });
 
@@ -348,7 +348,7 @@ describe('AI-BAL-7 — инвариант #1 цел', () => {
     const s = game2();
     const staged = battleState(s, homeOf(s, 'p1'), HOPELESS, OVERWHELMING);
     const before = JSON.stringify(staged.fleets);
-    aiOrders(staged, 'p2', 'expand', 'test');
+    aiOrders(staged, 'p2', 'expand', 'strong');
     expect(JSON.stringify(staged.fleets)).toBe(before);
   });
 });
