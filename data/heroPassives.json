@@ -12,5 +12,12 @@
     "hook": "combat.damage",
     "scope": "ownFleetsNear",
     "params": { "bonus": 0.08, "radius": 300 }
+  },
+  "convoy_impulse": {
+    "name": "Convoy Impulse",
+    "description": "hero.passive.convoy-impulse.desc",
+    "hook": "fleet.speed",
+    "scope": "ownFleetsNear",
+    "params": { "bonus": 0.08, "radius": 300 }
   }
 }

@@ -764,6 +764,19 @@ export interface Hero {
     weakPoints?: number;
     evasion?: number;
   }[];
+  /** Active phantom radar contacts planted via `hero.effect.decoy` — each makes `at`
+   *  read as an occupied node to EVERY viewer but the owner, until `until` (ms).
+   *
+   *  A decoy is deliberately NOT a fleet. An empty fleet would join battles, capture
+   *  planets and count toward victory (`fleetOps` rejects ghost battles for exactly this
+   *  reason); a phantom must change what rivals SEE and nothing else. So it lives here,
+   *  in state, and is mixed into `signatures` inside `visibleState` — the per-viewer
+   *  projection — which is why the simulation cannot tell a decoy exists at all.
+   *
+   *  `signature` is the same scale a real fleet radiates (Σ count × unit signature), so
+   *  the reader buckets it into S/M/L with the identical rule and nothing new is
+   *  invented for fakes. Filtered by `until` at read time; pruned on cast. */
+  activeDecoys?: { at: PlanetId; signature: number; until: number }[];
 }
 
 /** A temporary lane a hero opened: a real, routable graph edge between two nodes for

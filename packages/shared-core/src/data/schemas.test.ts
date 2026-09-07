@@ -27,7 +27,7 @@ function loadShippedBundle(): Record<string, unknown> {
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.11');
+    expect(data.version).toBe('0.1.12');
     expect(data.resources).toContain('microelectronics');
     expect(data.units.siege_lance?.stats.range).toBe(300); // artillery firing radius (map units)
     expect(data.units.cruiser?.upkeep.credits).toBe(64); // daily upkeep, BAL-3 scale
@@ -407,7 +407,8 @@ describe('hero archetypes + abilities (HERO-1, docs/heroes.md)', () => {
     // Both ship a full LADDER of four: `corridor` up the transhuman side, `scan` up the
     // psionic one. A branch is a progression, not a pair of perks — and the owner's
     // complaint that started this ("I don't see nodes 3 and 4") is only ever answered
-    // by a check, never by looking.
+    // by a check, never by looking. HC-3 adds three more nodes, and the shape of what
+    // they hang off is the point of the assertions below: two forks and one summit.
     const ladder = (branch: string): string[] =>
       Object.entries(nodes)
         .filter(([, n]) => n.branch === branch)
@@ -416,15 +417,32 @@ describe('hero archetypes + abilities (HERO-1, docs/heroes.md)', () => {
     expect(ladder('transhuman')).toEqual([
       'corridor_open',
       'corridor_sustained',
+      'fleet_uplink',
       'neural_lace',
       'overclocked_helm',
+      'void_translocator',
     ]);
     expect(ladder('psionic')).toEqual([
+      'false_echo',
       'psi_evasion',
       'psi_veil',
       'psi_weak_points',
       'void_attunement',
     ]);
+    // HC-3.1 — the fleet-wide speed passive forks off the transhuman ROOT, so a player
+    // chooses between corridors and staging rather than getting both down one chain.
+    expect(nodes.fleet_uplink?.requires).toEqual(['neural_lace']);
+    expect(nodes.fleet_uplink?.grants.passive).toBe('convoy_impulse');
+    // HC-3.2 — a hero ability carries no rarity of its own (`rarity` appears nowhere in
+    // the schemas; `Hero.grade` is the HERO's tier), so "the rarest skill" can only be
+    // expressed as DEPTH. The warp jump therefore sits behind the whole corridor ladder;
+    // this assertion is what keeps it there when someone rebalances the tree.
+    expect(nodes.void_translocator?.requires).toEqual(['corridor_open']);
+    expect(nodes.void_translocator?.grants.ability).toBe('warp_jump');
+    // HC-3.3 — the decoy forks off `psi_veil`: the same branch that teaches reading a
+    // rival radar teaches writing into it.
+    expect(nodes.false_echo?.requires).toEqual(['psi_veil']);
+    expect(nodes.false_echo?.grants.ability).toBe('decoy_signal');
     // Fail-closed: an unknown branch or a negative cost never parses.
     expect(
       safeParseGameData({

@@ -56,5 +56,29 @@
     "branch": "psionic",
     "requires": ["psi_weak_points"],
     "cost": { "energy": 308, "credits": 250 }
+  },
+  "fleet_uplink": {
+    "name": "Fleet Uplink",
+    "description": "hero.tree.fleet-uplink.desc",
+    "branch": "transhuman",
+    "requires": ["neural_lace"],
+    "cost": { "microelectronics": 60, "credits": 80 },
+    "grants": { "passive": "convoy_impulse" }
+  },
+  "void_translocator": {
+    "name": "Void Translocator",
+    "description": "hero.tree.void-translocator.desc",
+    "branch": "transhuman",
+    "requires": ["corridor_open"],
+    "cost": { "microelectronics": 180, "credits": 400 },
+    "grants": { "ability": "warp_jump" }
+  },
+  "false_echo": {
+    "name": "False Echo",
+    "description": "hero.tree.false-echo.desc",
+    "branch": "psionic",
+    "requires": ["psi_veil"],
+    "cost": { "energy": 160, "credits": 120 },
+    "grants": { "ability": "decoy_signal" }
   }
 }

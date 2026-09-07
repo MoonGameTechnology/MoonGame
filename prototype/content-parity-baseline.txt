@@ -27,6 +27,27 @@
 #   · 2026-09-06 (CONV-17), бандл 0.1.11 — 261 → 210: пятьдесят одно `description`,
 #     где канон держал готовую прозу (29 из них — по-русски) вместо ключа локализации,
 #     хотя потребители зовут `t(description)`. Ключи уже существовали в обеих локалях.
+#   · 2026-09-07 (HC-3 + CONV-17), бандл 0.1.12 — 216 строк: HC-3 принёс три способности
+#     героя и три узла дерева, и к ним то же правило применено сразу.
+#
+# ВАЖНО, и это правка утверждения из HC-3: «новая сущность героя платит ДВЕ строки, и
+# починить их нечем, кроме сведения каталогов» — верно только для ПОЛОВИНЫ пары.
+#   · `description` чинится и до CONV-12: поле обязано держать КЛЮЧ (его зовут через
+#     `t()` — `heroStaff.ts`, `techTree.ts:324`), а у общей сущности ключ у прототипа уже
+#     есть и уже заведён в обеих локалях. Так закрыт 51 случай в CONV-17 и 6 из HC-3.
+#   · `name` действительно ждёт CONV-12: у ШИПНУТОГО бандла имя английское, а перевод
+#     живёт ключом `data.<слаг>` (это держит `i18n.test.ts`), тогда как прототип рисует
+#     имена героев и учёных через `t(name)`. Две живые конвенции, выбор — за развилкой.
+# Поэтому новая сущность героя платит ОДНУ строку (`field:name`), а не две.
+#
+# 2026-09-07 (HC-3): +12 строк за три новые способности героя (warp_jump, decoy_signal,
+# convoy_impulse и три узла дерева). Это НЕ новый класс дрейфа, а тот же самый, что уже
+# описан выше: у канона имя английское, а описание — русская проза, у прототипа оба поля
+# суть КЛЮЧИ локализации. Пока каталоги не сведены (CONV-12), любая новая сущность героя
+# платит ровно эти две строки — «починить» их здесь нечем, кроме самого сведения. Ни
+# одна из двенадцати не про расхождение МЕХАНИКИ: type/cooldownHours/range/params/
+# hook/scope/branch/requires/cost/grants у всех трёх совпадают побайтно, и именно это
+# сторож и проверил.
 buildings/barracks field:buildTimeHours
 buildings/barracks field:cost
 buildings/barracks field:hp
@@ -105,20 +126,26 @@ heroAbilities/annihilate field:name
 heroAbilities/boarding_translocation field:name
 heroAbilities/bulwark field:name
 heroAbilities/corridor field:name
+heroAbilities/decoy_signal field:name
 heroAbilities/diplomatic_landing field:name
 heroAbilities/rally field:name
 heroAbilities/recall field:name
 heroAbilities/scan field:name
+heroAbilities/warp_jump field:name
+heroPassives/convoy_impulse field:name
 heroPassives/rally_beacon field:name
 heroPassives/vanguard_impulse field:name
 heroSkillTrees/corridor_open field:name
 heroSkillTrees/corridor_sustained field:name
+heroSkillTrees/false_echo field:name
+heroSkillTrees/fleet_uplink field:name
 heroSkillTrees/neural_lace field:name
 heroSkillTrees/overclocked_helm field:name
 heroSkillTrees/psi_evasion field:name
 heroSkillTrees/psi_veil field:name
 heroSkillTrees/psi_weak_points field:name
 heroSkillTrees/void_attunement field:name
+heroSkillTrees/void_translocator field:name
 heroes/commander field:name
 heroes/ravager field:name
 heroes/vanguard field:name

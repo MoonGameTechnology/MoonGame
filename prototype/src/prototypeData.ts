@@ -1069,7 +1069,7 @@ export const data: GameData = parseGameData({
   },
   // Способности: `temp_lane`/`annihilate` — встроенные эффекты heroModule (кастуются),
   // `spawn_*` — пассивные маркеры точек развёртывания (читает `hero.spawn`), а
-  // `aura`/`reveal`/`recall` исполняет `heroEffectsModule` через capability
+  // `aura`/`reveal`/`recall`/`jump`/`decoy` исполняет `heroEffectsModule` через capability
   // `hero.effect.<type>` — он стоит в `MODULES` прототипа, так что живы ВСЕ типы этого
   // каталога (сверено прогоном при AI-BAL-8: касты `aura`/`reveal` доходят до эффекта, а
   // `hero.ability.used` эмитится только после его применения). `E_NO_EFFECT` остаётся
@@ -1151,6 +1151,29 @@ export const data: GameData = parseGameData({
       range: 0,
       params: {},
     },
+    // Вершина коридорной ветки: путь больше не прокладывается, герой просто исчезает
+    // здесь и появляется там. Дальний кулдаун — единственный сдерживающий рычаг,
+    // который у способности вообще есть (`cost` у прыжка нет намеренно: платить за него
+    // казной значило бы делать его СИЛЬНЕЕ у богатого, а он и так самый дорогой в дереве).
+    warp_jump: {
+      name: 'hero.ability.warp-jump.name',
+      description: 'hero.ability.warp-jump.desc',
+      type: 'jump',
+      cooldownHours: 36,
+      range: 350,
+      params: {},
+    },
+    // Ложное эхо. `signature` — та же шкала, что излучает настоящий флот (Σ count ×
+    // signature юнита), поэтому фантом попадает в те же ведёрки S/M/L: 8 читается как
+    // «M», то есть как средний отряд, а не как несуществующий класс цели.
+    decoy_signal: {
+      name: 'hero.ability.decoy-signal.name',
+      description: 'hero.ability.decoy-signal.desc',
+      type: 'decoy',
+      cooldownHours: 8,
+      range: 400,
+      params: { signature: 8, durationHours: 4 },
+    },
   },
   heroPassives: {
     vanguard_impulse: {
@@ -1164,6 +1187,18 @@ export const data: GameData = parseGameData({
       name: 'hero.passive.rally-beacon.name',
       description: 'hero.passive.rally-beacon.desc',
       hook: 'combat.damage',
+      scope: 'ownFleetsNear',
+      params: { bonus: 0.08, radius: 300 },
+    },
+    // Четвёртая клетка матрицы `hook × scope`: скорость (как `vanguard_impulse`), но на
+    // ЧУЖИЕ корабли владельца в радиусе (как `rally_beacon`). Кода под неё писать не
+    // пришлось — `passiveApplies` умеет `ownFleetsNear`, а хук `fleet.speed` получает узел.
+    // Узел этот — ОТПРАВЛЕНИЯ: пассив разгоняет флоты, стартующие рядом с героем, а не
+    // пролетающие мимо (герой командует сбором, а не подгоняет чужой транзит).
+    convoy_impulse: {
+      name: 'hero.passive.convoy-impulse.name',
+      description: 'hero.passive.convoy-impulse.desc',
+      hook: 'fleet.speed',
       scope: 'ownFleetsNear',
       params: { bonus: 0.08, radius: 300 },
     },
@@ -1226,6 +1261,36 @@ export const data: GameData = parseGameData({
       branch: 'psionic',
       requires: ['psi_weak_points'],
       cost: { energy: 308, credits: 250 },
+    },
+    // Развилка трансгуманной ветки от `neural_lace`: дальше либо коридоры, либо ордер.
+    fleet_uplink: {
+      name: 'hero.tree.fleet-uplink.name',
+      description: 'hero.tree.fleet-uplink.desc',
+      branch: 'transhuman',
+      requires: ['neural_lace'],
+      cost: { microelectronics: 60, credits: 80 },
+      grants: { passive: 'convoy_impulse' },
+    },
+    // Редкости у СПОСОБНОСТИ в данных нет (`Hero.grade` — редкость героя), поэтому
+    // «самый редкий скилл» выражен единственным доступным способом: глубиной. Прыжок
+    // стоит за всей коридорной лестницей — четыре узла и 425 микроэлектроники до него.
+    void_translocator: {
+      name: 'hero.tree.void-translocator.name',
+      description: 'hero.tree.void-translocator.desc',
+      branch: 'transhuman',
+      requires: ['corridor_open'],
+      cost: { microelectronics: 180, credits: 400 },
+      grants: { ability: 'warp_jump' },
+    },
+    // Псионная развилка от `psi_veil`: та же ветка учит и читать чужой радар, и писать
+    // в него. Дальше по прямой — боевая лестница скана, вбок — обман.
+    false_echo: {
+      name: 'hero.tree.false-echo.name',
+      description: 'hero.tree.false-echo.desc',
+      branch: 'psionic',
+      requires: ['psi_veil'],
+      cost: { energy: 160, credits: 120 },
+      grants: { ability: 'decoy_signal' },
     },
   },
   heroFittings: {

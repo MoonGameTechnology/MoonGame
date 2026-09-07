@@ -524,6 +524,30 @@ function project(
     }
     delete view.fleets[id];
   }
+  // HERO-FX `decoy`: phantom contacts other players' heroes planted (`hero.effect.decoy`).
+  // A lie told to a radar is told HERE, in the per-viewer projection, and never in
+  // `GameState` — a fake fleet there would fight, capture and count toward victory.
+  // Read off `state`, not `view`: other players' heroes are stripped from the view above.
+  //
+  // A phantom passes exactly the two gates a real contact passes, which is what makes it
+  // believable and what makes it beatable:
+  //   · the viewer's RADAR must reach the node — a decoy nobody watches fools nobody;
+  //   · an IDENTIFIED node shows its real (empty) contents, so scouting the spot calls
+  //     the bluff. No extra rule needed for either.
+  // The owner is never fooled by its own decoy, and a DEAD hero radiates nothing —
+  // the same liveness rule its auras and reveals follow.
+  const decoyHeroes = state.heroes;
+  if (decoyHeroes !== undefined) {
+    // Sorted (BF-13): the emitted list must not follow JSONB key order.
+    for (const id of Object.keys(decoyHeroes).sort()) {
+      const hero = decoyHeroes[id]!;
+      if (hero.owner === viewerId || hero.alive !== true) continue;
+      for (const d of hero.activeDecoys ?? []) {
+        if (d.until <= state.time || identify.has(d.at) || !radar.has(d.at)) continue;
+        signatures.push({ location: d.at, size: bucket(d.signature) });
+      }
+    }
+  }
   signatures.sort((a, b) => (a.location < b.location ? -1 : a.location > b.location ? 1 : 0));
   view.signatures = signatures;
 
