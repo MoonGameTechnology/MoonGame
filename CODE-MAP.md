@@ -195,8 +195,9 @@
 | файл | экспорт | назначение |
 |---|---|---|
 | `kernel/kernel.ts` | `createKernel(modules)` | компиляция immutable kernel |
-| `kernel/applyAction.ts` | `applyAction(state, action, ctx)` | чистое применение действия |
-| `kernel/advanceTo.ts` | `advanceTo(state, ctx)` | сдвиг часов + scheduled events |
+| `kernel/kernel.ts` | `Kernel.applyAction(state, action, ctx)` | чистое применение действия |
+| `kernel/kernel.ts` | `Kernel.advanceTo(state, ctx)` | сдвиг часов + scheduled events |
+| `kernel/kernel.ts` | `Kernel.canApply` / `canApplyAll` | «можно ли?» ЗАРАНЕЕ (RULES-1/3) — тот же прогон, результат выброшен |
 | `state/gameState.ts` | `GameState`, `createInitialState`, `Player`, `Planet`, `Fleet`, `MatchState` | типы состояния |
 | `state/buildFromMap.ts` | `buildStateFromMap(map, data, opts)` | посев матча из карты |
 | `state/diplomacy.ts` | `getStance`, `setStance`, `pairKey`, `DEFAULT_STANCE` | дипломатия |
@@ -291,8 +292,10 @@
 | `manifest.json` | версия контент-бандла |
 | `units.json` | юниты (корабли, пехота) |
 | `buildings.json` | здания |
-| `factions.json` | фракции (azure, crimson, amber, violet) |
+| `factions.json` | фракции — шесть: четыре дома (azure, crimson, amber, violet) + легаси-пара vanguard, swarm |
 | `technologies.json` | технологии |
+| `modes.json` | режимы игры — семь пресетов (`standard`, `pve_waves`, `duel`, `team_2v2`…`team_5v5`): `victory` + `teamFormat` + опц. `modules[]`/`pve` |
+| `market.json` | список товаров сессионной биржи (`goods`) |
 | `scientists.json` | научные лидеры |
 | `heroes.json` | архетипы героев |
 | `heroAbilities.json` | способности героев |
