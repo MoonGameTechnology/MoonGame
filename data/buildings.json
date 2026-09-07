@@ -216,6 +216,9 @@
     "produces": {
       "metal": 30
     },
+    "upkeep": {
+      "energy": 40
+    },
     "hp": 20,
     "scoreValue": 6,
     "upgrades": [
@@ -228,6 +231,9 @@
         "produces": {
           "metal": 60
         },
+        "upkeep": {
+          "energy": 70
+        },
         "hp": 30
       },
       {
@@ -238,6 +244,9 @@
         "buildTimeHours": 20,
         "produces": {
           "metal": 100
+        },
+        "upkeep": {
+          "energy": 110
         },
         "hp": 40
       }

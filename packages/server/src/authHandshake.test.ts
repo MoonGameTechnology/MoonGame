@@ -26,7 +26,10 @@ function nextMessage(ws: WebSocket): Promise<ServerMessage> {
 }
 
 /** Connect expecting the upgrade to be REJECTED; resolves the HTTP status the server sent. */
-function rejectStatus(target: string, opts?: { origin?: string }): Promise<number> {
+function rejectStatus(
+  target: string,
+  opts?: { origin?: string; headers?: Record<string, string> },
+): Promise<number> {
   return new Promise((resolve, reject) => {
     const ws = new WebSocket(target, opts);
     ws.on('unexpected-response', (_req, res) => {
@@ -197,6 +200,97 @@ describe('CORS на HTTP-маршрутах (SEC-21)', () => {
         headers: { origin: 'https://evil.example', 'access-control-request-method': 'GET' },
       });
       expect(evil.headers.get('access-control-allow-origin')).toBeNull();
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+/**
+ * HTTPS-1.1 — за прокси принимаем только то, что дошло до него по HTTPS.
+ *
+ * `TRUST_PROXY=1` — это объявление «передо мной терминирующий прокси». Без проверки
+ * протокола оно значило лишь «верь X-Forwarded-For», и запрос, обошедший прокси и
+ * пришедший прямо в plain-порт, продолжал бы обслуживаться как защищённый.
+ */
+describe('доверие прокси: протокол форварда (HTTPS-1.1)', () => {
+  const withProxy = { room: createDevMatch(data), auth, trustProxy: true };
+
+  it('за прокси пускает только https-форвард', async () => {
+    const server = createMultiplayerServer(withProxy);
+    const url = await server.listen();
+    const t = await token({ matchId: 'dev', playerId: 'green' });
+    try {
+      const ws = new WebSocket(`${url}?token=${t}`, {
+        headers: { 'x-forwarded-proto': 'https' },
+      });
+      try {
+        expect(await nextMessage(ws)).toMatchObject({ type: 'welcome', playerId: 'green' });
+      } finally {
+        ws.close();
+      }
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('за прокси отбивает http-форвард и ОТСУТСТВИЕ заголовка — оба 403', async () => {
+    const server = createMultiplayerServer(withProxy);
+    const url = await server.listen();
+    const t = await token({ matchId: 'dev', playerId: 'green' });
+    try {
+      // Прокси не терминирует TLS: соединение до него шло открытым текстом.
+      expect(
+        await rejectStatus(`${url}?token=${t}`, { headers: { 'x-forwarded-proto': 'http' } }),
+      ).toBe(403);
+      // Заголовка нет вовсе: либо прокси недонастроен, либо запрос обошёл его и
+      // стучится прямо в plain-порт. Считать такое соединение защищённым нельзя.
+      expect(await rejectStatus(`${url}?token=${t}`)).toBe(403);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('цепочка прокси: смотрим ПЕРВЫЙ хоп — протокол самого клиента', async () => {
+    const server = createMultiplayerServer(withProxy);
+    const url = await server.listen();
+    const t = await token({ matchId: 'dev', playerId: 'green' });
+    try {
+      // `https, http` — клиент пришёл по HTTPS, дальше внутри периметра открытым
+      // текстом. Это норма; отказ здесь ломал бы двухзвенную схему (край + локальный
+      // прокси), а не защищал.
+      const ws = new WebSocket(`${url}?token=${t}`, {
+        headers: { 'x-forwarded-proto': 'https, http' },
+      });
+      try {
+        expect(await nextMessage(ws)).toMatchObject({ type: 'welcome' });
+      } finally {
+        ws.close();
+      }
+      // Обратный порядок — клиент пришёл открытым текстом, и это отказ.
+      expect(
+        await rejectStatus(`${url}?token=${t}`, { headers: { 'x-forwarded-proto': 'http, https' } }),
+      ).toBe(403);
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('БЕЗ прокси форвард-заголовки игнорируются — иначе клиент решал бы за сервер', async () => {
+    const server = createMultiplayerServer({ room: createDevMatch(data), auth });
+    const url = await server.listen();
+    const t = await token({ matchId: 'dev', playerId: 'green' });
+    try {
+      // Ни отсутствие заголовка, ни подделанный `http` не мешают: `trustProxy` выключен,
+      // значит форвард-заголовкам тут вообще не верят (анти-spoofing).
+      const ws = new WebSocket(`${url}?token=${t}`, {
+        headers: { 'x-forwarded-proto': 'http' },
+      });
+      try {
+        expect(await nextMessage(ws)).toMatchObject({ type: 'welcome', playerId: 'green' });
+      } finally {
+        ws.close();
+      }
     } finally {
       await server.close();
     }

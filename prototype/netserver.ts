@@ -322,6 +322,23 @@ if (!AUTH && HOST_BIND === '0.0.0.0' && !PROD_FLAG) {
       'before exposing this beyond a trusted network.\n',
   );
 }
+// HTTPS-1.1, вторая половина: `TRUST_PROXY=1` объявляет прокси впереди, и с ним сервер
+// начинает ВЕРИТЬ `X-Forwarded-Proto`. Верить чужому заголовку можно ровно до тех пор,
+// пока прислать его может только прокси — то есть пока plain-порт не торчит наружу.
+// Гвардия в `wsServer.ts` ловит недонастроенный прокси и наивный обход (заголовка нет →
+// 403), но ПОДДЕЛАННЫЙ заголовок от неотличима от настоящего по построению. Поэтому
+// единственная реальная защита — привязка: за прокси upstream слушает loopback
+// (`SERVER_BIND=127.0.0.1` в `deploy/docker-compose.tls.yml`, DoD HTTPS-2.1).
+// Публичная привязка вместе с TRUST_PROXY — не всегда ошибка (прокси может стоять на
+// другой машине частной сети), поэтому предупреждаем, а не отказываем.
+if (process.env.TRUST_PROXY === '1' && HOST_BIND !== '127.0.0.1' && HOST_BIND !== 'localhost') {
+  process.stderr.write(
+    `warning: TRUST_PROXY=1 вместе с HOST=${HOST_BIND} — plain-порт слушает не только loopback. ` +
+      'Пока он достижим снаружи, клиент может прислать собственный X-Forwarded-Proto: https ' +
+      'и обойти проверку транспорта. Привяжите upstream к 127.0.0.1 (см. SERVER_BIND в ' +
+      'deploy/docker-compose.tls.yml) или закройте порт файрволом.\n',
+  );
+}
 // The prototype host defaults to a ten-chair FFA. `TEAMS=<format>` seeds two allied
 // flanks instead: 1v1/2v2/3v3/4v4/5v5 give 2/4/6/8/10 chairs (PVE-1.1), and `TEAMS=pve`
 // keeps its own layout — two humans against one strong bot. Every

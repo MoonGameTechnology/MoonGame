@@ -1,7 +1,7 @@
 {
   "corridor": {
     "name": "Corridor",
-    "description": "Одноразовый коридор до близкого мира: проходит только армия с этим героем, закрывается по её прибытии. Улучшения дают срок жизни, затем открывают проход всем.",
+    "description": "hero.ability.corridor.desc",
     "type": "temp_lane",
     "cooldownHours": 12,
     "range": 300,
@@ -25,7 +25,7 @@
   },
   "annihilate": {
     "name": "Annihilate",
-    "description": "Уничтожает планету в радиусе — она остаётся узлом, но становится мёртвым миром.",
+    "description": "hero.ability.annihilate.desc",
     "type": "annihilate",
     "cooldownHours": 48,
     "range": 500,
@@ -33,7 +33,7 @@
   },
   "rally": {
     "name": "Rally",
-    "description": "Боевой клич: временный бонус к боевой ауре для своих флотов рядом с героем.",
+    "description": "hero.ability.rally.desc",
     "type": "aura",
     "cooldownHours": 18,
     "range": 0,
@@ -45,7 +45,7 @@
   },
   "scan": {
     "name": "Scan",
-    "description": "Раскрывает зону вокруг цели сквозь туман на время. Улучшения превращают просвеченную зону в боевую: сперва подсвечивают бреши в броне врага, затем ведут по радару свои и союзные флоты.",
+    "description": "hero.ability.scan.desc",
     "type": "reveal",
     "cooldownHours": 10,
     "range": 400,
@@ -70,7 +70,7 @@
   },
   "recall": {
     "name": "Recall",
-    "description": "Мгновенно отзывает корабль-героя в столицу.",
+    "description": "hero.ability.recall.desc",
     "type": "recall",
     "cooldownHours": 24,
     "range": 0,
@@ -78,7 +78,7 @@
   },
   "bulwark": {
     "name": "Bulwark",
-    "description": "Временный щит: бонус к обороне своим флотам рядом с героем.",
+    "description": "hero.ability.bulwark.desc",
     "type": "aura",
     "cooldownHours": 20,
     "range": 0,
@@ -90,7 +90,7 @@
   },
   "boarding_translocation": {
     "name": "Boarding Translocation",
-    "description": "Герой формируется прямо на борту одного из своих флотов — где бы тот ни был. Пассивный навык: расширяет точки развёртывания.",
+    "description": "hero.ability.boarding-translocation.desc",
     "type": "spawn_fleet",
     "cooldownHours": 0,
     "range": 0,
@@ -98,7 +98,7 @@
   },
   "diplomatic_landing": {
     "name": "Diplomatic Landing",
-    "description": "Союзные миры принимают героя как своего: корабль может подняться и на планете союзника. Пассивный навык: расширяет точки развёртывания.",
+    "description": "hero.ability.diplomatic-landing.desc",
     "type": "spawn_allied",
     "cooldownHours": 0,
     "range": 0,
@@ -106,7 +106,7 @@
   },
   "warp_jump": {
     "name": "Warp Jump",
-    "description": "Прокол пространства: корабль героя вместе с десантом в трюме мгновенно оказывается в узле в радиусе действия. Из активного боя не выдёргивает.",
+    "description": "hero.ability.warp-jump.desc",
     "type": "jump",
     "cooldownHours": 36,
     "range": 350,
@@ -114,7 +114,7 @@
   },
   "decoy_signal": {
     "name": "Decoy Signal",
-    "description": "Ложное эхо: узел в радиусе действия начинает читаться чужими радарами как занятый. Разведавший узел видит правду — пустоту.",
+    "description": "hero.ability.decoy-signal.desc",
     "type": "decoy",
     "cooldownHours": 8,
     "range": 400,

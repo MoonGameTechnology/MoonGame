@@ -79,7 +79,11 @@ export interface MultiplayerServerOptions {
    *  `request.ip` is the CLIENT address, not the proxy's — without this the auth API's
    *  per-IP rate limit would throttle every player behind the proxy as one bucket.
    *  Only enable when a trusted proxy is actually in front (a direct client could
-   *  otherwise spoof the header to dodge per-IP limits). Default off. */
+   *  otherwise spoof the header to dodge per-IP limits). Default off.
+   *
+   *  HTTPS-1.1: включённый флаг ЕЩЁ И ТРЕБУЕТ, чтобы соединение дошло до прокси по
+   *  HTTPS — upgrade с `x-forwarded-proto`, отличным от `https` (в том числе без
+   *  заголовка вовсе), отбивается 403. См. `forwardedHttps`. */
   trustProxy?: boolean;
 }
 
@@ -91,6 +95,30 @@ export interface MultiplayerServerHandle {
 
 function baseUrl(request: IncomingMessage): string {
   return `http://${request.headers.host ?? 'localhost'}`;
+}
+
+/**
+ * HTTPS-1.1: пришло ли соединение к прокси по HTTPS.
+ *
+ * Спрашивается ТОЛЬКО когда `trustProxy` включён — это и есть объявление «передо мной
+ * стоит терминирующий прокси». Без него форвард-заголовки не значат ничего (их шлёт
+ * кто угодно), и проверять их было бы хуже, чем не проверять: клиент сам бы решал,
+ * считать ли своё соединение защищённым.
+ *
+ * Заголовок может нести цепочку (`https, http`) — исходный протокол клиента идёт
+ * ПЕРВЫМ, остальные хопы уже внутри периметра.
+ *
+ * Отсутствие заголовка — тоже «нет», и это осознанно. `TRUST_PROXY=1` обещает прокси
+ * впереди, а обе прокси, которые репозиторий возит с собой, ставят этот заголовок
+ * (`deploy/Caddyfile` — Caddy из коробки, `deploy/setup-proxy.sh` — `X-Forwarded-Proto
+ * $scheme`). Запрос без него либо обошёл прокси и стучится прямо в открытый plain-порт
+ * (то, что HTTPS-2.1 запрещает выставлять наружу), либо прокси настроен неверно —
+ * в обоих случаях считать соединение защищённым нельзя (fail-secure, инвариант #4).
+ */
+function forwardedHttps(request: IncomingMessage): boolean {
+  const raw = request.headers['x-forwarded-proto'];
+  const first = Array.isArray(raw) ? raw[0] : raw;
+  return (first ?? '').split(',')[0]?.trim().toLowerCase() === 'https';
 }
 
 const UPGRADE_REASON: Record<number, string> = {
@@ -304,6 +332,20 @@ export function createMultiplayerServer(
         });
       };
       try {
+        // HTTPS-1.1: за прокси принимаем только то, что дошло до него по HTTPS. Стоит
+        // ПЕРВЫМ: вопрос «на том ли транспорте пришли» решается до всех остальных.
+        // Причина печатается в stderr — иначе оператор арендованного сервера увидит
+        // «не подключается» и не поймёт, что виноват недонастроенный прокси.
+        if (options.trustProxy && !forwardedHttps(request)) {
+          process.stderr.write(
+            'upgrade refused: TRUST_PROXY=1, но x-forwarded-proto не `https` ' +
+              `(получено: ${String(request.headers['x-forwarded-proto'] ?? '<нет заголовка>')}). ` +
+              'Проверьте, что прокси терминирует TLS и ставит X-Forwarded-Proto, а plain-порт ' +
+              'сервера не выставлен наружу.\n',
+          );
+          rejectUpgrade(socket, 403);
+          return;
+        }
         // Origin allowlist (F-06): reject a cross-site upgrade up front. A missing Origin
         // (a non-browser client) is not on any allowlist, so it is refused when configured.
         if (allowedOrigins && !allowedOrigins.includes(request.headers.origin ?? '')) {
