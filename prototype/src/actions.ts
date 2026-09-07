@@ -61,11 +61,17 @@ export const launchFleet = (playerId: string, planetId: string) =>
   act(playerId, 'fleet.launch', { planetId });
 export const mergeFleet = (playerId: string, from: string, into: string) =>
   act(playerId, 'fleet.merge', { from, into });
+/** Отделить часть флота. `take[i].modules` адресует КОНКРЕТНЫЙ стек (FSPLIT-1):
+ *  лоадаут — часть личности стека (SM-0.3), поэтому «два крейсера» неоднозначны, пока
+ *  один и тот же корпус летает и с начинкой, и голым; без поля — прежнее поведение
+ *  (любой стек), `[]` — адрес голых. `takeLanding` делит десант в трюме (FSPLIT-2);
+ *  без него весь десант остаётся исходному флоту, как было. */
 export const splitFleet = (
   playerId: string,
   fleetId: string,
-  take: Array<{ unit: string; count: number }>,
-) => act(playerId, 'fleet.split', { fleetId, take });
+  take: Array<{ unit: string; modules?: string[]; count: number }>,
+  takeLanding?: Array<{ unit: string; count: number }>,
+) => act(playerId, 'fleet.split', { fleetId, take, ...(takeLanding ? { takeLanding } : {}) });
 export const buildBuilding = (playerId: string, planetId: string, building: string) =>
   act(playerId, 'building.construct', { planetId, building });
 export const upgradeBuilding = (playerId: string, planetId: string, building: string) =>

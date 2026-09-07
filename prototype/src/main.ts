@@ -587,7 +587,13 @@ import { resolveIntro, parseSeenIntros, type IntroCard } from './intros';
 import { buildRecap, type RecapEvent } from './recap';
 import { briefSince, marksAway, splitByAttention, worthShowing } from './awayBrief';
 import { HOLD_TIP_MS, cursorTipPos, holdTipPos, movedTooFar } from './tipPlacement';
-import { normalizeTake, shipCounts, stepTake } from './splitPlan';
+import {
+  cargoSplit,
+  normalizeSlotTake,
+  splitSlots,
+  stepTake,
+  type SplitSlot,
+} from './splitPlan';
 import { splitDialogHtml, splitDialogLives, splitRows } from './splitDialog';
 import { canAssaultFromOrbit, canMerge, canSplit, uniformMode } from './cmdAvailability';
 import { DEFAULT_FIRE_MODE, fireMenuHtml, fireModeLabel, fireModeTargets } from './fireMode';
@@ -7466,9 +7472,20 @@ function renderCmdBar() {
   cmdbar.classList.add('show');
 }
 
-/** Ship counts (by type) of a fleet — the rows of the split dialog. */
-function fleetShipCounts(f: Fleet): Record<string, number> {
-  return shipCounts(f.units); // арифметика деления — `splitPlan.ts` (REFM-76)
+/** Split-dialog rows of a fleet: one per STACK (unit + loadout), ships first, then
+ *  the troops in the hold (FSPLIT-1/2). A stack — not a unit type — is the addressable
+ *  thing: the same hull flies fitted and bare, and the loadout is part of the stack's
+ *  identity (SM-0.3), so "two cruisers" says nothing until it says WHICH two. */
+function fleetSplitSlots(f: Fleet): SplitSlot[] {
+  return splitSlots(f.units, f.landing ?? []); // арифметика деления — `splitPlan.ts` (REFM-76)
+}
+
+/** Hold capacity of one ship stack with its loadout installed (a cargo module is
+ *  exactly why two stacks of the same hull carry different amounts). */
+function stackCargoCapacity(unit: string, modules?: readonly string[]): number {
+  const def = data.units[unit];
+  if (!def) return 0;
+  return effectiveStats(def, { ...(modules ? { modules: [...modules] } : {}) }, data).cargoCapacity ?? 0;
 }
 
 /** The "Split fleet" modal: per ship type, +1 / +10 / All (and −1) move ships into
@@ -7494,12 +7511,22 @@ function renderSplitDialog() {
     lastSplitHtml = '';
     return;
   }
-  const counts = fleetShipCounts(f);
+  const slots = fleetSplitSlots(f);
   // Состав живой: отбор пересчитывается под него на каждой перерисовке (`splitPlan.ts`).
-  plan.take = normalizeTake(plan.take, counts);
+  plan.take = normalizeSlotTake(plan.take, slots);
+  const cargo = cargoSplit(slots, plan.take, stackCargoCapacity, (u) =>
+    data.units[u]?.stats.cargoSize ?? 1,
+  );
   const html = splitDialogHtml(
-    { fleetId: plan.fleetId, rows: splitRows(counts, plan.take) },
-    { icon: (u) => unitIconHtml(u, data, youColor, 18), name: displayUnit },
+    { fleetId: plan.fleetId, rows: splitRows(slots, plan.take), cargo },
+    {
+      icon: (u) => unitIconHtml(u, data, youColor, 18),
+      name: displayUnit,
+      moduleName: (m) => {
+        const mdef = data.modules[m];
+        return mdef ? tData(mdef.name) : m;
+      },
+    },
   );
   if (html !== lastSplitHtml) {
     splitdlg.innerHTML = html;
@@ -7528,10 +7555,22 @@ splitdlg.addEventListener('click', (ev) => {
     return;
   }
   if (sx === 'confirm') {
-    const take = Object.entries(splitState.take)
-      .filter(([, n]) => n > 0)
-      .map(([unit, count]) => ({ unit, count }));
-    if (take.length) playerOrder(splitFleet(ME, splitState.fleetId, take));
+    // Приказ адресует стеки, а не типы: у каждой строки — свой лоадаут, десант едет
+    // отдельным списком (FSPLIT-1/2). Без строки в отборе стек остаётся исходному флоту.
+    const f0 = s.fleets[splitState.fleetId];
+    const slots = f0 ? fleetSplitSlots(f0) : [];
+    const take: Array<{ unit: string; modules?: string[]; count: number }> = [];
+    const takeLanding: Array<{ unit: string; count: number }> = [];
+    for (const slot of slots) {
+      const n = splitState.take[slot.key] ?? 0;
+      if (n <= 0) continue;
+      if (slot.kind === 'ship') take.push({ unit: slot.unit, modules: slot.modules ?? [], count: n });
+      else takeLanding.push({ unit: slot.unit, count: n });
+    }
+    if (take.length)
+      playerOrder(
+        splitFleet(ME, splitState.fleetId, take, takeLanding.length ? takeLanding : undefined),
+      );
     splitState = null;
     renderSplitDialog();
     lastCmdHtml = '';
@@ -7540,13 +7579,13 @@ splitdlg.addEventListener('click', (ev) => {
     renderPanel();
     return;
   }
-  const unit = bEl.dataset.unit ?? '';
+  const key = bEl.dataset.key ?? '';
   const f = s.fleets[splitState.fleetId];
   if (!f) return;
-  const have = fleetShipCounts(f)[unit] ?? 0;
-  const cur = splitState.take[unit] ?? 0;
+  const have = fleetSplitSlots(f).find((sl) => sl.key === key)?.have ?? 0;
+  const cur = splitState.take[key] ?? 0;
   if (sx === 'inc' || sx === 'dec' || sx === 'all') {
-    splitState.take[unit] = stepTake(cur, have, sx, Number(bEl.dataset.n));
+    splitState.take[key] = stepTake(cur, have, sx, Number(bEl.dataset.n));
   }
   renderSplitDialog();
 });

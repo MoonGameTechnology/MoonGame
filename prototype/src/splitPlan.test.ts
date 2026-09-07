@@ -1,9 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
   canConfirm,
+  canConfirmSplit,
+  cargoSplit,
   clampTake,
+  normalizeSlotTake,
   normalizeTake,
   shipCounts,
+  shipTotals,
+  splitSlots,
   splitTotals,
   stepTake,
 } from './splitPlan';
@@ -107,5 +112,90 @@ describe('деление флота — итоги и подтверждение
 
   it('пустой флот подтвердить нельзя', () => {
     expect(canConfirm(0, 0)).toBe(false);
+  });
+});
+
+// FSPLIT-1/2 — адрес отбора это СТЕК, а не тип, и десант делится вместе с кораблями.
+describe('слоты отбора: стек, а не тип', () => {
+  const units = [
+    { unit: 'cruiser', count: 2, modules: ['railgun'] },
+    { unit: 'cruiser', count: 3 },
+    { unit: 'scout', count: 1 },
+  ];
+
+  it('ОДИН КОРПУС — ДВЕ СТРОКИ, если начинка разная', () => {
+    const slots = splitSlots(units);
+    expect(slots.map((x) => `${x.unit}:${x.have}`)).toEqual(['cruiser:2', 'cruiser:3', 'scout:1']);
+    expect(slots[0]!.modules).toEqual(['railgun']);
+    expect(slots[1]!.modules).toBeUndefined();
+    expect(new Set(slots.map((x) => x.key)).size).toBe(3); // адреса различимы
+  });
+
+  it('порядок модулей не создаёт третью строку — лоадаут это НАБОР', () => {
+    const slots = splitSlots([
+      { unit: 'cruiser', count: 1, modules: ['a', 'b'] },
+      { unit: 'cruiser', count: 2, modules: ['b', 'a'] },
+    ]);
+    expect(slots).toHaveLength(1);
+    expect(slots[0]!.have).toBe(3);
+  });
+
+  it('десант идёт своими слотами, после кораблей', () => {
+    const slots = splitSlots([{ unit: 'cruiser', count: 1 }], [{ unit: 'militia', count: 4 }]);
+    expect(slots.map((x) => x.kind)).toEqual(['ship', 'landing']);
+  });
+
+  it('СТЕК ИСЧЕЗ — исчезает и его отбор (бой под открытым окном)', () => {
+    const before = splitSlots(units);
+    const take = normalizeSlotTake({ [before[0]!.key]: 2, [before[2]!.key]: 1 }, before);
+    const after = splitSlots([{ unit: 'scout', count: 1 }]); // фиттованные крейсеры погибли
+    const fixed = normalizeSlotTake(take, after);
+    expect(Object.keys(fixed)).toEqual([after[0]!.key]);
+  });
+
+  it('«не ноль и не всё» считается по КОРАБЛЯМ: десант в этот счёт не входит', () => {
+    const slots = splitSlots([{ unit: 'cruiser', count: 2 }], [{ unit: 'militia', count: 5 }]);
+    const ships = slots[0]!.key;
+    expect(shipTotals(slots, { [ships]: 1 })).toEqual({ takeTotal: 1, total: 2, left: 1 });
+    // весь десант с одним из двух кораблей — деление честное
+    expect(shipTotals(slots, { [ships]: 1, [slots[1]!.key]: 5 }).takeTotal).toBe(1);
+  });
+});
+
+describe('трюм при делении', () => {
+  // крейсер везёт 2, скаут — 0; militia занимает 1
+  const capacity = (unit: string) => (unit === 'cruiser' ? 2 : 0);
+  const size = () => 1;
+  const slots = splitSlots(
+    [
+      { unit: 'cruiser', count: 2 },
+      { unit: 'scout', count: 1 },
+    ],
+    [{ unit: 'militia', count: 3 }],
+  );
+  const [ships, scouts, troops] = [slots[0]!.key, slots[1]!.key, slots[2]!.key];
+
+  it('считает обе половины: что уезжает и что остаётся', () => {
+    const c = cargoSplit(slots, { [ships]: 1, [troops]: 2 }, capacity, size);
+    expect(c).toMatchObject({ takenUsed: 2, takenCapacity: 2, keptUsed: 1, keptCapacity: 2 });
+    expect(c.fits).toBe(true);
+  });
+
+  it('ПЕРЕГРУЗ УЕЗЖАЮЩИХ ВИДЕН ДО ОТПРАВКИ: три солдата на один крейсер не влезут', () => {
+    const c = cargoSplit(slots, { [ships]: 1, [troops]: 3 }, capacity, size);
+    expect(c.fits).toBe(false);
+    expect(canConfirmSplit(slots, { [ships]: 1, [troops]: 3 }, c)).toBe(false);
+  });
+
+  it('БРОСИТЬ ВОЙСКА ТОЖЕ НЕЛЬЗЯ: увели оба крейсера, десант остался на скауте', () => {
+    const take = { [ships]: 2, [scouts]: 0, [troops]: 0 };
+    const c = cargoSplit(slots, take, capacity, size);
+    expect(c).toMatchObject({ keptUsed: 3, keptCapacity: 0 });
+    expect(canConfirmSplit(slots, take, c)).toBe(false);
+  });
+
+  it('честное деление с трюмом подтверждается', () => {
+    const take = { [ships]: 1, [troops]: 2 };
+    expect(canConfirmSplit(slots, take, cargoSplit(slots, take, capacity, size))).toBe(true);
   });
 });

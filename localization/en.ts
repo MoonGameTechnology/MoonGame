@@ -979,9 +979,12 @@ export const en: Record<string, string> = {
   // --- split — Разделение флота: диалог и предпросмотр.
   'split.all': 'All',
   'split.confirm': 'Confirm',
+  'split.hold': 'hold — new fleet: {a} · original: {b}',
+  'split.hold.over': 'the troops do not fit',
   'split.note':
-    'Peel ships into a new fleet — it stays in the same sector. At least one ship stays behind; carried troops stay with the original.',
+    'Peel ships into a new fleet — it stays in the same sector. At least one ship stays behind; carried troops are split along with the ships.',
   'split.preview': 'new fleet: {a} ships · original keeps {b}',
+  'split.section.landing': 'Carried troops',
   'split.title': 'SPLIT FLEET',
 
   // --- stat — Характеристики юнита в компактных подписях.
