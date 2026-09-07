@@ -1203,6 +1203,19 @@ export const data: GameData = parseGameData({
       params: { bonus: 0.08, radius: 300 },
     },
   },
+  // Ступени редкости → сколько СКИЛЛОВ герой носит одновременно (HPR-1.2). Держится
+  // ОДИНАКОВО с `data/heroGrades.json` (английское имя, без описания), поэтому в базовый
+  // список паритета не попадает ни строкой: имя тут нигде не рисуется — подписи ступеней
+  // в интерфейсе берутся из `HERO_GRADES` (`heroes.ts`) ключами локализации.
+  // NB: `main` пока стоит в этой лестнице четвёртой ступенью. Так исторически, и HPR-1.1
+  // его отсюда выведет — главный герой не редкость, а личный флагман со звёздами (§0.3
+  // hero-progression-roadmap.md). Числа при этом не изменятся: 1 + 3★ = 4.
+  heroGrades: {
+    common: { name: 'Common', skillSlots: 1 },
+    rare: { name: 'Rare', skillSlots: 2 },
+    legendary: { name: 'Legendary', skillSlots: 3 },
+    main: { name: 'Main', skillSlots: 4 },
+  },
   heroSkillTrees: {
     neural_lace: {
       name: 'hero.tree.neural-lace.name',

@@ -719,9 +719,20 @@ export interface Hero {
   /** Rarity tier (e.g. `common` | `rare` | `legendary` | `main`). Drives the client
    *  roster's module-slot count; the core carries it but does not enforce slots. */
   grade?: string;
-  /** Equipped ability "modules", one per grade slot (`null` = empty). Carried with the
-   *  hero; per-module gating/effects are a later brick. */
+  /** Ability "modules" the hero OWNS — the pool it may equip from. Filled by the
+   *  archetype's `startAbilities` and by skill-tree / fitting grants. Owning is not
+   *  wearing: what the hero can actually CAST is {@link Hero.equipped}. */
   abilities?: (string | null)[];
+  /** Ability ids currently IN SLOTS, bounded by the hero's skill-slot budget
+   *  (`heroSkillSlots` — the rarity's `skillSlots`, HPR-1.2). Moved in and out by
+   *  `hero.equip` / `hero.unequip`.
+   *
+   *  ABSENT ⇒ legacy loadout: everything owned counts as worn. That fallback is what
+   *  keeps old matches and replays working — before this field the two concepts were
+   *  one, and a saved hero has no way to say which of its abilities were "worn". A
+   *  legacy hero over its budget is grandfathered: it keeps casting what it has, and
+   *  the budget only bites when the player adds something new. */
+  equipped?: string[];
   /** Active passive ids (→ `data.heroPassives`, HERO-5): always-on hook contributions
    *  while the hero is alive. Copied from the archetype's `startPassives` at seed. */
   passives?: string[];

@@ -22,7 +22,7 @@ import {
 import { data } from './prototypeData';
 import { SECTOR_TYPES, MAP, START_CANDIDATES } from './map';
 import { FAVOUR_BASE } from './botFavour';
-import { DEFAULT_HEROES, type HeroGrade, type HeroLoadout } from './heroes';
+import { DEFAULT_HEROES, heroSlots, type HeroGrade, type HeroLoadout } from './heroes';
 import { DEFAULT_SHIP_LOADOUTS, type ShipLoadout } from './ships';
 import { hpOfLevel } from './economy';
 
@@ -311,6 +311,13 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
         grade: loadout.grade,
         archetype,
         abilities: [...new Set([...picks, ...markers])],
+        // HPR-1.2: владеть и НОСИТЬ — разные вещи. `abilities` — пул героя, `equipped` —
+        // что стоит в слотах и потому кастуется. Засеиваем явно, а не полагаемся на
+        // legacy-откат «надето всё, чем владеешь»: без этого бюджет редкости в новом
+        // матче не действовал бы вовсе, пока игрок сам что-нибудь не снимет.
+        // Маркеры развёртывания (`spawn_*`) слот НЕ занимают — их читает `hero.spawn`
+        // из пула, а не из слотов, и они не кастуются в принципе.
+        equipped: picks.slice(0, heroSlots(loadout.grade)),
         passives: [...(def?.startPassives ?? [])],
         home: seat.start,
         ...(main ? { alive: true, fleetId: `${seat.id}-1` } : {}),

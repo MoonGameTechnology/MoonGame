@@ -333,9 +333,51 @@ function chargeOrReject(h: HandlerContext, playerId: PlayerId, cost: ResourceBag
 /** Extend the hero's instance loadout with a grant (shared by skill nodes, HERO-7, and
  *  fittings, HERO-6). Deduped — a grant the hero already carries changes nothing, so
  *  no source can stack the same passive/ability twice. */
-function applyGrants(hero: Hero, grants: { ability?: string; passive?: string }): void {
+/** Fallback skill-slot budget for a hero the rarity system doesn't cover yet — no
+ *  `grade`, or a grade the shipped catalogue doesn't know. Base default, never a
+ *  crash (modulesystem.md): a hero-less-rarity match keeps working on one slot. */
+const DEFAULT_SKILL_SLOTS = 1;
+
+/** How many abilities `hero` may keep EQUIPPED at once (HPR-1.2).
+ *
+ *  Read from the hero's RARITY (`Hero.grade` → `data.heroGrades[].skillSlots`), which
+ *  is the resolution of 2026-09-07: slots under skills come from rarity, while the
+ *  archetype's `slots` stays the budget for FITTINGS. The two are different budgets
+ *  with confusingly similar numbers — see `HeroGradeDefSchema`. */
+export function heroSkillSlots(hero: Hero, data: HandlerContext['ctx']['data']): number {
+  const grade = hero.grade;
+  if (grade === undefined) return DEFAULT_SKILL_SLOTS;
+  return data.heroGrades[grade]?.skillSlots ?? DEFAULT_SKILL_SLOTS;
+}
+
+/** What the hero actually WEARS. Absent `equipped` ⇒ legacy loadout, where owning and
+ *  wearing were the same thing — everything owned counts as worn, so old saves and
+ *  replays behave exactly as before this field existed. `null` holes in the owned list
+ *  (empty designer slots) are not abilities and never count. */
+export function equippedOf(hero: Hero): string[] {
+  if (hero.equipped !== undefined) return hero.equipped;
+  return (hero.abilities ?? []).filter((a): a is string => a !== null);
+}
+
+function applyGrants(
+  hero: Hero,
+  grants: { ability?: string; passive?: string },
+  slots?: number,
+): void {
   if (grants.ability !== undefined && !(hero.abilities ?? []).includes(grants.ability)) {
     (hero.abilities ??= []).push(grants.ability);
+    // A granted ability lands STRAIGHT IN A SLOT while one is free (HPR-1.2). Without
+    // this, unlocking a tree node would hand the player something they own but cannot
+    // cast until they visit another screen — a wall right after a purchase. When the
+    // budget is full the grant stays in the pool and the player chooses what to swap:
+    // that is the moment slots are FOR, and the only moment they should interrupt.
+    //
+    // Only for a hero with an explicit loadout: on a legacy one (`equipped` absent)
+    // everything owned already counts as worn, and materialising the field here would
+    // silently change what that hero wears mid-match.
+    if (hero.equipped !== undefined && slots !== undefined && hero.equipped.length < slots) {
+      hero.equipped = [...hero.equipped, grants.ability];
+    }
   }
   if (grants.passive !== undefined && !(hero.passives ?? []).includes(grants.passive)) {
     (hero.passives ??= []).push(grants.passive);
@@ -504,7 +546,7 @@ function castAnnihilate(h: HandlerContext, playerId: PlayerId, planetId: PlanetI
 
 export const heroModule: GameModule = {
   id: 'hero',
-  version: '1.0.0',
+  version: '1.1.0',
   setup(api) {
     api.onAction('hero.move', (action, h) => {
       const { to } = action.payload as { to?: string };
@@ -577,8 +619,9 @@ export const heroModule: GameModule = {
       gateLiveDeployed(h, hero);
       const def = h.ctx.data.heroAbilities[abilityId];
       if (!def) return h.reject('E_NO_ABILITY');
-      // The hero must actually carry the ability in a slot (its data-driven loadout).
-      if (!(hero.abilities ?? []).includes(abilityId)) return h.reject('E_NOT_EQUIPPED');
+      // The hero must actually WEAR the ability, not merely own it (HPR-1.2). On a
+      // legacy hero (no `equipped`) the two are the same set, so nothing regresses.
+      if (!equippedOf(hero).includes(abilityId)) return h.reject('E_NOT_EQUIPPED');
       const key = cooldownKey(def.type);
       if (onCooldown(hero, key, h.ctx.now)) return h.reject('E_COOLDOWN');
       const range = abilityRange(def);
@@ -835,8 +878,71 @@ export const heroModule: GameModule = {
       chargeOrReject(h, action.playerId, def.cost);
 
       hero.skills = [...skills, node];
-      applyGrants(hero, def.grants);
+      applyGrants(hero, def.grants, heroSkillSlots(hero, h.ctx.data));
       h.emit('hero.skill.unlocked', { owner: action.playerId, heroId, node, grants: def.grants });
+    });
+
+    // HPR-1.2 — put an OWNED ability into a slot / take it back out. Owning and
+    // wearing became two things here: `Hero.abilities` is the pool the player has
+    // collected, `Hero.equipped` is what fits in the rarity's budget and can be cast.
+    //
+    // Reversible on purpose, unlike `hero.fit` (fittings are welded on for good): a
+    // loadout the player cannot rearrange is a trap, and the whole point of slots is
+    // choosing between what you own. Costs nothing — the price was paid when the
+    // ability was earned.
+    api.onAction('hero.equip', (action, h) => {
+      const { heroId, abilityId } = action.payload as { heroId?: string; abilityId?: string };
+      if (typeof heroId !== 'string' || typeof abilityId !== 'string') {
+        return h.reject('E_BAD_PAYLOAD');
+      }
+      const hero = h.state.heroes?.[heroId];
+      if (!hero) return h.reject('E_NO_HERO');
+      if (hero.owner !== action.playerId) return h.reject('E_FORBIDDEN');
+      if (hero.alive === false) return h.reject('E_HERO_DEAD');
+      // Wearing what you don't own is the one thing this action must never allow —
+      // otherwise the whole collection axis (drops, auction, ownership) is bypassed.
+      if (!(hero.abilities ?? []).includes(abilityId)) return h.reject('E_NOT_OWNED');
+      const equipped = equippedOf(hero);
+      const slots = heroSkillSlots(hero, h.ctx.data);
+      // Same generic slots+items gate as ship modules and hero fittings (SHIP-4),
+      // expressed as a single-category budget — one mechanism, one failure order.
+      const gate = canInstall(
+        {
+          item: (id) => h.ctx.data.heroAbilities[id],
+          category: () => 'skill',
+          capacity: () => slots,
+        },
+        equipped,
+        abilityId,
+      );
+      if (!gate.ok) {
+        const code = {
+          unknown: 'E_NO_ABILITY',
+          duplicate: 'E_ALREADY_EQUIPPED',
+          no_slot: 'E_NO_SLOTS',
+        }[gate.reason as 'unknown' | 'duplicate' | 'no_slot'];
+        return h.reject(code ?? 'E_INTERNAL');
+      }
+      hero.equipped = [...equipped, abilityId];
+      h.emit('hero.equipped', { owner: action.playerId, heroId, abilityId });
+    });
+
+    api.onAction('hero.unequip', (action, h) => {
+      const { heroId, abilityId } = action.payload as { heroId?: string; abilityId?: string };
+      if (typeof heroId !== 'string' || typeof abilityId !== 'string') {
+        return h.reject('E_BAD_PAYLOAD');
+      }
+      const hero = h.state.heroes?.[heroId];
+      if (!hero) return h.reject('E_NO_HERO');
+      if (hero.owner !== action.playerId) return h.reject('E_FORBIDDEN');
+      if (hero.alive === false) return h.reject('E_HERO_DEAD');
+      const equipped = equippedOf(hero);
+      if (!equipped.includes(abilityId)) return h.reject('E_NOT_EQUIPPED');
+      // Writing the filtered list MATERIALISES `equipped` for a legacy hero: from here
+      // on it says explicitly what is worn, which is exactly what taking a slot off
+      // means. A hero grandfathered over its budget shrinks toward it, never past it.
+      hero.equipped = equipped.filter((id) => id !== abilityId);
+      h.emit('hero.unequipped', { owner: action.playerId, heroId, abilityId });
     });
 
     // HERO-6 — install a ship fitting into one of the archetype's slots. Locked in
@@ -882,7 +988,7 @@ export const heroModule: GameModule = {
       chargeOrReject(h, action.playerId, def.cost);
 
       hero.fittings = [...fitted, fitting];
-      applyGrants(hero, def.grants);
+      applyGrants(hero, def.grants, heroSkillSlots(hero, h.ctx.data));
       h.emit('hero.fitted', { owner: action.playerId, heroId, fitting, grants: def.grants });
     });
   },

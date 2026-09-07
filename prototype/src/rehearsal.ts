@@ -76,6 +76,8 @@ const WIRE_PAYLOADS: Record<string, unknown> = {
   'hero.spawn': { heroId: 'hero:p1', at: 'home_p1' },
   'hero.skill.unlock': { heroId: 'hero:p1', node: 'neural_lace' },
   'hero.fit': { heroId: 'hero:p1', fitting: 'psi_lens' },
+  'hero.equip': { heroId: 'hero:p1', abilityId: 'scan' },
+  'hero.unequip': { heroId: 'hero:p1', abilityId: 'scan' },
   'station.deploy': { planetId: 'home_p1' },
   'seat.claim': { faction: 'missing-faction', scientists: [] },
   'building.construct': { planetId: 'home_p1', building: 'mine' },
