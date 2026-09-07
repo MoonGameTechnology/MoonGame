@@ -197,7 +197,6 @@ sectors/empty_space field:name
 sectors/ion_storm field:scoreValue
 sectors/nebula field:scoreValue
 sectors/solar_flare_zone field:scoreValue
-technologies/ace_programs field:conditions
 technologies/ai_stewardship field:conditions
 technologies/ai_stewardship field:prerequisites
 technologies/fortified_infrastructure field:unlocks
@@ -211,8 +210,6 @@ technologies/meta_industry_2 only-in-prototype
 technologies/microelectronics_fabrication field:cost
 technologies/microelectronics_fabrication field:unlocks
 technologies/orbital_logistics field:unlocks
-technologies/planetary_bastions field:conditions
-technologies/saturation_barrage field:conditions
 technologies/siege_doctrine field:cost
 technologies/siege_doctrine field:unlocks
 units/cruiser field:cost

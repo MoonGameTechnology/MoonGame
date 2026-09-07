@@ -131,8 +131,15 @@ export const data: GameData = parseGameData({
     // --- эпохи (TT-3.1 контент): новые узлы всех пяти веток. Философия прототипа
     // сохранена — только аддитивные эффекты, доступный контент не запирается.
     // dayGate ЖЁСТКИЙ (ядро: E_TOO_EARLY); в UI подпись «День N» = dayGate+1 —
-    // счёт статус-бара (день 1 — первый). Капстоуны веток гейтит учёный ветки
-    // (has_scientist — качественный доступ, не % скорости).
+    // счёт статус-бара (день 1 — первый).
+    // CONV-16: капстоун ветки гейтился учёным этой ветки (has_scientist — качественный
+    // доступ, не % скорости). Правило пережило сокращение состава учёных до трёх и
+    // тихо сломалось: веток пять, а учёные остались только у `command` и `space`,
+    // поэтому `planetary_bastions`/`ace_programs`/`saturation_barrage` не открывались
+    // НИКОГДА (`technology.ts` требует совпадения `def.branch`). Гейты сняты вслед за
+    // каноном, который сделал это осознанно тем же коммитом, что сократил учёных
+    // (36dd8aa). Уцелел один — у `ai_stewardship`: его ветку `command` держит overseer,
+    // так что там правило по-прежнему исполнимо. Сторож — `techTree.test.ts`.
     deep_survey: {
       name: 'Deep-Space Survey',
       description: 'tech.node.deep-survey.desc',
@@ -185,7 +192,6 @@ export const data: GameData = parseGameData({
       researchTimeHours: 18,
       dayGate: 12,
       prerequisites: ['fortified_infrastructure'],
-      conditions: [{ type: 'has_scientist', branch: 'ground' }],
       effects: { combatDamageBonus: 0.08 },
     },
     flight_decks: {
@@ -218,7 +224,6 @@ export const data: GameData = parseGameData({
       researchTimeHours: 20,
       dayGate: 12,
       prerequisites: ['strike_vectors'],
-      conditions: [{ type: 'has_scientist', branch: 'squadron' }],
       effects: { combatDamageBonus: 0.06, fleetSpeedBonus: 0.06 },
     },
     guidance_arrays: {
@@ -251,7 +256,6 @@ export const data: GameData = parseGameData({
       researchTimeHours: 20,
       dayGate: 12,
       prerequisites: ['warhead_miniaturization'],
-      conditions: [{ type: 'has_scientist', branch: 'missile' }],
       effects: { combatDamageBonus: 0.1 },
     },
     signal_corps: {
