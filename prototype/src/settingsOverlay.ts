@@ -20,6 +20,8 @@ export interface SettingsView {
   ownPings: boolean;
   glow: boolean;
   starfield: boolean;
+  /** Непрерывное «дыхание» слоёв карты. Выкл замораживает их, но не прячет. */
+  motion: boolean;
   fps: boolean;
   soundOn: boolean;
   /** Громкость звука, 0..1. */
@@ -105,6 +107,7 @@ export function settingsBoxHtml(view: SettingsView): string {
       t('settings.gfx.starfield.hint'),
       view.starfield,
     ) +
+    switchRow('motion', t('settings.gfx.motion'), t('settings.gfx.motion.hint'), view.motion) +
     switchRow('fps', t('settings.gfx.fps'), t('settings.gfx.fps.hint'), view.fps) +
     // SND-1: секция «Звук» — тумблер синтезированных откликов + громкость.
     `<div class="pc-sec">${t('settings.snd.title')}</div>` +
@@ -125,6 +128,7 @@ export interface SettingsHost {
   setOwnPings(v: boolean): void;
   setGlow(v: boolean): void;
   setStarfield(v: boolean): void;
+  setMotion(v: boolean): void;
   setFps(v: boolean): void;
   setSound(v: boolean): void;
   setVolume(v: number): void;
@@ -163,6 +167,7 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
     toggle('ownpings', host.setOwnPings);
     toggle('glow', host.setGlow);
     toggle('starfield', host.setStarfield);
+    toggle('motion', host.setMotion);
     toggle('fps', host.setFps);
     toggle('snd', host.setSound, (on) => {
       if (on) host.previewSound(); // включил — сразу слышно, ЧТО включил

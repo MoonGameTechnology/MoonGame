@@ -464,6 +464,9 @@ import {
   setStarfield,
   showFpsOn,
   setShowFps,
+  motionOn,
+  setMotion,
+  fxBreath,
 } from './graphicsPrefs';
 import { initSettings } from './settingsOverlay';
 // «Профиль командира» — карьерное досье (REFM-10).
@@ -731,7 +734,7 @@ import { ringed, ringsShown } from './assaultRings';
 import { mergeStep } from './mergeChase';
 import { gridGap, gridLines, gridOffset } from './backdropGrid';
 import { mapScale, screenRadius } from './mapRadius';
-import { breath, phaseAt, phaseOfId } from './pulseFx';
+import { phaseAt, phaseOfId } from './pulseFx';
 import { authorizedBase } from './hubAuth';
 import { diploIntent } from './diploClick';
 import { afterTokenRefused, joinStep } from './joinGate';
@@ -2296,7 +2299,7 @@ function drawSignatureAt(
   const r = cls === 'L' ? 9 : cls === 'M' ? 7 : 5;
   // Дыхание слоя — `pulseFx.ts` (REFM-137): фаза от места контакта, иначе все метки
   // мигают в такт и читаются как один щёлкающий слой.
-  const pulse = breath(now, { period: 200, base: 0.5, amp: 0.5, phase: pos.x * 0.05 });
+  const pulse = fxBreath(now, { period: 200, base: 0.5, amp: 0.5, phase: pos.x * 0.05 });
   cx.save();
   cx.translate(pos.x, pos.y);
   cx.strokeStyle = rgba('#ffb43a', (0.5 + 0.3 * pulse) * fade); // amber = unidentified contact
@@ -4582,7 +4585,7 @@ function render(now: number) {
     }
     const showOwner = p.owner;
     const col = ownerColor(p.owner);
-    const ownerPulse = breath(now, {
+    const ownerPulse = fxBreath(now, {
       period: 620,
       base: 0.64,
       amp: 0.36,
@@ -5058,14 +5061,14 @@ function render(now: number) {
     const { ships, wingPips, troops } = emblemTally(f.units, f.landing ?? [], isSquadron);
     // Фаза от ХЭША идентификатора, а не от его длины (`pulseFx.ts`, правило 2): у
     // «p1-1» и «p2-3» длина одна, и все флоты матча заводили двигатели в такт.
-    const engine = breath(now, { period: 120, base: 0.55, amp: 0.45, phase: phaseOfId(f.id) });
+    const engine = fxBreath(now, { period: 120, base: 0.55, amp: 0.45, phase: phaseOfId(f.id) });
 
     // bombardment beam down to the planet
     if (f.bombarding && f.location) {
       const target = s.planets[f.location];
       if (target) {
         const pc = world(target.position);
-        const spark = breath(now, { period: 90, base: 0.45, amp: 0.55, phase: phaseOfId(f.id) });
+        const spark = fxBreath(now, { period: 90, base: 0.45, amp: 0.55, phase: phaseOfId(f.id) });
         cx.save();
         cx.strokeStyle = rgba('#ffb15f', 0.3 + 0.3 * spark);
         cx.lineWidth = 1.2 + spark;
@@ -5263,7 +5266,7 @@ function render(now: number) {
     if (f.owner === ME && chainStepsOf(f.id)) {
       // TGT-1: an army carrying a standing plan breathes a dashed accent ring —
       // one glance tells which fleets are already "spoken for".
-      const pu = breath(now, { period: 300, base: 0.5, amp: 0.5, phase: phaseOfId(f.id) });
+      const pu = fxBreath(now, { period: 300, base: 0.5, amp: 0.5, phase: phaseOfId(f.id) });
       cx.save();
       cx.strokeStyle = rgba(ownerColor(ME), 0.3 + 0.4 * pu);
       cx.lineWidth = 1.3;
@@ -9518,6 +9521,7 @@ const settings = initSettings({
     ownPings: showOwnPings,
     glow: glowOn(),
     starfield: starfieldOn(),
+    motion: motionOn(),
     fps: showFpsOn(),
     soundOn: snd.enabled(),
     volume: snd.volume(),
@@ -9529,6 +9533,7 @@ const settings = initSettings({
   setOwnPings: setShowOwnPings,
   setGlow: setGlowFx,
   setStarfield: setStarfield,
+  setMotion: setMotion,
   setFps: setShowFps,
   setSound: (v) => snd.setEnabled(v),
   setVolume: (v) => snd.setVolume(v),

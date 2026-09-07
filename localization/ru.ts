@@ -1662,6 +1662,8 @@ export const ru: Record<string, string> = {
   'settings.gfx.glow': 'Свечение и ореолы',
   'settings.gfx.glow.hint':
     'мягкое сияние вокруг миров, флотов и границ — выключите ради чёткой карты и скорости',
+  'settings.gfx.motion': 'Движение слоёв',
+  'settings.gfx.motion.hint': 'дыхание меток, свечений и двигателей; выкл замораживает их, но не прячет',
   'settings.gfx.starfield': 'Звёздный фон',
   'settings.gfx.starfield.hint':
     'дрейфующие туманности и звёзды на фоне — выключите для плоского фона',

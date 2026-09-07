@@ -15,6 +15,7 @@
  * изменились — переехало только объявление.
  */
 import { readBool, writeBool } from './prefs';
+import { breath, type Breath } from './pulseFx';
 
 /** Свечение и ореолы: мягкие диски вокруг миров, флотов и границ. По умолчанию ВКЛ. */
 let glowFx = readBool('void.glowFx', true);
@@ -28,6 +29,44 @@ export function setGlowFx(v: boolean): void {
  *  и картинку, и их цену в кадре (см. шапку модуля). */
 export function fxBlur(n: number): number {
   return glowFx ? n : 0;
+}
+
+/**
+ * Движение: непрерывное «дыхание» живых слоёв карты (метка контакта, свечение владельца,
+ * двигатели флота, луч обстрела, кольцо плана — `pulseFx`).
+ *
+ * ПО УМОЛЧАНИЮ БЕРЁТСЯ ИЗ СИСТЕМЫ. `prefers-reduced-motion: reduce` — это заявленная
+ * потребность человека (вестибулярные расстройства, укачивание), а не предпочтение
+ * оформления, поэтому она уважается ДО того, как игрок откроет настройки. Явный тумблер
+ * потом перекрывает системный ответ в обе стороны.
+ *
+ * Выключенное движение НЕ убирает слой, а замораживает его в СЕРЕДИНЕ размаха
+ * (`Breath.base`): информация остаётся на экране, уходит только колебание. Убрать слой
+ * значило бы отнять у игрока сигнал вместо того, чтобы отнять качание — именно этой
+ * ошибкой чаще всего и заканчивается «поддержка reduced motion».
+ *
+ * Побочная выгода на телефоне: замороженный слой не пересчитывает синус каждый кадр на
+ * каждом живом объекте — дешевле и по CPU, и по батарее.
+ */
+function systemPrefersReducedMotion(): boolean {
+  // matchMedia нет в node (тесты, харнессы) — там честный ответ «система молчит».
+  try {
+    return typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  } catch {
+    return false;
+  }
+}
+let motion = readBool('void.motion', !systemPrefersReducedMotion());
+export const motionOn = (): boolean => motion;
+export function setMotion(v: boolean): void {
+  motion = v;
+  writeBool('void.motion', v);
+}
+
+/** Единственный кран для дыхания слоёв — аналог {@link fxBlur} для движения.
+ *  Выключено → середина размаха, то есть слой виден и неподвижен. */
+export function fxBreath(now: number, b: Breath): number {
+  return motion ? breath(now, b) : b.base;
 }
 
 /** Глубокий космос: дрейфующие туманности и звёздные точки, запечённые в статический

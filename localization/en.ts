@@ -1666,6 +1666,8 @@ export const en: Record<string, string> = {
   'settings.gfx.glow': 'Glow & haloes',
   'settings.gfx.glow.hint':
     'soft bloom around worlds, fleets and borders — turn off for a crisp, faster map',
+  'settings.gfx.motion': 'Layer motion',
+  'settings.gfx.motion.hint': 'breathing of markers, glows and engines; off freezes them without hiding them',
   'settings.gfx.starfield': 'Star backdrop',
   'settings.gfx.starfield.hint':
     'drifting nebulae and stars in the background — turn off for a flat backdrop',
