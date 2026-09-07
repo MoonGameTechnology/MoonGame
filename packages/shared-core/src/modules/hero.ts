@@ -519,9 +519,10 @@ function closeTempLane(h: HandlerContext, laneId: string): void {
  *  world. Empty space (uncapturable) and a previously-annihilated dead world are
  *  both rejected. Shared by the legacy `planet.annihilate` pre-gate (which checks
  *  the target before range/cooldown — pinned by tests) and the cast body. */
-function requireDestructible(h: HandlerContext, planetId: PlanetId): NonNullable<
-  GameState['planets'][string]
-> {
+function requireDestructible(
+  h: HandlerContext,
+  planetId: PlanetId,
+): NonNullable<GameState['planets'][string]> {
   const planet = h.state.planets[planetId];
   if (!planet) h.reject('E_NO_PLANET');
   if (!isCapturable(h.ctx.data, planet) || planet.kind === DEAD_KIND) {
@@ -683,7 +684,11 @@ export const heroModule: GameModule = {
     // Speed bonus on a leg that runs along one of the fleet owner's active temp lanes,
     // then the owner's hero passives (HERO-5): ×(1 + Σ applicable `fleet.speed` bonuses).
     api.hook<number>('fleet.speed', (speed, args, h) => {
-      const { fleetId, from, to } = (args ?? {}) as { fleetId?: string; from?: string; to?: string };
+      const { fleetId, from, to } = (args ?? {}) as {
+        fleetId?: string;
+        from?: string;
+        to?: string;
+      };
       if (typeof fleetId !== 'string' || typeof from !== 'string' || typeof to !== 'string') {
         return speed;
       }
@@ -979,9 +984,11 @@ export const heroModule: GameModule = {
       );
       if (!gate.ok) {
         // `not_allowed` is unreachable (no predicate) → the fail-secure default.
-        const code = { unknown: 'E_NO_FITTING', duplicate: 'E_ALREADY_FITTED', no_slot: 'E_NO_SLOTS' }[
-          gate.reason as 'unknown' | 'duplicate' | 'no_slot'
-        ];
+        const code = {
+          unknown: 'E_NO_FITTING',
+          duplicate: 'E_ALREADY_FITTED',
+          no_slot: 'E_NO_SLOTS',
+        }[gate.reason as 'unknown' | 'duplicate' | 'no_slot'];
         return h.reject(code ?? 'E_INTERNAL');
       }
       const def = h.ctx.data.heroFittings[fitting]!; // gate passed ⇒ the fitting exists

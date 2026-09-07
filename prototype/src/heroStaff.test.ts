@@ -404,3 +404,75 @@ describe('штаб героев — клики', () => {
     expect(sent[0]!.type).toBe('hero.fit');
   });
 });
+
+describe('штаб героев — слоты под скиллы (HPR-1.2)', () => {
+  /** Панель «Способности» у главного героя: он носит три, бюджет — четыре. */
+  function slotsPane(over: Partial<HeroStaffHost> = {}): {
+    staff: ReturnType<typeof initHeroStaff>;
+    html: string;
+  } {
+    const staff = initHeroStaff(hostOf(over));
+    staff.click(click('[data-htab]', { htab: 'abilities' }));
+    return { staff, html: staff.paneHtml() };
+  }
+
+  it('бюджет показан ЧИСЛОМ, а свободный слот — приглашением, а не дырой', () => {
+    const { html } = slotsPane();
+    // «Слоты · 3/4» — пипсы перестают читаться после четырёх и не говорят, сколько осталось.
+    expect(html).toMatch(/Слоты · \d+\/\d+/);
+    expect(html).toContain('hx-bay');
+    expect(html).toContain(t('hero.slot.empty'));
+  });
+
+  it('надеть из запаса — это заказ hero.equip на нужного героя и нужный скилл', () => {
+    // Засеянный ростер носит всё, чем владеет, поэтому запас задаём явно: владеет
+    // тремя, носит одну — две ждут слота.
+    const s = staffed();
+    const hero = Object.values(s.heroes!).find((h) => h.owner === 'p1')!;
+    hero.abilities = ['rally', 'scan', 'bulwark'];
+    hero.equipped = ['rally'];
+    const orders: Action[] = [];
+    const { staff, html } = slotsPane({ state: () => s, order: (a) => orders.push(a) });
+    const btn = /data-hequip="([^"]+)" data-ab="([^"]+)"/.exec(html);
+    expect(btn, 'в запасе должен быть хотя бы один надеваемый скилл').not.toBeNull();
+    staff.click(click('[data-hequip]', { hequip: btn![1]!, ab: btn![2]! }));
+    expect(orders).toHaveLength(1);
+    expect(orders[0]!.type).toBe('hero.equip');
+    expect(orders[0]!.payload).toEqual({ heroId: btn![1], abilityId: btn![2] });
+  });
+
+  it('снять — обратимо, и это отдельный заказ hero.unequip', () => {
+    const orders: Action[] = [];
+    const { staff, html } = slotsPane({ order: (a) => orders.push(a) });
+    const btn = /data-hunequip="([^"]+)" data-ab="([^"]+)"/.exec(html);
+    expect(btn, 'занятый слот обязан предлагать снятие').not.toBeNull();
+    staff.click(click('[data-hunequip]', { hunequip: btn![1]!, ab: btn![2]! }));
+    expect(orders).toHaveLength(1);
+    expect(orders[0]!.type).toBe('hero.unequip');
+  });
+
+  it('перк развёртывания лежит в запасе, но слот не занимает и надеть его нельзя', () => {
+    // `spawn_*` читает `hero.spawn` из пула, а не из слотов — кнопки надевания у него нет.
+    const s = staffed();
+    const hero = Object.values(s.heroes!).find((h) => h.owner === 'p1')!;
+    hero.abilities = ['rally', 'diplomatic_landing'];
+    hero.equipped = ['rally'];
+    const { html } = slotsPane({ state: () => s });
+    expect(html).toContain(t('hero.abil.deploy-perk'));
+    expect(html).not.toMatch(/data-hequip="[^"]*" data-ab="diplomatic_landing"/);
+  });
+
+  it('когда слотов нет, лишнее ПОКАЗАНО погашенным, а не спрятано', () => {
+    const s = staffed();
+    const hero = Object.values(s.heroes!).find((h) => h.owner === 'p1')!;
+    hero.grade = 'common'; // один слот
+    hero.abilities = ['rally', 'scan'];
+    hero.equipped = ['rally'];
+    const { html } = slotsPane({ state: () => s });
+    // Скилл виден — прятать его значило бы врать о том, чем игрок владеет…
+    expect(html).toContain(t('data.scan'));
+    // …но причина названа, и кнопки надевания нет.
+    expect(html).toContain(t('hero.slot.full'));
+    expect(html).not.toMatch(/data-hequip="[^"]*" data-ab="scan"/);
+  });
+});

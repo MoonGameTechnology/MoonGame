@@ -20,7 +20,13 @@ import { t } from '../../localization/runtime';
 import { data } from './prototypeData';
 import { esc, cost, fmtHrs } from './format';
 import { HOUR } from './time';
-import { castHeroAbility, unlockHeroSkill, fitHero } from './actions';
+import {
+  castHeroAbility,
+  unlockHeroSkill,
+  fitHero,
+  equipHeroAbility,
+  unequipHeroAbility,
+} from './actions';
 import { houseDisplayName } from './setupSeats';
 
 type HeroInst = NonNullable<GameState['heroes']>[string];
@@ -324,30 +330,94 @@ function heroTreeHtml(hero: HeroInst, res: Bag): string {
   return html + `</div>`;
 }
 
-/** The abilities tab — the hero's equipped, castable loadout (cast via the command flow;
- *  ranged casts arm the map, self/aura fire in place). Spawn-markers show as passive perks. */
+/** Skill-slot budget of a hero — the rarity's `skillSlots`, mirroring the core's
+ *  `heroSkillSlots`. Unknown/absent grade degrades to one slot, exactly as there. */
+function skillSlotsOf(hero: HeroInst): number {
+  const grade = hero.grade;
+  if (grade === undefined) return 1;
+  return data.heroGrades[grade]?.skillSlots ?? 1;
+}
+
+/** What the hero WEARS. Mirrors the core's `equippedOf`, including its legacy fallback:
+ *  no `equipped` field ⇒ an old loadout where owning and wearing were one thing. */
+function wornOf(hero: HeroInst): string[] {
+  if (hero.equipped !== undefined) return hero.equipped;
+  return (hero.abilities ?? []).filter((a): a is string => a !== null);
+}
+
+/**
+ * The abilities tab — SLOTS, and a pool to fill them from (HPR-1.2).
+ *
+ * Reads as the ship loadout does on purpose: a slot is a BAY, the same shape the
+ * shipyard uses for hull modules, so the two screens teach one language instead of two.
+ * Filling one is tap-a-slot → tap-an-item, the interaction the whole app already uses;
+ * dragging is a later layer over exactly this, never instead of it (it is also the only
+ * thing that works from a keyboard).
+ *
+ * Three rules the layout has to keep:
+ *  · the budget is a NUMBER (`2/3`), not only pips — pips stop being countable past
+ *    four and never say how much room is left;
+ *  · an ability that does not fit is shown DIMMED WITH ITS REASON, never hidden —
+ *    hiding it would make the screen lie about what the player owns;
+ *  · spawn-markers are perks, not slots: they ride in the pool and cost nothing to
+ *    carry, because `hero.spawn` reads them from what the hero OWNS.
+ */
 function heroAbilitiesHtml(hero: HeroInst, now: number): string {
   const dead = hero.alive === false;
-  const abilities = (hero.abilities ?? []).filter(
+  const owned = (hero.abilities ?? []).filter(
     (a): a is string => a !== null && !!data.heroAbilities[a],
   );
-  if (!abilities.length) return `<div class="hx-note">${t('hero.abil.empty')}</div>`;
-  let html = '';
-  for (const ab of abilities) {
+  if (!owned.length) return `<div class="hx-note">${t('hero.abil.empty')}</div>`;
+  const worn = wornOf(hero).filter((a) => !!data.heroAbilities[a]);
+  const slots = skillSlotsOf(hero);
+  const free = Math.max(0, slots - worn.length);
+
+  // --- слоты: занятые отсеки + пустые приглашения ---------------------------
+  const bays: string[] = [];
+  for (const ab of worn) {
     const ad = data.heroAbilities[ab]!;
     const cdLeft = Math.max(0, (hero.cooldowns?.[heroCdKey(ad.type)] ?? 0) - now);
-    const action = ad.type.startsWith('spawn_')
-      ? `<span class="hx-badge">${t('hero.abil.deploy-perk')}</span>`
-      : cdLeft > 0
+    const cast =
+      cdLeft > 0
         ? `<span class="hx-badge cd">${t('hero.abil.cooldown', { h: fmtHrs(cdLeft / HOUR) })}</span>`
         : HERO_CASTABLE.has(ad.type)
           ? `<button class="hx-btn" data-hcast="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${(ad.range ?? 0) > 0 ? t('hero.abil.pick-target') : t('hero.abil.activate')}</button>`
           : `<span class="hx-badge">${t('hero.abil.soon')}</span>`;
-    html +=
-      `<div class="hx-row"><div class="hx-grow"><span class="hx-an">${esc(t(ad.name))}</span>` +
+    bays.push(
+      `<div class="hx-bay on"><div class="hx-grow"><span class="hx-an">${esc(t(ad.name))}</span>` +
+        `<div class="hx-note">${esc(t(ad.description ?? ''))}</div></div>` +
+        `<div class="hx-bayact">${cast}` +
+        `<button class="hx-btn ghost" data-hunequip="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${t('hero.slot.remove')}</button>` +
+        `</div></div>`,
+    );
+  }
+  for (let i = 0; i < free; i += 1) {
+    bays.push(`<div class="hx-bay off">${t('hero.slot.empty')}</div>`);
+  }
+
+  // --- пул: чем владеет, но не носит ----------------------------------------
+  const pool = owned.filter((ab) => !worn.includes(ab));
+  let poolHtml = '';
+  for (const ab of pool) {
+    const ad = data.heroAbilities[ab]!;
+    const perk = ad.type.startsWith('spawn_');
+    // Перк слот не занимает — он всегда «при герое», и кнопки надевания у него нет.
+    const action = perk
+      ? `<span class="hx-badge">${t('hero.abil.deploy-perk')}</span>`
+      : free > 0
+        ? `<button class="hx-btn" data-hequip="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${t('hero.slot.equip')}</button>`
+        : `<span class="hx-badge">${t('hero.slot.full')}</span>`;
+    poolHtml +=
+      `<div class="hx-row${perk || free > 0 ? '' : ' dim'}"><div class="hx-grow">` +
+      `<span class="hx-an">${esc(t(ad.name))}</span>` +
       `<div class="hx-note">${esc(t(ad.description ?? ''))}</div></div>${action}</div>`;
   }
-  return html;
+
+  return (
+    `<div class="hx-h">${t('hero.slot.head', { u: worn.length, n: slots })}</div>` +
+    `<div class="hx-bays">${bays.join('')}</div>` +
+    (poolHtml ? `<div class="hx-h">${t('hero.slot.pool')}</div>${poolHtml}` : '')
+  );
 }
 
 /** The fittings tab — slot budget as pips, each fitting a row; tap an installable one to
@@ -574,6 +644,18 @@ export function initHeroStaff(host: HeroStaffHost): {
     if (skillBtn) {
       host.order(unlockHeroSkill(host.me(), skillBtn.dataset.hskill!, skillBtn.dataset.node!));
       view = { ...view, dossier: null }; // the node is bought — dismiss its dossier
+      return 'repaint';
+    }
+    const equipBtn = tg.closest('[data-hequip]') as HTMLElement | null;
+    if (equipBtn) {
+      host.order(equipHeroAbility(host.me(), equipBtn.dataset.hequip!, equipBtn.dataset.ab!));
+      return 'repaint';
+    }
+    const unequipBtn = tg.closest('[data-hunequip]') as HTMLElement | null;
+    if (unequipBtn) {
+      host.order(
+        unequipHeroAbility(host.me(), unequipBtn.dataset.hunequip!, unequipBtn.dataset.ab!),
+      );
       return 'repaint';
     }
     const fitBtn = tg.closest('[data-hfit]') as HTMLElement | null;
