@@ -67,6 +67,18 @@ const data: GameData = parseGameData({
     },
     // a malformed reveal (ranged so a target is supplied, but no radius/duration) — reject.
     dudscan: { name: 'DudScan', type: 'reveal', cooldownHours: 5, range: 400, params: {} },
+    // jump: a ranged (600) teleport of the hero's whole ship — `recall` with a target.
+    jump: { name: 'Прыжок', type: 'jump', cooldownHours: 36, range: 600 },
+    // decoy: a ranged (600) phantom radar contact for 4h, radiating an M-sized signature.
+    decoy: {
+      name: 'Фантом',
+      type: 'decoy',
+      cooldownHours: 8,
+      range: 600,
+      params: { signature: 8, durationHours: 4 },
+    },
+    // a malformed decoy (no signature / no duration) — the provider must reject it.
+    duddecoy: { name: 'DudDecoy', type: 'decoy', cooldownHours: 5, range: 600, params: {} },
   },
 });
 const HOUR = 3_600_000;
@@ -513,5 +525,199 @@ describe('heroEffects — the PSI ladder (scan steps 2–3 → combat inside the
     const r = round(st);
     expect(r.dmgToDefender).toBeCloseTo(20 * 1.1 * 1.05, 6); // aura (dealing side) × weak points (taking side)
     expect(r.dmgToAttacker).toBeCloseTo(20 / 1.05, 6); // p2 deals: no aura, but p1 evades
+  });
+});
+
+describe('heroEffects — jump (a targeted recall: the hero ship warps to a node in range)', () => {
+  const kernel = createKernel([heroModule, heroEffectsModule]);
+
+  /** A(p1) holds the hero ship, B is 500 away (inside the 600 range), C is 1500 (outside). */
+  function world(over?: {
+    fleet?: Partial<Fleet>;
+    hero?: Partial<Hero>;
+    battles?: Record<string, Battle>;
+  }): GameState {
+    const s = createInitialState({ seed: 'fx', version: { data: '0.1.0', manifest: '1' } });
+    const f1: Fleet = {
+      id: 'f1',
+      owner: 'p1',
+      location: 'A',
+      movement: null,
+      // The hold rides along: a jump must carry the landing force, not strand it.
+      units: [
+        { unit: 'hero', count: 1 },
+        { unit: 'warship', count: 3 },
+      ],
+      traits: [],
+      ...over?.fleet,
+    };
+    const hero: Hero = {
+      id: 'hero:p1:1',
+      owner: 'p1',
+      location: 'A',
+      home: 'A',
+      cooldowns: {},
+      alive: true,
+      fleetId: 'f1',
+      abilities: ['jump'],
+      ...over?.hero,
+    };
+    return {
+      ...s,
+      players: { p1: player('p1') },
+      planets: {
+        A: planet('A', 'p1', 0),
+        B: planet('B', null, 500),
+        C: planet('C', null, 1500),
+      },
+      fleets: { f1 },
+      heroes: { 'hero:p1:1': hero },
+      ...(over?.battles ? { battles: over.battles } : {}),
+    };
+  }
+  const cast = (target: string, seq = 1) =>
+    act('hero.ability', 'p1', { heroId: 'hero:p1:1', abilityId: 'jump', target }, seq);
+
+  it('moves the whole ship — hold included — to the target and follows the node memory', () => {
+    const r = okApply(kernel.applyAction(world(), cast('B'), ctx(0)));
+    expect(r.state.fleets.f1?.location).toBe('B');
+    expect(r.state.fleets.f1?.movement).toBeNull();
+    // The landing force travels with the hull; a jump is a move, not a respawn.
+    expect(r.state.fleets.f1?.units).toEqual([
+      { unit: 'hero', count: 1 },
+      { unit: 'warship', count: 3 },
+    ]);
+    expect(r.state.heroes!['hero:p1:1']?.location).toBe('B');
+    expect(r.events.map((e) => e.type)).toContain('hero.jumped');
+    expect(r.state.heroes!['hero:p1:1']?.cooldowns['fx:jump']).toBeGreaterThan(0);
+  });
+
+  it('snaps a mid-flight ship to the target (clears movement + any parked edge)', () => {
+    const flying = world({
+      fleet: {
+        location: null,
+        movement: { to: 'C', from: 'A', departedAt: 0, arrivesAt: HOUR },
+        edge: { from: 'A', to: 'C', t: 0.5 },
+      },
+    });
+    const r = okApply(kernel.applyAction(flying, cast('B'), ctx(0)));
+    expect(r.state.fleets.f1?.location).toBe('B');
+    expect(r.state.fleets.f1?.movement).toBeNull();
+    expect(r.state.fleets.f1?.edge).toBeNull();
+  });
+
+  it('refuses a target beyond the ability range — the generic gate, before the effect', () => {
+    expect(errCode(kernel.applyAction(world(), cast('C'), ctx(0)))).toBe('E_OUT_OF_RANGE');
+  });
+
+  it('refuses to warp a ship out of an active battle (E_FLEET_BUSY)', () => {
+    const inFight = world({ fleet: { battleId: 'b1' }, battles: { b1: {} as Battle } });
+    expect(errCode(kernel.applyAction(inFight, cast('B'), ctx(0)))).toBe('E_FLEET_BUSY');
+  });
+
+  it('rejects a reserve (undeployed) hero — nothing to move', () => {
+    const reserve = world({ hero: { alive: undefined, fleetId: undefined } });
+    delete reserve.fleets.f1;
+    expect(errCode(kernel.applyAction(reserve, cast('B'), ctx(0)))).toBe('E_HERO_NOT_DEPLOYED');
+  });
+
+  it('rejects a no-op jump onto the node it already idles on (E_SAME_LOCATION)', () => {
+    expect(errCode(kernel.applyAction(world(), cast('A'), ctx(0)))).toBe('E_SAME_LOCATION');
+  });
+
+  it('a rejected jump costs nothing — the cooldown is not burned', () => {
+    const before = world();
+    const r = kernel.applyAction(before, cast('C'), ctx(0));
+    expect(r.ok).toBe(false);
+    // Fail-secure: the kernel discards the whole draft, so nothing at all was written.
+    expect(before.heroes!['hero:p1:1']?.cooldowns['fx:jump']).toBeUndefined();
+  });
+
+  it('cools down: a second jump inside 36h is E_COOLDOWN', () => {
+    const r = okApply(kernel.applyAction(world(), cast('B', 1), ctx(0)));
+    expect(errCode(kernel.applyAction(r.state, cast('A', 2), ctx(HOUR)))).toBe('E_COOLDOWN');
+  });
+});
+
+describe('heroEffects — decoy (a phantom radar contact, stored on the hero)', () => {
+  const kernel = createKernel([heroModule, heroEffectsModule]);
+
+  function world(abilities: string[] = ['decoy']): GameState {
+    const s = createInitialState({ seed: 'fx', version: { data: '0.1.0', manifest: '1' } });
+    const f1: Fleet = {
+      id: 'f1',
+      owner: 'p1',
+      location: 'A',
+      movement: null,
+      units: [{ unit: 'hero', count: 1 }],
+      traits: [],
+    };
+    const hero: Hero = {
+      id: 'hero:p1:1',
+      owner: 'p1',
+      location: 'A',
+      home: 'A',
+      cooldowns: {},
+      alive: true,
+      fleetId: 'f1',
+      abilities,
+    };
+    return {
+      ...s,
+      players: { p1: player('p1') },
+      planets: {
+        A: planet('A', 'p1', 0),
+        B: planet('B', null, 500),
+        D: planet('D', null, 400),
+        C: planet('C', null, 1500),
+      },
+      fleets: { f1 },
+      heroes: { 'hero:p1:1': hero },
+    };
+  }
+  const cast = (abilityId: string, target: string, seq = 1) =>
+    act('hero.ability', 'p1', { heroId: 'hero:p1:1', abilityId, target }, seq);
+
+  it('records the phantom on the hero with the cast signature and window', () => {
+    const r = okApply(kernel.applyAction(world(), cast('decoy', 'B'), ctx(0)));
+    expect(r.state.heroes!['hero:p1:1']?.activeDecoys).toEqual([
+      { at: 'B', signature: 8, until: 4 * HOUR },
+    ]);
+    expect(r.events.map((e) => e.type)).toContain('hero.decoyed');
+  });
+
+  it('creates NO fleet and no unit — a decoy is a lie told to the projection, not a force', () => {
+    const before = world();
+    const r = okApply(kernel.applyAction(before, cast('decoy', 'B'), ctx(0)));
+    // The simulation must not be able to tell a decoy exists: an empty fleet would be
+    // pulled into battles, could capture, and would count toward victory.
+    expect(Object.keys(r.state.fleets)).toEqual(Object.keys(before.fleets));
+    expect(r.state.planets.B?.garrison).toEqual([]);
+    expect(r.state.planets.B?.owner).toBeNull();
+  });
+
+  it('prunes expired phantoms on the next cast and keeps the live one', () => {
+    const first = okApply(kernel.applyAction(world(), cast('decoy', 'B', 1), ctx(0)));
+    // 8h cooldown > 4h duration, so by the time it can be cast again the first is dead.
+    const second = okApply(kernel.applyAction(first.state, cast('decoy', 'D', 2), ctx(9 * HOUR)));
+    expect(second.state.heroes!['hero:p1:1']?.activeDecoys).toEqual([
+      { at: 'D', signature: 8, until: 13 * HOUR },
+    ]);
+  });
+
+  it('refuses a target beyond the ability range', () => {
+    expect(errCode(kernel.applyAction(world(), cast('decoy', 'C'), ctx(0)))).toBe('E_OUT_OF_RANGE');
+  });
+
+  it('rejects a malformed decoy (no signature / no duration) so the cooldown is not wasted', () => {
+    expect(errCode(kernel.applyAction(world(['duddecoy']), cast('duddecoy', 'B'), ctx(0)))).toBe(
+      'E_BAD_EFFECT',
+    );
+  });
+
+  it('rejects an ability the hero does not carry', () => {
+    expect(errCode(kernel.applyAction(world([]), cast('decoy', 'B'), ctx(0)))).toBe(
+      'E_NOT_EQUIPPED',
+    );
   });
 });

@@ -73,7 +73,8 @@ export const ru: Record<string, string> = {
   'admin.state.online': 'на связи',
   'admin.state.offline': 'не в сети',
   'admin.kick': 'Снять',
-  'admin.kick.confirm': 'Снять {nick} с места? Империя останется на карте, кресло освободится для нового игрока.',
+  'admin.kick.confirm':
+    'Снять {nick} с места? Империя останется на карте, кресло освободится для нового игрока.',
   'admin.kick.done': '{nick} снят — кресло {seat} свободно',
   'admin.err.creds': 'Неверный позывной или пароль',
   'admin.err.no-authority': 'У этой учётной записи нет прав администратора',
@@ -546,6 +547,7 @@ export const ru: Record<string, string> = {
   'data.carrier': 'носитель',
   'data.combined-arms': 'Общевойсковой бой',
   'data.commander': 'Командир',
+  'data.convoy-impulse': 'Импульс ордера',
   'data.corridor': 'Коридор',
   'data.credit-refinery': 'Кредитный НПЗ',
   'data.credits': 'кредиты',
@@ -554,6 +556,7 @@ export const ru: Record<string, string> = {
   'data.crystalline': 'Кристаллический',
   'data.dead-world': 'Мёртвый мир',
   'data.debris-field': 'Поле обломков',
+  'data.decoy-signal': 'Ложный сигнал',
   'data.deep-space-survey': 'Дальняя разведка космоса',
   'data.deep-void': 'Глубокая пустота',
   'data.dense-nebula': 'Плотная туманность',
@@ -563,7 +566,9 @@ export const ru: Record<string, string> = {
   'data.empty-space': 'Пустое пространство',
   'data.energy': 'энергия',
   'data.evasive-vectors': 'Манёвренность',
+  'data.false-echo': 'Ложное эхо',
   'data.fighter-squadron': 'истребительная эскадрилья',
+  'data.fleet-uplink': 'Канал ордера',
   'data.flight-decks': 'Полётные палубы',
   'data.food': 'пища',
   'data.fort': 'Форт',
@@ -651,8 +656,10 @@ export const ru: Record<string, string> = {
   'data.void-armadas': 'Армады Пустоты',
   'data.void-attunement': 'Сонастройка с Пустотой',
   'data.void-fortress': 'Крепость пустоты',
+  'data.void-translocator': 'Транслокатор Пустоты',
   'data.volcanic': 'Вулканический',
   'data.warden': 'Страж',
+  'data.warp-jump': 'Варп-прыжок',
   'data.warhead-miniaturization': 'Миниатюризация боеголовок',
   'data.weak-points': 'Слабые места',
 
@@ -1139,6 +1146,9 @@ export const ru: Record<string, string> = {
   'hero.ability.corridor.desc':
     'Пробивает коридор до близкого мира. Одноразовый: пройти по нему может только армия с этим героем, и он закрывается, как только она прибыла. Улучшения продлевают ему жизнь, а затем открывают проход союзникам — но открытый проход общий, и враг войдёт в него тоже.',
   'hero.ability.corridor.name': 'Коридор',
+  'hero.ability.decoy-signal.desc':
+    'Подделывает радарный контакт: узел в радиусе начинает читаться чужими радарами как занятый. Фантом видно только там, куда достаёт чужой радар, и он рассыпается, стоит противнику подойти и разглядеть узел вблизи.',
+  'hero.ability.decoy-signal.name': 'Ложный сигнал',
   'hero.ability.diplomatic-landing.desc':
     'Союзные миры принимают героя как своего: корабль может подняться и на планете союзника. Пассивный навык: расширяет точки развёртывания.',
   'hero.ability.diplomatic-landing.name': 'Дипломатическая высадка',
@@ -1150,6 +1160,9 @@ export const ru: Record<string, string> = {
   'hero.ability.scan.desc':
     'Раскрывает зону вокруг цели сквозь туман на время. Улучшения превращают просвеченную зону в боевую: сперва подсвечивают бреши в броне врага, затем ведут по радару свои и союзные флоты.',
   'hero.ability.scan.name': 'Разведка',
+  'hero.ability.warp-jump.desc':
+    'Прокол пространства: корабль героя вместе с десантом в трюме мгновенно оказывается в узле в радиусе действия. Прыгает и сквозь туман. Из активного боя не выдёргивает.',
+  'hero.ability.warp-jump.name': 'Варп-прыжок',
   'hero.arch.commander': 'Командир',
   'hero.arch.destroyer': 'Разрушитель',
   'hero.arch.vanguard': 'Авангард',
@@ -1168,6 +1181,9 @@ export const ru: Record<string, string> = {
   'hero.grade.rare': 'Редкий',
   'hero.hook.combat-damage': 'урон флотам рядом',
   'hero.hook.fleet-speed': 'скорость флота',
+  'hero.passive.convoy-impulse.desc':
+    'Герой ведёт сбор: флоты, выходящие из узлов в радиусе 300, летят на 8% быстрее.',
+  'hero.passive.convoy-impulse.name': 'Импульс ордера',
   'hero.passive.rally-beacon.desc':
     'Флоты рядом с героем бьются яростнее: +8% к урону своих флотов в радиусе 300.',
   'hero.passive.rally-beacon.name': 'Маяк сбора',
@@ -1180,6 +1196,12 @@ export const ru: Record<string, string> = {
   'hero.tree.corridor-sustained.desc':
     'Коридор держится по часам, а не гаснет с первым же проходом армии героя.',
   'hero.tree.corridor-sustained.name': 'Устойчивый коридор',
+  'hero.tree.false-echo.desc':
+    'Обратная сторона пси-зрения: герой учится не только читать чужой радар, но и писать в него то, чего нет.',
+  'hero.tree.false-echo.name': 'Ложное эхо',
+  'hero.tree.fleet-uplink.desc':
+    'Нейроканал расходится на весь ордер: с места быстрее снимается не только корабль героя, но и флоты рядом.',
+  'hero.tree.fleet-uplink.name': 'Канал ордера',
   'hero.tree.neural-lace.desc':
     'Имплант прямого канала «мозг—штурвал»: корабль героя разгоняется на +10%.',
   'hero.tree.neural-lace.name': 'Нейрокружево',
@@ -1196,6 +1218,9 @@ export const ru: Record<string, string> = {
   'hero.tree.void-attunement.desc':
     'Пси-резонанс героя воодушевляет флоты рядом: +8% к урону в радиусе 300.',
   'hero.tree.void-attunement.name': 'Сонастройка с Пустотой',
+  'hero.tree.void-translocator.desc':
+    'Вершина коридорной ветки: герой перестаёт прокладывать путь и просто исчезает в одном узле, чтобы появиться в другом.',
+  'hero.tree.void-translocator.name': 'Транслокатор Пустоты',
   'hero.unit.commander.desc':
     'Главный герой-флагман: командный трансгуманист, усиливает флот и открывает коридоры.',
   'hero.unit.commander.name': 'Командир',
@@ -1663,7 +1688,8 @@ export const ru: Record<string, string> = {
   'settings.gfx.glow.hint':
     'мягкое сияние вокруг миров, флотов и границ — выключите ради чёткой карты и скорости',
   'settings.gfx.motion': 'Движение слоёв',
-  'settings.gfx.motion.hint': 'дыхание меток, свечений и двигателей; выкл замораживает их, но не прячет',
+  'settings.gfx.motion.hint':
+    'дыхание меток, свечений и двигателей; выкл замораживает их, но не прячет',
   'settings.gfx.starfield': 'Звёздный фон',
   'settings.gfx.starfield.hint':
     'дрейфующие туманности и звёзды на фоне — выключите для плоского фона',

@@ -89,8 +89,19 @@ export const heroCdKey = (type: string): string =>
   type === 'temp_lane' ? 'path' : type === 'annihilate' ? 'annihilate' : `fx:${type}`;
 // Ability types the prototype kernel can actually resolve: the two heroModule
 // built-ins + every `hero.effect.<type>` the kernel's MODULES provide (heroEffects →
-// recall/aura/reveal). Types not here have no engine effect yet → the «скоро» badge.
-export const HERO_CASTABLE = new Set(['temp_lane', 'annihilate', 'recall', 'aura', 'reveal']);
+// recall/aura/reveal/jump/decoy). Types not here have no engine effect yet → the «скоро»
+// badge. Keeping this list in step with `heroEffectsModule` is the whole job of the
+// parity test in `heroStaff.test.ts`: a provider added there and forgotten here gives a
+// silently uncastable ability — exactly how `station.deploy` sat unreachable for months.
+export const HERO_CASTABLE = new Set([
+  'temp_lane',
+  'annihilate',
+  'recall',
+  'aura',
+  'reveal',
+  'jump',
+  'decoy',
+]);
 // STAFF-1 shape: one focused hero + tabs (Обзор / Дерево / Способности / Фиттинги), a
 // real branch skill-tree with prereq connectors and per-node states, and a tap-to-open
 // dossier that shows what a node/fitting grants BEFORE you buy it.
