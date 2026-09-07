@@ -476,3 +476,42 @@ describe('штаб героев — слоты под скиллы (HPR-1.2)', (
     expect(html).not.toMatch(/data-hequip="[^"]*" data-ab="scan"/);
   });
 });
+
+describe('штаб героев — фиттинги в той же идиоме отсеков', () => {
+  function fitPane(over: Partial<HeroStaffHost> = {}): string {
+    const staff = initHeroStaff(hostOf(over));
+    staff.click(click('[data-htab]', { htab: 'fittings' }));
+    return staff.paneHtml();
+  }
+
+  it('свободные слоты — такие же отсеки, как у скиллов', () => {
+    const html = fitPane();
+    expect(html).toContain('hx-bay');
+    expect(html).toContain(t('hero.slot.empty'));
+  });
+
+  it('у установленного фиттинга НЕТ кнопки снятия — он приварен навсегда', () => {
+    const s = staffed();
+    const hero = Object.values(s.heroes!).find((h) => h.owner === 'p1')!;
+    hero.fittings = ['psi_amplifier'];
+    const html = fitPane({ state: () => s });
+    // Отсек занят и это видно…
+    expect(html).toContain(t('hero.fit.installed'));
+    // …но `hero.fit` необратим, поэтому «снять» тут быть не должно — в отличие от скиллов.
+    expect(html).not.toContain(`data-hunequip`);
+    expect(html).not.toContain(t('hero.slot.remove'));
+  });
+
+  it('при полном бюджете остальные фиттинги видны, но погашены и не тапаются', () => {
+    const s = staffed();
+    const hero = Object.values(s.heroes!).find((h) => h.owner === 'p1')!;
+    // «Страж» — один слот, значит остальные фиттинги каталога заведомо не влезут
+    // (у командира слотов больше, чем фиттингов вообще, и запас вышел бы пустым).
+    hero.archetype = 'warden';
+    hero.fittings = [Object.keys(data.heroFittings)[0]!];
+    const html = fitPane({ state: () => s });
+    expect(html).toContain(t('hero.fit.no-slots'));
+    expect(html).toContain('hx-row dim');
+    expect(html).not.toContain('data-hfitd');
+  });
+});

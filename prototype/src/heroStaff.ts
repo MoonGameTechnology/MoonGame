@@ -420,16 +420,41 @@ function heroAbilitiesHtml(hero: HeroInst, now: number): string {
   );
 }
 
-/** The fittings tab — slot budget as pips, each fitting a row; tap an installable one to
- *  open its dossier (with the irreversibility warning) before committing a slot. */
+/**
+ * The fittings tab — the SAME bay idiom as the skill slots next door, with one
+ * deliberate difference: a fitting is welded on for good (`hero.fit`, no refit), so an
+ * occupied bay carries no «снять». That asymmetry is the point of showing them alike —
+ * two screens in one language make the one rule that differs actually visible, where
+ * two different layouts would just read as two unrelated screens.
+ *
+ * Tapping an empty bay is not the commit: it opens the fitting's dossier with the
+ * irreversibility warning first. A permanent choice should cost one more tap than a
+ * reversible one.
+ */
 function heroFittingsHtml(hero: HeroInst, res: Bag): string {
   const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
   const slots = def?.slots ?? 0;
   if (slots <= 0) return `<div class="hx-note">${t('hero.fit.none')}</div>`;
   const fitted = hero.fittings ?? [];
-  let html = `<div class="hx-h">${t('hero.fit.slots', { u: fitted.length, n: slots })}</div>`;
+  const free = Math.max(0, slots - fitted.length);
+
+  const bays: string[] = [];
+  for (const fid of fitted) {
+    const fd = data.heroFittings[fid];
+    if (!fd) continue; // неизвестный id — молча пропускаем (base default, не падение)
+    bays.push(
+      `<div class="hx-bay on"><div class="hx-grow"><span class="hx-an">${esc(t(fd.name))}</span>` +
+        `<div class="hx-note">${esc(t(fd.description ?? ''))}</div></div>` +
+        `<span class="hx-badge on">✓ ${t('hero.fit.installed')}</span></div>`,
+    );
+  }
+  for (let i = 0; i < free; i += 1) {
+    bays.push(`<div class="hx-bay off">${t('hero.slot.empty')}</div>`);
+  }
+
+  let poolHtml = '';
   for (const [fid, fd] of Object.entries(data.heroFittings)) {
-    const installed = fitted.includes(fid);
+    if (fitted.includes(fid)) continue; // уже в отсеке — показан выше
     const grant = fd.grants.ability
       ? `<span class="hx-g ab">${t('hero.tree.ability')}</span>`
       : fd.grants.passive
@@ -437,18 +462,23 @@ function heroFittingsHtml(hero: HeroInst, res: Bag): string {
         : fd.statMods
           ? `<span class="hx-g pa">${t('hero.fit.hull')}</span>`
           : '';
-    const canFit = !installed && fitted.length < slots;
-    const action = installed
-      ? `<span class="hx-badge on">✓ ${t('hero.fit.installed')}</span>`
-      : canFit
-        ? `<span class="hx-cost">${cost(fd.cost, res)}</span>`
-        : `<span class="hx-badge">${t('hero.fit.no-slots')}</span>`;
-    const tap = canFit ? ` data-hfitd="${fid}"` : '';
-    html +=
-      `<div class="hx-row"${tap}><div class="hx-grow"><span class="hx-an">${esc(t(fd.name))}</span>` +
+    const canFit = free > 0;
+    // Не влезающее показано погашенным с причиной, а не спрятано — то же правило,
+    // что у слотов скиллов: экран не должен врать о том, что вообще существует.
+    const action = canFit
+      ? `<span class="hx-cost">${cost(fd.cost, res)}</span>`
+      : `<span class="hx-badge">${t('hero.fit.no-slots')}</span>`;
+    poolHtml +=
+      `<div class="hx-row${canFit ? '' : ' dim'}"${canFit ? ` data-hfitd="${fid}"` : ''}>` +
+      `<div class="hx-grow"><span class="hx-an">${esc(t(fd.name))}</span>` +
       `<div class="hx-note">${esc(t(fd.description ?? ''))}</div></div>${grant}${action}</div>`;
   }
-  return html;
+
+  return (
+    `<div class="hx-h">${t('hero.fit.slots', { u: fitted.length, n: slots })}</div>` +
+    `<div class="hx-bays">${bays.join('')}</div>` +
+    (poolHtml ? `<div class="hx-h">${t('hero.slot.pool')}</div>${poolHtml}` : '')
+  );
 }
 
 /** The overview tab — archetype line, a stat strip (abilities / tree progress / fittings)
