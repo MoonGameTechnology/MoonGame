@@ -28,7 +28,7 @@ function game2(): GameState {
 const only = (actions: Action[], type: string): Action[] => actions.filter((a) => a.type === type);
 const payloads = <T>(actions: Action[], type: string): T[] =>
   only(actions, type).map((a) => a.payload as T);
-const orders = (s: GameState, profile: 'basic' | 'test' = 'test'): Action[] =>
+const orders = (s: GameState, profile: 'weak' | 'strong' = 'strong'): Action[] =>
   aiOrders(s, 'p2', 'expand', profile);
 
 /** Домашний мир места (тот, где стоит космопорт). */
@@ -105,7 +105,7 @@ describe('AI-BAL-8 — подъём ростера (`hero.spawn`)', () => {
   });
 
   it('ИГРОВОЙ бот ростер не поднимает', () => {
-    expect(only(orders(rich(game2()), 'basic'), 'hero.spawn')).toHaveLength(0);
+    expect(only(orders(rich(game2()), 'weak'), 'hero.spawn')).toHaveLength(0);
   });
 });
 
@@ -147,7 +147,7 @@ describe('AI-BAL-8 — дерево навыков (`hero.skill.unlock`)', () =>
   });
 
   it('ИГРОВОЙ бот дерево не качает', () => {
-    expect(only(orders(rich(game2()), 'basic'), 'hero.skill.unlock')).toHaveLength(0);
+    expect(only(orders(rich(game2()), 'weak'), 'hero.skill.unlock')).toHaveLength(0);
   });
 });
 
@@ -178,7 +178,7 @@ describe('AI-BAL-8 — фитинги (`hero.fit`)', () => {
   });
 
   it('ИГРОВОЙ бот фитинги не ставит', () => {
-    expect(only(orders(rich(game2()), 'basic'), 'hero.fit')).toHaveLength(0);
+    expect(only(orders(rich(game2()), 'weak'), 'hero.fit')).toHaveLength(0);
   });
 });
 
@@ -309,7 +309,7 @@ describe('AI-BAL-8 — способности (`hero.ability`)', () => {
   });
 
   it('ИГРОВОЙ бот способностей не кастует', () => {
-    expect(only(orders(heroInBattle(rich(game2())), 'basic'), 'hero.ability')).toHaveLength(0);
+    expect(only(orders(heroInBattle(rich(game2())), 'weak'), 'hero.ability')).toHaveLength(0);
   });
 });
 

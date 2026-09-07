@@ -72,7 +72,7 @@ function fleetAt(
 describe('AI-BAL-3 — наземная армия и десант (тест-профиль)', () => {
   it('строит КАЗАРМУ: без неё ядро отбивает любой наземный заказ', () => {
     const s = game2();
-    expect(built(aiOrders(s, 'p2', 'expand', 'test'), 'barracks')).toContain(homeOf(s, 'p2'));
+    expect(built(aiOrders(s, 'p2', 'expand', 'strong'), 'barracks')).toContain(homeOf(s, 'p2'));
   });
 
   it('с казармой заказывает наземные войска дома', () => {
@@ -82,7 +82,7 @@ describe('AI-BAL-3 — наземная армия и десант (тест-п�
       buildings: [...s.planets[home]!.buildings, { type: 'barracks', level: 1, hp: 25 }],
       garrison: [],
     });
-    const ground = unitOrders(aiOrders(withYard, 'p2', 'expand', 'test')).filter((o) =>
+    const ground = unitOrders(aiOrders(withYard, 'p2', 'expand', 'strong')).filter((o) =>
       GROUND.includes(o.unit),
     );
     expect(ground.length).toBeGreaterThan(0);
@@ -97,7 +97,7 @@ describe('AI-BAL-3 — наземная армия и десант (тест-п�
       buildings: [...s.planets[home]!.buildings, { type: 'barracks', level: 1, hp: 25 }],
       garrison: [],
     });
-    const ground = unitOrders(aiOrders(withYard, 'p2', 'expand', 'test')).filter((o) =>
+    const ground = unitOrders(aiOrders(withYard, 'p2', 'expand', 'strong')).filter((o) =>
       GROUND.includes(o.unit),
     );
     expect(ground[0]!.unit).toBe('heavy_infantry');
@@ -129,7 +129,7 @@ describe('AI-BAL-3 — наземная армия и десант (тест-п�
       ...staged,
       fleets: { 'f:test': fleetAt('f:test', home, [{ unit: 'cruiser', count: 1 }]) },
     };
-    const lifted = loads(aiOrders(withFleet, 'p2', 'expand', 'test'));
+    const lifted = loads(aiOrders(withFleet, 'p2', 'expand', 'strong'));
     expect(lifted.reduce((n, l) => n + l.count, 0)).toBe(4);
     expect(lifted[0]!.unit).toBe('heavy_infantry'); // тяжёлое вперёд
   });
@@ -143,7 +143,7 @@ describe('AI-BAL-3 — наземная армия и десант (тест-п�
       // scout: cargoCapacity 1
       fleets: { 'f:small': fleetAt('f:small', home, [{ unit: 'scout', count: 1 }]) },
     };
-    expect(loads(aiOrders(withFleet, 'p2', 'expand', 'test')).reduce((n, l) => n + l.count, 0)).toBe(1);
+    expect(loads(aiOrders(withFleet, 'p2', 'expand', 'strong')).reduce((n, l) => n + l.count, 0)).toBe(1);
   });
 
   it('ШТУРМУЕТ гарнизонный вражеский мир — но только имея десант в трюме', () => {
@@ -154,10 +154,10 @@ describe('AI-BAL-3 — наземная армия и десант (тест-п�
       ...atWar,
       fleets: { 'f:strike': fleetAt('f:strike', target, [{ unit: 'cruiser', count: 2 }], landing) },
     });
-    const withTroops = only(aiOrders(fleet([{ unit: 'militia', count: 2 }]), 'p2', 'expand', 'test'), 'fleet.assault');
+    const withTroops = only(aiOrders(fleet([{ unit: 'militia', count: 2 }]), 'p2', 'expand', 'strong'), 'fleet.assault');
     expect(withTroops).toHaveLength(1);
     expect((withTroops[0]!.payload as { fleetId: string }).fleetId).toBe('f:strike');
-    expect(only(aiOrders(fleet([]), 'p2', 'expand', 'test'), 'fleet.assault')).toHaveLength(0);
+    expect(only(aiOrders(fleet([]), 'p2', 'expand', 'strong'), 'fleet.assault')).toHaveLength(0);
   });
 
   it('ИГРОВОЙ бот штурма не отдаёт — второй фазой захвата ведает драйвер игрока', () => {

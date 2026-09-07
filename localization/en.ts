@@ -1649,6 +1649,9 @@ export const en: Record<string, string> = {
   // --- setup — Экран «Настройка схватки»: домашний мир, боты, скорость времени.
   'setup.bonus.damage': '+{n}% damage',
   'setup.bonus.economy': '+{n}% economy',
+  'setup.ai.hint': 'Tap to cycle: off → weak → strong',
+  'setup.ai.strong': 'STRONG',
+  'setup.ai.weak': 'WEAK',
   'setup.bonus.radar': '+{n}% radar',
   'setup.bonus.speed': '+{n}% fleet speed',
   'setup.cancel': 'Back',
@@ -1669,7 +1672,7 @@ export const en: Record<string, string> = {
   'setup.start': 'LAUNCH',
   'setup.start.solo': 'LAUNCH SOLO',
   'setup.sub':
-    'Pick your homeworld on the map, choose how many AI rivals join, then launch. Empty slots are taken by the AI — switch a slot OFF to command a smaller sector, or switch them all off for a peaceful solo sandbox to explore the interface.',
+    'Pick your homeworld on the map, choose your rivals, then launch. The button on the right of a seat row cycles it: off → weak bot → strong. The weak one is predictable and good for learning the interface; the strong one researches, lands troops and trades. Switch every seat off for a peaceful solo sandbox.',
   'setup.teams.note': 'one side = allies',
   'setup.teams.off': 'Team battle: off',
   'setup.teams.on': 'Team battle: ON',

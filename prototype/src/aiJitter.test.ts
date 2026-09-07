@@ -74,13 +74,13 @@ const first = (actions: Action[], type: string): Action | undefined =>
 /** Где бот заложил ШАХТУ — точка входа в обход своих миров.
  *  Смотреть на первую стройку вообще нельзя: экономическая цепочка идёт раньше и всегда
  *  строит на базе, так что она одинакова у всех сидов ЗАКОННО. */
-const firstBuildAt = (s: GameState, profile: 'basic' | 'test'): string | undefined =>
+const firstBuildAt = (s: GameState, profile: 'weak' | 'strong'): string | undefined =>
   (aiOrders(s, 'p2', 'expand', profile)
     .filter((a) => a.type === 'building.construct')
     .map((a) => a.payload as { planetId: string; building: string })
     .find((x) => x.building === 'mine'))?.planetId;
 /** Куда пошёл флот — точка выбора цели. */
-const moveTarget = (s: GameState, profile: 'basic' | 'test'): string | undefined =>
+const moveTarget = (s: GameState, profile: 'weak' | 'strong'): string | undefined =>
   (first(aiOrders(s, 'p2', 'expand', profile), 'fleet.move')?.payload as
     | { to: string }
     | undefined)?.to;
@@ -89,12 +89,12 @@ describe('AI-BAL-5 — разброс есть', () => {
   it('точка входа в обход миров различается по сидам', () => {
     // Блоки развития выписывают ОДНУ стройку за тик и выходят по `break`, поэтому решает
     // первый подходящий мир — раньше он был один и тот же во всех матчах.
-    const picks = new Set(SEEDS.map((seed) => firstBuildAt(midgame(seed), 'test')));
+    const picks = new Set(SEEDS.map((seed) => firstBuildAt(midgame(seed), 'strong')));
     expect(picks.size).toBeGreaterThan(1);
   });
 
   it('цель флота различается по сидам', () => {
-    const targets = new Set(SEEDS.map((seed) => moveTarget(midgame(seed), 'test')));
+    const targets = new Set(SEEDS.map((seed) => moveTarget(midgame(seed), 'strong')));
     expect(targets.size).toBeGreaterThan(1);
   });
 });
@@ -123,7 +123,7 @@ describe('BAL-1 — равные цели разводит шум, а не по�
     const picks = new Set(
       SEEDS.map((seed) => {
         const st = { ...equidistant, rng: game(seed).rng };
-        return moveTarget(st, 'test');
+        return moveTarget(st, 'strong');
       }),
     );
     expect(picks.size).toBeGreaterThan(1);
@@ -133,7 +133,7 @@ describe('BAL-1 — равные цели разводит шум, а не по�
 describe('AI-BAL-5 — детерминизм цел (инвариант #1)', () => {
   it('один сид разыгрывается ОДИНАКОВО, сколько ни повторяй', () => {
     const shape = (s: GameState): string =>
-      JSON.stringify(aiOrders(s, 'p2', 'expand', 'test').map((a) => [a.type, a.payload]));
+      JSON.stringify(aiOrders(s, 'p2', 'expand', 'strong').map((a) => [a.type, a.payload]));
     expect(shape(midgame('sp-7'))).toBe(shape(midgame('sp-7')));
   });
 
@@ -142,14 +142,14 @@ describe('AI-BAL-5 — детерминизм цел (инвариант #1)', (
     // ядра рассинхронизировал бы бои и сломал реплей матча.
     const s = midgame('sp-3');
     const before = JSON.stringify(s.rng);
-    aiOrders(s, 'p2', 'expand', 'test');
+    aiOrders(s, 'p2', 'expand', 'strong');
     expect(JSON.stringify(s.rng)).toBe(before);
   });
 
   it('ИГРОВОЙ бот разброса не получил — его решения от сида не зависят', () => {
     // Правило блока AI-BAL: всё новое достаётся только тест-профилю. Живой игрок
     // встречает прежнего предсказуемого соперника.
-    expect(new Set(SEEDS.map((seed) => firstBuildAt(midgame(seed), 'basic'))).size).toBe(1);
-    expect(new Set(SEEDS.map((seed) => moveTarget(midgame(seed), 'basic'))).size).toBe(1);
+    expect(new Set(SEEDS.map((seed) => firstBuildAt(midgame(seed), 'weak'))).size).toBe(1);
+    expect(new Set(SEEDS.map((seed) => moveTarget(midgame(seed), 'weak'))).size).toBe(1);
   });
 });
