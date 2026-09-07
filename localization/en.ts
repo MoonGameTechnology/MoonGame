@@ -70,7 +70,8 @@ export const en: Record<string, string> = {
   'admin.state.online': 'online',
   'admin.state.offline': 'offline',
   'admin.kick': 'Remove',
-  'admin.kick.confirm': 'Take {nick}\u2019s seat back? The empire stays on the map; the chair frees up for a new player.',
+  'admin.kick.confirm':
+    'Take {nick}\u2019s seat back? The empire stays on the map; the chair frees up for a new player.',
   'admin.kick.done': '{nick} removed — seat {seat} is free',
   'admin.err.creds': 'Wrong callsign or password',
   'admin.err.no-authority': 'This account has no admin authority',
@@ -545,6 +546,7 @@ export const en: Record<string, string> = {
   'data.carrier': 'carrier',
   'data.combined-arms': 'Combined Arms',
   'data.commander': 'Commander',
+  'data.convoy-impulse': 'Convoy Impulse',
   'data.corridor': 'Corridor',
   'data.credit-refinery': 'Credit Refinery',
   'data.credits': 'credits',
@@ -553,6 +555,7 @@ export const en: Record<string, string> = {
   'data.crystalline': 'Crystalline',
   'data.dead-world': 'Dead World',
   'data.debris-field': 'Debris Field',
+  'data.decoy-signal': 'Decoy Signal',
   'data.deep-space-survey': 'Deep-Space Survey',
   'data.deep-void': 'Deep Void',
   'data.dense-nebula': 'Dense Nebula',
@@ -562,7 +565,9 @@ export const en: Record<string, string> = {
   'data.empty-space': 'Empty Space',
   'data.energy': 'energy',
   'data.evasive-vectors': 'Evasive Vectors',
+  'data.false-echo': 'False Echo',
   'data.fighter-squadron': 'fighter squadron',
+  'data.fleet-uplink': 'Fleet Uplink',
   'data.flight-decks': 'Flight Decks',
   'data.food': 'food',
   'data.fort': 'Fort',
@@ -650,8 +655,10 @@ export const en: Record<string, string> = {
   'data.void-armadas': 'Void Armadas',
   'data.void-attunement': 'Void Attunement',
   'data.void-fortress': 'Void Fortress',
+  'data.void-translocator': 'Void Translocator',
   'data.volcanic': 'Volcanic',
   'data.warden': 'Warden',
+  'data.warp-jump': 'Warp Jump',
   'data.warhead-miniaturization': 'Warhead Miniaturization',
   'data.weak-points': 'Weak Points',
 
@@ -1138,6 +1145,9 @@ export const en: Record<string, string> = {
   'hero.ability.corridor.desc':
     'Punches a corridor to a nearby world. One-shot: only the army carrying this hero may use it, and it closes the moment that army arrives. Upgrades give it a lifetime, then open it to your allies — an open corridor is shared, so the enemy may walk in too.',
   'hero.ability.corridor.name': 'Corridor',
+  'hero.ability.decoy-signal.desc':
+    'Fakes a radar contact: a node in range starts reading as occupied on rival radar. The phantom only shows where their radar reaches, and it falls apart the moment they get close enough to identify the node.',
+  'hero.ability.decoy-signal.name': 'Decoy Signal',
   'hero.ability.diplomatic-landing.desc':
     "Allied worlds receive the hero as one of their own: the ship can also rise from an ally's planet. Passive skill: widens the deployment points.",
   'hero.ability.diplomatic-landing.name': 'Diplomatic Landing',
@@ -1149,6 +1159,9 @@ export const en: Record<string, string> = {
   'hero.ability.scan.desc':
     'Reveals an area around the target through the fog for a while. Upgrades turn the lit zone into a combat zone: first it marks the gaps in enemy armour, then it flies your own and allied fleets by the radar picture.',
   'hero.ability.scan.name': 'Scan',
+  'hero.ability.warp-jump.desc':
+    'A puncture in space: the hero ship and the troops in its hold appear instantly at a node in range. Jumps through fog too. Will not pull a ship out of an active battle.',
+  'hero.ability.warp-jump.name': 'Warp Jump',
   'hero.arch.commander': 'Commander',
   'hero.arch.destroyer': 'Destroyer',
   'hero.arch.vanguard': 'Vanguard',
@@ -1167,6 +1180,9 @@ export const en: Record<string, string> = {
   'hero.grade.rare': 'Rare',
   'hero.hook.combat-damage': 'damage to nearby fleets',
   'hero.hook.fleet-speed': 'fleet speed',
+  'hero.passive.convoy-impulse.desc':
+    'The hero runs the staging: fleets departing nodes within 300 fly 8% faster.',
+  'hero.passive.convoy-impulse.name': 'Convoy Impulse',
   'hero.passive.rally-beacon.desc':
     'Fleets near the hero fight harder: +8% damage for your fleets within 300.',
   'hero.passive.rally-beacon.name': 'Rally Beacon',
@@ -1179,6 +1195,12 @@ export const en: Record<string, string> = {
   'hero.tree.corridor-sustained.desc':
     "The corridor lives on a clock instead of closing behind the hero's army.",
   'hero.tree.corridor-sustained.name': 'Sustained Corridor',
+  'hero.tree.false-echo.desc':
+    'The other side of psi-sight: the hero learns not only to read a rival radar, but to write into it what is not there.',
+  'hero.tree.false-echo.name': 'False Echo',
+  'hero.tree.fleet-uplink.desc':
+    'The neural link spreads to the whole order: not just the hero ship, but nearby fleets get under way faster.',
+  'hero.tree.fleet-uplink.name': 'Fleet Uplink',
   'hero.tree.neural-lace.desc': "A direct brain-to-helm implant: the hero's ship gains +10% speed.",
   'hero.tree.neural-lace.name': 'Neural Lace',
   'hero.tree.overclocked-helm.desc':
@@ -1195,6 +1217,9 @@ export const en: Record<string, string> = {
   'hero.tree.void-attunement.desc':
     "The hero's psi resonance inspires nearby fleets: +8% damage within 300.",
   'hero.tree.void-attunement.name': 'Void Attunement',
+  'hero.tree.void-translocator.desc':
+    'The top of the corridor branch: the hero stops laying a path and simply vanishes at one node to appear at another.',
+  'hero.tree.void-translocator.name': 'Void Translocator',
   'hero.unit.commander.desc':
     'The flagship hero: a command transhuman who strengthens the fleet and opens corridors.',
   'hero.unit.commander.name': 'Commander',
@@ -1667,7 +1692,8 @@ export const en: Record<string, string> = {
   'settings.gfx.glow.hint':
     'soft bloom around worlds, fleets and borders — turn off for a crisp, faster map',
   'settings.gfx.motion': 'Layer motion',
-  'settings.gfx.motion.hint': 'breathing of markers, glows and engines; off freezes them without hiding them',
+  'settings.gfx.motion.hint':
+    'breathing of markers, glows and engines; off freezes them without hiding them',
   'settings.gfx.starfield': 'Star backdrop',
   'settings.gfx.starfield.hint':
     'drifting nebulae and stars in the background — turn off for a flat backdrop',

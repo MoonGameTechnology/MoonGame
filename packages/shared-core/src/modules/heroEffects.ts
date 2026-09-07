@@ -48,6 +48,77 @@ const recall: HeroEffect = ({ heroId, hero, owner }, h) => {
 };
 
 /**
+ * `jump` — instantly move the hero's ship (and everything it carries) to a node the
+ * dispatcher already validated as in-range. `recall` with a target, and deliberately
+ * nothing more: the generic gate has proven `target` exists and lies within the
+ * ability's `range` of the hero's node, so the only work here is the transfer plus the
+ * two refusals a teleport must keep — you cannot warp out of a fight, and warping onto
+ * the spot you already idle on would burn the cooldown for nothing.
+ *
+ * Ranged (`range > 0` in the catalogue), untargetable otherwise; the long cooldown is
+ * the cost. It jumps THROUGH fog on purpose: no other ability asks whether the player
+ * can see its target, and adding that question here would need a second, per-viewer
+ * notion of "visible" inside the reducer, which the core does not have.
+ */
+const jump: HeroEffect = ({ heroId, hero, owner, target }, h) => {
+  // The range gate guarantees a valid in-range node for a ranged ability; guard anyway.
+  if (typeof target !== 'string' || !h.state.planets[target]) return h.reject('E_BAD_PAYLOAD');
+  const fleetId = hero.fleetId;
+  const fleet = fleetId !== undefined ? h.state.fleets[fleetId] : undefined;
+  if (!fleet) return h.reject('E_HERO_NOT_DEPLOYED'); // nothing to move (a reserve hero)
+  if (fleet.battleId != null && h.state.battles[fleet.battleId]) {
+    return h.reject('E_FLEET_BUSY');
+  }
+  // Already parked idle on the target → no-op; reject so the cooldown isn't wasted.
+  if (fleet.location === target && fleet.movement == null && fleet.edge == null) {
+    return h.reject('E_SAME_LOCATION');
+  }
+  fleet.location = target;
+  fleet.movement = null;
+  fleet.edge = null; // clear any parked-on-lane state (edge is only valid while unlocated)
+  hero.location = target; // the hero's node memory follows its ship (HERO-2)
+  h.emit('hero.jumped', { owner, heroId, fleetId, to: target });
+};
+
+/**
+ * `decoy` — plant a PHANTOM radar contact on a node in range: for `durationHours` that
+ * node reads as occupied to every viewer but the owner.
+ *
+ * The decoy is not a fleet, and that is the whole design. An empty fleet would be drawn
+ * into battles, could capture, and would count toward victory (`fleetOps` rejects
+ * ghost battles precisely because empty sides are nonsense); a lie told to a radar must
+ * change what rivals SEE and nothing else. So the cast only records `{at, signature,
+ * until}` on the hero, and `visibleState` mixes it into that viewer's `signatures` —
+ * the simulation never learns a decoy exists.
+ *
+ * Two consequences of living in the projection, both intended:
+ *   · a decoy is only seen where the viewer's RADAR reaches, exactly like a real
+ *     contact — one planted where nobody watches fools nobody;
+ *   · it evaporates for anyone who gets close enough to IDENTIFY the node, because an
+ *     identified node shows its real (empty) contents. The bluff is called by scouting
+ *     it, which needs no code of its own.
+ *
+ * `params`: `signature` (the same Σ count × unit signature scale a real fleet radiates,
+ * so the reader buckets it S/M/L by the identical rule), `durationHours`.
+ */
+const decoy: HeroEffect = ({ heroId, hero, params, owner, target }, h) => {
+  // The range gate guarantees a valid in-range node for a ranged ability; guard anyway.
+  if (typeof target !== 'string' || !h.state.planets[target]) return h.reject('E_BAD_PAYLOAD');
+  const p = params;
+  const signature = num(p.signature);
+  const durationHours = num(p.durationHours);
+  // Malformed / no-op decoy → reject so the player isn't charged the cooldown for nothing.
+  if (signature <= 0 || durationHours <= 0) return h.reject('E_BAD_EFFECT');
+  // Same timeScale rule as the aura and reveal windows.
+  const until = h.ctx.now + hoursToMs(h.ctx, durationHours);
+  // Prune expired decoys on cast (cooldown > duration ⇒ the list stays tiny), then add.
+  const live = (hero.activeDecoys ?? []).filter((d) => d.until > h.ctx.now);
+  live.push({ at: target, signature, until });
+  hero.activeDecoys = live;
+  h.emit('hero.decoyed', { owner, heroId, at: target, signature, until });
+};
+
+/**
  * `aura` — a TIME-BOXED combat aura (rally / bulwark). Casting stores a `{bonus, radius,
  * until}` buff on the hero; while live it feeds the `combat.damage` hook below for the
  * owner's fleets within `radius` of the hero's node — the temporary twin of the HERO-5
@@ -189,6 +260,8 @@ export const heroEffectsModule: GameModule = {
     api.provideCapability<HeroEffect>('hero.effect.recall', recall);
     api.provideCapability<HeroEffect>('hero.effect.aura', aura);
     api.provideCapability<HeroEffect>('hero.effect.reveal', reveal);
+    api.provideCapability<HeroEffect>('hero.effect.jump', jump);
+    api.provideCapability<HeroEffect>('hero.effect.decoy', decoy);
 
     // Time-boxed combat aura → `combat.damage`, composing with the base default and the
     // heroModule contributions (multiple registrants chain; ×-factors commute, so the

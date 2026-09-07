@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale } from '../../localization/runtime';
 import { newGame } from './game';
+import { data } from './prototypeData';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { t } from '../../localization/runtime';
 import {
@@ -122,6 +123,38 @@ describe('штаб героев — словарь способностей', ()
     expect(HERO_CASTABLE.has('recall')).toBe(true);
     expect(HERO_CASTABLE.has('temp_lane')).toBe(true);
     expect(HERO_CASTABLE.has('нет-такого-типа')).toBe(false);
+  });
+
+  // Два встроенных эффекта heroModule; остальные приходят провайдерами capability.
+  const BUILT_IN = ['temp_lane', 'annihilate'];
+  /** Типы, которые `heroEffectsModule` объявляет как `hero.effect.<тип>`. Читаем ИСХОДНИК:
+   *  реестр capability у ядра приватный, а знать надо именно объявленное, а не то, что
+   *  кто-то не забыл продублировать здесь. */
+  const provided = (): string[] =>
+    [
+      ...readFileSync('packages/shared-core/src/modules/heroEffects.ts', 'utf8').matchAll(
+        /provideCapability<HeroEffect>\('hero\.effect\.([a-z_]+)'/g,
+      ),
+    ].map((m) => m[1]!);
+
+  it('HERO_CASTABLE совпадает с тем, что реально объявил heroEffectsModule', () => {
+    // Ровно тот промах, из-за которого `station.deploy` месяцами лежал недостижимым:
+    // эффект написан и покрыт тестами, а до игрока не доходит, потому что список на
+    // стороне интерфейса про него не знает. Сверяем в ОБЕ стороны — забытый тип даёт
+    // молча некастуемую способность, лишний даёт кнопку, которая упрётся в E_NO_EFFECT.
+    const engine = [...BUILT_IN, ...provided()].sort();
+    expect(engine.length).toBeGreaterThan(BUILT_IN.length);
+    expect([...HERO_CASTABLE].sort()).toEqual(engine);
+  });
+
+  it('у каждой способности каталога есть исполнитель — иначе она мертва в игре', () => {
+    // `spawn_*` — не касты, а пассивные маркеры точек развёртывания: их читает
+    // `hero.spawn`, кнопки у них нет by design (в интерфейсе это бейдж «перк»).
+    const MARKERS = new Set(['spawn_fleet', 'spawn_allied']);
+    const orphans = Object.entries(data.heroAbilities)
+      .filter(([, def]) => !HERO_CASTABLE.has(def.type) && !MARKERS.has(def.type))
+      .map(([id, def]) => `${id}: ${def.type}`);
+    expect(orphans.sort()).toEqual([]);
   });
 
   it('ключ кулдауна зеркалит ядро: две встроенные ветки и префикс для эффектов', () => {

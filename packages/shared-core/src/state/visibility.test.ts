@@ -5,6 +5,7 @@ import {
   createInitialState,
   type Fleet,
   type GameState,
+  type Hero,
   type Planet,
   type Player,
 } from './gameState';
@@ -834,5 +835,97 @@ describe('радиус радара = антенна корпуса + модул
 
   it('незнакомый корпус пропускается, а не роняет проекцию', () => {
     expect(fleetRadarRange({ units: [{ unit: 'нет-такого', count: 2 }] }, data)).toBe(0);
+  });
+});
+
+describe('decoy — a phantom contact lives in the projection, never in the world', () => {
+  const ddata: GameData = parseGameData({
+    version: '0.1.0',
+    resources: ['metal'],
+    units: {
+      cruiser: { faction: 'x', stats: { attack: 4, defense: 4, speed: 6, hp: 20 }, signature: 6 },
+    },
+    factions: {},
+    buildings: { radar: { name: 'Radar', radarRange: 100 } }, // reach 100 → identify ≤50, radar ≤100
+    events: {},
+  });
+
+  /** p1 watches from H with a reach-100 radar; p2's hero plants phantoms around it.
+   *    NEAR (40)  — inside the identify half: p1 sees the node's real (empty) contents
+   *    MID  (80)  — radar-only ring: the phantom is believable exactly here
+   *    FAR  (200) — beyond the radar: nothing to fake for someone who isn't looking */
+  function decoyState(decoys: Hero['activeDecoys'], over: Partial<Hero> = {}): GameState {
+    const hero: Hero = {
+      id: 'hero:p2:1',
+      owner: 'p2',
+      location: 'FAR',
+      cooldowns: {},
+      alive: true,
+      activeDecoys: decoys,
+      ...over,
+    };
+    return {
+      ...createInitialState({ seed: 'd', version: { data: '0.1.0', manifest: '1' } }),
+      time: 0,
+      players: { p1: player('p1'), p2: player('p2') },
+      planets: {
+        H: planet('H', 'p1', [], {
+          position: { x: 0, y: 0 },
+          buildings: [{ type: 'radar', level: 1, hp: 0 }],
+        }),
+        NEAR: planet('NEAR', null, [], { position: { x: 40, y: 0 } }),
+        MID: planet('MID', null, [], { position: { x: 80, y: 0 } }),
+        FAR: planet('FAR', null, [], { position: { x: 200, y: 0 } }),
+      },
+      heroes: { 'hero:p2:1': hero },
+    };
+  }
+  const at = (node: string, signature = 8, until = 10_000): NonNullable<Hero['activeDecoys']> => [
+    { at: node, signature, until },
+  ];
+
+  it('shows a rival a contact where nothing stands — inside their radar ring', () => {
+    const view = visibleState(decoyState(at('MID')), 'p1', ddata);
+    expect(view.signatures).toEqual([{ location: 'MID', size: 'M' }]);
+    // …and the world it lies about is untouched: no fleet was invented to carry it.
+    expect(Object.keys(view.fleets)).toEqual([]);
+  });
+
+  it('never fools its own owner', () => {
+    const view = visibleState(decoyState(at('MID')), 'p2', ddata);
+    expect(view.signatures).toEqual([]);
+  });
+
+  it('is called by scouting it: an IDENTIFIED node shows the real, empty truth', () => {
+    // NEAR is inside the identify half of p1's radar, so the bluff collapses with no
+    // rule of its own — the node simply reports what it actually holds.
+    const view = visibleState(decoyState(at('NEAR')), 'p1', ddata);
+    expect(view.signatures).toEqual([]);
+  });
+
+  it('fools nobody where nobody is looking (outside the radar ring)', () => {
+    const view = visibleState(decoyState(at('FAR')), 'p1', ddata);
+    expect(view.signatures).toEqual([]);
+  });
+
+  it('expires by the clock — a stale phantom is not projected', () => {
+    const state = decoyState(at('MID', 8, 10_000));
+    state.time = 10_000; // `until` is exclusive, exactly like auras and reveals
+    expect(visibleState(state, 'p1', ddata).signatures).toEqual([]);
+  });
+
+  it('goes down with its hero — a dead hero radiates nothing', () => {
+    const view = visibleState(decoyState(at('MID'), { alive: false }), 'p1', ddata);
+    expect(view.signatures).toEqual([]);
+  });
+
+  it('buckets the faked signature on the same scale a real fleet radiates', () => {
+    // 8 → M, 20 → L: no separate size ladder for fakes, or the two would read apart.
+    expect(visibleState(decoyState(at('MID', 8)), 'p1', ddata).signatures).toEqual([
+      { location: 'MID', size: 'M' },
+    ]);
+    expect(visibleState(decoyState(at('MID', 20)), 'p1', ddata).signatures).toEqual([
+      { location: 'MID', size: 'L' },
+    ]);
   });
 });

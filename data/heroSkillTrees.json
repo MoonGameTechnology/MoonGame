@@ -56,5 +56,29 @@
     "branch": "psionic",
     "requires": ["psi_weak_points"],
     "cost": { "energy": 308, "credits": 250 }
+  },
+  "fleet_uplink": {
+    "name": "Fleet Uplink",
+    "description": "Нейроканал расходится на весь ордер: не только корабль героя, но и флоты рядом снимаются с места быстрее.",
+    "branch": "transhuman",
+    "requires": ["neural_lace"],
+    "cost": { "microelectronics": 60, "credits": 80 },
+    "grants": { "passive": "convoy_impulse" }
+  },
+  "void_translocator": {
+    "name": "Void Translocator",
+    "description": "Вершина коридорной ветки: герой перестаёт прокладывать путь и просто исчезает в одном узле, чтобы появиться в другом.",
+    "branch": "transhuman",
+    "requires": ["corridor_open"],
+    "cost": { "microelectronics": 180, "credits": 400 },
+    "grants": { "ability": "warp_jump" }
+  },
+  "false_echo": {
+    "name": "False Echo",
+    "description": "Обратная сторона пси-зрения: герой учится не только читать чужой радар, но и писать в него то, чего нет.",
+    "branch": "psionic",
+    "requires": ["psi_veil"],
+    "cost": { "energy": 160, "credits": 120 },
+    "grants": { "ability": "decoy_signal" }
   }
 }

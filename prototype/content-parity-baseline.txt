@@ -20,6 +20,15 @@
 # про эту сущность.
 #
 # Снят 2026-08-27 (CONV-11) с `prototypeData.ts` против бандла `data/*.json` версии 0.1.9.
+#
+# 2026-09-07 (HC-3): +12 строк за три новые способности героя (warp_jump, decoy_signal,
+# convoy_impulse и три узла дерева). Это НЕ новый класс дрейфа, а тот же самый, что уже
+# описан выше: у канона имя английское, а описание — русская проза, у прототипа оба поля
+# суть КЛЮЧИ локализации. Пока каталоги не сведены (CONV-12), любая новая сущность героя
+# платит ровно эти две строки — «починить» их здесь нечем, кроме самого сведения. Ни
+# одна из двенадцати не про расхождение МЕХАНИКИ: type/cooldownHours/range/params/
+# hook/scope/branch/requires/cost/grants у всех трёх совпадают побайтно, и именно это
+# сторож и проверил.
 buildings/barracks field:buildTimeHours
 buildings/barracks field:cost
 buildings/barracks field:hp
@@ -107,6 +116,8 @@ heroAbilities/bulwark field:description
 heroAbilities/bulwark field:name
 heroAbilities/corridor field:description
 heroAbilities/corridor field:name
+heroAbilities/decoy_signal field:description
+heroAbilities/decoy_signal field:name
 heroAbilities/diplomatic_landing field:description
 heroAbilities/diplomatic_landing field:name
 heroAbilities/rally field:description
@@ -115,9 +126,13 @@ heroAbilities/recall field:description
 heroAbilities/recall field:name
 heroAbilities/scan field:description
 heroAbilities/scan field:name
+heroAbilities/warp_jump field:description
+heroAbilities/warp_jump field:name
 heroFittings/ablative_plating field:description
 heroFittings/aegis_matrix field:description
 heroFittings/psi_amplifier field:description
+heroPassives/convoy_impulse field:description
+heroPassives/convoy_impulse field:name
 heroPassives/rally_beacon field:description
 heroPassives/rally_beacon field:name
 heroPassives/vanguard_impulse field:description
@@ -126,6 +141,10 @@ heroSkillTrees/corridor_open field:description
 heroSkillTrees/corridor_open field:name
 heroSkillTrees/corridor_sustained field:description
 heroSkillTrees/corridor_sustained field:name
+heroSkillTrees/false_echo field:description
+heroSkillTrees/false_echo field:name
+heroSkillTrees/fleet_uplink field:description
+heroSkillTrees/fleet_uplink field:name
 heroSkillTrees/neural_lace field:description
 heroSkillTrees/neural_lace field:name
 heroSkillTrees/overclocked_helm field:description
@@ -138,6 +157,8 @@ heroSkillTrees/psi_weak_points field:description
 heroSkillTrees/psi_weak_points field:name
 heroSkillTrees/void_attunement field:description
 heroSkillTrees/void_attunement field:name
+heroSkillTrees/void_translocator field:description
+heroSkillTrees/void_translocator field:name
 heroes/commander field:description
 heroes/commander field:name
 heroes/ravager field:description

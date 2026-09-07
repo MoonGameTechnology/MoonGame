@@ -12,5 +12,12 @@
     "hook": "combat.damage",
     "scope": "ownFleetsNear",
     "params": { "bonus": 0.08, "radius": 300 }
+  },
+  "convoy_impulse": {
+    "name": "Convoy Impulse",
+    "description": "Герой ведёт сбор: флоты игрока, выходящие из узлов в радиусе 300, летят на 8% быстрее.",
+    "hook": "fleet.speed",
+    "scope": "ownFleetsNear",
+    "params": { "bonus": 0.08, "radius": 300 }
   }
 }

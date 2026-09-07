@@ -103,5 +103,24 @@
     "cooldownHours": 0,
     "range": 0,
     "params": {}
+  },
+  "warp_jump": {
+    "name": "Warp Jump",
+    "description": "Прокол пространства: корабль героя вместе с десантом в трюме мгновенно оказывается в узле в радиусе действия. Из активного боя не выдёргивает.",
+    "type": "jump",
+    "cooldownHours": 36,
+    "range": 350,
+    "params": {}
+  },
+  "decoy_signal": {
+    "name": "Decoy Signal",
+    "description": "Ложное эхо: узел в радиусе действия начинает читаться чужими радарами как занятый. Разведавший узел видит правду — пустоту.",
+    "type": "decoy",
+    "cooldownHours": 8,
+    "range": 400,
+    "params": {
+      "signature": 8,
+      "durationHours": 4
+    }
   }
 }
