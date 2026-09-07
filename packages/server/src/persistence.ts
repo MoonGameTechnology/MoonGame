@@ -54,6 +54,7 @@ import {
   type ReceiptStore,
   type UserStore,
 } from './store';
+import { MemoryMetaMarket, PostgresMetaMarket, type MetaMarket } from './metaMarket';
 
 /**
  * Durability wiring for the dev harness (F8): a `MatchStore` + `ReceiptStore` so a
@@ -92,6 +93,7 @@ export interface Stores {
   /** Personal arsenal (ARS-2) — hulls/modules/fittings an account owns between
    *  sessions; snapshots (ARS-3) and the live build gate (LARS-1) read it. */
   arsenalStore: ArsenalStore;
+  metaMarket: MetaMarket;
   /** Corp-arsenal rentals (ARS-6) — which corp-owned item is on loan to whom, for
    *  which war; ownership itself never leaves `arsenalStore` (a corp-owned item is
    *  just a row keyed by the corp's id). */
@@ -109,6 +111,7 @@ export interface Stores {
 export async function createStores(env: NodeJS.ProcessEnv = process.env): Promise<Stores> {
   const url = env.DATABASE_URL;
   if (!url) {
+    const arsenalStore = new MemoryArsenalStore();
     return {
       store: new MemoryMatchStore(),
       receiptStore: new MemoryReceiptStore(),
@@ -122,7 +125,8 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
       feedStore: new MemoryAvaFeedStore(),
       sessionStore: new MemoryAvaSessionStore(),
       medalStore: new MemoryMedalStore(),
-      arsenalStore: new MemoryArsenalStore(),
+      arsenalStore,
+      metaMarket: new MemoryMetaMarket(arsenalStore),
       corpRentStore: new MemoryCorpRentStore(),
       dropStore: new MemoryDropStore(),
       friendStore: new MemoryFriendStore(),
@@ -150,6 +154,7 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
     sessionStore: new PostgresAvaSessionStore(pool),
     medalStore: new PostgresMedalStore(pool),
     arsenalStore: new PostgresArsenalStore(pool),
+    metaMarket: new PostgresMetaMarket(pool),
     corpRentStore: new PostgresCorpRentStore(pool),
     dropStore: new PostgresDropStore(pool),
     friendStore: new PostgresFriendStore(pool),

@@ -13,11 +13,7 @@ import { createStores, snapshotOf } from './persistence';
 import { seatClaim, seatClaimAction } from './joinSeat';
 import { checkProductionReadiness, configFromEnv } from './serverConfig';
 import { createMatchLoader } from './serverWiring';
-import {
-  creditCommanderXp,
-  ordinaryMatchExtras,
-  type SeatAccounts,
-} from './commanderCredit';
+import { creditCommanderXp, ordinaryMatchExtras, type SeatAccounts } from './commanderCredit';
 import { newMatchId } from './matchId';
 import {
   registerMatchApi,
@@ -37,6 +33,7 @@ import { AvaService } from './avaService';
 import { registerMedalApi } from './medalApi';
 import { MedalService } from './medalService';
 import { registerArsenalApi } from './arsenalApi';
+import { registerMetaMarketApi } from './metaMarketApi';
 import { CorpArsenalService } from './corpArsenalService';
 import { registerCorpArsenalApi } from './corpArsenalApi';
 import { registerPushApi } from './pushApi';
@@ -206,7 +203,8 @@ const loadMatch = createMatchLoader({
               arsenal: stores.arsenalStore,
               tables: dropTables,
               now: Date.now(),
-              log: (record) => process.stdout.write(`${JSON.stringify({ t: 'drop', ...record })}\n`),
+              log: (record) =>
+                process.stdout.write(`${JSON.stringify({ t: 'drop', ...record })}\n`),
             },
             matchId,
             entries,
@@ -328,7 +326,10 @@ const matchApi: MatchApiDeps = {
   // широкой сигнатурой, поэтому TypeScript такое пропускает. Прототипный хост
   // (`prototype/netserver.ts`) BF-30 реализовывал, канонический — нет, и разъезд не
   // проявлялся ровно потому, что играли на прототипном.
-  join: async (matchId, { nick, accountId, preferredSlot, preferredFaction, preferredScientists }) => {
+  join: async (
+    matchId,
+    { nick, accountId, preferredSlot, preferredFaction, preferredScientists },
+  ) => {
     const snap = await stores.store.load(matchId);
     if (!snap) return { error: 'E_NO_MATCH' };
     if (!signToken) return { error: 'E_AUTH_DISABLED' }; // no token auth configured
@@ -510,6 +511,7 @@ const server = createMultiplayerServer({
           registerMedalApi(scope, { service: medalService, identify });
           // Arsenal witryna (ARS-5) — read-only, session-gated: my own items only.
           registerArsenalApi(scope, { store: stores.arsenalStore, identify });
+          registerMetaMarketApi(scope, { market: stores.metaMarket, identify });
           // Corp-arsenal rentals (ARS-6) — head/officer hands out a corp item.
           registerCorpArsenalApi(scope, { service: corpArsenalService, identify });
           // Friends (FRIENDS-1) — roster + requests, session-gated. Presence is read

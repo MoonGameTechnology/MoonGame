@@ -1291,6 +1291,17 @@ export const en: Record<string, string> = {
   'hub.tile.support': 'Support',
   'hub.tile.tutorial': 'Tutorial',
   'hub.tile.updates': 'Updates',
+  'auction.title': 'Auction',
+  'auction.subtitle': 'Trade earned equipment between matches',
+  'auction.browse': 'Open listings',
+  'auction.sell': 'Sell from arsenal',
+  'auction.buy': 'Buy',
+  'auction.cancel': 'Cancel listing',
+  'auction.list': 'List',
+  'auction.price': 'Price',
+  'auction.fee': 'An {n}% exchange fee is burned on every sale.',
+  'auction.empty': 'There are no open listings.',
+  'auction.no-items': 'No tradable instances. Soulbound items and blueprints cannot be listed.',
 
   // --- hud — Постоянный интерфейс матча: верхняя панель ресурсов.
   'hud.back.title': 'Back',
