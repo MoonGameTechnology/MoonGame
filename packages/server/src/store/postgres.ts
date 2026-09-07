@@ -270,6 +270,34 @@ export async function migrate(pool: Pool): Promise<void> {
     );
     CREATE INDEX IF NOT EXISTS corp_arsenal_rent_matchup_idx ON corp_arsenal_rent (matchup_id);
 
+    -- MetaMarket (EC-3): кошелёк Варрантов, книга лотов и леджер сделок.
+    -- CHECK (warrants >= 0) — последний рубеж против ухода в минус: покупка запирает
+    -- обе строки кошельков FOR UPDATE, но ограничение оставлено намеренно, чтобы даже
+    -- будущий незапертый путь не смог напечатать деньги.
+    -- item_id UNIQUE — один предмет не может стоять в двух лотах одновременно.
+    CREATE TABLE IF NOT EXISTS meta_wallets (
+      account_id text PRIMARY KEY,
+      warrants bigint NOT NULL CHECK (warrants >= 0)
+    );
+    CREATE TABLE IF NOT EXISTS meta_market_listings (
+      id text PRIMARY KEY,
+      seller_id text NOT NULL,
+      seller_login text NOT NULL,
+      item_id text NOT NULL UNIQUE,
+      price bigint NOT NULL CHECK (price > 0),
+      created_at bigint NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS meta_market_price_idx ON meta_market_listings(price, created_at);
+    CREATE TABLE IF NOT EXISTS meta_market_ledger (
+      id text PRIMARY KEY,
+      account_id text NOT NULL,
+      delta bigint NOT NULL,
+      reason text NOT NULL,
+      listing_id text,
+      at bigint NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS meta_market_ledger_account_idx ON meta_market_ledger(account_id, at DESC);
+
     -- Drop loop (ARS-4): the (match, account) claim PK is the exactly-once roll gate
     -- (a replayed match end inserts nothing → no second roll, no double pity bump);
     -- drop_meta holds the pity counter and the salvage-shard balance per account.

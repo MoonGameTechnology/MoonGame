@@ -39,6 +39,7 @@ import { AvaService } from './avaService';
 import { registerMedalApi } from './medalApi';
 import { MedalService } from './medalService';
 import { registerArsenalApi } from './arsenalApi';
+import { registerMetaMarketApi } from './metaMarketApi';
 import { CorpArsenalService } from './corpArsenalService';
 import { registerCorpArsenalApi } from './corpArsenalApi';
 import { registerPushApi } from './pushApi';
@@ -528,6 +529,10 @@ const server = createMultiplayerServer({
           registerMedalApi(scope, { service: medalService, identify });
           // Arsenal witryna (ARS-5) — read-only, session-gated: my own items only.
           registerArsenalApi(scope, { store: stores.arsenalStore, identify });
+          // MetaMarket (EC-3) — аукцион мета-предметов: кошелёк, лоты, покупка с
+          // атомарной передачей и сжиганием комиссии. Пишущие маршруты под per-IP
+          // лимитом (EC-0.3 wash-trading), фаусет по умолчанию выключен.
+          registerMetaMarketApi(scope, { market: stores.metaMarket, identify });
           // Corp-arsenal rentals (ARS-6) — head/officer hands out a corp item.
           registerCorpArsenalApi(scope, { service: corpArsenalService, identify });
           // Friends (FRIENDS-1) — roster + requests, session-gated. Presence is read
