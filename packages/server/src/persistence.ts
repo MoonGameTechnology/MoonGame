@@ -1,4 +1,5 @@
 import type { MatchRoom } from './matchRoom';
+import { MemoryMetaMarket, PostgresMetaMarket, type MetaMarket } from './metaMarket';
 import {
   MemoryAccountStore,
   MemoryArsenalStore,
@@ -98,6 +99,9 @@ export interface Stores {
   corpRentStore: CorpRentStore;
   /** Drop loop (ARS-4) — per-account pity + salvage shards + exactly-once roll claims. */
   dropStore: DropStore;
+  /** Аукцион мета-предметов (EC-3): кошелёк Варрантов, лоты, леджер. Фаусет по
+   *  умолчанию ВЫКЛЮЧЕН — включается `META_MARKET_FAUCET` и только на стенде. */
+  metaMarket: MetaMarket;
   /** Web Push subscriptions (ONB-5) — one per account, durable so it survives a restart. */
   friendStore: FriendStore;
   pushStore: PushStore;
@@ -107,6 +111,10 @@ export interface Stores {
 }
 
 export async function createStores(env: NodeJS.ProcessEnv = process.env): Promise<Stores> {
+  // Фаусет аукциона читается ЗДЕСЬ, в композиционном корне, а не внутри модуля рынка:
+  // так тесты задают его явно, а прод по умолчанию получает 0 (ARS-0 anti-RMT).
+  const faucet = Number(env.META_MARKET_FAUCET ?? 0) || 0;
+  const memoryArsenal = new MemoryArsenalStore();
   const url = env.DATABASE_URL;
   if (!url) {
     return {
@@ -122,7 +130,8 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
       feedStore: new MemoryAvaFeedStore(),
       sessionStore: new MemoryAvaSessionStore(),
       medalStore: new MemoryMedalStore(),
-      arsenalStore: new MemoryArsenalStore(),
+      arsenalStore: memoryArsenal,
+      metaMarket: new MemoryMetaMarket(memoryArsenal, undefined, faucet),
       corpRentStore: new MemoryCorpRentStore(),
       dropStore: new MemoryDropStore(),
       friendStore: new MemoryFriendStore(),
@@ -150,6 +159,7 @@ export async function createStores(env: NodeJS.ProcessEnv = process.env): Promis
     sessionStore: new PostgresAvaSessionStore(pool),
     medalStore: new PostgresMedalStore(pool),
     arsenalStore: new PostgresArsenalStore(pool),
+    metaMarket: new PostgresMetaMarket(pool, undefined, faucet),
     corpRentStore: new PostgresCorpRentStore(pool),
     dropStore: new PostgresDropStore(pool),
     friendStore: new PostgresFriendStore(pool),

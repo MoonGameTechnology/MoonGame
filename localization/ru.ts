@@ -109,6 +109,18 @@ export const ru: Record<string, string> = {
   'ai.sortie.idle-only': '🛩 дежурный вылет — только когда флот свободен',
 
   // --- arsenal — «Арсенал»: коллекция аккаунта, фильтр, пустое состояние.
+  'auction.title': 'Аукцион',
+  'auction.subtitle': 'Торговля заработанным снаряжением между матчами',
+  'auction.browse': 'Открытые лоты',
+  'auction.sell': 'Продать из арсенала',
+  'auction.buy': 'Купить',
+  'auction.cancel': 'Снять лот',
+  'auction.list': 'Выставить',
+  'auction.price': 'Цена',
+  'auction.fee': 'Комиссия биржи {n}% сжигается при каждой сделке.',
+  'auction.empty': 'Открытых лотов пока нет.',
+  'auction.no-items':
+    'Нет торгуемых экземпляров. Привязанные предметы и чертежи выставлять нельзя.',
   'arsenal.empty': 'Арсенал пуст',
   'arsenal.empty.hint': 'войдите под аккаунтом на сервере с накоплением, чтобы увидеть коллекцию',
   'arsenal.filter.all': 'Всё',
@@ -1321,6 +1333,7 @@ export const ru: Record<string, string> = {
   'hub.solo': 'Одиночная игра',
   'hub.sovereigns': 'Суверены — донат-валюта',
   'hub.status.online': 'в сети',
+  'hub.tile.auction': 'Аукцион',
   'hub.tile.account': 'Аккаунт',
   'hub.tile.chat': 'Чат',
   'hub.tile.community': 'Сообщество',

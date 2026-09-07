@@ -106,6 +106,17 @@ export const en: Record<string, string> = {
   'ai.sortie.idle-only': '🛩 standing patrol — only when the fleet is free',
 
   // --- arsenal — «Арсенал»: коллекция аккаунта, фильтр, пустое состояние.
+  'auction.title': 'Auction',
+  'auction.subtitle': 'Trade earned equipment between matches',
+  'auction.browse': 'Open listings',
+  'auction.sell': 'Sell from arsenal',
+  'auction.buy': 'Buy',
+  'auction.cancel': 'Cancel listing',
+  'auction.list': 'List',
+  'auction.price': 'Price',
+  'auction.fee': 'An {n}% exchange fee is burned on every sale.',
+  'auction.empty': 'There are no open listings.',
+  'auction.no-items': 'No tradable instances. Soulbound items and blueprints cannot be listed.',
   'arsenal.empty': 'Arsenal empty',
   'arsenal.empty.hint':
     'sign in with an account on a server with persistence to see your collection',
@@ -1322,6 +1333,7 @@ export const en: Record<string, string> = {
   'hub.solo': 'Solo game',
   'hub.sovereigns': 'Sovereigns — the donate currency',
   'hub.status.online': 'online',
+  'hub.tile.auction': 'Auction',
   'hub.tile.account': 'Account',
   'hub.tile.chat': 'Chat',
   'hub.tile.community': 'Community',

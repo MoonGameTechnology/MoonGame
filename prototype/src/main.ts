@@ -544,6 +544,7 @@ import {
   type StewardMetrics,
 } from './stewardScreen';
 import { initArsenal } from './arsenalScreen';
+import { initMetaMarket } from './metaMarketScreen';
 // DEV TEST MODE — self-contained dev-only scenarios; remove this import + the
 // initTestMode(...) call below + the #testmode HTML/CSS to cut it cleanly.
 // (The player build already does: the only uses sit under `!__PLAYER_BUILD__`, so
@@ -8935,6 +8936,7 @@ const HUB_PANELS: Record<string, string> = {
   meta: 'hp-meta',
   friends: 'hp-friends',
   arsenal: 'hp-arsenal',
+  auction: 'hp-auction',
   ally: 'hp-ally',
   more: 'hp-more',
 };
@@ -8955,6 +8957,7 @@ function hubTab(tab: string): void {
   if (tab === 'friends') void friends.refresh(); // roster + presence are server truth
   if (tab === 'rank') void rank.refresh(); // places are computed server-side (RANK-1)
   if (tab === 'arsenal') void arsenal.refresh(); // cache paints now, server refresh trails
+  if (tab === 'auction') void metaMarket.refresh();
   for (const [k, pid] of Object.entries(HUB_PANELS))
     $(pid).style.display = k === tab ? 'flex' : 'none';
   for (const b of Array.from(document.querySelectorAll('.hub-tab')))
@@ -9058,6 +9061,17 @@ const arsenal = initArsenal({
   openCodex,
   authorizedBase: hubAuthorizedBase,
 });
+// EC-3 «Аукцион»: витрина торговли мета-предметами. Лоты и кошелёк живут на сервере,
+// поэтому кэша, как у арсенала, здесь нет — экран всегда спрашивает свежее.
+const metaMarket = initMetaMarket({
+  root: () => $('hp-auction'),
+  arsenal: () => arsenal.items(),
+  authorizedBase: hubAuthorizedBase,
+  note: (message) => {
+    hubNote.textContent = message;
+  },
+});
+
 function arsenalKey(): string {
   return 'vd.arsenal.' + (nickInput.value.trim() || 'guest');
 }
@@ -9481,6 +9495,7 @@ for (const b of Array.from(document.querySelectorAll('.hub-tab'))) {
 // «Прокачка» уехала из нижней навигации (там семь вкладок — предел) в «Ещё»: плитка
 // открывает ТУ ЖЕ панель `hp-meta`, а не свою копию экрана.
 document.getElementById('hub-meta')?.addEventListener('click', () => hubTab('meta'));
+document.getElementById('hub-auction')?.addEventListener('click', () => hubTab('auction'));
 for (const tile of Array.from(document.querySelectorAll('#hp-more .hub-tile[data-more]'))) {
   tile.addEventListener('click', () => {
     // The tile's own label span is already localized (localizeStaticDom ran at boot);
