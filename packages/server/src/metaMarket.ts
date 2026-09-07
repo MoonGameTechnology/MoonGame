@@ -246,8 +246,15 @@ export class PostgresMetaMarket implements MetaMarket {
         [randomUUID(), accountId, this.faucet, this.now()],
       );
     }
+    // Две ГОТОВЫЕ строки вместо интерполяции в шаблон. Значение здесь было бы
+    // фиксированным литералом, но правило `no-sql-string-interpolation` (SD-1.3)
+    // запрещает сам приём: как только в шаблон однажды пустили `${}`, следующая правка
+    // подставит туда уже не константу. Дешевле не заводить исключение, а не
+    // интерполировать вовсе.
     const r = await c.query<{ warrants: string }>(
-      `SELECT warrants FROM meta_wallets WHERE account_id=$1${lock ? ' FOR UPDATE' : ''}`,
+      lock
+        ? 'SELECT warrants FROM meta_wallets WHERE account_id=$1 FOR UPDATE'
+        : 'SELECT warrants FROM meta_wallets WHERE account_id=$1',
       [accountId],
     );
     return Number(r.rows[0]!.warrants);
