@@ -80,6 +80,7 @@ import {
   dockRepairCost,
   fleetAtOwnDock,
   MAX_CHAIN_STEPS,
+  type AiProfile,
   type ChainStep,
   type Patrol,
 } from './game';
@@ -333,8 +334,12 @@ import {
   factionBonuses,
   houseDisplayName,
   houseNameFor,
+  isAiSeat as isAiRole,
+  nextSeatRole,
   rivalCount,
+  seatAiProfile,
   seatFactionIds as seatSeatFactionIds,
+  type SeatRole,
 } from './setupSeats';
 import { SNAP_REACH, drawOrder, lanes, mapViewBox, viewBoxPoint } from './setupMap';
 import {
@@ -587,7 +592,13 @@ import { resolveIntro, parseSeenIntros, type IntroCard } from './intros';
 import { buildRecap, type RecapEvent } from './recap';
 import { briefSince, marksAway, splitByAttention, worthShowing } from './awayBrief';
 import { HOLD_TIP_MS, cursorTipPos, holdTipPos, movedTooFar } from './tipPlacement';
-import { normalizeTake, shipCounts, stepTake } from './splitPlan';
+import {
+  cargoSplit,
+  normalizeSlotTake,
+  splitSlots,
+  stepTake,
+  type SplitSlot,
+} from './splitPlan';
 import { splitDialogHtml, splitDialogLives, splitRows } from './splitDialog';
 import { canAssaultFromOrbit, canMerge, canSplit, uniformMode } from './cmdAvailability';
 import { DEFAULT_FIRE_MODE, fireMenuHtml, fireModeLabel, fireModeTargets } from './fireMode';
@@ -1185,8 +1196,10 @@ let fleetInfoFor: string | null = null;
 let planetInfoFor: string | null = null;
 const buildQueues: Record<string, PlanetBuildQueue> = {};
 const logLines: string[] = [];
-// Player ids the local sim drives as AI (empty seats become AI). Default solo = p2.
-let AI_PLAYERS = new Set<string>(['p2']);
+// Player ids the local sim drives as AI (empty seats become AI), each with the
+// DIFFICULTY chosen on the setup screen (AIDIFF-1: «слабый» = the old simple bot,
+// «сильный» = the full-heuristics one). Default solo = p2 on weak.
+let AI_PLAYERS = new Map<string, AiProfile>([['p2', 'weak']]);
 // Session war record (from `unit.died` events): enemy units you destroyed vs your own
 // units lost. Cumulative since the match started; reset on a new match. Only battles
 // YOU take part in are counted (tracked by location via battle.started/resolved), so
@@ -1221,9 +1234,9 @@ const captureFlashes = new Map<string, { owner: string; at: number }>();
 const battleLosses = new Map<string, Record<string, Record<string, number>>>();
 // Single-player setup screen state: per-seat role (seat 0 is always you) + your
 // chosen homeworld. Seats 2-10 toggle 'ai'/'off'; an 'ai' seat spawns a rival.
-const freshSetupSlots = (): Array<'human' | 'ai' | 'off'> =>
+const freshSetupSlots = (): SeatRole[] =>
   SEAT_META.map((_, i) => (i === 0 ? 'human' : i === 1 ? 'ai' : 'off'));
-let setupSlots: Array<'human' | 'ai' | 'off'> = freshSetupSlots();
+let setupSlots: SeatRole[] = freshSetupSlots();
 // Team battle (2v2 etc.): when on, seats fight in sides — same side ALLIED (win
 // together, no friendly fire), across sides at WAR from the first hour. Seat 0 (you)
 // is always side A; the default when enabling pairs you with seat 1 vs seats 2-3.
@@ -7466,9 +7479,20 @@ function renderCmdBar() {
   cmdbar.classList.add('show');
 }
 
-/** Ship counts (by type) of a fleet — the rows of the split dialog. */
-function fleetShipCounts(f: Fleet): Record<string, number> {
-  return shipCounts(f.units); // арифметика деления — `splitPlan.ts` (REFM-76)
+/** Split-dialog rows of a fleet: one per STACK (unit + loadout), ships first, then
+ *  the troops in the hold (FSPLIT-1/2). A stack — not a unit type — is the addressable
+ *  thing: the same hull flies fitted and bare, and the loadout is part of the stack's
+ *  identity (SM-0.3), so "two cruisers" says nothing until it says WHICH two. */
+function fleetSplitSlots(f: Fleet): SplitSlot[] {
+  return splitSlots(f.units, f.landing ?? []); // арифметика деления — `splitPlan.ts` (REFM-76)
+}
+
+/** Hold capacity of one ship stack with its loadout installed (a cargo module is
+ *  exactly why two stacks of the same hull carry different amounts). */
+function stackCargoCapacity(unit: string, modules?: readonly string[]): number {
+  const def = data.units[unit];
+  if (!def) return 0;
+  return effectiveStats(def, { ...(modules ? { modules: [...modules] } : {}) }, data).cargoCapacity ?? 0;
 }
 
 /** The "Split fleet" modal: per ship type, +1 / +10 / All (and −1) move ships into
@@ -7494,12 +7518,22 @@ function renderSplitDialog() {
     lastSplitHtml = '';
     return;
   }
-  const counts = fleetShipCounts(f);
+  const slots = fleetSplitSlots(f);
   // Состав живой: отбор пересчитывается под него на каждой перерисовке (`splitPlan.ts`).
-  plan.take = normalizeTake(plan.take, counts);
+  plan.take = normalizeSlotTake(plan.take, slots);
+  const cargo = cargoSplit(slots, plan.take, stackCargoCapacity, (u) =>
+    data.units[u]?.stats.cargoSize ?? 1,
+  );
   const html = splitDialogHtml(
-    { fleetId: plan.fleetId, rows: splitRows(counts, plan.take) },
-    { icon: (u) => unitIconHtml(u, data, youColor, 18), name: displayUnit },
+    { fleetId: plan.fleetId, rows: splitRows(slots, plan.take), cargo },
+    {
+      icon: (u) => unitIconHtml(u, data, youColor, 18),
+      name: displayUnit,
+      moduleName: (m) => {
+        const mdef = data.modules[m];
+        return mdef ? tData(mdef.name) : m;
+      },
+    },
   );
   if (html !== lastSplitHtml) {
     splitdlg.innerHTML = html;
@@ -7528,10 +7562,22 @@ splitdlg.addEventListener('click', (ev) => {
     return;
   }
   if (sx === 'confirm') {
-    const take = Object.entries(splitState.take)
-      .filter(([, n]) => n > 0)
-      .map(([unit, count]) => ({ unit, count }));
-    if (take.length) playerOrder(splitFleet(ME, splitState.fleetId, take));
+    // Приказ адресует стеки, а не типы: у каждой строки — свой лоадаут, десант едет
+    // отдельным списком (FSPLIT-1/2). Без строки в отборе стек остаётся исходному флоту.
+    const f0 = s.fleets[splitState.fleetId];
+    const slots = f0 ? fleetSplitSlots(f0) : [];
+    const take: Array<{ unit: string; modules?: string[]; count: number }> = [];
+    const takeLanding: Array<{ unit: string; count: number }> = [];
+    for (const slot of slots) {
+      const n = splitState.take[slot.key] ?? 0;
+      if (n <= 0) continue;
+      if (slot.kind === 'ship') take.push({ unit: slot.unit, modules: slot.modules ?? [], count: n });
+      else takeLanding.push({ unit: slot.unit, count: n });
+    }
+    if (take.length)
+      playerOrder(
+        splitFleet(ME, splitState.fleetId, take, takeLanding.length ? takeLanding : undefined),
+      );
     splitState = null;
     renderSplitDialog();
     lastCmdHtml = '';
@@ -7540,13 +7586,13 @@ splitdlg.addEventListener('click', (ev) => {
     renderPanel();
     return;
   }
-  const unit = bEl.dataset.unit ?? '';
+  const key = bEl.dataset.key ?? '';
   const f = s.fleets[splitState.fleetId];
   if (!f) return;
-  const have = fleetShipCounts(f)[unit] ?? 0;
-  const cur = splitState.take[unit] ?? 0;
+  const have = fleetSplitSlots(f).find((sl) => sl.key === key)?.have ?? 0;
+  const cur = splitState.take[key] ?? 0;
   if (sx === 'inc' || sx === 'dec' || sx === 'all') {
-    splitState.take[unit] = stepTake(cur, have, sx, Number(bEl.dataset.n));
+    splitState.take[key] = stepTake(cur, have, sx, Number(bEl.dataset.n));
   }
   renderSplitDialog();
 });
@@ -8875,7 +8921,7 @@ if (!__PLAYER_BUILD__) {
   });
   initTestMode({
     startScenario: (state, resumeSpeed) => {
-      installMatch(state, new Set()); // scenarios drive themselves — no AI
+      installMatch(state, new Map()); // scenarios drive themselves — no AI
       speed = 0; // start paused at t=0
       // prime the fast-forward (▶▶) control to the chosen multiplier and show paused
       const spd = Array.from(document.querySelectorAll('[data-speed]')) as HTMLElement[];
@@ -9816,12 +9862,17 @@ function renderSetupSlots(): void {
         (setupTeams ? teamChip(0, true) : '') +
         `<span class="you">${t('comms.you')}</span></div>`;
     } else {
-      const aiOn = role === 'ai';
+      // Кнопка строки гоняет место по кругу «выкл → слабый → сильный» (AIDIFF-1) —
+      // подпись называет ИМЕННО то, что будет играть, а не «вкл/выкл»: иначе выбранная
+      // сложность не видна, и игрок не знает, кого позвал.
+      const aiOn = isAiRole(role);
+      const strong = role === 'ai-strong';
+      const label = strong ? t('setup.ai.strong') : aiOn ? t('setup.ai.weak') : t('setup.off');
       h +=
         `<div class="srow ${aiOn ? '' : 'off'}"><span class="dot" style="background:${m.color};color:${m.color}"></span>` +
         `<span class="nm">${house}</span>` +
         (setupTeams && aiOn ? teamChip(i, false) : '') +
-        `<button class="stog ${aiOn ? 'ai' : ''}" data-slot="${i}">${aiOn ? t('diplo.filter.ai') : t('setup.off')}</button></div>`;
+        `<button class="stog ${aiOn ? 'ai' : ''}${strong ? ' strong' : ''}" data-slot="${i}" title="${esc(t('setup.ai.hint'))}">${label}</button></div>`;
     }
   }
   setupSlotsEl.innerHTML = h;
@@ -10003,7 +10054,7 @@ topEl.addEventListener('click', (ev) => {
   );
 });
 
-function installMatch(state: GameState, aiPlayers: Set<string>): void {
+function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>): void {
   s = state;
   syncPlayerNames(s);
   ME = 'p1';
@@ -10063,7 +10114,16 @@ function installMatch(state: GameState, aiPlayers: Set<string>): void {
 }
 function startMatch(setup: SetupConfig): void {
   const st = newGame(setup);
-  installMatch(st, new Set(setup.seats.filter((x) => x.ai).map((x) => x.id)));
+  // Сложность каждого соперника берётся из его строки на экране настройки (AIDIFF-1).
+  // Она НЕ едет в `SetupConfig` и, значит, не попадает ни в состояние, ни в сохранение:
+  // это политика локального хоста, как и всё остальное в `soloDrivers`.
+  const profiles = new Map<string, AiProfile>();
+  for (const seat of setup.seats) {
+    if (!seat.ai) continue;
+    const i = SEAT_META.findIndex((m) => m.id === seat.id);
+    profiles.set(seat.id, (i >= 0 ? seatAiProfile(setupSlots[i]) : null) ?? 'weak');
+  }
+  installMatch(st, profiles);
   applyTimeSpeed(setupSpeed); // launch running at the chosen time-flow multiplier
   // SANDBOX — fenced hook. Arm the practice tools for this match from the setup
   // checkbox; remember the home world for the immortal-home toggle and show the opener.
@@ -10079,8 +10139,14 @@ function startMatch(setup: SetupConfig): void {
  *  is determined from the map's player slots. */
 function startPvEMatch(): void {
   const st = pveState(data);
-  // AI seats = all players except p1 (the human host).
-  const aiSeats = new Set(Object.keys(st.players).filter((id) => id !== 'p1'));
+  // AI seats = all players except p1 (the human host). Карта PvE своей строки настройки
+  // не имеет, поэтому её боты остаются прежними, слабыми — выбор сложности живёт на
+  // экране настройки (AIDIFF-1).
+  const aiSeats = new Map<string, AiProfile>(
+    Object.keys(st.players)
+      .filter((id) => id !== 'p1')
+      .map((id) => [id, 'weak' as const]),
+  );
   installMatch(st, aiSeats);
   applyTimeSpeed(setupSpeed);
   openSetup('hub'); // close setup screen — returns to hub
@@ -10153,7 +10219,7 @@ setupSlotsEl.addEventListener('click', (ev) => {
   const t = (ev.target as Element).closest('[data-slot]');
   if (!t) return;
   const i = Number(t.getAttribute('data-slot'));
-  setupSlots[i] = setupSlots[i] === 'ai' ? 'off' : 'ai';
+  setupSlots[i] = nextSeatRole(setupSlots[i]!); // выкл → слабый → сильный → выкл
   renderSetup();
 });
 setupSpeedEl.addEventListener('click', (ev) => {

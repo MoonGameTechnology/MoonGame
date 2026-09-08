@@ -1031,7 +1031,16 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #splitdlg .ssub{margin:6px 0 12px;color:var(--dim);font-size:11px;line-height:1.5;}
 #splitdlg .srow{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;
   padding:7px 0;border-top:1px solid var(--line);}
-#splitdlg .sname{display:flex;align-items:center;gap:6px;color:var(--ink);font-weight:700;}
+#splitdlg .sname{display:flex;align-items:center;flex-wrap:wrap;gap:6px;color:var(--ink);font-weight:700;}
+#splitdlg .smods{display:flex;flex-wrap:wrap;gap:2px;}
+#splitdlg .smod{font:400 8px ui-monospace,monospace;line-height:1.3;padding:0 3px;border-radius:2px;
+  background:rgba(53,214,230,.12);color:var(--cyan);white-space:nowrap;}
+#splitdlg .shead2{margin-top:12px;padding-top:9px;border-top:1px solid var(--cyan-dim);
+  font-size:11px;letter-spacing:1.5px;color:var(--cyan);}
+#splitdlg .scargo{margin-top:7px;color:var(--dim);font-size:11px;text-align:right;}
+#splitdlg .scargo b{color:#eafffb;}
+#splitdlg .scargo.bad{color:var(--red);}
+#splitdlg .scargo.bad b{color:var(--red);}
 #splitdlg .scur{min-width:26px;text-align:center;color:#eafffb;font-variant-numeric:tabular-nums;}
 #splitdlg .snew{min-width:42px;text-align:right;color:var(--grn);font-weight:700;font-variant-numeric:tabular-nums;}
 #splitdlg .sbtns{display:flex;gap:4px;}
@@ -1914,6 +1923,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #setup .srow .stog{font:11px ui-monospace,monospace;letter-spacing:1px;border:1px solid var(--line-hi);
   border-radius:6px;padding:6px 12px;min-width:64px;cursor:pointer;background:transparent;color:var(--dim);}
 #setup .srow .stog.ai{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.12);}
+#setup .srow .stog.strong{border-color:var(--amber);color:var(--amber);background:rgba(255,180,58,.14);}
 #setup .tmrow{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
 #setup .tmtog{flex:1;padding:9px 12px;border-radius:8px;border:1px solid var(--line-hi);background:transparent;
   color:var(--dim);font:700 12px ui-monospace,monospace;letter-spacing:.5px;cursor:pointer;text-align:left;}

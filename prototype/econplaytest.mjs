@@ -142,9 +142,9 @@ function runMatch(seed, n) {
     }
     if (state.match.status === 'ended') break;
     for (const seat of ids) {
-      // Тот же лабораторный профиль, что у selfplay: кривые ресурсов должны сниматься
+      // Тот же сильный профиль, что у selfplay: кривые ресурсов должны сниматься
       // с бота, у которого работает ветка эффектов (AI-BAL-1.1).
-      for (const a of aiOrders(state, seat, POSTURE, 'test')) {
+      for (const a of aiOrders(state, seat, POSTURE, 'strong')) {
         const r = kernel.applyAction(state, a, ctx(now));
         if (r.ok) {
           state = r.state;

@@ -18,6 +18,7 @@
  */
 import type { Action, Fleet, GameState } from '../../packages/shared-core/src/index';
 import { getStance } from '../../packages/shared-core/src/index';
+import type { AiProfile } from './ai';
 import {
   aiOrders,
   assaultFleet,
@@ -55,8 +56,10 @@ export function autoProbeKey(f: Fleet, now: number, hereOwner: string | null): s
 export interface SoloHost {
   state(): GameState;
   me(): string;
-  /** Места, которые ведёт локальный ИИ (пустые кресла). */
-  aiSeats(): ReadonlySet<string>;
+  /** Места, которые ведёт локальный ИИ (пустые кресла), и КАКОЙ силы бот на каждом
+   *  (AIDIFF-1). Сложность едет вместе с местом, а не отдельной настройкой хоста: в
+   *  одном матче соперники могут быть разными, и «сильный» — свойство кресла. */
+  aiSeats(): ReadonlyMap<string, AiProfile>;
   /** Приказ ЧУЖОГО места: применяется прямо здесь. */
   applyLocal(a: Action): void;
   /** СВОЙ приказ: общий путь клиента (в сети он уходит на сервер). */
@@ -105,12 +108,13 @@ export function initSoloDrivers(host: SoloHost): SoloDrivers {
     lastAiAt = s.time;
     // Приказы каждого пустого кресла берутся из общего `aiOrders` — той же логики,
     // которой сетевой сервер ведёт незанятые места.
-    for (const ai of host.aiSeats()) {
-      for (const a of aiOrders(host.state(), ai)) host.applyLocal(a);
+    for (const [ai, profile] of host.aiSeats()) {
+      for (const a of aiOrders(host.state(), ai, 'expand', profile)) host.applyLocal(a);
     }
     // «Хранитель»: пока ваше место делегировано, локальный ИИ играет и его — на его
     // осанке (оборона), чтобы делегирование в соло реально держало линию, а не
-    // показывало таймер.
+    // показывало таймер. Профиль здесь СЛАБЫЙ (дефолт) намеренно: сложность выбирают
+    // соперникам, а не себе — «Хранитель» это ваш автопилот, а не второй игрок.
     const me = host.me();
     const posture = stewardActive(host.state(), me, host.state().time);
     if (posture && !host.aiSeats().has(me)) {
