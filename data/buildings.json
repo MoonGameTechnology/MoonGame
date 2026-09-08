@@ -58,50 +58,49 @@
   "barracks": {
     "name": "Barracks",
     "cost": {
-      "metal": 120
+      "metal": 70
     },
-    "buildTimeHours": 8,
-    "hp": 20,
+    "buildTimeHours": 3,
+    "hp": 25,
     "enablesGroundConstruction": true,
-    "scoreValue": 6,
-    "traits": [],
+    "scoreValue": 2,
     "upgrades": [
       {
         "cost": {
-          "metal": 160,
-          "credits": 40
+          "metal": 100,
+          "credits": 30
+        },
+        "buildTimeHours": 6,
+        "upkeep": {
+          "energy": 15
+        },
+        "hp": 35,
+        "enablesGroundConstruction": true
+      },
+      {
+        "cost": {
+          "metal": 150,
+          "credits": 60
+        },
+        "buildTimeHours": 9,
+        "upkeep": {
+          "energy": 25
+        },
+        "hp": 45,
+        "enablesGroundConstruction": true
+      },
+      {
+        "cost": {
+          "metal": 200,
+          "credits": 90
         },
         "buildTimeHours": 12,
-        "hp": 30,
-        "enablesGroundConstruction": true,
         "upkeep": {
-          "energy": 20
-        }
-      },
-      {
-        "cost": {
-          "metal": 220,
-          "credits": 80
+          "energy": 35
         },
-        "buildTimeHours": 18,
-        "hp": 40,
-        "enablesGroundConstruction": true,
-        "upkeep": {
-          "energy": 30
-        }
-      },
-      {
-        "cost": {
-          "metal": 300,
-          "credits": 120
-        },
-        "buildTimeHours": 24,
-        "hp": 55,
-        "enablesGroundConstruction": true,
+        "hp": 60,
         "buildSpeedBonus": 0.05,
-        "upkeep": {
-          "energy": 40
-        }
+        "enablesGroundConstruction": true
       }
     ]
   },
@@ -111,108 +110,103 @@
       "metal": 200,
       "credits": 80
     },
-    "buildTimeHours": 12,
+    "buildTimeHours": 5,
     "hp": 25,
     "shipRepair": 0.05,
     "enablesShipConstruction": true,
-    "scoreValue": 6,
-    "traits": []
+    "scoreValue": 4
   },
   "radar": {
-    "name": "Sensor Array I",
+    "name": "Radar Array",
     "cost": {
-      "metal": 120,
+      "metal": 90,
       "credits": 40
     },
-    "buildTimeHours": 6,
-    "produces": {},
+    "buildTimeHours": 3,
     "hp": 18,
-    "radarRange": 180,
-    "scoreValue": 6,
+    "radarRange": 240,
+    "scoreValue": 2,
     "upgrades": [
       {
         "cost": {
-          "metal": 220,
-          "credits": 90
+          "metal": 180,
+          "credits": 80
         },
-        "buildTimeHours": 10,
-        "hp": 26,
-        "radarRange": 300,
+        "buildTimeHours": 5,
         "upkeep": {
-          "energy": 80
-        }
+          "energy": 50
+        },
+        "hp": 28,
+        "radarRange": 330
       },
-      {
-        "cost": {
-          "metal": 360,
-          "credits": 160
-        },
-        "buildTimeHours": 14,
-        "hp": 34,
-        "radarRange": 420,
-        "upkeep": {
-          "energy": 120
-        }
-      }
-    ],
-    "traits": [],
-    "upkeep": {
-      "energy": 50
-    }
-  },
-  "fort": {
-    "name": "Fortress",
-    "cost": {
-      "metal": 150
-    },
-    "buildTimeHours": 10,
-    "hp": 35,
-    "defenseBonus": 0.35,
-    "scoreValue": 20,
-    "upgrades": [
       {
         "cost": {
           "metal": 300,
-          "credits": 100
+          "credits": 140
         },
-        "buildTimeHours": 16,
-        "hp": 50,
-        "defenseBonus": 0.5
+        "buildTimeHours": 7,
+        "upkeep": {
+          "energy": 80
+        },
+        "hp": 38,
+        "radarRange": 420
+      }
+    ],
+    "upkeep": {
+      "energy": 30
+    }
+  },
+  "fort": {
+    "name": "Fort",
+    "cost": {
+      "metal": 100
+    },
+    "buildTimeHours": 4,
+    "hp": 40,
+    "defenseBonus": 0.3,
+    "scoreValue": 5,
+    "upgrades": [
+      {
+        "cost": {
+          "metal": 200,
+          "credits": 80
+        },
+        "buildTimeHours": 6,
+        "hp": 60,
+        "defenseBonus": 0.45
       },
       {
         "cost": {
-          "metal": 500,
-          "credits": 200
+          "metal": 340,
+          "credits": 160
         },
-        "buildTimeHours": 24,
-        "hp": 65,
-        "defenseBonus": 0.65
+        "buildTimeHours": 8,
+        "hp": 85,
+        "defenseBonus": 0.6
       }
-    ],
-    "traits": []
+    ]
   },
   "orbital_aa": {
-    "name": "Orbital AA Battery",
+    "name": "Orbital AA",
     "cost": {
       "metal": 140,
       "credits": 50
     },
-    "buildTimeHours": 8,
+    "buildTimeHours": 5,
     "hp": 30,
-    "aaDamage": 14,
-    "scoreValue": 6,
-    "traits": [],
+    "aaDamage": 12,
+    "scoreValue": 3,
     "upkeep": {
-      "energy": 40
+      "energy": 30
     }
   },
   "metal_station": {
-    "name": "Salvage Metal Rig I",
+    "name": "Salvage Metal Rig",
     "cost": {
       "metal": 80,
       "credits": 30
     },
-    "buildTimeHours": 8,
+    "buildTimeHours": 4,
     "produces": {
       "metal": 30
     },
@@ -220,14 +214,14 @@
       "energy": 40
     },
     "hp": 20,
-    "scoreValue": 6,
+    "scoreValue": 5,
     "upgrades": [
       {
         "cost": {
           "metal": 220,
           "credits": 90
         },
-        "buildTimeHours": 14,
+        "buildTimeHours": 6,
         "produces": {
           "metal": 60
         },
@@ -241,7 +235,7 @@
           "metal": 380,
           "credits": 170
         },
-        "buildTimeHours": 20,
+        "buildTimeHours": 8,
         "produces": {
           "metal": 100
         },
@@ -250,186 +244,300 @@
         },
         "hp": 40
       }
-    ],
-    "traits": []
+    ]
   },
   "power_plant": {
-    "name": "Fusion Reactor I",
+    "name": "Fusion Plant",
     "cost": {
       "metal": 110,
       "credits": 30
     },
-    "buildTimeHours": 6,
+    "buildTimeHours": 4,
     "produces": {
-      "energy": 25
+      "energy": 14
     },
-    "hp": 16,
-    "scoreValue": 8,
+    "hp": 20,
+    "scoreValue": 4,
     "upgrades": [
       {
         "cost": {
-          "metal": 280,
-          "credits": 110
+          "metal": 240,
+          "credits": 100
         },
-        "buildTimeHours": 16,
+        "buildTimeHours": 6,
         "produces": {
-          "energy": 60
+          "energy": 26
         },
-        "hp": 26,
         "upkeep": {
           "credits": 96
-        }
+        },
+        "hp": 28
       },
       {
         "cost": {
-          "metal": 460,
-          "credits": 210
+          "metal": 400,
+          "credits": 190
         },
-        "buildTimeHours": 22,
+        "buildTimeHours": 8,
         "produces": {
-          "energy": 110
+          "energy": 42
         },
-        "hp": 36,
         "upkeep": {
           "credits": 160
-        }
+        },
+        "hp": 36
       }
     ],
-    "traits": [],
     "upkeep": {
       "credits": 48
     }
   },
   "fabricator": {
-    "name": "Microelectronics Fab I",
+    "name": "Microelectronics Fab",
     "cost": {
-      "metal": 200,
-      "credits": 120,
-      "energy": 60
+      "metal": 180,
+      "credits": 100
     },
-    "buildTimeHours": 14,
+    "buildTimeHours": 6,
     "produces": {
-      "microelectronics": 8
+      "microelectronics": 5
     },
     "hp": 22,
-    "scoreValue": 14,
+    "scoreValue": 6,
     "upgrades": [
       {
         "cost": {
-          "metal": 360,
-          "credits": 220,
-          "energy": 140
+          "metal": 320,
+          "credits": 200,
+          "microelectronics": 30
         },
-        "buildTimeHours": 20,
+        "buildTimeHours": 8,
         "produces": {
-          "microelectronics": 18
+          "microelectronics": 11
         },
-        "hp": 32,
         "upkeep": {
-          "energy": 275
-        }
+          "energy": 275,
+          "food": 70
+        },
+        "hp": 32
       },
       {
         "cost": {
-          "metal": 560,
-          "credits": 360,
-          "energy": 260
+          "metal": 520,
+          "credits": 340,
+          "microelectronics": 80
         },
-        "buildTimeHours": 28,
+        "buildTimeHours": 10,
         "produces": {
-          "microelectronics": 32
+          "microelectronics": 19
         },
-        "hp": 44,
         "upkeep": {
-          "energy": 450
-        }
+          "energy": 450,
+          "food": 110
+        },
+        "hp": 42
       }
     ],
-    "traits": [],
     "upkeep": {
-      "energy": 150
+      "energy": 150,
+      "food": 40
     }
   },
   "hospital": {
     "name": "Field Hospital",
     "cost": {
-      "metal": 160,
-      "credits": 60
+      "metal": 120,
+      "credits": 40
     },
-    "buildTimeHours": 8,
-    "hp": 20,
+    "buildTimeHours": 4,
+    "hp": 22,
     "healRate": 0.15,
-    "scoreValue": 8,
-    "traits": [],
+    "scoreValue": 4,
     "upgrades": [
       {
         "cost": {
-          "metal": 220,
-          "credits": 80
+          "metal": 160,
+          "credits": 60
         },
-        "buildTimeHours": 12,
-        "hp": 30,
-        "healRate": 0.25,
+        "buildTimeHours": 6,
         "upkeep": {
-          "energy": 30
-        }
+          "energy": 20
+        },
+        "hp": 32,
+        "healRate": 0.25
       },
       {
         "cost": {
-          "metal": 300,
-          "credits": 120
+          "metal": 220,
+          "credits": 90
         },
-        "buildTimeHours": 18,
-        "hp": 40,
-        "healRate": 0.40,
+        "buildTimeHours": 9,
         "upkeep": {
-          "energy": 50
-        }
+          "energy": 35
+        },
+        "hp": 42,
+        "healRate": 0.4
       }
     ]
   },
   "factory": {
     "name": "Vehicle Factory",
     "cost": {
-      "metal": 200,
-      "credits": 100
+      "metal": 150,
+      "credits": 60
     },
-    "buildTimeHours": 12,
+    "buildTimeHours": 6,
     "hp": 25,
     "enablesGroundConstruction": true,
-    "scoreValue": 10,
-    "traits": [],
+    "scoreValue": 5,
     "upkeep": {
-      "energy": 50
+      "energy": 30
     },
     "upgrades": [
+      {
+        "cost": {
+          "metal": 180,
+          "credits": 80
+        },
+        "buildTimeHours": 8,
+        "upkeep": {
+          "energy": 50
+        },
+        "hp": 35,
+        "enablesSquadronConstruction": true,
+        "enablesGroundConstruction": true
+      },
       {
         "cost": {
           "metal": 250,
           "credits": 120
         },
-        "buildTimeHours": 16,
-        "hp": 35,
-        "enablesGroundConstruction": true,
-        "enablesSquadronConstruction": true,
+        "buildTimeHours": 12,
         "upkeep": {
           "energy": 70
-        }
+        },
+        "hp": 45,
+        "buildSpeedBonus": 0.5,
+        "enablesSquadronConstruction": true,
+        "enablesGroundConstruction": true
+      }
+    ]
+  },
+  "farm": {
+    "name": "Hydroponics Farm",
+    "cost": {
+      "metal": 90
+    },
+    "buildTimeHours": 3,
+    "produces": {
+      "food": 10
+    },
+    "upkeep": {
+      "energy": 30
+    },
+    "hp": 18,
+    "upgrades": [
+      {
+        "cost": {
+          "metal": 160,
+          "credits": 40
+        },
+        "buildTimeHours": 4,
+        "produces": {
+          "food": 16
+        },
+        "upkeep": {
+          "energy": 50
+        },
+        "hp": 24
       },
       {
         "cost": {
-          "metal": 350,
-          "credits": 180
+          "metal": 260,
+          "credits": 90
         },
-        "buildTimeHours": 24,
-        "hp": 45,
-        "enablesGroundConstruction": true,
-        "enablesSquadronConstruction": true,
-        "buildSpeedBonus": 0.5,
+        "buildTimeHours": 6,
+        "produces": {
+          "food": 24
+        },
         "upkeep": {
-          "energy": 100
-        }
+          "energy": 80
+        },
+        "hp": 30
       }
-    ]
+    ],
+    "scoreValue": 3
+  },
+  "mine": {
+    "name": "Metal Mine",
+    "cost": {
+      "metal": 80
+    },
+    "buildTimeHours": 3,
+    "produces": {
+      "metal": 12
+    },
+    "hp": 20,
+    "upgrades": [
+      {
+        "cost": {
+          "metal": 140
+        },
+        "buildTimeHours": 4,
+        "produces": {
+          "metal": 18
+        },
+        "hp": 26
+      },
+      {
+        "cost": {
+          "metal": 230,
+          "credits": 50
+        },
+        "buildTimeHours": 5,
+        "produces": {
+          "metal": 27
+        },
+        "hp": 32
+      }
+    ],
+    "scoreValue": 4
+  },
+  "refinery": {
+    "name": "Credit Refinery",
+    "cost": {
+      "metal": 110
+    },
+    "buildTimeHours": 4,
+    "produces": {
+      "credits": 8
+    },
+    "upkeep": {
+      "energy": 40
+    },
+    "hp": 20,
+    "scoreValue": 3
+  },
+  "starfort": {
+    "name": "Void Fortress",
+    "cost": {
+      "metal": 180,
+      "credits": 60
+    },
+    "buildTimeHours": 6,
+    "hp": 70,
+    "defenseBonus": 0.4,
+    "scoreValue": 6
+  },
+  "tax_office": {
+    "name": "Tax Office",
+    "cost": {
+      "metal": 120,
+      "credits": 60
+    },
+    "buildTimeHours": 4,
+    "hp": 16,
+    "scoreValue": 3,
+    "creditsBonus": 0.25
   }
 }

@@ -24,24 +24,20 @@
   "sensor_frigate": {
     "faction": "vanguard",
     "stats": {
-      "attack": 3,
-      "defense": 4,
-      "speed": 8,
-      "hp": 18,
+      "attack": 4,
+      "defense": 6,
+      "speed": 56,
+      "hp": 22,
       "cargoCapacity": 1
     },
-    "line": "rear",
-    "traits": [],
-    "abilities": [],
-    "signature": 1,
     "radarRange": 60,
     "cost": {
-      "metal": 120,
+      "metal": 55,
       "microelectronics": 2
     },
     "buildTimeHours": 2,
     "upkeep": {
-      "credits": 32
+      "credits": 16
     },
     "slots": {
       "utility": 1
@@ -50,24 +46,21 @@
   "cruiser": {
     "faction": "vanguard",
     "stats": {
-      "attack": 10,
-      "defense": 8,
-      "speed": 6,
-      "hp": 40,
-      "shield": 15,
-      "cargoCapacity": 2
+      "attack": 16,
+      "defense": 14,
+      "speed": 40,
+      "hp": 60,
+      "cargoCapacity": 5
     },
-    "line": "front",
-    "traits": [],
-    "abilities": [],
     "signature": 4,
     "cost": {
-      "metal": 220,
-      "credits": 80
+      "metal": 60,
+      "credits": 20,
+      "microelectronics": 3
     },
     "buildTimeHours": 3,
     "upkeep": {
-      "credits": 64
+      "credits": 32
     },
     "slots": {
       "weapon": 1,
@@ -101,26 +94,21 @@
   },
   "dropship": {
     "faction": "vanguard",
-    "domain": "space",
     "stats": {
       "attack": 2,
       "defense": 6,
-      "speed": 6,
+      "speed": 44,
       "hp": 50,
-      "shield": 12,
-      "cargoCapacity": 12
+      "cargoCapacity": 8
     },
-    "line": "rear",
-    "traits": [],
-    "abilities": [],
-    "signature": 4,
+    "signature": 3,
     "cost": {
-      "metal": 180,
-      "credits": 40
+      "metal": 70,
+      "credits": 20
     },
     "buildTimeHours": 4,
     "upkeep": {
-      "credits": 40
+      "credits": 24
     },
     "slots": {
       "defense": 1,
@@ -131,22 +119,21 @@
     "faction": "vanguard",
     "domain": "ground",
     "stats": {
-      "attack": 6,
-      "defense": 14,
-      "speed": 0,
-      "hp": 20,
-      "cargoSize": 1
+      "attack": 4,
+      "defense": 8,
+      "speed": 44,
+      "hp": 14
     },
-    "line": "front",
-    "traits": [],
-    "abilities": [],
-    "signature": 1,
+    "traits": [
+      "ground"
+    ],
     "cost": {
-      "metal": 40
+      "metal": 15
     },
     "buildTimeHours": 1,
     "upkeep": {
-      "credits": 8
+      "credits": 8,
+      "food": 5
     }
   },
   "drop_infantry": {
@@ -176,85 +163,81 @@
     "faction": "vanguard",
     "domain": "ground",
     "stats": {
-      "attack": 24,
-      "defense": 20,
-      "speed": 0,
-      "hp": 50,
-      "cargoSize": 1
+      "attack": 22,
+      "defense": 14,
+      "speed": 40,
+      "hp": 46
     },
-    "line": "front",
-    "traits": [],
-    "abilities": [],
+    "traits": [
+      "ground"
+    ],
     "signature": 2,
     "cost": {
-      "metal": 140,
-      "credits": 40
+      "metal": 120,
+      "credits": 30
     },
     "buildTimeHours": 4,
     "upkeep": {
-      "credits": 32
+      "credits": 32,
+      "food": 10
     }
   },
   "heavy_infantry": {
     "faction": "vanguard",
     "domain": "ground",
     "stats": {
-      "attack": 20,
-      "defense": 16,
-      "speed": 0,
-      "hp": 35,
-      "cargoSize": 1
+      "attack": 8,
+      "defense": 20,
+      "speed": 40,
+      "hp": 34
     },
-    "line": "front",
-    "traits": [],
-    "abilities": [],
-    "signature": 1,
+    "traits": [
+      "ground"
+    ],
     "cost": {
-      "metal": 90,
-      "credits": 30
+      "metal": 55,
+      "credits": 15
     },
     "buildTimeHours": 2,
     "upkeep": {
-      "credits": 24
+      "credits": 16,
+      "food": 5
     }
   },
   "special_forces": {
     "faction": "vanguard",
     "domain": "ground",
     "stats": {
-      "attack": 30,
+      "attack": 18,
       "defense": 12,
-      "speed": 0,
-      "hp": 28,
-      "cargoSize": 1
+      "speed": 52,
+      "hp": 26
     },
-    "line": "front",
-    "traits": [],
-    "abilities": [],
-    "signature": 1,
+    "traits": [
+      "ground"
+    ],
     "cost": {
-      "metal": 120,
-      "credits": 50
+      "metal": 60,
+      "credits": 45,
+      "microelectronics": 5
     },
     "buildTimeHours": 3,
     "upkeep": {
-      "credits": 32
+      "credits": 32,
+      "food": 5
     }
   },
   "hero": {
     "faction": "vanguard",
     "stats": {
-      "attack": 12,
-      "defense": 12,
-      "speed": 6,
-      "hp": 120,
-      "shield": 40
+      "attack": 16,
+      "defense": 14,
+      "speed": 40,
+      "hp": 180
     },
-    "line": "front",
     "traits": [
       "hero"
     ],
-    "abilities": [],
     "signature": 6,
     "cost": {
       "metal": 400,
@@ -262,7 +245,7 @@
     },
     "buildTimeHours": 10,
     "upkeep": {
-      "credits": 80
+      "credits": 64
     }
   },
   "fighter_squadron": {
@@ -270,22 +253,20 @@
     "stats": {
       "attack": 14,
       "defense": 3,
-      "speed": 14,
+      "speed": 92,
       "hp": 10,
-      "cargoSize": 1,
       "strikeRange": 180,
       "fuel": 3,
       "rearmRounds": 2
     },
-    "line": "front",
     "traits": [
       "squadron"
     ],
-    "abilities": [],
     "signature": 2,
     "cost": {
       "metal": 90,
-      "credits": 40
+      "credits": 40,
+      "microelectronics": 10
     },
     "buildTimeHours": 2,
     "upkeep": {
@@ -300,17 +281,14 @@
     "stats": {
       "attack": 4,
       "defense": 10,
-      "speed": 5,
+      "speed": 40,
       "hp": 70,
-      "shield": 20,
       "cargoCapacity": 6
     },
-    "line": "front",
     "traits": [
       "carrier"
     ],
-    "abilities": [],
-    "signature": 7,
+    "signature": 6,
     "cost": {
       "metal": 320,
       "credits": 160
@@ -322,6 +300,54 @@
     "slots": {
       "defense": 1,
       "utility": 2
+    }
+  },
+  "scout": {
+    "faction": "blue",
+    "stats": {
+      "attack": 5,
+      "defense": 4,
+      "speed": 64,
+      "hp": 12,
+      "cargoCapacity": 1
+    },
+    "cost": {
+      "metal": 20
+    },
+    "buildTimeHours": 1,
+    "upkeep": {
+      "credits": 8
+    },
+    "radarRange": 105,
+    "slots": {
+      "utility": 1
+    }
+  },
+  "siege": {
+    "faction": "blue",
+    "stats": {
+      "attack": 30,
+      "defense": 6,
+      "speed": 30,
+      "hp": 40,
+      "range": 240
+    },
+    "traits": [
+      "artillery"
+    ],
+    "cost": {
+      "metal": 90,
+      "credits": 40,
+      "microelectronics": 4
+    },
+    "buildTimeHours": 5,
+    "upkeep": {
+      "credits": 48
+    },
+    "signature": 5,
+    "slots": {
+      "weapon": 1,
+      "utility": 1
     }
   }
 }

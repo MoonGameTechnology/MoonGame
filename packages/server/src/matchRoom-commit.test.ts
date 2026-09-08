@@ -396,7 +396,16 @@ describe('MatchRoom · LARS-1 live arsenal sync', () => {
       ...seed.state,
       players: {
         ...seed.state.players,
-        green: { ...green, arsenal: { hulls: ['cruiser'], modules: [], fittings: [] } },
+        green: {
+          ...green,
+          // CONV-12 свёл каталоги, и крейсер теперь стоит ещё и микроэлектронику
+          // (правило ECON-7 прототипа: боевой корабль требует хай-тек-ресурс).
+          // Эти тесты про ВЛАДЕНИЕ модулем, а не про экономику, поэтому казна
+          // пополняется явно — иначе отказ приедет E_INSUFFICIENT и спрячет то,
+          // что проверяется.
+          resources: { ...green.resources, microelectronics: 10 },
+          arsenal: { hulls: ['cruiser'], modules: [], fittings: [] },
+        },
       },
     };
     return createDevMatch(data, {

@@ -1,10 +1,10 @@
 {
   "empty_space": {
-    "name": "Empty Space",
+    "name": "Open space",
     "speedBonus": 0.15
   },
   "asteroid_field": {
-    "name": "Asteroid Field",
+    "name": "Asteroid field",
     "speedBonus": -0.25,
     "hpBonus": 0.1,
     "scoreValue": 5

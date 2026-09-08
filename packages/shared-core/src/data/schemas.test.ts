@@ -27,10 +27,10 @@ function loadShippedBundle(): Record<string, unknown> {
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.12');
+    expect(data.version).toBe('0.1.13');
     expect(data.resources).toContain('microelectronics');
     expect(data.units.siege_lance?.stats.range).toBe(300); // artillery firing radius (map units)
-    expect(data.units.cruiser?.upkeep.credits).toBe(64); // daily upkeep, BAL-3 scale
+    expect(data.units.cruiser?.upkeep.credits).toBe(32); // daily upkeep, BAL-3 scale
     // fleet ⊕ ground-army separation: domains + transport capacity.
     expect(data.units.cruiser?.domain).toBe('space'); // schema default
     expect(data.units.tank?.domain).toBe('ground');
@@ -41,9 +41,9 @@ describe('game data schema (docs/architecture.md §2)', () => {
     for (const id of ['militia', 'drop_infantry', 'tank']) {
       expect(data.units[id]?.stats.cargoSize).toBe(1);
     }
-    expect(data.units.dropship?.stats.cargoCapacity).toBe(12); // dedicated lift
+    expect(data.units.dropship?.stats.cargoCapacity).toBe(8); // dedicated lift
     expect(data.units.scout_drone?.stats.cargoCapacity).toBe(0); // default, carries nothing
-    expect(data.buildings.orbital_aa?.aaDamage).toBe(14); // anti-ship orbital AA — a defensive building
+    expect(data.buildings.orbital_aa?.aaDamage).toBe(12); // anti-ship orbital AA — a defensive building
     expect(data.units.cruiser?.stats.aaDamage).toBe(0); // default, no AA
     expect(data.buildings.mine_t1?.aaDamage).toBe(0); // buildings default to no AA
     // squadrons-roadmap SQ-0.1: a carrier-borne fighter squadron + the new squadron stats.
@@ -61,7 +61,6 @@ describe('game data schema (docs/architecture.md §2)', () => {
     expect(data.planetTypes.volcanic?.productionBonus).toBeCloseTo(0.25);
     expect(data.planetTypes.terran?.defenseBonus).toBeCloseTo(0.1);
     expect(data.planetTypes.barren?.defenseBonus).toBe(0); // schema default
-    expect(data.technologies.orbital_logistics?.unlocks.units).toContain('dropship');
     expect(data.technologies.siege_doctrine?.prerequisites).toEqual(['orbital_logistics']);
     expect(data.technologies.industrial_automation?.effects.productionBonus).toBeCloseTo(0.1);
     // ship modules: typed hull slots + a data-driven module catalog.
@@ -140,20 +139,64 @@ describe('game data schema (docs/architecture.md §2)', () => {
     expect(instant, 'buildTimeHours не задан в data/units.json — заказ выполняется мгновенно').toEqual([]);
   });
 
+  it('бесплатно и мгновенно исследуется только мета-прогрессия (CONV-12)', () => {
+    // Тот же класс дефекта, что CONV-15 поймал у `buildTimeHours`: `cost` и
+    // `researchTimeHours` необязательны, схема подставляет `{}` и `0`, и технология без
+    // них исследуется даром в тот же миг. У шести `meta_*` это НАМЕРЕННО — прототип
+    // выдаёт их уже завершёнными за узлы прокачки командира (`prototype/src/meta.ts`) и
+    // прячет из окна исследований по префиксу. Любая другая бесплатная технология —
+    // забытые числа, а не задумка, и увидит её сначала игрок, а не ревьюер.
+    const data = parseGameData(loadShippedBundle());
+    const free = Object.entries(data.technologies)
+      .filter(([, def]) => Object.keys(def.cost).length === 0 && def.researchTimeHours <= 0)
+      .map(([id]) => id)
+      .filter((id) => !id.startsWith('meta_'))
+      .sort();
+    expect(free, 'технология бесплатна и мгновенна, но это не мета-грант').toEqual([]);
+  });
+
+  it('исследование запирает ровно три вещи — и список закрыт намеренно (CONV-12)', () => {
+    // Гейт на контент, который строится с первой минуты, меняет экономику молча: игрок
+    // получает ту же постройку на несколько игровых дней позже, а замер об этом не
+    // узнает. При сведении каталогов (CONV-12) канон снял три таких гейта — на `fort`,
+    // `fabricator` и `dropship`, — потому что в прототипе, чей баланс мерили девять
+    // кирпичей BAL, они доступны сразу. Уцелели только те, что запирают сущность,
+    // которой у прототипа не было вовсе: запереть ещё-не-существующее дешевле, чем
+    // отобрать доступное. Новая строка здесь = осознанное решение с замером, а не
+    // побочный эффект правки контента.
+    const data = parseGameData(loadShippedBundle());
+    const gates = Object.entries(data.technologies)
+      .flatMap(([id, def]) => [
+        ...(def.unlocks.units ?? []).map((u) => `${id} → unit:${u}`),
+        ...(def.unlocks.buildings ?? []).map((b) => `${id} → building:${b}`),
+        ...(def.unlocks.abilities ?? []).map((a) => `${id} → ability:${a}`),
+      ])
+      .sort();
+    expect(gates).toEqual([
+      'ai_stewardship → ability:steward',
+      'industrial_automation → building:mine_t2',
+      'siege_doctrine → unit:siege_lance',
+    ]);
+  });
+
   it('ships producers for every economy resource (ECON-3: energy + microelectronics)', () => {
     const data = parseGameData(loadShippedBundle());
-    // Fusion reactor feeds energy, scaling across its 3 levels.
+    // Fusion reactor feeds energy, scaling across its 3 levels (CONV-12: the ladder
+    // is the prototype's — the one nine BAL bricks measured).
     const power = data.buildings.power_plant;
     expect(power).toBeDefined();
     expect(buildingMaxLevel(power!)).toBe(3);
-    expect(buildingLevel(power!, 1).produces.energy).toBe(25);
-    expect(buildingLevel(power!, 3).produces.energy).toBe(110);
-    // The fab turns energy+metal into microelectronics (premium, gated by tech).
+    expect(buildingLevel(power!, 1).produces.energy).toBe(14);
+    expect(buildingLevel(power!, 3).produces.energy).toBe(42);
+    // The fab turns metal+credits into microelectronics. Its bootstrap chain is the
+    // point: the UPGRADES cost the very good the fab produces, so scaling it up has to
+    // be paid for out of its own output.
     const fab = data.buildings.fabricator;
     expect(fab).toBeDefined();
-    expect(buildingLevel(fab!, 1).produces.microelectronics).toBe(8);
-    expect(buildingLevel(fab!, 1).cost.energy).toBe(60); // consumes energy to build
-    expect(data.technologies.microelectronics_fabrication?.unlocks.buildings).toContain('fabricator');
+    expect(buildingLevel(fab!, 1).produces.microelectronics).toBe(5);
+    expect(buildingLevel(fab!, 1).cost.microelectronics).toBeUndefined();
+    expect(buildingLevel(fab!, 2).cost.microelectronics).toBe(30);
+    expect(buildingLevel(fab!, 3).cost.microelectronics).toBe(80);
     // Every economy resource now has at least one building that produces it.
     const produced = new Set<string>();
     for (const def of Object.values(data.buildings)) {
@@ -207,11 +250,12 @@ describe('game data schema (docs/architecture.md §2)', () => {
     const data = parseGameData(loadShippedBundle());
     const fort = data.buildings.fort;
     expect(fort).toBeDefined();
-    // "от 35 до 65 на 3 уровне" — both HP and the ground-defense bonus scale.
-    expect(buildingLevel(fort!, 1).hp).toBe(35);
-    expect(buildingLevel(fort!, 3).hp).toBe(65);
-    expect(buildingLevel(fort!, 1).defenseBonus).toBeCloseTo(0.35);
-    expect(buildingLevel(fort!, 3).defenseBonus).toBeCloseTo(0.65);
+    // Both HP and the ground-defense bonus scale across the three rungs (CONV-12: the
+    // numbers are the prototype's, so what BAL measured is what the bundle now ships).
+    expect(buildingLevel(fort!, 1).hp).toBe(40);
+    expect(buildingLevel(fort!, 3).hp).toBe(85);
+    expect(buildingLevel(fort!, 1).defenseBonus).toBeCloseTo(0.3);
+    expect(buildingLevel(fort!, 3).defenseBonus).toBeCloseTo(0.6);
     // Every ordinary building still grants the baseline +1%.
     expect(buildingLevel(data.buildings.barracks!, 1).defenseBonus).toBeCloseTo(0.01);
   });
@@ -222,8 +266,8 @@ describe('game data schema (docs/architecture.md §2)', () => {
     expect(radar).toBeDefined();
     expect(buildingMaxLevel(radar!)).toBe(3);
     // radarRange is a Euclidean distance (map units), not jumps.
-    expect(buildingLevel(radar!, 1).radarRange).toBe(180);
-    expect(buildingLevel(radar!, 2).radarRange).toBe(300);
+    expect(buildingLevel(radar!, 1).radarRange).toBe(240);
+    expect(buildingLevel(radar!, 2).radarRange).toBe(330);
     expect(buildingLevel(radar!, 3).radarRange).toBe(420);
   });
 

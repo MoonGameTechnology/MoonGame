@@ -107,4 +107,19 @@ describe('СТОРОЖ: дрейф двух каталогов не растёт
         'Подробности — в шапке prototype/content-parity-baseline.txt.',
     ).toEqual({ added: [], gone: [] });
   });
+
+  it('в базовом списке не осталось ни одной строки `only-in-prototype` (CONV-12a)', () => {
+    // Храповик, а не украшение. CONV-12a сделал список ОДНОСТОРОННИМ: канон принял все
+    // сущности прототипа, поэтому «есть только у прототипа» больше не бывает. Пока это
+    // так, `data/*.json` — надмножество играбельного контента, и переезд прототипа на
+    // него (CONV-12b) ничего не теряет. Первая же новая сущность, заведённая только в
+    // `prototypeData.ts`, вернёт двусторонний дрейф и уронит этот тест — а не всплывёт
+    // через месяц пустым экраном на каноническом клиенте.
+    const baseline = parseBaseline(readFileSync('prototype/content-parity-baseline.txt', 'utf8'));
+    const onlyProto = baseline.filter((line) => line.endsWith('only-in-prototype'));
+    expect(
+      onlyProto,
+      'сущность заведена только в каталоге прототипа — заведи её и в data/*.json',
+    ).toEqual([]);
+  });
 });

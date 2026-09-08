@@ -1,4 +1,4 @@
-# Базовый список расхождений двух каталогов контента (CONV-11).
+# Базовый список расхождений двух каталогов контента (CONV-11 завёл, CONV-12 сводит).
 #
 # Контент заведён ДВАЖДЫ: `prototype/src/prototypeData.ts` (его читают играбельный
 # прототип, прото-хост и оба харнеса замера) и `data/*.json` (его читают
@@ -7,9 +7,8 @@
 # мешало завести юнит в одном каталоге и забыть про другой. Так они и разъехались:
 # совпали только идентификаторы.
 #
-# Этот файл НЕ разрешает расхождения — он их ПЕРЕСЧИТЫВАЕТ. Каждая строка = один
-# накопленный долг, который сведёт CONV-12; сторож (`contentParity.test.ts`) краснеет
-# на ЛЮБОМ отличии от этого списка:
+# Этот файл НЕ разрешает расхождения — он их ПЕРЕСЧИТЫВАЕТ. Сторож
+# (`contentParity.test.ts`) краснеет на ЛЮБОМ отличии от этого списка:
 #   · появилась новая строка  → дрейф вырос, это чинят, а не дописывают сюда;
 #   · пропала строка          → долг закрыт, убери её тем же PR (конвенция
 #                               `.trivyignore`: запись живёт, пока живёт обоснование).
@@ -19,9 +18,16 @@
 # полевая намеренно: иначе новое поле у уже разошедшегося юнита спряталось бы за строкой
 # про эту сущность.
 #
-# Снят 2026-08-27 (CONV-11) с `prototypeData.ts` против бандла `data/*.json` версии 0.1.9:
-# 274 строки. Дальше сокращался только теми правками, что закрывают ДЕФЕКТ канона, а не
-# выбирают сторону в развилке CONV-12:
+# ЧТО ЭТОТ СПИСОК ОЗНАЧАЕТ СЕЙЧАС — и это главное изменение CONV-12a. Раньше он был
+# ДВУСТОРОННИМ: обе стороны несли то, чего нет у другой. Теперь строк `only-in-prototype`
+# в нём НЕТ НИ ОДНОЙ (это отдельно проверяет сторож), и каждая оставшаяся строка значит
+# ровно одно: «канон несёт то, чего у прототипа нет, — и ни один модуль в графе прототипа
+# этого поля не читает». То есть список превратился из счётчика взаимного дрейфа в
+# ОПИСЬ НАСЛЕДСТВА: это ровно то, что прототип получит, когда начнёт читать `data/*.json`
+# (CONV-12b), и ровно то, что должен покрыть контрольный замер.
+#
+# История сокращений (каждая строка — правка, закрывшая дефект, а не выбор стороны):
+#   · 2026-08-27 (CONV-11), бандл 0.1.9 — список снят: 274 строки.
 #   · 2026-09-06 (CONV-15), бандл 0.1.10 — 274 → 261: тринадцать полей, которых в сыром
 #     `data/*.json` не было вовсе; дефолт схемы подставлял 0 и молча менял правила.
 #   · 2026-09-06 (CONV-17), бандл 0.1.11 — 261 → 210: пятьдесят одно `description`,
@@ -29,87 +35,29 @@
 #     хотя потребители зовут `t(description)`. Ключи уже существовали в обеих локалях.
 #   · 2026-09-07 (HC-3 + CONV-17), бандл 0.1.12 — 216 строк: HC-3 принёс три способности
 #     героя и три узла дерева, и к ним то же правило применено сразу.
+#   · 2026-09-07 (CONV-16), бандл 0.1.12 — 216 → 213: сняты три недостижимых гейта
+#     `has_scientist` на ветки, у которых учёного нет.
+#   · 2026-09-08 (CONV-12a), бандл 0.1.13 — 213 → 99: канон принял балансные числа и
+#     14 сущностей прототипа. Правило выбора стороны — не вкус, а вопрос «КТО ЧИТАЕТ ЭТО
+#     ПОЛЕ в графе модулей, который крутит прототип»: читает — побеждает прототип (его
+#     числа мерили девять кирпичей BAL); не читает никто или читает только каноническая
+#     машинерия (`pve`, `factionStart`, `visibility`) — остаётся канон, и такая строка
+#     закроется сама, когда умрёт второй каталог.
 #
-# ВАЖНО, и это правка утверждения из HC-3: «новая сущность героя платит ДВЕ строки, и
-# починить их нечем, кроме сведения каталогов» — верно только для ПОЛОВИНЫ пары.
-#   · `description` чинится и до CONV-12: поле обязано держать КЛЮЧ (его зовут через
-#     `t()` — `heroStaff.ts`, `techTree.ts:324`), а у общей сущности ключ у прототипа уже
-#     есть и уже заведён в обеих локалях. Так закрыт 51 случай в CONV-17 и 6 из HC-3.
-#   · `name` действительно ждёт CONV-12: у ШИПНУТОГО бандла имя английское, а перевод
-#     живёт ключом `data.<слаг>` (это держит `i18n.test.ts`), тогда как прототип рисует
-#     имена героев и учёных через `t(name)`. Две живые конвенции, выбор — за развилкой.
-# Поэтому новая сущность героя платит ОДНУ строку (`field:name`), а не две.
-#
-# 2026-09-07 (HC-3): +12 строк за три новые способности героя (warp_jump, decoy_signal,
-# convoy_impulse и три узла дерева). Это НЕ новый класс дрейфа, а тот же самый, что уже
-# описан выше: у канона имя английское, а описание — русская проза, у прототипа оба поля
-# суть КЛЮЧИ локализации. Пока каталоги не сведены (CONV-12), любая новая сущность героя
-# платит ровно эти две строки — «починить» их здесь нечем, кроме самого сведения. Ни
-# одна из двенадцати не про расхождение МЕХАНИКИ: type/cooldownHours/range/params/
-# hook/scope/branch/requires/cost/grants у всех трёх совпадают побайтно, и именно это
-# сторож и проверил.
-buildings/barracks field:buildTimeHours
-buildings/barracks field:cost
-buildings/barracks field:hp
-buildings/barracks field:scoreValue
-buildings/barracks field:upgrades
+# ПРО `field:name` У ГЕРОЕВ, СПОСОБНОСТЕЙ И УЧЁНЫХ (31 строка ниже). Это не дрейф
+# значений, а ДВЕ ЖИВЫЕ КОНВЕНЦИИ: у шипнутого бандла имя английское, а перевод живёт
+# ключом `data.<слаг>` (это держит `i18n.test.ts`), тогда как прототип рисует имена
+# героев и учёных через `t(name)` и потому хранит в `name` сам ключ. Побеждает канон:
+# его форму проверяет гейт. Правка — на стороне прототипа (перевести рендереры на
+# `tData()`), поэтому строки закроются в CONV-12b, а не здесь.
+# `description` к этой паре НЕ относится: оно обязано держать ключ в ОБОИХ каталогах
+# (его зовут через `t()` — `heroStaff.ts`, `techTree.ts:324`), и так закрыт 51 случай в
+# CONV-17 и 6 из HC-3. Поэтому новая сущность героя платит ОДНУ строку (`field:name`),
+# а не две — вопреки тому, что писалось при HC-3.
 buildings/biomass_pit only-in-canon
-buildings/fabricator field:buildTimeHours
-buildings/fabricator field:cost
-buildings/fabricator field:name
-buildings/fabricator field:produces
-buildings/fabricator field:scoreValue
-buildings/fabricator field:upgrades
-buildings/fabricator field:upkeep
-buildings/factory field:buildTimeHours
-buildings/factory field:cost
-buildings/factory field:scoreValue
-buildings/factory field:upgrades
-buildings/factory field:upkeep
-buildings/farm only-in-prototype
-buildings/fort field:buildTimeHours
-buildings/fort field:cost
-buildings/fort field:defenseBonus
-buildings/fort field:hp
-buildings/fort field:name
-buildings/fort field:scoreValue
-buildings/fort field:upgrades
-buildings/hospital field:buildTimeHours
-buildings/hospital field:cost
-buildings/hospital field:hp
-buildings/hospital field:scoreValue
-buildings/hospital field:upgrades
-buildings/metal_station field:buildTimeHours
-buildings/metal_station field:name
-buildings/metal_station field:scoreValue
-buildings/metal_station field:upgrades
-buildings/mine only-in-prototype
 buildings/mine_t1 only-in-canon
 buildings/mine_t2 only-in-canon
-buildings/orbital_aa field:aaDamage
-buildings/orbital_aa field:buildTimeHours
-buildings/orbital_aa field:name
-buildings/orbital_aa field:scoreValue
-buildings/orbital_aa field:upkeep
-buildings/power_plant field:buildTimeHours
-buildings/power_plant field:hp
-buildings/power_plant field:name
-buildings/power_plant field:produces
-buildings/power_plant field:scoreValue
-buildings/power_plant field:upgrades
-buildings/radar field:buildTimeHours
-buildings/radar field:cost
-buildings/radar field:name
-buildings/radar field:radarRange
-buildings/radar field:scoreValue
-buildings/radar field:upgrades
-buildings/radar field:upkeep
-buildings/refinery only-in-prototype
 buildings/shipyard only-in-canon
-buildings/spaceport field:buildTimeHours
-buildings/spaceport field:scoreValue
-buildings/starfort only-in-prototype
-buildings/tax_office only-in-prototype
 events/infect_planet only-in-canon
 events/void_anomaly only-in-canon
 factions/amber field:startingLoadout
@@ -157,7 +105,6 @@ modes/team_2v2 only-in-canon
 modes/team_3v3 only-in-canon
 modes/team_4v4 only-in-canon
 modes/team_5v5 only-in-canon
-modules/point_defense_array field:cost
 planetTypes/barren field:scoreValue
 planetTypes/crystalline field:scoreValue
 planetTypes/energy_nexus only-in-canon
@@ -175,89 +122,34 @@ resources/microelectronics only-in-canon
 scientists/overseer field:name
 scientists/polymath field:name
 scientists/void_admiral field:name
-sectorKinds/asteroid field:allowedBuildings
 sectorKinds/asteroid field:appearance
 sectorKinds/dead_world field:appearance
 sectorKinds/debris_field field:allowedBuildings
 sectorKinds/debris_field field:appearance
 sectorKinds/empty field:allowedBuildings
 sectorKinds/empty field:appearance
-sectorKinds/graveyard only-in-prototype
-sectorKinds/nebula field:allowedBuildings
 sectorKinds/nebula field:appearance
-sectorKinds/planet field:allowedBuildings
 sectorKinds/planet field:appearance
 sectorKinds/void_station only-in-canon
-sectors/asteroid_field field:name
 sectors/asteroid_field field:scoreValue
 sectors/deep_void field:scoreValue
 sectors/dense_nebula field:scoreValue
 sectors/derelict_graveyard field:scoreValue
-sectors/empty_space field:name
 sectors/ion_storm field:scoreValue
 sectors/nebula field:scoreValue
 sectors/solar_flare_zone field:scoreValue
-technologies/ai_stewardship field:conditions
-technologies/ai_stewardship field:prerequisites
-technologies/fortified_infrastructure field:unlocks
 technologies/industrial_automation field:unlocks
-technologies/meta_drill_combat only-in-prototype
-technologies/meta_drill_radar only-in-prototype
-technologies/meta_drill_speed only-in-prototype
-technologies/meta_drill_veteran only-in-prototype
-technologies/meta_industry only-in-prototype
-technologies/meta_industry_2 only-in-prototype
-technologies/microelectronics_fabrication field:cost
-technologies/microelectronics_fabrication field:unlocks
-technologies/orbital_logistics field:unlocks
-technologies/siege_doctrine field:cost
 technologies/siege_doctrine field:unlocks
-units/cruiser field:cost
 units/cruiser field:faction
-units/cruiser field:stats
-units/cruiser field:upkeep
 units/drop_infantry only-in-canon
-units/dropship field:cost
 units/dropship field:faction
-units/dropship field:line
-units/dropship field:signature
-units/dropship field:stats
-units/dropship field:upkeep
-units/fighter_squadron field:cost
 units/fighter_squadron field:faction
-units/fighter_squadron field:stats
-units/heavy_infantry field:cost
 units/heavy_infantry field:faction
-units/heavy_infantry field:stats
-units/heavy_infantry field:traits
-units/heavy_infantry field:upkeep
 units/hero field:faction
-units/hero field:stats
-units/hero field:upkeep
-units/militia field:cost
 units/militia field:faction
-units/militia field:stats
-units/militia field:traits
-units/militia field:upkeep
-units/scout only-in-prototype
 units/scout_drone only-in-canon
-units/sensor_frigate field:cost
 units/sensor_frigate field:faction
-units/sensor_frigate field:line
-units/sensor_frigate field:stats
-units/sensor_frigate field:upkeep
-units/siege only-in-prototype
 units/siege_lance only-in-canon
-units/special_forces field:cost
 units/special_forces field:faction
-units/special_forces field:stats
-units/special_forces field:traits
-units/special_forces field:upkeep
 units/strike_carrier field:faction
-units/strike_carrier field:signature
-units/strike_carrier field:stats
-units/tank field:cost
 units/tank field:faction
-units/tank field:stats
-units/tank field:traits
-units/tank field:upkeep
