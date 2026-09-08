@@ -15,7 +15,7 @@ import type { GameModule, HandlerContext } from '../kernel/module';
 import type { Fleet, GameState } from '../state/gameState';
 import type { GameData } from '../data/schemas';
 import { distance, fleetBaseSpeed } from '../state/route';
-import { shuttleStrikeRange, fleetHasShuttle } from '../state/shuttle';
+import { shuttleStrikeRange, fleetHasShuttle, shuttleBayAt, trimHangar } from '../state/shuttle';
 import { ownFleet, applyDamageToSide, removeIfWiped } from '../util/combat';
 import { sumUnitStat } from '../util/stacks';
 import { timeScaleOf } from '../action/types';
@@ -247,6 +247,44 @@ export const shuttleModule: GameModule = {
       // as a one-shot check here — PD fires whenever an enemy shuttle is in
       // range, not just on arrival.
       h.emit('fleet.arrived', { fleetId, departedAt: owner });
+    });
+
+    /**
+     * АНГАР НЕ ПЕРЕЖИВАЕТ СВОЙ ПОРТ (SHU-1.1). Челнок стоит ВНУТРИ космопорта, поэтому
+     * снесённый порт забирает его с собой, а упавшая вместимость оставляет ровно
+     * столько, сколько теперь помещается.
+     *
+     * Правило висит на `time.advanced`, а не на событии «здание разрушено», намеренно:
+     * порт исчезает НЕСКОЛЬКИМИ путями — бомбардировка, наземный штурм, а вместимость
+     * может упасть и от смены уровня. Реакция на одно событие закрыла бы один путь и
+     * оставила остальные, и в состоянии остались бы челноки, которым негде стоять.
+     * Здесь же ловится захват: мир сменил владельца — ангар прежнего хозяина пуст
+     * (`planet.captured` ниже снимает его сразу, это лишь страховка того же правила).
+     */
+    api.on('time.advanced', (_event, h: HandlerContext) => {
+      for (const planet of Object.values(h.state.planets)) {
+        const hangar = planet.hangar;
+        if (!hangar || hangar.length === 0) continue;
+        const bay = planet.owner === null ? 0 : shuttleBayAt(planet, h.ctx.data);
+        const kept = trimHangar(hangar, bay);
+        const lost = hangar.reduce((n, st) => n + st.count, 0) - kept.reduce((n, st) => n + st.count, 0);
+        if (lost <= 0) continue;
+        planet.hangar = kept;
+        h.emit('shuttle.lost', { planetId: planet.id, owner: planet.owner, count: lost });
+      }
+    });
+
+    /** Мир захвачен — челноки прежнего владельца гибнут вместе с портом, а не достаются
+     *  захватчику (резолюция владельца 2026-09-08). Сразу, не дожидаясь тика: между
+     *  захватом и следующим `time.advanced` ангар иначе числился бы за новым хозяином. */
+    api.on('planet.captured', (event, h: HandlerContext) => {
+      const { planetId } = event.payload as { planetId?: string };
+      if (typeof planetId !== 'string') return;
+      const planet = h.state.planets[planetId];
+      const lost = (planet?.hangar ?? []).reduce((n, st) => n + st.count, 0);
+      if (!planet || lost <= 0) return;
+      planet.hangar = [];
+      h.emit('shuttle.lost', { planetId, owner: planet.owner, count: lost });
     });
 
     /** Reactive point-defense on time.advanced: for each fleet with PD > 0 that

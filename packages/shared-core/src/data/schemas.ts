@@ -184,6 +184,11 @@ export const BuildingLevelSchema = z.object({
   /** Point-defense (anti-shuttle/anti-missile) firepower per game hour at this level.
    *  Distinct from `aaDamage`: intercepts shuttle/missile strikes, not regular fleets. */
   pointDefense: z.number().nonnegative().default(0),
+  /** How many shuttles this level can base (SHU-1.1). A shuttle is not a fleet: it
+   *  lives INSIDE the spaceport (`planet.hangar`), so the port's bay is both the gate
+   *  ("can a shuttle be built here at all") and the cap ("how many"). 0 = this building
+   *  bases no shuttles. */
+  shuttleBay: z.number().nonnegative().default(0),
   /** Доля, на которую здание поднимает ВЕСЬ кредитный доход своего мира на этом
    *  уровне (0.25 = +25%). См. одноимённое поле в `BuildingDefSchema`. */
   creditsBonus: z.number().default(0),
@@ -201,13 +206,11 @@ export const BuildingLevelSchema = z.object({
    *  а не «отнимает».
    *
    *  Почему они здесь появились: данные (и `data/buildings.json`, и каталог прототипа)
-   *  давно писали `enablesShuttleConstruction` в АПГРЕЙДАХ завода — «завод второго
-   *  уровня открывает эскадрильи». Схема этих полей на уровне не знала, zod их молча
-   *  отбрасывал, и гейт `unit.build` читал только базовый def — где флага нет. Итог:
-   *  `interceptor` (единственный `shuttle`-юнит) нельзя было построить НИ НА
-   *  КАКОМ уровне завода, приказ отбивался `E_NO_HANGAR` всегда. */
+   *  давно писали способность в АПГРЕЙДАХ здания. Схема этих полей на уровне не знала,
+   *  zod их молча отбрасывал, и гейт `unit.build` читал только базовый def. Итог: юнит
+   *  был непостроим НИ НА КАКОМ уровне. Та же опасность у `shuttleBay` (SHU-1.1), и
+   *  сторож в `construction.test.ts` держит оба случая. */
   enablesShipConstruction: z.boolean().optional(),
-  enablesShuttleConstruction: z.boolean().optional(),
   enablesGroundConstruction: z.boolean().optional(),
 });
 
@@ -221,6 +224,8 @@ export const BuildingDefSchema = z.object({
   /** Structural HP — bombarded from orbit and stormed on the ground (GDD §7.4);
    *  a destroyed building stops granting its defense bonus. */
   hp: z.number().nonnegative().default(0),
+  /** Shuttle capacity of the building's FIRST level (see BuildingLevelSchema). */
+  shuttleBay: z.number().nonnegative().default(0),
   /** Ground-defense bonus the building grants the garrison (0.01 = +1%); a
    *  fortress grants much more, and it grows with level. */
   defenseBonus: z.number().default(0.01),
@@ -255,7 +260,6 @@ export const BuildingDefSchema = z.object({
    *  airbase). A planet needs at least one standing building with this flag
    *  to build any unit with the `shuttle` trait (`unit.build`). Уровень МОЖЕТ
    *  открыть способность позже — см. `BuildingLevelSchema`. */
-  enablesShuttleConstruction: z.boolean().default(false),
   /** True for a building that enables ground-unit construction (barracks for
    *  infantry, factory for vehicles). A planet needs at least one standing
    *  building with this flag to build any `domain: 'ground'` unit. Not per-level. */
@@ -844,8 +848,8 @@ export type GameData = z.infer<typeof GameDataSchema>;
  *  levels 2..N come from `upgrades`. Out-of-range levels fall back to level 1. */
 export function buildingLevel(def: BuildingDef, level: number): BuildingLevel {
   if (level <= 1) {
-    const { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage, pointDefense, creditsBonus, buildSpeedBonus } = def;
-    return { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage, pointDefense, creditsBonus, buildSpeedBonus };
+    const { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, creditsBonus, buildSpeedBonus } = def;
+    return { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, creditsBonus, buildSpeedBonus };
   }
   return def.upgrades[level - 2] ?? buildingLevel(def, 1);
 }

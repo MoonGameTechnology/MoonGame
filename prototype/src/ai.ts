@@ -33,7 +33,6 @@ import {
   moveFleet,
   launchFleet,
   buildBuilding,
-  upgradeBuilding,
   buildUnit,
   declareWar,
   canTraverse,
@@ -122,9 +121,7 @@ const DROPSHIP_CAP = 2;
 /** Сколько артиллерийских корпусов держит сильный бот (AI-BAL-4): дальний огонь — не
  *  замена флоту, а добавка к нему; стеклянная пушка гибнет от первого же сближения. */
 const SIEGE_CAP = 2;
-/** Уровень завода, на котором открывается ангар (`enablesShuttleConstruction`). */
-const SHUTTLE_FACTORY_LEVEL = 2;
-/** Предел ударных крыльев — картонные, дорогие по микроэлектронике, конкурируют с
+/** Предел челноков — картонные, дорогие по микроэлектронике, конкурируют с
  *  крейсерами за тот же дефицитный ресурс. */
 const SHUTTLE_CAP = 3;
 /** Запас казны сверх цены заказа (мера та же, что у построек бота). */
@@ -838,12 +835,6 @@ export function aiOrders(
     // Порядок здесь и есть цепочка захвата: казарма → войска → гарнизон на призовых
     // мирах (он-то и превращает «прилетел и забрал» в ШТУРМ) → десантный корпус.
     if (profile === 'strong') {
-      const pendingUpgrade = (planetId: string, building: string): boolean =>
-        state.scheduled.some((e) => {
-          if (e.type !== 'construction.complete') return false;
-          const q = e.payload as { kind?: string; planetId?: string; building?: string };
-          return q.kind === 'upgrade' && q.planetId === planetId && q.building === building;
-        });
       const pendingUnit = (planetId: string, unit: string): boolean =>
         state.scheduled.some((e) => {
           if (e.type !== 'construction.complete') return false;
@@ -942,23 +933,12 @@ export function aiOrders(
       ) {
         out.push(buildUnit(ai, base.id, 'siege', 1));
       }
-      // Эскадрильи. Ворота — здание с `enablesShuttleConstruction`; у завода эта
-      // способность появляется ВТОРЫМ уровнем, поэтому цепочка длинная: построить завод
-      // → апгрейдить → строить крылья. Дальше эскадрилья дерётся как обычный ударный
-      // корпус в составе флота (быстрая, больно бьёт, картонная — её счётчик орбитальная
-      // ПВО). СВОБОДНОГО ВЫЛЕТА у неё пока нет ни у кого: `shuttle.strike` требует
-      // `fleet.homeBase`, а это поле в игре не выставляет ни один модуль (`fleet.split`
-      // в том числе) — механика вылета не достроена, это отдельный кирпич, не задача бота.
-      const factory = base.buildings.find((b) => b.type === 'factory' && b.hp > 0);
-      if (!factory) {
-        if (affordable('factory') && !pendingBuild(base.id, 'factory')) {
-          out.push(buildBuilding(ai, base.id, 'factory'));
-        }
-      } else if (factory.level < SHUTTLE_FACTORY_LEVEL) {
-        if (affordable('factory') && !pendingUpgrade(base.id, 'factory')) {
-          out.push(upgradeBuilding(ai, base.id, 'factory'));
-        }
-      } else if (
+      // Челноки (SHU-1.1). Ворота — КОСМОПОРТ: челнок строится в порту и живёт в нём,
+      // поэтому у бота цепочка короткая — порт у него и так есть под корабли. Дальше
+      // челнок дерётся как обычный ударный корпус в составе флота (быстрый, больно
+      // бьёт, картонный — его счётчик орбитальная ПВО). Собственного вылета из порта у
+      // него пока нет: это SHU-1.2, отдельный кирпич, а не задача бота.
+      if (
         shipsOwned('interceptor') < SHUTTLE_CAP &&
         !pendingUnit(base.id, 'interceptor') &&
         affordableUnit('interceptor', 1)
