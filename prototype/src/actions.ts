@@ -61,11 +61,17 @@ export const launchFleet = (playerId: string, planetId: string) =>
   act(playerId, 'fleet.launch', { planetId });
 export const mergeFleet = (playerId: string, from: string, into: string) =>
   act(playerId, 'fleet.merge', { from, into });
+/** Отделить часть флота. `take[i].modules` адресует КОНКРЕТНЫЙ стек (FSPLIT-1):
+ *  лоадаут — часть личности стека (SM-0.3), поэтому «два крейсера» неоднозначны, пока
+ *  один и тот же корпус летает и с начинкой, и голым; без поля — прежнее поведение
+ *  (любой стек), `[]` — адрес голых. `takeLanding` делит десант в трюме (FSPLIT-2);
+ *  без него весь десант остаётся исходному флоту, как было. */
 export const splitFleet = (
   playerId: string,
   fleetId: string,
-  take: Array<{ unit: string; count: number }>,
-) => act(playerId, 'fleet.split', { fleetId, take });
+  take: Array<{ unit: string; modules?: string[]; count: number }>,
+  takeLanding?: Array<{ unit: string; count: number }>,
+) => act(playerId, 'fleet.split', { fleetId, take, ...(takeLanding ? { takeLanding } : {}) });
 export const buildBuilding = (playerId: string, planetId: string, building: string) =>
   act(playerId, 'building.construct', { planetId, building });
 export const upgradeBuilding = (playerId: string, planetId: string, building: string) =>
@@ -235,4 +241,10 @@ export const unlockHeroSkill = (playerId: string, heroId: string, node: string) 
 /** Install a ship fitting into one of the hero archetype's slots (no refit). */
 export const fitHero = (playerId: string, heroId: string, fitting: string) =>
   act(playerId, 'hero.fit', { heroId, fitting });
-
+/** Put an owned ability into one of the hero's skill slots (HPR-1.2). Reversible,
+ *  unlike `fitHero`: the budget exists so the player can choose, not to lock them in. */
+export const equipHeroAbility = (playerId: string, heroId: string, abilityId: string) =>
+  act(playerId, 'hero.equip', { heroId, abilityId });
+/** Take an ability back out of its slot — it stays owned, just not worn. */
+export const unequipHeroAbility = (playerId: string, heroId: string, abilityId: string) =>
+  act(playerId, 'hero.unequip', { heroId, abilityId });

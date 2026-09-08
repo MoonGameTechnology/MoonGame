@@ -51,6 +51,8 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   'hero.spawn': z.object({ heroId: id, at: id }),
   'hero.skill.unlock': z.object({ heroId: id, node: id }),
   'hero.fit': z.object({ heroId: id, fitting: id }),
+  'hero.equip': z.object({ heroId: id, abilityId: id }),
+  'hero.unequip': z.object({ heroId: id, abilityId: id }),
   // station.ts
   'station.deploy': z.object({ planetId: id }),
   // seatClaim.ts (ENTRY-3). Оба поля необязательны: заявка без выбора законна —
@@ -120,12 +122,19 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   // section header above is stale for this group specifically.
   'fleet.launch': z.object({ planetId: id }),
   'fleet.merge': z.object({ from: id, into: id }),
+  // FSPLIT-1/2: `modules` адресует КОНКРЕТНЫЙ стек (лоадаут — часть его идентичности,
+  // SM-0.3), `takeLanding` делит трюм. Оба поля необязательны: без них payload прежний,
+  // и старые отправители (бот, крылья эскадрилий) валидируются как раньше.
   'fleet.split': z.object({
     fleetId: id,
     take: z
-      .array(z.object({ unit: id, count }))
+      .array(z.object({ unit: id, modules: z.array(id).max(8).optional(), count }))
       .min(1)
       .max(32),
+    takeLanding: z
+      .array(z.object({ unit: id, count }))
+      .max(32)
+      .optional(),
   }),
   'fleet.engage': z.object({ fleetId: id, targetId: id }),
   // squadron free-space movement (squadronModule) — strike/return off the lane graph

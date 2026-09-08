@@ -1031,7 +1031,16 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #splitdlg .ssub{margin:6px 0 12px;color:var(--dim);font-size:11px;line-height:1.5;}
 #splitdlg .srow{display:grid;grid-template-columns:1fr auto auto auto;gap:8px;align-items:center;
   padding:7px 0;border-top:1px solid var(--line);}
-#splitdlg .sname{display:flex;align-items:center;gap:6px;color:var(--ink);font-weight:700;}
+#splitdlg .sname{display:flex;align-items:center;flex-wrap:wrap;gap:6px;color:var(--ink);font-weight:700;}
+#splitdlg .smods{display:flex;flex-wrap:wrap;gap:2px;}
+#splitdlg .smod{font:400 8px ui-monospace,monospace;line-height:1.3;padding:0 3px;border-radius:2px;
+  background:rgba(53,214,230,.12);color:var(--cyan);white-space:nowrap;}
+#splitdlg .shead2{margin-top:12px;padding-top:9px;border-top:1px solid var(--cyan-dim);
+  font-size:11px;letter-spacing:1.5px;color:var(--cyan);}
+#splitdlg .scargo{margin-top:7px;color:var(--dim);font-size:11px;text-align:right;}
+#splitdlg .scargo b{color:#eafffb;}
+#splitdlg .scargo.bad{color:var(--red);}
+#splitdlg .scargo.bad b{color:var(--red);}
 #splitdlg .scur{min-width:26px;text-align:center;color:#eafffb;font-variant-numeric:tabular-nums;}
 #splitdlg .snew{min-width:42px;text-align:right;color:var(--grn);font-weight:700;font-variant-numeric:tabular-nums;}
 #splitdlg .sbtns{display:flex;gap:4px;}
@@ -1156,6 +1165,19 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #herobody .hx-ovc b{display:block;font-size:16px;color:var(--cyan);}
 #herobody .hx-ovc span{font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);}
 #herobody .hx-row[data-hfitd]{cursor:pointer;}
+/* HPR-1.2 — слоты под скиллы. Отсек читается как отсек корабля в «Верфи»: рамка держит
+   форму и у занятого, и у пустого, поэтому ряд не «прыгает», когда скилл сняли. Занятый
+   подсвечен cyan'ом, пустой — приглушённой рамкой: пустота тут приглашение, а не дыра.
+   Высота 44px — нижняя граница тач-цели, ниже неё опускаться нельзя даже на 360px. */
+#herobody .hx-bays{display:flex;flex-direction:column;gap:6px;margin:6px 0;}
+#herobody .hx-bay{display:flex;align-items:center;gap:8px;min-height:44px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);}
+#herobody .hx-bay.on{border-color:var(--cyan-dim);background:rgba(53,214,230,.05);}
+#herobody .hx-bay.off{justify-content:center;border-style:dashed;color:var(--dim);font-size:11px;letter-spacing:.5px;}
+#herobody .hx-bayact{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+/* «Снять» — тихая кнопка: убрать скилл не должно выглядеть так же зазывно, как применить его. */
+#herobody .hx-btn.ghost{border-color:var(--line-hi);background:transparent;color:var(--dim);}
+/* Не влезающее ПОКАЗЫВАЕТСЯ погашенным, а не прячется: экран не должен врать о том, чем игрок владеет. */
+#herobody .hx-row.dim{opacity:.55;}
 #herobody .hx-dossier{margin-top:12px;border:1px solid var(--cyan);border-radius:10px;padding:12px;background:var(--glass);}
 #herobody .hx-dh{display:flex;align-items:center;gap:8px;}
 #herobody .hx-dnm{font-weight:700;color:#eafffb;font-size:13px;}
@@ -1901,6 +1923,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #setup .srow .stog{font:11px ui-monospace,monospace;letter-spacing:1px;border:1px solid var(--line-hi);
   border-radius:6px;padding:6px 12px;min-width:64px;cursor:pointer;background:transparent;color:var(--dim);}
 #setup .srow .stog.ai{border-color:var(--cyan);color:var(--cyan);background:rgba(53,214,230,.12);}
+#setup .srow .stog.strong{border-color:var(--amber);color:var(--amber);background:rgba(255,180,58,.14);}
 #setup .tmrow{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
 #setup .tmtog{flex:1;padding:9px 12px;border-radius:8px;border:1px solid var(--line-hi);background:transparent;
   color:var(--dim);font:700 12px ui-monospace,monospace;letter-spacing:.5px;cursor:pointer;text-align:left;}

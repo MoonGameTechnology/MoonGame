@@ -8,6 +8,7 @@ import {
   createInitialState,
   type Fleet,
   type GameState,
+  type Hero,
   type Planet,
   type Player,
 } from '../state/gameState';
@@ -105,6 +106,12 @@ const data: GameData = parseGameData({
       requires: ['neural_lace', 'overclock'],
       grants: {},
     },
+  },
+  // HPR-1.2: лестница редкости → бюджет НАДЕТЫХ скиллов. Без неё `heroSkillSlots`
+  // честно падает на базовый дефолт в один слот, и тест про «у rare их два» врал бы.
+  heroGrades: {
+    common: { name: 'Common', skillSlots: 1 },
+    rare: { name: 'Rare', skillSlots: 2 },
   },
   // HERO-5 catalog: one passive per scope for each wired hook.
   heroPassives: {
@@ -1379,5 +1386,104 @@ describe('hero — heroOf picks by sorted instance id, not insertion order (BF-1
     const r = okApply(kernel.applyAction(st, act('hero.move', 'p1', { to: 'B' }), ctx(0)));
     expect(r.state.heroes!['hero:p1:1']!.location).toBe('B'); // sorted-first moved
     expect(r.state.heroes!['hero:p1:2']!.location).toBe('A'); // the other untouched
+  });
+});
+
+describe('hero — надеть/снять скилл: владение против ношения (HPR-1.2)', () => {
+  const kernel = createKernel([heroModule]);
+  const equip = (abilityId: string, seq = 1): Action =>
+    act('hero.equip', 'p1', { heroId: 'hero:p1', abilityId }, seq);
+  const unequip = (abilityId: string, seq = 1): Action =>
+    act('hero.unequip', 'p1', { heroId: 'hero:p1', abilityId }, seq);
+
+  /** Герой РЕДКОСТИ `rare` — по каталогу это два слота под скиллы. */
+  function owner(over?: Partial<Hero>): GameState {
+    const st = world();
+    Object.assign(st.heroes!['hero:p1']!, {
+      grade: 'rare',
+      abilities: ['corridor', 'annihilate', 'burst'],
+      equipped: [],
+      ...over,
+    });
+    return st;
+  }
+
+  it('надевает то, чем владеет, и это становится кастуемым', () => {
+    const r = okApply(kernel.applyAction(owner(), equip('corridor'), ctx(0)));
+    expect(r.state.heroes!['hero:p1']?.equipped).toEqual(['corridor']);
+    expect(r.events.map((e) => e.type)).toContain('hero.equipped');
+  });
+
+  it('НЕ надевает то, чем не владеет — иначе вся ось коллекции обходится', () => {
+    // `ghost` есть в каталоге способностей, но не в пуле героя.
+    expect(errCode(kernel.applyAction(owner(), equip('ghost'), ctx(0)))).toBe('E_NOT_OWNED');
+  });
+
+  it('упирается в бюджет редкости: у `rare` два слота, третий отказан', () => {
+    let st = owner();
+    st = okApply(kernel.applyAction(st, equip('corridor', 1), ctx(0))).state;
+    st = okApply(kernel.applyAction(st, equip('annihilate', 2), ctx(0))).state;
+    expect(errCode(kernel.applyAction(st, equip('burst', 3), ctx(0)))).toBe('E_NO_SLOTS');
+    // …а после снятия место освобождается: слоты обратимы, в отличие от фиттингов.
+    const freed = okApply(kernel.applyAction(st, unequip('corridor', 4), ctx(0))).state;
+    const ok = okApply(kernel.applyAction(freed, equip('burst', 5), ctx(0)));
+    expect(ok.state.heroes!['hero:p1']?.equipped).toEqual(['annihilate', 'burst']);
+  });
+
+  it('дважды одно и то же не надевается', () => {
+    const st = okApply(kernel.applyAction(owner(), equip('corridor', 1), ctx(0))).state;
+    expect(errCode(kernel.applyAction(st, equip('corridor', 2), ctx(0)))).toBe(
+      'E_ALREADY_EQUIPPED',
+    );
+  });
+
+  it('каст читает НАДЕТОЕ, а не «что есть»', () => {
+    const st = owner({ equipped: [] });
+    // Владеет `corridor`, но не носит — каст отказан.
+    expect(
+      errCode(
+        kernel.applyAction(st, act('hero.ability', 'p1', { heroId: 'hero:p1', abilityId: 'corridor', target: 'B' }), ctx(0)),
+      ),
+    ).toBe('E_NOT_EQUIPPED');
+  });
+
+  it('СТАРЫЙ герой без поля `equipped` кастует как раньше — реплеи не ломаются', () => {
+    const legacy = world();
+    Object.assign(legacy.heroes!['hero:p1']!, {
+      grade: 'common', // всего один слот…
+      // Носит два при бюджете в один — наследие; `burst` он тоже ВЛАДЕЕТ, иначе
+      // проверка упрётся в гейт владения и до бюджета не доедет.
+      abilities: ['corridor', 'annihilate', 'burst'],
+    });
+    delete legacy.heroes!['hero:p1']!.equipped;
+    // Ничего не отвалилось: старый расклад считается надетым целиком.
+    const r = kernel.applyAction(
+      legacy,
+      act('hero.ability', 'p1', { heroId: 'hero:p1', abilityId: 'corridor', target: 'B' }),
+      ctx(0),
+    );
+    expect(r.ok).toBe(true);
+    // И это не «почти как раньше»: у старого героя НАДЕТЫМ считается всё, чем он
+    // владеет, поэтому надеть что-то ещё нечего — оно уже на нём.
+    expect(errCode(kernel.applyAction(legacy, equip('burst'), ctx(0)))).toBe(
+      'E_ALREADY_EQUIPPED',
+    );
+    // Бюджет начинает действовать с первого СНЯТИЯ: оно материализует `equipped`,
+    // и дальше расклад может только сокращаться к бюджету, но не расти сверх него.
+    const shrunk = okApply(kernel.applyAction(legacy, unequip('corridor'), ctx(0))).state;
+    expect(shrunk.heroes!['hero:p1']?.equipped).toEqual(['annihilate', 'burst']);
+    expect(errCode(kernel.applyAction(shrunk, equip('corridor', 2), ctx(0)))).toBe('E_NO_SLOTS');
+  });
+
+  it('чужого героя не переодеть', () => {
+    expect(
+      errCode(kernel.applyAction(owner(), act('hero.equip', 'p2', { heroId: 'hero:p1', abilityId: 'corridor' }), ctx(0))),
+    ).toBe('E_FORBIDDEN');
+  });
+
+  it('снять можно только надетое', () => {
+    expect(errCode(kernel.applyAction(owner(), unequip('corridor'), ctx(0)))).toBe(
+      'E_NOT_EQUIPPED',
+    );
   });
 });

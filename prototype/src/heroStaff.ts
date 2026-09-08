@@ -20,7 +20,13 @@ import { t } from '../../localization/runtime';
 import { data } from './prototypeData';
 import { esc, cost, fmtHrs } from './format';
 import { HOUR } from './time';
-import { castHeroAbility, unlockHeroSkill, fitHero } from './actions';
+import {
+  castHeroAbility,
+  unlockHeroSkill,
+  fitHero,
+  equipHeroAbility,
+  unequipHeroAbility,
+} from './actions';
 import { houseDisplayName } from './setupSeats';
 
 type HeroInst = NonNullable<GameState['heroes']>[string];
@@ -324,42 +330,131 @@ function heroTreeHtml(hero: HeroInst, res: Bag): string {
   return html + `</div>`;
 }
 
-/** The abilities tab — the hero's equipped, castable loadout (cast via the command flow;
- *  ranged casts arm the map, self/aura fire in place). Spawn-markers show as passive perks. */
+/** Skill-slot budget of a hero — the rarity's `skillSlots`, mirroring the core's
+ *  `heroSkillSlots`. Unknown/absent grade degrades to one slot, exactly as there. */
+function skillSlotsOf(hero: HeroInst): number {
+  const grade = hero.grade;
+  if (grade === undefined) return 1;
+  return data.heroGrades[grade]?.skillSlots ?? 1;
+}
+
+/** What the hero WEARS. Mirrors the core's `equippedOf`, including its legacy fallback:
+ *  no `equipped` field ⇒ an old loadout where owning and wearing were one thing. */
+function wornOf(hero: HeroInst): string[] {
+  if (hero.equipped !== undefined) return hero.equipped;
+  return (hero.abilities ?? []).filter((a): a is string => a !== null);
+}
+
+/**
+ * The abilities tab — SLOTS, and a pool to fill them from (HPR-1.2).
+ *
+ * Reads as the ship loadout does on purpose: a slot is a BAY, the same shape the
+ * shipyard uses for hull modules, so the two screens teach one language instead of two.
+ * Filling one is tap-a-slot → tap-an-item, the interaction the whole app already uses;
+ * dragging is a later layer over exactly this, never instead of it (it is also the only
+ * thing that works from a keyboard).
+ *
+ * Three rules the layout has to keep:
+ *  · the budget is a NUMBER (`2/3`), not only pips — pips stop being countable past
+ *    four and never say how much room is left;
+ *  · an ability that does not fit is shown DIMMED WITH ITS REASON, never hidden —
+ *    hiding it would make the screen lie about what the player owns;
+ *  · spawn-markers are perks, not slots: they ride in the pool and cost nothing to
+ *    carry, because `hero.spawn` reads them from what the hero OWNS.
+ */
 function heroAbilitiesHtml(hero: HeroInst, now: number): string {
   const dead = hero.alive === false;
-  const abilities = (hero.abilities ?? []).filter(
+  const owned = (hero.abilities ?? []).filter(
     (a): a is string => a !== null && !!data.heroAbilities[a],
   );
-  if (!abilities.length) return `<div class="hx-note">${t('hero.abil.empty')}</div>`;
-  let html = '';
-  for (const ab of abilities) {
+  if (!owned.length) return `<div class="hx-note">${t('hero.abil.empty')}</div>`;
+  const worn = wornOf(hero).filter((a) => !!data.heroAbilities[a]);
+  const slots = skillSlotsOf(hero);
+  const free = Math.max(0, slots - worn.length);
+
+  // --- слоты: занятые отсеки + пустые приглашения ---------------------------
+  const bays: string[] = [];
+  for (const ab of worn) {
     const ad = data.heroAbilities[ab]!;
     const cdLeft = Math.max(0, (hero.cooldowns?.[heroCdKey(ad.type)] ?? 0) - now);
-    const action = ad.type.startsWith('spawn_')
-      ? `<span class="hx-badge">${t('hero.abil.deploy-perk')}</span>`
-      : cdLeft > 0
+    const cast =
+      cdLeft > 0
         ? `<span class="hx-badge cd">${t('hero.abil.cooldown', { h: fmtHrs(cdLeft / HOUR) })}</span>`
         : HERO_CASTABLE.has(ad.type)
           ? `<button class="hx-btn" data-hcast="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${(ad.range ?? 0) > 0 ? t('hero.abil.pick-target') : t('hero.abil.activate')}</button>`
           : `<span class="hx-badge">${t('hero.abil.soon')}</span>`;
-    html +=
-      `<div class="hx-row"><div class="hx-grow"><span class="hx-an">${esc(t(ad.name))}</span>` +
+    bays.push(
+      `<div class="hx-bay on"><div class="hx-grow"><span class="hx-an">${esc(t(ad.name))}</span>` +
+        `<div class="hx-note">${esc(t(ad.description ?? ''))}</div></div>` +
+        `<div class="hx-bayact">${cast}` +
+        `<button class="hx-btn ghost" data-hunequip="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${t('hero.slot.remove')}</button>` +
+        `</div></div>`,
+    );
+  }
+  for (let i = 0; i < free; i += 1) {
+    bays.push(`<div class="hx-bay off">${t('hero.slot.empty')}</div>`);
+  }
+
+  // --- пул: чем владеет, но не носит ----------------------------------------
+  const pool = owned.filter((ab) => !worn.includes(ab));
+  let poolHtml = '';
+  for (const ab of pool) {
+    const ad = data.heroAbilities[ab]!;
+    const perk = ad.type.startsWith('spawn_');
+    // Перк слот не занимает — он всегда «при герое», и кнопки надевания у него нет.
+    const action = perk
+      ? `<span class="hx-badge">${t('hero.abil.deploy-perk')}</span>`
+      : free > 0
+        ? `<button class="hx-btn" data-hequip="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${t('hero.slot.equip')}</button>`
+        : `<span class="hx-badge">${t('hero.slot.full')}</span>`;
+    poolHtml +=
+      `<div class="hx-row${perk || free > 0 ? '' : ' dim'}"><div class="hx-grow">` +
+      `<span class="hx-an">${esc(t(ad.name))}</span>` +
       `<div class="hx-note">${esc(t(ad.description ?? ''))}</div></div>${action}</div>`;
   }
-  return html;
+
+  return (
+    `<div class="hx-h">${t('hero.slot.head', { u: worn.length, n: slots })}</div>` +
+    `<div class="hx-bays">${bays.join('')}</div>` +
+    (poolHtml ? `<div class="hx-h">${t('hero.slot.pool')}</div>${poolHtml}` : '')
+  );
 }
 
-/** The fittings tab — slot budget as pips, each fitting a row; tap an installable one to
- *  open its dossier (with the irreversibility warning) before committing a slot. */
+/**
+ * The fittings tab — the SAME bay idiom as the skill slots next door, with one
+ * deliberate difference: a fitting is welded on for good (`hero.fit`, no refit), so an
+ * occupied bay carries no «снять». That asymmetry is the point of showing them alike —
+ * two screens in one language make the one rule that differs actually visible, where
+ * two different layouts would just read as two unrelated screens.
+ *
+ * Tapping an empty bay is not the commit: it opens the fitting's dossier with the
+ * irreversibility warning first. A permanent choice should cost one more tap than a
+ * reversible one.
+ */
 function heroFittingsHtml(hero: HeroInst, res: Bag): string {
   const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
   const slots = def?.slots ?? 0;
   if (slots <= 0) return `<div class="hx-note">${t('hero.fit.none')}</div>`;
   const fitted = hero.fittings ?? [];
-  let html = `<div class="hx-h">${t('hero.fit.slots', { u: fitted.length, n: slots })}</div>`;
+  const free = Math.max(0, slots - fitted.length);
+
+  const bays: string[] = [];
+  for (const fid of fitted) {
+    const fd = data.heroFittings[fid];
+    if (!fd) continue; // неизвестный id — молча пропускаем (base default, не падение)
+    bays.push(
+      `<div class="hx-bay on"><div class="hx-grow"><span class="hx-an">${esc(t(fd.name))}</span>` +
+        `<div class="hx-note">${esc(t(fd.description ?? ''))}</div></div>` +
+        `<span class="hx-badge on">✓ ${t('hero.fit.installed')}</span></div>`,
+    );
+  }
+  for (let i = 0; i < free; i += 1) {
+    bays.push(`<div class="hx-bay off">${t('hero.slot.empty')}</div>`);
+  }
+
+  let poolHtml = '';
   for (const [fid, fd] of Object.entries(data.heroFittings)) {
-    const installed = fitted.includes(fid);
+    if (fitted.includes(fid)) continue; // уже в отсеке — показан выше
     const grant = fd.grants.ability
       ? `<span class="hx-g ab">${t('hero.tree.ability')}</span>`
       : fd.grants.passive
@@ -367,18 +462,23 @@ function heroFittingsHtml(hero: HeroInst, res: Bag): string {
         : fd.statMods
           ? `<span class="hx-g pa">${t('hero.fit.hull')}</span>`
           : '';
-    const canFit = !installed && fitted.length < slots;
-    const action = installed
-      ? `<span class="hx-badge on">✓ ${t('hero.fit.installed')}</span>`
-      : canFit
-        ? `<span class="hx-cost">${cost(fd.cost, res)}</span>`
-        : `<span class="hx-badge">${t('hero.fit.no-slots')}</span>`;
-    const tap = canFit ? ` data-hfitd="${fid}"` : '';
-    html +=
-      `<div class="hx-row"${tap}><div class="hx-grow"><span class="hx-an">${esc(t(fd.name))}</span>` +
+    const canFit = free > 0;
+    // Не влезающее показано погашенным с причиной, а не спрятано — то же правило,
+    // что у слотов скиллов: экран не должен врать о том, что вообще существует.
+    const action = canFit
+      ? `<span class="hx-cost">${cost(fd.cost, res)}</span>`
+      : `<span class="hx-badge">${t('hero.fit.no-slots')}</span>`;
+    poolHtml +=
+      `<div class="hx-row${canFit ? '' : ' dim'}"${canFit ? ` data-hfitd="${fid}"` : ''}>` +
+      `<div class="hx-grow"><span class="hx-an">${esc(t(fd.name))}</span>` +
       `<div class="hx-note">${esc(t(fd.description ?? ''))}</div></div>${grant}${action}</div>`;
   }
-  return html;
+
+  return (
+    `<div class="hx-h">${t('hero.fit.slots', { u: fitted.length, n: slots })}</div>` +
+    `<div class="hx-bays">${bays.join('')}</div>` +
+    (poolHtml ? `<div class="hx-h">${t('hero.slot.pool')}</div>${poolHtml}` : '')
+  );
 }
 
 /** The overview tab — archetype line, a stat strip (abilities / tree progress / fittings)
@@ -574,6 +674,18 @@ export function initHeroStaff(host: HeroStaffHost): {
     if (skillBtn) {
       host.order(unlockHeroSkill(host.me(), skillBtn.dataset.hskill!, skillBtn.dataset.node!));
       view = { ...view, dossier: null }; // the node is bought — dismiss its dossier
+      return 'repaint';
+    }
+    const equipBtn = tg.closest('[data-hequip]') as HTMLElement | null;
+    if (equipBtn) {
+      host.order(equipHeroAbility(host.me(), equipBtn.dataset.hequip!, equipBtn.dataset.ab!));
+      return 'repaint';
+    }
+    const unequipBtn = tg.closest('[data-hunequip]') as HTMLElement | null;
+    if (unequipBtn) {
+      host.order(
+        unequipHeroAbility(host.me(), unequipBtn.dataset.hunequip!, unequipBtn.dataset.ab!),
+      );
       return 'repaint';
     }
     const fitBtn = tg.closest('[data-hfit]') as HTMLElement | null;

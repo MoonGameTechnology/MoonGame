@@ -257,9 +257,10 @@ function runMatch(i) {
     if (reversedAt(stepIdx)) seatsInOrder.reverse();
     stepIdx += 1;
     for (const seat of seatsInOrder) {
-      // 'test' — лабораторный профиль (AI-BAL-1.1). Живой игрок такого бота не встречает:
-      // соло и прото-хост зовут aiOrders без профиля, и выставить его в игре нечем.
-      for (const a of aiOrders(state, seat, 'expand', 'test')) {
+      // 'strong' — бот с полными эвристиками: прибор обязан мерить игру, а не гонку
+      // двух построек. Тот же профиль игрок может выбрать себе в соперники в СОЛО-игре
+      // (AIDIFF-1); в сеть он по-прежнему не ходит.
+      for (const a of aiOrders(state, seat, 'expand', 'strong')) {
         const r = kernel.applyAction(state, a, ctx(now));
         if (r.ok) {
           state = r.state;

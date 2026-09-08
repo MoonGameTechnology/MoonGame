@@ -69,11 +69,11 @@ function withFactory(s: GameState, level: number): GameState {
 
 describe('AI-BAL-4 — артиллерия', () => {
   it('на войне строит `siege` — дальний огонь ведёт само ядро, приказ не нужен', () => {
-    expect(unitsBuilt(aiOrders(rich(game2()), 'p2', 'expand', 'test'))).toContain('siege');
+    expect(unitsBuilt(aiOrders(rich(game2()), 'p2', 'expand', 'strong'))).toContain('siege');
   });
 
   it('в мирное время артиллерию не строит', () => {
-    expect(unitsBuilt(aiOrders(rich(game2(), false), 'p2', 'expand', 'test'))).not.toContain('siege');
+    expect(unitsBuilt(aiOrders(rich(game2(), false), 'p2', 'expand', 'strong'))).not.toContain('siege');
   });
 
   it('ИГРОВОЙ бот артиллерию не строит даже на войне', () => {
@@ -83,18 +83,18 @@ describe('AI-BAL-4 — артиллерия', () => {
 
 describe('AI-BAL-4 — эскадрильи: завод → апгрейд → крыло', () => {
   it('без завода — ставит завод', () => {
-    expect(buildingsBuilt(aiOrders(rich(game2()), 'p2', 'expand', 'test'))).toContain('factory');
+    expect(buildingsBuilt(aiOrders(rich(game2()), 'p2', 'expand', 'strong'))).toContain('factory');
   });
 
   it('завод первого уровня — АПГРЕЙДИТ его (ангар открывается вторым)', () => {
-    const orders = aiOrders(withFactory(rich(game2()), 1), 'p2', 'expand', 'test');
+    const orders = aiOrders(withFactory(rich(game2()), 1), 'p2', 'expand', 'strong');
     expect(upgraded(orders)).toContain('factory');
     expect(unitsBuilt(orders)).not.toContain('fighter_squadron'); // рано: ангара ещё нет
   });
 
   it('завод второго уровня — строит крыло', () => {
     expect(
-      unitsBuilt(aiOrders(withFactory(rich(game2()), 2), 'p2', 'expand', 'test')),
+      unitsBuilt(aiOrders(withFactory(rich(game2()), 2), 'p2', 'expand', 'strong')),
     ).toContain('fighter_squadron');
   });
 
@@ -114,7 +114,7 @@ describe('AI-BAL-4 — то, что оставлено боту НЕнужным
       (f) => f.owner === 'p2' && f.units.some((st) => st.unit === 'hero' && st.count > 0),
     );
     expect(heroAboard).toBe(true);
-    expect(unitsBuilt(aiOrders(rich(game2()), 'p2', 'expand', 'test'))).not.toContain('hero');
+    expect(unitsBuilt(aiOrders(rich(game2()), 'p2', 'expand', 'strong'))).not.toContain('hero');
   });
 
   it('носитель и сенсорный фрегат не заказываются', () => {
@@ -123,7 +123,7 @@ describe('AI-BAL-4 — то, что оставлено боту НЕнужным
     // сейчас лишь дорогой транспорт, дублирующий `dropship`. `sensor_frigate` — глаза, а
     // бот читает состояние целиком и туманом не пользуется. Оба ждут своей механики, а не
     // правила бота: строить их «чтобы не были мёртвыми» — подгонка отчёта.
-    const orders = unitsBuilt(aiOrders(rich(game2()), 'p2', 'expand', 'test'));
+    const orders = unitsBuilt(aiOrders(rich(game2()), 'p2', 'expand', 'strong'));
     expect(orders).not.toContain('strike_carrier');
     expect(orders).not.toContain('sensor_frigate');
   });

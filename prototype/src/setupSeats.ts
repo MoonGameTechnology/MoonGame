@@ -20,8 +20,45 @@
 
 import { tData } from '../../localization/runtime';
 
-/** Роль места: ты, ИИ или выключено. */
-export type SeatRole = 'human' | 'ai' | 'off';
+/**
+ * Роль места: ты, ИИ той или иной силы, или выключено (AIDIFF-1).
+ *
+ * Сложность — часть РОЛИ, а не отдельное поле рядом: место либо пустое, либо его ведёт
+ * КОНКРЕТНЫЙ бот, и две правды («бот есть» + «бот такой») разъезжались бы ровно там, где
+ * их читают порознь — в раздаче стартов, в счётчике соперников и в кнопке строки.
+ *
+ * `ai` — прежний простой соперник (слабый). Имя оставлено как было: это ДЕФОЛТ, и всё,
+ * что раньше означало «на месте бот», продолжает означать ровно это.
+ */
+export type SeatRole = 'human' | 'ai' | 'ai-strong' | 'off';
+
+/** Ведёт ли место бот — любой силы. */
+export function isAiSeat(role: SeatRole | undefined): boolean {
+  return role === 'ai' || role === 'ai-strong';
+}
+
+/** Сложность бота на месте в терминах `aiOrders` (`AiProfile`). Не-ботовское место
+ *  сложности не имеет, поэтому спрашивать её у него бессмысленно — `null`. */
+export function seatAiProfile(role: SeatRole | undefined): 'weak' | 'strong' | null {
+  if (role === 'ai') return 'weak';
+  if (role === 'ai-strong') return 'strong';
+  return null;
+}
+
+/**
+ * Следующее состояние кнопки строки бота (заказ владельца 2026-09-07): один тап гоняет
+ * место по кругу «выкл → слабый → сильный → выкл». Круг, а не отдельный переключатель
+ * сложности: на телефоне строка узкая, и вторая кнопка рядом с первой — это два промаха
+ * вместо одного тапа.
+ *
+ * Место 0 (ты) сюда не попадает: экран не даёт сменить свою роль, и `human` возвращается
+ * как есть — циклом её не сломать даже случайным вызовом.
+ */
+export function nextSeatRole(role: SeatRole): SeatRole {
+  if (role === 'human') return 'human';
+  if (role === 'off') return 'ai';
+  return role === 'ai' ? 'ai-strong' : 'off';
+}
 
 /** Раздать дома местам: твой первый, остальные по кругу в стабильном порядке. */
 export function seatFactionIds(mine: string, factions: readonly string[], seats: number): string[] {
@@ -86,9 +123,10 @@ export function factionBonuses(p: FactionPassives | undefined): FactionBonus[] {
     .map(([kind, v]) => ({ kind, pct: Math.round((v ?? 0) * 100) }));
 }
 
-/** Сколько мест занято ИИ. Место 1 — всегда ты, оно в счёт соперников не идёт. */
+/** Сколько мест занято ИИ — любой силы. Место 1 — всегда ты, оно в счёт соперников
+ *  не идёт. */
 export function rivalCount(slots: readonly SeatRole[]): number {
-  return slots.slice(1).filter((r) => r === 'ai').length;
+  return slots.slice(1).filter(isAiSeat).length;
 }
 
 /** Одно место, реально идущее в матч, и мир, с которого оно стартует. */
@@ -104,7 +142,8 @@ export interface SeatAssignment {
  *    `slots[0]`: экран не даёт эту роль сменить, а раздача не обязана её перепроверять.
  * 2. **AI-места забирают кандидатов ПО ПОРЯДКУ индекса**, минуя выключенные — стабильный
  *    порядок нужен затем же, зачем и в `seatFactionIds`: одинаковый выбор игрока даёт
- *    одинаковую расстановку.
+ *    одинаковую расстановку. Сила бота на раздачу не влияет: она про то, КАК он играет,
+ *    а не про то, где садится.
  * 3. **Свой мир из кандидатов исключён заранее** — иначе AI сел бы на уже занятый старт.
  * 4. **Кандидаты кончились — раздача останавливается, а не зацикливается на пропуске.**
  *    Дальние AI-места остаются без места (их не будет в матче): лучше меньше соперников,
@@ -120,7 +159,7 @@ export function assignSeats(
   const free = startCandidates.filter((c) => c !== playerStart);
   let fi = 0;
   for (let i = 1; i < seatCount; i++) {
-    if (slots[i] !== 'ai') continue;
+    if (!isAiSeat(slots[i])) continue;
     const start = free[fi++];
     if (!start) break;
     out.push({ index: i, start });
