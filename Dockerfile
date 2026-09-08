@@ -96,7 +96,7 @@ RUN mkdir -p playtest-logs
 # the SAME libssl3t64 3.5.6-1~deb13u2 / libc6 2.41-12+deb13u3 / zlib1g 1.3.dfsg… as the
 # digest it replaces (read out of /var/lib/dpkg/status.d in the amd64 manifest, pulled
 # from gcr.io on 2026-08-26). It closes no `.trivyignore` entry — see that file's header.
-FROM gcr.io/distroless/nodejs22-debian13:nonroot@sha256:22d2f0480e59548ad14cf10d8921b24ef809780e7a61b162838f3d15a4a92e3d AS runtime
+FROM gcr.io/distroless/nodejs22-debian13:nonroot@sha256:4e4fb0ce55fd73901600796ef079a9490369d2515d7da31633a91608c82ca13b AS runtime
 # Bring the app (source + prod-only node_modules + baked HTML + the pre-built server
 # bundle) and hand the tree to the non-root user so the one runtime write left
 # (playtest-logs) succeeds. node_modules uses pnpm's relative symlink layout, so copying
