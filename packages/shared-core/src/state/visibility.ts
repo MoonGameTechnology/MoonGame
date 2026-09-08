@@ -470,6 +470,14 @@ function project(
     if (Object.keys(view.capital).length === 0) delete view.capital;
   }
 
+  // Челночные удары (SHU-1.2): свои видны, чужие сняты целиком. Иначе игрок заранее
+  // знает о налёте, и внезапность, ради которой челнок и летит мимо линий, исчезает.
+  if (view.strikes) {
+    const mine = view.strikes.filter((s) => s.owner === viewerId);
+    if (mine.length === 0) delete view.strikes;
+    else view.strikes = mine.map((s) => ({ ...s, units: s.units.map((u) => ({ ...u })) }));
+  }
+
   // Planets: keep topology (id/position/links) but strip contents you can't see.
   // A world you have seen before shows its remembered snapshot (variant B);
   // one never identified shows nothing.

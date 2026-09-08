@@ -337,6 +337,14 @@ export interface Planet {
   resources: ResourceBag;
   buildings: BuildingInstance[];
   garrison: UnitStack[];
+  /** Sortie readiness of the world's port (SHU-1.2): `fuel` strikes left before the
+   *  port must rearm, `rearming` hours left on that cooldown. Undefined = full.
+   *
+   *  Счётчик принадлежит ПОРТУ, а не отдельной машине: челноки в ангаре — стеки без
+   *  своей личности (они сливаются по юниту и лоадауту), и завести топливо на стек
+   *  значило бы запретить им сливаться вовсе. Игроку это ещё и понятнее: у порта одно
+   *  читаемое состояние «готов / перезаряжается», а не N счётчиков. */
+  sortie?: { fuel: number; rearming: number };
   /** Shuttles based in the world's spaceport (SHU-1.1). NOT a fleet and NOT part of
    *  the garrison: a shuttle sits inside the port, never appears in orbit, and takes no
    *  part in the ground defense of the world. Capacity is the ports' `shuttleBay`; lose
@@ -552,6 +560,10 @@ export interface GameState {
   battles: Record<BattleId, Battle>;
   /** Monotonic counter handing each battle its id. */
   battleSeq: number;
+  /** Челночные удары в полёте (SHU-1.2). Пусто/отсутствует = никто никуда не летит. */
+  strikes?: ShuttleStrike[];
+  /** Monotonic counter handing each strike its id — детерминированный, как `battleSeq`. */
+  strikeSeq?: number;
   /** Pending timeline, processed in (at, seq) order by `advanceTo`. */
   scheduled: ScheduledEvent[];
   /** Monotonic counter handing each scheduled event its deterministic `seq`. */
@@ -836,6 +848,36 @@ export interface TempLane {
 }
 
 /** A player's remembered last-known state of one world (fog-of-war memory). */
+/**
+ * Летящий удар челноков (SHU-1.2) — то, чего в старой модели не было вовсе.
+ *
+ * Челнок не флот: на карте его нет, по линиям он не ходит и в бой не вступает. Но и
+ * мгновенным удар быть не может — иначе против него нечего выставить, и модуль точечной
+ * обороны теряет смысл (резолюция владельца 2026-09-08). Поэтому вылет живёт в состоянии
+ * ровно столько, сколько длится полёт: откуда, чем, куда и когда долетит.
+ */
+export interface ShuttleStrike {
+  id: string;
+  owner: PlayerId;
+  /** Порт вылета — он же порт возврата. */
+  from: PlanetId;
+  /** Что именно летит (стеки покидают ангар на время вылета). */
+  units: UnitStack[];
+  /** Цель: чужой флот или чужой мир (по нему бьют ЗДАНИЯ, как бомбардировка). */
+  target: { kind: 'fleet'; id: FleetId } | { kind: 'planet'; id: PlanetId };
+  /** Точка удара, снятая в момент вылета: цель может уйти, но челноки летят туда, куда
+   *  их послали — «навёлся и пустил», а не самонаведение. */
+  to: { x: number; y: number };
+  departedAt: number;
+  arrivesAt: number;
+  /** `out` — летит к цели, `back` — возвращается в порт. */
+  leg: 'out' | 'back';
+  /** Урон, накопленный от ПВО и ещё не переведённый в сбитые машины. Копится, потому
+   *  что «раненых» челноков в модели нет: машина либо летит, либо сбита. Без накопления
+   *  залп слабее корпуса не делал бы вообще ничего, и ПВО молча простаивала бы. */
+  damage?: number;
+}
+
 export interface PlanetSnapshot {
   owner: PlayerId | null;
   garrison: UnitStack[];

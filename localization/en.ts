@@ -818,11 +818,6 @@ export const en: Record<string, string> = {
   'hint.pick-barrage': '🎯 tap an enemy fleet to focus fire · empty space = auto',
   'hint.pick-merge': '⛬ pick a fleet to merge with',
   'hint.pick-order': 'tap a point on the map — each tap adds an order',
-  'hint.shuttle-launched': '🛩 shuttle launched — steer it onto the target',
-  'hint.shuttle-strike-aim': '🎯 tap an enemy fleet to strike with the shuttle',
-  'hint.shuttle-strike-sent': '🎯 shuttle is heading to the target',
-  'hint.shuttle-strike-cancel': 'strike cancelled',
-  'hint.shuttle-returning': '↩ shuttle returning to base',
   'hint.standing-sortie': '🛩 standing patrol on — the shuttles strike any enemy in range',
 
   // --- loadout — Ship loadout editor (packages/client): stat-preview labels.
@@ -1875,19 +1870,8 @@ export const en: Record<string, string> = {
   'side.unit.ground': 'ground',
   'side.unit.space': 'space',
   'side.wing.conveyor': 'Shuttle yard',
-  'side.wing.fuel': 'fuel {n}',
   'side.wing.garrison.hint':
     'A carrier (◈) holds shuttles (△). Launch them from the selected fleet\'s panel with "🛩 Launch shuttles".',
-  'side.wing.hint':
-    'Splits the shuttles off into their own fast strike fleet — send them in while the carrier stays put. Needs at least one non-shuttle ship left behind. Countered by orbital AA.',
-  'side.wing.launch': '🛩 Launch shuttles ({n})',
-  'side.wing.strike': '🎯 Strike',
-  'side.wing.return': '↩ Return',
-  'side.wing.patrol': '🛩 Patrol',
-  'side.wing.patrol-on': '🛩 standing patrol: ON',
-  'side.wing.radius': 'radius {r}',
-  'side.wing.rearming': 'rearming {n}',
-  'side.wing.title': 'Shuttles',
   'side.world.blackout': 'blackout: radars and AA −50%',
   'side.world.bonus.defense': 'defense',
   'side.world.bonus.production': 'prod.',

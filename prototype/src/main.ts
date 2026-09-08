@@ -55,12 +55,8 @@ import {
   orderAuto,
   orderScramble,
   fleetIdle,
-  shuttleTake,
   shuttleStrikeRange,
   fleetHasShuttle,
-  isWing,
-  wingCanAct,
-  wingCanReturn,
   sortieSpec,
   freshSortie,
   botFavour,
@@ -84,7 +80,6 @@ import {
   type ChainStep,
   type Patrol,
 } from './game';
-import { act as makeAction } from './actions';
 import {
   dominantUnit,
   glyphHalo,
@@ -1033,7 +1028,6 @@ let barrageAim = false; // "Обстрел" armed → next tap picks the artille
 let heroAim: { heroId: string; abilityId: string } | null = null;
 let heroSpawnAim: string | null = null;
 // Shuttle free-space strike armed → next tap on an enemy fleet sends shuttle.strike
-let shuttleStrikeAim: string | null = null;
 // CC-2 standing order: fleets whose owner opted into AUTO-STORM — they descend and assault
 // a hostile world on arrival by themselves (the AI's autoEngage capture loop, opted-in).
 const autoAssault = new Set<string>();
@@ -1944,16 +1938,6 @@ function fleetHasArtillery(f: Fleet | undefined): boolean {
   );
 }
 
-/** Can the fleet launch its shuttles right now? `fleet.split` refuses to take the whole
- *  stack (E_SPLIT_ALL) and only works on a stationary fleet (E_IN_TRANSIT / E_IN_BATTLE),
- *  so the launch is offered only when a non-shuttle ship stays behind and the carrier is
- *  parked and out of combat (shuttles-roadmap SQ-1.1). */
-function fleetCanLaunchShuttle(f: Fleet | undefined): boolean {
-  if (!fleetHasShuttle(f, data) || f!.movement || !f!.location || f!.battleId) return false;
-  const total = f!.units.reduce((n, u) => n + u.count, 0);
-  const wing = shuttleTake(f!, data).reduce((n, u) => n + u.count, 0);
-  return wing > 0 && total > wing;
-}
 
 /** Division ⇄ hold transport for a docked fleet `f` over world `here`: load the
  *  player's garrisoning divisions (if they fit the free hold) and unload the ones it
@@ -5705,41 +5689,10 @@ function fleetPanelHtml(f: Fleet): string {
   // Artillery rules of engagement moved to the ☰ command bar («🔥 Режим огня»
   // button + popover menu) — the bottom sheet keeps information, not controls.
 
-  // Carrier air wing (shuttles-roadmap SQ-1.1) — launch the shuttle ships as a
-  // separate fast strike fleet. Needs a non-shuttle ship left behind (fleet.split
-  // refuses to take the whole stack), so an all-fighter fleet just flies itself.
-  if (f.owner === ME && fleetHasShuttle(f, data)) {
-    const wing = shuttleTake(f, data).reduce((n, u) => n + u.count, 0);
-    h += `<div class="sec">${t('side.wing.title')}</div><div class="row">`;
-    h += btn('launchshuttle', '', t('side.wing.launch', { n: wing }), fleetCanLaunchShuttle(f));
-    h += `</div>`;
-    h += `<div class="hint">${t('side.wing.hint')}</div>`;
-
-    // CC-4 status only — the «🛩 Деж. вылет» TOGGLE moved to the ☰ command row
-    // (SO-UI: the panel keeps information, the bar keeps controls).
-    const pt = patrolOf(f.id);
-    if (pt) {
-      const status =
-        pt.sortie.rearming > 0
-          ? t('side.wing.rearming', { n: pt.sortie.rearming })
-          : t('side.wing.fuel', { n: pt.sortie.fuel });
-      h += `<div class="row dim">${t('side.wing.patrol-on')} · ${t('side.wing.radius', { r: Math.round(pt.radius) })} · ${status}</div>`;
-    }
-  }
-
-  // Shuttle strike wing (a fleet split off from a carrier with homeBase) — free-space
-  // movement: strike an enemy in range, return to base, or toggle patrol (CC-4).
-  // Что такое действующее крыло — `shuttle.ts` (REFM-135): панель и обработчики
-  // приказов обязаны отвечать на это одинаково, иначе кнопка обещает то, чего нет.
-  if (isWing(f, ME, fleetHasShuttle(f, data))) {
-    const isPatrol = !!patrolOf(f.id);
-    const canAct = wingCanAct(f);
-    h += `<div class="sec">${t('side.wing.title')}</div><div class="row">`;
-    h += btn('shuttlestrike', '', t('side.wing.strike'), canAct);
-    h += btn('shuttlereturn', '', t('side.wing.return'), wingCanReturn(f));
-    h += btn('shuttlepatrol', '', isPatrol ? t('side.wing.patrol-on') : t('side.wing.patrol'), canAct);
-    h += `</div>`;
-  }
+  // Ангар порта и вылет челноков — панель мира, а не флота (SHU-3.1): по новой модели
+  // (SHU-1.2) челнок не летает во флоте, он стоит в космопорте и бьёт оттуда. Секции
+  // «Запустить крыло / Удар / Возврат / Патруль» сняты вместе с флотовой моделью: они
+  // слали действия, которых больше нет.
 
   // The player's projection hero rides here → name it and flag its fleet aura.
   if (f.units.some((u) => u.count > 0 && data.units[u.unit]?.traits.includes('hero'))) {
@@ -7255,7 +7208,6 @@ function renderCmdBar() {
     if (aiming) aiming = false;
     if (assaultAim) assaultAim = false;
     if (merging) merging = false;
-    shuttleStrikeAim = null;
     fireMenu = false; // пустое выделение — 🔥-меню не должно всплыть при новом выборе
     troopsPlan = null; // ⇵-меню тоже: иначе всплывёт над СЛЕДУЮЩИМ выбранным флотом
     castMenu = false; // и ✨: оно тут забывалось, и повторный выбор открывал его сам
@@ -7681,33 +7633,6 @@ side.addEventListener('click', (ev) => {
   } else if (act === 'planetinfo') {
     // Тап по имени мира: карточка ⇄ сводка статистики (для выбранной планеты).
     if (selPlanet) planetInfoFor = planetInfoFor === selPlanet ? null : selPlanet;
-  } else if (act === 'launchshuttle') {
-    // Split the shuttle stack off into its own fast strike fleet (SQ-1.1).
-    const f = selFleet ? s.fleets[selFleet] : undefined;
-    if (fleetCanLaunchShuttle(f)) {
-      playerOrder(splitFleet(ME, f!.id, shuttleTake(f!, data)));
-      note(t('hint.shuttle-launched'));
-    }
-  } else if (act === 'shuttlestrike') {
-    // Shuttle free-space strike: arm the aim mode to pick an enemy fleet in range.
-    const f = selFleet ? s.fleets[selFleet] : undefined;
-    if (isWing(f, ME, fleetHasShuttle(f, data)) && wingCanAct(f)) {
-      shuttleStrikeAim = selFleet;
-      note(t('hint.shuttle-strike-aim'));
-    }
-  } else if (act === 'shuttlereturn') {
-    // Shuttle return to base: fly back to the carrier in free space.
-    const f = selFleet ? s.fleets[selFleet] : undefined;
-    if (isWing(f, ME, fleetHasShuttle(f, data)) && wingCanReturn(f)) {
-      playerOrder(makeAction(ME, 'shuttle.return', { fleetId: f!.id }));
-      note(t('hint.shuttle-returning'));
-    }
-  } else if (act === 'shuttlepatrol') {
-    // Toggle CC-4 standing patrol for this shuttle fleet.
-    const f = selFleet ? s.fleets[selFleet] : undefined;
-    if (isWing(f, ME, fleetHasShuttle(f, data)) && wingCanAct(f)) {
-      setScramble([f!.id], !patrolOf(f!.id));
-    }
   }
   lastPanelHtml = '';
   renderPanel();
@@ -7928,7 +7853,6 @@ cmdbar.addEventListener('click', (ev) => {
   // ALWAYS_DISARMED: подтверждаются тапом по КАРТЕ, своей команды в ряду у них нет.
   heroAim = null;
   heroSpawnAim = null;
-  shuttleStrikeAim = null;
   if (cmd === 'move') {
     aiming = !aiming; // arm / disarm the move order
     assaultAim = false;
@@ -8139,7 +8063,6 @@ function selectAt(mx: number, my: number) {
     assaultAim,
     pickMode,
     aiming,
-    shuttleStrikeAim: !!shuttleStrikeAim,
   });
   // Merge armed: the next tap on a friendly fleet (not itself in the selection) is
   // the anchor — the selected fleet(s) fly to it and fuse. Any other tap cancels.
@@ -8183,24 +8106,6 @@ function selectAt(mx: number, my: number) {
   }
   // Shuttle strike armed: the next tap on an enemy fleet sends shuttle.strike
   // (free-space flight to the target). A tap on empty space disarms.
-  if (owner === 'shuttle-strike' && shuttleStrikeAim) {
-    const target = nearestHit(
-      hostileFleets(Object.values(s.fleets), ME),
-      fleetAnchor,
-      mx,
-      my,
-      rFleet,
-    );
-    if (target) {
-      playerOrder(makeAction(ME, 'shuttle.strike', { fleetId: shuttleStrikeAim, targetFleetId: target.id }));
-      note(t('hint.shuttle-strike-sent'));
-    } else {
-      note(t('hint.shuttle-strike-cancel'));
-    }
-    shuttleStrikeAim = null;
-    lastPanelHtml = '';
-    return;
-  }
   // Hero cast armed: the next tap picks the target world. Range / cooldown / cost
   // are the core's gates — a mis-aim comes back as an honest rejection note.
   if (owner === 'cast' && heroAim) {

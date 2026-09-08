@@ -818,11 +818,6 @@ export const ru: Record<string, string> = {
   'hint.pick-barrage': '🎯 тапните вражеский флот для сосредоточенного огня · пустота = авто',
   'hint.pick-merge': '⛬ выберите флот для объединения',
   'hint.pick-order': 'тапните точку на карте — каждый тап добавляет приказ',
-  'hint.shuttle-launched': '🛩 челноки подняты — ведите их на цель',
-  'hint.shuttle-strike-aim': '🎯 тапните вражеский флот для удара челноков',
-  'hint.shuttle-strike-sent': '🎯 челноки пошли на цель',
-  'hint.shuttle-strike-cancel': 'удар отменён',
-  'hint.shuttle-returning': '↩ челноки возвращаются на базу',
   'hint.standing-sortie': '🛩 дежурный вылет включён — челноки бьют врага в радиусе',
 
   // --- loadout — Оснащение корабля (packages/client): подписи характеристик в превью.
@@ -1873,19 +1868,8 @@ export const ru: Record<string, string> = {
   'side.unit.ground': 'земля',
   'side.unit.space': 'космос',
   'side.wing.conveyor': 'Верфь челноков',
-  'side.wing.fuel': 'топливо {n}',
   'side.wing.garrison.hint':
     'Носитель (◈) несёт челноки (△). Запускайте их из панели выбранного флота кнопкой «🛩 Запустить челноки».',
-  'side.wing.hint':
-    'Отделяет челноки в отдельный быстрый флот — уводите его на удар, а носитель остаётся в строю. Нужен хотя бы один корабль, кроме челноков. Контрится орбитальным ПВО.',
-  'side.wing.launch': '🛩 Запустить челноки ({n})',
-  'side.wing.strike': '🎯 Удар',
-  'side.wing.return': '↩ Возврат',
-  'side.wing.patrol': '🛩 Патруль',
-  'side.wing.patrol-on': '🛩 дежурный вылет: ВКЛ',
-  'side.wing.radius': 'радиус {r}',
-  'side.wing.rearming': 'перезарядка {n}',
-  'side.wing.title': 'Авиагруппа',
   'side.world.blackout': 'блэкаут: радары и ПВО −50%',
   'side.world.bonus.defense': 'оборона',
   'side.world.bonus.production': 'произв.',

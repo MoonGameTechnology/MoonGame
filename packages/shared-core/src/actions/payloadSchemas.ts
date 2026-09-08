@@ -139,8 +139,15 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   }),
   'fleet.engage': z.object({ fleetId: id, targetId: id }),
   // shuttle free-space movement (shuttleModule) — strike/return off the lane graph
-  'shuttle.strike': z.object({ fleetId: id, targetFleetId: id }),
-  'shuttle.return': z.object({ fleetId: id }),
+  // Вылет челноков из порта (SHU-1.2). Ровно одна цель из двух — «обе или ни одной»
+  // схема не выражает, это проверяет обработчик (fail-secure).
+  'shuttle.strike': z.object({
+    planetId: id,
+    unit: id,
+    count,
+    targetFleetId: id.optional(),
+    targetPlanetId: id.optional(),
+  }),
   // capital (hero respawn / re-fit anchor)
   'capital.designate': z.object({ planetId: id }),
   // steward («Хранитель») — postures are data-driven; the module gates the value

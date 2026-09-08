@@ -53,7 +53,6 @@ export interface TapModes {
   /** Вооружён ход («Курс»). */
   aiming: boolean;
   /** Вооружён удар эскадрильи (shuttle.strike). */
-  shuttleStrikeAim: boolean;
 }
 
 /** Решить, кто забирает тап. Порядок ветвей — и есть правила 1–4. */
@@ -64,7 +63,6 @@ export function tapOwner(m: TapModes): TapOwner {
   if (m.heroAim) return 'cast';
   if (m.heroSpawnAim) return 'deploy';
   if (m.assaultAim) return 'assault';
-  if (m.shuttleStrikeAim) return 'shuttle-strike';
   if (m.pickMode && !m.aiming) return 'pick-group'; // правило 4
   if (m.aiming) return 'move'; // правило 2
   return 'select'; // правило 3

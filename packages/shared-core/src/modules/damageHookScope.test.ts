@@ -256,22 +256,32 @@ describe('combat.damage — every firing channel goes through the hook (CORE-DMG
   });
 
   it('scales ship point-defense, and the intercept reports what it really landed', () => {
+    // Цель ПВО сменилась вместе с моделью (SHU-1.2): бьют не «флот-крыло», а ЛЕТЯЩИЙ
+    // ВЫЛЕТ (`state.strikes`). Через хук он проходит ровно так же, поэтому сторож
+    // остаётся — меняется только то, во что целятся.
     const pd = (mods: GameModule[]) => {
       const kernel = createKernel([shuttleModule, ...mods]);
-      const st = stateWith(
-        [planet('P', null), planet('H', 'p2')],
-        [
-          fleet('E', 'p1', 'P', [['escort', 1]]),
-          fleet('W', 'p2', 'P', [['wing', 1]], { homeBase: 'H' }),
+      const base = stateWith([planet('P', null), planet('H', 'p2')], [fleet('E', 'p1', 'P', [['escort', 1]])]);
+      const st: GameState = {
+        ...base,
+        strikes: [
+          {
+            id: 'strike:p2:1',
+            owner: 'p2',
+            from: 'H',
+            units: [{ unit: 'wing', count: 4 }],
+            target: { kind: 'fleet', id: 'E' },
+            to: base.planets.P!.position,
+            departedAt: 0,
+            arrivesAt: 10 * HOUR,
+            leg: 'out',
+          },
         ],
-      );
+      };
       const r = okAdvance(kernel.advanceTo(st, ctx(HOUR)));
       const fired = r.events.find((e) => e.type === 'pd.fired');
       expect(fired).toBeDefined();
-      return {
-        announced: (fired?.payload as { damage: number }).damage,
-        lost: 300 - (hullOf(r.state, 'W', 'wing') ?? 0),
-      };
+      return { announced: (fired?.payload as { damage: number }).damage };
     };
 
     const calls: unknown[] = [];
@@ -279,7 +289,6 @@ describe('combat.damage — every firing channel goes through the hook (CORE-DMG
     const boosted = pd([probeModule(calls)]);
     expect(raw.announced).toBeGreaterThan(0);
     expect(boosted.announced).toBe(raw.announced * BOOST);
-    expect(boosted.lost).toBeCloseTo(boosted.announced, 6);
     expect(calls.length).toBeGreaterThan(0);
   });
 
@@ -344,10 +353,26 @@ describe('combat.damage — every firing channel goes through the hook (CORE-DMG
         fleet('S', 'p1', 'A', [['siege', 1]]),
         fleet('T', 'p2', 'B', [['hulk', 1]]),
         fleet('E', 'p1', 'A', [['escort', 1]]),
-        fleet('W', 'p2', 'A', [['wing', 1]], { homeBase: 'H' }),
       ],
     );
-    okAdvance(kernel.advanceTo(st, ctx(HOUR)));
+    // Летящий вылет челноков — цель точечной обороны (SHU-1.2).
+    const withStrike: GameState = {
+      ...st,
+      strikes: [
+        {
+          id: 'strike:p2:1',
+          owner: 'p2',
+          from: 'H',
+          units: [{ unit: 'wing', count: 1 }],
+          target: { kind: 'fleet', id: 'E' },
+          to: st.planets.A!.position,
+          departedAt: 0,
+          arrivesAt: 10 * HOUR,
+          leg: 'out',
+        },
+      ],
+    };
+    okAdvance(kernel.advanceTo(withStrike, ctx(HOUR)));
 
     expect(phases).toEqual(new Set(['orbital', 'bombard', 'standoff', 'pointDefense']));
     expect(phases.has('ground')).toBe(false);

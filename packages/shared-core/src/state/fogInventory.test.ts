@@ -60,7 +60,13 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   planets: 'filtered', // топология публична, содержимое неопознанного мира — нет
   fleets: 'filtered', // чужой флот виден только опознанным (иначе — засветка)
   battles: 'filtered',
-  battleSeq: 'public', // счётчик, не факт о мире
+  battleSeq: 'public',
+  // SHU-1.2: свои челночные удары в полёте видны, чужие сняты целиком — иначе игрок
+  // заранее знает о налёте, и внезапность, ради которой челнок и летит мимо линий,
+  // исчезает. Перехвату (SHU-1.3) проекция не нужна: ПВО реагирует на сервере.
+  strikes: 'filtered',
+  strikeSeq: 'public', // счётчик id, как battleSeq — предсказывать в нём нечего
+ // счётчик, не факт о мире
   scheduled: 'filtered', // чужие таймеры — это будущие намерения
   scheduleSeq: 'public',
   fog: 'stripped', // память тумана — серверная кухня
@@ -246,6 +252,35 @@ function maximalState(): GameState {
       },
     },
     battleSeq: 2,
+    // SHU-1.2: свой вылет виден, чужой (канареечный) обязан быть снят целиком.
+    strikes: [
+      {
+        id: 'mine_strike',
+        owner: VIEWER,
+        from: 'A',
+        units: [{ unit: 'interceptor', count: 1 }],
+        // Целится в мир, а не в канареечный флот: id цели едет в проекции вместе со
+        // своим ударом (я в неё целюсь — значит знаю о ней), и канареечная строка
+        // утекла бы законным путём, обманув сторожа.
+        target: { kind: 'planet', id: 'Z' },
+        to: { x: 10, y: 0 },
+        departedAt: 0,
+        arrivesAt: 100,
+        leg: 'out',
+      },
+      {
+        id: 'CANARY_strike',
+        owner: RIVAL,
+        from: 'Z',
+        units: [{ unit: 'interceptor', count: 3 }],
+        target: { kind: 'planet', id: 'A' },
+        to: { x: 0, y: 0 },
+        departedAt: 0,
+        arrivesAt: 100,
+        leg: 'out',
+      },
+    ],
+    strikeSeq: 2,
     scheduled: [
       { id: 'evt:1', at: 200, type: 'own.timer', payload: { owner: VIEWER }, seq: 0 },
       { id: 'evt:2', at: 300, type: 'CANARY_type', payload: { owner: RIVAL }, seq: 1 },
