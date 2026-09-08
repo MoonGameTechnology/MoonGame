@@ -475,6 +475,11 @@ export const data: GameData = parseGameData({
       cost: { metal: 400, credits: 200 },
       buildTimeHours: 10,
       upkeep: { credits: 64 },
+      // HPR-1.5.1: the hero's ship is fitted like any other hull — one bay of each
+      // kind, the cruiser shape. Every hero shares this hull, so hardware is equal
+      // across archetypes; the main hero's extra bay is a GRADE bonus (HPR-1.5.2),
+      // not a different ship. What separates heroes is their skills, not their bays.
+      slots: { weapon: 1, defense: 1, utility: 1 },
     },
   },
   // Ship modules (mirror of data/modules.json) — the «Оснащение корабля» loadout
