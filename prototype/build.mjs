@@ -1165,6 +1165,19 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #herobody .hx-ovc b{display:block;font-size:16px;color:var(--cyan);}
 #herobody .hx-ovc span{font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);}
 #herobody .hx-row[data-hfitd]{cursor:pointer;}
+/* HPR-1.2 — слоты под скиллы. Отсек читается как отсек корабля в «Верфи»: рамка держит
+   форму и у занятого, и у пустого, поэтому ряд не «прыгает», когда скилл сняли. Занятый
+   подсвечен cyan'ом, пустой — приглушённой рамкой: пустота тут приглашение, а не дыра.
+   Высота 44px — нижняя граница тач-цели, ниже неё опускаться нельзя даже на 360px. */
+#herobody .hx-bays{display:flex;flex-direction:column;gap:6px;margin:6px 0;}
+#herobody .hx-bay{display:flex;align-items:center;gap:8px;min-height:44px;padding:6px 10px;border-radius:8px;border:1px solid var(--line);}
+#herobody .hx-bay.on{border-color:var(--cyan-dim);background:rgba(53,214,230,.05);}
+#herobody .hx-bay.off{justify-content:center;border-style:dashed;color:var(--dim);font-size:11px;letter-spacing:.5px;}
+#herobody .hx-bayact{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+/* «Снять» — тихая кнопка: убрать скилл не должно выглядеть так же зазывно, как применить его. */
+#herobody .hx-btn.ghost{border-color:var(--line-hi);background:transparent;color:var(--dim);}
+/* Не влезающее ПОКАЗЫВАЕТСЯ погашенным, а не прячется: экран не должен врать о том, чем игрок владеет. */
+#herobody .hx-row.dim{opacity:.55;}
 #herobody .hx-dossier{margin-top:12px;border:1px solid var(--cyan);border-radius:10px;padding:12px;background:var(--glass);}
 #herobody .hx-dh{display:flex;align-items:center;gap:8px;}
 #herobody .hx-dnm{font-weight:700;color:#eafffb;font-size:13px;}

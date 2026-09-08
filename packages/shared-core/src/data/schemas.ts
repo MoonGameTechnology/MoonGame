@@ -577,6 +577,22 @@ export const HERO_PASSIVE_SCOPES = ['heroFleet', 'ownFleetsNear'] as const;
 /** A hero passive (docs/heroes.md §Данные) — an always-on, data-driven contribution to
  *  a hook while its hero is alive. Carried by a hero instance (`Hero.passives`, copied
  *  from the archetype's `startPassives` at seed). Balancing = editing these numbers. */
+/** Ступень редкости героя — сколько СКИЛЛОВ он носит одновременно (HPR-1.2).
+ *  Заведено данными, а не константой, потому что это число сегодня живёт ДВАЖДЫ
+ *  (`HERO_GRADES` в прототипе и нигде в ядре) и уже успело разъехаться со слотами
+ *  ФИТТИНГОВ архетипа (`HeroArchetypeDef.slots`) — обратной лестницей похожих чисел.
+ *  Здесь оно одно, и его читают оба каталога.
+ *
+ *  ВАЖНО: `slots` архетипа и `skillSlots` редкости — РАЗНЫЕ бюджеты. Первый ограничивает
+ *  `hero.fit` (компоненты корабля), второй — `hero.equip` (способности). Путать их нельзя:
+ *  у `commander` 4 фиттинга и у `main` 4 скилла — совпадение чисел, а не одно правило. */
+export const HeroGradeDefSchema = z.object({
+  name: z.string(),
+  description: z.string().optional(),
+  /** Сколько способностей ступень позволяет держать НАДЕТЫМИ одновременно. */
+  skillSlots: z.number().int().nonnegative().default(1),
+});
+
 export const HeroPassiveDefSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
@@ -794,6 +810,7 @@ export const GameDataSchema = z.object({
   heroPassives: z.record(z.string(), HeroPassiveDefSchema).default({}),
   heroSkillTrees: z.record(z.string(), HeroSkillNodeSchema).default({}),
   heroFittings: z.record(z.string(), HeroFittingDefSchema).default({}),
+  heroGrades: z.record(z.string(), HeroGradeDefSchema).default({}),
   modes: z.record(z.string(), GameModeDefSchema).default({}),
   // `.prefault({})` pipes the empty object through the nested schema, so its
   // per-field defaults stay the single source of truth (no literal to drift).

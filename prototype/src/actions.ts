@@ -241,4 +241,10 @@ export const unlockHeroSkill = (playerId: string, heroId: string, node: string) 
 /** Install a ship fitting into one of the hero archetype's slots (no refit). */
 export const fitHero = (playerId: string, heroId: string, fitting: string) =>
   act(playerId, 'hero.fit', { heroId, fitting });
-
+/** Put an owned ability into one of the hero's skill slots (HPR-1.2). Reversible,
+ *  unlike `fitHero`: the budget exists so the player can choose, not to lock them in. */
+export const equipHeroAbility = (playerId: string, heroId: string, abilityId: string) =>
+  act(playerId, 'hero.equip', { heroId, abilityId });
+/** Take an ability back out of its slot — it stays owned, just not worn. */
+export const unequipHeroAbility = (playerId: string, heroId: string, abilityId: string) =>
+  act(playerId, 'hero.unequip', { heroId, abilityId });
