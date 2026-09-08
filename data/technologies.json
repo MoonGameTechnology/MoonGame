@@ -16,7 +16,6 @@
     "tier": 1,
     "cost": { "credits": 160, "metal": 120 },
     "researchTimeHours": 6,
-    "unlocks": { "units": ["dropship"] },
     "effects": { "fleetSpeedBonus": 0.12 }
   },
   "siege_doctrine": {
@@ -24,7 +23,7 @@
     "description": "tech.node.siege-doctrine.desc",
     "branch": "space",
     "tier": 2,
-    "cost": { "credits": 260, "metal": 220 },
+    "cost": { "credits": 260, "metal": 220, "microelectronics": 40 },
     "researchTimeHours": 10,
     "dayGate": 3,
     "prerequisites": ["orbital_logistics"],
@@ -39,19 +38,17 @@
     "cost": { "credits": 180, "metal": 240 },
     "researchTimeHours": 8,
     "dayGate": 3,
-    "prerequisites": ["industrial_automation"],
-    "unlocks": { "buildings": ["fort"] }
+    "prerequisites": ["industrial_automation"]
   },
   "microelectronics_fabrication": {
     "name": "Microelectronics Fabrication",
     "description": "tech.node.microelectronics-fabrication.desc",
     "branch": "space",
     "tier": 2,
-    "cost": { "credits": 220, "metal": 180, "energy": 120 },
+    "cost": { "credits": 220, "metal": 180 },
     "researchTimeHours": 10,
     "dayGate": 2,
     "prerequisites": ["industrial_automation"],
-    "unlocks": { "buildings": ["fabricator"] },
     "effects": { "productionBonus": 0.05 }
   },
   "deep_survey": {
@@ -200,7 +197,43 @@
     "cost": { "credits": 400, "metal": 260 },
     "researchTimeHours": 14,
     "dayGate": 15,
-    "prerequisites": ["logistics_command"],
-    "unlocks": { "abilities": ["steward"] }
+    "unlocks": { "abilities": ["steward"] },
+    "conditions": [{ "type": "has_scientist", "branch": "command", "minLevel": 1 }]
+  },
+  "meta_drill_speed": {
+    "name": "Commander Drill: Logistics",
+    "description": "tech.node.meta-drill-speed.desc",
+    "branch": "command",
+    "effects": { "fleetSpeedBonus": 0.05 }
+  },
+  "meta_drill_combat": {
+    "name": "Commander Drill: Gunnery",
+    "description": "tech.node.meta-drill-combat.desc",
+    "branch": "command",
+    "effects": { "combatDamageBonus": 0.05 }
+  },
+  "meta_drill_radar": {
+    "name": "Commander Drill: Recon",
+    "description": "tech.node.meta-drill-radar.desc",
+    "branch": "command",
+    "effects": { "radarRangeBonus": 0.15 }
+  },
+  "meta_drill_veteran": {
+    "name": "Commander Drill: Veterancy",
+    "description": "tech.node.meta-drill-veteran.desc",
+    "branch": "command",
+    "effects": { "fleetSpeedBonus": 0.05, "combatDamageBonus": 0.05 }
+  },
+  "meta_industry": {
+    "name": "Commander Drill: Industry",
+    "description": "tech.node.meta-industry.desc",
+    "branch": "command",
+    "effects": { "productionBonus": 0.05 }
+  },
+  "meta_industry_2": {
+    "name": "Commander Drill: Magnate",
+    "description": "tech.node.meta-industry-2.desc",
+    "branch": "command",
+    "effects": { "productionBonus": 0.05 }
   }
 }

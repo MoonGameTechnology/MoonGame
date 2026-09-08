@@ -575,3 +575,32 @@ describe('досье технологии — без мигания на жив�
     expect(body.popped()).toBe(false); // пересозданная модалка НЕ выпрыгивает заново
   });
 });
+
+// CONV-16. Правило каталога записано в самом `prototypeData.ts` («капстоуны веток
+// гейтит учёный ветки»), и оно тихо сломалось, когда состав учёных сократили до трёх:
+// гейт `has_scientist { branch }` выполним, только если в каталоге ЕСТЬ учёный этой
+// ветки (`technology.ts` требует совпадения `def.branch`). Веток пять, учёных три —
+// значит три капстоуна нельзя было открыть НИКОГДА, и заметить это можно было лишь
+// сыграв до 12-го дня. Сторож ловит любой такой гейт на сборке, а не в партии.
+describe('гейты технологий по учёному достижимы (CONV-16)', () => {
+  it('нет условия `has_scientist` на ветку, у которой нет учёного', () => {
+    // `flatMap`, а не `filter` с предикатом: `branch` — это union литералов веток,
+    // и предикат `b is string` шире параметра, что tsc отвергает (TS2677).
+    const branches = new Set(
+      Object.values(data.scientists).flatMap((s) => (s.branch === undefined ? [] : [s.branch])),
+    );
+    const unreachable = Object.entries(data.technologies)
+      .flatMap(([id, def]) =>
+        (def.conditions ?? []).map((c) =>
+          c.type === 'has_scientist' && c.branch !== undefined && !branches.has(c.branch)
+            ? `${id} → ветка '${c.branch}'`
+            : '',
+        ),
+      )
+      .filter((s) => s !== '')
+      .sort();
+    expect(unreachable, 'технологию не откроет никто: учёного такой ветки в каталоге нет').toEqual(
+      [],
+    );
+  });
+});

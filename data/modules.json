@@ -52,7 +52,7 @@
     "slot": "defense",
     "tag": "vertical",
     "effects": { "stats": { "pointDefense": 8 } },
-    "cost": { "metal": 65 },
+    "cost": { "metal": 50 },
     "allowed": { "domain": "space" }
   }
 }
