@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 5706 зелёных** (61 skip, 429 файлов).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 5717 зелёных** (61 skip, 430 файлов).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -1537,7 +1537,7 @@ ad-hoc запрос «видим ли объект на identify-уровне» 
 экран меню (Этап 4), персистентность меты + `MatchStore.list` (Postgres уже под это
 индексирован), лобби/создание матча (MM-1.1).
 
-## 6. Данные (`data/*.json`, версия `0.1.18`)
+## 6. Данные (`data/*.json`, версия `0.1.19`)
 
 > **RULES-2 — правила про КОНТЕНТ живут здесь, а не в коде.** Поля-правила у зданий:
 > `maxPerPlanet` (лимит экземпляров на мире, дефолт 1) и `creditsBonus` (доля прибавки ко
@@ -1633,13 +1633,14 @@ speed, hp, shield, range, cargoCapacity, cargoSize, aaDamage}` (+ любые д�
   (армия очков не даёт — см. victory). Есть: `scout_drone, scout, sensor_frigate,
 cruiser, siege, siege_lance, artillery(artillery,range 300), dropship(cargoCapacity 8),
 militia, drop_infantry, tank(cargoSize 1), heavy_infantry, special_forces, hero,
-interceptor, strike_carrier` (16 юнитов: 13 `vanguard` + 3 `blue`, приехавших из
-каталога прототипа с CONV-12a; `orbital_aa` — защитное здание, не юнит;
-`infected_cruiser` в контенте нет).
+interceptor, strike_carrier(shuttleBay 4), shuttle_carrier(«Шаттл», shuttleBay 6)`
+(17 юнитов: 13 `vanguard` + 4 `blue`, приехавших из каталога прототипа с CONV-12a;
+`orbital_aa` — защитное здание, не юнит; `infected_cruiser` в контенте нет).
   **Линии получения урона — свойство кораблей** (GDD §7.2, раздача — в §5,
   `combat.tick`): front — `cruiser, dropship, strike_carrier, interceptor, hero`;
   mid — `scout, scout_drone, sensor_frigate`; rear — `siege, siege_lance`;
-  артиллерийская — `artillery`, ЕДИНСТВЕННЫЙ носитель трейта `artillery`. Осадные
+  артиллерийская — `artillery`, ЕДИНСТВЕННЫЙ носитель трейта `artillery`; `shuttle_carrier`
+  стоит в rear вместе с осадными. Осадные
   платформы трейт отдали ему вместе со `stats.range`, поэтому огня с дистанции они
   больше не ведут и дерутся из задней линии. У наземных `line` не читается.
   `sensor_frigate` — носитель дальнего радара: один `utility`-слот, своя антенна 60, и
@@ -2342,9 +2343,25 @@ instantRepair, fleetRepair, effects, seatClaim])` (35 модулей — сос�
   копится и переводится в сбитые машины по корпусу. Свои вылеты видны в тумане, чужие
   сняты целиком. Старая флотовая модель («крыло» с `homeBase`, `shuttle.return`, кнопки
   крыла) снята; остаток — мёртвые поля `Fleet` и патруль CC-4, это SHU-2.2.
-  `interceptor` и `strike_carrier` строятся; `orbital_aa` (защитное здание, не юнит) —
-  counter по флотам у орбиты, ядро суммирует `aaDamage` и по гарнизону, и по зданиям.
-  Носитель пока обычный корпус — своя вместимость челноков будет в SHU-2.1.
+  **НОСИТЕЛЬ — ВТОРАЯ БАЗА (SHU-2.1):** `shuttleBay` стал ещё и статом КОРПУСА, поэтому
+  вылет идёт «с порта ИЛИ с носителя». Челноки на борту — `Fleet.hangar` (не `units`: они
+  не стреляют в раунде и не впитывают залп), топливо — `Fleet.sortie`, вместимость флота
+  Σ `count × shuttleBay` его корпусов. Обе базы читаются через ОДНУ проекцию `BaseView`
+  в `shuttle.ts`, поэтому проверки вылета, посадки, перезарядки и обрезки ангара
+  существуют в одном экземпляре. `ShuttleStrike.from: PlanetId` заменён размеченной
+  `base: {kind:'planet'|'fleet', id}` — той же формы, что `target`; манифест 10→11.
+  На борт челноки попадают перегрузкой в своём порту: `shuttle.load`/`shuttle.unload
+  { fleetId, unit, count }` (обе стороны свои, коды `E_NOT_SHUTTLE`, `E_NO_CAPACITY`,
+  `E_NOT_ENOUGH`, `E_FORBIDDEN`, `E_FLEET_BUSY`). Вылетать может только СТОЯЩИЙ у узла
+  носитель (порт не двигается); возврату это не мешает — позиция базы берётся текущая,
+  так что ушедший носитель челноки догоняют. Порога повреждения у носителя нет и не
+  нужно: сбитые корпуса роняют вместимость, и лишних снимает та же обрезка на
+  `time.advanced`, что у порта; погибший целиком флот уносит ангар с собой (осиротеть
+  нечему — ангар лежит НА флоте), а вылет с исчезнувшей базой ловится на посадке
+  (`shuttle.lost`). Тесты: 11 в `shuttleCarrier.test.ts`.
+  `interceptor`, `strike_carrier` (ангар 4) и `shuttle_carrier` («Шаттл», ангар 6)
+  строятся; `orbital_aa` (защитное здание, не юнит) — counter по флотам у орбиты, ядро
+  суммирует `aaDamage` и по гарнизону, и по зданиям.
 - **Цепочки приказов (command-chains) — УДАЛЕНЫ к релизу (REL-1, «пока убери»).**
   Старая очередь приказов (CC-5/CC-6: `orderQueueModule`, клиентский план
   `fleetQueues`+`driveQueues`, UI «Очередь приказов»/«➕ строить») и

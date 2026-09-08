@@ -290,7 +290,8 @@
       "defense": 10,
       "speed": 40,
       "hp": 70,
-      "cargoCapacity": 6
+      "cargoCapacity": 6,
+      "shuttleBay": 4
     },
     "line": "front",
     "traits": [
@@ -381,6 +382,34 @@
     },
     "slots": {
       "weapon": 1,
+      "utility": 1
+    }
+  },
+  "shuttle_carrier": {
+    "faction": "blue",
+    "stats": {
+      "attack": 3,
+      "defense": 18,
+      "speed": 34,
+      "hp": 90,
+      "shuttleBay": 6
+    },
+    "line": "rear",
+    "traits": [
+      "carrier"
+    ],
+    "signature": 6,
+    "cost": {
+      "metal": 260,
+      "credits": 130,
+      "microelectronics": 6
+    },
+    "buildTimeHours": 7,
+    "upkeep": {
+      "credits": 88
+    },
+    "slots": {
+      "defense": 2,
       "utility": 1
     }
   }

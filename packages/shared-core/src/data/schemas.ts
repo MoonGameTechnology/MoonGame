@@ -60,6 +60,12 @@ export const UnitStatsSchema = z
     /** Combat rounds a spent shuttle sits rearming on its carrier before it can
      *  sortie again (SQ-2.1). Deterministic cooldown, like a hero ability. */
     rearmRounds: z.number().nonnegative().default(0),
+    /** How many shuttles this HULL can base — a carrier is a mobile spaceport
+     *  (SHU-2.1). Same meaning as a building's `shuttleBay`, and the same rule
+     *  follows from it: a hull that bases zero is indistinguishable from one that
+     *  cannot base at all, so there is no separate "is a carrier" flag to drift
+     *  out of step with the number. A fleet's capacity is Σ count × shuttleBay. */
+    shuttleBay: z.number().nonnegative().default(0),
   })
   .catchall(z.number());
 

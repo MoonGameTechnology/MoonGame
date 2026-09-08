@@ -428,7 +428,7 @@ export const data: GameData = parseGameData({
     strike_carrier: {
       // A slow, tanky flat-top with few guns of its own — its punch is the shuttles it carries.
       faction: 'blue',
-      stats: { attack: 4, defense: 10, speed: 40, hp: 70, cargoCapacity: 6 },
+      stats: { attack: 4, defense: 10, speed: 40, hp: 70, cargoCapacity: 6, shuttleBay: 4 },
       line: 'front', // the fattest hull afloat — it holds the line
       traits: ['carrier'],
       signature: 6,
@@ -436,6 +436,22 @@ export const data: GameData = parseGameData({
       buildTimeHours: 6,
       upkeep: { credits: 96 },
       slots: { defense: 1, utility: 2 }, // a flat-top: armour + sensor/cargo bays
+    },
+    shuttle_carrier: {
+      // «Шаттл» — ПЛАВУЧИЙ КОСМОПОРТ (SHU-2.1, заказ владельца). Своих пушек почти нет
+      // (attack 3), зато держит удар (defense 18, hp 90) и несёт шесть челноков: с него
+      // они вылетают и на него садятся, поэтому флот бьёт челноками вдали от своих миров.
+      // Стоит в ЗАДНЕЙ линии — на неё приходится пятая часть залпа, пока строй впереди
+      // цел; ангар на нём живёт ровно столько, сколько живы его корпуса.
+      faction: 'blue',
+      stats: { attack: 3, defense: 18, speed: 34, hp: 90, shuttleBay: 6 },
+      line: 'rear',
+      traits: ['carrier'],
+      signature: 6, // корпус такого размера радар видит издалека
+      cost: { metal: 260, credits: 130, microelectronics: 6 },
+      buildTimeHours: 7,
+      upkeep: { credits: 88 },
+      slots: { defense: 2, utility: 1 }, // два защитных отсека — корпус живучести, не огня
     },
     // (Orbital AA is not a unit: it's a defensive *building* — anti-ship, immobile,
     //  player-built, see `orbital_aa` under buildings.)

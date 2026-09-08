@@ -15,6 +15,7 @@
 import type { Fleet, Planet, UnitStack } from './gameState';
 import type { GameData } from '../data/schemas';
 import { buildingLevel } from '../data/schemas';
+import { sumUnitStat } from '../util/stacks';
 
 /** The shuttle-trait ship stacks aboard a fleet — what a carrier launches as a
  *  strike wing (SQ-1.1: launch-as-unit). Pure. */
@@ -146,9 +147,18 @@ export function shuttleBayAt(planet: Planet, data: GameData): number {
   return bay;
 }
 
-/** Сколько мест ангара занято сейчас. */
-export function hangarUsed(planet: Planet): number {
-  return (planet.hangar ?? []).reduce((n, st) => n + st.count, 0);
+/** Сколько челноков базируется на флоте: Σ `shuttleBay` его ЖИВЫХ корпусов (SHU-2.1).
+ *  Носитель — мобильный космопорт, поэтому вместимость считается тем же способом, что у
+ *  мира, только слагаемые берутся у кораблей. Порога повреждения у носителя нет и не
+ *  нужно: подбитый носитель гибнет целыми корпусами, вместимость падает сама, и лишние
+ *  челноки снимает та же `trimHangar`, что у порта. */
+export function fleetShuttleBay(fleet: Fleet, data: GameData): number {
+  return sumUnitStat(fleet.units, data, 'shuttleBay');
+}
+
+/** Сколько мест ангара занято сейчас — у мира или у флота (форма ангара одна). */
+export function hangarUsed(host: { hangar?: UnitStack[] }): number {
+  return (host.hangar ?? []).reduce((n, st) => n + st.count, 0);
 }
 
 /** Обрезать ангар до вместимости `bay`, начиная с ХВОСТА: раньше построенное переживает

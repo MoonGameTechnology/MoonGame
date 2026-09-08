@@ -642,6 +642,7 @@ export const en: Record<string, string> = {
   'data.shield-booster': 'Shield Booster',
   'data.point-defense-array': 'Point Defense Array',
   'data.siege-doctrine': 'Siege Doctrine',
+  'data.shuttle-carrier': 'Shuttle',
   'data.siege': 'siege',
   'data.signal-corps': 'Signal Corps',
   'data.solar-flare-zone': 'Solar Flare Zone',
@@ -792,11 +793,14 @@ export const en: Record<string, string> = {
   'dossier.unit.scout.desc':
     'A light recon hull. Fast (speed {sp}) and almost silent (signature {sig}) — it maps the void where a battle fleet fears to go.',
   'dossier.unit.scout.name': 'Scout',
+  'dossier.unit.shuttle-carrier.desc':
+    'A spaceport under way: {bay} shuttle berths, and they launch from it and land back on it — so the fleet can strike with shuttles far from its own worlds. Almost no guns of its own ({a} attack), but it holds ({d} defense, {hp} hull) and stands in the REAR line. The hangar lives exactly as long as its hulls do: lose the carrier and you lose the shuttles aboard.',
+  'dossier.unit.shuttle-carrier.name': 'Shuttle',
   'dossier.unit.siege.desc':
     "A heavy siege platform: the fleet's biggest single gun ({a} damage) on thin armor ({d} defense, {hp} hull). It stands in the REAR line, so only a fifth of an incoming volley reaches it while the cruisers hold the front. It has no standoff fire: to shoot, it joins the battle like everyone else.",
   'dossier.unit.siege.name': 'Siege Platform',
   'dossier.unit.strike-carrier.desc':
-    'A slow armored carrier ({hp} hull, hold for {c}) — almost no guns of its own, all its strength is in the shuttles it carries. Keep it behind and launch them at a target with "🛩 Launch shuttles".',
+    'A slow armored carrier ({hp} hull, hold for {c}) — almost no guns of its own, all its strength is in the shuttles it carries: {bay} hangar berths, launching and landing straight off the deck. Keep it behind.',
   'dossier.unit.strike-carrier.name': 'Strike Carrier',
 
   // --- faction — Фракции: пассивный бонус дома.

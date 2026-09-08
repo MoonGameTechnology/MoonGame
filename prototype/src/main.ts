@@ -963,6 +963,7 @@ const BUILD_UNITS = [
   'siege',
   'artillery',
   'strike_carrier',
+  'shuttle_carrier',
   'interceptor',
   'militia',
   'heavy_infantry',

@@ -27,7 +27,7 @@ function loadShippedBundle(): Record<string, unknown> {
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.18');
+    expect(data.version).toBe('0.1.19');
     expect(data.resources).toContain('microelectronics');
     // The `artillery` hull is the ONE standoff platform: the trait is what the core
     // reads for both standoff fire and the artillery damage line, and `range` is the
@@ -42,6 +42,12 @@ describe('game data schema (docs/architecture.md §2)', () => {
     expect(data.units.cruiser?.line).toBe('front');
     expect(data.units.scout?.line).toBe('mid');
     expect(data.units.siege?.line).toBe('rear');
+    // Carriers are mobile spaceports (SHU-2.1): `shuttleBay` on the HULL is what bases
+    // shuttles aboard, so a hull with 0 simply cannot base any.
+    expect(data.units.shuttle_carrier?.stats.shuttleBay).toBe(6);
+    expect(data.units.shuttle_carrier?.line).toBe('rear');
+    expect(data.units.strike_carrier?.stats.shuttleBay).toBe(4);
+    expect(data.units.cruiser?.stats.shuttleBay ?? 0).toBe(0);
     expect(data.units.cruiser?.upkeep.credits).toBe(32); // daily upkeep, BAL-3 scale
     // fleet ⊕ ground-army separation: domains + transport capacity.
     expect(data.units.cruiser?.domain).toBe('space'); // schema default
