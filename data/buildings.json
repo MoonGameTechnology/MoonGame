@@ -411,7 +411,7 @@
         "buildTimeHours": 16,
         "hp": 35,
         "enablesGroundConstruction": true,
-        "enablesSquadronConstruction": true,
+        "enablesShuttleConstruction": true,
         "upkeep": {
           "energy": 70
         }
@@ -424,7 +424,7 @@
         "buildTimeHours": 24,
         "hp": 45,
         "enablesGroundConstruction": true,
-        "enablesSquadronConstruction": true,
+        "enablesShuttleConstruction": true,
         "buildSpeedBonus": 0.5,
         "upkeep": {
           "energy": 100

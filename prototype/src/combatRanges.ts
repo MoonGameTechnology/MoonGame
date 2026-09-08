@@ -3,7 +3,7 @@
  * артиллерии, радиус эскадрильи, зубы ПВО и линия «по кому сейчас ведётся огонь».
  *
  * Чистая функция, а не рисование по месту, по трём причинам сразу:
- *  · РАДИУСЫ БЕРУТСЯ ИЗ ЯДРА. `artilleryRange` и `squadronStrikeRange` — те самые
+ *  · РАДИУСЫ БЕРУТСЯ ИЗ ЯДРА. `artilleryRange` и `shuttleStrikeRange` — те самые
  *    функции, по которым ядро СТРЕЛЯЕТ. Своя копия формулы в клиенте разъехалась бы на
  *    первой правке (у артиллерии дальность идёт через `effectiveStats`, то есть модули
  *    корабля её меняют), и игрок целился бы по одному кругу, а огонь шёл по другому.
@@ -33,7 +33,7 @@
  */
 import {
   artilleryRange,
-  squadronStrikeRange,
+  shuttleStrikeRange,
   type Fleet,
   type GameData,
   type GameState,
@@ -41,7 +41,7 @@ import {
 
 /** Вид оружия — он же ключ цвета. Цвета живут в `main.ts` рядом с остальной палитрой;
  *  здесь только вид, чтобы модуль не знал про канву. */
-export type RangeKind = 'artillery' | 'squadron' | 'aa';
+export type RangeKind = 'artillery' | 'shuttle' | 'aa';
 
 /** Круг досягаемости вокруг точки. `radius` в МИРОВЫХ единицах (масштаб накладывает
  *  рисующий), `radius === 0` для `aa` — у ПВО нет области, только отметка на узле. */
@@ -108,9 +108,9 @@ export function combatRanges(
       }
     }
 
-    const wing = squadronStrikeRange(fleet, data);
+    const wing = shuttleStrikeRange(fleet, data);
     if (wing > 0) {
-      rings.push({ kind: 'squadron', x: at.x, y: at.y, radius: wing, sourceId: id });
+      rings.push({ kind: 'shuttle', x: at.x, y: at.y, radius: wing, sourceId: id });
     }
   }
 

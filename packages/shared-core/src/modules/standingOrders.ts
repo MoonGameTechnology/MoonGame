@@ -21,7 +21,7 @@
 import type { GameModule } from '../kernel/module';
 import type { Fleet, PatrolEntry } from '../state/gameState';
 import { fleetIdle, validateChainSteps } from '../state/chain';
-import { fleetHasSquadron, sortieSpec, squadronStrikeRange, freshSortie } from '../state/squadron';
+import { fleetHasShuttle, sortieSpec, shuttleStrikeRange, freshSortie } from '../state/shuttle';
 import { ownFleet } from '../util/combat';
 
 const HOUR = 3_600_000;
@@ -64,14 +64,14 @@ export const standingOrdersModule: GameModule = {
         }
         return;
       }
-      if (!fleetHasSquadron(f, h.ctx.data)) return h.reject('E_NO_SHIPS');
+      if (!fleetHasShuttle(f, h.ctx.data)) return h.reject('E_NO_SHIPS');
       const pos = f.location !== null ? h.state.planets[f.location]?.position : undefined;
       if (!pos || !fleetIdle(f)) return h.reject('E_CONDITIONS_UNMET');
       const spec = sortieSpec(f, h.ctx.data);
       const stashed = h.state.wingSorties?.[f.id];
       const entry: PatrolEntry = {
         center: { x: pos.x, y: pos.y },
-        radius: squadronStrikeRange(f, h.ctx.data),
+        radius: shuttleStrikeRange(f, h.ctx.data),
         sortie: stashed
           ? {
               fuel: Math.min(stashed.fuel, spec.maxFuel),

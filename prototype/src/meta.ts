@@ -210,7 +210,7 @@ export function averagePlace(stats: MetaStats): number | null {
 export function leagueKey(level: number): string {
   if (level >= 20) return 'profile.league.armada';
   if (level >= 15) return 'profile.league.fleet';
-  if (level >= 10) return 'profile.league.squadron';
+  if (level >= 10) return 'profile.league.squad';
   if (level >= 5) return 'profile.league.patrol';
   return 'profile.league.recon';
 }

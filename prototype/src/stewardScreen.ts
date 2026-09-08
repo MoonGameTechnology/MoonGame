@@ -24,7 +24,7 @@ import { DAY, HOUR } from './time';
 const STEW_DURATIONS = [4, 8, 12];
 
 /** The posture a delegation runs (ST-3.3): «Оборона» is the safe default, «Активная
- *  оборона» adds the forecast-gated counterstrike + squadron fire-watch. */
+ *  оборона» adds the forecast-gated counterstrike + shuttle fire-watch. */
 export type StewardPosture = 'defend' | 'active_defend';
 
 /** Your standing at a glance — snapshotted when the watch starts and diffed on

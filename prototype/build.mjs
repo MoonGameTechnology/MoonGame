@@ -1994,7 +1994,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #setup .tpl-stats .syn.none{color:var(--dim);}
 #setup .tpl-cost{color:var(--dim);font-size:11px;margin-top:6px;}
 /* polished live stat preview — labelled rows with base→derived + a track bar (the
-   approved loadout-menu look). Shared by the ship / hero / squadron fitting panes. */
+   approved loadout-menu look). Shared by the ship / hero / shuttle fitting panes. */
 .lstats{border:1px solid var(--line-hi);border-radius:10px;padding:13px 14px;margin-bottom:8px;background:rgba(255,255,255,.02);}
 .lstats .lhd{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan-dim);font-weight:800;margin-bottom:11px;}
 .lstats .lsum{font-size:12px;color:var(--ink);line-height:1.7;}

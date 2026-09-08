@@ -67,7 +67,7 @@ const CLIENT_ACTIONS: Action[] = [
   unloadArmy(P, 'f1', 'infantry', 2),
   launchFleet(P, 'C1R1'),
   mergeFleet(P, 'f1', 'f2'),
-  splitFleet(P, 'f1', [{ unit: 'fighter_squadron', count: 2 }]),
+  splitFleet(P, 'f1', [{ unit: 'interceptor', count: 2 }]),
   engageFleet(P, 'f1', 'f2'),
   buildBuilding(P, 'C1R1', 'mine'),
   upgradeBuilding(P, 'C1R1', 'mine'),

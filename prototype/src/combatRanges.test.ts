@@ -4,7 +4,7 @@
 // Заведи кто-нибудь свою формулу в клиенте — и игрок целится по одному кругу, а огонь
 // идёт по другому; поймать это глазами нельзя, а тестом — можно.
 import { describe, it, expect } from 'vitest';
-import { artilleryRange, squadronStrikeRange } from '../../packages/shared-core/src/index';
+import { artilleryRange, shuttleStrikeRange } from '../../packages/shared-core/src/index';
 import { newGame, data } from './game';
 import { combatRanges, ringLook, type RangeKind } from './combatRanges';
 import type { Fleet, GameState } from '../../packages/shared-core/src/index';
@@ -37,17 +37,17 @@ describe('RANGE-UX — радиусы приходят из ядра, а не и
     expect(ring!.radius).toBeGreaterThan(0);
   });
 
-  it('круг эскадрильи равен squadronStrikeRange ядра', () => {
+  it('круг эскадрильи равен shuttleStrikeRange ядра', () => {
     const { s, fleet } = withFleet([
-      { unit: 'fighter_squadron', count: 2 },
+      { unit: 'interceptor', count: 2 },
       { unit: 'strike_carrier', count: 1 },
     ]);
-    const core = squadronStrikeRange(fleet, data);
+    const core = shuttleStrikeRange(fleet, data);
     const ring = combatRanges(s, data, [fleet.id], ME, locate, seen).rings.find(
-      (r) => r.kind === 'squadron',
+      (r) => r.kind === 'shuttle',
     );
     // Радиус крыла даёт НОСИТЕЛЬ, а не сама эскадрилья (в форк-каталоге прототипа у
-    // `fighter_squadron` strikeRange = 0). Сторож держит равенство с ядром в любом
+    // `interceptor` strikeRange = 0). Сторож держит равенство с ядром в любом
     // случае: есть радиус — есть круг, нет радиуса — нет круга.
     if (core > 0) {
       expect(ring).toBeDefined();
@@ -115,13 +115,13 @@ describe('RANGE-UX — заметность кольца (REFM-123)', () => {
   });
 
   it('ПРИЦЕЛ — ТОЛЬКО ПРО АРТИЛЛЕРИЮ: у эскадрильи и ПВО вид от него не зависит', () => {
-    expect(ringLook('squadron', true)).toEqual(ringLook('squadron', false));
+    expect(ringLook('shuttle', true)).toEqual(ringLook('shuttle', false));
     expect(ringLook('aa', true)).toEqual(ringLook('aa', false));
   });
 
   it('ПВО ЗАМЕТНЕЕ РАДИУСОВ: это отметка на мире, и утонуть в фоне ей нельзя', () => {
     expect(ringLook('aa', false).alpha).toBeGreaterThan(ringLook('artillery', false).alpha);
-    expect(ringLook('aa', false).alpha).toBeGreaterThan(ringLook('squadron', false).alpha);
+    expect(ringLook('aa', false).alpha).toBeGreaterThan(ringLook('shuttle', false).alpha);
   });
 
   it('у ПВО СВОЙ пунктир — отметка не должна читаться как обрезанный радиус', () => {
@@ -135,7 +135,7 @@ describe('RANGE-UX — заметность кольца (REFM-123)', () => {
   });
 
   it('все виды рисуются видимой линией', () => {
-    for (const kind of ['artillery', 'squadron', 'aa'] as RangeKind[])
+    for (const kind of ['artillery', 'shuttle', 'aa'] as RangeKind[])
       for (const aiming of [true, false]) {
         const look = ringLook(kind, aiming);
         expect(look.alpha).toBeGreaterThan(0);

@@ -1,5 +1,5 @@
 import { seedRng, type RngState } from '../rng/rng';
-import type { SortieState } from './squadron';
+import type { SortieState } from './shuttle';
 import type { FleetChain } from './chain';
 
 /**
@@ -419,7 +419,7 @@ export interface Fleet {
    *  `fleet.retreat` — the disengaging fleet flees faster while `now < it`. Absent =
    *  no boost. Read by the `fleet.speed` hook. */
   retreatHasteUntil?: number;
-  /** Free-space position for squadron/missile fleets that move OFF the lane graph.
+  /** Free-space position for shuttle/missile fleets that move OFF the lane graph.
    *  Set when the fleet is launched from a carrier/base; the fleet flies freely
    *  within `strikeRange` of its `homeBase`. Null/absent = a regular lane-bound fleet. */
   freePosition?: { x: number; y: number } | null;
@@ -427,12 +427,12 @@ export interface Fleet {
    *  `targetX,targetY` (a point in space, not a node). Arrives at `arrivesAt`.
    *  Null/absent = parked at `freePosition` (not currently flying). */
   freeMovement?: { targetX: number; targetY: number; departedAt: number; arrivesAt: number } | null;
-  /** The fleet this one was launched from (its carrier/base). A squadron must stay
+  /** The fleet this one was launched from (its carrier/base). A shuttle must stay
    *  within `strikeRange` of its home base's position. Absent = not a launched fleet. */
   homeBase?: FleetId | null;
   /** Point-defense cooldown: world-time (ms) until which this fleet's PD system
    *  is recharging after a volley. Absent/0 = ready to fire. PD fires reactively
-   *  when an enemy squadron enters range, then cools down for 20 game-minutes. */
+   *  when an enemy shuttle enters range, then cools down for 20 game-minutes. */
   pdCooldownUntil?: number;
 }
 
@@ -618,7 +618,7 @@ export interface GameState {
    *  armed (`standingOrdersModule`, `order.auto`). A driver reads this; the module
    *  itself only stores the flag and garbage-collects it for dead fleets. */
   autoAssault?: Record<FleetId, true>;
-  /** CC-4 дежурный вылет ("standing patrol"): a squadron wing armed to auto-scramble
+  /** CC-4 дежурный вылет ("standing patrol"): a shuttle wing armed to auto-scramble
    *  at the nearest identified hostile within `radius` of `center`, maintained by
    *  `standingOrdersModule` (`order.scramble` arms/disarms; `patrol.stamp` is the
    *  server driver's own runtime update of `sortie`/`rearmAt` — never client-issuable,

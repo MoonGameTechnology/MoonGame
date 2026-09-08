@@ -270,7 +270,7 @@
       "utility": 1
     }
   },
-  "fighter_squadron": {
+  "interceptor": {
     "faction": "vanguard",
     "stats": {
       "attack": 14,
@@ -284,7 +284,7 @@
     },
     "line": "front",
     "traits": [
-      "squadron"
+      "shuttle"
     ],
     "abilities": [],
     "signature": 2,

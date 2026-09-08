@@ -43,21 +43,21 @@ export const UnitStatsSchema = z
     /** Orbital-AA damage per hour a (ground) unit deals to a hostile fleet on the
      *  NEAR orbit while the planet is not under a ground assault. 0 = no AA. */
     aaDamage: z.number().nonnegative().default(0),
-    /** Point-defense damage per hour — anti-squadron/anti-missile flak that a
+    /** Point-defense damage per hour — anti-shuttle/anti-missile flak that a
      *  SHIP (not just a planet) carries. Distinct from `aaDamage` (which is
-     *  planet-side orbital AA): `pointDefense` fires on incoming squadron/missile
+     *  planet-side orbital AA): `pointDefense` fires on incoming shuttle/missile
      *  strikes, NOT on regular fleets. 0 = no point defense. */
     pointDefense: z.number().nonnegative().default(0),
     /** Range (Euclidean, map units) at which point-defense engages enemy
-     *  squadrons/missiles. 0 = use the default PD_RANGE (120). */
+     *  shuttles/missiles. 0 = use the default PD_RANGE (120). */
     pointDefenseRange: z.number().nonnegative().default(0),
-    /** Squadron reach (squadrons-roadmap SQ-3.1): the Euclidean distance in MAP
-     *  UNITS a launched `squadron` may strike from its carrier. 0 = no reach. */
+    /** Shuttle reach (shuttles-roadmap SQ-3.1): the Euclidean distance in MAP
+     *  UNITS a launched `shuttle` may strike from its carrier. 0 = no reach. */
     strikeRange: z.number().nonnegative().default(0),
-    /** Squadron sorties before it must rearm (SQ-2.1). 0 = not a squadron / no
-     *  sortie limit. Decrements per sortie; at 0 the squadron goes to `rearmRounds`. */
+    /** Shuttle sorties before it must rearm (SQ-2.1). 0 = not a shuttle / no
+     *  sortie limit. Decrements per sortie; at 0 the shuttle goes to `rearmRounds`. */
     fuel: z.number().nonnegative().default(0),
-    /** Combat rounds a spent squadron sits rearming on its carrier before it can
+    /** Combat rounds a spent shuttle sits rearming on its carrier before it can
      *  sortie again (SQ-2.1). Deterministic cooldown, like a hero ability. */
     rearmRounds: z.number().nonnegative().default(0),
   })
@@ -181,8 +181,8 @@ export const BuildingLevelSchema = z.object({
   /** Anti-ship orbital-AA firepower this level fires per game hour at a hostile fleet on the
    *  near orbit (an emplacement building). Summed alongside garrison `aaDamage` in combat. */
   aaDamage: z.number().nonnegative().default(0),
-  /** Point-defense (anti-squadron/anti-missile) firepower per game hour at this level.
-   *  Distinct from `aaDamage`: intercepts squadron/missile strikes, not regular fleets. */
+  /** Point-defense (anti-shuttle/anti-missile) firepower per game hour at this level.
+   *  Distinct from `aaDamage`: intercepts shuttle/missile strikes, not regular fleets. */
   pointDefense: z.number().nonnegative().default(0),
   /** Доля, на которую здание поднимает ВЕСЬ кредитный доход своего мира на этом
    *  уровне (0.25 = +25%). См. одноимённое поле в `BuildingDefSchema`. */
@@ -201,13 +201,13 @@ export const BuildingLevelSchema = z.object({
    *  а не «отнимает».
    *
    *  Почему они здесь появились: данные (и `data/buildings.json`, и каталог прототипа)
-   *  давно писали `enablesSquadronConstruction` в АПГРЕЙДАХ завода — «завод второго
+   *  давно писали `enablesShuttleConstruction` в АПГРЕЙДАХ завода — «завод второго
    *  уровня открывает эскадрильи». Схема этих полей на уровне не знала, zod их молча
    *  отбрасывал, и гейт `unit.build` читал только базовый def — где флага нет. Итог:
-   *  `fighter_squadron` (единственный `squadron`-юнит) нельзя было построить НИ НА
+   *  `interceptor` (единственный `shuttle`-юнит) нельзя было построить НИ НА
    *  КАКОМ уровне завода, приказ отбивался `E_NO_HANGAR` всегда. */
   enablesShipConstruction: z.boolean().optional(),
-  enablesSquadronConstruction: z.boolean().optional(),
+  enablesShuttleConstruction: z.boolean().optional(),
   enablesGroundConstruction: z.boolean().optional(),
 });
 
@@ -242,20 +242,20 @@ export const BuildingDefSchema = z.object({
   /** Anti-ship orbital-AA firepower per game hour (an emplacement building like an
    *  orbital-AA battery). Fires on hostile near-orbit fleets, summed with garrison AA. */
   aaDamage: z.number().nonnegative().default(0),
-  /** Point-defense (anti-squadron/anti-missile) firepower per game hour. Distinct
+  /** Point-defense (anti-shuttle/anti-missile) firepower per game hour. Distinct
    *  from `aaDamage` (anti-ship orbital AA): `pointDefense` intercepts incoming
-   *  squadron/missile strikes, not regular fleets. 0 = no point defense. */
+   *  shuttle/missile strikes, not regular fleets. 0 = no point defense. */
   pointDefense: z.number().nonnegative().default(0),
   /** True for a building that can lay down hulls (shipyard/spaceport) — a planet needs
    *  at least one standing (undestroyed) building with this flag to build any
    *  space-domain unit (`unit.build`). Уровень МОЖЕТ открыть способность позже — см.
    *  одноимённое поле в `BuildingLevelSchema`. */
   enablesShipConstruction: z.boolean().default(false),
-  /** True for a building that can build and base squadrons (a hangar bay /
+  /** True for a building that can build and base shuttles (a hangar bay /
    *  airbase). A planet needs at least one standing building with this flag
-   *  to build any unit with the `squadron` trait (`unit.build`). Уровень МОЖЕТ
+   *  to build any unit with the `shuttle` trait (`unit.build`). Уровень МОЖЕТ
    *  открыть способность позже — см. `BuildingLevelSchema`. */
-  enablesSquadronConstruction: z.boolean().default(false),
+  enablesShuttleConstruction: z.boolean().default(false),
   /** True for a building that enables ground-unit construction (barracks for
    *  infantry, factory for vehicles). A planet needs at least one standing
    *  building with this flag to build any `domain: 'ground'` unit. Not per-level. */
@@ -370,7 +370,7 @@ export const TechnologyEffectsSchema = z.object({
 /** The five tech-tree branches (UI tabs), shared by technologies, scientists and the
  *  `has_scientist` gate. `command` is the automation / command-and-control branch (AI
  *  delegation "Steward", and later order chains and standing postures). */
-const BranchSchema = z.enum(['ground', 'space', 'squadron', 'missile', 'command']);
+const BranchSchema = z.enum(['ground', 'space', 'shuttle', 'missile', 'command']);
 
 /** Shared "at least N" threshold for a condition (default 1 = mere existence). This
  *  single `min` knob is the main data lever for tuning a gate without touching code. */
@@ -407,7 +407,7 @@ export const TechnologyDefSchema = z.object({
   description: z.string().optional(),
   tier: z.number().int().positive().default(1),
   /** Tech-tree branch (UI tab). Defaults to 'space' so existing nodes that omit
-   *  it stay valid (back-compat); squadron/missile branches may have no content yet. */
+   *  it stay valid (back-compat); shuttle/missile branches may have no content yet. */
   branch: BranchSchema.default('space'),
   /** Session day from which the node becomes researchable (0 = from match start).
    *  A "day" is game-time, timeScale-scaled — mirrors how `researchTimeHours`

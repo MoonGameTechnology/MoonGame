@@ -105,7 +105,7 @@ export const researchTech = (playerId: string, technology: string) =>
   act(playerId, 'technology.research', { technology });
 /** «Хранитель»: hand this seat to the AI until game-time `until`, running `posture` —
  *  'defend' («Оборона», the safe default) or 'active_defend' («Активная оборона»,
- *  ST-3.3: + forecast-gated counterstrike and squadron fire-watch on own soil).
+ *  ST-3.3: + forecast-gated counterstrike and shuttle fire-watch on own soil).
  *  Rejected (E_STEWARD_LOCKED) until the Steward tech is researched. */
 export const delegateSteward = (
   playerId: string,
@@ -158,7 +158,7 @@ export function canTraverse(state: GameState, mover: string, owner: string | nul
 /** Toggle the CC-2 auto-storm stance on an owned fleet (authoritative standing order). */
 export const orderAuto = (playerId: string, fleetId: string, on: boolean) =>
   act(playerId, 'order.auto', { fleetId, on });
-/** Stand (or stand down) a CC-4 reactive patrol on an owned squadron fleet — the server
+/** Stand (or stand down) a CC-4 reactive patrol on an owned shuttle fleet — the server
  *  computes the patrol itself (center / radius / fresh sortie). */
 export const orderScramble = (playerId: string, fleetId: string, on: boolean) =>
   act(playerId, 'order.scramble', { fleetId, on });

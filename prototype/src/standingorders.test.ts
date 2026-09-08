@@ -18,7 +18,7 @@ import {
 const kernel = createKernel([standingOrdersModule]);
 const ctx = (now = 0): Context => ({ now, data });
 
-// fighter_squadron (data/units.json): fuel 3, rearmRounds 2, strikeRange 180.
+// interceptor (data/units.json): fuel 3, rearmRounds 2, strikeRange 180.
 const WING_FUEL = 3;
 const WING_REARM = 2;
 const WING_RANGE = 180;
@@ -32,7 +32,7 @@ function fleet(id: string, over: Partial<Fleet> = {}): Fleet {
 function wing(id: string, over: Partial<Fleet> = {}): Fleet {
   return fleet(id, {
     units: [
-      { unit: 'fighter_squadron', count: 2 },
+      { unit: 'interceptor', count: 2 },
       { unit: 'strike_carrier', count: 1 },
     ],
     ...over,
@@ -100,7 +100,7 @@ describe('standingOrdersModule — CC-4 patrol (authoritative)', () => {
     expect('patrols' in (s as SOState)).toBe(false);
   });
 
-  it('needs a squadron and a parked node (fail-secure)', () => {
+  it('needs a shuttle and a parked node (fail-secure)', () => {
     const noWing = stateWith([fleet('F')]);
     expect(rej(kernel.applyAction(noWing, orderScramble('green', 'F', true), ctx()))).toBe('E_NO_SHIPS');
     const adrift = stateWith([wing('W', { location: null } as Partial<Fleet>)]);

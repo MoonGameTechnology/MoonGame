@@ -310,7 +310,7 @@ export const en: Record<string, string> = {
   'cmd.split': 'Split',
   'cmd.split.hint': 'peel some ships off a docked fleet into a new one',
   'cmd.standing-sortie': 'Scramble',
-  'cmd.standing-sortie.hint': 'the squadron automatically hits enemies within range',
+  'cmd.standing-sortie.hint': 'the shuttle automatically hits enemies within range',
   'cmd.stop': 'Stop',
   'cmd.troops': 'Troops',
   'cmd.troops.hint':
@@ -563,7 +563,7 @@ export const en: Record<string, string> = {
   'data.energy': 'energy',
   'data.evasive-vectors': 'Evasive Vectors',
   'data.false-echo': 'False Echo',
-  'data.fighter-squadron': 'fighter squadron',
+  'data.interceptor': 'interceptor',
   'data.fleet-uplink': 'Fleet Uplink',
   'data.flight-decks': 'Flight Decks',
   'data.food': 'food',
@@ -635,7 +635,7 @@ export const en: Record<string, string> = {
   'data.space': 'space',
   'data.spaceport': 'Spaceport',
   'data.special-forces': 'special forces',
-  'data.squadron': 'squadron',
+  'data.shuttle': 'shuttle',
   'data.standard': 'Standard',
   'data.steward-protocol': 'Steward Protocol',
   'data.sustained-corridor': 'Sustained Corridor',
@@ -698,13 +698,13 @@ export const en: Record<string, string> = {
   'dossier.building.mine':
     'A drilling rig gnaws into the planet, mining {m}⬢ per hour. Upgrades dig deeper to reach the richest veins. The foundation for building your fleet.',
   'dossier.building.orbital-aa':
-    "A stationary anti-air battery guards your world's airspace, dealing {dmg} damage per hour to ships in orbit. A nightmare for bombers hanging over the world and for raiding squadrons. Doesn't block capture (that's ground defense's job) — it just mows down the fleet overhead.",
+    "A stationary anti-air battery guards your world's airspace, dealing {dmg} damage per hour to ships in orbit. A nightmare for bombers hanging over the world and for raiding shuttles. Doesn't block capture (that's ground defense's job) — it just mows down the fleet overhead.",
   'dossier.building.power-plant':
     "A fusion reactor powers your worlds, producing {e}↯ per hour. Energy is the lifeblood of your buildings — they don't run on magic. When it runs short, everything browns out to half output.",
   'dossier.building.radar':
     'A radar complex sees through the space around your world and catches enemy signatures long before they dare attack. Upgrades widen the coverage.',
   'dossier.building.refinery':
-    'A refining complex turning ore and logistics into liquid credits — {c}¤ per hour. Fuel for imperial bureaucracy, shipyards and mercenary squadrons.',
+    'A refining complex turning ore and logistics into liquid credits — {c}¤ per hour. Fuel for imperial bureaucracy, shipyards and mercenary shuttles.',
   'dossier.building.starfort':
     'A standalone fortress raised in an asteroid field: {d} to defense and {hp} structure HP. Turns a faceless crossroads into a fortified node with orbit and AA.',
   'dossier.building.tax-office':
@@ -753,9 +753,9 @@ export const en: Record<string, string> = {
   'dossier.tab.ships.desc':
     'The fleet is your weapon and shield. Order ships here to reinforce it.',
   'dossier.tab.ships.name': 'Fleet',
-  'dossier.tab.squadron.desc':
-    'A carrier (◈) holds squadrons (△). Launch the wing from the selected fleet\'s panel with "🛩 Launch squadron".',
-  'dossier.tab.squadron.name': 'Wings',
+  'dossier.tab.shuttle.desc':
+    'A carrier (◈) holds shuttles (△). Launch them from the selected fleet\'s panel with "🛩 Launch shuttles".',
+  'dossier.tab.shuttle.name': 'Shuttles',
   'dossier.task.eta': 'Remaining: {r}',
   'dossier.task.output': '{r}: {now}/h now → {final}/h once finished',
   'dossier.task.queued': 'Queued — not started yet.',
@@ -765,11 +765,11 @@ export const en: Record<string, string> = {
     "The battle line's workhorse: {a} attack, {hp} hull and a hold for {c}. A general-purpose warship, equally solid on offense and defense.",
   'dossier.unit.cruiser.name': 'Cruiser',
   'dossier.unit.default': 'A combat unit.',
-  'dossier.unit.fighter-squadron.desc':
-    "A carrier-borne wing: fast (speed {sp}) and hits hard ({a} attack), but almost no armor ({hp} hull). Splits off the carrier into its own fast fleet and strikes from range {r}. Countered by orbital AA — don't send it against an AA-covered world.",
-  'dossier.unit.fighter-squadron.name': 'Fighter squadron',
+  'dossier.unit.interceptor.desc':
+    "An interceptor: fast (speed {sp}) and hits hard ({a} attack), but almost no armor ({hp} hull). Splits off the carrier into its own fast fleet and strikes from range {r}. Countered by orbital AA — don't send it against an AA-covered world.",
+  'dossier.unit.interceptor.name': 'Interceptor',
   'dossier.unit.hero.desc':
-    "The commander's own combat projection — a flagship leading the home fleet: {a} attack and {hp} hull. But that's not what matters: its presence holds the squadron together, granting {b} attack/defense to every ship nearby. If it falls, the commander loses their projection until it's rebuilt at the home world.",
+    "The commander's own combat projection — a flagship leading the home fleet: {a} attack and {hp} hull. But that's not what matters: its presence holds the shuttle together, granting {b} attack/defense to every ship nearby. If it falls, the commander loses their projection until it's rebuilt at the home world.",
   'dossier.unit.hero.name': 'Flagship',
   'dossier.unit.scout.desc':
     'A light recon hull. Fast (speed {sp}) and almost silent (signature {sig}) — it maps the void where a battle fleet fears to go.',
@@ -778,7 +778,7 @@ export const en: Record<string, string> = {
     'A heavy siege platform: {a} damage from range {r}, but thin armor ({d} defense). Its place is behind the cruisers, from where it smashes fortifications and shipyards.',
   'dossier.unit.siege.name': 'Siege Platform',
   'dossier.unit.strike-carrier.desc':
-    'A slow armored carrier ({hp} hull, hold for {c}) — almost no guns of its own, all its strength is in the wing it carries. Keep it behind and launch the wing at a target with "🛩 Launch squadron".',
+    'A slow armored carrier ({hp} hull, hold for {c}) — almost no guns of its own, all its strength is in the shuttles it carries. Keep it behind and launch them at a target with "🛩 Launch shuttles".',
   'dossier.unit.strike-carrier.name': 'Strike Carrier',
 
   // --- faction — Фракции: пассивный бонус дома.
@@ -792,8 +792,8 @@ export const en: Record<string, string> = {
   'fleet.size.armada': 'Armada',
   'fleet.size.fleet': 'Fleet',
   'fleet.size.flight': 'Wing',
-  'fleet.size.squadron': 'Flight',
-  'fleet.size.squadron-heavy': 'Squadron',
+  'fleet.size.group': 'Flight',
+  'fleet.size.group-heavy': 'Squadron',
 
   // --- fmt — Форматирование величин: длительности.
   'fmt.hours': '{n}h',
@@ -818,12 +818,12 @@ export const en: Record<string, string> = {
   'hint.pick-barrage': '🎯 tap an enemy fleet to focus fire · empty space = auto',
   'hint.pick-merge': '⛬ pick a fleet to merge with',
   'hint.pick-order': 'tap a point on the map — each tap adds an order',
-  'hint.squadron-launched': '🛩 squadron launched — steer it onto the target',
-  'hint.squadron-strike-aim': '🎯 tap an enemy fleet to strike with the squadron',
-  'hint.squadron-strike-sent': '🎯 squadron is heading to the target',
-  'hint.squadron-strike-cancel': 'strike cancelled',
-  'hint.squadron-returning': '↩ squadron returning to base',
-  'hint.standing-sortie': '🛩 standing patrol on — the wing strikes any enemy in range',
+  'hint.shuttle-launched': '🛩 shuttle launched — steer it onto the target',
+  'hint.shuttle-strike-aim': '🎯 tap an enemy fleet to strike with the shuttle',
+  'hint.shuttle-strike-sent': '🎯 shuttle is heading to the target',
+  'hint.shuttle-strike-cancel': 'strike cancelled',
+  'hint.shuttle-returning': '↩ shuttle returning to base',
+  'hint.standing-sortie': '🛩 standing patrol on — the shuttles strike any enemy in range',
 
   // --- loadout — Ship loadout editor (packages/client): stat-preview labels.
   'loadout.stat.attack': 'Attack damage',
@@ -895,7 +895,7 @@ export const en: Record<string, string> = {
   'profile.league': 'League',
   'profile.league.recon': 'Recon',
   'profile.league.patrol': 'Patrol',
-  'profile.league.squadron': 'Squadron',
+  'profile.league.squad': 'Squadron',
   'profile.league.fleet': 'Fleet',
   'profile.league.armada': 'Armada',
   'profile.matches': 'Matches',
@@ -1045,7 +1045,7 @@ export const en: Record<string, string> = {
     'Typed slots: a module fits only its own type. <b>Greyed</b> — not for a free slot, or already installed.',
   'yard.tab.heroes': 'Heroes',
   'yard.tab.ships': 'Ships',
-  'yard.tab.squads': 'Squadrons',
+  'yard.tab.squads': 'Shuttles',
   'yard.title': 'CONSTRUCTOR',
 
   // --- end — Экран конца матча: исход, опыт, итоговая таблица, реванш.
@@ -1510,7 +1510,7 @@ export const en: Record<string, string> = {
   'onb.intro.ava.title': 'Alliance wars (AvA)',
   'onb.intro.badge': 'first time',
   'onb.intro.constructor.body':
-    'Here you assemble ships, squadrons, divisions and heroes from modules. The loadout is locked at build time — choose slots up front, a finished unit cannot be re-fitted. The «Heroes» tab is your commander HQ.',
+    'Here you assemble ships, shuttles, divisions and heroes from modules. The loadout is locked at build time — choose slots up front, a finished unit cannot be re-fitted. The «Heroes» tab is your commander HQ.',
   'onb.intro.constructor.title': 'Shipyard — loadouts',
   'onb.intro.corp.body':
     'A corporation is your squad within the session: a shared warehouse, member roles, and joint alliance-vs-alliance wars (AvA). Join one or found your own — the «Wars» tab opens challenges between corporations.',
@@ -1609,7 +1609,7 @@ export const en: Record<string, string> = {
   'rail.chat.label': 'Chat',
   'rail.chat.title': 'Chat',
   'rail.constructor.label': 'Shipyard',
-  'rail.constructor.title': 'Constructor — outfit ships, squadrons, army and heroes',
+  'rail.constructor.title': 'Constructor — outfit ships, shuttles, army and heroes',
   'rail.corp.label': 'Corp',
   'rail.corp.title': 'Corporation',
   'rail.diplo.label': 'Diplo',
@@ -1803,7 +1803,7 @@ export const en: Record<string, string> = {
   'side.garrison.plus-troops': '+{n} troops',
   'side.garrison.select': 'Select →',
   'side.garrison.ships': 'Ships in garrison',
-  'side.garrison.wing': 'Air wing in garrison',
+  'side.garrison.wing': 'Shuttles in garrison',
   'side.ground.conveyor': 'Ground conveyor',
   'side.ground.empty': 'no ground army here',
   'side.ground.hint':
@@ -1871,23 +1871,23 @@ export const en: Record<string, string> = {
   'side.tab.buildings': 'Buildings',
   'side.tab.fleet': 'Fleet',
   'side.tab.ground': 'Ground',
-  'side.tab.wings': 'Wings',
+  'side.tab.wings': 'Shuttles',
   'side.unit.ground': 'ground',
   'side.unit.space': 'space',
-  'side.wing.conveyor': 'Air wing shipyard',
+  'side.wing.conveyor': 'Shuttle yard',
   'side.wing.fuel': 'fuel {n}',
   'side.wing.garrison.hint':
-    'A carrier (◈) holds squadrons (△). Launch the wing from the selected fleet\'s panel with "🛩 Launch squadron".',
+    'A carrier (◈) holds shuttles (△). Launch them from the selected fleet\'s panel with "🛩 Launch shuttles".',
   'side.wing.hint':
-    'Splits the wing off into its own fast strike fleet — send it in while the carrier stays put. Needs at least one non-squadron ship left behind. Countered by orbital AA.',
-  'side.wing.launch': '🛩 Launch squadron ({n})',
+    'Splits the shuttles off into their own fast strike fleet — send them in while the carrier stays put. Needs at least one non-shuttle ship left behind. Countered by orbital AA.',
+  'side.wing.launch': '🛩 Launch shuttles ({n})',
   'side.wing.strike': '🎯 Strike',
   'side.wing.return': '↩ Return',
   'side.wing.patrol': '🛩 Patrol',
   'side.wing.patrol-on': '🛩 standing patrol: ON',
   'side.wing.radius': 'radius {r}',
   'side.wing.rearming': 'rearming {n}',
-  'side.wing.title': 'Air wing',
+  'side.wing.title': 'Shuttles',
   'side.world.blackout': 'blackout: radars and AA −50%',
   'side.world.bonus.defense': 'defense',
   'side.world.bonus.production': 'prod.',
@@ -1897,7 +1897,7 @@ export const en: Record<string, string> = {
   'side.world.count.buildings': 'buildings',
   'side.world.count.ground': 'ground',
   'side.world.count.ships': 'ships',
-  'side.world.count.squadrons': 'squadrons',
+  'side.world.count.shuttles': 'shuttles',
   'side.world.defense': 'defense {p}',
   'side.world.designation': 'Designation',
   'side.world.fleet-ships': '{n} ships',
@@ -1954,7 +1954,7 @@ export const en: Record<string, string> = {
   'steward.log.title': "Steward's journal",
   'steward.on.active': 'The Steward runs an active defense.',
   'steward.on.active.note':
-    'While you sleep: holds the borders, stands squadron patrols and counterstrikes at your own worlds when the loss forecast is acceptable.',
+    'While you sleep: holds the borders, stands shuttle patrols and counterstrikes at your own worlds when the loss forecast is acceptable.',
   'steward.on.defense': 'The Steward holds the line.',
   'steward.on.defense.note':
     'While you sleep: holds the borders and repels attacks, keeps building and trading — no offensives.',
@@ -1967,7 +1967,7 @@ export const en: Record<string, string> = {
   'steward.stance': 'Posture',
   'steward.stance.active': 'Active defense',
   'steward.stance.active.note':
-    'Active defense: everything above, plus a counterstrike at your own worlds when the loss forecast is acceptable (under 35%) and standing squadron patrols. It never leaves your territory.',
+    'Active defense: everything above, plus a counterstrike at your own worlds when the loss forecast is acceptable (under 35%) and standing shuttle patrols. It never leaves your territory.',
   'steward.stance.defense': 'Defense',
   'steward.stance.defense.note':
     'The “Defend” posture: holds and repels, keeps building and trading — no offensives, no diplomacy. Control returns automatically, with a morning report.',
@@ -1978,7 +1978,7 @@ export const en: Record<string, string> = {
   'tech.branch.ground': 'Ground',
   'tech.branch.missile': 'Missiles',
   'tech.branch.space': 'Space',
-  'tech.branch.squadron': 'Squadrons',
+  'tech.branch.shuttle': 'Shuttles',
   'tech.fx.damage': 'damage',
   'tech.fx.fleet-speed': 'fleet speed',
   'tech.fx.production': 'production',
@@ -2012,7 +2012,7 @@ export const en: Record<string, string> = {
     "Saturation barrage: overwhelms any missile defence. +10% damage. The Missile Chief's capstone.",
   'tech.node.siege-doctrine.desc': 'Long-range siege crews: +8% damage.',
   'tech.node.signal-corps.desc': 'Signal corps: one picture of the battle. +8% radar range.',
-  'tech.node.strike-vectors.desc': 'Strike vectors: plotted squadron approaches. +8% damage.',
+  'tech.node.strike-vectors.desc': 'Strike vectors: plotted shuttle approaches. +8% damage.',
   'tech.node.void-armadas.desc':
     'Grand-formation doctrine: +6% damage and fleet speed. Requires 5 of your own sectors.',
   'tech.node.warhead-miniaturization.desc':

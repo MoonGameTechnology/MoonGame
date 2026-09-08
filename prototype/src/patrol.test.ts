@@ -12,11 +12,11 @@ import type { Fleet } from '../../packages/shared-core/src/index';
 
 // Патруль крыла (SQ-4.1) и реактивный дежурный вылет (CC-4) — это `patrol.ts`
 // прототипа, а не хелперы крыла: те свелись в ядро (CONV-5) и проверяются в
-// `packages/shared-core/src/state/squadron.test.ts`, а предикаты «действующего крыла»
-// уехали в `decisions/wingOrders.ts`. Файл переехал из `squadron.test.ts` вместе со
+// `packages/shared-core/src/state/shuttle.test.ts`, а предикаты «действующего крыла»
+// уехали в `decisions/wingOrders.ts`. Файл переехал из `shuttle.test.ts` вместе со
 // сведением — здесь осталось ровно то, чего в ядре нет.
 
-describe('squadron patrol (SQ-4.1)', () => {
+describe('shuttle patrol (SQ-4.1)', () => {
   const center = { x: 500, y: 500 };
   const patrol = (sortie = freshSortie(3)): Patrol => ({ center, radius: 180, sortie });
 

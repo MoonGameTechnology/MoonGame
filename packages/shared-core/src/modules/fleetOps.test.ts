@@ -35,10 +35,10 @@ const data: GameData = parseGameData({
       domain: 'space',
       stats: { attack: 1, defense: 1, speed: 10, hp: 10 },
     },
-    fighter_squadron: {
+    interceptor: {
       faction: 'x',
       domain: 'space',
-      traits: ['squadron'],
+      traits: ['shuttle'],
       stats: { attack: 14, defense: 3, speed: 14, hp: 10, strikeRange: 180, fuel: 3, rearmRounds: 2 },
     },
     hero: {
@@ -570,11 +570,11 @@ describe('fleetOps — fleet.split (peel ships off a fleet into a fresh one)', (
     expect(r.events.map((e) => e.type)).toContain('fleet.split');
   });
 
-  // SQ-1.1: splitting squadron-trait ships off a carrier creates a strike WING —
-  // it must carry homeBase (the carrier), or squadronModule's free flight
-  // (squadron.strike/return) rejects with E_NOT_SQUADRON and the whole
+  // SQ-1.1: splitting shuttle-trait ships off a carrier creates a strike WING —
+  // it must carry homeBase (the carrier), or shuttleModule's free flight
+  // (shuttle.strike/return) rejects with E_NOT_SHUTTLE and the whole
   // free-flight path is dead code.
-  it('a squadron split gets homeBase (the strike wing contract)', () => {
+  it('a shuttle split gets homeBase (the strike wing contract)', () => {
     const kernel = createKernel([fleetOpsModule]);
     const s = stateWith({
       players: [player('p1')],
@@ -582,16 +582,16 @@ describe('fleetOps — fleet.split (peel ships off a fleet into a fresh one)', (
       fleets: [
         fleet('F1', 'p1', 'A', [
           ['cruiser', 1],
-          ['fighter_squadron', 2],
+          ['interceptor', 2],
         ]),
       ],
     });
-    const r = okApply(kernel.applyAction(s, split('F1', [{ unit: 'fighter_squadron', count: 2 }]), ctx));
+    const r = okApply(kernel.applyAction(s, split('F1', [{ unit: 'interceptor', count: 2 }]), ctx));
     const newId = Object.keys(r.state.fleets).find((id) => id !== 'F1')!;
     const wing = r.state.fleets[newId]!;
     expect(wing.homeBase).toBe('F1'); // the carrier is the base
     // ВТОРОЙ координаты у пристыкованного крыла нет — и не должно быть. `location`
-    // у него есть (без него split отказал бы с E_IN_TRANSIT), а `squadron.strike`
+    // у него есть (без него split отказал бы с E_IN_TRANSIT), а `shuttle.strike`
     // берёт начало полёта как `freePosition ?? позиция location`. Выставленная здесь
     // `freePosition` не обновляется при обычном ходе по лейну, и уведённое `fleet.move`
     // крыло навсегда осталось бы для эскадрильной логики у точки вылета.
@@ -601,7 +601,7 @@ describe('fleetOps — fleet.split (peel ships off a fleet into a fresh one)', (
 
   // Смешанный split — не крыло. Свободный полёт уносит ВЕСЬ флот, поэтому «хотя бы
   // один истребитель» позволяло бы увести крейсер мимо графа линий, подцепив его к
-  // отделяемым эскадрильям. Крыло — это ровно squadron-стеки (`squadronTake`).
+  // отделяемым эскадрильям. Крыло — это ровно shuttle-стеки (`shuttleTake`).
   it('a MIXED split is not a wing — a regular ship can not smuggle itself off the lanes', () => {
     const kernel = createKernel([fleetOpsModule]);
     const s = stateWith({
@@ -610,7 +610,7 @@ describe('fleetOps — fleet.split (peel ships off a fleet into a fresh one)', (
       fleets: [
         fleet('F1', 'p1', 'A', [
           ['cruiser', 3],
-          ['fighter_squadron', 2],
+          ['interceptor', 2],
         ]),
       ],
     });
@@ -619,7 +619,7 @@ describe('fleetOps — fleet.split (peel ships off a fleet into a fresh one)', (
         s,
         split('F1', [
           { unit: 'cruiser', count: 1 },
-          { unit: 'fighter_squadron', count: 2 },
+          { unit: 'interceptor', count: 2 },
         ]),
         ctx,
       ),
@@ -628,9 +628,9 @@ describe('fleetOps — fleet.split (peel ships off a fleet into a fresh one)', (
     expect(r.state.fleets[newId]?.homeBase).toBeUndefined();
   });
 
-  // The inverse: a NON-squadron split must NOT get homeBase — a regular fleet
-  // stays lane-bound and squadron.strike must keep rejecting it.
-  it('a non-squadron split does NOT get homeBase (stays lane-bound)', () => {
+  // The inverse: a NON-shuttle split must NOT get homeBase — a regular fleet
+  // stays lane-bound and shuttle.strike must keep rejecting it.
+  it('a non-shuttle split does NOT get homeBase (stays lane-bound)', () => {
     const kernel = createKernel([fleetOpsModule]);
     const s = stateWith({
       players: [player('p1')],

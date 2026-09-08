@@ -22,7 +22,7 @@ const data: GameData = parseGameData({
     carrier: {
       faction: 'x',
       domain: 'space',
-      traits: ['squadron'],
+      traits: ['shuttle'],
       stats: { attack: 2, defense: 2, speed: 6, hp: 30, fuel: 2, rearmRounds: 3, strikeRange: 50 },
     },
     cruiser: {
@@ -253,9 +253,9 @@ describe('patrolActions — CC-4', () => {
     expect(stamp?.action.payload).toMatchObject({ sortie: { fuel: 2, rearming: 0 } });
   });
 
-  it('drops a fleet that lost its squadron — no crash, no actions, no stamp', () => {
+  it('drops a fleet that lost its shuttle — no crash, no actions, no stamp', () => {
     const s = withPatrol({ targets: [] });
-    s.fleets.f1 = fleet('f1', 'p1', 'A', [['cruiser', 1]]); // squadron ship replaced
+    s.fleets.f1 = fleet('f1', 'p1', 'A', [['cruiser', 1]]); // shuttle ship replaced
     expect(patrolActions(s, data, 0)).toEqual([]);
   });
 });

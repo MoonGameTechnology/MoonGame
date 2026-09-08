@@ -1,6 +1,6 @@
 /**
- * Squadron free-space movement — эскадрильи (и ракеты) летают СВОБОДНО в пространстве,
- * не по линиям (lane graph). Модель «вылет юнитом» (squadrons-roadmap.md §0):
+ * Shuttle free-space movement — эскадрильи (и ракеты) летают СВОБОДНО в пространстве,
+ * не по линиям (lane graph). Модель «вылет юнитом» (shuttles-roadmap.md §0):
  * эскадрилья выходит из трюма носителя как отдельный флот, летит к цели прямой
  * линией (не по lane), дерётся обычным боем, возвращается на перезарядку.
  *
@@ -8,20 +8,20 @@
  * Счётчик вылетов (`SortieState`) живёт в `state.patrols`/`state.wingSorties`
  * (управляется `standingOrdersModule`); этот модуль — только движение.
  *
- * Новый action: `squadron.strike { fleetId, targetFleetId }` — свободный полёт к цели.
- * Событие: `squadron.arrived { fleetId, owner }` — прибытие (бой или возврат).
+ * Новый action: `shuttle.strike { fleetId, targetFleetId }` — свободный полёт к цели.
+ * Событие: `shuttle.arrived { fleetId, owner }` — прибытие (бой или возврат).
  */
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type { Fleet, GameState } from '../state/gameState';
 import type { GameData } from '../data/schemas';
 import { distance, fleetBaseSpeed } from '../state/route';
-import { squadronStrikeRange, fleetHasSquadron } from '../state/squadron';
+import { shuttleStrikeRange, fleetHasShuttle } from '../state/shuttle';
 import { ownFleet, applyDamageToSide, removeIfWiped } from '../util/combat';
 import { sumUnitStat } from '../util/stacks';
 import { timeScaleOf } from '../action/types';
 import { MS_PER_HOUR } from '../util/time';
 
-/** Total point-defense (anti-squadron/anti-missile) firepower of a fleet —
+/** Total point-defense (anti-shuttle/anti-missile) firepower of a fleet —
  *  Σ the `pointDefense` stat of its live units (via effectiveStats, so modules
  *  are included). 0 = no point defense. */
 function fleetPointDefense(fleet: Fleet, data: GameData): number {
@@ -44,8 +44,8 @@ function fleetPDRange(fleet: Fleet, data: GameData): number {
   return r > 0 ? r : PD_RANGE;
 }
 
-/** A squadron's free-flight speed (map units / hour). */
-function squadronSpeed(fleet: Fleet, data: GameData): number {
+/** A shuttle's free-flight speed (map units / hour). */
+function shuttleSpeed(fleet: Fleet, data: GameData): number {
   return fleetBaseSpeed(fleet, data);
 }
 
@@ -62,20 +62,20 @@ function fleetWorldPos(fleet: Fleet, state: GameState): { x: number; y: number }
   return null;
 }
 
-/** Is this fleet a squadron (free-space mover with homeBase and squadron-trait units)? */
-function isSquadronFleet(fleet: Fleet, data: GameData): boolean {
-  return !!fleet.homeBase && fleetHasSquadron(fleet, data);
+/** Is this fleet a shuttle (free-space mover with homeBase and shuttle-trait units)? */
+function isShuttleFleet(fleet: Fleet, data: GameData): boolean {
+  return !!fleet.homeBase && fleetHasShuttle(fleet, data);
 }
 
-export const squadronModule: GameModule = {
-  id: 'squadron',
+export const shuttleModule: GameModule = {
+  id: 'shuttle',
   version: '1.0.0',
   setup(api) {
-    /** `squadron.strike { fleetId, targetFleetId }` — launch a squadron fleet toward
-     *  an enemy fleet in free space (not via lanes). The squadron must already be
+    /** `shuttle.strike { fleetId, targetFleetId }` — launch a shuttle fleet toward
+     *  an enemy fleet in free space (not via lanes). The shuttle must already be
      *  a separate fleet (split off via `fleet.split`), have a `homeBase`, and be
      *  within `strikeRange` of its base. The target must be an identified hostile. */
-    api.onAction('squadron.strike', (action, h: HandlerContext) => {
+    api.onAction('shuttle.strike', (action, h: HandlerContext) => {
       const payload = action.payload as { fleetId?: string; targetFleetId?: string };
       if (typeof payload?.fleetId !== 'string' || typeof payload?.targetFleetId !== 'string') {
         return h.reject('E_BAD_PAYLOAD');
@@ -84,12 +84,12 @@ export const squadronModule: GameModule = {
       if (!fleet) {
         return h.reject('E_NO_FLEET');
       }
-      // Must be a squadron fleet (has homeBase, has squadron-trait units)
+      // Must be a shuttle fleet (has homeBase, has shuttle-trait units)
       if (!fleet.homeBase) {
-        return h.reject('E_NOT_SQUADRON');
+        return h.reject('E_NOT_SHUTTLE');
       }
-      if (!fleetHasSquadron(fleet, h.ctx.data)) {
-        return h.reject('E_NOT_SQUADRON');
+      if (!fleetHasShuttle(fleet, h.ctx.data)) {
+        return h.reject('E_NOT_SHUTTLE');
       }
       if (fleet.battleId) {
         return h.reject('E_IN_BATTLE');
@@ -106,8 +106,8 @@ export const squadronModule: GameModule = {
         return h.reject('E_NOT_HOSTILE');
       }
 
-      // The squadron must have a current position (freePosition or location)
-      const origin = fleet.freePosition ?? fleetPosForSquadron(fleet, h.state);
+      // The shuttle must have a current position (freePosition or location)
+      const origin = fleet.freePosition ?? fleetPosForShuttle(fleet, h.state);
       if (!origin) {
         return h.reject('E_NO_POSITION');
       }
@@ -124,7 +124,7 @@ export const squadronModule: GameModule = {
       if (!basePos) {
         return h.reject('E_NO_BASE');
       }
-      const range = squadronStrikeRange(fleet, h.ctx.data);
+      const range = shuttleStrikeRange(fleet, h.ctx.data);
       if (range <= 0) {
         return h.reject('E_NO_RANGE');
       }
@@ -133,8 +133,8 @@ export const squadronModule: GameModule = {
         return h.reject('E_OUT_OF_RANGE');
       }
 
-      // Compute flight time based on squadron speed
-      const speed = squadronSpeed(fleet, h.ctx.data); // map units / hour
+      // Compute flight time based on shuttle speed
+      const speed = shuttleSpeed(fleet, h.ctx.data); // map units / hour
       if (speed <= 0) {
         return h.reject('E_NO_SPEED');
       }
@@ -153,12 +153,12 @@ export const squadronModule: GameModule = {
       fleet.edge = null;
       fleet.movement = null;
 
-      h.schedule(arrivesAt, 'squadron.arrived', { fleetId: fleet.id, owner: action.playerId });
-      h.emit('squadron.launched', { fleetId: fleet.id, owner: action.playerId, targetFleetId: target.id });
+      h.schedule(arrivesAt, 'shuttle.arrived', { fleetId: fleet.id, owner: action.playerId });
+      h.emit('shuttle.launched', { fleetId: fleet.id, owner: action.playerId, targetFleetId: target.id });
     });
 
-    /** `squadron.return { fleetId }` — fly back to the home base in free space. */
-    api.onAction('squadron.return', (action, h: HandlerContext) => {
+    /** `shuttle.return { fleetId }` — fly back to the home base in free space. */
+    api.onAction('shuttle.return', (action, h: HandlerContext) => {
       const payload = action.payload as { fleetId?: string };
       if (typeof payload?.fleetId !== 'string') {
         return h.reject('E_BAD_PAYLOAD');
@@ -168,7 +168,7 @@ export const squadronModule: GameModule = {
         return h.reject('E_NO_FLEET');
       }
       if (!fleet.homeBase) {
-        return h.reject('E_NOT_SQUADRON');
+        return h.reject('E_NOT_SHUTTLE');
       }
       if (fleet.freeMovement) {
         return h.reject('E_FLEET_BUSY');
@@ -183,12 +183,12 @@ export const squadronModule: GameModule = {
         return h.reject('E_NO_BASE');
       }
 
-      const origin = fleet.freePosition ?? fleetPosForSquadron(fleet, h.state);
+      const origin = fleet.freePosition ?? fleetPosForShuttle(fleet, h.state);
       if (!origin) {
         return h.reject('E_NO_POSITION');
       }
 
-      const speed = squadronSpeed(fleet, h.ctx.data);
+      const speed = shuttleSpeed(fleet, h.ctx.data);
       if (speed <= 0) {
         return h.reject('E_NO_SPEED');
       }
@@ -202,15 +202,15 @@ export const squadronModule: GameModule = {
         arrivesAt,
       };
 
-      h.schedule(arrivesAt, 'squadron.arrived', { fleetId: fleet.id, owner: action.playerId });
-      h.emit('squadron.returning', { fleetId: fleet.id, owner: action.playerId });
+      h.schedule(arrivesAt, 'shuttle.arrived', { fleetId: fleet.id, owner: action.playerId });
+      h.emit('shuttle.returning', { fleetId: fleet.id, owner: action.playerId });
     });
 
-    /** `squadron.arrived` — free flight completed. The fleet parks at its target
+    /** `shuttle.arrived` — free flight completed. The fleet parks at its target
      *  position. If the target was an enemy fleet, combat starts (via the existing
      *  `fleet.arrived` → collision logic in combatModule). If returning, the fleet
      *  docks back at its base. */
-    api.on('squadron.arrived', (event, h: HandlerContext) => {
+    api.on('shuttle.arrived', (event, h: HandlerContext) => {
       const { fleetId, owner } = event.payload as { fleetId: string; owner: string };
       const fleet = h.state.fleets[fleetId];
       if (!fleet || !fleet.freeMovement) {
@@ -236,7 +236,7 @@ export const squadronModule: GameModule = {
             }
             delete h.state.fleets[fleetId];
           }
-          h.emit('squadron.docked', { fleetId, owner, baseId: fleet.homeBase });
+          h.emit('shuttle.docked', { fleetId, owner, baseId: fleet.homeBase });
           return;
         }
       }
@@ -244,17 +244,17 @@ export const squadronModule: GameModule = {
       // Not at base — arrived at a target. Emit fleet.arrived so combatModule
       // can pick up the collision (if the target fleet is still there).
       // Point-defense is handled reactively on time.advanced (see below), not
-      // as a one-shot check here — PD fires whenever an enemy squadron is in
+      // as a one-shot check here — PD fires whenever an enemy shuttle is in
       // range, not just on arrival.
       h.emit('fleet.arrived', { fleetId, departedAt: owner });
     });
 
     /** Reactive point-defense on time.advanced: for each fleet with PD > 0 that
-     *  is NOT on cooldown, find all enemy squadrons in PD range. If any — fire
+     *  is NOT on cooldown, find all enemy shuttles in PD range. If any — fire
      *  one volley (full PD damage distributed evenly across all targets), then
      *  start the 20-minute cooldown. If none — PD stays ready (no cooldown).
      *
-     *  This is REACTIVE, not periodic: PD fires the moment an enemy squadron
+     *  This is REACTIVE, not periodic: PD fires the moment an enemy shuttle
      *  enters range (detected on the next time.advanced tick), then recharges.
      *  The cooldown gates how fast a single PD system can respond to waves. */
     api.on('time.advanced', (_event, h: HandlerContext) => {
@@ -273,12 +273,12 @@ export const squadronModule: GameModule = {
         if (!myPos) continue;
         const range = fleetPDRange(fleet, data);
 
-        // Find all enemy squadrons in PD range
+        // Find all enemy shuttles in PD range
         const targets: Fleet[] = [];
         for (const target of Object.values(h.state.fleets)) {
           if (target.owner === fleet.owner) continue;
           if (target.battleId) continue; // already in combat
-          if (!isSquadronFleet(target, data)) continue; // PD only hits squadrons
+          if (!isShuttleFleet(target, data)) continue; // PD only hits shuttles
           const tp = fleetWorldPos(target, h.state);
           if (!tp) continue;
           if (distance(myPos, tp) <= range) targets.push(target);
@@ -315,9 +315,9 @@ export const squadronModule: GameModule = {
   },
 };
 
-/** Get the current world position of a squadron fleet (from freePosition, or
+/** Get the current world position of a shuttle fleet (from freePosition, or
  *  fall back to its planet location). */
-function fleetPosForSquadron(fleet: Fleet, state: GameState): { x: number; y: number } | null {
+function fleetPosForShuttle(fleet: Fleet, state: GameState): { x: number; y: number } | null {
   if (fleet.freePosition) return fleet.freePosition;
   if (fleet.location) return state.planets[fleet.location]?.position ?? null;
   return null;

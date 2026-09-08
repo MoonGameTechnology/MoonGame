@@ -28,7 +28,7 @@ import {
   canSortie,
   spendSortie,
   tickRearm,
-  fleetHasSquadron,
+  fleetHasShuttle,
   sortieSpec,
   withinRange,
   getStance,
@@ -137,7 +137,7 @@ export function patrolActions(
   for (const fid of Object.keys(patrols).sort()) {
     const p = patrols[fid]!;
     const f = state.fleets[fid];
-    if (!f || !fleetHasSquadron(f, data)) continue; // lost its wing — standingOrdersModule's own GC sweeps the entry
+    if (!f || !fleetHasShuttle(f, data)) continue; // lost its wing — standingOrdersModule's own GC sweeps the entry
     const spec = sortieSpec(f, data);
     let sortie = p.sortie;
     let rearmAt = p.rearmAt ?? now + HOUR;

@@ -1,8 +1,8 @@
 /**
- * Squadron mechanics (squadrons-roadmap SQ-1.1/SQ-2.1/SQ-3.1) — the carrier-borne
+ * Shuttle mechanics (shuttles-roadmap SQ-1.1/SQ-2.1/SQ-3.1) — the carrier-borne
  * strike wing's pure math: which stacks a fleet can launch, the sortie fuel/rearm
  * counter, and the strike-radius reach check. Was a 1:1 port of the prototype's
- * `squadron.ts` — no numbers or semantics changed; since CONV-6 that copy is gone and
+ * `shuttle.ts` — no numbers or semantics changed; since CONV-6 that copy is gone and
  * this is the only one, called by both hosts with an explicit `data`. The prototype's
  * client-side wing predicates (`isWing`/`wingCanAct`/`wingCanReturn`, REFM-135) did NOT
  * come here — they decide what to offer the player, not what the world does, and live
@@ -10,19 +10,19 @@
  * kernel module yet: that needs new GameState shape (where a launched wing's
  * `SortieState` lives) and touches the action/reducer pipeline, a separate,
  * riskier pass. `patrolTarget`/`scrambleOrder` (the auto-scramble driver, CC-4)
- * live in the prototype's `game.ts`, not `squadron.ts` — out of scope here.
+ * live in the prototype's `game.ts`, not `shuttle.ts` — out of scope here.
  */
 import type { Fleet } from './gameState';
 import type { GameData } from '../data/schemas';
 
-/** The squadron-trait ship stacks aboard a fleet — what a carrier launches as a
+/** The shuttle-trait ship stacks aboard a fleet — what a carrier launches as a
  *  strike wing (SQ-1.1: launch-as-unit). Pure. */
-export function squadronTake(
+export function shuttleTake(
   fleet: Fleet,
   data: GameData,
 ): Array<{ unit: string; count: number }> {
   return fleet.units
-    .filter((st) => st.count > 0 && (data.units[st.unit]?.traits.includes('squadron') ?? false))
+    .filter((st) => st.count > 0 && (data.units[st.unit]?.traits.includes('shuttle') ?? false))
     .map((st) => ({ unit: st.unit, count: st.count }));
 }
 
@@ -33,14 +33,14 @@ export interface SortieState {
   rearming: number;
 }
 
-/** The wing's max sortie budget + rearm length, read from its squadron unit's
- *  stats (schema defaults 0). Reads the FIRST squadron-trait stack of the fleet. */
+/** The wing's max sortie budget + rearm length, read from its shuttle unit's
+ *  stats (schema defaults 0). Reads the FIRST shuttle-trait stack of the fleet. */
 export function sortieSpec(
   fleet: Fleet,
   data: GameData,
 ): { maxFuel: number; rearmRounds: number } {
   const st = fleet.units.find(
-    (s) => s.count > 0 && (data.units[s.unit]?.traits.includes('squadron') ?? false),
+    (s) => s.count > 0 && (data.units[s.unit]?.traits.includes('shuttle') ?? false),
   );
   const u = st ? data.units[st.unit]?.stats : undefined;
   return {
@@ -80,20 +80,20 @@ export function tickRearm(s: SortieState, maxFuel: number): SortieState {
     : { fuel: s.fuel, rearming };
 }
 
-/** Does this fleet carry a launchable strike wing (squadron-trait ships)? */
-export function fleetHasSquadron(f: Fleet | undefined, data: GameData): boolean {
+/** Does this fleet carry a launchable strike wing (shuttle-trait ships)? */
+export function fleetHasShuttle(f: Fleet | undefined, data: GameData): boolean {
   return (
     !!f &&
-    f.units.some((u) => u.count > 0 && (data.units[u.unit]?.traits.includes('squadron') ?? false))
+    f.units.some((u) => u.count > 0 && (data.units[u.unit]?.traits.includes('shuttle') ?? false))
   );
 }
 
 /** The wing's strike radius (map units) — the longest `strikeRange` among its live
- *  squadron ships. 0 = carries no strike wing. */
-export function squadronStrikeRange(fleet: Fleet, data: GameData): number {
+ *  shuttle ships. 0 = carries no strike wing. */
+export function shuttleStrikeRange(fleet: Fleet, data: GameData): number {
   let r = 0;
   for (const st of fleet.units) {
-    if (st.count > 0 && (data.units[st.unit]?.traits.includes('squadron') ?? false)) {
+    if (st.count > 0 && (data.units[st.unit]?.traits.includes('shuttle') ?? false)) {
       r = Math.max(r, data.units[st.unit]?.stats.strikeRange ?? 0);
     }
   }
@@ -114,12 +114,12 @@ export function withinRange(
 
 /** Can the wing strike `targetPos` from its launch node at `fromPos`? Only a real
  *  strike wing (range > 0) whose target lies inside the radius (SQ-3.1). */
-export function squadronReaches(
+export function shuttleReaches(
   fleet: Fleet,
   data: GameData,
   fromPos: { x: number; y: number },
   targetPos: { x: number; y: number },
 ): boolean {
-  const r = squadronStrikeRange(fleet, data);
+  const r = shuttleStrikeRange(fleet, data);
   return r > 0 && withinRange(fromPos, targetPos, r);
 }

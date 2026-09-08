@@ -26,7 +26,7 @@ import {
   chainStamp,
   data,
   engageFleet,
-  fleetHasSquadron,
+  fleetHasShuttle,
   fleetIdle,
   HOUR,
   order,
@@ -204,7 +204,7 @@ export function initSoloDrivers(host: SoloHost): SoloDrivers {
     if (rounds > 0) lastPatrolTick += rounds * HOUR;
     for (const [fid, p] of [...patrols]) {
       const f = s.fleets[fid];
-      if (!f || f.owner !== me || !fleetHasSquadron(f, data)) {
+      if (!f || f.owner !== me || !fleetHasShuttle(f, data)) {
         patrols.delete(fid);
         continue;
       }

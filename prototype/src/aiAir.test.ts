@@ -1,12 +1,12 @@
 // AI-BAL-4: артиллерия и эскадрильи у ТЕСТ-бота (профиль `test`, AI-BAL-1.1).
 //
-// Что здесь закрепляется. `siege`, `fighter_squadron`, `strike_carrier`, `sensor_frigate`
+// Что здесь закрепляется. `siege`, `interceptor`, `strike_carrier`, `sensor_frigate`
 // и `hero` показывались «мёртвым контентом» — и каждая позиция оказалась мертва по СВОЕЙ
 // причине, а не по одной общей:
 //   • `siege` — просто не было правила. Артиллерия при этом не требует от бота НИ ОДНОЙ
 //     новой команды: `artilleryModule` сам заставляет свободный стоящий флот обстрелять
 //     ближайшего врага в радиусе. Построить — и целый пласт боя входит в измерение;
-//   • `fighter_squadron` — был НЕПОСТРОИМ вовсе: ангар открывается вторым уровнем завода,
+//   • `interceptor` — был НЕПОСТРОИМ вовсе: ангар открывается вторым уровнем завода,
 //     а гейт читал только базовый def (починено в `construction.ts`);
 //   • `hero` — не мёртв: он ПОСЕЯН во флоте каждого места с первой секунды и воюет, просто
 //     не проходит через `unit.built`. Врал отчёт, а не бот (починено в `selfplay.mjs`).
@@ -89,19 +89,19 @@ describe('AI-BAL-4 — эскадрильи: завод → апгрейд → �
   it('завод первого уровня — АПГРЕЙДИТ его (ангар открывается вторым)', () => {
     const orders = aiOrders(withFactory(rich(game2()), 1), 'p2', 'expand', 'strong');
     expect(upgraded(orders)).toContain('factory');
-    expect(unitsBuilt(orders)).not.toContain('fighter_squadron'); // рано: ангара ещё нет
+    expect(unitsBuilt(orders)).not.toContain('interceptor'); // рано: ангара ещё нет
   });
 
   it('завод второго уровня — строит крыло', () => {
     expect(
       unitsBuilt(aiOrders(withFactory(rich(game2()), 2), 'p2', 'expand', 'strong')),
-    ).toContain('fighter_squadron');
+    ).toContain('interceptor');
   });
 
   it('ИГРОВОЙ бот ни завода, ни крыльев не заказывает', () => {
     const orders = aiOrders(withFactory(rich(game2()), 2), 'p2', 'expand');
     expect(buildingsBuilt(orders)).not.toContain('factory');
-    expect(unitsBuilt(orders)).not.toContain('fighter_squadron');
+    expect(unitsBuilt(orders)).not.toContain('interceptor');
   });
 });
 
@@ -118,7 +118,7 @@ describe('AI-BAL-4 — то, что оставлено боту НЕнужным
   });
 
   it('носитель и сенсорный фрегат не заказываются', () => {
-    // `strike_carrier` — носитель без работающего вылета: `squadron.strike` требует
+    // `strike_carrier` — носитель без работающего вылета: `shuttle.strike` требует
     // `fleet.homeBase`, а это поле в игре не выставляет ни один модуль, так что носитель
     // сейчас лишь дорогой транспорт, дублирующий `dropship`. `sensor_frigate` — глаза, а
     // бот читает состояние целиком и туманом не пользуется. Оба ждут своей механики, а не

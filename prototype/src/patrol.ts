@@ -1,10 +1,10 @@
 /**
- * Squadron patrol (squadrons-roadmap SQ-4.1) — the pure reactive-scramble decision
+ * Shuttle patrol (shuttles-roadmap SQ-4.1) — the pure reactive-scramble decision
  * core: a wing left on patrol auto-strikes an enemy that enters its radius, burning
  * a sortie (SQ-2.1) each time; when it runs dry it rearms and then resumes — no live
  * player in the moment, fully deterministic. Extracted from `game.ts` (REFP-23):
  * depends on `SortieState`/`canSortie`/`spendSortie`/`withinRange` (ядро,
- * `state/squadron.ts` — CONV-5,
+ * `state/shuttle.ts` — CONV-5,
  * REFP-7) and `engageFleet`/`moveFleet` (`actions.ts`, REFP-22). The frame-loop
  * driver (`main.ts`, mirrors `autoEngage`/`driveQueues`) issues the strike order,
  * burns the sortie, and ticks the rearm on a game-hour cadence; the server-side

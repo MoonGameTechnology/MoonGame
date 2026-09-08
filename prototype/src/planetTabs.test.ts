@@ -16,7 +16,7 @@ const ROSTER = [
   'scout',
   'siege',
   'strike_carrier',
-  'fighter_squadron',
+  'interceptor',
   'militia',
   'tank',
 ];
@@ -25,7 +25,7 @@ describe('вкладки мира — разбор гарнизона', () => {
   const garrison: UnitStack[] = [
     { unit: 'tank', count: 2 },
     { unit: 'cruiser', count: 1 },
-    { unit: 'fighter_squadron', count: 3 },
+    { unit: 'interceptor', count: 3 },
     { unit: 'strike_carrier', count: 1 },
     { unit: 'militia', count: 4 },
   ];
@@ -34,7 +34,7 @@ describe('вкладки мира — разбор гарнизона', () => {
     const g = garrisonByTab(garrison, data);
     expect(g.ground.map((st) => st.unit)).toEqual(['tank', 'militia']);
     expect(g.ships.map((st) => st.unit)).toEqual(['cruiser']);
-    expect(g.wings.map((st) => st.unit)).toEqual(['fighter_squadron', 'strike_carrier']);
+    expect(g.wings.map((st) => st.unit)).toEqual(['interceptor', 'strike_carrier']);
     expect(g.ground.length + g.ships.length + g.wings.length).toBe(garrison.length);
   });
 
@@ -80,7 +80,7 @@ describe('вкладки мира — счётчики', () => {
   it('крылья не попадают в счётчик кораблей', () => {
     const p = planet([{ unit: 'strike_carrier', count: 1 }]);
     const c = tabCounts(p, data, []);
-    expect(c.squadron).toBe(1);
+    expect(c.shuttle).toBe(1);
     expect(c.ships).toBe(0);
   });
 
@@ -94,14 +94,14 @@ describe('вкладки мира — ростер стройки', () => {
   it('вкладка предлагает строить ТО ЖЕ, что показывает', () => {
     expect(buildRoster('ground', ROSTER, data)).toEqual(['militia', 'tank']);
     expect(buildRoster('ships', ROSTER, data)).toEqual(['cruiser', 'scout', 'siege']);
-    expect(buildRoster('squadron', ROSTER, data)).toEqual(['strike_carrier', 'fighter_squadron']);
+    expect(buildRoster('shuttle', ROSTER, data)).toEqual(['strike_carrier', 'interceptor']);
   });
 
   it('каждый юнит ростера попадает ровно в одну вкладку', () => {
     const seen = [
       ...buildRoster('ground', ROSTER, data),
       ...buildRoster('ships', ROSTER, data),
-      ...buildRoster('squadron', ROSTER, data),
+      ...buildRoster('shuttle', ROSTER, data),
     ];
     expect(seen.sort()).toEqual([...ROSTER].sort());
     expect(new Set(seen).size).toBe(ROSTER.length);
