@@ -178,8 +178,6 @@ export interface PlayerArsenal {
   hulls: string[];
   /** Installable ship modules → `data.modules` ids. */
   modules: string[];
-  /** Installable hero fittings → `data.heroFittings` ids. */
-  fittings: string[];
 }
 
 /** A live Steward delegation on a player (see `Player.steward`). */
@@ -747,11 +745,6 @@ export interface Hero {
   /** Unlocked skill-tree node ids (→ `data.heroSkillTrees`, HERO-7). Grants applied on
    *  unlock land in `abilities`/`passives`; the list itself gates `requires` chains. */
   skills?: string[];
-  /** Installed ship fittings (→ `data.heroFittings`, HERO-6), capped by the archetype's
-   *  `slots`. Installed for good — no refit (the ship-modules owner rule).
-   *  СИСТЕМА УХОДИТ: железо героя — обычные модули корабля ({@link Hero.modules}); этот
-   *  каталог сносит `HPR-1.5.4`. */
-  fittings?: string[];
   /** Installed ship MODULES of the hero's ship (→ `data.modules`, HPR-1.5.2) — the same
    *  hardware every other hull carries, bounded by the hull's typed bays plus the grade's
    *  `moduleSlots` bonus (the main hero's extra bay). Stored on the HERO, not on the stack:

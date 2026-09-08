@@ -25,6 +25,7 @@ const data: GameData = parseGameData({
   units: {
     cruiser: { faction: 'x', stats: { attack: 5, defense: 5, speed: 5, hp: 40 }, cost: { metal: 10 }, slots: { weapon: 1 } },
     drone: { faction: 'x', stats: { attack: 1, defense: 1, speed: 10, hp: 6 }, cost: { metal: 3 } },
+    hero: { faction: 'x', stats: { attack: 5, defense: 5, speed: 5, hp: 100 }, traits: ['hero'], slots: { weapon: 1 } },
   },
   factions: {},
   buildings: {
@@ -35,11 +36,7 @@ const data: GameData = parseGameData({
     railgun: { name: 'Railgun', slot: 'weapon', tag: 'horizontal', cost: { metal: 5 } },
     coilgun: { name: 'Coilgun', slot: 'weapon', tag: 'horizontal', cost: { metal: 5 } },
   },
-  heroes: { commander: { name: 'Cmdr', slots: 2 } },
-  heroFittings: {
-    visor: { name: 'Visor', cost: {} },
-    crest: { name: 'Crest', cost: {} },
-  },
+  heroes: { commander: { name: 'Cmdr', ship: { unit: 'hero' } } },
 });
 
 const ctx = (now = 0): Context => ({ now, data });
@@ -89,7 +86,7 @@ function errCode(r: ApplyResult): string {
   return r.code;
 }
 
-const OWNED: PlayerArsenal = { hulls: ['cruiser'], modules: ['railgun'], fittings: ['visor'] };
+const OWNED: PlayerArsenal = { hulls: ['cruiser'], modules: ['railgun'] };
 
 describe('unit.build × arsenal snapshot (ARS-3)', () => {
   const kernel = createKernel([constructionModule]);
@@ -111,13 +108,13 @@ describe('unit.build × arsenal snapshot (ARS-3)', () => {
   });
 });
 
-describe('hero.fit × arsenal snapshot (ARS-3)', () => {
+describe('hero.install × arsenal snapshot (ARS-3)', () => {
   const kernel = createKernel([heroModule]);
-  const fit = (fitting: string): Action => ({
+  const install = (moduleId: string): Action => ({
     id: 's:p1:2',
-    type: 'hero.fit',
+    type: 'hero.install',
     playerId: 'p1',
-    payload: { heroId: 'hero:p1', fitting },
+    payload: { heroId: 'hero:p1', moduleId },
     issuedAt: 0,
   });
   const withHero = (arsenal?: PlayerArsenal): GameState => {
@@ -130,10 +127,14 @@ describe('hero.fit × arsenal snapshot (ARS-3)', () => {
     };
   };
 
-  it('an owned fitting installs; an unowned one is E_NOT_OWNED; no snapshot = open', () => {
-    expect(okApply(kernel.applyAction(withHero(OWNED), fit('visor'), ctx())).ok).toBe(true);
-    expect(errCode(kernel.applyAction(withHero(OWNED), fit('crest'), ctx()))).toBe('E_NOT_OWNED');
-    expect(okApply(kernel.applyAction(withHero(), fit('crest'), ctx())).ok).toBe(true);
+  // HPR-1.5.2: the hero's ship is fitted from the SAME `arsenal.modules` list a built
+  // ship is — the ownership axis has one catalogue now, not one per equipment system.
+  it('an owned module installs; an unowned one is E_NOT_OWNED; no snapshot = open', () => {
+    expect(okApply(kernel.applyAction(withHero(OWNED), install('railgun'), ctx())).ok).toBe(true);
+    expect(errCode(kernel.applyAction(withHero(OWNED), install('coilgun'), ctx()))).toBe(
+      'E_NOT_OWNED',
+    );
+    expect(okApply(kernel.applyAction(withHero(), install('coilgun'), ctx())).ok).toBe(true);
   });
 });
 
@@ -151,7 +152,7 @@ describe('arsenal.sync × live build-catalog ownership (LARS-1)', () => {
     const st = stateWith([player('p1', OWNED)]);
     // coilgun isn't in the boot-time snapshot yet.
     expect(errCode(kernel.applyAction(st, build('cruiser', ['coilgun']), ctx()))).toBe('E_NOT_OWNED');
-    const grown: PlayerArsenal = { hulls: ['cruiser'], modules: ['railgun', 'coilgun'], fittings: ['visor'] };
+    const grown: PlayerArsenal = { hulls: ['cruiser'], modules: ['railgun', 'coilgun'] };
     const synced = okApply(kernel.applyAction(st, sync(grown), ctx())).state;
     expect(okApply(kernel.applyAction(synced, build('cruiser', ['coilgun']), ctx())).ok).toBe(true);
   });
@@ -169,7 +170,7 @@ describe('arsenal.sync × live build-catalog ownership (LARS-1)', () => {
 
   it('a sold-off item disappears from the live catalog too (full replace, not a union)', () => {
     const st = stateWith([player('p1', OWNED)]);
-    const shrunk: PlayerArsenal = { hulls: [], modules: ['railgun'], fittings: ['visor'] };
+    const shrunk: PlayerArsenal = { hulls: [], modules: ['railgun'] };
     const synced = okApply(kernel.applyAction(st, sync(shrunk), ctx())).state;
     expect(errCode(kernel.applyAction(synced, build('cruiser'), ctx()))).toBe('E_NOT_OWNED');
   });

@@ -189,7 +189,8 @@ export {
   designateCapital,
   spawnHero,
   unlockHeroSkill,
-  fitHero,
+  installHeroModule,
+  uninstallHeroModule,
 } from './actions';
 
 // --- server-side seat AIs ----------------------------------------------------

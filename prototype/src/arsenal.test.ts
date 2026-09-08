@@ -22,20 +22,21 @@ const module1: ArsenalItem = {
   origin: 'drop',
   acquiredAt: 5,
 };
-const fitting: ArsenalItem = {
-  itemId: 'starter:acc:hero_fitting:command',
-  kind: 'hero_fitting',
+const module2: ArsenalItem = {
+  itemId: 'starter:acc:module:command',
+  kind: 'module',
   form: 'blueprint',
   defId: 'command',
   soulbound: true,
   origin: 'starter',
   acquiredAt: 0,
 };
-const all = [hull, module1, fitting];
+const all = [hull, module1, module2];
 
 describe('arsenal witryna — filter/group', () => {
   it('filters by kind', () => {
-    expect(filterArsenal(all, { kind: 'module' })).toEqual([module1]);
+    expect(filterArsenal(all, { kind: 'module' })).toEqual([module1, module2]);
+    expect(filterArsenal(all, { kind: 'hull' })).toEqual([hull]);
     expect(filterArsenal(all, {})).toEqual(all);
   });
 
@@ -46,13 +47,12 @@ describe('arsenal witryna — filter/group', () => {
 
   it('gradesOf collects only the graded instances, sorted', () => {
     expect(gradesOf(all)).toEqual([2]);
-    expect(gradesOf([hull, fitting])).toEqual([]);
+    expect(gradesOf([hull, module2])).toEqual([]);
   });
 
   it('ownedDefIds narrows to one kind, deduped', () => {
     expect(ownedDefIds(all, 'hull')).toEqual(new Set(['cruiser']));
-    expect(ownedDefIds(all, 'module')).toEqual(new Set(['laser']));
-    expect(ownedDefIds(all, 'hero_fitting')).toEqual(new Set(['command']));
+    expect(ownedDefIds(all, 'module')).toEqual(new Set(['laser', 'command']));
   });
 });
 

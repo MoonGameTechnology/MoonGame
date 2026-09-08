@@ -27,7 +27,7 @@ function loadShippedBundle(): Record<string, unknown> {
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.15');
+    expect(data.version).toBe('0.1.16');
     expect(data.resources).toContain('microelectronics');
     expect(data.units.siege_lance?.stats.range).toBe(300); // artillery firing radius (map units)
     expect(data.units.cruiser?.upkeep.credits).toBe(64); // daily upkeep, BAL-3 scale
@@ -197,9 +197,6 @@ describe('game data schema (docs/architecture.md §2)', () => {
     }
     for (const [id, def] of Object.entries(data.heroSkillTrees)) {
       check(def.cost, `skill node ${id} cost`);
-    }
-    for (const [id, def] of Object.entries(data.heroFittings)) {
-      check(def.cost, `hero fitting ${id} cost`);
     }
   });
 
@@ -458,33 +455,27 @@ describe('hero archetypes + abilities (HERO-1, docs/heroes.md)', () => {
     ).toBe(false);
   });
 
-  it('shipped fittings are consistent and fail-closed (HERO-6)', () => {
-    const data = parseGameData(loadShippedBundle());
-    const abilities = new Set(Object.keys(data.heroAbilities));
-    const passives = new Set(Object.keys(data.heroPassives));
-    for (const [id, def] of Object.entries(data.heroFittings)) {
-      if (def.grants.ability !== undefined) {
-        expect(abilities.has(def.grants.ability), `fitting ${id} grants unknown ability`).toBe(true);
-      }
-      if (def.grants.passive !== undefined) {
-        expect(passives.has(def.grants.passive), `fitting ${id} grants unknown passive`).toBe(true);
-      }
-    }
-    expect(data.heroFittings.psi_amplifier?.grants.ability).toBe('scan');
-    expect(data.heroFittings.ablative_plating?.statMods.hp).toBe(40);
-    // Anti self-expansion: a fitting may not grow slot capacity; costs stay nonnegative.
-    expect(
-      safeParseGameData({
-        ...loadShippedBundle(),
-        heroFittings: { bad: { name: 'X', statMods: { slots: 1 } } },
-      }).success,
-    ).toBe(false);
-    expect(
-      safeParseGameData({
-        ...loadShippedBundle(),
-        heroFittings: { bad: { name: 'X', cost: { metal: -5 } } },
-      }).success,
-    ).toBe(false);
+  // HPR-1.5.3/1.5.4 — the second equipment system is GONE, and this is the test that
+  // says so. It used to assert the shipped fittings were consistent; the honest successor
+  // asserts the bundle no longer ships the catalogue at all, and that what those entries
+  // granted is still reachable by the normal route (skill-tree nodes, real modules).
+  it('the hero-fitting catalogue is gone and its grants live on the normal routes', () => {
+    const bundle = loadShippedBundle() as Record<string, unknown>;
+    expect('heroFittings' in bundle).toBe(false);
+    const data = parseGameData(bundle);
+    expect('heroFittings' in data).toBe(false);
+    const grantsOf = (key: 'ability' | 'passive'): Set<string> =>
+      new Set(
+        Object.values(data.heroSkillTrees)
+          .map((node) => node.grants[key])
+          .filter((id): id is string => id !== undefined),
+      );
+    // `psi_amplifier` granted `scan`; `aegis_matrix` granted `rally_beacon` — both were
+    // already reachable from the tree, which is why the entries were duplicates.
+    expect(grantsOf('ability').has('scan')).toBe(true);
+    expect(grantsOf('passive').has('rally_beacon')).toBe(true);
+    // `ablative_plating` was a dead copy of a REAL module carrying the same id.
+    expect(data.modules.ablative_plating?.effects.stats.hp).toBe(12);
   });
 
   it('rejects a hero ability with a negative cost (no resource minting)', () => {

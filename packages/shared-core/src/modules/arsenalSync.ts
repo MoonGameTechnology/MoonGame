@@ -25,8 +25,7 @@ export const arsenalSyncModule: GameModule = {
       if (
         !payload ||
         !Array.isArray(payload.hulls) ||
-        !Array.isArray(payload.modules) ||
-        !Array.isArray(payload.fittings)
+        !Array.isArray(payload.modules)
       ) {
         return h.reject('E_BAD_PAYLOAD');
       }
@@ -39,7 +38,6 @@ export const arsenalSyncModule: GameModule = {
       player.arsenal = {
         hulls: [...new Set(payload.hulls)].sort(),
         modules: [...new Set(payload.modules)].sort(),
-        fittings: [...new Set(payload.fittings)].sort(),
       };
     });
   },

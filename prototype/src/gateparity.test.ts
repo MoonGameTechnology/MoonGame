@@ -38,7 +38,8 @@ import {
   castHeroAbility,
   spawnHero,
   unlockHeroSkill,
-  fitHero,
+  installHeroModule,
+  uninstallHeroModule,
   freshSortie,
   orderChain,
   forceMarchFleet,
@@ -95,7 +96,8 @@ const CLIENT_ACTIONS: Action[] = [
   castHeroAbility(P, 'hero:p1:1', 'scan', 'B2'),
   spawnHero(P, 'hero:p1:2', 'C1R1'),
   unlockHeroSkill(P, 'hero:p1:1', 'neural_lace'),
-  fitHero(P, 'hero:p1:1', 'psi_lens'),
+  installHeroModule(P, 'hero:p1:1', 'ion_engine'),
+  uninstallHeroModule(P, 'hero:p1:1', 'ion_engine'),
   // CHAIN-UX: многоточечный план через реальный билдер — дрейф формы шага между
   // билдером и гейт-схемой обязан падать здесь, а не на боевом gated-сервере.
   orderChain(P, 'f1', [

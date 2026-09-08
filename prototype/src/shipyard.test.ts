@@ -181,13 +181,13 @@ describe('верфь — что игроку разрешено строить (
 
   it('со снимком остаются только собственные корпуса', () => {
     const s = rich();
-    s.players.p1!.arsenal = { hulls: ['scout'], modules: [], fittings: [] };
+    s.players.p1!.arsenal = { hulls: ['scout'], modules: [] };
     expect(ownedHullsOf(s, 'p1', YARD_HULLS)).toEqual(['scout']);
   });
 
   it('ни одного своего корпуса — панель честно пустая, а не пустой конструктор', () => {
     const s = rich();
-    s.players.p1!.arsenal = { hulls: [], modules: [], fittings: [] };
+    s.players.p1!.arsenal = { hulls: [], modules: [] };
     expect(loadoutPaneHtml(s, 'p1', draftOf(), YARD_HULLS, view)).toContain('cn-soon');
   });
 });
@@ -343,7 +343,7 @@ describe('верфь — панель конструктора', () => {
 
   it('снимок арсенала добавляет честную оговорку про сроки', () => {
     const gated = rich();
-    gated.players.p1!.arsenal = { hulls: ['cruiser'], modules: ['ion_engine'], fittings: [] };
+    gated.players.p1!.arsenal = { hulls: ['cruiser'], modules: ['ion_engine'] };
     const html = loadoutPaneHtml(gated, 'p1', draftOf(), YARD_HULLS, view);
     expect((html.match(/cn-note/g) ?? []).length).toBe(2);
   });
@@ -419,7 +419,7 @@ describe('верфь — окно', () => {
     const win = fakeWin();
     const s = rich();
     // корпус со снимком арсенала, где модуля НЕТ — ядро откажет по стабильному коду
-    s.players.p1!.arsenal = { hulls: ['cruiser'], modules: [], fittings: [] };
+    s.players.p1!.arsenal = { hulls: ['cruiser'], modules: [] };
     const notes: string[] = [];
     const yard = initShipyard(
       hostOf({ root: () => win, state: () => s, note: (m) => notes.push(m) }),

@@ -5,7 +5,7 @@ import {
   castHeroAbility,
   spawnHero,
   unlockHeroSkill,
-  fitHero,
+  installHeroModule,
   data,
 } from './game';
 import type { GameState, Hero } from '@void/shared-core';
@@ -128,14 +128,18 @@ describe('hero actions — the core engine over the prototype catalogs', () => {
     expect(tierOfCast(s)).toBe(3); // общий: проходят союзники — и все остальные заодно
   });
 
-  it('hero.fit installs a fitting within the archetype slot budget', () => {
+  it('hero.install fits an ordinary ship module into the hero hull (HPR-1.5.2)', () => {
     const s = newGame();
-    const main = mainOf(s, 'p1'); // commander: 4 slots
-    const r = order(s, fitHero('p1', main.id, 'psi_amplifier'), s.time);
+    const main = mainOf(s, 'p1');
+    // Переоснащение — между выходами: у главного героя корабль уже в поле, поэтому
+    // ядро отбивает заказ, и это ПРАВИЛО, а не помеха тесту.
+    expect(order(s, installHeroModule('p1', main.id, 'ion_engine'), s.time).error).toBe(
+      'E_HERO_DEPLOYED',
+    );
+    const docked = benched(s, 'p1')[0]!;
+    const r = order(s, installHeroModule('p1', docked.id, 'ion_engine'), s.time);
     expect(r.error).toBeUndefined();
-    const h = r.state.heroes![main.id]!;
-    expect(h.fittings).toContain('psi_amplifier');
-    expect(h.abilities).toContain('scan'); // the fitting's ability grant landed
+    expect(r.state.heroes![docked.id]!.modules).toContain('ion_engine');
   });
 
   it('hero.ability recall (hero.effect.recall capability) warps a deployed ship home', () => {

@@ -1220,6 +1220,9 @@ grants{ability?|passive?}, cost}`, анти-self-expansion рефайн как �
   (HERO-4/5, общий `applyGrants` с дедупом); `statMods` едут данными до шва
   эффективных статов (SHIP-3/4) — «designed, not live». Шипованы «Пси-усилитель»
   (scan), «Матрица „Эгида"» (rally_beacon), «Абляционная обшивка» (hp+40, не live).
+  ⛔ **СНЯТО `HPR-1.5.4` (2026-09-08).** Второй системы снаряжения в коде нет: железо героя —
+  обычные модули корабля (`hero.install`/`hero.uninstall`). Запись оставлена как история:
+  два из трёх фиттингов дублировали узлы дерева, третий — настоящий модуль с тем же id.
   3 теста.
 - **HERO-7** ✅ Дерево навыков: `data/heroSkillTrees.json` (`HeroSkillNode {name, branch?,
 requires[], cost, grants{ability?|passive?}}`; ветки **transhuman**/**psionic**, по руту на

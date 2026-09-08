@@ -77,7 +77,6 @@ const WIRE_PAYLOADS: Record<string, unknown> = {
   'hero.ability': { heroId: 'hero:p1', abilityId: 'scan', target: 'nexus' },
   'hero.spawn': { heroId: 'hero:p1', at: 'home_p1' },
   'hero.skill.unlock': { heroId: 'hero:p1', node: 'neural_lace' },
-  'hero.fit': { heroId: 'hero:p1', fitting: 'psi_lens' },
   'hero.equip': { heroId: 'hero:p1', abilityId: 'scan' },
   'hero.install': { heroId: 'hero:p1', moduleId: 'ion_engine' },
   'hero.uninstall': { heroId: 'hero:p1', moduleId: 'ion_engine' },

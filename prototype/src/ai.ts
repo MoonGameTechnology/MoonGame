@@ -13,7 +13,9 @@ import {
   getStance,
   heroCooldownKey,
   MARKET_COMMISSION,
+  moduleAllowed,
   previewBattle,
+  slotUsage,
   technologyLock,
   type GameState,
   type Action,
@@ -47,7 +49,7 @@ import {
   splitFleet,
   spawnHero,
   unlockHeroSkill,
-  fitHero,
+  installHeroModule,
   castHeroAbility,
 } from './actions';
 import { botEmbargoes } from './botFavour';
@@ -1042,18 +1044,31 @@ export function aiOrders(
       }
     }
 
-    // 3. ФИТИНГИ — тоже по одному за тик. Слоты считает архетип; ставится навсегда
-    //    (рефита нет), поэтому порядок «дешёвое вперёд» заодно и есть приоритет.
+    // 3. ЖЕЛЕЗО КОРАБЛЯ — тоже по одному за тик (HPR-1.5.2, бывшие фиттинги). Ядро
+    //    переоснащает героя только ВНЕ ПОЛЯ (`E_HERO_DEPLOYED`), поэтому здесь тот же
+    //    отбор: развёрнутого не трогаем — иначе бот сыпал бы заведомо отбиваемые приказы
+    //    каждый тик. Отсеки типизированы, допуск модуля судит его собственное правило;
+    //    здесь их ЗЕРКАЛО ровно в той мере, чтобы приказ был законным.
+    //    Цены у установки пока нет (её ставит HPR-1.6) — порядок «дешёвое вперёд»
+    //    остаётся приоритетом «сначала простое», а не проверкой кошелька.
     for (const x of roster) {
-      if (x.alive === false) continue;
-      const slots = x.archetype !== undefined ? (data.heroes[x.archetype]?.slots ?? 0) : 0;
-      const fitted = x.fittings ?? [];
-      if (fitted.length >= slots) continue;
-      const fit = Object.keys(data.heroFittings)
-        .filter((id) => !fitted.includes(id) && affordableCost(data.heroFittings[id]?.cost))
-        .sort(byPrice((id) => data.heroFittings[id]?.cost))[0];
-      if (fit !== undefined) {
-        out.push(fitHero(ai, x.id, fit));
+      if (x.fleetId !== undefined && state.fleets[x.fleetId] !== undefined) continue;
+      const hull = (x.archetype !== undefined ? data.heroes[x.archetype]?.ship.unit : undefined) ?? 'hero';
+      const hullDef = data.units[hull];
+      if (!hullDef) continue;
+      const bonus = x.grade !== undefined ? data.heroGrades[x.grade]?.moduleSlots : undefined;
+      const installed = (x.modules ?? []).filter((m) => !!data.modules[m]);
+      const used = slotUsage(installed, data);
+      const mod = Object.keys(data.modules)
+        .filter((id) => {
+          const md = data.modules[id];
+          if (!md || installed.includes(id)) return false;
+          if (!moduleAllowed(hull, hullDef, md)) return false;
+          return used[md.slot] < hullDef.slots[md.slot] + (bonus?.[md.slot] ?? 0);
+        })
+        .sort(byPrice((id) => data.modules[id]?.cost))[0];
+      if (mod !== undefined) {
+        out.push(installHeroModule(ai, x.id, mod));
         break;
       }
     }

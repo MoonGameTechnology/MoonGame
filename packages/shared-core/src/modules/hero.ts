@@ -55,11 +55,13 @@ import { canAfford, payCost } from '../util/treasury';
  * node's grants land on the instance (`abilities` / `passives`) so the existing
  * HERO-4/HERO-5 engines pick them up with no extra wiring.
  *
- * HERO-6 (docs/heroes.md) — ship fittings: `hero.fit {heroId, fitting}` installs a
- * `data.heroFittings` component into one of the archetype's `slots` (for good — the
- * ship-modules "no refit" owner rule). The fitting's `grants` land on the instance
- * loadout (live via HERO-4/5); its `statMods` ride as data until the effective-stats
- * seam (SHIP-3/4) makes them live.
+ * HPR-1.5.2 (hero-progression-roadmap.md) — ship HARDWARE: `hero.install` /
+ * `hero.uninstall {heroId, moduleId}` fit ordinary `data.modules` into the hull's typed
+ * bays (plus the grade's `moduleSlots` bonus). The set lives on `Hero.modules` so it
+ * outlives the ship, and `deployHero` stamps it onto the hull it forms. This REPLACED
+ * `hero.fit`/`data.heroFittings` (HERO-6), a second, parallel equipment system whose
+ * `statMods` seam was never wired: two of its three entries duplicated skill-tree
+ * grants and the third duplicated a real module (HPR-1.5.3/1.5.4).
  *
  * HERO-4 (docs/heroes.md) adds the generic, data-driven dispatcher on top:
  *
@@ -324,7 +326,7 @@ function boardHeroShip(h: HandlerContext, hero: Hero, host: Fleet): void {
 }
 
 /** Charge `cost` to the player's treasury or reject — the shared terminal gate of every
- *  priced hero action (`hero.ability` / `hero.skill.unlock` / `hero.fit`). Charges the
+ *  priced hero action (`hero.ability` / `hero.skill.unlock`). Charges the
  *  DRAFT, so a later reject in the same handler still discards the payment. */
 function chargeOrReject(h: HandlerContext, playerId: PlayerId, cost: ResourceBag): void {
   const player = h.state.players[playerId];
@@ -333,8 +335,7 @@ function chargeOrReject(h: HandlerContext, playerId: PlayerId, cost: ResourceBag
   payCost(player.resources, cost);
 }
 
-/** Extend the hero's instance loadout with a grant (shared by skill nodes, HERO-7, and
- *  fittings, HERO-6). Deduped — a grant the hero already carries changes nothing, so
+/** Extend the hero's instance loadout with a grant (skill-tree nodes, HERO-7). Deduped — a grant the hero already carries changes nothing, so
  *  no source can stack the same passive/ability twice. */
 /** Fallback skill-slot budget for a hero the rarity system doesn't cover yet — no
  *  `grade`, or a grade the shipped catalogue doesn't know. Base default, never a
@@ -575,7 +576,7 @@ function castAnnihilate(h: HandlerContext, playerId: PlayerId, planetId: PlanetI
 
 export const heroModule: GameModule = {
   id: 'hero',
-  version: '1.2.0',
+  version: '2.0.0',
   setup(api) {
     api.onAction('hero.move', (action, h) => {
       const { to } = action.payload as { to?: string };
@@ -919,7 +920,7 @@ export const heroModule: GameModule = {
     // wearing became two things here: `Hero.abilities` is the pool the player has
     // collected, `Hero.equipped` is what fits in the rarity's budget and can be cast.
     //
-    // Reversible on purpose, unlike `hero.fit` (fittings are welded on for good): a
+    // Reversible on purpose: a
     // loadout the player cannot rearrange is a trap, and the whole point of slots is
     // choosing between what you own. Costs nothing — the price was paid when the
     // ability was earned.
@@ -937,7 +938,7 @@ export const heroModule: GameModule = {
       if (!(hero.abilities ?? []).includes(abilityId)) return h.reject('E_NOT_OWNED');
       const equipped = equippedOf(hero);
       const slots = heroSkillSlots(hero, h.ctx.data);
-      // Same generic slots+items gate as ship modules and hero fittings (SHIP-4),
+      // Same generic slots+items gate as ship modules (SHIP-4),
       // expressed as a single-category budget — one mechanism, one failure order.
       const gate = canInstall(
         {
@@ -1052,53 +1053,5 @@ export const heroModule: GameModule = {
       h.emit('hero.uninstalled', { owner: action.playerId, heroId, moduleId });
     });
 
-    // HERO-6 — install a ship fitting into one of the archetype's slots. Locked in
-    // for good (no refit); grants are live (HERO-4/5), statMods await SHIP-3.
-    // The install gate is the generic slots+items mechanism (`util/fitting.ts`,
-    // SHIP-4) — the same one ship modules run through — expressed as a
-    // single-category budget (the archetype's `slots`; archetype-less ⇒ 0).
-    api.onAction('hero.fit', (action, h) => {
-      const { heroId, fitting } = action.payload as { heroId?: string; fitting?: string };
-      if (typeof heroId !== 'string' || typeof fitting !== 'string') {
-        return h.reject('E_BAD_PAYLOAD');
-      }
-      const hero = h.state.heroes?.[heroId];
-      if (!hero) return h.reject('E_NO_HERO');
-      if (hero.owner !== action.playerId) return h.reject('E_FORBIDDEN');
-      if (hero.alive === false) return h.reject('E_HERO_DEAD');
-      // ARS-3 ownership gate: a seat with an arsenal snapshot installs only the
-      // fittings it owns; no snapshot ⇒ unrestricted (regular matches unchanged).
-      const arsenal = h.state.players[action.playerId]?.arsenal;
-      if (arsenal && !arsenal.fittings.includes(fitting)) {
-        return h.reject('E_NOT_OWNED');
-      }
-      const fitted = hero.fittings ?? [];
-      const slots =
-        hero.archetype !== undefined ? (h.ctx.data.heroes[hero.archetype]?.slots ?? 0) : 0;
-      const gate = canInstall(
-        {
-          item: (id) => h.ctx.data.heroFittings[id],
-          category: () => 'fitting',
-          capacity: () => slots,
-        },
-        fitted,
-        fitting,
-      );
-      if (!gate.ok) {
-        // `not_allowed` is unreachable (no predicate) → the fail-secure default.
-        const code = {
-          unknown: 'E_NO_FITTING',
-          duplicate: 'E_ALREADY_FITTED',
-          no_slot: 'E_NO_SLOTS',
-        }[gate.reason as 'unknown' | 'duplicate' | 'no_slot'];
-        return h.reject(code ?? 'E_INTERNAL');
-      }
-      const def = h.ctx.data.heroFittings[fitting]!; // gate passed ⇒ the fitting exists
-      chargeOrReject(h, action.playerId, def.cost);
-
-      hero.fittings = [...fitted, fitting];
-      applyGrants(hero, def.grants, heroSkillSlots(hero, h.ctx.data));
-      h.emit('hero.fitted', { owner: action.playerId, heroId, fitting, grants: def.grants });
-    });
   },
 };

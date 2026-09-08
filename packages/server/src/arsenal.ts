@@ -49,7 +49,7 @@ export function validateStarterArsenal(
 export function arsenalSnapshotOf(items: readonly ArsenalItem[]): PlayerArsenal {
   const pick = (kind: ArsenalItem['kind']): string[] =>
     [...new Set(items.filter((i) => i.kind === kind).map((i) => i.defId))].sort();
-  return { hulls: pick('hull'), modules: pick('module'), fittings: pick('hero_fitting') };
+  return { hulls: pick('hull'), modules: pick('module') };
 }
 
 /** ARS-6 — merge a corp-rental snapshot into a personal one: the union per kind,
@@ -61,7 +61,6 @@ export function mergeArsenal(a: PlayerArsenal, b: PlayerArsenal): PlayerArsenal 
   return {
     hulls: union(a.hulls, b.hulls),
     modules: union(a.modules, b.modules),
-    fittings: union(a.fittings, b.fittings),
   };
 }
 

@@ -155,12 +155,10 @@ describe('CorpArsenalService — ARS-3 snapshot merge', () => {
     expect(await f.service.rentedArsenalOf(FIGHTER.accountId, f.matchupId)).toEqual({
       hulls: ['cruiser'],
       modules: [],
-      fittings: [],
     });
     expect(await f.service.rentedArsenalOf(MEMBER.accountId, f.matchupId)).toEqual({
       hulls: [],
       modules: [],
-      fittings: [],
     });
   });
 });
