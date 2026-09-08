@@ -969,27 +969,41 @@ describe('hero — manual spawn (HERO-3)', () => {
     ).toBe('E_BAD_PAYLOAD');
   });
 
-  it('HERO-8: the spawn_fleet marker lets the hero board an OWN fleet (and only an own one)', () => {
+  // Резолюция владельца 2026-09-08 («как в героях меча и магии»): каждый герой ведёт
+  // СВОЙ флот. Маркер не сажает на борт — он открывает выход ТАМ, где стоит свой флот.
+  it('HERO-8: the spawn_fleet marker deploys BESIDE an own fleet, never aboard it', () => {
     const st = rosterWorld();
     st.fleets.raid = fleet('raid', 'p1', 'C'); // scout ×1, parked at p2's C
     st.fleets.foe = fleet('foe', 'p2', 'C');
     // Without the marker a fleet target is not a legal spawn class.
     expect(errCode(kernel.applyAction(st, spawn(SECOND, 'raid'), ctx(0)))).toBe('E_BAD_SPAWN');
-    // With it the hero forms ABOARD: its ship joins the host's stack, the hero
-    // commands the host, and heroNode now reads the host's node.
     st.heroes![SECOND]!.abilities = ['boarding'];
     const r = okApply(kernel.applyAction(st, spawn(SECOND, 'raid'), ctx(0)));
     const hero = r.state.heroes![SECOND]!;
-    expect(hero.fleetId).toBe('raid');
+    // Свой флот — и он НЕ хозяйский: узел тот же, флот другой.
     expect(hero.location).toBe('C');
-    expect(r.state.fleets.raid?.units).toEqual([
-      { unit: 'scout', count: 1 },
-      { unit: 'hero', count: 1 },
-    ]);
-    expect(r.events.some((e) => e.type === 'hero.spawned' && (e.payload as { aboard?: boolean }).aboard)).toBe(true);
+    expect(hero.fleetId).not.toBe('raid');
+    expect(r.state.fleets[hero.fleetId!]?.location).toBe('C');
+    expect(r.state.fleets[hero.fleetId!]?.units).toEqual([{ unit: 'hero', count: 1 }]);
+    // Хозяйский флот не тронут — герой в него не сел.
+    expect(r.state.fleets.raid?.units).toEqual([{ unit: 'scout', count: 1 }]);
+    expect(
+      r.events.some((e) => e.type === 'hero.spawned' && (e.payload as { beside?: string }).beside === 'raid'),
+    ).toBe(true);
     // A foreign fleet stays off-limits even with the marker; an unknown id is E_NO_PLANET.
     expect(errCode(kernel.applyAction(st, spawn(SECOND, 'foe'), ctx(0)))).toBe('E_BAD_SPAWN');
     expect(errCode(kernel.applyAction(st, spawn(SECOND, 'nowhere'), ctx(0)))).toBe('E_NO_PLANET');
+  });
+
+  it('HERO-8: рядом с флотом В ПУТИ выйти нельзя — там нет узла', () => {
+    const st = rosterWorld();
+    st.fleets.raid = fleet('raid', 'p1', 'C');
+    st.fleets.raid.movement = { from: 'C', to: 'A', departedAt: 0, arrivesAt: 10 * HOUR };
+    st.heroes![SECOND]!.abilities = ['boarding'];
+    // Раньше герой садился на борт и в полёте тоже; своим флотом в пустоте не выйдешь.
+    expect(errCode(kernel.applyAction(st, spawn(SECOND, 'raid'), ctx(0)))).toBe(
+      'E_HOST_IN_TRANSIT',
+    );
   });
 
   it('HERO-8: the spawn_allied marker opens ALLIED worlds — not neutral, not at-war', () => {

@@ -77,7 +77,8 @@ Void Dominion — мобильная/браузерная **real-time** (неп�
   клиент игроков — `prototype/`.
   **Контент в браузере (AUD-1):** `gameData.ts`'s `FRAGMENTS` — клиентская копия списка
   фрагментов — несла 11 позиций из 18; не хватало `modules` и всего геройского слоя
-  (`heroes`/`heroAbilities`/`heroPassives`/`heroSkillTrees`/`heroFittings`) плюс `rewards`.
+  (`heroes`/`heroAbilities`/`heroPassives`/`heroSkillTrees` и тогда ещё `heroFittings`,
+  снятый позже в `HPR-1.5.4`) плюс `rewards`.
   Молчал баг из-за схемы: у каталогов стоит `.default({})`, поэтому неподанный фрагмент
   превращался в пустой объект, и `shippedGameData()` отдавал ВАЛИДНЫЙ бандл без контента.
   Починено; сторож `gameData.test.ts` (3 теста) держит три пути регрессии: паритет ключей
@@ -190,7 +191,7 @@ packages/action-layer/src/
   modules/       army, arsenalSync, artillery, autoRally, capital, captureOnArrival, combat, construction, diplomacy, economy, effects, espionage, faction, fleetOps, fleetRepair, forcedMarch, hero, heroEffects, instantRepair, intercept, market, movement, orbital, planetType, pve, scientist, seatClaim, sector, shuttle, standingOrders, station, steward, tax, technology, victory, visibility  (36 модулей, + *.test.ts; сколько из них СОБИРАЕТ каждое ядро — §9)
   examples/      skirmish.test.ts (демо-сценарий + SVG)
   index.ts       баррель (экспорт публичного API)
-data/            manifest, resources, units, buildings, factions, events, sectors, sectorKinds, planetTypes, technologies, scientists, rewards, heroes, heroAbilities, heroFittings, heroPassives, heroSkillTrees, modes, modules, medals, dropTables, starterArsenal (.json)
+data/            manifest, resources, units, buildings, factions, events, sectors, sectorKinds, planetTypes, technologies, scientists, rewards, heroes, heroAbilities, heroGrades, heroPassives, heroSkillTrees, modes, modules, medals, dropTables, starterArsenal (.json)
 localization/    ВЕСЬ текст для игрока: index.ts (метаданные без текстов: LocaleId/LOCALE_IDS/DEFAULT_LOCALE/LOCALE_LABEL/dataKey), ru.ts, en.ts (плоские карты ключ→текст, 1782 ключа), bundles.ts (LOCALE_SOURCES + запекание фолбэка bakedLocale, LOC-6), core.ts (рантайм поверх ПОДКЛЮЧЁННЫХ таблиц: registerMessages/t/tData/lookup/hasKey/setLocale/localizeStaticDom, LOC-5+LOC-6), runtime.ts (точка входа «все локали сразу» для прототипа и тестов) + core.test.ts/bundles.test.ts/runtime.test.ts, vitest.setup.ts. Мост старых msgid снят вместе с LOC-2 — в коде только ключи
 decisions/       ОБЩИЕ решения обоих клиентов (`decisions/README.md`): чистая функция + типы + тесты, ни DOM, ни сети. Заведена, потому что 179 вынесенных REFM-модулей легли внутрь `prototype/src` и новому клиенту недоступны — он пишет свои `welcomeScreen`/`matchHud`/`mapRender`/`camera`. Устроена как `/localization`: корневая папка, оба клиента тянут относительным путём, конфигурации сборки не нужно. Явные упоминания — `vitest.config.ts` (include тестов), `prototype/tsconfig.json` (include типов), `prototype/src/i18n.test.ts` (папка в списке потребителей локализации). Первый жилец — `joinLanding.ts` (ADDR-5). Старое задним числом не переносится: новое кладём сюда, старое переезжает, когда его и так трогают
 docs/            architecture, modulesystem, roadmap, deep-technical-roadmap, multiplayer, engineering-risks, gdd, metagame, state(этот)
@@ -1249,25 +1250,29 @@ E_NOT_DESTRUCTIBLE, E_OUT_OF_RANGE, E_COOLDOWN`.
   или удержанный кэпом герой поднимается вручную, когда мир/слот появился. Событие
   `hero.spawned` (авто-путь по-прежнему `hero.respawned`). **HERO-8:** ноская способность
   маркер-типа `spawn_fleet`/`spawn_allied` (не кастуемая — «носится» в `Hero.abilities`)
-  расширяет цели спавна: **свой флот** (герой абордажится в стек хоста — `addUnits`, аура
-  кроет весь флот, `fleetId`→хост, событие с `aboard: true`; чужой флот — `E_BAD_SPAWN`)
-  и **союзный мир** (D1-дипломатия, только `alliance`; нейтрал/война — `E_BAD_SPAWN`).
+  расширяет цели спавна: **свой флот** — герой выходит ТАМ, ГДЕ ТОТ СТОИТ, **отдельным
+  своим флотом рядом** (событие с `beside: <id хоста>`); хозяйский флот не меняется.
+  Флот в пути точкой выхода не служит (`E_HOST_IN_TRANSIT`) — узла там нет, а свой флот
+  надо где-то формировать; чужой флот — `E_BAD_SPAWN`. И **союзный мир** (D1-дипломатия,
+  только `alliance`; нейтрал/война — `E_BAD_SPAWN`).
   Шипованы «Абордажная транслокация» (ravager) и «Дипломатическая высадка» (commander).
-- Действие **`hero.fit {heroId, fitting}`** (HERO-6) — установка фитинга из
-  `data/heroFittings.json` (`HeroFittingDef {statMods, grants{ability?|passive?}, cost}`,
-  анти-self-expansion рефайн) в слот архетипа (`slots`; `Hero.fittings`, **без refit** —
-  owner-правило ship-модулей). Гейты: владение/живость → `E_NO_FITTING` →
-  `E_ALREADY_FITTED` → `E_NO_SLOTS` (безархетипный герой слотов не имеет) → казна.
-  **Инсталл-гейт — общий генерик-механизм «слоты+предметы»** (`util/fitting.ts`, SHIP-4):
-  `canInstall`/`validateInstalled(spec)` — каталог → дубль → `allowed` → бюджет
-  по категории, generic-причины, которые каждый потребитель мапит в СВОИ стабильные
-  `E_*`-коды; ship-лоадаут (`canEquip`/`validateLoadout`) и `hero.fit` — обёртки над ним
-  (герои = одно-категорийный бюджет без предиката), поведение и коды не изменились.
-  `grants` — живые (общий `applyGrants` с дедупом, HERO-4/5); `statMods` — данные без
-  шва эффективных статов героя (свой будущий кирпич; «designed, not live» — SHIP-4
-  унифицировал только слот-гейт, не статы). Событие `hero.fitted`. Шипованы
-  «Пси-усилитель» (scan), «Матрица „Эгида"» (rally_beacon), «Абляционная обшивка»
-  (hp+40, не live).
+- **Каждый герой ведёт СВОЙ флот (HERO-10, инвариант).** В одном флоте не больше одного
+  героя, и держится это на ВСЕХ путях, а не только на развёртывании: `fleet.merge`
+  отказывает `E_TWO_HEROES` при слиянии двух геройских флотов (забрать безгеройский —
+  можно, это обычное усиление армии), `fleet.split` не даёт отколоть корабль героя
+  (`E_HERO_UNIT`, было и раньше), а маркер `spawn_fleet` выводит героя РЯДОМ с флотом,
+  а не внутрь. Читатель у инварианта общий — `heroByFleet` в `state/heroes.ts`: потребителя
+  два и они в разных модулях, а модуль модулю не импортируется. **Следствие, ради которого
+  это и стоит помнить:** привязка смерти флота к герою однозначна ПО ПОСТРОЕНИЮ, а не по
+  аккуратности вызывающего.
+- **Инсталл-гейт — один генерик-механизм «слоты+предметы»** (`util/fitting.ts`, SHIP-4):
+  `canInstall`/`validateInstalled(spec)` — каталог → дубль → `allowed` → бюджет по
+  категории; generic-причины каждый потребитель мапит в СВОИ стабильные `E_*`-коды.
+  Потребителей ровно два, и оба ходят через него: ship-лоадаут
+  (`canEquip`/`validateLoadout`, типизированные отсеки корпуса) и слоты скиллов героя
+  (`hero.equip`, одно-категорийный бюджет без предиката). Третьего — `hero.fit` поверх
+  `heroFittings` — больше нет: система снесена в `HPR-1.5.4`, железо героя это обычные
+  модули корабля (см. пункт про `hero.install` выше).
 - **Пред-матч ростер (HERO-9, buildFromMap):** `SlotAssignment.heroes?: string[]` — до
   **3 разных** архетипов (решение по прецедентам C3/совета учёных: снапшот при сборке;
   `E_UNKNOWN_HERO`/`E_DUPLICATE_HERO`/`E_TOO_MANY_HEROES`; ростер без владеемого мира —
@@ -1646,7 +1651,8 @@ vanguard/warden`; `branch` — своя ось `transhuman|psionic`, `ship.unit`
   `startAbilities`/`startPassives`), `heroAbilities.json` (`{type, cooldownHours, range,
 cost, params}` — включая маркер-типы `spawn_fleet`/`spawn_allied`), `heroPassives.json`
   (`{hook, scope, params}`), `heroSkillTrees.json` (`{branch?, requires[], cost,
-grants}`), `heroFittings.json` (`{statMods, grants, cost}`). **Обе ветки дерева — по
+grants}`), `heroGrades.json` (`{name, skillSlots, moduleSlots}` — бюджеты обеих осей).
+**Обе ветки дерева — по
   четыре узла и по одной цене** (решение владельца после балансного разбора): ветки
   берут разные ресурсы, поэтому сравнены в ЧАСАХ ПРОИЗВОДИТЕЛЯ — 4 + 9 + 14 + 22 часа
   здания L1 плюс 0/100/150/250 кредитов на обеих. Transhuman платит микроэлектроникой

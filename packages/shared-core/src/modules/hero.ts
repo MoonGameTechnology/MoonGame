@@ -13,14 +13,13 @@ import type {
 } from '../state/gameState';
 import { stacksHaveTrait } from '../data/traits';
 import { getStance, stanceToRelation } from '../state/diplomacy';
-import { fleetSideDealingHit, heroNode } from '../state/heroes';
+import { fleetSideDealingHit, heroByFleet, heroNode } from '../state/heroes';
 import { distance } from '../state/route';
 import { isCapturable } from '../state/sectorKind';
 import { laneIsPublic } from '../state/corridor';
 import { isAllied } from '../util/combat';
 import { canInstall } from '../util/fitting';
 import { moduleAllowed, type SlotCounts } from '../util/loadout';
-import { addUnits } from '../util/stacks';
 import { canAfford, payCost } from '../util/treasury';
 
 /**
@@ -129,14 +128,6 @@ function heroOf(state: GameState, playerId: PlayerId): Hero | undefined {
     if (heroes[id]!.owner === playerId) return heroes[id];
   }
   return undefined;
-}
-
-/** The hero commanding this fleet (its ship), if any. Insertion-order stable. The
- *  undefined guard keeps the hero-less common case allocation-free — this runs on
- *  every fleet.transit/arrived and both death signals. */
-function heroByFleet(state: GameState, fleetId: string): Hero | undefined {
-  if (state.heroes === undefined) return undefined;
-  return Object.values(state.heroes).find((hero) => hero.fleetId === fleetId);
 }
 
 /** Does this fleet currently carry a living hero unit? (drives the fleet aura). */
@@ -312,17 +303,6 @@ function formHeroShip(h: HandlerContext, hero: Hero, at: PlanetId): string {
   hero.location = at;
   hero.fleetId = fleetId;
   return fleetId;
-}
-
-/** Board the hero onto an existing fleet (HERO-8 `spawn_fleet`): its ship joins the
- *  host's stack (the whole fleet then enjoys the hero aura), the hero commands the
- *  host. Mid-flight hosts keep the hero's node memory unchanged. */
-function boardHeroShip(h: HandlerContext, hero: Hero, host: Fleet): void {
-  const ship = heroShipStack(h, hero);
-  addUnits(host.units, ship.unit, 1, ship.modules);
-  hero.alive = true;
-  if (typeof host.location === 'string') hero.location = host.location;
-  hero.fleetId = host.id;
 }
 
 /** Charge `cost` to the player's treasury or reject — the shared terminal gate of every
@@ -576,7 +556,7 @@ function castAnnihilate(h: HandlerContext, playerId: PlayerId, planetId: PlanetI
 
 export const heroModule: GameModule = {
   id: 'hero',
-  version: '2.0.0',
+  version: '3.0.0',
   setup(api) {
     api.onAction('hero.move', (action, h) => {
       const { to } = action.payload as { to?: string };
@@ -866,6 +846,12 @@ export const heroModule: GameModule = {
         if (host.owner !== action.playerId || !carriesAbilityType(h, hero, SPAWN_FLEET_TYPE)) {
           return h.reject('E_BAD_SPAWN');
         }
+        // Появиться РЯДОМ с флотом можно только там, где у флота есть узел: в полёте
+        // его нет вовсе. Раньше герой садился на борт и в пути тоже — теперь он
+        // формирует собственный флот, а формировать его в пустоте не на чем.
+        if (host.movement || typeof host.location !== 'string') {
+          return h.reject('E_HOST_IN_TRANSIT');
+        }
       }
       if (activeHeroCount(h.state, action.playerId) >= HERO_ACTIVE_CAP) {
         return h.reject('E_HERO_CAP');
@@ -874,14 +860,13 @@ export const heroModule: GameModule = {
         const fleetId = formHeroShip(h, hero, at);
         h.emit('hero.spawned', { owner: action.playerId, heroId, fleetId, at });
       } else if (host) {
-        boardHeroShip(h, hero, host);
-        h.emit('hero.spawned', {
-          owner: action.playerId,
-          heroId,
-          fleetId: host.id,
-          at: hero.location,
-          aboard: true,
-        });
+        // Резолюция владельца 2026-09-08: каждый герой ведёт СВОЙ флот. Маркер
+        // `spawn_fleet` теперь не сажает на борт, а разрешает выйти ТАМ, где стоит
+        // свой флот, — отдельным флотом рядом. Тактический смысл (развернуться
+        // вперёд, а не только дома) сохранён целиком, инвариант не нарушен.
+        const at = host.location as PlanetId; // гейт выше уже отверг флот в пути
+        const fleetId = formHeroShip(h, hero, at);
+        h.emit('hero.spawned', { owner: action.playerId, heroId, fleetId, at, beside: host.id });
       }
     });
 
