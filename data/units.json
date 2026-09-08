@@ -7,7 +7,7 @@
       "speed": 12,
       "hp": 6
     },
-    "line": "rear",
+    "line": "mid",
     "traits": [],
     "abilities": [
       "long_range_scan"
@@ -30,6 +30,7 @@
       "hp": 22,
       "cargoCapacity": 1
     },
+    "line": "mid",
     "radarRange": 60,
     "cost": {
       "metal": 55,
@@ -52,6 +53,7 @@
       "hp": 60,
       "cargoCapacity": 5
     },
+    "line": "front",
     "signature": 4,
     "cost": {
       "metal": 60,
@@ -74,13 +76,10 @@
       "attack": 18,
       "defense": 2,
       "speed": 5,
-      "hp": 14,
-      "range": 300
+      "hp": 14
     },
     "line": "rear",
-    "traits": [
-      "artillery"
-    ],
+    "traits": [],
     "abilities": [],
     "signature": 5,
     "cost": {
@@ -101,6 +100,7 @@
       "hp": 50,
       "cargoCapacity": 8
     },
+    "line": "front",
     "signature": 3,
     "cost": {
       "metal": 70,
@@ -235,6 +235,7 @@
       "speed": 40,
       "hp": 180
     },
+    "line": "front",
     "traits": [
       "hero"
     ],
@@ -264,6 +265,7 @@
       "fuel": 3,
       "rearmRounds": 2
     },
+    "line": "front",
     "traits": [
       "shuttle"
     ],
@@ -290,6 +292,7 @@
       "hp": 70,
       "cargoCapacity": 6
     },
+    "line": "front",
     "traits": [
       "carrier"
     ],
@@ -316,6 +319,7 @@
       "hp": 12,
       "cargoCapacity": 1
     },
+    "line": "mid",
     "cost": {
       "metal": 20
     },
@@ -334,12 +338,10 @@
       "attack": 30,
       "defense": 6,
       "speed": 30,
-      "hp": 40,
-      "range": 240
+      "hp": 40
     },
-    "traits": [
-      "artillery"
-    ],
+    "line": "rear",
+    "traits": [],
     "cost": {
       "metal": 90,
       "credits": 40,
@@ -350,6 +352,33 @@
       "credits": 48
     },
     "signature": 5,
+    "slots": {
+      "weapon": 1,
+      "utility": 1
+    }
+  },
+  "artillery": {
+    "faction": "blue",
+    "stats": {
+      "attack": 26,
+      "defense": 4,
+      "speed": 26,
+      "hp": 24,
+      "range": 300
+    },
+    "traits": [
+      "artillery"
+    ],
+    "signature": 5,
+    "cost": {
+      "metal": 110,
+      "credits": 50,
+      "microelectronics": 5
+    },
+    "buildTimeHours": 6,
+    "upkeep": {
+      "credits": 56
+    },
     "slots": {
       "weapon": 1,
       "utility": 1

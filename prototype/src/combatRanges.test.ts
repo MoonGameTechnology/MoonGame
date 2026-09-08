@@ -28,7 +28,7 @@ function withFleet(units: Array<{ unit: string; count: number }>): {
 
 describe('RANGE-UX — радиусы приходят из ядра, а не из интерфейса', () => {
   it('круг артиллерии равен artilleryRange ядра — до последней единицы', () => {
-    const { s, fleet } = withFleet([{ unit: 'siege', count: 2 }]);
+    const { s, fleet } = withFleet([{ unit: 'artillery', count: 2 }]);
     const ring = combatRanges(s, data, [fleet.id], ME, locate, seen).rings.find(
       (r) => r.kind === 'artillery',
     );
@@ -66,7 +66,7 @@ describe('RANGE-UX — радиусы приходят из ядра, а не и
   });
 
   it('линия огня рисуется ТОЛЬКО когда цель существует', () => {
-    const { s, fleet } = withFleet([{ unit: 'siege', count: 1 }]);
+    const { s, fleet } = withFleet([{ unit: 'artillery', count: 1 }]);
     // цель есть
     const foe = Object.values(s.fleets).find((f) => f.id !== fleet.id);
     if (foe) {

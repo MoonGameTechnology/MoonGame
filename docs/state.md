@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 5695 зелёных** (61 skip, 429 файлов).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 5706 зелёных** (61 skip, 429 файлов).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -591,10 +591,20 @@ INSTEAD-of-фокус — opportunity-cost (лидер-«+слот» branchless)
   `util/stacks.ts`); все сверх капа только впитывают урон (пулы корпуса/щита —
   без капа). Кап действует на обе стороны любого рода (флот/десант/гарнизон),
   на бомбардировку и артиллерию; ПВО (`aaDamage`) и карго — вне капа.
-  `previewBattle` считает с тем же капом (паритет закреплён тестом). Линии
-  `front/mid/rear/artillery`
-  (артиллерия — трейт `artillery`, в ближнем бою бьёт `attack` и получает урон
-  последней; вне боя бьёт **на расстоянии** — см. `runArtillery` ниже). Пул HP стека с переносом, `unit.died`. **Это же — сейчас — и наземная фаза** (десант/гарнизон),
+  `previewBattle` считает с тем же капом (паритет закреплён тестом).
+  **Линии получения урона** `front/mid/rear/artillery` (`util/combat.ts`): залп
+  делится между ВСЕМИ линиями, которые есть в бою, — `LINE_SHARE` 40/30/20/10 %.
+  Линия без живого корабля не участвует, и её процент делится **поровну** между
+  присутствующими; неделимый остаток идёт вперёд (нос округляется вверх, корма
+  вниз), поэтому front+mid+rear без артиллерии — 44/33/23, а одна линия всегда
+  берёт 100 % (`lineShares`, сумма ровно 100). Переполнение не пропадает: линия,
+  которой досталось больше, чем она может впитать, гибнет, а остаток
+  переразделяется по ТОМУ ЖЕ правилу между уцелевшими (правило одно, не два;
+  проходов максимум четыре — каждый либо тратит всё, либо выбивает линию).
+  Линия — свойство **корабля**: у наземных `unitTier` всегда `front`, то есть
+  армию раздача не режет. Артиллерийская линия — ровно трейт `artillery` (он же
+  даёт огонь **на расстоянии**, см. `runArtillery` ниже), и несёт его один корпус —
+  `artillery`. Пул HP стека с переносом, `unit.died`. **Это же — сейчас — и наземная фаза** (десант/гарнизон),
   плоской моделью, той же, что флот/орбита. `state/groundCombat.ts` (FND-4,
   game-vision-roadmap.md) — готовый, протестированный тип-матричный движок
   (`GROUND_ROSTER` militia/heavy_infantry/special_forces/tank, пер-цель atk/def,
@@ -1527,7 +1537,7 @@ ad-hoc запрос «видим ли объект на identify-уровне» 
 экран меню (Этап 4), персистентность меты + `MatchStore.list` (Postgres уже под это
 индексирован), лобби/создание матча (MM-1.1).
 
-## 6. Данные (`data/*.json`, версия `0.1.17`)
+## 6. Данные (`data/*.json`, версия `0.1.18`)
 
 > **RULES-2 — правила про КОНТЕНТ живут здесь, а не в коде.** Поля-правила у зданий:
 > `maxPerPlanet` (лимит экземпляров на мире, дефолт 1) и `creditsBonus` (доля прибавки ко
@@ -1620,11 +1630,18 @@ ad-hoc запрос «видим ли объект на identify-уровне» 
 - **units** (схема `UnitDef`): `domain('space'|'ground')`, `stats{attack, defense,
 speed, hp, shield, range, cargoCapacity, cargoSize, aaDamage}` (+ любые доп. числа),
   `line, traits, abilities, cost, buildTimeHours, upkeep`, `signature, radarRange`
-  (армия очков не даёт — см. victory). Есть: `scout_drone, sensor_frigate,
-cruiser, siege_lance(artillery,range), dropship(cargoCapacity 12), militia,
-drop_infantry, tank(cargoSize 1), heavy_infantry, special_forces, hero, interceptor,
-strike_carrier` (13 юнитов, все vanguard; `orbital_aa` — защитное здание, не юнит;
+  (армия очков не даёт — см. victory). Есть: `scout_drone, scout, sensor_frigate,
+cruiser, siege, siege_lance, artillery(artillery,range 300), dropship(cargoCapacity 8),
+militia, drop_infantry, tank(cargoSize 1), heavy_infantry, special_forces, hero,
+interceptor, strike_carrier` (16 юнитов: 13 `vanguard` + 3 `blue`, приехавших из
+каталога прототипа с CONV-12a; `orbital_aa` — защитное здание, не юнит;
 `infected_cruiser` в контенте нет).
+  **Линии получения урона — свойство кораблей** (GDD §7.2, раздача — в §5,
+  `combat.tick`): front — `cruiser, dropship, strike_carrier, interceptor, hero`;
+  mid — `scout, scout_drone, sensor_frigate`; rear — `siege, siege_lance`;
+  артиллерийская — `artillery`, ЕДИНСТВЕННЫЙ носитель трейта `artillery`. Осадные
+  платформы трейт отдали ему вместе со `stats.range`, поэтому огня с дистанции они
+  больше не ведут и дерутся из задней линии. У наземных `line` не читается.
   `sensor_frigate` — носитель дальнего радара: один `utility`-слот, своя антенна 60, и
   это ЕДИНСТВЕННЫЙ корпус, куда встаёт `radar_module` (`allowed.units` в `modules.json`,
   исполняет общий гейт `canEquip` → `E_NOT_ALLOWED`).
@@ -2183,7 +2200,8 @@ instantRepair, fleetRepair, effects, seatClaim])` (35 модулей — сос�
   целятся тапом по КАРТЕ, поэтому взводят хост (`armCast`/`armSpawn`) и отвечают
   `'close'` — `heroAim`/`heroSpawnAim` остались в `main.ts`. Инлайн-данные `game.ts` дополнены каталогом
   `modules` (6 модулей, зеркало `data/modules.json`) + типизированными `slots` на корпусах
-  кораблей (cruiser/siege/scout/dropship) и челноков (interceptor/strike_carrier).
+  кораблей (cruiser/siege/artillery/scout/sensor_frigate/dropship) и челноков
+  (interceptor/strike_carrier).
   Тесты: `shipyard.test.ts` (38) — цена и полоса характеристики (включая экранирование
   подписи, CWE-79), метка «откуда» (LARS-4), фильтр по снимку арсенала (ARS-5),
   нормализация черновика, разметка панели (гашение заказа без казны и без своих миров),

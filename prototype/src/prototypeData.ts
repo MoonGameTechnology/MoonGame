@@ -327,6 +327,7 @@ export const data: GameData = parseGameData({
     scout: {
       faction: 'blue',
       stats: { attack: 5, defense: 4, speed: 64, hp: 12, cargoCapacity: 1 },
+      line: 'mid', // eyes, not a shield wall — screened by the hulls in front
       signature: 1, // quiet recon hull
       radarRange: 105, // projects fleet radar — read by both the core fog and the prototype view (плейтест 2026-07-18: −50%)
       cost: { metal: 20 },
@@ -341,6 +342,7 @@ export const data: GameData = parseGameData({
     sensor_frigate: {
       faction: 'blue',
       stats: { attack: 4, defense: 6, speed: 56, hp: 22, cargoCapacity: 1 },
+      line: 'mid', // стоит за боевой линией вместе с разведчиком
       signature: 1, // слушает, а не кричит — читается как разведкорпус
       radarRange: 60, // своя антенна скромная; дальнее зрение даёт модуль
       cost: { metal: 55, microelectronics: 2 }, // ECON-7: сенсоры — хай-тек
@@ -361,23 +363,41 @@ export const data: GameData = parseGameData({
       slots: { weapon: 1, defense: 1, utility: 1 }, // the balanced warship: one of each bay
     },
     siege: {
-      // Artillery: a backline platform that fires from range at one target —
-      // a pure standoff (no return fire) within `range` map units (combat
-      // runArtillery). Reaches ~one neighbouring world (~205 apart), no further.
+      // A heavy gun platform that fights IN the battle from the rear line: the
+      // biggest single gun in the roster, but it must close with the enemy like
+      // everyone else. Standoff fire moved to the dedicated `artillery` hull —
+      // the `artillery` trait is what the core reads for it, and this hull no
+      // longer carries it (so its old `range` would have been dead data).
       faction: 'blue',
-      stats: { attack: 30, defense: 6, speed: 30, hp: 40, range: 240 },
-      traits: ['artillery'],
+      stats: { attack: 30, defense: 6, speed: 30, hp: 40 },
+      line: 'rear',
       signature: 5, // huge siege platform — loudest
       cost: { metal: 90, credits: 40, microelectronics: 4 }, // ECON-7: guided munitions
       buildTimeHours: 5,
       upkeep: { credits: 48 },
       slots: { weapon: 1, utility: 1 }, // a gun bay + a utility bay — a glass cannon
     },
+    artillery: {
+      // THE standoff platform (the only one): fires at a single target from
+      // `range` map units away without joining the melee — the `artillery` trait
+      // is what the core reads, both for that fire and for the artillery LINE,
+      // which takes just 10% of an incoming volley while the fleet in front of it
+      // still stands. Priced for that shelter: it dies the moment it is exposed.
+      faction: 'blue',
+      stats: { attack: 26, defense: 4, speed: 26, hp: 24, range: 300 },
+      traits: ['artillery'],
+      signature: 5, // a gun this big is not subtle
+      cost: { metal: 110, credits: 50, microelectronics: 5 }, // ECON-7: guided munitions
+      buildTimeHours: 6,
+      upkeep: { credits: 56 },
+      slots: { weapon: 1, utility: 1 },
+    },
     dropship: {
       // Carrier hull (GDD §6.1 / backlog SHIP): the biggest hold in the fleet but almost
       // no guns — it hauls divisions (and, later, shuttles) and wants an escort.
       faction: 'blue',
       stats: { attack: 2, defense: 6, speed: 44, hp: 50, cargoCapacity: 8 },
+      line: 'front', // a big hull is a shield whether or not it wants to be
       signature: 3, // a fat hauler — easy to spot
       cost: { metal: 70, credits: 20 },
       buildTimeHours: 4,
@@ -397,6 +417,7 @@ export const data: GameData = parseGameData({
         fuel: 3,
         rearmRounds: 2,
       },
+      line: 'front', // a strike wing goes in first
       traits: ['shuttle'],
       signature: 2,
       cost: { metal: 90, credits: 40, microelectronics: 10 },
@@ -408,6 +429,7 @@ export const data: GameData = parseGameData({
       // A slow, tanky flat-top with few guns of its own — its punch is the shuttles it carries.
       faction: 'blue',
       stats: { attack: 4, defense: 10, speed: 40, hp: 70, cargoCapacity: 6 },
+      line: 'front', // the fattest hull afloat — it holds the line
       traits: ['carrier'],
       signature: 6,
       cost: { metal: 320, credits: 160 },

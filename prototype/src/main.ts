@@ -961,6 +961,7 @@ const BUILD_UNITS = [
   'cruiser',
   'scout',
   'siege',
+  'artillery',
   'strike_carrier',
   'interceptor',
   'militia',

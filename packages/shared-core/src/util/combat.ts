@@ -20,12 +20,69 @@ import { getStance, type DiplomacyCapability } from '../state/diplomacy';
 export const MAX_COMBAT_ROUNDS = 240;
 
 export type Tier = 'front' | 'mid' | 'rear' | 'artillery';
-/** Damage-receiving order (GDD §7.2): artillery is only reachable once the
- *  front, mid and rear lines are gone. */
+/** The lines bow to stern (GDD §7.2). Not a damage ORDER any more — every line
+ *  present in the fight is hit in the same volley; the order decides only which
+ *  line rounds UP when an absent line's share is split (see {@link lineShares}). */
 export const TIER_ORDER: readonly Tier[] = ['front', 'mid', 'rear', 'artillery'];
 
+/** Share of an incoming volley each line takes, in whole percent (sums to 100).
+ *  A line with no live ship takes nothing and its share is split across the lines
+ *  that ARE present. Balance constants (like COMBAT_UNIT_CAP) — data after shakeout. */
+export const LINE_SHARE: Readonly<Record<Tier, number>> = {
+  front: 40,
+  mid: 30,
+  rear: 20,
+  artillery: 10,
+};
+
+/**
+ * Which line a unit takes its damage in.
+ *
+ * Lines are a SHIP formation: a ground assault is one body of troops, so every
+ * ground unit shares the front line and the whole volley lands on it — the split
+ * below can never carve up an army. The `artillery` trait carries its own line
+ * (it is the same flag that lets the unit fire from standoff range), so an
+ * artillery ship never needs to restate it in `line`.
+ */
 export function unitTier(def: UnitDef): Tier {
+  if (def.domain === 'ground') {
+    return 'front';
+  }
   return def.traits.includes('artillery') ? 'artillery' : def.line;
+}
+
+/**
+ * How a volley splits across the lines that are actually in the fight, in whole
+ * percent summing to exactly 100 (GDD §7.2).
+ *
+ * Base split is {@link LINE_SHARE}; an ABSENT line takes nothing and its percent
+ * is divided EVENLY among the present ones. When that division is not whole, the
+ * odd percent goes to the more forward lines (bow rounds up, stern rounds down) —
+ * so front+mid+rear with no artillery is 44/33/23, not 43/33/23 or 44/34/23.
+ * One line alone therefore always takes 100%.
+ *
+ * `present` need not be sorted: the result is read off {@link TIER_ORDER}, so the
+ * split is a pure function of WHICH lines are in the fight, never of stack order.
+ */
+export function lineShares(present: readonly Tier[]): Record<Tier, number> {
+  const out: Record<Tier, number> = { front: 0, mid: 0, rear: 0, artillery: 0 };
+  const lines = TIER_ORDER.filter((tier) => present.includes(tier));
+  if (lines.length === 0) {
+    return out;
+  }
+  let orphaned = 100;
+  for (const tier of lines) {
+    orphaned -= LINE_SHARE[tier];
+  }
+  const each = Math.floor(orphaned / lines.length);
+  let odd = orphaned - each * lines.length;
+  for (const tier of lines) {
+    out[tier] = LINE_SHARE[tier] + each + (odd > 0 ? 1 : 0);
+    if (odd > 0) {
+      odd -= 1;
+    }
+  }
+  return out;
 }
 
 // --- combatant side access (ships / landing troops / planet garrison) --------
@@ -139,12 +196,102 @@ export function stackHull(
 }
 
 /**
- * The PURE damage model: applies `totalDamage` to a unit list, filling the
- * receiving lines in tier order. Tracks each stack's remaining HP pool so
- * partial damage persists across rounds; whole ships/troops are lost as the
- * pool drops. No bus access — losses are RETURNED (`deaths`, in processing
- * order) so the math is unit-testable in isolation; the `applyDamage` wrapper
- * turns each loss into a `unit.died` event.
+ * Damage ONE line: spends `amount` on the line's stacks (sorted by unit id, so
+ * the order is data-driven and not stack order) and RETURNS what the line could
+ * not absorb. Each stack's remaining HP pool is tracked so partial damage
+ * persists across rounds; whole ships/troops are lost as the pool drops.
+ */
+function damageLine(
+  units: UnitStack[],
+  tier: Tier,
+  amount: number,
+  data: GameData,
+  deaths: { unit: string; count: number }[],
+): number {
+  let remaining = amount;
+  const stacks = units
+    .filter((s) => {
+      if (s.count <= 0) {
+        return false;
+      }
+      const def = data.units[s.unit];
+      return def ? unitTier(def) === tier : false;
+    })
+    .sort((a, b) => (a.unit < b.unit ? -1 : a.unit > b.unit ? 1 : 0));
+
+  for (const stack of stacks) {
+    if (remaining <= 0) {
+      break;
+    }
+    const def = data.units[stack.unit];
+    if (!def) {
+      continue;
+    }
+    const eff = effectiveStats(def, stack, data);
+    const { perShip, pool: startPool } = stackHull(stack, eff.hp);
+
+    // Ablative shield absorbs first (shields-roadmap SH-0.2); only the overflow
+    // reaches the hull. A shield never kills — a ship dies only when its hull hits 0.
+    const shieldPerShip = eff.shield ?? 0;
+    if (shieldPerShip > 0) {
+      let shield = stack.shieldHp ?? stack.count * shieldPerShip;
+      const shieldAbsorbed = Math.min(remaining, shield);
+      shield -= shieldAbsorbed;
+      remaining -= shieldAbsorbed;
+      stack.shieldHp = shield;
+      if (remaining <= 0) {
+        continue; // shield soaked it all — hull untouched
+      }
+    }
+
+    let pool = startPool;
+    const absorbed = Math.min(remaining, pool);
+    pool -= absorbed;
+    remaining -= absorbed;
+
+    const newCount = pool <= 0 ? 0 : Math.ceil(pool / perShip);
+    const lost = stack.count - newCount;
+    if (lost > 0) {
+      deaths.push({ unit: stack.unit, count: lost });
+    }
+    stack.count = newCount;
+    stack.hp = newCount > 0 ? pool : 0;
+    // Dead ships take their shields with them: cap the pool at surviving capacity.
+    if (shieldPerShip > 0) {
+      stack.shieldHp = newCount > 0 ? Math.min(stack.shieldHp ?? 0, newCount * shieldPerShip) : 0;
+    }
+  }
+  return remaining;
+}
+
+/** The lines that have at least one live ship, in {@link TIER_ORDER}. A stack whose
+ *  unit is missing from `data` belongs to no line — it neither fires nor is hit. */
+function presentLines(units: readonly UnitStack[], data: GameData): Tier[] {
+  return TIER_ORDER.filter((tier) =>
+    units.some((s) => {
+      if (s.count <= 0) {
+        return false;
+      }
+      const def = data.units[s.unit];
+      return def ? unitTier(def) === tier : false;
+    }),
+  );
+}
+
+/**
+ * The PURE damage model (GDD §7.2): EVERY line in the fight takes a slice of
+ * `totalDamage` in the same volley — {@link lineShares} says how big a slice,
+ * given which lines are present.
+ *
+ * Overkill is never wasted: a line handed more than it can absorb dies and its
+ * leftover is re-split over the lines still standing by the SAME rule — the
+ * split is simply recomputed and the pass repeats. There is one rule in the
+ * game, not a split rule plus a spill rule. That terminates in at most four
+ * passes: a pass either spends everything or empties a line.
+ *
+ * No bus access — losses are RETURNED (`deaths`, in processing order) so the math
+ * is unit-testable in isolation; the `applyDamage` wrapper turns each loss into a
+ * `unit.died` event.
  */
 export function damageUnits(
   units: UnitStack[],
@@ -153,59 +300,26 @@ export function damageUnits(
 ): { survivors: UnitStack[]; deaths: { unit: string; count: number }[] } {
   const deaths: { unit: string; count: number }[] = [];
   let remaining = totalDamage;
-  for (const tier of TIER_ORDER) {
-    if (remaining <= 0) {
-      break;
+  while (remaining > 0) {
+    const lines = presentLines(units, data);
+    if (lines.length === 0) {
+      break; // nothing left that can be hit
     }
-    const stacks = units
-      .filter((s) => {
-        const def = data.units[s.unit];
-        return def ? unitTier(def) === tier : false;
-      })
-      .sort((a, b) => (a.unit < b.unit ? -1 : a.unit > b.unit ? 1 : 0));
-
-    for (const stack of stacks) {
-      if (remaining <= 0) {
-        break;
-      }
-      const def = data.units[stack.unit];
-      if (!def) {
-        continue;
-      }
-      const eff = effectiveStats(def, stack, data);
-      const { perShip, pool: startPool } = stackHull(stack, eff.hp);
-
-      // Ablative shield absorbs first (shields-roadmap SH-0.2); only the overflow
-      // reaches the hull. A shield never kills — a ship dies only when its hull hits 0.
-      const shieldPerShip = eff.shield ?? 0;
-      if (shieldPerShip > 0) {
-        let shield = stack.shieldHp ?? stack.count * shieldPerShip;
-        const shieldAbsorbed = Math.min(remaining, shield);
-        shield -= shieldAbsorbed;
-        remaining -= shieldAbsorbed;
-        stack.shieldHp = shield;
-        if (remaining <= 0) {
-          continue; // shield soaked it all — hull untouched
-        }
-      }
-
-      let pool = startPool;
-      const absorbed = Math.min(remaining, pool);
-      pool -= absorbed;
-      remaining -= absorbed;
-
-      const newCount = pool <= 0 ? 0 : Math.ceil(pool / perShip);
-      const lost = stack.count - newCount;
-      if (lost > 0) {
-        deaths.push({ unit: stack.unit, count: lost });
-      }
-      stack.count = newCount;
-      stack.hp = newCount > 0 ? pool : 0;
-      // Dead ships take their shields with them: cap the pool at surviving capacity.
-      if (shieldPerShip > 0) {
-        stack.shieldHp = newCount > 0 ? Math.min(stack.shieldHp ?? 0, newCount * shieldPerShip) : 0;
-      }
+    const shares = lineShares(lines);
+    let allocated = 0;
+    let leftover = 0;
+    for (const [i, tier] of lines.entries()) {
+      // The last line takes the exact remainder, so splitting by percent can
+      // neither lose nor mint damage to floating-point rounding.
+      const slice =
+        i === lines.length - 1 ? remaining - allocated : (remaining * shares[tier]) / 100;
+      allocated += slice;
+      leftover += damageLine(units, tier, slice, data, deaths);
     }
+    if (leftover >= remaining) {
+      break; // absorbed nothing — cannot happen with live lines, but never spin
+    }
+    remaining = leftover;
   }
   return { survivors: units.filter((s) => s.count > 0), deaths };
 }

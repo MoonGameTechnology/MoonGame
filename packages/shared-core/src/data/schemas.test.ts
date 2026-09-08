@@ -27,9 +27,21 @@ function loadShippedBundle(): Record<string, unknown> {
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.17');
+    expect(data.version).toBe('0.1.18');
     expect(data.resources).toContain('microelectronics');
-    expect(data.units.siege_lance?.stats.range).toBe(300); // artillery firing radius (map units)
+    // The `artillery` hull is the ONE standoff platform: the trait is what the core
+    // reads for both standoff fire and the artillery damage line, and `range` is the
+    // firing radius (map units). The siege platforms handed the role over to it.
+    expect(data.units.artillery?.traits).toContain('artillery');
+    expect(data.units.artillery?.stats.range).toBe(300);
+    for (const id of ['siege', 'siege_lance']) {
+      expect(data.units[id]?.traits).not.toContain('artillery');
+      expect(data.units[id]?.stats.range ?? 0).toBe(0);
+    }
+    // Damage lines are a SHIP formation (GDD §7.2) — the ship roster fills all four.
+    expect(data.units.cruiser?.line).toBe('front');
+    expect(data.units.scout?.line).toBe('mid');
+    expect(data.units.siege?.line).toBe('rear');
     expect(data.units.cruiser?.upkeep.credits).toBe(32); // daily upkeep, BAL-3 scale
     // fleet ⊕ ground-army separation: domains + transport capacity.
     expect(data.units.cruiser?.domain).toBe('space'); // schema default

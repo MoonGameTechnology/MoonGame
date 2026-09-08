@@ -42,6 +42,7 @@ export const UNIT_ICON: Record<string, string> = {
   cruiser: '▲',
   scout: '◌',
   siege: '✦',
+  artillery: '✧', // the standoff battery — a lighter echo of the siege platform ✦
   strike_carrier: '◈', // a flat-top capital hull — hangar bays for the wing
   interceptor: '△', // light strike wing (hollow, to read apart from the cruiser ▲)
   hero: '♔', // the player's projection — a crowned flagship

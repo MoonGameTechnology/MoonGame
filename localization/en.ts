@@ -604,6 +604,7 @@ export const en: Record<string, string> = {
   'data.microelectronics-fab': 'Microelectronics Fab',
   'data.microelectronics-fabrication': 'Microelectronics Fabrication',
   'data.microelectronics': 'microelectronics',
+  'data.mid': 'mid',
   'data.militia': 'militia',
   'data.nebula': 'Nebula',
   'data.neural-lace': 'Neural Lace',
@@ -775,6 +776,9 @@ export const en: Record<string, string> = {
   'dossier.task.queued': 'Queued — not started yet.',
   'dossier.task.title': 'Building',
   'dossier.task.unit-ready': "Joins the planet's garrison/fleet once finished.",
+  'dossier.unit.artillery.desc':
+    'A long-range battery: it hits one target from {r} away without joining the battle and without taking return fire. The price is a glass hull ({hp}) and a slow one. It stands in its own ARTILLERY line: while a single ship still stands in front of it, only a tenth of a volley reaches it — but left alone, it takes everything.',
+  'dossier.unit.artillery.name': 'Artillery',
   'dossier.unit.cruiser.desc':
     "The battle line's workhorse: {a} attack, {hp} hull and a hold for {c}. A general-purpose warship, equally solid on offense and defense.",
   'dossier.unit.cruiser.name': 'Cruiser',
@@ -789,7 +793,7 @@ export const en: Record<string, string> = {
     'A light recon hull. Fast (speed {sp}) and almost silent (signature {sig}) — it maps the void where a battle fleet fears to go.',
   'dossier.unit.scout.name': 'Scout',
   'dossier.unit.siege.desc':
-    'A heavy siege platform: {a} damage from range {r}, but thin armor ({d} defense). Its place is behind the cruisers, from where it smashes fortifications and shipyards.',
+    "A heavy siege platform: the fleet's biggest single gun ({a} damage) on thin armor ({d} defense, {hp} hull). It stands in the REAR line, so only a fifth of an incoming volley reaches it while the cruisers hold the front. It has no standoff fire: to shoot, it joins the battle like everyone else.",
   'dossier.unit.siege.name': 'Siege Platform',
   'dossier.unit.strike-carrier.desc':
     'A slow armored carrier ({hp} hull, hold for {c}) — almost no guns of its own, all its strength is in the shuttles it carries. Keep it behind and launch them at a target with "🛩 Launch shuttles".',

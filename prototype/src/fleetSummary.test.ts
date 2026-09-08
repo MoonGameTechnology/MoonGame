@@ -72,7 +72,7 @@ describe('сводка армии — состав', () => {
   it('корабли складываются по архетипам в порядке состава', () => {
     const s = sum([
       { unit: 'cruiser', count: 2 },
-      { unit: 'siege', count: 1 },
+      { unit: 'artillery', count: 1 },
       { unit: 'scout', count: 3 },
     ]);
     expect(s.composition).toEqual([
