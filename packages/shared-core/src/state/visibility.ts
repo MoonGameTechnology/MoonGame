@@ -519,9 +519,16 @@ function project(
   delete view.fog; // memory is authoritative-internal — never shipped raw
   // The seeded RNG stream (sfc32 a/b/c/d) is the world's dice: a client holding it can
   // roll every upcoming combat round / dark event before the server does — the sharpest
-  // hidden-information leak there is. Authoritative-internal like `fog`: only the server
-  // runs the kernel (a net-mode client renders snapshots, it never calls advanceTo /
-  // applyAction), and `hashState` never reads it, so the desync digest is unaffected.
+  // hidden-information leak there is. Authoritative-internal like `fog`; `hashState`
+  // never reads it, so the desync digest is unaffected.
+  //
+  // ВНИМАНИЕ на будущее. Здесь стояло обоснование «ядро крутит только сервер, сетевой
+  // клиент лишь рисует снапшоты и applyAction не зовёт». Оно ПРОТУХЛО (RULES-1): клиент
+  // зовёт `canApply`, чтобы погасить недоступные приказы, то есть гоняет те же
+  // обработчики на этой самой проекции. Резать поток всё равно правильно — но ядро
+  // обязано переживать его отсутствие, а не падать: `runStep` подставляет `AbsentRng`
+  // и отвечает `E_NO_RNG` тому, кто до костей дотянулся (kernel.ts). Не «чините» это
+  // место, возвращая клиенту поток.
   delete (view as Partial<GameState>).rng;
 
   // Fleets: own + identified enemy stay; radar-only enemy → a coarse signature;
