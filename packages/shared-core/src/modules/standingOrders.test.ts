@@ -20,7 +20,7 @@ const data: GameData = parseGameData({
     carrier: {
       faction: 'x',
       domain: 'space',
-      traits: ['squadron'],
+      traits: ['shuttle'],
       stats: { attack: 2, defense: 2, speed: 6, hp: 30, fuel: 2, rearmRounds: 3, strikeRange: 50 },
     },
     cruiser: {
@@ -167,7 +167,7 @@ describe('standingOrders — order.scramble (CC-4 standing patrol)', () => {
     expect(r.state.patrols?.f1?.sortie).toEqual({ fuel: 0, rearming: 3 });
   });
 
-  it('rejects a fleet with no squadron ships, and a busy fleet', () => {
+  it('rejects a fleet with no shuttle ships, and a busy fleet', () => {
     const kernel = createKernel([standingOrdersModule]);
     const bare = stateWith({
       players: [player('p1')],

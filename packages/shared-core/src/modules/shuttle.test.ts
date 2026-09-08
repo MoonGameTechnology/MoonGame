@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createKernel } from '../kernel/kernel';
 import { fleetOpsModule } from './fleetOps';
-import { squadronModule } from './squadron';
+import { shuttleModule } from './shuttle';
 import {
   createInitialState,
   type Fleet,
@@ -13,10 +13,10 @@ import { parseGameData, type GameData } from '../data/schemas';
 import type { Action, Context } from '../action/types';
 
 /**
- * Свободный вылет эскадрилий — шов между `fleet.split` и `squadron.strike`.
+ * Свободный вылет эскадрилий — шов между `fleet.split` и `shuttle.strike`.
  *
  * У модуля не было ни одного теста, и именно поэтому весь свободный вылет успел
- * побыть недостижимым кодом: `squadron.strike` требует `fleet.homeBase`, а не
+ * побыть недостижимым кодом: `shuttle.strike` требует `fleet.homeBase`, а не
  * выставлял его никто. Тесты здесь держат ровно этот шов — не внутренности модуля,
  * а то, что вылет вообще состоится и полетит откуда надо.
  */
@@ -26,10 +26,10 @@ const data: GameData = parseGameData({
   resources: ['metal'],
   units: {
     cruiser: { faction: 'x', domain: 'space', stats: { attack: 5, defense: 5, speed: 6, hp: 40 } },
-    fighter_squadron: {
+    interceptor: {
       faction: 'x',
       domain: 'space',
-      traits: ['squadron'],
+      traits: ['shuttle'],
       stats: { attack: 14, defense: 3, speed: 14, hp: 10, strikeRange: 180, fuel: 3, rearmRounds: 2 },
     },
   },
@@ -39,7 +39,7 @@ const data: GameData = parseGameData({
 });
 
 const ctx: Context = { now: 0, data };
-const kernel = createKernel([fleetOpsModule, squadronModule]);
+const kernel = createKernel([fleetOpsModule, shuttleModule]);
 
 const player = (id: string): Player => ({
   id,
@@ -100,7 +100,7 @@ const split = (take: Array<{ unit: string; count: number }>): Action => ({
 });
 const strike = (fleetId: string): Action => ({
   id: `a:strike:${fleetId}`,
-  type: 'squadron.strike',
+  type: 'shuttle.strike',
   playerId: 'p1',
   payload: { fleetId, targetFleetId: 'E1' },
   issuedAt: 0,
@@ -117,12 +117,12 @@ function splitWing(
   return { state: r.state, wingId };
 }
 
-describe('squadron — свободный вылет от носителя', () => {
+describe('shuttle — свободный вылет от носителя', () => {
   // Тот самый сквозной контракт: пока `fleet.split` не выставлял `homeBase`,
-  // здесь стоял E_NOT_SQUADRON и весь модуль был недостижим.
+  // здесь стоял E_NOT_SHUTTLE и весь модуль был недостижим.
   it('отделённое крыло взлетает: split → strike принят', () => {
-    const { state, wingId } = splitWing(world([['cruiser', 1], ['fighter_squadron', 2]]), [
-      { unit: 'fighter_squadron', count: 2 },
+    const { state, wingId } = splitWing(world([['cruiser', 1], ['interceptor', 2]]), [
+      { unit: 'interceptor', count: 2 },
     ]);
     const r = kernel.applyAction(state, strike(wingId), ctx);
     expect(r.ok, r.ok ? '' : `отказ ${r.code}`).toBe(true);
@@ -134,8 +134,8 @@ describe('squadron — свободный вылет от носителя', () 
   // месте, считало бы полёт от точки вылета — эскадрильная логика читает позицию
   // как `freePosition ?? location` и предпочла бы застывшую.
   it('вылет считается от ТЕКУЩЕГО места крыла, а не от точки отделения', () => {
-    const { state, wingId } = splitWing(world([['cruiser', 1], ['fighter_squadron', 2]]), [
-      { unit: 'fighter_squadron', count: 2 },
+    const { state, wingId } = splitWing(world([['cruiser', 1], ['interceptor', 2]]), [
+      { unit: 'interceptor', count: 2 },
     ]);
     const fromA = kernel.applyAction(state, strike(wingId), ctx);
 
@@ -156,21 +156,21 @@ describe('squadron — свободный вылет от носителя', () 
   });
 
   // Регрессия: свободный полёт уносит ВЕСЬ флот, поэтому крылом считается только
-  // чистый squadron-состав. Иначе крейсер уходил бы мимо графа линий «зайцем».
+  // чистый shuttle-состав. Иначе крейсер уходил бы мимо графа линий «зайцем».
   it('смешанный отряд крылом не становится и взлететь не может', () => {
-    const { state, wingId } = splitWing(world([['cruiser', 3], ['fighter_squadron', 2]]), [
+    const { state, wingId } = splitWing(world([['cruiser', 3], ['interceptor', 2]]), [
       { unit: 'cruiser', count: 1 },
-      { unit: 'fighter_squadron', count: 2 },
+      { unit: 'interceptor', count: 2 },
     ]);
     expect(state.fleets[wingId]?.homeBase).toBeUndefined();
     const r = kernel.applyAction(state, strike(wingId), ctx);
-    expect(r.ok ? 'принят' : r.code).toBe('E_NOT_SQUADRON');
+    expect(r.ok ? 'принят' : r.code).toBe('E_NOT_SHUTTLE');
   });
 
   // Обычный флот к свободному полёту не допускается — правило не размылось.
   it('не-эскадрильный отряд отклоняется', () => {
     const { state, wingId } = splitWing(world([['cruiser', 3]]), [{ unit: 'cruiser', count: 1 }]);
     const r = kernel.applyAction(state, strike(wingId), ctx);
-    expect(r.ok ? 'принят' : r.code).toBe('E_NOT_SQUADRON');
+    expect(r.ok ? 'принят' : r.code).toBe('E_NOT_SHUTTLE');
   });
 });

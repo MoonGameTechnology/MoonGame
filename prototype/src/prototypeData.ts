@@ -191,7 +191,7 @@ export const data: GameData = parseGameData({
     flight_decks: {
       name: 'Flight Decks',
       description: 'tech.node.flight-decks.desc',
-      branch: 'squadron',
+      branch: 'shuttle',
       tier: 1,
       cost: { credits: 160, metal: 120 },
       researchTimeHours: 6,
@@ -201,7 +201,7 @@ export const data: GameData = parseGameData({
     strike_vectors: {
       name: 'Strike Vectors',
       description: 'tech.node.strike-vectors.desc',
-      branch: 'squadron',
+      branch: 'shuttle',
       tier: 2,
       cost: { credits: 280, metal: 220, microelectronics: 30 },
       researchTimeHours: 12,
@@ -212,13 +212,13 @@ export const data: GameData = parseGameData({
     ace_programs: {
       name: 'Ace Programs',
       description: 'tech.node.ace-programs.desc',
-      branch: 'squadron',
+      branch: 'shuttle',
       tier: 3,
       cost: { credits: 500, metal: 380, microelectronics: 60 },
       researchTimeHours: 20,
       dayGate: 12,
       prerequisites: ['strike_vectors'],
-      conditions: [{ type: 'has_scientist', branch: 'squadron' }],
+      conditions: [{ type: 'has_scientist', branch: 'shuttle' }],
       effects: { combatDamageBonus: 0.06, fleetSpeedBonus: 0.06 },
     },
     guidance_arrays: {
@@ -371,7 +371,7 @@ export const data: GameData = parseGameData({
     },
     dropship: {
       // Carrier hull (GDD §6.1 / backlog SHIP): the biggest hold in the fleet but almost
-      // no guns — it hauls divisions (and, later, squadrons) and wants an escort.
+      // no guns — it hauls divisions (and, later, shuttles) and wants an escort.
       faction: 'blue',
       stats: { attack: 2, defense: 6, speed: 44, hp: 50, cargoCapacity: 8 },
       signature: 3, // a fat hauler — easy to spot
@@ -380,8 +380,8 @@ export const data: GameData = parseGameData({
       upkeep: { credits: 24 },
       slots: { defense: 1, utility: 2 }, // no guns — it armours up and carries утилиту
     },
-    fighter_squadron: {
-      // Carrier-borne strike wing (squadrons-roadmap SQ-0.1): very fast + hard-hitting
+    interceptor: {
+      // Carrier-borne strike wing (shuttles-roadmap SQ-0.1): very fast + hard-hitting
       // but paper-thin — launch it ahead to strike, orbital AA (orbital_aa) is its counter.
       faction: 'blue',
       stats: {
@@ -393,7 +393,7 @@ export const data: GameData = parseGameData({
         fuel: 3,
         rearmRounds: 2,
       },
-      traits: ['squadron'],
+      traits: ['shuttle'],
       signature: 2,
       cost: { metal: 90, credits: 40, microelectronics: 10 },
       buildTimeHours: 2,
@@ -401,7 +401,7 @@ export const data: GameData = parseGameData({
       slots: { weapon: 1 }, // a single gun mount — upgun the paper-thin strike wing
     },
     strike_carrier: {
-      // A slow, tanky flat-top with few guns of its own — its punch is the squadrons it carries.
+      // A slow, tanky flat-top with few guns of its own — its punch is the shuttles it carries.
       faction: 'blue',
       stats: { attack: 4, defense: 10, speed: 40, hp: 70, cargoCapacity: 6 },
       traits: ['carrier'],
@@ -796,9 +796,9 @@ export const data: GameData = parseGameData({
         },
       ],
     },
-    // Factory — builds ground vehicles (tank) and squadrons (fighter_squadron).
-    // enablesGroundConstruction + enablesSquadronConstruction: the gate for
-    // vehicle/squadron unit.build on this planet.
+    // Factory — builds ground vehicles (tank) and shuttles (interceptor).
+    // enablesGroundConstruction + enablesShuttleConstruction: the gate for
+    // vehicle/shuttle unit.build on this planet.
     factory: {
       name: 'Vehicle Factory',
       cost: { metal: 150, credits: 60 },
@@ -813,7 +813,7 @@ export const data: GameData = parseGameData({
           buildTimeHours: 8,
           hp: 35,
           enablesGroundConstruction: true,
-          enablesSquadronConstruction: true,
+          enablesShuttleConstruction: true,
           upkeep: { energy: 50 },
         },
         {
@@ -821,7 +821,7 @@ export const data: GameData = parseGameData({
           buildTimeHours: 12,
           hp: 45,
           enablesGroundConstruction: true,
-          enablesSquadronConstruction: true,
+          enablesShuttleConstruction: true,
           buildSpeedBonus: 0.5,
           upkeep: { energy: 70 },
         },

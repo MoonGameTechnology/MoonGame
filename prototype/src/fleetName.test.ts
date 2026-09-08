@@ -26,10 +26,10 @@ describe('fleetKindKey — тип соединения по размеру', () 
   it('пороги: звено → эскадрилья → эскадра → флот → армада', () => {
     expect(fleetKindKey(1)).toBe('fleet.size.flight');
     expect(fleetKindKey(2)).toBe('fleet.size.flight');
-    expect(fleetKindKey(3)).toBe('fleet.size.squadron');
-    expect(fleetKindKey(5)).toBe('fleet.size.squadron');
-    expect(fleetKindKey(6)).toBe('fleet.size.squadron-heavy');
-    expect(fleetKindKey(12)).toBe('fleet.size.squadron-heavy');
+    expect(fleetKindKey(3)).toBe('fleet.size.group');
+    expect(fleetKindKey(5)).toBe('fleet.size.group');
+    expect(fleetKindKey(6)).toBe('fleet.size.group-heavy');
+    expect(fleetKindKey(12)).toBe('fleet.size.group-heavy');
     expect(fleetKindKey(13)).toBe('fleet.size.fleet');
     expect(fleetKindKey(25)).toBe('fleet.size.fleet');
     expect(fleetKindKey(26)).toBe('fleet.size.armada');

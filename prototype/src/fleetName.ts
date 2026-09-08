@@ -63,8 +63,8 @@ export function fleetCallsign(id: string): string {
  *  отражает боевой хвост). Переводится `t()` на месте вызова. */
 export function fleetKindKey(shipCount: number): string {
   if (shipCount <= 2) return 'fleet.size.flight';
-  if (shipCount <= 5) return 'fleet.size.squadron';
-  if (shipCount <= 12) return 'fleet.size.squadron-heavy';
+  if (shipCount <= 5) return 'fleet.size.group';
+  if (shipCount <= 12) return 'fleet.size.group-heavy';
   if (shipCount <= 25) return 'fleet.size.fleet';
   return 'fleet.size.armada';
 }

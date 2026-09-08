@@ -11,16 +11,16 @@ import {
   canSortie,
   spendSortie,
   tickRearm,
-  squadronTake,
-  fleetHasSquadron,
-  squadronStrikeRange,
+  shuttleTake,
+  fleetHasShuttle,
+  shuttleStrikeRange,
   withinRange,
-  squadronReaches,
+  shuttleReaches,
   type SortieState,
-} from './squadron';
+} from './shuttle';
 
-// SQ-1.1/SQ-2.1/SQ-3.1 (squadrons-roadmap.md): 1:1 port of the prototype's
-// `squadron.ts` pure math onto the real shipped bundle (`fighter_squadron`
+// SQ-1.1/SQ-2.1/SQ-3.1 (shuttles-roadmap.md): 1:1 port of the prototype's
+// `shuttle.ts` pure math onto the real shipped bundle (`interceptor`
 // already ships with strikeRange/fuel/rearmRounds — canon just lacked this
 // module). Not wired into a `fleet.launch` action yet — pure math only.
 
@@ -33,53 +33,53 @@ function fleet(units: Array<{ unit: string; count: number }>): Fleet {
   return { id: 'f1', owner: 'p1', location: 'p1', movement: null, units, traits: [] };
 }
 
-const squadronUnit = Object.keys(data.units).find((u) =>
-  data.units[u]!.traits.includes('squadron'),
+const shuttleUnit = Object.keys(data.units).find((u) =>
+  data.units[u]!.traits.includes('shuttle'),
 )!;
-const nonSquadronUnit = Object.keys(data.units).find(
-  (u) => !data.units[u]!.traits.includes('squadron'),
+const nonShuttleUnit = Object.keys(data.units).find(
+  (u) => !data.units[u]!.traits.includes('shuttle'),
 )!;
 
-describe('squadronTake (SQ-1.1, real shipped data)', () => {
-  it('picks out only the squadron-trait stacks aboard a fleet', () => {
+describe('shuttleTake (SQ-1.1, real shipped data)', () => {
+  it('picks out only the shuttle-trait stacks aboard a fleet', () => {
     const f = fleet([
-      { unit: squadronUnit, count: 2 },
-      { unit: nonSquadronUnit, count: 3 },
+      { unit: shuttleUnit, count: 2 },
+      { unit: nonShuttleUnit, count: 3 },
     ]);
-    expect(squadronTake(f, data)).toEqual([{ unit: squadronUnit, count: 2 }]);
+    expect(shuttleTake(f, data)).toEqual([{ unit: shuttleUnit, count: 2 }]);
   });
 
-  it('is empty for a fleet with no squadron aboard', () => {
-    expect(squadronTake(fleet([{ unit: nonSquadronUnit, count: 3 }]), data)).toEqual([]);
+  it('is empty for a fleet with no shuttle aboard', () => {
+    expect(shuttleTake(fleet([{ unit: nonShuttleUnit, count: 3 }]), data)).toEqual([]);
   });
 
   it('ignores a zero-count stack', () => {
-    expect(squadronTake(fleet([{ unit: squadronUnit, count: 0 }]), data)).toEqual([]);
+    expect(shuttleTake(fleet([{ unit: shuttleUnit, count: 0 }]), data)).toEqual([]);
   });
 });
 
-describe('fleetHasSquadron (real shipped data)', () => {
-  it('true when the fleet carries a live squadron stack', () => {
-    expect(fleetHasSquadron(fleet([{ unit: squadronUnit, count: 1 }]), data)).toBe(true);
+describe('fleetHasShuttle (real shipped data)', () => {
+  it('true when the fleet carries a live shuttle stack', () => {
+    expect(fleetHasShuttle(fleet([{ unit: shuttleUnit, count: 1 }]), data)).toBe(true);
   });
 
-  it('false for undefined, empty, or squadron-free fleets', () => {
-    expect(fleetHasSquadron(undefined, data)).toBe(false);
-    expect(fleetHasSquadron(fleet([]), data)).toBe(false);
-    expect(fleetHasSquadron(fleet([{ unit: nonSquadronUnit, count: 3 }]), data)).toBe(false);
+  it('false for undefined, empty, or shuttle-free fleets', () => {
+    expect(fleetHasShuttle(undefined, data)).toBe(false);
+    expect(fleetHasShuttle(fleet([]), data)).toBe(false);
+    expect(fleetHasShuttle(fleet([{ unit: nonShuttleUnit, count: 3 }]), data)).toBe(false);
   });
 });
 
 describe('sortieSpec (SQ-2.1, reads the wing unit stats off real shipped data)', () => {
-  it('reads maxFuel + rearmRounds off the squadron-trait ship', () => {
-    const spec = sortieSpec(fleet([{ unit: squadronUnit, count: 2 }]), data);
-    expect(spec.maxFuel).toBe(data.units[squadronUnit]!.stats.fuel);
-    expect(spec.rearmRounds).toBe(data.units[squadronUnit]!.stats.rearmRounds);
+  it('reads maxFuel + rearmRounds off the shuttle-trait ship', () => {
+    const spec = sortieSpec(fleet([{ unit: shuttleUnit, count: 2 }]), data);
+    expect(spec.maxFuel).toBe(data.units[shuttleUnit]!.stats.fuel);
+    expect(spec.rearmRounds).toBe(data.units[shuttleUnit]!.stats.rearmRounds);
     expect(spec.maxFuel).toBeGreaterThan(0); // the shipped fighter carries fuel
   });
 
-  it('is zeros for a fleet with no squadron aboard', () => {
-    expect(sortieSpec(fleet([{ unit: nonSquadronUnit, count: 3 }]), data)).toEqual({
+  it('is zeros for a fleet with no shuttle aboard', () => {
+    expect(sortieSpec(fleet([{ unit: nonShuttleUnit, count: 3 }]), data)).toEqual({
       maxFuel: 0,
       rearmRounds: 0,
     });
@@ -156,16 +156,16 @@ describe('sortie / rearm counter (SQ-2.1)', () => {
   });
 });
 
-describe('squadron strike radius (SQ-3.1, real shipped data)', () => {
-  const range = data.units[squadronUnit]!.stats.strikeRange;
+describe('shuttle strike radius (SQ-3.1, real shipped data)', () => {
+  const range = data.units[shuttleUnit]!.stats.strikeRange;
 
-  it('reads the longest strikeRange among live squadron ships', () => {
-    expect(squadronStrikeRange(fleet([{ unit: squadronUnit, count: 2 }]), data)).toBe(range);
+  it('reads the longest strikeRange among live shuttle ships', () => {
+    expect(shuttleStrikeRange(fleet([{ unit: shuttleUnit, count: 2 }]), data)).toBe(range);
     expect(range).toBeGreaterThan(0);
   });
 
-  it('a fleet without a squadron has no strike radius', () => {
-    expect(squadronStrikeRange(fleet([{ unit: nonSquadronUnit, count: 3 }]), data)).toBe(0);
+  it('a fleet without a shuttle has no strike radius', () => {
+    expect(shuttleStrikeRange(fleet([{ unit: nonShuttleUnit, count: 3 }]), data)).toBe(0);
   });
 
   it('withinRange is boundary-inclusive (exactly on the edge reaches)', () => {
@@ -175,14 +175,14 @@ describe('squadron strike radius (SQ-3.1, real shipped data)', () => {
   });
 
   it('the wing strikes inside its radius and not beyond it (boundary)', () => {
-    const wing = fleet([{ unit: squadronUnit, count: 2 }]);
+    const wing = fleet([{ unit: shuttleUnit, count: 2 }]);
     const from = { x: 500, y: 500 };
-    expect(squadronReaches(wing, data, from, { x: 500 + range, y: 500 })).toBe(true); // edge
-    expect(squadronReaches(wing, data, from, { x: 500 + range + 1, y: 500 })).toBe(false); // out
+    expect(shuttleReaches(wing, data, from, { x: 500 + range, y: 500 })).toBe(true); // edge
+    expect(shuttleReaches(wing, data, from, { x: 500 + range + 1, y: 500 })).toBe(false); // out
   });
 
   it('a non-strike fleet never reaches (range 0)', () => {
-    const nonWing = fleet([{ unit: nonSquadronUnit, count: 3 }]);
-    expect(squadronReaches(nonWing, data, { x: 0, y: 0 }, { x: 0, y: 0 })).toBe(false);
+    const nonWing = fleet([{ unit: nonShuttleUnit, count: 3 }]);
+    expect(shuttleReaches(nonWing, data, { x: 0, y: 0 }, { x: 0, y: 0 })).toBe(false);
   });
 });

@@ -398,7 +398,7 @@ function finishBattle(h: HandlerContext, battle: Battle, stalemate = false): voi
  * Damage runs through the `combat.damage` hook — the shared damage extension point
  * (admiral / tactic / bombardment), carrying `phase` in its args. EVERY firing channel
  * uses it (CORE-DMG-1): the melee round here, planetary AA and bombardment in
- * `orbital`, standoff fire in `artillery`, point-defense in `squadron` — so a
+ * `orbital`, standoff fire in `artillery`, point-defense in `shuttle` — so a
  * technology bonus or faction passive reaches all of them alike. Only `phase: 'ground'`
  * opens the defender-side mitigations (fort, standing buildings, planet type), so the
  * other channels are scaled by the attacker's bonuses and nothing else. A new firing

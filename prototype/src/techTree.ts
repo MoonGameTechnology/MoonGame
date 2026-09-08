@@ -30,7 +30,7 @@ const clamp = (v: number, a: number, b: number): number => Math.max(a, Math.min(
 export const TECH_BRANCHES: Array<{ key: string; label: string }> = [
   { key: 'space', label: 'tech.branch.space' },
   { key: 'ground', label: 'tech.branch.ground' },
-  { key: 'squadron', label: 'tech.branch.squadron' },
+  { key: 'shuttle', label: 'tech.branch.shuttle' },
   { key: 'missile', label: 'tech.branch.missile' },
   { key: 'command', label: 'tech.branch.command' }, // automation / C2 — «Хранитель» lives here
 ];

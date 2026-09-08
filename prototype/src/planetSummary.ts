@@ -32,7 +32,7 @@ export const BASE_OUTPUT_RESOURCES = ['metal', 'credits', 'food', 'energy'] as c
 /** Крыло: сама эскадрилья И несущий её авианосец — они живут одной вкладкой. */
 export function isWingUnit(unit: string, data: GameData): boolean {
   const traits = data.units[unit]?.traits ?? [];
-  return traits.includes('squadron') || traits.includes('carrier');
+  return traits.includes('shuttle') || traits.includes('carrier');
 }
 
 /** Корабль линии: всё, что не наземное и не крыло. */

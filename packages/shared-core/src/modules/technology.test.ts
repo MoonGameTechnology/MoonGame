@@ -254,7 +254,7 @@ describe('technology module — session research tree', () => {
     }
     expect(byBranch.space).toContain('logistics');
     expect(
-      Object.keys(byBranch).every((b) => ['ground', 'space', 'squadron', 'missile'].includes(b)),
+      Object.keys(byBranch).every((b) => ['ground', 'space', 'shuttle', 'missile'].includes(b)),
     ).toBe(true);
   });
 

@@ -46,13 +46,13 @@ describe('game data schema (docs/architecture.md §2)', () => {
     expect(data.buildings.orbital_aa?.aaDamage).toBe(14); // anti-ship orbital AA — a defensive building
     expect(data.units.cruiser?.stats.aaDamage).toBe(0); // default, no AA
     expect(data.buildings.mine_t1?.aaDamage).toBe(0); // buildings default to no AA
-    // squadrons-roadmap SQ-0.1: a carrier-borne fighter squadron + the new squadron stats.
-    expect(data.units.fighter_squadron?.traits).toContain('squadron');
-    expect(data.units.fighter_squadron?.stats.strikeRange).toBe(180); // Euclidean reach
-    expect(data.units.fighter_squadron?.stats.fuel).toBe(3); // sorties before rearm
-    expect(data.units.fighter_squadron?.stats.rearmRounds).toBe(2);
+    // shuttles-roadmap SQ-0.1: a carrier-borne fighter shuttle + the new shuttle stats.
+    expect(data.units.interceptor?.traits).toContain('shuttle');
+    expect(data.units.interceptor?.stats.strikeRange).toBe(180); // Euclidean reach
+    expect(data.units.interceptor?.stats.fuel).toBe(3); // sorties before rearm
+    expect(data.units.interceptor?.stats.rearmRounds).toBe(2);
     expect(data.units.strike_carrier?.stats.cargoCapacity).toBe(6); // hangar = shared cargo hold
-    expect(data.units.cruiser?.stats.strikeRange).toBe(0); // schema default (not a squadron)
+    expect(data.units.cruiser?.stats.strikeRange).toBe(0); // schema default (not a shuttle)
     // reanimate_on_kill/Necromancer cut (designer-role) → assert a surviving event instead.
     expect(data.events.infect_planet?.trigger).toBe('planet_captured');
     expect(data.sectors.asteroid_field?.speedBonus).toBeCloseTo(-0.25);

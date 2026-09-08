@@ -39,12 +39,12 @@ const data: GameData = parseGameData({
       cost: { metal: 5 },
       buildTimeHours: 0,
     },
-    fighter_squadron: {
+    interceptor: {
       faction: 'x',
       stats: { attack: 14, defense: 3, speed: 14, hp: 10, strikeRange: 180, fuel: 3, rearmRounds: 2 },
       cost: { metal: 90, credits: 40 },
       buildTimeHours: 2,
-      traits: ['squadron'],
+      traits: ['shuttle'],
     },
   },
   factions: {},
@@ -66,7 +66,7 @@ const data: GameData = parseGameData({
       buildTimeHours: 6,
       hp: 25,
       enablesGroundConstruction: true,
-      enablesSquadronConstruction: true,
+      enablesShuttleConstruction: true,
     },
     barracks: {
       name: 'Barracks',
@@ -85,7 +85,7 @@ const data: GameData = parseGameData({
       hp: 25,
       enablesGroundConstruction: true,
       upgrades: [
-        { cost: { metal: 120 }, buildTimeHours: 5, hp: 35, enablesSquadronConstruction: true },
+        { cost: { metal: 120 }, buildTimeHours: 5, hp: 35, enablesShuttleConstruction: true },
         { cost: { metal: 160 }, buildTimeHours: 6, hp: 45 },
       ],
     },
@@ -331,9 +331,9 @@ describe('construction module — a space-domain hull needs a standing shipyard'
 
 describe('construction module — способность может открываться АПГРЕЙДОМ', () => {
   // Регрессия: данные (и `data/buildings.json`, и каталог прототипа) объявляют
-  // `enablesSquadronConstruction` в апгрейдах завода, но схема знала флаг только у
+  // `enablesShuttleConstruction` в апгрейдах завода, но схема знала флаг только у
   // самого здания, zod его в уровне отбрасывал, а гейт читал базовый def. Итог:
-  // `fighter_squadron` был непостроим НА ЛЮБОМ уровне — приказ всегда отбивался
+  // `interceptor` был непостроим НА ЛЮБОМ уровне — приказ всегда отбивался
   // `E_NO_HANGAR`, и вся ветка эскадрилий не играла.
   const yard = (level: number): Planet => ({
     ...planet('A', 'p1'),
@@ -342,7 +342,7 @@ describe('construction module — способность может открыв
   const order = (level: number) =>
     createKernel([constructionModule]).applyAction(
       stateWith({ players: [player('p1', { metal: 400, credits: 200 })], planets: [yard(level)] }),
-      build('fighter_squadron'),
+      build('interceptor'),
       ctx(0),
     );
 
@@ -362,30 +362,30 @@ describe('construction module — способность может открыв
   });
 });
 
-describe('construction module — a squadron-trait unit needs a standing hangar bay', () => {
-  it('rejects unit.build for a squadron unit with no hangar bay on the planet', () => {
+describe('construction module — a shuttle-trait unit needs a standing hangar bay', () => {
+  it('rejects unit.build for a shuttle unit with no hangar bay on the planet', () => {
     const kernel = createKernel([constructionModule]);
     const st = stateWith({ players: [player('p1', { metal: 200 })], planets: [planet('A', 'p1', ['shipyard'])] });
-    const r = kernel.applyAction(st, build('fighter_squadron'), ctx(0));
+    const r = kernel.applyAction(st, build('interceptor'), ctx(0));
     expect(r.ok).toBe(false);
     expect(!r.ok && r.code).toBe('E_NO_HANGAR');
   });
 
-  it('a shipyard alone does not unlock squadrons (they are not regular ships)', () => {
+  it('a shipyard alone does not unlock shuttles (they are not regular ships)', () => {
     const kernel = createKernel([constructionModule]);
     const st = stateWith({ players: [player('p1', { metal: 200 })], planets: [planet('A', 'p1', ['shipyard'])] });
-    const r = kernel.applyAction(st, build('fighter_squadron'), ctx(0));
+    const r = kernel.applyAction(st, build('interceptor'), ctx(0));
     expect(r.ok).toBe(false);
     expect(!r.ok && r.code).toBe('E_NO_HANGAR');
   });
 
-  it('a hangar bay unlocks squadron construction on that planet', () => {
+  it('a hangar bay unlocks shuttle construction on that planet', () => {
     const kernel = createKernel([constructionModule]);
     const st = stateWith({
       players: [player('p1', { metal: 200, credits: 100 })],
       planets: [planet('A', 'p1', ['factory'])],
     });
-    const r = okApply(kernel.applyAction(st, build('fighter_squadron'), ctx(0)));
+    const r = okApply(kernel.applyAction(st, build('interceptor'), ctx(0)));
     expect(r.ok).toBe(true);
   });
 
@@ -405,7 +405,7 @@ describe('construction module — a squadron-trait unit needs a standing hangar 
     const a = planet('A', 'p1', ['factory']);
     a.buildings[0]!.hp = 0;
     const st = stateWith({ players: [player('p1', { metal: 200, credits: 100 })], planets: [a] });
-    const r = kernel.applyAction(st, build('fighter_squadron'), ctx(0));
+    const r = kernel.applyAction(st, build('interceptor'), ctx(0));
     expect(r.ok).toBe(false);
     expect(!r.ok && r.code).toBe('E_NO_HANGAR');
   });

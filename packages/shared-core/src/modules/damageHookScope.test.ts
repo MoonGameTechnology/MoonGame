@@ -4,7 +4,7 @@ import type { GameModule } from '../kernel/module';
 import { combatModule } from './combat';
 import { orbitalModule } from './orbital';
 import { artilleryModule } from './artillery';
-import { squadronModule } from './squadron';
+import { shuttleModule } from './shuttle';
 import { constructionModule } from './construction';
 import {
   createInitialState,
@@ -52,7 +52,7 @@ const data: GameData = parseGameData({
       line: 'rear',
       traits: ['artillery'],
     },
-    // Point-defense carrier and the squadron its flak intercepts.
+    // Point-defense carrier and the shuttle its flak intercepts.
     escort: {
       faction: 'x',
       stats: { attack: 0, defense: 0, speed: 4, hp: 200, pointDefense: 20 },
@@ -62,7 +62,7 @@ const data: GameData = parseGameData({
       faction: 'x',
       stats: { attack: 0, defense: 0, speed: 8, hp: 300 },
       line: 'front',
-      traits: ['squadron'],
+      traits: ['shuttle'],
     },
   },
   factions: {},
@@ -257,7 +257,7 @@ describe('combat.damage — every firing channel goes through the hook (CORE-DMG
 
   it('scales ship point-defense, and the intercept reports what it really landed', () => {
     const pd = (mods: GameModule[]) => {
-      const kernel = createKernel([squadronModule, ...mods]);
+      const kernel = createKernel([shuttleModule, ...mods]);
       const st = stateWith(
         [planet('P', null), planet('H', 'p2')],
         [
@@ -319,7 +319,7 @@ describe('combat.damage — every firing channel goes through the hook (CORE-DMG
     const kernel = createKernel([
       orbitalModule,
       artilleryModule,
-      squadronModule,
+      shuttleModule,
       {
         id: 'phase-probe',
         version: '1.0.0',

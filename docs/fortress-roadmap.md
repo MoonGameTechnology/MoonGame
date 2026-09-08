@@ -5,7 +5,7 @@
 > (`kind: empty` → `void_station`), после чего его застраивают по нужде, как планету.
 > **Форт** (`fort`) — это ЗДАНИЕ на планете: снижение получаемого урона + гарнизон.
 > Парные доки: `state.md` §5 (station) / §6 (данные), `map-roadmap.md` (виды секторов),
-> `modulesystem.md` (шина), `squadrons-roadmap.md` (SQ-5.1 — «звёздная крепость» как база
+> `modulesystem.md` (шина), `shuttles-roadmap.md` (SQ-5.1 — «звёздная крепость» как база
 > эскадрилий, другая ось), `gdd.md` §7 (бой и захват). Формат — кирпичики:
 > `id · зона · статус · «Готово, когда»`. Зоны: `[core]` · `[data]` · `[proto]`.
 
@@ -125,7 +125,7 @@ E_BAD_PAYLOAD → E_NO_PLANET → E_NOT_EMPTY → E_FORBIDDEN → E_NO_ANCHOR �
 ### FORT-1.1 · Технический юнит + технология `[data]` 🔒(FORT-0.1) — S
 **Подзадачи:** юнит-строитель в `data/units.json` с новым трейтом (напр. `constructor`) —
 схему менять НЕ надо, `traits: string[]` уже принимает любую строку, прецедент — трейт
-`squadron` (`construction.ts:426`); технология в `data/technologies.json` с
+`shuttle` (`construction.ts:426`); технология в `data/technologies.json` с
 `unlocks: { units: ['<id>'] }` — гейт включается **только данными**, хук
 `construction.requirement` (`technology.ts:367-383`) отдаст `E_TECH_LOCKED` сам; выбрать
 `domain` осознанно (`space` — авто-ралли поднимет юнит в флот; `ground` — поедет грузом).
@@ -204,8 +204,8 @@ E_BAD_PAYLOAD → E_NO_PLANET → E_NOT_EMPTY → E_FORBIDDEN → E_NO_ANCHOR �
 
 ### FORT-3.2 · ПВО бьёт авиацию, а не только корабли `[core][data]` 🔒(FORT-3.1) — M
 **Подзадачи:** шов уже прорезан — `BuildingLevelSchema.pointDefense` описан как
-«intercepts squadron/missile strikes, not regular fleets», но **ни одно здание его не
-заполняет**, а `squadron.ts` читает PD только с флотов (`fleetPointDefense`); научить
+«intercepts shuttle/missile strikes, not regular fleets», но **ни одно здание его не
+заполняет**, а `shuttle.ts` читает PD только с флотов (`fleetPointDefense`); научить
 эскадрильи видеть планетарный PD и заполнить поле у `orbital_aa`; решить с владельцем
 порядок целей — сейчас батарея с 1-го уровня бьёт по КОРАБЛЯМ, а в видении по кораблям
 она должна бить только на максимальном уровне.
@@ -229,7 +229,7 @@ fail-secure.
 
 ## Что этот роадмап НЕ покрывает
 
-- **«Звёздная крепость» как база эскадрилий** — это `squadrons-roadmap.md` SQ-5.1
+- **«Звёздная крепость» как база эскадрилий** — это `shuttles-roadmap.md` SQ-5.1
   (апгрейд `fort` vs новое здание, лимит базирования). Другая ось: там крепость — здание
   на планете, здесь — узел карты.
 - **Форт прототипа `starfort`** (`prototype/src/prototypeData.ts`, только на астероидах,

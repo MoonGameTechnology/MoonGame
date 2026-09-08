@@ -223,9 +223,9 @@ units/dropship field:line
 units/dropship field:signature
 units/dropship field:stats
 units/dropship field:upkeep
-units/fighter_squadron field:cost
-units/fighter_squadron field:faction
-units/fighter_squadron field:stats
+units/interceptor field:cost
+units/interceptor field:faction
+units/interceptor field:stats
 units/heavy_infantry field:cost
 units/heavy_infantry field:faction
 units/heavy_infantry field:stats

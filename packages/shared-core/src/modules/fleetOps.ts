@@ -152,7 +152,7 @@ export const fleetOpsModule: GameModule = {
     //   · `take[i].modules` сужает отбор до одного лоадаута — без него «два крейсера»
     //     двусмысленно, как только один корпус летает и фиттованным, и голым, а
     //     `takeFromStacks` брала первый попавшийся стек. Поле необязательное: без него
-    //     поведение прежнее (любой лоадаут), и старые вызовы — бот, `squadronTake` —
+    //     поведение прежнее (любой лоадаут), и старые вызовы — бот, `shuttleTake` —
     //     работают как работали.
     //   · `takeLanding` уводит часть десанта с новым флотом. Раньше он ВСЕГДА оставался
     //     у исходного, и разделить десант можно было только через планету (выгрузить и
@@ -299,26 +299,26 @@ export const fleetOpsModule: GameModule = {
       }
       const seq = nextFleetSeq(h.state);
       const id = `fleet:${action.playerId}:${h.ctx.now}:${seq}`;
-      // SQ-1.1 (squadrons-roadmap): a split of squadron-trait ships is a strike
+      // SQ-1.1 (shuttles-roadmap): a split of shuttle-trait ships is a strike
       // WING — it gets `homeBase` (the carrier it launched from), and that is what
-      // lets squadronModule fly it off the lane graph (`squadron.strike`/`return`).
-      // Without it `squadron.strike` rejects with E_NOT_SQUADRON and the whole
+      // lets shuttleModule fly it off the lane graph (`shuttle.strike`/`return`).
+      // Without it `shuttle.strike` rejects with E_NOT_SHUTTLE and the whole
       // free-flight path is unreachable.
       //
       // ВСЕ отделяемые корабли обязаны быть эскадрильями, а не хотя бы один. Крыло —
-      // это ровно squadron-стеки (`squadronTake` в `state/squadron.ts` так его и
+      // это ровно shuttle-стеки (`shuttleTake` в `state/shuttle.ts` так его и
       // определяет), и «хотя бы один» позволяло увести крейсер мимо графа линий,
       // подцепив его к отделяемым истребителям: свободный полёт уносит ВЕСЬ флот.
       //
-      // Позицию здесь НЕ выставляем намеренно. `squadron.strike` берёт начало полёта
+      // Позицию здесь НЕ выставляем намеренно. `shuttle.strike` берёт начало полёта
       // как `freePosition ?? позиция location` — у пристыкованного крыла `location`
       // есть (иначе split отказал бы выше с E_IN_TRANSIT), так что вторая координата
       // не нужна. А выставленная — вредна: она не мутирует при обычном ходе по лейну,
       // и крыло, которое увели `fleet.move`, для всей эскадрильной логики
       // (`fleetWorldPos` предпочитает `freePosition`) навсегда осталось бы у точки
       // вылета — с неверным временем полёта и неверной проверкой радиуса ПВО.
-      const isSquadronWing = taken.every((st) =>
-        defHasTrait(h.ctx.data.units[st.unit], 'squadron'),
+      const isShuttleWing = taken.every((st) =>
+        defHasTrait(h.ctx.data.units[st.unit], 'shuttle'),
       );
       h.state.fleets[id] = {
         id,
@@ -330,7 +330,7 @@ export const fleetOpsModule: GameModule = {
         traits: [],
         battleId: null,
         ...(fleet.orbit ? { orbit: fleet.orbit } : {}),
-        ...(isSquadronWing ? { homeBase: fleet.id } : {}),
+        ...(isShuttleWing ? { homeBase: fleet.id } : {}),
       };
       h.emit('fleet.split', {
         from: payload.fleetId,

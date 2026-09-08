@@ -119,7 +119,7 @@ describe('meta-progression — career counters (profile screen)', () => {
     expect(leagueKey(1)).toBe('profile.league.recon');
     expect(leagueKey(4)).toBe('profile.league.recon');
     expect(leagueKey(5)).toBe('profile.league.patrol');
-    expect(leagueKey(10)).toBe('profile.league.squadron');
+    expect(leagueKey(10)).toBe('profile.league.squad');
     expect(leagueKey(15)).toBe('profile.league.fleet');
     expect(leagueKey(99)).toBe('profile.league.armada');
   });

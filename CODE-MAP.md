@@ -65,7 +65,7 @@
 | 23 | `army` | `army.ts` | `army.load`, `army.unload` | — | — | `army.loaded`, `army.unloaded` |
 | 24 | `fleet-ops` | `fleetOps.ts` | `fleet.engage`, `fleet.launch`, `fleet.merge`, `fleet.split` | — | — | `battle.started`, `fleet.launched`, `fleet.merged`, `fleet.split` · sched: `combat.tick` |
 | 25 | `auto-rally` | `autoRally.ts` | — | `unit.built` | — | — |
-| 26 | `squadron` | `squadron.ts` | `squadron.return`, `squadron.strike` | `squadron.arrived`, `time.advanced` | — | `fleet.arrived`, `pd.fired`, `squadron.docked`, `squadron.launched`, `squadron.returning` · sched: `squadron.arrived` |
+| 26 | `shuttle` | `shuttle.ts` | `shuttle.return`, `shuttle.strike` | `shuttle.arrived`, `time.advanced` | — | `fleet.arrived`, `pd.fired`, `shuttle.docked`, `shuttle.launched`, `shuttle.returning` · sched: `shuttle.arrived` |
 | 27 | `capital` | `capital.ts` | `capital.designate` | — | — | `capital.designated` |
 | 28 | `standing-orders` | `standingOrders.ts` | `chain.stamp`, `order.auto`, `order.chain`, `order.scramble`, `patrol.stamp` | `time.advanced` | — | — |
 | 29 | `instant-repair` | `instantRepair.ts` | `fleet.instantRepair` | — | — | `fleet.instantRepaired` |
@@ -120,7 +120,7 @@
 | `espionage.detected` | `espionage` | — |
 | `espionage.failed` | `espionage` | — |
 | `fleet.arrival` | `movement`* | `movement` |
-| `fleet.arrived` | `movement`, `squadron` | `hero`, `orbital`, `combat`, `capture-on-arrival`, `forced-march`, `visibility` |
+| `fleet.arrived` | `movement`, `shuttle` | `hero`, `orbital`, `combat`, `capture-on-arrival`, `forced-march`, `visibility` |
 | `fleet.barrage` | `artillery` | — |
 | `fleet.barrageMode` | `artillery` | — |
 | `fleet.bombard` | `orbital` | — |
@@ -157,7 +157,7 @@
 | `market.listed` | `market` | — |
 | `market.traded` | `market` | — |
 | `match.ended` | `victory` | — |
-| `pd.fired` | `squadron` | — |
+| `pd.fired` | `shuttle` | — |
 | `planet.bombarded` | `orbital` | `construction` |
 | `planet.captured` | `combat`, `capture-on-arrival` | `steward`, `victory`, `visibility`, `effects` |
 | `planet.destroyed` | `hero` | `steward` |
@@ -168,10 +168,10 @@
 | `seat.claimed` | `seatClaim` | — |
 | `seat.released` | `seatClaim` | — |
 | `seat.seated` | `seatClaim` | — |
-| `squadron.arrived` | `squadron`* | `squadron` |
-| `squadron.docked` | `squadron` | — |
-| `squadron.launched` | `squadron` | — |
-| `squadron.returning` | `squadron` | — |
+| `shuttle.arrived` | `shuttle`* | `shuttle` |
+| `shuttle.docked` | `shuttle` | — |
+| `shuttle.launched` | `shuttle` | — |
+| `shuttle.returning` | `shuttle` | — |
 | `station.deployed` | `station` | — |
 | `steward.delegated` | `steward` | — |
 | `steward.expired` | `steward` | — |
@@ -182,7 +182,7 @@
 | `technology.research.boosted` | `technology` | — |
 | `technology.research.started` | `technology` | — |
 | `technology.researched` | `technology` | — |
-| `time.advanced` | kernel (`advanceTo`) | `economy`, `espionage`, `orbital`, `artillery`, `construction`, `steward`, `squadron`, `standing-orders`, `forced-march`, `pve`, `victory`, `visibility`, `effects` |
+| `time.advanced` | kernel (`advanceTo`) | `economy`, `espionage`, `orbital`, `artillery`, `construction`, `steward`, `shuttle`, `standing-orders`, `forced-march`, `pve`, `victory`, `visibility`, `effects` |
 | `unit.built` | `construction` | `auto-rally`, `victory` |
 | `unit.died` | `combat` | `hero` |
 

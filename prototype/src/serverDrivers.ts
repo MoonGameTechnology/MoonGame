@@ -3,8 +3,8 @@
  * auto-storm, CC-1 order chains, and CC-4 reactive patrols. Extracted from
  * `game.ts` (REFP-24): depends on `fleetIdle`/`ChainStep`/`FleetChain`
  * (`chain.ts`, REFP-8), `Patrol`/`scrambleOrder` (`patrol.ts`, REFP-23),
- * `SortieState`/`sortieSpec`/`tickRearm`/`fleetHasSquadron` (ядро,
- * `state/squadron.ts` — CONV-5,
+ * `SortieState`/`sortieSpec`/`tickRearm`/`fleetHasShuttle` (ядро,
+ * `state/shuttle.ts` — CONV-5,
  * REFP-7), and the action builders `moveFleet`/`orbitFleet`/`assaultFleet`/
  * `barrageFleet`/`castHeroAbility` (`actions.ts`, REFP-22/24). Pure — a host
  * (`main.ts`'s frame loop, or NET's `standingOrders`/`chain` modules) applies
@@ -26,7 +26,7 @@ import { scrambleOrder, type Patrol } from './patrol';
 import {
   sortieSpec,
   tickRearm,
-  fleetHasSquadron,
+  fleetHasShuttle,
   type SortieState,
 } from '../../packages/shared-core/src/index';
 import { moveFleet, orbitFleet, assaultFleet, barrageFleet, castHeroAbility } from './actions';
@@ -248,7 +248,7 @@ export function serverPatrolActions(
   for (const fid of Object.keys(patrols).sort()) {
     const p = patrols[fid]!;
     const f = state.fleets[fid];
-    if (!f || !fleetHasSquadron(f, data)) {
+    if (!f || !fleetHasShuttle(f, data)) {
       out.push({ fleetId: fid, owner: f?.owner ?? '', actions: [], drop: true });
       continue;
     }

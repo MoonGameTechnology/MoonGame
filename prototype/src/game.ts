@@ -87,19 +87,19 @@ export {
   instantRepairModule,
 } from '../../packages/shared-core/src/index';
 
-// --- fleets, squadrons, standing orders --------------------------------------
+// --- fleets, shuttles, standing orders --------------------------------------
 export { fleetOpsModule, autoRallyModule } from '../../packages/shared-core/src/index';
 export {
-  squadronTake,
+  shuttleTake,
   sortieSpec,
   freshSortie,
   canSortie,
   spendSortie,
   tickRearm,
-  fleetHasSquadron,
-  squadronStrikeRange,
+  fleetHasShuttle,
+  shuttleStrikeRange,
   withinRange,
-  squadronReaches,
+  shuttleReaches,
   type SortieState,
 } from '../../packages/shared-core/src/index';
 // Предикаты «действующего крыла» — сторона КЛИЕНТА, а не правило мира, поэтому они

@@ -144,7 +144,7 @@ function isQueued(
 /** Строительные способности здания — те, что гейтят `unit.build`. */
 type ConstructionCapability =
   | 'enablesShipConstruction'
-  | 'enablesSquadronConstruction'
+  | 'enablesShuttleConstruction'
   | 'enablesGroundConstruction';
 
 /** Открыта ли способность у здания ЭТОГО уровня. База — флаг самого здания; дальше
@@ -152,8 +152,8 @@ type ConstructionCapability =
  *  (см. `BuildingLevelSchema`: «уровень открывает», а не «уровень умеет»).
  *
  *  Раньше здесь читался только базовый def, и это делало данные немой опечаткой:
- *  завод объявляет `enablesSquadronConstruction` в апгрейдах — «второй уровень
- *  открывает эскадрильи», — а гейт этого не видел, поэтому `fighter_squadron`
+ *  завод объявляет `enablesShuttleConstruction` в апгрейдах — «второй уровень
+ *  открывает эскадрильи», — а гейт этого не видел, поэтому `interceptor`
  *  отбивался `E_NO_HANGAR` на любом уровне завода, то есть был непостроим вовсе. */
 function capabilityAt(def: BuildingDef, level: number, key: ConstructionCapability): boolean {
   if (def[key]) return true;
@@ -179,11 +179,11 @@ function hasShipyard(planet: Planet, data: GameData): boolean {
   return hasCapability(planet, data, 'enablesShipConstruction');
 }
 
-/** The facility a squadron-trait unit needs to be built and based (factory / airbase).
- *  No limit on how many squadrons a planet can base — the building is the gate, not a
+/** The facility a shuttle-trait unit needs to be built and based (factory / airbase).
+ *  No limit on how many shuttles a planet can base — the building is the gate, not a
  *  capacity. */
 function hasHangarBay(planet: Planet, data: GameData): boolean {
-  return hasCapability(planet, data, 'enablesSquadronConstruction');
+  return hasCapability(planet, data, 'enablesShuttleConstruction');
 }
 
 /** The facility a ground-domain unit needs to be built (barracks for infantry,
@@ -423,11 +423,11 @@ export const constructionModule: GameModule = {
         return h.reject('E_UNKNOWN_UNIT');
       }
       requireUnlocked(h, action.playerId, 'unit', payload.unit);
-      const isSquadron = def.traits.includes('squadron');
-      if (isSquadron && !hasHangarBay(planet, h.ctx.data)) {
+      const isShuttle = def.traits.includes('shuttle');
+      if (isShuttle && !hasHangarBay(planet, h.ctx.data)) {
         return h.reject('E_NO_HANGAR');
       }
-      if (!isSquadron && def.domain === 'space' && !hasShipyard(planet, h.ctx.data)) {
+      if (!isShuttle && def.domain === 'space' && !hasShipyard(planet, h.ctx.data)) {
         return h.reject('E_NO_SHIPYARD');
       }
       if (def.domain === 'ground' && !hasGroundFacility(planet, h.ctx.data)) {

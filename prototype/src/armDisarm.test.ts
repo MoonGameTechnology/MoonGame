@@ -58,7 +58,7 @@ describe('disarms', () => {
 describe('ALWAYS_DISARMED', () => {
   // Правило 5: у этих прицелов своей команды нет вовсе — они не в таблице.
   it('names the aims that no row command can keep', () => {
-    expect([...ALWAYS_DISARMED]).toEqual(['heroAim', 'heroSpawnAim', 'squadronStrikeAim']);
+    expect([...ALWAYS_DISARMED]).toEqual(['heroAim', 'heroSpawnAim', 'shuttleStrikeAim']);
     for (const name of ALWAYS_DISARMED) expect(STATES).not.toContain(name as unknown as ArmedState);
   });
 });

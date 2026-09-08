@@ -353,11 +353,11 @@ describe('stewardGuardOrders — эвакуация под угрозой (ST-3.
     expect(reportEntries(orders)).toMatchObject([{ kind: 'hold', node: 'H' }]);
   });
 
-  it('«Активная оборона» stands a fire-watch: docked squadron wings at own worlds get a CC-4 patrol', () => {
+  it('«Активная оборона» stands a fire-watch: docked shuttle wings at own worlds get a CC-4 patrol', () => {
     // No threat anywhere — the fire-watch is a standing readiness order, and it
     // is exclusive to the active posture.
     const s = guardState({
-      fleets: [fl('F1', 'p1', { location: 'H', units: stacks([['fighter_squadron', 2]]) })],
+      fleets: [fl('F1', 'p1', { location: 'H', units: stacks([['interceptor', 2]]) })],
     });
     const active = stewardGuardOrders(s, 'p1', 'active_defend');
     expect(active.map((a) => a.type)).toEqual(['order.scramble', 'steward.report']);
@@ -368,7 +368,7 @@ describe('stewardGuardOrders — эвакуация под угрозой (ST-3.
 
   it('an evacuating wing stands its patrol down before flying out (no stale patrol record)', () => {
     const base = guardState({
-      fleets: [raider(inboundToH(10)), fl('F1', 'p1', { location: 'H', units: stacks([['fighter_squadron', 2]]) })],
+      fleets: [raider(inboundToH(10)), fl('F1', 'p1', { location: 'H', units: stacks([['interceptor', 2]]) })],
     });
     const s = base as GameState & { patrols?: Record<string, unknown> };
     s.patrols = { F1: { center: { x: 100, y: 0 }, radius: 180, sortie: { fuel: 3, rearming: 0 }, rearmAt: NOW } };
