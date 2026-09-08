@@ -14,6 +14,8 @@ import {
   createMultiplayerServer,
   hmacSecret,
   signJoinToken,
+  SOCKET_FLOOD_MAX,
+  SOCKET_FLOOD_WINDOW_MS,
   type ActionReceipt,
   type ServerMessage,
   type ServerWelcomeMessage,
@@ -77,6 +79,8 @@ const WIRE_PAYLOADS: Record<string, unknown> = {
   'hero.skill.unlock': { heroId: 'hero:p1', node: 'neural_lace' },
   'hero.fit': { heroId: 'hero:p1', fitting: 'psi_lens' },
   'hero.equip': { heroId: 'hero:p1', abilityId: 'scan' },
+  'hero.install': { heroId: 'hero:p1', moduleId: 'ion_engine' },
+  'hero.uninstall': { heroId: 'hero:p1', moduleId: 'ion_engine' },
   'hero.unequip': { heroId: 'hero:p1', abilityId: 'scan' },
   'station.deploy': { planetId: 'home_p1' },
   'seat.claim': { faction: 'missing-faction', scientists: [] },
@@ -111,6 +115,10 @@ const WIRE_PAYLOADS: Record<string, unknown> = {
   'order.chain': { fleetId: 'p1_1', steps: [] },
 };
 
+/** Slack left under the server's per-socket cap for the pings and the odd extra message
+ *  that share the same window — pacing to the cap exactly would still get clipped. */
+const FLOOD_MARGIN = 5;
+
 function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -132,6 +140,8 @@ class WireClient {
   welcome!: ServerWelcomeMessage;
   state?: GameState;
   clientSeq = 0;
+  private sentInWindow = 0;
+  private windowSince = Date.now();
 
   private constructor(
     url: string,
@@ -190,7 +200,28 @@ class WireClient {
     this.queue.length = 0;
   }
 
+  /** Wait out the server's flood window when this socket is about to cross its cap.
+   *  Over the cap the server drops the message BEFORE parsing it — by design, so there
+   *  is no reply, no rejection and no error: the sender just waits until its timeout.
+   *  The rehearsal walks the WHOLE action catalogue over one socket, so it is the one
+   *  client that legitimately approaches the cap, and it must pace itself the way a real
+   *  client's own tempo does. The margin leaves room for the pings sharing the window. */
+  private async respectFloodWindow(): Promise<void> {
+    const now = Date.now();
+    if (now - this.windowSince >= SOCKET_FLOOD_WINDOW_MS) {
+      this.windowSince = now;
+      this.sentInWindow = 0;
+    }
+    if (this.sentInWindow >= SOCKET_FLOOD_MAX - FLOOD_MARGIN) {
+      await sleep(SOCKET_FLOOD_WINDOW_MS - (now - this.windowSince) + 5);
+      this.windowSince = Date.now();
+      this.sentInWindow = 0;
+    }
+    this.sentInWindow += 1;
+  }
+
   async send(type: string, payload: unknown, envelope?: ReturnType<typeof createActionEnvelope>) {
+    await this.respectFloodWindow();
     const sent =
       envelope ??
       createActionEnvelope({

@@ -1,5 +1,5 @@
 import { hoursToMs } from '../action/types';
-import type { HeroAbilityDef, HeroPassiveDef } from '../data/schemas';
+import type { HeroAbilityDef, HeroPassiveDef, ModuleDef, ShipSlotType } from '../data/schemas';
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type {
   Fleet,
@@ -9,6 +9,7 @@ import type {
   PlayerId,
   ResourceBag,
   TempLane,
+  UnitStack,
 } from '../state/gameState';
 import { stacksHaveTrait } from '../data/traits';
 import { getStance, stanceToRelation } from '../state/diplomacy';
@@ -18,6 +19,7 @@ import { isCapturable } from '../state/sectorKind';
 import { laneIsPublic } from '../state/corridor';
 import { isAllied } from '../util/combat';
 import { canInstall } from '../util/fitting';
+import { moduleAllowed, type SlotCounts } from '../util/loadout';
 import { addUnits } from '../util/stacks';
 import { canAfford, payCost } from '../util/treasury';
 
@@ -299,7 +301,7 @@ function formHeroShip(h: HandlerContext, hero: Hero, at: PlanetId): string {
     owner: hero.owner,
     location: at,
     movement: null,
-    units: [{ unit: heroShipUnit(h, hero), count: 1 }],
+    units: [heroShipStack(h, hero)],
     traits: [],
     orbit: 'near',
   };
@@ -314,7 +316,8 @@ function formHeroShip(h: HandlerContext, hero: Hero, at: PlanetId): string {
  *  host's stack (the whole fleet then enjoys the hero aura), the hero commands the
  *  host. Mid-flight hosts keep the hero's node memory unchanged. */
 function boardHeroShip(h: HandlerContext, hero: Hero, host: Fleet): void {
-  addUnits(host.units, heroShipUnit(h, hero), 1);
+  const ship = heroShipStack(h, hero);
+  addUnits(host.units, ship.unit, 1, ship.modules);
   hero.alive = true;
   if (typeof host.location === 'string') hero.location = host.location;
   hero.fleetId = host.id;
@@ -354,6 +357,31 @@ export function heroSkillSlots(hero: Hero, data: HandlerContext['ctx']['data']):
  *  wearing were the same thing — everything owned counts as worn, so old saves and
  *  replays behave exactly as before this field existed. `null` holes in the owned list
  *  (empty designer slots) are not abilities and never count. */
+/** Module bays the hero's SHIP offers: the hull's own typed slots plus the grade's
+ *  `moduleSlots` bonus (§0.38 — hardware is equal across heroes, and only the main hero,
+ *  the player's personal flagship, carries one bay more). Unknown hull or grade ⇒ the
+ *  part that IS known still counts; nothing here can crash a match (modulesystem.md). */
+export function heroModuleSlots(hero: Hero, unit: string, data: HandlerContext['ctx']['data']): SlotCounts {
+  const hull = data.units[unit]?.slots;
+  const bonus = hero.grade !== undefined ? data.heroGrades[hero.grade]?.moduleSlots : undefined;
+  return {
+    weapon: (hull?.weapon ?? 0) + (bonus?.weapon ?? 0),
+    defense: (hull?.defense ?? 0) + (bonus?.defense ?? 0),
+    utility: (hull?.utility ?? 0) + (bonus?.utility ?? 0),
+  };
+}
+
+/** The hero's ship as a `UnitStack`: the hull plus whatever hardware the hero carries.
+ *  An empty set leaves the key ABSENT rather than writing `[]` — a stack's loadout is
+ *  part of its merge identity, so an empty array would split stacks that used to merge
+ *  and change old behaviour for heroes that own no modules. */
+function heroShipStack(h: HandlerContext, hero: Hero): UnitStack {
+  const stack: UnitStack = { unit: heroShipUnit(h, hero), count: 1 };
+  const mods = hero.modules;
+  if (mods !== undefined && mods.length > 0) stack.modules = [...mods];
+  return stack;
+}
+
 export function equippedOf(hero: Hero): string[] {
   if (hero.equipped !== undefined) return hero.equipped;
   return (hero.abilities ?? []).filter((a): a is string => a !== null);
@@ -547,7 +575,7 @@ function castAnnihilate(h: HandlerContext, playerId: PlayerId, planetId: PlanetI
 
 export const heroModule: GameModule = {
   id: 'hero',
-  version: '1.1.0',
+  version: '1.2.0',
   setup(api) {
     api.onAction('hero.move', (action, h) => {
       const { to } = action.payload as { to?: string };
@@ -948,6 +976,80 @@ export const heroModule: GameModule = {
       // means. A hero grandfathered over its budget shrinks toward it, never past it.
       hero.equipped = equipped.filter((id) => id !== abilityId);
       h.emit('hero.unequipped', { owner: action.playerId, heroId, abilityId });
+    });
+
+    // --- the OTHER axis: hardware (HPR-1.5.2) ---------------------------------
+    // Skills are what the hero KNOWS; modules are what its SHIP is made of. Both use
+    // the same generic gate (`util/fitting.ts`), and that is the point — one mechanism,
+    // two budgets from two sources: abilities from the grade (`skillSlots`), bays from
+    // the HULL plus the grade's `moduleSlots` bonus (§0.38).
+    //
+    // The set lives on the HERO, so it outlives the ship: death destroys the fleet and
+    // the stack, and `deployHero` stamps the kit back onto the hull it forms. That is
+    // the whole reason the field is not on the stack.
+    //
+    // A DEPLOYED hero is refused (`E_HERO_DEPLOYED`): its ship is already in the field
+    // with the loadout stamped at deploy, so accepting the order would change a number
+    // the player cannot see and would not take effect until the hero next died. Refit
+    // happens between deployments. `HPR-1.6` RELAXES this to «at the capital, for
+    // resources, after a wait» — it must relax this gate, not merely add to it.
+    api.onAction('hero.install', (action, h) => {
+      const { heroId, moduleId } = action.payload as { heroId?: string; moduleId?: string };
+      if (typeof heroId !== 'string' || typeof moduleId !== 'string') {
+        return h.reject('E_BAD_PAYLOAD');
+      }
+      const hero = h.state.heroes?.[heroId];
+      if (!hero) return h.reject('E_NO_HERO');
+      if (hero.owner !== action.playerId) return h.reject('E_FORBIDDEN');
+      if (hero.fleetId && h.state.fleets[hero.fleetId]) return h.reject('E_HERO_DEPLOYED');
+      // ARS-3 ownership gate, the same list `unit.build` checks: a seat with an arsenal
+      // snapshot installs only the modules it owns; no snapshot ⇒ unrestricted.
+      const arsenal = h.state.players[action.playerId]?.arsenal;
+      if (arsenal && !arsenal.modules.includes(moduleId)) return h.reject('E_NOT_OWNED');
+      const unit = heroShipUnit(h, hero);
+      const def = h.ctx.data.units[unit];
+      const slots = heroModuleSlots(hero, unit, h.ctx.data);
+      const installed = hero.modules ?? [];
+      const gate = canInstall<ModuleDef>(
+        {
+          item: (id) => h.ctx.data.modules[id],
+          category: (m) => m.slot,
+          capacity: (category) => slots[category as ShipSlotType],
+          // The module's own allow rule still decides — bays did not turn the hero's
+          // hull into a universal socket. No hull def ⇒ nothing is allowed (fail-secure).
+          allowed: (m) => def !== undefined && moduleAllowed(unit, def, m),
+        },
+        installed,
+        moduleId,
+      );
+      if (!gate.ok) {
+        // Same public codes `unit.build` reports for the same situations — unifying the
+        // mechanism must not grow a second vocabulary for one failure.
+        const code = {
+          unknown: 'E_UNKNOWN_MODULE',
+          duplicate: 'E_DUP_MODULE',
+          not_allowed: 'E_NOT_ALLOWED',
+          no_slot: 'E_NO_SLOT',
+        }[gate.reason];
+        return h.reject(code);
+      }
+      hero.modules = [...installed, moduleId];
+      h.emit('hero.installed', { owner: action.playerId, heroId, moduleId });
+    });
+
+    api.onAction('hero.uninstall', (action, h) => {
+      const { heroId, moduleId } = action.payload as { heroId?: string; moduleId?: string };
+      if (typeof heroId !== 'string' || typeof moduleId !== 'string') {
+        return h.reject('E_BAD_PAYLOAD');
+      }
+      const hero = h.state.heroes?.[heroId];
+      if (!hero) return h.reject('E_NO_HERO');
+      if (hero.owner !== action.playerId) return h.reject('E_FORBIDDEN');
+      if (hero.fleetId && h.state.fleets[hero.fleetId]) return h.reject('E_HERO_DEPLOYED');
+      const installed = hero.modules ?? [];
+      if (!installed.includes(moduleId)) return h.reject('E_NO_MODULE');
+      hero.modules = installed.filter((id) => id !== moduleId);
+      h.emit('hero.uninstalled', { owner: action.playerId, heroId, moduleId });
     });
 
     // HERO-6 — install a ship fitting into one of the archetype's slots. Locked in

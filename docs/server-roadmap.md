@@ -18,7 +18,9 @@
   не уходят (`matchRoom.ts`).
 - **Per-player rate-limit действий** (`E_RATE_LIMIT`, транзиентно, без квитанции — `rateLimited`
   в `matchRoom.ts`) + **connection flood-guard** (грубый per-socket cap до парсинга —
-  `FLOOD_MAX` в `wsServer.ts`).
+  `SOCKET_FLOOD_MAX`/`SOCKET_FLOOD_WINDOW_MS` в `wsServer.ts`, экспортируются: сверх порога
+  сообщение роняется ДО парсинга и ответа не будет вовсе, поэтому всё, что гоняет сервер
+  пачкой, обязано держать темп по этим числам, а не по их копии).
 - **Мульти-матч реестр** (`matchRegistry.ts`) + браузер матчей `GET /matches` и роутинг
   `/<prefix>/<id>` (`wsServer.ts`).
 - **v1 offline-планировщик:** `tick()` / `msUntilNextEvent()` на `MatchRoom` — драйвер пробуждения

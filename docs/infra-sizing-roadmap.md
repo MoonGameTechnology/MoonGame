@@ -40,7 +40,7 @@
 | Потолок пропускной комнаты | **одно ядро** (нет cluster/worker) | там же |
 | CPU на действие | O(игроков): на действие — цикл по пирам с `visibleState`+`diffState`+delta на каждого | `broadcastState` в `matchRoom.ts` |
 | Память live-state | ~(игроки+1) клонов `GameState` на комнату (`stateValue` + `lastVisible` на игрока) | `stateValue` + `lastVisible` в `matchRoom.ts` |
-| Потолок burst | 20 действий/с/игрок; 50 msg/с/сокет (pre-parse) | `ACTION_RATE_MAX_DEFAULT` в `matchRoom.ts`; `FLOOD_MAX` в `wsServer.ts` |
+| Потолок burst | 20 действий/с/игрок; 50 msg/с/сокет (pre-parse) | `ACTION_RATE_MAX_DEFAULT` в `matchRoom.ts`; `SOCKET_FLOOD_MAX` в `wsServer.ts` |
 | Backpressure-cap | 1 MiB на сокет, дальше drop (close 1013) | `MAX_BUFFERED_BYTES` в `matchRoom.ts` |
 | Payload-cap | 32 KB вход | `maxPayload` в `wsServer.ts` |
 | Данные игры | **~33 KB** JSON | `wc -c data/*.json` = 33 451 |

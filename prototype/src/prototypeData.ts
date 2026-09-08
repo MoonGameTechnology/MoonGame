@@ -1219,7 +1219,7 @@ export const data: GameData = parseGameData({
     common: { name: 'Common', skillSlots: 1 },
     rare: { name: 'Rare', skillSlots: 2 },
     legendary: { name: 'Legendary', skillSlots: 3 },
-    main: { name: 'Main', skillSlots: 4 },
+    main: { name: 'Main', skillSlots: 4, moduleSlots: { utility: 1 } },
   },
   heroSkillTrees: {
     neural_lace: {

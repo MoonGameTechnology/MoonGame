@@ -591,6 +591,12 @@ export const HeroGradeDefSchema = z.object({
   description: z.string().optional(),
   /** Сколько способностей ступень позволяет держать НАДЕТЫМИ одновременно. */
   skillSlots: z.number().int().nonnegative().default(1),
+  /** ПРИБАВКА к отсекам под модули КОРАБЛЯ поверх корпуса (§0.38 hero-progression-roadmap).
+   *  Железо у героев одинаковое — его даёт корпус (`units.hero.slots`), — и лишь основной
+   *  герой, личный флагман игрока, несёт на один отсек больше. Дельта, а не полный бюджет:
+   *  иначе правка корпуса тихо разъедется со ступенями. Ноль везде ⇒ ступень железо не
+   *  трогает (так у всех, кроме `main`). */
+  moduleSlots: ShipSlotsSchema.default({ weapon: 0, defense: 0, utility: 0 }),
 });
 
 export const HeroPassiveDefSchema = z.object({

@@ -53,6 +53,8 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   'hero.fit': z.object({ heroId: id, fitting: id }),
   'hero.equip': z.object({ heroId: id, abilityId: id }),
   'hero.unequip': z.object({ heroId: id, abilityId: id }),
+  'hero.install': z.object({ heroId: id, moduleId: id }),
+  'hero.uninstall': z.object({ heroId: id, moduleId: id }),
   // station.ts
   'station.deploy': z.object({ planetId: id }),
   // seatClaim.ts (ENTRY-3). Оба поля необязательны: заявка без выбора законна —

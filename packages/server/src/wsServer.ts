@@ -163,6 +163,23 @@ export function tlsFromEnv(
   return { key: readFileSync(keyFile), cert: readFileSync(certFile) };
 }
 
+/**
+ * Connection-level flood guard: a coarse per-socket message cap that drops a raw flood
+ * BEFORE the (more expensive) parse — protecting CPU from a spam-clicker or a script.
+ * The fine-grained, post-parse throttle is MatchRoom's per-action rate limit; this is
+ * the cheap outer net (the connection half of audit F-03).
+ *
+ * EXPORTED because a dropped message gets no reply of any kind — that is the whole
+ * point of dropping it before the parse — so a client that outruns the cap simply waits
+ * forever. Anything that drives this server in a burst (the multiplayer rehearsal walks
+ * the entire action catalogue over one socket) has to pace itself by THESE numbers
+ * rather than a copy of them that silently goes stale.
+ */
+export const SOCKET_FLOOD_WINDOW_MS = 1_000;
+/** Messages per window per socket; a legit client sends a few per second (actions + a
+ *  2s ping), so 50 is slack. */
+export const SOCKET_FLOOD_MAX = 50;
+
 export function createMultiplayerServer(
   options: MultiplayerServerOptions,
 ): MultiplayerServerHandle {
@@ -509,12 +526,6 @@ export function createMultiplayerServer(
   // lock the real player out of their own match on reconnect. A ping/pong
   // heartbeat reaps the dead socket: terminate() → 'close' → removePeer frees it.
   const alive = new WeakMap<WebSocket, boolean>();
-  // Connection-level flood guard: a coarse per-socket message cap that drops a raw
-  // flood BEFORE the (more expensive) parse — protecting CPU from a spam-clicker or a
-  // script. The fine-grained, post-parse throttle is MatchRoom's per-action rate limit;
-  // this is the cheap outer net (the connection half of audit F-03).
-  const FLOOD_WINDOW_MS = 1_000;
-  const FLOOD_MAX = 50; // a legit client sends a few msgs/s (actions + a 2s ping); 50 is slack
   const inbound = new WeakMap<WebSocket, { n: number; since: number }>();
   wss.on(
     'connection',
@@ -565,13 +576,13 @@ export function createMultiplayerServer(
       ws.on('message', (data) => {
         const now = Date.now();
         const c = inbound.get(ws) ?? { n: 0, since: now };
-        if (now - c.since >= FLOOD_WINDOW_MS) {
+        if (now - c.since >= SOCKET_FLOOD_WINDOW_MS) {
           c.n = 0;
           c.since = now;
         }
         c.n += 1;
         inbound.set(ws, c);
-        if (c.n > FLOOD_MAX) return; // drop a raw flood before the parse (cheap)
+        if (c.n > SOCKET_FLOOD_MAX) return; // drop a raw flood before the parse (cheap)
         const raw = typeof data === 'string' ? data : data.toString('utf8');
         // Pass the server-minted sessionId so a gated room can authorize the envelope's
         // session binding against it (SV-1.1-live-A). Ignored by an un-gated room.
