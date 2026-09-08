@@ -591,6 +591,12 @@ export const HeroGradeDefSchema = z.object({
   description: z.string().optional(),
   /** Сколько способностей ступень позволяет держать НАДЕТЫМИ одновременно. */
   skillSlots: z.number().int().nonnegative().default(1),
+  /** ПРИБАВКА к отсекам под модули КОРАБЛЯ поверх корпуса (§0.38 hero-progression-roadmap).
+   *  Железо у героев одинаковое — его даёт корпус (`units.hero.slots`), — и лишь основной
+   *  герой, личный флагман игрока, несёт на один отсек больше. Дельта, а не полный бюджет:
+   *  иначе правка корпуса тихо разъедется со ступенями. Ноль везде ⇒ ступень железо не
+   *  трогает (так у всех, кроме `main`). */
+  moduleSlots: ShipSlotsSchema.default({ weapon: 0, defense: 0, utility: 0 }),
 });
 
 export const HeroPassiveDefSchema = z.object({
@@ -634,28 +640,6 @@ export const HeroSkillNodeSchema = z.object({
   cost: NonnegativeCostSchema.default({}),
   grants: HeroSkillGrantsSchema.default({}),
 });
-
-/** A hero-ship fitting (HERO-6, docs/heroes.md §Данные) — a component installed into
- *  one of the archetype's `slots` («настройка самого корабля»). `grants` land on the
- *  instance loadout and are LIVE (HERO-4/5 engines); `statMods` are flat stat deltas
- *  for the hero's ship, carried as data until the effective-unit-stats seam (SHIP-3/4)
- *  lands — designed, not yet live (the prototype's `live:false` philosophy). Mirrors
- *  `ModuleDefSchema`, incl. the anti-self-expansion refine. */
-export const HeroFittingDefSchema = z
-  .object({
-    name: z.string(),
-    description: z.string().optional(),
-    /** Flat additive stat deltas for the hero's SHIP (e.g. { hp: 40, speed: -1 }).
-     *  Trade-offs are allowed (negatives); slot capacity is not (refined below). */
-    statMods: z.record(z.string(), z.number()).default({}),
-    /** What installing the fitting grants the hero (live via HERO-4/5). */
-    grants: HeroSkillGrantsSchema.default({}),
-    /** Treasury cost to install. */
-    cost: NonnegativeCostSchema.default({}),
-  })
-  .refine((f) => !Object.keys(f.statMods).some((k) => /slot/i.test(k)), {
-    message: 'a fitting may not modify slot capacity (anti self-expansion)',
-  });
 
 /** The ship a hero commands: either an existing unit archetype (`unit` → `data.units`) or
  *  inline stat overrides. A hero reuses the fleet for position/movement/combat, so its
@@ -809,7 +793,6 @@ export const GameDataSchema = z.object({
   heroAbilities: z.record(z.string(), HeroAbilityDefSchema).default({}),
   heroPassives: z.record(z.string(), HeroPassiveDefSchema).default({}),
   heroSkillTrees: z.record(z.string(), HeroSkillNodeSchema).default({}),
-  heroFittings: z.record(z.string(), HeroFittingDefSchema).default({}),
   heroGrades: z.record(z.string(), HeroGradeDefSchema).default({}),
   modes: z.record(z.string(), GameModeDefSchema).default({}),
   // `.prefault({})` pipes the empty object through the nested schema, so its
@@ -848,7 +831,6 @@ export type HeroShip = z.infer<typeof HeroShipSchema>;
 export type HeroArchetypeDef = z.infer<typeof HeroArchetypeDefSchema>;
 export type HeroPassiveDef = z.infer<typeof HeroPassiveDefSchema>;
 export type HeroSkillNode = z.infer<typeof HeroSkillNodeSchema>;
-export type HeroFittingDef = z.infer<typeof HeroFittingDefSchema>;
 export type HeroSkillGrants = z.infer<typeof HeroSkillGrantsSchema>;
 export type TeamFormat = z.infer<typeof TeamFormatSchema>;
 export type ModeVictory = z.infer<typeof ModeVictorySchema>;

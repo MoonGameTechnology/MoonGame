@@ -487,17 +487,6 @@ export function createDossiers(host: DossierHost): {
         `<div class="cx-stats">${rows.join('')}</div>`
       );
     }
-    if (kind === 'hf') {
-      const def = data.heroFittings[id];
-      if (!def) return '';
-      const rows = [cxRow(t('codex.row.cost'), cost(def.cost, treasury()))];
-      for (const [k, v] of Object.entries(def.statMods ?? {}))
-        rows.push(cxRow(tData(k), (v > 0 ? '+' : '') + String(v)));
-      return (
-        `<div class="cx-head"><span class="cx-ic">◆</span><b>${esc(tData(def.name))}</b><span class="cx-tag">${t('codex.tag.fitting')}</span></div>` +
-        `<div class="cx-stats">${rows.join('')}</div><div class="cx-desc">${esc(t(def.description ?? ''))}</div>`
-      );
-    }
     const def = data.units[id];
     if (!def) return '';
     const st = def.stats;

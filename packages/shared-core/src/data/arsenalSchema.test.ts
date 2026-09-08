@@ -88,7 +88,7 @@ describe('ArsenalItemSchema (ARS-1) — parse + the hybrid rule', () => {
   it('round-trips through JSON unchanged', () => {
     const item = parseArsenalItem({
       itemId: 'rt-1',
-      kind: 'hero_fitting',
+      kind: 'module',
       form: 'instance',
       defId: 'f',
       grade: 2,
@@ -106,7 +106,6 @@ describe('validateArsenalItem (ARS-1) — catalog check against the shipped bund
   it('accepts items whose defId exists in the right catalog', () => {
     expect(validateArsenalItem(item('hull', someId(data.units)), data)).toEqual([]);
     expect(validateArsenalItem(item('module', someId(data.modules)), data)).toEqual([]);
-    expect(validateArsenalItem(item('hero_fitting', someId(data.heroFittings)), data)).toEqual([]);
   });
 
   it('rejects an unknown defId with a stable code — and checks the RIGHT catalog', () => {

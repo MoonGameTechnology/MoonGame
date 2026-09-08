@@ -339,7 +339,6 @@ export function buildStateFromMap(map: MatchMap, data: GameData, options: BuildF
             arsenal: {
               hulls: [...new Set(a.arsenal.hulls)].sort(),
               modules: [...new Set(a.arsenal.modules)].sort(),
-              fittings: [...new Set(a.arsenal.fittings)].sort(),
             },
           }
         : {}),

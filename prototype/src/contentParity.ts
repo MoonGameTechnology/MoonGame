@@ -44,7 +44,6 @@ const CATALOG_SECTIONS = [
   'heroAbilities',
   'heroPassives',
   'heroSkillTrees',
-  'heroFittings',
   'heroGrades',
   'modes',
 ] as const;

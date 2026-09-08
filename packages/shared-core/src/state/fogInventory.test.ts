@@ -188,7 +188,7 @@ function maximalState(): GameState {
         steward: { posture: 'defend', until: 500 },
         stewardLog: [{ at: 50, kind: 'hold', node: 'A' }],
         stewardHoldPoints: ['A'],
-        arsenal: { hulls: ['scout'], modules: [], fittings: [] },
+        arsenal: { hulls: ['scout'], modules: [] },
       },
       // Соперник: те же поля, засеянные канарейками.
       [RIVAL]: {
@@ -208,7 +208,7 @@ function maximalState(): GameState {
         steward: { posture: 'CANARY_posture', until: 900 },
         stewardLog: [{ at: 60, kind: 'evac', node: 'CANARY_node' }],
         stewardHoldPoints: ['CANARY_hold'],
-        arsenal: { hulls: ['CANARY_hull'], modules: [], fittings: [] },
+        arsenal: { hulls: ['CANARY_hull'], modules: [] },
       },
     },
     planets: {

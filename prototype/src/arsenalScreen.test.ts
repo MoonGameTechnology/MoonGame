@@ -34,9 +34,9 @@ const gradedModule: ArsenalItem = {
   origin: 'drop',
   acquiredAt: 10,
 };
-const fitting: ArsenalItem = {
-  itemId: 'craft:acc:fit:visor',
-  kind: 'hero_fitting',
+const craftedModule: ArsenalItem = {
+  itemId: 'craft:acc:mod:visor',
+  kind: 'module',
   form: 'blueprint',
   defId: 'visor',
   soulbound: false,
@@ -78,19 +78,19 @@ describe('арсенал — карточка предмета', () => {
   it('корпус читается как юнит, модуль и фитинг — по своим каталогам', () => {
     expect(arsenalItemName(hull)).toBe('Крейсер');
     expect(arsenalItemName({ ...gradedModule, defId: 'cargo_bay' })).toBe('Грузовой отсек');
-    expect(arsenalItemName({ ...fitting, defId: 'psi_amplifier' })).toBe('Пси-усилитель');
+    expect(arsenalItemName({ ...craftedModule, defId: 'ion_engine' })).toBe('Ионный двигатель');
   });
 
   it('незнакомый defId не роняет карточку — уходит как есть', () => {
     // коллекция приходит с сервера и может опережать контент клиента
     expect(arsenalItemName(gradedModule)).toBe('laser');
-    expect(arsenalItemName(fitting)).toBe('visor');
+    expect(arsenalItemName(craftedModule)).toBe('visor');
   });
 
   it('каждый вид ведёт на СВОЮ страницу кодекса', () => {
     expect(arsenalCardHtml(hull)).toContain('data-codex="u:cruiser"');
     expect(arsenalCardHtml(gradedModule)).toContain('data-codex="md:laser"');
-    expect(arsenalCardHtml(fitting)).toContain('data-codex="hf:visor"');
+    expect(arsenalCardHtml(craftedModule)).toContain('data-codex="md:visor"');
   });
 
   it('бейджи показываются только когда есть что показывать', () => {
@@ -126,7 +126,7 @@ describe('арсенал — панель', () => {
     const html = arsenalPanelHtml([hull], {});
     expect(html).toContain('<button class="ar-fchip on" data-ar-kind="">');
     expect(html).toContain('data-ar-kind="hull"');
-    expect(html).toContain('data-ar-kind="hero_fitting"');
+    expect(html).toContain('data-ar-kind="module"');
   });
 
   it('фильтр вида и подсвечивает свой чип, и режет сетку', () => {
@@ -176,7 +176,7 @@ describe('арсенал — витрина (cache-first)', () => {
       vi.fn((url: string, init: { headers: Record<string, string> }) => {
         expect(url).toBe('https://srv/arsenal/me');
         expect(init.headers.authorization).toBe('Bearer tok');
-        return Promise.resolve({ ok: true, json: () => Promise.resolve({ items: [fitting] }) });
+        return Promise.resolve({ ok: true, json: () => Promise.resolve({ items: [craftedModule] }) });
       }),
     );
     const { refresh, items } = initArsenal(
@@ -190,7 +190,7 @@ describe('арсенал — витрина (cache-first)', () => {
     await refresh();
     expect(items().map((i) => i.defId)).toEqual(['visor']);
     expect(written).toHaveLength(1);
-    expect(root.html()).toContain('hf:visor');
+    expect(root.html()).toContain('md:visor');
   });
 
   it('отказ сервера и обрыв сети оставляют кэшированную коллекцию', async () => {

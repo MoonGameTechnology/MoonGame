@@ -37,8 +37,10 @@ export interface UnitStack {
    *  damage before `hp`; a ship still dies only when its HULL (`hp`) hits 0.
    *  Undefined = full shield (shields-roadmap SH-0.1). */
   shieldHp?: number;
-  /** Installed ship modules (the loadout), chosen at BUILD time and LOCKED after
-   *  — there is no refit action. Ids → `data.modules`; effect applies ×count.
+  /** Installed ship modules (the loadout). For a BUILT stack it is chosen at build
+   *  time and locked after — there is no refit of a built ship. The one stack minted
+   *  another way is the hero's: `deployHero` stamps it from {@link Hero.modules}, which
+   *  the player refits between deployments (HPR-1.5.2). Ids → `data.modules`; ×count.
    *  Part of the stack's merge identity: stacks with different loadouts never
    *  merge (ship-modules-roadmap.md SM-0.3). Absent = no modules. */
   modules?: ModuleId[];
@@ -176,8 +178,6 @@ export interface PlayerArsenal {
   hulls: string[];
   /** Installable ship modules → `data.modules` ids. */
   modules: string[];
-  /** Installable hero fittings → `data.heroFittings` ids. */
-  fittings: string[];
 }
 
 /** A live Steward delegation on a player (see `Player.steward`). */
@@ -716,8 +716,11 @@ export interface Hero {
   cooldowns: Record<string, number>;
   /** False while the hero is dead and awaiting respawn; absent/true ⇒ alive. */
   alive?: boolean;
-  /** Rarity tier (e.g. `common` | `rare` | `legendary` | `main`). Drives the client
-   *  roster's module-slot count; the core carries it but does not enforce slots. */
+  /** Rarity tier (e.g. `common` | `rare` | `legendary` | `main`) → `data.heroGrades`.
+   *  Drives BOTH of the hero's budgets, and the core enforces them: how many abilities
+   *  may be worn (`skillSlots`, HPR-1.2) and the bonus module bays on top of the hull
+   *  (`moduleSlots`, HPR-1.5.2 — the main hero's extra bay). Unknown/absent ⇒ base
+   *  defaults, never a crash. */
   grade?: string;
   /** Ability "modules" the hero OWNS — the pool it may equip from. Filled by the
    *  archetype's `startAbilities` and by skill-tree / fitting grants. Owning is not
@@ -742,9 +745,13 @@ export interface Hero {
   /** Unlocked skill-tree node ids (→ `data.heroSkillTrees`, HERO-7). Grants applied on
    *  unlock land in `abilities`/`passives`; the list itself gates `requires` chains. */
   skills?: string[];
-  /** Installed ship fittings (→ `data.heroFittings`, HERO-6), capped by the archetype's
-   *  `slots`. Installed for good — no refit (the ship-modules owner rule). */
-  fittings?: string[];
+  /** Installed ship MODULES of the hero's ship (→ `data.modules`, HPR-1.5.2) — the same
+   *  hardware every other hull carries, bounded by the hull's typed bays plus the grade's
+   *  `moduleSlots` bonus (the main hero's extra bay). Stored on the HERO, not on the stack:
+   *  death destroys the fleet and the stack, and a flagship that came back stripped after a
+   *  game-day of downtime would be impossible to explain. `deployHero` stamps this list
+   *  onto the ship it forms. Absent/empty ⇒ a bare hull, exactly as before. */
+  modules?: ModuleId[];
   /** Respawn anchor — the owner's capital. A slain hero re-forms here if still held;
    *  absent ⇒ the core falls back to the hero's last node, then any owned world. */
   home?: PlanetId;

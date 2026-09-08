@@ -151,34 +151,47 @@ describe('AI-BAL-8 — дерево навыков (`hero.skill.unlock`)', () =>
   });
 });
 
-describe('AI-BAL-8 — фитинги (`hero.fit`)', () => {
-  it('ставит фитинг в свободный слот, по одному за тик', () => {
-    const s = rich(game2());
-    const fits = payloads<{ heroId: string; fitting: string }>(orders(s), 'hero.fit');
-    expect(fits).toHaveLength(1);
-    expect(data.heroFittings[fits[0]!.fitting]).toBeDefined();
+describe('AI-BAL-8 — железо корабля (`hero.install`)', () => {
+  /** Герой ВНЕ ПОЛЯ: ядро переоснащает только такого (`E_HERO_DEPLOYED`), и бот
+   *  обязан отбирать так же — иначе он каждый тик отдавал бы отбиваемый приказ. */
+  const docked = (s: GameState): GameState => {
+    let out = s;
+    for (const x of heroesOf(out, 'p2')) out = withHero(out, x.id, { fleetId: undefined });
+    return out;
+  };
+
+  it('ставит модуль в свободный отсек, по одному за тик', () => {
+    const s = docked(rich(game2()));
+    const mods = payloads<{ heroId: string; moduleId: string }>(orders(s), 'hero.install');
+    expect(mods).toHaveLength(1);
+    expect(data.modules[mods[0]!.moduleId]).toBeDefined();
   });
 
-  it('уже установленный фитинг не ставится повторно', () => {
-    const s = rich(game2());
-    const first = payloads<{ heroId: string; fitting: string }>(orders(s), 'hero.fit')[0]!;
-    const staged = withHero(s, first.heroId, { fittings: [first.fitting] });
-    const next = payloads<{ heroId: string; fitting: string }>(orders(staged), 'hero.fit')[0]!;
-    expect(next.fitting).not.toBe(first.fitting);
+  it('уже поставленный модуль не ставится повторно', () => {
+    const s = docked(rich(game2()));
+    const first = payloads<{ heroId: string; moduleId: string }>(orders(s), 'hero.install')[0]!;
+    const staged = withHero(s, first.heroId, { modules: [first.moduleId] });
+    const next = payloads<{ heroId: string; moduleId: string }>(
+      orders(staged),
+      'hero.install',
+    )[0]!;
+    expect(next.moduleId).not.toBe(first.moduleId);
   });
 
-  it('слоты кончились — приказа нет', () => {
-    // Слоты считает архетип; заполняем каждому герою столько, сколько у него слотов.
-    let s = rich(game2());
-    for (const x of heroesOf(s, 'p2')) {
-      const slots = data.heroes[x.archetype!]?.slots ?? 0;
-      s = withHero(s, x.id, { fittings: Object.keys(data.heroFittings).slice(0, slots) });
+  it('приказ всегда адресован герою ВНЕ поля — развёрнутого редьюсер отбил бы', () => {
+    // В ростере есть и поднятые, и запасные (активных ядро держит не больше трёх),
+    // поэтому проверяем не «приказов нет», а КОМУ они адресованы.
+    const s = rich(game2());
+    const mods = payloads<{ heroId: string; moduleId: string }>(orders(s), 'hero.install');
+    expect(mods.length).toBeGreaterThan(0);
+    for (const m of mods) {
+      const hero = s.heroes![m.heroId]!;
+      expect(hero.fleetId === undefined || s.fleets[hero.fleetId] === undefined).toBe(true);
     }
-    expect(only(orders(s), 'hero.fit')).toHaveLength(0);
   });
 
-  it('ИГРОВОЙ бот фитинги не ставит', () => {
-    expect(only(orders(rich(game2()), 'weak'), 'hero.fit')).toHaveLength(0);
+  it('ИГРОВОЙ бот железо не ставит', () => {
+    expect(only(orders(docked(rich(game2())), 'weak'), 'hero.install')).toHaveLength(0);
   });
 });
 

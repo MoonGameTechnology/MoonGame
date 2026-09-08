@@ -475,6 +475,11 @@ export const data: GameData = parseGameData({
       cost: { metal: 400, credits: 200 },
       buildTimeHours: 10,
       upkeep: { credits: 64 },
+      // HPR-1.5.1: the hero's ship is fitted like any other hull — one bay of each
+      // kind, the cruiser shape. Every hero shares this hull, so hardware is equal
+      // across archetypes; the main hero's extra bay is a GRADE bonus (HPR-1.5.2),
+      // not a different ship. What separates heroes is their skills, not their bays.
+      slots: { weapon: 1, defense: 1, utility: 1 },
     },
   },
   // Ship modules (mirror of data/modules.json) — the «Оснащение корабля» loadout
@@ -1214,7 +1219,7 @@ export const data: GameData = parseGameData({
     common: { name: 'Common', skillSlots: 1 },
     rare: { name: 'Rare', skillSlots: 2 },
     legendary: { name: 'Legendary', skillSlots: 3 },
-    main: { name: 'Main', skillSlots: 4 },
+    main: { name: 'Main', skillSlots: 4, moduleSlots: { utility: 1 } },
   },
   heroSkillTrees: {
     neural_lace: {
@@ -1304,26 +1309,6 @@ export const data: GameData = parseGameData({
       requires: ['psi_veil'],
       cost: { energy: 160, credits: 120 },
       grants: { ability: 'decoy_signal' },
-    },
-  },
-  heroFittings: {
-    psi_amplifier: {
-      name: 'Psi Amplifier',
-      description: 'hero.fit.psi-amplifier.desc',
-      grants: { ability: 'scan' },
-      cost: { microelectronics: 30 },
-    },
-    aegis_matrix: {
-      name: 'Aegis Matrix',
-      description: 'hero.fit.aegis-matrix.desc',
-      grants: { passive: 'rally_beacon' },
-      cost: { metal: 60 },
-    },
-    ablative_plating: {
-      name: 'Ablative Cladding',
-      description: 'hero.fit.ablative-plating.desc',
-      statMods: { hp: 40 },
-      cost: { metal: 30 },
     },
   },
 });

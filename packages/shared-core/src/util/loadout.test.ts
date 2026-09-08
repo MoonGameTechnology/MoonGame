@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 import { parseGameData, type GameData } from '../data/schemas';
+import { loadGameData } from '../data/loadGameData';
 import {
   effectiveStats,
   slotUsage,
@@ -145,5 +149,59 @@ describe('loadout-aware stack identity (addUnits merge)', () => {
     addUnits(stacks, 'cruiser', 1, ['cargo', 'targeting']); // same set, different order → merges
     expect(stacks).toHaveLength(1);
     expect(stacks[0]?.count).toBe(2);
+  });
+});
+
+// HPR-1.5.1 — the hero's ship is a hull like any other. Until now the `hero` unit
+// carried no `slots`, so every module bounced off it (`E_NO_SLOT`) and the hero's
+// hardware lived in a SECOND system (`heroFittings` + the never-wired `statMods`).
+// Giving the hull typed bays makes the live seam — `effectiveStats`, read by combat,
+// artillery, construction and forced march — the only one. These assertions run
+// against the REAL `data/*.json`, not a fixture: the point is that the shipped
+// catalog works, not that the engine could.
+describe('HPR-1.5.1 — the shipped hero hull takes ordinary ship modules', () => {
+  const dataDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../../data');
+  const shipped: GameData = loadGameData(
+    (name: string): unknown => JSON.parse(readFileSync(path.join(dataDir, name), 'utf8')),
+  );
+  const heroDef = shipped.units.hero!;
+
+  it('offers one bay of each category', () => {
+    expect(heroDef.slots).toEqual({ weapon: 1, defense: 1, utility: 1 });
+    expect(hullSlotTypes(heroDef)).toEqual(['weapon', 'defense', 'utility']);
+  });
+
+  it('accepts a space module into each bay', () => {
+    for (const id of ['targeting_array', 'ablative_plating', 'ion_engine'])
+      expect(canEquip('hero', heroDef, [], id, shipped)).toEqual({ ok: true });
+  });
+
+  it('installed modules change the stats combat reads', () => {
+    const base = effectiveStats(heroDef, {}, shipped);
+    const fitted = effectiveStats(
+      heroDef,
+      { modules: ['targeting_array', 'ablative_plating', 'ion_engine'] },
+      shipped,
+    );
+    expect(fitted.attack).toBe((base.attack ?? 0) + 4);
+    expect(fitted.hp).toBe((base.hp ?? 0) + 12);
+    expect(fitted.speed).toBe((base.speed ?? 0) + 2);
+    // The combat/artillery path (`sumUnitStat`) sees the same numbers — a fitted
+    // hero stack is genuinely stronger, not merely annotated.
+    const stack: UnitStack = { unit: 'hero', count: 1, modules: ['targeting_array'] };
+    expect(sumUnitStat([stack], shipped, 'attack')).toBe((base.attack ?? 0) + 4);
+  });
+
+  it('the bays are BOUNDED and still honour a module’s own allow rule', () => {
+    // A second module of an occupied category has nowhere to go…
+    expect(canEquip('hero', heroDef, ['ablative_plating'], 'shield_booster', shipped)).toEqual({
+      ok: false,
+      code: 'E_NO_SLOT',
+    });
+    // …and a hull-locked module stays locked: bays did not make the hero universal.
+    expect(canEquip('hero', heroDef, [], 'radar_module', shipped)).toEqual({
+      ok: false,
+      code: 'E_NOT_ALLOWED',
+    });
   });
 });

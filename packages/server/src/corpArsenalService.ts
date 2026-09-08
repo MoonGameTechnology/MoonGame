@@ -111,7 +111,7 @@ export class CorpArsenalService {
    *  nothing's rented — the orchestrator then merges nothing. */
   async rentedArsenalOf(accountId: string, matchupId: string): Promise<PlayerArsenal> {
     const rows = await this.rentals.activeForAccount(matchupId, accountId);
-    if (rows.length === 0) return { hulls: [], modules: [], fittings: [] };
+    if (rows.length === 0) return { hulls: [], modules: [] };
     const items: ArsenalItem[] = [];
     for (const row of rows) {
       const item = await this.arsenal.get(row.itemId);

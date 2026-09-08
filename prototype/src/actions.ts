@@ -238,11 +238,15 @@ export const spawnHero = (playerId: string, heroId: string, at: string) =>
 /** Unlock a hero skill-tree node (branch/requires/cost gate the order). */
 export const unlockHeroSkill = (playerId: string, heroId: string, node: string) =>
   act(playerId, 'hero.skill.unlock', { heroId, node });
-/** Install a ship fitting into one of the hero archetype's slots (no refit). */
-export const fitHero = (playerId: string, heroId: string, fitting: string) =>
-  act(playerId, 'hero.fit', { heroId, fitting });
-/** Put an owned ability into one of the hero's skill slots (HPR-1.2). Reversible,
- *  unlike `fitHero`: the budget exists so the player can choose, not to lock them in. */
+/** Install an ordinary ship module into one of the hero ship's typed bays (HPR-1.5.2).
+ *  Only outside the field — the core refuses a deployed hero (`E_HERO_DEPLOYED`). */
+export const installHeroModule = (playerId: string, heroId: string, moduleId: string) =>
+  act(playerId, 'hero.install', { heroId, moduleId });
+/** Take a module back out of its bay — the hero keeps owning it, the ship just flies без него. */
+export const uninstallHeroModule = (playerId: string, heroId: string, moduleId: string) =>
+  act(playerId, 'hero.uninstall', { heroId, moduleId });
+/** Put an owned ability into one of the hero's skill slots (HPR-1.2). The budget exists
+ *  so the player can choose, not to lock them in — so this is reversible too. */
 export const equipHeroAbility = (playerId: string, heroId: string, abilityId: string) =>
   act(playerId, 'hero.equip', { heroId, abilityId });
 /** Take an ability back out of its slot — it stays owned, just not worn. */
