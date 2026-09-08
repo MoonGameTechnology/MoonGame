@@ -30,13 +30,14 @@ import type { GameModule } from '../kernel/module';
 import type { Battle, UnitStack } from '../state/gameState';
 import { hoursToMs } from '../action/types';
 import { defHasTrait } from '../data/traits';
+import { heroByFleet } from '../state/heroes';
 import { isHostile, ownFleet } from '../util/combat';
 import { garrisonUnderAssault, nextFleetSeq } from '../util/fleet';
 import { sumUnitStat, takeFromStacks, mergeStacks, loadoutKey } from '../util/stacks';
 
 export const fleetOpsModule: GameModule = {
   id: 'fleet-ops',
-  version: '1.0.0',
+  version: '1.1.0',
   setup(api) {
     // Scramble a planet's garrison into a mobile fleet: ships → fleet.units,
     // liftable ground troops → fleet.landing (bounded by the ships' summed
@@ -127,6 +128,19 @@ export const fleetOpsModule: GameModule = {
       }
       if (from.movement || into.movement || !from.location || from.location !== into.location) {
         return h.reject('E_NOT_COLOCATED');
+      }
+      // Каждый герой ведёт СВОЙ флот (резолюция владельца 2026-09-08, «как в HoMM»):
+      // в одном флоте не больше одного героя. Забрать безгеройский флот герою можно —
+      // это обычное усиление армии; слить ДВА геройских нельзя.
+      //
+      // Гейт стоит здесь не для красоты правила. Без него инвариант держался бы только
+      // на развёртывании, а `fleet.merge` — рядовое действие, доступное любому игроку, —
+      // сводил бы двух героев в один флот, и код ниже честно перенацеливал бы `fleetId`
+      // обоим. После этого `heroByFleet` возвращает одного из двух, и смерть флота
+      // приписывается не тому герою. С этим гейтом «один герой на флот» верно ПО
+      // ПОСТРОЕНИЮ, а не по внимательности вызывающего.
+      if (heroByFleet(h.state, payload.from) && heroByFleet(h.state, payload.into)) {
+        return h.reject('E_TWO_HEROES');
       }
       into.units = mergeStacks(into.units, from.units);
       into.landing = mergeStacks(into.landing ?? [], from.landing ?? []);

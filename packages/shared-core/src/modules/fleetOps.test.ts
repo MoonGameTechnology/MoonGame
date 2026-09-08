@@ -324,6 +324,41 @@ describe('fleetOps — fleet.merge (fuse two co-located idle fleets)', () => {
     expect(r.state.heroes?.h1?.fleetId).toBe('F2');
   });
 
+  // Резолюция владельца 2026-09-08 («как в героях меча и магии»): каждый герой ведёт
+  // СВОЙ флот. Дыра была не в экзотике, а здесь: `fleet.merge` — рядовое действие,
+  // доступное любому игроку, и без гейта оно сводило двух героев в один флот, после
+  // чего `heroByFleet` возвращает одного из двух и смерть приписывается не тому.
+  it('НЕ сливает два ГЕРОЙСКИХ флота — один герой на флот', () => {
+    const kernel = createKernel([fleetOpsModule]);
+    const s = stateWith({
+      players: [player('p1')],
+      fleets: [
+        fleet('F1', 'p1', 'A', [['hero', 1]]),
+        fleet('F2', 'p1', 'A', [['hero', 1]]),
+      ],
+      heroes: [hero('h1', 'p1', 'F1'), hero('h2', 'p1', 'F2')],
+    });
+    expect(errCode(kernel.applyAction(s, merge('F1', 'F2'), ctx))).toBe('E_TWO_HEROES');
+    // Отказ — целиком: ни стеки, ни привязки героев не тронуты.
+    expect(s.fleets.F1).toBeDefined();
+    expect(s.heroes?.h1?.fleetId).toBe('F1');
+  });
+
+  it('забрать БЕЗГЕРОЙСКИЙ флот герою по-прежнему можно — это обычное усиление армии', () => {
+    const kernel = createKernel([fleetOpsModule]);
+    const s = stateWith({
+      players: [player('p1')],
+      fleets: [
+        fleet('F1', 'p1', 'A', [['cruiser', 2]]),
+        fleet('F2', 'p1', 'A', [['hero', 1]]),
+      ],
+      heroes: [hero('h1', 'p1', 'F2')],
+    });
+    const r = okApply(kernel.applyAction(s, merge('F1', 'F2'), ctx));
+    expect(r.state.fleets.F1).toBeUndefined();
+    expect(r.state.heroes?.h1?.fleetId).toBe('F2');
+  });
+
   it('rejects merging the same fleet, a foreign fleet, or fleets not co-located/idle', () => {
     const kernel = createKernel([fleetOpsModule]);
     const s = stateWith({

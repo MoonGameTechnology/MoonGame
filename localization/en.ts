@@ -1140,7 +1140,7 @@ export const en: Record<string, string> = {
   'hero.ability.annihilate.desc': 'Destroys a planet in range — it becomes a dead world.',
   'hero.ability.annihilate.name': 'Annihilate',
   'hero.ability.boarding-translocation.desc':
-    'The hero forms aboard one of your fleets — wherever it happens to be. Passive skill: widens the deployment points.',
+    'The hero arrives where one of your fleets is PARKED — as a separate fleet alongside it. Every hero leads their own squadron, so they never join another; a fleet in transit is not a landing point. Passive skill: widens the deployment points.',
   'hero.ability.boarding-translocation.name': 'Boarding Translocation',
   'hero.ability.bulwark.desc': 'A temporary shield: +defense to your fleets near the hero.',
   'hero.ability.bulwark.name': 'Bulwark',
