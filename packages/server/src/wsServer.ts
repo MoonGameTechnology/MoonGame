@@ -258,6 +258,22 @@ export function createMultiplayerServer(
     }
     void reply.header('access-control-allow-methods', 'GET, POST, OPTIONS');
     void reply.header('access-control-allow-headers', 'authorization, content-type');
+    // Ответы API персональные: `/commander/me`, `/arsenal/me`, `/corps/me`, весь `/ava/*`
+    // отдают состояние КОНКРЕТНОГО игрока, а директив кэширования не ставил никто.
+    // Чей это кэш на самом деле — важно не перепутать. ОБЩИЙ кэш аутентифицированный
+    // ответ и так не сохранит: сессия ездит в `Authorization: Bearer` (`prototype/src/*`,
+    // `packages/client`), а RFC 9111 §3.5 запрещает shared cache хранить ответ на запрос
+    // с этим заголовком без явного разрешения. Дыра в другом, в кэше БРАУЗЕРА: `Authorization`
+    // на private cache не влияет, а GET-ответ без директив эвристически кэшируем (§4.2.2) —
+    // то есть личные данные игрока оседают на диске и переживают выход из аккаунта, а
+    // «Назад» показывает чужое состояние на общем устройстве.
+    // Ставим одним хуком на весь периметр, а не точечно: маршрутов под девяносто, и список
+    // «где важно» разъехался бы с первым же новым эндпойнтом. Цена — публичные `/matches`
+    // и `/health` тоже перестают кэшироваться; при отсутствии CDN и на JSON в килобайты
+    // это дешевле, чем перечислять исключения и ошибиться в них.
+    // Статике не мешает: `/` и `/index.html` ставят СВОЙ `no-store, must-revalidate` в
+    // обработчике, а он отрабатывает после хука и перезаписывает значение.
+    void reply.header('cache-control', 'no-store');
     // Handle CORS preflight (OPTIONS) inline — Fastify 404s unknown methods by
     // default, and a preflight is an OPTIONS request the browser sends BEFORE the
     // real fetch (when Authorization header is present). Without a 2xx on OPTIONS,

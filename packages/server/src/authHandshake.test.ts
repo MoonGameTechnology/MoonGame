@@ -140,6 +140,52 @@ describe('SE-0.1 · authenticated handshake', () => {
 });
 
 /**
+ * SEC-33. `cache-control: no-store` на всём HTTP-периметре. До этого директив кэширования
+ * не ставил НИКТО, кроме HTML-индекса, — то есть личный JSON игрока (`/arsenal/me`,
+ * `/corps/me`, `/ava/*`) браузер был волен положить на диск и показать после выхода из
+ * аккаунта или по кнопке «Назад». Общий кэш такое не хранит сам (сессия в `Authorization`,
+ * RFC 9111 §3.5), а private cache — хранит, и именно он здесь дыра. Проверяем на `/health`
+ * и `/matches`: хук `onRequest` общий, поэтому поведение видно на любом маршруте.
+ */
+describe('cache-control на HTTP-маршрутах (SEC-33)', () => {
+  // Именно ORIGIN, а не `replace(/\/$/, '')` как у соседей: `listen()` отдаёт URL С ПУТЁМ
+  // (`ws://host:port/matches/dev/`), и обрезка одного слэша оставляет префикс `/matches/dev`.
+  // Соседним тестам это сходит с рук — хук `onRequest` отрабатывает и на 404, — но здесь
+  // проверяется РЕАЛЬНЫЙ обработчик индекса, и до него надо доехать.
+  const httpBase = (wsUrl: string): string => new URL(wsUrl.replace(/^ws/, 'http')).origin;
+
+  it('API-ответы приходят с no-store', async () => {
+    const server = createMultiplayerServer({ room: createDevMatch(data) });
+    const url = httpBase(await server.listen());
+    try {
+      const health = await fetch(`${url}/health`);
+      expect(health.headers.get('cache-control')).toBe('no-store');
+
+      const matches = await fetch(`${url}/matches`);
+      expect(matches.headers.get('cache-control')).toBe('no-store');
+    } finally {
+      await server.close();
+    }
+  });
+
+  it('HTML-индекс сохраняет свой более строгий заголовок — обработчик перекрывает хук', async () => {
+    const server = createMultiplayerServer({
+      room: createDevMatch(data),
+      indexHtml: '<!doctype html><title>t</title>',
+    });
+    const url = httpBase(await server.listen());
+    try {
+      const res = await fetch(`${url}/`);
+      // Не просто «no-store»: свежесть клиента держится на must-revalidate, и хук,
+      // отработавший РАНЬШЕ обработчика, не должен был его затереть.
+      expect(res.headers.get('cache-control')).toBe('no-store, must-revalidate');
+    } finally {
+      await server.close();
+    }
+  });
+});
+
+/**
  * SEC-21. Origin-allowlist охраняет ТЕПЕРЬ и HTTP-периметр, а не только рукопожатие.
  * До этого `Access-Control-Allow-Origin: *` стоял безусловно на всех маршрутах, то есть
  * одна и та же сессия была защищена на WS и открыта на `/auth/*`, `/matches`, `/corps/*`.
