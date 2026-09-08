@@ -18,7 +18,10 @@ const CLIENT_ACTION_TYPES = [
   'hero.ability',
   'hero.spawn',
   'hero.skill.unlock',
-  'hero.fit',
+  'hero.equip',
+  'hero.unequip',
+  'hero.install',
+  'hero.uninstall',
   'planet.annihilate',
   'station.deploy',
   'seat.claim',
@@ -40,8 +43,7 @@ const CLIENT_ACTION_TYPES = [
   'fleet.merge',
   'fleet.split',
   'fleet.engage',
-  'squadron.strike',
-  'squadron.return',
+  'shuttle.strike',
   'capital.designate',
   'steward.delegate',
   'steward.recall',
@@ -84,7 +86,9 @@ describe('SV-1.2 · action payload schemas', () => {
       ['hero.ability', { heroId: 'hero:p1', abilityId: 'recall' }], // untargeted cast
       ['hero.spawn', { heroId: 'hero:p1', at: 'home_a' }],
       ['hero.skill.unlock', { heroId: 'hero:p1', node: 'neural_lace' }],
-      ['hero.fit', { heroId: 'hero:p1', fitting: 'psi_amplifier' }],
+      ['hero.equip', { heroId: 'hero:p1', abilityId: 'corridor' }],
+      ['hero.install', { heroId: 'hero:p1', moduleId: 'ion_engine' }],
+      ['hero.unequip', { heroId: 'hero:p1', abilityId: 'corridor' }],
       ['planet.annihilate', { planetId: 'p1' }],
       ['station.deploy', { planetId: 'p1' }],
       ['building.construct', { planetId: 'p1', building: 'radar' }],
@@ -108,7 +112,7 @@ describe('SV-1.2 · action payload schemas', () => {
       ['market.cancel', { id: 'lot:1' }], // the prototype book cancels by `id`
       ['fleet.launch', { planetId: 'p1' }],
       ['fleet.merge', { from: 'f1', into: 'f2' }],
-      ['fleet.split', { fleetId: 'f1', take: [{ unit: 'fighter_squadron', count: 2 }] }],
+      ['fleet.split', { fleetId: 'f1', take: [{ unit: 'interceptor', count: 2 }] }],
       ['fleet.engage', { fleetId: 'f1', targetId: 'f2' }],
       ['capital.designate', { planetId: 'p1' }],
       ['steward.delegate', { posture: 'defend', until: 123456 }],
@@ -186,7 +190,7 @@ describe('SV-1.2 · action payload schemas', () => {
       ['hero.ability', { heroId: 'hero:p1', abilityId: 'corridor', target: 7 }], // target not an id
       ['hero.spawn', { heroId: 'hero:p1' }], // missing spawn world
       ['hero.skill.unlock', { node: 'neural_lace' }], // missing heroId
-      ['hero.fit', { heroId: 'hero:p1' }], // missing fitting
+      ['hero.install', { heroId: 'hero:p1' }], // missing moduleId
       ['diplomacy.declare', { target: 'p2', stance: 'frenemy' }], // not a known stance
       ['diplomacy.declare', { target: 'p2' }], // missing stance
       ['diplomacy.declare', { stance: 'war' }], // missing target

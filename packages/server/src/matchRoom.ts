@@ -359,7 +359,7 @@ function envelopeActionId(envelope: unknown): string {
 function sameArsenal(a: PlayerArsenal, b: PlayerArsenal): boolean {
   const eq = (x: string[], y: string[]): boolean =>
     x.length === y.length && x.every((v, i) => v === y[i]);
-  return eq(a.hulls, b.hulls) && eq(a.modules, b.modules) && eq(a.fittings, b.fittings);
+  return eq(a.hulls, b.hulls) && eq(a.modules, b.modules);
 }
 
 /** Ally-ping tuning (ephemeral, server-side; never part of the deterministic core). */

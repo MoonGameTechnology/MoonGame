@@ -22,20 +22,17 @@ import { filterArsenal, gradesOf, parseArsenalItems, type ArsenalFilter } from '
 const KIND_ICON: Record<ArsenalItem['kind'], string> = {
   hull: '◈',
   module: '◆',
-  hero_fitting: '◇',
 };
 
 /** Which codex page a card deep-links to (`codexHtml`'s kind vocabulary). */
 const CODEX_KIND: Record<ArsenalItem['kind'], string> = {
   hull: 'u',
   module: 'md',
-  hero_fitting: 'hf',
 };
 
 const KIND_KEY: Record<ArsenalItem['kind'], string> = {
   hull: 'arsenal.kind.hull',
   module: 'arsenal.kind.module',
-  hero_fitting: 'arsenal.kind.fitting',
 };
 
 const ORIGIN_KEY: Record<ArsenalItem['origin'], string> = {
@@ -53,12 +50,11 @@ export function originLabel(origin: ArsenalItem['origin']): string {
   return t(ORIGIN_KEY[origin]);
 }
 
-/** Display name of one owned thing, per kind: hulls read as units, modules and hero
- *  fittings as their catalogue names (falling back to the raw defId). */
+/** Display name of one owned thing, per kind: hulls read as units, modules as their
+ *  catalogue name (falling back to the raw defId). */
 export function arsenalItemName(item: ArsenalItem): string {
   if (item.kind === 'hull') return unitTitle(item.defId);
-  if (item.kind === 'module') return tData(data.modules[item.defId]?.name ?? item.defId);
-  return tData(data.heroFittings[item.defId]?.name ?? item.defId);
+  return tData(data.modules[item.defId]?.name ?? item.defId);
 }
 
 /** One collection card: icon, name, and the grade/durability/origin footnote. */
@@ -88,7 +84,7 @@ export function arsenalPanelHtml(
       `<span style="font-size:11px;color:var(--cyan-dim)">${t('arsenal.empty.hint')}</span></div>`
     );
   }
-  const kinds: Array<ArsenalItem['kind']> = ['hull', 'module', 'hero_fitting'];
+  const kinds: Array<ArsenalItem['kind']> = ['hull', 'module'];
   let chips = `<button class="ar-fchip${filter.kind ? '' : ' on'}" data-ar-kind="">${t('arsenal.filter.all')}</button>`;
   for (const k of kinds)
     chips += `<button class="ar-fchip${filter.kind === k ? ' on' : ''}" data-ar-kind="${k}">${t(KIND_KEY[k])}</button>`;

@@ -10,6 +10,7 @@ import { MS_PER_HOUR } from '../util/time';
 import { canAfford, payCost, refundCost } from '../util/treasury';
 import { buildProgress } from '../util/construction';
 import { addUnits } from '../util/stacks';
+import { hangarUsed, shuttleBayAt } from '../state/shuttle';
 import { effectiveStats, loadoutCost, validateLoadout } from '../util/loadout';
 
 /** Share of the ground assault's round damage that also wears down the planet's
@@ -142,19 +143,16 @@ function isQueued(
 }
 
 /** Строительные способности здания — те, что гейтят `unit.build`. */
-type ConstructionCapability =
-  | 'enablesShipConstruction'
-  | 'enablesSquadronConstruction'
-  | 'enablesGroundConstruction';
+type ConstructionCapability = 'enablesShipConstruction' | 'enablesGroundConstruction';
 
 /** Открыта ли способность у здания ЭТОГО уровня. База — флаг самого здания; дальше
  *  способность может открыть любой ПРОЙДЕННЫЙ апгрейд, и назад она не выключается
  *  (см. `BuildingLevelSchema`: «уровень открывает», а не «уровень умеет»).
  *
  *  Раньше здесь читался только базовый def, и это делало данные немой опечаткой:
- *  завод объявляет `enablesSquadronConstruction` в апгрейдах — «второй уровень
- *  открывает эскадрильи», — а гейт этого не видел, поэтому `fighter_squadron`
- *  отбивался `E_NO_HANGAR` на любом уровне завода, то есть был непостроим вовсе. */
+ *  здание объявляет способность в апгрейдах — «второй уровень открывает», — а гейт
+ *  этого не видел, и юнит оказывался непостроим вовсе. Та же ловушка сторожится для
+ *  вместимости ангара (`shuttleBay`, SHU-1.1), которую читает `shuttleBayAt`. */
 function capabilityAt(def: BuildingDef, level: number, key: ConstructionCapability): boolean {
   if (def[key]) return true;
   for (let l = 2; l <= level; l++) {
@@ -179,11 +177,22 @@ function hasShipyard(planet: Planet, data: GameData): boolean {
   return hasCapability(planet, data, 'enablesShipConstruction');
 }
 
-/** The facility a squadron-trait unit needs to be built and based (factory / airbase).
- *  No limit on how many squadrons a planet can base — the building is the gate, not a
- *  capacity. */
-function hasHangarBay(planet: Planet, data: GameData): boolean {
-  return hasCapability(planet, data, 'enablesSquadronConstruction');
+/** Сколько ЕЩЁ челноков примет мир (SHU-1.1): вместимость стоящих портов минус уже
+ *  базирующиеся минус уже заказанные и не достроенные.
+ *
+ *  Очередь считается вместе с ангаром намеренно. Иначе десять заказов по одному прошли
+ *  бы там, где один заказ на десять честно отбивается: каждый по отдельности видел бы
+ *  пустой ангар, а на выходе порт получил бы вдесятеро больше, чем вмещает. */
+function hangarFree(h: HandlerContext, planet: Planet): number {
+  const data = h.ctx.data;
+  let queued = 0;
+  for (const e of h.state.scheduled) {
+    if (e.type !== 'construction.complete') continue;
+    const p = e.payload as CompletePayload;
+    if (p.kind !== 'unit' || p.planetId !== planet.id || typeof p.unit !== 'string') continue;
+    if (data.units[p.unit]?.traits.includes('shuttle')) queued += p.count ?? 0;
+  }
+  return shuttleBayAt(planet, data) - hangarUsed(planet) - queued;
 }
 
 /** The facility a ground-domain unit needs to be built (barracks for infantry,
@@ -423,11 +432,19 @@ export const constructionModule: GameModule = {
         return h.reject('E_UNKNOWN_UNIT');
       }
       requireUnlocked(h, action.playerId, 'unit', payload.unit);
-      const isSquadron = def.traits.includes('squadron');
-      if (isSquadron && !hasHangarBay(planet, h.ctx.data)) {
-        return h.reject('E_NO_HANGAR');
+      // Челнок строится В КОСМОПОРТЕ и остаётся в нём: порт — и гейт, и предел
+      // (SHU-1.1). Ноль вместимости читается как «порта нет» — отдельного флага
+      // «умеет ангар» больше нет, чтобы две правды не разъезжались.
+      const isShuttle = def.traits.includes('shuttle');
+      if (isShuttle) {
+        if (shuttleBayAt(planet, h.ctx.data) <= 0) {
+          return h.reject('E_NO_PORT');
+        }
+        if (hangarFree(h, planet) < count) {
+          return h.reject('E_HANGAR_FULL');
+        }
       }
-      if (!isSquadron && def.domain === 'space' && !hasShipyard(planet, h.ctx.data)) {
+      if (!isShuttle && def.domain === 'space' && !hasShipyard(planet, h.ctx.data)) {
         return h.reject('E_NO_SHIPYARD');
       }
       if (def.domain === 'ground' && !hasGroundFacility(planet, h.ctx.data)) {
@@ -647,7 +664,15 @@ export const constructionModule: GameModule = {
           owner: p.playerId,
         });
       } else if (p.kind === 'unit' && typeof p.unit === 'string' && typeof p.count === 'number') {
-        addUnits(planet.garrison, p.unit, p.count, p.modules);
+        // Челнок сдают В ПОРТ (SHU-1.1) — он не гарнизон (не держит мир, не гибнет в
+        // наземном штурме) и не флот (`autoRally` его не поднимает).
+        const built = h.ctx.data.units[p.unit];
+        if (built?.traits.includes('shuttle')) {
+          planet.hangar = planet.hangar ?? [];
+          addUnits(planet.hangar, p.unit, p.count, p.modules);
+        } else {
+          addUnits(planet.garrison, p.unit, p.count, p.modules);
+        }
         h.emit('unit.built', {
           planetId: planet.id,
           unit: p.unit,

@@ -112,9 +112,9 @@ describe('штаб героев — нормализация вида', () => {
 
   it('вкладка и досье нормализацию переживают', () => {
     const s = staffed();
-    const v = normalizeHeroView(s, 'p1', viewOf({ tab: 'fittings', dossier: 'fit:x' }));
-    expect(v.tab).toBe('fittings');
-    expect(v.dossier).toBe('fit:x');
+    const v = normalizeHeroView(s, 'p1', viewOf({ tab: 'ship', dossier: 'node:x' }));
+    expect(v.tab).toBe('ship');
+    expect(v.dossier).toBe('node:x');
   });
 });
 
@@ -285,10 +285,10 @@ describe('штаб героев — разметка панели', () => {
   it('переключение вкладки меняет тело панели', () => {
     const staff = initHeroStaff(hostOf());
     const tree = staff.paneHtml();
-    staff.click(click('[data-htab]', { htab: 'fittings' }));
-    const fittings = staff.paneHtml();
-    expect(fittings).not.toBe(tree);
-    expect(fittings).toContain('hx-tab on');
+    staff.click(click('[data-htab]', { htab: 'ship' }));
+    const ship = staff.paneHtml();
+    expect(ship).not.toBe(tree);
+    expect(ship).toContain('hx-tab on');
   });
 
   it('у каждой вкладки штаба своя иконка и локализованная подпись', () => {
@@ -394,13 +394,136 @@ describe('штаб героев — клики', () => {
     expect(staff.paneHtml()).not.toContain('hx-dossier');
   });
 
-  it('установка фиттинга уходит приказом в ядро', () => {
+  it('установка и снятие модуля уходят приказами в ядро', () => {
     const s = staffed();
     const hero = ownHeroes(s, 'p1')[0]!;
     const sent: Action[] = [];
     const staff = initHeroStaff(hostOf({ state: () => s, order: (a) => sent.push(a) }));
-    expect(staff.click(click('[data-hfit]', { hfit: hero.id, fit: 'fit-x' }))).toBe('repaint');
-    expect(sent.length).toBe(1);
-    expect(sent[0]!.type).toBe('hero.fit');
+    expect(
+      staff.click(click('[data-hinstall]', { hinstall: hero.id, mod: 'ion_engine' })),
+    ).toBe('repaint');
+    expect(
+      staff.click(click('[data-huninstall]', { huninstall: hero.id, mod: 'ion_engine' })),
+    ).toBe('repaint');
+    expect(sent.map((a) => a.type)).toEqual(['hero.install', 'hero.uninstall']);
+  });
+});
+
+describe('штаб героев — слоты под скиллы (HPR-1.2)', () => {
+  /** Панель «Способности» у главного героя: он носит три, бюджет — четыре. */
+  function slotsPane(over: Partial<HeroStaffHost> = {}): {
+    staff: ReturnType<typeof initHeroStaff>;
+    html: string;
+  } {
+    const staff = initHeroStaff(hostOf(over));
+    staff.click(click('[data-htab]', { htab: 'abilities' }));
+    return { staff, html: staff.paneHtml() };
+  }
+
+  it('бюджет показан ЧИСЛОМ, а свободный слот — приглашением, а не дырой', () => {
+    const { html } = slotsPane();
+    // «Слоты · 3/4» — пипсы перестают читаться после четырёх и не говорят, сколько осталось.
+    expect(html).toMatch(/Слоты · \d+\/\d+/);
+    expect(html).toContain('hx-bay');
+    expect(html).toContain(t('hero.slot.empty'));
+  });
+
+  it('надеть из запаса — это заказ hero.equip на нужного героя и нужный скилл', () => {
+    // Засеянный ростер носит всё, чем владеет, поэтому запас задаём явно: владеет
+    // тремя, носит одну — две ждут слота.
+    const s = staffed();
+    const hero = Object.values(s.heroes!).find((h) => h.owner === 'p1')!;
+    hero.abilities = ['rally', 'scan', 'bulwark'];
+    hero.equipped = ['rally'];
+    const orders: Action[] = [];
+    const { staff, html } = slotsPane({ state: () => s, order: (a) => orders.push(a) });
+    const btn = /data-hequip="([^"]+)" data-ab="([^"]+)"/.exec(html);
+    expect(btn, 'в запасе должен быть хотя бы один надеваемый скилл').not.toBeNull();
+    staff.click(click('[data-hequip]', { hequip: btn![1]!, ab: btn![2]! }));
+    expect(orders).toHaveLength(1);
+    expect(orders[0]!.type).toBe('hero.equip');
+    expect(orders[0]!.payload).toEqual({ heroId: btn![1], abilityId: btn![2] });
+  });
+
+  it('снять — обратимо, и это отдельный заказ hero.unequip', () => {
+    const orders: Action[] = [];
+    const { staff, html } = slotsPane({ order: (a) => orders.push(a) });
+    const btn = /data-hunequip="([^"]+)" data-ab="([^"]+)"/.exec(html);
+    expect(btn, 'занятый слот обязан предлагать снятие').not.toBeNull();
+    staff.click(click('[data-hunequip]', { hunequip: btn![1]!, ab: btn![2]! }));
+    expect(orders).toHaveLength(1);
+    expect(orders[0]!.type).toBe('hero.unequip');
+  });
+
+  it('перк развёртывания лежит в запасе, но слот не занимает и надеть его нельзя', () => {
+    // `spawn_*` читает `hero.spawn` из пула, а не из слотов — кнопки надевания у него нет.
+    const s = staffed();
+    const hero = Object.values(s.heroes!).find((h) => h.owner === 'p1')!;
+    hero.abilities = ['rally', 'diplomatic_landing'];
+    hero.equipped = ['rally'];
+    const { html } = slotsPane({ state: () => s });
+    expect(html).toContain(t('hero.abil.deploy-perk'));
+    expect(html).not.toMatch(/data-hequip="[^"]*" data-ab="diplomatic_landing"/);
+  });
+
+  it('когда слотов нет, лишнее ПОКАЗАНО погашенным, а не спрятано', () => {
+    const s = staffed();
+    const hero = Object.values(s.heroes!).find((h) => h.owner === 'p1')!;
+    hero.grade = 'common'; // один слот
+    hero.abilities = ['rally', 'scan'];
+    hero.equipped = ['rally'];
+    const { html } = slotsPane({ state: () => s });
+    // Скилл виден — прятать его значило бы врать о том, чем игрок владеет…
+    expect(html).toContain(t('data.scan'));
+    // …но причина названа, и кнопки надевания нет.
+    expect(html).toContain(t('hero.slot.full'));
+    expect(html).not.toMatch(/data-hequip="[^"]*" data-ab="scan"/);
+  });
+});
+
+describe('штаб героев — корабль: модули в той же идиоме отсеков (HPR-1.5.4)', () => {
+  function shipPane(over: Partial<HeroStaffHost> = {}): string {
+    const staff = initHeroStaff(hostOf(over));
+    staff.click(click('[data-htab]', { htab: 'ship' }));
+    return staff.paneHtml();
+  }
+
+  /** Герой ВНЕ поля — переоснащать можно только такого. */
+  function dockedState(): { s: GameState; hero: NonNullable<GameState['heroes']>[string] } {
+    const s = staffed();
+    const hero = Object.values(s.heroes!).find((h) => h.owner === 'p1')!;
+    delete hero.fleetId;
+    return { s, hero };
+  }
+
+  it('пустой отсек называет СВОЙ тип — «свободен» без типа врал бы', () => {
+    const { s } = dockedState();
+    const html = shipPane({ state: () => s });
+    expect(html).toContain('hx-bay');
+    expect(html).toContain(t('hero.ship.bay.weapon'));
+  });
+
+  it('у поставленного модуля ЕСТЬ снятие — в отличие от старых фиттингов', () => {
+    const { s, hero } = dockedState();
+    hero.modules = ['ion_engine'];
+    const html = shipPane({ state: () => s });
+    expect(html).toContain('data-huninstall');
+    expect(html).toContain(t('hero.slot.remove'));
+  });
+
+  it('чужому корпусу модуль не предлагают — показан с причиной, а не спрятан', () => {
+    const { s } = dockedState();
+    const html = shipPane({ state: () => s });
+    // `radar_module` разрешён только `sensor_frigate` — на корпусе героя он должен
+    // быть ВИДЕН и погашен: экран не врёт о том, что вообще существует.
+    expect(html).toContain(t('hero.ship.wrong-hull'));
+    expect(html).toContain('hx-row dim');
+  });
+
+  it('герой в поле переоснащение не предлагает, и говорит почему', () => {
+    const s = staffed();
+    const html = shipPane({ state: () => s }); // главный герой развёрнут
+    expect(html).toContain(t('hero.ship.refit-docked'));
+    expect(html).not.toContain('data-hinstall');
   });
 });

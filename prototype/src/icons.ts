@@ -43,7 +43,7 @@ export const UNIT_ICON: Record<string, string> = {
   scout: '◌',
   siege: '✦',
   strike_carrier: '◈', // a flat-top capital hull — hangar bays for the wing
-  fighter_squadron: '△', // light strike wing (hollow, to read apart from the cruiser ▲)
+  interceptor: '△', // light strike wing (hollow, to read apart from the cruiser ▲)
   hero: '♔', // the player's projection — a crowned flagship
   militia: '▿', // massed light foot
   heavy_infantry: '◆', // the armoured line

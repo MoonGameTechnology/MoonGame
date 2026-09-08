@@ -62,7 +62,7 @@ describe('хвост маркера флота', () => {
   });
 });
 
-const крыло = (u: string) => u === 'fighter_squadron';
+const крыло = (u: string) => u === 'interceptor';
 const груз = (unit: string) => ({ unit });
 
 describe('хвост груза — что в каком ряду', () => {
@@ -73,7 +73,7 @@ describe('хвост груза — что в каком ряду', () => {
   });
 
   it('ГРУЗЯЩЕЕСЯ ВСТАЁТ В РЯД СВОЕЙ ФОРМЫ: иначе пипс «прыгнет» по окончании погрузки', () => {
-    const r = cargoRows(1, 1, [груз('fighter_squadron'), груз('militia')], крыло);
+    const r = cargoRows(1, 1, [груз('interceptor'), груз('militia')], крыло);
     expect(r.diamonds.map((p) => p.kind)).toEqual(['wing', 'load']);
     expect(r.squares.map((p) => p.kind)).toEqual(['troop', 'load']);
   });

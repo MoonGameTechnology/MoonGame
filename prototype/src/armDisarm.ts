@@ -54,7 +54,7 @@ export const KEEPS_ARMED: Record<ArmedState, readonly string[]> = {
  * Прицелы, которые гасит ЛЮБАЯ кнопка ряда (правило 5). Список — для читателя: он
  * называет то, у чего своих команд нет вовсе, и объясняет, почему их нет в таблице.
  */
-export const ALWAYS_DISARMED = ['heroAim', 'heroSpawnAim', 'squadronStrikeAim'] as const;
+export const ALWAYS_DISARMED = ['heroAim', 'heroSpawnAim'] as const;
 
 /** Правила 1, 2 и 4: остаётся ли состояние взведённым при этой команде. */
 export function keepsArmed(state: ArmedState, cmd: string | undefined): boolean {

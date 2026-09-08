@@ -38,7 +38,8 @@
     "shipRepair": 0.1,
     "enablesShipConstruction": true,
     "scoreValue": 12,
-    "traits": []
+    "traits": [],
+    "shuttleBay": 6
   },
   "biomass_pit": {
     "name": "Biomass Pit",
@@ -114,7 +115,8 @@
     "hp": 25,
     "shipRepair": 0.05,
     "enablesShipConstruction": true,
-    "scoreValue": 4
+    "scoreValue": 4,
+    "shuttleBay": 6
   },
   "radar": {
     "name": "Radar Array",
@@ -404,7 +406,6 @@
           "energy": 50
         },
         "hp": 35,
-        "enablesSquadronConstruction": true,
         "enablesGroundConstruction": true
       },
       {
@@ -418,7 +419,6 @@
         },
         "hp": 45,
         "buildSpeedBonus": 0.5,
-        "enablesSquadronConstruction": true,
         "enablesGroundConstruction": true
       }
     ]

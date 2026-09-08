@@ -16,7 +16,7 @@ import type { Fleet, GameData, Planet, UnitStack } from '../../packages/shared-c
 import { isGroundUnit, isShipUnit, isWingUnit } from './planetSummary';
 
 /** Вкладки карточки мира в порядке показа. */
-export const PLANET_TABS = ['ground', 'ships', 'squadron', 'buildings'] as const;
+export const PLANET_TABS = ['ground', 'ships', 'shuttle', 'buildings'] as const;
 export type PlanetTabId = (typeof PLANET_TABS)[number];
 
 /** Гарнизон, разложенный по вкладкам. Порядок стеков внутри — как в гарнизоне. */
@@ -48,7 +48,7 @@ export function tabCounts(
   return {
     ground: g.ground.length,
     ships: g.ships.length + orbit.length,
-    squadron: g.wings.length,
+    shuttle: g.wings.length,
     buildings: p.buildings.length,
   };
 }
@@ -57,6 +57,6 @@ export function tabCounts(
 export function buildRoster(tab: PlanetTabId, units: readonly string[], data: GameData): string[] {
   if (tab === 'ground') return units.filter((u) => isGroundUnit(u, data));
   if (tab === 'ships') return units.filter((u) => isShipUnit(u, data));
-  if (tab === 'squadron') return units.filter((u) => isWingUnit(u, data));
+  if (tab === 'shuttle') return units.filter((u) => isWingUnit(u, data));
   return [];
 }

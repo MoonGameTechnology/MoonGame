@@ -203,10 +203,10 @@ describe('AvaOrchestrator × arsenal snapshot (ARS-3)', () => {
     const roster = new MemoryAvaRosterStore();
     const sessions = new MemoryAvaSessionStore();
     const built: AvaSessionSpec[] = [];
-    const arsenals: Record<string, { hulls: string[]; modules: string[]; fittings: string[] }> = {
-      'acc-a1': { hulls: ['cruiser'], modules: ['cargo_bay'], fittings: [] },
-      'acc-a2': { hulls: ['scout_drone'], modules: [], fittings: [] },
-      'acc-b': { hulls: ['dropship'], modules: [], fittings: [] },
+    const arsenals: Record<string, { hulls: string[]; modules: string[] }> = {
+      'acc-a1': { hulls: ['cruiser'], modules: ['cargo_bay'] },
+      'acc-a2': { hulls: ['scout_drone'], modules: [] },
+      'acc-b': { hulls: ['dropship'], modules: [] },
     };
     const orch = new AvaOrchestrator({
       challengeStore: challenges,
@@ -255,13 +255,13 @@ describe('AvaOrchestrator × corp rentals (ARS-6)', () => {
       },
       now: () => 42,
       arsenalOf: (accountId) =>
-        Promise.resolve(accountId === 'acc-a1' ? { hulls: ['cruiser'], modules: [], fittings: [] } : { hulls: [], modules: [], fittings: [] }),
+        Promise.resolve(accountId === 'acc-a1' ? { hulls: ['cruiser'], modules: [] } : { hulls: [], modules: [] }),
       // ARS-6: acc-a1 also has a corp-rented module for THIS matchup only.
       corpRentalOf: (accountId, matchupId) =>
         Promise.resolve(
           accountId === 'acc-a1' && matchupId === 'mu-rent'
-            ? { hulls: [], modules: ['cargo_bay'], fittings: [] }
-            : { hulls: [], modules: [], fittings: [] },
+            ? { hulls: [], modules: ['cargo_bay'] }
+            : { hulls: [], modules: [] },
         ),
     });
     const h = { orch, challenges, roster, sessions, built } as unknown as Harness;
@@ -273,7 +273,6 @@ describe('AvaOrchestrator × corp rentals (ARS-6)', () => {
     expect(state.players[seats['acc-a1']!]?.arsenal).toEqual({
       hulls: ['cruiser'], // personal
       modules: ['cargo_bay'], // rented in
-      fittings: [],
     });
   });
 });

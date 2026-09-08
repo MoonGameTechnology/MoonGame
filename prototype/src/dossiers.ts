@@ -169,10 +169,10 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
           c: hl(st.cargoCapacity ?? 0),
         }),
       };
-    case 'fighter_squadron':
+    case 'interceptor':
       return {
-        name: t('dossier.unit.fighter-squadron.name'),
-        body: t('dossier.unit.fighter-squadron.desc', {
+        name: t('dossier.unit.interceptor.name'),
+        body: t('dossier.unit.interceptor.desc', {
           sp: hl(st.speed),
           a: hl(st.attack),
           hp: hl(st.hp),
@@ -356,10 +356,10 @@ export function createDossiers(host: DossierHost): {
         body: t('dossier.tab.ships.desc'),
       };
     }
-    if (key === 'tab:squadron') {
+    if (key === 'tab:shuttle') {
       return {
-        name: t('dossier.tab.squadron.name'),
-        body: t('dossier.tab.squadron.desc'),
+        name: t('dossier.tab.shuttle.name'),
+        body: t('dossier.tab.shuttle.desc'),
       };
     }
     if (key === 'tab:buildings') {
@@ -485,17 +485,6 @@ export function createDossiers(host: DossierHost): {
       return (
         `<div class="cx-head"><span class="cx-ic">◆</span><b>${esc(tData(def.name))}</b><span class="cx-tag">${t('codex.tag.module')}</span></div>` +
         `<div class="cx-stats">${rows.join('')}</div>`
-      );
-    }
-    if (kind === 'hf') {
-      const def = data.heroFittings[id];
-      if (!def) return '';
-      const rows = [cxRow(t('codex.row.cost'), cost(def.cost, treasury()))];
-      for (const [k, v] of Object.entries(def.statMods ?? {}))
-        rows.push(cxRow(tData(k), (v > 0 ? '+' : '') + String(v)));
-      return (
-        `<div class="cx-head"><span class="cx-ic">◆</span><b>${esc(tData(def.name))}</b><span class="cx-tag">${t('codex.tag.fitting')}</span></div>` +
-        `<div class="cx-stats">${rows.join('')}</div><div class="cx-desc">${esc(t(def.description ?? ''))}</div>`
       );
     }
     const def = data.units[id];

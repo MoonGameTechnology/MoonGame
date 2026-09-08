@@ -78,7 +78,7 @@ description: Добавление и правка игрового контен�
   контента (`heroAbilities`/`heroSkillTrees`/`heroFittings`) — `nonnegative`:
   отрицательная цена печатала бы ресурсы через `payCost`.
 - Enum'ы fail-closed: неизвестная ветка героя (`transhuman|psionic`), ветка техов
-  (`ground|space|squadron|missile|command`) или `hook` пассивки роняют парс целиком.
+  (`ground|space|shuttle|missile|command`) или `hook` пассивки роняют парс целиком.
   Это правильно (инвариант 4, fail-secure): битые данные не должны доехать до ядра.
 
 ## 3. Перекрёстные ссылки должны резолвиться

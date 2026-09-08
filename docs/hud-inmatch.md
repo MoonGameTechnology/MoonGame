@@ -8,7 +8,7 @@
 > не видит игрок (туман уже вырезан на сервере). Тема — `theme.ts` (cyan-on-void glass).
 > Клиент — **PWA-first** (`cross-platform-roadmap.md`; ремарка «RN» в `theme.ts` устарела).
 > Парные доки: `main-menu.md` (мета-шелл НАД матчем), `state.md` (данные), `shields`/
-> `ship-modules`/`squadrons`/`tech-tree`-роадмапы (стат-панель/иконки). Формат — кирпичики
+> `ship-modules`/`shuttles`/`tech-tree`-роадмапы (стат-панель/иконки). Формат — кирпичики
 > `HUD-*`. Зоны: `[cli]` (клиент) · `[core]`/`[srv]` где нужен новый данные/действие.
 
 ---

@@ -55,12 +55,8 @@ import {
   orderAuto,
   orderScramble,
   fleetIdle,
-  squadronTake,
-  squadronStrikeRange,
-  fleetHasSquadron,
-  isWing,
-  wingCanAct,
-  wingCanReturn,
+  shuttleStrikeRange,
+  fleetHasShuttle,
   sortieSpec,
   freshSortie,
   botFavour,
@@ -80,10 +76,10 @@ import {
   dockRepairCost,
   fleetAtOwnDock,
   MAX_CHAIN_STEPS,
+  type AiProfile,
   type ChainStep,
   type Patrol,
 } from './game';
-import { act as makeAction } from './actions';
 import {
   dominantUnit,
   glyphHalo,
@@ -333,8 +329,12 @@ import {
   factionBonuses,
   houseDisplayName,
   houseNameFor,
+  isAiSeat as isAiRole,
+  nextSeatRole,
   rivalCount,
+  seatAiProfile,
   seatFactionIds as seatSeatFactionIds,
+  type SeatRole,
 } from './setupSeats';
 import { SNAP_REACH, drawOrder, lanes, mapViewBox, viewBoxPoint } from './setupMap';
 import {
@@ -587,7 +587,13 @@ import { resolveIntro, parseSeenIntros, type IntroCard } from './intros';
 import { buildRecap, type RecapEvent } from './recap';
 import { briefSince, marksAway, splitByAttention, worthShowing } from './awayBrief';
 import { HOLD_TIP_MS, cursorTipPos, holdTipPos, movedTooFar } from './tipPlacement';
-import { normalizeTake, shipCounts, stepTake } from './splitPlan';
+import {
+  cargoSplit,
+  normalizeSlotTake,
+  splitSlots,
+  stepTake,
+  type SplitSlot,
+} from './splitPlan';
 import { splitDialogHtml, splitDialogLives, splitRows } from './splitDialog';
 import { canAssaultFromOrbit, canMerge, canSplit, uniformMode } from './cmdAvailability';
 import { DEFAULT_FIRE_MODE, fireMenuHtml, fireModeLabel, fireModeTargets } from './fireMode';
@@ -956,7 +962,7 @@ const BUILD_UNITS = [
   'scout',
   'siege',
   'strike_carrier',
-  'fighter_squadron',
+  'interceptor',
   'militia',
   'heavy_infantry',
   'special_forces',
@@ -969,7 +975,7 @@ let ME = 'p1';
 // account balance, NOT match state, so the prototype shows a placeholder here; the real
 // balance comes from the account once monetization is wired.
 const SOVEREIGNS = 500;
-type PlanetTab = 'ground' | 'ships' | 'squadron' | 'buildings';
+type PlanetTab = 'ground' | 'ships' | 'shuttle' | 'buildings';
 
 // Holographic draw primitives (rgba tint, cached glow/sphere sprites) now live in the
 // shared render kit (@void/client · holoDraw.ts, CP0.2 — one render implementation). The
@@ -1021,12 +1027,11 @@ let barrageAim = false; // "Обстрел" armed → next tap picks the artille
 // point the hero's ship rises at (own world / own fleet / allied world by markers).
 let heroAim: { heroId: string; abilityId: string } | null = null;
 let heroSpawnAim: string | null = null;
-// Squadron free-space strike armed → next tap on an enemy fleet sends squadron.strike
-let squadronStrikeAim: string | null = null;
+// Shuttle free-space strike armed → next tap on an enemy fleet sends shuttle.strike
 // CC-2 standing order: fleets whose owner opted into AUTO-STORM — they descend and assault
 // a hostile world on arrival by themselves (the AI's autoEngage capture loop, opted-in).
 const autoAssault = new Set<string>();
-// CC-4 reactive auto-scramble: squadron fleets on "дежурный вылет" — they auto-sortie at
+// CC-4 reactive auto-scramble: shuttle fleets on "дежурный вылет" — they auto-sortie at
 // any identified, at-war contact that enters their strike radius (SQ-4.1 patrol core),
 // burning fuel and rearming on a game-hour cadence (SQ-2.1). Client-side plan, like the
 // order queue; single-player only (the server owns fleets in net play).
@@ -1185,8 +1190,10 @@ let fleetInfoFor: string | null = null;
 let planetInfoFor: string | null = null;
 const buildQueues: Record<string, PlanetBuildQueue> = {};
 const logLines: string[] = [];
-// Player ids the local sim drives as AI (empty seats become AI). Default solo = p2.
-let AI_PLAYERS = new Set<string>(['p2']);
+// Player ids the local sim drives as AI (empty seats become AI), each with the
+// DIFFICULTY chosen on the setup screen (AIDIFF-1: «слабый» = the old simple bot,
+// «сильный» = the full-heuristics one). Default solo = p2 on weak.
+let AI_PLAYERS = new Map<string, AiProfile>([['p2', 'weak']]);
 // Session war record (from `unit.died` events): enemy units you destroyed vs your own
 // units lost. Cumulative since the match started; reset on a new match. Only battles
 // YOU take part in are counted (tracked by location via battle.started/resolved), so
@@ -1221,9 +1228,9 @@ const captureFlashes = new Map<string, { owner: string; at: number }>();
 const battleLosses = new Map<string, Record<string, Record<string, number>>>();
 // Single-player setup screen state: per-seat role (seat 0 is always you) + your
 // chosen homeworld. Seats 2-10 toggle 'ai'/'off'; an 'ai' seat spawns a rival.
-const freshSetupSlots = (): Array<'human' | 'ai' | 'off'> =>
+const freshSetupSlots = (): SeatRole[] =>
   SEAT_META.map((_, i) => (i === 0 ? 'human' : i === 1 ? 'ai' : 'off'));
-let setupSlots: Array<'human' | 'ai' | 'off'> = freshSetupSlots();
+let setupSlots: SeatRole[] = freshSetupSlots();
 // Team battle (2v2 etc.): when on, seats fight in sides — same side ALLIED (win
 // together, no friendly fire), across sides at WAR from the first hour. Seat 0 (you)
 // is always side A; the default when enabling pairs you with seat 1 vs seats 2-3.
@@ -1716,12 +1723,12 @@ if (typeof window !== 'undefined') window.addEventListener('resize', () => clamp
 
 const planet = (id: string | null | undefined): Planet | undefined =>
   id ? s.planets[id] : undefined;
-// Squadrons/carriers are their own build category (air wing): a carrier (◈) ferries the
-// fighter squadrons (△) it launches, so both live under the Wings tab — apart from line
+// Shuttles/carriers are their own build category (air wing): a carrier (◈) ferries the
+// fighter shuttles (△) it launches, so both live under the Wings tab — apart from line
 // spacecraft (which stay under Ships).
 // Само правило деления по домену живёт в `planetSummary.ts` (REFM-38) — одно место,
 // где «крыло» отделено от корабля линии, иначе авианосец считается дважды.
-const isSquadron = (u: string) => isWingUnit(u, data);
+const isShuttle = (u: string) => isWingUnit(u, data);
 const isGround = (u: string) => isGroundUnit(u, data);
 const floor = Math.floor;
 /** Compact number like Iron Order's bar: 15.7k, 728, … */
@@ -1931,16 +1938,6 @@ function fleetHasArtillery(f: Fleet | undefined): boolean {
   );
 }
 
-/** Can the fleet launch its squadrons right now? `fleet.split` refuses to take the whole
- *  stack (E_SPLIT_ALL) and only works on a stationary fleet (E_IN_TRANSIT / E_IN_BATTLE),
- *  so the launch is offered only when a non-squadron ship stays behind and the carrier is
- *  parked and out of combat (squadrons-roadmap SQ-1.1). */
-function fleetCanLaunchSquadron(f: Fleet | undefined): boolean {
-  if (!fleetHasSquadron(f, data) || f!.movement || !f!.location || f!.battleId) return false;
-  const total = f!.units.reduce((n, u) => n + u.count, 0);
-  const wing = squadronTake(f!, data).reduce((n, u) => n + u.count, 0);
-  return wing > 0 && total > wing;
-}
 
 /** Division ⇄ hold transport for a docked fleet `f` over world `here`: load the
  *  player's garrisoning divisions (if they fit the free hold) and unload the ones it
@@ -3519,7 +3516,7 @@ function setScramble(ids: string[], on: boolean): void {
     // Кому дежурство положено и почему отказ — `stanceToggle.ts` (REFM-98).
     const want = scrambleStance(
       !!f && f.owner === ME,
-      !!f && fleetHasSquadron(f, data),
+      !!f && fleetHasShuttle(f, data),
       !!patrolOf(id),
       on,
       !!pos0,
@@ -3556,7 +3553,7 @@ function setScramble(ids: string[], on: boolean): void {
         id,
         standingPatrol(
           pos,
-          squadronStrikeRange(f, data),
+          shuttleStrikeRange(f, data),
           wingSorties.get(id),
           sortieSpec(f, data),
           freshSortie,
@@ -3905,7 +3902,7 @@ function drawCombatRanges(): void {
     known,
   );
   if (!rings.length && !lines.length) return;
-  const tint: Record<string, string> = { artillery: R_ARTY, squadron: R_WING, aa: R_AA };
+  const tint: Record<string, string> = { artillery: R_ARTY, shuttle: R_WING, aa: R_AA };
   cx.save();
   for (const ring of rings) {
     const c = world({ x: ring.x, y: ring.y } as never);
@@ -5053,12 +5050,12 @@ function render(now: number) {
     const A = fleetAnchor(f);
     if (!A || !visible(A, 120)) continue;
     const col = ownerColor(f.owner);
-    // Squadrons ABOARD a carrier live in the hold, not in the battle line: with any
-    // non-squadron hull present they leave the triangle pyramid and ride the cargo
-    // tail as diamonds. A pure strike wing in flight IS its squadrons — triangles.
+    // Shuttles ABOARD a carrier live in the hold, not in the battle line: with any
+    // non-shuttle hull present they leave the triangle pyramid and ride the cargo
+    // tail as diamonds. A pure strike wing in flight IS its shuttles — triangles.
     // Три числа эмблемы — `fleetTally.ts` (REFM-115). Развилка там же: пока есть хоть
     // один КОРПУС, крыло едет грузом; корпусов нет — крыло и есть флот.
-    const { ships, wingPips, troops } = emblemTally(f.units, f.landing ?? [], isSquadron);
+    const { ships, wingPips, troops } = emblemTally(f.units, f.landing ?? [], isShuttle);
     // Фаза от ХЭША идентификатора, а не от его длины (`pulseFx.ts`, правило 2): у
     // «p1-1» и «p2-3» длина одна, и все флоты матча заводили двигатели в такт.
     const engine = fxBreath(now, { period: 120, base: 0.55, amp: 0.45, phase: phaseOfId(f.id) });
@@ -5170,13 +5167,13 @@ function render(now: number) {
 
     // cargo glued to the tail (behind the base, following the heading), SPLIT by
     // shape so counts read at a glance: row 1 — only diamonds (carried divisions,
-    // hold squadrons — «ромбик размером с квадратик»), row 2 — only squares (ground
+    // hold shuttles — «ромбик размером с квадратик»), row 2 — only squares (ground
     // troops). A loading pip (~1h) fills up in place inside its shape's row. Cell
     // centres ride the rotated baseline, the pips themselves stay upright.
     const loads = pendingLoads.filter((p) => p.fleetId === f.id); // empty for enemy/idle fleets
     // Кто в каком ряду — `markerTail.ts` (REFM-116): ряды делятся по ФОРМЕ, и
     // грузящаяся единица встаёт в ряд своей формы, а не отдельным рядом «в пути».
-    const { diamonds: diaRow, squares: sqRow } = cargoRows(wingPips, troops, loads, isSquadron);
+    const { diamonds: diaRow, squares: sqRow } = cargoRows(wingPips, troops, loads, isShuttle);
     type CargoPip = (typeof diaRow)[number];
     // The same rotation the pyramid uses; local +y = the tail. Pips and the ship
     // count are placed through this, drawn upright at their rotated spots.
@@ -5189,7 +5186,7 @@ function render(now: number) {
       tailPoint(A.x, A.y, th, lx, ly);
     const CELL = CARGO_CELL,
       SQ = 5,
-      DS = 3.1; // squadron pip: a diamond with the footprint of the square
+      DS = 3.1; // shuttle pip: a diamond with the footprint of the square
     const diamond = (cxr: number, cyr: number, r: number, fill: boolean): void => {
       cx.beginPath();
       cx.moveTo(cxr, cyr - r);
@@ -5213,7 +5210,7 @@ function render(now: number) {
         const pip = row[i]!;
         const c0 = tailAt(lx, ly);
         if (pip.kind === 'wing') {
-          // hold squadron → a solid diamond ("ромбик")
+          // hold shuttle → a solid diamond ("ромбик")
           cx.fillStyle = rgba(col, 0.85);
           cx.strokeStyle = rgba(col, 0.95);
           diamond(c0.x, c0.y, DS, true);
@@ -5226,11 +5223,11 @@ function render(now: number) {
           cx.strokeStyle = rgba(col, 0.95);
           cx.strokeRect(x + 0.5, y + 0.5, SQ - 1, SQ - 1);
         } else {
-          // loading pip → fills in place over ~1h (squadron = growing diamond,
+          // loading pip → fills in place over ~1h (shuttle = growing diamond,
           // ground troop = empty square filling bottom-up)
           const p = pip.load!;
           const prog = loadFill(s.time, p.startAt, p.doneAt); // зажат — `markerTail.ts`
-          if (isSquadron(p.unit)) {
+          if (isShuttle(p.unit)) {
             cx.strokeStyle = rgba(col, 0.85);
             diamond(c0.x, c0.y, DS, false);
             if (prog > 0) {
@@ -5692,41 +5689,10 @@ function fleetPanelHtml(f: Fleet): string {
   // Artillery rules of engagement moved to the ☰ command bar («🔥 Режим огня»
   // button + popover menu) — the bottom sheet keeps information, not controls.
 
-  // Carrier air wing (squadrons-roadmap SQ-1.1) — launch the squadron ships as a
-  // separate fast strike fleet. Needs a non-squadron ship left behind (fleet.split
-  // refuses to take the whole stack), so an all-fighter fleet just flies itself.
-  if (f.owner === ME && fleetHasSquadron(f, data)) {
-    const wing = squadronTake(f, data).reduce((n, u) => n + u.count, 0);
-    h += `<div class="sec">${t('side.wing.title')}</div><div class="row">`;
-    h += btn('launchsquad', '', t('side.wing.launch', { n: wing }), fleetCanLaunchSquadron(f));
-    h += `</div>`;
-    h += `<div class="hint">${t('side.wing.hint')}</div>`;
-
-    // CC-4 status only — the «🛩 Деж. вылет» TOGGLE moved to the ☰ command row
-    // (SO-UI: the panel keeps information, the bar keeps controls).
-    const pt = patrolOf(f.id);
-    if (pt) {
-      const status =
-        pt.sortie.rearming > 0
-          ? t('side.wing.rearming', { n: pt.sortie.rearming })
-          : t('side.wing.fuel', { n: pt.sortie.fuel });
-      h += `<div class="row dim">${t('side.wing.patrol-on')} · ${t('side.wing.radius', { r: Math.round(pt.radius) })} · ${status}</div>`;
-    }
-  }
-
-  // Squadron strike wing (a fleet split off from a carrier with homeBase) — free-space
-  // movement: strike an enemy in range, return to base, or toggle patrol (CC-4).
-  // Что такое действующее крыло — `squadron.ts` (REFM-135): панель и обработчики
-  // приказов обязаны отвечать на это одинаково, иначе кнопка обещает то, чего нет.
-  if (isWing(f, ME, fleetHasSquadron(f, data))) {
-    const isPatrol = !!patrolOf(f.id);
-    const canAct = wingCanAct(f);
-    h += `<div class="sec">${t('side.wing.title')}</div><div class="row">`;
-    h += btn('squadronstrike', '', t('side.wing.strike'), canAct);
-    h += btn('squadronreturn', '', t('side.wing.return'), wingCanReturn(f));
-    h += btn('squadronpatrol', '', isPatrol ? t('side.wing.patrol-on') : t('side.wing.patrol'), canAct);
-    h += `</div>`;
-  }
+  // Ангар порта и вылет челноков — панель мира, а не флота (SHU-3.1): по новой модели
+  // (SHU-1.2) челнок не летает во флоте, он стоит в космопорте и бьёт оттуда. Секции
+  // «Запустить крыло / Удар / Возврат / Патруль» сняты вместе с флотовой моделью: они
+  // слали действия, которых больше нет.
 
   // The player's projection hero rides here → name it and flag its fleet aura.
   if (f.units.some((u) => u.count > 0 && data.units[u.unit]?.traits.includes('hero'))) {
@@ -5938,7 +5904,7 @@ function planetSummaryHtml(p: Planet): string {
       `<div class="row">${t('side.world.type-bonuses')}: <b>${bonus.join(' · ')}</b></div>`,
     );
   rows.push(
-    `<div class="row">⚔ ${t('side.world.garrison')}: <b>${sm.garrison.ground}</b> ${t('side.world.count.ground')} · <b>${sm.garrison.ships}</b> ${t('side.world.count.ships')}${sm.garrison.wings ? ` · <b>${sm.garrison.wings}</b> ${t('side.world.count.squadrons')}` : ''}</div>`,
+    `<div class="row">⚔ ${t('side.world.garrison')}: <b>${sm.garrison.ground}</b> ${t('side.world.count.ground')} · <b>${sm.garrison.ships}</b> ${t('side.world.count.ships')}${sm.garrison.wings ? ` · <b>${sm.garrison.wings}</b> ${t('side.world.count.shuttles')}` : ''}</div>`,
   );
   const blist =
     sm.buildings
@@ -5967,7 +5933,7 @@ function planetSummaryHtml(p: Planet): string {
   );
 }
 
-/** Side-panel: a known world — ownership header + ground/ships/squadron/buildings tabs. */
+/** Side-panel: a known world — ownership header + ground/ships/shuttle/buildings tabs. */
 function planetPanelHtml(p: Planet): string {
   const mine = p.owner === ME;
   const sec = tData(data.sectors[p.terrain ?? '']?.name ?? p.terrain ?? '—');
@@ -6059,7 +6025,7 @@ function planetPanelHtml(p: Planet): string {
     t('side.tab.fleet'),
     counts.ships,
     'tab:ships',
-  )}${tabButton('squadron', t('side.tab.wings'), counts.squadron, 'tab:squadron')}${tabButton('buildings', t('side.tab.buildings'), counts.buildings, 'tab:buildings')}</div>`;
+  )}${tabButton('shuttle', t('side.tab.wings'), counts.shuttle, 'tab:shuttle')}${tabButton('buildings', t('side.tab.buildings'), counts.buildings, 'tab:buildings')}</div>`;
 
   // Tab content is split into self-contained blocks; on desktop they flow into
   // side-by-side columns (filling the wide panel), on phones they stack vertically.
@@ -6121,10 +6087,10 @@ function planetPanelHtml(p: Planet): string {
       // PC carries this in the ФЛОТ tab's hover dossier ('tab:ships')
       cols.push(`<div class="hint">${t('side.shipyard.hint')}</div>`);
     }
-  } else if (planetTab === 'squadron') {
+  } else if (planetTab === 'shuttle') {
     cols.push(`<div class="sec">${t('side.garrison.wing')}</div>` + unitRows(wing)); // всегда, см. выше
     if (mine) {
-      const wingBuilds = buildRoster('squadron', BUILD_UNITS, data);
+      const wingBuilds = buildRoster('shuttle', BUILD_UNITS, data);
       cols.push(
         `<div class="sec">${t('side.wing.conveyor')}</div>` +
           conveyorHtml(p.id, 'units') +
@@ -6132,7 +6098,7 @@ function planetPanelHtml(p: Planet): string {
       );
     }
     if (!pcUi()) {
-      // PC carries this in the КРЫЛЬЯ tab's hover dossier ('tab:squadron')
+      // PC carries this in the КРЫЛЬЯ tab's hover dossier ('tab:shuttle')
       cols.push(`<div class="hint">${t('side.wing.garrison.hint')}</div>`);
     }
   } else {
@@ -7242,7 +7208,6 @@ function renderCmdBar() {
     if (aiming) aiming = false;
     if (assaultAim) assaultAim = false;
     if (merging) merging = false;
-    squadronStrikeAim = null;
     fireMenu = false; // пустое выделение — 🔥-меню не должно всплыть при новом выборе
     troopsPlan = null; // ⇵-меню тоже: иначе всплывёт над СЛЕДУЮЩИМ выбранным флотом
     castMenu = false; // и ✨: оно тут забывалось, и повторный выбор открывал его сам
@@ -7415,7 +7380,7 @@ function renderCmdBar() {
           ids.length === 0,
           t('cmd.auto-assault.hint'),
         ) +
-        (fleets.some((f) => fleetHasSquadron(f, data))
+        (fleets.some((f) => fleetHasShuttle(f, data))
           ? cmdBtn(
               'qscramble',
               '🛩',
@@ -7423,7 +7388,7 @@ function renderCmdBar() {
               // Через ту же проверку: здесь пустого множества не бывает (кнопки нет без
               // крыльев), но защита не должна держаться на соседнем условии.
               allOn(
-                fleets.filter((fl) => fleetHasSquadron(fl, data)),
+                fleets.filter((fl) => fleetHasShuttle(fl, data)),
                 (fl) => !!patrolOf(fl.id),
               )
                 ? 'on'
@@ -7466,9 +7431,20 @@ function renderCmdBar() {
   cmdbar.classList.add('show');
 }
 
-/** Ship counts (by type) of a fleet — the rows of the split dialog. */
-function fleetShipCounts(f: Fleet): Record<string, number> {
-  return shipCounts(f.units); // арифметика деления — `splitPlan.ts` (REFM-76)
+/** Split-dialog rows of a fleet: one per STACK (unit + loadout), ships first, then
+ *  the troops in the hold (FSPLIT-1/2). A stack — not a unit type — is the addressable
+ *  thing: the same hull flies fitted and bare, and the loadout is part of the stack's
+ *  identity (SM-0.3), so "two cruisers" says nothing until it says WHICH two. */
+function fleetSplitSlots(f: Fleet): SplitSlot[] {
+  return splitSlots(f.units, f.landing ?? []); // арифметика деления — `splitPlan.ts` (REFM-76)
+}
+
+/** Hold capacity of one ship stack with its loadout installed (a cargo module is
+ *  exactly why two stacks of the same hull carry different amounts). */
+function stackCargoCapacity(unit: string, modules?: readonly string[]): number {
+  const def = data.units[unit];
+  if (!def) return 0;
+  return effectiveStats(def, { ...(modules ? { modules: [...modules] } : {}) }, data).cargoCapacity ?? 0;
 }
 
 /** The "Split fleet" modal: per ship type, +1 / +10 / All (and −1) move ships into
@@ -7494,12 +7470,22 @@ function renderSplitDialog() {
     lastSplitHtml = '';
     return;
   }
-  const counts = fleetShipCounts(f);
+  const slots = fleetSplitSlots(f);
   // Состав живой: отбор пересчитывается под него на каждой перерисовке (`splitPlan.ts`).
-  plan.take = normalizeTake(plan.take, counts);
+  plan.take = normalizeSlotTake(plan.take, slots);
+  const cargo = cargoSplit(slots, plan.take, stackCargoCapacity, (u) =>
+    data.units[u]?.stats.cargoSize ?? 1,
+  );
   const html = splitDialogHtml(
-    { fleetId: plan.fleetId, rows: splitRows(counts, plan.take) },
-    { icon: (u) => unitIconHtml(u, data, youColor, 18), name: displayUnit },
+    { fleetId: plan.fleetId, rows: splitRows(slots, plan.take), cargo },
+    {
+      icon: (u) => unitIconHtml(u, data, youColor, 18),
+      name: displayUnit,
+      moduleName: (m) => {
+        const mdef = data.modules[m];
+        return mdef ? tData(mdef.name) : m;
+      },
+    },
   );
   if (html !== lastSplitHtml) {
     splitdlg.innerHTML = html;
@@ -7528,10 +7514,22 @@ splitdlg.addEventListener('click', (ev) => {
     return;
   }
   if (sx === 'confirm') {
-    const take = Object.entries(splitState.take)
-      .filter(([, n]) => n > 0)
-      .map(([unit, count]) => ({ unit, count }));
-    if (take.length) playerOrder(splitFleet(ME, splitState.fleetId, take));
+    // Приказ адресует стеки, а не типы: у каждой строки — свой лоадаут, десант едет
+    // отдельным списком (FSPLIT-1/2). Без строки в отборе стек остаётся исходному флоту.
+    const f0 = s.fleets[splitState.fleetId];
+    const slots = f0 ? fleetSplitSlots(f0) : [];
+    const take: Array<{ unit: string; modules?: string[]; count: number }> = [];
+    const takeLanding: Array<{ unit: string; count: number }> = [];
+    for (const slot of slots) {
+      const n = splitState.take[slot.key] ?? 0;
+      if (n <= 0) continue;
+      if (slot.kind === 'ship') take.push({ unit: slot.unit, modules: slot.modules ?? [], count: n });
+      else takeLanding.push({ unit: slot.unit, count: n });
+    }
+    if (take.length)
+      playerOrder(
+        splitFleet(ME, splitState.fleetId, take, takeLanding.length ? takeLanding : undefined),
+      );
     splitState = null;
     renderSplitDialog();
     lastCmdHtml = '';
@@ -7540,13 +7538,13 @@ splitdlg.addEventListener('click', (ev) => {
     renderPanel();
     return;
   }
-  const unit = bEl.dataset.unit ?? '';
+  const key = bEl.dataset.key ?? '';
   const f = s.fleets[splitState.fleetId];
   if (!f) return;
-  const have = fleetShipCounts(f)[unit] ?? 0;
-  const cur = splitState.take[unit] ?? 0;
+  const have = fleetSplitSlots(f).find((sl) => sl.key === key)?.have ?? 0;
+  const cur = splitState.take[key] ?? 0;
   if (sx === 'inc' || sx === 'dec' || sx === 'all') {
-    splitState.take[unit] = stepTake(cur, have, sx, Number(bEl.dataset.n));
+    splitState.take[key] = stepTake(cur, have, sx, Number(bEl.dataset.n));
   }
   renderSplitDialog();
 });
@@ -7588,7 +7586,7 @@ side.addEventListener('click', (ev) => {
   } else if (act === 'selfleet') {
     setFleetSelection([arg]);
   } else if (act === 'tab') {
-    if (arg === 'ground' || arg === 'ships' || arg === 'squadron' || arg === 'buildings') {
+    if (arg === 'ground' || arg === 'ships' || arg === 'shuttle' || arg === 'buildings') {
       planetTab = arg;
     }
   } else if (act === 'openbuild') {
@@ -7635,33 +7633,6 @@ side.addEventListener('click', (ev) => {
   } else if (act === 'planetinfo') {
     // Тап по имени мира: карточка ⇄ сводка статистики (для выбранной планеты).
     if (selPlanet) planetInfoFor = planetInfoFor === selPlanet ? null : selPlanet;
-  } else if (act === 'launchsquad') {
-    // Split the squadron stack off into its own fast strike fleet (SQ-1.1).
-    const f = selFleet ? s.fleets[selFleet] : undefined;
-    if (fleetCanLaunchSquadron(f)) {
-      playerOrder(splitFleet(ME, f!.id, squadronTake(f!, data)));
-      note(t('hint.squadron-launched'));
-    }
-  } else if (act === 'squadronstrike') {
-    // Squadron free-space strike: arm the aim mode to pick an enemy fleet in range.
-    const f = selFleet ? s.fleets[selFleet] : undefined;
-    if (isWing(f, ME, fleetHasSquadron(f, data)) && wingCanAct(f)) {
-      squadronStrikeAim = selFleet;
-      note(t('hint.squadron-strike-aim'));
-    }
-  } else if (act === 'squadronreturn') {
-    // Squadron return to base: fly back to the carrier in free space.
-    const f = selFleet ? s.fleets[selFleet] : undefined;
-    if (isWing(f, ME, fleetHasSquadron(f, data)) && wingCanReturn(f)) {
-      playerOrder(makeAction(ME, 'squadron.return', { fleetId: f!.id }));
-      note(t('hint.squadron-returning'));
-    }
-  } else if (act === 'squadronpatrol') {
-    // Toggle CC-4 standing patrol for this squadron fleet.
-    const f = selFleet ? s.fleets[selFleet] : undefined;
-    if (isWing(f, ME, fleetHasSquadron(f, data)) && wingCanAct(f)) {
-      setScramble([f!.id], !patrolOf(f!.id));
-    }
   }
   lastPanelHtml = '';
   renderPanel();
@@ -7882,7 +7853,6 @@ cmdbar.addEventListener('click', (ev) => {
   // ALWAYS_DISARMED: подтверждаются тапом по КАРТЕ, своей команды в ряду у них нет.
   heroAim = null;
   heroSpawnAim = null;
-  squadronStrikeAim = null;
   if (cmd === 'move') {
     aiming = !aiming; // arm / disarm the move order
     assaultAim = false;
@@ -8047,8 +8017,8 @@ cmdbar.addEventListener('click', (ev) => {
     setAutoAssault(ids, on);
     if (on) note(t('hint.auto-assault'));
   } else if (cmd === 'qscramble') {
-    // SO-UI: the CC-4 «дежурный вылет», group-uniform over the squadron fleets.
-    const wings = ids.filter((id) => fleetHasSquadron(s.fleets[id], data));
+    // SO-UI: the CC-4 «дежурный вылет», group-uniform over the shuttle fleets.
+    const wings = ids.filter((id) => fleetHasShuttle(s.fleets[id], data));
     const on = !wings.every((id) => patrolOf(id));
     setScramble(wings, on);
     if (on) note(t('hint.standing-sortie'));
@@ -8093,7 +8063,6 @@ function selectAt(mx: number, my: number) {
     assaultAim,
     pickMode,
     aiming,
-    squadronStrikeAim: !!squadronStrikeAim,
   });
   // Merge armed: the next tap on a friendly fleet (not itself in the selection) is
   // the anchor — the selected fleet(s) fly to it and fuse. Any other tap cancels.
@@ -8135,26 +8104,8 @@ function selectAt(mx: number, my: number) {
     lastPanelHtml = '';
     return;
   }
-  // Squadron strike armed: the next tap on an enemy fleet sends squadron.strike
+  // Shuttle strike armed: the next tap on an enemy fleet sends shuttle.strike
   // (free-space flight to the target). A tap on empty space disarms.
-  if (owner === 'squadron-strike' && squadronStrikeAim) {
-    const target = nearestHit(
-      hostileFleets(Object.values(s.fleets), ME),
-      fleetAnchor,
-      mx,
-      my,
-      rFleet,
-    );
-    if (target) {
-      playerOrder(makeAction(ME, 'squadron.strike', { fleetId: squadronStrikeAim, targetFleetId: target.id }));
-      note(t('hint.squadron-strike-sent'));
-    } else {
-      note(t('hint.squadron-strike-cancel'));
-    }
-    squadronStrikeAim = null;
-    lastPanelHtml = '';
-    return;
-  }
   // Hero cast armed: the next tap picks the target world. Range / cooldown / cost
   // are the core's gates — a mis-aim comes back as an honest rejection note.
   if (owner === 'cast' && heroAim) {
@@ -8792,7 +8743,7 @@ const resourceCard = initResourceCard({
 
 // --- constructor («Верфь»): the unified loadout tab --------------------------
 // One in-match screen that switches between the loadout constructors (ships and
-// squadrons now; the «Герои» pane is still the hero штаб below — it folds in with
+// shuttles now; the «Герои» pane is still the hero штаб below — it folds in with
 // its own brick). The window itself lives in `shipyard.ts` (REFM-13); here it only
 // gets the host state it cannot reach on its own, plus the hero pane's markup and
 // its clicks.
@@ -8875,7 +8826,7 @@ if (!__PLAYER_BUILD__) {
   });
   initTestMode({
     startScenario: (state, resumeSpeed) => {
-      installMatch(state, new Set()); // scenarios drive themselves — no AI
+      installMatch(state, new Map()); // scenarios drive themselves — no AI
       speed = 0; // start paused at t=0
       // prime the fast-forward (▶▶) control to the chosen multiplier and show paused
       const spd = Array.from(document.querySelectorAll('[data-speed]')) as HTMLElement[];
@@ -9816,12 +9767,17 @@ function renderSetupSlots(): void {
         (setupTeams ? teamChip(0, true) : '') +
         `<span class="you">${t('comms.you')}</span></div>`;
     } else {
-      const aiOn = role === 'ai';
+      // Кнопка строки гоняет место по кругу «выкл → слабый → сильный» (AIDIFF-1) —
+      // подпись называет ИМЕННО то, что будет играть, а не «вкл/выкл»: иначе выбранная
+      // сложность не видна, и игрок не знает, кого позвал.
+      const aiOn = isAiRole(role);
+      const strong = role === 'ai-strong';
+      const label = strong ? t('setup.ai.strong') : aiOn ? t('setup.ai.weak') : t('setup.off');
       h +=
         `<div class="srow ${aiOn ? '' : 'off'}"><span class="dot" style="background:${m.color};color:${m.color}"></span>` +
         `<span class="nm">${house}</span>` +
         (setupTeams && aiOn ? teamChip(i, false) : '') +
-        `<button class="stog ${aiOn ? 'ai' : ''}" data-slot="${i}">${aiOn ? t('diplo.filter.ai') : t('setup.off')}</button></div>`;
+        `<button class="stog ${aiOn ? 'ai' : ''}${strong ? ' strong' : ''}" data-slot="${i}" title="${esc(t('setup.ai.hint'))}">${label}</button></div>`;
     }
   }
   setupSlotsEl.innerHTML = h;
@@ -10003,7 +9959,7 @@ topEl.addEventListener('click', (ev) => {
   );
 });
 
-function installMatch(state: GameState, aiPlayers: Set<string>): void {
+function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>): void {
   s = state;
   syncPlayerNames(s);
   ME = 'p1';
@@ -10063,7 +10019,16 @@ function installMatch(state: GameState, aiPlayers: Set<string>): void {
 }
 function startMatch(setup: SetupConfig): void {
   const st = newGame(setup);
-  installMatch(st, new Set(setup.seats.filter((x) => x.ai).map((x) => x.id)));
+  // Сложность каждого соперника берётся из его строки на экране настройки (AIDIFF-1).
+  // Она НЕ едет в `SetupConfig` и, значит, не попадает ни в состояние, ни в сохранение:
+  // это политика локального хоста, как и всё остальное в `soloDrivers`.
+  const profiles = new Map<string, AiProfile>();
+  for (const seat of setup.seats) {
+    if (!seat.ai) continue;
+    const i = SEAT_META.findIndex((m) => m.id === seat.id);
+    profiles.set(seat.id, (i >= 0 ? seatAiProfile(setupSlots[i]) : null) ?? 'weak');
+  }
+  installMatch(st, profiles);
   applyTimeSpeed(setupSpeed); // launch running at the chosen time-flow multiplier
   // SANDBOX — fenced hook. Arm the practice tools for this match from the setup
   // checkbox; remember the home world for the immortal-home toggle and show the opener.
@@ -10079,8 +10044,14 @@ function startMatch(setup: SetupConfig): void {
  *  is determined from the map's player slots. */
 function startPvEMatch(): void {
   const st = pveState(data);
-  // AI seats = all players except p1 (the human host).
-  const aiSeats = new Set(Object.keys(st.players).filter((id) => id !== 'p1'));
+  // AI seats = all players except p1 (the human host). Карта PvE своей строки настройки
+  // не имеет, поэтому её боты остаются прежними, слабыми — выбор сложности живёт на
+  // экране настройки (AIDIFF-1).
+  const aiSeats = new Map<string, AiProfile>(
+    Object.keys(st.players)
+      .filter((id) => id !== 'p1')
+      .map((id) => [id, 'weak' as const]),
+  );
   installMatch(st, aiSeats);
   applyTimeSpeed(setupSpeed);
   openSetup('hub'); // close setup screen — returns to hub
@@ -10153,7 +10124,7 @@ setupSlotsEl.addEventListener('click', (ev) => {
   const t = (ev.target as Element).closest('[data-slot]');
   if (!t) return;
   const i = Number(t.getAttribute('data-slot'));
-  setupSlots[i] = setupSlots[i] === 'ai' ? 'off' : 'ai';
+  setupSlots[i] = nextSeatRole(setupSlots[i]!); // выкл → слабый → сильный → выкл
   renderSetup();
 });
 setupSpeedEl.addEventListener('click', (ev) => {
@@ -11465,19 +11436,19 @@ if (!__PLAYER_BUILD__ && DEV_UI && typeof window !== 'undefined') {
         })),
       };
     },
-    // Stock the first own fleet with hold cargo (squadrons in the hold + landing
+    // Stock the first own fleet with hold cargo (shuttles in the hold + landing
     // troops + a fake in-progress load) so the emblem's cargo tail can be previewed
     // without building a carrier — dev chrome, mutates local state only.
     stockFleet(): string | null {
       const f = Object.values(s.fleets).find((x) => x.owner === ME);
       if (!f) return null;
-      const wing = f.units.find((st) => isSquadron(st.unit));
+      const wing = f.units.find((st) => isShuttle(st.unit));
       if (wing) wing.count += 2;
-      else f.units.push({ unit: 'fighter_squadron', count: 2 });
+      else f.units.push({ unit: 'interceptor', count: 2 });
       (f.landing ??= []).push({ unit: 'militia', count: 2 });
       pendingLoads.push({
         fleetId: f.id,
-        unit: 'fighter_squadron',
+        unit: 'interceptor',
         startAt: s.time,
         doneAt: s.time + LOAD_TIME,
       });

@@ -1,5 +1,5 @@
 import { seedRng, type RngState } from '../rng/rng';
-import type { SortieState } from './squadron';
+import type { SortieState } from './shuttle';
 import type { FleetChain } from './chain';
 
 /**
@@ -37,8 +37,10 @@ export interface UnitStack {
    *  damage before `hp`; a ship still dies only when its HULL (`hp`) hits 0.
    *  Undefined = full shield (shields-roadmap SH-0.1). */
   shieldHp?: number;
-  /** Installed ship modules (the loadout), chosen at BUILD time and LOCKED after
-   *  — there is no refit action. Ids → `data.modules`; effect applies ×count.
+  /** Installed ship modules (the loadout). For a BUILT stack it is chosen at build
+   *  time and locked after — there is no refit of a built ship. The one stack minted
+   *  another way is the hero's: `deployHero` stamps it from {@link Hero.modules}, which
+   *  the player refits between deployments (HPR-1.5.2). Ids → `data.modules`; ×count.
    *  Part of the stack's merge identity: stacks with different loadouts never
    *  merge (ship-modules-roadmap.md SM-0.3). Absent = no modules. */
   modules?: ModuleId[];
@@ -176,8 +178,6 @@ export interface PlayerArsenal {
   hulls: string[];
   /** Installable ship modules → `data.modules` ids. */
   modules: string[];
-  /** Installable hero fittings → `data.heroFittings` ids. */
-  fittings: string[];
 }
 
 /** A live Steward delegation on a player (see `Player.steward`). */
@@ -337,6 +337,20 @@ export interface Planet {
   resources: ResourceBag;
   buildings: BuildingInstance[];
   garrison: UnitStack[];
+  /** Sortie readiness of the world's port (SHU-1.2): `fuel` strikes left before the
+   *  port must rearm, `rearming` hours left on that cooldown. Undefined = full.
+   *
+   *  Счётчик принадлежит ПОРТУ, а не отдельной машине: челноки в ангаре — стеки без
+   *  своей личности (они сливаются по юниту и лоадауту), и завести топливо на стек
+   *  значило бы запретить им сливаться вовсе. Игроку это ещё и понятнее: у порта одно
+   *  читаемое состояние «готов / перезаряжается», а не N счётчиков. */
+  sortie?: { fuel: number; rearming: number };
+  /** Shuttles based in the world's spaceport (SHU-1.1). NOT a fleet and NOT part of
+   *  the garrison: a shuttle sits inside the port, never appears in orbit, and takes no
+   *  part in the ground defense of the world. Capacity is the ports' `shuttleBay`; lose
+   *  the port (destroyed or captured) and the shuttles in it are lost with it.
+   *  Undefined/empty = nothing based here. */
+  hangar?: UnitStack[];
   traits: TraitId[];
   /** Cancelled-mid-build construction/upgrade/unit orders, paused and resumable
    *  (see `PausedConstructionSite`). Undefined/empty = nothing paused here. */
@@ -419,7 +433,7 @@ export interface Fleet {
    *  `fleet.retreat` — the disengaging fleet flees faster while `now < it`. Absent =
    *  no boost. Read by the `fleet.speed` hook. */
   retreatHasteUntil?: number;
-  /** Free-space position for squadron/missile fleets that move OFF the lane graph.
+  /** Free-space position for shuttle/missile fleets that move OFF the lane graph.
    *  Set when the fleet is launched from a carrier/base; the fleet flies freely
    *  within `strikeRange` of its `homeBase`. Null/absent = a regular lane-bound fleet. */
   freePosition?: { x: number; y: number } | null;
@@ -427,12 +441,12 @@ export interface Fleet {
    *  `targetX,targetY` (a point in space, not a node). Arrives at `arrivesAt`.
    *  Null/absent = parked at `freePosition` (not currently flying). */
   freeMovement?: { targetX: number; targetY: number; departedAt: number; arrivesAt: number } | null;
-  /** The fleet this one was launched from (its carrier/base). A squadron must stay
+  /** The fleet this one was launched from (its carrier/base). A shuttle must stay
    *  within `strikeRange` of its home base's position. Absent = not a launched fleet. */
   homeBase?: FleetId | null;
   /** Point-defense cooldown: world-time (ms) until which this fleet's PD system
    *  is recharging after a volley. Absent/0 = ready to fire. PD fires reactively
-   *  when an enemy squadron enters range, then cools down for 20 game-minutes. */
+   *  when an enemy shuttle enters range, then cools down for 20 game-minutes. */
   pdCooldownUntil?: number;
 }
 
@@ -546,6 +560,10 @@ export interface GameState {
   battles: Record<BattleId, Battle>;
   /** Monotonic counter handing each battle its id. */
   battleSeq: number;
+  /** Челночные удары в полёте (SHU-1.2). Пусто/отсутствует = никто никуда не летит. */
+  strikes?: ShuttleStrike[];
+  /** Monotonic counter handing each strike its id — детерминированный, как `battleSeq`. */
+  strikeSeq?: number;
   /** Pending timeline, processed in (at, seq) order by `advanceTo`. */
   scheduled: ScheduledEvent[];
   /** Monotonic counter handing each scheduled event its deterministic `seq`. */
@@ -618,7 +636,7 @@ export interface GameState {
    *  armed (`standingOrdersModule`, `order.auto`). A driver reads this; the module
    *  itself only stores the flag and garbage-collects it for dead fleets. */
   autoAssault?: Record<FleetId, true>;
-  /** CC-4 дежурный вылет ("standing patrol"): a squadron wing armed to auto-scramble
+  /** CC-4 дежурный вылет ("standing patrol"): a shuttle wing armed to auto-scramble
    *  at the nearest identified hostile within `radius` of `center`, maintained by
    *  `standingOrdersModule` (`order.scramble` arms/disarms; `patrol.stamp` is the
    *  server driver's own runtime update of `sortie`/`rearmAt` — never client-issuable,
@@ -716,12 +734,26 @@ export interface Hero {
   cooldowns: Record<string, number>;
   /** False while the hero is dead and awaiting respawn; absent/true ⇒ alive. */
   alive?: boolean;
-  /** Rarity tier (e.g. `common` | `rare` | `legendary` | `main`). Drives the client
-   *  roster's module-slot count; the core carries it but does not enforce slots. */
+  /** Rarity tier (e.g. `common` | `rare` | `legendary` | `main`) → `data.heroGrades`.
+   *  Drives BOTH of the hero's budgets, and the core enforces them: how many abilities
+   *  may be worn (`skillSlots`, HPR-1.2) and the bonus module bays on top of the hull
+   *  (`moduleSlots`, HPR-1.5.2 — the main hero's extra bay). Unknown/absent ⇒ base
+   *  defaults, never a crash. */
   grade?: string;
-  /** Equipped ability "modules", one per grade slot (`null` = empty). Carried with the
-   *  hero; per-module gating/effects are a later brick. */
+  /** Ability "modules" the hero OWNS — the pool it may equip from. Filled by the
+   *  archetype's `startAbilities` and by skill-tree / fitting grants. Owning is not
+   *  wearing: what the hero can actually CAST is {@link Hero.equipped}. */
   abilities?: (string | null)[];
+  /** Ability ids currently IN SLOTS, bounded by the hero's skill-slot budget
+   *  (`heroSkillSlots` — the rarity's `skillSlots`, HPR-1.2). Moved in and out by
+   *  `hero.equip` / `hero.unequip`.
+   *
+   *  ABSENT ⇒ legacy loadout: everything owned counts as worn. That fallback is what
+   *  keeps old matches and replays working — before this field the two concepts were
+   *  one, and a saved hero has no way to say which of its abilities were "worn". A
+   *  legacy hero over its budget is grandfathered: it keeps casting what it has, and
+   *  the budget only bites when the player adds something new. */
+  equipped?: string[];
   /** Active passive ids (→ `data.heroPassives`, HERO-5): always-on hook contributions
    *  while the hero is alive. Copied from the archetype's `startPassives` at seed. */
   passives?: string[];
@@ -731,9 +763,13 @@ export interface Hero {
   /** Unlocked skill-tree node ids (→ `data.heroSkillTrees`, HERO-7). Grants applied on
    *  unlock land in `abilities`/`passives`; the list itself gates `requires` chains. */
   skills?: string[];
-  /** Installed ship fittings (→ `data.heroFittings`, HERO-6), capped by the archetype's
-   *  `slots`. Installed for good — no refit (the ship-modules owner rule). */
-  fittings?: string[];
+  /** Installed ship MODULES of the hero's ship (→ `data.modules`, HPR-1.5.2) — the same
+   *  hardware every other hull carries, bounded by the hull's typed bays plus the grade's
+   *  `moduleSlots` bonus (the main hero's extra bay). Stored on the HERO, not on the stack:
+   *  death destroys the fleet and the stack, and a flagship that came back stripped after a
+   *  game-day of downtime would be impossible to explain. `deployHero` stamps this list
+   *  onto the ship it forms. Absent/empty ⇒ a bare hull, exactly as before. */
+  modules?: ModuleId[];
   /** Respawn anchor — the owner's capital. A slain hero re-forms here if still held;
    *  absent ⇒ the core falls back to the hero's last node, then any owned world. */
   home?: PlanetId;
@@ -812,6 +848,36 @@ export interface TempLane {
 }
 
 /** A player's remembered last-known state of one world (fog-of-war memory). */
+/**
+ * Летящий удар челноков (SHU-1.2) — то, чего в старой модели не было вовсе.
+ *
+ * Челнок не флот: на карте его нет, по линиям он не ходит и в бой не вступает. Но и
+ * мгновенным удар быть не может — иначе против него нечего выставить, и модуль точечной
+ * обороны теряет смысл (резолюция владельца 2026-09-08). Поэтому вылет живёт в состоянии
+ * ровно столько, сколько длится полёт: откуда, чем, куда и когда долетит.
+ */
+export interface ShuttleStrike {
+  id: string;
+  owner: PlayerId;
+  /** Порт вылета — он же порт возврата. */
+  from: PlanetId;
+  /** Что именно летит (стеки покидают ангар на время вылета). */
+  units: UnitStack[];
+  /** Цель: чужой флот или чужой мир (по нему бьют ЗДАНИЯ, как бомбардировка). */
+  target: { kind: 'fleet'; id: FleetId } | { kind: 'planet'; id: PlanetId };
+  /** Точка удара, снятая в момент вылета: цель может уйти, но челноки летят туда, куда
+   *  их послали — «навёлся и пустил», а не самонаведение. */
+  to: { x: number; y: number };
+  departedAt: number;
+  arrivesAt: number;
+  /** `out` — летит к цели, `back` — возвращается в порт. */
+  leg: 'out' | 'back';
+  /** Урон, накопленный от ПВО и ещё не переведённый в сбитые машины. Копится, потому
+   *  что «раненых» челноков в модели нет: машина либо летит, либо сбита. Без накопления
+   *  залп слабее корпуса не делал бы вообще ничего, и ПВО молча простаивала бы. */
+  damage?: number;
+}
+
 export interface PlanetSnapshot {
   owner: PlayerId | null;
   garrison: UnitStack[];

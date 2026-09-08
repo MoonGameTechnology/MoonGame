@@ -125,7 +125,6 @@ export const ru: Record<string, string> = {
   'arsenal.empty': 'Арсенал пуст',
   'arsenal.empty.hint': 'войдите под аккаунтом на сервере с накоплением, чтобы увидеть коллекцию',
   'arsenal.filter.all': 'Всё',
-  'arsenal.kind.fitting': 'Оснастка',
   'arsenal.kind.hull': 'Корпуса',
   'arsenal.kind.module': 'Модули',
   'arsenal.origin.auction': 'аукцион',
@@ -313,7 +312,7 @@ export const ru: Record<string, string> = {
   'cmd.split': 'Делить',
   'cmd.split.hint': 'отделить часть кораблей пришвартованного флота в новый',
   'cmd.standing-sortie': 'Деж. вылет',
-  'cmd.standing-sortie.hint': 'эскадрилья автоматически бьёт врага в радиусе',
+  'cmd.standing-sortie.hint': 'челнок автоматически бьёт врага в радиусе',
   'cmd.stop': 'Стоп',
   'cmd.troops': 'Десант',
   'cmd.troops.hint':
@@ -351,7 +350,6 @@ export const ru: Record<string, string> = {
   'codex.row.speed': 'Скорость',
   'codex.row.upkeep': 'Содержание',
   'codex.tag.building': 'здание',
-  'codex.tag.fitting': 'оснастка',
   'codex.tag.ground-unit': 'наземный юнит',
   'codex.tag.mechanic': 'механика',
   'codex.tag.module': 'модуль',
@@ -529,10 +527,8 @@ export const ru: Record<string, string> = {
 
   // --- data — Имена игровых ДАННЫХ (data/*.json + таблицы прототипа), через tData().
   'data.aa': 'ПВО',
-  'data.ablative-cladding': 'Абляционная обшивка',
   'data.ablative-plating': 'Броневые плиты',
   'data.ace-programs': 'Программа асов',
-  'data.aegis-matrix': 'Матрица «Эгида»',
   'data.amber-concord': 'Янтарное согласие',
   'data.annihilate': 'Аннигиляция',
   'data.artillery': 'артиллерия',
@@ -554,6 +550,7 @@ export const ru: Record<string, string> = {
   'data.commander-drill-magnate': 'Магнат',
   'data.commander-drill-recon': 'Дальняя разведка',
   'data.commander-drill-veterancy': 'Ветеран кампаний',
+  'data.common': 'Простой',
   'data.convoy-impulse': 'Импульс ордера',
   'data.corridor': 'Коридор',
   'data.credit-refinery': 'Кредитный НПЗ',
@@ -575,7 +572,7 @@ export const ru: Record<string, string> = {
   'data.energy-nexus': 'Энергетический узел',
   'data.evasive-vectors': 'Манёвренность',
   'data.false-echo': 'Ложное эхо',
-  'data.fighter-squadron': 'истребительная эскадрилья',
+  'data.interceptor': 'перехватчик',
   'data.fleet-uplink': 'Канал ордера',
   'data.flight-decks': 'Полётные палубы',
   'data.food': 'пища',
@@ -595,10 +592,15 @@ export const ru: Record<string, string> = {
   'data.ion-engine': 'Ионный двигатель',
   'data.ion-storm': 'Ионный шторм',
   'data.irradiated': 'Облучённый',
+  'data.legendary': 'Легендарный',
   'data.logistics-command': 'Командование логистики',
+  'data.main': 'Главный',
   'data.metal-extractor-i': 'Рудный экстрактор I',
   'data.metal-extractor-ii': 'Рудный экстрактор II',
   'data.metal-mine': 'Металлодобыча',
+  'data.orbital-shipyard': 'Орбитальная верфь',
+  'data.polymath': 'Полимат',
+  'data.rare': 'Уникальный',
   'data.metal': 'металл',
   'data.microelectronics-fab': 'Фабрика микроэлектроники',
   'data.microelectronics-fabrication': 'Производство микроэлектроники',
@@ -610,19 +612,16 @@ export const ru: Record<string, string> = {
   'data.open-space': 'Открытый космос',
   'data.orbital-aa': 'Орбитальное ПВО',
   'data.orbital-logistics': 'Орбитальная логистика',
-  'data.orbital-shipyard': 'Орбитальная верфь',
   'data.overclocked-helm': 'Разогнанный шлем',
   'data.overseer': 'Куратор',
   'data.planet': 'Планета',
   'data.planetary-bastions': 'Планетарные бастионы',
   'data.duel': 'Дуэль',
-  'data.polymath': 'Полимат',
   'data.team-2v2': 'Двое на двое',
   'data.team-3v3': 'Трое на трое',
   'data.team-4v4': 'Четверо на четверо',
   'data.team-5v5': 'Пятеро на пятеро',
   'data.pve-waves': 'Волны Роя',
-  'data.psi-amplifier': 'Пси-усилитель',
   'data.psi-veil': 'Пси-вуаль',
   'data.radar-array': 'Радарный массив',
   'data.radar-module': 'Радар-модуль',
@@ -649,7 +648,7 @@ export const ru: Record<string, string> = {
   'data.space': 'космос',
   'data.spaceport': 'Космопорт',
   'data.special-forces': 'спецназ',
-  'data.squadron': 'эскадрилья',
+  'data.shuttle': 'челнок',
   'data.standard': 'Стандартный',
   'data.steward-protocol': 'Протокол «Хранитель»',
   'data.sustained-corridor': 'Устойчивый коридор',
@@ -704,7 +703,7 @@ export const ru: Record<string, string> = {
     'Казармы нужны для защиты вашего мира от захватчиков. Тут живут ваши доблестные защитники.',
   'dossier.building.default': 'Планетарное сооружение.',
   'dossier.building.fabricator':
-    'Чистые цеха литографии печатают {m}▦ в час. Прожорлива к энергии и людям, зато её продукция ведёт эскадрильи и открывает осадные доктрины. Апгрейды окупаются собственной продукцией.',
+    'Чистые цеха литографии печатают {m}▦ в час. Прожорлива к энергии и людям, зато её продукция ведёт челноки и открывает осадные доктрины. Апгрейды окупаются собственной продукцией.',
   'dossier.building.farm':
     'Ярусы гидропонных оранжерей под спектральными лампами позволяют вашим подопечным питаться, ведь голод беспощаден. Выращивает {f}❖ в час. Ваши рабочие и воины едят каждый день, было бы глупо проиграть сражение из-за голодного обморока.',
   'dossier.building.fort':
@@ -714,7 +713,7 @@ export const ru: Record<string, string> = {
   'dossier.building.mine':
     'Буровая платформа вгрызается в планету и добывает {m}⬢ в час. Улучшение позволяет копать глубже, чтобы добраться до самых богатых жил. Основа для строительства флота.',
   'dossier.building.orbital-aa':
-    'Стационарная зенитная батарея защищает воздушное пространство вашего мира и наносит {dmg} урона в час по кораблям на орбите. Кошмар для бомбардировщиков, повисших над планетой, и для налетающих эскадрилий. Захват мира не блокирует — это дело наземной обороны; батарея лишь выкашивает флот над головой.',
+    'Стационарная зенитная батарея защищает воздушное пространство вашего мира и наносит {dmg} урона в час по кораблям на орбите. Кошмар для бомбардировщиков, повисших над планетой, и для налетающих челноков. Захват мира не блокирует — это дело наземной обороны; батарея лишь выкашивает флот над головой.',
   'dossier.building.power-plant':
     'Термоядерный реактор питает энергией ваши миры, он производит {e}↯ в час. Энергия — кровь ваших построек, ведь они работают не на волшебстве. При дефиците всё проседает до половины мощности.',
   'dossier.building.radar':
@@ -770,9 +769,9 @@ export const ru: Record<string, string> = {
   'dossier.tab.ships.desc':
     'Флот — ваше оружие и защита. Здесь вы можете заказывать корабли для пополнения флота.',
   'dossier.tab.ships.name': 'Флот',
-  'dossier.tab.squadron.desc':
-    'Носитель (◈) несёт эскадрильи (△). Запускайте авиагруппу из панели выбранного флота кнопкой «🛩 Запустить эскадрилью».',
-  'dossier.tab.squadron.name': 'Крылья',
+  'dossier.tab.shuttle.desc':
+    'Носитель (◈) несёт челноки (△). Запускайте их из панели выбранного флота кнопкой «🛩 Запустить челноки».',
+  'dossier.tab.shuttle.name': 'Челноки',
   'dossier.task.eta': 'Осталось: {r}',
   'dossier.task.output': '{r}: {now}/ч сейчас → {final}/ч по готовности',
   'dossier.task.queued': 'В очереди — ещё не начато.',
@@ -782,9 +781,9 @@ export const ru: Record<string, string> = {
     'Рабочая лошадь линейного флота: {a} атаки, {hp} корпуса и трюм на {c}. Универсальный боевой корабль, одинаково уверенный в обороне и в наступлении.',
   'dossier.unit.cruiser.name': 'Крейсер',
   'dossier.unit.default': 'Боевая единица.',
-  'dossier.unit.fighter-squadron.desc':
-    'Палубная эскадрилья: стремительная (ход {sp}) и больно бьёт ({a} атаки), но брони почти нет ({hp} корпуса). Отделяется от носителя в отдельный быстрый флот и наносит удар с дистанции {r}. Контрится орбитальным ПВО — не гоните её на прикрытую ПВО планету.',
-  'dossier.unit.fighter-squadron.name': 'Истребительная эскадрилья',
+  'dossier.unit.interceptor.desc':
+    'Перехватчик: стремительный (ход {sp}) и больно бьёт ({a} атаки), но брони почти нет ({hp} корпуса). Отделяется от носителя в отдельный быстрый флот и наносит удар с дистанции {r}. Контрится орбитальным ПВО — не гоните его на прикрытую ПВО планету.',
+  'dossier.unit.interceptor.name': 'Перехватчик',
   'dossier.unit.hero.desc':
     'Боевая проекция самого командующего — флагман во главе родного флота: {a} атаки и {hp} корпуса. Но решает не это: его присутствие держит эскадру в кулаке, давая {b} к атаке и обороне всем кораблям рядом. Падёт — командующий лишается проекции, пока та не отстроится заново на родном мире.',
   'dossier.unit.hero.name': 'Флагман',
@@ -795,7 +794,7 @@ export const ru: Record<string, string> = {
     'Тяжёлая осадная платформа: {a} урона с дистанции {r}, но тонкая броня ({d} защиты). Её место за спинами крейсеров, откуда она крушит укрепления и верфи.',
   'dossier.unit.siege.name': 'Осадная платформа',
   'dossier.unit.strike-carrier.desc':
-    'Медленный бронированный носитель ({hp} корпуса, трюм на {c}) — своих пушек почти нет, вся его сила в эскадрильях, что он несёт. Держите его позади и запускайте авиагруппу по цели кнопкой «🛩 Запустить эскадрилью».',
+    'Медленный бронированный носитель ({hp} корпуса, трюм на {c}) — своих пушек почти нет, вся его сила в челноках, что он несёт. Держите его позади и запускайте их по цели кнопкой «🛩 Запустить челноки».',
   'dossier.unit.strike-carrier.name': 'Ударный носитель',
 
   // --- faction — Фракции: пассивный бонус дома.
@@ -808,8 +807,8 @@ export const ru: Record<string, string> = {
   'fleet.size.armada': 'Армада',
   'fleet.size.fleet': 'Флот',
   'fleet.size.flight': 'Звено',
-  'fleet.size.squadron': 'Эскадрилья',
-  'fleet.size.squadron-heavy': 'Эскадра',
+  'fleet.size.group': 'Эскадрилья',
+  'fleet.size.group-heavy': 'Эскадра',
 
   // --- fmt — Форматирование величин: длительности.
   'fmt.hours': '{n}ч',
@@ -833,12 +832,7 @@ export const ru: Record<string, string> = {
   'hint.pick-barrage': '🎯 тапните вражеский флот для сосредоточенного огня · пустота = авто',
   'hint.pick-merge': '⛬ выберите флот для объединения',
   'hint.pick-order': 'тапните точку на карте — каждый тап добавляет приказ',
-  'hint.squadron-launched': '🛩 эскадрилья запущена — ведите её на цель',
-  'hint.squadron-strike-aim': '🎯 тапните вражеский флот для удара эскадрильи',
-  'hint.squadron-strike-sent': '🎯 эскадрилья пошла на цель',
-  'hint.squadron-strike-cancel': 'удар отменён',
-  'hint.squadron-returning': '↩ эскадрилья возвращается на базу',
-  'hint.standing-sortie': '🛩 дежурный вылет включён — эскадрилья бьёт врага в радиусе',
+  'hint.standing-sortie': '🛩 дежурный вылет включён — челноки бьют врага в радиусе',
 
   // --- loadout — Оснащение корабля (packages/client): подписи характеристик в превью.
   'loadout.stat.attack': 'Урон в атаке',
@@ -910,7 +904,7 @@ export const ru: Record<string, string> = {
   'profile.league': 'Лига',
   'profile.league.recon': 'Разведка',
   'profile.league.patrol': 'Патруль',
-  'profile.league.squadron': 'Эскадра',
+  'profile.league.squad': 'Эскадра',
   'profile.league.fleet': 'Флот',
   'profile.league.armada': 'Армада',
   'profile.matches': 'Матчей',
@@ -994,9 +988,12 @@ export const ru: Record<string, string> = {
   // --- split — Разделение флота: диалог и предпросмотр.
   'split.all': 'Все',
   'split.confirm': 'Подтвердить',
+  'split.hold': 'трюм — новый флот: {a} · исходный: {b}',
+  'split.hold.over': 'десант не влезает',
   'split.note':
-    'Отделите корабли в новый флот — он останется в том же секторе. Хотя бы один корабль остаётся; десант в трюме остаётся с исходным флотом.',
+    'Отделите корабли в новый флот — он останется в том же секторе. Хотя бы один корабль остаётся; десант в трюме делится вместе с кораблями.',
   'split.preview': 'новый флот: {a} кораблей · у исходного останется {b}',
+  'split.section.landing': 'Десант в трюме',
   'split.title': 'РАЗДЕЛЕНИЕ ФЛОТА',
 
   // --- stat — Характеристики юнита в компактных подписях.
@@ -1058,7 +1055,7 @@ export const ru: Record<string, string> = {
     'Типизированные слоты: модуль встаёт только в свой тип. <b>Серые</b> — не для свободного слота или уже стоят.',
   'yard.tab.heroes': 'Герои',
   'yard.tab.ships': 'Корабли',
-  'yard.tab.squads': 'Эскадрильи',
+  'yard.tab.squads': 'Челноки',
   'yard.title': 'КОНСТРУКТОР',
 
   // --- end — Экран конца матча: исход, опыт, итоговая таблица, реванш.
@@ -1153,7 +1150,7 @@ export const ru: Record<string, string> = {
   'hero.ability.annihilate.desc': 'Уничтожает планету в радиусе — она становится мёртвым миром.',
   'hero.ability.annihilate.name': 'Аннигиляция',
   'hero.ability.boarding-translocation.desc':
-    'Герой формируется прямо на борту одного из своих флотов — где бы тот ни был. Пассивный навык: расширяет точки развёртывания.',
+    'Герой выходит там, где СТОИТ один из его флотов, — своим отдельным флотом рядом. Каждый герой ведёт свою эскадру, поэтому на борт чужой он не садится; флот в пути точкой выхода не служит. Пассивный навык: расширяет точки развёртывания.',
   'hero.ability.boarding-translocation.name': 'Абордажная транслокация',
   'hero.ability.bulwark.desc': 'Временный щит: +оборона своим флотам рядом с героем.',
   'hero.ability.bulwark.name': 'Бастион',
@@ -1184,11 +1181,6 @@ export const ru: Record<string, string> = {
   'hero.branch.common': 'Общие',
   'hero.branch.psionic': 'псионик',
   'hero.branch.transhuman': 'трансгуман',
-  'hero.fit.ablative-plating.desc':
-    'Дополнительные +40 к корпусу корабля героя. (Статы корабля заработают со швом эффективных статов, SHIP-3.)',
-  'hero.fit.aegis-matrix.desc':
-    'Полевой генератор воодушевляет флоты рядом с героем: +8% к урону в радиусе 300.',
-  'hero.fit.psi-amplifier.desc': 'Резонансный контур раскрывает герою разведку сквозь туман.',
   'hero.grade.common': 'Обычный',
   'hero.grade.legendary': 'Легендарный',
   'hero.grade.main': 'Главный',
@@ -1253,30 +1245,39 @@ export const ru: Record<string, string> = {
   'hero.abil.empty': 'Нет способностей.',
   'hero.abil.pick-target': 'Цель…',
   'hero.abil.soon': 'скоро',
-  'hero.fit.hull': 'корпус',
-  'hero.fit.hull-mod': 'Модификатор корпуса',
-  'hero.fit.install': 'Необратимо — установить',
-  'hero.fit.installed': 'установлен',
-  'hero.fit.no-slots': 'нет слотов',
-  'hero.fit.none': 'У этого героя нет слотов фиттингов.',
-  'hero.fit.permanent': 'Ставится навсегда — рефита нет',
-  'hero.fit.slots': 'Слоты · {u}/{n}',
   'hero.hq.dead': 'погиб',
   'hero.hq.deploy': 'Развернуть',
   'hero.hq.deployed': '⚓ развёрнут',
   'hero.hq.deployed-count': 'развёрнуто {a}/{c}',
   'hero.hq.empty': 'У вас пока нет героев.',
   'hero.hq.enroute': 'в пути',
-  'hero.hq.fittings': 'Фиттинги',
+  'hero.hq.modules': 'Модули',
   'hero.hq.reserve': 'резерв',
   'hero.hq.tab.abilities': 'Способности',
-  'hero.hq.tab.fittings': 'Фиттинги',
   'hero.hq.tab.overview': 'Обзор',
+  'hero.hq.tab.ship': 'Корабль',
   'hero.hq.tab.tree': 'Дерево',
+  'hero.slot.empty': 'Слот свободен',
+  'hero.slot.equip': 'Надеть',
+  'hero.slot.full': 'Нет слота',
+  'hero.slot.head': 'Слоты · {u}/{n}',
+  'hero.slot.pool': 'В запасе',
+  'hero.slot.remove': 'Снять',
+  'hero.ship.bay.defense': 'защита',
+  'hero.ship.bay.utility': 'система',
+  'hero.ship.bay.weapon': 'оружие',
+  'hero.ship.deployed': 'в поле',
+  'hero.ship.empty': 'Отсек свободен · {k}',
+  'hero.ship.no-bay': 'нет отсека',
+  'hero.ship.none': 'У корабля этого героя нет отсеков под модули.',
+  'hero.ship.refit-docked':
+    'Корабль в поле — переоснащать можно между выходами: в резерве или после гибели.',
+  'hero.ship.slots': 'Отсеки · {u}/{n}',
+  'hero.ship.wrong-hull': 'не для этого корпуса',
   'hero.stat.abilities': 'способностей',
   'hero.stat.active': 'актив',
   'hero.stat.bonuses': 'Текущие бонусы',
-  'hero.stat.fittings': 'фиттингов',
+  'hero.stat.modules': 'модулей',
   'hero.stat.tree-nodes': 'узлов дерева',
   'hero.tree.ability': 'способность',
   'hero.tree.cooldown': 'КД {h}ч',
@@ -1516,7 +1517,7 @@ export const ru: Record<string, string> = {
   'onb.intro.ava.title': 'Войны альянсов (AvA)',
   'onb.intro.badge': 'впервые',
   'onb.intro.constructor.body':
-    'Здесь вы собираете корабли, эскадрильи, дивизии и героев из модулей. Лоадаут фиксируется при постройке — выбирайте слоты заранее, переоснастить готовое нельзя. Вкладка «Герои» — штаб командиров.',
+    'Здесь вы собираете корабли, челноки, дивизии и героев из модулей. Лоадаут фиксируется при постройке — выбирайте слоты заранее, переоснастить готовое нельзя. Вкладка «Герои» — штаб командиров.',
   'onb.intro.constructor.title': 'Верфь — оснащение',
   'onb.intro.corp.body':
     'Корпорация — это ваш отряд в общей сессии: общий склад, роли участников и совместные войны альянсов (AvA). Вступите в существующую или создайте свою — вкладка «Войны» открывает доступ к вызовам между корпорациями.',
@@ -1615,7 +1616,7 @@ export const ru: Record<string, string> = {
   'rail.chat.label': 'Чат',
   'rail.chat.title': 'Чат',
   'rail.constructor.label': 'Верфь',
-  'rail.constructor.title': 'Конструктор — оснащение кораблей, эскадрилий, армии и героев',
+  'rail.constructor.title': 'Конструктор — оснащение кораблей, челноков, армии и героев',
   'rail.corp.label': 'Корп',
   'rail.corp.title': 'Корпорация',
   'rail.diplo.label': 'Дипло',
@@ -1658,6 +1659,9 @@ export const ru: Record<string, string> = {
   // --- setup — Экран «Настройка схватки»: домашний мир, боты, скорость времени.
   'setup.bonus.damage': '+{n}% урон',
   'setup.bonus.economy': '+{n}% экономика',
+  'setup.ai.hint': 'Тап переключает: выкл → слабый → сильный',
+  'setup.ai.strong': 'СИЛЬНЫЙ',
+  'setup.ai.weak': 'СЛАБЫЙ',
   'setup.bonus.radar': '+{n}% радар',
   'setup.bonus.speed': '+{n}% скорость флотов',
   'setup.cancel': 'Назад',
@@ -1678,7 +1682,7 @@ export const ru: Record<string, string> = {
   'setup.start': 'ЗАПУСК',
   'setup.start.solo': 'ЗАПУСК В ОДИНОЧКУ',
   'setup.sub':
-    'Выберите свой домашний мир на карте, задайте число соперников-ботов и запускайте. Пустые места займут боты — выключите место, чтобы командовать меньшим сектором, или выключите все ради мирной одиночной песочницы для знакомства с интерфейсом.',
+    'Выберите свой домашний мир на карте, задайте соперников и запускайте. Кнопка справа в строке места гоняет её по кругу: выкл → слабый бот → сильный. Слабый предсказуем и хорош для знакомства с интерфейсом; сильный исследует технологии, возит десант и торгует. Выключите все места ради мирной одиночной песочницы.',
   'setup.teams.note': 'одна сторона — союзники',
   'setup.teams.off': 'Командный бой: выкл',
   'setup.teams.on': 'Командный бой: ВКЛ',
@@ -1874,23 +1878,12 @@ export const ru: Record<string, string> = {
   'side.tab.buildings': 'Здания',
   'side.tab.fleet': 'Флот',
   'side.tab.ground': 'Земля',
-  'side.tab.wings': 'Крылья',
+  'side.tab.wings': 'Челноки',
   'side.unit.ground': 'земля',
   'side.unit.space': 'космос',
-  'side.wing.conveyor': 'Верфь авиагруппы',
-  'side.wing.fuel': 'топливо {n}',
+  'side.wing.conveyor': 'Верфь челноков',
   'side.wing.garrison.hint':
-    'Носитель (◈) несёт эскадрильи (△). Запускайте авиагруппу из панели выбранного флота кнопкой «🛩 Запустить эскадрилью».',
-  'side.wing.hint':
-    'Отделяет эскадрильи в отдельный быстрый флот — уводите его на удар, а носитель остаётся в строю. Нужен хотя бы один не-эскадрильный корабль. Контрится орбитальным ПВО.',
-  'side.wing.launch': '🛩 Запустить эскадрилью ({n})',
-  'side.wing.strike': '🎯 Удар',
-  'side.wing.return': '↩ Возврат',
-  'side.wing.patrol': '🛩 Патруль',
-  'side.wing.patrol-on': '🛩 дежурный вылет: ВКЛ',
-  'side.wing.radius': 'радиус {r}',
-  'side.wing.rearming': 'перезарядка {n}',
-  'side.wing.title': 'Авиагруппа',
+    'Носитель (◈) несёт челноки (△). Запускайте их из панели выбранного флота кнопкой «🛩 Запустить челноки».',
   'side.world.blackout': 'блэкаут: радары и ПВО −50%',
   'side.world.bonus.defense': 'оборона',
   'side.world.bonus.production': 'произв.',
@@ -1900,7 +1893,7 @@ export const ru: Record<string, string> = {
   'side.world.count.buildings': 'построек',
   'side.world.count.ground': 'наземных',
   'side.world.count.ships': 'кораблей',
-  'side.world.count.squadrons': 'эскадрилий',
+  'side.world.count.shuttles': 'челноков',
   'side.world.defense': 'оборона {p}',
   'side.world.designation': 'Обозначение',
   'side.world.fleet-ships': '{n} кораблей',
@@ -1956,7 +1949,7 @@ export const ru: Record<string, string> = {
   'steward.log.title': 'Журнал Хранителя',
   'steward.on.active': 'Хранитель ведёт активную оборону.',
   'steward.on.active.note':
-    'Пока вы спите: держит рубежи, поднимает дежурные эскадрильи и контратакует у своих миров, когда прогноз потерь приемлем.',
+    'Пока вы спите: держит рубежи, поднимает дежурные челноки и контратакует у своих миров, когда прогноз потерь приемлем.',
   'steward.on.defense': 'Хранитель ведёт оборону.',
   'steward.on.defense.note':
     'Пока вы спите: держит рубежи и отбивает атаки, застраивает очередь и торгует — без наступлений.',
@@ -1969,7 +1962,7 @@ export const ru: Record<string, string> = {
   'steward.stance': 'Поза',
   'steward.stance.active': 'Активная оборона',
   'steward.stance.active.note':
-    'Активная оборона: всё то же, плюс контрудар по врагу у своих миров при приемлемом прогнозе потерь (до 35%) и дежурные вылеты эскадрилий. Свою территорию не покидает.',
+    'Активная оборона: всё то же, плюс контрудар по врагу у своих миров при приемлемом прогнозе потерь (до 35%) и дежурные вылеты челноков. Свою территорию не покидает.',
   'steward.stance.defense': 'Оборона',
   'steward.stance.defense.note':
     'Поза «Оборона»: держит и отбивает, застраивает очередь, торгует — без наступлений и дипломатии. Управление вернётся автоматически, с утренней сводкой.',
@@ -1980,7 +1973,7 @@ export const ru: Record<string, string> = {
   'tech.branch.ground': 'Земля',
   'tech.branch.missile': 'Ракеты',
   'tech.branch.space': 'Космос',
-  'tech.branch.squadron': 'Эскадрильи',
+  'tech.branch.shuttle': 'Челноки',
   'tech.fx.damage': 'урон',
   'tech.fx.fleet-speed': 'скорость флотов',
   'tech.fx.production': 'производство',
@@ -2014,7 +2007,7 @@ export const ru: Record<string, string> = {
     'Насыщающий залп: перегрузка любой ПРО. +10% к урону. Капстоун Ракетчика.',
   'tech.node.siege-doctrine.desc': 'Осадные расчёты дальнего боя: +8% к урону.',
   'tech.node.signal-corps.desc': 'Войска связи: единая картина боя. +8% к радиусу радаров.',
-  'tech.node.strike-vectors.desc': 'Ударные векторы: расчёт заходов эскадрилий. +8% к урону.',
+  'tech.node.strike-vectors.desc': 'Ударные векторы: расчёт заходов челноков. +8% к урону.',
   'tech.node.void-armadas.desc':
     'Доктрина больших соединений: +6% к урону и скорости флотов. Требует 5 своих секторов.',
   'tech.node.warhead-miniaturization.desc':

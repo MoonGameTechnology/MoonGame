@@ -38,7 +38,8 @@ import {
   castHeroAbility,
   spawnHero,
   unlockHeroSkill,
-  fitHero,
+  installHeroModule,
+  uninstallHeroModule,
   freshSortie,
   orderChain,
   forceMarchFleet,
@@ -66,7 +67,7 @@ const CLIENT_ACTIONS: Action[] = [
   unloadArmy(P, 'f1', 'infantry', 2),
   launchFleet(P, 'C1R1'),
   mergeFleet(P, 'f1', 'f2'),
-  splitFleet(P, 'f1', [{ unit: 'fighter_squadron', count: 2 }]),
+  splitFleet(P, 'f1', [{ unit: 'interceptor', count: 2 }]),
   engageFleet(P, 'f1', 'f2'),
   buildBuilding(P, 'C1R1', 'mine'),
   upgradeBuilding(P, 'C1R1', 'mine'),
@@ -95,7 +96,8 @@ const CLIENT_ACTIONS: Action[] = [
   castHeroAbility(P, 'hero:p1:1', 'scan', 'B2'),
   spawnHero(P, 'hero:p1:2', 'C1R1'),
   unlockHeroSkill(P, 'hero:p1:1', 'neural_lace'),
-  fitHero(P, 'hero:p1:1', 'psi_lens'),
+  installHeroModule(P, 'hero:p1:1', 'ion_engine'),
+  uninstallHeroModule(P, 'hero:p1:1', 'ion_engine'),
   // CHAIN-UX: многоточечный план через реальный билдер — дрейф формы шага между
   // билдером и гейт-схемой обязан падать здесь, а не на боевом gated-сервере.
   orderChain(P, 'f1', [

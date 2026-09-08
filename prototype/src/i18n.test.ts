@@ -310,7 +310,6 @@ describe('локализация — ключи', () => {
       ['buildings', data.buildings],
       ['units', data.units],
       ['modules', data.modules],
-      ['heroFittings', data.heroFittings],
       ['sectors', data.sectors],
       ['planetTypes', data.planetTypes],
     ];

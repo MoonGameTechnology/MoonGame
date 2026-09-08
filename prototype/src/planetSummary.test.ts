@@ -24,7 +24,7 @@ describe('сводка мира — домены гарнизона', () => {
   it('АВИАНОСЕЦ — крыло, а не корабль линии: иначе он посчитается дважды', () => {
     expect(isWingUnit('strike_carrier', data)).toBe(true);
     expect(isShipUnit('strike_carrier', data)).toBe(false);
-    expect(isWingUnit('fighter_squadron', data)).toBe(true);
+    expect(isWingUnit('interceptor', data)).toBe(true);
   });
 
   it('корабль линии — не наземный и не крыло', () => {
@@ -44,7 +44,7 @@ describe('сводка мира — домены гарнизона', () => {
         { unit: 'tank', count: 3 },
         { unit: 'cruiser', count: 2 },
         { unit: 'strike_carrier', count: 1 },
-        { unit: 'fighter_squadron', count: 4 },
+        { unit: 'interceptor', count: 4 },
       ],
       data,
     );

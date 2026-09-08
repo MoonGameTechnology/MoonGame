@@ -246,9 +246,14 @@
     "buildTimeHours": 10,
     "upkeep": {
       "credits": 64
+    },
+    "slots": {
+      "weapon": 1,
+      "defense": 1,
+      "utility": 1
     }
   },
-  "fighter_squadron": {
+  "interceptor": {
     "faction": "vanguard",
     "stats": {
       "attack": 14,
@@ -260,7 +265,7 @@
       "rearmRounds": 2
     },
     "traits": [
-      "squadron"
+      "shuttle"
     ],
     "signature": 2,
     "cost": {

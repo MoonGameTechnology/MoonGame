@@ -22,7 +22,7 @@ import type { GameData } from './schemas';
  */
 
 /** What the item references in the game-data catalogs. */
-export const ArsenalItemKindSchema = z.enum(['hull', 'module', 'hero_fitting']);
+export const ArsenalItemKindSchema = z.enum(['hull', 'module']);
 
 /** Blueprint = a permanent unlock (build for session resources); instance = one
  *  unique, tradable item (ARS-0.1 — the hybrid model). */
@@ -47,9 +47,10 @@ export const ArsenalItemSchema = z
     itemId: z.string().min(1),
     kind: ArsenalItemKindSchema,
     form: ArsenalItemFormSchema.default('blueprint'),
-    /** Catalog reference: hull → `data.units`, module → `data.modules`,
-     *  hero_fitting → `data.heroFittings`. Existence is checked against a real
-     *  bundle by {@link validateArsenalItem} (fail-secure on an unknown id). */
+    /** Catalog reference: hull → `data.units`, module → `data.modules`. Existence is
+     *  checked against a real bundle by {@link validateArsenalItem} (fail-secure). The
+     *  `hero_fitting` kind is gone with the second fitting system (HPR-1.5.3/1.5.4):
+     *  the hero's ship carries the same MODULES as every other hull. */
     defId: z.string().min(1),
     /** Upgrade grade (EC-2.1, +1..+3) — instances only. */
     grade: z.number().int().min(1).max(GRADE_MAX).optional(),
@@ -98,6 +99,6 @@ export function safeParseArsenalItem(raw: unknown): z.ZodSafeParseResult<Arsenal
  *  granted, snapshotted or built). */
 export function validateArsenalItem(item: ArsenalItem, data: GameData): string[] {
   const catalog =
-    item.kind === 'hull' ? data.units : item.kind === 'module' ? data.modules : data.heroFittings;
+    item.kind === 'hull' ? data.units : data.modules;
   return catalog[item.defId] ? [] : [`E_UNKNOWN_DEF:${item.kind}:${item.defId}`];
 }

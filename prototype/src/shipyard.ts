@@ -41,9 +41,9 @@ const YARD_TABS: [YardTab, string][] = [
   ['heroes', 'yard.tab.heroes'],
 ];
 
-/** Buildable space hulls the «Корабли» pane fits; squadron/carrier hulls → «Эскадрильи». */
+/** Buildable space hulls the «Корабли» pane fits; shuttle/carrier hulls → «Эскадрильи». */
 export const YARD_HULLS = ['cruiser', 'siege', 'scout', 'sensor_frigate', 'dropship'];
-export const YARD_SQUAD_HULLS = ['fighter_squadron', 'strike_carrier'];
+export const YARD_SQUAD_HULLS = ['interceptor', 'strike_carrier'];
 
 /** How many hulls one order may queue at once (the ± stepper's range). */
 const MAX_COUNT = 20;
@@ -159,7 +159,7 @@ export function normalizeDraft(
   return next;
 }
 
-/** The loadout constructor pane for a family of hulls (ships or squadrons) — same
+/** The loadout constructor pane for a family of hulls (ships or shuttles) — same
  *  `loadoutEditor` view-model, just a different hull list. Expects an already
  *  normalised draft. */
 export function loadoutPaneHtml(

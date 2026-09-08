@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
-import { newGame, order, HOUR, type Patrol } from './game';
+import { newGame, order, HOUR, START_CANDIDATES, type Patrol } from './game';
 import { initSoloDrivers, autoProbeKey, AI_STEP_MS, type SoloHost } from './soloDrivers';
 
 /**
@@ -17,7 +17,7 @@ function harness(over: Partial<SoloHost> = {}, seed: GameState = newGame()) {
   const api = initSoloDrivers({
     state: () => s,
     me: () => 'p1',
-    aiSeats: () => new Set(['p2']),
+    aiSeats: () => new Map([['p2', 'weak' as const]]),
     applyLocal: (a) => {
       others.push(a);
       const out = order(s, a, s.time);
@@ -76,6 +76,48 @@ describe('соло-драйверы — ходы ИИ', () => {
     h.api.runAI();
     expect(h.others.length).toBeGreaterThan(0);
     for (const a of h.others) expect(a.playerId).toBe('p2');
+  });
+
+  it('СЛОЖНОСТЬ КРЕСЛА ДОЕЗЖАЕТ ДО БОТА: сильный исследует, слабый — нет (AIDIFF-1)', () => {
+    // Разница профилей проверяется тем, чего у слабого нет вовсе (ветка исследований),
+    // а не числом приказов: их количество зависит от казны и меняется от правок баланса.
+    const research = (as: Action[]): Action[] =>
+      as.filter((a) => a.type === 'technology.research');
+    const run = (profile: 'weak' | 'strong'): Action[] => {
+      const h = harness({ aiSeats: () => new Map([['p2', profile]]) });
+      h.setState(at(h.state(), AI_STEP_MS));
+      h.api.runAI();
+      return h.others;
+    };
+    expect(research(run('weak'))).toHaveLength(0);
+    expect(research(run('strong')).length).toBeGreaterThan(0);
+  });
+
+  it('РАЗНЫЕ КРЕСЛА — РАЗНАЯ СИЛА: сложность у места своя, а не одна на матч', () => {
+    // Матч на ТРИ места: два бота разной силы за одним столом — ровно то, что игрок
+    // собирает строками экрана настройки.
+    const three = newGame({
+      seats: [
+        { id: 'p1', name: 'A', faction: 'azure', start: START_CANDIDATES[0]!, ai: false },
+        { id: 'p2', name: 'B', faction: 'crimson', start: START_CANDIDATES[1]!, ai: true },
+        { id: 'p3', name: 'C', faction: 'amber', start: START_CANDIDATES[2]!, ai: true },
+      ],
+    });
+    const h = harness(
+      {
+        aiSeats: () =>
+          new Map([
+            ['p2', 'strong'],
+            ['p3', 'weak'],
+          ]),
+      },
+      three,
+    );
+    h.setState(at(h.state(), AI_STEP_MS));
+    h.api.runAI();
+    const by = (id: string): Action[] => h.others.filter((a) => a.playerId === id);
+    expect(by('p2').some((a) => a.type === 'technology.research')).toBe(true);
+    expect(by('p3').some((a) => a.type === 'technology.research')).toBe(false);
   });
 
   it('ходы ИИ идут ЛОКАЛЬНЫМ путём, а не как свои приказы', () => {

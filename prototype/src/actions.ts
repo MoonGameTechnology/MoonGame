@@ -61,11 +61,17 @@ export const launchFleet = (playerId: string, planetId: string) =>
   act(playerId, 'fleet.launch', { planetId });
 export const mergeFleet = (playerId: string, from: string, into: string) =>
   act(playerId, 'fleet.merge', { from, into });
+/** Отделить часть флота. `take[i].modules` адресует КОНКРЕТНЫЙ стек (FSPLIT-1):
+ *  лоадаут — часть личности стека (SM-0.3), поэтому «два крейсера» неоднозначны, пока
+ *  один и тот же корпус летает и с начинкой, и голым; без поля — прежнее поведение
+ *  (любой стек), `[]` — адрес голых. `takeLanding` делит десант в трюме (FSPLIT-2);
+ *  без него весь десант остаётся исходному флоту, как было. */
 export const splitFleet = (
   playerId: string,
   fleetId: string,
-  take: Array<{ unit: string; count: number }>,
-) => act(playerId, 'fleet.split', { fleetId, take });
+  take: Array<{ unit: string; modules?: string[]; count: number }>,
+  takeLanding?: Array<{ unit: string; count: number }>,
+) => act(playerId, 'fleet.split', { fleetId, take, ...(takeLanding ? { takeLanding } : {}) });
 export const buildBuilding = (playerId: string, planetId: string, building: string) =>
   act(playerId, 'building.construct', { planetId, building });
 export const upgradeBuilding = (playerId: string, planetId: string, building: string) =>
@@ -99,7 +105,7 @@ export const researchTech = (playerId: string, technology: string) =>
   act(playerId, 'technology.research', { technology });
 /** «Хранитель»: hand this seat to the AI until game-time `until`, running `posture` —
  *  'defend' («Оборона», the safe default) or 'active_defend' («Активная оборона»,
- *  ST-3.3: + forecast-gated counterstrike and squadron fire-watch on own soil).
+ *  ST-3.3: + forecast-gated counterstrike and shuttle fire-watch on own soil).
  *  Rejected (E_STEWARD_LOCKED) until the Steward tech is researched. */
 export const delegateSteward = (
   playerId: string,
@@ -152,7 +158,7 @@ export function canTraverse(state: GameState, mover: string, owner: string | nul
 /** Toggle the CC-2 auto-storm stance on an owned fleet (authoritative standing order). */
 export const orderAuto = (playerId: string, fleetId: string, on: boolean) =>
   act(playerId, 'order.auto', { fleetId, on });
-/** Stand (or stand down) a CC-4 reactive patrol on an owned squadron fleet — the server
+/** Stand (or stand down) a CC-4 reactive patrol on an owned shuttle fleet — the server
  *  computes the patrol itself (center / radius / fresh sortie). */
 export const orderScramble = (playerId: string, fleetId: string, on: boolean) =>
   act(playerId, 'order.scramble', { fleetId, on });
@@ -232,7 +238,17 @@ export const spawnHero = (playerId: string, heroId: string, at: string) =>
 /** Unlock a hero skill-tree node (branch/requires/cost gate the order). */
 export const unlockHeroSkill = (playerId: string, heroId: string, node: string) =>
   act(playerId, 'hero.skill.unlock', { heroId, node });
-/** Install a ship fitting into one of the hero archetype's slots (no refit). */
-export const fitHero = (playerId: string, heroId: string, fitting: string) =>
-  act(playerId, 'hero.fit', { heroId, fitting });
-
+/** Install an ordinary ship module into one of the hero ship's typed bays (HPR-1.5.2).
+ *  Only outside the field — the core refuses a deployed hero (`E_HERO_DEPLOYED`). */
+export const installHeroModule = (playerId: string, heroId: string, moduleId: string) =>
+  act(playerId, 'hero.install', { heroId, moduleId });
+/** Take a module back out of its bay — the hero keeps owning it, the ship just flies без него. */
+export const uninstallHeroModule = (playerId: string, heroId: string, moduleId: string) =>
+  act(playerId, 'hero.uninstall', { heroId, moduleId });
+/** Put an owned ability into one of the hero's skill slots (HPR-1.2). The budget exists
+ *  so the player can choose, not to lock them in — so this is reversible too. */
+export const equipHeroAbility = (playerId: string, heroId: string, abilityId: string) =>
+  act(playerId, 'hero.equip', { heroId, abilityId });
+/** Take an ability back out of its slot — it stays owned, just not worn. */
+export const unequipHeroAbility = (playerId: string, heroId: string, abilityId: string) =>
+  act(playerId, 'hero.unequip', { heroId, abilityId });

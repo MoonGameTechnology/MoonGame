@@ -27,7 +27,7 @@ function loadShippedBundle(): Record<string, unknown> {
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.13');
+    expect(data.version).toBe('0.1.17');
     expect(data.resources).toContain('microelectronics');
     expect(data.units.siege_lance?.stats.range).toBe(300); // artillery firing radius (map units)
     expect(data.units.cruiser?.upkeep.credits).toBe(32); // daily upkeep, BAL-3 scale
@@ -46,13 +46,13 @@ describe('game data schema (docs/architecture.md §2)', () => {
     expect(data.buildings.orbital_aa?.aaDamage).toBe(12); // anti-ship orbital AA — a defensive building
     expect(data.units.cruiser?.stats.aaDamage).toBe(0); // default, no AA
     expect(data.buildings.mine_t1?.aaDamage).toBe(0); // buildings default to no AA
-    // squadrons-roadmap SQ-0.1: a carrier-borne fighter squadron + the new squadron stats.
-    expect(data.units.fighter_squadron?.traits).toContain('squadron');
-    expect(data.units.fighter_squadron?.stats.strikeRange).toBe(180); // Euclidean reach
-    expect(data.units.fighter_squadron?.stats.fuel).toBe(3); // sorties before rearm
-    expect(data.units.fighter_squadron?.stats.rearmRounds).toBe(2);
+    // shuttles-roadmap SQ-0.1: a carrier-borne fighter shuttle + the new shuttle stats.
+    expect(data.units.interceptor?.traits).toContain('shuttle');
+    expect(data.units.interceptor?.stats.strikeRange).toBe(180); // Euclidean reach
+    expect(data.units.interceptor?.stats.fuel).toBe(3); // sorties before rearm
+    expect(data.units.interceptor?.stats.rearmRounds).toBe(2);
     expect(data.units.strike_carrier?.stats.cargoCapacity).toBe(6); // hangar = shared cargo hold
-    expect(data.units.cruiser?.stats.strikeRange).toBe(0); // schema default (not a squadron)
+    expect(data.units.cruiser?.stats.strikeRange).toBe(0); // schema default (not a shuttle)
     // reanimate_on_kill/Necromancer cut (designer-role) → assert a surviving event instead.
     expect(data.events.infect_planet?.trigger).toBe('planet_captured');
     expect(data.sectors.asteroid_field?.speedBonus).toBeCloseTo(-0.25);
@@ -139,22 +139,6 @@ describe('game data schema (docs/architecture.md §2)', () => {
     expect(instant, 'buildTimeHours не задан в data/units.json — заказ выполняется мгновенно').toEqual([]);
   });
 
-  it('бесплатно и мгновенно исследуется только мета-прогрессия (CONV-12)', () => {
-    // Тот же класс дефекта, что CONV-15 поймал у `buildTimeHours`: `cost` и
-    // `researchTimeHours` необязательны, схема подставляет `{}` и `0`, и технология без
-    // них исследуется даром в тот же миг. У шести `meta_*` это НАМЕРЕННО — прототип
-    // выдаёт их уже завершёнными за узлы прокачки командира (`prototype/src/meta.ts`) и
-    // прячет из окна исследований по префиксу. Любая другая бесплатная технология —
-    // забытые числа, а не задумка, и увидит её сначала игрок, а не ревьюер.
-    const data = parseGameData(loadShippedBundle());
-    const free = Object.entries(data.technologies)
-      .filter(([, def]) => Object.keys(def.cost).length === 0 && def.researchTimeHours <= 0)
-      .map(([id]) => id)
-      .filter((id) => !id.startsWith('meta_'))
-      .sort();
-    expect(free, 'технология бесплатна и мгновенна, но это не мета-грант').toEqual([]);
-  });
-
   it('исследование запирает ровно три вещи — и список закрыт намеренно (CONV-12)', () => {
     // Гейт на контент, который строится с первой минуты, меняет экономику молча: игрок
     // получает ту же постройку на несколько игровых дней позже, а замер об этом не
@@ -179,10 +163,26 @@ describe('game data schema (docs/architecture.md §2)', () => {
     ]);
   });
 
+  it('бесплатно и мгновенно исследуется только мета-прогрессия (CONV-12)', () => {
+    // Тот же класс дефекта, что CONV-15 поймал у `buildTimeHours`: `cost` и
+    // `researchTimeHours` необязательны, схема подставляет `{}` и `0`, и технология без
+    // них исследуется даром в тот же миг. У шести `meta_*` это НАМЕРЕННО — прототип
+    // выдаёт их уже завершёнными за узлы прокачки командира (`prototype/src/meta.ts`) и
+    // прячет из окна исследований по префиксу. Любая другая бесплатная технология —
+    // забытые числа, а не задумка, и увидит её сначала игрок, а не ревьюер.
+    const data = parseGameData(loadShippedBundle());
+    const free = Object.entries(data.technologies)
+      .filter(([, def]) => Object.keys(def.cost).length === 0 && def.researchTimeHours <= 0)
+      .map(([id]) => id)
+      .filter((id) => !id.startsWith('meta_'))
+      .sort();
+    expect(free, 'технология бесплатна и мгновенна, но это не мета-грант').toEqual([]);
+  });
+
   it('ships producers for every economy resource (ECON-3: energy + microelectronics)', () => {
     const data = parseGameData(loadShippedBundle());
-    // Fusion reactor feeds energy, scaling across its 3 levels (CONV-12: the ladder
-    // is the prototype's — the one nine BAL bricks measured).
+    // Fusion reactor feeds energy, scaling across its 3 levels (CONV-12: лестница —
+    // прототипная, та самая, которую мерили девять кирпичей BAL).
     const power = data.buildings.power_plant;
     expect(power).toBeDefined();
     expect(buildingMaxLevel(power!)).toBe(3);
@@ -241,17 +241,14 @@ describe('game data schema (docs/architecture.md §2)', () => {
     for (const [id, def] of Object.entries(data.heroSkillTrees)) {
       check(def.cost, `skill node ${id} cost`);
     }
-    for (const [id, def] of Object.entries(data.heroFittings)) {
-      check(def.cost, `hero fitting ${id} cost`);
-    }
   });
 
   it('builds the fortress up to level 3 (HP and defense both grow)', () => {
     const data = parseGameData(loadShippedBundle());
     const fort = data.buildings.fort;
     expect(fort).toBeDefined();
-    // Both HP and the ground-defense bonus scale across the three rungs (CONV-12: the
-    // numbers are the prototype's, so what BAL measured is what the bundle now ships).
+    // Both HP and the ground-defense bonus scale across the three rungs (CONV-12: числа
+    // прототипные, поэтому бандл шипит ровно то, что мерил BAL).
     expect(buildingLevel(fort!, 1).hp).toBe(40);
     expect(buildingLevel(fort!, 3).hp).toBe(85);
     expect(buildingLevel(fort!, 1).defenseBonus).toBeCloseTo(0.3);
@@ -502,33 +499,27 @@ describe('hero archetypes + abilities (HERO-1, docs/heroes.md)', () => {
     ).toBe(false);
   });
 
-  it('shipped fittings are consistent and fail-closed (HERO-6)', () => {
-    const data = parseGameData(loadShippedBundle());
-    const abilities = new Set(Object.keys(data.heroAbilities));
-    const passives = new Set(Object.keys(data.heroPassives));
-    for (const [id, def] of Object.entries(data.heroFittings)) {
-      if (def.grants.ability !== undefined) {
-        expect(abilities.has(def.grants.ability), `fitting ${id} grants unknown ability`).toBe(true);
-      }
-      if (def.grants.passive !== undefined) {
-        expect(passives.has(def.grants.passive), `fitting ${id} grants unknown passive`).toBe(true);
-      }
-    }
-    expect(data.heroFittings.psi_amplifier?.grants.ability).toBe('scan');
-    expect(data.heroFittings.ablative_plating?.statMods.hp).toBe(40);
-    // Anti self-expansion: a fitting may not grow slot capacity; costs stay nonnegative.
-    expect(
-      safeParseGameData({
-        ...loadShippedBundle(),
-        heroFittings: { bad: { name: 'X', statMods: { slots: 1 } } },
-      }).success,
-    ).toBe(false);
-    expect(
-      safeParseGameData({
-        ...loadShippedBundle(),
-        heroFittings: { bad: { name: 'X', cost: { metal: -5 } } },
-      }).success,
-    ).toBe(false);
+  // HPR-1.5.3/1.5.4 — the second equipment system is GONE, and this is the test that
+  // says so. It used to assert the shipped fittings were consistent; the honest successor
+  // asserts the bundle no longer ships the catalogue at all, and that what those entries
+  // granted is still reachable by the normal route (skill-tree nodes, real modules).
+  it('the hero-fitting catalogue is gone and its grants live on the normal routes', () => {
+    const bundle = loadShippedBundle() as Record<string, unknown>;
+    expect('heroFittings' in bundle).toBe(false);
+    const data = parseGameData(bundle);
+    expect('heroFittings' in data).toBe(false);
+    const grantsOf = (key: 'ability' | 'passive'): Set<string> =>
+      new Set(
+        Object.values(data.heroSkillTrees)
+          .map((node) => node.grants[key])
+          .filter((id): id is string => id !== undefined),
+      );
+    // `psi_amplifier` granted `scan`; `aegis_matrix` granted `rally_beacon` — both were
+    // already reachable from the tree, which is why the entries were duplicates.
+    expect(grantsOf('ability').has('scan')).toBe(true);
+    expect(grantsOf('passive').has('rally_beacon')).toBe(true);
+    // `ablative_plating` was a dead copy of a REAL module carrying the same id.
+    expect(data.modules.ablative_plating?.effects.stats.hp).toBe(12);
   });
 
   it('rejects a hero ability with a negative cost (no resource minting)', () => {

@@ -8,6 +8,7 @@ import {
   createInitialState,
   type Fleet,
   type GameState,
+  type Hero,
   type Planet,
   type Player,
 } from '../state/gameState';
@@ -15,6 +16,7 @@ import { parseGameData, type GameData } from '../data/schemas';
 import type { Action, AdvanceResult, ApplyResult, Context } from '../action/types';
 import { deepFreeze } from '../util/clone';
 import { setStance } from '../state/diplomacy';
+import { sumUnitStat } from '../util/stacks';
 
 const data: GameData = parseGameData({
   version: '0.1.0',
@@ -23,12 +25,23 @@ const data: GameData = parseGameData({
     scout: { faction: 'x', stats: { attack: 1, defense: 1, speed: 10, hp: 6 } },
     warship: { faction: 'x', stats: { attack: 20, defense: 20, speed: 5, hp: 200 }, line: 'front' },
     // The projection hero: tanky, no offence of its own — its value is the fleet aura.
+    // HPR-1.5.2: its hull carries the same typed bays every other hull does.
     hero: {
       faction: 'x',
       stats: { attack: 0, defense: 0, speed: 5, hp: 120 },
       line: 'front',
       traits: ['hero'],
+      slots: { weapon: 1, defense: 1, utility: 1 },
     },
+  },
+  // HPR-1.5.2 module catalog: one per category, a SECOND utility (to prove the bay is
+  // bounded and that the main hero's bonus bay opens it), and a hull-locked one.
+  modules: {
+    gun: { name: 'Gun', slot: 'weapon', tag: 'vertical', effects: { stats: { attack: 4 } }, cost: { metal: 60 } },
+    plate: { name: 'Plate', slot: 'defense', tag: 'vertical', effects: { stats: { hp: 12 } }, cost: { metal: 50 } },
+    bay: { name: 'Bay', slot: 'utility', tag: 'horizontal', effects: { stats: { cargoCapacity: 6 } }, cost: { metal: 45 }, allowed: { domain: 'space' } },
+    bay2: { name: 'Bay II', slot: 'utility', tag: 'horizontal', effects: { stats: { cargoCapacity: 4 } }, cost: { metal: 40 } },
+    scout_eye: { name: 'Scout Eye', slot: 'utility', tag: 'horizontal', effects: { stats: { radarRange: 90 } }, cost: { metal: 30 }, allowed: { units: ['scout'] } },
   },
   factions: {},
   buildings: { mine: { name: 'Mine', produces: { metal: 10 } } },
@@ -76,12 +89,6 @@ const data: GameData = parseGameData({
   heroes: {
     raider: { name: 'Raider', branch: 'transhuman', ship: { unit: 'warship' }, slots: 2 },
   },
-  // HERO-6 fittings: a live ability grant, a live passive grant, a not-yet-live statMod.
-  heroFittings: {
-    psi_lens: { name: 'Psi Lens', grants: { ability: 'burst' }, cost: { metal: 20 } },
-    war_drum: { name: 'War Drum', grants: { passive: 'warcry' } },
-    plating: { name: 'Plating', statMods: { hp: 40 } },
-  },
   // HERO-7 tree: a transhuman root + a costly child, a psionic node, a common node.
   heroSkillTrees: {
     neural_lace: { name: 'Neural Lace', branch: 'transhuman', grants: { passive: 'swift' } },
@@ -105,6 +112,15 @@ const data: GameData = parseGameData({
       requires: ['neural_lace', 'overclock'],
       grants: {},
     },
+  },
+  // HPR-1.2: лестница редкости → бюджет НАДЕТЫХ скиллов. Без неё `heroSkillSlots`
+  // честно падает на базовый дефолт в один слот, и тест про «у rare их два» врал бы.
+  heroGrades: {
+    common: { name: 'Common', skillSlots: 1 },
+    rare: { name: 'Rare', skillSlots: 2 },
+    // HPR-1.5.2 (§0.38): железо у героев одинаковое — его даёт корпус, — и только
+    // основной герой несёт на один отсек больше. Дельта, а не полный бюджет.
+    main: { name: 'Main', skillSlots: 4, moduleSlots: { utility: 1 } },
   },
   // HERO-5 catalog: one passive per scope for each wired hook.
   heroPassives: {
@@ -953,27 +969,41 @@ describe('hero — manual spawn (HERO-3)', () => {
     ).toBe('E_BAD_PAYLOAD');
   });
 
-  it('HERO-8: the spawn_fleet marker lets the hero board an OWN fleet (and only an own one)', () => {
+  // Резолюция владельца 2026-09-08 («как в героях меча и магии»): каждый герой ведёт
+  // СВОЙ флот. Маркер не сажает на борт — он открывает выход ТАМ, где стоит свой флот.
+  it('HERO-8: the spawn_fleet marker deploys BESIDE an own fleet, never aboard it', () => {
     const st = rosterWorld();
     st.fleets.raid = fleet('raid', 'p1', 'C'); // scout ×1, parked at p2's C
     st.fleets.foe = fleet('foe', 'p2', 'C');
     // Without the marker a fleet target is not a legal spawn class.
     expect(errCode(kernel.applyAction(st, spawn(SECOND, 'raid'), ctx(0)))).toBe('E_BAD_SPAWN');
-    // With it the hero forms ABOARD: its ship joins the host's stack, the hero
-    // commands the host, and heroNode now reads the host's node.
     st.heroes![SECOND]!.abilities = ['boarding'];
     const r = okApply(kernel.applyAction(st, spawn(SECOND, 'raid'), ctx(0)));
     const hero = r.state.heroes![SECOND]!;
-    expect(hero.fleetId).toBe('raid');
+    // Свой флот — и он НЕ хозяйский: узел тот же, флот другой.
     expect(hero.location).toBe('C');
-    expect(r.state.fleets.raid?.units).toEqual([
-      { unit: 'scout', count: 1 },
-      { unit: 'hero', count: 1 },
-    ]);
-    expect(r.events.some((e) => e.type === 'hero.spawned' && (e.payload as { aboard?: boolean }).aboard)).toBe(true);
+    expect(hero.fleetId).not.toBe('raid');
+    expect(r.state.fleets[hero.fleetId!]?.location).toBe('C');
+    expect(r.state.fleets[hero.fleetId!]?.units).toEqual([{ unit: 'hero', count: 1 }]);
+    // Хозяйский флот не тронут — герой в него не сел.
+    expect(r.state.fleets.raid?.units).toEqual([{ unit: 'scout', count: 1 }]);
+    expect(
+      r.events.some((e) => e.type === 'hero.spawned' && (e.payload as { beside?: string }).beside === 'raid'),
+    ).toBe(true);
     // A foreign fleet stays off-limits even with the marker; an unknown id is E_NO_PLANET.
     expect(errCode(kernel.applyAction(st, spawn(SECOND, 'foe'), ctx(0)))).toBe('E_BAD_SPAWN');
     expect(errCode(kernel.applyAction(st, spawn(SECOND, 'nowhere'), ctx(0)))).toBe('E_NO_PLANET');
+  });
+
+  it('HERO-8: рядом с флотом В ПУТИ выйти нельзя — там нет узла', () => {
+    const st = rosterWorld();
+    st.fleets.raid = fleet('raid', 'p1', 'C');
+    st.fleets.raid.movement = { from: 'C', to: 'A', departedAt: 0, arrivesAt: 10 * HOUR };
+    st.heroes![SECOND]!.abilities = ['boarding'];
+    // Раньше герой садился на борт и в полёте тоже; своим флотом в пустоте не выйдешь.
+    expect(errCode(kernel.applyAction(st, spawn(SECOND, 'raid'), ctx(0)))).toBe(
+      'E_HOST_IN_TRANSIT',
+    );
   });
 
   it('HERO-8: the spawn_allied marker opens ALLIED worlds — not neutral, not at-war', () => {
@@ -1133,61 +1163,6 @@ describe('hero — skill tree (HERO-7)', () => {
   });
 });
 
-describe('hero — ship fittings (HERO-6)', () => {
-  const kernel = createKernel([heroModule]);
-  const HERO_ID = 'hero:p1';
-
-  /** world() + the hero is a raider (2 fitting slots) with a treasury. */
-  function fitWorld(): GameState {
-    const st = world();
-    st.heroes![HERO_ID]!.archetype = 'raider';
-    st.players.p1!.resources = { metal: 25 };
-    return st;
-  }
-  const fit = (fitting: string, playerId = 'p1', seq = 1) =>
-    act('hero.fit', playerId, { heroId: HERO_ID, fitting }, seq);
-
-  it('installs a fitting: cost charged, grant lands, the loadout is live', () => {
-    const r = okApply(kernel.applyAction(fitWorld(), fit('psi_lens'), ctx(0)));
-    const hero = r.state.heroes![HERO_ID]!;
-    expect(hero.fittings).toEqual(['psi_lens']);
-    expect(hero.abilities).toContain('burst'); // granted, HERO-4 equipment gate passes
-    expect(r.state.players.p1?.resources.metal).toBe(5); // 25 − 20
-    expect(r.events.map((e) => e.type)).toContain('hero.fitted');
-    // A statMods-only fitting installs cleanly too (data for the SHIP-3 seam).
-    const plated = okApply(kernel.applyAction(r.state, fit('plating', 'p1', 2), ctx(1)));
-    expect(plated.state.heroes![HERO_ID]!.fittings).toEqual(['psi_lens', 'plating']);
-  });
-
-  it('enforces the slot budget, uniqueness and the fail-secure gate set', () => {
-    // Two slots filled → the third fitting has nowhere to go.
-    const st = fitWorld();
-    st.heroes![HERO_ID]!.fittings = ['plating', 'war_drum'];
-    expect(errCode(kernel.applyAction(st, fit('psi_lens'), ctx(0)))).toBe('E_NO_SLOTS');
-    // The same fitting cannot be doubled.
-    const one = fitWorld();
-    one.heroes![HERO_ID]!.fittings = ['psi_lens'];
-    expect(errCode(kernel.applyAction(one, fit('psi_lens'), ctx(0)))).toBe('E_ALREADY_FITTED');
-    // An archetype-less hero exposes no slots at all.
-    const bare = world();
-    expect(
-      errCode(kernel.applyAction(bare, act('hero.fit', 'p1', { heroId: HERO_ID, fitting: 'war_drum' }), ctx(0))),
-    ).toBe('E_NO_SLOTS');
-    // Unknown fitting / poor purse / dead hero / foreign hero.
-    expect(errCode(kernel.applyAction(fitWorld(), fit('warp_core'), ctx(0)))).toBe('E_NO_FITTING');
-    const poor = fitWorld();
-    poor.players.p1!.resources = { metal: 5 };
-    expect(errCode(kernel.applyAction(poor, fit('psi_lens'), ctx(0)))).toBe('E_INSUFFICIENT');
-    expect(poor.players.p1?.resources.metal).toBe(5); // nothing charged on rejection
-    const dead = fitWorld();
-    dead.heroes![HERO_ID]!.alive = false;
-    expect(errCode(kernel.applyAction(dead, fit('war_drum'), ctx(0)))).toBe('E_HERO_DEAD');
-    expect(errCode(kernel.applyAction(fitWorld(), fit('war_drum', 'p2'), ctx(0)))).toBe(
-      'E_FORBIDDEN',
-    );
-  });
-});
-
 describe('hero — data-driven passives (HERO-5)', () => {
   it('heroFleet scope: +10% speed for the ship the hero commands, nobody else', () => {
     const kernel = createKernel([heroModule, movementModule]);
@@ -1282,8 +1257,13 @@ describe('hero — death and respawn', () => {
     version: '0.1.0',
     resources: ['metal'],
     units: {
-      hero: { faction: 'x', stats: { attack: 0, defense: 0, speed: 5, hp: 120 }, line: 'front', traits: ['hero'] },
+      hero: { faction: 'x', stats: { attack: 0, defense: 0, speed: 5, hp: 120 }, line: 'front', traits: ['hero'], slots: { utility: 1 } },
       killer: { faction: 'x', stats: { attack: 150, defense: 150, speed: 5, hp: 300 }, line: 'front' },
+    },
+    // A combat-inert module (cargo, not hp) so the kit under test cannot change who
+    // wins the fight it has to survive.
+    modules: {
+      hold: { name: 'Hold', slot: 'utility', tag: 'horizontal', effects: { stats: { cargoCapacity: 6 } }, cost: { metal: 45 } },
     },
     factions: {},
     buildings: {},
@@ -1336,6 +1316,27 @@ describe('hero — death and respawn', () => {
     expect(reborn.events.map((e) => e.type)).toContain('hero.respawned');
   });
 
+  // HPR-1.5.2 — ловушка, ради которой кирпич отдельный: респаун пересоздаёт флот и стек
+  // ЗАНОВО. Набор модулей живёт НА ГЕРОЕ именно поэтому: не перенеси его явно — флагман
+  // вернётся голым, и заметят это не сразу, а через игровые сутки, когда объяснить будет
+  // уже нечем.
+  it('железо переживает смерть: воскресший корабль несёт тот же набор', () => {
+    const st = arena();
+    st.heroes!['hero:p1']!.modules = ['hold'];
+    st.fleets.F!.units = [{ unit: 'hero', count: 1, modules: ['hold'] }];
+    const started = okApply(kernel.applyAction(st, act('arrive', 'p1', { fleetId: 'F' }), kctx(0)));
+    const dead = okAdvance(kernel.advanceTo(started.state, kctx(2 * HOUR)));
+    expect(heroOf(dead.state, 'p1')?.alive).toBe(false);
+    // Набор пережил гибель корабля — он никогда и не хранился на стеке.
+    expect(heroOf(dead.state, 'p1')?.modules).toEqual(['hold']);
+
+    const reborn = okAdvance(kernel.advanceTo(dead.state, kctx(30 * HOUR)));
+    const heroFleet = Object.values(reborn.state.fleets).find((f) => f.owner === 'p1' && heroUnit(f));
+    expect(heroFleet?.units[0]?.modules).toEqual(['hold']);
+    // И это не декорация: модуль считается тем же швом, что у обычных кораблей.
+    expect(sumUnitStat(heroFleet!.units, killerData, 'cargoCapacity')).toBe(6);
+  });
+
   it('respawns at the capital (home) even when another owned world sorts first', () => {
     const s = createInitialState({ seed: 'cap-respawn', version: { data: '0.1.0', manifest: '1' } });
     const st: GameState = {
@@ -1379,5 +1380,228 @@ describe('hero — heroOf picks by sorted instance id, not insertion order (BF-1
     const r = okApply(kernel.applyAction(st, act('hero.move', 'p1', { to: 'B' }), ctx(0)));
     expect(r.state.heroes!['hero:p1:1']!.location).toBe('B'); // sorted-first moved
     expect(r.state.heroes!['hero:p1:2']!.location).toBe('A'); // the other untouched
+  });
+});
+
+describe('hero — железо корабля: модули на герое (HPR-1.5.2)', () => {
+  const kernel = createKernel([heroModule]);
+  const install = (moduleId: string, seq = 1): Action =>
+    act('hero.install', 'p1', { heroId: 'hero:p1', moduleId }, seq);
+  const uninstall = (moduleId: string, seq = 1): Action =>
+    act('hero.uninstall', 'p1', { heroId: 'hero:p1', moduleId }, seq);
+
+  /** Герой у себя в тылу: не развёрнут, поэтому корабль можно переоснащать. */
+  function docked(over?: Partial<Hero>): GameState {
+    const st = world();
+    Object.assign(st.heroes!['hero:p1']!, over ?? {});
+    return st;
+  }
+
+  it('ставит модуль в свободный отсек корпуса', () => {
+    const r = okApply(kernel.applyAction(docked(), install('gun'), ctx(0)));
+    expect(r.state.heroes!['hero:p1']?.modules).toEqual(['gun']);
+    expect(r.events.map((e) => e.type)).toContain('hero.installed');
+  });
+
+  it('отсеки ТИПИЗИРОВАНЫ и ограничены: второй модуль занятой категории отказан', () => {
+    const st = okApply(kernel.applyAction(docked(), install('bay', 1), ctx(0))).state;
+    expect(errCode(kernel.applyAction(st, install('bay2', 2), ctx(0)))).toBe('E_NO_SLOT');
+    // …но отсек ДРУГОЙ категории свободен — бюджет считается по категориям, не общей кучей.
+    expect(okApply(kernel.applyAction(st, install('gun', 3), ctx(0))).state.heroes!['hero:p1']
+      ?.modules).toEqual(['bay', 'gun']);
+  });
+
+  // §0.38: железо у героев одинаковое, и ровно одно исключение — основной герой,
+  // личный флагман игрока, несёт на один отсек больше. Здесь это и проверяется:
+  // тот же корпус, та же пара модулей, разница только в ступени.
+  it('основному герою ступень добавляет отсек — второй утилитный модуль встаёт', () => {
+    const st = okApply(
+      kernel.applyAction(docked({ grade: 'main' }), install('bay', 1), ctx(0)),
+    ).state;
+    const r = okApply(kernel.applyAction(st, install('bay2', 2), ctx(0)));
+    expect(r.state.heroes!['hero:p1']?.modules).toEqual(['bay', 'bay2']);
+  });
+
+  it('правило допуска самого модуля никуда не делось: отсеки — не универсальная розетка', () => {
+    // `scout_eye` разрешён только корпусу `scout`.
+    expect(errCode(kernel.applyAction(docked(), install('scout_eye'), ctx(0)))).toBe(
+      'E_NOT_ALLOWED',
+    );
+  });
+
+  it('коды отказа те же, что у постройки корабля: неизвестный и повторный модуль', () => {
+    expect(errCode(kernel.applyAction(docked(), install('nope'), ctx(0)))).toBe(
+      'E_UNKNOWN_MODULE',
+    );
+    const st = okApply(kernel.applyAction(docked(), install('gun', 1), ctx(0))).state;
+    expect(errCode(kernel.applyAction(st, install('gun', 2), ctx(0)))).toBe('E_DUP_MODULE');
+  });
+
+  it('в поле корабль не переоснащают — развёрнутый герой отказан', () => {
+    const st = docked({ fleetId: 'HF' });
+    st.fleets.HF = {
+      id: 'HF',
+      owner: 'p1',
+      location: 'A',
+      movement: null,
+      traits: [],
+      units: [{ unit: 'hero', count: 1 }],
+    };
+    expect(errCode(kernel.applyAction(st, install('gun'), ctx(0)))).toBe('E_HERO_DEPLOYED');
+  });
+
+  it('чужого героя не переоснастить, а без владения модулем — отказ (ARS-3)', () => {
+    expect(
+      errCode(
+        kernel.applyAction(
+          docked(),
+          act('hero.install', 'p2', { heroId: 'hero:p1', moduleId: 'gun' }),
+          ctx(0),
+        ),
+      ),
+    ).toBe('E_FORBIDDEN');
+    const st = docked();
+    st.players.p1!.arsenal = { hulls: ['hero'], modules: ['bay'] };
+    expect(errCode(kernel.applyAction(st, install('gun'), ctx(0)))).toBe('E_NOT_OWNED');
+    expect(okApply(kernel.applyAction(st, install('bay'), ctx(0))).state.heroes!['hero:p1']
+      ?.modules).toEqual(['bay']);
+  });
+
+  it('снятое освобождает отсек; снять то, чего нет, нельзя', () => {
+    const st = okApply(kernel.applyAction(docked(), install('bay', 1), ctx(0))).state;
+    expect(errCode(kernel.applyAction(st, uninstall('bay2', 2), ctx(0)))).toBe('E_NO_MODULE');
+    const freed = okApply(kernel.applyAction(st, uninstall('bay', 3), ctx(0)));
+    expect(freed.state.heroes!['hero:p1']?.modules).toEqual([]);
+    expect(freed.events.map((e) => e.type)).toContain('hero.uninstalled');
+    const refitted = okApply(kernel.applyAction(freed.state, install('bay2', 4), ctx(0)));
+    expect(refitted.state.heroes!['hero:p1']?.modules).toEqual(['bay2']);
+  });
+
+  it('развёртывание штампует набор на корабль — и статы считает effectiveStats', () => {
+    // Ровно случай из резолюции §0.36: герой не в поле (тут — павший), его переоснащают,
+    // и в следующий выход корабль идёт уже с новым железом.
+    const st = okApply(kernel.applyAction(docked({ alive: false }), install('gun', 1), ctx(0)))
+      .state;
+    const spawned = okApply(
+      kernel.applyAction(st, act('hero.spawn', 'p1', { heroId: 'hero:p1', at: 'A' }, 2), ctx(0)),
+    );
+    const hero = spawned.state.heroes!['hero:p1']!;
+    const fleet = spawned.state.fleets[hero.fleetId!]!;
+    expect(fleet.units[0]?.modules).toEqual(['gun']);
+    // +4 attack от `gun` на пустом корпусе героя (базовая атака 0) — то есть модуль
+    // РАБОТАЕТ на том же шве, что и у обычных кораблей, а не лежит рядом.
+    expect(sumUnitStat(fleet.units, data, 'attack')).toBe(4);
+  });
+
+  it('герой без модулей минтит стек БЕЗ ключа `modules` — идентичность старых стеков цела', () => {
+    const spawned = okApply(
+      kernel.applyAction(
+        docked({ alive: false }),
+        act('hero.spawn', 'p1', { heroId: 'hero:p1', at: 'A' }),
+        ctx(0),
+      ),
+    );
+    const hero = spawned.state.heroes!['hero:p1']!;
+    const stack = spawned.state.fleets[hero.fleetId!]!.units[0]!;
+    expect('modules' in stack).toBe(false);
+  });
+});
+
+describe('hero — надеть/снять скилл: владение против ношения (HPR-1.2)', () => {
+  const kernel = createKernel([heroModule]);
+  const equip = (abilityId: string, seq = 1): Action =>
+    act('hero.equip', 'p1', { heroId: 'hero:p1', abilityId }, seq);
+  const unequip = (abilityId: string, seq = 1): Action =>
+    act('hero.unequip', 'p1', { heroId: 'hero:p1', abilityId }, seq);
+
+  /** Герой РЕДКОСТИ `rare` — по каталогу это два слота под скиллы. */
+  function owner(over?: Partial<Hero>): GameState {
+    const st = world();
+    Object.assign(st.heroes!['hero:p1']!, {
+      grade: 'rare',
+      abilities: ['corridor', 'annihilate', 'burst'],
+      equipped: [],
+      ...over,
+    });
+    return st;
+  }
+
+  it('надевает то, чем владеет, и это становится кастуемым', () => {
+    const r = okApply(kernel.applyAction(owner(), equip('corridor'), ctx(0)));
+    expect(r.state.heroes!['hero:p1']?.equipped).toEqual(['corridor']);
+    expect(r.events.map((e) => e.type)).toContain('hero.equipped');
+  });
+
+  it('НЕ надевает то, чем не владеет — иначе вся ось коллекции обходится', () => {
+    // `ghost` есть в каталоге способностей, но не в пуле героя.
+    expect(errCode(kernel.applyAction(owner(), equip('ghost'), ctx(0)))).toBe('E_NOT_OWNED');
+  });
+
+  it('упирается в бюджет редкости: у `rare` два слота, третий отказан', () => {
+    let st = owner();
+    st = okApply(kernel.applyAction(st, equip('corridor', 1), ctx(0))).state;
+    st = okApply(kernel.applyAction(st, equip('annihilate', 2), ctx(0))).state;
+    expect(errCode(kernel.applyAction(st, equip('burst', 3), ctx(0)))).toBe('E_NO_SLOTS');
+    // …а после снятия место освобождается: слоты обратимы, в отличие от фиттингов.
+    const freed = okApply(kernel.applyAction(st, unequip('corridor', 4), ctx(0))).state;
+    const ok = okApply(kernel.applyAction(freed, equip('burst', 5), ctx(0)));
+    expect(ok.state.heroes!['hero:p1']?.equipped).toEqual(['annihilate', 'burst']);
+  });
+
+  it('дважды одно и то же не надевается', () => {
+    const st = okApply(kernel.applyAction(owner(), equip('corridor', 1), ctx(0))).state;
+    expect(errCode(kernel.applyAction(st, equip('corridor', 2), ctx(0)))).toBe(
+      'E_ALREADY_EQUIPPED',
+    );
+  });
+
+  it('каст читает НАДЕТОЕ, а не «что есть»', () => {
+    const st = owner({ equipped: [] });
+    // Владеет `corridor`, но не носит — каст отказан.
+    expect(
+      errCode(
+        kernel.applyAction(st, act('hero.ability', 'p1', { heroId: 'hero:p1', abilityId: 'corridor', target: 'B' }), ctx(0)),
+      ),
+    ).toBe('E_NOT_EQUIPPED');
+  });
+
+  it('СТАРЫЙ герой без поля `equipped` кастует как раньше — реплеи не ломаются', () => {
+    const legacy = world();
+    Object.assign(legacy.heroes!['hero:p1']!, {
+      grade: 'common', // всего один слот…
+      // Носит два при бюджете в один — наследие; `burst` он тоже ВЛАДЕЕТ, иначе
+      // проверка упрётся в гейт владения и до бюджета не доедет.
+      abilities: ['corridor', 'annihilate', 'burst'],
+    });
+    delete legacy.heroes!['hero:p1']!.equipped;
+    // Ничего не отвалилось: старый расклад считается надетым целиком.
+    const r = kernel.applyAction(
+      legacy,
+      act('hero.ability', 'p1', { heroId: 'hero:p1', abilityId: 'corridor', target: 'B' }),
+      ctx(0),
+    );
+    expect(r.ok).toBe(true);
+    // И это не «почти как раньше»: у старого героя НАДЕТЫМ считается всё, чем он
+    // владеет, поэтому надеть что-то ещё нечего — оно уже на нём.
+    expect(errCode(kernel.applyAction(legacy, equip('burst'), ctx(0)))).toBe(
+      'E_ALREADY_EQUIPPED',
+    );
+    // Бюджет начинает действовать с первого СНЯТИЯ: оно материализует `equipped`,
+    // и дальше расклад может только сокращаться к бюджету, но не расти сверх него.
+    const shrunk = okApply(kernel.applyAction(legacy, unequip('corridor'), ctx(0))).state;
+    expect(shrunk.heroes!['hero:p1']?.equipped).toEqual(['annihilate', 'burst']);
+    expect(errCode(kernel.applyAction(shrunk, equip('corridor', 2), ctx(0)))).toBe('E_NO_SLOTS');
+  });
+
+  it('чужого героя не переодеть', () => {
+    expect(
+      errCode(kernel.applyAction(owner(), act('hero.equip', 'p2', { heroId: 'hero:p1', abilityId: 'corridor' }), ctx(0))),
+    ).toBe('E_FORBIDDEN');
+  });
+
+  it('снять можно только надетое', () => {
+    expect(errCode(kernel.applyAction(owner(), unequip('corridor'), ctx(0)))).toBe(
+      'E_NOT_EQUIPPED',
+    );
   });
 });

@@ -23,7 +23,7 @@ import heroes from '../../../data/heroes.json';
 import heroAbilities from '../../../data/heroAbilities.json';
 import heroPassives from '../../../data/heroPassives.json';
 import heroSkillTrees from '../../../data/heroSkillTrees.json';
-import heroFittings from '../../../data/heroFittings.json';
+import heroGrades from '../../../data/heroGrades.json';
 import modes from '../../../data/modes.json';
 import rewards from '../../../data/rewards.json';
 import market from '../../../data/market.json';
@@ -50,7 +50,7 @@ export const FRAGMENTS: Record<string, unknown> = {
   'heroAbilities.json': heroAbilities,
   'heroPassives.json': heroPassives,
   'heroSkillTrees.json': heroSkillTrees,
-  'heroFittings.json': heroFittings,
+  'heroGrades.json': heroGrades,
   'modes.json': modes,
   'rewards.json': rewards,
   'market.json': market,

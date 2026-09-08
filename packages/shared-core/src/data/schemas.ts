@@ -43,21 +43,21 @@ export const UnitStatsSchema = z
     /** Orbital-AA damage per hour a (ground) unit deals to a hostile fleet on the
      *  NEAR orbit while the planet is not under a ground assault. 0 = no AA. */
     aaDamage: z.number().nonnegative().default(0),
-    /** Point-defense damage per hour — anti-squadron/anti-missile flak that a
+    /** Point-defense damage per hour — anti-shuttle/anti-missile flak that a
      *  SHIP (not just a planet) carries. Distinct from `aaDamage` (which is
-     *  planet-side orbital AA): `pointDefense` fires on incoming squadron/missile
+     *  planet-side orbital AA): `pointDefense` fires on incoming shuttle/missile
      *  strikes, NOT on regular fleets. 0 = no point defense. */
     pointDefense: z.number().nonnegative().default(0),
     /** Range (Euclidean, map units) at which point-defense engages enemy
-     *  squadrons/missiles. 0 = use the default PD_RANGE (120). */
+     *  shuttles/missiles. 0 = use the default PD_RANGE (120). */
     pointDefenseRange: z.number().nonnegative().default(0),
-    /** Squadron reach (squadrons-roadmap SQ-3.1): the Euclidean distance in MAP
-     *  UNITS a launched `squadron` may strike from its carrier. 0 = no reach. */
+    /** Shuttle reach (shuttles-roadmap SQ-3.1): the Euclidean distance in MAP
+     *  UNITS a launched `shuttle` may strike from its carrier. 0 = no reach. */
     strikeRange: z.number().nonnegative().default(0),
-    /** Squadron sorties before it must rearm (SQ-2.1). 0 = not a squadron / no
-     *  sortie limit. Decrements per sortie; at 0 the squadron goes to `rearmRounds`. */
+    /** Shuttle sorties before it must rearm (SQ-2.1). 0 = not a shuttle / no
+     *  sortie limit. Decrements per sortie; at 0 the shuttle goes to `rearmRounds`. */
     fuel: z.number().nonnegative().default(0),
-    /** Combat rounds a spent squadron sits rearming on its carrier before it can
+    /** Combat rounds a spent shuttle sits rearming on its carrier before it can
      *  sortie again (SQ-2.1). Deterministic cooldown, like a hero ability. */
     rearmRounds: z.number().nonnegative().default(0),
   })
@@ -181,9 +181,14 @@ export const BuildingLevelSchema = z.object({
   /** Anti-ship orbital-AA firepower this level fires per game hour at a hostile fleet on the
    *  near orbit (an emplacement building). Summed alongside garrison `aaDamage` in combat. */
   aaDamage: z.number().nonnegative().default(0),
-  /** Point-defense (anti-squadron/anti-missile) firepower per game hour at this level.
-   *  Distinct from `aaDamage`: intercepts squadron/missile strikes, not regular fleets. */
+  /** Point-defense (anti-shuttle/anti-missile) firepower per game hour at this level.
+   *  Distinct from `aaDamage`: intercepts shuttle/missile strikes, not regular fleets. */
   pointDefense: z.number().nonnegative().default(0),
+  /** How many shuttles this level can base (SHU-1.1). A shuttle is not a fleet: it
+   *  lives INSIDE the spaceport (`planet.hangar`), so the port's bay is both the gate
+   *  ("can a shuttle be built here at all") and the cap ("how many"). 0 = this building
+   *  bases no shuttles. */
+  shuttleBay: z.number().nonnegative().default(0),
   /** Доля, на которую здание поднимает ВЕСЬ кредитный доход своего мира на этом
    *  уровне (0.25 = +25%). См. одноимённое поле в `BuildingDefSchema`. */
   creditsBonus: z.number().default(0),
@@ -201,13 +206,11 @@ export const BuildingLevelSchema = z.object({
    *  а не «отнимает».
    *
    *  Почему они здесь появились: данные (и `data/buildings.json`, и каталог прототипа)
-   *  давно писали `enablesSquadronConstruction` в АПГРЕЙДАХ завода — «завод второго
-   *  уровня открывает эскадрильи». Схема этих полей на уровне не знала, zod их молча
-   *  отбрасывал, и гейт `unit.build` читал только базовый def — где флага нет. Итог:
-   *  `fighter_squadron` (единственный `squadron`-юнит) нельзя было построить НИ НА
-   *  КАКОМ уровне завода, приказ отбивался `E_NO_HANGAR` всегда. */
+   *  давно писали способность в АПГРЕЙДАХ здания. Схема этих полей на уровне не знала,
+   *  zod их молча отбрасывал, и гейт `unit.build` читал только базовый def. Итог: юнит
+   *  был непостроим НИ НА КАКОМ уровне. Та же опасность у `shuttleBay` (SHU-1.1), и
+   *  сторож в `construction.test.ts` держит оба случая. */
   enablesShipConstruction: z.boolean().optional(),
-  enablesSquadronConstruction: z.boolean().optional(),
   enablesGroundConstruction: z.boolean().optional(),
 });
 
@@ -221,6 +224,8 @@ export const BuildingDefSchema = z.object({
   /** Structural HP — bombarded from orbit and stormed on the ground (GDD §7.4);
    *  a destroyed building stops granting its defense bonus. */
   hp: z.number().nonnegative().default(0),
+  /** Shuttle capacity of the building's FIRST level (see BuildingLevelSchema). */
+  shuttleBay: z.number().nonnegative().default(0),
   /** Ground-defense bonus the building grants the garrison (0.01 = +1%); a
    *  fortress grants much more, and it grows with level. */
   defenseBonus: z.number().default(0.01),
@@ -242,20 +247,19 @@ export const BuildingDefSchema = z.object({
   /** Anti-ship orbital-AA firepower per game hour (an emplacement building like an
    *  orbital-AA battery). Fires on hostile near-orbit fleets, summed with garrison AA. */
   aaDamage: z.number().nonnegative().default(0),
-  /** Point-defense (anti-squadron/anti-missile) firepower per game hour. Distinct
+  /** Point-defense (anti-shuttle/anti-missile) firepower per game hour. Distinct
    *  from `aaDamage` (anti-ship orbital AA): `pointDefense` intercepts incoming
-   *  squadron/missile strikes, not regular fleets. 0 = no point defense. */
+   *  shuttle/missile strikes, not regular fleets. 0 = no point defense. */
   pointDefense: z.number().nonnegative().default(0),
   /** True for a building that can lay down hulls (shipyard/spaceport) — a planet needs
    *  at least one standing (undestroyed) building with this flag to build any
    *  space-domain unit (`unit.build`). Уровень МОЖЕТ открыть способность позже — см.
    *  одноимённое поле в `BuildingLevelSchema`. */
   enablesShipConstruction: z.boolean().default(false),
-  /** True for a building that can build and base squadrons (a hangar bay /
+  /** True for a building that can build and base shuttles (a hangar bay /
    *  airbase). A planet needs at least one standing building with this flag
-   *  to build any unit with the `squadron` trait (`unit.build`). Уровень МОЖЕТ
+   *  to build any unit with the `shuttle` trait (`unit.build`). Уровень МОЖЕТ
    *  открыть способность позже — см. `BuildingLevelSchema`. */
-  enablesSquadronConstruction: z.boolean().default(false),
   /** True for a building that enables ground-unit construction (barracks for
    *  infantry, factory for vehicles). A planet needs at least one standing
    *  building with this flag to build any `domain: 'ground'` unit. Not per-level. */
@@ -370,7 +374,7 @@ export const TechnologyEffectsSchema = z.object({
 /** The five tech-tree branches (UI tabs), shared by technologies, scientists and the
  *  `has_scientist` gate. `command` is the automation / command-and-control branch (AI
  *  delegation "Steward", and later order chains and standing postures). */
-const BranchSchema = z.enum(['ground', 'space', 'squadron', 'missile', 'command']);
+const BranchSchema = z.enum(['ground', 'space', 'shuttle', 'missile', 'command']);
 
 /** Shared "at least N" threshold for a condition (default 1 = mere existence). This
  *  single `min` knob is the main data lever for tuning a gate without touching code. */
@@ -407,7 +411,7 @@ export const TechnologyDefSchema = z.object({
   description: z.string().optional(),
   tier: z.number().int().positive().default(1),
   /** Tech-tree branch (UI tab). Defaults to 'space' so existing nodes that omit
-   *  it stay valid (back-compat); squadron/missile branches may have no content yet. */
+   *  it stay valid (back-compat); shuttle/missile branches may have no content yet. */
   branch: BranchSchema.default('space'),
   /** Session day from which the node becomes researchable (0 = from match start).
    *  A "day" is game-time, timeScale-scaled — mirrors how `researchTimeHours`
@@ -577,6 +581,28 @@ export const HERO_PASSIVE_SCOPES = ['heroFleet', 'ownFleetsNear'] as const;
 /** A hero passive (docs/heroes.md §Данные) — an always-on, data-driven contribution to
  *  a hook while its hero is alive. Carried by a hero instance (`Hero.passives`, copied
  *  from the archetype's `startPassives` at seed). Balancing = editing these numbers. */
+/** Ступень редкости героя — сколько СКИЛЛОВ он носит одновременно (HPR-1.2).
+ *  Заведено данными, а не константой, потому что это число сегодня живёт ДВАЖДЫ
+ *  (`HERO_GRADES` в прототипе и нигде в ядре) и уже успело разъехаться со слотами
+ *  ФИТТИНГОВ архетипа (`HeroArchetypeDef.slots`) — обратной лестницей похожих чисел.
+ *  Здесь оно одно, и его читают оба каталога.
+ *
+ *  ВАЖНО: `slots` архетипа и `skillSlots` редкости — РАЗНЫЕ бюджеты. Первый ограничивает
+ *  `hero.fit` (компоненты корабля), второй — `hero.equip` (способности). Путать их нельзя:
+ *  у `commander` 4 фиттинга и у `main` 4 скилла — совпадение чисел, а не одно правило. */
+export const HeroGradeDefSchema = z.object({
+  name: z.string(),
+  description: z.string().optional(),
+  /** Сколько способностей ступень позволяет держать НАДЕТЫМИ одновременно. */
+  skillSlots: z.number().int().nonnegative().default(1),
+  /** ПРИБАВКА к отсекам под модули КОРАБЛЯ поверх корпуса (§0.38 hero-progression-roadmap).
+   *  Железо у героев одинаковое — его даёт корпус (`units.hero.slots`), — и лишь основной
+   *  герой, личный флагман игрока, несёт на один отсек больше. Дельта, а не полный бюджет:
+   *  иначе правка корпуса тихо разъедется со ступенями. Ноль везде ⇒ ступень железо не
+   *  трогает (так у всех, кроме `main`). */
+  moduleSlots: ShipSlotsSchema.default({ weapon: 0, defense: 0, utility: 0 }),
+});
+
 export const HeroPassiveDefSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
@@ -618,28 +644,6 @@ export const HeroSkillNodeSchema = z.object({
   cost: NonnegativeCostSchema.default({}),
   grants: HeroSkillGrantsSchema.default({}),
 });
-
-/** A hero-ship fitting (HERO-6, docs/heroes.md §Данные) — a component installed into
- *  one of the archetype's `slots` («настройка самого корабля»). `grants` land on the
- *  instance loadout and are LIVE (HERO-4/5 engines); `statMods` are flat stat deltas
- *  for the hero's ship, carried as data until the effective-unit-stats seam (SHIP-3/4)
- *  lands — designed, not yet live (the prototype's `live:false` philosophy). Mirrors
- *  `ModuleDefSchema`, incl. the anti-self-expansion refine. */
-export const HeroFittingDefSchema = z
-  .object({
-    name: z.string(),
-    description: z.string().optional(),
-    /** Flat additive stat deltas for the hero's SHIP (e.g. { hp: 40, speed: -1 }).
-     *  Trade-offs are allowed (negatives); slot capacity is not (refined below). */
-    statMods: z.record(z.string(), z.number()).default({}),
-    /** What installing the fitting grants the hero (live via HERO-4/5). */
-    grants: HeroSkillGrantsSchema.default({}),
-    /** Treasury cost to install. */
-    cost: NonnegativeCostSchema.default({}),
-  })
-  .refine((f) => !Object.keys(f.statMods).some((k) => /slot/i.test(k)), {
-    message: 'a fitting may not modify slot capacity (anti self-expansion)',
-  });
 
 /** The ship a hero commands: either an existing unit archetype (`unit` → `data.units`) or
  *  inline stat overrides. A hero reuses the fleet for position/movement/combat, so its
@@ -793,7 +797,7 @@ export const GameDataSchema = z.object({
   heroAbilities: z.record(z.string(), HeroAbilityDefSchema).default({}),
   heroPassives: z.record(z.string(), HeroPassiveDefSchema).default({}),
   heroSkillTrees: z.record(z.string(), HeroSkillNodeSchema).default({}),
-  heroFittings: z.record(z.string(), HeroFittingDefSchema).default({}),
+  heroGrades: z.record(z.string(), HeroGradeDefSchema).default({}),
   modes: z.record(z.string(), GameModeDefSchema).default({}),
   // `.prefault({})` pipes the empty object through the nested schema, so its
   // per-field defaults stay the single source of truth (no literal to drift).
@@ -831,7 +835,6 @@ export type HeroShip = z.infer<typeof HeroShipSchema>;
 export type HeroArchetypeDef = z.infer<typeof HeroArchetypeDefSchema>;
 export type HeroPassiveDef = z.infer<typeof HeroPassiveDefSchema>;
 export type HeroSkillNode = z.infer<typeof HeroSkillNodeSchema>;
-export type HeroFittingDef = z.infer<typeof HeroFittingDefSchema>;
 export type HeroSkillGrants = z.infer<typeof HeroSkillGrantsSchema>;
 export type TeamFormat = z.infer<typeof TeamFormatSchema>;
 export type ModeVictory = z.infer<typeof ModeVictorySchema>;
@@ -845,8 +848,8 @@ export type GameData = z.infer<typeof GameDataSchema>;
  *  levels 2..N come from `upgrades`. Out-of-range levels fall back to level 1. */
 export function buildingLevel(def: BuildingDef, level: number): BuildingLevel {
   if (level <= 1) {
-    const { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage, pointDefense, creditsBonus, buildSpeedBonus } = def;
-    return { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage, pointDefense, creditsBonus, buildSpeedBonus };
+    const { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, creditsBonus, buildSpeedBonus } = def;
+    return { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, creditsBonus, buildSpeedBonus };
   }
   return def.upgrades[level - 2] ?? buildingLevel(def, 1);
 }

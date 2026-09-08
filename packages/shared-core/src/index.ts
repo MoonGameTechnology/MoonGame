@@ -155,18 +155,18 @@ export {
 } from './state/groundCombat';
 export { scanNodeThreats, type NodeThreat } from './state/threat';
 export {
-  squadronTake,
+  shuttleTake,
   sortieSpec,
   freshSortie,
   canSortie,
   spendSortie,
   tickRearm,
-  fleetHasSquadron,
-  squadronStrikeRange,
+  fleetHasShuttle,
+  shuttleStrikeRange,
   withinRange,
-  squadronReaches,
+  shuttleReaches,
   type SortieState,
-} from './state/squadron';
+} from './state/shuttle';
 export {
   fleetIdle,
   validateChainSteps,
@@ -275,7 +275,6 @@ export {
   HeroAbilityDefSchema,
   HeroPassiveDefSchema,
   HeroSkillNodeSchema,
-  HeroFittingDefSchema,
   HeroBranchSchema,
   TechnologyEffectsSchema,
   TechnologyUnlocksSchema,
@@ -319,7 +318,6 @@ export {
   type HeroPassiveDef,
   type HeroSkillNode,
   type HeroSkillGrants,
-  type HeroFittingDef,
   type HeroShip,
   type HeroBranch,
   type TechnologyEffects,
@@ -413,7 +411,7 @@ export { factionModule } from './modules/faction';
 export { armyModule } from './modules/army';
 export { fleetOpsModule } from './modules/fleetOps';
 export { autoRallyModule } from './modules/autoRally';
-export { squadronModule } from './modules/squadron';
+export { shuttleModule } from './modules/shuttle';
 export { capitalModule, capitalsOf, capitalOf } from './modules/capital';
 export { standingOrdersModule } from './modules/standingOrders';
 export {

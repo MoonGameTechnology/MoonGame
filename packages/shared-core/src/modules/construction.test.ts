@@ -39,12 +39,12 @@ const data: GameData = parseGameData({
       cost: { metal: 5 },
       buildTimeHours: 0,
     },
-    fighter_squadron: {
+    interceptor: {
       faction: 'x',
       stats: { attack: 14, defense: 3, speed: 14, hp: 10, strikeRange: 180, fuel: 3, rearmRounds: 2 },
       cost: { metal: 90, credits: 40 },
       buildTimeHours: 2,
-      traits: ['squadron'],
+      traits: ['shuttle'],
     },
   },
   factions: {},
@@ -60,13 +60,22 @@ const data: GameData = parseGameData({
       hp: 20,
       enablesShipConstruction: true,
     },
+    // Космопорт: верфь кораблей И дом челноков (SHU-1.1) — вместимость `shuttleBay`
+    // одновременно и гейт постройки, и предел базирования.
+    spaceport: {
+      name: 'Spaceport',
+      cost: { metal: 200 },
+      buildTimeHours: 5,
+      hp: 25,
+      enablesShipConstruction: true,
+      shuttleBay: 6,
+    },
     factory: {
       name: 'Factory',
       cost: { metal: 150, credits: 60 },
       buildTimeHours: 6,
       hp: 25,
       enablesGroundConstruction: true,
-      enablesSquadronConstruction: true,
     },
     barracks: {
       name: 'Barracks',
@@ -75,9 +84,9 @@ const data: GameData = parseGameData({
       hp: 25,
       enablesGroundConstruction: true,
     },
-    // Ангар открывается ТОЛЬКО апгрейдом — ровно так, как это записано в реальных
-    // данных для завода (`data/buildings.json`): база строит технику, второй уровень
-    // добавляет эскадрильи.
+    // Вместимость ангара открывается ТОЛЬКО апгрейдом — сторож ниже проверяет, что
+    // гейт читает уровень, а не базовый def (иначе `shuttleBay` в апгрейде был бы
+    // немой опечаткой, как это однажды и случилось с флагом ангара).
     airbase: {
       name: 'Airbase',
       cost: { metal: 100 },
@@ -85,8 +94,8 @@ const data: GameData = parseGameData({
       hp: 25,
       enablesGroundConstruction: true,
       upgrades: [
-        { cost: { metal: 120 }, buildTimeHours: 5, hp: 35, enablesSquadronConstruction: true },
-        { cost: { metal: 160 }, buildTimeHours: 6, hp: 45 },
+        { cost: { metal: 120 }, buildTimeHours: 5, hp: 35, shuttleBay: 2 },
+        { cost: { metal: 160 }, buildTimeHours: 6, hp: 45, shuttleBay: 2 },
       ],
     },
     fort: {
@@ -329,12 +338,10 @@ describe('construction module — a space-domain hull needs a standing shipyard'
   });
 });
 
-describe('construction module — способность может открываться АПГРЕЙДОМ', () => {
-  // Регрессия: данные (и `data/buildings.json`, и каталог прототипа) объявляют
-  // `enablesSquadronConstruction` в апгрейдах завода, но схема знала флаг только у
-  // самого здания, zod его в уровне отбрасывал, а гейт читал базовый def. Итог:
-  // `fighter_squadron` был непостроим НА ЛЮБОМ уровне — приказ всегда отбивался
-  // `E_NO_HANGAR`, и вся ветка эскадрилий не играла.
+describe('construction module — вместимость ангара может открываться АПГРЕЙДОМ', () => {
+  // Регрессия из времён флага ангара: схема знала способность только у самого здания,
+  // zod отбрасывал её в уровне, гейт читал базовый def — и юнит был непостроим на любом
+  // уровне. `shuttleBay` наследует ту же опасность, поэтому наследует и сторожа.
   const yard = (level: number): Planet => ({
     ...planet('A', 'p1'),
     buildings: [{ type: 'airbase', level, hp: 100 }],
@@ -342,54 +349,52 @@ describe('construction module — способность может открыв
   const order = (level: number) =>
     createKernel([constructionModule]).applyAction(
       stateWith({ players: [player('p1', { metal: 400, credits: 200 })], planets: [yard(level)] }),
-      build('fighter_squadron'),
+      build('interceptor'),
       ctx(0),
     );
 
-  it('первый уровень ангара НЕ открывает — способности там ещё нет', () => {
+  it('первый уровень вместимости НЕ даёт — ангара там ещё нет', () => {
     const r = order(1);
     expect(r.ok).toBe(false);
-    expect(!r.ok && r.code).toBe('E_NO_HANGAR');
+    expect(!r.ok && r.code).toBe('E_NO_PORT');
   });
 
-  it('второй уровень открывает эскадрильи', () => {
+  it('второй уровень открывает челноки', () => {
     expect(order(2).ok).toBe(true);
   });
 
-  it('третий уровень её НЕ отнимает — способность накапливается, а не переопределяется', () => {
-    // У третьего уровня флага нет вовсе; «уровень открывает» не значит «уровень умеет».
+  it('третий уровень вместимости не теряет', () => {
     expect(order(3).ok).toBe(true);
   });
 });
 
-describe('construction module — a squadron-trait unit needs a standing hangar bay', () => {
-  it('rejects unit.build for a squadron unit with no hangar bay on the planet', () => {
+describe('construction module — челнок строится ТОЛЬКО в космопорте (SHU-1.1)', () => {
+  it('нет порта — постройка челнока отбивается E_NO_PORT', () => {
     const kernel = createKernel([constructionModule]);
-    const st = stateWith({ players: [player('p1', { metal: 200 })], planets: [planet('A', 'p1', ['shipyard'])] });
-    const r = kernel.applyAction(st, build('fighter_squadron'), ctx(0));
+    const st = stateWith({ players: [player('p1', { metal: 200 })], planets: [planet('A', 'p1', ['factory'])] });
+    const r = kernel.applyAction(st, build('interceptor'), ctx(0));
     expect(r.ok).toBe(false);
-    expect(!r.ok && r.code).toBe('E_NO_HANGAR');
+    expect(!r.ok && r.code).toBe('E_NO_PORT');
   });
 
-  it('a shipyard alone does not unlock squadrons (they are not regular ships)', () => {
+  it('ВЕРФЬ БЕЗ ВМЕСТИМОСТИ ЧЕЛНОК НЕ ДАЁТ: он живёт в порту, а не на стапеле', () => {
     const kernel = createKernel([constructionModule]);
     const st = stateWith({ players: [player('p1', { metal: 200 })], planets: [planet('A', 'p1', ['shipyard'])] });
-    const r = kernel.applyAction(st, build('fighter_squadron'), ctx(0));
+    const r = kernel.applyAction(st, build('interceptor'), ctx(0));
     expect(r.ok).toBe(false);
-    expect(!r.ok && r.code).toBe('E_NO_HANGAR');
+    expect(!r.ok && r.code).toBe('E_NO_PORT');
   });
 
-  it('a hangar bay unlocks squadron construction on that planet', () => {
+  it('космопорт открывает постройку челнока', () => {
     const kernel = createKernel([constructionModule]);
     const st = stateWith({
-      players: [player('p1', { metal: 200, credits: 100 })],
-      planets: [planet('A', 'p1', ['factory'])],
+      players: [player('p1', { metal: 400, credits: 200 })],
+      planets: [planet('A', 'p1', ['spaceport'])],
     });
-    const r = okApply(kernel.applyAction(st, build('fighter_squadron'), ctx(0)));
-    expect(r.ok).toBe(true);
+    expect(okApply(kernel.applyAction(st, build('interceptor'), ctx(0))).ok).toBe(true);
   });
 
-  it('a hangar bay does NOT unlock regular ship construction (shipyard still needed)', () => {
+  it('завод по-прежнему НЕ открывает обычные корабли (нужна верфь)', () => {
     const kernel = createKernel([constructionModule]);
     const st = stateWith({
       players: [player('p1', { metal: 200, credits: 100 })],
@@ -400,14 +405,14 @@ describe('construction module — a squadron-trait unit needs a standing hangar 
     expect(!r.ok && r.code).toBe('E_NO_SHIPYARD');
   });
 
-  it('a destroyed (hp<=0) hangar bay does not count as standing', () => {
+  it('РАЗРУШЕННЫЙ (hp<=0) порт вместимости не даёт', () => {
     const kernel = createKernel([constructionModule]);
-    const a = planet('A', 'p1', ['factory']);
+    const a = planet('A', 'p1', ['spaceport']);
     a.buildings[0]!.hp = 0;
-    const st = stateWith({ players: [player('p1', { metal: 200, credits: 100 })], planets: [a] });
-    const r = kernel.applyAction(st, build('fighter_squadron'), ctx(0));
+    const st = stateWith({ players: [player('p1', { metal: 400, credits: 200 })], planets: [a] });
+    const r = kernel.applyAction(st, build('interceptor'), ctx(0));
     expect(r.ok).toBe(false);
-    expect(!r.ok && r.code).toBe('E_NO_HANGAR');
+    expect(!r.ok && r.code).toBe('E_NO_PORT');
   });
 });
 

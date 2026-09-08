@@ -197,7 +197,7 @@ export const data: GameData = parseGameData({
     flight_decks: {
       name: 'Flight Decks',
       description: 'tech.node.flight-decks.desc',
-      branch: 'squadron',
+      branch: 'shuttle',
       tier: 1,
       cost: { credits: 160, metal: 120 },
       researchTimeHours: 6,
@@ -207,7 +207,7 @@ export const data: GameData = parseGameData({
     strike_vectors: {
       name: 'Strike Vectors',
       description: 'tech.node.strike-vectors.desc',
-      branch: 'squadron',
+      branch: 'shuttle',
       tier: 2,
       cost: { credits: 280, metal: 220, microelectronics: 30 },
       researchTimeHours: 12,
@@ -218,7 +218,7 @@ export const data: GameData = parseGameData({
     ace_programs: {
       name: 'Ace Programs',
       description: 'tech.node.ace-programs.desc',
-      branch: 'squadron',
+      branch: 'shuttle',
       tier: 3,
       cost: { credits: 500, metal: 380, microelectronics: 60 },
       researchTimeHours: 20,
@@ -375,7 +375,7 @@ export const data: GameData = parseGameData({
     },
     dropship: {
       // Carrier hull (GDD §6.1 / backlog SHIP): the biggest hold in the fleet but almost
-      // no guns — it hauls divisions (and, later, squadrons) and wants an escort.
+      // no guns — it hauls divisions (and, later, shuttles) and wants an escort.
       faction: 'blue',
       stats: { attack: 2, defense: 6, speed: 44, hp: 50, cargoCapacity: 8 },
       signature: 3, // a fat hauler — easy to spot
@@ -384,8 +384,8 @@ export const data: GameData = parseGameData({
       upkeep: { credits: 24 },
       slots: { defense: 1, utility: 2 }, // no guns — it armours up and carries утилиту
     },
-    fighter_squadron: {
-      // Carrier-borne strike wing (squadrons-roadmap SQ-0.1): very fast + hard-hitting
+    interceptor: {
+      // Carrier-borne strike wing (shuttles-roadmap SQ-0.1): very fast + hard-hitting
       // but paper-thin — launch it ahead to strike, orbital AA (orbital_aa) is its counter.
       faction: 'blue',
       stats: {
@@ -397,7 +397,7 @@ export const data: GameData = parseGameData({
         fuel: 3,
         rearmRounds: 2,
       },
-      traits: ['squadron'],
+      traits: ['shuttle'],
       signature: 2,
       cost: { metal: 90, credits: 40, microelectronics: 10 },
       buildTimeHours: 2,
@@ -405,7 +405,7 @@ export const data: GameData = parseGameData({
       slots: { weapon: 1 }, // a single gun mount — upgun the paper-thin strike wing
     },
     strike_carrier: {
-      // A slow, tanky flat-top with few guns of its own — its punch is the squadrons it carries.
+      // A slow, tanky flat-top with few guns of its own — its punch is the shuttles it carries.
       faction: 'blue',
       stats: { attack: 4, defense: 10, speed: 40, hp: 70, cargoCapacity: 6 },
       traits: ['carrier'],
@@ -479,6 +479,11 @@ export const data: GameData = parseGameData({
       cost: { metal: 400, credits: 200 },
       buildTimeHours: 10,
       upkeep: { credits: 64 },
+      // HPR-1.5.1: the hero's ship is fitted like any other hull — one bay of each
+      // kind, the cruiser shape. Every hero shares this hull, so hardware is equal
+      // across archetypes; the main hero's extra bay is a GRADE bonus (HPR-1.5.2),
+      // not a different ship. What separates heroes is their skills, not their bays.
+      slots: { weapon: 1, defense: 1, utility: 1 },
     },
   },
   // Ship modules (mirror of data/modules.json) — the «Оснащение корабля» loadout
@@ -795,9 +800,9 @@ export const data: GameData = parseGameData({
         },
       ],
     },
-    // Factory — builds ground vehicles (tank) and squadrons (fighter_squadron).
-    // enablesGroundConstruction + enablesSquadronConstruction: the gate for
-    // vehicle/squadron unit.build on this planet.
+    // Factory — builds ground vehicles (tank) and shuttles (interceptor).
+    // enablesGroundConstruction: the gate for
+    // vehicle/shuttle unit.build on this planet.
     factory: {
       name: 'Vehicle Factory',
       cost: { metal: 150, credits: 60 },
@@ -812,7 +817,6 @@ export const data: GameData = parseGameData({
           buildTimeHours: 8,
           hp: 35,
           enablesGroundConstruction: true,
-          enablesSquadronConstruction: true,
           upkeep: { energy: 50 },
         },
         {
@@ -820,7 +824,6 @@ export const data: GameData = parseGameData({
           buildTimeHours: 12,
           hp: 45,
           enablesGroundConstruction: true,
-          enablesSquadronConstruction: true,
           buildSpeedBonus: 0.5,
           upkeep: { energy: 70 },
         },
@@ -836,6 +839,9 @@ export const data: GameData = parseGameData({
       hp: 25,
       shipRepair: 0.05,
       enablesShipConstruction: true,
+      // Дом челноков (SHU-1.1): вместимость порта — и гейт постройки, и предел
+      // базирования. Челнок стоит ВНУТРИ порта и на орбите не показывается.
+      shuttleBay: 6,
       scoreValue: 4,
     },
     // radar array — projects a detection radius (in jumps) that grows with its
@@ -1207,6 +1213,19 @@ export const data: GameData = parseGameData({
       params: { bonus: 0.08, radius: 300 },
     },
   },
+  // Ступени редкости → сколько СКИЛЛОВ герой носит одновременно (HPR-1.2). Держится
+  // ОДИНАКОВО с `data/heroGrades.json` (английское имя, без описания), поэтому в базовый
+  // список паритета не попадает ни строкой: имя тут нигде не рисуется — подписи ступеней
+  // в интерфейсе берутся из `HERO_GRADES` (`heroes.ts`) ключами локализации.
+  // NB: `main` пока стоит в этой лестнице четвёртой ступенью. Так исторически, и HPR-1.1
+  // его отсюда выведет — главный герой не редкость, а личный флагман со звёздами (§0.3
+  // hero-progression-roadmap.md). Числа при этом не изменятся: 1 + 3★ = 4.
+  heroGrades: {
+    common: { name: 'Common', skillSlots: 1 },
+    rare: { name: 'Rare', skillSlots: 2 },
+    legendary: { name: 'Legendary', skillSlots: 3 },
+    main: { name: 'Main', skillSlots: 4, moduleSlots: { utility: 1 } },
+  },
   heroSkillTrees: {
     neural_lace: {
       name: 'hero.tree.neural-lace.name',
@@ -1295,26 +1314,6 @@ export const data: GameData = parseGameData({
       requires: ['psi_veil'],
       cost: { energy: 160, credits: 120 },
       grants: { ability: 'decoy_signal' },
-    },
-  },
-  heroFittings: {
-    psi_amplifier: {
-      name: 'Psi Amplifier',
-      description: 'hero.fit.psi-amplifier.desc',
-      grants: { ability: 'scan' },
-      cost: { microelectronics: 30 },
-    },
-    aegis_matrix: {
-      name: 'Aegis Matrix',
-      description: 'hero.fit.aegis-matrix.desc',
-      grants: { passive: 'rally_beacon' },
-      cost: { metal: 60 },
-    },
-    ablative_plating: {
-      name: 'Ablative Cladding',
-      description: 'hero.fit.ablative-plating.desc',
-      statMods: { hp: 40 },
-      cost: { metal: 30 },
     },
   },
 });

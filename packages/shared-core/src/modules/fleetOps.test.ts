@@ -35,10 +35,10 @@ const data: GameData = parseGameData({
       domain: 'space',
       stats: { attack: 1, defense: 1, speed: 10, hp: 10 },
     },
-    fighter_squadron: {
+    interceptor: {
       faction: 'x',
       domain: 'space',
-      traits: ['squadron'],
+      traits: ['shuttle'],
       stats: { attack: 14, defense: 3, speed: 14, hp: 10, strikeRange: 180, fuel: 3, rearmRounds: 2 },
     },
     hero: {
@@ -161,15 +161,25 @@ const merge = (from: string, into: string, playerId = 'p1'): Action => ({
 });
 const split = (
   fleetId: string,
-  take: Array<{ unit: string; count: number }>,
+  take: Array<{ unit: string; count: number; modules?: string[] }>,
   playerId = 'p1',
+  takeLanding?: Array<{ unit: string; count: number }>,
 ): Action => ({
   id: `a:${playerId}:3`,
   type: 'fleet.split',
   playerId,
-  payload: { fleetId, take },
+  payload: { fleetId, take, ...(takeLanding ? { takeLanding } : {}) },
   issuedAt: 0,
 });
+/** Флот с произвольными стеками (лоадаут, пулы) и десантом в трюме. */
+function loadedFleet(
+  id: string,
+  units: Fleet['units'],
+  landing: Fleet['units'] = [],
+  owner = 'p1',
+): Fleet {
+  return { id, owner, location: 'A', movement: null, units, landing, traits: [] };
+}
 const engage = (fleetId: string, targetId: string, playerId = 'p1'): Action => ({
   id: `a:${playerId}:4`,
   type: 'fleet.engage',
@@ -314,6 +324,41 @@ describe('fleetOps — fleet.merge (fuse two co-located idle fleets)', () => {
     expect(r.state.heroes?.h1?.fleetId).toBe('F2');
   });
 
+  // Резолюция владельца 2026-09-08 («как в героях меча и магии»): каждый герой ведёт
+  // СВОЙ флот. Дыра была не в экзотике, а здесь: `fleet.merge` — рядовое действие,
+  // доступное любому игроку, и без гейта оно сводило двух героев в один флот, после
+  // чего `heroByFleet` возвращает одного из двух и смерть приписывается не тому.
+  it('НЕ сливает два ГЕРОЙСКИХ флота — один герой на флот', () => {
+    const kernel = createKernel([fleetOpsModule]);
+    const s = stateWith({
+      players: [player('p1')],
+      fleets: [
+        fleet('F1', 'p1', 'A', [['hero', 1]]),
+        fleet('F2', 'p1', 'A', [['hero', 1]]),
+      ],
+      heroes: [hero('h1', 'p1', 'F1'), hero('h2', 'p1', 'F2')],
+    });
+    expect(errCode(kernel.applyAction(s, merge('F1', 'F2'), ctx))).toBe('E_TWO_HEROES');
+    // Отказ — целиком: ни стеки, ни привязки героев не тронуты.
+    expect(s.fleets.F1).toBeDefined();
+    expect(s.heroes?.h1?.fleetId).toBe('F1');
+  });
+
+  it('забрать БЕЗГЕРОЙСКИЙ флот герою по-прежнему можно — это обычное усиление армии', () => {
+    const kernel = createKernel([fleetOpsModule]);
+    const s = stateWith({
+      players: [player('p1')],
+      fleets: [
+        fleet('F1', 'p1', 'A', [['cruiser', 2]]),
+        fleet('F2', 'p1', 'A', [['hero', 1]]),
+      ],
+      heroes: [hero('h1', 'p1', 'F2')],
+    });
+    const r = okApply(kernel.applyAction(s, merge('F1', 'F2'), ctx));
+    expect(r.state.fleets.F1).toBeUndefined();
+    expect(r.state.heroes?.h1?.fleetId).toBe('F2');
+  });
+
   it('rejects merging the same fleet, a foreign fleet, or fleets not co-located/idle', () => {
     const kernel = createKernel([fleetOpsModule]);
     const s = stateWith({
@@ -354,6 +399,193 @@ describe('fleetOps — fleet.merge (fuse two co-located idle fleets)', () => {
 });
 
 describe('fleetOps — fleet.split (peel ships off a fleet into a fresh one)', () => {
+  // FSPLIT-1 (заказ владельца): делить надо ИМЕННО ТЕ корабли, что имел в виду игрок.
+  // Раньше отбор шёл по типу юнита, а `takeFromStacks` брала первый попавшийся стек —
+  // два крейсера с рельсотроном и два голых были для раскола одним «cruiser: 4», и
+  // фиттинги уезжали как повезёт. Лоадаут — часть идентичности стека (SM-0.3), значит
+  // и адресовать надо стек: `{ unit, modules }`.
+  it('ЛОАДАУТ АДРЕСУЕТСЯ: уходят ровно фиттованные, голые остаются', () => {
+    const kernel = createKernel([fleetOpsModule]);
+    const s = stateWith({
+      players: [player('p1')],
+      fleets: [
+        loadedFleet('F1', [
+          { unit: 'cruiser', count: 2, modules: ['plating'] },
+          { unit: 'cruiser', count: 2 },
+        ]),
+      ],
+    });
+    const r = okApply(
+      kernel.applyAction(s, split('F1', [{ unit: 'cruiser', count: 2, modules: ['plating'] }]), ctx),
+    );
+    expect(r.state.fleets.F1?.units).toEqual([{ unit: 'cruiser', count: 2 }]);
+    const newId = Object.keys(r.state.fleets).find((id) => id !== 'F1')!;
+    expect(r.state.fleets[newId]?.units).toEqual([
+      { unit: 'cruiser', count: 2, modules: ['plating'] },
+    ]);
+  });
+
+  it('ПУСТОЙ ЛОАДАУТ — ТОЖЕ АДРЕС: `modules: []` уводит голые, не трогая фиттованные', () => {
+    const kernel = createKernel([fleetOpsModule]);
+    const s = stateWith({
+      players: [player('p1')],
+      fleets: [
+        loadedFleet('F1', [
+          { unit: 'cruiser', count: 2, modules: ['plating'] },
+          { unit: 'cruiser', count: 2 },
+        ]),
+      ],
+    });
+    const r = okApply(
+      kernel.applyAction(s, split('F1', [{ unit: 'cruiser', count: 1, modules: [] }]), ctx),
+    );
+    const newId = Object.keys(r.state.fleets).find((id) => id !== 'F1')!;
+    expect(r.state.fleets[newId]?.units).toEqual([{ unit: 'cruiser', count: 1 }]);
+    expect(r.state.fleets.F1?.units).toEqual([
+      { unit: 'cruiser', count: 2, modules: ['plating'] },
+      { unit: 'cruiser', count: 1 },
+    ]);
+  });
+
+  it('НЕ ХВАТАЕТ ИМЕННО ЭТИХ: суммы по типу мало, считается адресуемый стек', () => {
+    const kernel = createKernel([fleetOpsModule]);
+    const s = stateWith({
+      players: [player('p1')],
+      fleets: [
+        loadedFleet('F1', [
+          { unit: 'cruiser', count: 1, modules: ['plating'] },
+          { unit: 'cruiser', count: 5 },
+        ]),
+      ],
+    });
+    // всего крейсеров 6, но фиттованный ровно один
+    expect(
+      errCode(
+        kernel.applyAction(s, split('F1', [{ unit: 'cruiser', count: 2, modules: ['plating'] }]), ctx),
+      ),
+    ).toBe('E_NOT_ENOUGH');
+  });
+
+  it('БЕЗ `modules` — прежнее поведение: любой лоадаут этого типа (бот и крылья шлют так)', () => {
+    const kernel = createKernel([fleetOpsModule]);
+    const s = stateWith({
+      players: [player('p1')],
+      fleets: [
+        loadedFleet('F1', [
+          { unit: 'cruiser', count: 1, modules: ['plating'] },
+          { unit: 'cruiser', count: 2 },
+        ]),
+      ],
+    });
+    const r = okApply(kernel.applyAction(s, split('F1', [{ unit: 'cruiser', count: 2 }]), ctx));
+    const newId = Object.keys(r.state.fleets).find((id) => id !== 'F1')!;
+    const total = (id: string) =>
+      (r.state.fleets[id]?.units ?? []).reduce((a, st) => a + st.count, 0);
+    expect(total(newId)).toBe(2);
+    expect(total('F1')).toBe(1);
+  });
+
+  // FSPLIT-2: десант в трюме — половина смысла раскола. Раньше он ВСЕГДА оставался у
+  // исходного флота (`landing: []` у нового), и игрок не мог отправить часть войск
+  // одним отрядом, а часть другим — приходилось грузить заново на планете.
+  it('ДЕСАНТ ДЕЛИТСЯ: заказанные войска уезжают с новым флотом, остальные остаются', () => {
+    const kernel = createKernel([fleetOpsModule]);
+    const s = stateWith({
+      players: [player('p1')],
+      fleets: [
+        loadedFleet(
+          'F1',
+          [{ unit: 'cruiser', count: 4 }], // вместимость 2 на крейсер → 8
+          [{ unit: 'militia', count: 4 }], // cargoSize 1 → занято 4
+        ),
+      ],
+    });
+    const r = okApply(
+      kernel.applyAction(
+        s,
+        split('F1', [{ unit: 'cruiser', count: 2 }], 'p1', [{ unit: 'militia', count: 3 }]),
+        ctx,
+      ),
+    );
+    const newId = Object.keys(r.state.fleets).find((id) => id !== 'F1')!;
+    expect(r.state.fleets[newId]?.landing).toEqual([{ unit: 'militia', count: 3 }]);
+    expect(r.state.fleets.F1?.landing).toEqual([{ unit: 'militia', count: 1 }]);
+  });
+
+  it('ДЕСАНТ БЕЗ ЗАКАЗА ОСТАЁТСЯ ДОМА — прежнее поведение не изменилось', () => {
+    const kernel = createKernel([fleetOpsModule]);
+    const s = stateWith({
+      players: [player('p1')],
+      fleets: [
+        loadedFleet('F1', [{ unit: 'cruiser', count: 2 }], [{ unit: 'militia', count: 2 }]),
+      ],
+    });
+    const r = okApply(kernel.applyAction(s, split('F1', [{ unit: 'cruiser', count: 1 }]), ctx));
+    const newId = Object.keys(r.state.fleets).find((id) => id !== 'F1')!;
+    expect(r.state.fleets[newId]?.landing).toEqual([]);
+    expect(r.state.fleets.F1?.landing).toEqual([{ unit: 'militia', count: 2 }]);
+  });
+
+  it('ТРЮМ НОВОГО ФЛОТА НЕ РЕЗИНОВЫЙ: десант больше вместимости — E_NO_CAPACITY', () => {
+    const kernel = createKernel([fleetOpsModule]);
+    const s = stateWith({
+      players: [player('p1')],
+      fleets: [
+        loadedFleet('F1', [{ unit: 'cruiser', count: 4 }], [{ unit: 'militia', count: 6 }]),
+      ],
+    });
+    // один крейсер увозит максимум 2 militia
+    expect(
+      errCode(
+        kernel.applyAction(
+          s,
+          split('F1', [{ unit: 'cruiser', count: 1 }], 'p1', [{ unit: 'militia', count: 3 }]),
+          ctx,
+        ),
+      ),
+    ).toBe('E_NO_CAPACITY');
+  });
+
+  it('ОСТАТОК ТОЖЕ ДОЛЖЕН ВЛЕЗТЬ: увели транспорты, а войска бросили — E_NO_CAPACITY', () => {
+    const kernel = createKernel([fleetOpsModule]);
+    const s = stateWith({
+      players: [player('p1')],
+      fleets: [
+        loadedFleet(
+          'F1',
+          [
+            { unit: 'cruiser', count: 3 }, // вместимость 6
+            { unit: 'scout', count: 1 }, // 0
+          ],
+          [{ unit: 'militia', count: 6 }],
+        ),
+      ],
+    });
+    // уводим все крейсеры без десанта: в исходном остаётся скаут с шестью militia
+    expect(
+      errCode(kernel.applyAction(s, split('F1', [{ unit: 'cruiser', count: 3 }]), ctx)),
+    ).toBe('E_NO_CAPACITY');
+  });
+
+  it('СТОЛЬКО ДЕСАНТА НЕТ: заказ больше наличного — E_NO_ARMY, состояние не тронуто', () => {
+    const kernel = createKernel([fleetOpsModule]);
+    const s = stateWith({
+      players: [player('p1')],
+      fleets: [
+        loadedFleet('F1', [{ unit: 'cruiser', count: 4 }], [{ unit: 'militia', count: 2 }]),
+      ],
+    });
+    expect(
+      errCode(
+        kernel.applyAction(
+          s,
+          split('F1', [{ unit: 'cruiser', count: 2 }], 'p1', [{ unit: 'militia', count: 3 }]),
+          ctx,
+        ),
+      ),
+    ).toBe('E_NO_ARMY');
+  });
+
   it('peels the requested ships into a new co-located fleet, apportioning hull pro-rata', () => {
     const kernel = createKernel([fleetOpsModule]);
     const s = stateWith({
@@ -373,11 +605,11 @@ describe('fleetOps — fleet.split (peel ships off a fleet into a fresh one)', (
     expect(r.events.map((e) => e.type)).toContain('fleet.split');
   });
 
-  // SQ-1.1: splitting squadron-trait ships off a carrier creates a strike WING —
-  // it must carry homeBase (the carrier), or squadronModule's free flight
-  // (squadron.strike/return) rejects with E_NOT_SQUADRON and the whole
+  // SQ-1.1: splitting shuttle-trait ships off a carrier creates a strike WING —
+  // it must carry homeBase (the carrier), or shuttleModule's free flight
+  // (shuttle.strike/return) rejects with E_NOT_SHUTTLE and the whole
   // free-flight path is dead code.
-  it('a squadron split gets homeBase (the strike wing contract)', () => {
+  it('a shuttle split gets homeBase (the strike wing contract)', () => {
     const kernel = createKernel([fleetOpsModule]);
     const s = stateWith({
       players: [player('p1')],
@@ -385,16 +617,16 @@ describe('fleetOps — fleet.split (peel ships off a fleet into a fresh one)', (
       fleets: [
         fleet('F1', 'p1', 'A', [
           ['cruiser', 1],
-          ['fighter_squadron', 2],
+          ['interceptor', 2],
         ]),
       ],
     });
-    const r = okApply(kernel.applyAction(s, split('F1', [{ unit: 'fighter_squadron', count: 2 }]), ctx));
+    const r = okApply(kernel.applyAction(s, split('F1', [{ unit: 'interceptor', count: 2 }]), ctx));
     const newId = Object.keys(r.state.fleets).find((id) => id !== 'F1')!;
     const wing = r.state.fleets[newId]!;
     expect(wing.homeBase).toBe('F1'); // the carrier is the base
     // ВТОРОЙ координаты у пристыкованного крыла нет — и не должно быть. `location`
-    // у него есть (без него split отказал бы с E_IN_TRANSIT), а `squadron.strike`
+    // у него есть (без него split отказал бы с E_IN_TRANSIT), а `shuttle.strike`
     // берёт начало полёта как `freePosition ?? позиция location`. Выставленная здесь
     // `freePosition` не обновляется при обычном ходе по лейну, и уведённое `fleet.move`
     // крыло навсегда осталось бы для эскадрильной логики у точки вылета.
@@ -404,7 +636,7 @@ describe('fleetOps — fleet.split (peel ships off a fleet into a fresh one)', (
 
   // Смешанный split — не крыло. Свободный полёт уносит ВЕСЬ флот, поэтому «хотя бы
   // один истребитель» позволяло бы увести крейсер мимо графа линий, подцепив его к
-  // отделяемым эскадрильям. Крыло — это ровно squadron-стеки (`squadronTake`).
+  // отделяемым эскадрильям. Крыло — это ровно shuttle-стеки (`shuttleTake`).
   it('a MIXED split is not a wing — a regular ship can not smuggle itself off the lanes', () => {
     const kernel = createKernel([fleetOpsModule]);
     const s = stateWith({
@@ -413,7 +645,7 @@ describe('fleetOps — fleet.split (peel ships off a fleet into a fresh one)', (
       fleets: [
         fleet('F1', 'p1', 'A', [
           ['cruiser', 3],
-          ['fighter_squadron', 2],
+          ['interceptor', 2],
         ]),
       ],
     });
@@ -422,7 +654,7 @@ describe('fleetOps — fleet.split (peel ships off a fleet into a fresh one)', (
         s,
         split('F1', [
           { unit: 'cruiser', count: 1 },
-          { unit: 'fighter_squadron', count: 2 },
+          { unit: 'interceptor', count: 2 },
         ]),
         ctx,
       ),
@@ -431,9 +663,9 @@ describe('fleetOps — fleet.split (peel ships off a fleet into a fresh one)', (
     expect(r.state.fleets[newId]?.homeBase).toBeUndefined();
   });
 
-  // The inverse: a NON-squadron split must NOT get homeBase — a regular fleet
-  // stays lane-bound and squadron.strike must keep rejecting it.
-  it('a non-squadron split does NOT get homeBase (stays lane-bound)', () => {
+  // The inverse: a NON-shuttle split must NOT get homeBase — a regular fleet
+  // stays lane-bound and shuttle.strike must keep rejecting it.
+  it('a non-shuttle split does NOT get homeBase (stays lane-bound)', () => {
     const kernel = createKernel([fleetOpsModule]);
     const s = stateWith({
       players: [player('p1')],

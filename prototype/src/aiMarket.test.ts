@@ -27,9 +27,9 @@ function game2(): GameState {
 const only = (actions: Action[], type: string): Action[] => actions.filter((a) => a.type === type);
 const payloads = <T>(actions: Action[], type: string): T[] =>
   only(actions, type).map((a) => a.payload as T);
-const orders = (s: GameState, profile: 'basic' | 'test' = 'test'): Action[] =>
+const orders = (s: GameState, profile: 'weak' | 'strong' = 'strong'): Action[] =>
   aiOrders(s, 'p2', 'expand', profile);
-const takes = (s: GameState, profile: 'basic' | 'test' = 'test') =>
+const takes = (s: GameState, profile: 'weak' | 'strong' = 'strong') =>
   payloads<{ id: string; amount?: number }>(orders(s, profile), 'market.take');
 
 /** Состояние с заданной казной места p2 и книгой заказов. */
@@ -191,19 +191,19 @@ describe('AI-BAL-9 — границы книги', () => {
     // Прежний набор лотов у игрового бота: излишки на продажу и заявка на МЕТАЛЛ.
     // Заявка на микроэлектронику — новинка тест-профиля, как и снятие чужих лотов.
     const s = book({ ...NEUTRAL, credits: 4000, metal: 10, microelectronics: 10 }, []);
-    const bids = (profile: 'basic' | 'test'): string[] =>
+    const bids = (profile: 'weak' | 'strong'): string[] =>
       payloads<{ side: string; resource: string }>(orders(s, profile), 'market.list')
         .filter((l) => l.side === 'buy')
         .map((l) => l.resource);
-    expect(bids('basic')).toEqual(['metal']);
-    expect(bids('test')).toContain('microelectronics');
+    expect(bids('weak')).toEqual(['metal']);
+    expect(bids('strong')).toContain('microelectronics');
   });
 
   it('ИГРОВОЙ бот чужих лотов не снимает', () => {
     const s = book({ ...NEUTRAL, microelectronics: 10 }, [
       { id: 'lot:micro', side: 'sell', resource: 'microelectronics', price: 1, amount: 12 },
     ]);
-    expect(takes(s, 'basic')).toHaveLength(0);
+    expect(takes(s, 'weak')).toHaveLength(0);
   });
 });
 

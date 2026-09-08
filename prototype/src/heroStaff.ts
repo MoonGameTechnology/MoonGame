@@ -3,7 +3,7 @@
  *
  * One place for the whole hero loop: deploy reserves (`hero.spawn`), cast abilities
  * (`hero.ability` — built-ins live, typed-but-unwired honestly say «скоро»), walk the
- * skill tree (`hero.skill.unlock`) and install fittings (`hero.fit`). All gates
+ * skill tree (`hero.skill.unlock`) and refit the hero's ship (`hero.install`). All gates
  * (range/cooldown/cost/slots/branch) are the core's — this only shows them.
  *
  * The pane has no window of its own: it lives inside `shipyard.ts`'s «Герои» tab, so
@@ -15,20 +15,34 @@
  * per-tab builders) and the view state is a plain value (`HeroView`) normalised by a
  * pure `normalizeHeroView`; only `initHeroStaff(host)` holds anything mutable.
  */
-import type { Action, GameState } from '../../packages/shared-core/src/index';
-import { t } from '../../localization/runtime';
+import {
+  moduleAllowed,
+  slotUsage,
+  type Action,
+  type GameState,
+  type ShipSlotType,
+  type SlotCounts,
+} from '../../packages/shared-core/src/index';
+import { t, tData } from '../../localization/runtime';
 import { data } from './prototypeData';
 import { esc, cost, fmtHrs } from './format';
 import { HOUR } from './time';
-import { castHeroAbility, unlockHeroSkill, fitHero } from './actions';
+import {
+  castHeroAbility,
+  unlockHeroSkill,
+  installHeroModule,
+  uninstallHeroModule,
+  equipHeroAbility,
+  unequipHeroAbility,
+} from './actions';
 import { houseDisplayName } from './setupSeats';
 
 type HeroInst = NonNullable<GameState['heroes']>[string];
-export type HeroTab = 'overview' | 'tree' | 'abilities' | 'fittings';
+export type HeroTab = 'overview' | 'tree' | 'abilities' | 'ship';
 type Bag = Record<string, number>;
 
 /** What the pane is showing: which hero is focused, which tab is open, and which
- *  node/fitting dossier is pinned («node:<id>» | «fit:<id>»). Client-only view state. */
+ *  node dossier is pinned («node:<id>»). Client-only view state. */
 export interface HeroView {
   sel: string | null;
   tab: HeroTab;
@@ -104,7 +118,7 @@ export const HERO_CASTABLE = new Set([
 ]);
 // STAFF-1 shape: one focused hero + tabs (Обзор / Дерево / Способности / Фиттинги), a
 // real branch skill-tree with prereq connectors and per-node states, and a tap-to-open
-// dossier that shows what a node/fitting grants BEFORE you buy it.
+// dossier that shows what a node grants BEFORE you buy it.
 
 /** The pane's tabs. A GRID of four pills (2×2), not a strip of equal flex cells: at a
  *  quarter of a phone's width «Способности» had no room and the row read as one grey
@@ -113,7 +127,7 @@ export const HERO_TABS: Array<{ key: HeroTab; label: string; icon: string }> = [
   { key: 'overview', label: 'hero.hq.tab.overview', icon: '◈' },
   { key: 'tree', label: 'hero.hq.tab.tree', icon: '⋔' },
   { key: 'abilities', label: 'hero.hq.tab.abilities', icon: '✦' },
-  { key: 'fittings', label: 'hero.hq.tab.fittings', icon: '▣' },
+  { key: 'ship', label: 'hero.hq.tab.ship', icon: '▣' },
 ];
 
 /** Human short labels for a passive's hook (what the bonus actually does). */
@@ -168,11 +182,12 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
   const bonuses = (hero.passives ?? [])
     .map((p) => `<span class="hx-trait">${esc(heroPassiveLine(p))}</span>`)
     .join('');
-  const slots = def?.slots ?? 0;
-  const used = (hero.fittings ?? []).length;
+  const bays = heroBaysOf(hero);
+  const slots = bays.weapon + bays.defense + bays.utility;
+  const used = (hero.modules ?? []).length;
   const fitPips =
     slots > 0
-      ? `<span class="hx-trait">${t('hero.hq.fittings')} <span class="hx-pips">${'●'.repeat(used)}${'○'.repeat(Math.max(0, slots - used))}</span></span>`
+      ? `<span class="hx-trait">${t('hero.hq.modules')} <span class="hx-pips">${'●'.repeat(used)}${'○'.repeat(Math.max(0, slots - used))}</span></span>`
       : '';
   const ident =
     `<div class="hx-ident${def?.branch === 'psionic' ? ' ps' : ''}">` +
@@ -199,8 +214,8 @@ function heroStaffBodyHtml(state: GameState, me: string, view: HeroView, res: Ba
       ? heroTreeHtml(hero, res)
       : view.tab === 'abilities'
         ? heroAbilitiesHtml(hero, state.time)
-        : view.tab === 'fittings'
-          ? heroFittingsHtml(hero, res)
+        : view.tab === 'ship'
+          ? heroShipHtml(hero)
           : heroOverviewHtml(hero);
 
   const dossier = view.dossier ? heroDossierHtml(hero, view.dossier, res) : '';
@@ -324,64 +339,205 @@ function heroTreeHtml(hero: HeroInst, res: Bag): string {
   return html + `</div>`;
 }
 
-/** The abilities tab — the hero's equipped, castable loadout (cast via the command flow;
- *  ranged casts arm the map, self/aura fire in place). Spawn-markers show as passive perks. */
+/** Skill-slot budget of a hero — the rarity's `skillSlots`, mirroring the core's
+ *  `heroSkillSlots`. Unknown/absent grade degrades to one slot, exactly as there. */
+function skillSlotsOf(hero: HeroInst): number {
+  const grade = hero.grade;
+  if (grade === undefined) return 1;
+  return data.heroGrades[grade]?.skillSlots ?? 1;
+}
+
+/** The hull the hero's ship is made of — mirrors the core's `heroShipUnit`. */
+function heroHullOf(hero: HeroInst): string {
+  return (
+    (hero.archetype !== undefined ? data.heroes[hero.archetype]?.ship.unit : undefined) ?? 'hero'
+  );
+}
+
+/** Module bays of the hero's ship — mirrors the core's `heroModuleSlots`: the hull's own
+ *  typed slots plus the grade's `moduleSlots` bonus (§0.38 — only the main hero has one). */
+function heroBaysOf(hero: HeroInst): SlotCounts {
+  const hull = data.units[heroHullOf(hero)]?.slots;
+  const bonus = hero.grade !== undefined ? data.heroGrades[hero.grade]?.moduleSlots : undefined;
+  return {
+    weapon: (hull?.weapon ?? 0) + (bonus?.weapon ?? 0),
+    defense: (hull?.defense ?? 0) + (bonus?.defense ?? 0),
+    utility: (hull?.utility ?? 0) + (bonus?.utility ?? 0),
+  };
+}
+
+/** What the hero WEARS. Mirrors the core's `equippedOf`, including its legacy fallback:
+ *  no `equipped` field ⇒ an old loadout where owning and wearing were one thing. */
+function wornOf(hero: HeroInst): string[] {
+  if (hero.equipped !== undefined) return hero.equipped;
+  return (hero.abilities ?? []).filter((a): a is string => a !== null);
+}
+
+/**
+ * The abilities tab — SLOTS, and a pool to fill them from (HPR-1.2).
+ *
+ * Reads as the ship loadout does on purpose: a slot is a BAY, the same shape the
+ * shipyard uses for hull modules, so the two screens teach one language instead of two.
+ * Filling one is tap-a-slot → tap-an-item, the interaction the whole app already uses;
+ * dragging is a later layer over exactly this, never instead of it (it is also the only
+ * thing that works from a keyboard).
+ *
+ * Three rules the layout has to keep:
+ *  · the budget is a NUMBER (`2/3`), not only pips — pips stop being countable past
+ *    four and never say how much room is left;
+ *  · an ability that does not fit is shown DIMMED WITH ITS REASON, never hidden —
+ *    hiding it would make the screen lie about what the player owns;
+ *  · spawn-markers are perks, not slots: they ride in the pool and cost nothing to
+ *    carry, because `hero.spawn` reads them from what the hero OWNS.
+ */
 function heroAbilitiesHtml(hero: HeroInst, now: number): string {
   const dead = hero.alive === false;
-  const abilities = (hero.abilities ?? []).filter(
+  const owned = (hero.abilities ?? []).filter(
     (a): a is string => a !== null && !!data.heroAbilities[a],
   );
-  if (!abilities.length) return `<div class="hx-note">${t('hero.abil.empty')}</div>`;
-  let html = '';
-  for (const ab of abilities) {
+  if (!owned.length) return `<div class="hx-note">${t('hero.abil.empty')}</div>`;
+  const worn = wornOf(hero).filter((a) => !!data.heroAbilities[a]);
+  const slots = skillSlotsOf(hero);
+  const free = Math.max(0, slots - worn.length);
+
+  // --- слоты: занятые отсеки + пустые приглашения ---------------------------
+  const bays: string[] = [];
+  for (const ab of worn) {
     const ad = data.heroAbilities[ab]!;
     const cdLeft = Math.max(0, (hero.cooldowns?.[heroCdKey(ad.type)] ?? 0) - now);
-    const action = ad.type.startsWith('spawn_')
-      ? `<span class="hx-badge">${t('hero.abil.deploy-perk')}</span>`
-      : cdLeft > 0
+    const cast =
+      cdLeft > 0
         ? `<span class="hx-badge cd">${t('hero.abil.cooldown', { h: fmtHrs(cdLeft / HOUR) })}</span>`
         : HERO_CASTABLE.has(ad.type)
           ? `<button class="hx-btn" data-hcast="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${(ad.range ?? 0) > 0 ? t('hero.abil.pick-target') : t('hero.abil.activate')}</button>`
           : `<span class="hx-badge">${t('hero.abil.soon')}</span>`;
-    html +=
-      `<div class="hx-row"><div class="hx-grow"><span class="hx-an">${esc(t(ad.name))}</span>` +
+    bays.push(
+      `<div class="hx-bay on"><div class="hx-grow"><span class="hx-an">${esc(t(ad.name))}</span>` +
+        `<div class="hx-note">${esc(t(ad.description ?? ''))}</div></div>` +
+        `<div class="hx-bayact">${cast}` +
+        `<button class="hx-btn ghost" data-hunequip="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${t('hero.slot.remove')}</button>` +
+        `</div></div>`,
+    );
+  }
+  for (let i = 0; i < free; i += 1) {
+    bays.push(`<div class="hx-bay off">${t('hero.slot.empty')}</div>`);
+  }
+
+  // --- пул: чем владеет, но не носит ----------------------------------------
+  const pool = owned.filter((ab) => !worn.includes(ab));
+  let poolHtml = '';
+  for (const ab of pool) {
+    const ad = data.heroAbilities[ab]!;
+    const perk = ad.type.startsWith('spawn_');
+    // Перк слот не занимает — он всегда «при герое», и кнопки надевания у него нет.
+    const action = perk
+      ? `<span class="hx-badge">${t('hero.abil.deploy-perk')}</span>`
+      : free > 0
+        ? `<button class="hx-btn" data-hequip="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${t('hero.slot.equip')}</button>`
+        : `<span class="hx-badge">${t('hero.slot.full')}</span>`;
+    poolHtml +=
+      `<div class="hx-row${perk || free > 0 ? '' : ' dim'}"><div class="hx-grow">` +
+      `<span class="hx-an">${esc(t(ad.name))}</span>` +
       `<div class="hx-note">${esc(t(ad.description ?? ''))}</div></div>${action}</div>`;
   }
-  return html;
+
+  return (
+    `<div class="hx-h">${t('hero.slot.head', { u: worn.length, n: slots })}</div>` +
+    `<div class="hx-bays">${bays.join('')}</div>` +
+    (poolHtml ? `<div class="hx-h">${t('hero.slot.pool')}</div>${poolHtml}` : '')
+  );
 }
 
-/** The fittings tab — slot budget as pips, each fitting a row; tap an installable one to
- *  open its dossier (with the irreversibility warning) before committing a slot. */
-function heroFittingsHtml(hero: HeroInst, res: Bag): string {
-  const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
-  const slots = def?.slots ?? 0;
-  if (slots <= 0) return `<div class="hx-note">${t('hero.fit.none')}</div>`;
-  const fitted = hero.fittings ?? [];
-  let html = `<div class="hx-h">${t('hero.fit.slots', { u: fitted.length, n: slots })}</div>`;
-  for (const [fid, fd] of Object.entries(data.heroFittings)) {
-    const installed = fitted.includes(fid);
-    const grant = fd.grants.ability
-      ? `<span class="hx-g ab">${t('hero.tree.ability')}</span>`
-      : fd.grants.passive
-        ? `<span class="hx-g pa">${t('hero.tree.passive')}</span>`
-        : fd.statMods
-          ? `<span class="hx-g pa">${t('hero.fit.hull')}</span>`
-          : '';
-    const canFit = !installed && fitted.length < slots;
-    const action = installed
-      ? `<span class="hx-badge on">✓ ${t('hero.fit.installed')}</span>`
-      : canFit
-        ? `<span class="hx-cost">${cost(fd.cost, res)}</span>`
-        : `<span class="hx-badge">${t('hero.fit.no-slots')}</span>`;
-    const tap = canFit ? ` data-hfitd="${fid}"` : '';
-    html +=
-      `<div class="hx-row"${tap}><div class="hx-grow"><span class="hx-an">${esc(t(fd.name))}</span>` +
-      `<div class="hx-note">${esc(t(fd.description ?? ''))}</div></div>${grant}${action}</div>`;
+/** Bay-kind label per slot category. A literal map, not `t(`hero.ship.bay.${slot}`)`:
+ *  the localisation gate scans for LITERAL keys, so a computed one reads as an orphan
+ *  translation and the build goes red — and rightly, since nothing could prove it exists. */
+const BAY_KEY: Record<ShipSlotType, string> = {
+  weapon: 'hero.ship.bay.weapon',
+  defense: 'hero.ship.bay.defense',
+  utility: 'hero.ship.bay.utility',
+};
+
+/** One line describing a module: its stat deltas. `ModuleDef` carries no description —
+ *  and does not need one here, since what a bay does to the ship IS its numbers. */
+function moduleLine(id: string): string {
+  const md = data.modules[id];
+  if (!md) return '';
+  return Object.entries(md.effects.stats)
+    .map(([k, v]) => `${tData(k)} ${v > 0 ? '+' : ''}${v}`)
+    .join(' · ');
+}
+
+/**
+ * The ship tab — the hero's HARDWARE (HPR-1.5.2/1.5.4). The SAME bay idiom as the skill
+ * slots next door, because it now really is the same mechanism: ordinary ship modules in
+ * typed bays, gated by the same `canInstall`. Two screens in one language.
+ *
+ * What differs from the skills tab is what the DATA differs in, nothing else:
+ *  · bays are TYPED, so a free bay says which kind it is — «свободен» alone would lie
+ *    when the free slot is a gun mount and the player is holding an engine;
+ *  · a module that cannot go in is dimmed WITH ITS REASON (wrong hull / no bay), never
+ *    hidden — the same rule as the ability pool;
+ *  · refit happens between deployments: a hero in the field is shown its bays read-only
+ *    with the reason, because the core refuses it (`E_HERO_DEPLOYED`) and a button that
+ *    only ever fails is worse than no button.
+ */
+function heroShipHtml(hero: HeroInst): string {
+  const bays = heroBaysOf(hero);
+  const total = bays.weapon + bays.defense + bays.utility;
+  if (total <= 0) return `<div class="hx-note">${t('hero.ship.none')}</div>`;
+  const hull = heroHullOf(hero);
+  const hullDef = data.units[hull];
+  const installed = (hero.modules ?? []).filter((m) => !!data.modules[m]);
+  const deployed = hero.fleetId !== undefined;
+  const used = slotUsage(installed, data);
+  const free = (c: ShipSlotType): number => Math.max(0, bays[c] - used[c]);
+
+  const rows: string[] = [];
+  for (const mid of installed) {
+    const md = data.modules[mid]!;
+    const off = deployed
+      ? `<span class="hx-badge">${t('hero.ship.deployed')}</span>`
+      : `<button class="hx-btn ghost" data-huninstall="${hero.id}" data-mod="${mid}">${t('hero.slot.remove')}</button>`;
+    rows.push(
+      `<div class="hx-bay on"><div class="hx-grow"><span class="hx-an">${esc(tData(md.name))}</span>` +
+        `<div class="hx-note">${esc(moduleLine(mid))}</div></div>` +
+        `<div class="hx-bayact"><span class="hx-g pa">${t(BAY_KEY[md.slot])}</span>${off}</div></div>`,
+    );
   }
-  return html;
+  // Пустые отсеки называют СВОЙ тип: «свободен» без типа врал бы, когда свободна
+  // оружейная ячейка, а игрок держит в руках двигатель.
+  for (const c of ['weapon', 'defense', 'utility'] as ShipSlotType[])
+    for (let i = 0; i < free(c); i += 1)
+      rows.push(`<div class="hx-bay off">${t('hero.ship.empty', { k: t(BAY_KEY[c]) })}</div>`);
+
+  let poolHtml = '';
+  for (const [mid, md] of Object.entries(data.modules)) {
+    if (installed.includes(mid)) continue;
+    const allowed = hullDef !== undefined && moduleAllowed(hull, hullDef, md);
+    const fits = allowed && free(md.slot) > 0;
+    const action = !allowed
+      ? `<span class="hx-badge">${t('hero.ship.wrong-hull')}</span>`
+      : deployed
+        ? `<span class="hx-badge">${t('hero.ship.deployed')}</span>`
+        : fits
+          ? `<button class="hx-btn" data-hinstall="${hero.id}" data-mod="${mid}">${t('hero.slot.equip')}</button>`
+          : `<span class="hx-badge">${t('hero.ship.no-bay')}</span>`;
+    poolHtml +=
+      `<div class="hx-row${fits && !deployed ? '' : ' dim'}"><div class="hx-grow">` +
+      `<span class="hx-an">${esc(tData(md.name))}</span>` +
+      `<div class="hx-note">${esc(moduleLine(mid))}</div></div>` +
+      `<span class="hx-g pa">${t(BAY_KEY[md.slot])}</span>${action}</div>`;
+  }
+
+  return (
+    `<div class="hx-h">${t('hero.ship.slots', { u: installed.length, n: total })}</div>` +
+    (deployed ? `<div class="hx-note">${t('hero.ship.refit-docked')}</div>` : '') +
+    `<div class="hx-bays">${rows.join('')}</div>` +
+    (poolHtml ? `<div class="hx-h">${t('hero.slot.pool')}</div>${poolHtml}` : '')
+  );
 }
 
-/** The overview tab — archetype line, a stat strip (abilities / tree progress / fittings)
+/** The overview tab — archetype line, a stat strip (abilities / tree progress / ship bays)
  *  and the hero's live passive bonuses. */
 function heroOverviewHtml(hero: HeroInst): string {
   const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
@@ -395,7 +551,10 @@ function heroOverviewHtml(hero: HeroInst): string {
     `<div class="hx-ov">` +
     `<div class="hx-ovc"><b>${abil}</b><span>${t('hero.stat.abilities')}</span></div>` +
     `<div class="hx-ovc"><b>${learned}/${treeTotal}</b><span>${t('hero.stat.tree-nodes')}</span></div>` +
-    `<div class="hx-ovc"><b>${(hero.fittings ?? []).length}/${def?.slots ?? 0}</b><span>${t('hero.stat.fittings')}</span></div>` +
+    `<div class="hx-ovc"><b>${(hero.modules ?? []).length}/${(() => {
+      const b = heroBaysOf(hero);
+      return b.weapon + b.defense + b.utility;
+    })()}</b><span>${t('hero.stat.modules')}</span></div>` +
     `</div>`;
   const bonuses = (hero.passives ?? [])
     .map(
@@ -407,8 +566,10 @@ function heroOverviewHtml(hero: HeroInst): string {
   return html;
 }
 
-/** The dossier card — what the tapped node/fitting grants, its prereqs and price, and the
- *  commit button (a node's «Изучить», a fitting's irreversible «Установить»). */
+/** The dossier card — what the tapped skill node grants, its prereqs and price, and the
+ *  commit button («Изучить»). Modules need no such card: installing one is reversible,
+ *  so it commits straight from the pool row — a permanent choice earned the extra tap,
+ *  a reversible one does not. */
 function heroDossierHtml(hero: HeroInst, dossier: string, res: Bag): string {
   const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
   const dead = hero.alive === false;
@@ -453,35 +614,6 @@ function heroDossierHtml(hero: HeroInst, dossier: string, res: Bag): string {
       `</div>`
     );
   }
-  if (kind === 'fit') {
-    const fd = data.heroFittings[id];
-    if (!fd) return '';
-    const fitted = hero.fittings ?? [];
-    const slots = def?.slots ?? 0;
-    const gAb = fd.grants.ability ? data.heroAbilities[fd.grants.ability] : undefined;
-    const give = gAb
-      ? `<div class="hx-dgl">${t('hero.tree.grants-ability')}</div><div class="hx-dgv">${esc(t(gAb.name))}</div><div class="hx-note">${esc(t(gAb.description ?? ''))}</div>`
-      : fd.grants.passive
-        ? `<div class="hx-dgl">${t('hero.tree.grants-passive')}</div><div class="hx-dgv">${esc(heroPassiveLine(fd.grants.passive))}</div>`
-        : fd.statMods
-          ? `<div class="hx-dgl">${t('hero.fit.hull-mod')}</div><div class="hx-dgv">${esc(
-              Object.entries(fd.statMods)
-                .map(([k, v]) => `${k} +${v}`)
-                .join(', '),
-            )}</div>`
-          : '';
-    const canBuy =
-      !fitted.includes(id) && fitted.length < slots && affordable(res, fd.cost) && !dead;
-    return (
-      `<div class="hx-dossier">` +
-      `<div class="hx-dh"><span class="hx-dnm">${esc(t(fd.name))}</span>${close}</div>` +
-      (give ? `<div class="hx-give">${give}</div>` : '') +
-      `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.cost')}</span><span class="hx-cost">${cost(fd.cost, res)}</span></div>` +
-      `<div class="hx-warn">${t('hero.fit.permanent')}</div>` +
-      `<button class="hx-dbtn danger" data-hfit="${hero.id}" data-fit="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.fit.install')} · ${cost(fd.cost, res)}</button>` +
-      `</div>`
-    );
-  }
   return '';
 }
 /** What the hero staff needs from the match screen. */
@@ -517,7 +649,7 @@ export function initHeroStaff(host: HeroStaffHost): {
   };
 
   const click = (tg: HTMLElement): 'repaint' | 'close' | null => {
-    // STAFF-1 view state: focus a hero / switch tab / open-close the node·fitting dossier.
+    // STAFF-1 view state: focus a hero / switch tab / open-close the node dossier.
     const selBtn = tg.closest('[data-hsel]') as HTMLElement | null;
     if (selBtn) {
       view = { ...view, sel: selBtn.dataset.hsel!, dossier: null };
@@ -531,11 +663,6 @@ export function initHeroStaff(host: HeroStaffHost): {
     const nodeBtn = tg.closest('[data-hnode]') as HTMLElement | null;
     if (nodeBtn) {
       view = { ...view, dossier: `node:${nodeBtn.dataset.hnode!}` };
-      return 'repaint';
-    }
-    const fitdBtn = tg.closest('[data-hfitd]') as HTMLElement | null;
-    if (fitdBtn) {
-      view = { ...view, dossier: `fit:${fitdBtn.dataset.hfitd!}` };
       return 'repaint';
     }
     if (tg.closest('[data-hdclose]')) {
@@ -576,10 +703,30 @@ export function initHeroStaff(host: HeroStaffHost): {
       view = { ...view, dossier: null }; // the node is bought — dismiss its dossier
       return 'repaint';
     }
-    const fitBtn = tg.closest('[data-hfit]') as HTMLElement | null;
-    if (fitBtn) {
-      host.order(fitHero(host.me(), fitBtn.dataset.hfit!, fitBtn.dataset.fit!));
-      view = { ...view, dossier: null }; // the fitting is installed — dismiss its dossier
+    const equipBtn = tg.closest('[data-hequip]') as HTMLElement | null;
+    if (equipBtn) {
+      host.order(equipHeroAbility(host.me(), equipBtn.dataset.hequip!, equipBtn.dataset.ab!));
+      return 'repaint';
+    }
+    const unequipBtn = tg.closest('[data-hunequip]') as HTMLElement | null;
+    if (unequipBtn) {
+      host.order(
+        unequipHeroAbility(host.me(), unequipBtn.dataset.hunequip!, unequipBtn.dataset.ab!),
+      );
+      return 'repaint';
+    }
+    const installBtn = tg.closest('[data-hinstall]') as HTMLElement | null;
+    if (installBtn) {
+      host.order(
+        installHeroModule(host.me(), installBtn.dataset.hinstall!, installBtn.dataset.mod!),
+      );
+      return 'repaint';
+    }
+    const uninstallBtn = tg.closest('[data-huninstall]') as HTMLElement | null;
+    if (uninstallBtn) {
+      host.order(
+        uninstallHeroModule(host.me(), uninstallBtn.dataset.huninstall!, uninstallBtn.dataset.mod!),
+      );
       return 'repaint';
     }
     return null;

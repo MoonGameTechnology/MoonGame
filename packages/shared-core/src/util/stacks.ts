@@ -67,12 +67,25 @@ export function sumUnitStat(stacks: readonly UnitStack[], data: GameData, stat: 
  *  them pro-rata — copying the whole pool onto both halves would duplicate hull
  *  that combat then mints into extra ships. The loadout rides onto the taken stack
  *  so a routine split never strips paid modules. Used by fleet-formation actions
- *  (`fleet.split`) to peel ships off a fleet or a planet's garrison. */
-export function takeFromStacks(src: UnitStack[], unit: string, count: number): UnitStack[] {
+ *  (`fleet.split`) to peel ships off a fleet or a planet's garrison.
+ *
+ *  `modules` narrows the take to ONE loadout (FSPLIT-1): a loadout is part of a
+ *  stack's identity (SM-0.3), so "two cruisers" is ambiguous the moment the same
+ *  hull flies both fitted and bare — this is how a caller says WHICH two. Omitted =
+ *  any loadout, first stack first (the historical behaviour every existing caller
+ *  relies on); `[]` is not "any", it addresses the BARE stacks. */
+export function takeFromStacks(
+  src: UnitStack[],
+  unit: string,
+  count: number,
+  modules?: readonly string[],
+): UnitStack[] {
+  const wantKey = modules === undefined ? null : loadoutKey(modules);
   let remaining = count;
   const taken: UnitStack[] = [];
   for (const st of src) {
     if (st.unit !== unit || remaining <= 0) continue;
+    if (wantKey !== null && loadoutKey(st.modules) !== wantKey) continue;
     const move = Math.min(st.count, remaining);
     remaining -= move;
     const frac = move / st.count; // share of the pools that leaves with the taken ships

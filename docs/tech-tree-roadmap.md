@@ -7,7 +7,7 @@
 > (сбрасывается с матчем, GDD §5.1), детерминированное, читается снапшотом при старте
 > (GDD §5.2). Дерево — **бэкбон анлоков** всего контента (юниты/здания/модули по ветке).
 > Парные доки: `technology`-модуль/`schemas.ts` (TechnologyDef), `gdd.md` §5,
-> `account-level.md` (мета: какие узлы доступны), `squadrons`/`missiles`/`shields`-роадмапы
+> `account-level.md` (мета: какие узлы доступны), `shuttles`/`missiles`/`shields`-роадмапы
 > (что ветки открывают), `mechanics-roadmap.md`. Формат — кирпичики. Зоны: `[core]`·`[data]`·`[cli]`.
 
 ---
@@ -20,7 +20,7 @@
 на игроке; снапшот при старте.
 
 **✅ Уже добавлено (в коде):**
-- **5 веток** (`branch`): `ground` · `space` · `squadron` · `missile` · `command` — вкладки UI = ветки.
+- **5 веток** (`branch`): `ground` · `space` · `shuttle` · `missile` · `command` — вкладки UI = ветки.
   ✅ уже в коде: `schemas.ts` (`branch` enum из 5 значений, default `space`), `data/technologies.json` (узлы несут ветку).
 - **День-гейт** (`dayGate`): технология **доступна к исследованию только с дня N** сессии
   (мировое время, timeScale-масштаб) — пейсинг эпох, нельзя зарашить всё в начале.
@@ -39,7 +39,7 @@
 ## Статус реализации (что уже в коде, PR #66)
 
 **✅ Зашиплено** (`technology`-модуль / `schemas.ts` / `index.ts`):
-- **TT-0.1 ветки** — `branch` (`ground`|`space`|`squadron`|`missile`|`command`, default `space`); 19 нод размечены по всем 5 веткам.
+- **TT-0.1 ветки** — `branch` (`ground`|`space`|`shuttle`|`missile`|`command`, default `space`); 19 нод размечены по всем 5 веткам.
 - **TT-0.2 день-гейт** — `dayGate`; проверка по мировому клоку: `state.time − (startedAt ?? 0) ≥ dayGate·MS_PER_DAY` — совпадает с «Day N» матч-браузера (`matchRegistry`); добавлен якорь `GameState.startedAt`.
 - **TT-0.3 условия** — курируемый каталог `TechnologyConditionSchema` (`z.discriminatedUnion`): `own_sectors`/`has_building`/`controls_planet_type`/`has_unit` (count-порог `min`, default 1) + `has_scientist {branch?, minLevel?}` (учёный) — **балансируется чистыми данными**. Новый тип = 1 вариант схемы + 1 `case` (пропуск `case` = ошибка компиляции через `never`-guard).
 - **TT-1.1 правило доступности** — чистая **`technologyLock(def, state, playerId, data)`** = prereqs → день-гейт → условия; отдаёт первый непройденный гейт стабильным кодом (`E_PREREQUISITE`/`E_TOO_EARLY`/`E_CONDITIONS_UNMET`) или `null`. Экспортирована для будущего UI/action-слоя («что доступно и почему нет»).
@@ -48,13 +48,13 @@
 - **TT-4 учёный** — `ScientistDef`-каталог (`data/scientists.json`) + `Player.scientists[]` — совет из 0–2 лидеров (снапшот при сборке через слот-ассайнмент; `E_UNKNOWN_SCIENTIST` fail-secure на старте; приватен в тумане). **TT-4.3 +слот**: `scientist`-модуль → хук `research.slots`. **TT-4.1/4.2 фокус+капстоун**: data-driven условие `has_scientist {branch?, minLevel?}` (качественный доступ, **НЕ % скорости**); `+слот` — INSTEAD-of-фокус opportunity-cost (полимат — branchless).
 
 **✅ Контент-пас эпох + TT-3.1 UI (2026-07-17):** дерево выросло с 6 до **19 видимых нод**
-(размечены все 5 веток; капстоуны на `has_scientist{branch}` — у ground/squadron/missile/
+(размечены все 5 веток; капстоуны на `has_scientist{branch}` — у ground/shuttle/missile/
 command, `void_armadas` — первый узел на `own_sectors`); день-гейты
 `2/3/5/8/12/15` проставлены в обоих бандлах.
 ⚠️ **«Все 5 веток живые» — это утверждение оказалось неверным** (разбор BAL-6, замер
 `selfplay 300`): каталог учёных несёт три записи на пять веток (`overseer:command`,
 `void_admiral:space`, `polymath` без ветки), поэтому капстоуны `planetary_bastions`
-(ground), `ace_programs` (squadron) и `saturation_barrage` (missile) гейтятся учёным
+(ground), `ace_programs` (shuttle) и `saturation_barrage` (missile) гейтятся учёным
 ветки, которого НЕТ в каталоге, и недостижимы ни для кого. Достроить ростер — **BAL-13**
 в `backlog.md`; там же **BAL-12** про то, почему замер этот слой вообще не видит.
 
@@ -70,7 +70,7 @@ command, `void_armadas` — первый узел на `own_sectors`); день-
 ## Фаза 0 · Модель данных (расширение схемы) `[data][core]`
 
 ### TT-0.1 · Ветки `branch` `[data][core]` ✅ — S
-**Подзадачи:** поле `branch` (`ground`|`space`|`squadron`|`missile`) на `TechnologyDef`; разложить
+**Подзадачи:** поле `branch` (`ground`|`space`|`shuttle`|`missile`) на `TechnologyDef`; разложить
 `technologies.json` по 4 веткам; вкладки UI маппятся на `branch`. Default-ветка для совместимости.
 **Готово, когда:** каждое техно имеет ветку; дерево группируется по 4 вкладкам; zod.
 **✅ уже в коде:** `schemas.ts` (`branch` enum из 5 значений вкл. `command`, default `space`), `data/technologies.json`
@@ -123,7 +123,7 @@ command, `void_armadas` — первый узел на `own_sectors`); день-
 ## Фаза 3 · UI — 4 вкладки `[cli]`
 
 ### TT-3.1 · Вкладки веток + состояния узлов `[cli]` ✅ — M
-**Подзадачи:** вкладки-ветки (все 5: `space`/`ground`/`squadron`/`missile`/`command`); состояние узла:
+**Подзадачи:** вкладки-ветки (все 5: `space`/`ground`/`shuttle`/`missile`/`command`); состояние узла:
 **заблокировано днём** (показать день N) / **заблокировано условием** (показать условие) /
 **доступно** / **в исследовании** / **изучено**; дерево с prereq-связями.
 **Готово, когда:** видно ветки, гейты по дню/условию и прогресс исследования.

@@ -22,7 +22,7 @@ import {
   hashGameDataBundle,
   heroModule,
   heroEffectsModule,
-  squadronModule,
+  shuttleModule,
   instantRepairModule,
   interceptModule,
   marketModule,
@@ -143,7 +143,7 @@ export const DEV_MODULES: GameModule[] = [
   armyModule,
   fleetOpsModule, // fleet.launch/merge/split: garrison → mobile fleet, the missing link
   autoRallyModule, // CONV-10: построенный корабль сам уходит на орбиту в RALLY-флот (BF-29)
-  squadronModule, // SQ: free-space movement for squadrons (strike/return off the lane graph)
+  shuttleModule, // SQ: free-space movement for shuttles (strike/return off the lane graph)
   capitalModule, // capital.designate: re-point the hero respawn anchor
   standingOrdersModule, // order.auto/order.scramble/order.chain: standing-order intent storage
   instantRepairModule, // fleet.instantRepair: paid-in-credits hull top-up, anywhere
@@ -177,8 +177,13 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '9'; // CORE-PARITY: heroEffects/steward/espionage/
-// effects внесены в граф — канонический сервер их не грузил, хотя прототип грузил.
+export const MODULE_MANIFEST_VERSION = '10'; // SHU-0.1: эскадрильи → челноки — модуль
+// `squadron` переименован в `shuttle` вместе с типами своих действий (`shuttle.strike` /
+// `shuttle.return`). Членство и порядок графа не изменились, но ИМЕНА, которые матч
+// пишет в свою историю, изменились: матч, начатый на манифесте 9, содержит действия
+// `squadron.*`, для которых в графе 10 обработчика больше нет. Отказ загрузки — честный
+// исход; тихо прочитать старую книгу новым словарём — нет. (До 9: CORE-PARITY —
+// heroEffects/steward/espionage/effects внесены в граф.)
 
 export interface DevMatchOptions {
   /** Match/room id (default `'dev'`). Distinct ids let a registry hold many matches. */

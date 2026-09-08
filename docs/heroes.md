@@ -2,9 +2,9 @@
 
 > Дизайн-док. Реализация дробится на кирпичики — см. **Блок HERO** в `backlog.md`.
 > **Реализовано и на main** (не скелет): data-driven диспетчер `hero.ability` +
-> `hero.spawn`/`hero.skill.unlock`/`hero.fit` (`modules/hero.ts`), провайдеры `hero.effect.*`
+> `hero.spawn`/`hero.skill.unlock`/`hero.install` (`modules/hero.ts`), провайдеры `hero.effect.*`
 > (`heroEffects.ts`), контент в `data/heroes.json`/`heroAbilities.json`/`heroPassives.json`/
-> `heroFittings.json`/`heroSkillTrees.json`, предматчевый ростер (`buildFromMap`). Этот
+> `heroSkillTrees.json`/`heroGrades.json`, предматчевый ростер (`buildFromMap`). Этот
 > документ — исходный дизайн, «во что оно выросло и почему именно так»; ранний скелет
 > (PR #31, три хардкод-способности) давно поглощён.
 
@@ -60,7 +60,8 @@ interface Hero {
   archetype: string;          // -> data/heroes.json
   branch?: 'transhuman' | 'psionic';
   fleetId?: FleetId;          // корабль, которым герой управляет сейчас; undefined = мёртв/не заспавнен
-  fittings: string[];         // -> data/heroFittings.json (слоты корабля)
+  modules: string[];          // -> data/modules.json (отсеки корабля героя, HPR-1.5.2)
+  equipped: string[];         // надетые скиллы (бюджет от редкости, HPR-1.2)
   skills: string[];           // разблокированные узлы дерева
   cooldowns: Record<string, number>; // per-ability readyAt (ms), как уже сделано
   respawnAt?: number;         // если мёртв: время, когда можно зареспаунить
@@ -87,8 +88,14 @@ interface Hero {
   владение/живость/дальность/кулдаун/стоимость и диспатчит по `type`.
 - **`data/heroPassives.json`** — пассивки: `{ hook, scope, params }` (напр.
   `hook:'fleet.speed', scope:'ownFleetsNear', params:{bonus:0.1}}` — баф усиления флота).
-- **`data/heroFittings.json`** — компоненты корабля: `{ statMods{}, grants?{ ability?|passive? } }` (без отдельного `slot` — общий слот-бюджет архетипа; `grants` — объект)
-  (настройка самого корабля: статы / выдаёт способность).
+- **Железо корабля — `data/modules.json`**, те же модули, что у любого корпуса. Отдельного
+  каталога «фиттингов» больше НЕТ: он был снят в `HPR-1.5.3/1.5.4` по резолюции владельца
+  2026-09-07 (§0.35 роадмапа). У героя есть КОРАБЛЬ (железо) — это модули, живой шов
+  `effectiveStats` с `SHIP-3`, — и есть ОН САМ (что умеет) — это скиллы. `heroFittings`
+  стоял между двумя осями и дублировал обе: его `statMods` был вторым, неподключённым швом
+  статов рядом с работающим, а два из трёх `grants` повторяли узлы дерева (`psi_veil` →
+  `scan`, `void_attunement` → `rally_beacon`); третья запись, `ablative_plating`, была
+  мёртвой копией настоящего модуля с тем же id.
 - **`data/heroSkillTrees.json`** — две ветки (`transhuman` / `psionic`): узлы
   `{ requires[], grants: { ability? | passive? } }` —
   «дерево = бонусы к способностям».
@@ -109,8 +116,10 @@ interface Hero {
   `path.create`/`annihilate` переезжают сюда как **типы-эффекты в данных**.
 - **`hero.move`** — **сохранено** (`hero.ts` `onAction('hero.move')`): телепорт-редеплой для
   героя-без-корабля; для героя-на-корабле движение идёт обычным `fleet.move`.
-- **`hero.fit {heroId, slot, fitting}` / `hero.skill.unlock {heroId, node}`** — настройка
-  корабля и прокачка дерева (валидация слотов/`requires`/ветки; обычно вне боя).
+- **`hero.install` / `hero.uninstall {heroId, moduleId}` · `hero.skill.unlock {heroId, node}`**
+  — переоснащение корабля и прокачка дерева. Бюджет отсеков — корпус плюс прибавка ступени
+  (§0.38), гейт — общий `canInstall`; переоснащение только вне поля (`E_HERO_DEPLOYED`),
+  правила «где, почём, сколько ждать» ставит `HPR-1.6`.
 - **Пассивки → хуки**: при сборке движок навешивает из данных вклад в `fleet.speed` /
   `combat.damage` / `economy.production` по `scope` (свой флот рядом, гарнизон мира и т.п.).
 - **`on('fleet.destroyed')`** → смерть героя + респаун-кулдаун (см. выше),
