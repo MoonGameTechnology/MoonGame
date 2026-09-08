@@ -603,8 +603,18 @@ jobs:
         continue-on-error: true
         run: |
           set -u
-          refs=$(grep -hE '^[[:space:]]+image: ' deploy/docker-compose.yml deploy/docker-compose.tls.yml |
-            awk '{print $2}' | sort -u)
+          # SEC-34. Ссылки берутся из ДВУХ мест: compose (сторонние образы прода) и
+          # `Dockerfile` (базы НАШЕГО образа). Раньше шаг читал только первое, и пины
+          # `Dockerfile` были ровно тем же слепым пятном, каким до SEC-18 были пины
+          # compose: протухание невидимо, потому что Trivy тянет замороженный дайджест и
+          # отчёт не меняется. Поймано на себе — пин distroless отставал на пересборку,
+          # и заметить это было нечем.
+          refs=$(
+            { grep -hE '^[[:space:]]+image: ' deploy/docker-compose.yml deploy/docker-compose.tls.yml |
+                awk '{print $2}'
+              grep -hE '^FROM[[:space:]]' Dockerfile | awk '{print $2}'
+            } | sort -u
+          )
           stale=0
           for ref in $refs; do
             # Ссылка без дайджеста этот шаг не касается: её «свежесть» бессмысленна,
@@ -612,33 +622,54 @@ jobs:
             case "$ref" in *@sha256:*) ;; *) echo "  $ref — без дайджеста, пропуск"; continue ;; esac
             pinned=${ref#*@}
             namever=${ref%@*}
-            repo=${namever%:*}
-            tag=${namever##*:}
-            # Официальные образы (`caddy`) живут в library/, остальные — как записаны.
-            case "$repo" in */*) path="$repo" ;; *) path="library/$repo" ;; esac
-            tok=$(curl -s --max-time 30 "https://auth.docker.io/token?service=registry.docker.io&scope=repository:${path}:pull" |
-              sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+            # Хост реестра отделяем от имени: первый сегмент считается хостом ТОЛЬКО если
+            # похож на домен (точка или порт). Иначе `distroless/nodejs22-debian13` из
+            # `gcr.io/...` и `library/postgres` неразличимы, и запрос уходит не туда.
+            first=${namever%%/*}
+            case "$namever" in
+              */*)
+                case "$first" in
+                  *.* | *:*) host=$first; rest=${namever#*/} ;;
+                  *) host=registry-1.docker.io; rest=$namever ;;
+                esac
+                ;;
+              *) host=registry-1.docker.io; rest=$namever ;;
+            esac
+            repo=${rest%:*}
+            case "$rest" in *:*) tag=${rest##*:} ;; *) tag=latest ;; esac
+            # Accept перечисляет и OCI, и docker-схемы — без него реестр отдаст дайджест
+            # другой (legacy) схемы, и сверка соврёт.
+            accept='application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json,application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json'
             # HEAD по тегу: реестр отдаёт дайджест в Docker-Content-Digest, качать
-            # манифест целиком не нужно. Accept перечисляет и OCI, и docker-схемы —
-            # без него реестр отдаст дайджест другой (legacy) схемы, и сверка соврёт.
-            now=$(curl -sI --max-time 30 -H "Authorization: Bearer $tok" \
-              -H 'Accept: application/vnd.oci.image.index.v1+json,application/vnd.docker.distribution.manifest.list.v2+json,application/vnd.oci.image.manifest.v1+json,application/vnd.docker.distribution.manifest.v2+json' \
-              "https://registry-1.docker.io/v2/${path}/manifests/${tag}" |
-              tr -d '\r' | sed -n 's/^[Dd]ocker-[Cc]ontent-[Dd]igest: //p')
+            # манифест целиком не нужно. Docker Hub требует анонимный токен, gcr.io — нет.
+            if [ "$host" = registry-1.docker.io ]; then
+              case "$repo" in */*) path="$repo" ;; *) path="library/$repo" ;; esac
+              tok=$(curl -s --max-time 30 "https://auth.docker.io/token?service=registry.docker.io&scope=repository:${path}:pull" |
+                sed -n 's/.*"token":"\([^"]*\)".*/\1/p')
+              now=$(curl -sI --max-time 30 -H "Authorization: Bearer $tok" -H "Accept: $accept" \
+                "https://${host}/v2/${path}/manifests/${tag}" |
+                tr -d '\r' | sed -n 's/^[Dd]ocker-[Cc]ontent-[Dd]igest: //p')
+            else
+              path="$repo"
+              now=$(curl -sI --max-time 30 -H "Accept: $accept" \
+                "https://${host}/v2/${path}/manifests/${tag}" |
+                tr -d '\r' | sed -n 's/^[Dd]ocker-[Cc]ontent-[Dd]igest: //p')
+            fi
+            label="${host}/${path}:${tag}"
             if [ -z "$now" ]; then
               # Неразрешившийся тег — НЕ «свежо»: молчание тут читалось бы как успех.
-              echo "::warning::${repo}:${tag} — не удалось разрешить тег в реестре, свежесть пина НЕ проверена"
+              echo "::warning::${label} — не удалось разрешить тег в реестре, свежесть пина НЕ проверена"
               continue
             fi
             if [ "$now" = "$pinned" ]; then
-              echo "  ${repo}:${tag} — пин актуален (апстрим не пересобирал)"
+              echo "  ${label} — пин актуален (апстрим не пересобирал)"
             else
-              echo "  ${repo}:${tag} — ПИН УСТАРЕЛ: тег указывает на ${now}, у нас ${pinned}"
+              echo "  ${label} — ПИН УСТАРЕЛ: тег указывает на ${now}, у нас ${pinned}"
               stale=1
             fi
           done
           if [ "$stale" = 1 ]; then
-            echo "::warning::Апстрим пересобрал образ прода. Обновите дайджест в deploy/docker-compose*.yml (docs/security/image-pinning.md) и перечитайте запись триажа по caddy в docs/security/pipeline.md — часть открытых CVE могла закрыться."
+            echo "::warning::Апстрим пересобрал образ. Обновите дайджест там, где он записан — deploy/docker-compose*.yml (сторонние образы прода) или Dockerfile (базы нашего образа), см. docs/security/image-pinning.md — и перечитайте записи триажа в docs/security/pipeline.md: часть открытых CVE могла закрыться."
           fi
       - name: trivy image — postgres/caddy referenced by deploy/
         id: scan
