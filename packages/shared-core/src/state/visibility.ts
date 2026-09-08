@@ -478,6 +478,11 @@ function project(
   for (const planet of Object.values(view.planets)) {
     if (planet.owner === viewerId || identify.has(planet.id) || spiedPlanets.has(planet.id))
       continue;
+    // Ангар чужого мира не виден НИКОГДА (SHU-1.1): челнок стоит внутри порта, а не на
+    // орбите — снаружи видно здание, но не то, сколько машин в нём. Единственное
+    // исключение выше по функции: шпионаж (`spiedPlanets`) вскрывает мир целиком и
+    // сюда не доходит.
+    delete planet.hangar;
     const snap = memory?.[planet.id];
     if (snap) {
       planet.owner = snap.owner;

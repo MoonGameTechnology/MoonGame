@@ -12,8 +12,9 @@
  * riskier pass. `patrolTarget`/`scrambleOrder` (the auto-scramble driver, CC-4)
  * live in the prototype's `game.ts`, not `shuttle.ts` — out of scope here.
  */
-import type { Fleet } from './gameState';
+import type { Fleet, Planet, UnitStack } from './gameState';
 import type { GameData } from '../data/schemas';
+import { buildingLevel } from '../data/schemas';
 
 /** The shuttle-trait ship stacks aboard a fleet — what a carrier launches as a
  *  strike wing (SQ-1.1: launch-as-unit). Pure. */
@@ -122,4 +123,46 @@ export function shuttleReaches(
 ): boolean {
   const r = shuttleStrikeRange(fleet, data);
   return r > 0 && withinRange(fromPos, targetPos, r);
+}
+
+
+// --- Ангар космопорта (SHU-1.1) ------------------------------------------------------
+//
+// Челнок не флот и не гарнизон: он стоит ВНУТРИ порта. Поэтому вместимость порта — сразу
+// и гейт («можно ли здесь вообще держать челноки»), и предел («сколько»). Отдельного
+// флага «умеет ангар» нет намеренно: порт, вмещающий ноль, ничем не отличается от
+// отсутствующего, а два способа сказать одно и то же расходятся на первой же правке
+// данных.
+
+/** Сколько челноков вмещают СТОЯЩИЕ порты мира: Σ `shuttleBay` их текущих уровней.
+ *  Разрушенное здание (`hp <= 0`) вместимости не даёт — его уже нет. */
+export function shuttleBayAt(planet: Planet, data: GameData): number {
+  let bay = 0;
+  for (const b of planet.buildings) {
+    if (b.hp <= 0) continue;
+    const def = data.buildings[b.type];
+    if (def) bay += buildingLevel(def, b.level).shuttleBay;
+  }
+  return bay;
+}
+
+/** Сколько мест ангара занято сейчас. */
+export function hangarUsed(planet: Planet): number {
+  return (planet.hangar ?? []).reduce((n, st) => n + st.count, 0);
+}
+
+/** Обрезать ангар до вместимости `bay`, начиная с ХВОСТА: раньше построенное переживает
+ *  потерю порта, позже построенное гибнет первым. Порядок здесь — не вкус, а инвариант
+ *  детерминизма: «лишние гибнут» обязано давать один и тот же результат на сервере и в
+ *  реплее, поэтому правило фиксировано и не зависит от обхода объекта. */
+export function trimHangar(stacks: readonly UnitStack[], bay: number): UnitStack[] {
+  let left = Math.max(0, Math.floor(bay));
+  const out: UnitStack[] = [];
+  for (const st of stacks) {
+    if (left <= 0) break;
+    const keep = Math.min(st.count, left);
+    left -= keep;
+    out.push({ ...st, count: keep, ...(st.modules ? { modules: [...st.modules] } : {}) });
+  }
+  return out;
 }

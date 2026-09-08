@@ -38,7 +38,8 @@
     "shipRepair": 0.1,
     "enablesShipConstruction": true,
     "scoreValue": 12,
-    "traits": []
+    "traits": [],
+    "shuttleBay": 6
   },
   "biomass_pit": {
     "name": "Biomass Pit",
@@ -116,7 +117,8 @@
     "shipRepair": 0.05,
     "enablesShipConstruction": true,
     "scoreValue": 6,
-    "traits": []
+    "traits": [],
+    "shuttleBay": 6
   },
   "radar": {
     "name": "Sensor Array I",
@@ -381,7 +383,7 @@
         },
         "buildTimeHours": 18,
         "hp": 40,
-        "healRate": 0.40,
+        "healRate": 0.4,
         "upkeep": {
           "energy": 50
         }
@@ -411,7 +413,6 @@
         "buildTimeHours": 16,
         "hp": 35,
         "enablesGroundConstruction": true,
-        "enablesShuttleConstruction": true,
         "upkeep": {
           "energy": 70
         }
@@ -424,7 +425,6 @@
         "buildTimeHours": 24,
         "hp": 45,
         "enablesGroundConstruction": true,
-        "enablesShuttleConstruction": true,
         "buildSpeedBonus": 0.5,
         "upkeep": {
           "energy": 100

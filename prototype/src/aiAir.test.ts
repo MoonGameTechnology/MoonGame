@@ -27,15 +27,6 @@ function game2(): GameState {
 const only = (actions: Action[], type: string): Action[] => actions.filter((a) => a.type === type);
 const unitsBuilt = (actions: Action[]): string[] =>
   only(actions, 'unit.build').map((a) => (a.payload as { unit: string }).unit);
-const buildingsBuilt = (actions: Action[]): string[] =>
-  only(actions, 'building.construct').map((a) => (a.payload as { building: string }).building);
-const upgraded = (actions: Action[]): string[] =>
-  only(actions, 'building.upgrade').map((a) => (a.payload as { building: string }).building);
-
-const homeOf = (s: GameState, seat: string): string =>
-  Object.values(s.planets).find(
-    (p) => p.owner === seat && p.buildings.some((b) => b.type === 'spaceport'),
-  )!.id;
 
 /** Война + богатая казна: правило должно быть ПО КАРМАНУ, иначе тест мерил бы бедность. */
 function rich(s: GameState, war = true): GameState {
@@ -52,20 +43,6 @@ function rich(s: GameState, war = true): GameState {
   };
 }
 
-/** Кладёт на домашний мир завод нужного уровня. */
-function withFactory(s: GameState, level: number): GameState {
-  const home = homeOf(s, 'p2');
-  return {
-    ...s,
-    planets: {
-      ...s.planets,
-      [home]: {
-        ...s.planets[home]!,
-        buildings: [...s.planets[home]!.buildings, { type: 'factory', level, hp: 25 }],
-      },
-    },
-  };
-}
 
 describe('AI-BAL-4 — артиллерия', () => {
   it('на войне строит `siege` — дальний огонь ведёт само ядро, приказ не нужен', () => {
@@ -81,27 +58,16 @@ describe('AI-BAL-4 — артиллерия', () => {
   });
 });
 
-describe('AI-BAL-4 — эскадрильи: завод → апгрейд → крыло', () => {
-  it('без завода — ставит завод', () => {
-    expect(buildingsBuilt(aiOrders(rich(game2()), 'p2', 'expand', 'strong'))).toContain('factory');
+describe('AI-BAL-4 / SHU-1.1 — челноки строятся в КОСМОПОРТЕ', () => {
+  // Раньше воротами челноков был завод второго уровня («ангар»), и бот вёл длинную
+  // цепочку завод → апгрейд → крыло. С SHU-1.1 челнок живёт в порту, а порт у бота и
+  // так стоит под корабли — цепочка исчезла вместе с воротами.
+  it('порт есть — сильный бот заказывает челнок', () => {
+    expect(unitsBuilt(aiOrders(rich(game2()), 'p2', 'expand', 'strong'))).toContain('interceptor');
   });
 
-  it('завод первого уровня — АПГРЕЙДИТ его (ангар открывается вторым)', () => {
-    const orders = aiOrders(withFactory(rich(game2()), 1), 'p2', 'expand', 'strong');
-    expect(upgraded(orders)).toContain('factory');
-    expect(unitsBuilt(orders)).not.toContain('interceptor'); // рано: ангара ещё нет
-  });
-
-  it('завод второго уровня — строит крыло', () => {
-    expect(
-      unitsBuilt(aiOrders(withFactory(rich(game2()), 2), 'p2', 'expand', 'strong')),
-    ).toContain('interceptor');
-  });
-
-  it('ИГРОВОЙ бот ни завода, ни крыльев не заказывает', () => {
-    const orders = aiOrders(withFactory(rich(game2()), 2), 'p2', 'expand');
-    expect(buildingsBuilt(orders)).not.toContain('factory');
-    expect(unitsBuilt(orders)).not.toContain('interceptor');
+  it('ИГРОВОЙ (слабый) бот челноков не заказывает', () => {
+    expect(unitsBuilt(aiOrders(rich(game2()), 'p2', 'expand'))).not.toContain('interceptor');
   });
 });
 
@@ -118,9 +84,8 @@ describe('AI-BAL-4 — то, что оставлено боту НЕнужным
   });
 
   it('носитель и сенсорный фрегат не заказываются', () => {
-    // `strike_carrier` — носитель без работающего вылета: `shuttle.strike` требует
-    // `fleet.homeBase`, а это поле в игре не выставляет ни один модуль, так что носитель
-    // сейчас лишь дорогой транспорт, дублирующий `dropship`. `sensor_frigate` — глаза, а
+    // `strike_carrier` — носитель без работающего вылета: своя вместимость челноков
+    // появится в SHU-2.1, пока это лишь дорогой транспорт, дублирующий `dropship`. `sensor_frigate` — глаза, а
     // бот читает состояние целиком и туманом не пользуется. Оба ждут своей механики, а не
     // правила бота: строить их «чтобы не были мёртвыми» — подгонка отчёта.
     const orders = unitsBuilt(aiOrders(rich(game2()), 'p2', 'expand', 'strong'));

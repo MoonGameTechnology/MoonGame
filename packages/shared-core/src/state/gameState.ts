@@ -337,6 +337,12 @@ export interface Planet {
   resources: ResourceBag;
   buildings: BuildingInstance[];
   garrison: UnitStack[];
+  /** Shuttles based in the world's spaceport (SHU-1.1). NOT a fleet and NOT part of
+   *  the garrison: a shuttle sits inside the port, never appears in orbit, and takes no
+   *  part in the ground defense of the world. Capacity is the ports' `shuttleBay`; lose
+   *  the port (destroyed or captured) and the shuttles in it are lost with it.
+   *  Undefined/empty = nothing based here. */
+  hangar?: UnitStack[];
   traits: TraitId[];
   /** Cancelled-mid-build construction/upgrade/unit orders, paused and resumable
    *  (see `PausedConstructionSite`). Undefined/empty = nothing paused here. */

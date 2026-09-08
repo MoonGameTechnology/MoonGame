@@ -797,7 +797,7 @@ export const data: GameData = parseGameData({
       ],
     },
     // Factory — builds ground vehicles (tank) and shuttles (interceptor).
-    // enablesGroundConstruction + enablesShuttleConstruction: the gate for
+    // enablesGroundConstruction: the gate for
     // vehicle/shuttle unit.build on this planet.
     factory: {
       name: 'Vehicle Factory',
@@ -813,7 +813,6 @@ export const data: GameData = parseGameData({
           buildTimeHours: 8,
           hp: 35,
           enablesGroundConstruction: true,
-          enablesShuttleConstruction: true,
           upkeep: { energy: 50 },
         },
         {
@@ -821,7 +820,6 @@ export const data: GameData = parseGameData({
           buildTimeHours: 12,
           hp: 45,
           enablesGroundConstruction: true,
-          enablesShuttleConstruction: true,
           buildSpeedBonus: 0.5,
           upkeep: { energy: 70 },
         },
@@ -837,6 +835,9 @@ export const data: GameData = parseGameData({
       hp: 25,
       shipRepair: 0.05,
       enablesShipConstruction: true,
+      // Дом челноков (SHU-1.1): вместимость порта — и гейт постройки, и предел
+      // базирования. Челнок стоит ВНУТРИ порта и на орбите не показывается.
+      shuttleBay: 6,
       scoreValue: 4,
     },
     // radar array — projects a detection radius (in jumps) that grows with its
