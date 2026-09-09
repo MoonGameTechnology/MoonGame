@@ -583,6 +583,11 @@
 | RESIL-5 | ✅ | srv proto | `docs/backlog.md:13118` | Генеральная репетиция: весь стек разом, и |
 | RESIL-6 | ✅ | srv proto | `docs/backlog.md:13153` | Достоверность генералки: настоящая база, |
 | ADDR-7 | ✅ | sec proto | `docs/backlog.md:13263` | Ссылка на партию не пускает по незнанию: |
+| OPS-2 | ✅ | ops sec | `docs/backlog.md:13301` | Обновление доносит до машины новые ключи |
+| REL-6 | ✅ | srv | `docs/backlog.md:13323` | Возврат на своё место мгновенный: перехват вместо |
+| CMB-4 | ⏳ | core | `docs/backlog.md:13338` | Первый раунд боя — на самой встрече, а не через игровой час. |
+| BLD-1 | ⏳ | core proto | `docs/backlog.md:13350` | Очередь строительства: заказы встают в ряд, а не |
+| UI-14 | ⏳ | proto | `docs/backlog.md:13367` | Осмотр чужого флота должен быть находимым. |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |

@@ -28,6 +28,7 @@ const run = promisify(execFile);
 const DEPLOY_DIR = dirname(fileURLToPath(import.meta.url));
 const UPDATE_SH = join(DEPLOY_DIR, 'update.sh');
 const INSTALLER = join(DEPLOY_DIR, 'install-ubuntu.sh');
+const ENV_KEYS_SH = join(DEPLOY_DIR, 'env-keys.sh');
 
 /** Заглушка-исполняемый файл: пишет свой вызов в лог и ведёт себя по сценарию. */
 function stub(binDir, name, body) {
@@ -41,7 +42,7 @@ function stub(binDir, name, body) {
  * `healthFailFirst` — сколько первых проверок `/health` считать провальными
  * (так тест доходит до отката, не дожидаясь реальных таймаутов).
  */
-function sandbox({ verifyExit = 0, healthFailFirst = 0, branch = 'playtest' } = {}) {
+function sandbox({ verifyExit = 0, healthFailFirst = 0, branch = 'playtest', serverEnv = '# stub\n' } = {}) {
   const root = mkdtempSync(join(tmpdir(), 'void-update-'));
   const repo = join(root, 'repo');
   const deploy = join(repo, 'deploy');
@@ -51,9 +52,12 @@ function sandbox({ verifyExit = 0, healthFailFirst = 0, branch = 'playtest' } = 
 
   writeFileSync(join(deploy, 'update.sh'), readFileSync(UPDATE_SH));
   chmodSync(join(deploy, 'update.sh'), 0o755);
-  for (const f of ['docker-compose.yml', 'docker-compose.release.yml', 'server.env']) {
+  // Настоящий, не заглушка: добор ключей — часть проверяемого поведения.
+  writeFileSync(join(deploy, 'env-keys.sh'), readFileSync(ENV_KEYS_SH));
+  for (const f of ['docker-compose.yml', 'docker-compose.release.yml']) {
     writeFileSync(join(deploy, f), '# stub\n');
   }
+  writeFileSync(join(deploy, 'server.env'), serverEnv);
 
   const log = join(root, 'calls.log');
   writeFileSync(log, '');
@@ -98,7 +102,14 @@ exit 0`,
     HEALTH_FAIL_FIRST: String(healthFailFirst),
     HEALTH_TRIES: '1',
   };
-  return { root, repo, deploy, env, readLog: () => readFileSync(log, 'utf8') };
+  return {
+    root,
+    repo,
+    deploy,
+    env,
+    readLog: () => readFileSync(log, 'utf8'),
+    readEnvFile: () => readFileSync(join(deploy, 'server.env'), 'utf8'),
+  };
 }
 
 async function runUpdate(sb, extraEnv = {}) {
@@ -225,5 +236,94 @@ describe('install-ubuntu.sh — механизм обновления больш
   it('хелпер moongame update зовёт файл репозитория, а не копию', () => {
     expect(installer).toContain('$INSTALL_DIR/deploy/update.sh');
     expect(installer).not.toMatch(/bash \$INSTALL_DIR\/update-dev\.sh/);
+  });
+});
+
+/**
+ * OPS-2. Добор ключей `server.env` при обновлении.
+ *
+ * Дефект нашёлся на живом сервере: установщик пишет этот файл РОВНО ОДИН РАЗ и потом
+ * бережно сохраняет, а обновление его только читало. Значит ключ, добавленный в
+ * установщик позже, до развёрнутой машины не доезжал никогда. Так на сервере владельца
+ * потерялись `TIME_SCALE` (мир шёл в реальном времени, постройки по 3–24 часа — на
+ * плейтесте «ничего не происходило») и `AUTH_JWT_SECRET` — а без него сервер стоит
+ * БЕЗ АККАУНТОВ: место в партии берёт любой, кто знает позывной.
+ */
+describe('update.sh — добор недостающих ключей server.env (OPS-2)', () => {
+  it('дописывает ключи, которых в файле нет', async () => {
+    const sb = sandbox({ serverEnv: '# старый файл\nPORT=8788\n' });
+    await runUpdate(sb);
+    const env = sb.readEnvFile();
+    expect(env).toMatch(/^TIME_SCALE=100$/m);
+    expect(env).toMatch(/^GATE=1$/m);
+    expect(env).toMatch(/^SEAT_LOCK=1$/m);
+    // Секрет генерируется, а не берётся из константы: 32 байта hex.
+    expect(env).toMatch(/^AUTH_JWT_SECRET=[0-9a-f]{64}$/m);
+  });
+
+  it('НЕ трогает значение, которое оператор уже выставил', async () => {
+    const sb = sandbox({ serverEnv: 'TIME_SCALE=7\nAUTH_JWT_SECRET=already-mine\n' });
+    await runUpdate(sb);
+    const env = sb.readEnvFile();
+    // Правило 1: существующее значение неприкосновенно — оператор мог настроить руками.
+    expect(env).toMatch(/^TIME_SCALE=7$/m);
+    expect(env).toMatch(/^AUTH_JWT_SECRET=already-mine$/m);
+    expect(env).not.toMatch(/^TIME_SCALE=100$/m);
+  });
+
+  it('НЕ генерирует POSTGRES_PASSWORD, а закрепляет дефолт compose', async () => {
+    // Иначе — `28P01 password authentication failed` на уже созданном томе: том хранит
+    // тот пароль, что действовал при создании. Ровно этот отказ и ловили на живой машине.
+    const sb = sandbox({ serverEnv: '# пусто\n' });
+    await runUpdate(sb);
+    expect(sb.readEnvFile()).toMatch(/^POSTGRES_PASSWORD=void$/m);
+  });
+
+  it('ALLOWED_ORIGINS не угадывает, а предупреждает', async () => {
+    // Правило 3: неверный allowlist отбивает рукопожатие у ВСЕХ — «починка» стала бы
+    // полным отказом. Дыра называется вслух, значение выбирает человек.
+    const sb = sandbox({ serverEnv: '# пусто\n' });
+    const { stdout } = await runUpdate(sb);
+    expect(stdout).toContain('ALLOWED_ORIGINS');
+    expect(sb.readEnvFile()).not.toMatch(/^ALLOWED_ORIGINS=/m);
+  });
+
+  it('говорит вслух, что дописал и чем это грозило', async () => {
+    const sb = sandbox({ serverEnv: '# пусто\n' });
+    const { stdout } = await runUpdate(sb);
+    expect(stdout).toContain('дописаны недостающие ключи');
+    expect(stdout).toContain('БЕЗ АККАУНТОВ');
+  });
+
+  it('на полном файле не дописывает ничего', async () => {
+    const full = [
+      'PORT=8788',
+      'TIME_SCALE=24',
+      'MATCHES=1',
+      'POSTGRES_PASSWORD=secret',
+      'GATE=1',
+      'SEAT_LOCK=1',
+      'AUTH_JWT_SECRET=abc',
+      'ALLOWED_ORIGINS=http://host:8788',
+    ].join('\n');
+    const sb = sandbox({ serverEnv: `${full}\n` });
+    const { stdout } = await runUpdate(sb);
+    expect(stdout).not.toContain('дописаны недостающие ключи');
+    expect(sb.readEnvFile().trim()).toBe(full);
+  });
+
+  it('список ключей и установщик не разъезжаются', () => {
+    // Единственная машинная защита от повторения дефекта: ключ, заведённый в
+    // установщике, обязан быть и в общем списке — иначе он снова не доедет до уже
+    // развёрнутой машины, и узнаем мы об этом опять на живом сервере.
+    const keys = readFileSync(ENV_KEYS_SH, 'utf8')
+      .match(/^ENV_REQUIRED_KEYS="([^"]+)"/m)[1]
+      .split(/\s+/);
+    const installer = readFileSync(INSTALLER, 'utf8');
+    for (const key of keys) {
+      expect(installer, `${key} нет в install-ubuntu.sh`).toMatch(
+        new RegExp(`^${key}=`, 'm'),
+      );
+    }
   });
 });
