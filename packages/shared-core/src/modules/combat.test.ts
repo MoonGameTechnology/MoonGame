@@ -5,12 +5,14 @@ import { combatModule } from './combat';
 import { orbitalModule } from './orbital';
 import { artilleryModule } from './artillery';
 import { interceptModule } from './intercept';
+import { diplomacyModule } from './diplomacy';
 import { movementModule } from './movement';
 import {
   createInitialState,
   type Fleet,
   type GameState,
   type Planet,
+  type Player,
   type UnitStack,
 } from '../state/gameState';
 import { parseGameData, type GameData } from '../data/schemas';
@@ -1432,5 +1434,72 @@ describe('combat — первый раунд на встрече (CMB-4)', () =>
     // Меняется ТОЛЬКО первый залп: ускорять бой целиком владелец не просил, а это был
     // бы уже другой баланс.
     expect(Object.values(onContact().state.battles)[0]?.nextRoundAt).toBe(HOUR);
+  });
+});
+
+
+/**
+ * CMB-5 — вражда началась, а флоты уже рядом.
+ *
+ * Бой заводило только ДВИЖЕНИЕ (прибытие, транзит, перехват) и штурм. Обратный случай —
+ * «стоят мирно, объявили войну» — не заводил ничего: флоты могли простоять на одном узле
+ * сколько угодно. В соло дыры не видно, там покадровый `checkFleetClashes` прототипа
+ * выдаёт `fleet.engage` за игрока; на сервере такого цикла нет. Правило жило в КЛИЕНТЕ.
+ */
+describe('combat — вражда началась: стоящие рядом сходятся сразу (CMB-5)', () => {
+  const seat = (id: string): Player => ({
+    id,
+    name: id,
+    faction: 'x',
+    status: 'active',
+    resources: {},
+  });
+  const peaceful = (): GameState => {
+    const s = baseState(
+      [fleet('A', 'p1', 'X', [['fighter', 2]]), fleet('D', 'p2', 'X', [['fighter', 2]])],
+      [planet('X', null)],
+    );
+    const st: GameState = { ...s, players: { p1: seat('p1'), p2: seat('p2') } };
+    // Пара без записи в `diplomacy` считается воюющей (FFA), поэтому мир объявляем явно —
+    // иначе флоты сцепились бы ещё до объявления и проверять было бы нечего.
+    setStance(st, 'p1', 'p2', 'peace');
+    return st;
+  };
+  const declare = (playerId: string, target: string, stance: string): Action => ({
+    id: `s:${playerId}:d`,
+    type: 'diplomacy.declare',
+    playerId,
+    payload: { target, stance },
+    issuedAt: 0,
+  });
+
+  it('мирно стоящие рядом флоты не дерутся — пока мир', () => {
+    const kernel = createKernel([...combatFamily, diplomacyModule]);
+    const st = peaceful();
+    const idle = okAdvance(kernel.advanceTo(st, ctx(2 * HOUR)));
+    expect(Object.keys(idle.state.battles)).toEqual([]);
+    expect(idle.state.fleets.A?.battleId).toBeUndefined();
+  });
+
+  it('объявление войны заводит бой НЕМЕДЛЕННО, не дожидаясь чьего-то хода', () => {
+    const kernel = createKernel([...combatFamily, diplomacyModule]);
+    const war = okApply(kernel.applyAction(peaceful(), declare('p1', 'p2', 'war'), ctx(0)));
+    const ids = Object.keys(war.state.battles);
+    expect(ids).toHaveLength(1);
+    const battle = war.state.battles[ids[0]!];
+    expect(battle?.nextRoundAt).toBe(0); // и первый залп — на самом объявлении (CMB-4)
+    expect(war.state.fleets.A?.battleId).toBe(ids[0]);
+    expect(war.state.fleets.D?.battleId).toBe(ids[0]);
+    expect(war.events.map((e) => e.type)).toContain('battle.started');
+  });
+
+  it('смягчение стойки боёв не заводит — правило спрашивает состояние, а не событие', () => {
+    const kernel = createKernel([...combatFamily, diplomacyModule]);
+    const st = peaceful();
+    // Встречное согласие на пакт: `diplomacy.changed` придёт, а враждебности нет.
+    const a = okApply(kernel.applyAction(st, declare('p1', 'p2', 'pact'), ctx(0)));
+    const b = okApply(kernel.applyAction(a.state, declare('p2', 'p1', 'pact'), ctx(0)));
+    expect(b.events.map((e) => e.type)).toContain('diplomacy.changed');
+    expect(Object.keys(b.state.battles)).toEqual([]);
   });
 });

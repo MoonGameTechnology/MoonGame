@@ -485,6 +485,36 @@ export const combatModule: GameModule = {
       engageFleets(h, fleetId, at);
     });
 
+    /**
+     * CMB-5. Вражда началась — стоящие рядом флоты сходятся НЕМЕДЛЕННО.
+     *
+     * Бой заводили только ПРИБЫТИЕ (`fleet.arrived`/`fleet.transit`), перехват и штурм.
+     * То есть «встреча» понималась как движение, и оставалась дыра ровно в другую
+     * сторону: флоты уже стоят на одном узле мирно, игрок объявляет войну — и не
+     * происходит НИЧЕГО, пока кто-нибудь не сдвинется. Стой хоть сутки.
+     *
+     * В соло этого не видно: прототип покадрово зовёт `checkFleetClashes`, который
+     * выдаёт `fleet.engage` за игрока. То есть правило было, но жило В КЛИЕНТЕ — а на
+     * сервере такого цикла нет вовсе. Та же болезнь, что у очереди стройки (BLD-1):
+     * соло и сеть играли по разным правилам, и разошлись они молча.
+     *
+     * Стойку здесь не читаем: `engageFleets` спрашивает `isHostile` у СОСТОЯНИЯ, уже
+     * изменённого объявлением. Поэтому смягчение стойки честно ничего не находит, и
+     * отдельной ветки «а вот если мир» заводить не нужно.
+     */
+    api.on('diplomacy.changed', (event, h) => {
+      const { a, b } = event.payload as { a?: unknown; b?: unknown };
+      if (typeof a !== 'string' || typeof b !== 'string') return;
+      // Порядок обхода фиксирован сортировкой: кто из пары окажется атакующим, не
+      // должно зависеть от порядка создания флотов (инвариант детерминизма).
+      for (const id of Object.keys(h.state.fleets).sort()) {
+        const f = h.state.fleets[id];
+        if (!f || (f.owner !== a && f.owner !== b)) continue;
+        if (!f.location || f.movement || f.battleId) continue;
+        engageFleets(h, id, f.location);
+      }
+    });
+
     // The crossing instant arrives (scheduled by the `intercept` module):
     // re-validate (both still on the lane, hostile, alive, free) — a re-route
     // since scheduling makes this a stale no-op — then pin both fleets to the
