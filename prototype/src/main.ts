@@ -237,7 +237,6 @@ import { syncCommanderXp } from './commanderSync';
 import { panelSlackFor } from './panelSlack';
 import { longPressAction, pressIntent } from './pressIntent';
 import { assaultMovers, assaultTargetBlocker, collectBlockers, moveMovers } from './warPrompt';
-import { assaultOrderState, dropsOrder } from './assaultQueue';
 import { laneEnds, warConfirmPlan } from './warOrders';
 import { bakeSignature, needsRebake, ownersSignature } from './staticLayerCache';
 import { clipPolygon, clipRect, provinceSeeds } from './provinceMap';
@@ -1035,7 +1034,6 @@ let assaultAim = false;
  *  условная возможность, и прятать её значило бы заставлять игрока гадать, отчего она
  *  то есть, то нет. Что цель не годится, скажет ядро — одним понятным отказом. */
 let engageAim = false;
-const assaultOnArrival = new Map<string, string>();
 let barrageAim = false; // "Обстрел" armed → next tap picks the artillery's focus target
 // Hero window armed modes: a cast waits for its target world; a deploy waits for the
 // point the hero's ship rises at (own world / own fleet / allied world by markers).
@@ -2855,36 +2853,33 @@ function dispatchAssault(fleetIds: string[], destId: string): void {
       issueAssault(step.id, s.fleets[step.id]?.orbit);
       continue;
     }
-    playerOrder(moveFleet(ME, step.id, destId));
-    assaultOnArrival.set(step.id, destId);
-  }
-}
-/** Fire the one-shot assault orders of fleets that reached their ШТУРМ target
- *  (runs each frame beside autoEngage). Redirected fleets drop the order. */
-function pumpAssaultOrders(): void {
-  if (!assaultOnArrival.size) return;
-  for (const [id, destId] of [...assaultOnArrival]) {
-    const f = s.fleets[id];
-    // Что стало с отложенным приказом — `assaultQueue.ts` (REFM-58): перенаправленный
-    // снимается, бой по прилёте ждут, вставший не в цели протухает.
-    const state = assaultOrderState(f, destId);
-    if (dropsOrder(state)) {
-      assaultOnArrival.delete(id);
-      continue;
-    }
-    if (state !== 'ready' || !f) continue;
-    // RULES-4. Флот на месте — приказ издаётся СЕЙЧАС, поэтому решает ядро, а не
-    // три рукописных условия («захвачен своими / опустел» + отдельно десант). Оно
-    // же покрывает и `E_OWN_PLANET`, и `E_NOT_CAPTURABLE`, и чужой идущий штурм.
-    const code = assaultVerdict(id, f);
-    if (code !== null) {
-      // одно понятное сообщение вместо цикла отказов; приказ снимается в любом случае
-      note(code === 'E_NO_TROOPS' ? t('log.assault.no-troops') : '✖ ' + errText(code), destId);
-      assaultOnArrival.delete(id);
-      continue;
-    }
-    issueAssault(id, f.orbit);
-    assaultOnArrival.delete(id);
+    // ORD-2. Отложенный ШТУРМ уходит в ЯДРО цепочкой приказов «дойти → штурмовать», а не
+    // в локальную карту клиента.
+    //
+    // Раньше здесь было `moveFleet` + запись в `assaultOnArrival`, и сам штурм издавал
+    // покадровый цикл браузера — в ОБОИХ режимах. В сети это значило: перелёт ведёт
+    // сервер, часами реального времени, а решающий приказ ждёт открытой вкладки. Закрыл
+    // вкладку, перезагрузил страницу, оборвалась связь — карта пары исчезла вместе со
+    // страницей, флот прилетал и стоял на орбите вечно. Для игры, которая идёт 24/7 и вся
+    // построена на «отдал приказ и ушёл», это была молчаливая потеря самого дорогого
+    // приказа.
+    //
+    // Цепочки ядра (`order.chain`) для этого уже всё умеют: шаг `assault` сам поднимает
+    // флот на ближнюю орбиту и штурмует, а гоняют цепочки ОБА хоста — сервер
+    // (`runServerStanding` → `serverChainActions`) и соло-драйвер прототипа. То есть
+    // правило переезжает туда, где исполняется, и становится одним на сеть и на соло.
+    //
+    // Что при этом ИЗМЕНИЛОСЬ, и это надо знать: план теперь ПЕРЕЖИВАЕТ перенаправление.
+    // Локальная карта снималась, как только флот получал другой приказ; цепочка — нет,
+    // она возобновится, когда флот освободится. Так ведут себя все планы («Приказ»,
+    // CHAIN-UX), и отменяется он там же — тапом по ◎-бейджу плана. Взамен приказ стал
+    // ВИДИМЫМ: раньше он жил невидимкой в памяти вкладки и молча исчезал.
+    playerOrder(
+      orderChain(ME, step.id, [
+        { kind: 'move', to: destId },
+        { kind: 'assault' },
+      ]),
+    );
   }
 }
 /** As tryMoveGroup, but the target is a point on a lane (continuous order). Either lane
@@ -10097,7 +10092,6 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>): void
   pendingLoads = [];
   aiming = false;
   assaultAim = false;
-  assaultOnArrival.clear();
   merging = false;
   additive = false;
   splitState = null;
@@ -11880,18 +11874,15 @@ function frame(nowReal: number) {
     const target = advanceTarget(s.time, dt, speed, HOUR);
     apply(advance(s, target));
     solo.autoEngage();
-    pumpAssaultOrders();
     solo.checkFleetClashes();
     solo.drivePatrols(); // CC-4: дежурные вылеты бьют контакты в радиусе
     solo.driveChains(); // CC-1: продвинуть цепочки приказов (ждать → курс → штурм/обстрел)
     solo.runAI();
     closeIdleRallies(); // drop the 'rally' tag once a world's build pipeline empties
   }
-  // Aimed ШТУРМ resolves in net too: the server drives fleet travel and the arrival
-  // battle, and the client issues the ground assault once the fleet is parked on the
-  // target world. (Solo pumps it inside the sim block above; in both modes assaultOnArrival
-  // stays empty until a ШТУРМ is actually aimed, so this is a no-op otherwise.)
-  if (NET) pumpAssaultOrders();
+  // ORD-2: отложенного ШТУРМА у клиента больше нет вовсе — он уехал в ядро цепочкой
+  // «дойти → штурмовать», и её гоняют оба хоста (сервер и соло-драйвер). Поэтому
+  // покадрового насоса здесь тоже нет: приказ исполняется, даже когда вкладка закрыта.
   updateGoals(); // ONB-7: tick the first-session checklist off live state (no-op when idle)
   // The orbit spin only advances while the world is actually running (sim ticking, or a
   // live net match), so pausing freezes the ships on their rings instead of drifting on.
