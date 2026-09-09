@@ -2114,7 +2114,7 @@ APK собирается в двух лейнах (matrix в `android.yml`): д�
 economy, movement, hero, heroEffects, orbital, combat, artillery, intercept, captureOnArrival,
 construction, arsenalSync, technology, scientist, steward, army, victory, fleetOps, autoRally,
 diplomacy, espionage, botDiplomacy, market, capital, standingOrders, shuttle, forcedMarch,
-instantRepair, fleetRepair, effects, seatClaim])` (35 модулей — состав и его отличие от
+instantRepair, fleetRepair, effects, seatClaim, visibility])` (36 модулей — состав и его отличие от
 серверного `DEV_MODULES` разобраны в §9), тик в реальном
   времени (скорость ⏸/▶/⏩). Концовка матча — из авторитетного `state.match` (`victoryModule`),
   полноэкранный экран итогов победы/поражения/ничьи (счёт+место+статы+XP, рематч; см.
@@ -2970,7 +2970,18 @@ seeded RNG + golden, `advanceTo`; список — §3, разбор — §5): �
 | Сборка | Модулей | Чего нет |
 | --- | --: | --- |
 | `DEV_MODULES` (канонический сервер, `scenario.ts`) | **36** | — берёт весь каталог ядра |
-| `MODULES` (ядро прототипа, `protoKernel.ts`) | **35** | `pve`, `station`, `visibility` |
+| `MODULES` (ядро прототипа, `protoKernel.ts`) | **36** | `pve`, `station` |
+
+**FOG-10 (2026-09-09): `visibility` доехал и до прототипа.** Он был только в серверном
+списке, а живой хост (`prototype/netserver.ts`) крутит ПРОТОТИПНЫЙ — значит `state.fog`
+на сервере не писался никогда, и память разведки жила только во вкладке браузера
+(`scanMemory.ts`): перезагрузил страницу — разведанные лично миры снова «?». Теперь
+модуль в обоих списках, а клиент подсевает свою память из присланного `remembered`
+(`updateMemory`), то есть серверная память — источник, клиентская — кэш кадра.
+**Цена включения:** список модулей версионируется на матч (инвариант 6), поэтому уже
+идущие матчи ответят «module manifest mismatch — Refusing to load». Модуль поставлен в
+КОНЕЦ списка: подписки у него только на свои поводы, хуков нет, относительный порядок
+остальных не тронут.
 
 До 2026-08-26 канон грузил 32 модуля из 36: `effects`, `espionage`, `heroEffects` и
 `steward` были написаны, покрыты тестами и НЕ включены в граф. Дороже всего обходился

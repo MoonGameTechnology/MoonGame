@@ -593,9 +593,9 @@
 | CMB-7 | ✅ | core | `docs/backlog.md:13566` | Перемирие посреди боя не останавливало бой. |
 | CMB-6 | ⏳ | core | `docs/backlog.md:13587` | После ничьей третий враждебный флот остаётся стоять рядом. |
 | ORD-2 | ✅ | proto | `docs/backlog.md:13597` | Нацеленный ШТУРМ теперь переживает закрытую |
-| FOG-10 | ⏳ | proto core | `docs/backlog.md:13617` | На живом сервере память разведки живёт только во |
-| FOG-9 | ✅ | core | `docs/backlog.md:13635` | Приостановленная стройка чужого мира была видна |
-| TEST-4 | ✅ | srv | `docs/backlog.md:13645` | topXp падал на живой базе разработчика. |
+| FOG-10 | ✅ | proto core | `docs/backlog.md:13617` | Память разведки перестала жить только |
+| FOG-9 | ✅ | core | `docs/backlog.md:13641` | Приостановленная стройка чужого мира была видна |
+| TEST-4 | ✅ | srv | `docs/backlog.md:13651` | topXp падал на живой базе разработчика. |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
