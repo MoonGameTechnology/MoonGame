@@ -168,7 +168,6 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
         name: t('dossier.unit.artillery.name'),
         body: t('dossier.unit.artillery.desc', {
           a: hl(st.attack),
-          r: hl(st.range ?? 0),
           hp: hl(st.hp),
         }),
       };

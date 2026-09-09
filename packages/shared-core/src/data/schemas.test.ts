@@ -29,16 +29,15 @@ describe('game data schema (docs/architecture.md §2)', () => {
     const data = parseGameData(loadShippedBundle());
     expect(data.version).toBe('0.1.20');
     expect(data.resources).toContain('microelectronics');
-    // The `artillery` hull is the ONE standoff platform: the trait is what the core
-    // reads for both standoff fire and the artillery damage line, and `range` is the
-    // firing radius (map units). The siege platforms handed the role over to it.
+    // ROS-2.1: трейт `artillery` больше НЕ означает ни своей линии, ни огня с
+    // дистанции — он означает «ответный залп по мне не проходит». Поэтому радиуса у
+    // корпуса нет вовсе, а стоит он в тылу, как всякий тяжёлый корабль.
     expect(data.units.artillery?.traits).toContain('artillery');
-    expect(data.units.artillery?.stats.range).toBe(300);
-    for (const id of ['siege', 'siege_lance']) {
-      expect(data.units[id]?.traits).not.toContain('artillery');
+    expect(data.units.artillery?.line).toBe('rear');
+    for (const id of ['artillery', 'siege', 'siege_lance']) {
       expect(data.units[id]?.stats.range ?? 0).toBe(0);
     }
-    // Damage lines are a SHIP formation (GDD §7.2) — the ship roster fills all four.
+    // Линии — строй КОРАБЛЕЙ (GDD §7.2), и ростер заполняет все три.
     expect(data.units.cruiser?.line).toBe('front');
     expect(data.units.scout?.line).toBe('mid');
     expect(data.units.siege?.line).toBe('rear');

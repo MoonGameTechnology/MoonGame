@@ -874,10 +874,11 @@
 | ROS-1.3 | ✅ | core data | `docs/roster-roadmap.md:183` | Осадная платформа осаждает планету, а не флот 2026-09-09 |
 | ROS-1.4 | 🔶 | core data proto | `docs/roster-roadmap.md:209` | Бомбардировщик и профили урона челноков 2026-09-09 |
 | ROS-1.5 | ⏳ | core data | `docs/roster-roadmap.md:246` | Десантный челнок: высадка вместо удара |
-| ROS-2.1 | ⏳ | core data | `docs/roster-roadmap.md:267` | Три линии 50/30/20, артиллерия без ответного огня |
-| ROS-2.2 | 🔒 | core data | `docs/roster-roadmap.md:289` | Челнок — сторона боя: ответный урон и зональное ПВО |
-| ROS-3.1 | ⏳ | proto | `docs/roster-roadmap.md:314` | Экран «Производство»: пять типов, модули, количество, планета |
-| ROS-3.2 | ⏳ | proto | `docs/roster-roadmap.md:332` | Шаттл — корабль во всём интерфейсе |
+| ROS-2.1 | ✅ | core data proto | `docs/roster-roadmap.md:267` | Три линии 50/30/20, артиллерия без ответного огня 2026-09-09 |
+| ROS-2.1a | ⏳ | core proto | `docs/roster-roadmap.md:318` | Снос машинерии обстрела |
+| ROS-2.2 | 🔒 | core data | `docs/roster-roadmap.md:331` | Челнок — сторона боя: ответный урон и зональное ПВО |
+| ROS-3.1 | ⏳ | proto | `docs/roster-roadmap.md:356` | Экран «Производство»: пять типов, модули, количество, планета |
+| ROS-3.2 | ⏳ | proto | `docs/roster-roadmap.md:374` | Шаттл — корабль во всём интерфейсе |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md:48` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md:55` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md:64` | Сервисные идентичности и scoped-токены |

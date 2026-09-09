@@ -381,13 +381,16 @@ export const data: GameData = parseGameData({
       slots: { weapon: 1, utility: 1 }, // a gun bay + a utility bay — a glass cannon
     },
     artillery: {
-      // THE standoff platform (the only one): fires at a single target from
-      // `range` map units away without joining the melee — the `artillery` trait
-      // is what the core reads, both for that fire and for the artillery LINE,
-      // which takes just 10% of an incoming volley while the fleet in front of it
-      // still stands. Priced for that shelter: it dies the moment it is exposed.
+      // АРТИЛЛЕРИЯ (ROS-2.1, заказ владельца). Дистанционного огня у неё больше нет:
+      // чтобы ударить, она подходит вплотную и вяжется в бой, как все, — поэтому
+      // ушёл и `range`. Своей линии тоже нет: она стоит в ТЫЛУ вместе с осадными.
+      // Трейт `artillery` остался и значит теперь ровно одно: когда атакует её
+      // сторона, ОТВЕТНЫЙ огонь по ней не проходит и уходит на другие корабли
+      // (`util/combat.ts`, щадящий режим раздачи урона). Бьёт безнаказанно — но
+      // под чужой атакой получает свою тыловую долю залпа и гибнет как все.
       faction: 'blue',
-      stats: { attack: 26, defense: 4, speed: 26, hp: 24, range: 300 },
+      stats: { attack: 26, defense: 4, speed: 26, hp: 24 },
+      line: 'rear',
       traits: ['artillery'],
       signature: 5, // a gun this big is not subtle
       cost: { metal: 110, credits: 50, microelectronics: 5 }, // ECON-7: guided munitions

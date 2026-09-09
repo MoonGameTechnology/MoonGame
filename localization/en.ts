@@ -777,7 +777,7 @@ export const en: Record<string, string> = {
   'dossier.task.title': 'Building',
   'dossier.task.unit-ready': "Joins the planet's garrison/fleet once finished.",
   'dossier.unit.artillery.desc':
-    'A long-range battery: it hits one target from {r} away without joining the battle and without taking return fire. The price is a glass hull ({hp}) and a slow one. It stands in its own ARTILLERY line: while a single ship still stands in front of it, only a tenth of a volley reaches it — but left alone, it takes everything.',
+    'A heavy battery: {a} damage a volley on a glass hull ({hp}). It fires WITH IMPUNITY — while your fleet is the attacker, return fire never reaches it and lands on your other ships instead. That is not immortality: under someone else\'s attack it stands in the REAR line and takes its share, and left alone it takes everything.',
   'dossier.unit.artillery.name': 'Artillery',
   'dossier.unit.cruiser.desc':
     "The battle line's workhorse: {a} attack, {hp} hull and a hold for {c}. A general-purpose warship, equally solid on offense and defense.",
@@ -1520,8 +1520,8 @@ export const en: Record<string, string> = {
     '🏅 All first-session goals done! +{n} XP — you are ready for a real match.',
   'onb.goals.title': 'First-session goals',
   'onb.intro.artillery.body':
-    'Artillery fleets fire on the enemy from afar, before closing the distance — focus fire on one target, or let the fleet pick one itself. Artillery has thin armor, so keep it behind the line, not on the front.',
-  'onb.intro.artillery.title': 'Barrage — firing from range',
+    'Artillery fires with impunity: while you are the attacker, return fire never reaches it and lands on your other ships instead. Its armor is thin and its place is the rear line, not the front — under someone else\'s attack it dies like anything else.',
+  'onb.intro.artillery.title': 'Artillery — fire without an answer',
   'onb.intro.async-delay.body':
     'This fleet will arrive in real hours — the world of Void Dominion runs continuously, even while you are offline. You can close the game: your orders carry out on their own, and on your return we will send a notification and show a "while you were away" digest.',
   'onb.intro.async-delay.title': 'The world runs without you',

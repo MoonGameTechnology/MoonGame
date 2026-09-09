@@ -374,8 +374,7 @@
       "attack": 26,
       "defense": 4,
       "speed": 26,
-      "hp": 24,
-      "range": 300
+      "hp": 24
     },
     "traits": [
       "artillery"
@@ -393,7 +392,8 @@
     "slots": {
       "weapon": 1,
       "utility": 1
-    }
+    },
+    "line": "rear"
   },
   "shuttle_carrier": {
     "faction": "blue",

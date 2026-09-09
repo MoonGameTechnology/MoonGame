@@ -10,7 +10,7 @@ import { deepClone } from '../util/clone';
  *
  * A PURE what-if over the combat module's own round engine: the same simultaneous
  * round — aggressor fires `attack`, the standing side answers with `defense` — the
- * same tier-ordered pure damage model (`damageUnits`: front→mid→rear→artillery,
+ * same tier-ordered pure damage model (`damageUnits`: front→mid→rear,
  * ablative shields first, whole units lost as pools drop), the same stalemate
  * valve. Inputs are never mutated (the sim runs on deep clones); no bus, no
  * schedule, no RNG — combat resolution is fully deterministic.
@@ -119,7 +119,9 @@ export function previewBattle(
     const toDefender = cappedUnitStat(a, data, 'attack');
     const toAttacker = cappedUnitStat(d, data, 'defense');
     d = damageUnits(d, toDefender, data).survivors;
-    a = damageUnits(a, toAttacker, data).survivors;
+    // Прогноз обязан щадить артиллерию атакующего ровно так же, как живой бой
+    // (ROS-2.1) — иначе игрок увидит один исход, а получит другой.
+    a = damageUnits(a, toAttacker, data, { sparesArtillery: true }).survivors;
   }
 
   const aAlive = alive(a);
