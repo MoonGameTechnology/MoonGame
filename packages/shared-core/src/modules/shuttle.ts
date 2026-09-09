@@ -21,11 +21,20 @@
  * Здесь же живёт точечная оборона (`pointDefense`) — единственная контрмера челнокам.
  */
 import type { GameModule, HandlerContext } from '../kernel/module';
-import type { Fleet, GameState, Planet, ShuttleStrike, UnitStack } from '../state/gameState';
+import type {
+  Fleet,
+  GameState,
+  Planet,
+  ShuttleStrike,
+  StrikeBase,
+  UnitStack,
+} from '../state/gameState';
 import type { GameData } from '../data/schemas';
 import { distance } from '../state/route';
 import {
   canSortie,
+  fleetShuttleBay,
+  hangarUsed,
   freshSortie,
   shuttleBayAt,
   spendSortie,
@@ -33,6 +42,7 @@ import {
   trimHangar,
 } from '../state/shuttle';
 import { applyDamageToSide, removeIfWiped } from '../util/combat';
+import { requireOwnedIdleFleet } from '../util/fleet';
 import { addUnits, cappedUnitStat, sumUnitStat } from '../util/stacks';
 import { buildingLevel } from '../data/schemas';
 import { timeScaleOf } from '../action/types';
@@ -74,6 +84,96 @@ function fleetWorldPos(fleet: Fleet, state: GameState): { x: number; y: number }
   return null;
 }
 
+/** Позиция базы вылета — мира или носителя. Носитель ДВИЖЕТСЯ, поэтому позиция
+ *  всегда берётся текущая, а не запомненная при вылете: запомненная разъехалась бы
+ *  с носителем ровно так же, как хранимая позиция флота разъезжается с расписанием. */
+function basePosition(base: StrikeBase, state: GameState): { x: number; y: number } | null {
+  if (base.kind === 'planet') {
+    return state.planets[base.id]?.position ?? null;
+  }
+  const fleet = state.fleets[base.id];
+  return fleet ? fleetWorldPos(fleet, state) : null;
+}
+
+/**
+ * ОДНА форма для двух баз (SHU-2.1). Космопорт и носитель делают одно и то же —
+ * вмещают челноки, держат топливо и принимают их обратно, — поэтому все проверки
+ * вылета читают эту проекцию, а не «если мир … иначе если флот …» в каждой ветке.
+ * Вторая копия правил на второй базе разъехалась бы с первой на первой же правке.
+ */
+interface BaseView {
+  ref: StrikeBase;
+  owner: string | null;
+  position: { x: number; y: number } | null;
+  /** Вместимость. 0 читается как «базы нет»: порт, вмещающий ноль, ничем не отличается
+   *  от отсутствующего (SHU-1.1), и у носителя ровно так же. */
+  bay: number;
+  /** Не выпускает из-за повреждений. Есть только у порта: у носителя вместимость
+   *  падает вместе с погибшими корпусами, отдельного порога не нужно. */
+  disabled: boolean;
+  hangar: UnitStack[];
+  setHangar: (next: UnitStack[]) => void;
+  sortie: { fuel: number; rearming: number } | undefined;
+  setSortie: (next: { fuel: number; rearming: number }) => void;
+}
+
+function planetBase(planet: Planet, data: GameData): BaseView {
+  return {
+    ref: { kind: 'planet', id: planet.id },
+    owner: planet.owner,
+    position: planet.position,
+    bay: shuttleBayAt(planet, data),
+    disabled: portDisabled(planet, data),
+    hangar: planet.hangar ?? [],
+    setHangar: (next) => {
+      planet.hangar = next;
+    },
+    sortie: planet.sortie,
+    setSortie: (next) => {
+      planet.sortie = next;
+    },
+  };
+}
+
+function fleetBase(fleet: Fleet, state: GameState, data: GameData): BaseView {
+  return {
+    ref: { kind: 'fleet', id: fleet.id },
+    owner: fleet.owner,
+    position: fleetWorldPos(fleet, state),
+    bay: fleetShuttleBay(fleet, data),
+    disabled: false,
+    hangar: fleet.hangar ?? [],
+    setHangar: (next) => {
+      fleet.hangar = next;
+    },
+    sortie: fleet.sortie,
+    setSortie: (next) => {
+      fleet.sortie = next;
+    },
+  };
+}
+
+/** База по ссылке — или `null`, если её больше нет (снесённый порт, погибший носитель). */
+function baseOf(ref: StrikeBase, state: GameState, data: GameData): BaseView | null {
+  if (ref.kind === 'planet') {
+    const planet = state.planets[ref.id];
+    return planet ? planetBase(planet, data) : null;
+  }
+  const fleet = state.fleets[ref.id];
+  return fleet ? fleetBase(fleet, state, data) : null;
+}
+
+/** Топливо и перезарядка базы берутся у ЧЕЛНОКОВ, которые в ней стоят (первый стек):
+ *  счётчик принадлежит базе, а числа — машине. */
+function baseSortieSpec(base: BaseView, data: GameData): { maxFuel: number; rearmRounds: number } {
+  const st = base.hangar.find((s) => s.count > 0);
+  const stats = st ? data.units[st.unit]?.stats : undefined;
+  return {
+    maxFuel: Math.max(0, Math.floor(stats?.fuel ?? 0)),
+    rearmRounds: Math.max(0, Math.floor(stats?.rearmRounds ?? 0)),
+  };
+}
+
 /** Где сейчас летящий удар: линейная интерполяция между портом и точкой удара по доле
  *  пройденного времени. Позиции у челнока нет в состоянии намеренно — она ВЫВОДИТСЯ,
  *  как позиция флота на лейне: хранимая копия разъехалась бы с расписанием. */
@@ -82,9 +182,9 @@ function strikePosition(
   state: GameState,
   now: number,
 ): { x: number; y: number } | null {
-  const port = state.planets[strike.from]?.position ?? null;
-  if (!port) return null;
-  const [a, b] = strike.leg === 'out' ? [port, strike.to] : [strike.to, port];
+  const home = basePosition(strike.base, state);
+  if (!home) return null;
+  const [a, b] = strike.leg === 'out' ? [home, strike.to] : [strike.to, home];
   const span = strike.arrivesAt - strike.departedAt;
   const t = span <= 0 ? 1 : Math.min(1, Math.max(0, (now - strike.departedAt) / span));
   return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
@@ -128,23 +228,6 @@ function portDisabled(planet: Planet, data: GameData): boolean {
   return best < PORT_LAUNCH_HP;
 }
 
-/** Топливо и перезарядка порта берутся у ЧЕЛНОКОВ, которые в нём стоят (первый стек —
- *  как `sortieSpec` для флота): счётчик принадлежит порту, а числа — машине. */
-function hangarSortieSpec(planet: Planet, data: GameData): { maxFuel: number; rearmRounds: number } {
-  const st = (planet.hangar ?? []).find((s) => s.count > 0);
-  const stats = st ? data.units[st.unit]?.stats : undefined;
-  return {
-    maxFuel: Math.max(0, Math.floor(stats?.fuel ?? 0)),
-    rearmRounds: Math.max(0, Math.floor(stats?.rearmRounds ?? 0)),
-  };
-}
-
-/** Радиус удара челнока этого типа. */
-function hangarStrikeRange(planet: Planet, data: GameData, unit: string): number {
-  void planet;
-  return data.units[unit]?.stats.strikeRange ?? 0;
-}
-
 /** Снять `count` челноков `unit` из ангара. */
 function takeFromHangar(hangar: readonly UnitStack[], unit: string, count: number): UnitStack[] {
   let left = count;
@@ -182,9 +265,12 @@ export const shuttleModule: GameModule = {
   version: '1.0.0',
   setup(api) {
     /**
-     * `shuttle.strike { planetId, unit, count, targetFleetId | targetPlanetId }` —
-     * вылет из порта. Челноки покидают ангар, летят по прямой к точке, снятой в момент
+     * `shuttle.strike { planetId | fleetId, unit, count, targetFleetId | targetPlanetId }`
+     * — вылет с базы. Челноки покидают ангар, летят по прямой к точке, снятой в момент
      * вылета, и после удара разворачиваются домой.
+     *
+     * База — мир с космопортом ИЛИ флот-носитель (SHU-2.1). Ровно одна из двух: обе
+     * или ни одной — отказ (fail-secure; схема payload этого не выражает).
      *
      * Цель фиксируется КООРДИНАТОЙ, а не ссылкой: «навёлся и пустил». Цель может уйти —
      * челноки всё равно летят туда, куда их послали, и по прибытии бьют того, кто там
@@ -193,32 +279,51 @@ export const shuttleModule: GameModule = {
     api.onAction('shuttle.strike', (action, h: HandlerContext) => {
       const p = action.payload as {
         planetId?: string;
+        fleetId?: string;
         unit?: string;
         count?: number;
         targetFleetId?: string;
         targetPlanetId?: string;
       };
-      if (typeof p?.planetId !== 'string' || typeof p?.unit !== 'string') {
+      if (typeof p?.unit !== 'string') {
         return h.reject('E_BAD_PAYLOAD');
+      }
+      const fromPlanet = typeof p.planetId === 'string';
+      const fromFleet = typeof p.fleetId === 'string';
+      if (fromPlanet === fromFleet) {
+        return h.reject('E_BAD_PAYLOAD'); // ровно одна база
       }
       const count = p.count ?? 1;
       if (!Number.isSafeInteger(count) || count <= 0) return h.reject('E_BAD_PAYLOAD');
-      const port = h.state.planets[p.planetId];
-      if (!port) return h.reject('E_NO_PLANET');
-      if (port.owner !== action.playerId) return h.reject('E_FORBIDDEN');
 
-      // Порт: есть, цел и с топливом. Порог повреждения — на ВЫЛЕТ (правило владельца);
-      // возврату он не мешает, иначе челнок повис бы в пустоте.
-      if (shuttleBayAt(port, h.ctx.data) <= 0) return h.reject('E_NO_PORT');
-      if (portDisabled(port, h.ctx.data)) return h.reject('E_PORT_DAMAGED');
+      let base: BaseView;
+      if (fromPlanet) {
+        const planet = h.state.planets[p.planetId!];
+        if (!planet) return h.reject('E_NO_PLANET');
+        if (planet.owner !== action.playerId) return h.reject('E_FORBIDDEN');
+        base = planetBase(planet, h.ctx.data);
+      } else {
+        // Носитель обязан СТОЯТЬ у узла и быть свободен (`E_FLEET_BUSY` — бой, перелёт
+        // или стоянка на лейне): порт не двигается, и вылет с разгоняющегося носителя
+        // пришлось бы догонять — вторая ветка правил в самом горячем месте ядра.
+        // Возврату это не мешает: носитель волен уйти, пока челноки летят.
+        const fleet = requireOwnedIdleFleet(h, p.fleetId!, action.playerId);
+        base = fleetBase(fleet, h.state, h.ctx.data);
+      }
 
-      const have = (port.hangar ?? [])
+      // База: есть, цела и с топливом. Порог повреждения — на ВЫЛЕТ (правило владельца);
+      // возврату он не мешает, иначе челнок повис бы в пустоте. У носителя порога нет:
+      // подбитый носитель теряет корпуса, вместимость падает сама.
+      if (base.bay <= 0) return h.reject('E_NO_PORT');
+      if (base.disabled) return h.reject('E_PORT_DAMAGED');
+
+      const have = base.hangar
         .filter((st) => st.unit === p.unit)
         .reduce((n, st) => n + st.count, 0);
       if (have < count) return h.reject('E_NOT_ENOUGH');
 
-      const spec = hangarSortieSpec(port, h.ctx.data);
-      const sortie = port.sortie ?? freshSortie(spec.maxFuel);
+      const spec = baseSortieSpec(base, h.ctx.data);
+      const sortie = base.sortie ?? freshSortie(spec.maxFuel);
       if (!canSortie(sortie)) return h.reject('E_NO_FUEL');
 
       // Цель: чужой флот или чужой мир. Ровно одна из двух — payload-схема этого не
@@ -233,14 +338,15 @@ export const shuttleModule: GameModule = {
       const targetOwner = targetFleet?.owner ?? targetPlanet?.owner ?? null;
       if (targetOwner === action.playerId) return h.reject('E_NOT_HOSTILE');
 
-      const from = port.position;
+      const from = base.position;
+      if (!from) return h.reject('E_NO_PORT'); // носитель без позиции (в перелёте) — не база
       const to = targetFleet
         ? (fleetWorldPos(targetFleet, h.state) ?? null)
         : (targetPlanet?.position ?? null);
       if (!to) return h.reject('E_NO_TARGET_POSITION');
 
-      // Радиус считается ОТ УЗЛА БАЗИРОВАНИЯ: своей позиции у челнока в порту нет.
-      const range = hangarStrikeRange(port, h.ctx.data, p.unit);
+      // Радиус считается ОТ УЗЛА БАЗИРОВАНИЯ: своей позиции у челнока в ангаре нет.
+      const range = h.ctx.data.units[p.unit]?.stats.strikeRange ?? 0;
       if (range <= 0) return h.reject('E_NO_RANGE');
       if (distance(from, to) > range) return h.reject('E_OUT_OF_RANGE');
 
@@ -248,15 +354,15 @@ export const shuttleModule: GameModule = {
       if (speed <= 0) return h.reject('E_NO_SPEED');
       const flightMs = Math.max(1, Math.round((distance(from, to) / speed) * hourMs(h)));
 
-      // Челноки покидают ангар — с этой секунды их в порту нет.
-      port.hangar = takeFromHangar(port.hangar ?? [], p.unit, count);
-      port.sortie = spendSortie(sortie, spec.rearmRounds);
+      // Челноки покидают ангар — с этой секунды их в базе нет.
+      base.setHangar(takeFromHangar(base.hangar, p.unit, count));
+      base.setSortie(spendSortie(sortie, spec.rearmRounds));
       const seq = (h.state.strikeSeq ?? 0) + 1;
       h.state.strikeSeq = seq;
       const strike: ShuttleStrike = {
         id: `strike:${action.playerId}:${h.ctx.now}:${seq}`,
         owner: action.playerId,
-        from: port.id,
+        base: base.ref,
         units: [{ unit: p.unit, count }],
         target: targetFleet
           ? { kind: 'fleet', id: targetFleet.id }
@@ -271,8 +377,80 @@ export const shuttleModule: GameModule = {
       h.emit('shuttle.launched', {
         strikeId: strike.id,
         owner: action.playerId,
-        from: port.id,
+        from: base.ref.id,
+        fromKind: base.ref.kind,
         count,
+      });
+    });
+
+    /**
+     * `shuttle.load` / `shuttle.unload { fleetId, unit, count }` — перегрузка челноков
+     * между космопортом мира и СТОЯЩИМ ТАМ ЖЕ носителем (SHU-2.1). Ровно тот же шов,
+     * что у наземной армии (`army.load`/`army.unload`): челнок строится в порту, но
+     * воевать вдали от своих миров может только с борта.
+     *
+     * Обе стороны — СВОИ. Порт союзника не донор и не гараж: «помощь» иначе означала бы
+     * вывоз чужой обороны, ровно как у `army.load`.
+     */
+    const transfer = (
+      action: { playerId: string; payload: unknown },
+      h: HandlerContext,
+    ): { fleet: Fleet; planet: Planet; unit: string; count: number } => {
+      const p = action.payload as { fleetId?: string; unit?: string; count?: number };
+      if (typeof p?.fleetId !== 'string' || typeof p?.unit !== 'string') {
+        return h.reject('E_BAD_PAYLOAD');
+      }
+      const count = p.count ?? 1;
+      if (!Number.isSafeInteger(count) || count <= 0) return h.reject('E_BAD_PAYLOAD');
+      const def = h.ctx.data.units[p.unit];
+      if (!def) return h.reject('E_UNKNOWN_UNIT');
+      if (!def.traits.includes('shuttle')) return h.reject('E_NOT_SHUTTLE');
+      const fleet = requireOwnedIdleFleet(h, p.fleetId, action.playerId);
+      const planet = fleet.location ? h.state.planets[fleet.location] : undefined;
+      if (!planet) return h.reject('E_NO_PLANET');
+      if (planet.owner !== action.playerId) return h.reject('E_FORBIDDEN');
+      return { fleet, planet, unit: p.unit, count };
+    };
+
+    api.onAction('shuttle.load', (action, h: HandlerContext) => {
+      const { fleet, planet, unit, count } = transfer(action, h);
+      const have = (planet.hangar ?? [])
+        .filter((st) => st.unit === unit)
+        .reduce((n, st) => n + st.count, 0);
+      if (have < count) return h.reject('E_NOT_ENOUGH');
+      const free = fleetShuttleBay(fleet, h.ctx.data) - hangarUsed(fleet);
+      if (count > free) return h.reject('E_NO_CAPACITY');
+      planet.hangar = takeFromHangar(planet.hangar ?? [], unit, count);
+      const aboard = [...(fleet.hangar ?? [])];
+      addUnits(aboard, unit, count);
+      fleet.hangar = aboard;
+      h.emit('shuttle.loaded', {
+        fleetId: fleet.id,
+        planetId: planet.id,
+        unit,
+        count,
+        owner: action.playerId,
+      });
+    });
+
+    api.onAction('shuttle.unload', (action, h: HandlerContext) => {
+      const { fleet, planet, unit, count } = transfer(action, h);
+      const have = (fleet.hangar ?? [])
+        .filter((st) => st.unit === unit)
+        .reduce((n, st) => n + st.count, 0);
+      if (have < count) return h.reject('E_NOT_ENOUGH');
+      const free = shuttleBayAt(planet, h.ctx.data) - hangarUsed(planet);
+      if (count > free) return h.reject('E_NO_CAPACITY');
+      fleet.hangar = takeFromHangar(fleet.hangar ?? [], unit, count);
+      const ashore = [...(planet.hangar ?? [])];
+      addUnits(ashore, unit, count);
+      planet.hangar = ashore;
+      h.emit('shuttle.unloaded', {
+        fleetId: fleet.id,
+        planetId: planet.id,
+        unit,
+        count,
+        owner: action.playerId,
       });
     });
 
@@ -338,9 +516,11 @@ export const shuttleModule: GameModule = {
             }
           }
         }
-        // Разворот домой — тем же путём и с той же скоростью.
-        const port = h.state.planets[strike.from];
-        const back = port ? distance(strike.to, port.position) : 0;
+        // Разворот домой — тем же путём и с той же скоростью. Позиция базы берётся
+        // ТЕКУЩАЯ: носитель мог сдвинуться, пока челноки летели, и лететь они должны
+        // к нему, а не к точке, где он стоял на вылете.
+        const home = basePosition(strike.base, h.state);
+        const back = home ? distance(strike.to, home) : 0;
         const speed = strikeSpeed(strike, h.ctx.data);
         const flightMs = speed > 0 ? Math.max(1, Math.round((back / speed) * hourMs(h))) : 1;
         strike.leg = 'back';
@@ -350,46 +530,71 @@ export const shuttleModule: GameModule = {
         return;
       }
 
-      // Посадка. Порт мог погибнуть, пока челноки летели, — тогда садиться некуда.
+      // Посадка. База могла погибнуть, пока челноки летели (снесённый порт, сбитый
+      // носитель, захваченный мир), — тогда садиться некуда.
       h.state.strikes = strikes.filter((s) => s.id !== strikeId);
-      const port = h.state.planets[strike.from];
-      const bay = port && port.owner === strike.owner ? shuttleBayAt(port, h.ctx.data) : 0;
-      if (!port || bay <= 0) {
+      const base = baseOf(strike.base, h.state, h.ctx.data);
+      const bay = base && base.owner === strike.owner ? base.bay : 0;
+      if (!base || bay <= 0) {
         h.emit('shuttle.lost', {
-          planetId: strike.from,
+          baseId: strike.base.id,
+          baseKind: strike.base.kind,
           owner: strike.owner,
           count: strike.units.reduce((n, st) => n + st.count, 0),
         });
         return;
       }
-      const hangar = [...(port.hangar ?? [])];
+      const hangar = [...base.hangar];
       for (const st of strike.units) addUnits(hangar, st.unit, st.count, st.modules);
-      port.hangar = trimHangar(hangar, bay);
-      h.emit('shuttle.landed', { planetId: port.id, owner: strike.owner, strikeId });
+      base.setHangar(trimHangar(hangar, bay));
+      h.emit('shuttle.landed', {
+        baseId: base.ref.id,
+        baseKind: base.ref.kind,
+        owner: strike.owner,
+        strikeId,
+      });
     });
 
     /**
-     * АНГАР НЕ ПЕРЕЖИВАЕТ СВОЙ ПОРТ (SHU-1.1). Челнок стоит ВНУТРИ космопорта, поэтому
-     * снесённый порт забирает его с собой, а упавшая вместимость оставляет ровно
+     * АНГАР НЕ ПЕРЕЖИВАЕТ СВОЮ БАЗУ (SHU-1.1, распространено на носители в SHU-2.1).
+     * Челнок стоит ВНУТРИ космопорта или носителя, поэтому снесённый порт и сбитые
+     * корпуса носителя забирают его с собой, а упавшая вместимость оставляет ровно
      * столько, сколько теперь помещается.
      *
      * Правило висит на `time.advanced`, а не на событии «здание разрушено», намеренно:
-     * порт исчезает НЕСКОЛЬКИМИ путями — бомбардировка, наземный штурм, а вместимость
-     * может упасть и от смены уровня. Реакция на одно событие закрыла бы один путь и
-     * оставила остальные, и в состоянии остались бы челноки, которым негде стоять.
-     * Здесь же ловится захват: мир сменил владельца — ангар прежнего хозяина пуст
-     * (`planet.captured` ниже снимает его сразу, это лишь страховка того же правила).
+     * база исчезает НЕСКОЛЬКИМИ путями — бомбардировка, наземный штурм, гибель корпусов
+     * в бою, — а вместимость может упасть и от смены уровня. Реакция на одно событие
+     * закрыла бы один путь и оставила остальные, и в состоянии остались бы челноки,
+     * которым негде стоять. Здесь же ловится захват: мир сменил владельца — ангар
+     * прежнего хозяина пуст (`planet.captured` ниже снимает его сразу, это лишь
+     * страховка того же правила).
+     *
+     * Флот, погибший ЦЕЛИКОМ, отдельного правила не требует: ангар лежит НА флоте, и
+     * удаление флота уносит его с собой — осиротеть здесь нечему. Вылет, чья база
+     * исчезла за время полёта, ловится на посадке (`shuttle.lost` там же).
      */
     api.on('time.advanced', (_event, h: HandlerContext) => {
-      for (const planet of Object.values(h.state.planets)) {
-        const hangar = planet.hangar;
-        if (!hangar || hangar.length === 0) continue;
-        const bay = planet.owner === null ? 0 : shuttleBayAt(planet, h.ctx.data);
-        const kept = trimHangar(hangar, bay);
-        const lost = hangar.reduce((n, st) => n + st.count, 0) - kept.reduce((n, st) => n + st.count, 0);
+      const bases: BaseView[] = [
+        ...Object.values(h.state.planets).map((planet) => ({
+          ...planetBase(planet, h.ctx.data),
+          // Ничей мир не держит ангар: вместимость нейтрального мира читается как 0.
+          bay: planet.owner === null ? 0 : shuttleBayAt(planet, h.ctx.data),
+        })),
+        ...Object.values(h.state.fleets).map((fleet) => fleetBase(fleet, h.state, h.ctx.data)),
+      ];
+      for (const base of bases) {
+        if (base.hangar.length === 0) continue;
+        const kept = trimHangar(base.hangar, base.bay);
+        const lost =
+          base.hangar.reduce((n, st) => n + st.count, 0) - kept.reduce((n, st) => n + st.count, 0);
         if (lost <= 0) continue;
-        planet.hangar = kept;
-        h.emit('shuttle.lost', { planetId: planet.id, owner: planet.owner, count: lost });
+        base.setHangar(kept);
+        h.emit('shuttle.lost', {
+          baseId: base.ref.id,
+          baseKind: base.ref.kind,
+          owner: base.owner,
+          count: lost,
+        });
       }
     });
 
@@ -403,7 +608,12 @@ export const shuttleModule: GameModule = {
       const lost = (planet?.hangar ?? []).reduce((n, st) => n + st.count, 0);
       if (!planet || lost <= 0) return;
       planet.hangar = [];
-      h.emit('shuttle.lost', { planetId, owner: planet.owner, count: lost });
+      h.emit('shuttle.lost', {
+        baseId: planetId,
+        baseKind: 'planet',
+        owner: planet.owner,
+        count: lost,
+      });
     });
 
     /**
@@ -468,18 +678,24 @@ export const shuttleModule: GameModule = {
       h.state.strikes = strikes.filter((st) => st.units.length > 0);
     });
 
-    /** Перезарядка порта идёт ДОМА: час мира — раунд перезарядки (SHU-1.2). */
+    /** Перезарядка идёт ДОМА: час мира — раунд перезарядки (SHU-1.2). «Дом» — любая
+     *  база: и космопорт, и носитель (SHU-2.1), поэтому счётчик тикает у обоих одним
+     *  правилом, а не двумя копиями, которые разъедутся. */
     api.on('time.advanced', (event, h: HandlerContext) => {
       const { from, to } = event.payload as { from: number; to: number };
       const hours = Math.floor((to - from) / hourMs(h));
       if (hours <= 0) return;
-      for (const planet of Object.values(h.state.planets)) {
-        const sortie = planet.sortie;
+      const bases: BaseView[] = [
+        ...Object.values(h.state.planets).map((planet) => planetBase(planet, h.ctx.data)),
+        ...Object.values(h.state.fleets).map((fleet) => fleetBase(fleet, h.state, h.ctx.data)),
+      ];
+      for (const base of bases) {
+        const sortie = base.sortie;
         if (!sortie || sortie.rearming <= 0) continue;
-        const spec = hangarSortieSpec(planet, h.ctx.data);
+        const spec = baseSortieSpec(base, h.ctx.data);
         let next = sortie;
         for (let i = 0; i < hours && next.rearming > 0; i++) next = tickRearm(next, spec.maxFuel);
-        planet.sortie = next;
+        base.setSortie(next);
       }
     });
 

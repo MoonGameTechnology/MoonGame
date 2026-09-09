@@ -32,7 +32,7 @@ import type { GameData, UnitDef, UnitStack } from '../../packages/shared-core/sr
 export type ShipArchetype = 'scout' | 'combat' | 'artillery' | 'transport' | 'flagship' | 'swarm';
 
 /** cargoCapacity с этого порога читается как выделенный транспортник
- *  (постер: «высокий cargoCapacity»; dropship 8 — да, cruiser 5 — нет). */
+ *  (постер: «высокий cargoCapacity»; десантный корабль 16 — да, cruiser 5 — нет). */
 export const TRANSPORT_CARGO_MIN = 8;
 
 /** Роль корабля из полей unit-def — порядок проверок фиксирует приоритет

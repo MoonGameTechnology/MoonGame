@@ -268,7 +268,7 @@ describe('combat.damage — every firing channel goes through the hook (CORE-DMG
           {
             id: 'strike:p2:1',
             owner: 'p2',
-            from: 'H',
+            base: { kind: 'planet', id: 'H' },
             units: [{ unit: 'wing', count: 4 }],
             target: { kind: 'fleet', id: 'E' },
             to: base.planets.P!.position,
@@ -362,7 +362,7 @@ describe('combat.damage — every firing channel goes through the hook (CORE-DMG
         {
           id: 'strike:p2:1',
           owner: 'p2',
-          from: 'H',
+          base: { kind: 'planet', id: 'H' },
           units: [{ unit: 'wing', count: 1 }],
           target: { kind: 'fleet', id: 'E' },
           to: st.planets.A!.position,

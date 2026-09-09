@@ -341,6 +341,13 @@ export {
 export { deepClone, deepFreeze } from './util/clone';
 export { MS_PER_HOUR, MS_PER_DAY } from './util/time';
 export {
+  unitTier,
+  lineShares,
+  LINE_SHARE,
+  TIER_ORDER,
+  type Tier,
+} from './util/combat';
+export {
   findHealthyStack,
   addUnits,
   sumUnitStat,

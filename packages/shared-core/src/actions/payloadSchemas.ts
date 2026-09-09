@@ -142,12 +142,18 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   // Вылет челноков из порта (SHU-1.2). Ровно одна цель из двух — «обе или ни одной»
   // схема не выражает, это проверяет обработчик (fail-secure).
   'shuttle.strike': z.object({
-    planetId: id,
+    // База вылета — мир с космопортом ИЛИ флот-носитель (SHU-2.1). Ровно одна из двух,
+    // как и цель: «обе или ни одной» схема не выражает, это гейт обработчика.
+    planetId: id.optional(),
+    fleetId: id.optional(),
     unit: id,
     count,
     targetFleetId: id.optional(),
     targetPlanetId: id.optional(),
   }),
+  // Перегрузка челноков между космопортом и стоящим там носителем (SHU-2.1).
+  'shuttle.load': z.object({ fleetId: id, unit: id, count }),
+  'shuttle.unload': z.object({ fleetId: id, unit: id, count }),
   // capital (hero respawn / re-fit anchor)
   'capital.designate': z.object({ planetId: id }),
   // steward («Хранитель») — postures are data-driven; the module gates the value
