@@ -631,7 +631,14 @@ describe('MatchRoom — singlePeerPerPlayer (1v1 slot guard)', () => {
     });
   }
 
-  it('refuses a second live connection to an occupied side, frees it on disconnect', () => {
+  // Одна рука на империи — но выигрывает НОВОЕ соединение, а не старое.
+  //
+  // Прежде отказывали пришедшему, и на живом плейтесте это ударило по своему же
+  // владельцу: кресло держал ЕГО ЖЕ мёртвый сокет (пропал сигнал, TCP-FIN не дошёл), а
+  // реап идёт heartbeat'ом до ~30 секунд. Игрок открывал игру заново и получал
+  // обвинение, что играет с другого устройства. Личность пришедшего проверена
+  // рукопожатием, значит это тот же человек — впускаем его, прощаемся со старым.
+  it('впускает НОВОЕ соединение на занятое кресло, выселяя старое', () => {
     const r = guarded();
     const a = new MemoryPeer();
     const b = new MemoryPeer();
@@ -639,16 +646,39 @@ describe('MatchRoom — singlePeerPerPlayer (1v1 slot guard)', () => {
     expect(r.addPeer('p1', a)).toBe(true);
     expect(a.messages[0]).toMatchObject({ type: 'welcome', playerId: 'p1' });
 
-    // a second person taking the SAME side is refused (this is what stranded the lobby)
-    expect(r.addPeer('p1', b)).toBe(false);
-    expect(b.messages).toEqual([{ type: 'error', matchId: 'guard', code: 'E_SLOT_TAKEN' }]);
+    // Пришедший садится, а прежнее соединение получает отказ и закрывается.
+    expect(r.addPeer('p1', b)).toBe(true);
+    expect(b.messages[0]).toMatchObject({ type: 'welcome', playerId: 'p1' });
+    expect(a.messages.at(-1)).toEqual({ type: 'error', matchId: 'guard', code: 'E_SLOT_TAKEN' });
 
-    // the OTHER side is still free — the way a real 1v1 must go
+    // Чужое кресло при этом не трогается — 1v1 остаётся 1v1.
     expect(r.addPeer('p2', new MemoryPeer())).toBe(true);
 
-    // a slot frees the moment its peer drops, so reconnect-after-drop still works
-    r.removePeer('p1', a);
+    // И обычный путь «сокет отвалился → вернулся» работает как прежде.
+    r.removePeer('p1', b);
     expect(r.addPeer('p1', new MemoryPeer())).toBe(true);
+  });
+
+  it('выселение не оставляет за креслом двух соединений', async () => {
+    // Суть инварианта: перехват меняет ТОГО, кто сидит, а не их количество. Если бы
+    // старое соединение снималось только асинхронным обработчиком закрытия, на кресле
+    // на миг оказывалось бы двое — и оба получали бы дельты.
+    const r = guarded();
+    const first = new MemoryPeer();
+    const second = new MemoryPeer();
+    r.addPeer('p1', first);
+    const beforeFirst = first.messages.length;
+    r.addPeer('p1', second);
+
+    // Рассылка после перехвата доходит только до нового.
+    const beforeSecond = second.messages.length;
+    await r.receive(
+      'p1',
+      second,
+      JSON.stringify({ type: 'action', action: action('t1', 'p1', 'Взятое') }),
+    );
+    expect(second.messages.length).toBeGreaterThan(beforeSecond);
+    expect(first.messages.length).toBe(beforeFirst + 1); // только сам отказ, ничего сверх
   });
 
   it('still allows multiple peers per side when the guard is off (default)', () => {

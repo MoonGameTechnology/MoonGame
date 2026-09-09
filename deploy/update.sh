@@ -109,6 +109,15 @@ run_as_owner git -C "$REPO_DIR" fetch origin "$BRANCH"
 # падает здесь, до пересборки, а не оставляет полугибрид в проде.
 run_as_owner git -C "$REPO_DIR" merge --ff-only "origin/$BRANCH"
 
+# Добор ключей `server.env` — ПОСЛЕ обновления кода и ДО пересборки: список ключей
+# приезжает тем же `git merge` выше, поэтому дописывается уже новый список, а не тот,
+# что лежал на машине. До этого ключ, добавленный в установщик, не доезжал до
+# развёрнутой машины никогда — установщик пишет файл один раз, а обновление его только
+# читало. Существующие значения не трогаются; подробности и правила — в env-keys.sh.
+# shellcheck source=deploy/env-keys.sh
+. "$DEPLOY_DIR/env-keys.sh"
+ensure_env_keys "$ENV_FILE"
+
 # Образ, на котором сервер работает ПРЯМО СЕЙЧАС — единственная точка отката.
 PREV_IMAGE_ID="$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" ps -q server 2>/dev/null \
   | head -1 | xargs -r docker inspect --format '{{.Image}}' 2>/dev/null || true)"
