@@ -201,6 +201,16 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
           r: hl(st.strikeRange ?? 0),
         }),
       };
+    case 'bomber':
+      return {
+        name: t('dossier.unit.bomber.name'),
+        body: t('dossier.unit.bomber.desc', {
+          a: hl(st.attack),
+          s: hl(st.siegeDamage ?? 0),
+          hp: hl(st.hp),
+          r: hl(st.strikeRange ?? 0),
+        }),
+      };
     case 'hero':
       return {
         name: t('dossier.unit.hero.name'),

@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 5747 зелёных** (62 skip, 434 файла; с `DATABASE_URL` — 5809 без пропусков: все пропуски — тесты durable-пути, которым нужна база).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 5751 зелёных** (62 skip, 434 файла; с `DATABASE_URL` — 5813 без пропусков: все пропуски — тесты durable-пути, которым нужна база).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -1660,10 +1660,11 @@ speed, hp, shield, range, cargoCapacity, cargoSize, aaDamage, siegeDamage}`
   `line, traits, abilities, cost, buildTimeHours, upkeep`, `signature, radarRange`
   (армия очков не даёт — см. victory). Есть: `scout_drone, scout, sensor_frigate,
 cruiser, siege(«осадная платформа», siegeDamage 60 при attack 6 и hp 120),
-siege_lance, artillery(artillery,range 300),
+siege_lance, artillery(artillery,range 300), bomber(челнок против корпусов: attack 20,
+siegeDamage 18),
 strike_carrier(«десантный корабль», cargoCapacity 16), shuttle_carrier(«Шаттл»,
 shuttleBay 6), militia, drop_infantry, tank(cargoSize 1), heavy_infantry,
-special_forces, hero, interceptor` (16 юнитов: 12 `vanguard` + 4 `blue`, приехавших из
+special_forces, hero, interceptor` (17 юнитов: 12 `vanguard` + 5 `blue`, приехавших из
 каталога прототипа с CONV-12a; `orbital_aa` — защитное здание, не юнит;
 `infected_cruiser` в контенте нет). `dropship` СНЯТ (заказ владельца 2026-09-09):
 десантный корабль в игре один, и это переделанный `strike_carrier` — трюм 16, hp 140,
@@ -2385,7 +2386,13 @@ instantRepair, fleetRepair, effects, seatClaim])` (35 модулей — сос�
   КООРДИНАТА, а не ссылка: ушла — бьют пустоту). Полёт живёт в `state.strikes`, позиция
   выводится из времени. Урон ОДНОСТОРОННИЙ: флоту через хук `combat.damage`
   (`phase: 'shuttle'`), миру событием `planet.bombarded` (урон зданиям) — ни боя, ни
-  ответного огня. Коды: `E_NO_PORT`, `E_PORT_DAMAGED` (порт повреждён более чем на 30%),
+  ответного огня. **Профиль урона зависит от ЦЕЛИ (ROS-1.4):** по кораблям челнок бьёт
+  `attack`, по зданиям — свой `siegeDamage` (стат осадной платформы, ROS-1.3), а машина
+  без него считается по `attack`, как до разделения. Одной цифрой роли челноков не
+  различались: бомбардировщик (`attack` 20, `siegeDamage` 18) и перехватчик (`attack` 14,
+  `siegeDamage` 1) отличаются именно этой парой. Стат `shuttleDamage` (урон ПО челнокам)
+  сознательно ещё не заведён: канала урона по вылетам, кроме `pointDefense` кораблей, в
+  игре нет — он приедет вместе с перехватом (SHU-1.3). Коды: `E_NO_PORT`, `E_PORT_DAMAGED` (порт повреждён более чем на 30%),
   `E_NO_FUEL`, `E_NOT_ENOUGH`, `E_OUT_OF_RANGE`, `E_NOT_HOSTILE`. Топливо и перезарядка —
   у ПОРТА (`planet.sortie`), не у машины. Точечная оборона бьёт по летящим вылетам, урон
   копится и переводится в сбитые машины по корпусу. Свои вылеты видны в тумане, чужие

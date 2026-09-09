@@ -398,6 +398,9 @@ export const data: GameData = parseGameData({
     interceptor: {
       // Carrier-borne strike wing (shuttles-roadmap SQ-0.1): very fast + hard-hitting
       // but paper-thin — launch it ahead to strike, orbital AA (orbital_aa) is its counter.
+      // ROS-1.4: по ЗДАНИЯМ он почти безвреден (`siegeDamage` 1) — истребитель не
+      // бомбардировщик. Полное разведение ролей (нерф `attack` и охота за чужими
+      // челноками) ждёт перехвата — SHU-1.3, см. роадмап челноков.
       faction: 'blue',
       stats: {
         attack: 14,
@@ -407,6 +410,7 @@ export const data: GameData = parseGameData({
         strikeRange: 180,
         fuel: 3,
         rearmRounds: 2,
+        siegeDamage: 1,
       },
       line: 'front', // a strike wing goes in first
       traits: ['shuttle'],
@@ -415,6 +419,32 @@ export const data: GameData = parseGameData({
       buildTimeHours: 2,
       upkeep: { credits: 32 },
       slots: { weapon: 1 }, // a single gun mount — upgun the paper-thin strike wing
+    },
+    bomber: {
+      // БОМБАРДИРОВЩИК (ROS-1.4, заказ владельца): челнок против КОРАБЛЕЙ. Бьёт вдвое
+      // тяжелее перехватчика (20 против 14), по постройкам работает средне
+      // (`siegeDamage` 18 — меньше осадной платформы, но несравнимо больше, чем 1 у
+      // перехватчика), и за это платит скоростью, топливом и долгой перезарядкой.
+      // Пара «перехватчик / бомбардировщик» и есть развод ролей внутри челноков:
+      // одному — чужие машины, другому — корпуса.
+      faction: 'blue',
+      stats: {
+        attack: 20,
+        defense: 4,
+        speed: 62,
+        hp: 16,
+        strikeRange: 150,
+        fuel: 2,
+        rearmRounds: 3,
+        siegeDamage: 18,
+      },
+      line: 'front',
+      traits: ['shuttle'],
+      signature: 2,
+      cost: { metal: 120, credits: 60, microelectronics: 12 },
+      buildTimeHours: 3,
+      upkeep: { credits: 40 },
+      slots: { weapon: 1 }, // одна орудийная точка — как у перехватчика
     },
     strike_carrier: {
       // ДЕСАНТНЫЙ КОРАБЛЬ (заказ владельца 2026-09-09): самый большой трюм в ростере

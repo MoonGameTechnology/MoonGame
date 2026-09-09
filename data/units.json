@@ -244,7 +244,8 @@
       "hp": 10,
       "strikeRange": 180,
       "fuel": 3,
-      "rearmRounds": 2
+      "rearmRounds": 2,
+      "siegeDamage": 1
     },
     "line": "front",
     "traits": [
@@ -259,6 +260,36 @@
     "buildTimeHours": 2,
     "upkeep": {
       "credits": 32
+    },
+    "slots": {
+      "weapon": 1
+    }
+  },
+  "bomber": {
+    "faction": "blue",
+    "stats": {
+      "attack": 20,
+      "defense": 4,
+      "speed": 62,
+      "hp": 16,
+      "strikeRange": 150,
+      "fuel": 2,
+      "rearmRounds": 3,
+      "siegeDamage": 18
+    },
+    "line": "front",
+    "traits": [
+      "shuttle"
+    ],
+    "signature": 2,
+    "cost": {
+      "metal": 120,
+      "credits": 60,
+      "microelectronics": 12
+    },
+    "buildTimeHours": 3,
+    "upkeep": {
+      "credits": 40
     },
     "slots": {
       "weapon": 1
