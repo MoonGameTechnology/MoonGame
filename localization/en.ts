@@ -787,7 +787,7 @@ export const en: Record<string, string> = {
     "A bomber: the shuttle built for HULLS — {a} damage to a ship, twice what an interceptor lands. Against buildings it is middling ({s} per hour): it will hurt a world, but levelling one is siege-platform work. Heavier and slower than an interceptor ({hp} hull, {r} reach), longer to rearm, and it never joins the battle: fly in, hit, go home.",
   'dossier.unit.bomber.name': 'Bomber',
   'dossier.unit.interceptor.desc':
-    "An interceptor: fast (speed {sp}) and hits hard ({a} attack), but almost no armor ({hp} hull). Splits off the carrier into its own fast fleet and strikes from range {r}. Countered by orbital AA — don't send it against an AA-covered world.",
+    "An interceptor: a hunter of ENEMY SHUTTLES — {s} damage against them, more than anything else fields. Against ships it is nearly harmless ({a} attack), against buildings more so. Fast (speed {sp}) but unarmored ({hp} hull), reach {r}. Above all it scrambles ON ITS OWN, without an order, whenever a hostile strike passes near its port or carrier — and burns the base's fuel doing it.",
   'dossier.unit.interceptor.name': 'Interceptor',
   'dossier.unit.hero.desc':
     "The commander's own combat projection — a flagship leading the home fleet: {a} attack and {hp} hull. But that's not what matters: its presence holds the shuttle together, granting {b} attack/defense to every ship nearby. If it falls, the commander loses their projection until it's rebuilt at the home world.",

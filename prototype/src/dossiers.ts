@@ -195,6 +195,7 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
         name: t('dossier.unit.interceptor.name'),
         body: t('dossier.unit.interceptor.desc', {
           sp: hl(st.speed),
+          s: hl(st.shuttleDamage ?? 0),
           a: hl(st.attack),
           hp: hl(st.hp),
           r: hl(st.strikeRange ?? 0),

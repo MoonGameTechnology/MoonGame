@@ -575,13 +575,13 @@
 | FSPLIT-1 | ✅ | core act proto | `docs/backlog.md:12862` | Отбор при делении адресует СТЕК, а не тип корабля. |
 | FSPLIT-2 | ✅ | core act proto | `docs/backlog.md:12872` | Десант делится вместе с кораблями, по трюму обеих половин. |
 | AIDIFF-1 | ✅ | proto | `docs/backlog.md:12900` | Строка места переключается «выкл → слабый → сильный». |
-| RESIL-1 | ⏳ | proto | `docs/backlog.md:12980` | Фоновые промисы браузерного клиента. |
-| RESIL-2 | ⏳ | proto | `docs/backlog.md:12991` | Цикл подсветки обучающего тура. |
-| RESIL-3 | ⏳ | srv | `docs/backlog.md:12999` | Именованный фатал процесса. |
-| RESIL-4 | ✅ | srv | `docs/backlog.md:13010` | Соак проверяет, что мир не встал. |
-| RESIL-5 | ✅ | srv proto | `docs/backlog.md:13028` | Генеральная репетиция: весь стек разом, и |
-| RESIL-6 | ✅ | srv proto | `docs/backlog.md:13063` | Достоверность генералки: настоящая база, |
-| ADDR-7 | ✅ | sec proto | `docs/backlog.md:13167` | Ссылка на партию не пускает по незнанию: |
+| RESIL-1 | ⏳ | proto | `docs/backlog.md:12982` | Фоновые промисы браузерного клиента. |
+| RESIL-2 | ⏳ | proto | `docs/backlog.md:12993` | Цикл подсветки обучающего тура. |
+| RESIL-3 | ⏳ | srv | `docs/backlog.md:13001` | Именованный фатал процесса. |
+| RESIL-4 | ✅ | srv | `docs/backlog.md:13012` | Соак проверяет, что мир не встал. |
+| RESIL-5 | ✅ | srv proto | `docs/backlog.md:13030` | Генеральная репетиция: весь стек разом, и |
+| RESIL-6 | ✅ | srv proto | `docs/backlog.md:13065` | Достоверность генералки: настоящая база, |
+| ADDR-7 | ✅ | sec proto | `docs/backlog.md:13175` | Ссылка на партию не пускает по незнанию: |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
@@ -873,13 +873,13 @@
 | ROS-1.1 | ✅ | core data proto | `docs/roster-roadmap.md:136` | Пехота и техника: два рода наземных войск 2026-09-09 |
 | ROS-1.2 | ⏳ | data | `docs/roster-roadmap.md:170` | Фрегат: корабль поддержки под модули |
 | ROS-1.3 | ✅ | core data | `docs/roster-roadmap.md:183` | Осадная платформа осаждает планету, а не флот 2026-09-09 |
-| ROS-1.4 | 🔶 | core data proto | `docs/roster-roadmap.md:209` | Бомбардировщик и профили урона челноков 2026-09-09 |
-| ROS-1.5 | ⏳ | core data | `docs/roster-roadmap.md:246` | Десантный челнок: высадка вместо удара |
-| ROS-2.1 | ✅ | core data proto | `docs/roster-roadmap.md:267` | Три линии 50/30/20, артиллерия без ответного огня 2026-09-09 |
-| ROS-2.1a | ⏳ | core proto | `docs/roster-roadmap.md:318` | Снос машинерии обстрела |
-| ROS-2.2 | 🔒 | core data | `docs/roster-roadmap.md:331` | Челнок — сторона боя: ответный урон и зональное ПВО |
-| ROS-3.1 | ⏳ | proto | `docs/roster-roadmap.md:356` | Экран «Производство»: пять типов, модули, количество, планета |
-| ROS-3.2 | ⏳ | proto | `docs/roster-roadmap.md:374` | Шаттл — корабль во всём интерфейсе |
+| ROS-1.4 | ✅ | core data proto | `docs/roster-roadmap.md:209` | Бомбардировщик и профили урона челноков 2026-09-09 |
+| ROS-1.5 | ⏳ | core data | `docs/roster-roadmap.md:245` | Десантный челнок: высадка вместо удара |
+| ROS-2.1 | ✅ | core data proto | `docs/roster-roadmap.md:266` | Три линии 50/30/20, артиллерия без ответного огня 2026-09-09 |
+| ROS-2.1a | ⏳ | proto | `docs/roster-roadmap.md:317` | Управление огнём показывается только тем, кто может стрелять |
+| ROS-2.2 | ⏳ | core data | `docs/roster-roadmap.md:334` | Челнок — сторона боя: ответный урон и зональное ПВО |
+| ROS-3.1 | ⏳ | proto | `docs/roster-roadmap.md:361` | Экран «Производство»: пять типов, модули, количество, планета |
+| ROS-3.2 | ⏳ | proto | `docs/roster-roadmap.md:379` | Шаттл — корабль во всём интерфейсе |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md:48` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md:55` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md:64` | Сервисные идентичности и scoped-токены |

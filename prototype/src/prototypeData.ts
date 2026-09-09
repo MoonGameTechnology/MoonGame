@@ -401,12 +401,15 @@ export const data: GameData = parseGameData({
     interceptor: {
       // Carrier-borne strike wing (shuttles-roadmap SQ-0.1): very fast + hard-hitting
       // but paper-thin — launch it ahead to strike, orbital AA (orbital_aa) is its counter.
-      // ROS-1.4: по ЗДАНИЯМ он почти безвреден (`siegeDamage` 1) — истребитель не
-      // бомбардировщик. Полное разведение ролей (нерф `attack` и охота за чужими
-      // челноками) ждёт перехвата — SHU-1.3, см. роадмап челноков.
+      // ROS-1.4 + SHU-1.3: роли разведены до конца. По КОРПУСАМ он почти безвреден
+      // (`attack` 4), по зданиям тем более (`siegeDamage` 1), зато против чужих
+      // ЧЕЛНОКОВ страшен (`shuttleDamage` 22) — и это единственная машина, которая
+      // поднимается из ангара навстречу чужому удару. Нерф урона по кораблям приехал
+      // ВМЕСТЕ с перехватом, а не раньше: до него охотиться было не на кого, и
+      // ослабленный перехватчик просто выпал бы из игры.
       faction: 'blue',
       stats: {
-        attack: 14,
+        attack: 4,
         defense: 3,
         speed: 92,
         hp: 10,
@@ -414,6 +417,7 @@ export const data: GameData = parseGameData({
         fuel: 3,
         rearmRounds: 2,
         siegeDamage: 1,
+        shuttleDamage: 22,
       },
       line: 'front', // a strike wing goes in first
       traits: ['shuttle'],
@@ -440,6 +444,7 @@ export const data: GameData = parseGameData({
         fuel: 2,
         rearmRounds: 3,
         siegeDamage: 18,
+        shuttleDamage: 2, // от чужих машин почти не отобьётся — это работа перехватчика
       },
       line: 'front',
       traits: ['shuttle'],
