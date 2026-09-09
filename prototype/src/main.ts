@@ -26,6 +26,7 @@ import {
   orbitFleet,
   assaultFleet,
   bombardFleet,
+  engageFleet,
   barrageFleet,
   barrageModeFleet,
   loadArmy,
@@ -34,7 +35,6 @@ import {
   splitFleet,
   buildBuilding,
   upgradeBuilding,
-  buildUnit,
   cancelConstruction,
   resumeConstruction,
   declareWar,
@@ -160,6 +160,7 @@ import {
   fleetRadarRange,
   abilityRange,
   type PausedConstructionSite,
+  type QueuedConstruction,
 } from '../../packages/shared-core/src/index';
 import {
   MultiplayerClient,
@@ -236,7 +237,6 @@ import { syncCommanderXp } from './commanderSync';
 import { panelSlackFor } from './panelSlack';
 import { longPressAction, pressIntent } from './pressIntent';
 import { assaultMovers, assaultTargetBlocker, collectBlockers, moveMovers } from './warPrompt';
-import { assaultOrderState, dropsOrder } from './assaultQueue';
 import { laneEnds, warConfirmPlan } from './warOrders';
 import { bakeSignature, needsRebake, ownersSignature } from './staticLayerCache';
 import { clipPolygon, clipRect, provinceSeeds } from './provinceMap';
@@ -358,11 +358,9 @@ import {
 } from './pointerPick';
 import {
   afford as coreAfford,
-  emptyQueue,
   laneOf,
   queuedAction as coreQueuedAction,
   queuedCost,
-  waitsForMoney,
 } from './buildOrders';
 import {
   activeConstruction as coreActiveConstruction,
@@ -431,7 +429,6 @@ import type {
   BuildKind,
   BuildLane,
   ConstructionPayload,
-  PlanetBuildQueue,
   QueuedBuild,
 } from './buildQueue';
 import {
@@ -718,9 +715,6 @@ import {
 import { diploDelivery } from './diploDelivery';
 import { garrisonSide, planFor, troopsGate } from './troopsScene';
 import {
-  BUILD_LANES,
-  headStarts,
-  queueRuns,
   rallyCloses,
   shipsPending,
   withoutRally,
@@ -1026,12 +1020,20 @@ let endScreen: MatchEnd | null = null;
 let selFleet: string | null = null;
 let selPlanet: string | null = null;
 let selFleets = new Set<string>();
+/** UI-14. ЧУЖОЙ флот, который игрок тапнул, чтобы посмотреть. Держится ОТДЕЛЬНО от
+ *  `selFleet` намеренно: `selFleet` — адрес приказа, и чужой id в нём завёл бы приказы,
+ *  которые ядро отклонит. Осмотр — состояние панели и только её. */
+let inspectFleet: string | null = null;
 let aiming = false; // "Move" command armed → next world tap orders the move
 // PC ШТУРМ: armed like "Move", but the target must be someone else's capturable
 // world — the fleet flies there and assaults on arrival (one-shot, not the CC-2
 // standing auto-storm). Keyed by fleet id → destination world.
 let assaultAim = false;
-const assaultOnArrival = new Map<string, string>();
+/** Вооружена «Атака» (ATK-1): следующий тап по ЧУЖОМУ флоту — приказ его атаковать.
+ *  Кнопка стоит в ряду команд ВСЕГДА, как «Курс»: атака — базовое действие флота, а не
+ *  условная возможность, и прятать её значило бы заставлять игрока гадать, отчего она
+ *  то есть, то нет. Что цель не годится, скажет ядро — одним понятным отказом. */
+let engageAim = false;
 let barrageAim = false; // "Обстрел" armed → next tap picks the artillery's focus target
 // Hero window armed modes: a cast waits for its target world; a deploy waits for the
 // point the hero's ship rises at (own world / own fleet / allied world by markers).
@@ -1198,7 +1200,6 @@ let fleetInfoFor: string | null = null;
 // Тап по имени МИРА открывает карточку статистики планеты (какой мир сейчас в
 // режиме сводки; другой мир в панели → обычная карточка сама собой).
 let planetInfoFor: string | null = null;
-const buildQueues: Record<string, PlanetBuildQueue> = {};
 const logLines: string[] = [];
 // Player ids the local sim drives as AI (empty seats become AI), each with the
 // DIFFICULTY chosen on the setup screen (AIDIFF-1: «слабый» = the old simple bot,
@@ -1754,37 +1755,20 @@ function myRes(): Record<string, number> {
 function afford(bag: Record<string, number> | undefined): boolean {
   return coreAfford(myRes(), bag);
 }
-/** Локальная (офлайновая) очередь стройки этого мира — ядру она неизвестна: в сети
- *  стройку таймит сервер. Создаётся по первому обращению. */
-function queueOf(planetId: string): PlanetBuildQueue {
-  return (buildQueues[planetId] ??= emptyQueue());
+/** Ждущие заказы этой полосы — из ЯДРА (BLD-1): очередь больше не локальная. */
+function coreQueue(planetId: string, lane: BuildLane): QueuedConstruction[] {
+  return (s.planets[planetId]?.buildQueue ?? []).filter((q) => laneOf(q.kind) === lane);
 }
-/** Цена головы очереди — ДЛЯ ПОКАЗА (строка «⏳ ждём: …»); правила масштаба и смещения
+/** Цена ждущего заказа — ДЛЯ ПОКАЗА (строка «⏳ ждём: …»); правила масштаба и смещения
  *  уровней живут в `buildOrders.ts` (REFM-32). */
-function buildCost(planetId: string, q: QueuedBuild): Record<string, number> | undefined {
-  return queuedCost(s, data, planetId, q);
+function buildCost(planetId: string, q: QueuedConstruction): Record<string, number> | undefined {
+  const id = q.building ?? q.unit;
+  if (id === undefined) return undefined;
+  return queuedCost(s, data, planetId, { kind: q.kind, id, count: q.count ?? 1 });
 }
 /** Приказ, которым голова очереди уедет в ядро. */
 function queuedAction(planetId: string, q: QueuedBuild): Action {
   return coreQueuedAction(ME, planetId, q);
-}
-/**
- * RULES-4. Пора ли пускать голову очереди — ВЕРДИКТ ЯДРА, а не свой прайс-лист.
- *
- * Очередь умеет ждать ровно одно — деньги, поэтому единственный код, на котором она
- * держит голову, это `E_INSUFFICIENT`. Любой другой отказ ожиданием не лечится (или
- * лечится не очередью), и голова уезжает в ядро, где игрок получает НАСТОЯЩУЮ причину
- * (`queue.failed` печатает `errText(код)`) вместо молчаливого зависания.
- *
- * Что это чинит. Прежний `afford(buildCost(...))` был FAIL-OPEN против инварианта #4:
- * `buildCost` возвращал `undefined` для неизвестного id и для уже максимального
- * уровня, а `afford(undefined)` — `true`, то есть очередь считала голову «готовой» и
- * дёргала ядро. Плюс он переписывал прайс ядра целиком и мимо него проходили и
- * масштаб на `count`, и все неденежные ворота (`E_BOMBARDED`, `E_WRONG_SECTOR`,
- * `E_NO_SHIPYARD`, `E_MAX_LEVEL`) — очередь считала «можно», ядро отбивало.
- */
-function canStartQueued(planetId: string, q: QueuedBuild): boolean {
-  return !waitsForMoney(canOrder(s, queuedAction(planetId, q)));
 }
 /** Стройка, идущая на мире прямо сейчас (голову по `(at, seq)` выбирает
  *  `buildProgress.ts`, REFM-31 — там же и правило порядка). */
@@ -1827,6 +1811,18 @@ function queuedLabel(q: QueuedBuild): string {
   }
   return `${BUILD_ICON[q.id] ?? '▣'} ${tData(data.buildings[q.id]?.name ?? q.id)}`;
 }
+/**
+ * BLD-1. Приказ всегда уезжает В ЯДРО — очередь живёт там.
+ *
+ * Раньше здесь стояла развилка: в сети приказ отправлялся сразу («сервер таймит
+ * стройку»), а в соло ложился в ЛОКАЛЬНУЮ очередь прототипа. Из-за неё сеть и соло
+ * играли по разным правилам, и на живом плейтесте это вылезло ровно так, как и должно
+ * было: в сети каждый тап заводил ЕЩЁ ОДНУ параллельную стройку, экран показывал
+ * ближайшую, и игрок видел «постройки заменяют друг друга, ресурсы тратятся».
+ *
+ * Теперь очередь одна и она в ядре (`Planet.buildQueue`): и сервер, и локальный
+ * редьюсер прототипа исполняют одно правило, а клиент её только ПОКАЗЫВАЕТ.
+ */
 function enqueueBuild(planetId: string, order: QueuedBuild): void {
   // Одна точка опоры против дубля одноэкземплярного здания: плитка, кодекс и любой
   // будущий вход проходят здесь, и серые плитки остаются чистой косметикой.
@@ -1834,30 +1830,15 @@ function enqueueBuild(planetId: string, order: QueuedBuild): void {
     note('✖ ' + errText(buildingLocked(planetId, order.id) === 'built' ? 'E_ALREADY_BUILT' : 'E_ALREADY_QUEUED'));
     return;
   }
-  if (NET) {
-    // No local build queue in net mode — the server times construction. Send the
-    // order straight away (one tap = one build queued server-side).
-    const action =
-      order.kind === 'unit'
-        ? buildUnit(ME, planetId, order.id, order.count)
-        : order.kind === 'upgrade'
-          ? upgradeBuilding(ME, planetId, order.id)
-          : buildBuilding(ME, planetId, order.id);
-    playerOrder(action);
-    return;
+  // Тост «в очередь» — ПРЕДСКАЗАНИЕ клиента: полоса занята, значит ядро поставит заказ
+  // в ряд, а не начнёт его. Держать это предсказание можно ровно потому, что оно
+  // косметическое: правду показывает панель конвейера, которая читает состояние, и
+  // следующий снимок её поправит. Раньше тост был только в соло — в сети локальной
+  // очереди не было вовсе, и тап не отвечал игроку ничем.
+  if (activeConstruction(planetId, laneOf(order.kind))) {
+    note(t('queue.added', { what: queuedLabel(order), at: planetId }));
   }
-  queueOf(planetId)[laneOf(order.kind)].push(order);
-  note(t('queue.added', { what: queuedLabel(order), at: planetId }));
-  pumpBuildQueues();
-}
-function submitQueued(planetId: string, queued: QueuedBuild): StepOut {
-  const action = queuedAction(planetId, queued);
-  const before = sandboxBuildSnapshot(action.type);
-  const out = order(s, action, s.time);
-  apply(out);
-  sandboxBuildRestore(before, !out.error);
-  if (!out.error) activeTour?.notifyAction(action.type); // local build queue bypasses playerOrder
-  return out;
+  playerOrder(queuedAction(planetId, order));
 }
 // A rally fleet keeps swallowing freshly-built ships only while its world still has
 // a ship in the pipeline (one building, or one queued). The moment the queue drains,
@@ -1869,7 +1850,7 @@ function closeIdleRallies(): void {
   // строит корабли НИ сейчас, НИ по очереди; закрытие снимает МЕТКУ, а не распускает
   // флот, иначе одна эскадра росла бы весь матч; о летящем флоте не решают вовсе.
   const строит = (planetId: string): boolean =>
-    shipsPending(!!activeConstruction(planetId, 'units'), buildQueues[planetId]?.units.length ?? 0);
+    shipsPending(!!activeConstruction(planetId, 'units'), coreQueue(planetId, 'units').length);
   for (const f of Object.values(s.fleets)) {
     const view = {
       mine: f.owner === ME,
@@ -1878,33 +1859,6 @@ function closeIdleRallies(): void {
       traits: f.traits,
     };
     if (rallyCloses(view, строит)) f.traits = withoutRally(f.traits ?? []);
-  }
-}
-function pumpBuildQueues(): void {
-  for (const planetId of Object.keys(buildQueues)) {
-    const q = buildQueues[planetId];
-    const p = s.planets[planetId];
-    if (!queueRuns(!!q && !!p, p?.owner === ME) || !q) {
-      continue;
-    }
-    // Полосы решаются ПО ОЧЕРЕДИ, а не единым планом (правило 5 в `buildPipeline.ts`):
-    // пуск головы тратит ресурсы, и вердикт по второй полосе зависит от уже применённой.
-    for (const lane of BUILD_LANES) {
-      const next = q[lane][0];
-      // Вердикт ядра — ЛЕНИВО (правило 9): у пустой полосы его спрашивать не про что, у
-      // занятой незачем, а лишний `canOrder` на каждом кадре — плата ни за что.
-      if (
-        !next ||
-        !headStarts(!!activeConstruction(planetId, lane), () => !canStartQueued(planetId, next))
-      ) {
-        continue;
-      }
-      q[lane].shift();
-      const r = submitQueued(planetId, next);
-      if (r.error) {
-        note(t('queue.failed', { what: queuedLabel(next), err: errText(r.error) }));
-      }
-    }
   }
 }
 /** Где флот НАХОДИТСЯ по правилам, в МИРОВЫХ координатах — правила и вся интерполяция
@@ -2228,8 +2182,24 @@ function fleetSeen(f: Fleet): boolean {
 // ОПОЗНАННЫЕ узлы (радар состава не выдаёт), снимок — копия, а не ссылка на живой
 // мир, и память принадлежит матчу.
 const memory = createScanMemory();
+/**
+ * Записать в память разведки то, что видно СЕЙЧАС, и то, что помнит СЕРВЕР (FOG-10).
+ *
+ * Клиентская память (`scanMemory.ts`) живёт ровно столько, сколько живёт вкладка. Пока
+ * страница открыта, этого хватает; перезагрузил — и разведанные лично миры снова «?».
+ * Настоящее хранилище памяти есть в ядре (`state.fog`, пишет `visibilityModule`), и
+ * `visibleState` присылает по нему список `remembered`, УЖЕ подставив в эти миры их
+ * последний известный снимок. Значит достаточно снять с них снимок тем же вызовом:
+ * серверная память становится источником, клиентская — кэшем кадра, и после
+ * перезагрузки карта восстанавливается из первого же снапшота.
+ *
+ * В соло поля нет (проекция там не применяется) — и не нужно: состояние полное, а
+ * память набирается из того, что видно.
+ */
 function updateMemory(identify: Set<string>): void {
   memory.remember(identify, s.planets);
+  const remembered = (s as { remembered?: string[] }).remembered;
+  if (remembered?.length) memory.remember(remembered, s.planets);
 }
 
 /** True if node `id` is identified (full detail); fog off ⇒ always true. */
@@ -2899,36 +2869,33 @@ function dispatchAssault(fleetIds: string[], destId: string): void {
       issueAssault(step.id, s.fleets[step.id]?.orbit);
       continue;
     }
-    playerOrder(moveFleet(ME, step.id, destId));
-    assaultOnArrival.set(step.id, destId);
-  }
-}
-/** Fire the one-shot assault orders of fleets that reached their ШТУРМ target
- *  (runs each frame beside autoEngage). Redirected fleets drop the order. */
-function pumpAssaultOrders(): void {
-  if (!assaultOnArrival.size) return;
-  for (const [id, destId] of [...assaultOnArrival]) {
-    const f = s.fleets[id];
-    // Что стало с отложенным приказом — `assaultQueue.ts` (REFM-58): перенаправленный
-    // снимается, бой по прилёте ждут, вставший не в цели протухает.
-    const state = assaultOrderState(f, destId);
-    if (dropsOrder(state)) {
-      assaultOnArrival.delete(id);
-      continue;
-    }
-    if (state !== 'ready' || !f) continue;
-    // RULES-4. Флот на месте — приказ издаётся СЕЙЧАС, поэтому решает ядро, а не
-    // три рукописных условия («захвачен своими / опустел» + отдельно десант). Оно
-    // же покрывает и `E_OWN_PLANET`, и `E_NOT_CAPTURABLE`, и чужой идущий штурм.
-    const code = assaultVerdict(id, f);
-    if (code !== null) {
-      // одно понятное сообщение вместо цикла отказов; приказ снимается в любом случае
-      note(code === 'E_NO_TROOPS' ? t('log.assault.no-troops') : '✖ ' + errText(code), destId);
-      assaultOnArrival.delete(id);
-      continue;
-    }
-    issueAssault(id, f.orbit);
-    assaultOnArrival.delete(id);
+    // ORD-2. Отложенный ШТУРМ уходит в ЯДРО цепочкой приказов «дойти → штурмовать», а не
+    // в локальную карту клиента.
+    //
+    // Раньше здесь было `moveFleet` + запись в `assaultOnArrival`, и сам штурм издавал
+    // покадровый цикл браузера — в ОБОИХ режимах. В сети это значило: перелёт ведёт
+    // сервер, часами реального времени, а решающий приказ ждёт открытой вкладки. Закрыл
+    // вкладку, перезагрузил страницу, оборвалась связь — карта пары исчезла вместе со
+    // страницей, флот прилетал и стоял на орбите вечно. Для игры, которая идёт 24/7 и вся
+    // построена на «отдал приказ и ушёл», это была молчаливая потеря самого дорогого
+    // приказа.
+    //
+    // Цепочки ядра (`order.chain`) для этого уже всё умеют: шаг `assault` сам поднимает
+    // флот на ближнюю орбиту и штурмует, а гоняют цепочки ОБА хоста — сервер
+    // (`runServerStanding` → `serverChainActions`) и соло-драйвер прототипа. То есть
+    // правило переезжает туда, где исполняется, и становится одним на сеть и на соло.
+    //
+    // Что при этом ИЗМЕНИЛОСЬ, и это надо знать: план теперь ПЕРЕЖИВАЕТ перенаправление.
+    // Локальная карта снималась, как только флот получал другой приказ; цепочка — нет,
+    // она возобновится, когда флот освободится. Так ведут себя все планы («Приказ»,
+    // CHAIN-UX), и отменяется он там же — тапом по ◎-бейджу плана. Взамен приказ стал
+    // ВИДИМЫМ: раньше он жил невидимкой в памяти вкладки и молча исчезал.
+    playerOrder(
+      orderChain(ME, step.id, [
+        { kind: 'move', to: destId },
+        { kind: 'assault' },
+      ]),
+    );
   }
 }
 /** As tryMoveGroup, but the target is a point on a lane (continuous order). Either lane
@@ -3011,11 +2978,23 @@ function setFleetSelection(ids: string[]) {
   const sel = selectFleets(ids, (id) => s.fleets[id]?.owner === ME);
   selFleets = new Set(sel.picked);
   selFleet = sel.single;
+  inspectFleet = sel.inspect; // UI-14: одинокий чужой уходит на осмотр, а не в никуда
   selPlanet = null; // a fleet selection never co-selects a planet (mutually exclusive)
   lastPanelHtml = '';
 }
+/**
+ * Чей флот показывает панель. Осмотр чужого (UI-14) уступает ВСЕМУ: он виден, только
+ * пока не выбрано ничего своего. Это не вежливость, а структура: так протухший
+ * `inspectFleet` не может заслонить свежий выбор мира или флота, и правило держится
+ * само, а не дисциплиной в пяти местах, где выбор меняется.
+ */
+function panelFleet(): string | null {
+  if (selFleet || selPlanet || selFleets.size) return selFleet;
+  return inspectFleet;
+}
 function clearSelection() {
   selFleet = null;
+  inspectFleet = null;
   selPlanet = null;
   selFleets = new Set();
   merging = false;
@@ -5382,7 +5361,7 @@ function conveyorHtml(planetId: string, lane: BuildLane): string {
   // Разметку собирает `conveyorView.ts` (REFM-36) — там же правило «живые числа не
   // входят в подпись панели» и «очередь без денег называет цену».
   const active = activeConstruction(planetId, lane);
-  const queued = queueOf(planetId)[lane];
+  const queued = coreQueue(planetId, lane);
   const head = queued[0];
   return kitConveyorHtml(
     planetId,
@@ -5396,15 +5375,15 @@ function conveyorHtml(planetId: string, lane: BuildLane): string {
             seq: active.seq,
           }
         : null,
-      queued: queued.map((q) => ({ label: queuedLabel(q) })),
+      queued: queued.map((q) => ({ label: constructionLabel(q), id: q.id })),
       paused: (s.planets[planetId]?.pausedConstruction ?? [])
         .filter((p) => laneOf(p.kind) === lane)
         .map((p) => ({ id: p.id, label: pausedLabel(p), progress: p.progress })),
       // Строку «ждём цену» показываем только на ПК: на телефоне место дороже.
-      waitingCost:
-        !active && pcUi() && head && !canStartQueued(planetId, head)
-          ? cost(buildCost(planetId, head), myRes())
-          : null,
+      // Условие простое именно потому, что решает ЯДРО: полоса свободна, а голова всё
+      // ещё ждёт — значит она уперлась ровно в деньги (BLD-1, правило 4); своего
+      // прайс-листа для этого вывода клиенту больше не нужно.
+      waitingCost: !active && pcUi() && head ? cost(buildCost(planetId, head), myRes()) : null,
       compact: pcUi(),
     },
     {
@@ -5633,6 +5612,18 @@ function fleetPanelHtml(f: Fleet): string {
   );
   // Тап по имени открыл сводку армии — карточка целиком уступает ей место.
   if (fleetInfoFor === f.id) return h + fleetSummaryHtml(f);
+  // UI-14. ЧУЖОЙ флот — только осмотр: тот же разбор состава, что игрок уже знает по
+  // своим (тап по имени), и ни одной кнопки приказа. Кнопки тут были бы не «строгостью
+  // интерфейса», а обманом: ядро всё равно отвечает `E_FORBIDDEN` на приказ чужому
+  // флоту. Строка-подсказка объясняет, ПОЧЕМУ приказов нет, — иначе пустая карточка
+  // читается как поломка, а именно с этого и началась находка владельца.
+  if (f.owner !== ME) {
+    return (
+      h +
+      `<div class="hint">${t('side.fleet.foreign.hint', { who: NAME[f.owner] ?? f.owner })}</div>` +
+      fleetSummaryHtml(f)
+    );
+  }
   // ХП-бар Bytro-стиля + два ремонта: ECON-3а — экспресс за METAL у своего дока
   // (дешёвый, основной), и ненавязчивый платный за кредиты — где угодно вне боя
   // (цены — те же формулы, что в гейте).
@@ -5803,8 +5794,15 @@ function fleetPanelHtml(f: Fleet): string {
         f.bombarding ? t('side.strike.bombard.stop') : t('side.strike.bombard'),
         bombardEnabled(inOrbit, nShips),
       );
-      // Штурм не спрашивает состав: высаживается десант, а не корпуса.
-      at += btn('assault', '', t('side.strike.assault'), assaultEnabled(inOrbit));
+      // Штурм не спрашивает КОРАБЛИ (высаживается десант, а не корпуса), но десант
+      // спрашивает — там, где его требует ядро: на защищённом мире без него ответ
+      // `E_NO_TROOPS`, и живая кнопка обещала бы заведомый отказ (правило 4).
+      at += btn(
+        'assault',
+        '',
+        t('side.strike.assault'),
+        assaultEnabled(inOrbit, sumUnits(f.landing ?? []) > 0, sumUnits(here!.garrison) > 0),
+      );
       at += `</div>`;
       at += `<div class="hint">${t('side.strike.hint')}</div>`;
       // Combat forecast (ONB-6): «если атакую — что будет?» — the pure base-model
@@ -6180,7 +6178,7 @@ function planetPanelHtml(p: Planet): string {
 function panelHtml(): string {
   // Приоритет претендентов и отсев мёртвых ссылок — в `panelSelect.ts` (REFM-39):
   // устаревший выбор флота проваливается на мир, а не запирает панель пустотой.
-  const pick = pickPanel({ fleets: selFleets, fleet: selFleet, planet: selPlanet }, s, seesDetails);
+  const pick = pickPanel({ fleets: selFleets, fleet: panelFleet(), planet: selPlanet }, s, seesDetails);
   if (pick.kind === 'group') return taskGroupPanelHtml(pick.fleets);
   if (pick.kind === 'fleet') return fleetPanelHtml(pick.fleet);
   if (pick.kind === 'empty') return `<div class="hint">${t('side.empty')}</div>`;
@@ -6196,7 +6194,12 @@ const { objDossier, codexHtml } = createDossiers({
   me: () => ME,
   pcUi,
   youColor: () => youColor,
-  queueOf,
+  queuedOrders: (planetId, lane) =>
+    coreQueue(planetId, lane).map((q) => ({
+      kind: q.kind,
+      id: q.building ?? q.unit ?? '',
+      count: q.count ?? 1,
+    })),
   activeConstruction,
   progressPct,
 });
@@ -6744,7 +6747,7 @@ function buildingLocked(planetId: string, id: string): TileLock {
   // её нет — там стройку таймит сервер), поэтому она приходит отдельным флагом.
   return tileLock(
     canOrder(s, buildBuilding(ME, planetId, id)),
-    queueOf(planetId).buildings.some((q) => q.kind === 'building' && q.id === id),
+    coreQueue(planetId, 'buildings').some((q) => q.building === id),
   );
 }
 /** Доход ПОСТРОЕННОГО здания за час — готовой разметкой; у недоходного пусто. Цифра
@@ -7336,6 +7339,9 @@ function renderCmdBar() {
   const html =
     `<span class="cmdlabel">${ids.length > 1 ? t('cmd.selection.many', { n: ids.length }) : t('cmd.selection.one')}</span>` +
     cmdBtn('move', '⤳', t('cmd.move'), aiming ? 'on' : '', false, t('cmd.move.hint')) +
+    // ATK-1: «Атака» — всегда, как «Курс». Цель у неё ФЛОТ, а не мир (в отличие от
+    // ШТУРМА ниже), поэтому и кнопка отдельная, и прицел отдельный.
+    cmdBtn('engage', '⚡', t('cmd.engage'), engageAim ? 'on' : '', false, t('cmd.engage.hint')) +
     (shown.stop ? cmdBtn('stop', '■', t('cmd.stop'), 'danger', false, t('cmd.stop.hint')) : '') +
     cmdBtn(
       'attack',
@@ -7627,17 +7633,19 @@ side.addEventListener('click', (ev) => {
     enqueueBuild(selPlanet!, { kind: 'building', id: arg, count: 1 });
   } else if (act === 'unit') {
     enqueueBuild(selPlanet!, { kind: 'unit', id: arg, count: 1 });
+  } else if (act === 'engage') {
+    // Нарочная атака чужого флота на своём же узле (`fleet.engage`). Первый залп — на
+    // самом приказе (CMB-4), поэтому «атака» здесь и правда атака, а не заявка на неё.
+    playerOrder(engageFleet(ME, selFleet!, arg));
   } else if (act === 'cancelbuild') {
     // The active order only — refunds the unbuilt share and pauses it (resumable).
     playerOrder(cancelConstruction(ME, selPlanet!, Number(arg)));
   } else if (act === 'resumebuild') {
     playerOrder(resumeConstruction(ME, selPlanet!, Number(arg)));
   } else if (act === 'dequeue') {
-    // Nothing was ever paid for a not-yet-dispatched queued order (single-player
-    // local buffer only — net mode sends immediately, so there's nothing to dequeue
-    // there) — a plain local removal, no action needed.
-    const [qLane, qIdx] = arg.split(':');
-    queueOf(selPlanet!)[qLane as BuildLane].splice(Number(qIdx), 1);
+    // BLD-1: очередь в ядре, поэтому снятие ждущего — тот же приказ отмены, что и
+    // снятие идущей стройки. Возврата тут не будет: ждущий заказ не оплачен.
+    playerOrder(cancelConstruction(ME, selPlanet!, Number(arg)));
   } else if (act === 'spyplanet') {
     playerOrder(spyOn(ME, arg, 'planet', selPlanet!)); // arg = the world's (last known) owner
   } else if (act === 'capital') {
@@ -7879,15 +7887,22 @@ cmdbar.addEventListener('click', (ev) => {
   if (disarms('cast', cmd)) castMenu = false;
   if (disarms('troops', cmd)) troopsPlan = null;
   if (disarms('assault', cmd)) assaultAim = false;
+  if (disarms('engage', cmd)) engageAim = false;
   // A real order leaves «Выбрать+» (the group stays selected and takes it);
   // ☰ and the ⊕ toggle itself keep the picking session alive.
   if (disarms('pick', cmd)) pickMode = false;
   // ALWAYS_DISARMED: подтверждаются тапом по КАРТЕ, своей команды в ряду у них нет.
   heroAim = null;
   heroSpawnAim = null;
-  if (cmd === 'move') {
+  if (cmd === 'engage') {
+    engageAim = !engageAim; // arm / disarm the attack order
+    aiming = false;
+    assaultAim = false;
+    if (engageAim) note(t('hint.pick-engage'));
+  } else if (cmd === 'move') {
     aiming = !aiming; // arm / disarm the move order
     assaultAim = false;
+    engageAim = false;
     // Подсказка только на тач: там один палец занят прицелом, и жест камеры надо
     // назвать вслух. На PC мышь и так возит камеру перетаскиванием.
     if (aiming && !pcUi()) note(t('hint.aim-armed'));
@@ -7908,6 +7923,7 @@ cmdbar.addEventListener('click', (ev) => {
       // the fleet there and it storms on arrival (valid targets ring up on the map).
       assaultAim = !assaultAim;
       aiming = false;
+      engageAim = false;
       if (assaultAim) note(t('hint.pick-assault'));
     } else {
       for (const id of ids) if (s.fleets[id]?.orbit === 'near') playerOrder(assaultFleet(ME, id));
@@ -8093,6 +8109,7 @@ function selectAt(mx: number, my: number) {
     heroAim: !!heroAim,
     heroSpawnAim: !!heroSpawnAim,
     assaultAim,
+    engageAim,
     pickMode,
     aiming,
   });
@@ -8196,6 +8213,56 @@ function selectAt(mx: number, my: number) {
     lastPanelHtml = '';
     return;
   }
+  /**
+   * ATK-1. «Атака» наведена: следующий тап по ЧУЖОМУ флоту — приказ его атаковать.
+   *
+   * Два случая, и оба выражаются уже существующими приказами ядра:
+   *  · цель стоит на ТОМ ЖЕ узле — `fleet.engage` немедленно (первый залп на самом
+   *    приказе, CMB-4);
+   *  · цель в другом месте — марш к её узлу. Отдельного «атаковать издалека» заводить
+   *    не нужно: ядро само сцепляет прибывший флот с враждебным на месте
+   *    (`engageFleets` на `fleet.arrived`), то есть марш И ЕСТЬ атака на расстоянии.
+   *
+   * Промах (тап не по флоту) прицел СНИМАЕТ — в отличие от ШТУРМА, который промах
+   * прощает: там цель это МИР, крупный и слипающийся в скоплениях, а здесь цель —
+   * точка флота, и «не попал» почти всегда значит «передумал».
+   */
+  if (owner === 'engage') {
+    const foe = nearestHit(
+      Object.values(s.fleets)
+        .filter(
+          (g) =>
+            g.owner !== ME &&
+            fleetVisible(false, known(fleetNode(g)), intelFleetOwners.has(g.owner)) &&
+            sumUnits(g.units) > 0,
+        )
+        .map((g) => ({ id: g.id, anchor: fleetAnchor(g) })),
+      (g) => g.anchor,
+      mx,
+      my,
+      rFleet,
+    );
+    engageAim = false;
+    lastPanelHtml = '';
+    if (!foe) {
+      note(t('hint.engage-enemy-only'));
+      return;
+    }
+    const target = s.fleets[foe.id]!;
+    for (const id of selectedFleetIds()) {
+      const mine = s.fleets[id];
+      if (!mine) continue;
+      if (mine.location && mine.location === target.location) {
+        playerOrder(engageFleet(ME, id, target.id));
+      } else if (target.location) {
+        // Марш к узлу цели: сцепку по прибытии заводит само ядро.
+        playerOrder(moveFleet(ME, id, target.location));
+      } else {
+        note(t('hint.engage-in-flight')); // цель сама в пути — курса к ней нет
+      }
+    }
+    return;
+  }
   // SEL-1 «Выбрать+»: while picking, taps only toggle OWN fleets in/out of the
   // group — nothing deselects, worlds don't grab the tap, the map is a picking
   // surface until the mode is left (⊕ again, or any common order).
@@ -8285,15 +8352,18 @@ function selectAt(mx: number, my: number) {
     lastPanelHtml = '';
   };
   if (!pcUi()) {
-    // Mobile (frozen in this chat): the original fleet-first behaviour — nearest own
-    // fleet under the tap, else the world, else clear. Перебора нет.
-    const mine = fleetIds[0] ?? null;
+    // Mobile (frozen in this chat): the original fleet-first behaviour — nearest
+    // TAPPABLE fleet under the tap, else the world, else clear. Перебора нет.
+    // «Ближайший» — не обязательно свой: с UI-14 чужой видимый флот тоже отвечает на
+    // тап, только осмотром (правило 6 в `fleetSelection.ts`), поэтому имя переменной
+    // здесь `hit`, а не `mine` — фильтр «своё» стоит дальше, в `setFleetSelection`.
+    const hit = fleetIds[0] ?? null;
     // Shift / Ctrl / ⌘ → extend the group instead of replacing it.
-    if (additive && mine) {
-      toggleFleetInSelection(mine);
+    if (additive && hit) {
+      toggleFleetInSelection(hit);
       return;
     }
-    applyPick(touchPick(mine, n?.id ?? null));
+    applyPick(touchPick(hit, n?.id ?? null));
     return;
   }
   // PC — RimWorld-style cycling: gather EVERY selectable object under the tap — your
@@ -8704,7 +8774,7 @@ const buildWin = initBuildScreen({
   probe: (a) => canOrder(s, a),
   // Локальная соло-очередь: ядро о ней не знает, buildingLocked — знает.
   localQueued: (pid, id) =>
-    queueOf(pid).buildings.some((q) => q.kind === 'building' && q.id === id),
+    coreQueue(pid, 'buildings').some((q) => q.building === id),
   build: (pid, id) => enqueueBuild(pid, { kind: 'building', id, count: 1 }),
   openInfo: (id) => openCodex(`b:${id}`),
   lockText: errText,
@@ -10038,7 +10108,6 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>): void
   pendingLoads = [];
   aiming = false;
   assaultAim = false;
-  assaultOnArrival.clear();
   merging = false;
   additive = false;
   splitState = null;
@@ -10063,7 +10132,6 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>): void
   // Kept honest against the kernel: victoryModule ends on score (SCORE_LIMIT), on
   // elimination, or on domination — no "capital capture" victory exists.
   note(t('hud.goal', { n: SCORE_LIMIT }));
-  for (const k of Object.keys(buildQueues)) delete buildQueues[k];
   defaultView(); // phone: zoom onto home; desktop: whole-map fit
   setupEl.style.display = 'none';
   // SANDBOX — fenced hook. A fresh match starts with no frozen-queue carryover and the
@@ -11822,19 +11890,15 @@ function frame(nowReal: number) {
     const target = advanceTarget(s.time, dt, speed, HOUR);
     apply(advance(s, target));
     solo.autoEngage();
-    pumpAssaultOrders();
     solo.checkFleetClashes();
     solo.drivePatrols(); // CC-4: дежурные вылеты бьют контакты в радиусе
     solo.driveChains(); // CC-1: продвинуть цепочки приказов (ждать → курс → штурм/обстрел)
     solo.runAI();
-    pumpBuildQueues();
     closeIdleRallies(); // drop the 'rally' tag once a world's build pipeline empties
   }
-  // Aimed ШТУРМ resolves in net too: the server drives fleet travel and the arrival
-  // battle, and the client issues the ground assault once the fleet is parked on the
-  // target world. (Solo pumps it inside the sim block above; in both modes assaultOnArrival
-  // stays empty until a ШТУРМ is actually aimed, so this is a no-op otherwise.)
-  if (NET) pumpAssaultOrders();
+  // ORD-2: отложенного ШТУРМА у клиента больше нет вовсе — он уехал в ядро цепочкой
+  // «дойти → штурмовать», и её гоняют оба хоста (сервер и соло-драйвер). Поэтому
+  // покадрового насоса здесь тоже нет: приказ исполняется, даже когда вкладка закрыта.
   updateGoals(); // ONB-7: tick the first-session checklist off live state (no-op when idle)
   // The orbit spin only advances while the world is actually running (sim ticking, or a
   // live net match), so pausing freezes the ships on their rings instead of drifting on.

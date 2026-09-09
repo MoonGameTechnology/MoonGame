@@ -5,22 +5,31 @@ const своё = (id: string): boolean => id.startsWith('my');
 
 describe('что значит выделить флот', () => {
   it('РОВНО ОДИН — он же «текущий»: у одиночного флота своя карточка', () => {
-    expect(selectFleets(['my1'], своё)).toEqual({ picked: ['my1'], single: 'my1' });
+    expect(selectFleets(['my1'], своё)).toEqual({ picked: ['my1'], single: 'my1', inspect: null });
   });
 
   it('несколько — «текущего» НЕТ: иначе приказ ушёл бы одному из группы', () => {
-    expect(selectFleets(['my1', 'my2'], своё)).toEqual({ picked: ['my1', 'my2'], single: null });
+    expect(selectFleets(['my1', 'my2'], своё)).toEqual({
+      picked: ['my1', 'my2'],
+      single: null,
+      inspect: null,
+    });
   });
 
   it('ТОЛЬКО СВОЁ: чужие отсеиваются на входе, а не отказом на каждом приказе', () => {
     expect(selectFleets(['my1', 'foe1', 'foe2'], своё)).toEqual({
       picked: ['my1'],
       single: 'my1',
+      inspect: null,
     });
   });
 
   it('одни чужие — пустое выделение', () => {
-    expect(selectFleets(['foe1', 'foe2'], своё)).toEqual({ picked: [], single: null });
+    expect(selectFleets(['foe1', 'foe2'], своё)).toEqual({
+      picked: [],
+      single: null,
+      inspect: null, // двое чужих — это не осмотр, а промах по стопке
+    });
   });
 
   it('пустой список — пустое выделение', () => {
@@ -29,6 +38,26 @@ describe('что значит выделить флот', () => {
 
   it('порядок выделенных сохраняется — им подписаны строки списка группы', () => {
     expect(selectFleets(['my2', 'my1', 'my3'], своё).picked).toEqual(['my2', 'my1', 'my3']);
+  });
+});
+
+describe('правило 6 — одинокий чужой уходит на ОСМОТР (UI-14)', () => {
+  it('тап по чужому флоту даёт осмотр, а не пустоту', () => {
+    expect(selectFleets(['foe1'], своё)).toEqual({ picked: [], single: null, inspect: 'foe1' });
+  });
+
+  it('осмотр НЕ становится адресом приказа: своего в наборе нет', () => {
+    const sel = selectFleets(['foe1'], своё);
+    expect(sel.single).toBeNull(); // `single` — куда уйдёт приказ; чужому нельзя
+    expect(sel.picked).toEqual([]);
+  });
+
+  it('рамка со своим и чужим — это выбор группы, а не осмотр', () => {
+    expect(selectFleets(['my1', 'foe1'], своё).inspect).toBeNull();
+  });
+
+  it('двое чужих под тапом — промах по стопке, осмотра нет', () => {
+    expect(selectFleets(['foe1', 'foe2'], своё).inspect).toBeNull();
   });
 });
 

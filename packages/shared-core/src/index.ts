@@ -32,6 +32,7 @@ export {
   type UnitStack,
   type BuildingInstance,
   type PausedConstructionSite,
+  type QueuedConstruction,
   type ActiveResearch,
   type PlayerTechnologyState,
   type StewardState,

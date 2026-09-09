@@ -10,6 +10,7 @@ const modes = (over: Partial<TapModes> = {}): TapModes => ({
   heroAim: false,
   heroSpawnAim: false,
   assaultAim: false,
+  engageAim: false,
   pickMode: false,
   aiming: false,
   ...over,
@@ -36,6 +37,7 @@ describe('тап по карте — кто его забирает', () => {
     expect(tapOwner(modes({ heroAim: true }))).toBe('cast');
     expect(tapOwner(modes({ heroSpawnAim: true }))).toBe('deploy');
     expect(tapOwner(modes({ assaultAim: true }))).toBe('assault');
+    expect(tapOwner(modes({ engageAim: true }))).toBe('engage');
     expect(tapOwner(modes({ aiming: true }))).toBe('move');
   });
 
@@ -54,6 +56,9 @@ describe('тап по карте — кто его забирает', () => {
     expect(tapOwner(modes({ barrageAim: true, heroAim: true }))).toBe('barrage');
     expect(tapOwner(modes({ heroAim: true, heroSpawnAim: true }))).toBe('cast');
     expect(tapOwner(modes({ heroSpawnAim: true, assaultAim: true }))).toBe('deploy');
+    // ШТУРМ важнее «Атаки»: он целится в МИР, и его промах прощается (armedTap),
+    // поэтому отдавать ему тап раньше — значит не терять уже наведённый штурм.
+    expect(tapOwner(modes({ assaultAim: true, engageAim: true }))).toBe('assault');
   });
 
   it('ОБЫЧНОЕ ВЫДЕЛЕНИЕ — ПОСЛЕДНИЙ ВАРИАНТ: иначе ни один режим не сработал бы', () => {

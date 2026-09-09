@@ -10,7 +10,7 @@ import {
   createDossiers,
   type DossierHost,
 } from './dossiers';
-import type { ActiveBuild, PlanetBuildQueue } from './buildQueue';
+import type { ActiveBuild } from './buildQueue';
 
 // REFM-4: first tests over the dossier/codex corpus. Locale pinned RU for the same
 // reason as format.test.ts — under Node there is no browser language, so the runtime
@@ -31,7 +31,7 @@ function hostOf(over: Partial<DossierHost> = {}): DossierHost {
     me: () => 'p1',
     pcUi: () => true,
     youColor: () => '#3ad17a',
-    queueOf: () => ({ buildings: [], units: [] }) as PlanetBuildQueue,
+    queuedOrders: () => [],
     activeConstruction: () => null,
     progressPct: () => 0,
     ...over,
@@ -146,7 +146,7 @@ describe('dossiers — разбор ключа стройки', () => {
   it('заказ из очереди берётся по индексу; выход за край → null', () => {
     const { constructionDossier } = createDossiers(
       hostOf({
-        queueOf: () => ({ buildings: [{ kind: 'building', id: 'mine', count: 1 }], units: [] }),
+        queuedOrders: () => [{ kind: 'building', id: 'mine', count: 1 }],
       }),
     );
     expect(constructionDossier(`c:${homeId}:buildings:queued:0`)?.body).toContain('В очереди');
