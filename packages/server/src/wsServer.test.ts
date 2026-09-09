@@ -198,3 +198,30 @@ describe('адрес партии как путь (ADDR-3)', () => {
     }
   });
 });
+
+// Регрессия того же класса, что замершая карта и вставшие часы матча: асинхронная работа,
+// запущенная как «выстрелил и забыл», обязана содержать своё отклонение. Node с 15-й версии
+// убивает процесс на необработанном отклонении промиса — значит одно неудачное сообщение
+// одного игрока уносило бы с собой ВСЕ матчи этого процесса. `receive` может отклониться
+// по-настоящему: `await this.enqueue(...)` в нём возвращает непойманный промис ящика.
+describe('createMultiplayerServer · сбой обработки сообщения не роняет сервер', () => {
+  it('отклонение receive() содержится: соединение остаётся живым', async () => {
+    const room = makeRoom();
+    (room as unknown as { receive: () => Promise<void> }).receive = () =>
+      Promise.reject(new Error('boom'));
+    const server = createMultiplayerServer({ room });
+    const url = await server.listen();
+    try {
+      const ws = new WebSocket(`${url}?player=p1`);
+      const welcome = nextMessage(ws);
+      await once(ws, 'open');
+      await welcome; // приветствие шлёт сам сервер, оно через receive не идёт
+      ws.send(JSON.stringify({ type: 'ping' }));
+      await new Promise((r) => setTimeout(r, 50));
+      expect(ws.readyState).toBe(WebSocket.OPEN);
+      ws.close();
+    } finally {
+      await server.close();
+    }
+  });
+});

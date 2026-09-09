@@ -602,7 +602,15 @@ export function createMultiplayerServer(
         const raw = typeof data === 'string' ? data : data.toString('utf8');
         // Pass the server-minted sessionId so a gated room can authorize the envelope's
         // session binding against it (SV-1.1-live-A). Ignored by an un-gated room.
-        void room.receive(playerId, ws, raw, sessionId); // fire-and-forget; ping may be async
+        // Fire-and-forget (ping/persist делают это асинхронным), но отклонение обязано быть
+        // СОДЕРЖАНО: Node с 15-й версии убивает процесс на необработанном отклонении
+        // промиса, то есть одно неудачное сообщение одного игрока уносило бы вместе с
+        // собой все матчи этого процесса. То же рассуждение, что в `hibernate` реестра.
+        void room.receive(playerId, ws, raw, sessionId).catch((err: unknown) => {
+          process.stderr.write(
+            `[ws] receive failed for ${playerId} in match ${room.id}: ${String(err)}\n`,
+          );
+        });
       });
       ws.on('close', () => {
         sockets.delete(ws);
