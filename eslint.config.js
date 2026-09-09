@@ -78,6 +78,34 @@ export default tseslint.config(
     },
   },
   {
+    // «Как часы» с машинным сторожем (а не с обещанием быть внимательным).
+    //
+    // Node с 15-й версии УБИВАЕТ процесс на необработанном отклонении промиса. Значит в
+    // серверном коде каждый фоновый промис — потенциальный обрыв всех матчей разом:
+    // заминка базы в отложенном сохранении, сорвавшееся пробуждение спящего матча,
+    // неудачное сообщение одного игрока. Ровно на этом классе мы уже потеряли плейтест
+    // (замершая карта — его клиентский родственник), поэтому правило теперь не в голове,
+    // а здесь: у каждого фонового промиса ОБЯЗАН быть назван исход при отказе — обычно
+    // через `detach()` (`packages/server/src/detach.ts`).
+    //
+    // `ignoreVoid: false` — принципиально: именно `void p` и был той формой, которая
+    // выглядит как «я подумал об этом», а на деле просто прячет промис от линтера.
+    //
+    // Граница проведена по ПРОЦЕССУ, а не по вкусу: сторожим то, что крутится 24/7 и
+    // падением уносит всех. Браузерный `prototype/src/**` сюда НЕ входит — там отклонение
+    // это запись в консоли вкладки, а не оборванный матч; его уборка отдельная и большая.
+    // Правило типозависимое (`projectService`), поэтому линт этих файлов заметно дороже —
+    // ещё одна причина не расширять список без нужды.
+    files: ['packages/server/src/**/*.ts', 'prototype/netserver.ts'],
+    ignores: ['packages/server/src/**/*.test.ts'],
+    languageOptions: {
+      parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
+    },
+    rules: {
+      '@typescript-eslint/no-floating-promises': ['error', { ignoreVoid: false }],
+    },
+  },
+  {
     // CI / repo-automation scripts run on Node — give them the Node globals they use
     // (the determinism rules above never apply here; this is build glue, not the core).
     // `prototype/*.mjs` joins them (REFM-0.1): the zone's build/host/harness scripts

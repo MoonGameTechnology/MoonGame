@@ -8,6 +8,7 @@ import type { RoomObservation } from './matchRoom';
 import type { ArsenalStore, MatchSnapshot, StoredReceipt } from './store';
 import { standingOrderTickActions } from './standingOrderDriver';
 import { expiredSeatClaims } from './seatExpiry';
+import { detach } from './detach';
 
 /**
  * The match-loading wiring `main.ts` hands to the LazyRoomRegistry, extracted
@@ -140,7 +141,7 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
     // actions, the exact drift the prototype host already fixed with its inline driver.
     driver = startClockDriver(room, {
       onTick: ({ progressed }) => {
-        void stores.store.save(snapshotOf(room));
+        detach('сохранение снапшота на тике', stores.store.save(snapshotOf(room)));
         // Standing orders (CC-2 auto-storm / CC-4 patrol, standingOrderDriver.ts): the
         // missing "who decides, and when" half of `standingOrdersModule`. Skip on a
         // same-instant stall — submitting would emit `action` observations that
@@ -149,7 +150,7 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
         const stalled = !progressed && room.msUntilNextEvent() === 0;
         if (room.isStarted && !stalled && !standingOrdersBusy) {
           standingOrdersBusy = true;
-          void (async () => {
+          detach('постоянные приказы', (async () => {
             try {
               for (const { playerId, action } of standingOrderTickActions(
                 room.state,
@@ -172,7 +173,7 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
             } finally {
               standingOrdersBusy = false;
             }
-          })();
+          })());
         }
       },
       onStall: () => deps.onStall?.(matchId),

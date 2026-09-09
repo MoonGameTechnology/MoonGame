@@ -707,10 +707,17 @@ const shutdown = (): void => {
   keeper?.stop(); // stop reconciling before we drain
   // server.close() drains sockets and awaits registry.shutdown() (persist + stop every
   // live match's driver), so there is no separate driver to stop here.
-  void server
+  // Выключение обязано ДОЙТИ до выхода. Раньше цепочка висела без `catch`: сбой закрытия
+  // сокетов или пула означал не «вышли с ошибкой», а необработанное отклонение — процесс
+  // умирал, не дойдя до `process.exit`, и оркестратор добивал его по таймауту SIGKILL.
+  server
     .close()
     .then(() => stores.close())
-    .then(() => process.exit(0));
+    .then(() => process.exit(0))
+    .catch((err: unknown) => {
+      process.stderr.write(`shutdown failed: ${String(err)}\n`);
+      process.exit(1);
+    });
 };
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);

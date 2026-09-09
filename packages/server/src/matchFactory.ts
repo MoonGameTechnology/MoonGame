@@ -10,6 +10,8 @@
  * store can't double-create.
  */
 
+import { detach } from './detach';
+
 export interface MatchKeeperOptions {
   /** How many OPEN matches (ongoing with ≥1 free seat) to keep available. */
   target: number;
@@ -80,10 +82,10 @@ export class MatchKeeper {
    *  the process alive on its own. Idempotent-ish: call `stop()` before re-starting. */
   start(intervalMs: number): void {
     const schedule = this.o.schedule ?? ((fn, ms): unknown => setInterval(fn, ms));
-    const handle = schedule(() => void this.tick(), intervalMs);
+    const handle = schedule(() => detach('тик фабрики матчей', this.tick()), intervalMs);
     (handle as { unref?: () => void })?.unref?.();
     this.handle = handle;
-    void this.tick(); // seed immediately, don't wait a full interval for an empty feed
+    detach('первый тик фабрики матчей', this.tick()); // seed immediately, don't wait a full interval for an empty feed
   }
 
   stop(): void {
