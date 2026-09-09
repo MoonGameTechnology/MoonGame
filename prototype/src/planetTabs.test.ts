@@ -34,8 +34,9 @@ describe('вкладки мира — разбор гарнизона', () => {
   it('каждый стек попадает ровно в одну вкладку', () => {
     const g = garrisonByTab(garrison, data);
     expect(g.ground.map((st) => st.unit)).toEqual(['tank', 'militia']);
-    expect(g.ships.map((st) => st.unit)).toEqual(['cruiser']);
-    expect(g.wings.map((st) => st.unit)).toEqual(['interceptor', 'shuttle_carrier']);
+    // ROS-3.2: носитель — корабль, крылом остаются только сами машины.
+    expect(g.ships.map((st) => st.unit)).toEqual(['cruiser', 'shuttle_carrier']);
+    expect(g.wings.map((st) => st.unit)).toEqual(['interceptor']);
     expect(g.ground.length + g.ships.length + g.wings.length).toBe(garrison.length);
   });
 
@@ -79,10 +80,16 @@ describe('вкладки мира — счётчики', () => {
   });
 
   it('крылья не попадают в счётчик кораблей', () => {
-    const p = planet([{ unit: 'shuttle_carrier', count: 1 }]);
+    const p = planet([{ unit: 'interceptor', count: 1 }]);
     const c = tabCounts(p, data, []);
     expect(c.shuttle).toBe(1);
     expect(c.ships).toBe(0);
+  });
+
+  it('А НОСИТЕЛЬ — НАОБОРОТ (ROS-3.2): он считается кораблём, а не крылом', () => {
+    const c = tabCounts(planet([{ unit: 'shuttle_carrier', count: 1 }]), data, []);
+    expect(c.ships).toBe(1);
+    expect(c.shuttle).toBe(0);
   });
 
   it('у пустого мира счётчики нулевые по всем вкладкам', () => {
@@ -99,8 +106,9 @@ describe('вкладки мира — ростер стройки', () => {
       'scout',
       'siege',
       'strike_carrier',
+      'shuttle_carrier', // ROS-3.2: носитель заказывается среди кораблей
     ]);
-    expect(buildRoster('shuttle', ROSTER, data)).toEqual(['shuttle_carrier', 'interceptor']);
+    expect(buildRoster('shuttle', ROSTER, data)).toEqual(['interceptor']);
   });
 
   it('каждый юнит ростера попадает ровно в одну вкладку', () => {

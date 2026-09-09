@@ -582,19 +582,19 @@
 | RESIL-4 | ✅ | srv | `docs/backlog.md:13100` | Соак проверяет, что мир не встал. |
 | RESIL-5 | ✅ | srv proto | `docs/backlog.md:13118` | Генеральная репетиция: весь стек разом, и |
 | RESIL-6 | ✅ | srv proto | `docs/backlog.md:13153` | Достоверность генералки: настоящая база, |
-| ADDR-7 | ✅ | sec proto | `docs/backlog.md:13290` | Ссылка на партию не пускает по незнанию: |
-| OPS-2 | ✅ | ops sec | `docs/backlog.md:13328` | Обновление доносит до машины новые ключи |
-| REL-6 | ✅ | srv | `docs/backlog.md:13350` | Возврат на своё место мгновенный: перехват вместо |
-| CMB-4 | ✅ | core | `docs/backlog.md:13365` | Первый раунд боя — на самой встрече, а не через |
-| BLD-1 | ✅ | core proto | `docs/backlog.md:13385` | Очередь строительства: заказы встают в |
-| UI-14 | ✅ | proto | `docs/backlog.md:13425` | Осмотр чужого флота должен быть находимым. |
-| CMB-5 | ✅ | core | `docs/backlog.md:13448` | Вражда началась — стоящие рядом флоты сходятся |
-| ATK-1 | ✅ | proto | `docs/backlog.md:13464` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
-| CMB-6 | ⏳ | core | `docs/backlog.md:13552` | После ничьей третий враждебный флот остаётся стоять рядом. |
-| ORD-2 | ⏳ | proto | `docs/backlog.md:13562` | Нацеленный ШТУРМ не переживает закрытую вкладку. |
-| FOG-10 | ⏳ | proto core | `docs/backlog.md:13582` | На живом сервере память разведки живёт только во |
-| TEST-4 | ⏳ | srv | `docs/backlog.md:13600` | topXp не изолирован по прогону. |
-| FOG-9 | ⏳ | core | `docs/backlog.md:13609` | Приостановленная стройка чужого мира видна наблюдателю. |
+| ADDR-7 | ✅ | sec proto | `docs/backlog.md:13295` | Ссылка на партию не пускает по незнанию: |
+| OPS-2 | ✅ | ops sec | `docs/backlog.md:13333` | Обновление доносит до машины новые ключи |
+| REL-6 | ✅ | srv | `docs/backlog.md:13355` | Возврат на своё место мгновенный: перехват вместо |
+| CMB-4 | ✅ | core | `docs/backlog.md:13370` | Первый раунд боя — на самой встрече, а не через |
+| BLD-1 | ✅ | core proto | `docs/backlog.md:13390` | Очередь строительства: заказы встают в |
+| UI-14 | ✅ | proto | `docs/backlog.md:13430` | Осмотр чужого флота должен быть находимым. |
+| CMB-5 | ✅ | core | `docs/backlog.md:13453` | Вражда началась — стоящие рядом флоты сходятся |
+| ATK-1 | ✅ | proto | `docs/backlog.md:13469` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
+| CMB-6 | ⏳ | core | `docs/backlog.md:13557` | После ничьей третий враждебный флот остаётся стоять рядом. |
+| ORD-2 | ⏳ | proto | `docs/backlog.md:13567` | Нацеленный ШТУРМ не переживает закрытую вкладку. |
+| FOG-10 | ⏳ | proto core | `docs/backlog.md:13587` | На живом сервере память разведки живёт только во |
+| TEST-4 | ⏳ | srv | `docs/backlog.md:13605` | topXp не изолирован по прогону. |
+| FOG-9 | ⏳ | core | `docs/backlog.md:13614` | Приостановленная стройка чужого мира видна наблюдателю. |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
@@ -892,7 +892,7 @@
 | ROS-2.1a | ✅ | proto | `docs/roster-roadmap.md:389` | Управление огнём показывается только тем, кто может стрелять 2026-09-09 |
 | ROS-2.2 | ✅ | core data proto | `docs/roster-roadmap.md:415` | Челнок — сторона боя: ответный урон и зональное ПВО 2026-09-09 |
 | ROS-3.1 | ✅ | proto | `docs/roster-roadmap.md:452` | Экран «Производство»: пять типов, модули, количество, планета 2026-09-09 |
-| ROS-3.2 | ⏳ | proto | `docs/roster-roadmap.md:490` | Шаттл — корабль во всём интерфейсе |
+| ROS-3.2 | ✅ | proto | `docs/roster-roadmap.md:490` | Шаттл — корабль во всём интерфейсе 2026-09-09 |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md:48` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md:55` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md:64` | Сервисные идентичности и scoped-токены |
