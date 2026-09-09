@@ -11,7 +11,7 @@
  */
 
 // --- content + map -----------------------------------------------------------
-export { data } from './prototypeData';
+export { data } from './gameData';
 export { SECTOR_TYPES, MAP, START_CANDIDATES, type SectorType, type MapNode } from './map';
 
 // --- wall-clock units of game time -------------------------------------------
@@ -38,6 +38,7 @@ export {
   parseNetworkMatchMode,
   networkSeats,
   newGame,
+  PLAYABLE_FACTIONS,
 } from './matchSetup';
 
 // --- the kernel assembly point (module ORDER = determinism contract) ---------

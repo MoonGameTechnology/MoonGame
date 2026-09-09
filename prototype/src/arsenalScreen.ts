@@ -14,7 +14,7 @@
  */
 import type { ArsenalItem } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
-import { data } from './prototypeData';
+import { data } from './gameData';
 import { esc } from './format';
 import { unitTitle } from './dossiers';
 import { filterArsenal, gradesOf, parseArsenalItems, type ArsenalFilter } from './arsenal';

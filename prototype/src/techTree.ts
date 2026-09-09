@@ -20,7 +20,7 @@ import {
 } from '../../packages/shared-core/src/index';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
-import { data } from './prototypeData';
+import { data } from './gameData';
 import { DAY, HOUR } from './time';
 import { esc, cost, displayUnit, fmtEta } from './format';
 import { researchTech } from './actions';
@@ -196,7 +196,7 @@ export function techTreeHtml(
     .map((c) => data.scientists[c.id])
     .find((d) => d?.branch === tab);
   const leadHtml = lead
-    ? `🧪 ${t('tech.curator')} <b>${esc(t(lead.name))}</b>`
+    ? `🧪 ${t('tech.curator')} <b>${esc(tData(lead.name))}</b>`
     : `🔭 ${t('tech.curator.none')}`;
   // СПИСОК вместо сетки (TT-4, макет владельца): узлы ветки идут ярусами, каждый —
   // полноразмерной строкой, где ЭФФЕКТ, ЦЕНА и СРОК видны без тапа. Сетка 52-пиксельных

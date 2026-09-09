@@ -18,7 +18,7 @@
  */
 import type { Action, ArsenalItem, GameState } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
-import { data } from './prototypeData';
+import { data } from './gameData';
 import { esc, displayUnit } from './format';
 import { unitIconHtml } from './icons';
 import { SECTOR_TYPES } from './map';

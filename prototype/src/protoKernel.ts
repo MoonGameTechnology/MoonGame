@@ -47,7 +47,7 @@ import {
   type Context,
   type DomainEvent,
 } from '../../packages/shared-core/src/index';
-import { data } from './prototypeData';
+import { data } from './gameData';
 import { hungerModule } from './hunger';
 import { botDiplomacyModule } from './botDiplomacy';
 

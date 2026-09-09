@@ -19,7 +19,7 @@ import {
   type GameState,
   type Hero,
 } from '../../packages/shared-core/src/index';
-import { data } from './prototypeData';
+import { data } from './gameData';
 import { canOrderAll } from './protoKernel';
 import { fleetIdle, type ChainStep, type FleetChain } from '../../packages/shared-core/src/index';
 import { scrambleOrder, type Patrol } from './patrol';

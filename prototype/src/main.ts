@@ -7417,7 +7417,7 @@ function renderCmdBar() {
                 : opt.ranged
                   ? t('cmd.cast.needs-target')
                   : t('cmd.cast.self');
-            return `<button data-cmd="castdo" data-ab="${opt.id}" data-hero="${castHero.id}"${opt.cdH > 0 ? ' disabled' : ''}><b>${esc(t(ad.name))}</b><span>${sub}</span></button>`;
+            return `<button data-cmd="castdo" data-ab="${opt.id}" data-hero="${castHero.id}"${opt.cdH > 0 ? ' disabled' : ''}><b>${esc(tData(ad.name))}</b><span>${sub}</span></button>`;
           })
           .join('') +
         `</div>`
@@ -9657,7 +9657,7 @@ const setupHeroes: HeroLoadout[] = DEFAULT_HEROES.map((h) => ({
 /** The hero's display name — the главный hero shows the player's callsign (nick),
  *  falling back to its localized preset name only while the nick field is empty. */
 function heroName(h: HeroLoadout): string {
-  return h.grade === 'main' ? nickInput.value.trim() || t(h.name) : h.name;
+  return h.grade === 'main' ? nickInput.value.trim() || tData(h.name) : h.name;
 }
 
 const setupShips: ShipLoadout[] = DEFAULT_SHIP_LOADOUTS.map((l) => ({
@@ -12313,7 +12313,7 @@ function chainAbilitiesFor(fleetIds: string[]): ChainAbility[] {
   if (!hero) return [];
   return castOptionsOf(hero).map((opt) => ({
     id: opt.id,
-    name: t(data.heroAbilities[opt.id]!.name),
+    name: tData(data.heroAbilities[opt.id]!.name),
     cdH: opt.cdH,
     ranged: opt.ranged,
   }));

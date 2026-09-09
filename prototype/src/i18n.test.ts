@@ -7,7 +7,7 @@ import { en } from '../../localization/en';
 import { dataKey } from '../../localization';
 import { composeGameDataBundle } from '../../packages/shared-core/src/index';
 import { GLOSSARY } from './codexIndex';
-import { data } from './prototypeData';
+import { data } from './gameData';
 import { INTROS } from './intros';
 import { FIRST_GOALS } from './firstGoals';
 import { HUD_ORIENTATION_TOUR } from './onboardingTour';

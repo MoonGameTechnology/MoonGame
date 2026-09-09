@@ -13,7 +13,7 @@ import {
   isBuildable,
   isCapturable,
 } from '../../packages/shared-core/src/index';
-import { data } from './prototypeData';
+import { data } from './gameData';
 
 /**
  * Sector-type registry — the whole map is a graph of sectors, each of exactly one

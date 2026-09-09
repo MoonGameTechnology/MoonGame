@@ -19,7 +19,7 @@ import {
   type Player,
   type Fleet,
 } from '../../packages/shared-core/src/index';
-import { data } from './prototypeData';
+import { data } from './gameData';
 import { SECTOR_TYPES, MAP, START_CANDIDATES } from './map';
 import { FAVOUR_BASE } from './botFavour';
 import { DEFAULT_HEROES, heroSlots, type HeroGrade, type HeroLoadout } from './heroes';
@@ -145,6 +145,14 @@ const NETWORK_HOUSES = [
   { name: 'Amber Concord', faction: 'amber' },
   { name: 'Violet Ascendancy', faction: 'violet' },
 ] as const;
+
+/** Дома, которые игра РЕАЛЬНО сажает за стол, в порядке рассадки.
+ *  Единственный источник этого факта: до CONV-12b харнес замера (`selfplay.mjs`) брал
+ *  набор фракций из `Object.keys(data.factions)`, то есть из КАТАЛОГА. Пока в каталоге
+ *  лежали ровно эти четыре, оба списка совпадали и расхождение было невидимым; первая
+ *  же фракция, заведённая в данных, но не посаженная за стол, увела бы замер мерить
+ *  игру, в которую никто не играет. */
+export const PLAYABLE_FACTIONS: readonly string[] = NETWORK_HOUSES.map((h) => h.faction);
 
 const NETWORK_MODES: readonly NetworkMatchMode[] = ['ffa', ...TEAM_MODES, 'pve'];
 
