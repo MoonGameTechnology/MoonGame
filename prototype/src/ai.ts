@@ -46,6 +46,7 @@ import {
   retreatFleet,
   bombardFleet,
   splitFleet,
+  strikeShuttle,
   spawnHero,
   unlockHeroSkill,
   installHeroModule,
@@ -130,9 +131,44 @@ const ARTILLERY_CAP = 2;
  *  линии, а линия без корабля не участвует в раздаче урона: не строй бот платформу —
  *  и замер разбирал бы бой, в котором задней линии просто нет. */
 const SIEGE_CAP = 2;
-/** Предел челноков — картонные, дорогие по микроэлектронике, конкурируют с
- *  крейсерами за тот же дефицитный ресурс. */
+/** Предел челноков КАЖДОГО рода — картонные, дорогие по микроэлектронике, конкурируют
+ *  с крейсерами за тот же дефицитный ресурс. Считается по АНГАРУ порта, а не по флотам:
+ *  челнок с SHU-1.1 живёт в `planet.hangar` и во флот не попадает никогда. */
 const SHUTTLE_CAP = 3;
+
+/**
+ * Ударный ростер челноков (SHU-3.2) — кого бот СТРОИТ и кого ПОСЫЛАЕТ.
+ *
+ * Перехватчика в списке нет намеренно, и это не пропуск: его работа — встречать чужие
+ * вылеты, и она идёт БЕЗ приказа (база поднимает звено сама, SHU-1.3). Строит его бот
+ * отдельным правилом ниже; послать его бить корпуса значило бы измерить не ту роль —
+ * у него `attack` 4 против 20 у бомбардировщика (ROS-1.4).
+ */
+const STRIKE_SHUTTLES = ['bomber', 'landing_shuttle'] as const;
+
+/** Сколько машин уходит в один вылет. Порт всё равно тратит на вылет одно топливо,
+ *  поэтому мелкими группами летать незачем; больше трёх — и одна ответка зонального
+ *  ПВО (ROS-2.2) выкашивает разом весь ангар. */
+const STRIKE_WAVE = 2;
+
+/** Груз десантного вылета: наземные войска сверх домашней стражи, в фиксированном
+ *  порядке ростера обороны и не больше вместимости. Пусто — вылет не поднимается:
+ *  десантный челнок без груза долетит и просто погибнет. */
+function troopsForDrop(port: Planet, capacity: number): Array<{ unit: string; count: number }> {
+  const out: Array<{ unit: string; count: number }> = [];
+  let room = capacity;
+  for (const unit of GROUND_ROSTER) {
+    if (room <= 0) break;
+    const have = port.garrison.reduce((n, st) => n + (st.unit === unit ? st.count : 0), 0);
+    const size = data.units[unit]?.stats.cargoSize ?? 1;
+    const spare = Math.min(have - HOME_GUARD, Math.floor(room / Math.max(1, size)));
+    if (spare > 0) {
+      out.push({ unit, count: spare });
+      room -= spare * size;
+    }
+  }
+  return out;
+}
 /** Запас казны сверх цены заказа (мера та же, что у построек бота). */
 const ORDER_RESERVE: Record<string, number> = { metal: 60, credits: 60 };
 /**
@@ -971,17 +1007,118 @@ export function aiOrders(
       ) {
         out.push(buildUnit(ai, base.id, 'siege', 1));
       }
-      // Челноки (SHU-1.1). Ворота — КОСМОПОРТ: челнок строится в порту и живёт в нём,
-      // поэтому у бота цепочка короткая — порт у него и так есть под корабли. Дальше
-      // челнок дерётся как обычный ударный корпус в составе флота (быстрый, больно
-      // бьёт, картонный — его счётчик орбитальное ПКО). Собственного вылета из порта у
-      // него пока нет: это SHU-1.2, отдельный кирпич, а не задача бота.
-      if (
-        shipsOwned('interceptor') < SHUTTLE_CAP &&
-        !pendingUnit(base.id, 'interceptor') &&
-        affordableUnit('interceptor', 1)
-      ) {
-        out.push(buildUnit(ai, base.id, 'interceptor', 1));
+      // ═══ ЧЕЛНОКИ (SHU-1.1 + SHU-3.2) ═══
+      // Ворота — КОСМОПОРТ: челнок строится в порту и живёт в нём, поэтому цепочка
+      // короткая — порт у бота и так есть под корабли.
+      //
+      // СЧЁТ ИДЁТ ПО АНГАРУ, а не по флотам. `shipsOwned` смотрит во флоты и в
+      // гарнизон, а челнок с SHU-1.1 не бывает ни там, ни там — он лежит в
+      // `planet.hangar`. Пока предел считался тем счётчиком, он не срабатывал НИКОГДА:
+      // бот заказывал челнок каждый тик до упора в `E_HANGAR_FULL` и платил за это
+      // отказами весь матч.
+      const hangarOwned = (unit: string): number =>
+        Object.values(state.planets).reduce(
+          (n, p) =>
+            n +
+            (p.owner === ai
+              ? (p.hangar ?? []).reduce((k, st) => k + (st.unit === unit ? st.count : 0), 0)
+              : 0),
+          0,
+        );
+      const orderShuttle = (unit: string): void => {
+        if (hangarOwned(unit) >= SHUTTLE_CAP) return;
+        if (pendingUnit(base.id, unit)) return;
+        if (!affordableUnit(unit, 1)) return;
+        out.push(buildUnit(ai, base.id, unit, 1));
+      };
+      // Перехватчик — ВСЕГДА, и на войне, и в мире: он не оружие нападения, а ПВО
+      // базы. Своё дело он делает без единого приказа — база поднимает звено навстречу
+      // чужому вылету сама (SHU-1.3), — поэтому держать его дежурным есть смысл и в
+      // мирное время, ровно как орбитальное ПКО.
+      orderShuttle('interceptor');
+      // Ударные челноки — только на войне: бомбардировщик бьёт корпуса (ROS-1.4),
+      // десантный везёт войска и высаживает плацдарм (ROS-1.5). В мирное время оба
+      // просто занимали бы ангар и микроэлектронику.
+      if (warFooting) for (const unit of STRIKE_SHUTTLES) orderShuttle(unit);
+    }
+    // ═══ ВЫЛЕТ ЧЕЛНОКОВ (SHU-3.2) ═══
+    // Без этого правила весь пласт челноков не участвовал в замерах ВООБЩЕ: бот их
+    // строил, они ложились в порт и лежали там до конца матча. Ни удара, ни ответки
+    // (ROS-2.2), ни зонального ПВО, ни высадки плацдарма (ROS-1.5) отчёт не видел.
+    //
+    // Правило нарочно короткое, той же формы, что и постройка: ОДИН вылет с порта за
+    // тик (топливо у порта общее, вторым приказом его не растянуть), цель — БЛИЖАЙШАЯ
+    // в радиусе, тай-брейк по id. Ближайшая, а не «лучшая»: выбор цели — это стратегия,
+    // а кирпичу нужно, чтобы механика заработала и попала в измерение.
+    if (profile === 'strong' && warFooting) {
+      const port = state.planets[base.id];
+      const hangar = port?.hangar ?? [];
+      // Машины перебираются в ФИКСИРОВАННОМ порядке ростера, а не порядком ангара:
+      // порядок стеков зависит от истории заказов, и один сид разыгрался бы по-разному.
+      const ready = STRIKE_SHUTTLES.find((u) =>
+        hangar.some((st) => st.unit === u && st.count > 0),
+      );
+      if (port && ready) {
+        const reach = data.units[ready]?.stats.strikeRange ?? 0;
+        const inReach = (at: { x: number; y: number }): boolean => d(port.position, at) <= reach;
+        // Цель — чужой ФЛОТ (бомбардировщик бьёт корпуса) либо чужой МИР. Оба перебора
+        // отсортированы по расстоянию, затем по id — иначе выбор зависел бы от порядка
+        // ключей объекта (инвариант #1).
+        const byNear = <T extends { id: string }>(
+          xs: T[],
+          at: (x: T) => { x: number; y: number },
+        ): T | undefined =>
+          xs
+            .slice()
+            .sort(
+              (a, b) =>
+                d(port.position, at(a)) - d(port.position, at(b)) ||
+                (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+            )[0];
+        const count = Math.min(
+          hangar.find((st) => st.unit === ready)?.count ?? 0,
+          STRIKE_WAVE,
+        );
+        const foeFleet =
+          ready === 'bomber'
+            ? byNear(
+                Object.values(state.fleets).filter(
+                  (f) =>
+                    f.owner !== ai &&
+                    getStance(state, ai, f.owner) === 'war' &&
+                    f.location !== null &&
+                    f.units.some((st) => st.count > 0) &&
+                    inReach(state.planets[f.location]?.position ?? { x: 1e9, y: 1e9 }),
+                ),
+                (f) => state.planets[f.location!]!.position,
+              )
+            : undefined;
+        const foeWorld = byNear(
+          Object.values(state.planets).filter(
+            (p) =>
+              p.owner !== null &&
+              p.owner !== ai &&
+              getStance(state, ai, p.owner) === 'war' &&
+              inReach(p.position),
+          ),
+          (p) => p.position,
+        );
+        if (count > 0 && foeFleet) {
+          out.push(strikeShuttle(ai, port.id, ready, count, { targetFleetId: foeFleet.id }));
+        } else if (count > 0 && foeWorld) {
+          // Десантный вылет везёт войска: без груза он долетит и просто погибнет.
+          // Берём из гарнизона сверх домашней стражи, тем же порогом, что и погрузка
+          // на корабль, — дом пустым не оставляем.
+          const troops =
+            ready === 'landing_shuttle'
+              ? troopsForDrop(port, count * (data.units[ready]?.stats.cargoCapacity ?? 0))
+              : undefined;
+          if (ready !== 'landing_shuttle' || (troops && troops.length > 0)) {
+            out.push(
+              strikeShuttle(ai, port.id, ready, count, { targetPlanetId: foeWorld.id }, troops),
+            );
+          }
+        }
       }
     }
     // (marine retired: the AI no longer cheap-builds a ground trooper. Its home keeps its
