@@ -156,7 +156,7 @@ export const ru: Record<string, string> = {
   'build.cat.defense': 'ОБОРОНА',
   'build.cat.economy': 'ЭКОНОМИКА',
   'build.cat.infra': 'ИНФРАСТРУКТУРА',
-  'build.fx.aa': 'ПВО: {n} урона',
+  'build.fx.aa': 'ПКО: {n} урона по кораблям',
   'build.fx.credits': '+{n}% к кредитам мира',
   'build.fx.defense': '+{n}% к обороне',
   'build.fx.production': '+{n}% к производству',
@@ -331,7 +331,7 @@ export const ru: Record<string, string> = {
   'codex.hub.sec.mechanic': 'Механики',
   'codex.hub.sec.unit': 'Юниты',
   'codex.hub.title': 'СПРАВОЧНИК',
-  'codex.row.aa': 'ПВО',
+  'codex.row.aa': 'ПКО',
   'codex.row.atk-def': 'Атака / Оборона',
   'codex.row.build-time': 'Время постройки',
   'codex.row.cargo': 'Вместимость трюма',
@@ -526,7 +526,6 @@ export const ru: Record<string, string> = {
   'codex.close': 'ЗАКРЫТЬ',
 
   // --- data — Имена игровых ДАННЫХ (data/*.json + таблицы прототипа), через tData().
-  'data.aa': 'ПВО',
   'data.ablative-plating': 'Броневые плиты',
   'data.ace-programs': 'Программа асов',
   'data.amber-concord': 'Янтарное согласие',
@@ -611,7 +610,7 @@ export const ru: Record<string, string> = {
   'data.neural-lace': 'Нейрокружево',
   'data.oceanic': 'Океанический',
   'data.open-space': 'Открытый космос',
-  'data.orbital-aa': 'Орбитальное ПВО',
+  'data.orbital-defense-battery': 'Орбитальное ПКО',
   'data.orbital-logistics': 'Орбитальная логистика',
   'data.overclocked-helm': 'Разогнанный шлем',
   'data.overseer': 'Куратор',
@@ -643,7 +642,7 @@ export const ru: Record<string, string> = {
   'data.scout': 'разведчик',
   'data.sensor-frigate': 'сенсорный фрегат',
   'data.shield-booster': 'Тяжёлый щит',
-  'data.point-defense-array': 'Точечная оборона',
+  'data.area-defense-array': 'Зональное ПВО',
   'data.siege-doctrine': 'Осадная доктрина',
   'data.shuttle-carrier': 'Шаттл',
   'data.siege': 'осадная платформа',
@@ -717,7 +716,7 @@ export const ru: Record<string, string> = {
   'dossier.building.mine':
     'Буровая платформа вгрызается в планету и добывает {m}⬢ в час. Улучшение позволяет копать глубже, чтобы добраться до самых богатых жил. Основа для строительства флота.',
   'dossier.building.orbital-aa':
-    'Стационарная зенитная батарея защищает воздушное пространство вашего мира и наносит {dmg} урона в час по кораблям на орбите. Кошмар для бомбардировщиков, повисших над планетой, и для налетающих челноков. Захват мира не блокирует — это дело наземной обороны; батарея лишь выкашивает флот над головой.',
+    'Орбитальное ПКО: стационарная батарея бьёт по КОРАБЛЯМ на орбите — {dmg} урона в час. Против челноков она бесполезна: те влетают в воздушное пространство, и там их встречает зональное ПВО. Захват мира батарея не блокирует — это дело наземной обороны; она лишь выкашивает флот над головой.',
   'dossier.building.power-plant':
     'Термоядерный реактор питает энергией ваши миры, он производит {e}↯ в час. Энергия — кровь ваших построек, ведь они работают не на волшебстве. При дефиците всё проседает до половины мощности.',
   'dossier.building.radar':
@@ -1781,9 +1780,9 @@ export const ru: Record<string, string> = {
   'effect.patrol': 'дежурный вылет',
   'effect.rearming': 'перезарядка {n}',
   'effect.fuel': 'топливо {n}',
-  'effect.blackout': 'блэкаут: ПВО/радары −50%',
+  'effect.blackout': 'блэкаут: ПКО/радары −50%',
   'effect.hunger': 'голод: −25% наземный урон',
-  'effect.point-defense': 'точечная оборона {n}',
+  'effect.point-defense': 'зональное ПВО {n}',
   'side.fleet.in-orbit': 'на орбите',
   'side.fleet.on-lane': '⟜ стоит на трассе {lane} · {p}% пути',
   'side.fleet.repair.dock.title': 'Экспресс-ремонт у своего дока за металл',
@@ -1845,7 +1844,7 @@ export const ru: Record<string, string> = {
   'side.strike.forecast.hint':
     'Прогноз по видимым составам, без бонусов местности, укреплений и технологий — реальный бой может отличаться.',
   'side.strike.hint':
-    'С орбиты можно бомбардировать (изнашивает здания и замораживает их выпуск), но ПВО гарнизона достаёт до вас. Штурм высаживает десант против гарнизона.',
+    'С орбиты можно бомбардировать (изнашивает здания и замораживает их выпуск), но ПКО гарнизона достаёт до вас. Штурм высаживает десант против гарнизона.',
   'side.strike.title': 'Удар',
   'side.summary.attack': 'Атака',
   'side.summary.back': '‹ Назад к карточке',
@@ -1873,7 +1872,7 @@ export const ru: Record<string, string> = {
   'side.wing.conveyor': 'Верфь челноков',
   'side.wing.garrison.hint':
     'Носитель (◈) несёт челноки (△). Запускайте их из панели выбранного флота кнопкой «🛩 Запустить челноки».',
-  'side.world.blackout': 'блэкаут: радары и ПВО −50%',
+  'side.world.blackout': 'блэкаут: радары и ПКО −50%',
   'side.world.bonus.defense': 'оборона',
   'side.world.bonus.production': 'произв.',
   'side.world.buildings': 'Постройки',

@@ -153,7 +153,7 @@ export const en: Record<string, string> = {
   'build.cat.defense': 'DEFENSE',
   'build.cat.economy': 'ECONOMY',
   'build.cat.infra': 'INFRASTRUCTURE',
-  'build.fx.aa': 'AA: {n} damage',
+  'build.fx.aa': 'Interdiction: {n} damage to ships',
   'build.fx.credits': '+{n}% world credits',
   'build.fx.defense': '+{n}% defense',
   'build.fx.production': '+{n}% production',
@@ -329,7 +329,7 @@ export const en: Record<string, string> = {
   'codex.hub.sec.mechanic': 'Mechanics',
   'codex.hub.sec.unit': 'Units',
   'codex.hub.title': 'CODEX',
-  'codex.row.aa': 'AA',
+  'codex.row.aa': 'Interdiction',
   'codex.row.atk-def': 'Attack / Defense',
   'codex.row.build-time': 'Build time',
   'codex.row.cargo': 'Cargo capacity',
@@ -525,7 +525,6 @@ export const en: Record<string, string> = {
   'codex.close': 'CLOSE',
 
   // --- data — Имена игровых ДАННЫХ (data/*.json + таблицы прототипа), через tData().
-  'data.aa': 'aa',
   'data.ablative-plating': 'Ablative Plating',
   'data.ace-programs': 'Ace Programs',
   'data.amber-concord': 'Amber Concord',
@@ -610,7 +609,7 @@ export const en: Record<string, string> = {
   'data.neural-lace': 'Neural Lace',
   'data.oceanic': 'Oceanic',
   'data.open-space': 'Open space',
-  'data.orbital-aa': 'Orbital AA',
+  'data.orbital-defense-battery': 'Orbital Defense Battery',
   'data.orbital-logistics': 'Orbital Logistics',
   'data.overclocked-helm': 'Overclocked Helm',
   'data.overseer': 'Overseer',
@@ -642,7 +641,7 @@ export const en: Record<string, string> = {
   'data.scout': 'scout',
   'data.sensor-frigate': 'sensor frigate',
   'data.shield-booster': 'Shield Booster',
-  'data.point-defense-array': 'Point Defense Array',
+  'data.area-defense-array': 'Area Defense Array',
   'data.siege-doctrine': 'Siege Doctrine',
   'data.shuttle-carrier': 'Shuttle',
   'data.siege': 'siege',
@@ -716,7 +715,7 @@ export const en: Record<string, string> = {
   'dossier.building.mine':
     'A drilling rig gnaws into the planet, mining {m}⬢ per hour. Upgrades dig deeper to reach the richest veins. The foundation for building your fleet.',
   'dossier.building.orbital-aa':
-    "A stationary anti-air battery guards your world's airspace, dealing {dmg} damage per hour to ships in orbit. A nightmare for bombers hanging over the world and for raiding shuttles. Doesn't block capture (that's ground defense's job) — it just mows down the fleet overhead.",
+    "Orbital interdiction: a fixed battery that fires on SHIPS in orbit — {dmg} damage per hour. Against shuttles it is useless: those dive into the world's airspace, and area defense is what meets them there. It does not block capture (that is ground defense's job) — it just mows down the fleet overhead.",
   'dossier.building.power-plant':
     "A fusion reactor powers your worlds, producing {e}↯ per hour. Energy is the lifeblood of your buildings — they don't run on magic. When it runs short, everything browns out to half output.",
   'dossier.building.radar':
@@ -1785,9 +1784,9 @@ export const en: Record<string, string> = {
   'effect.patrol': 'standing patrol',
   'effect.rearming': 'rearming {n}',
   'effect.fuel': 'fuel {n}',
-  'effect.blackout': 'blackout: AA/radar −50%',
+  'effect.blackout': 'blackout: interdiction/radar −50%',
   'effect.hunger': 'hunger: −25% ground damage',
-  'effect.point-defense': 'point defense {n}',
+  'effect.point-defense': 'area defense {n}',
   'side.fleet.in-orbit': 'in orbit',
   'side.fleet.on-lane': '⟜ holding on the {lane} lane · {p}% across',
   'side.fleet.repair.dock.title': 'Express repair at your own dock for metal',
@@ -1847,7 +1846,7 @@ export const en: Record<string, string> = {
   'side.strike.forecast.hint':
     'Forecast from visible compositions only — terrain, fortification and technology bonuses are not included; the real battle may differ.',
   'side.strike.hint':
-    "In orbit you can bombard (wears buildings and freezes their output), but the garrison's AA reaches you. Assault lands your troops against the garrison.",
+    "In orbit you can bombard (wears buildings and freezes their output), but the garrison's interdiction reaches you. Assault lands your troops against the garrison.",
   'side.strike.title': 'Strike',
   'side.summary.attack': 'Attack',
   'side.summary.back': '‹ Back to the card',
@@ -1875,7 +1874,7 @@ export const en: Record<string, string> = {
   'side.wing.conveyor': 'Shuttle yard',
   'side.wing.garrison.hint':
     'A carrier (◈) holds shuttles (△). Launch them from the selected fleet\'s panel with "🛩 Launch shuttles".',
-  'side.world.blackout': 'blackout: radars and AA −50%',
+  'side.world.blackout': 'blackout: radars and interdiction −50%',
   'side.world.bonus.defense': 'defense',
   'side.world.bonus.production': 'prod.',
   'side.world.buildings': 'Structures',
