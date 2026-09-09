@@ -29,7 +29,7 @@ import {
 import { findHealthyStack, sumUnitStat } from '../../packages/shared-core/src/util/stacks';
 import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet';
 import { act, moveFleet, loadArmy, engageFleet, orderScramble } from './actions';
-import { data } from './prototypeData';
+import { data } from './gameData';
 import { ctx } from './protoKernel';
 import { fleetHasShuttle } from '../../packages/shared-core/src/index';
 import type { Patrol } from './patrol';

@@ -18,7 +18,7 @@ import {
   type Planet,
   type Player,
 } from '../../packages/shared-core/src/index';
-import { data } from './prototypeData';
+import { data } from './gameData';
 
 /** Здание с радаром берём из каталога — через тот же аксессор, что и ядро. */
 const RADAR_BUILDING = Object.keys(data.buildings).find(

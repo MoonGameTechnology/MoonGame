@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale, t, tData } from '../../localization/runtime';
-import { data } from './prototypeData';
+import { data } from './gameData';
 import {
   sciInfluenceText,
   sciPickBodyHtml,

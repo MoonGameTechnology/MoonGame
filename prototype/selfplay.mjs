@@ -32,6 +32,7 @@ const {
   aiOrders,
   scoreParts,
   splitDeadContent,
+  PLAYABLE_FACTIONS,
   HOUR,
   DAY,
   START_CANDIDATES,
@@ -48,7 +49,14 @@ const STEP = 2 * HOUR; // the AI decision cadence (mirrors the netserver driver)
 // построению, хеш — лишь в пределе, а на 300 матчах предел ещё не наступил. Пары
 // УПОРЯДОЧЕННЫЕ (4×3 = 12): порядок решает, кто садится в p1, а слотовый перекос —
 // самостоятельная величина отчёта, и смешивать его с фракционным нельзя.
-const FACTION_IDS = Object.keys(data.factions ?? {});
+//
+// CONV-12b: список берётся из `PLAYABLE_FACTIONS` — того же места, откуда его берёт
+// сервер, — а НЕ из `Object.keys(data.factions)`. Каталог и стол это разные вещи:
+// каталог может нести фракцию, которую ни один режим не сажает, и тогда харнес начнёт
+// мерить игру, в которую никто не играет. Пока в каталоге лежали ровно эти четыре, оба
+// списка совпадали и подмена была не видна; сведение каталогов приносит в данные ещё
+// две фракции, и разница становится настоящей.
+const FACTION_IDS = [...PLAYABLE_FACTIONS];
 const FACTION_PAIRS = FACTION_IDS.flatMap((a) =>
   FACTION_IDS.filter((b) => b !== a).map((b) => [a, b]),
 );

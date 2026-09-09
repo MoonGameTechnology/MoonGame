@@ -18,7 +18,7 @@
 // расстояние — длина маршрута в пикселях, а не отрезок между точками.
 import { describe, expect, it } from 'vitest';
 import { MAP, SECTOR_TYPES, START_CANDIDATES } from './map';
-import { data } from './prototypeData';
+import { data } from './gameData';
 
 const byId = new Map(MAP.map((n) => [n.id, n]));
 const SECTORS = START_CANDIDATES.length;

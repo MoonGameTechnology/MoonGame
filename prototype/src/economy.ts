@@ -22,7 +22,7 @@ import {
   civicTax,
   inhabitedWorldCount,
 } from '../../packages/shared-core/src/index';
-import { data } from './prototypeData';
+import { data } from './gameData';
 import { HOUR } from './time';
 
 /** ECON-6: почасовой экономический срез для пайплайна наблюдений хоста — казна /

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { newGame, advance, data, kernel, START_CANDIDATES } from './game';
 import type { SetupConfig } from './game';
-import { DEFAULT_SETUP, networkSeats } from './matchSetup';
+import { DEFAULT_SETUP, networkSeats, PLAYABLE_FACTIONS } from './matchSetup';
 
 // H3 — factions are PURE passive bonuses to the economy or units (for now), applied by
 // the core factionModule through the same hooks as technologies. The hooks themselves
@@ -15,8 +15,19 @@ const solo = (faction: string): SetupConfig => ({
 });
 
 describe('factions (H3) — passive house bonuses over the prototype data', () => {
-  it('the catalog carries the four houses, purely economy-or-units passives', () => {
-    expect(Object.keys(data.factions).sort()).toEqual(['amber', 'azure', 'crimson', 'violet']);
+  it('за стол садятся ЧЕТЫРЕ дома, и пассивки всего каталога — чисто экономика/юниты', () => {
+    // CONV-12b развёл два разных факта, которые до сведения каталогов совпадали и
+    // потому читались как один. КАТАЛОГ несёт шесть фракций: к четырём домам лора
+    // добавились `vanguard` (легаси-тег, которым помечены юниты канона) и `swarm`
+    // (со своим зданием `biomass_pit`). За СТОЛ по-прежнему садятся четыре — этот
+    // список держит `PLAYABLE_FACTIONS`, и харнес замера читает именно его.
+    expect([...PLAYABLE_FACTIONS].sort()).toEqual(['amber', 'azure', 'crimson', 'violet']);
+    expect(Object.keys(data.factions).sort()).toEqual([
+      'amber', 'azure', 'crimson', 'swarm', 'vanguard', 'violet',
+    ]);
+    // Правило H3 проверяется по ВСЕМУ каталогу, а не только по посаженным: фракция,
+    // заведённая с уникальным юнитом или радарным бонусом, нарушит его ещё до того,
+    // как её посадят за стол.
     for (const f of Object.values(data.factions)) {
       // pure passives: no unique units / faction abilities, no radar reach —
       // strictly «экономика или юниты» (production / damage / fleet speed).

@@ -13,7 +13,7 @@
 // именно ЗЕРКАЛО этих гейтов, то есть что бот не сыплет заведомо отбиваемыми приказами.
 import { describe, expect, it } from 'vitest';
 import { newGame, aiOrders, START_CANDIDATES } from './game';
-import { data } from './prototypeData';
+import { data } from './gameData';
 import type { Action, GameState, Hero } from '../../packages/shared-core/src/index';
 
 function game2(): GameState {

@@ -49,6 +49,7 @@ export const UNIT_ICON: Record<string, string> = {
   heavy_infantry: '◆', // the armoured line
   special_forces: '✱', // the elite few
   tank: '▮', // the heavy armour block
+  drop_infantry: '⇓', // сброшенная с орбиты пехота — стрелка вниз, а не ещё один клин
 };
 
 /** A small glyph per province KIND, drawn above each province so its type reads at a

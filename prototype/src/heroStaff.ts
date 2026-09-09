@@ -24,7 +24,7 @@ import {
   type SlotCounts,
 } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
-import { data } from './prototypeData';
+import { data } from './gameData';
 import { esc, cost, fmtHrs } from './format';
 import { HOUR } from './time';
 import {
@@ -73,7 +73,11 @@ export function heroDisplayName(hero: HeroInst): string {
   const fallback = hero.name ?? hero.id;
   if (hero.grade === 'main') return houseDisplayName(fallback);
   const def = hero.archetype !== undefined ? data.heroes[hero.archetype] : undefined;
-  return t(def?.name ?? fallback);
+  // Две РАЗНЫЕ формы, и один вызов на обе не годится (CONV-12b). Имя архетипа приходит
+  // из каталога и теперь английское (`Ravager`) — его переводит `tData()` по слагу
+  // `data.ravager`. Запасной путь берёт имя из СОСТОЯНИЯ (`HeroLoadout.name`), а там
+  // лежит ключ локали (`hero.arch.destroyer`) — его переводит `t()`.
+  return def?.name !== undefined ? tData(def.name) : t(fallback);
 }
 
 /** Can this purse cover the price? (The core decides for real — this only dims a button.) */
@@ -330,7 +334,7 @@ function heroTreeHtml(hero: HeroInst, res: Bag): string {
           : '';
       const tap = rail.own && !owned ? ` data-hnode="${nid}"` : '';
       html +=
-        `<div class="${cls}"${tap}>${conn}<div class="hx-nn"><span class="hx-crest">${crest}</span>${esc(t(nd.name))}</div>` +
+        `<div class="${cls}"${tap}>${conn}<div class="hx-nn"><span class="hx-crest">${crest}</span>${esc(tData(nd.name))}</div>` +
         `<div class="hx-nd">${esc(t(nd.description ?? ''))}</div>` +
         `<div class="hx-nf">${grant}${foot}</div></div>`;
     }
@@ -412,7 +416,7 @@ function heroAbilitiesHtml(hero: HeroInst, now: number): string {
           ? `<button class="hx-btn" data-hcast="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${(ad.range ?? 0) > 0 ? t('hero.abil.pick-target') : t('hero.abil.activate')}</button>`
           : `<span class="hx-badge">${t('hero.abil.soon')}</span>`;
     bays.push(
-      `<div class="hx-bay on"><div class="hx-grow"><span class="hx-an">${esc(t(ad.name))}</span>` +
+      `<div class="hx-bay on"><div class="hx-grow"><span class="hx-an">${esc(tData(ad.name))}</span>` +
         `<div class="hx-note">${esc(t(ad.description ?? ''))}</div></div>` +
         `<div class="hx-bayact">${cast}` +
         `<button class="hx-btn ghost" data-hunequip="${hero.id}" data-ab="${ab}" ${dead ? 'disabled' : ''}>${t('hero.slot.remove')}</button>` +
@@ -437,7 +441,7 @@ function heroAbilitiesHtml(hero: HeroInst, now: number): string {
         : `<span class="hx-badge">${t('hero.slot.full')}</span>`;
     poolHtml +=
       `<div class="hx-row${perk || free > 0 ? '' : ' dim'}"><div class="hx-grow">` +
-      `<span class="hx-an">${esc(t(ad.name))}</span>` +
+      `<span class="hx-an">${esc(tData(ad.name))}</span>` +
       `<div class="hx-note">${esc(t(ad.description ?? ''))}</div></div>${action}</div>`;
   }
 
@@ -583,7 +587,7 @@ function heroDossierHtml(hero: HeroInst, dossier: string, res: Bag): string {
     const skills = hero.skills ?? [];
     const gAb = nd.grants.ability ? data.heroAbilities[nd.grants.ability] : undefined;
     const give = gAb
-      ? `<div class="hx-dgl">${t('hero.tree.grants-ability')}</div><div class="hx-dgv">${esc(t(gAb.name))}${(gAb.range ?? 0) > 0 ? ` · ${t('hero.tree.range', { r: gAb.range })}` : ''}${gAb.cooldownHours ? ` · ${t('hero.tree.cooldown', { h: gAb.cooldownHours })}` : ''}</div><div class="hx-note">${esc(t(gAb.description ?? ''))}</div>`
+      ? `<div class="hx-dgl">${t('hero.tree.grants-ability')}</div><div class="hx-dgv">${esc(tData(gAb.name))}${(gAb.range ?? 0) > 0 ? ` · ${t('hero.tree.range', { r: gAb.range })}` : ''}${gAb.cooldownHours ? ` · ${t('hero.tree.cooldown', { h: gAb.cooldownHours })}` : ''}</div><div class="hx-note">${esc(t(gAb.description ?? ''))}</div>`
       : nd.grants.passive
         ? `<div class="hx-dgl">${t('hero.tree.grants-passive')}</div><div class="hx-dgv">${esc(heroPassiveLine(nd.grants.passive))}</div>`
         : '';
@@ -604,7 +608,7 @@ function heroDossierHtml(hero: HeroInst, dossier: string, res: Bag): string {
         : `<button class="hx-dbtn" data-hskill="${hero.id}" data-node="${id}" ${canBuy ? '' : 'disabled'}>${t('hero.tree.unlock')} · ${cost(nd.cost, res)}</button>`;
     return (
       `<div class="hx-dossier">` +
-      `<div class="hx-dh">${def?.branch ? `<span class="hx-tag">${esc(t(HERO_BRANCH_RU[def.branch] ?? def.branch))}</span>` : ''}<span class="hx-dnm">${esc(t(nd.name))}</span>${close}</div>` +
+      `<div class="hx-dh">${def?.branch ? `<span class="hx-tag">${esc(t(HERO_BRANCH_RU[def.branch] ?? def.branch))}</span>` : ''}<span class="hx-dnm">${esc(tData(nd.name))}</span>${close}</div>` +
       (give ? `<div class="hx-give">${give}</div>` : '') +
       (reqHtml
         ? `<div class="hx-drow"><span class="hx-dk">${t('hero.tree.requires')}</span><span class="hx-dv">${reqHtml}</span></div>`

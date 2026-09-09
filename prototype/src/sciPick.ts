@@ -72,7 +72,7 @@ export function sciPickBodyHtml(
       const dis = placed || chosen.length >= COUNCIL_SIZE;
       return (
         `<button class="sp-card${placed ? ' picked' : ''}" data-spadd="${id}"${dis ? ' disabled' : ''}>` +
-        `<div class="sp-cn">${esc(t(def.name))}${placed ? '<span class="sp-tick">✓</span>' : ''}</div>` +
+        `<div class="sp-cn">${esc(tData(def.name))}${placed ? '<span class="sp-tick">✓</span>' : ''}</div>` +
         `<div class="sp-inf">${esc(influence(id))}</div></button>`
       );
     })

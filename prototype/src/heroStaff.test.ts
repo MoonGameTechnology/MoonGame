@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs';
 import { describe, it, expect, beforeAll } from 'vitest';
 import { setLocale } from '../../localization/runtime';
 import { newGame } from './game';
-import { data } from './prototypeData';
+import { data } from './gameData';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { t } from '../../localization/runtime';
 import {

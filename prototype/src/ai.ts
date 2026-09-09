@@ -54,7 +54,7 @@ import {
 import { botEmbargoes } from './botFavour';
 import { netIncome } from './economy';
 import { SECTOR_TYPES } from './map';
-import { data } from './prototypeData';
+import { data } from './gameData';
 import type { MarketSide } from '../../packages/shared-core/src/index';
 import { stewardGuardOrders } from './stewardGuard';
 

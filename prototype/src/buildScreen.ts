@@ -21,7 +21,7 @@
 import { buildingLevel, buildingMaxLevel } from '../../packages/shared-core/src/index';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
-import { data } from './prototypeData';
+import { data } from './gameData';
 import { buildingName, cost, esc, resLine } from './format';
 import { BUILD_ICON } from './icons';
 import { buildBuilding } from './actions';

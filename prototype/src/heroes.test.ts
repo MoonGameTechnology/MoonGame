@@ -10,7 +10,7 @@ import {
   type HeroGrade,
   type HeroLoadout,
 } from './heroes';
-import { data } from './prototypeData';
+import { data } from './gameData';
 
 const load = (grade: HeroGrade, abilities: (string | null)[]): HeroLoadout => ({ name: 'h', grade, abilities });
 

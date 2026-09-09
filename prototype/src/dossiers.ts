@@ -25,7 +25,7 @@ import {
 } from '../../packages/shared-core/src/index';
 // Straight from the source modules, not through the `game.ts` barrel — same as
 // `game.ts` itself sources them, and it keeps this module off the façade.
-import { data } from './prototypeData';
+import { data } from './gameData';
 import { HOUR } from './time';
 import { t, tData } from '../../localization/runtime';
 import { GLOSSARY } from './codexIndex';
