@@ -100,6 +100,11 @@ export function buildingDossier(id: string, level: number): Dossier | null {
         name,
         body: t('dossier.building.orbital-aa', { dmg: hl(lv.aaDamage ?? 0) }),
       };
+    case 'zonal_aa':
+      return {
+        name,
+        body: t('dossier.building.zonal-aa', { dmg: hl(lv.pointDefense ?? 0) }),
+      };
     case 'metal_station':
       return {
         name,
@@ -218,6 +223,15 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
         body: t('dossier.unit.bomber.desc', {
           a: hl(st.attack),
           s: hl(st.siegeDamage ?? 0),
+          hp: hl(st.hp),
+          r: hl(st.strikeRange ?? 0),
+        }),
+      };
+    case 'landing_shuttle':
+      return {
+        name: t('dossier.unit.landing-shuttle.name'),
+        body: t('dossier.unit.landing-shuttle.desc', {
+          c: hl(st.cargoCapacity ?? 0),
           hp: hl(st.hp),
           r: hl(st.strikeRange ?? 0),
         }),

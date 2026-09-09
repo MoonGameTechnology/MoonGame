@@ -298,6 +298,32 @@
       "weapon": 1
     }
   },
+  "landing_shuttle": {
+    "faction": "blue",
+    "stats": {
+      "attack": 0,
+      "defense": 2,
+      "speed": 54,
+      "hp": 24,
+      "strikeRange": 120,
+      "fuel": 2,
+      "rearmRounds": 2,
+      "cargoCapacity": 3
+    },
+    "line": "front",
+    "traits": [
+      "shuttle"
+    ],
+    "signature": 2,
+    "cost": {
+      "metal": 70,
+      "credits": 20
+    },
+    "buildTimeHours": 2,
+    "upkeep": {
+      "credits": 24
+    }
+  },
   "strike_carrier": {
     "faction": "vanguard",
     "stats": {

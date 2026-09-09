@@ -202,6 +202,20 @@
       "energy": 30
     }
   },
+  "zonal_aa": {
+    "name": "Area Defense Battery",
+    "cost": {
+      "metal": 130,
+      "credits": 40
+    },
+    "buildTimeHours": 4,
+    "hp": 22,
+    "pointDefense": 40,
+    "scoreValue": 3,
+    "upkeep": {
+      "energy": 25
+    }
+  },
   "metal_station": {
     "name": "Salvage Metal Rig",
     "cost": {

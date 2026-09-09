@@ -1,5 +1,5 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
-import type { Battle, CombatantRef, Fleet, PlanetId } from '../state/gameState';
+import type { Battle, CombatantRef, Fleet, Planet, PlanetId, UnitStack } from '../state/gameState';
 import type { GameData } from '../data/schemas';
 import { hoursToMs, type Context } from '../action/types';
 import { MS_PER_HOUR } from '../util/time';
@@ -131,7 +131,9 @@ function pinToEdge(fleet: Fleet, from: PlanetId, to: PlanetId, t: number): void 
 function startBattle(h: HandlerContext, battle: Battle): void {
   h.state.battles[battle.id] = battle;
   for (const side of [battle.attacker, battle.defender]) {
-    if (side.ref.kind !== 'garrison') {
+    // Стороны, которые держит МИР (гарнизон и плацдарм), не привязаны к флоту:
+    // запирать и останавливать нечего.
+    if (side.ref.kind !== 'garrison' && side.ref.kind !== 'beachhead') {
       const f = h.state.fleets[side.ref.fleetId];
       if (f) {
         f.battleId = battle.id;
@@ -285,9 +287,38 @@ function capturePlanet(
   });
 }
 
+/**
+ * Захват мира ВЫИГРАВШИМ ПЛАЦДАРМОМ (ROS-1.5) — брат `capturePlanet`, но без флота.
+ *
+ * Второй копией правил захвата он не является: событие `planet.captured` то же самое и
+ * `via: 'assault'` тот же (мир взят наземным боем, а не занят с орбиты), потому что для
+ * всех читателей — счёта, харнеса замеров, журнала — это ровно такой же штурм. Разошлось
+ * бы только имя виновника: `by` у обычного захвата — id флота, а здесь флота нет, и
+ * поэтому там стоит id мира. Врать про несуществующий флот хуже, чем назвать место.
+ */
+function capturePlanetByBeachhead(
+  h: HandlerContext,
+  planet: Planet,
+  force: { owner: string; units: UnitStack[] },
+  previousOwner: string | null,
+): void {
+  if (!isCapturable(h.ctx.data, planet)) {
+    return; // пустое пространство не принадлежит никому, даже после выигранного боя
+  }
+  planet.owner = force.owner;
+  planet.garrison = force.units.filter((s) => s.count > 0);
+  h.emit('planet.captured', {
+    planetId: planet.id,
+    owner: force.owner,
+    by: planet.id,
+    from: previousOwner,
+    via: 'assault',
+  });
+}
+
 function releaseOrDestroyFleet(h: HandlerContext, ref: CombatantRef): void {
-  if (ref.kind === 'garrison') {
-    return;
+  if (ref.kind === 'garrison' || ref.kind === 'beachhead') {
+    return; // стороны без флота — освобождать и уничтожать нечего
   }
   const fleet = h.state.fleets[ref.fleetId];
   if (!fleet) {
@@ -345,6 +376,21 @@ function finishBattle(h: HandlerContext, battle: Battle, stalemate = false): voi
       capturePlanet(h, battle.location, battle.attacker.ref.fleetId, planet.owner, true);
     }
   }
+  // ПЛАЦДАРМ (ROS-1.5) — тот же захват, только десант держит мир, а не флот. Он
+  // ВРЕМЕННЫЙ по определению: чем бы бой ни кончился, поля после него не остаётся —
+  // выигравший десант становится гарнизоном, проигравший исчезает вместе с боем.
+  // Иначе на карте завелись бы вечные «чужие войска на моей земле», которых в модели
+  // нет и заводить которые этот кирпич не стал.
+  if (battle.phase === 'ground' && battle.attacker.ref.kind === 'beachhead') {
+    const planet = h.state.planets[battle.location];
+    const force = planet?.beachhead;
+    if (planet && force) {
+      if (aAlive && !dAlive && planet.owner === battle.defender.owner) {
+        capturePlanetByBeachhead(h, planet, force, battle.defender.owner);
+      }
+      delete planet.beachhead;
+    }
+  }
 
   releaseOrDestroyFleet(h, battle.attacker.ref);
   releaseOrDestroyFleet(h, battle.defender.ref);
@@ -391,11 +437,12 @@ function finishBattle(h: HandlerContext, battle: Battle, stalemate = false): voi
     }
   }
 
-  if (battle.phase === 'ground' && battle.attacker.ref.kind !== 'garrison') {
+  if (battle.phase === 'ground' && battle.attacker.ref.kind === 'landing') {
     // Mirror the orbital victor rule for the GROUND finish: a relief fleet arriving
     // mid-assault could not engage (the assault fleet was battleId-locked), and
     // nothing re-engaged after resolution — hostile fleets coexisted at the node
     // forever (bug-hunt MAJOR). engageFleets no-ops unless both sides are live.
+    // Плацдарм сюда не попадает: флота, который надо было бы расцепить, у него нет.
     const f = h.state.fleets[battle.attacker.ref.fleetId];
     if (f && !f.battleId && f.location !== null) {
       engageFleets(h, f.id, battle.location);
@@ -480,6 +527,36 @@ export const combatModule: GameModule = {
 
     // Land the carried army on the contested world below. A single orbit (GDD §7.4):
     // the fleet must be stationed in that orbit (not in transit / on a lane).
+    /**
+     * ПЛАЦДАРМ ВЫСАДИЛСЯ (ROS-1.5) — десантный челнок поставил чужие войска на землю
+     * обороняемого мира, и с этой секунды за мир идёт наземный бой.
+     *
+     * Слушателем, а не вызовом из `shuttle.ts`: модули не импортируют друг друга, а
+     * правила боя (в том числе «один наземный бой на гарнизон») живут здесь. Нет
+     * модуля боя — событие никто не слышит, плацдарм стоит, ядро не падает.
+     */
+    api.on('beachhead.landed', (event, h) => {
+      const { planetId } = event.payload as { planetId?: string };
+      if (typeof planetId !== 'string') return;
+      const planet = h.state.planets[planetId];
+      const force = planet?.beachhead;
+      if (!planet || !force) return;
+      // Тот же гейт, что у второго штурма: два боя за один гарнизон делили бы одну
+      // ссылку защитника — двойной ответный огонь и два захвата подряд.
+      for (const id of Object.keys(h.state.battles).sort()) {
+        const b = h.state.battles[id];
+        if (b && b.phase === 'ground' && b.location === planetId) return;
+      }
+      startBattle(h, {
+        id: `battle:${h.state.battleSeq++}`,
+        location: planetId,
+        phase: 'ground',
+        attacker: { ref: { kind: 'beachhead', planetId }, owner: force.owner },
+        defender: { ref: { kind: 'garrison', planetId }, owner: planet.owner },
+        round: 0,
+      });
+    });
+
     api.onAction('fleet.assault', (action, h) => {
       const { fleetId } = action.payload as { fleetId?: string };
       if (typeof fleetId !== 'string') {

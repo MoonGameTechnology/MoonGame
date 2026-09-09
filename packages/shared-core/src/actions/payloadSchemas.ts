@@ -150,6 +150,9 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
     count,
     targetFleetId: id.optional(),
     targetPlanetId: id.optional(),
+    // ROS-1.5 — груз десантного вылета. Берётся с базы в момент вылета: у машин в
+    // ангаре нет своей личности, поэтому трюм принадлежит ВЫЛЕТУ, а не стеку.
+    troops: z.array(z.object({ unit: id, count })).optional(),
   }),
   // Перегрузка челноков между космопортом и стоящим там носителем (SHU-2.1).
   'shuttle.load': z.object({ fleetId: id, unit: id, count }),

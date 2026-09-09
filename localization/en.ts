@@ -211,6 +211,9 @@ export const en: Record<string, string> = {
   'chat.tab.coalition': 'Coalition',
   'chat.tab.session': 'Session',
   'chat.you': 'You',
+  'data.landing-shuttle': 'landing shuttle',
+  'dossier.unit.landing-shuttle.desc': 'Landing shuttle: an unarmed hull with a hold of {c} — it cannot strike ships at all, and the order is refused outright. One-way: it puts down with its cargo and never flies home. An empty enemy world falls at once; a defended one gets a BEACHHEAD that opens a ground battle with no ship in sight; your own worlds get reinforcements. Area defense shreds both the craft and what they carried ({hp} hull, range {r}).',
+  'dossier.unit.landing-shuttle.name': 'Landing Shuttle',
   'side.build.open': 'Build',
   'spy.log.empty': 'no attempts yet',
   'spy.log.title': 'JOURNAL',
@@ -268,7 +271,7 @@ export const en: Record<string, string> = {
   'chain.add-wait6': '⏱ +6h',
   'chain.fire': '🎯 Fire +1h',
   'chain.full': 'plan is full — 8 steps',
-  'chain.no-art': 'no artillery in the selection',
+  'chain.no-art': 'nothing in the selection fires at range',
   'chain.overwrite': 'fleet plans differ — sending replaces them all',
   'chain.undo': 'Undo step',
 
@@ -609,6 +612,7 @@ export const en: Record<string, string> = {
   'data.neural-lace': 'Neural Lace',
   'data.oceanic': 'Oceanic',
   'data.open-space': 'Open space',
+  'data.area-defense-battery': 'Area Defense Battery',
   'data.orbital-defense-battery': 'Orbital Defense Battery',
   'data.orbital-logistics': 'Orbital Logistics',
   'data.overclocked-helm': 'Overclocked Helm',
@@ -716,6 +720,8 @@ export const en: Record<string, string> = {
     'A drilling rig gnaws into the planet, mining {m}⬢ per hour. Upgrades dig deeper to reach the richest veins. The foundation for building your fleet.',
   'dossier.building.orbital-aa':
     "Orbital interdiction: a fixed battery that fires on SHIPS in orbit — {dmg} damage per hour. Against shuttles it is useless: those dive into the world's airspace, and area defense is what meets them there. It does not block capture (that is ground defense's job) — it just mows down the fleet overhead.",
+  'dossier.building.zonal-aa':
+    "Area defense: a battery that meets SHUTTLES once they dive into the world's airspace — {dmg} damage to the wave at the moment it strikes. Without it a shuttle raid on your world costs the raider nothing: they hit and leave intact. With it, half the wave never flies home. It does nothing against ships in orbit — that is orbital interdiction's job.",
   'dossier.building.power-plant':
     "A fusion reactor powers your worlds, producing {e}↯ per hour. Energy is the lifeblood of your buildings — they don't run on magic. When it runs short, everything browns out to half output.",
   'dossier.building.radar':
@@ -1434,6 +1440,8 @@ export const en: Record<string, string> = {
   'log.market.buy': 'buy',
   'log.market.sell': 'sell',
   'log.market.trade': '⇄ market: {n} {res} for {paid} ¤ ({side})',
+  'log.shuttle.repelled.mine': '✳ Flak downed {n} of our craft · {at}',
+  'log.shuttle.repelled.theirs': '✳ Our flak downed {n} enemy craft · {at}',
   'log.spy.caught': '🛡 Counter-intel: agent {who} caught stealing ({what})!',
   'log.spy.fail': '🕵 Agent failed ({who}) — the fee is gone',
   'log.spy.fail.short': '✖ Failed against {who} — the fee burned',

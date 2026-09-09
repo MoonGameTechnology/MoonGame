@@ -355,6 +355,20 @@ export interface Planet {
   /** Cancelled-mid-build construction/upgrade/unit orders, paused and resumable
    *  (see `PausedConstructionSite`). Undefined/empty = nothing paused here. */
   pausedConstruction?: PausedConstructionSite[];
+  /** ПЛАЦДАРМ — чужие войска, высаженные на этот мир десантным челноком (ROS-1.5).
+   *
+   *  Это ВРЕМЕННАЯ сторона наземного боя, а не второй гарнизон: она живёт ровно пока
+   *  идёт бой за мир. Выиграла — становится гарнизоном и берёт мир; проиграла —
+   *  исчезает. Постоянных «чужих войск на моей земле» в модели нет, и заводить их
+   *  этот кирпич не стал: одна планета — один хозяин.
+   *
+   *  Почему не `Fleet.landing`, как у высадки с флота: у вылета челноков флота нет
+   *  вовсе, а `landing` адресуется id флота. Плацдарм — тот же десант, только его
+   *  держит МИР, потому что держать больше некому.
+   *
+   *  Владелец здесь обязателен: без него после гибели последнего защитника было бы
+   *  непонятно, кому достался мир. Undefined = плацдарма нет. */
+  beachhead?: { owner: PlayerId; units: UnitStack[] };
 }
 
 export interface FleetMovement {
@@ -474,12 +488,14 @@ export type BarrageMode = 'passive' | 'return' | 'standard' | 'aggressive';
 
 /**
  * A combatant in a battle — the ship units of a fleet (orbital), the landing
- * troops a fleet carries (ground assault), or a planet's garrison (ground
- * defense). One round engine drives all three (GDD §7.3).
+ * troops a fleet carries (ground assault), the BEACHHEAD a shuttle drop put ashore
+ * (ROS-1.5), or a planet's garrison (ground defense). One round engine drives all
+ * four (GDD §7.3).
  */
 export type CombatantRef =
   | { kind: 'fleet'; fleetId: FleetId }
   | { kind: 'landing'; fleetId: FleetId }
+  | { kind: 'beachhead'; planetId: PlanetId }
   | { kind: 'garrison'; planetId: PlanetId };
 
 export interface BattleSide {
@@ -894,6 +910,13 @@ export interface ShuttleStrike {
    *  что «раненых» челноков в модели нет: машина либо летит, либо сбита. Без накопления
    *  залп слабее корпуса не делал бы вообще ничего, и оборона молча простаивала бы. */
   damage?: number;
+  /** ТРЮМ вылета — наземные войска, которые везёт десантный челнок (ROS-1.5).
+   *
+   *  Груз берётся с базы В МОМЕНТ ВЫЛЕТА и живёт здесь, а не в ангаре: машины в ангаре —
+   *  стеки без своей личности (они сливаются по юниту и лоадауту), и трюм на стеке
+   *  запретил бы им сливаться вовсе. Долетевший груз сходит на землю, вылет при этом
+   *  гибнет; сбитая по дороге машина уносит свою долю трюма. Undefined = обычный удар. */
+  cargo?: UnitStack[];
 }
 
 export interface PlanetSnapshot {

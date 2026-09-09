@@ -26,6 +26,7 @@ export const BUILD_ICON: Record<string, string> = {
   starfort: '✦',
   radar: '⊚',
   orbital_aa: '⌁',
+  zonal_aa: '✳', // зональное ПВО: разрыв зенитного снаряда — контрмера ЧЕЛНОКАМ
   spaceport: '⊞', // стапель: без него корабль на мире не заложить
   metal_station: '⛏', // утилизационная станция — металл из обломков
   hospital: '✚', // полевой госпиталь: единственный источник лечения гарнизона
@@ -47,6 +48,7 @@ export const UNIT_ICON: Record<string, string> = {
   shuttle_carrier: '⬢', // плавучий космопорт — сплошной корпус, весь объём под ангар
   interceptor: '△', // light strike wing (hollow, to read apart from the cruiser ▲)
   bomber: '⧨', // челнок с бомбовой нагрузкой — тот же треугольник, но «полный»
+  landing_shuttle: '⧗', // десантный борт: везёт не бомбы, а людей — и садится с ними
   hero: '♔', // the player's projection — a crowned flagship
   militia: '▿', // massed light foot
   heavy_infantry: '◆', // the armoured line
