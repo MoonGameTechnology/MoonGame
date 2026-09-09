@@ -22,12 +22,22 @@ import {
   type StoredReceipt,
 } from '../../packages/server/src/index';
 import { createDevMatch, loadShippedData } from '../../packages/server/src/scenario';
+import { startClockDriver } from '../../packages/server/src/clockDriver';
+import type { RoomObservation } from '../../packages/server/src/matchRoom';
+import { aiOrders } from './ai';
 
 export interface RehearsalOptions {
   players: number;
   latencyMs: number;
   persistDelayMs: number;
   timeoutMs: number;
+  /** RESIL-5 — сколько ИГРОВЫХ часов прожить «живой» фазой после проверки провода.
+   *  `0` (по умолчанию) её выключает: остальные фазы утверждают ТОЧНЫЕ счётчики
+   *  действий, и трафик ботов их сдвинул бы. Гоняется отдельным тестом и из CLI. */
+  gameHours: number;
+  /** Потолок приказов от одного бота за игровой час. Держит прогон быстрым и не даёт
+   *  боту упереться в анти-флуд провода вместо игры. */
+  botActionsPerHour: number;
 }
 
 export interface RehearsalReport {
@@ -44,6 +54,14 @@ export interface RehearsalReport {
   fogViolations: number;
   finalSequence: number;
   durationMs: number;
+  /** RESIL-5, живая фаза. `gameHours` 0 ⇒ она не запускалась и остальные три нули. */
+  gameHours: number;
+  /** Приказов, отправленных ботами по НАСТОЯЩЕМУ проводу (через гейт и квитанции). */
+  botActions: number;
+  /** Тик не сдвинул время, пока работа просрочена, — застой часов. Должен быть 0. */
+  stalls: number;
+  /** У запланированного события бросил обработчик, и его выбросили. Должен быть 0. */
+  deadLetters: number;
 }
 
 const DEFAULTS: RehearsalOptions = {
@@ -51,6 +69,8 @@ const DEFAULTS: RehearsalOptions = {
   latencyMs: 75,
   persistDelayMs: 15,
   timeoutMs: 10_000,
+  gameHours: 0,
+  botActionsPerHour: 2,
 };
 
 /** One schema-valid payload for every action type exposed to an untrusted client.
@@ -275,6 +295,10 @@ export async function runRehearsal(
   const sign = { key: secret, algorithm: 'HS256' as const, issuer: 'void', audience: 'match' };
   let snapshot: { state: GameState; seq: number } | undefined;
   const receipts = new Map<string, StoredReceipt>();
+  // Часы репетиции ПОДВИЖНЫ (были прибиты к 1000). До живой фазы значение не меняется,
+  // поэтому все прежние фазы видят ровно тот же мир, что и раньше.
+  const clock = { now: 1_000 };
+  const observations: RoomObservation[] = [];
   let durableWrites = 0;
   let hashMismatches = 0;
   let fogViolations = 0;
@@ -291,10 +315,11 @@ export async function runRehearsal(
     createDevMatch(data, {
       id: 'rehearsal',
       players: playerIds,
-      now: () => 1_000,
+      now: () => clock.now,
       time: 1_000,
       gate: new ActionGate({ payloadValidator: isValidActionPayload }),
       persist,
+      observe: (e) => observations.push(e),
       actionRateMax: 1_000,
       actionRateWindowMs: 1_000,
       ...(snapshot
@@ -408,6 +433,83 @@ export async function runRehearsal(
       }
     }
 
+    // --- ФАЗА ЖИЗНИ (RESIL-5) --------------------------------------------------
+    //
+    // Всё выше проверяет ПРОВОДИМОСТЬ: конверты, дубли, отказы по правилам, туман,
+    // квитанции. Это разные вопросы к одной системе, и до сих пор второй не задавался
+    // вовсе: мир в репетиции стоял на месте (часы были прибиты к 1000), а трафик был
+    // скриптом по одному payload на тип.
+    //
+    // Здесь мир ЖИВЁТ. Время двигает НАСТОЯЩИЙ `startClockDriver` — с внедрённым
+    // таймером, поэтому его собственная логика (взвод, сторож застоя, перевзвод после
+    // тика) работает по-честному, а прогон остаётся детерминированным и быстрым.
+    // Трафик создают те же `aiOrders`, что водят пустые кресла на сервере, и уходит он
+    // по НАСТОЯЩЕМУ проводу: гейт, конверты, `clientSeq`, квитанции, durable-persist.
+    //
+    // Чего эта фаза сознательно НЕ делает и почему — в `RESIL-5` бэклога: бот решает по
+    // состоянию СЕРВЕРА, а не по своей проекции под туманом (решение по проекции сейчас
+    // невозможно — `decisionNoise` читает `state.rng`, а его в проекции нет); карта
+    // остаётся dev-сценарием; Postgres подменён задержкой.
+    let botActions = 0;
+    if (options.gameHours > 0) {
+      const HOUR = 3_600_000;
+      const timer: { fn: (() => void) | null } = { fn: null };
+      const driver = startClockDriver(room, {
+        schedule: (fn) => {
+          timer.fn = fn;
+          return {};
+        },
+        cancel: () => {
+          timer.fn = null;
+        },
+        heartbeatMs: 1_000,
+      });
+      try {
+        for (let hour = 1; hour <= options.gameHours; hour += 1) {
+          clock.now = 1_000 + hour * HOUR;
+          // Дать драйверу разобрать всё, что стало просроченным за этот час. Потолок
+          // здесь не «на всякий случай», а страховка от вечного цикла, если тик перестанет
+          // двигать время: сторож застоя внутри драйвера уйдёт в простой сам, но ждать
+          // этого молча репетиция не должна.
+          for (let guard = 0; guard < 8 && timer.fn; guard += 1) {
+            const fire = timer.fn;
+            timer.fn = null;
+            fire();
+          }
+          for (const client of clients) {
+            const orders = aiOrders(room.state, client.playerId).slice(0, options.botActionsPerHour);
+            for (const order of orders) {
+              await client.send(order.type, order.payload);
+              botActions += 1;
+            }
+          }
+          driver.reschedule(); // действия могли запланировать новое — взвести под них
+        }
+      } finally {
+        driver.stop();
+      }
+
+      // Мир обязан был пройти заявленный срок, а не постоять.
+      if (room.state.time < 1_000 + options.gameHours * HOUR) {
+        throw new Error(
+          `живая фаза не довела часы: ${room.state.time} < ${1_000 + options.gameHours * HOUR}`,
+        );
+      }
+      // И каждый клиент обязан по-прежнему СХОДИТЬСЯ СО СВОЕЙ ПРОЕКЦИЕЙ: сутки жизни не
+      // должны развести его с сервером.
+      //
+      // Заметь, чего здесь НЕТ: грубой проверки «клиент не видит чужой флот», которая
+      // стоит в статических фазах выше. Она верна только в мире, где никто не двигается
+      // (до этой фазы флоты стояли по домам). Стоило им полететь — чужой флот появляется
+      // в проекции ЗАКОННО, как только его опознали, и та проверка начала бы врать. А
+      // сильная проверка тумана — вот эта: если бы сервер показал лишнее, состояние
+      // клиента разошлось бы с `baseView` и хэши не совпали.
+      for (const client of clients) {
+        const expected = baseView(room.state, client.playerId, data);
+        if (!client.state || hashState(client.state) !== hashState(expected)) hashMismatches += 1;
+      }
+    }
+
     await Promise.all(clients.map((client) => client.close()));
     await server.close();
     if (!snapshot) throw new Error('durable snapshot was not written');
@@ -432,13 +534,23 @@ export async function runRehearsal(
       }
       const expected = baseView(room.state, client.playerId, data);
       if (hashState(client.welcome.state) !== hashState(expected)) hashMismatches += 1;
-      for (const other of playerIds.filter((id) => id !== client.playerId)) {
-        if (client.welcome.state.fleets[`${other}_1`]) fogViolations += 1;
+      // Грубая проверка «чужого флота не видно» держится ТОЛЬКО в неподвижном мире, где
+      // флоты не успели встретиться. После живой фазы она начинает врать: опознанный
+      // чужой флот попадает в проекцию законно. Сильная проверка от этого не страдает —
+      // она сравнивает состояние клиента с его же проекцией строкой выше.
+      if (options.gameHours === 0) {
+        for (const other of playerIds.filter((id) => id !== client.playerId)) {
+          if (client.welcome.state.fleets[`${other}_1`]) fogViolations += 1;
+        }
       }
       await client.close();
     }
 
     return {
+      gameHours: options.gameHours,
+      botActions,
+      stalls: observations.filter((e) => e.kind === 'advance_overflow').length,
+      deadLetters: observations.filter((e) => e.kind === 'dead_letter').length,
       players: options.players,
       actionsAccepted,
       duplicatesPrevented,
