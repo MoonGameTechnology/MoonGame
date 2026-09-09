@@ -565,6 +565,7 @@ export const en: Record<string, string> = {
   'data.dense-nebula': 'Dense Nebula',
   'data.derelict-graveyard': 'Derelict Graveyard',
   'data.diplomatic-landing': 'Diplomatic Landing',
+  'data.drop-infantry': 'drop infantry',
   'data.empty-space': 'Empty Space',
   'data.energy': 'energy',
   'data.energy-nexus': 'Energy Nexus',
@@ -616,6 +617,8 @@ export const en: Record<string, string> = {
   'data.planet': 'Planet',
   'data.planetary-bastions': 'Planetary Bastions',
   'data.duel': 'Duel',
+  'data.scout-drone': 'scout drone',
+  'data.siege-lance': 'siege lance',
   'data.team-2v2': 'Team 2v2',
   'data.team-3v3': 'Team 3v3',
   'data.team-4v4': 'Team 4v4',
@@ -974,11 +977,8 @@ export const en: Record<string, string> = {
   // --- sci — Учёные совета: имя и что даёт ветка.
   'sci.overseer.desc':
     'Leader of the command branch (C2): doctrines of automation and delegation. Unlocks the «Steward Protocol» — handing your seat to an AI while you sleep.',
-  'sci.overseer.name': 'Overseer',
   'sci.polymath.desc': 'A generalist with no branch: +1 research slot (2→3) instead of a focus.',
-  'sci.polymath.name': 'Polymath',
   'sci.void-admiral.desc': 'Leader of the space branch: shipyards, logistics, siege doctrines.',
-  'sci.void-admiral.name': 'Void Admiral',
 
   // --- scipick — Совет учёных: кандидаты, фокус ветки, закрепление.
   'scipick.candidates': 'Candidates · tap to fill a slot',
@@ -1161,7 +1161,6 @@ export const en: Record<string, string> = {
   'hero.ability.annihilate.name': 'Annihilate',
   'hero.ability.boarding-translocation.desc':
     'The hero arrives where one of your fleets is PARKED — as a separate fleet alongside it. Every hero leads their own squadron, so they never join another; a fleet in transit is not a landing point. Passive skill: widens the deployment points.',
-  'hero.ability.boarding-translocation.name': 'Boarding Translocation',
   'hero.ability.bulwark.desc': 'A temporary shield: +defense to your fleets near the hero.',
   'hero.ability.bulwark.name': 'Bulwark',
   'hero.ability.corridor.desc':
@@ -1169,10 +1168,8 @@ export const en: Record<string, string> = {
   'hero.ability.corridor.name': 'Corridor',
   'hero.ability.decoy-signal.desc':
     'Fakes a radar contact: a node in range starts reading as occupied on rival radar. The phantom only shows where their radar reaches, and it falls apart the moment they get close enough to identify the node.',
-  'hero.ability.decoy-signal.name': 'Decoy Signal',
   'hero.ability.diplomatic-landing.desc':
     "Allied worlds receive the hero as one of their own: the ship can also rise from an ally's planet. Passive skill: widens the deployment points.",
-  'hero.ability.diplomatic-landing.name': 'Diplomatic Landing',
   'hero.ability.rally.desc':
     'A battle cry: a temporary extra aura bonus for your fleets near the hero.',
   'hero.ability.rally.name': 'Rally',
@@ -1183,7 +1180,6 @@ export const en: Record<string, string> = {
   'hero.ability.scan.name': 'Scan',
   'hero.ability.warp-jump.desc':
     'A puncture in space: the hero ship and the troops in its hold appear instantly at a node in range. Jumps through fog too. Will not pull a ship out of an active battle.',
-  'hero.ability.warp-jump.name': 'Warp Jump',
   'hero.arch.commander': 'Commander',
   'hero.arch.destroyer': 'Destroyer',
   'hero.arch.vanguard': 'Vanguard',
@@ -1199,54 +1195,36 @@ export const en: Record<string, string> = {
   'hero.hook.fleet-speed': 'fleet speed',
   'hero.passive.convoy-impulse.desc':
     'The hero runs the staging: fleets departing nodes within 300 fly 8% faster.',
-  'hero.passive.convoy-impulse.name': 'Convoy Impulse',
   'hero.passive.rally-beacon.desc':
     'Fleets near the hero fight harder: +8% damage for your fleets within 300.',
-  'hero.passive.rally-beacon.name': 'Rally Beacon',
   'hero.passive.vanguard-impulse.desc':
     "The hero's ship drives its fleet at full burn: +10% speed for the hero's fleet.",
-  'hero.passive.vanguard-impulse.name': 'Vanguard Impulse',
   'hero.tree.corridor-open.desc':
     'Opens the corridor to your ALLIES: their fleets use your passage as their own, at the same speed bonus. It becomes a shared road, so a neutral — or the enemy — can step in as well, but for them it is only a road: no bonus.',
-  'hero.tree.corridor-open.name': 'Shared Corridor',
   'hero.tree.corridor-sustained.desc':
     "The corridor lives on a clock instead of closing behind the hero's army.",
-  'hero.tree.corridor-sustained.name': 'Sustained Corridor',
   'hero.tree.false-echo.desc':
     'The other side of psi-sight: the hero learns not only to read a rival radar, but to write into it what is not there.',
-  'hero.tree.false-echo.name': 'False Echo',
   'hero.tree.fleet-uplink.desc':
     'The neural link spreads to the whole order: not just the hero ship, but nearby fleets get under way faster.',
-  'hero.tree.fleet-uplink.name': 'Fleet Uplink',
   'hero.tree.neural-lace.desc': "A direct brain-to-helm implant: the hero's ship gains +10% speed.",
-  'hero.tree.neural-lace.name': 'Neural Lace',
   'hero.tree.overclocked-helm.desc':
     'Overclocking the neural interface lets the hero lay corridors.',
-  'hero.tree.overclocked-helm.name': 'Overclocked Helm',
   'hero.tree.psi-evasion.desc':
     'The radar picture reaches your own too: your fleets and allied fleets inside the lit zone take 5% less incoming damage.',
-  'hero.tree.psi-evasion.name': 'Evasive Vectors',
   'hero.tree.psi-veil.desc': 'Honed psi-sight: the hero learns to tear the fog open with a scan.',
-  'hero.tree.psi-veil.name': 'Psi Veil',
   'hero.tree.psi-weak-points.desc':
     'The radar does more than light the dark: it reads the gaps in hostile armour. Enemy fleets inside the lit zone take 5% more damage. Your own, allied and neutral fleets are untouched.',
-  'hero.tree.psi-weak-points.name': 'Weak Points',
   'hero.tree.void-attunement.desc':
     "The hero's psi resonance inspires nearby fleets: +8% damage within 300.",
-  'hero.tree.void-attunement.name': 'Void Attunement',
   'hero.tree.void-translocator.desc':
     'The top of the corridor branch: the hero stops laying a path and simply vanishes at one node to appear at another.',
-  'hero.tree.void-translocator.name': 'Void Translocator',
   'hero.unit.commander.desc':
     'The flagship hero: a command transhuman who strengthens the fleet and opens corridors.',
-  'hero.unit.commander.name': 'Commander',
   'hero.unit.ravager.desc': 'A psionic destroyer: annihilates worlds and tears open the fog.',
-  'hero.unit.ravager.name': 'Destroyer',
   'hero.unit.vanguard.desc':
     'A transhuman manoeuvrist: corridors and a war cry for the leading fleets.',
-  'hero.unit.vanguard.name': 'Vanguard',
   'hero.unit.warden.desc': 'A psionic defender: holds the line behind a bastion shield.',
-  'hero.unit.warden.name': 'Sentinel',
 
   // --- hero.hq / hero.tree / hero.abil / hero.fit — Штаб героев: состав, дерево навыков, способности, фиттинги.
   'hero.abil.activate': 'Activate',
