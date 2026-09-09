@@ -244,10 +244,29 @@ function takeFromHangar(hangar: readonly UnitStack[], unit: string, count: numbe
   return out;
 }
 
-/** Сила вылета — Σ `count × attack` челноков, ограниченная линией боя, ровно как у
- *  артиллерии: количество бьёт, но не бесконечно. */
-function strikePower(strike: ShuttleStrike, data: GameData): number {
-  return cappedUnitStat(strike.units, data, 'attack');
+/** Сила вылета против ЦЕЛИ ЭТОГО РОДА, ограниченная линией боя, ровно как у
+ *  артиллерии: количество бьёт, но не бесконечно.
+ *
+ *  Профилей два (ROS-1.4): по КОРАБЛЯМ челнок бьёт `attack`, по ЗДАНИЯМ — своим
+ *  `siegeDamage` (тот же стат, которым осадная платформа крушит мир, ROS-1.3).
+ *  Одной цифрой роли челноков не различались вовсе: машина, хорошая против флота,
+ *  была ровно настолько же хороша против построек, и «бомбардировщик против
+ *  кораблей, перехватчик против челноков» оставалось словами в дизайне.
+ *
+ *  Нет `siegeDamage` → по зданиям считается `attack`, как до разделения: мягкая
+ *  деградация, чужой и старый контент ведёт себя как вёл. */
+function strikePower(
+  strike: ShuttleStrike,
+  data: GameData,
+  target: ShuttleStrike['target']['kind'],
+): number {
+  if (target === 'fleet') {
+    return cappedUnitStat(strike.units, data, 'attack');
+  }
+  return cappedUnitStat(strike.units, data, (stats) => {
+    const siege = stats.siegeDamage ?? 0;
+    return siege > 0 ? siege : (stats.attack ?? 0);
+  });
 }
 
 /** Скорость вылета — самая медленная машина в нём. */
@@ -470,7 +489,7 @@ export const shuttleModule: GameModule = {
       if (!strike) return; // сбит по дороге / удалён — dead letter, таймлайн не застревает
 
       if (strike.leg === 'out') {
-        const power = strikePower(strike, h.ctx.data);
+        const power = strikePower(strike, h.ctx.data, strike.target.kind);
         if (power > 0) {
           if (strike.target.kind === 'fleet') {
             const target = h.state.fleets[strike.target.id];

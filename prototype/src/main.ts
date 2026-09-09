@@ -967,6 +967,7 @@ const BUILD_UNITS = [
   'strike_carrier',
   'shuttle_carrier',
   'interceptor',
+  'bomber',
   'militia',
   'heavy_infantry',
   'special_forces',

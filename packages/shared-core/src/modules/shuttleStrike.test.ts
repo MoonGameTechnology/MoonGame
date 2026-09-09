@@ -35,7 +35,41 @@ const data: GameData = parseGameData({
       domain: 'space',
       traits: ['shuttle'],
       // speed 100 map units/hour, радиус 180 — до B (100) достаёт, до C (300) нет.
-      stats: { attack: 12, defense: 3, speed: 100, hp: 10, strikeRange: 180, fuel: 2, rearmRounds: 2 },
+      // ROS-1.4: по ЗДАНИЯМ почти не работает (siegeDamage 1) — он охотник, не бомбер.
+      stats: {
+        attack: 12,
+        defense: 3,
+        speed: 100,
+        hp: 10,
+        strikeRange: 180,
+        fuel: 2,
+        rearmRounds: 2,
+        siegeDamage: 1,
+      },
+    },
+    // ROS-1.4: бомбардировщик — челнок против КОРАБЛЕЙ, по зданиям средний.
+    bomber: {
+      faction: 'x',
+      domain: 'space',
+      traits: ['shuttle'],
+      stats: {
+        attack: 20,
+        defense: 4,
+        speed: 100,
+        hp: 16,
+        strikeRange: 180,
+        fuel: 2,
+        rearmRounds: 3,
+        siegeDamage: 8,
+      },
+    },
+    // Челнок БЕЗ осадного стата — сторож мягкой деградации: бьёт здания по `attack`,
+    // ровно как весь контент до ROS-1.4.
+    legacy_shuttle: {
+      faction: 'x',
+      domain: 'space',
+      traits: ['shuttle'],
+      stats: { attack: 6, defense: 3, speed: 100, hp: 10, strikeRange: 180, fuel: 2, rearmRounds: 2 },
     },
   },
   factions: {},
@@ -95,18 +129,32 @@ function world(over: { portHp?: number; hangar?: number } = {}): GameState {
   };
 }
 
+/** Доложить в порт A машины другого класса (ROS-1.4). Отдельным хелпером, а не в
+ *  `world()`: состав ангара по умолчанию закреплён тестами вылета и возврата, и
+ *  лишний стек там сдвинул бы их счёт. */
+function withHangar(state: GameState, unit: string, count = 2): GameState {
+  const home = state.planets.A!;
+  return {
+    ...state,
+    planets: { ...state.planets, A: { ...home, hangar: [...(home.hangar ?? []), { unit, count }] } },
+  };
+}
+
 let seq = 0;
 const strike = (
-  target: { targetFleetId: string } | { targetPlanetId: string },
+  target: ({ targetFleetId: string } | { targetPlanetId: string }) & { unit?: string },
   count = 1,
   planetId = 'A',
-): Action => ({
-  id: `a:${seq++}`,
-  type: 'shuttle.strike',
-  playerId: 'p1',
-  payload: { planetId, unit: 'interceptor', count, ...target },
-  issuedAt: 0,
-});
+): Action => {
+  const { unit = 'interceptor', ...where } = target;
+  return {
+    id: `a:${seq++}`,
+    type: 'shuttle.strike',
+    playerId: 'p1',
+    payload: { planetId, unit, count, ...where },
+    issuedAt: 0,
+  };
+};
 
 function apply(state: GameState, action: Action): GameState {
   const r = kernel.applyAction(state, action, at(state));
@@ -183,6 +231,45 @@ describe('удар челноков — попадание и возврат (п
     const after = advance(s, 2);
     const mine = after.planets.B?.buildings.find((b) => b.type === 'mine');
     expect(mine?.hp ?? 0).toBeLessThan(20);
+  });
+
+  // ROS-1.4. У челнока теперь ДВА профиля урона: по кораблям он бьёт `attack`, по
+  // зданиям — `siegeDamage`. Одной цифрой «перехватчик против челноков, бомбардировщик
+  // против кораблей» не выражалось: любой челнок был одинаково хорош против всего.
+  it('по ЗДАНИЯМ челнок бьёт своим siegeDamage, а не attack', () => {
+    // Перехватчик: attack 12, siegeDamage 1. Двое за удар снимают 2 hp, а не 24.
+    const s = apply(world(), strike({ targetPlanetId: 'B' }, 2));
+    const after = advance(s, 2);
+    const mine = after.planets.B?.buildings.find((b) => b.type === 'mine');
+    expect(mine?.hp).toBe(18);
+  });
+
+  it('бомбардировщик по зданиям бьёт заметно сильнее перехватчика', () => {
+    const s = apply(withHangar(world(), 'bomber'), strike({ targetPlanetId: 'B', unit: 'bomber' }, 2));
+    const after = advance(s, 2);
+    const mine = after.planets.B?.buildings.find((b) => b.type === 'mine');
+    expect(mine?.hp).toBe(4); // 2 × 8 = 16 против 2 у перехватчика
+  });
+
+  it('по КОРАБЛЯМ обе машины бьют своим attack, осадный стат не участвует', () => {
+    const hit = (unit: string): number => {
+      const s = apply(withHangar(world(), unit), strike({ targetFleetId: 'E1', unit }, 2));
+      // `hp` появляется только когда по стеку попали; целый корпус — это undefined,
+      // то есть «снято ноль».
+      return 100 - (hullOf(advance(s, 2), 'E1') ?? 100);
+    };
+    expect(hit('bomber')).toBe(40); // 2 × 20
+    expect(hit('interceptor')).toBe(24); // 2 × 12 — по кораблю он слабее бомбардировщика
+  });
+
+  it('челнок без siegeDamage бьёт здания по-старому — своим attack', () => {
+    const s = apply(
+      withHangar(world(), 'legacy_shuttle'),
+      strike({ targetPlanetId: 'B', unit: 'legacy_shuttle' }, 2),
+    );
+    const after = advance(s, 2);
+    const mine = after.planets.B?.buildings.find((b) => b.type === 'mine');
+    expect(mine?.hp).toBe(8); // 2 × 6 = 12, как до разделения профилей
   });
 
   it('ЧЕЛНОКИ ВОЗВРАЩАЮТСЯ В ТОТ ЖЕ ПОРТ', () => {

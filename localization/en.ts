@@ -783,6 +783,9 @@ export const en: Record<string, string> = {
     "The battle line's workhorse: {a} attack, {hp} hull and a hold for {c}. A general-purpose warship, equally solid on offense and defense.",
   'dossier.unit.cruiser.name': 'Cruiser',
   'dossier.unit.default': 'A combat unit.',
+  'dossier.unit.bomber.desc':
+    "A bomber: the shuttle built for HULLS — {a} damage to a ship, twice what an interceptor lands. Against buildings it is middling ({s} per hour): it will hurt a world, but levelling one is siege-platform work. Heavier and slower than an interceptor ({hp} hull, {r} reach), longer to rearm, and it never joins the battle: fly in, hit, go home.",
+  'dossier.unit.bomber.name': 'Bomber',
   'dossier.unit.interceptor.desc':
     "An interceptor: fast (speed {sp}) and hits hard ({a} attack), but almost no armor ({hp} hull). Splits off the carrier into its own fast fleet and strikes from range {r}. Countered by orbital AA — don't send it against an AA-covered world.",
   'dossier.unit.interceptor.name': 'Interceptor',

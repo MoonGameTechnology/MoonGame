@@ -50,7 +50,7 @@ export const YARD_HULLS = [
   'sensor_frigate',
   'strike_carrier',
 ];
-export const YARD_SQUAD_HULLS = ['interceptor', 'shuttle_carrier'];
+export const YARD_SQUAD_HULLS = ['interceptor', 'bomber', 'shuttle_carrier'];
 
 /** How many hulls one order may queue at once (the ± stepper's range). */
 const MAX_COUNT = 20;
