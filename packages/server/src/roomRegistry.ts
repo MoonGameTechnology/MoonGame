@@ -1,4 +1,5 @@
 import type { MatchRoom } from './matchRoom';
+import { detach } from './detach';
 
 /**
  * A set of independent match-actors hosted in one process, addressed by match id
@@ -168,7 +169,7 @@ export class LazyRoomRegistry implements RoomRegistry {
     if (this.idle.has(matchId)) return; // already counting down
     this.idle.set(
       matchId,
-      this.schedule(() => void this.hibernate(matchId), this.idleMs),
+      this.schedule(() => detach(`гибернация матча ${matchId}`, this.hibernate(matchId)), this.idleMs),
     );
   }
 
@@ -234,7 +235,10 @@ export class LazyRoomRegistry implements RoomRegistry {
     if (ms === null) return; // nothing scheduled — nothing to wake for
     this.wakes.set(
       matchId,
-      this.schedule(() => void this.wake(matchId), Math.max(0, Math.min(ms, MAX_WAKE_DELAY))),
+      this.schedule(
+        () => detach(`пробуждение матча ${matchId}`, this.wake(matchId)),
+        Math.max(0, Math.min(ms, MAX_WAKE_DELAY)),
+      ),
     );
   }
 

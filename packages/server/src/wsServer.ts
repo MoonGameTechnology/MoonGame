@@ -11,6 +11,7 @@ import { InMemoryRoomRegistry, type RoomRegistry } from './roomRegistry';
 import type { AccountStore } from './store';
 import { verifyJoinToken, type JoinTokenVerifyConfig } from './auth';
 import { serializeServerMessage, type ServerErrorCode } from './protocol';
+import { detach } from './detach';
 
 export interface MultiplayerServerOptions {
   /** Single-match shortcut. Exactly one of `room` / `registry` must be given; `room`
@@ -345,8 +346,11 @@ export function createMultiplayerServer(
   const auth = options.auth;
   app.server.on('upgrade', (request, socket, head) => {
     // Async because auth/nick-login resolve identity through the join-token verifier or
-    // the (possibly DB-backed) account store before we accept the upgrade.
-    void (async () => {
+    // the (possibly DB-backed) account store before we accept the upgrade. Отказ этого
+    // промиса содержан (`detach`): рукопожатие идёт от кого угодно из сети, и уронить им
+    // процесс со всеми матчами не должно быть можно. Основной обработчик — `catch` ниже,
+    // который честно отвечает 500; `detach` страхует его самого.
+    detach('рукопожатие WebSocket', (async () => {
       // NETA2-1: a refusal the client can READ. A browser hides a rejected WS handshake's
       // HTTP status from JS, so `rejectUpgrade` (raw status + destroy) is indistinguishable
       // from "server down". For NON-security reasons that the public `GET /matches` feed
@@ -529,7 +533,7 @@ export function createMultiplayerServer(
       } catch {
         rejectUpgrade(socket, 500);
       }
-    })();
+    })());
   });
 
   // Track live sockets so close() can actively drain them: `httpServer.close()`
@@ -583,9 +587,12 @@ export function createMultiplayerServer(
           // `claimedAt` уходит в идентификатор действия: после смены владельца кресла
           // подтверждение нового игрока иначе дедуплится квитанцией предыдущего, и
           // место не закрепляется никогда (см. `seatConfirmAction`).
-          void room.submitServerAction(
-            playerId,
-            seatConfirmAction(room.id, playerId, room.state.time, claimedAt),
+          detach(
+            'подтверждение места',
+            room.submitServerAction(
+              playerId,
+              seatConfirmAction(room.id, playerId, room.state.time, claimedAt),
+            ),
           );
         }
       }
