@@ -516,7 +516,7 @@ describe('штаб героев — корабль: модули в той же 
   it('чужому корпусу модуль не предлагают — показан с причиной, а не спрятан', () => {
     const { s } = dockedState();
     const html = shipPane({ state: () => s });
-    // `radar_module` разрешён только `sensor_frigate` — на корпусе героя он должен
+    // `radar_module` разрешён только `frigate` — на корпусе героя он должен
     // быть ВИДЕН и погашен: экран не врёт о том, что вообще существует.
     expect(html).toContain(t('hero.ship.wrong-hull'));
     expect(html).toContain('hx-row dim');

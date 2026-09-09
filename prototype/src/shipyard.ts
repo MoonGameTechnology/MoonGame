@@ -47,7 +47,7 @@ export const YARD_HULLS = [
   'siege',
   'artillery',
   'scout',
-  'sensor_frigate',
+  'frigate',
   'strike_carrier',
 ];
 export const YARD_SQUAD_HULLS = ['interceptor', 'bomber', 'shuttle_carrier'];

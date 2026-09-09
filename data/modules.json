@@ -30,7 +30,7 @@
     "allowed": {
       "domain": "space",
       "units": [
-        "sensor_frigate"
+        "frigate"
       ]
     }
   },
