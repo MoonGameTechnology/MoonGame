@@ -594,8 +594,8 @@
 | CMB-6 | ⏳ | core | `docs/backlog.md:13585` | После ничьей третий враждебный флот остаётся стоять рядом. |
 | ORD-2 | ⏳ | proto | `docs/backlog.md:13595` | Нацеленный ШТУРМ не переживает закрытую вкладку. |
 | FOG-10 | ⏳ | proto core | `docs/backlog.md:13615` | На живом сервере память разведки живёт только во |
-| TEST-4 | ⏳ | srv | `docs/backlog.md:13633` | topXp не изолирован по прогону. |
-| FOG-9 | ⏳ | core | `docs/backlog.md:13642` | Приостановленная стройка чужого мира видна наблюдателю. |
+| FOG-9 | ✅ | core | `docs/backlog.md:13633` | Приостановленная стройка чужого мира была видна |
+| TEST-4 | ✅ | srv | `docs/backlog.md:13643` | topXp падал на живой базе разработчика. |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |

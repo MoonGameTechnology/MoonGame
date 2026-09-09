@@ -417,4 +417,24 @@ describe('BLD-1 — отмена, потолок, захват, туман', () 
     expect(visibleState(b.state, 'p1', data).planets.A?.buildQueue).toHaveLength(1);
     expect(visibleState(b.state, 'p2', data).planets.A?.buildQueue).toBeUndefined();
   });
+
+  it('приостановленная стройка чужого мира — тоже намерение, и тоже не видна (FOG-9)', () => {
+    const kernel = createKernel([constructionModule]);
+    const st = stateWith({
+      players: [player('p1', { metal: 300, credits: 50 }), player('p2', {})],
+      planets: [planet('A', 'p1')],
+    });
+    const a = okApply(kernel.applyAction(st, construct('mine'), ctx(0)));
+    const cancelled = okApply(kernel.applyAction(a.state, cancel(activeSeq(a.state)), ctx(HOUR)));
+    expect(cancelled.state.planets.A?.pausedConstruction).toHaveLength(1);
+
+    // Свой мир отдаёт приостановленное; чужой — нет, даже когда его видно в упор:
+    // вид, уровень и остаток цены рассказывают, ЧТО хозяин собирался тут поставить.
+    expect(visibleState(cancelled.state, 'p1', data).planets.A?.pausedConstruction).toHaveLength(
+      1,
+    );
+    expect(
+      visibleState(cancelled.state, 'p2', data).planets.A?.pausedConstruction,
+    ).toBeUndefined();
+  });
 });
