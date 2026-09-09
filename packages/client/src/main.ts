@@ -279,12 +279,19 @@ function runMatch(getState: () => GameState, bounds: Bounds, interact?: MatchInt
   // обработчиках) — так это и выглядело на первом плейтесте прототипа, где кадр падал
   // на состоянии без RNG. Один плохой кадр — это пропущенная отрисовка, не конец карты.
   let frameErrs = 0;
-  const loop = (): void => {
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let lastFrame = 0;
+  let visualTime = 0;
+  const loop = (frameTime: number): void => {
+    const dt = frameTime - lastFrame;
+    lastFrame = frameTime;
+    if (!document.hidden && !reducedMotion.matches && dt > 0 && dt < 1000) visualTime += dt;
     try {
       const state = getState();
       renderMap(g, state, cam, vp, bounds, {
         now: state.time,
         dpr,
+        visualTime,
         selected: interact?.getSelected?.() ?? null,
       });
     } catch (err) {

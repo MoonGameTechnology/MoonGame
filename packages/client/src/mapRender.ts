@@ -14,6 +14,8 @@ import { worldToScreen, inView, type Cam, type Viewport, type Bounds } from './c
 import { blitGlow, blitSphere, rgba } from './holoDraw';
 import { drawTerritory, type TerritorySeed } from './territory';
 import { theme } from './theme';
+import { drawSpaceBackdrop } from './spaceBackdrop';
+import { drawProvinceSelection } from './provinceSelection';
 
 /** Seat colours in join order (cyan / red / amber / violet — the prototype's palette). */
 const OWNER_COLORS = ['#35d6e6', '#ff5a4d', '#ffb43a', '#b07cff'] as const;
@@ -47,6 +49,8 @@ export interface MapRenderOpts {
   now: number;
   /** Device-pixel-ratio the canvas transform was set to — the holo sprites bake at it. */
   dpr: number;
+  /** Visual-only rotation clock; the caller freezes it for reduced motion/background tabs. */
+  visualTime?: number;
   /** Planet id to ring as the current selection (a fleet's home), if any. */
   selected?: string | null;
 }
@@ -76,6 +80,7 @@ export function renderMap(
   const vw = vp.right;
   const vh = vp.bottom;
   g.clearRect(vp.left, vp.top, vw - vp.left, vh - vp.top);
+  drawSpaceBackdrop(g, vw, vh, cam.x, cam.y, true);
 
   // Political territory — the weighted-Voronoi province fill (shared drawTerritory): every
   // sector is a cell coloured by its owner (neutral a faint wash), so who-holds-what reads
@@ -91,21 +96,30 @@ export function renderMap(
   ];
   const W = 9000 * cam.scale * cam.scale; // size → weight (screen px²), zoom-consistent
   const seeds: TerritorySeed[] = [];
-  for (const p of Object.values(state.planets)) {
+  const planets = Object.values(state.planets);
+  for (const p of planets) {
     const c = worldToScreen(p.position, cam, vp, bounds);
-    seeds.push({ x: c.x, y: c.y, w: (p.size ?? 1) * W, owner: p.owner ?? null, kind: p.kind ?? 'planet' });
+    seeds.push({
+      x: c.x,
+      y: c.y,
+      w: (p.size ?? 1) * W,
+      owner: p.owner ?? null,
+      kind: p.kind ?? 'planet',
+    });
   }
   if (seeds.length >= 2) {
-    drawTerritory(g, seeds, clip, {
+    const cells = drawTerritory(g, seeds, clip, {
       ownerColor,
       neutralFill: NEUTRAL,
       kindAccent: (kind) => KIND_COLOR[kind],
     });
+    const selected = cells.find((cell) => planets[cell.idx]?.id === opts.selected);
+    if (selected) drawProvinceSelection(g, selected.poly);
   }
 
   // Star lanes (each undirected edge once), over the territory fill.
-  g.lineWidth = 1;
-  g.strokeStyle = rgba(theme.cyan, 0.22);
+  g.lineWidth = 0.7;
+  g.strokeStyle = rgba(theme.cyan, 0.28);
   const drawn = new Set<string>();
   for (const p of Object.values(state.planets)) {
     const a = worldToScreen(p.position, cam, vp, bounds);
@@ -129,8 +143,8 @@ export function renderMap(
     const c = worldToScreen(p.position, cam, vp, bounds);
     if (!inView(c, vw, vh, 44)) continue;
     const col = p.owner ? ownerColor(p.owner) : NEUTRAL;
-    blitGlow(g, opts.dpr, col, c.x, c.y, R + 20, p.owner ? 0.3 : 0.12); // territory aura
-    blitSphere(g, opts.dpr, col, c.x, c.y, R, 1); // lit holographic volume
+    blitGlow(g, opts.dpr, col, c.x, c.y, R + 14, p.owner ? 0.12 : 0.045);
+    blitSphere(g, opts.dpr, col, c.x, c.y, R, 1, opts.visualTime ?? 0);
     // floating type badge — the sector kind, glowing in its accent colour just above the node
     const icon = KIND_ICON[p.kind ?? ''];
     if (icon) {
