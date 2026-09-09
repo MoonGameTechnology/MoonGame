@@ -94,6 +94,7 @@
   "militia": {
     "faction": "vanguard",
     "domain": "ground",
+    "kind": "infantry",
     "stats": {
       "attack": 4,
       "defense": 8,
@@ -115,6 +116,7 @@
   "drop_infantry": {
     "faction": "vanguard",
     "domain": "ground",
+    "kind": "infantry",
     "stats": {
       "attack": 16,
       "defense": 8,
@@ -138,6 +140,7 @@
   "tank": {
     "faction": "vanguard",
     "domain": "ground",
+    "kind": "vehicle",
     "stats": {
       "attack": 22,
       "defense": 14,
@@ -161,6 +164,7 @@
   "heavy_infantry": {
     "faction": "vanguard",
     "domain": "ground",
+    "kind": "infantry",
     "stats": {
       "attack": 8,
       "defense": 20,
@@ -183,6 +187,7 @@
   "special_forces": {
     "faction": "vanguard",
     "domain": "ground",
+    "kind": "infantry",
     "stats": {
       "attack": 18,
       "defense": 12,

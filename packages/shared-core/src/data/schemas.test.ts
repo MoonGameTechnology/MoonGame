@@ -166,6 +166,35 @@ describe('game data schema (docs/architecture.md §2)', () => {
     expect(instant, 'buildTimeHours не задан в data/units.json — заказ выполняется мгновенно').toEqual([]);
   });
 
+  // ROS-1.1. Род наземных войск решает, ГДЕ юнит строится: пехота — в казармах,
+  // техника — на заводе. Схема даёт дефолт `infantry` (наземный юнит без рода иначе
+  // был бы непостроим нигде), но в живом каталоге дефолт — это молчаливое допущение:
+  // забытое поле у танка отправило бы его в казармы, и никто бы не заметил. Поэтому
+  // каталог обязан объявлять род ЯВНО, и проверяется это по СЫРОМУ json, а не по
+  // разобранному бандлу — после `parseGameData` забытое поле неотличимо от
+  // объявленного.
+  it('каждый наземный юнит каталога объявляет род войск явно (дефолт схемы не подменяет данные)', () => {
+    const raw = loadShippedBundle() as { units: Record<string, Record<string, unknown>> };
+    const silent = Object.entries(raw.units)
+      .filter(([, def]) => def.domain === 'ground' && def.kind === undefined)
+      .map(([id]) => id)
+      .sort();
+    expect(silent, 'нет поля kind в data/units.json — род войск взят дефолтом').toEqual([]);
+  });
+
+  // Второй половиной той же пары идут ЗДАНИЯ: род войск бесполезен, если его негде
+  // строить. Каталог обязан держать дом для каждого рода — иначе один из них стал бы
+  // непостроимым молча, а в замерах это выглядело бы как «бот не хочет технику».
+  it('у каждого рода наземных войск есть здание-дом в каталоге', () => {
+    const data = parseGameData(loadShippedBundle());
+    const homes = (flag: 'enablesInfantryConstruction' | 'enablesVehicleConstruction'): string[] =>
+      Object.entries(data.buildings)
+        .filter(([, def]) => def[flag] || def.upgrades.some((lvl) => lvl[flag]))
+        .map(([id]) => id);
+    expect({ infantry: homes('enablesInfantryConstruction').length > 0, vehicle: homes('enablesVehicleConstruction').length > 0 })
+      .toEqual({ infantry: true, vehicle: true });
+  });
+
   it('исследование запирает ровно три вещи — и список закрыт намеренно (CONV-12)', () => {
     // Гейт на контент, который строится с первой минуты, меняет экономику молча: игрок
     // получает ту же постройку на несколько игровых дней позже, а замер об этом не
