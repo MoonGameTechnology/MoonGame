@@ -619,6 +619,11 @@ describe('MatchRoom — lobby gate (waitForPlayers)', () => {
   });
 });
 
+/** Сколько живых соединений держит кресло p1 — инвариант «одна рука на империи». */
+function sittingCount(r: MatchRoom): number {
+  return r.peerCount;
+}
+
 describe('MatchRoom — singlePeerPerPlayer (1v1 slot guard)', () => {
   function guarded(): MatchRoom {
     return new MatchRoom({
@@ -638,25 +643,60 @@ describe('MatchRoom — singlePeerPerPlayer (1v1 slot guard)', () => {
   // реап идёт heartbeat'ом до ~30 секунд. Игрок открывал игру заново и получал
   // обвинение, что играет с другого устройства. Личность пришедшего проверена
   // рукопожатием, значит это тот же человек — впускаем его, прощаемся со старым.
+  /** Подключение с ДОКАЗАННОЙ личностью: токен или билет места. Позиционные аргументы —
+   *  как у `addPeer(playerId, peer, sessionId, welcomeExtras, accountId, verified)`. */
+  const join = (r: MatchRoom, id: string, peer: MemoryPeer, account?: string): boolean =>
+    r.addPeer(id, peer, undefined, undefined, account, true);
+
   it('впускает НОВОЕ соединение на занятое кресло, выселяя старое', () => {
     const r = guarded();
     const a = new MemoryPeer();
     const b = new MemoryPeer();
 
-    expect(r.addPeer('p1', a)).toBe(true);
+    expect(join(r, 'p1', a, 'acc-1')).toBe(true);
     expect(a.messages[0]).toMatchObject({ type: 'welcome', playerId: 'p1' });
 
     // Пришедший садится, а прежнее соединение получает отказ и закрывается.
-    expect(r.addPeer('p1', b)).toBe(true);
+    expect(join(r, 'p1', b, 'acc-1')).toBe(true);
     expect(b.messages[0]).toMatchObject({ type: 'welcome', playerId: 'p1' });
     expect(a.messages.at(-1)).toEqual({ type: 'error', matchId: 'guard', code: 'E_SLOT_TAKEN' });
 
     // Чужое кресло при этом не трогается — 1v1 остаётся 1v1.
-    expect(r.addPeer('p2', new MemoryPeer())).toBe(true);
+    expect(join(r, 'p2', new MemoryPeer(), 'acc-2')).toBe(true);
 
     // И обычный путь «сокет отвалился → вернулся» работает как прежде.
     r.removePeer('p1', b);
-    expect(r.addPeer('p1', new MemoryPeer())).toBe(true);
+    expect(join(r, 'p1', new MemoryPeer(), 'acc-1')).toBe(true);
+  });
+
+  // Перехват — удобство, и оно не имеет права стоить места. Обе проверки ниже нашло
+  // ревью на PR #939, и обе про то, что доказательство личности здесь не формальность.
+  it('НЕ выселяет по недоказанной личности (дев-рукопожатие `?player=`)', () => {
+    // `?player=` берётся прямо из адреса и ничем не подтверждается, а прототип — боевой
+    // хост плейтестов — поднимает комнату с этим же guard'ом. Без проверки любой, кто
+    // знает id матча и игрока, выселял бы сидящего и забирал его империю.
+    const r = guarded();
+    const sitting = new MemoryPeer();
+    const stranger = new MemoryPeer();
+    expect(join(r, 'p1', sitting, 'acc-1')).toBe(true);
+
+    expect(r.addPeer('p1', stranger)).toBe(false); // verified не передан
+    expect(stranger.messages).toEqual([{ type: 'error', matchId: 'guard', code: 'E_SLOT_TAKEN' }]);
+    expect(sitting.messages.at(-1)).toMatchObject({ type: 'welcome' }); // сидящего не тронули
+  });
+
+  it('НЕ выселяет ЧУЖИМ аккаунтом, даже с доказанной личностью', () => {
+    // Токен доказывает лишь, что он когда-то был выдан на это место. После админского
+    // кика и передачи кресла прежний токен живёт ещё до четверти часа — и им нельзя
+    // выселять нового владельца.
+    const r = guarded();
+    const owner = new MemoryPeer();
+    const previous = new MemoryPeer();
+    expect(join(r, 'p1', owner, 'acc-new')).toBe(true);
+
+    expect(join(r, 'p1', previous, 'acc-old')).toBe(false);
+    expect(previous.messages).toEqual([{ type: 'error', matchId: 'guard', code: 'E_SLOT_TAKEN' }]);
+    expect(sittingCount(r)).toBe(1);
   });
 
   it('выселение не оставляет за креслом двух соединений', async () => {
@@ -666,9 +706,9 @@ describe('MatchRoom — singlePeerPerPlayer (1v1 slot guard)', () => {
     const r = guarded();
     const first = new MemoryPeer();
     const second = new MemoryPeer();
-    r.addPeer('p1', first);
+    join(r, 'p1', first, 'acc-1');
     const beforeFirst = first.messages.length;
-    r.addPeer('p1', second);
+    join(r, 'p1', second, 'acc-1');
 
     // Рассылка после перехвата доходит только до нового.
     const beforeSecond = second.messages.length;
