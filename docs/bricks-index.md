@@ -576,7 +576,7 @@
 | RESIL-1 | ⏳ | proto | `docs/backlog.md:12861` | Фоновые промисы браузерного клиента. |
 | RESIL-2 | ⏳ | proto | `docs/backlog.md:12872` | Цикл подсветки обучающего тура. |
 | RESIL-3 | ⏳ | srv | `docs/backlog.md:12880` | Именованный фатал процесса. |
-| RESIL-4 | ⏳ | srv | `docs/backlog.md:12891` | Соак проверяет, что мир не встал. |
+| RESIL-4 | ✅ | srv | `docs/backlog.md:12891` | Соак проверяет, что мир не встал. |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
