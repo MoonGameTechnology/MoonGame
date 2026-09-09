@@ -70,6 +70,12 @@ export const strikeShuttle = (
     ...target,
     ...(troops && troops.length > 0 ? { troops } : {}),
   });
+/** Перегрузка челноков между космопортом мира и стоящим там носителем (SHU-2.1):
+ *  `load` — с мира на борт, `unload` — с борта на мир. */
+export const loadShuttle = (playerId: string, fleetId: string, unit: string, count = 1) =>
+  act(playerId, 'shuttle.load', { fleetId, unit, count });
+export const unloadShuttle = (playerId: string, fleetId: string, unit: string, count = 1) =>
+  act(playerId, 'shuttle.unload', { fleetId, unit, count });
 export const loadArmy = (playerId: string, fleetId: string, unit: string, count = 1) =>
   act(playerId, 'army.load', { fleetId, unit, count });
 export const unloadArmy = (playerId: string, fleetId: string, unit: string, count = 1) =>

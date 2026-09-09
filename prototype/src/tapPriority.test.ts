@@ -10,12 +10,20 @@ const modes = (over: Partial<TapModes> = {}): TapModes => ({
   heroAim: false,
   heroSpawnAim: false,
   assaultAim: false,
+  strikeAim: false,
   pickMode: false,
   aiming: false,
   ...over,
 });
 
 describe('тап по карте — кто его забирает', () => {
+  it('SHU-3.1 — ВЗВЕДЁННЫЙ УДАР ЧЕЛНОКОВ забирает тап: он ждёт ровно одну цель', () => {
+    expect(tapOwner(modes({ strikeAim: true }))).toBe('shuttle-strike');
+    // …но не перебивает режимы, которые взводятся выше по приоритету.
+    expect(tapOwner(modes({ strikeAim: true, chainMode: true }))).toBe('chain-plan');
+    expect(tapOwner(modes({ strikeAim: true, assaultAim: true }))).toBe('assault');
+  });
+
   it('РЕЖИМ «ПРИКАЗ» ГЛУШИТ ВСЁ: пока он жив, тап — всегда точка плана', () => {
     const все = modes({
       chainMode: true,
