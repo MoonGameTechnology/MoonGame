@@ -36,10 +36,13 @@ describe('рантайм локализации — t/lookup/tData', () => {
   });
 
   it('tData не отдаёт наружу ключ, если в него приехал ключ', () => {
-    // Страховка из tData(): слаг `dataKey()` съел бы точки, и игрок увидел бы
-    // `sci.overseer.name` — ровно та ошибка, что светилась на экране совета учёных.
-    expect(tData('sci.overseer.name')).toBe(t('sci.overseer.name'));
-    expect(tData('sci.overseer.name')).not.toBe('sci.overseer.name');
+    // Страховка из tData(): слаг `dataKey()` съел бы точки, и игрок увидел бы сам ключ —
+    // ровно та ошибка, что светилась на экране совета учёных (`sci.overseer.name`).
+    // CONV-12c: тот ключ снят вместе со вторым каталогом (перевод учёного живёт под
+    // `data.overseer`), поэтому фикстурой служит живой ключ. Проверяется САМА страховка,
+    // а не конкретная запись, так что подходит любой существующий ключ с точками.
+    expect(tData('hero.branch.transhuman')).toBe(t('hero.branch.transhuman'));
+    expect(tData('hero.branch.transhuman')).not.toBe('hero.branch.transhuman');
   });
 
   it('LOCALE — известный код языка', () => {

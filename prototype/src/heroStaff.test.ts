@@ -4,7 +4,7 @@ import { setLocale } from '../../localization/runtime';
 import { newGame } from './game';
 import { data } from './gameData';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
-import { t } from '../../localization/runtime';
+import { t, tData } from '../../localization/runtime';
 import {
   HERO_TABS,
   ownHeroes,
@@ -219,19 +219,21 @@ describe('штаб героев — разметка панели', () => {
     expect(html).toContain('hx-tree');
   });
 
+  /** Подпись узла дерева — СПРОШЕННАЯ ТАК ЖЕ, КАК ЕЁ БЕРЁТ РЕНДЕР (CONV-12c).
+   *  Раньше тесты искали в разметке `t('hero.tree.<id>.name')`: каталог прототипа хранил
+   *  в `name` сам ключ локали. Каталог теперь один, шипнутый, и в `name` лежит английское
+   *  имя, которое рендер переводит через `tData()`. Тест, знающий ключ наизусть, сломался
+   *  бы и на любом будущем переименовании; спрашивая каталог, он остаётся верным. */
+  const treeName = (id: string): string => tData(data.heroSkillTrees[id]!.name);
+
   it('в дереве трансгуманиста видны ВСЕ ЧЕТЫРЕ узла ветки, включая запертые', () => {
     // Жалоба владельца с живой игры: «не наблюдаю 3 и 4 узлов». Рейка ветки рисует
     // весь каталог, а не только доступное — запертый узел показывается с замком и
     // рассказывает в досье, чего ему не хватает. Сторож держит именно это: добавили
     // узел в данные — он обязан появиться игроку, а не потеряться в UI.
     const html = initHeroStaff(hostOf()).paneHtml();
-    for (const node of [
-      'hero.tree.neural-lace.name',
-      'hero.tree.overclocked-helm.name',
-      'hero.tree.corridor-sustained.name',
-      'hero.tree.corridor-open.name',
-    ]) {
-      expect(html, node).toContain(t(node));
+    for (const node of ['neural_lace', 'overclocked_helm', 'corridor_sustained', 'corridor_open']) {
+      expect(html, node).toContain(treeName(node));
     }
     expect(html).toContain('🔒'); // ступени заперты, пока не взят родитель
   });
@@ -241,8 +243,8 @@ describe('штаб героев — разметка панели', () => {
     // «Слабых мест», затем до «Манёвренности». Чужая ветка рисуется приглушённой рейкой,
     // поэтому все её узлы обязаны быть на экране у ЛЮБОГО героя, а не только у психионика.
     const html = initHeroStaff(hostOf()).paneHtml();
-    const order = ['void-attunement', 'psi-veil', 'psi-weak-points', 'psi-evasion'].map((k) =>
-      html.indexOf(t(`hero.tree.${k}.name`)),
+    const order = ['void_attunement', 'psi_veil', 'psi_weak_points', 'psi_evasion'].map((k) =>
+      html.indexOf(treeName(k)),
     );
     expect(order.every((i) => i >= 0)).toBe(true); // все четыре на экране
     expect(order).toEqual([...order].sort((a, b) => a - b)); // и сверху вниз по прокачке
@@ -254,8 +256,8 @@ describe('штаб героев — разметка панели', () => {
     // по одному, дальше вступал алфавит (`corridor_open` < `corridor_sustained` <
     // `overclocked_helm`). Теперь порядок задаёт ГЛУБИНА цепочки.
     const html = initHeroStaff(hostOf()).paneHtml();
-    const order = ['neural-lace', 'overclocked-helm', 'corridor-sustained', 'corridor-open'].map(
-      (k) => html.indexOf(t(`hero.tree.${k}.name`)),
+    const order = ['neural_lace', 'overclocked_helm', 'corridor_sustained', 'corridor_open'].map(
+      (k) => html.indexOf(treeName(k)),
     );
     expect(order.every((i) => i >= 0)).toBe(true); // все четыре на экране
     expect(order).toEqual([...order].sort((a, b) => a - b)); // и именно в этом порядке

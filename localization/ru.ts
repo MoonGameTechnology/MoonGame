@@ -566,6 +566,7 @@ export const ru: Record<string, string> = {
   'data.dense-nebula': 'Плотная туманность',
   'data.derelict-graveyard': 'Кладбище кораблей',
   'data.diplomatic-landing': 'Дипломатическая высадка',
+  'data.drop-infantry': 'десантная пехота',
   'data.empty-space': 'Пустое пространство',
   'data.energy': 'энергия',
   'data.energy-nexus': 'Энергетический узел',
@@ -617,6 +618,8 @@ export const ru: Record<string, string> = {
   'data.planet': 'Планета',
   'data.planetary-bastions': 'Планетарные бастионы',
   'data.duel': 'Дуэль',
+  'data.scout-drone': 'разведдрон',
+  'data.siege-lance': 'осадная пика',
   'data.team-2v2': 'Двое на двое',
   'data.team-3v3': 'Трое на трое',
   'data.team-4v4': 'Четверо на четверо',
@@ -975,11 +978,8 @@ export const ru: Record<string, string> = {
   // --- sci — Учёные совета: имя и что даёт ветка.
   'sci.overseer.desc':
     'Лидер ветки командования (C2): доктрины автоматизации и делегирования. Открывает «Протокол Хранитель» — передачу места ИИ на время сна.',
-  'sci.overseer.name': 'Куратор',
   'sci.polymath.desc': 'Генералист без ветки: +1 слот исследования (2→3) вместо фокуса.',
-  'sci.polymath.name': 'Полимат',
   'sci.void-admiral.desc': 'Лидер космической ветки: верфи, логистика, осадные доктрины.',
-  'sci.void-admiral.name': 'Космоадмирал',
 
   // --- scipick — Совет учёных: кандидаты, фокус ветки, закрепление.
   'scipick.candidates': 'Кандидаты · нажмите, чтобы занять слот',
@@ -1162,7 +1162,6 @@ export const ru: Record<string, string> = {
   'hero.ability.annihilate.name': 'Аннигиляция',
   'hero.ability.boarding-translocation.desc':
     'Герой выходит там, где СТОИТ один из его флотов, — своим отдельным флотом рядом. Каждый герой ведёт свою эскадру, поэтому на борт чужой он не садится; флот в пути точкой выхода не служит. Пассивный навык: расширяет точки развёртывания.',
-  'hero.ability.boarding-translocation.name': 'Абордажная транслокация',
   'hero.ability.bulwark.desc': 'Временный щит: +оборона своим флотам рядом с героем.',
   'hero.ability.bulwark.name': 'Бастион',
   'hero.ability.corridor.desc':
@@ -1170,10 +1169,8 @@ export const ru: Record<string, string> = {
   'hero.ability.corridor.name': 'Коридор',
   'hero.ability.decoy-signal.desc':
     'Подделывает радарный контакт: узел в радиусе начинает читаться чужими радарами как занятый. Фантом видно только там, куда достаёт чужой радар, и он рассыпается, стоит противнику подойти и разглядеть узел вблизи.',
-  'hero.ability.decoy-signal.name': 'Ложный сигнал',
   'hero.ability.diplomatic-landing.desc':
     'Союзные миры принимают героя как своего: корабль может подняться и на планете союзника. Пассивный навык: расширяет точки развёртывания.',
-  'hero.ability.diplomatic-landing.name': 'Дипломатическая высадка',
   'hero.ability.rally.desc':
     'Боевой клич: временный доп. бонус к ауре для своих флотов рядом с героем.',
   'hero.ability.rally.name': 'Сбор',
@@ -1184,7 +1181,6 @@ export const ru: Record<string, string> = {
   'hero.ability.scan.name': 'Разведка',
   'hero.ability.warp-jump.desc':
     'Прокол пространства: корабль героя вместе с десантом в трюме мгновенно оказывается в узле в радиусе действия. Прыгает и сквозь туман. Из активного боя не выдёргивает.',
-  'hero.ability.warp-jump.name': 'Варп-прыжок',
   'hero.arch.commander': 'Командир',
   'hero.arch.destroyer': 'Разрушитель',
   'hero.arch.vanguard': 'Авангард',
@@ -1200,54 +1196,36 @@ export const ru: Record<string, string> = {
   'hero.hook.fleet-speed': 'скорость флота',
   'hero.passive.convoy-impulse.desc':
     'Герой ведёт сбор: флоты, выходящие из узлов в радиусе 300, летят на 8% быстрее.',
-  'hero.passive.convoy-impulse.name': 'Импульс ордера',
   'hero.passive.rally-beacon.desc':
     'Флоты рядом с героем бьются яростнее: +8% к урону своих флотов в радиусе 300.',
-  'hero.passive.rally-beacon.name': 'Маяк сбора',
   'hero.passive.vanguard-impulse.desc':
     'Корабль героя ведёт свой флот на форсаже: +10% к скорости флота героя.',
-  'hero.passive.vanguard-impulse.name': 'Импульс авангарда',
   'hero.tree.corridor-open.desc':
     'Открывает коридор СОЮЗНИКАМ: их флоты идут вашим проходом, как своим, — с тем же ускорением. Проход при этом становится общим: войти сможет и нейтрал, и противник, но им коридор даёт только дорогу, без ускорения.',
-  'hero.tree.corridor-open.name': 'Общий коридор',
   'hero.tree.corridor-sustained.desc':
     'Коридор держится по часам, а не гаснет с первым же проходом армии героя.',
-  'hero.tree.corridor-sustained.name': 'Устойчивый коридор',
   'hero.tree.false-echo.desc':
     'Обратная сторона пси-зрения: герой учится не только читать чужой радар, но и писать в него то, чего нет.',
-  'hero.tree.false-echo.name': 'Ложное эхо',
   'hero.tree.fleet-uplink.desc':
     'Нейроканал расходится на весь ордер: с места быстрее снимается не только корабль героя, но и флоты рядом.',
-  'hero.tree.fleet-uplink.name': 'Канал ордера',
   'hero.tree.neural-lace.desc':
     'Имплант прямого канала «мозг—штурвал»: корабль героя разгоняется на +10%.',
-  'hero.tree.neural-lace.name': 'Нейрокружево',
   'hero.tree.overclocked-helm.desc': 'Форсаж нейроинтерфейса открывает герою прокладку коридоров.',
-  'hero.tree.overclocked-helm.name': 'Разогнанный шлем',
   'hero.tree.psi-evasion.desc':
     'Картинка радара идёт и своим: ваши флоты и флоты союзников внутри просвеченной зоны получают на 5% меньше входящего урона.',
-  'hero.tree.psi-evasion.name': 'Манёвренность',
   'hero.tree.psi-veil.desc': 'Отточенное пси-зрение: герой учится вскрывать туман разведкой.',
-  'hero.tree.psi-veil.name': 'Пси-вуаль',
   'hero.tree.psi-weak-points.desc':
     'Радар не просто светит: он читает бреши в чужой броне. Флоты противника внутри просвеченной зоны получают на 5% больше урона. Свои, союзные и нейтральные флоты не задеты.',
-  'hero.tree.psi-weak-points.name': 'Слабые места',
   'hero.tree.void-attunement.desc':
     'Пси-резонанс героя воодушевляет флоты рядом: +8% к урону в радиусе 300.',
-  'hero.tree.void-attunement.name': 'Сонастройка с Пустотой',
   'hero.tree.void-translocator.desc':
     'Вершина коридорной ветки: герой перестаёт прокладывать путь и просто исчезает в одном узле, чтобы появиться в другом.',
-  'hero.tree.void-translocator.name': 'Транслокатор Пустоты',
   'hero.unit.commander.desc':
     'Главный герой-флагман: командный трансгуманист, усиливает флот и открывает коридоры.',
-  'hero.unit.commander.name': 'Командир',
   'hero.unit.ravager.desc': 'Псионик-разрушитель: аннигилирует миры и вскрывает туман.',
-  'hero.unit.ravager.name': 'Разрушитель',
   'hero.unit.vanguard.desc':
     'Трансгуманист-манёвренник: коридоры и боевой клич для передовых флотов.',
-  'hero.unit.vanguard.name': 'Авангард',
   'hero.unit.warden.desc': 'Псионик-защитник: держит рубеж бастионным щитом.',
-  'hero.unit.warden.name': 'Страж',
 
   // --- hero.hq / hero.tree / hero.abil / hero.fit — Штаб героев: состав, дерево навыков, способности, фиттинги.
   'hero.abil.activate': 'Активировать',
