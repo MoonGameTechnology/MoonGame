@@ -272,11 +272,18 @@ function runMatch(getState: () => GameState, bounds: Bounds, interact?: MatchInt
     down = null;
   });
 
-  const loop = (): void => {
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let lastFrame = 0;
+  let visualTime = 0;
+  const loop = (frameTime: number): void => {
+    const dt = frameTime - lastFrame;
+    lastFrame = frameTime;
+    if (!document.hidden && !reducedMotion.matches && dt > 0 && dt < 1000) visualTime += dt;
     const state = getState();
     renderMap(g, state, cam, vp, bounds, {
       now: state.time,
       dpr,
+      visualTime,
       selected: interact?.getSelected?.() ?? null,
     });
     requestAnimationFrame(loop);

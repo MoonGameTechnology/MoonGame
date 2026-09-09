@@ -3,6 +3,7 @@
 // assert nothing throws. Not a substitute for a real browser, but it exercises
 // init, the real-time loop, rendering calls, the side panel and input.
 import { build } from 'esbuild';
+import assert from 'node:assert/strict';
 
 const listeners = new Map(); // el -> {type: [fn]}
 function mkEl(id) {
@@ -48,9 +49,13 @@ function mkEl(id) {
     querySelectorAll() {
       return [];
     },
+    querySelector() {
+      return null;
+    },
     getContext() {
       return ctxProxy;
     },
+    setPointerCapture() {},
     width: 900,
     height: 600,
   };
@@ -73,6 +78,7 @@ const getEl = (id) => {
 };
 
 globalThis.document = {
+  addEventListener() {},
   getElementById: getEl,
   querySelector: () => mkEl('q'), // tab/overlay wiring uses it; a stub element is enough
   querySelectorAll: () => [],
@@ -83,7 +89,15 @@ globalThis.document = {
   body: mkEl('body'),
 };
 let t = 0;
-globalThis.performance = { now: () => (t += 16) };
+const realPerformance = globalThis.performance;
+globalThis.performance = new Proxy(realPerformance, {
+  get(target, prop) {
+    if (prop === 'now') return () => (t += 16);
+    const value = Reflect.get(target, prop, target);
+    return typeof value === 'function' ? value.bind(target) : value;
+  },
+});
+globalThis.Path2D = class Path2D {};
 // Net-mode reads localStorage for the saved server URL; stub it (no persistence).
 globalThis.localStorage = { getItem: () => null, setItem() {}, removeItem() {} };
 // resize() probes coarse-pointer media to spot phones; the fake DOM is a desktop.
@@ -113,6 +127,7 @@ const res = await build({
   platform: 'node',
   format: 'cjs',
   target: 'es2020',
+  loader: { '.webp': 'dataurl' },
   write: false,
   // The build profile is a REQUIRED define (see main.ts) — the smoke test drives
   // the full dev client, same as dist/void-dominion.html.
@@ -131,14 +146,30 @@ for (let i = 0; i < 40 && rafCbs.length; i++) {
   frames++;
 }
 
-// simulate a click on the canvas (HOME ≈ 130,330) and a side-panel build click
+// Drive the actual pointer handlers: a synthetic `click` no longer reaches map input.
 const canvas = getEl('map');
-const canvasClicks = (listeners.get(canvas) ?? {}).click ?? [];
-for (const fn2 of canvasClicks) fn2({ clientX: 130, clientY: 330 });
+for (const type of ['pointerdown', 'pointerup']) {
+  const handlers = (listeners.get(canvas) ?? {})[type] ?? [];
+  assert.ok(handlers.length, `map must register ${type}`);
+  for (const handler of handlers)
+    handler({
+      pointerId: 1,
+      pointerType: 'mouse',
+      button: 0,
+      clientX: 450,
+      clientY: 300,
+      shiftKey: false,
+      ctrlKey: false,
+      metaKey: false,
+      preventDefault() {},
+    });
+}
 const sideEl = getEl('side');
 const sideClicks = (listeners.get(sideEl) ?? {}).click ?? [];
 for (const fn2 of sideClicks)
-  fn2({ target: { closest: () => ({ disabled: false, dataset: { act: 'build', arg: 'refinery' } }) } });
+  fn2({
+    target: { closest: () => ({ disabled: false, dataset: { act: 'build', arg: 'refinery' } }) },
+  });
 
 // a few more frames after interaction
 for (let i = 0; i < 20 && rafCbs.length; i++) {
@@ -146,6 +177,8 @@ for (let i = 0; i < 20 && rafCbs.length; i++) {
   frames++;
 }
 
-console.log(`UI OK — ran ${frames} frames + clicks with no throw. clock="${getEl('clock').textContent}"`);
+console.log(
+  `UI OK — ran ${frames} frames + clicks with no throw. clock="${getEl('clock').textContent}"`,
+);
 console.log(`purse="${getEl('purse').textContent}"`);
 console.log(`log has ${(getEl('log').innerHTML.match(/<div>/g) || []).length} lines`);
