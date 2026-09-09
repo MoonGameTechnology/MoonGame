@@ -39,6 +39,8 @@ EXTERNAL_PORT="${EXTERNAL_PORT:-}"
 INTERNAL_PORT="${INTERNAL_PORT:-8788}"
 TIME_SCALE="${TIME_SCALE:-100}"
 POSTGRES_PASSWORD="moongame_dev_$(openssl rand -hex 8)"
+# Взведён, если пароль подхвачен от прошлой установки (см. блок переустановки ниже).
+REUSED_SECRETS=0
 # Секрет подписи join-токенов. Гард checkProductionReadiness требует ≥32 символов
 # (MIN_SECRET_LEN), поэтому 32 байта hex = 64 символа — с запасом.
 AUTH_JWT_SECRET="$(openssl rand -hex 32)"
@@ -140,6 +142,23 @@ if [ -d "$INSTALL_DIR" ]; then
     read -p "Заменить существующую установку? (y/n) " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
+        # Секреты ПЕРЕЖИВАЮТ переустановку — это корректность, а не удобство.
+        # rm -rf ниже сносит server.env, а том void-pgdata остаётся жить: Postgres
+        # применяет POSTGRES_PASSWORD ТОЛЬКО при первичной инициализации тома, поэтому
+        # свежесгенерированный пароль дал бы серверу 28P01 и цикл перезапусков — при
+        # внешне здоровом postgres (его healthcheck pg_isready пароль не проверяет).
+        # AUTH_JWT_SECRET сохраняется по той же причине, что описана в самом server.env:
+        # смена секрета обесценивает все выданные join-токены.
+        if [ -f "$ENV_FILE" ]; then
+            OLD_PG=$(grep -m1 '^POSTGRES_PASSWORD=' "$ENV_FILE" | cut -d= -f2-)
+            OLD_JWT=$(grep -m1 '^AUTH_JWT_SECRET=' "$ENV_FILE" | cut -d= -f2-)
+            if [ -n "$OLD_PG" ]; then
+                POSTGRES_PASSWORD="$OLD_PG"
+                REUSED_SECRETS=1
+            fi
+            [ -n "$OLD_JWT" ] && AUTH_JWT_SECRET="$OLD_JWT"
+            [ -n "$OLD_PG" ] && log_info "Секреты прошлой установки сохранены"
+        fi
         rm -rf "$INSTALL_DIR"
     else
         log_error "Установка отменена"
@@ -286,6 +305,12 @@ case "$1" in
         sudo systemctl status $SERVICE_NAME
         ;;
     logs)
+        # Логи КОНТЕЙНЕРОВ. Журнал юнита показывает только вывод самого `docker compose
+        # up`, а не сервера — при разборе падения нужен именно контейнер.
+        cd $INSTALL_DIR/deploy
+        sudo docker compose --env-file server.env logs -f --tail 100
+        ;;
+    journal)
         sudo journalctl -u $SERVICE_NAME -f
         ;;
     update)
@@ -305,7 +330,8 @@ case "$1" in
         echo "  stop        — остановить сервер"
         echo "  restart     — перезапустить сервер"
         echo "  status      — статус сервера"
-        echo "  logs        — вывести логи (Ctrl+C для выхода)"
+        echo "  logs        — логи сервера (Ctrl+C для выхода)"
+        echo "  journal     — журнал systemd-юнита"
         echo "  update      — обновить код и перезапустить"
         echo "  shell       — оболочка в директории проекта"
         echo ""
@@ -320,19 +346,51 @@ log_success "Команды CLI установлены"
 log_info "Запуск Docker контейнеров..."
 log_warning "Это займет время (~2-3 минуты) при первом запуске..."
 cd "$INSTALL_DIR/deploy"
-sudo -u $SERVICE_USER docker compose --env-file "$ENV_FILE" up -d --build
 
-# Проверка здоровья сервера
+# Ловушка Postgres: пароль из окружения применяется ТОЛЬКО при первичной инициализации
+# тома. Том переживает и `docker compose down`, и снос $INSTALL_DIR, так что «старая
+# база + новый пароль» — состояние, из которого стек сам не выберется: сервер получает
+# 28P01 и уходит в цикл перезапусков, а postgres при этом рапортует Healthy (pg_isready
+# пароль не проверяет). Проверяем ЗАРАНЕЕ и спрашиваем, а не оставляем на разбор по логам.
+if [ "$REUSED_SECRETS" != "1" ] && docker volume inspect deploy_void-pgdata &>/dev/null; then
+    log_warning "Найден том базы от прошлой установки, а пароль сгенерирован новый."
+    log_warning "Postgres оставит СТАРЫЙ пароль — сервер не сможет подключиться."
+    read -p "Удалить том базы (текущие матчи будут потеряны)? (y/n) " -n 1 -r
+    echo
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+        sudo -u $SERVICE_USER docker compose --env-file "$ENV_FILE" down -v &>/dev/null || true
+        docker volume rm deploy_void-pgdata &>/dev/null || true
+        log_success "Том базы удалён — Postgres проинициализируется заново"
+    else
+        log_error "Без этого сервер не стартует. Верни прежний POSTGRES_PASSWORD в $ENV_FILE или удали том вручную."
+        exit 1
+    fi
+fi
+
+# Сборка отдельным шагом: сам стек поднимает systemd-юнит (его ExecStart не собирает),
+# и владелец у контейнеров должен быть ОДИН. Раньше установщик поднимал стек прямым
+# `compose up`, а юнит только включал — из-за чего `moongame status/restart` управляли
+# тем, что никогда не запускалось, а `journalctl -u moongame` был пуст.
+sudo -u $SERVICE_USER docker compose --env-file "$ENV_FILE" build
+
+log_info "Запуск сервиса..."
+systemctl start $SERVICE_NAME
+
+# Проверка здоровья сервера. Окно щедрое: на слабой машине первый старт — это ещё и
+# миграции БД, а поспешный вывод «сервер не отвечает» отправляет разбираться туда,
+# где всё в порядке.
 log_info "Проверка здоровья сервера..."
-sleep 10
 
-for i in {1..30}; do
+for i in {1..180}; do
     if curl -sf http://localhost:$INTERNAL_PORT/health &>/dev/null; then
+        echo ""
         log_success "Сервер готов к работе!"
         break
     fi
-    if [ $i -eq 30 ]; then
-        log_error "Сервер не отвечает (проверь: moongame logs)"
+    if [ $i -eq 180 ]; then
+        echo ""
+        log_error "Сервер не отвечает. Причина будет в логах контейнера:"
+        log_error "  moongame logs"
         exit 1
     fi
     echo -n "."

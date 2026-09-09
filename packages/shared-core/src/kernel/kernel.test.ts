@@ -453,3 +453,42 @@ describe('kernel — canApply (RULES-1)', () => {
     for (let i = 0; i < 5; i++) expect(kernel.canApply(state, a, ctx())).toBe(first);
   });
 });
+
+describe('шаг на состоянии БЕЗ потока RNG (проекция под туманом)', () => {
+  // `visibleState` вырезает `rng` из проекции — клиент с ним прокрутил бы будущие бои
+  // вперёд сервера. При этом сетевой клиент зовёт `canApply`, чтобы погасить
+  // недоступные приказы: ядро обязано отвечать вердиктом, а не падать наружу.
+  function fogProjected(state: GameState): GameState {
+    const view = { ...state };
+    delete (view as Partial<GameState>).rng;
+    return view;
+  }
+
+  it('проверка, не трогающая кости, даёт тот же ответ, что и с костями', () => {
+    const kernel = createKernel([bankModule]);
+    const state = withPlanet(baseState(), makePlanet('p', 'p1', { credits: 100 }));
+    const ok = action('bank.withdraw', { planetId: 'p', amount: 40 });
+    const tooMuch = action('bank.withdraw', { planetId: 'p', amount: 400 });
+
+    expect(kernel.canApply(fogProjected(state), ok, ctx())).toBe(kernel.canApply(state, ok, ctx()));
+    expect(kernel.canApply(fogProjected(state), tooMuch, ctx())).toBe(
+      kernel.canApply(state, tooMuch, ctx()),
+    );
+  });
+
+  it('бросок без костей — ОТКАЗ E_NO_RNG, а не исключение наружу', () => {
+    const kernel = createKernel([diceModule]);
+    const view = fogProjected(baseState());
+    const a = action('dice.roll', {});
+
+    expect(() => kernel.applyAction(view, a, ctx())).not.toThrow();
+    expect(expectErr(kernel.applyAction(view, a, ctx())).code).toBe('E_NO_RNG');
+  });
+
+  it('косточки не выдумываются: успешный шаг оставляет состояние без потока', () => {
+    const kernel = createKernel([bankModule]);
+    const view = fogProjected(withPlanet(baseState(), makePlanet('p', 'p1', { credits: 100 })));
+    const res = expectOk(kernel.applyAction(view, action('bank.withdraw', { planetId: 'p', amount: 40 }), ctx()));
+    expect(res.state.rng).toBeUndefined();
+  });
+});

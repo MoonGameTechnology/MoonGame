@@ -135,6 +135,14 @@ const res = await build({
 });
 
 const mod = { exports: {} };
+// Production keeps scheduling after a failed frame. The smoke test must still fail
+// when that recovery path logs a render error, rather than report healthy frames.
+const frameErrors = [];
+const printError = console.error;
+console.error = (...args) => {
+  if (String(args[0]).startsWith('frame fail')) frameErrors.push(args[1] ?? args[0]);
+  printError(...args);
+};
 const fn = new Function('module', 'exports', 'require', res.outputFiles[0].text);
 fn(mod, mod.exports, () => ({}));
 
@@ -177,6 +185,8 @@ for (let i = 0; i < 20 && rafCbs.length; i++) {
   frames++;
 }
 
+assert.equal(frameErrors.length, 0, 'the render loop must not silently recover from a broken frame');
+console.error = printError;
 console.log(
   `UI OK — ran ${frames} frames + clicks with no throw. clock="${getEl('clock').textContent}"`,
 );
