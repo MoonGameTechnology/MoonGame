@@ -27,7 +27,7 @@ function loadShippedBundle(): Record<string, unknown> {
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.21'); // ROS-2.2 завёл новое здание — зональное ПВО
+    expect(data.version).toBe('0.1.22'); // ROS-1.5 завёл десантный челнок
     expect(data.resources).toContain('microelectronics');
     // ROS-2.1: трейт `artillery` больше НЕ означает ни своей линии, ни огня с
     // дистанции — он означает «ответный залп по мне не проходит». Поэтому радиуса у

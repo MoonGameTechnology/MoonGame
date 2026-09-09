@@ -337,8 +337,9 @@ export interface BattleSideView {
   ownerName: string;
   /** Owner's `faction` content id ('' when neutral/unknown). */
   ownerFaction: string;
-  /** What is fighting: an orbital `fleet`, a fleet's `landing` troops, or a planet `garrison`. */
-  kind: 'fleet' | 'landing' | 'garrison';
+  /** What is fighting: an orbital `fleet`, a fleet's `landing` troops, the `beachhead`
+   *  a shuttle drop put ashore (ROS-1.5), or a planet `garrison`. */
+  kind: 'fleet' | 'landing' | 'beachhead' | 'garrison';
   /** Composition of this side's forces. */
   units: SelectionStack[];
   /** Aggregate hull / shield (when `data` is supplied; shield omitted with no capacity). */
@@ -380,9 +381,12 @@ function sideView(
   const stacks: UnitStack[] =
     ref.kind === 'garrison'
       ? (state.planets[ref.planetId]?.garrison ?? [])
-      : ref.kind === 'landing'
-        ? (state.fleets[ref.fleetId]?.landing ?? [])
-        : (state.fleets[ref.fleetId]?.units ?? []);
+      : // ROS-1.5: плацдарм держит МИР, а не флот — читается оттуда же, откуда гарнизон.
+        ref.kind === 'beachhead'
+        ? (state.planets[ref.planetId]?.beachhead?.units ?? [])
+        : ref.kind === 'landing'
+          ? (state.fleets[ref.fleetId]?.landing ?? [])
+          : (state.fleets[ref.fleetId]?.units ?? []);
   const owner = side.owner;
   const ownerPlayer = owner != null ? state.players[owner] : undefined;
   const view: BattleSideView = {
