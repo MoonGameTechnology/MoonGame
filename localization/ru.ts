@@ -1056,7 +1056,7 @@ export const ru: Record<string, string> = {
   'yard.module.remove': 'снять модуль',
   'yard.modules.all-taken': 'Доступные модули — все слоты заняты',
   'yard.modules.for-slot': 'Доступные модули — для слота «{s}»',
-  'yard.no-worlds': 'нет своих миров',
+  'yard.no-place': 'нет подходящего места',
   'yard.ordered': '⚒ заказано: {n}× {hull}',
   'yard.pick.ally-world': ' / мир союзника',
   'yard.pick.hero-world': '⚓ выберите свой мир{fl}{al} — там поднимется корабль героя',
@@ -1071,9 +1071,11 @@ export const ru: Record<string, string> = {
   'yard.slots.note':
     'Типизированные слоты: модуль встаёт только в свой тип. <b>Серые</b> — не для свободного слота или уже стоят.',
   'yard.tab.heroes': 'Герои',
+  'yard.tab.infantry': 'Пехота',
   'yard.tab.ships': 'Корабли',
   'yard.tab.squads': 'Челноки',
-  'yard.title': 'КОНСТРУКТОР',
+  'yard.tab.vehicles': 'Техника',
+  'yard.title': 'ПРОИЗВОДСТВО',
 
   // --- end — Экран конца матча: исход, опыт, итоговая таблица, реванш.
   'end.board': 'Смотреть доску',
@@ -1516,7 +1518,7 @@ export const ru: Record<string, string> = {
   'onb.intro.badge': 'впервые',
   'onb.intro.constructor.body':
     'Здесь вы собираете корабли, челноки, дивизии и героев из модулей. Лоадаут фиксируется при постройке — выбирайте слоты заранее, переоснастить готовое нельзя. Вкладка «Герои» — штаб командиров.',
-  'onb.intro.constructor.title': 'Верфь — оснащение',
+  'onb.intro.constructor.title': 'Производство — заказ и оснащение',
   'onb.intro.corp.body':
     'Корпорация — это ваш отряд в общей сессии: общий склад, роли участников и совместные войны альянсов (AvA). Вступите в существующую или создайте свою — вкладка «Войны» открывает доступ к вызовам между корпорациями.',
   'onb.intro.corp.title': 'Кабинет корпорации',
@@ -1581,7 +1583,7 @@ export const ru: Record<string, string> = {
     'Готово! Пора действовать: улучшите Металлодобычу, поднимите флот, отдайте курс. Удачи, командир.',
   'onb.tour.hud.purse':
     'Ваша казна: доход от металлодобычи минус содержание флота. Следите, чтобы не уйти в минус.',
-  'onb.tour.hud.tools': 'Инструменты командира: дипломатия, наука, верфь, рынок и сводки событий.',
+  'onb.tour.hud.tools': 'Инструменты командира: дипломатия, наука, производство, рынок и сводки событий.',
   'onb.tour.hud.welcome':
     'Короткий тур по интерфейсу — на нём держится весь мир. «Пропустить обучение» доступно всегда.',
   'onb.tour.next': 'Далее',
@@ -1613,7 +1615,7 @@ export const ru: Record<string, string> = {
   // --- rail — Рельса инструментов в матче: подпись кнопки (.label) + подсказка (.title).
   'rail.chat.label': 'Чат',
   'rail.chat.title': 'Чат',
-  'rail.constructor.label': 'Верфь',
+  'rail.constructor.label': 'Производство',
   'rail.constructor.title': 'Конструктор — оснащение кораблей, челноков, армии и героев',
   'rail.corp.label': 'Корп',
   'rail.corp.title': 'Корпорация',
@@ -1838,7 +1840,7 @@ export const ru: Record<string, string> = {
   'side.scan.spy': '🕵 Разведать мир · {c}¤',
   'side.scan.stale': 'Вне сенсорного охвата — последний скан (мог устареть).',
   'side.scan.title': 'ПОСЛЕДНИЕ ДАННЫЕ ✦',
-  'side.shipyard.conveyor': 'Конвейер верфи',
+  'side.shipyard.conveyor': 'Конвейер кораблей',
   'side.shipyard.hint':
     'Флот — ваше оружие и защита. Здесь вы можете заказывать корабли для пополнения флота.',
   'side.stat.atk': 'АТК',
@@ -1880,7 +1882,7 @@ export const ru: Record<string, string> = {
   'side.tab.wings': 'Челноки',
   'side.unit.ground': 'земля',
   'side.unit.space': 'космос',
-  'side.wing.conveyor': 'Верфь челноков',
+  'side.wing.conveyor': 'Конвейер челноков',
   'side.wing.garrison.hint':
     'Носитель (◈) несёт челноки (△). Запускайте их из панели выбранного флота кнопкой «🛩 Запустить челноки».',
   'side.world.blackout': 'блэкаут: радары и ПКО −50%',

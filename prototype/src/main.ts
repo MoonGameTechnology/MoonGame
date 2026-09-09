@@ -93,7 +93,7 @@ import { planetName } from './planetName';
 import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet';
 import { DEFAULT_HEROES, type HeroLoadout } from './heroes';
 import { DEFAULT_SHIP_LOADOUTS, type ShipLoadout } from './ships';
-// «Верфь» — вкладка оснащения (REFM-13): окно целиком живёт в `shipyard.ts`, здесь
+// «Производство» — экран заказа (REFM-13, ROS-3.1): окно целиком живёт в `shipyard.ts`, здесь
 // только проводка (host-хуки) и панель героев, которая переедет своим кирпичом.
 import { initShipyard } from './shipyard';
 import { initHeroStaff, HERO_CASTABLE, heroCdKey, heroDisplayName } from './heroStaff';
@@ -8708,7 +8708,7 @@ let stewSnapshot: StewardMetrics | null = null;
 
 
 // --- heroes («штаб героев») ---------------------------------------------------
-// The hero pane of the Верфь: roster, skill tree, abilities, fittings. The pane
+// The hero pane of «Производство»: roster, skill tree, abilities, fittings. The pane
 // itself lives in `heroStaff.ts` (REFM-14); here it only gets the host state it
 // cannot reach on its own. Ranged casts and deploys resolve on the MAP, so the pane
 // arms `heroAim`/`heroSpawnAim` through these two hooks and the world tap fires them.
@@ -8751,7 +8751,7 @@ const resourceCard = initResourceCard({
 });
 
 
-// --- constructor («Верфь»): the unified loadout tab --------------------------
+// --- constructor («Производство», ROS-0.2): the unified order screen ---------
 // One in-match screen that switches between the loadout constructors (ships and
 // shuttles now; the «Герои» pane is still the hero штаб below — it folds in with
 // its own brick). The window itself lives in `shipyard.ts` (REFM-13); here it only
@@ -9665,7 +9665,7 @@ const setupShips: ShipLoadout[] = DEFAULT_SHIP_LOADOUTS.map((l) => ({
 }));
 
 // Loadout is chosen in-match now (ships at build time under tech-unlocks, heroes in the
-// capital), so the pre-match Верфь / Герои / Дивизии editors and their inventory chrome
+// capital), so the pre-match «Производство» / Герои / Дивизии editors and their inventory chrome
 // were removed. `setupTemplates` / `setupHeroes` / `setupShips` above keep seeding the
 // match with the default rosters via buildSetupConfig.
 
@@ -11656,7 +11656,7 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'tech', isOpen: () => techWin.classList.contains('show'), close: () => techWin.classList.remove('show') }, // z47
   { id: 'steward', isOpen: () => stewWin?.classList.contains('show') === true, close: () => stewWin?.classList.remove('show') }, // z47
   { id: 'market', isOpen: () => marketWin.classList.contains('show'), close: () => marketWin.classList.remove('show') }, // z47
-  { id: 'constructor', isOpen: () => constructorWin.classList.contains('show'), close: () => shipyard.close() }, // z47 «Верфь»
+  { id: 'constructor', isOpen: () => constructorWin.classList.contains('show'), close: () => shipyard.close() }, // z47 «Производство»
   { id: 'codex', isOpen: () => codexEl?.classList.contains('show') === true, close: () => codexEl?.classList.remove('show') }, // z46
   // «Постройки» стоят НИЖЕ кодекса (z45): карточка здания открывается поверх окна,
   // и Back обязан сначала закрыть её, а уже потом само окно.

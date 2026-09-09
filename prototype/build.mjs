@@ -1165,7 +1165,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #herobody .hx-ovc b{display:block;font-size:16px;color:var(--cyan);}
 #herobody .hx-ovc span{font-size:9px;letter-spacing:.5px;text-transform:uppercase;color:var(--dim);}
 #herobody .hx-row[data-hfitd]{cursor:pointer;}
-/* HPR-1.2 — слоты под скиллы. Отсек читается как отсек корабля в «Верфи»: рамка держит
+/* HPR-1.2 — слоты под скиллы. Отсек читается как отсек корабля в «Производстве»: рамка держит
    форму и у занятого, и у пустого, поэтому ряд не «прыгает», когда скилл сняли. Занятый
    подсвечен cyan'ом, пустой — приглушённой рамкой: пустота тут приглашение, а не дыра.
    Высота 44px — нижняя граница тач-цели, ниже неё опускаться нельзя даже на 360px. */
@@ -1426,7 +1426,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .mk-btn:disabled{opacity:.4;cursor:not-allowed;border-color:var(--line);color:var(--dim);background:transparent;}
 .mk-empty{padding:10px 2px;font-size:11px;color:var(--dim);opacity:.8;}
 
-/* === CONSTRUCTOR («Верфь») — unified loadout tab; two-column ship-outfit designer === */
+/* === CONSTRUCTOR («Производство») — unified order screen; two-column designer === */
 #constructor{position:fixed;inset:0;z-index:47;display:none;align-items:center;justify-content:center;padding:16px;
   background:rgba(1,5,9,.6);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
 #constructor.show{display:flex;}
@@ -1520,6 +1520,12 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .cn-step .cn-sv{min-width:34px;text-align:center;font:700 13px ui-monospace,monospace;color:#eafffb;}
 .cn-plan{flex:1;min-width:120px;padding:8px 10px;border:1px solid var(--line-hi);border-radius:8px;background:rgba(0,0,0,.25);
   color:var(--ink);font:12px ui-monospace,monospace;}
+/* ROS-3.1 — «нет подходящего места» вместо селектора планет: янтарь, а не серый шум.
+   Это ОТКАЗ, а не пустой список: игрок должен прочитать его как «сначала построй
+   казармы», а не как «сейчас догрузится». Занимает то же место, что и селектор. */
+.cn-noplace{flex:1;min-width:120px;padding:8px 10px;border:1px dashed var(--amber,#ffb43a);
+  border-radius:8px;background:rgba(255,180,58,.07);color:var(--amber,#ffb43a);
+  font:12px ui-monospace,monospace;text-align:center;}
 .cn-soon{padding:26px 14px;text-align:center;color:var(--dim);font-size:12.5px;line-height:1.6;}
 .cn-soon .cn-si{font-size:30px;margin-bottom:8px;opacity:.7;}
 /* army pane: 6-slot formation grid + synergies */
@@ -2770,13 +2776,13 @@ const page = (js) => `<!doctype html>
 <div id="buildwin"><div class="twbox"><div class="lw-head"><b data-i18n="win.build.title"></b><button class="tw-close">✕</button></div><div id="buildwinbody"></div></div></div>
 <!-- steward («Хранитель») window — content rendered by renderSteward() in main.ts -->
 <div id="steward"><div class="twbox"><div class="lw-head"><b data-i18n="win.steward.title"></b><button class="tw-close">✕</button></div><div id="stewardbody"></div></div></div>
-<!-- heroes: the roster/штаб now lives INSIDE the constructor «Верфь» tab (Герои pane) -->
+<!-- heroes: the roster/штаб now lives INSIDE the «Производство» screen (Герои pane) -->
 <!-- scientist council picker (setup-time, before the start-point) — rendered by renderSciPick() -->
 <div id="scipick"><div class="twbox"><div class="lw-head"><b data-i18n="win.scipick.title"></b><button class="sp-cancel" type="button" data-i18n="win.scipick.back"></button></div><div id="scipickbody"></div></div></div>
 <!-- division template designer (H4, Stellaris-style) — rendered by renderDivDesign() -->
 <!-- session market — whole box rendered by renderMarket() in main.ts -->
 <div id="market"></div>
-<!-- constructor («Верфь») — unified loadout tab; whole box rendered by renderConstructor() -->
+<!-- constructor («Производство») — unified order screen; whole box rendered by renderConstructor() -->
 <div id="constructor"></div>
 <aside id="side"></aside>
 <div id="toasts"></div>
