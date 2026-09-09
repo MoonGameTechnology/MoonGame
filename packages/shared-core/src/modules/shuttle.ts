@@ -40,6 +40,8 @@ import type {
 } from '../state/gameState';
 import type { GameData } from '../data/schemas';
 import { distance } from '../state/route';
+import { hasMapShare } from '../state/diplomacy';
+import { isCapturable } from '../state/sectorKind';
 import {
   canSortie,
   fleetShuttleBay,
@@ -50,9 +52,9 @@ import {
   tickRearm,
   trimHangar,
 } from '../state/shuttle';
-import { applyDamageToSide, removeIfWiped } from '../util/combat';
+import { applyDamageToSide, isAllied, removeIfWiped } from '../util/combat';
 import { requireOwnedIdleFleet } from '../util/fleet';
-import { addUnits, cappedUnitStat, sumUnitStat } from '../util/stacks';
+import { addUnits, cappedUnitStat, findHealthyStack, sumUnitStat } from '../util/stacks';
 import { buildingLevel } from '../data/schemas';
 import { timeScaleOf } from '../action/types';
 import { MS_PER_HOUR } from '../util/time';
@@ -408,6 +410,190 @@ function repelStrike(
   });
 }
 
+/**
+ * Урезать груз до того, что довезли УЦЕЛЕВШИЕ машины (ROS-1.5).
+ *
+ * Сбитая машина уносит свою долю трюма — иначе зональное ПВО выбивало бы конвой, а на
+ * землю всё равно сходил бы полный десант, и оборона против высадки ничего не решала бы.
+ * Режем с хвоста тем же порядком, что и сами машины (`shootDownStrike`): порядок
+ * детерминирован, а «кого именно потеряли» игрок всё равно видит числом, а не списком.
+ */
+function trimCargoToSurvivors(strike: ShuttleStrike, data: GameData): void {
+  const cargo = strike.cargo ?? [];
+  if (cargo.length === 0) return;
+  let room = 0;
+  for (const st of strike.units) {
+    room += (data.units[st.unit]?.stats.cargoCapacity ?? 0) * st.count;
+  }
+  let used = 0;
+  for (const st of cargo) used += (data.units[st.unit]?.stats.cargoSize ?? 0) * st.count;
+  for (let i = cargo.length - 1; i >= 0 && used > room; i--) {
+    const st = cargo[i]!;
+    const size = data.units[st.unit]?.stats.cargoSize ?? 0;
+    if (size <= 0) continue;
+    const drop = Math.min(st.count, Math.ceil((used - room) / size));
+    st.count -= drop;
+    used -= drop * size;
+  }
+  strike.cargo = cargo.filter((st) => st.count > 0);
+}
+
+/**
+ * ВЫСАДКА (ROS-1.5) — что делает долетевший груз на чужой земле.
+ *
+ * Решение владельца 2026-09-09: десант с челнока — полноценная сторона наземного боя.
+ * Флота у него нет, поэтому его держит МИР (`planet.beachhead`), а не флот, как у
+ * высадки с орбиты; всё остальное — тот же шов, что у `fleet.assault`:
+ *
+ *  · мир СВОЙ или дружественный → груз просто уходит в гарнизон (переброска
+ *    подкреплений, дефолт кирпича на открытый вопрос владельцу);
+ *  · мир чужой и НЕОБОРОНЯЕМЫЙ → он берётся сразу, десант становится гарнизоном;
+ *  · мир чужой и обороняемый → встаёт ПЛАЦДАРМ и начинается наземный бой; если свой
+ *    плацдарм там уже есть, груз доливается в него (переброска под огонь);
+ *  · за мир уже дерётся КТО-ТО ДРУГОЙ → сесть некуда: один наземный бой на гарнизон
+ *    (то же правило, что отбивает второй штурм кодом `E_UNDER_ASSAULT`), и груз гибнет
+ *    вместе с машинами. Это не молчаливая потеря: о ней говорит `shuttle.landed`
+ *    с `landed: 0`.
+ */
+function landCargo(h: HandlerContext, strike: ShuttleStrike, planet: Planet): void {
+  const cargo = (strike.cargo ?? []).filter((st) => st.count > 0);
+  const owner = strike.owner;
+  const friendly =
+    planet.owner === owner ||
+    (planet.owner !== null &&
+      (isAllied(h, owner, planet.owner) || hasMapShare(h.state, owner, planet.owner)));
+  let landed = cargo;
+  let mode: 'reinforce' | 'capture' | 'beachhead' | 'lost' = 'lost';
+
+  if (cargo.length === 0) {
+    mode = 'lost';
+  } else if (friendly) {
+    for (const st of cargo) addUnits(planet.garrison, st.unit, st.count);
+    mode = 'reinforce';
+  } else if (planet.beachhead?.owner === owner) {
+    // Свой плацдарм уже на земле — подкрепление в идущий бой. Ссылка стороны адресует
+    // МИР, а не снимок стеков, поэтому подошедшие войска считаются со следующего раунда.
+    for (const st of cargo) addUnits(planet.beachhead.units, st.unit, st.count);
+    mode = 'beachhead';
+  } else if (planet.beachhead || groundBattleAt(h, planet.id)) {
+    landed = []; // за мир дерётся другой — садиться некуда
+  } else if (!isCapturable(h.ctx.data, planet)) {
+    landed = []; // пустое пространство не занимают пехотой
+  } else if (!planet.garrison.some((st) => st.count > 0)) {
+    const previous = planet.owner;
+    planet.owner = owner;
+    planet.garrison = cargo.map((st) => ({ ...st }));
+    h.emit('planet.captured', {
+      planetId: planet.id,
+      owner,
+      by: planet.id,
+      from: previous,
+      via: 'assault',
+    });
+    mode = 'capture';
+  } else {
+    planet.beachhead = { owner, units: cargo.map((st) => ({ ...st })) };
+    // Бой начинает МОДУЛЬ БОЯ, услышав событие: модули не зовут друг друга напрямую
+    // (инвариант «только через шину»), и `startBattle` живёт там же, где все остальные
+    // правила боя. Нет модуля боя — плацдарм просто стоит, а не падает.
+    h.emit('beachhead.landed', { planetId: planet.id, owner });
+    mode = 'beachhead';
+  }
+
+  h.emit('shuttle.landed', {
+    strikeId: strike.id,
+    owner,
+    planetId: planet.id,
+    landed: landed.reduce((n, st) => n + st.count, 0),
+    mode,
+  });
+}
+
+/** Идёт ли на этом мире наземный бой — то же правило «один бой на гарнизон», которым
+ *  `fleet.assault` отбивает второй штурм. */
+function groundBattleAt(h: HandlerContext, planetId: string): boolean {
+  for (const id of Object.keys(h.state.battles).sort()) {
+    const b = h.state.battles[id];
+    if (b && b.phase === 'ground' && b.location === planetId) return true;
+  }
+  return false;
+}
+
+/** Откуда десантный вылет берёт груз: у мира это гарнизон, у носителя — его десант.
+ *  Обе стороны уже существуют в модели (`army.load` возит войска ровно между ними), и
+ *  третьего хранилища кирпич не заводит. */
+function troopSource(state: GameState, base: BaseView): UnitStack[] | null {
+  if (base.ref.kind === 'planet') return state.planets[base.ref.id]?.garrison ?? null;
+  const fleet = state.fleets[base.ref.id];
+  return fleet ? (fleet.landing ?? []) : null;
+}
+
+function setTroopSource(state: GameState, base: BaseView, units: UnitStack[]): void {
+  if (base.ref.kind === 'planet') {
+    const planet = state.planets[base.ref.id];
+    if (planet) planet.garrison = units;
+    return;
+  }
+  const fleet = state.fleets[base.ref.id];
+  if (fleet) fleet.landing = units;
+}
+
+/**
+ * Проверить заявленный груз и собрать его стеки (ROS-1.5). Ничего не меняет — только
+ * отвечает «можно» или кодом отказа, потому что fail-secure требует отбить приказ до
+ * первой правки состояния.
+ *
+ * Три границы, и все три — существующие правила, а не новые: грузом бывает ТОЛЬКО
+ * наземный юнит (как у `army.load`), его должно хватать в источнике, и он обязан
+ * влезть в `cargoCapacity` вылета — тот же стат, которым меряется трюм корабля.
+ */
+function loadTroops(
+  h: HandlerContext,
+  base: BaseView,
+  troops: ReadonlyArray<{ unit?: string; count?: number }>,
+  shuttle: string,
+  shuttles: number,
+): { units: UnitStack[] } | { code: string } {
+  if (troops.length === 0) return { units: [] };
+  const source = troopSource(h.state, base);
+  if (!source) return { code: 'E_NO_ARMY' };
+  const capacity = (h.ctx.data.units[shuttle]?.stats.cargoCapacity ?? 0) * shuttles;
+  const units: UnitStack[] = [];
+  let used = 0;
+  for (const want of troops) {
+    if (typeof want.unit !== 'string') return { code: 'E_BAD_PAYLOAD' };
+    const n = want.count ?? 0;
+    if (!Number.isSafeInteger(n) || n <= 0) return { code: 'E_BAD_PAYLOAD' };
+    const def = h.ctx.data.units[want.unit];
+    if (!def) return { code: 'E_UNKNOWN_UNIT' };
+    if (def.domain !== 'ground') return { code: 'E_NOT_GROUND' };
+    const stack = findHealthyStack(source, want.unit);
+    if (!stack || stack.count < n) return { code: 'E_NO_ARMY' };
+    used += n * def.stats.cargoSize;
+    addUnits(units, want.unit, n);
+  }
+  if (used > capacity) return { code: 'E_NO_CAPACITY' };
+  return { units };
+}
+
+/** Снять погруженное с базы. Отдельным шагом после всех проверок: до этой строки
+ *  состояние не тронуто, и любой отказ выше не оставляет за собой полугрузки. */
+function takeCargoFromBase(h: HandlerContext, base: BaseView, cargo: readonly UnitStack[]): void {
+  if (cargo.length === 0) return;
+  const source = troopSource(h.state, base);
+  if (!source) return;
+  const left = source.map((st) => ({ ...st }));
+  for (const st of cargo) {
+    const from = findHealthyStack(left, st.unit);
+    if (from) from.count -= st.count;
+  }
+  setTroopSource(
+    h.state,
+    base,
+    left.filter((st) => st.count > 0),
+  );
+}
+
 /** Скорость вылета — самая медленная машина в нём. */
 function strikeSpeed(strike: ShuttleStrike, data: GameData): number {
   let slowest = Infinity;
@@ -442,6 +628,7 @@ export const shuttleModule: GameModule = {
         count?: number;
         targetFleetId?: string;
         targetPlanetId?: string;
+        troops?: Array<{ unit?: string; count?: number }>;
       };
       if (typeof p?.unit !== 'string') {
         return h.reject('E_BAD_PAYLOAD');
@@ -494,7 +681,18 @@ export const shuttleModule: GameModule = {
       if (wantFleet && !targetFleet) return h.reject('E_NO_TARGET');
       if (wantPlanet && !targetPlanet) return h.reject('E_NO_PLANET');
       const targetOwner = targetFleet?.owner ?? targetPlanet?.owner ?? null;
-      if (targetOwner === action.playerId) return h.reject('E_NOT_HOSTILE');
+      // ROS-1.5: по КОРАБЛЯМ безоружная машина не бьёт вовсе. Признак берётся из
+      // данных (`attack`), а не из имени юнита и не из отдельного флага: «нечем бить»
+      // и есть всё правило. Отказ — на приказе, потому что пустой полёт стоил бы
+      // игроку топлива и часа ради заведомого ничего.
+      if (targetFleet && (h.ctx.data.units[p.unit]?.stats.attack ?? 0) <= 0) {
+        return h.reject('E_INVALID_TARGET');
+      }
+      // Свой мир бомбить нельзя — но ВЕЗТИ на него подкрепление можно и нужно (ROS-1.5):
+      // десантный вылет это транспорт, а не удар, и запрет «по своим не бьют» к нему
+      // не относится. Признак — груз в заявке, а не тип машины.
+      const hasTroops = Array.isArray(p.troops) && p.troops.length > 0;
+      if (targetOwner === action.playerId && !hasTroops) return h.reject('E_NOT_HOSTILE');
 
       const from = base.position;
       if (!from) return h.reject('E_NO_PORT'); // носитель без позиции (в перелёте) — не база
@@ -512,8 +710,14 @@ export const shuttleModule: GameModule = {
       if (speed <= 0) return h.reject('E_NO_SPEED');
       const flightMs = Math.max(1, Math.round((distance(from, to) / speed) * hourMs(h)));
 
+      // ROS-1.5 — ГРУЗ. Берётся с базы прямо сейчас, до создания вылета: иначе войска
+      // числились бы и в гарнизоне, и в трюме, и второй приказ послал бы тот же взвод.
+      const cargo = loadTroops(h, base, p.troops ?? [], p.unit, count);
+      if ('code' in cargo) return h.reject(cargo.code);
+
       // Челноки покидают ангар — с этой секунды их в базе нет.
       base.setHangar(takeFromHangar(base.hangar, p.unit, count));
+      takeCargoFromBase(h, base, cargo.units);
       base.setSortie(spendSortie(sortie, spec.rearmRounds));
       const seq = (h.state.strikeSeq ?? 0) + 1;
       h.state.strikeSeq = seq;
@@ -529,6 +733,7 @@ export const shuttleModule: GameModule = {
         departedAt: h.ctx.now,
         arrivesAt: h.ctx.now + flightMs,
         leg: 'out',
+        ...(cargo.units.length > 0 ? { cargo: cargo.units } : {}),
       };
       h.state.strikes = [...(h.state.strikes ?? []), strike];
       h.schedule(strike.arrivesAt, 'shuttle.arrived', { strikeId: strike.id });
@@ -693,6 +898,17 @@ export const shuttleModule: GameModule = {
         }
         // Волна, которую ответка сбила целиком, домой не летит и в состоянии не остаётся.
         if (strike.units.length === 0) {
+          h.state.strikes = strikes.filter((st) => st.id !== strikeId);
+          return;
+        }
+        // ДЕСАНТНЫЙ ВЫЛЕТ (ROS-1.5) одноразовый: груз сходит на землю, машины остаются
+        // там же. Обратной ноги у него нет вовсе — это не удар с возвратом, а высадка.
+        if (strike.cargo !== undefined) {
+          const target = h.state.planets[strike.target.id];
+          if (target) {
+            trimCargoToSurvivors(strike, h.ctx.data);
+            landCargo(h, strike, target);
+          }
           h.state.strikes = strikes.filter((st) => st.id !== strikeId);
           return;
         }

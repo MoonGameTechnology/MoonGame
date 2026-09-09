@@ -109,6 +109,9 @@ export function sideUnits(state: GameState, ref: CombatantRef): UnitStack[] | nu
       const f = state.fleets[ref.fleetId];
       return f ? (f.landing ?? []) : null;
     }
+    // ROS-1.5: плацдарм — тот же десант, только держит его МИР, а не флот.
+    case 'beachhead':
+      return state.planets[ref.planetId]?.beachhead?.units ?? null;
     case 'garrison':
       return state.planets[ref.planetId]?.garrison ?? null;
   }
@@ -124,6 +127,11 @@ export function setSideUnits(state: GameState, ref: CombatantRef, units: UnitSta
     case 'landing': {
       const f = state.fleets[ref.fleetId];
       if (f) f.landing = units;
+      return;
+    }
+    case 'beachhead': {
+      const beachhead = state.planets[ref.planetId]?.beachhead;
+      if (beachhead) beachhead.units = units;
       return;
     }
     case 'garrison': {
@@ -408,16 +416,20 @@ export function applyDamageToSide(
   if (!units) {
     return;
   }
-  const source: Record<string, string> =
-    ref.kind === 'garrison'
-      ? { at: location, planetId: ref.planetId }
-      : { at: location, fleetId: ref.fleetId };
+  // Плацдарм адресуется миром, как и гарнизон: флота у него нет (ROS-1.5).
+  const onPlanet = ref.kind === 'garrison' || ref.kind === 'beachhead';
+  const source: Record<string, string> = onPlanet
+    ? { at: location, planetId: ref.planetId }
+    : { at: location, fleetId: ref.fleetId };
   // Tag the casualty's owner NOW: a wiped fleet is deleted before the `unit.died`
-  // event drains, so listeners (heroes / score) can't re-find it.
+  // event drains, so listeners (heroes / score) can't re-find it. У плацдарма
+  // владелец СВОЙ — он не хозяин мира, он на него высадился.
   const owner =
-    ref.kind === 'garrison'
-      ? h.state.planets[ref.planetId]?.owner
-      : h.state.fleets[ref.fleetId]?.owner;
+    ref.kind === 'beachhead'
+      ? h.state.planets[ref.planetId]?.beachhead?.owner
+      : ref.kind === 'garrison'
+        ? h.state.planets[ref.planetId]?.owner
+        : h.state.fleets[ref.fleetId]?.owner;
   if (owner != null) {
     source.owner = owner;
   }

@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 5781 зелёный** (62 skip, 434 файла; с `DATABASE_URL` — 5843 без пропусков: все пропуски — тесты durable-пути, которым нужна база).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 5794 зелёных** (62 skip, 435 файлов; с `DATABASE_URL` — 5856 без пропусков: все пропуски — тесты durable-пути, которым нужна база).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -223,7 +223,9 @@ prototype/       src/game.ts (чистый index-фасад реэкспорто
 - `battles: Record<id, Battle>` — `location`, `phase:'orbital'|'ground'`,
   `attacker/defender {ref: CombatantRef, owner}`, `round`, **`nextRoundAt?`**
   (время следующего почасового раунда — таймер боя для клиента). `CombatantRef` =
-  `fleet` | `landing` | `garrison`.
+  `fleet` | `landing` | `beachhead` | `garrison` (ROS-1.5: `beachhead` — десант, высаженный
+  челноком, его держит МИР (`planet.beachhead {owner, units}`), а не флот; сторона ВРЕМЕННАЯ —
+  выиграла, стала гарнизоном и взяла мир, проиграла, исчезла вместе с боем).
 - `scheduled: ScheduledEvent[]` `{id, at, type, payload, seq}`, счётчики
   `battleSeq`, `scheduleSeq`.
 - `UnitStack {unit, count, hp?, shieldHp?, modules?}` (`hp` — пул корпуса, `shieldHp` — пул
@@ -1688,9 +1690,10 @@ cruiser, siege(«осадная платформа», siegeDamage 60 при atta
 siege_lance, artillery(трейт artillery — бьёт без ответного огня), bomber(челнок против корпусов:
 attack 20, siegeDamage 18), interceptor(охотник за челноками: shuttleDamage 22 при
 attack 4),
-strike_carrier(«десантный корабль», cargoCapacity 16), shuttle_carrier(«Шаттл»,
+landing_shuttle(«десантный челнок», ROS-1.5: attack 0, cargoCapacity 3 — не бьёт, а возит
+и садится), strike_carrier(«десантный корабль», cargoCapacity 16), shuttle_carrier(«Шаттл»,
 shuttleBay 6), militia, drop_infantry, tank(cargoSize 1), heavy_infantry,
-special_forces, hero, interceptor` (17 юнитов: 12 `vanguard` + 5 `blue`, приехавших из
+special_forces, hero, interceptor` (18 юнитов: 12 `vanguard` + 6 `blue`, приехавших из
 каталога прототипа с CONV-12a; `orbital_aa` — защитное здание, не юнит;
 `infected_cruiser` в контенте нет). `dropship` СНЯТ (заказ владельца 2026-09-09):
 десантный корабль в игре один, и это переделанный `strike_carrier` — трюм 16, hp 140,
@@ -2444,6 +2447,19 @@ instantRepair, fleetRepair, effects, seatClaim])` (35 модулей — сос�
   корабля по вылету, проходящему в радиусе; `shuttle.intercepted` — поднятые навстречу
   перехватчики; `shuttle.repelled` — ответка цели, и только она бывает у планеты. Счёт
   сбитых машин на все три — один (`absorbIntoStrike`).
+  **ВЫСАДКА (ROS-1.5, заказ владельца п. 10):** `landing_shuttle` — безоружный борт с
+  трюмом (`cargoCapacity`), по кораблям отбивается `E_INVALID_TARGET` (признак — `attack`
+  вылета, а не имя юнита). Груз берётся с базы В МОМЕНТ ВЫЛЕТА (`troops` в
+  `shuttle.strike` → `ShuttleStrike.cargo`), источник — гарнизон мира или десант носителя;
+  отдельного действия погрузки НЕТ: у машин в ангаре нет своей личности, и трюм на стеке
+  запретил бы стекам сливаться. Вылет одноразовый — обратной ноги у него нет.
+  `landCargo` даёт четыре исхода: свой/союзный мир — груз в гарнизон; чужой
+  НЕОБОРОНЯЕМЫЙ — захват сразу; чужой обороняемый — ПЛАЦДАРМ (`planet.beachhead`) плюс
+  событие `beachhead.landed`, по которому наземный бой начинает МОДУЛЬ БОЯ (через шину,
+  не вызовом); за мир уже дерётся другой — садиться некуда, груз гибнет и об этом говорит
+  `shuttle.landed` с `landed: 0`. Зональное ПВО режет и груз: сбитая машина уносит свою
+  долю трюма (`trimCargoToSurvivors`). Плацдарм виден там же, где гарнизон, и снимается
+  под туманом (в памятный снимок не кладётся — он живёт часы).
   **ПЕРЕХВАТ (SHU-1.3):** база (порт ИЛИ носитель) на `time.advanced` сама поднимает
   дежурное звено навстречу БЛИЖАЙШЕМУ чужому вылету в радиусе и сбивает корпуса — урон
   через тот же хук `combat.damage` (фаза `intercept`), событие `shuttle.intercepted`.

@@ -227,6 +227,9 @@ function maximalState(): GameState {
         terrain: 'CANARY_terrain',
         planetType: 'CANARY_ptype',
         kind: 'CANARY_kind',
+        // ROS-1.5: плацдарм на чужом мире за туманом — это И факт вторжения, И место,
+        // куда зритель не смотрит. Утечь он не должен ни одним из двух.
+        beachhead: { owner: 'CANARY_invader', units: [{ unit: 'CANARY_unit', count: 2 }] },
       }),
     },
     fleets: {
