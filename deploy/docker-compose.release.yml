@@ -15,6 +15,14 @@
 # `--no-build` matters: the base file still carries a `build:` section (the from-source
 # path stays supported), and without the flag compose may rebuild locally and silently
 # discard the verified image.
+#
+# ПУБЛИЧНЫЙ ХОСТ (с TLS-оверлеем) — ЧЕТВЁРТЫМ ФАЙЛОМ `docker-compose.release-tls.yml`
+# (SEC-35). Наш Caddy теперь тоже публикуется и подписывается, и релизный `image:` ему даёт
+# тот оверлей, а НЕ этот. Почему не здесь: сервис `caddy` живёт только в TLS-оверлее, а этот
+# файл применяют и без него (`moongame update`), — compose слил бы `caddy` и туда, и обычное
+# обновление сервера падало бы на «required variable VOID_CADDY_IMAGE is missing a value»
+# (проверено запуском). Разбор и готовые команды — в шапке `docker-compose.release-tls.yml`
+# и в `deploy/README.md`.
 services:
   server:
     # Digest ref, never a tag — a tag can be re-pointed after verification, which would

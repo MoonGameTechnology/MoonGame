@@ -112,14 +112,23 @@ const GROUND_ROSTER = ['tank', 'special_forces', 'heavy_infantry', 'militia'] as
  *  тяжёлая пехота (20) стоит насмерть лучше танка (14) и втрое дешевле. */
 const GROUND_DEFENDERS = ['heavy_infantry', 'tank', 'militia'] as const;
 
+/** Наземные цеха дома, в порядке постройки (ROS-1.1): казармы дают пехоту, завод —
+ *  технику. Порядок фиксирован — как и у ростера выше, ради инварианта #1. */
+const GROUND_YARDS = ['barracks', 'factory'] as const;
+
 /** Сколько наземных юнитов сильный бот держит дома: гарнизон + запас на десант. */
 const GROUND_STOCK = 8;
 /** Столько войск НЕ грузится в трюм: иначе дом остаётся пустым и берётся прилётом. */
 const HOME_GUARD = 3;
-/** Верхний предел десантных корпусов — трюм 8 против 5 у крейсера, больше не нужно. */
+/** Верхний предел десантных кораблей — трюм 16 против 5 у крейсера, больше не нужно. */
 const DROPSHIP_CAP = 2;
 /** Сколько артиллерийских корпусов держит сильный бот (AI-BAL-4): дальний огонь — не
  *  замена флоту, а добавка к нему; стеклянная пушка гибнет от первого же сближения. */
+const ARTILLERY_CAP = 2;
+/** Осадных платформ — столько же. Дальнего огня платформа больше не даёт (трейт
+ *  `artillery` уехал на одноимённый корпус), но она — единственный корабль ЗАДНЕЙ
+ *  линии, а линия без корабля не участвует в раздаче урона: не строй бот платформу —
+ *  и замер разбирал бы бой, в котором задней линии просто нет. */
 const SIEGE_CAP = 2;
 /** Предел челноков — картонные, дорогие по микроэлектронике, конкурируют с
  *  крейсерами за тот же дефицитный ресурс. */
@@ -219,13 +228,20 @@ function worldsInOrder(state: GameState, ai: string, salt: string, profile: AiPr
   return own.slice(shift).concat(own.slice(0, shift), rest);
 }
 
-/** Стоит ли на мире ЖИВОЕ здание, открывающее наземное производство (казарма/завод).
- *  Зеркало ядерного `hasGroundFacility` (`construction.ts`) — того самого гейта, который
- *  отбивает `unit.build` кодом `E_NO_GROUND_FACILITY`. */
-function hasGroundYard(p: Planet): boolean {
-  return p.buildings.some(
-    (b) => b.hp > 0 && data.buildings[b.type]?.enablesGroundConstruction === true,
-  );
+/** Стоит ли на мире ЖИВОЕ здание, в котором можно заложить ИМЕННО ЭТОТ юнит: пехоте
+ *  нужны казармы, технике — завод (ROS-1.1). Зеркало ядерного `hasGroundFacility`
+ *  (`construction.ts`), того самого гейта, который отбивает `unit.build` кодами
+ *  `E_NO_BARRACKS` / `E_NO_FACTORY`.
+ *
+ *  Род войск читается из ДАННЫХ (`UnitDef.kind`), а не из списка id: иначе новый
+ *  наземный юнит молча выпал бы из репертуара бота и снова стал «мёртвым контентом»
+ *  в замерах — ровно тот диагноз, ради которого писался AI-BAL-3. */
+function hasFacilityFor(p: Planet, unit: string): boolean {
+  const flag =
+    data.units[unit]?.kind === 'vehicle'
+      ? 'enablesVehicleConstruction'
+      : 'enablesInfantryConstruction';
+  return p.buildings.some((b) => b.hp > 0 && data.buildings[b.type]?.[flag] === true);
 }
 
 /** Сколько НАЗЕМНЫХ юнитов стоит в гарнизоне мира (корабли в гарнизоне не в счёт). */
@@ -806,7 +822,7 @@ export function aiOrders(
         // Без казармы ядро отобьёт заказ (`E_NO_GROUND_FACILITY`) — раньше этот блок
         // сыпал такими отказами весь матч (60 за пробный матч). Поведение не меняется:
         // отсеиваются ровно те приказы, которые всё равно ничего не делали.
-        if (!hasGroundYard(p)) continue;
+        if (!hasFacilityFor(p, 'militia')) continue;
         out.push(buildUnit(ai, p.id, 'militia', 2));
         garrisonOrders += 1;
       }
@@ -815,7 +831,7 @@ export function aiOrders(
       const baseMilitia = base.garrison
         .filter((s) => s.unit === 'militia')
         .reduce((n, s) => n + s.count, 0);
-      if (baseMilitia < 4 && (pl.resources.metal ?? 0) > 120 && hasGroundYard(base)) {
+      if (baseMilitia < 4 && (pl.resources.metal ?? 0) > 120 && hasFacilityFor(base, 'militia')) {
         out.push(buildUnit(ai, base.id, 'militia', 2));
       }
       if (ownFleets < 8 && (pl.resources.metal ?? 0) > 140) {
@@ -826,8 +842,8 @@ export function aiOrders(
     // Диагноз, ради которого этот блок и появился: в батче на 300 матчей ВСЕ четыре
     // наземных юнита показывались «мёртвым контентом» — и не потому, что бот их не
     // заказывал (на войне он заказывал ополчение), а потому, что каждый такой заказ
-    // ядро отбивало кодом `E_NO_GROUND_FACILITY`: наземное производство открывает
-    // казарма (`enablesGroundConstruction`), а бот не строил её никогда — стартовый
+    // ядро отбивало отказом «нет здания»: наземное производство открывает
+    // казарма (сегодня `enablesInfantryConstruction`), а бот не строил её никогда — стартовый
     // мир получает только космопорт (`matchSetup.ts`). Отказ тихий: `applyAction`
     // возвращает `{ ok: false }`, харнес его пропускает, и в отчёте это выглядело как
     // «бот не хочет пехоту», а не как «пехота ему запрещена».
@@ -847,12 +863,18 @@ export function aiOrders(
           (r) => (pl.resources[r] ?? 0) >= (cost[r] ?? 0) * count + (ORDER_RESERVE[r] ?? 0),
         );
       };
-      // 1. Казарма дома — ворота ко ВСЕМУ наземному ростеру.
-      if (!hasGroundYard(base)) {
-        if (affordable('barracks') && !pendingBuild(base.id, 'barracks')) {
-          out.push(buildBuilding(ai, base.id, 'barracks'));
-        }
-      } else {
+      // 1. Дома — оба цеха: КАЗАРМЫ открывают пехоту, ЗАВОД — технику (ROS-1.1).
+      //    Одной казармой ростер больше не открывается: без завода танк отбивается
+      //    кодом `E_NO_FACTORY`, и самый тяжёлый род войск снова выпал бы из замеров.
+      //    Порядок «казармы → завод» — от дешёвого к дорогому: ранняя казна тянет
+      //    пехоту, поздняя доплачивает за технику.
+      const missingYard = GROUND_YARDS.find(
+        (b) => !base.buildings.some((x) => x.type === b && x.hp > 0) && !pendingBuild(base.id, b),
+      );
+      if (missingYard) {
+        if (affordable(missingYard)) out.push(buildBuilding(ai, base.id, missingYard));
+      }
+      if (hasFacilityFor(base, 'militia')) {
         // 2. Запас войск дома: гарнизон столицы + то, что увезёт десант. Берётся самое
         //    тяжёлое по карману, поэтому ростер отыгрывается весь: ранняя казна тянет
         //    ополчение, поздняя — спецназ и танки.
@@ -864,7 +886,7 @@ export function aiOrders(
           // Пока дома нет даже домашней стражи — заказывается ОБОРОНИТЕЛЬНЫЙ род войск;
           // всё сверх неё уедет в трюме, поэтому там нужен ударный.
           const list = groundCount(base) < HOME_GUARD ? GROUND_DEFENDERS : GROUND_ROSTER;
-          const pick = list.find((u) => affordableUnit(u, 2));
+          const pick = list.find((u) => affordableUnit(u, 2) && hasFacilityFor(base, u));
           if (pick) out.push(buildUnit(ai, base.id, pick, 2));
         }
       }
@@ -873,7 +895,7 @@ export function aiOrders(
       //    ровно этого измерению не хватало.
       for (const p of worldsInOrder(state, ai, 'barracks', profile)) {
         if (p.owner !== ai || p.kind !== 'planet' || p.id === base.id) continue;
-        if (!hasGroundYard(p)) {
+        if (!hasFacilityFor(p, 'militia')) {
           if (pendingBuild(p.id, 'barracks')) continue;
           if (!affordable('barracks')) break;
           out.push(buildBuilding(ai, p.id, 'barracks'));
@@ -910,21 +932,32 @@ export function aiOrders(
             n + (fl.owner === ai ? fl.units.reduce((k, st) => k + (st.unit === unit ? st.count : 0), 0) : 0),
           0,
         ) + base.garrison.reduce((n, st) => n + (st.unit === unit ? st.count : 0), 0);
-      // 4. Десантный корпус: трюм 8 против 5 у крейсера — без него ударная группа
+      // 4. Десантный корабль: трюм 16 против 5 у крейсера — без него ударная группа
       //    везёт горстку и штурм захлёбывается на первом же гарнизоне.
       if (
-        shipsOwned('dropship') < DROPSHIP_CAP &&
-        !pendingUnit(base.id, 'dropship') &&
-        affordableUnit('dropship', 1)
+        shipsOwned('strike_carrier') < DROPSHIP_CAP &&
+        !pendingUnit(base.id, 'strike_carrier') &&
+        affordableUnit('strike_carrier', 1)
       ) {
-        out.push(buildUnit(ai, base.id, 'dropship', 1));
+        out.push(buildUnit(ai, base.id, 'strike_carrier', 1));
       }
       // ═══ 6. АРТИЛЛЕРИЯ И АВИАЦИЯ (AI-BAL-4) ═══
       // Артиллерия стреляет САМА: `artilleryModule` каждым пролётом времени заставляет
       // свободный стоящий флот с `artillery`-корпусом обстрелять ближайший враждебный
       // стоящий флот в радиусе `range` — без приказа, без ответного огня и без входа в
-      // бой. То есть `siege` не требует от бота ни одной новой команды: достаточно его
-      // ПОСТРОИТЬ, и целый пласт боя (дальний огонь) входит в измерение.
+      // бой. То есть корпус `artillery` не требует от бота ни одной новой команды:
+      // достаточно его ПОСТРОИТЬ, и целый пласт боя (дальний огонь) входит в измерение.
+      if (
+        warFooting &&
+        shipsOwned('artillery') < ARTILLERY_CAP &&
+        !pendingUnit(base.id, 'artillery') &&
+        affordableUnit('artillery', 1)
+      ) {
+        out.push(buildUnit(ai, base.id, 'artillery', 1));
+      }
+      // Осадная платформа — задняя линия (GDD §7.2). Огня с дистанции она не даёт, но
+      // без неё у бота не бывает ЗАДНЕЙ линии вовсе, и раздача урона по линиям меряется
+      // лишь наполовину.
       if (
         warFooting &&
         shipsOwned('siege') < SIEGE_CAP &&

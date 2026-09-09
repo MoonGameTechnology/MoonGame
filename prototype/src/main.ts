@@ -189,6 +189,8 @@ import {
 import { buildLabel, currentBuild } from './updater';
 import { initApkUpdater } from './apkUpdate';
 import { measureViewport, STARS, NEBULAE } from './viewport';
+import { drawSpaceBackdrop, spaceBackdropReady } from '../../packages/client/src/spaceBackdrop';
+import { drawProvinceSelection, insideProvince, selectionPulse, type ProvincePolygon } from '../../packages/client/src/provinceSelection';
 import { initPingUi } from './pingUi';
 import { initSoloDrivers } from './soloDrivers';
 import { initMatchEnd } from './matchEnd';
@@ -779,7 +781,7 @@ import { warPromptText, warReason } from './warPromptView';
 import { pickEffect } from './pickApply';
 import { fleetsUnderTap } from './tapTargets';
 import { resolveAddress } from './serverAddress';
-import { authStatusUrl, identityMode, revealSignup } from './identityProbe';
+import { authStatusUrl, identityMode, revealSignup, type IdentityMode } from './identityProbe';
 import { seatView, type SeatView } from './seatList';
 import { pollLine, pollTick, type PollPhase } from './matchPoll';
 import { pingRoute, relayIntake } from './relayIntake';
@@ -961,8 +963,11 @@ const BUILD_UNITS = [
   'cruiser',
   'scout',
   'siege',
+  'artillery',
   'strike_carrier',
+  'shuttle_carrier',
   'interceptor',
+  'bomber',
   'militia',
   'heavy_infantry',
   'special_forces',
@@ -986,8 +991,8 @@ function blitGlow(color: string, x: number, y: number, r: number, a: number): vo
   if (!glowOn()) return; // graphics pref: glow & haloes off → skip the bloom discs entirely
   hdBlitGlow(cx, DPR, color, x, y, r, a);
 }
-function blitSphere(color: string, x: number, y: number, r: number, a = 1): void {
-  hdBlitSphere(cx, DPR, color, x, y, r, a);
+function blitSphere(color: string, x: number, y: number, r: number, a = 1, clockMs = 0): void {
+  hdBlitSphere(cx, DPR, color, x, y, r, a, clockMs);
 }
 
 /** Total count across a stack of units (ships, garrison or landing troops). */
@@ -1946,6 +1951,7 @@ function fleetHasArtillery(f: Fleet | undefined): boolean {
 // Порог открытия слоя, раздутие радиуса, потолок по соседу и веер слотов — правила
 // `orbitRing.ts` (REFM-94); здесь остаётся только замер зазора на экране.
 let orbitPhase = 0; // accumulated sim-time ms (frozen on pause) — drives the orbit spin
+let hologramTime = 0; // visual-only clock; also freezes when decorative motion is disabled
 /** Ring/animation are gated on the same close-zoom threshold. */
 function orbitsLive(): boolean {
   return ringsLive(cam.scale);
@@ -2271,12 +2277,12 @@ function drawFogMarker(c: { x: number; y: number }, id: string, mem: Snapshot | 
     const icons = mem.buildings.map((b) => BUILD_ICON[b.type] ?? '▪').join('');
     cx.fillText(`G:${mem.garrison} ${icons} ✦last`, c.x + 13, c.y + 10);
   } else {
-    cx.strokeStyle = 'rgba(90,110,120,0.3)';
+    cx.strokeStyle = 'rgba(125,161,176,0.5)';
     cx.lineWidth = 1;
     cx.beginPath();
     cx.arc(c.x, c.y, 6, 0, TAU);
     cx.stroke();
-    cx.fillStyle = 'rgba(90,110,120,0.4)';
+    cx.fillStyle = 'rgba(125,161,176,0.65)';
     cx.font = '9px ui-monospace,Menlo,monospace';
     cx.textAlign = 'center';
     cx.fillText('?', c.x, c.y + 3);
@@ -3591,15 +3597,15 @@ function poly(x: number, y: number, r: number, sides: number, rot = 0) {
   cx.closePath();
 }
 
-/** Four slowly-rotating corner brackets — the "locked target" selection reticle. */
+/** Stable corner brackets keep the picked object's position unambiguous. */
 function targetBrackets(x: number, y: number, r: number, t: number) {
   cx.save();
   cx.translate(x, y);
-  cx.rotate(t / 1600);
+  cx.globalAlpha = fxBreath(t, { period: 1800, base: 0.9, amp: 0.1, phase: 0 });
   cx.strokeStyle = LOCK;
   cx.lineWidth = 1.6;
   cx.shadowColor = LOCK;
-  cx.shadowBlur = fxBlur(8);
+  cx.shadowBlur = fxBlur(3);
   // Четыре уголка «захваченной цели» — их геометрию считает `mapShapes.ts`.
   for (const b of bracketStrokes(r, 6)) {
     cx.beginPath();
@@ -4118,6 +4124,9 @@ const bg = document.createElement('canvas');
 const bgx = bg.getContext('2d') as CanvasRenderingContext2D;
 let bgContent = ''; // viewport + ownership signature (camera-independent)
 let bgCam = { x: 0, y: 0, scale: 1 }; // camera the static layer was last baked at
+let provincePolygons = new Map<string, ProvincePolygon>();
+let paintedSelection: string | null = null;
+let selectionStarted = 0;
 
 /** The owner of node `id` AS THE VIEWER MAY KNOW IT: live when identified (or fog
  *  off), last-known from memory when only remembered, unknown otherwise. The
@@ -4153,7 +4162,7 @@ function buildStaticLayer(): void {
     me: ME,
     owners: ownersSig(),
     starfield: starfieldOn(),
-  });
+  }) + `|sky:${starfieldOn() && spaceBackdropReady() ? 1 : 0}`;
   const width = Math.round(VW * DPR);
   const baked = bgContent ? { signature: bgContent, cam: bgCam, width: bg.width } : null;
   if (!needsRebake(baked, { signature: content, cam, width })) return;
@@ -4165,13 +4174,11 @@ function buildStaticLayer(): void {
   g.setTransform(DPR, 0, 0, DPR, 0, 0);
   g.clearRect(0, 0, VW, VH);
 
-  // 0) backdrop — deep-space fill + slow nebula clouds + a radar plotting grid +
-  //    faint star ticks. Baked here (not per-frame) so idle frames stay cheap; the
-  //    "alive" motion comes from the live layers (lane packets, scan sweep, fleets).
-  g.fillStyle = '#02060c';
-  g.fillRect(0, 0, VW, VH);
+  // Dark space is embedded in the offline bundle. Bake it with the static layer;
+  // loading the image invalidates this cache once, even if the camera stays still.
+  drawSpaceBackdrop(g, VW, VH, cam.x, cam.y, starfieldOn());
   // Graphics pref: `starfield` off leaves the flat fill + grid (nebulae/stars skipped).
-  if (starfieldOn())
+  if (starfieldOn() && !spaceBackdropReady())
     for (const neb of NEBULAE) {
       const r = neb.r * (MOBILE ? 0.7 : 1);
       const grd = g.createRadialGradient(neb.x * VW, neb.y * VH, 0, neb.x * VW, neb.y * VH, r);
@@ -4197,8 +4204,8 @@ function buildStaticLayer(): void {
   g.stroke();
   if (starfieldOn())
     for (const st of STARS) {
-      g.fillStyle = rgba('#9fe6e0', st.b);
-      g.fillRect(st.x * VW, st.y * VH, 1, 1);
+      g.fillStyle = rgba('#bfeee6', st.b * 0.45);
+      g.fillRect(st.x * VW, st.y * VH, 0.7, 0.7);
     }
 
   // PROVINCES — political map (Bytro-style). Every sector is a filled CELL of a
@@ -4208,9 +4215,12 @@ function buildStaticLayer(): void {
   // shared border — no lanes. (Empty void waypoints aren't real provinces → skipped.)
   // Отбор узлов и вес семени — `provinceMap.ts` (REFM-61): пустой узел не провинция,
   // вес растёт квадратично по масштабу, иначе карта перекраивается при зуме.
+  const provinceIds: string[] = [];
   const seeds = provinceSeeds(MAP, cam.scale, (n) => {
     const p = s.planets[n.id];
-    return p ? { size: p.size ?? 1, at: world(n), owner: knownOwner(n.id) } : null;
+    if (!p) return null;
+    provinceIds.push(n.id);
+    return { size: p.size ?? 1, at: world(n), owner: knownOwner(n.id) };
   });
   // Clip cells to the MAP boundary (province bounding box + padding), not the
   // viewport — otherwise the outermost provinces stretch to the screen edge. This
@@ -4224,19 +4234,20 @@ function buildStaticLayer(): void {
   // power diagram, fills each province in its owner's colour, and draws same-owner
   // inner hairlines vs glowing owner frontiers. Fog is honoured upstream: each seed
   // carries the owner AS THE VIEWER KNOWS IT (knownOwner), so a hidden capture never
-  // repaints the map. Owned land is painted strongly (who-holds-what at a glance);
-  // neutral stays a faint wash; a faint terrain tint reads through per sector kind.
-  drawTerritory(g, seeds, clip, {
+  // repaints the map. Ownership reads through precise frontiers and restrained
+  // transparent fills, leaving the background visible through the plotting plane.
+  const cells = drawTerritory(g, seeds, clip, {
     ownerColor,
     neutralFill: COLOR.null!,
     kindAccent: (kind) => SECTOR_TYPES[kind]?.color,
   });
+  provincePolygons = new Map(cells.map((cell) => [provinceIds[cell.idx]!, cell.poly]));
 
   // PATH NETWORK — thin roads between adjacent provinces (the visible "пути").
   // Movement runs along these; an army marches province-to-adjacent-province and
   // its route (drawAimPreview / drawFleetRoutes) traces them.
-  g.strokeStyle = 'rgba(150,185,195,0.34)';
-  g.lineWidth = 1.1;
+  g.strokeStyle = 'rgba(150,185,195,0.32)';
+  g.lineWidth = 0.7;
   // Каждая дорога рисуется ОДИН раз — `setupMap.ts` (правило 1, REFM-127), та же
   // функция, что раскладывает трассы мини-карты сетапа. Здесь стоял свой цикл с тем же
   // сравнением идентификаторов: штрих полупрозрачный, и дважды нарисованная дорога
@@ -4252,8 +4263,8 @@ function buildStaticLayer(): void {
   }
 
   // map boundary — a faint frame so the edge of the sector reads as intentional
-  g.strokeStyle = 'rgba(90,130,140,0.35)';
-  g.lineWidth = 1.5;
+  g.strokeStyle = 'rgba(90,151,165,0.2)';
+  g.lineWidth = 0.7;
   g.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
 }
 
@@ -4297,15 +4308,15 @@ function drawRadarRange(now: number): void {
 
   // outer — signature reach (coarse blips in fog)
   const o = radiusPx(reach);
-  cx.fillStyle = rgba('#5ff0c0', 0.04);
+  cx.fillStyle = rgba('#5ff0c0', 0.012);
   cx.beginPath();
   cx.arc(c.x, c.y, o, 0, TAU);
   cx.fill();
   cx.setLineDash([6, 7]);
   cx.lineDashOffset = -now / 60;
-  cx.strokeStyle = rgba('#5ff0c0', 0.34 + 0.18 * pulse);
-  cx.lineWidth = 1.3;
-  cx.shadowBlur = fxBlur(6);
+  cx.strokeStyle = rgba('#5ff0c0', 0.3 + 0.12 * pulse);
+  cx.lineWidth = 0.8;
+  cx.shadowBlur = fxBlur(2);
   cx.stroke();
   cx.fillStyle = rgba('#aef6e6', 0.85);
   cx.fillText(`◌ SIGNATURE ${reach}`, c.x + o + 7, c.y + 3);
@@ -4313,14 +4324,14 @@ function drawRadarRange(now: number): void {
   // inner — full-reveal reach (contacts fully identified)
   const inner = rings.reveal; // та же доля, что у сводного покрытия (REFM-63, правило 4)
   const i = radiusPx(inner);
-  cx.fillStyle = rgba('#5ff0c0', 0.06);
+  cx.fillStyle = rgba('#5ff0c0', 0.02);
   cx.beginPath();
   cx.arc(c.x, c.y, i, 0, TAU);
   cx.fill();
   cx.setLineDash([]);
-  cx.strokeStyle = rgba('#7df0d0', 0.6 + 0.2 * pulse);
-  cx.lineWidth = 1.4;
-  cx.shadowBlur = fxBlur(7);
+  cx.strokeStyle = rgba('#7df0d0', 0.5 + 0.12 * pulse);
+  cx.lineWidth = 1;
+  cx.shadowBlur = fxBlur(3);
   cx.stroke();
   cx.fillStyle = rgba('#aef6e6', 0.9);
   cx.fillText(`● REVEAL ${Math.round(inner)}`, c.x + i + 7, c.y - 7);
@@ -4338,6 +4349,12 @@ function render(now: number) {
   // Сам закон и его следствия — `semanticZoom.ts` (REFM-93).
   const detail = detailAt(cam.scale);
   blitStaticLayer(); // backdrop + province political map (re-baked on camera move, else cached)
+  if (paintedSelection !== selPlanet) {
+    paintedSelection = selPlanet;
+    selectionStarted = now;
+  }
+  const selectedPoly = selPlanet ? provincePolygons.get(selPlanet) : undefined;
+  if (selectedPoly) drawProvinceSelection(cx, selectedPoly, selectionPulse(now - selectionStarted, motionOn()), LOCK);
   drawCaptureFlashes(now); // wave over a just-flipped province, over the political fill
   drawScanSweep(now); // slow radar sweep — pure console chrome
   updateRadarContacts(now); // the arm paints enemy signatures as it crosses them
@@ -4744,14 +4761,14 @@ function render(now: number) {
     }
 
     // territory aura — cached glow disc (no per-node gradient)
-    blitGlow(col, c.x, c.y, R + 34 * ns, showOwner ? 0.3 : 0.1);
+    blitGlow(col, c.x, c.y, R + 20 * ns, showOwner ? 0.13 : 0.045);
 
     // sensor-range ring (dashed, faint)
     cx.save();
     cx.setLineDash([3, 5]);
-    cx.lineDashOffset = -now / 180;
-    cx.strokeStyle = rgba(col, 0.18 + 0.13 * ownerPulse);
-    cx.lineWidth = 1;
+    cx.lineDashOffset = -hologramTime / 240;
+    cx.strokeStyle = rgba(col, 0.12 + 0.05 * ownerPulse);
+    cx.lineWidth = 0.75;
     cx.beginPath();
     cx.arc(c.x, c.y, R + (14 + 2 * ownerPulse) * ns, 0, TAU);
     cx.stroke();
@@ -4798,26 +4815,14 @@ function render(now: number) {
     }
 
     if (n.sector === 'planet') {
-      // Planet: holographic volume — a lit sphere inside the ring, subtle at far view,
-      // blooming to full once you zoom into a region
-      blitSphere(col, c.x, c.y, R, sphereBloom(cam.scale));
-
-      // wireframe body + bright core (glow comes from the cached aura/bloom discs,
-      // not shadowBlur — shadowBlur per node per frame is a major CPU cost)
-      blitGlow(col, c.x, c.y, R + 7, showOwner ? 0.22 : 0.12);
-      cx.strokeStyle = col;
-      cx.lineWidth = 2;
-      cx.beginPath();
-      cx.arc(c.x, c.y, R, 0, TAU);
-      cx.stroke();
-      cx.fillStyle = rgba(col, 0.72 + 0.28 * ownerPulse);
-      cx.beginPath();
-      cx.arc(c.x, c.y, 2.6 + 1.2 * ownerPulse, 0, TAU);
-      cx.fill();
+      // A transparent rotating wire volume, with no opaque core obscuring its mesh.
+      // The visual clock is independent of game speed and freezes on pause/reduced motion.
+      blitSphere(col, c.x, c.y, R, Math.max(0.65, sphereBloom(cam.scale)), hologramTime + phaseAt(n.x, n.y) * 400);
+      blitGlow(col, c.x, c.y, R + 7, showOwner ? 0.08 : 0.035);
 
       // N/E/S/W crosshair ticks
-      cx.strokeStyle = rgba(col, 0.7);
-      cx.lineWidth = 1.2;
+      cx.strokeStyle = rgba(col, 0.45);
+      cx.lineWidth = 0.75;
       cx.beginPath();
       for (const [dx, dy] of CARDINAL) {
         cx.moveTo(c.x + dx * (R - 3), c.y + dy * (R - 3));
@@ -8207,7 +8212,12 @@ function selectAt(mx: number, my: number) {
     return;
   }
   // Plain tap = selection. Правила выбора и перебора стопки — `tapCycle.ts` (REFM-65).
-  const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
+  // Контур берём из уже нарисованных ячеек. Этот запасной выбор касается только
+  // обычного тапа: приказы выше сохраняют свои прежние цели, флоты — приоритет ниже.
+  buildStaticLayer();
+  const provinceId = [...provincePolygons].find(([, poly]) => insideProvince(poly, mx, my))?.[0];
+  const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode)
+    ?? MAP.find((node) => node.id === provinceId);
   // Свои флоты под тапом, ближайший первым: и мобильной ветке (ей нужен только
   // первый), и перебору на ПК (ему нужны все).
   // Также — ВИДИМЫЕ чужие флоты (опознанные или радарные): их можно выделить
@@ -8242,6 +8252,7 @@ function selectAt(mx: number, my: number) {
       return;
     }
     selPlanet = effect.id;
+    selectionStarted = lastReal;
     selFleet = null;
     selFleets = new Set();
     lastPanelHtml = '';
@@ -8778,8 +8789,8 @@ const showConnect = (show: boolean): void => {
   connectEl.style.display = show ? 'flex' : 'none';
 };
 /** Виден ли экран подключения. Нужен там, где решение зависит от того, ПРОЧИТАЕТ ли
- *  игрок написанное в его строку статуса: по ссылке на сессию оверлей скрыт с самого
- *  начала загрузочной ветки, и текст отказа в нём равен молчанию (ADDR-5). */
+ *  игрок написанное в его строку статуса. Пришёл ли он по ссылке — отдельный вопрос и
+ *  отдельный признак (`cameFromLink`): оверлей держится до впуска в обоих случаях. */
 const connectShown = (): boolean => connectEl.style.display !== 'none';
 srvInput.value =
   localStorage.getItem('void.server') ??
@@ -8976,7 +8987,11 @@ async function hubAuthorizedBase(): Promise<{ base: string; token: string } | nu
   const srv = resolveServer();
   if (srv) await probeAuthMode(srv.base); // проба режима — только когда есть у кого
   return authorizedBase(
-    { server: srv, accountsMode: authMode, token: srv ? sessionToken(srv.base) : null },
+    {
+      server: srv,
+      accountsMode: authMode === 'accounts',
+      token: srv ? sessionToken(srv.base) : null,
+    },
     httpBase,
   );
 }
@@ -9074,7 +9089,7 @@ async function syncCommanderFromServer(): Promise<void> {
   const srv = resolveServer();
   if (!srv) return;
   await probeAuthMode(srv.base);
-  if (!authMode) return;
+  if (authMode !== 'accounts') return;
   const session = sessionToken(srv.base);
   if (!session) return;
   try {
@@ -9115,7 +9130,7 @@ $('cnew').addEventListener('click', () => {
   // With accounts OFF (nick-only server) there is no password to set, so a new commander
   // just gets a suggested callsign and drops into the hub.
   void authProbe.then(() => {
-    if (authMode) {
+    if (authMode === 'accounts') {
       openRegister();
       return;
     }
@@ -9140,7 +9155,7 @@ function signInByCallsign(): void {
   // Same race guard as «Новый командир»: never pick the guest branch while the
   // /auth/status probe is still in flight.
   void authProbe.then(() => {
-    if (authMode) {
+    if (authMode === 'accounts') {
       void welcomeSignIn(nick);
       return;
     }
@@ -9511,7 +9526,15 @@ document.getElementById('rail-settings')?.addEventListener('click', () => settin
 // block that read is a TDZ, and esbuild's const/let→var lowering turns the crash into a
 // silent `undefined` (the httpBase trap; caught by tsc TS2448 when the prototype gained
 // a typecheck).
-let authMode = false;
+// Что сервер сказал про аккаунты. НЕ булево: «не знаю» (проба ещё не спрошена или не
+// дошла) обязано отличаться от «аккаунтов нет» — иначе незнание читается как разрешение
+// (`joinLanding`, правило 5). До ответа сервера — именно «не знаю».
+let authMode: IdentityMode = 'unknown';
+/** Игрок пришёл ПО ССЫЛКЕ на партию, а не через экран подключения. Решает, куда его
+ *  посадить, если войти не дали: у пришедшего по ссылке нет экрана, на который можно
+ *  вернуться, — ему его надо дать (ADDR-5). Раньше это выводилось из невидимости
+ *  оверлея, но оверлей теперь держится до впуска, и признак стал самостоятельным. */
+let cameFromLink = false;
 /** When a join is attempted without a stored session, we show the welcome card; this
  *  holds the match AND the seat/faction the player already chose, so the sign-in can
  *  resume the join in full. `take()` reads and forgets in one step — see
@@ -9535,7 +9558,15 @@ if (bootReset) {
   // Direct deep-link into a match. Two paths:
   //  (a) cached session JWT → connectToMatch immediately (no welcome card)
   //  (b) no session → show welcome card, welcomeSignIn auto-resumes the join
-  showConnect(false);
+  //
+  // ПОКА НЕ ВПУСТИЛИ — КАРТА ЗАКРЫТА. Раньше ветка начиналась с `showConnect(false)`, и
+  // это снимало оверлей ДО того, как станет известен исход: пришедший по ссылке видел
+  // карту, пока сервер ещё только решал, пускать ли его. Тому, кого не пустят, она не
+  // предназначалась вовсе. Оверлей снимает единственное честное событие — приход
+  // приветственного снимка (там `showConnect(false)` и стоит); ровно об этом же
+  // предупреждает правило 2 в `socketFate.ts`: «отвергнутый вход мигнёт игроку картой».
+  cameFromLink = true;
+  showConnect(true);
   showHub(false);
   void (async () => {
     const srv = resolveServer();
@@ -9546,7 +9577,7 @@ if (bootReset) {
     // into the browser console (and into any screen recording of a playtest).
     const cached = srv ? sessionRecord(srv.base) : null;
     const where = joinLanding({
-      authRequired: !!authMode,
+      identity: authMode,
       hasSession: !!cached,
       refused: false,
     });
@@ -9558,8 +9589,9 @@ if (bootReset) {
     // No session — show the welcome card so the player can register/login,
     // then welcomeSignIn auto-resumes the join via pendingJoinAfterAuth.
     pendingJoinAfterAuth.remember(bootJoinId, bootSlot, bootFaction, bootScientists);
-    // ADDR-5: ветка началась с showConnect(false), и без этой строки карточка входа
-    // выставлялась ВНУТРИ скрытого оверлея — игрок получал пустой экран вместо входа.
+    // ADDR-5. Оверлей ветка держит показанным с самого начала, так что строка здесь —
+    // не «показать», а «не дать погаснуть»: когда-то ветка начиналась со скрытого
+    // оверлея, и карточка входа выставлялась ВНУТРИ него — игрок получал пустой экран.
     showConnect(true);
     showStage('welcome');
     const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
@@ -9580,14 +9612,14 @@ if (bootReset) {
   showStage('welcome');
   void (async () => {
     const srv = resolveServer();
-    if (srv) await probeAuthMode(srv.base);
+    const mode = srv ? await probeAuthMode(srv.base) : authMode;
     const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
     if (savedNick) {
       wNickInput.value = savedNick;
     } else {
       wNickInput.value = suggestCallsign();
     }
-    if (authMode) {
+    if (mode === 'accounts') {
       wPassRowEl.style.display = 'flex';
       wPassInput.focus();
     } else {
@@ -10379,7 +10411,7 @@ function connect(): void {
   const url = dialUrl(
     base,
     currentMatchId,
-    dialIdentity(authMode, pendingJoinToken, nick, seatTicket),
+    dialIdentity(authMode === 'accounts', pendingJoinToken, nick, seatTicket),
   );
   pendingJoinToken = null; // one dial per token fetch — a reconnect mints a fresh one
   statusEl.textContent = t('net.connecting', { nick });
@@ -10450,16 +10482,17 @@ function connect(): void {
       scheduleReconnect(); // a reconnect attempt failed to admit → back off and retry
     }
     // `keep-reason`: нас не впустили — ответ сервера уже в строке статуса, и стирать
-    // его нечем (правило 4). Оверлей ПОКАЗАН, если игрок пришёл через экран подключения,
-    // — но не когда он пришёл по ссылке на сессию: там ветка началась с showConnect(false),
-    // и строка статуса, как и весь экран, невидима. Тогда сажаем его на видимый экран
-    // (ADDR-5): причина уезжает с ним, а решение о том, куда именно, не зависит от кода
-    // отказа — иначе ссылка стала бы оракулом существования партий.
-    if (!connectShown()) {
+    // его нечем (правило 4). Пришедшего через экран подключения он там и прочитает. А вот
+    // пришедшему ПО ССЫЛКЕ возвращаться некуда: экрана, с которого он начал, у него нет.
+    // Его сажаем на видимый экран (ADDR-5) — причина уезжает с ним, а решение о том, куда
+    // именно, не зависит от кода отказа: иначе ссылка стала бы оракулом существования
+    // партий. Признак берётся из `cameFromLink`, а не из невидимости оверлея: оверлей
+    // теперь держится до впуска, чтобы не показывать карту тому, кого могут не пустить.
+    if (cameFromLink || !connectShown()) {
       const reason = statusEl.textContent ?? '';
       const srv = resolveServer();
       const landing = joinLanding({
-        authRequired: !!authMode,
+        identity: authMode,
         hasSession: srv ? !!sessionRecord(srv.base) : false,
         refused: true,
       });
@@ -10534,14 +10567,18 @@ function sessionToken(base: string): string | null {
 }
 
 /** Probe the server's identity mode and show/hide the password field. */
-async function probeAuthMode(base: string): Promise<void> {
+async function probeAuthMode(base: string): Promise<IdentityMode> {
   // Что означает ответ пробы — `identityProbe.ts` (REFM-154): ответ «не 2xx» это не
   // беда, а «аккаунтов тут нет» (игру часто открывают с обычной раздачи файлов); тело
   // разбирают только у 2xx (голый `res.json()` на HTML-404 бросал SyntaxError в
   // консоль); не дошли до сервера — считаем режим позывных, вход и так выдаст
   // настоящую ошибку. Режим аккаунтов включает ровно живое «да».
-  authMode = (await identityMode(() => fetch(authStatusUrl(base)))) === 'accounts';
-  if (passRow) passRow.style.display = authMode ? '' : 'none';
+  authMode = await identityMode(() => fetch(authStatusUrl(base)));
+  if (passRow) passRow.style.display = authMode === 'accounts' ? '' : 'none';
+  // Возвращаем то же самое, что положили: после `await` компилятор не видит присвоения
+  // модульной переменной и сужает её до начального «не знаю», а читать её сразу после
+  // пробы нужно именно здесь.
+  return authMode;
 }
 
 // First visit, Bytro-style (SES-2.5 UX): when the server runs accounts, sign-up IS
@@ -10730,7 +10767,11 @@ function connectToMatch(
   void (async () => {
     const srv = resolveServer();
     const cached = srv ? sessionRecord(srv.base) : null;
-    const next = joinStep({ accountsMode: authMode, serverKnown: !!srv, hasSession: !!cached });
+    const next = joinStep({
+      accountsMode: authMode === 'accounts',
+      serverKnown: !!srv,
+      hasSession: !!cached,
+    });
     if (next.step === 'sign-in') {
       askSignIn(id, slot, faction, next.password ? srv : null, scientists);
       return;
@@ -11373,9 +11414,10 @@ function scheduleReconnect(): void {
     // Accounts mode (SES-2.5): the join token is short-lived (15 min), so a redial
     // mints a fresh one off the long-lived session first; an expired session drops
     // the redial to the connect screen with «введите пароль» (fail-explicit).
-    const srv = authMode ? resolveServer() : null;
+    const accounts = authMode === 'accounts';
+    const srv = accounts ? resolveServer() : null;
     const session = srv ? sessionToken(srv.base) : null;
-    const plan = redialPlan(authMode, !!session);
+    const plan = redialPlan(accounts, !!session);
     if (plan === 'dial') {
       connect(); // reuse the saved server + nick; don't reset the attempt counter
       return;
@@ -11770,6 +11812,7 @@ function frame(nowReal: number) {
   // The orbit spin only advances while the world is actually running (sim ticking, or a
   // live net match), so pausing freezes the ships on their rings instead of drifting on.
   if (saneGap(dt) && spinRuns(NET, speed, !!banner)) orbitPhase += dt;
+  if (saneGap(dt) && !document.hidden && motionOn() && !endScreen && spinRuns(NET, speed, !!banner)) hologramTime += dt;
   pumpPendingLoads(); // fire ~1h cargo loads whose hour has elapsed (both modes)
   resolvePendingMerges(); // complete fleet merges whose movers have arrived
   // Итог матча приходит в ОБОИХ режимах (сетевые снимки несут его в `match`).
@@ -11974,7 +12017,31 @@ function frame(nowReal: number) {
     lastIntelAt = nowReal;
     renderDiplo();
   }
-  requestAnimationFrame(frame);
+}
+
+/** Сколько исключений кадра печатать целиком: первое — с полным стеком, дальше только
+ *  счётчик. Иначе сломанный кадр забивает консоль по 60 строк в секунду, и в ней уже
+ *  не найти ничего другого. */
+const FRAME_ERR_LOG_MAX = 3;
+let frameErrs = 0;
+
+/**
+ * Цикл кадров. Планирование следующего кадра ВЫНЕСЕНО из `frame` намеренно: пока
+ * `requestAnimationFrame(frame)` стоял последней строкой самого кадра, любое исключение
+ * внутри означало, что следующий кадр не будет запланирован НИКОГДА — карта замирала
+ * насмерть, а страница при этом оставалась живой (чат, кнопки, окна работают на своих
+ * обработчиках), и выглядело это как «завис только мир». Ровно так и вышло на первом
+ * плейтесте: выделение флота дергало `canOrder`, тот падал на состоянии без RNG.
+ * Один плохой кадр — это пропущенная отрисовка, а не конец карты.
+ */
+function frameLoop(nowReal: number) {
+  try {
+    frame(nowReal);
+  } catch (err) {
+    if (frameErrs++ < FRAME_ERR_LOG_MAX) console.error('frame failed', err);
+    else if (frameErrs === FRAME_ERR_LOG_MAX + 1) console.error('frame failing repeatedly — further errors muted');
+  }
+  requestAnimationFrame(frameLoop);
 }
 
 // Codex popup: full specs for a building/ship tile, with a contextual "Build here"
@@ -12893,7 +12960,7 @@ if (diploEl) {
   });
 }
 
-requestAnimationFrame(frame);
+requestAnimationFrame(frameLoop);
 
 // --- in-app APK auto-update -------------------------------------------------
 // Вся проводка (и оба решения под ней — что сказать про исход и когда проверять) —

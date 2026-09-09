@@ -1,4 +1,5 @@
 import type { MatchRoom } from './matchRoom';
+import { detach } from './detach';
 
 /**
  * A set of independent match-actors hosted in one process, addressed by match id
@@ -92,6 +93,12 @@ export interface LazyRoomRegistryOptions {
  *  the reload's catch-up is a no-op if nothing is due yet, and re-arm. */
 const MAX_WAKE_DELAY = 2_147_483_647;
 
+/** Пауза перед ПОВТОРОМ пробуждения, которое сорвалось на ошибке (см. `wake`). Не ноль:
+ *  сорвалось оно, скорее всего, на недоступном сторе, а немедленный повтор превратил бы
+ *  сбой базы в busy-loop — та же логика, что у сторожа простоя выше. Полминуты переживает
+ *  переподключение к базе и при этом не заставляет мир ждать вручную. */
+const WAKE_RETRY_MS = 30_000;
+
 export class LazyRoomRegistry implements RoomRegistry {
   private readonly live = new Map<string, LoadedMatch>();
   private readonly loading = new Map<string, Promise<MatchRoom | undefined>>();
@@ -162,7 +169,7 @@ export class LazyRoomRegistry implements RoomRegistry {
     if (this.idle.has(matchId)) return; // already counting down
     this.idle.set(
       matchId,
-      this.schedule(() => void this.hibernate(matchId), this.idleMs),
+      this.schedule(() => detach(`гибернация матча ${matchId}`, this.hibernate(matchId)), this.idleMs),
     );
   }
 
@@ -228,7 +235,10 @@ export class LazyRoomRegistry implements RoomRegistry {
     if (ms === null) return; // nothing scheduled — nothing to wake for
     this.wakes.set(
       matchId,
-      this.schedule(() => void this.wake(matchId), Math.max(0, Math.min(ms, MAX_WAKE_DELAY))),
+      this.schedule(
+        () => detach(`пробуждение матча ${matchId}`, this.wake(matchId)),
+        Math.max(0, Math.min(ms, MAX_WAKE_DELAY)),
+      ),
     );
   }
 
@@ -246,11 +256,26 @@ export class LazyRoomRegistry implements RoomRegistry {
   private async wake(matchId: string): Promise<void> {
     this.wakes.delete(matchId);
     if (this.live.get(matchId)) return; // already live (someone connected) → driver handles it
-    const room = await this.resolve(matchId);
-    if (!room) return; // no longer in the store
-    // tick() returns whether the clock advanced — a stalled runaway makes no progress, and
-    // the re-hibernation uses that to avoid an infinite 0ms wake spin.
-    const progressed = room.tick(); // process events due up to now; re-hibernation persists it
-    if (room.peerCount === 0) await this.hibernate(matchId, progressed);
+    // ОШИБКА ЗДЕСЬ СТОИТ МИРА. Это пробуждение — единственное место, где взводится
+    // СЛЕДУЮЩЕЕ (через `hibernate` в конце), и зовут его как `void this.wake(...)`.
+    // Значит сорвавшийся `resolve` (недоступный стор) или бросивший `tick` не просто
+    // терял один цикл: спящий матч не просыпался больше НИКОГДА — его круглосуточный мир
+    // стоял, пока кто-нибудь не подключится руками, — а необработанное отклонение промиса
+    // вдобавок роняло процесс со всеми остальными матчами. Ровно это рассуждение уже
+    // проведено в `hibernate` («runs as `void hibernate`»), сюда его не распространили.
+    try {
+      const room = await this.resolve(matchId);
+      if (!room) return; // no longer in the store — нечего будить и не о чем сообщать
+      // tick() returns whether the clock advanced — a stalled runaway makes no progress, and
+      // the re-hibernation uses that to avoid an infinite 0ms wake spin.
+      const progressed = room.tick(); // process events due up to now; re-hibernation persists it
+      if (room.peerCount === 0) await this.hibernate(matchId, progressed);
+    } catch (err) {
+      // Громко и с повтором: сбой стора обычно временный, а мир ждать не должен.
+      process.stderr.write(
+        `[registry] wake failed for match ${matchId}: ${String(err)} — retry in ${WAKE_RETRY_MS}ms\n`,
+      );
+      this.armWake(matchId, WAKE_RETRY_MS);
+    }
   }
 }

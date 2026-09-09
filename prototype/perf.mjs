@@ -138,6 +138,7 @@ const res = await build({
   platform: 'node',
   format: 'cjs',
   target: 'es2020',
+  loader: { '.webp': 'dataurl' },
   write: false,
   // The build profile is a REQUIRED define (see main.ts) — without it the bundle
   // keeps a bare `__PLAYER_BUILD__` and dies with a ReferenceError on first read.

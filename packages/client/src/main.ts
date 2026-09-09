@@ -272,13 +272,33 @@ function runMatch(getState: () => GameState, bounds: Bounds, interact?: MatchInt
     down = null;
   });
 
-  const loop = (): void => {
-    const state = getState();
-    renderMap(g, state, cam, vp, bounds, {
-      now: state.time,
-      dpr,
-      selected: interact?.getSelected?.() ?? null,
-    });
+  // Планирование следующего кадра ВЫНЕСЕНО из отрисовки намеренно, и это не стиль.
+  // Пока `requestAnimationFrame(loop)` стоял последней строкой самого кадра, любое
+  // исключение из `renderMap` означало, что следующего кадра не будет НИКОГДА: карта
+  // замирала насмерть, а страница оставалась живой (остальное висит на своих
+  // обработчиках) — так это и выглядело на первом плейтесте прототипа, где кадр падал
+  // на состоянии без RNG. Один плохой кадр — это пропущенная отрисовка, не конец карты.
+  let frameErrs = 0;
+  const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let lastFrame = 0;
+  let visualTime = 0;
+  const loop = (frameTime: number): void => {
+    const dt = frameTime - lastFrame;
+    lastFrame = frameTime;
+    if (!document.hidden && !reducedMotion.matches && dt > 0 && dt < 1000) visualTime += dt;
+    try {
+      const state = getState();
+      renderMap(g, state, cam, vp, bounds, {
+        now: state.time,
+        dpr,
+        visualTime,
+        selected: interact?.getSelected?.() ?? null,
+      });
+    } catch (err) {
+      // Первые три — со стеком, дальше молчок: падающий кадр иначе забьёт консоль
+      // шестьюдесятью строками в секунду и спрячет всё остальное.
+      if (frameErrs++ < 3) console.error('frame failed', err);
+    }
     requestAnimationFrame(loop);
   };
   requestAnimationFrame(loop);

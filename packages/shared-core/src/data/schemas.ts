@@ -43,6 +43,24 @@ export const UnitStatsSchema = z
     /** Orbital-AA damage per hour a (ground) unit deals to a hostile fleet on the
      *  NEAR orbit while the planet is not under a ground assault. 0 = no AA. */
     aaDamage: z.number().nonnegative().default(0),
+    /** Structural damage per game hour this hull rains on a bombarded planet's
+     *  BUILDINGS (ROS-1.3). 0 = not a siege hull: bombardment then falls back to
+     *  `attack × BOMBARD_FRACTION`, as it did for every hull before this stat.
+     *
+     *  A separate number from `attack` on purpose: while structural damage was a
+     *  fraction of `attack`, «weak against ships, terrible for buildings» could
+     *  not be expressed at all — a siege platform could only wreck a world by
+     *  also being a strong warship. It does NOT feed fleet-vs-fleet combat. */
+    siegeDamage: z.number().nonnegative().default(0),
+    /** Damage this hull deals to an enemy SHUTTLE STRIKE when it scrambles against
+     *  it (SHU-1.3). 0 = not an interceptor: the hull stays in the hangar and lets
+     *  the strike through.
+     *
+     *  Distinct from `pointDefense` (flak a SHIP or a building fires reactively) and
+     *  from `attack` (what the shuttle deals to fleets): an interceptor is meant to
+     *  be terrible against hulls and murderous against other shuttles, and one
+     *  number could not say both. */
+    shuttleDamage: z.number().nonnegative().default(0),
     /** Point-defense damage per hour — anti-shuttle/anti-missile flak that a
      *  SHIP (not just a planet) carries. Distinct from `aaDamage` (which is
      *  planet-side orbital AA): `pointDefense` fires on incoming shuttle/missile
@@ -60,6 +78,12 @@ export const UnitStatsSchema = z
     /** Combat rounds a spent shuttle sits rearming on its carrier before it can
      *  sortie again (SQ-2.1). Deterministic cooldown, like a hero ability. */
     rearmRounds: z.number().nonnegative().default(0),
+    /** How many shuttles this HULL can base — a carrier is a mobile spaceport
+     *  (SHU-2.1). Same meaning as a building's `shuttleBay`, and the same rule
+     *  follows from it: a hull that bases zero is indistinguishable from one that
+     *  cannot base at all, so there is no separate "is a carrier" flag to drift
+     *  out of step with the number. A fleet's capacity is Σ count × shuttleBay. */
+    shuttleBay: z.number().nonnegative().default(0),
   })
   .catchall(z.number());
 
@@ -84,6 +108,14 @@ export const UnitDefSchema = z.object({
    *  the landing force in a ground assault). Fleets carry ground units up to
    *  their ships' `cargoCapacity`. */
   domain: z.enum(['space', 'ground']).default('space'),
+  /** Род наземных войск (ROS-1.1): пехота строится в КАЗАРМАХ, техника — на ЗАВОДЕ.
+   *  Читается только при `domain: 'ground'`; у космических корпусов поля нет смысла.
+   *
+   *  Дефолт — пехота, а не «обязательно объяви»: наземный юнит без рода строился бы
+   *  нигде (fail-secure превратил бы забытое поле в непостроимый юнит), а так забытое
+   *  поле стоит казарм. Чтобы «забыли» не доехало до каталога, живой контент обязан
+   *  объявлять род ЯВНО — это держит сторож в `schemas.test.ts`. */
+  kind: z.enum(['infantry', 'vehicle']).default('infantry'),
   /** Damage-receiving line (GDD §7.2). `artillery` trait overrides this. */
   line: z.enum(['front', 'mid', 'rear']).default('front'),
   traits: z.array(z.string()).default([]),
@@ -211,7 +243,8 @@ export const BuildingLevelSchema = z.object({
    *  был непостроим НИ НА КАКОМ уровне. Та же опасность у `shuttleBay` (SHU-1.1), и
    *  сторож в `construction.test.ts` держит оба случая. */
   enablesShipConstruction: z.boolean().optional(),
-  enablesGroundConstruction: z.boolean().optional(),
+  enablesInfantryConstruction: z.boolean().optional(),
+  enablesVehicleConstruction: z.boolean().optional(),
 });
 
 export const BuildingDefSchema = z.object({
@@ -260,10 +293,16 @@ export const BuildingDefSchema = z.object({
    *  airbase). A planet needs at least one standing building with this flag
    *  to build any unit with the `shuttle` trait (`unit.build`). Уровень МОЖЕТ
    *  открыть способность позже — см. `BuildingLevelSchema`. */
-  /** True for a building that enables ground-unit construction (barracks for
-   *  infantry, factory for vehicles). A planet needs at least one standing
-   *  building with this flag to build any `domain: 'ground'` unit. Not per-level. */
-  enablesGroundConstruction: z.boolean().default(false),
+  /** True for a building that trains INFANTRY — barracks (ROS-1.1). A planet needs
+   *  at least one standing building with this flag to build a ground unit whose
+   *  `kind` is `infantry`. Уровень МОЖЕТ открыть способность позже — см.
+   *  одноимённое поле в `BuildingLevelSchema`. */
+  enablesInfantryConstruction: z.boolean().default(false),
+  /** True for a building that assembles VEHICLES — a factory (ROS-1.1). The same
+   *  rule as above, for `kind: 'vehicle'`. Два флага, а не один: заказ владельца
+   *  разводит рода войск по зданиям, и «наземное производство» вообще перестало
+   *  быть одной способностью. */
+  enablesVehicleConstruction: z.boolean().default(false),
   /** RULES-2. Сколько экземпляров этого здания может стоять на ОДНОМ мире.
    *
    *  Правило «одно здание такого типа на мир, уровень растят улучшением» жило

@@ -42,8 +42,11 @@ export const UNIT_ICON: Record<string, string> = {
   cruiser: '▲',
   scout: '◌',
   siege: '✦',
-  strike_carrier: '◈', // a flat-top capital hull — hangar bays for the wing
+  artillery: '✧', // the standoff battery — a lighter echo of the siege platform ✦
+  strike_carrier: '⊟', // десантный корабль — сплошной трюм, ни одного орудийного отсека
+  shuttle_carrier: '⬢', // плавучий космопорт — сплошной корпус, весь объём под ангар
   interceptor: '△', // light strike wing (hollow, to read apart from the cruiser ▲)
+  bomber: '⧨', // челнок с бомбовой нагрузкой — тот же треугольник, но «полный»
   hero: '♔', // the player's projection — a crowned flagship
   militia: '▿', // massed light foot
   heavy_infantry: '◆', // the armoured line

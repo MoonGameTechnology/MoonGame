@@ -66,7 +66,7 @@ const data: GameData = parseGameData({
       name: 'Barracks',
       cost: { metal: 70 },
       buildTimeHours: 3,
-      enablesGroundConstruction: true,
+      enablesInfantryConstruction: true,
     },
   },
   events: {},

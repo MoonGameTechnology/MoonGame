@@ -172,7 +172,12 @@ export function canOrder(state: GameState, action: Action): string | null {
     memoState = state;
     memo.clear();
   }
-  const key = `${action.playerId} ${action.type} ${JSON.stringify(action.payload)}`;
+  // Разделитель — `\u0000` ЭКРАНИРОВАННЫМ, а не сырым байтом. Символ выбран верно (в
+  // id, типе и JSON он не встречается, так что склейка ключа однозначна), но записанный
+  // в файл как есть он делает файл БИНАРНЫМ для инструментов: `file` зовёт его `data`,
+  // а `grep` молча пропускает с «binary file matches» — то есть поиск по репозиторию
+  // этот файл не видит. Строка на рантайме та же самая, escape меняет только исходник.
+  const key = `${action.playerId}\u0000${action.type}\u0000${JSON.stringify(action.payload)}`;
   const hit = memo.get(key);
   if (hit !== undefined) return hit;
   const verdict = kernel.canApply(state, action, ctx(state.time));

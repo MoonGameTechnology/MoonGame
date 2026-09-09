@@ -20,6 +20,7 @@
 import {
   buildingLevel,
   thresholdRamp,
+  unitTier,
   COMBAT_UNIT_CAP,
   type GameState,
 } from '../../packages/shared-core/src/index';
@@ -156,9 +157,18 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
       return {
         name: t('dossier.unit.siege.name'),
         body: t('dossier.unit.siege.desc', {
+          s: hl(st.siegeDamage ?? 0),
           a: hl(st.attack),
-          r: hl(st.range ?? 0),
+          hp: hl(st.hp),
           d: hl(st.defense),
+        }),
+      };
+    case 'artillery':
+      return {
+        name: t('dossier.unit.artillery.name'),
+        body: t('dossier.unit.artillery.desc', {
+          a: hl(st.attack),
+          hp: hl(st.hp),
         }),
       };
     case 'strike_carrier':
@@ -167,6 +177,17 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
         body: t('dossier.unit.strike-carrier.desc', {
           hp: hl(st.hp),
           c: hl(st.cargoCapacity ?? 0),
+          a: hl(st.attack),
+        }),
+      };
+    case 'shuttle_carrier':
+      return {
+        name: t('dossier.unit.shuttle-carrier.name'),
+        body: t('dossier.unit.shuttle-carrier.desc', {
+          bay: hl(st.shuttleBay ?? 0),
+          d: hl(st.defense),
+          hp: hl(st.hp),
+          a: hl(st.attack),
         }),
       };
     case 'interceptor':
@@ -174,7 +195,18 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
         name: t('dossier.unit.interceptor.name'),
         body: t('dossier.unit.interceptor.desc', {
           sp: hl(st.speed),
+          s: hl(st.shuttleDamage ?? 0),
           a: hl(st.attack),
+          hp: hl(st.hp),
+          r: hl(st.strikeRange ?? 0),
+        }),
+      };
+    case 'bomber':
+      return {
+        name: t('dossier.unit.bomber.name'),
+        body: t('dossier.unit.bomber.desc', {
+          a: hl(st.attack),
+          s: hl(st.siegeDamage ?? 0),
           hp: hl(st.hp),
           r: hl(st.strikeRange ?? 0),
         }),
@@ -508,8 +540,15 @@ export function createDossiers(host: DossierHost): {
     // Домен и трейты могут нести один и тот же ключ (у наземных юнитов domain:
     // 'ground' И трейт 'ground' — два разных механических флага, см. fleetLaunch
     // vs fleetOps), а игроку это одна и та же «земля» — схлопываем дубли.
+    // Линию берём у ЯДРА (`unitTier`), а не из сырого `def.line`: у наземных линия
+    // всегда передняя, а артиллерийский корпус стоит в своей линии по трейту — сырое
+    // поле в обоих случаях соврало бы игроку.
     const tags = [
-      ...new Set([def.domain ?? 'space', def.line, ...(def.traits ?? [])].filter((x): x is string => !!x)),
+      ...new Set(
+        [def.domain ?? 'space', unitTier(def), ...(def.traits ?? [])].filter(
+          (x): x is string => !!x,
+        ),
+      ),
     ]
       .map((x) => tData(x))
       .join(', ');

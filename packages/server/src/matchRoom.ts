@@ -37,6 +37,7 @@ import type { ArsenalStore, MatchSnapshot, StoredReceipt } from './store';
 import { arsenalSnapshotOf } from './arsenal';
 import { InMemoryEphemeralStore, type EphemeralStore } from './ephemeral';
 import { PerKeyWindow } from './rateLimit';
+import { detach } from './detach';
 
 export interface RoomPeer {
   send(data: string): void;
@@ -751,7 +752,7 @@ export class MatchRoom {
       ...this.hashField(view.base),
       ...this.lobbyField(),
     });
-    void this.sendVisiblePings(playerId, peer); // existing ally markers, on join (best-effort)
+    detach('маркеры союзников при входе', this.sendVisiblePings(playerId, peer)); // best-effort
     this.sendVisibleChat(playerId, peer); // the visible chat back-log, on join
     // Tell already-present peers the wait ended (waitForPlayers) or the lobby
     // roster changed (manualStart, pre-start), so their lobby screen updates.
@@ -1290,7 +1291,7 @@ export class MatchRoom {
     if (orders.length === 0) return;
     this.serverOrderSeq += orders.length;
     this.serverOrdersBusy = true;
-    void (async () => {
+    detach('приказы серверной автоматики', (async () => {
       try {
         for (const action of orders) {
           await this.submitServerAction(action.playerId, action);
@@ -1300,7 +1301,7 @@ export class MatchRoom {
       } finally {
         this.serverOrdersBusy = false;
       }
-    })();
+    })());
   }
 
   /** Wall-ms until the soonest scheduled event comes due — what an offline wakeup

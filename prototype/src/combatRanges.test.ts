@@ -7,12 +7,28 @@ import { describe, it, expect } from 'vitest';
 import { artilleryRange, shuttleStrikeRange } from '../../packages/shared-core/src/index';
 import { newGame, data } from './game';
 import { combatRanges, ringLook, type RangeKind } from './combatRanges';
-import type { Fleet, GameState } from '../../packages/shared-core/src/index';
+import type { Fleet, GameData, GameState } from '../../packages/shared-core/src/index';
 
 const ME = 'p1';
 const HERE = { x: 0, y: 0 };
 const locate = () => HERE;
 const seen = () => true;
+
+/** Каталог с ДАЛЬНОБОЙНЫМ корпусом. После ROS-2.1 в живом ростере таких нет —
+ *  артиллерия дерётся вплотную, — но механизм дальнего огня в движке остался и ждёт
+ *  своего носителя (`missiles-roadmap.md`). Сторож проверяет МЕХАНИЗМ, поэтому носитель
+ *  ему нужен свой; отдельный тест ниже следит, что в живом каталоге его действительно нет.
+ */
+const rangedData: GameData = {
+  ...data,
+  units: {
+    ...data.units,
+    longbow: {
+      ...data.units.artillery!,
+      stats: { ...data.units.artillery!.stats, range: 300 },
+    },
+  },
+};
 
 /** Партия, в которой мой флот несёт заданный набор кораблей. */
 function withFleet(units: Array<{ unit: string; count: number }>): {
@@ -27,14 +43,28 @@ function withFleet(units: Array<{ unit: string; count: number }>): {
 }
 
 describe('RANGE-UX — радиусы приходят из ядра, а не из интерфейса', () => {
-  it('круг артиллерии равен artilleryRange ядра — до последней единицы', () => {
-    const { s, fleet } = withFleet([{ unit: 'siege', count: 2 }]);
-    const ring = combatRanges(s, data, [fleet.id], ME, locate, seen).rings.find(
+  it('круг дальнего огня равен artilleryRange ядра — до последней единицы', () => {
+    const { s, fleet } = withFleet([{ unit: 'longbow', count: 2 }]);
+    const ring = combatRanges(s, rangedData, [fleet.id], ME, locate, seen).rings.find(
       (r) => r.kind === 'artillery',
     );
     expect(ring).toBeDefined();
-    expect(ring!.radius).toBe(artilleryRange(fleet, data));
+    expect(ring!.radius).toBe(artilleryRange(fleet, rangedData));
     expect(ring!.radius).toBeGreaterThan(0);
+  });
+
+  it('ROS-2.1: в ЖИВОМ каталоге дальнобойных корпусов не осталось — кругов не будет', () => {
+    // Артиллерия подходит вплотную и вяжется в бой, поэтому радиуса у неё нет; движок
+    // дальнего огня при этом жив и ждёт носителя (см. `rangedData` выше).
+    const ranged = Object.entries(data.units)
+      .filter(([, u]) => (u.stats.range ?? 0) > 0)
+      .map(([id]) => id);
+    expect(ranged).toEqual([]);
+    const { s, fleet } = withFleet([{ unit: 'artillery', count: 2 }]);
+    const rings = combatRanges(s, data, [fleet.id], ME, locate, seen).rings.filter(
+      (r) => r.kind === 'artillery',
+    );
+    expect(rings).toEqual([]);
   });
 
   it('круг эскадрильи равен shuttleStrikeRange ядра', () => {
@@ -66,18 +96,20 @@ describe('RANGE-UX — радиусы приходят из ядра, а не и
   });
 
   it('линия огня рисуется ТОЛЬКО когда цель существует', () => {
-    const { s, fleet } = withFleet([{ unit: 'siege', count: 1 }]);
+    const { s, fleet } = withFleet([{ unit: 'longbow', count: 1 }]);
     // цель есть
     const foe = Object.values(s.fleets).find((f) => f.id !== fleet.id);
     if (foe) {
       const armed: Fleet = { ...fleet, barrageTarget: foe.id };
       const withTarget = { ...s, fleets: { ...s.fleets, [armed.id]: armed } };
-      expect(combatRanges(withTarget, data, [armed.id], ME, locate, seen).lines).toHaveLength(1);
+      expect(combatRanges(withTarget, rangedData, [armed.id], ME, locate, seen).lines).toHaveLength(
+        1,
+      );
     }
     // цель погибла — круг остаётся, линии нет (врать про несуществующую цель нельзя)
     const ghost: Fleet = { ...fleet, barrageTarget: 'нет-такого-флота' };
     const stale = { ...s, fleets: { ...s.fleets, [ghost.id]: ghost } };
-    const out = combatRanges(stale, data, [ghost.id], ME, locate, seen);
+    const out = combatRanges(stale, rangedData, [ghost.id], ME, locate, seen);
     expect(out.lines).toEqual([]);
     expect(out.rings.some((r) => r.kind === 'artillery')).toBe(true);
   });

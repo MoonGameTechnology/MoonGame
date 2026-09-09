@@ -35,8 +35,19 @@ const data: GameData = parseGameData({
     militia: {
       faction: 'x',
       domain: 'ground',
+      kind: 'infantry',
       stats: { attack: 1, defense: 2, speed: 0, hp: 8 },
       cost: { metal: 5 },
+      buildTimeHours: 0,
+    },
+    // ROS-1.1: техника — второй род наземных войск. Живёт на ЗАВОДЕ, и это
+    // единственное, чем она отличается от пехоты для гейта постройки.
+    tank: {
+      faction: 'x',
+      domain: 'ground',
+      kind: 'vehicle',
+      stats: { attack: 6, defense: 4, speed: 0, hp: 20 },
+      cost: { metal: 12 },
       buildTimeHours: 0,
     },
     interceptor: {
@@ -75,14 +86,24 @@ const data: GameData = parseGameData({
       cost: { metal: 150, credits: 60 },
       buildTimeHours: 6,
       hp: 25,
-      enablesGroundConstruction: true,
+      enablesVehicleConstruction: true,
     },
     barracks: {
       name: 'Barracks',
       cost: { metal: 70 },
       buildTimeHours: 3,
       hp: 25,
-      enablesGroundConstruction: true,
+      enablesInfantryConstruction: true,
+    },
+    // Завод, у которого производство техники открывает ВТОРОЙ уровень: сторож ниже
+    // держит ту же ловушку, что уже ловилась на ангаре — способность, объявленную в
+    // апгрейде, гейт обязан видеть.
+    workshop: {
+      name: 'Workshop',
+      cost: { metal: 90 },
+      buildTimeHours: 3,
+      hp: 20,
+      upgrades: [{ cost: { metal: 140 }, buildTimeHours: 4, hp: 30, enablesVehicleConstruction: true }],
     },
     // Вместимость ангара открывается ТОЛЬКО апгрейдом — сторож ниже проверяет, что
     // гейт читает уровень, а не базовый def (иначе `shuttleBay` в апгрейде был бы
@@ -92,7 +113,7 @@ const data: GameData = parseGameData({
       cost: { metal: 100 },
       buildTimeHours: 4,
       hp: 25,
-      enablesGroundConstruction: true,
+      enablesInfantryConstruction: true,
       upgrades: [
         { cost: { metal: 120 }, buildTimeHours: 5, hp: 35, shuttleBay: 2 },
         { cost: { metal: 160 }, buildTimeHours: 6, hp: 45, shuttleBay: 2 },
@@ -320,7 +341,7 @@ describe('construction module — a space-domain hull needs a standing shipyard'
     expect(!r.ok && r.code).toBe('E_NO_SHIPYARD');
   });
 
-  it('ground-domain units never need a shipyard (but DO need a ground facility)', () => {
+  it('ground-domain units never need a shipyard (but DO need their own facility)', () => {
     const kernel = createKernel([constructionModule]);
     const st = stateWith({ players: [player('p1', { metal: 100 })], planets: [planet('A', 'p1', ['barracks'])] });
     const r = okApply(kernel.applyAction(st, build('militia'), ctx(0)));
@@ -335,6 +356,61 @@ describe('construction module — a space-domain hull needs a standing shipyard'
     });
     expect(okApply(kernel.applyAction(st, build('cruiser'), ctx(0))).ok).toBe(true);
     expect(okApply(kernel.applyAction(st, build('drone'), ctx(0))).ok).toBe(true);
+  });
+});
+
+describe('construction module — ROS-1.1: пехота из казарм, техника с завода', () => {
+  // Заказ владельца: наземные войска делятся на два рода, и здание у каждого своё.
+  // До этого оба здания несли ОДИН флаг `enablesGroundConstruction`, поэтому казарма
+  // строила танки, а завод — пехоту; комментарий в редьюсере обещал разделение,
+  // которого в коде не было.
+  const kernel = createKernel([constructionModule]);
+  const withBuildings = (...buildings: string[]): GameState =>
+    stateWith({ players: [player('p1', { metal: 100 })], planets: [planet('A', 'p1', buildings)] });
+
+  it('казарма строит пехоту', () => {
+    expect(okApply(kernel.applyAction(withBuildings('barracks'), build('militia'), ctx(0))).ok).toBe(
+      true,
+    );
+  });
+
+  it('казарма НЕ строит технику — E_NO_FACTORY', () => {
+    expect(errCode(kernel.applyAction(withBuildings('barracks'), build('tank'), ctx(0)))).toBe(
+      'E_NO_FACTORY',
+    );
+  });
+
+  it('завод строит технику', () => {
+    expect(okApply(kernel.applyAction(withBuildings('factory'), build('tank'), ctx(0))).ok).toBe(
+      true,
+    );
+  });
+
+  it('завод НЕ строит пехоту — E_NO_BARRACKS', () => {
+    expect(errCode(kernel.applyAction(withBuildings('factory'), build('militia'), ctx(0)))).toBe(
+      'E_NO_BARRACKS',
+    );
+  });
+
+  it('мир с обоими зданиями строит оба рода', () => {
+    const st = withBuildings('barracks', 'factory');
+    expect(okApply(kernel.applyAction(st, build('militia'), ctx(0))).ok).toBe(true);
+    expect(okApply(kernel.applyAction(st, build('tank'), ctx(0))).ok).toBe(true);
+  });
+
+  it('разрушенное здание (hp<=0) не считается стоящим', () => {
+    const st = withBuildings('factory');
+    st.planets.A!.buildings[0]!.hp = 0;
+    expect(errCode(kernel.applyAction(st, build('tank'), ctx(0)))).toBe('E_NO_FACTORY');
+  });
+
+  it('способность может открыть АПГРЕЙД: мастерская даёт технику только со 2-го уровня', () => {
+    expect(errCode(kernel.applyAction(withBuildings('workshop'), build('tank'), ctx(0)))).toBe(
+      'E_NO_FACTORY',
+    );
+    const second = withBuildings('workshop');
+    second.planets.A!.buildings[0]!.level = 2;
+    expect(okApply(kernel.applyAction(second, build('tank'), ctx(0))).ok).toBe(true);
   });
 });
 

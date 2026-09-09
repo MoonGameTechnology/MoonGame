@@ -327,6 +327,7 @@ export const data: GameData = parseGameData({
     scout: {
       faction: 'blue',
       stats: { attack: 5, defense: 4, speed: 64, hp: 12, cargoCapacity: 1 },
+      line: 'mid', // eyes, not a shield wall — screened by the hulls in front
       signature: 1, // quiet recon hull
       radarRange: 105, // projects fleet radar — read by both the core fog and the prototype view (плейтест 2026-07-18: −50%)
       cost: { metal: 20 },
@@ -341,6 +342,7 @@ export const data: GameData = parseGameData({
     sensor_frigate: {
       faction: 'blue',
       stats: { attack: 4, defense: 6, speed: 56, hp: 22, cargoCapacity: 1 },
+      line: 'mid', // стоит за боевой линией вместе с разведчиком
       signature: 1, // слушает, а не кричит — читается как разведкорпус
       radarRange: 60, // своя антенна скромная; дальнее зрение даёт модуль
       cost: { metal: 55, microelectronics: 2 }, // ECON-7: сенсоры — хай-тек
@@ -361,42 +363,63 @@ export const data: GameData = parseGameData({
       slots: { weapon: 1, defense: 1, utility: 1 }, // the balanced warship: one of each bay
     },
     siege: {
-      // Artillery: a backline platform that fires from range at one target —
-      // a pure standoff (no return fire) within `range` map units (combat
-      // runArtillery). Reaches ~one neighbouring world (~205 apart), no further.
+      // ОСАДНАЯ ПЛАТФОРМА (ROS-1.3, заказ владельца): большая неповоротливая махина,
+      // которая с орбиты сбрасывает бомбы на мир. В бою против кораблей и челноков
+      // слабая (attack 6), зато держит удар (hp 120) и выносит ПОСТРОЙКИ — за это
+      // отвечает отдельный стат `siegeDamage`, который читает бомбардировка
+      // (`orbital.ts`). Одним `attack` эту роль выразить было нечем: пока урон по
+      // зданиям был его долей, «страшная для планеты» означало «сильная и в космосе».
+      // Standoff-огонь остаётся у `artillery`: трейта у платформы нет, и «осада»
+      // здесь — это бомбардировка с орбиты, а не стрельба по флоту издалека.
       faction: 'blue',
-      stats: { attack: 30, defense: 6, speed: 30, hp: 40, range: 240 },
-      traits: ['artillery'],
+      stats: { attack: 6, defense: 10, speed: 22, hp: 120, siegeDamage: 60 },
+      line: 'rear',
       signature: 5, // huge siege platform — loudest
       cost: { metal: 90, credits: 40, microelectronics: 4 }, // ECON-7: guided munitions
       buildTimeHours: 5,
       upkeep: { credits: 48 },
       slots: { weapon: 1, utility: 1 }, // a gun bay + a utility bay — a glass cannon
     },
-    dropship: {
-      // Carrier hull (GDD §6.1 / backlog SHIP): the biggest hold in the fleet but almost
-      // no guns — it hauls divisions (and, later, shuttles) and wants an escort.
+    artillery: {
+      // АРТИЛЛЕРИЯ (ROS-2.1, заказ владельца). Дистанционного огня у неё больше нет:
+      // чтобы ударить, она подходит вплотную и вяжется в бой, как все, — поэтому
+      // ушёл и `range`. Своей линии тоже нет: она стоит в ТЫЛУ вместе с осадными.
+      // Трейт `artillery` остался и значит теперь ровно одно: когда атакует её
+      // сторона, ОТВЕТНЫЙ огонь по ней не проходит и уходит на другие корабли
+      // (`util/combat.ts`, щадящий режим раздачи урона). Бьёт безнаказанно — но
+      // под чужой атакой получает свою тыловую долю залпа и гибнет как все.
       faction: 'blue',
-      stats: { attack: 2, defense: 6, speed: 44, hp: 50, cargoCapacity: 8 },
-      signature: 3, // a fat hauler — easy to spot
-      cost: { metal: 70, credits: 20 },
-      buildTimeHours: 4,
-      upkeep: { credits: 24 },
-      slots: { defense: 1, utility: 2 }, // no guns — it armours up and carries утилиту
+      stats: { attack: 26, defense: 4, speed: 26, hp: 24 },
+      line: 'rear',
+      traits: ['artillery'],
+      signature: 5, // a gun this big is not subtle
+      cost: { metal: 110, credits: 50, microelectronics: 5 }, // ECON-7: guided munitions
+      buildTimeHours: 6,
+      upkeep: { credits: 56 },
+      slots: { weapon: 1, utility: 1 },
     },
     interceptor: {
       // Carrier-borne strike wing (shuttles-roadmap SQ-0.1): very fast + hard-hitting
       // but paper-thin — launch it ahead to strike, orbital AA (orbital_aa) is its counter.
+      // ROS-1.4 + SHU-1.3: роли разведены до конца. По КОРПУСАМ он почти безвреден
+      // (`attack` 4), по зданиям тем более (`siegeDamage` 1), зато против чужих
+      // ЧЕЛНОКОВ страшен (`shuttleDamage` 22) — и это единственная машина, которая
+      // поднимается из ангара навстречу чужому удару. Нерф урона по кораблям приехал
+      // ВМЕСТЕ с перехватом, а не раньше: до него охотиться было не на кого, и
+      // ослабленный перехватчик просто выпал бы из игры.
       faction: 'blue',
       stats: {
-        attack: 14,
+        attack: 4,
         defense: 3,
         speed: 92,
         hp: 10,
         strikeRange: 180,
         fuel: 3,
         rearmRounds: 2,
+        siegeDamage: 1,
+        shuttleDamage: 22,
       },
+      line: 'front', // a strike wing goes in first
       traits: ['shuttle'],
       signature: 2,
       cost: { metal: 90, credits: 40, microelectronics: 10 },
@@ -404,16 +427,65 @@ export const data: GameData = parseGameData({
       upkeep: { credits: 32 },
       slots: { weapon: 1 }, // a single gun mount — upgun the paper-thin strike wing
     },
-    strike_carrier: {
-      // A slow, tanky flat-top with few guns of its own — its punch is the shuttles it carries.
+    bomber: {
+      // БОМБАРДИРОВЩИК (ROS-1.4, заказ владельца): челнок против КОРАБЛЕЙ. Бьёт вдвое
+      // тяжелее перехватчика (20 против 14), по постройкам работает средне
+      // (`siegeDamage` 18 — меньше осадной платформы, но несравнимо больше, чем 1 у
+      // перехватчика), и за это платит скоростью, топливом и долгой перезарядкой.
+      // Пара «перехватчик / бомбардировщик» и есть развод ролей внутри челноков:
+      // одному — чужие машины, другому — корпуса.
       faction: 'blue',
-      stats: { attack: 4, defense: 10, speed: 40, hp: 70, cargoCapacity: 6 },
-      traits: ['carrier'],
+      stats: {
+        attack: 20,
+        defense: 4,
+        speed: 62,
+        hp: 16,
+        strikeRange: 150,
+        fuel: 2,
+        rearmRounds: 3,
+        siegeDamage: 18,
+        shuttleDamage: 2, // от чужих машин почти не отобьётся — это работа перехватчика
+      },
+      line: 'front',
+      traits: ['shuttle'],
+      signature: 2,
+      cost: { metal: 120, credits: 60, microelectronics: 12 },
+      buildTimeHours: 3,
+      upkeep: { credits: 40 },
+      slots: { weapon: 1 }, // одна орудийная точка — как у перехватчика
+    },
+    strike_carrier: {
+      // ДЕСАНТНЫЙ КОРАБЛЬ (заказ владельца 2026-09-09): самый большой трюм в ростере
+      // (16 против 5 у крейсера), толстый корпус и почти никакого огня — он не воюет,
+      // он довозит армию и держит удар, пока она высаживается. Челноков не несёт вовсе:
+      // трейт `carrier` и `shuttleBay` сняты, ангар остался только у «Шаттла».
+      // ВНУТРЕННЕЕ ИМЯ ИСТОРИЧЕСКОЕ: корпус раньше был «ударным носителем». Игроку id
+      // не показывается (имя приходит из локали `data.strike-carrier`), а переименование
+      // задело бы 24 файла ради буквы — если решим переименовать, это отдельная правка.
+      faction: 'blue',
+      stats: { attack: 1, defense: 12, speed: 34, hp: 140, cargoCapacity: 16 },
+      line: 'front', // самый толстый корпус во флоте — он и держит строй
       signature: 6,
-      cost: { metal: 320, credits: 160 },
-      buildTimeHours: 6,
-      upkeep: { credits: 96 },
-      slots: { defense: 1, utility: 2 }, // a flat-top: armour + sensor/cargo bays
+      cost: { metal: 150, credits: 60 },
+      buildTimeHours: 5,
+      upkeep: { credits: 48 },
+      slots: { defense: 1, utility: 2 }, // броня + трюмы, ни одного орудийного отсека
+    },
+    shuttle_carrier: {
+      // «Шаттл» — ПЛАВУЧИЙ КОСМОПОРТ (SHU-2.1, заказ владельца). Своих пушек почти нет
+      // (attack 3), зато держит удар (defense 18, hp 90) и несёт шесть челноков: с него
+      // они вылетают и на него садятся, поэтому флот бьёт челноками вдали от своих миров.
+      // Стоит в ЗАДНЕЙ линии — на неё приходится пятая часть залпа, пока строй впереди
+      // цел; ангар на нём живёт ровно столько, сколько живы его корпуса.
+      faction: 'blue',
+      stats: { attack: 3, defense: 18, speed: 34, hp: 90, shuttleBay: 6 },
+      line: 'rear',
+      traits: ['carrier'],
+      signature: 6, // корпус такого размера радар видит издалека
+      cost: { metal: 260, credits: 130, microelectronics: 6 },
+      buildTimeHours: 7,
+      upkeep: { credits: 88 },
+      slots: { defense: 2, utility: 1 }, // два защитных отсека — корпус живучести, не огня
     },
     // (Orbital AA is not a unit: it's a defensive *building* — anti-ship, immobile,
     //  player-built, see `orbital_aa` under buildings.)
@@ -431,6 +503,7 @@ export const data: GameData = parseGameData({
       faction: 'blue',
       stats: { attack: 4, defense: 8, speed: 44, hp: 14, cargoSize: 1 },
       domain: 'ground',
+      kind: 'infantry',
       traits: ['ground'],
       signature: 1,
       cost: { metal: 15 },
@@ -441,6 +514,7 @@ export const data: GameData = parseGameData({
       faction: 'blue',
       stats: { attack: 8, defense: 20, speed: 40, hp: 34, cargoSize: 1 },
       domain: 'ground',
+      kind: 'infantry',
       traits: ['ground'],
       signature: 1,
       cost: { metal: 55, credits: 15 },
@@ -451,6 +525,7 @@ export const data: GameData = parseGameData({
       faction: 'blue',
       stats: { attack: 18, defense: 12, speed: 52, hp: 26, cargoSize: 1 },
       domain: 'ground',
+      kind: 'infantry',
       traits: ['ground'],
       signature: 1,
       cost: { metal: 60, credits: 45, microelectronics: 5 },
@@ -462,6 +537,7 @@ export const data: GameData = parseGameData({
       faction: 'blue',
       stats: { attack: 22, defense: 14, speed: 40, hp: 46, cargoSize: 1 },
       domain: 'ground',
+      kind: 'vehicle',
       traits: ['ground'],
       signature: 2,
       cost: { metal: 120, credits: 30 },
@@ -743,28 +819,28 @@ export const data: GameData = parseGameData({
       cost: { metal: 70 },
       buildTimeHours: 3,
       hp: 25,
-      enablesGroundConstruction: true,
+      enablesInfantryConstruction: true,
       scoreValue: 2,
       upgrades: [
         {
           cost: { metal: 100, credits: 30 },
           buildTimeHours: 6,
           hp: 35,
-          enablesGroundConstruction: true,
+          enablesInfantryConstruction: true,
           upkeep: { energy: 15 },
         },
         {
           cost: { metal: 150, credits: 60 },
           buildTimeHours: 9,
           hp: 45,
-          enablesGroundConstruction: true,
+          enablesInfantryConstruction: true,
           upkeep: { energy: 25 },
         },
         {
           cost: { metal: 200, credits: 90 },
           buildTimeHours: 12,
           hp: 60,
-          enablesGroundConstruction: true,
+          enablesInfantryConstruction: true,
           buildSpeedBonus: 0.05,
           upkeep: { energy: 35 },
         },
@@ -800,15 +876,15 @@ export const data: GameData = parseGameData({
         },
       ],
     },
-    // Factory — builds ground vehicles (tank) and shuttles (interceptor).
-    // enablesGroundConstruction: the gate for
-    // vehicle/shuttle unit.build on this planet.
+    // Завод — дом ТЕХНИКИ (ROS-1.1): `enablesVehicleConstruction` гейтит `unit.build`
+    // наземных юнитов с `kind: 'vehicle'` на этом мире. Пехоту он не строит — она
+    // живёт в казармах; челнокам нужен не он, а ангар (`shuttleBay`).
     factory: {
       name: 'Vehicle Factory',
       cost: { metal: 150, credits: 60 },
       buildTimeHours: 6,
       hp: 25,
-      enablesGroundConstruction: true,
+      enablesVehicleConstruction: true,
       scoreValue: 5,
       upkeep: { energy: 30 },
       upgrades: [
@@ -816,14 +892,14 @@ export const data: GameData = parseGameData({
           cost: { metal: 180, credits: 80 },
           buildTimeHours: 8,
           hp: 35,
-          enablesGroundConstruction: true,
+          enablesVehicleConstruction: true,
           upkeep: { energy: 50 },
         },
         {
           cost: { metal: 250, credits: 120 },
           buildTimeHours: 12,
           hp: 45,
-          enablesGroundConstruction: true,
+          enablesVehicleConstruction: true,
           buildSpeedBonus: 0.5,
           upkeep: { energy: 70 },
         },

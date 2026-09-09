@@ -114,11 +114,11 @@ describe('stewardGuardOrders — эвакуация под угрозой (ST-3.
 
   it('a stranded garrison summons the nearest free-hold transport — if it beats the threat', () => {
     const s = guardState({
-      fleets: [raider(inboundToH(20)), fl('F2', 'p1', { location: 'S', units: stacks([['dropship', 1]]) })],
+      fleets: [raider(inboundToH(20)), fl('F2', 'p1', { location: 'S', units: stacks([['strike_carrier', 1]]) })],
       hGarrison: stacks([['militia', 4]]),
     });
     const orders = stewardGuardOrders(s, 'p1');
-    // S→H is ~2.3 game-hours at dropship speed + the 2h tick margin — well inside 20h.
+    // S→H is ~3 game-hours at landing-ship speed + the 2h tick margin — well inside 20h.
     expect(orders.map((a) => a.type)).toEqual(['fleet.move', 'steward.report']);
     expect(orders[0]!.payload).toMatchObject({ fleetId: 'F2', to: 'H' });
     expect(reportEntries(orders)).toMatchObject([{ kind: 'ferry', node: 'H', fleetId: 'F2' }]);
@@ -126,7 +126,7 @@ describe('stewardGuardOrders — эвакуация под угрозой (ST-3.
 
   it('a transport that cannot arrive before the assault is not fed into it — «не спасти» is journaled', () => {
     const s = guardState({
-      fleets: [raider(inboundToH(3)), fl('F2', 'p1', { location: 'S', units: stacks([['dropship', 1]]) })],
+      fleets: [raider(inboundToH(3)), fl('F2', 'p1', { location: 'S', units: stacks([['strike_carrier', 1]]) })],
       hGarrison: stacks([['militia', 4]]),
     });
     // ~2.3h travel + 2h margin > 3h to impact — summoning would deliver it into the battle.
@@ -140,10 +140,10 @@ describe('stewardGuardOrders — эвакуация под угрозой (ST-3.
       fleets: [
         raider(inboundToH(20)),
         fl('F2', 'p1', {
-          units: stacks([['dropship', 1]]),
+          units: stacks([['strike_carrier', 1]]),
           movement: { from: 'S', to: 'H', departedAt: NOW - 1 * HOUR, arrivesAt: NOW + 1 * HOUR },
         }),
-        fl('F3', 'p1', { location: 'S', units: stacks([['dropship', 1]]) }),
+        fl('F3', 'p1', { location: 'S', units: stacks([['strike_carrier', 1]]) }),
       ],
       hGarrison: stacks([['militia', 4]]),
     });
@@ -165,7 +165,7 @@ describe('stewardGuardOrders — эвакуация под угрозой (ST-3.
   it('never poaches the ferry off ANOTHER threatened node — that node lifts its own garrison in place', () => {
     // H and S are both threatened (S by a through-H journey), R is the safe rear.
     // H has a stranded garrison and no transport; the only free hold is the
-    // dropship docked at S. It must serve S (load + fly to R), not fly empty to H.
+    // landing ship docked at S. It must serve S (load + fly to R), not fly empty to H.
     const s = guardState({
       withR: true,
       fleets: [
@@ -174,7 +174,7 @@ describe('stewardGuardOrders — эвакуация под угрозой (ST-3.
           units: stacks([['cruiser', 4]]),
           movement: { from: 'E', to: 'H', departedAt: NOW - 1 * HOUR, arrivesAt: NOW + 8 * HOUR, path: ['S'], destination: 'S' },
         }),
-        fl('F2', 'p1', { location: 'S', units: stacks([['dropship', 1]]) }),
+        fl('F2', 'p1', { location: 'S', units: stacks([['strike_carrier', 1]]) }),
       ],
       hGarrison: stacks([['militia', 4]]),
       sGarrison: stacks([['militia', 2]]),
@@ -270,7 +270,7 @@ describe('stewardGuardOrders — эвакуация под угрозой (ST-3.
 
   it('multi-tick, through the REAL kernel: summon → dock → lift → leave, then the driver goes quiet', () => {
     let s = guardState({
-      fleets: [raider(inboundToH(20)), fl('F2', 'p1', { location: 'S', units: stacks([['dropship', 1]]) })],
+      fleets: [raider(inboundToH(20)), fl('F2', 'p1', { location: 'S', units: stacks([['strike_carrier', 1]]) })],
       hGarrison: stacks([['militia', 4]]),
     });
     const apply = (orders: ReturnType<typeof stewardGuardOrders>): void => {
@@ -458,7 +458,7 @@ describe('stewardGuardOrders — эвакуация под угрозой (ST-3.
     // H's garrison is stranded; the only transport sits docked at the anchor S —
     // it stays (the anchor keeps its wing), so H journals «не спасти».
     const s = guardState({
-      fleets: [raider(inboundToH(20)), fl('F2', 'p1', { location: 'S', units: stacks([['dropship', 1]]) })],
+      fleets: [raider(inboundToH(20)), fl('F2', 'p1', { location: 'S', units: stacks([['strike_carrier', 1]]) })],
       hGarrison: stacks([['militia', 4]]),
     });
     s.players.p1!.stewardHoldPoints = ['S'];

@@ -310,9 +310,14 @@ Dockerfile, но это утверждение об исходниках, а н�
 никто не сканировал и не подписывал. Рекомендуемый прод-путь — забрать образ, который
 собрал и подписал CI.
 
-Что гарантирует цепочка: `image.yml` на каждый пуш в `main` собирает образ, гоняет по
-нему **блокирующий** Trivy (находка ⇒ пуша нет), кладёт в GHCR и подписывает
-**дайджест** через keyless-cosign. Дайджест печатается в summary прогона.
+Что гарантирует цепочка: `image.yml` на каждый пуш в `main` собирает образ, прогоняет по
+нему **блокирующие** гейты (не прошёл ⇒ пуша нет), кладёт в GHCR и подписывает **дайджест**
+через keyless-cosign. Дайджест печатается в summary прогона.
+
+**Образов ДВА, и оба публикуются и подписываются (SEC-35):** сервер —
+`ghcr.io/moongametechnology/moongame`, фронт — `ghcr.io/moongametechnology/moongame/caddy`
+(свой Caddy, SEC-31). Разными пакетами намеренно: у них своя история дайджестов и свой цикл
+пересборки. Проверяются одной и той же командой — подпись обоих ставит один воркфлоу.
 
 ```bash
 # 1. Проверить подпись — это и есть гейт (exit≠0 ⇒ дальше не идти)
@@ -325,10 +330,30 @@ docker pull ghcr.io/moongametechnology/moongame@sha256:<digest>
 #    и молча выбросит проверенный образ)
 cd deploy && VOID_IMAGE=ghcr.io/moongametechnology/moongame@sha256:<digest> \
   docker compose -f docker-compose.yml -f docker-compose.release.yml up -d --no-build
-
-# публичный хост — добавить TLS-оверлей третьим -f:
-#   -f docker-compose.yml -f docker-compose.tls.yml -f docker-compose.release.yml
 ```
+
+**Публичный хост (с TLS) — те же три шага, но для ДВУХ образов:**
+
+```bash
+C="-f docker-compose.yml -f docker-compose.tls.yml \
+   -f docker-compose.release.yml -f docker-compose.release-tls.yml"
+SRV=ghcr.io/moongametechnology/moongame@sha256:<digest>
+CAD=ghcr.io/moongametechnology/moongame/caddy@sha256:<digest>
+
+./deploy/verify-image.sh "$SRV" && ./deploy/verify-image.sh "$CAD"   # гейт, оба
+docker pull "$SRV" && docker pull "$CAD"
+cd deploy && VOID_IMAGE="$SRV" VOID_CADDY_IMAGE="$CAD" docker compose $C up -d --no-build
+```
+
+**Почему у caddy отдельный четвёртый `-f` (SEC-35).** Сервис `caddy` живёт ТОЛЬКО в
+TLS-оверлее, а `docker-compose.release.yml` применяют и без него — это документированный
+путь обновления сервера (`moongame update`). Compose сливает сервисы по имени из всех
+переданных файлов, поэтому строка про caddy в общем релизном оверлее ломала бы обычное
+обновление: проверено запуском — `docker compose -f docker-compose.yml -f
+docker-compose.release.yml config` падает с «required variable VOID_CADDY_IMAGE is
+missing a value». Отсюда `docker-compose.release-tls.yml`: его передают ровно там, где
+caddy есть. Сборка на хосте при этом никуда не делась — `build:` в TLS-оверлее остаётся
+рабочим путём для плейтест-хоста и ветки с непримёрженным фиксом.
 
 Только по дайджесту, не по тегу: тег после проверки можно перевесить на другие байты —
 `verify-image.sh` поэтому отказывается работать с тегом. Обновление = повторить те же
@@ -336,15 +361,17 @@ cd deploy && VOID_IMAGE=ghcr.io/moongametechnology/moongame@sha256:<digest> \
 
 ## 🛡️ Хардненинг контейнеров — чек-лист при правке compose (SEC-12)
 
-**Compose теперь сканируется — но не целиком, и чек-лист остаётся.** Trivy misconfig
-умеет Dockerfile/k8s/terraform/cloudformation/helm/ARM, Docker Compose в список не
-входит; этот пробел закрыт отдельным движком — джобой `kics` в `security.yml`
-(информационной до триажа базовой линии). Два её ограничения и делают чек-лист живым
-вторым слоем, а не рудиментом: KICS читает каждый файл **изолированно** и не понимает
-мерж оверлеев, поэтому фрагментам `tls.yml`/`release.yml` он штатно ставит «нет
-healthcheck / cap_drop / security_opt», хотя те лежат в базовом файле и сливаются в
-рантайме; и про осознанные исключения ниже его правила не знают ничего. Проходить руками
-при добавлении/правке сервиса:
+**Compose сканируется, но чек-лист остаётся.** Trivy misconfig умеет
+Dockerfile/k8s/terraform/cloudformation/helm/ARM, Docker Compose в список не входит; этот
+пробел закрыт отдельным движком — джобой `kics` в `security.yml` (информационной до триажа
+базовой линии). Сам KICS читает каждый файл **изолированно** и про мерж оверлеев не знает
+ничего — поэтому джоба кормит его не файлами, а СКЛЕЙКАМИ (`docker compose config` по
+каждой реально запускаемой комбинации; с SEC-35 их четыре, включая публичный прод с двумя
+подписанными образами). Это сняло ложные «нет healthcheck / cap_drop / security_opt» у
+фрагментов оверлеев, но чек-лист живым вторым слоем быть не перестал: про осознанные
+исключения ниже правила KICS по-прежнему не знают ничего, а новую комбинацию файлов надо
+завести в джобе руками — сама она её не найдёт. Проходить руками при добавлении/правке
+сервиса:
 
 - [ ] `security_opt: [no-new-privileges:true]` — процесс не получит привилегии через setuid;
 - [ ] `cap_drop: [ALL]`, обратно — только доказанно нужное (`caddy` → `NET_BIND_SERVICE` под 80/443);

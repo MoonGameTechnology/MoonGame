@@ -565,7 +565,6 @@ export const en: Record<string, string> = {
   'data.dense-nebula': 'Dense Nebula',
   'data.derelict-graveyard': 'Derelict Graveyard',
   'data.diplomatic-landing': 'Diplomatic Landing',
-  'data.dropship': 'dropship',
   'data.empty-space': 'Empty Space',
   'data.energy': 'energy',
   'data.energy-nexus': 'Energy Nexus',
@@ -604,6 +603,7 @@ export const en: Record<string, string> = {
   'data.microelectronics-fab': 'Microelectronics Fab',
   'data.microelectronics-fabrication': 'Microelectronics Fabrication',
   'data.microelectronics': 'microelectronics',
+  'data.mid': 'mid',
   'data.militia': 'militia',
   'data.nebula': 'Nebula',
   'data.neural-lace': 'Neural Lace',
@@ -641,6 +641,7 @@ export const en: Record<string, string> = {
   'data.shield-booster': 'Shield Booster',
   'data.point-defense-array': 'Point Defense Array',
   'data.siege-doctrine': 'Siege Doctrine',
+  'data.shuttle-carrier': 'Shuttle',
   'data.siege': 'siege',
   'data.signal-corps': 'Signal Corps',
   'data.solar-flare-zone': 'Solar Flare Zone',
@@ -652,7 +653,7 @@ export const en: Record<string, string> = {
   'data.steward-protocol': 'Steward Protocol',
   'data.sustained-corridor': 'Sustained Corridor',
   'data.shared-corridor': 'Shared Corridor',
-  'data.strike-carrier': 'strike carrier',
+  'data.strike-carrier': 'landing ship',
   'data.strike-vectors': 'Strike Vectors',
   'data.tank': 'tank',
   'data.targeting-array': 'Targeting Array',
@@ -775,12 +776,18 @@ export const en: Record<string, string> = {
   'dossier.task.queued': 'Queued — not started yet.',
   'dossier.task.title': 'Building',
   'dossier.task.unit-ready': "Joins the planet's garrison/fleet once finished.",
+  'dossier.unit.artillery.desc':
+    'A heavy battery: {a} damage a volley on a glass hull ({hp}). It fires WITH IMPUNITY — while your fleet is the attacker, return fire never reaches it and lands on your other ships instead. That is not immortality: under someone else\'s attack it stands in the REAR line and takes its share, and left alone it takes everything.',
+  'dossier.unit.artillery.name': 'Artillery',
   'dossier.unit.cruiser.desc':
     "The battle line's workhorse: {a} attack, {hp} hull and a hold for {c}. A general-purpose warship, equally solid on offense and defense.",
   'dossier.unit.cruiser.name': 'Cruiser',
   'dossier.unit.default': 'A combat unit.',
+  'dossier.unit.bomber.desc':
+    "A bomber: the shuttle built for HULLS — {a} damage to a ship, twice what an interceptor lands. Against buildings it is middling ({s} per hour): it will hurt a world, but levelling one is siege-platform work. Heavier and slower than an interceptor ({hp} hull, {r} reach), longer to rearm, and it never joins the battle: fly in, hit, go home.",
+  'dossier.unit.bomber.name': 'Bomber',
   'dossier.unit.interceptor.desc':
-    "An interceptor: fast (speed {sp}) and hits hard ({a} attack), but almost no armor ({hp} hull). Splits off the carrier into its own fast fleet and strikes from range {r}. Countered by orbital AA — don't send it against an AA-covered world.",
+    "An interceptor: a hunter of ENEMY SHUTTLES — {s} damage against them, more than anything else fields. Against ships it is nearly harmless ({a} attack), against buildings more so. Fast (speed {sp}) but unarmored ({hp} hull), reach {r}. Above all it scrambles ON ITS OWN, without an order, whenever a hostile strike passes near its port or carrier — and burns the base's fuel doing it.",
   'dossier.unit.interceptor.name': 'Interceptor',
   'dossier.unit.hero.desc':
     "The commander's own combat projection — a flagship leading the home fleet: {a} attack and {hp} hull. But that's not what matters: its presence holds the shuttle together, granting {b} attack/defense to every ship nearby. If it falls, the commander loses their projection until it's rebuilt at the home world.",
@@ -788,12 +795,15 @@ export const en: Record<string, string> = {
   'dossier.unit.scout.desc':
     'A light recon hull. Fast (speed {sp}) and almost silent (signature {sig}) — it maps the void where a battle fleet fears to go.',
   'dossier.unit.scout.name': 'Scout',
+  'dossier.unit.shuttle-carrier.desc':
+    'A spaceport under way: {bay} shuttle berths, and they launch from it and land back on it — so the fleet can strike with shuttles far from its own worlds. Almost no guns of its own ({a} attack), but it holds ({d} defense, {hp} hull) and stands in the REAR line. The hangar lives exactly as long as its hulls do: lose the carrier and you lose the shuttles aboard.',
+  'dossier.unit.shuttle-carrier.name': 'Shuttle',
   'dossier.unit.siege.desc':
-    'A heavy siege platform: {a} damage from range {r}, but thin armor ({d} defense). Its place is behind the cruisers, from where it smashes fortifications and shipyards.',
+    "A siege platform: it rains bombs from orbit onto the world below — {s} damage per hour to BUILDINGS, more than anything else in the fleet. Against ships and shuttles it is nearly useless ({a} attack), but it is tough ({hp} hull, {d} defense) and stands in the REAR line, so it can hold a siege for a long time. It has no standoff fire: against a fleet it joins the battle like everyone else.",
   'dossier.unit.siege.name': 'Siege Platform',
   'dossier.unit.strike-carrier.desc':
-    'A slow armored carrier ({hp} hull, hold for {c}) — almost no guns of its own, all its strength is in the shuttles it carries. Keep it behind and launch them at a target with "🛩 Launch shuttles".',
-  'dossier.unit.strike-carrier.name': 'Strike Carrier',
+    "A landing ship: the fleet's biggest hold ({c} berths) on its thickest hull ({hp}). It does not fight — {a} attack is nothing — it delivers the army to a hostile world and soaks while it lands. It carries no shuttles: only the Shuttle has a hangar.",
+  'dossier.unit.strike-carrier.name': 'Landing Ship',
 
   // --- faction — Фракции: пассивный бонус дома.
   'faction.amber.desc': 'A nomad concord of hauliers: fleets run the lanes 15% faster.',
@@ -1120,7 +1130,8 @@ export const en: Record<string, string> = {
   'err.no-ships': 'no ships',
   'err.no-shipyard': 'needs a shipyard/spaceport',
   'err.no-hangar': 'needs a factory or hangar',
-  'err.no-ground-facility': 'needs barracks or factory',
+  'err.no-barracks': 'needs barracks',
+  'err.no-factory': 'needs a vehicle factory',
   'err.no-slots': 'all fitting slots are taken',
   'err.no-target': 'no target',
   'err.no-troops': 'the world is defended — an assault needs troops aboard',
@@ -1509,8 +1520,8 @@ export const en: Record<string, string> = {
     '🏅 All first-session goals done! +{n} XP — you are ready for a real match.',
   'onb.goals.title': 'First-session goals',
   'onb.intro.artillery.body':
-    'Artillery fleets fire on the enemy from afar, before closing the distance — focus fire on one target, or let the fleet pick one itself. Artillery has thin armor, so keep it behind the line, not on the front.',
-  'onb.intro.artillery.title': 'Barrage — firing from range',
+    'Artillery fires with impunity: while you are the attacker, return fire never reaches it and lands on your other ships instead. Its armor is thin and its place is the rear line, not the front — under someone else\'s attack it dies like anything else.',
+  'onb.intro.artillery.title': 'Artillery — fire without an answer',
   'onb.intro.async-delay.body':
     'This fleet will arrive in real hours — the world of Void Dominion runs continuously, even while you are offline. You can close the game: your orders carry out on their own, and on your return we will send a notification and show a "while you were away" digest.',
   'onb.intro.async-delay.title': 'The world runs without you',
@@ -1735,7 +1746,7 @@ export const en: Record<string, string> = {
 
   // --- ship — Корабли: корпуса и модули (имя + описание).
   'ship.hull.cruiser': 'Cruiser',
-  'ship.hull.dropship': 'Carrier',
+  'ship.hull.dropship': 'Landing Ship',
   'ship.hull.scout_drone': 'Scout Drone',
   'ship.hull.siege_lance': 'Siege Lance',
   'ship.module.battery.desc': '+30% to attack.',

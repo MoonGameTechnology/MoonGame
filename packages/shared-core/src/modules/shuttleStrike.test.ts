@@ -35,7 +35,44 @@ const data: GameData = parseGameData({
       domain: 'space',
       traits: ['shuttle'],
       // speed 100 map units/hour, радиус 180 — до B (100) достаёт, до C (300) нет.
-      stats: { attack: 12, defense: 3, speed: 100, hp: 10, strikeRange: 180, fuel: 2, rearmRounds: 2 },
+      // ROS-1.4: по ЗДАНИЯМ почти не работает (siegeDamage 1) — он охотник, не бомбер.
+      stats: {
+        attack: 12,
+        defense: 3,
+        speed: 100,
+        hp: 10,
+        strikeRange: 180,
+        fuel: 2,
+        rearmRounds: 2,
+        siegeDamage: 1,
+        // SHU-1.3: ради этого он и охотник — урон ПО ЧУЖИМ ЧЕЛНОКАМ. Хватает,
+        // чтобы двое сбили одну машину чужого вылета (корпус 10).
+        shuttleDamage: 12,
+      },
+    },
+    // ROS-1.4: бомбардировщик — челнок против КОРАБЛЕЙ, по зданиям средний.
+    bomber: {
+      faction: 'x',
+      domain: 'space',
+      traits: ['shuttle'],
+      stats: {
+        attack: 20,
+        defense: 4,
+        speed: 100,
+        hp: 16,
+        strikeRange: 180,
+        fuel: 2,
+        rearmRounds: 3,
+        siegeDamage: 8,
+      },
+    },
+    // Челнок БЕЗ осадного стата — сторож мягкой деградации: бьёт здания по `attack`,
+    // ровно как весь контент до ROS-1.4.
+    legacy_shuttle: {
+      faction: 'x',
+      domain: 'space',
+      traits: ['shuttle'],
+      stats: { attack: 6, defense: 3, speed: 100, hp: 10, strikeRange: 180, fuel: 2, rearmRounds: 2 },
     },
   },
   factions: {},
@@ -95,18 +132,32 @@ function world(over: { portHp?: number; hangar?: number } = {}): GameState {
   };
 }
 
+/** Доложить в порт A машины другого класса (ROS-1.4). Отдельным хелпером, а не в
+ *  `world()`: состав ангара по умолчанию закреплён тестами вылета и возврата, и
+ *  лишний стек там сдвинул бы их счёт. */
+function withHangar(state: GameState, unit: string, count = 2): GameState {
+  const home = state.planets.A!;
+  return {
+    ...state,
+    planets: { ...state.planets, A: { ...home, hangar: [...(home.hangar ?? []), { unit, count }] } },
+  };
+}
+
 let seq = 0;
 const strike = (
-  target: { targetFleetId: string } | { targetPlanetId: string },
+  target: ({ targetFleetId: string } | { targetPlanetId: string }) & { unit?: string },
   count = 1,
   planetId = 'A',
-): Action => ({
-  id: `a:${seq++}`,
-  type: 'shuttle.strike',
-  playerId: 'p1',
-  payload: { planetId, unit: 'interceptor', count, ...target },
-  issuedAt: 0,
-});
+): Action => {
+  const { unit = 'interceptor', ...where } = target;
+  return {
+    id: `a:${seq++}`,
+    type: 'shuttle.strike',
+    playerId: 'p1',
+    payload: { planetId, unit, count, ...where },
+    issuedAt: 0,
+  };
+};
 
 function apply(state: GameState, action: Action): GameState {
   const r = kernel.applyAction(state, action, at(state));
@@ -169,6 +220,98 @@ describe('удар челноков — вылет (правила 1–2, 5)', (
   });
 });
 
+describe('перехват — свои челноки поднимаются навстречу чужому удару (SHU-1.3)', () => {
+  // Заказ владельца: перехватчик создан ПРОТИВ ЧЕЛНОКОВ. До этого кирпича ударить по
+  // чужому вылету было нечем вовсе — цель удара это флот или мир, — поэтому роль
+  // существовала только на бумаге, а `shuttleDamage` некому было читать.
+  /** Мир p2 с портом и перехватчиками в ангаре — он и будет перехватывать. */
+  const defended = (over: { hangar?: number; fuel?: number; attackers?: number } = {}): GameState => {
+    const s = world({ hangar: over.attackers ?? 2 });
+    const b = s.planets.B!;
+    const port = { type: 'spaceport', level: 1, hp: 30 };
+    return {
+      ...s,
+      planets: {
+        ...s.planets,
+        B: {
+          ...b,
+          buildings: [...b.buildings, port],
+          hangar: [{ unit: 'interceptor', count: over.hangar ?? 2 }],
+          ...(over.fuel === undefined ? {} : { sortie: { fuel: over.fuel, rearming: 0 } }),
+        },
+      },
+    };
+  };
+
+  it('чужой удар по пути ТЕРЯЕТ машины — перехватчики поднялись и сбили', () => {
+    // Двое перехватчиков дают 24 урона, корпус челнока 10 → сбиты ДВЕ машины из трёх.
+    const s = apply(defended({ attackers: 3 }), strike({ targetPlanetId: 'B' }, 3));
+    const after = advance(s, 2);
+    const mine = after.planets.B?.buildings.find((b) => b.type === 'mine');
+    expect(mine?.hp).toBe(19); // долетел ОДИН челнок: 1 × siegeDamage 1
+  });
+
+  it('удар, потерявший ВСЕ машины, до цели не доходит вовсе', () => {
+    const s = apply(defended(), strike({ targetPlanetId: 'B' }, 2));
+    const after = advance(s, 2);
+    const mine = after.planets.B?.buildings.find((b) => b.type === 'mine');
+    expect(mine?.hp).toBe(20); // 24 урона против двух корпусов по 10 — сбиты оба
+    expect(after.strikes ?? []).toHaveLength(0);
+  });
+
+  it('перехват тратит топливо базы — бесконечно поднимать нельзя', () => {
+    // Смотрим состояние СРАЗУ после перехвата: дальше вступает перезарядка (час мира =
+    // раунд), и через пару часов бак снова полон — это другой механизм, SHU-1.2.
+    const s = apply(defended({ fuel: 1 }), strike({ targetPlanetId: 'B' }, 2));
+    const after = advance(s, 1);
+    expect(after.planets.B?.sortie?.fuel).toBe(0);
+    expect(after.planets.B?.sortie?.rearming).toBeGreaterThan(0);
+  });
+
+  it('без топлива перехвата НЕТ — удар доходит целиком', () => {
+    const s = apply(defended({ fuel: 0 }), strike({ targetPlanetId: 'B' }, 2));
+    const after = advance(s, 2);
+    const mine = after.planets.B?.buildings.find((b) => b.type === 'mine');
+    expect(mine?.hp).toBe(18); // оба челнока дошли: 2 × 1
+  });
+
+  it('СВОЙ удар не перехватывают — поднимаются только против чужого', () => {
+    // Порт p1 с перехватчиками бьёт по своему же миру A: перехвата быть не должно.
+    const s0 = world();
+    const own: GameState = {
+      ...s0,
+      planets: {
+        ...s0.planets,
+        A: { ...s0.planets.A!, owner: 'p1' },
+      },
+    };
+    const s = apply(own, strike({ targetFleetId: 'E1' }, 2));
+    const after = advance(s, 2);
+    expect(after.strikes ?? []).toHaveLength(0); // долетел и вернулся, никто не мешал
+    expect(hullOf(after, 'E1')).toBeLessThan(100);
+  });
+
+  it('машина без shuttleDamage перехватывать не умеет — она не охотник', () => {
+    const s0 = world();
+    const b = s0.planets.B!;
+    const withBombers: GameState = {
+      ...s0,
+      planets: {
+        ...s0.planets,
+        B: {
+          ...b,
+          buildings: [...b.buildings, { type: 'spaceport', level: 1, hp: 30 }],
+          hangar: [{ unit: 'legacy_shuttle', count: 4 }],
+        },
+      },
+    };
+    const s = apply(withBombers, strike({ targetPlanetId: 'B' }, 2));
+    const after = advance(s, 2);
+    const mine = after.planets.B?.buildings.find((b) => b.type === 'mine');
+    expect(mine?.hp).toBe(18); // удар дошёл целиком
+  });
+});
+
 describe('удар челноков — попадание и возврат (правила 3–4)', () => {
   it('УДАР ОДНОСТОРОННИЙ: цель получает урон, боя не начинается', () => {
     const s = apply(world(), strike({ targetFleetId: 'E1' }, 2));
@@ -183,6 +326,45 @@ describe('удар челноков — попадание и возврат (п
     const after = advance(s, 2);
     const mine = after.planets.B?.buildings.find((b) => b.type === 'mine');
     expect(mine?.hp ?? 0).toBeLessThan(20);
+  });
+
+  // ROS-1.4. У челнока теперь ДВА профиля урона: по кораблям он бьёт `attack`, по
+  // зданиям — `siegeDamage`. Одной цифрой «перехватчик против челноков, бомбардировщик
+  // против кораблей» не выражалось: любой челнок был одинаково хорош против всего.
+  it('по ЗДАНИЯМ челнок бьёт своим siegeDamage, а не attack', () => {
+    // Перехватчик: attack 12, siegeDamage 1. Двое за удар снимают 2 hp, а не 24.
+    const s = apply(world(), strike({ targetPlanetId: 'B' }, 2));
+    const after = advance(s, 2);
+    const mine = after.planets.B?.buildings.find((b) => b.type === 'mine');
+    expect(mine?.hp).toBe(18);
+  });
+
+  it('бомбардировщик по зданиям бьёт заметно сильнее перехватчика', () => {
+    const s = apply(withHangar(world(), 'bomber'), strike({ targetPlanetId: 'B', unit: 'bomber' }, 2));
+    const after = advance(s, 2);
+    const mine = after.planets.B?.buildings.find((b) => b.type === 'mine');
+    expect(mine?.hp).toBe(4); // 2 × 8 = 16 против 2 у перехватчика
+  });
+
+  it('по КОРАБЛЯМ обе машины бьют своим attack, осадный стат не участвует', () => {
+    const hit = (unit: string): number => {
+      const s = apply(withHangar(world(), unit), strike({ targetFleetId: 'E1', unit }, 2));
+      // `hp` появляется только когда по стеку попали; целый корпус — это undefined,
+      // то есть «снято ноль».
+      return 100 - (hullOf(advance(s, 2), 'E1') ?? 100);
+    };
+    expect(hit('bomber')).toBe(40); // 2 × 20
+    expect(hit('interceptor')).toBe(24); // 2 × 12 — по кораблю он слабее бомбардировщика
+  });
+
+  it('челнок без siegeDamage бьёт здания по-старому — своим attack', () => {
+    const s = apply(
+      withHangar(world(), 'legacy_shuttle'),
+      strike({ targetPlanetId: 'B', unit: 'legacy_shuttle' }, 2),
+    );
+    const after = advance(s, 2);
+    const mine = after.planets.B?.buildings.find((b) => b.type === 'mine');
+    expect(mine?.hp).toBe(8); // 2 × 6 = 12, как до разделения профилей
   });
 
   it('ЧЕЛНОКИ ВОЗВРАЩАЮТСЯ В ТОТ ЖЕ ПОРТ', () => {

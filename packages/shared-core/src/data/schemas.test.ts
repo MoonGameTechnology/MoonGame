@@ -27,9 +27,31 @@ function loadShippedBundle(): Record<string, unknown> {
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.17');
+    expect(data.version).toBe('0.1.20');
     expect(data.resources).toContain('microelectronics');
-    expect(data.units.siege_lance?.stats.range).toBe(300); // artillery firing radius (map units)
+    // ROS-2.1: трейт `artillery` больше НЕ означает ни своей линии, ни огня с
+    // дистанции — он означает «ответный залп по мне не проходит». Поэтому радиуса у
+    // корпуса нет вовсе, а стоит он в тылу, как всякий тяжёлый корабль.
+    expect(data.units.artillery?.traits).toContain('artillery');
+    expect(data.units.artillery?.line).toBe('rear');
+    for (const id of ['artillery', 'siege', 'siege_lance']) {
+      expect(data.units[id]?.stats.range ?? 0).toBe(0);
+    }
+    // Линии — строй КОРАБЛЕЙ (GDD §7.2), и ростер заполняет все три.
+    expect(data.units.cruiser?.line).toBe('front');
+    expect(data.units.scout?.line).toBe('mid');
+    expect(data.units.siege?.line).toBe('rear');
+    // Carriers are mobile spaceports (SHU-2.1): `shuttleBay` on the HULL is what bases
+    // shuttles aboard, so a hull with 0 simply cannot base any.
+    // «Шаттл» — ЕДИНСТВЕННЫЙ носитель челноков после того, как десантный корабль
+    // отдал ангар (заказ владельца 2026-09-09).
+    expect(data.units.shuttle_carrier?.stats.shuttleBay).toBe(6);
+    expect(data.units.shuttle_carrier?.line).toBe('rear');
+    expect(
+      Object.entries(data.units)
+        .filter(([, u]) => (u.stats.shuttleBay ?? 0) > 0)
+        .map(([id]) => id),
+    ).toEqual(['shuttle_carrier']);
     expect(data.units.cruiser?.upkeep.credits).toBe(32); // daily upkeep, BAL-3 scale
     // fleet ⊕ ground-army separation: domains + transport capacity.
     expect(data.units.cruiser?.domain).toBe('space'); // schema default
@@ -41,7 +63,12 @@ describe('game data schema (docs/architecture.md §2)', () => {
     for (const id of ['militia', 'drop_infantry', 'tank']) {
       expect(data.units[id]?.stats.cargoSize).toBe(1);
     }
-    expect(data.units.dropship?.stats.cargoCapacity).toBe(8); // dedicated lift
+    // Десантный корабль — единственный выделенный транспорт: самый большой трюм в
+    // ростере. `dropship` снят (заказ владельца), его роль забрал этот корпус.
+    expect(data.units.dropship).toBeUndefined();
+    expect(data.units.strike_carrier?.stats.cargoCapacity).toBe(16);
+    expect(data.units.strike_carrier?.stats.shuttleBay ?? 0).toBe(0); // челноков не несёт
+    expect(data.units.strike_carrier?.traits).toEqual([]);
     expect(data.units.scout_drone?.stats.cargoCapacity).toBe(0); // default, carries nothing
     expect(data.buildings.orbital_aa?.aaDamage).toBe(12); // anti-ship orbital AA — a defensive building
     expect(data.units.cruiser?.stats.aaDamage).toBe(0); // default, no AA
@@ -51,7 +78,6 @@ describe('game data schema (docs/architecture.md §2)', () => {
     expect(data.units.interceptor?.stats.strikeRange).toBe(180); // Euclidean reach
     expect(data.units.interceptor?.stats.fuel).toBe(3); // sorties before rearm
     expect(data.units.interceptor?.stats.rearmRounds).toBe(2);
-    expect(data.units.strike_carrier?.stats.cargoCapacity).toBe(6); // hangar = shared cargo hold
     expect(data.units.cruiser?.stats.strikeRange).toBe(0); // schema default (not a shuttle)
     // reanimate_on_kill/Necromancer cut (designer-role) → assert a surviving event instead.
     expect(data.events.infect_planet?.trigger).toBe('planet_captured');
@@ -137,6 +163,35 @@ describe('game data schema (docs/architecture.md §2)', () => {
       .map(([id]) => id)
       .sort();
     expect(instant, 'buildTimeHours не задан в data/units.json — заказ выполняется мгновенно').toEqual([]);
+  });
+
+  // ROS-1.1. Род наземных войск решает, ГДЕ юнит строится: пехота — в казармах,
+  // техника — на заводе. Схема даёт дефолт `infantry` (наземный юнит без рода иначе
+  // был бы непостроим нигде), но в живом каталоге дефолт — это молчаливое допущение:
+  // забытое поле у танка отправило бы его в казармы, и никто бы не заметил. Поэтому
+  // каталог обязан объявлять род ЯВНО, и проверяется это по СЫРОМУ json, а не по
+  // разобранному бандлу — после `parseGameData` забытое поле неотличимо от
+  // объявленного.
+  it('каждый наземный юнит каталога объявляет род войск явно (дефолт схемы не подменяет данные)', () => {
+    const raw = loadShippedBundle() as { units: Record<string, Record<string, unknown>> };
+    const silent = Object.entries(raw.units)
+      .filter(([, def]) => def.domain === 'ground' && def.kind === undefined)
+      .map(([id]) => id)
+      .sort();
+    expect(silent, 'нет поля kind в data/units.json — род войск взят дефолтом').toEqual([]);
+  });
+
+  // Второй половиной той же пары идут ЗДАНИЯ: род войск бесполезен, если его негде
+  // строить. Каталог обязан держать дом для каждого рода — иначе один из них стал бы
+  // непостроимым молча, а в замерах это выглядело бы как «бот не хочет технику».
+  it('у каждого рода наземных войск есть здание-дом в каталоге', () => {
+    const data = parseGameData(loadShippedBundle());
+    const homes = (flag: 'enablesInfantryConstruction' | 'enablesVehicleConstruction'): string[] =>
+      Object.entries(data.buildings)
+        .filter(([, def]) => def[flag] || def.upgrades.some((lvl) => lvl[flag]))
+        .map(([id]) => id);
+    expect({ infantry: homes('enablesInfantryConstruction').length > 0, vehicle: homes('enablesVehicleConstruction').length > 0 })
+      .toEqual({ infantry: true, vehicle: true });
   });
 
   it('исследование запирает ровно три вещи — и список закрыт намеренно (CONV-12)', () => {
