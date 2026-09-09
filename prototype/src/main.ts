@@ -34,7 +34,6 @@ import {
   splitFleet,
   buildBuilding,
   upgradeBuilding,
-  buildUnit,
   cancelConstruction,
   resumeConstruction,
   declareWar,
@@ -160,6 +159,7 @@ import {
   fleetRadarRange,
   abilityRange,
   type PausedConstructionSite,
+  type QueuedConstruction,
 } from '../../packages/shared-core/src/index';
 import {
   MultiplayerClient,
@@ -358,11 +358,9 @@ import {
 } from './pointerPick';
 import {
   afford as coreAfford,
-  emptyQueue,
   laneOf,
   queuedAction as coreQueuedAction,
   queuedCost,
-  waitsForMoney,
 } from './buildOrders';
 import {
   activeConstruction as coreActiveConstruction,
@@ -431,7 +429,6 @@ import type {
   BuildKind,
   BuildLane,
   ConstructionPayload,
-  PlanetBuildQueue,
   QueuedBuild,
 } from './buildQueue';
 import {
@@ -718,9 +715,6 @@ import {
 import { diploDelivery } from './diploDelivery';
 import { garrisonSide, planFor, troopsGate } from './troopsScene';
 import {
-  BUILD_LANES,
-  headStarts,
-  queueRuns,
   rallyCloses,
   shipsPending,
   withoutRally,
@@ -1198,7 +1192,6 @@ let fleetInfoFor: string | null = null;
 // Тап по имени МИРА открывает карточку статистики планеты (какой мир сейчас в
 // режиме сводки; другой мир в панели → обычная карточка сама собой).
 let planetInfoFor: string | null = null;
-const buildQueues: Record<string, PlanetBuildQueue> = {};
 const logLines: string[] = [];
 // Player ids the local sim drives as AI (empty seats become AI), each with the
 // DIFFICULTY chosen on the setup screen (AIDIFF-1: «слабый» = the old simple bot,
@@ -1753,37 +1746,20 @@ function myRes(): Record<string, number> {
 function afford(bag: Record<string, number> | undefined): boolean {
   return coreAfford(myRes(), bag);
 }
-/** Локальная (офлайновая) очередь стройки этого мира — ядру она неизвестна: в сети
- *  стройку таймит сервер. Создаётся по первому обращению. */
-function queueOf(planetId: string): PlanetBuildQueue {
-  return (buildQueues[planetId] ??= emptyQueue());
+/** Ждущие заказы этой полосы — из ЯДРА (BLD-1): очередь больше не локальная. */
+function coreQueue(planetId: string, lane: BuildLane): QueuedConstruction[] {
+  return (s.planets[planetId]?.buildQueue ?? []).filter((q) => laneOf(q.kind) === lane);
 }
-/** Цена головы очереди — ДЛЯ ПОКАЗА (строка «⏳ ждём: …»); правила масштаба и смещения
+/** Цена ждущего заказа — ДЛЯ ПОКАЗА (строка «⏳ ждём: …»); правила масштаба и смещения
  *  уровней живут в `buildOrders.ts` (REFM-32). */
-function buildCost(planetId: string, q: QueuedBuild): Record<string, number> | undefined {
-  return queuedCost(s, data, planetId, q);
+function buildCost(planetId: string, q: QueuedConstruction): Record<string, number> | undefined {
+  const id = q.building ?? q.unit;
+  if (id === undefined) return undefined;
+  return queuedCost(s, data, planetId, { kind: q.kind, id, count: q.count ?? 1 });
 }
 /** Приказ, которым голова очереди уедет в ядро. */
 function queuedAction(planetId: string, q: QueuedBuild): Action {
   return coreQueuedAction(ME, planetId, q);
-}
-/**
- * RULES-4. Пора ли пускать голову очереди — ВЕРДИКТ ЯДРА, а не свой прайс-лист.
- *
- * Очередь умеет ждать ровно одно — деньги, поэтому единственный код, на котором она
- * держит голову, это `E_INSUFFICIENT`. Любой другой отказ ожиданием не лечится (или
- * лечится не очередью), и голова уезжает в ядро, где игрок получает НАСТОЯЩУЮ причину
- * (`queue.failed` печатает `errText(код)`) вместо молчаливого зависания.
- *
- * Что это чинит. Прежний `afford(buildCost(...))` был FAIL-OPEN против инварианта #4:
- * `buildCost` возвращал `undefined` для неизвестного id и для уже максимального
- * уровня, а `afford(undefined)` — `true`, то есть очередь считала голову «готовой» и
- * дёргала ядро. Плюс он переписывал прайс ядра целиком и мимо него проходили и
- * масштаб на `count`, и все неденежные ворота (`E_BOMBARDED`, `E_WRONG_SECTOR`,
- * `E_NO_SHIPYARD`, `E_MAX_LEVEL`) — очередь считала «можно», ядро отбивало.
- */
-function canStartQueued(planetId: string, q: QueuedBuild): boolean {
-  return !waitsForMoney(canOrder(s, queuedAction(planetId, q)));
 }
 /** Стройка, идущая на мире прямо сейчас (голову по `(at, seq)` выбирает
  *  `buildProgress.ts`, REFM-31 — там же и правило порядка). */
@@ -1826,6 +1802,18 @@ function queuedLabel(q: QueuedBuild): string {
   }
   return `${BUILD_ICON[q.id] ?? '▣'} ${tData(data.buildings[q.id]?.name ?? q.id)}`;
 }
+/**
+ * BLD-1. Приказ всегда уезжает В ЯДРО — очередь живёт там.
+ *
+ * Раньше здесь стояла развилка: в сети приказ отправлялся сразу («сервер таймит
+ * стройку»), а в соло ложился в ЛОКАЛЬНУЮ очередь прототипа. Из-за неё сеть и соло
+ * играли по разным правилам, и на живом плейтесте это вылезло ровно так, как и должно
+ * было: в сети каждый тап заводил ЕЩЁ ОДНУ параллельную стройку, экран показывал
+ * ближайшую, и игрок видел «постройки заменяют друг друга, ресурсы тратятся».
+ *
+ * Теперь очередь одна и она в ядре (`Planet.buildQueue`): и сервер, и локальный
+ * редьюсер прототипа исполняют одно правило, а клиент её только ПОКАЗЫВАЕТ.
+ */
 function enqueueBuild(planetId: string, order: QueuedBuild): void {
   // Одна точка опоры против дубля одноэкземплярного здания: плитка, кодекс и любой
   // будущий вход проходят здесь, и серые плитки остаются чистой косметикой.
@@ -1833,30 +1821,15 @@ function enqueueBuild(planetId: string, order: QueuedBuild): void {
     note('✖ ' + errText(buildingLocked(planetId, order.id) === 'built' ? 'E_ALREADY_BUILT' : 'E_ALREADY_QUEUED'));
     return;
   }
-  if (NET) {
-    // No local build queue in net mode — the server times construction. Send the
-    // order straight away (one tap = one build queued server-side).
-    const action =
-      order.kind === 'unit'
-        ? buildUnit(ME, planetId, order.id, order.count)
-        : order.kind === 'upgrade'
-          ? upgradeBuilding(ME, planetId, order.id)
-          : buildBuilding(ME, planetId, order.id);
-    playerOrder(action);
-    return;
+  // Тост «в очередь» — ПРЕДСКАЗАНИЕ клиента: полоса занята, значит ядро поставит заказ
+  // в ряд, а не начнёт его. Держать это предсказание можно ровно потому, что оно
+  // косметическое: правду показывает панель конвейера, которая читает состояние, и
+  // следующий снимок её поправит. Раньше тост был только в соло — в сети локальной
+  // очереди не было вовсе, и тап не отвечал игроку ничем.
+  if (activeConstruction(planetId, laneOf(order.kind))) {
+    note(t('queue.added', { what: queuedLabel(order), at: planetId }));
   }
-  queueOf(planetId)[laneOf(order.kind)].push(order);
-  note(t('queue.added', { what: queuedLabel(order), at: planetId }));
-  pumpBuildQueues();
-}
-function submitQueued(planetId: string, queued: QueuedBuild): StepOut {
-  const action = queuedAction(planetId, queued);
-  const before = sandboxBuildSnapshot(action.type);
-  const out = order(s, action, s.time);
-  apply(out);
-  sandboxBuildRestore(before, !out.error);
-  if (!out.error) activeTour?.notifyAction(action.type); // local build queue bypasses playerOrder
-  return out;
+  playerOrder(queuedAction(planetId, order));
 }
 // A rally fleet keeps swallowing freshly-built ships only while its world still has
 // a ship in the pipeline (one building, or one queued). The moment the queue drains,
@@ -1868,7 +1841,7 @@ function closeIdleRallies(): void {
   // строит корабли НИ сейчас, НИ по очереди; закрытие снимает МЕТКУ, а не распускает
   // флот, иначе одна эскадра росла бы весь матч; о летящем флоте не решают вовсе.
   const строит = (planetId: string): boolean =>
-    shipsPending(!!activeConstruction(planetId, 'units'), buildQueues[planetId]?.units.length ?? 0);
+    shipsPending(!!activeConstruction(planetId, 'units'), coreQueue(planetId, 'units').length);
   for (const f of Object.values(s.fleets)) {
     const view = {
       mine: f.owner === ME,
@@ -1877,33 +1850,6 @@ function closeIdleRallies(): void {
       traits: f.traits,
     };
     if (rallyCloses(view, строит)) f.traits = withoutRally(f.traits ?? []);
-  }
-}
-function pumpBuildQueues(): void {
-  for (const planetId of Object.keys(buildQueues)) {
-    const q = buildQueues[planetId];
-    const p = s.planets[planetId];
-    if (!queueRuns(!!q && !!p, p?.owner === ME) || !q) {
-      continue;
-    }
-    // Полосы решаются ПО ОЧЕРЕДИ, а не единым планом (правило 5 в `buildPipeline.ts`):
-    // пуск головы тратит ресурсы, и вердикт по второй полосе зависит от уже применённой.
-    for (const lane of BUILD_LANES) {
-      const next = q[lane][0];
-      // Вердикт ядра — ЛЕНИВО (правило 9): у пустой полосы его спрашивать не про что, у
-      // занятой незачем, а лишний `canOrder` на каждом кадре — плата ни за что.
-      if (
-        !next ||
-        !headStarts(!!activeConstruction(planetId, lane), () => !canStartQueued(planetId, next))
-      ) {
-        continue;
-      }
-      q[lane].shift();
-      const r = submitQueued(planetId, next);
-      if (r.error) {
-        note(t('queue.failed', { what: queuedLabel(next), err: errText(r.error) }));
-      }
-    }
   }
 }
 /** Где флот НАХОДИТСЯ по правилам, в МИРОВЫХ координатах — правила и вся интерполяция
@@ -5374,7 +5320,7 @@ function conveyorHtml(planetId: string, lane: BuildLane): string {
   // Разметку собирает `conveyorView.ts` (REFM-36) — там же правило «живые числа не
   // входят в подпись панели» и «очередь без денег называет цену».
   const active = activeConstruction(planetId, lane);
-  const queued = queueOf(planetId)[lane];
+  const queued = coreQueue(planetId, lane);
   const head = queued[0];
   return kitConveyorHtml(
     planetId,
@@ -5388,15 +5334,15 @@ function conveyorHtml(planetId: string, lane: BuildLane): string {
             seq: active.seq,
           }
         : null,
-      queued: queued.map((q) => ({ label: queuedLabel(q) })),
+      queued: queued.map((q) => ({ label: constructionLabel(q), id: q.id })),
       paused: (s.planets[planetId]?.pausedConstruction ?? [])
         .filter((p) => laneOf(p.kind) === lane)
         .map((p) => ({ id: p.id, label: pausedLabel(p), progress: p.progress })),
       // Строку «ждём цену» показываем только на ПК: на телефоне место дороже.
-      waitingCost:
-        !active && pcUi() && head && !canStartQueued(planetId, head)
-          ? cost(buildCost(planetId, head), myRes())
-          : null,
+      // Условие простое именно потому, что решает ЯДРО: полоса свободна, а голова всё
+      // ещё ждёт — значит она уперлась ровно в деньги (BLD-1, правило 4); своего
+      // прайс-листа для этого вывода клиенту больше не нужно.
+      waitingCost: !active && pcUi() && head ? cost(buildCost(planetId, head), myRes()) : null,
       compact: pcUi(),
     },
     {
@@ -6188,7 +6134,12 @@ const { objDossier, codexHtml } = createDossiers({
   me: () => ME,
   pcUi,
   youColor: () => youColor,
-  queueOf,
+  queuedOrders: (planetId, lane) =>
+    coreQueue(planetId, lane).map((q) => ({
+      kind: q.kind,
+      id: q.building ?? q.unit ?? '',
+      count: q.count ?? 1,
+    })),
   activeConstruction,
   progressPct,
 });
@@ -6736,7 +6687,7 @@ function buildingLocked(planetId: string, id: string): TileLock {
   // её нет — там стройку таймит сервер), поэтому она приходит отдельным флагом.
   return tileLock(
     canOrder(s, buildBuilding(ME, planetId, id)),
-    queueOf(planetId).buildings.some((q) => q.kind === 'building' && q.id === id),
+    coreQueue(planetId, 'buildings').some((q) => q.building === id),
   );
 }
 /** Доход ПОСТРОЕННОГО здания за час — готовой разметкой; у недоходного пусто. Цифра
@@ -7625,11 +7576,9 @@ side.addEventListener('click', (ev) => {
   } else if (act === 'resumebuild') {
     playerOrder(resumeConstruction(ME, selPlanet!, Number(arg)));
   } else if (act === 'dequeue') {
-    // Nothing was ever paid for a not-yet-dispatched queued order (single-player
-    // local buffer only — net mode sends immediately, so there's nothing to dequeue
-    // there) — a plain local removal, no action needed.
-    const [qLane, qIdx] = arg.split(':');
-    queueOf(selPlanet!)[qLane as BuildLane].splice(Number(qIdx), 1);
+    // BLD-1: очередь в ядре, поэтому снятие ждущего — тот же приказ отмены, что и
+    // снятие идущей стройки. Возврата тут не будет: ждущий заказ не оплачен.
+    playerOrder(cancelConstruction(ME, selPlanet!, Number(arg)));
   } else if (act === 'spyplanet') {
     playerOrder(spyOn(ME, arg, 'planet', selPlanet!)); // arg = the world's (last known) owner
   } else if (act === 'capital') {
@@ -8696,7 +8645,7 @@ const buildWin = initBuildScreen({
   probe: (a) => canOrder(s, a),
   // Локальная соло-очередь: ядро о ней не знает, buildingLocked — знает.
   localQueued: (pid, id) =>
-    queueOf(pid).buildings.some((q) => q.kind === 'building' && q.id === id),
+    coreQueue(pid, 'buildings').some((q) => q.building === id),
   build: (pid, id) => enqueueBuild(pid, { kind: 'building', id, count: 1 }),
   openInfo: (id) => openCodex(`b:${id}`),
   lockText: errText,
@@ -10055,7 +10004,6 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>): void
   // Kept honest against the kernel: victoryModule ends on score (SCORE_LIMIT), on
   // elimination, or on domination — no "capital capture" victory exists.
   note(t('hud.goal', { n: SCORE_LIMIT }));
-  for (const k of Object.keys(buildQueues)) delete buildQueues[k];
   defaultView(); // phone: zoom onto home; desktop: whole-map fit
   setupEl.style.display = 'none';
   // SANDBOX — fenced hook. A fresh match starts with no frozen-queue carryover and the
@@ -11819,7 +11767,6 @@ function frame(nowReal: number) {
     solo.drivePatrols(); // CC-4: дежурные вылеты бьют контакты в радиусе
     solo.driveChains(); // CC-1: продвинуть цепочки приказов (ждать → курс → штурм/обстрел)
     solo.runAI();
-    pumpBuildQueues();
     closeIdleRallies(); // drop the 'rally' tag once a world's build pipeline empties
   }
   // Aimed ШТУРМ resolves in net too: the server drives fleet travel and the arrival

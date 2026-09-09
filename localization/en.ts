@@ -938,7 +938,6 @@ export const en: Record<string, string> = {
   'profile.medals.empty':
     'Medals show up here once your corporation goes to war. Sign in on a server with the meta layer to see the showcase.',
   'queue.added': 'queued: {what} at {at}',
-  'queue.failed': '{what} — failed: {err}',
   'queue.unknown': 'unknown order',
   'queue.upgrade': '{b} — upgrade',
 

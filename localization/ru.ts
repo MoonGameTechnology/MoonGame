@@ -938,7 +938,6 @@ export const ru: Record<string, string> = {
   'profile.medals.empty':
     'Медали появятся здесь, когда корпорация начнёт войны альянсов. Войдите под аккаунтом на сервере с мета-слоем, чтобы увидеть витрину.',
   'queue.added': 'в очередь: {what} на {at}',
-  'queue.failed': '{what} — не вышло: {err}',
   'queue.unknown': 'неизвестный заказ',
   'queue.upgrade': '{b} — улучшение',
 

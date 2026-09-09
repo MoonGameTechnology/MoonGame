@@ -484,6 +484,11 @@ function project(
   const remembered: PlanetId[] = [];
   const memory = state.fog?.[viewerId];
   for (const planet of Object.values(view.planets)) {
+    // BLD-1. Очередь стройки — БУДУЩЕЕ НАМЕРЕНИЕ, ровно то, за что ниже режут
+    // `scheduled` и выше — цепочки приказов: «что он собирается построить» это разведка
+    // планов, а не наблюдение мира. Поэтому режется РАНЬШЕ развилки видимости: чужой
+    // мир не отдаёт очередь, даже когда ты смотришь на него в упор.
+    if (planet.owner !== viewerId) delete planet.buildQueue;
     if (planet.owner === viewerId || identify.has(planet.id) || spiedPlanets.has(planet.id))
       continue;
     // Ангар чужого мира не виден НИКОГДА (SHU-1.1): челнок стоит внутри порта, а не на

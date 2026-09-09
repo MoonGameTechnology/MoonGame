@@ -586,8 +586,9 @@
 | OPS-2 | ✅ | ops sec | `docs/backlog.md:13321` | Обновление доносит до машины новые ключи |
 | REL-6 | ✅ | srv | `docs/backlog.md:13343` | Возврат на своё место мгновенный: перехват вместо |
 | CMB-4 | ✅ | core | `docs/backlog.md:13358` | Первый раунд боя — на самой встрече, а не через |
-| BLD-1 | ⏳ | core proto | `docs/backlog.md:13378` | Очередь строительства: заказы встают в ряд, а не |
-| UI-14 | ⏳ | proto | `docs/backlog.md:13395` | Осмотр чужого флота должен быть находимым. |
+| BLD-1 | ✅ | core proto | `docs/backlog.md:13378` | Очередь строительства: заказы встают в |
+| UI-14 | ⏳ | proto | `docs/backlog.md:13418` | Осмотр чужого флота должен быть находимым. |
+| FOG-9 | ⏳ | core | `docs/backlog.md:13427` | Приостановленная стройка чужого мира видна наблюдателю. |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
