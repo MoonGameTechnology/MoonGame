@@ -177,7 +177,13 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '10'; // SHU-0.1: эскадрильи → челноки — модуль
+export const MODULE_MANIFEST_VERSION = '11'; // SHU-2.1: носитель — мобильный космопорт.
+// Форма состояния изменилась: у вылета вместо `from: PlanetId` размеченная база
+// `base: {kind,id}` (мир ИЛИ носитель), у флота появились `hangar`/`sortie`, и модуль
+// `shuttle` принимает два новых действия (`shuttle.load`/`shuttle.unload`). Матч,
+// начатый на манифесте 10, несёт вылеты со старым полем — новый обработчик прочитал бы
+// у них базу как `undefined` и уронил бы возврат. Отказ загрузки честнее. (До 11:)
+// SHU-0.1: эскадрильи → челноки — модуль
 // `squadron` переименован в `shuttle` вместе с типами своих действий (`shuttle.strike` /
 // `shuttle.return`). Членство и порядок графа не изменились, но ИМЕНА, которые матч
 // пишет в свою историю, изменились: матч, начатый на манифесте 9, содержит действия

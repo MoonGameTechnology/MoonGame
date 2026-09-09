@@ -257,7 +257,7 @@ function maximalState(): GameState {
       {
         id: 'mine_strike',
         owner: VIEWER,
-        from: 'A',
+        base: { kind: 'planet', id: 'A' },
         units: [{ unit: 'interceptor', count: 1 }],
         // Целится в мир, а не в канареечный флот: id цели едет в проекции вместе со
         // своим ударом (я в неё целюсь — значит знаю о ней), и канареечная строка
@@ -271,7 +271,7 @@ function maximalState(): GameState {
       {
         id: 'CANARY_strike',
         owner: RIVAL,
-        from: 'Z',
+        base: { kind: 'planet', id: 'Z' },
         units: [{ unit: 'interceptor', count: 3 }],
         target: { kind: 'planet', id: 'A' },
         to: { x: 0, y: 0 },

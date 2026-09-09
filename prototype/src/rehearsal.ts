@@ -126,6 +126,8 @@ const WIRE_PAYLOADS: Record<string, unknown> = {
     count: 1,
     targetFleetId: 'missing-fleet',
   },
+  'shuttle.load': { fleetId: 'p1_1', unit: 'interceptor', count: 1 },
+  'shuttle.unload': { fleetId: 'p1_1', unit: 'interceptor', count: 1 },
   'capital.designate': { planetId: 'home_p1' },
   'steward.delegate': { posture: 'defend', until: 10_000 },
   'steward.recall': {},

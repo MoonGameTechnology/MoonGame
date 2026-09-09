@@ -405,6 +405,17 @@ export interface Fleet {
   /** Ground army carried as cargo (the landing force of a ground assault),
    *  bounded by the ships' transport capacity — see the `army` module. */
   landing?: UnitStack[];
+  /** Shuttles BASED on this fleet's carriers (SHU-2.1) — the mobile equivalent of
+   *  `Planet.hangar`. NOT part of `units`: a based shuttle is not a ship of the line,
+   *  it never fires in a battle round and never soaks a volley; it only flies sorties.
+   *  Capacity is Σ `shuttleBay` of the fleet's hulls; lose the carriers and the
+   *  shuttles go with them, exactly as they do when a port falls.
+   *  Undefined/empty = nothing based aboard. */
+  hangar?: UnitStack[];
+  /** Sortie budget of the shuttles based aboard (fuel + rearm countdown) — the
+   *  fleet-side twin of `Planet.sortie`, and for the same reason: the counter belongs
+   *  to the BASE, not to the machine, so stacks in the hangar stay mergeable. */
+  sortie?: { fuel: number; rearming: number };
   /** Set (`'near'`) while the fleet is stationed in orbit at a planet; undefined while
    *  in transit. There is a SINGLE orbit (GDD §7.4): a stationed fleet can bombard /
    *  land and is exposed to the planet's orbital AA — no separate "far" safe standoff.
@@ -856,11 +867,18 @@ export interface TempLane {
  * обороны теряет смысл (резолюция владельца 2026-09-08). Поэтому вылет живёт в состоянии
  * ровно столько, сколько длится полёт: откуда, чем, куда и когда долетит.
  */
+/** Откуда челноки вылетели — туда же они и возвращаются. Мир (космопорт) ИЛИ
+ *  флот-носитель: носитель — это мобильный космопорт (SHU-2.1), и всё, что делает
+ *  порт (вместимость, топливо, дом для возврата), он делает тоже. Форма та же
+ *  размеченная пара, что и у `target` ниже: две ссылки на разные сущности читаются
+ *  одинаково, и добавить третью базу можно, не переписывая проверки. */
+export type StrikeBase = { kind: 'planet'; id: PlanetId } | { kind: 'fleet'; id: FleetId };
+
 export interface ShuttleStrike {
   id: string;
   owner: PlayerId;
-  /** Порт вылета — он же порт возврата. */
-  from: PlanetId;
+  /** База вылета — она же база возврата (мир с космопортом или флот-носитель). */
+  base: StrikeBase;
   /** Что именно летит (стеки покидают ангар на время вылета). */
   units: UnitStack[];
   /** Цель: чужой флот или чужой мир (по нему бьют ЗДАНИЯ, как бомбардировка). */

@@ -18,7 +18,6 @@
     "perUnit": {
       "cruiser": 2,
       "siege_lance": 3,
-      "dropship": 2,
       "tank": 2,
       "strike_carrier": 4
     }
