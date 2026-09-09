@@ -579,6 +579,7 @@
 | RESIL-2 | ⏳ | proto | `docs/backlog.md:12958` | Цикл подсветки обучающего тура. |
 | RESIL-3 | ⏳ | srv | `docs/backlog.md:12966` | Именованный фатал процесса. |
 | RESIL-4 | ✅ | srv | `docs/backlog.md:12977` | Соак проверяет, что мир не встал. |
+| RESIL-5 | ✅ | srv proto | `docs/backlog.md:12995` | Генеральная репетиция: весь стек разом, и |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
