@@ -580,6 +580,7 @@
 | RESIL-3 | ⏳ | srv | `docs/backlog.md:12967` | Именованный фатал процесса. |
 | RESIL-4 | ✅ | srv | `docs/backlog.md:12978` | Соак проверяет, что мир не встал. |
 | RESIL-5 | ✅ | srv proto | `docs/backlog.md:12996` | Генеральная репетиция: весь стек разом, и |
+| RESIL-6 | ✅ | srv proto | `docs/backlog.md:13031` | Достоверность генералки: настоящая база, |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |

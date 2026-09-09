@@ -54,4 +54,69 @@ describe('multiplayer rehearsal', () => {
     // И перезапуск в конце по-прежнему поднял мир из durable-снапшота.
     expect(report.serverRestarts).toBe(1);
   }, 60_000);
+
+  // RESIL-6 — три оси достоверности, которых у генералки не было: настоящая база,
+  // сон матча без зрителей и невзгоды сети. Про Postgres — отдельный тест ниже.
+  it('переживает сон матча и невзгоды сети', async () => {
+    const report = await runRehearsal({
+      players: 3, // третий нужен «уснувшей вкладке»: спит один, играют остальные
+      latencyMs: 0,
+      persistDelayMs: 0,
+      timeoutMs: 20_000,
+      gameHours: 12,
+      botActionsPerHour: 2,
+      hibernate: true,
+      networkTrouble: true,
+    });
+
+    // Сеть: приказ потерялся → строгий шлюз увидел разрыв → переподключение вылечило.
+    expect(report.droppedOrders).toBe(1);
+    expect(report.sequenceGaps).toBe(1);
+    expect(report.abruptDrops).toBe(1);
+    // Уснувшая вкладка реально проспала дельты, а не «проснулась» на пустом месте:
+    // без этого проверка догона `applyDelta` была бы украшением.
+    expect(report.backlogDeltas).toBeGreaterThan(0);
+
+    // Сон: матч заснул, проснулся по своему событию и заснул снова — и мир за это
+    // время ушёл вперёд, хотя не было подключено НИКОГО.
+    expect(report.hibernations).toBe(2);
+    expect(report.wakes).toBe(1);
+    expect(report.offlineAdvanceMs).toBeGreaterThan(0);
+
+    // И всё это — не ценой расхождения с сервером и не ценой застоя часов.
+    expect(report.hashMismatches).toBe(0);
+    expect(report.stalls).toBe(0);
+    expect(report.deadLetters).toBe(0);
+    expect(report.storeKind).toBe('memory');
+  }, 90_000);
+});
+
+// Postgres — только когда база подана (в CI это сервисный контейнер, локально —
+// поднятый вручную кластер). Тот же приём, что у контрактов сторов в
+// `packages/server/src/store/store.test.ts`: без базы тест пропускается, а не врёт.
+const DB = process.env.DATABASE_URL;
+describe.skipIf(!DB)('multiplayer rehearsal — настоящий Postgres', () => {
+  // Главная ценность здесь не в том, что запись прошла, а в том, что состояние,
+  // ПРОЖИВШЕЕ игровые сутки, вернулось из JSONB без потерь. Это единственная
+  // исполняемая проверка инварианта «GameState сериализуем»: класс, Map, Date или NaN
+  // внутри состояния переживут `deepClone` и все тесты ядра, но круг через базу — нет.
+  it('поднимает мир из базы после суток жизни, ничего не потеряв в JSONB', async () => {
+    const report = await runRehearsal({
+      players: 2,
+      latencyMs: 0,
+      persistDelayMs: 0,
+      timeoutMs: 60_000,
+      gameHours: 24,
+      botActionsPerHour: 2,
+      databaseUrl: DB,
+    });
+
+    expect(report.storeKind).toBe('postgres');
+    expect(report.jsonbRoundTripOk).toBe(true);
+    expect(report.serverRestarts).toBe(1);
+    expect(report.durableWrites).toBeGreaterThan(0);
+    expect(report.hashMismatches).toBe(0);
+    expect(report.stalls).toBe(0);
+    expect(report.deadLetters).toBe(0);
+  }, 120_000);
 });
