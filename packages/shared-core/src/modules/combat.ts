@@ -68,8 +68,22 @@ function applyRetreatToll(fleet: Fleet, data: GameData): void {
 
 // --- battle lifecycle --------------------------------------------------------
 
-function scheduleTick(h: HandlerContext, battleId: string): void {
-  const at = h.ctx.now + roundIntervalMs(h.ctx);
+/** Назначить раунд. `immediate` — ПЕРВЫЙ раунд, на самой встрече (CMB-4).
+ *
+ *  Раньше первый раунд назначался тем же помощником, что и остальные, то есть через
+ *  игровой час после столкновения. Защиты у этой задержки не было — она вышла побочно,
+ *  из переиспользования, — а цена оказалась игровой: КОНТАКТ БЫЛ БЕСПЛАТНЫМ. Флот
+ *  подходил вплотную, оба вставали, и, успев уйти внутри часа, он не получал и не
+ *  наносил ни одного выстрела. Решение владельца после плейтеста: обменяться ударами
+ *  обязаны при первой же встрече.
+ *
+ *  Почему «назначить на сейчас», а не позвать раунд встроенно из `startBattle`:
+ *  `advanceTo` продолжает крутить цикл и берёт событие, назначенное на текущий миг,
+ *  следующей итерацией (`earliestDue`, ветка `at === committed.time`). Значит
+ *  цепочка «победил → сцепился со следующим» пойдёт отдельными событиями в порядке
+ *  `(at, seq)`, как всё остальное на таймлайне, а не рекурсией внутри одного шага. */
+function scheduleTick(h: HandlerContext, battleId: string, immediate = false): void {
+  const at = immediate ? h.ctx.now : h.ctx.now + roundIntervalMs(h.ctx);
   h.schedule(at, 'combat.tick', { battleId });
   // Surface the round clock so the client can render a live battle countdown.
   const battle = h.state.battles[battleId];
@@ -132,7 +146,7 @@ function startBattle(h: HandlerContext, battle: Battle): void {
     attacker: battle.attacker.owner,
     defender: battle.defender.owner,
   });
-  scheduleTick(h, battle.id);
+  scheduleTick(h, battle.id, true); // CMB-4: первый залп — на самой встрече
 }
 
 /**

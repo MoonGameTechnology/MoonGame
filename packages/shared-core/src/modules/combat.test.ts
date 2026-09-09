@@ -294,7 +294,7 @@ describe('combat — damage lines (GDD §7.2)', () => {
       [planet('P', null)],
     );
     const started = okApply(kernel.applyAction(st, arrive('A'), ctx(0)));
-    const r = okAdvance(kernel.advanceTo(started.state, ctx(HOUR))); // one round
+    const r = okAdvance(kernel.advanceTo(started.state, ctx(0))); // one round (CMB-4: на встрече)
 
     // Средней линии нет: её 30% делятся поровну → фронт 65%, тыл 35% (ROS-2.1).
     const d = r.state.fleets.D;
@@ -316,7 +316,7 @@ describe('combat — damage lines (GDD §7.2)', () => {
       [planet('P', null)],
     );
     const started = okApply(kernel.applyAction(st, arrive('A'), ctx(0)));
-    const r = okAdvance(kernel.advanceTo(started.state, ctx(HOUR))); // one round
+    const r = okAdvance(kernel.advanceTo(started.state, ctx(0))); // one round (CMB-4: на встрече)
 
     // front 40 + artillery 10 = 50 claimed; the absent mid+rear 50 splits evenly.
     const d = r.state.fleets.D;
@@ -338,7 +338,7 @@ describe('combat — damage lines (GDD §7.2)', () => {
       [planet('P', null)],
     );
     const started = okApply(kernel.applyAction(st, arrive('A'), ctx(0)));
-    const r = okAdvance(kernel.advanceTo(started.state, ctx(HOUR))); // one round
+    const r = okAdvance(kernel.advanceTo(started.state, ctx(0))); // one round (CMB-4: на встрече)
 
     // Pass 1: front 60% = 18, rear 40% = 12 — the rear can only take 10 and dies.
     // Pass 2: the 2 left over re-split over the front alone (100%) → 18 + 2 = 20.
@@ -358,7 +358,11 @@ describe('shields (ablative)', () => {
       [planet('P', null)],
     );
     const started = okApply(kernel.applyAction(st, arrive('A'), ctx(0)));
-    return okAdvance(kernel.advanceTo(started.state, ctx(HOUR))).state;
+    // РОВНО один раунд. С CMB-4 первый залп назначен на сам миг встречи, поэтому
+    // продвижение на час дало бы ДВА раунда (встреча + следующий час) и помощник
+    // перестал бы соответствовать своему имени. Продвигаемся на тот же миг: событие,
+    // назначенное на `now`, ядро подхватывает (`earliestDue`, ветка `at === time`).
+    return okAdvance(kernel.advanceTo(started.state, ctx(0))).state;
   }
 
   it('absorbs damage into the shield before the hull', () => {
@@ -619,7 +623,7 @@ describe('combat — attack vs defense stats (return-fire mechanic)', () => {
       [planet('P', null)],
     );
     const started = okApply(kernel.applyAction(st, arrive('A'), ctx(0)));
-    const r = okAdvance(kernel.advanceTo(started.state, ctx(HOUR))); // one round
+    const r = okAdvance(kernel.advanceTo(started.state, ctx(0))); // one round (CMB-4: на встрече)
     const round = r.events.find((e) => e.type === 'combat.round');
     const p = round?.payload as { dmgToDefender: number; dmgToAttacker: number };
 
@@ -650,7 +654,10 @@ describe('combat — lane intercept (crossing ON a lane, GDD §7.4)', () => {
     expect(Object.keys(m2.state.battles)).toHaveLength(0);
     expect(m2.state.scheduled.some((e) => e.type === 'fleet.intercept')).toBe(true);
 
-    const r = okAdvance(kernel.advanceTo(m2.state, ctx(4 * HOUR)));
+    // Довести ровно до ВСТРЕЧИ (3 ч): с CMB-4 первый залп приходится на неё, и лишний
+    // час здесь означал бы второй раунд — а два фрегата против двух за два раунда друг
+    // друга уничтожают, и проверять «оба приколоты к середине полосы» стало бы не на чем.
+    const r = okAdvance(kernel.advanceTo(m2.state, ctx(3 * HOUR)));
     expect(types(r.events)).toContain('battle.started');
     // Both pinned to the SAME mid-lane point — neither at a node, both off-transit.
     const f1 = r.state.fleets.F1;
@@ -662,7 +669,7 @@ describe('combat — lane intercept (crossing ON a lane, GDD §7.4)', () => {
     // The battle is live and its hourly round clock (the combat timer) is exposed.
     const battle = Object.values(r.state.battles)[0];
     expect(battle).toBeDefined();
-    expect(battle?.nextRoundAt).toBe(5 * HOUR); // 3h start → 4h round 1 → next at 5h
+    expect(battle?.nextRoundAt).toBe(4 * HOUR); // встреча в 3h → залп там же → следующий в 4h
   });
 
   it('a parked fleet is caught by a hostile fleet running down its lane', () => {
@@ -680,7 +687,10 @@ describe('combat — lane intercept (crossing ON a lane, GDD §7.4)', () => {
     const m = okApply(kernel.applyAction(st, move('E', 'B', 'p2'), ctx(0)));
     expect(m.state.scheduled.some((e) => e.type === 'fleet.intercept')).toBe(true);
 
-    const r = okAdvance(kernel.advanceTo(m.state, ctx(4 * HOUR)));
+    // До самой встречи (середина полосы, 3 ч): с CMB-4 залп приходится на неё, и лишний
+    // час дал бы второй раунд — двое на двое за два раунда гибнут, и проверять
+    // «бегун приколот к точке стоянки» стало бы не на чем.
+    const r = okAdvance(kernel.advanceTo(m.state, ctx(3 * HOUR)));
     expect(types(r.events)).toContain('battle.started');
     expect(Object.keys(r.state.battles)).toHaveLength(1);
     // The runner was pinned to the parked fleet's point — not carried on to node B.
@@ -760,8 +770,9 @@ describe('combat — ships keep hull damage; ground rests at full (persistent hu
       [planet('P', null)],
     );
     const started = okApply(kernel.applyAction(st, arrive('A'), ctx(0)));
-    // Mid-battle the survivor carries a partial HP pool...
-    const mid = okAdvance(kernel.advanceTo(started.state, ctx(HOUR)));
+    // Mid-battle the survivor carries a partial HP pool... Один раунд теперь приходится
+    // на сам миг встречи (CMB-4), поэтому «после одного раунда» — это `ctx(0)`, а не час.
+    const mid = okAdvance(kernel.advanceTo(started.state, ctx(0)));
     expect(stackOf(mid.state.fleets.A, 'aggressor')?.hp).toBe(80);
     // ...and once the battle resolves the SHIP keeps its reduced hull — no auto-heal,
     // so a battered fleet limps off and only mends at a repair base (construction.ts).
@@ -1307,9 +1318,11 @@ describe('combat — bug-hunt batch: assault guards, stalemate, ground chain-eng
     expect(relief.state.fleets.R?.battleId ?? null).toBeNull();
     // Ground battle resolves at its first tick (militia falls in one round, ~1h) →
     // the attacker must chain-engage the relief fleet instead of coexisting with it
-    // at the node forever. Peek at 1.5h: capture done, the CHAINED orbital battle is
-    // live (its own first round lands at 2h).
-    const r = okAdvance(kernel.advanceTo(relief.state, ctx(HOUR + HOUR / 2)));
+    // at the node forever. С CMB-4 всё это происходит НА МЕСТЕ: наземный раунд бьёт в
+    // миг штурма, ополчение падает, захват совершается, и сцепка с подмогой начинается
+    // тут же — своим событием на том же мгновении (`advanceTo` берёт его следующей
+    // итерацией, не рекурсией). Смотрим туда же: захват сделан, сцепленный бой живой.
+    const r = okAdvance(kernel.advanceTo(relief.state, ctx(0)));
     expect(r.state.planets.P?.owner).toBe('p1');
     expect(types(r.events)).toEqual(
       expect.arrayContaining(['planet.captured', 'battle.resolved', 'battle.started']),
@@ -1371,5 +1384,53 @@ describe('planet.captured — СПОСОБ захвата различается
     const done = okAdvance(kernel.advanceTo(started.state, ctx(50 * HOUR)));
     expect(capturedVia(done.events)).toBe('assault');
     expect(done.state.planets.P?.garrison?.[0]?.unit).toBe('marine');
+  });
+});
+
+/**
+ * CMB-4 — обмен ударами на самой встрече.
+ *
+ * Находка владельца с живого плейтеста: «столкнул два флота, они не нанесли друг другу
+ * урона». Первый раунд назначался тем же помощником, что и остальные, то есть через
+ * игровой час после столкновения. Защиты у задержки не было — она вышла побочно, из
+ * переиспользования, — а цена оказалась игровой: КОНТАКТ БЫЛ БЕСПЛАТНЫМ. Подошёл,
+ * посмотрел и, успев уйти внутри часа, не получил и не нанёс ни выстрела.
+ *
+ * Пара берётся не любая: `aggressor` (атака 30) против `guardian` (защита 20) — только
+ * у обороняющегося с НЕНУЛЕВОЙ защитой есть ответный огонь, а у `fighter` он нулевой,
+ * и «обмен» на нём проверить нечем.
+ */
+describe('combat — первый раунд на встрече (CMB-4)', () => {
+  const kernel = createKernel([...combatFamily, arrivalModule]);
+  const AGGRESSOR_HP = 100;
+  const GUARDIAN_HP = 100;
+
+  /** Мир сразу после столкновения: время НЕ двигается ни на миллисекунду вперёд. */
+  function onContact(): ReturnType<typeof okAdvance> {
+    const st = baseState(
+      [fleet('A', 'p1', 'P', [['aggressor', 1]]), fleet('D', 'p2', 'P', [['guardian', 1]])],
+      [planet('P', null)],
+    );
+    const started = okApply(kernel.applyAction(st, arrive('A'), ctx(0)));
+    return okAdvance(kernel.advanceTo(started.state, ctx(0)));
+  }
+
+  it('ОБЕ стороны получают урон в миг встречи, а не через час', () => {
+    const { state } = onContact();
+    // Раунд одновременный: нападающий бьёт атакой, обороняющийся отвечает защитой.
+    expect(stackOf(state.fleets.D, 'guardian')?.hp).toBeLessThan(GUARDIAN_HP);
+    expect(stackOf(state.fleets.A, 'aggressor')?.hp).toBeLessThan(AGGRESSOR_HP);
+  });
+
+  it('это именно РАУНД, а не разовая царапина: счётчик и событие на месте', () => {
+    const r = onContact();
+    expect(types(r.events)).toContain('combat.round');
+    expect(Object.values(r.state.battles)[0]?.round).toBe(1);
+  });
+
+  it('дальше каданс прежний — следующий раунд ровно через игровой час', () => {
+    // Меняется ТОЛЬКО первый залп: ускорять бой целиком владелец не просил, а это был
+    // бы уже другой баланс.
+    expect(Object.values(onContact().state.battles)[0]?.nextRoundAt).toBe(HOUR);
   });
 });
