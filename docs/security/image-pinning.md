@@ -10,8 +10,8 @@
 |---|---|---|
 | **Сканеры** | `security.yml` | ежемесячно, скилл `refresh-scanner-digests` |
 | **Гейт основного CI** | `ci.yml` (`osv-scanner` в шаге SCA, сервис-контейнер `postgres`) | вместе со сканерами — тот же скилл |
-| **Базы нашего образа** | `Dockerfile` (`node:26-slim`, distroless) | при бампе базы + ре-ревью `.trivyignore`; с SEC-34 протухание ловит шаг «пин против тега» |
-| **Сторонние образы прода** | `deploy/docker-compose*.yml` (postgres, caddy) | при бампе; их CVE видит джоба `trivy-deps` |
+| **Базы наших образов** | `Dockerfile` (`node:26-slim`, distroless) и `deploy/caddy/Dockerfile` (`caddy:2-builder-alpine`, `caddy:2-alpine`) | при бампе базы + ре-ревью `.trivyignore`; с SEC-34 протухание ловит шаг «пин против тега» |
+| **Сторонние образы прода** | `deploy/docker-compose*.yml` (postgres) | при бампе; их CVE видит джоба `trivy-deps` |
 
 Про группу `ci.yml` стоит сказать отдельно, потому что её тут не было и правило считалось
 выполненным, пока образ бежал по тегу. Шаг SCA в основном гейте — **блокирующий**: чужой
@@ -110,10 +110,15 @@ curl -sS -o /dev/null -D - -H "Authorization: Bearer $tok" \
 | Образ | Дайджест | Снят | Файл |
 |-------|----------|------|------|
 | `postgres:16-alpine` | `sha256:cf78e76683b9ca8c5733cbbdce6c9262b45b6767934dd0a95e671f9a0fc20685` | 2026-09 | `docker-compose.yml` |
-| `caddy:2-alpine` | `sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648` | 2026-07 · сверен 2026-09-07 | `docker-compose.tls.yml` |
+
+_Caddy из этой таблицы ушёл в SEC-31: мы собираем его сами, и обе его базы теперь живут в
+`deploy/caddy/Dockerfile` — строкой выше, в группе «Базы наших образов». Пины те же
+(`caddy:2-alpine` `sha256:5f5c8640…` как рантайм, `caddy:2-builder-alpine` `sha256:1a1689db…`
+как сборочная стадия), сменилось только место и то, какая джоба их сканирует._
 
 **Кто следит за протуханием (SEC-34).** Шаг «пин против тега» в джобе `trivy-deps` читает
-ссылки из ОБОИХ мест — `deploy/docker-compose*.yml` И `Dockerfile` — и спрашивает у реестра,
+ссылки из ОБОИХ мест — `deploy/docker-compose*.yml` И `Dockerfile`'ов (корневого и
+`deploy/caddy/`, добавлен в SEC-31) — и спрашивает у реестра,
 на что тег указывает сейчас. До SEC-34 он читал только compose, и пины `Dockerfile` были тем
 же слепым пятном, каким до SEC-18 были пины compose: Trivy тянет замороженный дайджест, отчёт
 не меняется, и отставание не видно ниоткуда. Поймано на себе — пин distroless отставал на

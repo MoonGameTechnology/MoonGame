@@ -40,7 +40,8 @@ const EXPECTED = [
   // поэтому — «✅ просканировано» рядом с мёртвым образом и есть та самая ложная
   // зелень, против которой заведена вся таблица.
   { key: 'smoke-image', name: 'Smoke — собранный образ стартует и отвечает' },
-  { key: 'trivy-deps', name: 'Trivy image — сторонние образы прода (postgres/caddy)' },
+  { key: 'trivy-caddy', name: 'Trivy image — наш образ Caddy (SEC-31)' },
+  { key: 'trivy-deps', name: 'Trivy image — сторонние образы прода (postgres)' },
   { key: 'kics', name: 'KICS — IaC (Docker Compose прода)' },
   {
     key: 'dependency-review',

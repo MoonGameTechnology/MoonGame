@@ -15,6 +15,13 @@
 # `--no-build` matters: the base file still carries a `build:` section (the from-source
 # path stays supported), and without the flag compose may rebuild locally and silently
 # discard the verified image.
+#
+# ПУБЛИЧНЫЙ ХОСТ (с TLS-оверлеем) — СНАЧАЛА СОБРАТЬ CADDY (SEC-31). У сервиса `caddy` там
+# стоит `build:` без `image:`: апстримный образ не пересобирали с 2026-06-22, и мы собираем
+# его сами. `up --no-build` его не поднимет, а снимать флаг нельзя — он защищает проверенный
+# по подписи образ СЕРВЕРА от локальной пересборки. Поэтому `docker compose … build caddy`
+# отдельным шагом до `up`; runbook — `deploy/README.md`. Один шаг вернётся с SEC-35, когда
+# наш Caddy начнут публиковать и подписывать, и он получит здесь свой пиненный `image:`.
 services:
   server:
     # Digest ref, never a tag — a tag can be re-pointed after verification, which would

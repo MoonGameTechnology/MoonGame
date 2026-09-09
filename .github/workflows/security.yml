@@ -19,8 +19,9 @@ name: Security scan
 # image.yml before the GHCR push). A finding nobody can fix produced .trivyignore
 # paperwork, not remediation, while holding the whole repo's merge queue — eight times
 # in two and a half weeks. No severity threshold: a fixable LOW is work, not noise.
-# New suppressions go to .semgrepignore / .gitleaks.toml / .trivyignore WITH a
-# reason + date (see docs/security/pipeline.md).
+# New suppressions go to .semgrepignore / .gitleaks.toml / .trivyignore-fs.yaml
+# (trivy-fs) / .trivyignore (trivy-image) WITH a reason + date (see
+# docs/security/pipeline.md). One list per perimeter — see each file's header.
 # Still informational (not yet triaged as bricks): codeql, trufflehog, trivy-deps,
 # kics, dependency-review, dependency-check, zizmor, scorecard, and the `check` job (its
 # blocking twin lives in ci.yml).
@@ -153,7 +154,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -191,7 +192,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -245,7 +246,7 @@ jobs:
       security-events: write
       actions: read
     steps:
-      - uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -289,7 +290,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -338,7 +339,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -377,7 +378,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -427,7 +428,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -438,9 +439,14 @@ jobs:
         run: |
           set +e
           # Pinned by digest (= 0.58.2): a tag can be re-pointed, a digest cannot.
-          # --exit-code 1 → exit 1 on findings (blocking, SEC-1); .trivyignore applies
+          # --exit-code 1 → exit 1 on findings (blocking, SEC-1).
+          # --ignorefile: СВОЙ список (.trivyignore-fs.yaml), не корневой .trivyignore.
+          # Корневой держит CVE базового ОБРАЗА и адресует только по id, без пути; для
+          # этой джобы он вдобавок пустая подписка — измерено, прогон с ним и с пустым
+          # ignorefile дают один и тот же набор находок. Причины — в шапке нового файла.
           docker run --rm -v "$PWD:/src" -w /src aquasec/trivy@sha256:665030f4d33a82c1e8d9d5e0453365842236723c1ee5cc3becca698268e66a56 \
-            fs --scanners vuln,secret,misconfig --exit-code 1 --format sarif --output trivy.sarif .
+            fs --scanners vuln,secret,misconfig --ignorefile .trivyignore-fs.yaml \
+            --exit-code 1 --format sarif --output trivy.sarif .
           rc=$?
           set -e
           ok=true; case $rc in 125 | 126 | 127) ok=false ;; esac
@@ -465,7 +471,7 @@ jobs:
           RC: ${{ steps.scan.outputs.rc }}
         run: |
           if [ "$RC" != "0" ]; then
-            echo "::error::Trivy fs is a blocking scanner (SEC-1): finding or scan failure (exit $RC). Fix it; suppress ONLY via .trivyignore WITH CVE-id, reason and review date."
+            echo "::error::Trivy fs is a blocking scanner (SEC-1): finding or scan failure (exit $RC). Fix it; suppress ONLY via .trivyignore-fs.yaml WITH id, paths, reason and review trigger."
             exit 1
           fi
 
@@ -476,7 +482,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -572,12 +578,121 @@ jobs:
           fi
           exit $fail
 
+  trivy-caddy:
+    name: Vuln — наш образ Caddy (Trivy image)
+    # SEC-31. Caddy мы теперь собираем сами (`deploy/caddy/Dockerfile`): апстримный образ
+    # не пересобирали с 2026-06-22, а его Go-бинарь несёт 13 stdlib-находок, которые
+    # закрываются одной сменой тулчейна. Джоба делает три вещи: собирает образ (сборка
+    # БЛОКИРУЮЩАЯ — не собрался наш Dockerfile, это наш баг), сканирует его и проверяет
+    # приёмочный критерий кирпича поимённо.
+    #
+    # Почему НАХОДКИ здесь информационные, в отличие от `trivy-image`. Пакеты рантайм-базы
+    # (curl, openssl) мы намеренно не обновляем — это разменяло бы воспроизводимость сборки
+    # на свежесть пакетов, и решение оставлено отдельным (см. шапку Dockerfile). У этих
+    # находок фикс опубликован, поэтому гейт с `--ignore-unfixed` покраснел бы в первый же
+    # день, а чинить их этот кирпич не брался. Блокирует здесь ПРИЁМКА: если пересборка
+    # перестанет закрывать те самые находки, ради которых она затевалась, — это красное.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
+        with:
+          egress-policy: audit
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: build — собираем свой Caddy (блокирующий)
+        run: docker build -t void-caddy:scan -f deploy/caddy/Dockerfile deploy/caddy
+      - name: trivy image — отчёт по своему Caddy
+        id: scan
+        continue-on-error: true
+        run: |
+          set +e
+          # Тот же пиненный сканер и тот же общий кэш БД, что у соседних джоб.
+          # `--ignorefile /dev/null` — НЕ формальность. Рабочий каталог здесь репозиторий
+          # (в него пишется отчёт), а Trivy молча подхватывает `./.trivyignore` из cwd —
+          # ловушка, найденная в SEC-32 (разбор в docs/security/pipeline.md). Корневой файл
+          # заведён под НАШ distroless-образ, и его id, совпав с пакетом в alpine-базе caddy,
+          # тихо вырезали бы находку из этого отчёта. Джоба информационная, то есть отчёт —
+          # единственное, ради чего она есть; подавлять в нём нечего и незачем.
+          scan() {
+            docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
+              -v "$PWD:/out" -v /tmp/trivy-cache:/root/.cache/trivy -w /out \
+              aquasec/trivy@sha256:665030f4d33a82c1e8d9d5e0453365842236723c1ee5cc3becca698268e66a56 \
+              image --ignorefile /dev/null "$@" void-caddy:scan
+          }
+          scan --format sarif --output trivy-caddy.sarif
+          rc=$?
+          # JSON нужен ОТДЕЛЬНО: приёмка ниже сверяет пару (id, пакет), а в SARIF имя пакета
+          # лежит внутри текста сообщения — по нему нельзя отличить CVE-2026-46600 в stdlib
+          # (её пересборка закрывает) от неё же в x/net (её не закрывает).
+          scan --format json --output trivy-caddy.json
+          [ $? -eq 0 ] || rc=$?
+          ok=true
+          [ "$rc" -eq 0 ] || ok=false
+          [ -s trivy-caddy.sarif ] || ok=false
+          echo "{\"key\":\"trivy-caddy\",\"ok\":$ok,\"exit\":$rc}" > status-trivy-caddy.json
+      - name: приёмка SEC-31 — целевые находки исчезли из бинаря
+        run: |
+          set -eu
+          # Тринадцать stdlib-находок, которые закрывает свежий тулчейн (go1.26.8 против
+          # go1.26.3 у апстрима), плюс CVE-2026-56852 в x/text — её закрывает единственный
+          # модульный бамп в Dockerfile. Сверяем ПАРУ (id, пакет), а не один id.
+          stdlib_ids="CVE-2026-27145 CVE-2026-33818 CVE-2026-39821 CVE-2026-39822 CVE-2026-42504 CVE-2026-42505 CVE-2026-42507 CVE-2026-46600 CVE-2026-56853 CVE-2026-56858 CVE-2026-56859 CVE-2026-56860 CVE-2026-56862"
+          left=""
+          for id in $stdlib_ids; do
+            if jq -e --arg id "$id" '[.Results[]? | select(.Target == "usr/bin/caddy")
+                 | (.Vulnerabilities // [])[]
+                 | select(.VulnerabilityID == $id and .PkgName == "stdlib")] | length > 0' \
+                 trivy-caddy.json >/dev/null; then
+              left="$left $id(stdlib)"
+            fi
+          done
+          if jq -e '[.Results[]? | select(.Target == "usr/bin/caddy")
+               | (.Vulnerabilities // [])[]
+               | select(.VulnerabilityID == "CVE-2026-56852" and .PkgName == "golang.org/x/text")] | length > 0' \
+               trivy-caddy.json >/dev/null; then
+            left="$left CVE-2026-56852(x/text)"
+          fi
+          echo "::group::что осталось в бинаре после пересборки"
+          jq -r '.Results[]? | select(.Target == "usr/bin/caddy") | (.Vulnerabilities // [])[]
+                 | "\(.Severity)\t\(.VulnerabilityID)\t\(.PkgName) \(.InstalledVersion)"' \
+                 trivy-caddy.json | sort || true
+          echo "::endgroup::"
+          if [ -n "$left" ]; then
+            echo "::error::пересборка перестала закрывать целевые находки:$left"
+            exit 1
+          fi
+          echo "приёмка пройдена: все 14 целевых находок отсутствуют в usr/bin/caddy"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: report-trivy-caddy
+          path: |
+            trivy-caddy.sarif
+            trivy-caddy.json
+            status-trivy-caddy.json
+          if-no-files-found: warn
+      - name: upload to code scanning
+        if: always()
+        continue-on-error: true
+        uses: github/codeql-action/upload-sarif@cdf488f595d80d6e07e03d4674febd5ab45fa938 # v4.37.9
+        with:
+          sarif_file: trivy-caddy.sarif
+          category: trivy-caddy
+
   trivy-deps:
     name: Vuln — third-party prod images (Trivy image)
-    # SEC-11: `trivy-image` above scans OUR image only. Production runs two more
-    # containers nobody was scanning — postgres and caddy from deploy/. Their refs are
-    # READ OUT OF THE COMPOSE FILES here (not a second hardcoded list), so a digest bump
-    # in deploy/ can't drift away from what CI actually scans.
+    # SEC-11: `trivy-image` above scans OUR image only. Production runs more containers
+    # nobody was scanning — their refs are READ OUT OF THE COMPOSE FILES here (not a
+    # second hardcoded list), so a digest bump in deploy/ can't drift away from what CI
+    # actually scans.
+    # С SEC-31 сюда попадает только `postgres`: caddy мы собираем сами, у него в compose
+    # больше нет строки `image:`, и его сканирует своя джоба `trivy-caddy` выше. Список
+    # по-прежнему выводится из файлов, а не задан руками, поэтому смена вида ссылки
+    # переносит образ между джобами автоматически, без правки здесь.
     # Informational on landing (the SEC-6 pattern): third-party base images carry CVEs
     # we don't control, so this becomes blocking only after the first triage — otherwise
     # an upstream advisory would redden `main` with nothing to fix in this repo.
@@ -586,7 +701,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -604,7 +719,7 @@ jobs:
         run: |
           set -u
           # SEC-34. Ссылки берутся из ДВУХ мест: compose (сторонние образы прода) и
-          # `Dockerfile` (базы НАШЕГО образа). Раньше шаг читал только первое, и пины
+          # `Dockerfile`'ов (базы НАШИХ образов — сервера и, с SEC-31, своего Caddy). Раньше шаг читал только первое, и пины
           # `Dockerfile` были ровно тем же слепым пятном, каким до SEC-18 были пины
           # compose: протухание невидимо, потому что Trivy тянет замороженный дайджест и
           # отчёт не меняется. Поймано на себе — пин distroless отставал на пересборку,
@@ -612,7 +727,7 @@ jobs:
           refs=$(
             { grep -hE '^[[:space:]]+image: ' deploy/docker-compose.yml deploy/docker-compose.tls.yml |
                 awk '{print $2}'
-              grep -hE '^FROM[[:space:]]' Dockerfile | awk '{print $2}'
+              grep -hE '^FROM[[:space:]]' Dockerfile deploy/caddy/Dockerfile | awk '{print $2}'
             } | sort -u
           )
           stale=0
@@ -775,7 +890,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -945,7 +1060,7 @@ jobs:
       contents: read
       pull-requests: write # для comment-summary-in-pr: on-failure
     steps:
-      - uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1042,7 +1157,7 @@ jobs:
       # a quiet green.
       NVD_API_KEY: ${{ secrets.NVD_API_KEY }}
     steps:
-      - uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1122,7 +1237,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1253,7 +1368,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1286,7 +1401,7 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1328,7 +1443,7 @@ jobs:
       security-events: write
       id-token: write
     steps:
-      - uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -1401,7 +1516,7 @@ jobs:
       pull-requests: write # PR comments
       issues: write
     steps:
-      - uses: step-security/harden-runner@05e31511f85b41b11d1cf0ef85d0992719546e2c # v2.21.0
+      - uses: step-security/harden-runner@e14015d583714f6e62063499dc959a02595150a1 # v2.21.1
         with:
           egress-policy: audit
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1

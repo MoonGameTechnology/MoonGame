@@ -326,9 +326,21 @@ docker pull ghcr.io/moongametechnology/moongame@sha256:<digest>
 cd deploy && VOID_IMAGE=ghcr.io/moongametechnology/moongame@sha256:<digest> \
   docker compose -f docker-compose.yml -f docker-compose.release.yml up -d --no-build
 
-# публичный хост — добавить TLS-оверлей третьим -f:
-#   -f docker-compose.yml -f docker-compose.tls.yml -f docker-compose.release.yml
+# публичный хост — добавить TLS-оверлей третьим -f И собрать caddy ОТДЕЛЬНО:
+#   C="-f docker-compose.yml -f docker-compose.tls.yml -f docker-compose.release.yml"
+#   docker compose $C build caddy      # свой Caddy (SEC-31) — у него нет image:, только build:
+#   VOID_IMAGE=... docker compose $C up -d --no-build
 ```
+
+**Почему на публичном хосте появился отдельный `build caddy` (SEC-31).** Caddy мы больше не
+берём готовым из апстрима — его бинарь там собран go1.26.3 и несёт находки, которые
+закрываются одной пересборкой (разбор — запись SEC-31 в `docs/security/pipeline.md`). Поэтому
+у сервиса `caddy` в TLS-оверлее стоит `build:`, а не `image:`, и голый `up --no-build` его
+поднять не сможет: собирать нечем, тянуть неоткуда. `--no-build` при этом снимать НЕЛЬЗЯ —
+он тут ровно затем, чтобы compose не пересобрал проверенный по подписи образ сервера.
+Отсюда два шага вместо одного: сначала собрать только caddy, потом поднять всё с `--no-build`.
+Когда SEC-35 научит `image.yml` публиковать и подписывать наш Caddy, шаг снова станет одним —
+caddy получит в релиз-оверлее свой пиненный `image:`, как сейчас у сервера.
 
 Только по дайджесту, не по тегу: тег после проверки можно перевесить на другие байты —
 `verify-image.sh` поэтому отказывается работать с тегом. Обновление = повторить те же
