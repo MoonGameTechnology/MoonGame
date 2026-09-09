@@ -1,12 +1,24 @@
 #!/usr/bin/env bash
-# Verify a published Void Dominion image before deploying it (SEC-13).
+# Verify a published Void Dominion image before deploying it (SEC-13, SEC-35).
 #
-#   ./deploy/verify-image.sh ghcr.io/moongametechnology/moongame@sha256:<digest>
+#   ./deploy/verify-image.sh ghcr.io/moongametechnology/moongame@sha256:<digest>        # сервер
+#   ./deploy/verify-image.sh ghcr.io/moongametechnology/moongame/caddy@sha256:<digest>  # фронт
 #
 # What it proves: those exact bytes were built and signed by THIS repository's
 # image.yml workflow on `main` (keyless cosign — Fulcio certificate + Rekor
-# transparency log), and image.yml only pushes what a blocking Trivy scan passed.
+# transparency log), and image.yml only pushes what its blocking gates passed.
 # An image someone built by hand, or a tag re-pointed in the registry, fails here.
+#
+# ОБА ОБРАЗА ПРОВЕРЯЮТСЯ ОДНОЙ И ТОЙ ЖЕ КОМАНДОЙ, и это не упрощение. Ограничение
+# `--certificate-identity-regexp` адресует ВОРКФЛОУ (`image.yml@refs/heads/main`), а обе
+# джобы — и `publish`, и `publish-caddy` — живут именно в нём. Подпись при этом привязана
+# к КОНКРЕТНОМУ дайджесту, так что подсунуть подпись фронта серверному ref (или наоборот)
+# нечем: `cosign verify <ref>` ищет подпись ровно этих байтов. Различается ниже только
+# то, ЧЕМ поднимать проверенный образ, — сервер и фронт стоят в разных оверлеях.
+#
+# Гейты у двух джоб разные (у сервера — блокирующий `trivy --ignore-unfixed`, у Caddy —
+# приёмка пересборки + смоук); почему так, разобрано в `image.yml` и в записи SEC-35
+# в `docs/security/pipeline.md`. На проверку подписи это не влияет.
 #
 # Exit code is the gate: run it before `docker pull` / `compose up` and stop on failure.
 set -euo pipefail
@@ -58,5 +70,18 @@ echo
 echo "✅ signature OK — built and signed by ${REPO} image.yml on main."
 echo "   deploy it with:"
 echo "     docker pull $REF"
-echo "     cd deploy && VOID_IMAGE=$REF \\"
-echo "       docker compose -f docker-compose.yml -f docker-compose.release.yml up -d --no-build"
+# Какой из двух образов проверили — видно по имени пакета: фронт лежит отдельным пакетом
+# `<repo>/caddy` (своя история дайджестов, свой цикл пересборки). Печатаем ровно ту
+# команду, которая поднимет ИМЕННО его: caddy живёт в TLS-оверлее, и релизный `image:`
+# ему даёт четвёртый файл, а не общий docker-compose.release.yml (разбор — в его шапке).
+case "${REF%@*}" in
+  */caddy)
+    echo "     cd deploy && VOID_IMAGE=<серверный ref> VOID_CADDY_IMAGE=$REF \\"
+    echo "       docker compose -f docker-compose.yml -f docker-compose.tls.yml \\"
+    echo "         -f docker-compose.release.yml -f docker-compose.release-tls.yml up -d --no-build"
+    ;;
+  *)
+    echo "     cd deploy && VOID_IMAGE=$REF \\"
+    echo "       docker compose -f docker-compose.yml -f docker-compose.release.yml up -d --no-build"
+    ;;
+esac

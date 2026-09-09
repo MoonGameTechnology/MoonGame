@@ -634,38 +634,11 @@ jobs:
           [ "$rc" -eq 0 ] || ok=false
           [ -s trivy-caddy.sarif ] || ok=false
           echo "{\"key\":\"trivy-caddy\",\"ok\":$ok,\"exit\":$rc}" > status-trivy-caddy.json
+      # Тот же критерий, что блокирует ПУБЛИКАЦИЮ образа в `image.yml` (SEC-35). Список
+      # находок и разбор — в самом скрипте; двух копий списка в двух воркфлоу быть не
+      # должно, иначе критерий приёмки разъедется между «проверяем» и «выпускаем».
       - name: приёмка SEC-31 — целевые находки исчезли из бинаря
-        run: |
-          set -eu
-          # Тринадцать stdlib-находок, которые закрывает свежий тулчейн (go1.26.8 против
-          # go1.26.3 у апстрима), плюс CVE-2026-56852 в x/text — её закрывает единственный
-          # модульный бамп в Dockerfile. Сверяем ПАРУ (id, пакет), а не один id.
-          stdlib_ids="CVE-2026-27145 CVE-2026-33818 CVE-2026-39821 CVE-2026-39822 CVE-2026-42504 CVE-2026-42505 CVE-2026-42507 CVE-2026-46600 CVE-2026-56853 CVE-2026-56858 CVE-2026-56859 CVE-2026-56860 CVE-2026-56862"
-          left=""
-          for id in $stdlib_ids; do
-            if jq -e --arg id "$id" '[.Results[]? | select(.Target == "usr/bin/caddy")
-                 | (.Vulnerabilities // [])[]
-                 | select(.VulnerabilityID == $id and .PkgName == "stdlib")] | length > 0' \
-                 trivy-caddy.json >/dev/null; then
-              left="$left $id(stdlib)"
-            fi
-          done
-          if jq -e '[.Results[]? | select(.Target == "usr/bin/caddy")
-               | (.Vulnerabilities // [])[]
-               | select(.VulnerabilityID == "CVE-2026-56852" and .PkgName == "golang.org/x/text")] | length > 0' \
-               trivy-caddy.json >/dev/null; then
-            left="$left CVE-2026-56852(x/text)"
-          fi
-          echo "::group::что осталось в бинаре после пересборки"
-          jq -r '.Results[]? | select(.Target == "usr/bin/caddy") | (.Vulnerabilities // [])[]
-                 | "\(.Severity)\t\(.VulnerabilityID)\t\(.PkgName) \(.InstalledVersion)"' \
-                 trivy-caddy.json | sort || true
-          echo "::endgroup::"
-          if [ -n "$left" ]; then
-            echo "::error::пересборка перестала закрывать целевые находки:$left"
-            exit 1
-          fi
-          echo "приёмка пройдена: все 14 целевых находок отсутствуют в usr/bin/caddy"
+        run: .github/scripts/caddy-rebuild-acceptance.sh trivy-caddy.json
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
@@ -941,10 +914,18 @@ jobs:
           gen base docker-compose.yml
           gen base+tls docker-compose.yml docker-compose.tls.yml
           gen base+release docker-compose.yml docker-compose.release.yml
+          # SEC-35: реальный ПУБЛИЧНЫЙ прод — четыре файла разом. Без этой цели новый
+          # оверлей `release-tls.yml` не сканировался бы вовсе, а именно он описывает то,
+          # что смотрит в интернет. Остальные три остаются: `base` — локальный playtest,
+          # `base+tls` — публичный хост со сборкой на месте, `base+release` — обновление
+          # сервера без TLS (`moongame update`); это разные запускаемые конфигурации.
+          gen base+tls+release+release-tls \
+            docker-compose.yml docker-compose.tls.yml \
+            docker-compose.release.yml docker-compose.release-tls.yml
 
           n=$(find kics-src -name '*.yaml' -size +0 | wc -l)
           echo "copied=$n" >> "$GITHUB_OUTPUT"
-          echo "expected=3" >> "$GITHUB_OUTPUT"
+          echo "expected=4" >> "$GITHUB_OUTPUT"
           ls -l kics-src
       - name: kics
         id: scan
@@ -972,7 +953,7 @@ jobs:
           # "0". Сравнение вырождалось в `[ 0 -ge 0 ]` и ПРОХОДИЛО: ноль просканированных
           # compose-файлов уходил как «✅ просканировано». Поэтому число целей
           # проверяется ОТДЕЛЬНО и раньше, а не через дефолт подстановки.
-          [ "${COPIED:-0}" -ge "${EXPECTED:-3}" ] || ok=false
+          [ "${COPIED:-0}" -ge "${EXPECTED:-4}" ] || ok=false
           [ "$scanned" -ge "${COPIED:-1}" ] || ok=false
           echo "{\"key\":\"kics\",\"ok\":$ok,\"exit\":$rc,\"scanned\":$scanned}" > status-kics.json
           echo "rc=$rc" >> "$GITHUB_OUTPUT"
@@ -1025,8 +1006,8 @@ jobs:
           # «Целей не нашлось» — отдельный случай, и раньше он проваливался мимо гейта по
           # той же причине, что и сентинел: `${COPIED:-1}` не защищает от строки "0".
           # Сообщение тоже своё: тут виноват не KICS, а исчезнувший glob.
-          if [ "${COPIED:-0}" -lt "${EXPECTED:-3}" ]; then
-            echo "::error::kics: собрано ${COPIED:-0} слитых конфигов из ${EXPECTED:-3} — сборка не состоялась, сканировать было нечего. Обычная причина: \`docker compose config\` не отработал (переехал файл, сломался оверлей, или compose перестал принимать --no-interpolate). Смотри вывод шага «собрать СЛИТЫЕ конфиги»."
+          if [ "${COPIED:-0}" -lt "${EXPECTED:-4}" ]; then
+            echo "::error::kics: собрано ${COPIED:-0} слитых конфигов из ${EXPECTED:-4} — сборка не состоялась, сканировать было нечего. Обычная причина: \`docker compose config\` не отработал (переехал файл, сломался оверлей, или compose перестал принимать --no-interpolate). Смотри вывод шага «собрать СЛИТЫЕ конфиги»."
             exit 1
           fi
           if [ "$SCANNED" -lt "$COPIED" ]; then
