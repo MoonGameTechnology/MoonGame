@@ -582,12 +582,12 @@
 | RESIL-4 | ✅ | srv | `docs/backlog.md:13100` | Соак проверяет, что мир не встал. |
 | RESIL-5 | ✅ | srv proto | `docs/backlog.md:13118` | Генеральная репетиция: весь стек разом, и |
 | RESIL-6 | ✅ | srv proto | `docs/backlog.md:13153` | Достоверность генералки: настоящая база, |
-| ADDR-7 | ✅ | sec proto | `docs/backlog.md:13266` | Ссылка на партию не пускает по незнанию: |
-| OPS-2 | ✅ | ops sec | `docs/backlog.md:13304` | Обновление доносит до машины новые ключи |
-| REL-6 | ✅ | srv | `docs/backlog.md:13326` | Возврат на своё место мгновенный: перехват вместо |
-| CMB-4 | ✅ | core | `docs/backlog.md:13341` | Первый раунд боя — на самой встрече, а не через |
-| BLD-1 | ⏳ | core proto | `docs/backlog.md:13361` | Очередь строительства: заказы встают в ряд, а не |
-| UI-14 | ⏳ | proto | `docs/backlog.md:13378` | Осмотр чужого флота должен быть находимым. |
+| ADDR-7 | ✅ | sec proto | `docs/backlog.md:13270` | Ссылка на партию не пускает по незнанию: |
+| OPS-2 | ✅ | ops sec | `docs/backlog.md:13308` | Обновление доносит до машины новые ключи |
+| REL-6 | ✅ | srv | `docs/backlog.md:13330` | Возврат на своё место мгновенный: перехват вместо |
+| CMB-4 | ✅ | core | `docs/backlog.md:13345` | Первый раунд боя — на самой встрече, а не через |
+| BLD-1 | ⏳ | core proto | `docs/backlog.md:13365` | Очередь строительства: заказы встают в ряд, а не |
+| UI-14 | ⏳ | proto | `docs/backlog.md:13382` | Осмотр чужого флота должен быть находимым. |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
@@ -877,15 +877,15 @@
 | ROS-0.1 | ✅ | data proto core | `docs/roster-roadmap.md:109` | ПКО и зональное ПВО: имя насквозь 2026-09-09 |
 | ROS-0.2 | ⏳ | proto | `docs/roster-roadmap.md:140` | «Верфь» → «Производство» |
 | ROS-1.1 | ✅ | core data proto | `docs/roster-roadmap.md:152` | Пехота и техника: два рода наземных войск 2026-09-09 |
-| ROS-1.2 | ⏳ | data | `docs/roster-roadmap.md:186` | Фрегат: корабль поддержки под модули |
-| ROS-1.3 | ✅ | core data | `docs/roster-roadmap.md:199` | Осадная платформа осаждает планету, а не флот 2026-09-09 |
-| ROS-1.4 | ✅ | core data proto | `docs/roster-roadmap.md:225` | Бомбардировщик и профили урона челноков 2026-09-09 |
-| ROS-1.5 | ⏳ | core data | `docs/roster-roadmap.md:261` | Десантный челнок: высадка вместо удара |
-| ROS-2.1 | ✅ | core data proto | `docs/roster-roadmap.md:282` | Три линии 50/30/20, артиллерия без ответного огня 2026-09-09 |
-| ROS-2.1a | ⏳ | proto | `docs/roster-roadmap.md:333` | Управление огнём показывается только тем, кто может стрелять |
-| ROS-2.2 | ⏳ | core data | `docs/roster-roadmap.md:350` | Челнок — сторона боя: ответный урон и зональное ПВО |
-| ROS-3.1 | ⏳ | proto | `docs/roster-roadmap.md:377` | Экран «Производство»: пять типов, модули, количество, планета |
-| ROS-3.2 | ⏳ | proto | `docs/roster-roadmap.md:395` | Шаттл — корабль во всём интерфейсе |
+| ROS-1.2 | ✅ | data proto | `docs/roster-roadmap.md:186` | Фрегат: корабль поддержки под модули 2026-09-09 |
+| ROS-1.3 | ✅ | core data | `docs/roster-roadmap.md:220` | Осадная платформа осаждает планету, а не флот 2026-09-09 |
+| ROS-1.4 | ✅ | core data proto | `docs/roster-roadmap.md:246` | Бомбардировщик и профили урона челноков 2026-09-09 |
+| ROS-1.5 | ⏳ | core data | `docs/roster-roadmap.md:282` | Десантный челнок: высадка вместо удара |
+| ROS-2.1 | ✅ | core data proto | `docs/roster-roadmap.md:303` | Три линии 50/30/20, артиллерия без ответного огня 2026-09-09 |
+| ROS-2.1a | ⏳ | proto | `docs/roster-roadmap.md:354` | Управление огнём показывается только тем, кто может стрелять |
+| ROS-2.2 | ⏳ | core data | `docs/roster-roadmap.md:371` | Челнок — сторона боя: ответный урон и зональное ПВО |
+| ROS-3.1 | ⏳ | proto | `docs/roster-roadmap.md:398` | Экран «Производство»: пять типов, модули, количество, планета |
+| ROS-3.2 | ⏳ | proto | `docs/roster-roadmap.md:416` | Шаттл — корабль во всём интерфейсе |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md:48` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md:55` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md:64` | Сервисные идентичности и scoped-токены |

@@ -250,11 +250,11 @@ describe('верфь — панель конструктора', () => {
   // Радар — роль ОДНОГО корпуса. Правило живёт в данных (`allowed.units`), а верфь
   // обязана его честно объяснить: на крейсере утилита свободна, и подпись «нужен
   // слот» читалась бы как враньё.
-  it('радар предлагается на сенсорном фрегате и заперт с внятной причиной на остальных', () => {
+  it('радар предлагается на фрегате и заперт с внятной причиной на остальных', () => {
     const frigate = loadoutPaneHtml(
       s,
       'p1',
-      normalizeDraft(s, 'p1', draftOf({ hull: 'sensor_frigate' }), YARD_HULLS),
+      normalizeDraft(s, 'p1', draftOf({ hull: 'frigate' }), YARD_HULLS),
       YARD_HULLS,
       view,
     );
@@ -272,16 +272,18 @@ describe('верфь — панель конструктора', () => {
     expect(cruiser.slice(at, at + 400)).toContain('не для этого корпуса'); // …и сказано почему
   });
 
-  it('новый корпус есть в списке верфи и несёт ровно один отсек', () => {
-    expect(YARD_HULLS).toContain('sensor_frigate');
+  // ROS-1.2: фрегат — корабль ПОДДЕРЖКИ, и его ценность в навеске. Панель обязана
+  // показать все четыре отсека: один защитный и три под системы.
+  it('фрегат есть в списке верфи и несёт САМУЮ ШИРОКУЮ навеску — четыре отсека', () => {
+    expect(YARD_HULLS).toContain('frigate');
     const html = loadoutPaneHtml(
       s,
       'p1',
-      normalizeDraft(s, 'p1', draftOf({ hull: 'sensor_frigate' }), YARD_HULLS),
+      normalizeDraft(s, 'p1', draftOf({ hull: 'frigate' }), YARD_HULLS),
       YARD_HULLS,
       view,
     );
-    expect((html.match(/class="cn-bay/g) ?? []).length).toBe(1);
+    expect((html.match(/class="cn-bay/g) ?? []).length).toBe(4);
   });
 
   it('пустая казна гасит кнопку заказа, а не позволяет отправить отказ', () => {
