@@ -818,7 +818,7 @@ import {
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
-import { combatRanges, ringLook } from './combatRanges';
+import { canBarrage, combatRanges, ringLook } from './combatRanges';
 import { corridorLines } from './corridorView';
 import { recapAdmits } from './recapGate';
 // ONB-7 — first-session goals checklist (mine/fleet/capture/score, ticked from state).
@@ -1934,13 +1934,11 @@ function selectedFleetIds(): string[] {
   return selFleet && s.fleets[selFleet]?.owner === ME ? [selFleet] : [];
 }
 
-/** Does this fleet carry artillery (units that fire at range — the `fleet.barrage`
- *  / standoff-fire mechanic applies)? */
-function fleetHasArtillery(f: Fleet | undefined): boolean {
-  return (
-    !!f &&
-    f.units.some((u) => u.count > 0 && (data.units[u.unit]?.traits.includes('artillery') ?? false))
-  );
+/** Может ли флот вести дальний огонь — правило и его разбор в `combatRanges.ts`
+ *  (ROS-2.1a). Спрашивать трейт `artillery` тут нельзя: после ROS-2.1 он значит
+ *  безнаказанность в ближнем бою, а не наличие орудий. */
+function fleetCanBarrage(f: Fleet | undefined): boolean {
+  return !!f && canBarrage(f, data);
 }
 
 
@@ -7230,7 +7228,7 @@ function renderCmdBar() {
   // Режим огня артиллерии — `fireMode.ts` (REFM-158): это СТОЯЧЕЕ ПРАВИЛО, а не
   // выстрел, поэтому у каждого режима в меню стоит вторая строка-правило, а подпись
   // кнопки несёт режим только при единогласии — иначе она соврала бы про часть группы.
-  const artFleets = fleets.filter((f) => f.owner === ME && fleetHasArtillery(f));
+  const artFleets = fleets.filter((f) => f.owner === ME && fleetCanBarrage(f));
   // Единогласие режима, доступность слияния/деления/штурма — `cmdAvailability.ts` (REFM-78).
   const uniMode = uniformMode(artFleets.map((f) => f.barrageMode ?? DEFAULT_FIRE_MODE));
   const fmLabel = fireModeLabel(uniMode);
@@ -7268,8 +7266,8 @@ function renderCmdBar() {
   // GRND-1 ⇅ «Десант»: как и split, команда строго ОДНОФЛОТОВАЯ — гарнизон и трюм у
   // каждого свои, один клик на группу разослал бы приказы с разной арифметикой.
   const troopsIn = lone ? troopsInputFor(lone.id) : null;
-  // Artillery in the selection → offer the standoff-fire focus order.
-  const anyArtillery = fleets.some(fleetHasArtillery);
+  // Someone in the selection can fire at range → offer the standoff-fire focus order.
+  const anyArtillery = fleets.some(fleetCanBarrage);
   // Hero-flagship aboard a selected fleet → its castable abilities become a ✨ popover
   // (the map-tap targeting reuses the same heroAim flow as the hero window).
   // Флагман группы и его кастуемые способности — правила в `heroCasts.ts` (REFM-68).
@@ -8001,7 +7999,7 @@ cmdbar.addEventListener('click', (ev) => {
         return {
           id,
           owner: f?.owner ?? '',
-          artillery: !!f && fleetHasArtillery(f),
+          artillery: !!f && fleetCanBarrage(f),
           mode: f?.barrageMode,
         };
       }),
@@ -8101,7 +8099,7 @@ function selectAt(mx: number, my: number) {
     );
     const targetId: string | null = target?.id ?? null;
     for (const id of selectedFleetIds()) {
-      if (fleetHasArtillery(s.fleets[id])) playerOrder(barrageFleet(ME, id, targetId));
+      if (fleetCanBarrage(s.fleets[id])) playerOrder(barrageFleet(ME, id, targetId));
     }
     if (targetId) note(t('hint.barrage-set'));
     else note(t('hint.barrage-auto'));
@@ -12444,7 +12442,7 @@ function renderChainMenu(): void {
     startId,
     {
       capturable: m.kind !== 'fleet' && (sectorTypeOf(m.id)?.capturable ?? false),
-      hasArtillery: chainMode.fleetIds.some((id) => fleetHasArtillery(s.fleets[id])),
+      hasArtillery: chainMode.fleetIds.some((id) => fleetCanBarrage(s.fleets[id])),
       abilities: chainAbilitiesFor(chainMode.fleetIds),
     },
   );

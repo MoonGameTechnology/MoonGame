@@ -268,7 +268,7 @@ export const en: Record<string, string> = {
   'chain.add-wait6': '⏱ +6h',
   'chain.fire': '🎯 Fire +1h',
   'chain.full': 'plan is full — 8 steps',
-  'chain.no-art': 'no artillery in the selection',
+  'chain.no-art': 'nothing in the selection fires at range',
   'chain.overwrite': 'fleet plans differ — sending replaces them all',
   'chain.undo': 'Undo step',
 

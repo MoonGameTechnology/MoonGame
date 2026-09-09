@@ -270,7 +270,7 @@ export const ru: Record<string, string> = {
   'chain.add-wait6': '⏱ +6ч',
   'chain.fire': '🎯 Огонь +1ч',
   'chain.full': 'план полон — 8 шагов',
-  'chain.no-art': 'в выделении нет артиллерии',
+  'chain.no-art': 'в выделении нет дальнобойных орудий',
   'chain.overwrite': 'планы флотов различаются — отправка заменит все',
   'chain.undo': 'Отменить шаг',
 

@@ -3,10 +3,11 @@
 // Смысл файла не в том, что круги рисуются, а в том, что их РАДИУС берётся из ядра.
 // Заведи кто-нибудь свою формулу в клиенте — и игрок целится по одному кругу, а огонь
 // идёт по другому; поймать это глазами нельзя, а тестом — можно.
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import { artilleryRange, shuttleStrikeRange } from '../../packages/shared-core/src/index';
 import { newGame, data } from './game';
-import { combatRanges, ringLook, type RangeKind } from './combatRanges';
+import { canBarrage, combatRanges, ringLook, type RangeKind } from './combatRanges';
 import type { Fleet, GameData, GameState } from '../../packages/shared-core/src/index';
 
 const ME = 'p1';
@@ -179,5 +180,52 @@ describe('RANGE-UX — заметность кольца (REFM-123)', () => {
 
   it('вид стабилен', () => {
     expect(ringLook('artillery', true)).toEqual(ringLook('artillery', true));
+  });
+});
+
+describe('ROS-2.1a — управление огнём предлагается ровно тем, кто может стрелять', () => {
+  it('ПРИЗНАК — ДАЛЬНОСТЬ, А НЕ ТРЕЙТ: после ROS-2.1 `artillery` значит безнаказанность в упор', () => {
+    // Корпус `artillery` дерётся вплотную и НЕ получает ответки — трейт теперь про это.
+    // Спроси интерфейс про трейт — и он предложит наводку флоту, которому стрелять нечем.
+    const близкий = data.units.artillery!;
+    expect(близкий.traits).toContain('artillery');
+    expect(близкий.stats.range ?? 0).toBe(0);
+    const { fleet } = withFleet([{ unit: 'artillery', count: 3 }]);
+    expect(canBarrage(fleet, data)).toBe(false);
+  });
+
+  it('дальнобойный корпус — может: тот же вопрос, по которому ядро принимает приказ', () => {
+    const { fleet } = withFleet([{ unit: 'longbow', count: 1 }]);
+    expect(canBarrage(fleet, rangedData)).toBe(true);
+    expect(artilleryRange(fleet, rangedData)).toBeGreaterThan(0);
+  });
+
+  it('КНОПКА = КОЛЬЦО: наводку предлагают ровно тем флотам, у кого нарисован радиус', () => {
+    // Два разных ответа на один вопрос — это игрок, целящийся по кругу, которого нет
+    // (или наоборот). Держим равенство на обоих каталогах и обоих корпусах.
+    for (const [d, unit] of [
+      [rangedData, 'longbow'],
+      [data, 'artillery'],
+      [data, 'cruiser'],
+    ] as const) {
+      const { s, fleet } = withFleet([{ unit, count: 2 }]);
+      const ring = combatRanges(s, d, [fleet.id], ME, locate, seen).rings.some(
+        (r) => r.kind === 'artillery' && r.sourceId === fleet.id,
+      );
+      expect(canBarrage(fleet, d), unit).toBe(ring);
+    }
+  });
+
+  it('пустой флот стрелять не может — и кольца у него нет', () => {
+    const { fleet } = withFleet([{ unit: 'longbow', count: 0 }]);
+    expect(canBarrage(fleet, rangedData)).toBe(false);
+  });
+
+  it('КАДР СПРАШИВАЕТ ИМЕННО ЭТО: в `main.ts` не осталось гейта по трейту', () => {
+    // Сторож на регрессию ROS-2.1: кадр обязан звать `canBarrage`, а не перебирать
+    // `traits.includes('artillery')` сам — иначе кнопки снова разъедутся с ядром.
+    const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+    expect(src).toContain('canBarrage');
+    expect(src).not.toMatch(/traits\.includes\('artillery'\)/);
   });
 });
