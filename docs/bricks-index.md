@@ -897,23 +897,23 @@
 | SE-3.1 | ⏳ | srv sec | `docs/secure-environment-roadmap.md:107` | Least-privilege роли БД |
 | SE-3.2 | ⏳ | srv | `docs/secure-environment-roadmap.md:112` | Шифрование at-rest + in-transit [A02] |
 | SE-3.3 | ⏳ | srv | `docs/secure-environment-roadmap.md:117` | RLS как defense-in-depth |
-| SE-3.4 | ⏳ | srv sec | `docs/secure-environment-roadmap.md:122` | Бэкапы + PITR + проверенный restore |
-| SE-4.1 | ⏳ | srv sec | `docs/secure-environment-roadmap.md:131` | ACL / TLS / приватный bind |
-| SE-5.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md:140` | Минимальный non-root read-only образ |
-| SE-5.2 | ✅ | sec | `docs/secure-environment-roadmap.md:149` | Сканирование образа сервера |
-| SE-6.1 | ⏳ | srv | `docs/secure-environment-roadmap.md:159` | Лимиты соединений и сообщений |
-| SE-6.2 | ⏳ | srv sec | `docs/secure-environment-roadmap.md:164` | Rate-limiting действий |
-| SE-6.3 | ⏳ | srv | `docs/secure-environment-roadmap.md:170` | Per-player очередь (анти-double-spend) |
-| SE-6.4 | ✅ | srv | `docs/secure-environment-roadmap.md:176` | Фильтр видимости перед отправкой |
-| SE-6.5 | ⏳ | srv | `docs/secure-environment-roadmap.md:183` | Масштаб WS без поломки auth/видимости |
-| SE-7.1 | ⏳ | cli sec | `docs/secure-environment-roadmap.md:192` | CSP + Trusted Types + HSTS |
-| SE-7.2 | ⏳ | cli sec | `docs/secure-environment-roadmap.md:197` | SRI и безопасные куки |
-| SE-8.1 | ⏳ | srv sec | `docs/secure-environment-roadmap.md:206` | Структурное аудит-логирование |
-| SE-8.2 | 🔒 | sec | `docs/secure-environment-roadmap.md:211` | Алерты на аномалии |
-| SE-8.3 | ⏳ | srv sec | `docs/secure-environment-roadmap.md:216` | Метрики и трекинг ошибок |
-| SE-9.1 | ⏳ | srv | `docs/secure-environment-roadmap.md:225` | Переживание рестарта посреди матча |
-| SE-9.2 | 🔒 | docs sec | `docs/secure-environment-roadmap.md:230` | DR: RTO/RPO, runbooks, kill-switch |
-| SE-10.1 | 🔒 | docs | `docs/secure-environment-roadmap.md:239` | Минимизация данных и GDPR-база |
+| SE-3.4 | 🔶 | srv sec | `docs/secure-environment-roadmap.md:122` | Бэкапы + PITR + проверенный restore |
+| SE-4.1 | ⏳ | srv sec | `docs/secure-environment-roadmap.md:159` | ACL / TLS / приватный bind |
+| SE-5.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md:168` | Минимальный non-root read-only образ |
+| SE-5.2 | ✅ | sec | `docs/secure-environment-roadmap.md:177` | Сканирование образа сервера |
+| SE-6.1 | ⏳ | srv | `docs/secure-environment-roadmap.md:187` | Лимиты соединений и сообщений |
+| SE-6.2 | ⏳ | srv sec | `docs/secure-environment-roadmap.md:192` | Rate-limiting действий |
+| SE-6.3 | ⏳ | srv | `docs/secure-environment-roadmap.md:198` | Per-player очередь (анти-double-spend) |
+| SE-6.4 | ✅ | srv | `docs/secure-environment-roadmap.md:204` | Фильтр видимости перед отправкой |
+| SE-6.5 | ⏳ | srv | `docs/secure-environment-roadmap.md:211` | Масштаб WS без поломки auth/видимости |
+| SE-7.1 | ⏳ | cli sec | `docs/secure-environment-roadmap.md:220` | CSP + Trusted Types + HSTS |
+| SE-7.2 | ⏳ | cli sec | `docs/secure-environment-roadmap.md:225` | SRI и безопасные куки |
+| SE-8.1 | ⏳ | srv sec | `docs/secure-environment-roadmap.md:234` | Структурное аудит-логирование |
+| SE-8.2 | 🔒 | sec | `docs/secure-environment-roadmap.md:239` | Алерты на аномалии |
+| SE-8.3 | ⏳ | srv sec | `docs/secure-environment-roadmap.md:244` | Метрики и трекинг ошибок |
+| SE-9.1 | ⏳ | srv | `docs/secure-environment-roadmap.md:253` | Переживание рестарта посреди матча |
+| SE-9.2 | 🔒 | docs sec | `docs/secure-environment-roadmap.md:258` | DR: RTO/RPO, runbooks, kill-switch |
+| SE-10.1 | 🔒 | docs | `docs/secure-environment-roadmap.md:267` | Минимизация данных и GDPR-база |
 | SD-0.1 | ⏳ | docs sec | `docs/secure-sdlc-roadmap.md:65` | Цель ASVS L2 + threat-model-кадэнс |
 | SD-0.2 | ✅ | sec | `docs/secure-sdlc-roadmap.md:70` | SEC-1: триаж и baseline сканеров |
 | SD-1.1 | ⏳ | core act srv | `docs/secure-sdlc-roadmap.md:87` | Валидация на каждой границе доверия |
