@@ -210,6 +210,36 @@ function hasGroundFacility(planet: Planet, data: GameData, kind: UnitDef['kind']
   return hasCapability(planet, data, GROUND_FACILITY[kind].capability);
 }
 
+/**
+ * ГДЕ ЭТОТ ЮНИТ ВООБЩЕ МОЖНО ЗАЛОЖИТЬ — тот же гейт зданий, что применяет `unit.build`,
+ * вынесенный наружу чистой функцией. Возвращает код отказа или `null`, если мир годится.
+ *
+ * Экспортируется РАДИ ИНТЕРФЕЙСА (ROS-3.1), по той же причине, что и `artilleryRange`:
+ * экран «Производство» показывает список миров, где заказ пройдёт, и своя копия этих
+ * правил разъехалась бы на первой же правке — игрок выбирал бы мир, на котором ядро
+ * отвечает отказом. Спрашивать надо ту функцию, по которой ядро и решает.
+ *
+ * Считается только ПОСТОЯННАЯ половина гейта — здания. Очередь (`E_HANGAR_FULL`) сюда не
+ * входит: она зависит от уже поставленных заказов, то есть от расписания, которого у
+ * чистой функции нет, и остаётся ответом ядра в момент приказа.
+ */
+export function unitBuildSiteBlocker(
+  planet: Planet,
+  def: UnitDef,
+  data: GameData,
+): 'E_NO_PORT' | 'E_NO_SHIPYARD' | 'E_NO_BARRACKS' | 'E_NO_FACTORY' | null {
+  if (def.traits.includes('shuttle')) {
+    return shuttleBayAt(planet, data) > 0 ? null : 'E_NO_PORT';
+  }
+  if (def.domain === 'space') {
+    return hasShipyard(planet, data) ? null : 'E_NO_SHIPYARD';
+  }
+  if (def.domain === 'ground') {
+    return hasGroundFacility(planet, data, def.kind) ? null : GROUND_FACILITY[def.kind].code;
+  }
+  return null;
+}
+
 function requireUnlocked(
   h: HandlerContext,
   playerId: string,

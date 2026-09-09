@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { setLocale } from '../../localization/runtime';
+import { setLocale, t, tData } from '../../localization/runtime';
 import { newGame } from './game';
+import { data } from './gameData';
 import type { Action, ArsenalItem, GameState } from '../../packages/shared-core/src/index';
 import {
   bagText,
@@ -13,6 +14,10 @@ import {
   initShipyard,
   YARD_HULLS,
   YARD_SQUAD_HULLS,
+  YARD_GROUND_HULLS,
+  groundHullsOf,
+  hullsOfTab,
+  buildSites,
   type YardDraft,
   type YardHost,
 } from './shipyard';
@@ -294,12 +299,16 @@ describe('верфь — панель конструктора', () => {
     expect(html).toMatch(/data-cnbuild disabled/);
   });
 
-  it('без своих миров селектор заблокирован и заказ невозможен', () => {
+  it('НЕТ ПОДХОДЯЩЕГО МЕСТА — ВМЕСТО СЕЛЕКТОРА НАДПИСЬ, а не пустой выпадающий список', () => {
+    // ROS-3.1, заказ владельца: пустой селектор игрок читает как «сейчас загрузится»
+    // и жмёт кнопку, которой нечего отправить. Отказ должен быть виден до нажатия.
     const homeless = rich();
     for (const p of Object.values(homeless.planets)) if (p.owner === 'p1') p.owner = null;
     const d = normalizeDraft(homeless, 'p1', draftOf(), YARD_HULLS);
     const html = loadoutPaneHtml(homeless, 'p1', d, YARD_HULLS, view);
-    expect(html).toContain('<select class="cn-plan" id="cn-planet" disabled');
+    expect(html).toContain('cn-noplace');
+    expect(html).toContain(t('yard.no-place'));
+    expect(html).not.toContain('id="cn-planet"');
     expect(html).toMatch(/data-cnbuild disabled/);
   });
 
@@ -519,6 +528,114 @@ describe('верфь — окно', () => {
     const before = win.html();
     win.fire(click('.cn-nothing'));
     expect(win.html()).toBe(before);
+    expect(sent).toEqual([]);
+  });
+});
+
+describe('ROS-0.2 + ROS-3.1 — «Производство»: пять типов с одного экрана', () => {
+  /** Поставить зданию `type` на домашний мир p1 — так открывается производство рода. */
+  function withBuilding(s: GameState, type: string): GameState {
+    const home = Object.values(s.planets).find((p) => p.owner === 'p1');
+    if (!home) throw new Error('нет домашнего мира');
+    home.buildings = [...home.buildings, { type, level: 1, hp: data.buildings[type]!.hp }];
+    return s;
+  }
+
+  it('ЭКРАН НАЗЫВАЕТСЯ ПРОИЗВОДСТВОМ, а здание остаётся верфью — это разные вещи', () => {
+    expect(yardBoxHtml('ships', '')).toContain(t('yard.title'));
+    expect(t('yard.title')).toBe('ПРОИЗВОДСТВО');
+    // Здание владелец не переименовывал: у него своё имя из данных.
+    expect(tData(data.buildings.shipyard!.name)).toBe('Орбитальная верфь');
+  });
+
+  it('ПЯТЬ ВКЛАДОК В ПОРЯДКЕ ЗАКАЗА: Корабли · Челноки · Пехота · Техника · Герои', () => {
+    const html = yardBoxHtml('ships', '');
+    const order = ['yard.tab.ships', 'yard.tab.squads', 'yard.tab.infantry', 'yard.tab.vehicles', 'yard.tab.heroes']
+      .map((k) => html.indexOf(t(k)));
+    expect(order.every((i) => i >= 0)).toBe(true);
+    expect([...order].sort((a, b) => a - b)).toEqual(order);
+  });
+
+  it('РОД ВОЙСК РЕШАЮТ ДАННЫЕ, а не второй список: каждый наземный корпус ровно в одной вкладке', () => {
+    const inf = groundHullsOf('infantry');
+    const veh = groundHullsOf('vehicle');
+    expect(inf).not.toEqual([]);
+    expect(veh).not.toEqual([]);
+    expect(inf.filter((id) => veh.includes(id))).toEqual([]);
+    expect([...inf, ...veh].sort()).toEqual([...YARD_GROUND_HULLS].sort());
+    for (const id of inf) expect(data.units[id]?.kind).toBe('infantry');
+    for (const id of veh) expect(data.units[id]?.kind).toBe('vehicle');
+  });
+
+  it('десантный челнок (ROS-1.5) заказывается на вкладке «Челноки», а не потерялся', () => {
+    expect(hullsOfTab('squads')).toContain('landing_shuttle');
+  });
+
+  it('МЕСТО ЗАКАЗА СПРАШИВАЕТСЯ У ЯДРА: без казарм пехоту заказать негде', () => {
+    // Стартовый мир несёт космопорт, но ни казарм, ни завода: корабли и челноки
+    // заказать можно, пехоту и технику — нет. Ровно так же ответит и ядро.
+    const s = rich();
+    expect(buildSites(s, 'p1', 'cruiser').length).toBeGreaterThan(0);
+    expect(buildSites(s, 'p1', 'interceptor').length).toBeGreaterThan(0);
+    expect(buildSites(s, 'p1', 'militia')).toEqual([]);
+    expect(buildSites(s, 'p1', 'tank')).toEqual([]);
+  });
+
+  it('построил казармы — появилось место для пехоты, но не для техники', () => {
+    const s = withBuilding(rich(), 'barracks');
+    expect(buildSites(s, 'p1', 'militia').length).toBe(1);
+    expect(buildSites(s, 'p1', 'tank')).toEqual([]);
+  });
+
+  it('построил завод — появилось место для техники', () => {
+    const s = withBuilding(rich(), 'factory');
+    expect(buildSites(s, 'p1', 'tank').length).toBe(1);
+  });
+
+  it('«нет подходящего места» показывается ИМЕННО ТАМ, где род не производится', () => {
+    const s = rich();
+    const inf = normalizeDraft(s, 'p1', draftOf({ hull: 'militia' }), hullsOfTab('infantry'));
+    const html = loadoutPaneHtml(s, 'p1', inf, hullsOfTab('infantry'), view);
+    expect(html).toContain(t('yard.no-place'));
+    expect(html).toMatch(/data-cnbuild disabled/);
+    // А на вкладке кораблей тот же экран показывает нормальный выбор мира.
+    const ships = normalizeDraft(s, 'p1', draftOf(), YARD_HULLS);
+    expect(loadoutPaneHtml(s, 'p1', ships, YARD_HULLS, view)).toContain('id="cn-planet"');
+  });
+
+  it('смена вкладки на «Пехоту» переводит конструктор на её ростер и её мир', () => {
+    const s = withBuilding(rich(), 'barracks');
+    const win = fakeWin();
+    const yard = initShipyard(hostOf({ root: () => win, state: () => s }));
+    yard.open();
+    win.fire(click('.cn-tab', { ctab: 'infantry' }));
+    expect(win.html()).toContain(t('data.militia'));
+    expect(win.html()).not.toContain(t('data.cruiser'));
+  });
+
+  it('заказ пехоты уходит в ядро с миром, где есть казармы', () => {
+    const s = withBuilding(rich(), 'barracks');
+    const home = Object.values(s.planets).find((p) => p.owner === 'p1')!.id;
+    const sent: Action[] = [];
+    const win = fakeWin();
+    const yard = initShipyard(hostOf({ root: () => win, state: () => s, order: (a) => sent.push(a) }));
+    yard.open();
+    win.fire(click('.cn-tab', { ctab: 'infantry' }));
+    win.fire(click('[data-cnbuild]'));
+    expect(sent).toHaveLength(1);
+    const p = sent[0]!.payload as { unit: string; planetId: string };
+    expect(p.planetId).toBe(home);
+    expect(data.units[p.unit]?.kind).toBe('infantry');
+  });
+
+  it('без казарм заказ пехоты не отправляется вовсе — кнопка не обещает лишнего', () => {
+    const s = rich();
+    const sent: Action[] = [];
+    const win = fakeWin();
+    const yard = initShipyard(hostOf({ root: () => win, state: () => s, order: (a) => sent.push(a) }));
+    yard.open();
+    win.fire(click('.cn-tab', { ctab: 'infantry' }));
+    win.fire(click('[data-cnbuild]'));
     expect(sent).toEqual([]);
   });
 });

@@ -408,7 +408,7 @@ export {
   MAX_RESEARCH_SLOTS,
   clampResearchSlots,
 } from './modules/technology';
-export { constructionModule } from './modules/construction';
+export { constructionModule, unitBuildSiteBlocker } from './modules/construction';
 export { arsenalSyncModule } from './modules/arsenalSync';
 export { stationModule } from './modules/station';
 export { seatClaimModule } from './modules/seatClaim';

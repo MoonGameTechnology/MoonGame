@@ -1056,7 +1056,7 @@ export const en: Record<string, string> = {
   'yard.module.remove': 'remove module',
   'yard.modules.all-taken': 'Available modules — all slots full',
   'yard.modules.for-slot': 'Available modules — for the «{s}» slot',
-  'yard.no-worlds': 'no worlds of yours',
+  'yard.no-place': 'no suitable site',
   'yard.ordered': '⚒ ordered: {n}× {hull}',
   'yard.pick.ally-world': " / ally's world",
   'yard.pick.hero-world': "⚓ pick your world{fl}{al} — the hero's ship rises there",
@@ -1071,9 +1071,11 @@ export const en: Record<string, string> = {
   'yard.slots.note':
     'Typed slots: a module fits only its own type. <b>Greyed</b> — not for a free slot, or already installed.',
   'yard.tab.heroes': 'Heroes',
+  'yard.tab.infantry': 'Infantry',
   'yard.tab.ships': 'Ships',
   'yard.tab.squads': 'Shuttles',
-  'yard.title': 'CONSTRUCTOR',
+  'yard.tab.vehicles': 'Vehicles',
+  'yard.title': 'PRODUCTION',
 
   // --- end — Экран конца матча: исход, опыт, итоговая таблица, реванш.
   'end.board': 'View the board',
@@ -1519,7 +1521,7 @@ export const en: Record<string, string> = {
   'onb.intro.badge': 'first time',
   'onb.intro.constructor.body':
     'Here you assemble ships, shuttles, divisions and heroes from modules. The loadout is locked at build time — choose slots up front, a finished unit cannot be re-fitted. The «Heroes» tab is your commander HQ.',
-  'onb.intro.constructor.title': 'Shipyard — loadouts',
+  'onb.intro.constructor.title': 'Production — orders and loadouts',
   'onb.intro.corp.body':
     'A corporation is your squad within the session: a shared warehouse, member roles, and joint alliance-vs-alliance wars (AvA). Join one or found your own — the «Wars» tab opens challenges between corporations.',
   'onb.intro.corp.title': 'Corporation cabinet',
@@ -1584,7 +1586,7 @@ export const en: Record<string, string> = {
     'Done! Time to act: upgrade your Metal Mine, raise a fleet, set a course. Good luck, commander.',
   'onb.tour.hud.purse': 'Your treasury: mine income minus fleet upkeep. Keep it out of the red.',
   'onb.tour.hud.tools':
-    "The commander's tools: diplomacy, research, shipyard, market and the event log.",
+    "The commander's tools: diplomacy, research, production, market and the event log.",
   'onb.tour.hud.welcome':
     'A quick tour of the interface — the whole game runs on it. «Skip tutorial» is always available.',
   'onb.tour.next': 'Next',
@@ -1616,7 +1618,7 @@ export const en: Record<string, string> = {
   // --- rail — Рельса инструментов в матче: подпись кнопки (.label) + подсказка (.title).
   'rail.chat.label': 'Chat',
   'rail.chat.title': 'Chat',
-  'rail.constructor.label': 'Shipyard',
+  'rail.constructor.label': 'Production',
   'rail.constructor.title': 'Constructor — outfit ships, shuttles, army and heroes',
   'rail.corp.label': 'Corp',
   'rail.corp.title': 'Corporation',
@@ -1841,7 +1843,7 @@ export const en: Record<string, string> = {
   'side.scan.spy': '🕵 Spy on the world · {c}¤',
   'side.scan.stale': 'Out of sensor range — last scan (may be stale).',
   'side.scan.title': 'LAST KNOWN ✦',
-  'side.shipyard.conveyor': 'Shipyard conveyor',
+  'side.shipyard.conveyor': 'Ship conveyor',
   'side.shipyard.hint': 'The fleet is your weapon and shield. Order ships here to reinforce it.',
   'side.stat.atk': 'ATK',
   'side.stat.def': 'DEF',
@@ -1882,7 +1884,7 @@ export const en: Record<string, string> = {
   'side.tab.wings': 'Shuttles',
   'side.unit.ground': 'ground',
   'side.unit.space': 'space',
-  'side.wing.conveyor': 'Shuttle yard',
+  'side.wing.conveyor': 'Shuttle conveyor',
   'side.wing.garrison.hint':
     'A carrier (◈) holds shuttles (△). Launch them from the selected fleet\'s panel with "🛩 Launch shuttles".',
   'side.world.blackout': 'blackout: radars and interdiction −50%',
