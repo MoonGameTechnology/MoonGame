@@ -1733,11 +1733,12 @@ if (typeof window !== 'undefined') window.addEventListener('resize', () => clamp
 
 const planet = (id: string | null | undefined): Planet | undefined =>
   id ? s.planets[id] : undefined;
-// Shuttles/carriers are their own build category (air wing): a carrier (◈) ferries the
-// fighter shuttles (△) it launches, so both live under the Wings tab — apart from line
-// spacecraft (which stay under Ships).
-// Само правило деления по домену живёт в `planetSummary.ts` (REFM-38) — одно место,
-// где «крыло» отделено от корабля линии, иначе авианосец считается дважды.
+// Крыло — это САМИ МАШИНЫ и только они (ROS-3.2): вкладка «Челноки» держит
+// перехватчик, бомбардировщик и десантный челнок, а НОСИТЕЛЬ («Шаттл») — корабль
+// линии и живёт среди кораблей. Он их возит, как авианосец возит авиацию, и от этого
+// челноком не становится.
+// Само правило живёт в `planetSummary.ts` (REFM-38) — одно место, где «крыло»
+// отделено от корабля линии, иначе один и тот же корпус считается дважды.
 const isShuttle = (u: string) => isWingUnit(u, data);
 const isGround = (u: string) => isGroundUnit(u, data);
 const floor = Math.floor;
@@ -5079,7 +5080,14 @@ function render(now: number) {
     // tail as diamonds. A pure strike wing in flight IS its shuttles — triangles.
     // Три числа эмблемы — `fleetTally.ts` (REFM-115). Развилка там же: пока есть хоть
     // один КОРПУС, крыло едет грузом; корпусов нет — крыло и есть флот.
-    const { ships, wingPips, troops } = emblemTally(f.units, f.landing ?? [], isShuttle);
+    // ROS-3.2: сам НОСИТЕЛЬ — корпус и стоит в линии, а машины из его ангара
+    // (`f.hangar`, SHU-2.1) едут в том же хвосте груза, что и крыло на борту.
+    const { ships, wingPips, troops } = emblemTally(
+      f.units,
+      f.landing ?? [],
+      isShuttle,
+      f.hangar ?? [],
+    );
     // Фаза от ХЭША идентификатора, а не от его длины (`pulseFx.ts`, правило 2): у
     // «p1-1» и «p2-3» длина одна, и все флоты матча заводили двигатели в такт.
     const engine = fxBreath(now, { period: 120, base: 0.55, amp: 0.45, phase: phaseOfId(f.id) });

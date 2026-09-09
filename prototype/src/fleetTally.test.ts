@@ -66,6 +66,56 @@ describe('эмблема флота — корпуса и крыло', () => {
   });
 });
 
+describe('ROS-3.2 — носитель и его ангар: корпус в линии, машины в грузе', () => {
+  it('НОСИТЕЛЬ СЧИТАЕТСЯ КОРПУСОМ: он стоит в линии и держит залп, а не едет грузом', () => {
+    // `isWing` теперь отвечает «нет» на носитель (ROS-3.2), и эмблема обязана
+    // показать его треугольником среди кораблей — иначе флот из одного носителя
+    // читается как «0 кораблей», то есть как пустое место.
+    const t = emblemTally([{ unit: 'shuttle_carrier', count: 1 }], [], () => false);
+    expect(t.ships).toBe(1);
+    expect(t.wingPips).toBe(0);
+  });
+
+  it('АНГАР НОСИТЕЛЯ ЕДЕТ ГРУЗОМ: машины на борту — не боевая линия', () => {
+    // Пока носитель считался крылом, его собственный ромбик и был всей отметкой о
+    // челноках. Теперь корпус ушёл в линию, и без ангара шесть машин на борту
+    // пропали бы с эмблемы вовсе — флот выглядел бы налегке.
+    const t = emblemTally([{ unit: 'shuttle_carrier', count: 1 }], [], () => false, [
+      { unit: 'interceptor', count: 4 },
+    ]);
+    expect(t.ships).toBe(1);
+    expect(t.wingPips).toBe(4);
+  });
+
+  it('ангар и крыло-на-борту складываются в один хвост, а не в два счёта', () => {
+    const t = emblemTally(
+      [
+        { unit: 'cruiser', count: 2 },
+        { unit: 'interceptor', count: 1 },
+      ],
+      [],
+      (u) => u === 'interceptor',
+      [{ unit: 'bomber', count: 3 }],
+    );
+    expect(t.ships).toBe(2);
+    expect(t.wingPips).toBe(4);
+  });
+
+  it('ЧИСТОЕ КРЫЛО С АНГАРОМ НЕ ПУТАЕТСЯ: корпусов нет — крыло и есть флот, ангар всё равно груз', () => {
+    const t = emblemTally([{ unit: 'interceptor', count: 3 }], [], () => true, [
+      { unit: 'bomber', count: 2 },
+    ]);
+    expect(t.ships).toBe(3);
+    expect(t.wingPips).toBe(2);
+  });
+
+  it('ангара нет — поведение ровно прежнее (мягкая деградация)', () => {
+    const units = [{ unit: 'cruiser', count: 2 }, { unit: 'interceptor', count: 1 }];
+    const isWing = (u: string): boolean => u === 'interceptor';
+    expect(emblemTally(units, [], isWing, [])).toEqual(emblemTally(units, [], isWing));
+  });
+});
+
 describe('эмблема флота — десант', () => {
   it('ДЕСАНТ СЧИТАЕТСЯ ОТДЕЛЬНО: он решает судьбу мира, а не бой в космосе', () => {
     const t = считать([st('cruiser', 2)], [st('militia', 3), st('marine', 1)]);
