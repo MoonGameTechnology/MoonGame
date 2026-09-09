@@ -163,6 +163,17 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
           d: hl(st.defense),
         }),
       };
+    case 'frigate':
+      return {
+        name: t('dossier.unit.frigate.name'),
+        body: t('dossier.unit.frigate.desc', {
+          a: hl(st.attack),
+          d: hl(st.defense),
+          hp: hl(st.hp),
+          n: hl((def.slots?.weapon ?? 0) + (def.slots?.defense ?? 0) + (def.slots?.utility ?? 0)),
+          r: hl(def.radarRange ?? 0),
+        }),
+      };
     case 'artillery':
       return {
         name: t('dossier.unit.artillery.name'),

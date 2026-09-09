@@ -21,13 +21,13 @@
       "credits": 16
     }
   },
-  "sensor_frigate": {
+  "frigate": {
     "faction": "vanguard",
     "stats": {
-      "attack": 4,
-      "defense": 6,
+      "attack": 3,
+      "defense": 5,
       "speed": 56,
-      "hp": 22,
+      "hp": 30,
       "cargoCapacity": 1
     },
     "line": "mid",
@@ -41,7 +41,8 @@
       "credits": 16
     },
     "slots": {
-      "utility": 1
+      "defense": 1,
+      "utility": 3
     }
   },
   "cruiser": {

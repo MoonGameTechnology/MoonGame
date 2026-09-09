@@ -639,7 +639,7 @@ export const en: Record<string, string> = {
   'data.field-hospital': 'Field Hospital',
   'data.vehicle-factory': 'Vehicle Factory',
   'data.scout': 'scout',
-  'data.sensor-frigate': 'sensor frigate',
+  'data.frigate': 'frigate',
   'data.shield-booster': 'Shield Booster',
   'data.area-defense-array': 'Area Defense Array',
   'data.siege-doctrine': 'Siege Doctrine',
@@ -791,6 +791,9 @@ export const en: Record<string, string> = {
   'dossier.unit.interceptor.desc':
     "An interceptor: a hunter of ENEMY SHUTTLES — {s} damage against them, more than anything else fields. Against ships it is nearly harmless ({a} attack), against buildings more so. Fast (speed {sp}) but unarmored ({hp} hull), reach {r}. Above all it scrambles ON ITS OWN, without an order, whenever a hostile strike passes near its port or carrier — and burns the base's fuel doing it.",
   'dossier.unit.interceptor.name': 'Interceptor',
+  'dossier.unit.frigate.desc':
+    "A frigate: a SUPPORT hull. It barely fights on its own ({a} attack, {d} defense) and lives off what you bolt onto it — {n} module bays, more than any other hull carries. Tougher than a scout ({hp} hull), it stands in the mid line. It is the ONLY ship the radar module fits: its own antenna is modest ({r}), the long sight comes from the pairing.",
+  'dossier.unit.frigate.name': 'Frigate',
   'dossier.unit.hero.desc':
     "The commander's own combat projection — a flagship leading the home fleet: {a} attack and {hp} hull. But that's not what matters: its presence holds the shuttle together, granting {b} attack/defense to every ship nearby. If it falls, the commander loses their projection until it's rebuilt at the home world.",
   'dossier.unit.hero.name': 'Flagship',

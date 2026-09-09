@@ -3,7 +3,7 @@
 // Отчёт валил в одну строку то, что лечится по-разному: `farm`/`power_plant` бот СТРОИТЬ
 // УМЕЕТ (правило «подними ферму при дефиците еды» стоит в `ai.ts`) — они молчали, пока
 // дефицит был недостижим, и ожили от правки КОНТЕНТА (BAL-3, шкала `upkeep`); а
-// `radar`/`starfort`/`sensor_frigate` бот не заказывает вовсе, потому что механики, ради
+// `radar`/`starfort`/`frigate` бот не заказывает вовсе, потому что механики, ради
 // которых они существуют (туман, гарнизон), прибор не покрывает — там правка контента не
 // поможет вообще. Первое — сигнал про БАЛАНС, второе — про ПРИБОР, и одна общая строка
 // толкала чинить не то.
@@ -57,10 +57,10 @@ describe('AI-BAL-10 — диагноз мёртвого контента', () =>
     // постройки: сколько раз он это построил — вопрос к прогону, а не к исходнику.
     const ai = readFileSync('prototype/src/ai.ts', 'utf8');
     const split = splitDeadContent(
-      ['farm', 'power_plant', 'radar', 'sensor_frigate', 'starfort', 'spaceport'],
+      ['farm', 'power_plant', 'radar', 'frigate', 'starfort', 'spaceport'],
       ai,
     );
     expect(split.unbuilt).toEqual(['farm', 'power_plant']);
-    expect(split.offRepertoire).toEqual(['radar', 'sensor_frigate', 'starfort', 'spaceport']);
+    expect(split.offRepertoire).toEqual(['radar', 'frigate', 'starfort', 'spaceport']);
   });
 });

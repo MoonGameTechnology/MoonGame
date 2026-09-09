@@ -1356,7 +1356,7 @@ E_NOT_DESTRUCTIBLE, E_OUT_OF_RANGE, E_COOLDOWN`.
   на всех героев (архетипы делят один корпус). `effectiveStats`/`canEquip` живые с `SHIP-3`,
   поэтому модуль на корабле героя сразу меняет статы, которые читает бой. `domain` у `UnitDef`
   дефолтится в `space`, поэтому `allowed.domain: space` проходит; `radar_module` с
-  `allowed.units: ['sensor_frigate']` на корпус героя не встаёт. Две оси героя развело
+  `allowed.units: ['frigate']` на корпус героя не встаёт. Две оси героя развело
   окончательно (§0.38 роадмапа): бюджет ЖЕЛЕЗА даёт КОРПУС + `moduleSlots` ступени (только у
   `main` он ненулевой: +1 утилитный отсек), бюджет УМЕНИЙ — `skillSlots` РЕДКОСТИ.
   **Набор живёт на `Hero.modules`, а не на стеке**, потому что смерть уничтожает флот вместе
@@ -1682,7 +1682,7 @@ speed, hp, shield, range, cargoCapacity, cargoSize, aaDamage, siegeDamage}`
   корпус, тогда бомбардировка считается по старой формуле; в бою флот-на-флот стат
   не участвует) (+ любые доп. числа),
   `line, traits, abilities, cost, buildTimeHours, upkeep`, `signature, radarRange`
-  (армия очков не даёт — см. victory). Есть: `scout_drone, scout, sensor_frigate,
+  (армия очков не даёт — см. victory). Есть: `scout_drone, scout, frigate,
 cruiser, siege(«осадная платформа», siegeDamage 60 при attack 6 и hp 120),
 siege_lance, artillery(трейт artillery — бьёт без ответного огня), bomber(челнок против корпусов:
 attack 20, siegeDamage 18), interceptor(охотник за челноками: shuttleDamage 22 при
@@ -1697,15 +1697,19 @@ attack 1, челноков не несёт. Внутреннее имя корп
 носитель»); игроку оно не видно, имя приходит из локали `data.strike-carrier`.
   **Линии получения урона — свойство кораблей** (GDD §7.2, раздача — в §5,
   `combat.tick`). Линий ТРИ (ROS-2.1): front — `cruiser, strike_carrier, interceptor,
-  bomber, hero`; mid — `scout, scout_drone, sensor_frigate`; rear — `siege, siege_lance,
+  bomber, hero`; mid — `scout, scout_drone, frigate`; rear — `siege, siege_lance,
   artillery, shuttle_carrier`. Прежняя четвёртая, артиллерийская, снята: трейт
   `artillery` больше не даёт ни линии, ни огня с дистанции — он означает, что по этому
   корпусу НЕ ПРОХОДИТ ответный залп, когда атакует его сторона. У наземных `line` не читается — зато
   читается `kind`: техника это только `tank`, остальные четверо (`militia`,
   `heavy_infantry`, `special_forces`, `drop_infantry`) — пехота.
-  `sensor_frigate` — носитель дальнего радара: один `utility`-слот, своя антенна 60, и
-  это ЕДИНСТВЕННЫЙ корпус, куда встаёт `radar_module` (`allowed.units` в `modules.json`,
-  исполняет общий гейт `canEquip` → `E_NOT_ALLOWED`).
+  `frigate` (бывший `sensor_frigate`, ROS-1.2) — корабль ПОДДЕРЖКИ: сам почти не воюет
+  (`attack` 3, `defense` 5), зато несёт САМУЮ ШИРОКУЮ навеску в ростере — четыре отсека
+  (`defense` 1 + `utility` 3), больше, чем у любого другого корпуса, и это свойство
+  закреплено тестом. Он же по-прежнему ЕДИНСТВЕННЫЙ дом `radar_module` (`allowed.units`
+  в `modules.json`, исполняет общий гейт `canEquip` → `E_NOT_ALLOWED`): своя антенна
+  скромная (60), дальнее зрение даёт связка «фрегат + модуль». Чем занять остальные
+  отсеки — открытый вопрос к владельцу: каталог модулей пока меньше, чем навеска.
   Щиты (аблятивные) НИ У ОДНОГО юнита бандла не заданы: `shield` приходит только от
   модуля `shield_booster` (+15, `modules.json`). Значения по корпусам — план
   `shields-roadmap.md`, а не данные.
@@ -1783,7 +1787,7 @@ grants}`), `heroGrades.json` (`{name, skillSlots, moduleSlots}` — бюджет
   `radar_module`, `ion_engine`, `targeting_array`, `ablative_plating`, `shield_booster` —
   `ModuleDefSchema`; ядро читает их живьём в `util/loadout.ts`, инлайн-каталог прототипа
   §7 их ЗЕРКАЛИТ). `radar_module` — единственный с именным списком корпусов
-  (`allowed.units: ['sensor_frigate']`): дальнее зрение это роль одного корабля, а не
+  (`allowed.units: ['frigate']`): дальнее зрение это роль одного корабля, а не
   опция для любого крейсера; правило исполняет общий гейт `canEquip` (`E_NOT_ALLOWED`),
   в коде нет ни одной проверки по id. Радиус радара флота = антенна корпуса ПЛЮС
   прибавки модулей (`stackRadarRange`/`fleetRadarRange` в `state/visibility.ts`) — до
@@ -2270,7 +2274,7 @@ instantRepair, fleetRepair, effects, seatClaim])` (35 модулей — сос�
   целятся тапом по КАРТЕ, поэтому взводят хост (`armCast`/`armSpawn`) и отвечают
   `'close'` — `heroAim`/`heroSpawnAim` остались в `main.ts`. Инлайн-данные `game.ts` дополнены каталогом
   `modules` (6 модулей, зеркало `data/modules.json`) + типизированными `slots` на корпусах
-  кораблей (cruiser/siege/artillery/scout/sensor_frigate/strike_carrier) и челноков
+  кораблей (cruiser/siege/artillery/scout/frigate/strike_carrier) и челноков
   (interceptor/shuttle_carrier).
   Тесты: `shipyard.test.ts` (38) — цена и полоса характеристики (включая экранирование
   подписи, CWE-79), метка «откуда» (LARS-4), фильтр по снимку арсенала (ARS-5),
@@ -3114,7 +3118,7 @@ credits, строкой отчёта «рынок»).
 `aiProfile.test.ts`, — поэтому не может устареть молча; чистая функция `splitDeadContent`
 (`prototype/src/deadContent.ts`, 6 тестов) плюс поля `deadUnbuilt`/`deadOffRepertoire` в
 машинном JSON. На 300 матчах категория «умеет, но не построил» **пуста**: все 5 оставшихся
-позиций (`sensor_frigate`, `strike_carrier`, `spaceport`, `radar`, `starfort`) лежат вне
+позиций (`frigate`, `strike_carrier`, `spaceport`, `radar`, `starfort`) лежат вне
 репертуара бота, то есть балансных правок в этом списке нет — он целиком про механики,
 которые прибор не покрывает (туман, гарнизонная оборона, орбитальная логистика, носитель).
 **И два прежних вывода оказались артефактами бинарного
