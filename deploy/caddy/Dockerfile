@@ -40,3 +40,18 @@ RUN xcaddy build --with golang.org/x/text@v0.39.0
 # ровно один файл — бинарь.
 FROM caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
+
+# Проба живости (Trivy DS026). Та же, что уже стояла у сервиса в `docker-compose.tls.yml`
+# (SEC-20): admin-API Caddy на 127.0.0.1:2019 наружу не публикуется, а `/config/` отвечает
+# только когда конфиг загружен — то есть проба различает «процесс запустился» и «процесс
+# обслуживает». Здесь она нужна ещё и потому, что compose-проба образ не сопровождает: с
+# появлением своего Dockerfile тот же самый образ стал сканируемым, и без HEALTHCHECK
+# внутри него `trivy-fs` был прав. `curl` в базовом образе штатный (apk-пакет).
+HEALTHCHECK --interval=10s --timeout=5s --start-period=20s --retries=3 \
+  CMD curl -fsS -o /dev/null http://127.0.0.1:2019/config/ || exit 1
+
+# `USER` тут НЕТ намеренно, и это осознанный принятый риск (Trivy DS002), а не недосмотр:
+# контейнер обязан слушать привилегированные 80/443, а под non-root это требует ambient
+# capability, которую docker не выставляет. Полный разбор, чем риск закрыт сейчас
+# (`cap_drop: ALL` + только NET_BIND_SERVICE + `no-new-privileges`) и что нужно, чтобы
+# уйти на non-root, — в `.trivyignore-fs.yaml`; работа заведена кирпичом SEC-36.

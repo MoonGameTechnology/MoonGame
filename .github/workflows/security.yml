@@ -19,8 +19,9 @@ name: Security scan
 # image.yml before the GHCR push). A finding nobody can fix produced .trivyignore
 # paperwork, not remediation, while holding the whole repo's merge queue — eight times
 # in two and a half weeks. No severity threshold: a fixable LOW is work, not noise.
-# New suppressions go to .semgrepignore / .gitleaks.toml / .trivyignore WITH a
-# reason + date (see docs/security/pipeline.md).
+# New suppressions go to .semgrepignore / .gitleaks.toml / .trivyignore-fs.yaml
+# (trivy-fs) / .trivyignore (trivy-image) WITH a reason + date (see
+# docs/security/pipeline.md). One list per perimeter — see each file's header.
 # Still informational (not yet triaged as bricks): codeql, trufflehog, trivy-deps,
 # kics, dependency-review, dependency-check, zizmor, scorecard, and the `check` job (its
 # blocking twin lives in ci.yml).
@@ -438,9 +439,14 @@ jobs:
         run: |
           set +e
           # Pinned by digest (= 0.58.2): a tag can be re-pointed, a digest cannot.
-          # --exit-code 1 → exit 1 on findings (blocking, SEC-1); .trivyignore applies
+          # --exit-code 1 → exit 1 on findings (blocking, SEC-1).
+          # --ignorefile: СВОЙ список (.trivyignore-fs.yaml), не корневой .trivyignore.
+          # Корневой держит CVE базового ОБРАЗА и адресует только по id, без пути; для
+          # этой джобы он вдобавок пустая подписка — измерено, прогон с ним и с пустым
+          # ignorefile дают один и тот же набор находок. Причины — в шапке нового файла.
           docker run --rm -v "$PWD:/src" -w /src aquasec/trivy@sha256:665030f4d33a82c1e8d9d5e0453365842236723c1ee5cc3becca698268e66a56 \
-            fs --scanners vuln,secret,misconfig --exit-code 1 --format sarif --output trivy.sarif .
+            fs --scanners vuln,secret,misconfig --ignorefile .trivyignore-fs.yaml \
+            --exit-code 1 --format sarif --output trivy.sarif .
           rc=$?
           set -e
           ok=true; case $rc in 125 | 126 | 127) ok=false ;; esac
@@ -465,7 +471,7 @@ jobs:
           RC: ${{ steps.scan.outputs.rc }}
         run: |
           if [ "$RC" != "0" ]; then
-            echo "::error::Trivy fs is a blocking scanner (SEC-1): finding or scan failure (exit $RC). Fix it; suppress ONLY via .trivyignore WITH CVE-id, reason and review date."
+            echo "::error::Trivy fs is a blocking scanner (SEC-1): finding or scan failure (exit $RC). Fix it; suppress ONLY via .trivyignore-fs.yaml WITH id, paths, reason and review trigger."
             exit 1
           fi
 
@@ -605,10 +611,17 @@ jobs:
         run: |
           set +e
           # Тот же пиненный сканер и тот же общий кэш БД, что у соседних джоб.
+          # `--ignorefile /dev/null` — НЕ формальность. Рабочий каталог здесь репозиторий
+          # (в него пишется отчёт), а Trivy молча подхватывает `./.trivyignore` из cwd —
+          # ловушка, найденная в SEC-32 (разбор в docs/security/pipeline.md). Корневой файл
+          # заведён под НАШ distroless-образ, и его id, совпав с пакетом в alpine-базе caddy,
+          # тихо вырезали бы находку из этого отчёта. Джоба информационная, то есть отчёт —
+          # единственное, ради чего она есть; подавлять в нём нечего и незачем.
           scan() {
             docker run --rm -v /var/run/docker.sock:/var/run/docker.sock \
               -v "$PWD:/out" -v /tmp/trivy-cache:/root/.cache/trivy -w /out \
-              aquasec/trivy@sha256:665030f4d33a82c1e8d9d5e0453365842236723c1ee5cc3becca698268e66a56 image "$@" void-caddy:scan
+              aquasec/trivy@sha256:665030f4d33a82c1e8d9d5e0453365842236723c1ee5cc3becca698268e66a56 \
+              image --ignorefile /dev/null "$@" void-caddy:scan
           }
           scan --format sarif --output trivy-caddy.sarif
           rc=$?
