@@ -363,13 +363,16 @@ export const data: GameData = parseGameData({
       slots: { weapon: 1, defense: 1, utility: 1 }, // the balanced warship: one of each bay
     },
     siege: {
-      // A heavy gun platform that fights IN the battle from the rear line: the
-      // biggest single gun in the roster, but it must close with the enemy like
-      // everyone else. Standoff fire moved to the dedicated `artillery` hull —
-      // the `artillery` trait is what the core reads for it, and this hull no
-      // longer carries it (so its old `range` would have been dead data).
+      // ОСАДНАЯ ПЛАТФОРМА (ROS-1.3, заказ владельца): большая неповоротливая махина,
+      // которая с орбиты сбрасывает бомбы на мир. В бою против кораблей и челноков
+      // слабая (attack 6), зато держит удар (hp 120) и выносит ПОСТРОЙКИ — за это
+      // отвечает отдельный стат `siegeDamage`, который читает бомбардировка
+      // (`orbital.ts`). Одним `attack` эту роль выразить было нечем: пока урон по
+      // зданиям был его долей, «страшная для планеты» означало «сильная и в космосе».
+      // Standoff-огонь остаётся у `artillery`: трейта у платформы нет, и «осада»
+      // здесь — это бомбардировка с орбиты, а не стрельба по флоту издалека.
       faction: 'blue',
-      stats: { attack: 30, defense: 6, speed: 30, hp: 40 },
+      stats: { attack: 6, defense: 10, speed: 22, hp: 120, siegeDamage: 60 },
       line: 'rear',
       signature: 5, // huge siege platform — loudest
       cost: { metal: 90, credits: 40, microelectronics: 4 }, // ECON-7: guided munitions

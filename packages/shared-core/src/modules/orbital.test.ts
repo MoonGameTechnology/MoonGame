@@ -35,6 +35,15 @@ const data: GameData = parseGameData({
       line: 'rear',
     },
     marine: { faction: 'x', domain: 'ground', stats: { attack: 10, defense: 6, speed: 0, hp: 20 } },
+    // ROS-1.3: осадная платформа — слабая в космическом бою, страшная для зданий.
+    // Её урон по постройкам объявлен ОТДЕЛЬНЫМ статом, потому что одним `attack`
+    // «слабый по кораблям и сильный по зданиям» выразить нечем.
+    siege: {
+      faction: 'x',
+      domain: 'space',
+      stats: { attack: 4, defense: 8, speed: 4, hp: 120, siegeDamage: 30 },
+      line: 'rear',
+    },
   },
   factions: {},
   buildings: {
@@ -177,6 +186,67 @@ describe('orbital — bombardment effects (GDD §7.4)', () => {
     expect(r.state.players.p2?.resources.metal ?? 0).toBe(0); // production frozen
     const mine = r.state.planets.P?.buildings.find((b) => b.type === 'mine');
     expect(mine?.hp).toBeLessThan(20); // 10 attack × 0.5 × 2h = 10 structural damage
+  });
+
+  // ROS-1.3. Урон по зданиям больше не производная от `attack`: у кого объявлен
+  // `siegeDamage`, тот бомбардирует ПО НЕМУ и в полную силу. Без этого стата корабль
+  // считается по-старому (attack × 0.5) — мягкая деградация, весь прежний контент
+  // ведёт себя как вёл.
+  it('осадная платформа бьёт по зданиям своим siegeDamage, а не долей attack', () => {
+    const kernel = createKernel([economyModule, ...combatFamily, constructionModule]);
+    const st = stateWith({
+      players: [player('p2', { metal: 0 })],
+      planets: [planet('P', 'p2', { buildings: [['depot', 1]] })], // hp 30
+      fleets: [fleet('F', 'p1', 'P', [['siege', 1]], { orbit: 'near', bombarding: true })],
+    });
+    const r = okAdvance(kernel.advanceTo(st, at(HOUR)));
+    // 30 siegeDamage × 1ч = 30 — ровно прочность склада, и он снесён (снесённое
+    // здание уходит из списка, `building.destroyed`), а не оставлен с нулём hp.
+    expect(r.state.planets.P?.buildings.map((b) => b.type)).toEqual([]);
+    expect(r.events.map((e) => e.type)).toContain('building.destroyed');
+  });
+
+  it('корабль без siegeDamage бомбардирует по-старому — attack × 0.5', () => {
+    const kernel = createKernel([economyModule, ...combatFamily, constructionModule]);
+    const st = stateWith({
+      players: [player('p2', { metal: 0 })],
+      planets: [planet('P', 'p2', { buildings: [['depot', 1]] })], // hp 30
+      fleets: [fleet('F', 'p1', 'P', [['cruiser', 1]], { orbit: 'near', bombarding: true })],
+    });
+    const r = okAdvance(kernel.advanceTo(st, at(HOUR)));
+    const depot = r.state.planets.P?.buildings.find((b) => b.type === 'depot');
+    expect(depot?.hp).toBe(25); // 10 attack × 0.5 × 1ч = 5
+  });
+
+  it('смешанный флот складывает обе формулы в одном залпе', () => {
+    const kernel = createKernel([economyModule, ...combatFamily, constructionModule]);
+    const st = stateWith({
+      players: [player('p2', { metal: 0 })],
+      planets: [planet('P', 'p2', { buildings: [['mine', 1]] })], // hp 20
+      fleets: [
+        fleet('F', 'p1', 'P', [['siege', 1], ['cruiser', 1]], { orbit: 'near', bombarding: true }),
+      ],
+    });
+    const r = okAdvance(kernel.advanceTo(st, at(HOUR)));
+    // 30 (платформа) + 5 (крейсер) = 35 за час против 20 прочности — шахты не стало.
+    expect(r.state.planets.P?.buildings.map((b) => b.type)).toEqual([]);
+  });
+
+  // Осадная платформа слаба ИМЕННО в космосе: её `siegeDamage` не должен подменять
+  // `attack` там, где стреляют по кораблям, иначе «слабый корабль» перестал бы им быть.
+  it('siegeDamage не усиливает корабль в бою флот-на-флот', () => {
+    const kernel = createKernel([...combatFamily]);
+    const st = stateWith({
+      planets: [planet('P', null)],
+      fleets: [
+        fleet('S', 'p1', 'P', [['siege', 1]]),
+        fleet('E', 'p2', 'P', [['cruiser', 1]]),
+      ],
+    });
+    const r = okAdvance(kernel.advanceTo(st, at(HOUR)));
+    // Крейсер (attack 10) против платформы (attack 4, hp 120): платформа держится,
+    // но своим осадным калибром по кораблю не бьёт — крейсер жив.
+    expect(r.state.fleets.E?.units[0]?.count).toBe(1);
   });
 
   it('lets production flow when the same fleet is not bombarding', () => {

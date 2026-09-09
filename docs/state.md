@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 5743 зелёных** (62 skip, 434 файла; с `DATABASE_URL` — 5805 без пропусков: все пропуски — тесты durable-пути, которым нужна база).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 5747 зелёных** (62 skip, 434 файла; с `DATABASE_URL` — 5809 без пропусков: все пропуски — тесты durable-пути, которым нужна база).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -664,8 +664,13 @@ INSTEAD-of-фокус — opportunity-cost (лидер-«+слот» branchless)
   нет наземного штурма** (иначе ПВО просто обороняет гарнизон как наземный
   юнит); обнулённый флот уничтожается. (б)
   **Бомбардировка** — каждый бомбящий флот эмитит `planet.bombarded
-{planetId, power, owner}` (`power = Σ attack × 0.5 × часы`, Σ — по капу
-  10 юнитов, как в ближнем бою).
+{planetId, power, owner}` (`power` — по капу 10 юнитов, как в ближнем бою;
+  ПОКОРПУСНО: осадный корпус даёт свой `stats.siegeDamage` целиком, любой другой —
+  `attack × 0.5`, и обе формулы делят ОДНУ огневую линию, ROS-1.3. Раньше формула
+  была одна на всех — доля `attack`, — и «слабый в космосе, страшный для планеты»
+  выразить было нечем: осадный корабль мог крушить мир, только будучи заодно сильным
+  боевым. Смешанный флот считается одним вызовом `cappedUnitStat` с ФОРМУЛОЙ вместо
+  имени стата: два вызова потратили бы кап дважды и удвоили залп).
   **Оптимизация `runOrbital`:** пре-индекс флотов по локации + сет наземных штурмов;
   стоимость O(planets + fleets + battles) вместо O(planets × fleets).
 - На `time.advanced` — **артиллерийский залп на расстоянии** (`runArtillery`,
@@ -1648,10 +1653,14 @@ ad-hoc запрос «видим ли объект на identify-уровне» 
 - **units** (схема `UnitDef`): `domain('space'|'ground')`, `kind('infantry'|'vehicle')` —
   род НАЗЕМНЫХ войск (ROS-1.1: пехота строится в казармах, техника на заводе; у
   космических корпусов поле не читается), `stats{attack, defense,
-speed, hp, shield, range, cargoCapacity, cargoSize, aaDamage}` (+ любые доп. числа),
+speed, hp, shield, range, cargoCapacity, cargoSize, aaDamage, siegeDamage}`
+  (`siegeDamage` — урон по ПОСТРОЙКАМ при бомбардировке, ROS-1.3; 0 = не осадный
+  корпус, тогда бомбардировка считается по старой формуле; в бою флот-на-флот стат
+  не участвует) (+ любые доп. числа),
   `line, traits, abilities, cost, buildTimeHours, upkeep`, `signature, radarRange`
   (армия очков не даёт — см. victory). Есть: `scout_drone, scout, sensor_frigate,
-cruiser, siege, siege_lance, artillery(artillery,range 300),
+cruiser, siege(«осадная платформа», siegeDamage 60 при attack 6 и hp 120),
+siege_lance, artillery(artillery,range 300),
 strike_carrier(«десантный корабль», cargoCapacity 16), shuttle_carrier(«Шаттл»,
 shuttleBay 6), militia, drop_infantry, tank(cargoSize 1), heavy_infantry,
 special_forces, hero, interceptor` (16 юнитов: 12 `vanguard` + 4 `blue`, приехавших из

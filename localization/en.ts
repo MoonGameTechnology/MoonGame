@@ -796,7 +796,7 @@ export const en: Record<string, string> = {
     'A spaceport under way: {bay} shuttle berths, and they launch from it and land back on it — so the fleet can strike with shuttles far from its own worlds. Almost no guns of its own ({a} attack), but it holds ({d} defense, {hp} hull) and stands in the REAR line. The hangar lives exactly as long as its hulls do: lose the carrier and you lose the shuttles aboard.',
   'dossier.unit.shuttle-carrier.name': 'Shuttle',
   'dossier.unit.siege.desc':
-    "A heavy siege platform: the fleet's biggest single gun ({a} damage) on thin armor ({d} defense, {hp} hull). It stands in the REAR line, so only a fifth of an incoming volley reaches it while the cruisers hold the front. It has no standoff fire: to shoot, it joins the battle like everyone else.",
+    "A siege platform: it rains bombs from orbit onto the world below — {s} damage per hour to BUILDINGS, more than anything else in the fleet. Against ships and shuttles it is nearly useless ({a} attack), but it is tough ({hp} hull, {d} defense) and stands in the REAR line, so it can hold a siege for a long time. It has no standoff fire: against a fleet it joins the battle like everyone else.",
   'dossier.unit.siege.name': 'Siege Platform',
   'dossier.unit.strike-carrier.desc':
     "A landing ship: the fleet's biggest hold ({c} berths) on its thickest hull ({hp}). It does not fight — {a} attack is nothing — it delivers the army to a hostile world and soaks while it lands. It carries no shuttles: only the Shuttle has a hangar.",

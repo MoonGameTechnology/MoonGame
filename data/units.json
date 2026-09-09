@@ -314,10 +314,11 @@
   "siege": {
     "faction": "blue",
     "stats": {
-      "attack": 30,
-      "defense": 6,
-      "speed": 30,
-      "hp": 40
+      "attack": 6,
+      "defense": 10,
+      "speed": 22,
+      "hp": 120,
+      "siegeDamage": 60
     },
     "line": "rear",
     "traits": [],

@@ -145,11 +145,17 @@ export const COMBAT_UNIT_CAP = 10;
  *  Stacks the optional `eligible` filter rejects neither fire nor consume budget
  *  (artillery standoff spends the cap on artillery units only). Deterministic:
  *  the sort key is (stat desc, unit id asc); stacks tied on both have identical
- *  per-unit contributions, so their relative order can't change the sum. */
+ *  per-unit contributions, so their relative order can't change the sum.
+ *
+ *  `stat` may be a FORMULA over the unit's effective stats instead of one stat
+ *  name (ROS-1.3): bombardment reads `siegeDamage` from the hulls that carry it
+ *  and `attack × fraction` from those that don't, and both kinds share ONE firing
+ *  line. Two calls could not express that — each would spend the full cap, and a
+ *  mixed fleet would fire twice over. */
 export function cappedUnitStat(
   stacks: readonly UnitStack[],
   data: GameData,
-  stat: string,
+  stat: string | ((stats: Record<string, number>) => number),
   eligible?: (def: UnitDef) => boolean,
   cap: number = COMBAT_UNIT_CAP,
 ): number {
@@ -158,7 +164,12 @@ export function cappedUnitStat(
     if (s.count <= 0) continue;
     const def = data.units[s.unit];
     if (!def || (eligible && !eligible(def))) continue;
-    rows.push({ per: effectiveStats(def, s, data)[stat] ?? 0, unit: s.unit, count: s.count });
+    const stats = effectiveStats(def, s, data);
+    rows.push({
+      per: typeof stat === 'function' ? stat(stats) : (stats[stat] ?? 0),
+      unit: s.unit,
+      count: s.count,
+    });
   }
   rows.sort((a, b) => b.per - a.per || (a.unit < b.unit ? -1 : a.unit > b.unit ? 1 : 0));
   let budget = cap;
