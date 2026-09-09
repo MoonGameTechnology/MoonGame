@@ -581,6 +581,7 @@
 | RESIL-4 | ✅ | srv | `docs/backlog.md:13012` | Соак проверяет, что мир не встал. |
 | RESIL-5 | ✅ | srv proto | `docs/backlog.md:13030` | Генеральная репетиция: весь стек разом, и |
 | RESIL-6 | ✅ | srv proto | `docs/backlog.md:13065` | Достоверность генералки: настоящая база, |
+| ADDR-7 | ✅ | sec proto | `docs/backlog.md:13175` | Ссылка на партию не пускает по незнанию: |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |

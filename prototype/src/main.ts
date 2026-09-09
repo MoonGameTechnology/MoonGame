@@ -781,7 +781,7 @@ import { warPromptText, warReason } from './warPromptView';
 import { pickEffect } from './pickApply';
 import { fleetsUnderTap } from './tapTargets';
 import { resolveAddress } from './serverAddress';
-import { authStatusUrl, identityMode, revealSignup } from './identityProbe';
+import { authStatusUrl, identityMode, revealSignup, type IdentityMode } from './identityProbe';
 import { seatView, type SeatView } from './seatList';
 import { pollLine, pollTick, type PollPhase } from './matchPoll';
 import { pingRoute, relayIntake } from './relayIntake';
@@ -8789,8 +8789,8 @@ const showConnect = (show: boolean): void => {
   connectEl.style.display = show ? 'flex' : 'none';
 };
 /** Виден ли экран подключения. Нужен там, где решение зависит от того, ПРОЧИТАЕТ ли
- *  игрок написанное в его строку статуса: по ссылке на сессию оверлей скрыт с самого
- *  начала загрузочной ветки, и текст отказа в нём равен молчанию (ADDR-5). */
+ *  игрок написанное в его строку статуса. Пришёл ли он по ссылке — отдельный вопрос и
+ *  отдельный признак (`cameFromLink`): оверлей держится до впуска в обоих случаях. */
 const connectShown = (): boolean => connectEl.style.display !== 'none';
 srvInput.value =
   localStorage.getItem('void.server') ??
@@ -8987,7 +8987,11 @@ async function hubAuthorizedBase(): Promise<{ base: string; token: string } | nu
   const srv = resolveServer();
   if (srv) await probeAuthMode(srv.base); // проба режима — только когда есть у кого
   return authorizedBase(
-    { server: srv, accountsMode: authMode, token: srv ? sessionToken(srv.base) : null },
+    {
+      server: srv,
+      accountsMode: authMode === 'accounts',
+      token: srv ? sessionToken(srv.base) : null,
+    },
     httpBase,
   );
 }
@@ -9085,7 +9089,7 @@ async function syncCommanderFromServer(): Promise<void> {
   const srv = resolveServer();
   if (!srv) return;
   await probeAuthMode(srv.base);
-  if (!authMode) return;
+  if (authMode !== 'accounts') return;
   const session = sessionToken(srv.base);
   if (!session) return;
   try {
@@ -9126,7 +9130,7 @@ $('cnew').addEventListener('click', () => {
   // With accounts OFF (nick-only server) there is no password to set, so a new commander
   // just gets a suggested callsign and drops into the hub.
   void authProbe.then(() => {
-    if (authMode) {
+    if (authMode === 'accounts') {
       openRegister();
       return;
     }
@@ -9151,7 +9155,7 @@ function signInByCallsign(): void {
   // Same race guard as «Новый командир»: never pick the guest branch while the
   // /auth/status probe is still in flight.
   void authProbe.then(() => {
-    if (authMode) {
+    if (authMode === 'accounts') {
       void welcomeSignIn(nick);
       return;
     }
@@ -9522,7 +9526,15 @@ document.getElementById('rail-settings')?.addEventListener('click', () => settin
 // block that read is a TDZ, and esbuild's const/let→var lowering turns the crash into a
 // silent `undefined` (the httpBase trap; caught by tsc TS2448 when the prototype gained
 // a typecheck).
-let authMode = false;
+// Что сервер сказал про аккаунты. НЕ булево: «не знаю» (проба ещё не спрошена или не
+// дошла) обязано отличаться от «аккаунтов нет» — иначе незнание читается как разрешение
+// (`joinLanding`, правило 5). До ответа сервера — именно «не знаю».
+let authMode: IdentityMode = 'unknown';
+/** Игрок пришёл ПО ССЫЛКЕ на партию, а не через экран подключения. Решает, куда его
+ *  посадить, если войти не дали: у пришедшего по ссылке нет экрана, на который можно
+ *  вернуться, — ему его надо дать (ADDR-5). Раньше это выводилось из невидимости
+ *  оверлея, но оверлей теперь держится до впуска, и признак стал самостоятельным. */
+let cameFromLink = false;
 /** When a join is attempted without a stored session, we show the welcome card; this
  *  holds the match AND the seat/faction the player already chose, so the sign-in can
  *  resume the join in full. `take()` reads and forgets in one step — see
@@ -9546,7 +9558,15 @@ if (bootReset) {
   // Direct deep-link into a match. Two paths:
   //  (a) cached session JWT → connectToMatch immediately (no welcome card)
   //  (b) no session → show welcome card, welcomeSignIn auto-resumes the join
-  showConnect(false);
+  //
+  // ПОКА НЕ ВПУСТИЛИ — КАРТА ЗАКРЫТА. Раньше ветка начиналась с `showConnect(false)`, и
+  // это снимало оверлей ДО того, как станет известен исход: пришедший по ссылке видел
+  // карту, пока сервер ещё только решал, пускать ли его. Тому, кого не пустят, она не
+  // предназначалась вовсе. Оверлей снимает единственное честное событие — приход
+  // приветственного снимка (там `showConnect(false)` и стоит); ровно об этом же
+  // предупреждает правило 2 в `socketFate.ts`: «отвергнутый вход мигнёт игроку картой».
+  cameFromLink = true;
+  showConnect(true);
   showHub(false);
   void (async () => {
     const srv = resolveServer();
@@ -9557,7 +9577,7 @@ if (bootReset) {
     // into the browser console (and into any screen recording of a playtest).
     const cached = srv ? sessionRecord(srv.base) : null;
     const where = joinLanding({
-      authRequired: !!authMode,
+      identity: authMode,
       hasSession: !!cached,
       refused: false,
     });
@@ -9569,8 +9589,9 @@ if (bootReset) {
     // No session — show the welcome card so the player can register/login,
     // then welcomeSignIn auto-resumes the join via pendingJoinAfterAuth.
     pendingJoinAfterAuth.remember(bootJoinId, bootSlot, bootFaction, bootScientists);
-    // ADDR-5: ветка началась с showConnect(false), и без этой строки карточка входа
-    // выставлялась ВНУТРИ скрытого оверлея — игрок получал пустой экран вместо входа.
+    // ADDR-5. Оверлей ветка держит показанным с самого начала, так что строка здесь —
+    // не «показать», а «не дать погаснуть»: когда-то ветка начиналась со скрытого
+    // оверлея, и карточка входа выставлялась ВНУТРИ него — игрок получал пустой экран.
     showConnect(true);
     showStage('welcome');
     const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
@@ -9591,14 +9612,14 @@ if (bootReset) {
   showStage('welcome');
   void (async () => {
     const srv = resolveServer();
-    if (srv) await probeAuthMode(srv.base);
+    const mode = srv ? await probeAuthMode(srv.base) : authMode;
     const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
     if (savedNick) {
       wNickInput.value = savedNick;
     } else {
       wNickInput.value = suggestCallsign();
     }
-    if (authMode) {
+    if (mode === 'accounts') {
       wPassRowEl.style.display = 'flex';
       wPassInput.focus();
     } else {
@@ -10390,7 +10411,7 @@ function connect(): void {
   const url = dialUrl(
     base,
     currentMatchId,
-    dialIdentity(authMode, pendingJoinToken, nick, seatTicket),
+    dialIdentity(authMode === 'accounts', pendingJoinToken, nick, seatTicket),
   );
   pendingJoinToken = null; // one dial per token fetch — a reconnect mints a fresh one
   statusEl.textContent = t('net.connecting', { nick });
@@ -10461,16 +10482,17 @@ function connect(): void {
       scheduleReconnect(); // a reconnect attempt failed to admit → back off and retry
     }
     // `keep-reason`: нас не впустили — ответ сервера уже в строке статуса, и стирать
-    // его нечем (правило 4). Оверлей ПОКАЗАН, если игрок пришёл через экран подключения,
-    // — но не когда он пришёл по ссылке на сессию: там ветка началась с showConnect(false),
-    // и строка статуса, как и весь экран, невидима. Тогда сажаем его на видимый экран
-    // (ADDR-5): причина уезжает с ним, а решение о том, куда именно, не зависит от кода
-    // отказа — иначе ссылка стала бы оракулом существования партий.
-    if (!connectShown()) {
+    // его нечем (правило 4). Пришедшего через экран подключения он там и прочитает. А вот
+    // пришедшему ПО ССЫЛКЕ возвращаться некуда: экрана, с которого он начал, у него нет.
+    // Его сажаем на видимый экран (ADDR-5) — причина уезжает с ним, а решение о том, куда
+    // именно, не зависит от кода отказа: иначе ссылка стала бы оракулом существования
+    // партий. Признак берётся из `cameFromLink`, а не из невидимости оверлея: оверлей
+    // теперь держится до впуска, чтобы не показывать карту тому, кого могут не пустить.
+    if (cameFromLink || !connectShown()) {
       const reason = statusEl.textContent ?? '';
       const srv = resolveServer();
       const landing = joinLanding({
-        authRequired: !!authMode,
+        identity: authMode,
         hasSession: srv ? !!sessionRecord(srv.base) : false,
         refused: true,
       });
@@ -10545,14 +10567,18 @@ function sessionToken(base: string): string | null {
 }
 
 /** Probe the server's identity mode and show/hide the password field. */
-async function probeAuthMode(base: string): Promise<void> {
+async function probeAuthMode(base: string): Promise<IdentityMode> {
   // Что означает ответ пробы — `identityProbe.ts` (REFM-154): ответ «не 2xx» это не
   // беда, а «аккаунтов тут нет» (игру часто открывают с обычной раздачи файлов); тело
   // разбирают только у 2xx (голый `res.json()` на HTML-404 бросал SyntaxError в
   // консоль); не дошли до сервера — считаем режим позывных, вход и так выдаст
   // настоящую ошибку. Режим аккаунтов включает ровно живое «да».
-  authMode = (await identityMode(() => fetch(authStatusUrl(base)))) === 'accounts';
-  if (passRow) passRow.style.display = authMode ? '' : 'none';
+  authMode = await identityMode(() => fetch(authStatusUrl(base)));
+  if (passRow) passRow.style.display = authMode === 'accounts' ? '' : 'none';
+  // Возвращаем то же самое, что положили: после `await` компилятор не видит присвоения
+  // модульной переменной и сужает её до начального «не знаю», а читать её сразу после
+  // пробы нужно именно здесь.
+  return authMode;
 }
 
 // First visit, Bytro-style (SES-2.5 UX): when the server runs accounts, sign-up IS
@@ -10741,7 +10767,11 @@ function connectToMatch(
   void (async () => {
     const srv = resolveServer();
     const cached = srv ? sessionRecord(srv.base) : null;
-    const next = joinStep({ accountsMode: authMode, serverKnown: !!srv, hasSession: !!cached });
+    const next = joinStep({
+      accountsMode: authMode === 'accounts',
+      serverKnown: !!srv,
+      hasSession: !!cached,
+    });
     if (next.step === 'sign-in') {
       askSignIn(id, slot, faction, next.password ? srv : null, scientists);
       return;
@@ -11384,9 +11414,10 @@ function scheduleReconnect(): void {
     // Accounts mode (SES-2.5): the join token is short-lived (15 min), so a redial
     // mints a fresh one off the long-lived session first; an expired session drops
     // the redial to the connect screen with «введите пароль» (fail-explicit).
-    const srv = authMode ? resolveServer() : null;
+    const accounts = authMode === 'accounts';
+    const srv = accounts ? resolveServer() : null;
     const session = srv ? sessionToken(srv.base) : null;
-    const plan = redialPlan(authMode, !!session);
+    const plan = redialPlan(accounts, !!session);
     if (plan === 'dial') {
       connect(); // reuse the saved server + nick; don't reset the attempt counter
       return;
