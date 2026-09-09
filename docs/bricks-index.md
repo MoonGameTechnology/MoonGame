@@ -589,10 +589,11 @@
 | BLD-1 | ✅ | core proto | `docs/backlog.md:13385` | Очередь строительства: заказы встают в |
 | UI-14 | ✅ | proto | `docs/backlog.md:13425` | Осмотр чужого флота должен быть находимым. |
 | CMB-5 | ✅ | core | `docs/backlog.md:13448` | Вражда началась — стоящие рядом флоты сходятся |
-| ORD-2 | ⏳ | proto | `docs/backlog.md:13464` | Нацеленный ШТУРМ не переживает закрытую вкладку. |
-| FOG-10 | ⏳ | proto core | `docs/backlog.md:13484` | На живом сервере память разведки живёт только во |
-| TEST-4 | ⏳ | srv | `docs/backlog.md:13502` | topXp не изолирован по прогону. |
-| FOG-9 | ⏳ | core | `docs/backlog.md:13511` | Приостановленная стройка чужого мира видна наблюдателю. |
+| ATK-1 | ✅ | proto | `docs/backlog.md:13464` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
+| ORD-2 | ⏳ | proto | `docs/backlog.md:13488` | Нацеленный ШТУРМ не переживает закрытую вкладку. |
+| FOG-10 | ⏳ | proto core | `docs/backlog.md:13508` | На живом сервере память разведки живёт только во |
+| TEST-4 | ⏳ | srv | `docs/backlog.md:13526` | topXp не изолирован по прогону. |
+| FOG-9 | ⏳ | core | `docs/backlog.md:13535` | Приостановленная стройка чужого мира видна наблюдателю. |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |

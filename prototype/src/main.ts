@@ -26,6 +26,7 @@ import {
   orbitFleet,
   assaultFleet,
   bombardFleet,
+  engageFleet,
   barrageFleet,
   barrageModeFleet,
   loadArmy,
@@ -1029,6 +1030,11 @@ let aiming = false; // "Move" command armed → next world tap orders the move
 // world — the fleet flies there and assaults on arrival (one-shot, not the CC-2
 // standing auto-storm). Keyed by fleet id → destination world.
 let assaultAim = false;
+/** Вооружена «Атака» (ATK-1): следующий тап по ЧУЖОМУ флоту — приказ его атаковать.
+ *  Кнопка стоит в ряду команд ВСЕГДА, как «Курс»: атака — базовое действие флота, а не
+ *  условная возможность, и прятать её значило бы заставлять игрока гадать, отчего она
+ *  то есть, то нет. Что цель не годится, скажет ядро — одним понятным отказом. */
+let engageAim = false;
 const assaultOnArrival = new Map<string, string>();
 let barrageAim = false; // "Обстрел" armed → next tap picks the artillery's focus target
 // Hero window armed modes: a cast waits for its target world; a deploy waits for the
@@ -5769,8 +5775,15 @@ function fleetPanelHtml(f: Fleet): string {
         f.bombarding ? t('side.strike.bombard.stop') : t('side.strike.bombard'),
         bombardEnabled(inOrbit, nShips),
       );
-      // Штурм не спрашивает состав: высаживается десант, а не корпуса.
-      at += btn('assault', '', t('side.strike.assault'), assaultEnabled(inOrbit));
+      // Штурм не спрашивает КОРАБЛИ (высаживается десант, а не корпуса), но десант
+      // спрашивает — там, где его требует ядро: на защищённом мире без него ответ
+      // `E_NO_TROOPS`, и живая кнопка обещала бы заведомый отказ (правило 4).
+      at += btn(
+        'assault',
+        '',
+        t('side.strike.assault'),
+        assaultEnabled(inOrbit, sumUnits(f.landing ?? []) > 0, sumUnits(here!.garrison) > 0),
+      );
       at += `</div>`;
       at += `<div class="hint">${t('side.strike.hint')}</div>`;
       // Combat forecast (ONB-6): «если атакую — что будет?» — the pure base-model
@@ -7307,6 +7320,9 @@ function renderCmdBar() {
   const html =
     `<span class="cmdlabel">${ids.length > 1 ? t('cmd.selection.many', { n: ids.length }) : t('cmd.selection.one')}</span>` +
     cmdBtn('move', '⤳', t('cmd.move'), aiming ? 'on' : '', false, t('cmd.move.hint')) +
+    // ATK-1: «Атака» — всегда, как «Курс». Цель у неё ФЛОТ, а не мир (в отличие от
+    // ШТУРМА ниже), поэтому и кнопка отдельная, и прицел отдельный.
+    cmdBtn('engage', '⚡', t('cmd.engage'), engageAim ? 'on' : '', false, t('cmd.engage.hint')) +
     (shown.stop ? cmdBtn('stop', '■', t('cmd.stop'), 'danger', false, t('cmd.stop.hint')) : '') +
     cmdBtn(
       'attack',
@@ -7598,6 +7614,10 @@ side.addEventListener('click', (ev) => {
     enqueueBuild(selPlanet!, { kind: 'building', id: arg, count: 1 });
   } else if (act === 'unit') {
     enqueueBuild(selPlanet!, { kind: 'unit', id: arg, count: 1 });
+  } else if (act === 'engage') {
+    // Нарочная атака чужого флота на своём же узле (`fleet.engage`). Первый залп — на
+    // самом приказе (CMB-4), поэтому «атака» здесь и правда атака, а не заявка на неё.
+    playerOrder(engageFleet(ME, selFleet!, arg));
   } else if (act === 'cancelbuild') {
     // The active order only — refunds the unbuilt share and pauses it (resumable).
     playerOrder(cancelConstruction(ME, selPlanet!, Number(arg)));
@@ -7848,15 +7868,22 @@ cmdbar.addEventListener('click', (ev) => {
   if (disarms('cast', cmd)) castMenu = false;
   if (disarms('troops', cmd)) troopsPlan = null;
   if (disarms('assault', cmd)) assaultAim = false;
+  if (disarms('engage', cmd)) engageAim = false;
   // A real order leaves «Выбрать+» (the group stays selected and takes it);
   // ☰ and the ⊕ toggle itself keep the picking session alive.
   if (disarms('pick', cmd)) pickMode = false;
   // ALWAYS_DISARMED: подтверждаются тапом по КАРТЕ, своей команды в ряду у них нет.
   heroAim = null;
   heroSpawnAim = null;
-  if (cmd === 'move') {
+  if (cmd === 'engage') {
+    engageAim = !engageAim; // arm / disarm the attack order
+    aiming = false;
+    assaultAim = false;
+    if (engageAim) note(t('hint.pick-engage'));
+  } else if (cmd === 'move') {
     aiming = !aiming; // arm / disarm the move order
     assaultAim = false;
+    engageAim = false;
     // Подсказка только на тач: там один палец занят прицелом, и жест камеры надо
     // назвать вслух. На PC мышь и так возит камеру перетаскиванием.
     if (aiming && !pcUi()) note(t('hint.aim-armed'));
@@ -7877,6 +7904,7 @@ cmdbar.addEventListener('click', (ev) => {
       // the fleet there and it storms on arrival (valid targets ring up on the map).
       assaultAim = !assaultAim;
       aiming = false;
+      engageAim = false;
       if (assaultAim) note(t('hint.pick-assault'));
     } else {
       for (const id of ids) if (s.fleets[id]?.orbit === 'near') playerOrder(assaultFleet(ME, id));
@@ -8062,6 +8090,7 @@ function selectAt(mx: number, my: number) {
     heroAim: !!heroAim,
     heroSpawnAim: !!heroSpawnAim,
     assaultAim,
+    engageAim,
     pickMode,
     aiming,
   });
@@ -8163,6 +8192,56 @@ function selectAt(mx: number, my: number) {
     if (fate === 'fire') tryAssaultGroup(selectedFleetIds(), n!.id);
     assaultAim = false;
     lastPanelHtml = '';
+    return;
+  }
+  /**
+   * ATK-1. «Атака» наведена: следующий тап по ЧУЖОМУ флоту — приказ его атаковать.
+   *
+   * Два случая, и оба выражаются уже существующими приказами ядра:
+   *  · цель стоит на ТОМ ЖЕ узле — `fleet.engage` немедленно (первый залп на самом
+   *    приказе, CMB-4);
+   *  · цель в другом месте — марш к её узлу. Отдельного «атаковать издалека» заводить
+   *    не нужно: ядро само сцепляет прибывший флот с враждебным на месте
+   *    (`engageFleets` на `fleet.arrived`), то есть марш И ЕСТЬ атака на расстоянии.
+   *
+   * Промах (тап не по флоту) прицел СНИМАЕТ — в отличие от ШТУРМА, который промах
+   * прощает: там цель это МИР, крупный и слипающийся в скоплениях, а здесь цель —
+   * точка флота, и «не попал» почти всегда значит «передумал».
+   */
+  if (owner === 'engage') {
+    const foe = nearestHit(
+      Object.values(s.fleets)
+        .filter(
+          (g) =>
+            g.owner !== ME &&
+            fleetVisible(false, known(fleetNode(g)), intelFleetOwners.has(g.owner)) &&
+            sumUnits(g.units) > 0,
+        )
+        .map((g) => ({ id: g.id, anchor: fleetAnchor(g) })),
+      (g) => g.anchor,
+      mx,
+      my,
+      rFleet,
+    );
+    engageAim = false;
+    lastPanelHtml = '';
+    if (!foe) {
+      note(t('hint.engage-enemy-only'));
+      return;
+    }
+    const target = s.fleets[foe.id]!;
+    for (const id of selectedFleetIds()) {
+      const mine = s.fleets[id];
+      if (!mine) continue;
+      if (mine.location && mine.location === target.location) {
+        playerOrder(engageFleet(ME, id, target.id));
+      } else if (target.location) {
+        // Марш к узлу цели: сцепку по прибытии заводит само ядро.
+        playerOrder(moveFleet(ME, id, target.location));
+      } else {
+        note(t('hint.engage-in-flight')); // цель сама в пути — курса к ней нет
+      }
+    }
     return;
   }
   // SEL-1 «Выбрать+»: while picking, taps only toggle OWN fleets in/out of the

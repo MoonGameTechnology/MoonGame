@@ -65,9 +65,9 @@ describe('ALWAYS_DISARMED', () => {
 
 describe('the table itself', () => {
   // Правило 6: `chainMode` в таблицу не входит — полоска цепочки заменяет ряд целиком.
-  it('covers the seven row states and not the chain mode', () => {
+  it('covers the eight row states and not the chain mode', () => {
     expect(STATES.sort()).toEqual(
-      ['assault', 'barrage', 'cast', 'firemode', 'merge', 'pick', 'troops'].sort(),
+      ['assault', 'barrage', 'cast', 'engage', 'firemode', 'merge', 'pick', 'troops'].sort(),
     );
     expect(STATES).not.toContain('chain' as ArmedState);
   });
