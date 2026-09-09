@@ -41,7 +41,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@playwright/mcp": "0.0.79",
+    "@playwright/mcp": "0.0.80",
     "@types/node": "^26.2.0",
     "@types/ws": "8.18.1",
     "@vitest/coverage-v8": "^4.1.11",
@@ -50,7 +50,7 @@
     "fast-check": "^4.9.0",
     "prettier": "^3.9.6",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.68.0",
+    "typescript-eslint": "^8.69.0",
     "vitest": "^4.1.11",
     "ws": "8.21.3"
   },
