@@ -115,6 +115,20 @@ function findEnemyFleetAt(
   return best;
 }
 
+/**
+ * CMB-7. Перестали ли стороны боя быть враждебными.
+ *
+ * Ничейный гарнизон (`owner === null`) сюда не попадает: у него нет стойки, спрашивать
+ * её не у кого, и бой с ним не прекращается ничем, кроме исхода. Fail-secure: неизвестно
+ * — значит НЕ перемирие, бой продолжается.
+ */
+function ceasefired(h: HandlerContext, battle: Battle): boolean {
+  const a = battle.attacker.owner;
+  const b = battle.defender.owner;
+  if (a === null || b === null) return false;
+  return !isHostile(h, a, b);
+}
+
 /** Pulls a fleet out of transit and pins it at a node (it now fights/holds). */
 function pinToNode(fleet: Fleet, at: string): void {
   fleet.location = at;
@@ -332,9 +346,22 @@ function releaseOrDestroyFleet(h: HandlerContext, ref: CombatantRef): void {
   }
 }
 
-function finishBattle(h: HandlerContext, battle: Battle, stalemate = false): void {
+/**
+ * Чем кончился бой:
+ *  · `decided`   — обычный исход, победитель тот, кто остался жив;
+ *  · `stalemate` — предохранитель `MAX_COMBAT_ROUNDS`: обе стороны живы, победителя нет;
+ *  · `ceasefire` — стороны перестали быть враждебными (CMB-7).
+ *
+ * Два последних ведут себя одинаково: победителя нет и цепочки «победитель сцепляется
+ * со следующим» не будет. Раньше это был булев `stalemate`; третий смысл в булеве не
+ * помещался, а звать перемирие «ничьёй» значило бы соврать и игроку, и журналу.
+ */
+type BattleEnd = 'decided' | 'stalemate' | 'ceasefire';
+
+function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decided'): void {
   const aAlive = sideAlive(h.state, battle.attacker.ref);
   const dAlive = sideAlive(h.state, battle.defender.ref);
+  const stalemate = end !== 'decided';
   const winner = stalemate
     ? null
     : aAlive && !dAlive
@@ -401,6 +428,7 @@ function finishBattle(h: HandlerContext, battle: Battle, stalemate = false): voi
     phase: battle.phase,
     winner,
     rounds: battle.round,
+    end,
   });
 
   // A STALEMATE (the MAX_COMBAT_ROUNDS valve) must NOT chain-engage: both sides are
@@ -505,6 +533,13 @@ export const combatModule: GameModule = {
     api.on('diplomacy.changed', (event, h) => {
       const { a, b } = event.payload as { a?: unknown; b?: unknown };
       if (typeof a !== 'string' || typeof b !== 'string') return;
+      // CMB-7: сначала РАСЦЕПИТЬ тех, кто перестал быть врагом, и только потом сцеплять
+      // тех, кто им стал. В обратном порядке смягчение стойки на миг оставило бы бой
+      // живым, а сцепка увидела бы стороны занятыми.
+      for (const id of Object.keys(h.state.battles).sort()) {
+        const battle = h.state.battles[id];
+        if (battle && ceasefired(h, battle)) finishBattle(h, battle, 'ceasefire');
+      }
       // Порядок обхода фиксирован сортировкой: кто из пары окажется атакующим, не
       // должно зависеть от порядка создания флотов (инвариант детерминизма).
       for (const id of Object.keys(h.state.fleets).sort()) {
@@ -670,10 +705,21 @@ export const combatModule: GameModule = {
         finishBattle(h, battle);
         return;
       }
+      // CMB-7. Бой идёт, только пока стороны ВРАЖДЕБНЫ. Раньше здесь спрашивали лишь
+      // «жива ли сторона», и вражда проверялась ровно один раз — при заведении боя.
+      // Значит помирившиеся посреди боя продолжали убивать друг друга до чьей-нибудь
+      // смерти: кнопка мира на них не действовала, и это читается как сломанный мир, а
+      // не как правило. Здесь — САМО правило (каждый раунд спрашивает заново), а
+      // мгновенное применение — в обработчике `diplomacy.changed`: раунд стоит игровой
+      // час, и без него перемирие стоило бы ещё одного залпа.
+      if (ceasefired(h, battle)) {
+        finishBattle(h, battle, 'ceasefire');
+        return;
+      }
 
       battle.round += 1;
       if (battle.round > MAX_COMBAT_ROUNDS) {
-        finishBattle(h, battle, true); // stalemate safety valve
+        finishBattle(h, battle, 'stalemate'); // safety valve
         return;
       }
 

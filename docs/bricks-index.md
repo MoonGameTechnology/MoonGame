@@ -590,11 +590,12 @@
 | UI-14 | ✅ | proto | `docs/backlog.md:13430` | Осмотр чужого флота должен быть находимым. |
 | CMB-5 | ✅ | core | `docs/backlog.md:13453` | Вражда началась — стоящие рядом флоты сходятся |
 | ATK-1 | ✅ | proto | `docs/backlog.md:13469` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
-| CMB-6 | ⏳ | core | `docs/backlog.md:13557` | После ничьей третий враждебный флот остаётся стоять рядом. |
-| ORD-2 | ⏳ | proto | `docs/backlog.md:13567` | Нацеленный ШТУРМ не переживает закрытую вкладку. |
-| FOG-10 | ⏳ | proto core | `docs/backlog.md:13587` | На живом сервере память разведки живёт только во |
-| TEST-4 | ⏳ | srv | `docs/backlog.md:13605` | topXp не изолирован по прогону. |
-| FOG-9 | ⏳ | core | `docs/backlog.md:13614` | Приостановленная стройка чужого мира видна наблюдателю. |
+| CMB-7 | ✅ | core | `docs/backlog.md:13564` | Перемирие посреди боя не останавливало бой. |
+| CMB-6 | ⏳ | core | `docs/backlog.md:13585` | После ничьей третий враждебный флот остаётся стоять рядом. |
+| ORD-2 | ⏳ | proto | `docs/backlog.md:13595` | Нацеленный ШТУРМ не переживает закрытую вкладку. |
+| FOG-10 | ⏳ | proto core | `docs/backlog.md:13615` | На живом сервере память разведки живёт только во |
+| TEST-4 | ⏳ | srv | `docs/backlog.md:13633` | topXp не изолирован по прогону. |
+| FOG-9 | ⏳ | core | `docs/backlog.md:13642` | Приостановленная стройка чужого мира видна наблюдателю. |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
@@ -813,6 +814,14 @@
 | MS-2.2 | 🔒 | core data | `docs/missiles-roadmap.md:68` | Детонация |
 | MS-3.1 | 🔒 | core data | `docs/missiles-roadmap.md:75` | Пусковой/ракеты как предмет + P2W-guardrail |
 | MS-4.1 | 🔒 | cli | `docs/missiles-roadmap.md:83` | Рендер полёта/перехвата/удара |
+| MSB-0 | ⏳ | docs | `docs/multiside-combat-roadmap.md:99` | Решение владельца: (а), (б) или (в) |
+| MSB-1 | ⏳ | core | `docs/multiside-combat-roadmap.md:108` | Battle становится СПИСКОМ сторон |
+| MSB-2 | ⏳ | core data | `docs/multiside-combat-roadmap.md:123` | Правило деления урона |
+| MSB-3 | ⏳ | core | `docs/multiside-combat-roadmap.md:141` | Вступление в идущий бой |
+| MSB-4 | ⏳ | core | `docs/multiside-combat-roadmap.md:155` | Совместный штурм и чей мир |
+| MSB-5 | ⏳ | core | `docs/multiside-combat-roadmap.md:168` | Что делает бой при смене владельца стороны |
+| MSB-6 | ⏳ | proto cli | `docs/multiside-combat-roadmap.md:177` | Панель боя на N сторон |
+| MSB-7 | ⏳ | core proto | `docs/multiside-combat-roadmap.md:185` | Зенитки, обстрел и артиллерия при N сторонах |
 | ONB-0 | ✅ | proto srv | `docs/onboarding-roadmap.md:101` | Состояние первого запуска + воронка [proto/srv] (proto) |
 | ONB-1 | ✅ | proto | `docs/onboarding-roadmap.md:137` | Движок гайд-марок (spotlight) ★ |
 | ONB-2 | ✅ | proto | `docs/onboarding-roadmap.md:188` | Гайдовый первый матч (скриптовая соло-песочница) ★ |
