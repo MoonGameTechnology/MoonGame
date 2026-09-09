@@ -392,18 +392,6 @@ export const data: GameData = parseGameData({
       upkeep: { credits: 56 },
       slots: { weapon: 1, utility: 1 },
     },
-    dropship: {
-      // Carrier hull (GDD §6.1 / backlog SHIP): the biggest hold in the fleet but almost
-      // no guns — it hauls divisions (and, later, shuttles) and wants an escort.
-      faction: 'blue',
-      stats: { attack: 2, defense: 6, speed: 44, hp: 50, cargoCapacity: 8 },
-      line: 'front', // a big hull is a shield whether or not it wants to be
-      signature: 3, // a fat hauler — easy to spot
-      cost: { metal: 70, credits: 20 },
-      buildTimeHours: 4,
-      upkeep: { credits: 24 },
-      slots: { defense: 1, utility: 2 }, // no guns — it armours up and carries утилиту
-    },
     interceptor: {
       // Carrier-borne strike wing (shuttles-roadmap SQ-0.1): very fast + hard-hitting
       // but paper-thin — launch it ahead to strike, orbital AA (orbital_aa) is its counter.
@@ -426,16 +414,21 @@ export const data: GameData = parseGameData({
       slots: { weapon: 1 }, // a single gun mount — upgun the paper-thin strike wing
     },
     strike_carrier: {
-      // A slow, tanky flat-top with few guns of its own — its punch is the shuttles it carries.
+      // ДЕСАНТНЫЙ КОРАБЛЬ (заказ владельца 2026-09-09): самый большой трюм в ростере
+      // (16 против 5 у крейсера), толстый корпус и почти никакого огня — он не воюет,
+      // он довозит армию и держит удар, пока она высаживается. Челноков не несёт вовсе:
+      // трейт `carrier` и `shuttleBay` сняты, ангар остался только у «Шаттла».
+      // ВНУТРЕННЕЕ ИМЯ ИСТОРИЧЕСКОЕ: корпус раньше был «ударным носителем». Игроку id
+      // не показывается (имя приходит из локали `data.strike-carrier`), а переименование
+      // задело бы 24 файла ради буквы — если решим переименовать, это отдельная правка.
       faction: 'blue',
-      stats: { attack: 4, defense: 10, speed: 40, hp: 70, cargoCapacity: 6, shuttleBay: 4 },
-      line: 'front', // the fattest hull afloat — it holds the line
-      traits: ['carrier'],
+      stats: { attack: 1, defense: 12, speed: 34, hp: 140, cargoCapacity: 16 },
+      line: 'front', // самый толстый корпус во флоте — он и держит строй
       signature: 6,
-      cost: { metal: 320, credits: 160 },
-      buildTimeHours: 6,
-      upkeep: { credits: 96 },
-      slots: { defense: 1, utility: 2 }, // a flat-top: armour + sensor/cargo bays
+      cost: { metal: 150, credits: 60 },
+      buildTimeHours: 5,
+      upkeep: { credits: 48 },
+      slots: { defense: 1, utility: 2 }, // броня + трюмы, ни одного орудийного отсека
     },
     shuttle_carrier: {
       // «Шаттл» — ПЛАВУЧИЙ КОСМОПОРТ (SHU-2.1, заказ владельца). Своих пушек почти нет

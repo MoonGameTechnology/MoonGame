@@ -21,10 +21,15 @@ const fleet = (location: string, units: UnitStack[]): Fleet =>
   ({ id: `f-${location}-${units.length}`, owner: 'p1', location, units }) as Fleet;
 
 describe('сводка мира — домены гарнизона', () => {
-  it('АВИАНОСЕЦ — крыло, а не корабль линии: иначе он посчитается дважды', () => {
-    expect(isWingUnit('strike_carrier', data)).toBe(true);
-    expect(isShipUnit('strike_carrier', data)).toBe(false);
+  it('НОСИТЕЛЬ ЧЕЛНОКОВ — крыло, а не корабль линии: иначе он посчитается дважды', () => {
+    // Крыло — по ТРЕЙТУ `carrier`, а не по имени корпуса: десантный корабль
+    // (`strike_carrier`) трейт отдал вместе с ангаром и стал обычным кораблём линии,
+    // а носителем челноков остался «Шаттл».
+    expect(isWingUnit('shuttle_carrier', data)).toBe(true);
+    expect(isShipUnit('shuttle_carrier', data)).toBe(false);
     expect(isWingUnit('interceptor', data)).toBe(true);
+    expect(isShipUnit('strike_carrier', data)).toBe(true);
+    expect(isWingUnit('strike_carrier', data)).toBe(false);
   });
 
   it('корабль линии — не наземный и не крыло', () => {
@@ -43,7 +48,7 @@ describe('сводка мира — домены гарнизона', () => {
       [
         { unit: 'tank', count: 3 },
         { unit: 'cruiser', count: 2 },
-        { unit: 'strike_carrier', count: 1 },
+        { unit: 'shuttle_carrier', count: 1 },
         { unit: 'interceptor', count: 4 },
       ],
       data,

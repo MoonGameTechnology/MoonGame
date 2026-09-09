@@ -565,7 +565,6 @@ export const en: Record<string, string> = {
   'data.dense-nebula': 'Dense Nebula',
   'data.derelict-graveyard': 'Derelict Graveyard',
   'data.diplomatic-landing': 'Diplomatic Landing',
-  'data.dropship': 'dropship',
   'data.empty-space': 'Empty Space',
   'data.energy': 'energy',
   'data.energy-nexus': 'Energy Nexus',
@@ -654,7 +653,7 @@ export const en: Record<string, string> = {
   'data.steward-protocol': 'Steward Protocol',
   'data.sustained-corridor': 'Sustained Corridor',
   'data.shared-corridor': 'Shared Corridor',
-  'data.strike-carrier': 'strike carrier',
+  'data.strike-carrier': 'landing ship',
   'data.strike-vectors': 'Strike Vectors',
   'data.tank': 'tank',
   'data.targeting-array': 'Targeting Array',
@@ -800,8 +799,8 @@ export const en: Record<string, string> = {
     "A heavy siege platform: the fleet's biggest single gun ({a} damage) on thin armor ({d} defense, {hp} hull). It stands in the REAR line, so only a fifth of an incoming volley reaches it while the cruisers hold the front. It has no standoff fire: to shoot, it joins the battle like everyone else.",
   'dossier.unit.siege.name': 'Siege Platform',
   'dossier.unit.strike-carrier.desc':
-    'A slow armored carrier ({hp} hull, hold for {c}) — almost no guns of its own, all its strength is in the shuttles it carries: {bay} hangar berths, launching and landing straight off the deck. Keep it behind.',
-  'dossier.unit.strike-carrier.name': 'Strike Carrier',
+    "A landing ship: the fleet's biggest hold ({c} berths) on its thickest hull ({hp}). It does not fight — {a} attack is nothing — it delivers the army to a hostile world and soaks while it lands. It carries no shuttles: only the Shuttle has a hangar.",
+  'dossier.unit.strike-carrier.name': 'Landing Ship',
 
   // --- faction — Фракции: пассивный бонус дома.
   'faction.amber.desc': 'A nomad concord of hauliers: fleets run the lanes 15% faster.',
@@ -1743,7 +1742,7 @@ export const en: Record<string, string> = {
 
   // --- ship — Корабли: корпуса и модули (имя + описание).
   'ship.hull.cruiser': 'Cruiser',
-  'ship.hull.dropship': 'Carrier',
+  'ship.hull.dropship': 'Landing Ship',
   'ship.hull.scout_drone': 'Scout Drone',
   'ship.hull.siege_lance': 'Siege Lance',
   'ship.module.battery.desc': '+30% to attack.',

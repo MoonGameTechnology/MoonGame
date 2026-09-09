@@ -56,8 +56,8 @@ describe('сводка армии — пулы корпуса и щита', () =
   });
 
   it('десант в трюме входит в живучесть — бомбардировка бьёт и по нему', () => {
-    const bare = sum([{ unit: 'dropship', count: 1 }]);
-    const loaded = sum([{ unit: 'dropship', count: 1 }], {
+    const bare = sum([{ unit: 'strike_carrier', count: 1 }]);
+    const loaded = sum([{ unit: 'strike_carrier', count: 1 }], {
       landing: [{ unit: 'tank', count: 2 }],
     });
     expect(loaded.hull.max).toBe(bare.hull.max + 2 * 46);
@@ -120,7 +120,7 @@ describe('сводка армии — состав', () => {
 
 describe('сводка армии — трюм, радар, содержание', () => {
   it('вместимость складывается по кораблям, а возить некому — трюма нет', () => {
-    expect(sum([{ unit: 'dropship', count: 2 }]).cargo).toEqual({ used: 0, cap: 16 });
+    expect(sum([{ unit: 'strike_carrier', count: 2 }]).cargo).toEqual({ used: 0, cap: 32 });
     expect(sum([{ unit: 'siege', count: 2 }]).cargo).toBeNull();
   });
 
@@ -132,9 +132,11 @@ describe('сводка армии — трюм, радар, содержание
         tank: { ...data.units.tank!, stats: { ...data.units.tank!.stats, cargoSize: 3 } },
       },
     };
-    const f = fleet([{ unit: 'dropship', count: 1 }], { landing: [{ unit: 'tank', count: 2 }] });
-    expect(fleetSummary(f, data, 0).cargo).toEqual({ used: 2, cap: 8 });
-    expect(fleetSummary(f, heavy, 0).cargo).toEqual({ used: 6, cap: 8 });
+    const f = fleet([{ unit: 'strike_carrier', count: 1 }], {
+      landing: [{ unit: 'tank', count: 2 }],
+    });
+    expect(fleetSummary(f, data, 0).cargo).toEqual({ used: 2, cap: 16 });
+    expect(fleetSummary(f, heavy, 0).cargo).toEqual({ used: 6, cap: 16 });
   });
 
   it('РАДАР — МАКСИМУМ по кораблям: два разведчика не видят вдвое дальше', () => {

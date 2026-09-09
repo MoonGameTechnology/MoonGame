@@ -116,7 +116,7 @@ const GROUND_DEFENDERS = ['heavy_infantry', 'tank', 'militia'] as const;
 const GROUND_STOCK = 8;
 /** Столько войск НЕ грузится в трюм: иначе дом остаётся пустым и берётся прилётом. */
 const HOME_GUARD = 3;
-/** Верхний предел десантных корпусов — трюм 8 против 5 у крейсера, больше не нужно. */
+/** Верхний предел десантных кораблей — трюм 16 против 5 у крейсера, больше не нужно. */
 const DROPSHIP_CAP = 2;
 /** Сколько артиллерийских корпусов держит сильный бот (AI-BAL-4): дальний огонь — не
  *  замена флоту, а добавка к нему; стеклянная пушка гибнет от первого же сближения. */
@@ -915,14 +915,14 @@ export function aiOrders(
             n + (fl.owner === ai ? fl.units.reduce((k, st) => k + (st.unit === unit ? st.count : 0), 0) : 0),
           0,
         ) + base.garrison.reduce((n, st) => n + (st.unit === unit ? st.count : 0), 0);
-      // 4. Десантный корпус: трюм 8 против 5 у крейсера — без него ударная группа
+      // 4. Десантный корабль: трюм 16 против 5 у крейсера — без него ударная группа
       //    везёт горстку и штурм захлёбывается на первом же гарнизоне.
       if (
-        shipsOwned('dropship') < DROPSHIP_CAP &&
-        !pendingUnit(base.id, 'dropship') &&
-        affordableUnit('dropship', 1)
+        shipsOwned('strike_carrier') < DROPSHIP_CAP &&
+        !pendingUnit(base.id, 'strike_carrier') &&
+        affordableUnit('strike_carrier', 1)
       ) {
-        out.push(buildUnit(ai, base.id, 'dropship', 1));
+        out.push(buildUnit(ai, base.id, 'strike_carrier', 1));
       }
       // ═══ 6. АРТИЛЛЕРИЯ И АВИАЦИЯ (AI-BAL-4) ═══
       // Артиллерия стреляет САМА: `artilleryModule` каждым пролётом времени заставляет

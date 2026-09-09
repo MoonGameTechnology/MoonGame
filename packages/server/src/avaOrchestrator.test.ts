@@ -206,7 +206,7 @@ describe('AvaOrchestrator × arsenal snapshot (ARS-3)', () => {
     const arsenals: Record<string, { hulls: string[]; modules: string[] }> = {
       'acc-a1': { hulls: ['cruiser'], modules: ['cargo_bay'] },
       'acc-a2': { hulls: ['scout_drone'], modules: [] },
-      'acc-b': { hulls: ['dropship'], modules: [] },
+      'acc-b': { hulls: ['strike_carrier'], modules: [] },
     };
     const orch = new AvaOrchestrator({
       challengeStore: challenges,

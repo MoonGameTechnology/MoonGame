@@ -566,7 +566,6 @@ export const ru: Record<string, string> = {
   'data.dense-nebula': 'Плотная туманность',
   'data.derelict-graveyard': 'Кладбище кораблей',
   'data.diplomatic-landing': 'Дипломатическая высадка',
-  'data.dropship': 'носитель',
   'data.empty-space': 'Пустое пространство',
   'data.energy': 'энергия',
   'data.energy-nexus': 'Энергетический узел',
@@ -655,7 +654,7 @@ export const ru: Record<string, string> = {
   'data.steward-protocol': 'Протокол «Хранитель»',
   'data.sustained-corridor': 'Устойчивый коридор',
   'data.shared-corridor': 'Общий коридор',
-  'data.strike-carrier': 'ударный носитель',
+  'data.strike-carrier': 'десантный корабль',
   'data.strike-vectors': 'Ударные векторы',
   'data.tank': 'танк',
   'data.targeting-array': 'Система наведения',
@@ -802,8 +801,8 @@ export const ru: Record<string, string> = {
     'Тяжёлая осадная платформа: самое крупное орудие флота ({a} урона) при тонкой броне ({d} защиты, {hp} корпуса). Стоит в ЗАДНЕЙ линии — на неё приходится лишь пятая часть залпа, пока впереди держат строй крейсеры. Огня с дистанции не ведёт: чтобы ударить, платформа входит в бой вместе со всеми.',
   'dossier.unit.siege.name': 'Осадная платформа',
   'dossier.unit.strike-carrier.desc':
-    'Медленный бронированный носитель ({hp} корпуса, трюм на {c}) — своих пушек почти нет, вся его сила в челноках, что он несёт: {bay} мест ангара, вылет и посадка прямо с борта. Держите его позади.',
-  'dossier.unit.strike-carrier.name': 'Ударный носитель',
+    'Десантный корабль: самый большой трюм во флоте ({c} мест) на самом толстом корпусе ({hp}). Он не воюет — {a} атаки это ничто, — он довозит армию к чужому миру и держит удар, пока она высаживается. Челноков не несёт: ангар только у «Шаттла».',
+  'dossier.unit.strike-carrier.name': 'Десантный корабль',
 
   // --- faction — Фракции: пассивный бонус дома.
   'faction.amber.desc': 'Кочевой конкорд логистов: флоты идут по лейнам на +15% быстрее.',
@@ -1739,7 +1738,7 @@ export const ru: Record<string, string> = {
 
   // --- ship — Корабли: корпуса и модули (имя + описание).
   'ship.hull.cruiser': 'Крейсер',
-  'ship.hull.dropship': 'Носитель',
+  'ship.hull.dropship': 'Десантный корабль',
   'ship.hull.scout_drone': 'Скаут-дрон',
   'ship.hull.siege_lance': 'Осадная ланса',
   'ship.module.battery.desc': '+30% к атаке.',

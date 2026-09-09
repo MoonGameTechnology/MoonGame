@@ -42,8 +42,15 @@ const YARD_TABS: [YardTab, string][] = [
 ];
 
 /** Buildable space hulls the «Корабли» pane fits; shuttle/carrier hulls → «Эскадрильи». */
-export const YARD_HULLS = ['cruiser', 'siege', 'artillery', 'scout', 'sensor_frigate', 'dropship'];
-export const YARD_SQUAD_HULLS = ['interceptor', 'strike_carrier', 'shuttle_carrier'];
+export const YARD_HULLS = [
+  'cruiser',
+  'siege',
+  'artillery',
+  'scout',
+  'sensor_frigate',
+  'strike_carrier',
+];
+export const YARD_SQUAD_HULLS = ['interceptor', 'shuttle_carrier'];
 
 /** How many hulls one order may queue at once (the ± stepper's range). */
 const MAX_COUNT = 20;

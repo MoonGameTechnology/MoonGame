@@ -177,7 +177,7 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
         body: t('dossier.unit.strike-carrier.desc', {
           hp: hl(st.hp),
           c: hl(st.cargoCapacity ?? 0),
-          bay: hl(st.shuttleBay ?? 0),
+          a: hl(st.attack),
         }),
       };
     case 'shuttle_carrier':

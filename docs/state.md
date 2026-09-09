@@ -1537,7 +1537,7 @@ ad-hoc запрос «видим ли объект на identify-уровне» 
 экран меню (Этап 4), персистентность меты + `MatchStore.list` (Postgres уже под это
 индексирован), лобби/создание матча (MM-1.1).
 
-## 6. Данные (`data/*.json`, версия `0.1.19`)
+## 6. Данные (`data/*.json`, версия `0.1.20`)
 
 > **RULES-2 — правила про КОНТЕНТ живут здесь, а не в коде.** Поля-правила у зданий:
 > `maxPerPlanet` (лимит экземпляров на мире, дефолт 1) и `creditsBonus` (доля прибавки ко
@@ -1631,13 +1631,17 @@ ad-hoc запрос «видим ли объект на identify-уровне» 
 speed, hp, shield, range, cargoCapacity, cargoSize, aaDamage}` (+ любые доп. числа),
   `line, traits, abilities, cost, buildTimeHours, upkeep`, `signature, radarRange`
   (армия очков не даёт — см. victory). Есть: `scout_drone, scout, sensor_frigate,
-cruiser, siege, siege_lance, artillery(artillery,range 300), dropship(cargoCapacity 8),
-militia, drop_infantry, tank(cargoSize 1), heavy_infantry, special_forces, hero,
-interceptor, strike_carrier(shuttleBay 4), shuttle_carrier(«Шаттл», shuttleBay 6)`
-(17 юнитов: 13 `vanguard` + 4 `blue`, приехавших из каталога прототипа с CONV-12a;
-`orbital_aa` — защитное здание, не юнит; `infected_cruiser` в контенте нет).
+cruiser, siege, siege_lance, artillery(artillery,range 300),
+strike_carrier(«десантный корабль», cargoCapacity 16), shuttle_carrier(«Шаттл»,
+shuttleBay 6), militia, drop_infantry, tank(cargoSize 1), heavy_infantry,
+special_forces, hero, interceptor` (16 юнитов: 12 `vanguard` + 4 `blue`, приехавших из
+каталога прототипа с CONV-12a; `orbital_aa` — защитное здание, не юнит;
+`infected_cruiser` в контенте нет). `dropship` СНЯТ (заказ владельца 2026-09-09):
+десантный корабль в игре один, и это переделанный `strike_carrier` — трюм 16, hp 140,
+attack 1, челноков не несёт. Внутреннее имя корпуса историческое (был «ударный
+носитель»); игроку оно не видно, имя приходит из локали `data.strike-carrier`.
   **Линии получения урона — свойство кораблей** (GDD §7.2, раздача — в §5,
-  `combat.tick`): front — `cruiser, dropship, strike_carrier, interceptor, hero`;
+  `combat.tick`): front — `cruiser, strike_carrier, interceptor, hero`;
   mid — `scout, scout_drone, sensor_frigate`; rear — `siege, siege_lance`;
   артиллерийская — `artillery`, ЕДИНСТВЕННЫЙ носитель трейта `artillery`; `shuttle_carrier`
   стоит в rear вместе с осадными. Осадные
@@ -1646,7 +1650,9 @@ interceptor, strike_carrier(shuttleBay 4), shuttle_carrier(«Шаттл», shutt
   `sensor_frigate` — носитель дальнего радара: один `utility`-слот, своя антенна 60, и
   это ЕДИНСТВЕННЫЙ корпус, куда встаёт `radar_module` (`allowed.units` в `modules.json`,
   исполняет общий гейт `canEquip` → `E_NOT_ALLOWED`).
-  Щиты (аблятивные) у боевых кораблей: cruiser 15, dropship 12, hero 40.
+  Щиты (аблятивные) НИ У ОДНОГО юнита бандла не заданы: `shield` приходит только от
+  модуля `shield_booster` (+15, `modules.json`). Значения по корпусам — план
+  `shields-roadmap.md`, а не данные.
 - **buildings** (`BuildingDef`): `cost, buildTimeHours, produces, hp,
 defenseBonus, upgrades[{…}], traits, scoreValue, radarRange, healRate, shipRepair`. Есть: `mine_t1, mine_t2,
 shipyard, biomass_pit, barracks, spaceport, radar, fort, orbital_aa, hospital, metal_station, power_plant, fabricator`
@@ -2201,8 +2207,8 @@ instantRepair, fleetRepair, effects, seatClaim])` (35 модулей — сос�
   целятся тапом по КАРТЕ, поэтому взводят хост (`armCast`/`armSpawn`) и отвечают
   `'close'` — `heroAim`/`heroSpawnAim` остались в `main.ts`. Инлайн-данные `game.ts` дополнены каталогом
   `modules` (6 модулей, зеркало `data/modules.json`) + типизированными `slots` на корпусах
-  кораблей (cruiser/siege/artillery/scout/sensor_frigate/dropship) и челноков
-  (interceptor/strike_carrier).
+  кораблей (cruiser/siege/artillery/scout/sensor_frigate/strike_carrier) и челноков
+  (interceptor/shuttle_carrier).
   Тесты: `shipyard.test.ts` (38) — цена и полоса характеристики (включая экранирование
   подписи, CWE-79), метка «откуда» (LARS-4), фильтр по снимку арсенала (ARS-5),
   нормализация черновика, разметка панели (гашение заказа без казны и без своих миров),
@@ -2359,8 +2365,10 @@ instantRepair, fleetRepair, effects, seatClaim])` (35 модулей — сос�
   `time.advanced`, что у порта; погибший целиком флот уносит ангар с собой (осиротеть
   нечему — ангар лежит НА флоте), а вылет с исчезнувшей базой ловится на посадке
   (`shuttle.lost`). Тесты: 11 в `shuttleCarrier.test.ts`.
-  `interceptor`, `strike_carrier` (ангар 4) и `shuttle_carrier` («Шаттл», ангар 6)
-  строятся; `orbital_aa` (защитное здание, не юнит) — counter по флотам у орбиты, ядро
+  `shuttle_carrier` («Шаттл», ангар 6) — ЕДИНСТВЕННЫЙ носитель челноков: `strike_carrier`
+  переделан в десантный корабль и ангар отдал (заказ владельца 2026-09-09), так что
+  трейт `carrier` и `shuttleBay` в ростере остались ровно у одного корпуса.
+  `orbital_aa` (защитное здание, не юнит) — counter по флотам у орбиты, ядро
   суммирует `aaDamage` и по гарнизону, и по зданиям.
 - **Цепочки приказов (command-chains) — УДАЛЕНЫ к релизу (REL-1, «пока убери»).**
   Старая очередь приказов (CC-5/CC-6: `orderQueueModule`, клиентский план
