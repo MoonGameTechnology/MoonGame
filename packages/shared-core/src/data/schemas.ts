@@ -52,6 +52,15 @@ export const UnitStatsSchema = z
      *  not be expressed at all — a siege platform could only wreck a world by
      *  also being a strong warship. It does NOT feed fleet-vs-fleet combat. */
     siegeDamage: z.number().nonnegative().default(0),
+    /** Damage this hull deals to an enemy SHUTTLE STRIKE when it scrambles against
+     *  it (SHU-1.3). 0 = not an interceptor: the hull stays in the hangar and lets
+     *  the strike through.
+     *
+     *  Distinct from `pointDefense` (flak a SHIP or a building fires reactively) and
+     *  from `attack` (what the shuttle deals to fleets): an interceptor is meant to
+     *  be terrible against hulls and murderous against other shuttles, and one
+     *  number could not say both. */
+    shuttleDamage: z.number().nonnegative().default(0),
     /** Point-defense damage per hour — anti-shuttle/anti-missile flak that a
      *  SHIP (not just a planet) carries. Distinct from `aaDamage` (which is
      *  planet-side orbital AA): `pointDefense` fires on incoming shuttle/missile
