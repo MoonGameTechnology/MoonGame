@@ -7,6 +7,8 @@
  * one module serves surfaces at different pixel ratios.
  */
 
+import { SPHERE_FRAMES, sphereFrame, sphereWire } from './holoSphere';
+
 const TAU = Math.PI * 2;
 
 /** hex `#rrggbb` → `rgba()` with alpha — for tinted rings, ticks and trails. */
@@ -61,40 +63,60 @@ export function blitGlow(
   ctx.globalAlpha = 1;
 }
 
-// Shaded holographic spheres: one lit sphere baked per (colour, dpr) — specular up-left,
-// colour body, translucent Fresnel rim — blitted scaled to a node, same cache-and-blit
-// trick as the glow (no per-node gradient on the hot path).
+// A 4×4 wireframe atlas per colour/DPR. Rotation is a source-rectangle choice, not
+// hundreds of trigonometric calculations on every node every frame. The LRU bound
+// also covers colour-picker changes and moving the window between density scales.
 const sphereCache = new Map<string, HTMLCanvasElement>();
+const SPHERE_TILE = 48;
+const MAX_SPHERE_ATLASES = 16;
 function sphereSprite(dpr: number, color: string): HTMLCanvasElement {
   const key = `${color}:${dpr}`;
   const hit = sphereCache.get(key);
-  if (hit) return hit;
-  const rad = 32;
+  if (hit) {
+    sphereCache.delete(key);
+    sphereCache.set(key, hit);
+    return hit;
+  }
+  const tile = Math.ceil(SPHERE_TILE * dpr);
+  const rad = SPHERE_TILE / 2;
   const cv = document.createElement('canvas');
-  cv.width = cv.height = Math.ceil(rad * 2 * dpr);
+  cv.width = cv.height = tile * 4;
   const g = cv.getContext('2d') as CanvasRenderingContext2D;
-  g.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const grd = g.createRadialGradient(rad - rad * 0.34, rad - rad * 0.4, rad * 0.06, rad, rad, rad);
-  grd.addColorStop(0, rgba('#ffffff', 0.8));
-  grd.addColorStop(0.18, rgba(color, 0.62));
-  grd.addColorStop(0.55, rgba(color, 0.26));
-  grd.addColorStop(0.85, rgba(color, 0.1));
-  grd.addColorStop(1, rgba(color, 0.02));
-  g.fillStyle = grd;
-  g.beginPath();
-  g.arc(rad, rad, rad - 1, 0, TAU);
-  g.fill();
-  g.strokeStyle = rgba('#ffffff', 0.26); // holographic rim
-  g.lineWidth = 1.2;
-  g.beginPath();
-  g.arc(rad, rad, rad - 1.4, 0, TAU);
-  g.stroke();
+  for (let frame = 0; frame < SPHERE_FRAMES; frame++) {
+    g.setTransform(
+      tile / SPHERE_TILE,
+      0,
+      0,
+      tile / SPHERE_TILE,
+      (frame % 4) * tile,
+      Math.floor(frame / 4) * tile,
+    );
+    const wire = sphereWire(frame);
+    for (const side of ['back', 'front'] as const) {
+      g.strokeStyle = rgba(color, side === 'front' ? 0.86 : 0.2);
+      g.lineWidth = side === 'front' ? 0.85 : 0.6;
+      g.beginPath();
+      for (const [x0, y0, x1, y1] of wire[side]) {
+        g.moveTo(rad + x0 * (rad - 2), rad + y0 * (rad - 2));
+        g.lineTo(rad + x1 * (rad - 2), rad + y1 * (rad - 2));
+      }
+      g.stroke();
+    }
+    g.strokeStyle = rgba(color, 0.9);
+    g.lineWidth = 1.05;
+    g.beginPath();
+    g.arc(rad, rad, rad - 2, 0, TAU);
+    g.stroke();
+  }
+  if (sphereCache.size >= MAX_SPHERE_ATLASES) {
+    sphereCache.delete(sphereCache.keys().next().value!);
+  }
   sphereCache.set(key, cv);
   return cv;
 }
 
-/** Blit the cached shaded sphere of `color` centred at (x,y) at node radius r, scaled by
- *  `a` (fade the volume out at the far/whole-map view where nodes pack together). */
+/** Pure vector hologram, cached at device density. Pass a paused/reduced-motion clock
+ *  to freeze the same atlas frame; omitting the clock preserves a static sphere. */
 export function blitSphere(
   ctx: CanvasRenderingContext2D,
   dpr: number,
@@ -103,9 +125,24 @@ export function blitSphere(
   y: number,
   r: number,
   a = 1,
+  timeMs = 0,
 ): void {
   if (a <= 0.02) return;
-  ctx.globalAlpha = a;
-  ctx.drawImage(sphereSprite(dpr, color), x - r, y - r, r * 2, r * 2);
-  ctx.globalAlpha = 1;
+  const atlas = sphereSprite(dpr, color);
+  const tile = atlas.width / 4;
+  const frame = sphereFrame(timeMs);
+  ctx.save();
+  ctx.globalAlpha *= a;
+  ctx.drawImage(
+    atlas,
+    (frame % 4) * tile,
+    Math.floor(frame / 4) * tile,
+    tile,
+    tile,
+    x - r,
+    y - r,
+    r * 2,
+    r * 2,
+  );
+  ctx.restore();
 }

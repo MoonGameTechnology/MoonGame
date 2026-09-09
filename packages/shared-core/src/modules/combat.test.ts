@@ -281,7 +281,7 @@ describe('combat — resolution over real hours', () => {
 });
 
 describe('combat — damage lines (GDD §7.2)', () => {
-  it('the front line absorbs damage before the rear', () => {
+  it('splits one volley across every line present — 60/40 with front + rear', () => {
     const kernel = createKernel([...combatFamily, arrivalModule]);
     const st = baseState(
       [
@@ -296,13 +296,14 @@ describe('combat — damage lines (GDD §7.2)', () => {
     const started = okApply(kernel.applyAction(st, arrive('A'), ctx(0)));
     const r = okAdvance(kernel.advanceTo(started.state, ctx(HOUR))); // one round
 
+    // No mid, no artillery: their 40% is split evenly → front 60%, rear 40%.
     const d = r.state.fleets.D;
-    expect(stackOf(d, 'shield')?.hp).toBe(40); // front took the 10 damage
+    expect(stackOf(d, 'shield')?.hp).toBe(44); // 50 − 60% of 10
+    expect(stackOf(d, 'backliner')?.hp).toBe(6); // 10 − 40% of 10 — the rear is NOT spared
     expect(stackOf(d, 'backliner')?.count).toBe(1);
-    expect(stackOf(d, 'backliner')?.hp).toBeUndefined(); // rear untouched
   });
 
-  it('artillery is only hit once the front line is gone', () => {
+  it('artillery is hit in the same volley as the front line, at its own share', () => {
     const kernel = createKernel([...combatFamily, arrivalModule]);
     const st = baseState(
       [
@@ -317,10 +318,33 @@ describe('combat — damage lines (GDD §7.2)', () => {
     const started = okApply(kernel.applyAction(st, arrive('A'), ctx(0)));
     const r = okAdvance(kernel.advanceTo(started.state, ctx(HOUR))); // one round
 
+    // front 40 + artillery 10 = 50 claimed; the absent mid+rear 50 splits evenly.
     const d = r.state.fleets.D;
-    expect(stackOf(d, 'fighter')?.hp).toBe(10); // front fighter took the hit
-    expect(stackOf(d, 'artil')?.count).toBe(1); // artillery shielded
-    expect(stackOf(d, 'artil')?.hp).toBeUndefined();
+    expect(stackOf(d, 'fighter')?.hp).toBe(13.5); // 20 − 65% of 10
+    expect(stackOf(d, 'artil')?.hp).toBe(4.5); // 8 − 35% of 10 — no longer shielded
+    expect(stackOf(d, 'artil')?.count).toBe(1);
+  });
+
+  it('a line that dies spills its leftover onto the lines still standing', () => {
+    const kernel = createKernel([...combatFamily, arrivalModule]);
+    const st = baseState(
+      [
+        fleet('A', 'p1', 'P', [['fighter', 3]]), // deals 30/round
+        fleet('D', 'p2', 'P', [
+          ['shield', 1], // front, hp 50 (defense 0 — it cannot answer)
+          ['backliner', 1], // rear, hp 10
+        ]),
+      ],
+      [planet('P', null)],
+    );
+    const started = okApply(kernel.applyAction(st, arrive('A'), ctx(0)));
+    const r = okAdvance(kernel.advanceTo(started.state, ctx(HOUR))); // one round
+
+    // Pass 1: front 60% = 18, rear 40% = 12 — the rear can only take 10 and dies.
+    // Pass 2: the 2 left over re-split over the front alone (100%) → 18 + 2 = 20.
+    const d = r.state.fleets.D;
+    expect(stackOf(d, 'backliner')).toBeUndefined(); // wiped
+    expect(stackOf(d, 'shield')?.hp).toBe(30); // 50 − 20, not 50 − 18: nothing is wasted
   });
 });
 

@@ -151,7 +151,6 @@ technologies/industrial_automation field:unlocks
 technologies/siege_doctrine field:unlocks
 units/cruiser field:faction
 units/drop_infantry only-in-canon
-units/dropship field:faction
 units/heavy_infantry field:faction
 units/hero field:faction
 units/interceptor field:faction

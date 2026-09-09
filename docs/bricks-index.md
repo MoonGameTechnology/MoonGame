@@ -575,10 +575,11 @@
 | FSPLIT-1 | ✅ | core act proto | `docs/backlog.md:12861` | Отбор при делении адресует СТЕК, а не тип корабля. |
 | FSPLIT-2 | ✅ | core act proto | `docs/backlog.md:12871` | Десант делится вместе с кораблями, по трюму обеих половин. |
 | AIDIFF-1 | ✅ | proto | `docs/backlog.md:12899` | Строка места переключается «выкл → слабый → сильный». |
-| RESIL-1 | ⏳ | proto | `docs/backlog.md:12978` | Фоновые промисы браузерного клиента. |
-| RESIL-2 | ⏳ | proto | `docs/backlog.md:12989` | Цикл подсветки обучающего тура. |
-| RESIL-3 | ⏳ | srv | `docs/backlog.md:12997` | Именованный фатал процесса. |
-| RESIL-4 | ✅ | srv | `docs/backlog.md:13008` | Соак проверяет, что мир не встал. |
+| RESIL-1 | ⏳ | proto | `docs/backlog.md:12979` | Фоновые промисы браузерного клиента. |
+| RESIL-2 | ⏳ | proto | `docs/backlog.md:12990` | Цикл подсветки обучающего тура. |
+| RESIL-3 | ⏳ | srv | `docs/backlog.md:12998` | Именованный фатал процесса. |
+| RESIL-4 | ✅ | srv | `docs/backlog.md:13009` | Соак проверяет, что мир не встал. |
+| RESIL-5 | ✅ | srv proto | `docs/backlog.md:13027` | Генеральная репетиция: весь стек разом, и |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |

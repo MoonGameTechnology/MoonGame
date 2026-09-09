@@ -34,7 +34,7 @@
 ### Стоки
 
 - **Стройка** — единственный сток metal: здания, корабли (cruiser 60m+20c …
-  strike_carrier 320m+160c), техи (120–500c + 80–380m, поздние + 5–60 micro).
+  strike_carrier 150m+60c), техи (120–500c + 80–380m, поздние + 5–60 micro).
 - **Апкип юнитов** (в сутки): credits у всех (scout 1 … carrier 12), **food только у
   наземки** (militia/infantry 1, tank 2).
 - **Апкип зданий**: energy (radar 6, orbital_aa 6, farm 6, metal_station 8,

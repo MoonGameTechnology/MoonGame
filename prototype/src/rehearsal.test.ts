@@ -27,4 +27,31 @@ describe('multiplayer rehearsal', () => {
       CLIENT_ACTION_TYPES.length,
     );
   });
+
+  // RESIL-5 — «генеральная репетиция»: тот же полный стек (провод, гейт, конверты,
+  // квитанции, durable-persist, перезапуск), но мир при этом ЖИВЁТ, а трафик создают
+  // боты. Отдельным тестом, потому что прогон выше утверждает ТОЧНЫЕ счётчики действий,
+  // а живая фаза их по определению сдвигает.
+  it('живёт игровые сутки под ботами: без застоя, без мёртвых писем, без десинка', async () => {
+    const report = await runRehearsal({
+      players: 2,
+      latencyMs: 0,
+      persistDelayMs: 0,
+      timeoutMs: 20_000,
+      gameHours: 24,
+      botActionsPerHour: 2,
+    });
+
+    expect(report.gameHours).toBe(24);
+    // Мир не встал и не подавился: оба сигнала берутся из потока наблюдений комнаты.
+    expect(report.stalls).toBe(0);
+    expect(report.deadLetters).toBe(0);
+    // Сутки жизни не развели клиента с сервером и не показали ему чужое.
+    expect(report.hashMismatches).toBe(0);
+    expect(report.fogViolations).toBe(0); // счётчик статических фаз — они по-прежнему честны
+    // Анти-пустышка: боты действительно играли по проводу, а не молчали сутки.
+    expect(report.botActions).toBeGreaterThan(0);
+    // И перезапуск в конце по-прежнему поднял мир из durable-снапшота.
+    expect(report.serverRestarts).toBe(1);
+  }, 60_000);
 });

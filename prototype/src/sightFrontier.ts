@@ -72,9 +72,9 @@ export interface FrontierLook {
 
 const FRONTIER: Record<SightTier, FrontierLook> = {
   // Внешний край: почти прозрачная дымка — она отвечает лишь «сюда добивает засечка».
-  signature: { lineWidth: 1.2, fillAlpha: 0.03, strokeAlpha: 0.16 },
+  signature: { lineWidth: 0.8, fillAlpha: 0.012, strokeAlpha: 0.14 },
   // Внутренний: заметно плотнее и толще — это рабочая граница, по ней ведут разведку.
-  reveal: { lineWidth: 1.4, fillAlpha: 0.05, strokeAlpha: 0.3 },
+  reveal: { lineWidth: 1, fillAlpha: 0.02, strokeAlpha: 0.26 },
 };
 
 /** Вид сводной границы — одной записью, чтобы тиры не сползлись друг к другу. */
@@ -91,9 +91,9 @@ export interface OwnRingLook {
 
 const OWN_RING: Record<SightTier, OwnRingLook> = {
   // «Здесь только засечка» — пунктиром, как и всё неточное на этой карте.
-  signature: { dash: [3, 6], alpha: 0.5 },
+  signature: { dash: [3, 6], alpha: 0.32 },
   // «Здесь опознание» — сплошной и ярче.
-  reveal: { dash: [], alpha: 0.72 },
+  reveal: { dash: [], alpha: 0.5 },
 };
 
 /** Вид собственного кольца выбранного источника (правило 6). */

@@ -27,9 +27,32 @@ function loadShippedBundle(): Record<string, unknown> {
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.17');
+    expect(data.version).toBe('0.1.20');
     expect(data.resources).toContain('microelectronics');
-    expect(data.units.siege_lance?.stats.range).toBe(300); // artillery firing radius (map units)
+    // The `artillery` hull is the ONE standoff platform: the trait is what the core
+    // reads for both standoff fire and the artillery damage line, and `range` is the
+    // firing radius (map units). The siege platforms handed the role over to it.
+    expect(data.units.artillery?.traits).toContain('artillery');
+    expect(data.units.artillery?.stats.range).toBe(300);
+    for (const id of ['siege', 'siege_lance']) {
+      expect(data.units[id]?.traits).not.toContain('artillery');
+      expect(data.units[id]?.stats.range ?? 0).toBe(0);
+    }
+    // Damage lines are a SHIP formation (GDD §7.2) — the ship roster fills all four.
+    expect(data.units.cruiser?.line).toBe('front');
+    expect(data.units.scout?.line).toBe('mid');
+    expect(data.units.siege?.line).toBe('rear');
+    // Carriers are mobile spaceports (SHU-2.1): `shuttleBay` on the HULL is what bases
+    // shuttles aboard, so a hull with 0 simply cannot base any.
+    // «Шаттл» — ЕДИНСТВЕННЫЙ носитель челноков после того, как десантный корабль
+    // отдал ангар (заказ владельца 2026-09-09).
+    expect(data.units.shuttle_carrier?.stats.shuttleBay).toBe(6);
+    expect(data.units.shuttle_carrier?.line).toBe('rear');
+    expect(
+      Object.entries(data.units)
+        .filter(([, u]) => (u.stats.shuttleBay ?? 0) > 0)
+        .map(([id]) => id),
+    ).toEqual(['shuttle_carrier']);
     expect(data.units.cruiser?.upkeep.credits).toBe(32); // daily upkeep, BAL-3 scale
     // fleet ⊕ ground-army separation: domains + transport capacity.
     expect(data.units.cruiser?.domain).toBe('space'); // schema default
@@ -41,7 +64,12 @@ describe('game data schema (docs/architecture.md §2)', () => {
     for (const id of ['militia', 'drop_infantry', 'tank']) {
       expect(data.units[id]?.stats.cargoSize).toBe(1);
     }
-    expect(data.units.dropship?.stats.cargoCapacity).toBe(8); // dedicated lift
+    // Десантный корабль — единственный выделенный транспорт: самый большой трюм в
+    // ростере. `dropship` снят (заказ владельца), его роль забрал этот корпус.
+    expect(data.units.dropship).toBeUndefined();
+    expect(data.units.strike_carrier?.stats.cargoCapacity).toBe(16);
+    expect(data.units.strike_carrier?.stats.shuttleBay ?? 0).toBe(0); // челноков не несёт
+    expect(data.units.strike_carrier?.traits).toEqual([]);
     expect(data.units.scout_drone?.stats.cargoCapacity).toBe(0); // default, carries nothing
     expect(data.buildings.orbital_aa?.aaDamage).toBe(12); // anti-ship orbital AA — a defensive building
     expect(data.units.cruiser?.stats.aaDamage).toBe(0); // default, no AA
@@ -51,7 +79,6 @@ describe('game data schema (docs/architecture.md §2)', () => {
     expect(data.units.interceptor?.stats.strikeRange).toBe(180); // Euclidean reach
     expect(data.units.interceptor?.stats.fuel).toBe(3); // sorties before rearm
     expect(data.units.interceptor?.stats.rearmRounds).toBe(2);
-    expect(data.units.strike_carrier?.stats.cargoCapacity).toBe(6); // hangar = shared cargo hold
     expect(data.units.cruiser?.stats.strikeRange).toBe(0); // schema default (not a shuttle)
     // reanimate_on_kill/Necromancer cut (designer-role) → assert a surviving event instead.
     expect(data.events.infect_planet?.trigger).toBe('planet_captured');
