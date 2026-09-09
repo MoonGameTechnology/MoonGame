@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 5734 зелёных** (62 skip, 434 файла; с `DATABASE_URL` — 5796 без пропусков: все пропуски — тесты durable-пути, которым нужна база).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 5743 зелёных** (62 skip, 434 файла; с `DATABASE_URL` — 5805 без пропусков: все пропуски — тесты durable-пути, которым нужна база).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -713,7 +713,7 @@ INSTEAD-of-фокус — opportunity-cost (лидер-«+слот» branchless)
   — последний барьер против дубля завершения); юниты идут в гарнизон. Коды: `E_BAD_PAYLOAD, E_NO_PLANET,
 E_FORBIDDEN, E_UNKNOWN_BUILDING/UNIT, E_ALREADY_BUILT, E_ALREADY_QUEUED,
 E_NO_BUILDING, E_MAX_LEVEL, E_INSUFFICIENT, E_BOMBARDED, E_WRONG_SECTOR,
-E_NO_SHIPYARD`.
+E_NO_SHIPYARD, E_NO_BARRACKS, E_NO_FACTORY`.
 - **Верфь-гейт на постройку кораблей (bugfix, `enablesShipConstruction`):**
   `unit.build` для юнита с `domain: 'space'` требует хотя бы одно ЖИВОЕ (`hp>0`)
   здание с флагом `BuildingDef.enablesShipConstruction` (`shipyard`/`spaceport`
@@ -724,6 +724,17 @@ E_NO_SHIPYARD`.
   (`prototype/src/game.ts newGame`, `packages/server/src/scenario.ts
   createDevMatch`, `data/maps/*.json`) стартует с `spaceport`, иначе постройка
   флота с хода 1 была бы невозможна.
+- **Наземный гейт — ПО РОДУ ВОЙСК (ROS-1.1):** пехота (`UnitDef.kind: 'infantry'`)
+  требует живое здание с `enablesInfantryConstruction` (казармы) → иначе
+  `E_NO_BARRACKS`; техника (`kind: 'vehicle'`) — с `enablesVehicleConstruction`
+  (завод) → иначе `E_NO_FACTORY`. Прежний общий флаг `enablesGroundConstruction`
+  снят: он стоял на обоих зданиях, поэтому казарма строила танки, а завод — пехоту.
+  Пара «род → способность → код» живёт одной таблицей `GROUND_FACILITY` в
+  `construction.ts`, так что новый род войск вводится юнитом и зданием, а не правкой
+  редьюсера. Способность может открыть АПГРЕЙД здания (общий `capabilityAt`, как у
+  верфи и ангара). Схема даёт `kind` дефолт `infantry` (иначе забытое поле сделало бы
+  юнит непостроимым нигде), а живой каталог обязан объявлять род ЯВНО — это держит
+  сторож в `schemas.test.ts`.
 - **Ростер по типу провинции (province-centric):** `sectorKinds[kind].allowedBuildings`
   — единый источник «что здесь строится», редактируется в одном месте. `building.construct`
   проверяет `building ∈ allowedBuildings`, иначе `E_WRONG_SECTOR`. Отсутствует/`undefined`
@@ -1634,7 +1645,9 @@ ad-hoc запрос «видим ли объект на identify-уровне» 
 
 - **resources:** `credits` (деньги), `metal`, `food`, `energy`, `microelectronics` —
   внутриматчевый набор из 5. Торгуются на сессионной бирже (модуль `market`).
-- **units** (схема `UnitDef`): `domain('space'|'ground')`, `stats{attack, defense,
+- **units** (схема `UnitDef`): `domain('space'|'ground')`, `kind('infantry'|'vehicle')` —
+  род НАЗЕМНЫХ войск (ROS-1.1: пехота строится в казармах, техника на заводе; у
+  космических корпусов поле не читается), `stats{attack, defense,
 speed, hp, shield, range, cargoCapacity, cargoSize, aaDamage}` (+ любые доп. числа),
   `line, traits, abilities, cost, buildTimeHours, upkeep`, `signature, radarRange`
   (армия очков не даёт — см. victory). Есть: `scout_drone, scout, sensor_frigate,
@@ -1653,7 +1666,9 @@ attack 1, челноков не несёт. Внутреннее имя корп
   артиллерийская — `artillery`, ЕДИНСТВЕННЫЙ носитель трейта `artillery`; `shuttle_carrier`
   стоит в rear вместе с осадными. Осадные
   платформы трейт отдали ему вместе со `stats.range`, поэтому огня с дистанции они
-  больше не ведут и дерутся из задней линии. У наземных `line` не читается.
+  больше не ведут и дерутся из задней линии. У наземных `line` не читается — зато
+  читается `kind`: техника это только `tank`, остальные четверо (`militia`,
+  `heavy_infantry`, `special_forces`, `drop_infantry`) — пехота.
   `sensor_frigate` — носитель дальнего радара: один `utility`-слот, своя антенна 60, и
   это ЕДИНСТВЕННЫЙ корпус, куда встаёт `radar_module` (`allowed.units` в `modules.json`,
   исполняет общий гейт `canEquip` → `E_NOT_ALLOWED`).

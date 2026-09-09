@@ -462,6 +462,7 @@ export const data: GameData = parseGameData({
       faction: 'blue',
       stats: { attack: 4, defense: 8, speed: 44, hp: 14, cargoSize: 1 },
       domain: 'ground',
+      kind: 'infantry',
       traits: ['ground'],
       signature: 1,
       cost: { metal: 15 },
@@ -472,6 +473,7 @@ export const data: GameData = parseGameData({
       faction: 'blue',
       stats: { attack: 8, defense: 20, speed: 40, hp: 34, cargoSize: 1 },
       domain: 'ground',
+      kind: 'infantry',
       traits: ['ground'],
       signature: 1,
       cost: { metal: 55, credits: 15 },
@@ -482,6 +484,7 @@ export const data: GameData = parseGameData({
       faction: 'blue',
       stats: { attack: 18, defense: 12, speed: 52, hp: 26, cargoSize: 1 },
       domain: 'ground',
+      kind: 'infantry',
       traits: ['ground'],
       signature: 1,
       cost: { metal: 60, credits: 45, microelectronics: 5 },
@@ -493,6 +496,7 @@ export const data: GameData = parseGameData({
       faction: 'blue',
       stats: { attack: 22, defense: 14, speed: 40, hp: 46, cargoSize: 1 },
       domain: 'ground',
+      kind: 'vehicle',
       traits: ['ground'],
       signature: 2,
       cost: { metal: 120, credits: 30 },
@@ -774,28 +778,28 @@ export const data: GameData = parseGameData({
       cost: { metal: 70 },
       buildTimeHours: 3,
       hp: 25,
-      enablesGroundConstruction: true,
+      enablesInfantryConstruction: true,
       scoreValue: 2,
       upgrades: [
         {
           cost: { metal: 100, credits: 30 },
           buildTimeHours: 6,
           hp: 35,
-          enablesGroundConstruction: true,
+          enablesInfantryConstruction: true,
           upkeep: { energy: 15 },
         },
         {
           cost: { metal: 150, credits: 60 },
           buildTimeHours: 9,
           hp: 45,
-          enablesGroundConstruction: true,
+          enablesInfantryConstruction: true,
           upkeep: { energy: 25 },
         },
         {
           cost: { metal: 200, credits: 90 },
           buildTimeHours: 12,
           hp: 60,
-          enablesGroundConstruction: true,
+          enablesInfantryConstruction: true,
           buildSpeedBonus: 0.05,
           upkeep: { energy: 35 },
         },
@@ -831,15 +835,15 @@ export const data: GameData = parseGameData({
         },
       ],
     },
-    // Factory — builds ground vehicles (tank) and shuttles (interceptor).
-    // enablesGroundConstruction: the gate for
-    // vehicle/shuttle unit.build on this planet.
+    // Завод — дом ТЕХНИКИ (ROS-1.1): `enablesVehicleConstruction` гейтит `unit.build`
+    // наземных юнитов с `kind: 'vehicle'` на этом мире. Пехоту он не строит — она
+    // живёт в казармах; челнокам нужен не он, а ангар (`shuttleBay`).
     factory: {
       name: 'Vehicle Factory',
       cost: { metal: 150, credits: 60 },
       buildTimeHours: 6,
       hp: 25,
-      enablesGroundConstruction: true,
+      enablesVehicleConstruction: true,
       scoreValue: 5,
       upkeep: { energy: 30 },
       upgrades: [
@@ -847,14 +851,14 @@ export const data: GameData = parseGameData({
           cost: { metal: 180, credits: 80 },
           buildTimeHours: 8,
           hp: 35,
-          enablesGroundConstruction: true,
+          enablesVehicleConstruction: true,
           upkeep: { energy: 50 },
         },
         {
           cost: { metal: 250, credits: 120 },
           buildTimeHours: 12,
           hp: 45,
-          enablesGroundConstruction: true,
+          enablesVehicleConstruction: true,
           buildSpeedBonus: 0.5,
           upkeep: { energy: 70 },
         },

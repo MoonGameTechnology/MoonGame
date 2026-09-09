@@ -76,7 +76,7 @@ const data: GameData = parseGameData({
       enablesShipConstruction: true,
       shuttleBay: 1,
     },
-    barracks: { name: 'Barracks', cost: {}, buildTimeHours: 0, hp: 20, enablesGroundConstruction: true },
+    barracks: { name: 'Barracks', cost: {}, buildTimeHours: 0, hp: 20, enablesInfantryConstruction: true },
   },
   events: {},
 });

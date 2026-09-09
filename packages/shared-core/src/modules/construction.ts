@@ -1,6 +1,6 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type { BuildingInstance, Planet, PausedConstructionSite, Player } from '../state/gameState';
-import type { BuildingDef, GameData, ResourceBag } from '../data/schemas';
+import type { BuildingDef, GameData, ResourceBag, UnitDef } from '../data/schemas';
 import { buildingLevel, buildingMaxLevel } from '../data/schemas';
 import { isBombarded } from '../state/orbit';
 import { allowedBuildings } from '../state/sectorKind';
@@ -143,7 +143,10 @@ function isQueued(
 }
 
 /** Строительные способности здания — те, что гейтят `unit.build`. */
-type ConstructionCapability = 'enablesShipConstruction' | 'enablesGroundConstruction';
+type ConstructionCapability =
+  | 'enablesShipConstruction'
+  | 'enablesInfantryConstruction'
+  | 'enablesVehicleConstruction';
 
 /** Открыта ли способность у здания ЭТОГО уровня. База — флаг самого здания; дальше
  *  способность может открыть любой ПРОЙДЕННЫЙ апгрейд, и назад она не выключается
@@ -195,10 +198,16 @@ function hangarFree(h: HandlerContext, planet: Planet): number {
   return shuttleBayAt(planet, data) - hangarUsed(planet) - queued;
 }
 
-/** The facility a ground-domain unit needs to be built (barracks for infantry,
- *  factory for vehicles). */
-function hasGroundFacility(planet: Planet, data: GameData): boolean {
-  return hasCapability(planet, data, 'enablesGroundConstruction');
+/** Здание, без которого наземный юнит не заложить: КАЗАРМЫ для пехоты, ЗАВОД для
+ *  техники (ROS-1.1). Род войск живёт в данных (`UnitDef.kind`), поэтому новый род
+ *  вводится юнитом и зданием, а не правкой этой функции. */
+const GROUND_FACILITY = {
+  infantry: { capability: 'enablesInfantryConstruction', code: 'E_NO_BARRACKS' },
+  vehicle: { capability: 'enablesVehicleConstruction', code: 'E_NO_FACTORY' },
+} as const satisfies Record<string, { capability: ConstructionCapability; code: string }>;
+
+function hasGroundFacility(planet: Planet, data: GameData, kind: UnitDef['kind']): boolean {
+  return hasCapability(planet, data, GROUND_FACILITY[kind].capability);
 }
 
 function requireUnlocked(
@@ -447,8 +456,11 @@ export const constructionModule: GameModule = {
       if (!isShuttle && def.domain === 'space' && !hasShipyard(planet, h.ctx.data)) {
         return h.reject('E_NO_SHIPYARD');
       }
-      if (def.domain === 'ground' && !hasGroundFacility(planet, h.ctx.data)) {
-        return h.reject('E_NO_GROUND_FACILITY');
+      // Наземный юнит идёт в СВОЁ здание: пехота в казармы, техника на завод
+      // (ROS-1.1). Отказ называет недостающее здание, а не «наземное производство» —
+      // игроку из кода отказа должно быть видно, что именно строить.
+      if (def.domain === 'ground' && !hasGroundFacility(planet, h.ctx.data, def.kind)) {
+        return h.reject(GROUND_FACILITY[def.kind].code);
       }
       // ARS-3 ownership gate: a seat with an arsenal SNAPSHOT builds only what it
       // owns — the hull and every module must be listed (fail-secure E_NOT_OWNED).
