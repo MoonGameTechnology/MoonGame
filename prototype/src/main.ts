@@ -1020,6 +1020,10 @@ let endScreen: MatchEnd | null = null;
 let selFleet: string | null = null;
 let selPlanet: string | null = null;
 let selFleets = new Set<string>();
+/** UI-14. ЧУЖОЙ флот, который игрок тапнул, чтобы посмотреть. Держится ОТДЕЛЬНО от
+ *  `selFleet` намеренно: `selFleet` — адрес приказа, и чужой id в нём завёл бы приказы,
+ *  которые ядро отклонит. Осмотр — состояние панели и только её. */
+let inspectFleet: string | null = null;
 let aiming = false; // "Move" command armed → next world tap orders the move
 // PC ШТУРМ: armed like "Move", but the target must be someone else's capturable
 // world — the fleet flies there and assaults on arrival (one-shot, not the CC-2
@@ -2956,11 +2960,23 @@ function setFleetSelection(ids: string[]) {
   const sel = selectFleets(ids, (id) => s.fleets[id]?.owner === ME);
   selFleets = new Set(sel.picked);
   selFleet = sel.single;
+  inspectFleet = sel.inspect; // UI-14: одинокий чужой уходит на осмотр, а не в никуда
   selPlanet = null; // a fleet selection never co-selects a planet (mutually exclusive)
   lastPanelHtml = '';
 }
+/**
+ * Чей флот показывает панель. Осмотр чужого (UI-14) уступает ВСЕМУ: он виден, только
+ * пока не выбрано ничего своего. Это не вежливость, а структура: так протухший
+ * `inspectFleet` не может заслонить свежий выбор мира или флота, и правило держится
+ * само, а не дисциплиной в пяти местах, где выбор меняется.
+ */
+function panelFleet(): string | null {
+  if (selFleet || selPlanet || selFleets.size) return selFleet;
+  return inspectFleet;
+}
 function clearSelection() {
   selFleet = null;
+  inspectFleet = null;
   selPlanet = null;
   selFleets = new Set();
   merging = false;
@@ -5571,6 +5587,18 @@ function fleetPanelHtml(f: Fleet): string {
   );
   // Тап по имени открыл сводку армии — карточка целиком уступает ей место.
   if (fleetInfoFor === f.id) return h + fleetSummaryHtml(f);
+  // UI-14. ЧУЖОЙ флот — только осмотр: тот же разбор состава, что игрок уже знает по
+  // своим (тап по имени), и ни одной кнопки приказа. Кнопки тут были бы не «строгостью
+  // интерфейса», а обманом: ядро всё равно отвечает `E_FORBIDDEN` на приказ чужому
+  // флоту. Строка-подсказка объясняет, ПОЧЕМУ приказов нет, — иначе пустая карточка
+  // читается как поломка, а именно с этого и началась находка владельца.
+  if (f.owner !== ME) {
+    return (
+      h +
+      `<div class="hint">${t('side.fleet.foreign.hint', { who: NAME[f.owner] ?? f.owner })}</div>` +
+      fleetSummaryHtml(f)
+    );
+  }
   // ХП-бар Bytro-стиля + два ремонта: ECON-3а — экспресс за METAL у своего дока
   // (дешёвый, основной), и ненавязчивый платный за кредиты — где угодно вне боя
   // (цены — те же формулы, что в гейте).
@@ -6118,7 +6146,7 @@ function planetPanelHtml(p: Planet): string {
 function panelHtml(): string {
   // Приоритет претендентов и отсев мёртвых ссылок — в `panelSelect.ts` (REFM-39):
   // устаревший выбор флота проваливается на мир, а не запирает панель пустотой.
-  const pick = pickPanel({ fleets: selFleets, fleet: selFleet, planet: selPlanet }, s, seesDetails);
+  const pick = pickPanel({ fleets: selFleets, fleet: panelFleet(), planet: selPlanet }, s, seesDetails);
   if (pick.kind === 'group') return taskGroupPanelHtml(pick.fleets);
   if (pick.kind === 'fleet') return fleetPanelHtml(pick.fleet);
   if (pick.kind === 'empty') return `<div class="hint">${t('side.empty')}</div>`;
@@ -8226,15 +8254,18 @@ function selectAt(mx: number, my: number) {
     lastPanelHtml = '';
   };
   if (!pcUi()) {
-    // Mobile (frozen in this chat): the original fleet-first behaviour — nearest own
-    // fleet under the tap, else the world, else clear. Перебора нет.
-    const mine = fleetIds[0] ?? null;
+    // Mobile (frozen in this chat): the original fleet-first behaviour — nearest
+    // TAPPABLE fleet under the tap, else the world, else clear. Перебора нет.
+    // «Ближайший» — не обязательно свой: с UI-14 чужой видимый флот тоже отвечает на
+    // тап, только осмотром (правило 6 в `fleetSelection.ts`), поэтому имя переменной
+    // здесь `hit`, а не `mine` — фильтр «своё» стоит дальше, в `setFleetSelection`.
+    const hit = fleetIds[0] ?? null;
     // Shift / Ctrl / ⌘ → extend the group instead of replacing it.
-    if (additive && mine) {
-      toggleFleetInSelection(mine);
+    if (additive && hit) {
+      toggleFleetInSelection(hit);
       return;
     }
-    applyPick(touchPick(mine, n?.id ?? null));
+    applyPick(touchPick(hit, n?.id ?? null));
     return;
   }
   // PC — RimWorld-style cycling: gather EVERY selectable object under the tap — your

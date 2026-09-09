@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 5797 зелёных** (62 skip, 435 файлов; с `DATABASE_URL` — 5859 без пропусков: все пропуски — тесты durable-пути, которым нужна база).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 5803 зелёных** (62 skip, 436 файлов; с `DATABASE_URL` — 5865 без пропусков: все пропуски — тесты durable-пути, которым нужна база).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -723,6 +723,12 @@ INSTEAD-of-фокус — opportunity-cost (лидер-«+слот» branchless)
 E_FORBIDDEN, E_UNKNOWN_BUILDING/UNIT, E_ALREADY_BUILT, E_ALREADY_QUEUED,
 E_NO_BUILDING, E_MAX_LEVEL, E_INSUFFICIENT, E_BOMBARDED, E_WRONG_SECTOR,
 E_NO_SHIPYARD, E_NO_BARRACKS, E_NO_FACTORY`.
+- **Осмотр чужого флота (UI-14).** Тап по ВИДИМОМУ чужому флоту открывает панель с
+  разбором его состава — и ни одной кнопки приказа. Выделение по-прежнему только своё
+  (`fleetSelection.ts`, правило 1); осмотр живёт отдельным полем `inspect` и отдельной
+  переменной клиента, а не подмешивается в «текущий флот», потому что тот адресует
+  приказы. Панель показывает осмотр, только пока не выбрано ничего своего (`panelFleet()`)
+  — так устаревший осмотр структурно не может заслонить свежий выбор.
 - **Очередь стройки (BLD-1, `Planet.buildQueue`).** Мир строит по ОДНОЙ вещи в полосе;
   полос две и они независимы: `buildings` (здание и апгрейд спорят за стройплощадку) и
   `units` (верфь/казармы). Заказ в занятую полосу не отвергается и не идёт параллельно —

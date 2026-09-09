@@ -1780,6 +1780,7 @@ export const ru: Record<string, string> = {
   'side.fleet.enroute': '↗ идёт к {dest} · прибытие через',
   'side.fleet.hero-aura': '— проекция · +5% атаки/обороны этому флоту',
   'side.fleet.hull-tag': 'корпус {p}%',
+  'side.fleet.foreign.hint': 'флот игрока {who} — только осмотр: приказы идут своим',
   'side.fleet.hunger': 'голод: −25% на земле',
   'effect.title': 'Эффекты',
   'effect.in-battle': 'в бою',

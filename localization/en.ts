@@ -1784,6 +1784,7 @@ export const en: Record<string, string> = {
   'side.fleet.enroute': '↗ en route to {dest} · arrives in',
   'side.fleet.hero-aura': '— projection · +5% attack/defense to this fleet',
   'side.fleet.hull-tag': 'hull {p}%',
+  'side.fleet.foreign.hint': '{who}’s fleet — inspection only: orders go to your own',
   'side.fleet.hunger': 'starving: −25% on the ground',
   'effect.title': 'Effects',
   'effect.in-battle': 'in battle',
