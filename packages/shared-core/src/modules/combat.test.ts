@@ -296,10 +296,10 @@ describe('combat — damage lines (GDD §7.2)', () => {
     const started = okApply(kernel.applyAction(st, arrive('A'), ctx(0)));
     const r = okAdvance(kernel.advanceTo(started.state, ctx(HOUR))); // one round
 
-    // No mid, no artillery: their 40% is split evenly → front 60%, rear 40%.
+    // Средней линии нет: её 30% делятся поровну → фронт 65%, тыл 35% (ROS-2.1).
     const d = r.state.fleets.D;
-    expect(stackOf(d, 'shield')?.hp).toBe(44); // 50 − 60% of 10
-    expect(stackOf(d, 'backliner')?.hp).toBe(6); // 10 − 40% of 10 — the rear is NOT spared
+    expect(stackOf(d, 'shield')?.hp).toBe(43.5); // 50 − 65% от 10
+    expect(stackOf(d, 'backliner')?.hp).toBe(6.5); // 10 − 35% от 10 — тыл не щадят
     expect(stackOf(d, 'backliner')?.count).toBe(1);
   });
 

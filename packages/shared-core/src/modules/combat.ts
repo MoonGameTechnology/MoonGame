@@ -581,7 +581,13 @@ export const combatModule: GameModule = {
         },
       );
       applyDamageToSide(h, battle.defender.ref, dmgToDefender, data, battle.location);
-      applyDamageToSide(h, battle.attacker.ref, dmgToAttacker, data, battle.location);
+      // ОТВЕТНЫЙ огонь обходит артиллерию атакующей стороны (ROS-2.1): она бьёт
+      // безнаказанно, пока рядом стоит кто-то ещё, кому этот залп можно отдать.
+      // Под ЧУЖОЙ атакой (строкой выше) такой поблажки нет — там она обычный
+      // тыловой корабль и получает свою долю.
+      applyDamageToSide(h, battle.attacker.ref, dmgToAttacker, data, battle.location, {
+        sparesArtillery: true,
+      });
       h.emit('combat.round', {
         battleId,
         round: battle.round,

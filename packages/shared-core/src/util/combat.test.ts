@@ -17,9 +17,13 @@ const data: GameData = parseGameData({
     },
     picket: { faction: 'x', stats: { attack: 3, defense: 3, speed: 7, hp: 30 }, line: 'mid' },
     healer: { faction: 'x', stats: { attack: 0, defense: 2, speed: 5, hp: 10 }, line: 'rear' },
+    // ROS-2.1: артиллерия — обычный ТЫЛОВОЙ корпус (своей линии у неё больше нет),
+    // а трейт `artillery` означает теперь ровно одно: по ней не проходит ответный
+    // огонь, когда атакует её сторона.
     gun: {
       faction: 'x',
       stats: { attack: 12, defense: 1, speed: 4, hp: 20 },
+      line: 'rear',
       traits: ['artillery'],
     },
     // A ground unit that ASKS for the rear — lines are a ship formation, so the
@@ -44,48 +48,35 @@ const stack = (unit: string, count: number, extra: Partial<UnitStack> = {}): Uni
 });
 
 describe('lineShares — how a volley splits across the lines', () => {
-  it('is 40/30/20/10 when all four lines are in the fight', () => {
-    expect(lineShares(['front', 'mid', 'rear', 'artillery'])).toEqual({
-      front: 40,
-      mid: 30,
-      rear: 20,
-      artillery: 10,
-    });
+  // ROS-2.1: линий ТРИ. Прежняя четвёртая (артиллерийская) снята вместе со своей
+  // долей: 40/30/20/10 сходились в 100 только вместе с ней.
+  it('все три линии в бою — 50/30/20', () => {
+    expect(lineShares(['front', 'mid', 'rear'])).toEqual({ front: 50, mid: 30, rear: 20 });
   });
 
-  it('gives a lone line the whole volley, whichever line it is', () => {
+  it('одна линия забирает весь залп', () => {
     expect(lineShares(['front']).front).toBe(100);
-    expect(lineShares(['artillery']).artillery).toBe(100);
+    expect(lineShares(['rear']).rear).toBe(100);
   });
 
-  it('splits an absent line evenly across the ones present', () => {
-    // rear + artillery gone: their 30 splits 15/15.
-    expect(lineShares(['front', 'mid'])).toEqual({ front: 55, mid: 45, rear: 0, artillery: 0 });
-    // front + rear gone: their 60 splits 30/30.
-    expect(lineShares(['mid', 'artillery'])).toEqual({
-      front: 0,
-      mid: 60,
-      rear: 0,
-      artillery: 40,
-    });
+  it('доля ОТСУТСТВУЮЩЕЙ линии делится поровну между присутствующими', () => {
+    // тыла нет: его 20 делятся 10/10.
+    expect(lineShares(['front', 'mid'])).toEqual({ front: 60, mid: 40, rear: 0 });
+    // средней нет: её 30 делятся 15/15.
+    expect(lineShares(['front', 'rear'])).toEqual({ front: 65, mid: 0, rear: 35 });
   });
 
-  it('rounds an indivisible remainder UP for the more forward line', () => {
-    // artillery gone: 10 over three lines is 3⅓ each — the odd percent goes to the bow.
-    expect(lineShares(['front', 'mid', 'rear'])).toEqual({
-      front: 44,
-      mid: 33,
-      rear: 23,
-      artillery: 0,
-    });
+  it('нечётный процент уходит вперёд по строю (нос округляется вверх)', () => {
+    // фронта нет: его 50 на двоих — по 25, делится нацело.
+    expect(lineShares(['mid', 'rear'])).toEqual({ front: 0, mid: 55, rear: 45 });
   });
 
-  it('always sums to exactly 100, and ignores the order it is asked in', () => {
+  it('результат не зависит от порядка аргументов и всегда сходится в 100', () => {
     const combos: Array<Parameters<typeof lineShares>[0]> = [
       ['front'],
       ['mid', 'front'],
-      ['rear', 'artillery', 'front'],
-      ['artillery', 'rear', 'mid', 'front'],
+      ['rear', 'front'],
+      ['rear', 'mid', 'front'],
     ];
     for (const combo of combos) {
       const shares = lineShares(combo);
@@ -94,8 +85,8 @@ describe('lineShares — how a volley splits across the lines', () => {
     }
   });
 
-  it('is all zeroes when nobody is left to hit', () => {
-    expect(lineShares([])).toEqual({ front: 0, mid: 0, rear: 0, artillery: 0 });
+  it('пустой бой — нули', () => {
+    expect(lineShares([])).toEqual({ front: 0, mid: 0, rear: 0 });
   });
 });
 
@@ -120,26 +111,32 @@ describe('damageUnits — the pure damage model', () => {
   });
 
   it('hits EVERY present line in the same volley, by share', () => {
-    // front (cruiser) + rear (healer): the absent mid+artillery 40% splits evenly,
-    // so 100 damage goes 60 to the front and 40 to the rear.
+    // front (cruiser) + rear (healer): отсутствующая средняя линия отдаёт свои 30
+    // поровну, поэтому 100 урона идут 65 во фронт и 35 в тыл (ROS-2.1).
     const units = [stack('healer', 4), stack('cruiser', 2)];
     const { survivors, deaths } = damageUnits(units, 100, data);
-    expect(deaths).toEqual([{ unit: 'cruiser', count: 1 }, { unit: 'healer', count: 4 }]);
-    expect(survivors).toEqual([{ unit: 'cruiser', count: 1, hp: 20 }]); // 80 − 60
+    expect(deaths).toEqual([{ unit: 'cruiser', count: 1 }, { unit: 'healer', count: 3 }]);
+    expect(survivors).toEqual([
+      { unit: 'healer', count: 1, hp: 5 }, // тыл: 40 − 35
+      { unit: 'cruiser', count: 1, hp: 15 }, // фронт: 80 − 65
+    ]);
   });
 
-  it('splits all four lines 40/30/20/10 and spends the volley exactly', () => {
+  it('делит залп по ТРЁМ линиям 50/30/20 и тратит его без остатка (ROS-2.1)', () => {
     const units = [
-      stack('cruiser', 4), // front, 160 hp
-      stack('picket', 4), // mid, 120 hp
-      stack('healer', 8), // rear, 80 hp
-      stack('gun', 3), // artillery, 60 hp
+      stack('cruiser', 4), // фронт, 160 hp
+      stack('picket', 4), // средняя, 120 hp
+      stack('healer', 8), // тыл, 80 hp
+      stack('gun', 3), // тоже ТЫЛ: своей линии у артиллерии больше нет
     ];
     damageUnits(units, 100, data);
-    expect(units.find((u) => u.unit === 'cruiser')?.hp).toBe(120); // 160 − 40
+    expect(units.find((u) => u.unit === 'cruiser')?.hp).toBe(110); // 160 − 50
     expect(units.find((u) => u.unit === 'picket')?.hp).toBe(90); // 120 − 30
-    expect(units.find((u) => u.unit === 'healer')?.hp).toBe(60); // 80 − 20
-    expect(units.find((u) => u.unit === 'gun')?.hp).toBe(50); // 60 − 10
+    // Тыловые 20 делятся ВНУТРИ линии по id (`gun` < `healer`): пушки принимают
+    // залп первыми и держат его целиком.
+    expect(units.find((u) => u.unit === 'gun')?.hp).toBe(40); // 60 − 20
+    // Незадетый стек так и остаётся без пула hp: он появляется только при попадании.
+    expect(units.find((u) => u.unit === 'healer')?.hp).toBeUndefined();
   });
 
   it('re-splits what a dying line could not absorb — no damage is wasted', () => {
@@ -166,6 +163,32 @@ describe('damageUnits — the pure damage model', () => {
     const units = [stack('trooper', 4)]; // 96 hp
     damageUnits(units, 24, data);
     expect(units[0]?.hp).toBe(72); // all 24 landed
+  });
+
+  // ROS-2.1. Артиллерия бьёт безнаказанно: ответный огонь по ней НЕ проходит и
+  // перераспределяется на остальные корпуса её стороны. Это не бессмертие — под чужой
+  // атакой она стоит в тылу и получает свою долю, как всякий тыловой корабль.
+  it('ОТВЕТНЫЙ залп обходит артиллерию, пока на её стороне есть кто-то ещё', () => {
+    const units = [stack('cruiser', 1), stack('gun', 1)]; // 40 hp фронта + 20 hp пушки
+    damageUnits(units, 20, data, { sparesArtillery: true });
+    expect(units.find((u) => u.unit === 'gun')?.hp).toBeUndefined(); // цела, по ней не попадали
+    expect(units.find((u) => u.unit === 'cruiser')?.hp).toBe(20); // весь залп ушёл в крейсер
+  });
+
+  it('а ОБЫЧНЫЙ залп (по обороняющейся стороне) артиллерию задевает — она в тылу', () => {
+    const units = [stack('cruiser', 1), stack('gun', 1)];
+    damageUnits(units, 20, data);
+    // Две линии из трёх: фронт 65%, тыл 35% — пушка получила свою долю.
+    expect(units.find((u) => u.unit === 'gun')?.hp).toBe(13);
+    expect(units.find((u) => u.unit === 'cruiser')?.hp).toBe(27);
+  });
+
+  it('когда КРОМЕ артиллерии никого не осталось — залп приходит по ней', () => {
+    // Иначе флот из одних пушек был бы неубиваем: владелец решил, что артиллерия
+    // не бессмертна, поэтому щадящее правило действует только пока есть кого щадить.
+    const units = [stack('gun', 2)]; // 40 hp
+    damageUnits(units, 15, data, { sparesArtillery: true });
+    expect(units[0]?.hp).toBe(25);
   });
 
   it('shields absorb first and never kill; dead ships take their shields along', () => {
