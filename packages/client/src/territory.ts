@@ -219,14 +219,14 @@ export function computePowerCell(
  *  faint neutral wash) with a terrain accent, then classified borders — same-owner inner
  *  hairlines, neutral divisions, and glowing owner frontiers. Fog is the caller's concern
  *  (it bakes `owner` as last-known); this just draws what the seeds say. Owned land is
- *  painted strongly so who-holds-what reads at a glance; a captured cluster of one owner
- *  paints as ONE political field with only faint inner province divisions. */
+ *  read through a restrained tint and precise frontiers; dark space remains visible
+ *  through the projection, including on dense whole-map views. */
 export function drawTerritory(
   g: CanvasRenderingContext2D,
   seeds: TerritorySeed[],
   clip: Array<[number, number]>,
   palette: TerritoryPalette,
-): void {
+): TerritoryCell[] {
   const cells = computePowerCells(seeds, clip);
   const trace = (poly: Array<[number, number]>): void => {
     g.beginPath();
@@ -241,13 +241,13 @@ export function drawTerritory(
     trace(cell.poly);
     g.fillStyle = rgba(
       cell.owner ? palette.ownerColor(cell.owner) : palette.neutralFill,
-      cell.owner ? 0.58 : 0.1,
+      cell.owner ? 0.075 : 0.018,
     );
     g.fill();
     const accent = palette.kindAccent(cell.kind);
     if (accent) {
       trace(cell.poly);
-      g.fillStyle = rgba(accent, 0.16); // province-type tint reads through the owner fill
+      g.fillStyle = rgba(accent, cell.owner ? 0.025 : 0.07);
       g.fill();
     }
   }
@@ -269,13 +269,14 @@ export function drawTerritory(
   g.lineJoin = 'round';
   g.lineCap = 'round';
   for (const [owner, segs] of ownedInner)
-    strokeSegs(segs, rgba(palette.ownerColor(owner), 0.18), 0.65); // inner hairlines
-  strokeSegs(neutralEdge, 'rgba(67,98,110,0.34)', 1); // neutral divisions
+    strokeSegs(segs, rgba(palette.ownerColor(owner), 0.3), 0.65); // inner hairlines
+  strokeSegs(neutralEdge, 'rgba(95,176,197,0.55)', 0.75); // neutral divisions
   for (const [owner, segs] of ownedFront)
-    strokeSegs(segs, rgba(palette.ownerColor(owner), 0.14), 5.5); // frontier glow
+    strokeSegs(segs, rgba(palette.ownerColor(owner), 0.08), 3); // restrained emission
   for (const [owner, segs] of ownedFront)
-    strokeSegs(segs, rgba(palette.ownerColor(owner), 0.9), 1.6); // frontier crisp
+    strokeSegs(segs, rgba(palette.ownerColor(owner), 0.85), 1.15); // frontier crisp
   g.restore();
+  return cells;
 }
 
 /** A cell edge as a stroke segment: [x0, y0, x1, y1]. */

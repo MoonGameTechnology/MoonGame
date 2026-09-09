@@ -15,6 +15,7 @@ const bundle = async (playerBuild) => {
     format: 'iife',
     platform: 'browser',
     target: 'es2020',
+    loader: { '.webp': 'dataurl' },
     minify: true,
     legalComments: 'none',
     write: false,
@@ -62,9 +63,7 @@ body{margin:0;overflow:hidden;color:var(--ink);
   font:12px/1.45 ui-monospace,"SFMono-Regular",Menlo,Consolas,monospace;letter-spacing:.2px;
   user-select:none;overscroll-behavior:none;touch-action:none;
   background:radial-gradient(125% 105% at 50% 38%,#04141c 0%,#02080e 58%,#01040a 100%);}
-/* CRT scanlines + faint vignette over the map, beneath the HUD */
-body::before{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;mix-blend-mode:multiply;opacity:.5;
-  background:repeating-linear-gradient(0deg,rgba(0,0,0,0) 0 2px,rgba(0,0,0,.16) 2px 3px);}
+/* Clear optical projection: thin vector strokes stay sharp without a CRT overlay. */
 #map{position:fixed;inset:0;z-index:0;display:block;touch-action:none;}
 
 /* themed scrollbars — angular neon thumb on a dark grid track, in the HUD's tactical key.
@@ -119,9 +118,10 @@ body::before{content:"";position:fixed;inset:0;z-index:1;pointer-events:none;mix
    shrink together (flex:1 1 0; min-width:0) so the row scales down instead of
    overflowing. Each capsule = a bare line-glyph + tabular amount + flow, in the mock's
    MUTED palette: neutral grey outline, grey icon, near-white number (no cyan glow). */
-#purse{display:flex;align-items:center;flex:1 1 auto;min-width:0;overflow:hidden;gap:6px;padding:0 8px 6px;}
+#purse{display:flex;align-items:center;flex:1 1 auto;min-width:0;overflow:hidden;gap:0;padding:0 8px 4px;}
 .res{display:flex;align-items:center;justify-content:center;gap:6px;padding:0 8px;height:100%;flex:1 1 0;min-width:0;
-  position:relative;overflow:hidden;border:1px solid rgba(148,170,173,.26);border-radius:14px;background:rgba(6,14,16,.35);}
+  position:relative;overflow:hidden;border:1px solid transparent;border-right-color:var(--line);border-radius:0;background:transparent;}
+.res:last-child{border-right-color:transparent;}
 .res.short{border-color:rgba(255,90,77,.4);}
 /* amount + flow share one "value line" (.rv); the amount owns the room (flex:0 0 auto),
    the flow rate clips first (phones drop flow digits entirely — see the chip builder). */
@@ -218,7 +218,7 @@ body.sheet-open #speedbar{bottom:calc(var(--sheeth,34vh) + 12px);}
   text-shadow:0 0 6px rgba(0,0,0,.85);}
 .spd button{min-width:30px;height:26px;padding:0 5px;border-radius:2px;cursor:pointer;font:11px ui-monospace,monospace;
   background:transparent;color:var(--cyan-dim);border:1px solid var(--line-hi);}
-.spd button.on{background:rgba(53,214,230,.16);color:var(--cyan);border-color:var(--cyan);box-shadow:0 0 10px rgba(53,214,230,.4);}
+.spd button.on{background:rgba(53,214,230,.10);color:var(--cyan);border-color:var(--cyan);box-shadow:inset 0 0 8px rgba(53,214,230,.08);}
 .spd .spddiv{width:1px;height:18px;background:var(--line-hi);margin:0 2px;}
 .spd .spdmini{min-width:26px;font-size:10px;opacity:.9;}
 .spd .sep{width:1px;height:18px;background:var(--line-hi);margin:0 4px;flex:0 0 auto;}
