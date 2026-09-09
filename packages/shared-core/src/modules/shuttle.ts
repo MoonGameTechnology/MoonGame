@@ -205,6 +205,47 @@ function shootDownStrike(strike: ShuttleStrike, amount: number): number {
   return downed;
 }
 
+/** Насколько далеко база поднимает перехватчики — самый дальнобойный охотник в
+ *  ангаре. Тот же `strikeRange`, которым он летит бить: машина не может встречать
+ *  дальше, чем достаёт сама. */
+function interceptReach(hangar: readonly UnitStack[], data: GameData): number {
+  let reach = 0;
+  for (const st of hangar) {
+    if (st.count <= 0) continue;
+    const stats = data.units[st.unit]?.stats;
+    if (!stats || (stats.shuttleDamage ?? 0) <= 0) continue;
+    reach = Math.max(reach, stats.strikeRange ?? 0);
+  }
+  return reach;
+}
+
+/** Ближайший ЧУЖОЙ вылет в радиусе базы, детерминированно: ближе — раньше, при равной
+ *  дистанции побеждает меньший id. Одна цель за час на базу: дежурное звено взлетает
+ *  один раз и садится, а не размазывает залп по всем небесам сразу. */
+function nearestHostileStrike(
+  strikes: readonly ShuttleStrike[],
+  base: BaseView,
+  reach: number,
+  h: HandlerContext,
+): ShuttleStrike | null {
+  const from = base.position;
+  if (!from) return null;
+  let best: ShuttleStrike | null = null;
+  let bestDist = Infinity;
+  for (const st of strikes) {
+    if (st.owner === base.owner || st.units.length === 0) continue;
+    const p = strikePosition(st, h.state, h.ctx.now);
+    if (!p) continue;
+    const d = distance(from, p);
+    if (d > reach) continue;
+    if (d < bestDist || (d === bestDist && best !== null && st.id < best.id)) {
+      best = st;
+      bestDist = d;
+    }
+  }
+  return best;
+}
+
 /** Один игровой час в миллисекундах мира — с учётом ускорения времени матча. */
 function hourMs(h: HandlerContext): number {
   return MS_PER_HOUR * timeScaleOf(h.ctx);
@@ -694,6 +735,71 @@ export const shuttleModule: GameModule = {
         fleet.pdCooldownUntil = h.ctx.now + cooldownMs;
       }
       // Вылет, у которого не осталось машин, до цели не долетит.
+      h.state.strikes = strikes.filter((st) => st.units.length > 0);
+    });
+
+    /**
+     * ПЕРЕХВАТ (SHU-1.3) — вторая контрмера челнокам и единственная АКТИВНАЯ: своя
+     * база поднимает машины навстречу чужому вылету, проходящему в её радиусе, и
+     * сбивает его корпуса. Реактивно, как и точечная оборона: приказа не нужно —
+     * дежурное звено взлетает само, иначе игрок оборонялся бы только сидя у экрана.
+     *
+     * Три вещи, которые здесь легко потерять при правке:
+     *
+     * 1. **Перехватчик — тот, у кого есть `shuttleDamage`.** Отдельного флага «я
+     *    истребитель» нет намеренно: ноль урона по челнокам и «не умею перехватывать»
+     *    — одно и то же, а два способа сказать одно разъезжаются (тот же довод, что у
+     *    `shuttleBay` в SHU-1.1).
+     * 2. **Взлёт стоит топлива БАЗЫ.** Дежурство не бесплатно: пустой порт пропускает
+     *    удар, и это ровно то решение, ради которого топливо вообще существует.
+     * 3. **Машины не улетают из ангара.** Перехват — это подъём и посадка внутри
+     *    одного часа; заводить ради него второй летящий объект в состоянии значило бы
+     *    удвоить сущность, которую видят туман, ПВО и выбор цели.
+     */
+    api.on('time.advanced', (_event, h: HandlerContext) => {
+      const strikes = h.state.strikes ?? [];
+      if (strikes.length === 0) return;
+      const data = h.ctx.data;
+      const bases: BaseView[] = [
+        ...Object.values(h.state.planets).map((planet) => planetBase(planet, data)),
+        ...Object.values(h.state.fleets).map((fleet) => fleetBase(fleet, h.state, data)),
+      ];
+      for (const base of bases) {
+        if (base.owner === null || base.position === null) continue;
+        const power = sumUnitStat(base.hangar, data, 'shuttleDamage');
+        if (power <= 0) continue; // в ангаре нет охотников
+        const spec = baseSortieSpec(base, data);
+        const sortie = base.sortie ?? freshSortie(spec.maxFuel);
+        if (!canSortie(sortie)) continue; // дежурить нечем — топливо или перезарядка
+        const reach = interceptReach(base.hangar, data);
+        if (reach <= 0) continue;
+
+        const target = nearestHostileStrike(strikes, base, reach, h);
+        if (!target) continue;
+
+        const dealt = h.hook<number>('combat.damage', power, {
+          phase: 'intercept',
+          location: base.ref.kind === 'planet' ? base.ref.id : '',
+          attacker: base.owner,
+          defender: target.owner,
+        });
+        // Тот же перевод урона в сбитые машины, что у точечной обороны: у вылета нет
+        // своего пула здоровья, и заводить его здесь второй раз нельзя.
+        const hull = Math.max(1, data.units[target.units[0]!.unit]?.stats.hp ?? 1);
+        target.damage = (target.damage ?? 0) + dealt;
+        const downed = shootDownStrike(target, Math.floor(target.damage / hull));
+        target.damage -= downed * hull;
+        base.setSortie(spendSortie(sortie, spec.rearmRounds));
+        h.emit('shuttle.intercepted', {
+          baseId: base.ref.id,
+          baseKind: base.ref.kind,
+          owner: base.owner,
+          strikeId: target.id,
+          targetOwner: target.owner,
+          damage: dealt,
+          downed,
+        });
+      }
       h.state.strikes = strikes.filter((st) => st.units.length > 0);
     });
 

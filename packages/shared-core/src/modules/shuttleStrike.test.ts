@@ -45,6 +45,9 @@ const data: GameData = parseGameData({
         fuel: 2,
         rearmRounds: 2,
         siegeDamage: 1,
+        // SHU-1.3: ради этого он и охотник — урон ПО ЧУЖИМ ЧЕЛНОКАМ. Хватает,
+        // чтобы двое сбили одну машину чужого вылета (корпус 10).
+        shuttleDamage: 12,
       },
     },
     // ROS-1.4: бомбардировщик — челнок против КОРАБЛЕЙ, по зданиям средний.
@@ -214,6 +217,98 @@ describe('удар челноков — вылет (правила 1–2, 5)', (
     s = apply(s, strike({ targetFleetId: 'E1' })); // fuel 2 → 1
     s = apply(s, strike({ targetFleetId: 'E1' })); // fuel 1 → 0, порт на перезарядке
     expect(code(s, strike({ targetFleetId: 'E1' }))).toBe('E_NO_FUEL');
+  });
+});
+
+describe('перехват — свои челноки поднимаются навстречу чужому удару (SHU-1.3)', () => {
+  // Заказ владельца: перехватчик создан ПРОТИВ ЧЕЛНОКОВ. До этого кирпича ударить по
+  // чужому вылету было нечем вовсе — цель удара это флот или мир, — поэтому роль
+  // существовала только на бумаге, а `shuttleDamage` некому было читать.
+  /** Мир p2 с портом и перехватчиками в ангаре — он и будет перехватывать. */
+  const defended = (over: { hangar?: number; fuel?: number; attackers?: number } = {}): GameState => {
+    const s = world({ hangar: over.attackers ?? 2 });
+    const b = s.planets.B!;
+    const port = { type: 'spaceport', level: 1, hp: 30 };
+    return {
+      ...s,
+      planets: {
+        ...s.planets,
+        B: {
+          ...b,
+          buildings: [...b.buildings, port],
+          hangar: [{ unit: 'interceptor', count: over.hangar ?? 2 }],
+          ...(over.fuel === undefined ? {} : { sortie: { fuel: over.fuel, rearming: 0 } }),
+        },
+      },
+    };
+  };
+
+  it('чужой удар по пути ТЕРЯЕТ машины — перехватчики поднялись и сбили', () => {
+    // Двое перехватчиков дают 24 урона, корпус челнока 10 → сбиты ДВЕ машины из трёх.
+    const s = apply(defended({ attackers: 3 }), strike({ targetPlanetId: 'B' }, 3));
+    const after = advance(s, 2);
+    const mine = after.planets.B?.buildings.find((b) => b.type === 'mine');
+    expect(mine?.hp).toBe(19); // долетел ОДИН челнок: 1 × siegeDamage 1
+  });
+
+  it('удар, потерявший ВСЕ машины, до цели не доходит вовсе', () => {
+    const s = apply(defended(), strike({ targetPlanetId: 'B' }, 2));
+    const after = advance(s, 2);
+    const mine = after.planets.B?.buildings.find((b) => b.type === 'mine');
+    expect(mine?.hp).toBe(20); // 24 урона против двух корпусов по 10 — сбиты оба
+    expect(after.strikes ?? []).toHaveLength(0);
+  });
+
+  it('перехват тратит топливо базы — бесконечно поднимать нельзя', () => {
+    // Смотрим состояние СРАЗУ после перехвата: дальше вступает перезарядка (час мира =
+    // раунд), и через пару часов бак снова полон — это другой механизм, SHU-1.2.
+    const s = apply(defended({ fuel: 1 }), strike({ targetPlanetId: 'B' }, 2));
+    const after = advance(s, 1);
+    expect(after.planets.B?.sortie?.fuel).toBe(0);
+    expect(after.planets.B?.sortie?.rearming).toBeGreaterThan(0);
+  });
+
+  it('без топлива перехвата НЕТ — удар доходит целиком', () => {
+    const s = apply(defended({ fuel: 0 }), strike({ targetPlanetId: 'B' }, 2));
+    const after = advance(s, 2);
+    const mine = after.planets.B?.buildings.find((b) => b.type === 'mine');
+    expect(mine?.hp).toBe(18); // оба челнока дошли: 2 × 1
+  });
+
+  it('СВОЙ удар не перехватывают — поднимаются только против чужого', () => {
+    // Порт p1 с перехватчиками бьёт по своему же миру A: перехвата быть не должно.
+    const s0 = world();
+    const own: GameState = {
+      ...s0,
+      planets: {
+        ...s0.planets,
+        A: { ...s0.planets.A!, owner: 'p1' },
+      },
+    };
+    const s = apply(own, strike({ targetFleetId: 'E1' }, 2));
+    const after = advance(s, 2);
+    expect(after.strikes ?? []).toHaveLength(0); // долетел и вернулся, никто не мешал
+    expect(hullOf(after, 'E1')).toBeLessThan(100);
+  });
+
+  it('машина без shuttleDamage перехватывать не умеет — она не охотник', () => {
+    const s0 = world();
+    const b = s0.planets.B!;
+    const withBombers: GameState = {
+      ...s0,
+      planets: {
+        ...s0.planets,
+        B: {
+          ...b,
+          buildings: [...b.buildings, { type: 'spaceport', level: 1, hp: 30 }],
+          hangar: [{ unit: 'legacy_shuttle', count: 4 }],
+        },
+      },
+    };
+    const s = apply(withBombers, strike({ targetPlanetId: 'B' }, 2));
+    const after = advance(s, 2);
+    const mine = after.planets.B?.buildings.find((b) => b.type === 'mine');
+    expect(mine?.hp).toBe(18); // удар дошёл целиком
   });
 });
 
