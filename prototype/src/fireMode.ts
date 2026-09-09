@@ -77,7 +77,7 @@ export function fireMenuHtml(uniform: string | null): string {
 export interface FireModeFleet {
   id: string;
   owner: string;
-  /** Есть ли на борту артиллерия — только у неё есть режим огня. */
+  /** Может ли флот вести дальний огонь — только у такого есть режим огня (`canBarrage`). */
   artillery: boolean;
   /** Режим прямо сейчас; пусто — значит дефолтный (правило 7). */
   mode: string | null | undefined;
