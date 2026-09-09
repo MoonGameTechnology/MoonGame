@@ -3,56 +3,115 @@
     "name": "Cargo Bay",
     "slot": "utility",
     "tag": "horizontal",
-    "effects": { "stats": { "cargoCapacity": 6 } },
-    "cost": { "metal": 45 },
-    "allowed": { "domain": "space" }
+    "effects": {
+      "stats": {
+        "cargoCapacity": 6
+      }
+    },
+    "cost": {
+      "metal": 45
+    },
+    "allowed": {
+      "domain": "space"
+    }
   },
   "radar_module": {
     "name": "Radar Module",
     "slot": "utility",
     "tag": "horizontal",
-    "effects": { "stats": { "radarRange": 180 } },
-    "cost": { "metal": 55 },
-    "allowed": { "domain": "space", "units": ["sensor_frigate"] }
+    "effects": {
+      "stats": {
+        "radarRange": 180
+      }
+    },
+    "cost": {
+      "metal": 55
+    },
+    "allowed": {
+      "domain": "space",
+      "units": [
+        "sensor_frigate"
+      ]
+    }
   },
   "ion_engine": {
     "name": "Ion Engine",
     "slot": "utility",
     "tag": "vertical",
-    "effects": { "stats": { "speed": 2 } },
-    "cost": { "metal": 40 },
-    "allowed": { "domain": "space" }
+    "effects": {
+      "stats": {
+        "speed": 2
+      }
+    },
+    "cost": {
+      "metal": 40
+    },
+    "allowed": {
+      "domain": "space"
+    }
   },
   "targeting_array": {
     "name": "Targeting Array",
     "slot": "weapon",
     "tag": "vertical",
-    "effects": { "stats": { "attack": 4 } },
-    "cost": { "metal": 60 },
-    "allowed": { "domain": "space" }
+    "effects": {
+      "stats": {
+        "attack": 4
+      }
+    },
+    "cost": {
+      "metal": 60
+    },
+    "allowed": {
+      "domain": "space"
+    }
   },
   "ablative_plating": {
     "name": "Ablative Plating",
     "slot": "defense",
     "tag": "vertical",
-    "effects": { "stats": { "hp": 12 } },
-    "cost": { "metal": 50 },
-    "allowed": { "domain": "space" }
+    "effects": {
+      "stats": {
+        "hp": 12
+      }
+    },
+    "cost": {
+      "metal": 50
+    },
+    "allowed": {
+      "domain": "space"
+    }
   },
   "shield_booster": {
     "name": "Shield Booster",
     "slot": "defense",
     "tag": "vertical",
-    "effects": { "stats": { "shield": 15 } },
-    "cost": { "metal": 80 },
-    "allowed": { "domain": "space" }
+    "effects": {
+      "stats": {
+        "shield": 15
+      }
+    },
+    "cost": {
+      "metal": 80
+    },
+    "allowed": {
+      "domain": "space"
+    }
   },
   "point_defense_array": {
-    "name": "Point Defense Array",
+    "name": "Area Defense Array",
     "slot": "defense",
     "tag": "vertical",
-    "effects": { "stats": { "pointDefense": 8 } },
-    "cost": { "metal": 50 },
-    "allowed": { "domain": "space" }
+    "effects": {
+      "stats": {
+        "pointDefense": 8
+      }
+    },
+    "cost": {
+      "metal": 50
+    },
+    "allowed": {
+      "domain": "space"
+    }
   }
 }

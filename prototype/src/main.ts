@@ -922,7 +922,7 @@ const LOCK = '#7df0d0'; // selection / targeting reticle accent
 // в выделении и артиллерия, и носитель. Линия огня — того же цвета, что круг стрелка.
 const R_ARTY = '#ffb43a'; // артиллерия: янтарный (как и весь огневой контур в HUD)
 const R_WING = '#9ad7ff'; // эскадрилья: холодный голубой
-const R_AA = '#c07dff'; // ПВО: сиреневый — это ОТМЕТКА на мире, а не область
+const R_AA = '#c07dff'; // ПКО: сиреневый — это ОТМЕТКА на мире, а не область
 // HERO-CORRIDOR: одноразовый коридор — КРАСНЫЙ мигающий пунктир (он исчезнет с первым
 // же проходом, это не дорога); временный и общий — спокойная бирюза с таймером.
 const CORR_ONCE = '#ff5c5c';
@@ -950,7 +950,7 @@ const BUILDABLE = [
   'fort',
   'orbital_aa',
 ];
-// `orbital_aa` (orbital ПВО — anti-ship near-orbit emplacement) is a defensive BUILDING:
+// `orbital_aa` (орбитальное ПКО — anti-ship near-orbit emplacement) is a defensive BUILDING:
 // the player builds it like a fort. It fires on hostile fleets over the world (core
 // `aaStrengthAt` sums building AA) but does NOT block ground capture — only ground troops
 // do that. A space fortress also comes with one pre-installed (installFortressAA).
@@ -1211,7 +1211,7 @@ const aaShots: Array<{
   from: { x: number; y: number };
   to: { x: number; y: number };
   at: number;
-  close: boolean; // ближняя ПВО (гарнизон, залп раз в 15 мин) — рисуется легче
+  close: boolean; // ближняя зенитка гарнизона, залп раз в 15 мин — рисуется легче
 }> = [];
 // Siege (artillery) volleys to visualize: map-space endpoints captured at event
 // time, drawn as a ballistic ARC with a stagger of shell particles and an impact
@@ -3382,7 +3382,7 @@ function handleEvents(events: DomainEvent[]) {
         if (!planet || !known(p.planetId as string)) break; // fogged flak stays unseen
         // Концы дуги и предел очереди — `fireEffects.ts` (REFM-178): жертва могла погибнуть
         // ЭТИМ же залпом (ядро издаёт событие после урона), и тогда вспышка встаёт над
-        // своей орбитой — беззвучно пропавший залп читался бы как «ПВО не сработало».
+        // своей орбитой — беззвучно пропавший залп читался бы как «ПКО не сработало».
         const target = s.fleets[p.fleetId as string];
         aaShots.push({
           from: { ...planet.position },
@@ -3887,7 +3887,7 @@ function drawCorridors(now: number): void {
 }
 
 /**
- * RANGE-UX — круги досягаемости выделенных флотов и отметки ПВО.
+ * RANGE-UX — круги досягаемости выделенных флотов и отметки ПКО.
  *
  * Вся арифметика — в `combatRanges.ts` (чистая, покрыта гейтом); здесь только канва.
  * Радиусы приходят ИЗ ЯДРА — рисуется ровно тот круг, по которому ядро стреляет.
@@ -3913,14 +3913,14 @@ function drawCombatRanges(): void {
   for (const ring of rings) {
     const c = world({ x: ring.x, y: ring.y } as never);
     // Заметность кольца — `combatRanges.ts` (REFM-123): при взведённом обстреле граница
-    // дострела выходит на первый план, а ПВО заметнее радиусов, потому что это отметка.
+    // дострела выходит на первый план, а ПКО заметнее радиусов, потому что это отметка.
     const look = ringLook(ring.kind, !!barrageAim);
     cx.strokeStyle = rgba(tint[ring.kind] ?? R_ARTY, look.alpha);
     cx.lineWidth = look.width;
     cx.setLineDash([...look.dash]);
     cx.beginPath();
     if (ring.radius > 0) cx.arc(c.x, c.y, worldDist(ring.radius), 0, TAU);
-    // ПВО: у него нет области — только «у этого мира есть зубы».
+    // ПКО: у него нет области — только «у этого мира есть зубы».
     else cx.arc(c.x, c.y, 13, 0, TAU);
     cx.stroke();
   }
@@ -5314,7 +5314,7 @@ function render(now: number) {
   drawChainOverlay(now); // CHAIN-UX: цепочки планов + черновик режима «Приказ»
   drawAssaultTargets();
   drawCorridors(now); // HERO-CORRIDOR: временные коридоры героев
-  drawCombatRanges(); // RANGE-UX: артиллерия / эскадрилья / ПВО — до прицельных линий
+  drawCombatRanges(); // RANGE-UX: артиллерия / эскадрилья / ПКО — до прицельных линий
   drawAbilityRings(); // ABIL-RING: уже работающие ауры и сканы — фиолетовым пунктиром
   drawAimPreview();
   drawCastAim(); // CAST-UX: дальность каста + область действия
@@ -5649,7 +5649,7 @@ function fleetPanelHtml(f: Fleet): string {
   // blackout, hunger, bombardment, point defense, free flight, barrage focus.
   // О чём карточка говорит и о чём МОЛЧИТ — `fleetEffects.ts` (REFM-197): долговые метки
   // только на СВОЁМ флоте (иначе мои долги показались бы бедой противника), голод — лишь
-  // когда на борту есть десант, точечная оборона не считает пустые стопки (они остаются
+  // когда на борту есть десант, зональное ПВО не считает пустые стопки (они остаются
   // в составе, но стволов у них нет) и не пишется нулём, а пустая полоса не рисуется
   // совсем — заголовок без меток выглядит поломкой, а не спокойствием.
   const pt = patrolOf(f.id);
@@ -5965,7 +5965,7 @@ function planetPanelHtml(p: Planet): string {
   let h =
     header +
     `<div class="pstats"><span data-desc="stat:garrison">⚔ ${gcount} <span class="pl">${t('side.world.stat.garrison')}</span></span><span data-desc="stat:ground">${unitIcon('heavy_infantry', data)} ${sumUnits(ground)} <span class="pl">${t('side.world.count.ground')}</span></span><span data-desc="stat:gships">${unitIcon('cruiser', data)} ${sumUnits(ships)} <span class="pl">${t('side.world.count.ships')}</span></span><span data-desc="stat:pbuild">▣ ${p.buildings.length} <span class="pl">${t('side.world.count.buildings')}</span></span></div>`;
-  // ECON-2: блэкаут — неоплаченная энергия глушит радары и ПВО этого владельца вдвое.
+  // ECON-2: блэкаут — неоплаченная энергия глушит радары и ПКО этого владельца вдвое.
   // Блэкаут — свойство ВЛАДЕЛЬЦА, а не этого мира (`arrearsWarnings.ts`, REFM-89).
   if (showsBlackout(mine, s.players[ME]?.arrears)) {
     h += `<div class="row" style="color:var(--red)">⚡ ${t('side.world.blackout')}</div>`;

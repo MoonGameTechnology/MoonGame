@@ -355,7 +355,7 @@ describe('combat.damage — every firing channel goes through the hook (CORE-DMG
         fleet('E', 'p1', 'A', [['escort', 1]]),
       ],
     );
-    // Летящий вылет челноков — цель точечной обороны (SHU-1.2).
+    // Летящий вылет челноков — цель зонального ПВО (SHU-1.2).
     const withStrike: GameState = {
       ...st,
       strikes: [
