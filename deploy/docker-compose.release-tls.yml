@@ -1,0 +1,31 @@
+# Void Dominion — release overlay ДЛЯ CADDY (SEC-35): взять подписанный образ фронта из
+# GHCR вместо сборки на хосте. Кладётся ПОВЕРХ базового файла, TLS-оверлея и релизного:
+#
+#   ./verify-image.sh "$VOID_CADDY_IMAGE"     # cosign verify — гейт, сначала он
+#   docker pull "$VOID_CADDY_IMAGE"
+#   VOID_IMAGE=… VOID_CADDY_IMAGE=… docker compose \
+#     -f docker-compose.yml -f docker-compose.tls.yml \
+#     -f docker-compose.release.yml -f docker-compose.release-tls.yml up -d --no-build
+#
+# ЗАЧЕМ ОТДЕЛЬНЫЙ ФАЙЛ, А НЕ СТРОКА В docker-compose.release.yml. Сервис `caddy` живёт
+# ТОЛЬКО в TLS-оверлее, а релизный оверлей применяют и без него — это документированный
+# путь обновления сервера (`deploy/update.sh`, `moongame update`). Compose сливает сервисы
+# по имени из ВСЕХ переданных файлов, поэтому `caddy` в релизном оверлее появлялся бы и
+# там, где TLS не подключён. Проверено запуском: `docker compose -f docker-compose.yml -f
+# docker-compose.release.yml config` в этом случае падает с «required variable
+# VOID_CADDY_IMAGE is missing a value» — то есть обычное обновление сервера перестало бы
+# подниматься из-за переменной для фронта, которого на этом пути нет вовсе. Разделение
+# файлов чинит это по построению: этот оверлей передают ровно там, где caddy есть.
+#
+# ПОЧЕМУ НЕ ЗАМЕНИТЬ `build:` В TLS-ОВЕРЛЕЕ. Сборка на хосте остаётся рабочим путём —
+# плейтест-хост, ветка с непримёрженным фиксом, машина разработчика. `build:` там и
+# остаётся; этот файл его перекрывает `image:`, а `--no-build` не даёт compose пересобрать
+# то, что мы только что проверили по подписи.
+services:
+  caddy:
+    # Только дайджест, никогда тег: тег после проверки можно перевесить на другие байты,
+    # и подпись стала бы театром. `verify-image.sh` поэтому отказывается работать с тегом.
+    # Ref печатает джоба `publish-caddy` в summary своего прогона.
+    image: ${VOID_CADDY_IMAGE:?set VOID_CADDY_IMAGE to the verified digest ref, e.g. ghcr.io/moongametechnology/moongame/caddy@sha256:...}
+    # Никогда не подсовывать молча устаревшую локальную копию того же ref.
+    pull_policy: always

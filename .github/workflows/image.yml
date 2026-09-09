@@ -8,11 +8,20 @@ name: Release image (GHCR + cosign)
 # scanned in CI was never the artifact that ran in production — there was no way to
 # state "what is running was scanned", and no identity (digest) to even ask about.
 #
-# THE CHAIN. build → scan (BLOCKING, same .trivyignore as security.yml) → push to GHCR
-# → keyless cosign signature over the resulting DIGEST. A failed scan means no push, so
-# an unscanned image cannot reach the registry the deploy pulls from. The deploy side
-# verifies the signature before starting anything: deploy/verify-image.sh +
-# deploy/docker-compose.release.yml (runbook in deploy/README.md).
+# THE CHAIN. build → blocking gate → push to GHCR → keyless cosign signature over the
+# resulting DIGEST. A failed gate means no push, so an unchecked image cannot reach the
+# registry the deploy pulls from. The deploy side verifies the signature before starting
+# anything: deploy/verify-image.sh + deploy/docker-compose.release.yml (runbook in
+# deploy/README.md).
+#
+# ДВА ОБРАЗА, ДВЕ ДЖОБЫ (SEC-35). `publish` выпускает образ сервера, `publish-caddy` —
+# наш собственный Caddy (`deploy/caddy/Dockerfile`, SEC-31), который до сих пор собирался
+# на хосте и потому был единственным куском прода без идентичности и подписи. Джобы
+# независимы (свой пакет GHCR, своя история дайджестов) и подписываются ОДНИМ этим
+# воркфлоу — поэтому `deploy/verify-image.sh` проверяет оба одной и той же командой.
+# Гейты у них РАЗНЫЕ, и это разобрано у самих джоб: у сервера — `trivy --ignore-unfixed
+# --exit-code 1`, у Caddy — приёмка пересборки + смоук, потому что в его бинаре остаются
+# уже разобранные и принятые находки с опубликованным фиксом.
 #
 # WHY A DIGEST, NOT A TAG. Tags are mutable; a signature over a tag proves nothing about
 # the bytes that get pulled later. Everything downstream — signing, verification, the
@@ -30,6 +39,12 @@ name: Release image (GHCR + cosign)
 # exceed it. Flip that setting to read/write (or grant the package `write` to this repo
 # under the package's own settings once it exists). The first package a workflow pushes
 # inherits the repository's visibility.
+#
+# ПЕРВЫЙ ПРОГОН SEC-35 СОЗДАЁТ ВТОРОЙ ПАКЕТ — `<repo>/caddy`. Проверьте его видимость
+# сразу: `deploy/verify-image.sh` намеренно ходит в реестр БЕЗ учётных данных (пакет
+# сервера публичный), и приватный пакет фронта уронил бы проверку подписи на деплое. Если
+# он окажется приватным — либо откройте его, либо передавайте креды флагами, как описано
+# в шапке самого скрипта.
 #
 # Actions are SHA-pinned (SD-6.1 / F-16); checkouts don't persist credentials.
 
@@ -222,5 +237,185 @@ jobs:
             echo "docker pull $REF"
             echo "cd deploy && VOID_IMAGE=$REF \\"
             echo "  docker compose -f docker-compose.yml -f docker-compose.release.yml up -d --no-build"
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publish-caddy:
+    name: 'Caddy: build → приёмка → smoke → push → sign'
+    # SEC-35 — вторая половина того же утверждения. Джоба `publish` выше сделала
+    # проверяемым «что бежит в проде — то и просканировано» для образа СЕРВЕРА. У Caddy
+    # этого не было: SEC-31 перевёл его на собственную сборку, но собиралась она НА ХОСТЕ
+    # (`build:` в `deploy/docker-compose.tls.yml`), то есть у байтов, которые терминируют
+    # TLS из интернета, не было ни идентичности, ни подписи — только утверждение об
+    # исходниках. Теперь цепочка та же: собрали → проверили → запушили → подписали
+    # дайджест, а `deploy/verify-image.sh` проверяет подпись перед стартом.
+    #
+    # ЧЕМ ГЕЙТ ОТЛИЧАЕТСЯ ОТ СЕРВЕРНОГО, И ПОЧЕМУ ЭТО НЕ ОСЛАБЛЕНИЕ. У `publish` гейт —
+    # `trivy --ignore-unfixed --exit-code 1`: «есть опубликованный фикс, который мы не
+    # поставили — не выпускаем». Здесь такой гейт был бы красным в первый же день, и
+    # починить его было бы нечем, кроме запрещённого: в бинаре остаются находки С фиксом
+    # (`CVE-2026-56854` CRITICAL в x/crypto, три HIGH в grpc), а закрываются они только
+    # бампом модулей ПОВЕРХ `go.mod` caddy — ровно то, от чего SEC-31 отказался, чтобы в
+    # TLS-терминаторе не появилось непроверенных апстримом комбинаций. Все они разобраны
+    # поимённо по символам в бинаре и признаны недостижимыми (запись SEC-32 в
+    # `docs/security/pipeline.md`); гейт, запрещающий выпуск из-за уже разобранного и
+    # принятого, не защищает, а держит прод на старой сборке. То же и с пакетами базы
+    # (curl, openssl, c-ares): их лечит `apk upgrade`, и это отдельное решение владельца.
+    #
+    # Поэтому блокируют здесь ДВА других шага, и оба про этот образ по существу:
+    #   ПРИЁМКА — пересборка всё ещё закрывает те 14 находок, ради которых она затевалась
+    #             (тот же скрипт, что и в `security.yml`: одна копия списка на репозиторий);
+    #   СМОУК   — собранный образ стартует, HEALTHCHECK доходит до healthy и :80 отвечает.
+    # Смоук здесь не формальность: мы подменяем в образе бинарь, а Trivy читает файловую
+    # систему и ничего не запускает — подпись нерабочего артефакта хуже отсутствия подписи.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # push image + signature to ghcr.io
+      id-token: write # keyless cosign: GitHub OIDC → Fulcio → Rekor
+      attestations: write # SLSA build provenance
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # GHCR namespaces are lowercase; `MoonGameTechnology/MoonGame` is not. Caddy живёт
+      # ОТДЕЛЬНЫМ пакетом под тем же неймспейсом — у него своя история дайджестов и свой
+      # цикл пересборки, мешать его с образом сервера в одном пакете нельзя.
+      - name: resolve image name
+        id: img
+        env:
+          REPO: ${{ github.repository }}
+        run: |
+          echo "image=ghcr.io/$(echo "$REPO" | tr '[:upper:]' '[:lower:]')/caddy" >> "$GITHUB_OUTPUT"
+
+      - name: build
+        env:
+          IMAGE: ${{ steps.img.outputs.image }}
+        run: docker build -t "$IMAGE:ci" -f deploy/caddy/Dockerfile deploy/caddy
+
+      - name: scan
+        env:
+          IMAGE: ${{ steps.img.outputs.image }}
+        run: |
+          # Тот же пиненный сканер (= 0.58.2), что у trivy-fs/trivy-image/trivy-deps/
+          # trivy-caddy в security.yml — бампить их надо вместе.
+          #
+          # `--ignorefile /dev/null` — НЕ формальность. Рабочий каталог здесь репозиторий
+          # (в него пишется отчёт), а Trivy молча подхватывает `./.trivyignore` из cwd —
+          # ловушка из записи SEC-32. Корневой файл заведён под НАШ distroless-образ, и
+          # его id, совпав с пакетом alpine-базы caddy, тихо вырезал бы находку из отчёта,
+          # по которому ниже принимается решение о выпуске.
+          docker run --rm -v /var/run/docker.sock:/var/run/docker.sock -v "$PWD:/out" -w /out \
+            aquasec/trivy@sha256:665030f4d33a82c1e8d9d5e0453365842236723c1ee5cc3becca698268e66a56 \
+            image --ignorefile /dev/null --format json --output trivy-caddy-release.json "$IMAGE:ci"
+
+      # БЛОКИРУЮЩИЙ гейт №1 перед пушем: пересборка всё ещё делает то, ради чего она есть.
+      # Скрипт падает и на пустом отчёте, то есть сорванный скан выше тоже останавливает
+      # выпуск, а не пропускает его молча (fail-secure).
+      - name: приёмка SEC-31 (блокирующая)
+        run: .github/scripts/caddy-rebuild-acceptance.sh trivy-caddy-release.json
+
+      # БЛОКИРУЮЩИЙ гейт №2, к сканеру ортогональный: образ реально стартует и обслуживает.
+      - name: smoke before push (blocking)
+        env:
+          IMAGE: ${{ steps.img.outputs.image }}
+        run: .github/scripts/smoke-caddy-image.sh "$IMAGE:ci"
+
+      - name: push
+        id: push
+        env:
+          IMAGE: ${{ steps.img.outputs.image }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ github.token }}
+          SHA: ${{ github.sha }}
+        run: |
+          echo "$REGISTRY_TOKEN" | docker login ghcr.io -u "$REGISTRY_USER" --password-stdin
+          short="${SHA:0:12}"
+          docker tag "$IMAGE:ci" "$IMAGE:main"
+          docker tag "$IMAGE:ci" "$IMAGE:sha-$short"
+          docker push "$IMAGE:main"
+          docker push "$IMAGE:sha-$short"
+          # The digest is assigned by the registry on push — read it back rather than
+          # computing it locally, so what we sign is exactly what a `docker pull` gets.
+          ref=$(docker image inspect --format '{{range .RepoDigests}}{{println .}}{{end}}' "$IMAGE:main" |
+            grep "^$IMAGE@" | head -1)
+          if [ -z "$ref" ]; then
+            echo "::error::could not resolve the pushed digest — refusing to sign a tag"
+            exit 1
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+          echo "pushed $ref"
+          echo "digest=${ref#*@}" >> "$GITHUB_OUTPUT"
+
+      # SLSA build provenance — «чем и из чего собрано», в дополнение к подписи («кто
+      # подписал»). Разбор пина (SHA коммита у аннотированного тега) — у джобы `publish`.
+      - name: attest build provenance (SLSA)
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.img.outputs.image }}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
+
+      # Keyless: сертификат Fulcio привязывает подпись к ЭТОМУ файлу воркфлоу + репозиторию
+      # + коммиту. Креды реестра идут ФЛАГАМИ, а не смонтированным docker-конфигом — разбор
+      # (distroless-образ cosign работает не от root) у джобы `publish` выше.
+      - name: sign the digest (cosign, keyless)
+        env:
+          COSIGN_EXPERIMENTAL: '1'
+          REF: ${{ steps.push.outputs.ref }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ github.token }}
+        run: |
+          docker run --rm \
+            -e COSIGN_EXPERIMENTAL \
+            -e ACTIONS_ID_TOKEN_REQUEST_TOKEN \
+            -e ACTIONS_ID_TOKEN_REQUEST_URL \
+            -e REGISTRY_USER \
+            -e REGISTRY_TOKEN \
+            ghcr.io/sigstore/cosign/cosign@sha256:b03690aa52bfe94054187142fba24dc54137650682810633901767d8a3e15b31 \
+            sign --yes \
+            --registry-username "$REGISTRY_USER" \
+            --registry-password "$REGISTRY_TOKEN" \
+            "$REF"
+
+      # Та же команда и те же ограничения на identity, что у deploy/verify-image.sh:
+      # зелёная публикация, которую никто не может проверить, хуже отсутствия подписи.
+      # Identity здесь тот же файл воркфлоу, что у сервера, — и это не небрежность:
+      # ограничение адресует ВОРКФЛОУ, а проверяется подпись, привязанная к КОНКРЕТНОМУ
+      # дайджесту, так что один скрипт проверяет оба образа и перепутать их нечем.
+      - name: verify what we just signed
+        env:
+          REF: ${{ steps.push.outputs.ref }}
+          REPO: ${{ github.repository }}
+          REGISTRY_USER: ${{ github.actor }}
+          REGISTRY_TOKEN: ${{ github.token }}
+        run: |
+          docker run --rm \
+            -e REGISTRY_USER \
+            -e REGISTRY_TOKEN \
+            ghcr.io/sigstore/cosign/cosign@sha256:b03690aa52bfe94054187142fba24dc54137650682810633901767d8a3e15b31 \
+            verify "$REF" \
+            --registry-username "$REGISTRY_USER" \
+            --registry-password "$REGISTRY_TOKEN" \
+            --certificate-identity-regexp "^https://github.com/$REPO/\.github/workflows/image\.yml@refs/heads/main$" \
+            --certificate-oidc-issuer https://token.actions.githubusercontent.com \
+            -o text
+
+      - name: deploy instructions
+        env:
+          REF: ${{ steps.push.outputs.ref }}
+        run: |
+          {
+            echo "## 🔒 Signed Caddy image published"
+            echo ""
+            echo "Публичный хост (TLS-оверлей). Оба образа — по дайджесту:"
+            echo ""
+            echo '```bash'
+            echo "./deploy/verify-image.sh $REF   # cosign verify — сначала это"
+            echo "docker pull $REF"
+            echo "cd deploy && VOID_IMAGE=<серверный ref> VOID_CADDY_IMAGE=$REF \\"
+            echo "  docker compose -f docker-compose.yml -f docker-compose.tls.yml \\"
+            echo "    -f docker-compose.release.yml -f docker-compose.release-tls.yml up -d --no-build"
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"

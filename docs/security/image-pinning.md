@@ -19,9 +19,11 @@
 уронив ни одного чека. Дайджест `osv-scanner` обязан совпадать с тем, что в
 `security.yml` (одна и та же версия сканера в двух местах) — бампить их одним заходом.
 
-Наш собственный образ в проде дайджестом не пинится «в файле»: его публикует
-`image.yml` (GHCR + подпись cosign), а дайджест приезжает на деплой через
-`VOID_IMAGE` — см. `deploy/docker-compose.release.yml` и `deploy/verify-image.sh`.
+Наши собственные образы в проде дайджестом не пинятся «в файле»: их публикует
+`image.yml` (GHCR + подпись cosign), а дайджест приезжает на деплой переменной. Их ДВА
+(SEC-35): сервер — `VOID_IMAGE`, см. `deploy/docker-compose.release.yml`; свой Caddy —
+`VOID_CADDY_IMAGE`, см. `deploy/docker-compose.release-tls.yml`. Проверяет оба один
+`deploy/verify-image.sh`.
 
 ## Как получить sha256-дайджест образа
 
@@ -88,7 +90,7 @@ curl -sS -o /dev/null -D - -H "Authorization: Bearer $tok" \
 | `zricethezav/gitleaks` | ✅ sha256 | `= v8.18.4` |
 | `trufflesecurity/trufflehog` | ✅ sha256 | |
 | `ghcr.io/google/osv-scanner` | ✅ sha256 | `= v1.9.1` |
-| `aquasec/trivy` | ✅ sha256 | `= 0.58.2`, **4 использования**: `trivy-fs`, `trivy-image`, `trivy-deps` в `security.yml` + гейт перед пушем в `image.yml` — бампить вместе |
+| `aquasec/trivy` | ✅ sha256 | `= 0.58.2`, **6 использований**: `trivy-fs`, `trivy-image`, `trivy-deps`, `trivy-caddy` в `security.yml` + гейт перед пушем у обеих джоб `image.yml` (`publish`, `publish-caddy`) — бампить вместе |
 | `anchore/syft` | ✅ sha256 | `= v1.20.0`, 2 использования: `trivy-image` и `sbom` |
 | `ghcr.io/zaproxy/zaproxy` | ✅ sha256 | джоба `dast-zap` (SEC-6) |
 | `ghcr.io/zizmorcore/zizmor` | ✅ sha256 | |
@@ -97,8 +99,11 @@ curl -sS -o /dev/null -D - -H "Authorization: Bearer $tok" \
 
 **Четвёртая группа — релизный конвейер.** `image.yml` и `deploy/verify-image.sh` тянут
 `ghcr.io/sigstore/cosign/cosign` — пинен по дайджесту, тот же, что в `android.yml`;
-обновлять его вместе со сканерами. Там же — четвёртое использование `aquasec/trivy`
-(блокирующий скан перед пушем в GHCR), поэтому бамп версии Trivy трогает и релиз-путь.
+обновлять его вместе со сканерами. Обе публикующие джобы (`publish` и `publish-caddy`,
+SEC-35) зовут его одинаково, поэтому при бампе правятся ЧЕТЫРЕ вхождения в `image.yml`
+(подпись + проверка у каждой джобы) плюс `deploy/verify-image.sh` и `android.yml`. Там же
+живут два из шести использований `aquasec/trivy` (скан перед пушем в GHCR у каждой джобы),
+поэтому бамп версии Trivy трогает и релиз-путь.
 
 ## Сторонние образы прода (`deploy/docker-compose*.yml`)
 
