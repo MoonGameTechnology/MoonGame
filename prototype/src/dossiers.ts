@@ -157,6 +157,7 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
       return {
         name: t('dossier.unit.siege.name'),
         body: t('dossier.unit.siege.desc', {
+          s: hl(st.siegeDamage ?? 0),
           a: hl(st.attack),
           hp: hl(st.hp),
           d: hl(st.defense),

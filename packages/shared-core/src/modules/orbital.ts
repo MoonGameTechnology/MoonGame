@@ -57,10 +57,22 @@ function nearOrbitHostile(
   return best;
 }
 
-/** Bombardment firepower a fleet rains on the planet = Σ ship attack × fraction,
- *  over at most COMBAT_UNIT_CAP units (the same firing line as melee/artillery). */
+/** Bombardment firepower a fleet rains on the planet, over at most COMBAT_UNIT_CAP
+ *  units (the same firing line as melee/artillery).
+ *
+ *  Per hull: a SIEGE platform contributes its `siegeDamage` in full; every other
+ *  hull contributes `attack × BOMBARD_FRACTION`, exactly as before (ROS-1.3). Two
+ *  numbers, because one could not say «weak against ships, terrible for buildings»:
+ *  while structural damage was a fraction of `attack`, a siege hull could only be
+ *  made to wreck buildings by making it a strong warship too.
+ *
+ *  The choice is per HULL, not per fleet, so a mixed fleet needs one firing line
+ *  over both formulas — hence the formula form of `cappedUnitStat`. */
 function bombardPower(fleet: Fleet, data: GameData): number {
-  return cappedUnitStat(fleet.units, data, 'attack') * BOMBARD_FRACTION;
+  return cappedUnitStat(fleet.units, data, (stats) => {
+    const siege = stats.siegeDamage ?? 0;
+    return siege > 0 ? siege : (stats.attack ?? 0) * BOMBARD_FRACTION;
+  });
 }
 
 /** Resolves the orbital layer over one continuous time span: planetary AA fires

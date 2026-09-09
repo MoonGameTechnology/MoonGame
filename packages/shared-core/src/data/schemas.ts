@@ -43,6 +43,15 @@ export const UnitStatsSchema = z
     /** Orbital-AA damage per hour a (ground) unit deals to a hostile fleet on the
      *  NEAR orbit while the planet is not under a ground assault. 0 = no AA. */
     aaDamage: z.number().nonnegative().default(0),
+    /** Structural damage per game hour this hull rains on a bombarded planet's
+     *  BUILDINGS (ROS-1.3). 0 = not a siege hull: bombardment then falls back to
+     *  `attack × BOMBARD_FRACTION`, as it did for every hull before this stat.
+     *
+     *  A separate number from `attack` on purpose: while structural damage was a
+     *  fraction of `attack`, «weak against ships, terrible for buildings» could
+     *  not be expressed at all — a siege platform could only wreck a world by
+     *  also being a strong warship. It does NOT feed fleet-vs-fleet combat. */
+    siegeDamage: z.number().nonnegative().default(0),
     /** Point-defense damage per hour — anti-shuttle/anti-missile flak that a
      *  SHIP (not just a planet) carries. Distinct from `aaDamage` (which is
      *  planet-side orbital AA): `pointDefense` fires on incoming shuttle/missile
