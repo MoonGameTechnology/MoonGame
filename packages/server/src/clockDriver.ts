@@ -89,8 +89,9 @@ export function startClockDriver(
     }
   };
 
-  const fire = (): void => {
-    handle = null;
+  /** Один тик. Возвращает, взводить ли следующий: `false` — это ОСОЗНАННЫЙ уход в простой
+   *  сторожем застоя, а не сбой. */
+  const tickOnce = (): boolean => {
     const progressed = room.tick(); // fires everything due up to `now`, broadcasts
     options.onTick?.({ progressed });
     // Stall guard: a tick that made no forward progress while work is still due
@@ -104,12 +105,33 @@ export function startClockDriver(
         // Go idle (do not re-arm) rather than busy-loop. Not a hard stop: a later
         // reschedule() — e.g. a new player action — resets the counter and retries.
         options.onStall?.();
-        return;
+        return false;
       }
     } else {
       stalls = 0;
     }
-    arm(); // re-arm for the next scheduled event
+    return true;
+  };
+
+  const fire = (): void => {
+    handle = null;
+    // Перевзвод ВЫНЕСЕН из тела тика намеренно. Пока `arm()` стоял последней строкой
+    // самого тика, любое исключение из `room.tick()` или из хука `onTick` означало, что
+    // следующего тика не будет НИКОГДА: часы матча вставали для всех, кто в нём, — а
+    // брошенное из колбэка таймера исключение вдобавок роняло процесс целиком.
+    let rearm: boolean;
+    try {
+      rearm = tickOnce();
+    } catch (err) {
+      // В простой, а не в повтор: сорвавшийся тик — это, в отличие от недоступного стора,
+      // обычно детерминированная ошибка кода, и она сорвётся снова, а `msUntilNextEvent()`
+      // у просроченного события даёт ноль, то есть повтор был бы busy-loop. Не жёсткий
+      // стоп: `reschedule()` (например, действие игрока) поднимает заново — ровно как
+      // после сторожа застоя выше.
+      process.stderr.write(`[clock] tick failed: ${String(err)} — idle until reschedule()\n`);
+      rearm = false;
+    }
+    if (rearm) arm();
   };
 
   function arm(): void {

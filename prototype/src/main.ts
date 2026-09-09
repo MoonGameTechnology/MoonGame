@@ -11976,7 +11976,31 @@ function frame(nowReal: number) {
     lastIntelAt = nowReal;
     renderDiplo();
   }
-  requestAnimationFrame(frame);
+}
+
+/** Сколько исключений кадра печатать целиком: первое — с полным стеком, дальше только
+ *  счётчик. Иначе сломанный кадр забивает консоль по 60 строк в секунду, и в ней уже
+ *  не найти ничего другого. */
+const FRAME_ERR_LOG_MAX = 3;
+let frameErrs = 0;
+
+/**
+ * Цикл кадров. Планирование следующего кадра ВЫНЕСЕНО из `frame` намеренно: пока
+ * `requestAnimationFrame(frame)` стоял последней строкой самого кадра, любое исключение
+ * внутри означало, что следующий кадр не будет запланирован НИКОГДА — карта замирала
+ * насмерть, а страница при этом оставалась живой (чат, кнопки, окна работают на своих
+ * обработчиках), и выглядело это как «завис только мир». Ровно так и вышло на первом
+ * плейтесте: выделение флота дергало `canOrder`, тот падал на состоянии без RNG.
+ * Один плохой кадр — это пропущенная отрисовка, а не конец карты.
+ */
+function frameLoop(nowReal: number) {
+  try {
+    frame(nowReal);
+  } catch (err) {
+    if (frameErrs++ < FRAME_ERR_LOG_MAX) console.error('frame failed', err);
+    else if (frameErrs === FRAME_ERR_LOG_MAX + 1) console.error('frame failing repeatedly — further errors muted');
+  }
+  requestAnimationFrame(frameLoop);
 }
 
 // Codex popup: full specs for a building/ship tile, with a contextual "Build here"
@@ -12895,7 +12919,7 @@ if (diploEl) {
   });
 }
 
-requestAnimationFrame(frame);
+requestAnimationFrame(frameLoop);
 
 // --- in-app APK auto-update -------------------------------------------------
 // Вся проводка (и оба решения под ней — что сказать про исход и когда проверять) —

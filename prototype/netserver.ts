@@ -97,6 +97,7 @@ import {
   creditCommanderXp,
   nickSeatAccounts,
 } from '../packages/server/src/commanderCredit';
+import { detach } from '../packages/server/src/detach';
 const { Pool } = pgPkg;
 
 // --- M0/M1 playtest log: append room events to a per-run JSONL and feed every one
@@ -412,16 +413,16 @@ async function createHostedMatch(id: string): Promise<HostedMatch> {
       // written by the room's commit-before-broadcast `persist` callback — skip it
       // here or we double-write. Only the SYNC path (server drivers, ungated actions)
       // has no other durable writer, so it still persists through this branch.
-      void receiptStore.save(id, {
+      detach('сохранение квитанции', receiptStore.save(id, {
         actionId: ev.actionId,
         playerId: ev.playerId,
         seq: ev.seq,
         ok: ev.ok,
         ...(ev.code ? { code: ev.code } : {}),
-      });
+      }));
     } else if (ev.kind === 'end' && AUTH) {
       // Bank each seated commander's match XP onto their account (idempotent).
-      void creditMatchXp(id, ev.rewards);
+      detach('начисление опыта за матч', creditMatchXp(id, ev.rewards));
     }
     // Persist after anything that changes the world (debounced below), and re-arm
     // the offline wakeup: an action may schedule or consume events — both move the
@@ -506,7 +507,7 @@ async function createHostedMatch(id: string): Promise<HostedMatch> {
     if (saveTimer) return;
     saveTimer = setTimeout(() => {
       saveTimer = null;
-      void doSave();
+      detach('отложенное сохранение мира', doSave());
     }, 500);
   }
   async function doSave(): Promise<void> {
@@ -634,7 +635,7 @@ async function createHostedMatch(id: string): Promise<HostedMatch> {
         // Async drivers (durable rooms await the mailbox); the busy flag stops a later
         // heartbeat from double-running them while a slow persist is still in flight.
         driversBusy = true;
-        void (async () => {
+        detach('серверные драйверы', (async () => {
           try {
             await runServerAI(); // drive any empty seat once the clock has moved
             await runServerStanding(); // CC-2/CC-4: standing orders (auto-storm / дежурный вылет)
@@ -647,7 +648,7 @@ async function createHostedMatch(id: string): Promise<HostedMatch> {
           } finally {
             driversBusy = false;
           }
-        })();
+        })());
       }
       scheduleSave(); // persist the advanced world
     },
@@ -1229,13 +1230,20 @@ const shutdown = (): void => {
     /* the report just falls back to the partial per-line data */
   }
   for (const h of hosted) h.clearTimers();
+  // Выключение обязано ДОЙТИ до выхода. Без `catch` сбой финального сброса (недоступная
+  // база) был не «вышли с ошибкой», а необработанным отклонением: процесс умирал, не
+  // дойдя до `process.exit`, и оркестратор добивал его по таймауту SIGKILL — то есть
+  // последний снапшот мира терялся именно там, где его и сохраняли.
   void (async () => {
     // Final flush per room so the latest state of EVERY session is durable before exit.
     for (const h of hosted) await h.flush();
     if (pool) await pool.end();
     await server.close();
     process.exit(0);
-  })();
+  })().catch((err: unknown) => {
+    process.stderr.write(`shutdown failed: ${String(err)}\n`);
+    process.exit(1);
+  });
 };
 process.on('SIGINT', shutdown);
 process.on('SIGTERM', shutdown);

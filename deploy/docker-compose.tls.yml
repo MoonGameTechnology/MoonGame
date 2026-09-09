@@ -32,8 +32,19 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD (e.g. openssl rand -hex 32) before a public deploy}
 
   caddy:
-    # Digest-pinned (A08) — see docs/security/image-pinning.md. Refreshed 2026-07.
-    image: caddy:2-alpine@sha256:5f5c8640aae01df9654968d946d8f1a56c497f1dd5c5cda4cf95ab7c14d58648
+    # СВОЯ сборка (SEC-31), а не апстримный образ. Причина — в шапке `caddy/Dockerfile`:
+    # апстрим не пересобирал `caddy:2-alpine` с 2026-06-22, и его Go-бинарь несёт 13
+    # stdlib-находок, шесть из которых достижимы у нас. Пересборка тем же исходником, но
+    # свежим тулчейном (go1.26.8 из пиненного `2-builder-alpine`), закрывает их все, а
+    # единственный модульный бамп x/text — седьмую достижимую.
+    #
+    # Собирается на хосте — ровно как `server` в базовом файле; обе стадии Dockerfile
+    # пинены по дайджесту, так что «из чего собрано» остаётся воспроизводимым. Публикация
+    # подписанного образа в GHCR (по образцу `image.yml`) — отдельный кирпич SEC-35: её
+    # нельзя проверить до мержа, потому что `image.yml` бежит только на `main`.
+    build:
+      context: ./caddy
+      dockerfile: Dockerfile
     restart: unless-stopped
     # Hardening (SEC-12). Caddy is the ONLY service facing the internet, so it gets the
     # tightest set: no privilege gain, and every capability dropped except the one it
