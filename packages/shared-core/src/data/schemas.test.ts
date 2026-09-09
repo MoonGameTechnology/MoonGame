@@ -27,7 +27,7 @@ function loadShippedBundle(): Record<string, unknown> {
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.20');
+    expect(data.version).toBe('0.1.21'); // ROS-2.2 завёл новое здание — зональное ПВО
     expect(data.resources).toContain('microelectronics');
     // ROS-2.1: трейт `artillery` больше НЕ означает ни своей линии, ни огня с
     // дистанции — он означает «ответный залп по мне не проходит». Поэтому радиуса у
@@ -71,6 +71,11 @@ describe('game data schema (docs/architecture.md §2)', () => {
     expect(data.units.strike_carrier?.traits).toEqual([]);
     expect(data.units.scout_drone?.stats.cargoCapacity).toBe(0); // default, carries nothing
     expect(data.buildings.orbital_aa?.aaDamage).toBe(12); // anti-ship orbital AA — a defensive building
+    // ROS-2.2: зональное ПВО — ОТДЕЛЬНОЕ здание против ЧЕЛНОКОВ, и стат у него другой.
+    // Спутать их легко (оба «ПВО» на слух), а игрок платит за разные угрозы.
+    expect(data.buildings.zonal_aa?.pointDefense).toBe(40);
+    expect(data.buildings.zonal_aa?.aaDamage).toBe(0);
+    expect(data.buildings.orbital_aa?.pointDefense).toBe(0);
     expect(data.units.cruiser?.stats.aaDamage).toBe(0); // default, no AA
     expect(data.buildings.mine_t1?.aaDamage).toBe(0); // buildings default to no AA
     // shuttles-roadmap SQ-0.1: a carrier-borne fighter shuttle + the new shuttle stats.

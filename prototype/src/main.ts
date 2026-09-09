@@ -949,7 +949,11 @@ const BUILDABLE = [
   'radar',
   'fort',
   'orbital_aa',
+  'zonal_aa',
 ];
+// ROS-2.2 — `zonal_aa` (зональное ПВО) стоит рядом с ПКО и НЕ дублирует его: ПКО
+// (`aaDamage`) бьёт КОРАБЛИ на орбите, зональное ПВО (`pointDefense`) — ЧЕЛНОКИ, и
+// без него удар челноков по миру безответен. Игрок выбирает, от кого защищаться.
 // `orbital_aa` (орбитальное ПКО — anti-ship near-orbit emplacement) is a defensive BUILDING:
 // the player builds it like a fort. It fires on hostile fleets over the world (core
 // `aaStrengthAt` sums building AA) but does NOT block ground capture — only ground troops
@@ -3418,6 +3422,22 @@ function handleEvents(events: DomainEvent[]) {
           seed: siegeSeed++,
         });
         capShots(siegeShots, SIEGE_SHOTS_MAX);
+        break;
+      }
+      // ROS-2.2 — ответка по челнокам в момент удара. Две точки зрения на одно
+      // событие, и обе нужны: свои машины сбили — это счёт за налёт, свои зенитки
+      // отработали — это то, ради чего их и строили. Чужую ответку по чужим челнокам
+      // журнал не показывает: она не про меня.
+      case 'shuttle.repelled': {
+        const mine = p.owner === ME;
+        if (!mine && p.targetOwner !== ME) break;
+        if ((p.downed as number) <= 0) break; // залп был, машин не сбил — строка ни о чём
+        note(
+          t(mine ? 'log.shuttle.repelled.mine' : 'log.shuttle.repelled.theirs', {
+            n: p.downed as number,
+            at: p.targetId as string,
+          }),
+        );
         break;
       }
       case 'market.bought':

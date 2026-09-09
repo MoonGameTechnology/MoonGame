@@ -100,6 +100,11 @@ export function buildingDossier(id: string, level: number): Dossier | null {
         name,
         body: t('dossier.building.orbital-aa', { dmg: hl(lv.aaDamage ?? 0) }),
       };
+    case 'zonal_aa':
+      return {
+        name,
+        body: t('dossier.building.zonal-aa', { dmg: hl(lv.pointDefense ?? 0) }),
+      };
     case 'metal_station':
       return {
         name,

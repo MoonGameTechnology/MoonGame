@@ -9,10 +9,11 @@
  *
  * Три вещи, которые из этого следуют и которые легко потерять при правке:
  *
- * 1. **Удар односторонний.** Цель получает урон, но боя не начинается: ни `battleId`, ни
- *    ответного огня. Та же семантика, что у артиллерийского standoff (`artillery.ts`) —
- *    контрмера не «отстреляться в ответ», а сбить челноки на подлёте (зональное ПВО и
- *    перехват, SHU-1.3).
+ * 1. **Боя не начинается — но безнаказанности нет** (ROS-2.2, заказ владельца п. 4).
+ *    Ни `battleId`, ни раундов: челнок в бой не вяжется. Ответку в момент удара он при
+ *    этом получает — от кораблей символическую (долю их огня), от планеты нулевую, и
+ *    по-настоящему дорогую там, где стоит ЗОНАЛЬНОЕ ПВО. До ROS-2.2 удар не стоил
+ *    нападающему ничего вовсе, и контрмерой были только выстрелы по трассе.
  * 2. **Полёт живёт в состоянии** (`state.strikes`), а не считается мгновенно. Мгновенный
  *    удар не оставил бы против себя никакой защиты и обнулил бы зональное ПВО.
  * 3. **Порт — и дом, и условие.** Вылет невозможен без живого порта (повреждён больше
@@ -21,6 +22,12 @@
  *
  * Здесь же живёт ЗОНАЛЬНОЕ ПВО (`pointDefense`) — контрмера челнокам вместе с
  * перехватом (SHU-1.3). Не путать с ПКО (`aaDamage`): та бьёт по КОРАБЛЯМ на орбите.
+ *
+ * Зенитка стреляет по вылету в ТРЁХ разных местах, и это не три копии одного:
+ * `pd.fired` — реактивный залп корабля по вылету, ПРОХОДЯЩЕМУ в его радиусе;
+ * `shuttle.intercepted` — поднятые навстречу перехватчики (SHU-1.3);
+ * `shuttle.repelled` — ответка ЦЕЛИ в момент удара (ROS-2.2), и только она бывает
+ * у планеты. Каналы разные, счёт сбитых машин один — `absorbIntoStrike`.
  */
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type {
@@ -55,6 +62,44 @@ import { MS_PER_HOUR } from '../util/time';
  *  are included). 0 = no point defense. */
 function fleetPointDefense(fleet: Fleet, data: GameData): number {
   return sumUnitStat(fleet.units, data, 'pointDefense');
+}
+
+/** Σ the `pointDefense` of a planet's standing buildings — ЗОНАЛЬНОЕ ПВО мира
+ *  (ROS-2.2). Считается ровно как ПКО в `orbital.ts` (`aaOrbitalAt`): по уровню
+ *  постройки, без гарнизона. Гарнизон сюда не входит намеренно — по заказу владельца
+ *  зональное ПВО это ЗДАНИЕ и модуль корабля, а не свойство наземных войск. */
+function planetPointDefense(planet: Planet, data: GameData): number {
+  let total = 0;
+  for (const b of planet.buildings) {
+    const def = data.buildings[b.type];
+    if (def) total += buildingLevel(def, b.level).pointDefense;
+  }
+  return total;
+}
+
+/** Доля огня цели-ФЛОТА, которой она огрызается на удар челноков (ROS-2.2, §0.2).
+ *  Символическая по замыслу: без зенитки удар почти безнаказан, и платит игрок
+ *  именно за зенитку, а не за то, что у него вообще есть корабли. */
+const RETURN_FIRE_FRACTION = 0.05;
+
+/**
+ * ОТВЕТНЫЙ УРОН по вылету в момент удара (ROS-2.2, заказ владельца п. 4).
+ *
+ * Одна формула на обе цели, и обе половины считаются тем же счётом, что и везде:
+ *  · пушки — `cappedUnitStat` (в упор бьёт не весь рой, а COMBAT_UNIT_CAP стволов,
+ *    ровно как в бою, при бомбардировке и на дистанции), взятые долей;
+ *  · зенитка — полный Σ `pointDefense`, тем же несокращённым счётом, каким его уже
+ *    считает залп зонального ПВО по трассе. Две арифметики для одного стата разошлись
+ *    бы на первой же правке.
+ *
+ * У ПЛАНЕТЫ пушечной половины нет вовсе: голому миру ответить челноку нечем — стреляют
+ * только зенитные установки, которые игрок построил.
+ */
+function returnFireAgainstFleet(target: Fleet, data: GameData): number {
+  return (
+    cappedUnitStat(target.units, data, 'attack') * RETURN_FIRE_FRACTION +
+    fleetPointDefense(target, data)
+  );
 }
 
 /** Default PD engagement range (map units) when the unit's `pointDefenseRange` is 0. */
@@ -207,6 +252,25 @@ function shootDownStrike(strike: ShuttleStrike, amount: number): number {
   return downed;
 }
 
+/**
+ * Перевести УРОН по вылету в СБИТЫЕ МАШИНЫ по корпусу челнока, накопив остаток.
+ *
+ * У вылета нет своего пула здоровья — и не должно быть: иначе половина сбитого крыла
+ * жила бы «раненой» в состоянии, которого игрок не видит. Недобор до корпуса копится на
+ * самом вылете и досчитывается следующим залпом, поэтому три канала (зональное ПВО на
+ * трассе, перехват, ответка в момент удара) обязаны считать ОДИНАКОВО — счёт живёт здесь
+ * в одном экземпляре, а не тремя копиями по месту.
+ */
+function absorbIntoStrike(strike: ShuttleStrike, damage: number, data: GameData): number {
+  const first = strike.units[0];
+  if (!first) return 0;
+  const hull = Math.max(1, data.units[first.unit]?.stats.hp ?? 1);
+  strike.damage = (strike.damage ?? 0) + damage;
+  const downed = shootDownStrike(strike, Math.floor(strike.damage / hull));
+  strike.damage -= downed * hull;
+  return downed;
+}
+
 /** Насколько далеко база поднимает перехватчики — самый дальнобойный охотник в
  *  ангаре. Тот же `strikeRange`, которым он летит бить: машина не может встречать
  *  дальше, чем достаёт сама. */
@@ -309,6 +373,38 @@ function strikePower(
   return cappedUnitStat(strike.units, data, (stats) => {
     const siege = stats.siegeDamage ?? 0;
     return siege > 0 ? siege : (stats.attack ?? 0);
+  });
+}
+
+/**
+ * Пустить ответку по вылету и записать, чего она стоила (ROS-2.2).
+ *
+ * Через хук `combat.damage` со СВОЕЙ фазой `returnFire` (CORE-DMG-1): все каналы огня
+ * ходят через один хук, и канал, который перестал его звать, молча отменяет техи и
+ * пассивы фракций для своей доли урона. Ноль ответки — молчание: голый мир ничем не
+ * стрелял, и событие о выстреле было бы враньём.
+ */
+function repelStrike(
+  h: HandlerContext,
+  strike: ShuttleStrike,
+  amount: number,
+  target: { id: string; owner: string | null; location: string },
+): void {
+  if (amount <= 0) return;
+  const dealt = h.hook<number>('combat.damage', amount, {
+    phase: 'returnFire',
+    location: target.location,
+    attacker: target.owner ?? '',
+    defender: strike.owner,
+  });
+  const downed = absorbIntoStrike(strike, dealt, h.ctx.data);
+  h.emit('shuttle.repelled', {
+    strikeId: strike.id,
+    owner: strike.owner,
+    targetId: target.id,
+    targetOwner: target.owner,
+    damage: dealt,
+    downed,
   });
 }
 
@@ -533,11 +629,15 @@ export const shuttleModule: GameModule = {
 
       if (strike.leg === 'out') {
         const power = strikePower(strike, h.ctx.data, strike.target.kind);
-        if (power > 0) {
-          if (strike.target.kind === 'fleet') {
-            const target = h.state.fleets[strike.target.id];
-            // Цель ушла с точки удара — челноки бьют пустоту и возвращаются ни с чем.
-            if (target && target.owner !== strike.owner) {
+        if (strike.target.kind === 'fleet') {
+          const target = h.state.fleets[strike.target.id];
+          // Цель ушла с точки удара — челноки бьют пустоту и возвращаются ни с чем.
+          if (target && target.owner !== strike.owner) {
+            // Ответка считается ДО удара, из того же снимка: цель, которую этот залп
+            // добьёт, всё равно успевает огрызнуться — та же одновременность, что у
+            // артиллерии, где залпы считаются из состояния до отрезка.
+            const answer = returnFireAgainstFleet(target, h.ctx.data);
+            if (power > 0) {
               const dealt = h.hook<number>('combat.damage', power, {
                 phase: 'shuttle',
                 location: target.location ?? '',
@@ -554,9 +654,17 @@ export const shuttleModule: GameModule = {
               applyDamageToSide(h, { kind: 'fleet', fleetId: target.id }, dealt, h.ctx.data, '');
               removeIfWiped(h, target.id);
             }
-          } else {
-            const target = h.state.planets[strike.target.id];
-            if (target && target.owner !== strike.owner) {
+            repelStrike(h, strike, answer, {
+              id: strike.target.id,
+              owner: target.owner,
+              location: target.location ?? '',
+            });
+          }
+        } else {
+          const target = h.state.planets[strike.target.id];
+          if (target && target.owner !== strike.owner) {
+            const answer = planetPointDefense(target, h.ctx.data);
+            if (power > 0) {
               const dealt = h.hook<number>('combat.damage', power, {
                 phase: 'shuttle',
                 location: target.id,
@@ -576,7 +684,17 @@ export const shuttleModule: GameModule = {
                 owner: target.owner,
               });
             }
+            repelStrike(h, strike, answer, {
+              id: target.id,
+              owner: target.owner,
+              location: target.id,
+            });
           }
+        }
+        // Волна, которую ответка сбила целиком, домой не летит и в состоянии не остаётся.
+        if (strike.units.length === 0) {
+          h.state.strikes = strikes.filter((st) => st.id !== strikeId);
+          return;
         }
         // Разворот домой — тем же путём и с той же скоростью. Позиция базы берётся
         // ТЕКУЩАЯ: носитель мог сдвинуться, пока челноки летели, и лететь они должны
@@ -718,13 +836,9 @@ export const shuttleModule: GameModule = {
             attacker: fleet.owner,
             defender: target.owner,
           });
-          // Урон переводится в СБИТЫЕ МАШИНЫ по корпусу челнока: у вылета нет своего
-          // пула здоровья — он и не должен его иметь, иначе половина сбитого крыла
-          // жила бы «раненой» в состоянии, которого игрок не видит.
-          const hull = Math.max(1, data.units[target.units[0]!.unit]?.stats.hp ?? 1);
-          target.damage = (target.damage ?? 0) + dealt;
-          const downed = shootDownStrike(target, Math.floor(target.damage / hull));
-          target.damage -= downed * hull;
+          // Урон переводится в СБИТЫЕ МАШИНЫ по корпусу челнока — счёт один на все
+          // каналы, см. `absorbIntoStrike`.
+          const downed = absorbIntoStrike(target, dealt, data);
           h.emit('pd.fired', {
             fleetId: fleet.id,
             owner: fleet.owner,
@@ -785,12 +899,8 @@ export const shuttleModule: GameModule = {
           attacker: base.owner,
           defender: target.owner,
         });
-        // Тот же перевод урона в сбитые машины, что у зонального ПВО: у вылета нет
-        // своего пула здоровья, и заводить его здесь второй раз нельзя.
-        const hull = Math.max(1, data.units[target.units[0]!.unit]?.stats.hp ?? 1);
-        target.damage = (target.damage ?? 0) + dealt;
-        const downed = shootDownStrike(target, Math.floor(target.damage / hull));
-        target.damage -= downed * hull;
+        // Тот же перевод урона в сбитые машины, что у зонального ПВО (`absorbIntoStrike`).
+        const downed = absorbIntoStrike(target, dealt, data);
         base.setSortie(spendSortie(sortie, spec.rearmRounds));
         h.emit('shuttle.intercepted', {
           baseId: base.ref.id,
