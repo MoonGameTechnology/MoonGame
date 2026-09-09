@@ -909,11 +909,14 @@ export function aiOrders(
       // 5. ОБОРОНА (AI-BAL-2): форт → госпиталь → орбитальное ПКО. Порядок — по тому,
       //    что каждое здание делает для УДЕРЖАНИЯ: форт даёт гарнизону +30% обороны
       //    (`defenseBonus` через хук `combat.damage`), госпиталь его лечит между
-      //    штурмами (`healRate`), ПКО бьёт флот на орбите (`aaDamage`). Плюс любое
+      //    штурмами (`healRate`), ПКО бьёт флот на орбите (`aaDamage`), зональное ПВО
+      //    (ROS-2.2) огрызается по челнокам, бьющим мир (`pointDefense`) — последним,
+      //    потому что оно контрмера ОДНОМУ роду угрозы, а первые три держат мир от всех.
+      //    Плюс любое
       //    стоящее здание снимает 1% наземного урона (потолок 90%), поэтому застроенный
       //    мир дорог сам по себе. Только призовые миры: провинций вчетверо больше, и
       //    застраивать их — разорить казну на десятую долю территории.
-      const DEFENSE_CHAIN = ['fort', 'hospital', 'orbital_aa'] as const;
+      const DEFENSE_CHAIN = ['fort', 'hospital', 'orbital_aa', 'zonal_aa'] as const;
       for (const p of warFooting ? worldsInOrder(state, ai, 'defense', profile) : []) {
         if (p.owner !== ai || p.kind !== 'planet') continue;
         const missing = DEFENSE_CHAIN.find(
