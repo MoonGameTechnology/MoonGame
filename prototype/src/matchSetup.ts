@@ -2,7 +2,7 @@
  * Match setup — seat/setup config types and `newGame`, the pure builder that
  * turns a `SetupConfig` into a playable `GameState`. Extracted from `game.ts`
  * (REFP-20): depends on `map.ts`/`formations.ts`/`botFavour.ts`/`heroes.ts`/
- * `ships.ts`/`economy.ts` (all already extracted) + `prototypeData.ts` + core
+ * `ships.ts`/`economy.ts` (all already extracted) + `gameData.ts` + core
  * shared-core helpers. `player`/`fleet`/`ARCHETYPE_OF_GRADE` were private
  * `game.ts` helpers used only by `newGame` — moved here with it rather than
  * exported from `game.ts` for a single caller. `game.ts` imports the public

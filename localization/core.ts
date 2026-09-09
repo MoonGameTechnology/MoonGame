@@ -86,7 +86,7 @@ export function t(key: string, vars?: Record<string, string | number>): string {
  *  виден под своим именем, а не как `data.new-unit`. */
 export function tData(name: string): string {
   // `?? lookup(name)` — страховка, а не разрешение путать вызовы. Если сюда всё же
-  // приехал КЛЮЧ (поля каталога `prototypeData.ts` частично хранят ключи), слаг
+  // приехал КЛЮЧ (часть полей каталога `data/*.json` хранит ключи, а не текст), слаг
   // `dataKey()` его схлопнет — точки и кириллица вырезаются, — и наружу вылез бы сам
   // ключ. Так игрок получит перевод, а не `sci.overseer.name`.
   return lookup(dataKey(name)) ?? lookup(name) ?? name;
