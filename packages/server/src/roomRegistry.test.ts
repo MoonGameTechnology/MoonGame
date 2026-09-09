@@ -460,8 +460,12 @@ describe('LazyRoomRegistry · wake scheduler (24/7 offline world)', () => {
     void store.save({ matchId: 'm', dataVersion: 'test', seq: 0, status: 'ongoing', state: beatState(100) });
     const data = beatData();
     const kernel = createKernel([beatModule]);
+    /** Переключатель «стор недоступен» — им проверяется, что сорвавшееся пробуждение
+     *  не теряет мир насовсем. Остальные тесты его не трогают. */
+    const fail = { load: false };
     const registry = new LazyRoomRegistry({
       load: async (id) => {
+        if (fail.load) throw new Error('store unavailable');
         const snap = await store.load(id);
         if (!snap) return null;
         const room = new MatchRoom({ id, initialState: snap.state, kernel, data, now: () => clock.now });
@@ -471,7 +475,7 @@ describe('LazyRoomRegistry · wake scheduler (24/7 offline world)', () => {
       schedule: timer.schedule,
       cancel: timer.cancel,
     });
-    return { clock, timer, store, registry };
+    return { clock, timer, store, registry, fail };
   }
 
   it('wakes a hibernated match at its next event, processes + persists it, re-arms the next', async () => {
@@ -500,6 +504,41 @@ describe('LazyRoomRegistry · wake scheduler (24/7 offline world)', () => {
     expect(snap?.state.players.p1?.resources.beats).toBe(1); // the beat fired + was persisted
     expect(registry.get('m')).toBeUndefined(); // re-hibernated (still unwatched)
     expect(timer.pending?.ms).toBe(50); // re-armed for the NEXT beat (t=200, now=150)
+  });
+
+  it('сорвавшееся пробуждение не теряет мир: ошибка стора даёт повтор, а не тишину навсегда', async () => {
+    // Пробуждение — ЕДИНСТВЕННОЕ место, где взводится следующее, и зовут его как
+    // `void this.wake(...)`. Пока ошибка отсюда не ловилась, недоступный на секунду стор
+    // означал, что спящий матч не проснётся больше никогда (а необработанное отклонение
+    // промиса вдобавок роняло процесс со всеми остальными матчами).
+    const { clock, timer, store, registry, fail } = beatHarness();
+
+    await registry.resolve('m');
+    const peer = fakePeer();
+    const room = registry.get('m')!;
+    room.addPeer('p1', peer);
+    registry.retain('m');
+    room.removePeer('p1', peer);
+    registry.release('m');
+
+    timer.fire(); // idle → hibernate
+    await flush();
+    expect(timer.pending?.ms).toBe(100); // пробуждение взведено на удар в t=100
+
+    clock.now = 150;
+    fail.load = true;
+    timer.fire(); // пробуждение срывается на сторе
+    await flush();
+
+    // Мир не брошен: взведён повтор (без починки здесь не было НИЧЕГО).
+    expect(timer.pending?.ms).toBe(30_000);
+
+    // И повтор доводит дело до конца, когда стор вернулся.
+    fail.load = false;
+    timer.fire();
+    await flush();
+    const snap = await store.load('m');
+    expect(snap?.state.players.p1?.resources.beats).toBe(1);
   });
 
   it('does not re-arm the wake for a stalled runaway match (no spin)', async () => {
