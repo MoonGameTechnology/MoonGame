@@ -21,15 +21,31 @@ const fleet = (location: string, units: UnitStack[]): Fleet =>
   ({ id: `f-${location}-${units.length}`, owner: 'p1', location, units }) as Fleet;
 
 describe('сводка мира — домены гарнизона', () => {
-  it('НОСИТЕЛЬ ЧЕЛНОКОВ — крыло, а не корабль линии: иначе он посчитается дважды', () => {
-    // Крыло — по ТРЕЙТУ `carrier`, а не по имени корпуса: десантный корабль
-    // (`strike_carrier`) трейт отдал вместе с ангаром и стал обычным кораблём линии,
-    // а носителем челноков остался «Шаттл».
-    expect(isWingUnit('shuttle_carrier', data)).toBe(true);
-    expect(isShipUnit('shuttle_carrier', data)).toBe(false);
-    expect(isWingUnit('interceptor', data)).toBe(true);
+  it('«ШАТТЛ» — КОРАБЛЬ, А НЕ КРЫЛО (ROS-3.2): носитель — не то же, что то, что он возит', () => {
+    // Данные говорят это прямо: трейта `shuttle` у носителя нет, у него своя линия
+    // (`rear`) и он держит залп. Интерфейс же считал крылом всё, что связано с
+    // челноками, — и носитель уезжал во вкладку «Челноки», в ростер челноков
+    // «Производства» и в хвост груза на эмблеме. Крыло — это ТОЛЬКО сами машины.
+    expect(data.units.shuttle_carrier?.traits).not.toContain('shuttle');
+    expect(isWingUnit('shuttle_carrier', data)).toBe(false);
+    expect(isShipUnit('shuttle_carrier', data)).toBe(true);
+    // Настоящие челноки крылом остаются — все три.
+    for (const wing of ['interceptor', 'bomber', 'landing_shuttle']) {
+      expect(isWingUnit(wing, data), wing).toBe(true);
+      expect(isShipUnit(wing, data), wing).toBe(false);
+    }
+    // Десантный корабль трейт отдал вместе с ангаром ещё раньше и остаётся кораблём.
     expect(isShipUnit('strike_carrier', data)).toBe(true);
     expect(isWingUnit('strike_carrier', data)).toBe(false);
+  });
+
+  it('КРЫЛО = ТРЕЙТ `shuttle`, и никакой второй признак его не расширяет', () => {
+    // Сторож на возврат: правило одно и берётся из данных. Заведи кто-нибудь второй
+    // признак («у него ангар» / «имя кончается на _carrier») — и носитель снова уедет
+    // к челнокам, а игрок снова не найдёт его в списке кораблей.
+    for (const [id, def] of Object.entries(data.units)) {
+      expect(isWingUnit(id, data), id).toBe(def.traits.includes('shuttle'));
+    }
   });
 
   it('корабль линии — не наземный и не крыло', () => {
@@ -53,7 +69,9 @@ describe('сводка мира — домены гарнизона', () => {
       ],
       data,
     );
-    expect(split).toEqual({ ground: 3, ships: 2, wings: 5 });
+    // ROS-3.2: носитель считается КОРАБЛЁМ — 2 крейсера + 1 «Шаттл» = 3 корпуса,
+    // крылом остаются только сами машины.
+    expect(split).toEqual({ ground: 3, ships: 3, wings: 4 });
     expect(split.ground + split.ships + split.wings).toBe(10);
   });
 
