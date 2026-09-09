@@ -866,6 +866,17 @@
 | PVE-6.2 | ✅ | docs | `docs/pve-team-modes-roadmap.md:401` | Обновить docs/state.md |
 | PVE-6.3 | ✅ | docs | `docs/pve-team-modes-roadmap.md:416` | Обновить CODE-MAP.md |
 | PVE-6.4 | ✅ | docs | `docs/pve-team-modes-roadmap.md:439` | ADR 05/06 → accepted |
+| ROS-0.1 | ⏳ | data proto | `docs/roster-roadmap.md:109` | ПКО и зональное ПВО: имя насквозь |
+| ROS-0.2 | ⏳ | proto | `docs/roster-roadmap.md:124` | «Верфь» → «Производство» |
+| ROS-1.1 | ⏳ | core data | `docs/roster-roadmap.md:136` | Пехота и техника: два рода наземных войск |
+| ROS-1.2 | 🔒 | data | `docs/roster-roadmap.md:149` | Фрегат: корабль поддержки под модули |
+| ROS-1.3 | ⏳ | core data | `docs/roster-roadmap.md:163` | Осадная платформа осаждает планету, а не флот |
+| ROS-1.4 | 🔒 | core data | `docs/roster-roadmap.md:175` | Бомбардировщик и профили урона челноков |
+| ROS-1.5 | ⏳ | core data | `docs/roster-roadmap.md:187` | Десантный челнок: высадка вместо удара |
+| ROS-2.1 | ⏳ | core data | `docs/roster-roadmap.md:208` | Три линии 50/30/20, артиллерия без ответного огня |
+| ROS-2.2 | 🔒 | core data | `docs/roster-roadmap.md:230` | Челнок — сторона боя: ответный урон и зональное ПВО |
+| ROS-3.1 | 🔒 | proto | `docs/roster-roadmap.md:253` | Экран «Производство»: пять типов, модули, количество, планета |
+| ROS-3.2 | ⏳ | proto | `docs/roster-roadmap.md:269` | Шаттл — корабль во всём интерфейсе |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md:48` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md:55` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md:64` | Сервисные идентичности и scoped-токены |
