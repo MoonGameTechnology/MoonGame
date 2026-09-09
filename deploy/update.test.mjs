@@ -304,12 +304,52 @@ describe('update.sh — добор недостающих ключей server.en
       'GATE=1',
       'SEAT_LOCK=1',
       'AUTH_JWT_SECRET=abc',
+      'PROD=0',
       'ALLOWED_ORIGINS=http://host:8788',
     ].join('\n');
     const sb = sandbox({ serverEnv: `${full}\n` });
     const { stdout } = await runUpdate(sb);
     expect(stdout).not.toContain('дописаны недостающие ключи');
     expect(sb.readEnvFile().trim()).toBe(full);
+  });
+
+  // Находки ревью на PR #939 — каждая ниже закрывает свою.
+  it('добирает PROD=0: без него compose подставит 1 и сервер не стартует без TLS', async () => {
+    // Установка, которая старше самого ключа, осталась бы без TLS под fail-secure
+    // гардом — то есть починка сломала бы ровно те машины, ради которых делалась.
+    const sb = sandbox({ serverEnv: '# старая установка\n' });
+    const { stdout } = await runUpdate(sb);
+    expect(sb.readEnvFile()).toMatch(/^PROD=0$/m);
+    expect(stdout).toContain('без TLS');
+  });
+
+  it('пустое ALLOWED_ORIGINS= считается ненастроенным и всё равно предупреждает', async () => {
+    // Для сервера пустое значение равносильно отсутствию allowlist: защита от CSWSH
+    // выключена так же. Считать строку «существующей» значило бы подавить единственное
+    // предупреждение об этом.
+    const sb = sandbox({ serverEnv: 'ALLOWED_ORIGINS=\n' });
+    const { stdout } = await runUpdate(sb);
+    expect(stdout).toContain('ALLOWED_ORIGINS');
+    expect(sb.readEnvFile()).toMatch(/^ALLOWED_ORIGINS=$/m); // не перезаписали
+  });
+
+  it('добирает ключи и на пути подписанного образа (рекомендованном)', async () => {
+    // Иначе OPS-2 чинил бы только менее безопасную сборку из исходников.
+    const sb = sandbox({ serverEnv: '# пусто\n' });
+    await runUpdate(sb, { VOID_IMAGE: 'ghcr.io/x/y@sha256:deadbeef' });
+    const env = sb.readEnvFile();
+    expect(env).toMatch(/^TIME_SCALE=100$/m);
+    expect(env).toMatch(/^AUTH_JWT_SECRET=[0-9a-f]{64}$/m);
+  });
+
+  it('при откате возвращает server.env к состоянию до обновления', async () => {
+    // Откат обязан вернуть машину туда, где она была, ЦЕЛИКОМ: с новым `server.env` и
+    // прежним образом health отвечал бы, скрипт рапортовал бы успех, а игроки больше не
+    // вошли бы прежним способом — дописанный секрет переводит сервер на аккаунты.
+    const before = '# старая установка\nPORT=8788\n';
+    const sb = sandbox({ serverEnv: before, healthFailFirst: 99 });
+    await runUpdate(sb, { VOID_IMAGE: 'ghcr.io/x/y@sha256:deadbeef' });
+    expect(sb.readEnvFile()).toBe(before);
   });
 
   it('список ключей и установщик не разъезжаются', () => {

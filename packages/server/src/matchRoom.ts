@@ -411,6 +411,9 @@ export class MatchRoom {
   private started = false;
   private readonly emitStateHash: boolean;
   private readonly singlePeerPerPlayer: boolean;
+  /** Аккаунт, подключённый ЭТИМ сокетом (может отсутствовать — дев-путь без аккаунтов).
+   *  `WeakMap`, потому что живёт ровно столько же, сколько сам сокет. */
+  private readonly peerAccountId = new WeakMap<RoomPeer, string | undefined>();
   private readonly observe?: (event: RoomObservation) => void;
   private readonly record?: (step: { at: number; action?: Action }) => void;
   /** Durable write for strict commit-before-broadcast (see options.persist). */
@@ -710,6 +713,11 @@ export class MatchRoom {
     sessionId?: string,
     welcomeExtras?: { seatTicket?: string },
     accountId?: string,
+    /** Личность подключающегося ДОКАЗАНА рукопожатием — join-токен (`auth`) или билет
+     *  места (`seatLock`). Дев-путь `?player=`/`?nick=` личность не доказывает: там
+     *  идентификатор просто назван в адресе. Решает, можно ли перехватить занятое
+     *  кресло (см. ниже) — по недоказанной личности нельзя. */
+    verified = false,
   ): boolean {
     if (!this.hasPlayer(playerId)) {
       this.send(peer, { type: 'error', matchId: this.id, code: 'E_UNKNOWN_PLAYER' });
@@ -736,17 +744,44 @@ export class MatchRoom {
     // меняется только кто из двух остаётся. Старому уходит тот же `E_SLOT_TAKEN` —
     // «этим именем уже играют, другая вкладка или устройство?» читается там верно.
     if (this.singlePeerPerPlayer) {
-      for (const stale of [...(this.peers.get(playerId) ?? [])]) {
-        this.send(stale, { type: 'error', matchId: this.id, code: 'E_SLOT_TAKEN' });
-        stale.close?.(1008, 'slot taken over');
-        // Снимаем СИНХРОННО: обработчик закрытия сокета придёт позже, а место должно
-        // освободиться до того, как ниже добавится новый.
-        this.removePeer(playerId, stale);
+      const held = [...(this.peers.get(playerId) ?? [])];
+      if (held.length > 0) {
+        // ПЕРЕХВАТ ТОЛЬКО ПО ДОКАЗАННОЙ ЛИЧНОСТИ И ТОЛЬКО СВОЕГО ЖЕ МЕСТА.
+        //
+        // Две дыры, которые эти условия закрывают (обе найдены ревью на PR #939):
+        //
+        //  · Дев-рукопожатие берёт `?player=` прямо из адреса и ничего не проверяет
+        //    (`wsServer.ts`), а прототип — боевой хост плейтестов — поднимает комнату с
+        //    `singlePeerPerPlayer`. Без `verified` любой, кто знает id матча и игрока,
+        //    выселял бы сидящего и забирал его империю. Раньше место защищал отказ.
+        //  · Даже с доказанной личностью токен доказывает лишь, что он КОГДА-ТО был
+        //    выдан на это место. После админского кика и передачи кресла другому
+        //    аккаунту прежний токен живёт ещё до четверти часа — и им можно было бы
+        //    выселить нового владельца. Поэтому сверяем аккаунт с тем, кто сидит СЕЙЧАС.
+        //
+        // Не совпало — прежнее поведение: отказ пришедшему. Место дороже удобства.
+        const sitting = this.peerAccountId.get(held[0]!);
+        if (!verified || sitting !== accountId) {
+          this.send(peer, { type: 'error', matchId: this.id, code: 'E_SLOT_TAKEN' });
+          peer.close?.(1008, 'slot taken');
+          return false;
+        }
+        for (const stale of held) {
+          this.send(stale, { type: 'error', matchId: this.id, code: 'E_SLOT_TAKEN' });
+          stale.close?.(1008, 'slot taken over');
+          // Снимаем СИНХРОННО: обработчик закрытия сокета придёт позже, а место должно
+          // освободиться до того, как ниже добавится новый.
+          this.removePeer(playerId, stale);
+        }
       }
     }
     const playerPeers = this.peers.get(playerId) ?? new Set<RoomPeer>();
     playerPeers.add(peer);
     this.peers.set(playerId, playerPeers);
+    // Кто именно сидит на этом сокете. Отдельно от `playerAccountId`: та карта хранит
+    // ПЕРВОГО владельца кресла на всю жизнь комнаты (и правильно делает — это договор
+    // арсенала), а для перехвата нужен тот, кто сидит сейчас.
+    this.peerAccountId.set(peer, accountId);
     this.observe?.({ kind: 'join', playerId });
     if (this.manualStart && this.host === null) this.host = playerId; // first in hosts
     const flipped = this.syncLobbyClock(); // last player in? the match resumes
@@ -856,6 +891,13 @@ export class MatchRoom {
     raw: string,
     sessionId?: string,
   ): Promise<void> {
+    // Сокет, снятый с кресла, больше не говорит от его имени. Перехват (см. `addPeer`)
+    // убирает прежний сокет из набора СИНХРОННО, но `close()` лишь переводит соединение
+    // в CLOSING до ответного кадра, а обработчик `message` при этом жив: уже
+    // отправленные кадры могут доехать сюда и применить действие ПАРАЛЛЕЛЬНО новому —
+    // ровно то, что обещание «одна рука на империи» запрещает. Молча: выселенному уже
+    // сказали `E_SLOT_TAKEN`, второй раз объясняться незачем.
+    if (!this.peers.get(playerId)?.has(peer)) return;
     if (raw.length > this.maxPayloadBytes) {
       this.send(peer, { type: 'error', matchId: this.id, code: 'E_PAYLOAD_TOO_LARGE' });
       return;

@@ -38,6 +38,25 @@ ENV_FILE="$DEPLOY_DIR/server.env"
 HEALTH_PORT="${PORT:-8788}"
 HEALTH_TRIES="${HEALTH_TRIES:-30}"
 
+# Конфигурация ОТКАТЫВАЕТСЯ ВМЕСТЕ С ОБРАЗОМ.
+#
+# Добор ключей ниже меняет постуру: дописанный `AUTH_JWT_SECRET` переводит сервер с
+# позывных на аккаунты. Если новая версия не поднялась и мы вернули ПРЕЖНИЙ образ, а
+# `server.env` оставили новым, откат прошёл бы «успешно» — health отвечает — но игроки
+# больше не вошли бы прежним способом. Откат обязан возвращать машину туда, где она
+# была, целиком, а не наполовину.
+# shellcheck disable=SC2317  # вызывается из веток отката ниже
+ENV_BACKUP=""
+backup_env() {
+  [ -f "$ENV_FILE" ] || return 0
+  ENV_BACKUP="$(mktemp)" && cp "$ENV_FILE" "$ENV_BACKUP" || ENV_BACKUP=""
+}
+restore_env() {
+  [ -n "$ENV_BACKUP" ] && [ -f "$ENV_BACKUP" ] || return 0
+  cp "$ENV_BACKUP" "$ENV_FILE"
+  echo "[*] server.env возвращён к состоянию до обновления." >&2
+}
+
 health_ok() {
   local i
   for ((i = 1; i <= HEALTH_TRIES; i++)); do
@@ -59,6 +78,17 @@ if [ -n "${VOID_IMAGE:-}" ]; then
 
   PREV_IMAGE="$(cat "$LAST_GOOD" 2>/dev/null || true)"
 
+  # Добор ключей нужен и здесь — это РЕКОМЕНДОВАННЫЙ путь обновления, и без него OPS-2
+  # чинил бы только менее безопасную сборку из исходников. Оговорка: этот путь намеренно
+  # не трогает checkout (в прод уезжает подписанный образ, а не то, что тут собралось),
+  # поэтому список ключей берётся тот, что уже лежит на машине. Это всё равно строго
+  # лучше, чем не добирать вовсе; принести свежий список сюда — задача обновления
+  # checkout'а, а не подъёма образа.
+  # shellcheck source=deploy/env-keys.sh
+  . "$DEPLOY_DIR/env-keys.sh"
+  backup_env
+  ensure_env_keys "$ENV_FILE"
+
   echo "[*] Забираем образ и поднимаем на нём стек..."
   docker pull "$VOID_IMAGE"
   VOID_IMAGE="$VOID_IMAGE" docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" -f "$RELEASE_OVERLAY" up -d --no-build
@@ -70,6 +100,7 @@ if [ -n "${VOID_IMAGE:-}" ]; then
   fi
 
   echo "[✗] Сервер не поднялся после обновления." >&2
+  restore_env
   if [ -n "$PREV_IMAGE" ]; then
     echo "[*] Откатываемся на предыдущий проверенный образ: $PREV_IMAGE" >&2
     VOID_IMAGE="$PREV_IMAGE" docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" -f "$RELEASE_OVERLAY" up -d --no-build
@@ -116,6 +147,7 @@ run_as_owner git -C "$REPO_DIR" merge --ff-only "origin/$BRANCH"
 # читало. Существующие значения не трогаются; подробности и правила — в env-keys.sh.
 # shellcheck source=deploy/env-keys.sh
 . "$DEPLOY_DIR/env-keys.sh"
+backup_env
 ensure_env_keys "$ENV_FILE"
 
 # Образ, на котором сервер работает ПРЯМО СЕЙЧАС — единственная точка отката.
@@ -137,6 +169,7 @@ if health_ok; then
 fi
 
 echo "[✗] Сервер не отвечает на /health после обновления." >&2
+restore_env
 if [ -n "$PREV_IMAGE_ID" ]; then
   IMAGE_NAME="$(docker compose --env-file "$ENV_FILE" -f "$COMPOSE_BASE" config --images 2>/dev/null | head -1)"
   if [ -n "$IMAGE_NAME" ]; then
