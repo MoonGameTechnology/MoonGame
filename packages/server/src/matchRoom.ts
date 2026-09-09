@@ -721,11 +721,28 @@ export class MatchRoom {
     // different value for the same seat within one room's life.
     if (accountId && !this.playerAccountId.has(playerId))
       this.playerAccountId.set(playerId, accountId);
-    if (this.singlePeerPerPlayer && (this.peers.get(playerId)?.size ?? 0) > 0) {
-      // That side is already controlled by a live connection.
-      this.send(peer, { type: 'error', matchId: this.id, code: 'E_SLOT_TAKEN' });
-      peer.close?.(1008, 'slot taken');
-      return false;
+    // Одно живое соединение на кресло — но выигрывает НОВОЕ, а не старое.
+    //
+    // Раньше отказывали пришедшему: место занято, приходи позже. «Позже» означало до
+    // ~30 секунд (реап мёртвых сокетов идёт heartbeat'ом в два интервала по 15 с), и
+    // держало кресло чаще всего собственное мёртвое соединение игрока: у телефона
+    // пропал сигнал, TCP-FIN не дошёл, сервер про обрыв ещё не знает. Игрок открывал
+    // игру заново и получал обвинение, что играет с другого устройства, — за своим же
+    // столом. Поймано на живом плейтесте.
+    //
+    // Личность пришедшего к этому моменту уже проверена рукопожатием (join-токен или
+    // билет места), то есть это ТОТ ЖЕ человек. Значит правильный ответ — впустить его
+    // и попрощаться со старым соединением: инвариант «одна рука на империи» цел,
+    // меняется только кто из двух остаётся. Старому уходит тот же `E_SLOT_TAKEN` —
+    // «этим именем уже играют, другая вкладка или устройство?» читается там верно.
+    if (this.singlePeerPerPlayer) {
+      for (const stale of [...(this.peers.get(playerId) ?? [])]) {
+        this.send(stale, { type: 'error', matchId: this.id, code: 'E_SLOT_TAKEN' });
+        stale.close?.(1008, 'slot taken over');
+        // Снимаем СИНХРОННО: обработчик закрытия сокета придёт позже, а место должно
+        // освободиться до того, как ниже добавится новый.
+        this.removePeer(playerId, stale);
+      }
     }
     const playerPeers = this.peers.get(playerId) ?? new Set<RoomPeer>();
     playerPeers.add(peer);
