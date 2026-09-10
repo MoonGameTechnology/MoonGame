@@ -952,7 +952,8 @@ const BUILDABLE = [
 // `orbital_aa` (орбитальное ПКО — anti-ship near-orbit emplacement) is a defensive BUILDING:
 // the player builds it like a fort. It fires on hostile fleets over the world (core
 // `aaStrengthAt` sums building AA) but does NOT block ground capture — only ground troops
-// do that. A space fortress also comes with one pre-installed (installFortressAA).
+// do that. Nothing hands it out for free: it is researched (`orbital_defense_grid`)
+// and then built like any other structure — ORB-3.
 // H4-REVERT: наземные юниты вернулись в общий конвейер. Пока их поднимала мобилизация
 // дивизии, этот массив был чисто космическим — и снос дивизий без этой строки оставил
 // бы игрока вовсе без сухопутных войск, то есть без второй фазы захвата мира.
@@ -2298,16 +2299,6 @@ function apply(out: StepOut) {
   handleEvents(out.events);
 }
 
-// A space fortress comes with a fixed orbital-AA emplacement (prototype scenario rule).
-// It's a building now: its AA fires on near-orbit attackers, but it does NOT make the
-// junction "defended" against a walk-in — only ground troops block ground capture.
-function installFortressAA(planetId: string) {
-  const pl = s.planets[planetId];
-  if (!pl) return;
-  if (pl.buildings.some((b) => b.type === 'orbital_aa')) return; // already emplaced
-  pl.buildings.push({ type: 'orbital_aa', level: 1, hp: data.buildings.orbital_aa?.hp ?? 30 });
-}
-
 /** Apply a player-issued order and surface a rejection in the log (so a denied
  *  click — wrong orbit, no capacity, can't afford — isn't silently swallowed). */
 // Kernel rejection codes → a human phrase. The key is DERIVED from the code
@@ -3058,7 +3049,7 @@ function tellSteward(kind: StewardEvent, p: Record<string, unknown>): void {
 
 /** Рассказать игроку о событии стройки — правила в `buildLog.ts` (REFM-175). */
 function tellBuild(kind: BuildLogKind, p: Record<string, unknown>): void {
-  const line = buildLogLine(kind, p.building as string);
+  const line = buildLogLine(kind);
   const b = buildingName(data.buildings[p.building as string]?.name, p.building as string);
   const at = p.planetId as string;
   const text = line.needsLevel
@@ -3066,7 +3057,6 @@ function tellBuild(kind: BuildLogKind, p: Record<string, unknown>): void {
     : t(line.key, { b, at });
   if (line.anchored) note(text, at);
   else note(text);
-  if (line.installsFortressAA) installFortressAA(at);
 }
 function handleEvents(events: DomainEvent[]) {
   for (const e of events) {

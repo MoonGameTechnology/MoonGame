@@ -24,9 +24,6 @@
 /** Событие стройки, о котором рассказывают игроку. */
 export type BuildLogKind = 'constructed' | 'upgraded' | 'destroyed';
 
-/** Здание, чья готовность включает зенитный огонь мира (правило 4). */
-export const FORTRESS_BUILDING = 'starfort';
-
 /** Что сказать про событие и что оно тянет за собой. */
 export interface BuildLogLine {
   /** Ключ строки ленты. */
@@ -35,32 +32,20 @@ export interface BuildLogLine {
   needsLevel: boolean;
   /** Прыгает ли лента камерой на этот мир (правило 2). */
   anchored: boolean;
-  /** Ставить ли миру зенитки (правило 4). */
-  installsFortressAA: boolean;
 }
 
-/** Что стройка сообщает игроку (правила 1, 2, 4). */
-export function buildLogLine(kind: BuildLogKind, building: string): BuildLogLine {
+/** Что стройка сообщает игроку (правила 1, 2).
+ *
+ *  ORB-3: правила 4 («готовый звёздный форт ставит миру зенитки») больше нет —
+ *  орбитальное ПКО самостоятельная постройка, и получить её иначе, чем построив,
+ *  нельзя. Вместе с правилом ушёл и аргумент `building`: строке ленты вид здания
+ *  больше ни на что не влияет. */
+export function buildLogLine(kind: BuildLogKind): BuildLogLine {
   if (kind === 'upgraded') {
-    return {
-      key: 'log.build.upgraded',
-      needsLevel: true,
-      anchored: false,
-      installsFortressAA: false,
-    };
+    return { key: 'log.build.upgraded', needsLevel: true, anchored: false };
   }
   if (kind === 'destroyed') {
-    return {
-      key: 'log.build.destroyed',
-      needsLevel: false,
-      anchored: true,
-      installsFortressAA: false,
-    };
+    return { key: 'log.build.destroyed', needsLevel: false, anchored: true };
   }
-  return {
-    key: 'log.build.done',
-    needsLevel: false,
-    anchored: false,
-    installsFortressAA: building === FORTRESS_BUILDING,
-  };
+  return { key: 'log.build.done', needsLevel: false, anchored: false };
 }
