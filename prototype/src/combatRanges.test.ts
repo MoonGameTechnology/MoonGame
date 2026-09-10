@@ -6,7 +6,9 @@
 import { describe, it, expect } from 'vitest';
 import { shuttleStrikeRange } from '../../packages/shared-core/src/index';
 import { newGame, data } from './game';
-import { combatRanges, ringLook, type RangeKind } from './combatRanges';
+import { aimRing, combatRanges, ringLook, type RangeKind } from './combatRanges';
+import { squadronReach } from '../../packages/shared-core/src/index';
+import type { Squadron } from '../../packages/shared-core/src/index';
 import type { Fleet, GameState } from '../../packages/shared-core/src/index';
 
 const ME = 'p1';
@@ -115,5 +117,48 @@ describe('RANGE-UX — заметность кольца (REFM-123)', () => {
 
   it('вид стабилен', () => {
     expect(ringLook('shuttle')).toEqual(ringLook('shuttle'));
+  });
+});
+
+describe('SHU-3.1 — круг ВЗВЕДЁННОГО прицела', () => {
+  const squad = (units: Array<[string, number]>): Squadron => ({
+    id: 'sq:p1:1',
+    units: units.map(([unit, count]) => ({ unit, count })),
+  });
+
+  it('РАДИУС РАВЕН squadronReach ЯДРА — тому самому, по которому оно отбивает промах', () => {
+    const sq = squad([['landing_shuttle', 2]]);
+    const core = squadronReach(sq, data);
+    const ring = aimRing({ squadron: sq, at: { x: 7, y: 9 } }, data);
+    if (core > 0) {
+      expect(ring?.radius).toBe(core);
+      expect(ring?.x).toBe(7);
+      expect(ring?.y).toBe(9);
+      expect(ring?.sourceId).toBe('sq:p1:1');
+    } else {
+      expect(ring).toBeNull();
+    }
+  });
+
+  it('ДАЛЬНОСТЬ ПО САМОЙ КОРОТКОЙ РУКЕ, а не по самой длинной: круг обещает то, что долетит', () => {
+    const mixed = squad([
+      ['landing_shuttle', 1],
+      ['interceptor', 1],
+    ]);
+    expect(aimRing({ squadron: mixed, at: { x: 0, y: 0 } }, data)?.radius ?? 0).toBe(
+      squadronReach(mixed, data),
+    );
+  });
+
+  it('ПРИЦЕЛ НЕ ВЗВЕДЁН — КРУГА НЕТ: кольцо показывает режим, а не свойство базы', () => {
+    expect(aimRing(null, data)).toBeNull();
+  });
+
+  it('ЗВЕНО БЕЗ ДАЛЬНОСТИ КРУГА НЕ ДАЁТ — нулевой радиус не факт о мире, а линия ни о чём', () => {
+    expect(aimRing({ squadron: squad([['militia', 3]]), at: { x: 0, y: 0 } }, data)).toBeNull();
+  });
+
+  it('ВЗВЕДЁННЫЙ ПРИЦЕЛ ЗАМЕТНЕЕ пассивного радиуса — по нему целятся прямо сейчас', () => {
+    expect(ringLook('aim').alpha).toBeGreaterThan(ringLook('shuttle').alpha);
   });
 });

@@ -54,6 +54,7 @@ import {
   squadronCargoCapacity,
   squadronCargoUsed,
   squadronSize,
+  squadronReach,
   tickRearm,
   trimHangar,
 } from '../state/shuttle';
@@ -691,18 +692,6 @@ function slowestSpeed(units: readonly UnitStack[], data: GameData): number {
     slowest = Math.min(slowest, data.units[st.unit]?.stats.speed ?? 0);
   }
   return Number.isFinite(slowest) ? slowest : 0;
-}
-
-/** Дальность ЭСКАДРЫ — по самой короткой руке (SHU-4.2). Тот же довод, что у скорости:
- *  соединение идёт целиком, и цель, до которой не дотянется одна машина, недосягаема
- *  для всех. Максимум обещал бы удар, из которого часть эскадры не вернулась бы домой. */
-function squadronReach(sq: Squadron, data: GameData): number {
-  let shortest = Infinity;
-  for (const st of sq.units) {
-    if (st.count <= 0) continue;
-    shortest = Math.min(shortest, data.units[st.unit]?.stats.strikeRange ?? 0);
-  }
-  return Number.isFinite(shortest) ? shortest : 0;
 }
 
 /** Скорость вылета — самая медленная машина в нём. */

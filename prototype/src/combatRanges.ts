@@ -25,14 +25,16 @@
 import {
   hasOrbit,
   shuttleStrikeRange,
+  squadronReach,
   type Fleet,
   type GameData,
   type GameState,
+  type Squadron,
 } from '../../packages/shared-core/src/index';
 
 /** Вид оружия — он же ключ цвета. Цвета живут в `main.ts` рядом с остальной палитрой;
  *  здесь только вид, чтобы модуль не знал про канву. */
-export type RangeKind = 'shuttle' | 'aa';
+export type RangeKind = 'shuttle' | 'aa' | 'aim';
 
 /** Круг досягаемости вокруг точки. `radius` в МИРОВЫХ единицах (масштаб накладывает
  *  рисующий), `radius === 0` для `aa` — у ПКО нет области, только отметка на узле. */
@@ -99,6 +101,28 @@ export function combatRanges(
   return { rings };
 }
 
+/**
+ * Круг ВЗВЕДЁННОГО ПРИЦЕЛА (остаток SHU-3.1) — докуда дотянется ЭТО звено с ЭТОЙ базы.
+ *
+ * Отдельно от `combatRanges`, потому что это другой вопрос. Тот отвечает «что вокруг
+ * выделенного» и берёт `shuttleStrikeRange` — САМУЮ ДЛИННУЮ руку носителя; здесь взведён
+ * конкретный приказ, и мерка у него `squadronReach` — САМАЯ КОРОТКАЯ рука соединения,
+ * ровно та, по которой ядро отобьёт `E_OUT_OF_RANGE`. Числа честно разные: круг носителя
+ * говорит, на что он способен в принципе, круг прицела — куда долетит взведённая эскадра.
+ *
+ * Звено без дальности круга не получает вовсе: «радиус 0» — не факт о мире, а линия ни о
+ * чём (то же правило, что у блока вместимости в `hangarPanel.ts`).
+ */
+export function aimRing(
+  aim: { squadron: Squadron; at: { x: number; y: number } } | null,
+  data: GameData,
+): RangeRing | null {
+  if (!aim) return null;
+  const radius = squadronReach(aim.squadron, data);
+  if (radius <= 0) return null;
+  return { kind: 'aim', x: aim.at.x, y: aim.at.y, radius, sourceId: aim.squadron.id };
+}
+
 /** Как выглядит кольцо: цвет живёт в палитре `main.ts`, здесь — заметность (правила 1–3). */
 export interface RangeLook {
   alpha: number;
@@ -106,8 +130,11 @@ export interface RangeLook {
   width: number;
 }
 
-/** Вид кольца по виду: ПКО заметнее радиуса вылета — у него нет области, только отметка. */
+/** Вид кольца по виду: ПКО заметнее радиуса вылета — у него нет области, только отметка.
+ *  Взведённый прицел заметнее обоих: это не справка о базе, а режим, в котором игрок
+ *  находится ПРЯМО СЕЙЧАС, и следующий тап по карте отправит машины. */
 export function ringLook(kind: RangeKind): RangeLook {
+  if (kind === 'aim') return { alpha: 0.85, dash: [7, 5], width: 1.6 };
   if (kind === 'aa') return { alpha: 0.7, dash: [2, 3], width: 1.2 };
   return { alpha: 0.32, dash: [5, 7], width: 1.2 };
 }
