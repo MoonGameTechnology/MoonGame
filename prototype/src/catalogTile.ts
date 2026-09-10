@@ -42,14 +42,16 @@ const BUILT = 'E_ALREADY_BUILT';
 const QUEUED = new Set(['E_ALREADY_QUEUED', 'E_ALREADY_PAUSED']);
 
 /**
- * Вердикт ядра (`canOrder`) + местная очередь прототипа → состояние плитки.
- * Локальная очередь ядру неизвестна по определению: в сети её нет, там стройку
- * таймит сервер, — поэтому она приходит отдельным флагом, а не ещё одним правилом.
+ * Вердикт ядра (`canOrder`) + признак «этот заказ уже в очереди мира» → состояние плитки.
+ * Признак приходит аргументом, а не читается здесь: модель чистая и в мир не смотрит.
+ * С BLD-1 очередь живёт В ЯДРЕ (`planet.buildQueue`), поэтому на стоящий в ней заказ ядро
+ * и само отвечает `E_ALREADY_QUEUED`; признак остаётся вторым путём к тому же ответу и
+ * гасит плитку, если вердикт пришёл другой.
  */
-export function tileLock(code: string | null | undefined, locallyQueued = false): TileLock {
+export function tileLock(code: string | null | undefined, inWorldQueue = false): TileLock {
   if (code === BUILT) return 'built';
   if (code != null && QUEUED.has(code)) return 'queued';
-  return locallyQueued ? 'queued' : null;
+  return inWorldQueue ? 'queued' : null;
 }
 
 /** Из чего собрать плитку: иконка — готовая разметка, имя и подпись — текст. */

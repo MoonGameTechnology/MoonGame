@@ -727,11 +727,6 @@ import {
 } from './stewardLog';
 import { diploDelivery } from './diploDelivery';
 import { garrisonSide, planFor, troopsGate } from './troopsScene';
-import {
-  rallyCloses,
-  shipsPending,
-  withoutRally,
-} from './buildPipeline';
 import { standingPatrol, stashOnStandDown } from './sortieResume';
 import {
   fleetSignature as coreFleetSignature,
@@ -1856,27 +1851,6 @@ function enqueueBuild(planetId: string, order: QueuedBuild): void {
     note(t('queue.added', { what: queuedLabel(order), at: planetId }));
   }
   playerOrder(queuedAction(planetId, order));
-}
-// A rally fleet keeps swallowing freshly-built ships only while its world still has
-// a ship in the pipeline (one building, or one queued). The moment the queue drains,
-// the fleet is "closed" (loses its 'rally' tag) so the NEXT order opens a fresh fleet
-// — ships only pool together if you queue the next batch before the current one finishes.
-// Single-player only: in net mode the server owns the fleets and their tags.
-function closeIdleRallies(): void {
-  // Условия конвейера — `buildPipeline.ts` (REFM-172): сбор закрывается, когда мир не
-  // строит корабли НИ сейчас, НИ по очереди; закрытие снимает МЕТКУ, а не распускает
-  // флот, иначе одна эскадра росла бы весь матч; о летящем флоте не решают вовсе.
-  const строит = (planetId: string): boolean =>
-    shipsPending(!!activeConstruction(planetId, 'units'), coreQueue(planetId, 'units').length);
-  for (const f of Object.values(s.fleets)) {
-    const view = {
-      mine: f.owner === ME,
-      location: f.location ?? null,
-      moving: !!f.movement,
-      traits: f.traits,
-    };
-    if (rallyCloses(view, строит)) f.traits = withoutRally(f.traits ?? []);
-  }
 }
 /** Где флот НАХОДИТСЯ по правилам, в МИРОВЫХ координатах — правила и вся интерполяция
  *  живут чистой моделью `fleetOrigin.ts`; здесь остаётся подстановка живого состояния. */
@@ -6836,8 +6810,8 @@ function buildingLocked(planetId: string, id: string): TileLock {
   // и копия разъезжалась: кодекс проверял только «уже стоит» и всю стройку первого
   // экземпляра предлагал заказать второй.
   // Какие коды означают повтор, а какие плитку НЕ гасят — в `catalogTile.ts`
-  // (REFM-42). Локальная очередь прототипа ядру неизвестна по определению (в сети
-  // её нет — там стройку таймит сервер), поэтому она приходит отдельным флагом.
+  // (REFM-42). Второй аргумент — очередь МИРА: с BLD-1 она живёт в ядре, поэтому
+  // читается оттуда же (`coreQueue`), а не из клиентской копии, которой больше нет.
   return tileLock(
     canOrder(s, buildBuilding(ME, planetId, id)),
     coreQueue(planetId, 'buildings').some((q) => q.building === id),
@@ -12032,7 +12006,6 @@ function frame(nowReal: number) {
     solo.drivePatrols(); // CC-4: дежурные вылеты бьют контакты в радиусе
     solo.driveChains(); // CC-1: продвинуть цепочки приказов (ждать → курс → штурм/обстрел)
     solo.runAI();
-    closeIdleRallies(); // drop the 'rally' tag once a world's build pipeline empties
   }
   // ORD-2: отложенного ШТУРМА у клиента больше нет вовсе — он уехал в ядро цепочкой
   // «дойти → штурмовать», и её гоняют оба хоста (сервер и соло-драйвер). Поэтому
