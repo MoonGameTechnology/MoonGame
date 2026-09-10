@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { FLEET_CALLSIGNS, fleetCallsign, fleetKindKey } from './fleetName';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { FLEET_CALLSIGNS, FLEET_KIND_KEY, fleetCallsign } from './fleetName';
 
 describe('fleetCallsign — детерминированный позывной из id', () => {
   it('один id → один и тот же позывной (стабильно между вызовами/клиентами)', () => {
@@ -22,17 +24,18 @@ describe('fleetCallsign — детерминированный позывной 
   });
 });
 
-describe('fleetKindKey — тип соединения по размеру', () => {
-  it('пороги: звено → эскадрилья → эскадра → флот → армада', () => {
-    expect(fleetKindKey(1)).toBe('fleet.size.flight');
-    expect(fleetKindKey(2)).toBe('fleet.size.flight');
-    expect(fleetKindKey(3)).toBe('fleet.size.group');
-    expect(fleetKindKey(5)).toBe('fleet.size.group');
-    expect(fleetKindKey(6)).toBe('fleet.size.group-heavy');
-    expect(fleetKindKey(12)).toBe('fleet.size.group-heavy');
-    expect(fleetKindKey(13)).toBe('fleet.size.fleet');
-    expect(fleetKindKey(25)).toBe('fleet.size.fleet');
-    expect(fleetKindKey(26)).toBe('fleet.size.armada');
-    expect(fleetKindKey(100)).toBe('fleet.size.armada');
+describe('имя соединения кораблей — всегда ФЛОТ (SHU-4.1)', () => {
+  // Заказ владельца 2026-09-10 (§0.4 `shuttles-roadmap.md`): группа челноков зовётся
+  // ЭСКАДРОЙ, группа кораблей — ФЛОТОМ. Лестница размеров (звено/эскадрилья/эскадра/
+  // армада) была авиационной, то есть звала корабли словами челноков — два словаря на
+  // одну вещь, ровно то, от чего ушёл SHU-0.1. Размер из имени не пропал для игрока:
+  // корабли и десант стоят числами в подзаголовке карточки.
+  it('ИМЯ НЕ ЗАВИСИТ ОТ РАЗМЕРА: у соединения кораблей один ключ, а не лестница', () => {
+    expect(FLEET_KIND_KEY).toBe('fleet.kind.ships');
+  });
+
+  it('ЛЕСТНИЦА НЕ ВЕРНЁТСЯ МОЛЧА: в модуле имени не осталось ключей размера', () => {
+    const src = readFileSync(fileURLToPath(new URL('./fleetName.ts', import.meta.url)), 'utf8');
+    expect(src).not.toMatch(/fleet\.size\./);
   });
 });

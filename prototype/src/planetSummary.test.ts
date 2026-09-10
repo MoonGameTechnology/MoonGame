@@ -89,6 +89,27 @@ describe('сводка мира — домены гарнизона', () => {
   });
 });
 
+describe('сводка мира — машины считаются в АНГАРЕ, а не в гарнизоне (SHU-4.1)', () => {
+  // Тот же дефект, что SHU-3.1 нашёл во вкладке: челнок с SHU-1.1 в гарнизоне не бывает
+  // НИКОГДА, он лежит в `planet.hangar`. Сводка мира читала только гарнизон, поэтому
+  // третья доля строки («… · N челноков») была вечным нулём и не рисовалась вовсе:
+  // игрок платил за машины, видел их во вкладке и не видел в сводке того же мира.
+  it('МАШИНЫ ИЗ АНГАРА ПОПАДАЮТ В СВОДКУ — иначе доля строки вечно нулевая', () => {
+    const sm = planetSummary(
+      planet({ garrison: [{ unit: 'tank', count: 2 }], hangar: [{ unit: 'interceptor', count: 3 }] }),
+      data,
+      [],
+    );
+    expect(sm.garrison.wings).toBe(3);
+    expect(sm.garrison.ground).toBe(2);
+  });
+
+  it('пустой ангар ничего не прибавляет, и мира без поля ангара это не роняет', () => {
+    const bare = planetSummary(planet({ garrison: [{ unit: 'cruiser', count: 1 }] }), data, []);
+    expect(bare.garrison).toEqual({ ground: 0, ships: 1, wings: 0 });
+  });
+});
+
 describe('сводка мира — выход и бонусы', () => {
   it('ВЫХОД ПЕРЕЧИСЛЯЕТ И НУЛИ — иначе перекос типа планеты не виден', () => {
     const sm = planetSummary(planet({ planetType: 'terran' }), data, []);

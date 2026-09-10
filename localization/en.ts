@@ -792,8 +792,8 @@ export const en: Record<string, string> = {
     'The fleet is your weapon and shield. Order ships here to reinforce it.',
   'dossier.tab.ships.name': 'Fleet',
   'dossier.tab.shuttle.desc':
-    'A carrier (◈) holds shuttles (△). Launch them from the selected fleet\'s panel with "🛩 Launch shuttles".',
-  'dossier.tab.shuttle.name': 'Shuttles',
+    'The spaceport squadron: the machines (△) sit in the world\'s hangar and never appear on the map. The strike button sends a sortie out; the target is picked by a tap on the map. A carrier (◈) takes a squadron along — its bay is shown in the fleet panel.',
+  'dossier.tab.shuttle.name': 'Squadron',
   'dossier.task.eta': 'Remaining: {r}',
   'dossier.task.output': '{r}: {now}/h now → {final}/h once finished',
   'dossier.task.queued': 'Queued — not started yet.',
@@ -838,12 +838,9 @@ export const en: Record<string, string> = {
   'faction.violet.desc':
     'Universalists of the dawn: a little of everything — +5% economy and +5% damage.',
 
-  // --- fleet — Автоимя флота по размеру соединения.
-  'fleet.size.armada': 'Armada',
-  'fleet.size.fleet': 'Fleet',
-  'fleet.size.flight': 'Wing',
-  'fleet.size.group': 'Flight',
-  'fleet.size.group-heavy': 'Squadron',
+  // --- fleet — Автоимя соединения: слово + позывной. Лестница размеров снята в
+  // SHU-4.1: её ступени были авиационными, а те принадлежат челнокам («эскадра»).
+  'fleet.kind.ships': 'Fleet',
 
   // --- fmt — Форматирование величин: длительности.
   'fmt.hours': '{n}h',
@@ -1831,7 +1828,7 @@ export const en: Record<string, string> = {
   'side.garrison.plus-troops': '+{n} troops',
   'side.garrison.select': 'Select →',
   'side.garrison.ships': 'Ships in garrison',
-  'side.garrison.wing': 'Shuttles in garrison',
+  'side.garrison.wing': 'Squadron in port',
   'side.ground.conveyor': 'Ground conveyor',
   'side.ground.empty': 'no ground army here',
   'side.ground.hint':
@@ -1899,12 +1896,12 @@ export const en: Record<string, string> = {
   'side.tab.buildings': 'Buildings',
   'side.tab.fleet': 'Fleet',
   'side.tab.ground': 'Ground',
-  'side.tab.wings': 'Shuttles',
+  'side.tab.wings': 'Squadron',
   'side.unit.ground': 'ground',
   'side.unit.space': 'space',
   'side.wing.conveyor': 'Shuttle conveyor',
   'side.wing.garrison.hint':
-    'A carrier (◈) holds shuttles (△). Launch them from the selected fleet\'s panel with "🛩 Launch shuttles".',
+    'The squadron sits in the port hangar and never appears on the map. "{b}" sends a sortie out — pick the target by tapping the map. A carrier (◈) takes a squadron along: its bay is in the fleet panel.',
   'side.world.blackout': 'blackout: radars and interdiction −50%',
   'side.world.bonus.defense': 'defense',
   'side.world.bonus.production': 'prod.',
