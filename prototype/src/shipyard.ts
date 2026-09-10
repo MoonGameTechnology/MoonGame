@@ -1,10 +1,20 @@
 /**
- * «Верфь» — the unified in-match loadout tab (CON-1, LARS-4, REFM-13).
+ * «ПРОИЗВОДСТВО» — the unified in-match order screen (CON-1, LARS-4, REFM-13, ROS-3.1).
  *
- * One window with three panes: «Корабли» and «Эскадрильи» are the same loadout
- * constructor over different hull families, «Герои» is the hero штаб the host still
- * owns (it folds in with its own brick — this module only asks the host for its
- * markup and hands hero clicks straight back).
+ * ROS-0.2 + ROS-3.1 (заказ владельца, п. 3). Экран назывался «Верфь»/«Конструктор» и
+ * умел заказывать только то, что летает. Теперь это ОДНО место заказа на все пять типов:
+ * «Корабли» · «Челноки» · «Пехота» · «Техника» · «Герои». Новым МЕСТОМ постройки он при
+ * этом не стал: место у каждого рода своё (казармы / завод / космопорт-верфь), и экран
+ * лишь показывает, где заказ пройдёт, — а где своих подходящих миров нет, вместо выбора
+ * планеты стоит «нет подходящего места».
+ *
+ * ГДЕ МОЖНО ЗАЛОЖИТЬ — спрашивается у ЯДРА (`unitBuildSiteBlocker`), а не считается
+ * здесь второй копией правил. Своя копия разъехалась бы на первой правке, и игрок
+ * выбирал бы мир, на котором ядро отвечает отказом. Ровно та же дисциплина, что у
+ * радиусов огня (RANGE-UX) и у кнопки режима огня (ROS-2.1a).
+ *
+ * Панель мира заказ НЕ отняла: там он локальный — «здесь и сейчас на этом мире», — и
+ * второй способ у игрока остаётся.
  *
  * The constructor renders the framework-agnostic `loadoutEditor` view-model from
  * `@void/client` — typed slots + live derived stats + cost — and confirms into
@@ -16,7 +26,12 @@
  * (`YardDraft`) normalised by a pure `normalizeDraft`; only `initShipyard(host)`
  * touches the DOM, through explicit hooks instead of `main.ts`'s module-level state.
  */
-import type { Action, ArsenalItem, GameState } from '../../packages/shared-core/src/index';
+import {
+  unitBuildSiteBlocker,
+  type Action,
+  type ArsenalItem,
+  type GameState,
+} from '../../packages/shared-core/src/index';
 import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
 import { esc, displayUnit } from './format';
@@ -33,24 +48,55 @@ import {
   type LoadoutEditorResult,
 } from '../../packages/client/src/loadoutEditor';
 
-export type YardTab = 'ships' | 'squads' | 'heroes';
+export type YardTab = 'ships' | 'squads' | 'infantry' | 'vehicles' | 'heroes';
 
+/** Порядок вкладок — заказ владельца дословно: Корабли · Челноки · Пехота · Техника ·
+ *  Герои. Наземные посередине, а не в конце: они дешевле и заказываются чаще. */
 const YARD_TABS: [YardTab, string][] = [
   ['ships', 'yard.tab.ships'],
   ['squads', 'yard.tab.squads'],
+  ['infantry', 'yard.tab.infantry'],
+  ['vehicles', 'yard.tab.vehicles'],
   ['heroes', 'yard.tab.heroes'],
 ];
 
-/** Buildable space hulls the «Корабли» pane fits; shuttle/carrier hulls → «Эскадрильи». */
+/** Buildable space hulls the «Корабли» pane fits; shuttle/carrier hulls → «Челноки». */
 export const YARD_HULLS = [
   'cruiser',
   'siege',
   'artillery',
   'scout',
-  'sensor_frigate',
+  'frigate',
   'strike_carrier',
+  // ROS-3.2: «Шаттл» — КОРАБЛЬ, который возит челноки, а не челнок. Он заказывается
+  // среди кораблей, как и всякий корпус со своей линией боя.
+  'shuttle_carrier',
 ];
-export const YARD_SQUAD_HULLS = ['interceptor', 'bomber', 'shuttle_carrier'];
+export const YARD_SQUAD_HULLS = ['interceptor', 'bomber', 'landing_shuttle'];
+
+/** Наземный ростер экрана — тот же набор, что предлагает панель мира. РАЗДЕЛЯЕТ его по
+ *  вкладкам не второй список, а ДАННЫЕ (`UnitDef.kind`, ROS-1.1): новый род войск или
+ *  переезд корпуса из пехоты в технику решается юнитом, а не правкой интерфейса. */
+export const YARD_GROUND_HULLS = ['militia', 'heavy_infantry', 'special_forces', 'tank'];
+
+export function groundHullsOf(kind: 'infantry' | 'vehicle'): string[] {
+  return YARD_GROUND_HULLS.filter((id) => data.units[id]?.kind === kind);
+}
+
+/** Корпуса вкладки. Одно место, где вкладка превращается в ростер, — им пользуются и
+ *  отрисовка, и нормализация черновика, и обработчик кликов. */
+export function hullsOfTab(tab: YardTab): string[] {
+  switch (tab) {
+    case 'squads':
+      return YARD_SQUAD_HULLS;
+    case 'infantry':
+      return groundHullsOf('infantry');
+    case 'vehicles':
+      return groundHullsOf('vehicle');
+    default:
+      return YARD_HULLS;
+  }
+}
 
 /** How many hulls one order may queue at once (the ± stepper's range). */
 const MAX_COUNT = 20;
@@ -118,7 +164,7 @@ export function statBarHtml(line: LoadoutStatLine, max: number): string {
   );
 }
 
-/** LARS-4 — a small "откуда" tag for a Верфь card, from whatever the hub Arsenal
+/** LARS-4 — a small "откуда" tag for a «Производство» card, from whatever the hub Arsenal
  *  витрина has cached (best-effort: blank if the player never opened that tab this
  *  session, never a guess). Only flags a NON-starter origin — a starter blueprint
  *  sitting in every match isn't news; a fresh drop/craft/auction pickup is. */
@@ -138,11 +184,22 @@ export function ownedHullsOf(state: GameState, me: string, hullList: string[]): 
   return snap ? hullList.filter((h) => snap.hulls.includes(h)) : hullList;
 }
 
-/** Worlds of yours that can take a build order (buildable sector kinds only). */
-function buildablePlanets(state: GameState, me: string) {
-  return Object.values(state.planets).filter(
-    (p) => p.owner === me && SECTOR_TYPES[p.kind ?? '']?.buildable,
-  );
+/**
+ * Ваши миры, где ЭТОТ корпус можно заложить (ROS-3.1).
+ *
+ * Два условия, и оба чужие — свои правила экран не выдумывает: сектор должен быть
+ * застраиваемым (`SECTOR_TYPES`), а здания на мире — открывать производство ИМЕННО
+ * этого рода. Второе спрашивается у ядра (`unitBuildSiteBlocker`): космопорт для
+ * челнока, верфь для корабля, казармы для пехоты, завод для техники. Пустой список
+ * означает не «нет своих миров», а «нет ПОДХОДЯЩЕГО места» — разница для игрока
+ * существенная, и подпись под селектором её называет.
+ */
+export function buildSites(state: GameState, me: string, hull: string) {
+  const def = data.units[hull];
+  return Object.values(state.planets).filter((p) => {
+    if (p.owner !== me || !SECTOR_TYPES[p.kind ?? '']?.buildable) return false;
+    return def ? unitBuildSiteBlocker(p, def, data) === null : true;
+  });
 }
 
 /** Pull a draft back onto legal ground before it is rendered or sent: a hull outside
@@ -161,7 +218,9 @@ export function normalizeDraft(
     next.hull = owned[0]!;
     next.modules = [];
   }
-  const worlds = buildablePlanets(state, me);
+  // Мир проверяется ПОД ВЫБРАННЫЙ КОРПУС: переключение вкладки меняет и требование к
+  // зданию, и годный мир вместе с ним (казармы вместо верфи — уже другой список).
+  const worlds = buildSites(state, me, next.hull);
   if (!next.planet || !worlds.some((p) => p.id === next.planet)) next.planet = worlds[0]?.id ?? '';
   return next;
 }
@@ -258,7 +317,7 @@ export function loadoutPaneHtml(
   // right: live preview + cost + build
   const maxStat = Math.max(1, ...m.preview.map((p) => p.effective));
   const bars = m.preview.map((p) => statBarHtml(p, maxStat)).join('');
-  const worlds = buildablePlanets(state, me);
+  const worlds = buildSites(state, me, draft.hull);
   const planOpts = worlds
     .map(
       (p) =>
@@ -276,7 +335,12 @@ export function loadoutPaneHtml(
   const right =
     `<div class="cn-side"><div class="cn-ph">${t('yard.cost.with-modules')} — <em>${t('yard.cost.live')}</em></div>${bars}${cost}` +
     `<div class="cn-row2"><div class="cn-step"><button data-cncount="-" ${draft.count <= 1 ? 'disabled' : ''}>−</button><span class="cn-sv">${draft.count}</span><button data-cncount="+" ${draft.count >= MAX_COUNT ? 'disabled' : ''}>+</button></div>` +
-    `<select class="cn-plan" id="cn-planet"${worlds.length ? '' : ' disabled'}>${planOpts || `<option>${t('yard.no-worlds')}</option>`}</select></div>` +
+    // Нет годного мира — вместо селектора ПРЯМАЯ надпись (заказ владельца): пустой
+    // выпадающий список игрок читает как «сейчас загрузится», а не как отказ, и жмёт
+    // кнопку заказа, которой всё равно нечего отправить.
+    (worlds.length
+      ? `<select class="cn-plan" id="cn-planet">${planOpts}</select></div>`
+      : `<div class="cn-noplace">${t('yard.no-place')}</div></div>`) +
     `<button class="cn-build" data-cnbuild ${canBuild ? '' : 'disabled'}>${t('yard.build', { n: String(draft.count) })}</button>` +
     `<div class="cn-lock">🔒 <span>${t('yard.loadout.note')}</span></div></div>`;
   return `<div class="cn-grid">${left}${right}</div>`;
@@ -293,7 +357,7 @@ export function yardBoxHtml(tab: YardTab, body: string): string {
   );
 }
 
-/** What the Верфь needs from the match screen. */
+/** What «Производство» needs from the match screen. */
 export interface YardHost {
   /** The window element (`#constructor`) — painted and click-delegated here. */
   root(): HTMLElement;
@@ -332,7 +396,7 @@ export function initShipyard(host: YardHost): {
   let tab: YardTab = 'ships';
   let draft: YardDraft = { hull: YARD_HULLS[0]!, modules: [], count: 1, planet: '' };
 
-  const hullsOf = (): string[] => (tab === 'squads' ? YARD_SQUAD_HULLS : YARD_HULLS);
+  const hullsOf = (): string[] => hullsOfTab(tab);
   const close = (): void => host.root().classList.remove('show');
 
   function paint(): void {

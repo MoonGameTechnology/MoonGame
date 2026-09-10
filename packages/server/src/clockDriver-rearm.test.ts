@@ -43,6 +43,10 @@ describe('clock driver · re-arm after a committed action (review §3)', () => {
     // Fresh dev match has nothing scheduled → the initial arm leaves no timer.
     expect(armed).toBeNull();
 
+    // Сокет должен СИДЕТЬ, чтобы говорить от имени места: `receive` игнорирует кадры от
+    // сокета, которого нет в наборе игрока (снятый перехватом или вовсе не принятый).
+    room.addPeer('green', silentPeer);
+
     // A committed fleet.move schedules a future arrival.
     await room.receive('green', silentPeer, JSON.stringify({ type: 'action', action: move('green_1', 'nexus') }));
 

@@ -1,5 +1,11 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
-import type { BuildingInstance, Planet, PausedConstructionSite, Player } from '../state/gameState';
+import type {
+  BuildingInstance,
+  Planet,
+  PausedConstructionSite,
+  Player,
+  QueuedConstruction,
+} from '../state/gameState';
 import type { BuildingDef, GameData, ResourceBag, UnitDef } from '../data/schemas';
 import { buildingLevel, buildingMaxLevel } from '../data/schemas';
 import { isBombarded } from '../state/orbit';
@@ -135,11 +141,197 @@ function isQueued(
   planetId: string,
   building: string,
 ): boolean {
-  return h.state.scheduled.some((e) => {
+  const inFlight = h.state.scheduled.some((e) => {
     if (e.type !== 'construction.complete') return false;
     const p = e.payload as CompletePayload;
     return p.kind === kind && p.planetId === planetId && p.building === building;
   });
+  if (inFlight) return true;
+  // BLD-1: ждущий заказ — тоже «уже заказано». Иначе один и тот же дом ушёл бы в
+  // очередь дважды и второй экземпляр умер бы на пороге `atInstanceCap`.
+  const queue = h.state.planets[planetId]?.buildQueue ?? [];
+  return queue.some((q) => q.kind === kind && q.building === building);
+}
+
+// --- очередь стройки (BLD-1) -------------------------------------------------
+//
+// Находка владельца на плейтесте: «каждая новая постройка переопределяла предыдущую,
+// ресурсы тратились». Переопределял ЭКРАН, а не редьюсер: ядро принимало все заказы и
+// строило их ПАРАЛЛЕЛЬНО, а клиент показывал ровно один — ближайший по времени.
+// С места игрока это неотличимо от «съело ресурсы».
+//
+// Решение владельца: заказы встают в ОЧЕРЕДЬ. Голова строится, остальные ждут и
+// стартуют сами; заменить идущую стройку можно только явной отменой.
+//
+// Правила, которые из этого следуют (решались здесь — их не было ни в дизайне, ни в
+// коде):
+//
+//  1. **Одна стройка на ПОЛОСУ на мире.** Полос две: `buildings` (здание и апгрейд —
+//     они спорят за одну стройплощадку) и `units` (верфь/казармы). Полосы независимы:
+//     долгий дом не должен морозить верфь. Ровно это правило уже записано в прототипе
+//     (`buildPipeline.ts`, правила 2–3) — там оно даже утверждает, будто «ядро всё
+//     равно не примет второй». Не принимало только ОДИНАКОВЫЙ (`isQueued`); теперь
+//     утверждение стало правдой, и две очереди схлопываются в одну.
+//  2. **Деньги списываются НА СТАРТЕ, а не на заказе.** Иначе очередь перестаёт быть
+//     планом: в игре, где ты офлайн часами, весь смысл ряда — «накопится и построится
+//     само». Ждущий заказ не стоит ничего, поэтому его отмена — просто удаление.
+//  3. **Проверяем деньги ТАМ ЖЕ, где стартуем.** Заказ в свободную полосу стартует
+//     сразу, значит и проверяется сразу — `E_INSUFFICIENT` как раньше, контракт не
+//     менялся. Заказ в занятую полосу сейчас не стартует, значит и денег у него сейчас
+//     не спрашивают. Никакого отдельного правила «когда прощаем бедность» нет.
+//  4. **Голова, которой не хватило денег, ЖДЁТ** и пробует снова раз в игровой час.
+//     Повтор — событие на таймлайне, а не опрос: старт обязан быть привязан к
+//     запланированному событию, иначе момент старта зависел бы от того, каким шагом
+//     звали `advanceTo` (сервер тикает секундами, тест — часами), и это был бы разрыв
+//     детерминизма. Тот же приём уже стоит рядом для бомбардировки.
+//  5. **Глубина очереди ограничена.** Это не баланс, а граница ПЕРСИСТИРУЕМОГО
+//     состояния: очередь живёт в JSONB, и «сколько угодно» здесь означало бы, что
+//     объём строки задаёт клиент.
+//  6. **Захват мира стирает очередь.** Ничего не пропадает — она не оплачена.
+//
+// Туман: очередь видит только владелец мира (`visibleState`). Это будущее НАМЕРЕНИЕ —
+// ровно то, за что там режут `scheduled` и цепочки приказов.
+
+/** Полоса конвейера: за одну стройплощадку спорят здание и апгрейд, отдельно — юниты. */
+type BuildLane = 'buildings' | 'units';
+
+function laneOfKind(kind: CompletePayload['kind']): BuildLane {
+  return kind === 'unit' ? 'units' : 'buildings';
+}
+
+/** Потолок ждущих заказов в одной полосе одного мира (правило 5). */
+const MAX_BUILD_QUEUE = 5;
+
+/** Как часто голова, упёршаяся в деньги, пробует стартовать снова (правило 4). */
+const QUEUE_RETRY_HOURS = 1;
+
+/** Идёт ли на мире стройка в этой полосе прямо сейчас. Неразборчивый `kind` считается
+ *  полосой зданий — в сторону «занято», а не «свободно» (инвариант #4). */
+function laneBusy(h: HandlerContext, planetId: string, lane: BuildLane): boolean {
+  return h.state.scheduled.some((e) => {
+    if (e.type !== 'construction.complete') return false;
+    const p = e.payload as CompletePayload;
+    return p.planetId === planetId && laneOfKind(p.kind) === lane;
+  });
+}
+
+/** Поставить заказ в хвост очереди мира. Возвращает код отказа или null. */
+function enqueueOrder(
+  h: HandlerContext,
+  planet: Planet,
+  order: Omit<QueuedConstruction, 'id'>,
+): string | null {
+  const queue = planet.buildQueue ?? [];
+  const lane = laneOfKind(order.kind);
+  if (queue.filter((q) => laneOfKind(q.kind) === lane).length >= MAX_BUILD_QUEUE) {
+    return 'E_QUEUE_FULL';
+  }
+  // Личность из счётчика запланированных событий — чтобы `construction.cancel` брал
+  // ОДИН номер и не путал ждущий заказ с идущей стройкой (см. `QueuedConstruction`).
+  const id = h.state.scheduleSeq++;
+  planet.buildQueue = [...queue, { ...order, id }];
+  h.emit('construction.queued', {
+    planetId: planet.id,
+    id,
+    kind: order.kind,
+    playerId: order.playerId,
+    ...(order.building !== undefined ? { building: order.building } : {}),
+    ...(order.level !== undefined ? { level: order.level } : {}),
+    ...(order.unit !== undefined ? { unit: order.unit } : {}),
+    ...(order.count !== undefined ? { count: order.count } : {}),
+  });
+  return null;
+}
+
+/** Может ли ждущий заказ вообще ещё приземлиться. Проверяется ПЕРЕД оплатой: платить
+ *  за апгрейд снесённого здания и терять деньги на пороге — худший из возможных
+ *  ответов игроку. Возвращает false → заказ выбрасывается из очереди. */
+function queuedStillValid(h: HandlerContext, planet: Planet, q: QueuedConstruction): boolean {
+  if (q.kind === 'building' && typeof q.building === 'string') {
+    return !atInstanceCap(h, planet, q.building);
+  }
+  if (q.kind === 'upgrade' && typeof q.building === 'string' && typeof q.level === 'number') {
+    const instance = q.uid
+      ? planet.buildings.find((b) => b.uid === q.uid)
+      : planet.buildings.find((b) => b.type === q.building);
+    return !!instance && instance.level === q.level - 1;
+  }
+  return q.kind === 'unit' && typeof q.unit === 'string' && typeof q.count === 'number';
+}
+
+/** Назначить повтор попытки старта (правило 4), не плодя дублей. */
+function scheduleQueuePump(h: HandlerContext, planetId: string, lane: BuildLane): void {
+  const pending = h.state.scheduled.some((e) => {
+    if (e.type !== 'construction.queue.pump') return false;
+    const p = e.payload as { planetId?: string; lane?: string };
+    return p.planetId === planetId && p.lane === lane;
+  });
+  if (pending) return;
+  h.schedule(h.ctx.now + hoursToMs(h.ctx, QUEUE_RETRY_HOURS), 'construction.queue.pump', {
+    planetId,
+    lane,
+  });
+}
+
+/**
+ * Пустить голову полосы, если можно. Единственная точка старта из очереди: её зовут
+ * завершение стройки, отмена и повтор по таймеру.
+ *
+ * Порядок проверок — фикс: полоса занята → нечего решать; заказ протух → выбросить и
+ * взяться за следующий; денег нет → ЖДАТЬ (заказ остаётся головой, назначается повтор).
+ */
+function startNextQueued(h: HandlerContext, planet: Planet, lane: BuildLane): void {
+  if (laneBusy(h, planet.id, lane)) return;
+  if (isBombarded(h.state, planet.id)) return; // производство заморожено — не старт, а пауза
+  for (;;) {
+    const queue = planet.buildQueue ?? [];
+    const head = queue.find((q) => laneOfKind(q.kind) === lane);
+    if (!head) return;
+    const drop = (): void => {
+      planet.buildQueue = (planet.buildQueue ?? []).filter((q) => q.id !== head.id);
+      if (planet.buildQueue.length === 0) delete planet.buildQueue;
+    };
+    const player = h.state.players[head.playerId];
+    const spec = orderSpec(h.ctx.data, head);
+    if (!player || planet.owner !== head.playerId || !spec || !queuedStillValid(h, planet, head)) {
+      drop();
+      h.emit('construction.queue.dropped', {
+        planetId: planet.id,
+        id: head.id,
+        kind: head.kind,
+        playerId: head.playerId,
+      });
+      continue; // следующий заказ той же полосы получает свой шанс в этот же миг
+    }
+    if (!canAfford(player.resources, spec.cost)) {
+      scheduleQueuePump(h, planet.id, lane);
+      return;
+    }
+    payCost(player.resources, spec.cost);
+    drop();
+    scheduleCompletion(h, spec.hours, {
+      kind: head.kind,
+      planetId: planet.id,
+      playerId: head.playerId,
+      building: head.building,
+      level: head.level,
+      uid: head.uid,
+      unit: head.unit,
+      count: head.count,
+      modules: head.modules,
+    });
+    h.emit('construction.started', {
+      kind: head.kind,
+      planetId: planet.id,
+      playerId: head.playerId,
+      ...(head.building !== undefined ? { building: head.building } : {}),
+      ...(head.level !== undefined ? { level: head.level } : {}),
+      ...(head.unit !== undefined ? { unit: head.unit } : {}),
+      ...(head.count !== undefined ? { count: head.count } : {}),
+      fromQueue: true,
+    });
+    return;
+  }
 }
 
 /** Строительные способности здания — те, что гейтят `unit.build`. */
@@ -208,6 +400,36 @@ const GROUND_FACILITY = {
 
 function hasGroundFacility(planet: Planet, data: GameData, kind: UnitDef['kind']): boolean {
   return hasCapability(planet, data, GROUND_FACILITY[kind].capability);
+}
+
+/**
+ * ГДЕ ЭТОТ ЮНИТ ВООБЩЕ МОЖНО ЗАЛОЖИТЬ — тот же гейт зданий, что применяет `unit.build`,
+ * вынесенный наружу чистой функцией. Возвращает код отказа или `null`, если мир годится.
+ *
+ * Экспортируется РАДИ ИНТЕРФЕЙСА (ROS-3.1), по той же причине, что и `artilleryRange`:
+ * экран «Производство» показывает список миров, где заказ пройдёт, и своя копия этих
+ * правил разъехалась бы на первой же правке — игрок выбирал бы мир, на котором ядро
+ * отвечает отказом. Спрашивать надо ту функцию, по которой ядро и решает.
+ *
+ * Считается только ПОСТОЯННАЯ половина гейта — здания. Очередь (`E_HANGAR_FULL`) сюда не
+ * входит: она зависит от уже поставленных заказов, то есть от расписания, которого у
+ * чистой функции нет, и остаётся ответом ядра в момент приказа.
+ */
+export function unitBuildSiteBlocker(
+  planet: Planet,
+  def: UnitDef,
+  data: GameData,
+): 'E_NO_PORT' | 'E_NO_SHIPYARD' | 'E_NO_BARRACKS' | 'E_NO_FACTORY' | null {
+  if (def.traits.includes('shuttle')) {
+    return shuttleBayAt(planet, data) > 0 ? null : 'E_NO_PORT';
+  }
+  if (def.domain === 'space') {
+    return hasShipyard(planet, data) ? null : 'E_NO_SHIPYARD';
+  }
+  if (def.domain === 'ground') {
+    return hasGroundFacility(planet, data, def.kind) ? null : GROUND_FACILITY[def.kind].code;
+  }
+  return null;
 }
 
 function requireUnlocked(
@@ -349,6 +571,16 @@ export const constructionModule: GameModule = {
       ) {
         return h.reject('E_ALREADY_PAUSED'); // resume it instead of re-ordering fresh
       }
+      // BLD-1: полоса занята — заказ встаёт в очередь и стартует сам. Денег у него
+      // здесь не спрашивают: он сейчас и не стартует (правило 3).
+      if (laneBusy(h, planet.id, 'buildings')) {
+        const code = enqueueOrder(h, planet, {
+          kind: 'building',
+          playerId: action.playerId,
+          building: payload.building,
+        });
+        return code ? h.reject(code) : undefined;
+      }
       const level1 = buildingLevel(def, 1);
       if (!canAfford(player.resources, level1.cost)) {
         return h.reject('E_INSUFFICIENT');
@@ -400,6 +632,16 @@ export const constructionModule: GameModule = {
         planet.pausedConstruction?.some((s) => s.kind === 'upgrade' && s.building === instance.type)
       ) {
         return h.reject('E_ALREADY_PAUSED'); // resume it instead of re-ordering fresh
+      }
+      if (laneBusy(h, planet.id, 'buildings')) {
+        const code = enqueueOrder(h, planet, {
+          kind: 'upgrade',
+          playerId: action.playerId,
+          building: instance.type,
+          level: nextLevel,
+          uid: instance.uid,
+        });
+        return code ? h.reject(code) : undefined;
       }
       const next = buildingLevel(def, nextLevel);
       if (!canAfford(player.resources, next.cost)) {
@@ -480,6 +722,16 @@ export const constructionModule: GameModule = {
         const valid = validateLoadout(payload.unit, def, modules, h.ctx.data);
         if (!valid.ok) return h.reject(valid.code);
       }
+      if (laneBusy(h, planet.id, 'units')) {
+        const code = enqueueOrder(h, planet, {
+          kind: 'unit',
+          playerId: action.playerId,
+          unit: payload.unit,
+          count,
+          ...(modules && modules.length > 0 ? { modules } : {}),
+        });
+        return code ? h.reject(code) : undefined;
+      }
       // The loadout is paid up-front with the hull and locked onto the built stack.
       const perShip =
         modules && modules.length > 0
@@ -518,6 +770,28 @@ export const constructionModule: GameModule = {
         return h.reject('E_BAD_PAYLOAD');
       }
       const { planet, player } = ownedPlanet(h, action, payload.planetId);
+      // BLD-1. Один номер — один заказ, независимо от того, СТРОИТСЯ он или ЖДЁТ:
+      // `id` ждущего берётся из того же счётчика, что и `seq` запланированного, так
+      // что перепутать их нельзя. Игроку это одна кнопка «отменить», а не две.
+      const waiting = (planet.buildQueue ?? []).find((q) => q.id === payload.seq);
+      if (waiting) {
+        if (waiting.playerId !== action.playerId) {
+          return h.reject('E_FORBIDDEN');
+        }
+        planet.buildQueue = (planet.buildQueue ?? []).filter((q) => q.id !== payload.seq);
+        if (planet.buildQueue.length === 0) delete planet.buildQueue;
+        // Возврата нет и быть не может: ждущий заказ не оплачен (правило 2). Поэтому
+        // же он не становится `PausedConstructionSite` — возобновлять нечего.
+        h.emit('construction.cancelled', {
+          planetId: planet.id,
+          seq: payload.seq,
+          kind: waiting.kind,
+          progress: 0,
+          playerId: action.playerId,
+          waiting: true,
+        });
+        return;
+      }
       const event = h.state.scheduled.find(
         (e) => e.type === 'construction.complete' && e.seq === payload.seq,
       );
@@ -558,6 +832,9 @@ export const constructionModule: GameModule = {
         progress,
         playerId: action.playerId,
       });
+      // Полоса освободилась — её занимает следующий по очереди (BLD-1). Ровно это и
+      // делает отмену осмысленной кнопкой: «убрать текущее» = «пустить следующее».
+      startNextQueued(h, planet, laneOfKind(p.kind));
     });
 
     // Resume a paused site: pays exactly what was refunded, re-schedules exactly the
@@ -599,6 +876,13 @@ export const constructionModule: GameModule = {
           return h.reject('E_ALREADY_QUEUED');
         }
       }
+      // BLD-1: возобновление — это СТАРТ, а полоса одна. В очередь его не ставим:
+      // приостановленная стройка уже хранит свой прогресс и остаток цены отдельно
+      // (`PausedConstructionSite`), и заводить ей второе место ожидания значило бы
+      // держать одну сущность в двух списках. Игрок возобновит, когда полоса освободится.
+      if (laneBusy(h, planet.id, laneOfKind(site.kind))) {
+        return h.reject('E_LANE_BUSY');
+      }
       if (!canAfford(player.resources, site.remainingCost)) {
         return h.reject('E_INSUFFICIENT');
       }
@@ -622,6 +906,11 @@ export const constructionModule: GameModule = {
       });
     });
 
+    // BLD-1. Освободить полосу и пустить в неё следующего обязан КАЖДЫЙ путь, который
+    // израсходовал событие завершения, — включая тихие «не приземлилось» ниже
+    // (лимит экземпляров, здание ушло вперёд). Иначе полоса осталась бы занятой
+    // навсегда: событие уже снято с таймлайна, а очередь ждёт его вечно. Единственное
+    // исключение — отсрочка под бомбардировкой: там стройка НЕ закончилась.
     api.on('construction.complete', (event, h) => {
       const p = event.payload as CompletePayload;
       if (typeof p?.planetId !== 'string' || typeof p?.playerId !== 'string') {
@@ -637,6 +926,33 @@ export const constructionModule: GameModule = {
         h.schedule(h.ctx.now + hoursToMs(h.ctx, 1), 'construction.complete', p);
         return;
       }
+      landCompletion(h, planet, p);
+      startNextQueued(h, planet, laneOfKind(p.kind));
+    });
+
+    // Повтор попытки для головы, упёршейся в деньги (правило 4). Сам себя не
+    // перепланирует: новый повтор назначает только `startNextQueued`, и только если
+    // денег снова не хватило, — очередь опустела или голова стартовала, цикл затих.
+    api.on('construction.queue.pump', (event, h) => {
+      const p = (event.payload ?? {}) as { planetId?: unknown; lane?: unknown };
+      if (typeof p.planetId !== 'string') return;
+      const lane: BuildLane = p.lane === 'units' ? 'units' : 'buildings';
+      const planet = h.state.planets[p.planetId];
+      if (!planet) return;
+      startNextQueued(h, planet, lane);
+    });
+
+    // Захват стирает очередь прежнего хозяина (правило 6). Терять нечего — ждущие
+    // заказы не оплачены; а оставить их значило бы показать новому владельцу планы
+    // старого и однажды списать деньги с игрока за чужой мир.
+    api.on('planet.captured', (event, h) => {
+      const p = (event.payload ?? {}) as { planetId?: unknown };
+      if (typeof p.planetId !== 'string') return;
+      const planet = h.state.planets[p.planetId];
+      if (planet?.buildQueue) delete planet.buildQueue;
+    });
+
+    function landCompletion(h: HandlerContext, planet: Planet, p: CompletePayload): void {
       if (p.kind === 'building' && typeof p.building === 'string') {
         // Same instance cap as the order gate, read from the same data field. This is
         // the LAST barrier (a duplicate/replayed completion must not double-build), so
@@ -693,7 +1009,7 @@ export const constructionModule: GameModule = {
           ...(p.modules && p.modules.length > 0 ? { modules: p.modules } : {}),
         });
       }
-    });
+    }
 
     // Standing buildings toughen the garrison: reduce the damage it takes in the
     // ground phase by the planet's total defense bonus (the side being damaged

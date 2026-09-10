@@ -60,7 +60,7 @@ describe('конвейер — когда стройки нет', () => {
     const html = conveyorHtml(
       'C1R1',
       'buildings',
-      view({ queued: [{ label: 'Шахта' }], waitingCost: '100¤' }),
+      view({ queued: [{ label: 'Шахта', id: 7 }], waitingCost: '100¤' }),
       labels,
     );
     expect(html).toContain('ждём: 100¤');
@@ -85,7 +85,10 @@ describe('конвейер — когда стройки нет', () => {
 });
 
 describe('конвейер — очередь', () => {
-  const queued = [{ label: 'Шахта' }, { label: 'Ферма' }];
+  const queued = [
+    { label: 'Шахта', id: 11 },
+    { label: 'Ферма', id: 12 },
+  ];
 
   it('строки пронумерованы с единицы и идут по порядку', () => {
     const html = conveyorHtml('C1R1', 'buildings', view({ queued }), labels);
@@ -94,10 +97,13 @@ describe('конвейер — очередь', () => {
     expect(html.indexOf('Шахта')).toBeLessThan(html.indexOf('Ферма'));
   });
 
-  it('у каждой строки своя кнопка снятия с её местом в полосе', () => {
+  it('кнопка снятия несёт НОМЕР заказа, а не его место в ряду', () => {
+    // BLD-1: снятие ждущего идёт тем же `construction.cancel`, что и снятие идущей
+    // стройки, поэтому кнопке нужен id заказа. Позиция для этого не годится — она
+    // съезжает, как только голова ряда стартовала.
     const html = conveyorHtml('C1R1', 'units', view({ queued }), labels);
-    expect(html).toContain('data-arg="units:0"');
-    expect(html).toContain('data-arg="units:1"');
+    expect(html).toContain('data-arg="11"');
+    expect(html).toContain('data-arg="12"');
   });
 
   it('пустая очередь говорит об этом словами', () => {

@@ -21,13 +21,13 @@
       "credits": 16
     }
   },
-  "sensor_frigate": {
+  "frigate": {
     "faction": "vanguard",
     "stats": {
-      "attack": 4,
-      "defense": 6,
+      "attack": 3,
+      "defense": 5,
       "speed": 56,
-      "hp": 22,
+      "hp": 30,
       "cargoCapacity": 1
     },
     "line": "mid",
@@ -41,7 +41,8 @@
       "credits": 16
     },
     "slots": {
-      "utility": 1
+      "defense": 1,
+      "utility": 3
     }
   },
   "cruiser": {
@@ -295,6 +296,32 @@
     },
     "slots": {
       "weapon": 1
+    }
+  },
+  "landing_shuttle": {
+    "faction": "blue",
+    "stats": {
+      "attack": 0,
+      "defense": 2,
+      "speed": 54,
+      "hp": 24,
+      "strikeRange": 120,
+      "fuel": 2,
+      "rearmRounds": 2,
+      "cargoCapacity": 3
+    },
+    "line": "front",
+    "traits": [
+      "shuttle"
+    ],
+    "signature": 2,
+    "cost": {
+      "metal": 70,
+      "credits": 20
+    },
+    "buildTimeHours": 2,
+    "upkeep": {
+      "credits": 24
     }
   },
   "strike_carrier": {

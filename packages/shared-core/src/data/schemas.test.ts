@@ -27,7 +27,7 @@ function loadShippedBundle(): Record<string, unknown> {
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.20');
+    expect(data.version).toBe('0.1.22'); // ROS-1.5 завёл десантный челнок
     expect(data.resources).toContain('microelectronics');
     // ROS-2.1: трейт `artillery` больше НЕ означает ни своей линии, ни огня с
     // дистанции — он означает «ответный залп по мне не проходит». Поэтому радиуса у
@@ -71,6 +71,11 @@ describe('game data schema (docs/architecture.md §2)', () => {
     expect(data.units.strike_carrier?.traits).toEqual([]);
     expect(data.units.scout_drone?.stats.cargoCapacity).toBe(0); // default, carries nothing
     expect(data.buildings.orbital_aa?.aaDamage).toBe(12); // anti-ship orbital AA — a defensive building
+    // ROS-2.2: зональное ПВО — ОТДЕЛЬНОЕ здание против ЧЕЛНОКОВ, и стат у него другой.
+    // Спутать их легко (оба «ПВО» на слух), а игрок платит за разные угрозы.
+    expect(data.buildings.zonal_aa?.pointDefense).toBe(40);
+    expect(data.buildings.zonal_aa?.aaDamage).toBe(0);
+    expect(data.buildings.orbital_aa?.pointDefense).toBe(0);
     expect(data.units.cruiser?.stats.aaDamage).toBe(0); // default, no AA
     expect(data.buildings.mine_t1?.aaDamage).toBe(0); // buildings default to no AA
     // shuttles-roadmap SQ-0.1: a carrier-borne fighter shuttle + the new shuttle stats.
@@ -100,21 +105,28 @@ describe('game data schema (docs/architecture.md §2)', () => {
 
   // Дальнее зрение — роль ОДНОГО корабля, а не опция для любого крейсера. Правило
   // объявлено данными (`allowed.units`) и исполняется общим гейтом `canEquip`; тест
-  // держит и данные, и гейт — чтобы «только сенсорный фрегат» не осталось на словах.
-  it('радар-модуль ставится ТОЛЬКО на сенсорный фрегат, у которого ровно один слот', () => {
+  // держит и данные, и гейт — чтобы «только фрегат» не осталось на словах.
+  it('радар-модуль ставится ТОЛЬКО на фрегат — платформу с самой широкой навеской', () => {
     const data = parseGameData(loadShippedBundle());
     const radar = data.modules.radar_module!;
-    expect(radar.allowed?.units).toEqual(['sensor_frigate']);
-    const frigate = data.units.sensor_frigate!;
-    expect(frigate.slots).toEqual({ weapon: 0, defense: 0, utility: 1 });
-    expect(moduleAllowed('sensor_frigate', frigate, radar)).toBe(true);
-    expect(canEquip('sensor_frigate', frigate, [], 'radar_module', data)).toEqual({ ok: true });
+    expect(radar.allowed?.units).toEqual(['frigate']);
+    const frigate = data.units.frigate!;
+    // ROS-1.2: корабль поддержки — отсеков у него больше, чем у любого другого корпуса.
+    expect(frigate.slots).toEqual({ weapon: 0, defense: 1, utility: 3 });
+    const bays = (u: typeof frigate): number =>
+      u.slots.weapon + u.slots.defense + u.slots.utility;
+    for (const [id, def] of Object.entries(data.units)) {
+      if (id === 'frigate') continue;
+      expect(bays(def), id).toBeLessThan(bays(frigate));
+    }
+    expect(moduleAllowed('frigate', frigate, radar)).toBe(true);
+    expect(canEquip('frigate', frigate, [], 'radar_module', data)).toEqual({ ok: true });
     // …и ни на кого больше. Причина ВСЕГДА `E_NOT_ALLOWED`, даже у корпуса без
     // utility-слота: гейт спрашивает «этому кораблю вообще можно?» раньше, чем «есть
     // ли место», и это правильный порядок — иначе крейсер со свободным отсеком и
     // эскадрилья без него объяснялись бы игроку по-разному.
     for (const id of Object.keys(data.units)) {
-      if (id === 'sensor_frigate') continue;
+      if (id === 'frigate') continue;
       const def = data.units[id]!;
       expect(moduleAllowed(id, def, radar), id).toBe(false);
       expect(canEquip(id, def, [], 'radar_module', data), id).toEqual({
@@ -122,8 +134,14 @@ describe('game data schema (docs/architecture.md §2)', () => {
         code: 'E_NOT_ALLOWED',
       });
     }
-    // Второй модуль в единственный отсек уже не влезет — слот занят радаром.
-    expect(canEquip('sensor_frigate', frigate, ['radar_module'], 'cargo_bay', data)).toEqual({
+    // Отсеков теперь много, поэтому радар НЕ съедает навеску целиком: рядом с ним
+    // встаёт и трюм — ровно то, ради чего фрегат стал платформой поддержки.
+    expect(canEquip('frigate', frigate, ['radar_module'], 'cargo_bay', data)).toEqual({ ok: true });
+    // Но навеска не безразмерна: ЗАЩИТНЫЙ отсек у фрегата один, и второй защитный
+    // модуль в него уже не влезет (utility-отсеков три, а utility-модулей в каталоге
+    // ровно столько же — переполнить их можно было бы только дублем, а дубль ловится
+    // раньше, своим кодом).
+    expect(canEquip('frigate', frigate, ['ablative_plating'], 'shield_booster', data)).toEqual({
       ok: false,
       code: 'E_NO_SLOT',
     });

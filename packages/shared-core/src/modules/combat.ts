@@ -1,5 +1,5 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
-import type { Battle, CombatantRef, Fleet, PlanetId } from '../state/gameState';
+import type { Battle, CombatantRef, Fleet, Planet, PlanetId, UnitStack } from '../state/gameState';
 import type { GameData } from '../data/schemas';
 import { hoursToMs, type Context } from '../action/types';
 import { MS_PER_HOUR } from '../util/time';
@@ -68,8 +68,22 @@ function applyRetreatToll(fleet: Fleet, data: GameData): void {
 
 // --- battle lifecycle --------------------------------------------------------
 
-function scheduleTick(h: HandlerContext, battleId: string): void {
-  const at = h.ctx.now + roundIntervalMs(h.ctx);
+/** Назначить раунд. `immediate` — ПЕРВЫЙ раунд, на самой встрече (CMB-4).
+ *
+ *  Раньше первый раунд назначался тем же помощником, что и остальные, то есть через
+ *  игровой час после столкновения. Защиты у этой задержки не было — она вышла побочно,
+ *  из переиспользования, — а цена оказалась игровой: КОНТАКТ БЫЛ БЕСПЛАТНЫМ. Флот
+ *  подходил вплотную, оба вставали, и, успев уйти внутри часа, он не получал и не
+ *  наносил ни одного выстрела. Решение владельца после плейтеста: обменяться ударами
+ *  обязаны при первой же встрече.
+ *
+ *  Почему «назначить на сейчас», а не позвать раунд встроенно из `startBattle`:
+ *  `advanceTo` продолжает крутить цикл и берёт событие, назначенное на текущий миг,
+ *  следующей итерацией (`earliestDue`, ветка `at === committed.time`). Значит
+ *  цепочка «победил → сцепился со следующим» пойдёт отдельными событиями в порядке
+ *  `(at, seq)`, как всё остальное на таймлайне, а не рекурсией внутри одного шага. */
+function scheduleTick(h: HandlerContext, battleId: string, immediate = false): void {
+  const at = immediate ? h.ctx.now : h.ctx.now + roundIntervalMs(h.ctx);
   h.schedule(at, 'combat.tick', { battleId });
   // Surface the round clock so the client can render a live battle countdown.
   const battle = h.state.battles[battleId];
@@ -78,17 +92,22 @@ function scheduleTick(h: HandlerContext, battleId: string): void {
   }
 }
 
-/** Lowest-id hostile, alive, unengaged fleet sitting at node `at`. */
+/** Lowest-id hostile, alive, unengaged fleet sitting at node `at`.
+ *
+ *  `except` — тот, с кем сцепляться НЕЛЬЗЯ (CMB-6): им называют напарника по только что
+ *  завершённой ничьей. Без него пара, разведённая предохранителем `MAX_COMBAT_ROUNDS`,
+ *  тут же начинала тот же бой заново, и предохранитель терял смысл. */
 function findEnemyFleetAt(
   h: HandlerContext,
   at: string,
   owner: string,
   excludeId: string,
+  except?: string | null,
 ): Fleet | null {
   let best: Fleet | null = null;
   for (const id of Object.keys(h.state.fleets)) {
     const f = h.state.fleets[id];
-    if (!f || f.id === excludeId || f.location !== at || f.battleId) {
+    if (!f || f.id === excludeId || f.id === except || f.location !== at || f.battleId) {
       continue;
     }
     if (!f.units.some((s) => s.count > 0) || !isHostile(h, owner, f.owner)) {
@@ -99,6 +118,20 @@ function findEnemyFleetAt(
     }
   }
   return best;
+}
+
+/**
+ * CMB-7. Перестали ли стороны боя быть враждебными.
+ *
+ * Ничейный гарнизон (`owner === null`) сюда не попадает: у него нет стойки, спрашивать
+ * её не у кого, и бой с ним не прекращается ничем, кроме исхода. Fail-secure: неизвестно
+ * — значит НЕ перемирие, бой продолжается.
+ */
+function ceasefired(h: HandlerContext, battle: Battle): boolean {
+  const a = battle.attacker.owner;
+  const b = battle.defender.owner;
+  if (a === null || b === null) return false;
+  return !isHostile(h, a, b);
 }
 
 /** Pulls a fleet out of transit and pins it at a node (it now fights/holds). */
@@ -117,7 +150,9 @@ function pinToEdge(fleet: Fleet, from: PlanetId, to: PlanetId, t: number): void 
 function startBattle(h: HandlerContext, battle: Battle): void {
   h.state.battles[battle.id] = battle;
   for (const side of [battle.attacker, battle.defender]) {
-    if (side.ref.kind !== 'garrison') {
+    // Стороны, которые держит МИР (гарнизон и плацдарм), не привязаны к флоту:
+    // запирать и останавливать нечего.
+    if (side.ref.kind !== 'garrison' && side.ref.kind !== 'beachhead') {
       const f = h.state.fleets[side.ref.fleetId];
       if (f) {
         f.battleId = battle.id;
@@ -132,7 +167,7 @@ function startBattle(h: HandlerContext, battle: Battle): void {
     attacker: battle.attacker.owner,
     defender: battle.defender.owner,
   });
-  scheduleTick(h, battle.id);
+  scheduleTick(h, battle.id, true); // CMB-4: первый залп — на самой встрече
 }
 
 /**
@@ -142,12 +177,17 @@ function startBattle(h: HandlerContext, battle: Battle): void {
  * separate, deliberate act from orbit (`fleet.assault`), so simply arriving
  * never captures — the fleet just holds the orbit (a single orbit, GDD §7.4).
  */
-function engageFleets(h: HandlerContext, fleetId: string, at: string): void {
+function engageFleets(
+  h: HandlerContext,
+  fleetId: string,
+  at: string,
+  except?: string | null,
+): void {
   const fleet = h.state.fleets[fleetId];
   if (!fleet || fleet.battleId) {
     return;
   }
-  const enemy = findEnemyFleetAt(h, at, fleet.owner, fleetId);
+  const enemy = findEnemyFleetAt(h, at, fleet.owner, fleetId, except);
   if (!enemy) {
     return;
   }
@@ -271,9 +311,38 @@ function capturePlanet(
   });
 }
 
+/**
+ * Захват мира ВЫИГРАВШИМ ПЛАЦДАРМОМ (ROS-1.5) — брат `capturePlanet`, но без флота.
+ *
+ * Второй копией правил захвата он не является: событие `planet.captured` то же самое и
+ * `via: 'assault'` тот же (мир взят наземным боем, а не занят с орбиты), потому что для
+ * всех читателей — счёта, харнеса замеров, журнала — это ровно такой же штурм. Разошлось
+ * бы только имя виновника: `by` у обычного захвата — id флота, а здесь флота нет, и
+ * поэтому там стоит id мира. Врать про несуществующий флот хуже, чем назвать место.
+ */
+function capturePlanetByBeachhead(
+  h: HandlerContext,
+  planet: Planet,
+  force: { owner: string; units: UnitStack[] },
+  previousOwner: string | null,
+): void {
+  if (!isCapturable(h.ctx.data, planet)) {
+    return; // пустое пространство не принадлежит никому, даже после выигранного боя
+  }
+  planet.owner = force.owner;
+  planet.garrison = force.units.filter((s) => s.count > 0);
+  h.emit('planet.captured', {
+    planetId: planet.id,
+    owner: force.owner,
+    by: planet.id,
+    from: previousOwner,
+    via: 'assault',
+  });
+}
+
 function releaseOrDestroyFleet(h: HandlerContext, ref: CombatantRef): void {
-  if (ref.kind === 'garrison') {
-    return;
+  if (ref.kind === 'garrison' || ref.kind === 'beachhead') {
+    return; // стороны без флота — освобождать и уничтожать нечего
   }
   const fleet = h.state.fleets[ref.fleetId];
   if (!fleet) {
@@ -287,9 +356,22 @@ function releaseOrDestroyFleet(h: HandlerContext, ref: CombatantRef): void {
   }
 }
 
-function finishBattle(h: HandlerContext, battle: Battle, stalemate = false): void {
+/**
+ * Чем кончился бой:
+ *  · `decided`   — обычный исход, победитель тот, кто остался жив;
+ *  · `stalemate` — предохранитель `MAX_COMBAT_ROUNDS`: обе стороны живы, победителя нет;
+ *  · `ceasefire` — стороны перестали быть враждебными (CMB-7).
+ *
+ * Два последних ведут себя одинаково: победителя нет и цепочки «победитель сцепляется
+ * со следующим» не будет. Раньше это был булев `stalemate`; третий смысл в булеве не
+ * помещался, а звать перемирие «ничьёй» значило бы соврать и игроку, и журналу.
+ */
+type BattleEnd = 'decided' | 'stalemate' | 'ceasefire';
+
+function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decided'): void {
   const aAlive = sideAlive(h.state, battle.attacker.ref);
   const dAlive = sideAlive(h.state, battle.defender.ref);
+  const stalemate = end !== 'decided';
   const winner = stalemate
     ? null
     : aAlive && !dAlive
@@ -331,6 +413,21 @@ function finishBattle(h: HandlerContext, battle: Battle, stalemate = false): voi
       capturePlanet(h, battle.location, battle.attacker.ref.fleetId, planet.owner, true);
     }
   }
+  // ПЛАЦДАРМ (ROS-1.5) — тот же захват, только десант держит мир, а не флот. Он
+  // ВРЕМЕННЫЙ по определению: чем бы бой ни кончился, поля после него не остаётся —
+  // выигравший десант становится гарнизоном, проигравший исчезает вместе с боем.
+  // Иначе на карте завелись бы вечные «чужие войска на моей земле», которых в модели
+  // нет и заводить которые этот кирпич не стал.
+  if (battle.phase === 'ground' && battle.attacker.ref.kind === 'beachhead') {
+    const planet = h.state.planets[battle.location];
+    const force = planet?.beachhead;
+    if (planet && force) {
+      if (aAlive && !dAlive && planet.owner === battle.defender.owner) {
+        capturePlanetByBeachhead(h, planet, force, battle.defender.owner);
+      }
+      delete planet.beachhead;
+    }
+  }
 
   releaseOrDestroyFleet(h, battle.attacker.ref);
   releaseOrDestroyFleet(h, battle.defender.ref);
@@ -341,13 +438,31 @@ function finishBattle(h: HandlerContext, battle: Battle, stalemate = false): voi
     phase: battle.phase,
     winner,
     rounds: battle.round,
+    end,
   });
 
-  // A STALEMATE (the MAX_COMBAT_ROUNDS valve) must NOT chain-engage: both sides are
-  // alive, so the "victor" re-engage would restart the identical zero-damage battle
-  // immediately — an unbounded battle/release livelock (bug-hunt MAJOR). The pair
-  // coexists released; any later arrival/action may engage them afresh.
-  if (stalemate) return;
+  // CMB-6. Здесь стоял ранний выход «после ничьей не сцеплять НИКОГО», и его причина
+  // была верной: иначе та же пара мгновенно начинала бы тот же нулевой бой заново, и
+  // предохранитель `MAX_COMBAT_ROUNDS` терял бы смысл.
+  //
+  // Но сторож оказался ШИРЕ своей причины. Причина — «та же пара», а следствие было
+  // «никто вообще»: третий враждебный флот, который всё это время стоял на узле и не мог
+  // сцепиться (у всех был `battleId`), оставался нетронутым и после развода — до тех пор,
+  // пока кто-нибудь не прилетит. Двое подрались вничью, третий смотрел и остался
+  // смотреть.
+  //
+  // Теперь запрет назван точно: сцепляйся с любым, КРОМЕ напарника по этой ничьей
+  // (`except` ниже). Пара расходится, как и расходилась, а третий получает свой бой.
+  //
+  // Почему хватает исключения на один миг, без памяти в состоянии: автосцепку заводят
+  // только внешние поводы — прибытие, транзит, перехват, смена стойки и вот этот финал
+  // боя. После возврата отсюда никто не попытается свести эту пару снова, пока в мире
+  // что-нибудь не произойдёт, — а тогда это уже новая встреча, а не перезапуск старой.
+  const exceptId =
+    stalemate && battle.attacker.ref.kind === 'fleet' && battle.defender.ref.kind === 'fleet'
+      ? { [battle.attacker.ref.fleetId]: battle.defender.ref.fleetId,
+          [battle.defender.ref.fleetId]: battle.attacker.ref.fleetId }
+      : {};
 
   if (battle.phase === 'orbital') {
     // Whichever fleet SURVIVED holds the node — not just the attacker. The victor
@@ -356,32 +471,37 @@ function finishBattle(h: HandlerContext, battle: Battle, stalemate = false): voi
     // because every fleet there already had a battleId (findEnemyFleetAt skips
     // battleId fleets). Previously only the attacker-victor re-engaged, so a
     // defender that won left a third hostile fleet coexisting at the node forever.
-    const victorId =
-      battle.attacker.ref.kind === 'fleet' && aAlive
-        ? battle.attacker.ref.fleetId
-        : battle.defender.ref.kind === 'fleet' && dAlive
-          ? battle.defender.ref.fleetId
-          : null;
-    if (victorId !== null) {
-      const f = h.state.fleets[victorId];
-      if (f) {
-        f.orbit = 'near';
-        f.bombarding = false;
-        // Chain into any other defender only when the victor holds a NODE; a lane
-        // intercept leaves it parked on the edge (location null) — never teleport it.
-        // engageFleets is battleId-guarded, so this starts at most one new battle.
-        if (f.location !== null) {
-          engageFleets(h, victorId, battle.location);
-        }
+    // Решённый бой оставляет живым ОДНОГО, ничья и перемирие — обоих, и шанс сцепиться
+    // с третьим положен каждому выжившему. Обход по отсортированным id: кто окажется
+    // нападающим в следующем бою, не должно зависеть от того, кто в прошлом был
+    // атакующим (инвариант детерминизма).
+    const survivors = [
+      battle.attacker.ref.kind === 'fleet' && aAlive ? battle.attacker.ref.fleetId : null,
+      battle.defender.ref.kind === 'fleet' && dAlive ? battle.defender.ref.fleetId : null,
+    ]
+      .filter((id): id is string => id !== null)
+      .sort();
+    for (const survivorId of survivors) {
+      const f = h.state.fleets[survivorId];
+      if (!f) continue;
+      f.orbit = 'near';
+      f.bombarding = false;
+      // Chain into any other defender only when the victor holds a NODE; a lane
+      // intercept leaves it parked on the edge (location null) — never teleport it.
+      // engageFleets is battleId-guarded, so this starts at most one new battle —
+      // и второй выживший, если первый уже сцепился, увидит его занятым.
+      if (f.location !== null) {
+        engageFleets(h, survivorId, battle.location, exceptId[survivorId]);
       }
     }
   }
 
-  if (battle.phase === 'ground' && battle.attacker.ref.kind !== 'garrison') {
+  if (battle.phase === 'ground' && battle.attacker.ref.kind === 'landing') {
     // Mirror the orbital victor rule for the GROUND finish: a relief fleet arriving
     // mid-assault could not engage (the assault fleet was battleId-locked), and
     // nothing re-engaged after resolution — hostile fleets coexisted at the node
     // forever (bug-hunt MAJOR). engageFleets no-ops unless both sides are live.
+    // Плацдарм сюда не попадает: флота, который надо было бы расцепить, у него нет.
     const f = h.state.fleets[battle.attacker.ref.fleetId];
     if (f && !f.battleId && f.location !== null) {
       engageFleets(h, f.id, battle.location);
@@ -422,6 +542,43 @@ export const combatModule: GameModule = {
     api.on('fleet.transit', (event, h) => {
       const { fleetId, at } = event.payload as { fleetId: string; at: string };
       engageFleets(h, fleetId, at);
+    });
+
+    /**
+     * CMB-5. Вражда началась — стоящие рядом флоты сходятся НЕМЕДЛЕННО.
+     *
+     * Бой заводили только ПРИБЫТИЕ (`fleet.arrived`/`fleet.transit`), перехват и штурм.
+     * То есть «встреча» понималась как движение, и оставалась дыра ровно в другую
+     * сторону: флоты уже стоят на одном узле мирно, игрок объявляет войну — и не
+     * происходит НИЧЕГО, пока кто-нибудь не сдвинется. Стой хоть сутки.
+     *
+     * В соло этого не видно: прототип покадрово зовёт `checkFleetClashes`, который
+     * выдаёт `fleet.engage` за игрока. То есть правило было, но жило В КЛИЕНТЕ — а на
+     * сервере такого цикла нет вовсе. Та же болезнь, что у очереди стройки (BLD-1):
+     * соло и сеть играли по разным правилам, и разошлись они молча.
+     *
+     * Стойку здесь не читаем: `engageFleets` спрашивает `isHostile` у СОСТОЯНИЯ, уже
+     * изменённого объявлением. Поэтому смягчение стойки честно ничего не находит, и
+     * отдельной ветки «а вот если мир» заводить не нужно.
+     */
+    api.on('diplomacy.changed', (event, h) => {
+      const { a, b } = event.payload as { a?: unknown; b?: unknown };
+      if (typeof a !== 'string' || typeof b !== 'string') return;
+      // CMB-7: сначала РАСЦЕПИТЬ тех, кто перестал быть врагом, и только потом сцеплять
+      // тех, кто им стал. В обратном порядке смягчение стойки на миг оставило бы бой
+      // живым, а сцепка увидела бы стороны занятыми.
+      for (const id of Object.keys(h.state.battles).sort()) {
+        const battle = h.state.battles[id];
+        if (battle && ceasefired(h, battle)) finishBattle(h, battle, 'ceasefire');
+      }
+      // Порядок обхода фиксирован сортировкой: кто из пары окажется атакующим, не
+      // должно зависеть от порядка создания флотов (инвариант детерминизма).
+      for (const id of Object.keys(h.state.fleets).sort()) {
+        const f = h.state.fleets[id];
+        if (!f || (f.owner !== a && f.owner !== b)) continue;
+        if (!f.location || f.movement || f.battleId) continue;
+        engageFleets(h, id, f.location);
+      }
     });
 
     // The crossing instant arrives (scheduled by the `intercept` module):
@@ -466,6 +623,36 @@ export const combatModule: GameModule = {
 
     // Land the carried army on the contested world below. A single orbit (GDD §7.4):
     // the fleet must be stationed in that orbit (not in transit / on a lane).
+    /**
+     * ПЛАЦДАРМ ВЫСАДИЛСЯ (ROS-1.5) — десантный челнок поставил чужие войска на землю
+     * обороняемого мира, и с этой секунды за мир идёт наземный бой.
+     *
+     * Слушателем, а не вызовом из `shuttle.ts`: модули не импортируют друг друга, а
+     * правила боя (в том числе «один наземный бой на гарнизон») живут здесь. Нет
+     * модуля боя — событие никто не слышит, плацдарм стоит, ядро не падает.
+     */
+    api.on('beachhead.landed', (event, h) => {
+      const { planetId } = event.payload as { planetId?: string };
+      if (typeof planetId !== 'string') return;
+      const planet = h.state.planets[planetId];
+      const force = planet?.beachhead;
+      if (!planet || !force) return;
+      // Тот же гейт, что у второго штурма: два боя за один гарнизон делили бы одну
+      // ссылку защитника — двойной ответный огонь и два захвата подряд.
+      for (const id of Object.keys(h.state.battles).sort()) {
+        const b = h.state.battles[id];
+        if (b && b.phase === 'ground' && b.location === planetId) return;
+      }
+      startBattle(h, {
+        id: `battle:${h.state.battleSeq++}`,
+        location: planetId,
+        phase: 'ground',
+        attacker: { ref: { kind: 'beachhead', planetId }, owner: force.owner },
+        defender: { ref: { kind: 'garrison', planetId }, owner: planet.owner },
+        round: 0,
+      });
+    });
+
     api.onAction('fleet.assault', (action, h) => {
       const { fleetId } = action.payload as { fleetId?: string };
       if (typeof fleetId !== 'string') {
@@ -549,10 +736,21 @@ export const combatModule: GameModule = {
         finishBattle(h, battle);
         return;
       }
+      // CMB-7. Бой идёт, только пока стороны ВРАЖДЕБНЫ. Раньше здесь спрашивали лишь
+      // «жива ли сторона», и вражда проверялась ровно один раз — при заведении боя.
+      // Значит помирившиеся посреди боя продолжали убивать друг друга до чьей-нибудь
+      // смерти: кнопка мира на них не действовала, и это читается как сломанный мир, а
+      // не как правило. Здесь — САМО правило (каждый раунд спрашивает заново), а
+      // мгновенное применение — в обработчике `diplomacy.changed`: раунд стоит игровой
+      // час, и без него перемирие стоило бы ещё одного залпа.
+      if (ceasefired(h, battle)) {
+        finishBattle(h, battle, 'ceasefire');
+        return;
+      }
 
       battle.round += 1;
       if (battle.round > MAX_COMBAT_ROUNDS) {
-        finishBattle(h, battle, true); // stalemate safety valve
+        finishBattle(h, battle, 'stalemate'); // safety valve
         return;
       }
 

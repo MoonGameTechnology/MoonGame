@@ -421,6 +421,10 @@ export function createMultiplayerServer(
           return;
         }
         let playerId: string;
+        // Доказана ли личность рукопожатием. Только тогда комната позволит перехватить
+        // занятое кресло: дев-путь `?player=`/`?nick=` берёт идентификатор ИЗ АДРЕСА и
+        // ничего не проверяет, а значит по нему нельзя выселять сидящего.
+        let verifiedIdentity = false;
         // LARS-1: the JWT's accountId, when present, so the room can key a live
         // ArsenalStore read to this seat. Only the auth handshake ever carries one —
         // the dev/nick paths have no account.
@@ -448,6 +452,7 @@ export function createMultiplayerServer(
           }
           playerId = verified.claim.playerId;
           accountId = verified.claim.accountId;
+          verifiedIdentity = true;
         } else if (options.seatLock) {
           // Seat lock (REL-5): nick+ticket is the SOLE identity on this path — the
           // direct `?player=` handshake would bypass the lock, so it is refused
@@ -497,6 +502,7 @@ export function createMultiplayerServer(
             rejectUpgrade(socket, 401); // locked seat, no/wrong ticket — no detail leaked
             return;
           }
+          verifiedIdentity = true; // билет предъявлен (или только что выдан этому нику)
         } else {
           // Insecure dev handshake: `?player=` directly, or `?nick=` via the account store.
           playerId = url.searchParams.get('player') ?? '';
@@ -528,7 +534,17 @@ export function createMultiplayerServer(
         // envelope's session binding, SV-1.1-live-A). A reconnect mints a fresh one.
         const sessionId = randomUUID();
         wss.handleUpgrade(request, socket, head, (ws) => {
-          wss.emit('connection', ws, request, playerId, room, sessionId, mintedTicket, accountId);
+          wss.emit(
+            'connection',
+            ws,
+            request,
+            playerId,
+            room,
+            sessionId,
+            mintedTicket,
+            accountId,
+            verifiedIdentity,
+          );
         });
       } catch {
         rejectUpgrade(socket, 500);
@@ -557,6 +573,9 @@ export function createMultiplayerServer(
       sessionId: string,
       mintedTicket?: string,
       accountId?: string,
+      /** Личность доказана рукопожатием (токен/билет) — только тогда комната разрешит
+       *  перехватить занятое кресло. */
+      verifiedIdentity = false,
     ) => {
       sockets.add(ws);
       alive.set(ws, true);
@@ -571,6 +590,7 @@ export function createMultiplayerServer(
           sessionId,
           mintedTicket ? { seatTicket: mintedTicket } : undefined,
           accountId,
+          verifiedIdentity,
         )
       ) {
         registry.retain?.(room.id); // keep the match resident while this socket is connected

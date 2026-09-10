@@ -1,6 +1,6 @@
 // AI-BAL-4: артиллерия и эскадрильи у ТЕСТ-бота (профиль `test`, AI-BAL-1.1).
 //
-// Что здесь закрепляется. `siege`, `interceptor`, `strike_carrier`, `sensor_frigate`
+// Что здесь закрепляется. `siege`, `interceptor`, `strike_carrier`, `frigate`
 // и `hero` показывались «мёртвым контентом» — и каждая позиция оказалась мертва по СВОЕЙ
 // причине, а не по одной общей:
 //   • `siege` — просто не было правила. Артиллерия при этом не требует от бота НИ ОДНОЙ
@@ -10,7 +10,7 @@
 //     а гейт читал только базовый def (починено в `construction.ts`);
 //   • `hero` — не мёртв: он ПОСЕЯН во флоте каждого места с первой секунды и воюет, просто
 //     не проходит через `unit.built`. Врал отчёт, а не бот (починено в `selfplay.mjs`).
-// `strike_carrier` и `sensor_frigate` намеренно оставлены боту ненужными — см. хвост файла.
+// `strike_carrier` и `frigate` намеренно оставлены боту ненужными — см. хвост файла.
 import { describe, expect, it } from 'vitest';
 import { newGame, aiOrders, START_CANDIDATES } from './game';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
@@ -90,11 +90,11 @@ describe('AI-BAL-4 — то, что оставлено боту НЕнужным
     //
     // Не заказываются осознанно, а не по забывчивости: `shuttle_carrier` — носитель
     // челноков, а челноков бот не строит и не запускает вовсе (это SHU-3.2);
-    // `sensor_frigate` — глаза, а бот читает состояние целиком и туманом не пользуется.
+    // `frigate` — глаза, а бот читает состояние целиком и туманом не пользуется.
     // Оба ждут своей механики: строить их «чтобы не были мёртвыми» — подгонка отчёта.
     const orders = unitsBuilt(aiOrders(rich(game2()), 'p2', 'expand', 'strong'));
     expect(orders).toContain('strike_carrier');
     expect(orders).not.toContain('shuttle_carrier');
-    expect(orders).not.toContain('sensor_frigate');
+    expect(orders).not.toContain('frigate');
   });
 });

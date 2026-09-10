@@ -32,6 +32,7 @@ export {
   type UnitStack,
   type BuildingInstance,
   type PausedConstructionSite,
+  type QueuedConstruction,
   type ActiveResearch,
   type PlayerTechnologyState,
   type StewardState,
@@ -408,7 +409,7 @@ export {
   MAX_RESEARCH_SLOTS,
   clampResearchSlots,
 } from './modules/technology';
-export { constructionModule } from './modules/construction';
+export { constructionModule, unitBuildSiteBlocker } from './modules/construction';
 export { arsenalSyncModule } from './modules/arsenalSync';
 export { stationModule } from './modules/station';
 export { seatClaimModule } from './modules/seatClaim';

@@ -20,7 +20,10 @@ export interface ConveyorView {
   /** Идущая стройка: подпись, момент завершения, длительность и id для отмены. */
   active: { label: string; at: number; durationMs: number; seq: number } | null;
   /** Очередь после активной, в порядке исполнения. */
-  queued: Array<{ label: string }>;
+  /** Ждущие заказы. `id` — номер, которым заказ отменяют: с BLD-1 очередь живёт
+   *  в ЯДРЕ, и снятие ждущего идёт тем же `construction.cancel`, что и снятие
+   *  идущего, — позиция в списке личностью заказа больше не является. */
+  queued: Array<{ label: string; id: number }>;
   /** Приостановленные стройки: доля готовности 0..1. `id` — номер площадки в ядре. */
   paused: Array<{ id: string | number; label: string; progress: number }>;
   /** Голова очереди ждёт денег — тогда это её цена (уже размеченная строка). */
@@ -85,7 +88,7 @@ export function conveyorHtml(
         .map(
           (q, i) =>
             `<span data-desc="${key}:queued:${i}"><em>${i + 1}</em>${q.label}` +
-            `<button class="q-x" data-act="dequeue" data-arg="${esc(lane)}:${i}" title="${esc(labels.dequeue)}">✕</button></span>`,
+            `<button class="q-x" data-act="dequeue" data-arg="${q.id}" title="${esc(labels.dequeue)}">✕</button></span>`,
         )
         .join('') +
       `</div>`;

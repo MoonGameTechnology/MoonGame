@@ -153,7 +153,7 @@ export const en: Record<string, string> = {
   'build.cat.defense': 'DEFENSE',
   'build.cat.economy': 'ECONOMY',
   'build.cat.infra': 'INFRASTRUCTURE',
-  'build.fx.aa': 'AA: {n} damage',
+  'build.fx.aa': 'Interdiction: {n} damage to ships',
   'build.fx.credits': '+{n}% world credits',
   'build.fx.defense': '+{n}% defense',
   'build.fx.production': '+{n}% production',
@@ -211,6 +211,9 @@ export const en: Record<string, string> = {
   'chat.tab.coalition': 'Coalition',
   'chat.tab.session': 'Session',
   'chat.you': 'You',
+  'data.landing-shuttle': 'landing shuttle',
+  'dossier.unit.landing-shuttle.desc': 'Landing shuttle: an unarmed hull with a hold of {c} — it cannot strike ships at all, and the order is refused outright. One-way: it puts down with its cargo and never flies home. An empty enemy world falls at once; a defended one gets a BEACHHEAD that opens a ground battle with no ship in sight; your own worlds get reinforcements. Area defense shreds both the craft and what they carried ({hp} hull, range {r}).',
+  'dossier.unit.landing-shuttle.name': 'Landing Shuttle',
   'side.build.open': 'Build',
   'spy.log.empty': 'no attempts yet',
   'spy.log.title': 'JOURNAL',
@@ -268,7 +271,7 @@ export const en: Record<string, string> = {
   'chain.add-wait6': '⏱ +6h',
   'chain.fire': '🎯 Fire +1h',
   'chain.full': 'plan is full — 8 steps',
-  'chain.no-art': 'no artillery in the selection',
+  'chain.no-art': 'nothing in the selection fires at range',
   'chain.overwrite': 'fleet plans differ — sending replaces them all',
   'chain.undo': 'Undo step',
 
@@ -301,6 +304,8 @@ export const en: Record<string, string> = {
   'cmd.merge.pick': 'Merge…',
   'cmd.more': 'More',
   'cmd.more.hint': 'extra orders',
+  'cmd.engage': 'Attack',
+  'cmd.engage.hint': 'strike an enemy fleet: at once if adjacent, else march to it',
   'cmd.move': 'Move',
   'cmd.move.hint': 'pick a planet — the fleet routes to it along the star lanes',
   'cmd.multiselect': 'Select+',
@@ -329,7 +334,7 @@ export const en: Record<string, string> = {
   'codex.hub.sec.mechanic': 'Mechanics',
   'codex.hub.sec.unit': 'Units',
   'codex.hub.title': 'CODEX',
-  'codex.row.aa': 'AA',
+  'codex.row.aa': 'Interdiction',
   'codex.row.atk-def': 'Attack / Defense',
   'codex.row.build-time': 'Build time',
   'codex.row.cargo': 'Cargo capacity',
@@ -525,7 +530,6 @@ export const en: Record<string, string> = {
   'codex.close': 'CLOSE',
 
   // --- data — Имена игровых ДАННЫХ (data/*.json + таблицы прототипа), через tData().
-  'data.aa': 'aa',
   'data.ablative-plating': 'Ablative Plating',
   'data.ace-programs': 'Ace Programs',
   'data.amber-concord': 'Amber Concord',
@@ -610,7 +614,8 @@ export const en: Record<string, string> = {
   'data.neural-lace': 'Neural Lace',
   'data.oceanic': 'Oceanic',
   'data.open-space': 'Open space',
-  'data.orbital-aa': 'Orbital AA',
+  'data.area-defense-battery': 'Area Defense Battery',
+  'data.orbital-defense-battery': 'Orbital Defense Battery',
   'data.orbital-logistics': 'Orbital Logistics',
   'data.overclocked-helm': 'Overclocked Helm',
   'data.overseer': 'Overseer',
@@ -640,9 +645,9 @@ export const en: Record<string, string> = {
   'data.field-hospital': 'Field Hospital',
   'data.vehicle-factory': 'Vehicle Factory',
   'data.scout': 'scout',
-  'data.sensor-frigate': 'sensor frigate',
+  'data.frigate': 'frigate',
   'data.shield-booster': 'Shield Booster',
-  'data.point-defense-array': 'Point Defense Array',
+  'data.area-defense-array': 'Area Defense Array',
   'data.siege-doctrine': 'Siege Doctrine',
   'data.shuttle-carrier': 'Shuttle',
   'data.siege': 'siege',
@@ -716,7 +721,9 @@ export const en: Record<string, string> = {
   'dossier.building.mine':
     'A drilling rig gnaws into the planet, mining {m}⬢ per hour. Upgrades dig deeper to reach the richest veins. The foundation for building your fleet.',
   'dossier.building.orbital-aa':
-    "A stationary anti-air battery guards your world's airspace, dealing {dmg} damage per hour to ships in orbit. A nightmare for bombers hanging over the world and for raiding shuttles. Doesn't block capture (that's ground defense's job) — it just mows down the fleet overhead.",
+    "Orbital interdiction: a fixed battery that fires on SHIPS in orbit — {dmg} damage per hour. Against shuttles it is useless: those dive into the world's airspace, and area defense is what meets them there. It does not block capture (that is ground defense's job) — it just mows down the fleet overhead.",
+  'dossier.building.zonal-aa':
+    "Area defense: a battery that meets SHUTTLES once they dive into the world's airspace — {dmg} damage to the wave at the moment it strikes. Without it a shuttle raid on your world costs the raider nothing: they hit and leave intact. With it, half the wave never flies home. It does nothing against ships in orbit — that is orbital interdiction's job.",
   'dossier.building.power-plant':
     "A fusion reactor powers your worlds, producing {e}↯ per hour. Energy is the lifeblood of your buildings — they don't run on magic. When it runs short, everything browns out to half output.",
   'dossier.building.radar':
@@ -792,6 +799,9 @@ export const en: Record<string, string> = {
   'dossier.unit.interceptor.desc':
     "An interceptor: a hunter of ENEMY SHUTTLES — {s} damage against them, more than anything else fields. Against ships it is nearly harmless ({a} attack), against buildings more so. Fast (speed {sp}) but unarmored ({hp} hull), reach {r}. Above all it scrambles ON ITS OWN, without an order, whenever a hostile strike passes near its port or carrier — and burns the base's fuel doing it.",
   'dossier.unit.interceptor.name': 'Interceptor',
+  'dossier.unit.frigate.desc':
+    "A frigate: a SUPPORT hull. It barely fights on its own ({a} attack, {d} defense) and lives off what you bolt onto it — {n} module bays, more than any other hull carries. Tougher than a scout ({hp} hull), it stands in the mid line. It is the ONLY ship the radar module fits: its own antenna is modest ({r}), the long sight comes from the pairing.",
+  'dossier.unit.frigate.name': 'Frigate',
   'dossier.unit.hero.desc':
     "The commander's own combat projection — a flagship leading the home fleet: {a} attack and {hp} hull. But that's not what matters: its presence holds the shuttle together, granting {b} attack/defense to every ship nearby. If it falls, the commander loses their projection until it's rebuilt at the home world.",
   'dossier.unit.hero.name': 'Flagship',
@@ -799,7 +809,7 @@ export const en: Record<string, string> = {
     'A light recon hull. Fast (speed {sp}) and almost silent (signature {sig}) — it maps the void where a battle fleet fears to go.',
   'dossier.unit.scout.name': 'Scout',
   'dossier.unit.shuttle-carrier.desc':
-    'A spaceport under way: {bay} shuttle berths, and they launch from it and land back on it — so the fleet can strike with shuttles far from its own worlds. Almost no guns of its own ({a} attack), but it holds ({d} defense, {hp} hull) and stands in the REAR line. The hangar lives exactly as long as its hulls do: lose the carrier and you lose the shuttles aboard.',
+    'A spaceport under way: {bay} shuttle berths, and they launch from it and land back on it — so the fleet can strike with shuttles far from its own worlds. It is a SHIP, not a shuttle: it carries craft the way a carrier carries aircraft, stands in the REAR line and holds ({d} defense, {hp} hull), though it has almost no guns of its own ({a} attack). Ordered among the ships. The hangar lives exactly as long as its hulls do: lose the carrier and you lose the shuttles aboard.',
   'dossier.unit.shuttle-carrier.name': 'Shuttle',
   'dossier.unit.siege.desc':
     "A siege platform: it rains bombs from orbit onto the world below — {s} damage per hour to BUILDINGS, more than anything else in the fleet. Against ships and shuttles it is nearly useless ({a} attack), but it is tough ({hp} hull, {d} defense) and stands in the REAR line, so it can hold a siege for a long time. It has no standoff fire: against a fleet it joins the battle like everyone else.",
@@ -843,6 +853,9 @@ export const en: Record<string, string> = {
   'hint.multiselect': '⊕ tap your fleets — build the group, then give a common order',
   'hint.pick-assault': "⚔ pick someone else's world to storm",
   'hint.pick-barrage': '🎯 tap an enemy fleet to focus fire · empty space = auto',
+  'hint.pick-engage': 'tap an enemy fleet — we attack it',
+  'hint.engage-enemy-only': 'only an enemy fleet can be attacked',
+  'hint.engage-in-flight': 'the target is under way — no course to it; wait until it stops',
   'hint.pick-merge': '⛬ pick a fleet to merge with',
   'hint.pick-order': 'tap a point on the map — each tap adds an order',
   'hint.standing-sortie': '🛩 standing patrol on — the shuttles strike any enemy in range',
@@ -930,7 +943,6 @@ export const en: Record<string, string> = {
   'profile.medals.empty':
     'Medals show up here once your corporation goes to war. Sign in on a server with the meta layer to see the showcase.',
   'queue.added': 'queued: {what} at {at}',
-  'queue.failed': '{what} — failed: {err}',
   'queue.unknown': 'unknown order',
   'queue.upgrade': '{b} — upgrade',
 
@@ -1048,7 +1060,7 @@ export const en: Record<string, string> = {
   'yard.module.remove': 'remove module',
   'yard.modules.all-taken': 'Available modules — all slots full',
   'yard.modules.for-slot': 'Available modules — for the «{s}» slot',
-  'yard.no-worlds': 'no worlds of yours',
+  'yard.no-place': 'no suitable site',
   'yard.ordered': '⚒ ordered: {n}× {hull}',
   'yard.pick.ally-world': " / ally's world",
   'yard.pick.hero-world': "⚓ pick your world{fl}{al} — the hero's ship rises there",
@@ -1063,9 +1075,11 @@ export const en: Record<string, string> = {
   'yard.slots.note':
     'Typed slots: a module fits only its own type. <b>Greyed</b> — not for a free slot, or already installed.',
   'yard.tab.heroes': 'Heroes',
+  'yard.tab.infantry': 'Infantry',
   'yard.tab.ships': 'Ships',
   'yard.tab.squads': 'Shuttles',
-  'yard.title': 'CONSTRUCTOR',
+  'yard.tab.vehicles': 'Vehicles',
+  'yard.title': 'PRODUCTION',
 
   // --- end — Экран конца матча: исход, опыт, итоговая таблица, реванш.
   'end.board': 'View the board',
@@ -1432,6 +1446,8 @@ export const en: Record<string, string> = {
   'log.market.buy': 'buy',
   'log.market.sell': 'sell',
   'log.market.trade': '⇄ market: {n} {res} for {paid} ¤ ({side})',
+  'log.shuttle.repelled.mine': '✳ Flak downed {n} of our craft · {at}',
+  'log.shuttle.repelled.theirs': '✳ Our flak downed {n} enemy craft · {at}',
   'log.spy.caught': '🛡 Counter-intel: agent {who} caught stealing ({what})!',
   'log.spy.fail': '🕵 Agent failed ({who}) — the fee is gone',
   'log.spy.fail.short': '✖ Failed against {who} — the fee burned',
@@ -1509,7 +1525,7 @@ export const en: Record<string, string> = {
   'onb.intro.badge': 'first time',
   'onb.intro.constructor.body':
     'Here you assemble ships, shuttles, divisions and heroes from modules. The loadout is locked at build time — choose slots up front, a finished unit cannot be re-fitted. The «Heroes» tab is your commander HQ.',
-  'onb.intro.constructor.title': 'Shipyard — loadouts',
+  'onb.intro.constructor.title': 'Production — orders and loadouts',
   'onb.intro.corp.body':
     'A corporation is your squad within the session: a shared warehouse, member roles, and joint alliance-vs-alliance wars (AvA). Join one or found your own — the «Wars» tab opens challenges between corporations.',
   'onb.intro.corp.title': 'Corporation cabinet',
@@ -1574,7 +1590,7 @@ export const en: Record<string, string> = {
     'Done! Time to act: upgrade your Metal Mine, raise a fleet, set a course. Good luck, commander.',
   'onb.tour.hud.purse': 'Your treasury: mine income minus fleet upkeep. Keep it out of the red.',
   'onb.tour.hud.tools':
-    "The commander's tools: diplomacy, research, shipyard, market and the event log.",
+    "The commander's tools: diplomacy, research, production, market and the event log.",
   'onb.tour.hud.welcome':
     'A quick tour of the interface — the whole game runs on it. «Skip tutorial» is always available.',
   'onb.tour.next': 'Next',
@@ -1606,7 +1622,7 @@ export const en: Record<string, string> = {
   // --- rail — Рельса инструментов в матче: подпись кнопки (.label) + подсказка (.title).
   'rail.chat.label': 'Chat',
   'rail.chat.title': 'Chat',
-  'rail.constructor.label': 'Shipyard',
+  'rail.constructor.label': 'Production',
   'rail.constructor.title': 'Constructor — outfit ships, shuttles, army and heroes',
   'rail.corp.label': 'Corp',
   'rail.corp.title': 'Corporation',
@@ -1775,6 +1791,7 @@ export const en: Record<string, string> = {
   'side.fleet.enroute': '↗ en route to {dest} · arrives in',
   'side.fleet.hero-aura': '— projection · +5% attack/defense to this fleet',
   'side.fleet.hull-tag': 'hull {p}%',
+  'side.fleet.foreign.hint': '{who}’s fleet — inspection only: orders go to your own',
   'side.fleet.hunger': 'starving: −25% on the ground',
   'effect.title': 'Effects',
   'effect.in-battle': 'in battle',
@@ -1785,9 +1802,9 @@ export const en: Record<string, string> = {
   'effect.patrol': 'standing patrol',
   'effect.rearming': 'rearming {n}',
   'effect.fuel': 'fuel {n}',
-  'effect.blackout': 'blackout: AA/radar −50%',
+  'effect.blackout': 'blackout: interdiction/radar −50%',
   'effect.hunger': 'hunger: −25% ground damage',
-  'effect.point-defense': 'point defense {n}',
+  'effect.point-defense': 'area defense {n}',
   'side.fleet.in-orbit': 'in orbit',
   'side.fleet.on-lane': '⟜ holding on the {lane} lane · {p}% across',
   'side.fleet.repair.dock.title': 'Express repair at your own dock for metal',
@@ -1831,7 +1848,7 @@ export const en: Record<string, string> = {
   'side.scan.spy': '🕵 Spy on the world · {c}¤',
   'side.scan.stale': 'Out of sensor range — last scan (may be stale).',
   'side.scan.title': 'LAST KNOWN ✦',
-  'side.shipyard.conveyor': 'Shipyard conveyor',
+  'side.shipyard.conveyor': 'Ship conveyor',
   'side.shipyard.hint': 'The fleet is your weapon and shield. Order ships here to reinforce it.',
   'side.stat.atk': 'ATK',
   'side.stat.def': 'DEF',
@@ -1847,7 +1864,7 @@ export const en: Record<string, string> = {
   'side.strike.forecast.hint':
     'Forecast from visible compositions only — terrain, fortification and technology bonuses are not included; the real battle may differ.',
   'side.strike.hint':
-    "In orbit you can bombard (wears buildings and freezes their output), but the garrison's AA reaches you. Assault lands your troops against the garrison.",
+    "In orbit you can bombard (wears buildings and freezes their output), but the garrison's interdiction reaches you. Assault lands your troops against the garrison.",
   'side.strike.title': 'Strike',
   'side.summary.attack': 'Attack',
   'side.summary.back': '‹ Back to the card',
@@ -1872,10 +1889,10 @@ export const en: Record<string, string> = {
   'side.tab.wings': 'Shuttles',
   'side.unit.ground': 'ground',
   'side.unit.space': 'space',
-  'side.wing.conveyor': 'Shuttle yard',
+  'side.wing.conveyor': 'Shuttle conveyor',
   'side.wing.garrison.hint':
     'A carrier (◈) holds shuttles (△). Launch them from the selected fleet\'s panel with "🛩 Launch shuttles".',
-  'side.world.blackout': 'blackout: radars and AA −50%',
+  'side.world.blackout': 'blackout: radars and interdiction −50%',
   'side.world.bonus.defense': 'defense',
   'side.world.bonus.production': 'prod.',
   'side.world.buildings': 'Structures',

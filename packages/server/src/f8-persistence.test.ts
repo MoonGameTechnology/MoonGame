@@ -180,6 +180,7 @@ describe('F8 · the real loader wiring (serverWiring.createMatchLoader)', () => 
     // The committed path: this room persists BEFORE committing — the exact wiring
     // main.ts hands the registry, no mirroring.
     const act = orbit('green', 'green_1', 'near', 1);
+    loaded.room.addPeer('green', silentPeer); // сокет обязан сидеть, чтобы говорить
     await loaded.room.receive('green', silentPeer, raw(act));
     const snap = await store.load(MATCH);
     expect(snap?.state.fleets.green_1?.orbit).toBe('near'); // snapshot landed
@@ -192,6 +193,7 @@ describe('F8 · the real loader wiring (serverWiring.createMatchLoader)', () => 
     const resumed = (await load(MATCH))!;
     expect(resumed.room.state.fleets.green_1?.orbit).toBe('near');
     const seqBefore = resumed.room.sequence;
+    resumed.room.addPeer('green', silentPeer);
     await resumed.room.receive('green', silentPeer, raw(act)); // idempotent retry
     expect(resumed.room.sequence).toBe(seqBefore); // deduped by the restored receipt
     await resumed.dispose();

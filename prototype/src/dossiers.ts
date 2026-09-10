@@ -32,7 +32,7 @@ import { t, tData } from '../../localization/runtime';
 import { GLOSSARY } from './codexIndex';
 import { esc, hl, round1, cost, displayUnit, fmtEta, resChip, resLine } from './format';
 import { BUILD_ICON, unitIcon, unitIconHtml } from './icons';
-import type { ActiveBuild, BuildKind, BuildLane, PlanetBuildQueue } from './buildQueue';
+import type { ActiveBuild, BuildKind, BuildLane, QueuedBuild } from './buildQueue';
 
 /** A dossier card: the object's name plus an HTML body (live numbers highlighted). */
 export interface Dossier {
@@ -51,7 +51,9 @@ export interface DossierHost {
   pcUi(): boolean;
   /** Your side's colour, for the unit silhouettes in codex cards. */
   youColor(): string;
-  queueOf(planetId: string): PlanetBuildQueue;
+  /** Ждущие заказы полосы, в порядке очереди (с BLD-1 очередь ядровая — хост
+   *  переводит её в этот словарь). */
+  queuedOrders(planetId: string, lane: BuildLane): QueuedBuild[];
   activeConstruction(planetId: string, lane: BuildLane): ActiveBuild | null;
   progressPct(active: ActiveBuild): number;
 }
@@ -99,6 +101,11 @@ export function buildingDossier(id: string, level: number): Dossier | null {
       return {
         name,
         body: t('dossier.building.orbital-aa', { dmg: hl(lv.aaDamage ?? 0) }),
+      };
+    case 'zonal_aa':
+      return {
+        name,
+        body: t('dossier.building.zonal-aa', { dmg: hl(lv.pointDefense ?? 0) }),
       };
     case 'metal_station':
       return {
@@ -163,6 +170,17 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
           d: hl(st.defense),
         }),
       };
+    case 'frigate':
+      return {
+        name: t('dossier.unit.frigate.name'),
+        body: t('dossier.unit.frigate.desc', {
+          a: hl(st.attack),
+          d: hl(st.defense),
+          hp: hl(st.hp),
+          n: hl((def.slots?.weapon ?? 0) + (def.slots?.defense ?? 0) + (def.slots?.utility ?? 0)),
+          r: hl(def.radarRange ?? 0),
+        }),
+      };
     case 'artillery':
       return {
         name: t('dossier.unit.artillery.name'),
@@ -207,6 +225,15 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
         body: t('dossier.unit.bomber.desc', {
           a: hl(st.attack),
           s: hl(st.siegeDamage ?? 0),
+          hp: hl(st.hp),
+          r: hl(st.strikeRange ?? 0),
+        }),
+      };
+    case 'landing_shuttle':
+      return {
+        name: t('dossier.unit.landing-shuttle.name'),
+        body: t('dossier.unit.landing-shuttle.desc', {
+          c: hl(st.cargoCapacity ?? 0),
           hp: hl(st.hp),
           r: hl(st.strikeRange ?? 0),
         }),
@@ -330,7 +357,7 @@ export function createDossiers(host: DossierHost): {
       );
     }
     if (state === 'queued') {
-      const q = host.queueOf(planetId)[lane as BuildLane][Number(ref)];
+      const q = host.queuedOrders(planetId, lane as BuildLane)[Number(ref)];
       if (!q) return null;
       const level =
         q.kind === 'upgrade'
