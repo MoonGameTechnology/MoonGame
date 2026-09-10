@@ -145,8 +145,12 @@ function code(state: GameState, action: Action): string | null {
   return r.ok ? null : r.code;
 }
 
+/** Машины ангара одним списком: с SHU-4.2 они лежат внутри ЭСКАДР, а этим тестам важен
+ *  состав порта, а не то, как он разбит на соединения. */
 const hangarOf = (s: GameState, id = 'A'): Array<{ unit: string; count: number }> =>
-  (s.planets[id]?.hangar ?? []).map((st) => ({ unit: st.unit, count: st.count }));
+  (s.planets[id]?.hangar ?? []).flatMap((sq) =>
+    sq.units.map((st) => ({ unit: st.unit, count: st.count })),
+  );
 
 /** Заказать и ДОСТРОИТЬ: заказ ставит событие завершения на таймлайн, поэтому мир нужно
  *  сдвинуть — иначе проверялась бы очередь, а не доставка. */

@@ -29,6 +29,7 @@ export {
   type BattleSide,
   type CombatantRef,
   type ScheduledEvent,
+  type Squadron,
   type UnitStack,
   type BuildingInstance,
   type PausedConstructionSite,
@@ -168,6 +169,12 @@ export {
   shuttleBayAt,
   fleetShuttleBay,
   hangarUsed,
+  // SHU-4.2: ангар — список ЭСКАДР, и «просто машины» из него достаёт одна функция на
+  // всех читателей; своя развёртка у каждого разъехалась бы с этой.
+  hangarMachines,
+  squadronSize,
+  squadronCargoCapacity,
+  squadronCargoUsed,
   shuttleStrikeRange,
   withinRange,
   shuttleReaches,

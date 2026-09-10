@@ -104,7 +104,7 @@ function fleet(id: string, owner: string, location: string, units: Array<[string
 function world(over: { defenders?: Array<[string, number]>; aa?: boolean } = {}): GameState {
   const s = createInitialState({ seed: 'ros22', version: { data: '0.1.0', manifest: '1' } });
   const home = planet('A', 'p1', 0, ['spaceport']);
-  home.hangar = [{ unit: 'interceptor', count: 8 }];
+  home.hangar = [{ id: 'sq:strike', units: [{ unit: 'interceptor', count: 8 }] }];
   return {
     ...s,
     players: { p1: player('p1'), p2: player('p2') },
@@ -119,14 +119,13 @@ function world(over: { defenders?: Array<[string, number]>; aa?: boolean } = {})
 }
 
 let seq = 0;
-const strike = (
-  target: { targetFleetId: string } | { targetPlanetId: string },
-  count = 8,
-): Action => ({
+/** Вылет ЭСКАДРОЙ (SHU-4.2): в порту одно соединение из восьми машин, летит оно целиком,
+ *  поэтому «сколько послать» больше не параметр приказа. */
+const strike = (target: { targetFleetId: string } | { targetPlanetId: string }): Action => ({
   id: `a:${seq++}`,
   type: 'shuttle.strike',
   playerId: 'p1',
-  payload: { planetId: 'A', unit: 'interceptor', count, ...target },
+  payload: { planetId: 'A', squadronId: 'sq:strike', ...target },
   issuedAt: 0,
 });
 
@@ -146,7 +145,7 @@ function run(
 
 /** Сколько машин село обратно в порт (то есть пережило ответку). */
 const home = (s: GameState): number =>
-  (s.planets.A?.hangar ?? []).reduce((n, st) => n + st.count, 0);
+  (s.planets.A?.hangar ?? []).reduce((n, sq) => n + sq.units.reduce((m, st) => m + st.count, 0), 0);
 /** Нагрузка события ответки. У ядра ключи события — `unknown`, поэтому приведение стоит
  *  в ОДНОМ месте, а не рассыпано по каждому `expect`. */
 interface RepelPayload {

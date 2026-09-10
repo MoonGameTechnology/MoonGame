@@ -265,6 +265,7 @@ describe('combat.damage — every firing channel goes through the hook (CORE-DMG
           id: 'strike:p2:1',
           owner: 'p2',
           base: { kind: 'planet', id: 'H' },
+          squadronId: 'sq:test',
           units: [{ unit: 'wing', count: 1 }],
           target: { kind: 'fleet', id: 'E' },
           to: st.planets.A!.position,
