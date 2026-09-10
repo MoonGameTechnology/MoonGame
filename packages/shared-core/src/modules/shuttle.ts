@@ -927,21 +927,40 @@ export const shuttleModule: GameModule = {
       });
     });
 
-    /** `shuttle.unloadTroops { planetId | fleetId, squadronId }` — ссадить весь трюм
-     *  обратно. Приказ без обратного хода запер бы войска в трюме до вылета, а вылет
-     *  десантный одноразовый — то есть навсегда. */
+    /**
+     * `shuttle.unloadTroops { planetId | fleetId, squadronId, troops? }` — ссадить трюм
+     * обратно. Приказ без обратного хода запер бы войска в трюме до вылета, а вылет
+     * десантный одноразовый — то есть навсегда.
+     *
+     * `troops` НЕОБЯЗАТЕЛЕН, и это не удобство: интерфейс (SHU-4.3) считает погрузку и
+     * выгрузку ОДНИМ знаковым планом на строку («+2 взять, −1 ссадить»), и «всё или
+     * ничего» им не выразить — кнопка обещала бы игроку то, чего ядро не умеет. Без
+     * списка ссаживается весь трюм: это и есть «выгрузить всё» одним тапом.
+     */
     api.onAction('shuttle.unloadTroops', (action, h: HandlerContext) => {
-      const p = (action.payload ?? {}) as { squadronId?: unknown };
+      const p = (action.payload ?? {}) as { squadronId?: unknown; troops?: unknown };
       const base = baseFromPayload(h, action.playerId, p as Record<string, unknown>);
       const squad = requireSquadron(h, base, p.squadronId);
-      const cargo = (squad.cargo ?? []).filter((st) => st.count > 0);
-      if (cargo.length === 0) return h.reject('E_NO_ARMY');
+      const aboard = (squad.cargo ?? []).filter((st) => st.count > 0);
+      if (aboard.length === 0) return h.reject('E_NO_ARMY');
+      // Заявка проверяется ЦЕЛИКОМ до первой правки состояния (fail-secure): половина
+      // ссаженного взвода при отказе второй половины — это молча испорченный трюм.
+      const cargo = p.troops === undefined ? aboard : parseStacks(h, p.troops);
+      let left: UnitStack[] = aboard.map((st) => ({ ...st }));
+      for (const want of cargo) {
+        const next = takeMachines(left, want.unit, want.count);
+        if (!next) return h.reject('E_NO_ARMY');
+        left = next;
+      }
       const source = troopSource(h.state, base);
       if (!source) return h.reject('E_NO_ARMY');
       const back = source.map((st) => ({ ...st }));
       for (const st of cargo) addUnits(back, st.unit, st.count);
       setTroopSource(h.state, base, back);
-      putSquadron(base, { id: squad.id, units: squad.units });
+      // Пустой трюм — ОТСУТСТВИЕ поля, а не ключ со значением `undefined`: состояние
+      // хранится как JSONB, и «пустой ключ» пережил бы только один рейс до базы.
+      const { cargo: _gone, ...bare } = squad;
+      putSquadron(base, left.length > 0 ? { ...bare, cargo: left } : bare);
       h.emit('squadron.unloaded', {
         baseId: base.ref.id,
         baseKind: base.ref.kind,

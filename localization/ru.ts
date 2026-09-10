@@ -221,14 +221,22 @@ export const ru: Record<string, string> = {
   'hint.wing-empty': '✖ поднимать нечего — ангар пуст',
   'side.build.open': 'Построить',
   'side.wing.blocked.empty': 'ангар пуст — поднимать нечего',
+  'side.wing.cargo': 'в трюме: {n}',
+  'side.wing.empty': 'ангар пуст',
   'side.wing.blocked.no-fuel': 'топливо кончилось — ждём перезарядки',
   'side.wing.blocked.rearming': 'порт перезаряжается — вылет позже',
   'side.wing.fuel': 'вылетов осталось: {n} из {max}',
+  'side.wing.merge': '⛬ Слить',
+  'side.wing.merge.into': '⛬ сюда',
+  'side.wing.merge.pick': 'выберите звено, в которое слить',
   'side.wing.hangar': 'Ангар порта — {used} из {bay}',
   'side.wing.load': '↑ На борт',
   'side.wing.no-port': 'нет космопорта — челноков тут не держат',
+  'side.wing.split': '⊟ Отделить борт',
   'side.wing.rearming': 'перезарядка: {h} ч',
   'side.wing.strike': '✳ Удар',
+  'side.wing.troops': '⇅ Десант',
+  'side.wing.troops.done': '✓ Подтвердить',
   'side.wing.unload': '↓ В порт',
   'spy.log.empty': 'попыток ещё не было',
   'spy.log.title': 'ЖУРНАЛ',
@@ -824,6 +832,7 @@ export const ru: Record<string, string> = {
   // --- fleet — Автоимя соединения: слово + позывной. Лестница размеров снята в
   // SHU-4.1: её ступени были авиационными, а те принадлежат челнокам («эскадра»).
   'fleet.kind.ships': 'Флот',
+  'fleet.kind.shuttles': 'Эскадра',
 
   // --- fmt — Форматирование величин: длительности.
   'fmt.hours': '{n}ч',

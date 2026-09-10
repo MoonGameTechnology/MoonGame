@@ -283,6 +283,34 @@ describe('SHU-4.2 — груз грузится ЗАРАНЕЕ', () => {
     expect(s.planets.A?.garrison).toEqual([{ unit: 'marine', count: 10 }]);
   });
 
+  it('ВЫГРУЗКА БЫВАЕТ ЧАСТИЧНОЙ: ссадить можно И ВЗВОД, а не только весь трюм', () => {
+    // Интерфейс (SHU-4.3) считает погрузку и выгрузку ОДНИМ знаковым планом на строку
+    // («+2 взять, −1 ссадить»), и «всё или ничего» он выразить не может: кнопка обещала
+    // бы игроку то, чего ядро не умеет. Заявка без списка по-прежнему ссаживает всё.
+    let s = apply(
+      world([sq('sq:p1:1', [['lander', 2]])], [['marine', 10]]),
+      act('shuttle.loadTroops', { planetId: 'A', squadronId: 'sq:p1:1', troops: [{ unit: 'marine', count: 5 }] }),
+    );
+    s = apply(
+      s,
+      act('shuttle.unloadTroops', { planetId: 'A', squadronId: 'sq:p1:1', troops: [{ unit: 'marine', count: 2 }] }),
+    );
+    expect(hangarOf(s)[0]?.cargo).toEqual([{ unit: 'marine', count: 3 }]);
+    expect(s.planets.A?.garrison).toEqual([{ unit: 'marine', count: 7 }]);
+  });
+
+  it('ссадить больше, чем в трюме, нельзя — заявка отбивается целиком', () => {
+    const s = apply(
+      world([sq('sq:p1:1', [['lander', 2]])], [['marine', 10]]),
+      act('shuttle.loadTroops', { planetId: 'A', squadronId: 'sq:p1:1', troops: [{ unit: 'marine', count: 3 }] }),
+    );
+    expect(
+      reject(s, act('shuttle.unloadTroops', { planetId: 'A', squadronId: 'sq:p1:1', troops: [{ unit: 'marine', count: 4 }] })),
+    ).toBe('E_NO_ARMY');
+    // Состояние не тронуто: fail-secure отбивает ДО первой правки.
+    expect(hangarOf(s)[0]?.cargo).toEqual([{ unit: 'marine', count: 3 }]);
+  });
+
   it('нельзя грузить чужую эскадру и войска, которых в гарнизоне нет', () => {
     const s = world([sq('sq:p1:1', [['lander', 2]])], [['marine', 1]]);
     expect(reject(s, act('shuttle.loadTroops', { planetId: 'A', squadronId: 'sq:p1:1', troops: [{ unit: 'marine', count: 2 }] }))).toBe(
