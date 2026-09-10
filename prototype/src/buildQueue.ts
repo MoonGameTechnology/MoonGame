@@ -24,12 +24,6 @@ export interface QueuedBuild {
   count: number;
 }
 
-/** Both lanes of one world's queue. */
-export interface PlanetBuildQueue {
-  buildings: QueuedBuild[];
-  units: QueuedBuild[];
-}
-
 /** The payload of a scheduled `construction.complete` event, as the UI reads it —
  *  every field optional because it arrives from state, not from a typed builder. */
 export interface ConstructionPayload {

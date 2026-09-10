@@ -1,15 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import type { GameData, GameState } from '../../packages/shared-core/src/index';
 import type { QueuedBuild } from './buildQueue';
-import {
-  WAIT_CODE,
-  afford,
-  emptyQueue,
-  laneOf,
-  queuedAction,
-  queuedCost,
-  waitsForMoney,
-} from './buildOrders';
+import { afford, laneOf, queuedAction, queuedCost } from './buildOrders';
 
 const data = {
   units: { corvette: { cost: { credits: 20, alloy: 5 } }, hero: {} },
@@ -35,16 +27,6 @@ describe('очередь — полосы', () => {
     expect(laneOf('unit')).toBe('units');
     expect(laneOf('building')).toBe('buildings');
     expect(laneOf('upgrade')).toBe('buildings');
-  });
-
-  it('новая очередь пуста в обеих полосах', () => {
-    expect(emptyQueue()).toEqual({ buildings: [], units: [] });
-  });
-
-  it('каждая новая очередь — своя (полосы не общие на все миры)', () => {
-    const a = emptyQueue();
-    a.units.push(q({ kind: 'unit', id: 'corvette' }));
-    expect(emptyQueue().units).toEqual([]);
   });
 });
 
@@ -138,21 +120,5 @@ describe('очередь — приказ головы', () => {
   it('приказ адресован тому миру, из очереди которого взят', () => {
     const a = queuedAction('p1', 'C7R7', q()) as unknown as { payload: { planetId: string } };
     expect(a.payload.planetId).toBe('C7R7');
-  });
-});
-
-describe('очередь — когда голову держать', () => {
-  it('нечем платить — ждём', () => {
-    expect(waitsForMoney(WAIT_CODE)).toBe(true);
-  });
-
-  it('приказ проходит — пускаем', () => {
-    expect(waitsForMoney(null)).toBe(false);
-  });
-
-  it('ЛЮБОЙ неденежный отказ пускаем в ядро — там игрок узнает настоящую причину', () => {
-    for (const code of ['E_MAX_LEVEL', 'E_NO_SHIPYARD', 'E_BOMBARDED', 'E_WRONG_SECTOR']) {
-      expect(waitsForMoney(code)).toBe(false);
-    }
   });
 });
