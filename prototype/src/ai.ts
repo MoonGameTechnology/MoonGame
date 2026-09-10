@@ -499,9 +499,13 @@ export function aiOrders(
       // (а) Погрузка ДОМА и в мирное время: пустой трюм у стены гарнизона означает,
       //     что флот долетит и встанет. Дома остаётся `HOME_GUARD` — иначе бот
       //     вывозит собственную оборону и его столицу берут прилётом.
+      //     ПОДЪЁМ ЗАНИМАЕТ ЧАС (CARGO-1), а вылет его ОТМЕНЯЕТ: флот, который
+      //     грузится, этот тик СТОИТ дома, иначе улетел бы с пустым трюмом.
       if (here0 && here0.id === base.id) {
+        if ((f.loading ?? []).length > 0) continue; // подъём идёт — ждём его
         let free = liftFree(f);
         let spare = groundCount(here0) - HOME_GUARD;
+        let ordered = false;
         for (const u of GROUND_ROSTER) {
           if (free <= 0 || spare <= 0) break;
           const size = data.units[u]?.stats.cargoSize ?? 1;
@@ -511,8 +515,10 @@ export function aiOrders(
             out.push(loadArmy(ai, f.id, u, take));
             free -= take * size;
             spare -= take;
+            ordered = true;
           }
         }
+        if (ordered) continue; // час подъёма — вылет следующим тиком
       }
       // (а2) ГАРНИЗОН НА ЗАНЯТОМ МИРЕ (AI-BAL-2). Мир без войск берётся ПРИЛЁТОМ —
       //      `captureOnArrival` не смотрит ни на здания, ни на их оборонный бонус, только
@@ -589,11 +595,17 @@ export function aiOrders(
       if (shipCount(f) < 3) continue;
       // Lift a landing party before the sortie: only ground troops can take a
       // garrisoned world (two-phase capture), so a strike group without a landing
-      // can raid provinces but never resolve the war. Load, then move — same tick.
+      // can raid provinces but never resolve the war.
+      // ПОДЪЁМ ЗАНИМАЕТ ЧАС (CARGO-1), и вылет его ОТМЕНЯЕТ — поэтому «погрузить и
+      // улететь одним тиком» больше не работает: группа ждёт свой десант дома и
+      // уходит следующим тиком уже с ним. Без ожидания она улетала бы пустой и до
+      // конца матча не могла бы взять ни одного гарнизонного мира.
+      if ((f.loading ?? []).length > 0) continue; // подъём идёт — стоим
       const militia = base.garrison.find((s) => s.unit === 'militia' && s.count > 0);
       const hasLanding = (f.landing ?? []).some((s) => s.count > 0);
       if (!hasLanding && militia) {
         out.push(loadArmy(ai, f.id, 'militia', Math.min(2, militia.count)));
+        continue; // час подъёма — вылет следующим тиком
       }
     }
     const here = state.planets[f.location];

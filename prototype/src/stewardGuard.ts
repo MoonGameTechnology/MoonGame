@@ -317,11 +317,31 @@ export function stewardGuardOrders(
     for (const s of p.garrison) {
       if (s.count <= 0 || !liftable(s.unit) || left.has(s.unit)) continue;
       const healthy = findHealthyStack(p.garrison, s.unit);
-      if (healthy) left.set(s.unit, healthy.count);
+      if (!healthy) continue;
+      // Обещанное идущими подъёмами (CARGO-1) стоит в гарнизоне, но уже занято: без
+      // вычитания второй паром спланировал бы ту же роту и получил бы `E_NO_ARMY`.
+      let claimed = 0;
+      for (const fl of Object.values(state.fleets)) {
+        for (const c of fl.loading ?? []) {
+          if (c.from === p.id && c.unit === s.unit) claimed += c.count;
+        }
+      }
+      left.set(s.unit, Math.max(0, healthy.count - claimed));
     }
-    // Docked fleets fly out — lifting what garrison fits their holds first
-    // (load and move stack in one tick: actions apply in order while docked).
+    // Docked fleets fly out — lifting what garrison fits their holds first.
+    // ПОГРУЗКА ЗАНИМАЕТ ЧАС (CARGO-1), поэтому «погрузить и улететь одним тиком»
+    // больше не работает: вылет ОТМЕНЯЕТ незавершённый подъём, и паром ушёл бы
+    // пустым, бросив тех, за кем пришёл. Носитель, у которого подъём идёт, этот тик
+    // СТОИТ; уходит он следующим тиком после срока — эвакуация стала дороже на час,
+    // и это ровно та цена, ради которой час и заводили.
+    let acted = 0; // сколько паромов реально получили приказ В ЭТОТ тик
     for (const f of docked) {
+      // Подъём уже идёт — этот тик про него и есть: ни второго заказа, ни вылета.
+      if ((f.loading ?? []).length > 0) {
+        tasked.add(f.id);
+        continue;
+      }
+      let lifting = false;
       if (!assaulted) {
         let free = freeHold(f);
         for (const [unit, have] of left) {
@@ -332,21 +352,31 @@ export function stewardGuardOrders(
           out.push(loadArmy(ai, f.id, unit, n));
           left.set(unit, have - n);
           free -= n * size;
+          lifting = true;
         }
+      }
+      if (lifting) {
+        acted += 1;
+        tasked.add(f.id); // занят подъёмом — другие правила его в этот тик не трогают
+        continue;
       }
       // A standing patrol flies out with its carrier: stand it down first (the
       // sortie is stashed, BF-26) so no stale patrol record points at this node.
       if ((state as GuardState).patrols?.[f.id]) out.push(orderScramble(ai, f.id, false));
       out.push(moveFleet(ai, f.id, haven));
+      acted += 1;
       tasked.add(f.id);
     }
-    if (docked.length > 0) {
+    // Журнал рассказывает о РЕШЕНИИ, а не о состоянии: пока идёт часовой подъём,
+    // драйвер молчит, иначе одна и та же эвакуация переписывалась бы в него каждый
+    // тик этого часа.
+    if (acted > 0) {
       report.push({
         at: state.time,
         kind: 'evac',
         node: p.id,
         to: haven,
-        count: docked.length,
+        count: acted,
         fraction: frac(stand.defender.damageFraction),
       });
     }
