@@ -53,6 +53,29 @@ export const barrageFleet = (playerId: string, fleetId: string, targetId: string
 /** Set an artillery fleet's rules of engagement (passive/return/standard/aggressive). */
 export const barrageModeFleet = (playerId: string, fleetId: string, mode: string) =>
   act(playerId, 'fleet.barrageMode', { fleetId, mode });
+/** Поднять вылет челноков из порта мира по цели (SHU-1.2). `troops` — груз десантного
+ *  вылета (ROS-1.5); обычному удару он не нужен и не передаётся. */
+export const strikeShuttle = (
+  playerId: string,
+  planetId: string,
+  unit: string,
+  count: number,
+  target: { targetFleetId: string } | { targetPlanetId: string },
+  troops?: Array<{ unit: string; count: number }>,
+) =>
+  act(playerId, 'shuttle.strike', {
+    planetId,
+    unit,
+    count,
+    ...target,
+    ...(troops && troops.length > 0 ? { troops } : {}),
+  });
+/** Перегрузка челноков между космопортом мира и стоящим там носителем (SHU-2.1):
+ *  `load` — с мира на борт, `unload` — с борта на мир. */
+export const loadShuttle = (playerId: string, fleetId: string, unit: string, count = 1) =>
+  act(playerId, 'shuttle.load', { fleetId, unit, count });
+export const unloadShuttle = (playerId: string, fleetId: string, unit: string, count = 1) =>
+  act(playerId, 'shuttle.unload', { fleetId, unit, count });
 export const loadArmy = (playerId: string, fleetId: string, unit: string, count = 1) =>
   act(playerId, 'army.load', { fleetId, unit, count });
 export const unloadArmy = (playerId: string, fleetId: string, unit: string, count = 1) =>

@@ -163,6 +163,11 @@ export {
   spendSortie,
   tickRearm,
   fleetHasShuttle,
+  // SHU-3.1: интерфейс показывает ангар (порт мира и трюм носителя) и обязан считать
+  // вместимость ТОЙ ЖЕ функцией, что и ядро, — своя копия разъехалась бы на первой правке.
+  shuttleBayAt,
+  fleetShuttleBay,
+  hangarUsed,
   shuttleStrikeRange,
   withinRange,
   shuttleReaches,
