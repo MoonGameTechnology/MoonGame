@@ -445,6 +445,20 @@ export interface FleetEdge {
   t: number;
 }
 
+/** One ground lift in progress — see `Fleet.loading` (CARGO-1). A CLAIM, not custody:
+ *  the units stay in the garrison until the hour is up, so nothing is ever in limbo. */
+export interface LoadingClaim {
+  unit: string;
+  count: number;
+  /** The world the units are lifted from. The lift only completes while the fleet is
+   *  still docked THERE — flying away is how a player cancels it. */
+  from: PlanetId;
+  /** World-time (ms) the lift began — the client draws the filling pip from it. */
+  startAt: number;
+  /** World-time (ms) the lift finishes. */
+  doneAt: number;
+}
+
 export interface Fleet {
   id: FleetId;
   owner: PlayerId;
@@ -458,6 +472,12 @@ export interface Fleet {
   /** Ground army carried as cargo (the landing force of a ground assault),
    *  bounded by the ships' transport capacity — see the `army` module. */
   landing?: UnitStack[];
+  /** Ground lifts in progress (CARGO-1): a lift takes a game-hour, so the order
+   *  lives HERE, in the world, instead of in a client's memory. The units are still
+   *  in the world's garrison — they defend it, and no other order can draw them —
+   *  but they are promised to this fleet and become `landing` when the hour is up.
+   *  Absent/empty = nothing being winched aboard. */
+  loading?: LoadingClaim[];
   /** Shuttles BASED on this fleet's carriers (SHU-2.1) — the mobile equivalent of
    *  `Planet.hangar`. NOT part of `units`: a based shuttle is not a ship of the line,
    *  it never fires in a battle round and never soaks a volley; it only flies sorties.

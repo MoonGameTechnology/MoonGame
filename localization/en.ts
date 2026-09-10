@@ -2071,7 +2071,7 @@ export const en: Record<string, string> = {
   'troops.damaged': "damaged units don't embark",
   'troops.hold': 'hold {a}/{b}',
   'troops.planned': 'ordered {n}',
-  'troops.timing': 'loading ≈1h per unit · unloading is instant',
+  'troops.timing': 'loading ≈1h · unloading is instant',
   'troops.title': 'TROOPS',
 
   // --- upd — Баннер обновления сборки (APK; в браузере не показывается).

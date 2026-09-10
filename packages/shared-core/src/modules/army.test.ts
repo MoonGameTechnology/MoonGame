@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { createKernel } from '../kernel/kernel';
 import { armyModule } from './army';
 import { diplomacyModule } from './diplomacy';
+import { movementModule } from './movement';
 import { setMapShare, setStance } from '../state/diplomacy';
 import {
   createInitialState,
@@ -50,6 +51,14 @@ const data: GameData = parseGameData({
   events: {},
 });
 const ctx: Context = { now: 0, data };
+const HOUR = 3_600_000;
+const at = (now: number): Context => ({ now, data });
+/** Прокрутить мир до `now` — именно так созревает часовая погрузка (CARGO-1). */
+function advanced(kernel: ReturnType<typeof createKernel>, st: GameState, now: number): GameState {
+  const r = kernel.advanceTo(st, at(now));
+  if (!r.ok) throw new Error(`advance failed: ${r.code}`);
+  return r.state;
+}
 
 function player(id: string): Player {
   return { id, name: id, faction: 'x', status: 'active', resources: {} };
@@ -99,6 +108,13 @@ const load = (fleetId: string, unit: string, count?: number, playerId = 'p1'): A
   payload: { fleetId, unit, count },
   issuedAt: 0,
 });
+const move = (fleetId: string, to: string, playerId = 'p1'): Action => ({
+  id: `a:${playerId}:move`,
+  type: 'fleet.move',
+  playerId,
+  payload: { fleetId, to },
+  issuedAt: 0,
+});
 const unload = (fleetId: string, unit: string, count?: number, playerId = 'p1'): Action => ({
   id: `a:${playerId}:2`,
   type: 'army.unload',
@@ -128,15 +144,79 @@ const base = () =>
   });
 
 describe('army module — loading ground army onto fleets', () => {
-  it('loads ground army from the garrison into the fleet (within capacity)', () => {
+  it('loads ground army from the garrison into the fleet — after the hour, not at once', () => {
     const kernel = createKernel([armyModule]);
     const r = okApply(kernel.applyAction(base(), load('F', 'militia', 3), ctx));
-    expect(r.state.fleets.F?.landing).toEqual([{ unit: 'militia', count: 3 }]);
+    // Заказ принят, но трюм ещё пуст, а рота — на месте: она СТОИТ в гарнизоне.
+    expect(r.state.fleets.F?.landing ?? []).toEqual([]);
     expect(r.state.planets.A?.garrison).toEqual([
+      { unit: 'militia', count: 4 },
+      { unit: 'tank', count: 2 },
+    ]);
+    expect(r.state.fleets.F?.loading).toEqual([
+      { unit: 'militia', count: 3, from: 'A', startAt: 0, doneAt: HOUR },
+    ]);
+    expect(r.events.map((e) => e.type)).toContain('army.loading');
+    expect(r.events.map((e) => e.type)).not.toContain('army.loaded');
+
+    // Час прошёл — вот теперь рота на борту, и заявки больше нет.
+    const done = advanced(kernel, r.state, HOUR);
+    expect(done.fleets.F?.landing).toEqual([{ unit: 'militia', count: 3 }]);
+    expect(done.planets.A?.garrison).toEqual([
       { unit: 'militia', count: 1 },
       { unit: 'tank', count: 2 },
     ]);
-    expect(r.events.map((e) => e.type)).toContain('army.loaded');
+    expect(done.fleets.F?.loading).toBeUndefined();
+  });
+
+  it('до срока не поднимает НИЧЕГО — даже за минуту до', () => {
+    const kernel = createKernel([armyModule]);
+    const r = okApply(kernel.applyAction(base(), load('F', 'militia', 3), ctx));
+    const almost = advanced(kernel, r.state, HOUR - 60_000);
+    expect(almost.fleets.F?.landing ?? []).toEqual([]);
+    expect(almost.fleets.F?.loading).toHaveLength(1);
+  });
+
+  it('идущая погрузка БРОНИРУЕТ гарнизон: второй флот у того же мира её не вычерпает', () => {
+    const kernel = createKernel([armyModule]);
+    const st = stateWith({
+      players: [player('p1')],
+      planets: [planet('A', 'p1', [['militia', 4]])],
+      fleets: [
+        fleet('F', 'p1', 'A', [['dropship', 1]]),
+        fleet('G', 'p1', 'A', [['dropship', 1]]),
+      ],
+    });
+    const first = okApply(kernel.applyAction(st, load('F', 'militia', 3), ctx)).state;
+    // В гарнизоне ЧЕТЫРЕ и все на месте, но три уже обещаны — свободна одна.
+    expect(first.planets.A?.garrison).toEqual([{ unit: 'militia', count: 4 }]);
+    expect(errCode(kernel.applyAction(first, load('G', 'militia', 2, 'p1'), ctx))).toBe('E_NO_ARMY');
+    okApply(kernel.applyAction(first, load('G', 'militia', 1, 'p1'), ctx));
+  });
+
+  it('ушёл — значит отменил: заявка снимается в тот же миг, а не висит бронью весь час', () => {
+    // Через НАСТОЯЩЕЕ движение: правило держится на факте `fleet.departed`, и
+    // подделка этого факта проверяла бы подделку.
+    const kernel = createKernel([movementModule, armyModule]);
+    const st = stateWith({
+      players: [player('p1')],
+      planets: [planet('A', 'p1', [['militia', 4]]), planet('B', 'p1')],
+      fleets: [fleet('F', 'p1', 'A', [['dropship', 1]]), fleet('G', 'p1', 'A', [['dropship', 1]])],
+    });
+    st.planets.B!.position = { x: 10, y: 0 };
+    st.planets.A!.links = ['B'];
+    st.planets.B!.links = ['A'];
+    const ordered = okApply(kernel.applyAction(st, load('F', 'militia', 3), ctx)).state;
+    expect(errCode(kernel.applyAction(ordered, load('G', 'militia', 2), ctx))).toBe('E_NO_ARMY');
+
+    const flew = okApply(kernel.applyAction(ordered, move('F', 'B'), ctx)).state;
+    expect(flew.fleets.F?.loading).toBeUndefined(); // заявка снята сразу
+    expect(flew.planets.A?.garrison).toEqual([{ unit: 'militia', count: 4 }]); // ничего не пропало
+    okApply(kernel.applyAction(flew, load('G', 'militia', 4), ctx)); // бронь отпустила гарнизон
+
+    // И час спустя улетевший ничего не «догружает».
+    const later = advanced(kernel, flew, HOUR);
+    expect(later.fleets.F?.landing ?? []).toEqual([]);
   });
 
   it('rejects loading beyond the fleet transport capacity', () => {
@@ -157,8 +237,12 @@ describe('army module — loading ground army onto fleets', () => {
       fleets: [fleet('F', 'p1', 'A', [['dropship', 1]])], // capacity 12
     });
     const r = okApply(kernel.applyAction(st, load('F', 'tank', 4), ctx)); // 4 × 3 = 12, exactly full
-    expect(r.state.fleets.F?.landing).toEqual([{ unit: 'tank', count: 4 }]);
+    // Трюм занят ОБЕЩАНИЕМ, ещё до того как танки въехали: иначе два заказа подряд
+    // пообещали бы один и тот же отсек.
     expect(errCode(kernel.applyAction(r.state, load('F', 'tank', 1), ctx))).toBe('E_NO_CAPACITY');
+    const done = advanced(kernel, r.state, HOUR);
+    expect(done.fleets.F?.landing).toEqual([{ unit: 'tank', count: 4 }]);
+    expect(errCode(kernel.applyAction(done, load('F', 'tank', 1), at(HOUR)))).toBe('E_NO_CAPACITY');
   });
 
   it('rejects a space unit as cargo (only the ground army is carried)', () => {

@@ -258,14 +258,34 @@ describe('AI-BAL-7 — осада (`fleet.bombard`)', () => {
 });
 
 describe('AI-BAL-7 — кулак делится (`fleet.split`)', () => {
-  /** Крупная ударная группа, стоящая на СВОЁМ мире и готовая отчалить. */
+  /** Крупная ударная группа, стоящая на СВОЁМ мире и готовая отчалить.
+   *  Трюм уже занят намеренно: с CARGO-1 подъём десанта занимает ЧАС, и флот с
+   *  пустым трюмом у стены гарнизона сперва грузится (свой тест ниже), а отчаливает
+   *  следующим тиком. Здесь проверяется РАСКОЛ, поэтому час выведен за скобки. */
   function fistState(s: GameState, ships: number): GameState {
     const home = homeOf(s, 'p2');
     return {
       ...atWar(s),
-      fleets: { 'f:fist': fleetAt('f:fist', 'p2', home, [{ unit: 'cruiser', count: ships }]) },
+      fleets: {
+        'f:fist': fleetAt('f:fist', 'p2', home, [{ unit: 'cruiser', count: ships }], {
+          landing: [{ unit: 'militia', count: 99 }], // трюм полон — поднимать нечего
+        }),
+      },
     };
   }
+
+  it('с ПУСТЫМ трюмом кулак сперва грузится и никуда не отчаливает (CARGO-1)', () => {
+    const s = game2();
+    const home = homeOf(s, 'p2');
+    const empty: GameState = {
+      ...atWar(s),
+      fleets: { 'f:fist': fleetAt('f:fist', 'p2', home, [{ unit: 'cruiser', count: 8 }]) },
+    };
+    const orders = aiOrders(empty, 'p2', 'expand', 'strong');
+    expect(only(orders, 'army.load').length).toBeGreaterThan(0);
+    expect(only(orders, 'fleet.move')).toHaveLength(0);
+    expect(only(orders, 'fleet.split')).toHaveLength(0);
+  });
 
   it('крупный кулак отчаливает ПОЛОВИНОЙ, вторая остаётся дома', () => {
     const s = game2();
@@ -307,10 +327,16 @@ describe('AI-BAL-7 — кулак делится (`fleet.split`)', () => {
     const staged: GameState = {
       ...atWar(s),
       fleets: {
-        'f:fist': fleetAt('f:fist', 'p2', home, [
-          { unit: 'cruiser', count: 8 },
-          { unit: 'hero', count: 2 },
-        ]),
+        'f:fist': fleetAt(
+          'f:fist',
+          'p2',
+          home,
+          [
+            { unit: 'cruiser', count: 8 },
+            { unit: 'hero', count: 2 },
+          ],
+          { landing: [{ unit: 'militia', count: 99 }] }, // трюм полон: час подъёма вне этого теста
+        ),
       },
     };
     const take = payloads<{ take: Array<{ unit: string }> }>(
