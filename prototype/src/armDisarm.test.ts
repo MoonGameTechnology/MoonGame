@@ -12,7 +12,6 @@ describe('keepsArmed', () => {
 
   // Правило 2: подкоманды поповера — свои, иначе меню закрывалось бы от своей же кнопки.
   it('keeps a popover alive while the player works inside it', () => {
-    expect(keepsArmed('firemode', 'fmset')).toBe(true);
     expect(keepsArmed('cast', 'castdo')).toBe(true);
     expect(keepsArmed('troops', 'tstep')).toBe(true);
     expect(keepsArmed('troops', 'tmax')).toBe(true);
@@ -65,16 +64,15 @@ describe('ALWAYS_DISARMED', () => {
 
 describe('the table itself', () => {
   // Правило 6: `chainMode` в таблицу не входит — полоска цепочки заменяет ряд целиком.
-  it('covers the eight row states and not the chain mode', () => {
+  it('covers the five row states and not the chain mode', () => {
     expect(STATES.sort()).toEqual(
-      ['assault', 'barrage', 'cast', 'engage', 'firemode', 'merge', 'pick', 'troops'].sort(),
+      ['assault', 'cast', 'engage', 'merge', 'pick', 'troops'].sort(),
     );
     expect(STATES).not.toContain('chain' as ArmedState);
   });
 
   it('lists every state under its own name first', () => {
     expect(KEEPS_ARMED.merge[0]).toBe('merge');
-    expect(KEEPS_ARMED.firemode[0]).toBe('firemode');
     expect(KEEPS_ARMED.troops[0]).toBe('troops');
   });
 });

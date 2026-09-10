@@ -181,14 +181,6 @@ export function unitDossier(id: string, pcUi: boolean): Dossier | null {
           r: hl(def.radarRange ?? 0),
         }),
       };
-    case 'artillery':
-      return {
-        name: t('dossier.unit.artillery.name'),
-        body: t('dossier.unit.artillery.desc', {
-          a: hl(st.attack),
-          hp: hl(st.hp),
-        }),
-      };
     case 'strike_carrier':
       return {
         name: t('dossier.unit.strike-carrier.name'),

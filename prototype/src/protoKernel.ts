@@ -18,7 +18,6 @@ import {
   heroEffectsModule,
   combatModule,
   orbitalModule,
-  artilleryModule,
   interceptModule,
   captureOnArrivalModule,
   sectorModule,
@@ -64,10 +63,8 @@ export const MODULES: GameModule[] = [
   heroEffectsModule, // first hero.effect.<type> capability provider: recall (warp ship home)
   // The combat family (split along the bus seams). Order matters (invariant #6):
   // orbital stamps orbit on fleet.arrived BEFORE combat engages, and runs its
-  // AA/bombard span BEFORE artillery's standoff span — the old internal sequence.
   orbitalModule, // the single near-orbit: stationing, AA fire, bombardment
   combatModule, // melee battles: engage / tick / assault / retreat / capture
-  artilleryModule, // standoff fire accrual + barrage orders
   interceptModule, // schedules lane-crossing meetings (resolved by combat)
   captureOnArrivalModule, // walk-in capture now a kernel rule (was client-side seizeSector)
   constructionModule,

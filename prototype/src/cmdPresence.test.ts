@@ -3,8 +3,6 @@ import { cmdShown, type CmdSelection } from './cmdPresence';
 
 const пусто: CmdSelection = {
   stoppable: false,
-  anyArtillery: false,
-  ownArtillery: 0,
   castHero: false,
   more: false,
   picking: false,
@@ -22,19 +20,6 @@ describe('cmdPresence — что показывается отсутствием
     expect(cmdShown(с({ castHero: true })).cast).toBe(true);
   });
 
-  it('обстрел и режим огня — только при артиллерии', () => {
-    expect(cmdShown(пусто).barrage).toBe(false);
-    expect(cmdShown(пусто).firemode).toBe(false);
-    expect(cmdShown(с({ anyArtillery: true, ownArtillery: 2 })).barrage).toBe(true);
-    expect(cmdShown(с({ anyArtillery: true, ownArtillery: 2 })).firemode).toBe(true);
-  });
-
-  // Сторож: два входа заведены НАРОЧНО — в кадре это два разных выражения.
-  it('обстрел и режим огня спрашивают РАЗНОЕ и могут разойтись', () => {
-    const чужая = с({ anyArtillery: true, ownArtillery: 0 });
-    expect(cmdShown(чужая).barrage).toBe(true);
-    expect(cmdShown(чужая).firemode).toBe(false);
-  });
 });
 
 describe('cmdPresence — набор группы (правило 4)', () => {

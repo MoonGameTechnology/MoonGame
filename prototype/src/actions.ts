@@ -46,13 +46,6 @@ export const retreatFleet = (playerId: string, fleetId: string) =>
   act(playerId, 'fleet.retreat', { fleetId });
 export const bombardFleet = (playerId: string, fleetId: string, on: boolean) =>
   act(playerId, 'fleet.bombard', { fleetId, on });
-/** Focus an artillery fleet's standoff fire on one enemy fleet (targetId), or
- *  clear (targetId null) to auto-target the nearest hostile in range. */
-export const barrageFleet = (playerId: string, fleetId: string, targetId: string | null) =>
-  act(playerId, 'fleet.barrage', { fleetId, targetId });
-/** Set an artillery fleet's rules of engagement (passive/return/standard/aggressive). */
-export const barrageModeFleet = (playerId: string, fleetId: string, mode: string) =>
-  act(playerId, 'fleet.barrageMode', { fleetId, mode });
 /** Поднять вылет челноков из порта мира по цели (SHU-1.2). `troops` — груз десантного
  *  вылета (ROS-1.5); обычному удару он не нужен и не передаётся. */
 export const strikeShuttle = (

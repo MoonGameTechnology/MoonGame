@@ -8,8 +8,6 @@ import {
   stopFleet,
   orbitFleet,
   bombardFleet,
-  barrageFleet,
-  barrageModeFleet,
   assaultFleet,
   retreatFleet,
   loadArmy,
@@ -59,8 +57,6 @@ const CLIENT_ACTIONS: Action[] = [
   stopFleet(P, 'f1'),
   orbitFleet(P, 'f1'),
   bombardFleet(P, 'f1', true),
-  barrageFleet(P, 'f1', 'f2'),
-  barrageModeFleet(P, 'f1', 'aggressive'),
   assaultFleet(P, 'f1'),
   retreatFleet(P, 'f1'),
   loadArmy(P, 'f1', 'infantry', 2),
@@ -105,7 +101,6 @@ const CLIENT_ACTIONS: Action[] = [
     { kind: 'wait', hours: 2 },
     { kind: 'move', to: 'C1R1' },
     { kind: 'assault' },
-    { kind: 'strike', target: null, hours: 3 },
   ]),
   orderChain(P, 'f1', []), // снять план — тоже клиентский интент (✓ на пустом черновике)
 ];

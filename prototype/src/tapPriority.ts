@@ -32,7 +32,6 @@
 export type TapOwner =
   | 'chain-plan' // режим «Приказ»
   | 'merge' // слияние флотов
-  | 'barrage' // наводка залпа
   | 'cast' // применение способности героя
   | 'deploy' // высадка героя
   | 'assault' // штурм с ПК
@@ -46,7 +45,6 @@ export type TapOwner =
 export interface TapModes {
   chainMode: boolean;
   merging: boolean;
-  barrageAim: boolean;
   heroAim: boolean;
   heroSpawnAim: boolean;
   assaultAim: boolean;
@@ -64,7 +62,6 @@ export interface TapModes {
 export function tapOwner(m: TapModes): TapOwner {
   if (m.chainMode) return 'chain-plan'; // правило 1
   if (m.merging) return 'merge';
-  if (m.barrageAim) return 'barrage';
   if (m.heroAim) return 'cast';
   if (m.heroSpawnAim) return 'deploy';
   if (m.assaultAim) return 'assault';

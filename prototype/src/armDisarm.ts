@@ -36,8 +36,6 @@
 /** Взводимое состояние командного ряда, которое гаснет от чужой команды. */
 export type ArmedState =
   | 'merge'
-  | 'barrage'
-  | 'firemode'
   | 'cast'
   | 'troops'
   | 'assault'
@@ -50,8 +48,6 @@ export type ArmedState =
  */
 export const KEEPS_ARMED: Record<ArmedState, readonly string[]> = {
   merge: ['merge'],
-  barrage: ['barrage'],
-  firemode: ['firemode', 'fmset'],
   cast: ['cast', 'castdo'],
   troops: ['troops', 'tstep', 'tmax', 'tok'],
   assault: ['attack'],

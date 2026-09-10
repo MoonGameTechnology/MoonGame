@@ -153,8 +153,6 @@ export {
   assaultFleet,
   retreatFleet,
   bombardFleet,
-  barrageFleet,
-  barrageModeFleet,
   loadArmy,
   unloadArmy,
   launchFleet,

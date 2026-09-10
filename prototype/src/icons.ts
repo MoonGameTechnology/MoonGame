@@ -43,7 +43,6 @@ export const UNIT_ICON: Record<string, string> = {
   cruiser: '▲',
   scout: '◌',
   siege: '✦',
-  artillery: '✧', // the standoff battery — a lighter echo of the siege platform ✦
   strike_carrier: '⊟', // десантный корабль — сплошной трюм, ни одного орудийного отсека
   shuttle_carrier: '⬢', // плавучий космопорт — сплошной корпус, весь объём под ангар
   interceptor: '△', // light strike wing (hollow, to read apart from the cruiser ▲)

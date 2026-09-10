@@ -282,9 +282,7 @@ export const en: Record<string, string> = {
 
   // --- chain — Режим «Приказ»: полоска плана, меню точки, отказы.
   'chain.add-wait6': '⏱ +6h',
-  'chain.fire': '🎯 Fire +1h',
   'chain.full': 'plan is full — 8 steps',
-  'chain.no-art': 'nothing in the selection fires at range',
   'chain.overwrite': 'fleet plans differ — sending replaces them all',
   'chain.undo': 'Undo step',
 
@@ -293,23 +291,11 @@ export const en: Record<string, string> = {
   'cmd.assault.hint': 'fly to an enemy world and land troops on arrival',
   'cmd.auto-assault': 'Auto-storm',
   'cmd.auto-assault.hint': 'the fleet storms an enemy world by itself on arrival',
-  'cmd.barrage': 'Barrage',
-  'cmd.barrage.hint': 'focus artillery fire on an enemy fleet from standoff range',
   'cmd.cast': 'Cast',
   'cmd.cast.cooldown': 'CD {h}',
   'cmd.cast.hint': "use a hero ability from the fleet's roster",
   'cmd.cast.needs-target': 'target on map',
   'cmd.cast.self': 'in place',
-  'cmd.fire.aggressive': 'Aggr',
-  'cmd.fire.aggressive.hint': 'at anyone except pact/alliance',
-  'cmd.fire.hint': 'when artillery fires on its own: passive · return · standard · aggressive',
-  'cmd.fire.passive': 'Passive',
-  'cmd.fire.passive.hint': 'holds fire',
-  'cmd.fire.return': 'Return',
-  'cmd.fire.return.hint': 'only after the fleet takes damage',
-  'cmd.fire.standard': 'Std',
-  'cmd.fire.standard.hint': 'at declared enemies',
-  'cmd.fire.title': 'Fire mode',
   'cmd.forced-march': 'Boost',
   'cmd.forced-march.hint': 'forced march: +50% speed at the cost of −5% hull per hour under way',
   'cmd.merge': 'Merge',
@@ -547,7 +533,6 @@ export const en: Record<string, string> = {
   'data.ace-programs': 'Ace Programs',
   'data.amber-concord': 'Amber Concord',
   'data.annihilate': 'Annihilate',
-  'data.artillery': 'artillery',
   'data.asteroid-field': 'Asteroid field',
   'data.azure-compact': 'Azure Compact',
   'data.barracks': 'Barracks',
@@ -799,9 +784,6 @@ export const en: Record<string, string> = {
   'dossier.task.queued': 'Queued — not started yet.',
   'dossier.task.title': 'Building',
   'dossier.task.unit-ready': "Joins the planet's garrison/fleet once finished.",
-  'dossier.unit.artillery.desc':
-    'A heavy battery: {a} damage a volley on a glass hull ({hp}). It fires WITH IMPUNITY — while your fleet is the attacker, return fire never reaches it and lands on your other ships instead. That is not immortality: under someone else\'s attack it stands in the REAR line and takes its share, and left alone it takes everything.',
-  'dossier.unit.artillery.name': 'Artillery',
   'dossier.unit.cruiser.desc':
     "The battle line's workhorse: {a} attack, {hp} hull and a hold for {c}. A general-purpose warship, equally solid on offense and defense.",
   'dossier.unit.cruiser.name': 'Cruiser',
@@ -855,14 +837,11 @@ export const en: Record<string, string> = {
   'hint.assault-enemy-only': "⚔ only someone else's world can be stormed",
   'hint.auto-assault':
     '⚔ auto-storm on — the fleet storms the hostile world it arrives at by itself',
-  'hint.barrage-auto': '🎯 auto-target',
-  'hint.barrage-set': '🎯 focus fire set',
   'hint.cast-cancelled': '✖ cast cancelled',
   'hint.deploy-cancelled': '✖ deploy cancelled',
   'hint.forced-march': '⚡ forced march: +50% speed, −5% hull per hour underway',
   'hint.multiselect': '⊕ tap your fleets — build the group, then give a common order',
   'hint.pick-assault': "⚔ pick someone else's world to storm",
-  'hint.pick-barrage': '🎯 tap an enemy fleet to focus fire · empty space = auto',
   'hint.pick-engage': 'tap an enemy fleet — we attack it',
   'hint.engage-enemy-only': 'only an enemy fleet can be attacked',
   'hint.engage-in-flight': 'the target is under way — no course to it; wait until it stops',
@@ -1036,7 +1015,6 @@ export const en: Record<string, string> = {
 
   // --- tgt — Композер приказов (TGT-1): шаги плана, отправка.
   'tgt.add-wait': '⏱ +1h',
-  'tgt.at': '🎯{n}h',
   'tgt.clear': 'clear the order',
   'tgt.fleets': '{n} fleets',
   'tgt.placed': '◎ order set — the fleet will run the plan itself',
@@ -1523,9 +1501,6 @@ export const en: Record<string, string> = {
   'onb.goals.all-done':
     '🏅 All first-session goals done! +{n} XP — you are ready for a real match.',
   'onb.goals.title': 'First-session goals',
-  'onb.intro.artillery.body':
-    'Artillery fires with impunity: while you are the attacker, return fire never reaches it and lands on your other ships instead. Its armor is thin and its place is the rear line, not the front — under someone else\'s attack it dies like anything else.',
-  'onb.intro.artillery.title': 'Artillery — fire without an answer',
   'onb.intro.async-delay.body':
     'This fleet will arrive in real hours — the world of Void Dominion runs continuously, even while you are offline. You can close the game: your orders carry out on their own, and on your return we will send a notification and show a "while you were away" digest.',
   'onb.intro.async-delay.title': 'The world runs without you',
@@ -1765,7 +1740,6 @@ export const en: Record<string, string> = {
   'ship.module.thruster.name': 'Thruster',
 
   // --- side — Боковая панель матча: конвейеры, карточка флота, бой, досье мира, вкладки гарнизона.
-  'side.arch.artillery': 'artillery',
   'side.arch.combat': 'combat',
   'side.arch.flagship': 'flagship',
   'side.arch.scout': 'scouts',
@@ -1807,7 +1781,6 @@ export const en: Record<string, string> = {
   'effect.in-battle': 'in battle',
   'effect.forced-march': 'forced march',
   'effect.bombarding': 'bombarding',
-  'effect.barrage-focus': 'fire focus',
   'effect.free-flight': 'in flight',
   'effect.patrol': 'standing patrol',
   'effect.rearming': 'rearming {n}',

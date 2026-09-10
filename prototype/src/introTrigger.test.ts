@@ -10,10 +10,6 @@ describe('обучающие вставки — какой приказ что �
     expect(introFor('fleet.retreat', false)).toBe('retreat');
   });
 
-  it('первый залп объясняет артиллерию', () => {
-    expect(introFor('fleet.barrage', false)).toBe('artillery');
-  });
-
   it('СПИСОК ЗАКРЫТ: приказ без своей вставки не поднимает ничего', () => {
     expect(introFor('fleet.split', false)).toBeNull();
     expect(introFor('build.start', false)).toBeNull();
@@ -25,7 +21,6 @@ describe('обучающие вставки — тур владеет экран
   it('ВО ВРЕМЯ ТУРА ВСТАВКИ МОЛЧАТ: двум учителям разом игрок не внемлет', () => {
     expect(introFor('fleet.move', true)).toBeNull();
     expect(introFor('fleet.retreat', true)).toBeNull();
-    expect(introFor('fleet.barrage', true)).toBeNull();
   });
 
   it('после тура те же приказы снова учат', () => {

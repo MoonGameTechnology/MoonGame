@@ -21,7 +21,7 @@ export interface IntroCard {
 }
 
 /** The advanced systems worth a first-contact card. Panel-open triggers for now;
- *  the `trigger` field leaves room for firstAvailable/firstFail (retreat/artillery). */
+ *  the `trigger` field leaves room for firstAvailable/firstFail (retreat). */
 export const INTROS: IntroCard[] = [
   {
     id: 'tech',
@@ -91,14 +91,6 @@ export const INTROS: IntroCard[] = [
     trigger: 'firstFail',
     titleKey: 'onb.intro.retreat.title',
     bodyKey: 'onb.intro.retreat.body',
-  },
-  {
-    // ONB-3 remainder: fired on the FIRST `fleet.barrage` order — the moment standoff
-    // fire becomes tangible, mirroring asyncDelay's "teach on first real use" pattern.
-    id: 'artillery',
-    trigger: 'firstAvailable',
-    titleKey: 'onb.intro.artillery.title',
-    bodyKey: 'onb.intro.artillery.body',
   },
 ];
 

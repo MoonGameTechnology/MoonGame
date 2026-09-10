@@ -8,7 +8,7 @@ import { getStance, type DiplomacyCapability } from '../state/diplomacy';
 /**
  * Shared combat primitives — the damage model, combatant-side accessors,
  * hostility test and lane-occupancy math used by the combat family of modules
- * (`combat` melee battles, `orbital` AA/bombardment, `artillery` standoff fire,
+ * (`combat` melee battles, `orbital` AA/bombardment,
  * `intercept` lane crossings). A helper library, NOT a module: the modules stay
  * decoupled from each other (invariant #3) and share only these pure(ish)
  * functions, exactly like `util/fleet.ts` / `state/route.ts`.
@@ -24,18 +24,16 @@ export type Tier = 'front' | 'mid' | 'rear';
  *  present in the fight is hit in the same volley; the order decides only which
  *  line rounds UP when an absent line's share is split (see {@link lineShares}).
  *
- *  ROS-2.1: there used to be a FOURTH line, `artillery`, carried by the trait of
- *  the same name. It is gone: artillery now fights from the rear like any other
- *  hull, and what the trait buys it is immunity to RETURN fire (see
- *  {@link damageUnits}), not a line of its own. */
+ *  ROS-2.1 dropped a fourth line that a since-removed trait carried; every hull
+ *  now states its own line and there is no exception to it. */
 export const TIER_ORDER: readonly Tier[] = ['front', 'mid', 'rear'];
 
 /** Share of an incoming volley each line takes, in whole percent (sums to 100).
  *  A line with no live ship takes nothing and its share is split across the lines
  *  that ARE present. Balance constants (like COMBAT_UNIT_CAP) — data after shakeout.
  *
- *  50/30/20 since ROS-2.1: the old 40/30/20/10 only summed to 100 together with the
- *  artillery line, so dropping that line had to redistribute its ten percent. */
+ *  50/30/20 since ROS-2.1: the old 40/30/20/10 only summed to 100 together with a
+ *  fourth line, so dropping that line had to redistribute its ten percent. */
 export const LINE_SHARE: Readonly<Record<Tier, number>> = {
   front: 50,
   mid: 30,
@@ -49,20 +47,13 @@ export const LINE_SHARE: Readonly<Record<Tier, number>> = {
  * ground unit shares the front line and the whole volley lands on it — the split
  * below can never carve up an army.
  *
- * ROS-2.1: the `artillery` trait no longer decides a line. It buys immunity to
- * return fire instead, and an artillery hull states its line like everyone else.
+ * No hull overrides its line: `def.line` is the whole rule.
  */
 export function unitTier(def: UnitDef): Tier {
   if (def.domain === 'ground') {
     return 'front';
   }
   return def.line;
-}
-
-/** Does this hull fire without taking the answer? ROS-2.1 — the whole meaning of
- *  the `artillery` trait after its line and its standoff fire were removed. */
-export function firesWithImpunity(def: UnitDef): boolean {
-  return def.traits.includes('artillery');
 }
 
 /**
@@ -72,7 +63,7 @@ export function firesWithImpunity(def: UnitDef): boolean {
  * Base split is {@link LINE_SHARE}; an ABSENT line takes nothing and its percent
  * is divided EVENLY among the present ones. When that division is not whole, the
  * odd percent goes to the more forward lines (bow rounds up, stern rounds down) —
- * so front+mid+rear with no artillery is 44/33/23, not 43/33/23 or 44/34/23.
+ * so an even split of a missing line's 20% is 60/40, never 61/39.
  * One line alone therefore always takes 100%.
  *
  * `present` need not be sorted: the result is read off {@link TIER_ORDER}, so the
@@ -229,12 +220,11 @@ function damageLine(
   amount: number,
   data: GameData,
   deaths: { unit: string; count: number }[],
-  spared: ReadonlySet<string> = EMPTY_SET,
 ): number {
   let remaining = amount;
   const stacks = units
     .filter((s) => {
-      if (!isTargetable(s, data, spared)) {
+      if (!isTargetable(s, data)) {
         return false;
       }
       const def = data.units[s.unit];
@@ -287,47 +277,19 @@ function damageLine(
   return remaining;
 }
 
-/** Can this stack be hit by the volley being distributed? Everything alive can,
- *  EXCEPT artillery while the volley is return fire and someone else is still
- *  standing to take it (ROS-2.1). */
-function isTargetable(
-  stack: UnitStack,
-  data: GameData,
-  spared: ReadonlySet<string>,
-): boolean {
-  return stack.count > 0 && !!data.units[stack.unit] && !spared.has(stack.unit);
+/** Can this stack be hit by the volley being distributed? Everything alive can:
+ *  no hull is exempt from a volley aimed at its side. */
+function isTargetable(stack: UnitStack, data: GameData): boolean {
+  return stack.count > 0 && !!data.units[stack.unit];
 }
-
-/** Which units this volley may NOT touch. Empty unless the volley is return fire;
- *  empty as well when artillery is ALL that is left, because sparing everyone would
- *  make such a fleet unkillable — the owner's ruling is «artillery is not immortal».  */
-function sparedUnits(
-  units: readonly UnitStack[],
-  data: GameData,
-  spareArtillery: boolean,
-): ReadonlySet<string> {
-  if (!spareArtillery) return EMPTY_SET;
-  const spared = new Set<string>();
-  let others = 0;
-  for (const s of units) {
-    if (s.count <= 0) continue;
-    const def = data.units[s.unit];
-    if (!def) continue;
-    if (firesWithImpunity(def)) spared.add(s.unit);
-    else others += s.count;
-  }
-  return others > 0 ? spared : EMPTY_SET;
-}
-const EMPTY_SET: ReadonlySet<string> = new Set<string>();
 
 /** The lines that have at least one live, TARGETABLE ship, in {@link TIER_ORDER}.
  *  A stack whose unit is missing from `data` belongs to no line — it neither fires
- *  nor is hit; a spared artillery stack is likewise invisible to this volley, so
- *  its line's share is redistributed by the ordinary «absent line» rule. */
-function presentLines(units: readonly UnitStack[], data: GameData, spared: ReadonlySet<string>): Tier[] {
+ *  nor is hit, and its line's share is redistributed by the «absent line» rule. */
+function presentLines(units: readonly UnitStack[], data: GameData): Tier[] {
   return TIER_ORDER.filter((tier) =>
     units.some((s) => {
-      if (!isTargetable(s, data, spared)) {
+      if (!isTargetable(s, data)) {
         return false;
       }
       const def = data.units[s.unit];
@@ -355,16 +317,11 @@ export function damageUnits(
   units: UnitStack[],
   totalDamage: number,
   data: GameData,
-  opts: { sparesArtillery?: boolean } = {},
 ): { survivors: UnitStack[]; deaths: { unit: string; count: number }[] } {
   const deaths: { unit: string; count: number }[] = [];
   let remaining = totalDamage;
   while (remaining > 0) {
-    // Щадимых пересчитываем КАЖДЫМ проходом: перелив может выбить последний
-    // неартиллерийский корпус, и тогда следующий проход обязан бить уже по пушкам —
-    // иначе остаток залпа растворился бы в воздухе.
-    const spared = sparedUnits(units, data, opts.sparesArtillery === true);
-    const lines = presentLines(units, data, spared);
+    const lines = presentLines(units, data);
     if (lines.length === 0) {
       break; // nothing left that can be hit
     }
@@ -377,7 +334,7 @@ export function damageUnits(
       const slice =
         i === lines.length - 1 ? remaining - allocated : (remaining * shares[tier]) / 100;
       allocated += slice;
-      leftover += damageLine(units, tier, slice, data, deaths, spared);
+      leftover += damageLine(units, tier, slice, data, deaths);
     }
     if (leftover >= remaining) {
       break; // absorbed nothing — cannot happen with live lines, but never spin
@@ -395,9 +352,8 @@ export function applyDamage(
   totalDamage: number,
   data: GameData,
   source: Record<string, string>,
-  opts: { sparesArtillery?: boolean } = {},
 ): UnitStack[] {
-  const { survivors, deaths } = damageUnits(units, totalDamage, data, opts);
+  const { survivors, deaths } = damageUnits(units, totalDamage, data);
   for (const d of deaths) {
     h.emit('unit.died', { unit: d.unit, count: d.count, ...source });
   }
@@ -410,7 +366,6 @@ export function applyDamageToSide(
   dmg: number,
   data: GameData,
   location: string,
-  opts: { sparesArtillery?: boolean } = {},
 ): void {
   const units = sideUnits(h.state, ref);
   if (!units) {
@@ -433,16 +388,15 @@ export function applyDamageToSide(
   if (owner != null) {
     source.owner = owner;
   }
-  // Taking damage provokes a fleet's `return` ("ответный") artillery fire mode and
-  // stamps `lastDamagedAt` (shields hold their regen for a delay after being hit).
+  // Taking damage stamps `lastDamagedAt` — shields hold their regen for a delay
+  // after being hit (shields-roadmap SH-1.1).
   if (ref.kind === 'fleet' && dmg > 0) {
     const f = h.state.fleets[ref.fleetId];
     if (f) {
-      f.barrageProvoked = true;
       f.lastDamagedAt = h.ctx.now;
     }
   }
-  setSideUnits(h.state, ref, applyDamage(h, units, dmg, data, source, opts));
+  setSideUnits(h.state, ref, applyDamage(h, units, dmg, data, source));
 }
 
 /** Delete a fleet whose LAST ship just died outside a battle (orbital AA or

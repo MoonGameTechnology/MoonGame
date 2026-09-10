@@ -31,7 +31,7 @@ import { createDevMatch, DEV_MODULES, MODULE_MANIFEST_VERSION, loadShippedData }
  *  состояния — у флота появились заявки на подъём десанта. Правило рядом с самой
  *  константой требует поднимать её и в этом случае, поэтому список просто
  *  перезакреплён за новой версией, без правок.) */
-const PINNED_FOR_VERSION = '13';
+const PINNED_FOR_VERSION = '14';
 
 /** Граф модулей версии `PINNED_FOR_VERSION` — идентификаторы В ПОРЯДКЕ ВЫПОЛНЕНИЯ.
  *  Не алфавит и не набор: порядок здесь и есть предмет договора (инвариант #6). */
@@ -51,7 +51,6 @@ const PINNED_MODULE_IDS = [
   // а свой залп отрабатывает до artillery.
   'orbital',
   'combat',
-  'artillery',
   'intercept',
   'capture-on-arrival',
   'construction',

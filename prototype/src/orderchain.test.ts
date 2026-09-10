@@ -27,7 +27,7 @@ import {
 } from './game';
 
 // CC-1: fleet order chains — Задержка (wait), Точка+ (waypoint moves) and queued
-// abilities («прийти и открыть огонь» = move+barrage) on one authoritative rail.
+// abilities («прийти и штурмовать» = move+assault) on one authoritative rail.
 // The module stores/advances the chain fail-secure; the pure driver core decides the
 // next step; the integration test runs a real march through movementModule.
 
@@ -122,9 +122,6 @@ describe('order.chain — setting the plan (fail-secure)', () => {
       [{ kind: 'wait', hours: -3 }],
       [{ kind: 'wait', hours: Number.NaN }],
       [{ kind: 'wait', hours: MAX_CHAIN_WAIT_HOURS + 1 }],
-      [{ kind: 'barrage', target: 42 }],
-      [{ kind: 'strike', target: null, hours: 0 }],
-      [{ kind: 'strike', target: 42, hours: 2 }],
       [{ kind: 'ability', abilityId: 42 }],
       [{ kind: 'ability', abilityId: 'no_such_ability' }],
       [{ kind: 'ability', abilityId: 'corridor', target: 42 }],
@@ -229,24 +226,7 @@ describe('serverChainActions — the pure driver core', () => {
     expect(parked[0]?.patch).toEqual({ steps: [] });
   });
 
-  it('strike: opens the fire window (focus + deadline), holds, then ceases fire and moves on', () => {
-    const steps: ChainStep[] = [
-      { kind: 'strike', target: 'X', hours: 3 },
-      { kind: 'move', to: 'B' },
-    ];
-    const open = serverChainActions(chained(fleet('F'), steps), 0);
-    expect(open[0]?.actions.map((a) => a.type)).toEqual(['fleet.barrage']);
-    expect(open[0]?.actions[0]?.payload).toEqual({ fleetId: 'F', targetId: 'X' });
-    expect(open[0]?.patch).toEqual({ steps, waitUntil: 3 * HOUR });
-    // mid-window: guns stay hot, the driver stays silent
-    expect(serverChainActions(chained(fleet('F'), steps, 3 * HOUR), HOUR)).toEqual([]);
-    // window elapsed: cease fire (clear focus) and consume the step
-    const done = serverChainActions(chained(fleet('F'), steps, 3 * HOUR), 3 * HOUR);
-    expect(done[0]?.actions[0]?.payload).toEqual({ fleetId: 'F', targetId: null });
-    expect(done[0]?.patch).toEqual({ steps: [{ kind: 'move', to: 'B' }] });
-  });
-
-  it('assault enters orbit first when needed; barrage carries its focus target', () => {
+  it('assault enters orbit first when needed', () => {
     const far = serverChainActions(chained(fleet('F'), [{ kind: 'assault' }]), 0);
     expect(far[0]?.actions.map((a) => a.type)).toEqual(['fleet.orbit', 'fleet.assault']);
     const near = serverChainActions(
@@ -254,8 +234,6 @@ describe('serverChainActions — the pure driver core', () => {
       0,
     );
     expect(near[0]?.actions.map((a) => a.type)).toEqual(['fleet.assault']);
-    const fire = serverChainActions(chained(fleet('F'), [{ kind: 'barrage', target: 'X' }]), 0);
-    expect(fire[0]?.actions[0]?.payload).toEqual({ fleetId: 'F', targetId: 'X' });
   });
 
   it('a busy fleet (in transit / in battle) is left alone until free', () => {

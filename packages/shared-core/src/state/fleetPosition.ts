@@ -4,7 +4,7 @@ import type { Fleet, GameState, PlanetId } from './gameState';
  *  within the lane's [0,1] span, honoring the leg's own [startT, endT]
  *  sub-segment and clamping outside the travel window. THE one copy of the
  *  progress math — movement (fleet.stop), visibility (sensor reach / radar
- *  anchor) and artillery (standoff range) all read it from here, so the
+ *  anchor) all read it from here, so the
  *  interpolation semantics cannot silently fork. */
 export function legT(mv: NonNullable<Fleet['movement']>, now: number): number {
   const span = mv.arrivesAt - mv.departedAt;

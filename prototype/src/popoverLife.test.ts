@@ -4,22 +4,17 @@ import { barStays, popoverLife, type OpenPopovers, type PopoverBases } from './p
 const БАЗА: PopoverBases = {
   selected: 1,
   picking: false,
-  artillery: 1,
   castHero: true,
   troopsInput: true,
   loneId: 'f1',
 };
-const ОТКРЫТО: OpenPopovers = { fire: true, cast: true, troopsFleetId: 'f1' };
+const ОТКРЫТО: OpenPopovers = { cast: true, troopsFleetId: 'f1' };
 const жизнь = (b: Partial<PopoverBases> = {}, o: Partial<OpenPopovers> = {}) =>
   popoverLife({ ...БАЗА, ...b }, { ...ОТКРЫТО, ...o });
 
 describe('поповеры — основание живо', () => {
   it('всё на месте — всё и остаётся', () => {
-    expect(жизнь()).toEqual({ bar: true, fire: true, cast: true, troops: true });
-  });
-
-  it('УШЛА АРТИЛЛЕРИЯ — ГАСНЕТ 🔥: меню режима огня без арт-флотов ни о чём', () => {
-    expect(жизнь({ artillery: 0 }).fire).toBe(false);
+    expect(жизнь()).toEqual({ bar: true, cast: true, troops: true });
   });
 
   it('не стало флагмана — гаснет ✨', () => {
@@ -30,10 +25,8 @@ describe('поповеры — основание живо', () => {
     expect(жизнь({ troopsInput: false }).troops).toBe(false);
   });
 
-  it('гаснет только своё: пропажа героя 🔥 не трогает', () => {
-    const st = жизнь({ castHero: false });
-    expect(st.fire).toBe(true);
-    expect(st.troops).toBe(true);
+  it('гаснет только своё: пропажа героя ⇅ не трогает', () => {
+    expect(жизнь({ castHero: false }).troops).toBe(true);
   });
 });
 
@@ -55,7 +48,6 @@ describe('поповеры — пустое выделение', () => {
   it('ПУСТОЕ ВЫДЕЛЕНИЕ ГАСИТ ВСЁ РАЗОМ: иначе меню всплывёт над следующим флотом', () => {
     expect(жизнь({ selected: 0, loneId: null })).toEqual({
       bar: false,
-      fire: false,
       cast: false,
       troops: false,
     });
@@ -74,9 +66,8 @@ describe('поповеры — пустое выделение', () => {
   });
 
   it('закрытые поповеры при живом выделении так и остаются закрытыми', () => {
-    expect(жизнь({}, { fire: false, cast: false })).toEqual({
+    expect(жизнь({}, { cast: false })).toEqual({
       bar: true,
-      fire: false,
       cast: false,
       troops: true,
     });

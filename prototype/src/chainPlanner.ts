@@ -59,7 +59,7 @@ export function draftFinish(steps: ChainStep[], startId: string | null): string 
   return cur;
 }
 
-export type ChainAct = 'move' | 'wait' | 'wait6' | 'assault' | 'fire' | 'ability';
+export type ChainAct = 'move' | 'wait' | 'wait6' | 'assault' | 'ability';
 
 export interface ChainAbility {
   id: string;
@@ -74,7 +74,6 @@ export interface ChainMenuOpts {
   /** Мир можно штурмовать (capturable-сектор чужого владельца). */
   capturable: boolean;
   /** В выделении есть артиллерия — гейт огневых пунктов. */
-  hasArtillery: boolean;
   /** Способности героя на борту (пусто — героя нет). */
   abilities: ChainAbility[];
 }
@@ -106,7 +105,7 @@ export function applyMenuAction(
   const room = MAX_CHAIN_STEPS - steps.length;
   const grow = (extraH: number): ChainDraft | null => {
     const last = steps[steps.length - 1];
-    if (!last || (last.kind !== 'wait' && last.kind !== 'strike')) return null;
+    if (!last || last.kind !== 'wait') return null;
     if (last.hours >= MAX_CHAIN_WAIT_HOURS) return null;
     steps[steps.length - 1] = {
       ...last,
@@ -134,12 +133,6 @@ export function applyMenuAction(
     }
     case 'assault':
       return point.kind === 'enemy' ? push([{ kind: 'assault' }]) : null;
-    case 'fire': {
-      const target = point.kind === 'fleet' ? point.id : null;
-      const last = steps[steps.length - 1];
-      if (!needMove && last?.kind === 'strike' && last.target === target) return grow(1);
-      return push([{ kind: 'strike', target, hours: 1 }]);
-    }
     case 'ability': {
       if (!ability || room < 1) return null;
       steps.push({
@@ -187,16 +180,6 @@ export function chainMenuItems(
     const ok = can('assault');
     items.push({ act: 'assault', label: `⚔ ${t('cmd.assault')}`, disabled: !ok, why: fullWhy(ok) });
   }
-  if (point.kind === 'enemy' || point.kind === 'fleet') {
-    const ok = opts.hasArtillery && can('fire');
-    items.push({
-      act: 'fire',
-      label: t('chain.fire'),
-      disabled: !ok,
-      keep: true,
-      why: opts.hasArtillery ? fullWhy(ok) : t('chain.no-art'),
-    });
-  }
   if (point.kind !== 'fleet') {
     for (const ab of opts.abilities) {
       const ok = ab.cdH <= 0 && can('ability', ab);
@@ -228,7 +211,7 @@ export interface ChainTimePoint {
  *  текущего перелёта / взведённой задержки); `travelH` — оценка перелёта между
  *  узлами (null — маршрута нет); `abilityHoldH` — остаток кулдауна способности:
  *  единственный холд драйвера, без него времена хвоста систематически врут.
- *  `headRemH` — остаток ПЕРВОГО wait/strike, если драйвер его уже взвёл. */
+ *  `headRemH` — остаток ПЕРВОГО wait, если драйвер его уже взвёл. */
 export function chainTimeline(
   steps: ChainStep[],
   startId: string | null,
@@ -246,7 +229,7 @@ export function chainTimeline(
       if (st.kind === 'move') {
         const dt = cur ? travelH(cur, st.to) : null;
         h = dt === null ? null : h + dt;
-      } else if (st.kind === 'wait' || st.kind === 'strike') {
+      } else if (st.kind === 'wait') {
         h += i === 0 && headRemH !== undefined ? headRemH : st.hours;
       } else if (st.kind === 'ability') {
         h += Math.max(0, abilityHoldH(st.abilityId));
@@ -278,7 +261,6 @@ export function stepGlyph(st: ChainStep): string {
 /** Подпись часов шага для капсулы (пусто — шаг без длительности). */
 export function stepHours(st: ChainStep): string {
   if (st.kind === 'wait') return t('tgt.wait', { n: st.hours });
-  if (st.kind === 'strike') return t('tgt.at', { n: st.hours });
   return '';
 }
 

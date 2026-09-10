@@ -29,13 +29,13 @@ describe('game data schema (docs/architecture.md §2)', () => {
     const data = parseGameData(loadShippedBundle());
     expect(data.version).toBe('0.1.22'); // ROS-1.5 завёл десантный челнок
     expect(data.resources).toContain('microelectronics');
-    // ROS-2.1: трейт `artillery` больше НЕ означает ни своей линии, ни огня с
-    // дистанции — он означает «ответный залп по мне не проходит». Поэтому радиуса у
-    // корпуса нет вовсе, а стоит он в тылу, как всякий тяжёлый корабль.
-    expect(data.units.artillery?.traits).toContain('artillery');
-    expect(data.units.artillery?.line).toBe('rear');
-    for (const id of ['artillery', 'siege', 'siege_lance']) {
-      expect(data.units[id]?.stats.range ?? 0).toBe(0);
+    // Подсистема обстрела снята целиком вместе с трейтом `artillery` и корпусом,
+    // который его носил: ни того, ни другого в шипнутом каталоге больше нет, и
+    // огня с дистанции в игре не существует — радиус не читает никто.
+    expect(data.units.artillery).toBeUndefined();
+    for (const def of Object.values(data.units)) {
+      expect(def.traits).not.toContain('artillery');
+      expect(def.stats.range ?? 0).toBe(0);
     }
     // Линии — строй КОРАБЛЕЙ (GDD §7.2), и ростер заполняет все три.
     expect(data.units.cruiser?.line).toBe('front');

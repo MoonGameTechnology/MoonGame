@@ -2,7 +2,6 @@ import { describe, it, expect } from 'vitest';
 import { createKernel } from '../kernel/kernel';
 import { combatModule } from './combat';
 import { orbitalModule } from './orbital';
-import { artilleryModule } from './artillery';
 import { interceptModule } from './intercept';
 import { economyModule } from './economy';
 import { constructionModule } from './construction';
@@ -21,7 +20,7 @@ import type { Action, AdvanceResult, ApplyResult, Context } from '../action/type
  *  (orbital stamps orbit before combat engages; orbital's AA/bombard span runs
  *  before artillery's standoff span), so these kernels behave exactly like the
  *  pre-split single module. */
-const combatFamily = [orbitalModule, combatModule, artilleryModule, interceptModule];
+const combatFamily = [orbitalModule, combatModule, interceptModule];
 
 const data: GameData = parseGameData({
   version: '0.1.0',

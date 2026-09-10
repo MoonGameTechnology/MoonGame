@@ -27,7 +27,7 @@ beforeAll(() => setLocale('ru')); // под Node рантайм иначе фо�
 const own: ChainPoint = { id: 'A', kind: 'own' };
 const enemy: ChainPoint = { id: 'B', kind: 'enemy' };
 const foe: ChainPoint = { id: 'f-9', kind: 'fleet' };
-const opts = { capturable: true, hasArtillery: true, abilities: [] };
+const opts = { capturable: true, abilities: [] };
 
 describe('черновик и жесты', () => {
   it('финиш маршрута — последний перелёт, иначе старт', () => {
@@ -68,21 +68,6 @@ describe('черновик и жесты', () => {
     expect(applyMenuAction(d, 'wait', own, 'A')).toBeNull();
   });
 
-  it('огонь по флоту — strike с целью, повторный тап растит окно', () => {
-    let d = applyMenuAction(emptyDraft(), 'fire', foe, 'S')!;
-    expect(d.steps).toEqual([{ kind: 'strike', target: 'f-9', hours: 1 }]);
-    d = applyMenuAction(d, 'fire', foe, 'S')!;
-    expect((d.steps[0] as { hours: number }).hours).toBe(2);
-  });
-
-  it('огонь у мира — strike по авто-цели ПОСЛЕ перелёта туда', () => {
-    const d = applyMenuAction(emptyDraft(), 'fire', enemy, 'S')!;
-    expect(d.steps).toEqual([
-      { kind: 'move', to: 'B' },
-      { kind: 'strike', target: null, hours: 1 },
-    ]);
-  });
-
   it('кап 8 шагов: жест, который не влезает, не применяется', () => {
     const steps: ChainStep[] = Array.from({ length: MAX_CHAIN_STEPS - 1 }, (_, i) => ({
       kind: 'move',
@@ -113,22 +98,13 @@ describe('меню точки — «в зависимости от того, ч�
     expect(acts).toEqual(['move', 'wait', 'wait6']);
   });
 
-  it('вражеский capturable-мир добавляет штурм и огонь', () => {
+  it('вражеский capturable-мир добавляет штурм', () => {
     const acts = chainMenuItems(emptyDraft(), enemy, 'S', opts).map((i) => i.act);
-    expect(acts).toEqual(['move', 'wait', 'wait6', 'assault', 'fire']);
+    expect(acts).toEqual(['move', 'wait', 'wait6', 'assault']);
   });
 
-  it('вражеский флот — только огонь', () => {
-    const acts = chainMenuItems(emptyDraft(), foe, 'S', opts).map((i) => i.act);
-    expect(acts).toEqual(['fire']);
-  });
-
-  it('без дальнобойных орудий огонь серый, и причина написана в пункте', () => {
-    // ROS-2.1a: причина названа по ДАЛЬНОСТИ, а не по роду войск — артиллерия в
-    // выделении как раз может быть, только стрелять издалека ей больше нечем.
-    const fire = chainMenuItems(emptyDraft(), foe, 'S', { ...opts, hasArtillery: false })[0]!;
-    expect(fire.disabled).toBe(true);
-    expect(fire.why).toBe('в выделении нет дальнобойных орудий');
+  it('по вражескому ФЛОТУ шагов нет — цель приказа это мир', () => {
+    expect(chainMenuItems(emptyDraft(), foe, 'S', opts)).toEqual([]);
   });
 
   it('способность на кулдауне серая, с бейджем остатка', () => {
@@ -144,7 +120,6 @@ describe('меню точки — «в зависимости от того, ч�
   it('пункты наращивания часов помечены keep — меню не закрывается', () => {
     const items = chainMenuItems(emptyDraft(), enemy, 'S', opts);
     expect(items.find((i) => i.act === 'wait')!.keep).toBe(true);
-    expect(items.find((i) => i.act === 'fire')!.keep).toBe(true);
     expect(items.find((i) => i.act === 'assault')!.keep).toBeUndefined();
   });
 });
@@ -256,7 +231,6 @@ describe('разметка', () => {
     expect(stepGlyph({ kind: 'move', to: 'A' })).toBe('✈');
     expect(stepGlyph({ kind: 'assault' })).toBe('⚔');
     expect(stepHours({ kind: 'wait', hours: 4 })).toBe('⏱4ч');
-    expect(stepHours({ kind: 'strike', target: null, hours: 2 })).toBe('🎯2ч');
     expect(stepHours({ kind: 'assault' })).toBe('');
   });
 });

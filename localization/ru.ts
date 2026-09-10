@@ -284,9 +284,7 @@ export const ru: Record<string, string> = {
 
   // --- chain — Режим «Приказ»: полоска плана, меню точки, отказы.
   'chain.add-wait6': '⏱ +6ч',
-  'chain.fire': '🎯 Огонь +1ч',
   'chain.full': 'план полон — 8 шагов',
-  'chain.no-art': 'в выделении нет дальнобойных орудий',
   'chain.overwrite': 'планы флотов различаются — отправка заменит все',
   'chain.undo': 'Отменить шаг',
 
@@ -295,23 +293,11 @@ export const ru: Record<string, string> = {
   'cmd.assault.hint': 'лететь к чужому миру и высадить десант при подходе',
   'cmd.auto-assault': 'Авто-штурм',
   'cmd.auto-assault.hint': 'флот сам штурмует вражеский мир по прибытии',
-  'cmd.barrage': 'Обстрел',
-  'cmd.barrage.hint': 'сосредоточить огонь артиллерии по вражескому флоту с дистанции',
   'cmd.cast': 'Каст',
   'cmd.cast.cooldown': 'КД {h}',
   'cmd.cast.hint': 'применить способность героя из состава флота',
   'cmd.cast.needs-target': 'цель на карте',
   'cmd.cast.self': 'на месте',
-  'cmd.fire.aggressive': 'Агрес',
-  'cmd.fire.aggressive.hint': 'по любому, кроме пакта/союза',
-  'cmd.fire.hint': 'когда артиллерия стреляет сама: пассив · ответ · станд · агрес',
-  'cmd.fire.passive': 'Пассив',
-  'cmd.fire.passive.hint': 'не стреляет',
-  'cmd.fire.return': 'Ответ',
-  'cmd.fire.return.hint': 'только после урона по флоту',
-  'cmd.fire.standard': 'Станд',
-  'cmd.fire.standard.hint': 'по тем, с кем война',
-  'cmd.fire.title': 'Режим огня',
   'cmd.forced-march': 'Ускорить',
   'cmd.forced-march.hint': 'форс-марш: +50% скорости ценой −5% прочности за час хода',
   'cmd.merge': 'Слить',
@@ -548,7 +534,6 @@ export const ru: Record<string, string> = {
   'data.ace-programs': 'Программа асов',
   'data.amber-concord': 'Янтарное согласие',
   'data.annihilate': 'Аннигиляция',
-  'data.artillery': 'артиллерия',
   'data.asteroid-field': 'Астероидное поле',
   'data.azure-compact': 'Лазурный пакт',
   'data.barracks': 'Казармы',
@@ -801,9 +786,6 @@ export const ru: Record<string, string> = {
   'dossier.task.queued': 'В очереди — ещё не начато.',
   'dossier.task.title': 'Стройка',
   'dossier.task.unit-ready': 'По готовности пополнит гарнизон/флот планеты.',
-  'dossier.unit.artillery.desc':
-    'Тяжёлая батарея: {a} урона в залпе при стеклянном корпусе ({hp}). Бьёт БЕЗНАКАЗАННО — когда атакует ваш флот, ответный огонь по ней не проходит и уходит на другие корабли. Но это не бессмертие: под чужой атакой она стоит в ДАЛЬНЕЙ линии и получает свою долю залпа, а оставшись одна — принимает всё.',
-  'dossier.unit.artillery.name': 'Артиллерия',
   'dossier.unit.cruiser.desc':
     'Рабочая лошадь линейного флота: {a} атаки, {hp} корпуса и трюм на {c}. Универсальный боевой корабль, одинаково уверенный в обороне и в наступлении.',
   'dossier.unit.cruiser.name': 'Крейсер',
@@ -855,14 +837,11 @@ export const ru: Record<string, string> = {
   'hint.aim-armed': '⤳ выберите цель — камера двигается двумя пальцами',
   'hint.assault-enemy-only': '⚔ штурмовать можно только чужой мир',
   'hint.auto-assault': '⚔ авто-штурм включён — флот сам штурмует вражеский мир по прибытии',
-  'hint.barrage-auto': '🎯 автоприцел',
-  'hint.barrage-set': '🎯 сосредоточенный огонь назначен',
   'hint.cast-cancelled': '✖ каст отменён',
   'hint.deploy-cancelled': '✖ развёртывание отменено',
   'hint.forced-march': '⚡ форс-марш: +50% скорости, −5% прочности за час хода',
   'hint.multiselect': '⊕ тапайте свои флоты — соберите группу и отдайте общий приказ',
   'hint.pick-assault': '⚔ выберите чужой мир для штурма',
-  'hint.pick-barrage': '🎯 тапните вражеский флот для сосредоточенного огня · пустота = авто',
   'hint.pick-engage': 'ткните во вражеский флот — атакуем его',
   'hint.engage-enemy-only': 'атаковать можно только вражеский флот',
   'hint.engage-in-flight': 'цель в пути — курса к ней нет, дождитесь остановки',
@@ -1037,7 +1016,6 @@ export const ru: Record<string, string> = {
 
   // --- tgt — Композер приказов (TGT-1): шаги плана, отправка.
   'tgt.add-wait': '⏱ +1ч',
-  'tgt.at': '🎯{n}ч',
   'tgt.clear': 'снять приказ',
   'tgt.fleets': '{n} флотов',
   'tgt.placed': '◎ приказ поставлен — флот исполнит план сам',
@@ -1521,9 +1499,6 @@ export const ru: Record<string, string> = {
   'onb.goals.all-done':
     '🏅 Все цели первой сессии выполнены! +{n} XP — вы готовы к настоящему матчу.',
   'onb.goals.title': 'Цели первой сессии',
-  'onb.intro.artillery.body':
-    'Артиллерия бьёт безнаказанно: пока атакуете вы, ответный огонь по ней не проходит и достаётся другим вашим кораблям. Броня у неё слабая, место — в дальней линии, а не на передовой: под чужой атакой она гибнет как все.',
-  'onb.intro.artillery.title': 'Артиллерия — огонь без ответа',
   'onb.intro.async-delay.body':
     'Этот флот прибудет через часы реального времени — мир Void Dominion идёт непрерывно, даже когда вы офлайн. Можете закрыть игру: приказы выполнятся сами, а к возвращению мы пришлём уведомление и покажем сводку «пока вас не было».',
   'onb.intro.async-delay.title': 'Мир идёт без вас',
@@ -1761,7 +1736,6 @@ export const ru: Record<string, string> = {
   'ship.module.thruster.name': 'Двигатель',
 
   // --- side — Боковая панель матча: конвейеры, карточка флота, бой, досье мира, вкладки гарнизона.
-  'side.arch.artillery': 'артиллерия',
   'side.arch.combat': 'боевые',
   'side.arch.flagship': 'флагман',
   'side.arch.scout': 'скауты',
@@ -1803,7 +1777,6 @@ export const ru: Record<string, string> = {
   'effect.in-battle': 'в бою',
   'effect.forced-march': 'форс-марш',
   'effect.bombarding': 'бомбардировка',
-  'effect.barrage-focus': 'фокус огня',
   'effect.free-flight': 'в полёте',
   'effect.patrol': 'дежурный вылет',
   'effect.rearming': 'перезарядка {n}',
