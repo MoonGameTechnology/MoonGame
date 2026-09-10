@@ -8007,6 +8007,7 @@ cmdbar.addEventListener('click', (ev) => {
   // ALWAYS_DISARMED: подтверждаются тапом по КАРТЕ, своей команды в ряду у них нет.
   heroAim = null;
   heroSpawnAim = null;
+  strikeAim = null;
   if (cmd === 'engage') {
     engageAim = !engageAim; // arm / disarm the attack order
     aiming = false;
