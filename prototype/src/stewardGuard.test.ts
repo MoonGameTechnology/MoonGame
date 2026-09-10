@@ -80,15 +80,30 @@ describe('stewardGuardOrders — эвакуация под угрозой (ST-3.
       hGarrison: stacks([['militia', 4]]),
     });
     const orders = stewardGuardOrders(s, 'p1');
-    // Load rides BEFORE the move — both apply the same tick while still docked;
-    // the SITREP stamp narrating the decision rides last.
-    expect(orders.map((a) => a.type)).toEqual(['army.load', 'fleet.move', 'steward.report']);
+    // ПОДЪЁМ ЗАНИМАЕТ ЧАС (CARGO-1), и вылет его отменяет — значит в один тик
+    // «погрузить и улететь» больше нельзя: этот тик только грузит. SITREP-штамп,
+    // объясняющий решение, по-прежнему едет последним.
+    expect(orders.map((a) => a.type)).toEqual(['army.load', 'steward.report']);
     expect(orders[0]!.payload).toMatchObject({ fleetId: 'F1', unit: 'militia', count: 4 });
-    expect(orders[1]!.payload).toMatchObject({ fleetId: 'F1', to: 'S' });
     expect(reportEntries(orders)).toMatchObject([{ kind: 'evac', node: 'H', to: 'S', count: 1 }]);
+    // Пока подъём идёт, паром СТОИТ — иначе он ушёл бы пустым, бросив тех, за кем пришёл.
+    const lifting = guardState({
+      fleets: [
+        raider(inboundToH(10)),
+        fl('F1', 'p1', {
+          location: 'H',
+          units: stacks([['cruiser', 1]]),
+          loading: [{ unit: 'militia', count: 4, from: 'H', startAt: NOW, doneAt: NOW + HOUR }],
+        }),
+      ],
+      hGarrison: stacks([['militia', 4]]),
+    });
+    // …и молчит: журнал рассказывает о решении, а не о состоянии, иначе одна
+    // эвакуация переписывалась бы в него каждый тик этого часа.
+    expect(stewardGuardOrders(lifting, 'p1')).toEqual([]);
     // The wiring: a delegated «Оборона» tick carries the same orders.
     const viaAi = aiOrders(s, 'p1', 'defend').filter((a) => a.type === 'army.load' || a.type === 'fleet.move');
-    expect(viaAi.map((a) => a.type)).toEqual(['army.load', 'fleet.move']);
+    expect(viaAi.map((a) => a.type)).toEqual(['army.load']);
   });
 
   it('an acceptable stand (forecast losses under the limit) holds the line — journal only', () => {
@@ -180,9 +195,9 @@ describe('stewardGuardOrders — эвакуация под угрозой (ST-3.
       sGarrison: stacks([['militia', 2]]),
     });
     const orders = stewardGuardOrders(s, 'p1');
-    expect(orders.map((a) => a.type)).toEqual(['army.load', 'fleet.move', 'steward.report']);
+    // Подъём занимает час (CARGO-1) — этот тик грузит, вылет будет следующим.
+    expect(orders.map((a) => a.type)).toEqual(['army.load', 'steward.report']);
     expect(orders[0]!.payload).toMatchObject({ fleetId: 'F2', unit: 'militia', count: 2 });
-    expect(orders[1]!.payload).toMatchObject({ fleetId: 'F2', to: 'R' });
     // The journal narrates BOTH nodes: H's garrison is stranded (its only ferry
     // is needed at S), S's wing evacuates to the rear.
     expect(reportEntries(orders)).toMatchObject([
@@ -291,20 +306,36 @@ describe('stewardGuardOrders — эвакуация под угрозой (ST-3.
     expect(adv.error).toBeUndefined();
     s = adv.state;
     expect(s.fleets.F2!.location).toBe('H');
-    // Tick 2: the docked branch lifts the garrison and flies to safety — every
-    // order ACCEPTED by the real modules, not just well-shaped.
+    // Tick 2: the docked branch ORDERS the lift — and only the lift. Подъём занимает
+    // час (CARGO-1), а вылет его отменяет, поэтому паром в этот тик стоит.
     const tick2 = stewardGuardOrders(s, 'p1');
-    expect(tick2.map((a) => a.type)).toEqual(['army.load', 'fleet.move', 'steward.report']);
+    expect(tick2.map((a) => a.type)).toEqual(['army.load', 'steward.report']);
     apply(tick2);
+    expect(s.planets.H!.garrison).toEqual([{ unit: 'militia', count: 4 }]); // ещё на земле
+    expect(s.fleets.F2!.loading).toMatchObject([{ unit: 'militia', count: 4, from: 'H' }]);
+    expect(s.fleets.F2!.movement).toBeNull();
+    // Tick 2а: пока час идёт, драйвер молчит — второй раз ту же роту он не заказывает
+    // и паром не угоняет.
+    expect(stewardGuardOrders(s, 'p1')).toEqual([]);
+    // Час прошёл — рота на борту, гарнизон пуст.
+    const lifted = advance(s, s.time + HOUR);
+    expect(lifted.error).toBeUndefined();
+    s = lifted.state;
     expect(s.planets.H!.garrison).toEqual([]);
     expect(s.fleets.F2!.landing).toMatchObject([{ unit: 'militia', count: 4 }]);
+    expect(s.fleets.F2!.loading).toBeUndefined();
+    // Tick 3: трюм полон, держать больше нечего — паром уходит в тыл.
+    const tick3 = stewardGuardOrders(s, 'p1');
+    expect(tick3.map((a) => a.type)).toEqual(['fleet.move', 'steward.report']);
+    apply(tick3);
     expect(s.fleets.F2!.movement).toMatchObject({ to: 'S' });
     // The journal now narrates the whole rescue, oldest first.
     expect(s.players.p1!.stewardLog).toMatchObject([
       { kind: 'ferry', node: 'H' },
       { kind: 'evac', node: 'H', to: 'S', count: 1 },
+      { kind: 'evac', node: 'H', to: 'S', count: 1 },
     ]);
-    // Tick 3: nothing left to protect at H — the driver re-runs to silence.
+    // Tick 4: nothing left to protect at H — the driver re-runs to silence.
     expect(stewardGuardOrders(s, 'p1')).toEqual([]);
   });
 
