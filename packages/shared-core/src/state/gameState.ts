@@ -513,17 +513,11 @@ export interface Fleet {
    *  `fleet.retreat` — the disengaging fleet flees faster while `now < it`. Absent =
    *  no boost. Read by the `fleet.speed` hook. */
   retreatHasteUntil?: number;
-  /** Free-space position for shuttle/missile fleets that move OFF the lane graph.
-   *  Set when the fleet is launched from a carrier/base; the fleet flies freely
-   *  within `strikeRange` of its `homeBase`. Null/absent = a regular lane-bound fleet. */
-  freePosition?: { x: number; y: number } | null;
-  /** Active free-space flight: the fleet is flying from `freePosition` toward
-   *  `targetX,targetY` (a point in space, not a node). Arrives at `arrivesAt`.
-   *  Null/absent = parked at `freePosition` (not currently flying). */
-  freeMovement?: { targetX: number; targetY: number; departedAt: number; arrivesAt: number } | null;
-  /** The fleet this one was launched from (its carrier/base). A shuttle must stay
-   *  within `strikeRange` of its home base's position. Absent = not a launched fleet. */
-  homeBase?: FleetId | null;
+  // ЗДЕСЬ БЫЛИ `freePosition`/`freeMovement`/`homeBase` — свободный полёт «крыла как
+  // флота» (SQ-1.1). Сняты в SHU-2.2 вместе с остальной старой машинерией: с SHU-1.1
+  // челнок живёт в `Planet.hangar`/`Fleet.hangar` и в `Fleet.units` не попадает ниоткуда
+  // (сторож — правило 5 в `shuttleHangar.test.ts`), поэтому полей никто не выставлял, а
+  // читатели получали `undefined` и молча шли по ветке «обычный флот».
   /** Point-defense cooldown: world-time (ms) until which this fleet's PD system
    *  is recharging after a volley. Absent/0 = ready to fire. PD fires reactively
    *  when an enemy shuttle enters range, then cools down for 20 game-minutes. */

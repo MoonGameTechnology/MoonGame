@@ -5629,8 +5629,6 @@ function effectTagText(tag: EffectTag): string {
       return `⚡ ${t('effect.forced-march')}`;
     case 'bombarding':
       return `⊗ ${t('effect.bombarding')}`;
-    case 'free-flight':
-      return `🛬 ${t('effect.free-flight')}`;
     case 'patrol': {
       const fuel =
         'rearming' in tag
@@ -5752,7 +5750,6 @@ function fleetPanelHtml(f: Fleet): string {
       inBattle: !!f.battleId,
       forcedMarch: boosted,
       bombarding: !!f.bombarding,
-      freeFlight: !!f.freeMovement,
       patrol: pt ? { rearming: pt.sortie.rearming, fuel: pt.sortie.fuel } : null,
       troops: nTr,
       pointDefense: pd,

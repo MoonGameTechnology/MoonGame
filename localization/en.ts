@@ -1792,7 +1792,6 @@ export const en: Record<string, string> = {
   'effect.in-battle': 'in battle',
   'effect.forced-march': 'forced march',
   'effect.bombarding': 'bombarding',
-  'effect.free-flight': 'in flight',
   'effect.patrol': 'standing patrol',
   'effect.rearming': 'rearming {n}',
   'effect.fuel': 'fuel {n}',

@@ -1788,7 +1788,6 @@ export const ru: Record<string, string> = {
   'effect.in-battle': 'в бою',
   'effect.forced-march': 'форс-марш',
   'effect.bombarding': 'бомбардировка',
-  'effect.free-flight': 'в полёте',
   'effect.patrol': 'дежурный вылет',
   'effect.rearming': 'перезарядка {n}',
   'effect.fuel': 'топливо {n}',
