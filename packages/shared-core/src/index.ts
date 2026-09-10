@@ -30,6 +30,9 @@ export {
   type CombatantRef,
   type ScheduledEvent,
   type Squadron,
+  // Остаток SHU-3.1: карта рисует ЛЕТЯЩИЕ вылеты, а значит читает их форму.
+  type ShuttleStrike,
+  type StrikeBase,
   type UnitStack,
   type BuildingInstance,
   type PausedConstructionSite,
@@ -175,6 +178,9 @@ export {
   squadronSize,
   squadronCargoCapacity,
   squadronCargoUsed,
+  // Остаток SHU-3.1: круг взведённого прицела рисуется ТОЙ ЖЕ дальностью, по которой
+  // ядро отбивает `E_OUT_OF_RANGE`.
+  squadronReach,
   shuttleStrikeRange,
   withinRange,
   shuttleReaches,

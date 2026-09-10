@@ -8,7 +8,7 @@ import {
   type FlakTier,
 } from './flakTiers';
 
-const ТИРЫ: FlakTier[] = ['orbital', 'close'];
+const ТИРЫ: FlakTier[] = ['orbital', 'close', 'intercept'];
 
 describe('зенитный огонь — какой тир', () => {
   it('признак «ближняя» выбирает тир, а не отдельные свойства', () => {
@@ -89,5 +89,17 @@ describe('зенитный огонь — ход трассы', () => {
   it('за жизнь трассы штрих успевает уйти заметно дальше своего шага', () => {
     const шаг = flakLook('orbital').dash[0] + flakLook('orbital').dash[1];
     expect(Math.abs(flakDashOffset(FLAK_LIFE_MS))).toBeGreaterThan(шаг);
+  });
+});
+
+describe('SHU-3.1 — перехват это ТРЕТИЙ тир, а не перекрашенная зенитка', () => {
+  it('У ПЕРЕХВАТА СВОЙ ЦВЕТ: игрок обязан отличить встречное звено от залпа с земли', () => {
+    expect(flakLook('intercept').color).not.toBe(flakLook('orbital').color);
+    expect(flakLook('intercept').color).not.toBe(flakLook('close').color);
+  });
+
+  it('ОН ЗАМЕТНЕЕ БЛИЖНЕЙ ЗЕНИТКИ: сбитая эскадра — событие дороже дежурной очереди', () => {
+    expect(flakLook('intercept').alpha).toBeGreaterThan(flakLook('close').alpha);
+    expect(flakLook('intercept').burstGrow).toBeGreaterThan(flakLook('close').burstGrow);
   });
 });

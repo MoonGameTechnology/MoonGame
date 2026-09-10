@@ -167,6 +167,7 @@ import {
   abilityRange,
   hangarMachines,
   type Squadron,
+  type StrikeBase,
   type PausedConstructionSite,
   type QueuedConstruction,
 } from '../../packages/shared-core/src/index';
@@ -221,6 +222,7 @@ import {
 import {
   mergeTargets,
   splitOne,
+  squadronCallsignOf,
   squadronCards,
   SQUADRON_KIND_KEY,
   troopsInputForSquadron,
@@ -806,14 +808,23 @@ import {
   radarContacts,
   waitingBanner,
 } from './snapshotIngest';
-import { FLAK_LIFE_MS, flakBurstRadius, flakDashOffset, flakLook, flakTier } from './flakTiers';
+import {
+  FLAK_LIFE_MS,
+  flakBurstRadius,
+  flakDashOffset,
+  flakLook,
+  flakTier,
+  type FlakTier,
+} from './flakTiers';
 import { sweepGlow as armsGlow, sweepPaint, sweepShows } from './sweepFx';
 import { emblemTally } from './fleetTally';
 import { jumpStep, type JumpKind } from './mapJump';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
-import { combatRanges, ringLook } from './combatRanges';
+import { aimRing, combatRanges, ringLook } from './combatRanges';
+// Остаток SHU-3.1: где сейчас летящая эскадра и по какой линии (чистые решения).
+import { strikeProgress, strikeTrails } from './strikeTrail';
 import { corridorLines } from './corridorView';
 import { recapAdmits } from './recapGate';
 // ONB-7 — first-session goals checklist (mine/fleet/capture/score, ticked from state).
@@ -1224,7 +1235,11 @@ const aaShots: Array<{
   from: { x: number; y: number };
   to: { x: number; y: number };
   at: number;
-  close: boolean; // ближняя зенитка гарнизона, залп раз в 15 мин — рисуется легче
+  // ТИР, а не «ближняя ли это зенитка»: с остатком SHU-3.1 сюда же встаёт ВСТРЕЧНЫЙ
+  // ПЕРЕХВАТ (`shuttle.intercepted`), у которого признака «ближний/орбитальный» нет
+  // вовсе. Очередь и кадр отрисовки у всех трёх один — расходится только вид
+  // (`flakTiers.ts`), поэтому второй копии этого блока не заводим.
+  tier: FlakTier;
 }> = [];
 // Capture flashes: a province that changed hands lights up in its NEW owner's colour —
 // a wave sweeps across its cell and the frontier ignites, fading over ~1.5s, so a
@@ -1841,6 +1856,23 @@ function enqueueBuild(planetId: string, order: QueuedBuild): void {
  *  живут чистой моделью `fleetOrigin.ts`; здесь остаётся подстановка живого состояния. */
 function fleetPos(f: Fleet): { x: number; y: number } | null {
   return fleetOrigin(f, s.time, (id) => s.planets[id]?.position ?? null);
+}
+/** Где сейчас БАЗА вылета — космопорт мира или носитель. Точка живая (правило 2
+ *  `strikeTrail.ts`): носитель волен уйти, пока челноки летят. */
+function strikeBasePos(base: StrikeBase): { x: number; y: number } | null {
+  if (base.kind === 'planet') return s.planets[base.id]?.position ?? null;
+  const f = s.fleets[base.id];
+  return f ? fleetPos(f) : null;
+}
+/** Где сейчас САМ вылет — по времени мира, тем же счётом, что рисует трассу. */
+function strikeWorldPos(strikeId: string): { x: number; y: number } | null {
+  const st = (s.strikes ?? []).find((x) => x.id === strikeId);
+  if (!st) return null;
+  const home = strikeBasePos(st.base);
+  if (!home) return null;
+  const [from, to] = st.leg === 'back' ? [st.to, home] : [home, st.to];
+  const k = strikeProgress(st, s.time);
+  return { x: from.x + (to.x - from.x) * k, y: from.y + (to.y - from.y) * k };
 }
 /** Та же точка отсчёта, спроецированная НА ЭКРАН.
  *
@@ -3318,7 +3350,29 @@ function handleEvents(events: DomainEvent[]) {
           from: { ...planet.position },
           to: aaImpact(target && fleetPos(target), planet.position),
           at: performance.now(),
-          close: p.tier === 'close',
+          tier: flakTier(p.tier === 'close'),
+        });
+        capShots(aaShots, AA_SHOTS_MAX);
+        break;
+      }
+      // ВСТРЕЧНЫЙ ПЕРЕХВАТ (SHU-1.3) — база подняла дежурное звено навстречу чужому
+      // вылету. На карте это ТРЕТИЙ тир огня (`flakTiers.ts`), а не зенитка: спутав их,
+      // игрок решит, что его прикрывает пушка, тогда как тратится топливо порта.
+      // Концы берутся СЕЙЧАС (правило 1 `fireEffects.ts`): вылет мог быть сбит этим же
+      // подъёмом, и тогда вспышка встаёт над орбитой самой базы — молча пропавший
+      // перехват читался бы как «звено не взлетело».
+      case 'shuttle.intercepted': {
+        const base = { kind: p.baseKind, id: p.baseId } as StrikeBase;
+        const home = strikeBasePos(base); // одна функция на «где база» — и здесь, и у трассы
+        if (!home) break;
+        const carrier = base.kind === 'fleet' ? s.fleets[base.id] : undefined;
+        const node = base.kind === 'planet' ? base.id : carrier ? fleetNode(carrier) : null;
+        if (!seen(isMine([p.owner as string, p.targetOwner as string], ME), known(node))) break;
+        aaShots.push({
+          from: { ...home },
+          to: aaImpact(strikeWorldPos(p.strikeId as string), home),
+          at: performance.now(),
+          tier: 'intercept',
         });
         capShots(aaShots, AA_SHOTS_MAX);
         break;
@@ -3733,6 +3787,66 @@ function drawFleetRoutes() {
   }
 }
 
+/**
+ * ЛЕТЯЩИЕ ВЫЛЕТЫ (остаток SHU-3.1) — трасса и значок эскадры на ней.
+ *
+ * Что рисовать и куда — `strikeTrail.ts` (чистое, под гейтом): свои вылеты и только
+ * они, концы живые, ход по времени мира. Здесь остаётся канва.
+ *
+ * Вид намеренно НЕ такой, как у маршрута флота: маршрут — это план, который игрок ещё
+ * волен отменить, а вылет уже в воздухе и отменить его нельзя. Отсюда сплошная линия
+ * вместо пунктира плана и цвет крыла (`R_WING`), а не цвет захвата.
+ */
+function drawStrikeTrails(): void {
+  const trails = strikeTrails(s.strikes, { me: ME, now: s.time, basePos: strikeBasePos });
+  if (!trails.length) return;
+  cx.save();
+  for (const tr of trails) {
+    const a = world(tr.from);
+    const b = world(tr.to);
+    const m = world(tr.at);
+    if (!visible(a, 160) && !visible(b, 160)) continue;
+    // Обратная нога БЛЕДНЕЕ: удар уже случился, и путь домой не требует внимания так,
+    // как путь к цели, — иначе возвращающееся звено кричало бы громче летящего в бой.
+    const alpha = tr.leg === 'back' ? 0.3 : 0.55;
+    cx.strokeStyle = rgba(R_WING, alpha);
+    cx.lineWidth = 1.1;
+    cx.setLineDash([]);
+    cx.shadowColor = R_WING;
+    cx.shadowBlur = fxBlur(6);
+    cx.beginPath();
+    cx.moveTo(a.x, a.y);
+    cx.lineTo(b.x, b.y);
+    cx.stroke();
+    // Значок звена — треугольник, тот же знак, каким машины помечены в панели (△),
+    // носом ПО КУРСУ: неориентированная точка не сказала бы, куда оно летит.
+    const ang = Math.atan2(b.y - a.y, b.x - a.x);
+    cx.save();
+    cx.translate(m.x, m.y);
+    cx.rotate(ang);
+    cx.fillStyle = rgba(R_WING, tr.leg === 'back' ? 0.55 : 0.95);
+    cx.beginPath();
+    cx.moveTo(6, 0);
+    cx.lineTo(-4, 3.5);
+    cx.lineTo(-4, -3.5);
+    cx.closePath();
+    cx.fill();
+    cx.restore();
+    // Подпись — позывной и число бортов, ТОТ ЖЕ позывной, что у карточки в порту:
+    // игрок обязан узнать в летящем значке звено, которое отправлял.
+    if (cam.scale >= 0.9) {
+      cx.setLineDash([]);
+      cx.shadowBlur = 0;
+      cx.fillStyle = rgba(R_WING, tr.leg === 'back' ? 0.5 : 0.8);
+      cx.font = '10px ui-monospace, monospace';
+      cx.textAlign = 'center';
+      cx.fillText(`${squadronCallsignOf(tr.squadronId)} ·${tr.machines}`, m.x, m.y - 9);
+      cx.textAlign = 'start';
+    }
+  }
+  cx.restore();
+}
+
 /** While ШТУРМ is armed (PC): ring every valid target — someone else's capturable
  *  world (enemy or friendly faction alike; the friendly path asks to declare war). */
 function drawAssaultTargets() {
@@ -3804,7 +3918,8 @@ function drawCorridors(now: number): void {
 }
 
 /**
- * RANGE-UX — круги досягаемости выделенных флотов и отметки ПКО.
+ * RANGE-UX — круги досягаемости выделенных флотов, отметки ПКО и круг ВЗВЕДЁННОГО
+ * прицела (остаток SHU-3.1).
  *
  * Вся арифметика — в `combatRanges.ts` (чистая, покрыта гейтом); здесь только канва.
  * Радиусы приходят ИЗ ЯДРА — рисуется ровно тот круг, по которому ядро стреляет.
@@ -3824,8 +3939,19 @@ function drawCombatRanges(): void {
     },
     known,
   );
+  // Круг ВЗВЕДЁННОГО прицела (остаток SHU-3.1) — рядом с пассивными радиусами, потому
+  // что это тот же вопрос «докуда дотянется», только про конкретное звено и здесь и
+  // сейчас. Дальность — `squadronReach` ядра, та самая, по которой оно отобьёт промах.
+  const aiming = strikeAim ? squadronAt(strikeAim.squadronId) : null;
+  const aimAt = aiming
+    ? 'planetId' in aiming.base
+      ? (s.planets[aiming.base.planetId]?.position ?? null)
+      : ((f) => (f ? fleetPos(f) : null))(s.fleets[aiming.base.fleetId])
+    : null;
+  const aim = aiming && aimAt ? aimRing({ squadron: aiming.sq, at: aimAt }, data) : null;
+  if (aim) rings.push(aim);
   if (!rings.length) return;
-  const tint: Record<string, string> = { shuttle: R_WING, aa: R_AA };
+  const tint: Record<string, string> = { shuttle: R_WING, aa: R_AA, aim: R_WING };
   cx.save();
   for (const ring of rings) {
     const c = world({ x: ring.x, y: ring.y } as never);
@@ -4266,6 +4392,7 @@ function render(now: number) {
   drawRadarCoverage(); // my sensor reach (radar arrays + ships)
 
   drawFleetRoutes();
+  drawStrikeTrails(); // остаток SHU-3.1: вылет в воздухе виден на карте
   drawGoFlash(now); // brief ring on a world reached via a plan row's target link
 
   // battles — pulsing red contact ring at the actual clash point (an engaged
@@ -4320,9 +4447,10 @@ function render(now: number) {
       if (!visible(a, 160) && !visible(b, 160)) continue;
       const k = flashProgress(nowMs, shot.at, FLAK_LIFE_MS);
       const fade = fadeOf(k);
-      // Два тира, два вида — таблицей в `flakTiers.ts` (REFM-112): часовой ОРБИТАЛЬНЫЙ
-      // залп тяжелее и заметнее, чем 15-минутная БЛИЖНЯЯ зенитка, по всем осям сразу.
-      const look = flakLook(flakTier(shot.close));
+      // Тир — весь вид разом, таблицей в `flakTiers.ts` (REFM-112): часовой ОРБИТАЛЬНЫЙ
+      // залп тяжелее и заметнее 15-минутной БЛИЖНЕЙ зенитки по всем осям сразу, а
+      // ВСТРЕЧНЫЙ ПЕРЕХВАТ отличается от обоих — это не выстрел с земли.
+      const look = flakLook(shot.tier);
       cx.strokeStyle = rgba(look.color, look.alpha * fade);
       cx.lineWidth = look.width;
       cx.setLineDash([...look.dash]);
