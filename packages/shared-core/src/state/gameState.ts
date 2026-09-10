@@ -478,6 +478,12 @@ export interface Fleet {
    *  but they are promised to this fleet and become `landing` when the hour is up.
    *  Absent/empty = nothing being winched aboard. */
   loading?: LoadingClaim[];
+  /** Standing "merge into that fleet once we are together" (MRG-1). Set when
+   *  `fleet.merge` is ordered while this fleet is already FLYING to the target's
+   *  node: the order then waits in the world instead of in a client's memory, and
+   *  the fuse happens on arrival even if nobody is watching. Cleared when it
+   *  resolves — or when it cannot (target gone / moved on / not co-located). */
+  mergeInto?: FleetId | null;
   /** Shuttles BASED on this fleet's carriers (SHU-2.1) — the mobile equivalent of
    *  `Planet.hangar`. NOT part of `units`: a based shuttle is not a ship of the line,
    *  it never fires in a battle round and never soaks a volley; it only flies sorties.

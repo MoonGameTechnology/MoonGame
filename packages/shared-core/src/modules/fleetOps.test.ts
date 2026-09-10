@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createKernel } from '../kernel/kernel';
 import { fleetOpsModule } from './fleetOps';
+import { movementModule } from './movement';
 import {
   createInitialState,
   type Fleet,
@@ -73,6 +74,7 @@ const data: GameData = parseGameData({
   },
 });
 const ctx: Context = { now: 0, data };
+const HOUR = 3_600_000;
 
 function player(id: string): Player {
   return { id, name: id, faction: 'x', status: 'active', resources: {} };
@@ -395,6 +397,76 @@ describe('fleetOps — fleet.merge (fuse two co-located idle fleets)', () => {
       fleets: [fleet('F1', 'p1', 'A', [['cruiser', 1]])],
     });
     expect(errCode(kernel.applyAction(s, merge('__proto__', 'F1'), ctx))).toBe('E_NO_FLEET');
+  });
+});
+
+describe('fleetOps — fleet.merge на догоняющем ходу (MRG-1)', () => {
+  // Приказ «слить» отдаётся, когда флоты ещё не рядом: клиент отправляет догоняющего
+  // в путь, а САМО слияние жило у него в памяти вкладки и досылалось покадрово —
+  // закрыл вкладку, и флот долетал, но не сливался. Теперь ждёт мир.
+  const kernel = createKernel([movementModule, fleetOpsModule]);
+  const move = (fleetId: string, to: string, playerId = 'p1'): Action => ({
+    id: `a:${playerId}:mv:${fleetId}:${to}`,
+    type: 'fleet.move',
+    playerId,
+    payload: { fleetId, to },
+    issuedAt: 0,
+  });
+  /** F1 стоит на B и ПО-НАСТОЯЩЕМУ отправляется к F2 на A: полёт должен быть заведён
+   *  модулем движения, иначе прилёта не случится — его планирует `beginLeg`. */
+  const world = (): GameState => {
+    const st = stateWith({
+      players: [player('p1')],
+      planets: [planet('A', 'p1'), planet('B', 'p1')],
+      fleets: [fleet('F1', 'p1', 'B', [['cruiser', 2]]), fleet('F2', 'p1', 'A', [['cruiser', 1]])],
+    });
+    st.planets.B!.position = { x: 10, y: 0 };
+    st.planets.A!.links = ['B'];
+    st.planets.B!.links = ['A'];
+    return okApply(kernel.applyAction(st, move('F1', 'A'), ctx)).state;
+  };
+
+  it('приказ на догоняющем ходу не отбивается, а ЖДЁТ в мире', () => {
+    const r = okApply(kernel.applyAction(world(), merge('F1', 'F2'), ctx));
+    expect(r.state.fleets.F1?.mergeInto).toBe('F2'); // намерение легло в состояние
+    expect(r.state.fleets.F1).toBeDefined(); // ещё не слились
+    expect(r.events.map((e) => e.type)).toContain('fleet.merge.pending');
+  });
+
+  it('созревает на ПРИЛЁТЕ — без единого приказа от клиента', () => {
+    const ordered = okApply(kernel.applyAction(world(), merge('F1', 'F2'), ctx)).state;
+    const adv = kernel.advanceTo(ordered, { now: 4 * HOUR, data });
+    if (!adv.ok) throw new Error(`advance failed: ${adv.code}`);
+    expect(adv.state.fleets.F1).toBeUndefined();
+    expect(adv.state.fleets.F2?.units).toEqual([{ unit: 'cruiser', count: 3 }]);
+    expect(adv.events.map((e) => e.type)).toContain('fleet.merged');
+  });
+
+  it('цель ушла — намерение снимается, а не висит вечно', () => {
+    const ordered = okApply(kernel.applyAction(world(), merge('F1', 'F2'), ctx)).state;
+    const away = okApply(kernel.applyAction(ordered, move('F2', 'B'), ctx)).state;
+    const adv = kernel.advanceTo(away, { now: 4 * HOUR, data });
+    if (!adv.ok) throw new Error(`advance failed: ${adv.code}`);
+    expect(adv.state.fleets.F1).toBeDefined(); // не слились — разминулись
+    expect(adv.state.fleets.F1?.mergeInto).toBeFalsy();
+  });
+
+  it('гейты спрашиваются НА ЗАКАЗЕ, а не через часы полёта', () => {
+    const st = world();
+    st.fleets.F2!.owner = 'p2';
+    st.players.p2 = player('p2');
+    expect(errCode(kernel.applyAction(st, merge('F1', 'F2'), ctx))).toBe('E_FORBIDDEN');
+    // И встречный случай: догоняющий летит НЕ туда, где цель, — это не слияние.
+    const elsewhere = stateWith({
+      players: [player('p1')],
+      planets: [planet('A', 'p1'), planet('B', 'p1')],
+      fleets: [fleet('F1', 'p1', 'A', [['cruiser', 2]]), fleet('F2', 'p1', 'A', [['cruiser', 1]])],
+    });
+    elsewhere.planets.B!.position = { x: 10, y: 0 };
+    elsewhere.planets.A!.links = ['B'];
+    elsewhere.planets.B!.links = ['A'];
+    const flownOff = okApply(kernel.applyAction(elsewhere, move('F1', 'B'), ctx)).state;
+    expect(errCode(kernel.applyAction(flownOff, merge('F1', 'F2'), ctx))).toBe('E_NOT_COLOCATED');
   });
 });
 

@@ -177,7 +177,11 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '12'; // CARGO-1: подъём десанта занимает час.
+export const MODULE_MANIFEST_VERSION = '13'; // MRG-1: слияние ждёт встречи в мире.
+// Форма состояния изменилась: у флота появилось поле `mergeInto` — намерение слиться,
+// которое созревает на прилёте. Матч на манифесте 12 несёт приказы, у которых вторую
+// половину держал клиент, — то есть играет по ДРУГИМ правилам. (До 13:)
+// export const MODULE_MANIFEST_VERSION = '12'; // CARGO-1: подъём десанта занимает час.
 // Форма состояния изменилась: у флота появилось поле `loading` — ЗАЯВКИ на подъём
 // (`{unit,count,from,startAt,doneAt}`), и `army.load` больше не переносит войска сразу,
 // а планирует событие `army.load.done`. Матч, начатый на манифесте 11, несёт заказы

@@ -741,7 +741,6 @@ import { pruneGroup, refSurvives } from './selectionPrune';
 import { restoresWallet, snapshotWallet } from './freeBuild';
 import { TOAST_FADE_MS, TOAST_LIFE_MS, toastClass, toastOverflow, toastText } from './toastView';
 import { ringed, ringsShown } from './assaultRings';
-import { mergeStep } from './mergeChase';
 import { gridGap, gridLines, gridOffset } from './backdropGrid';
 import { mapScale, screenRadius } from './mapRadius';
 import { phaseAt, phaseOfId } from './pulseFx';
@@ -1091,9 +1090,6 @@ let cmdMore = false; // ☰ — the second row of the command bar (extras live t
 let fireMenu = false; // 🔥 — режим огня артиллерии: поповер-меню над командным рядом
 let castMenu = false; // ✨ — способности героя-флагмана: поповер-меню каста над рядом
 let merging = false; // "Merge" armed → next tap on a friendly fleet picks the anchor
-// Fleets ordered to merge but not yet co-located: each flies to its anchor and the
-// fusion fires once they share a docked sector (see resolvePendingMerges()).
-let pendingMerges: Array<{ mover: string; into: string }> = [];
 let additive = false; // Shift or Ctrl/⌘ held on the current tap → add to the fleet selection
 // Split-fleet dialog: which fleet, and how many of each ship type peel off.
 let splitState: { fleetId: string; take: Record<string, number> } | null = null;
@@ -2336,9 +2332,9 @@ function errText(code: string): string {
 }
 function playerOrder(action: Action): boolean {
   // Возврат — «приказ не ОТВЕРГНУТ сейчас»: в соло это честный исход редьюсера,
-  // в сети и при реконнекте — true (исход асинхронный). Нужен покадровым циклам
-  // (resolvePendingMerges), чтобы выбрасывать отвергнутый приказ, а не пережимать
-  // его каждый кадр — бесконечные тосты отказа (живой плейтест).
+  // в сети и при реконнекте — true (исход асинхронный). Нужен вызывающим, которые
+  // повторяют приказ, — чтобы выбросить отвергнутый, а не пережимать его каждый кадр
+  // (бесконечные тосты отказа, живой плейтест).
   // Куда уходит приказ — `orderRoute.ts` (REFM-147): в сети клиент шлёт НАМЕРЕНИЕ и не
   // трогает локальный редьюсер (иначе следующий снимок сотрёт «принятый» приказ), при
   // оборванной связи приказ честно отвергается (сервер о нём не узнает), а обучение
@@ -3030,11 +3026,12 @@ function orderMerge(movers: string[], anchorId: string) {
       playerOrder(mergeFleet(ME, step.mover, anchorId));
       continue;
     }
-    // Новое намерение вытесняет прежнее (правило 6): игрок передумал, и старая запись
-    // слила бы флот не туда — молча, уже по прибытии.
-    pendingMerges = pendingMerges.filter((pm) => pm.mover !== step.mover);
-    pendingMerges.push({ mover: step.mover, into: anchorId });
+    // Догоняющего сперва отправляем в путь, и только потом объявляем слияние: ядро
+    // принимает «слить» у ЛЕТЯЩЕГО (MRG-1) и держит намерение у себя (`fleet.mergeInto`),
+    // поэтому вторая половина приказа больше не живёт в памяти вкладки и исполняется,
+    // даже когда игрока нет. Новое намерение вытесняет прежнее самим полем.
     if (step.sendTo) playerOrder(moveFleet(ME, step.mover, step.sendTo));
+    playerOrder(mergeFleet(ME, step.mover, anchorId));
   }
   setFleetSelection([anchorId]); // keep the surviving fleet selected for follow-up
   note(plan.queued ? `⛬ ${plan.queued} fleet(s) en route to merge` : '⛬ fleets merged');
@@ -3051,25 +3048,6 @@ function mergeGroup(ids: string[]) {
   );
 }
 
-/** Drive in-flight merge orders: fuse on arrival, re-chase if the anchor moved. */
-function resolvePendingMerges() {
-  if (!pendingMerges.length) return;
-  pendingMerges = pendingMerges.filter(({ mover, into }) => {
-    // Судьба приказа в этом кадре — `mergeChase.ts` (REFM-107).
-    const step = mergeStep(s.fleets[mover], s.fleets[into]);
-    if (step.do === 'drop') return false;
-    if (step.do === 'fuse') {
-      playerOrder(mergeFleet(ME, mover, into));
-      return false; // слились — приказ исполнен
-    }
-    if (step.do === 'chase') {
-      // Consume-on-reject (правило 5): отвергнутый догоняющий ход выбрасывает слияние,
-      // иначе idle-флот пережимал бы его каждый кадр — бесконечные «✖ …».
-      if (!playerOrder(moveFleet(ME, mover, step.to))) return false;
-    }
-    return true;
-  });
-}
 /** Рассказать игроку о событии вахты — правила в `stewardLog.ts` (REFM-176). */
 function tellSteward(kind: StewardEvent, p: Record<string, unknown>): void {
   const r = stewardReport(kind, (p as { posture?: string }).posture);
@@ -10217,7 +10195,6 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>): void
   selFleet = null;
   selPlanet = null;
   selFleets = new Set();
-  pendingMerges = [];
   aiming = false;
   assaultAim = false;
   merging = false;
@@ -12015,7 +11992,6 @@ function frame(nowReal: number) {
   // live net match), so pausing freezes the ships on their rings instead of drifting on.
   if (saneGap(dt) && spinRuns(NET, speed, !!banner)) orbitPhase += dt;
   if (saneGap(dt) && !document.hidden && motionOn() && !endScreen && spinRuns(NET, speed, !!banner)) hologramTime += dt;
-  resolvePendingMerges(); // complete fleet merges whose movers have arrived
   // Итог матча приходит в ОБОИХ режимах (сетевые снимки несут его в `match`).
   const ended = matchEnd.check();
   if (ended) endScreen = ended;
