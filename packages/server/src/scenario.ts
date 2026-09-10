@@ -175,7 +175,18 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '14'; // Артиллерия снята целиком.
+export const MODULE_MANIFEST_VERSION = '15'; // SHU-4.2: ангар — список ЭСКАДР.
+// Форма состояния изменилась: `planet.hangar`/`fleet.hangar` больше не плоские стеки, а
+// список эскадр (`{id, units, cargo}`), у вылета появился `squadronId`, а в состоянии —
+// счётчик `squadronSeq`. Матч на манифесте 14 несёт ангары старой формы: новый читатель
+// увидел бы у них `units: undefined` и уронил бы и вылет, и подсчёт вместимости. Отказ
+// загрузки честнее.
+//
+// ПОЧЕМУ 15, А НЕ 14: до 14 версию подняли ДВА кирпича сразу и независимо — ART-0 (снял
+// артиллерию) в `main` и этот. Слитая ветка несёт ОБЕ смены формы, поэтому число одно и
+// оно следующее: две разные формы под одним номером — ровно то, от чего страж манифеста
+// и защищает. (До 15:)
+// export const MODULE_MANIFEST_VERSION = '14'; // Артиллерия снята целиком.
 // Подсистема огня с дистанции убрана по решению владельца: модуль `artillery` вышел из
 // графа, действий `fleet.barrage`/`fleet.barrageMode` больше нет, у флота исчезли поля
 // `barrageTarget`/`barrageMode`/`barrageProvoked`, а из словаря цепочек — шаги `barrage`

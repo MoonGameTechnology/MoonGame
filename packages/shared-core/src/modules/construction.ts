@@ -16,7 +16,7 @@ import { MS_PER_HOUR } from '../util/time';
 import { canAfford, payCost, refundCost } from '../util/treasury';
 import { buildProgress } from '../util/construction';
 import { addUnits } from '../util/stacks';
-import { hangarUsed, shuttleBayAt } from '../state/shuttle';
+import { basedMachine, hangarUsed, shuttleBayAt } from '../state/shuttle';
 import { effectiveStats, loadoutCost, validateLoadout } from '../util/loadout';
 
 /** Share of the ground assault's round damage that also wears down the planet's
@@ -996,8 +996,19 @@ export const constructionModule: GameModule = {
         // наземном штурме) и не флот (`autoRally` его не поднимает).
         const built = h.ctx.data.units[p.unit];
         if (built?.traits.includes('shuttle')) {
-          planet.hangar = planet.hangar ?? [];
-          addUnits(planet.hangar, p.unit, p.count, p.modules);
+          // Готовая машина встаёт в ЭСКАДРУ (SHU-4.2), а не россыпью. Правило живёт в
+          // `state/shuttle.ts` — там же, где вся арифметика ангара: своя копия здесь
+          // разъехалась бы с посадкой вернувшегося вылета. Импортировать его из
+          // модуля челноков нельзя вовсе — модули общаются только через шину.
+          const seq = (h.state.squadronSeq ?? 0) + 1;
+          h.state.squadronSeq = seq;
+          planet.hangar = basedMachine(
+            planet.hangar ?? [],
+            p.unit,
+            p.count,
+            `sq:${p.playerId}:${seq}`,
+            p.modules,
+          );
         } else {
           addUnits(planet.garrison, p.unit, p.count, p.modules);
         }

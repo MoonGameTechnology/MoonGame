@@ -46,29 +46,45 @@ export const retreatFleet = (playerId: string, fleetId: string) =>
   act(playerId, 'fleet.retreat', { fleetId });
 export const bombardFleet = (playerId: string, fleetId: string, on: boolean) =>
   act(playerId, 'fleet.bombard', { fleetId, on });
-/** Поднять вылет челноков из порта мира по цели (SHU-1.2). `troops` — груз десантного
- *  вылета (ROS-1.5); обычному удару он не нужен и не передаётся. */
+/** Поднять ЭСКАДРУ из порта мира по цели (SHU-1.2, адресация — SHU-4.2). Груз десанта
+ *  здесь не передаётся: он уже в трюме, его кладут туда заранее (`loadSquadronTroops`). */
 export const strikeShuttle = (
   playerId: string,
   planetId: string,
-  unit: string,
-  count: number,
+  squadronId: string,
   target: { targetFleetId: string } | { targetPlanetId: string },
-  troops?: Array<{ unit: string; count: number }>,
-) =>
-  act(playerId, 'shuttle.strike', {
-    planetId,
-    unit,
-    count,
-    ...target,
-    ...(troops && troops.length > 0 ? { troops } : {}),
-  });
-/** Перегрузка челноков между космопортом мира и стоящим там носителем (SHU-2.1):
- *  `load` — с мира на борт, `unload` — с борта на мир. */
-export const loadShuttle = (playerId: string, fleetId: string, unit: string, count = 1) =>
-  act(playerId, 'shuttle.load', { fleetId, unit, count });
-export const unloadShuttle = (playerId: string, fleetId: string, unit: string, count = 1) =>
-  act(playerId, 'shuttle.unload', { fleetId, unit, count });
+) => act(playerId, 'shuttle.strike', { planetId, squadronId, ...target });
+/** Перегрузка ЭСКАДРЫ между космопортом мира и стоящим там носителем (SHU-2.1):
+ *  `load` — с мира на борт, `unload` — с борта на мир. Соединение едет целиком. */
+export const loadShuttle = (playerId: string, fleetId: string, squadronId: string) =>
+  act(playerId, 'shuttle.load', { fleetId, squadronId });
+export const unloadShuttle = (playerId: string, fleetId: string, squadronId: string) =>
+  act(playerId, 'shuttle.unload', { fleetId, squadronId });
+/** Делёж и слияние эскадр в пределах базы (SHU-4.2). */
+export const splitSquadron = (
+  playerId: string,
+  base: { planetId: string } | { fleetId: string },
+  squadronId: string,
+  units: Array<{ unit: string; count: number }>,
+) => act(playerId, 'shuttle.split', { ...base, squadronId, units });
+export const mergeSquadron = (
+  playerId: string,
+  base: { planetId: string } | { fleetId: string },
+  squadronId: string,
+  intoId: string,
+) => act(playerId, 'shuttle.merge', { ...base, squadronId, intoId });
+/** Погрузка десанта в трюм ЗАРАНЕЕ и выгрузка обратно (SHU-4.2). */
+export const loadSquadronTroops = (
+  playerId: string,
+  base: { planetId: string } | { fleetId: string },
+  squadronId: string,
+  troops: Array<{ unit: string; count: number }>,
+) => act(playerId, 'shuttle.loadTroops', { ...base, squadronId, troops });
+export const unloadSquadronTroops = (
+  playerId: string,
+  base: { planetId: string } | { fleetId: string },
+  squadronId: string,
+) => act(playerId, 'shuttle.unloadTroops', { ...base, squadronId });
 export const loadArmy = (playerId: string, fleetId: string, unit: string, count = 1) =>
   act(playerId, 'army.load', { fleetId, unit, count });
 export const unloadArmy = (playerId: string, fleetId: string, unit: string, count = 1) =>

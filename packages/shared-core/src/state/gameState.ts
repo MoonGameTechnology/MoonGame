@@ -345,12 +345,12 @@ export interface Planet {
    *  значило бы запретить им сливаться вовсе. Игроку это ещё и понятнее: у порта одно
    *  читаемое состояние «готов / перезаряжается», а не N счётчиков. */
   sortie?: { fuel: number; rearming: number };
-  /** Shuttles based in the world's spaceport (SHU-1.1). NOT a fleet and NOT part of
-   *  the garrison: a shuttle sits inside the port, never appears in orbit, and takes no
-   *  part in the ground defense of the world. Capacity is the ports' `shuttleBay`; lose
-   *  the port (destroyed or captured) and the shuttles in it are lost with it.
-   *  Undefined/empty = nothing based here. */
-  hangar?: UnitStack[];
+  /** ЭСКАДРЫ, базирующиеся в космопорте мира (SHU-1.1, форма — SHU-4.2). НЕ флот и НЕ
+   *  часть гарнизона: челнок стоит внутри порта, на орбите не появляется и в наземной
+   *  обороне мира не участвует. Вместимость — `shuttleBay` портов; потерян порт
+   *  (снесён или захвачен) — потеряно и то, что в нём стояло.
+   *  Undefined/пусто = здесь ничего не базируется. */
+  hangar?: Squadron[];
   traits: TraitId[];
   /** Cancelled-mid-build construction/upgrade/unit orders, paused and resumable
    *  (see `PausedConstructionSite`). Undefined/empty = nothing paused here. */
@@ -484,13 +484,13 @@ export interface Fleet {
    *  the fuse happens on arrival even if nobody is watching. Cleared when it
    *  resolves — or when it cannot (target gone / moved on / not co-located). */
   mergeInto?: FleetId | null;
-  /** Shuttles BASED on this fleet's carriers (SHU-2.1) — the mobile equivalent of
-   *  `Planet.hangar`. NOT part of `units`: a based shuttle is not a ship of the line,
-   *  it never fires in a battle round and never soaks a volley; it only flies sorties.
-   *  Capacity is Σ `shuttleBay` of the fleet's hulls; lose the carriers and the
-   *  shuttles go with them, exactly as they do when a port falls.
-   *  Undefined/empty = nothing based aboard. */
-  hangar?: UnitStack[];
+  /** ЭСКАДРЫ, базирующиеся на носителях этого флота (SHU-2.1) — подвижный близнец
+   *  `Planet.hangar`, и форма у них ОДНА (SHU-4.2). НЕ часть `units`: базирующийся
+   *  челнок не корабль линии, он не стреляет в раунде боя и не принимает на себя залп,
+   *  он только летает в вылеты. Вместимость — Σ `shuttleBay` корпусов флота; погибли
+   *  носители — погибло и то, что на них стояло, ровно как при потере порта.
+   *  Undefined/пусто = на борту ничего не базируется. */
+  hangar?: Squadron[];
   /** Sortie budget of the shuttles based aboard (fuel + rearm countdown) — the
    *  fleet-side twin of `Planet.sortie`, and for the same reason: the counter belongs
    *  to the BASE, not to the machine, so stacks in the hangar stay mergeable. */
@@ -636,6 +636,10 @@ export interface GameState {
   strikes?: ShuttleStrike[];
   /** Monotonic counter handing each strike its id — детерминированный, как `battleSeq`. */
   strikeSeq?: number;
+  /** Monotonic counter handing each SQUADRON its id (SHU-4.2) — той же природы, что
+   *  `battleSeq`/`strikeSeq`: id обязан быть выводим одинаково на сервере и в реплее, а
+   *  `Math.random` в ядре запрещён. */
+  squadronSeq?: number;
   /** Pending timeline, processed in (at, seq) order by `advanceTo`. */
   scheduled: ScheduledEvent[];
   /** Monotonic counter handing each scheduled event its deterministic `seq`. */
@@ -935,11 +939,40 @@ export interface TempLane {
  *  одинаково, и добавить третью базу можно, не переписывая проверки. */
 export type StrikeBase = { kind: 'planet'; id: PlanetId } | { kind: 'fleet'; id: FleetId };
 
+/**
+ * ЭСКАДРА — соединение челноков одной базы (SHU-4.2, заказ владельца 2026-09-10).
+ *
+ * До этого кирпича ангар был плоским списком стеков, и у машин не было никакой
+ * личности: стеки сливаются по юниту и лоадауту, поэтому «разделить и объединить»
+ * было нечего, а трюм на стеке запретил бы им сливаться вовсе (это стояло прямо в
+ * комментарии `ShuttleStrike.cargo`). Эскадра даёт машинам ту самую личность: свой
+ * id, свой состав и свой трюм, переживающий вылет.
+ *
+ * ПОЗЫВНОЙ ЗДЕСЬ НЕ ХРАНИТСЯ. Он выводится из `id` чистой функцией на клиенте — ровно
+ * как имя флота (`fleetName.ts`): выведенное имя одинаково у всех клиентов, не едет по
+ * сети и не может разъехаться с состоянием.
+ */
+export interface Squadron {
+  id: string;
+  /** Машины эскадры. Стеки внутри ОДНОЙ эскадры по-прежнему сливаются по юниту и
+   *  лоадауту — личность у соединения, а не у каждой машины. */
+  units: UnitStack[];
+  /** ТРЮМ — наземные войска, погруженные ЗАРАНЕЕ (ROS-1.5 + SHU-4.2). До этого груз
+   *  брали с базы в момент вылета, и до вылета его не существовало вовсе. Теперь он
+   *  живёт здесь: покинул гарнизон, занял место в трюме и ждёт приказа.
+   *  Undefined/пусто = эскадра идёт налегке. */
+  cargo?: UnitStack[];
+}
+
 export interface ShuttleStrike {
   id: string;
   owner: PlayerId;
   /** База вылета — она же база возврата (мир с космопортом или флот-носитель). */
   base: StrikeBase;
+  /** id ЭСКАДРЫ, которая ушла в этот вылет (SHU-4.2). Соединение переживает вылет:
+   *  вернувшись, оно встаёт в ангар под тем же именем. Личность, пропадающая на час
+   *  полёта, — не личность. */
+  squadronId: string;
   /** Что именно летит (стеки покидают ангар на время вылета). */
   units: UnitStack[];
   /** Цель: чужой флот или чужой мир (по нему бьют ЗДАНИЯ, как бомбардировка). */

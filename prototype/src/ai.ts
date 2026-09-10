@@ -17,6 +17,9 @@ import {
   previewBattle,
   slotUsage,
   technologyLock,
+  hangarMachines,
+  squadronSize,
+  squadronCargoCapacity,
   type GameState,
   type Action,
   type Battle,
@@ -48,6 +51,7 @@ import {
   bombardFleet,
   splitFleet,
   strikeShuttle,
+  loadSquadronTroops,
   spawnHero,
   unlockHeroSkill,
   installHeroModule,
@@ -146,11 +150,6 @@ const SHUTTLE_CAP = 3;
  * у него `attack` 4 против 20 у бомбардировщика (ROS-1.4).
  */
 const STRIKE_SHUTTLES = ['bomber', 'landing_shuttle'] as const;
-
-/** Сколько машин уходит в один вылет. Порт всё равно тратит на вылет одно топливо,
- *  поэтому мелкими группами летать незачем; больше трёх — и одна ответка зонального
- *  ПВО (ROS-2.2) выкашивает разом весь ангар. */
-const STRIKE_WAVE = 2;
 
 /** Груз десантного вылета: наземные войска сверх домашней стражи, в фиксированном
  *  порядке ростера обороны и не больше вместимости. Пусто — вылет не поднимается:
@@ -1056,7 +1055,7 @@ export function aiOrders(
           (n, p) =>
             n +
             (p.owner === ai
-              ? (p.hangar ?? []).reduce((k, st) => k + (st.unit === unit ? st.count : 0), 0)
+              ? hangarMachines(p).reduce((k, st) => k + (st.unit === unit ? st.count : 0), 0)
               : 0),
           0,
         );
@@ -1090,10 +1089,17 @@ export function aiOrders(
       const hangar = port?.hangar ?? [];
       // Машины перебираются в ФИКСИРОВАННОМ порядке ростера, а не порядком ангара:
       // порядок стеков зависит от истории заказов, и один сид разыгрался бы по-разному.
+      // SHU-4.2: летит ЭСКАДРА целиком, поэтому бот ищет не стек, а СОЕДИНЕНИЕ, в
+      // котором есть нужная машина. Волну он больше не отмеряет: сколько построено в
+      // звене, столько и уйдёт — делёж ради размера волны потребовал бы знать id,
+      // который ядро выдаст только после применения приказа.
       const ready = STRIKE_SHUTTLES.find((u) =>
-        hangar.some((st) => st.unit === u && st.count > 0),
+        hangar.some((sq) => sq.units.some((st) => st.unit === u && st.count > 0)),
       );
-      if (port && ready) {
+      const squad = ready
+        ? hangar.find((sq) => sq.units.some((st) => st.unit === ready && st.count > 0))
+        : undefined;
+      if (port && ready && squad) {
         const reach = data.units[ready]?.stats.strikeRange ?? 0;
         const inReach = (at: { x: number; y: number }): boolean => d(port.position, at) <= reach;
         // Цель — чужой ФЛОТ (бомбардировщик бьёт корпуса) либо чужой МИР. Оба перебора
@@ -1110,10 +1116,7 @@ export function aiOrders(
                 d(port.position, at(a)) - d(port.position, at(b)) ||
                 (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
             )[0];
-        const count = Math.min(
-          hangar.find((st) => st.unit === ready)?.count ?? 0,
-          STRIKE_WAVE,
-        );
+        const count = squadronSize(squad);
         const foeFleet =
           ready === 'bomber'
             ? byNear(
@@ -1139,19 +1142,22 @@ export function aiOrders(
           (p) => p.position,
         );
         if (count > 0 && foeFleet) {
-          out.push(strikeShuttle(ai, port.id, ready, count, { targetFleetId: foeFleet.id }));
+          out.push(strikeShuttle(ai, port.id, squad.id, { targetFleetId: foeFleet.id }));
         } else if (count > 0 && foeWorld) {
           // Десантный вылет везёт войска: без груза он долетит и просто погибнет.
           // Берём из гарнизона сверх домашней стражи, тем же порогом, что и погрузка
-          // на корабль, — дом пустым не оставляем.
+          // на корабль, — дом пустым не оставляем. С SHU-4.2 груз кладут в трюм
+          // ОТДЕЛЬНЫМ приказом, и он идёт ПЕРЕД ударом: два приказа одного тика
+          // применяются по порядку, поэтому эскадра взлетает уже гружёной.
           const troops =
             ready === 'landing_shuttle'
-              ? troopsForDrop(port, count * (data.units[ready]?.stats.cargoCapacity ?? 0))
+              ? troopsForDrop(port, squadronCargoCapacity(squad, data))
               : undefined;
-          if (ready !== 'landing_shuttle' || (troops && troops.length > 0)) {
-            out.push(
-              strikeShuttle(ai, port.id, ready, count, { targetPlanetId: foeWorld.id }, troops),
-            );
+          if (ready !== 'landing_shuttle') {
+            out.push(strikeShuttle(ai, port.id, squad.id, { targetPlanetId: foeWorld.id }));
+          } else if (troops && troops.length > 0) {
+            out.push(loadSquadronTroops(ai, { planetId: port.id }, squad.id, troops));
+            out.push(strikeShuttle(ai, port.id, squad.id, { targetPlanetId: foeWorld.id }));
           }
         }
       }

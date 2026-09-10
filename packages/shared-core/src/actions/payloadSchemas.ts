@@ -140,17 +140,40 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
     // как и цель: «обе или ни одной» схема не выражает, это гейт обработчика.
     planetId: id.optional(),
     fleetId: id.optional(),
-    unit: id,
-    count,
+    // ЭСКАДРА (SHU-4.2): летит соединение целиком, поэтому «юнит и сколько» тут больше
+    // нет. Груза тоже нет — он уже в трюме, его кладут заранее (`shuttle.loadTroops`).
+    squadronId: id,
     targetFleetId: id.optional(),
     targetPlanetId: id.optional(),
-    // ROS-1.5 — груз десантного вылета. Берётся с базы в момент вылета: у машин в
-    // ангаре нет своей личности, поэтому трюм принадлежит ВЫЛЕТУ, а не стеку.
-    troops: z.array(z.object({ unit: id, count })).optional(),
   }),
   // Перегрузка челноков между космопортом и стоящим там носителем (SHU-2.1).
-  'shuttle.load': z.object({ fleetId: id, unit: id, count }),
-  'shuttle.unload': z.object({ fleetId: id, unit: id, count }),
+  'shuttle.load': z.object({ fleetId: id, squadronId: id }),
+  'shuttle.unload': z.object({ fleetId: id, squadronId: id }),
+  // Пересборка ангара (SHU-4.2). База — мир ИЛИ носитель, ровно одна из двух: как и у
+  // вылета, «обе или ни одной» схема не выражает, это гейт обработчика.
+  'shuttle.split': z.object({
+    planetId: id.optional(),
+    fleetId: id.optional(),
+    squadronId: id,
+    units: z.array(z.object({ unit: id, count })).min(1),
+  }),
+  'shuttle.merge': z.object({
+    planetId: id.optional(),
+    fleetId: id.optional(),
+    squadronId: id,
+    intoId: id,
+  }),
+  'shuttle.loadTroops': z.object({
+    planetId: id.optional(),
+    fleetId: id.optional(),
+    squadronId: id,
+    troops: z.array(z.object({ unit: id, count })).min(1),
+  }),
+  'shuttle.unloadTroops': z.object({
+    planetId: id.optional(),
+    fleetId: id.optional(),
+    squadronId: id,
+  }),
   // capital (hero respawn / re-fit anchor)
   'capital.designate': z.object({ planetId: id }),
   // steward («Хранитель») — postures are data-driven; the module gates the value

@@ -66,6 +66,7 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   // исчезает. Перехвату (SHU-1.3) проекция не нужна: ПВО реагирует на сервере.
   strikes: 'filtered',
   strikeSeq: 'public', // счётчик id, как battleSeq — предсказывать в нём нечего
+  squadronSeq: 'public', // тот же счётчик id для эскадр (SHU-4.2)
  // счётчик, не факт о мире
   scheduled: 'filtered', // чужие таймеры — это будущие намерения
   scheduleSeq: 'public',
@@ -261,6 +262,7 @@ function maximalState(): GameState {
         id: 'mine_strike',
         owner: VIEWER,
         base: { kind: 'planet', id: 'A' },
+        squadronId: 'sq:fog',
         units: [{ unit: 'interceptor', count: 1 }],
         // Целится в мир, а не в канареечный флот: id цели едет в проекции вместе со
         // своим ударом (я в неё целюсь — значит знаю о ней), и канареечная строка
@@ -275,6 +277,7 @@ function maximalState(): GameState {
         id: 'CANARY_strike',
         owner: RIVAL,
         base: { kind: 'planet', id: 'Z' },
+        squadronId: 'sq:fog',
         units: [{ unit: 'interceptor', count: 3 }],
         target: { kind: 'planet', id: 'A' },
         to: { x: 0, y: 0 },
@@ -284,6 +287,7 @@ function maximalState(): GameState {
       },
     ],
     strikeSeq: 2,
+    squadronSeq: 3,
     scheduled: [
       { id: 'evt:1', at: 200, type: 'own.timer', payload: { owner: VIEWER }, seq: 0 },
       { id: 'evt:2', at: 300, type: 'CANARY_type', payload: { owner: RIVAL }, seq: 1 },
