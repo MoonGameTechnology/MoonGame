@@ -593,12 +593,12 @@
 | CMB-7 | ✅ | core | `docs/backlog.md:13566` | Перемирие посреди боя не останавливало бой. |
 | RLY-1 | ✅ | proto | `docs/backlog.md:13587` | Сбор построенного: соло и сеть играли по РАЗНЫМ |
 | CARGO-1 | ✅ | core proto | `docs/backlog.md:13619` | Часовая погрузка десанта жила в |
-| MRG-1 | ⏳ | core proto | `docs/backlog.md:13667` | «Слиться по прибытии» — вторая половина приказа тоже |
-| CMB-6 | ✅ | core | `docs/backlog.md:13697` | После ничьей третий враждебный флот получает свой |
-| ORD-2 | ✅ | proto | `docs/backlog.md:13727` | Нацеленный ШТУРМ теперь переживает закрытую |
-| FOG-10 | ✅ | proto core | `docs/backlog.md:13747` | Память разведки перестала жить только |
-| FOG-9 | ✅ | core | `docs/backlog.md:13771` | Приостановленная стройка чужого мира была видна |
-| TEST-4 | ✅ | srv | `docs/backlog.md:13781` | topXp падал на живой базе разработчика. |
+| MRG-1 | ✅ | core proto | `docs/backlog.md:13667` | «Слиться по прибытии» — вторая половина |
+| CMB-6 | ✅ | core | `docs/backlog.md:13706` | После ничьей третий враждебный флот получает свой |
+| ORD-2 | ✅ | proto | `docs/backlog.md:13736` | Нацеленный ШТУРМ теперь переживает закрытую |
+| FOG-10 | ✅ | proto core | `docs/backlog.md:13756` | Память разведки перестала жить только |
+| FOG-9 | ✅ | core | `docs/backlog.md:13780` | Приостановленная стройка чужого мира была видна |
+| TEST-4 | ✅ | srv | `docs/backlog.md:13790` | topXp падал на живой базе разработчика. |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
