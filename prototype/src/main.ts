@@ -31,6 +31,10 @@ import {
   barrageModeFleet,
   loadArmy,
   unloadArmy,
+  // SHU-3.1 — челноки: перегрузка порт ⇄ носитель и сам вылет.
+  loadShuttle,
+  unloadShuttle,
+  strikeShuttle,
   mergeFleet,
   splitFleet,
   buildBuilding,
@@ -200,6 +204,15 @@ import { asteroidsFor, bracketStrokes, polyPoints } from './mapShapes';
 import { conveyorHtml as kitConveyorHtml } from './conveyorView';
 import { LIMP_PCT, fleetSummary, hullPct, stackHullPct } from './fleetSummary';
 import { isGroundUnit, isWingUnit, planetSummary } from './planetSummary';
+// SHU-3.1 — ангар глазами игрока: состав, вместимость, топливо, перегрузка.
+import {
+  fleetHangar,
+  hasHangar,
+  planetHangar,
+  transferOffer,
+  transferPick,
+  type HangarView,
+} from './hangarPanel';
 import { fleetWhere, groupTotals, pickPanel } from './panelSelect';
 import { buildRoster, garrisonByTab, tabCounts } from './planetTabs';
 import {
@@ -1035,6 +1048,10 @@ let assaultAim = false;
  *  то есть, то нет. Что цель не годится, скажет ядро — одним понятным отказом. */
 let engageAim = false;
 let barrageAim = false; // "Обстрел" armed → next tap picks the artillery's focus target
+// SHU-3.1 — «Удар» взведён: следующий тап по карте выбирает цель вылета. Держим ОТКУДА
+// (id мира-порта или флота-носителя): цель у вылета одна, а баз у игрока много, и без
+// источника приказ пришлось бы угадывать по выделению.
+let strikeAim: { from: string } | null = null;
 // Hero window armed modes: a cast waits for its target world; a deploy waits for the
 // point the hero's ship rises at (own world / own fleet / allied world by markers).
 let heroAim: { heroId: string; abilityId: string } | null = null;
@@ -5340,6 +5357,51 @@ function cardHeader(color: string, title: string, sub: string, titleAct?: string
 function tabButton(tab: PlanetTab, label: string, count: number, desc?: string): string {
   return kitTabButton(tab, label, count, planetTab === tab, desc);
 }
+/** Что поднять в вылет с этой базы (SHU-3.1): первая живая машина ангара и вся её
+ *  пачка. Дальность и топливо проверяет ЯДРО — интерфейс своей копии этих правил не
+ *  заводит; `null` = поднимать нечего. */
+function strikePick(from: string): { unit: string; count: number } | null {
+  const host = s.planets[from] ?? s.fleets[from];
+  const stack = (host?.hangar ?? []).find((st) => st.count > 0);
+  return stack ? { unit: stack.unit, count: stack.count } : null;
+}
+
+/**
+ * Секция ангара в панели (SHU-3.1): состав, вместимость, топливо места и — на своём
+ * месте — кнопка удара. Одна разметка на порт мира и на трюм носителя: у ангара везде
+ * один смысл, и вторая вёрстка развела бы две панели по мелочам.
+ *
+ * `owner` — id мира или флота: он уезжает в `data-arg` кнопки, чтобы обработчик знал,
+ * ОТКУДА поднимать вылет, не заводя второго состояния.
+ */
+function hangarSectionHtml(view: HangarView, owner: string, mine: boolean): string {
+  const head =
+    `<div class="sec">${t('side.wing.hangar', { used: view.used, bay: view.bay })}</div>` +
+    (view.sortie
+      ? `<div class="row dim">${
+          view.sortie.rearming > 0
+            ? t('side.wing.rearming', { h: view.sortie.rearming })
+            : t('side.wing.fuel', { n: view.sortie.fuel, max: view.sortie.maxFuel })
+        }</div>`
+      : '');
+  const rows = unitRows(view.stacks);
+  if (!mine) return head + rows;
+  // Причина «нельзя лететь» называется СВОИМ словом (правило 3 в `hangarPanel.ts`):
+  // пустой ангар, перезарядка и сухой бак — разные ожидания у игрока.
+  const why =
+    view.blocked === 'empty'
+      ? t('side.wing.blocked.empty')
+      : view.blocked === 'rearming'
+        ? t('side.wing.blocked.rearming')
+        : view.blocked === 'no-fuel'
+          ? t('side.wing.blocked.no-fuel')
+          : '';
+  const strike =
+    `<div class="row">${btn('wingstrike', owner, t('side.wing.strike'), view.blocked === null)}</div>` +
+    (why ? `<div class="row dim">${why}</div>` : '');
+  return head + rows + strike;
+}
+
 function unitRows(stacks: Array<{ unit: string; count: number }>): string {
   return kitUnitRows(
     stacks,
@@ -5712,10 +5774,29 @@ function fleetPanelHtml(f: Fleet): string {
   // Artillery rules of engagement moved to the ☰ command bar («🔥 Режим огня»
   // button + popover menu) — the bottom sheet keeps information, not controls.
 
-  // Ангар порта и вылет челноков — панель мира, а не флота (SHU-3.1): по новой модели
-  // (SHU-1.2) челнок не летает во флоте, он стоит в космопорте и бьёт оттуда. Секции
-  // «Запустить крыло / Удар / Возврат / Патруль» сняты вместе с флотовой моделью: они
-  // слали действия, которых больше нет.
+  // ТРЮМ НОСИТЕЛЯ (SHU-2.1 + SHU-3.1). Ангар ПОРТА живёт в панели мира — челнок не
+  // летает во флоте, он стоит в космопорте и бьёт оттуда (SHU-1.2). Но «Шаттл» —
+  // вторая база челноков, она ездит вместе с флотом, и её трюм показывать больше
+  // негде: до этого кирпича шесть машин на борту не были видны игроку вообще.
+  const hold = f.owner === ME && enemyKnown ? fleetHangar(f, data) : null;
+  if (hasHangar(hold)) {
+    h += hangarSectionHtml(hold, f.id, true);
+    // Перегрузка предлагается, только когда пройдёт: носитель стоит у СВОЕГО мира и
+    // место есть с обеих сторон (правило 4 в `hangarPanel.ts`). Иначе кнопок нет —
+    // не серых, а нет: серая обещала бы действие, которого в этом месте не бывает.
+    const at = f.location ? s.planets[f.location] : undefined;
+    const offer = transferOffer(at ? planetHangar(at, data) : null, hold, {
+      docked: !!at && !f.movement && at.owner === ME,
+      mine: f.owner === ME,
+    });
+    if (offer.load || offer.unload) {
+      h +=
+        `<div class="row">` +
+        (offer.load ? btn('wingload', f.id, t('side.wing.load'), true) : '') +
+        (offer.unload ? btn('wingunload', f.id, t('side.wing.unload'), true) : '') +
+        `</div>`;
+    }
+  }
 
   // The player's projection hero rides here → name it and flag its fleet aura.
   if (f.units.some((u) => u.count > 0 && data.units[u.unit]?.traits.includes('hero'))) {
@@ -5973,7 +6054,7 @@ function planetPanelHtml(p: Planet): string {
   const kindName = tData(sectorTypeOf(p.id)?.name ?? SECTOR_OF[p.id] ?? '—');
   // Разбор гарнизона по вкладкам и их счётчики — в `planetTabs.ts` (REFM-41), там же
   // правило «вкладка флота считает и орбиту»: построенное само уходит в космос.
-  const { ground, ships, wings: wing } = garrisonByTab(p.garrison, data);
+  const { ground, ships } = garrisonByTab(p.garrison, data);
   const gcount = sumUnits(p.garrison);
   const here = Object.values(s.fleets).filter((f) => f.location === p.id);
   const counts = tabCounts(p, data, here);
@@ -6118,7 +6199,19 @@ function planetPanelHtml(p: Planet): string {
       cols.push(`<div class="hint">${t('side.shipyard.hint')}</div>`);
     }
   } else if (planetTab === 'shuttle') {
-    cols.push(`<div class="sec">${t('side.garrison.wing')}</div>` + unitRows(wing)); // всегда, см. выше
+    // SHU-3.1 — АНГАР ПОРТА, а не гарнизон. Раньше здесь стоял `wing` — гарнизон,
+    // отфильтрованный по трейту `shuttle`, — и вкладка была гарантированно пустой:
+    // челнок с SHU-1.1 в гарнизоне не бывает никогда, он лежит в `planet.hangar`.
+    // Игрок платил за машины и не мог их ни увидеть, ни применить.
+    const port = planetHangar(p, data);
+    if (hasHangar(port)) {
+      cols.push(hangarSectionHtml(port, p.id, mine));
+    } else {
+      // Порта нет — говорим об этом прямо. Пустой список читался бы как «челноков нет»,
+      // хотя их тут негде и держать.
+      cols.push(`<div class="sec">${t('side.garrison.wing')}</div>` +
+        `<div class="row dim">${t('side.wing.no-port')}</div>`);
+    }
     if (mine) {
       const wingBuilds = buildRoster('shuttle', BUILD_UNITS, data);
       cols.push(
@@ -7646,6 +7739,26 @@ side.addEventListener('click', (ev) => {
     // BLD-1: очередь в ядре, поэтому снятие ждущего — тот же приказ отмены, что и
     // снятие идущей стройки. Возврата тут не будет: ждущий заказ не оплачен.
     playerOrder(cancelConstruction(ME, selPlanet!, Number(arg)));
+  } else if (act === 'wingstrike') {
+    // SHU-3.1 — взвести УДАР. Цель выбирается тапом по карте, как у наводки залпа и у
+    // каста: у вылета нет «цели по умолчанию», а гадать за игрока — худший из вариантов.
+    strikeAim = { from: arg };
+    note(t('hint.wing-aim'));
+  } else if (act === 'wingload' || act === 'wingunload') {
+    // Что именно перегружать — `hangarPanel.ts` (`transferPick`): первый живой стек
+    // источника, столько, сколько влезет в приёмник. Кнопки нет, если брать нечего,
+    // поэтому `null` здесь означает «состояние изменилось между отрисовкой и тапом».
+    const f = s.fleets[arg];
+    const at = f?.location ? s.planets[f.location] : undefined;
+    const portView = at ? planetHangar(at, data) : null;
+    const holdView = f ? fleetHangar(f, data) : null;
+    const up = act === 'wingload';
+    const pick = transferPick(up ? portView : holdView, up ? holdView : portView);
+    if (pick) {
+      playerOrder(
+        (up ? loadShuttle : unloadShuttle)(ME, arg, pick.unit, pick.count),
+      );
+    }
   } else if (act === 'spyplanet') {
     playerOrder(spyOn(ME, arg, 'planet', selPlanet!)); // arg = the world's (last known) owner
   } else if (act === 'capital') {
@@ -7894,6 +8007,7 @@ cmdbar.addEventListener('click', (ev) => {
   // ALWAYS_DISARMED: подтверждаются тапом по КАРТЕ, своей команды в ряду у них нет.
   heroAim = null;
   heroSpawnAim = null;
+  strikeAim = null;
   if (cmd === 'engage') {
     engageAim = !engageAim; // arm / disarm the attack order
     aiming = false;
@@ -8110,6 +8224,7 @@ function selectAt(mx: number, my: number) {
     heroSpawnAim: !!heroSpawnAim,
     assaultAim,
     engageAim,
+    strikeAim: !!strikeAim,
     pickMode,
     aiming,
   });
@@ -8153,8 +8268,31 @@ function selectAt(mx: number, my: number) {
     lastPanelHtml = '';
     return;
   }
-  // Shuttle strike armed: the next tap on an enemy fleet sends shuttle.strike
-  // (free-space flight to the target). A tap on empty space disarms.
+  // SHU-3.1 — УДАР ВЗВЕДЁН: следующий тап выбирает цель вылета. Сначала ищем чужой
+  // ФЛОТ (по нему бьют `attack`), потом чужой МИР (по нему — здания). Тап по пустому
+  // месту снимает прицел: взведённый режим обязан иметь выход без приказа.
+  //
+  // Что именно поднять, решает `strikePick` — первая живая машина ангара и вся её
+  // пачка. Дальность, топливо, враждебность цели и вместимость проверяет ЯДРО: свою
+  // копию этих правил интерфейс не заводит, он показывает отказ (`errText`).
+  if (owner === 'shuttle-strike' && strikeAim) {
+    const from = strikeAim.from;
+    strikeAim = null;
+    const foe = nearestHit(hostileFleets(Object.values(s.fleets), ME), fleetAnchor, mx, my, rFleet);
+    const node = foe ? null : nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
+    const pick = strikePick(from);
+    if (!pick) {
+      note(t('hint.wing-empty'));
+    } else if (foe) {
+      playerOrder(strikeShuttle(ME, from, pick.unit, pick.count, { targetFleetId: foe.id }));
+    } else if (node) {
+      playerOrder(strikeShuttle(ME, from, pick.unit, pick.count, { targetPlanetId: node.id }));
+    } else {
+      note(t('hint.wing-cancelled'));
+    }
+    lastPanelHtml = '';
+    return;
+  }
   // Hero cast armed: the next tap picks the target world. Range / cooldown / cost
   // are the core's gates — a mis-aim comes back as an honest rejection note.
   if (owner === 'cast' && heroAim) {
