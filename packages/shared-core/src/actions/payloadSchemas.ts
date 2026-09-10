@@ -173,6 +173,9 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
     planetId: id.optional(),
     fleetId: id.optional(),
     squadronId: id,
+    // Необязателен: без списка ссаживается весь трюм (SHU-4.2), со списком — часть
+    // (SHU-4.3: интерфейс считает погрузку и выгрузку одним знаковым планом).
+    troops: z.array(z.object({ unit: id, count })).min(1).optional(),
   }),
   // capital (hero respawn / re-fit anchor)
   'capital.designate': z.object({ planetId: id }),

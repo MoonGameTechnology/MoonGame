@@ -80,11 +80,20 @@ export const loadSquadronTroops = (
   squadronId: string,
   troops: Array<{ unit: string; count: number }>,
 ) => act(playerId, 'shuttle.loadTroops', { ...base, squadronId, troops });
+/** `troops` НЕОБЯЗАТЕЛЕН: без него ссаживается весь трюм, со списком — часть. Панель
+ *  (SHU-4.3) считает погрузку и выгрузку одним знаковым планом, и «всё или ничего»
+ *  ей не выразить. */
 export const unloadSquadronTroops = (
   playerId: string,
   base: { planetId: string } | { fleetId: string },
   squadronId: string,
-) => act(playerId, 'shuttle.unloadTroops', { ...base, squadronId });
+  troops?: Array<{ unit: string; count: number }>,
+) =>
+  act(playerId, 'shuttle.unloadTroops', {
+    ...base,
+    squadronId,
+    ...(troops && troops.length > 0 ? { troops } : {}),
+  });
 export const loadArmy = (playerId: string, fleetId: string, unit: string, count = 1) =>
   act(playerId, 'army.load', { fleetId, unit, count });
 export const unloadArmy = (playerId: string, fleetId: string, unit: string, count = 1) =>

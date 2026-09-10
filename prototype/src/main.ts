@@ -33,6 +33,10 @@ import {
   loadShuttle,
   unloadShuttle,
   strikeShuttle,
+  splitSquadron,
+  mergeSquadron,
+  loadSquadronTroops,
+  unloadSquadronTroops,
   mergeFleet,
   splitFleet,
   buildBuilding,
@@ -162,6 +166,7 @@ import {
   fleetRadarRange,
   abilityRange,
   hangarMachines,
+  type Squadron,
   type PausedConstructionSite,
   type QueuedConstruction,
 } from '../../packages/shared-core/src/index';
@@ -212,6 +217,15 @@ import {
   transferPick,
   type HangarView,
 } from './hangarPanel';
+// SHU-4.3 — эскадра глазами игрока: карточка соединения, делёж, слияние, десант.
+import {
+  mergeTargets,
+  splitOne,
+  squadronCards,
+  SQUADRON_KIND_KEY,
+  troopsInputForSquadron,
+  type SquadronCard,
+} from './squadronPanel';
 import { fleetWhere, groupTotals, pickPanel } from './panelSelect';
 import { buildRoster, garrisonByTab, tabCounts } from './planetTabs';
 import {
@@ -1024,7 +1038,14 @@ let engageAim = false;
 // SHU-3.1 — «Удар» взведён: следующий тап по карте выбирает цель вылета. Держим ОТКУДА
 // (id мира-порта или флота-носителя): цель у вылета одна, а баз у игрока много, и без
 // источника приказ пришлось бы угадывать по выделению.
-let strikeAim: { from: string } | null = null;
+let strikeAim: { from: string; squadronId: string } | null = null;
+/** Взведённое СЛИЯНИЕ эскадр (SHU-4.3): первый тап называет источник, второй —
+ *  приёмника. Два тапа, а не выпадающий список: приёмник это такая же карточка на
+ *  экране, и выбирать его удобнее там же, где на него смотрят. */
+let squadMerge: { from: string } | null = null;
+/** Открытый блок погрузки десанта в звено (SHU-4.3): чей и с каким планом. План —
+ *  знаковая дельта на тип, ровно как у корабельного десанта (`troopsMenu.ts`). */
+let squadTroops: { id: string; plan: Record<string, number> } | null = null;
 // Hero window armed modes: a cast waits for its target world; a deploy waits for the
 // point the hero's ship rises at (own world / own fleet / allied world by markers).
 let heroAim: { heroId: string; abilityId: string } | null = null;
@@ -5119,14 +5140,7 @@ function cardHeader(color: string, title: string, sub: string, titleAct?: string
 function tabButton(tab: PlanetTab, label: string, count: number, desc?: string): string {
   return kitTabButton(tab, label, count, planetTab === tab, desc);
 }
-/** КАКУЮ ЭСКАДРУ поднять с этой базы (SHU-3.1, адресация — SHU-4.2): первое живое
- *  соединение ангара, и летит оно целиком. Дальность и топливо проверяет ЯДРО —
- *  интерфейс своей копии этих правил не заводит; `null` = поднимать нечего. */
-function strikePick(from: string): { squadronId: string } | null {
-  const host = s.planets[from] ?? s.fleets[from];
-  const sq = (host?.hangar ?? []).find((q) => q.units.some((st) => st.count > 0));
-  return sq ? { squadronId: sq.id } : null;
-}
+
 
 /**
  * Секция ангара в панели (SHU-3.1): состав, вместимость, топливо места и — на своём
@@ -5146,10 +5160,10 @@ function hangarSectionHtml(view: HangarView, owner: string, mine: boolean): stri
             : t('side.wing.fuel', { n: view.sortie.fuel, max: view.sortie.maxFuel })
         }</div>`
       : '');
-  const rows = unitRows(view.stacks);
-  if (!mine) return head + rows;
   // Причина «нельзя лететь» называется СВОИМ словом (правило 3 в `hangarPanel.ts`):
-  // пустой ангар, перезарядка и сухой бак — разные ожидания у игрока.
+  // пустой ангар, перезарядка и сухой бак — разные ожидания у игрока. Причина у МЕСТА
+  // одна на все звенья: топливо принадлежит базе (SHU-1.2), поэтому строка стоит над
+  // карточками, а не в каждой.
   const why =
     view.blocked === 'empty'
       ? t('side.wing.blocked.empty')
@@ -5158,10 +5172,117 @@ function hangarSectionHtml(view: HangarView, owner: string, mine: boolean): stri
         : view.blocked === 'no-fuel'
           ? t('side.wing.blocked.no-fuel')
           : '';
-  const strike =
-    `<div class="row">${btn('wingstrike', owner, t('side.wing.strike'), view.blocked === null)}</div>` +
-    (why ? `<div class="row dim">${why}</div>` : '');
-  return head + rows + strike;
+  const cards = squadronCards(view, { mine, data });
+  if (cards.length === 0) {
+    return head + `<div class="row dim">${esc(t('side.wing.empty'))}</div>`;
+  }
+  const body = cards.map((c) => squadronCardHtml(c, view)).join('');
+  return head + body + (mine && why ? `<div class="row dim">${esc(why)}</div>` : '');
+}
+
+/**
+ * КАРТОЧКА ЭСКАДРЫ (SHU-4.3) — соединение читается так же, как флот на карте: своё имя,
+ * свой состав, свои кнопки. До этого кирпича ангар был одним списком машин, а «Удар»
+ * поднимал ПЕРВОЕ живое звено: выбирать было не из чего.
+ *
+ * Решения (кому что можно) живут в `squadronPanel.ts` — здесь только разметка. Адрес
+ * приказа — id ЭСКАДРЫ: он уникален, и по нему же находится база (`squadronBase`),
+ * поэтому составного ключа «база+звено» в разметке нет и разъезжаться нечему.
+ */
+function squadronCardHtml(card: SquadronCard, view: HangarView): string {
+  const title = `${t(SQUADRON_KIND_KEY)} «${card.name}»`;
+  const cargo = card.cargo.reduce((n, st) => n + st.count, 0);
+  const sub = cargo > 0 ? ` <span class="dim">· ${esc(t('side.wing.cargo', { n: cargo }))}</span>` : '';
+  const head = `<div class="row"><b>${esc(title)}</b>${sub}</div>`;
+  const rows = unitRows(card.stacks);
+  if (!card.canStrike && !card.canSplit && !card.canMerge && !card.canLoad) return head + rows;
+
+  // Слияние — ДВА ТАПА: первый взводит источник, второй выбирает приёмника. Пока
+  // источник взведён, у остальных карточек кнопка меняет смысл на «сюда», а у самого
+  // источника — на отмену: взведённый режим обязан иметь выход без приказа.
+  const armed = squadMerge?.from ?? null;
+  const isSource = armed === card.id;
+  const canReceive = armed !== null && mergeTargets(view, armed).includes(card.id);
+  const merge = card.canMerge
+    ? canReceive
+      ? btn('wingmergeto', card.id, t('side.wing.merge.into'), true)
+      : btn('wingmerge', card.id, t('side.wing.merge'), true)
+    : '';
+  const buttons =
+    `<div class="row">` +
+    btn('wingstrike', card.id, t('side.wing.strike'), card.canStrike) +
+    (card.canSplit ? btn('wingsplit', card.id, t('side.wing.split'), true) : '') +
+    merge +
+    (card.canLoad ? btn('wingtroops', card.id, t('side.wing.troops'), true) : '') +
+    `</div>` +
+    (isSource ? `<div class="row dim">${esc(t('side.wing.merge.pick'))}</div>` : '');
+  const troops = squadTroops?.id === card.id ? squadronTroopsHtml(card.id) : '';
+  return head + rows + buttons + troops;
+}
+
+/** Блок погрузки десанта в ОДНО звено (SHU-4.3). Арифметику «сколько влезет» считает
+ *  общая модель `troopsMenu.ts` — та же, что у корабельного десанта; здесь только
+ *  строки со счётчиками и подтверждение. */
+function squadronTroopsHtml(squadronId: string): string {
+  const inp = squadTroopsInput(squadronId);
+  if (!inp) return '';
+  const m = troopsModel({ ...inp, plan: squadTroops?.plan ?? {} });
+  const rows = m.rows
+    .map((r) => {
+      const nm = displayUnit(r.unit);
+      const sign = r.delta > 0 ? '+' : '';
+      return (
+        `<div class="row">` +
+        `<span class="bicon">${unitIconHtml(r.unit, data, youColor, 18)}</span>${esc(nm)} ` +
+        `<span class="dim">${r.garrison} ▸ ${r.hold}</span> ` +
+        `<button class="b" data-act="wingtstep" data-arg="${esc(squadronId)}" data-unit="${esc(r.unit)}" data-n="-1"${r.delta <= -r.maxUnload ? ' disabled' : ''}>−</button>` +
+        `<b>${sign}${r.delta}</b>` +
+        `<button class="b" data-act="wingtstep" data-arg="${esc(squadronId)}" data-unit="${esc(r.unit)}" data-n="1"${r.delta >= r.maxLoad ? ' disabled' : ''}>+</button>` +
+        `</div>`
+      );
+    })
+    .join('');
+  const hold = t('troops.hold', { a: m.capacity - m.freeCargo, b: m.capacity });
+  return (
+    `<div class="row dim">${esc(hold)}</div>` +
+    rows +
+    `<div class="row">${btn('wingtok', squadronId, t('side.wing.troops.done'), m.valid)}</div>`
+  );
+}
+
+/** Где стоит эта эскадра — мир или носитель. Адрес ВЫВОДИТСЯ из состояния, а не
+ *  склеивается в `data-arg`: составной ключ «база+звено» разъехался бы с ангаром на
+ *  первой же перегрузке порт ⇄ носитель. */
+function squadronBase(id: string): { planetId: string } | { fleetId: string } | null {
+  for (const p of Object.values(s.planets)) {
+    if ((p.hangar ?? []).some((q) => q.id === id)) return { planetId: p.id };
+  }
+  for (const f of Object.values(s.fleets)) {
+    if ((f.hangar ?? []).some((q) => q.id === id)) return { fleetId: f.id };
+  }
+  return null;
+}
+
+/** Эскадра по id — вместе с базой, на которой она стоит. */
+function squadronAt(id: string): { sq: Squadron; base: { planetId: string } | { fleetId: string } } | null {
+  const base = squadronBase(id);
+  if (!base) return null;
+  const host = 'planetId' in base ? s.planets[base.planetId] : s.fleets[base.fleetId];
+  const sq = (host?.hangar ?? []).find((q) => q.id === id);
+  return sq ? { sq, base } : null;
+}
+
+/** Вход модели десанта для звена: гарнизон мира или десант носителя против трюма.
+ *  База берётся ОТ САМОГО ЗВЕНА (`squadronAt`), а не приходит параметром: источник
+ *  войск обязан быть тем же местом, где стоит эскадра. */
+function squadTroopsInput(squadronId: string): TroopsInput | null {
+  const found = squadronAt(squadronId);
+  if (!found) return null;
+  const source =
+    'planetId' in found.base
+      ? (s.planets[found.base.planetId]?.garrison ?? [])
+      : (s.fleets[found.base.fleetId]?.landing ?? []);
+  return troopsInputForSquadron(found.sq, source, data);
 }
 
 function unitRows(stacks: Array<{ unit: string; count: number }>): string {
@@ -7476,10 +7597,56 @@ side.addEventListener('click', (ev) => {
     // снятие идущей стройки. Возврата тут не будет: ждущий заказ не оплачен.
     playerOrder(cancelConstruction(ME, selPlanet!, Number(arg)));
   } else if (act === 'wingstrike') {
-    // SHU-3.1 — взвести УДАР. Цель выбирается тапом по карте, как у наводки залпа и у
-    // каста: у вылета нет «цели по умолчанию», а гадать за игрока — худший из вариантов.
-    strikeAim = { from: arg };
-    note(t('hint.wing-aim'));
+    // SHU-3.1 — взвести УДАР, с SHU-4.3 — удар КОНКРЕТНОГО звена (`arg` = id эскадры).
+    // Цель выбирается тапом по карте, как у наводки залпа и у каста: у вылета нет
+    // «цели по умолчанию», а гадать за игрока — худший из вариантов.
+    const base = squadronBase(arg);
+    if (base) {
+      strikeAim = { from: 'planetId' in base ? base.planetId : base.fleetId, squadronId: arg };
+      squadMerge = null;
+      note(t('hint.wing-aim'));
+    }
+  } else if (act === 'wingsplit') {
+    // Отделяет ОДНУ машину в новое звено (правило 3 в `squadronPanel.ts`): повторный
+    // тап отделяет ещё одну. Что именно уходит, решает чистый `splitOne`.
+    const found = squadronAt(arg);
+    const take = found ? splitOne(found.sq) : null;
+    if (found && take) playerOrder(splitSquadron(ME, found.base, arg, [take]));
+  } else if (act === 'wingmerge') {
+    // Первый тап взводит источник; повторный по нему же — отмена (взведённый режим
+    // обязан иметь выход без приказа).
+    squadMerge = squadMerge?.from === arg ? null : { from: arg };
+  } else if (act === 'wingmergeto') {
+    const from = squadMerge?.from;
+    const found = from ? squadronAt(from) : null;
+    if (from && found) playerOrder(mergeSquadron(ME, found.base, from, arg));
+    squadMerge = null;
+  } else if (act === 'wingtroops') {
+    squadTroops = squadTroops?.id === arg ? null : { id: arg, plan: {} }; // toggle
+  } else if (act === 'wingtstep') {
+    // Шаг счётчика КЛАМПИТСЯ моделью, а не блокируется — как в ⇅-меню корабельного
+    // десанта: «+5» при трёх свободных местах даст +3, а не откажет.
+    const inp = squadTroops ? squadTroopsInput(squadTroops.id) : null;
+    if (squadTroops && inp) {
+      const unit = bEl.dataset.unit ?? '';
+      squadTroops.plan = stepPlan(
+        { ...inp, plan: squadTroops.plan },
+        unit,
+        Number(bEl.dataset.n),
+      );
+    }
+  } else if (act === 'wingtok') {
+    const st = squadTroops;
+    const found = st ? squadronAt(st.id) : null;
+    const inp = st ? squadTroopsInput(st.id) : null;
+    if (st && found && inp) {
+      const { load, unload } = planOrders(troopsModel({ ...inp, plan: st.plan }));
+      // Выгрузка идёт ПЕРВОЙ: она освобождает трюм, на который модель уже посчитала
+      // погрузку. Обратный порядок отбился бы `E_NO_CAPACITY` на ровном месте.
+      if (unload.length) playerOrder(unloadSquadronTroops(ME, found.base, st.id, unload));
+      if (load.length) playerOrder(loadSquadronTroops(ME, found.base, st.id, load));
+    }
+    squadTroops = null;
   } else if (act === 'wingload' || act === 'wingunload') {
     // Что именно перегружать — `hangarPanel.ts` (`transferPick`): первый живой стек
     // источника, столько, сколько влезет в приёмник. Кнопки нет, если брать нечего,
@@ -7953,21 +8120,21 @@ function selectAt(mx: number, my: number) {
   // ФЛОТ (по нему бьют `attack`), потом чужой МИР (по нему — здания). Тап по пустому
   // месту снимает прицел: взведённый режим обязан иметь выход без приказа.
   //
-  // Что именно поднять, решает `strikePick` — первая живая машина ангара и вся её
-  // пачка. Дальность, топливо, враждебность цели и вместимость проверяет ЯДРО: свою
-  // копию этих правил интерфейс не заводит, он показывает отказ (`errText`).
+  // ЧТО поднять, решать уже не нужно: с SHU-4.3 прицел взводит КОНКРЕТНАЯ карточка и
+  // несёт id своей эскадры. Дальность, топливо, враждебность цели и вместимость
+  // проверяет ЯДРО: свою копию этих правил интерфейс не заводит, он показывает отказ
+  // (`errText`).
   if (owner === 'shuttle-strike' && strikeAim) {
-    const from = strikeAim.from;
+    const { from, squadronId } = strikeAim;
     strikeAim = null;
     const foe = nearestHit(hostileFleets(Object.values(s.fleets), ME), fleetAnchor, mx, my, rFleet);
     const node = foe ? null : nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
-    const pick = strikePick(from);
-    if (!pick) {
-      note(t('hint.wing-empty'));
+    if (!squadronAt(squadronId)) {
+      note(t('hint.wing-empty')); // звено исчезло между наводкой и тапом
     } else if (foe) {
-      playerOrder(strikeShuttle(ME, from, pick.squadronId, { targetFleetId: foe.id }));
+      playerOrder(strikeShuttle(ME, from, squadronId, { targetFleetId: foe.id }));
     } else if (node) {
-      playerOrder(strikeShuttle(ME, from, pick.squadronId, { targetPlanetId: node.id }));
+      playerOrder(strikeShuttle(ME, from, squadronId, { targetPlanetId: node.id }));
     } else {
       note(t('hint.wing-cancelled'));
     }
