@@ -71,6 +71,19 @@ describe('game data schema (docs/architecture.md §2)', () => {
     expect(data.units.strike_carrier?.traits).toEqual([]);
     expect(data.units.scout_drone?.stats.cargoCapacity).toBe(0); // default, carries nothing
     expect(data.buildings.orbital_aa?.aaDamage).toBe(12); // anti-ship orbital AA — a defensive building
+    // ORB-1 — ОРБИТАЛЬНЫЙ СЛОЙ НЕСУТ РОВНО ДВА ВИДА УЗЛА: планета и космическая
+    // крепость. Правило владельца («бомбардировать можно только планету и крепость
+    // космическую») живёт ИМЕННО ЗДЕСЬ, в данных: ядро только спрашивает флаг. Новый
+    // вид узла с `orbit: true` — это молчаливое расширение правила, и сторож обязан
+    // на него упасть. Обратите внимание на ДЕФОЛТ схемы (`orbit: true`): вид, забывший
+    // объявить флаг, слой получает, поэтому проверка идёт по разобранным данным.
+    const withOrbit = Object.keys(data.sectorKinds)
+      .filter((k) => data.sectorKinds[k]?.orbit === true)
+      .sort();
+    expect(withOrbit).toEqual(['planet', 'void_station']);
+    // И ПКО им обоим доступно: у крепости роспись построек закрытая, поэтому её
+    // отсутствие в списке = крепость без зенитных зубов.
+    expect(data.sectorKinds.void_station?.allowedBuildings).toContain('orbital_aa');
     // ROS-2.2: зональное ПВО — ОТДЕЛЬНОЕ здание против ЧЕЛНОКОВ, и стат у него другой.
     // Спутать их легко (оба «ПВО» на слух), а игрок платит за разные угрозы.
     expect(data.buildings.zonal_aa?.pointDefense).toBe(40);
@@ -221,6 +234,15 @@ describe('game data schema (docs/architecture.md §2)', () => {
     // которой у прототипа не было вовсе: запереть ещё-не-существующее дешевле, чем
     // отобрать доступное. Новая строка здесь = осознанное решение с замером, а не
     // побочный эффект правки контента.
+    //
+    // ORB-1 (2026-09-10) — ЧЕТВЁРТАЯ строка, и она как раз ОТБИРАЕТ доступное: заказ
+    // владельца «изучается технология, строится здание». Раньше не выполнялось ни то,
+    // ни другое — батарея не значилась ни в одной технологии И выдавалась родному миру
+    // готовой (`matchSetup.ts`). Гейт поставлен вместе со снятием стартовой батареи:
+    // держать одно без другого бессмысленно (гейт при готовой постройке ничего не
+    // запирает, а снятие без гейта просто отнимает оборону). Узел `orbital_defense_grid`
+    // намеренно ЯРУС 1 без предпосылок — цена в том, что оборону надо оплатить и
+    // подождать, а не в том, что её увели за цепочку исследований.
     const data = parseGameData(loadShippedBundle());
     const gates = Object.entries(data.technologies)
       .flatMap(([id, def]) => [
@@ -232,6 +254,7 @@ describe('game data schema (docs/architecture.md §2)', () => {
     expect(gates).toEqual([
       'ai_stewardship → ability:steward',
       'industrial_automation → building:mine_t2',
+      'orbital_defense_grid → building:orbital_aa',
       'siege_doctrine → unit:siege_lance',
     ]);
   });

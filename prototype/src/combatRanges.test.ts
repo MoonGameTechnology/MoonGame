@@ -56,16 +56,34 @@ describe('RANGE-UX — радиусы приходят из ядра, а не и
   });
 });
 
+/** Партия, в которой КАЖДЫЙ владеемый мир поднял орбитальное ПКО.
+ *
+ *  ORB-1: стартовое ПКО отобрано — теперь батарея исследуется (`orbital_defense_grid`)
+ *  и строится. Тесты ниже про ПРАВИЛА ОВЕРЛЕЯ (радиус, туман), а не про стартовую
+ *  раскладку, поэтому батарею они ставят себе сами. */
+function withAa(): GameState {
+  const base = newGame();
+  const planets = { ...base.planets };
+  for (const p of Object.values(planets)) {
+    if (p.owner === null) continue;
+    planets[p.id] = {
+      ...p,
+      buildings: [...p.buildings, { type: 'orbital_aa', level: 1, hp: 30 }],
+    };
+  }
+  return { ...base, planets };
+}
+
 describe('RANGE-UX — ПВО: отметка, а не область; и оно под туманом', () => {
   it('у ПВО радиус НОЛЬ — оно бьёт по своему узлу, круга у него нет', () => {
-    const s = newGame();
+    const s = withAa();
     const aa = combatRanges(s, data, [], ME, locate, seen).rings.filter((r) => r.kind === 'aa');
-    expect(aa.length).toBeGreaterThan(0); // стартовый мир несёт orbital_aa
+    expect(aa.length).toBeGreaterThan(0);
     for (const r of aa) expect(r.radius).toBe(0);
   });
 
   it('чужие зубы ПВО не показываются за туманом — оверлей не должен быть разведкой', () => {
-    const s = newGame();
+    const s = withAa();
     const visible = combatRanges(s, data, [], ME, locate, seen).rings.filter((r) => r.kind === 'aa');
     const fogged = combatRanges(s, data, [], ME, locate, () => false).rings.filter(
       (r) => r.kind === 'aa',

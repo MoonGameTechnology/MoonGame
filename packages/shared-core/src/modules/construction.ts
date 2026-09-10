@@ -282,7 +282,7 @@ function scheduleQueuePump(h: HandlerContext, planetId: string, lane: BuildLane)
  */
 function startNextQueued(h: HandlerContext, planet: Planet, lane: BuildLane): void {
   if (laneBusy(h, planet.id, lane)) return;
-  if (isBombarded(h.state, planet.id)) return; // производство заморожено — не старт, а пауза
+  if (isBombarded(h.state, planet.id, h.ctx.data)) return; // производство заморожено — не старт, а пауза
   for (;;) {
     const queue = planet.buildQueue ?? [];
     const head = queue.find((q) => laneOfKind(q.kind) === lane);
@@ -542,7 +542,7 @@ export const constructionModule: GameModule = {
         return h.reject('E_BAD_PAYLOAD');
       }
       const { planet, player } = ownedPlanet(h, action, payload.planetId);
-      if (isBombarded(h.state, planet.id)) {
+      if (isBombarded(h.state, planet.id, h.ctx.data)) {
         return h.reject('E_BOMBARDED'); // production frozen under bombardment
       }
       const def = h.ctx.data.buildings[payload.building];
@@ -606,7 +606,7 @@ export const constructionModule: GameModule = {
         return h.reject('E_BAD_PAYLOAD');
       }
       const { planet, player } = ownedPlanet(h, action, payload.planetId);
-      if (isBombarded(h.state, planet.id)) {
+      if (isBombarded(h.state, planet.id, h.ctx.data)) {
         return h.reject('E_BOMBARDED');
       }
       // RULES-2.1: address a SPECIFIC instance by uid when maxPerPlanet > 1.
@@ -675,7 +675,7 @@ export const constructionModule: GameModule = {
         return h.reject('E_BAD_PAYLOAD');
       }
       const { planet, player } = ownedPlanet(h, action, payload.planetId);
-      if (isBombarded(h.state, planet.id)) {
+      if (isBombarded(h.state, planet.id, h.ctx.data)) {
         return h.reject('E_BOMBARDED');
       }
       const def = h.ctx.data.units[payload.unit];
@@ -846,7 +846,7 @@ export const constructionModule: GameModule = {
         return h.reject('E_BAD_PAYLOAD');
       }
       const { planet, player } = ownedPlanet(h, action, payload.planetId);
-      if (isBombarded(h.state, planet.id)) {
+      if (isBombarded(h.state, planet.id, h.ctx.data)) {
         return h.reject('E_BOMBARDED');
       }
       const paused = planet.pausedConstruction ?? [];
@@ -920,7 +920,7 @@ export const constructionModule: GameModule = {
       if (!planet || planet.owner !== p.playerId) {
         return; // planet gone or captured mid-build → investment forfeited
       }
-      if (isBombarded(h.state, planet.id)) {
+      if (isBombarded(h.state, planet.id, h.ctx.data)) {
         // production frozen under bombardment → re-defer until it lifts (scale the
         // retry by timeScale like every other duration, so a fast match isn't stuck)
         h.schedule(h.ctx.now + hoursToMs(h.ctx, 1), 'construction.complete', p);

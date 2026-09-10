@@ -18,6 +18,15 @@
     "researchTimeHours": 6,
     "effects": { "fleetSpeedBonus": 0.12 }
   },
+  "orbital_defense_grid": {
+    "name": "Orbital Defense Grid",
+    "description": "tech.node.orbital-defense-grid.desc",
+    "branch": "space",
+    "tier": 1,
+    "cost": { "credits": 140, "metal": 100 },
+    "researchTimeHours": 5,
+    "unlocks": { "buildings": ["orbital_aa"] }
+  },
   "siege_doctrine": {
     "name": "Siege Doctrine",
     "description": "tech.node.siege-doctrine.desc",

@@ -5763,7 +5763,7 @@ function fleetPanelHtml(f: Fleet): string {
         'bombard',
         f.bombarding ? 'off' : 'on',
         f.bombarding ? t('side.strike.bombard.stop') : t('side.strike.bombard'),
-        bombardEnabled(inOrbit, nShips),
+        bombardEnabled(inOrbit, nShips, sectorTypeOf(here!.id)?.orbit ?? true),
       );
       // Штурм не спрашивает КОРАБЛИ (высаживается десант, а не корпуса), но десант
       // спрашивает — там, где его требует ядро: на защищённом мире без него ответ

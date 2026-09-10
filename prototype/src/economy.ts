@@ -69,7 +69,7 @@ export function netIncome(state: GameState, playerId: string): Record<string, nu
     techBonus += data.technologies[id]?.effects?.productionBonus ?? 0;
   const bonusMult = (1 + factionBonus) * (1 + techBonus);
   for (const p of Object.values(state.planets)) {
-    if (p.owner !== playerId || isBombarded(state, p.id)) continue;
+    if (p.owner !== playerId || isBombarded(state, p.id, data)) continue;
     const mult =
       (1 + (p.planetType ? (data.planetTypes[p.planetType]?.productionBonus ?? 0) : 0)) * bonusMult;
     // Credits are settled per-planet so the civic tax + Tax Office boost mirror the
@@ -239,7 +239,7 @@ export function incomeBreakdown(
   const bonusMult = (1 + factionBonus) * (1 + techBonus);
 
   for (const p of Object.values(state.planets)) {
-    if (p.owner !== playerId || isBombarded(state, p.id)) continue;
+    if (p.owner !== playerId || isBombarded(state, p.id, data)) continue;
     const mult =
       (1 + (p.planetType ? (data.planetTypes[p.planetType]?.productionBonus ?? 0) : 0)) * bonusMult;
     let credits = 0;

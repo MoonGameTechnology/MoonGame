@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { bombardedPlanets, isBombarded } from './orbit';
 import { setStance } from './diplomacy';
 import { createInitialState, type Fleet, type GameState, type Planet } from './gameState';
+import { fixtureData } from '../testkit/arbitraries';
 
 function planet(id: string, owner: string | null): Planet {
   return {
@@ -46,27 +47,27 @@ function stateWith(planets: Planet[], fleets: Fleet[]): GameState {
 describe('isBombarded', () => {
   it('returns false for a non-existent planet', () => {
     const st = stateWith([], []);
-    expect(isBombarded(st, 'nonexistent')).toBe(false);
+    expect(isBombarded(st, 'nonexistent', fixtureData)).toBe(false);
   });
 
   it('returns false when no fleets are present', () => {
     const st = stateWith([planet('P', 'p1')], []);
-    expect(isBombarded(st, 'P')).toBe(false);
+    expect(isBombarded(st, 'P', fixtureData)).toBe(false);
   });
 
   it('returns false when a fleet is present but not bombarding', () => {
     const st = stateWith([planet('P', 'p1')], [fleet('F', 'p2', 'P', 'near', false)]);
-    expect(isBombarded(st, 'P')).toBe(false);
+    expect(isBombarded(st, 'P', fixtureData)).toBe(false);
   });
 
   it('returns false when the bombarding fleet is in transit (not in orbit)', () => {
     const st = stateWith([planet('P', 'p1')], [fleet('F', 'p2', 'P', undefined, true)]);
-    expect(isBombarded(st, 'P')).toBe(false);
+    expect(isBombarded(st, 'P', fixtureData)).toBe(false);
   });
 
   it('returns false when the bombarding fleet belongs to the planet owner', () => {
     const st = stateWith([planet('P', 'p1')], [fleet('F', 'p1', 'P', 'near', true)]);
-    expect(isBombarded(st, 'P')).toBe(false);
+    expect(isBombarded(st, 'P', fixtureData)).toBe(false);
   });
 
   it('returns false when the fleet is at a different location', () => {
@@ -74,12 +75,12 @@ describe('isBombarded', () => {
       [planet('P', 'p1'), planet('Q', 'p2')],
       [fleet('F', 'p2', 'Q', 'near', true)],
     );
-    expect(isBombarded(st, 'P')).toBe(false);
+    expect(isBombarded(st, 'P', fixtureData)).toBe(false);
   });
 
   it('returns true when a hostile fleet is bombarding from the near orbit', () => {
     const st = stateWith([planet('P', 'p1')], [fleet('F', 'p2', 'P', 'near', true)]);
-    expect(isBombarded(st, 'P')).toBe(true);
+    expect(isBombarded(st, 'P', fixtureData)).toBe(true);
   });
 
   it('returns true if any one of multiple fleets satisfies bombardment conditions', () => {
@@ -90,7 +91,7 @@ describe('isBombarded', () => {
         fleet('F2', 'p2', 'P', 'near', true), // hostile, stationed in orbit, bombarding
       ],
     );
-    expect(isBombarded(st, 'P')).toBe(true);
+    expect(isBombarded(st, 'P', fixtureData)).toBe(true);
   });
 
   it('a fleet PINNED in a melee (battleId) does not freeze the planet — it is not shelling', () => {
@@ -98,14 +99,14 @@ describe('isBombarded', () => {
     // damage and freeze read one shared predicate, so they cannot disagree.
     const pinned = { ...fleet('F', 'p2', 'P', 'near', true), battleId: 'B1' };
     const st = stateWith([planet('P', 'p1')], [pinned]);
-    expect(isBombarded(st, 'P')).toBe(false);
+    expect(isBombarded(st, 'P', fixtureData)).toBe(false);
   });
 
   it('only an at-WAR pair bombards: peace/pact/alliance freeze nothing', () => {
     for (const stance of ['peace', 'pact', 'alliance'] as const) {
       const st = stateWith([planet('P', 'p1')], [fleet('F', 'p2', 'P', 'near', true)]);
       setStance(st, 'p1', 'p2', stance);
-      expect(isBombarded(st, 'P'), stance).toBe(false);
+      expect(isBombarded(st, 'P', fixtureData), stance).toBe(false);
     }
   });
 
@@ -118,6 +119,6 @@ describe('isBombarded', () => {
         fleet('F3', 'p2', 'R', 'near', true), // shelling R
       ],
     );
-    expect(bombardedPlanets(st)).toEqual(new Set(['P', 'R']));
+    expect(bombardedPlanets(st, fixtureData)).toEqual(new Set(['P', 'R']));
   });
 });

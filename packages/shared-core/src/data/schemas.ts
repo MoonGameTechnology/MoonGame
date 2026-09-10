@@ -496,7 +496,14 @@ export const SectorKindDefSchema = z.object({
   capturable: z.boolean().default(true),
   /** Can structures be raised here? */
   buildable: z.boolean().default(true),
-  /** Does it have the orbital layer — can fleets station in orbit (cities, fortresses)? */
+  /** Does it have the orbital layer? Only a province WITH one can be shelled from
+   *  above and can answer with orbital AA — in the shipped catalogue exactly two
+   *  kinds carry it: `planet` and `void_station` (the space fortress). Enforced in
+   *  the orbital module: the `fleet.bombard` gate (`E_WRONG_SECTOR`), the shared
+   *  `isActivelyBombarding` predicate (so damage and the economy freeze cannot
+   *  disagree), and the AA/bombardment span itself. NOT a gate on entering orbit:
+   *  a fleet still arrives, fights and lands anywhere — an asteroid field is
+   *  capturable, and assault reads `fleet.orbit`, not this flag. */
   orbit: z.boolean().default(true),
   /** Province-centric build roster: the building ids raisable on this province type.
    *  Absent/undefined = ANY building (the permissive default, so kind-less / roster-less
