@@ -1,4 +1,6 @@
 import { getStance } from './diplomacy';
+import { hasOrbit } from './sectorKind';
+import type { GameData } from '../data/schemas';
 import type { Fleet, GameState, PlanetId, PlayerId } from './gameState';
 
 /**
@@ -7,6 +9,12 @@ import type { Fleet, GameState, PlanetId, PlayerId } from './gameState';
  * construction freeze (via {@link bombardedPlanets}), so the rule can't fork.
  *
  * A fleet shells only when ALL hold:
+ *  - the province HAS an orbital layer (`sectorKinds[kind].orbit`) — only a planet
+ *    and a space fortress can be shelled from above; an asteroid field, a nebula,
+ *    a dead world or a debris junction cannot. The check lives HERE, in the shared
+ *    predicate, and not only in the `fleet.bombard` gate: damage and freeze read
+ *    this one function, so a rule enforced at the action alone would fork the
+ *    moment any other path flipped `bombarding` or a province's `kind`;
  *  - bombardment is switched on and the fleet sits on the NEAR orbit of a world;
  *  - it is NOT pinned in a melee (`battleId`): a pinned fleet is busy fighting —
  *    it neither shells nor freezes the planet (bug-hunt MAJOR: a relief fleet
@@ -24,12 +32,16 @@ export function isActivelyBombarding(
   state: GameState,
   fleet: Fleet,
   hostile: (a: PlayerId, b: PlayerId) => boolean,
+  data: GameData,
 ): boolean {
   if (!fleet.bombarding || fleet.battleId || fleet.orbit !== 'near' || fleet.location === null) {
     return false;
   }
   const planet = state.planets[fleet.location];
-  return planet !== undefined && planet.owner !== null && hostile(fleet.owner, planet.owner);
+  if (planet === undefined || !hasOrbit(data, planet)) {
+    return false;
+  }
+  return planet.owner !== null && hostile(fleet.owner, planet.owner);
 }
 
 /** The D1 fallback hostility read: only an explicit `war` stance is hostile —
@@ -44,11 +56,11 @@ function stanceHostile(state: GameState): (a: PlayerId, b: PlayerId) => boolean 
  * call this once and then use `Set.has` — O(1) per planet instead of the
  * previous O(fleets) per planet. Per-fleet rule: {@link isActivelyBombarding}.
  */
-export function bombardedPlanets(state: GameState): Set<PlanetId> {
+export function bombardedPlanets(state: GameState, data: GameData): Set<PlanetId> {
   const set = new Set<PlanetId>();
   const hostile = stanceHostile(state);
   for (const fleet of Object.values(state.fleets)) {
-    if (isActivelyBombarding(state, fleet, hostile)) {
+    if (isActivelyBombarding(state, fleet, hostile, data)) {
       set.add(fleet.location as PlanetId);
     }
   }
@@ -64,6 +76,6 @@ export function bombardedPlanets(state: GameState): Set<PlanetId> {
  * For bulk checks (iterating many planets) prefer `bombardedPlanets(state)` to
  * avoid an O(fleets) scan per planet.
  */
-export function isBombarded(state: GameState, planetId: PlanetId): boolean {
-  return bombardedPlanets(state).has(planetId);
+export function isBombarded(state: GameState, planetId: PlanetId, data: GameData): boolean {
+  return bombardedPlanets(state, data).has(planetId);
 }

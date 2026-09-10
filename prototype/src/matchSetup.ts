@@ -232,8 +232,10 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
     home.buildings = [
       { type: 'mine', level: 1, hp: hpOfLevel('mine', 1) },
       { type: 'radar', level: 1, hp: hpOfLevel('radar', 1) },
-      // Anti-ship defence is a building now: an orbital-AA emplacement over the homeworld.
-      { type: 'orbital_aa', level: 1, hp: hpOfLevel('orbital_aa', 1) },
+      // ORB-1: НИКАКОГО стартового ПКО. Раньше родной мир получал батарею готовой, и
+      // «изучается технология, строится здание» не выполнялось дважды: ни технологии не
+      // было, ни постройки не требовалось. Теперь это `orbital_defense_grid`
+      // (`data/technologies.json`) плюс обычный `building.construct`.
       // A starting yard — space-domain hulls need a standing shipyard/spaceport to
       // build at all (enablesShipConstruction); without one, turn-1 fleet-building
       // would be impossible.

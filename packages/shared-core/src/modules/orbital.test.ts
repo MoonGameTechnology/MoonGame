@@ -22,7 +22,7 @@ import type { Action, AdvanceResult, ApplyResult, Context } from '../action/type
  *  pre-split single module. */
 const combatFamily = [orbitalModule, combatModule, interceptModule];
 
-const data: GameData = parseGameData({
+const dataLiteral = {
   version: '0.1.0',
   resources: ['metal'],
   units: {
@@ -51,7 +51,8 @@ const data: GameData = parseGameData({
     flak: { name: 'Orbital AA', cost: { metal: 60 }, buildTimeHours: 0, hp: 25, aaDamage: 28 },
   },
   events: {},
-});
+};
+const data: GameData = parseGameData(dataLiteral);
 const HOUR = 3_600_000;
 const ctx: Context = { now: 0, data };
 const at = (now: number): Context => ({ now, data });
@@ -424,5 +425,90 @@ describe('orbital — anti-air (orbital AA)', () => {
     });
     const r = okAdvance(kernel.advanceTo(st, at(2 * HOUR)));
     expect(r.state.fleets.E?.units[0]?.count).toBe(1); // AA busy on the ground → E untouched
+  });
+});
+
+// ORB-1 — ОРБИТАЛЬНЫЙ СЛОЙ ЕСТЬ РОВНО У ДВУХ ВИДОВ УЗЛА: планета и космическая
+// крепость. Решение владельца: «бомбардировать можно только планету и крепость
+// космическую».
+//
+// Почему это отдельный блок, а не строчка в существующих. Поле `orbit` в
+// `sectorKinds` объявляло этот слой С САМОГО НАЧАЛА — и его не спрашивал НИКТО:
+// правило жило в данных и не существовало в игре (соседние флаги той же записи —
+// `capturable`, `allowedBuildings` — спрашиваются, этот не спрашивался). Поэтому
+// тесты идут парами «можно / нельзя» и отдельно проверяют, что нельзя держится
+// ОБЩИМ ПРЕДИКАТОМ, а не только воротами действия.
+const kindData: GameData = parseGameData({
+  ...dataLiteral,
+  sectorKinds: {
+    planet: { orbit: true },
+    void_station: { orbit: true },
+    nebula: { orbit: false },
+    asteroid: { orbit: false },
+    dead_world: { orbit: false },
+  },
+});
+const kAt = (now: number): Context => ({ now, data: kindData });
+const kindPlanet = (
+  id: string,
+  owner: string | null,
+  kind: string,
+  opts: { buildings?: Array<[string, number]>; garrison?: Array<[string, number]> } = {},
+): Planet => ({ ...planet(id, owner, opts), kind });
+
+describe('orbital — орбитальный слой (ORB-1)', () => {
+  const scene = (kind: string) =>
+    stateWith({
+      planets: [kindPlanet('X', 'p2', kind)],
+      fleets: [fleet('F', 'p1', 'X', [['cruiser', 1]], { orbit: 'near' })],
+    });
+
+  it('планету бомбардировать можно', () => {
+    const kernel = createKernel([...combatFamily]);
+    const r = okApply(kernel.applyAction(scene('planet'), bombard('F', true), kAt(0)));
+    expect(r.state.fleets.F?.bombarding).toBe(true);
+  });
+
+  it('КОСМИЧЕСКУЮ КРЕПОСТЬ — ТОЖЕ: она второй носитель слоя, а не исключение', () => {
+    const kernel = createKernel([...combatFamily]);
+    const r = okApply(kernel.applyAction(scene('void_station'), bombard('F', true), kAt(0)));
+    expect(r.state.fleets.F?.bombarding).toBe(true);
+  });
+
+  it('туманность, астероид и мёртвый мир — нельзя: E_WRONG_SECTOR', () => {
+    const kernel = createKernel([...combatFamily]);
+    for (const kind of ['nebula', 'asteroid', 'dead_world']) {
+      const r = kernel.applyAction(scene(kind), bombard('F', true), kAt(0));
+      expect(errCode(r), kind).toBe('E_WRONG_SECTOR');
+    }
+  });
+
+  it('ПРАВИЛО ДЕРЖИТ ОБЩИЙ ПРЕДИКАТ, А НЕ ТОЛЬКО ВОРОТА: залп, взведённый в обход\n     действия, не морозит производство и не крошит постройки', () => {
+    // Ровно та же сцена, что и в «freezes the production… and wears its structures»
+    // выше, но узел — туманность. Ворота действия здесь не при чём: `bombarding`
+    // выставлен прямо в состоянии. Если бы проверку поставили ТОЛЬКО в действие,
+    // урон и заморозка разъехались бы с ним — а их обещано держать одной функцией.
+    const kernel = createKernel([economyModule, ...combatFamily, constructionModule]);
+    const st = stateWith({
+      players: [player('p2', { metal: 0 })],
+      planets: [kindPlanet('N', 'p2', 'nebula', { buildings: [['mine', 1]] })],
+      fleets: [fleet('F', 'p1', 'N', [['cruiser', 1]], { orbit: 'near', bombarding: true })],
+    });
+    const r = okAdvance(kernel.advanceTo(st, kAt(2 * HOUR)));
+    expect(r.state.players.p2?.resources.metal ?? 0).toBeGreaterThan(0); // добыча идёт
+    expect(r.state.planets.N?.buildings.find((b) => b.type === 'mine')?.hp).toBe(20); // шахта цела
+  });
+
+  it('ПКО без орбитального слоя молчит: стрелять по орбите, которой нет, нечем', () => {
+    // Зеркало теста «fires at a hostile fleet… and can destroy it»: тот же гарнизон,
+    // тот же срок, тот же крейсер — но узел без слоя, и крейсер уходит живым.
+    const kernel = createKernel([...combatFamily]);
+    const st = stateWith({
+      planets: [kindPlanet('N', 'p1', 'nebula', { garrison: [['aa', 2]] })],
+      fleets: [fleet('E', 'p2', 'N', [['cruiser', 1]], { orbit: 'near' })],
+    });
+    const r = okAdvance(kernel.advanceTo(st, kAt(2 * HOUR)));
+    expect(r.state.fleets.E).toBeDefined();
+    expect(r.events.map((e) => e.type)).not.toContain('aa.fired');
   });
 });

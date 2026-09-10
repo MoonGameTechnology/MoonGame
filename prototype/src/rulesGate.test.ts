@@ -20,7 +20,9 @@ function field() {
   const home = Object.values(s.planets).find((p) => p.owner === ME)!;
   const fleet = Object.values(s.fleets).find((f) => f.owner === ME) ?? null;
   // Здание, которого на стартовом мире ЕЩЁ НЕТ: часть каталога уже построена
-  // (mine/radar/orbital_aa/spaceport), и заказ такого сразу отбился бы E_ALREADY_BUILT.
+  // (mine/radar/spaceport), и заказ такого сразу отбился бы E_ALREADY_BUILT.
+  // ORB-1: `orbital_aa` из этого списка ушёл — стартовой батареи больше нет, и заказать
+  // её теперь нельзя по другой причине (`E_TECH_LOCKED`), поэтому в кандидаты она не годится.
   const fresh = ['farm', 'fort', 'tax_office', 'refinery', 'barracks'].find(
     (b) => !home.buildings.some((x) => x.type === b),
   )!;

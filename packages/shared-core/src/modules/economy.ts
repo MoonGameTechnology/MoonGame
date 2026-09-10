@@ -263,7 +263,7 @@ export const economyModule: GameModule = {
       const hours = (span / MS_PER_HOUR) * scale;
       const days = (span / MS_PER_DAY) * scale;
       const data = h.ctx.data;
-      const bombarded = bombardedPlanets(h.state); // O(fleets) once, then O(1) per planet
+      const bombarded = bombardedPlanets(h.state, data); // O(fleets) once, then O(1) per planet
 
       // Sorted (BF-13): several planets credit the same treasury cell — float
       // addition order must not depend on JSONB key order after hibernation.

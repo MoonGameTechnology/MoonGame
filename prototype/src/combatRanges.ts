@@ -23,6 +23,7 @@
  * кораблями.
  */
 import {
+  hasOrbit,
   shuttleStrikeRange,
   type Fleet,
   type GameData,
@@ -114,6 +115,10 @@ export function ringLook(kind: RangeKind): RangeLook {
 /** Суммарная сила ПКО мира: стационарные установки зданий + ближняя зенитка гарнизона
  *  — обе шкалы, по которым бьёт `orbital.ts`. Ноль = зубов нет, отметки не будет. */
 function aaStrength(planet: GameState['planets'][string], data: GameData): number {
+  // ORB-1: нет орбитального слоя — нет и залпа по орбите (`orbital.ts` пропускает
+  // такой узел целиком). Отметка на карте обязана молчать вместе с пушкой, иначе
+  // оверлей обещает зубы, которых нет.
+  if (!hasOrbit(data, planet)) return 0;
   let total = 0;
   for (const b of planet.buildings) {
     const def = data.buildings[b.type];

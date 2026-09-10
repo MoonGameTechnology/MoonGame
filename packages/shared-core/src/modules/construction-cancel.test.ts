@@ -158,7 +158,7 @@ describe('construction module — cancel refunds the unbuilt share and pauses', 
         },
       },
     };
-    expect(isBombarded(besieged, 'A')).toBe(true); // sanity: the siege actually froze production
+    expect(isBombarded(besieged, 'A', data)).toBe(true); // sanity: the siege actually froze production
     okApply(kernel.applyAction(besieged, cancel(seq), ctx(HOUR)));
   });
 });

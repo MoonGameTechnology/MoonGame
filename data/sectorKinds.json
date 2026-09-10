@@ -18,7 +18,7 @@
     "name": "Nebula",
     "capturable": true,
     "buildable": true,
-    "orbit": true,
+    "orbit": false,
     "appearance": { "color": "#8f6dff", "label": "nebula", "shape": "city" }
   },
   "empty": {
@@ -42,7 +42,7 @@
     "scoreValue": 10,
     "capturable": true,
     "buildable": true,
-    "orbit": true,
+    "orbit": false,
     "allowedBuildings": ["metal_station"],
     "appearance": { "color": "#5a4a4a", "label": "dead world", "shape": "city" }
   },
@@ -50,12 +50,32 @@
     "name": "Derelict Graveyard",
     "orbit": false
   },
+  "ion_storm": {
+    "name": "Ion Storm",
+    "orbit": false
+  },
+  "dense_nebula": {
+    "name": "Dense Nebula",
+    "orbit": false
+  },
+  "solar_flare": {
+    "name": "Solar Flare Zone",
+    "orbit": false
+  },
   "void_station": {
     "name": "Void Station",
     "capturable": true,
     "buildable": true,
-    "orbit": false,
-    "allowedBuildings": ["shipyard", "spaceport", "radar", "fort", "power_plant", "fabricator"],
+    "orbit": true,
+    "allowedBuildings": [
+      "shipyard",
+      "spaceport",
+      "radar",
+      "fort",
+      "power_plant",
+      "fabricator",
+      "orbital_aa"
+    ],
     "appearance": { "color": "#5f8f8c", "label": "void fortress", "shape": "station" }
   }
 }

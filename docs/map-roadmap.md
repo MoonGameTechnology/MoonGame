@@ -131,7 +131,9 @@ terrain?, planetType?, owner?, buildings?, garrison? }` + рёбра `paths` (п
 dead_world/void_station + `capturable`/`buildable`/`orbit`) + `SectorKindDefSchema`
 + `data.sectorKinds`; поле `Planet.kind`;
 аксессоры `sectorKindDef`/`isCapturable`/`isBuildable`/`hasOrbit` с мягким
-дефолтом (нет вида → всё разрешено). Загрузчик карты проецирует `kind`; шиппед-
+дефолтом (нет вида → всё разрешено). **ORB-1 (2026-09-10):** `orbit` из объявленного,
+но неспрашиваемого флага стал правилом — орбитальный слой (бомбардировка сверху +
+ответ ПКО) есть ровно у `planet` и `void_station`; см. `state.md` §5 «orbital». Загрузчик карты проецирует `kind`; шиппед-
 лоадеры читают `sectorKinds.json`; прототип получил `kind` на узлах + `sectorKinds`
 в данных (пустота снова незахватываема). Валидатор карты ловит `E_UNKNOWN_KIND`.
 **Готово, когда:** ✅ новый вид добавляется данными, без правок логики.

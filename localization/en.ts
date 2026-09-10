@@ -614,6 +614,7 @@ export const en: Record<string, string> = {
   'data.open-space': 'Open space',
   'data.area-defense-battery': 'Area Defense Battery',
   'data.orbital-defense-battery': 'Orbital Defense Battery',
+  'data.orbital-defense-grid': 'Orbital Defense Grid',
   'data.orbital-logistics': 'Orbital Logistics',
   'data.overclocked-helm': 'Overclocked Helm',
   'data.overseer': 'Overseer',
@@ -1149,6 +1150,7 @@ export const en: Record<string, string> = {
   'err.research-slots-full': 'all research slots are full',
   'err.respawn-cooldown': 'the hero is still recovering',
   'err.same-location': 'fleet is already here',
+  'err.tech-locked': 'requires a technology',
   'err.too-early': 'too early',
   'err.unknown-building': 'unknown building',
   'err.unknown-provider': 'Unknown provider.',
@@ -1992,6 +1994,8 @@ export const en: Record<string, string> = {
   'tech.node.meta-industry-2.desc': 'Meta-progression: another +5% production.',
   'tech.node.meta-industry.desc': 'Meta-progression: +5% production.',
   'tech.node.microelectronics-fabrication.desc': 'Orbital foundries: +5% production.',
+  'tech.node.orbital-defense-grid.desc':
+    'Orbital defence grid: unlocks the orbital AA emplacement — a battery that fires on fleets in orbit.',
   'tech.node.orbital-logistics.desc': 'Standardised haulage: +12% fleet speed.',
   'tech.node.planetary-bastions.desc':
     "Planetary bastions: a full-cycle defence industry. +8% damage. The Marshal's capstone.",

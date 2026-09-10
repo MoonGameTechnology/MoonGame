@@ -75,9 +75,12 @@ export function strikeOffered(
   return worldOwner !== fleetOwner && capturable;
 }
 
-/** Правило 3: доступен ли обстрел. */
-export function bombardEnabled(inOrbit: boolean, ships: number): boolean {
-  return inOrbit && ships > 0;
+/** Правило 3: доступен ли обстрел. Третье условие — ВИД УЗЛА: обстрелять можно
+ *  только то, у чего есть орбитальный слой (планета и космическая крепость). Ядро
+ *  ответит `E_WRONG_SECTOR`, и живая кнопка обещала бы заведомый отказ — то же
+ *  соображение, что и у правила 4 про десант. */
+export function bombardEnabled(inOrbit: boolean, ships: number, orbitalLayer: boolean): boolean {
+  return inOrbit && ships > 0 && orbitalLayer;
 }
 
 /** Правило 4: доступен ли штурм. Десант спрашивается только там, где его требует ядро

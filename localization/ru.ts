@@ -615,6 +615,7 @@ export const ru: Record<string, string> = {
   'data.open-space': 'Открытый космос',
   'data.area-defense-battery': 'Зональное ПВО',
   'data.orbital-defense-battery': 'Орбитальное ПКО',
+  'data.orbital-defense-grid': 'Орбитальная оборонная сеть',
   'data.orbital-logistics': 'Орбитальная логистика',
   'data.overclocked-helm': 'Разогнанный шлем',
   'data.overseer': 'Куратор',
@@ -1150,6 +1151,7 @@ export const ru: Record<string, string> = {
   'err.research-slots-full': 'все исследовательские слоты заняты',
   'err.respawn-cooldown': 'герой ещё восстанавливается',
   'err.same-location': 'флот уже здесь',
+  'err.tech-locked': 'нужна технология',
   'err.too-early': 'слишком рано',
   'err.unknown-building': 'неизвестное здание',
   'err.unknown-provider': 'Неизвестный провайдер.',
@@ -1989,6 +1991,8 @@ export const ru: Record<string, string> = {
   'tech.node.meta-industry-2.desc': 'Мета-прокачка: ещё +5% к производству.',
   'tech.node.meta-industry.desc': 'Мета-прокачка: +5% к производству.',
   'tech.node.microelectronics-fabrication.desc': 'Орбитальные фабрики: +5% к производству.',
+  'tech.node.orbital-defense-grid.desc':
+    'Орбитальная оборонная сеть: открывает постройку орбитального ПКО — батареи, что бьёт по флоту на орбите.',
   'tech.node.orbital-logistics.desc': 'Стандартизация перевозок: +12% к скорости флотов.',
   'tech.node.planetary-bastions.desc':
     'Планетарные бастионы: оборонная промышленность полного цикла. +8% к урону. Капстоун Маршала.',
