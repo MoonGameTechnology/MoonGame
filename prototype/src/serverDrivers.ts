@@ -6,7 +6,7 @@
  * `SortieState`/`sortieSpec`/`tickRearm`/`fleetHasShuttle` (ядро,
  * `state/shuttle.ts` — CONV-5,
  * REFP-7), and the action builders `moveFleet`/`orbitFleet`/`assaultFleet`/
- * `barrageFleet`/`castHeroAbility` (`actions.ts`, REFP-22/24). Pure — a host
+ * `castHeroAbility` (`actions.ts`, REFP-22/24). Pure — a host
  * (`main.ts`'s frame loop, or NET's `standingOrders`/`chain` modules) applies
  * the returned actions/patches; a rejected action is simply skipped, never
  * retried forever (the CC-2 rejected-churn lesson). `game.ts` imports these
@@ -29,7 +29,7 @@ import {
   fleetHasShuttle,
   type SortieState,
 } from '../../packages/shared-core/src/index';
-import { moveFleet, orbitFleet, assaultFleet, barrageFleet, castHeroAbility } from './actions';
+import { moveFleet, orbitFleet, assaultFleet, castHeroAbility } from './actions';
 
 const HOUR = 3_600_000;
 
@@ -165,26 +165,6 @@ export function serverChainActions(
             : [orbitFleet(f.owner, fid), assaultFleet(f.owner, fid)],
         patch: { steps: rest },
       });
-    } else if (head.kind === 'strike') {
-      // Fire window, two-phase like `wait`: open — focus the guns and arm the
-      // deadline; close — cease fire (clear focus) and move on. A fleet with no
-      // artillery just idles through the window (the focus order rejects, the
-      // window still runs — deterministic either way).
-      if (chain.waitUntil === undefined) {
-        out.push({
-          fleetId: fid,
-          owner: f.owner,
-          actions: [barrageFleet(f.owner, fid, head.target)],
-          patch: { steps: chain.steps, waitUntil: now + head.hours * HOUR },
-        });
-      } else if (now >= chain.waitUntil) {
-        out.push({
-          fleetId: fid,
-          owner: f.owner,
-          actions: [barrageFleet(f.owner, fid, null)],
-          patch: { steps: rest },
-        });
-      }
     } else if (head.kind === 'ability') {
       // A hero ability queued as a step (CC-1 × HERO-4): the hero commanding THIS fleet
       // casts it once the fleet is free. Consume-on-issue like move/assault — the core
@@ -203,13 +183,6 @@ export function serverChainActions(
           patch: { steps: rest },
         });
       }
-    } else {
-      out.push({
-        fleetId: fid,
-        owner: f.owner,
-        actions: [barrageFleet(f.owner, fid, head.target)],
-        patch: { steps: rest },
-      });
     }
   }
   return out;

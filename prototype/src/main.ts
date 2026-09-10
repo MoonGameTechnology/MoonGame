@@ -27,8 +27,6 @@ import {
   assaultFleet,
   bombardFleet,
   engageFleet,
-  barrageFleet,
-  barrageModeFleet,
   loadArmy,
   unloadArmy,
   // SHU-3.1 — челноки: перегрузка порт ⇄ носитель и сам вылет.
@@ -608,8 +606,7 @@ import {
   type SplitSlot,
 } from './splitPlan';
 import { splitDialogHtml, splitDialogLives, splitRows } from './splitDialog';
-import { canAssaultFromOrbit, canMerge, canSplit, uniformMode } from './cmdAvailability';
-import { DEFAULT_FIRE_MODE, fireMenuHtml, fireModeLabel, fireModeTargets } from './fireMode';
+import { canAssaultFromOrbit, canMerge, canSplit } from './cmdAvailability';
 import { stayingFleets, stripState } from './chainStripState';
 import {
   IDLE,
@@ -626,7 +623,7 @@ import { dossierLevel, nextHover, showsBody } from './dossierHover';
 import { liftBy, opensNow } from './sheetLift';
 import { barStays, popoverLife } from './popoverLife';
 import { parseBuildAnchor, quickBuildOrder } from './quickBuild';
-import { isMine, seen, seenArc, seenTail } from './eventVisibility';
+import { isMine, seen, seenTail } from './eventVisibility';
 import { recordLoss, tallyDeath } from './warTally';
 import { destroyHeard, reorgHeard, reorgKey, tradeHeard, tradeSide } from './fleetNews';
 import {
@@ -717,7 +714,7 @@ import { fleetOrigin } from './fleetOrigin';
 import { netContacts, soloContacts } from './radarContacts';
 import { buildLogLine, type BuildLogKind } from './buildLog';
 import { bootyKind, bootyText, counterLine, spyRepaint } from './spyLog';
-import { AA_SHOTS_MAX, SIEGE_SHOTS_MAX, aaImpact, capShots, siegeImpact } from './fireEffects';
+import { AA_SHOTS_MAX, aaImpact, capShots } from './fireEffects';
 import { battleOutcome, battlePhaseKey, lossTally } from './battleLog';
 import {
   decisionsField,
@@ -795,16 +792,6 @@ import {
   radarContacts,
   waitingBanner,
 } from './snapshotIngest';
-import {
-  arcLift,
-  arcPoint,
-  arcPolyline,
-  burstK,
-  shellT,
-  sparkAngle,
-  volleyLife,
-  type VolleySpec,
-} from './volleyFx';
 import { FLAK_LIFE_MS, flakBurstRadius, flakDashOffset, flakLook, flakTier } from './flakTiers';
 import { sweepGlow as armsGlow, sweepPaint, sweepShows } from './sweepFx';
 import { emblemTally } from './fleetTally';
@@ -812,7 +799,7 @@ import { jumpStep, type JumpKind } from './mapJump';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
-import { canBarrage, combatRanges, ringLook } from './combatRanges';
+import { combatRanges, ringLook } from './combatRanges';
 import { corridorLines } from './corridorView';
 import { recapAdmits } from './recapGate';
 // ONB-7 — first-session goals checklist (mine/fleet/capture/score, ticked from state).
@@ -961,7 +948,6 @@ const BUILD_UNITS = [
   'cruiser',
   'scout',
   'siege',
-  'artillery',
   'strike_carrier',
   'shuttle_carrier',
   'interceptor',
@@ -1034,7 +1020,6 @@ let assaultAim = false;
  *  условная возможность, и прятать её значило бы заставлять игрока гадать, отчего она
  *  то есть, то нет. Что цель не годится, скажет ядро — одним понятным отказом. */
 let engageAim = false;
-let barrageAim = false; // "Обстрел" armed → next tap picks the artillery's focus target
 // SHU-3.1 — «Удар» взведён: следующий тап по карте выбирает цель вылета. Держим ОТКУДА
 // (id мира-порта или флота-носителя): цель у вылета одна, а баз у игрока много, и без
 // источника приказ пришлось бы угадывать по выделению.
@@ -1088,7 +1073,6 @@ const chainRouteCache = new Map<string, string[] | null>();
 // order (Курс/Штурм/Цель…) — issuing one drops back out of the mode.
 let pickMode = false;
 let cmdMore = false; // ☰ — the second row of the command bar (extras live there)
-let fireMenu = false; // 🔥 — режим огня артиллерии: поповер-меню над командным рядом
 let castMenu = false; // ✨ — способности героя-флагмана: поповер-меню каста над рядом
 let merging = false; // "Merge" armed → next tap on a friendly fleet picks the anchor
 let additive = false; // Shift or Ctrl/⌘ held on the current tap → add to the fleet selection
@@ -1220,16 +1204,6 @@ const aaShots: Array<{
   at: number;
   close: boolean; // ближняя зенитка гарнизона, залп раз в 15 мин — рисуется легче
 }> = [];
-// Siege (artillery) volleys to visualize: map-space endpoints captured at event
-// time, drawn as a ballistic ARC with a stagger of shell particles and an impact
-// burst — so a standoff bombardment visibly points at WHO is being hit.
-const siegeShots: Array<{
-  from: { x: number; y: number };
-  to: { x: number; y: number };
-  at: number; // performance.now() at event time
-  seed: number; // stable per-volley variation (spark angles, shell jitter)
-}> = [];
-let siegeSeed = 0;
 // Capture flashes: a province that changed hands lights up in its NEW owner's colour —
 // a wave sweeps across its cell and the frontier ignites, fading over ~1.5s, so a
 // silent capture (previously only a toast) reads on the map at a glance. Fog-gated at
@@ -1872,13 +1846,6 @@ function battleAnchor(b: Battle): { x: number; y: number } | null {
 function selectedFleetIds(): string[] {
   if (selFleets.size) return [...selFleets].filter((id) => s.fleets[id]?.owner === ME);
   return selFleet && s.fleets[selFleet]?.owner === ME ? [selFleet] : [];
-}
-
-/** Может ли флот вести дальний огонь — правило и его разбор в `combatRanges.ts`
- *  (ROS-2.1a). Спрашивать трейт `artillery` тут нельзя: после ROS-2.1 он значит
- *  безнаказанность в ближнем бою, а не наличие орудий. */
-function fleetCanBarrage(f: Fleet | undefined): boolean {
-  return !!f && canBarrage(f, data);
 }
 
 
@@ -3345,35 +3312,6 @@ function handleEvents(events: DomainEvent[]) {
         capShots(aaShots, AA_SHOTS_MAX);
         break;
       }
-      case 'artillery.fired': {
-        // Standoff bombardment: arc from the shooter to its victim. Endpoints are
-        // captured NOW — the victim may already be wiped from the state (the core
-        // emits after damage), so fall back to the `near` node anchor it sent.
-        const shooter = s.fleets[p.fleetId as string];
-        const from = shooter && fleetPos(shooter);
-        if (!from) break;
-        const anchorNode = (id: string | null | undefined) =>
-          id ? (s.planets[id]?.position ?? null) : null;
-        const victim = s.fleets[p.target as string];
-        // Запасной конец присылает САМО событие: ядро знает, во что целились, даже когда
-        // цели уже нет; нет ни одного конца — выстрела нет (правила 3–4 в `fireEffects.ts`).
-        const to = siegeImpact(victim && fleetPos(victim), anchorNode(p.near as string));
-        if (!to) break;
-        // Fog: show the exchange only if either end sits on a node we can see.
-        const shooterNode = shooter.location ?? shooter.edge?.from;
-        const nearNode = (p.near as string) ?? '';
-        // Хватит опознанного конца — любого: залп по видимой цели замечаешь, даже не
-        // зная, откуда бьют (`eventVisibility.ts`, правило 4).
-        if (!seenArc(!!shooterNode && known(shooterNode), known(nearNode))) break;
-        siegeShots.push({
-          from: { ...from },
-          to: { x: to.x, y: to.y },
-          at: performance.now(),
-          seed: siegeSeed++,
-        });
-        capShots(siegeShots, SIEGE_SHOTS_MAX);
-        break;
-      }
       // ROS-2.2 — ответка по челнокам в момент удара. Две точки зрения на одно
       // событие, и обе нужны: свои машины сбили — это счёт за налёт, свои зенитки
       // отработали — это то, ради чего их и строили. Чужую ответку по чужим челнокам
@@ -3862,7 +3800,7 @@ function drawCorridors(now: number): void {
  */
 function drawCombatRanges(): void {
   const ids = selectedFleetIds();
-  const { rings, lines } = combatRanges(
+  const { rings } = combatRanges(
     s,
     data,
     ids,
@@ -3875,14 +3813,14 @@ function drawCombatRanges(): void {
     },
     known,
   );
-  if (!rings.length && !lines.length) return;
-  const tint: Record<string, string> = { artillery: R_ARTY, shuttle: R_WING, aa: R_AA };
+  if (!rings.length) return;
+  const tint: Record<string, string> = { shuttle: R_WING, aa: R_AA };
   cx.save();
   for (const ring of rings) {
     const c = world({ x: ring.x, y: ring.y } as never);
-    // Заметность кольца — `combatRanges.ts` (REFM-123): при взведённом обстреле граница
-    // дострела выходит на первый план, а ПКО заметнее радиусов, потому что это отметка.
-    const look = ringLook(ring.kind, !!barrageAim);
+    // Заметность кольца — `combatRanges.ts` (REFM-123): ПКО заметнее радиуса вылета,
+    // потому что это отметка на мире, а не область.
+    const look = ringLook(ring.kind);
     cx.strokeStyle = rgba(tint[ring.kind] ?? R_ARTY, look.alpha);
     cx.lineWidth = look.width;
     cx.setLineDash([...look.dash]);
@@ -3893,19 +3831,6 @@ function drawCombatRanges(): void {
     cx.stroke();
   }
   cx.setLineDash([]);
-  for (const line of lines) {
-    const a = world({ x: line.from.x, y: line.from.y } as never);
-    const b = world({ x: line.to.x, y: line.to.y } as never);
-    cx.strokeStyle = rgba(R_ARTY, 0.85);
-    cx.lineWidth = 1.6;
-    cx.shadowColor = R_ARTY;
-    cx.shadowBlur = fxBlur(6);
-    cx.beginPath();
-    cx.moveTo(a.x, a.y);
-    cx.lineTo(b.x, b.y);
-    cx.stroke();
-    cx.shadowBlur = 0;
-  }
   cx.restore();
 }
 
@@ -4402,111 +4327,6 @@ function render(now: number) {
       cx.beginPath();
       cx.arc(b.x, b.y, flakBurstRadius(look, k), 0, TAU);
       cx.fill();
-    }
-    cx.restore();
-  }
-
-  // Siege bombardment (artillery.fired): a ballistic ARC from the shooter to its
-  // victim with a stagger of shell particles and impact bursts — the map answers
-  // «who is shelling whom» at a glance. Endpoints are map-space; projected each
-  // frame so the volley tracks pan/zoom.
-  if (siegeShots.length) {
-    const nowMs = performance.now();
-    // Расписание залпа (жизнь, окно полёта каждого снаряда, окно его разрыва, углы
-    // искр) — `volleyFx.ts` (REFM-111): фазы сцеплены, и врозь они разъезжаются.
-    const VOLLEY: VolleySpec = { shells: 3, flightMs: 780, staggerMs: 130, burstMs: 520 };
-    const { shells: SHELLS, flightMs: FLIGHT } = VOLLEY;
-    const LIFE = volleyLife(VOLLEY);
-    // LOD: the volley stays visible on the schematic view (a battle is a signal),
-    // but compact — arcs/bursts shrink with the node art so they can't swallow a
-    // zoomed-out province.
-    const sk = artScale(detail);
-    cx.save();
-    for (let i = siegeShots.length - 1; i >= 0; i--) {
-      const shot = siegeShots[i]!;
-      const age = nowMs - shot.at;
-      if (age > LIFE) {
-        siegeShots.splice(i, 1);
-        continue;
-      }
-      const a = world(shot.from);
-      const b = world(shot.to);
-      if (!visible(a, 200) && !visible(b, 200)) continue;
-      // Форма дуги — `volleyFx.ts` (REFM-130, правила 6–8) там же, где её расписание:
-      // навесной огонь читается только пока лоб дуги зажат полом и потолком, а сам
-      // подъём ужимается вместе с артом узла.
-      const lift = arcLift(Math.hypot(b.x - a.x, b.y - a.y), sk);
-      const q = (t: number) => arcPoint(a, b, lift, t);
-      // 1) the traced arc — a faint amber dashed path up to the lead shell.
-      const lead = Math.min(1, age / FLIGHT);
-      const pathFade = Math.max(0, 1 - age / LIFE);
-      cx.strokeStyle = rgba('#ffb066', 0.34 * pathFade);
-      cx.lineWidth = 1;
-      cx.setLineDash([4, 5]);
-      cx.lineDashOffset = -age / 16;
-      cx.beginPath();
-      cx.moveTo(a.x, a.y);
-      // След идёт только ДО головного снаряда (правило 8): дорисованный до цели, он
-      // читался бы как линия связи, обещающая ещё не случившееся попадание.
-      for (const pt of arcPolyline(a, b, lift, lead)) cx.lineTo(pt.x, pt.y);
-      cx.stroke();
-      cx.setLineDash([]);
-      // 2) the shells — bright tracer dots with a short glowing tail.
-      cx.shadowColor = '#ffb066';
-      for (let sh = 0; sh < SHELLS; sh++) {
-        const t = shellT(age, sh, VOLLEY);
-        if (t === null) continue;
-        const pt = q(t);
-        const tail = q(Math.max(0, t - 0.06));
-        cx.strokeStyle = rgba('#ffd29b', 0.85);
-        cx.lineWidth = 1.6;
-        cx.shadowBlur = fxBlur(7);
-        cx.beginPath();
-        cx.moveTo(tail.x, tail.y);
-        cx.lineTo(pt.x, pt.y);
-        cx.stroke();
-        cx.fillStyle = rgba('#fff1dc', 0.95);
-        cx.beginPath();
-        cx.arc(pt.x, pt.y, 1.7, 0, TAU);
-        cx.fill();
-      }
-      cx.shadowBlur = 0;
-      // 3) impacts — each landed shell pops an expanding ring + sparks on stable
-      // per-volley angles (seeded — no per-frame randomness, replays stay clean).
-      for (let sh = 0; sh < SHELLS; sh++) {
-        const k = burstK(age, sh, VOLLEY);
-        if (k === null) continue;
-        const burstFade = 1 - k;
-        // Hot core flash first — the «попал!» read — then the expanding ring.
-        if (k < 0.45) {
-          cx.fillStyle = rgba('#fff1dc', 0.9 * (1 - k / 0.45));
-          cx.shadowColor = '#ff8a3d';
-          cx.shadowBlur = fxBlur(10);
-          cx.beginPath();
-          cx.arc(b.x, b.y, (3.2 - k * 3) * sk, 0, TAU);
-          cx.fill();
-          cx.shadowBlur = 0;
-        }
-        cx.strokeStyle = rgba('#ff8a3d', 0.75 * burstFade);
-        cx.lineWidth = 1.6;
-        cx.beginPath();
-        cx.arc(b.x, b.y, (2 + k * 14) * sk, 0, TAU);
-        cx.stroke();
-        cx.fillStyle = rgba('#ffd29b', 0.85 * burstFade);
-        for (let spk = 0; spk < 5; spk++) {
-          const ang = sparkAngle(shot.seed, sh, spk, 12);
-          const r = (4 + k * 14) * sk;
-          cx.beginPath();
-          cx.arc(
-            b.x + Math.cos(ang) * r,
-            b.y + Math.sin(ang) * r * 0.8,
-            Math.max(0.8, 1.3 * sk),
-            0,
-            TAU,
-          );
-          cx.fill();
-        }
-      }
     }
     cx.restore();
   }
@@ -5518,7 +5338,6 @@ function fleetSummaryHtml(f: Fleet): string {
   const ARCH_LABEL: Record<string, string> = {
     scout: t('side.arch.scout'),
     combat: t('side.arch.combat'),
-    artillery: t('side.arch.artillery'),
     transport: t('side.arch.transport'),
     flagship: t('side.arch.flagship'),
     swarm: t('side.arch.swarm'),
@@ -5571,8 +5390,6 @@ function effectTagText(tag: EffectTag): string {
       return `⚡ ${t('effect.forced-march')}`;
     case 'bombarding':
       return `⊗ ${t('effect.bombarding')}`;
-    case 'barrage-focus':
-      return `🎯 ${t('effect.barrage-focus')}`;
     case 'free-flight':
       return `🛬 ${t('effect.free-flight')}`;
     case 'patrol': {
@@ -5696,7 +5513,6 @@ function fleetPanelHtml(f: Fleet): string {
       inBattle: !!f.battleId,
       forcedMarch: boosted,
       bombarding: !!f.bombarding,
-      barrageFocus: !!f.barrageTarget,
       freeFlight: !!f.freeMovement,
       patrol: pt ? { rearming: pt.sortie.rearming, fuel: pt.sortie.fuel } : null,
       troops: nTr,
@@ -7294,7 +7110,6 @@ function renderCmdBar() {
     if (aiming) aiming = false;
     if (assaultAim) assaultAim = false;
     if (merging) merging = false;
-    fireMenu = false; // пустое выделение — 🔥-меню не должно всплыть при новом выборе
     troopsPlan = null; // ⇵-меню тоже: иначе всплывёт над СЛЕДУЮЩИМ выбранным флотом
     castMenu = false; // и ✨: оно тут забывалось, и повторный выбор открывал его сам
     cmdbar.classList.remove('show');
@@ -7308,13 +7123,7 @@ function renderCmdBar() {
   // (E_NOT_A_LANE — у прыжка нет середины), в бою. Правило переиспользуемое: любую
   // командную кнопку можно вешать на ту же пробу её настоящего приказа.
   const anyStoppable = fleets.some((f) => canOrder(s, stopFleet(ME, f.id)) === null);
-  // Режим огня артиллерии — `fireMode.ts` (REFM-158): это СТОЯЧЕЕ ПРАВИЛО, а не
-  // выстрел, поэтому у каждого режима в меню стоит вторая строка-правило, а подпись
-  // кнопки несёт режим только при единогласии — иначе она соврала бы про часть группы.
-  const artFleets = fleets.filter((f) => f.owner === ME && fleetCanBarrage(f));
-  // Единогласие режима, доступность слияния/деления/штурма — `cmdAvailability.ts` (REFM-78).
-  const uniMode = uniformMode(artFleets.map((f) => f.barrageMode ?? DEFAULT_FIRE_MODE));
-  const fmLabel = fireModeLabel(uniMode);
+  // Доступность слияния/деления/штурма — `cmdAvailability.ts` (REFM-78).
   const docked = fleets.filter((f) => f.location && !f.movement && !f.battleId);
   // PC: ШТУРМ is a targeting command (fly there + storm on arrival) — armable
   // whenever the selection has ships. Mobile keeps the in-orbit-only button.
@@ -7349,8 +7158,6 @@ function renderCmdBar() {
   // GRND-1 ⇅ «Десант»: как и split, команда строго ОДНОФЛОТОВАЯ — гарнизон и трюм у
   // каждого свои, один клик на группу разослал бы приказы с разной арифметикой.
   const troopsIn = lone ? troopsInputFor(lone.id) : null;
-  // Someone in the selection can fire at range → offer the standoff-fire focus order.
-  const anyArtillery = fleets.some(fleetCanBarrage);
   // Hero-flagship aboard a selected fleet → its castable abilities become a ✨ popover
   // (the map-tap targeting reuses the same heroAim flow as the hero window).
   // Флагман группы и его кастуемые способности — правила в `heroCasts.ts` (REFM-68).
@@ -7364,14 +7171,12 @@ function renderCmdBar() {
     {
       selected: ids.length,
       picking: pickMode,
-      artillery: artFleets.length,
       castHero: !!castHero,
       troopsInput: !!troopsIn,
       loneId: lone?.id ?? null,
     },
-    { fire: fireMenu, cast: castMenu, troopsFleetId: troopsPlan?.fleetId ?? null },
+    { cast: castMenu, troopsFleetId: troopsPlan?.fleetId ?? null },
   );
-  fireMenu = life.fire;
   castMenu = life.cast;
   if (!life.troops) troopsPlan = null;
   // Состав ряда — `cmdPresence.ts` (REFM-185): серая кнопка и ОТСУТСТВУЮЩАЯ значат
@@ -7381,8 +7186,6 @@ function renderCmdBar() {
   // иначе из режима нечем выйти.
   const shown = cmdShown({
     stoppable: anyStoppable,
-    anyArtillery,
-    ownArtillery: artFleets.length,
     castHero: !!castHero,
     more: cmdMore,
     picking: pickMode,
@@ -7405,19 +7208,6 @@ function renderCmdBar() {
     cmdBtn('target', '◎', t('cmd.target'), '', false, t('cmd.target.hint')) +
     (shown.cast
       ? cmdBtn('cast', '✨', t('cmd.cast'), castMenu ? 'on' : '', false, t('cmd.cast.hint'))
-      : '') +
-    (shown.barrage
-      ? cmdBtn(
-          'barrage',
-          '🎯',
-          t('cmd.barrage'),
-          barrageAim ? 'on' : '',
-          false,
-          t('cmd.barrage.hint'),
-        )
-      : '') +
-    (shown.firemode
-      ? cmdBtn('firemode', '🔥', fmLabel, fireMenu ? 'on' : '', false, t('cmd.fire.hint'))
       : '') +
     cmdBtn(
       'merge',
@@ -7487,8 +7277,6 @@ function renderCmdBar() {
             )
           : '')
       : '') +
-    // 🔥 поповер над баром: четыре режима с подписью-правилом; ● — текущий.
-    (fireMenu && artFleets.length > 0 ? fireMenuHtml(uniMode) : '') +
     // ✨ поповер: способности героя-флагмана — каст прямо с ряда (дальняя → цель на карте).
     (castMenu && castHero
       ? `<div class="cmdpop">` +
@@ -7951,8 +7739,6 @@ cmdbar.addEventListener('click', (ev) => {
   // других команд там физически нет, и выход только своими кнопками (chexit/chsend),
   // Back и Escape.
   if (disarms('merge', cmd)) merging = false;
-  if (disarms('barrage', cmd)) barrageAim = false;
-  if (disarms('firemode', cmd)) fireMenu = false;
   if (disarms('cast', cmd)) castMenu = false;
   if (disarms('troops', cmd)) troopsPlan = null;
   if (disarms('assault', cmd)) assaultAim = false;
@@ -8044,12 +7830,6 @@ cmdbar.addEventListener('click', (ev) => {
       }
     }
     troopsPlan = null;
-  } else if (cmd === 'barrage') {
-    // Arm focus-fire: the next tap on an enemy fleet aims the selected artillery
-    // at it; a tap on empty space clears back to auto-targeting the nearest.
-    barrageAim = !barrageAim;
-    aiming = false;
-    if (barrageAim) note(t('hint.pick-barrage'));
   } else if (cmd === 'target') {
     // CHAIN-UX: вход в режим «Приказ» — карта становится рабочей поверхностью,
     // тапы по точкам собирают план (CC-1 цепочка), полоска заменяет ряд команд.
@@ -8088,7 +7868,6 @@ cmdbar.addEventListener('click', (ev) => {
     cmdMore = !cmdMore; // ☰ — show/hide the extras row
   } else if (cmd === 'cast') {
     castMenu = !castMenu; // ✨ — открыть/закрыть меню способностей героя-флагмана
-    fireMenu = false;
     aiming = false;
   } else if (cmd === 'castdo') {
     // Cast a hero ability from the row: ranged → arm the map (next world tap = target,
@@ -8102,29 +7881,6 @@ cmdbar.addEventListener('click', (ev) => {
     } else {
       playerOrder(castHeroAbility(ME, heroId, abilityId));
     }
-  } else if (cmd === 'firemode') {
-    fireMenu = !fireMenu; // 🔥 — открыть/закрыть меню выбора режима огня
-    aiming = false;
-  } else if (cmd === 'fmset') {
-    // Выбор в 🔥-меню: единый режим всем выделенным флотам с артиллерией. Кому именно
-    // слать — `fireMode.ts` (REFM-158, правила 5–7): приказ уходит только тем, у кого
-    // режим ДРУГОЙ, иначе платим кругом через ядро за отсутствие изменений.
-    const mode = bEl.dataset.mode ?? DEFAULT_FIRE_MODE;
-    const targets = fireModeTargets(
-      ids.map((id) => {
-        const f = s.fleets[id];
-        return {
-          id,
-          owner: f?.owner ?? '',
-          artillery: !!f && fleetCanBarrage(f),
-          mode: f?.barrageMode,
-        };
-      }),
-      ME,
-      mode,
-    );
-    for (const id of targets) playerOrder(barrageModeFleet(ME, id, mode));
-    fireMenu = false;
   } else if (cmd === 'boost') {
     // BOOST-1 форс-марш: toggle for the whole selection — ON unless everyone
     // already marches. Wear only bites while actually flying.
@@ -8177,7 +7933,6 @@ function selectAt(mx: number, my: number) {
   const owner = tapOwner({
     chainMode: !!chainMode,
     merging,
-    barrageAim,
     heroAim: !!heroAim,
     heroSpawnAim: !!heroSpawnAim,
     assaultAim,
@@ -8201,28 +7956,6 @@ function selectAt(mx: number, my: number) {
     );
     if (anchor) orderMerge(movers, anchor.id);
     merging = false;
-    lastPanelHtml = '';
-    return;
-  }
-  // Barrage armed: the next tap on an enemy fleet focuses the selected artillery's
-  // standoff fire on it; a tap on empty space (no enemy fleet) clears back to
-  // auto-targeting the nearest hostile in range. A mis-aimed/peace target is
-  // rejected server-side (surfaced as a log note).
-  if (owner === 'barrage') {
-    const target = nearestHit(
-      hostileFleets(Object.values(s.fleets), ME),
-      fleetAnchor,
-      mx,
-      my,
-      rFleet,
-    );
-    const targetId: string | null = target?.id ?? null;
-    for (const id of selectedFleetIds()) {
-      if (fleetCanBarrage(s.fleets[id])) playerOrder(barrageFleet(ME, id, targetId));
-    }
-    if (targetId) note(t('hint.barrage-set'));
-    else note(t('hint.barrage-auto'));
-    barrageAim = false;
     lastPanelHtml = '';
     return;
   }
@@ -8541,7 +8274,7 @@ canvas.addEventListener('pointerdown', (ev) => {
       ctrl: ev.ctrlKey,
       meta: ev.metaKey,
       overOwnFleet,
-      orderArmed: !!(aiming || merging || barrageAim || chainMode),
+      orderArmed: !!(aiming || merging || chainMode),
     });
     additive = intent.additive;
     boxSelecting = intent.boxSelect;
@@ -11685,13 +11418,6 @@ if (!__PLAYER_BUILD__ && DEV_UI && typeof window !== 'undefined') {
       });
       return f.id;
     },
-    pushSiege(fromId: string, toId: string): boolean {
-      const a = s.planets[fromId]?.position;
-      const b = s.planets[toId]?.position;
-      if (!a || !b) return false;
-      siegeShots.push({ from: { ...a }, to: { ...b }, at: performance.now(), seed: siegeSeed++ });
-      return true;
-    },
     // Open a hero corridor between two nodes so its overlay (blinking one-shot vs
     // timed lane) can be looked at without levelling a hero and casting for real.
     openCorridor(fromId: string, toId: string, tier: number): boolean {
@@ -11872,10 +11598,9 @@ const BACK_LAYERS: BackLayer[] = [
   // кэш разметки надо сбить руками, иначе строка не изменится и DOM останется прежним.
   {
     id: 'cmdbar',
-    isOpen: () => troopsPlan !== null || fireMenu || castMenu,
+    isOpen: () => troopsPlan !== null || castMenu,
     close: () => {
       troopsPlan = null;
-      fireMenu = false;
       castMenu = false;
       lastCmdHtml = '';
     },
@@ -11884,12 +11609,11 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'chain', isOpen: () => chainMode !== null, close: () => exitChainMode() },
   {
     id: 'aim',
-    isOpen: () => aiming || assaultAim || merging || barrageAim,
+    isOpen: () => aiming || assaultAim || merging,
     close: () => {
       aiming = false;
       assaultAim = false;
       merging = false;
-      barrageAim = false;
       lastPanelHtml = '';
     },
   },
@@ -12626,7 +12350,6 @@ function renderChainMenu(): void {
     startId,
     {
       capturable: m.kind !== 'fleet' && (sectorTypeOf(m.id)?.capturable ?? false),
-      hasArtillery: chainMode.fleetIds.some((id) => fleetCanBarrage(s.fleets[id])),
       abilities: chainAbilitiesFor(chainMode.fleetIds),
     },
   );
@@ -12668,7 +12391,6 @@ document.getElementById('tgted')?.addEventListener('click', (ev) => {
     | 'wait'
     | 'wait6'
     | 'assault'
-    | 'fire'
     | 'ability'
     | undefined;
   if (!act) return;

@@ -32,12 +32,6 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   // orbital.ts
   'fleet.orbit': z.object({ fleetId: id, orbit: z.literal('near') }), // a single orbit (GDD §7.4)
   'fleet.bombard': z.object({ fleetId: id, on: z.boolean() }),
-  // artillery.ts — focus-fire: a hostile fleet id, or null/absent to resume auto-targeting
-  'fleet.barrage': z.object({ fleetId: id, targetId: id.nullish() }),
-  'fleet.barrageMode': z.object({
-    fleetId: id,
-    mode: z.enum(['passive', 'return', 'standard', 'aggressive']),
-  }),
   // combat.ts (melee battles)
   'fleet.assault': z.object({ fleetId: id }),
   'fleet.retreat': z.object({ fleetId: id }),
@@ -215,13 +209,6 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
           z.object({ kind: z.literal('move'), to: id }),
           z.object({ kind: z.literal('wait'), hours: z.number().positive().finite() }),
           z.object({ kind: z.literal('assault') }),
-          z.object({ kind: z.literal('barrage'), target: id.nullable() }),
-          // fire window: focus standoff fire for N game-hours, then cease and move on
-          z.object({
-            kind: z.literal('strike'),
-            target: id.nullable(),
-            hours: z.number().positive().finite(),
-          }),
           // hero ability cast as a step (CC-1 × HERO-4): the fleet's hero casts it
           // once the fleet is free; `target` — optional world for ranged casts.
           // Keep in lockstep with `state/chain.ts` — this arm was missing at first,

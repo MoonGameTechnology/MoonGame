@@ -26,8 +26,6 @@ export interface PopoverBases {
   selected: number;
   /** Включён режим набора группы. */
   picking: boolean;
-  /** Арт-флотов в выделении. */
-  artillery: number;
   /** Есть ли флагман с хотя бы одной применимой способностью. */
   castHero: boolean;
   /** Есть ли что показать ⇅-меню. */
@@ -38,7 +36,6 @@ export interface PopoverBases {
 
 /** Какие поповеры игрок открыл. */
 export interface OpenPopovers {
-  fire: boolean;
   cast: boolean;
   /** Флот, под который набран план десанта; `null` — меню закрыто. */
   troopsFleetId: string | null;
@@ -48,7 +45,6 @@ export interface OpenPopovers {
 export interface PopoverState {
   /** Держится ли ряд команд. Ложь — гаснут ещё и все прицелы: это одно событие. */
   bar: boolean;
-  fire: boolean;
   cast: boolean;
   troops: boolean;
 }
@@ -56,7 +52,7 @@ export interface PopoverState {
 /**
  * Держится ли ряд команд (правила 3–4). Вынесено отдельно, потому что спрашивается
  * РАНЬШЕ, чем известны основания поповеров: пустое выделение гасит ряд вместе с
- * прицелами, не доходя до подсчёта артиллерии и трюмов.
+ * прицелами, не доходя до подсчёта трюмов.
  */
 export function barStays(selected: number, picking: boolean): boolean {
   return selected > 0 || picking;
@@ -65,10 +61,9 @@ export function barStays(selected: number, picking: boolean): boolean {
 /** Что переживает текущее выделение (правила 1–4). */
 export function popoverLife(bases: PopoverBases, open: OpenPopovers): PopoverState {
   const bar = barStays(bases.selected, bases.picking);
-  if (!bar) return { bar, fire: false, cast: false, troops: false };
+  if (!bar) return { bar, cast: false, troops: false };
   return {
     bar,
-    fire: open.fire && bases.artillery > 0,
     cast: open.cast && bases.castHero,
     troops: open.troopsFleetId !== null && bases.troopsInput && open.troopsFleetId === bases.loneId,
   };

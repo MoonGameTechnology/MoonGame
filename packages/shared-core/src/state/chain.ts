@@ -2,7 +2,7 @@
  * CC-1 fleet order queue (command chains) — the chain step vocabulary, the fleet's
  * queued plan shape, and the payload validator. Port of the prototype's
  * `chain.ts` (REFP-8's extraction), carrying the full step vocabulary —
- * `move`/`wait`/`assault`/`barrage`/`strike`/`ability` — in lockstep with the gate
+ * `move`/`wait`/`assault`/`ability` — in lockstep with the gate
  * schema (`order.chain` in `actions/payloadSchemas.ts`). The `ability` kind was
  * initially left out of this port ("no matching schema entry yet"), which silently
  * diverged the three copies: solo accepted the step, a gated server rejected the
@@ -21,19 +21,15 @@ export function fleetIdle(fleet: Fleet): boolean {
 }
 
 /** One CC-1 chain step. `move` — fly to a world; `wait` — hold N game-hours;
- *  `assault` — storm the world under the fleet; `barrage` — focus artillery
- *  standoff fire (null = nearest hostile); `strike` — a fire window: focus
- *  standoff fire for `hours` game-hours, then cease and move on; `ability` — the
- *  fleet's hero casts `abilityId` once the fleet is free (`target` — a world for
- *  ranged casts; the `hero.ability` handler re-gates everything). A step runs
- *  when the fleet is free, so "arrive then open fire" = [move, barrage] and a
- *  waypoint route is just several move steps. */
+ *  `assault` — storm the world under the fleet; `ability` — the fleet's hero casts
+ *  `abilityId` once the fleet is free (`target` — a world for ranged casts; the
+ *  `hero.ability` handler re-gates everything). A step runs when the fleet is free,
+ *  so "arrive then storm" = [move, assault] and a waypoint route is just several
+ *  move steps. */
 export type ChainStep =
   | { kind: 'move'; to: string }
   | { kind: 'wait'; hours: number }
   | { kind: 'assault' }
-  | { kind: 'barrage'; target: string | null }
-  | { kind: 'strike'; target: string | null; hours: number }
   | { kind: 'ability'; abilityId: string; target?: string | null };
 
 /** A fleet's queued chain: the remaining steps + the deadline of the ARMED head
@@ -78,24 +74,6 @@ export function validateChainSteps(
       out.push({ kind: 'wait', hours: h });
     } else if (step.kind === 'assault') {
       out.push({ kind: 'assault' });
-    } else if (step.kind === 'barrage') {
-      if (step.target !== null && step.target !== undefined && typeof step.target !== 'string') {
-        return null;
-      }
-      out.push({ kind: 'barrage', target: typeof step.target === 'string' ? step.target : null });
-    } else if (step.kind === 'strike') {
-      if (step.target !== null && step.target !== undefined && typeof step.target !== 'string') {
-        return null;
-      }
-      const h = step.hours;
-      if (typeof h !== 'number' || !Number.isFinite(h) || h <= 0 || h > MAX_CHAIN_WAIT_HOURS) {
-        return null;
-      }
-      out.push({
-        kind: 'strike',
-        target: typeof step.target === 'string' ? step.target : null,
-        hours: h,
-      });
     } else if (step.kind === 'ability') {
       // The ability must exist in the catalog (like `move` checks the world); the
       // `hero.ability` handler re-gates ownership/liveness/equipment/range/cost.

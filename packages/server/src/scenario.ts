@@ -4,7 +4,6 @@ import {
   armyModule,
   arsenalSyncModule,
   autoRallyModule,
-  artilleryModule,
   captureOnArrivalModule,
   combatModule,
   constructionModule,
@@ -129,7 +128,6 @@ export const DEV_MODULES: GameModule[] = [
   // the old single module had internally.
   orbitalModule, // the single near-orbit: stationing, AA fire, bombardment
   combatModule, // melee battles: engage / tick / assault / retreat / capture
-  artilleryModule, // standoff fire accrual + barrage orders
   interceptModule, // schedules lane-crossing meetings (resolved by combat)
   captureOnArrivalModule, // walk-in capture of undefended neutral sectors (after combat)
   constructionModule,
@@ -177,12 +175,23 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '14'; // SHU-4.2: ангар — список ЭСКАДР.
+export const MODULE_MANIFEST_VERSION = '15'; // SHU-4.2: ангар — список ЭСКАДР.
 // Форма состояния изменилась: `planet.hangar`/`fleet.hangar` больше не плоские стеки, а
 // список эскадр (`{id, units, cargo}`), у вылета появился `squadronId`, а в состоянии —
-// счётчик `squadronSeq`. Матч на манифесте 13 несёт ангары старой формы: новый читатель
+// счётчик `squadronSeq`. Матч на манифесте 14 несёт ангары старой формы: новый читатель
 // увидел бы у них `units: undefined` и уронил бы и вылет, и подсчёт вместимости. Отказ
-// загрузки честнее. (До 14:)
+// загрузки честнее.
+//
+// ПОЧЕМУ 15, А НЕ 14: до 14 версию подняли ДВА кирпича сразу и независимо — ART-0 (снял
+// артиллерию) в `main` и этот. Слитая ветка несёт ОБЕ смены формы, поэтому число одно и
+// оно следующее: две разные формы под одним номером — ровно то, от чего страж манифеста
+// и защищает. (До 15:)
+// export const MODULE_MANIFEST_VERSION = '14'; // Артиллерия снята целиком.
+// Подсистема огня с дистанции убрана по решению владельца: модуль `artillery` вышел из
+// графа, действий `fleet.barrage`/`fleet.barrageMode` больше нет, у флота исчезли поля
+// `barrageTarget`/`barrageMode`/`barrageProvoked`, а из словаря цепочек — шаги `barrage`
+// и `strike`. Матч на манифесте 13 несёт и поля, и шаги, которых новый граф не понимает.
+// (До 14:)
 // export const MODULE_MANIFEST_VERSION = '13'; // MRG-1: слияние ждёт встречи в мире.
 // Форма состояния изменилась: у флота появилось поле `mergeInto` — намерение слиться,
 // которое созревает на прилёте. Матч на манифесте 12 несёт приказы, у которых вторую

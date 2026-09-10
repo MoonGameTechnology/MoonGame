@@ -46,13 +46,6 @@ export const retreatFleet = (playerId: string, fleetId: string) =>
   act(playerId, 'fleet.retreat', { fleetId });
 export const bombardFleet = (playerId: string, fleetId: string, on: boolean) =>
   act(playerId, 'fleet.bombard', { fleetId, on });
-/** Focus an artillery fleet's standoff fire on one enemy fleet (targetId), or
- *  clear (targetId null) to auto-target the nearest hostile in range. */
-export const barrageFleet = (playerId: string, fleetId: string, targetId: string | null) =>
-  act(playerId, 'fleet.barrage', { fleetId, targetId });
-/** Set an artillery fleet's rules of engagement (passive/return/standard/aggressive). */
-export const barrageModeFleet = (playerId: string, fleetId: string, mode: string) =>
-  act(playerId, 'fleet.barrageMode', { fleetId, mode });
 /** Поднять ЭСКАДРУ из порта мира по цели (SHU-1.2, адресация — SHU-4.2). Груз десанта
  *  здесь не передаётся: он уже в трюме, его кладут туда заранее (`loadSquadronTroops`). */
 export const strikeShuttle = (

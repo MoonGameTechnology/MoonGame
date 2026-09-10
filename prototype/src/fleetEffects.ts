@@ -28,7 +28,6 @@ export type EffectTag =
   | { kind: 'in-battle' }
   | { kind: 'forced-march' }
   | { kind: 'bombarding' }
-  | { kind: 'barrage-focus' }
   | { kind: 'free-flight' }
   | { kind: 'patrol'; rearming: number }
   | { kind: 'patrol'; fuel: number }
@@ -42,7 +41,6 @@ export interface FleetFacts {
   inBattle: boolean;
   forcedMarch: boolean;
   bombarding: boolean;
-  barrageFocus: boolean;
   freeFlight: boolean;
   /** Дежурный вылет, если он есть: сколько крыльев перевооружается и сколько топлива. */
   patrol: { rearming: number; fuel: number } | null;
@@ -94,7 +92,6 @@ export function fleetEffects(f: FleetFacts, me: string, arrears: readonly string
   if (f.inBattle) tags.push({ kind: 'in-battle' });
   if (f.forcedMarch) tags.push({ kind: 'forced-march' });
   if (f.bombarding) tags.push({ kind: 'bombarding' });
-  if (f.barrageFocus) tags.push({ kind: 'barrage-focus' });
   if (f.freeFlight) tags.push({ kind: 'free-flight' });
   // Правило 3: перевооружение вытесняет топливо — это одно состояние вылета, не два.
   if (f.patrol)

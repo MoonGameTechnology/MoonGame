@@ -9,8 +9,6 @@ const CLIENT_ACTION_TYPES = [
   'fleet.orbit',
   'fleet.assault',
   'fleet.bombard',
-  'fleet.barrage',
-  'fleet.barrageMode',
   'fleet.retreat',
   'army.load',
   'army.unload',
@@ -75,10 +73,6 @@ describe('SV-1.2 · action payload schemas', () => {
       ['fleet.orbit', { fleetId: 'f1', orbit: 'near' }],
       ['fleet.assault', { fleetId: 'f1' }],
       ['fleet.bombard', { fleetId: 'f1', on: true }],
-      ['fleet.barrage', { fleetId: 'f1', targetId: 'f2' }],
-      ['fleet.barrage', { fleetId: 'f1', targetId: null }], // clear → auto-target
-      ['fleet.barrage', { fleetId: 'f1' }], // absent target also clears
-      ['fleet.barrageMode', { fleetId: 'f1', mode: 'aggressive' }],
       ['fleet.retreat', { fleetId: 'f1' }],
       // CONV-9: книга двусторонняя, поэтому `side` обязателен; дробное количество
       // по-прежнему законно (ресурсы копятся непрерывно). `market.buy` и отмена по
@@ -138,8 +132,6 @@ describe('SV-1.2 · action payload schemas', () => {
             { kind: 'wait', hours: 2 },
             { kind: 'move', to: 'p1' },
             { kind: 'assault' },
-            { kind: 'barrage', target: null },
-            { kind: 'strike', target: null, hours: 3 },
             { kind: 'ability', abilityId: 'corridor', target: 'p1' },
             { kind: 'ability', abilityId: 'rally' }, // self/aura cast — no target
           ],
@@ -161,8 +153,6 @@ describe('SV-1.2 · action payload schemas', () => {
       ['fleet.orbit', { fleetId: 'f1', orbit: 'far' }], // the old far/near switch is gone
       ['fleet.orbit', { fleetId: 'f1' }], // missing orbit
       ['fleet.bombard', { fleetId: 'f1', on: 'yes' }], // on not a boolean
-      ['fleet.barrage', { fleetId: 'f1', targetId: 7 }], // target neither an id nor null
-      ['fleet.barrageMode', { fleetId: 'f1', mode: 'berserk' }], // not a known ROE mode
       ['fleet.retreat', {}], // missing fleetId
       ['fleet.repair', {}], // missing fleetId
       ['order.chain', { fleetId: 'f1' }], // missing steps

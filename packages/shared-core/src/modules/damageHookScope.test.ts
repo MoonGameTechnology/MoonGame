@@ -3,9 +3,7 @@ import { createKernel } from '../kernel/kernel';
 import type { GameModule } from '../kernel/module';
 import { combatModule } from './combat';
 import { orbitalModule } from './orbital';
-import { artilleryModule } from './artillery';
 import { shuttleModule } from './shuttle';
-import { constructionModule } from './construction';
 import {
   createInitialState,
   type Fleet,
@@ -20,7 +18,7 @@ import type { Action, AdvanceResult, ApplyResult, Context } from '../action/type
  * CORE-DMG-1 — the REACH of the `combat.damage` hook, pinned by test.
  *
  * Every firing channel runs its damage through the hook: the melee round, planetary
- * AA, standoff artillery, ship point-defense and orbital bombardment alike. An owner
+ * AA, ship point-defense and orbital bombardment alike. An owner
  * decision (reversed once — the earlier reading called the melee-only scope deliberate),
  * so it needs a guard in the direction it now holds: a channel that stops consulting
  * the hook silently drops the whole extension point for its share of the damage, which
@@ -45,13 +43,8 @@ const data: GameData = parseGameData({
     // Inert, deep-hulled punching bag: it survives every channel, so a scenario
     // ends with a live target whose HP loss is a readable signal.
     hulk: { faction: 'x', stats: { attack: 0, defense: 0, speed: 4, hp: 4000 }, line: 'front' },
-    // Standoff artillery — needs a firing radius to shoot without closing.
-    siege: {
-      faction: 'x',
-      stats: { attack: 12, defense: 0, speed: 4, hp: 40, range: 250 },
-      line: 'rear',
-      traits: ['artillery'],
-    },
+    // Тяжёлый тыловой корпус — просто ещё один корабль в сцене.
+    siege: { faction: 'x', stats: { attack: 12, defense: 0, speed: 4, hp: 40 }, line: 'rear' },
     // Point-defense carrier and the shuttle its flak intercepts.
     escort: {
       faction: 'x',
@@ -230,97 +223,6 @@ describe('combat.damage — every firing channel goes through the hook (CORE-DMG
     expect(calls.length).toBeGreaterThan(0);
   });
 
-  it('scales standoff artillery, and the barrage reports what it really landed', () => {
-    const barrage = (mods: GameModule[]) => {
-      const kernel = createKernel([artilleryModule, ...mods]);
-      const st = stateWith(
-        [planet('A', 'p1', { at: { x: 0, y: 0 } }), planet('B', 'p2', { at: { x: 100, y: 0 } })],
-        [fleet('S', 'p1', 'A', [['siege', 1]]), fleet('T', 'p2', 'B', [['hulk', 1]])],
-      );
-      const r = okAdvance(kernel.advanceTo(st, ctx(HOUR)));
-      const fired = r.events.find((e) => e.type === 'artillery.fired');
-      expect(fired).toBeDefined();
-      return {
-        announced: (fired?.payload as { power: number }).power,
-        lost: 4000 - (hullOf(r.state, 'T', 'hulk') ?? 0),
-      };
-    };
-
-    const calls: unknown[] = [];
-    const raw = barrage([]);
-    const boosted = barrage([probeModule(calls)]);
-    expect(raw.announced).toBeGreaterThan(0);
-    expect(boosted.announced).toBe(raw.announced * BOOST);
-    expect(boosted.lost).toBeCloseTo(boosted.announced, 6);
-    expect(calls.length).toBeGreaterThan(0);
-  });
-
-  it('scales ship point-defense, and the intercept reports what it really landed', () => {
-    // Цель ПВО сменилась вместе с моделью (SHU-1.2): бьют не «флот-крыло», а ЛЕТЯЩИЙ
-    // ВЫЛЕТ (`state.strikes`). Через хук он проходит ровно так же, поэтому сторож
-    // остаётся — меняется только то, во что целятся.
-    const pd = (mods: GameModule[]) => {
-      const kernel = createKernel([shuttleModule, ...mods]);
-      const base = stateWith([planet('P', null), planet('H', 'p2')], [fleet('E', 'p1', 'P', [['escort', 1]])]);
-      const st: GameState = {
-        ...base,
-        strikes: [
-          {
-            id: 'strike:p2:1',
-            owner: 'p2',
-            base: { kind: 'planet', id: 'H' },
-            squadronId: 'sq:test',
-            units: [{ unit: 'wing', count: 4 }],
-            target: { kind: 'fleet', id: 'E' },
-            to: base.planets.P!.position,
-            departedAt: 0,
-            arrivesAt: 10 * HOUR,
-            leg: 'out',
-          },
-        ],
-      };
-      const r = okAdvance(kernel.advanceTo(st, ctx(HOUR)));
-      const fired = r.events.find((e) => e.type === 'pd.fired');
-      expect(fired).toBeDefined();
-      return { announced: (fired?.payload as { damage: number }).damage };
-    };
-
-    const calls: unknown[] = [];
-    const raw = pd([]);
-    const boosted = pd([probeModule(calls)]);
-    expect(raw.announced).toBeGreaterThan(0);
-    expect(boosted.announced).toBe(raw.announced * BOOST);
-    expect(calls.length).toBeGreaterThan(0);
-  });
-
-  it('scales orbital bombardment at the source, before the power leaves on the bus', () => {
-    const shell = (mods: GameModule[]) => {
-      const kernel = createKernel([orbitalModule, constructionModule, ...mods]);
-      const st = stateWith(
-        [planet('P', 'p2', { buildings: [['depot', 1]] })],
-        [fleet('B', 'p1', 'P', [['cruiser', 1]], { orbit: 'near', bombarding: true })],
-      );
-      const r = okAdvance(kernel.advanceTo(st, ctx(HOUR)));
-      const shelled = r.events.find((e) => e.type === 'planet.bombarded');
-      expect(shelled).toBeDefined();
-      const depot = r.state.planets.P?.buildings.find((b) => b.type === 'depot');
-      return {
-        announced: (shelled?.payload as { power: number }).power,
-        lost: 400 - (depot?.hp ?? 0),
-      };
-    };
-
-    const calls: unknown[] = [];
-    const raw = shell([]);
-    const boosted = shell([probeModule(calls)]);
-    expect(raw.announced).toBeGreaterThan(0);
-    // `construction` applies whatever arrives, so scaling at the source is the only
-    // way a bonus reaches the structures — and the event must already carry it.
-    expect(boosted.announced).toBe(raw.announced * BOOST);
-    expect(boosted.lost).toBeGreaterThan(raw.lost);
-    expect(calls.length).toBeGreaterThan(0);
-  });
-
   it('keeps the defender-side mitigations on the ground phase only', () => {
     // The fort / standing-buildings / planet-type hooks guard on `phase === 'ground'`.
     // None of the newly wired channels claims that phase, so widening the hook's reach
@@ -328,7 +230,6 @@ describe('combat.damage — every firing channel goes through the hook (CORE-DMG
     const phases = new Set<string>();
     const kernel = createKernel([
       orbitalModule,
-      artilleryModule,
       shuttleModule,
       {
         id: 'phase-probe',
@@ -376,7 +277,7 @@ describe('combat.damage — every firing channel goes through the hook (CORE-DMG
     };
     okAdvance(kernel.advanceTo(withStrike, ctx(HOUR)));
 
-    expect(phases).toEqual(new Set(['orbital', 'bombard', 'standoff', 'pointDefense']));
+    expect(phases).toEqual(new Set(['orbital', 'bombard', 'pointDefense']));
     expect(phases.has('ground')).toBe(false);
   });
 });

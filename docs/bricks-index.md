@@ -594,11 +594,12 @@
 | RLY-1 | ✅ | proto | `docs/backlog.md:13601` | Сбор построенного: соло и сеть играли по РАЗНЫМ |
 | CARGO-1 | ✅ | core proto | `docs/backlog.md:13633` | Часовая погрузка десанта жила в |
 | MRG-1 | ✅ | core proto | `docs/backlog.md:13681` | «Слиться по прибытии» — вторая половина |
-| CMB-6 | ✅ | core | `docs/backlog.md:13720` | После ничьей третий враждебный флот получает свой |
-| ORD-2 | ✅ | proto | `docs/backlog.md:13750` | Нацеленный ШТУРМ теперь переживает закрытую |
-| FOG-10 | ✅ | proto core | `docs/backlog.md:13770` | Память разведки перестала жить только |
-| FOG-9 | ✅ | core | `docs/backlog.md:13794` | Приостановленная стройка чужого мира была видна |
-| TEST-4 | ✅ | srv | `docs/backlog.md:13804` | topXp падал на живой базе разработчика. |
+| ART-0 | ✅ | core data proto | `docs/backlog.md:13704` | Артиллерия снята из игры целиком |
+| CMB-6 | ✅ | core | `docs/backlog.md:13751` | После ничьей третий враждебный флот получает свой |
+| ORD-2 | ✅ | proto | `docs/backlog.md:13781` | Нацеленный ШТУРМ теперь переживает закрытую |
+| FOG-10 | ✅ | proto core | `docs/backlog.md:13801` | Память разведки перестала жить только |
+| FOG-9 | ✅ | core | `docs/backlog.md:13825` | Приостановленная стройка чужого мира была видна |
+| TEST-4 | ✅ | srv | `docs/backlog.md:13835` | topXp падал на живой базе разработчика. |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
@@ -893,18 +894,18 @@
 | PVE-6.2 | ✅ | docs | `docs/pve-team-modes-roadmap.md:401` | Обновить docs/state.md |
 | PVE-6.3 | ✅ | docs | `docs/pve-team-modes-roadmap.md:416` | Обновить CODE-MAP.md |
 | PVE-6.4 | ✅ | docs | `docs/pve-team-modes-roadmap.md:439` | ADR 05/06 → accepted |
-| ROS-0.1 | ✅ | data proto core | `docs/roster-roadmap.md:109` | ПКО и зональное ПВО: имя насквозь 2026-09-09 |
-| ROS-0.2 | ✅ | proto | `docs/roster-roadmap.md:140` | «Верфь» → «Производство» 2026-09-09 |
-| ROS-1.1 | ✅ | core data proto | `docs/roster-roadmap.md:158` | Пехота и техника: два рода наземных войск 2026-09-09 |
-| ROS-1.2 | ✅ | data proto | `docs/roster-roadmap.md:192` | Фрегат: корабль поддержки под модули 2026-09-09 |
-| ROS-1.3 | ✅ | core data | `docs/roster-roadmap.md:226` | Осадная платформа осаждает планету, а не флот 2026-09-09 |
-| ROS-1.4 | ✅ | core data proto | `docs/roster-roadmap.md:252` | Бомбардировщик и профили урона челноков 2026-09-09 |
-| ROS-1.5 | ✅ | core data proto | `docs/roster-roadmap.md:288` | Десантный челнок: высадка вместо удара 2026-09-09 |
-| ROS-2.1 | ✅ | core data proto | `docs/roster-roadmap.md:338` | Три линии 50/30/20, артиллерия без ответного огня 2026-09-09 |
-| ROS-2.1a | ✅ | proto | `docs/roster-roadmap.md:389` | Управление огнём показывается только тем, кто может стрелять 2026-09-09 |
-| ROS-2.2 | ✅ | core data proto | `docs/roster-roadmap.md:415` | Челнок — сторона боя: ответный урон и зональное ПВО 2026-09-09 |
-| ROS-3.1 | ✅ | proto | `docs/roster-roadmap.md:452` | Экран «Производство»: пять типов, модули, количество, планета 2026-09-09 |
-| ROS-3.2 | ✅ | proto | `docs/roster-roadmap.md:490` | Шаттл — корабль во всём интерфейсе 2026-09-09 |
+| ROS-0.1 | ✅ | data proto core | `docs/roster-roadmap.md:116` | ПКО и зональное ПВО: имя насквозь 2026-09-09 |
+| ROS-0.2 | ✅ | proto | `docs/roster-roadmap.md:147` | «Верфь» → «Производство» 2026-09-09 |
+| ROS-1.1 | ✅ | core data proto | `docs/roster-roadmap.md:165` | Пехота и техника: два рода наземных войск 2026-09-09 |
+| ROS-1.2 | ✅ | data proto | `docs/roster-roadmap.md:199` | Фрегат: корабль поддержки под модули 2026-09-09 |
+| ROS-1.3 | ✅ | core data | `docs/roster-roadmap.md:233` | Осадная платформа осаждает планету, а не флот 2026-09-09 |
+| ROS-1.4 | ✅ | core data proto | `docs/roster-roadmap.md:259` | Бомбардировщик и профили урона челноков 2026-09-09 |
+| ROS-1.5 | ✅ | core data proto | `docs/roster-roadmap.md:295` | Десантный челнок: высадка вместо удара 2026-09-09 |
+| ROS-2.1 | ✅ | core data proto | `docs/roster-roadmap.md:345` | Три линии 50/30/20, артиллерия без ответного огня 2026-09-09 |
+| ROS-2.1a | ✅ | proto | `docs/roster-roadmap.md:396` | Управление огнём показывается только тем, кто может стрелять 2026-09-09 |
+| ROS-2.2 | ✅ | core data proto | `docs/roster-roadmap.md:422` | Челнок — сторона боя: ответный урон и зональное ПВО 2026-09-09 |
+| ROS-3.1 | ✅ | proto | `docs/roster-roadmap.md:459` | Экран «Производство»: пять типов, модули, количество, планета 2026-09-09 |
+| ROS-3.2 | ✅ | proto | `docs/roster-roadmap.md:497` | Шаттл — корабль во всём интерфейсе 2026-09-09 |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md:48` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md:55` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md:64` | Сервисные идентичности и scoped-токены |
@@ -1003,8 +1004,8 @@
 | SHU-3.2 | ✅ | proto | `docs/shuttles-roadmap.md:300` | Бот умеет челноки 2026-09-09 |
 | SHU-4.1 | ✅ | proto | `docs/shuttles-roadmap.md:351` | Словарь: эскадра у мира, флот у кораблей 2026-09-10 |
 | SHU-4.2 | ✅ | core data | `docs/shuttles-roadmap.md:393` | Эскадра как соединение ангара 2026-09-10 |
-| SHU-4.3 | ⏳ | proto | `docs/shuttles-roadmap.md:451` | Панель мира: эскадры как флоты |
-| SHU-4.4 | ⏳ | core | `docs/shuttles-roadmap.md:465` | Погоня: удар по движущейся цели |
+| SHU-4.3 | ⏳ | proto | `docs/shuttles-roadmap.md:453` | Панель мира: эскадры как флоты |
+| SHU-4.4 | ⏳ | core | `docs/shuttles-roadmap.md:467` | Погоня: удар по движущейся цели |
 | ST-3.1 | ✅ | core | `docs/steward-roadmap.md:68` | Ядро: доля потерь по прогнозу + трипваер «враг близко» |
 | ST-3.2 | ✅ | srv proto | `docs/steward-roadmap.md:89` | Драйвер: эвакуация под угрозой (поза defend) |
 | ST-3.3 | ✅ | core srv proto | `docs/steward-roadmap.md:116` | Поза «Активная оборона» — контрудар при приемлемых потерях |

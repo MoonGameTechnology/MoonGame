@@ -518,7 +518,7 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
  * Damage runs through the `combat.damage` hook — the shared damage extension point
  * (admiral / tactic / bombardment), carrying `phase` in its args. EVERY firing channel
  * uses it (CORE-DMG-1): the melee round here, planetary AA and bombardment in
- * `orbital`, standoff fire in `artillery`, point-defense in `shuttle` — so a
+ * `orbital`, point-defense in `shuttle` — so a
  * technology bonus or faction passive reaches all of them alike. Only `phase: 'ground'`
  * opens the defender-side mitigations (fort, standing buildings, planet type), so the
  * other channels are scaled by the attacker's bonuses and nothing else. A new firing
@@ -527,7 +527,7 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
  * `planet.captured`.
  *
  * The former monolith is split along the bus seams: the near-orbit layer
- * (AA / bombardment) lives in `orbital`, standoff fire in `artillery`, and the
+ * (AA / bombardment) lives in `orbital`, and the
  * lane-crossing detector in `intercept` — each degrades gracefully on its own.
  */
 export const combatModule: GameModule = {
@@ -779,13 +779,7 @@ export const combatModule: GameModule = {
         },
       );
       applyDamageToSide(h, battle.defender.ref, dmgToDefender, data, battle.location);
-      // ОТВЕТНЫЙ огонь обходит артиллерию атакующей стороны (ROS-2.1): она бьёт
-      // безнаказанно, пока рядом стоит кто-то ещё, кому этот залп можно отдать.
-      // Под ЧУЖОЙ атакой (строкой выше) такой поблажки нет — там она обычный
-      // тыловой корабль и получает свою долю.
-      applyDamageToSide(h, battle.attacker.ref, dmgToAttacker, data, battle.location, {
-        sparesArtillery: true,
-      });
+      applyDamageToSide(h, battle.attacker.ref, dmgToAttacker, data, battle.location);
       h.emit('combat.round', {
         battleId,
         round: battle.round,

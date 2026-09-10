@@ -29,17 +29,16 @@
  */
 import type { GameData, UnitDef, UnitStack } from '../../packages/shared-core/src/index';
 
-export type ShipArchetype = 'scout' | 'combat' | 'artillery' | 'transport' | 'flagship' | 'swarm';
+export type ShipArchetype = 'scout' | 'combat' | 'transport' | 'flagship' | 'swarm';
 
 /** cargoCapacity с этого порога читается как выделенный транспортник
  *  (постер: «высокий cargoCapacity»; десантный корабль 16 — да, cruiser 5 — нет). */
 export const TRANSPORT_CARGO_MIN = 8;
 
 /** Роль корабля из полей unit-def — порядок проверок фиксирует приоритет
- *  (флагман > артиллерия > рой > транспорт > скаут > боевой по умолчанию). */
+ *  (флагман > рой > транспорт > скаут > боевой по умолчанию). */
 export function unitArchetype(def: UnitDef): ShipArchetype {
   if (def.traits.includes('hero')) return 'flagship';
-  if (def.traits.includes('artillery') || (def.stats.range ?? 0) > 0) return 'artillery';
   if (def.faction === 'swarm') return 'swarm';
   if ((def.stats.cargoCapacity ?? 0) >= TRANSPORT_CARGO_MIN) return 'transport';
   if ((def.signature ?? 1) <= 1 && (def.radarRange ?? 0) > 0) return 'scout';
@@ -75,7 +74,6 @@ export const ARCHETYPE_PATH: Record<ShipArchetype, string> = {
   // широкая дельта с крыльями — front-line
   combat: 'M12 2 L18.5 20.5 L14.5 18.5 L12 21.5 L9.5 18.5 L5.5 20.5 Z',
   // ствол мортиры над клином-лафетом
-  artillery: 'M10.8 2.5 h2.4 v7 h-2.4 Z M6.5 11 h11 L15 21.5 h-6 Z',
   // шестигранный контейнеровоз
   transport: 'M8 5.5 h8 l3.5 6.5 l-3.5 6.5 h-8 l-3.5 -6.5 Z',
   // дельта флагмана — гало-кольцо дорисовывает рендерер (пунктирная орбита)

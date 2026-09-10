@@ -6,7 +6,6 @@ import { TAP_RADIUS, tapOwner, tapRadius, type TapModes } from './tapPriority';
 const modes = (over: Partial<TapModes> = {}): TapModes => ({
   chainMode: false,
   merging: false,
-  barrageAim: false,
   heroAim: false,
   heroSpawnAim: false,
   assaultAim: false,
@@ -29,7 +28,6 @@ describe('тап по карте — кто его забирает', () => {
     const все = modes({
       chainMode: true,
       merging: true,
-      barrageAim: true,
       heroAim: true,
       heroSpawnAim: true,
       assaultAim: true,
@@ -41,7 +39,6 @@ describe('тап по карте — кто его забирает', () => {
 
   it('каждый вооружённый приказ забирает тап себе', () => {
     expect(tapOwner(modes({ merging: true }))).toBe('merge');
-    expect(tapOwner(modes({ barrageAim: true }))).toBe('barrage');
     expect(tapOwner(modes({ heroAim: true }))).toBe('cast');
     expect(tapOwner(modes({ heroSpawnAim: true }))).toBe('deploy');
     expect(tapOwner(modes({ assaultAim: true }))).toBe('assault');
@@ -60,8 +57,6 @@ describe('тап по карте — кто его забирает', () => {
   });
 
   it('порядок среди приказов фиксирован: слияние раньше залпа, залп раньше способности', () => {
-    expect(tapOwner(modes({ merging: true, barrageAim: true }))).toBe('merge');
-    expect(tapOwner(modes({ barrageAim: true, heroAim: true }))).toBe('barrage');
     expect(tapOwner(modes({ heroAim: true, heroSpawnAim: true }))).toBe('cast');
     expect(tapOwner(modes({ heroSpawnAim: true, assaultAim: true }))).toBe('deploy');
     // ШТУРМ важнее «Атаки»: он целится в МИР, и его промах прощается (armedTap),
