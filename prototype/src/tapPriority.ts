@@ -55,7 +55,9 @@ export interface TapModes {
   pickMode: boolean;
   /** Вооружён ход («Курс»). */
   aiming: boolean;
-  /** Вооружён удар эскадрильи (shuttle.strike). */
+  /** Вооружён УДАР ЧЕЛНОКОВ (`shuttle.strike`, SHU-3.1). Поле было объявлено
+   *  комментарием без самого поля — режим планировали и не построили. */
+  strikeAim: boolean;
 }
 
 /** Решить, кто забирает тап. Порядок ветвей — и есть правила 1–4. */
@@ -67,6 +69,10 @@ export function tapOwner(m: TapModes): TapOwner {
   if (m.heroSpawnAim) return 'deploy';
   if (m.assaultAim) return 'assault';
   if (m.engageAim) return 'engage';
+  // Удар челноков — ПОСЛЕ «Атаки» и до набора группы. Порядок между этими двумя
+  // произволен по смыслу (взведён всегда РОВНО один: они взводятся из разных мест и
+  // гасят друг друга), но зафиксирован здесь, чтобы правило оставалось читаемым.
+  if (m.strikeAim) return 'shuttle-strike';
   if (m.pickMode && !m.aiming) return 'pick-group'; // правило 4
   if (m.aiming) return 'move'; // правило 2
   return 'select'; // правило 3

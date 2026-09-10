@@ -183,6 +183,15 @@ function runMatch(i) {
   let tradeCredits = 0;
   let tradeFees = 0;
   let firstCombatAt = null;
+  // SHU-3.2 — ЧЕЛНОКИ В ОТЧЁТЕ. Пласт механики (удар, ответка ROS-2.2, перехват
+  // SHU-1.3, высадка плацдарма ROS-1.5) не имел в замере ни одной строки: постройка
+  // челнока считалась в `usage`, а что он потом делал — нет. «Построено 12» при нуле
+  // вылетов читалось как живая механика, хотя машины просто лежали в порту.
+  let sorties = 0;
+  let strikeHits = 0;
+  let strikeDamage = 0;
+  let shuttlesDowned = 0;
+  let dropsLanded = 0;
   const consume = (events, now) => {
     for (const e of events) {
       if (e.type === 'unit.built') {
@@ -227,6 +236,18 @@ function runMatch(i) {
         splits++;
       } else if (e.type === 'planet.bombarded') {
         bombardSpans++;
+      } else if (e.type === 'shuttle.launched') {
+        sorties++;
+      } else if (e.type === 'shuttle.hit') {
+        strikeHits++;
+        strikeDamage += (e.payload ?? {}).damage ?? 0;
+      } else if (e.type === 'shuttle.repelled' || e.type === 'shuttle.intercepted') {
+        // Обе контрмеры считаются одним числом НАРОЧНО: вопрос замера — «сбивают ли
+        // челноки вообще», а не «чем именно». Разведёт их отдельный кирпич, когда
+        // станет что сравнивать.
+        shuttlesDowned += (e.payload ?? {}).downed ?? 0;
+      } else if (e.type === 'shuttle.landed') {
+        if (((e.payload ?? {}).landed ?? 0) > 0) dropsLanded++;
       } else if (e.type === 'battle.started' && firstCombatAt === null) firstCombatAt = now;
     }
   };
@@ -333,6 +354,11 @@ function runMatch(i) {
     sieges,
     splits,
     bombardSpans,
+    sorties,
+    strikeHits,
+    strikeDamage,
+    shuttlesDowned,
+    dropsLanded,
     heroSpawns,
     heroSkills,
     heroFits,
@@ -390,6 +416,11 @@ let fleetsDestroyedTotal = 0;
 let siegesTotal = 0;
 let splitsTotal = 0;
 let bombardSpansTotal = 0;
+let sortiesTotal = 0;
+let strikeHitsTotal = 0;
+let strikeDamageTotal = 0;
+let shuttlesDownedTotal = 0;
+let dropsLandedTotal = 0;
 let heroSpawnsTotal = 0;
 let heroSkillsTotal = 0;
 let heroFitsTotal = 0;
@@ -432,6 +463,11 @@ for (let i = 0; i < N; i++) {
   siegesTotal += r.sieges;
   splitsTotal += r.splits;
   bombardSpansTotal += r.bombardSpans;
+  sortiesTotal += r.sorties;
+  strikeHitsTotal += r.strikeHits;
+  strikeDamageTotal += r.strikeDamage;
+  shuttlesDownedTotal += r.shuttlesDowned;
+  dropsLandedTotal += r.dropsLanded;
   heroSpawnsTotal += r.heroSpawns;
   heroSkillsTotal += r.heroSkills;
   heroFitsTotal += r.heroFits;
@@ -624,6 +660,7 @@ console.log(
     `  наземная   : ${groundBattlesTotal} наземных боёв из ${battlesTotal} · захваты: прилётом ${arrivalCaptures} · занято с орбиты ${occupyCaptures} · штурмом ${assaultCaptures}  ← «штурмом» и есть вторая фаза захвата (GDD §7.4); 0 = она не играется. «Занято с орбиты» боя НЕ требует — это чужой мир без гарнизона (AI-BAL-10)`,
     `  тактика    : отступлений ${retreatsTotal} · осад ${siegesTotal} (обстрелов ${bombardSpansTotal}) · расколов флота ${splitsTotal}  ← AI-BAL-7; 0 в строке = механика вне измерения`,
     `  рынок      : сделок ${tradesTotal} на ${tradeCreditsTotal.toFixed(0)} credits (сгорело комиссией ${tradeFeesTotal.toFixed(0)})  ← AI-BAL-9; лоты выставлялись и раньше, доказывают только СДЕЛКИ`,
+    `  челноки    : вылетов ${sortiesTotal} · попаданий ${strikeHitsTotal} на ${strikeDamageTotal.toFixed(0)} урона · сбито машин ${shuttlesDownedTotal} · высадок ${dropsLandedTotal}  ← SHU-3.2; «построено» в мёртвом контенте НЕ доказывает механику: машина может пролежать весь матч в порту. Ноль вылетов при ненулевой постройке — ровно этот случай`,
     `  герои      : подъёмов ${heroSpawnsTotal} · узлов дерева ${heroSkillsTotal} · фитингов ${heroFitsTotal} · кастов ${
       [...heroCastsTotal.entries()]
         .sort()
@@ -748,6 +785,11 @@ console.log(
         trades: tradesTotal,
         tradeCredits: tradeCreditsTotal,
         tradeFees: tradeFeesTotal,
+        sorties: sortiesTotal,
+        strikeHits: strikeHitsTotal,
+        strikeDamage: strikeDamageTotal,
+        shuttlesDowned: shuttlesDownedTotal,
+        dropsLanded: dropsLandedTotal,
         heroSpawns: heroSpawnsTotal,
         heroSkills: heroSkillsTotal,
         heroFits: heroFitsTotal,
