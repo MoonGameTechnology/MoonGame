@@ -12,10 +12,10 @@
  * riskier pass. `patrolTarget`/`scrambleOrder` (the auto-scramble driver, CC-4)
  * live in the prototype's `game.ts`, not `shuttle.ts` — out of scope here.
  */
-import type { Fleet, Planet, UnitStack } from './gameState';
+import type { Fleet, Planet, Squadron, UnitStack } from './gameState';
 import type { GameData } from '../data/schemas';
 import { buildingLevel } from '../data/schemas';
-import { sumUnitStat } from '../util/stacks';
+import { addUnits, sumUnitStat } from '../util/stacks';
 
 /** The shuttle-trait ship stacks aboard a fleet — what a carrier launches as a
  *  strike wing (SQ-1.1: launch-as-unit). Pure. */
@@ -156,23 +156,87 @@ export function fleetShuttleBay(fleet: Fleet, data: GameData): number {
   return sumUnitStat(fleet.units, data, 'shuttleBay');
 }
 
-/** Сколько мест ангара занято сейчас — у мира или у флота (форма ангара одна). */
-export function hangarUsed(host: { hangar?: UnitStack[] }): number {
-  return (host.hangar ?? []).reduce((n, st) => n + st.count, 0);
+/** Все МАШИНЫ базы одним списком — ангар без деления на эскадры (SHU-4.2).
+ *
+ *  Половине читателей нужна не структура соединений, а ответ «что вообще стоит в этом
+ *  порту»: вместимость, сводка мира, счётчик бота. Своя развёртка у каждого из них
+ *  разъехалась бы с этой на первой же правке формы, поэтому она здесь одна. */
+export function hangarMachines(host: { hangar?: Squadron[] }): UnitStack[] {
+  const out: UnitStack[] = [];
+  for (const sq of host.hangar ?? []) {
+    for (const st of sq.units) if (st.count > 0) out.push(st);
+  }
+  return out;
+}
+
+/** Сколько машин в эскадре. */
+export function squadronSize(sq: Squadron): number {
+  return sq.units.reduce((n, st) => n + (st.count > 0 ? st.count : 0), 0);
+}
+
+/** Сколько мест ангара занято сейчас — у мира или у флота (форма ангара одна).
+ *  Считаются МАШИНЫ, а не эскадры: место в порту занимает борт, а не соединение. */
+export function hangarUsed(host: { hangar?: Squadron[] }): number {
+  return (host.hangar ?? []).reduce((n, sq) => n + squadronSize(sq), 0);
+}
+
+/** Сколько наземных войск поднимет эскадра: Σ `cargoCapacity` её машин (ROS-1.5). */
+export function squadronCargoCapacity(sq: Squadron, data: GameData): number {
+  return sumUnitStat(sq.units, data, 'cargoCapacity');
+}
+
+/** Сколько мест трюма занято сейчас. */
+export function squadronCargoUsed(sq: Squadron): number {
+  return (sq.cargo ?? []).reduce((n, st) => n + st.count, 0);
+}
+
+/** Построенная (или севшая) машина встаёт в ПЕРВУЮ эскадру базы, где такой юнит уже
+ *  есть, иначе заводит свою (SHU-4.2). Правило одно на весь ангар и держит две вещи
+ *  сразу: шесть заказанных перехватчиков не превращаются в шесть эскадр по одному, а
+ *  десантный борт не оказывается молча в ударном звене. Порядок обхода — порядок
+ *  массива, то есть детерминирован. */
+export function basedMachine(
+  hangar: readonly Squadron[],
+  unit: string,
+  count: number,
+  freshId: string,
+  modules?: readonly string[],
+): Squadron[] {
+  const out = hangar.map((q) => ({ ...q, units: q.units.map((st) => ({ ...st })) }));
+  const home = out.find((q) => q.units.some((st) => st.unit === unit));
+  if (home) {
+    addUnits(home.units, unit, count, modules);
+    return out;
+  }
+  const fresh: Squadron = { id: freshId, units: [] };
+  addUnits(fresh.units, unit, count, modules);
+  out.push(fresh);
+  return out;
 }
 
 /** Обрезать ангар до вместимости `bay`, начиная с ХВОСТА: раньше построенное переживает
  *  потерю порта, позже построенное гибнет первым. Порядок здесь — не вкус, а инвариант
  *  детерминизма: «лишние гибнут» обязано давать один и тот же результат на сервере и в
- *  реплее, поэтому правило фиксировано и не зависит от обхода объекта. */
-export function trimHangar(stacks: readonly UnitStack[], bay: number): UnitStack[] {
+ *  реплее, поэтому правило фиксировано и не зависит от обхода объекта.
+ *
+ *  С эскадрами хвост считается СКВОЗНЫМ (SHU-4.2): сначала гибнут машины последней
+ *  эскадры, и только когда она опустела — предыдущей. Опустевшая эскадра исчезает
+ *  вместе с последней машиной: соединение без бортов — не соединение, а имя. ТРЮМ
+ *  гибнет вместе со своей эскадрой — войска стояли на её бортах. */
+export function trimHangar(hangar: readonly Squadron[], bay: number): Squadron[] {
   let left = Math.max(0, Math.floor(bay));
-  const out: UnitStack[] = [];
-  for (const st of stacks) {
+  const out: Squadron[] = [];
+  for (const sq of hangar) {
     if (left <= 0) break;
-    const keep = Math.min(st.count, left);
-    left -= keep;
-    out.push({ ...st, count: keep, ...(st.modules ? { modules: [...st.modules] } : {}) });
+    const units: UnitStack[] = [];
+    for (const st of sq.units) {
+      if (left <= 0) break;
+      const keep = Math.min(st.count, left);
+      left -= keep;
+      units.push({ ...st, count: keep, ...(st.modules ? { modules: [...st.modules] } : {}) });
+    }
+    if (units.length === 0) continue;
+    out.push({ ...sq, units, ...(sq.cargo ? { cargo: sq.cargo.map((c) => ({ ...c })) } : {}) });
   }
   return out;
 }

@@ -13,7 +13,7 @@
 // `strike_carrier` и `frigate` намеренно оставлены боту ненужными — см. хвост файла.
 import { describe, expect, it } from 'vitest';
 import { newGame, aiOrders, START_CANDIDATES, kernel, ctx } from './game';
-import type { Action, GameState } from '../../packages/shared-core/src/index';
+import type { Action, GameState, Squadron } from '../../packages/shared-core/src/index';
 
 function game2(): GameState {
   return newGame({
@@ -99,10 +99,11 @@ describe('SHU-3.2 — бот СТРОИТ новый ростер челноко
     // `E_HANGAR_FULL`, платя за это отказами весь матч.
     const s = rich(game2());
     const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
+    // SHU-4.2: ангар — эскадры, по звену на класс машин (так их и ставит постройка).
     home.hangar = [
-      { unit: 'interceptor', count: 3 },
-      { unit: 'bomber', count: 3 },
-      { unit: 'landing_shuttle', count: 3 },
+      { id: 'sq:i', units: [{ unit: 'interceptor', count: 3 }] },
+      { id: 'sq:b', units: [{ unit: 'bomber', count: 3 }] },
+      { id: 'sq:l', units: [{ unit: 'landing_shuttle', count: 3 }] },
     ];
     const built = unitsBuilt(aiOrders(s, 'p2', 'expand', 'strong'));
     expect(built).not.toContain('interceptor');
@@ -120,10 +121,10 @@ describe('SHU-3.2 — бот ПОДНИМАЕТ челноки: иначе он�
    * начинаются тогда, когда война доходит до его порога, — правило проверяется именно
    * в этом состоянии, а не в стартовом.
    */
-  function armed(over: { hangar?: Array<{ unit: string; count: number }> } = {}): GameState {
+  function armed(over: { hangar?: Squadron[] } = {}): GameState {
     const s = rich(game2());
     const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
-    home.hangar = over.hangar ?? [{ unit: 'bomber', count: 2 }];
+    home.hangar = over.hangar ?? [{ id: 'sq:1', units: [{ unit: 'bomber', count: 2 }] }];
     const near = Object.values(s.planets)
       .filter((p) => p.id !== home.id && p.owner === null)
       .sort(
@@ -137,23 +138,27 @@ describe('SHU-3.2 — бот ПОДНИМАЕТ челноки: иначе он�
   const strikes = (s: GameState): Action[] => only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.strike');
 
   it('ЕСТЬ БОМБАРДИРОВЩИК И ЦЕЛЬ В РАДИУСЕ — ВЫЛЕТ УХОДИТ', () => {
-    const out = strikes(armed());
+    // SHU-4.2: приказ адресует ЭСКАДРУ, а не «юнит и сколько», поэтому проверяется id
+    // соединения — и то, что оно и правда бомбардировочное.
+    const s = armed();
+    const out = strikes(s);
     expect(out.length).toBeGreaterThan(0);
-    const p = out[0]!.payload as { unit: string; planetId: string; count: number };
-    expect(p.unit).toBe('bomber');
-    expect(p.count).toBeGreaterThan(0);
+    const p = out[0]!.payload as { squadronId: string; planetId: string };
+    const home = Object.values(s.planets).find((w) => w.owner === 'p2')!;
+    const squad = (home.hangar ?? []).find((q) => q.id === p.squadronId);
+    expect(squad?.units[0]?.unit).toBe('bomber');
   });
 
   it('ПЕРЕХВАТЧИК В УДАР НЕ ПОСЫЛАЕТСЯ: его работа — встречать чужих, и она без приказа', () => {
     // У перехватчика `attack` 4 против 20 у бомбардировщика (ROS-1.4): послать его
     // бить корпуса — значит измерить не ту роль. Свою он делает сам, подъёмом с базы.
-    expect(strikes(armed({ hangar: [{ unit: 'interceptor', count: 3 }] }))).toEqual([]);
+    expect(strikes(armed({ hangar: [{ id: 'sq:1', units: [{ unit: 'interceptor', count: 3 }] }] }))).toEqual([]);
   });
 
   it('в мирное время вылетов нет — бить некого', () => {
     const s = rich(game2(), false);
     const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
-    home.hangar = [{ unit: 'bomber', count: 2 }];
+    home.hangar = [{ id: 'sq:1', units: [{ unit: 'bomber', count: 2 }] }];
     expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.strike')).toEqual([]);
   });
 
@@ -167,30 +172,43 @@ describe('SHU-3.2 — бот ПОДНИМАЕТ челноки: иначе он�
   });
 
   it('ОДИН ВЫЛЕТ НА ПОРТ ЗА ТИК — топливо порта общее, вторым приказом его не растянуть', () => {
-    expect(strikes(armed({ hangar: [{ unit: 'bomber', count: 6 }] })).length).toBe(1);
+    expect(strikes(armed({ hangar: [{ id: 'sq:1', units: [{ unit: 'bomber', count: 6 }] }] })).length).toBe(1);
   });
 
   it('ДЕСАНТНЫЙ ВЫЛЕТ ИДЁТ С ГРУЗОМ — без него он долетит и просто погибнет', () => {
-    const s = armed({ hangar: [{ unit: 'landing_shuttle', count: 2 }] });
+    const s = armed({ hangar: [{ id: 'sq:1', units: [{ unit: 'landing_shuttle', count: 2 }] }] });
     const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
     home.garrison = [{ unit: 'militia', count: 8 }]; // сверх домашней стражи есть что везти
-    const out = only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.strike');
+    // SHU-4.2: груз кладут в трюм ОТДЕЛЬНЫМ приказом, и он обязан идти ПЕРЕД ударом —
+    // иначе эскадра взлетит порожней. Проверяем оба и их порядок.
+    const orders = aiOrders(s, 'p2', 'expand', 'strong');
+    const out = only(orders, 'shuttle.strike');
+    const loads = only(orders, 'shuttle.loadTroops');
     expect(out).toHaveLength(1);
-    const p = out[0]!.payload as {
-      unit: string;
-      targetPlanetId?: string;
-      troops?: Array<{ unit: string; count: number }>;
+    expect(loads).toHaveLength(1);
+    expect(orders.indexOf(loads[0]!)).toBeLessThan(orders.indexOf(out[0]!));
+    const p = out[0]!.payload as { squadronId: string; targetPlanetId?: string };
+    const lp = loads[0]!.payload as {
+      squadronId: string;
+      troops: Array<{ unit: string; count: number }>;
     };
-    expect(p.unit).toBe('landing_shuttle');
+    const home2 = Object.values(s.planets).find((w) => w.owner === 'p2')!;
+    expect((home2.hangar ?? []).find((q) => q.id === p.squadronId)?.units[0]?.unit).toBe(
+      'landing_shuttle',
+    );
     expect(p.targetPlanetId).toBeTruthy(); // десант летит по МИРУ, а не по кораблю
-    expect((p.troops ?? []).reduce((n, t) => n + t.count, 0)).toBeGreaterThan(0);
-    expect(kernel.applyAction(s, out[0]!, ctx(s.time)).ok).toBe(true);
+    expect(lp.squadronId).toBe(p.squadronId);
+    expect(lp.troops.reduce((n, t) => n + t.count, 0)).toBeGreaterThan(0);
+    // Обе заявки проходят ЯДРО, а не только выглядят правильными.
+    const loaded = kernel.applyAction(s, loads[0]!, ctx(s.time));
+    expect(loaded.ok).toBe(true);
+    if (loaded.ok) expect(kernel.applyAction(loaded.state, out[0]!, ctx(s.time)).ok).toBe(true);
   });
 
   it('ДОМ ПУСТЫМ НЕ ОСТАВЛЯЕТ: везти нечего — вылета нет вовсе', () => {
     // Тот же порог домашней стражи, что и у погрузки на корабль: гарнизон из трёх
     // бойцов целиком уходит в оборону дома, и десантному челноку грузить нечего.
-    const s = armed({ hangar: [{ unit: 'landing_shuttle', count: 2 }] });
+    const s = armed({ hangar: [{ id: 'sq:1', units: [{ unit: 'landing_shuttle', count: 2 }] }] });
     const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
     home.garrison = [{ unit: 'militia', count: 3 }];
     expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.strike')).toEqual([]);

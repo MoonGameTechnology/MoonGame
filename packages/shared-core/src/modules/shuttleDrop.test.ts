@@ -91,7 +91,16 @@ function planet(
     buildings: (over.buildings ?? []).map((type) => ({ type, level: 1, hp: data.buildings[type]!.hp })),
     garrison: (over.garrison ?? []).map(([unit, count]) => ({ unit, count })),
     traits: [],
-    ...(over.hangar === undefined ? {} : { hangar: [{ unit: 'landing_shuttle', count: over.hangar }] }),
+    // SHU-4.2: ангар — эскадры. Держим ДВА звена по половине, чтобы тесты могли послать
+    // и часть машин (одно звено), и все (слияние + вылет), не гадая о выданных id.
+    ...(over.hangar === undefined
+      ? {}
+      : {
+          hangar: ['sq:a', 'sq:b'].map((id) => ({
+            id,
+            units: [{ unit: 'landing_shuttle', count: Math.floor(over.hangar! / 2) }],
+          })),
+        }),
   };
 }
 
@@ -133,39 +142,66 @@ function fleetOf(id: string, owner: string, location: string): Fleet {
 }
 
 let seq = 0;
+const order = (type: string, payload: Record<string, unknown>): Action => ({
+  id: `a:${seq++}`,
+  type,
+  playerId: 'p1',
+  payload,
+  issuedAt: 0,
+});
+
+/**
+ * Десантный вылет ПОСЛЕДОВАТЕЛЬНОСТЬЮ (SHU-4.2): груз теперь кладут в трюм ЗАРАНЕЕ, а
+ * не заявляют в приказе на удар. Хелпер собирает её целиком — (слияние) → погрузка →
+ * удар, — чтобы тесты говорили про исход высадки, а не про механику трёх приказов.
+ * `count: 4` значит «всеми машинами», то есть сперва свести оба звена в одно.
+ */
 const drop = (
   over: {
-    unit?: string;
+    squadronId?: string;
     count?: number;
     troops?: Array<{ unit: string; count: number }>;
     targetPlanetId?: string;
     targetFleetId?: string;
   } = {},
-): Action => {
-  const { unit = 'landing_shuttle', count = 2, troops = [{ unit: 'militia', count: 4 }], ...target } = over;
-  return {
-    id: `a:${seq++}`,
-    type: 'shuttle.strike',
-    playerId: 'p1',
-    payload: {
+): Action[] => {
+  const {
+    squadronId = 'sq:a',
+    count = 2,
+    troops = [{ unit: 'militia', count: 4 }],
+    ...target
+  } = over;
+  const out: Action[] = [];
+  if (count === 4) out.push(order('shuttle.merge', { planetId: 'A', squadronId: 'sq:b', intoId: squadronId }));
+  if (troops.length > 0) out.push(order('shuttle.loadTroops', { planetId: 'A', squadronId, troops }));
+  out.push(
+    order('shuttle.strike', {
       planetId: 'A',
-      unit,
-      count,
-      troops,
+      squadronId,
       ...(target.targetFleetId || target.targetPlanetId ? target : { targetPlanetId: 'B' }),
-    },
-    issuedAt: 0,
-  };
+    }),
+  );
+  return out;
 };
 
-function apply(state: GameState, action: Action): GameState {
-  const r = kernel.applyAction(state, action, at(state));
-  if (!r.ok) throw new Error(r.code);
-  return r.state;
+function apply(state: GameState, actions: Action | Action[]): GameState {
+  let s = state;
+  for (const action of Array.isArray(actions) ? actions : [actions]) {
+    const r = kernel.applyAction(s, action, at(s));
+    if (!r.ok) throw new Error(r.code);
+    s = r.state;
+  }
+  return s;
 }
-function code(state: GameState, action: Action): string | null {
-  const r = kernel.applyAction(state, action, at(state));
-  return r.ok ? null : r.code;
+/** Код ПЕРВОГО отказа в последовательности — там же, где раньше отбивался один приказ. */
+function code(state: GameState, actions: Action | Action[]): string | null {
+  let s = state;
+  for (const action of Array.isArray(actions) ? actions : [actions]) {
+    const r = kernel.applyAction(s, action, at(s));
+    if (!r.ok) return r.code;
+    s = r.state;
+  }
+  return null;
 }
 function advance(state: GameState, hours: number): { state: GameState; events: DomainEvent[] } {
   const r = kernel.advanceTo(state, { now: state.time + hours * HOUR, data });
@@ -185,10 +221,13 @@ describe('ROS-1.5 — приказ: кого и с чем можно посла�
     const s0 = world();
     const s = {
       ...s0,
-      planets: { ...s0.planets, A: { ...s0.planets.A!, hangar: [{ unit: 'bomber', count: 2 }] } },
+      planets: {
+        ...s0.planets,
+        A: { ...s0.planets.A!, hangar: [{ id: 'sq:a', units: [{ unit: 'bomber', count: 2 }] }] },
+      },
       fleets: { E1: fleetOf('E1', 'p2', 'B') },
     };
-    expect(code(s, drop({ unit: 'bomber', troops: [], targetFleetId: 'E1' }))).toBeNull();
+    expect(code(s, drop({ troops: [], targetFleetId: 'E1' }))).toBeNull();
   });
 
   it('трюм не резиновый: больше `cargoCapacity` вылета не увезти', () => {
@@ -205,7 +244,10 @@ describe('ROS-1.5 — приказ: кого и с чем можно посла�
   it('груз уходит из гарнизона СРАЗУ на вылете — вторая посылка тем же взводом не пройдёт', () => {
     const s = apply(world(), drop({ troops: [{ unit: 'militia', count: 4 }] }));
     expect(count(s.planets.A?.garrison, 'militia')).toBe(4);
-    expect(code(s, drop({ troops: [{ unit: 'militia', count: 5 }] }))).toBe('E_NO_ARMY');
+    // Второе звено ещё в порту — но взвода на него уже не хватит: первый улетел с грузом.
+    expect(code(s, drop({ squadronId: 'sq:b', troops: [{ unit: 'militia', count: 5 }] }))).toBe(
+      'E_NO_ARMY',
+    );
   });
 });
 
@@ -220,7 +262,9 @@ describe('ROS-1.5 — высадка (правила 3–6)', () => {
 
   it('ЧЕЛНОКИ ОДНОРАЗОВЫЕ: домой не возвращаются и в состоянии не остаются', () => {
     const { state } = advance(apply(world(), drop()), 4);
-    expect(count(state.planets.A?.hangar, 'landing_shuttle')).toBe(2); // взлетели двое из четырёх
+    // Ангар — эскадры, поэтому машины считаются по всем звеньям (SHU-4.2).
+    const left = (state.planets.A?.hangar ?? []).flatMap((q) => q.units);
+    expect(count(left, 'landing_shuttle')).toBe(2); // взлетели двое из четырёх
     expect(state.strikes ?? []).toEqual([]);
   });
 

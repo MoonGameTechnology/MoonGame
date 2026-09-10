@@ -177,7 +177,13 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '13'; // MRG-1: слияние ждёт встречи в мире.
+export const MODULE_MANIFEST_VERSION = '14'; // SHU-4.2: ангар — список ЭСКАДР.
+// Форма состояния изменилась: `planet.hangar`/`fleet.hangar` больше не плоские стеки, а
+// список эскадр (`{id, units, cargo}`), у вылета появился `squadronId`, а в состоянии —
+// счётчик `squadronSeq`. Матч на манифесте 13 несёт ангары старой формы: новый читатель
+// увидел бы у них `units: undefined` и уронил бы и вылет, и подсчёт вместимости. Отказ
+// загрузки честнее. (До 14:)
+// export const MODULE_MANIFEST_VERSION = '13'; // MRG-1: слияние ждёт встречи в мире.
 // Форма состояния изменилась: у флота появилось поле `mergeInto` — намерение слиться,
 // которое созревает на прилёте. Матч на манифесте 12 несёт приказы, у которых вторую
 // половину держал клиент, — то есть играет по ДРУГИМ правилам. (До 13:)

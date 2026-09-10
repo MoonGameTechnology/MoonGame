@@ -88,7 +88,9 @@ const fleetAt = (id: string, owner: string, location: string, units: Fleet['unit
 function world(): GameState {
   const s = createInitialState({ seed: 'shu21', version: { data: '0.1.0', manifest: '1' } });
   const home = planet('HOME', 'p1', 0, true);
-  home.hangar = [{ unit: 'interceptor', count: 3 }];
+  // SHU-4.2: ангар — список ЭСКАДР, и перегрузка возит соединение ЦЕЛИКОМ. Три
+  // отдельных звена по машине дают тестам ту же зернистость, что раньше давал `count`.
+  home.hangar = [1, 2, 3].map((n) => ({ id: `sq:${n}`, units: [{ unit: 'interceptor', count: 1 }] }));
   return {
     ...s,
     players: { p1: player('p1'), p2: player('p2') },
@@ -115,10 +117,10 @@ const act = (type: string, payload: Record<string, unknown>): Action => ({
   payload,
   issuedAt: 0,
 });
-const load = (count = 1, fleetId = 'CV'): Action =>
-  act('shuttle.load', { fleetId, unit: 'interceptor', count });
-const unload = (count = 1, fleetId = 'CV'): Action =>
-  act('shuttle.unload', { fleetId, unit: 'interceptor', count });
+const loadOne = (squadronId = 'sq:1', fleetId = 'CV'): Action =>
+  act('shuttle.load', { fleetId, squadronId });
+const unloadOne = (squadronId = 'sq:1', fleetId = 'CV'): Action =>
+  act('shuttle.unload', { fleetId, squadronId });
 
 function apply(state: GameState, action: Action): GameState {
   const r = kernel.applyAction(state, action, at(state));
@@ -134,10 +136,17 @@ function advance(state: GameState, hours: number): GameState {
   if (!r.ok) throw new Error(r.code);
   return r.state;
 }
-const aboard = (s: GameState, id = 'CV'): number =>
-  (s.fleets[id]?.hangar ?? []).reduce((n, st) => n + st.count, 0);
-const ashore = (s: GameState, id = 'HOME'): number =>
-  (s.planets[id]?.hangar ?? []).reduce((n, st) => n + st.count, 0);
+const machines = (hangar: { units: Array<{ count: number }> }[] | undefined): number =>
+  (hangar ?? []).reduce((n, sq) => n + sq.units.reduce((m, st) => m + st.count, 0), 0);
+const aboard = (s: GameState, id = 'CV'): number => machines(s.fleets[id]?.hangar);
+const ashore = (s: GameState, id = 'HOME'): number => machines(s.planets[id]?.hangar);
+
+/** Поднять на борт `n` первых звеньев порта — «часть машин» в терминах эскадр. */
+function load(state: GameState, n: number, fleetId = 'CV'): GameState {
+  let s = state;
+  for (let i = 1; i <= n; i++) s = apply(s, loadOne(`sq:${i}`, fleetId));
+  return s;
+}
 
 /** Перегнать носитель на плацдарм — «вдали от своих миров», как просит кирпич. */
 function deploy(s: GameState): GameState {
@@ -147,47 +156,58 @@ function deploy(s: GameState): GameState {
 
 describe('носитель — перегрузка челноков (правила 1–2)', () => {
   it('челноки переходят из порта на борт и обратно', () => {
-    let s = world();
-    s = apply(s, load(2));
+    let s = load(world(), 2);
     expect(aboard(s)).toBe(2);
     expect(ashore(s)).toBe(1);
-    s = apply(s, unload(1));
+    s = apply(s, unloadOne('sq:1'));
     expect(aboard(s)).toBe(1);
     expect(ashore(s)).toBe(2);
   });
 
   it('сверх вместимости корпусов не грузится — E_NO_CAPACITY', () => {
     const s = world(); // два корпуса × 2 места = 4, но в порту всего 3
-    expect(code(s, load(3))).toBe(null);
-    expect(code(apply(s, load(3)), load(1))).toBe('E_NOT_ENOUGH'); // порт опустел
-    const packed = { ...s, planets: { ...s.planets, HOME: { ...s.planets.HOME!, hangar: [{ unit: 'interceptor', count: 9 }] } } };
-    expect(code(packed, load(5))).toBe('E_NO_CAPACITY');
+    expect(ashore(load(s, 3))).toBe(0); // все три звена уехали
+    expect(code(load(s, 3), loadOne('sq:1'))).toBe('E_NO_SQUADRON'); // порт опустел
+    const packed = {
+      ...s,
+      planets: {
+        ...s.planets,
+        HOME: { ...s.planets.HOME!, hangar: [{ id: 'sq:big', units: [{ unit: 'interceptor', count: 9 }] }] },
+      },
+    };
+    // Эскадра переезжает ЦЕЛИКОМ, поэтому девятка не влезает в четыре места — и не
+    // «частично грузится», а честно отбивается.
+    expect(code(packed, loadOne('sq:big'))).toBe('E_NO_CAPACITY');
   });
 
   it('корабль без мест ангара не носитель — E_NO_CAPACITY', () => {
-    expect(code(world(), load(1, 'LINE'))).toBe('E_NO_CAPACITY');
+    expect(code(world(), loadOne('sq:1', 'LINE'))).toBe('E_NO_CAPACITY');
   });
 
-  it('грузится ТОЛЬКО челнок и только в своём мире', () => {
+  it('перегрузка — только СВОЯ эскадра и только в своём мире', () => {
+    // Проверки «а челнок ли это» здесь больше нет и быть не может: ездит ЭСКАДРА, а в
+    // ангаре не бывает ничего, кроме челноков (SHU-4.2). Её место занял отказ по
+    // несуществующему соединению — та же граница, выраженная в новой форме.
     const s = world();
-    expect(code(s, act('shuttle.load', { fleetId: 'CV', unit: 'cruiser', count: 1 }))).toBe(
-      'E_NOT_SHUTTLE',
+    expect(code(s, act('shuttle.load', { fleetId: 'CV', squadronId: 'нет-такой' }))).toBe(
+      'E_NO_SQUADRON',
     );
     const away = { ...s, fleets: { ...s.fleets, CV: { ...s.fleets.CV!, location: 'FOE' } } };
-    expect(code(away, load(1))).toBe('E_FORBIDDEN');
+    expect(code(away, loadOne('sq:1'))).toBe('E_FORBIDDEN');
   });
 });
 
 describe('носитель — вылет и возврат (правила 3–4)', () => {
   it('ГОТОВНОСТЬ КИРПИЧА: флот с носителем бьёт челноками там, куда порт не достаёт', () => {
-    let s = apply(world(), load(2));
+    let s = load(world(), 2);
     s = deploy(s);
     // Из дома цель недосягаема — тысяча единиц против радиуса 180.
-    expect(code(s, act('shuttle.strike', { planetId: 'HOME', unit: 'interceptor', targetFleetId: 'E1', count: 1 }))).toBe(
+    expect(code(s, act('shuttle.strike', { planetId: 'HOME', squadronId: 'sq:3', targetFleetId: 'E1' }))).toBe(
       'E_OUT_OF_RANGE',
     );
-    // С носителя — сто единиц, попадает.
-    s = apply(s, act('shuttle.strike', { fleetId: 'CV', unit: 'interceptor', count: 2, targetFleetId: 'E1' }));
+    // С носителя — сто единиц, попадает. Летят обе эскадры, поднятые на борт.
+    s = apply(s, act('shuttle.strike', { fleetId: 'CV', squadronId: 'sq:1', targetFleetId: 'E1' }));
+    s = apply(s, act('shuttle.strike', { fleetId: 'CV', squadronId: 'sq:2', targetFleetId: 'E1' }));
     expect(aboard(s)).toBe(0); // ушли с борта
     expect(s.strikes?.[0]?.base).toEqual({ kind: 'fleet', id: 'CV' });
 
@@ -203,22 +223,22 @@ describe('носитель — вылет и возврат (правила 3–
   it('топливо и перезарядка живут у НОСИТЕЛЯ, как у порта', () => {
     // Грузим три: два уходят в вылеты, третий остаётся на борту — иначе пустой ангар
     // отобьёт третий приказ раньше топлива (`E_NOT_ENOUGH`), и проверять было бы нечего.
-    let s = deploy(apply(world(), load(3)));
-    const strike = (): Action =>
-      act('shuttle.strike', { fleetId: 'CV', unit: 'interceptor', count: 1, targetFleetId: 'E1' });
-    s = apply(s, strike());
+    let s = deploy(load(world(), 3));
+    const strike = (n: number): Action =>
+      act('shuttle.strike', { fleetId: 'CV', squadronId: `sq:${n}`, targetFleetId: 'E1' });
+    s = apply(s, strike(1));
     expect(s.fleets.CV?.sortie?.fuel).toBe(1);
-    s = apply(s, strike());
+    s = apply(s, strike(2));
     expect(s.fleets.CV?.sortie).toEqual({ fuel: 0, rearming: 2 });
-    expect(code(s, strike())).toBe('E_NO_FUEL');
+    expect(code(s, strike(3))).toBe('E_NO_FUEL');
     s = advance(s, 4); // вылеты вернулись, перезарядка отсчиталась
     expect(s.fleets.CV?.sortie?.fuel).toBe(2);
-    expect(code(s, strike())).toBe(null);
+    expect(code(s, strike(3))).toBe(null);
   });
 
   it('носитель погиб, пока челноки летели — садиться некуда', () => {
-    let s = deploy(apply(world(), load(2)));
-    s = apply(s, act('shuttle.strike', { fleetId: 'CV', unit: 'interceptor', count: 2, targetFleetId: 'E1' }));
+    let s = deploy(load(world(), 2));
+    s = apply(s, act('shuttle.strike', { fleetId: 'CV', squadronId: 'sq:1', targetFleetId: 'E1' }));
     const { CV: _gone, ...rest } = s.fleets;
     s = { ...s, fleets: rest };
     s = advance(s, 4);
@@ -227,26 +247,26 @@ describe('носитель — вылет и возврат (правила 3–
   });
 
   it('ровно одна база: обе или ни одной — отказ', () => {
-    const s = apply(world(), load(1));
-    expect(code(s, act('shuttle.strike', { unit: 'interceptor', count: 1, targetFleetId: 'E1' }))).toBe(
+    const s = load(world(), 1);
+    expect(code(s, act('shuttle.strike', { squadronId: 'sq:1', targetFleetId: 'E1' }))).toBe(
       'E_BAD_PAYLOAD',
     );
     expect(
-      code(s, act('shuttle.strike', { planetId: 'HOME', fleetId: 'CV', unit: 'interceptor', count: 1, targetFleetId: 'E1' })),
+      code(s, act('shuttle.strike', { planetId: 'HOME', fleetId: 'CV', squadronId: 'sq:1', targetFleetId: 'E1' })),
     ).toBe('E_BAD_PAYLOAD');
   });
 
   it('обычный флот базой не является — E_NO_PORT', () => {
     const s = world();
     expect(
-      code(s, act('shuttle.strike', { fleetId: 'LINE', unit: 'interceptor', count: 1, targetFleetId: 'E1' })),
+      code(s, act('shuttle.strike', { fleetId: 'LINE', squadronId: 'sq:1', targetFleetId: 'E1' })),
     ).toBe('E_NO_PORT');
   });
 });
 
 describe('носитель — ангар не переживает свои корпуса (правило 5)', () => {
   it('погиб корпус — лишние челноки списываются', () => {
-    let s = apply(world(), load(3));
+    let s = load(world(), 3);
     expect(aboard(s)).toBe(3);
     // Один из двух носителей сбит: мест осталось 2, третий челнок падает вместе с ним.
     const cv = s.fleets.CV!;
@@ -256,7 +276,7 @@ describe('носитель — ангар не переживает свои к�
   });
 
   it('носителей не осталось — ангар пуст', () => {
-    let s = apply(world(), load(2));
+    let s = load(world(), 2);
     const cv = s.fleets.CV!;
     s = { ...s, fleets: { ...s.fleets, CV: { ...cv, units: [{ unit: 'cruiser', count: 1 }] } } };
     s = advance(s, 1);

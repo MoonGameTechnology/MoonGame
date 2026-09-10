@@ -35,6 +35,7 @@ import type {
   GameState,
   Planet,
   ShuttleStrike,
+  Squadron,
   StrikeBase,
   UnitStack,
 } from '../state/gameState';
@@ -45,10 +46,14 @@ import { isCapturable } from '../state/sectorKind';
 import {
   canSortie,
   fleetShuttleBay,
+  hangarMachines,
   hangarUsed,
   freshSortie,
   shuttleBayAt,
   spendSortie,
+  squadronCargoCapacity,
+  squadronCargoUsed,
+  squadronSize,
   tickRearm,
   trimHangar,
 } from '../state/shuttle';
@@ -160,8 +165,8 @@ interface BaseView {
   /** Не выпускает из-за повреждений. Есть только у порта: у носителя вместимость
    *  падает вместе с погибшими корпусами, отдельного порога не нужно. */
   disabled: boolean;
-  hangar: UnitStack[];
-  setHangar: (next: UnitStack[]) => void;
+  hangar: Squadron[];
+  setHangar: (next: Squadron[]) => void;
   sortie: { fuel: number; rearming: number } | undefined;
   setSortie: (next: { fuel: number; rearming: number }) => void;
 }
@@ -212,10 +217,26 @@ function baseOf(ref: StrikeBase, state: GameState, data: GameData): BaseView | n
   return fleet ? fleetBase(fleet, state, data) : null;
 }
 
-/** Топливо и перезарядка базы берутся у ЧЕЛНОКОВ, которые в ней стоят (первый стек):
- *  счётчик принадлежит базе, а числа — машине. */
-function baseSortieSpec(base: BaseView, data: GameData): { maxFuel: number; rearmRounds: number } {
-  const st = base.hangar.find((s) => s.count > 0);
+/**
+ * Топливо и перезарядка базы берутся у ЧЕЛНОКОВ ЭТОЙ БАЗЫ (первая машина): счётчик
+ * принадлежит базе, а числа — машине.
+ *
+ * «Свои машины» — и те, что стоят в ангаре, И ТЕ, ЧТО СЕЙЧАС В ВОЗДУХЕ. Разница не
+ * косметическая: пустой ангар давал `maxFuel: 0`, а `tickRearm` по окончании отсчёта
+ * «заправляет» базу ровно на эту величину — то есть в ноль. Порт, поднявший всё, что у
+ * него было, оставался сухим НАВСЕГДА: топлива нет, перезарядка кончилась, вылет уже
+ * никогда не разрешится. До SHU-4.2 в это упирались редко (поднимали часть машин), а с
+ * эскадрой вылет уходит соединением целиком — и редкий случай стал обычным.
+ */
+function baseSortieSpec(
+  base: BaseView,
+  state: GameState,
+  data: GameData,
+): { maxFuel: number; rearmRounds: number } {
+  const away = (state.strikes ?? []).find(
+    (s) => s.base.kind === base.ref.kind && s.base.id === base.ref.id,
+  );
+  const st = hangarMachines({ hangar: base.hangar })[0] ?? away?.units.find((u) => u.count > 0);
   const stats = st ? data.units[st.unit]?.stats : undefined;
   return {
     maxFuel: Math.max(0, Math.floor(stats?.fuel ?? 0)),
@@ -338,10 +359,36 @@ function portDisabled(planet: Planet, data: GameData): boolean {
 }
 
 /** Снять `count` челноков `unit` из ангара. */
-function takeFromHangar(hangar: readonly UnitStack[], unit: string, count: number): UnitStack[] {
+// --- ЭСКАДРА (SHU-4.2) ---------------------------------------------------------------
+//
+// Соединение челноков одной базы: свой id, свой состав, свой трюм. Все приказы ниже
+// работают ВНУТРИ одной базы и через одну проекцию `BaseView` — порт мира и трюм
+// носителя делают с эскадрами одно и то же, и вторая копия правил на второй базе
+// разъехалась бы с первой на первой же правке (тот же довод, что и в SHU-2.1).
+
+/** Следующий id эскадры. Счётчик в состоянии, а не `Math.random`: id обязан выводиться
+ *  одинаково на сервере и в реплее (инвариант детерминизма). Позывной из него строит
+ *  КЛИЕНТ чистой функцией — как имя флота, — поэтому в состоянии его нет. */
+function nextSquadronId(h: HandlerContext, owner: string): string {
+  const seq = (h.state.squadronSeq ?? 0) + 1;
+  h.state.squadronSeq = seq;
+  return `sq:${owner}:${seq}`;
+}
+
+/** Эскадра базы по id — или отказ. Молчаливого «ничего не произошло» здесь быть не
+ *  может: приказ по несуществующему соединению это ошибка, а не пустая операция. */
+function requireSquadron(h: HandlerContext, base: BaseView, id: unknown): Squadron {
+  if (typeof id !== 'string') return h.reject('E_BAD_PAYLOAD');
+  const sq = base.hangar.find((q) => q.id === id);
+  if (!sq) return h.reject('E_NO_SQUADRON');
+  return sq;
+}
+
+/** Снять `count` машин юнита из СПИСКА СТЕКОВ. Возвращает остаток; `null` — не хватило. */
+function takeMachines(units: readonly UnitStack[], unit: string, count: number): UnitStack[] | null {
   let left = count;
   const out: UnitStack[] = [];
-  for (const st of hangar) {
+  for (const st of units) {
     if (st.unit !== unit || left <= 0) {
       out.push({ ...st });
       continue;
@@ -350,7 +397,29 @@ function takeFromHangar(hangar: readonly UnitStack[], unit: string, count: numbe
     left -= take;
     if (st.count - take > 0) out.push({ ...st, count: st.count - take });
   }
+  return left > 0 ? null : out;
+}
+
+/** Заявка «столько-то таких машин» из payload — общая форма делёжа и погрузки. */
+function parseStacks(h: HandlerContext, raw: unknown): Array<{ unit: string; count: number }> {
+  if (!Array.isArray(raw) || raw.length === 0) return h.reject('E_BAD_PAYLOAD');
+  const out: Array<{ unit: string; count: number }> = [];
+  for (const item of raw) {
+    const want = item as { unit?: unknown; count?: unknown };
+    if (typeof want.unit !== 'string') return h.reject('E_BAD_PAYLOAD');
+    const n = Number(want.count ?? 0);
+    if (!Number.isSafeInteger(n) || n <= 0) return h.reject('E_BAD_PAYLOAD');
+    out.push({ unit: want.unit, count: n });
+  }
   return out;
+}
+
+/** Записать в ангар изменённую эскадру; опустевшая ИСЧЕЗАЕТ — соединение без бортов
+ *  это не соединение, а имя. */
+function putSquadron(base: BaseView, next: Squadron): void {
+  base.setHangar(
+    base.hangar.flatMap((q) => (q.id !== next.id ? [q] : squadronSize(next) > 0 ? [next] : [])),
+  );
 }
 
 /** Сила вылета против ЦЕЛИ ЭТОГО РОДА, ограниченная линией боя, ровно как у
@@ -550,27 +619,22 @@ function setTroopSource(state: GameState, base: BaseView, units: UnitStack[]): v
 function loadTroops(
   h: HandlerContext,
   base: BaseView,
-  troops: ReadonlyArray<{ unit?: string; count?: number }>,
-  shuttle: string,
-  shuttles: number,
+  troops: ReadonlyArray<{ unit: string; count: number }>,
+  capacity: number,
 ): { units: UnitStack[] } | { code: string } {
   if (troops.length === 0) return { units: [] };
   const source = troopSource(h.state, base);
   if (!source) return { code: 'E_NO_ARMY' };
-  const capacity = (h.ctx.data.units[shuttle]?.stats.cargoCapacity ?? 0) * shuttles;
   const units: UnitStack[] = [];
   let used = 0;
   for (const want of troops) {
-    if (typeof want.unit !== 'string') return { code: 'E_BAD_PAYLOAD' };
-    const n = want.count ?? 0;
-    if (!Number.isSafeInteger(n) || n <= 0) return { code: 'E_BAD_PAYLOAD' };
     const def = h.ctx.data.units[want.unit];
     if (!def) return { code: 'E_UNKNOWN_UNIT' };
     if (def.domain !== 'ground') return { code: 'E_NOT_GROUND' };
     const stack = findHealthyStack(source, want.unit);
-    if (!stack || stack.count < n) return { code: 'E_NO_ARMY' };
-    used += n * def.stats.cargoSize;
-    addUnits(units, want.unit, n);
+    if (!stack || stack.count < want.count) return { code: 'E_NO_ARMY' };
+    used += want.count * def.stats.cargoSize;
+    addUnits(units, want.unit, want.count);
   }
   if (used > capacity) return { code: 'E_NO_CAPACITY' };
   return { units };
@@ -594,14 +658,56 @@ function takeCargoFromBase(h: HandlerContext, base: BaseView, cargo: readonly Un
   );
 }
 
-/** Скорость вылета — самая медленная машина в нём. */
-function strikeSpeed(strike: ShuttleStrike, data: GameData): number {
+/** База из payload: ровно одна из двух — свой мир с портом ИЛИ свой носитель. Общая
+ *  преамбула ВСЕХ приказов ангара (вылет, делёж, слияние, погрузка): своя копия у
+ *  каждого разъехалась бы с остальными на первой же правке правил владения. */
+function baseFromPayload(
+  h: HandlerContext,
+  playerId: string,
+  p: { planetId?: unknown; fleetId?: unknown },
+): BaseView {
+  const fromPlanet = typeof p.planetId === 'string';
+  const fromFleet = typeof p.fleetId === 'string';
+  if (fromPlanet === fromFleet) return h.reject('E_BAD_PAYLOAD'); // ровно одна база
+  if (fromPlanet) {
+    const planet = h.state.planets[p.planetId as string];
+    if (!planet) return h.reject('E_NO_PLANET');
+    if (planet.owner !== playerId) return h.reject('E_FORBIDDEN');
+    return planetBase(planet, h.ctx.data);
+  }
+  // Носитель обязан СТОЯТЬ у узла и быть свободен (`E_FLEET_BUSY` — бой, перелёт или
+  // стоянка на лейне): порт не двигается, и вылет с разгоняющегося носителя пришлось
+  // бы догонять — вторая ветка правил в самом горячем месте ядра. Возврату это не
+  // мешает: носитель волен уйти, пока челноки летят.
+  const fleet = requireOwnedIdleFleet(h, p.fleetId as string, playerId);
+  return fleetBase(fleet, h.state, h.ctx.data);
+}
+
+/** Скорость соединения — самая медленная машина в нём: летят вместе, не порознь. */
+function slowestSpeed(units: readonly UnitStack[], data: GameData): number {
   let slowest = Infinity;
-  for (const st of strike.units) {
+  for (const st of units) {
     if (st.count <= 0) continue;
     slowest = Math.min(slowest, data.units[st.unit]?.stats.speed ?? 0);
   }
   return Number.isFinite(slowest) ? slowest : 0;
+}
+
+/** Дальность ЭСКАДРЫ — по самой короткой руке (SHU-4.2). Тот же довод, что у скорости:
+ *  соединение идёт целиком, и цель, до которой не дотянется одна машина, недосягаема
+ *  для всех. Максимум обещал бы удар, из которого часть эскадры не вернулась бы домой. */
+function squadronReach(sq: Squadron, data: GameData): number {
+  let shortest = Infinity;
+  for (const st of sq.units) {
+    if (st.count <= 0) continue;
+    shortest = Math.min(shortest, data.units[st.unit]?.stats.strikeRange ?? 0);
+  }
+  return Number.isFinite(shortest) ? shortest : 0;
+}
+
+/** Скорость вылета — самая медленная машина в нём. */
+function strikeSpeed(strike: ShuttleStrike, data: GameData): number {
+  return slowestSpeed(strike.units, data);
 }
 
 export const shuttleModule: GameModule = {
@@ -624,50 +730,24 @@ export const shuttleModule: GameModule = {
       const p = action.payload as {
         planetId?: string;
         fleetId?: string;
-        unit?: string;
-        count?: number;
+        squadronId?: string;
         targetFleetId?: string;
         targetPlanetId?: string;
-        troops?: Array<{ unit?: string; count?: number }>;
       };
-      if (typeof p?.unit !== 'string') {
-        return h.reject('E_BAD_PAYLOAD');
-      }
-      const fromPlanet = typeof p.planetId === 'string';
-      const fromFleet = typeof p.fleetId === 'string';
-      if (fromPlanet === fromFleet) {
-        return h.reject('E_BAD_PAYLOAD'); // ровно одна база
-      }
-      const count = p.count ?? 1;
-      if (!Number.isSafeInteger(count) || count <= 0) return h.reject('E_BAD_PAYLOAD');
-
-      let base: BaseView;
-      if (fromPlanet) {
-        const planet = h.state.planets[p.planetId!];
-        if (!planet) return h.reject('E_NO_PLANET');
-        if (planet.owner !== action.playerId) return h.reject('E_FORBIDDEN');
-        base = planetBase(planet, h.ctx.data);
-      } else {
-        // Носитель обязан СТОЯТЬ у узла и быть свободен (`E_FLEET_BUSY` — бой, перелёт
-        // или стоянка на лейне): порт не двигается, и вылет с разгоняющегося носителя
-        // пришлось бы догонять — вторая ветка правил в самом горячем месте ядра.
-        // Возврату это не мешает: носитель волен уйти, пока челноки летят.
-        const fleet = requireOwnedIdleFleet(h, p.fleetId!, action.playerId);
-        base = fleetBase(fleet, h.state, h.ctx.data);
-      }
+      const base = baseFromPayload(h, action.playerId, p ?? {});
 
       // База: есть, цела и с топливом. Порог повреждения — на ВЫЛЕТ (правило владельца);
       // возврату он не мешает, иначе челнок повис бы в пустоте. У носителя порога нет:
       // подбитый носитель теряет корпуса, вместимость падает сама.
+      //
+      // Проверяется РАНЬШЕ эскадры намеренно: «этот флот вообще не база» — более точный
+      // ответ, чем «в нём нет такого соединения», а у обычного корабля его и не бывает.
       if (base.bay <= 0) return h.reject('E_NO_PORT');
       if (base.disabled) return h.reject('E_PORT_DAMAGED');
+      const squad = requireSquadron(h, base, p?.squadronId);
+      if (squadronSize(squad) <= 0) return h.reject('E_NOT_ENOUGH');
 
-      const have = base.hangar
-        .filter((st) => st.unit === p.unit)
-        .reduce((n, st) => n + st.count, 0);
-      if (have < count) return h.reject('E_NOT_ENOUGH');
-
-      const spec = baseSortieSpec(base, h.ctx.data);
+      const spec = baseSortieSpec(base, h.state, h.ctx.data);
       const sortie = base.sortie ?? freshSortie(spec.maxFuel);
       if (!canSortie(sortie)) return h.reject('E_NO_FUEL');
 
@@ -685,14 +765,14 @@ export const shuttleModule: GameModule = {
       // данных (`attack`), а не из имени юнита и не из отдельного флага: «нечем бить»
       // и есть всё правило. Отказ — на приказе, потому что пустой полёт стоил бы
       // игроку топлива и часа ради заведомого ничего.
-      if (targetFleet && (h.ctx.data.units[p.unit]?.stats.attack ?? 0) <= 0) {
+      if (targetFleet && cappedUnitStat(squad.units, h.ctx.data, 'attack') <= 0) {
         return h.reject('E_INVALID_TARGET');
       }
       // Свой мир бомбить нельзя — но ВЕЗТИ на него подкрепление можно и нужно (ROS-1.5):
       // десантный вылет это транспорт, а не удар, и запрет «по своим не бьют» к нему
-      // не относится. Признак — груз в заявке, а не тип машины.
-      const hasTroops = Array.isArray(p.troops) && p.troops.length > 0;
-      if (targetOwner === action.playerId && !hasTroops) return h.reject('E_NOT_HOSTILE');
+      // не относится. Признак — ГРУЗ В ТРЮМЕ (SHU-4.2 грузит его заранее, до приказа).
+      const cargo = (squad.cargo ?? []).filter((st) => st.count > 0);
+      if (targetOwner === action.playerId && cargo.length === 0) return h.reject('E_NOT_HOSTILE');
 
       const from = base.position;
       if (!from) return h.reject('E_NO_PORT'); // носитель без позиции (в перелёте) — не база
@@ -702,22 +782,19 @@ export const shuttleModule: GameModule = {
       if (!to) return h.reject('E_NO_TARGET_POSITION');
 
       // Радиус считается ОТ УЗЛА БАЗИРОВАНИЯ: своей позиции у челнока в ангаре нет.
-      const range = h.ctx.data.units[p.unit]?.stats.strikeRange ?? 0;
+      // У СОЕДИНЕНИЯ он по САМОЙ КОРОТКОЙ руке (SHU-4.2) — как и скорость по самой
+      // медленной машине: эскадра идёт вместе, и дальность у неё общая.
+      const range = squadronReach(squad, h.ctx.data);
       if (range <= 0) return h.reject('E_NO_RANGE');
       if (distance(from, to) > range) return h.reject('E_OUT_OF_RANGE');
 
-      const speed = h.ctx.data.units[p.unit]?.stats.speed ?? 0;
+      const speed = slowestSpeed(squad.units, h.ctx.data);
       if (speed <= 0) return h.reject('E_NO_SPEED');
       const flightMs = Math.max(1, Math.round((distance(from, to) / speed) * hourMs(h)));
 
-      // ROS-1.5 — ГРУЗ. Берётся с базы прямо сейчас, до создания вылета: иначе войска
-      // числились бы и в гарнизоне, и в трюме, и второй приказ послал бы тот же взвод.
-      const cargo = loadTroops(h, base, p.troops ?? [], p.unit, count);
-      if ('code' in cargo) return h.reject(cargo.code);
-
-      // Челноки покидают ангар — с этой секунды их в базе нет.
-      base.setHangar(takeFromHangar(base.hangar, p.unit, count));
-      takeCargoFromBase(h, base, cargo.units);
+      // Эскадра покидает ангар ЦЕЛИКОМ — с этой секунды её в базе нет. Груз уже в
+      // трюме (SHU-4.2), брать с базы нечего: он ушёл из гарнизона при погрузке.
+      base.setHangar(base.hangar.filter((q) => q.id !== squad.id));
       base.setSortie(spendSortie(sortie, spec.rearmRounds));
       const seq = (h.state.strikeSeq ?? 0) + 1;
       h.state.strikeSeq = seq;
@@ -725,7 +802,8 @@ export const shuttleModule: GameModule = {
         id: `strike:${action.playerId}:${h.ctx.now}:${seq}`,
         owner: action.playerId,
         base: base.ref,
-        units: [{ unit: p.unit, count }],
+        squadronId: squad.id,
+        units: squad.units.map((st) => ({ ...st })),
         target: targetFleet
           ? { kind: 'fleet', id: targetFleet.id }
           : { kind: 'planet', id: targetPlanet!.id },
@@ -733,7 +811,7 @@ export const shuttleModule: GameModule = {
         departedAt: h.ctx.now,
         arrivesAt: h.ctx.now + flightMs,
         leg: 'out',
-        ...(cargo.units.length > 0 ? { cargo: cargo.units } : {}),
+        ...(cargo.length > 0 ? { cargo: cargo.map((st) => ({ ...st })) } : {}),
       };
       h.state.strikes = [...(h.state.strikes ?? []), strike];
       h.schedule(strike.arrivesAt, 'shuttle.arrived', { strikeId: strike.id });
@@ -742,15 +820,145 @@ export const shuttleModule: GameModule = {
         owner: action.playerId,
         from: base.ref.id,
         fromKind: base.ref.kind,
-        count,
+        count: squadronSize(squad),
       });
     });
 
     /**
-     * `shuttle.load` / `shuttle.unload { fleetId, unit, count }` — перегрузка челноков
-     * между космопортом мира и СТОЯЩИМ ТАМ ЖЕ носителем (SHU-2.1). Ровно тот же шов,
-     * что у наземной армии (`army.load`/`army.unload`): челнок строится в порту, но
-     * воевать вдали от своих миров может только с борта.
+     * `shuttle.split { planetId | fleetId, squadronId, units: [{unit,count}] }` —
+     * отделить машины в НОВУЮ эскадру той же базы (SHU-4.2).
+     *
+     * **Позывной остаётся у БОЛЬШЕЙ половины** (дефолт кирпича): отделил двойку от
+     * десятки — имя у восьмёрки, отделил восьмёрку — имя ушло с ней. Иначе имя
+     * следовало бы за тем, на что игрок случайно нажал. Ничья — у исходной.
+     *
+     * **Эскадру с грузом делить нельзя.** Делёж трюма — правило, которого в модели нет
+     * и которое пришлось бы выдумывать (кому достаётся взвод, если бортов поровну?).
+     * Выгрузи, раздели, погрузи заново — три понятных шага вместо одного гадания.
+     */
+    api.onAction('shuttle.split', (action, h: HandlerContext) => {
+      const p = (action.payload ?? {}) as { squadronId?: unknown; units?: unknown };
+      const base = baseFromPayload(h, action.playerId, p as Record<string, unknown>);
+      const squad = requireSquadron(h, base, p.squadronId);
+      if (squadronCargoUsed(squad) > 0) return h.reject('E_HAS_CARGO');
+
+      const want = parseStacks(h, p.units);
+      let left: UnitStack[] = squad.units.map((st) => ({ ...st }));
+      const moved: UnitStack[] = [];
+      for (const w of want) {
+        const next = takeMachines(left, w.unit, w.count);
+        if (!next) return h.reject('E_NOT_ENOUGH');
+        left = next;
+        addUnits(moved, w.unit, w.count);
+      }
+      // Делить нечего, если уходит ВСЁ: это не делёж, а переименование.
+      const stay = left.reduce((n, st) => n + st.count, 0);
+      if (stay <= 0) return h.reject('E_BAD_PAYLOAD');
+
+      const goes = moved.reduce((n, st) => n + st.count, 0);
+      const freshId = nextSquadronId(h, action.playerId);
+      const keepsName = goes > stay ? moved : left;
+      const named: Squadron = { id: squad.id, units: keepsName };
+      const other: Squadron = { id: freshId, units: keepsName === moved ? left : moved };
+      base.setHangar(base.hangar.flatMap((q) => (q.id === squad.id ? [named, other] : [q])));
+      h.emit('squadron.split', {
+        baseId: base.ref.id,
+        baseKind: base.ref.kind,
+        owner: action.playerId,
+        squadronId: squad.id,
+        newId: freshId,
+      });
+    });
+
+    /**
+     * `shuttle.merge { planetId | fleetId, squadronId, intoId }` — свести две эскадры
+     * ОДНОЙ базы в одну (SHU-4.2). Трюмы складываются и переполнить приёмник не могут:
+     * вместимость складывается вместе с бортами, а каждая половина уже влезала в свою.
+     */
+    api.onAction('shuttle.merge', (action, h: HandlerContext) => {
+      const p = (action.payload ?? {}) as { squadronId?: unknown; intoId?: unknown };
+      const base = baseFromPayload(h, action.playerId, p as Record<string, unknown>);
+      if (p.squadronId === p.intoId) return h.reject('E_BAD_PAYLOAD');
+      const from = requireSquadron(h, base, p.squadronId);
+      const into = requireSquadron(h, base, p.intoId);
+
+      const units = into.units.map((st) => ({ ...st }));
+      for (const st of from.units) addUnits(units, st.unit, st.count, st.modules);
+      const cargo = (into.cargo ?? []).map((st) => ({ ...st }));
+      for (const st of from.cargo ?? []) addUnits(cargo, st.unit, st.count);
+      const merged: Squadron = { id: into.id, units, ...(cargo.length > 0 ? { cargo } : {}) };
+      base.setHangar(base.hangar.flatMap((q) => (q.id === from.id ? [] : q.id === into.id ? [merged] : [q])));
+      h.emit('squadron.merged', {
+        baseId: base.ref.id,
+        baseKind: base.ref.kind,
+        owner: action.playerId,
+        squadronId: into.id,
+        absorbed: from.id,
+      });
+    });
+
+    /**
+     * `shuttle.loadTroops { planetId | fleetId, squadronId, troops: [{unit,count}] }` —
+     * погрузить наземные войска в трюм ЗАРАНЕЕ (SHU-4.2, заказ владельца).
+     *
+     * До этого кирпича груз брали с базы в момент вылета, и до вылета трюма не
+     * существовало вовсе: собрать десант и подержать его наготове было нельзя. Теперь
+     * войска ПОКИДАЮТ ГАРНИЗОН СРАЗУ — иначе тот же взвод числился бы и в обороне мира,
+     * и в трюме, и два приказа послали бы его дважды.
+     */
+    api.onAction('shuttle.loadTroops', (action, h: HandlerContext) => {
+      const p = (action.payload ?? {}) as { squadronId?: unknown; troops?: unknown };
+      const base = baseFromPayload(h, action.playerId, p as Record<string, unknown>);
+      const squad = requireSquadron(h, base, p.squadronId);
+      const want = parseStacks(h, p.troops);
+      const free = squadronCargoCapacity(squad, h.ctx.data) - squadronCargoUsed(squad);
+      const loaded = loadTroops(h, base, want, free);
+      if ('code' in loaded) return h.reject(loaded.code);
+
+      const cargo = (squad.cargo ?? []).map((st) => ({ ...st }));
+      for (const st of loaded.units) addUnits(cargo, st.unit, st.count);
+      putSquadron(base, { ...squad, cargo });
+      takeCargoFromBase(h, base, loaded.units);
+      h.emit('squadron.loaded', {
+        baseId: base.ref.id,
+        baseKind: base.ref.kind,
+        owner: action.playerId,
+        squadronId: squad.id,
+      });
+    });
+
+    /** `shuttle.unloadTroops { planetId | fleetId, squadronId }` — ссадить весь трюм
+     *  обратно. Приказ без обратного хода запер бы войска в трюме до вылета, а вылет
+     *  десантный одноразовый — то есть навсегда. */
+    api.onAction('shuttle.unloadTroops', (action, h: HandlerContext) => {
+      const p = (action.payload ?? {}) as { squadronId?: unknown };
+      const base = baseFromPayload(h, action.playerId, p as Record<string, unknown>);
+      const squad = requireSquadron(h, base, p.squadronId);
+      const cargo = (squad.cargo ?? []).filter((st) => st.count > 0);
+      if (cargo.length === 0) return h.reject('E_NO_ARMY');
+      const source = troopSource(h.state, base);
+      if (!source) return h.reject('E_NO_ARMY');
+      const back = source.map((st) => ({ ...st }));
+      for (const st of cargo) addUnits(back, st.unit, st.count);
+      setTroopSource(h.state, base, back);
+      putSquadron(base, { id: squad.id, units: squad.units });
+      h.emit('squadron.unloaded', {
+        baseId: base.ref.id,
+        baseKind: base.ref.kind,
+        owner: action.playerId,
+        squadronId: squad.id,
+      });
+    });
+
+    /**
+     * `shuttle.load` / `shuttle.unload { fleetId, squadronId }` — перегрузка ЭСКАДРЫ
+     * между космопортом мира и СТОЯЩИМ ТАМ ЖЕ носителем (SHU-2.1; с SHU-4.2 ездит
+     * соединение целиком, а не россыпь машин). Ровно тот же шов, что у наземной армии
+     * (`army.load`/`army.unload`): челнок строится в порту, но воевать вдали от своих
+     * миров может только с борта.
+     *
+     * Эскадра переезжает ПОД СВОИМ ИМЕНЕМ: перегрузка — смена базы, а не роспуск
+     * соединения. Груз в трюме едет вместе с ней — он стоит на её бортах.
      *
      * Обе стороны — СВОИ. Порт союзника не донор и не гараж: «помощь» иначе означала бы
      * вывоз чужой обороны, ровно как у `army.load`.
@@ -758,61 +966,67 @@ export const shuttleModule: GameModule = {
     const transfer = (
       action: { playerId: string; payload: unknown },
       h: HandlerContext,
-    ): { fleet: Fleet; planet: Planet; unit: string; count: number } => {
-      const p = action.payload as { fleetId?: string; unit?: string; count?: number };
-      if (typeof p?.fleetId !== 'string' || typeof p?.unit !== 'string') {
+    ): { fleet: Fleet; planet: Planet; squadronId: string } => {
+      const p = action.payload as { fleetId?: string; squadronId?: string };
+      if (typeof p?.fleetId !== 'string' || typeof p?.squadronId !== 'string') {
         return h.reject('E_BAD_PAYLOAD');
       }
-      const count = p.count ?? 1;
-      if (!Number.isSafeInteger(count) || count <= 0) return h.reject('E_BAD_PAYLOAD');
-      const def = h.ctx.data.units[p.unit];
-      if (!def) return h.reject('E_UNKNOWN_UNIT');
-      if (!def.traits.includes('shuttle')) return h.reject('E_NOT_SHUTTLE');
       const fleet = requireOwnedIdleFleet(h, p.fleetId, action.playerId);
       const planet = fleet.location ? h.state.planets[fleet.location] : undefined;
       if (!planet) return h.reject('E_NO_PLANET');
       if (planet.owner !== action.playerId) return h.reject('E_FORBIDDEN');
-      return { fleet, planet, unit: p.unit, count };
+      return { fleet, planet, squadronId: p.squadronId };
+    };
+
+    /** Переезд эскадры между двумя ангарами одного узла. Форма ангара одна, поэтому и
+     *  правило одно: своя копия на каждую сторону разъехалась бы. */
+    const moveSquadron = (
+      h: HandlerContext,
+      from: { hangar?: Squadron[] },
+      to: { hangar?: Squadron[] },
+      squadronId: string,
+      freeSpace: number,
+    ): Squadron => {
+      const squad = (from.hangar ?? []).find((q) => q.id === squadronId);
+      if (!squad) return h.reject('E_NO_SQUADRON');
+      if (squadronSize(squad) > freeSpace) return h.reject('E_NO_CAPACITY');
+      from.hangar = (from.hangar ?? []).filter((q) => q.id !== squadronId);
+      to.hangar = [...(to.hangar ?? []), squad];
+      return squad;
     };
 
     api.onAction('shuttle.load', (action, h: HandlerContext) => {
-      const { fleet, planet, unit, count } = transfer(action, h);
-      const have = (planet.hangar ?? [])
-        .filter((st) => st.unit === unit)
-        .reduce((n, st) => n + st.count, 0);
-      if (have < count) return h.reject('E_NOT_ENOUGH');
-      const free = fleetShuttleBay(fleet, h.ctx.data) - hangarUsed(fleet);
-      if (count > free) return h.reject('E_NO_CAPACITY');
-      planet.hangar = takeFromHangar(planet.hangar ?? [], unit, count);
-      const aboard = [...(fleet.hangar ?? [])];
-      addUnits(aboard, unit, count);
-      fleet.hangar = aboard;
+      const { fleet, planet, squadronId } = transfer(action, h);
+      const squad = moveSquadron(
+        h,
+        planet,
+        fleet,
+        squadronId,
+        fleetShuttleBay(fleet, h.ctx.data) - hangarUsed(fleet),
+      );
       h.emit('shuttle.loaded', {
         fleetId: fleet.id,
         planetId: planet.id,
-        unit,
-        count,
+        squadronId: squad.id,
+        count: squadronSize(squad),
         owner: action.playerId,
       });
     });
 
     api.onAction('shuttle.unload', (action, h: HandlerContext) => {
-      const { fleet, planet, unit, count } = transfer(action, h);
-      const have = (fleet.hangar ?? [])
-        .filter((st) => st.unit === unit)
-        .reduce((n, st) => n + st.count, 0);
-      if (have < count) return h.reject('E_NOT_ENOUGH');
-      const free = shuttleBayAt(planet, h.ctx.data) - hangarUsed(planet);
-      if (count > free) return h.reject('E_NO_CAPACITY');
-      fleet.hangar = takeFromHangar(fleet.hangar ?? [], unit, count);
-      const ashore = [...(planet.hangar ?? [])];
-      addUnits(ashore, unit, count);
-      planet.hangar = ashore;
+      const { fleet, planet, squadronId } = transfer(action, h);
+      const squad = moveSquadron(
+        h,
+        fleet,
+        planet,
+        squadronId,
+        shuttleBayAt(planet, h.ctx.data) - hangarUsed(planet),
+      );
       h.emit('shuttle.unloaded', {
         fleetId: fleet.id,
         planetId: planet.id,
-        unit,
-        count,
+        squadronId: squad.id,
+        count: squadronSize(squad),
         owner: action.playerId,
       });
     });
@@ -940,9 +1154,16 @@ export const shuttleModule: GameModule = {
         });
         return;
       }
-      const hangar = [...base.hangar];
-      for (const st of strike.units) addUnits(hangar, st.unit, st.count, st.modules);
-      base.setHangar(trimHangar(hangar, bay));
+      // Эскадра встаёт в ангар ПОД СВОИМ ИМЕНЕМ (SHU-4.2): она уходила соединением и
+      // возвращается им же. Если её id за время полёта занят (перегрузка, слияние —
+      // ангар живёт своей жизнью, пока машины летят), соединение садится под свежим,
+      // потому что двух эскадр с одним именем в модели быть не может.
+      const taken = base.hangar.some((q) => q.id === strike.squadronId);
+      const home: Squadron = {
+        id: taken ? nextSquadronId(h, strike.owner) : strike.squadronId,
+        units: strike.units.map((st) => ({ ...st })),
+      };
+      base.setHangar(trimHangar([...base.hangar, home], bay));
       h.emit('shuttle.landed', {
         baseId: base.ref.id,
         baseKind: base.ref.kind,
@@ -981,8 +1202,7 @@ export const shuttleModule: GameModule = {
       for (const base of bases) {
         if (base.hangar.length === 0) continue;
         const kept = trimHangar(base.hangar, base.bay);
-        const lost =
-          base.hangar.reduce((n, st) => n + st.count, 0) - kept.reduce((n, st) => n + st.count, 0);
+        const lost = hangarUsed({ hangar: base.hangar }) - hangarUsed({ hangar: kept });
         if (lost <= 0) continue;
         base.setHangar(kept);
         h.emit('shuttle.lost', {
@@ -1001,7 +1221,7 @@ export const shuttleModule: GameModule = {
       const { planetId } = event.payload as { planetId?: string };
       if (typeof planetId !== 'string') return;
       const planet = h.state.planets[planetId];
-      const lost = (planet?.hangar ?? []).reduce((n, st) => n + st.count, 0);
+      const lost = hangarUsed({ hangar: planet?.hangar });
       if (!planet || lost <= 0) return;
       planet.hangar = [];
       h.emit('shuttle.lost', {
@@ -1098,12 +1318,13 @@ export const shuttleModule: GameModule = {
       ];
       for (const base of bases) {
         if (base.owner === null || base.position === null) continue;
-        const power = sumUnitStat(base.hangar, data, 'shuttleDamage');
+        const machines = hangarMachines({ hangar: base.hangar });
+        const power = sumUnitStat(machines, data, 'shuttleDamage');
         if (power <= 0) continue; // в ангаре нет охотников
-        const spec = baseSortieSpec(base, data);
+        const spec = baseSortieSpec(base, h.state, data);
         const sortie = base.sortie ?? freshSortie(spec.maxFuel);
         if (!canSortie(sortie)) continue; // дежурить нечем — топливо или перезарядка
-        const reach = interceptReach(base.hangar, data);
+        const reach = interceptReach(machines, data);
         if (reach <= 0) continue;
 
         const target = nearestHostileStrike(strikes, base, reach, h);
@@ -1145,7 +1366,7 @@ export const shuttleModule: GameModule = {
       for (const base of bases) {
         const sortie = base.sortie;
         if (!sortie || sortie.rearming <= 0) continue;
-        const spec = baseSortieSpec(base, h.ctx.data);
+        const spec = baseSortieSpec(base, h.state, h.ctx.data);
         let next = sortie;
         for (let i = 0; i < hours && next.rearming > 0; i++) next = tickRearm(next, spec.maxFuel);
         base.setSortie(next);

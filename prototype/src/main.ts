@@ -163,6 +163,7 @@ import {
   sensorCoverage,
   fleetRadarRange,
   abilityRange,
+  hangarMachines,
   type PausedConstructionSite,
   type QueuedConstruction,
 } from '../../packages/shared-core/src/index';
@@ -5033,7 +5034,7 @@ function render(now: number) {
       f.units,
       f.landing ?? [],
       isShuttle,
-      f.hangar ?? [],
+      hangarMachines(f), // SHU-4.2: машины трюма лежат внутри эскадр
     );
     // Фаза от ХЭША идентификатора, а не от его длины (`pulseFx.ts`, правило 2): у
     // «p1-1» и «p2-3» длина одна, и все флоты матча заводили двигатели в такт.
@@ -5308,13 +5309,13 @@ function cardHeader(color: string, title: string, sub: string, titleAct?: string
 function tabButton(tab: PlanetTab, label: string, count: number, desc?: string): string {
   return kitTabButton(tab, label, count, planetTab === tab, desc);
 }
-/** Что поднять в вылет с этой базы (SHU-3.1): первая живая машина ангара и вся её
- *  пачка. Дальность и топливо проверяет ЯДРО — интерфейс своей копии этих правил не
- *  заводит; `null` = поднимать нечего. */
-function strikePick(from: string): { unit: string; count: number } | null {
+/** КАКУЮ ЭСКАДРУ поднять с этой базы (SHU-3.1, адресация — SHU-4.2): первое живое
+ *  соединение ангара, и летит оно целиком. Дальность и топливо проверяет ЯДРО —
+ *  интерфейс своей копии этих правил не заводит; `null` = поднимать нечего. */
+function strikePick(from: string): { squadronId: string } | null {
   const host = s.planets[from] ?? s.fleets[from];
-  const stack = (host?.hangar ?? []).find((st) => st.count > 0);
-  return stack ? { unit: stack.unit, count: stack.count } : null;
+  const sq = (host?.hangar ?? []).find((q) => q.units.some((st) => st.count > 0));
+  return sq ? { squadronId: sq.id } : null;
 }
 
 /**
@@ -7712,9 +7713,7 @@ side.addEventListener('click', (ev) => {
     const up = act === 'wingload';
     const pick = transferPick(up ? portView : holdView, up ? holdView : portView);
     if (pick) {
-      playerOrder(
-        (up ? loadShuttle : unloadShuttle)(ME, arg, pick.unit, pick.count),
-      );
+      playerOrder((up ? loadShuttle : unloadShuttle)(ME, arg, pick.squadronId));
     }
   } else if (act === 'spyplanet') {
     playerOrder(spyOn(ME, arg, 'planet', selPlanet!)); // arg = the world's (last known) owner
@@ -8243,9 +8242,9 @@ function selectAt(mx: number, my: number) {
     if (!pick) {
       note(t('hint.wing-empty'));
     } else if (foe) {
-      playerOrder(strikeShuttle(ME, from, pick.unit, pick.count, { targetFleetId: foe.id }));
+      playerOrder(strikeShuttle(ME, from, pick.squadronId, { targetFleetId: foe.id }));
     } else if (node) {
-      playerOrder(strikeShuttle(ME, from, pick.unit, pick.count, { targetPlanetId: node.id }));
+      playerOrder(strikeShuttle(ME, from, pick.squadronId, { targetPlanetId: node.id }));
     } else {
       note(t('hint.wing-cancelled'));
     }

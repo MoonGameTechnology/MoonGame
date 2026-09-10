@@ -33,7 +33,7 @@ const carrier = (over: Partial<Fleet> = {}): Fleet => ({
 describe('SHU-3.1 — ангар МИРА виден игроку', () => {
   it('ЧЕЛНОКИ БЕРУТСЯ ИЗ АНГАРА, А НЕ ИЗ ГАРНИЗОНА — их там не бывает', () => {
     const p = port({
-      hangar: [{ unit: 'interceptor', count: 2 }],
+      hangar: [{ id: 'sq:1', units: [{ unit: 'interceptor', count: 2 }] }],
       garrison: [{ unit: 'militia', count: 5 }],
     });
     const v = planetHangar(p, data)!;
@@ -54,13 +54,13 @@ describe('SHU-3.1 — ангар МИРА виден игроку', () => {
   });
 
   it('выбитый стек в состав не попадает', () => {
-    const v = planetHangar(port({ hangar: [{ unit: 'interceptor', count: 0 }] }), data)!;
+    const v = planetHangar(port({ hangar: [{ id: 'sq:1', units: [{ unit: 'interceptor', count: 0 }] }] }), data)!;
     expect(v.stacks).toEqual([]);
     expect(v.free).toBe(v.bay);
   });
 
   it('ТРИ ПРИЧИНЫ «НЕЛЬЗЯ ЛЕТЕТЬ» НАЗЫВАЮТСЯ РАЗНЫМИ СЛОВАМИ', () => {
-    const full = { hangar: [{ unit: 'interceptor', count: 1 }] };
+    const full = { hangar: [{ id: 'sq:1', units: [{ unit: 'interceptor', count: 1 }] }] };
     expect(planetHangar(port(full), data)!.blocked).toBeNull();
     expect(planetHangar(port({ ...full, sortie: { fuel: 2, rearming: 3 } }), data)!.blocked).toBe(
       'rearming',
@@ -73,14 +73,14 @@ describe('SHU-3.1 — ангар МИРА виден игроку', () => {
 
   it('топливо — счётчик МЕСТА, и у пустого порта его не показывают', () => {
     expect(planetHangar(port(), data)!.sortie).toBeUndefined();
-    const v = planetHangar(port({ hangar: [{ unit: 'interceptor', count: 1 }] }), data)!;
+    const v = planetHangar(port({ hangar: [{ id: 'sq:1', units: [{ unit: 'interceptor', count: 1 }] }] }), data)!;
     expect(v.sortie?.maxFuel).toBe(data.units.interceptor!.stats.fuel);
   });
 });
 
 describe('SHU-3.1 — трюм НОСИТЕЛЯ виден той же формой', () => {
   it('«Шаттл» несёт ангар, и его состав читается так же, как у порта', () => {
-    const v = fleetHangar(carrier({ hangar: [{ unit: 'bomber', count: 2 }] }), data)!;
+    const v = fleetHangar(carrier({ hangar: [{ id: 'sq:1', units: [{ unit: 'bomber', count: 2 }] }] }), data)!;
     expect(v.used).toBe(2);
     expect(v.bay).toBe(data.units.shuttle_carrier!.stats.shuttleBay);
   });
@@ -91,11 +91,11 @@ describe('SHU-3.1 — трюм НОСИТЕЛЯ виден той же форм�
 });
 
 describe('SHU-3.1 — перегрузка порт ⇄ носитель предлагается, только если ПРОЙДЁТ', () => {
-  const full = planetHangar(port({ hangar: [{ unit: 'interceptor', count: 2 }] }), data);
+  const full = planetHangar(port({ hangar: [{ id: 'sq:1', units: [{ unit: 'interceptor', count: 2 }] }] }), data);
   const empty = planetHangar(port(), data);
   const hold = fleetHangar(carrier(), data);
   const heldFull = fleetHangar(
-    carrier({ hangar: [{ unit: 'bomber', count: data.units.shuttle_carrier!.stats.shuttleBay! }] }),
+    carrier({ hangar: [{ id: 'sq:1', units: [{ unit: 'bomber', count: data.units.shuttle_carrier!.stats.shuttleBay! }] }] }),
     data,
   );
 

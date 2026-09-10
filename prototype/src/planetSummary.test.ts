@@ -96,7 +96,7 @@ describe('сводка мира — машины считаются в АНГА�
   // игрок платил за машины, видел их во вкладке и не видел в сводке того же мира.
   it('МАШИНЫ ИЗ АНГАРА ПОПАДАЮТ В СВОДКУ — иначе доля строки вечно нулевая', () => {
     const sm = planetSummary(
-      planet({ garrison: [{ unit: 'tank', count: 2 }], hangar: [{ unit: 'interceptor', count: 3 }] }),
+      planet({ garrison: [{ unit: 'tank', count: 2 }], hangar: [{ id: 'sq:1', units: [{ unit: 'interceptor', count: 3 }] }] }),
       data,
       [],
     );

@@ -23,10 +23,11 @@
  *    не серой, а нет. Серая кнопка обещала бы действие, которого в этом месте не
  *    бывает (то же правило, что у командного ряда, `cmdPresence.ts`).
  */
-import type { GameData, Fleet, Planet, UnitStack } from '../../packages/shared-core/src/index';
+import type { GameData, Fleet, Planet, Squadron, UnitStack } from '../../packages/shared-core/src/index';
 import {
   canSortie,
   fleetShuttleBay,
+  hangarMachines,
   hangarUsed,
   shuttleBayAt,
   sortieSpec,
@@ -39,6 +40,10 @@ export type HangarBlock = 'empty' | 'rearming' | 'no-fuel' | null;
 /** Ангар одного места — порта мира или трюма носителя. Форма одна: у ангара везде
  *  один и тот же смысл, и вторая структура развела бы две панели по мелочам. */
 export interface HangarView {
+  /** ЭСКАДРЫ места (SHU-4.2) — то, чем адресуются приказы: вылет, перегрузка, делёж.
+   *  Панель со списком соединений придёт в SHU-4.3; пока отсюда берётся id. */
+  squadrons: Squadron[];
+  /** Машины места одним списком — состав, без деления на соединения. */
   stacks: UnitStack[];
   used: number;
   bay: number;
@@ -55,18 +60,20 @@ export function hasHangar(view: HangarView | null): view is HangarView {
 }
 
 function view(
-  host: { hangar?: UnitStack[] },
+  host: { hangar?: Squadron[] },
   bay: number,
   sortie: SortieState | undefined,
   maxFuel: number,
 ): HangarView | null {
   if (bay <= 0) return null;
-  const stacks = (host.hangar ?? []).filter((st) => st.count > 0);
+  const squadrons = (host.hangar ?? []).filter((sq) => sq.units.some((st) => st.count > 0));
+  const stacks = hangarMachines(host).filter((st) => st.count > 0);
   const used = hangarUsed(host);
   const live: SortieState = sortie ?? { fuel: maxFuel, rearming: 0 };
   const blocked: HangarBlock =
     used <= 0 ? 'empty' : live.rearming > 0 ? 'rearming' : canSortie(live) ? null : 'no-fuel';
   return {
+    squadrons,
     stacks,
     used,
     bay,
@@ -82,7 +89,7 @@ export function planetHangar(planet: Planet, data: GameData): HangarView | null 
   // Ёмкость топлива задаёт САМА МАШИНА (`fuel` первой в ангаре) — та же величина, по
   // которой ядро заводит счётчик порта. Пустой порт показывает состав без топлива:
   // выводить «0 из 0 вылетов» там, где лететь некому, значит пугать числом ни о чём.
-  const first = (planet.hangar ?? []).find((st) => st.count > 0);
+  const first = hangarMachines(planet).find((st) => st.count > 0);
   const maxFuel = first ? (data.units[first.unit]?.stats.fuel ?? 0) : 0;
   return view(planet, bay, planet.sortie, maxFuel);
 }
@@ -112,21 +119,22 @@ export function transferOffer(
 }
 
 /**
- * ЧТО ИМЕННО перегружать одной кнопкой (SHU-3.1). Кнопка у игрока одна, а стеков в
- * ангаре может быть несколько — выбор обязан быть ДЕТЕРМИНИРОВАННЫМ и объяснимым:
- * берётся ПЕРВЫЙ живой стек источника, столько, сколько влезет в приёмник. Первый, а
- * не «лучший»: какой челнок нужнее — решение игрока, и когда для него появится выбор,
- * он появится списком, а не догадкой кнопки.
+ * КАКУЮ ЭСКАДРУ перегружать одной кнопкой (SHU-3.1, форма — SHU-4.2). Кнопка у игрока
+ * одна, а соединений в ангаре может быть несколько — выбор обязан быть
+ * ДЕТЕРМИНИРОВАННЫМ и объяснимым: берётся ПЕРВАЯ живая эскадра источника, и только если
+ * она влезает в приёмник ЦЕЛИКОМ (ядро возит соединение целиком, половину оно отобьёт
+ * кодом `E_NO_CAPACITY`). Первая, а не «лучшая»: какое звено нужнее — решение игрока, и
+ * когда для него появится выбор, он появится списком, а не догадкой кнопки.
  *
  * `null` — перегружать нечего: кнопку в этом состоянии не показывают вовсе.
  */
 export function transferPick(
   from: HangarView | null,
   to: HangarView | null,
-): { unit: string; count: number } | null {
+): { squadronId: string; count: number } | null {
   if (!hasHangar(from) || !hasHangar(to)) return null;
-  const stack = from.stacks.find((st) => st.count > 0);
-  if (!stack) return null;
-  const count = Math.min(stack.count, to.free);
-  return count > 0 ? { unit: stack.unit, count } : null;
+  const sq = from.squadrons[0];
+  if (!sq) return null;
+  const count = sq.units.reduce((n, st) => n + st.count, 0);
+  return count > 0 && count <= to.free ? { squadronId: sq.id, count } : null;
 }
