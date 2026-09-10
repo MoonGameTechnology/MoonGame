@@ -31,11 +31,9 @@ const U = (
     stats: { attack: 10, defense: 8, speed: 40, hp: 50, ...(over.stats ?? {}) },
   }) as UnitDef;
 
-describe('unitArchetype — роль из полей unit-def (постер: 6 архетипов)', () => {
-  it('выводит все шесть архетипов по прототип-ростеру', () => {
+describe('unitArchetype — роль из полей unit-def (постер: 5 архетипов)', () => {
+  it('выводит все пять архетипов по прототип-ростеру', () => {
     expect(unitArchetype(U({ traits: ['hero'] }))).toBe('flagship');
-    expect(unitArchetype(U({ traits: ['artillery'], stats: { range: 240 } }))).toBe('artillery');
-    expect(unitArchetype(U({ stats: { range: 200 } }))).toBe('artillery'); // range без трейта
     expect(unitArchetype(U({ faction: 'swarm' }))).toBe('swarm');
     expect(unitArchetype(U({ stats: { cargoCapacity: 8 } }))).toBe('transport'); // dropship
     expect(unitArchetype(U({ signature: 1, radarRange: 105, stats: { hp: 12 } }))).toBe('scout');
@@ -96,7 +94,6 @@ describe('модификаторы постера — ОДНИ на панель
     expect(glyphHalo('flagship', false)).toBe(true); // у флагмана орбита есть всегда
     expect(glyphHalo('combat', false)).toBe(false);
     expect(glyphHalo('scout', false)).toBe(false);
-    expect(glyphHalo('artillery', false)).toBe(false);
   });
 
   it('тайл панели спрашивает про гало то же правило', () => {

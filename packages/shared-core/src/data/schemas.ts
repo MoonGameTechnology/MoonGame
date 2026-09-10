@@ -31,9 +31,9 @@ export const UnitStatsSchema = z
      *  shield pool before the hull; a ship dies when its HULL reaches 0. 0 = no
      *  shield. (Out-of-combat regen is a later brick, SH-1.1.) */
     shield: z.number().nonnegative().default(0),
-    /** Standoff firing radius in MAP UNITS — the Euclidean reach of an
-     *  `artillery` unit's ranged attack (combat `runArtillery`). 0 = melee only,
-     *  no ranged attack. The longest gun in a fleet sets the fleet's reach. */
+    /** Legacy standoff firing radius in MAP UNITS. Nothing reads it since the
+     *  standoff-fire subsystem was removed; kept so shipped content that still
+     *  states it keeps parsing. Shuttle reach is `strikeRange`, not this. */
     range: z.number().nonnegative().default(0),
     /** Ground-army transport capacity of a ship (0 = carries nothing; a
      *  dedicated dropship carries a lot). Bigger hulls carry more. */
@@ -116,7 +116,7 @@ export const UnitDefSchema = z.object({
    *  поле стоит казарм. Чтобы «забыли» не доехало до каталога, живой контент обязан
    *  объявлять род ЯВНО — это держит сторож в `schemas.test.ts`. */
   kind: z.enum(['infantry', 'vehicle']).default('infantry'),
-  /** Damage-receiving line (GDD §7.2). `artillery` trait overrides this. */
+  /** Damage-receiving line (GDD §7.2). No trait overrides it. */
   line: z.enum(['front', 'mid', 'rear']).default('front'),
   traits: z.array(z.string()).default([]),
   abilities: z.array(z.string()).default([]),

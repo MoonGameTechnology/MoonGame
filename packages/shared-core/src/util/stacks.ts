@@ -136,14 +136,14 @@ export function mergeStacks(base: UnitStack[], add: UnitStack[]): UnitStack[] {
 
 /** Combat line cap (Bytro-style): only this many units per combatant side fire in
  *  a volley — everyone beyond the cap only adds hull/shield to soak damage. Binds
- *  melee attack/defense, bombardment and artillery standoff; NOT AA, cargo or the
+ *  melee attack/defense and bombardment; NOT AA, cargo or the
  *  receiving hull pools. A balance constant (like BROWNOUT) — data after shakeout. */
 export const COMBAT_UNIT_CAP = 10;
 
 /** `sumUnitStat` bounded by the combat line cap: only the `cap` strongest units
  *  (per-unit EFFECTIVE `stat`, strongest first, ties by unit id) contribute.
  *  Stacks the optional `eligible` filter rejects neither fire nor consume budget
- *  (artillery standoff spends the cap on artillery units only). Deterministic:
+ *  (a filtered call spends the cap on the matching units only). Deterministic:
  *  the sort key is (stat desc, unit id asc); stacks tied on both have identical
  *  per-unit contributions, so their relative order can't change the sum.
  *

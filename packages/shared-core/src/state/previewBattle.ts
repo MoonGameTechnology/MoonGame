@@ -121,7 +121,7 @@ export function previewBattle(
     d = damageUnits(d, toDefender, data).survivors;
     // Прогноз обязан щадить артиллерию атакующего ровно так же, как живой бой
     // (ROS-2.1) — иначе игрок увидит один исход, а получит другой.
-    a = damageUnits(a, toAttacker, data, { sparesArtillery: true }).survivors;
+    a = damageUnits(a, toAttacker, data).survivors;
   }
 
   const aAlive = alive(a);

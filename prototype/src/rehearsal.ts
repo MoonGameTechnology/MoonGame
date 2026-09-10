@@ -124,8 +124,6 @@ const WIRE_PAYLOADS: Record<string, unknown> = {
   'fleet.stop': { fleetId: 'p1_1' },
   'fleet.orbit': { fleetId: 'p1_1', orbit: 'near' },
   'fleet.bombard': { fleetId: 'p1_1', on: true },
-  'fleet.barrage': { fleetId: 'p1_1', targetId: null },
-  'fleet.barrageMode': { fleetId: 'p1_1', mode: 'aggressive' },
   'fleet.assault': { fleetId: 'p1_1' },
   'fleet.retreat': { fleetId: 'p1_1' },
   'army.load': { fleetId: 'p1_1', unit: 'militia', count: 1 },

@@ -64,7 +64,6 @@ const YARD_TABS: [YardTab, string][] = [
 export const YARD_HULLS = [
   'cruiser',
   'siege',
-  'artillery',
   'scout',
   'frigate',
   'strike_carrier',

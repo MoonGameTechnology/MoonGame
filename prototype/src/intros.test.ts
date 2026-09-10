@@ -57,14 +57,10 @@ describe('resolveIntro — shown once', () => {
     expect(second.seen).toEqual(['market']);
   });
 
-  it('ONB-3 remainder: retreat/artillery follow the same first-contact pattern', () => {
+  it('ONB-3 remainder: retreat follows the same first-contact pattern', () => {
     const first = resolveIntro([], 'retreat');
     expect(first.card?.id).toBe('retreat');
     expect(resolveIntro(first.seen, 'retreat').card).toBeNull(); // shown once
-
-    const second = resolveIntro([], 'artillery');
-    expect(second.card?.id).toBe('artillery');
-    expect(resolveIntro(second.seen, 'artillery').card).toBeNull();
 
     const third = resolveIntro([], 'hero');
     expect(third.card?.id).toBe('hero');

@@ -58,7 +58,7 @@ function nearOrbitHostile(
 }
 
 /** Bombardment firepower a fleet rains on the planet, over at most COMBAT_UNIT_CAP
- *  units (the same firing line as melee/artillery).
+ *  units (the same firing line as melee).
  *
  *  Per hull: a SIEGE platform contributes its `siegeDamage` in full; every other
  *  hull contributes `attack × BOMBARD_FRACTION`, exactly as before (ROS-1.3). Two
@@ -276,8 +276,8 @@ export const orbitalModule: GameModule = {
 
     // The orbital layer accrues over continuous time, like the economy (AA fires
     // in discrete volleys on the from→to grid; bombardment accrues by hours).
-    // Registered before `artillery` in the manifest, preserving the old
-    // runOrbital→runArtillery order within each span.
+    // Its place in the manifest fixes the order in which the layers accrue
+    // within one span (invariant #6).
     api.on('time.advanced', (event, h) => {
       const { from, to } = event.payload as { from: number; to: number };
       const span = to - from;

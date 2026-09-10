@@ -397,33 +397,6 @@
       "utility": 1
     }
   },
-  "artillery": {
-    "faction": "blue",
-    "stats": {
-      "attack": 26,
-      "defense": 4,
-      "speed": 26,
-      "hp": 24
-    },
-    "traits": [
-      "artillery"
-    ],
-    "signature": 5,
-    "cost": {
-      "metal": 110,
-      "credits": 50,
-      "microelectronics": 5
-    },
-    "buildTimeHours": 6,
-    "upkeep": {
-      "credits": 56
-    },
-    "slots": {
-      "weapon": 1,
-      "utility": 1
-    },
-    "line": "rear"
-  },
   "shuttle_carrier": {
     "faction": "blue",
     "stats": {

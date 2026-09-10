@@ -17,15 +17,9 @@ const data: GameData = parseGameData({
     },
     picket: { faction: 'x', stats: { attack: 3, defense: 3, speed: 7, hp: 30 }, line: 'mid' },
     healer: { faction: 'x', stats: { attack: 0, defense: 2, speed: 5, hp: 10 }, line: 'rear' },
-    // ROS-2.1: артиллерия — обычный ТЫЛОВОЙ корпус (своей линии у неё больше нет),
-    // а трейт `artillery` означает теперь ровно одно: по ней не проходит ответный
-    // огонь, когда атакует её сторона.
-    gun: {
-      faction: 'x',
-      stats: { attack: 12, defense: 1, speed: 4, hp: 20 },
-      line: 'rear',
-      traits: ['artillery'],
-    },
+    // Тяжёлый тыловой корпус. Своей линии у тяжёлых больше нет (ROS-2.1) — линию
+    // называет только поле `line`, и исключений из неё не существует.
+    gun: { faction: 'x', stats: { attack: 12, defense: 1, speed: 4, hp: 20 }, line: 'rear' },
     // A ground unit that ASKS for the rear — lines are a ship formation, so the
     // request must be ignored and the trooper must stand in the front line.
     trooper: {
@@ -127,7 +121,7 @@ describe('damageUnits — the pure damage model', () => {
       stack('cruiser', 4), // фронт, 160 hp
       stack('picket', 4), // средняя, 120 hp
       stack('healer', 8), // тыл, 80 hp
-      stack('gun', 3), // тоже ТЫЛ: своей линии у артиллерии больше нет
+      stack('gun', 3), // тоже ТЫЛ
     ];
     damageUnits(units, 100, data);
     expect(units.find((u) => u.unit === 'cruiser')?.hp).toBe(110); // 160 − 50
@@ -165,29 +159,20 @@ describe('damageUnits — the pure damage model', () => {
     expect(units[0]?.hp).toBe(72); // all 24 landed
   });
 
-  // ROS-2.1. Артиллерия бьёт безнаказанно: ответный огонь по ней НЕ проходит и
-  // перераспределяется на остальные корпуса её стороны. Это не бессмертие — под чужой
-  // атакой она стоит в тылу и получает свою долю, как всякий тыловой корабль.
-  it('ОТВЕТНЫЙ залп обходит артиллерию, пока на её стороне есть кто-то ещё', () => {
-    const units = [stack('cruiser', 1), stack('gun', 1)]; // 40 hp фронта + 20 hp пушки
-    damageUnits(units, 20, data, { sparesArtillery: true });
-    expect(units.find((u) => u.unit === 'gun')?.hp).toBeUndefined(); // цела, по ней не попадали
-    expect(units.find((u) => u.unit === 'cruiser')?.hp).toBe(20); // весь залп ушёл в крейсер
-  });
-
-  it('а ОБЫЧНЫЙ залп (по обороняющейся стороне) артиллерию задевает — она в тылу', () => {
+  // Исключений из залпа больше нет: подсистема обстрела снята вместе с трейтом
+  // `artillery`, который единственный такое исключение и давал. Любой залп задевает
+  // ВСЕ присутствующие линии — доля тыла считается общим правилом.
+  it('залп задевает тыловой корабль наравне с фронтом — щадящих правил нет', () => {
     const units = [stack('cruiser', 1), stack('gun', 1)];
     damageUnits(units, 20, data);
-    // Две линии из трёх: фронт 65%, тыл 35% — пушка получила свою долю.
+    // Две линии из трёх: фронт 65%, тыл 35%.
     expect(units.find((u) => u.unit === 'gun')?.hp).toBe(13);
     expect(units.find((u) => u.unit === 'cruiser')?.hp).toBe(27);
   });
 
-  it('когда КРОМЕ артиллерии никого не осталось — залп приходит по ней', () => {
-    // Иначе флот из одних пушек был бы неубиваем: владелец решил, что артиллерия
-    // не бессмертна, поэтому щадящее правило действует только пока есть кого щадить.
+  it('сторона из одних тыловых кораблей получает залп целиком', () => {
     const units = [stack('gun', 2)]; // 40 hp
-    damageUnits(units, 15, data, { sparesArtillery: true });
+    damageUnits(units, 15, data);
     expect(units[0]?.hp).toBe(25);
   });
 

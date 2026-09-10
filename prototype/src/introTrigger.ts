@@ -16,13 +16,12 @@
  */
 
 /** Ключ обучающей вставки. */
-export type IntroKey = 'asyncDelay' | 'retreat' | 'artillery';
+export type IntroKey = 'asyncDelay' | 'retreat';
 
 /** Какой приказ какую вставку объясняет (правило 3). */
 const BY_ACTION: Record<string, IntroKey> = {
   'fleet.move': 'asyncDelay',
   'fleet.retreat': 'retreat',
-  'fleet.barrage': 'artillery',
 };
 
 /**
