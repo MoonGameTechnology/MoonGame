@@ -1603,3 +1603,76 @@ describe('combat — перемирие останавливает бой (CMB-7
     expect((resolved?.payload as { end?: unknown })?.end).not.toBe('ceasefire');
   });
 });
+
+
+/**
+ * CMB-6 — двое свели вничью, третий стоял рядом.
+ *
+ * Предохранитель `MAX_COMBAT_ROUNDS` намеренно не сцепляет пару заново: иначе те же двое
+ * мгновенно начинали бы тот же нулевой бой. Но запрет был шире своей причины — он глушил
+ * сцепку ВООБЩЕ, поэтому третий враждебный флот, который всё это время не мог вступить
+ * (у всех был `battleId`), после развода так и оставался стоять.
+ */
+describe('combat — после ничьей третий получает свой бой (CMB-6)', () => {
+  it('пара расходится, а третий враждебный флот на узле сцепляется', () => {
+    const kernel = createKernel([...combatFamily, arrivalModule]);
+    // A и B инертны друг против друга (`shield`: атака 0, защита 0) — гарантированная
+    // ничья. C вооружён, но вступить не может: к его прилёту оба уже в бою.
+    const st = baseState(
+      [
+        fleet('A', 'p1', 'P', [['shield', 1]]),
+        fleet('B', 'p2', 'P', [['shield', 1]]),
+        fleet('C', 'p3', 'P', [['fighter', 2]]),
+      ],
+      [planet('P', null)],
+    );
+    const engaged = okApply(kernel.applyAction(st, arrive('A'), ctx(0)));
+    expect(Object.keys(engaged.state.battles)).toHaveLength(1);
+    expect(engaged.state.fleets.C?.battleId).toBeFalsy(); // третий только смотрит
+
+    // За предохранителем: ничья разводит пару — и вот теперь третий обязан вступить.
+    const after = okAdvance(kernel.advanceTo(engaged.state, ctx(250 * HOUR)));
+    const ids = Object.keys(after.state.battles);
+    expect(ids).toHaveLength(1);
+    const fresh = after.state.battles[ids[0]!]!;
+    const sides = [fresh.attacker.owner, fresh.defender.owner].sort();
+    expect(sides).toContain('p3'); // третий — сторона нового боя
+    expect(after.state.fleets.C?.battleId).toBe(ids[0]);
+  });
+
+  it('но САМА пара вничью заново не сцепляется — предохранитель цел', () => {
+    const kernel = createKernel([...combatFamily, arrivalModule]);
+    const st = baseState(
+      [fleet('A', 'p1', 'P', [['shield', 1]]), fleet('B', 'p2', 'P', [['shield', 1]])],
+      [planet('P', null)],
+    );
+    const engaged = okApply(kernel.applyAction(st, arrive('A'), ctx(0)));
+    const after = okAdvance(kernel.advanceTo(engaged.state, ctx(250 * HOUR)));
+    expect(Object.keys(after.state.battles)).toHaveLength(0);
+    const later = okAdvance(kernel.advanceTo(after.state, ctx(300 * HOUR)));
+    expect(Object.keys(later.state.battles)).toHaveLength(0);
+  });
+
+  it('решённый бой по-прежнему сцепляет ПОБЕДИТЕЛЯ, а не обоих', () => {
+    const kernel = createKernel([...combatFamily, arrivalModule]);
+    // A убивает B первым же залпом (5 истребителей × 10 = 50 = весь корпус `shield`),
+    // C ждёт своей очереди.
+    const st = baseState(
+      [
+        fleet('A', 'p1', 'P', [['fighter', 5]]),
+        fleet('B', 'p2', 'P', [['shield', 1]]),
+        // Третий нарочно ЖИВУЧИЙ (10 × 50 = 500 корпуса против 50 урона в раунд):
+        // иначе тот же A добивает и его внутри окна, бой успевает кончиться, и тест
+        // смотрел бы на пустое поле, ничего не проверяя. Ловилось дважды: сперва C
+        // умирал за один залп, потом за три.
+        fleet('C', 'p3', 'P', [['shield', 10]]),
+      ],
+      [planet('P', null)],
+    );
+    const engaged = okApply(kernel.applyAction(st, arrive('A'), ctx(0)));
+    const after = okAdvance(kernel.advanceTo(engaged.state, ctx(2 * HOUR)));
+    expect(after.state.fleets.B).toBeUndefined(); // проигравший уничтожен
+    expect(after.state.fleets.A?.battleId).toBeTruthy(); // победитель сцепился с C
+    expect(after.state.fleets.C?.battleId).toBe(after.state.fleets.A?.battleId);
+  });
+});

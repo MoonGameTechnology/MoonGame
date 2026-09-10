@@ -591,11 +591,11 @@
 | CMB-5 | ✅ | core | `docs/backlog.md:13455` | Вражда началась — стоящие рядом флоты сходятся |
 | ATK-1 | ✅ | proto | `docs/backlog.md:13471` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
 | CMB-7 | ✅ | core | `docs/backlog.md:13566` | Перемирие посреди боя не останавливало бой. |
-| CMB-6 | ⏳ | core | `docs/backlog.md:13587` | После ничьей третий враждебный флот остаётся стоять рядом. |
-| ORD-2 | ✅ | proto | `docs/backlog.md:13597` | Нацеленный ШТУРМ теперь переживает закрытую |
-| FOG-10 | ✅ | proto core | `docs/backlog.md:13617` | Память разведки перестала жить только |
-| FOG-9 | ✅ | core | `docs/backlog.md:13641` | Приостановленная стройка чужого мира была видна |
-| TEST-4 | ✅ | srv | `docs/backlog.md:13651` | topXp падал на живой базе разработчика. |
+| CMB-6 | ✅ | core | `docs/backlog.md:13587` | После ничьей третий враждебный флот получает свой |
+| ORD-2 | ✅ | proto | `docs/backlog.md:13617` | Нацеленный ШТУРМ теперь переживает закрытую |
+| FOG-10 | ✅ | proto core | `docs/backlog.md:13637` | Память разведки перестала жить только |
+| FOG-9 | ✅ | core | `docs/backlog.md:13661` | Приостановленная стройка чужого мира была видна |
+| TEST-4 | ✅ | srv | `docs/backlog.md:13671` | topXp падал на живой базе разработчика. |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
