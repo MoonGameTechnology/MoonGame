@@ -36,6 +36,7 @@ export type TapOwner =
   | 'cast' // применение способности героя
   | 'deploy' // высадка героя
   | 'assault' // штурм с ПК
+  | 'engage' // атака чужого ФЛОТА («Атака» — цель флот, а не мир)
   | 'pick-group' // набор группы «Выбрать+»
   | 'move' // вооружённый ход
   | 'shuttle-strike' // удар эскадрильи (свободный полёт к цели)
@@ -49,6 +50,8 @@ export interface TapModes {
   heroAim: boolean;
   heroSpawnAim: boolean;
   assaultAim: boolean;
+  /** Вооружена «Атака»: следующий тап по ЧУЖОМУ флоту — приказ атаковать его. */
+  engageAim: boolean;
   pickMode: boolean;
   /** Вооружён ход («Курс»). */
   aiming: boolean;
@@ -65,8 +68,10 @@ export function tapOwner(m: TapModes): TapOwner {
   if (m.heroAim) return 'cast';
   if (m.heroSpawnAim) return 'deploy';
   if (m.assaultAim) return 'assault';
-  // Удар челноков — ПОСЛЕ штурма и до набора группы: он взводится из панели, как и
-  // штурм, и так же ждёт ровно одного тапа по цели.
+  if (m.engageAim) return 'engage';
+  // Удар челноков — ПОСЛЕ «Атаки» и до набора группы. Порядок между этими двумя
+  // произволен по смыслу (взведён всегда РОВНО один: они взводятся из разных мест и
+  // гасят друг друга), но зафиксирован здесь, чтобы правило оставалось читаемым.
   if (m.strikeAim) return 'shuttle-strike';
   if (m.pickMode && !m.aiming) return 'pick-group'; // правило 4
   if (m.aiming) return 'move'; // правило 2

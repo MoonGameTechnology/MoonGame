@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   assaultEnabled,
+  attackOffered,
   bombardEnabled,
   docked,
   forecastShown,
@@ -57,15 +58,41 @@ describe('обстрел и штурм — правила 3 и 4', () => {
     expect(bombardEnabled(false, 0)).toBe(false);
   });
 
-  it('штурм требует только орбиты: высаживается десант, а не корпуса', () => {
-    // Транспорт без единого боевого корабля обязан сохранить своё единственное дело.
-    expect(assaultEnabled(true)).toBe(true);
-    expect(assaultEnabled(false)).toBe(false);
+  it('штурм не спрашивает КОРАБЛИ: высаживается десант, а не корпуса', () => {
+    // Транспорт без единого боевого корабля обязан сохранить своё единственное дело:
+    // корабли не при чём — важен десант (и то лишь там, где мир защищён).
+    expect(assaultEnabled(true, true, true)).toBe(true);
+    expect(assaultEnabled(false, true, true)).toBe(false); // без ближней орбиты — никак
+  });
+
+  it('на ЗАЩИЩЁННОМ мире пустой трюм гасит кнопку: ядро ответит E_NO_TROOPS', () => {
+    // Ровно та тихая ошибка, ради которой заведён модуль: кнопка выглядит доступной,
+    // игрок жмёт, ядро отказывает, а снаружи это «ничего не произошло».
+    expect(assaultEnabled(true, false, true)).toBe(false);
+  });
+
+  it('на НЕзащищённом мире десант не нужен: пустой мир занимают, а не штурмуют', () => {
+    // Прятать кнопку тут значило бы отнять законный приказ — ядро такой штурм примет
+    // и просто займёт мир (`capturePlanet`, ветка «undefended → occupy»).
+    expect(assaultEnabled(true, false, false)).toBe(true);
+    expect(assaultEnabled(true, true, false)).toBe(true);
   });
 
   it('там, где обстрел запрещён пустым составом, штурм всё равно разрешён', () => {
     expect(bombardEnabled(true, 0)).toBe(false);
-    expect(assaultEnabled(true)).toBe(true);
+    expect(assaultEnabled(true, true, true)).toBe(true);
+  });
+});
+
+describe('attackOffered — правило 7', () => {
+  it('чужой флот стоит здесь и свободен — предлагаем атаку', () => {
+    expect(attackOffered(true, true)).toBe(true);
+  });
+  it('нет чужого флота — нечего атаковать', () => {
+    expect(attackOffered(true, false)).toBe(false);
+  });
+  it('свой флот не пришвартован — предлагать нечего (правило 1 сильнее)', () => {
+    expect(attackOffered(false, true)).toBe(false);
   });
 });
 

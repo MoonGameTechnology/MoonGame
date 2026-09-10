@@ -5,12 +5,14 @@ import { combatModule } from './combat';
 import { orbitalModule } from './orbital';
 import { artilleryModule } from './artillery';
 import { interceptModule } from './intercept';
+import { diplomacyModule } from './diplomacy';
 import { movementModule } from './movement';
 import {
   createInitialState,
   type Fleet,
   type GameState,
   type Planet,
+  type Player,
   type UnitStack,
 } from '../state/gameState';
 import { parseGameData, type GameData } from '../data/schemas';
@@ -1432,5 +1434,172 @@ describe('combat — первый раунд на встрече (CMB-4)', () =>
     // Меняется ТОЛЬКО первый залп: ускорять бой целиком владелец не просил, а это был
     // бы уже другой баланс.
     expect(Object.values(onContact().state.battles)[0]?.nextRoundAt).toBe(HOUR);
+  });
+});
+
+
+/**
+ * CMB-5 — вражда началась, а флоты уже рядом.
+ *
+ * Бой заводило только ДВИЖЕНИЕ (прибытие, транзит, перехват) и штурм. Обратный случай —
+ * «стоят мирно, объявили войну» — не заводил ничего: флоты могли простоять на одном узле
+ * сколько угодно. В соло дыры не видно, там покадровый `checkFleetClashes` прототипа
+ * выдаёт `fleet.engage` за игрока; на сервере такого цикла нет. Правило жило в КЛИЕНТЕ.
+ */
+describe('combat — вражда началась: стоящие рядом сходятся сразу (CMB-5)', () => {
+  const seat = (id: string): Player => ({
+    id,
+    name: id,
+    faction: 'x',
+    status: 'active',
+    resources: {},
+  });
+  const peaceful = (): GameState => {
+    const s = baseState(
+      [fleet('A', 'p1', 'X', [['fighter', 2]]), fleet('D', 'p2', 'X', [['fighter', 2]])],
+      [planet('X', null)],
+    );
+    const st: GameState = { ...s, players: { p1: seat('p1'), p2: seat('p2') } };
+    // Пара без записи в `diplomacy` считается воюющей (FFA), поэтому мир объявляем явно —
+    // иначе флоты сцепились бы ещё до объявления и проверять было бы нечего.
+    setStance(st, 'p1', 'p2', 'peace');
+    return st;
+  };
+  const declare = (playerId: string, target: string, stance: string): Action => ({
+    id: `s:${playerId}:d`,
+    type: 'diplomacy.declare',
+    playerId,
+    payload: { target, stance },
+    issuedAt: 0,
+  });
+
+  it('мирно стоящие рядом флоты не дерутся — пока мир', () => {
+    const kernel = createKernel([...combatFamily, diplomacyModule]);
+    const st = peaceful();
+    const idle = okAdvance(kernel.advanceTo(st, ctx(2 * HOUR)));
+    expect(Object.keys(idle.state.battles)).toEqual([]);
+    expect(idle.state.fleets.A?.battleId).toBeUndefined();
+  });
+
+  it('объявление войны заводит бой НЕМЕДЛЕННО, не дожидаясь чьего-то хода', () => {
+    const kernel = createKernel([...combatFamily, diplomacyModule]);
+    const war = okApply(kernel.applyAction(peaceful(), declare('p1', 'p2', 'war'), ctx(0)));
+    const ids = Object.keys(war.state.battles);
+    expect(ids).toHaveLength(1);
+    const battle = war.state.battles[ids[0]!];
+    expect(battle?.nextRoundAt).toBe(0); // и первый залп — на самом объявлении (CMB-4)
+    expect(war.state.fleets.A?.battleId).toBe(ids[0]);
+    expect(war.state.fleets.D?.battleId).toBe(ids[0]);
+    expect(war.events.map((e) => e.type)).toContain('battle.started');
+  });
+
+  it('смягчение стойки боёв не заводит — правило спрашивает состояние, а не событие', () => {
+    const kernel = createKernel([...combatFamily, diplomacyModule]);
+    const st = peaceful();
+    // Встречное согласие на пакт: `diplomacy.changed` придёт, а враждебности нет.
+    const a = okApply(kernel.applyAction(st, declare('p1', 'p2', 'pact'), ctx(0)));
+    const b = okApply(kernel.applyAction(a.state, declare('p2', 'p1', 'pact'), ctx(0)));
+    expect(b.events.map((e) => e.type)).toContain('diplomacy.changed');
+    expect(Object.keys(b.state.battles)).toEqual([]);
+  });
+});
+
+
+/**
+ * CMB-7 — перемирие посреди боя.
+ *
+ * Вражда проверялась ровно ОДИН раз: при заведении боя. `combat.tick` дальше спрашивал
+ * только «жива ли сторона», поэтому помирившиеся продолжали убивать друг друга до
+ * чьей-нибудь смерти. С места игрока это не правило, а сломанная кнопка мира: обе
+ * стороны согласились, а флоты стреляют.
+ */
+describe('combat — перемирие останавливает бой (CMB-7)', () => {
+  const seat = (id: string): Player => ({
+    id,
+    name: id,
+    faction: 'x',
+    status: 'active',
+    resources: {},
+  });
+  const atWar = (): GameState => {
+    const s = baseState(
+      [fleet('A', 'p1', 'X', [['fighter', 3]]), fleet('D', 'p2', 'X', [['fighter', 3]])],
+      [planet('X', null)],
+    );
+    return { ...s, players: { p1: seat('p1'), p2: seat('p2') } };
+  };
+  const declare = (playerId: string, target: string, stance: string): Action => ({
+    id: `s:${playerId}:d`,
+    type: 'diplomacy.declare',
+    playerId,
+    payload: { target, stance },
+    issuedAt: 0,
+  });
+
+  it('согласованный мир расцепляет бой НЕМЕДЛЕННО, без ещё одного залпа', () => {
+    const kernel = createKernel([...combatFamily, arrivalModule, diplomacyModule]);
+    // Пара без записи в `diplomacy` воюет (FFA): прибытие заводит бой сразу.
+    const war = okApply(kernel.applyAction(atWar(), arrive('A'), ctx(0)));
+    expect(Object.keys(war.state.battles)).toHaveLength(1);
+    const hullBefore = stackOf(war.state.fleets.A, 'fighter')?.hp;
+
+    // Мир — по взаимному согласию (D3): первый declare кладёт офер, встречный коммитит.
+    const a = okApply(kernel.applyAction(war.state, declare('p1', 'p2', 'peace'), ctx(0)));
+    expect(Object.keys(a.state.battles)).toHaveLength(1); // один офер боя не рвёт
+    const b = okApply(kernel.applyAction(a.state, declare('p2', 'p1', 'peace'), ctx(0)));
+
+    expect(Object.keys(b.state.battles)).toEqual([]);
+    expect(b.state.fleets.A?.battleId).toBeFalsy();
+    expect(b.state.fleets.D?.battleId).toBeFalsy();
+    // Ни одного лишнего залпа: корпус не изменился с момента заключения мира.
+    expect(stackOf(b.state.fleets.A, 'fighter')?.hp).toBe(hullBefore);
+    const resolved = b.events.find((e) => e.type === 'battle.resolved');
+    expect((resolved?.payload as { winner?: unknown; end?: unknown })?.winner).toBeNull();
+    expect((resolved?.payload as { end?: unknown })?.end).toBe('ceasefire');
+  });
+
+  it('и раунд боя сам спрашивает вражду заново — правило, а не только реакция', () => {
+    // Стойку меняем МИМО события (прямо в состоянии): так проверяется, что бой держится
+    // на правиле в ТАКТЕ, а не на одной подписке.
+    //
+    // Стороны нарочно неравные и толстые: у `fighter` защита 0, поэтому ответного огня
+    // нет, и 20 корпусов защитника двумя раундами не выбить. Иначе бой кончился бы
+    // сам — исходом, а не перемирием, и тест проходил бы, ничего не проверяя (поймано
+    // порчей: с отключённым `ceasefired` он всё равно зеленел).
+    const kernel = createKernel([...combatFamily, arrivalModule]);
+    const big = baseState(
+      [fleet('A', 'p1', 'X', [['fighter', 3]]), fleet('D', 'p2', 'X', [['fighter', 20]])],
+      [planet('X', null)],
+    );
+    const st0: GameState = { ...big, players: { p1: seat('p1'), p2: seat('p2') } };
+    const war = okApply(kernel.applyAction(st0, arrive('A'), ctx(0)));
+    expect(Object.keys(war.state.battles)).toHaveLength(1);
+
+    const st = { ...war.state };
+    setStance(st, 'p1', 'p2', 'peace');
+    const later = okAdvance(kernel.advanceTo(st, ctx(HOUR)));
+    expect(Object.keys(later.state.battles)).toEqual([]);
+    expect(later.state.fleets.A?.battleId).toBeFalsy();
+    const resolved = later.events.find((e) => e.type === 'battle.resolved');
+    expect((resolved?.payload as { end?: unknown })?.end).toBe('ceasefire');
+  });
+
+  it('бой с НИЧЕЙНЫМ гарнизоном перемирием не кончается: стойки у него нет', () => {
+    const kernel = createKernel([...combatFamily, arrivalModule]);
+    const s = baseState(
+      [fleet('A', 'p1', 'X', [['fighter', 3]], [['fighter', 2]])],
+      [planet('X', null, 0, 0, [['fighter', 2]])],
+    );
+    const st: GameState = { ...s, players: { p1: seat('p1') } };
+    // Прибытие само паркует флот в единственную орбиту — иначе штурм отобьётся
+    // `E_WRONG_ORBIT`.
+    const parked = okApply(kernel.applyAction(st, arrive('A'), ctx(0)));
+    const stormed = okApply(kernel.applyAction(parked.state, assault('A'), ctx(0)));
+    const ids = Object.keys(stormed.state.battles);
+    expect(ids).toHaveLength(1);
+    const on = okAdvance(kernel.advanceTo(stormed.state, ctx(HOUR)));
+    // Бой продолжается (или уже решён исходом) — но НЕ расцеплен перемирием.
+    const resolved = on.events.find((e) => e.type === 'battle.resolved');
+    expect((resolved?.payload as { end?: unknown })?.end).not.toBe('ceasefire');
   });
 });

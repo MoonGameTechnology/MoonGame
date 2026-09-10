@@ -32,7 +32,7 @@ import { t, tData } from '../../localization/runtime';
 import { GLOSSARY } from './codexIndex';
 import { esc, hl, round1, cost, displayUnit, fmtEta, resChip, resLine } from './format';
 import { BUILD_ICON, unitIcon, unitIconHtml } from './icons';
-import type { ActiveBuild, BuildKind, BuildLane, PlanetBuildQueue } from './buildQueue';
+import type { ActiveBuild, BuildKind, BuildLane, QueuedBuild } from './buildQueue';
 
 /** A dossier card: the object's name plus an HTML body (live numbers highlighted). */
 export interface Dossier {
@@ -51,7 +51,9 @@ export interface DossierHost {
   pcUi(): boolean;
   /** Your side's colour, for the unit silhouettes in codex cards. */
   youColor(): string;
-  queueOf(planetId: string): PlanetBuildQueue;
+  /** Ждущие заказы полосы, в порядке очереди (с BLD-1 очередь ядровая — хост
+   *  переводит её в этот словарь). */
+  queuedOrders(planetId: string, lane: BuildLane): QueuedBuild[];
   activeConstruction(planetId: string, lane: BuildLane): ActiveBuild | null;
   progressPct(active: ActiveBuild): number;
 }
@@ -355,7 +357,7 @@ export function createDossiers(host: DossierHost): {
       );
     }
     if (state === 'queued') {
-      const q = host.queueOf(planetId)[lane as BuildLane][Number(ref)];
+      const q = host.queuedOrders(planetId, lane as BuildLane)[Number(ref)];
       if (!q) return null;
       const level =
         q.kind === 'upgrade'
