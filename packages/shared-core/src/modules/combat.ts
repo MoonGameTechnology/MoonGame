@@ -92,17 +92,22 @@ function scheduleTick(h: HandlerContext, battleId: string, immediate = false): v
   }
 }
 
-/** Lowest-id hostile, alive, unengaged fleet sitting at node `at`. */
+/** Lowest-id hostile, alive, unengaged fleet sitting at node `at`.
+ *
+ *  `except` — тот, с кем сцепляться НЕЛЬЗЯ (CMB-6): им называют напарника по только что
+ *  завершённой ничьей. Без него пара, разведённая предохранителем `MAX_COMBAT_ROUNDS`,
+ *  тут же начинала тот же бой заново, и предохранитель терял смысл. */
 function findEnemyFleetAt(
   h: HandlerContext,
   at: string,
   owner: string,
   excludeId: string,
+  except?: string | null,
 ): Fleet | null {
   let best: Fleet | null = null;
   for (const id of Object.keys(h.state.fleets)) {
     const f = h.state.fleets[id];
-    if (!f || f.id === excludeId || f.location !== at || f.battleId) {
+    if (!f || f.id === excludeId || f.id === except || f.location !== at || f.battleId) {
       continue;
     }
     if (!f.units.some((s) => s.count > 0) || !isHostile(h, owner, f.owner)) {
@@ -172,12 +177,17 @@ function startBattle(h: HandlerContext, battle: Battle): void {
  * separate, deliberate act from orbit (`fleet.assault`), so simply arriving
  * never captures — the fleet just holds the orbit (a single orbit, GDD §7.4).
  */
-function engageFleets(h: HandlerContext, fleetId: string, at: string): void {
+function engageFleets(
+  h: HandlerContext,
+  fleetId: string,
+  at: string,
+  except?: string | null,
+): void {
   const fleet = h.state.fleets[fleetId];
   if (!fleet || fleet.battleId) {
     return;
   }
-  const enemy = findEnemyFleetAt(h, at, fleet.owner, fleetId);
+  const enemy = findEnemyFleetAt(h, at, fleet.owner, fleetId, except);
   if (!enemy) {
     return;
   }
@@ -431,11 +441,28 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
     end,
   });
 
-  // A STALEMATE (the MAX_COMBAT_ROUNDS valve) must NOT chain-engage: both sides are
-  // alive, so the "victor" re-engage would restart the identical zero-damage battle
-  // immediately — an unbounded battle/release livelock (bug-hunt MAJOR). The pair
-  // coexists released; any later arrival/action may engage them afresh.
-  if (stalemate) return;
+  // CMB-6. Здесь стоял ранний выход «после ничьей не сцеплять НИКОГО», и его причина
+  // была верной: иначе та же пара мгновенно начинала бы тот же нулевой бой заново, и
+  // предохранитель `MAX_COMBAT_ROUNDS` терял бы смысл.
+  //
+  // Но сторож оказался ШИРЕ своей причины. Причина — «та же пара», а следствие было
+  // «никто вообще»: третий враждебный флот, который всё это время стоял на узле и не мог
+  // сцепиться (у всех был `battleId`), оставался нетронутым и после развода — до тех пор,
+  // пока кто-нибудь не прилетит. Двое подрались вничью, третий смотрел и остался
+  // смотреть.
+  //
+  // Теперь запрет назван точно: сцепляйся с любым, КРОМЕ напарника по этой ничьей
+  // (`except` ниже). Пара расходится, как и расходилась, а третий получает свой бой.
+  //
+  // Почему хватает исключения на один миг, без памяти в состоянии: автосцепку заводят
+  // только внешние поводы — прибытие, транзит, перехват, смена стойки и вот этот финал
+  // боя. После возврата отсюда никто не попытается свести эту пару снова, пока в мире
+  // что-нибудь не произойдёт, — а тогда это уже новая встреча, а не перезапуск старой.
+  const exceptId =
+    stalemate && battle.attacker.ref.kind === 'fleet' && battle.defender.ref.kind === 'fleet'
+      ? { [battle.attacker.ref.fleetId]: battle.defender.ref.fleetId,
+          [battle.defender.ref.fleetId]: battle.attacker.ref.fleetId }
+      : {};
 
   if (battle.phase === 'orbital') {
     // Whichever fleet SURVIVED holds the node — not just the attacker. The victor
@@ -444,23 +471,27 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
     // because every fleet there already had a battleId (findEnemyFleetAt skips
     // battleId fleets). Previously only the attacker-victor re-engaged, so a
     // defender that won left a third hostile fleet coexisting at the node forever.
-    const victorId =
-      battle.attacker.ref.kind === 'fleet' && aAlive
-        ? battle.attacker.ref.fleetId
-        : battle.defender.ref.kind === 'fleet' && dAlive
-          ? battle.defender.ref.fleetId
-          : null;
-    if (victorId !== null) {
-      const f = h.state.fleets[victorId];
-      if (f) {
-        f.orbit = 'near';
-        f.bombarding = false;
-        // Chain into any other defender only when the victor holds a NODE; a lane
-        // intercept leaves it parked on the edge (location null) — never teleport it.
-        // engageFleets is battleId-guarded, so this starts at most one new battle.
-        if (f.location !== null) {
-          engageFleets(h, victorId, battle.location);
-        }
+    // Решённый бой оставляет живым ОДНОГО, ничья и перемирие — обоих, и шанс сцепиться
+    // с третьим положен каждому выжившему. Обход по отсортированным id: кто окажется
+    // нападающим в следующем бою, не должно зависеть от того, кто в прошлом был
+    // атакующим (инвариант детерминизма).
+    const survivors = [
+      battle.attacker.ref.kind === 'fleet' && aAlive ? battle.attacker.ref.fleetId : null,
+      battle.defender.ref.kind === 'fleet' && dAlive ? battle.defender.ref.fleetId : null,
+    ]
+      .filter((id): id is string => id !== null)
+      .sort();
+    for (const survivorId of survivors) {
+      const f = h.state.fleets[survivorId];
+      if (!f) continue;
+      f.orbit = 'near';
+      f.bombarding = false;
+      // Chain into any other defender only when the victor holds a NODE; a lane
+      // intercept leaves it parked on the edge (location null) — never teleport it.
+      // engageFleets is battleId-guarded, so this starts at most one new battle —
+      // и второй выживший, если первый уже сцепился, увидит его занятым.
+      if (f.location !== null) {
+        engageFleets(h, survivorId, battle.location, exceptId[survivorId]);
       }
     }
   }
