@@ -590,19 +590,19 @@
 | UI-14 | ✅ | proto | `docs/backlog.md:13447` | Осмотр чужого флота должен быть находимым. |
 | CMB-5 | ✅ | core | `docs/backlog.md:13470` | Вражда началась — стоящие рядом флоты сходятся |
 | ATK-1 | ✅ | proto | `docs/backlog.md:13486` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
-| CMB-7 | ✅ | core | `docs/backlog.md:13584` | Перемирие посреди боя не останавливало бой. |
-| RLY-1 | ✅ | proto | `docs/backlog.md:13605` | Сбор построенного: соло и сеть играли по РАЗНЫМ |
-| CARGO-1 | ✅ | core proto | `docs/backlog.md:13637` | Часовая погрузка десанта жила в |
-| MRG-1 | ✅ | core proto | `docs/backlog.md:13685` | «Слиться по прибытии» — вторая половина |
-| ART-0 | ✅ | core data proto | `docs/backlog.md:13708` | Артиллерия снята из игры целиком |
-| ORB-1 | ✅ | core data proto | `docs/backlog.md:13739` | Орбитальный слой объявлен в |
-| ORB-2 | ✅ | data proto | `docs/backlog.md:13771` | «Изучается технология, строится здание» не |
-| ORB-3 | ✅ | proto | `docs/backlog.md:13799` | Звёздный форт выдавал орбитальное ПКО мимо |
-| CMB-6 | ✅ | core | `docs/backlog.md:13836` | После ничьей третий враждебный флот получает свой |
-| ORD-2 | ✅ | proto | `docs/backlog.md:13866` | Нацеленный ШТУРМ теперь переживает закрытую |
-| FOG-10 | ✅ | proto core | `docs/backlog.md:13886` | Память разведки перестала жить только |
-| FOG-9 | ✅ | core | `docs/backlog.md:13910` | Приостановленная стройка чужого мира была видна |
-| TEST-4 | ✅ | srv | `docs/backlog.md:13920` | topXp падал на живой базе разработчика. |
+| CMB-7 | ✅ | core | `docs/backlog.md:13599` | Перемирие посреди боя не останавливало бой. |
+| RLY-1 | ✅ | proto | `docs/backlog.md:13620` | Сбор построенного: соло и сеть играли по РАЗНЫМ |
+| CARGO-1 | ✅ | core proto | `docs/backlog.md:13652` | Часовая погрузка десанта жила в |
+| MRG-1 | ✅ | core proto | `docs/backlog.md:13700` | «Слиться по прибытии» — вторая половина |
+| ART-0 | ✅ | core data proto | `docs/backlog.md:13723` | Артиллерия снята из игры целиком |
+| ORB-1 | ✅ | core data proto | `docs/backlog.md:13754` | Орбитальный слой объявлен в |
+| ORB-2 | ✅ | data proto | `docs/backlog.md:13786` | «Изучается технология, строится здание» не |
+| ORB-3 | ✅ | proto | `docs/backlog.md:13814` | Звёздный форт выдавал орбитальное ПКО мимо |
+| CMB-6 | ✅ | core | `docs/backlog.md:13851` | После ничьей третий враждебный флот получает свой |
+| ORD-2 | ✅ | proto | `docs/backlog.md:13881` | Нацеленный ШТУРМ теперь переживает закрытую |
+| FOG-10 | ✅ | proto core | `docs/backlog.md:13901` | Память разведки перестала жить только |
+| FOG-9 | ✅ | core | `docs/backlog.md:13925` | Приостановленная стройка чужого мира была видна |
+| TEST-4 | ✅ | srv | `docs/backlog.md:13935` | topXp падал на живой базе разработчика. |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
@@ -821,14 +821,14 @@
 | MS-2.2 | 🔒 | core data | `docs/missiles-roadmap.md:68` | Детонация |
 | MS-3.1 | 🔒 | core data | `docs/missiles-roadmap.md:75` | Пусковой/ракеты как предмет + P2W-guardrail |
 | MS-4.1 | 🔒 | cli | `docs/missiles-roadmap.md:83` | Рендер полёта/перехвата/удара |
-| MSB-0 | ✅ | docs | `docs/multiside-combat-roadmap.md:186` | Решение владельца: (а), (б) или (в) |
-| MSB-1 | ⏳ | core | `docs/multiside-combat-roadmap.md:191` | Battle становится СПИСКОМ сторон |
-| MSB-2 | ⏳ | core data | `docs/multiside-combat-roadmap.md:211` | Правило деления урона |
-| MSB-3 | ⏳ | core | `docs/multiside-combat-roadmap.md:225` | Вступление в идущий бой |
-| MSB-4 | ⏳ | core | `docs/multiside-combat-roadmap.md:241` | Совместный штурм и чей мир |
-| MSB-5 | ⏳ | core | `docs/multiside-combat-roadmap.md:259` | Что делает бой при смене владельца стороны |
-| MSB-6 | ⏳ | proto cli | `docs/multiside-combat-roadmap.md:268` | Панель боя на N сторон |
-| MSB-7 | ⏳ | core proto | `docs/multiside-combat-roadmap.md:276` | Зенитки, обстрел и артиллерия при N сторонах |
+| MSB-0 | ✅ | docs | `docs/multiside-combat-roadmap.md:274` | Решение владельца: (а), (б) или (в) |
+| MSB-1 | ⏳ | core | `docs/multiside-combat-roadmap.md:279` | Battle становится СПИСКОМ сторон |
+| MSB-2 | ⏳ | core data | `docs/multiside-combat-roadmap.md:304` | Правило деления урона |
+| MSB-3 | ⏳ | core | `docs/multiside-combat-roadmap.md:318` | Вступление в идущий бой |
+| MSB-4 | ⏳ | core | `docs/multiside-combat-roadmap.md:338` | Совместный штурм и чей мир |
+| MSB-5 | ⏳ | core | `docs/multiside-combat-roadmap.md:356` | Что делает бой при смене владельца стороны |
+| MSB-6 | ⏳ | proto cli | `docs/multiside-combat-roadmap.md:365` | Панель боя на N сторон |
+| MSB-7 | ⏳ | core proto | `docs/multiside-combat-roadmap.md:373` | Зенитки, обстрел и артиллерия при N сторонах |
 | ONB-0 | ✅ | proto srv | `docs/onboarding-roadmap.md:101` | Состояние первого запуска + воронка [proto/srv] (proto) |
 | ONB-1 | ✅ | proto | `docs/onboarding-roadmap.md:137` | Движок гайд-марок (spotlight) ★ |
 | ONB-2 | ✅ | proto | `docs/onboarding-roadmap.md:188` | Гайдовый первый матч (скриптовая соло-песочница) ★ |
