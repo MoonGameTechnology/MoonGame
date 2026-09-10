@@ -576,26 +576,26 @@
 | FSPLIT-1 | ✅ | core act proto | `docs/backlog.md:12952` | Отбор при делении адресует СТЕК, а не тип корабля. |
 | FSPLIT-2 | ✅ | core act proto | `docs/backlog.md:12962` | Десант делится вместе с кораблями, по трюму обеих половин. |
 | AIDIFF-1 | ✅ | proto | `docs/backlog.md:12990` | Строка места переключается «выкл → слабый → сильный». |
-| RESIL-1 | ⏳ | proto | `docs/backlog.md:13072` | Фоновые промисы браузерного клиента. |
-| RESIL-2 | ⏳ | proto | `docs/backlog.md:13083` | Цикл подсветки обучающего тура. |
-| RESIL-3 | ⏳ | srv | `docs/backlog.md:13091` | Именованный фатал процесса. |
-| RESIL-4 | ✅ | srv | `docs/backlog.md:13102` | Соак проверяет, что мир не встал. |
-| RESIL-5 | ✅ | srv proto | `docs/backlog.md:13120` | Генеральная репетиция: весь стек разом, и |
-| RESIL-6 | ✅ | srv proto | `docs/backlog.md:13155` | Достоверность генералки: настоящая база, |
-| ADDR-7 | ✅ | sec proto | `docs/backlog.md:13297` | Ссылка на партию не пускает по незнанию: |
-| OPS-2 | ✅ | ops sec | `docs/backlog.md:13335` | Обновление доносит до машины новые ключи |
-| REL-6 | ✅ | srv | `docs/backlog.md:13357` | Возврат на своё место мгновенный: перехват вместо |
-| CMB-4 | ✅ | core | `docs/backlog.md:13372` | Первый раунд боя — на самой встрече, а не через |
-| BLD-1 | ✅ | core proto | `docs/backlog.md:13392` | Очередь строительства: заказы встают в |
-| UI-14 | ✅ | proto | `docs/backlog.md:13432` | Осмотр чужого флота должен быть находимым. |
-| CMB-5 | ✅ | core | `docs/backlog.md:13455` | Вражда началась — стоящие рядом флоты сходятся |
-| ATK-1 | ✅ | proto | `docs/backlog.md:13471` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
-| CMB-7 | ✅ | core | `docs/backlog.md:13566` | Перемирие посреди боя не останавливало бой. |
-| CMB-6 | ✅ | core | `docs/backlog.md:13587` | После ничьей третий враждебный флот получает свой |
-| ORD-2 | ✅ | proto | `docs/backlog.md:13617` | Нацеленный ШТУРМ теперь переживает закрытую |
-| FOG-10 | ✅ | proto core | `docs/backlog.md:13637` | Память разведки перестала жить только |
-| FOG-9 | ✅ | core | `docs/backlog.md:13661` | Приостановленная стройка чужого мира была видна |
-| TEST-4 | ✅ | srv | `docs/backlog.md:13671` | topXp падал на живой базе разработчика. |
+| RESIL-1 | ⏳ | proto | `docs/backlog.md:13085` | Фоновые промисы браузерного клиента. |
+| RESIL-2 | ⏳ | proto | `docs/backlog.md:13096` | Цикл подсветки обучающего тура. |
+| RESIL-3 | ⏳ | srv | `docs/backlog.md:13104` | Именованный фатал процесса. |
+| RESIL-4 | ✅ | srv | `docs/backlog.md:13115` | Соак проверяет, что мир не встал. |
+| RESIL-5 | ✅ | srv proto | `docs/backlog.md:13133` | Генеральная репетиция: весь стек разом, и |
+| RESIL-6 | ✅ | srv proto | `docs/backlog.md:13168` | Достоверность генералки: настоящая база, |
+| ADDR-7 | ✅ | sec proto | `docs/backlog.md:13310` | Ссылка на партию не пускает по незнанию: |
+| OPS-2 | ✅ | ops sec | `docs/backlog.md:13348` | Обновление доносит до машины новые ключи |
+| REL-6 | ✅ | srv | `docs/backlog.md:13370` | Возврат на своё место мгновенный: перехват вместо |
+| CMB-4 | ✅ | core | `docs/backlog.md:13385` | Первый раунд боя — на самой встрече, а не через |
+| BLD-1 | ✅ | core proto | `docs/backlog.md:13405` | Очередь строительства: заказы встают в |
+| UI-14 | ✅ | proto | `docs/backlog.md:13445` | Осмотр чужого флота должен быть находимым. |
+| CMB-5 | ✅ | core | `docs/backlog.md:13468` | Вражда началась — стоящие рядом флоты сходятся |
+| ATK-1 | ✅ | proto | `docs/backlog.md:13484` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
+| CMB-7 | ✅ | core | `docs/backlog.md:13579` | Перемирие посреди боя не останавливало бой. |
+| CMB-6 | ✅ | core | `docs/backlog.md:13600` | После ничьей третий враждебный флот получает свой |
+| ORD-2 | ✅ | proto | `docs/backlog.md:13630` | Нацеленный ШТУРМ теперь переживает закрытую |
+| FOG-10 | ✅ | proto core | `docs/backlog.md:13650` | Память разведки перестала жить только |
+| FOG-9 | ✅ | core | `docs/backlog.md:13674` | Приостановленная стройка чужого мира была видна |
+| TEST-4 | ✅ | srv | `docs/backlog.md:13684` | topXp падал на живой базе разработчика. |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
@@ -990,6 +990,18 @@
 | SM-2.4 | 🔒 | core | `docs/ship-modules-roadmap.md:197` | Завершение + бой-фриз + ОГРАНИЧЕННЫЙ re-defer |
 | SM-2.5 | 🔒 | cli | `docs/ship-modules-roadmap.md:212` | Рендер фабрики |
 | SM-2.6 | 🔒 | data srv | `docs/ship-modules-roadmap.md:216` | Фейрнес/P2W-гард фабрики |
+| SHU-0.1 | ✅ | core data proto | `docs/shuttles-roadmap.md:105` | Переименование: эскадрильи → челноки |
+| SHU-1.1 | ✅ | core data | `docs/shuttles-roadmap.md:115` | Ангар космопорта |
+| SHU-1.2 | ✅ | core proto | `docs/shuttles-roadmap.md:139` | Удар и возврат |
+| SHU-1.3 | ✅ | core data | `docs/shuttles-roadmap.md:167` | Перехват |
+| SHU-2.1 | ✅ | core data | `docs/shuttles-roadmap.md:203` | Носитель как мобильный космопорт |
+| SHU-2.2 | 🔶 | core | `docs/shuttles-roadmap.md:231` | Снос старой машинерии |
+| SHU-3.1 | 🔶 | proto | `docs/shuttles-roadmap.md:237` | Интерфейс 2026-09-09 |
+| SHU-3.2 | ✅ | proto | `docs/shuttles-roadmap.md:300` | Бот умеет челноки 2026-09-09 |
+| SHU-4.1 | ⏳ | proto | `docs/shuttles-roadmap.md:351` | Словарь: эскадра у мира, флот у кораблей |
+| SHU-4.2 | ⏳ | core data | `docs/shuttles-roadmap.md:370` | Эскадра как соединение ангара |
+| SHU-4.3 | 🔒 | proto | `docs/shuttles-roadmap.md:399` | Панель мира: эскадры как флоты |
+| SHU-4.4 | ⏳ | core | `docs/shuttles-roadmap.md:409` | Погоня: удар по движущейся цели |
 | ST-3.1 | ✅ | core | `docs/steward-roadmap.md:68` | Ядро: доля потерь по прогнозу + трипваер «враг близко» |
 | ST-3.2 | ✅ | srv proto | `docs/steward-roadmap.md:89` | Драйвер: эвакуация под угрозой (поза defend) |
 | ST-3.3 | ✅ | core srv proto | `docs/steward-roadmap.md:116` | Поза «Активная оборона» — контрудар при приемлемых потерях |
