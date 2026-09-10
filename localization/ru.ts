@@ -794,8 +794,8 @@ export const ru: Record<string, string> = {
     'Флот — ваше оружие и защита. Здесь вы можете заказывать корабли для пополнения флота.',
   'dossier.tab.ships.name': 'Флот',
   'dossier.tab.shuttle.desc':
-    'Носитель (◈) несёт челноки (△). Запускайте их из панели выбранного флота кнопкой «🛩 Запустить челноки».',
-  'dossier.tab.shuttle.name': 'Челноки',
+    'Эскадра космопорта: машины (△) стоят в ангаре мира, на карте их нет. Кнопка удара поднимает вылет, цель выбирается тапом по карте. Носитель (◈) возит эскадру с собой — его трюм показан в панели флота.',
+  'dossier.tab.shuttle.name': 'Эскадра',
   'dossier.task.eta': 'Осталось: {r}',
   'dossier.task.output': '{r}: {now}/ч сейчас → {final}/ч по готовности',
   'dossier.task.queued': 'В очереди — ещё не начато.',
@@ -839,12 +839,9 @@ export const ru: Record<string, string> = {
   'faction.crimson.desc': 'Милитаристская гегемония: весь исходящий урон флотов и армий +10%.',
   'faction.violet.desc': 'Универсалисты восхода: понемногу всюду — экономика +5% и урон +5%.',
 
-  // --- fleet — Автоимя флота по размеру соединения.
-  'fleet.size.armada': 'Армада',
-  'fleet.size.fleet': 'Флот',
-  'fleet.size.flight': 'Звено',
-  'fleet.size.group': 'Эскадрилья',
-  'fleet.size.group-heavy': 'Эскадра',
+  // --- fleet — Автоимя соединения: слово + позывной. Лестница размеров снята в
+  // SHU-4.1: её ступени были авиационными, а те принадлежат челнокам («эскадра»).
+  'fleet.kind.ships': 'Флот',
 
   // --- fmt — Форматирование величин: длительности.
   'fmt.hours': '{n}ч',
@@ -1827,7 +1824,7 @@ export const ru: Record<string, string> = {
   'side.garrison.plus-troops': '+{n} десанта',
   'side.garrison.select': 'Выбрать →',
   'side.garrison.ships': 'Корабли в гарнизоне',
-  'side.garrison.wing': 'Авиагруппа в гарнизоне',
+  'side.garrison.wing': 'Эскадра в порту',
   'side.ground.conveyor': 'Наземный конвейер',
   'side.ground.empty': 'наземной армии здесь нет',
   'side.ground.hint':
@@ -1897,12 +1894,12 @@ export const ru: Record<string, string> = {
   'side.tab.buildings': 'Здания',
   'side.tab.fleet': 'Флот',
   'side.tab.ground': 'Земля',
-  'side.tab.wings': 'Челноки',
+  'side.tab.wings': 'Эскадра',
   'side.unit.ground': 'земля',
   'side.unit.space': 'космос',
   'side.wing.conveyor': 'Конвейер челноков',
   'side.wing.garrison.hint':
-    'Носитель (◈) несёт челноки (△). Запускайте их из панели выбранного флота кнопкой «🛩 Запустить челноки».',
+    'Эскадра стоит в ангаре порта, на карте её нет. «{b}» поднимает вылет — цель выберите тапом по карте. Носитель (◈) возит эскадру с собой: его трюм — в панели флота.',
   'side.world.blackout': 'блэкаут: радары и ПКО −50%',
   'side.world.bonus.defense': 'оборона',
   'side.world.bonus.production': 'произв.',

@@ -998,10 +998,10 @@
 | SHU-2.2 | 🔶 | core | `docs/shuttles-roadmap.md:231` | Снос старой машинерии |
 | SHU-3.1 | 🔶 | proto | `docs/shuttles-roadmap.md:237` | Интерфейс 2026-09-09 |
 | SHU-3.2 | ✅ | proto | `docs/shuttles-roadmap.md:300` | Бот умеет челноки 2026-09-09 |
-| SHU-4.1 | ⏳ | proto | `docs/shuttles-roadmap.md:351` | Словарь: эскадра у мира, флот у кораблей |
-| SHU-4.2 | ⏳ | core data | `docs/shuttles-roadmap.md:370` | Эскадра как соединение ангара |
-| SHU-4.3 | 🔒 | proto | `docs/shuttles-roadmap.md:399` | Панель мира: эскадры как флоты |
-| SHU-4.4 | ⏳ | core | `docs/shuttles-roadmap.md:409` | Погоня: удар по движущейся цели |
+| SHU-4.1 | ✅ | proto | `docs/shuttles-roadmap.md:351` | Словарь: эскадра у мира, флот у кораблей 2026-09-10 |
+| SHU-4.2 | ⏳ | core data | `docs/shuttles-roadmap.md:393` | Эскадра как соединение ангара |
+| SHU-4.3 | 🔒 | proto | `docs/shuttles-roadmap.md:422` | Панель мира: эскадры как флоты |
+| SHU-4.4 | ⏳ | core | `docs/shuttles-roadmap.md:432` | Погоня: удар по движущейся цели |
 | ST-3.1 | ✅ | core | `docs/steward-roadmap.md:68` | Ядро: доля потерь по прогнозу + трипваер «враг близко» |
 | ST-3.2 | ✅ | srv proto | `docs/steward-roadmap.md:89` | Драйвер: эвакуация под угрозой (поза defend) |
 | ST-3.3 | ✅ | core srv proto | `docs/steward-roadmap.md:116` | Поза «Активная оборона» — контрудар при приемлемых потерях |

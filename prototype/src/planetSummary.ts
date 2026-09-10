@@ -102,7 +102,11 @@ export function planetSummary(
   return {
     baseOutput: Object.fromEntries(BASE_OUTPUT_RESOURCES.map((r) => [r, base[r] ?? 0])),
     bonuses,
-    garrison: garrisonSplit(p.garrison, data),
+    // Машины считаются в АНГАРЕ, а не в гарнизоне (SHU-4.1). Челнок с SHU-1.1 в
+    // гарнизоне не бывает никогда — он лежит в `planet.hangar`, — поэтому чтение
+    // одного гарнизона делало долю «крылья» вечным нулём, и в сводке мира машины не
+    // показывались вовсе. Тот же дефект SHU-3.1 нашёл во вкладке панели.
+    garrison: garrisonSplit([...p.garrison, ...(p.hangar ?? [])], data),
     buildings: p.buildings.map((b) => ({ type: b.type, level: b.level })),
     victoryPoints: Math.round(provinceScore(data, p)),
     orbit: {

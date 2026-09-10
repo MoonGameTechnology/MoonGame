@@ -92,7 +92,7 @@ import {
   unitGlyphSvg,
   unitSizeClass,
 } from './unitGlyphs';
-import { fleetCallsign, fleetKindKey } from './fleetName';
+import { fleetCallsign, FLEET_KIND_KEY } from './fleetName';
 import { planetName } from './planetName';
 // GRND-1: гарнизон, запертый живым боем, не отпускает войска (ядро: E_UNDER_ASSAULT).
 import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet';
@@ -5658,8 +5658,9 @@ function fleetPanelHtml(f: Fleet): string {
   const hungry = showsStarving(f.owner === ME, nTr, s.players[ME]?.arrears)
     ? ` · 🍽 ${t('side.fleet.hunger')}`
     : '';
-  // Bytro-стиль: авто-имя соединения (тип по размеру + позывной), тап → сводка.
-  const fleetTitle = `${t(fleetKindKey(nShips))} «${fleetCallsign(f.id)}»`;
+  // Bytro-стиль: авто-имя соединения (слово + позывной), тап → сводка. Слово одно на
+  // любой размер (SHU-4.1): «эскадра» и прочие авиационные ступени принадлежат челнокам.
+  const fleetTitle = `${t(FLEET_KIND_KEY)} «${fleetCallsign(f.id)}»`;
   let h = cardHeader(
     ownerColor(f.owner),
     fleetTitle,
@@ -6221,8 +6222,13 @@ function planetPanelHtml(p: Planet): string {
       );
     }
     if (!pcUi()) {
-      // PC carries this in the КРЫЛЬЯ tab's hover dossier ('tab:shuttle')
-      cols.push(`<div class="hint">${t('side.wing.garrison.hint')}</div>`);
+      // PC carries this in the ЭСКАДРА tab's hover dossier ('tab:shuttle').
+      // Подпись кнопки подставляется ключом, а не переписывается литералом: прошлая
+      // редакция этой подсказки звала «🛩 Запустить челноки» — кнопку, которой не стало
+      // ещё в SHU-3.1, и разъехалась молча.
+      cols.push(
+        `<div class="hint">${t('side.wing.garrison.hint', { b: t('side.wing.strike') })}</div>`,
+      );
     }
   } else {
     cols.push(
