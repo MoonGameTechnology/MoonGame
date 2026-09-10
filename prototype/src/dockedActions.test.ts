@@ -52,10 +52,16 @@ describe('strikeOffered — правило 2', () => {
 
 describe('обстрел и штурм — правила 3 и 4', () => {
   it('обстрел требует И орбиты, И кораблей', () => {
-    expect(bombardEnabled(true, 3)).toBe(true);
-    expect(bombardEnabled(true, 0)).toBe(false);
-    expect(bombardEnabled(false, 3)).toBe(false);
-    expect(bombardEnabled(false, 0)).toBe(false);
+    expect(bombardEnabled(true, 3, true)).toBe(true);
+    expect(bombardEnabled(true, 0, true)).toBe(false);
+    expect(bombardEnabled(false, 3, true)).toBe(false);
+    expect(bombardEnabled(false, 0, true)).toBe(false);
+  });
+
+  // ORB-1: у астероида/туманности орбитального слоя нет — ядро ответит
+  // `E_WRONG_SECTOR`, и кнопка обязана быть мёртвой ДО отправки приказа.
+  it('УЗЕЛ БЕЗ ОРБИТАЛЬНОГО СЛОЯ ГАСИТ ОБСТРЕЛ, даже когда флот на месте и полон', () => {
+    expect(bombardEnabled(true, 3, false)).toBe(false);
   });
 
   it('штурм не спрашивает КОРАБЛИ: высаживается десант, а не корпуса', () => {
@@ -79,7 +85,7 @@ describe('обстрел и штурм — правила 3 и 4', () => {
   });
 
   it('там, где обстрел запрещён пустым составом, штурм всё равно разрешён', () => {
-    expect(bombardEnabled(true, 0)).toBe(false);
+    expect(bombardEnabled(true, 0, true)).toBe(false);
     expect(assaultEnabled(true, true, true)).toBe(true);
   });
 });

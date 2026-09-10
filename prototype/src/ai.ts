@@ -352,6 +352,11 @@ export function aiOrders(
   if (defensive) out.push(...stewardGuardOrders(state, ai, posture as StewardPosture));
   const isShipUnit = (u: string): boolean => !data.units[u]?.traits.includes('ground');
   const capturable = (p: Planet): boolean => SECTOR_TYPES[p.kind ?? '']?.capturable ?? false;
+  /** ORB-1: бомбардировать можно только узел с орбитальным слоем (планета и
+   *  космическая крепость). Без этой проверки ИИ вставал бы над туманностью и
+   *  выдавал `fleet.bombard` каждый цикл, получая `E_WRONG_SECTOR` до конца матча —
+   *  та же вечная стоянка, что описана выше про `E_SAME_LOCATION`. */
+  const orbitalLayer = (p: Planet): boolean => SECTOR_TYPES[p.kind ?? '']?.orbit ?? true;
   const d = (a: { x: number; y: number }, b: { x: number; y: number }): number =>
     Math.hypot(a.x - b.x, a.y - b.y);
   // Send each idle AI fleet toward the nearest capturable world it can reach — only
@@ -577,6 +582,7 @@ export function aiOrders(
         here0.owner !== null &&
         here0.owner !== ai &&
         capturable(here0) &&
+        orbitalLayer(here0) && // ядро бомбит только планету и космическую крепость
         getStance(state, ai, here0.owner) === 'war' && // ядро бомбит только врага
         f.units.some((st) => st.count > 0)
       ) {

@@ -7,6 +7,7 @@ import { MS_PER_HOUR } from '../util/time';
 import { cappedUnitStat, sumUnitStat } from '../util/stacks';
 import { requireOwnedIdleFleet } from '../util/fleet';
 import { isActivelyBombarding } from '../state/orbit';
+import { hasOrbit } from '../state/sectorKind';
 import { BLACKOUT_MULT } from '../state/visibility';
 import { applyDamageToSide, isHostile, removeIfWiped } from '../util/combat';
 
@@ -108,6 +109,12 @@ function runOrbital(h: HandlerContext, from: number, to: number, hours: number):
     }
     const localFleets = fleetsByLocation.get(planetId);
 
+    // No orbital layer (asteroid field, nebula, dead world, debris) — nothing to
+    // shell and nothing to shell FROM: neither AA nor bombardment happens here.
+    if (!hasOrbit(data, planet)) {
+      continue;
+    }
+
     // AA — anti-ship, only when not defending the ground. Two tiers, both firing
     // discrete VOLLEYS on the world-time grid (a fleet slipping in and out of orbit
     // BETWEEN volleys escapes untouched — timing a raid past the flak matters):
@@ -178,7 +185,7 @@ function runOrbital(h: HandlerContext, from: number, to: number, hours: number):
     if (localFleets) {
       const hostile = (a: string, b: string): boolean => isHostile(h, a, b);
       for (const f of localFleets) {
-        if (isActivelyBombarding(h.state, f, hostile)) {
+        if (isActivelyBombarding(h.state, f, hostile, data)) {
           const power = bombardPower(f, data) * hours;
           if (power > 0) {
             // CORE-DMG-1: the shelling power is scaled at the SOURCE, before it leaves
@@ -259,6 +266,13 @@ export const orbitalModule: GameModule = {
         const planet = h.state.planets[fleet.location];
         if (!planet) {
           return h.reject('E_NO_PLANET');
+        }
+        // Only a province WITH an orbital layer can be shelled from above (owner's
+        // rule: a planet and a space fortress, nothing else). The shared predicate
+        // repeats this — this gate exists so the player gets a reason instead of a
+        // switch that flips on and quietly does nothing.
+        if (!hasOrbit(h.ctx.data, planet)) {
+          return h.reject('E_WRONG_SECTOR');
         }
         if (planet.owner === fleet.owner) {
           return h.reject('E_OWN_PLANET');
