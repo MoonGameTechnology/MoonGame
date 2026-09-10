@@ -177,7 +177,13 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '11'; // SHU-2.1: носитель — мобильный космопорт.
+export const MODULE_MANIFEST_VERSION = '12'; // CARGO-1: подъём десанта занимает час.
+// Форма состояния изменилась: у флота появилось поле `loading` — ЗАЯВКИ на подъём
+// (`{unit,count,from,startAt,doneAt}`), и `army.load` больше не переносит войска сразу,
+// а планирует событие `army.load.done`. Матч, начатый на манифесте 11, несёт заказы
+// старой формы (их там просто нет) и играет по правилу «погрузка мгновенна» — то есть
+// по ДРУГИМ правилам. Отказ загрузки честнее. (До 12:)
+// export const MODULE_MANIFEST_VERSION = '11'; // SHU-2.1: носитель — мобильный космопорт.
 // Форма состояния изменилась: у вылета вместо `from: PlanetId` размеченная база
 // `base: {kind,id}` (мир ИЛИ носитель), у флота появились `hangar`/`sortie`, и модуль
 // `shuttle` принимает два новых действия (`shuttle.load`/`shuttle.unload`). Матч,

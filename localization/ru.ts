@@ -2065,7 +2065,7 @@ export const ru: Record<string, string> = {
   'troops.damaged': 'повреждённые части на борт не поднимаются',
   'troops.hold': 'трюм {a}/{b}',
   'troops.planned': 'заказано {n}',
-  'troops.timing': 'погрузка ≈1 ч за единицу · выгрузка сразу',
+  'troops.timing': 'погрузка ≈1 ч · выгрузка сразу',
   'troops.title': 'ДЕСАНТ',
 
   // --- upd — Баннер обновления сборки (APK; в браузере не показывается).

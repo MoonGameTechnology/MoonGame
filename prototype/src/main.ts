@@ -727,11 +727,6 @@ import {
 } from './stewardLog';
 import { diploDelivery } from './diploDelivery';
 import { garrisonSide, planFor, troopsGate } from './troopsScene';
-import {
-  rallyCloses,
-  shipsPending,
-  withoutRally,
-} from './buildPipeline';
 import { standingPatrol, stashOnStandDown } from './sortieResume';
 import {
   fleetSignature as coreFleetSignature,
@@ -814,14 +809,6 @@ import { FLAK_LIFE_MS, flakBurstRadius, flakDashOffset, flakLook, flakTier } fro
 import { sweepGlow as armsGlow, sweepPaint, sweepShows } from './sweepFx';
 import { emblemTally } from './fleetTally';
 import { jumpStep, type JumpKind } from './mapJump';
-import {
-  loadStep,
-  makeLoads,
-  queuedCargo,
-  queuedFromWorld,
-  queuedOf,
-  type PendingLoad,
-} from './loadQueue';
 // FRIENDS-1 — вкладка «Друзья»: список и заявки живут на аккаунте (сервер решает).
 import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
@@ -1857,27 +1844,6 @@ function enqueueBuild(planetId: string, order: QueuedBuild): void {
   }
   playerOrder(queuedAction(planetId, order));
 }
-// A rally fleet keeps swallowing freshly-built ships only while its world still has
-// a ship in the pipeline (one building, or one queued). The moment the queue drains,
-// the fleet is "closed" (loses its 'rally' tag) so the NEXT order opens a fresh fleet
-// — ships only pool together if you queue the next batch before the current one finishes.
-// Single-player only: in net mode the server owns the fleets and their tags.
-function closeIdleRallies(): void {
-  // Условия конвейера — `buildPipeline.ts` (REFM-172): сбор закрывается, когда мир не
-  // строит корабли НИ сейчас, НИ по очереди; закрытие снимает МЕТКУ, а не распускает
-  // флот, иначе одна эскадра росла бы весь матч; о летящем флоте не решают вовсе.
-  const строит = (planetId: string): boolean =>
-    shipsPending(!!activeConstruction(planetId, 'units'), coreQueue(planetId, 'units').length);
-  for (const f of Object.values(s.fleets)) {
-    const view = {
-      mine: f.owner === ME,
-      location: f.location ?? null,
-      moving: !!f.movement,
-      traits: f.traits,
-    };
-    if (rallyCloses(view, строит)) f.traits = withoutRally(f.traits ?? []);
-  }
-}
 /** Где флот НАХОДИТСЯ по правилам, в МИРОВЫХ координатах — правила и вся интерполяция
  *  живут чистой моделью `fleetOrigin.ts`; здесь остаётся подстановка живого состояния. */
 function fleetPos(f: Fleet): { x: number; y: number } | null {
@@ -2621,48 +2587,55 @@ document.getElementById('ob-skip')?.addEventListener('click', () => {
 });
 document.getElementById('hub-tutorial')?.addEventListener('click', beginOnboarding);
 
-// --- timed cargo loading (prototype UX: "погрузка занимает час") --------------
-// A ground-army load doesn't snap into the hold — it takes ~1 game-hour. The order
-// is queued here and the real `army.load` only fires once the world clock has
-// advanced LOAD_TIME, while the fleet marker animates the hold filling up. This is
-// prototype-only client state; the deterministic core is untouched.
-const LOAD_TIME = HOUR; // ~1 game-hour to lift one ground unit into the hold
-// Правила очереди — `loadQueue.ts` (REFM-97): поштучные записи, резерв трюма заранее,
-// резерв гарнизона по МИРУ и отмена вслед за носителем.
-let pendingLoads: PendingLoad[] = [];
+// --- часовая погрузка десанта: ТЕПЕРЬ ЭТО ПРАВИЛО МИРА, а не клиента ----------
+// Здесь ЖИЛА очередь `pendingLoads` — заказ час висел в памяти вкладки и только потом
+// уходил настоящим `army.load`. Онлайн это означало, что приказ существует, только пока
+// открыта вкладка: закрыл (или просто переподключился) — и он исчезал молча, без войск и
+// без сообщения, а при `TIME_SCALE=1` игровой час это РЕАЛЬНЫЙ час. С CARGO-1 час считает
+// ядро (`shared-core/modules/army.ts`): заказ живёт в состоянии мира как ЗАЯВКА
+// (`fleet.loading`), переживает офлайн и одинаково идёт в соло и в сети. Клиенту осталось
+// только ЧИТАТЬ её — правил здесь больше нет.
 
-/** Hold footprint (cargoSize) already reserved by this fleet's in-progress loads. */
+/** Заявки этого флота, развёрнутые ПОШТУЧНО: маркер рисует по пипсу на единицу. */
+function loadPips(fleetId: string): Array<{ unit: string; startAt: number; doneAt: number }> {
+  const out: Array<{ unit: string; startAt: number; doneAt: number }> = [];
+  for (const c of s.fleets[fleetId]?.loading ?? []) {
+    for (let i = 0; i < c.count; i++) out.push({ unit: c.unit, startAt: c.startAt, doneAt: c.doneAt });
+  }
+  return out;
+}
+
+/** Объём трюма, уже обещанный идущими подъёмами этого флота. */
 function pendingLoadCargo(fleetId: string): number {
-  return queuedCargo(pendingLoads, fleetId, (u) => data.units[u]?.stats.cargoSize ?? 1);
+  let n = 0;
+  for (const c of s.fleets[fleetId]?.loading ?? []) {
+    n += c.count * (data.units[c.unit]?.stats.cargoSize ?? 1);
+  }
+  return n;
 }
 
-/** How many of `unit` are already promised to in-progress loads lifting from the
- *  SAME garrison (planet), so a queued load never over-draws a world's stock. */
+/** Сколько единиц `unit` уже обещано подъёмами ИЗ ЭТОГО мира — по всем флотам. */
 function pendingLoadUnits(planetId: string, unit: string): number {
-  return queuedFromWorld(pendingLoads, planetId, unit, (id) => s.fleets[id]?.location);
+  let n = 0;
+  for (const f of Object.values(s.fleets)) {
+    for (const c of f.loading ?? []) if (c.from === planetId && c.unit === unit) n += c.count;
+  }
+  return n;
 }
 
-/** Положить в очередь `count` часовых погрузок БЕЗ проверок — вызывающий уже
- *  посчитал и место, и запас гарнизона (меню десанта делает это своей моделью). */
-function pushLoads(fleetId: string, unit: string, count: number): void {
-  pendingLoads.push(...makeLoads(fleetId, unit, count, s.time, LOAD_TIME));
+/** Сколько единиц `unit` поднимает именно этот флот. */
+function pendingLoadOf(fleetId: string, unit: string): number {
+  let n = 0;
+  for (const c of s.fleets[fleetId]?.loading ?? []) if (c.unit === unit) n += c.count;
+  return n;
 }
 
 /** Fail-secure: ядро не выпускает войска из гарнизона, запертого живым боем
- *  (`E_UNDER_ASSAULT`). Без этой проверки заказ висел бы час и молча отскочил. */
+ *  (`E_UNDER_ASSAULT`). Без этой проверки заказ ушёл бы и молча отскочил. */
 function troopsLiftable(planetId: string): boolean {
   if (!garrisonUnderAssault(s, planetId)) return true;
   note('✖ ' + t('cargo.under-assault'));
   return false;
-}
-
-/** Drive queued loads each frame: drop any whose carrier moved / fights / vanished
- *  (load cancelled), and fire the real `army.load` once a load's hour has elapsed. */
-function pumpPendingLoads(): void {
-  if (!pendingLoads.length) return;
-  const { fire, keep } = loadStep(pendingLoads, s.time, (id) => s.fleets[id]);
-  pendingLoads = keep;
-  for (const p of fire) playerOrder(loadArmy(ME, p.fleetId, p.unit, 1)); // garrison → hold
 }
 
 /** GRND-1: собрать вход меню десанта для флота. `null` — показывать нечего: флот не
@@ -2701,7 +2674,7 @@ function troopsInputFor(fleetId: string): TroopsInput | null {
     ),
     hold: findHealthyStack(landing, unit)?.count ?? 0,
     holdAll: totalOf(landing, unit),
-    queued: queuedOf(pendingLoads, fleetId, unit),
+    queued: pendingLoadOf(fleetId, unit),
     reserved: pendingLoadUnits(here.id, unit),
     cargoSize: data.units[unit]?.stats.cargoSize ?? 1,
   }));
@@ -5198,7 +5171,7 @@ function render(now: number) {
     // hold shuttles — «ромбик размером с квадратик»), row 2 — only squares (ground
     // troops). A loading pip (~1h) fills up in place inside its shape's row. Cell
     // centres ride the rotated baseline, the pips themselves stay upright.
-    const loads = pendingLoads.filter((p) => p.fleetId === f.id); // empty for enemy/idle fleets
+    const loads = loadPips(f.id); // empty for enemy/idle fleets
     // Кто в каком ряду — `markerTail.ts` (REFM-116): ряды делятся по ФОРМЕ, и
     // грузящаяся единица встаёт в ряд своей формы, а не отдельным рядом «в пути».
     const { diamonds: diaRow, squares: sqRow } = cargoRows(wingPips, troops, loads, isShuttle);
@@ -5922,7 +5895,7 @@ function fleetPanelHtml(f: Fleet): string {
       let ga = `<div class="sec">${t('side.ground.title')}</div>`;
       const groundHere = here!.garrison.filter((st) => isGround(st.unit));
       const carried = f.landing ?? [];
-      const loadingN = pendingLoads.filter((p) => p.fleetId === f.id).length;
+      const loadingN = loadPips(f.id).length;
       const types: string[] = [];
       for (const st of [...groundHere, ...carried])
         if (isGround(st.unit) && !types.includes(st.unit)) types.push(st.unit);
@@ -6842,8 +6815,8 @@ function buildingLocked(planetId: string, id: string): TileLock {
   // и копия разъезжалась: кодекс проверял только «уже стоит» и всю стройку первого
   // экземпляра предлагал заказать второй.
   // Какие коды означают повтор, а какие плитку НЕ гасят — в `catalogTile.ts`
-  // (REFM-42). Локальная очередь прототипа ядру неизвестна по определению (в сети
-  // её нет — там стройку таймит сервер), поэтому она приходит отдельным флагом.
+  // (REFM-42). Второй аргумент — очередь МИРА: с BLD-1 она живёт в ядре, поэтому
+  // читается оттуда же (`coreQueue`), а не из клиентской копии, которой больше нет.
   return tileLock(
     canOrder(s, buildBuilding(ME, planetId, id)),
     coreQueue(planetId, 'buildings').some((q) => q.building === id),
@@ -8089,7 +8062,9 @@ cmdbar.addEventListener('click', (ev) => {
       // на `army.load` — иначе защитник уплыл бы небитым). Высадку он не запирает, и
       // раньше один общий гейт резал обе половины: подкрепить осаждённый мир было
       // нельзя — ровно то, ради чего союзная высадка и нужна.
-      if (load.length && troopsLiftable(at)) for (const o of load) pushLoads(st.fleetId, o.unit, o.count);
+      if (load.length && troopsLiftable(at)) {
+        for (const o of load) playerOrder(loadArmy(ME, st.fleetId, o.unit, o.count));
+      }
     }
     troopsPlan = null;
   } else if (cmd === 'barrage') {
@@ -10249,7 +10224,6 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>): void
   selPlanet = null;
   selFleets = new Set();
   pendingMerges = [];
-  pendingLoads = [];
   aiming = false;
   assaultAim = false;
   merging = false;
@@ -10484,7 +10458,6 @@ function netClientFor(seat: string): MultiplayerClient {
           clearSelection();
           endScreen = null; // joining a match must not carry the previous result
           matchEnd.reset(); // переподключение к матчу считает его конец заново
-          pendingLoads = []; // drop any queued loads from a prior/local session
           if (chainMode) exitChainMode(); // черновик прежней сессии не переносится
           chainRouteCache.clear();
           showConnect(false);
@@ -11727,11 +11700,12 @@ if (!__PLAYER_BUILD__ && DEV_UI && typeof window !== 'undefined') {
       if (wing) wing.count += 2;
       else f.units.push({ unit: 'interceptor', count: 2 });
       (f.landing ??= []).push({ unit: 'militia', count: 2 });
-      pendingLoads.push({
-        fleetId: f.id,
+      (f.loading ??= []).push({
         unit: 'interceptor',
+        count: 1,
+        from: f.location ?? '',
         startAt: s.time,
-        doneAt: s.time + LOAD_TIME,
+        doneAt: s.time + HOUR,
       });
       return f.id;
     },
@@ -12038,7 +12012,6 @@ function frame(nowReal: number) {
     solo.drivePatrols(); // CC-4: дежурные вылеты бьют контакты в радиусе
     solo.driveChains(); // CC-1: продвинуть цепочки приказов (ждать → курс → штурм/обстрел)
     solo.runAI();
-    closeIdleRallies(); // drop the 'rally' tag once a world's build pipeline empties
   }
   // ORD-2: отложенного ШТУРМА у клиента больше нет вовсе — он уехал в ядро цепочкой
   // «дойти → штурмовать», и её гоняют оба хоста (сервер и соло-драйвер). Поэтому
@@ -12048,7 +12021,6 @@ function frame(nowReal: number) {
   // live net match), so pausing freezes the ships on their rings instead of drifting on.
   if (saneGap(dt) && spinRuns(NET, speed, !!banner)) orbitPhase += dt;
   if (saneGap(dt) && !document.hidden && motionOn() && !endScreen && spinRuns(NET, speed, !!banner)) hologramTime += dt;
-  pumpPendingLoads(); // fire ~1h cargo loads whose hour has elapsed (both modes)
   resolvePendingMerges(); // complete fleet merges whose movers have arrived
   // Итог матча приходит в ОБОИХ режимах (сетевые снимки несут его в `match`).
   const ended = matchEnd.check();
