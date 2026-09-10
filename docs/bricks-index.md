@@ -596,11 +596,12 @@
 | MRG-1 | ✅ | core proto | `docs/backlog.md:13680` | «Слиться по прибытии» — вторая половина |
 | ART-0 | ✅ | core data proto | `docs/backlog.md:13703` | Артиллерия снята из игры целиком |
 | ORB-1 | ✅ | core data proto | `docs/backlog.md:13734` | Орбитальный слой объявлен в |
-| CMB-6 | ✅ | core | `docs/backlog.md:13782` | После ничьей третий враждебный флот получает свой |
-| ORD-2 | ✅ | proto | `docs/backlog.md:13812` | Нацеленный ШТУРМ теперь переживает закрытую |
-| FOG-10 | ✅ | proto core | `docs/backlog.md:13832` | Память разведки перестала жить только |
-| FOG-9 | ✅ | core | `docs/backlog.md:13856` | Приостановленная стройка чужого мира была видна |
-| TEST-4 | ✅ | srv | `docs/backlog.md:13866` | topXp падал на живой базе разработчика. |
+| ORB-2 | ✅ | data proto | `docs/backlog.md:13766` | «Изучается технология, строится здание» не |
+| CMB-6 | ✅ | core | `docs/backlog.md:13811` | После ничьей третий враждебный флот получает свой |
+| ORD-2 | ✅ | proto | `docs/backlog.md:13841` | Нацеленный ШТУРМ теперь переживает закрытую |
+| FOG-10 | ✅ | proto core | `docs/backlog.md:13861` | Память разведки перестала жить только |
+| FOG-9 | ✅ | core | `docs/backlog.md:13885` | Приостановленная стройка чужого мира была видна |
+| TEST-4 | ✅ | srv | `docs/backlog.md:13895` | topXp падал на живой базе разработчика. |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |

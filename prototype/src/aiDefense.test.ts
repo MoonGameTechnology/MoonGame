@@ -29,7 +29,9 @@ const only = (actions: Action[], type: string): Action[] => actions.filter((a) =
 const builtTypes = (actions: Action[]): string[] =>
   only(actions, 'building.construct').map((a) => (a.payload as { building: string }).building);
 const unloads = (actions: Action[]): Array<{ unit: string; count: number }> =>
-  only(actions, 'army.unload').map((a) => a.payload as { fleetId: string; unit: string; count: number });
+  only(actions, 'army.unload').map(
+    (a) => a.payload as { fleetId: string; unit: string; count: number },
+  );
 
 const homeOf = (s: GameState, seat: string): string =>
   Object.values(s.planets).find(
@@ -70,6 +72,33 @@ describe('AI-BAL-2 — оборонительные здания (тест-пр�
     };
     const types = builtTypes(aiOrders(rich, 'p2', 'expand', 'strong'));
     for (const b of ['fort', 'hospital', 'orbital_aa']) expect(types).not.toContain(b);
+  });
+
+  // ORB-1. Орбитальное ПКО ушло за технологию, и звено цепочки стало ЗАПИРАЕМЫМ.
+  // Критерий «не построено и не в очереди» держал бы его вечно: бот заказывал бы
+  // батарею каждый тик, получал `E_TECH_LOCKED` и никогда не доходил бы до зонального
+  // ПВО за ним. Поэтому цепочка спрашивает ядро (`canOrder`), а не переводит правило
+  // заново — и перешагивает то, чего пока нельзя.
+  it('ЗАПЕРТОЕ ЗВЕНО ПЕРЕШАГИВАЕТСЯ: без технологии ПКО не заказывается, но цепочка идёт дальше', () => {
+    const s = atWar(game2());
+    const home = homeOf(s, 'p2');
+    const withPair: GameState = {
+      ...s,
+      planets: {
+        ...s.planets,
+        [home]: {
+          ...s.planets[home]!,
+          buildings: [
+            ...s.planets[home]!.buildings,
+            { type: 'fort', level: 1, hp: 40 },
+            { type: 'hospital', level: 1, hp: 40 },
+          ],
+        },
+      },
+    };
+    const types = builtTypes(aiOrders(withPair, 'p2', 'expand', 'strong'));
+    expect(types).not.toContain('orbital_aa'); // заперто технологией
+    expect(types).toContain('zonal_aa'); // а следующее звено бот всё-таки видит
   });
 
   it('цепочка идёт по порядку: форт стоит → заказывается госпиталь', () => {

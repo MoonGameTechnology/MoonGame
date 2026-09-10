@@ -50,6 +50,18 @@
     "name": "Derelict Graveyard",
     "orbit": false
   },
+  "ion_storm": {
+    "name": "Ion Storm",
+    "orbit": false
+  },
+  "dense_nebula": {
+    "name": "Dense Nebula",
+    "orbit": false
+  },
+  "solar_flare": {
+    "name": "Solar Flare Zone",
+    "orbit": false
+  },
   "void_station": {
     "name": "Void Station",
     "capturable": true,
