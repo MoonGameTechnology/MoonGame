@@ -26,8 +26,8 @@
  * `docs/backlog.md` REFP-13). Hero re-pointing on merge IS kept: heroes are
  * core state (`state.heroes`, `heroModule`).
  */
-import type { GameModule } from '../kernel/module';
-import type { Battle, UnitStack } from '../state/gameState';
+import type { GameModule, HandlerContext } from '../kernel/module';
+import type { Battle, Fleet, UnitStack } from '../state/gameState';
 import { hoursToMs } from '../action/types';
 import { defHasTrait } from '../data/traits';
 import { heroByFleet } from '../state/heroes';
@@ -104,9 +104,41 @@ export const fleetOpsModule: GameModule = {
       h.emit('fleet.launched', { fleetId: id, planetId: planet.id, owner: action.playerId });
     });
 
+    /**
+     * Сплавить `from` в `into`. Общая ЧАСТЬ: одна и та же плавка нужна и приказу
+     * игрока, и созревшему намерению (MRG-1), а два исполнения одного правила — это
+     * ровно тот баг, из-за которого модуль и заводили.
+     */
+    const fuse = (h: HandlerContext, fromId: string, intoId: string, owner: string): void => {
+      const from = h.state.fleets[fromId];
+      const into = h.state.fleets[intoId];
+      if (!from || !into) return;
+      into.units = mergeStacks(into.units, from.units);
+      into.landing = mergeStacks(into.landing ?? [], from.landing ?? []);
+      // Heroes are bound by fleetId: the hero UNIT rides into the merged fleet, so
+      // the hero ENTITY must follow — a stale fleetId would orphan it (and
+      // hero.spawn could then mint a duplicate free flagship).
+      for (const hr of Object.values(h.state.heroes ?? {})) {
+        if (hr.fleetId === fromId) hr.fleetId = intoId;
+      }
+      delete h.state.fleets[fromId];
+      h.emit('fleet.merged', { from: fromId, into: intoId, owner, at: into.location });
+    };
+
+    /** Можно ли сплавить эту пару ПРЯМО СЕЙЧАС (оба стоят, свободны, в одном узле). */
+    const fusable = (from: Fleet, into: Fleet): boolean =>
+      !from.battleId &&
+      !into.battleId &&
+      !from.movement &&
+      !into.movement &&
+      !!from.location &&
+      from.location === into.location;
+
     // Fuse `from` into `into` when both are docked, idle and share a location.
-    // Bringing the fleets together (flying one to the other) is the caller's
-    // job; by the time this runs the two must already be co-located.
+    // Если догоняющий УЖЕ ЛЕТИТ в узел цели — приказ не отбивается, а встаёт
+    // НАМЕРЕНИЕМ (`mergeInto`) и созревает на прилёте (MRG-1). Раньше вторую половину
+    // такого приказа держал клиент в памяти вкладки и досылал `fleet.merge` покадрово:
+    // закрыл вкладку — флот долетал и не сливался, приказ исполнялся наполовину.
     api.onAction('fleet.merge', (action, h) => {
       const payload = action.payload as { from?: string; into?: string };
       if (typeof payload?.from !== 'string' || typeof payload?.into !== 'string') {
@@ -126,7 +158,12 @@ export const fleetOpsModule: GameModule = {
       if (from.battleId || into.battleId) {
         return h.reject('E_IN_BATTLE');
       }
-      if (from.movement || into.movement || !from.location || from.location !== into.location) {
+      const flyingTo = from.movement
+        ? (from.movement.destination ?? from.movement.to)
+        : null;
+      const chasing =
+        !!flyingTo && !into.movement && !!into.location && into.location === flyingTo;
+      if (!fusable(from, into) && !chasing) {
         return h.reject('E_NOT_COLOCATED');
       }
       // Каждый герой ведёт СВОЙ флот (резолюция владельца 2026-09-08, «как в HoMM»):
@@ -142,21 +179,63 @@ export const fleetOpsModule: GameModule = {
       if (heroByFleet(h.state, payload.from) && heroByFleet(h.state, payload.into)) {
         return h.reject('E_TWO_HEROES');
       }
-      into.units = mergeStacks(into.units, from.units);
-      into.landing = mergeStacks(into.landing ?? [], from.landing ?? []);
-      // Heroes are bound by fleetId: the hero UNIT rides into the merged fleet, so
-      // the hero ENTITY must follow — a stale fleetId would orphan it (and
-      // hero.spawn could then mint a duplicate free flagship).
-      for (const hr of Object.values(h.state.heroes ?? {})) {
-        if (hr.fleetId === payload.from) hr.fleetId = into.id;
+      if (chasing) {
+        // Ещё в пути — приказ ЖДЁТ в мире. Гейты выше (свой, не в бою, не два героя)
+        // спрошены уже сейчас: отказ обязан прийти на ЗАКАЗЕ, а не через часы полёта.
+        from.mergeInto = into.id;
+        h.emit('fleet.merge.pending', {
+          from: payload.from,
+          into: payload.into,
+          owner: action.playerId,
+          at: flyingTo,
+        });
+        return;
       }
-      delete h.state.fleets[payload.from];
-      h.emit('fleet.merged', {
-        from: payload.from,
-        into: payload.into,
-        owner: action.playerId,
-        at: into.location,
-      });
+      fuse(h, payload.from, payload.into, action.playerId);
+    });
+
+    /**
+     * Созревшее намерение слияния (MRG-1). Смотрим на ОБЕ стороны прилёта: сойтись
+     * могут и потому, что долетел догоняющий, и потому, что вернулась цель.
+     *
+     * Не сошлось — намерение снимается, а не висит вечно: цель ушла дальше или её уже
+     * нет, и «догонять» здесь было бы новым приказом на движение, которого игрок не
+     * отдавал. Живой бой намерение НЕ снимает: `fusable` его просто не пропустит, а
+     * после боя уцелевшие, скорее всего, всё ещё рядом.
+     */
+    api.on('fleet.arrived', (event, h) => {
+      const p = event.payload as { fleetId?: string };
+      if (typeof p?.fleetId !== 'string') return;
+      const arrived = h.state.fleets[p.fleetId];
+      if (!arrived) return;
+      // Пары «кто с кем» — прилетевший со своей целью и все, кто ждал ЭТОГО прилёта.
+      const pairs: Array<[string, string]> = [];
+      if (typeof arrived.mergeInto === 'string') pairs.push([arrived.id, arrived.mergeInto]);
+      for (const id of Object.keys(h.state.fleets).sort()) {
+        const f = h.state.fleets[id];
+        if (f && f.id !== arrived.id && f.mergeInto === arrived.id) pairs.push([f.id, arrived.id]);
+      }
+      for (const [fromId, intoId] of pairs) {
+        const from = h.state.fleets[fromId];
+        const into = h.state.fleets[intoId];
+        if (!from) continue;
+        if (from.battleId) continue; // бой ПРИОСТАНАВЛИВАЕТ, а не отменяет
+        if (!into || into.owner !== from.owner) {
+          delete from.mergeInto; // цели больше нет — сливать не с чем
+          continue;
+        }
+        if (into.battleId) continue;
+        if (!fusable(from, into)) {
+          delete from.mergeInto; // разминулись
+          continue;
+        }
+        if (heroByFleet(h.state, fromId) && heroByFleet(h.state, intoId)) {
+          delete from.mergeInto; // «один герой на флот» — правило то же, что на заказе
+          continue;
+        }
+        delete from.mergeInto;
+        fuse(h, fromId, intoId, from.owner);
+      }
     });
 
     // Peel a chosen set of ships off a docked, idle fleet into a fresh fleet in
