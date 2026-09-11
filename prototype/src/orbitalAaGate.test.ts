@@ -10,7 +10,7 @@
 // батареи без гейта просто отнимает оборону.
 import { describe, expect, it } from 'vitest';
 import { newGame, data, order, HOUR } from './game';
-import { buildBuilding, researchTech } from './actions';
+import { buildBuilding, researchTech } from '../../decisions/actions';
 import type { GameState } from '../../packages/shared-core/src/index';
 
 const ME = 'p1';

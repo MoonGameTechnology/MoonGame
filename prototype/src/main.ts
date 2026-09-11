@@ -259,7 +259,7 @@ import { syncCommanderXp } from './commanderSync';
 import { panelSlackFor } from './panelSlack';
 import { longPressAction, pressIntent } from './pressIntent';
 import { assaultMovers, assaultTargetBlocker, collectBlockers, moveMovers } from './warPrompt';
-import { laneEnds, warConfirmPlan } from './warOrders';
+import { laneEnds, warConfirmPlan } from '../../decisions/warOrders';
 import { bakeSignature, needsRebake, ownersSignature } from './staticLayerCache';
 import { clipPolygon, clipRect, provinceSeeds } from './provinceMap';
 import { fleetVisible, nodeView, seesDetails as fogSeesDetails } from './fogView';
@@ -377,7 +377,7 @@ import {
   pickRadius,
   pinchOf,
   pinchStep,
-} from './pointerPick';
+} from '../../decisions/pointerPick';
 import {
   afford as coreAfford,
   laneOf,
@@ -613,7 +613,7 @@ import {
   splitSlots,
   stepTake,
   type SplitSlot,
-} from './splitPlan';
+} from '../../decisions/splitPlan';
 import { splitDialogHtml, splitDialogLives, splitRows } from './splitDialog';
 import { canAssaultFromOrbit, canMerge, canSplit } from './cmdAvailability';
 import { stayingFleets, stripState } from './chainStripState';
@@ -698,7 +698,7 @@ import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from './simClock';
 import { armedTap } from './armedTap';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
 import { canDockRepair, canRepair } from './repairOffer';
-import { capitalOffer, holdOffer } from './worldOrders';
+import { capitalOffer, holdOffer } from '../../decisions/worldOrders';
 import { spyOffer, windowLeftH } from './spyOffer';
 import { artScale, calloutAlpha, chevronAlpha, detailAt, sphereBloom } from './semanticZoom';
 import { calloutInk, calloutLine, calloutTier } from './nodeCallout';
@@ -718,7 +718,7 @@ import {
   ringShown,
   slotAngle,
 } from './orbitRing';
-import { routeShown, routeStops, routeStroke } from './fleetRoute';
+import { routeShown, routeStops, routeStroke } from '../../decisions/fleetRoute';
 import { fleetOrigin } from './fleetOrigin';
 import { netContacts, soloContacts } from './radarContacts';
 import { buildLogLine, type BuildLogKind } from './buildLog';
@@ -743,7 +743,7 @@ import { autoStance, scrambleStance } from './stanceToggle';
 import { fleetCount, goalBaseline, grew, mineLevels } from './goalTally';
 import { introFor } from './introTrigger';
 import { EVENT_LOG_MAX, LOG_LINES, isRepeat, pushBounded, stamp } from './noteLog';
-import { pruneGroup, refSurvives } from './selectionPrune';
+import { pruneGroup, refSurvives } from '../../decisions/selectionPrune';
 import { restoresWallet, snapshotWallet } from './freeBuild';
 import { TOAST_FADE_MS, TOAST_LIFE_MS, toastClass, toastOverflow, toastText } from './toastView';
 import { ringed, ringsShown } from './assaultRings';
@@ -753,7 +753,7 @@ import { phaseAt, phaseOfId } from './pulseFx';
 import { authorizedBase } from '../../decisions/hubAuth';
 import { diploIntent } from './diploClick';
 import { afterTokenRefused, joinStep } from '../../decisions/joinGate';
-import { assaultSteps } from './assaultOrder';
+import { assaultSteps } from '../../decisions/assaultOrder';
 import { dialIdentity, dialUrl, seatTicketKey } from '../../decisions/netDial';
 import { closeAction, isCurrentSocket } from '../../decisions/socketFate';
 import { welcomePlan } from '../../decisions/netWelcome';
@@ -782,11 +782,11 @@ import { archiveUrl, httpBase, matchesUrl, queryOutcome, seatsUrl } from '../../
 import { archiveEffect, type ArchiveEffect } from './archiveOutcome';
 import { mintedToken, passwordFrom, registerExtra } from '../../decisions/authRequest';
 import { carryEmail, recoverAnswer, recoverStep } from './recoverForm';
-import { selectFleets, toggleInSelection } from './fleetSelection';
-import { mergePlan } from './mergeOrders';
+import { selectFleets, toggleInSelection } from '../../decisions/fleetSelection';
+import { mergePlan } from '../../decisions/mergeOrders';
 import { assaultPlan } from './assaultDispatch';
 import { warPromptText, warReason } from './warPromptView';
-import { pickEffect } from './pickApply';
+import { pickEffect } from '../../decisions/pickApply';
 import { fleetsUnderTap } from './tapTargets';
 import { resolveAddress } from '../../decisions/serverAddress';
 import { authStatusUrl, identityMode, revealSignup, type IdentityMode } from './identityProbe';

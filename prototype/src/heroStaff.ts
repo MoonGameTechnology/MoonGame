@@ -34,7 +34,7 @@ import {
   uninstallHeroModule,
   equipHeroAbility,
   unequipHeroAbility,
-} from './actions';
+} from '../../decisions/actions';
 import { houseDisplayName } from './setupSeats';
 
 type HeroInst = NonNullable<GameState['heroes']>[string];
