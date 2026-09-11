@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { createKernel } from '../kernel/kernel';
+import { attackerOf, defenderOf } from '../state/battle';
 import { fleetOpsModule } from './fleetOps';
 import { movementModule } from './movement';
 import {
@@ -278,8 +279,10 @@ describe('fleetOps — fleet.launch (scramble a garrison into a mobile fleet)', 
           id: 'b1',
           location: 'A',
           phase: 'ground',
-          attacker: { ref: { kind: 'fleet', fleetId: 'x' }, owner: 'p2' },
-          defender: { ref: { kind: 'garrison', planetId: 'A' }, owner: 'p1' },
+          sides: [
+            { ref: { kind: 'fleet', fleetId: 'x' }, owner: 'p2', role: 'attacker' as const },
+            { ref: { kind: 'garrison', planetId: 'A' }, owner: 'p1', role: 'defender' as const },
+          ],
           round: 1,
         },
       },
@@ -771,8 +774,8 @@ describe('fleetOps — fleet.engage (deliberate attack on a co-located hostile f
     expect(r.events.map((e) => e.type)).toContain('battle.started');
     const battle = r.state.battles[r.state.fleets.A!.battleId!];
     expect(battle?.phase).toBe('orbital');
-    expect(battle?.attacker.owner).toBe('p1');
-    expect(battle?.defender.owner).toBe('p2');
+    expect(battle && attackerOf(battle)?.owner).toBe('p1');
+    expect(battle && defenderOf(battle)?.owner).toBe('p2');
   });
 
   it('rejects engaging your own fleet, yourself, or a fleet that does not exist', () => {

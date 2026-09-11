@@ -86,14 +86,18 @@ function battleState(
     id: 'battle:1',
     location: at,
     phase: 'orbital',
-    attacker: {
-      ref: { kind: 'fleet', fleetId: weAttack ? 'f:ours' : 'f:foe' },
-      owner: weAttack ? 'p2' : 'p1',
-    },
-    defender: {
-      ref: { kind: 'fleet', fleetId: weAttack ? 'f:foe' : 'f:ours' },
-      owner: weAttack ? 'p1' : 'p2',
-    },
+    sides: [
+      {
+        ref: { kind: 'fleet', fleetId: weAttack ? 'f:ours' : 'f:foe' },
+        owner: weAttack ? 'p2' : 'p1',
+        role: 'attacker',
+      },
+      {
+        ref: { kind: 'fleet', fleetId: weAttack ? 'f:foe' : 'f:ours' },
+        owner: weAttack ? 'p1' : 'p2',
+        role: 'defender',
+      },
+    ],
     round: 2,
   };
   return {
@@ -171,8 +175,10 @@ describe('AI-BAL-7 — флот умеет проиграть бой (`fleet.ret
       id: 'battle:g',
       location: at,
       phase: 'ground',
-      attacker: { ref: { kind: 'landing', fleetId: 'f:ours' }, owner: 'p2' },
-      defender: { ref: { kind: 'garrison', planetId: at }, owner: 'p1' },
+      sides: [
+        { ref: { kind: 'landing', fleetId: 'f:ours' }, owner: 'p2', role: 'attacker' as const },
+        { ref: { kind: 'garrison', planetId: at }, owner: 'p1', role: 'defender' as const },
+      ],
       round: 2,
     };
     const staged: GameState = {

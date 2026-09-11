@@ -904,8 +904,10 @@ describe('fleet retreat', () => {
           id: 'b1',
           location: 'P',
           phase: 'ground' as const,
-          attacker: { ref: { kind: 'landing' as const, fleetId: 'F' }, owner: 'p1' },
-          defender: { ref: { kind: 'garrison' as const, planetId: 'P' }, owner: 'p2' },
+          sides: [
+            { ref: { kind: 'landing' as const, fleetId: 'F' }, owner: 'p1', role: 'attacker' as const },
+            { ref: { kind: 'garrison' as const, planetId: 'P' }, owner: 'p2', role: 'defender' as const },
+          ],
           round: 0,
         },
       },
@@ -1303,7 +1305,7 @@ describe('combat — после ничьей третий получает св�
     const ids = Object.keys(after.state.battles);
     expect(ids).toHaveLength(1);
     const fresh = after.state.battles[ids[0]!]!;
-    const sides = [fresh.attacker.owner, fresh.defender.owner].sort();
+    const sides = fresh.sides.map((s) => s.owner).sort();
     expect(sides).toContain('p3'); // третий — сторона нового боя
     expect(after.state.fleets.C?.battleId).toBe(ids[0]);
   });

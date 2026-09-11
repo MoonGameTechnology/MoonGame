@@ -175,7 +175,23 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '16'; // SHU-2.2: дежурство армится на БАЗУ.
+export const MODULE_MANIFEST_VERSION = '17'; // Две смены формы сразу: MSB-1 + SHU-2.2.
+// ПОЧЕМУ 17, А НЕ 16: версию подняли ДВА кирпича независимо — MSB-1 (бой стал списком
+// сторон) в `main` и SHU-2.2 (дежурство армится на БАЗУ) здесь, оба до 16. Слитая ветка
+// несёт ОБЕ смены формы, поэтому число одно и оно следующее: две разные формы под одним
+// номером — ровно то, от чего страж манифеста и защищает.
+//
+// MSB-1: у `Battle` больше нет полей `attacker`/`defender` — есть `sides: BattleSide[]` в
+// порядке вступления, и каждая сторона несёт свою `role` ('attacker' | 'defender'), от
+// которой зависит, бьёт она `attack` или отвечает `defense`.
+//
+// SHU-2.2: дежурный вылет (CC-4) армится не на ФЛОТ, а на БАЗУ — в состоянии
+// `patrols: Record<baseId, {kind}>` вместо `PatrolEntry`, у флота исчезли мёртвые
+// `freePosition`/`freeMovement`/`homeBase`, а `wingSorties` снят целиком.
+//
+// Матч на манифесте 15 несёт бои старой формы и старые дежурства: новый читатель увидел
+// бы у них `sides: undefined` и уронил бы первый же такт. Отказ загрузки честнее. (До 17:)
+// export const MODULE_MANIFEST_VERSION = '16'; // (номер пропущен — см. выше)
 // export const MODULE_MANIFEST_VERSION = '15'; // SHU-4.2: ангар — список ЭСКАДР.
 // Форма состояния изменилась: `planet.hangar`/`fleet.hangar` больше не плоские стеки, а
 // список эскадр (`{id, units, cargo}`), у вылета появился `squadronId`, а в состоянии —

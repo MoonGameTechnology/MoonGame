@@ -27,8 +27,9 @@
 
 /** Бой, сведённый к тому, по чему решается «мой ли он». */
 export interface BattleLike {
-  attacker: { owner: string | null };
-  defender: { owner: string | null };
+  /** MSB-1: стороны — СПИСОК. Структурный тип повторяет форму ядра ровно настолько,
+   *  насколько её читает это правило: нужен только владелец каждой стороны. */
+  sides: ReadonlyArray<{ owner: string | null }>;
   location: string;
 }
 
@@ -38,7 +39,7 @@ export function battleConcernsMe(
   me: string,
   known: (id: string) => boolean,
 ): boolean {
-  return b.attacker.owner === me || b.defender.owner === me || known(b.location);
+  return b.sides.some((s) => s.owner === me) || known(b.location);
 }
 
 /** Сколько боёв просится ко мне на тревогу. */

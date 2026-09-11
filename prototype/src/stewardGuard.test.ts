@@ -455,8 +455,10 @@ describe('stewardGuardOrders — эвакуация под угрозой (ST-3.
           id: 'b1',
           location: 'H',
           phase: 'ground',
-          attacker: { ref: { kind: 'landing', fleetId: 'E1' }, owner: 'p2' },
-          defender: { ref: { kind: 'garrison', planetId: 'H' }, owner: 'p1' },
+          sides: [
+            { ref: { kind: 'landing', fleetId: 'E1' }, owner: 'p2', role: 'attacker' as const },
+            { ref: { kind: 'garrison', planetId: 'H' }, owner: 'p1', role: 'defender' as const },
+          ],
           round: 1,
         },
       },

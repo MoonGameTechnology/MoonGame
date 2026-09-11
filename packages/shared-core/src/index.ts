@@ -86,6 +86,7 @@ export {
   journeyEtaMs,
 } from './state/route';
 export { isBombarded, bombardedPlanets, isActivelyBombarding } from './state/orbit';
+export { sidesOf, attackerOf, defenderOf } from './state/battle';
 export { fleetPositionAt, fleetNodeAt, legT } from './state/fleetPosition';
 export {
   DEFAULT_STANCE,

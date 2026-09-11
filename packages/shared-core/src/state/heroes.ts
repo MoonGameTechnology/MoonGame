@@ -48,8 +48,11 @@ export function fleetSideDealingHit(
   if (typeof battleId !== 'string' || typeof attacker !== 'string') return null;
   const battle = state.battles[battleId];
   if (!battle) return null;
-  const side = battle.attacker.owner === attacker ? battle.attacker : battle.defender;
-  if (side.ref.kind !== 'fleet') return null;
+  // MSB-1: сторона ищется по владельцу СРЕДИ СТОРОН. Раньше здесь стоял тернарник
+  // «атакующий или иначе обороняющийся» — на двух сторонах это то же самое, при N
+  // «иначе» перестаёт быть определённым.
+  const side = battle.sides.find((s) => s.owner === attacker);
+  if (!side || side.ref.kind !== 'fleet') return null;
   return { battle, side: side as BattleSide & { ref: { kind: 'fleet'; fleetId: string } } };
 }
 
@@ -65,7 +68,7 @@ export function fleetSideTakingHit(
   if (typeof battleId !== 'string' || typeof defender !== 'string') return null;
   const battle = state.battles[battleId];
   if (!battle) return null;
-  const side = battle.defender.owner === defender ? battle.defender : battle.attacker;
-  if (side.owner !== defender || side.ref.kind !== 'fleet') return null;
+  const side = battle.sides.find((s) => s.owner === defender);
+  if (!side || side.ref.kind !== 'fleet') return null;
   return { battle, side: side as BattleSide & { ref: { kind: 'fleet'; fleetId: string } } };
 }

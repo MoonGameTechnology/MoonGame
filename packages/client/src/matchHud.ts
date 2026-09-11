@@ -20,7 +20,7 @@
  * SH-0.1/0.2 — `shieldHp` pool); a derived power rating / damage-reduction still
  * don't exist in the core (docs/hud-inmatch.md HUD-2 ⏳) and land once they ship.
  */
-import { MS_PER_DAY, previewBattle, previewLossCount } from '@void/shared-core';
+import { attackerOf, defenderOf, MS_PER_DAY, previewBattle, previewLossCount } from '@void/shared-core';
 import type {
   BattleId,
   BattlePreviewSide,
@@ -418,8 +418,15 @@ export function createBattleModel(
   if (!battle) {
     return { ok: false, code: 'E_NO_BATTLE' };
   }
-  const attacker = sideView(state, battle.attacker, viewerId, data);
-  const defender = sideView(state, battle.defender, viewerId, data);
+  // MSB-1: стороны приходят из СПИСКА. Сама панель пока двусторонняя — её вид на N
+  // сторон это MSB-6, и здесь он намеренно не меняется ни на пиксель.
+  const attackerSide = attackerOf(battle);
+  const defenderSide = defenderOf(battle);
+  if (!attackerSide || !defenderSide) {
+    return { ok: false, code: 'E_NO_BATTLE' };
+  }
+  const attacker = sideView(state, attackerSide, viewerId, data);
+  const defender = sideView(state, defenderSide, viewerId, data);
 
   const model: BattleModel = {
     kind: 'battle',
@@ -433,7 +440,7 @@ export function createBattleModel(
   if (battle.nextRoundAt != null) model.nextRoundAt = battle.nextRoundAt;
 
   // Only an orbital ship-side the viewer owns can retreat (not a garrison/landing).
-  for (const side of [battle.attacker, battle.defender]) {
+  for (const side of battle.sides) {
     if (side.ref.kind === 'fleet' && side.owner === viewerId) {
       model.retreatFleetId = side.ref.fleetId;
       break;

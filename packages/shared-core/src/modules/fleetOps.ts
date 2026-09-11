@@ -453,8 +453,10 @@ export const fleetOpsModule: GameModule = {
         id: battleId,
         location: f.location,
         phase: 'orbital',
-        attacker: { ref: { kind: 'fleet', fleetId: f.id }, owner: f.owner },
-        defender: { ref: { kind: 'fleet', fleetId: target.id }, owner: target.owner },
+        sides: [
+          { ref: { kind: 'fleet', fleetId: f.id }, owner: f.owner, role: 'attacker' },
+          { ref: { kind: 'fleet', fleetId: target.id }, owner: target.owner, role: 'defender' },
+        ],
         round: 0,
         nextRoundAt: roundAt,
       };
