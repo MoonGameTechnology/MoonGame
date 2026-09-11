@@ -239,7 +239,7 @@ import {
   saveSession,
   tokenFor,
   type SessionRec,
-} from './sessionStore';
+} from '../../decisions/sessionStore';
 import {
   authOutcome,
   shouldRegister,
@@ -408,7 +408,6 @@ import {
 import {
   t,
   tData,
-  hasKey,
   LOCALE,
   LOCALE_LABEL,
   setLocale,
@@ -751,7 +750,7 @@ import { ringed, ringsShown } from './assaultRings';
 import { gridGap, gridLines, gridOffset } from './backdropGrid';
 import { mapScale, screenRadius } from './mapRadius';
 import { phaseAt, phaseOfId } from './pulseFx';
-import { authorizedBase } from './hubAuth';
+import { authorizedBase } from '../../decisions/hubAuth';
 import { diploIntent } from './diploClick';
 import { afterTokenRefused, joinStep } from '../../decisions/joinGate';
 import { assaultSteps } from './assaultOrder';
@@ -762,6 +761,7 @@ import { orderPlan } from '../../decisions/orderRoute';
 import { clientPlan, liveSocket, seatKey } from '../../decisions/netClientReuse';
 import { errorTarget, refusalKey } from '../../decisions/errorRoute';
 import { joinLanding } from '../../decisions/joinLanding';
+import { refusalText as errText } from '../../decisions/refusalText';
 import {
   claimIntent,
   matchIdFrom,
@@ -2326,15 +2326,9 @@ function apply(out: StepOut) {
 
 /** Apply a player-issued order and surface a rejection in the log (so a denied
  *  click — wrong orbit, no capacity, can't afford — isn't silently swallowed). */
-// Kernel rejection codes → a human phrase. The key is DERIVED from the code
-// (E_NO_CAPACITY → err.no-capacity), so a new code needs only an entry in
-// /localization — there is no table here to forget to update. An unlisted code
-// degrades to the de-mangled code itself rather than showing a raw key.
-function errText(code: string): string {
-  const bare = code.replace(/^E_/, '').toLowerCase();
-  const key = `err.${bare.replace(/_/g, '-')}`;
-  return hasKey(key) ? t(key) : bare.replace(/_/g, ' ');
-}
+// Имя отказа — `decisions/refusalText.ts` (MIG-2). Правило «ключ выводится из кода»
+// осталось тем же, но живёт оно теперь в общей папке: тот же отказ обязан читаться
+// одинаково в прототипе и в `packages/client`, а две копии этого не гарантируют.
 function playerOrder(action: Action): boolean {
   // Возврат — «приказ не ОТВЕРГНУТ сейчас»: в соло это честный исход редьюсера,
   // в сети и при реконнекте — true (исход асинхронный). Нужен вызывающим, которые

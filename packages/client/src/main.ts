@@ -18,6 +18,11 @@ import { clampCam, zoomAt, type Cam, type Viewport, type Bounds } from './camera
 import { renderMap } from './mapRender';
 import { openLiveMatch } from './net';
 import { nearestPlanet, myFleetAt, moveAction } from './matchInput';
+import { browserIo, createSession, type NetSession } from './session';
+import { socketBase } from '../../../decisions/serverAddress';
+import { errorTarget, refusalKey } from '../../../decisions/errorRoute';
+import { refusalText } from '../../../decisions/refusalText';
+import type { MatchSummary } from '@void/protocol';
 
 /** Bind the typed theme tokens to CSS custom properties (docs/main-menu.md §5.4 — one
  *  TS engine → one look). The stylesheet in index.html reads these vars. */
@@ -92,6 +97,10 @@ function render(model: WelcomeModel): void {
       .join('') +
     `</div>` +
     `<div class="login"><input id="nick" maxlength="24" placeholder="${esc(model.loginLabel)}" autocomplete="off" />` +
+    // Пароль — обычное поле рядом с позывным: у сервера вход ОДИН (`POST /auth/login`),
+    // и первый вход им же заводит учётку (`authRules`/`authRequest`, порядок
+    // login→register). Отдельного экрана регистрации поэтому нет и не нужно.
+    `<input id="pass" type="password" maxlength="72" placeholder="${esc(t('client.auth.password'))}" autocomplete="current-password" />` +
     `<button class="btn" data-act="login">${esc(model.loginLabel)}</button></div>` +
     `<footer>${model.legal.map((l) => `<a data-legal="${l.id}">${esc(l.label)}</a>`).join('<span>·</span>')}</footer>` +
     // Language picker: the ids come from `/localization`, so a new locale file shows up
@@ -119,15 +128,46 @@ function loginNick(): string {
   return (document.getElementById('nick') as HTMLInputElement | null)?.value ?? '';
 }
 
-/** Sign in with whatever is typed. An empty callsign just puts the cursor back in the
- *  field — the blank input is the message, so no complaint is printed under the card. */
-function submitLogin(model: WelcomeModel): void {
-  const nick = loginNick();
-  if (!nick.trim()) {
+function loginPass(): string {
+  return (document.getElementById('pass') as HTMLInputElement | null)?.value ?? '';
+}
+
+/** Как назвать игроку исход входа. Ключи — на каждую причину своя, потому что ответы
+ *  на них РАЗНЫЕ: «пароль не подошёл» чинится паролем, «сервер недоступен» — повтором,
+ *  а «слишком часто» — паузой. Слить их в одно «не вышло» значит отправить чинить не то. */
+const AUTH_TEXT: Record<string, string> = {
+  'wrong-password': 'client.auth.wrong-password',
+  'mail-taken': 'client.auth.mail-taken',
+  'rate-limited': 'client.auth.rate-limited',
+  'register-refused': 'client.auth.refused',
+  'login-refused': 'client.auth.refused',
+};
+
+/** Вход по-настоящему: `session.signIn` ходит на сервер по правилам `/decisions`
+ *  (login → и только неизвестный логин уводит в register), а экран лишь показывает
+ *  исход и, если пустили, переключается на список партий. */
+async function submitLogin(): Promise<void> {
+  const nick = loginNick().trim();
+  if (!nick) {
     document.getElementById('nick')?.focus();
     return;
   }
-  setStatus(statusText(resolveWelcomeAction({ kind: 'login', nick }, model)));
+  const res = await session.signIn(nick, loginPass());
+  if (res.kind === 'invalid') {
+    setStatus(t(res.field === 'login' ? 'client.auth.bad-login' : 'client.auth.bad-password'));
+    document.getElementById(res.field === 'login' ? 'nick' : 'pass')?.focus();
+    return;
+  }
+  if (res.kind === 'offline') {
+    setStatus(t('client.auth.offline'));
+    return;
+  }
+  if (res.outcome === 'ok' || res.outcome === 'created') {
+    setStatus(t(res.outcome === 'created' ? 'client.auth.created' : 'client.auth.hello', { nick }));
+    void showMatches();
+    return;
+  }
+  setStatus(t(AUTH_TEXT[res.outcome] ?? 'client.auth.refused'));
 }
 
 function wire(model: WelcomeModel): void {
@@ -148,8 +188,20 @@ function wire(model: WelcomeModel): void {
         break;
       }
       case 'login':
-        submitLogin(model);
+        void submitLogin();
         break;
+      case 'signOut':
+        session.signOut();
+        location.reload(); // экран строится из t() на импорте — проще перезайти начисто
+        break;
+      case 'refresh':
+        void showMatches();
+        break;
+      case 'join': {
+        const id = target.dataset.match;
+        if (id) void joinMatch(id);
+        break;
+      }
       case 'lang': {
         // Fail-secure: only a known locale id is accepted, and the current one is a no-op
         // (a reload would just throw away what the player typed).
@@ -164,7 +216,8 @@ function wire(model: WelcomeModel): void {
   });
   app.addEventListener('keydown', (e) => {
     const ke = e as KeyboardEvent;
-    if (ke.key === 'Enter' && (ke.target as HTMLElement).id === 'nick') submitLogin(model);
+    const id = (ke.target as HTMLElement).id;
+    if (ke.key === 'Enter' && (id === 'nick' || id === 'pass')) void submitLogin();
   });
 }
 
@@ -309,6 +362,92 @@ function runMatch(getState: () => GameState, bounds: Bounds, interact?: MatchInt
 // server-hosted session (`?join=`). `gameData.ts` keeps the shipped-map loader for the
 // tests and for the match browser to reuse once it lands.
 
+/* ─────────────────────────── Match browser (MIG-2) ─────────────────────────── */
+
+/**
+ * Адрес сервера. Клиент отдаётся ТЕМ ЖЕ сервером, с которым говорит, поэтому умолчание —
+ * собственный хост страницы; `?server=` оставлен для дев-стенда и чужого хоста. Схему
+ * нормализует `socketBase` (решение, общее с прототипом) — в том числе поднимает `ws://`
+ * до `wss://` на HTTPS-странице, иначе браузер оборвёт соединение как смешанное
+ * содержимое, а выглядело бы это как «сервер не отвечает».
+ */
+function serverBase(): string {
+  const typed = new URLSearchParams(location.search).get('server') ?? location.host;
+  return socketBase(typed, location.protocol === 'https:') ?? `ws://${location.host}`;
+}
+
+const session: NetSession = createSession(serverBase(), browserIo());
+
+/** Одна строка списка. Всё, что показано, приезжает из read-model сервера
+ *  (`@void/protocol`) — клиент ничего про партию не выводит сам. */
+function matchRow(m: MatchSummary): string {
+  const line = t('client.matches.row', {
+    d: m.days + 1,
+    seated: m.players.seated,
+    capacity: m.players.capacity,
+  });
+  const badge = m.kind ? `<i class="kind">${esc(m.kind.toUpperCase())}</i>` : '';
+  return (
+    `<button class="btn row" data-act="join" data-match="${esc(m.matchId)}">` +
+    `<b>${esc(m.matchId)}</b>${badge}<span>${esc(line)}</span></button>`
+  );
+}
+
+/** Список партий вместо приветственной карточки. Свои партии идут первыми: в них уже
+ *  есть место, и возврат в свою партию — частый случай, а не поиск новой. */
+async function showMatches(): Promise<void> {
+  const app = document.getElementById('app');
+  if (!app) return;
+  const res = await session.matches();
+  const nick = session.login() ?? '';
+  if (res.outcome !== 'ok' || !res.lists) {
+    setStatus(t(res.outcome === 'refused' ? 'client.matches.refused' : 'client.matches.unreachable'));
+    return;
+  }
+  const { active, available } = res.lists;
+  const section = (titleKey: string, rows: MatchSummary[]): string =>
+    rows.length ? `<h2>${esc(t(titleKey))}</h2>${rows.map(matchRow).join('')}` : '';
+  app.innerHTML =
+    `<main class="welcome browser">` +
+    `<div class="crest">◆</div>` +
+    `<p class="tagline">${esc(nick)}</p>` +
+    section('client.matches.mine', active) +
+    section('client.matches.title', available) +
+    (active.length + available.length === 0
+      ? `<p class="tagline">${esc(t('client.matches.empty'))}</p>`
+      : '') +
+    `<div class="login"><button class="btn" data-act="refresh">${esc(t('client.matches.refresh'))}</button>` +
+    `<button class="btn stub" data-act="signOut">${esc(t('client.signout'))}</button></div>` +
+    `<div id="status" class="status" role="status" aria-live="polite"></div>` +
+    `</main>`;
+}
+
+/** Взять место и подключиться. Обмен сессии на короткий пропуск и сборку адреса делает
+ *  `session.join` по правилам `/decisions`; здесь — только показ причины отказа. */
+async function joinMatch(matchId: string): Promise<void> {
+  const res = await session.join(matchId);
+  if (res.ok) {
+    connectLive(res.wsUrl);
+    return;
+  }
+  // Каждая причина названа отдельно: «вход просрочен» чинится повторным входом, «мест
+  // нет» — другой партией, «сервер недоступен» — повтором. Общее «не вышло» не помогло бы.
+  const TEXT: Record<string, string> = {
+    'session-expired': 'client.join.expired',
+    'entry-closed': 'net.join-closed',
+    'seats-full': 'net.match-full',
+    offline: 'client.join.offline',
+    failed: 'client.join.failed',
+  };
+  setStatus(t(TEXT[res.reason] ?? 'client.join.failed'));
+  // Сессии больше нет — на карточку входа, иначе игрок жмёт по списку впустую.
+  if (res.reason === 'session-expired') {
+    render(welcome);
+    wire(welcome);
+    setStatus(t('client.join.expired'));
+  }
+}
+
 /** A small fixed overlay for the live-match connection status + a one-line hint (the
  *  welcome-screen #status is hidden once the map canvas takes over). */
 function setNetStatus(text: string): void {
@@ -355,7 +494,22 @@ function connectLive(url: string): void {
       if (s === 'connecting') setNetStatus(t('client.net.connecting'));
       else if (s === 'closed') setNetStatus(t('client.net.closed'));
     },
-    onError: (code) => setNetStatus(`✖ ${code}`),
+    // Отказ рукопожатия. Куда его показать, решает `errorRoute` (общее с прототипом):
+    // по устаревшему сокету — никуда, иначе в строку статуса. Причина называется СЛОВАМИ:
+    // сервер довёл рукопожатие до конца именно ради объяснения («мест нет», «вход
+    // закрыт»), и показать вместо этого `E_MATCH_FULL` значит выбросить объяснение.
+    onError: (code) => {
+      const where = errorTarget({ current: true, admitted: me !== null, code });
+      if (where === 'ignore') return;
+      const key = refusalKey(code);
+      setNetStatus(`✖ ${key ? t(key) : refusalText(code)}`);
+    },
+    // ОТКАЗ ПРИКАЗА. До MIG-2 этого обработчика не было вовсе: сервер отвергал приказ,
+    // а игрок не видел НИЧЕГО — нажатие просто пропадало. Это и был невыполненный
+    // критерий CP1.3 «отказ показывается человеку».
+    onRejection: (_actionId, code) => {
+      setNetStatus(t('client.rejected', { text: refusalText(code) }));
+    },
     onSnapshot: (snap) => {
       live = snap.state;
       if (snap.playerId) me = snap.playerId;

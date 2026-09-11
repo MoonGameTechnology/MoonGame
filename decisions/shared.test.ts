@@ -41,6 +41,18 @@ function importSpecifiers(code: string): string[] {
   return [...code.matchAll(/(?:from|import)\s*['"]([^'"]+)['"]/g)].map((m) => m[1] ?? '');
 }
 
+/**
+ * Код без комментариев — правило 2 запрещает ВЫЗОВЫ, а не слова.
+ *
+ * Без этого сторож ловил бы прозу: `sessionStore.ts` объясняет свой интерфейс фразой
+ * «минимум от `localStorage`, который нужен хранилищу», и сам при этом безупречно чист —
+ * он принимает `KeyValueStore` и ничего не трогает. Запретить такое упоминание значило
+ * бы заставить автора врать в комментарии о том, что модуль на самом деле заменяет.
+ */
+function stripComments(code: string): string {
+  return code.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/\/\/[^\n]*/g, ' ');
+}
+
 describe('/decisions — контракт общей папки', () => {
   it('папка не пуста и состоит из пар «решение + тест рядом» (правило 3)', () => {
     expect(sources.length).toBeGreaterThan(0);
@@ -67,7 +79,7 @@ describe('/decisions — контракт общей папки', () => {
     // Только ИСХОДНИКИ: тест решения вправе звать что угодно, он и так живёт в Node.
     const banned =
       /\b(document|localStorage|sessionStorage)\b|\bwindow\.|\bfetch\(|\bWebSocket\b|\bDate\.now\(|\bperformance\.now\(|\bMath\.random\(/;
-    const offenders = sources.filter((f) => banned.test(read(f)));
+    const offenders = sources.filter((f) => banned.test(stripComments(read(f))));
     expect(offenders, 'решение перестало быть проверяемым без браузера').toEqual([]);
   });
 });
