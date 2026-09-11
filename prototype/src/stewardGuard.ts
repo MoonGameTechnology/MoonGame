@@ -28,7 +28,7 @@ import {
 } from '../../packages/shared-core/src/index';
 import { findHealthyStack, sumUnitStat } from '../../packages/shared-core/src/util/stacks';
 import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet';
-import { act, moveFleet, loadArmy, engageFleet, orderScramble } from './actions';
+import { act, moveFleet, loadArmy, engageFleet, orderScramble } from '../../decisions/actions';
 import { data } from './gameData';
 import { ctx } from './protoKernel';
 import { hangarMachines } from '../../packages/shared-core/src/index';

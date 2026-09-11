@@ -9,7 +9,7 @@
  * This is intentionally thin: map rendering, the network transport and the PWA install
  * layer are later bricks (CP0.2 / CP1.x). No forked copy of the core or its data.
  */
-import { createInitialState, type Action, type GameState } from '@void/shared-core';
+import { createInitialState, type GameState } from '@void/shared-core';
 import { t, LOCALE, isLocaleId, setLocale } from '../../../localization/core';
 import { theme } from './theme';
 import { createWelcomeModel, resolveWelcomeAction, nextCallsign } from './welcomeScreen';
@@ -17,11 +17,12 @@ import type { WelcomeModel, WelcomeOutcome, AuthProviderId } from './welcomeScre
 import { clampCam, zoomAt, type Cam, type Viewport, type Bounds } from './camera';
 import { renderMap } from './mapRender';
 import { openLiveMatch } from './net';
-import { nearestPlanet, myFleetAt, moveAction } from './matchInput';
+import { nearestPlanet, myFleetAt } from './matchInput';
 import { browserIo, createSession, type NetSession } from './session';
 import { socketBase } from '../../../decisions/serverAddress';
 import { errorTarget, refusalKey } from '../../../decisions/errorRoute';
 import { refusalText } from '../../../decisions/refusalText';
+import { act, moveFleet, retreatFleet } from '../../../decisions/actions';
 import type { MatchSummary } from '@void/protocol';
 import { shippedGameData } from './gameData';
 import { createStatusBarModel, createSelectionModel, createBattleModel, resolveBattleAction } from './matchHud';
@@ -458,13 +459,6 @@ async function joinMatch(matchId: string): Promise<void> {
  *  без него модели отдают панели без корпуса/щита — они деградируют, а не падают. */
 const HUD_DATA = shippedGameData();
 
-/** Намерение любого типа. Тот же формат `id`, что у `moveAction` (`ui:<player>:<seq>`) —
- *  на gated-комнате его всё равно заменит конверт `action.v1`, а на дев-сервере он и
- *  есть ключ идемпотентности. */
-function intent(me: string, seq: number, type: string, payload: Record<string, unknown>): Action {
-  return { id: `ui:${me}:${seq}`, type, playerId: me, payload, issuedAt: 0 };
-}
-
 /** Корпуса своего дома (плюс общие). Это КОРОТКИЙ список для меню, а не право на
  *  постройку: право проверяет сервер, и его отказ теперь доходит словами. */
 function buildableUnits(faction: string | undefined): string[] {
@@ -514,7 +508,6 @@ function connectLive(url: string): void {
   let started = false;
   let me: string | null = null;
   let selectedFleet: string | null = null;
-  let seq = 1;
   const hint = (): void => {
     if (me) {
       setNetStatus(
@@ -578,7 +571,7 @@ function connectLive(url: string): void {
           setNetStatus(t('client.rejected', { text: refusalText(out.code) }));
           return;
         }
-        client.sendAction(intent(me, seq++, out.type, { fleetId: out.fleetId }));
+        client.sendAction(retreatFleet(me, out.fleetId));
         break;
       }
       case 'equip':
@@ -644,7 +637,7 @@ function connectLive(url: string): void {
           setNetStatus(t('client.rejected', { text: refusalText(out.code) }));
           return;
         }
-        client.sendAction(intent(me, seq++, out.action.type, out.action.payload));
+        client.sendAction(act(me, out.action.type, out.action.payload));
         panel = 'none';
         loadout = null;
         break;
@@ -710,7 +703,7 @@ function connectLive(url: string): void {
               // second tap → order the selected fleet to move there (server-authoritative)
               const f = live.fleets[selectedFleet];
               if (f && f.location && f.location !== planetId) {
-                client.sendAction(moveAction(me, seq++, selectedFleet, planetId));
+                client.sendAction(moveFleet(me, selectedFleet, planetId));
                 setNetStatus(t('client.net.order', { fleet: selectedFleet, planet: planetId }));
                 selectedFleet = null;
                 panel = 'none';

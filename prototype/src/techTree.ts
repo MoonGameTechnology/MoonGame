@@ -23,7 +23,7 @@ import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
 import { DAY, HOUR } from './time';
 import { esc, cost, displayUnit, fmtEta } from './format';
-import { researchTech } from './actions';
+import { researchTech } from '../../decisions/actions';
 
 const clamp = (v: number, a: number, b: number): number => Math.max(a, Math.min(b, v));
 

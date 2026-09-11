@@ -1,9 +1,22 @@
 /**
- * Player-order action builders — thin `Action` envelope constructors the UI
- * calls to issue orders (`main.ts`), plus `canTraverse` (fog/diplomacy gate for
- * pathing). Extracted from `game.ts` (REFP-22/27): pure, no other `game.ts`
- * deps beyond shared-core types + `getStance`. `game.ts` imports both for
- * internal AI use and re-exports for `main.ts` / `netserver.ts` / tests.
+ * Строители приказов игрока (MIG-5) — тонкие конструкторы конверта `Action`, которыми
+ * интерфейс выписывает намерение, плюс `canTraverse` (кого пропускает чужая провинция).
+ *
+ * Это КЛИЕНТСКАЯ половина контракта, вторая половина которого — `actionPayloadSchemas`
+ * в ядре: гейт `@void/action-layer` сверяет payload со схемой ДО редьюсера и отвечает
+ * `E_BAD_PAYLOAD`, если половины разошлись. Разъезд не ловится ни typecheck'ом, ни
+ * сборкой (payload здесь — `unknown`), поэтому его ловит тест рядом: каждый строитель
+ * проверяется НАСТОЯЩЕЙ схемой, а не своим представлением о ней.
+ *
+ * Почему файл общий (`/decisions`), а не прототипный: выписать приказ обязаны оба
+ * клиента, и выписать ОДИНАКОВО. Своя копия у второго клиента означала бы не «немного
+ * другой код», а другой payload — то есть приказ, который сервер молча отвергнет, хотя
+ * у соседнего клиента тот же жест работает. Извлечено из `game.ts` (REFP-22/27), потому
+ * и чисто: из всего ядра нужны только типы и `getStance`.
+ *
+ * Единственное состояние здесь — счётчик `seqCounter` в `act()`: он делает id приказа
+ * уникальным в пределах ОДНОЙ загрузки клиента. Это не решение и не правило мира —
+ * пространство имён для id, поэтому у каждой сборки оно своё и сходиться им не нужно.
  */
 import {
   getStance,
@@ -11,7 +24,7 @@ import {
   type DiplomaticStance,
   type GameState,
   type StewardPosture,
-} from '../../packages/shared-core/src/index';
+} from '../packages/shared-core/src/index';
 
 let seqCounter = 0;
 /** Exported for `game.ts`'s remaining, not-yet-extracted action builders (market/
@@ -241,7 +254,7 @@ export const chainStamp = (
 // Market listing, pulled ahead of the REFP-22 remainder for the same reason as the
 // standing-order toggles above: `aiOrders` (ai.ts, REFP-26) places lots and must not
 // import the facade back. Leaf builder — only the `MarketSide` type rides along.
-import type { MarketSide } from '../../packages/shared-core/src/index';
+import type { MarketSide } from '../packages/shared-core/src/index';
 /** List an open lot on the session market (sell `amount` at `price`, or a buy bid). */
 export const marketList = (
   playerId: string,
@@ -255,7 +268,7 @@ export const marketList = (
 // interleaved with in game.ts has since been extracted (chains REFP-8, divisions
 // REFP-13, market REFP-12), leaving pure leaf builders. Патрульный штамп отсюда ушёл
 // вместе с моделью «крыло как флот» (SHU-2.2).
-import type { ChainStep } from '../../packages/shared-core/src/index';
+import type { ChainStep } from '../packages/shared-core/src/index';
 /** Take (fill) up to `amount` from an open lot — buy from a sell lot / sell into a buy lot. */
 export const marketTake = (playerId: string, id: string, amount?: number) =>
   act(playerId, 'market.take', amount === undefined ? { id } : { id, amount });

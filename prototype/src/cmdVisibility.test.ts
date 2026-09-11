@@ -8,7 +8,7 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import { advance, canOrder, newGame, order, HOUR } from './game';
-import { moveFleet, stopFleet } from './actions';
+import { moveFleet, stopFleet } from '../../decisions/actions';
 
 /** Живое состояние прототипа: свой флот стоит дома. */
 const base = () => {
