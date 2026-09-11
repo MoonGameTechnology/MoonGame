@@ -547,6 +547,11 @@ export interface BattleSide {
   ref: CombatantRef;
   /** Owner of this side (for victory / planet ownership). */
   owner: PlayerId | null;
+  /** MSB-1: which stat this side fires with — an ATTACKER strikes with `attack`, a
+   *  DEFENDER answers with `defense` only. The role belongs to the SIDE, not to the
+   *  pair: once a battle can hold five participants, four of them may be attacking at
+   *  once and «attacker ↔ defender» stops describing the battle as a whole. */
+  role: 'attacker' | 'defender';
 }
 
 /**
@@ -559,8 +564,13 @@ export interface Battle {
   /** Contested planet where the engagement happens. */
   location: PlanetId;
   phase: 'orbital' | 'ground';
-  attacker: BattleSide;
-  defender: BattleSide;
+  /** MSB-1: the sides, in JOIN ORDER. A list, not two named fields — `{ attacker,
+   *  defender }` expressed exactly two and could not physically hold a third. Today
+   *  every battle carries exactly two entries and behaves as before; the rules that
+   *  USE a longer list (damage split, joining a running battle, joint assault) are
+   *  MSB-2/3/4. Read roles via `state/battle.ts`, never by index: the order here is
+   *  join order, which MSB-4 reads to decide whose world a joint assault takes. */
+  sides: BattleSide[];
   /** Rounds resolved so far. */
   round: number;
   /** Server time (ms) the next hourly round fires — the live battle timer the

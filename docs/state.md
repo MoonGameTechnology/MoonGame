@@ -6,7 +6,7 @@
 > `deep-technical-roadmap.md`, `multiplayer.md`, `metagame.md`, `map-roadmap.md`, `security-a06.md` (модель угроз/A06), корневой `CLAUDE.md` / `CONTRIBUTING.md`.
 >
 > **Ветка:** feature-ветка · **PR:** создаётся после изменений.
-> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 5792 зелёных** (70 skip, 437 файлов; с `DATABASE_URL` — 5862 без пропусков). Пропуски — тесты durable-пути и учение бэкапов, которым нужна база; в CI база есть, но нет пакета `age`, поэтому там 5861 и пропущен один тест — реальный криптокруг (проводку шифрования CI проверяет заглушкой, см. §10).
+> **Гейт:** `pnpm run check` (lint + typecheck + test + docs-check). **Тесты: 5797 зелёных** (70 skip, 438 файлов; с `DATABASE_URL` — 5867 без пропусков). Пропуски — тесты durable-пути и учение бэкапов, которым нужна база; в CI база есть, но нет пакета `age`, поэтому там 5861 и пропущен один тест — реальный криптокруг (проводку шифрования CI проверяет заглушкой, см. §10).
 
 **Быстрый старт сессии** (навигация — факты живут в секциях и не дублируются здесь):
 
@@ -221,7 +221,14 @@ prototype/       src/game.ts (чистый index-фасад реэкспорто
   `battleId?`, **`retreatHasteUntil?`** (мир-время, до которого действует баф скорости
   после отступления — читает хук `fleet.speed`).
 - `battles: Record<id, Battle>` — `location`, `phase:'orbital'|'ground'`,
-  `attacker/defender {ref: CombatantRef, owner}`, `round`, **`nextRoundAt?`**
+  **`sides: BattleSide[]`** (MSB-1: СПИСОК сторон в порядке вступления, а не два поля
+  `attacker`/`defender`; сторона = `{ref: CombatantRef, owner, role:'attacker'|'defender'}`).
+  Роль принадлежит СТОРОНЕ, а не паре: от неё зависит, бьёт сторона своим `attack` или
+  отвечает `defense`, и при N участниках атакующими могут быть сразу несколько. Спрашивают
+  роль через `state/battle.ts` (`sidesOf`/`attackerOf`/`defenderOf`), НЕ по индексу —
+  порядок в списке это порядок вступления, по нему MSB-4 решит, чей мир после совместного
+  штурма. Сегодня каждый бой ровно парный: кирпич сменил форму, не правила. Плюс `round`,
+  **`nextRoundAt?`**
   (время следующего почасового раунда — таймер боя для клиента). `CombatantRef` =
   `fleet` | `landing` | `beachhead` | `garrison` (ROS-1.5: `beachhead` — десант, высаженный
   челноком, его держит МИР (`planet.beachhead {owner, units}`), а не флот; сторона ВРЕМЕННАЯ —
@@ -641,7 +648,8 @@ INSTEAD-of-фокус — opportunity-cost (лидер-«+слот» branchless)
   replay/RNG golden-тесты), сознательно отделён. Интервал раунда =
   `MS_PER_HOUR / timeScale`; `battle.nextRoundAt` несёт время следующего раунда
   (таймер боя). Урон через хук **`combat.damage`** (args: battleId, phase, location,
-  attacker, defender). Исход → `battle.resolved`.
+  attacker, defender — это ВЛАДЕЛЬЦЫ сторон в аргументах хука, не поля боя: сам бой с
+  MSB-1 держит список). Исход → `battle.resolved`.
   **Через хук идут ВСЕ каналы урона** (CORE-DMG-1; решение владельца, ОБРАЩЁННОЕ — первая
   версия считала охват «только ближний бой» замыслом): раунд ближнего боя здесь, ПВО
   планеты и бомбардировка в `orbital`, корабельное ПВО в `shuttle`. Каждый канал зовёт хук

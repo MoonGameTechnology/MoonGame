@@ -20,6 +20,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { createKernel } from '../kernel/kernel';
+import { attackerOf } from '../state/battle';
 import { shuttleModule } from './shuttle';
 import { combatModule } from './combat';
 import { constructionModule } from './construction';
@@ -275,7 +276,7 @@ describe('ROS-1.5 — высадка (правила 3–6)', () => {
     expect(count(state.planets.B?.beachhead?.units, 'militia')).toBe(4);
     const battle = Object.values(state.battles)[0];
     expect(battle?.phase).toBe('ground');
-    expect(battle?.attacker.ref).toEqual({ kind: 'beachhead', planetId: 'B' });
+    expect(battle && attackerOf(battle)?.ref).toEqual({ kind: 'beachhead', planetId: 'B' });
     expect(state.planets.B?.owner).toBe('p2'); // мир ещё не взят — за него дерутся
   });
 

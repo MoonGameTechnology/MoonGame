@@ -417,8 +417,10 @@ describe('orbital — anti-air (orbital AA)', () => {
           id: 'battle:0',
           location: 'P',
           phase: 'ground',
-          attacker: { ref: { kind: 'landing', fleetId: 'G' }, owner: 'p2' },
-          defender: { ref: { kind: 'garrison', planetId: 'P' }, owner: 'p1' },
+          sides: [
+            { ref: { kind: 'landing', fleetId: 'G' }, owner: 'p2', role: 'attacker' as const },
+            { ref: { kind: 'garrison', planetId: 'P' }, owner: 'p1', role: 'defender' as const },
+          ],
           round: 0,
         },
       ],

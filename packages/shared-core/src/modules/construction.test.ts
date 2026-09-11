@@ -211,8 +211,10 @@ function groundBattle(buildings: BuildingInstance[] = [], garrisonCount = 10): G
     id: 'battle:0',
     location: 'A',
     phase: 'ground',
-    attacker: { ref: { kind: 'landing', fleetId: 'F' }, owner: 'p1' },
-    defender: { ref: { kind: 'garrison', planetId: 'A' }, owner: 'p2' },
+    sides: [
+      { ref: { kind: 'landing', fleetId: 'F' }, owner: 'p1', role: 'attacker' as const },
+      { ref: { kind: 'garrison', planetId: 'A' }, owner: 'p2', role: 'defender' as const },
+    ],
     round: 0,
   };
   return {
