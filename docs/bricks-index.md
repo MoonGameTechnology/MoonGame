@@ -821,14 +821,14 @@
 | MS-2.2 | 🔒 | core data | `docs/missiles-roadmap.md:68` | Детонация |
 | MS-3.1 | 🔒 | core data | `docs/missiles-roadmap.md:75` | Пусковой/ракеты как предмет + P2W-guardrail |
 | MS-4.1 | 🔒 | cli | `docs/missiles-roadmap.md:83` | Рендер полёта/перехвата/удара |
-| MSB-0 | ✅ | docs | `docs/multiside-combat-roadmap.md:323` | Решение владельца: (а), (б) или (в) |
-| MSB-1 | ✅ | core | `docs/multiside-combat-roadmap.md:328` | Battle стал СПИСКОМ сторон |
-| MSB-2 | ⏳ | core data | `docs/multiside-combat-roadmap.md:366` | Правило деления урона |
-| MSB-3 | ⏳ | core | `docs/multiside-combat-roadmap.md:381` | Вступление в идущий бой |
-| MSB-4 | ⏳ | core | `docs/multiside-combat-roadmap.md:411` | Совместный штурм и чей мир |
-| MSB-5 | ⏳ | core | `docs/multiside-combat-roadmap.md:429` | Что делает бой при смене владельца стороны |
-| MSB-6 | ⏳ | proto cli | `docs/multiside-combat-roadmap.md:438` | Панель боя на N сторон |
-| MSB-7 | ⏳ | core proto | `docs/multiside-combat-roadmap.md:446` | Зенитки и обстрел при N сторонах |
+| MSB-0 | ✅ | docs | `docs/multiside-combat-roadmap.md:335` | Решение владельца: (а), (б) или (в) |
+| MSB-1 | ✅ | core | `docs/multiside-combat-roadmap.md:340` | Battle стал СПИСКОМ сторон |
+| MSB-2 | ⏳ | core data | `docs/multiside-combat-roadmap.md:378` | Правило деления урона |
+| MSB-3 | ⏳ | core | `docs/multiside-combat-roadmap.md:393` | Вступление в идущий бой |
+| MSB-4 | ⏳ | core | `docs/multiside-combat-roadmap.md:423` | Совместный штурм и чей мир |
+| MSB-5 | ⏳ | core | `docs/multiside-combat-roadmap.md:441` | Что делает бой при смене владельца стороны |
+| MSB-6 | ⏳ | proto cli | `docs/multiside-combat-roadmap.md:450` | Панель боя на N сторон |
+| MSB-7 | ⏳ | core proto | `docs/multiside-combat-roadmap.md:458` | Зенитки и обстрел при N сторонах |
 | ONB-0 | ✅ | proto srv | `docs/onboarding-roadmap.md:101` | Состояние первого запуска + воронка [proto/srv] (proto) |
 | ONB-1 | ✅ | proto | `docs/onboarding-roadmap.md:137` | Движок гайд-марок (spotlight) ★ |
 | ONB-2 | ✅ | proto | `docs/onboarding-roadmap.md:188` | Гайдовый первый матч (скриптовая соло-песочница) ★ |
