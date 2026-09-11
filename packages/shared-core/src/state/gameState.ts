@@ -1,5 +1,4 @@
 import { seedRng, type RngState } from '../rng/rng';
-import type { SortieState } from './shuttle';
 import type { FleetChain } from './chain';
 
 /**
@@ -706,15 +705,17 @@ export interface GameState {
    *  armed (`standingOrdersModule`, `order.auto`). A driver reads this; the module
    *  itself only stores the flag and garbage-collects it for dead fleets. */
   autoAssault?: Record<FleetId, true>;
-  /** CC-4 дежурный вылет ("standing patrol"): a shuttle wing armed to auto-scramble
-   *  at the nearest identified hostile within `radius` of `center`, maintained by
-   *  `standingOrdersModule` (`order.scramble` arms/disarms; `patrol.stamp` is the
-   *  server driver's own runtime update of `sortie`/`rearmAt` — never client-issuable,
-   *  see `actions/payloadSchemas.ts`). */
-  patrols?: Record<FleetId, PatrolEntry>;
-  /** A wing's sortie budget stashed while its patrol is disarmed (`order.scramble`
-   *  off) — carries `fuel`/`rearming` forward instead of resetting on re-arm. */
-  wingSorties?: Record<FleetId, SortieState>;
+  /** CC-4 дежурный вылет: БАЗЫ (мир с портом или носитель), которым разрешено самим
+   *  поднимать эскадру навстречу опознанному врагу поблизости. Ключ — id базы, значение
+   *  называет, в каком пространстве имён этот id живёт.
+   *
+   *  Это ФЛАГ и только флаг — согласие игрока, а не правило. Центр берётся живой
+   *  (позиция базы сейчас: порт не двигается, а ушедший носитель обязан прикрывать себя
+   *  ТАМ, где он теперь), радиус — `squadronReach` эскадры, которая полетит, топливо и
+   *  перезарядка принадлежат БАЗЕ (SHU-1.2) и тратятся тем же `shuttle.strike`. До
+   *  SHU-2.2 здесь лежал снимок центра, радиуса и СВОЕГО запаса топлива — это осталось
+   *  от модели «крыло как флот», где дежурило подвижное соединение со своим баком. */
+  patrols?: Record<string, { kind: 'planet' | 'fleet' }>;
   /** CC-1 order chains: a fleet's queued plan (`standingOrdersModule`, `order.chain`
    *  sets/replaces it; `chain.stamp` is the server driver's own runtime update of
    *  the consumed head / armed wait deadline — never client-issuable). */
@@ -743,15 +744,6 @@ export interface PveState {
   /** World time the next wave is due — an echo of the scheduled event, for the HUD.
    *  Absent once the last wave has landed. */
   nextWaveAt?: number;
-}
-
-/** A standing patrol's launch anchor + reach + current sortie budget (CC-4). */
-export interface PatrolEntry {
-  center: { x: number; y: number };
-  radius: number;
-  sortie: SortieState;
-  /** World-time (ms) the rearm cadence next ticks; stamped by the server driver. */
-  rearmAt?: number;
 }
 
 /** Which side of the book a standing order sits on (CONV-9). */

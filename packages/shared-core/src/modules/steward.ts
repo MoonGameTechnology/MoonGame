@@ -44,7 +44,7 @@ export const MAX_STEWARD_HOLD_POINTS = 2;
 /** Sanitize one driver-stamped journal entry: required `at`/`kind`, then ONLY the
  *  known optional scalars are copied onto a FRESH object — nothing else from the
  *  payload can ride into JSONB state (fail-secure; same trust shape as
- *  `patrol.stamp`). Returns null on any violation — the report is then rejected
+ *  `chain.stamp`). Returns null on any violation — the report is then rejected
  *  whole, never applied partially. */
 function cleanEntry(raw: unknown): StewardLogEntry | null {
   const e = raw as Partial<StewardLogEntry> | null;
@@ -175,7 +175,7 @@ export const stewardModule: GameModule = {
 
     // SITREP stamp (ST-2.4): the SERVER DRIVER records the decisions it just made
     // for a delegated seat. Deliberately ABSENT from the client payload schemas
-    // (the gate refuses it from the wire, like `patrol.stamp`) — a client writing
+    // (the gate refuses it from the wire, like `chain.stamp`) — a client writing
     // its own journal would forge the morning report. Kept AFTER expiry: the
     // sleeping player's client is offline, so the report must live in state.
     api.onAction('steward.report', (action, h) => {

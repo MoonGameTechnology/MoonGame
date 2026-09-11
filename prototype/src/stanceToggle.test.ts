@@ -19,51 +19,24 @@ describe('стойки — авто-штурм', () => {
     expect(autoStance(true, true, false)).toBe('set');
   });
 
-  it('ГРУППА СНАПИТСЯ В ОДНО: разнородный набор приходит к общему состоянию', () => {
-    const было = [true, false, true, false];
-    const итог = было.map((cur) => (autoStance(true, cur, true) === 'set' ? true : cur));
-    expect(итог).toEqual([true, true, true, true]);
-  });
-});
-
-describe('стойки — дежурный вылет', () => {
-  it('пришвартованное свободное крыло поднимает патруль', () => {
-    expect(scrambleStance(true, true, false, true, true, true)).toBe('set');
+  it('ДЕЖУРСТВО СТАВИТСЯ, когда есть чем дежурить и состояние меняется', () => {
+    expect(scrambleStance(true, true, false, true)).toBe('set');
   });
 
-  it('ДЕЖУРИТЬ НЕЧЕМ БЕЗ КРЫЛА', () => {
-    expect(scrambleStance(true, false, false, true, true, true)).toBe('skip');
+  it('ПУСТОЙ АНГАР — СТОЙКИ НЕТ: дежурить нечем (правило 4)', () => {
+    expect(scrambleStance(true, false, false, true)).toBe('skip');
   });
 
-  it('чужой флот дежурства не получает', () => {
-    expect(scrambleStance(false, true, false, true, true, true)).toBe('skip');
+  it('ЧУЖАЯ БАЗА — СТОЙКИ НЕТ (правило 2)', () => {
+    expect(scrambleStance(false, true, false, true)).toBe('skip');
   });
 
-  it('уже дежурит — приказа нет', () => {
-    expect(scrambleStance(true, true, true, true, true, true)).toBe('skip');
+  it('УЖЕ В НУЖНОМ СОСТОЯНИИ — приказа нет (правило 3)', () => {
+    expect(scrambleStance(true, true, true, true)).toBe('skip');
+    expect(scrambleStance(true, true, false, false)).toBe('skip');
   });
 
-  it('СНЯТИЕ — ОТДЕЛЬНЫЙ ИСХОД: остаток вылета надо запомнить', () => {
-    expect(scrambleStance(true, true, true, false, true, true)).toBe('clear');
-  });
-
-  it('СНЯТИЕ НЕ ТРЕБУЕТ ПРИКОЛА: улетевшее дежурство тоже снимается', () => {
-    expect(scrambleStance(true, true, true, false, false, false)).toBe('clear');
-  });
-
-  it('ПАТРУЛЬ ВСТАЁТ ТОЛЬКО С ПРИКОЛА — зеркало гейта редьюсера', () => {
-    expect(scrambleStance(true, true, false, true, false, true)).toBe('need-dock');
-  });
-
-  it('занятый флот патруль не поднимает', () => {
-    expect(scrambleStance(true, true, false, true, true, false)).toBe('need-idle');
-  });
-
-  it('нет прикола важнее занятости — причина называется одна', () => {
-    expect(scrambleStance(true, true, false, true, false, false)).toBe('need-dock');
-  });
-
-  it('отказ по крылу важнее отказа по приколу: без крыла молчим', () => {
-    expect(scrambleStance(true, false, false, true, false, false)).toBe('skip');
+  it('СНЯТИЕ — обычный исход: запас вылетов принадлежит базе и им не трогается', () => {
+    expect(scrambleStance(true, true, true, false)).toBe('clear');
   });
 });

@@ -28,8 +28,7 @@ export type EffectTag =
   | { kind: 'in-battle' }
   | { kind: 'forced-march' }
   | { kind: 'bombarding' }
-  | { kind: 'patrol'; rearming: number }
-  | { kind: 'patrol'; fuel: number }
+  | { kind: 'patrol' }
   | { kind: 'blackout' }
   | { kind: 'hunger' }
   | { kind: 'point-defense'; n: number };
@@ -41,7 +40,8 @@ export interface FleetFacts {
   forcedMarch: boolean;
   bombarding: boolean;
   /** Дежурный вылет, если он есть: сколько крыльев перевооружается и сколько топлива. */
-  patrol: { rearming: number; fuel: number } | null;
+  /** Несёт ли эта база дежурство (SHU-2.2) — флаг, а не счётчик. */
+  patrol: boolean;
   /** Сколько десанта на борту — от этого зависит метка голода (правило 2). */
   troops: number;
   /** Суммарное зональное ПВО (см. {@link pointDefenseTotal}). */
@@ -90,13 +90,10 @@ export function fleetEffects(f: FleetFacts, me: string, arrears: readonly string
   if (f.inBattle) tags.push({ kind: 'in-battle' });
   if (f.forcedMarch) tags.push({ kind: 'forced-march' });
   if (f.bombarding) tags.push({ kind: 'bombarding' });
-  // Правило 3: перевооружение вытесняет топливо — это одно состояние вылета, не два.
-  if (f.patrol)
-    tags.push(
-      f.patrol.rearming > 0
-        ? { kind: 'patrol', rearming: f.patrol.rearming }
-        : { kind: 'patrol', fuel: f.patrol.fuel },
-    );
+  // Метка ФЛАГ, а не счётчик: с SHU-2.2 запас вылетов принадлежит БАЗЕ и показан там
+  // же, где ангар («вылетов N из M» / «перезарядка»). Дублировать его на карточке
+  // значило бы завести второе место, где живёт одно число.
+  if (f.patrol) tags.push({ kind: 'patrol' });
   if (debtTagsShown(f.owner, me)) {
     if (arrears.includes('energy')) tags.push({ kind: 'blackout' });
     if (hungerShown(arrears, f.troops)) tags.push({ kind: 'hunger' });

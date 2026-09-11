@@ -11,7 +11,7 @@ import type { PlayerArsenal } from '../state/gameState';
  * the very next `unit.build`.
  *
  * Deliberately NOT client-submittable (absent from `actionPayloadSchemas`, same
- * as `patrol.stamp`) — a client stamping its own arsenal would forge ownership.
+ * as `chain.stamp`) — a client stamping its own arsenal would forge ownership.
  * The server computes the payload from a live `ArsenalStore.listOf(accountId)`
  * read and submits it via `room.submitAction`, bypassing the action-layer gate —
  * the same pattern already used by the AI/patrol drivers.

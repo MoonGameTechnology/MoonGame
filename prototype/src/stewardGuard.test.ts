@@ -338,75 +338,23 @@ describe('stewardGuardOrders — эвакуация под угрозой (ST-3.
     // Tick 4: nothing left to protect at H — the driver re-runs to silence.
     expect(stewardGuardOrders(s, 'p1')).toEqual([]);
   });
-
-  it('«Активная оборона»: a parked intruder the wing beats cheaply is engaged; «Оборона» never engages', () => {
-    // 2 scouts sit at H (war declared after they docked — no auto-battle). The
-    // docked cruisers win the strike outright at ~7% hull cost — under the limit.
-    const s = guardState({
-      fleets: [fl('E1', 'p2', { location: 'H', units: stacks([['scout', 2]]) }), fl('F1', 'p1', { location: 'H', units: stacks([['cruiser', 2]]) })],
-    });
-    const active = stewardGuardOrders(s, 'p1', 'active_defend');
-    expect(active.map((a) => a.type)).toEqual(['fleet.engage', 'steward.report']);
-    expect(active[0]!.payload).toMatchObject({ fleetId: 'F1', targetId: 'E1' });
-    expect(reportEntries(active)).toMatchObject([{ kind: 'strike', node: 'H', fleetId: 'F1' }]);
-    const passive = stewardGuardOrders(s, 'p1', 'defend');
-    expect(passive.map((a) => a.type)).toEqual(['steward.report']);
-    expect(reportEntries(passive)).toMatchObject([{ kind: 'hold', node: 'H' }]);
-  });
-
-  it('«Активная оборона» does not start a strike the wing loses — holding is not a license to bleed', () => {
-    // A shielded carrier out-tanks 2 scouts in a strike (they lose), while the
-    // heavy garrison makes the STAND safe (holds) — so: no engage, no evac.
-    const s = guardState({
-      fleets: [fl('E1', 'p2', { location: 'H', units: stacks([['strike_carrier', 1]]) }), fl('F1', 'p1', { location: 'H', units: stacks([['scout', 2]]) })],
-      hGarrison: stacks([['heavy_infantry', 6]]),
-    });
-    const orders = stewardGuardOrders(s, 'p1', 'active_defend');
-    expect(orders.map((a) => a.type)).toEqual(['steward.report']);
-    expect(reportEntries(orders)).toMatchObject([{ kind: 'hold', node: 'H' }]);
-  });
-
-  it('the strike gate prices the WHOLE ladder: a cheap first intruder does not bait the wing into the deadly second', () => {
-    // Combat auto-re-engages a battle's victor into the next parked hostile —
-    // so beating 2 scouts cheaply would chain the damaged cruisers straight
-    // into 4 enemy cruisers. The heavy garrison keeps the STAND safe (hold),
-    // but no strike may start: the cumulative ladder breaches the limit.
-    const s = guardState({
-      fleets: [
-        fl('E1', 'p2', { location: 'H', units: stacks([['scout', 2]]) }),
-        fl('E2', 'p2', { location: 'H', units: stacks([['cruiser', 4]]) }),
-        fl('F1', 'p1', { location: 'H', units: stacks([['cruiser', 2]]) }),
-      ],
-      hGarrison: stacks([['heavy_infantry', 8]]),
-    });
-    const orders = stewardGuardOrders(s, 'p1', 'active_defend');
-    expect(orders.map((a) => a.type)).toEqual(['steward.report']);
-    expect(reportEntries(orders)).toMatchObject([{ kind: 'hold', node: 'H' }]);
-  });
-
-  it('«Активная оборона» stands a fire-watch: docked shuttle wings at own worlds get a CC-4 patrol', () => {
-    // No threat anywhere — the fire-watch is a standing readiness order, and it
-    // is exclusive to the active posture.
-    const s = guardState({
-      fleets: [fl('F1', 'p1', { location: 'H', units: stacks([['interceptor', 2]]) })],
-    });
+  it('ВАХТА СТАВИТСЯ НА СВОЙ МИР с эскадрой в ангаре (SHU-2.2 — раньше на флот)', () => {
+    const s = guardState({ fleets: [] });
+    s.planets.H = {
+      ...s.planets.H!,
+      hangar: [{ id: 'sq:p1:1', units: [{ unit: 'interceptor', count: 2 }] }],
+    };
     const active = stewardGuardOrders(s, 'p1', 'active_defend');
     expect(active.map((a) => a.type)).toEqual(['order.scramble', 'steward.report']);
-    expect(active[0]!.payload).toMatchObject({ fleetId: 'F1', on: true });
-    expect(reportEntries(active)).toMatchObject([{ kind: 'watch', node: 'H', fleetId: 'F1' }]);
+    expect(active[0]!.payload).toMatchObject({ planetId: 'H', on: true });
+    expect(reportEntries(active)).toMatchObject([{ kind: 'watch', node: 'H' }]);
+    // Вне «Активной обороны» вахта не ставится вовсе.
     expect(stewardGuardOrders(s, 'p1', 'defend')).toEqual([]);
   });
 
-  it('an evacuating wing stands its patrol down before flying out (no stale patrol record)', () => {
-    const base = guardState({
-      fleets: [raider(inboundToH(10)), fl('F1', 'p1', { location: 'H', units: stacks([['interceptor', 2]]) })],
-    });
-    const s = base as GameState & { patrols?: Record<string, unknown> };
-    s.patrols = { F1: { center: { x: 100, y: 0 }, radius: 180, sortie: { fuel: 3, rearming: 0 }, rearmAt: NOW } };
-    const orders = stewardGuardOrders(s, 'p1', 'active_defend');
-    expect(orders.map((a) => a.type)).toEqual(['order.scramble', 'fleet.move', 'steward.report']);
-    expect(orders[0]!.payload).toMatchObject({ fleetId: 'F1', on: false });
-    expect(orders[1]!.payload).toMatchObject({ fleetId: 'F1', to: 'S' });
+  it('ПУСТОЙ АНГАР ВАХТЫ НЕ ПОЛУЧАЕТ: дежурить нечем', () => {
+    const s = guardState({ fleets: [] });
+    expect(stewardGuardOrders(s, 'p1', 'active_defend')).toEqual([]);
   });
 
   it('точка удержания (ST-2.1): якорь НИКОГДА не эвакуируется — без подмоги это вынужденный hold', () => {

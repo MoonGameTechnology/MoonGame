@@ -167,31 +167,22 @@ describe('visibleState — order chains are the owner’s secret (future intent)
     expect('orders' in visibleState(state, 'p1', data)).toBe(false);
   });
 
-  it('standing orders (autoAssault / patrols / wingSorties) are stripped by the same rule', () => {
+  it('стоячие приказы (autoAssault / patrols) снимаются тем же правилом', () => {
     const state = scenario();
     state.autoAssault = { 'mine-1': true, 'enemy-near': true };
+    // Дежурство армится на БАЗУ (SHU-2.2): хозяин ищется по СВОЕМУ виду — у флота в
+    // `fleets`, у мира в `planets`. Общий проход по флотам снял бы и собственный мир.
+    const myWorld = Object.values(state.planets).find((p) => p.owner === 'p1')!;
+    const foreignWorld = Object.values(state.planets).find((p) => p.owner === 'p2')!;
     state.patrols = {
-      'mine-1': { center: { x: 0, y: 0 }, radius: 5, sortie: { fuel: 2, rearming: 0 } },
-      'enemy-near': { center: { x: 9, y: 9 }, radius: 7, sortie: { fuel: 1, rearming: 0 } },
-    };
-    state.wingSorties = {
-      'mine-1': { fuel: 1, rearming: 2 },
-      'enemy-near': { fuel: 0, rearming: 1 },
+      'mine-1': { kind: 'fleet' },
+      'enemy-near': { kind: 'fleet' },
+      [myWorld.id]: { kind: 'planet' },
+      [foreignWorld.id]: { kind: 'planet' },
     };
     const view = visibleState(state, 'p1', data) as VisibleState & GameState;
     expect(view.autoAssault).toEqual({ 'mine-1': true });
-    expect(Object.keys(view.patrols ?? {})).toEqual(['mine-1']);
-    expect(view.wingSorties).toEqual({ 'mine-1': { fuel: 1, rearming: 2 } });
-    // With nothing of the viewer's left, the keys vanish entirely (delta hygiene).
-    state.autoAssault = { 'enemy-near': true };
-    state.patrols = {
-      'enemy-near': { center: { x: 9, y: 9 }, radius: 7, sortie: { fuel: 1, rearming: 0 } },
-    };
-    state.wingSorties = { 'enemy-near': { fuel: 0, rearming: 1 } };
-    const bare = visibleState(state, 'p1', data);
-    expect('autoAssault' in bare).toBe(false);
-    expect('patrols' in bare).toBe(false);
-    expect('wingSorties' in bare).toBe(false);
+    expect(Object.keys(view.patrols ?? {}).sort()).toEqual(['mine-1', myWorld.id].sort());
   });
 
   it('forced-march flags (BOOST-1) are stripped by the same rule', () => {

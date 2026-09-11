@@ -175,7 +175,8 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '15'; // SHU-4.2: ангар — список ЭСКАДР.
+export const MODULE_MANIFEST_VERSION = '16'; // SHU-2.2: дежурство армится на БАЗУ.
+// export const MODULE_MANIFEST_VERSION = '15'; // SHU-4.2: ангар — список ЭСКАДР.
 // Форма состояния изменилась: `planet.hangar`/`fleet.hangar` больше не плоские стеки, а
 // список эскадр (`{id, units, cargo}`), у вылета появился `squadronId`, а в состоянии —
 // счётчик `squadronSeq`. Матч на манифесте 14 несёт ангары старой формы: новый читатель

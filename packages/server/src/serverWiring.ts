@@ -1,5 +1,12 @@
 import type { ActionGate } from '@void/action-layer';
-import { hashGameDataBundle, type DomainEvent, type GameData, type PlayerReward } from '@void/shared-core';
+import {
+  hashGameDataBundle,
+  type Action,
+  type DomainEvent,
+  type GameData,
+  type GameState,
+  type PlayerReward,
+} from '@void/shared-core';
 import { createDevMatch, MODULE_MANIFEST_VERSION } from './scenario';
 import { startClockDriver, HEARTBEAT_MS, type ClockDriverHandle } from './clockDriver';
 import { snapshotOf, type Stores } from './persistence';
@@ -155,8 +162,8 @@ export function createMatchLoader(deps: MatchLoaderDeps): (matchId: string) => P
               for (const { playerId, action } of standingOrderTickActions(
                 room.state,
                 data,
-                room.state.time,
-                (state, actions) => room.canApplyAll(state, actions, room.state.time),
+                (state: GameState, actions: readonly Action[]) =>
+                  room.canApplyAll(state, actions, room.state.time),
               )) {
                 await room.submitServerAction(playerId, action);
               }

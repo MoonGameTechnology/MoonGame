@@ -17,7 +17,6 @@
  * хозяин отдаёт оба, и драйверы проверяются на настоящем состоянии без DOM.
  */
 import type { Action, Fleet, GameState } from '../../packages/shared-core/src/index';
-import { getStance } from '../../packages/shared-core/src/index';
 import type { AiProfile } from './ai';
 import {
   aiOrders,
@@ -26,18 +25,14 @@ import {
   chainStamp,
   data,
   engageFleet,
-  fleetHasShuttle,
-  fleetIdle,
   HOUR,
   order,
   orbitFleet,
-  scrambleOrder,
   serverChainActions,
-  sortieSpec,
   stewardActive,
-  tickRearm,
-  type Patrol,
+  strikeShuttle,
 } from './game';
+import { patrolScrambles } from '../../packages/shared-core/src/index';
 
 /** Как часто ходит локальный ИИ (игровое время). Чаще — только лишние прогоны. */
 export const AI_STEP_MS = 2 * HOUR;
@@ -67,7 +62,7 @@ export interface SoloHost {
   /** Опт-ин авто-штурма для своего флота (CC-2). Чужие штурмуют всегда. */
   autoAssault(fleetId: string): boolean;
   /** Дежурные вылеты (CC-4): живая карта клиента — драйвер её же и чистит. */
-  patrols(): Map<string, Patrol>;
+  patrols(): Map<string, { kind: 'planet' | 'fleet' }>;
   /** Опознан ли узел (цель дежурного вылета обязана быть видимой). */
   known(loc: string): boolean;
 }
@@ -85,7 +80,6 @@ export interface SoloDrivers {
   drivePatrols(): void;
   /** Первый вставший дежурный вылет: считать перезарядку ОТСЮДА, а не от эпохи —
    *  иначе крыло получило бы разом все часы, что матч шёл до него. */
-  startPatrolCadence(): void;
   /** Новый матч: часы ИИ и память проб начинаются заново. */
   reset(): void;
 }
@@ -94,7 +88,6 @@ export function initSoloDrivers(host: SoloHost): SoloDrivers {
   /** Обречённые пары «орбита → штурм»: id флота → ключ состояния. */
   const probed = new Map<string, string>();
   let lastAiAt = 0;
-  let lastPatrolTick = 0;
 
   /** Свой приказ идёт своим путём, чужой — локально: в сети первый уходит на сервер. */
   const issue = (owner: string, a: Action): void => {
@@ -188,44 +181,30 @@ export function initSoloDrivers(host: SoloHost): SoloDrivers {
       for (const a of c.actions) issue(c.owner, a);
     }
   }
-
   /**
-   * CC-4: крыло на дежурном вылете, если оно простаивает, бьёт по опознанному контакту
-   * в радиусе удара — тратя одно топливо (SQ-2.1) — и перезаряжает один раунд за
-   * прошедший игровой час. Само решение (`scrambleOrder`) чистое и покрыто своим
-   * тестом; здесь только чтение мира: видимость и дипломатия.
+   * CC-4: дежурная БАЗА (мир с портом или носитель) сама поднимает эскадру навстречу
+   * ближайшему опознанному врагу в её радиусе (SHU-2.2 — раньше дежурил флот челноков).
+   *
+   * Решение целиком в ядре (`patrolScrambles`): и выбор цели, и чтение мира. Здесь
+   * остаётся отдать приказ. Ни топлива, ни перезарядки драйвер больше не ведёт — они
+   * принадлежат базе и тратятся самим `shuttle.strike`.
    */
   function drivePatrols(): void {
     const patrols = host.patrols();
     if (patrols.size === 0) return;
     const s = host.state();
-    const me = host.me();
-    const rounds = Math.max(0, Math.floor((s.time - lastPatrolTick) / HOUR));
-    if (rounds > 0) lastPatrolTick += rounds * HOUR;
-    for (const [fid, p] of [...patrols]) {
-      const f = s.fleets[fid];
-      if (!f || f.owner !== me || !fleetHasShuttle(f, data)) {
-        patrols.delete(fid);
-        continue;
-      }
-      const spec = sortieSpec(f, data);
-      for (let i = 0; i < rounds && p.sortie.rearming > 0; i++)
-        p.sortie = tickRearm(p.sortie, spec.maxFuel);
-      if (!fleetIdle(f)) continue; // занят (перелёт / бой) — сперва пусть разрешится
-      // Враждебные ОПОЗНАННЫЕ контакты, стоящие на узле, — законные цели крыла.
-      const targets: Array<{ id: string; location: string; pos: { x: number; y: number } }> = [];
-      for (const g of Object.values(s.fleets)) {
-        if (g.owner === me || !g.location || g.movement || !g.units.some((u) => u.count > 0))
-          continue;
-        if (g.battleId) continue; // в бою — engage отвергнут, а топливо вылета уже потрачено (BF-30)
-        if (getStance(s, me, g.owner) !== 'war') continue; // только объявленная война — авто-войны нет
-        if (!host.known(g.location)) continue; // «опознанная цель в зоне видимости»
-        const pos = s.planets[g.location]?.position;
-        if (pos) targets.push({ id: g.id, location: g.location, pos });
-      }
-      const { action, sortie } = scrambleOrder(me, f, p, targets, spec.rearmRounds);
-      p.sortie = sortie;
-      if (action) host.playerOrder(action);
+    // Соло держит дежурства в локальной карте — ядру их надо предъявить в его форме.
+    const view = { ...s, patrols: Object.fromEntries(patrols) };
+    for (const sc of patrolScrambles(view, data)) {
+      if (sc.owner !== host.me()) continue;
+      host.playerOrder(
+        strikeShuttle(
+          sc.owner,
+          sc.base.kind === 'planet' ? { planetId: sc.base.id } : { fleetId: sc.base.id },
+          sc.squadronId,
+          { targetFleetId: sc.targetFleetId },
+        ),
+      );
     }
   }
 
@@ -235,9 +214,6 @@ export function initSoloDrivers(host: SoloHost): SoloDrivers {
     checkFleetClashes,
     driveChains,
     drivePatrols,
-    startPatrolCadence: () => {
-      lastPatrolTick = host.state().time;
-    },
     reset: () => {
       lastAiAt = host.state().time;
       probed.clear();
