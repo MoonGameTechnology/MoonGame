@@ -1,6 +1,9 @@
 import { MS_PER_DAY, type GameData, type MatchConfig } from '@void/shared-core';
+import type { MatchKind, MatchLists, MatchSummary } from '@void/protocol';
 import type { MatchRoom } from './matchRoom';
 import type { AccountStore } from './store';
+
+export type { MatchKind, MatchLists, MatchSummary };
 
 /**
  * The multi-match registry behind the main-menu match browser.
@@ -44,10 +47,12 @@ export interface MatchMeta {
   archivedBy?: Set<string>;
 }
 
-/** Whether a session is played against other people or against the game (BRW-1).
- *  Decided by the SERVER from the mode preset — a client must not re-derive the rule,
- *  or two surfaces would disagree about what "PvE" means. */
-export type MatchKind = 'pvp' | 'pve';
+// Форма ленты браузера матчей объявлена в `@void/protocol` — её ЧИТАЕТ второй конец,
+// значит это контракт провода, а не внутренний тип сервера (тот же довод, что у
+// сообщений сокета). Реэкспорт оставлен, чтобы десятки внутренних импортов сервера
+// продолжали брать типы отсюда, а правка не растеклась по файлам, которые к ленте
+// отношения не имеют. ЛОГИКА осталась здесь: `matchKind()` ниже выводит `kind` из
+// пресета режима — клиент читает готовое поле и правило не переизобретает.
 
 /** The mode's kind, or undefined when the match has no mode / the mode is unknown.
  *  «PvE» is defined exactly once, here: the preset carries a `pve` section. */
@@ -56,40 +61,6 @@ export function matchKind(data: GameData | undefined, modeId: string | undefined
   const mode = data.modes[modeId];
   if (!mode) return undefined; // unknown mode: say nothing rather than guess "pvp"
   return mode.pve ? 'pve' : 'pvp';
-}
-
-/** One row of the match browser: a server projection (read-model), not live state. */
-export interface MatchSummary {
-  matchId: string;
-  mapId: string;
-  rules: MatchConfig;
-  /** Mode id this session runs (BRW-1). Absent ⇒ the match has no mode. */
-  modeId?: string;
-  /** PvP or PvE, derived from the mode preset by the server. Absent when the mode is
-   *  absent or unknown — the browser must read that as «режим неизвестен» and leave
-   *  the row unfiltered, NOT as «PvP» (the same fail-open reading `entryOpen` needs). */
-  kind?: MatchKind;
-  /** In-game days elapsed (`state.time / MS_PER_DAY`, floored) — "Day N" of the match. */
-  days: number;
-  /** Occupied vs total seats, e.g. { seated: 1, capacity: 2 }. */
-  players: { seated: number; capacity: number };
-  /** Simulation status (NOT the archive flag, which is per-viewer). */
-  status: 'ongoing' | 'ended';
-  createdAt: number;
-  /** Entry window (SES-2.3): can a NEW player still claim a free seat here? True when
-   *  no window is configured. A closed window keeps the match out of `available` even
-   *  if it has free seats (you cannot join it any more — only the seated may return). */
-  entryOpen: boolean;
-  /** Real ms until the entry window closes (0 once closed; a large sentinel when no
-   *  window is configured) — for the browser to show «вход открыт ещё …». */
-  entryClosesInMs: number;
-}
-
-/** The three browser tabs, projected for one viewer (by nick). */
-export interface MatchLists {
-  available: MatchSummary[];
-  active: MatchSummary[];
-  archived: MatchSummary[];
 }
 
 /** Fail-secure result of an archive/restore intent (A10: a stable code, no detail). */

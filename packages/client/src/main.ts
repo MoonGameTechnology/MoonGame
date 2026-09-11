@@ -9,7 +9,7 @@
  * This is intentionally thin: map rendering, the network transport and the PWA install
  * layer are later bricks (CP0.2 / CP1.x). No forked copy of the core or its data.
  */
-import { createInitialState, type GameState } from '@void/shared-core';
+import { createInitialState, type Action, type GameState } from '@void/shared-core';
 import { t, LOCALE, isLocaleId, setLocale } from '../../../localization/core';
 import { theme } from './theme';
 import { createWelcomeModel, resolveWelcomeAction, nextCallsign } from './welcomeScreen';
@@ -18,6 +18,15 @@ import { clampCam, zoomAt, type Cam, type Viewport, type Bounds } from './camera
 import { renderMap } from './mapRender';
 import { openLiveMatch } from './net';
 import { nearestPlanet, myFleetAt, moveAction } from './matchInput';
+import { browserIo, createSession, type NetSession } from './session';
+import { socketBase } from '../../../decisions/serverAddress';
+import { errorTarget, refusalKey } from '../../../decisions/errorRoute';
+import { refusalText } from '../../../decisions/refusalText';
+import type { MatchSummary } from '@void/protocol';
+import { shippedGameData } from './gameData';
+import { createStatusBarModel, createSelectionModel, createBattleModel, resolveBattleAction } from './matchHud';
+import { createLoadoutEditor, applyLoadoutAction, resolveLoadoutBuild, type LoadoutModel } from './loadoutEditor';
+import { statusBarHtml, selectionHtml, battleHtml, loadoutHtml, unitPickerHtml } from './hudView';
 
 /** Bind the typed theme tokens to CSS custom properties (docs/main-menu.md §5.4 — one
  *  TS engine → one look). The stylesheet in index.html reads these vars. */
@@ -92,6 +101,10 @@ function render(model: WelcomeModel): void {
       .join('') +
     `</div>` +
     `<div class="login"><input id="nick" maxlength="24" placeholder="${esc(model.loginLabel)}" autocomplete="off" />` +
+    // Пароль — обычное поле рядом с позывным: у сервера вход ОДИН (`POST /auth/login`),
+    // и первый вход им же заводит учётку (`authRules`/`authRequest`, порядок
+    // login→register). Отдельного экрана регистрации поэтому нет и не нужно.
+    `<input id="pass" type="password" maxlength="72" placeholder="${esc(t('client.auth.password'))}" autocomplete="current-password" />` +
     `<button class="btn" data-act="login">${esc(model.loginLabel)}</button></div>` +
     `<footer>${model.legal.map((l) => `<a data-legal="${l.id}">${esc(l.label)}</a>`).join('<span>·</span>')}</footer>` +
     // Language picker: the ids come from `/localization`, so a new locale file shows up
@@ -119,15 +132,46 @@ function loginNick(): string {
   return (document.getElementById('nick') as HTMLInputElement | null)?.value ?? '';
 }
 
-/** Sign in with whatever is typed. An empty callsign just puts the cursor back in the
- *  field — the blank input is the message, so no complaint is printed under the card. */
-function submitLogin(model: WelcomeModel): void {
-  const nick = loginNick();
-  if (!nick.trim()) {
+function loginPass(): string {
+  return (document.getElementById('pass') as HTMLInputElement | null)?.value ?? '';
+}
+
+/** Как назвать игроку исход входа. Ключи — на каждую причину своя, потому что ответы
+ *  на них РАЗНЫЕ: «пароль не подошёл» чинится паролем, «сервер недоступен» — повтором,
+ *  а «слишком часто» — паузой. Слить их в одно «не вышло» значит отправить чинить не то. */
+const AUTH_TEXT: Record<string, string> = {
+  'wrong-password': 'client.auth.wrong-password',
+  'mail-taken': 'client.auth.mail-taken',
+  'rate-limited': 'client.auth.rate-limited',
+  'register-refused': 'client.auth.refused',
+  'login-refused': 'client.auth.refused',
+};
+
+/** Вход по-настоящему: `session.signIn` ходит на сервер по правилам `/decisions`
+ *  (login → и только неизвестный логин уводит в register), а экран лишь показывает
+ *  исход и, если пустили, переключается на список партий. */
+async function submitLogin(): Promise<void> {
+  const nick = loginNick().trim();
+  if (!nick) {
     document.getElementById('nick')?.focus();
     return;
   }
-  setStatus(statusText(resolveWelcomeAction({ kind: 'login', nick }, model)));
+  const res = await session.signIn(nick, loginPass());
+  if (res.kind === 'invalid') {
+    setStatus(t(res.field === 'login' ? 'client.auth.bad-login' : 'client.auth.bad-password'));
+    document.getElementById(res.field === 'login' ? 'nick' : 'pass')?.focus();
+    return;
+  }
+  if (res.kind === 'offline') {
+    setStatus(t('client.auth.offline'));
+    return;
+  }
+  if (res.outcome === 'ok' || res.outcome === 'created') {
+    setStatus(t(res.outcome === 'created' ? 'client.auth.created' : 'client.auth.hello', { nick }));
+    void showMatches();
+    return;
+  }
+  setStatus(t(AUTH_TEXT[res.outcome] ?? 'client.auth.refused'));
 }
 
 function wire(model: WelcomeModel): void {
@@ -148,8 +192,20 @@ function wire(model: WelcomeModel): void {
         break;
       }
       case 'login':
-        submitLogin(model);
+        void submitLogin();
         break;
+      case 'signOut':
+        session.signOut();
+        location.reload(); // экран строится из t() на импорте — проще перезайти начисто
+        break;
+      case 'refresh':
+        void showMatches();
+        break;
+      case 'join': {
+        const id = target.dataset.match;
+        if (id) void joinMatch(id);
+        break;
+      }
       case 'lang': {
         // Fail-secure: only a known locale id is accepted, and the current one is a no-op
         // (a reload would just throw away what the player typed).
@@ -164,7 +220,8 @@ function wire(model: WelcomeModel): void {
   });
   app.addEventListener('keydown', (e) => {
     const ke = e as KeyboardEvent;
-    if (ke.key === 'Enter' && (ke.target as HTMLElement).id === 'nick') submitLogin(model);
+    const id = (ke.target as HTMLElement).id;
+    if (ke.key === 'Enter' && (id === 'nick' || id === 'pass')) void submitLogin();
   });
 }
 
@@ -309,6 +366,125 @@ function runMatch(getState: () => GameState, bounds: Bounds, interact?: MatchInt
 // server-hosted session (`?join=`). `gameData.ts` keeps the shipped-map loader for the
 // tests and for the match browser to reuse once it lands.
 
+/* ─────────────────────────── Match browser (MIG-2) ─────────────────────────── */
+
+/**
+ * Адрес сервера. Клиент отдаётся ТЕМ ЖЕ сервером, с которым говорит, поэтому умолчание —
+ * собственный хост страницы; `?server=` оставлен для дев-стенда и чужого хоста. Схему
+ * нормализует `socketBase` (решение, общее с прототипом) — в том числе поднимает `ws://`
+ * до `wss://` на HTTPS-странице, иначе браузер оборвёт соединение как смешанное
+ * содержимое, а выглядело бы это как «сервер не отвечает».
+ */
+function serverBase(): string {
+  const typed = new URLSearchParams(location.search).get('server') ?? location.host;
+  return socketBase(typed, location.protocol === 'https:') ?? `ws://${location.host}`;
+}
+
+const session: NetSession = createSession(serverBase(), browserIo());
+
+/** Одна строка списка. Всё, что показано, приезжает из read-model сервера
+ *  (`@void/protocol`) — клиент ничего про партию не выводит сам. */
+function matchRow(m: MatchSummary): string {
+  const line = t('client.matches.row', {
+    d: m.days + 1,
+    seated: m.players.seated,
+    capacity: m.players.capacity,
+  });
+  const badge = m.kind ? `<i class="kind">${esc(m.kind.toUpperCase())}</i>` : '';
+  return (
+    `<button class="btn row" data-act="join" data-match="${esc(m.matchId)}">` +
+    `<b>${esc(m.matchId)}</b>${badge}<span>${esc(line)}</span></button>`
+  );
+}
+
+/** Список партий вместо приветственной карточки. Свои партии идут первыми: в них уже
+ *  есть место, и возврат в свою партию — частый случай, а не поиск новой. */
+async function showMatches(): Promise<void> {
+  const app = document.getElementById('app');
+  if (!app) return;
+  const res = await session.matches();
+  const nick = session.login() ?? '';
+  if (res.outcome !== 'ok' || !res.lists) {
+    setStatus(t(res.outcome === 'refused' ? 'client.matches.refused' : 'client.matches.unreachable'));
+    return;
+  }
+  const { active, available } = res.lists;
+  const section = (titleKey: string, rows: MatchSummary[]): string =>
+    rows.length ? `<h2>${esc(t(titleKey))}</h2>${rows.map(matchRow).join('')}` : '';
+  app.innerHTML =
+    `<main class="welcome browser">` +
+    `<div class="crest">◆</div>` +
+    `<p class="tagline">${esc(nick)}</p>` +
+    section('client.matches.mine', active) +
+    section('client.matches.title', available) +
+    (active.length + available.length === 0
+      ? `<p class="tagline">${esc(t('client.matches.empty'))}</p>`
+      : '') +
+    `<div class="login"><button class="btn" data-act="refresh">${esc(t('client.matches.refresh'))}</button>` +
+    `<button class="btn stub" data-act="signOut">${esc(t('client.signout'))}</button></div>` +
+    `<div id="status" class="status" role="status" aria-live="polite"></div>` +
+    `</main>`;
+}
+
+/** Взять место и подключиться. Обмен сессии на короткий пропуск и сборку адреса делает
+ *  `session.join` по правилам `/decisions`; здесь — только показ причины отказа. */
+async function joinMatch(matchId: string): Promise<void> {
+  const res = await session.join(matchId);
+  if (res.ok) {
+    connectLive(res.wsUrl);
+    return;
+  }
+  // Каждая причина названа отдельно: «вход просрочен» чинится повторным входом, «мест
+  // нет» — другой партией, «сервер недоступен» — повтором. Общее «не вышло» не помогло бы.
+  const TEXT: Record<string, string> = {
+    'session-expired': 'client.join.expired',
+    'entry-closed': 'net.join-closed',
+    'seats-full': 'net.match-full',
+    offline: 'client.join.offline',
+    failed: 'client.join.failed',
+  };
+  setStatus(t(TEXT[res.reason] ?? 'client.join.failed'));
+  // Сессии больше нет — на карточку входа, иначе игрок жмёт по списку впустую.
+  if (res.reason === 'session-expired') {
+    render(welcome);
+    wire(welcome);
+    setStatus(t('client.join.expired'));
+  }
+}
+
+/* ───────────────────────────── In-match HUD (MIG-3) ───────────────────────────── */
+
+/** Каталог для проекций HUD. Тот же шипнутый бандл, что и у прототипа (`data/bundle`),
+ *  без него модели отдают панели без корпуса/щита — они деградируют, а не падают. */
+const HUD_DATA = shippedGameData();
+
+/** Намерение любого типа. Тот же формат `id`, что у `moveAction` (`ui:<player>:<seq>`) —
+ *  на gated-комнате его всё равно заменит конверт `action.v1`, а на дев-сервере он и
+ *  есть ключ идемпотентности. */
+function intent(me: string, seq: number, type: string, payload: Record<string, unknown>): Action {
+  return { id: `ui:${me}:${seq}`, type, playerId: me, payload, issuedAt: 0 };
+}
+
+/** Корпуса своего дома (плюс общие). Это КОРОТКИЙ список для меню, а не право на
+ *  постройку: право проверяет сервер, и его отказ теперь доходит словами. */
+function buildableUnits(faction: string | undefined): string[] {
+  return Object.entries(HUD_DATA.units)
+    .filter(([, def]) => !def.faction || def.faction === faction)
+    .map(([id]) => id)
+    .sort();
+}
+
+/** Куда HUD рисуется: фиксированный слой поверх канваса. Создаётся один раз. */
+function hudRoot(): HTMLElement {
+  let el = document.getElementById('hud');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'hud';
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
 /** A small fixed overlay for the live-match connection status + a one-line hint (the
  *  welcome-screen #status is hidden once the map canvas takes over). */
 function setNetStatus(text: string): void {
@@ -349,13 +525,159 @@ function connectLive(url: string): void {
       );
     }
   };
+  // Что открыто в HUD. Одновременно живёт ОДНА панель: выбор флота, бой или оснащение —
+  // на телефоне места под вторую нет, а «что именно я сейчас трогаю» должно быть
+  // однозначным.
+  let panel: 'none' | 'fleet' | 'battle' | 'yard' | 'loadout' = 'none';
+  let battleId: string | null = null;
+  let loadout: LoadoutModel | null = null;
+  let buildPlanet: string | null = null;
+
+  /** Перерисовать HUD из ТЕКУЩЕГО снапшота. Модели читают состояние сами — здесь только
+   *  выбор панели и вставка разметки. */
+  const renderHud = (): void => {
+    if (!live || !me) return;
+    const bar = createStatusBarModel(live, me, HUD_DATA);
+    let body = '';
+    if (panel === 'fleet' && selectedFleet) {
+      const sel = createSelectionModel(live, selectedFleet, me, HUD_DATA);
+      // Верфь предлагается, только если флот СТОИТ на МОЁМ мире: в пути строить негде,
+      // а на чужом — нечем.
+      const at = sel.ok && sel.status === 'stationed' ? sel.location : undefined;
+      const canBuildHere = !!at && live.planets[at]?.owner === me;
+      if (at && canBuildHere) buildPlanet = at;
+      if (sel.ok) body = selectionHtml(sel, live.time, { canBuildHere });
+      else panel = 'none'; // флот пропал из вида — панель закрывается сама
+    } else if (panel === 'battle' && battleId) {
+      const b = createBattleModel(live, battleId, me, HUD_DATA);
+      if (b.ok) body = battleHtml(b, live.time);
+      else {
+        panel = 'none';
+        battleId = null;
+      }
+    } else if (panel === 'yard' && buildPlanet) {
+      body = unitPickerHtml(buildableUnits(live.players[me]?.faction), buildPlanet);
+    } else if (panel === 'loadout' && loadout) {
+      body = loadoutHtml(loadout, HUD_DATA);
+    }
+    hudRoot().innerHTML = (bar.ok ? statusBarHtml(bar) : '') + body;
+  };
+
+  /** Намерения из HUD. Каждый путь идёт через резолвер модели, а не строит действие
+   *  руками: резолвер уже знает, когда действие невозможно, и отвечает стабильным кодом. */
+  const onHudClick = (e: Event): void => {
+    const target = (e.target as HTMLElement).closest('[data-act]') as HTMLElement | null;
+    if (!target || !live || !me) return;
+    switch (target.dataset.act) {
+      case 'retreat': {
+        if (!battleId) return;
+        const model = createBattleModel(live, battleId, me, HUD_DATA);
+        if (!model.ok) return;
+        const out = resolveBattleAction({ kind: 'retreat' }, model);
+        if (!out.ok) {
+          setNetStatus(t('client.rejected', { text: refusalText(out.code) }));
+          return;
+        }
+        client.sendAction(intent(me, seq++, out.type, { fleetId: out.fleetId }));
+        break;
+      }
+      case 'equip':
+      case 'unequip': {
+        const moduleId = target.dataset.module;
+        if (!loadout || !moduleId) return;
+        const next = applyLoadoutAction(
+          { kind: target.dataset.act === 'equip' ? 'equip' : 'unequip', moduleId },
+          loadout,
+          HUD_DATA,
+          live.players[me]?.resources ?? {},
+        );
+        // Отказ резолвера — это правило ядра (`canEquip`), а не сбой: слот занят, тип не
+        // тот, дубль. Показываем причину и оставляем черновик как был.
+        if (next.ok) loadout = next;
+        else setNetStatus(t('client.rejected', { text: refusalText(next.code) }));
+        renderHud();
+        return;
+      }
+      case 'count': {
+        const delta = Number(target.dataset.delta ?? 0);
+        if (!loadout) return;
+        const next = applyLoadoutAction(
+          { kind: 'setCount', count: Math.max(1, loadout.count + delta) },
+          loadout,
+          HUD_DATA,
+          live.players[me]?.resources ?? {},
+        );
+        if (next.ok) loadout = next;
+        renderHud();
+        return;
+      }
+      case 'pick': {
+        const unit = target.dataset.unit;
+        if (!unit) return;
+        const made = createLoadoutEditor(unit, HUD_DATA, live.players[me]?.resources ?? {});
+        if (!made.ok) {
+          setNetStatus(t('client.rejected', { text: refusalText(made.code) }));
+          return;
+        }
+        loadout = made;
+        panel = 'loadout';
+        renderHud();
+        return;
+      }
+      case 'yard': {
+        if (!buildPlanet) return;
+        panel = 'yard';
+        renderHud();
+        return;
+      }
+      case 'close': {
+        panel = 'none';
+        loadout = null;
+        buildPlanet = null;
+        renderHud();
+        return;
+      }
+      case 'build': {
+        if (!loadout || !buildPlanet) return;
+        const out = resolveLoadoutBuild(loadout, buildPlanet);
+        if (!out.ok) {
+          setNetStatus(t('client.rejected', { text: refusalText(out.code) }));
+          return;
+        }
+        client.sendAction(intent(me, seq++, out.action.type, out.action.payload));
+        panel = 'none';
+        loadout = null;
+        break;
+      }
+      default:
+        return;
+    }
+    renderHud();
+  };
+  hudRoot().addEventListener('click', onHudClick);
+
   setNetStatus(t('client.net.connecting'));
   const { client } = openLiveMatch(url, {
     onStatus: (s) => {
       if (s === 'connecting') setNetStatus(t('client.net.connecting'));
       else if (s === 'closed') setNetStatus(t('client.net.closed'));
     },
-    onError: (code) => setNetStatus(`✖ ${code}`),
+    // Отказ рукопожатия. Куда его показать, решает `errorRoute` (общее с прототипом):
+    // по устаревшему сокету — никуда, иначе в строку статуса. Причина называется СЛОВАМИ:
+    // сервер довёл рукопожатие до конца именно ради объяснения («мест нет», «вход
+    // закрыт»), и показать вместо этого `E_MATCH_FULL` значит выбросить объяснение.
+    onError: (code) => {
+      const where = errorTarget({ current: true, admitted: me !== null, code });
+      if (where === 'ignore') return;
+      const key = refusalKey(code);
+      setNetStatus(`✖ ${key ? t(key) : refusalText(code)}`);
+    },
+    // ОТКАЗ ПРИКАЗА. До MIG-2 этого обработчика не было вовсе: сервер отвергал приказ,
+    // а игрок не видел НИЧЕГО — нажатие просто пропадало. Это и был невыполненный
+    // критерий CP1.3 «отказ показывается человеку».
+    onRejection: (_actionId, code) => {
+      setNetStatus(t('client.rejected', { text: refusalText(code) }));
+    },
     onSnapshot: (snap) => {
       live = snap.state;
       if (snap.playerId) me = snap.playerId;
@@ -363,6 +685,7 @@ function connectLive(url: string): void {
         started = true;
         client.start(); // host of an unstarted lobby → run the world
       }
+      renderHud();
       const waiting = snap.lobby ? !snap.lobby.started : !!snap.waiting;
       if (waiting) {
         setNetStatus(t('client.net.waiting', { suffix: me ? t('client.net.waiting-you', { me }) : '' }));
@@ -378,6 +701,8 @@ function connectLive(url: string): void {
           onPickPlanet: (planetId) => {
             if (!planetId || !live || !me) {
               selectedFleet = null;
+              panel = 'none';
+              renderHud();
               hint();
               return;
             }
@@ -388,14 +713,36 @@ function connectLive(url: string): void {
                 client.sendAction(moveAction(me, seq++, selectedFleet, planetId));
                 setNetStatus(t('client.net.order', { fleet: selectedFleet, planet: planetId }));
                 selectedFleet = null;
+                panel = 'none';
+                renderHud();
                 return;
               }
               selectedFleet = null;
+              panel = 'none';
+              renderHud();
               hint();
               return;
             }
             // first tap → select one of my fleets at this planet (if any)
             selectedFleet = myFleetAt(live, planetId, me);
+            if (selectedFleet) {
+              // Флот в бою открывает панель БОЯ, а не состава: там есть единственное
+              // действие, которое в этот момент вообще имеет смысл, — отступить.
+              const inBattle = live.fleets[selectedFleet]?.battleId;
+              if (inBattle) {
+                battleId = inBattle;
+                panel = 'battle';
+              } else {
+                panel = 'fleet';
+              }
+            } else if (live.planets[planetId]?.owner === me) {
+              // Свой мир без моего флота — верфь: что здесь построить.
+              buildPlanet = planetId;
+              panel = 'yard';
+            } else {
+              panel = 'none';
+            }
+            renderHud();
             hint();
           },
         });
