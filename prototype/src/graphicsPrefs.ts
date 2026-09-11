@@ -79,6 +79,14 @@ export function setStarfield(v: boolean): void {
   writeBool('void.starfield', v);
 }
 
+/** Optional command-console appearance. The viewport gate lives in the UI adapter. */
+let holography = readBool('void.holography', true);
+export const holographyOn = (): boolean => holography;
+export function setHolography(v: boolean): void {
+  holography = v;
+  writeBool('void.holography', v);
+}
+
 /** Счётчик кадров в углу. По умолчанию ВЫКЛ (dev-режим и рассинхрон включают его сами). */
 let showFps = readBool('void.showFps', false);
 export const showFpsOn = (): boolean => showFps;

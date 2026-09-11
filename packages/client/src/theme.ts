@@ -39,3 +39,18 @@ export const theme: Theme = {
   lineHi: '#1d6b70',
   glass: 'rgba(3,14,18,0.82)',
 };
+
+/** Optional flagship glass skin; resource/owner colours keep their existing meaning. */
+export const holographicTheme: Theme & { void: string; surface: string; reflection: string } = {
+  ...theme,
+  cyan: '#74e8ed',
+  cyanDim: '#568c9c',
+  ink: '#c6d9e3',
+  dim: '#9aafbe',
+  line: '#1d3542',
+  lineHi: '#396571',
+  glass: 'rgba(3,14,24,0.92)',
+  void: '#030810',
+  surface: '#0a202d',
+  reflection: '#b9f5ff',
+};
