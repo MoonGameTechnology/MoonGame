@@ -22,7 +22,7 @@
  * Порог пароля берётся из `authRules.ts` — второй копии этого числа быть не должно.
  */
 
-import { validPassword } from './authRules';
+import { validPassword } from '../../decisions/authRules';
 
 /** Поле формы, на которое надо вернуть курсор. */
 export type RegisterField = 'nick' | 'pass' | 'pass2';

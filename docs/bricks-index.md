@@ -558,51 +558,54 @@
 | REFM-200 | ✅ | proto | `docs/backlog.md:12316` | «что карточка пришвартованного флота ПРЕДЛАГАЕТ сделать» |
 | REFM-201 | ✅ | proto | `docs/backlog.md:12360` | «чей сейчас ход в переговорах» |
 | REFM-202 | ✅ | proto | `docs/backlog.md:12405` | «как подписано место в списке» + починка того, что подпись |
-| AUD-1 | ✅ | cli | `docs/backlog.md:12494` | клиент собирал 11 фрагментов из 18. |
-| AUD-2 | ✅ | srv core | `docs/backlog.md:12514` | фог-роутинг событий не покрыт тестом. |
-| AUD-11 | ✅ | core | `docs/backlog.md:12543` | effect.applied всегда называет адресата. |
-| AUD-15 | ✅ | srv | `docs/backlog.md:12575` | сканер фог-контракта больше не слеп к комментариям. |
-| AUD-3 | ✅ | data | `docs/backlog.md:12598` | 28 непереводимых имён игровых данных вычищены. |
-| AUD-4 | ✅ | proto | `docs/backlog.md:12629` | гейт локализации увидел шипнутый контент. |
-| AUD-14 | ✅ | proto | `docs/backlog.md:12661` | имена домов доезжают до игрока переводом. |
-| AUD-12 | ✅ | proto | `docs/backlog.md:12683` | шапка досье героя больше не показывает игроку сам ключ. |
-| AUD-13 | ✅ | core proto | `docs/backlog.md:12699` | hero.name — отображаемый текст, вшитый в |
-| AUD-5 | ✅ | core | `docs/backlog.md:12743` | экспортирован runUntil(kernel, state, ctx, opts?). |
-| AUD-6 | ✅ | core | `docs/backlog.md:12758` | actionPayloadSchemas и CLIENTACTIONTYPES публичны. |
-| AUD-7 | ✅ | proto | `docs/backlog.md:12766` | SELFPLAYJSON отдаёт всё, что печатает человеку. |
-| AUD-8 | 🗑 | proto | `docs/backlog.md:12774` | сведён в CONV-12 |
-| AUD-9 | ✅ | sec | `docs/backlog.md:12782` | merge-queue выбрасывал PR с CIFAILURE при зелёном коде. |
-| AUD-10 | ✅ | sec | `docs/backlog.md:12810` | зелёный PR не вставал в очередь: у автомержа один шанс, и он |
-| FSPLIT-1 | ✅ | core act proto | `docs/backlog.md:12952` | Отбор при делении адресует СТЕК, а не тип корабля. |
-| FSPLIT-2 | ✅ | core act proto | `docs/backlog.md:12962` | Десант делится вместе с кораблями, по трюму обеих половин. |
-| AIDIFF-1 | ✅ | proto | `docs/backlog.md:12990` | Строка места переключается «выкл → слабый → сильный». |
-| RESIL-1 | ⏳ | proto | `docs/backlog.md:13088` | Фоновые промисы браузерного клиента. |
-| RESIL-2 | ⏳ | proto | `docs/backlog.md:13099` | Цикл подсветки обучающего тура. |
-| RESIL-3 | ⏳ | srv | `docs/backlog.md:13107` | Именованный фатал процесса. |
-| RESIL-4 | ✅ | srv | `docs/backlog.md:13118` | Соак проверяет, что мир не встал. |
-| RESIL-5 | ✅ | srv proto | `docs/backlog.md:13136` | Генеральная репетиция: весь стек разом, и |
-| RESIL-6 | ✅ | srv proto | `docs/backlog.md:13171` | Достоверность генералки: настоящая база, |
-| ADDR-7 | ✅ | sec proto | `docs/backlog.md:13313` | Ссылка на партию не пускает по незнанию: |
-| OPS-2 | ✅ | ops sec | `docs/backlog.md:13351` | Обновление доносит до машины новые ключи |
-| REL-6 | ✅ | srv | `docs/backlog.md:13373` | Возврат на своё место мгновенный: перехват вместо |
-| CMB-4 | ✅ | core | `docs/backlog.md:13388` | Первый раунд боя — на самой встрече, а не через |
-| BLD-1 | ✅ | core proto | `docs/backlog.md:13408` | Очередь строительства: заказы встают в |
-| UI-14 | ✅ | proto | `docs/backlog.md:13448` | Осмотр чужого флота должен быть находимым. |
-| CMB-5 | ✅ | core | `docs/backlog.md:13471` | Вражда началась — стоящие рядом флоты сходятся |
-| ATK-1 | ✅ | proto | `docs/backlog.md:13487` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
-| CMB-7 | ✅ | core | `docs/backlog.md:13607` | Перемирие посреди боя не останавливало бой. |
-| RLY-1 | ✅ | proto | `docs/backlog.md:13628` | Сбор построенного: соло и сеть играли по РАЗНЫМ |
-| CARGO-1 | ✅ | core proto | `docs/backlog.md:13660` | Часовая погрузка десанта жила в |
-| MRG-1 | ✅ | core proto | `docs/backlog.md:13708` | «Слиться по прибытии» — вторая половина |
-| ART-0 | ✅ | core data proto | `docs/backlog.md:13731` | Артиллерия снята из игры целиком |
-| ORB-1 | ✅ | core data proto | `docs/backlog.md:13762` | Орбитальный слой объявлен в |
-| ORB-2 | ✅ | data proto | `docs/backlog.md:13794` | «Изучается технология, строится здание» не |
-| ORB-3 | ✅ | proto | `docs/backlog.md:13822` | Звёздный форт выдавал орбитальное ПКО мимо |
-| CMB-6 | ✅ | core | `docs/backlog.md:13859` | После ничьей третий враждебный флот получает свой |
-| ORD-2 | ✅ | proto | `docs/backlog.md:13889` | Нацеленный ШТУРМ теперь переживает закрытую |
-| FOG-10 | ✅ | proto core | `docs/backlog.md:13909` | Память разведки перестала жить только |
-| FOG-9 | ✅ | core | `docs/backlog.md:13933` | Приостановленная стройка чужого мира была видна |
-| TEST-4 | ✅ | srv | `docs/backlog.md:13943` | topXp падал на живой базе разработчика. |
+| MIG-1 | ✅ | cli proto | `docs/backlog.md:12493` | Вход в сетевой матч переехал в /decisions. |
+| MIG-2 | ✅ | cli srv | `docs/backlog.md:12509` | Клиент ПОТРЕБЛЯЕТ переехавшее: вход, обзор, место, отказы. |
+| MIG-3 | ✅ | cli | `docs/backlog.md:12547` | HUD-модели наконец РИСУЮТСЯ, и интентов стало три. |
+| AUD-1 | ✅ | cli | `docs/backlog.md:12601` | клиент собирал 11 фрагментов из 18. |
+| AUD-2 | ✅ | srv core | `docs/backlog.md:12621` | фог-роутинг событий не покрыт тестом. |
+| AUD-11 | ✅ | core | `docs/backlog.md:12650` | effect.applied всегда называет адресата. |
+| AUD-15 | ✅ | srv | `docs/backlog.md:12682` | сканер фог-контракта больше не слеп к комментариям. |
+| AUD-3 | ✅ | data | `docs/backlog.md:12705` | 28 непереводимых имён игровых данных вычищены. |
+| AUD-4 | ✅ | proto | `docs/backlog.md:12736` | гейт локализации увидел шипнутый контент. |
+| AUD-14 | ✅ | proto | `docs/backlog.md:12768` | имена домов доезжают до игрока переводом. |
+| AUD-12 | ✅ | proto | `docs/backlog.md:12790` | шапка досье героя больше не показывает игроку сам ключ. |
+| AUD-13 | ✅ | core proto | `docs/backlog.md:12806` | hero.name — отображаемый текст, вшитый в |
+| AUD-5 | ✅ | core | `docs/backlog.md:12850` | экспортирован runUntil(kernel, state, ctx, opts?). |
+| AUD-6 | ✅ | core | `docs/backlog.md:12865` | actionPayloadSchemas и CLIENTACTIONTYPES публичны. |
+| AUD-7 | ✅ | proto | `docs/backlog.md:12873` | SELFPLAYJSON отдаёт всё, что печатает человеку. |
+| AUD-8 | 🗑 | proto | `docs/backlog.md:12881` | сведён в CONV-12 |
+| AUD-9 | ✅ | sec | `docs/backlog.md:12889` | merge-queue выбрасывал PR с CIFAILURE при зелёном коде. |
+| AUD-10 | ✅ | sec | `docs/backlog.md:12917` | зелёный PR не вставал в очередь: у автомержа один шанс, и он |
+| FSPLIT-1 | ✅ | core act proto | `docs/backlog.md:13059` | Отбор при делении адресует СТЕК, а не тип корабля. |
+| FSPLIT-2 | ✅ | core act proto | `docs/backlog.md:13069` | Десант делится вместе с кораблями, по трюму обеих половин. |
+| AIDIFF-1 | ✅ | proto | `docs/backlog.md:13097` | Строка места переключается «выкл → слабый → сильный». |
+| RESIL-1 | ⏳ | proto | `docs/backlog.md:13195` | Фоновые промисы браузерного клиента. |
+| RESIL-2 | ⏳ | proto | `docs/backlog.md:13206` | Цикл подсветки обучающего тура. |
+| RESIL-3 | ⏳ | srv | `docs/backlog.md:13214` | Именованный фатал процесса. |
+| RESIL-4 | ✅ | srv | `docs/backlog.md:13225` | Соак проверяет, что мир не встал. |
+| RESIL-5 | ✅ | srv proto | `docs/backlog.md:13243` | Генеральная репетиция: весь стек разом, и |
+| RESIL-6 | ✅ | srv proto | `docs/backlog.md:13278` | Достоверность генералки: настоящая база, |
+| ADDR-7 | ✅ | sec proto | `docs/backlog.md:13420` | Ссылка на партию не пускает по незнанию: |
+| OPS-2 | ✅ | ops sec | `docs/backlog.md:13458` | Обновление доносит до машины новые ключи |
+| REL-6 | ✅ | srv | `docs/backlog.md:13480` | Возврат на своё место мгновенный: перехват вместо |
+| CMB-4 | ✅ | core | `docs/backlog.md:13495` | Первый раунд боя — на самой встрече, а не через |
+| BLD-1 | ✅ | core proto | `docs/backlog.md:13515` | Очередь строительства: заказы встают в |
+| UI-14 | ✅ | proto | `docs/backlog.md:13555` | Осмотр чужого флота должен быть находимым. |
+| CMB-5 | ✅ | core | `docs/backlog.md:13578` | Вражда началась — стоящие рядом флоты сходятся |
+| ATK-1 | ✅ | proto | `docs/backlog.md:13594` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
+| CMB-7 | ✅ | core | `docs/backlog.md:13714` | Перемирие посреди боя не останавливало бой. |
+| RLY-1 | ✅ | proto | `docs/backlog.md:13735` | Сбор построенного: соло и сеть играли по РАЗНЫМ |
+| CARGO-1 | ✅ | core proto | `docs/backlog.md:13767` | Часовая погрузка десанта жила в |
+| MRG-1 | ✅ | core proto | `docs/backlog.md:13815` | «Слиться по прибытии» — вторая половина |
+| ART-0 | ✅ | core data proto | `docs/backlog.md:13838` | Артиллерия снята из игры целиком |
+| ORB-1 | ✅ | core data proto | `docs/backlog.md:13869` | Орбитальный слой объявлен в |
+| ORB-2 | ✅ | data proto | `docs/backlog.md:13901` | «Изучается технология, строится здание» не |
+| ORB-3 | ✅ | proto | `docs/backlog.md:13929` | Звёздный форт выдавал орбитальное ПКО мимо |
+| CMB-6 | ✅ | core | `docs/backlog.md:13966` | После ничьей третий враждебный флот получает свой |
+| ORD-2 | ✅ | proto | `docs/backlog.md:13996` | Нацеленный ШТУРМ теперь переживает закрытую |
+| FOG-10 | ✅ | proto core | `docs/backlog.md:14016` | Память разведки перестала жить только |
+| FOG-9 | ✅ | core | `docs/backlog.md:14040` | Приостановленная стройка чужого мира была видна |
+| TEST-4 | ✅ | srv | `docs/backlog.md:14050` | topXp падал на живой базе разработчика. |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
@@ -653,30 +656,30 @@
 | CP0.2 | ⏳ | cli proto | `docs/cross-platform-roadmap.md:92` | Вынести рендер-слой из прототипа |
 | CP0.3 | ✅ | cli core | `docs/cross-platform-roadmap.md:102` | Общий загрузчик данных |
 | CP1.1 | ✅ | cli | `docs/cross-platform-roadmap.md:116` | Реальный WS-транспорт |
-| CP1.2 | ⏳ | cli proto | `docs/cross-platform-roadmap.md:126` | Снять локальную авторитетность |
-| CP1.3 | ⏳ | cli | `docs/cross-platform-roadmap.md:133` | Интенты из UI |
-| CP1.4 | ✅ | cli | `docs/cross-platform-roadmap.md:140` | Реконнект и резюме |
-| CP2.1 | ✅ | cli | `docs/cross-platform-roadmap.md:176` | Web App Manifest |
-| CP2.2 | ⏳ | cli | `docs/cross-platform-roadmap.md:183` | Service Worker + app-shell |
-| CP2.3 | 🔒 | cli | `docs/cross-platform-roadmap.md:190` | Кэш снапшота (IndexedDB) |
-| CP2.4 | 🔒 | cli | `docs/cross-platform-roadmap.md:197` | Install UX и Lighthouse-бюджет |
-| CP2.5 | 🔒 | cli srv | `docs/cross-platform-roadmap.md:204` | Авто-обновление + force-update handshake |
-| CP3.1 | 🔒 | cli | `docs/cross-platform-roadmap.md:220` | Предпросмотр-прогон |
-| CP3.2 | 🔒 | cli | `docs/cross-platform-roadmap.md:227` | Сверка предпросмотр ↔ сервер |
-| CP3.3 | 🔒 | cli | `docs/cross-platform-roadmap.md:234` | «Что будет, если…» |
-| CP4.1 | 🔒 | cli | `docs/cross-platform-roadmap.md:248` | Интеграция Pixi v8 (слой карты) |
-| CP4.2 | 🔒 | cli | `docs/cross-platform-roadmap.md:255` | Камера, culling, DPI |
-| CP4.3 | 🔒 | cli | `docs/cross-platform-roadmap.md:262` | Off-thread рендер/симуляция (опц.) |
-| CP4.4 | 🔒 | cli | `docs/cross-platform-roadmap.md:269` | Перф-бюджет в CI |
-| CP5.1 | 🔒 | cli | `docs/cross-platform-roadmap.md:280` | Pointer vs touch |
-| CP5.2 | 🔒 | cli | `docs/cross-platform-roadmap.md:287` | Жесты и хаптика |
-| CP5.3 | 🔒 | cli | `docs/cross-platform-roadmap.md:294` | Адаптивные раскладки |
-| CP6.1 | 🔒 | cli sec | `docs/cross-platform-roadmap.md:305` | Android TWA |
-| CP6.2 | 🔒 | cli | `docs/cross-platform-roadmap.md:312` | iOS (и альт-Android) через Capacitor |
-| CP6.3 | 🔒 | sec | `docs/cross-platform-roadmap.md:324` | CI-артефакты сборок |
-| CP7.1 | 🔒 | cli | `docs/cross-platform-roadmap.md:338` | Web Push (браузеры / Android PWA) |
-| CP7.2 | 🔒 | cli | `docs/cross-platform-roadmap.md:342` | iOS native push через Capacitor |
-| CP7.3 | ⏳ |  | `docs/cross-platform-roadmap.md:346` | Серверные триггеры пушей [→F3] |
+| CP1.2 | ✅ | cli proto | `docs/cross-platform-roadmap.md:126` | Снять локальную авторитетность |
+| CP1.3 | 🔶 | cli | `docs/cross-platform-roadmap.md:142` | Интенты из UI |
+| CP1.4 | ✅ | cli | `docs/cross-platform-roadmap.md:159` | Реконнект и резюме |
+| CP2.1 | ✅ | cli | `docs/cross-platform-roadmap.md:195` | Web App Manifest |
+| CP2.2 | ⏳ | cli | `docs/cross-platform-roadmap.md:202` | Service Worker + app-shell |
+| CP2.3 | 🔒 | cli | `docs/cross-platform-roadmap.md:209` | Кэш снапшота (IndexedDB) |
+| CP2.4 | 🔒 | cli | `docs/cross-platform-roadmap.md:216` | Install UX и Lighthouse-бюджет |
+| CP2.5 | 🔒 | cli srv | `docs/cross-platform-roadmap.md:223` | Авто-обновление + force-update handshake |
+| CP3.1 | 🔒 | cli | `docs/cross-platform-roadmap.md:239` | Предпросмотр-прогон |
+| CP3.2 | 🔒 | cli | `docs/cross-platform-roadmap.md:246` | Сверка предпросмотр ↔ сервер |
+| CP3.3 | 🔒 | cli | `docs/cross-platform-roadmap.md:253` | «Что будет, если…» |
+| CP4.1 | 🔒 | cli | `docs/cross-platform-roadmap.md:267` | Интеграция Pixi v8 (слой карты) |
+| CP4.2 | 🔒 | cli | `docs/cross-platform-roadmap.md:274` | Камера, culling, DPI |
+| CP4.3 | 🔒 | cli | `docs/cross-platform-roadmap.md:281` | Off-thread рендер/симуляция (опц.) |
+| CP4.4 | 🔒 | cli | `docs/cross-platform-roadmap.md:288` | Перф-бюджет в CI |
+| CP5.1 | 🔒 | cli | `docs/cross-platform-roadmap.md:299` | Pointer vs touch |
+| CP5.2 | 🔒 | cli | `docs/cross-platform-roadmap.md:306` | Жесты и хаптика |
+| CP5.3 | 🔒 | cli | `docs/cross-platform-roadmap.md:313` | Адаптивные раскладки |
+| CP6.1 | 🔒 | cli sec | `docs/cross-platform-roadmap.md:324` | Android TWA |
+| CP6.2 | 🔒 | cli | `docs/cross-platform-roadmap.md:331` | iOS (и альт-Android) через Capacitor |
+| CP6.3 | 🔒 | sec | `docs/cross-platform-roadmap.md:343` | CI-артефакты сборок |
+| CP7.1 | 🔒 | cli | `docs/cross-platform-roadmap.md:357` | Web Push (браузеры / Android PWA) |
+| CP7.2 | 🔒 | cli | `docs/cross-platform-roadmap.md:361` | iOS native push через Capacitor |
+| CP7.3 | ⏳ |  | `docs/cross-platform-roadmap.md:365` | Серверные триггеры пушей [→F3] |
 | EC-0.1 | ✅ | docs | `docs/economy-roadmap.md:70` | Жанровое решение — решено (см. «Зафиксированные решения» выше) |
 | EC-0.2 | ✅ | docs | `docs/economy-roadmap.md:79` | Денежная модель на бумаге — решено (2026-07-19) |
 | EC-0.3 | ✅ | docs sec | `docs/economy-roadmap.md:104` | RMT/фрод threat-model — решено (2026-07-19) |
