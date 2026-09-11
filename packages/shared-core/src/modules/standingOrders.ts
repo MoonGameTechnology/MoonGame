@@ -1,30 +1,34 @@
 /**
- * Standing orders — CC-2 auto-storm (`order.auto`) and CC-4 дежурный вылет
- * (`order.scramble` + the server-only `patrol.stamp`), plus CC-1 order chains
- * (`order.chain` + the server-only `chain.stamp`). Port of the prototype's
- * `standingOrdersModule` (REFP-15); since CONV-7 that copy is gone and this is the
- * only implementation — the prototype loads this module and keeps only its DRIVERS.
+ * Standing orders — CC-2 auto-storm (`order.auto`), CC-4 дежурный вылет
+ * (`order.scramble`) и CC-1 order chains (`order.chain` + the server-only
+ * `chain.stamp`). Port of the prototype's `standingOrdersModule` (REFP-15); since
+ * CONV-7 that copy is gone and this is the only implementation — the prototype loads
+ * this module and keeps only its DRIVERS.
  *
- * This module only stores/validates the player's INTENT and garbage-collects it
- * for dead fleets (`time.advanced`). The actual driver — scrambling a patrol wing
- * at a spotted hostile, or consuming a chain's head step when the fleet goes idle
- * — is a server-side orchestration loop that repeatedly calls `applyAction` from
- * outside a single action/event pass (see the prototype's `serverChainActions`/
- * `serverPatrolActions` in `game.ts`); that driver is out of scope for this pass,
- * same as it not depending on any AI/bot decision loop for its own behaviour —
- * this module's four client actions are pure state CRUD with no simulated agent.
+ * This module only stores/validates the player's INTENT and garbage-collects it for
+ * dead fleets and lost worlds (`time.advanced`). The actual driver — scrambling a
+ * base's duty squadron at a spotted hostile, or consuming a chain's head step when the
+ * fleet goes idle — is a server-side orchestration loop that repeatedly calls
+ * `applyAction` from outside a single action/event pass
+ * (`packages/server/src/standingOrderDriver.ts`, and the prototype's `soloDrivers.ts`).
  *
- * `patrol.stamp`/`chain.stamp` have no gate schema (`actions/payloadSchemas.ts`
- * documents them as deliberately server-driver-only, gate-exempt) — a client
- * cannot reach them; only trusted server code may ever issue them.
+ * **CC-4 ПЕРЕЕХАЛ НА БАЗУ (SHU-2.2).** Раньше дежурство армилось на ФЛОТ челноков и
+ * держало собственные центр, радиус и запас топлива — модель «крыло как флот». Такого
+ * флота с SHU-1.1 не бывает, поэтому `order.scramble` теперь армит БАЗУ (мир с портом
+ * или носитель), а хранится один флаг: центр и радиус живые, топливо принадлежит базе и
+ * тратится обычным `shuttle.strike`. Вместе с моделью ушёл и `patrol.stamp` — серверный
+ * штамп «потратил топливо / перезарядился»: тратить и перезаряжать теперь некому, кроме
+ * самого ядра.
+ *
+ * `chain.stamp` has no gate schema (`actions/payloadSchemas.ts` documents it as
+ * deliberately server-driver-only, gate-exempt) — a client cannot reach it; only
+ * trusted server code may ever issue it.
  */
 import type { GameModule } from '../kernel/module';
-import type { Fleet, PatrolEntry } from '../state/gameState';
-import { fleetIdle, validateChainSteps } from '../state/chain';
-import { fleetHasShuttle, sortieSpec, shuttleStrikeRange, freshSortie } from '../state/shuttle';
+import type { Fleet, Planet } from '../state/gameState';
+import { validateChainSteps } from '../state/chain';
+import { hangarMachines, shuttleBayAt } from '../state/shuttle';
 import { ownFleet } from '../util/combat';
-
-const HOUR = 3_600_000;
 
 export const standingOrdersModule: GameModule = {
   id: 'standing-orders',
@@ -50,73 +54,53 @@ export const standingOrdersModule: GameModule = {
       }
     });
 
+    /**
+     * CC-4: включить/выключить ДЕЖУРНЫЙ ВЫЛЕТ у базы (SHU-2.2 — раньше у флота).
+     *
+     * База — мир с космопортом ИЛИ флот-носитель, ровно одна из двух (та же форма, что
+     * у `shuttle.strike`). Гейт спрашивает ровно одно: есть ли у базы ангар и стоит ли
+     * в нём хоть одна машина. Ни топлива, ни перезарядки, ни дальности здесь не
+     * проверяем НАМЕРЕННО — всё это проверит сам `shuttle.strike` в момент вылета, а
+     * вторая копия его условий разъехалась бы с ним на первой правке: дежурство
+     * выключалось бы там, где удар ещё проходит, и наоборот.
+     */
     api.onAction('order.scramble', (action, h) => {
-      const p = action.payload as { fleetId?: unknown; on?: unknown };
+      const p = action.payload as { planetId?: unknown; fleetId?: unknown; on?: unknown };
       if (typeof p?.on !== 'boolean') return h.reject('E_BAD_PAYLOAD');
-      const f: Fleet | undefined = ownedFleet(h.state, action.playerId, p.fleetId);
-      if (!f) return h.reject('E_NO_FLEET');
+      const named = [p.planetId, p.fleetId].filter((v) => v !== undefined);
+      if (named.length !== 1) return h.reject('E_BAD_PAYLOAD'); // ровно одна база
+      const kind: 'planet' | 'fleet' = p.planetId !== undefined ? 'planet' : 'fleet';
+      const rawId = kind === 'planet' ? p.planetId : p.fleetId;
+      if (typeof rawId !== 'string') return h.reject('E_BAD_PAYLOAD');
+
+      let baseId: string;
+      if (kind === 'planet') {
+        const planet: Planet | undefined = Object.prototype.hasOwnProperty.call(
+          h.state.planets,
+          rawId,
+        )
+          ? h.state.planets[rawId]
+          : undefined;
+        if (!planet) return h.reject('E_NO_TARGET');
+        if (planet.owner !== action.playerId) return h.reject('E_FORBIDDEN');
+        baseId = planet.id;
+        if (p.on && shuttleBayAt(planet, h.ctx.data) <= 0) return h.reject('E_NO_PORT');
+        if (p.on && hangarMachines(planet).length === 0) return h.reject('E_NO_SQUADRON');
+      } else {
+        const f: Fleet | undefined = ownedFleet(h.state, action.playerId, rawId);
+        if (!f) return h.reject('E_NO_FLEET');
+        baseId = f.id;
+        if (p.on && hangarMachines(f).length === 0) return h.reject('E_NO_SQUADRON');
+      }
+
       if (!p.on) {
-        const patrol = h.state.patrols?.[f.id];
-        if (patrol) {
-          (h.state.wingSorties ??= {})[f.id] = patrol.sortie;
-          delete h.state.patrols![f.id];
-          if (Object.keys(h.state.patrols!).length === 0) delete h.state.patrols;
+        if (h.state.patrols) {
+          delete h.state.patrols[baseId];
+          if (Object.keys(h.state.patrols).length === 0) delete h.state.patrols;
         }
         return;
       }
-      if (!fleetHasShuttle(f, h.ctx.data)) return h.reject('E_NO_SHIPS');
-      const pos = f.location !== null ? h.state.planets[f.location]?.position : undefined;
-      if (!pos || !fleetIdle(f)) return h.reject('E_CONDITIONS_UNMET');
-      const spec = sortieSpec(f, h.ctx.data);
-      const stashed = h.state.wingSorties?.[f.id];
-      const entry: PatrolEntry = {
-        center: { x: pos.x, y: pos.y },
-        radius: shuttleStrikeRange(f, h.ctx.data),
-        sortie: stashed
-          ? {
-              fuel: Math.min(stashed.fuel, spec.maxFuel),
-              rearming: Math.min(stashed.rearming, spec.rearmRounds),
-            }
-          : freshSortie(spec.maxFuel),
-        rearmAt: h.ctx.now + HOUR,
-      };
-      (h.state.patrols ??= {})[f.id] = entry;
-      if (h.state.wingSorties) {
-        delete h.state.wingSorties[f.id];
-        if (Object.keys(h.state.wingSorties).length === 0) delete h.state.wingSorties;
-      }
-    });
-
-    // Server-driver-only (no client gate schema): the runtime stamp that spends/
-    // rearms a patrol wing's sortie budget as it scrambles.
-    api.onAction('patrol.stamp', (action, h) => {
-      const p = action.payload as { fleetId?: unknown; sortie?: unknown; rearmAt?: unknown };
-      const f: Fleet | undefined = ownedFleet(h.state, action.playerId, p?.fleetId);
-      if (!f) return h.reject('E_NO_FLEET');
-      const patrol = h.state.patrols?.[f.id];
-      if (!patrol) return h.reject('E_NO_TARGET');
-      const s = p.sortie as { fuel?: unknown; rearming?: unknown } | undefined;
-      const spec = sortieSpec(f, h.ctx.data);
-      if (
-        typeof s?.fuel !== 'number' ||
-        !Number.isInteger(s.fuel) ||
-        s.fuel < 0 ||
-        s.fuel > spec.maxFuel ||
-        typeof s.rearming !== 'number' ||
-        !Number.isInteger(s.rearming) ||
-        s.rearming < 0 ||
-        s.rearming > spec.rearmRounds
-      ) {
-        return h.reject('E_BAD_PAYLOAD');
-      }
-      if (
-        p.rearmAt !== undefined &&
-        (typeof p.rearmAt !== 'number' || !Number.isFinite(p.rearmAt) || p.rearmAt < 0)
-      ) {
-        return h.reject('E_BAD_PAYLOAD');
-      }
-      patrol.sortie = { fuel: s.fuel, rearming: s.rearming };
-      if (p.rearmAt !== undefined) patrol.rearmAt = p.rearmAt;
+      (h.state.patrols ??= {})[baseId] = { kind };
     });
 
     api.onAction('order.chain', (action, h) => {
@@ -157,7 +141,7 @@ export const standingOrdersModule: GameModule = {
     });
 
     api.on('time.advanced', (_ev, h) => {
-      for (const key of ['autoAssault', 'patrols', 'wingSorties', 'orders'] as const) {
+      for (const key of ['autoAssault', 'orders'] as const) {
         const map = h.state[key];
         if (!map) continue;
         for (const fid of Object.keys(map)) {
@@ -166,6 +150,20 @@ export const standingOrdersModule: GameModule = {
           }
         }
         if (Object.keys(map).length === 0) delete h.state[key];
+      }
+      // Дежурство армится на БАЗУ (SHU-2.2), поэтому подчищается по СВОЕМУ виду: флот
+      // мог погибнуть, мир — уйти к другому хозяину. Чужой мир с включённым дежурством
+      // поднимал бы эскадру за бывшего владельца.
+      const patrols = h.state.patrols;
+      if (patrols) {
+        for (const [baseId, ref] of Object.entries(patrols)) {
+          const alive =
+            ref.kind === 'fleet'
+              ? Object.prototype.hasOwnProperty.call(h.state.fleets, baseId)
+              : Object.prototype.hasOwnProperty.call(h.state.planets, baseId);
+          if (!alive) delete patrols[baseId];
+        }
+        if (Object.keys(patrols).length === 0) delete h.state.patrols;
       }
     });
   },

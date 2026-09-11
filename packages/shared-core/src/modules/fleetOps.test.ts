@@ -680,11 +680,12 @@ describe('fleetOps — fleet.split (peel ships off a fleet into a fresh one)', (
     expect(r.events.map((e) => e.type)).toContain('fleet.split');
   });
 
-  // SQ-1.1: splitting shuttle-trait ships off a carrier creates a strike WING —
-  // it must carry homeBase (the carrier), or shuttleModule's free flight
-  // (shuttle.strike/return) rejects with E_NOT_SHUTTLE and the whole
-  // free-flight path is dead code.
-  it('a shuttle split gets homeBase (the strike wing contract)', () => {
+  // SHU-2.2: ветки «крыло» у `fleet.split` больше нет. Раньше отделённые челноки
+  // получали `homeBase` и улетали мимо графа линий — с SHU-1.1 челнок в `Fleet.units`
+  // не попадает ниоткуда (правило 5 в `shuttleHangar.test.ts`), так что отделять было
+  // нечего. Тест держит то, что осталось: отделение — обычный флот на том же узле, без
+  // каких-либо особых полей.
+  it('отделённые ЧЕЛНОКИ — обычный флот на узле, никакого свободного полёта', () => {
     const kernel = createKernel([fleetOpsModule]);
     const s = stateWith({
       players: [player('p1')],
@@ -699,57 +700,13 @@ describe('fleetOps — fleet.split (peel ships off a fleet into a fresh one)', (
     const r = okApply(kernel.applyAction(s, split('F1', [{ unit: 'interceptor', count: 2 }]), ctx));
     const newId = Object.keys(r.state.fleets).find((id) => id !== 'F1')!;
     const wing = r.state.fleets[newId]!;
-    expect(wing.homeBase).toBe('F1'); // the carrier is the base
-    // ВТОРОЙ координаты у пристыкованного крыла нет — и не должно быть. `location`
-    // у него есть (без него split отказал бы с E_IN_TRANSIT), а `shuttle.strike`
-    // берёт начало полёта как `freePosition ?? позиция location`. Выставленная здесь
-    // `freePosition` не обновляется при обычном ходе по лейну, и уведённое `fleet.move`
-    // крыло навсегда осталось бы для эскадрильной логики у точки вылета.
-    expect(wing.freePosition).toBeUndefined();
-    expect(wing.location).toBe('A'); // пристыковано: обычное место в графе линий
-  });
-
-  // Смешанный split — не крыло. Свободный полёт уносит ВЕСЬ флот, поэтому «хотя бы
-  // один истребитель» позволяло бы увести крейсер мимо графа линий, подцепив его к
-  // отделяемым эскадрильям. Крыло — это ровно shuttle-стеки (`shuttleTake`).
-  it('a MIXED split is not a wing — a regular ship can not smuggle itself off the lanes', () => {
-    const kernel = createKernel([fleetOpsModule]);
-    const s = stateWith({
-      players: [player('p1')],
-      planets: [planet('A', 'p1')],
-      fleets: [
-        fleet('F1', 'p1', 'A', [
-          ['cruiser', 3],
-          ['interceptor', 2],
-        ]),
-      ],
-    });
-    const r = okApply(
-      kernel.applyAction(
-        s,
-        split('F1', [
-          { unit: 'cruiser', count: 1 },
-          { unit: 'interceptor', count: 2 },
-        ]),
-        ctx,
-      ),
-    );
-    const newId = Object.keys(r.state.fleets).find((id) => id !== 'F1')!;
-    expect(r.state.fleets[newId]?.homeBase).toBeUndefined();
-  });
-
-  // The inverse: a NON-shuttle split must NOT get homeBase — a regular fleet
-  // stays lane-bound and shuttle.strike must keep rejecting it.
-  it('a non-shuttle split does NOT get homeBase (stays lane-bound)', () => {
-    const kernel = createKernel([fleetOpsModule]);
-    const s = stateWith({
-      players: [player('p1')],
-      planets: [planet('A', 'p1')],
-      fleets: [fleet('F1', 'p1', 'A', [['cruiser', 2]])],
-    });
-    const r = okApply(kernel.applyAction(s, split('F1', [{ unit: 'cruiser', count: 1 }]), ctx));
-    const newId = Object.keys(r.state.fleets).find((id) => id !== 'F1')!;
-    expect(r.state.fleets[newId]?.homeBase).toBeUndefined();
+    expect(wing.location).toBe('A'); // обычное место в графе линий
+    expect(wing.movement).toBeNull();
+    // Полей старой модели в состоянии не осталось вовсе — проверяем по ключам, потому
+    // что типа у них больше нет и обращение к ним не скомпилировалось бы.
+    for (const dead of ['homeBase', 'freePosition', 'freeMovement']) {
+      expect(Object.keys(wing)).not.toContain(dead);
+    }
   });
 
   it('rejects splitting off a hero unit, more than the fleet has, all of it, or none', () => {

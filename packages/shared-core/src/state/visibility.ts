@@ -447,11 +447,11 @@ function project(
       if (view.heroes[id]?.owner !== viewerId) delete view.heroes[id];
     }
   }
-  // Order chains and standing orders (`standingOrdersModule`'s `orders` / `autoAssault`
-  // / `patrols` / `wingSorties`, and the prototype-style `forcedMarch`) are future
-  // intent — exactly what `scheduled` is stripped for below. Keep only the entries of
-  // the viewer's OWN fleets; a map left empty is removed (same delta hygiene as offers).
-  for (const key of ['orders', 'autoAssault', 'patrols', 'wingSorties', 'forcedMarch'] as const) {
+  // Order chains and standing orders (`standingOrdersModule`'s `orders` / `autoAssault`,
+  // and the prototype-style `forcedMarch`) are future intent — exactly what `scheduled`
+  // is stripped for below. Keep only the entries of the viewer's OWN fleets; a map left
+  // empty is removed (same delta hygiene as offers).
+  for (const key of ['orders', 'autoAssault', 'forcedMarch'] as const) {
     const host = view as unknown as Record<string, Record<string, unknown> | undefined>;
     const map = host[key];
     if (!map) continue;
@@ -459,6 +459,18 @@ function project(
       if (state.fleets[fleetId]?.owner !== viewerId) delete map[fleetId];
     }
     if (Object.keys(map).length === 0) delete host[key];
+  }
+  // Дежурный вылет — то же будущее намерение, но с SHU-2.2 он армится на БАЗУ, поэтому
+  // хозяин ищется по СВОЕМУ виду: у флота — свой, у мира — свой. Раньше здесь стоял
+  // общий проход по `state.fleets`, и после переезда он снимал бы ВСЕ мировые дежурства
+  // (мира в `fleets` нет) — то есть игрок перестал бы видеть собственное.
+  if (view.patrols) {
+    for (const [baseId, ref] of Object.entries(view.patrols)) {
+      const owner =
+        ref.kind === 'fleet' ? state.fleets[baseId]?.owner : state.planets[baseId]?.owner;
+      if (owner !== viewerId) delete view.patrols[baseId];
+    }
+    if (Object.keys(view.patrols).length === 0) delete view.patrols;
   }
   // A rival's capital designation is their hero-respawn anchor — the same
   // targeting intel as steward hold points («вот его якорь»). Keep only the

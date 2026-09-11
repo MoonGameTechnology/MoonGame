@@ -80,8 +80,6 @@ import {
   serverAutoAssaultActions,
   serverPatrolActions,
   serverChainActions,
-  orderScramble,
-  patrolStamp,
   chainStamp,
   economySnapshot,
 } from './src/game';
@@ -574,27 +572,16 @@ async function createHostedMatch(id: string): Promise<HostedMatch> {
   }
 
   // CC-2 / CC-4: drive the authoritative STANDING orders (auto-storm + дежурный вылет)
-  // server-side — the pure decisions live in game.ts
-  // (serverAutoAssaultActions / serverPatrolActions, tested); this just applies them
-  // through the authoritative room. A rejected storm is simply skipped (a standing
-  // stance has no chain to block); patrol runtime state persists via patrol.stamp.
+  // server-side. Решения чистые: авто-штурм — в `game.ts`, дежурный вылет — уже в ЯДРЕ
+  // (`patrolScrambles`, SHU-2.2), здесь только применение через авторитетную комнату.
+  // Отклонённый приказ просто пропускается. Запаса вылетов драйвер больше не ведёт: он
+  // принадлежит БАЗЕ и тратится самим `shuttle.strike`.
   async function runServerStanding(): Promise<void> {
     if (!room.isStarted) return;
     for (const a of serverAutoAssaultActions(room.state)) {
       for (const act of a.actions) if (!(await room.submitServerAction(a.owner, act)).ok) break;
     }
-    for (const p of serverPatrolActions(room.state, room.state.time)) {
-      if (p.drop) {
-        if (p.owner)
-          await room.submitServerAction(p.owner, orderScramble(p.owner, p.fleetId, false));
-        continue;
-      }
-      if (p.patch) {
-        await room.submitServerAction(
-          p.owner,
-          patrolStamp(p.owner, p.fleetId, p.patch.sortie, p.patch.rearmAt),
-        );
-      }
+    for (const p of serverPatrolActions(room.state)) {
       for (const act of p.actions) await room.submitServerAction(p.owner, act);
     }
     // CC-1: advance the authoritative order chains — stamp first (consume-on-issue),

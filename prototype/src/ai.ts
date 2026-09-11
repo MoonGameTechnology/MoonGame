@@ -1147,7 +1147,7 @@ export function aiOrders(
           (p) => p.position,
         );
         if (count > 0 && foeFleet) {
-          out.push(strikeShuttle(ai, port.id, squad.id, { targetFleetId: foeFleet.id }));
+          out.push(strikeShuttle(ai, { planetId: port.id }, squad.id, { targetFleetId: foeFleet.id }));
         } else if (count > 0 && foeWorld) {
           // Десантный вылет везёт войска: без груза он долетит и просто погибнет.
           // Берём из гарнизона сверх домашней стражи, тем же порогом, что и погрузка
@@ -1159,10 +1159,10 @@ export function aiOrders(
               ? troopsForDrop(port, squadronCargoCapacity(squad, data))
               : undefined;
           if (ready !== 'landing_shuttle') {
-            out.push(strikeShuttle(ai, port.id, squad.id, { targetPlanetId: foeWorld.id }));
+            out.push(strikeShuttle(ai, { planetId: port.id }, squad.id, { targetPlanetId: foeWorld.id }));
           } else if (troops && troops.length > 0) {
             out.push(loadSquadronTroops(ai, { planetId: port.id }, squad.id, troops));
-            out.push(strikeShuttle(ai, port.id, squad.id, { targetPlanetId: foeWorld.id }));
+            out.push(strikeShuttle(ai, { planetId: port.id }, squad.id, { targetPlanetId: foeWorld.id }));
           }
         }
       }

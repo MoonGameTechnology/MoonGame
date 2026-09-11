@@ -392,27 +392,11 @@ export const fleetOpsModule: GameModule = {
       }
       const seq = nextFleetSeq(h.state);
       const id = `fleet:${action.playerId}:${h.ctx.now}:${seq}`;
-      // SQ-1.1 (shuttles-roadmap): a split of shuttle-trait ships is a strike
-      // WING — it gets `homeBase` (the carrier it launched from), and that is what
-      // lets shuttleModule fly it off the lane graph (`shuttle.strike`/`return`).
-      // Without it `shuttle.strike` rejects with E_NOT_SHUTTLE and the whole
-      // free-flight path is unreachable.
-      //
-      // ВСЕ отделяемые корабли обязаны быть эскадрильями, а не хотя бы один. Крыло —
-      // это ровно shuttle-стеки (`shuttleTake` в `state/shuttle.ts` так его и
-      // определяет), и «хотя бы один» позволяло увести крейсер мимо графа линий,
-      // подцепив его к отделяемым истребителям: свободный полёт уносит ВЕСЬ флот.
-      //
-      // Позицию здесь НЕ выставляем намеренно. `shuttle.strike` берёт начало полёта
-      // как `freePosition ?? позиция location` — у пристыкованного крыла `location`
-      // есть (иначе split отказал бы выше с E_IN_TRANSIT), так что вторая координата
-      // не нужна. А выставленная — вредна: она не мутирует при обычном ходе по лейну,
-      // и крыло, которое увели `fleet.move`, для всей эскадрильной логики
-      // (`fleetWorldPos` предпочитает `freePosition`) навсегда осталось бы у точки
-      // вылета — с неверным временем полёта и неверной проверкой радиуса зонального ПВО.
-      const isShuttleWing = taken.every((st) =>
-        defHasTrait(h.ctx.data.units[st.unit], 'shuttle'),
-      );
+      // ЗДЕСЬ БЫЛА ветка «крыло» (SQ-1.1): отделённым челнокам выставлялся `homeBase`,
+      // и это включало им полёт мимо графа линий. Снята в SHU-2.2 вместе с полем: с
+      // SHU-1.1 челнок живёт в ангаре и в `Fleet.units` не попадает ниоткуда (правило 5
+      // в `shuttleHangar.test.ts`), поэтому отделять было нечего — ветка не срабатывала
+      // ни разу. Отделение обычных кораблей она не касалась и не касается.
       h.state.fleets[id] = {
         id,
         owner: action.playerId,
@@ -423,7 +407,6 @@ export const fleetOpsModule: GameModule = {
         traits: [],
         battleId: null,
         ...(fleet.orbit ? { orbit: fleet.orbit } : {}),
-        ...(isShuttleWing ? { homeBase: fleet.id } : {}),
       };
       h.emit('fleet.split', {
         from: payload.fleetId,

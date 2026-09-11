@@ -134,7 +134,7 @@ function fleet(
   owner: string,
   location: string | null,
   units: Array<[string, number]>,
-  opts: { orbit?: 'near'; bombarding?: boolean; homeBase?: string } = {},
+  opts: { orbit?: 'near'; bombarding?: boolean } = {},
 ): Fleet {
   return {
     id,
@@ -144,7 +144,6 @@ function fleet(
     units: units.map(([unit, count]) => ({ unit, count })),
     orbit: opts.orbit,
     bombarding: opts.bombarding,
-    homeBase: opts.homeBase,
     battleId: null,
     traits: [],
   };

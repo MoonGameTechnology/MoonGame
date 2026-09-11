@@ -17,6 +17,12 @@ const data: GameData = parseGameData({
   version: '0.1.0',
   resources: ['metal'],
   units: {
+    interceptor: {
+      faction: 'x',
+      domain: 'space',
+      traits: ['shuttle'],
+      stats: { attack: 4, defense: 1, speed: 12, hp: 8, fuel: 3, rearmRounds: 2, strikeRange: 60 },
+    },
     carrier: {
       faction: 'x',
       domain: 'space',
@@ -30,7 +36,11 @@ const data: GameData = parseGameData({
     },
   },
   factions: {},
-  buildings: {},
+  buildings: {
+    // Космопорт нужен, чтобы у мира была вместимость ангара: гейт дежурства стоит на
+    // ней, а не на отдельном флаге (то же правило, что у постройки челнока, SHU-1.1).
+    spaceport: { name: 'Spaceport', shuttleBay: 4, hp: 100 },
+  },
   events: {},
   // one real ability so an `ability` chain step can name it (CC-1 × HERO-4)
   heroAbilities: { corridor: { name: 'Corridor', type: 'temp_lane' } },
@@ -120,128 +130,108 @@ describe('standingOrders — order.auto (CC-2 auto-storm)', () => {
     ).toBe('E_NO_FLEET');
   });
 });
-
-describe('standingOrders — order.scramble (CC-4 standing patrol)', () => {
-  function withCarrier() {
-    return stateWith({
-      players: [player('p1')],
-      planets: [planet('A', 'p1')],
-      fleets: [fleet('f1', 'p1', 'A', [['carrier', 1]])],
-    });
+describe('standingOrders — order.scramble (CC-4 дежурный вылет, на БАЗЕ с SHU-2.2)', () => {
+  /** Мир с портом и эскадрой в ангаре — база, которой дежурство положено. */
+  function withPort() {
+    const s = stateWith({ players: [player('p1')], planets: [planet('A', 'p1')] });
+    return {
+      ...s,
+      planets: {
+        ...s.planets,
+        A: {
+          ...s.planets.A!,
+          buildings: [{ type: 'spaceport', level: 1, hp: 100 }],
+          hangar: [{ id: 'sq:p1:1', units: [{ unit: 'interceptor', count: 2 }] }],
+        },
+      },
+    };
   }
 
-  it('arms a patrol at the fleet\'s current position with a fresh sortie', () => {
+  it('АРМИТ МИР: хранится один флаг, вида «мир» — ни центра, ни радиуса, ни топлива', () => {
     const kernel = createKernel([standingOrdersModule]);
     const r = okApply(
-      kernel.applyAction(withCarrier(), act('order.scramble', 'p1', { fleetId: 'f1', on: true }), ctx),
+      kernel.applyAction(withPort(), act('order.scramble', 'p1', { planetId: 'A', on: true }), ctx),
     );
-    expect(r.state.patrols?.f1).toMatchObject({
-      center: { x: 10, y: 20 },
-      radius: 50,
-      sortie: { fuel: 2, rearming: 0 },
-      rearmAt: 3_600_000,
-    });
+    expect(r.state.patrols?.A).toEqual({ kind: 'planet' });
   });
 
-  it('disarming stashes the current sortie into wingSorties and clears the patrol', () => {
+  it('СНЯТИЕ ПРОСТО УБИРАЕТ ФЛАГ: заначки запаса нет, он принадлежит базе', () => {
     const kernel = createKernel([standingOrdersModule]);
     let r = okApply(
-      kernel.applyAction(withCarrier(), act('order.scramble', 'p1', { fleetId: 'f1', on: true }), ctx),
+      kernel.applyAction(withPort(), act('order.scramble', 'p1', { planetId: 'A', on: true }), ctx),
     );
-    r = okApply(kernel.applyAction(r.state, act('order.scramble', 'p1', { fleetId: 'f1', on: false }), ctx));
+    r = okApply(
+      kernel.applyAction(r.state, act('order.scramble', 'p1', { planetId: 'A', on: false }), ctx),
+    );
     expect(r.state.patrols).toBeUndefined();
-    expect(r.state.wingSorties?.f1).toEqual({ fuel: 2, rearming: 0 });
   });
 
-  it('re-arming carries the stashed sortie forward instead of resetting it', () => {
+  it('ЧУЖОЙ МИР ДЕЖУРСТВА НЕ ПОЛУЧАЕТ', () => {
     const kernel = createKernel([standingOrdersModule]);
-    let r = okApply(
-      kernel.applyAction(withCarrier(), act('order.scramble', 'p1', { fleetId: 'f1', on: true }), ctx),
-    );
-    r = okApply(kernel.applyAction(r.state, act('patrol.stamp', 'p1', {
-      fleetId: 'f1',
-      sortie: { fuel: 0, rearming: 3 },
-    }), ctx));
-    r = okApply(kernel.applyAction(r.state, act('order.scramble', 'p1', { fleetId: 'f1', on: false }), ctx));
-    r = okApply(kernel.applyAction(r.state, act('order.scramble', 'p1', { fleetId: 'f1', on: true }), ctx));
-    expect(r.state.patrols?.f1?.sortie).toEqual({ fuel: 0, rearming: 3 });
-  });
-
-  it('rejects a fleet with no shuttle ships, and a busy fleet', () => {
-    const kernel = createKernel([standingOrdersModule]);
-    const bare = stateWith({
-      players: [player('p1')],
-      planets: [planet('A', 'p1')],
-      fleets: [fleet('f1', 'p1', 'A', [['cruiser', 1]])],
-    });
-    expect(
-      errCode(kernel.applyAction(bare, act('order.scramble', 'p1', { fleetId: 'f1', on: true }), ctx)),
-    ).toBe('E_NO_SHIPS');
-
-    const busy = stateWith({
-      players: [player('p1')],
-      planets: [planet('A', 'p1')],
-      fleets: [
-        {
-          ...fleet('f1', 'p1', 'A', [['carrier', 1]]),
-          movement: { to: 'B', from: 'A', departedAt: 0, arrivesAt: 100 },
-        },
-      ],
-    });
-    expect(
-      errCode(kernel.applyAction(busy, act('order.scramble', 'p1', { fleetId: 'f1', on: true }), ctx)),
-    ).toBe('E_CONDITIONS_UNMET');
-  });
-});
-
-describe('standingOrders — patrol.stamp (server-driver runtime stamp)', () => {
-  it('updates the sortie and optional rearmAt on an armed patrol', () => {
-    const kernel = createKernel([standingOrdersModule]);
-    const r0 = okApply(
-      kernel.applyAction(
-        stateWith({
-          players: [player('p1')],
-          planets: [planet('A', 'p1')],
-          fleets: [fleet('f1', 'p1', 'A', [['carrier', 1]])],
-        }),
-        act('order.scramble', 'p1', { fleetId: 'f1', on: true }),
-        ctx,
-      ),
-    );
-    const r = okApply(
-      kernel.applyAction(
-        r0.state,
-        act('patrol.stamp', 'p1', { fleetId: 'f1', sortie: { fuel: 1, rearming: 0 }, rearmAt: 999 }),
-        ctx,
-      ),
-    );
-    expect(r.state.patrols?.f1?.sortie).toEqual({ fuel: 1, rearming: 0 });
-    expect(r.state.patrols?.f1?.rearmAt).toBe(999);
-  });
-
-  it('rejects when there is no armed patrol, or an out-of-range sortie', () => {
-    const kernel = createKernel([standingOrdersModule]);
-    const s = stateWith({
-      players: [player('p1')],
-      planets: [planet('A', 'p1')],
-      fleets: [fleet('f1', 'p1', 'A', [['carrier', 1]])],
-    });
+    const s = withPort();
+    const foreign = { ...s, planets: { ...s.planets, A: { ...s.planets.A!, owner: 'p2' } } };
     expect(
       errCode(
-        kernel.applyAction(s, act('patrol.stamp', 'p1', { fleetId: 'f1', sortie: { fuel: 0, rearming: 0 } }), ctx),
+        kernel.applyAction(foreign, act('order.scramble', 'p1', { planetId: 'A', on: true }), ctx),
       ),
-    ).toBe('E_NO_TARGET');
+    ).toBe('E_FORBIDDEN');
+  });
 
-    const r0 = okApply(kernel.applyAction(s, act('order.scramble', 'p1', { fleetId: 'f1', on: true }), ctx));
+  it('БЕЗ ПОРТА И БЕЗ ЭСКАДРЫ ДЕЖУРИТЬ НЕЧЕМ — коды отказа РАЗНЫЕ', () => {
+    const kernel = createKernel([standingOrdersModule]);
+    const s = withPort();
+    const noPort = { ...s, planets: { ...s.planets, A: { ...s.planets.A!, buildings: [] } } };
+    expect(
+      errCode(
+        kernel.applyAction(noPort, act('order.scramble', 'p1', { planetId: 'A', on: true }), ctx),
+      ),
+    ).toBe('E_NO_PORT');
+    const empty = { ...s, planets: { ...s.planets, A: { ...s.planets.A!, hangar: [] } } };
+    expect(
+      errCode(
+        kernel.applyAction(empty, act('order.scramble', 'p1', { planetId: 'A', on: true }), ctx),
+      ),
+    ).toBe('E_NO_SQUADRON');
+  });
+
+  it('РОВНО ОДНА БАЗА: ни обеих, ни ни одной — иначе непонятно, кто дежурит', () => {
+    const kernel = createKernel([standingOrdersModule]);
+    const s = withPort();
     expect(
       errCode(
         kernel.applyAction(
-          r0.state,
-          act('patrol.stamp', 'p1', { fleetId: 'f1', sortie: { fuel: 99, rearming: 0 } }),
+          s,
+          act('order.scramble', 'p1', { planetId: 'A', fleetId: 'f1', on: true }),
           ctx,
         ),
       ),
     ).toBe('E_BAD_PAYLOAD');
+    expect(errCode(kernel.applyAction(s, act('order.scramble', 'p1', { on: true }), ctx))).toBe(
+      'E_BAD_PAYLOAD',
+    );
+  });
+
+  it('НОСИТЕЛЬ ТОЖЕ БАЗА — флаг вида «флот»', () => {
+    const kernel = createKernel([standingOrdersModule]);
+    const base = stateWith({
+      players: [player('p1')],
+      planets: [planet('A', 'p1')],
+      fleets: [fleet('f1', 'p1', 'A', [['carrier', 1]])],
+    });
+    const carrier = {
+      ...base,
+      fleets: {
+        ...base.fleets,
+        f1: {
+          ...base.fleets.f1!,
+          hangar: [{ id: 'sq:p1:9', units: [{ unit: 'interceptor', count: 1 }] }],
+        },
+      },
+    };
+    const r = okApply(
+      kernel.applyAction(carrier, act('order.scramble', 'p1', { fleetId: 'f1', on: true }), ctx),
+    );
+    expect(r.state.patrols?.f1).toEqual({ kind: 'fleet' });
   });
 });
 
@@ -373,23 +363,44 @@ describe('standingOrders — chain.stamp (server-driver runtime stamp)', () => {
 });
 
 describe('standingOrders — time.advanced garbage-collects dead fleets', () => {
-  it('drops autoAssault/patrols/wingSorties/orders entries for fleets that no longer exist', () => {
+  it('СНИМАЕТ приказы мёртвых флотов и дежурство ПОТЕРЯННОЙ базы', () => {
     const kernel = createKernel([standingOrdersModule]);
-    const s = stateWith({
+    const base = stateWith({
       players: [player('p1')],
       planets: [planet('A', 'p1')],
       fleets: [fleet('f1', 'p1', 'A', [['carrier', 1]]), fleet('f2', 'p1', 'A')],
     });
+    const s: GameState = {
+      ...base,
+      fleets: {
+        ...base.fleets,
+        f1: {
+          ...base.fleets.f1!,
+          hangar: [{ id: 'sq:p1:1', units: [{ unit: 'interceptor', count: 1 }] }],
+        },
+      },
+    };
     let r = okApply(kernel.applyAction(s, act('order.auto', 'p1', { fleetId: 'f2', on: true }), ctx));
-    r = okApply(kernel.applyAction(r.state, act('order.scramble', 'p1', { fleetId: 'f1', on: true }), ctx));
     r = okApply(
-      kernel.applyAction(r.state, act('order.chain', 'p1', { fleetId: 'f2', steps: [{ kind: 'assault' }] }), ctx),
+      kernel.applyAction(r.state, act('order.scramble', 'p1', { fleetId: 'f1', on: true }), ctx),
     );
-    // remove f2 entirely, then let a time.advanced pass sweep its orphaned entries
+    r = okApply(
+      kernel.applyAction(
+        r.state,
+        act('order.chain', 'p1', { fleetId: 'f2', steps: [{ kind: 'assault' }] }),
+        ctx,
+      ),
+    );
+    // Убираем f2 целиком — его приказы должны уйти, дежурство живого f1 остаться.
     const withoutF2: GameState = { ...r.state, fleets: { f1: r.state.fleets.f1! } };
     const advanced = okAdvance(kernel.advanceTo(withoutF2, { ...ctx, now: 1 }));
     expect(advanced.state.autoAssault).toBeUndefined();
     expect(advanced.state.orders).toBeUndefined();
-    expect(advanced.state.patrols?.f1).toBeDefined(); // f1 still alive — untouched
+    expect(advanced.state.patrols?.f1).toEqual({ kind: 'fleet' });
+
+    // А вот носитель погиб — дежурство базы уходит вместе с ней.
+    const noBase: GameState = { ...advanced.state, fleets: {} };
+    const swept = okAdvance(kernel.advanceTo(noBase, { ...ctx, now: 2 }));
+    expect(swept.state.patrols).toBeUndefined();
   });
 });

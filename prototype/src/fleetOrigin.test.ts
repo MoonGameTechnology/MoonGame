@@ -53,24 +53,7 @@ describe('fleetOrigin', () => {
     expect(fleetOrigin(f, 0, at)).toEqual({ x: 100, y: 200 });
   });
 
-  it('свободный полёт интерполируется вне графа лейнов (правило 4)', () => {
-    const f = {
-      freePosition: { x: 0, y: 0 },
-      freeMovement: { targetX: 400, targetY: 200, departedAt: 0, arrivesAt: 100 },
-    };
-    expect(fleetOrigin(f, 50, at)).toEqual({ x: 200, y: 100 });
-  });
-
-  it('припаркованная эскадрилья стоит в своей свободной точке', () => {
-    expect(fleetOrigin({ freePosition: { x: 42, y: 7 } }, 0, at)).toEqual({ x: 42, y: 7 });
-  });
-
-  it('свободный полёт без исходной точки — null, а не подставной ноль', () => {
-    const f = { freeMovement: { targetX: 1, targetY: 1, departedAt: 0, arrivesAt: 1 } };
-    expect(fleetOrigin(f, 0, at)).toBeNull();
-  });
-
-  it('неизвестный узел даёт null (правило 5)', () => {
+  it('неизвестный узел даёт null (правило 4)', () => {
     expect(fleetOrigin({ location: 'nowhere' }, 0, at)).toBeNull();
     const f = { movement: { from: 'alpha', to: 'nowhere', departedAt: 0, arrivesAt: 1 } };
     expect(fleetOrigin(f, 0, at)).toBeNull();

@@ -103,8 +103,6 @@ export const en: Record<string, string> = {
   'ai.end.pve-failed': 'the defence fell',
   'ai.end.score': 'by score limit',
   'ai.end.timeout': 'on the clock',
-  'ai.sortie.docked-only': '🛩 standing patrol — only from a parked node',
-  'ai.sortie.idle-only': '🛩 standing patrol — only when the fleet is free',
 
   // --- arsenal — «Арсенал»: коллекция аккаунта, фильтр, пустое состояние.
   'auction.title': 'Auction',
@@ -220,6 +218,8 @@ export const en: Record<string, string> = {
   'side.build.open': 'Build',
   'side.wing.blocked.empty': 'the hangar is empty — nothing to launch',
   'side.wing.cargo': 'aboard: {n}',
+  'side.wing.duty.off': '🛩 Stand duty',
+  'side.wing.duty.on': '🛩 Stand down',
   'side.wing.empty': 'the hangar is empty',
   'side.wing.blocked.no-fuel': 'out of fuel — waiting on the rearm',
   'side.wing.blocked.rearming': 'the port is rearming — a sortie must wait',
@@ -321,8 +321,6 @@ export const en: Record<string, string> = {
   'cmd.selection.one': 'FLEET',
   'cmd.split': 'Split',
   'cmd.split.hint': 'peel some ships off a docked fleet into a new one',
-  'cmd.standing-sortie': 'Scramble',
-  'cmd.standing-sortie.hint': 'the shuttle automatically hits enemies within range',
   'cmd.stop': 'Stop',
   'cmd.troops': 'Troops',
   'cmd.troops.hint':
@@ -1792,10 +1790,7 @@ export const en: Record<string, string> = {
   'effect.in-battle': 'in battle',
   'effect.forced-march': 'forced march',
   'effect.bombarding': 'bombarding',
-  'effect.free-flight': 'in flight',
   'effect.patrol': 'standing patrol',
-  'effect.rearming': 'rearming {n}',
-  'effect.fuel': 'fuel {n}',
   'effect.blackout': 'blackout: interdiction/radar −50%',
   'effect.hunger': 'hunger: −25% ground damage',
   'effect.point-defense': 'area defense {n}',

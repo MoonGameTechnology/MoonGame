@@ -184,14 +184,19 @@ export const actionPayloadSchemas: Record<string, z.ZodType> = {
   'steward.recall': z.object({}),
   // Hold point (ST-2.1) — a player-designated standing order; the module gates
   // ownership/cap. (`steward.report` stays deliberately ABSENT: the SITREP stamp
-  // is the SERVER driver's, like `patrol.stamp` — a client must not forge it.)
+  // is the SERVER driver's, like `chain.stamp` — a client must not forge it.)
   'steward.holdpoint': z.object({ planetId: id, on: z.boolean() }),
   // standing orders (CC-2 auto-storm / CC-4 дежурный вылет) — client toggles only.
-  // `patrol.stamp` is deliberately ABSENT: it is the SERVER driver's runtime stamp
-  // (submitAction path, gate-exempt); a client stamping its own sortie would refill
-  // its fuel — the gate must keep rejecting it from the wire.
   'order.auto': z.object({ fleetId: id, on: z.boolean() }),
-  'order.scramble': z.object({ fleetId: id, on: z.boolean() }),
+  // CC-4 армит БАЗУ (SHU-2.2): мир с портом ИЛИ носитель — ровно одна из двух, как у
+  // `shuttle.strike`; «обе или ни одной» схема не выражает, это гейт обработчика.
+  // Прежний серверный штамп `patrol.stamp` снят вместе с моделью «крыло как флот»:
+  // запас вылетов принадлежит БАЗЕ и тратится самим `shuttle.strike`, штамповать нечего.
+  'order.scramble': z.object({
+    planetId: id.optional(),
+    fleetId: id.optional(),
+    on: z.boolean(),
+  }),
   // BOOST-1 форс-марш: +50% speed for hull wear while in transit — client toggle.
   'fleet.forcemarch': z.object({ fleetId: id, on: z.boolean() }),
   // Платный мгновенный ремонт корпуса (карточка флота): цена выводится из state

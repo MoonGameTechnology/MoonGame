@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
-import { newGame, order, HOUR, START_CANDIDATES, type Patrol } from './game';
+import { newGame, order, HOUR, START_CANDIDATES } from './game';
 import { initSoloDrivers, autoProbeKey, AI_STEP_MS, type SoloHost } from './soloDrivers';
 
 /**
@@ -12,7 +12,7 @@ function harness(over: Partial<SoloHost> = {}, seed: GameState = newGame()) {
   let s = seed;
   const mine: Action[] = [];
   const others: Action[] = [];
-  const patrols = new Map<string, Patrol>();
+  const patrols = new Map<string, { kind: 'planet' | 'fleet' }>();
   const autoOn = new Set<string>();
   const api = initSoloDrivers({
     state: () => s,
@@ -340,66 +340,34 @@ describe('соло-драйверы — столкновения флотов', 
     expect(h.others).toEqual([]);
   });
 });
-
-describe('соло-драйверы — дежурные вылеты', () => {
-  const sortie = (over: Partial<Patrol['sortie']> = {}) => ({ fuel: 2, rearming: 0, ...over });
-  const patrol = (over: Partial<Patrol> = {}): Patrol =>
-    ({
-      center: { x: 0, y: 0 },
-      radius: 500,
-      sortie: sortie(),
-      ...over,
-    }) as Patrol;
-
-  it('без дежурных вылетов драйвер ничего не делает', () => {
+describe('соло-драйверы — дежурные вылеты (на БАЗЕ, SHU-2.2)', () => {
+  it('без дежурных баз драйвер ничего не делает', () => {
     const h = harness();
     h.api.drivePatrols();
     expect(h.mine).toEqual([]);
   });
 
-  it('вылет пропавшего флота вычищается', () => {
+  it('ПРОПАВШАЯ БАЗА ПРИКАЗА НЕ ДАЁТ — вылету неоткуда взяться', () => {
     const h = harness();
-    h.patrols.set('no-such-fleet', patrol());
+    h.patrols.set('no-such-base', { kind: 'planet' });
     h.api.drivePatrols();
-    expect(h.patrols.size).toBe(0);
+    expect(h.mine).toEqual([]);
   });
 
-  it('вылет чужого флота тоже вычищается — своим крылом он не станет', () => {
+  it('ЧУЖАЯ БАЗА МОИХ ПРИКАЗОВ НЕ РОЖДАЕТ: драйвер шлёт только за себя', () => {
     const h = harness();
-    const foe = Object.values(h.state().fleets).find((f) => f.owner !== 'p1')!;
-    h.patrols.set(foe.id, patrol());
+    const foreign = Object.values(h.state().planets).find((p) => p.owner && p.owner !== 'p1');
+    if (foreign) h.patrols.set(foreign.id, { kind: 'planet' });
     h.api.drivePatrols();
-    expect(h.patrols.size).toBe(0);
+    expect(h.mine).toEqual([]);
   });
 
-  it('перезарядка идёт по прошедшим часам, а не по кадрам', () => {
+  it('ПУСТОЙ АНГАР — ВЫЛЕТА НЕТ: дежурить нечем', () => {
     const h = harness();
-    const wing = Object.values(h.state().fleets).find(
-      (f) => f.owner === 'p1' && f.units.some((u) => u.count > 0),
-    )!;
-    const p = patrol({ sortie: sortie({ fuel: 0, rearming: 3 }) });
-    h.patrols.set(wing.id, p);
-    h.api.startPatrolCadence();
-    h.setState(at(h.state(), h.state().time + 2 * HOUR));
+    const mine = Object.values(h.state().planets).find((p) => p.owner === 'p1')!;
+    h.patrols.set(mine.id, { kind: 'planet' });
     h.api.drivePatrols();
-    // Либо крыло перезарядилось на прошедшие часы, либо вылет снят (флот без крыла) —
-    // но «стоял час и не сдвинулся» быть не должно.
-    const left = h.patrols.get(wing.id);
-    if (left) expect(left.sortie.rearming).toBeLessThan(3);
-  });
-
-  it('счёт перезарядки идёт от постановки вылета, а не от эпохи', () => {
-    const h = harness();
-    const wing = Object.values(h.state().fleets).find(
-      (f) => f.owner === 'p1' && f.units.some((u) => u.count > 0),
-    )!;
-    h.setState(at(h.state(), 100 * HOUR)); // матч давно идёт
-    h.api.startPatrolCadence();
-    const p = patrol({ sortie: sortie({ fuel: 0, rearming: 3 }) });
-    h.patrols.set(wing.id, p);
-    h.api.drivePatrols();
-    const left = h.patrols.get(wing.id);
-    if (left) expect(left.sortie.rearming).toBe(3); // ни одного часа ещё не прошло
+    expect(h.mine).toEqual([]);
   });
 });
 

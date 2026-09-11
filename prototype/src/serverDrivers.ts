@@ -13,8 +13,6 @@
  * for internal use and re-exports for `main.ts` / tests.
  */
 import {
-  identifiedNodes,
-  getStance,
   type Action,
   type GameState,
   type Hero,
@@ -22,14 +20,14 @@ import {
 import { data } from './gameData';
 import { canOrderAll } from './protoKernel';
 import { fleetIdle, type ChainStep, type FleetChain } from '../../packages/shared-core/src/index';
-import { scrambleOrder, type Patrol } from './patrol';
+import { patrolScrambles } from '../../packages/shared-core/src/index';
 import {
-  sortieSpec,
-  tickRearm,
-  fleetHasShuttle,
-  type SortieState,
-} from '../../packages/shared-core/src/index';
-import { moveFleet, orbitFleet, assaultFleet, castHeroAbility } from './actions';
+  moveFleet,
+  orbitFleet,
+  assaultFleet,
+  castHeroAbility,
+  strikeShuttle,
+} from './actions';
 
 const HOUR = 3_600_000;
 
@@ -38,7 +36,6 @@ const HOUR = 3_600_000;
 interface DriverState extends GameState {
   autoAssault?: Record<string, true>;
   orders?: Record<string, FleetChain>;
-  patrols?: Record<string, Patrol & { rearmAt?: number }>;
 }
 
 /** One tick of the SERVER-SIDE auto-storm driver (CC-2): every fleet flagged in
@@ -187,84 +184,26 @@ export function serverChainActions(
   }
   return out;
 }
-
-/** One tick of the SERVER-SIDE patrol driver (CC-4): tick each standing patrol's rearm
- *  on its game-hour cadence, then — if the wing is parked and flight-ready — scramble at
- *  the lowest-id identified, at-war contact inside the radius (the same pure scrambleOrder
- *  the solo driver uses; vision comes from the owner's identify coverage, so the server
- *  never lets a patrol see through the fog its owner has). Pure — the host applies the
- *  strike `actions` and persists `patch` via patrol.stamp; `drop` retires a patrol whose
- *  fleet lost its wing. */
+/**
+ * Один тик СЕРВЕРНОГО драйвера дежурного вылета (CC-4, на базе с SHU-2.2) — обёртка.
+ *
+ * Решение (кому лететь и по кому) целиком в ядре: `patrolScrambles`. Здесь остаётся
+ * завернуть его в прототипный `shuttle.strike`. Раньше тут лежала вторая копия правил
+ * плюс собственное ведение топлива через `patrol.stamp` — и то и другое ушло вместе с
+ * моделью «крыло как флот»: запас вылетов принадлежит БАЗЕ и тратится самим ударом.
+ */
 export function serverPatrolActions(
   state: GameState,
-  now: number,
-): Array<{
-  fleetId: string;
-  owner: string;
-  actions: Action[];
-  patch?: { sortie: SortieState; rearmAt?: number };
-  drop?: boolean;
-}> {
-  const patrols = (state as DriverState).patrols ?? {};
-  const out: Array<{
-    fleetId: string;
-    owner: string;
-    actions: Action[];
-    patch?: { sortie: SortieState; rearmAt?: number };
-    drop?: boolean;
-  }> = [];
-  const identify = new Map<string, Set<string>>(); // owner → identified nodes (hoisted per owner)
-  // Sorted fleet-id iteration (like serverChainActions above): JSONB does not preserve
-  // object key order, so unsorted iteration would make the strike-issue order — and thus
-  // which of two co-located wings wins a race for the same target — host/hibernation
-  // dependent. Sorting pins one order across hosts and wake cycles (invariant #6).
-  for (const fid of Object.keys(patrols).sort()) {
-    const p = patrols[fid]!;
-    const f = state.fleets[fid];
-    if (!f || !fleetHasShuttle(f, data)) {
-      out.push({ fleetId: fid, owner: f?.owner ?? '', actions: [], drop: true });
-      continue;
-    }
-    const spec = sortieSpec(f, data);
-    // Rearm cadence: one round per game-hour past `rearmAt` (absolute stamps — no
-    // wall-clock drift, works however rarely the offline room wakes).
-    let sortie = p.sortie;
-    let rearmAt = p.rearmAt ?? now + HOUR;
-    while (now >= rearmAt) {
-      sortie = tickRearm(sortie, spec.maxFuel);
-      rearmAt += HOUR;
-    }
-    let actions: Action[] = [];
-    if (fleetIdle(f)) {
-      let seen = identify.get(f.owner);
-      if (!seen) {
-        seen = identifiedNodes(state, f.owner, data);
-        identify.set(f.owner, seen);
-      }
-      const targets: Array<{ id: string; location: string; pos: { x: number; y: number } }> = [];
-      for (const g of Object.values(state.fleets)) {
-        if (g.owner === f.owner || !g.location || g.movement || !g.units.some((u) => u.count > 0))
-          continue;
-        if (g.battleId) continue; // already locked in a battle — engage would reject, yet the sortie fuel is spent (BF-30)
-        if (getStance(state, f.owner, g.owner) !== 'war') continue; // declared enemies only — never auto-war
-        if (!seen.has(g.location)) continue; // identified contacts only — fog-honest
-        const pos = state.planets[g.location]?.position;
-        if (pos) targets.push({ id: g.id, location: g.location, pos });
-      }
-      const res = scrambleOrder(f.owner, f, { ...p, sortie }, targets, spec.rearmRounds);
-      sortie = res.sortie;
-      if (res.action) actions = [res.action];
-    }
-    const changed =
-      sortie.fuel !== p.sortie.fuel ||
-      sortie.rearming !== p.sortie.rearming ||
-      rearmAt !== p.rearmAt;
-    out.push({
-      fleetId: fid,
-      owner: f.owner,
-      actions,
-      patch: changed ? { sortie, rearmAt } : undefined,
-    });
-  }
-  return out;
+): Array<{ owner: string; actions: Action[] }> {
+  return patrolScrambles(state, data).map((sc) => ({
+    owner: sc.owner,
+    actions: [
+      strikeShuttle(
+        sc.owner,
+        sc.base.kind === 'planet' ? { planetId: sc.base.id } : { fleetId: sc.base.id },
+        sc.squadronId,
+        { targetFleetId: sc.targetFleetId },
+      ),
+    ],
+  }));
 }

@@ -61,7 +61,6 @@ export {
   type PlayerReward,
   type DiplomaticStance,
   type IntelGrant,
-  type PatrolEntry,
 } from './state/gameState';
 export {
   buildStateFromMap,
@@ -187,6 +186,15 @@ export {
   shuttleReaches,
   type SortieState,
 } from './state/shuttle';
+// SHU-2.2: дежурный вылет армится на БАЗУ, и правило выбора цели у него ОДНО на оба
+// драйвера (прототипный и серверный) — до этого у каждого была своя копия.
+export {
+  patrolTarget,
+  patrolScrambles,
+  type PatrolContact,
+  type PatrolPoint,
+  type PatrolScramble,
+} from './state/patrol';
 export {
   fleetIdle,
   validateChainSteps,

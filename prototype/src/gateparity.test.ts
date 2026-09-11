@@ -32,7 +32,6 @@ import {
   setHoldPoint,
   orderAuto,
   orderScramble,
-  patrolStamp,
   castHeroAbility,
   spawnHero,
   unlockHeroSkill,
@@ -81,7 +80,8 @@ const CLIENT_ACTIONS: Action[] = [
   setHoldPoint(P, 'C1R1', true),
   setHoldPoint(P, 'C1R1', false),
   orderAuto(P, 'f1', true),
-  orderScramble(P, 'f1', false),
+  orderScramble(P, { planetId: 'C1R1' }, true),
+  orderScramble(P, { fleetId: 'f1' }, false),
   // CONV-1: обе кнопки после сведения обслуживает МОДУЛЬ ЯДРА, а билдеры остались
   // прототипными — значит разъехаться payload'у и схеме теперь есть где, и ловить
   // это должен гейт-паритет, а не удалённые дубли модульных тестов.
@@ -111,9 +111,13 @@ describe('gate parity (REL-2) — the schemas cover every prototype intent', () 
     expect(rejected.map((a) => a.type)).toEqual([]);
   });
 
-  it('patrol.stamp stays server-only — the gate must refuse it from the wire', () => {
-    const stamp = patrolStamp(P, 'f1', freshSortie(3), 42);
-    expect(isValidActionPayload(stamp.type, stamp.payload)).toBe(false);
+  // SHU-2.2: `patrol.stamp` снят вместе с моделью «крыло как флот» — запас вылетов
+  // принадлежит БАЗЕ и тратится самим `shuttle.strike`, штамповать нечего. Гейт обязан
+  // отбивать его и как СНЯТЫЙ тип, а не только как серверный.
+  it('снятый patrol.stamp с провода не проходит', () => {
+    expect(isValidActionPayload('patrol.stamp', { fleetId: 'f1', sortie: freshSortie(3) })).toBe(
+      false,
+    );
   });
 
   it('steward.report stays server-only — a client must not forge the SITREP (ST-2.4)', () => {
