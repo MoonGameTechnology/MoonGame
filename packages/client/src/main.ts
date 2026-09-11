@@ -9,7 +9,7 @@
  * This is intentionally thin: map rendering, the network transport and the PWA install
  * layer are later bricks (CP0.2 / CP1.x). No forked copy of the core or its data.
  */
-import { createInitialState, type GameState } from '@void/shared-core';
+import { createInitialState, type Action, type GameState } from '@void/shared-core';
 import { t, LOCALE, isLocaleId, setLocale } from '../../../localization/core';
 import { theme } from './theme';
 import { createWelcomeModel, resolveWelcomeAction, nextCallsign } from './welcomeScreen';
@@ -23,6 +23,10 @@ import { socketBase } from '../../../decisions/serverAddress';
 import { errorTarget, refusalKey } from '../../../decisions/errorRoute';
 import { refusalText } from '../../../decisions/refusalText';
 import type { MatchSummary } from '@void/protocol';
+import { shippedGameData } from './gameData';
+import { createStatusBarModel, createSelectionModel, createBattleModel, resolveBattleAction } from './matchHud';
+import { createLoadoutEditor, applyLoadoutAction, resolveLoadoutBuild, type LoadoutModel } from './loadoutEditor';
+import { statusBarHtml, selectionHtml, battleHtml, loadoutHtml, unitPickerHtml } from './hudView';
 
 /** Bind the typed theme tokens to CSS custom properties (docs/main-menu.md §5.4 — one
  *  TS engine → one look). The stylesheet in index.html reads these vars. */
@@ -448,6 +452,39 @@ async function joinMatch(matchId: string): Promise<void> {
   }
 }
 
+/* ───────────────────────────── In-match HUD (MIG-3) ───────────────────────────── */
+
+/** Каталог для проекций HUD. Тот же шипнутый бандл, что и у прототипа (`data/bundle`),
+ *  без него модели отдают панели без корпуса/щита — они деградируют, а не падают. */
+const HUD_DATA = shippedGameData();
+
+/** Намерение любого типа. Тот же формат `id`, что у `moveAction` (`ui:<player>:<seq>`) —
+ *  на gated-комнате его всё равно заменит конверт `action.v1`, а на дев-сервере он и
+ *  есть ключ идемпотентности. */
+function intent(me: string, seq: number, type: string, payload: Record<string, unknown>): Action {
+  return { id: `ui:${me}:${seq}`, type, playerId: me, payload, issuedAt: 0 };
+}
+
+/** Корпуса своего дома (плюс общие). Это КОРОТКИЙ список для меню, а не право на
+ *  постройку: право проверяет сервер, и его отказ теперь доходит словами. */
+function buildableUnits(faction: string | undefined): string[] {
+  return Object.entries(HUD_DATA.units)
+    .filter(([, def]) => !def.faction || def.faction === faction)
+    .map(([id]) => id)
+    .sort();
+}
+
+/** Куда HUD рисуется: фиксированный слой поверх канваса. Создаётся один раз. */
+function hudRoot(): HTMLElement {
+  let el = document.getElementById('hud');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'hud';
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
 /** A small fixed overlay for the live-match connection status + a one-line hint (the
  *  welcome-screen #status is hidden once the map canvas takes over). */
 function setNetStatus(text: string): void {
@@ -488,6 +525,137 @@ function connectLive(url: string): void {
       );
     }
   };
+  // Что открыто в HUD. Одновременно живёт ОДНА панель: выбор флота, бой или оснащение —
+  // на телефоне места под вторую нет, а «что именно я сейчас трогаю» должно быть
+  // однозначным.
+  let panel: 'none' | 'fleet' | 'battle' | 'yard' | 'loadout' = 'none';
+  let battleId: string | null = null;
+  let loadout: LoadoutModel | null = null;
+  let buildPlanet: string | null = null;
+
+  /** Перерисовать HUD из ТЕКУЩЕГО снапшота. Модели читают состояние сами — здесь только
+   *  выбор панели и вставка разметки. */
+  const renderHud = (): void => {
+    if (!live || !me) return;
+    const bar = createStatusBarModel(live, me, HUD_DATA);
+    let body = '';
+    if (panel === 'fleet' && selectedFleet) {
+      const sel = createSelectionModel(live, selectedFleet, me, HUD_DATA);
+      // Верфь предлагается, только если флот СТОИТ на МОЁМ мире: в пути строить негде,
+      // а на чужом — нечем.
+      const at = sel.ok && sel.status === 'stationed' ? sel.location : undefined;
+      const canBuildHere = !!at && live.planets[at]?.owner === me;
+      if (at && canBuildHere) buildPlanet = at;
+      if (sel.ok) body = selectionHtml(sel, live.time, { canBuildHere });
+      else panel = 'none'; // флот пропал из вида — панель закрывается сама
+    } else if (panel === 'battle' && battleId) {
+      const b = createBattleModel(live, battleId, me, HUD_DATA);
+      if (b.ok) body = battleHtml(b, live.time);
+      else {
+        panel = 'none';
+        battleId = null;
+      }
+    } else if (panel === 'yard' && buildPlanet) {
+      body = unitPickerHtml(buildableUnits(live.players[me]?.faction), buildPlanet);
+    } else if (panel === 'loadout' && loadout) {
+      body = loadoutHtml(loadout, HUD_DATA);
+    }
+    hudRoot().innerHTML = (bar.ok ? statusBarHtml(bar) : '') + body;
+  };
+
+  /** Намерения из HUD. Каждый путь идёт через резолвер модели, а не строит действие
+   *  руками: резолвер уже знает, когда действие невозможно, и отвечает стабильным кодом. */
+  const onHudClick = (e: Event): void => {
+    const target = (e.target as HTMLElement).closest('[data-act]') as HTMLElement | null;
+    if (!target || !live || !me) return;
+    switch (target.dataset.act) {
+      case 'retreat': {
+        if (!battleId) return;
+        const model = createBattleModel(live, battleId, me, HUD_DATA);
+        if (!model.ok) return;
+        const out = resolveBattleAction({ kind: 'retreat' }, model);
+        if (!out.ok) {
+          setNetStatus(t('client.rejected', { text: refusalText(out.code) }));
+          return;
+        }
+        client.sendAction(intent(me, seq++, out.type, { fleetId: out.fleetId }));
+        break;
+      }
+      case 'equip':
+      case 'unequip': {
+        const moduleId = target.dataset.module;
+        if (!loadout || !moduleId) return;
+        const next = applyLoadoutAction(
+          { kind: target.dataset.act === 'equip' ? 'equip' : 'unequip', moduleId },
+          loadout,
+          HUD_DATA,
+          live.players[me]?.resources ?? {},
+        );
+        // Отказ резолвера — это правило ядра (`canEquip`), а не сбой: слот занят, тип не
+        // тот, дубль. Показываем причину и оставляем черновик как был.
+        if (next.ok) loadout = next;
+        else setNetStatus(t('client.rejected', { text: refusalText(next.code) }));
+        renderHud();
+        return;
+      }
+      case 'count': {
+        const delta = Number(target.dataset.delta ?? 0);
+        if (!loadout) return;
+        const next = applyLoadoutAction(
+          { kind: 'setCount', count: Math.max(1, loadout.count + delta) },
+          loadout,
+          HUD_DATA,
+          live.players[me]?.resources ?? {},
+        );
+        if (next.ok) loadout = next;
+        renderHud();
+        return;
+      }
+      case 'pick': {
+        const unit = target.dataset.unit;
+        if (!unit) return;
+        const made = createLoadoutEditor(unit, HUD_DATA, live.players[me]?.resources ?? {});
+        if (!made.ok) {
+          setNetStatus(t('client.rejected', { text: refusalText(made.code) }));
+          return;
+        }
+        loadout = made;
+        panel = 'loadout';
+        renderHud();
+        return;
+      }
+      case 'yard': {
+        if (!buildPlanet) return;
+        panel = 'yard';
+        renderHud();
+        return;
+      }
+      case 'close': {
+        panel = 'none';
+        loadout = null;
+        buildPlanet = null;
+        renderHud();
+        return;
+      }
+      case 'build': {
+        if (!loadout || !buildPlanet) return;
+        const out = resolveLoadoutBuild(loadout, buildPlanet);
+        if (!out.ok) {
+          setNetStatus(t('client.rejected', { text: refusalText(out.code) }));
+          return;
+        }
+        client.sendAction(intent(me, seq++, out.action.type, out.action.payload));
+        panel = 'none';
+        loadout = null;
+        break;
+      }
+      default:
+        return;
+    }
+    renderHud();
+  };
+  hudRoot().addEventListener('click', onHudClick);
+
   setNetStatus(t('client.net.connecting'));
   const { client } = openLiveMatch(url, {
     onStatus: (s) => {
@@ -517,6 +685,7 @@ function connectLive(url: string): void {
         started = true;
         client.start(); // host of an unstarted lobby → run the world
       }
+      renderHud();
       const waiting = snap.lobby ? !snap.lobby.started : !!snap.waiting;
       if (waiting) {
         setNetStatus(t('client.net.waiting', { suffix: me ? t('client.net.waiting-you', { me }) : '' }));
@@ -532,6 +701,8 @@ function connectLive(url: string): void {
           onPickPlanet: (planetId) => {
             if (!planetId || !live || !me) {
               selectedFleet = null;
+              panel = 'none';
+              renderHud();
               hint();
               return;
             }
@@ -542,14 +713,36 @@ function connectLive(url: string): void {
                 client.sendAction(moveAction(me, seq++, selectedFleet, planetId));
                 setNetStatus(t('client.net.order', { fleet: selectedFleet, planet: planetId }));
                 selectedFleet = null;
+                panel = 'none';
+                renderHud();
                 return;
               }
               selectedFleet = null;
+              panel = 'none';
+              renderHud();
               hint();
               return;
             }
             // first tap → select one of my fleets at this planet (if any)
             selectedFleet = myFleetAt(live, planetId, me);
+            if (selectedFleet) {
+              // Флот в бою открывает панель БОЯ, а не состава: там есть единственное
+              // действие, которое в этот момент вообще имеет смысл, — отступить.
+              const inBattle = live.fleets[selectedFleet]?.battleId;
+              if (inBattle) {
+                battleId = inBattle;
+                panel = 'battle';
+              } else {
+                panel = 'fleet';
+              }
+            } else if (live.planets[planetId]?.owner === me) {
+              // Свой мир без моего флота — верфь: что здесь построить.
+              buildPlanet = planetId;
+              panel = 'yard';
+            } else {
+              panel = 'none';
+            }
+            renderHud();
             hint();
           },
         });
