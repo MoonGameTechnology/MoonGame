@@ -139,8 +139,26 @@ jobs:
       # rejections and browser warnings show up nowhere else. Non-blocking for now (same
       # posture as perf): the runner has to fetch a Chromium, so let it prove itself in
       # the log before it can redden main.
+      #
+      # `continue-on-error` hides the step's own red mark, so the two ways this can go
+      # wrong are reported as ANNOTATIONS instead — they render on the run summary and
+      # survive the swallowed exit code. Until this run, both modes were invisible: the
+      # step crashed on `Cannot find module 'playwright-core/cli.js'` in EVERY run since
+      # 2026-08-15 and the job stayed green, so the watchdog reported nothing and nobody
+      # could tell. They are deliberately different severities:
+      #   warning — the smoke could not START (no browser). Says nothing about the code.
+      #   error   — the smoke RAN and found a defect in the built bundle. A real finding.
+      # Flipping this step to blocking is the natural next step now that it works (see
+      # SEC-16's «следующий слой» note in docs/backlog.md); that is the owner's call, so
+      # it stays non-blocking here.
       - name: Browser smoke (non-blocking)
         run: |
-          pnpm run smoke:browser:install
-          pnpm run smoke:browser
+          if ! pnpm run smoke:browser:install; then
+            echo "::warning title=Browser smoke::смоук не смог установиться (Chromium недоступен) — бандл НЕ проверялся"
+            exit 1
+          fi
+          if ! pnpm run smoke:browser; then
+            echo "::error title=Browser smoke::смоук нашёл ошибку в собранном бандле — смотри лог шага"
+            exit 1
+          fi
         continue-on-error: true
