@@ -126,9 +126,11 @@ function fleetPDRange(fleet: Fleet, data: GameData): number {
   return r > 0 ? r : PD_RANGE;
 }
 
-/** Get the current world position of a fleet (freePosition, location, or edge). */
+/** Где флот СЕЙЧАС: узел, на котором он стоит, или точка стоянки на лейне.
+ *  Ветка «свободного полёта» (`freePosition`) снята в SHU-2.2 вместе с самим полем —
+ *  флота, летящего мимо графа линий, в модели больше нет. Флот В ПУТИ (`movement`) точки
+ *  здесь тоже не получает: это открытый дефект, его закрывает SHU-4.4 (погоня). */
 function fleetWorldPos(fleet: Fleet, state: GameState): { x: number; y: number } | null {
-  if (fleet.freePosition) return fleet.freePosition;
   if (fleet.location) return state.planets[fleet.location]?.position ?? null;
   if (fleet.edge) {
     const a = state.planets[fleet.edge.from]?.position;

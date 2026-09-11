@@ -60,11 +60,6 @@ import {
   type StepOut,
   orderAuto,
   orderScramble,
-  fleetIdle,
-  shuttleStrikeRange,
-  fleetHasShuttle,
-  sortieSpec,
-  freshSortie,
   botFavour,
   FAVOUR_BASE,
   FAVOUR_EMBARGO,
@@ -84,7 +79,6 @@ import {
   MAX_CHAIN_STEPS,
   type AiProfile,
   type ChainStep,
-  type Patrol,
 } from './game';
 import {
   dominantUnit,
@@ -741,7 +735,6 @@ import {
 } from './stewardLog';
 import { diploDelivery } from './diploDelivery';
 import { garrisonSide, planFor, troopsGate } from './troopsScene';
-import { standingPatrol, stashOnStandDown } from './sortieResume';
 import {
   fleetSignature as coreFleetSignature,
   planetRadar as corePlanetRadar,
@@ -1049,7 +1042,10 @@ let engageAim = false;
 // SHU-3.1 — «Удар» взведён: следующий тап по карте выбирает цель вылета. Держим ОТКУДА
 // (id мира-порта или флота-носителя): цель у вылета одна, а баз у игрока много, и без
 // источника приказ пришлось бы угадывать по выделению.
-let strikeAim: { from: string; squadronId: string } | null = null;
+// БАЗА хранится размеченной ({planetId} | {fleetId}), а не голой строкой: ядро ищет
+// мир и носитель в разных картах, и плоский id разъезжался с полем payload молча.
+let strikeAim: { from: { planetId: string } | { fleetId: string }; squadronId: string } | null =
+  null;
 /** Взведённое СЛИЯНИЕ эскадр (SHU-4.3): первый тап называет источник, второй —
  *  приёмника. Два тапа, а не выпадающий список: приёмник это такая же карточка на
  *  экране, и выбирать его удобнее там же, где на него смотрят. */
@@ -1065,16 +1061,13 @@ let heroSpawnAim: string | null = null;
 // CC-2 standing order: fleets whose owner opted into AUTO-STORM — they descend and assault
 // a hostile world on arrival by themselves (the AI's autoEngage capture loop, opted-in).
 const autoAssault = new Set<string>();
-// CC-4 reactive auto-scramble: shuttle fleets on "дежурный вылет" — they auto-sortie at
-// any identified, at-war contact that enters their strike radius (SQ-4.1 patrol core),
-// burning fuel and rearming on a game-hour cadence (SQ-2.1). Client-side plan, like the
-// order queue; single-player only (the server owns fleets in net play).
-const patrols = new Map<string, Patrol>();
-// Fuel/rearm stashed when a SOLO patrol is toggled OFF, so OFF→ON resumes the wing's
-// sortie instead of handing back a full tank — BF-26 parity with the server's
-// order.scramble path (st.wingSorties in game.ts); without it, toggling free-refuels a
-// dry wing. (NET arms via order.scramble, which does its own stash server-side.)
-const wingSorties = new Map<string, Patrol['sortie']>();
+// CC-4 ДЕЖУРНЫЙ ВЫЛЕТ (на БАЗЕ с SHU-2.2): миры с портом и носители, которым разрешено
+// самим поднимать эскадру навстречу опознанному врагу в её радиусе. Здесь только флаг —
+// топливо и перезарядка принадлежат базе (SHU-1.2) и тратятся самим ударом, поэтому ни
+// запаса, ни его «заначки на время выключения» больше нет: включить-выключить перестало
+// быть бесплатной дозаправкой само собой. Соло-план, как очередь приказов; в сети
+// авторитетно состояние (`order.scramble`).
+const patrols = new Map<string, { kind: 'planet' | 'fleet' }>();
 // A staged move that would cross territory of a player you're at PEACE with: held
 // until you confirm in the war-prompt (declaring war opens the route) or cancel.
 let warPrompt: {
@@ -3465,11 +3458,12 @@ function isAutoAssault(fleetId: string): boolean {
     ? ((s as { autoAssault?: Record<string, true> }).autoAssault?.[fleetId] ?? false)
     : autoAssault.has(fleetId);
 }
-/** The CC-4 standing patrol of a fleet — authoritative state in NET, local Map solo. */
-function patrolOf(fleetId: string): Patrol | undefined {
+/** Дежурит ли эта БАЗА (мир или носитель) — авторитетное состояние в сети, локальная
+ *  карта в соло. */
+function patrolOn(baseId: string): boolean {
   return NET
-    ? (s as { patrols?: Record<string, Patrol> }).patrols?.[fleetId]
-    : patrols.get(fleetId);
+    ? !!(s as { patrols?: Record<string, unknown> }).patrols?.[baseId]
+    : patrols.has(baseId);
 }
 /** CC-2: set the auto-storm stance UNIFORMLY on the given own fleets (☰-row toggle —
  *  a mixed group snaps to one state instead of flipping each). Authoritative in NET
@@ -3483,62 +3477,29 @@ function setAutoAssault(ids: string[], on: boolean): void {
     else autoAssault.delete(id);
   }
 }
-/** CC-4: stand (or stand down) «дежурный вылет» UNIFORMLY on the given fleets' wings.
- *  Authoritative in NET (order.scramble — the server computes the patrol and flies it
- *  while you're offline); the local Map + frame-loop driver in solo. */
-function setScramble(ids: string[], on: boolean): void {
-  for (const id of ids) {
-    const f = s.fleets[id];
-    const pos0 = f?.location ? s.planets[f.location]?.position : undefined;
-    // Кому дежурство положено и почему отказ — `stanceToggle.ts` (REFM-98).
-    const want = scrambleStance(
-      !!f && f.owner === ME,
-      !!f && fleetHasShuttle(f, data),
-      !!patrolOf(id),
-      on,
-      !!pos0,
-      !!f && fleetIdle(f),
-    );
-    if (want === 'skip' || !f) continue;
-    if (want === 'need-dock') {
-      note(t('ai.sortie.docked-only'));
-      continue;
-    }
-    if (want === 'need-idle') {
-      note(t('ai.sortie.idle-only'));
-      continue;
-    }
-    if (want === 'clear') {
-      if (NET) playerOrder(orderScramble(ME, id, false));
-      else {
-        // Бухгалтерия вылета через выключение — `sortieResume.ts` (REFM-171): снятое крыло
-        // ПОМНИТ свой вылет, иначе «выключить и включить» было бы бесплатной дозаправкой.
-        const stash = stashOnStandDown(patrols.get(id));
-        if (stash) wingSorties.set(id, stash);
-        patrols.delete(id);
-      }
-      continue;
-    }
-    const pos = pos0!;
-    if (NET) {
-      playerOrder(orderScramble(ME, id, true));
-    } else {
-      if (patrols.size === 0) solo.startPatrolCadence(); // счёт перезарядки — с этого мига
-      // Продолжение отложенного вылета, зажатое нынешней спецификацией крыла (правила 1–3
-      // и 5 в `sortieResume.ts`): усиление поднимает потолок, но не подливает топлива.
-      patrols.set(
-        id,
-        standingPatrol(
-          pos,
-          shuttleStrikeRange(f, data),
-          wingSorties.get(id),
-          sortieSpec(f, data),
-          freshSortie,
-        ),
-      );
-      wingSorties.delete(id); // правило 4: надкушенный бак не предъявляют дважды
-    }
+/**
+ * CC-4: включить/выключить «дежурный вылет» у БАЗЫ — мира с портом или носителя
+ * (SHU-2.2; раньше стойка армилась на флот челноков).
+ *
+ * Авторитетно в сети (`order.scramble` — сервер поднимает эскадру, пока игрок офлайн),
+ * локальная карта плюс кадровый драйвер в соло. Условия — `stanceToggle.ts`.
+ */
+function setScramble(base: { kind: 'planet' | 'fleet'; id: string }, on: boolean): void {
+  const host = base.kind === 'planet' ? s.planets[base.id] : s.fleets[base.id];
+  const want = scrambleStance(
+    !!host && host.owner === ME,
+    hangarMachines(host ?? { hangar: [] }).length > 0,
+    patrolOn(base.id),
+    on,
+  );
+  if (want === 'skip') return;
+  const payload = base.kind === 'planet' ? { planetId: base.id } : { fleetId: base.id };
+  if (NET) {
+    playerOrder(orderScramble(ME, payload, want === 'set'));
+    return;
   }
+  if (want === 'set') patrols.set(base.id, { kind: base.kind });
+  else patrols.delete(base.id);
 }
 
 // Итог матча и награда за него живут в `matchEnd.ts` (REFM-27): исход берётся из
@@ -5305,7 +5266,19 @@ function hangarSectionHtml(view: HangarView, owner: string, mine: boolean): stri
     return head + `<div class="row dim">${esc(t('side.wing.empty'))}</div>`;
   }
   const body = cards.map((c) => squadronCardHtml(c, view)).join('');
-  return head + body + (mine && why ? `<div class="row dim">${esc(why)}</div>` : '');
+  // ДЕЖУРНЫЙ ВЫЛЕТ (CC-4) — стойка БАЗЫ, а не отдельного звена (SHU-2.2), поэтому
+  // кнопка стоит здесь, под общей строкой топлива, а не на карточке. Включённое
+  // дежурство само поднимает ближайшую эскадру навстречу опознанному врагу в радиусе,
+  // тратя тот же запас вылетов, что и ручной удар.
+  const duty = mine
+    ? `<div class="row">${btn(
+        'wingduty',
+        owner,
+        t(patrolOn(owner) ? 'side.wing.duty.on' : 'side.wing.duty.off'),
+        true,
+      )}</div>`
+    : '';
+  return head + body + duty + (mine && why ? `<div class="row dim">${esc(why)}</div>` : '');
 }
 
 /**
@@ -5629,15 +5602,8 @@ function effectTagText(tag: EffectTag): string {
       return `⚡ ${t('effect.forced-march')}`;
     case 'bombarding':
       return `⊗ ${t('effect.bombarding')}`;
-    case 'free-flight':
-      return `🛬 ${t('effect.free-flight')}`;
-    case 'patrol': {
-      const fuel =
-        'rearming' in tag
-          ? t('effect.rearming', { n: tag.rearming })
-          : t('effect.fuel', { n: tag.fuel });
-      return `🛩 ${t('effect.patrol')} · ${fuel}`;
-    }
+    case 'patrol':
+      return `🛩 ${t('effect.patrol')}`;
     case 'blackout':
       return `🌫 ${t('effect.blackout')}`;
     case 'hunger':
@@ -5741,7 +5707,7 @@ function fleetPanelHtml(f: Fleet): string {
   // когда на борту есть десант, зональное ПВО не считает пустые стопки (они остаются
   // в составе, но стволов у них нет) и не пишется нулём, а пустая полоса не рисуется
   // совсем — заголовок без меток выглядит поломкой, а не спокойствием.
-  const pt = patrolOf(f.id);
+  const onDuty = patrolOn(f.id); // дежурит ли этот носитель (SHU-2.2)
   const pd = pointDefenseTotal(f.units, (st) => {
     const def = data.units[st.unit];
     return def ? (effectiveStats(def, st, data).pointDefense ?? 0) : null;
@@ -5752,8 +5718,7 @@ function fleetPanelHtml(f: Fleet): string {
       inBattle: !!f.battleId,
       forcedMarch: boosted,
       bombarding: !!f.bombarding,
-      freeFlight: !!f.freeMovement,
-      patrol: pt ? { rearming: pt.sortie.rearming, fuel: pt.sortie.fuel } : null,
+      patrol: onDuty,
       troops: nTr,
       pointDefense: pd,
     },
@@ -7498,23 +7463,7 @@ function renderCmdBar() {
           ids.length === 0,
           t('cmd.auto-assault.hint'),
         ) +
-        (fleets.some((f) => fleetHasShuttle(f, data))
-          ? cmdBtn(
-              'qscramble',
-              '🛩',
-              t('cmd.standing-sortie'),
-              // Через ту же проверку: здесь пустого множества не бывает (кнопки нет без
-              // крыльев), но защита не должна держаться на соседнем условии.
-              allOn(
-                fleets.filter((fl) => fleetHasShuttle(fl, data)),
-                (fl) => !!patrolOf(fl.id),
-              )
-                ? 'on'
-                : '',
-              false,
-              t('cmd.standing-sortie.hint'),
-            )
-          : '')
+        ''
       : '') +
     // ✨ поповер: способности героя-флагмана — каст прямо с ряда (дальняя → цель на карте).
     (castMenu && castHero
@@ -7730,10 +7679,17 @@ side.addEventListener('click', (ev) => {
     // «цели по умолчанию», а гадать за игрока — худший из вариантов.
     const base = squadronBase(arg);
     if (base) {
-      strikeAim = { from: 'planetId' in base ? base.planetId : base.fleetId, squadronId: arg };
+      strikeAim = { from: base, squadronId: arg };
       squadMerge = null;
       note(t('hint.wing-aim'));
     }
+  } else if (act === 'wingduty') {
+    // CC-4: стойка БАЗЫ — `arg` это id мира или носителя (SHU-2.2). Вид базы выводим
+    // по тому, где она нашлась: id мира и id флота живут в разных картах состояния.
+    const kind: 'planet' | 'fleet' = s.planets[arg] ? 'planet' : 'fleet';
+    const on = !patrolOn(arg);
+    setScramble({ kind, id: arg }, on);
+    if (on) note(t('hint.standing-sortie'));
   } else if (act === 'wingsplit') {
     // Отделяет ОДНУ машину в новое звено (правило 3 в `squadronPanel.ts`): повторный
     // тап отделяет ещё одну. Что именно уходит, решает чистый `splitOne`.
@@ -8177,12 +8133,6 @@ cmdbar.addEventListener('click', (ev) => {
     const on = !ids.every((id) => isAutoAssault(id));
     setAutoAssault(ids, on);
     if (on) note(t('hint.auto-assault'));
-  } else if (cmd === 'qscramble') {
-    // SO-UI: the CC-4 «дежурный вылет», group-uniform over the shuttle fleets.
-    const wings = ids.filter((id) => fleetHasShuttle(s.fleets[id], data));
-    const on = !wings.every((id) => patrolOf(id));
-    setScramble(wings, on);
-    if (on) note(t('hint.standing-sortie'));
   } else if (cmd === 'pick') {
     // SEL-1: touch multi-select — the sheet collapses, taps toggle own fleets.
     pickMode = !pickMode;

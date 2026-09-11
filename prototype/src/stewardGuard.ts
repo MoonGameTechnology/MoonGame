@@ -31,12 +31,11 @@ import { garrisonUnderAssault } from '../../packages/shared-core/src/util/fleet'
 import { act, moveFleet, loadArmy, engageFleet, orderScramble } from './actions';
 import { data } from './gameData';
 import { ctx } from './protoKernel';
-import { fleetHasShuttle } from '../../packages/shared-core/src/index';
-import type { Patrol } from './patrol';
+import { hangarMachines } from '../../packages/shared-core/src/index';
 
 /** The guard's narrow view of the prototype state extension it reads (the standing
  *  patrols peek) — the same local-projection pattern as `division.ts`/`serverDrivers.ts`. */
-type GuardState = GameState & { patrols?: Record<string, Patrol & { rearmAt?: number }> };
+type GuardState = GameState & { patrols?: Record<string, { kind: 'planet' | 'fleet' }> };
 
 /** A garrison unit the evacuation can actually lift: the same gate `army.load`
  *  enforces (ground cargo only, fixed emplacements stay). */
@@ -360,9 +359,9 @@ export function stewardGuardOrders(
         tasked.add(f.id); // занят подъёмом — другие правила его в этот тик не трогают
         continue;
       }
-      // A standing patrol flies out with its carrier: stand it down first (the
-      // sortie is stashed, BF-26) so no stale patrol record points at this node.
-      if ((state as GuardState).patrols?.[f.id]) out.push(orderScramble(ai, f.id, false));
+      // Дежурство носителя снимать не нужно: с SHU-2.2 оно принадлежит САМОЙ БАЗЕ и
+      // едет вместе с ней — центр берётся живой, поэтому устаревшей записи, указывающей
+      // на покинутый узел, взяться неоткуда.
       out.push(moveFleet(ai, f.id, haven));
       acted += 1;
       tasked.add(f.id);
@@ -420,18 +419,17 @@ export function stewardGuardOrders(
       }
     }
   }
-  // Fire-watch (ST-3.3, «Активная оборона» only): stand a CC-4 reactive patrol on
-  // every wing docked at an OWN world that isn't patrolling yet — the дежурный
-  // вылет then answers raiders inside its radius on its own cadence (including
-  // the mid-lane standoff campers `fleet.engage` can't reach). Never on foreign
-  // soil; a wing the evac branch just tasked is not re-ordered.
+  // Дежурная вахта (ST-3.3, только «Активная оборона»): поставить CC-4 на каждый СВОЙ
+  // мир, у которого в ангаре есть эскадра и дежурство ещё не включено, — дальше вылет
+  // сам отвечает налётчикам в своём радиусе. С SHU-2.2 вахту несёт БАЗА, а не флот
+  // челноков: такого флота не бывает, и раньше эта ветка не срабатывала ни разу.
   if (posture === 'active_defend') {
     const patrols = (state as GuardState).patrols;
-    for (const f of Object.values(state.fleets)) {
-      if (!idleOwn(f) || !fleetHasShuttle(f, data) || patrols?.[f.id]) continue;
-      if (state.planets[f.location!]?.owner !== ai) continue;
-      out.push(orderScramble(ai, f.id, true));
-      report.push({ at: state.time, kind: 'watch', node: f.location!, fleetId: f.id });
+    for (const planet of Object.values(state.planets)) {
+      if (planet.owner !== ai || patrols?.[planet.id]) continue;
+      if (hangarMachines(planet).length === 0) continue; // дежурить нечем
+      out.push(orderScramble(ai, { planetId: planet.id }, true));
+      report.push({ at: state.time, kind: 'watch', node: planet.id });
     }
   }
   // The SITREP stamp rides LAST: it narrates the orders above. Applied through

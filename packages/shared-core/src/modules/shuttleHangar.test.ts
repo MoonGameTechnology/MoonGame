@@ -16,11 +16,19 @@
  * 4. **Порт потерян — челноки потеряны.** Разрушен (штурм/бомбардировка) или захвачен
  *    вместе с миром: они физически внутри. Если вместимость упала, но не до нуля,
  *    гибнут лишние — состояние не может держать больше, чем вмещает порт.
+ * 5. **Из ангара во флот дороги нет** (сторож добавлен в SHU-2.2). Правило 3 говорит,
+ *    куда челнок попадает; это — что вынуть его оттуда нечем: `fleet.launch` поднимает
+ *    ГАРНИЗОН, а челнока в гарнизоне не бывает. Отсюда следует, что в `Fleet.units`
+ *    челнок не окажется НИКОГДА, — и это ровно тот факт, из-за которого в SHU-2.2 снесена
+ *    старая машинерия «крыло как флот» (`homeBase`/`freePosition`/`freeMovement`, ветка
+ *    `fleet.split` и патруль CC-4): весь тот путь был недостижим. Вернись челнок в
+ *    гарнизон — снесённое понадобится обратно, и узнать об этом лучше здесь.
  */
 import { describe, expect, it } from 'vitest';
 import { createKernel } from '../kernel/kernel';
 import { constructionModule } from './construction';
 import { autoRallyModule } from './autoRally';
+import { fleetOpsModule } from './fleetOps';
 import { shuttleModule } from './shuttle';
 import { captureOnArrivalModule } from './captureOnArrival';
 import { movementModule } from './movement';
@@ -298,5 +306,33 @@ describe('ангар космопорта — туман войны', () => {
     const s = built(world(), 'interceptor');
     const view = visibleState(s, 'p2', data);
     expect(view.planets.A?.hangar).toBeUndefined();
+  });
+});
+
+describe('SHU-2.2 — из ангара во флот дороги нет (правило 5)', () => {
+  it('`fleet.launch` ПОДНИМАЕТ ГАРНИЗОН: челнок остаётся в ангаре, во флот не попадает', () => {
+    const kernel2 = createKernel([constructionModule, autoRallyModule, fleetOpsModule]);
+    // Мир с портом: сначала строим корабль (он уйдёт в орбитальный флот) и челнок
+    // (он уйдёт в ангар), потом поднимаем гарнизон.
+    let s = built(world(), 'interceptor');
+    s = {
+      ...s,
+      // В гарнизоне — обычный корабль: ему подниматься можно, челноку в ангаре нечем.
+      planets: { ...s.planets, A: { ...s.planets.A!, garrison: [{ unit: 'cruiser', count: 1 }] } },
+    };
+    const before = Object.keys(s.fleets).length;
+    const r = kernel2.applyAction(
+      s,
+      { id: 'l1', type: 'fleet.launch', playerId: 'p1', issuedAt: 0, payload: { planetId: 'A' } },
+      { now: s.time, data },
+    );
+    if (!r.ok) throw new Error(`fleet.launch отказал: ${r.code}`);
+    const raised = Object.entries(r.state.fleets).filter(([id]) => !(id in s.fleets));
+    expect(Object.keys(r.state.fleets).length).toBeGreaterThan(before);
+    for (const [, f] of raised) {
+      expect(f.units.some((st) => st.unit === 'interceptor')).toBe(false);
+    }
+    // Ангар не выгребли: подъём флота его не касается.
+    expect(hangarOf(r.state)).toEqual([{ unit: 'interceptor', count: 1 }]);
   });
 });

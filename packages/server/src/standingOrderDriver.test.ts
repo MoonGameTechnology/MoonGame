@@ -19,6 +19,12 @@ const data: GameData = parseGameData({
   version: '0.1.0',
   resources: ['metal'],
   units: {
+    interceptor: {
+      faction: 'x',
+      domain: 'space',
+      traits: ['shuttle'],
+      stats: { attack: 4, defense: 1, speed: 12, hp: 8, fuel: 3, rearmRounds: 2, strikeRange: 60 },
+    },
     carrier: {
       faction: 'x',
       domain: 'space',
@@ -32,7 +38,7 @@ const data: GameData = parseGameData({
     },
   },
   factions: {},
-  buildings: {},
+  buildings: { spaceport: { name: 'Spaceport', shuttleBay: 4, hp: 100 } },
   events: {},
   sectorKinds: {
     homeworld: { scoreValue: 10, capturable: true, buildable: true, orbit: true },
@@ -182,81 +188,68 @@ describe('autoAssaultActions — CC-2', () => {
     expect(autoAssaultActions(contested, probe)).toEqual([]);
   });
 });
-
-describe('patrolActions — CC-4', () => {
+describe('patrolActions — CC-4 (дежурит БАЗА, SHU-2.2)', () => {
+  /** Мой мир с портом, эскадрой в ангаре и полным запасом вылетов. */
   function withPatrol(opts: {
-    sortie?: { fuel: number; rearming: number };
-    rearmAt?: number;
     targets?: Fleet[];
     stance?: 'war' | 'peace';
+    sortie?: { fuel: number; rearming: number };
+    hangar?: boolean;
   }) {
     const s = stateWith({
       players: [player('p1'), player('p2')],
       planets: [planet('A', 'p1', 0, 0, ['B']), planet('B', 'p2', 10, 0, ['A'])],
-      fleets: [fleet('f1', 'p1', 'A', [['carrier', 1]]), ...(opts.targets ?? [])],
-      patrols: {
-        f1: {
-          center: { x: 0, y: 0 },
-          radius: 50,
-          sortie: opts.sortie ?? { fuel: 2, rearming: 0 },
-          ...(opts.rearmAt !== undefined ? { rearmAt: opts.rearmAt } : {}),
-        },
-      },
+      fleets: opts.targets ?? [],
+      patrols: { A: { kind: 'planet' } },
     });
+    s.planets.A = {
+      ...s.planets.A!,
+      buildings: [{ type: 'spaceport', level: 1, hp: 100 }],
+      hangar:
+        opts.hangar === false
+          ? []
+          : [{ id: 'sq:p1:1', units: [{ unit: 'interceptor', count: 2 }] }],
+      ...(opts.sortie ? { sortie: opts.sortie } : {}),
+    };
     setStance(s, 'p1', 'p2', opts.stance ?? 'war');
     return s;
   }
 
-  it('scrambles at a co-located identified enemy — engage, and stamps the spent sortie', () => {
-    const s = withPatrol({ targets: [fleet('f2', 'p2', 'A', [['cruiser', 1]])] });
-    const out = patrolActions(s, data, 0);
-    const strike = out.find((a) => a.action.type !== 'patrol.stamp');
-    expect(strike?.action.type).toBe('fleet.engage');
-    expect(strike?.action.payload).toEqual({ fleetId: 'f1', targetId: 'f2' });
-    const stamp = out.find((a) => a.action.type === 'patrol.stamp');
-    expect(stamp?.action.payload).toMatchObject({ fleetId: 'f1', sortie: { fuel: 1, rearming: 0 } });
-  });
-
-  it('moves to intercept when the enemy is elsewhere but in range', () => {
+  it('ПОДНИМАЕТ ЭСКАДРУ по опознанному врагу в радиусе — обычным `shuttle.strike`', () => {
     const s = withPatrol({ targets: [fleet('f2', 'p2', 'B', [['cruiser', 1]])] });
-    const out = patrolActions(s, data, 0);
-    const strike = out.find((a) => a.action.type !== 'patrol.stamp');
-    expect(strike?.action.type).toBe('fleet.move');
-    expect(strike?.action.payload).toEqual({ fleetId: 'f1', to: 'B' });
+    const out = patrolActions(s, data);
+    expect(out).toHaveLength(1);
+    expect(out[0]!.action.type).toBe('shuttle.strike');
+    expect(out[0]!.action.payload).toEqual({
+      planetId: 'A',
+      squadronId: 'sq:p1:1',
+      targetFleetId: 'f2',
+    });
   });
 
-  it('holds fire with no fuel, at peace, or out of range', () => {
-    const dry = withPatrol({
-      sortie: { fuel: 0, rearming: 3 },
-      targets: [fleet('f2', 'p2', 'A', [['cruiser', 1]])],
-    });
-    expect(patrolActions(dry, data, 0).some((a) => a.action.type !== 'patrol.stamp')).toBe(false);
-
-    const peace = withPatrol({
-      rearmAt: 1_000_000, // already armed, far in the future — a bare re-evaluation at
-      // now=0 must not itself produce a rearmAt-changed stamp
-      targets: [fleet('f2', 'p2', 'A', [['cruiser', 1]])],
+  it('МИР — НЕ ЦЕЛЬ: без объявленной войны дежурство молчит', () => {
+    const s = withPatrol({
+      targets: [fleet('f2', 'p2', 'B', [['cruiser', 1]])],
       stance: 'peace',
     });
-    expect(patrolActions(peace, data, 0)).toEqual([]);
-
-    const farAway = withPatrol({ rearmAt: 1_000_000, targets: [fleet('f2', 'p2', 'B', [['cruiser', 1]])] });
-    farAway.planets.B!.position = { x: 9999, y: 0 };
-    expect(patrolActions(farAway, data, 0)).toEqual([]);
+    expect(patrolActions(s, data)).toEqual([]);
   });
 
-  it('rearms on the game-hour cadence when overdue', () => {
-    const HOUR = 3_600_000;
-    const s = withPatrol({ sortie: { fuel: 0, rearming: 3 }, rearmAt: 0 });
-    const out = patrolActions(s, data, HOUR * 3); // 3 rounds due
-    const stamp = out.find((a) => a.action.type === 'patrol.stamp');
-    expect(stamp?.action.payload).toMatchObject({ sortie: { fuel: 2, rearming: 0 } });
+  it('ПУСТОЙ АНГАР — ВЫЛЕТА НЕТ: дежурить нечем', () => {
+    const s = withPatrol({ targets: [fleet('f2', 'p2', 'B', [['cruiser', 1]])], hangar: false });
+    expect(patrolActions(s, data)).toEqual([]);
   });
 
-  it('drops a fleet that lost its shuttle — no crash, no actions, no stamp', () => {
-    const s = withPatrol({ targets: [] });
-    s.fleets.f1 = fleet('f1', 'p1', 'A', [['cruiser', 1]]); // shuttle ship replaced
-    expect(patrolActions(s, data, 0)).toEqual([]);
+  it('СУХОЙ БАК — ВЫЛЕТА НЕТ: заведомо отклоняемый приказ не подаём', () => {
+    const s = withPatrol({
+      targets: [fleet('f2', 'p2', 'B', [['cruiser', 1]])],
+      sortie: { fuel: 0, rearming: 2 },
+    });
+    expect(patrolActions(s, data)).toEqual([]);
+  });
+
+  it('ЦЕЛЕЙ НЕТ — ВЫЛЕТА НЕТ', () => {
+    expect(patrolActions(withPatrol({}), data)).toEqual([]);
   });
 });
 
@@ -270,10 +263,10 @@ describe('standingOrderTickActions — combines both drivers in a fixed order', 
         fleet('wing', 'p1', 'B', [['carrier', 1]]),
       ],
       autoAssault: { storm: true },
-      patrols: { wing: { center: { x: 0, y: 0 }, radius: 50, sortie: { fuel: 2, rearming: 0 } } },
+      patrols: { B: { kind: 'planet' } },
     });
     setStance(s, 'p1', 'p2', 'war');
-    const out = standingOrderTickActions(s, data, 0, probe);
+    const out = standingOrderTickActions(s, data, probe);
     expect(out[0]!.action.type).toBe('fleet.orbit'); // auto-assault first
     expect(out.some((a) => a.action.type === 'fleet.assault')).toBe(true);
   });
@@ -304,45 +297,29 @@ describe('integration — every emitted action is accepted by the REAL kernel', 
     }
   });
 
-  it('patrol: fleet.engage applies against a co-located identified enemy', () => {
+  it('дежурный вылет: `shuttle.strike` принимается настоящим редьюсером', () => {
     const s = stateWith({
       players: [player('p1'), player('p2')],
       planets: [planet('A', 'p1', 0, 0, ['B']), planet('B', 'p2', 10, 0, ['A'])],
-      fleets: [
-        fleet('f1', 'p1', 'A', [['carrier', 1]]),
-        fleet('f2', 'p2', 'A', [['cruiser', 1]]),
-      ],
-      patrols: { f1: { center: { x: 0, y: 0 }, radius: 50, sortie: { fuel: 2, rearming: 0 } } },
+      fleets: [fleet('f2', 'p2', 'B', [['cruiser', 1]])],
+      patrols: { A: { kind: 'planet' } },
     });
+    s.planets.A = {
+      ...s.planets.A!,
+      buildings: [{ type: 'spaceport', level: 1, hp: 100 }],
+      hangar: [{ id: 'sq:p1:1', units: [{ unit: 'interceptor', count: 2 }] }],
+    };
     setStance(s, 'p1', 'p2', 'war');
-    const out = patrolActions(s, data, 0);
+    const out = patrolActions(s, data);
+    expect(out).toHaveLength(1);
     let state = s;
     for (const { playerId, action } of out) {
       const r = kernel.applyAction(state, action, ctx);
       expect(r.ok, `${playerId}: ${action.type} → ${!r.ok ? r.code : 'ok'}`).toBe(true);
       if (r.ok) state = r.state;
     }
-    expect(state.battles && Object.keys(state.battles).length).toBeGreaterThan(0);
-  });
-
-  it('patrol: fleet.move applies to intercept a distant identified enemy', () => {
-    const s = stateWith({
-      players: [player('p1'), player('p2')],
-      planets: [planet('A', 'p1', 0, 0, ['B']), planet('B', 'p2', 10, 0, ['A'])],
-      fleets: [
-        fleet('f1', 'p1', 'A', [['carrier', 1]]),
-        fleet('f2', 'p2', 'B', [['cruiser', 1]]),
-      ],
-      patrols: { f1: { center: { x: 0, y: 0 }, radius: 50, sortie: { fuel: 2, rearming: 0 } } },
-    });
-    setStance(s, 'p1', 'p2', 'war');
-    const out = patrolActions(s, data, 0);
-    let state = s;
-    for (const { playerId, action } of out) {
-      const r = kernel.applyAction(state, action, ctx);
-      expect(r.ok, `${playerId}: ${action.type} → ${!r.ok ? r.code : 'ok'}`).toBe(true);
-      if (r.ok) state = r.state;
-    }
-    expect(state.fleets.f1?.movement).toBeTruthy();
+    // Машины ушли из ангара в воздух — вылет состоялся.
+    expect(state.strikes ?? []).toHaveLength(1);
+    expect(state.planets.A!.hangar ?? []).toHaveLength(0);
   });
 });

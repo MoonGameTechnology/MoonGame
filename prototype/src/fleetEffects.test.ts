@@ -15,8 +15,7 @@ const calm = (over: Partial<FleetFacts> = {}): FleetFacts => ({
   inBattle: false,
   forcedMarch: false,
   bombarding: false,
-  freeFlight: false,
-  patrol: null,
+  patrol: false,
   troops: 0,
   pointDefense: 0,
   ...over,
@@ -108,8 +107,7 @@ describe('fleetEffects', () => {
         inBattle: true,
         forcedMarch: true,
         bombarding: true,
-        freeFlight: true,
-        patrol: { rearming: 0, fuel: 4 },
+        patrol: true,
         troops: 2,
         pointDefense: 7,
       }),
@@ -120,7 +118,6 @@ describe('fleetEffects', () => {
       'in-battle',
       'forced-march',
       'bombarding',
-      'free-flight',
       'patrol',
       'blackout',
       'hunger',
@@ -128,14 +125,12 @@ describe('fleetEffects', () => {
     ]);
   });
 
-  // Правило 3: перевооружение вытесняет топливо.
-  it('names rearming instead of fuel while the wing is rearming', () => {
-    expect(fleetEffects(calm({ patrol: { rearming: 2, fuel: 9 } }), 'p1', [])).toEqual([
-      { kind: 'patrol', rearming: 2 },
-    ]);
-    expect(fleetEffects(calm({ patrol: { rearming: 0, fuel: 9 } }), 'p1', [])).toEqual([
-      { kind: 'patrol', fuel: 9 },
-    ]);
+  // SHU-2.2: метка дежурства стала ФЛАГОМ. Запас вылетов принадлежит БАЗЕ и показан у
+  // ангара («вылетов N из M» / «перезарядка»), поэтому счётчика здесь больше нет —
+  // иначе одно число жило бы в двух местах и разъехалось бы.
+  it('ДЕЖУРСТВО — ФЛАГ, а не счётчик топлива', () => {
+    expect(fleetEffects(calm({ patrol: true }), 'p1', [])).toEqual([{ kind: 'patrol' }]);
+    expect(fleetEffects(calm({ patrol: false }), 'p1', [])).toEqual([]);
   });
 
   // Правило 1 живьём: те же долги, чужой флот — ни одной долговой метки.

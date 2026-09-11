@@ -25,10 +25,12 @@
  * 3. **Припаркован НА лейне → доля `t`** этого лейна, а не ближайший узел: приказ
  *    «встать на дороге» оставляет флот между мирами, и мерить от узла значило бы
  *    приписать ему прибытие, которого не было.
- * 4. **Свободный полёт (эскадрильи/ракеты) — вне графа лейнов:** интерполяция от
- *    `freePosition` к точке цели, а стоящий на месте — сама `freePosition`.
- * 5. **Нет позиции — нет точки.** Неизвестный узел (туман обогнал состояние) или флот
+ * 4. **Нет позиции — нет точки.** Неизвестный узел (туман обогнал состояние) или флот
  *    без места даёт `null`, а не подставной ноль: рисующий просто пропускает его.
+ *
+ * Правила «свободного полёта» (`freePosition`/`freeMovement`) здесь БЫЛО пятым — оно
+ * снято в SHU-2.2 вместе с самими полями: флота, идущего мимо графа линий, в модели
+ * больше нет, челнок летает вылетом из ангара (`strikeTrail.ts`), а не флотом.
  *
  * Доля времени зажимается в [0,1]: кадр может прийти после `arrivesAt`, пока ядро ещё
  * не перевело флот в узел, и без зажима точка уехала бы за конец дороги.
@@ -57,21 +59,11 @@ export interface OriginEdge {
   t: number;
 }
 
-/** Свободный полёт вне графа лейнов (эскадрильи/ракеты). */
-export interface OriginFreeMovement {
-  targetX: number;
-  targetY: number;
-  departedAt: number;
-  arrivesAt: number;
-}
-
 /** Флот глазами этой модели — только поля, определяющие место. */
 export interface OriginFleet {
   location?: string | null;
   movement?: OriginMovement | null;
   edge?: OriginEdge | null;
-  freePosition?: OriginPoint | null;
-  freeMovement?: OriginFreeMovement | null;
 }
 
 /** Доля пройденного пути на момент `now`, зажатая в [0,1]. */
@@ -96,15 +88,6 @@ export function fleetOrigin(
   now: number,
   nodeAt: (planetId: string) => OriginPoint | null,
 ): OriginPoint | null {
-  // Правило 4: свободный полёт живёт вне графа лейнов.
-  if (f.freeMovement) {
-    const from = f.freePosition;
-    if (!from) return null;
-    const fm = f.freeMovement;
-    const t = progress(fm.departedAt, fm.arrivesAt, now);
-    return lerp(from, { x: fm.targetX, y: fm.targetY }, t);
-  }
-  if (f.freePosition) return { x: f.freePosition.x, y: f.freePosition.y };
   // Правило 1: стоит на орбите — центр мира, кольцо ни при чём.
   if (f.location) {
     const p = nodeAt(f.location);
@@ -118,7 +101,7 @@ export function fleetOrigin(
   }
   // Правило 2: в пути — доля внутри границ ноги.
   const m = f.movement;
-  if (!m) return null; // правило 5
+  if (!m) return null; // правило 4
   const a = nodeAt(m.from);
   const b = nodeAt(m.to);
   if (!a || !b) return null;

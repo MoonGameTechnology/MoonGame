@@ -50,10 +50,14 @@ export const bombardFleet = (playerId: string, fleetId: string, on: boolean) =>
  *  здесь не передаётся: он уже в трюме, его кладут туда заранее (`loadSquadronTroops`). */
 export const strikeShuttle = (
   playerId: string,
-  planetId: string,
+  // БАЗА вылета — мир с портом ИЛИ носитель (SHU-2.1), ровно одна из двух: ядро ищет
+  // мир в `planets`, носитель — в `fleets`. Раньше здесь стоял голый `planetId`, и удар
+  // с КАРТОЧКИ НОСИТЕЛЯ (панель флота, SHU-4.3) уезжал с id флота в поле мира —
+  // отбивался `E_NO_TARGET`. Размеченная база не даёт перепутать их молча.
+  base: { planetId: string } | { fleetId: string },
   squadronId: string,
   target: { targetFleetId: string } | { targetPlanetId: string },
-) => act(playerId, 'shuttle.strike', { planetId, squadronId, ...target });
+) => act(playerId, 'shuttle.strike', { ...base, squadronId, ...target });
 /** Перегрузка ЭСКАДРЫ между космопортом мира и стоящим там носителем (SHU-2.1):
  *  `load` — с мира на борт, `unload` — с борта на мир. Соединение едет целиком. */
 export const loadShuttle = (playerId: string, fleetId: string, squadronId: string) =>
@@ -201,39 +205,14 @@ export const orderAuto = (playerId: string, fleetId: string, on: boolean) =>
   act(playerId, 'order.auto', { fleetId, on });
 /** Stand (or stand down) a CC-4 reactive patrol on an owned shuttle fleet — the server
  *  computes the patrol itself (center / radius / fresh sortie). */
-export const orderScramble = (playerId: string, fleetId: string, on: boolean) =>
-  act(playerId, 'order.scramble', { fleetId, on });
-
-// Market listing, pulled ahead of the REFP-22 remainder for the same reason as the
-// standing-order toggles above: `aiOrders` (ai.ts, REFP-26) places lots and must not
-// import the facade back. Leaf builder — only the `MarketSide` type rides along.
-import type { MarketSide } from '../../packages/shared-core/src/index';
-/** List an open lot on the session market (sell `amount` at `price`, or a buy bid). */
-export const marketList = (
+/** CC-4: включить/выключить дежурный вылет у БАЗЫ — мира с портом ИЛИ носителя
+ *  (SHU-2.2). Ровно одна из двух, как у `shuttle.strike`. */
+export const orderScramble = (
   playerId: string,
-  side: MarketSide,
-  resource: string,
-  amount: number,
-  price: number,
-) => act(playerId, 'market.list', { side, resource, amount, price });
+  base: { planetId: string } | { fleetId: string },
+  on: boolean,
+) => act(playerId, 'order.scramble', { ...base, on });
 
-// REFP-22 (остаток): the second, scattered builder batch — the state it was
-// interleaved with in game.ts has since been extracted (patrol REFP-23, chains
-// REFP-8, divisions REFP-13, market REFP-12), leaving pure leaf builders.
-import type { SortieState } from '../../packages/shared-core/src/index';
-import type { ChainStep } from '../../packages/shared-core/src/index';
-/** The patrol driver's runtime stamp: burned fuel / ticked rearm / next cadence mark. */
-export const patrolStamp = (
-  playerId: string,
-  fleetId: string,
-  sortie: SortieState,
-  rearmAt?: number,
-) =>
-  act(
-    playerId,
-    'patrol.stamp',
-    rearmAt === undefined ? { fleetId, sortie } : { fleetId, sortie, rearmAt },
-  );
 /** CC-1: set (or [] = cancel) an owned fleet's whole order chain atomically. */
 export const orderChain = (playerId: string, fleetId: string, steps: ChainStep[]) =>
   act(playerId, 'order.chain', { fleetId, steps });
@@ -259,6 +238,24 @@ export const chainStamp = (
     waitUntil === undefined ? { fleetId, steps } : { fleetId, steps, waitUntil },
   );
 
+// Market listing, pulled ahead of the REFP-22 remainder for the same reason as the
+// standing-order toggles above: `aiOrders` (ai.ts, REFP-26) places lots and must not
+// import the facade back. Leaf builder — only the `MarketSide` type rides along.
+import type { MarketSide } from '../../packages/shared-core/src/index';
+/** List an open lot on the session market (sell `amount` at `price`, or a buy bid). */
+export const marketList = (
+  playerId: string,
+  side: MarketSide,
+  resource: string,
+  amount: number,
+  price: number,
+) => act(playerId, 'market.list', { side, resource, amount, price });
+
+// REFP-22 (остаток): the second, scattered builder batch — the state it was
+// interleaved with in game.ts has since been extracted (chains REFP-8, divisions
+// REFP-13, market REFP-12), leaving pure leaf builders. Патрульный штамп отсюда ушёл
+// вместе с моделью «крыло как флот» (SHU-2.2).
+import type { ChainStep } from '../../packages/shared-core/src/index';
 /** Take (fill) up to `amount` from an open lot — buy from a sell lot / sell into a buy lot. */
 export const marketTake = (playerId: string, id: string, amount?: number) =>
   act(playerId, 'market.take', amount === undefined ? { id } : { id, amount });

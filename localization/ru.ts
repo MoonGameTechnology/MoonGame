@@ -106,8 +106,6 @@ export const ru: Record<string, string> = {
   'ai.end.pve-failed': 'оборона пала',
   'ai.end.score': 'достижением лимита очков',
   'ai.end.timeout': 'истечением времени',
-  'ai.sortie.docked-only': '🛩 дежурный вылет — только со стоянки в узле',
-  'ai.sortie.idle-only': '🛩 дежурный вылет — только когда флот свободен',
 
   // --- arsenal — «Арсенал»: коллекция аккаунта, фильтр, пустое состояние.
   'auction.title': 'Аукцион',
@@ -222,6 +220,8 @@ export const ru: Record<string, string> = {
   'side.build.open': 'Построить',
   'side.wing.blocked.empty': 'ангар пуст — поднимать нечего',
   'side.wing.cargo': 'в трюме: {n}',
+  'side.wing.duty.off': '🛩 Дежурный вылет',
+  'side.wing.duty.on': '🛩 Снять с дежурства',
   'side.wing.empty': 'ангар пуст',
   'side.wing.blocked.no-fuel': 'топливо кончилось — ждём перезарядки',
   'side.wing.blocked.rearming': 'порт перезаряжается — вылет позже',
@@ -323,8 +323,6 @@ export const ru: Record<string, string> = {
   'cmd.selection.one': 'ФЛОТ',
   'cmd.split': 'Делить',
   'cmd.split.hint': 'отделить часть кораблей пришвартованного флота в новый',
-  'cmd.standing-sortie': 'Деж. вылет',
-  'cmd.standing-sortie.hint': 'челнок автоматически бьёт врага в радиусе',
   'cmd.stop': 'Стоп',
   'cmd.troops': 'Десант',
   'cmd.troops.hint':
@@ -1788,10 +1786,7 @@ export const ru: Record<string, string> = {
   'effect.in-battle': 'в бою',
   'effect.forced-march': 'форс-марш',
   'effect.bombarding': 'бомбардировка',
-  'effect.free-flight': 'в полёте',
   'effect.patrol': 'дежурный вылет',
-  'effect.rearming': 'перезарядка {n}',
-  'effect.fuel': 'топливо {n}',
   'effect.blackout': 'блэкаут: ПКО/радары −50%',
   'effect.hunger': 'голод: −25% наземный урон',
   'effect.point-defense': 'зональное ПВО {n}',
