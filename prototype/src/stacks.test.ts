@@ -153,8 +153,10 @@ describe('BF-27/BF-28 — fleet.launch: assault lock + cargo cap', () => {
       id: 'battle:t',
       location: home.id,
       phase: 'ground',
-      attacker: { ref: { kind: 'landing', fleetId: 'X' }, owner: 'p2' },
-      defender: { ref: { kind: 'garrison', planetId: home.id }, owner: 'p1' },
+      sides: [
+        { ref: { kind: 'landing', fleetId: 'X' }, owner: 'p2', role: 'attacker' as const },
+        { ref: { kind: 'garrison', planetId: home.id }, owner: 'p1', role: 'defender' as const },
+      ],
       round: 1,
     } as Battle;
     expect(order(s, launchFleet('p1', home.id), s.time).error).toBe('E_UNDER_ASSAULT');

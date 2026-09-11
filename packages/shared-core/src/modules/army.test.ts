@@ -332,8 +332,10 @@ describe('army module — no mid-assault evacuation (BF-27)', () => {
       id: 'battle:1',
       location: 'A',
       phase: 'ground',
-      attacker: { ref: { kind: 'landing', fleetId: 'X' }, owner: 'p2' },
-      defender: { ref: { kind: 'garrison', planetId: 'A' }, owner: 'p1' },
+      sides: [
+        { ref: { kind: 'landing', fleetId: 'X' }, owner: 'p2', role: 'attacker' as const },
+        { ref: { kind: 'garrison', planetId: 'A' }, owner: 'p1', role: 'defender' as const },
+      ],
       round: 1,
     };
     expect(errCode(kernel.applyAction(st, load('F', 'militia', 1), ctx))).toBe('E_UNDER_ASSAULT');
@@ -343,8 +345,10 @@ describe('army module — no mid-assault evacuation (BF-27)', () => {
       id: 'battle:2',
       location: 'B',
       phase: 'ground',
-      attacker: { ref: { kind: 'landing', fleetId: 'X' }, owner: 'p2' },
-      defender: { ref: { kind: 'garrison', planetId: 'B' }, owner: 'p1' },
+      sides: [
+        { ref: { kind: 'landing', fleetId: 'X' }, owner: 'p2', role: 'attacker' as const },
+        { ref: { kind: 'garrison', planetId: 'B' }, owner: 'p1', role: 'defender' as const },
+      ],
       round: 1,
     };
     okApply(kernel.applyAction(other, load('F', 'militia', 1), ctx));
@@ -397,8 +401,10 @@ describe('army — ALLY-LAND: высадка к союзнику', () => {
       id: 'battle:9',
       location: 'A',
       phase: 'ground',
-      attacker: { ref: { kind: 'landing', fleetId: 'X' }, owner: 'p3' },
-      defender: { ref: { kind: 'garrison', planetId: 'A' }, owner: 'p2' },
+      sides: [
+        { ref: { kind: 'landing', fleetId: 'X' }, owner: 'p3', role: 'attacker' as const },
+        { ref: { kind: 'garrison', planetId: 'A' }, owner: 'p2', role: 'defender' as const },
+      ],
       round: 1,
     };
     const out = okApply(kernel.applyAction(st, unload('F', 'militia', 2), ctx));

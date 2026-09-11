@@ -455,8 +455,10 @@ describe('createBattleModel', () => {
         phase: 'orbital',
         round: 2,
         nextRoundAt: 5000,
-        attacker: { ref: { kind: 'fleet', fleetId: 'f1' }, owner: 'p1' },
-        defender: { ref: { kind: 'fleet', fleetId: 'f2' }, owner: 'p2' },
+        sides: [
+          { ref: { kind: 'fleet', fleetId: 'f1' }, owner: 'p1', role: 'attacker' as const },
+          { ref: { kind: 'fleet', fleetId: 'f2' }, owner: 'p2', role: 'defender' as const },
+        ],
       },
     };
     return s;
@@ -517,8 +519,10 @@ describe('createBattleModel', () => {
         location: 'P',
         phase: 'ground',
         round: 1,
-        attacker: { ref: { kind: 'landing', fleetId: 'f1' }, owner: 'p1' },
-        defender: { ref: { kind: 'garrison', planetId: 'P' }, owner: 'p2' },
+        sides: [
+          { ref: { kind: 'landing', fleetId: 'f1' }, owner: 'p1', role: 'attacker' as const },
+          { ref: { kind: 'garrison', planetId: 'P' }, owner: 'p2', role: 'defender' as const },
+        ],
       },
     };
     const res = createBattleModel(s, 'b1', 'p1', DATA);

@@ -175,7 +175,18 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '15'; // SHU-4.2: ангар — список ЭСКАДР.
+export const MODULE_MANIFEST_VERSION = '16'; // MSB-1: бой — СПИСОК сторон.
+// Форма состояния изменилась: у `Battle` больше нет полей `attacker`/`defender` — есть
+// `sides: BattleSide[]` в порядке вступления, и каждая сторона несёт свою `role`
+// ('attacker' | 'defender'), от которой зависит, бьёт она `attack` или отвечает
+// `defense`. Матч на манифесте 15 несёт бои старой формы: новый читатель увидел бы у них
+// `sides: undefined` и уронил бы первый же такт. Отказ загрузки честнее.
+//
+// Правила боя этим кирпичом НЕ менялись — только форма: каждый бой по-прежнему ровно
+// парный, и весь боевой набор тестов зелёный без правки ожиданий. Правила, которым
+// список нужен (деление урона, вступление в идущий бой, совместный штурм), — MSB-2/3/4.
+// (До 16:)
+// export const MODULE_MANIFEST_VERSION = '15'; // SHU-4.2: ангар — список ЭСКАДР.
 // Форма состояния изменилась: `planet.hangar`/`fleet.hangar` больше не плоские стеки, а
 // список эскадр (`{id, units, cargo}`), у вылета появился `squadronId`, а в состоянии —
 // счётчик `squadronSeq`. Матч на манифесте 14 несёт ангары старой формы: новый читатель

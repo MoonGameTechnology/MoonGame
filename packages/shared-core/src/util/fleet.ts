@@ -37,7 +37,7 @@ export function requireOwnedIdleFleet(
  *  else the defender escapes unbloodied and the attacker wins an empty rock. */
 export function garrisonUnderAssault(state: GameState, planetId: PlanetId): boolean {
   return Object.values(state.battles).some((b) =>
-    [b.attacker, b.defender].some(
+    b.sides.some(
       (side) => side.ref.kind === 'garrison' && side.ref.planetId === planetId,
     ),
   );

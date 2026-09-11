@@ -9,8 +9,7 @@ import {
 } from './attentionBadges';
 
 const battle = (attacker: string, defender: string, location: string): BattleLike => ({
-  attacker: { owner: attacker },
-  defender: { owner: defender },
+  sides: [{ owner: attacker }, { owner: defender }],
   location,
 });
 

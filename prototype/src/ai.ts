@@ -458,9 +458,14 @@ export function aiOrders(
       if (!battle) continue;
       // Отступить может только ОРБИТАЛЬНАЯ сторона: сошедший на грунт десант ядро не
       // выпускает (`E_CANNOT_RETREAT`), так что приказ был бы чистым отказом.
-      const weAttack = isThisFleet(battle.attacker.ref, f.id);
-      if (!weAttack && !isThisFleet(battle.defender.ref, f.id)) continue;
-      const foe = sideUnits(weAttack ? battle.defender.ref : battle.attacker.ref);
+      // MSB-1: своя сторона ищется СРЕДИ СТОРОН, враг — то, что не она. На двух это
+      // прежнее «атакующий или обороняющийся», при N — единственная верная форма вопроса.
+      const mine = battle.sides.find((s) => isThisFleet(s.ref, f.id));
+      if (!mine) continue;
+      const weAttack = mine.role === 'attacker';
+      const foeSide = battle.sides.find((s) => s !== mine);
+      if (!foeSide) continue;
+      const foe = sideUnits(foeSide.ref);
       if (!foe.some((s) => s.count > 0)) continue; // добивать уже некого — бой наш
       const forecast = weAttack
         ? previewBattle(f.units, foe, data)

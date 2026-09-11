@@ -207,8 +207,10 @@ describe('AI-BAL-8 — способности (`hero.ability`)', () => {
           id: 'battle:1',
           location: fleet.location!,
           phase: 'orbital',
-          attacker: { ref: { kind: 'fleet', fleetId: fleet.id }, owner: 'p2' },
-          defender: { ref: { kind: 'fleet', fleetId: 'f:foe' }, owner: 'p1' },
+          sides: [
+            { ref: { kind: 'fleet', fleetId: fleet.id }, owner: 'p2', role: 'attacker' as const },
+            { ref: { kind: 'fleet', fleetId: 'f:foe' }, owner: 'p1', role: 'defender' as const },
+          ],
           round: 2,
         },
       },

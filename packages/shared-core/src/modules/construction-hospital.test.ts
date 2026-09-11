@@ -137,8 +137,10 @@ describe('hospital heal mechanic', () => {
         id: 'b1',
         location: 'home',
         phase: 'ground',
-        attacker: { ref: { kind: 'landing', fleetId: 'F' }, owner: 'p2' },
-        defender: { ref: { kind: 'garrison', planetId: 'home' }, owner: 'p1' },
+        sides: [
+          { ref: { kind: 'landing', fleetId: 'F' }, owner: 'p2', role: 'attacker' as const },
+          { ref: { kind: 'garrison', planetId: 'home' }, owner: 'p1', role: 'defender' as const },
+        ],
         round: 1,
       },
     };

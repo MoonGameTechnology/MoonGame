@@ -6,6 +6,7 @@ import { MS_PER_HOUR } from '../util/time';
 import { requireOwnedIdleFleet } from '../util/fleet';
 import { effectiveStats } from '../util/loadout';
 import { isCapturable } from '../state/sectorKind';
+import { attackerOf, defenderOf } from '../state/battle';
 import {
   applyDamageToSide,
   INTERCEPT_TOL,
@@ -128,10 +129,24 @@ function findEnemyFleetAt(
  * — значит НЕ перемирие, бой продолжается.
  */
 function ceasefired(h: HandlerContext, battle: Battle): boolean {
-  const a = battle.attacker.owner;
-  const b = battle.defender.owner;
-  if (a === null || b === null) return false;
-  return !isHostile(h, a, b);
+  // MSB-1: спрашиваем ПАРЫ сторон, а не два именованных поля. На двух сторонах это ровно
+  // прежнее поведение, а на N — уже верный вопрос: бой жив, пока враждебна хоть одна пара.
+  const sides = battle.sides;
+  let comparable = 0;
+  for (let i = 0; i < sides.length; i++) {
+    for (let j = i + 1; j < sides.length; j++) {
+      const a = sides[i]!.owner;
+      const b = sides[j]!.owner;
+      if (a === null || b === null) continue; // стойки нет — спрашивать не у кого
+      comparable += 1;
+      if (isHostile(h, a, b)) return false;
+    }
+  }
+  // FAIL-SECURE, и на нём этот обход уже споткнулся один раз: если сравнить было НЕЧЕГО
+  // (все пары с ничейной стороной), это НЕ перемирие. Голое `return true` в конце
+  // означало бы «неизвестно ⇒ мир» и разводило бы бой с ничейным гарнизоном — ровно то,
+  // что запрещает правило «любая неопределённость → отказ, а не тихий проход».
+  return comparable > 0;
 }
 
 /** Pulls a fleet out of transit and pins it at a node (it now fights/holds). */
@@ -149,7 +164,7 @@ function pinToEdge(fleet: Fleet, from: PlanetId, to: PlanetId, t: number): void 
 
 function startBattle(h: HandlerContext, battle: Battle): void {
   h.state.battles[battle.id] = battle;
-  for (const side of [battle.attacker, battle.defender]) {
+  for (const side of battle.sides) {
     // Стороны, которые держит МИР (гарнизон и плацдарм), не привязаны к флоту:
     // запирать и останавливать нечего.
     if (side.ref.kind !== 'garrison' && side.ref.kind !== 'beachhead') {
@@ -164,8 +179,8 @@ function startBattle(h: HandlerContext, battle: Battle): void {
     battleId: battle.id,
     location: battle.location,
     phase: battle.phase,
-    attacker: battle.attacker.owner,
-    defender: battle.defender.owner,
+    attacker: attackerOf(battle)?.owner ?? null,
+    defender: defenderOf(battle)?.owner ?? null,
   });
   scheduleTick(h, battle.id, true); // CMB-4: первый залп — на самой встрече
 }
@@ -196,8 +211,10 @@ function engageFleets(
     id: `battle:${h.state.battleSeq++}`,
     location: at,
     phase: 'orbital',
-    attacker: { ref: { kind: 'fleet', fleetId: fleet.id }, owner: fleet.owner },
-    defender: { ref: { kind: 'fleet', fleetId: enemy.id }, owner: enemy.owner },
+    sides: [
+      { ref: { kind: 'fleet', fleetId: fleet.id }, owner: fleet.owner, role: 'attacker' },
+      { ref: { kind: 'fleet', fleetId: enemy.id }, owner: enemy.owner, role: 'defender' },
+    ],
     round: 0,
   });
 }
@@ -259,8 +276,10 @@ function assaultPlanet(h: HandlerContext, fleet: Fleet): string | null {
       id: `battle:${h.state.battleSeq++}`,
       location: at,
       phase: 'ground',
-      attacker: { ref: { kind: 'landing', fleetId: fleet.id }, owner: fleet.owner },
-      defender: { ref: { kind: 'garrison', planetId: at }, owner: planet.owner },
+      sides: [
+        { ref: { kind: 'landing', fleetId: fleet.id }, owner: fleet.owner, role: 'attacker' },
+        { ref: { kind: 'garrison', planetId: at }, owner: planet.owner, role: 'defender' },
+      ],
       round: 0,
     });
     return null;
@@ -369,15 +388,24 @@ function releaseOrDestroyFleet(h: HandlerContext, ref: CombatantRef): void {
 type BattleEnd = 'decided' | 'stalemate' | 'ceasefire';
 
 function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decided'): void {
-  const aAlive = sideAlive(h.state, battle.attacker.ref);
-  const dAlive = sideAlive(h.state, battle.defender.ref);
+  // MSB-1: роли спрашиваются у СПИСКА сторон. Сегодня каждый бой ровно парный (кирпич
+  // меняет форму, не правила), поэтому обе роли на месте всегда; их отсутствие означало
+  // бы повреждённое состояние — fail-secure закрываем бой и уходим, не гадая.
+  const attacker = attackerOf(battle);
+  const defender = defenderOf(battle);
+  if (!attacker || !defender) {
+    delete h.state.battles[battle.id];
+    return;
+  }
+  const aAlive = sideAlive(h.state, attacker.ref);
+  const dAlive = sideAlive(h.state, defender.ref);
   const stalemate = end !== 'decided';
   const winner = stalemate
     ? null
     : aAlive && !dAlive
-      ? battle.attacker.owner
+      ? attacker.owner
       : dAlive && !aAlive
-        ? battle.defender.owner
+        ? defender.owner
         : null;
 
   // The battle is over. GROUND survivors (a planet garrison or a fleet's landing
@@ -390,7 +418,8 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
   // now — a battered fleet limps (route.ts speed drag) and only mends at a friendly
   // repair base (construction.ts). `applyDamage` reads `stack.hp ?? full`, so a
   // damaged ship simply re-enters its next battle at its current hull.
-  for (const ref of [battle.attacker.ref, battle.defender.ref]) {
+  for (const side of battle.sides) {
+    const ref = side.ref;
     if (ref.kind === 'fleet') continue; // ships carry hull + shield damage out of combat
     const survivors = sideUnits(h.state, ref);
     if (survivors) {
@@ -407,10 +436,10 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
   // new garrison. Re-validate against the CURRENT owner: if the world changed hands
   // mid-battle (a concurrent capture path), a stale-owner capture must not fire and
   // must not overwrite the fresh owner's garrison.
-  if (battle.phase === 'ground' && aAlive && !dAlive && battle.attacker.ref.kind === 'landing') {
+  if (battle.phase === 'ground' && aAlive && !dAlive && attacker.ref.kind === 'landing') {
     const planet = h.state.planets[battle.location];
-    if (planet && planet.owner === battle.defender.owner) {
-      capturePlanet(h, battle.location, battle.attacker.ref.fleetId, planet.owner, true);
+    if (planet && planet.owner === defender.owner) {
+      capturePlanet(h, battle.location, attacker.ref.fleetId, planet.owner, true);
     }
   }
   // ПЛАЦДАРМ (ROS-1.5) — тот же захват, только десант держит мир, а не флот. Он
@@ -418,19 +447,19 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
   // выигравший десант становится гарнизоном, проигравший исчезает вместе с боем.
   // Иначе на карте завелись бы вечные «чужие войска на моей земле», которых в модели
   // нет и заводить которые этот кирпич не стал.
-  if (battle.phase === 'ground' && battle.attacker.ref.kind === 'beachhead') {
+  if (battle.phase === 'ground' && attacker.ref.kind === 'beachhead') {
     const planet = h.state.planets[battle.location];
     const force = planet?.beachhead;
     if (planet && force) {
-      if (aAlive && !dAlive && planet.owner === battle.defender.owner) {
-        capturePlanetByBeachhead(h, planet, force, battle.defender.owner);
+      if (aAlive && !dAlive && planet.owner === defender.owner) {
+        capturePlanetByBeachhead(h, planet, force, defender.owner);
       }
       delete planet.beachhead;
     }
   }
 
-  releaseOrDestroyFleet(h, battle.attacker.ref);
-  releaseOrDestroyFleet(h, battle.defender.ref);
+  releaseOrDestroyFleet(h, attacker.ref);
+  releaseOrDestroyFleet(h, defender.ref);
   delete h.state.battles[battle.id];
   h.emit('battle.resolved', {
     battleId: battle.id,
@@ -459,9 +488,9 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
   // боя. После возврата отсюда никто не попытается свести эту пару снова, пока в мире
   // что-нибудь не произойдёт, — а тогда это уже новая встреча, а не перезапуск старой.
   const exceptId =
-    stalemate && battle.attacker.ref.kind === 'fleet' && battle.defender.ref.kind === 'fleet'
-      ? { [battle.attacker.ref.fleetId]: battle.defender.ref.fleetId,
-          [battle.defender.ref.fleetId]: battle.attacker.ref.fleetId }
+    stalemate && attacker.ref.kind === 'fleet' && defender.ref.kind === 'fleet'
+      ? { [attacker.ref.fleetId]: defender.ref.fleetId,
+          [defender.ref.fleetId]: attacker.ref.fleetId }
       : {};
 
   if (battle.phase === 'orbital') {
@@ -476,8 +505,8 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
     // нападающим в следующем бою, не должно зависеть от того, кто в прошлом был
     // атакующим (инвариант детерминизма).
     const survivors = [
-      battle.attacker.ref.kind === 'fleet' && aAlive ? battle.attacker.ref.fleetId : null,
-      battle.defender.ref.kind === 'fleet' && dAlive ? battle.defender.ref.fleetId : null,
+      attacker.ref.kind === 'fleet' && aAlive ? attacker.ref.fleetId : null,
+      defender.ref.kind === 'fleet' && dAlive ? defender.ref.fleetId : null,
     ]
       .filter((id): id is string => id !== null)
       .sort();
@@ -496,13 +525,13 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
     }
   }
 
-  if (battle.phase === 'ground' && battle.attacker.ref.kind === 'landing') {
+  if (battle.phase === 'ground' && attacker.ref.kind === 'landing') {
     // Mirror the orbital victor rule for the GROUND finish: a relief fleet arriving
     // mid-assault could not engage (the assault fleet was battleId-locked), and
     // nothing re-engaged after resolution — hostile fleets coexisted at the node
     // forever (bug-hunt MAJOR). engageFleets no-ops unless both sides are live.
     // Плацдарм сюда не попадает: флота, который надо было бы расцепить, у него нет.
-    const f = h.state.fleets[battle.attacker.ref.fleetId];
+    const f = h.state.fleets[attacker.ref.fleetId];
     if (f && !f.battleId && f.location !== null) {
       engageFleets(h, f.id, battle.location);
     }
@@ -615,8 +644,10 @@ export const combatModule: GameModule = {
         id: `battle:${h.state.battleSeq++}`,
         location: t <= 0.5 ? oa.lo : oa.hi, // nearest node — for display / event labels
         phase: 'orbital',
-        attacker: { ref: { kind: 'fleet', fleetId: fa.id }, owner: fa.owner },
-        defender: { ref: { kind: 'fleet', fleetId: fb.id }, owner: fb.owner },
+        sides: [
+          { ref: { kind: 'fleet', fleetId: fa.id }, owner: fa.owner, role: 'attacker' },
+          { ref: { kind: 'fleet', fleetId: fb.id }, owner: fb.owner, role: 'defender' },
+        ],
         round: 0,
       });
     });
@@ -647,8 +678,10 @@ export const combatModule: GameModule = {
         id: `battle:${h.state.battleSeq++}`,
         location: planetId,
         phase: 'ground',
-        attacker: { ref: { kind: 'beachhead', planetId }, owner: force.owner },
-        defender: { ref: { kind: 'garrison', planetId }, owner: planet.owner },
+        sides: [
+          { ref: { kind: 'beachhead', planetId }, owner: force.owner, role: 'attacker' },
+          { ref: { kind: 'garrison', planetId }, owner: planet.owner, role: 'defender' },
+        ],
         round: 0,
       });
     });
@@ -701,7 +734,8 @@ export const combatModule: GameModule = {
       }
       const isThisFleet = (ref: CombatantRef): boolean =>
         ref.kind === 'fleet' && ref.fleetId === fleetId;
-      if (!isThisFleet(battle.attacker.ref) && !isThisFleet(battle.defender.ref)) {
+      // MSB-1: ищем себя СРЕДИ СТОРОН, а не сверяемся с двумя полями.
+      if (!battle.sides.some((side) => isThisFleet(side.ref))) {
         return h.reject('E_CANNOT_RETREAT'); // the landing force, not the orbital fleet
       }
 
@@ -710,8 +744,11 @@ export const combatModule: GameModule = {
 
       // Free the opponent's side (a fleet can pursue; a garrison ref is a no-op),
       // then dissolve the now-one-sided battle.
-      const other = isThisFleet(battle.attacker.ref) ? battle.defender.ref : battle.attacker.ref;
-      releaseOrDestroyFleet(h, other);
+      // Отпускаем ВСЕ остальные стороны: на двух это прежний «противник», на N — каждый,
+      // кто остался в распускаемом бою.
+      for (const side of battle.sides) {
+        if (!isThisFleet(side.ref)) releaseOrDestroyFleet(h, side.ref);
+      }
       delete h.state.battles[battleId];
 
       if (fleet.units.length === 0) {
@@ -732,8 +769,16 @@ export const combatModule: GameModule = {
         return; // already resolved
       }
       const data = h.ctx.data;
-      if (!sideAlive(h.state, battle.attacker.ref) || !sideAlive(h.state, battle.defender.ref)) {
+      // MSB-1: гибель ЛЮБОЙ стороны закрывает бой — на двух это прежнее правило, а при N
+      // это выбор владельца «цепочка: каждая смерть — конец боя» (§0.0 №5 роадмапа).
+      if (battle.sides.some((side) => !sideAlive(h.state, side.ref))) {
         finishBattle(h, battle);
+        return;
+      }
+      const attacker = attackerOf(battle);
+      const defender = defenderOf(battle);
+      if (!attacker || !defender) {
+        finishBattle(h, battle); // повреждённое состояние — fail-secure
         return;
       }
       // CMB-7. Бой идёт, только пока стороны ВРАЖДЕБНЫ. Раньше здесь спрашивали лишь
@@ -758,40 +803,40 @@ export const combatModule: GameModule = {
       // its attack stat, the defender returns fire with its defense stat only.
       const dmgToDefender = h.hook<number>(
         'combat.damage',
-        sideDamage(h.state, battle.attacker.ref, data, 'attack'),
+        sideDamage(h.state, attacker.ref, data, 'attack'),
         {
           battleId,
           phase: battle.phase,
           location: battle.location,
-          attacker: battle.attacker.owner,
-          defender: battle.defender.owner,
+          attacker: attacker.owner,
+          defender: defender.owner,
         },
       );
       const dmgToAttacker = h.hook<number>(
         'combat.damage',
-        sideDamage(h.state, battle.defender.ref, data, 'defense'),
+        sideDamage(h.state, defender.ref, data, 'defense'),
         {
           battleId,
           phase: battle.phase,
           location: battle.location,
-          attacker: battle.defender.owner,
-          defender: battle.attacker.owner,
+          attacker: defender.owner,
+          defender: attacker.owner,
         },
       );
-      applyDamageToSide(h, battle.defender.ref, dmgToDefender, data, battle.location);
-      applyDamageToSide(h, battle.attacker.ref, dmgToAttacker, data, battle.location);
+      applyDamageToSide(h, defender.ref, dmgToDefender, data, battle.location);
+      applyDamageToSide(h, attacker.ref, dmgToAttacker, data, battle.location);
       h.emit('combat.round', {
         battleId,
         round: battle.round,
         phase: battle.phase,
         location: battle.location,
-        attacker: battle.attacker.owner,
-        defender: battle.defender.owner,
+        attacker: attacker.owner,
+        defender: defender.owner,
         dmgToAttacker,
         dmgToDefender,
       });
 
-      if (sideAlive(h.state, battle.attacker.ref) && sideAlive(h.state, battle.defender.ref)) {
+      if (sideAlive(h.state, attacker.ref) && sideAlive(h.state, defender.ref)) {
         scheduleTick(h, battleId);
       } else {
         finishBattle(h, battle);
