@@ -246,14 +246,14 @@ import {
   validLogin,
   validPassword,
   type AuthOutcome,
-} from './authRules';
+} from '../../decisions/authRules';
 import {
   dropsSession,
   joinOutcome,
   joinQuery,
   parseJoinPass,
   type JoinOutcome,
-} from './joinRules';
+} from '../../decisions/joinRules';
 import { createPendingJoin } from './pendingJoin';
 import { syncCommanderXp } from './commanderSync';
 import { panelSlackFor } from './panelSlack';
@@ -753,14 +753,14 @@ import { mapScale, screenRadius } from './mapRadius';
 import { phaseAt, phaseOfId } from './pulseFx';
 import { authorizedBase } from './hubAuth';
 import { diploIntent } from './diploClick';
-import { afterTokenRefused, joinStep } from './joinGate';
+import { afterTokenRefused, joinStep } from '../../decisions/joinGate';
 import { assaultSteps } from './assaultOrder';
-import { dialIdentity, dialUrl, seatTicketKey } from './netDial';
-import { closeAction, isCurrentSocket } from './socketFate';
-import { welcomePlan } from './netWelcome';
-import { orderPlan } from './orderRoute';
-import { clientPlan, liveSocket, seatKey } from './netClientReuse';
-import { errorTarget, refusalKey } from './errorRoute';
+import { dialIdentity, dialUrl, seatTicketKey } from '../../decisions/netDial';
+import { closeAction, isCurrentSocket } from '../../decisions/socketFate';
+import { welcomePlan } from '../../decisions/netWelcome';
+import { orderPlan } from '../../decisions/orderRoute';
+import { clientPlan, liveSocket, seatKey } from '../../decisions/netClientReuse';
+import { errorTarget, refusalKey } from '../../decisions/errorRoute';
 import { joinLanding } from '../../decisions/joinLanding';
 import {
   claimIntent,
@@ -776,11 +776,11 @@ import {
   type EntryOffer,
   type MatchSeat as EntrySeat,
 } from '../../decisions/entrySetup';
-import { clearStatusLine, fallbackFor, showServerRow } from './browserFallback';
-import { joinHref } from './seatJoin';
-import { archiveUrl, httpBase, matchesUrl, queryOutcome, seatsUrl } from './matchQuery';
+import { clearStatusLine, fallbackFor, showServerRow } from '../../decisions/browserFallback';
+import { joinHref } from '../../decisions/seatJoin';
+import { archiveUrl, httpBase, matchesUrl, queryOutcome, seatsUrl } from '../../decisions/matchQuery';
 import { archiveEffect, type ArchiveEffect } from './archiveOutcome';
-import { mintedToken, passwordFrom, registerExtra } from './authRequest';
+import { mintedToken, passwordFrom, registerExtra } from '../../decisions/authRequest';
 import { carryEmail, recoverAnswer, recoverStep } from './recoverForm';
 import { selectFleets, toggleInSelection } from './fleetSelection';
 import { mergePlan } from './mergeOrders';
@@ -788,10 +788,10 @@ import { assaultPlan } from './assaultDispatch';
 import { warPromptText, warReason } from './warPromptView';
 import { pickEffect } from './pickApply';
 import { fleetsUnderTap } from './tapTargets';
-import { resolveAddress } from './serverAddress';
+import { resolveAddress } from '../../decisions/serverAddress';
 import { authStatusUrl, identityMode, revealSignup, type IdentityMode } from './identityProbe';
 import { seatView, type SeatView } from './seatList';
-import { pollLine, pollTick, type PollPhase } from './matchPoll';
+import { pollLine, pollTick, type PollPhase } from '../../decisions/matchPoll';
 import { pingRoute, relayIntake } from './relayIntake';
 import {
   WAIT_MARK,
@@ -822,7 +822,7 @@ import { corridorLines } from './corridorView';
 import { recapAdmits } from './recapGate';
 // ONB-7 — first-session goals checklist (mine/fleet/capture/score, ticked from state).
 import { FIRST_GOALS, metGoals, mergeDone, goalsComplete, type GoalSignals } from './firstGoals';
-import { nextCycleStep, redialPlan } from './reconnectCycle';
+import { nextCycleStep, redialPlan } from '../../decisions/reconnectCycle';
 // ONB-0 — first-run onboarding state + funnel (per-callsign localStorage). Pure
 // model; main.ts persists it and drives the hub offer / «Ещё → Обучение» replay.
 import {

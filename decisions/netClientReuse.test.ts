@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
-import { createInitialState, type GameState } from '../../packages/shared-core/src/index';
-import { MultiplayerClient } from '../../packages/client/src/index';
-import type { ActionEnvelope } from '../../packages/action-layer/src/index';
+import { createInitialState, type GameState } from '../packages/shared-core/src/index';
+import { MultiplayerClient } from '../packages/client/src/index';
+import type { ActionEnvelope } from '../packages/action-layer/src/index';
 import { orderPlan } from './orderRoute';
 import { clientPlan, liveSocket, seatKey, type Wire } from './netClientReuse';
 

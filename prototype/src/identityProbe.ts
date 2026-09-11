@@ -27,7 +27,7 @@
  *    позывной значит, что карточку вообще пропустили, — раскрывать на ней логин и пароль
  *    незачем: их никто не увидит, а `suggestCallsign()` затёр бы уже введённое имя.
  */
-import { httpBase } from './matchQuery';
+import { httpBase } from '../../decisions/matchQuery';
 
 /** Чем на этом сервере является позывной. */
 export type IdentityMode =
