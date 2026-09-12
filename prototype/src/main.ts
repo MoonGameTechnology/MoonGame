@@ -493,7 +493,7 @@ import {
 import { initSettings } from './settingsOverlay';
 import { initHolographicUi, commandWindowHtml } from './holographicUi';
 import { reframePresentation, supportsHolography } from './holographicLayout';
-import { drawGlassScreen, drawGlassWave, drawTerrainField, makeTerrainField, hasTerrainMaterial, type TerrainField } from './holographicSurface';
+import { drawGlassScreen, drawGlassWave, drawGlassRim, drawTerrainField, makeTerrainField, hasTerrainMaterial, type TerrainField } from './holographicSurface';
 import { holographyOn, setHolography } from './graphicsPrefs';
 // «Профиль командира» — карьерное досье (REFM-10).
 import { initProfile } from './profileScreen';
@@ -4377,6 +4377,7 @@ function render(now: number) {
   if (holographic.active()) {
     for (const field of terrainFields) drawTerrainField(cx, field, hologramTime, true);
     drawGlassWave(cx, holographicFrame, VW, VH, hologramTime, glowOn());
+    drawGlassRim(cx, holographicFrame, hologramTime, glowOn());
   }
   if (paintedSelection !== selPlanet) {
     paintedSelection = selPlanet;
@@ -12067,11 +12068,7 @@ function frame(nowReal: number) {
     renderPanel();
     renderCmdBar();
     renderSplitDialog();
-    const commandIds = chainMode?.fleetIds ?? selectedFleetIds();
-    const commandFleet = commandIds[0] ? s.fleets[commandIds[0]] : undefined;
-    holographic.positionCommands(commandFleet ? fleetAnchor(commandFleet) : null,
-      commandIds.join('|'), side.style.display !== 'none');
-    holographic.drawLeader(cx);
+    holographic.layoutWindows();
   }
   // Status strip below the top bar: the in-game clock plus the donate currency
   // (Суверены ◆) pushed to the right end — one level down from the resource row.

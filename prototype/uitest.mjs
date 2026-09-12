@@ -9,8 +9,14 @@ const listeners = new Map(); // el -> {type: [fn]}
 function mkEl(id) {
   const el = {
     id,
-    style: { removeProperty(name) { delete this[name]; }, setProperty(name, value) { this[name] = value; } },
+    style: { removeProperty(name) { delete this[name]; }, setProperty(name, value) { this[name] = value; }, getPropertyPriority() { return ''; } },
     setAttribute(name, value) { this[name] = String(value); },
+    removeAttribute(name) { delete this[name]; },
+    parentNode: null,
+    get nextSibling() {
+      const siblings = this.parentNode?._children ?? [];
+      return siblings[siblings.indexOf(this) + 1] ?? null;
+    },
     dataset: {},
     classList: { toggle() {}, add() {}, remove() {}, contains: () => false },
     _children: [],
@@ -27,11 +33,21 @@ function mkEl(id) {
       listeners.set(this, m);
     },
     appendChild(child) {
+      child.parentNode?.removeChild(child);
       this._children.push(child);
+      child.parentNode = this;
+      return child;
+    },
+    insertBefore(child, before) {
+      child.parentNode?.removeChild(child);
+      const index = this._children.indexOf(before);
+      this._children.splice(index < 0 ? this._children.length : index, 0, child);
+      child.parentNode = this;
       return child;
     },
     removeChild(child) {
       this._children = this._children.filter((c) => c !== child);
+      child.parentNode = null;
       return child;
     },
     remove() {},
@@ -74,7 +90,12 @@ const ctxProxy = new Proxy(
 
 const els = new Map();
 const getEl = (id) => {
-  if (!els.has(id)) els.set(id, mkEl(id));
+  if (!els.has(id)) {
+    const attached = globalThis.document?.body?._children.find((child) => child.id === id);
+    const el = attached ?? mkEl(id);
+    els.set(id, el);
+    if (!attached) globalThis.document?.body?.appendChild(el);
+  }
   return els.get(id);
 };
 
@@ -87,6 +108,7 @@ globalThis.document = {
   // document.createElement('canvas') at module load — give the stub a real element
   // (its getContext returns the chainable ctx proxy) so the render path runs.
   createElement: () => mkEl('canvas'),
+  createComment: () => ({ ...mkEl('comment'), nodeType: 8 }),
   body: mkEl('body'),
 };
 let t = 0;

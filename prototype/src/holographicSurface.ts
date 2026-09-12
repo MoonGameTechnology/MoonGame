@@ -456,6 +456,55 @@ export function drawTerrainField(
   g.restore();
 }
 
+/** Faint, fixed-anchor interference along the world plane's rim, not free particles. */
+export function drawGlassRim(
+  g: CanvasRenderingContext2D, frame: HoloRect, clock: number, glow = true,
+): void {
+  if (frame.width <= 0 || frame.height <= 0) return;
+  const colors = ['#78cfe8', '#829ee5', '#a39bdc'];
+  const time = Math.max(0, clock) / 1000;
+  const thickness = Math.min(frame.width, frame.height);
+  g.save();
+  g.globalCompositeOperation = 'screen';
+  g.lineCap = 'round';
+  for (let color = 0; color < colors.length; color++) {
+    g.beginPath();
+    for (let edge = 0; edge < 4; edge++) {
+      for (let i = color; i < 18; i += colors.length) {
+        const phase = i * 2.39996 + edge * 4.13;
+        const center = 0.045 + (i / 17) * 0.91;
+        const life = 0.5 + 0.5 * Math.sin(time * 0.78 + phase);
+        const reach = 0.003 + life * 0.007;
+        for (let j = 0; j <= 8; j++) {
+          const along = center + ((j - 4) / 4) * reach;
+          const envelope = Math.sin((j / 8) * Math.PI);
+          const boil = Math.sin(j * 1.62 + time * 1.65 + phase) *
+            Math.sin(j * 0.61 - time * 0.82 + phase);
+          const normal = envelope * (0.0007 + life * 0.0028) * boil;
+          const x = edge % 2 === 0 ? along : (edge === 1 ? 1 : 0) + normal;
+          const y = edge % 2 === 0 ? (edge === 0 ? 0 : 1) + normal : along;
+          const px = frame.x + x * frame.width;
+          const py = frame.y + y * frame.height;
+          if (j === 0) g.moveTo(px, py); else g.lineTo(px, py);
+        }
+      }
+    }
+    g.strokeStyle = colors[color]!;
+    if (glow) {
+      g.globalAlpha = 0.045;
+      g.lineWidth = thickness * 0.008;
+      g.stroke();
+      g.globalAlpha = 0.075;
+      g.lineWidth = thickness * 0.003;
+      g.stroke();
+    }
+    g.globalAlpha = (glow ? 0.24 : 0.085) * (0.8 + 0.2 * Math.sin(time * 0.63 + color * 2.1));
+    g.lineWidth = thickness * 0.00085;
+    g.stroke();
+  }
+  g.restore();
+}
+
 /** Subtle interference on the world plane. Every point and stroke width is world-
  * relative: camera translation/zoom carries the reflection along with the map. */
 export function drawGlassWave(

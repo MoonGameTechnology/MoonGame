@@ -9,7 +9,7 @@ body.holo-ui{
   font-size:14px;letter-spacing:.1px;
 }
 /* The bevel belongs to each window. The map's much larger rim is drawn in world coordinates. */
-body.holo-ui :is(#top,#side,#cmdbar,#speedbar,#railtools,#chatwin,.twbox,.lwbox,.cnbox,.mkbox,
+body.holo-ui :is(#top,#side,#cmdbar,#holo-selection-window,#speedbar,#railtools,#chatwin,.twbox,.lwbox,.cnbox,.mkbox,
   .dpbox,.pcbox,.setbox,.cxbox,.chbox,.rc-box,.rcbox,.sbox,.corpbox,.ep-box,.inbox){
   background:linear-gradient(155deg,rgba(39,84,103,.3),transparent 42%),var(--glass);
   border:1px solid rgba(124,212,230,.46);border-radius:10px;clip-path:none;
@@ -245,3 +245,39 @@ body.holo-no-glow.holo-ui :is(#top,#side,#cmdbar,#speedbar,#railtools,#chatwin,.
   .dpbox,.pcbox,.setbox,.cxbox,.chbox,.rc-box,.rcbox,.sbox,.corpbox,.ep-box,.inbox){
   box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;
 }
+
+/* A single stationary selection window owns information and the original commands. */
+#holo-selection-window{display:none;}
+body.holo-ui #holo-selection-window{
+  position:fixed;right:18px;top:calc(var(--tbh) + 96px);width:min(410px,calc(100vw - 36px));
+  max-height:calc(100dvh - var(--tbh) - 130px);z-index:26;flex-direction:column;overflow:hidden;
+  border-color:rgba(140,233,242,.65);
+}
+body.holo-ui #holo-selection-window :is(#side,#cmdbar){
+  position:relative;inset:auto;transform:none;zoom:1;width:100%;max-width:100%;height:auto;
+  border:0;border-radius:0;background:transparent;box-shadow:none;backdrop-filter:none;
+  -webkit-backdrop-filter:none;animation:none;margin:0;
+}
+body.holo-ui #holo-selection-window #side{flex:1 1 auto;min-height:96px;max-height:none;overflow:hidden;}
+body.holo-ui #holo-selection-window #side .pscroll{padding:0 14px 12px;overscroll-behavior:contain;}
+body.holo-ui #holo-selection-window #side .phead{
+  position:sticky;top:0;z-index:2;padding:12px 0;margin-bottom:10px;
+  background:linear-gradient(120deg,#102632,#081721);
+}
+body.holo-ui #holo-selection-window #cmdbar{flex:0 1 auto;min-height:0;max-height:100%;overflow:auto;overscroll-behavior:contain;}
+body.holo-ui #holo-selection-window.has-info #cmdbar{flex-shrink:0;
+  max-height:min(42dvh,calc(var(--holo-window-room,100dvh) - 100px));border-top:1px solid var(--line-hi);}
+body.holo-ui #holo-selection-window.has-info :is(.holo-command-head,.holo-command-details){display:none;}
+body.holo-ui.chain-mode #holo-selection-window #cmdbar{width:100%;padding:12px;}
+/* Titles stay graspable; content and controls retain their own pointer/scroll gestures. */
+body.holo-ui .holo-floating-window{
+  position:fixed!important;right:auto!important;bottom:auto!important;margin:0!important;transform:none!important;
+  max-width:calc(100dvw - 24px)!important;
+  max-height:min(calc(100dvh - 24px),var(--holo-window-room,100dvh))!important;
+}
+body.holo-ui .holo-drag-handle{cursor:grab;touch-action:none;user-select:none;}
+body.holo-ui .holo-drag-handle::before{content:'⠿';display:inline-block;flex:0 0 12px;
+  color:var(--cyan-dim);font:16px/1 monospace;opacity:.65;margin-right:5px;pointer-events:none;}
+body.holo-ui .holo-drag-handle:focus-visible{outline-offset:-3px;}
+body.holo-window-dragging,body.holo-window-dragging *{cursor:grabbing!important;user-select:none!important;}
+body.holo-no-glow #holo-selection-window{backdrop-filter:none;-webkit-backdrop-filter:none;box-shadow:none;}

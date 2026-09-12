@@ -1440,6 +1440,7 @@ export const en: Record<string, string> = {
   // --- hud — Постоянный интерфейс матча: верхняя панель ресурсов.
   'hud.back.title': 'Back',
   'hud.command-details': 'Fleet details',
+  'hud.window.move': 'Move window — drag the title bar or use the arrow keys',
   'hud.holography.hint': 'Holographic interface on computers and tablets. Switch off to restore the simple view.',
   'hud.main-menu': 'Main menu',
   'hud.map': 'Map',
