@@ -176,7 +176,7 @@ function glassPath(g: CanvasRenderingContext2D, r: HoloRect, offset = 0): void {
   const y = r.y + offset;
   const w = r.width;
   const h = r.height;
-  const radius = Math.min(20, w / 4, h / 4);
+  const radius = Math.min(w, h) * 0.026;
   g.beginPath();
   g.moveTo(x + radius, y);
   g.lineTo(x + w - radius, y);
@@ -227,10 +227,10 @@ export function drawGlassScreen(g: CanvasRenderingContext2D, frame: HoloRect, gl
   wash.addColorStop(1, rgba('#153c49', 0.2));
   g.fillStyle = wash;
   g.fill();
-  g.strokeStyle = rgba(theme.cyan, 0.46);
-  g.lineWidth = 1;
+  g.strokeStyle = rgba(theme.cyan, 0.14);
+  g.lineWidth = 0.6;
   g.shadowColor = theme.cyan;
-  g.shadowBlur = glow ? 7 : 0;
+  g.shadowBlur = 0;
   g.stroke();
   g.shadowBlur = 0;
   glassPath(g, frame, 5);
@@ -456,52 +456,71 @@ export function drawTerrainField(
   g.restore();
 }
 
-/** Faint, fixed-anchor interference along the world plane's rim, not free particles. */
+/** The edge itself shimmers: one continuous filament with a small outward halo.
+ * Rounded corners and every displacement scale with the same world plane. */
 export function drawGlassRim(
   g: CanvasRenderingContext2D, frame: HoloRect, clock: number, glow = true,
 ): void {
   if (frame.width <= 0 || frame.height <= 0) return;
-  const colors = ['#78cfe8', '#829ee5', '#a39bdc'];
   const time = Math.max(0, clock) / 1000;
-  const thickness = Math.min(frame.width, frame.height);
+  const scale = Math.min(frame.width, frame.height);
+  const radius = scale * 0.026;
+  const arc = Math.PI * radius / 2;
+  const horizontal = frame.width - radius * 2;
+  const vertical = frame.height - radius * 2;
+  const perimeter = (horizontal + vertical + arc * 2) * 2;
+  const lengths = [horizontal, arc, vertical, arc, horizontal, arc, vertical, arc];
   g.save();
   g.globalCompositeOperation = 'screen';
   g.lineCap = 'round';
-  for (let color = 0; color < colors.length; color++) {
-    g.beginPath();
-    for (let edge = 0; edge < 4; edge++) {
-      for (let i = color; i < 18; i += colors.length) {
-        const phase = i * 2.39996 + edge * 4.13;
-        const center = 0.045 + (i / 17) * 0.91;
-        const life = 0.5 + 0.5 * Math.sin(time * 0.78 + phase);
-        const reach = 0.003 + life * 0.007;
-        for (let j = 0; j <= 8; j++) {
-          const along = center + ((j - 4) / 4) * reach;
-          const envelope = Math.sin((j / 8) * Math.PI);
-          const boil = Math.sin(j * 1.62 + time * 1.65 + phase) *
-            Math.sin(j * 0.61 - time * 0.82 + phase);
-          const normal = envelope * (0.0007 + life * 0.0028) * boil;
-          const x = edge % 2 === 0 ? along : (edge === 1 ? 1 : 0) + normal;
-          const y = edge % 2 === 0 ? (edge === 0 ? 0 : 1) + normal : along;
-          const px = frame.x + x * frame.width;
-          const py = frame.y + y * frame.height;
-          if (j === 0) g.moveTo(px, py); else g.lineTo(px, py);
-        }
-      }
+  g.lineJoin = 'round';
+  const spectrum = g.createLinearGradient(frame.x, frame.y, frame.x + frame.width, frame.y + frame.height);
+  spectrum.addColorStop(0, '#80dce9');
+  spectrum.addColorStop(0.34, '#90a8e9');
+  spectrum.addColorStop(0.67, '#b1a2e8');
+  spectrum.addColorStop(1, '#82dce8');
+  g.strokeStyle = spectrum;
+  g.beginPath();
+  for (let i = 0; i <= 320; i++) {
+    // The final point exactly meets the first, without an animated seam.
+    const fraction = (i % 320) / 320;
+    let distance = fraction * perimeter;
+    let segment = 0;
+    while (segment < 7 && distance > lengths[segment]!) distance -= lengths[segment++]!;
+    let x: number, y: number, nx: number, ny: number;
+    if (segment % 2 === 1) {
+      const corner = (segment - 1) / 2;
+      const angle = -Math.PI / 2 + corner * Math.PI / 2 + distance / radius;
+      nx = Math.cos(angle); ny = Math.sin(angle);
+      x = (corner < 2 ? frame.width - radius : radius) + nx * radius;
+      y = (corner === 0 || corner === 3 ? radius : frame.height - radius) + ny * radius;
+    } else {
+      const edge = segment / 2;
+      nx = edge === 1 ? 1 : edge === 3 ? -1 : 0;
+      ny = edge === 0 ? -1 : edge === 2 ? 1 : 0;
+      x = edge === 0 ? radius + distance : edge === 1 ? frame.width : edge === 2 ? frame.width - radius - distance : 0;
+      y = edge === 0 ? 0 : edge === 1 ? radius + distance : edge === 2 ? frame.height : frame.height - radius - distance;
     }
-    g.strokeStyle = colors[color]!;
-    if (glow) {
-      g.globalAlpha = 0.045;
-      g.lineWidth = thickness * 0.008;
-      g.stroke();
-      g.globalAlpha = 0.075;
-      g.lineWidth = thickness * 0.003;
-      g.stroke();
-    }
-    g.globalAlpha = (glow ? 0.24 : 0.085) * (0.8 + 0.2 * Math.sin(time * 0.63 + color * 2.1));
-    g.lineWidth = thickness * 0.00085;
-    g.stroke();
+    const phase = fraction * Math.PI * 2;
+    const charge = 0.55 + 0.45 * Math.sin(phase * 7 - time * 0.72);
+    const boil = Math.sin(phase * 53 + time * 1.6) * Math.sin(phase * 19 - time * 1.1);
+    const normal = scale * (0.00035 * Math.sin(phase * 11 + time * 0.8) + 0.0017 * charge * boil);
+    x += frame.x + nx * normal; y += frame.y + ny * normal;
+    if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
   }
+  g.closePath();
+  if (glow) {
+    // Reuse the path for a soft falloff on BOTH sides of the edge; no clipping at
+    // the map boundary, no per-frame shadow filters, no particles beside the line.
+    for (const [width, alpha] of [[0.028, 0.012], [0.020, 0.018], [0.013, 0.027], [0.008, 0.042], [0.004, 0.085]]) {
+      g.lineWidth = scale * width!;
+      g.globalAlpha = alpha! * (0.9 + 0.1 * Math.sin(time * 0.73));
+      g.stroke();
+    }
+  }
+  g.globalAlpha = (glow ? 0.64 : 0.15) * (0.88 + 0.12 * Math.sin(time * 0.61));
+  g.lineWidth = scale * 0.00115;
+  g.stroke();
   g.restore();
 }
 

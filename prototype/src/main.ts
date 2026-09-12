@@ -492,6 +492,7 @@ import {
 } from './graphicsPrefs';
 import { initSettings } from './settingsOverlay';
 import { initHolographicUi, commandWindowHtml } from './holographicUi';
+import { provincePingTarget, provinceForPing } from './provincePingAnchor';
 import { reframePresentation, supportsHolography } from './holographicLayout';
 import { drawGlassScreen, drawGlassWave, drawGlassRim, drawTerrainField, makeTerrainField, hasTerrainMaterial, type TerrainField } from './holographicSurface';
 import { holographyOn, setHolography } from './graphicsPrefs';
@@ -1354,6 +1355,14 @@ const holographic = initHolographicUi({
   dismiss: () => clearSelection(),
   details: () => {
     side.querySelector<HTMLElement>('[data-act="fleetinfo"]')?.click();
+  },
+  selectionKey: () => selectedFleetIds().join('|') || panelFleet() || selPlanet || '',
+  selectionAnchor: () => {
+    const fid = panelFleet();
+    const fleet = fid && s.fleets[fid];
+    const planet = selPlanet && s.planets[selPlanet];
+    const at = fleet ? fleetAnchor(fleet) : planet ? world(planet.position) : null;
+    return at ? toScreen(at, canvas.getBoundingClientRect(), VW, VH) : null;
   },
 });
 
@@ -5992,6 +6001,7 @@ function fleetPanelHtml(f: Fleet): string {
 /** Side-panel: a world outside sensor coverage — last-scan memory, or no telemetry. */
 function unknownPlanetHtml(p: Planet): string {
   const mem = memory.get(p.id);
+  const ping = `<div class="row">${btn('ping', '', pcUi() ? t('side.world.ping') : t('side.world.ping.long'), true)}</div>`;
   if (mem) {
     const icons =
       mem.buildings
@@ -6011,7 +6021,7 @@ function unknownPlanetHtml(p: Planet): string {
       `<div class="row">${t('side.scan.garrison')}: <b>${mem.garrison}</b></div>` +
       `<div class="row">${t('side.scan.buildings')}: ${icons}</div>` +
       spyRow +
-      `<div class="hint">${t('side.scan.hint')}</div>`
+      `<div class="hint">${t('side.scan.hint')}</div>` + ping
     );
   }
   // No «Снять выделение» on planet cards: it only clears FLEET selection (selPlanet
@@ -6019,7 +6029,7 @@ function unknownPlanetHtml(p: Planet): string {
   return (
     cardHeader('#5f8f8c', p.id, t('side.notelemetry.title')) +
     `<div class="row dim">${t('side.notelemetry.sub')}</div>` +
-    `<div class="hint">${t('side.notelemetry.hint')}</div>`
+    `<div class="hint">${t('side.notelemetry.hint')}</div>` + ping
   );
 }
 
@@ -10556,7 +10566,7 @@ function netClientFor(seat: string): MultiplayerClient {
         // Что делать с ретранслированной строкой — `relayIntake.ts` (REFM-148): личность
         // строки назначает сервер, своё эхо (и повтор при входе) не удваивает её, а
         // строку, которую нечем показать, не берём вовсе.
-        const node = ping.target.node;
+        const node = provinceForPing(ping.target, MAP);
         const intake = relayIntake({
           known: sessionMessages.some((m) => m.pingId === ping.id),
           showable: !!node, // prototype markers are province-anchored
@@ -12464,7 +12474,7 @@ function pingSelected(): void {
   if (pingRoute(NET, !!netClient) === 'server') {
     // The server is authoritative for pings: it stamps the marker and relays a
     // `ping.added` back to us + allies — that echo is what adds it (see onPingAdded).
-    netClient?.placePing({ kind: 'mark', target: { node: selPlanet }, label: desc });
+    sendProvincePing(selPlanet, desc);
   } else {
     pushMsg(COALITION, desc || t('chat.ping.mark', { node: selPlanet }), false, ME, selPlanet);
   }
@@ -12475,6 +12485,12 @@ function pingSelected(): void {
 }
 
 // --- province ping composer (tap a province → choose where the ping goes) --------
+/** Unknown nodes are valid public coordinates, but remain subject to the server's
+ * existing E_PING_UNSEEN rule for identified-node targets. */
+function sendProvincePing(loc: string, label: string): void {
+  const target = provincePingTarget(loc, known(loc), MAP);
+  if (target) netClient?.placePing({ kind: 'mark', target, label });
+}
 // Метка отмечает провинцию и делится ею: адресат — либо канал коалиции (общий маркер на
 // карте, который видят все союзники), либо личка одного игрока (приватный указатель «вот
 // сюда» в его ветке). Сама витрина — три окна (композер, список меток, попап маркера) —
@@ -12492,7 +12508,10 @@ const pings = initPingUi({
     sessionMessages = next;
   },
   push: (to, text, loc) => pushMsg(to, text, false, ME, loc),
-  net: () => (NET && netClient ? netClient : null),
+  net: () => (NET && netClient ? {
+    placePing: (ping) => sendProvincePing(ping.target.node, ping.label),
+    clearPing: (id) => netClient?.clearPing(id),
+  } : null),
   seats: diploSeats,
   coalitionSize: () => conversations.coalition().length,
   name: (id) => NAME[id] ?? id,

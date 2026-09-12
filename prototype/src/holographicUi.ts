@@ -3,7 +3,7 @@ import { t } from '../../localization/runtime';
 import { esc } from './format';
 import { holoIcon, skinIcon, type HoloIcon } from './holographicIcons';
 import { holographyOn, motionOn, glowOn } from './graphicsPrefs';
-import { supportsHolography } from './holographicLayout';
+import { supportsHolography, selectionWindowPosition, type HoloPoint } from './holographicLayout';
 import { initFloatingWindows } from './floatingWindows';
 
 interface HolographicHost {
@@ -13,6 +13,8 @@ interface HolographicHost {
   exit(): void;
   details(): void;
   dismiss(): void;
+  selectionKey(): string;
+  selectionAnchor(): HoloPoint | null;
 }
 
 export function commandWindowHtml(
@@ -65,6 +67,7 @@ export function initHolographicUi(host: HolographicHost) {
   let signature = '';
   let width = 1280;
   let height = 720;
+  let selected = '';
   const measureChrome = (): void => {
     const nav = navigation?.getBoundingClientRect();
     if (nav && nav.width > 0)
@@ -102,8 +105,9 @@ export function initHolographicUi(host: HolographicHost) {
       document.body.classList.toggle('holo-no-glow', !glowOn());
       if (next !== enabled) {
         if (next) {
-          selection.appendChild(host.side);
           selection.appendChild(host.commands);
+          selection.appendChild(host.side);
+          selected = '';
         } else {
           windows.sync(false, w, h);
           sideHome.parentNode!.insertBefore(host.side, sideHome.nextSibling);
@@ -121,6 +125,25 @@ export function initHolographicUi(host: HolographicHost) {
         selection.classList.toggle('has-info', info);
         selection.classList.toggle('has-commands', commands);
         selection.style.display = inGame && (info || commands) ? 'flex' : 'none';
+        // The command header replaces the former dossier header; keep its live
+        // orbit, damage and supply notes while removing the duplicate title.
+        if (info && commands) {
+          const caption = host.commands.querySelector<HTMLElement>('.holo-command-head span');
+          const details = host.side.querySelector<HTMLElement>('.ptitle span')?.textContent;
+          if (caption && details && caption.textContent !== details) caption.textContent = details;
+        }
+        const key = host.selectionKey();
+        if (inGame && (info || commands) && key !== selected) {
+          const anchor = host.selectionAnchor();
+          if (anchor) {
+            const box = selection.getBoundingClientRect();
+            const top = host.top.getBoundingClientRect().bottom + 24;
+            windows.openAt('holo-selection-window', selectionWindowPosition(anchor,
+              { width: box.width, height: box.height }, { width, height }, top));
+          }
+          selected = key;
+        }
+        if (!key) selected = '';
       }
       // Window coordinates only respond to the user's drag/keys and viewport resize.
       windows.sync(enabled, width, height);

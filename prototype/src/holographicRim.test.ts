@@ -6,7 +6,8 @@ function capture(frame = { x: 100, y: 80, width: 900, height: 600 }, clock = 700
   const strokes: { alpha: number; width: number }[] = [];
   const context = {
     globalAlpha: 1, lineWidth: 1,
-    save() {}, restore() {}, beginPath() {},
+    save() {}, restore() {}, beginPath() {}, closePath() {},
+    createLinearGradient() { return { addColorStop() {} }; },
     moveTo(x: number, y: number) { points.push([x, y]); },
     lineTo(x: number, y: number) { points.push([x, y]); },
     stroke() { strokes.push({ alpha: this.globalAlpha, width: this.lineWidth }); },
@@ -28,22 +29,27 @@ describe('world-bound holographic rim', () => {
     });
     before.strokes.forEach((stroke, i) => expect(after.strokes[i]!.width).toBeCloseTo(stroke.width * 2));
   });
-  it('stays in a narrow edge band and never paints the interior', () => {
+  it('traces the whole rounded boundary, with a continuous seam and a narrow displacement', () => {
     for (const time of [0, 5000, 17000, 51000]) {
       const sample = capture(undefined, time);
-      expect(sample.points.length).toBe(648);
+      expect(sample.points.length).toBe(321);
+      expect(sample.points.at(-1)).toEqual(sample.points[0]);
+      const radius = 600 * 0.026;
       for (const [x, y] of sample.points) {
-        const nx = (x! - 100) / 900, ny = (y! - 80) / 600;
-        expect(Math.min(Math.abs(nx), Math.abs(nx - 1), Math.abs(ny), Math.abs(ny - 1))).toBeLessThan(0.004);
-        expect(nx).toBeGreaterThan(-0.004); expect(nx).toBeLessThan(1.004);
-        expect(ny).toBeGreaterThan(-0.004); expect(ny).toBeLessThan(1.004);
+        // Signed distance to the same rounded rectangle used by the glass plane.
+        const dx = Math.abs(x! - 550) - (450 - radius);
+        const dy = Math.abs(y! - 380) - (300 - radius);
+        const distance = Math.hypot(Math.max(dx, 0), Math.max(dy, 0)) + Math.min(Math.max(dx, dy), 0) - radius;
+        expect(Math.abs(distance)).toBeLessThan(1.24);
       }
+      // Broad outer strokes softly extend beyond the line, not into a second frame.
+      expect(Math.max(...sample.strokes.map((stroke) => stroke.width))).toBeCloseTo(16.8);
     }
   });
   it('disables the wide glow while retaining a faint thin filament', () => {
-    expect(capture().strokes).toHaveLength(9);
+    expect(capture().strokes).toHaveLength(6);
     const quiet = capture(undefined, 7000, false);
-    expect(quiet.strokes).toHaveLength(3);
-    expect(quiet.strokes.every((s) => s.alpha <= 0.085 && s.width < 1)).toBe(true);
+    expect(quiet.strokes).toHaveLength(1);
+    expect(quiet.strokes.every((s) => s.alpha <= 0.15 && s.width < 1)).toBe(true);
   });
 });
