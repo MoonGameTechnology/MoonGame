@@ -4199,7 +4199,7 @@ function buildStaticLayer(): void {
   // Шаг, смещение под камерой и куда лечь линиям — `backdropGrid.ts` (REFM-110).
   const gap = gridGap(cam.scale);
   g.lineWidth = 1;
-  g.strokeStyle = holographic.active() ? 'rgba(113,163,184,0.05)' : GRID;
+  g.strokeStyle = holographic.active() ? 'rgba(113,163,184,0)' : GRID;
   g.beginPath();
   for (const x of gridLines(gridOffset(cam.x, gap), VW, gap)) {
     g.moveTo(x, 0);
@@ -4249,7 +4249,8 @@ function buildStaticLayer(): void {
   const cells = drawTerritory(g, seeds, clip, {
     ownerColor,
     neutralFill: COLOR.null!,
-    kindAccent: (kind) => SECTOR_TYPES[kind]?.color,
+    kindAccent: (kind) => holographic.active() && kind === 'asteroid' ? '#71879d'
+      : holographic.active() && kind === 'solar_flare' ? '#b295d8' : SECTOR_TYPES[kind]?.color,
     hideOwnedInner: holographic.active(),
   });
   provincePolygons = new Map(cells.map((cell) => [provinceIds[cell.idx]!, cell.poly]));
@@ -4259,7 +4260,7 @@ function buildStaticLayer(): void {
       const poly = provincePolygons.get(n.id);
       if (!poly) continue;
       const field = makeTerrainField(n.id, n.sector, sectorTypeOf(n.id)?.color ?? '#9fb6bd', poly,
-        known(n.id) || memory.has(n.id));
+        known(n.id) || memory.has(n.id), world(n));
       if (!field || field.box.x > VW || field.box.y > VH ||
         field.box.x + field.box.width < 0 || field.box.y + field.box.height < 0) continue;
       terrainFields.push(field);
@@ -4741,7 +4742,8 @@ function render(now: number) {
       cx.restore();
     }
 
-    if (holographic.active() && hasTerrainMaterial(n.sector) && n.sector !== 'dead_world') {
+    if (holographic.active() && hasTerrainMaterial(n.sector) &&
+      n.sector !== 'dead_world' && n.sector !== 'planet' && n.sector !== 'void_station') {
       // Terrain is the province's material; retain a precise selectable survey point.
       cx.fillStyle = rgba(col, .7);
       cx.beginPath();
@@ -4877,6 +4879,31 @@ function render(now: number) {
       cx.beginPath();
       cx.arc(c.x, c.y, 2, 0, TAU);
       cx.fill();
+      cx.restore();
+    } else if (holographic.active() && n.sector === 'void_station') {
+      // Station volume is a transparent orbital scaffold in the plotting plane.
+      cx.save();
+      cx.strokeStyle = rgba(col, 0.7);
+      cx.lineWidth = 0.85;
+      for (const offset of [-3 * ns, 3 * ns]) {
+        cx.beginPath();
+        cx.ellipse(c.x, c.y + offset, R, R * 0.45, 0, 0, TAU);
+        cx.stroke();
+      }
+      cx.beginPath();
+      for (const [dx, dy] of CARDINAL) {
+        const x = c.x + dx * R;
+        const y = c.y + dy * R * 0.45;
+        cx.moveTo(x, y - 3 * ns);
+        cx.lineTo(x, y + 3 * ns);
+        cx.moveTo(c.x, c.y);
+        cx.lineTo(c.x + dx * R * 1.2, c.y + dy * R * 0.6);
+      }
+      cx.moveTo(c.x, c.y - R);
+      cx.lineTo(c.x, c.y + R * 0.7);
+      cx.stroke();
+      poly(c.x, c.y, R * 0.33, 6, Math.PI / 6);
+      cx.stroke();
       cx.restore();
     } else {
       // Fallback for any other non-planet type: small hexagon marker

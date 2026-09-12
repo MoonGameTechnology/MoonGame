@@ -35,5 +35,9 @@ export function drawSpaceBackdrop(
   const h = sky.naturalHeight * scale;
   const x = (width - w) / 2 + Math.tanh(panX / 800) * 20;
   const y = (height - h) / 2 + Math.tanh(panY / 800) * 20;
+  g.save();
+  // The distant room/space stays behind the luminous plotting plane.
+  g.globalAlpha = holographic ? 0.3 : 1;
   g.drawImage(sky, x, y, w, h);
+  g.restore();
 }
