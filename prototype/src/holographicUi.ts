@@ -2,8 +2,9 @@
 import { t } from '../../localization/runtime';
 import { esc } from './format';
 import { rgba } from '../../packages/client/src/holoDraw';
+import { holoIcon, skinIcon, type HoloIcon } from './holographicIcons';
 import { holographicTheme } from '../../packages/client/src/theme';
-import { holographyOn, setHolography, motionOn, setMotion, glowOn } from './graphicsPrefs';
+import { holographyOn, motionOn, glowOn } from './graphicsPrefs';
 import {
   placeFleetPanel,
   supportsHolography,
@@ -37,9 +38,25 @@ export function commandWindowHtml(
 }
 
 export function initHolographicUi(host: HolographicHost) {
-  const toggle = document.getElementById('holo-toggle');
-  const animate = document.getElementById('holo-motion');
   const navigation = document.querySelector<HTMLElement>('.holo-nav');
+  const back = document.getElementById('holo-back');
+  if (back) back.innerHTML = holoIcon('caret-left');
+  // Replace only the decorative leading text, preserving labels, badges and listeners.
+  const railIcons: Record<string, HoloIcon> = {
+    'rail-diplo': 'handshake', 'rail-msgs': 'envelope-simple', 'rail-pings': 'broadcast',
+    'rail-tech': 'atom', 'rail-constructor': 'hammer', 'rail-steward': 'moon',
+    'rail-market': 'arrows-left-right', 'railcorp': 'hexagon', 'rail-chat': 'chat-circle-text',
+    'rail-log': 'list-bullets', 'rail-help': 'question', 'rail-settings': 'sliders-horizontal',
+    'rail-exit': 'sign-out',
+  };
+  for (const [id, icon] of Object.entries(railIcons)) {
+    const button = document.getElementById(id);
+    const leading = button?.firstChild;
+    if (!button || !leading || leading.nodeType !== 3) continue;
+    const markup = skinIcon(icon, esc(leading.textContent ?? ''));
+    leading.remove();
+    button.insertAdjacentHTML('afterbegin', markup);
+  }
   let enabled = false;
   let signature = '';
   let width = 1280;
@@ -78,8 +95,6 @@ export function initHolographicUi(host: HolographicHost) {
         panelSize = { width: r.inlineSize, height: r.blockSize };
     }).observe(host.commands);
   }
-  toggle?.addEventListener('click', () => setHolography(!holographyOn()));
-  animate?.addEventListener('click', () => setMotion(!motionOn()));
   document.getElementById('holo-back')?.addEventListener('click', host.exit);
   host.commands.addEventListener('pointerenter', (e) => {
     if (e.pointerType !== 'touch') pointerInside = true;
@@ -130,8 +145,6 @@ export function initHolographicUi(host: HolographicHost) {
       document.body.classList.toggle('holo-in-match', next && inMatch);
       document.body.classList.toggle('holo-still', !motionOn());
       document.body.classList.toggle('holo-no-glow', !glowOn());
-      toggle?.setAttribute('aria-checked', String(holographyOn()));
-      animate?.setAttribute('aria-checked', String(motionOn()));
       if (!next) {
         host.commands.style.removeProperty('left');
         host.commands.style.removeProperty('top');

@@ -9,6 +9,7 @@ import { build } from 'esbuild';
 import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 
 const holographicCss = readFileSync(new URL('./holographic.css', import.meta.url), 'utf8');
+const bridgeShellCss = readFileSync(new URL('./bridge-shell.css', import.meta.url), 'utf8');
 
 const bundle = async (playerBuild) => {
   const res = await build({
@@ -2734,7 +2735,7 @@ const page = (js) => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="icon" href="data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#061318"/><rect x="9" y="9" width="14" height="14" rx="2" transform="rotate(45 16 16)" fill="none" stroke="#35d6e6" stroke-width="2.5"/></svg>')}">
-<title>Void Dominion — Sector Command</title><style>${css}\n${holographicCss}</style></head>
+<title>Void Dominion — Sector Command</title><style>${css}\n${holographicCss}\n${bridgeShellCss}</style></head>
 <body>
 <canvas id="map"></canvas>
 <button id="holo-back" class="holo-back" type="button" data-i18n-title="hud.main-menu" data-i18n-aria="hud.main-menu">‹</button>
@@ -2743,13 +2744,12 @@ const page = (js) => `<!doctype html>
     <button id="topback" data-i18n-title="hud.back.title" type="button">‹</button>
     <div class="crest">
       <button id="crestmark" data-i18n-title="hud.crest.title" type="button">◆</button>
-      <div class="who"><b id="tbname">VOID DOMINION</b><span id="tbplace">SECTOR COMMAND</span></div>
+      <div class="who"><b id="tbname"></b><span id="tbplace"></span></div>
     </div>
     <span id="tbscore" class="dstat"></span>
     <div id="daycard"><b id="tbday"></b><span id="tbeta"></span></div>
   </div>
   <div id="purse"></div>
-  <div class="holo-switch holo-style"><span data-i18n="hud.holography"></span><button id="holo-toggle" type="button" role="switch" aria-checked="true" data-i18n-title="hud.holography.hint" data-i18n-aria="hud.holography"></button></div>
 </header>
 <nav class="holo-nav" data-i18n-aria="hud.map"><span aria-current="page" data-i18n="hud.map"></span><button id="holo-tech" type="button" data-i18n="win.tech.title"></button><button id="holo-constructor" type="button" data-i18n="rail.constructor.label"></button></nav>
 <div id="devline"></div>
@@ -2798,7 +2798,6 @@ const page = (js) => `<!doctype html>
        (data-mult = real wall-clock multiplier: 1800=½h·s, 3600=1h·s, 7200=2h·s). -->
   <span id="spd-ctl"><button id="spd-pause" data-speed="0">‖</button><button id="spd-play" data-speed="1" class="on">▶</button><button id="spd-fast" class="spd-pc-hide" data-speed="3">▶▶</button><span class="spddiv"></span><span class="spd-mult-legacy"><button class="spdmini" data-mult="1" data-i18n-title="speed.mult.real">×1</button><button class="spdmini" data-mult="10">×10</button><button class="spdmini" data-mult="50">×50</button><button class="spdmini" data-mult="100">×100</button></span><span class="spd-mult-pc"><button class="spdmini" data-mult="1" data-i18n-title="speed.mult.real">1×</button><button class="spdmini" data-mult="1800" data-i18n-title="speed.mult.half-hour">30×</button><button class="spdmini" data-mult="3600" data-i18n-title="speed.mult.hour">60×</button><button class="spdmini" data-mult="7200" data-i18n-title="speed.mult.two-hours">120×</button></span><span class="sep"></span></span>
   <!--dev-only--><span class="sep" id="restart-sep" style="display:none"></span><button id="restart" data-i18n-title="speed.restart" style="display:none">⟳</button><span class="sep"></span><!--/dev-only--><button id="tomenu" class="spd-pc-hide" data-i18n-title="speed.exit">⌂</button>
-  <div class="holo-switch"><span data-i18n="hud.animation"></span><button id="holo-motion" type="button" role="switch" aria-checked="true" data-i18n-aria="hud.animation"></button></div>
 </div>
 <div id="cmdbar"></div>
 <div id="codex"></div>

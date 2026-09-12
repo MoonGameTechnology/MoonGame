@@ -9,6 +9,7 @@ import {
   DEFAULT_CHAT_GEOM,
   censorText,
   chatBounds,
+  chatArrivalStart,
   clampGeom,
   discoverTabs,
   edgeAt,
@@ -49,6 +50,34 @@ function drag(over: Partial<ChatDrag> = {}): ChatDrag {
 function msg(over: Partial<ChatMessage> = {}): ChatMessage {
   return { at: 0, from: 'p1', to: 'session', text: 'привет', sys: false, ...over };
 }
+
+describe('чат — визуальный сигнал нового сообщения', () => {
+  it('отличает дозапись от обновления той же ленты', () => {
+    const a = msg();
+    const b = msg({ text: 'следом' });
+    expect(chatArrivalStart(a, [a])).toBe(1);
+    expect(chatArrivalStart(a, [a, b])).toBe(1);
+    expect(chatArrivalStart(undefined, [b])).toBe(0);
+  });
+
+  it('не выдаёт замену истории за приход новой реплики', () => {
+    expect(chatArrivalStart(msg(), [msg(), msg()])).toBe(2);
+  });
+
+  it('работает после удаления начала ограниченного журнала', () => {
+    const tail = msg();
+    expect(chatArrivalStart(tail, [tail, msg()])).toBe(1);
+  });
+
+  it('не анимирует историю при открытии и сохраняет безопасную отрисовку строк', () => {
+    const rows = [msg(), msg({ text: 'новая' })];
+    const draw = (m: ChatMessage) => `<p>${m.text}</p>`;
+    expect(feedInnerHtml(rows, 'session', cfg(), draw)).not.toContain('cw-arrival');
+    const live = feedInnerHtml(rows, 'session', cfg(), draw, 1);
+    expect(live.match(/cw-arrival/g)).toHaveLength(1);
+    expect(live).toContain('<div class="cw-arrival"><p>новая</p></div>');
+  });
+});
 
 describe('чат — цензура', () => {
   it('заменяет ругательство звёздочками той же длины', () => {
@@ -538,6 +567,17 @@ describe('чат — делегированные клики', () => {
     const { root, calls } = build();
     root.fire('click', { target: { closest: () => null } });
     expect(calls).toEqual([]);
+  });
+
+  it('завершение и отмена эффекта не оставляют старую строку для повторного проигрывания', () => {
+    const { root } = build();
+    const removed: string[] = [];
+    const target = { classList: { remove: (name: string) => removed.push(name) } };
+    root.fire('animationend', { animationName: 'unrelated', target });
+    expect(removed).toEqual([]);
+    root.fire('animationend', { animationName: 'holo-transmission', target });
+    root.fire('animationcancel', { animationName: 'holo-transmission', target });
+    expect(removed).toEqual(['cw-arrival', 'cw-arrival']);
   });
 });
 

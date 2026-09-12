@@ -39,7 +39,7 @@ import { unitIconHtml } from './icons';
 import { SECTOR_TYPES } from './map';
 import { originOf } from './arsenal';
 import { originLabel } from './arsenalScreen';
-import { buildShip } from './actions';
+import { buildShip } from '../../decisions/actions';
 import {
   createLoadoutEditor,
   applyLoadoutAction,

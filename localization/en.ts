@@ -1438,10 +1438,8 @@ export const en: Record<string, string> = {
   'hub.tile.updates': 'Updates',
 
   // --- hud — Постоянный интерфейс матча: верхняя панель ресурсов.
-  'hud.animation': 'Animation',
   'hud.back.title': 'Back',
   'hud.command-details': 'Fleet details',
-  'hud.holography': 'Holography',
   'hud.holography.hint': 'Holographic interface on computers and tablets. Switch off to restore the simple view.',
   'hud.main-menu': 'Main menu',
   'hud.map': 'Map',

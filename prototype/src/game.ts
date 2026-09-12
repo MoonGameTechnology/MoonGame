@@ -195,7 +195,7 @@ export {
   unlockHeroSkill,
   installHeroModule,
   uninstallHeroModule,
-} from './actions';
+} from '../../decisions/actions';
 
 // --- server-side seat AIs ----------------------------------------------------
 export { stewardGuardOrders } from './stewardGuard';

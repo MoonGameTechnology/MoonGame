@@ -194,6 +194,8 @@ import { buildLabel, currentBuild } from './updater';
 import { initApkUpdater } from './apkUpdate';
 import { measureViewport, STARS, NEBULAE } from './viewport';
 import { drawSpaceBackdrop, spaceBackdropReady } from '../../packages/client/src/spaceBackdrop';
+import { drawHolographicBattle, drawHolographicPing } from './holographicEffects';
+import { commandIcon, skinIcon } from './holographicIcons';
 import { drawProvinceSelection, insideProvince, selectionPulse, type ProvincePolygon } from '../../packages/client/src/provinceSelection';
 import { initPingUi } from './pingUi';
 import { initSoloDrivers } from './soloDrivers';
@@ -259,7 +261,7 @@ import { syncCommanderXp } from './commanderSync';
 import { panelSlackFor } from './panelSlack';
 import { longPressAction, pressIntent } from './pressIntent';
 import { assaultMovers, assaultTargetBlocker, collectBlockers, moveMovers } from './warPrompt';
-import { laneEnds, warConfirmPlan } from './warOrders';
+import { laneEnds, warConfirmPlan } from '../../decisions/warOrders';
 import { bakeSignature, needsRebake, ownersSignature } from './staticLayerCache';
 import { clipPolygon, clipRect, provinceSeeds } from './provinceMap';
 import { fleetVisible, nodeView, seesDetails as fogSeesDetails } from './fogView';
@@ -377,7 +379,7 @@ import {
   pickRadius,
   pinchOf,
   pinchStep,
-} from './pointerPick';
+} from '../../decisions/pointerPick';
 import {
   afford as coreAfford,
   laneOf,
@@ -617,7 +619,7 @@ import {
   splitSlots,
   stepTake,
   type SplitSlot,
-} from './splitPlan';
+} from '../../decisions/splitPlan';
 import { splitDialogHtml, splitDialogLives, splitRows } from './splitDialog';
 import { canAssaultFromOrbit, canMerge, canSplit } from './cmdAvailability';
 import { stayingFleets, stripState } from './chainStripState';
@@ -702,7 +704,7 @@ import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from './simClock';
 import { armedTap } from './armedTap';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
 import { canDockRepair, canRepair } from './repairOffer';
-import { capitalOffer, holdOffer } from './worldOrders';
+import { capitalOffer, holdOffer } from '../../decisions/worldOrders';
 import { spyOffer, windowLeftH } from './spyOffer';
 import { artScale, calloutAlpha, chevronAlpha, detailAt, sphereBloom } from './semanticZoom';
 import { calloutInk, calloutLine, calloutTier } from './nodeCallout';
@@ -722,7 +724,7 @@ import {
   ringShown,
   slotAngle,
 } from './orbitRing';
-import { routeShown, routeStops, routeStroke } from './fleetRoute';
+import { routeShown, routeStops, routeStroke } from '../../decisions/fleetRoute';
 import { fleetOrigin } from './fleetOrigin';
 import { netContacts, soloContacts } from './radarContacts';
 import { buildLogLine, type BuildLogKind } from './buildLog';
@@ -747,7 +749,7 @@ import { autoStance, scrambleStance } from './stanceToggle';
 import { fleetCount, goalBaseline, grew, mineLevels } from './goalTally';
 import { introFor } from './introTrigger';
 import { EVENT_LOG_MAX, LOG_LINES, isRepeat, pushBounded, stamp } from './noteLog';
-import { pruneGroup, refSurvives } from './selectionPrune';
+import { pruneGroup, refSurvives } from '../../decisions/selectionPrune';
 import { restoresWallet, snapshotWallet } from './freeBuild';
 import { TOAST_FADE_MS, TOAST_LIFE_MS, toastClass, toastOverflow, toastText } from './toastView';
 import { ringed, ringsShown } from './assaultRings';
@@ -757,7 +759,7 @@ import { phaseAt, phaseOfId } from './pulseFx';
 import { authorizedBase } from '../../decisions/hubAuth';
 import { diploIntent } from './diploClick';
 import { afterTokenRefused, joinStep } from '../../decisions/joinGate';
-import { assaultSteps } from './assaultOrder';
+import { assaultSteps } from '../../decisions/assaultOrder';
 import { dialIdentity, dialUrl, seatTicketKey } from '../../decisions/netDial';
 import { closeAction, isCurrentSocket } from '../../decisions/socketFate';
 import { welcomePlan } from '../../decisions/netWelcome';
@@ -786,11 +788,11 @@ import { archiveUrl, httpBase, matchesUrl, queryOutcome, seatsUrl } from '../../
 import { archiveEffect, type ArchiveEffect } from './archiveOutcome';
 import { mintedToken, passwordFrom, registerExtra } from '../../decisions/authRequest';
 import { carryEmail, recoverAnswer, recoverStep } from './recoverForm';
-import { selectFleets, toggleInSelection } from './fleetSelection';
-import { mergePlan } from './mergeOrders';
+import { selectFleets, toggleInSelection } from '../../decisions/fleetSelection';
+import { mergePlan } from '../../decisions/mergeOrders';
 import { assaultPlan } from './assaultDispatch';
 import { warPromptText, warReason } from './warPromptView';
-import { pickEffect } from './pickApply';
+import { pickEffect } from '../../decisions/pickApply';
 import { fleetsUnderTap } from './tapTargets';
 import { resolveAddress } from '../../decisions/serverAddress';
 import { authStatusUrl, identityMode, revealSignup, type IdentityMode } from './identityProbe';
@@ -4166,7 +4168,7 @@ function buildStaticLayer(): void {
     me: ME,
     owners: ownersSig(),
     starfield: starfieldOn(),
-  }) + `|sky:${starfieldOn() && spaceBackdropReady() ? 1 : 0}` +
+  }) + `|sky:${starfieldOn() && spaceBackdropReady(holographic.active()) ? 1 : 0}` +
     `|holo:${holographic.active()}|glow:${glowOn()}` +
     (holographic.active() ? `|terrain:${MAP.map((n) => known(n.id) || memory.has(n.id) ? '1' : '0').join('')}` : '');
   const width = Math.round(VW * DPR);
@@ -4182,9 +4184,9 @@ function buildStaticLayer(): void {
 
   // Dark space is embedded in the offline bundle. Bake it with the static layer;
   // loading the image invalidates this cache once, even if the camera stays still.
-  drawSpaceBackdrop(g, VW, VH, cam.x, cam.y, starfieldOn());
+  drawSpaceBackdrop(g, VW, VH, cam.x, cam.y, starfieldOn(), holographic.active());
   // Graphics pref: `starfield` off leaves the flat fill + grid (nebulae/stars skipped).
-  if (starfieldOn() && !spaceBackdropReady())
+  if (starfieldOn() && !spaceBackdropReady(holographic.active()))
     for (const neb of NEBULAE) {
       const r = neb.r * (MOBILE ? 0.7 : 1);
       const grd = g.createRadialGradient(neb.x * VW, neb.y * VH, 0, neb.x * VW, neb.y * VH, r);
@@ -4197,7 +4199,7 @@ function buildStaticLayer(): void {
   // Шаг, смещение под камерой и куда лечь линиям — `backdropGrid.ts` (REFM-110).
   const gap = gridGap(cam.scale);
   g.lineWidth = 1;
-  g.strokeStyle = GRID;
+  g.strokeStyle = holographic.active() ? 'rgba(113,163,184,0.05)' : GRID;
   g.beginPath();
   for (const x of gridLines(gridOffset(cam.x, gap), VW, gap)) {
     g.moveTo(x, 0);
@@ -4373,7 +4375,7 @@ function render(now: number) {
   blitStaticLayer(); // backdrop + province political map (re-baked on camera move, else cached)
   if (holographic.active()) {
     for (const field of terrainFields) drawTerrainField(cx, field, hologramTime, true);
-    drawGlassWave(cx, holographicFrame, VW, VH, hologramTime);
+    drawGlassWave(cx, holographicFrame, VW, VH, hologramTime, glowOn());
   }
   if (paintedSelection !== selPlanet) {
     paintedSelection = selPlanet;
@@ -4409,7 +4411,9 @@ function render(now: number) {
     if (mark.do !== 'draw' || !anchor) continue;
     const c = world(anchor);
     if (!visible(c, 120)) continue;
-    drawBattlePulse(c.x, c.y, wave, b.phase);
+    if (holographic.active())
+      drawHolographicBattle(cx, c.x, c.y, hologramTime, b.phase ?? 'orbital', glowOn());
+    else drawBattlePulse(c.x, c.y, wave, b.phase);
     if (mark.timer) {
       // `mark.timer` истинно только при назначенном раунде — отсюда и `!` ниже.
       cx.save();
@@ -4420,7 +4424,7 @@ function render(now: number) {
       cx.fillText(
         `${b.phase === 'ground' ? t('map.badge.landing') : t('map.badge.orbit')} · ${timeLeft(roundAt!)}`,
         c.x,
-        c.y - 28,
+        c.y - (holographic.active() ? 51 : 28),
       );
       cx.restore();
     }
@@ -7257,7 +7261,7 @@ function cmdBtn(
   desc?: string,
 ): string {
   const tip = desc ? `${label} — ${desc}` : label;
-  return `<button data-cmd="${cmd}" class="${cls}" title="${esc(tip)}" aria-label="${esc(tip)}" ${disabled ? 'disabled' : ''}><span class="ci">${icon}</span><span class="cl">${esc(label)}</span></button>`;
+  return `<button data-cmd="${cmd}" class="${cls}" title="${esc(tip)}" aria-label="${esc(tip)}" ${disabled ? 'disabled' : ''}><span class="ci" aria-hidden="true">${commandIcon(cmd, icon)}</span><span class="cl">${esc(label)}</span></button>`;
 }
 
 /** CHAIN-UX: полоска режима «Приказ» — живёт в ноде #cmdbar (все четыре
@@ -12307,7 +12311,7 @@ applyEmblem();
 // collapsible rail — the hamburger toggles the tool panel; picking a tool closes it.
 function setRailOpen(open: boolean): void {
   railEl.classList.toggle('open', open);
-  railGlyph.textContent = open ? '✕' : '☰';
+  railGlyph.innerHTML = open ? skinIcon('x', '✕') : skinIcon('list', '☰');
   railToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
 }
 railToggle.addEventListener('click', () => setRailOpen(!railEl.classList.contains('open')));
@@ -12735,6 +12739,11 @@ function drawPings(now: number): void {
     const x = c.x;
     const y = c.y - 22; // pin head floats above the node (плейтест: пинги крупнее)
     const col = ownerColor(m.from);
+    if (holographic.active()) {
+      drawHolographicPing(cx, c.x, c.y, col, hologramTime, pingPhase(x), glowOn());
+      pingHits.push({ loc: m.ping!, x, y: y - 1 });
+      continue;
+    }
     // Фазы, дыхание и жизнь колец — `pingPulse.ts` (REFM-72).
     const phase = pingPhase(x);
     const pulse = pinPulse(now, phase);
