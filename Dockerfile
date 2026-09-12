@@ -91,11 +91,14 @@ RUN mkdir -p playtest-logs
 # tags; last rebuild 2026-02), so debian12 is frozen with the libssl3/libc6 CVEs Trivy
 # flags — debian13 is the actively rebuilt line with current trixie-security packages.
 # Digest-pinned like the build stage (bump procedure in the Stage 1 comment);
-# nodejs22-debian13:nonroot digest refreshed 2026-08-26 (SEC-25).
-# The bump is HYGIENE, not remediation: upstream rebuilt the tag, but the new image ships
-# the SAME libssl3t64 3.5.6-1~deb13u2 / libc6 2.41-12+deb13u3 / zlib1g 1.3.dfsg… as the
-# digest it replaces (read out of /var/lib/dpkg/status.d in the amd64 manifest, pulled
-# from gcr.io on 2026-08-26). It closes no `.trivyignore` entry — see that file's header.
+# nodejs22-debian13:nonroot digest refreshed 2026-09-08 (SEC-34).
+# What this digest actually carries, read out of /var/lib/dpkg/status.d in its amd64
+# manifest (pulled from gcr.io on 2026-09-12, SEC-38): libssl3t64 3.5.7-1~deb13u2,
+# libc6 2.41-12+deb13u3, zlib1g 1:1.3.dfsg+really1.3.1-1+b1. The openssl version is the
+# fix ten `.trivyignore` entries were waiting for — SEC-34 recorded the bump as closing no
+# CVE because the suppression hid that group from the report, and SEC-38 deleted them.
+# So: on every bump, read these versions out of the new image and re-review `.trivyignore`
+# against them — a green report over a suppressed group proves nothing.
 FROM gcr.io/distroless/nodejs22-debian13:nonroot@sha256:4e4fb0ce55fd73901600796ef079a9490369d2515d7da31633a91608c82ca13b AS runtime
 # Bring the app (source + prod-only node_modules + baked HTML + the pre-built server
 # bundle) and hand the tree to the non-root user so the one runtime write left

@@ -36,75 +36,50 @@
 # Ре-ревью — при каждом бампе дайджеста базы (SEC-1, аудит SD-5.1 / F-15).
 #
 # История ревью (2026-07-10 SEC-1, 2026-08-11 SEC-22, 08-17, 08-20, 08-24 SEC-24,
-# 08-26 SEC-25 с бампом пина на sha256:22d2f048…, 08-28 SEC-26) — в `docs/security/pipeline.md`;
-# здесь она больше не дублируется, чтобы правило не тонуло в журнале.
+# 08-26 SEC-25 с бампом пина на sha256:22d2f048…, 08-28 SEC-26, 09-12 SEC-38 — снята
+# отработавшая группа openssl, заведена libc6) — в `docs/security/pipeline.md`; здесь она
+# больше не дублируется, чтобы правило не тонуло в журнале.
 
-# libssl3t64 3.5.6-1~deb13u2 — 3×MEDIUM + 5×LOW, and the FIRST group in this file with a
-# published fix: Debian ships 3.5.7-1~deb13u2 (Trivy's "Fixed Version" column, unlike every
-# entry above). It is suppressed anyway because we cannot install it: the runtime is
-# distroless — the base image IS the package set, there is no apt/apk to upgrade inside it,
-# and the rebuilt base pinned in the Dockerfile (sha256:22d2f048…) still carries 3.5.6-1~deb13u2
-# (read from /var/lib/dpkg/status.d in its amd64 manifest, pulled from gcr.io on 2026-08-26).
-# So the fix is real, reachable only by an upstream distroless rebuild, and not by us.
-#
-# Why this closed the merge queue: the finding reached the feed after the last green `main`
-# push run (2026-08-25 21:02 UTC) and, because `trivy image` runs without --severity, all 8
-# rows — 5 of them LOW — turned the blocking job red on every branch at once, including 8
-# dependabot PRs and #803.
-#
-# Not reachable here, protocol by protocol — none of these code paths exists in this image:
-#   · QUIC (CVE-2026-18798 server INITIAL-packet double free, CVE-2026-63075 ACK-only packet
-#     retention → memory exhaustion): the server is HTTP/1.1 + WebSocket over TCP (Fastify
-#     `http.Server`, or `https.Server` under RS-5.1 native TLS — still TLS-over-TCP). Node's
-#     QUIC binding is behind `--experimental-quic`, and the image's CMD passes no such flag.
-#   · CMP — Certificate Management Protocol (CVE-2026-63076 invalid pointer deref via crafted
-#     protectionAlg, CVE-2026-63073 sender DN used as format string, CVE-2026-63074 ExtraCerts
-#     cache growth): Node exposes no CMP API at all, and nothing here speaks it.
-#   · CMS — Cryptographic Message Syntax (CVE-2026-63072 heap overflow in key unwrapping):
-#     likewise unexposed by Node; no PKCS#7/CMS anywhere in the tree.
-#   · DTLS (CVE-2026-54874 memory buffering records for a future epoch): no datagram TLS —
-#     verified by grep, the tree has no DTLS and no UDP transport.
-#   · RPK — RFC 7250 raw public keys (CVE-2026-14457 signature-algorithm selection can
-#     dereference a missing certificate): not enabled; the server presents ordinary X.509.
-# And, as for every entry above, the runtime is distroless: no shell and no `openssl` CLI to
-# reach any of it another way.
-#
-# What could NOT be verified: the advisory texts themselves — security-tracker.debian.org and
-# avd.aquasec.com are blocked by the dev environment's egress proxy, so the reachability
-# argument rests on the protocol each CVE names (from Trivy's own titles) plus this repo's
-# code, not on reading upstream's analysis. The risk is therefore accepted for a SHORT window.
-# Re-review 2026-09-02 — or sooner, the moment the distroless base is rebuilt with
-# 3.5.7-1~deb13u2. When it is, this whole group is REMOVED, not extended: unlike the entries
-# above, it has a fix waiting, and a suppression outliving its fix is exactly the debt this
-# file's discipline exists to prevent.
-CVE-2026-18798
-CVE-2026-63072
-CVE-2026-63076
-CVE-2026-14457
-CVE-2026-54874
-CVE-2026-63073
-CVE-2026-63074
-CVE-2026-63075
 
-# --- 2026-08-29 (SEC-28): ДВЕ записи вернулись в эту же группу ------------------------
-# `CVE-2026-14456` (QUIC-сервер, теперь HIGH) и `CVE-2026-75803` (ChaCha20-Poly1305 / AES-OCB,
-# LOW) были сняты как «фикса не существует» — таким был их статус на момент триажа
-# (2026-08-17 `fix_deferred` и 2026-08-20 «(no fixed version)» соответственно). Снятие и
-# показало, что оценка УСТАРЕЛА: гейт на PR #824 покраснел и назвал обе, у обеих в отчёте
-# теперь `Status: fixed`, `Fixed Version: 3.5.7-1~deb13u2` — та же версия, которой ждёт вся
-# группа выше. Так что это не «мы ошиблись, подавляя», а «Debian выпустил фикс, а мы узнали
-# об этом от гейта» — ровно то, ради чего снятие и делалось вслепую, а не по памяти.
-# Ставим сюда по правилу файла: фикс ЕСТЬ, поставить нельзя (distroless без пакетного
-# менеджера, база всё ещё несёт 3.5.6-1~deb13u2).
+# libc6 2.41-12+deb13u3 — 2×MEDIUM, и это единственная группа в файле. Фикс ОПУБЛИКОВАН
+# (`2.41-12+deb13u4`, колонка «Fixed Version» самого Trivy), поставить его мы не можем.
+#   · CVE-2026-5450 — glibc: heap buffer overflow в `scanf` со спецификатором `%mc`;
+#   · CVE-2026-5928 — glibc: раскрытие информации / отказ в обслуживании через `ungetwc`.
 #
-# Достижимость — прежняя, разбор не изменился (полный текст — в `docs/security/pipeline.md`,
-# записи триажа 2026-08-17 и 2026-08-20):
-#   · CVE-2026-14456 — путь QUIC-СЕРВЕРА. Здесь HTTP/1.1 + WebSocket поверх TCP (Fastify
-#     `http.Server`, под RS-5.1 — `https.Server`, всё равно TLS-over-TCP); QUIC-биндинг Node
-#     живёт за `--experimental-quic`, которого в `CMD` образа нет.
-#   · CVE-2026-75803 — ChaCha20-Poly1305 / AES-OCB на finalize-пути одноразового AEAD API.
-#     Ни в пакетах, ни в прототипе нет ни `createCipheriv`, ни упоминания этих шифров;
-#     рантайм distroless — ни шелла, ни `openssl` CLI.
-# Уходят вместе со всей группой при пересборке базы. Ре-ревью — то же, 2026-09-02.
-CVE-2026-14456
-CVE-2026-75803
+# ПОЧЕМУ НЕЛЬЗЯ ПОСТАВИТЬ — проверено 2026-09-12 живыми запросами к gcr.io, не по памяти.
+# Рантайм distroless: база И ЕСТЬ набор пакетов, apt/apk внутри нет, поэтому единственный
+# путь к фиксу — пересборка базы апстримом. Её не было:
+#   · тег `gcr.io/distroless/nodejs22-debian13:nonroot` отдаёт ТОТ ЖЕ дайджест, что запинен
+#     в `Dockerfile` (`sha256:4e4fb0ce…`) — бампать нечего;
+#   · соседняя линия `nodejs24-debian13:nonroot` (`sha256:7781e8b4…`) несёт ТОТ ЖЕ
+#     `2.41-12+deb13u3` — переезд на неё не закрыл бы ничего;
+#   · upstream-lockfile distroless (`private/repos/deb/trixie.lock.json`, ветка `main`) всё
+#     ещё указывает на `libc6_2.41-12+deb13u3` из снапшота `20260826T203905Z`.
+# Обе версии прочитаны из `/var/lib/dpkg/status.d/libc6` в amd64-манифестах этих образов.
+#
+# ДОСТИЖИМОСТЬ — разобрана по САМОМУ образу, а не по общим словам про distroless. В образе
+# ровно один исполняемый файл, `/nodejs/bin/node` (1885 путей в базе; `usr/bin` и `usr/sbin`
+# пусты, шелла нет), а нативных аддонов мы не ставим (`pg-native`, `bufferutil`,
+# `utf-8-validate` — опциональные peer-зависимости, в lock-файле их нет). Значит, дёрнуть
+# libc может только node:
+#   · CVE-2026-5928 (`ungetwc`) — символа `ungetwc` НЕТ среди 563 UND-импортов бинаря
+#     (`readelf --dyn-syms -W`), широкосимвольного stdio там нет вовсе. Вызывать функцию
+#     попросту некому.
+#   · CVE-2026-5450 (`scanf` с `%mc`) — семейство scanf node импортирует
+#     (`__isoc99_sscanf`, `sscanf`, `fscanf`), так что «не слинковано» здесь НЕ аргумент.
+#     Но уязвим аллоцирующий спецификатор `%mc`, а спецификатор задаётся строкой ФОРМАТА,
+#     не входными данными: подстрока `%mc` в бинаре node не встречается ни разу
+#     (`strings -a … | grep -c '%mc'` → 0), а форматные строки в C++-коде node — константы,
+#     игроком не подставляемые. Управляемым остаётся только парсимый текст, а он смены
+#     спецификатора не даёт.
+#
+# ЧЕГО ПРОВЕРИТЬ НЕ УДАЛОСЬ: текстов самих advisory — `deb.debian.org` и `avd.aquasec.com`
+# режет egress-прокси среды разработки (403 на CONNECT). Разбор выше опирается на функции,
+# которые называет сам Trivy в заголовках находок, и на содержимое нашего образа.
+#
+# Ре-ревью 2026-09-19 — или раньше, как только апстрим пересоберёт базу с
+# `2.41-12+deb13u4`. Тогда эта группа УДАЛЯЕТСЯ, а не продлевается: подавление, пережившее
+# свой фикс, — ровно тот долг, против которого заведена дисциплина этого файла. Проверять
+# так же, как заведено: прочитать версию `libc6` из `status.d` свежего дайджеста.
+CVE-2026-5450
+CVE-2026-5928
