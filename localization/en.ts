@@ -4,6 +4,18 @@
 // untranslated string shows up in Russian rather than as a raw key. The locale
 // guard in prototype/src/i18n.test.ts fails on any key present in ru.ts but not here.
 export const en: Record<string, string> = {
+  // --- map-loading — initial map preparation ---
+  'map-loading.background': 'Preparing the backdrop',
+  'map-loading.cancel': 'Main menu',
+  'map-loading.geometry': 'Building the map',
+  'map-loading.progress': '{n}%',
+  'map-loading.quote.fleet': 'A fleet wins the battle. Supply wins the war.',
+  'map-loading.quote.frontier': 'Your dominion reaches only as far as your orders.',
+  'map-loading.quote.silence': 'Silence on the radar does not mean empty space.',
+  'map-loading.ready': 'Assembling the projection',
+  'map-loading.terrain': 'Preparing provinces',
+  'map-loading.title': 'Deploying the map',
+
   // --- acc / browser — Аккаунты (вход, регистрация, сессия) и браузер матчей.
   'acc.bad-pass': 'Wrong password',
   'acc.created': 'Account created',

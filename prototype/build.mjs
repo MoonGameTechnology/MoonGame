@@ -59,6 +59,7 @@ const css = `
   --ink:#bfeee6;--dim:#5f8f8c;
   --line:#0e3b40;--line-hi:#1d6b70;
   --glass:rgba(3,14,18,.82);
+  --void:#030810; /* holographicTheme.void — opaque loading surface */
   --up:#5ff0a8;--dn:#ff7a6a;--p1:#35d6e6;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
@@ -69,6 +70,23 @@ body{margin:0;overflow:hidden;color:var(--ink);
   background:radial-gradient(125% 105% at 50% 38%,#04141c 0%,#02080e 58%,#01040a 100%);}
 /* Clear optical projection: thin vector strokes stay sharp without a CRT overlay. */
 #map{position:fixed;inset:0;z-index:0;display:block;touch-action:none;}
+
+/* Map entry: a calm projection surface, actual work progress, original lore. */
+#maploading{position:fixed;inset:0;z-index:70;display:none;align-items:center;justify-content:center;
+  padding:max(24px,env(safe-area-inset-top)) max(24px,env(safe-area-inset-right)) max(24px,env(safe-area-inset-bottom)) max(24px,env(safe-area-inset-left));
+  background:var(--void);font-family:system-ui,sans-serif;}
+#maploading .ml-content{width:min(640px,100%);position:relative;}
+#maploading h1{font:inherit;font-size:15px;color:var(--cyan);margin:0 0 28px;}
+#maploading blockquote{margin:0;min-height:3.8em;font-size:clamp(23px,4vw,36px);line-height:1.35;text-wrap:balance;color:var(--ink);}
+#maploading .ml-work{margin-top:clamp(32px,8vh,80px);}
+#maploading .ml-status{display:flex;justify-content:space-between;gap:16px;font-size:13px;min-height:22px;color:var(--ink);}
+#maploading progress{appearance:none;display:block;width:100%;height:3px;margin:12px 0 22px;border:0;background:var(--line);color:var(--cyan);}
+#maploading progress::-webkit-progress-bar{background:var(--line);}
+#maploading progress::-webkit-progress-value{background:var(--cyan);box-shadow:0 0 12px var(--cyan-dim);}
+#maploading progress::-moz-progress-bar{background:var(--cyan);box-shadow:0 0 12px var(--cyan-dim);}
+#maploading button{min-height:44px;padding:10px 16px;border:1px solid var(--line-hi);background:transparent;color:var(--ink);font:inherit;cursor:pointer;}
+#maploading button:focus-visible{outline:2px solid var(--cyan);outline-offset:4px;}
+@media(max-height:420px){#maploading h1{margin-bottom:16px;}#maploading .ml-work{margin-top:20px;}#maploading blockquote{min-height:0;font-size:23px;}}
 
 /* themed scrollbars — angular neon thumb on a dark grid track, in the HUD's tactical key.
    Firefox gets the colour pair; WebKit gets the full glow/gradient treatment. */
@@ -2738,7 +2756,18 @@ const page = (js) => `<!doctype html>
 <link rel="icon" href="data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#061318"/><rect x="9" y="9" width="14" height="14" rx="2" transform="rotate(45 16 16)" fill="none" stroke="#35d6e6" stroke-width="2.5"/></svg>')}">
 <title>Void Dominion — Sector Command</title><style>${css}\n${holographicCss}\n${bridgeShellCss}\n${mobileConsoleCss}</style></head>
 <body>
-<canvas id="map"></canvas>
+<canvas id="map" tabindex="-1"></canvas>
+<section id="maploading" role="dialog" aria-modal="true" aria-labelledby="maploading-title">
+  <div class="ml-content">
+    <h1 id="maploading-title" data-i18n="map-loading.title"></h1>
+    <blockquote id="maploading-quote"></blockquote>
+    <div class="ml-work">
+      <div class="ml-status"><span id="maploading-status" role="status" aria-live="polite"></span><span id="maploading-percent" aria-hidden="true"></span></div>
+      <progress id="maploading-progress" max="1" value="0" aria-labelledby="maploading-title maploading-status"></progress>
+      <button id="maploading-cancel" data-i18n="map-loading.cancel"></button>
+    </div>
+  </div>
+</section>
 <button id="holo-back" class="holo-back" type="button" data-i18n-title="hud.main-menu" data-i18n-aria="hud.main-menu">‹</button>
 <header id="top">
   <div class="tbar">

@@ -609,6 +609,7 @@
 | FOG-10 | ✅ | proto core | `docs/backlog.md:14114` | Память разведки перестала жить только |
 | FOG-9 | ✅ | core | `docs/backlog.md:14138` | Приостановленная стройка чужого мира была видна |
 | TEST-4 | ✅ | srv | `docs/backlog.md:14148` | topXp падал на живой базе разработчика. |
+| MAP-PERF | ✅ |  | `docs/backlog.md:14168` | Ускорение движения раскрытой голографической карты и подготовка |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |

@@ -193,7 +193,8 @@ import {
 import { buildLabel, currentBuild } from './updater';
 import { initApkUpdater } from './apkUpdate';
 import { measureViewport, STARS, NEBULAE } from './viewport';
-import { drawSpaceBackdrop, spaceBackdropReady } from '../../packages/client/src/spaceBackdrop';
+import { drawSpaceBackdrop, spaceBackdropReady, prepareSpaceBackdrop } from '../../packages/client/src/spaceBackdrop';
+import { MapPreparation, type PreparationJob } from './mapPreparation';
 import { drawHolographicBattle, drawHolographicPing } from './holographicEffects';
 import { commandIcon, skinIcon } from './holographicIcons';
 import { drawProvinceSelection, insideProvince, selectionPulse, type ProvincePolygon } from '../../packages/client/src/provinceSelection';
@@ -497,6 +498,7 @@ import { initHolographicUi, commandWindowHtml } from './holographicUi';
 import { provincePingTarget, provinceForPing } from './provincePingAnchor';
 import { reframePresentation, supportsHolography } from './holographicLayout';
 import { drawGlassScreen, clipGlassSurface, drawGlassWave, drawGlassRim, drawTerrainField, makeTerrainField, hasTerrainMaterial, type TerrainField } from './holographicSurface';
+import { TerrainRasterCache } from './terrainRasterCache';
 import { holographyOn, setHolography } from './graphicsPrefs';
 // «Профиль командира» — карьерное досье (REFM-10).
 import { initProfile } from './profileScreen';
@@ -4177,15 +4179,15 @@ let selectionBox: { x1: number; y1: number; x2: number; y2: number } | null = nu
  * stretching, and never shimmers. Rebuilt only on viewport / ownership change.
  */
 // --- holographic static layer (territory + hyperlanes), camera-baked & cached --
-// The expensive world-space art — influence glows + the hyperlane network — is
-// rendered once into an offscreen canvas and re-blitted every frame; it rebuilds
-// only when the camera, ownership or viewport changes. Idle frames cost a single
-// drawImage, so the map holds 60fps instead of re-tracing the whole graph + a
-// Voronoi tiling every frame.
+// Idle frames reuse one screen-sized bake. Moving frames paint directly to the
+// visible canvas, reusing native-resolution province art without snapshotting a
+// freshly mutated full-screen surface on every move.
 const bg = document.createElement('canvas');
 const bgx = bg.getContext('2d') as CanvasRenderingContext2D;
+const terrainRaster = new TerrainRasterCache();
 let bgContent = ''; // viewport + ownership signature (camera-independent)
 let bgCam = { x: 0, y: 0, scale: 1 }; // camera the static layer was last baked at
+let presentedCam: { x: number; y: number; scale: number } | null = null;
 let provincePolygons = new Map<string, ProvincePolygon>();
 let terrainFields: TerrainField[] = [];
 let holographicFrame = { x: 0, y: 0, width: 0, height: 0 };
@@ -4215,15 +4217,9 @@ function holographicMapOn(): boolean {
 }
 
 /** Rebuild the cached province map when the camera/ownership/viewport moves. */
-function buildStaticLayer(): void {
-  // Rebuild only when the content/size changes, or when the camera has SETTLED at a
-  // new spot. During an active pan/zoom we skip the O(n²) re-tessellation entirely
-  // and let blitStaticLayer follow the camera with the last bake (transformed).
-  // Re-bake whenever the camera moved. The bake is viewport-sized, so following a pan
-  // with a transformed STALE bake left the newly-revealed area uncovered — a smear / a
-  // map squeezed into a corner on the wide map. A 52-seed power diagram is cheap enough
-  // to re-tile per moved frame; idle frames (camera at rest) still cost one cached blit.
-  // Само решение — в `staticLayerCache.ts` (REFM-60).
+function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, preparing = false): void {
+  // Always cover newly exposed edges at the current camera. Only the stationary
+  // offscreen bake can be reused; the viewer's knowledge remains its invalidator.
   const content = bakeSignature({
     vw: VW,
     vh: VH,
@@ -4236,12 +4232,14 @@ function buildStaticLayer(): void {
     (holographicMapOn() ? `|terrain:${MAP.map((n) => known(n.id) || memory.has(n.id) ? '1' : '0').join('')}` : '');
   const width = Math.round(VW * DPR);
   const baked = bgContent ? { signature: bgContent, cam: bgCam, width: bg.width } : null;
-  if (!needsRebake(baked, { signature: content, cam, width })) return;
-  bgContent = content;
-  bgCam = { x: cam.x, y: cam.y, scale: cam.scale };
-  bg.width = Math.round(VW * DPR);
-  bg.height = Math.round(VH * DPR);
-  const g = bgx;
+  if (g === bgx) {
+    if (!needsRebake(baked, { signature: content, cam, width })) return;
+    bgContent = content;
+    bgCam = { x: cam.x, y: cam.y, scale: cam.scale };
+    // Preserve the allocation when only the scene changed.
+    if (bg.width !== Math.round(VW * DPR)) bg.width = Math.round(VW * DPR);
+    if (bg.height !== Math.round(VH * DPR)) bg.height = Math.round(VH * DPR);
+  }
   g.setTransform(DPR, 0, 0, DPR, 0, 0);
   g.clearRect(0, 0, VW, VH);
 
@@ -4331,7 +4329,11 @@ function buildStaticLayer(): void {
       if (!field || field.box.x > VW || field.box.y > VH ||
         field.box.x + field.box.width < 0 || field.box.y + field.box.height < 0) continue;
       terrainFields.push(field);
-      drawTerrainField(g, field);
+      if (preparing) continue; // prewarm these fields in bounded loading slices
+      // Panning only translates the cached native-resolution terrain. During a
+      // zoom keep the original vector path, avoiding texture churn or soft scaling.
+      if (zooming) drawTerrainField(g, field);
+      else terrainRaster.draw(g, field, DPR);
     }
   }
 
@@ -4363,11 +4365,103 @@ function buildStaticLayer(): void {
 
 /** Blit the cached static layer (device-pixel 1:1) beneath the live dynamic art. */
 function blitStaticLayer(): void {
-  buildStaticLayer(); // re-bakes at the live camera whenever it moved (else returns the cache)
-  cx.save();
-  cx.setTransform(1, 0, 0, 1, 0, 0); // backing pixels — the bake is always at the live camera, 1:1
-  cx.drawImage(bg, 0, 0);
-  cx.restore();
+  const moving = presentedCam && (presentedCam.x !== cam.x || presentedCam.y !== cam.y || presentedCam.scale !== cam.scale);
+  if (moving) {
+    // Copying a freshly painted full-screen canvas forces its thousands of draw
+    // commands to flush before drawImage can snapshot it. Paint directly during
+    // motion; province textures remain cached and every exposed edge is current.
+    cx.save();
+    buildStaticLayer(cx, presentedCam!.scale !== cam.scale);
+    cx.restore();
+  } else {
+    // Once settled, bake once at the final camera; idle frames are one 1:1 blit.
+    buildStaticLayer();
+    cx.save();
+    cx.setTransform(1, 0, 0, 1, 0, 0);
+    cx.drawImage(bg, 0, 0);
+    cx.restore();
+  }
+  presentedCam = { x: cam.x, y: cam.y, scale: cam.scale };
+}
+
+const mapPreparation = new MapPreparation();
+const mapLoadingEl = $('maploading');
+const mapLoadingBar = $('maploading-progress') as HTMLProgressElement;
+const mapLoadingStatus = $('maploading-status');
+const mapLoadingPercent = $('maploading-percent');
+const mapLoadingQuote = $('maploading-quote');
+const mapLoadingCancel = $('maploading-cancel');
+let mapNeedsPreparation = true;
+let mapWasEntered = false;
+let mapLoadingViewport = '';
+let mapQuoteIndex = 0;
+
+function hideMapLoading(): void {
+  mapPreparation.cancel();
+  mapLoadingEl.style.display = 'none';
+  canvas.removeAttribute('aria-busy');
+  if (document.activeElement === mapLoadingCancel) canvas.focus({ preventScroll: true });
+}
+function leaveLoadingMap(): void {
+  hideMapLoading();
+  $('tomenu').click(); // the same intentional leave/solo pause as the HUD button
+}
+mapLoadingCancel.addEventListener('click', leaveLoadingMap);
+window.addEventListener('keydown', e => {
+  if (!mapPreparation.active || e.key === 'Escape') return;
+  // The focused exit button stays usable; no map shortcuts reach the hidden HUD.
+  if ((e.key === 'Enter' || e.key === ' ') && e.target === mapLoadingCancel) {
+    e.stopImmediatePropagation();
+    return; // retain the native button activation, but no map shortcut
+  }
+  e.preventDefault();
+  e.stopImmediatePropagation();
+}, true);
+
+/** Begin only after admission and the viewport adapters have framed the real map. */
+function prepareEnteringMap(): boolean {
+  const entered = inMatch() && (!NET || netAdmitted);
+  if (!entered) {
+    if (mapPreparation.active) hideMapLoading();
+    mapWasEntered = false;
+    return false;
+  }
+  const viewport = `${VW}:${VH}:${DPR}:${holographicMapOn()}`;
+  if (!mapWasEntered || mapNeedsPreparation || (mapPreparation.active && viewport !== mapLoadingViewport)) {
+    const restarting = mapPreparation.active;
+    mapWasEntered = true;
+    mapNeedsPreparation = false;
+    mapLoadingViewport = viewport;
+    mapLoadingEl.style.display = 'flex';
+    canvas.setAttribute('aria-busy', 'true');
+    if (!restarting) {
+      const quotes = [t('map-loading.quote.fleet'), t('map-loading.quote.frontier'), t('map-loading.quote.silence')];
+      mapLoadingQuote.textContent = quotes[mapQuoteIndex++ % quotes.length]!;
+      mapLoadingCancel.focus({ preventScroll: true });
+    }
+    const jobs: PreparationJob[] = [
+      { label: t('map-loading.background'), run: () => starfieldOn() ? prepareSpaceBackdrop(holographicMapOn()) : undefined },
+      { label: t('map-loading.geometry'), run: () => { bgContent = ''; buildStaticLayer(bgx, false, true); } },
+      ...MAP.map(n => ({ label: t('map-loading.terrain'), run: () => {
+        // Only art the viewer knows is present in terrainFields. No hidden intel
+        // is read or prepared; offscreen/oversized textures stay outside the budget.
+        const field = terrainFields.find(f => f.id === n.id);
+        if (field) terrainRaster.prepare(field, DPR);
+      } })),
+      { label: t('map-loading.ready'), run: () => { bgContent = ''; buildStaticLayer(); presentedCam = null; } },
+    ];
+    void mapPreparation.start(jobs, (done, total, label) => {
+      mapLoadingBar.max = total;
+      mapLoadingBar.value = done;
+      mapLoadingPercent.textContent = t('map-loading.progress', { n: Math.round(done * 100 / total) });
+      if (mapLoadingStatus.textContent !== label) mapLoadingStatus.textContent = label;
+    }).catch(error => {
+      console.warn('map preparation failed', error);
+      bgContent = '';
+      hideMapLoading(); // ordinary rendering retains its existing error handling
+    });
+  }
+  return mapPreparation.active && !mapPreparation.ready;
 }
 
 /** Draw the radar ranges of the selected sector: the OUTER signature radius (full
@@ -10447,6 +10541,7 @@ topEl.addEventListener('click', (ev) => {
 });
 
 function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>): void {
+  mapNeedsPreparation = true;
   s = state;
   syncPlayerNames(s);
   ME = 'p1';
@@ -10497,7 +10592,7 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>): void
     sandboxConfig.enabled = false;
     setSandboxButton(false);
   }
-  maybeStartPendingTour(); // ONB-0: run a queued onboarding guide over the fresh HUD
+  // Start the queued tour after the prepared HUD is actually visible.
   snd.play('start'); // приглушённая фанфара — матч начался (соло и дев-сценарии)
 }
 function startMatch(setup: SetupConfig): void {
@@ -10688,6 +10783,7 @@ function netClientFor(seat: string): MultiplayerClient {
           // Server accepted us — NOW we're really in the match.
           socketAdmitted = true;
           netAdmitted = true; // BF-30: ME is now the server-assigned seat — safe to render
+          if (plan.fanfare) mapNeedsPreparation = true;
           if (plan.fanfare) snd.play('start');
           reconnecting = false; // a fresh welcome ends any reconnect cycle
           reconnectAttempts = 0;
@@ -12051,6 +12147,7 @@ const hide = (id: string): void => document.getElementById(id)?.classList.remove
 const flexed = (id: string): boolean => document.getElementById(id)?.style.display === 'flex';
 
 const BACK_LAYERS: BackLayer[] = [
+  { id: 'maploading', isOpen: () => mapPreparation.active, close: leaveLoadingMap }, // z70
   // --- модалки поверх всего (z60…z57) ---
   { id: 'corp', isOpen: () => flexed('corp'), close: () => corp.close() }, // z60
   { id: 'scipick', isOpen: () => shown('scipick'), close: () => hide('scipick') }, // z60
@@ -12279,11 +12376,12 @@ function frame(nowReal: number) {
       ? null
       : computeVision(); // fog projection for this frame
   if (vision) updateMemory(vision.identify); // variant B: remember what we see
+  const preparingMap = prepareEnteringMap();
   // BF-30: in net mode, don't render the map until the server's welcome snapshot
   // has arrived and ME is set to the correct seat — otherwise the default `ME = 'p1'`
   // paints a spawn at p1's start before the server assigns the real seat.
-  if (NET && !netAdmitted) {
-    // show a blank canvas + the connect overlay (already shown by showConnect(true))
+  if ((NET && !netAdmitted) || preparingMap) {
+    // Admission/preparation owns the cover; do not paint the hidden map.
   } else {
     render(nowReal);
     renderPanel();
@@ -12291,6 +12389,10 @@ function frame(nowReal: number) {
     renderSplitDialog();
     holographic.layoutWindows();
     updateMobileHud();
+    if (mapPreparation.active && mapPreparation.ready) {
+      hideMapLoading(); // reveal only after the first complete frame, never a blank canvas
+      maybeStartPendingTour();
+    }
   }
   // Status strip below the top bar: the in-game clock plus the donate currency
   // (Суверены ◆) pushed to the right end — one level down from the resource row.
