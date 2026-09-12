@@ -70,7 +70,7 @@ export type LayerVerdict =
  *     (рельса инструментов: `#rail.open`).
  * Заводишь такой слой — впиши сюда, иначе сторож сочтёт его лишней ступенью лестницы.
  */
-export const EXTRA_LAYERS: readonly string[] = ['chain', 'aim', 'rail'];
+export const EXTRA_LAYERS: readonly string[] = ['chain', 'aim', 'rail', 'mobile-picker'];
 
 /**
  * ОПИСЬ ВСЕХ ОВЕРЛЕЕВ. Ключ — id из CSS (`prototype/build.mjs`), значение — вердикт.

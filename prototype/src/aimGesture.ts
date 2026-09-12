@@ -14,7 +14,7 @@
  */
 
 export interface ReleaseGesture {
-  /** Вооружён ли приказ («Курс» / ШТУРМ): следующий тап по миру его отправит. */
+  /** Вооружён ли приказ: отпускание выбирает цель (телефон) или отправляет приказ. */
   armed: boolean;
   /** PC-раскладка: мышь целится наведением, а перетаскивание — это панорама. */
   pc: boolean;
@@ -22,13 +22,15 @@ export interface ReleaseGesture {
   multiTouched: boolean;
   /** Уехал ли палец дальше порога тапа. */
   dragged: boolean;
+  /** Phone confirmation flow: a tap only stages the target; dragging remains pan. */
+  confirmRequired?: boolean;
 }
 
 /**
  * Правило целиком:
  *
- *  · **тач + вооружено + один палец** — протяжка ВЕДЁТ ПРИЦЕЛ, поэтому отпускание
- *    коммитит даже после движения: так на телефоне и целятся;
+ *  · **планшет без подтверждения + вооружено + один палец** — протяжка ведёт прицел;
+ *  · **телефон с подтверждением** — только чистый тап выбирает цель, кнопка отправляет;
  *  · **был второй палец** — жест возил камеру, а не целился. Не коммитит никогда,
  *    иначе конец панорамы превращался бы в приказ в случайной точке;
  *  · **всё остальное** (PC, или приказ не вооружён) — коммитит только чистый тап без
@@ -37,7 +39,7 @@ export interface ReleaseGesture {
 export function releaseCommits(g: ReleaseGesture): boolean {
   // Второй палец снимает вопрос сразу и независимо от протяжки: щипок бывает и
   // «на месте» (пальцы легли и поднялись), а приказом он от этого не становится.
-  if (g.armed && g.multiTouched) return false;
-  const aimDragCommits = g.armed && !g.pc;
+  if (g.multiTouched) return false;
+  const aimDragCommits = g.armed && !g.pc && !g.confirmRequired;
   return aimDragCommits || !g.dragged;
 }

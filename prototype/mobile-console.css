@@ -1,0 +1,412 @@
+/* Phone tactical console. The game hosts and their event delegates remain intact. */
+#mobile-sheet[hidden],
+#mobile-sheet [hidden] {
+  display: none !important;
+}
+#mobile-sheet {
+  display: none;
+}
+body.mobile-ui {
+  --tbh: 96px;
+}
+body.mobile-ui #mobile-sheet {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  left: max(8px, env(safe-area-inset-left));
+  right: max(8px, env(safe-area-inset-right));
+  bottom: max(8px, env(safe-area-inset-bottom));
+  z-index: 29;
+  max-height: calc(100dvh - var(--tbh) - 52px - env(safe-area-inset-top));
+  border: 1px solid rgba(118, 206, 229, 0.5);
+  border-radius: 18px;
+  background: linear-gradient(155deg, rgba(10, 30, 43, 0.98), rgba(3, 12, 23, 0.98));
+  box-shadow:
+    0 12px 36px #0009,
+    0 0 18px #58cee01a,
+    inset 0 1px #c4efff24;
+  overflow: hidden;
+  color: #c2e0eb;
+}
+.mobile-sheet-head {
+  display: flex;
+  align-items: center;
+  flex: none;
+  padding: 0 8px 0 14px;
+  min-height: 78px;
+  gap: 8px;
+}
+.mobile-grab {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  padding: 23px 0 10px;
+  background: none;
+  border: 0;
+  text-align: left;
+  color: inherit;
+  touch-action: none;
+  cursor: pointer;
+}
+.mobile-grab i {
+  position: absolute;
+  top: 9px;
+  left: 50%;
+  width: 34px;
+  height: 3px;
+  border-radius: 3px;
+  background: #85bdcc66;
+}
+.mobile-grab b {
+  display: block;
+  font:
+    600 14px ui-monospace,
+    monospace;
+  line-height: 1.3;
+  letter-spacing: 0.35px;
+  color: #e1f5fc;
+}
+.mobile-grab span {
+  display: block;
+  font:
+    11px/1.5 ui-monospace,
+    monospace;
+  color: #8dafbd;
+  margin-top: 4px;
+}
+.mobile-close {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 1px solid #7da8bc30;
+  border-radius: 12px;
+  background: #0c1b2b;
+  color: #b3dae6;
+  font: 24px/1 sans-serif;
+}
+.mobile-quick {
+  display: flex;
+  gap: 8px;
+  padding: 8px 12px 12px;
+  flex: none;
+}
+.mobile-quick button {
+  flex: 1;
+  min-height: 44px;
+  background: #0a1c2b;
+  border: 1px solid #6191a13d;
+  border-radius: 10px;
+  color: #a9d5e4;
+  font:
+    12px ui-monospace,
+    monospace;
+}
+body.mobile-ui #mobile-sheet #side {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  max-height: none;
+  min-height: 0;
+  flex: 1 1 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: none;
+  clip-path: none;
+}
+body.mobile-ui #mobile-sheet:not(.expanded) #side {
+  display: none !important;
+}
+body.mobile-ui #mobile-sheet #side::before {
+  display: none;
+}
+body.mobile-ui #mobile-sheet #side .phead {
+  display: none;
+}
+body.mobile-ui #mobile-sheet #side .pscroll {
+  padding: 10px 14px;
+  border-top: 1px solid #6292a32e;
+  max-height: 46dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+}
+body.mobile-ui #mobile-sheet #side .ptile {
+  min-height: 48px;
+}
+body.mobile-ui #mobile-sheet #cmdbar {
+  position: relative;
+  inset: auto;
+  transform: none;
+  z-index: auto;
+  flex: none;
+  max-width: none;
+  margin: 0;
+  padding: 0 12px 4px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: none;
+  gap: 7px;
+}
+body.mobile-ui #mobile-sheet #cmdbar.show {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+}
+body.mobile-ui #mobile-sheet #cmdbar > button {
+  min-width: 0;
+  width: 100%;
+  min-height: 54px;
+  height: auto;
+  padding: 8px 3px;
+  border: 1px solid #659ca449;
+  border-radius: 11px;
+  background: #092130;
+  color: #9ddde9;
+}
+body.mobile-ui #mobile-sheet #cmdbar > button .cl {
+  font:
+    10px/1.25 ui-monospace,
+    monospace;
+  letter-spacing: 0;
+  text-transform: none;
+  opacity: 1;
+}
+body.mobile-ui #mobile-sheet #cmdbar > button .ci {
+  font-size: 19px;
+}
+body.mobile-ui
+  #mobile-sheet:not(.more-open):not(.order-mode)
+  #cmdbar
+  > button:not([data-cmd='move']):not([data-cmd='engage']):not([data-cmd='stop']):not(
+    [data-cmd='more']
+  ) {
+  display: none;
+}
+body.mobile-ui #mobile-sheet #cmdbar > button[data-cmd='more'] {
+  order: 1;
+}
+body.mobile-ui #mobile-sheet #cmdbar > button[data-cmd='move'],
+body.mobile-ui #mobile-sheet #cmdbar > .mobile-primary {
+  background: #194556;
+  border-color: #68c2d2;
+  color: #e3fbff;
+}
+body.mobile-ui #mobile-sheet #cmdbar > button:disabled {
+  opacity: 0.38;
+}
+body.mobile-ui #mobile-sheet #cmdbar .cmdpop {
+  position: relative;
+  inset: auto;
+  grid-column: 1/-1;
+  max-width: none;
+  width: 100%;
+  min-width: 0;
+  max-height: 36dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  box-sizing: border-box;
+}
+body.mobile-ui #mobile-sheet.more-open #cmdbar {
+  max-height: 43dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+body.mobile-ui #mobile-sheet.order-mode #cmdbar {
+  grid-template-columns: 1fr 1.8fr;
+  padding: 14px;
+}
+.mobile-order-copy {
+  grid-column: 1/-1;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  margin-bottom: 5px;
+  font:
+    12px/1.45 ui-monospace,
+    monospace;
+}
+.mobile-order-copy > b {
+  color: #dbf6ff;
+  font-size: 13px;
+}
+.mobile-order-copy > span {
+  color: #86abba;
+  font-size: 11px;
+}
+.mobile-order-copy > strong {
+  color: #afe0e7;
+  font-weight: 500;
+}
+body.mobile-ui #mobile-sheet.order-mode #cmdbar > button {
+  font:
+    12px ui-monospace,
+    monospace;
+  min-height: 46px;
+}
+body.mobile-ui #mobile-sheet.order-mode #side,
+body.mobile-ui #mobile-sheet.choosing #side,
+body.mobile-ui #mobile-sheet.choosing #cmdbar {
+  display: none !important;
+}
+.mobile-choices {
+  overflow-y: auto;
+  max-height: 45dvh;
+  overscroll-behavior: contain;
+  padding: 0 12px 12px;
+}
+.mobile-choices > button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 8px;
+  min-height: 58px;
+  text-align: left;
+  border: 0;
+  border-top: 1px solid #5a87982e;
+  background: transparent;
+  color: #bcdeea;
+}
+.mobile-choices > button > span {
+  flex: 1;
+  min-width: 0;
+}
+.mobile-choices b,
+.mobile-choices small {
+  display: block;
+  font:
+    12px/1.45 ui-monospace,
+    monospace;
+}
+.mobile-choices small {
+  color: #829fab;
+  font-size: 10px;
+  margin-top: 3px;
+}
+.mobile-choices i {
+  font-style: normal;
+  font-size: 19px;
+  color: #87c6d9;
+}
+body.mobile-ui #top {
+  margin: 6px max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
+  width: auto;
+  border: 1px solid #72a7bc42;
+  border-radius: 14px;
+  background: linear-gradient(130deg, #0b2130ed, #06131ff2);
+  box-shadow: 0 5px 24px #0005;
+}
+body.mobile-ui #topback,
+body.mobile-ui #crestmark {
+  min-width: 40px;
+  min-height: 40px;
+}
+body.mobile-ui #purse {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  padding: 0 6px 5px;
+  overflow: visible;
+}
+body.mobile-ui #purse .res {
+  min-width: 0;
+  padding: 2px;
+  justify-content: center;
+  gap: 3px;
+  min-height: 44px;
+  height: auto;
+}
+body.mobile-ui #purse .res b {
+  font-size: 11px;
+}
+body.mobile-ui #devline {
+  padding-left: 18px;
+  padding-right: 18px;
+  top: calc(var(--tbh) + 10px + env(safe-area-inset-top));
+}
+body.mobile-ui #railtools {
+  max-height: 65dvh;
+  overflow-y: auto;
+  border-radius: 14px;
+}
+body.mobile-ui.aim-mode #toasts .toast:not(.jump) {
+  pointer-events: none;
+}
+body.mobile-ui #railtoggle {
+  border-radius: 14px;
+}
+body.mobile-ui #speedbar {
+  left: 76px;
+  right: max(8px, env(safe-area-inset-right));
+  max-width: none;
+  border-radius: 14px;
+  gap: 5px;
+}
+body.mobile-ui #spd-ctl {
+  display: contents;
+}
+body.mobile-ui #speedbar .sep,
+body.mobile-ui #speedbar .spddiv {
+  display: none;
+}
+body.mobile-ui #speedbar button {
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 9px;
+}
+body.mobile-ui #mobile-sheet button:focus-visible {
+  outline: 2px solid #c6f6ff;
+  outline-offset: -3px;
+}
+body.mobile-ui.holo-no-glow #mobile-sheet {
+  box-shadow: none;
+}
+@media (max-height: 520px) {
+  body.mobile-ui {
+    --tbh: 54px;
+  }
+  body.mobile-ui #top {
+    flex-direction: row;
+    align-items: center;
+  }
+  body.mobile-ui .tbar {
+    flex: 0 1 48%;
+    padding-right: 0;
+  }
+  body.mobile-ui .who {
+    display: none;
+  }
+  body.mobile-ui #purse {
+    padding-bottom: 0;
+  }
+  body.mobile-ui #daycard {
+    padding: 4px 6px;
+    margin-left: 6px;
+  }
+  body.mobile-ui .mobile-sheet-head {
+    min-height: 60px;
+  }
+  body.mobile-ui .mobile-grab {
+    padding-top: 18px;
+  }
+  body.mobile-ui #mobile-sheet {
+    left: auto;
+    width: min(350px, 47vw);
+  }
+  body.mobile-ui #mobile-sheet #side .pscroll {
+    max-height: 38dvh;
+  }
+  body.mobile-ui #mobile-sheet.order-mode {
+    left: max(8px, env(safe-area-inset-left));
+    width: auto;
+  }
+  body.mobile-ui #mobile-sheet.order-mode .mobile-order-copy {
+    grid-column: auto;
+    grid-row: 1;
+  }
+  body.mobile-ui #mobile-sheet.order-mode #cmdbar {
+    grid-template-columns: 1fr 90px 140px;
+    align-items: center;
+  }
+}
