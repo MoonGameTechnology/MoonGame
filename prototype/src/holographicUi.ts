@@ -3,7 +3,7 @@ import { t } from '../../localization/runtime';
 import { esc } from './format';
 import { holoIcon, skinIcon, type HoloIcon } from './holographicIcons';
 import { holographyOn, motionOn, glowOn } from './graphicsPrefs';
-import { supportsHolography, selectionWindowPosition, type HoloPoint } from './holographicLayout';
+import { supportsHolography, selectionWindowPosition, selectionThread, type HoloPoint } from './holographicLayout';
 import { initFloatingWindows } from './floatingWindows';
 
 interface HolographicHost {
@@ -61,6 +61,13 @@ export function initHolographicUi(host: HolographicHost) {
   host.side.parentNode!.insertBefore(sideHome, host.side);
   host.commands.parentNode!.insertBefore(commandHome, host.commands);
   document.body.appendChild(selection);
+  const thread = document.createElement('div');
+  thread.id = 'holo-selection-thread';
+  thread.setAttribute('aria-hidden', 'true');
+  thread.innerHTML = '<svg width="100%" height="100%"><path class="holo-thread-glow"/><path class="holo-thread-line"/></svg>';
+  document.body.appendChild(thread);
+  const threadPaths = thread.querySelectorAll<SVGPathElement>('path');
+  let threadPath = '';
   const windows = initFloatingWindows();
   let enabled = false;
   let inGame = false;
@@ -98,6 +105,7 @@ export function initHolographicUi(host: HolographicHost) {
       width = w;
       height = h;
       inGame = inMatch;
+      if (!next || !inMatch) thread.style.display = 'none';
       document.body.classList.toggle('holo-available', supported);
       document.body.classList.toggle('holo-ui', next);
       document.body.classList.toggle('holo-in-match', next && inMatch);
@@ -147,6 +155,19 @@ export function initHolographicUi(host: HolographicHost) {
       }
       // Window coordinates only respond to the user's drag/keys and viewport resize.
       windows.sync(enabled, width, height);
+      const box = enabled && inGame ? windows.bounds('holo-selection-window') : null;
+      const anchor = box ? host.selectionAnchor() : null;
+      const line = box && anchor && anchor.x >= 0 && anchor.y >= 0 && anchor.x <= width && anchor.y <= height
+        ? selectionThread(anchor, box) : null;
+      thread.style.display = line ? 'block' : 'none';
+      if (line) {
+        const round = (n: number): number => Math.round(n * 2) / 2;
+        const path = `M${round(line.from.x)} ${round(line.from.y)} L${round(line.to.x)} ${round(line.to.y)}`;
+        if (path !== threadPath) {
+          threadPaths.forEach((item) => item.setAttribute('d', path));
+          threadPath = path;
+        }
+      }
     },
   };
 }

@@ -248,6 +248,12 @@ body.holo-no-glow.holo-ui :is(#top,#side,#cmdbar,#speedbar,#railtools,#chatwin,.
 
 /* The small command window beside the selection contains the complete dossier too. */
 #holo-selection-window{display:none;}
+#holo-selection-thread{display:none;position:fixed;inset:0;z-index:19;pointer-events:none;}
+#holo-selection-thread *{pointer-events:none;}
+#holo-selection-thread path{fill:none;stroke:#a1dce9;stroke-linecap:round;}
+#holo-selection-thread .holo-thread-line{stroke-width:.9;opacity:.62;}
+#holo-selection-thread .holo-thread-glow{stroke-width:3.5;opacity:.1;}
+body.holo-no-glow #holo-selection-thread .holo-thread-glow{display:none;}
 body.holo-ui #holo-selection-window{
   position:fixed;left:50%;top:40%;width:min(340px,calc(100vw - 36px));
   --holo-window-max-height:min(620px,74dvh);

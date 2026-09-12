@@ -171,50 +171,35 @@ function polygon(g: CanvasRenderingContext2D, poly: ProvincePolygon): void {
   g.closePath();
 }
 
-function glassPath(g: CanvasRenderingContext2D, r: HoloRect, offset = 0): void {
-  const x = r.x + offset;
-  const y = r.y + offset;
+function glassPath(g: CanvasRenderingContext2D, r: HoloRect): void {
+  const x = r.x;
+  const y = r.y;
   const w = r.width;
   const h = r.height;
   const radius = Math.min(w, h) * 0.026;
   g.beginPath();
   g.moveTo(x + radius, y);
   g.lineTo(x + w - radius, y);
-  g.quadraticCurveTo(x + w, y, x + w, y + radius);
+  g.arc(x + w - radius, y + radius, radius, -Math.PI / 2, 0);
   g.lineTo(x + w, y + h - radius);
-  g.quadraticCurveTo(x + w, y + h, x + w - radius, y + h);
+  g.arc(x + w - radius, y + h - radius, radius, 0, Math.PI / 2);
   g.lineTo(x + radius, y + h);
-  g.quadraticCurveTo(x, y + h, x, y + h - radius);
+  g.arc(x + radius, y + h - radius, radius, Math.PI / 2, Math.PI);
   g.lineTo(x, y + radius);
-  g.quadraticCurveTo(x, y, x + radius, y);
+  g.arc(x + radius, y + radius, radius, Math.PI, Math.PI * 1.5);
   g.closePath();
 }
 
+/** Clip paint only. Province polygons, ownership and hit testing stay unchanged. */
+export function clipGlassSurface(g: CanvasRenderingContext2D, frame: HoloRect): void {
+  glassPath(g, frame);
+  g.clip();
+}
+
 /** Cached with the political map, including its world-boundary projection. */
-export function drawGlassScreen(g: CanvasRenderingContext2D, frame: HoloRect, glow: boolean): void {
+export function drawGlassScreen(g: CanvasRenderingContext2D, frame: HoloRect): void {
   if (frame.width <= 0 || frame.height <= 0) return;
   g.save();
-  const depth = frame.width * 0.005;
-  // A second, lower light plane gives the projection a visible thickness.
-  // Both planes belong to the world rectangle and follow its camera transform.
-  const lower = { ...frame, x: frame.x + depth * 0.28, y: frame.y + depth };
-  glassPath(g, lower);
-  g.fillStyle = rgba('#010b12', 0.2);
-  g.fill();
-  g.strokeStyle = rgba(theme.cyan, glow ? 0.19 : 0.1);
-  g.lineWidth = 0.8;
-  g.stroke();
-  g.beginPath();
-  for (const [x, y] of [
-    [frame.x + 20, frame.y],
-    [frame.x + frame.width - 20, frame.y],
-    [frame.x + 20, frame.y + frame.height],
-    [frame.x + frame.width - 20, frame.y + frame.height],
-  ]) {
-    g.moveTo(x!, y!);
-    g.lineTo(x! + depth * 0.28, y! + depth);
-  }
-  g.stroke();
   glassPath(g, frame);
   const wash = g.createLinearGradient(
     frame.x,
@@ -233,10 +218,6 @@ export function drawGlassScreen(g: CanvasRenderingContext2D, frame: HoloRect, gl
   g.shadowBlur = 0;
   g.stroke();
   g.shadowBlur = 0;
-  glassPath(g, frame, 5);
-  g.strokeStyle = rgba(theme.reflection, 0.12);
-  g.lineWidth = 0.7;
-  g.stroke();
   g.save();
   glassPath(g, frame);
   g.clip();

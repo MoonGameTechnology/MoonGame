@@ -494,7 +494,7 @@ import { initSettings } from './settingsOverlay';
 import { initHolographicUi, commandWindowHtml } from './holographicUi';
 import { provincePingTarget, provinceForPing } from './provincePingAnchor';
 import { reframePresentation, supportsHolography } from './holographicLayout';
-import { drawGlassScreen, drawGlassWave, drawGlassRim, drawTerrainField, makeTerrainField, hasTerrainMaterial, type TerrainField } from './holographicSurface';
+import { drawGlassScreen, clipGlassSurface, drawGlassWave, drawGlassRim, drawTerrainField, makeTerrainField, hasTerrainMaterial, type TerrainField } from './holographicSurface';
 import { holographyOn, setHolography } from './graphicsPrefs';
 // «Профиль командира» — карьерное досье (REFM-10).
 import { initProfile } from './profileScreen';
@@ -4247,7 +4247,11 @@ function buildStaticLayer(): void {
   const br = world(frame.bottomRight);
   const clip = clipPolygon(tl, br);
   holographicFrame = { x: tl.x, y: tl.y, width: br.x - tl.x, height: br.y - tl.y };
-  if (holographic.active()) drawGlassScreen(g, holographicFrame, glowOn());
+  if (holographic.active()) {
+    drawGlassScreen(g, holographicFrame);
+    g.save();
+    clipGlassSurface(g, holographicFrame);
+  }
   // Weighted-Voronoi political fill + classified borders — the shared @void/client
   // territory renderer clamps the weights (so no cell is swallowed), tessellates the
   // power diagram, fills each province in its owner's colour, and draws same-owner
@@ -4295,6 +4299,8 @@ function buildStaticLayer(): void {
     g.lineTo(b.x, b.y);
     g.stroke();
   }
+
+  if (holographic.active()) g.restore();
 
   // map boundary — a faint frame so the edge of the sector reads as intentional
   g.strokeStyle = 'rgba(90,151,165,0.2)';
@@ -4384,9 +4390,10 @@ function render(now: number) {
   const detail = detailAt(cam.scale);
   blitStaticLayer(); // backdrop + province political map (re-baked on camera move, else cached)
   if (holographic.active()) {
+    cx.save();
+    clipGlassSurface(cx, holographicFrame);
     for (const field of terrainFields) drawTerrainField(cx, field, hologramTime, true);
     drawGlassWave(cx, holographicFrame, VW, VH, hologramTime, glowOn());
-    drawGlassRim(cx, holographicFrame, hologramTime, glowOn());
   }
   if (paintedSelection !== selPlanet) {
     paintedSelection = selPlanet;
@@ -4395,6 +4402,10 @@ function render(now: number) {
   const selectedPoly = selPlanet ? provincePolygons.get(selPlanet) : undefined;
   if (selectedPoly) drawProvinceSelection(cx, selectedPoly, selectionPulse(now - selectionStarted, motionOn()), LOCK);
   drawCaptureFlashes(now); // wave over a just-flipped province, over the political fill
+  if (holographic.active()) {
+    cx.restore();
+    drawGlassRim(cx, holographicFrame, hologramTime, glowOn());
+  }
   drawScanSweep(now); // slow radar sweep — pure console chrome
   updateRadarContacts(now); // the arm paints enemy signatures as it crosses them
   updateThreatAlerts(); // «враг у ваших рубежей» — once per game step
