@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { reframePresentation, supportsHolography } from './holographicLayout';
+import { reframePresentation, supportsHolography, selectionWindowPosition } from './holographicLayout';
 import { worldToScreen } from '../../packages/client/src/camera';
 
 it('changing the skin preserves map positions and physical zoom in both directions', () => {
@@ -39,4 +39,14 @@ describe('holographic appearance is limited to computers and tablets', () => {
   ])('supports %s × %s', (w, h, coarse) => {
     expect(supportsHolography(Number(w), Number(h), Boolean(coarse))).toBe(true);
   });
+});
+
+
+it('opens beside the selection on the side with room and below the top chrome', () => {
+  const size = { width: 340, height: 550 };
+  const view = { width: 1400, height: 960 };
+  expect(selectionWindowPosition({ x: 500, y: 300 }, size, view, 104)).toEqual({ x: 530, y: 252 });
+  expect(selectionWindowPosition({ x: 1250, y: 300 }, size, view, 104)).toEqual({ x: 880, y: 252 });
+  expect(selectionWindowPosition({ x: 500, y: 40 }, size, view, 104).y).toBe(104);
+  expect(selectionWindowPosition({ x: 500, y: 940 }, size, view, 104).y).toBe(398);
 });

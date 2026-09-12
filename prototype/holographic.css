@@ -246,11 +246,12 @@ body.holo-no-glow.holo-ui :is(#top,#side,#cmdbar,#speedbar,#railtools,#chatwin,.
   box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;
 }
 
-/* A single stationary selection window owns information and the original commands. */
+/* The small command window beside the selection contains the complete dossier too. */
 #holo-selection-window{display:none;}
 body.holo-ui #holo-selection-window{
-  position:fixed;right:18px;top:calc(var(--tbh) + 96px);width:min(410px,calc(100vw - 36px));
-  max-height:calc(100dvh - var(--tbh) - 130px);z-index:26;flex-direction:column;overflow:hidden;
+  position:fixed;left:50%;top:40%;width:min(340px,calc(100vw - 36px));
+  --holo-window-max-height:min(620px,74dvh);
+  max-height:var(--holo-window-max-height);z-index:26;flex-direction:column;overflow:hidden;
   border-color:rgba(140,233,242,.65);
 }
 body.holo-ui #holo-selection-window :is(#side,#cmdbar){
@@ -266,14 +267,17 @@ body.holo-ui #holo-selection-window #side .phead{
 }
 body.holo-ui #holo-selection-window #cmdbar{flex:0 1 auto;min-height:0;max-height:100%;overflow:auto;overscroll-behavior:contain;}
 body.holo-ui #holo-selection-window.has-info #cmdbar{flex-shrink:0;
-  max-height:min(42dvh,calc(var(--holo-window-room,100dvh) - 100px));border-top:1px solid var(--line-hi);}
-body.holo-ui #holo-selection-window.has-info :is(.holo-command-head,.holo-command-details){display:none;}
+  max-height:min(46dvh,calc(var(--holo-window-room,100dvh) - 100px));border-bottom:1px solid var(--line-hi);}
+body.holo-ui #holo-selection-window #cmdbar .holo-command-head{position:sticky;top:0;z-index:3;
+  background:linear-gradient(120deg,#102632,#081721);}
+body.holo-ui #holo-selection-window.has-commands #side .phead{display:none;}
+body.holo-ui #holo-selection-window.has-commands #side .pscroll{padding-top:10px;}
 body.holo-ui.chain-mode #holo-selection-window #cmdbar{width:100%;padding:12px;}
 /* Titles stay graspable; content and controls retain their own pointer/scroll gestures. */
 body.holo-ui .holo-floating-window{
   position:fixed!important;right:auto!important;bottom:auto!important;margin:0!important;transform:none!important;
   max-width:calc(100dvw - 24px)!important;
-  max-height:min(calc(100dvh - 24px),var(--holo-window-room,100dvh))!important;
+  max-height:min(calc(100dvh - 24px),var(--holo-window-room,100dvh),var(--holo-window-max-height,100dvh))!important;
 }
 body.holo-ui .holo-drag-handle{cursor:grab;touch-action:none;user-select:none;}
 body.holo-ui .holo-drag-handle::before{content:'⠿';display:inline-block;flex:0 0 12px;

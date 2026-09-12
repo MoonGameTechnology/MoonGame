@@ -48,6 +48,7 @@ interface WindowEntry {
   size?: { width: number; height: number };
   visible: boolean;
   dirty: boolean;
+  userPlaced?: boolean;
 }
 
 export function initFloatingWindows() {
@@ -144,6 +145,7 @@ export function initFloatingWindows() {
       x: drag.origin.x + e.clientX - drag.start.x,
       y: drag.origin.y + e.clientY - drag.start.y,
     };
+    drag.entry.userPlaced = true;
     apply(drag.entry);
   }, true);
   for (const event of ['pointerup', 'pointercancel', 'lostpointercapture'] as const)
@@ -161,11 +163,19 @@ export function initFloatingWindows() {
     e.preventDefault();
     e.stopImmediatePropagation();
     const step = e.shiftKey ? 30 : 10;
+    entry.userPlaced = true;
     entry.point = { x: entry.point.x + delta.x * step, y: entry.point.y + delta.y * step };
     apply(entry);
   }, true);
 
   return {
+    /** A newly selected object suggests an opening position; a user's placement wins. */
+    openAt(id: string, point: HoloPoint): void {
+      const entry = entries.find((item) => item.id === id);
+      if (!entry || entry.userPlaced) return;
+      entry.point = point;
+      entry.dirty = true;
+    },
     sync(active: boolean, width: number, height: number): void {
       if (!active) {
         if (enabled) { finish(); entries.forEach(restore); }
