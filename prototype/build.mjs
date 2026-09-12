@@ -10,6 +10,7 @@ import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 
 const holographicCss = readFileSync(new URL('./holographic.css', import.meta.url), 'utf8');
 const bridgeShellCss = readFileSync(new URL('./bridge-shell.css', import.meta.url), 'utf8');
+const mobileConsoleCss = readFileSync(new URL('./mobile-console.css', import.meta.url), 'utf8');
 
 const bundle = async (playerBuild) => {
   const res = await build({
@@ -2735,7 +2736,7 @@ const page = (js) => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="icon" href="data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#061318"/><rect x="9" y="9" width="14" height="14" rx="2" transform="rotate(45 16 16)" fill="none" stroke="#35d6e6" stroke-width="2.5"/></svg>')}">
-<title>Void Dominion — Sector Command</title><style>${css}\n${holographicCss}\n${bridgeShellCss}</style></head>
+<title>Void Dominion — Sector Command</title><style>${css}\n${holographicCss}\n${bridgeShellCss}\n${mobileConsoleCss}</style></head>
 <body>
 <canvas id="map"></canvas>
 <button id="holo-back" class="holo-back" type="button" data-i18n-title="hud.main-menu" data-i18n-aria="hud.main-menu">‹</button>

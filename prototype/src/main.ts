@@ -285,6 +285,8 @@ import { BADGE_R, badgeBob, badgeCenterY, badgeLook, badgeShown, badgeTether } f
 import { chipFontPx, chipGlyph, chipMetrics, chipXs, chipY, chipsShown } from './buildChips';
 import { tapOwner, tapRadius } from './tapPriority';
 import { nextPick, tapCandidates, touchPick, type TapPick } from './tapCycle';
+import { initMobileHud, mobileOrderBar, type MobileChoice } from './mobileHud';
+import { mobileDraftMatches, mobileTargetPoint, type MobileOrderDraft, type MobileOrderKind, type MobileOrderTarget } from './mobileOrders';
 import { chainTapTarget, nearestOwnWorld as ownWorldNearest } from './chainTarget';
 import { arrivalHours, marchHours, restRouteHours } from './travelEta';
 import { castOptions, heroAboard, type CastOption } from './heroCasts';
@@ -636,7 +638,7 @@ import {
 } from './holdPress';
 import { groundTypes, hasTroops, totalOf, troopSources } from './troopsSources';
 import { dossierLevel, nextHover, showsBody } from './dossierHover';
-import { liftBy, opensNow } from './sheetLift';
+import { opensNow } from './sheetLift';
 import { barStays, popoverLife } from './popoverLife';
 import { parseBuildAnchor, quickBuildOrder } from './quickBuild';
 import { isMine, seen, seenTail } from './eventVisibility';
@@ -1210,6 +1212,8 @@ let reconnecting = false;
 let reconnectAttempts = 0;
 let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 let aimPointer: { x: number; y: number } | null = null; // last canvas pointer (for the move preview)
+let mobileDraft: MobileOrderDraft | null = null;
+let mobileChoices: TapPick[] = [];
 let hoverObj: string | null = null; // side-panel object under the pointer (data-desc key)
 let planetTab: PlanetTab = 'buildings';
 // Bytro-карточка: тап по имени флота открывает сводку армии — какой флот сейчас
@@ -1364,6 +1368,26 @@ const holographic = initHolographicUi({
     const at = fleet ? fleetAnchor(fleet) : planet ? world(planet.position) : null;
     return at ? toScreen(at, canvas.getBoundingClientRect(), VW, VH) : null;
   },
+});
+const mobileHud = initMobileHud({
+  side,
+  commands: cmdbar,
+  dismiss: () => {
+    if (mobileChoices.length) mobileChoices = [];
+    else clearSelection();
+  },
+  choose: (pick) => {
+    mobileChoices = [];
+    if (pick.kind === 'fleet') setFleetSelection([pick.id]);
+    else {
+      clearSelection();
+      selPlanet = pick.id;
+      selectionStarted = lastReal;
+    }
+  },
+  ping: () => side.querySelector<HTMLButtonElement>('[data-act="ping"]')?.click(),
+  summary: () => side.querySelector<HTMLElement>('[data-act="fleetinfo"], [data-act="planetinfo"]')?.click(),
+  resized: () => revealMobileSelection(),
 });
 
 // Player emblem — a cosmetic console crest the player picks in the main menu (hub) and
@@ -1665,7 +1689,7 @@ function insets(): { left: number; right: number; top: number; bottom: number } 
     return { left: 20, right: VW - 20, top: VW > 1200 ? 138 : 182, bottom: VH - 76 };
   }
   if (MOBILE) {
-    return { left: 14, right: VW - 24, top: TOP + 54, bottom: VH - 96 };
+    return { left: 14, right: VW - 24, top: VH < 520 ? 86 : TOP + 54, bottom: VH - 96 };
   }
   // Wide screens (tablets + landscape): frame the board with reserves that SCALE to the
   // viewport rather than fixed desktop constants. The old fixed 372px right column and
@@ -1714,7 +1738,7 @@ function visible(c: { x: number; y: number }, pad = 80): boolean {
  *  full-width bottom sheet on phones (→ slack below) and a right-hand column on wide
  *  screens (→ slack on the right); measure its live rect so both layouts just work. */
 function panelSlack(): { right?: number; bottom?: number } {
-  const el = typeof document !== 'undefined' ? document.getElementById('side') : null;
+  const el = typeof document !== 'undefined' ? document.getElementById(MOBILE ? 'mobile-sheet' : 'side') : null;
   const open = el && getComputedStyle(el).display !== 'none';
   // The arithmetic (which side is covered, and by how much) is `panelSlack.ts`
   // (REFM-54); measuring the live element stays here.
@@ -1761,7 +1785,10 @@ function defaultView(): void {
 }
 // Re-validate the camera after a real resize (orientation / window). Attached after
 // `cam` exists so the initial in-module resize() call never touches it (TDZ-safe).
-if (typeof window !== 'undefined') window.addEventListener('resize', () => clampCam());
+if (typeof window !== 'undefined') window.addEventListener('resize', () => {
+  clampCam();
+  requestAnimationFrame(revealMobileSelection);
+});
 
 // --- helpers -----------------------------------------------------------------
 
@@ -2985,6 +3012,8 @@ function syncPlayerNames(state: GameState): void {
     NAME[id] = houseDisplayName(player.name);
 }
 function setFleetSelection(ids: string[]) {
+  mobileDraft = null;
+  mobileChoices = [];
   // Что значит выделение — `fleetSelection.ts` (REFM-163): выделяется только СВОЁ
   // (чужой флот в наборе — приказ, который ядро всё равно отклонит), а «ровно один» и
   // «несколько» это разные состояния: у одиночного своя карточка со всеми приказами.
@@ -3006,6 +3035,15 @@ function panelFleet(): string | null {
   return inspectFleet;
 }
 function clearSelection() {
+  mobileDraft = null;
+  mobileChoices = [];
+  if (MOBILE) {
+    aiming = false;
+    assaultAim = false;
+    engageAim = false;
+    pickMode = false;
+    cmdMore = false;
+  }
   selFleet = null;
   inspectFleet = null;
   selPlanet = null;
@@ -4038,7 +4076,13 @@ function drawAbilityRings(): void {
 /** While "Move" is armed: a dashed line from each selected fleet to the world under
  *  the pointer (snaps to the nearest blip) — preview before committing. */
 function drawAimPreview() {
-  if (!(aiming || assaultAim) || !aimPointer) return;
+  const pointer = MOBILE ? mobileDraftPoint() : aimPointer;
+  if (!pointer) return;
+  if (MOBILE && mobileDraft && (engageAim || merging)) {
+    targetBrackets(pointer.x, pointer.y, 22, lastReal);
+    return;
+  }
+  if (!(aiming || assaultAim)) return;
   const ids = selectedFleetIds();
   if (!ids.length) return;
   // Prefer a node target; if none is near, aim at the closest point ON a lane —
@@ -4048,16 +4092,21 @@ function drawAimPreview() {
   // стояла своя копия тех же чисел (30 пальцем, 24 мышью), и разъедься она с тапом —
   // превью рисовало бы путь, которого отпускание не отправит, причём молча.
   const rAim = tapRadius('node', tapByTouch);
-  const hit = nearestHit(MAP, (n) => world(n), aimPointer.x, aimPointer.y, rAim);
+  const staged = mobileDraft?.target;
+  const hit = MOBILE
+    ? (staged?.kind === 'planet' ? MAP.find((n) => n.id === staged.id) : null)
+    : nearestHit(MAP, (n) => world(n), pointer.x, pointer.y, rAim);
   let target: { x: number; y: number } | null = hit ? world(hit) : null;
   const targetId: string | null = hit?.id ?? null;
   // Из чего складывается линия и что она обещает — `aimPreview.ts` (REFM-196): мир важнее
   // дороги (дорога ищется, только если узла рядом НЕТ), остриё падает на сам палец, путь
   // идёт по МАРШРУТУ через центры провинций, а не прямой, и без маршрута всё равно
   // дотягивается до острия — иначе не рисуется ничего, и игрок читает это как «не взведено».
-  const laneTarget = laneSought(targetId) ? nearestLanePoint(aimPointer.x, aimPointer.y) : null;
+  const laneTarget = MOBILE
+    ? (mobileDraft?.target.kind === 'lane' ? { ...mobileDraft.target, ...pointer } : null)
+    : laneSought(targetId) ? nearestLanePoint(pointer.x, pointer.y) : null;
   if (laneTarget) target = { x: laneTarget.x, y: laneTarget.y };
-  const tip = aimTip(target, aimPointer);
+  const tip = aimTip(target, pointer);
   cx.save();
   cx.strokeStyle = rgba(LOCK, 0.6);
   cx.lineWidth = 1.4;
@@ -4160,6 +4209,11 @@ function ownersSig(): string {
   );
 }
 
+/** Map art is shared by desktop and phone; floating windows remain desktop-only. */
+function holographicMapOn(): boolean {
+  return holographic.active() || (MOBILE && holographyOn());
+}
+
 /** Rebuild the cached province map when the camera/ownership/viewport moves. */
 function buildStaticLayer(): void {
   // Rebuild only when the content/size changes, or when the camera has SETTLED at a
@@ -4177,9 +4231,9 @@ function buildStaticLayer(): void {
     me: ME,
     owners: ownersSig(),
     starfield: starfieldOn(),
-  }) + `|sky:${starfieldOn() && spaceBackdropReady(holographic.active()) ? 1 : 0}` +
-    `|holo:${holographic.active()}|glow:${glowOn()}` +
-    (holographic.active() ? `|terrain:${MAP.map((n) => known(n.id) || memory.has(n.id) ? '1' : '0').join('')}` : '');
+  }) + `|sky:${starfieldOn() && spaceBackdropReady(holographicMapOn()) ? 1 : 0}` +
+    `|holo:${holographicMapOn()}|glow:${glowOn()}` +
+    (holographicMapOn() ? `|terrain:${MAP.map((n) => known(n.id) || memory.has(n.id) ? '1' : '0').join('')}` : '');
   const width = Math.round(VW * DPR);
   const baked = bgContent ? { signature: bgContent, cam: bgCam, width: bg.width } : null;
   if (!needsRebake(baked, { signature: content, cam, width })) return;
@@ -4193,9 +4247,9 @@ function buildStaticLayer(): void {
 
   // Dark space is embedded in the offline bundle. Bake it with the static layer;
   // loading the image invalidates this cache once, even if the camera stays still.
-  drawSpaceBackdrop(g, VW, VH, cam.x, cam.y, starfieldOn(), holographic.active());
+  drawSpaceBackdrop(g, VW, VH, cam.x, cam.y, starfieldOn(), holographicMapOn());
   // Graphics pref: `starfield` off leaves the flat fill + grid (nebulae/stars skipped).
-  if (starfieldOn() && !spaceBackdropReady(holographic.active()))
+  if (starfieldOn() && !spaceBackdropReady(holographicMapOn()))
     for (const neb of NEBULAE) {
       const r = neb.r * (MOBILE ? 0.7 : 1);
       const grd = g.createRadialGradient(neb.x * VW, neb.y * VH, 0, neb.x * VW, neb.y * VH, r);
@@ -4208,7 +4262,7 @@ function buildStaticLayer(): void {
   // Шаг, смещение под камерой и куда лечь линиям — `backdropGrid.ts` (REFM-110).
   const gap = gridGap(cam.scale);
   g.lineWidth = 1;
-  g.strokeStyle = holographic.active() ? 'rgba(113,163,184,0)' : GRID;
+  g.strokeStyle = holographicMapOn() ? 'rgba(113,163,184,0)' : GRID;
   g.beginPath();
   for (const x of gridLines(gridOffset(cam.x, gap), VW, gap)) {
     g.moveTo(x, 0);
@@ -4247,7 +4301,7 @@ function buildStaticLayer(): void {
   const br = world(frame.bottomRight);
   const clip = clipPolygon(tl, br);
   holographicFrame = { x: tl.x, y: tl.y, width: br.x - tl.x, height: br.y - tl.y };
-  if (holographic.active()) {
+  if (holographicMapOn()) {
     drawGlassScreen(g, holographicFrame);
     g.save();
     clipGlassSurface(g, holographicFrame);
@@ -4262,13 +4316,13 @@ function buildStaticLayer(): void {
   const cells = drawTerritory(g, seeds, clip, {
     ownerColor,
     neutralFill: COLOR.null!,
-    kindAccent: (kind) => holographic.active() && kind === 'asteroid' ? '#71879d'
-      : holographic.active() && kind === 'solar_flare' ? '#b295d8' : SECTOR_TYPES[kind]?.color,
-    hideOwnedInner: holographic.active(),
+    kindAccent: (kind) => holographicMapOn() && kind === 'asteroid' ? '#71879d'
+      : holographicMapOn() && kind === 'solar_flare' ? '#b295d8' : SECTOR_TYPES[kind]?.color,
+    hideOwnedInner: holographicMapOn(),
   });
   provincePolygons = new Map(cells.map((cell) => [provinceIds[cell.idx]!, cell.poly]));
   terrainFields = [];
-  if (holographic.active()) {
+  if (holographicMapOn()) {
     for (const n of MAP) {
       const poly = provincePolygons.get(n.id);
       if (!poly) continue;
@@ -4300,12 +4354,11 @@ function buildStaticLayer(): void {
     g.stroke();
   }
 
-  if (holographic.active()) g.restore();
-
   // map boundary — a faint frame so the edge of the sector reads as intentional
+  if (holographicMapOn()) g.restore();
   g.strokeStyle = 'rgba(90,151,165,0.2)';
   g.lineWidth = 0.7;
-  if (!holographic.active()) g.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+  if (!holographicMapOn()) g.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
 }
 
 /** Blit the cached static layer (device-pixel 1:1) beneath the live dynamic art. */
@@ -4389,7 +4442,7 @@ function render(now: number) {
   // Сам закон и его следствия — `semanticZoom.ts` (REFM-93).
   const detail = detailAt(cam.scale);
   blitStaticLayer(); // backdrop + province political map (re-baked on camera move, else cached)
-  if (holographic.active()) {
+  if (holographicMapOn()) {
     cx.save();
     clipGlassSurface(cx, holographicFrame);
     for (const field of terrainFields) drawTerrainField(cx, field, hologramTime, true);
@@ -4402,7 +4455,7 @@ function render(now: number) {
   const selectedPoly = selPlanet ? provincePolygons.get(selPlanet) : undefined;
   if (selectedPoly) drawProvinceSelection(cx, selectedPoly, selectionPulse(now - selectionStarted, motionOn()), LOCK);
   drawCaptureFlashes(now); // wave over a just-flipped province, over the political fill
-  if (holographic.active()) {
+  if (holographicMapOn()) {
     cx.restore();
     drawGlassRim(cx, holographicFrame, hologramTime, glowOn());
   }
@@ -4433,7 +4486,7 @@ function render(now: number) {
     if (mark.do !== 'draw' || !anchor) continue;
     const c = world(anchor);
     if (!visible(c, 120)) continue;
-    if (holographic.active())
+    if (holographicMapOn())
       drawHolographicBattle(cx, c.x, c.y, hologramTime, b.phase ?? 'orbital', glowOn());
     else drawBattlePulse(c.x, c.y, wave, b.phase);
     if (mark.timer) {
@@ -4446,7 +4499,7 @@ function render(now: number) {
       cx.fillText(
         `${b.phase === 'ground' ? t('map.badge.landing') : t('map.badge.orbit')} · ${timeLeft(roundAt!)}`,
         c.x,
-        c.y - (holographic.active() ? 51 : 28),
+        c.y - (holographicMapOn() ? 51 : 28),
       );
       cx.restore();
     }
@@ -4582,7 +4635,7 @@ function render(now: number) {
     // Висит ли бейдж, где именно и как выглядит — `kindBadge.ts` (REFM-121): он оторван
     // от узла, чтобы не слиться с искусством сектора, и потому обязан тянуть к нему луч
     // проектора; покачивание фазируется координатами узла, иначе вся карта дрожит в такт.
-    if (!holographic.active() && badgeShown(!!KIND_ICON[n.sector], detail)) {
+    if (!holographicMapOn() && badgeShown(!!KIND_ICON[n.sector], detail)) {
       const kc = sectorTypeOf(n.id)?.color ?? '#9fb6bd';
       const look = badgeLook();
       const nodeTop = c.y - R;
@@ -4763,7 +4816,7 @@ function render(now: number) {
       cx.restore();
     }
 
-    if (holographic.active() && hasTerrainMaterial(n.sector) &&
+    if (holographicMapOn() && hasTerrainMaterial(n.sector) &&
       n.sector !== 'dead_world' && n.sector !== 'planet' && n.sector !== 'void_station') {
       // Terrain is the province's material; retain a precise selectable survey point.
       cx.fillStyle = rgba(col, .7);
@@ -4901,7 +4954,7 @@ function render(now: number) {
       cx.arc(c.x, c.y, 2, 0, TAU);
       cx.fill();
       cx.restore();
-    } else if (holographic.active() && n.sector === 'void_station') {
+    } else if (holographicMapOn() && n.sector === 'void_station') {
       // Station volume is a transparent orbital scaffold in the plotting plane.
       cx.save();
       cx.strokeStyle = rgba(col, 0.7);
@@ -7207,17 +7260,36 @@ function renderObjDesc(): void {
 }
 
 let sheetWasOpen = false;
+/** Keep the selected marker above the measured sheet, without following a moving fleet. */
+function revealMobileSelection(): void {
+  if (!MOBILE || !inMatch() || mobileOrderKind() || pickMode || chainMode) return;
+  const el = document.getElementById('mobile-sheet');
+  if (!el || el.hidden) return;
+  const fid = panelFleet();
+  const f = fid ? s.fleets[fid] : null;
+  const p = selPlanet ? s.planets[selPlanet] : null;
+  const anchor = f ? fleetAnchor(f) : p ? world(p.position) : null;
+  if (!anchor) return;
+  const rect = el.getBoundingClientRect();
+  const top = topEl.getBoundingClientRect().bottom + 32;
+  const right = VH < 520 ? rect.left - 32 : VW - 28;
+  const bottom = VH < 520 ? VH - 28 : rect.top - 32;
+  cam.x += clamp(anchor.x, 28, Math.max(28, right)) - anchor.x;
+  cam.y += clamp(anchor.y, top, Math.max(top, bottom)) - anchor.y;
+  clampCam();
+}
+
 function renderPanel() {
   // Кто прячет лист — решает hudDock.panelOpen: признак один на все режимы прицела
   // («ждём тап по карте»), и «Курс» в нём теперь наравне со слиянием, набором группы
   // и режимом «Приказ». Раньше движение было исключением: игрок жал ⤳ и тапал в лист,
   // который закрывал пол-карты (заказ владельца — убирать нижний хаб и на движении).
   const dock: DockState = {
-    aiming,
+    aiming: aiming || (MOBILE && (assaultAim || engageAim || !!heroAim || !!strikeAim || !!heroSpawnAim)),
     merging,
     picking: pickMode,
     chaining: chainMode !== null,
-    hasSelection: selFleet !== null || selPlanet !== null || selFleets.size > 0,
+    hasSelection: panelFleet() !== null || selPlanet !== null || selFleets.size > 0,
   };
   const open = panelOpen(dock);
   side.style.display = open ? 'flex' : 'none';
@@ -7231,18 +7303,7 @@ function renderPanel() {
   // selected object is not the one thing the panel talks about yet hides.
   // Момент открытия и величина подъёма — `sheetLift.ts` (REFM-83).
   if (opensNow(open, sheetWasOpen, MOBILE)) {
-    // Выбран флот — якорь только его: лист говорит про флот, и уезжать к миру под ним
-    // неправильно. Негде нарисовать флот — камера остаётся на месте.
-    const anchor = selFleet
-      ? (s.fleets[selFleet] && fleetAnchor(s.fleets[selFleet]!)) || null
-      : selPlanet && s.planets[selPlanet]
-        ? world(s.planets[selPlanet]!.position)
-        : null;
-    const dy = liftBy(anchor ? anchor.y : null, VH);
-    if (dy) {
-      cam.y -= dy;
-      clampCam();
-    }
+    requestAnimationFrame(revealMobileSelection);
   }
   sheetWasOpen = open;
   if (!open) {
@@ -7311,6 +7372,105 @@ function cmdBtn(
 ): string {
   const tip = desc ? `${label} — ${desc}` : label;
   return `<button data-cmd="${cmd}" class="${cls}" title="${esc(tip)}" aria-label="${esc(tip)}" ${disabled ? 'disabled' : ''}><span class="ci" aria-hidden="true">${commandIcon(cmd, icon)}</span><span class="cl">${esc(label)}</span></button>`;
+}
+
+function mobileOrderKind(): MobileOrderKind | null {
+  if (!MOBILE) return null;
+  if (merging) return 'merge';
+  if (assaultAim) return 'assault';
+  if (engageAim) return 'engage';
+  return aiming ? 'move' : null;
+}
+
+function stageMobileTarget(order: MobileOrderKind, target: MobileOrderTarget | null): void {
+  mobileDraft = target ? { order, fleetIds: [...selectedFleetIds()], target } : null;
+  lastCmdHtml = '';
+}
+
+function mobileTargetAvailable(target: MobileOrderTarget, order: MobileOrderKind): boolean {
+  if (target.kind === 'lane') return order === 'move' && !!s.planets[target.from]?.links?.includes(target.to);
+  if (target.kind === 'planet') {
+    const p = s.planets[target.id];
+    return !!p && (order === 'move' || (order === 'assault' &&
+      assaultTargetOk(p.owner, !!sectorTypeOf(p.id)?.capturable, ME)));
+  }
+  const f = s.fleets[target.id];
+  if (!f) return false;
+  if (order === 'merge') return f.owner === ME && !selectedFleetIds().includes(f.id);
+  return order === 'engage' && f.owner !== ME && sumUnits(f.units) > 0 &&
+    fleetVisible(false, known(fleetNode(f)), intelFleetOwners.has(f.owner));
+}
+
+function mobileDraftPoint(): { x: number; y: number } | null {
+  if (!mobileDraft) return null;
+  return mobileTargetPoint(mobileDraft.target,
+    (id) => s.planets[id] ? world(s.planets[id]!.position) : null,
+    (id) => s.fleets[id] ? fleetAnchor(s.fleets[id]!) : null);
+}
+
+function mobileTargetLabel(target: MobileOrderTarget): string {
+  if (target.kind === 'planet') return target.id;
+  if (target.kind === 'fleet') return `${t(FLEET_KIND_KEY)} «${fleetCallsign(target.id)}»`;
+  return t('hud.mobile.lane', target);
+}
+
+/** Same existing engage/march actions for mouse and confirmed phone targeting. */
+function engageTarget(target: Fleet): void {
+  for (const id of selectedFleetIds()) {
+    const mine = s.fleets[id];
+    if (!mine) continue;
+    if (mine.location && mine.location === target.location) playerOrder(engageFleet(ME, id, target.id));
+    else if (target.location) playerOrder(moveFleet(ME, id, target.location));
+    else note(t('hint.engage-in-flight'));
+  }
+}
+
+function cancelMobileOrder(): void {
+  mobileDraft = null;
+  aiming = false;
+  assaultAim = false;
+  engageAim = false;
+  merging = false;
+  pickMode = false;
+  lastCmdHtml = '';
+  lastPanelHtml = '';
+}
+
+function sendMobileOrder(): void {
+  const order = mobileOrderKind();
+  const ids = selectedFleetIds();
+  if (!mobileDraftMatches(mobileDraft, order, ids) || !mobileTargetAvailable(mobileDraft.target, mobileDraft.order)) {
+    mobileDraft = null;
+    note(t('hud.mobile.target-stale'));
+    return;
+  }
+  const target = mobileDraft.target;
+  cancelMobileOrder();
+  if (order === 'move' && target.kind === 'planet') tryMoveGroup(ids, target.id);
+  else if (order === 'move' && target.kind === 'lane') tryMoveEdgeGroup(ids, target);
+  else if (order === 'assault' && target.kind === 'planet') tryAssaultGroup(ids, target.id);
+  else if (order === 'engage' && target.kind === 'fleet') engageTarget(s.fleets[target.id]!);
+  else if (order === 'merge' && target.kind === 'fleet') orderMerge(ids, target.id);
+}
+
+function updateMobileHud(): void {
+  if (!MOBILE) return;
+  const fid = panelFleet();
+  const f = fid ? s.fleets[fid] : null;
+  const inspectable = f && fleetVisible(f.owner === ME, known(fleetNode(f)), intelFleetOwners.has(f.owner));
+  const key = selPlanet && s.planets[selPlanet] ? `planet:${selPlanet}` : inspectable ? `fleet:${fid}` : selectedFleetIds().join('|');
+  const choices: MobileChoice[] = [];
+  for (const pick of mobileChoices) {
+    if (pick.kind === 'fleet') {
+      const f = s.fleets[pick.id];
+      if (!f || !fleetVisible(f.owner === ME, known(fleetNode(f)), intelFleetOwners.has(f.owner))) continue;
+      choices.push({ ...pick, title: `${t(FLEET_KIND_KEY)} «${fleetCallsign(f.id)}»`, sub: NAME[f.owner] ?? f.owner });
+    } else if (s.planets[pick.id]) {
+      choices.push({ ...pick, title: pick.id, sub: known(pick.id) ? t('hud.mobile.province') : t('side.notelemetry.title') });
+    }
+  }
+  mobileChoices = choices.map(({ kind, id }) => ({ kind, id }));
+  mobileHud.update(key, !!mobileOrderKind() || pickMode || !!chainMode, cmdMore, choices);
 }
 
 /** CHAIN-UX: полоска режима «Приказ» — живёт в ноде #cmdbar (все четыре
@@ -7407,11 +7567,24 @@ function renderCmdBar() {
   if (!barStays(ids.length, pickMode)) {
     if (aiming) aiming = false;
     if (assaultAim) assaultAim = false;
+    if (engageAim) engageAim = false;
     if (merging) merging = false;
     troopsPlan = null; // ⇵-меню тоже: иначе всплывёт над СЛЕДУЮЩИМ выбранным флотом
     castMenu = false; // и ✨: оно тут забывалось, и повторный выбор открывал его сам
     cmdbar.classList.remove('show');
     lastCmdHtml = '';
+    return;
+  }
+  if (MOBILE && (mobileOrderKind() || pickMode)) {
+    const order = mobileOrderKind();
+    if (!mobileDraftMatches(mobileDraft, order, ids) ||
+      (mobileDraft && !mobileTargetAvailable(mobileDraft.target, mobileDraft.order))) mobileDraft = null;
+    const label = pickMode ? t('cmd.multiselect') : order === 'assault' ? t('cmd.assault') :
+      order === 'engage' ? t('cmd.engage') : order === 'merge' ? t('cmd.merge.pick') : t('cmd.move');
+    const selection = ids.length === 1 ? fleetCallsign(ids[0]!) : t('cmd.selection.many', { n: ids.length });
+    const html = mobileOrderBar(`${label} · ${selection}`, mobileDraft ? mobileTargetLabel(mobileDraft.target) : null, pickMode);
+    if (html !== lastCmdHtml) { cmdbar.innerHTML = html; lastCmdHtml = html; }
+    cmdbar.classList.add('show');
     return;
   }
   const fleets = ids.map((id) => s.fleets[id]).filter((f): f is Fleet => !!f);
@@ -7423,9 +7596,9 @@ function renderCmdBar() {
   const anyStoppable = fleets.some((f) => canOrder(s, stopFleet(ME, f.id)) === null);
   // Доступность слияния/деления/штурма — `cmdAvailability.ts` (REFM-78).
   const docked = fleets.filter((f) => f.location && !f.movement && !f.battleId);
-  // PC: ШТУРМ is a targeting command (fly there + storm on arrival) — armable
-  // whenever the selection has ships. Mobile keeps the in-orbit-only button.
-  const canAssault = pcUi()
+  // PC and phone target a world (fly there + storm on arrival). The phone confirms
+  // before dispatch; the legacy tablet button remains in-orbit-only.
+  const canAssault = pcUi() || MOBILE
     ? fleets.some((f) => sumUnits(f.units) > 0)
     : docked.some((f) =>
         canAssaultFromOrbit(
@@ -8072,6 +8245,15 @@ cmdbar.addEventListener('click', (ev) => {
   if (!bEl || bEl.disabled) return;
   const cmd = bEl.dataset.cmd;
   const ids = selectedFleetIds();
+  if (MOBILE && (cmd === 'mobile-send' || cmd === 'mobile-cancel')) {
+    if (cmd === 'mobile-send') sendMobileOrder();
+    else cancelMobileOrder();
+    renderPanel();
+    renderCmdBar();
+    return;
+  }
+  if (MOBILE && cmd !== 'more') mobileDraft = null;
+  if (MOBILE && cmd && ['move', 'engage', 'merge', 'attack', 'pick', 'target'].includes(cmd)) cmdMore = false;
   // Что гаснет от СОСЕДНЕЙ команды — `armDisarm.ts` (REFM-195): у каждого взводимого
   // состояния свой список «своих» команд, и в нём же подкоманды поповера (иначе ⇅-меню
   // закрывалось бы от собственной кнопки «+1»); кнопка без команды гасит ВСЁ; а
@@ -8094,33 +8276,33 @@ cmdbar.addEventListener('click', (ev) => {
     engageAim = !engageAim; // arm / disarm the attack order
     aiming = false;
     assaultAim = false;
-    if (engageAim) note(t('hint.pick-engage'));
+    if (engageAim && !MOBILE) note(t('hint.pick-engage'));
   } else if (cmd === 'move') {
     aiming = !aiming; // arm / disarm the move order
     assaultAim = false;
     engageAim = false;
     // Подсказка только на тач: там один палец занят прицелом, и жест камеры надо
     // назвать вслух. На PC мышь и так возит камеру перетаскиванием.
-    if (aiming && !pcUi()) note(t('hint.aim-armed'));
+    if (aiming && !pcUi() && !MOBILE) note(t('hint.aim-armed'));
   } else if (cmd === 'merge') {
     if (ids.length >= 2) mergeGroup(ids);
     else {
       merging = !merging; // lone fleet → arm: next friendly-fleet tap is the anchor
       aiming = false;
-      if (merging) note(t('hint.pick-merge'));
+      if (merging && !MOBILE) note(t('hint.pick-merge'));
     }
   } else if (cmd === 'stop') {
     // Без тостов: в группе стоп уходит только тем, кому ядро его РАЗРЕШАЕТ (та же
     // проба, что показала кнопку) — флот в коридоре просто доезжает, отказа не видно.
     for (const id of ids) if (canOrder(s, stopFleet(ME, id)) === null) playerOrder(stopFleet(ME, id));
   } else if (cmd === 'attack') {
-    if (pcUi()) {
+    if (pcUi() || MOBILE) {
       // PC: ШТУРМ aims like «Курс» — the next click on someone else's world sends
       // the fleet there and it storms on arrival (valid targets ring up on the map).
       assaultAim = !assaultAim;
       aiming = false;
       engageAim = false;
-      if (assaultAim) note(t('hint.pick-assault'));
+      if (assaultAim && !MOBILE) note(t('hint.pick-assault'));
     } else {
       for (const id of ids) if (s.fleets[id]?.orbit === 'near') playerOrder(assaultFleet(ME, id));
       aiming = false;
@@ -8236,7 +8418,7 @@ cmdbar.addEventListener('click', (ev) => {
     // SEL-1: touch multi-select — the sheet collapses, taps toggle own fleets.
     pickMode = !pickMode;
     aiming = false;
-    if (pickMode) note(t('hint.multiselect'));
+    if (pickMode && !MOBILE) note(t('hint.multiselect'));
   }
   lastCmdHtml = '';
   lastPanelHtml = '';
@@ -8288,6 +8470,10 @@ function selectAt(mx: number, my: number) {
       my,
       rFleet,
     );
+    if (MOBILE) {
+      stageMobileTarget('merge', anchor ? { kind: 'fleet', id: anchor.id } : null);
+      return;
+    }
     if (anchor) orderMerge(movers, anchor.id);
     merging = false;
     lastPanelHtml = '';
@@ -8363,6 +8549,11 @@ function selectAt(mx: number, my: number) {
     // Годится только ЧУЖОЙ ЗАХВАТЫВАЕМЫЙ мир (`aimTargets.ts`, правило 4): от этого
     // зависит судьба прицела, а не только отказ ядра.
     const ok = !!target && assaultTargetOk(target.owner, capturable, ME);
+    if (MOBILE) {
+      stageMobileTarget('assault', ok && n ? { kind: 'planet', id: n.id } : null);
+      if (!ok) note(t('hint.assault-enemy-only'));
+      return;
+    }
     // Судьба прицела — `armedTap.ts` (REFM-88). ШТУРМ единственный ПРОЩАЕТ неподходящую
     // цель: промах по цели это не отказ от приказа, и переармировать после каждого
     // неточного тыка в скопление миров — наказание за меткость пальца.
@@ -8405,25 +8596,17 @@ function selectAt(mx: number, my: number) {
       my,
       rFleet,
     );
+    if (MOBILE) {
+      stageMobileTarget('engage', foe ? { kind: 'fleet', id: foe.id } : null);
+      return;
+    }
     engageAim = false;
     lastPanelHtml = '';
     if (!foe) {
       note(t('hint.engage-enemy-only'));
       return;
     }
-    const target = s.fleets[foe.id]!;
-    for (const id of selectedFleetIds()) {
-      const mine = s.fleets[id];
-      if (!mine) continue;
-      if (mine.location && mine.location === target.location) {
-        playerOrder(engageFleet(ME, id, target.id));
-      } else if (target.location) {
-        // Марш к узлу цели: сцепку по прибытии заводит само ядро.
-        playerOrder(moveFleet(ME, id, target.location));
-      } else {
-        note(t('hint.engage-in-flight')); // цель сама в пути — курса к ней нет
-      }
-    }
+    engageTarget(s.fleets[foe.id]!);
     return;
   }
   // SEL-1 «Выбрать+»: while picking, taps only toggle OWN fleets in/out of the
@@ -8459,6 +8642,12 @@ function selectAt(mx: number, my: number) {
   // war prompt instead of dispatching.
   if (owner === 'move') {
     const n = nearestHit(MAP, (nn) => world(nn), mx, my, rNode);
+    if (MOBILE) {
+      const lane = n ? null : nearestLanePoint(mx, my);
+      stageMobileTarget('move', n ? { kind: 'planet', id: n.id } : lane ?
+        { kind: 'lane', from: lane.from, to: lane.to, t: lane.t } : null);
+      return;
+    }
     if (n) tryMoveGroup(selectedFleetIds(), n.id);
     else {
       const lane = nearestLanePoint(mx, my);
@@ -8515,8 +8704,8 @@ function selectAt(mx: number, my: number) {
     lastPanelHtml = '';
   };
   if (!pcUi()) {
-    // Mobile (frozen in this chat): the original fleet-first behaviour — nearest
-    // TAPPABLE fleet under the tap, else the world, else clear. Перебора нет.
+    // Phone: choose explicitly from overlapping objects. The legacy tablet keeps
+    // the nearest tappable fleet, else the world, else clear. No invisible cycling.
     // «Ближайший» — не обязательно свой: с UI-14 чужой видимый флот тоже отвечает на
     // тап, только осмотром (правило 6 в `fleetSelection.ts`), поэтому имя переменной
     // здесь `hit`, а не `mine` — фильтр «своё» стоит дальше, в `setFleetSelection`.
@@ -8525,6 +8714,11 @@ function selectAt(mx: number, my: number) {
     if (additive && hit) {
       toggleFleetInSelection(hit);
       return;
+    }
+    if (MOBILE) {
+      const choices = tapCandidates(fleetIds, n?.id ?? null);
+      mobileChoices = choices.length > 1 ? choices : [];
+      if (mobileChoices.length) return;
     }
     applyPick(touchPick(hit, n?.id ?? null));
     return;
@@ -8573,10 +8767,8 @@ let pinchDist = 0;
 // прежде всего вооружённому приказу: одним пальцем там целятся, и без второго жеста
 // камера оказывалась заперта — цель за краем экрана была недостижима.
 let pinchMid: { x: number; y: number } | null = null;
-// Был ли в этом жесте второй палец. Одиночный тап при вооружённом приказе КОММИТИТ его
-// даже после протяжки (так целятся на телефоне), поэтому отпускание последнего пальца
-// после щипка обязано быть исключением: иначе панорама заканчивалась бы случайным
-// приказом в точке, где палец просто оторвался.
+// Был ли в этом жесте второй палец. После щипка нельзя ни выбирать объект,
+// ни ставить цель, ни отправлять приказ в точке отрыва последнего пальца.
 let multiTouched = false;
 let boxSelecting = false;
 // Пиксели страницы → координаты холста. Перевод один на палец и на колесо
@@ -8608,7 +8800,7 @@ canvas.addEventListener('pointerdown', (ev) => {
       ctrl: ev.ctrlKey,
       meta: ev.metaKey,
       overOwnFleet,
-      orderArmed: !!(aiming || merging || chainMode),
+      orderArmed: !!(aiming || merging || chainMode || (MOBILE && mobileOrderKind())),
     });
     additive = intent.additive;
     boxSelecting = intent.boxSelect;
@@ -8666,17 +8858,16 @@ canvas.addEventListener('pointermove', (ev) => {
   pointers.set(ev.pointerId, p);
   const moved = movedBeyondSlop(dragStart, p, ev.pointerType === 'touch');
   if (moved) cancelLongPress(); // a moving finger is a drag, not a long-press
-  // Чем занят этот жест — `dragIntent.ts` (REFM-199). Два пальца всегда щипок (второй
-  // палец ВЕЗЁТ камеру, а не отменяет приказ: раньше отменял, и цель за краем экрана
-  // становилась недостижимой); на тач вооружённый приказ забирает протяжку себе — это
-  // починка «слепого приказа», когда панорама съедала прицеливание и приказ не доходил
-  // вовсе; на PC мышь целится наведением, поэтому там протяжка остаётся панорамой.
+  // `dragIntent.ts`: два пальца — щипок. На телефоне один палец двигает карту
+  // даже при выборе цели; приказы подтверждает кнопка. Планшет сохраняет drag-aim,
+  // PC — прицел наведением и панораму перетаскиванием.
   const intent = dragIntent({
     pointers: pointers.size,
     armed: aiming || assaultAim,
     pc: pcUi(),
     boxing: boxSelecting,
     hasStart: !!dragStart,
+    confirmRequired: MOBILE,
   });
   if (intent === 'pinch') {
     const [a, b] = [...pointers.values()];
@@ -8743,6 +8934,7 @@ function endPointer(ev: PointerEvent) {
     pc: pcUi(),
     multiTouched,
     dragged,
+    confirmRequired: MOBILE,
   });
   if (single && p && commits) {
     tapByTouch = ev.pointerType === 'touch';
@@ -8770,7 +8962,7 @@ canvas.addEventListener(
 canvas.addEventListener('dblclick', () => defaultView());
 // track the pointer for the "Move" preview line (desktop only)
 canvas.addEventListener('pointermove', (ev) => {
-  aimPointer = ptXY(ev);
+  if (!MOBILE || !mobileOrderKind()) aimPointer = ptXY(ev);
 });
 
 // --- top bar / speed ---------------------------------------------------------
@@ -9749,7 +9941,7 @@ const settings = initSettings({
     starfield: starfieldOn(),
     motion: motionOn(),
     holography: holographyOn(),
-    holographySupported: supportsHolography(VW, VH, holoCoarsePointer?.matches ?? false),
+    holographySupported: MOBILE || supportsHolography(VW, VH, holoCoarsePointer?.matches ?? false),
     fps: showFpsOn(),
     soundOn: snd.enabled(),
     volume: snd.volume(),
@@ -11931,14 +12123,16 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'splitdlg', isOpen: () => splitState !== null, close: () => { splitState = null; lastPanelHtml = ''; } }, // z45
   // --- низ экрана (z27…z20) ---
   { id: 'chatwin', isOpen: () => chatWin.isOpen(), close: () => chatWin.close() }, // z27
+  { id: 'mobile-picker', isOpen: () => MOBILE && mobileChoices.length > 0, close: () => { mobileChoices = []; } },
   // Поповеры ряда команд живут ВНУТРИ #cmdbar: прячет их ближайший renderCmdBar, но
   // кэш разметки надо сбить руками, иначе строка не изменится и DOM останется прежним.
   {
     id: 'cmdbar',
-    isOpen: () => troopsPlan !== null || castMenu,
+    isOpen: () => troopsPlan !== null || castMenu || (MOBILE && cmdMore),
     close: () => {
       troopsPlan = null;
       castMenu = false;
+      if (MOBILE) cmdMore = false;
       lastCmdHtml = '';
     },
   }, // z26
@@ -11946,8 +12140,9 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'chain', isOpen: () => chainMode !== null, close: () => exitChainMode() },
   {
     id: 'aim',
-    isOpen: () => aiming || assaultAim || merging,
+    isOpen: () => aiming || assaultAim || merging || (MOBILE && (engageAim || pickMode)),
     close: () => {
+      if (MOBILE) cancelMobileOrder();
       aiming = false;
       assaultAim = false;
       merging = false;
@@ -11957,7 +12152,10 @@ const BACK_LAYERS: BackLayer[] = [
   // Раскрытая панель инструментов рельсы: на телефоне она занимает пол-экрана, а CSS-опись
   // её не видит — узел живёт всегда, раскрытость это класс `.open` (см. EXTRA_LAYERS).
   { id: 'rail', isOpen: () => railEl.classList.contains('open'), close: () => setRailOpen(false) }, // z26
-  { id: 'side', isOpen: () => selFleet !== null || selPlanet !== null || selFleets.size > 0, close: () => clearSelection() }, // z20
+  { id: 'side', isOpen: () => panelFleet() !== null || selPlanet !== null || selFleets.size > 0, close: () => {
+    if (mobileHud.expanded()) mobileHud.collapse();
+    else clearSelection();
+  } }, // z20
   // Экран настройки матча — последняя ступень: это не слой поверх матча, а сам экран,
   // и у него свой путь назад (в хаб / на экран входа).
   {
@@ -12027,6 +12225,8 @@ function frame(nowReal: number) {
   const wasHolographic = holographic.active();
   const previousViewport = insets();
   holographic.sync(VW, VH, holoCoarsePointer?.matches ?? false, inMatch());
+  mobileHud.sync(MOBILE && inMatch());
+  if (!MOBILE) { mobileDraft = null; mobileChoices = []; }
   if (wasHolographic !== holographic.active()) {
     Object.assign(cam, reframePresentation(cam, previousViewport, insets(), mapBounds()));
     clampCam();
@@ -12090,6 +12290,7 @@ function frame(nowReal: number) {
     renderCmdBar();
     renderSplitDialog();
     holographic.layoutWindows();
+    updateMobileHud();
   }
   // Status strip below the top bar: the in-game clock plus the donate currency
   // (Суверены ◆) pushed to the right end — one level down from the resource row.
@@ -12793,7 +12994,7 @@ function drawPings(now: number): void {
     const x = c.x;
     const y = c.y - 22; // pin head floats above the node (плейтест: пинги крупнее)
     const col = ownerColor(m.from);
-    if (holographic.active()) {
+    if (holographicMapOn()) {
       drawHolographicPing(cx, c.x, c.y, col, hologramTime, pingPhase(x), glowOn());
       pingHits.push({ loc: m.ping!, x, y: y - 1 });
       continue;
