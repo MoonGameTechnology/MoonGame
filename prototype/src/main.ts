@@ -1424,8 +1424,13 @@ function resize() {
   VH = v.h;
   DPR = v.dpr;
   MOBILE = v.mobile;
-  canvas.width = Math.round(VW * DPR);
-  canvas.height = Math.round(VH * DPR);
+  // WebView can repeat resize notifications without changing the viewport.
+  // Assigning even the SAME canvas size erases its bitmap and resets the context;
+  // keep the displayed frame until a real size/DPR change requires a new surface.
+  const width = Math.round(VW * DPR);
+  const height = Math.round(VH * DPR);
+  if (canvas.width !== width) canvas.width = width;
+  if (canvas.height !== height) canvas.height = height;
   canvas.style.width = VW + 'px';
   canvas.style.height = VH + 'px';
   chatWin.onViewportResize(); // the half-screen cap follows the new viewport
@@ -12279,12 +12284,12 @@ function frame(nowReal: number) {
       ? null
       : computeVision(); // fog projection for this frame
   if (vision) updateMemory(vision.identify); // variant B: remember what we see
-  // BF-30: in net mode, don't render the map until the server's welcome snapshot
-  // has arrived and ME is set to the correct seat — otherwise the default `ME = 'p1'`
-  // paints a spawn at p1's start before the server assigns the real seat.
-  if (NET && !netAdmitted) {
-    // show a blank canvas + the connect overlay (already shown by showConnect(true))
-  } else {
+  // The welcome/browser and hub are opaque full-screen pages. Painting the map
+  // behind them burns a full holographic frame on phone startup for nothing.
+  // Keep the clock/network path above running; only skip the covered presentation.
+  // Setup is translucent and deliberately retains its live map backdrop.
+  // BF-30: also wait for the admitted server seat before painting any net map.
+  if (!document.hidden && !connectShown() && hubEl.style.display === 'none' && !(NET && !netAdmitted)) {
     render(nowReal);
     renderPanel();
     renderCmdBar();
