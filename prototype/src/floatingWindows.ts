@@ -1,6 +1,6 @@
 /** Local window geometry. Never reads selection, camera or simulation state. */
 import { t } from '../../localization/runtime';
-import type { HoloPoint } from './holographicLayout';
+import type { HoloPoint, HoloRect } from './holographicLayout';
 
 const WINDOWS = [
   ['holo-selection-window', '', '.phead,.holo-command-head,.chlabel'],
@@ -169,6 +169,13 @@ export function initFloatingWindows() {
   }, true);
 
   return {
+    /** The leader reads cached geometry; it never moves or measures the window. */
+    bounds(id: string): HoloRect | null {
+      const entry = entries.find((item) => item.id === id);
+      return entry?.visible && entry.point && entry.size ? {
+        x: Math.round(entry.point.x), y: Math.round(entry.point.y), ...entry.size,
+      } : null;
+    },
     /** A newly selected object suggests an opening position; a user's placement wins. */
     openAt(id: string, point: HoloPoint): void {
       const entry = entries.find((item) => item.id === id);

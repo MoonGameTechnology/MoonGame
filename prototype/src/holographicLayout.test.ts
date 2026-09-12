@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { reframePresentation, supportsHolography, selectionWindowPosition } from './holographicLayout';
+import { reframePresentation, supportsHolography, selectionWindowPosition, selectionThread } from './holographicLayout';
 import { worldToScreen } from '../../packages/client/src/camera';
 
 it('changing the skin preserves map positions and physical zoom in both directions', () => {
@@ -49,4 +49,15 @@ it('opens beside the selection on the side with room and below the top chrome', 
   expect(selectionWindowPosition({ x: 1250, y: 300 }, size, view, 104)).toEqual({ x: 880, y: 252 });
   expect(selectionWindowPosition({ x: 500, y: 40 }, size, view, 104).y).toBe(104);
   expect(selectionWindowPosition({ x: 500, y: 940 }, size, view, 104).y).toBe(398);
+});
+
+it('connects each object to the nearest window side without crossing its rounded corners', () => {
+  const box = { x: 400, y: 200, width: 340, height: 500 };
+  expect(selectionThread({ x: 300, y: 350 }, box)).toEqual({ from: { x: 310, y: 350 }, to: { x: 400, y: 350 } });
+  expect(selectionThread({ x: 850, y: 350 }, box)?.to).toEqual({ x: 740, y: 350 });
+  expect(selectionThread({ x: 500, y: 100 }, box)?.to).toEqual({ x: 500, y: 200 });
+  expect(selectionThread({ x: 500, y: 850 }, box)?.to).toEqual({ x: 500, y: 700 });
+  expect(selectionThread({ x: 300, y: 100 }, box)?.to).toEqual({ x: 400, y: 214 });
+  expect(selectionThread({ x: 500, y: 350 }, box)).toBeNull();
+  expect(selectionThread({ x: 395, y: 350 }, box)).toBeNull();
 });

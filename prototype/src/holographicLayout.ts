@@ -38,6 +38,21 @@ export interface HoloRect {
   height: number;
 }
 
+/** A fine leader ends on the nearest straight side, clear of the window's corners. */
+export function selectionThread(anchor: HoloPoint, box: HoloRect): { from: HoloPoint; to: HoloPoint } | null {
+  const right = box.x + box.width, bottom = box.y + box.height;
+  if (anchor.x >= box.x && anchor.x <= right && anchor.y >= box.y && anchor.y <= bottom) return null;
+  const x = Math.max(box.x + 14, Math.min(anchor.x, right - 14));
+  const y = Math.max(box.y + 14, Math.min(anchor.y, bottom - 14));
+  const ends = [{ x: box.x, y }, { x: right, y }, { x, y: box.y }, { x, y: bottom }];
+  const distance = (p: HoloPoint): number => Math.hypot(p.x - anchor.x, p.y - anchor.y);
+  const to = ends.reduce((nearest, point) => distance(point) < distance(nearest) ? point : nearest);
+  const length = distance(to);
+  if (length <= 14) return null;
+  return { from: { x: anchor.x + (to.x - anchor.x) * 10 / length,
+    y: anchor.y + (to.y - anchor.y) * 10 / length }, to };
+}
+
 /** Place the compact command window beside the object once, without covering its marker. */
 export function selectionWindowPosition(
   anchor: HoloPoint, size: { width: number; height: number },
