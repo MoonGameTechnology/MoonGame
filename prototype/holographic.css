@@ -1,0 +1,247 @@
+/* Optional flagship console. Every rule is gated; the existing phone/simple skin stays available. */
+.holo-back,.holo-nav,.holo-more{display:none;}
+body.holo-ui{
+  --pcz:1;--vph:100dvh;--tbh:64px;
+  --cyan:#8ce9f2;--cyan-dim:#78adbb;--ink:#d8eaf1;--dim:#a1bac7;
+  --line:#233d49;--line-hi:#477381;--glass:rgba(3,13,21,.94);
+  --holo-surface:#0a202d;--holo-reflection:#b9f5ff;
+  font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  font-size:14px;letter-spacing:.1px;
+}
+/* The bevel belongs to each window. The map's much larger rim is drawn in world coordinates. */
+body.holo-ui :is(#top,#side,#cmdbar,#speedbar,#railtools,#chatwin,.twbox,.lwbox,.cnbox,.mkbox,
+  .dpbox,.pcbox,.setbox,.cxbox,.chbox,.rc-box,.rcbox,.sbox,.corpbox,.ep-box,.inbox){
+  background:linear-gradient(155deg,rgba(39,84,103,.3),transparent 42%),var(--glass);
+  border:1px solid rgba(124,212,230,.46);border-radius:10px;clip-path:none;
+  box-shadow:0 14px 36px rgba(0,0,0,.5),inset 0 1px 0 rgba(200,243,255,.2),
+    inset 0 -1px 0 rgba(1,8,13,.9),0 0 0 3px rgba(9,28,39,.26);
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+}
+/* A brighter command frame separates the immediate action from supporting information. */
+body.holo-ui #cmdbar{border-color:rgba(140,233,242,.76);}
+body.holo-ui :is(#side,#cmdbar,#chatwin,#railtools){scrollbar-width:thin;scrollbar-color:var(--line-hi) transparent;}
+/* Animate stable hosts only; live text/button replacement never restarts an entrance.
+   Opacity leaves measurements and every interactive target at their final coordinates. */
+body.holo-ui:not(.holo-still).sheet-open #side,
+body.holo-ui:not(.holo-still) #cmdbar.show,
+body.holo-ui:not(.holo-still) #rail.open #railtools,
+body.holo-ui:not(.holo-still) #chatwin.open{animation:holo-panel-in .18s ease-out;}
+@keyframes holo-panel-in{from{opacity:.55;}to{opacity:1;}}
+body.holo-ui button{font-family:inherit;}
+.holo-icon{display:none;}
+body.holo-ui .holo-icon{display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;vertical-align:middle;}
+body.holo-ui .holo-icon svg{display:block;width:19px;height:19px;fill:currentColor;}
+body.holo-ui .simple-icon{display:none;}
+body.holo-ui :is(button,input,select,[tabindex]):focus-visible{
+  outline:2px solid var(--holo-reflection);outline-offset:3px;
+}
+body.holo-ui button:disabled{cursor:not-allowed;}
+body.holo-ui #top{
+  top:16px;left:76px;right:18px;height:var(--tbh);padding:8px 15px;
+  display:flex;flex-direction:row;align-items:center;gap:14px;z-index:30;
+}
+body.holo-ui #top .tbar{display:contents;}
+body.holo-ui #topback{display:none;}
+body.holo-ui .crest{order:1;padding:0;gap:12px;flex:0 1 190px;min-width:130px;}
+body.holo-ui #crestmark{width:36px;height:36px;font-size:20px;box-shadow:inset 0 0 12px rgba(116,232,237,.07);}
+body.holo-ui .who b{font-size:15px;font-weight:600;letter-spacing:.15px;}
+body.holo-ui .who span{font-size:11px;letter-spacing:.2px;color:var(--dim);}
+body.holo-ui #purse{order:2;flex:1 1 auto;padding:0;gap:6px;min-width:0;height:40px;}
+body.holo-ui .res{height:36px;padding:0 4px;gap:6px;border:0;justify-content:flex-start;}
+body.holo-ui .res b{font-size:15px;font-weight:500;font-variant-numeric:tabular-nums;}
+body.holo-ui .res em{font-size:10px;}
+body.holo-ui .res i svg{width:17px;height:17px;}
+body.holo-ui #tbscore{order:3;margin:0;padding:5px 8px;font-size:12px;border-radius:5px;}
+body.holo-ui #daycard{order:4;margin:0;padding:0 0 0 10px;border:0;border-left:1px solid var(--line);border-radius:0;background:none;}
+body.holo-ui #daycard b{font-size:12px;letter-spacing:.3px;}
+body.holo-ui #daycard span{font-size:10px;letter-spacing:0;}
+body.holo-ui .holo-back{position:fixed;display:grid;place-items:center;left:18px;top:16px;width:42px;height:44px;
+  z-index:31;color:var(--ink);font:26px/1 ui-sans-serif,system-ui,sans-serif;cursor:pointer;
+  background:linear-gradient(145deg,rgba(19,51,67,.5),rgba(3,14,24,.96));
+  border:1px solid var(--line-hi);border-radius:5px 9px 5px 9px;
+  box-shadow:inset 0 1px 0 rgba(185,245,255,.2),0 3px 0 rgba(20,48,60,.7),0 6px 18px rgba(0,0,0,.5);}
+body.holo-ui .holo-back:hover{color:var(--cyan);border-color:var(--cyan-dim);}
+body.holo-ui .holo-back:active{transform:translateY(2px);box-shadow:inset 0 1px 0 rgba(185,245,255,.15);}
+body.holo-ui .holo-nav{position:fixed;display:flex;gap:8px;left:18px;top:calc(var(--tbh) + 30px);z-index:27;}
+body.holo-ui .holo-nav :is(button,span){display:flex;align-items:center;justify-content:center;min-width:86px;min-height:36px;
+  padding:7px 14px;border:1px solid var(--line);border-radius:4px;background:var(--glass);color:var(--ink);font-size:12px;}
+body.holo-ui .holo-nav button{cursor:pointer;}
+body.holo-ui .holo-nav [aria-current=page]{color:var(--holo-reflection);border-color:var(--cyan-dim);
+  background:rgba(8,39,51,.94);box-shadow:inset 0 -2px 0 rgba(140,233,242,.6);}
+body.holo-ui .holo-nav button:hover{border-color:var(--cyan-dim);}
+body.holo-ui #rail{left:var(--holo-nav-end,370px);top:calc(var(--tbh) + 30px);bottom:auto;gap:8px;flex-direction:column-reverse;align-items:flex-start;}
+body.holo-ui #railtoggle{display:flex;align-items:center;justify-content:center;gap:8px;width:92px;height:36px;
+  border:1px solid var(--line);border-radius:4px;font-size:14px;background:var(--glass);box-shadow:none;}
+body.holo-ui .holo-more{display:inline;font-size:12px;}
+body.holo-ui #railtools{width:264px;max-height:calc(100dvh - var(--tbh) - 136px);overflow-y:auto;
+  padding:10px;grid-template-columns:1fr 1fr;gap:5px;}
+body.holo-ui #rail.open #railtools{display:grid;}
+body.holo-ui #railtools::before,body.holo-ui #railtools::after{display:none;}
+body.holo-ui #railtools button{display:flex;align-items:center;justify-content:flex-start;gap:10px;width:auto;height:40px;
+  padding:7px 9px;font-size:16px;color:var(--cyan);border-radius:4px;}
+body.holo-ui #railtools .rlbl{display:inline;font-size:12px;line-height:1.3;letter-spacing:0;color:var(--ink);}
+body.holo-ui #railtools #rail-settings,body.holo-ui #railtools #rail-exit{display:flex;}
+body.holo-ui #devline{top:calc(var(--tbh) + 31px);left:auto;right:18px;width:auto;gap:16px;
+  background:transparent;border:0;font-size:11px;pointer-events:none;}
+body.holo-ui #devline .dl-donate{pointer-events:auto;animation:none;border-radius:5px;box-shadow:none;background:rgba(29,26,13,.75);}
+body.holo-ui #fps{top:calc(var(--tbh) + 70px);right:18px;font-size:10px;}
+body.holo-ui #toasts{top:calc(var(--tbh) + 76px);max-width:min(560px,70vw);}
+body.holo-ui #goals{top:calc(var(--tbh) + 82px);left:18px;right:auto;max-width:240px;font-size:12px;}
+/* The selection card remains the game's own full dossier, with all its live actions. */
+body.holo-ui #side{left:auto;right:18px;top:calc(var(--tbh) + 96px);bottom:auto;width:min(410px,39vw);
+  height:auto;max-height:calc(100dvh - var(--tbh) - 182px);overflow:hidden;z-index:20;flex-direction:column;}
+body.holo-ui #side .pscroll{padding:15px 16px;overflow-y:auto;min-height:0;touch-action:pan-y;}
+body.holo-ui #side .pdesc{display:none;}
+body.holo-ui #side .phead{margin:0 0 12px;padding-bottom:12px;gap:10px;}
+body.holo-ui #side .ptitle{display:block;min-width:0;}
+body.holo-ui #side .ptitle b{font-size:15px;letter-spacing:.4px;}
+body.holo-ui #side .ptitle span{display:block;font-size:12px;margin-top:5px;white-space:normal;line-height:1.5;}
+body.holo-ui #side .pclose{width:28px;height:28px;flex:0 0 auto;border-radius:4px;}
+body.holo-ui #side .row{font-size:12px;line-height:1.6;margin:6px 0;}
+body.holo-ui #side .sec{font-size:11px;letter-spacing:.5px;margin:15px 0 7px;color:var(--dim);}
+body.holo-ui #side .pstats span{font-size:11px;padding:5px 7px;}
+body.holo-ui #side .ptabs{gap:6px;margin:10px 0;padding:0;top:0;}
+body.holo-ui #side .ptab{min-height:34px;padding:7px 10px;font-size:12px;border-radius:4px;}
+body.holo-ui #side .ptiles{gap:7px;margin:8px 0;}
+body.holo-ui #side .ptile{min-height:50px;min-width:56px;padding:7px;}
+body.holo-ui #side .ptile .pt-n{font-size:11px;max-width:100px;}
+body.holo-ui #side .asset-row{font-size:12px;min-height:34px;padding:6px 8px;}
+body.holo-ui #side .asset-row b{font-size:12px;}
+body.holo-ui #side button.b{min-height:30px;padding:6px 9px;font-size:12px;border-radius:4px;}
+body.holo-ui #side .conveyor{padding:10px;margin:8px 0;}
+body.holo-ui #side .hint{font-size:12px;line-height:1.5;}
+/* The SAME command buttons are wrapped, not reimplemented or reduced to mock actions. */
+body.holo-ui #cmdbar,body.holo-ui.sheet-open #cmdbar{left:50%;top:40%;bottom:auto;transform:none;zoom:1;
+  width:292px;max-width:calc(100vw - 28px);padding:0;gap:0;overflow:auto;touch-action:pan-y;transition:none;}
+body.holo-ui #cmdbar.show{display:flex;flex-direction:column;align-items:stretch;}
+body.holo-ui #cmdbar .cmdlabel{display:none;}
+body.holo-ui #cmdbar .holo-command-head{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;
+  padding:13px 14px 11px;border-bottom:1px solid var(--line);background:rgba(33,81,98,.15);}
+body.holo-ui .holo-command-head b{font-size:14px;font-weight:600;letter-spacing:.4px;}
+body.holo-ui .holo-command-head span{display:block;color:var(--dim);font-size:12px;line-height:1.5;margin-top:4px;}
+body.holo-ui #cmdbar .holo-command-close{width:26px;min-width:26px;height:26px;padding:0;border-radius:4px;font-size:18px;}
+body.holo-ui .holo-command-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;padding:10px 12px;}
+body.holo-ui #cmdbar button{min-width:0;min-height:37px;height:auto;padding:8px;flex-direction:row;justify-content:flex-start;gap:8px;
+  font-size:12px;line-height:1.25;letter-spacing:0;border-radius:4px;border-color:var(--line-hi);box-shadow:none;text-align:left;}
+body.holo-ui #cmdbar .ci{font-size:17px;line-height:1;flex:0 0 20px;text-align:center;font-variant-emoji:text;}
+body.holo-ui #cmdbar button:not(:disabled):hover{border-color:var(--cyan);background-color:rgba(45,106,125,.2);}
+body.holo-ui #cmdbar button:not(:disabled):active{background-color:rgba(60,146,163,.28);}
+body.holo-ui #cmdbar button.on:not(:disabled){border-color:var(--cyan);color:var(--holo-reflection);
+  background-color:rgba(26,115,130,.26);box-shadow:inset 2px 0 0 var(--cyan);}
+body.holo-ui #cmdbar .cl{font-size:12px;letter-spacing:0;text-transform:none;opacity:1;}
+body.holo-ui #cmdbar button.holo-command-close{width:26px;height:26px;min-height:26px;
+  justify-content:center;align-items:center;text-align:center;}
+body.holo-ui #cmdbar [data-cmd=move]{grid-column:1/-1;min-height:40px;color:var(--holo-reflection);
+  background:rgba(26,115,130,.2);border-color:var(--cyan-dim);}
+body.holo-ui #cmdbar [data-cmd=move].on{background:rgba(26,145,157,.36);border-color:var(--cyan);}
+body.holo-ui #cmdbar button:disabled{opacity:.56;border-color:var(--line);}
+body.holo-ui #cmdbar .holo-command-details{margin:0 12px 10px;border:0;border-top:1px solid var(--line);
+  padding:10px 0 0;min-height:32px;font-size:12px;color:var(--cyan-dim);}
+body.holo-ui #cmdbar .cmdpop{position:static;grid-column:1/-1;min-width:0;max-width:none;width:100%;margin-top:5px;
+  padding:8px;border-radius:4px;background:rgba(0,6,12,.65);box-shadow:none;}
+body.holo-ui #cmdbar .cmdpop button{width:100%;min-height:38px;flex-wrap:wrap;}
+body.holo-ui #cmdbar .tpop .tbtns button{width:28px;min-width:28px;min-height:30px;padding:3px;}
+body.holo-ui #cmdbar .tpop .tbtns{flex-wrap:wrap;justify-content:flex-end;}
+body.holo-ui #cmdbar .tpop .trow{grid-template-columns:1fr;gap:4px;padding:8px 0;}
+body.holo-ui.chain-mode #cmdbar{width:350px;padding:12px;}
+body.holo-ui.chain-mode #cmdbar.show{display:flex;flex-flow:row wrap;gap:7px;}
+body.holo-ui.chain-mode #cmdbar .chlabel{flex:1 0 100%;white-space:normal;padding:0 0 6px;line-height:1.6;}
+body.holo-ui #speedbar,body.holo-ui.sheet-open #speedbar{bottom:18px;right:18px;padding:9px 12px;gap:6px;z-index:24;}
+body.holo-ui #speedbar button{height:30px;min-width:30px;font-size:12px;border-radius:4px;}
+body.holo-ui #speedbar #tomenu{display:none;}
+/* Existing dialogs retain their back/close order and every content/action handler. */
+body.holo-ui :is(#tech,#buildwin,#steward,#market,#constructor,#logwin,#diplo){
+  background:transparent;backdrop-filter:none;pointer-events:none;
+  padding:calc(var(--tbh) + 90px) 20px 84px;align-items:flex-start;justify-content:flex-end;
+}
+body.holo-ui :is(.twbox,.lwbox,.cnbox,.mkbox,.dpbox){pointer-events:auto;}
+body.holo-ui :is(#tech,#steward,#buildwin) .twbox,
+body.holo-ui #market .mkbox,body.holo-ui #logwin .lwbox,body.holo-ui #diplo .dpbox{
+  width:min(740px,72vw);max-height:calc(100dvh - var(--tbh) - 176px);
+}
+body.holo-ui #constructor .cnbox{width:min(960px,78vw);max-height:calc(100dvh - var(--tbh) - 176px);}
+body.holo-ui :is(.lw-head,.cn-head,.mk-head){min-height:48px;padding:12px 16px;background:rgba(14,40,54,.25);}
+body.holo-ui :is(.lw-head,.cn-head,.mk-head) b{font-size:14px;letter-spacing:.5px;}
+body.holo-ui :is(.tw-close,.lw-close,.cn-close,.mk-close){min-width:28px;min-height:28px;border-radius:4px;}
+body.holo-ui :is(#codex .cxbox,#codexhub .chbox){width:min(800px,84vw);max-height:82dvh;}
+body.holo-ui :is(#playercard .pcbox,#settings .setbox,#rescard .rc-box){width:min(520px,86vw);max-height:82dvh;}
+body.holo-ui #splitdlg .sbox{width:min(620px,84vw);max-height:80dvh;}
+body.holo-ui #corp .corpbox{width:min(960px,88vw);max-height:84dvh;}
+body.holo-ui #recap .rcbox{width:min(620px,86vw);max-height:82dvh;}
+body.holo-ui #intro .inbox{width:min(540px,86vw);max-height:82dvh;}
+body.holo-ui #objtip{max-width:min(410px,38vw);opacity:1;background:var(--glass);border-color:var(--line-hi);}
+body.holo-ui #objtip .pd-title{font-size:14px;letter-spacing:.3px;}
+body.holo-ui #objtip .pd-body{font-size:12px;}
+/* Transmission accents only decorate actual arrivals; history and channel changes stay still. */
+body.holo-ui #chatwin{--cw-edge:rgba(140,233,242,.46);}
+body.holo-ui .cw-head{position:relative;padding:9px 10px;border-radius:9px 9px 0 0;background:rgba(24,62,78,.16);}
+body.holo-ui .cw-title{font-family:inherit;font-weight:600;font-size:12px;line-height:1.4;letter-spacing:.3px;color:var(--ink);}
+body.holo-ui .cw-btn{opacity:1;color:var(--cyan-dim);border-radius:4px;}
+body.holo-ui .cw-btn .holo-icon svg{width:15px;height:15px;}
+body.holo-ui .cw-tabs{gap:4px;padding:8px 8px 0;}
+body.holo-ui .cw-tab{border-radius:4px 4px 0 0;font-family:inherit;letter-spacing:0;}
+body.holo-ui .cw-feed{gap:10px;line-height:1.6;padding:12px;}
+body.holo-ui .cw-feed .dp-line{color:var(--ink);}
+body.holo-ui .cw-feed .dp-line.ping{color:var(--amber);}
+body.holo-ui .cw-feed .dp-line.sys{color:var(--amber);}
+body.holo-ui .cw-arrival{position:relative;}
+body.holo-ui:not(.holo-still) .cw-arrival{animation:holo-transmission 1.6s ease-out both;}
+body.holo-ui:not(.holo-still) .cw-arrival::before{content:'';position:absolute;left:-7px;top:1px;bottom:1px;
+  width:2px;background:var(--cyan);pointer-events:none;animation:holo-receive 1.6s ease-out both;}
+body.holo-ui #msgbadge{background:#153f50;border:1px solid #74c7d9;color:#d5f6ff;box-shadow:0 0 8px rgba(83,199,225,.25);}
+body.holo-ui #railalert{border:1px solid rgba(255,186,104,.65);box-shadow:none;}
+body.holo-ui .cw-compose input{font-family:inherit;border-radius:4px;background:rgba(0,6,11,.65);}
+body.holo-ui .cw-send{border-radius:4px;}
+@keyframes holo-transmission{from{background-color:rgba(87,204,227,.16);}to{background-color:transparent;}}
+@keyframes holo-receive{0%{opacity:.9;transform:scaleY(.2);}35%{opacity:.8;transform:scaleY(1);}100%{opacity:0;transform:scaleY(1);}}
+body.holo-ui #hub{background-color:var(--glass);}
+body.holo-ui #hub :is(.hub-banner,.hub-id,.hub-body,.hub-note,.hub-nav){width:min(1040px,86%);}
+body.holo-ui #connect :is(.cbox,.cwrap){width:min(700px,88vw);}
+body.holo-ui #setup .sbox{width:min(1080px,90vw);max-height:88dvh;}
+body.holo-ui #setup .spane{min-height:0;}
+body.holo-ui #endscreen .es-box{width:min(620px,86vw);max-height:86dvh;}
+/* The footer remains reachable on short desktop windows; tablets use two resource rows. */
+@media(max-width:1200px){
+  body.holo-ui{--tbh:108px;}
+  body.holo-ui #top{display:grid;grid-template-columns:minmax(140px,1fr) auto auto;gap:6px 12px;padding:10px 12px;}
+  body.holo-ui .crest{grid-row:1;grid-column:1;min-width:0;}
+  body.holo-ui #tbscore{grid-row:1;grid-column:2;}
+  body.holo-ui #daycard{grid-row:1;grid-column:3;}
+  body.holo-ui #purse{grid-row:2;grid-column:1/-1;justify-content:space-between;border-top:1px solid var(--line);padding-top:5px;height:38px;}
+  body.holo-ui #side{width:min(380px,42vw);}
+}
+@media(max-width:900px){
+  body.holo-ui #top{left:70px;right:12px;gap:5px 8px;}
+  body.holo-ui .holo-back{left:12px;}
+  body.holo-ui #daycard span{font-size:9px;}
+  body.holo-ui #tbscore{font-size:10px;padding:4px 6px;}
+  body.holo-ui #side{width:min(340px,40vw);right:12px;}
+  body.holo-ui #devline #clock{display:none;}
+  body.holo-ui :is(#tech,#buildwin,#steward,#market,#constructor,#logwin,#diplo){padding-right:12px;padding-left:12px;}
+  body.holo-ui :is(#tech,#steward,#buildwin) .twbox,body.holo-ui #market .mkbox,
+  body.holo-ui #logwin .lwbox,body.holo-ui #diplo .dpbox,body.holo-ui #constructor .cnbox{width:min(720px,92vw);}
+}
+@media(pointer:coarse){
+  body.holo-ui .holo-back{width:44px;}
+  body.holo-ui #cmdbar button,body.holo-ui #cmdbar .cmdpop button,
+  body.holo-ui #cmdbar .tpop .tbtns button{min-height:44px;min-width:44px;}
+  body.holo-ui #cmdbar button.holo-command-close{height:44px;width:44px;min-height:44px;min-width:44px;}
+  body.holo-ui #side :is(.pclose,.ptab,button.b){min-height:44px;min-width:44px;}
+  body.holo-ui #side .pclose{height:44px;width:44px;}
+  body.holo-ui .holo-nav :is(button,span),body.holo-ui #railtoggle,
+  body.holo-ui #railtools button{min-height:44px;}
+  body.holo-ui :is(.tw-close,.lw-close,.cn-close,.mk-close,.cw-btn,.cw-send){min-width:44px;min-height:44px;}
+  body.holo-ui .cw-head{gap:4px;padding:7px;}
+  body.holo-ui .cw-tab{min-height:44px;}
+  body.holo-ui .cw-compose input{min-height:44px;}
+  body.holo-ui #speedbar button{height:44px;min-width:44px;}
+}
+@media(max-height:650px){
+  body.holo-ui #side{top:calc(var(--tbh) + 80px);max-height:calc(100dvh - var(--tbh) - 152px);}
+  body.holo-ui #side .pscroll{padding:10px 12px;}
+  body.holo-ui #speedbar{bottom:12px;padding:6px 10px;}
+}
+body.holo-no-glow.holo-ui :is(#top,#side,#cmdbar,#speedbar,#railtools,#chatwin,.twbox,.lwbox,.cnbox,.mkbox,
+  .dpbox,.pcbox,.setbox,.cxbox,.chbox,.rc-box,.rcbox,.sbox,.corpbox,.ep-box,.inbox){
+  box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;
+}

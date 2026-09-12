@@ -194,6 +194,8 @@ import { buildLabel, currentBuild } from './updater';
 import { initApkUpdater } from './apkUpdate';
 import { measureViewport, STARS, NEBULAE } from './viewport';
 import { drawSpaceBackdrop, spaceBackdropReady } from '../../packages/client/src/spaceBackdrop';
+import { drawHolographicBattle, drawHolographicPing } from './holographicEffects';
+import { commandIcon, skinIcon } from './holographicIcons';
 import { drawProvinceSelection, insideProvince, selectionPulse, type ProvincePolygon } from '../../packages/client/src/provinceSelection';
 import { initPingUi } from './pingUi';
 import { initSoloDrivers } from './soloDrivers';
@@ -489,6 +491,10 @@ import {
   fxBreath,
 } from './graphicsPrefs';
 import { initSettings } from './settingsOverlay';
+import { initHolographicUi, commandWindowHtml } from './holographicUi';
+import { reframePresentation, supportsHolography } from './holographicLayout';
+import { drawGlassScreen, drawGlassWave, drawTerrainField, makeTerrainField, hasTerrainMaterial, type TerrainField } from './holographicSurface';
+import { holographyOn, setHolography } from './graphicsPrefs';
 // «Профиль командира» — карьерное досье (REFM-10).
 import { initProfile } from './profileScreen';
 // AVA-C1/C2 — корпоративный кабинет (REFM-11).
@@ -1339,6 +1345,17 @@ const railToggle = $('railtoggle');
 const railGlyph = $('railglyph');
 const railAlert = $('railalert');
 const crestMark = $('crestmark');
+const holoCoarsePointer = window.matchMedia?.('(pointer: coarse)');
+const holographic = initHolographicUi({
+  commands: cmdbar,
+  top: topEl,
+  side,
+  exit: () => $('topback').click(),
+  dismiss: () => clearSelection(),
+  details: () => {
+    side.querySelector<HTMLElement>('[data-act="fleetinfo"]')?.click();
+  },
+});
 
 // Player emblem — a cosmetic console crest the player picks in the main menu (hub) and
 // wears in the in-match top-bar corner. Client-side only (localStorage) — never match
@@ -1635,6 +1652,9 @@ for (const n of MAP) {
 // no longer reserves the left rail (it folds into the drawer) → the map claims that
 // space; desktop keeps the rail + label gutter and the right panel column.
 function insets(): { left: number; right: number; top: number; bottom: number } {
+  if (holographic.active()) {
+    return { left: 20, right: VW - 20, top: VW > 1200 ? 138 : 182, bottom: VH - 76 };
+  }
   if (MOBILE) {
     return { left: 14, right: VW - 24, top: TOP + 54, bottom: VH - 96 };
   }
@@ -1716,12 +1736,11 @@ function centerOn(p: { x: number; y: number }, scale: number): void {
   cam.x = n.x;
   cam.y = n.y;
 }
-/** The opening / reset view. On a phone the wide map is too dense to read whole, so
- *  zoom onto your home region and pan to explore; on a wide screen the whole-map fit
- *  reads fine. The zoom is RELATIVE to the screen-fit, so it autoscales across screens. */
+/** The opening / reset view. Phones and the flagship console open on the home region;
+ *  the simple desktop view keeps its whole-map fit. Zoom is relative to the screen-fit. */
 function defaultView(): void {
   // Кого считать домом и когда приближаться к нему — `openingView.ts` (REFM-56).
-  const view = openingView(MOBILE, pickHome(Object.values(s.planets), ME));
+  const view = openingView(MOBILE || holographic.active(), pickHome(Object.values(s.planets), ME));
   if (view.kind === 'home') {
     centerOn(view.at, view.scale);
     return;
@@ -4110,6 +4129,8 @@ const bgx = bg.getContext('2d') as CanvasRenderingContext2D;
 let bgContent = ''; // viewport + ownership signature (camera-independent)
 let bgCam = { x: 0, y: 0, scale: 1 }; // camera the static layer was last baked at
 let provincePolygons = new Map<string, ProvincePolygon>();
+let terrainFields: TerrainField[] = [];
+let holographicFrame = { x: 0, y: 0, width: 0, height: 0 };
 let paintedSelection: string | null = null;
 let selectionStarted = 0;
 
@@ -4147,7 +4168,9 @@ function buildStaticLayer(): void {
     me: ME,
     owners: ownersSig(),
     starfield: starfieldOn(),
-  }) + `|sky:${starfieldOn() && spaceBackdropReady() ? 1 : 0}`;
+  }) + `|sky:${starfieldOn() && spaceBackdropReady(holographic.active()) ? 1 : 0}` +
+    `|holo:${holographic.active()}|glow:${glowOn()}` +
+    (holographic.active() ? `|terrain:${MAP.map((n) => known(n.id) || memory.has(n.id) ? '1' : '0').join('')}` : '');
   const width = Math.round(VW * DPR);
   const baked = bgContent ? { signature: bgContent, cam: bgCam, width: bg.width } : null;
   if (!needsRebake(baked, { signature: content, cam, width })) return;
@@ -4161,9 +4184,9 @@ function buildStaticLayer(): void {
 
   // Dark space is embedded in the offline bundle. Bake it with the static layer;
   // loading the image invalidates this cache once, even if the camera stays still.
-  drawSpaceBackdrop(g, VW, VH, cam.x, cam.y, starfieldOn());
+  drawSpaceBackdrop(g, VW, VH, cam.x, cam.y, starfieldOn(), holographic.active());
   // Graphics pref: `starfield` off leaves the flat fill + grid (nebulae/stars skipped).
-  if (starfieldOn() && !spaceBackdropReady())
+  if (starfieldOn() && !spaceBackdropReady(holographic.active()))
     for (const neb of NEBULAE) {
       const r = neb.r * (MOBILE ? 0.7 : 1);
       const grd = g.createRadialGradient(neb.x * VW, neb.y * VH, 0, neb.x * VW, neb.y * VH, r);
@@ -4176,7 +4199,7 @@ function buildStaticLayer(): void {
   // Шаг, смещение под камерой и куда лечь линиям — `backdropGrid.ts` (REFM-110).
   const gap = gridGap(cam.scale);
   g.lineWidth = 1;
-  g.strokeStyle = GRID;
+  g.strokeStyle = holographic.active() ? 'rgba(113,163,184,0.05)' : GRID;
   g.beginPath();
   for (const x of gridLines(gridOffset(cam.x, gap), VW, gap)) {
     g.moveTo(x, 0);
@@ -4214,6 +4237,8 @@ function buildStaticLayer(): void {
   const tl = world(frame.topLeft);
   const br = world(frame.bottomRight);
   const clip = clipPolygon(tl, br);
+  holographicFrame = { x: tl.x, y: tl.y, width: br.x - tl.x, height: br.y - tl.y };
+  if (holographic.active()) drawGlassScreen(g, holographicFrame, glowOn());
   // Weighted-Voronoi political fill + classified borders — the shared @void/client
   // territory renderer clamps the weights (so no cell is swallowed), tessellates the
   // power diagram, fills each province in its owner's colour, and draws same-owner
@@ -4225,8 +4250,22 @@ function buildStaticLayer(): void {
     ownerColor,
     neutralFill: COLOR.null!,
     kindAccent: (kind) => SECTOR_TYPES[kind]?.color,
+    hideOwnedInner: holographic.active(),
   });
   provincePolygons = new Map(cells.map((cell) => [provinceIds[cell.idx]!, cell.poly]));
+  terrainFields = [];
+  if (holographic.active()) {
+    for (const n of MAP) {
+      const poly = provincePolygons.get(n.id);
+      if (!poly) continue;
+      const field = makeTerrainField(n.id, n.sector, sectorTypeOf(n.id)?.color ?? '#9fb6bd', poly,
+        known(n.id) || memory.has(n.id));
+      if (!field || field.box.x > VW || field.box.y > VH ||
+        field.box.x + field.box.width < 0 || field.box.y + field.box.height < 0) continue;
+      terrainFields.push(field);
+      drawTerrainField(g, field);
+    }
+  }
 
   // PATH NETWORK — thin roads between adjacent provinces (the visible "пути").
   // Movement runs along these; an army marches province-to-adjacent-province and
@@ -4250,7 +4289,7 @@ function buildStaticLayer(): void {
   // map boundary — a faint frame so the edge of the sector reads as intentional
   g.strokeStyle = 'rgba(90,151,165,0.2)';
   g.lineWidth = 0.7;
-  g.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+  if (!holographic.active()) g.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
 }
 
 /** Blit the cached static layer (device-pixel 1:1) beneath the live dynamic art. */
@@ -4334,6 +4373,10 @@ function render(now: number) {
   // Сам закон и его следствия — `semanticZoom.ts` (REFM-93).
   const detail = detailAt(cam.scale);
   blitStaticLayer(); // backdrop + province political map (re-baked on camera move, else cached)
+  if (holographic.active()) {
+    for (const field of terrainFields) drawTerrainField(cx, field, hologramTime, true);
+    drawGlassWave(cx, holographicFrame, VW, VH, hologramTime, glowOn());
+  }
   if (paintedSelection !== selPlanet) {
     paintedSelection = selPlanet;
     selectionStarted = now;
@@ -4368,7 +4411,9 @@ function render(now: number) {
     if (mark.do !== 'draw' || !anchor) continue;
     const c = world(anchor);
     if (!visible(c, 120)) continue;
-    drawBattlePulse(c.x, c.y, wave, b.phase);
+    if (holographic.active())
+      drawHolographicBattle(cx, c.x, c.y, hologramTime, b.phase ?? 'orbital', glowOn());
+    else drawBattlePulse(c.x, c.y, wave, b.phase);
     if (mark.timer) {
       // `mark.timer` истинно только при назначенном раунде — отсюда и `!` ниже.
       cx.save();
@@ -4379,7 +4424,7 @@ function render(now: number) {
       cx.fillText(
         `${b.phase === 'ground' ? t('map.badge.landing') : t('map.badge.orbit')} · ${timeLeft(roundAt!)}`,
         c.x,
-        c.y - 28,
+        c.y - (holographic.active() ? 51 : 28),
       );
       cx.restore();
     }
@@ -4515,7 +4560,7 @@ function render(now: number) {
     // Висит ли бейдж, где именно и как выглядит — `kindBadge.ts` (REFM-121): он оторван
     // от узла, чтобы не слиться с искусством сектора, и потому обязан тянуть к нему луч
     // проектора; покачивание фазируется координатами узла, иначе вся карта дрожит в такт.
-    if (badgeShown(!!KIND_ICON[n.sector], detail)) {
+    if (!holographic.active() && badgeShown(!!KIND_ICON[n.sector], detail)) {
       const kc = sectorTypeOf(n.id)?.color ?? '#9fb6bd';
       const look = badgeLook();
       const nodeTop = c.y - R;
@@ -4696,7 +4741,13 @@ function render(now: number) {
       cx.restore();
     }
 
-    if (n.sector === 'planet') {
+    if (holographic.active() && hasTerrainMaterial(n.sector) && n.sector !== 'dead_world') {
+      // Terrain is the province's material; retain a precise selectable survey point.
+      cx.fillStyle = rgba(col, .7);
+      cx.beginPath();
+      cx.arc(c.x, c.y, 2.4, 0, TAU);
+      cx.fill();
+    } else if (n.sector === 'planet') {
       // A transparent rotating wire volume, with no opaque core obscuring its mesh.
       // The visual clock is independent of game speed and freezes on pause/reduced motion.
       blitSphere(col, c.x, c.y, R, Math.max(0.65, sphereBloom(cam.scale)), hologramTime + phaseAt(n.x, n.y) * 400);
@@ -7210,7 +7261,7 @@ function cmdBtn(
   desc?: string,
 ): string {
   const tip = desc ? `${label} — ${desc}` : label;
-  return `<button data-cmd="${cmd}" class="${cls}" title="${esc(tip)}" aria-label="${esc(tip)}" ${disabled ? 'disabled' : ''}><span class="ci">${icon}</span><span class="cl">${esc(label)}</span></button>`;
+  return `<button data-cmd="${cmd}" class="${cls}" title="${esc(tip)}" aria-label="${esc(tip)}" ${disabled ? 'disabled' : ''}><span class="ci" aria-hidden="true">${commandIcon(cmd, icon)}</span><span class="cl">${esc(label)}</span></button>`;
 }
 
 /** CHAIN-UX: полоска режима «Приказ» — живёт в ноде #cmdbar (все четыре
@@ -7388,7 +7439,7 @@ function renderCmdBar() {
     more: cmdMore,
     picking: pickMode,
   });
-  const html =
+  let html =
     `<span class="cmdlabel">${ids.length > 1 ? t('cmd.selection.many', { n: ids.length }) : t('cmd.selection.one')}</span>` +
     cmdBtn('move', '⤳', t('cmd.move'), aiming ? 'on' : '', false, t('cmd.move.hint')) +
     // ATK-1: «Атака» — всегда, как «Курс». Цель у неё ФЛОТ, а не мир (в отличие от
@@ -7483,6 +7534,11 @@ function renderCmdBar() {
           name: displayUnit,
         })
       : '');
+  if (holographic.active()) {
+    const title = lone ? fleetCallsign(lone.id) : t('cmd.selection.many', { n: ids.length });
+    const sub = lone ? [fleetNode(lone), t('side.fleet.sub.pc', { s: sumUnits(lone.units), tr: sumUnits(lone.landing ?? []) })].filter(Boolean).join(' · ') : '';
+    html = commandWindowHtml(html, title, sub, !!lone && !aiming && !merging && !pickMode);
+  }
   if (html !== lastCmdHtml) {
     cmdbar.innerHTML = html;
     lastCmdHtml = html;
@@ -9643,6 +9699,8 @@ const settings = initSettings({
     glow: glowOn(),
     starfield: starfieldOn(),
     motion: motionOn(),
+    holography: holographyOn(),
+    holographySupported: supportsHolography(VW, VH, holoCoarsePointer?.matches ?? false),
     fps: showFpsOn(),
     soundOn: snd.enabled(),
     volume: snd.volume(),
@@ -9655,6 +9713,7 @@ const settings = initSettings({
   setGlow: setGlowFx,
   setStarfield: setStarfield,
   setMotion: setMotion,
+  setHolography,
   setFps: setShowFps,
   setSound: (v) => snd.setEnabled(v),
   setVolume: (v) => snd.setVolume(v),
@@ -10188,7 +10247,7 @@ function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>): void
   // Kept honest against the kernel: victoryModule ends on score (SCORE_LIMIT), on
   // elimination, or on domination — no "capital capture" victory exists.
   note(t('hud.goal', { n: SCORE_LIMIT }));
-  defaultView(); // phone: zoom onto home; desktop: whole-map fit
+  defaultView(); // phone / flagship console: home; simple desktop: whole-map fit
   setupEl.style.display = 'none';
   // SANDBOX — fenced hook. A fresh match starts with no frozen-queue carryover and the
   // practice tools off; startMatch() re-arms them if the setup checkbox was ticked.
@@ -11916,6 +11975,13 @@ window.addEventListener('keydown', (e) => {
 });
 
 function frame(nowReal: number) {
+  const wasHolographic = holographic.active();
+  const previousViewport = insets();
+  holographic.sync(VW, VH, holoCoarsePointer?.matches ?? false, inMatch());
+  if (wasHolographic !== holographic.active()) {
+    Object.assign(cam, reframePresentation(cam, previousViewport, insets(), mapBounds()));
+    clampCam();
+  }
   // Keep the Back sentinel armed while something is closable OR a match is live, so a
   // bare in-match Back triggers the double-back hint instead of a silent unload. The
   // popstate handler re-arms itself right after a hint (so a genuine second Back
@@ -11974,6 +12040,11 @@ function frame(nowReal: number) {
     renderPanel();
     renderCmdBar();
     renderSplitDialog();
+    const commandIds = chainMode?.fleetIds ?? selectedFleetIds();
+    const commandFleet = commandIds[0] ? s.fleets[commandIds[0]] : undefined;
+    holographic.positionCommands(commandFleet ? fleetAnchor(commandFleet) : null,
+      commandIds.join('|'), side.style.display !== 'none');
+    holographic.drawLeader(cx);
   }
   // Status strip below the top bar: the in-game clock plus the donate currency
   // (Суверены ◆) pushed to the right end — one level down from the resource row.
@@ -12126,7 +12197,7 @@ function frame(nowReal: number) {
   }
   const showSpdCtl = displayOf(timeControlsShown(pcUi(), devSpeedControl, NET, __PLAYER_BUILD__));
   if (spdCtl && spdCtl.style.display !== showSpdCtl) spdCtl.style.display = showSpdCtl;
-  const showBar = displayOf(speedbarShown(pcUi(), devSpeedControl));
+  const showBar = displayOf(holographic.active() || speedbarShown(pcUi(), devSpeedControl));
   if (speedbarEl && speedbarEl.style.display !== showBar) speedbarEl.style.display = showBar;
   // Как часто живёт открытое окно — `liveWindows.ts` (REFM-194): дроссель считает РЕАЛЬНОЕ
   // время (по игровому он на разгоне ×7200 пробивался бы каждым кадром, а на паузе — никогда),
@@ -12240,11 +12311,13 @@ applyEmblem();
 // collapsible rail — the hamburger toggles the tool panel; picking a tool closes it.
 function setRailOpen(open: boolean): void {
   railEl.classList.toggle('open', open);
-  railGlyph.textContent = open ? '✕' : '☰';
+  railGlyph.innerHTML = open ? skinIcon('x', '✕') : skinIcon('list', '☰');
   railToggle.setAttribute('aria-expanded', open ? 'true' : 'false');
 }
 railToggle.addEventListener('click', () => setRailOpen(!railEl.classList.contains('open')));
 document.getElementById('railtools')?.addEventListener('click', () => setRailOpen(false));
+document.getElementById('holo-tech')?.addEventListener('click', () => $('rail-tech').click());
+document.getElementById('holo-constructor')?.addEventListener('click', () => $('rail-constructor').click());
 
 // emblem picker — the hub avatar opens a glyph grid; picking one persists + applies it.
 const emblemPick = document.getElementById('emblempick');
@@ -12666,6 +12739,11 @@ function drawPings(now: number): void {
     const x = c.x;
     const y = c.y - 22; // pin head floats above the node (плейтест: пинги крупнее)
     const col = ownerColor(m.from);
+    if (holographic.active()) {
+      drawHolographicPing(cx, c.x, c.y, col, hologramTime, pingPhase(x), glowOn());
+      pingHits.push({ loc: m.ping!, x, y: y - 1 });
+      continue;
+    }
     // Фазы, дыхание и жизнь колец — `pingPulse.ts` (REFM-72).
     const phase = pingPhase(x);
     const pulse = pinPulse(now, phase);

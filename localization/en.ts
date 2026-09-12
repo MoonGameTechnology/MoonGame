@@ -1439,6 +1439,11 @@ export const en: Record<string, string> = {
 
   // --- hud — Постоянный интерфейс матча: верхняя панель ресурсов.
   'hud.back.title': 'Back',
+  'hud.command-details': 'Fleet details',
+  'hud.holography.hint': 'Holographic interface on computers and tablets. Switch off to restore the simple view.',
+  'hud.main-menu': 'Main menu',
+  'hud.map': 'Map',
+  'hud.tools': 'More',
   'hud.crest.title': 'Your profile',
   'hud.deficit': '⚠ SHORTAGE — consuming buildings run at 50%',
   'hud.goal': 'Goal: ✦ {n} (a world — 50, a province — 10) or eliminate your rivals.',
@@ -1759,6 +1764,7 @@ export const en: Record<string, string> = {
   'settings.gfx.glow': 'Glow & haloes',
   'settings.gfx.glow.hint':
     'soft bloom around worlds, fleets and borders — turn off for a crisp, faster map',
+  'settings.gfx.holography': 'Holographic interface',
   'settings.gfx.motion': 'Layer motion',
   'settings.gfx.motion.hint':
     'breathing of markers, glows and engines; off freezes them without hiding them',

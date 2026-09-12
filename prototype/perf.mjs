@@ -14,7 +14,8 @@ const listeners = new Map(); // el -> {type: [fn]}
 function mkEl(id) {
   const el = {
     id,
-    style: {},
+    style: { removeProperty(name) { delete this[name]; }, setProperty(name, value) { this[name] = value; } },
+    setAttribute(name, value) { this[name] = String(value); },
     dataset: {},
     classList: { toggle() {}, add() {}, remove() {}, contains: () => false },
     _children: [],
@@ -49,7 +50,7 @@ function mkEl(id) {
       return null;
     },
     getBoundingClientRect() {
-      return { left: 0, top: 0, width: 900, height: 600 };
+      return { left: 0, top: 0, right: 900, bottom: 600, width: 900, height: 600 };
     },
     querySelectorAll() {
       return [];

@@ -22,6 +22,9 @@ export interface SettingsView {
   starfield: boolean;
   /** Непрерывное «дыхание» слоёв карты. Выкл замораживает их, но не прячет. */
   motion: boolean;
+  /** Appearance is offered only on desktop/tablet viewports. */
+  holography?: boolean;
+  holographySupported?: boolean;
   fps: boolean;
   soundOn: boolean;
   /** Громкость звука, 0..1. */
@@ -100,6 +103,7 @@ export function settingsBoxHtml(view: SettingsView): string {
     `<div class="set-ctl set-pals">${palettes}</div>` +
     `</div>` +
     `<div class="pc-sec">${t('settings.gfx.title')}</div>` +
+    (view.holographySupported ? switchRow('holography', t('settings.gfx.holography'), t('hud.holography.hint'), view.holography ?? true) : '') +
     switchRow('glow', t('settings.gfx.glow'), t('settings.gfx.glow.hint'), view.glow) +
     switchRow(
       'starfield',
@@ -129,6 +133,7 @@ export interface SettingsHost {
   setGlow(v: boolean): void;
   setStarfield(v: boolean): void;
   setMotion(v: boolean): void;
+  setHolography?(v: boolean): void;
   setFps(v: boolean): void;
   setSound(v: boolean): void;
   setVolume(v: number): void;
@@ -168,6 +173,7 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
     toggle('glow', host.setGlow);
     toggle('starfield', host.setStarfield);
     toggle('motion', host.setMotion);
+    if (host.setHolography) toggle('holography', host.setHolography);
     toggle('fps', host.setFps);
     toggle('snd', host.setSound, (on) => {
       if (on) host.previewSound(); // включил — сразу слышно, ЧТО включил

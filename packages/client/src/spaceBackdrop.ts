@@ -1,12 +1,16 @@
 import spaceUrl from './art/deep-space.webp';
+import holographicUrl from './art/holographic-space.webp';
 
-let sky: HTMLImageElement | undefined;
+const skies: Partial<Record<'simple' | 'holographic', HTMLImageElement>> = {};
 
 /** Lazy and optional in non-browser harnesses; a missing image leaves the dark flat fallback. */
-export function spaceBackdropReady(): boolean {
+export function spaceBackdropReady(holographic = false): boolean {
+  const key = holographic ? 'holographic' : 'simple';
+  let sky = skies[key];
   if (!sky && typeof Image !== 'undefined') {
     sky = new Image();
-    sky.src = spaceUrl;
+    sky.src = holographic ? holographicUrl : spaceUrl;
+    skies[key] = sky;
   }
   return !!sky?.complete && sky.naturalWidth > 0;
 }
@@ -19,12 +23,17 @@ export function drawSpaceBackdrop(
   panX: number,
   panY: number,
   enabled: boolean,
+  holographic = false,
 ): void {
   g.fillStyle = '#02060b';
   g.fillRect(0, 0, width, height);
-  if (!enabled || !spaceBackdropReady() || !sky) return;
-  const size = Math.max(width, height) + 48;
-  const x = (width - size) / 2 + Math.tanh(panX / 800) * 20;
-  const y = (height - size) / 2 + Math.tanh(panY / 800) * 20;
-  g.drawImage(sky, x, y, size, size);
+  if (!enabled || !spaceBackdropReady(holographic)) return;
+  const sky = skies[holographic ? 'holographic' : 'simple']!;
+  // Cover without stretching: the two skins use different native aspect ratios.
+  const scale = Math.max((width + 48) / sky.naturalWidth, (height + 48) / sky.naturalHeight);
+  const w = sky.naturalWidth * scale;
+  const h = sky.naturalHeight * scale;
+  const x = (width - w) / 2 + Math.tanh(panX / 800) * 20;
+  const y = (height - h) / 2 + Math.tanh(panY / 800) * 20;
+  g.drawImage(sky, x, y, w, h);
 }
