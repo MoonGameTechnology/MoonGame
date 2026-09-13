@@ -89,8 +89,8 @@ export function marketBoxHtml(
     ` · ${curIc('credits')} <b style="color:var(--ink)">${Math.round(res.credits ?? 0)}</b></div>`;
   const form =
     `<div class="mk-form"><div class="mk-seg">${seg('sell', t('market.sell'))}${seg('buy', t('market.buy'))}</div>` +
-    `<span class="mk-lbl">${t('market.qty')}</span><input class="mk-in" id="mk-amt" type="number" min="1" value="10">` +
-    `<span class="mk-lbl">${t('market.price')}</span><input class="mk-in" id="mk-price" type="number" min="0" value="3">` +
+    `<label class="mk-lbl" for="mk-amt">${t('market.qty')}</label><input class="mk-in" id="mk-amt" type="number" inputmode="numeric" min="1" value="10">` +
+    `<label class="mk-lbl" for="mk-price">${t('market.price')}</label><input class="mk-in" id="mk-price" type="number" inputmode="decimal" min="0" value="3">` +
     `<button class="mk-go" data-mkgo>${t('market.place')}</button></div>` +
     `<div class="mk-lbl" id="mk-net"></div>`;
   const askList = asks.length
@@ -100,7 +100,7 @@ export function marketBoxHtml(
     ? bids.map((l) => lotRow(l, true)).join('')
     : `<div class="mk-empty">${t('market.no-bids')}</div>`;
   return (
-    `<div class="mkbox"><div class="lw-head"><b>${t('market.title')}</b><button class="mk-close" style="margin-left:auto">✕</button></div>` +
+    `<div class="mkbox"><div class="lw-head"><b>${t('market.title')}</b><button class="mk-close" aria-label="${esc(t('card.close'))}" style="margin-left:auto">✕</button></div>` +
     `<div class="mk-tabs">${MARKET_RES.map((r) => tabBtn(r.key, t(r.label))).join('')}</div>` +
     `<div id="marketbody">${stock}${form}` +
     `<div class="mk-sec">${t('market.side.sell')} · ${asks.length}</div>${askList}` +
