@@ -72,6 +72,18 @@ export const UnitStatsSchema = z
     /** Shuttle reach (shuttles-roadmap SQ-3.1): the Euclidean distance in MAP
      *  UNITS a launched `shuttle` may strike from its carrier. 0 = no reach. */
     strikeRange: z.number().nonnegative().default(0),
+    /** How close a strike must get to a MOVING target before the hit counts —
+     *  the chase radius (SHU-4.4). A strike at a fleet no longer flies to a
+     *  snapshot point: it re-aims at the target's live position every recompute
+     *  and lands the blow once it is within this radius.
+     *
+     *  0 is a meaningful value, not a missing one: it means "must reach the point
+     *  exactly", i.e. only a stationary target can ever be caught. There is no
+     *  code-side default on purpose (unlike `pointDefenseRange`, whose 0 falls
+     *  back to PD_RANGE) — the numbers of this mechanic live in the data, and a
+     *  silent fallback would hide an underfilled hull. A squadron uses its
+     *  TIGHTEST radius, the same weakest-link rule as `strikeRange` and `speed`. */
+    chaseRadius: z.number().nonnegative().default(0),
     /** Shuttle sorties before it must rearm (SQ-2.1). 0 = not a shuttle / no
      *  sortie limit. Decrements per sortie; at 0 the shuttle goes to `rearmRounds`. */
     fuel: z.number().nonnegative().default(0),
