@@ -179,6 +179,7 @@ import { pveState } from '../../packages/client/src/gameData';
 import {
   worldToScreen as camWorldToScreen,
   zoomAt as camZoomAt,
+  pinchAt as camPinchAt,
   clampCam as camClampCam,
   centerOn as camCenterOn,
   fitTransform as camFitTransform,
@@ -383,7 +384,6 @@ import {
   nearestSegment,
   pickRadius,
   pinchOf,
-  pinchStep,
 } from '../../decisions/pointerPick';
 import {
   afford as coreAfford,
@@ -4350,12 +4350,15 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
 /** Blit the cached static layer (device-pixel 1:1) beneath the live dynamic art. */
 function blitStaticLayer(): void {
   const moving = presentedCam && (presentedCam.x !== cam.x || presentedCam.y !== cam.y || presentedCam.scale !== cam.scale);
-  if (moving || bgx.isContextLost?.()) {
+  const pinching = pinchStart !== null;
+  if (moving || pinching || bgx.isContextLost?.()) {
     // Copying a freshly painted full-screen canvas forces its thousands of draw
     // commands to flush before drawImage can snapshot it. Paint directly during
     // motion; province textures remain cached and every exposed edge is current.
     cx.save();
-    buildStaticLayer(cx, !!presentedCam && presentedCam.scale !== cam.scale);
+    // A touch stream can leave idle frames between moves. Do not allocate a new
+    // terrain bake at each intermediate scale; settle once when the pinch ends.
+    buildStaticLayer(cx, pinching || (!!presentedCam && presentedCam.scale !== cam.scale));
     cx.restore();
   } else {
     // Once settled, bake once at the final camera; idle frames are one 1:1 blit.
@@ -7337,7 +7340,7 @@ function renderObjDesc(): void {
 let sheetWasOpen = false;
 /** Keep the selected marker above the measured sheet, without following a moving fleet. */
 function revealMobileSelection(): void {
-  if (!MOBILE || !inMatch() || mobileOrderKind() || pickMode || chainMode) return;
+  if (!MOBILE || !inMatch() || mobileOrderKind() || pickMode || chainMode || pointers.size > 0) return;
   const el = document.getElementById('mobile-sheet');
   if (!el || el.hidden) return;
   const fid = panelFleet();
@@ -8837,11 +8840,21 @@ function cancelLongPress(): void {
   }
   mapHold = release(mapHold); // право съесть отпускание переживает снятие ожидания
 }
-let pinchDist = 0;
-// Середина щипка: два пальца не только МАСШТАБИРУЮТ, но и ВЕЗУТ камеру. Нужно это
-// прежде всего вооружённому приказу: одним пальцем там целятся, и без второго жеста
-// камера оказывалась заперта — цель за краем экрана была недостижима.
-let pinchMid: { x: number; y: number } | null = null;
+// One stable baseline for the entire gesture. Per-pointer incremental zoom loses
+// its anchor when one finger reaches a clamp before the other finger is updated.
+let pinchStart: { cam: typeof cam; at: ReturnType<typeof pinchOf> } | null = null;
+let pinchPending = false;
+function rebasePinch(): void {
+  const [a, b] = [...pointers.values()];
+  pinchStart = a && b ? { cam: { ...cam }, at: pinchOf(a, b) } : null;
+  pinchPending = false;
+}
+function flushPinch(): void {
+  if (!pinchPending || !pinchStart) return;
+  pinchPending = false;
+  const [a, b] = [...pointers.values()];
+  if (a && b) Object.assign(cam, camPinchAt(pinchStart.cam, pinchStart.at, pinchOf(a, b), insets(), mapBounds(), panelSlack()));
+}
 // Был ли в этом жесте второй палец. После щипка нельзя ни выбирать объект,
 // ни ставить цель, ни отправлять приказ в точке отрыва последнего пальца.
 let multiTouched = false;
@@ -8852,6 +8865,7 @@ let boxSelecting = false;
 const ptXY = (ev: { clientX: number; clientY: number }) =>
   fromScreen({ x: ev.clientX, y: ev.clientY }, canvas.getBoundingClientRect(), VW, VH);
 canvas.addEventListener('pointerdown', (ev) => {
+  flushPinch();
   canvas.setPointerCapture?.(ev.pointerId);
   const p = ptXY(ev);
   pointers.set(ev.pointerId, p);
@@ -8910,7 +8924,7 @@ canvas.addEventListener('pointerdown', (ev) => {
         }
       }, MAP_HOLD_MS);
     }
-  } else if (pointers.size === 2) {
+  } else if (pointers.size >= 2) {
     cancelLongPress();
     multiTouched = true;
     // Второй палец ВЕЗЁТ КАМЕРУ (и масштабирует), а не отменяет вооружённый приказ.
@@ -8918,12 +8932,9 @@ canvas.addEventListener('pointerdown', (ev) => {
     // при вооружённом «Курсе» было не сдвинуть вовсе, а цель за краем экрана
     // становилась недостижимой. Отменить приказ по-прежнему можно кнопкой (повторный
     // тап по «Курс») и Back/Escape — обе дороги живы.
-    const [a, b] = [...pointers.values()];
-    if (a && b) {
-      const pinch = pinchOf(a, b);
-      pinchDist = pinch.dist;
-      pinchMid = pinch.mid;
-    }
+    boxSelecting = false;
+    selectionBox = null;
+    rebasePinch();
   }
 });
 canvas.addEventListener('pointermove', (ev) => {
@@ -8945,21 +8956,9 @@ canvas.addEventListener('pointermove', (ev) => {
     confirmRequired: MOBILE,
   });
   if (intent === 'pinch') {
-    const [a, b] = [...pointers.values()];
-    if (a && b) {
-      const cur = pinchOf(a, b);
-      // Масштаб и перенос середины считает `pointerPick.ts` (REFM-33): щипок и
-      // масштабирует, и ВЕЗЁТ камеру — одно другому не мешает.
-      const step = pinchStep(pinchMid ? { dist: pinchDist, mid: pinchMid } : null, cur);
-      if (step.scale !== 1) zoomAt(cur.mid.x, cur.mid.y, step.scale);
-      if (step.dx || step.dy) {
-        cam.x += step.dx;
-        cam.y += step.dy;
-        clampCam();
-      }
-      pinchDist = cur.dist;
-      pinchMid = cur.mid;
-    }
+    // Pointer events arrive separately. Apply their latest pair together at the
+    // next frame, never present the half-updated midpoint between two fingers.
+    pinchPending = true;
   } else if (intent === 'box' && dragStart) {
     selectionBox = { x1: dragStart.x, y1: dragStart.y, x2: p.x, y2: p.y };
   } else if (cameraFollows(intent)) {
@@ -8970,6 +8969,11 @@ canvas.addEventListener('pointermove', (ev) => {
   if (marksDragged(intent, moved)) dragged = true;
 });
 function endPointer(ev: PointerEvent) {
+  if (pointers.has(ev.pointerId) && pinchStart) {
+    pointers.set(ev.pointerId, ptXY(ev));
+    pinchPending = true;
+    flushPinch(); // include the final movement before dropping either finger
+  }
   const single = pointers.size === 1;
   const p = pointers.get(ev.pointerId);
   if (single && boxSelecting && selectionBox) {
@@ -8992,10 +8996,7 @@ function endPointer(ev: PointerEvent) {
     boxSelecting = false;
   }
   pointers.delete(ev.pointerId);
-  if (pointers.size < 2) {
-    pinchDist = 0;
-    pinchMid = null;
-  }
+  rebasePinch();
   cancelLongPress();
   // Созревшее удержание СЪЕДАЕТ это отпускание (правила 4–5): оно уже сделало своё дело,
   // и пропусти мы его дальше — за один жест игрок получил бы ещё и выбор/приказ.
@@ -9017,14 +9018,18 @@ function endPointer(ev: PointerEvent) {
   }
 }
 canvas.addEventListener('pointerup', endPointer);
-canvas.addEventListener('pointercancel', (ev) => {
+function cancelPointer(ev: PointerEvent): void {
+  if (!pointers.has(ev.pointerId)) return;
   cancelLongPress();
   mapHold = IDLE; // жест отменён системой — отпускания не будет, и съедать нечего
   pointers.delete(ev.pointerId);
-  pinchDist = 0;
+  rebasePinch();
+  dragged = true;
   selectionBox = null;
   boxSelecting = false;
-});
+}
+canvas.addEventListener('pointercancel', cancelPointer);
+canvas.addEventListener('lostpointercapture', cancelPointer);
 canvas.addEventListener(
   'wheel',
   (ev) => {
@@ -12300,6 +12305,7 @@ window.addEventListener('keydown', (e) => {
 });
 
 function frame(nowReal: number) {
+  flushPinch();
   const wasHolographic = holographic.active();
   const previousViewport = insets();
   holographic.sync(VW, VH, holoCoarsePointer?.matches ?? false, inMatch());
