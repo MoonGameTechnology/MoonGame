@@ -21,6 +21,78 @@ describe('holographic sprite context recovery', () => {
     vi.unstubAllGlobals();
   });
   it.each([blitGlow, blitSphere])(
+    'keeps frequent-read sprites separate from default and legacy targets',
+    (draw) => {
+      const noop = () => {};
+      const context = {
+        globalAlpha: 1,
+        setTransform: noop,
+        save: noop,
+        restore: noop,
+        beginPath: noop,
+        moveTo: noop,
+        lineTo: noop,
+        stroke: noop,
+        arc: noop,
+        fillRect: noop,
+        createRadialGradient: () => ({ addColorStop: noop }),
+        drawImage: vi.fn(),
+      };
+      const surfaces: {
+        width: number;
+        height: number;
+        getContext: ReturnType<typeof vi.fn>;
+      }[] = [];
+      vi.stubGlobal('document', {
+        createElement: () => {
+          const surface = Object.assign(new EventTarget(), {
+            width: 0,
+            height: 0,
+            getContext: vi.fn(() => context),
+          });
+          surfaces.push(surface);
+          return surface;
+        },
+      });
+      const defaultTarget = {
+        ...context,
+        getContextAttributes: () => ({ willReadFrequently: false }),
+        drawImage: vi.fn(),
+      };
+      const frequentReadTarget = {
+        ...context,
+        getContextAttributes: () => ({ willReadFrequently: true }),
+        drawImage: vi.fn(),
+      };
+      const paint = (target: typeof context) =>
+        draw(target as unknown as CanvasRenderingContext2D, 2, '#35d6e6', 50, 50, 20, 1);
+
+      paint(defaultTarget);
+      paint(defaultTarget);
+      expect(surfaces).toHaveLength(1);
+      expect(surfaces[0]!.getContext.mock.calls).toEqual([['2d']]);
+      expect(defaultTarget.drawImage.mock.calls.map(([sprite]) => sprite)).toEqual([
+        surfaces[0],
+        surfaces[0],
+      ]);
+
+      paint(frequentReadTarget);
+      paint(frequentReadTarget);
+      expect(surfaces).toHaveLength(2);
+      expect(surfaces[1]!.getContext.mock.calls).toEqual([['2d', { willReadFrequently: true }]]);
+      expect(frequentReadTarget.drawImage.mock.calls.map(([sprite]) => sprite)).toEqual([
+        surfaces[1],
+        surfaces[1],
+      ]);
+
+      paint(defaultTarget);
+      paint(context); // A target without getContextAttributes uses the default cache.
+      expect(surfaces).toHaveLength(2);
+      expect(defaultTarget.drawImage.mock.lastCall?.[0]).toBe(surfaces[0]);
+      expect(context.drawImage.mock.lastCall?.[0]).toBe(surfaces[0]);
+    },
+  );
+  it.each([blitGlow, blitSphere])(
     'repaints a lost sprite without evicting a later replacement',
     (draw) => {
       const surfaces: (EventTarget & { width: number; height: number })[] = [];

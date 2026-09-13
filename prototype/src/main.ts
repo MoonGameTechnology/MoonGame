@@ -495,6 +495,7 @@ import {
   fxBreath,
 } from './graphicsPrefs';
 import { initSettings } from './settingsOverlay';
+import { canvasCompatibilityActive, canvasCompatibilityRequested, canvasCompatibilityOptions, setCanvasCompatibility } from './canvasCompatibility';
 import { initHolographicUi, commandWindowHtml } from './holographicUi';
 import { provincePingTarget, provinceForPing } from './provincePingAnchor';
 import { reframePresentation, supportsHolography } from './holographicLayout';
@@ -1311,7 +1312,8 @@ let vision: Vision | null = null; // identify + radar sets for this frame
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 const canvas = $('map') as unknown as HTMLCanvasElement;
-const cx = canvas.getContext('2d') as CanvasRenderingContext2D;
+const mapContextOptions = canvasCompatibilityOptions();
+const cx = (mapContextOptions ? canvas.getContext('2d', mapContextOptions) : canvas.getContext('2d')) as CanvasRenderingContext2D;
 const side = $('side');
 // HUD-DOCK: ряд команд (и регулятор скорости) стоят НА листе, поэтому его РЕАЛЬНАЯ
 // высота уезжает в `--sheeth`. Наблюдатель, а не замер в кадре: `offsetHeight` каждый
@@ -4149,8 +4151,10 @@ let selectionBox: { x1: number; y1: number; x2: number; y2: number } | null = nu
 // visible canvas, reusing native-resolution province art without snapshotting a
 // freshly mutated full-screen surface on every move.
 const bg = document.createElement('canvas');
-const bgx = bg.getContext('2d') as CanvasRenderingContext2D;
-const terrainRaster = new TerrainRasterCache();
+const bgx = (mapContextOptions ? bg.getContext('2d', mapContextOptions) : bg.getContext('2d')) as CanvasRenderingContext2D;
+const terrainRaster = new TerrainRasterCache(undefined, mapContextOptions);
+const mapContextEvents = { lost: 0, restored: 0 };
+const backgroundContextEvents = { lost: 0, restored: 0 };
 let bgContent = ''; // viewport + ownership signature (camera-independent)
 let bgCam = { x: 0, y: 0, scale: 1 }; // camera the static layer was last baked at
 let presentedCam: { x: number; y: number; scale: number } | null = null;
@@ -4167,12 +4171,12 @@ function invalidateMapSurfaces(): void {
   terrainRaster.clear();
   clearHolographicSprites();
 }
-canvas.addEventListener('contextlost', invalidateMapSurfaces);
-canvas.addEventListener('contextrestored', invalidateMapSurfaces);
+canvas.addEventListener('contextlost', () => { mapContextEvents.lost++; invalidateMapSurfaces(); });
+canvas.addEventListener('contextrestored', () => { mapContextEvents.restored++; invalidateMapSurfaces(); });
 // Offscreen contexts can also be lost independently. Their events do not bubble
 // through document, so observe the actual cached surface.
-bg.addEventListener?.('contextlost', () => { bgContent = ''; });
-bg.addEventListener?.('contextrestored', () => { bgContent = ''; });
+bg.addEventListener?.('contextlost', () => { backgroundContextEvents.lost++; bgContent = ''; });
+bg.addEventListener?.('contextrestored', () => { backgroundContextEvents.restored++; bgContent = ''; });
 
 /** The owner of node `id` AS THE VIEWER MAY KNOW IT: live when identified (or fog
  *  off), last-known from memory when only remembered, unknown otherwise. The
@@ -10012,6 +10016,31 @@ for (const tile of Array.from(document.querySelectorAll('#hp-more .hub-tile[data
 // владеет — каждая живёт там, где её читают (графика, цвета сторон, звук, развёртка), а
 // оверлей только показывает снимок и отдаёт изменение обратно.
 const settingsEl = $('settings');
+/** On-demand diagnostics: no pixel readbacks (those alter canvas heuristics),
+ * no match/account state, and no automatic upload. Attributes are requests, not
+ * proof of which raster backend WebView actually selected.
+ */
+function mapRenderingReport(): string {
+  const rect = canvas.getBoundingClientRect();
+  const active = canvasCompatibilityActive();
+  const requested = canvasCompatibilityRequested();
+  return JSON.stringify({
+    schema: 1,
+    build: currentBuild(),
+    userAgent: navigator.userAgent,
+    compatibility: { active, requested, restartPending: active !== requested },
+    viewport: { width: VW, height: VH, devicePixelRatio: window.devicePixelRatio,
+      renderDpr: DPR, visualScale: window.visualViewport?.scale ?? null },
+    canvas: { width: canvas.width, height: canvas.height, cssWidth: rect.width, cssHeight: rect.height,
+      attributes: cx.getContextAttributes?.() ?? null, contextLost: cx.isContextLost?.() ?? null,
+      events: { ...mapContextEvents } },
+    background: { attributes: bgx.getContextAttributes?.() ?? null,
+      contextLost: bgx.isContextLost?.() ?? null, events: { ...backgroundContextEvents } },
+    frameErrors: frameErrs,
+    estimatedFps: Math.round(fpsEma),
+    cameraScale: cam.scale,
+  }, null, 2);
+}
 const settings = initSettings({
   root: () => settingsEl,
   view: () => ({
@@ -10022,6 +10051,9 @@ const settings = initSettings({
     motion: motionOn(),
     holography: holographyOn(),
     holographySupported: MOBILE || supportsHolography(VW, VH, holoCoarsePointer?.matches ?? false),
+    renderCompatibility: canvasCompatibilityRequested(),
+    renderCompatibilityActive: canvasCompatibilityActive(),
+    renderCompatibilitySupported: /Android/i.test(navigator.userAgent),
     fps: showFpsOn(),
     soundOn: snd.enabled(),
     volume: snd.volume(),
@@ -10035,6 +10067,8 @@ const settings = initSettings({
   setStarfield: setStarfield,
   setMotion: setMotion,
   setHolography,
+  setRenderCompatibility: setCanvasCompatibility,
+  renderingReport: mapRenderingReport,
   setFps: setShowFps,
   setSound: (v) => snd.setEnabled(v),
   setVolume: (v) => snd.setVolume(v),

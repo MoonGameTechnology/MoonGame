@@ -3,8 +3,8 @@
  * surface (the prototype's Canvas2D map and the Stage-4 client; docs/cross-platform-roadmap.md
  * CP0.2 — "one render implementation, not two"). Stateless with respect to GAME state:
  * every function takes the target canvas context + device-pixel-ratio explicitly, so any
- * renderer can call them. The only owned state is per-colour sprite caches, keyed by dpr so
- * one module serves surfaces at different pixel ratios.
+ * renderer can call them. The only owned state is per-colour sprite caches, keyed by dpr and
+ * frequent-read setting so one module serves surfaces with different context preferences.
  */
 
 import { SPHERE_FRAMES, sphereFrame, sphereWire } from './holoSphere';
@@ -20,10 +20,20 @@ export function rgba(hex: string, a: number): string {
   return `rgba(${r},${g},${b},${a})`;
 }
 
-// Cached radial-glow sprites: baking one soft glow disc per (colour, radius, dpr) once and
+// Cached radial-glow sprites: baking one soft glow disc per colour/radius/DPR/read setting once and
 // blitting it with drawImage + globalAlpha is far cheaper than a per-node createRadialGradient
 // + shadowBlur every frame, so the map glow scales to many provinces.
 const glowCache = new Map<string, HTMLCanvasElement>();
+// Context attributes are immutable. Avoid allocating an attributes object for
+// every sprite on every frame; the weak key does not retain disposed canvases.
+const frequentReadContexts = new WeakMap<CanvasRenderingContext2D, boolean>();
+function frequentRead(ctx: CanvasRenderingContext2D): boolean {
+  const cached = frequentReadContexts.get(ctx);
+  if (cached !== undefined) return cached;
+  const requested = ctx.getContextAttributes?.().willReadFrequently === true;
+  frequentReadContexts.set(ctx, requested);
+  return requested;
+}
 /** A restored canvas has the same identity/dimensions, but its pixels are gone. */
 function rememberSprite(
   cache: Map<string, HTMLCanvasElement>,
@@ -38,16 +48,23 @@ function rememberSprite(
   cv.addEventListener?.('contextrestored', invalidate);
   cache.set(key, cv);
 }
-function glowSprite(dpr: number, color: string, radius: number): HTMLCanvasElement {
+function glowSprite(
+  dpr: number,
+  color: string,
+  radius: number,
+  willReadFrequently: boolean,
+): HTMLCanvasElement {
   const rad = Math.max(4, Math.round(radius));
-  const key = `${color}:${rad}:${dpr}`;
+  const key = `${color}:${rad}:${dpr}:${willReadFrequently}`;
   const hit = glowCache.get(key);
   if (hit) return hit;
   const cv = document.createElement('canvas');
   const px = Math.ceil(rad * 2 * dpr);
   cv.width = px;
   cv.height = px;
-  const g = cv.getContext('2d') as CanvasRenderingContext2D;
+  const g = (
+    willReadFrequently ? cv.getContext('2d', { willReadFrequently: true }) : cv.getContext('2d')
+  ) as CanvasRenderingContext2D;
   g.setTransform(dpr, 0, 0, dpr, 0, 0);
   const grd = g.createRadialGradient(rad, rad, 0, rad, rad, rad);
   grd.addColorStop(0, rgba(color, 0.95));
@@ -70,21 +87,21 @@ export function blitGlow(
   a: number,
 ): void {
   if (a <= 0.004) return;
-  const spr = glowSprite(dpr, color, r);
+  const spr = glowSprite(dpr, color, r, frequentRead(ctx));
   const rad = Math.max(4, Math.round(r));
   ctx.globalAlpha = Math.min(1, a);
   ctx.drawImage(spr, x - rad, y - rad, rad * 2, rad * 2);
   ctx.globalAlpha = 1;
 }
 
-// A 4×4 wireframe atlas per colour/DPR. Rotation is a source-rectangle choice, not
+// A 4×4 wireframe atlas per colour/DPR/read setting. Rotation is a source-rectangle choice, not
 // hundreds of trigonometric calculations on every node every frame. The LRU bound
 // also covers colour-picker changes and moving the window between density scales.
 const sphereCache = new Map<string, HTMLCanvasElement>();
 const SPHERE_TILE = 48;
 const MAX_SPHERE_ATLASES = 16;
-function sphereSprite(dpr: number, color: string): HTMLCanvasElement {
-  const key = `${color}:${dpr}`;
+function sphereSprite(dpr: number, color: string, willReadFrequently: boolean): HTMLCanvasElement {
+  const key = `${color}:${dpr}:${willReadFrequently}`;
   const hit = sphereCache.get(key);
   if (hit) {
     sphereCache.delete(key);
@@ -95,7 +112,9 @@ function sphereSprite(dpr: number, color: string): HTMLCanvasElement {
   const rad = SPHERE_TILE / 2;
   const cv = document.createElement('canvas');
   cv.width = cv.height = tile * 4;
-  const g = cv.getContext('2d') as CanvasRenderingContext2D;
+  const g = (
+    willReadFrequently ? cv.getContext('2d', { willReadFrequently: true }) : cv.getContext('2d')
+  ) as CanvasRenderingContext2D;
   for (let frame = 0; frame < SPHERE_FRAMES; frame++) {
     g.setTransform(
       tile / SPHERE_TILE,
@@ -151,7 +170,7 @@ export function blitSphere(
   timeMs = 0,
 ): void {
   if (a <= 0.02) return;
-  const atlas = sphereSprite(dpr, color);
+  const atlas = sphereSprite(dpr, color, frequentRead(ctx));
   const tile = atlas.width / 4;
   const frame = sphereFrame(timeMs);
   ctx.save();

@@ -32,12 +32,13 @@ function surfaces() {
     clip: noop,
     stroke: strokes,
   };
+  const getContext = vi.fn(() => ctx);
   vi.stubGlobal('document', {
     createElement: () => {
       const surface = Object.assign(new EventTarget(), {
         width: 0,
         height: 0,
-        getContext: () => ctx,
+        getContext,
       });
       created.push(surface);
       return surface;
@@ -45,11 +46,21 @@ function surfaces() {
   });
   const drawImage = vi.fn();
   const target = { ...ctx, drawImage } as unknown as CanvasRenderingContext2D;
-  return { created, strokes, drawImage, target };
+  return { created, strokes, drawImage, target, getContext };
 }
 afterEach(() => vi.unstubAllGlobals());
 
 describe('province raster cache', () => {
+  it('keeps lazy and rebuilt terrain on the requested context policy', () => {
+    const f = surfaces();
+    const cache = new TerrainRasterCache(undefined, { willReadFrequently: true });
+    cache.prepare(field(), 2);
+    cache.clear();
+    cache.draw(f.target, field(1, 2), 2);
+    expect(f.getContext).toHaveBeenCalledTimes(2);
+    for (const args of f.getContext.mock.calls)
+      expect(args).toEqual(['2d', { willReadFrequently: true }]);
+  });
   it('prepares art without painting the map and reuses it on first presentation', () => {
     const f = surfaces();
     const cache = new TerrainRasterCache();
