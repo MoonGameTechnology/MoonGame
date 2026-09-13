@@ -14,7 +14,7 @@ const mobileConsoleCss = readFileSync(new URL('./mobile-console.css', import.met
 
 const bundle = async (playerBuild) => {
   const res = await build({
-    entryPoints: ['prototype/src/main.ts'],
+    entryPoints: ['prototype/src/bootstrap.ts'],
     bundle: true,
     format: 'iife',
     platform: 'browser',
@@ -69,6 +69,23 @@ body{margin:0;overflow:hidden;color:var(--ink);
   background:radial-gradient(125% 105% at 50% 38%,#04141c 0%,#02080e 58%,#01040a 100%);}
 /* Clear optical projection: thin vector strokes stay sharp without a CRT overlay. */
 #map{position:fixed;inset:0;z-index:0;display:block;touch-action:none;}
+
+/* A failed startup is a stable, readable screen, never an animated empty menu. */
+body.app-starting *,body.app-starting *::before,body.app-starting *::after{
+  animation:none!important;transition:none!important;}
+body.app-starting #map{visibility:hidden;}
+body.app-startup-failed > :not(#startup-error){display:none!important;}
+#startup-error{position:fixed;inset:0;z-index:100000;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:18px;padding:24px;
+  padding-bottom:max(24px,env(safe-area-inset-bottom));background:#041016;
+  color:var(--ink);text-align:center;overflow:auto;touch-action:pan-y;}
+#startup-error[hidden]{display:none;}
+#startup-error h1{font-size:22px;line-height:1.3;margin:0;}
+#startup-error p{max-width:440px;margin:0;font-size:15px;line-height:1.5;}
+#startup-code{max-width:100%;overflow-wrap:anywhere;user-select:text;font-size:12px;color:#9bb4c1;}
+#startup-retry{min-width:160px;min-height:48px;padding:12px 20px;font:inherit;font-size:16px;
+  color:var(--ink);background:#0c313b;border:1px solid var(--cyan);border-radius:10px;}
+#startup-retry:focus-visible{outline:2px solid var(--ink);outline-offset:4px;}
 
 /* themed scrollbars — angular neon thumb on a dark grid track, in the HUD's tactical key.
    Firefox gets the colour pair; WebKit gets the full glow/gradient treatment. */
@@ -2738,6 +2755,12 @@ const page = (js) => `<!doctype html>
 <link rel="icon" href="data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#061318"/><rect x="9" y="9" width="14" height="14" rx="2" transform="rotate(45 16 16)" fill="none" stroke="#35d6e6" stroke-width="2.5"/></svg>')}">
 <title>Void Dominion — Sector Command</title><style>${css}\n${holographicCss}\n${bridgeShellCss}\n${mobileConsoleCss}</style></head>
 <body>
+<section id="startup-error" hidden role="alert" aria-labelledby="startup-title">
+  <h1 id="startup-title" data-i18n="startup.failed.title"></h1>
+  <p data-i18n="startup.failed.body"></p>
+  <code id="startup-code"></code>
+  <button id="startup-retry" type="button" data-i18n="startup.retry"></button>
+</section>
 <canvas id="map"></canvas>
 <button id="holo-back" class="holo-back" type="button" data-i18n-title="hud.main-menu" data-i18n-aria="hud.main-menu">‹</button>
 <header id="top">
