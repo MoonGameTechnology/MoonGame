@@ -88,7 +88,12 @@ function geometry(field: TerrainArtField): Geometry {
   const shape = poly
     .map(([x, y]) => `${Math.round(x * 10000)},${Math.round(y * 10000)}`)
     .join(";");
-  const key = `${field.id}:${field.kind}:${field.phase}:${shape}:${marker.join(",")}`;
+  // A camera translation changes floating-point roundoff, not the local marker.
+  // Exact decimal strings here defeated the cache on almost every moved frame,
+  // including the live pass that only needs four highlights.
+  const markerKey = marker.map((n) => Math.round(n * 1e6)).join(",");
+  const rockDetail = field.asteroids?.map((rock) => rock.radius > 2 ? '1' : '0').join('') ?? '';
+  const key = `${field.id}:${field.kind}:${field.phase}:${shape}:${markerKey}:${rockDetail}`;
   let result = geometryCache.get(key);
   if (result) {
     fieldCache.set(field, result);

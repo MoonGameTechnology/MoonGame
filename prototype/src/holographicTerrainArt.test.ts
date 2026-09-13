@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { drawTerrainArt, terrainEdgeAlpha } from "./holographicTerrainArt";
 
 const poly = [
@@ -155,5 +155,26 @@ describe("terrain art respects province geometry", () => {
     const still = recorder();
     drawTerrainArt(still.context, { ...field, kind: "asteroid" }, 8000, true);
     expect(still.strokes).toEqual([]);
+  });
+  it("does not regenerate the full terrain for live glints after a fractional pan", () => {
+    const original = { ...field, id: 'fractional-marker', marker: { x: 31.21, y: 47.13 } };
+    drawTerrainArt(recorder().context, original);
+    const hypot = vi.spyOn(Math, 'hypot');
+    try {
+      for (const [dx, dy] of [[.1, -.3], [178.273, -57.199], [-519.311, 391.222]]) {
+        const translated = {
+          ...original,
+          marker: { x: original.marker.x + dx!, y: original.marker.y + dy! },
+          box: { ...original.box, x: dx!, y: dy! },
+          poly: poly.map(([x, y]) => [x + dx!, y + dy!] as const),
+        };
+        const r = recorder();
+        drawTerrainArt(r.context, translated, 3000, true);
+        expect(r.strokes).toHaveLength(4);
+      }
+      // Edge-distance subdivision belongs to the static geometry build, not the
+      // four live highlights of a previously seen province.
+      expect(hypot).not.toHaveBeenCalled();
+    } finally { hypot.mockRestore(); }
   });
 });
