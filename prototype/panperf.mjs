@@ -114,8 +114,14 @@ const stats = (values) => {
 try {
   await checkMapLoading(browser, `http://127.0.0.1:${server.address().port}`);
   const page = await browser.newPage({
-    viewport: { width: 1920, height: 1080 },
-    deviceScaleFactor: 1,
+    ...(process.env.PAN_MOBILE === '1'
+      ? {
+          viewport: { width: 390, height: 844 },
+          deviceScaleFactor: 2,
+          isMobile: true,
+          hasTouch: true,
+        }
+      : { viewport: { width: 1920, height: 1080 }, deviceScaleFactor: 1 }),
   });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));

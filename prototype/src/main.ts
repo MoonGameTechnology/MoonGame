@@ -275,13 +275,11 @@ import {
   sweepChromeShown,
 } from './radarSources';
 import {
-  frontierLook,
-  frontierShown,
   ownRingLook,
   ownRingShown,
-  unionArcs,
   type SightTier,
 } from './sightFrontier';
+import { drawSightFrontier } from './drawSightFrontier';
 import { BADGE_R, badgeBob, badgeCenterY, badgeLook, badgeShown, badgeTether } from './kindBadge';
 import { chipFontPx, chipGlyph, chipMetrics, chipXs, chipY, chipsShown } from './buildChips';
 import { tapOwner, tapRadius } from './tapPriority';
@@ -3656,64 +3654,9 @@ function drawBattlePulse(
  * distance in MAP units; the projection is uniform so they read as true circles.
  * Only meaningful with fog on.
  */
-// Offscreen layer for compositing the UNION of radar circles into one clean
-// frontier (so overlapping ranges read as a single border, not a tangle of rings).
-let unionCv: HTMLCanvasElement | null = null;
-function unionCtx(): CanvasRenderingContext2D {
-  if (!unionCv) unionCv = document.createElement('canvas');
-  if (unionCv.width !== canvas.width || unionCv.height !== canvas.height) {
-    unionCv.width = canvas.width;
-    unionCv.height = canvas.height;
-  }
-  const g = unionCv.getContext('2d') as CanvasRenderingContext2D;
-  g.setTransform(1, 0, 0, 1, 0, 0);
-  g.clearRect(0, 0, unionCv.width, unionCv.height);
-  g.setTransform(DPR, 0, 0, DPR, 0, 0); // draw in CSS px, matching the main canvas
-  return g;
-}
-
-/** Paint a set of screen circles as ONE merged region: a faint union fill plus a
- *  crisp union outline. A circle fully inside another contributes nothing; an
- *  outlier extends the frontier — exactly one "border of visibility". */
+/** One frontier for overlapping sources, painted directly without a screen-sized mask. */
 function drawUnionTier(circles: Array<{ x: number; y: number; r: number }>, tier: SightTier): void {
-  // Вид тира и отбор дуг — `sightFrontier.ts` (REFM-120): внутренний тир обязан читаться
-  // сильнее внешнего, а сжатая копия не может съесть круг целиком (иначе вывернутая дуга
-  // выест дыру в уже собранной заливке).
-  // Проверок «прозрачность > 0» / «толщина > 0» здесь НЕТ намеренно (REFM-120.1, правило 8):
-  // числа приходят только из `frontierLook`, где положительны, и это заперто тестом по
-  // `SIGHT_TIERS`. А вот пустой набор кругов ниже проверяется по-настоящему — правило 4.
-  const { lineWidth: lineW, fillAlpha: fillA, strokeAlpha: strokeA } = frontierLook(tier);
-  if (!frontierShown(circles)) return;
-  const arcs = (g: CanvasRenderingContext2D, inset: number): void => {
-    g.beginPath();
-    for (const c of unionArcs(circles, inset)) {
-      g.moveTo(c.x + c.r, c.y); // moveTo each ⇒ separate subpaths, no joining lines
-      g.arc(c.x, c.y, c.r, 0, TAU);
-    }
-  };
-  // Filled union, drawn as ONE path straight onto the map — overlaps merge under
-  // nonzero winding, so there are no internal seams.
-  cx.fillStyle = rgba(LOCK, fillA);
-  arcs(cx, 0);
-  cx.fill();
-  // Crisp outline: fill the union white, erode an inset copy with destination-out
-  // → a ring tracing only the outer frontier; tint it, then blit 1:1 onto the map.
-  const g = unionCtx();
-  g.fillStyle = '#fff';
-  arcs(g, 0);
-  g.fill();
-  g.globalCompositeOperation = 'destination-out';
-  arcs(g, lineW);
-  g.fill();
-  g.globalCompositeOperation = 'source-in';
-  g.setTransform(1, 0, 0, 1, 0, 0);
-  g.fillStyle = rgba(LOCK, strokeA);
-  g.fillRect(0, 0, unionCv!.width, unionCv!.height);
-  g.globalCompositeOperation = 'source-over';
-  cx.save();
-  cx.setTransform(1, 0, 0, 1, 0, 0);
-  cx.drawImage(unionCv as HTMLCanvasElement, 0, 0);
-  cx.restore();
+  drawSightFrontier(cx, circles, tier, LOCK, VW, VH);
 }
 
 function drawRadarCoverage() {
