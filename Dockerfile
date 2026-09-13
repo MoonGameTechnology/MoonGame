@@ -45,6 +45,9 @@ COPY packages/action-layer/package.json packages/action-layer/
 RUN pnpm install --frozen-lockfile
 
 COPY . .
+# The base still carries libc6 deb13u3. Stage Debian's fixed package separately:
+# bytes + architecture + version are checked before extraction; no package scripts run.
+RUN node deploy/runtime/prepare-libc.mjs /runtime-libc
 RUN pnpm run prototype # bake dist/void-dominion{,-player}.html (player at /, dev at /dev)
 
 # Bake the server bundle HERE instead of at container startup. Two reasons, and the
@@ -91,12 +94,15 @@ RUN mkdir -p playtest-logs
 # tags; last rebuild 2026-02), so debian12 is frozen with the libssl3/libc6 CVEs Trivy
 # flags — debian13 is the actively rebuilt line with current trixie-security packages.
 # Digest-pinned like the build stage (bump procedure in the Stage 1 comment);
-# nodejs22-debian13:nonroot digest refreshed 2026-08-26 (SEC-25).
-# The bump is HYGIENE, not remediation: upstream rebuilt the tag, but the new image ships
-# the SAME libssl3t64 3.5.6-1~deb13u2 / libc6 2.41-12+deb13u3 / zlib1g 1.3.dfsg… as the
-# digest it replaces (read out of /var/lib/dpkg/status.d in the amd64 manifest, pulled
-# from gcr.io on 2026-08-26). It closes no `.trivyignore` entry — see that file's header.
+# nodejs22-debian13:nonroot digest refreshed 2026-09-08 (SEC-34).
+# Read from its amd64 package inventory on 2026-09-13: libssl3t64 3.5.7-1~deb13u2,
+# libc6 2.41-12+deb13u3. The former already fixes the old openssl ignore group.
+# SEC-39 overlays the complete, SHA-256-pinned Debian libc6 deb13u4 package plus its
+# inventory, fixing CVE-2026-5450/5928 while keeping the runtime shell/package-manager free.
+# On a base bump, compare actual package versions and remove the overlay once upstream
+# includes this fix; a scan with old suppressions cannot establish that a CVE was fixed.
 FROM gcr.io/distroless/nodejs22-debian13:nonroot@sha256:4e4fb0ce55fd73901600796ef079a9490369d2515d7da31633a91608c82ca13b AS runtime
+COPY --from=build /runtime-libc/ /
 # Bring the app (source + prod-only node_modules + baked HTML + the pre-built server
 # bundle) and hand the tree to the non-root user so the one runtime write left
 # (playtest-logs) succeeds. node_modules uses pnpm's relative symlink layout, so copying
