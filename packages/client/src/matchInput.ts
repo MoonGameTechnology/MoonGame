@@ -1,11 +1,13 @@
 /**
  * Map interaction for a live match (CP1.1 — the send half of the online loop). Pure,
  * DOM-free helpers: hit-test a tapped screen point to a planet, find the local player's
- * fleet at a planet, and build the server-authoritative order the client sends. The client
- * sends INTENT only (docs/architecture.md §5) — the server validates/authorizes/applies and
- * broadcasts the new state; these helpers just shape that intent.
+ * fleet at a planet. Building the order itself is NOT here: the envelope is `act()` in
+ * `/decisions/actions.ts`, shared with the prototype, so one gesture cannot produce two
+ * different payloads depending on which client the player entered through. The client
+ * sends INTENT only (docs/architecture.md §5) — the server validates/authorizes/applies
+ * and broadcasts the new state.
  */
-import type { Action, GameState, PlayerId, PlanetId } from '@void/shared-core';
+import type { GameState, PlayerId, PlanetId } from '@void/shared-core';
 import { worldToScreen, type Cam, type Viewport, type Bounds } from './camera';
 
 /** The planet nearest to a screen point within `maxPx`, or null — the tap hit-test. */
@@ -41,14 +43,3 @@ export function myFleetAt(state: GameState, planetId: PlanetId, me: PlayerId): s
   return null;
 }
 
-/** Build a `fleet.move` order for `fleetId → to`, issued by `me` with monotonic `seq`
- *  (the idempotency id the ungated dev server accepts: `ui:<player>:<seq>`). */
-export function moveAction(me: PlayerId, seq: number, fleetId: string, to: PlanetId): Action {
-  return {
-    id: `ui:${me}:${seq}`,
-    type: 'fleet.move',
-    playerId: me,
-    payload: { fleetId, to },
-    issuedAt: 0,
-  };
-}

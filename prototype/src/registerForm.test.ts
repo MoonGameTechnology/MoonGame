@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { MIN_PASSWORD } from './authRules';
+import { MIN_PASSWORD } from '../../decisions/authRules';
 import {
   CALLSIGNS,
   callsignFor,

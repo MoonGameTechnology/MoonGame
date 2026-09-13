@@ -28,7 +28,7 @@
  *    а состав ещё нет.
  */
 
-import { matchAddress } from '../../decisions/matchAddress';
+import { matchAddress } from './matchAddress';
 
 /** Можно ли уже входить (правило 1). */
 export function startEnabled(selectedSlot: string | null): boolean {

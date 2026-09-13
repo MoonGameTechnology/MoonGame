@@ -17,7 +17,7 @@ import { stewardActive, type Action, type GameState } from '../../packages/share
 import { t } from '../../localization/runtime';
 // Straight from the source modules, not through the `game.ts` barrel — same as the
 // other REFM screens, so this module never leans on the façade.
-import { delegateSteward, recallSteward } from './actions';
+import { delegateSteward, recallSteward } from '../../decisions/actions';
 import { DAY, HOUR } from './time';
 
 /** Game-hours a single delegation can run — the three offered buttons. */

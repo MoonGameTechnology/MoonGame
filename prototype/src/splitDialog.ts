@@ -34,7 +34,7 @@
  */
 import { t } from '../../localization/runtime';
 import { esc } from './format';
-import { canConfirmSplit, clampTake, shipTotals, type CargoSplit, type SplitSlot } from './splitPlan';
+import { canConfirmSplit, clampTake, shipTotals, type CargoSplit, type SplitSlot } from '../../decisions/splitPlan';
 
 /** Что нужно знать, чтобы решить судьбу окна (правила 1–4). */
 export interface SplitLifeInput {

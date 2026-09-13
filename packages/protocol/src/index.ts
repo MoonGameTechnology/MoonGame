@@ -19,6 +19,7 @@ import type {
   Action,
   DomainEvent,
   GameState,
+  MatchConfig,
   PlayerId,
   SignatureContact,
   StateDelta,
@@ -111,6 +112,64 @@ export interface ChatMessage {
   text: string;
   /** Match-clock stamp (the same clock as `Ping.createdAt` / `serverTime`). */
   at: number;
+}
+
+/* ───────────────── Match browser read-model (`GET /matches`) ─────────────────
+ *
+ * Тот же довод, что у сообщений сокета выше: форму, которую сервер ОТДАЁТ, а клиент
+ * ЧИТАЕТ, объявляют один раз. Раньше она жила только в `packages/server`, куда клиенту
+ * ходить нельзя (иначе серверный код приезжает в браузерный бандл), — то есть у второго
+ * клиента выбора не было: либо не читать ленту вовсе, либо завести рукописную копию.
+ * Копия — ровно тот дрейф, ради устранения которого заведён этот пакет (NETA2-4).
+ *
+ * Логика осталась на сервере: `matchKind()` выводит `kind` из пресета режима, и клиент
+ * это правило НЕ переизобретает — он читает готовое поле.
+ */
+
+/** Whether a session is played against other people or against the game (BRW-1).
+ *  Decided by the SERVER from the mode preset — a client must not re-derive the rule,
+ *  or two surfaces would disagree about what "PvE" means. */
+export type MatchKind = 'pvp' | 'pve';
+
+/** One row of the match browser: a server projection (read-model), not live state. */
+export interface MatchSummary {
+  matchId: string;
+  mapId: string;
+  rules: MatchConfig;
+  /** Mode id this session runs (BRW-1). Absent ⇒ the match has no mode. */
+  modeId?: string;
+  /** PvP or PvE, derived from the mode preset by the server. Absent when the mode is
+   *  absent or unknown — the browser must read that as «режим неизвестен» and leave
+   *  the row unfiltered, NOT as «PvP» (the same fail-open reading `entryOpen` needs). */
+  kind?: MatchKind;
+  /** In-game days elapsed (`state.time / MS_PER_DAY`, floored) — "Day N" of the match. */
+  days: number;
+  /** Occupied vs total seats, e.g. { seated: 1, capacity: 2 }. */
+  players: { seated: number; capacity: number };
+  /** Simulation status (NOT the archive flag, which is per-viewer). */
+  status: 'ongoing' | 'ended';
+  createdAt: number;
+  /** Entry window (SES-2.3): can a NEW player still claim a free seat here? True when
+   *  no window is configured. A closed window keeps the match out of `available` even
+   *  if it has free seats (you cannot join it any more — only the seated may return). */
+  entryOpen: boolean;
+  /** Real ms until the entry window closes (0 once closed; a large sentinel when no
+   *  window is configured) — for the browser to show «вход открыт ещё …». */
+  entryClosesInMs: number;
+}
+
+/** The three browser tabs, projected for one viewer (by nick). */
+export interface MatchLists {
+  available: MatchSummary[];
+  active: MatchSummary[];
+  archived: MatchSummary[];
+}
+
+/** Successful `GET /matches/:id/join`: the seat and a SHORT-LIVED token for the
+ *  WS handshake (`?token=`). A failure answers `{ error: ... }` with an HTTP status. */
+export interface JoinGrant {
+  playerId: PlayerId;
+  token: string;
 }
 
 export interface ClientActionMessage {

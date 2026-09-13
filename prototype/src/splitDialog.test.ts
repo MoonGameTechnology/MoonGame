@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { splitDialogLives, splitRows, splitDialogHtml } from './splitDialog';
-import { cargoSplit, splitSlots } from './splitPlan';
+import { cargoSplit, splitSlots } from '../../decisions/splitPlan';
 
 /** Флот без трюма и без десанта — фон для проверок, где важны только корабли. */
 const пусто = cargoSplit([], {}, () => 0, () => 1);

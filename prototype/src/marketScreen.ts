@@ -15,7 +15,7 @@ import type { Action, GameState } from '../../packages/shared-core/src/index';
 import { t } from '../../localization/runtime';
 import { esc, curIc } from './format';
 import { MARKET_COMMISSION } from '../../packages/shared-core/src/index';
-import { marketList, marketTake, marketCancel } from './actions';
+import { marketList, marketTake, marketCancel } from '../../decisions/actions';
 import { houseDisplayName } from './setupSeats';
 
 /** Credits are the currency, so they are not themselves a tradeable good. */

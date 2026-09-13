@@ -27,7 +27,7 @@ import {
   assaultFleet,
   castHeroAbility,
   strikeShuttle,
-} from './actions';
+} from '../../decisions/actions';
 
 const HOUR = 3_600_000;
 

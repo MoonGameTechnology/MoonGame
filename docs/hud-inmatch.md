@@ -189,14 +189,22 @@ export function resolveHudAction(action: HudTap, model: HudModel): HudIntent | {
   раунд, таймер `nextRoundAt`; единственное действие **«Отступить»** (`fleet.retreat`) — доступно, если
   игрок владеет орбитальным флотом-стороной (`retreatFleetId`). Ядро: действие `fleet.retreat`
   (−40% ТЕКУЩЕГО корпуса/щита + баф скорости), см. `state.md`.
+- ✅ **Панели РИСУЮТСЯ (MIG-3):** `packages/client/src/hudView.ts` — вторая половина,
+  которой не было: чистые `модель → HTML` (+21 тест) плюс проводка в `main.ts` и стили.
+  До неё 854 строки моделей и 892 строки тестов описывали панели, которые никто не
+  рисовал. Интентов у клиента стало три: `fleet.move`, `fleet.retreat` (через
+  `resolveBattleAction`) и `unit.build{modules}` (через `resolveLoadoutBuild`).
+  Прогнано в живом Chromium: тап по флоту → панель состава → «Построить здесь» → верфь →
+  оснащение → `unit.build` ушёл в сокет.
 - ⏳ **Нужен код (кирпичи):**
   - `HUD-1b` объединённый `createHudModel`/`resolveHudAction` + зоны B (карта) / C (действия-намерения).
   - `HUD-2` производные для панели: `fleetPower` / `damageReduction` (сборка из статов+бонусов).
   - `HUD-3` — `fleet.split`/`fleet.merge` уже в ядре (`fleetOpsModule`, живые обработчики); остаётся HUD-обвязка (референсные SPLIT/ADD).
   - `HUD-4` две HP-полоски (корпус/щит) — по мере `shields-roadmap`; иконки модулей — `ship-modules`.
 - 🔒 **Мета/блокировано:** ранг/место — из scoreboard (есть) ИЛИ account-level (docs-only);
-  кошелёк Суверены/Варранты и магазин «+» — мета-экономика (`economy-roadmap`), поверх матча;
-  рендер-шелл клиента — пока placeholder.
+  кошелёк Суверены/Варранты и магазин «+» — мета-экономика (`economy-roadmap`), поверх матча.
+  _(Строка «рендер-шелл клиента — пока placeholder» снята: с MIG-2/MIG-3 шелл умеет вход,
+  список партий, карту и боевой HUD.)_
 
 ## Последовательность
 

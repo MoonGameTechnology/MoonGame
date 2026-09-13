@@ -10,7 +10,7 @@
 import { describe, it, expect } from 'vitest';
 import { hashState } from '../../packages/shared-core/src/index';
 import { newGame, order, canOrder, canOrderAll } from './game';
-import { buildBuilding, buildUnit, assaultFleet, moveFleet, orbitFleet } from './actions';
+import { buildBuilding, buildUnit, assaultFleet, moveFleet, orbitFleet } from '../../decisions/actions';
 import { serverAutoAssaultActions } from './serverDrivers';
 
 const ME = 'p1';

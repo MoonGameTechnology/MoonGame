@@ -132,16 +132,11 @@ export function costText(bag: Record<string, number> | undefined): string {
   return parts.length ? parts.join(' ') : t('cost.free');
 }
 
-/** Localized display name of a unit id. Ids are English-ish («scout_drone») — the
- *  space-joined id is the DATA name the RU locale translates; EN shows it as-is. */
-export function displayUnit(unit: string): string {
-  return tData(unit.replace(/_/g, ' '));
-}
-
-/** Localized display name of a building id (`data/*.json` names are English). */
-export function buildingName(name: string | undefined, id: string): string {
-  return tData(name ?? id);
-}
+// Имена игровых данных — `decisions/dataNames.ts` (MIG-3): правило «id → имя» обязано
+// быть одним для обоих клиентов, иначе один и тот же корабль подписан в прототипе
+// «Разведдрон», а в новом клиенте «scout_drone». Реэкспорт — чтобы 40+ мест прототипа
+// продолжали импортировать отсюда.
+export { displayUnit, buildingName } from '../../decisions/dataNames';
 
 /** «2.5 ч» / «40 мин» — an ETA in the wording the HUD uses. */
 export function fmtEta(totalH: number): string {

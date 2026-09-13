@@ -9,35 +9,16 @@
  * (`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1`) — there the server must be pointed at the
  * existing binary with `--executable-path`, or it hangs on the first navigation.
  * On a normal dev machine no such flag must be passed, or Playwright would be
- * pinned to a browser that isn't there. So: resolve, then launch.
- *
- * Resolution order:
- *   1. `VOID_MCP_CHROMIUM` — explicit override (any environment);
- *   2. the `chromium` symlink/binary under `PLAYWRIGHT_BROWSERS_PATH`;
- *   3. nothing — let Playwright pick its own managed browser (the normal case).
+ * pinned to a browser that isn't there. So: resolve, then launch — the resolution
+ * order lives in `scripts/chromium.mjs`, shared with the browser smoke.
  *
  * Extra CLI args are forwarded, e.g. `node scripts/mcp-browser.mjs --device "iPhone 15"`.
  */
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 
-/** First readable candidate, or null when Playwright should decide for itself. */
-function resolveChromium() {
-  const explicit = process.env.VOID_MCP_CHROMIUM;
-  if (explicit) return existsSync(explicit) ? explicit : null;
-
-  const root = process.env.PLAYWRIGHT_BROWSERS_PATH;
-  if (!root) return null;
-  for (const candidate of [
-    path.join(root, 'chromium'), // symlink shipped by the web/CI images
-    path.join(root, 'chromium', 'chrome-linux', 'chrome'),
-  ]) {
-    if (existsSync(candidate)) return candidate;
-  }
-  return null;
-}
+import { resolveChromium } from './chromium.mjs';
 
 // The package exports only `.` and `./package.json`, so the CLI is resolved from the
 // package root rather than imported as a subpath (`./cli.js` is not exported).

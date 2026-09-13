@@ -79,6 +79,14 @@ export function setStarfield(v: boolean): void {
   writeBool('void.starfield', v);
 }
 
+/** Optional command-console appearance. The viewport gate lives in the UI adapter. */
+let holography = readBool('void.holography', true);
+export const holographyOn = (): boolean => holography;
+export function setHolography(v: boolean): void {
+  holography = v;
+  writeBool('void.holography', v);
+}
+
 /** Счётчик кадров в углу. По умолчанию ВЫКЛ (dev-режим и рассинхрон включают его сами). */
 let showFps = readBool('void.showFps', false);
 export const showFpsOn = (): boolean => showFps;
@@ -93,8 +101,8 @@ const PC_FINE =
     ? matchMedia('(min-width:900px) and (hover:hover) and (pointer:fine)')
     : null;
 
-/** Правда только в ПК-раскладке. Любая ПК-подстройка на стороне JS ОБЯЗАНА ехать на этом
- *  гейте — мобильная сборка заморожена. */
+/** Правда только в ПК-раскладке. Настольный ввод отделён от телефонного интерфейса
+ *  и старого планшетного ввода. */
 export function pcUi(): boolean {
   return PC_FINE?.matches ?? false;
 }

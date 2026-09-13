@@ -15,6 +15,8 @@
  */
 import { t } from '../../localization/runtime';
 import { esc } from './format';
+import { skinIcon } from './holographicIcons';
+import { motionOn } from './graphicsPrefs';
 
 /** Сообщение сессии в том виде, в каком его читает окно (структурно — `SessionMsg`
  *  из `main.ts`; здесь описано узко, чтобы модуль не зависел от хоста). */
@@ -351,12 +353,23 @@ export function feedInnerHtml(
   channelLabel: string,
   cfg: ChatCfg,
   lineHtml: (m: ChatMessage, stamp: ChatStamp) => string,
+  freshAfter = msgs.length,
 ): string {
   if (!msgs.length) {
     return `<div class="cw-empty">${t('chat.win.empty', { ch: esc(channelLabel) })}<br>${t('chat.win.empty.hint')}</div>`;
   }
   const stamp: ChatStamp = { day: cfg.showDay, time: cfg.showTime, real: cfg.showReal };
-  return msgs.map((m) => lineHtml(cfg.censor ? { ...m, text: censorText(m.text) } : m, stamp)).join('');
+  return msgs.map((m, i) => {
+    const line = lineHtml(cfg.censor ? { ...m, text: censorText(m.text) } : m, stamp);
+    return i >= freshAfter ? `<div class="cw-arrival">${line}</div>` : line;
+  }).join('');
+}
+
+/** Only append arrivals animate. A refreshed/replaced history is not a new signal. */
+export function chatArrivalStart(tail: ChatMessage | undefined, msgs: ChatMessage[]): number {
+  if (!tail) return 0;
+  const index = msgs.indexOf(tail);
+  return index < 0 ? msgs.length : index + 1;
 }
 
 /** Всплывающая панель настроек, вылетающая вправо: размер (в одну строку), шрифт,
@@ -406,13 +419,13 @@ export function windowHtml(o: {
   return (
     `<div class="cw-head" data-cwhead title="${o.pinned ? '' : t('chat.win.drag')}">` +
     `<span class="cw-title">${t('chat.win.title', { ch: esc(o.channelLabel) })}</span>` +
-    `<button class="cw-btn${o.pinned ? ' on' : ''}" data-cwact="pin" title="${t('chat.win.pin')}">📎</button>` +
-    `<button class="cw-btn${o.settingsOpen ? ' on' : ''}" data-cwact="settings" title="${t('chat.win.settings')}">⚙</button>` +
-    `<button class="cw-btn" data-cwact="min" title="${o.min ? t('chat.win.expand') : t('chat.win.collapse')}">${o.min ? '▢' : '—'}</button>` +
+    `<button class="cw-btn${o.pinned ? ' on' : ''}" data-cwact="pin" title="${t('chat.win.pin')}">${skinIcon('push-pin', '📎')}</button>` +
+    `<button class="cw-btn${o.settingsOpen ? ' on' : ''}" data-cwact="settings" title="${t('chat.win.settings')}">${skinIcon('sliders-horizontal', '⚙')}</button>` +
+    `<button class="cw-btn" data-cwact="min" title="${o.min ? t('chat.win.expand') : t('chat.win.collapse')}">${o.min ? skinIcon('corners-out', '▢') : skinIcon('minus', '—')}</button>` +
     `</div>` +
     `<div class="cw-tabs">${tabs}</div>` +
     `<div class="cw-feed" id="cw-feed">${o.feedHtml}</div>` +
-    `<div class="cw-compose"><input id="cw-text" type="text" maxlength="240" placeholder="${t('chat.input.ph')}" autocomplete="off"><button class="cw-send" data-cwact="send" title="${t('chat.win.send')}">▶</button></div>` +
+    `<div class="cw-compose"><input id="cw-text" type="text" maxlength="240" placeholder="${t('chat.input.ph')}" autocomplete="off"><button class="cw-send" data-cwact="send" title="${t('chat.win.send')}">${skinIcon('paper-plane-tilt', '▶')}</button></div>` +
     (o.settingsOpen ? settingsHtml(o.geom, o.cfg, o.vw, o.vh) : '')
   );
 }
@@ -468,6 +481,7 @@ export function initChat(host: ChatHost, sessionTab: string): ChatWindow {
   let cfg: ChatCfg = { ...DEFAULT_CHAT_CFG };
   let geom: ChatGeom = { ...DEFAULT_CHAT_GEOM };
   let drag: ChatDrag | null = null;
+  let feedTail: ChatMessage | undefined;
 
   const vp = (): { w: number; h: number } => host.viewport();
 
@@ -506,16 +520,17 @@ export function initChat(host: ChatHost, sessionTab: string): ChatWindow {
 
   const tabsNow = (): ChatTab[] => discoverTabs(host, tab);
 
-  const feedHtmlNow = (): string => {
-    const label = tabLabel(tabsNow(), tab, host.seatLabel(tab));
-    return feedInnerHtml(host.convoMessages(tab), label, cfg, host.lineHtml);
-  };
-
-  const renderFeed = (): void => {
+  const renderFeed = (arrival = false): void => {
     const win = host.root();
     const feed = win?.querySelector('#cw-feed') as HTMLElement | null;
     if (!feed) return;
-    feed.innerHTML = feedHtmlNow();
+    const msgs = host.convoMessages(tab);
+    const animate = arrival && motionOn() &&
+      typeof document !== 'undefined' && document.body.classList.contains('holo-ui');
+    const freshAfter = animate ? chatArrivalStart(feedTail, msgs) : msgs.length;
+    const label = tabLabel(tabsNow(), tab, host.seatLabel(tab));
+    feed.innerHTML = feedInnerHtml(msgs, label, cfg, host.lineHtml, freshAfter);
+    feedTail = msgs[msgs.length - 1];
     feed.scrollTop = feed.scrollHeight;
   };
 
@@ -531,6 +546,8 @@ export function initChat(host: ChatHost, sessionTab: string): ChatWindow {
     }
     const tabs = tabsNow();
     const { w: vw, h: vh } = vp();
+    const msgs = host.convoMessages(tab);
+    feedTail = msgs[msgs.length - 1];
     win.innerHTML = windowHtml({
       tabs,
       openTab: tab,
@@ -542,7 +559,7 @@ export function initChat(host: ChatHost, sessionTab: string): ChatWindow {
       cfg,
       vw,
       vh,
-      feedHtml: feedInnerHtml(host.convoMessages(tab), tabLabel(tabs, tab, host.seatLabel(tab)), cfg, host.lineHtml),
+      feedHtml: feedInnerHtml(msgs, tabLabel(tabs, tab, host.seatLabel(tab)), cfg, host.lineHtml),
     });
     applyGeom();
     const feed = win.querySelector('#cw-feed') as HTMLElement | null;
@@ -600,6 +617,13 @@ export function initChat(host: ChatHost, sessionTab: string): ChatWindow {
 
   const win = host.root();
   if (win) {
+    // Forget finished/cancelled accents, so toggling graphics cannot replay old lines.
+    const finishArrival = (e: AnimationEvent): void => {
+      if (e.animationName !== 'holo-transmission') return;
+      (e.target as HTMLElement).classList.remove('cw-arrival');
+    };
+    win.addEventListener('animationend', finishArrival);
+    win.addEventListener('animationcancel', finishArrival);
     // Начало жеста: тяга у любого края растягивает, тяга за заголовок двигает.
     // Скрепка (📎) запирает и то, и другое. Интерактивные элементы не участвуют.
     win.addEventListener('pointerdown', (e) => {
@@ -744,7 +768,7 @@ export function initChat(host: ChatHost, sessionTab: string): ChatWindow {
     toggle: () => (open ? doClose() : doOpen()),
     isOpen: () => open,
     refreshIfVisible: () => {
-      if (open && !min) renderFeed();
+      if (open && !min) renderFeed(true);
     },
     onViewportResize: () => {
       if (!open) return;

@@ -29,14 +29,48 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createInterface } from 'node:readline';
 
+import { resolveChromium } from '../scripts/chromium.mjs';
+
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const bundle = path.join(root, 'prototype/dist/void-dominion.html');
 const NAV_TIMEOUT_MS = 90_000;
 
-/** `--install`: fetch the Chromium build this Playwright expects (CI runners have none). */
+/**
+ * `--install`: fetch the Chromium build this Playwright expects (CI runners have none).
+ *
+ * The download is skipped when `scripts/chromium.mjs` already finds a binary: images that
+ * PRE-INSTALL Chromium (Claude Code on the web, CI images) also forbid fetching another
+ * revision, and the launcher will drive that exact binary anyway — downloading a second
+ * one would be work whose result nobody reads.
+ *
+ * Resolving the CLI takes two hops on purpose. `playwright-core` is a TRANSITIVE dep
+ * (via the pinned `@playwright/mcp`), so under pnpm's strict linking it is invisible from
+ * here — that is the `Cannot find module 'playwright-core/cli.js'` that made this step
+ * fail in every CI run. And `./cli.js` is not in the package's `exports`, so even a direct
+ * dependency would only trade that error for ERR_PACKAGE_PATH_NOT_EXPORTED. So: reach it
+ * THROUGH `@playwright/mcp` (which owns the version pin, keeping the fetched revision and
+ * the launched server in lockstep by construction) and off `package.json`, which is the
+ * one subpath the package does export.
+ */
 if (process.argv.includes('--install')) {
-  const cli = createRequire(import.meta.url).resolve('playwright-core/cli.js');
+  const preinstalled = resolveChromium();
+  if (preinstalled) {
+    console.log(`· Chromium уже на месте (${preinstalled}) — докачка не нужна`);
+    process.exit(0);
+  }
+  let cli;
+  try {
+    const mcpPkg = createRequire(import.meta.url).resolve('@playwright/mcp/package.json');
+    const corePkg = createRequire(mcpPkg).resolve('playwright-core/package.json');
+    cli = path.join(path.dirname(corePkg), 'cli.js');
+  } catch (err) {
+    console.error(
+      `\n✗ browser smoke install: не нашёл CLI playwright-core — ${err instanceof Error ? err.message : String(err)}`,
+    );
+    process.exit(1);
+  }
   const r = spawnSync(process.execPath, [cli, 'install', 'chromium'], { stdio: 'inherit' });
+  if (r.status !== 0) console.error('\n✗ browser smoke install: докачка Chromium не удалась');
   process.exit(r.status ?? 1);
 }
 

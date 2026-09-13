@@ -56,7 +56,7 @@ import {
   unlockHeroSkill,
   installHeroModule,
   castHeroAbility,
-} from './actions';
+} from '../../decisions/actions';
 import { botEmbargoes } from './botFavour';
 import { netIncome } from './economy';
 import { SECTOR_TYPES } from './map';

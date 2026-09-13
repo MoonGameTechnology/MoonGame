@@ -5,7 +5,7 @@
  * the CPU-heavy, purely-geometric core of the map: given the sector centres as weighted
  * seeds and a clip polygon, it tiles the plane into province cells (a bigger `w` claims
  * more land, adjacent cells share a border), fills each cell in its owner's colour, and
- * draws same-owner borders as faint inner hairlines vs owner frontiers as a bright glow.
+ * optionally draws same-owner divisions, and keeps owner frontiers as a bright glow.
  *
  * Stateless with respect to GAME state and fog: the caller builds the seeds (already
  * projected to screen space, owner resolved as the viewer may know it) and injects the
@@ -43,6 +43,8 @@ export interface TerritoryPalette {
   neutralFill: string;
   /** Optional terrain accent tint for a sector kind (hex `#rrggbb`), or `undefined`. */
   kindAccent: (kind: string) => string | undefined;
+  /** Hide only same-owner divisions; frontiers, neutral edges and cells stay intact. */
+  hideOwnedInner?: boolean;
 }
 
 /** Sentinel edge-tag: this province edge sits on the map boundary, not a neighbour. */
@@ -268,8 +270,10 @@ export function drawTerritory(
   g.save();
   g.lineJoin = 'round';
   g.lineCap = 'round';
-  for (const [owner, segs] of ownedInner)
-    strokeSegs(segs, rgba(palette.ownerColor(owner), 0.3), 0.65); // inner hairlines
+  if (!palette.hideOwnedInner) {
+    for (const [owner, segs] of ownedInner)
+      strokeSegs(segs, rgba(palette.ownerColor(owner), 0.3), 0.65); // inner hairlines
+  }
   strokeSegs(neutralEdge, 'rgba(95,176,197,0.55)', 0.75); // neutral divisions
   for (const [owner, segs] of ownedFront)
     strokeSegs(segs, rgba(palette.ownerColor(owner), 0.08), 3); // restrained emission

@@ -206,6 +206,193 @@
       #map[hidden] {
         display: none;
       }
+
+      /* ───────── Боевой HUD (MIG-3): статус-бар сверху, панель снизу ─────────
+         Мобиль-first: панель прижата к низу и ограничена по высоте, чтобы карта
+         оставалась видимой — на телефоне экран делит палец, а не мышь. */
+      #hud {
+        position: fixed;
+        inset: 0;
+        z-index: 9;
+        pointer-events: none; /* карта под HUD остаётся перетаскиваемой */
+        font: 12px ui-monospace, monospace;
+        color: var(--ink);
+      }
+      #hud > * {
+        pointer-events: auto; /* сами панели кликабельны */
+      }
+      .hud-bar {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 10px;
+        padding: 6px 10px;
+        background: rgba(3, 14, 18, 0.86);
+        border-bottom: 1px solid var(--line-hi);
+      }
+      .hud-bar .who b {
+        color: var(--cyan);
+      }
+      .hud-bar .who i,
+      .hud-bar .rank {
+        color: var(--dim);
+        font-style: normal;
+        margin-left: 6px;
+      }
+      .hud-bar .treasury {
+        margin-left: auto;
+        display: flex;
+        gap: 8px;
+      }
+      .hud-bar.defeated {
+        border-bottom-color: var(--red);
+      }
+      .hud-bar .dead {
+        color: var(--red);
+      }
+      .res b {
+        margin-left: 2px;
+      }
+      .hud-panel {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        max-height: 52vh;
+        overflow-y: auto;
+        padding: 10px 12px;
+        background: rgba(3, 14, 18, 0.92);
+        border-top: 1px solid var(--line-hi);
+      }
+      .hud-panel h3 {
+        margin: 0 0 6px;
+        font-size: 13px;
+        color: var(--cyan);
+      }
+      .hud-panel p {
+        margin: 2px 0;
+      }
+      .hud-panel .dim {
+        color: var(--dim);
+      }
+      .hud-panel .combat {
+        color: var(--red);
+        font-style: normal;
+      }
+      .bar {
+        position: relative;
+        height: 12px;
+        margin: 4px 0;
+        border: 1px solid var(--line);
+        border-radius: 3px;
+        overflow: hidden;
+      }
+      .bar i {
+        display: block;
+        height: 100%;
+        background: var(--cyan-dim);
+      }
+      .bar.shield i {
+        background: var(--amber);
+      }
+      .bar span {
+        position: absolute;
+        inset: 0;
+        text-align: center;
+        font-size: 10px;
+        line-height: 12px;
+      }
+      .stacks {
+        list-style: none;
+        margin: 6px 0 0;
+        padding: 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 4px 12px;
+      }
+      .sides {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .side.mine {
+        border-left: 2px solid var(--cyan);
+        padding-left: 6px;
+      }
+      .btn.danger {
+        border-color: var(--red);
+        color: #ffd9d9;
+      }
+      .btn.tiny {
+        width: auto;
+        padding: 4px 8px;
+        font-size: 11px;
+      }
+      .btn.off,
+      .btn[disabled] {
+        opacity: 0.45;
+        cursor: not-allowed;
+      }
+      .palette,
+      .slots {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        list-style: none;
+        margin: 6px 0;
+        padding: 0;
+      }
+      .slots li {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        border: 1px dashed var(--line);
+        border-radius: 6px;
+        padding: 2px 6px;
+      }
+      .slots li.filled {
+        border-style: solid;
+      }
+      .slots i {
+        color: var(--dim);
+        font-style: normal;
+      }
+      .stats {
+        list-style: none;
+        margin: 6px 0;
+        padding: 0;
+      }
+      .stats li {
+        display: flex;
+        gap: 8px;
+      }
+      .stats span {
+        flex: 1;
+        color: var(--dim);
+      }
+      .stats .up {
+        color: var(--cyan);
+        font-style: normal;
+      }
+      .stats .down {
+        color: var(--red);
+        font-style: normal;
+      }
+      /* Строка партии в браузере матчей (MIG-2). */
+      .btn.row {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        text-align: left;
+      }
+      .btn.row .kind {
+        font-style: normal;
+        color: var(--dim);
+      }
     </style>
   </head>
   <body>

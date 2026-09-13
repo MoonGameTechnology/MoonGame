@@ -24,7 +24,7 @@ import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
 import { buildingName, cost, esc, resLine } from './format';
 import { BUILD_ICON } from './icons';
-import { buildBuilding } from './actions';
+import { buildBuilding } from '../../decisions/actions';
 import { planetName } from './planetName';
 
 type BuildingDef = (typeof data.buildings)[string];

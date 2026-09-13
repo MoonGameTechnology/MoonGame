@@ -1,0 +1,4 @@
+Generated with OpenAI ImageGen for MoonGame, 2026-09-11.
+Art direction: approved dark flagship-console reference; original deep-space dust and sparse stars, quiet center; no map geometry, UI, planets or text.
+Native image: 1536x1024 RGB. Converted from generated PNG to WebP quality 96; no upscaling.
+WebP size: 211148 bytes. Embedded locally; no third-party runtime request.

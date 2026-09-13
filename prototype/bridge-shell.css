@@ -1,0 +1,333 @@
+/* The desktop bridge shell styles existing screens only. Authentication and game
+   actions remain attached to their original controls. No mobile rules are changed. */
+body.holo-ui {
+  --bridge-edge: rgba(132, 205, 221, .31);
+  --bridge-face: linear-gradient(135deg, rgba(28, 58, 77, .34), transparent 58%), rgba(5, 17, 29, .9);
+  --bridge-shadow: 0 20px 65px rgba(0, 0, 0, .4), inset 0 1px rgba(200, 240, 255, .14), inset 0 0 0 4px rgba(84, 160, 188, .025);
+}
+
+/* One atmospheric field surrounds the individual console windows. The planet and
+   stars are decoration, with no hit targets and no generated player-facing copy. */
+body.holo-ui :is(#connect, #hub) {
+  isolation: isolate;
+  background: radial-gradient(ellipse at 78% 35%, #122739 0, #080f1e 38%, #030911 82%);
+}
+body.holo-ui :is(#connect, #hub)::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -2;
+  pointer-events: none;
+  background-image:
+    radial-gradient(1px 1px at 14% 16%, #cadde8 70%, transparent),
+    radial-gradient(1px 1px at 62% 41%, #98bcca 70%, transparent),
+    radial-gradient(1px 1px at 83% 67%, #d2e0ed 70%, transparent),
+    radial-gradient(2px 2px at 74% 12%, rgba(196, 234, 246, .6), transparent),
+    radial-gradient(1px 1px at 41% 80%, #91a9c2 70%, transparent);
+  background-size: 211px 251px, 337px 359px, 419px 307px, 733px 577px, 293px 461px;
+  opacity: .54;
+}
+body.holo-ui :is(#connect, #hub)::after {
+  content: '';
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
+  width: 86vw;
+  height: 86vw;
+  right: -38vw;
+  top: 20vh;
+  border: 1px solid rgba(153, 219, 240, .4);
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse at 17% 11%, rgba(113, 150, 166, .22), transparent 29%),
+    repeating-radial-gradient(ellipse at 36% 15%, transparent 0 3%, rgba(71, 98, 121, .09) 3.2% 3.8%, transparent 4.1% 7%),
+    radial-gradient(circle at 20% 12%, #2b485d, #102335 25%, #050c18 59%, #02050d 76%);
+  box-shadow: -15px -12px 70px rgba(107, 196, 224, .1), -2px -3px 12px rgba(146, 222, 241, .22), inset 4px 6px 15px rgba(144, 215, 244, .16);
+  transform: rotate(-23deg);
+}
+body.holo-ui #connect {
+  padding: 32px max(32px, calc((100vw - 1120px) / 2));
+}
+body.holo-ui #connect .cwrap {
+  width: min(520px, 100%);
+  margin: auto auto auto 0;
+  padding: 52px 0 48px;
+}
+body.holo-ui #connect .cbox {
+  width: 100%;
+  padding: 34px 36px 28px;
+  border: 1px solid var(--bridge-edge);
+  border-radius: 5px 22px 5px 22px;
+  background: var(--bridge-face);
+  box-shadow: var(--bridge-shadow);
+  backdrop-filter: blur(18px);
+}
+body.holo-ui #connect .ccrest {
+  align-items: flex-start;
+  gap: 11px;
+  margin: 0 0 24px;
+}
+body.holo-ui #connect .ccrest .ring {
+  width: 50px;
+  height: 50px;
+  margin: 4px 0 20px;
+}
+body.holo-ui #connect .ccrest .ring::before {
+  inset: -5px;
+  border-color: rgba(151, 218, 235, .28);
+  box-shadow: none;
+}
+body.holo-ui #connect .ccrest .ring .dia {
+  width: 26px;
+  height: 26px;
+  border-color: #a2dce7;
+  background: rgba(133, 210, 226, .08);
+  box-shadow: 0 0 25px rgba(107, 202, 228, .2), inset 0 0 14px rgba(168, 233, 249, .1);
+}
+body.holo-ui #connect .ccrest .wm {
+  font-family: inherit;
+  font-size: clamp(22px, 2.2vw, 31px);
+  font-weight: 450;
+  letter-spacing: 4px;
+  color: #e2f0f6;
+  text-shadow: none;
+}
+body.holo-ui #connect .ccrest .wtag {
+  display: block;
+  color: #8eb9c9;
+  font-size: 10px;
+  letter-spacing: 2.7px;
+}
+body.holo-ui #connect .csub {
+  margin: 8px 0 24px;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #9fb3c4;
+}
+body.holo-ui #connect :is(.cnew, .cbtn, .mbtn) {
+  font-family: inherit;
+  font-weight: 550;
+  letter-spacing: .7px;
+  border-radius: 4px 10px 4px 10px;
+  border-color: #6196a5;
+  color: #dff9ff;
+  background: linear-gradient(110deg, rgba(75, 132, 152, .35), rgba(30, 68, 90, .44));
+  box-shadow: inset 0 1px rgba(195, 245, 255, .1);
+}
+body.holo-ui #connect .cnew { min-height: 54px; font-size: 14px; }
+body.holo-ui #connect :is(.cbtn, .mbtn).ghost {
+  color: #b5c7d4;
+  border-color: var(--bridge-edge);
+  background: rgba(9, 23, 36, .45);
+}
+body.holo-ui #connect :is(.cnew, .cbtn, .mbtn):hover:not(:disabled) {
+  border-color: #a7dce7;
+  background-color: rgba(97, 165, 190, .13);
+  box-shadow: inset 0 1px rgba(211, 246, 255, .2), 0 0 18px rgba(97, 171, 195, .1);
+}
+body.holo-ui #connect .cdiv { margin: 21px 0 17px; font-size: 10px; letter-spacing: 1px; }
+body.holo-ui #connect .cdiv::before,
+body.holo-ui #connect .cdiv::after { background: var(--bridge-edge); }
+body.holo-ui #connect .csocial { gap: 12px; }
+body.holo-ui #connect .csoc { width: 48px; height: 44px; border-radius: 6px; box-shadow: none; color: #b4c9d8; }
+body.holo-ui #connect .cstack { margin-top: 21px; }
+body.holo-ui #connect .cfield { margin-bottom: 17px; font-size: 11px; letter-spacing: .6px; }
+body.holo-ui #connect :is(.cfield input, .cfield select, .cwlogin input) {
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  min-height: 46px;
+  padding: 11px 13px;
+  margin-top: 7px;
+  background: rgba(2, 10, 20, .62);
+  border-color: var(--bridge-edge);
+  border-radius: 5px;
+  color: #deedf4;
+  letter-spacing: .2px;
+}
+body.holo-ui #connect .cwlogin input { margin-top: 0; }
+body.holo-ui #connect input::placeholder { color: #859aaf; opacity: 1; }
+body.holo-ui #connect :is(.clang, .cfoot a, .clink, .cback) { font-family: inherit; color: #a0b9ca; }
+body.holo-ui #connect .clang { border-radius: 5px; padding: 8px 11px; font-size: 11px; }
+body.holo-ui #connect .cback { margin-bottom: 24px; font-size: 12px; }
+body.holo-ui #connect .cfoot { gap: 18px; justify-content: flex-start; }
+body.holo-ui #connect .cfoot a { font-size: 11px; letter-spacing: .2px; }
+body.holo-ui #connect .ctitle { font-size: 19px; letter-spacing: 1px; color: #dcecf5; line-height: 1.4; }
+body.holo-ui #connect .ctitle .dia { width: 8px; height: 8px; flex-shrink: 0; box-shadow: 0 0 12px rgba(116, 232, 237, .25); }
+body.holo-ui #connect .cstat { font-size: 12px; line-height: 1.6; text-align: left; }
+body.holo-ui #connect .cstat:not(:empty) { padding: 12px; background: rgba(140, 109, 53, .08); border-left: 2px solid var(--amber); }
+body.holo-ui #connect :is(.mtab, .mfbtn, .mflabel, .mfval, .mname, .mmeta) { font-family: inherit; letter-spacing: .2px; }
+body.holo-ui #connect .mrow { border-color: var(--bridge-edge); background: rgba(10, 26, 42, .5); border-radius: 5px; }
+body.holo-ui #connect .mlist { max-height: 42dvh; }
+
+/* The hub keeps the original live panels and routes, framed as separate screens. */
+body.holo-ui #hub { padding: 24px 28px; gap: 13px; }
+body.holo-ui #hub :is(.hub-banner, .hub-id, .hub-body, .hub-note, .hub-nav) {
+  width: min(1080px, 100%);
+  margin-left: auto;
+  margin-right: auto;
+  border: 0;
+}
+body.holo-ui #hub .hub-banner {
+  height: 94px;
+  min-height: 72px;
+  flex-direction: row;
+  justify-content: flex-start;
+  gap: 20px;
+  padding: 12px 3px;
+}
+body.holo-ui #hub .hub-banner::before { display: none; }
+body.holo-ui #hub .hub-crest { width: 50px; height: 50px; }
+body.holo-ui #hub .hub-crest .dia { border-color: #a8dce8; box-shadow: 0 0 24px rgba(128, 204, 230, .15); }
+body.holo-ui #hub .hub-bt { color: #e1edf5; font-size: 29px; font-weight: 450; letter-spacing: 5px; text-shadow: none; }
+body.holo-ui #hub :is(.hub-id, .hub-body, .hub-nav) {
+  border: 1px solid var(--bridge-edge);
+  border-radius: 5px 16px 5px 16px;
+  background: var(--bridge-face);
+  box-shadow: var(--bridge-shadow);
+  backdrop-filter: blur(14px);
+}
+body.holo-ui #hub .hub-id { padding: 15px 21px; gap: 15px; }
+body.holo-ui #hub .hub-av { width: 42px; height: 42px; border-radius: 8px; font-size: 19px; }
+body.holo-ui #hub .hub-av::after { box-shadow: none; background: #95cedb; }
+body.holo-ui #hub .hub-name { font-size: 16px; font-weight: 550; }
+body.holo-ui #hub .hub-st { color: #9ab6c4; font-size: 10px; letter-spacing: 1px; margin-top: 5px; }
+body.holo-ui #hub .hub-st::before { box-shadow: none; }
+body.holo-ui #hub .hub-msg { border-radius: 5px; border-color: var(--bridge-edge); }
+body.holo-ui #hub .hub-body { padding: 24px; min-height: 0; }
+body.holo-ui #hub .hub-panel { gap: 15px; }
+body.holo-ui #hub #hp-home { flex-direction: row; flex-wrap: wrap; align-content: flex-start; }
+body.holo-ui #hub #hp-home > * { flex: 1 0 100%; min-width: 0; }
+body.holo-ui #hub #hp-home > :is(.hub-play, .hub-solo) { flex: 1 1 calc(50% - 8px); width: auto; }
+body.holo-ui #hub #hp-home > .hub-card:not(.ob-nudge) { flex: 1 1 calc(50% - 8px); }
+body.holo-ui #hub :is(.hub-play, .hub-solo) {
+  min-height: 58px;
+  border-radius: 4px 10px 4px 10px;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 550;
+  letter-spacing: .7px;
+}
+body.holo-ui #hub .hub-play {
+  border-color: #6ca2b2;
+  background: linear-gradient(120deg, rgba(68, 124, 147, .38), rgba(26, 60, 83, .44));
+  color: #e6f8ff;
+  box-shadow: inset 0 1px rgba(202, 243, 255, .15), 0 0 26px rgba(90, 172, 195, .07);
+}
+body.holo-ui #hub .hub-solo { color: #b9cdda; border-color: var(--bridge-edge); background: rgba(4, 16, 29, .32); }
+body.holo-ui #hub :is(.hub-play, .hub-solo):hover:not(:disabled) { border-color: #b3e6f2; background-color: rgba(107, 187, 208, .11); }
+body.holo-ui #hub .hub-sec { color: #a2bacb; margin-top: 11px; font-size: 10px; letter-spacing: 1.5px; padding-bottom: 10px; }
+body.holo-ui #hub .hub-card { border-color: rgba(130, 197, 218, .18); border-radius: 5px; padding: 18px; background: rgba(16, 36, 51, .28); }
+body.holo-ui #hub .hub-card .hc-ic { width: 35px; height: 35px; border-radius: 5px; font-size: 18px; background: rgba(91, 151, 176, .08); color: #a1d1df; }
+body.holo-ui #hub .hub-card .hc-t { font-size: 14px; line-height: 1.4; }
+body.holo-ui #hub .hub-card .hc-s { font-size: 12px; line-height: 1.6; margin-top: 5px; }
+body.holo-ui #hub :is(.hm-empty, .hm-more) { font-size: 12px; line-height: 1.6; }
+body.holo-ui #hub .ob-nudge { border-color: rgba(120, 189, 207, .4); background: rgba(23, 55, 72, .22); }
+body.holo-ui #hub .ob-nudge :is(.ob-go, .ob-later) { font-family: inherit; min-height: 36px; border-radius: 4px; }
+body.holo-ui #hub .ob-nudge .ob-go { background: #9ed1dc; color: #081522; }
+body.holo-ui #hub .hub-grid { grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); gap: 12px; }
+body.holo-ui #hub .hub-tile { min-height: 91px; border-radius: 5px; font-family: inherit; font-size: 12px; font-weight: 500; letter-spacing: .2px; gap: 10px; }
+body.holo-ui #hub .hub-tile .ht-ic { color: #a4cddf; text-shadow: none; }
+body.holo-ui #hub .hub-tile.wide { min-height: 44px; }
+body.holo-ui #hub .hub-nav { padding: 8px; gap: 5px; min-height: 66px; }
+body.holo-ui #hub .hub-tab { border: 1px solid transparent; border-radius: 5px; font-family: inherit; font-size: 11px; letter-spacing: .2px; gap: 6px; color: #9db6c6; padding: 8px 6px; }
+body.holo-ui #hub .hub-tab .hn-ic { color: inherit; font-size: 18px; }
+body.holo-ui #hub .hub-tab.active { border-color: rgba(123, 191, 211, .3); background: rgba(83, 140, 165, .12); color: #d1eef5; }
+body.holo-ui #hub .hub-tab.active .hn-ic { text-shadow: none; }
+body.holo-ui #hub .hub-tab:hover { color: #ecfaff; background: rgba(102, 161, 185, .08); }
+body.holo-ui #hub .hub-note { padding: 0; line-height: 1.5; }
+body.holo-ui #hub .hub-note:empty { display: none; }
+
+/* Preparation and results use the same material while leaving setup choices,
+   disabled states, simulation speed and outcome statistics intact. */
+body.holo-ui :is(#setup, #seatpick, #endscreen, #settings) {
+  padding: 24px;
+  background: rgba(2, 8, 17, .78);
+  backdrop-filter: blur(12px);
+}
+body.holo-ui :is(#setup, #seatpick) .sbox,
+body.holo-ui #endscreen .es-box,
+body.holo-ui #settings .setbox {
+  padding: 26px;
+  border: 1px solid var(--bridge-edge);
+  border-radius: 5px 18px 5px 18px;
+  background: var(--bridge-face);
+  box-shadow: var(--bridge-shadow);
+}
+body.holo-ui #setup .sbox { width: min(1080px, 94vw); max-height: calc(100dvh - 48px); display: flex; flex-direction: column; overflow: hidden; }
+body.holo-ui #setup .spane { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 18px 0; min-height: 0; overflow: auto; }
+body.holo-ui #setup .scol { min-height: 0; overflow-y: auto; padding: 18px; border: 1px solid rgba(126, 192, 214, .18); border-radius: 5px; background: rgba(2, 11, 21, .35); }
+body.holo-ui :is(#setup, #seatpick) .stitle { color: #dfedf6; font-size: 20px; letter-spacing: 1px; line-height: 1.4; flex-shrink: 0; }
+body.holo-ui :is(#setup, #seatpick) .stitle .dia { width: 8px; height: 8px; box-shadow: none; }
+body.holo-ui #setup .smap { height: 220px; border-radius: 5px; border-color: var(--bridge-edge); background: rgba(2, 8, 17, .72); }
+body.holo-ui #setup :is(.ssub, .smaphint, .sspeedhint) { font-family: inherit; font-size: 12px; line-height: 1.6; }
+body.holo-ui #setup .smaphint { margin: 10px 0 18px; }
+body.holo-ui #setup :is(.fph, .sspeedlabel) { font-size: 10px; color: #a1bccb; letter-spacing: 1.2px; }
+body.holo-ui #setup :is(.fchip, .srow, .scouncil) { border-radius: 5px; background: rgba(18, 39, 54, .3); border-color: var(--bridge-edge); }
+body.holo-ui #setup .fchip { padding: 12px; gap: 6px; }
+body.holo-ui #setup .fchip :is(b, span) { font-family: inherit; font-size: 12px; line-height: 1.5; }
+body.holo-ui #setup .fchip.on { border-color: #98d2e0; background: rgba(86, 151, 176, .15); }
+body.holo-ui #setup .srow { padding: 11px 12px; font-size: 12px; }
+body.holo-ui #setup :is(.srow .stog, .sspeed .spdchip, .scouncil .sc-n, .scouncil .sc-go) { font-family: inherit; font-size: 11px; letter-spacing: .2px; }
+body.holo-ui #setup .srow .stog { min-height: 31px; border-radius: 4px; }
+body.holo-ui #setup .sspeed { gap: 6px; }
+body.holo-ui #setup .sspeed .spdchip { min-height: 36px; padding: 8px 4px; border-radius: 4px; }
+body.holo-ui :is(#setup, #seatpick) .sgo { min-height: 49px; flex-shrink: 0; font-family: inherit; font-size: 13px; letter-spacing: 1px; border-radius: 4px 9px 4px 9px; border-color: #86bfce; color: #dff8ff; background: linear-gradient(110deg, rgba(67, 133, 153, .3), rgba(39, 73, 103, .25)); }
+body.holo-ui :is(#setup, #seatpick) .scancel { min-height: 40px; flex-shrink: 0; font-family: inherit; font-size: 12px; border-radius: 5px; border-color: var(--bridge-edge); }
+body.holo-ui #endscreen .es-box { width: min(560px, 88vw); padding: 34px; }
+body.holo-ui #endscreen .es-head { font-size: 30px; font-weight: 550; letter-spacing: 2px; line-height: 1.3; text-shadow: none; }
+body.holo-ui #endscreen .es-why { font-size: 13px; line-height: 1.6; }
+body.holo-ui #endscreen .es-grid { margin: 25px 0 12px; gap: 12px; }
+body.holo-ui #endscreen .es-cell { padding: 15px; border-radius: 5px; border-color: var(--bridge-edge); background: rgba(8, 25, 41, .48); }
+body.holo-ui #endscreen .es-k { font-size: 10px; color: #9db8c8; letter-spacing: .8px; }
+body.holo-ui #endscreen .es-v { margin-top: 8px; font-size: 24px; font-weight: 500; }
+body.holo-ui #endscreen .es-btn { font-family: inherit; min-height: 44px; border-radius: 5px; font-size: 12px; letter-spacing: .4px; }
+body.holo-ui #settings .setbox { width: min(510px, 88vw); max-height: calc(100dvh - 48px); }
+body.holo-ui #settings .set-row { gap: 12px; padding: 12px 0; border-bottom: 1px solid rgba(120, 180, 199, .12); }
+body.holo-ui #settings .set-lbl { font-family: inherit; font-size: 13px; line-height: 1.5; gap: 4px; }
+body.holo-ui #settings .set-sub { font-size: 11px; line-height: 1.6; color: #9bb2c3; }
+body.holo-ui #settings .set-val { font-size: 12px; }
+body.holo-ui #settings .set-ctl { gap: 14px; }
+body.holo-ui #settings .set-switch input:focus-visible ~ .sw-track { outline: 2px solid #d4f4ff; outline-offset: 4px; }
+body.holo-ui :is(#hub, #connect, #setup, #seatpick, #endscreen, #settings) :is(button, a, input, select):focus-visible {
+  outline: 2px solid #d8f4ff;
+  outline-offset: 3px;
+}
+body.holo-ui :is(#hub, #connect, #setup, #seatpick) button:disabled { opacity: .42; cursor: not-allowed; }
+
+@media (max-width: 1050px) {
+  body.holo-ui #connect { padding: 26px 40px; }
+  body.holo-ui #connect .cwrap { margin-left: auto; }
+  body.holo-ui #connect::after { right: -42vw; opacity: .65; }
+  body.holo-ui #hub { padding: 18px 22px; gap: 10px; }
+  body.holo-ui #hub .hub-banner { height: 76px; min-height: 64px; }
+  body.holo-ui #hub .hub-bt { font-size: 25px; letter-spacing: 4px; }
+  body.holo-ui #hub .hub-body { padding: 20px; }
+  body.holo-ui #setup .sbox { padding: 20px; }
+  body.holo-ui #setup .spane { gap: 12px; }
+  body.holo-ui #setup .scol { padding: 12px; }
+}
+@media (max-height: 760px) {
+  body.holo-ui #connect { padding-top: 18px; padding-bottom: 18px; }
+  body.holo-ui #connect .cwrap { padding-top: 42px; padding-bottom: 36px; }
+  body.holo-ui #connect .cbox { padding: 24px 30px; }
+  body.holo-ui #connect .ccrest { margin-bottom: 16px; gap: 9px; }
+  body.holo-ui #connect .ccrest .ring { width: 40px; height: 40px; margin: 0 0 10px; }
+  body.holo-ui #connect .ccrest .wm { font-size: 25px; }
+  body.holo-ui #connect .csub { margin-bottom: 18px; }
+  body.holo-ui #connect .cdiv { margin: 15px 0 12px; }
+  body.holo-ui #connect .cstack { margin-top: 16px; }
+  body.holo-ui #hub { padding-top: 12px; padding-bottom: 12px; }
+  body.holo-ui #hub .hub-banner { height: 56px; min-height: 48px; padding: 4px; }
+  body.holo-ui #hub .hub-bt { font-size: 25px; }
+  body.holo-ui #hub .hub-crest { transform: scale(.8); }
+  body.holo-ui #hub .hub-id { padding: 11px 18px; }
+  body.holo-ui #hub .hub-nav { min-height: 58px; padding: 5px; }
+  body.holo-ui #hub .hub-body { padding: 18px; }
+  body.holo-ui #setup .smap { height: 180px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  body.holo-ui :is(#connect, #hub, #setup, #seatpick, #endscreen, #settings) *,
+  body.holo-ui :is(#connect, #hub, #setup, #seatpick, #endscreen, #settings) *::before,
+  body.holo-ui :is(#connect, #hub, #setup, #seatpick, #endscreen, #settings) *::after { animation: none; transition: none; scroll-behavior: auto; }
+}

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { GameState } from '@void/shared-core';
-import { nearestPlanet, myFleetAt, moveAction } from './matchInput';
+import { nearestPlanet, myFleetAt } from './matchInput';
 import { worldToScreen, type Bounds, type Viewport, type Cam } from './camera';
 
 // A tiny state: two planets and one fleet parked at planet A.
@@ -34,18 +34,5 @@ describe('matchInput — myFleetAt', () => {
     expect(myFleetAt(STATE, 'a', 'green')).toBe('g1');
     expect(myFleetAt(STATE, 'a', 'red')).toBeNull(); // not my fleet
     expect(myFleetAt(STATE, 'b', 'green')).toBeNull(); // no fleet here
-  });
-});
-
-describe('matchInput — moveAction', () => {
-  it('builds a fleet.move order with the ui:<player>:<seq> idempotency id', () => {
-    const a = moveAction('green', 7, 'g1', 'b');
-    expect(a).toEqual({
-      id: 'ui:green:7',
-      type: 'fleet.move',
-      playerId: 'green',
-      payload: { fleetId: 'g1', to: 'b' },
-      issuedAt: 0,
-    });
   });
 });
