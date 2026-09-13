@@ -36,6 +36,7 @@ import { t, tData } from '../../localization/runtime';
 import { data } from './gameData';
 import { esc, displayUnit } from './format';
 import { unitIconHtml } from './icons';
+import { catalogPortraitHtml } from './shipArt';
 import { SECTOR_TYPES } from './map';
 import { originOf } from './arsenal';
 import { originLabel } from './arsenalScreen';
@@ -247,15 +248,16 @@ export function loadoutPaneHtml(
   if (!ed.ok) return `<div class="cn-soon">${t('yard.hull.unavailable')}</div>`;
   const m: LoadoutModel = ed;
   const hulls = ownedHulls
-    .map(
-      (h) =>
-        `<button class="cn-hbtn${h === draft.hull ? ' on' : ''}" data-cnhull="${h}">${unitIconHtml(h, data, view.youColor, 18)} ${esc(displayUnit(h))}</button>`,
-    )
+    .map((h) => {
+      const art = catalogPortraitHtml('u', h, data, 'thumb');
+      return `<button class="cn-hbtn${art ? ' with-art' : ''}${h === draft.hull ? ' on' : ''}" data-cnhull="${h}">${art || unitIconHtml(h, data, view.youColor, 18)} <span>${esc(displayUnit(h))}</span></button>`;
+    })
     .join('');
   const freeTypes = [...new Set(m.slots.filter((sl) => !sl.moduleId).map((sl) => sl.type))];
+  const portrait = catalogPortraitHtml('u', draft.hull, data);
   const hullCard =
-    `<div class="cn-hull"><div class="cn-hic">${unitIconHtml(draft.hull, data, view.youColor, 40)}</div><div><div class="cn-hn">${esc(displayUnit(draft.hull))}</div>` +
-    `<div class="cn-hm">${t('yard.slots.count', { n: String(m.slots.length) })}</div></div></div>`;
+    `<div class="cn-hull${portrait ? ' with-art' : ''}">${portrait}<div class="cn-hull-info"><div class="cn-hic">${unitIconHtml(draft.hull, data, view.youColor, 40)}</div><div><div class="cn-hn">${esc(displayUnit(draft.hull))}</div>` +
+    `<div class="cn-hm">${t('yard.slots.count', { n: String(m.slots.length) })}</div></div></div></div>`;
   const bays = m.slots
     .map((sl) => {
       if (sl.moduleId) {

@@ -9,13 +9,15 @@
  * star lanes, holographic planet spheres coloured by owner with a floating type badge, and
  * fleets at their interpolated positions. Node sizes stay constant in screen px.
  */
-import { fleetPositionAt, type GameState, type PlayerId } from '@void/shared-core';
+import { effectiveStats, fleetPositionAt, type GameData, type GameState, type PlayerId } from '@void/shared-core';
 import { worldToScreen, inView, type Cam, type Viewport, type Bounds } from './camera';
 import { blitGlow, blitSphere, rgba } from './holoDraw';
 import { drawTerritory, type TerritorySeed } from './territory';
 import { theme } from './theme';
 import { drawSpaceBackdrop } from './spaceBackdrop';
 import { drawProvinceSelection } from './provinceSelection';
+import { dominantUnit, glyphHalo, glyphScale, unitArchetype, unitShape, unitSizeClass } from './shipGlyphs';
+import { drawShipShape } from './shipShapes';
 
 /** Seat colours in join order (cyan / red / amber / violet — the prototype's palette). */
 const OWNER_COLORS = ['#35d6e6', '#ff5a4d', '#ffb43a', '#b07cff'] as const;
@@ -45,6 +47,8 @@ const KIND_COLOR: Record<string, string> = {
 };
 
 export interface MapRenderOpts {
+  /** Catalogue for identified hulls; hidden contacts have no unit stack to resolve. */
+  data: GameData;
   /** World time (ms) for interpolating fleets in transit. */
   now: number;
   /** Device-pixel-ratio the canvas transform was set to — the holo sprites bake at it. */
@@ -194,8 +198,8 @@ export function renderMap(
     }
   }
 
-  // Fleets — a small chevron in the owner's colour (with a soft glow) at its
-  // interpolated position (the SHARED leg math — state/fleetPosition.ts).
+  // Same holographic hulls and modifiers as the playable client. The caller supplies
+  // its server-filtered state; this pass never reconstructs hidden fleet composition.
   for (const f of Object.values(state.fleets)) {
     const pt = fleetPositionAt(state, f, opts.now);
     if (!pt) continue;
@@ -203,12 +207,32 @@ export function renderMap(
     if (!inView(c, vw, vh, 24)) continue;
     const col = colors.get(f.owner) ?? theme.cyan;
     blitGlow(g, opts.dpr, col, c.x, c.y, 10, 0.5);
-    g.beginPath();
-    g.moveTo(c.x, c.y - 5);
-    g.lineTo(c.x - 4, c.y + 4);
-    g.lineTo(c.x + 4, c.y + 4);
-    g.closePath();
-    g.fillStyle = col;
-    g.fill();
+    const dom = dominantUnit(f.units, opts.data);
+    const shape = dom && unitShape(dom.def, dom.unit);
+    g.save();
+    g.translate(c.x, c.y);
+    g.strokeStyle = col;
+    if (!dom || !shape) {
+      // Unknown contact: no made-up class, no inferred ship portrait.
+      g.beginPath();
+      g.arc(0, 0, 4, 0, Math.PI * 2);
+      g.stroke();
+      g.restore();
+      continue;
+    }
+    const k = glyphScale(unitSizeClass(dom.def.stats.hp));
+    const stack = f.units.find((st) => st.unit === dom.unit && st.count > 0)!;
+    if (glyphHalo(unitArchetype(dom.def), (effectiveStats(dom.def, stack, opts.data).shield ?? 0) > 0)) {
+      g.setLineDash([2.6, 2.8]);
+      g.beginPath();
+      g.arc(0, 0, 12.5 * k + 2, 0, Math.PI * 2);
+      g.stroke();
+      g.setLineDash([]);
+    }
+    g.scale(k, k);
+    g.translate(-12, -12);
+    g.fillStyle = rgba(col, 0.24);
+    drawShipShape(g, shape, cam.scale >= 0.9);
+    g.restore();
   }
 }
