@@ -826,7 +826,7 @@ import { initFriends } from './friendsScreen';
 import { initRank } from './rankScreen';
 import { aimRing, combatRanges, ringLook } from './combatRanges';
 // Остаток SHU-3.1: где сейчас летящая эскадра и по какой линии (чистые решения).
-import { strikeProgress, strikeTrails } from './strikeTrail';
+import { strikeLeg, strikeProgress, strikeTrails } from './strikeTrail';
 import { corridorLines } from './corridorView';
 import { recapAdmits } from './recapGate';
 // ONB-7 — first-session goals checklist (mine/fleet/capture/score, ticked from state).
@@ -1918,7 +1918,7 @@ function strikeWorldPos(strikeId: string): { x: number; y: number } | null {
   if (!st) return null;
   const home = strikeBasePos(st.base);
   if (!home) return null;
-  const [from, to] = st.leg === 'back' ? [st.to, home] : [home, st.to];
+  const [from, to] = strikeLeg(st, home);
   const k = strikeProgress(st, s.time);
   return { x: from.x + (to.x - from.x) * k, y: from.y + (to.y - from.y) * k };
 }
