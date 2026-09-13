@@ -187,6 +187,7 @@ import {
   rgba,
   blitGlow as hdBlitGlow,
   blitSphere as hdBlitSphere,
+  clearHolographicSprites,
 } from '../../packages/client/src/holoDraw';
 import {
   drawTerritory,
@@ -4159,6 +4160,20 @@ let holographicFrame = { x: 0, y: 0, width: 0, height: 0 };
 let paintedSelection: string | null = null;
 let selectionStarted = 0;
 
+/** WebView can restore contexts without changing canvas dimensions or camera state. */
+function invalidateMapSurfaces(): void {
+  bgContent = '';
+  presentedCam = null;
+  terrainRaster.clear();
+  clearHolographicSprites();
+}
+canvas.addEventListener('contextlost', invalidateMapSurfaces);
+canvas.addEventListener('contextrestored', invalidateMapSurfaces);
+// Offscreen contexts can also be lost independently. Their events do not bubble
+// through document, so observe the actual cached surface.
+bg.addEventListener?.('contextlost', () => { bgContent = ''; });
+bg.addEventListener?.('contextrestored', () => { bgContent = ''; });
+
 /** The owner of node `id` AS THE VIEWER MAY KNOW IT: live when identified (or fog
  *  off), last-known from memory when only remembered, unknown otherwise. The
  *  political fill and its cache signature both read THIS, never the raw truth —
@@ -4198,9 +4213,9 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   const width = Math.round(VW * DPR);
   const baked = bgContent ? { signature: bgContent, cam: bgCam, width: bg.width } : null;
   if (g === bgx) {
+    if (bgx.isContextLost?.()) return;
     if (!needsRebake(baked, { signature: content, cam, width })) return;
-    bgContent = content;
-    bgCam = { x: cam.x, y: cam.y, scale: cam.scale };
+    bgContent = ''; // publish the cache signature only after a complete paint
     // Preserve the allocation when only the scene changed.
     if (bg.width !== Math.round(VW * DPR)) bg.width = Math.round(VW * DPR);
     if (bg.height !== Math.round(VH * DPR)) bg.height = Math.round(VH * DPR);
@@ -4326,23 +4341,30 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   g.strokeStyle = 'rgba(90,151,165,0.2)';
   g.lineWidth = 0.7;
   if (!holographicMapOn()) g.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+  if (g === bgx && !bgx.isContextLost?.()) {
+    bgContent = content;
+    bgCam = { x: cam.x, y: cam.y, scale: cam.scale };
+  }
 }
 
 /** Blit the cached static layer (device-pixel 1:1) beneath the live dynamic art. */
 function blitStaticLayer(): void {
   const moving = presentedCam && (presentedCam.x !== cam.x || presentedCam.y !== cam.y || presentedCam.scale !== cam.scale);
-  if (moving) {
+  if (moving || bgx.isContextLost?.()) {
     // Copying a freshly painted full-screen canvas forces its thousands of draw
     // commands to flush before drawImage can snapshot it. Paint directly during
     // motion; province textures remain cached and every exposed edge is current.
     cx.save();
-    buildStaticLayer(cx, presentedCam!.scale !== cam.scale);
+    buildStaticLayer(cx, !!presentedCam && presentedCam.scale !== cam.scale);
     cx.restore();
   } else {
     // Once settled, bake once at the final camera; idle frames are one 1:1 blit.
     buildStaticLayer();
     cx.save();
     cx.setTransform(1, 0, 0, 1, 0, 0);
+    // Replace the entire frame even if a backing store disappears between the
+    // validity check and this blit. Source-over would accumulate live glow forever.
+    cx.globalCompositeOperation = 'copy';
     cx.drawImage(bg, 0, 0);
     cx.restore();
   }
@@ -4491,6 +4513,7 @@ function drawRadarRange(now: number): void {
 }
 
 function render(now: number) {
+  if (cx.isContextLost?.()) return;
   cx.setTransform(DPR, 0, 0, DPR, 0, 0); // draw in CSS pixels, crisp on hi-DPI
   // Semantic zoom (LOD): zoomed far out the map turns SCHEMATIC — holo type
   // badges, callout text, fleet pyramids/cargo/counts, orbit rings and battle
@@ -12350,7 +12373,7 @@ function frame(nowReal: number) {
     renderSplitDialog();
     holographic.layoutWindows();
     updateMobileHud();
-    if (mapPreparation.active && mapPreparation.ready) {
+    if (mapPreparation.active && mapPreparation.ready && !cx.isContextLost?.()) {
       hideMapLoading(); // reveal only after the first complete frame, never a blank canvas
       maybeStartPendingTour();
     }
