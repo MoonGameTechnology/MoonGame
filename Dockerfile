@@ -28,8 +28,10 @@
 # distroless), update the digest + the refreshed-date below, and re-review .trivyignore.
 # The dates live in these comments, not inline: a `#` after FROM's args would be parsed
 # as extra arguments (Dockerfile comments only count at line start) and break the build.
-# node:26-slim digest refreshed 2026-07.
-FROM node:26-slim@sha256:c0753125a3789977aefe869cbebccf70e3cfd7ea84ca48547458f02e4f1d7146 AS build
+# node:26-slim digest refreshed 2026-09-13 (SEC-40; the tag had moved on from the 2026-07
+# pin). This stage is NOT shipped, so the bump closes nothing in `trivy image` — it keeps
+# the builder off a stale base and the SEC-34 pin-vs-tag step quiet.
+FROM node:26-slim@sha256:14bf3eac4bf209d906d3c41256597d3ab1f926b2e93a79e9bdfe1efd32454239 AS build
 WORKDIR /app
 # Node ≥25 no longer ships corepack in the distribution (the 22→26 bump, PR #106,
 # silently broke this line — caught by the SEC-1 blocking trivy-image gate), so install
@@ -94,7 +96,8 @@ RUN mkdir -p playtest-logs
 # tags; last rebuild 2026-02), so debian12 is frozen with the libssl3/libc6 CVEs Trivy
 # flags — debian13 is the actively rebuilt line with current trixie-security packages.
 # Digest-pinned like the build stage (bump procedure in the Stage 1 comment);
-# nodejs22-debian13:nonroot digest refreshed 2026-09-08 (SEC-34).
+# nodejs22-debian13:nonroot digest refreshed 2026-09-08 (SEC-34) and re-checked against the
+# tag on 2026-09-13 (SEC-40) — upstream has not rebuilt, so the pin is still the newest.
 # Read from its amd64 package inventory on 2026-09-13: libssl3t64 3.5.7-1~deb13u2,
 # libc6 2.41-12+deb13u3. The former already fixes the old openssl ignore group.
 # SEC-39 overlays the complete, SHA-256-pinned Debian libc6 deb13u4 package plus its
