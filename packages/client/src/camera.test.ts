@@ -10,6 +10,7 @@ import {
   worldToScreen,
   screenToWorld,
   zoomAt,
+  pinchAt,
   clampCam,
   centerOn,
   inView,
@@ -49,6 +50,30 @@ describe('camera — projection', () => {
 });
 
 describe('camera — zoom', () => {
+  it('moves the original pinch anchor with the midpoint, without accumulating clamped steps', () => {
+    const cam = centerOn({ scale: 1, x: 0, y: 0 }, { x: 500, y: 500 }, 3, VP, B);
+    const start = { dist: 100, mid: { x: 180, y: 350 } };
+    const point = screenToWorld(start.mid, cam, VP, B);
+    const mid = { x: 215, y: 390 };
+    // Both finger event orders may briefly produce a different distance. Every
+    // update must still be relative to the original gesture, including at the cap.
+    for (const dist of [180, 240, 400, 210]) {
+      const next = pinchAt(cam, start, { dist, mid }, VP, B);
+      expect(next.scale).toBe(Math.min(6, (3 * dist) / 100));
+      const projected = worldToScreen(point, next, VP, B);
+      expect(projected.x).toBeCloseTo(mid.x, 6);
+      expect(projected.y).toBeCloseTo(mid.y, 6);
+    }
+    expect(pinchAt(cam, start, start, VP, B)).toEqual(cam);
+  });
+
+  it('keeps two-finger translation at the zoom limit at constant scale', () => {
+    const cam = centerOn({ scale: 1, x: 0, y: 0 }, { x: 500, y: 500 }, 6, VP, B);
+    const start = { dist: 240, mid: { x: 200, y: 400 } };
+    const next = pinchAt(cam, start, { dist: 240, mid: { x: 165, y: 435 } }, VP, B);
+    expect(next).toEqual({ scale: 6, x: cam.x - 35, y: cam.y + 35 });
+  });
+
   it('anchors the focal point: the map-space point under it stays put', () => {
     const cam0 = clampCam({ scale: 1, x: 0, y: 0 }, VP, B);
     const fx = 200;
@@ -72,6 +97,15 @@ describe('camera — zoom', () => {
 });
 
 describe('camera — pan clamp & centring', () => {
+  it('does not jump a slack-width when zoom crosses the viewport-fit threshold', () => {
+    const threshold = 800 / 376; // scaled map height exactly fills the portrait viewport
+    const before = clampCam({ scale: threshold - 0.00001, x: -200, y: -10000 }, VP, B);
+    const after = clampCam({ scale: threshold + 0.00001, x: -200, y: -10000 }, VP, B);
+    const anchor = { x: 500, y: 500 };
+    const a = worldToScreen(anchor, before, VP, B);
+    const b = worldToScreen(anchor, after, VP, B);
+    expect(Math.abs(a.y - b.y)).toBeLessThan(0.02);
+  });
   it('parks a smaller-than-viewport axis centred at the min-zoom floor', () => {
     const cam = clampCam({ scale: 1, x: 0, y: 0 }, VP, B);
     // At scale 1 the square map fits the 400px width → its centre sits at the play-area centre.
