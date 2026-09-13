@@ -263,7 +263,7 @@ import {
 import { createPendingJoin } from './pendingJoin';
 import { syncCommanderXp } from './commanderSync';
 import { panelSlackFor } from './panelSlack';
-import { longPressAction, pressIntent } from './pressIntent';
+import { longPressAction, pressIntent } from '../../decisions/pressIntent';
 import { assaultMovers, assaultTargetBlocker, collectBlockers, moveMovers } from './warPrompt';
 import { laneEnds, warConfirmPlan } from '../../decisions/warOrders';
 import { bakeSignature, needsRebake, ownersSignature } from './staticLayerCache';
@@ -285,8 +285,8 @@ import {
 import { drawSightFrontier } from './drawSightFrontier';
 import { BADGE_R, badgeBob, badgeCenterY, badgeLook, badgeShown, badgeTether } from './kindBadge';
 import { chipFontPx, chipGlyph, chipMetrics, chipXs, chipY, chipsShown } from './buildChips';
-import { tapOwner, tapRadius } from './tapPriority';
-import { nextPick, tapCandidates, touchPick, type TapPick } from './tapCycle';
+import { tapOwner, tapRadius } from '../../decisions/tapPriority';
+import { nextPick, tapCandidates, touchPick, type TapPick } from '../../decisions/tapCycle';
 import { initMobileHud, mobileOrderBar, type MobileChoice } from './mobileHud';
 import { mobileDraftMatches, mobileTargetPoint, type MobileOrderDraft, type MobileOrderKind, type MobileOrderTarget } from './mobileOrders';
 import { chainTapTarget, nearestOwnWorld as ownWorldNearest } from './chainTarget';
@@ -526,9 +526,9 @@ import { initSound } from './sound';
 // восьми рукописных копий «нет ключа ⇒ умолчание» + try/catch вокруг setItem.
 import { prefStore, readBool, readNum, readRaw, writeBool, writeRaw } from './prefs';
 // AIM-PAN — «коммитит ли отпускание вооружённый приказ»: правило со сторожем.
-import { releaseCommits } from './aimGesture';
+import { releaseCommits } from '../../decisions/aimGesture';
 // REFM-199: что означает ЕДУЩИЙ палец — брат `aimGesture.ts` (тот про отпускание).
-import { cameraFollows, dragIntent, marksDragged } from './dragIntent';
+import { cameraFollows, dragIntent, marksDragged } from '../../decisions/dragIntent';
 // REFM-200: что карточка пришвартованного флота ПРЕДЛАГАЕТ сделать.
 import {
   assaultEnabled,
@@ -626,7 +626,7 @@ import {
   type SplitSlot,
 } from '../../decisions/splitPlan';
 import { splitDialogHtml, splitDialogLives, splitRows } from './splitDialog';
-import { canAssaultFromOrbit, canMerge, canSplit } from './cmdAvailability';
+import { canAssaultFromOrbit, canMerge, canSplit } from '../../decisions/cmdAvailability';
 import { stayingFleets, stripState } from './chainStripState';
 import {
   IDLE,
@@ -637,7 +637,7 @@ import {
   press,
   release,
   type HoldState,
-} from './holdPress';
+} from '../../decisions/holdPress';
 import { groundTypes, hasTroops, totalOf, troopSources } from './troopsSources';
 import { dossierLevel, nextHover, showsBody } from './dossierHover';
 import { opensNow } from './sheetLift';
@@ -662,9 +662,9 @@ import {
   rewardDue,
 } from './goalsPanel';
 import { gainRepaint, researchHeard } from './gainNews';
-import { cmdShown } from './cmdPresence';
-import { allOn } from './cmdHighlight';
-import { assaultTargetOk, deployPick, hostileFleets, mergeAnchors, ownFleets } from './aimTargets';
+import { cmdShown } from '../../decisions/cmdPresence';
+import { allOn } from '../../decisions/cmdHighlight';
+import { assaultTargetOk, deployPick, hostileFleets, mergeAnchors, ownFleets } from '../../decisions/aimTargets';
 import { FORGOTTEN, afterRebuild, keepScroll, panelChanged } from './panelCache';
 import { attentionTotal, countShown, myBattleCount, railBadge } from './attentionBadges';
 import { atLimit, callsign, liveStanding, standingShown, topSignature } from './standingLine';
@@ -678,7 +678,7 @@ import {
   timeControlsShown,
 } from './matchExits';
 import { INTEL_MS, PROGRESS_MS, intelVisible, repaintDue } from './liveWindows';
-import { disarms } from './armDisarm';
+import { disarms } from '../../decisions/armDisarm';
 import {
   aimPath,
   aimTip,
@@ -688,7 +688,7 @@ import {
   routeNeeded,
   routeViaLane,
   targetPipRadius,
-} from './aimPreview';
+} from '../../decisions/aimPreview';
 import {
   type EffectTag,
   effectsShown,
@@ -706,7 +706,7 @@ import {
   stockBleeds,
 } from './resourceChip';
 import { advanceTarget, fpsNext, saneGap, simRuns, spinRuns } from './simClock';
-import { armedTap } from './armedTap';
+import { armedTap } from '../../decisions/armedTap';
 import { showsBlackout, showsStarving } from './arrearsWarnings';
 import { canDockRepair, canRepair } from './repairOffer';
 import { capitalOffer, holdOffer } from '../../decisions/worldOrders';
@@ -798,7 +798,7 @@ import { mergePlan } from '../../decisions/mergeOrders';
 import { assaultPlan } from './assaultDispatch';
 import { warPromptText, warReason } from './warPromptView';
 import { pickEffect } from '../../decisions/pickApply';
-import { fleetsUnderTap } from './tapTargets';
+import { fleetsUnderTap } from '../../decisions/tapTargets';
 import { resolveAddress } from '../../decisions/serverAddress';
 import { authStatusUrl, identityMode, revealSignup, type IdentityMode } from './identityProbe';
 import { seatView, type SeatView } from './seatList';

@@ -1,6 +1,5 @@
 import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { TAP_RADIUS, tapOwner, tapRadius, type TapModes } from './tapPriority';
 
 const modes = (over: Partial<TapModes> = {}): TapModes => ({
@@ -110,7 +109,10 @@ describe('тап по карте — радиус ОДИН на прицел и 
   });
 
   it('КОПИЯ НЕ ВЕРНЁТСЯ МОЛЧА: в отрисовке не должно быть своих радиусов под палец', () => {
-    const src = readFileSync(fileURLToPath(new URL('./main.ts', import.meta.url)), 'utf8');
+    // Путь от КОРНЯ репозитория, как у соседа по папке (`netClientReuse.test.ts`):
+    // после переезда в `/decisions` фикстура лежит не рядом, а в прототипе. Это
+    // ЧТЕНИЕ файла, а не импорт, — правило папки такое различает намеренно.
+    const src = readFileSync('prototype/src/main.ts', 'utf8');
     // именно та форма, что и стояла: `tapByTouch ? 30 : 24`
     expect(src).not.toMatch(/tapByTouch\s*\?\s*\d+\s*:\s*\d+/);
   });
