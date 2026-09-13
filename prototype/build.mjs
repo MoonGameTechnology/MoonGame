@@ -11,6 +11,7 @@ import { writeFileSync, mkdirSync, readFileSync } from 'node:fs';
 const holographicCss = readFileSync(new URL('./holographic.css', import.meta.url), 'utf8');
 const bridgeShellCss = readFileSync(new URL('./bridge-shell.css', import.meta.url), 'utf8');
 const mobileConsoleCss = readFileSync(new URL('./mobile-console.css', import.meta.url), 'utf8');
+const mobileStrategyCss = readFileSync(new URL('./mobile-strategy.css', import.meta.url), 'utf8');
 
 const bundle = async (playerBuild) => {
   const res = await build({
@@ -2736,7 +2737,7 @@ const page = (js) => `<!doctype html>
 <html lang="en"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="icon" href="data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" rx="6" fill="#061318"/><rect x="9" y="9" width="14" height="14" rx="2" transform="rotate(45 16 16)" fill="none" stroke="#35d6e6" stroke-width="2.5"/></svg>')}">
-<title>Void Dominion — Sector Command</title><style>${css}\n${holographicCss}\n${bridgeShellCss}\n${mobileConsoleCss}</style></head>
+<title>Void Dominion — Sector Command</title><style>${css}\n${holographicCss}\n${bridgeShellCss}\n${mobileConsoleCss}\n${mobileStrategyCss}</style></head>
 <body>
 <canvas id="map"></canvas>
 <button id="holo-back" class="holo-back" type="button" data-i18n-title="hud.main-menu" data-i18n-aria="hud.main-menu">‹</button>
@@ -2778,10 +2779,10 @@ const page = (js) => `<!doctype html>
 <div id="chatwin" class="desk-only"></div>
 <div id="logwin"><div class="lwbox"><div class="lw-head"><b data-i18n="win.log.title"></b><button class="lw-recap" id="lw-recap" type="button" data-i18n-title="win.log.recap">🛰</button><button class="lw-close">✕</button></div><div id="log"></div></div></div>
 <!-- technologies window — content rendered by renderTech() in main.ts -->
-<div id="tech"><div class="twbox"><div class="lw-head"><b data-i18n="win.tech.title"></b><button class="tw-close">✕</button></div><div id="techbody"></div></div></div>
-<div id="buildwin"><div class="twbox"><div class="lw-head"><b data-i18n="win.build.title"></b><button class="tw-close">✕</button></div><div id="buildwinbody"></div></div></div>
+<div id="tech"><div class="twbox"><div class="lw-head"><b data-i18n="win.tech.title"></b><button class="tw-close" data-i18n-aria="card.close">✕</button></div><div id="techbody"></div></div></div>
+<div id="buildwin"><div class="twbox"><div class="lw-head"><b data-i18n="win.build.title"></b><button class="tw-close" data-i18n-aria="card.close">✕</button></div><div id="buildwinbody"></div></div></div>
 <!-- steward («Хранитель») window — content rendered by renderSteward() in main.ts -->
-<div id="steward"><div class="twbox"><div class="lw-head"><b data-i18n="win.steward.title"></b><button class="tw-close">✕</button></div><div id="stewardbody"></div></div></div>
+<div id="steward"><div class="twbox"><div class="lw-head"><b data-i18n="win.steward.title"></b><button class="tw-close" data-i18n-aria="card.close">✕</button></div><div id="stewardbody"></div></div></div>
 <!-- heroes: the roster/штаб now lives INSIDE the «Производство» screen (Герои pane) -->
 <!-- scientist council picker (setup-time, before the start-point) — rendered by renderSciPick() -->
 <div id="scipick"><div class="twbox"><div class="lw-head"><b data-i18n="win.scipick.title"></b><button class="sp-cancel" type="button" data-i18n="win.scipick.back"></button></div><div id="scipickbody"></div></div></div>
