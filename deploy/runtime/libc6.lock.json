@@ -1,0 +1,25 @@
+{
+  "version": "2.41-12+deb13u4",
+  "packages": {
+    "amd64": {
+      "size": 2846580,
+      "sha256": "967aa62605721081c3eb2a17650611a792aa802d76a6511d1840242623d204c9"
+    },
+    "arm64": {
+      "size": 2483572,
+      "sha256": "8784eda966b189c777a384dac5ce009e8fc9b52d006926c5a013e7fa8aa688cc"
+    },
+    "armhf": {
+      "size": 2260832,
+      "sha256": "4fc6fed8d77d01c0dacb5fda8b880a8c8a669575936de5761b693077a6f6c2ec"
+    },
+    "ppc64el": {
+      "size": 2759428,
+      "sha256": "917cbd81a9038133bd58bbfe0991db889a78eb446be2080015b7804942b45ec2"
+    },
+    "s390x": {
+      "size": 2452544,
+      "sha256": "c6e658d8e17d885c831ad1275501ef1abdadc6c93e9ac7758cfd1e5cde2d608b"
+    }
+  }
+}
