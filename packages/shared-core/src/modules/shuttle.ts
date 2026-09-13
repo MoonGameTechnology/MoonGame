@@ -41,6 +41,8 @@ import type {
 } from '../state/gameState';
 import type { GameData } from '../data/schemas';
 import { distance } from '../state/route';
+import { chaseRadius, chaseStep } from '../state/chase';
+import { fleetPositionAt } from '../state/fleetPosition';
 import { hasMapShare } from '../state/diplomacy';
 import { isCapturable } from '../state/sectorKind';
 import {
@@ -115,6 +117,21 @@ const PD_RANGE = 120;
 /** PD cooldown after a volley (game-minutes). Reducible by module upgrades + tech. */
 const PD_COOLDOWN_MINUTES = 20;
 
+/** Как часто идущая ПОГОНЯ пересчитывает координаты цели и правит курс (SHU-4.4), в
+ *  минутах игрового времени. Шесть — компромисс, а не круглое число: реже, и быстрая
+ *  цель успевала бы проскочить радиус захвата между пересчётами; чаще, и ночь офлайна
+ *  считалась бы впустую. Константа, а не стат в данных, намеренно: это ЧАСТОТА ОПРОСА
+ *  движка, а не свойство машины, — числом в данных её можно было бы выкрутить так, что
+ *  исход зависел бы от неё, а не от скоростей. */
+const CHASE_STEP_MINUTES = 6;
+
+/** Как часто мир ПРОСЫПАЕТСЯ ради погони, в игровых часах. Не то же самое, что шаг
+ *  пересчёта выше: пробуждение стоит целого шага кернела (клон состояния), а пересчёт —
+ *  двух умножений. Поэтому событие приходит раз в час, а внутри обработчика прошедший
+ *  отрезок нарезается на шаги по `CHASE_STEP_MINUTES` — точность модели остаётся
+ *  минутной, а цена остаётся часовой, как у остальных почасовых механик. */
+const CHASE_WAKE_HOURS = 1;
+
 /** PD range for a fleet — from its units' `pointDefenseRange` stat, or the default. */
 function fleetPDRange(fleet: Fleet, data: GameData): number {
   let r = 0;
@@ -126,30 +143,19 @@ function fleetPDRange(fleet: Fleet, data: GameData): number {
   return r > 0 ? r : PD_RANGE;
 }
 
-/** Где флот СЕЙЧАС: узел, на котором он стоит, или точка стоянки на лейне.
- *  Ветка «свободного полёта» (`freePosition`) снята в SHU-2.2 вместе с самим полем —
- *  флота, летящего мимо графа линий, в модели больше нет. Флот В ПУТИ (`movement`) точки
- *  здесь тоже не получает: это открытый дефект, его закрывает SHU-4.4 (погоня). */
-function fleetWorldPos(fleet: Fleet, state: GameState): { x: number; y: number } | null {
-  if (fleet.location) return state.planets[fleet.location]?.position ?? null;
-  if (fleet.edge) {
-    const a = state.planets[fleet.edge.from]?.position;
-    const b = state.planets[fleet.edge.to]?.position;
-    if (!a || !b) return null;
-    return { x: a.x + (b.x - a.x) * fleet.edge.t, y: a.y + (b.y - a.y) * fleet.edge.t };
-  }
-  return null;
-}
-
 /** Позиция базы вылета — мира или носителя. Носитель ДВИЖЕТСЯ, поэтому позиция
  *  всегда берётся текущая, а не запомненная при вылете: запомненная разъехалась бы
  *  с носителем ровно так же, как хранимая позиция флота разъезжается с расписанием. */
-function basePosition(base: StrikeBase, state: GameState): { x: number; y: number } | null {
+function basePosition(
+  base: StrikeBase,
+  state: GameState,
+  now: number,
+): { x: number; y: number } | null {
   if (base.kind === 'planet') {
     return state.planets[base.id]?.position ?? null;
   }
   const fleet = state.fleets[base.id];
-  return fleet ? fleetWorldPos(fleet, state) : null;
+  return fleet ? fleetPositionAt(state, fleet, now) : null;
 }
 
 /**
@@ -192,11 +198,11 @@ function planetBase(planet: Planet, data: GameData): BaseView {
   };
 }
 
-function fleetBase(fleet: Fleet, state: GameState, data: GameData): BaseView {
+function fleetBase(fleet: Fleet, state: GameState, data: GameData, now: number): BaseView {
   return {
     ref: { kind: 'fleet', id: fleet.id },
     owner: fleet.owner,
-    position: fleetWorldPos(fleet, state),
+    position: fleetPositionAt(state, fleet, now),
     bay: fleetShuttleBay(fleet, data),
     disabled: false,
     hangar: fleet.hangar ?? [],
@@ -211,13 +217,18 @@ function fleetBase(fleet: Fleet, state: GameState, data: GameData): BaseView {
 }
 
 /** База по ссылке — или `null`, если её больше нет (снесённый порт, погибший носитель). */
-function baseOf(ref: StrikeBase, state: GameState, data: GameData): BaseView | null {
+function baseOf(
+  ref: StrikeBase,
+  state: GameState,
+  data: GameData,
+  now: number,
+): BaseView | null {
   if (ref.kind === 'planet') {
     const planet = state.planets[ref.id];
     return planet ? planetBase(planet, data) : null;
   }
   const fleet = state.fleets[ref.id];
-  return fleet ? fleetBase(fleet, state, data) : null;
+  return fleet ? fleetBase(fleet, state, data, now) : null;
 }
 
 /**
@@ -249,13 +260,29 @@ function baseSortieSpec(
 
 /** Где сейчас летящий удар: линейная интерполяция между портом и точкой удара по доле
  *  пройденного времени. Позиции у челнока нет в состоянии намеренно — она ВЫВОДИТСЯ,
- *  как позиция флота на лейне: хранимая копия разъехалась бы с расписанием. */
+ *  как позиция флота на лейне: хранимая копия разъехалась бы с расписанием.
+ *
+ *  У ПОГОНИ (SHU-4.4) начало отрезка другое: не база, а `strike.at` — точка ПОСЛЕДНЕГО
+ *  пересчёта. Между пересчётами эскадра идёт к нынешнему прицелу ровно так же линейно,
+ *  поэтому мимо `at` она не «прыгает» раз в час, а ползёт: замерший на карте значок
+ *  соврал бы и игроку, и обороне. Развилка стоит ЗДЕСЬ, в одной функции, а не у каждого
+ *  читателя: зональное ПВО, перехват и трасса спрашивают «где вылет» одинаково и обязаны
+ *  получать один ответ. */
 function strikePosition(
   strike: ShuttleStrike,
   state: GameState,
   now: number,
 ): { x: number; y: number } | null {
-  const home = basePosition(strike.base, state);
+  if (strike.at) {
+    const chase = strike.arrivesAt - strike.departedAt;
+    const k =
+      chase <= 0 ? 1 : Math.min(1, Math.max(0, (now - strike.departedAt) / chase));
+    return {
+      x: strike.at.x + (strike.to.x - strike.at.x) * k,
+      y: strike.at.y + (strike.to.y - strike.at.y) * k,
+    };
+  }
+  const home = basePosition(strike.base, state, now);
   if (!home) return null;
   const [a, b] = strike.leg === 'out' ? [home, strike.to] : [strike.to, home];
   const span = strike.arrivesAt - strike.departedAt;
@@ -683,7 +710,7 @@ function baseFromPayload(
   // бы догонять — вторая ветка правил в самом горячем месте ядра. Возврату это не
   // мешает: носитель волен уйти, пока челноки летят.
   const fleet = requireOwnedIdleFleet(h, p.fleetId as string, playerId);
-  return fleetBase(fleet, h.state, h.ctx.data);
+  return fleetBase(fleet, h.state, h.ctx.data, h.ctx.now);
 }
 
 /** Скорость соединения — самая медленная машина в нём: летят вместе, не порознь. */
@@ -699,6 +726,139 @@ function slowestSpeed(units: readonly UnitStack[], data: GameData): number {
 /** Скорость вылета — самая медленная машина в нём. */
 function strikeSpeed(strike: ShuttleStrike, data: GameData): number {
   return slowestSpeed(strike.units, data);
+}
+
+/**
+ * РАЗВОРОТ ДОМОЙ — тем же путём и с той же скоростью. Один на всех, кто разворачивает
+ * эскадру: удар состоялся, погоня сорвалась, цель исчезла. Три копии этих пяти строк
+ * разъехались бы на первой же правке правил возврата.
+ *
+ * Позиция базы берётся ТЕКУЩАЯ: носитель мог сдвинуться, пока челноки летели, и лететь
+ * они должны к нему, а не к точке, где он стоял на вылете.
+ *
+ * `to` становится точкой РАЗВОРОТА, а живой след (`at`) снимается: с этой секунды у
+ * эскадры снова есть расписание, и позицию надо выводить, а не хранить (см.
+ * `strikePosition`).
+ */
+function turnHome(h: HandlerContext, strike: ShuttleStrike): void {
+  const from = strike.at ?? strike.to;
+  const home = basePosition(strike.base, h.state, h.ctx.now);
+  const back = home ? distance(from, home) : 0;
+  const speed = strikeSpeed(strike, h.ctx.data);
+  const flightMs = speed > 0 ? Math.max(1, Math.round((back / speed) * hourMs(h))) : 1;
+  strike.to = from;
+  delete strike.at;
+  strike.leg = 'back';
+  strike.departedAt = h.ctx.now;
+  strike.arrivesAt = h.ctx.now + flightMs;
+  h.schedule(strike.arrivesAt, 'shuttle.arrived', { strikeId: strike.id });
+}
+
+
+/**
+ * НАЗНАЧИТЬ СЛЕДУЮЩИЙ ПЕРЕСЧЁТ ПОГОНИ. Раз в час — но не позже, чем эскадра рассчитывает
+ * дойти, и не чаще шага пересчёта: разбудить мир ради удара, который случится через
+ * десять минут, дешевле, чем проспать его на пятьдесят.
+ */
+function scheduleChase(h: HandlerContext, strike: ShuttleStrike): void {
+  const hour = hourMs(h);
+  const eta = Math.max(0, strike.arrivesAt - h.ctx.now);
+  const wake = Math.min(CHASE_WAKE_HOURS * hour, Math.max((CHASE_STEP_MINUTES / 60) * hour, eta));
+  h.schedule(h.ctx.now + Math.max(1, Math.round(wake)), 'shuttle.chase', { strikeId: strike.id });
+}
+
+/**
+ * ЧТО ПРОИСХОДИТ, КОГДА ЭСКАДРА ДОШЛА ДО ЦЕЛИ — удар, ответка, высадка, разворот.
+ *
+ * Вынесено из обработчика `shuttle.arrived` в SHU-4.4, потому что вызывающих стало ДВА.
+ * Удар по МИРУ прилетает по расписанию (`shuttle.arrived` в назначенный срок), а
+ * ПОГОНЯ момента прибытия не знает заранее — его находит пересчёт на `time.advanced`, и
+ * зовёт резолюцию сразу, на месте. Назначить себе событие «в прошлом» погоня не может:
+ * `advanceTo` начисляет последний отрезок времени и выходит из цикла, не перечитывая
+ * очередь, — удар доехал бы до СЛЕДУЮЩЕГО пробуждения, то есть опоздал бы на неизвестно
+ * сколько. Две копии этой резолюции разъехались бы на первой же правке правил урона.
+ */
+function resolveOutLeg(h: HandlerContext, strike: ShuttleStrike): void {
+      const power = strikePower(strike, h.ctx.data, strike.target.kind);
+      if (strike.target.kind === 'fleet') {
+        const target = h.state.fleets[strike.target.id];
+        // Цель ушла с точки удара — челноки бьют пустоту и возвращаются ни с чем.
+        if (target && target.owner !== strike.owner) {
+          // Ответка считается ДО удара, из того же снимка: цель, которую этот залп
+          // добьёт, всё равно успевает огрызнуться — та же одновременность, что у
+          // артиллерии, где залпы считаются из состояния до отрезка.
+          const answer = returnFireAgainstFleet(target, h.ctx.data);
+          if (power > 0) {
+            const dealt = h.hook<number>('combat.damage', power, {
+              phase: 'shuttle',
+              location: target.location ?? '',
+              attacker: strike.owner,
+              defender: target.owner,
+            });
+            h.emit('shuttle.hit', {
+              strikeId: strike.id,
+              owner: strike.owner,
+              targetId: target.id,
+              targetOwner: target.owner,
+              damage: dealt,
+            });
+            applyDamageToSide(h, { kind: 'fleet', fleetId: target.id }, dealt, h.ctx.data, '');
+            removeIfWiped(h, target.id);
+          }
+          repelStrike(h, strike, answer, {
+            id: strike.target.id,
+            owner: target.owner,
+            location: target.location ?? '',
+          });
+        }
+      } else {
+        const target = h.state.planets[strike.target.id];
+        if (target && target.owner !== strike.owner) {
+          const answer = planetPointDefense(target, h.ctx.data);
+          if (power > 0) {
+            const dealt = h.hook<number>('combat.damage', power, {
+              phase: 'shuttle',
+              location: target.id,
+              attacker: strike.owner,
+              defender: target.owner ?? '',
+            });
+            h.emit('shuttle.hit', {
+              strikeId: strike.id,
+              owner: strike.owner,
+              targetId: target.id,
+              targetOwner: target.owner,
+              damage: dealt,
+            });
+            h.emit('planet.bombarded', {
+              planetId: target.id,
+              power: dealt,
+              owner: target.owner,
+            });
+          }
+          repelStrike(h, strike, answer, {
+            id: target.id,
+            owner: target.owner,
+            location: target.id,
+          });
+        }
+      }
+      // Волна, которую ответка сбила целиком, домой не летит и в состоянии не остаётся.
+      if (strike.units.length === 0) {
+        h.state.strikes = (h.state.strikes ?? []).filter((st) => st.id !== strike.id);
+        return;
+      }
+      // ДЕСАНТНЫЙ ВЫЛЕТ (ROS-1.5) одноразовый: груз сходит на землю, машины остаются
+      // там же. Обратной ноги у него нет вовсе — это не удар с возвратом, а высадка.
+      if (strike.cargo !== undefined) {
+        const target = h.state.planets[strike.target.id];
+        if (target) {
+          trimCargoToSurvivors(strike, h.ctx.data);
+          landCargo(h, strike, target);
+        }
+        h.state.strikes = (h.state.strikes ?? []).filter((st) => st.id !== strike.id);
+        return;
+      }
+      turnHome(h, strike);
 }
 
 export const shuttleModule: GameModule = {
@@ -768,7 +928,7 @@ export const shuttleModule: GameModule = {
       const from = base.position;
       if (!from) return h.reject('E_NO_PORT'); // носитель без позиции (в перелёте) — не база
       const to = targetFleet
-        ? (fleetWorldPos(targetFleet, h.state) ?? null)
+        ? (fleetPositionAt(h.state, targetFleet, h.ctx.now) ?? null)
         : (targetPlanet?.position ?? null);
       if (!to) return h.reject('E_NO_TARGET_POSITION');
 
@@ -802,10 +962,16 @@ export const shuttleModule: GameModule = {
         departedAt: h.ctx.now,
         arrivesAt: h.ctx.now + flightMs,
         leg: 'out',
+        // ПОГОНЯ (SHU-4.4) заводится только на удар по ФЛОТУ: мир не двигается, и
+        // догонять его нечем — туда эскадра идёт по расписанию, как и раньше.
+        ...(targetFleet ? { at: { ...from } } : {}),
         ...(cargo.length > 0 ? { cargo: cargo.map((st) => ({ ...st })) } : {}),
       };
       h.state.strikes = [...(h.state.strikes ?? []), strike];
-      h.schedule(strike.arrivesAt, 'shuttle.arrived', { strikeId: strike.id });
+      // Удар по МИРУ прилетает точно в срок, как и раньше. У ПОГОНИ срока нет — вместо
+      // прибытия назначается первый пересчёт, и он же решит, когда эскадра дошла.
+      if (targetFleet) scheduleChase(h, strike);
+      else h.schedule(strike.arrivesAt, 'shuttle.arrived', { strikeId: strike.id });
       h.emit('shuttle.launched', {
         strikeId: strike.id,
         owner: action.playerId,
@@ -1057,103 +1223,14 @@ export const shuttleModule: GameModule = {
       if (!strike) return; // сбит по дороге / удалён — dead letter, таймлайн не застревает
 
       if (strike.leg === 'out') {
-        const power = strikePower(strike, h.ctx.data, strike.target.kind);
-        if (strike.target.kind === 'fleet') {
-          const target = h.state.fleets[strike.target.id];
-          // Цель ушла с точки удара — челноки бьют пустоту и возвращаются ни с чем.
-          if (target && target.owner !== strike.owner) {
-            // Ответка считается ДО удара, из того же снимка: цель, которую этот залп
-            // добьёт, всё равно успевает огрызнуться — та же одновременность, что у
-            // артиллерии, где залпы считаются из состояния до отрезка.
-            const answer = returnFireAgainstFleet(target, h.ctx.data);
-            if (power > 0) {
-              const dealt = h.hook<number>('combat.damage', power, {
-                phase: 'shuttle',
-                location: target.location ?? '',
-                attacker: strike.owner,
-                defender: target.owner,
-              });
-              h.emit('shuttle.hit', {
-                strikeId,
-                owner: strike.owner,
-                targetId: target.id,
-                targetOwner: target.owner,
-                damage: dealt,
-              });
-              applyDamageToSide(h, { kind: 'fleet', fleetId: target.id }, dealt, h.ctx.data, '');
-              removeIfWiped(h, target.id);
-            }
-            repelStrike(h, strike, answer, {
-              id: strike.target.id,
-              owner: target.owner,
-              location: target.location ?? '',
-            });
-          }
-        } else {
-          const target = h.state.planets[strike.target.id];
-          if (target && target.owner !== strike.owner) {
-            const answer = planetPointDefense(target, h.ctx.data);
-            if (power > 0) {
-              const dealt = h.hook<number>('combat.damage', power, {
-                phase: 'shuttle',
-                location: target.id,
-                attacker: strike.owner,
-                defender: target.owner ?? '',
-              });
-              h.emit('shuttle.hit', {
-                strikeId,
-                owner: strike.owner,
-                targetId: target.id,
-                targetOwner: target.owner,
-                damage: dealt,
-              });
-              h.emit('planet.bombarded', {
-                planetId: target.id,
-                power: dealt,
-                owner: target.owner,
-              });
-            }
-            repelStrike(h, strike, answer, {
-              id: target.id,
-              owner: target.owner,
-              location: target.id,
-            });
-          }
-        }
-        // Волна, которую ответка сбила целиком, домой не летит и в состоянии не остаётся.
-        if (strike.units.length === 0) {
-          h.state.strikes = strikes.filter((st) => st.id !== strikeId);
-          return;
-        }
-        // ДЕСАНТНЫЙ ВЫЛЕТ (ROS-1.5) одноразовый: груз сходит на землю, машины остаются
-        // там же. Обратной ноги у него нет вовсе — это не удар с возвратом, а высадка.
-        if (strike.cargo !== undefined) {
-          const target = h.state.planets[strike.target.id];
-          if (target) {
-            trimCargoToSurvivors(strike, h.ctx.data);
-            landCargo(h, strike, target);
-          }
-          h.state.strikes = strikes.filter((st) => st.id !== strikeId);
-          return;
-        }
-        // Разворот домой — тем же путём и с той же скоростью. Позиция базы берётся
-        // ТЕКУЩАЯ: носитель мог сдвинуться, пока челноки летели, и лететь они должны
-        // к нему, а не к точке, где он стоял на вылете.
-        const home = basePosition(strike.base, h.state);
-        const back = home ? distance(strike.to, home) : 0;
-        const speed = strikeSpeed(strike, h.ctx.data);
-        const flightMs = speed > 0 ? Math.max(1, Math.round((back / speed) * hourMs(h))) : 1;
-        strike.leg = 'back';
-        strike.departedAt = h.ctx.now;
-        strike.arrivesAt = h.ctx.now + flightMs;
-        h.schedule(strike.arrivesAt, 'shuttle.arrived', { strikeId });
+        resolveOutLeg(h, strike);
         return;
       }
 
       // Посадка. База могла погибнуть, пока челноки летели (снесённый порт, сбитый
       // носитель, захваченный мир), — тогда садиться некуда.
       h.state.strikes = strikes.filter((s) => s.id !== strikeId);
-      const base = baseOf(strike.base, h.state, h.ctx.data);
+      const base = baseOf(strike.base, h.state, h.ctx.data, h.ctx.now);
       const bay = base && base.owner === strike.owner ? base.bay : 0;
       if (!base || bay <= 0) {
         h.emit('shuttle.lost', {
@@ -1183,6 +1260,88 @@ export const shuttleModule: GameModule = {
     });
 
     /**
+     * ПОГОНЯ (SHU-4.4) — как летящий удар догоняет ДВИЖУЩУЮСЯ цель.
+     *
+     * До этого кирпича цель фиксировалась координатой на вылете, и флот, идущий по
+     * линии, не брался вовсе: приказ отбивался `E_NO_TARGET_POSITION`. Причина была не в
+     * правиле, а в ДУБЛЕ — у модуля лежала своя копия «где сейчас флот», и она, в отличие
+     * от ядровой `fleetPositionAt`, не знала про `Fleet.movement`. Копия снята, а поверх
+     * живой точки встала модель владельца: эскадра регулярно пересчитывает координаты
+     * цели, правит курс к центру её радиуса и бьёт, когда на очередном пересчёте
+     * оказалась ВНУТРИ радиуса.
+     *
+     * Пять решений, которые здесь легко потерять при правке:
+     *
+     * 1. **Погоня живёт на СВОЁМ событии, а не на `time.advanced`.** Отрезок непрерывного
+     *    времени нарезает ХОСТ — по своим пробуждениям, чужим таймерам, гибернации, — и
+     *    сетка пересчётов, привязанная к его границам, у двух хостов вышла бы разной.
+     *    Одна и та же партия дала бы разный исход, а реплей разъехался бы с матчем
+     *    (инвариант #1). Собственное расписание от этого не зависит вовсе.
+     * 2. **Отрезок между пробуждениями ИНТЕГРИРУЕТСЯ.** Между пересчётами час, и
+     *    «посмотреть только в конец» дало бы уход от любого удара: цель успела бы сделать
+     *    круг и вернуться. Шаг фиксирован (`CHASE_STEP_MINUTES`) и отсчитывается от
+     *    прошлого пересчёта, а не от начала отрезка хоста.
+     * 3. **Поводок меряется от БАЗЫ, а не от эскадры.** `strikeRange` и на вылете
+     *    считается от узла базирования (§0.2 роадмапа), второй точки отсчёта у него быть
+     *    не должно. Ушёл центр радиуса за дальность — атака отменяется сама. Это и есть
+     *    контригра: от медленной эскадры быстрый флот отрывается, от быстрой — никто.
+     * 4. **Цель исчезла или перестала быть чужой — домой.** Добитый в бою флот и союзник,
+     *    с которым помирились, одинаково не цель; гнаться за пустым id значило бы держать
+     *    вылет в состоянии до конца матча.
+     * 5. **Удар наносит НЕ этот обработчик.** Догнала — зовётся общая резолюция
+     *    `resolveOutLeg`, та же, что у удара по миру. Урон, ответка, высадка и разворот
+     *    живут в одном экземпляре; вторая копия разъехалась бы с первой ровно так же, как
+     *    разъехалась копия позиции флота.
+     */
+    api.on('shuttle.chase', (event, h: HandlerContext) => {
+      const { strikeId } = event.payload as { strikeId?: string };
+      if (typeof strikeId !== 'string') return;
+      const strike = (h.state.strikes ?? []).find((s) => s.id === strikeId);
+      // Сбит по дороге, уже развернулся, сел — пересчитывать нечего (dead letter).
+      if (!strike?.at || strike.leg !== 'out' || strike.target.kind !== 'fleet') return;
+
+      const data = h.ctx.data;
+      const hour = hourMs(h);
+      const stepMs = Math.max(1, (CHASE_STEP_MINUTES / 60) * hour);
+      const speed = strikeSpeed(strike, data);
+      const radius = chaseRadius(strike.units, data);
+      const leash = squadronReach({ id: strike.squadronId, units: strike.units }, data);
+
+      let cursor = strike.departedAt; // прошлый пересчёт (правило 2)
+      let caught = false;
+      let lost = false;
+      while (cursor < h.ctx.now && !caught && !lost) {
+        const next = Math.min(cursor + stepMs, h.ctx.now);
+        const target = h.state.fleets[strike.target.id];
+        const aim = target ? fleetPositionAt(h.state, target, next) : null;
+        const home = basePosition(strike.base, h.state, next);
+        if (!target || target.owner === strike.owner || !aim || !home) {
+          lost = true; // правило 4
+          break;
+        }
+        if (distance(home, aim) > leash) {
+          lost = true; // правило 3
+          break;
+        }
+        const step = chaseStep(strike.at, aim, speed * ((next - cursor) / hour), radius);
+        strike.at = step.at;
+        strike.to = aim;
+        caught = step.caught;
+        cursor = next;
+      }
+
+      if (caught) return resolveOutLeg(h, strike); // правило 5
+      if (lost) return turnHome(h, strike);
+      // Ни догнала, ни сорвалась: закрыть отрезок и переназначить пересчёт. `departedAt`
+      // у погони — момент ПОСЛЕДНЕГО пересчёта, а `arrivesAt` — оценка на нынешнем
+      // прицеле: расписания у неё нет, но игроку надо видеть, догоняет она или отстаёт.
+      const left = Math.max(0, distance(strike.at, strike.to) - radius);
+      strike.departedAt = h.ctx.now;
+      strike.arrivesAt = h.ctx.now + (speed > 0 ? Math.round((left / speed) * hour) : 0);
+      scheduleChase(h, strike);
+    });
+
+    /**
      * АНГАР НЕ ПЕРЕЖИВАЕТ СВОЮ БАЗУ (SHU-1.1, распространено на носители в SHU-2.1).
      * Челнок стоит ВНУТРИ космопорта или носителя, поэтому снесённый порт и сбитые
      * корпуса носителя забирают его с собой, а упавшая вместимость оставляет ровно
@@ -1207,7 +1366,7 @@ export const shuttleModule: GameModule = {
           // Ничей мир не держит ангар: вместимость нейтрального мира читается как 0.
           bay: planet.owner === null ? 0 : shuttleBayAt(planet, h.ctx.data),
         })),
-        ...Object.values(h.state.fleets).map((fleet) => fleetBase(fleet, h.state, h.ctx.data)),
+        ...Object.values(h.state.fleets).map((fleet) => fleetBase(fleet, h.state, h.ctx.data, h.ctx.now)),
       ];
       for (const base of bases) {
         if (base.hangar.length === 0) continue;
@@ -1263,7 +1422,7 @@ export const shuttleModule: GameModule = {
         if (pd <= 0) continue;
         if (fleet.battleId) continue; // в бою зональное ПВО — часть боя
         if (h.ctx.now < (fleet.pdCooldownUntil ?? 0)) continue;
-        const myPos = fleetWorldPos(fleet, h.state);
+        const myPos = fleetPositionAt(h.state, fleet, h.ctx.now);
         if (!myPos) continue;
         const range = fleetPDRange(fleet, data);
 
@@ -1324,7 +1483,7 @@ export const shuttleModule: GameModule = {
       const data = h.ctx.data;
       const bases: BaseView[] = [
         ...Object.values(h.state.planets).map((planet) => planetBase(planet, data)),
-        ...Object.values(h.state.fleets).map((fleet) => fleetBase(fleet, h.state, data)),
+        ...Object.values(h.state.fleets).map((fleet) => fleetBase(fleet, h.state, data, h.ctx.now)),
       ];
       for (const base of bases) {
         if (base.owner === null || base.position === null) continue;
@@ -1371,7 +1530,7 @@ export const shuttleModule: GameModule = {
       if (hours <= 0) return;
       const bases: BaseView[] = [
         ...Object.values(h.state.planets).map((planet) => planetBase(planet, h.ctx.data)),
-        ...Object.values(h.state.fleets).map((fleet) => fleetBase(fleet, h.state, h.ctx.data)),
+        ...Object.values(h.state.fleets).map((fleet) => fleetBase(fleet, h.state, h.ctx.data, h.ctx.now)),
       ];
       for (const base of bases) {
         const sortie = base.sortie;

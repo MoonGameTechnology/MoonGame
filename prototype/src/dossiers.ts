@@ -32,6 +32,7 @@ import { t, tData } from '../../localization/runtime';
 import { GLOSSARY } from './codexIndex';
 import { esc, hl, round1, cost, displayUnit, fmtEta, resChip, resLine } from './format';
 import { BUILD_ICON, unitIcon, unitIconHtml } from './icons';
+import { catalogPortraitHtml } from './shipArt';
 import type { ActiveBuild, BuildKind, BuildLane, QueuedBuild } from './buildQueue';
 
 /** A dossier card: the object's name plus an HTML body (live numbers highlighted). */
@@ -452,8 +453,10 @@ export function createDossiers(host: DossierHost): {
     if (key.startsWith('c:')) return constructionDossier(key);
     const [kind, id, lvl] = key.split(':');
     if (id === undefined) return null; // bare "b"/"u" key with no id — nothing to show
-    if (kind === 'b') return buildingDossier(id, Number(lvl) || 1);
-    if (kind === 'u') return unitDos(id);
+    if (kind === 'b' || kind === 'u') {
+      const dos = kind === 'b' ? buildingDossier(id, Number(lvl) || 1) : unitDos(id);
+      return dos ? { ...dos, body: catalogPortraitHtml(kind, id, data) + dos.body } : null;
+    }
     return null;
   }
 
@@ -518,6 +521,7 @@ export function createDossiers(host: DossierHost): {
           : '';
       return (
         `<div class="cx-head"><span class="cx-ic">${BUILD_ICON[id] ?? '▣'}</span><b>${esc(tData(def.name))}</b><span class="cx-tag">${t('codex.tag.building')}</span></div>` +
+        catalogPortraitHtml('b', id, data) +
         pager +
         `<div class="cx-stats">${rows.join('')}</div><div class="cx-desc">${dos?.body ?? ''}</div>`
       );
@@ -575,6 +579,7 @@ export function createDossiers(host: DossierHost): {
     const dos = unitDos(id);
     return (
       `<div class="cx-head"><span class="cx-ic">${unitIconHtml(id, data, host.youColor(), 24)}</span><b>${esc(dos?.name ?? displayUnit(id))}</b><span class="cx-tag">${def.domain === 'ground' ? t('codex.tag.ground-unit') : t('codex.tag.ship')}</span></div>` +
+      catalogPortraitHtml('u', id, data) +
       `<div class="cx-stats">${rows.join('')}</div><div class="cx-desc">${dos?.body ?? ''}</div>`
     );
   }

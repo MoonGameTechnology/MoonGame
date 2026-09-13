@@ -186,6 +186,7 @@ export {
   shuttleReaches,
   type SortieState,
 } from './state/shuttle';
+export { chaseRadius, chaseStep, type ChasePoint, type ChaseStep } from './state/chase';
 // SHU-2.2: дежурный вылет армится на БАЗУ, и правило выбора цели у него ОДНО на оба
 // драйвера (прототипный и серверный) — до этого у каждого была своя копия.
 export {

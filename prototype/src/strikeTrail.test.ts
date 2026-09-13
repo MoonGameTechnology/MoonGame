@@ -80,6 +80,24 @@ describe('SHU-3.1 — трасса', () => {
     expect(strikeTrails(undefined, { me: 'p1', now: 0, basePos })).toEqual([]);
   });
 
+  it('ПОГОНЯ ИДЁТ ОТ ЯКОРЯ ПЕРЕСЧЁТА, А НЕ ОТ БАЗЫ (SHU-4.4)', () => {
+    // У погони курс правится на ходу: «база → цель» нарисовало бы прямую туда, где
+    // эскадра никогда не была.
+    const [tr] = strikeTrails([strike({ at: { x: 40, y: 40 }, to: { x: 140, y: 40 } })], {
+      me: 'p1',
+      now: 0,
+      basePos,
+    });
+    expect(tr?.from).toEqual({ x: 40, y: 40 });
+    expect(tr?.to).toEqual({ x: 140, y: 40 });
+  });
+
+  it('ОБРАТНАЯ НОГА ЯКОРЯ НЕ ЗНАЕТ: у неё снова есть расписание, и её конец — точка разворота', () => {
+    const [tr] = strikeTrails([strike({ leg: 'back' })], { me: 'p1', now: 0, basePos });
+    expect(tr?.from).toEqual({ x: 100, y: 0 });
+    expect(tr?.to).toEqual({ x: 0, y: 0 });
+  });
+
   it('ПОЗЫВНОЙ ЗВЕНА ЕДЕТ С ТРАССОЙ: значок подписан тем же именем, что карточка в порту', () => {
     const [tr] = strikeTrails([strike()], { me: 'p1', now: 0, basePos });
     expect(tr?.squadronId).toBe('sq:p1:1');
