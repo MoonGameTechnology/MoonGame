@@ -2,6 +2,17 @@ import spaceUrl from './art/deep-space.webp';
 import holographicUrl from './art/holographic-space.webp';
 
 const skies: Partial<Record<'simple' | 'holographic', HTMLImageElement>> = {};
+const preparations: Partial<Record<'simple' | 'holographic', Promise<void>>> = {};
+
+/** Embedded artwork is decoded once; unavailable art keeps the existing flat fallback. */
+export function prepareSpaceBackdrop(holographic = false): Promise<void> {
+  const key = holographic ? 'holographic' : 'simple';
+  if (preparations[key]) return preparations[key];
+  spaceBackdropReady(holographic);
+  const sky = skies[key];
+  if (!sky) return Promise.resolve();
+  return (preparations[key] = sky.decode().catch(() => undefined));
+}
 
 /** Lazy and optional in non-browser harnesses; a missing image leaves the dark flat fallback. */
 export function spaceBackdropReady(holographic = false): boolean {

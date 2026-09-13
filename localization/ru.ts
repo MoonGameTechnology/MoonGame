@@ -7,6 +7,18 @@
 // НЕ добавляй сюда русский текст, который уже лежит в коде строкой — сначала
 // заведи ключ, потом замени строку в коде на t('ключ').
 export const ru: Record<string, string> = {
+  // --- map-loading — initial map preparation ---
+  'map-loading.background': 'Подготовка фона',
+  'map-loading.cancel': 'В главное меню',
+  'map-loading.geometry': 'Построение карты',
+  'map-loading.progress': '{n}%',
+  'map-loading.quote.fleet': 'Флот выигрывает сражение. Снабжение выигрывает войну.',
+  'map-loading.quote.frontier': 'Граница владений проходит там, куда успевает приказ.',
+  'map-loading.quote.silence': 'Тишина на радаре ещё не означает пустоту.',
+  'map-loading.ready': 'Сборка проекции',
+  'map-loading.terrain': 'Подготовка провинций',
+  'map-loading.title': 'Развёртывание карты',
+
   // --- acc / browser — Аккаунты (вход, регистрация, сессия) и браузер матчей.
   'acc.bad-pass': 'Неверный пароль',
   'acc.created': 'Аккаунт создан',

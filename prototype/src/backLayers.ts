@@ -85,6 +85,7 @@ export const EXTRA_LAYERS: readonly string[] = ['chain', 'aim', 'rail', 'mobile-
  * литерал не типизировался). У `Map` такой дыры нет — ключ есть только если его положили.
  */
 export const LAYER_INVENTORY: ReadonlyMap<string, LayerVerdict> = new Map<string, LayerVerdict>([
+  ['maploading', 'layer'], // z70, intentional leave while preparing the map
   // --- слои: Back закрывает, порядок задаётся z-index'ом в лестнице main.ts ---
   ['corp', 'layer'], // кабинет корпорации, z60 — перекрывает всё, включая свой скрим
   ['scipick', 'layer'], // выбор учёных поверх экрана настройки матча, z60
