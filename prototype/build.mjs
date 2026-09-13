@@ -611,6 +611,9 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 #settings .setbox{width:min(380px,92vw);max-height:86vh;overflow:auto;background:var(--glass);border:1px solid var(--cyan);
   border-radius:10px;padding:16px 18px 14px;box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
 .set-row{display:flex;flex-direction:column;gap:9px;padding:6px 0 2px;}
+.set-render-report-text{box-sizing:border-box;width:100%;min-height:180px;resize:vertical;
+  padding:10px;border:1px solid var(--line);background:var(--bg);color:var(--ink);
+  font:11px ui-monospace,monospace;user-select:text;-webkit-user-select:text;touch-action:pan-y;}
 .set-lbl{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--ink);}
 .set-lbl .set-sub{font-size:10px;color:var(--dim);letter-spacing:.2px;}
 .set-ctl{display:flex;align-items:center;gap:10px;}
