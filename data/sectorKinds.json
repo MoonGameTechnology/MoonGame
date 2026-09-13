@@ -12,12 +12,13 @@
     "capturable": true,
     "buildable": true,
     "orbit": false,
+    "allowedBuildings": ["starfort"],
     "appearance": { "color": "#d6a645", "label": "asteroid field", "shape": "junction" }
   },
   "nebula": {
     "name": "Nebula",
     "capturable": true,
-    "buildable": true,
+    "buildable": false,
     "orbit": false,
     "appearance": { "color": "#8f6dff", "label": "nebula", "shape": "city" }
   },
@@ -48,18 +49,22 @@
   },
   "graveyard": {
     "name": "Derelict Graveyard",
+    "buildable": false,
     "orbit": false
   },
   "ion_storm": {
     "name": "Ion Storm",
+    "buildable": false,
     "orbit": false
   },
   "dense_nebula": {
     "name": "Dense Nebula",
+    "buildable": false,
     "orbit": false
   },
   "solar_flare": {
     "name": "Solar Flare Zone",
+    "buildable": false,
     "orbit": false
   },
   "void_station": {
