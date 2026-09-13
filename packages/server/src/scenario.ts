@@ -175,7 +175,15 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '17'; // Две смены формы сразу: MSB-1 + SHU-2.2.
+export const MODULE_MANIFEST_VERSION = '18'; // SHU-4.4: удар ДОГОНЯЕТ движущуюся цель.
+// Форма состояния изменилась: у `ShuttleStrike` появился живой след погони (`at` —
+// точка последнего пересчёта), а `to` из снимка, снятого на вылете, стал НЫНЕШНИМ
+// прицелом; вылет по флоту больше не назначает себе прибытие, он ведётся собственным
+// событием `shuttle.chase`. Матч на манифесте 17 несёт вылеты старой формы: у них нет
+// ни следа, ни назначенного пересчёта — новый граф не довёл бы такой удар ни до цели,
+// ни домой, а старый прочитал бы живой прицел как точку удара и ударил бы по пустоте.
+// Отказ загрузки честнее. (До 18:)
+// export const MODULE_MANIFEST_VERSION = '17'; // Две смены формы сразу: MSB-1 + SHU-2.2.
 // ПОЧЕМУ 17, А НЕ 16: версию подняли ДВА кирпича независимо — MSB-1 (бой стал списком
 // сторон) в `main` и SHU-2.2 (дежурство армится на БАЗУ) здесь, оба до 16. Слитая ветка
 // несёт ОБЕ смены формы, поэтому число одно и оно следующее: две разные формы под одним
