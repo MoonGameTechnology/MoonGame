@@ -186,7 +186,10 @@ describe('dossiers — маршрутизация objDossier', () => {
 
   it('b:/u: уходят в свои досье, голый и незнакомый ключ → null', () => {
     expect(objDossier('b:mine:2')).toEqual(buildingDossier('mine', 2));
-    expect(objDossier('u:scout')).toEqual(unitDossier('scout', true));
+    const scout = objDossier('u:scout');
+    expect(scout?.name).toBe(unitDossier('scout', true)?.name);
+    expect(scout?.body).toContain(unitDossier('scout', true)!.body);
+    expect(scout?.body).toContain('data-ship-art="fighter"');
     expect(objDossier('b')).toBeNull();
     expect(objDossier('что-то')).toBeNull();
   });
@@ -232,9 +235,11 @@ describe('codex — карточка полной информации', () => {
     const ship = codexHtml('u', 'cruiser');
     expect(ship).toContain('cx-tag');
     expect(ship).toContain('#3ad17a'); // цвет стороны пришёл из хоста, не из main.ts
+    expect(ship).toContain('data-ship-art="cruiser"');
     const ground = codexHtml('u', 'militia');
     expect(ground).not.toBe('');
     expect(ground).not.toContain('#3ad17a'); // наземные держат текстовый глиф
+    expect(ground).not.toContain('<img');
   });
 
   it('строка «Класс» не повторяет один тег дважды (domain и трейт делят ключ)', () => {

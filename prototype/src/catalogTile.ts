@@ -61,6 +61,8 @@ export interface TileView {
   id: string;
   /** Готовая разметка иконки (svg или глиф) — вставляется как есть. */
   icon: string;
+  /** Optional realistic thumbnail; the action anchors remain on the same button. */
+  art?: string;
   /** Имя из данных — только текстом. */
   name: string;
   /** Подпись плитки (обычно цена) — только текстом. */
@@ -119,12 +121,14 @@ export function builtTileHtml(v: BuiltTileView): string {
  */
 export function catalogRowHtml(v: TileView): string {
   const desc = `${v.kind}:${esc(v.id)}`;
+  const visual = v.art || `<span class="bicon">${v.icon}</span>`;
+  const artClass = v.art ? ' with-art' : '';
   if (v.lock) {
     // Ни `data-codex`, ни `data-buildorder` — оба пути заказа закрыты (правило 1).
     const mark = v.lock === 'built' ? '✓' : '⏳';
     return (
-      `<button class="asset-row cat locked" data-desc="${desc}" data-name="${esc(v.name)}">` +
-      `<span class="bicon">${v.icon}</span><b>${esc(v.name)}</b>` +
+      `<button class="asset-row cat locked${artClass}" data-desc="${desc}" data-name="${esc(v.name)}">` +
+      `${visual}<b>${esc(v.name)}</b>` +
       `<span class="dim">${mark} ${esc(v.label)}</span></button>`
     );
   }
@@ -132,8 +136,8 @@ export function catalogRowHtml(v: TileView): string {
     ? ` data-buildorder="${v.kind === 'u' ? 'unit' : 'building'}:${esc(v.id)}"`
     : '';
   return (
-    `<button class="asset-row cat" data-codex="${desc}" data-desc="${desc}"${order} data-name="${esc(v.name)}">` +
-    `<span class="bicon">${v.icon}</span><b>${esc(v.name)}</b>` +
+    `<button class="asset-row cat${artClass}" data-codex="${desc}" data-desc="${desc}"${order} data-name="${esc(v.name)}">` +
+    `${visual}<b>${esc(v.name)}</b>` +
     `<span class="dim">${esc(v.label)}</span></button>`
   );
 }
@@ -141,12 +145,15 @@ export function catalogRowHtml(v: TileView): string {
 /** Разметка одной плитки. Чистая: ни DOM, ни состояния. */
 export function catalogTileHtml(v: TileView): string {
   const desc = `${v.kind}:${esc(v.id)}`;
-  const head = `<span class="pt-ic">${v.icon}</span>`;
+  const head = v.art
+    ? `${v.art}<span class="pt-n">${esc(v.name)}</span>`
+    : `<span class="pt-ic">${v.icon}</span>`;
+  const artClass = v.art ? ' with-art' : '';
   if (v.lock) {
     // Ни `data-codex`, ни `data-buildorder` — оба пути заказа закрыты (см. шапку).
     const mark = v.lock === 'built' ? '✓' : '⏳';
     return (
-      `<button class="ptile locked" data-desc="${desc}" data-name="${esc(v.name)}">` +
+      `<button class="ptile locked${artClass}" data-desc="${desc}" data-name="${esc(v.name)}">` +
       `${head}<span class="pt-c">${mark} ${esc(v.label)}</span></button>`
     );
   }
@@ -154,7 +161,7 @@ export function catalogTileHtml(v: TileView): string {
     ? ` data-buildorder="${v.kind === 'u' ? 'unit' : 'building'}:${esc(v.id)}"`
     : '';
   return (
-    `<button class="ptile" data-codex="${desc}" data-desc="${desc}"${order} data-name="${esc(v.name)}">` +
+    `<button class="ptile${artClass}" data-codex="${desc}" data-desc="${desc}"${order} data-name="${esc(v.name)}">` +
     `${head}<span class="pt-c">${esc(v.label)}</span></button>`
   );
 }

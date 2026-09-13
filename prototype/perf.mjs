@@ -174,6 +174,10 @@ const mod = { exports: {} };
 const fn = new Function('module', 'exports', 'require', res.outputFiles[0].text);
 fn(mod, mod.exports, () => ({}));
 
+// Profile a visible match. The real entry screens are opaque, so their covered
+// canvas must not be mistaken for the renderer workload this harness measures.
+for (const id of ['connect', 'hub', 'setup']) getEl(id).style.display = 'none';
+
 const canvas = getEl('map');
 const fire = (type, ev) => {
   for (const h of (listeners.get(canvas) ?? {})[type] ?? []) h(ev);

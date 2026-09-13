@@ -19,6 +19,9 @@ export const ru: Record<string, string> = {
   'map-loading.terrain': 'Подготовка провинций',
   'map-loading.title': 'Развёртывание карты',
 
+  'startup.failed.title': 'Не удалось запустить игру',
+  'startup.failed.body': 'Попробуйте ещё раз. Если ошибка повторяется, пришлите код ниже разработчику.',
+  'startup.retry': 'Повторить запуск',
   // --- acc / browser — Аккаунты (вход, регистрация, сессия) и браузер матчей.
   'acc.bad-pass': 'Неверный пароль',
   'acc.created': 'Аккаунт создан',

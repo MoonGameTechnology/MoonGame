@@ -86,8 +86,11 @@ import {
   glyphScale,
   unitArchetype,
   unitGlyphSvg,
+  unitShape,
   unitSizeClass,
 } from './unitGlyphs';
+import { drawShipShape } from '../../packages/client/src/shipShapes';
+import { catalogPortraitHtml } from './shipArt';
 import { fleetCallsign, FLEET_KIND_KEY } from './fleetName';
 import { planetName } from './planetName';
 // GRND-1: гарнизон, запертый живым боем, не отпускает войска (ядро: E_UNDER_ASSAULT).
@@ -441,7 +444,6 @@ import {
   SOV_SVG,
   unitIcon,
   unitIconHtml,
-  archPath2d,
   RES_SVG,
 } from './icons';
 // REFM-4: the object dossiers + the codex card live in `dossiers.ts`; the renderers
@@ -1424,8 +1426,13 @@ function resize() {
   VH = v.h;
   DPR = v.dpr;
   MOBILE = v.mobile;
-  canvas.width = Math.round(VW * DPR);
-  canvas.height = Math.round(VH * DPR);
+  // WebView can repeat resize notifications without changing the viewport.
+  // Assigning even the SAME canvas size erases its bitmap and resets the context;
+  // keep the displayed frame until a real size/DPR change requires a new surface.
+  const width = Math.round(VW * DPR);
+  const height = Math.round(VH * DPR);
+  if (canvas.width !== width) canvas.width = width;
+  if (canvas.height !== height) canvas.height = height;
   canvas.style.width = VW + 'px';
   canvas.style.height = VH + 'px';
   chatWin.onViewportResize(); // the half-screen cap follows the new viewport
@@ -3784,19 +3791,18 @@ function drawStrikeTrails(): void {
     cx.moveTo(a.x, a.y);
     cx.lineTo(b.x, b.y);
     cx.stroke();
-    // Значок звена — треугольник, тот же знак, каким машины помечены в панели (△),
-    // носом ПО КУРСУ: неориентированная точка не сказала бы, куда оно летит.
+    // Тот же корпус, что в ангаре: перехватчик, бомбардировщик или десантный челнок.
+    // Фильтр своих вылетов уже выполнен в strikeTrails; чужой состав сюда не попадает.
     const ang = Math.atan2(b.y - a.y, b.x - a.x);
+    const dom = dominantUnit(tr.units, data);
     cx.save();
     cx.translate(m.x, m.y);
-    cx.rotate(ang);
-    cx.fillStyle = rgba(R_WING, tr.leg === 'back' ? 0.55 : 0.95);
-    cx.beginPath();
-    cx.moveTo(6, 0);
-    cx.lineTo(-4, 3.5);
-    cx.lineTo(-4, -3.5);
-    cx.closePath();
-    cx.fill();
+    cx.rotate(ang + Math.PI / 2);
+    cx.scale(0.68, 0.68);
+    cx.translate(-12, -12);
+    cx.fillStyle = rgba(R_WING, 0.24);
+    cx.strokeStyle = rgba(R_WING, tr.leg === 'back' ? 0.55 : 0.95);
+    drawShipShape(cx, (dom && unitShape(dom.def, dom.unit)) || 'fighter', cam.scale >= 0.9);
     cx.restore();
     // Подпись — позывной и число бортов, ТОТ ЖЕ позывной, что у карточки в порту:
     // игрок обязан узнать в летящем значке звено, которое отправлял.
@@ -4756,17 +4762,16 @@ function render(now: number) {
       cx.beginPath();
       cx.arc(c.x, c.y, 7.5 + 0.6 * ownerPulse, 0, TAU);
       cx.stroke();
-      // space fortress: a hexagonal bastion ring around the hub (with HP bar)
+      // Orbital fortress: the station concept's six-spoke vector, with its HP bar.
       if (fort) {
         cx.save();
         cx.strokeStyle = col;
         cx.lineWidth = 1.6;
         cx.shadowColor = col;
         cx.shadowBlur = fxBlur(8);
-        poly(c.x, c.y, 12, 6, Math.PI / 6);
-        cx.stroke();
-        poly(c.x, c.y, 7, 6, Math.PI / 6);
-        cx.stroke();
+        cx.fillStyle = rgba(col, 0.24);
+        cx.translate(c.x - 12, c.y - 12);
+        drawShipShape(cx, 'station', detail > 0.5);
         cx.restore();
         const frac = Math.max(0, Math.min(1, fort.hp / hpOfLevel('starfort', fort.level)));
         cx.fillStyle = 'rgba(2,9,13,.7)';
@@ -5178,8 +5183,12 @@ function render(now: number) {
       }
     }
 
-    // LOD: far out a fleet is ONE glowing chevron, nose on course — the pyramid,
-    // cargo pips and ship count cross-fade away (schematic view keeps who/where).
+    const dom = dominantUnit(f.units, data);
+    const shape = (dom && unitShape(dom.def, dom.unit)) || 'cruiser';
+    const arch = dom ? unitArchetype(dom.def) : 'combat';
+    const domK = glyphScale(dom ? unitSizeClass(dom.def.stats.hp ?? 0) : 'S');
+    // На удалении остаётся внешний контур ТОГО ЖЕ корпуса. Внутренняя детализация,
+    // карго и счёт плавно исчезают, но фрегат не превращается в общий треугольник.
     if (detail < 1) {
       cx.save();
       cx.globalAlpha = chevronAlpha(detail);
@@ -5187,16 +5196,11 @@ function render(now: number) {
       cx.rotate(A.ang + Math.PI / 2);
       cx.shadowColor = col;
       cx.shadowBlur = fxBlur(5 + 4 * engine);
-      cx.fillStyle = rgba(col, 0.92);
-      cx.strokeStyle = 'rgba(4,10,12,.8)';
-      cx.lineWidth = 1;
-      cx.beginPath();
-      cx.moveTo(0, -7);
-      cx.lineTo(5.5, 5);
-      cx.lineTo(-5.5, 5);
-      cx.closePath();
-      cx.fill();
-      cx.stroke();
+      cx.scale(domK * 0.8, domK * 0.8);
+      cx.translate(-12, -12);
+      cx.fillStyle = rgba(col, 0.28);
+      cx.strokeStyle = rgba(col, 0.95);
+      drawShipShape(cx, shape, false);
       cx.restore();
     }
     if (detail === 0) {
@@ -5212,12 +5216,9 @@ function render(now: number) {
     // панели выделения). Размер S/M/L по hp доминанта, гало-кольцо при щите
     // (у флагмана — всегда), нос по курсу — heading от fleetAnchor, как раньше;
     // карго-хвост и счётчик едут по тому же курсу.
-    const dom = dominantUnit(f.units, data);
-    const arch = dom ? unitArchetype(dom.def) : 'combat';
     // Размер — из ЕДИНОЙ таблицы постера (`unitGlyphs.ts`, правило 1). Здесь стояла
     // своя (S 0.62 · M 0.8), и один и тот же разведчик был в панели заметно крупнее,
     // чем на карте: «размер = hp» переставал быть шкалой ровно там, где ею пользуются.
-    const domK = glyphScale(dom ? unitSizeClass(dom.def.stats.hp ?? 0) : 'S');
     const domStack = dom ? f.units.find((st) => st.unit === dom.unit && st.count > 0) : undefined;
     const domShield =
       dom && domStack ? (effectiveStats(dom.def, domStack, data).shield ?? 0) > 0 : false;
@@ -5240,12 +5241,9 @@ function render(now: number) {
     }
     cx.scale(domK, domK);
     cx.translate(-12, -12);
-    cx.fillStyle = rgba(col, 0.92);
-    cx.strokeStyle = 'rgba(4,10,12,.8)';
-    cx.lineWidth = 1;
-    const p2d = archPath2d(arch);
-    cx.fill(p2d, 'evenodd');
-    cx.stroke(p2d);
+    cx.fillStyle = rgba(col, 0.24);
+    cx.strokeStyle = rgba(col, 0.95);
+    drawShipShape(cx, shape, true);
     cx.restore();
 
     // cargo glued to the tail (behind the base, following the heading), SPLIT by
@@ -5705,7 +5703,7 @@ function fleetTilesHtml(f: Fleet, stacks: UnitStack[]): string {
       const icon =
         def.domain === 'ground'
           ? `<span class="pt-ic">${unitIcon(u.unit, data)}</span>`
-          : `<span class="pt-ic">${unitGlyphSvg(def, { color: ownerColor(f.owner), shield: (eff.shield ?? 0) > 0 })}</span>`;
+          : `<span class="pt-ic">${unitGlyphSvg(def, { unitId: u.unit, color: ownerColor(f.owner), shield: (eff.shield ?? 0) > 0 })}</span>`;
       // Show installed modules as small tags under the count (RULES-2.1 / SM-0.3):
       // two cruisers with different modules are separate stacks — the tags make
       // the difference visible at a glance, without opening the codex.
@@ -7027,6 +7025,7 @@ function codexTile(
     kind,
     id,
     icon: kind === 'b' ? (BUILD_ICON[id] ?? '▣') : unitIconHtml(id, data, youColor),
+    art: catalogPortraitHtml(kind, id, data, 'thumb'),
     name: kind === 'b' ? buildingName(data.buildings[id]?.name, id) : unitTitle(id),
     label,
     orderable,
@@ -12320,12 +12319,15 @@ function frame(nowReal: number) {
       : computeVision(); // fog projection for this frame
   if (vision) updateMemory(vision.identify); // variant B: remember what we see
   const preparingMap = prepareEnteringMap();
-  // BF-30: in net mode, don't render the map until the server's welcome snapshot
-  // has arrived and ME is set to the correct seat — otherwise the default `ME = 'p1'`
-  // paints a spawn at p1's start before the server assigns the real seat.
-  if ((NET && !netAdmitted) || preparingMap) {
-    // Admission/preparation owns the cover; do not paint the hidden map.
-  } else {
+  // Opaque entry screens and hidden tabs do not paint the covered map. Setup is
+  // translucent and keeps its backdrop; an admitted match waits for preparation.
+  if (
+    !document.hidden &&
+    !connectShown() &&
+    hubEl.style.display === 'none' &&
+    !(NET && !netAdmitted) &&
+    !preparingMap
+  ) {
     render(nowReal);
     renderPanel();
     renderCmdBar();

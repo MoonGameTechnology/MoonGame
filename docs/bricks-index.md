@@ -597,20 +597,21 @@
 | UI-14 | ✅ | proto | `docs/backlog.md:13667` | Осмотр чужого флота должен быть находимым. |
 | CMB-5 | ✅ | core | `docs/backlog.md:13690` | Вражда началась — стоящие рядом флоты сходятся |
 | ATK-1 | ✅ | proto | `docs/backlog.md:13706` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
-| CMB-7 | ✅ | core | `docs/backlog.md:13826` | Перемирие посреди боя не останавливало бой. |
-| RLY-1 | ✅ | proto | `docs/backlog.md:13847` | Сбор построенного: соло и сеть играли по РАЗНЫМ |
-| CARGO-1 | ✅ | core proto | `docs/backlog.md:13879` | Часовая погрузка десанта жила в |
-| MRG-1 | ✅ | core proto | `docs/backlog.md:13927` | «Слиться по прибытии» — вторая половина |
-| ART-0 | ✅ | core data proto | `docs/backlog.md:13950` | Артиллерия снята из игры целиком |
-| ORB-1 | ✅ | core data proto | `docs/backlog.md:13981` | Орбитальный слой объявлен в |
-| ORB-2 | ✅ | data proto | `docs/backlog.md:14013` | «Изучается технология, строится здание» не |
-| ORB-3 | ✅ | proto | `docs/backlog.md:14041` | Звёздный форт выдавал орбитальное ПКО мимо |
-| CMB-6 | ✅ | core | `docs/backlog.md:14078` | После ничьей третий враждебный флот получает свой |
-| ORD-2 | ✅ | proto | `docs/backlog.md:14108` | Нацеленный ШТУРМ теперь переживает закрытую |
-| FOG-10 | ✅ | proto core | `docs/backlog.md:14128` | Память разведки перестала жить только |
-| FOG-9 | ✅ | core | `docs/backlog.md:14152` | Приостановленная стройка чужого мира была видна |
-| TEST-4 | ✅ | srv | `docs/backlog.md:14162` | topXp падал на живой базе разработчика. |
-| MAP-PERF | ✅ |  | `docs/backlog.md:14182` | Ускорение движения раскрытой голографической карты и подготовка |
+| SHIPART-1 | ✅ | proto cli | `docs/backlog.md:13732` | Реалистичные портреты в постройке и описаниях, |
+| CMB-7 | ✅ | core | `docs/backlog.md:13840` | Перемирие посреди боя не останавливало бой. |
+| RLY-1 | ✅ | proto | `docs/backlog.md:13861` | Сбор построенного: соло и сеть играли по РАЗНЫМ |
+| CARGO-1 | ✅ | core proto | `docs/backlog.md:13893` | Часовая погрузка десанта жила в |
+| MRG-1 | ✅ | core proto | `docs/backlog.md:13941` | «Слиться по прибытии» — вторая половина |
+| ART-0 | ✅ | core data proto | `docs/backlog.md:13964` | Артиллерия снята из игры целиком |
+| ORB-1 | ✅ | core data proto | `docs/backlog.md:13995` | Орбитальный слой объявлен в |
+| ORB-2 | ✅ | data proto | `docs/backlog.md:14027` | «Изучается технология, строится здание» не |
+| ORB-3 | ✅ | proto | `docs/backlog.md:14055` | Звёздный форт выдавал орбитальное ПКО мимо |
+| CMB-6 | ✅ | core | `docs/backlog.md:14092` | После ничьей третий враждебный флот получает свой |
+| ORD-2 | ✅ | proto | `docs/backlog.md:14122` | Нацеленный ШТУРМ теперь переживает закрытую |
+| FOG-10 | ✅ | proto core | `docs/backlog.md:14142` | Память разведки перестала жить только |
+| FOG-9 | ✅ | core | `docs/backlog.md:14166` | Приостановленная стройка чужого мира была видна |
+| TEST-4 | ✅ | srv | `docs/backlog.md:14176` | topXp падал на живой базе разработчика. |
+| MAP-PERF | ✅ |  | `docs/backlog.md:14196` | Ускорение движения раскрытой голографической карты и подготовка |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
