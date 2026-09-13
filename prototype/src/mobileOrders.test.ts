@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { mobileDraftMatches, mobileTargetPoint, type MobileOrderDraft } from './mobileOrders';
-import { releaseCommits } from './aimGesture';
-import { dragIntent } from './dragIntent';
+import { releaseCommits } from '../../decisions/aimGesture';
+import { dragIntent } from '../../decisions/dragIntent';
 
 describe('phone orders require a stable selection and an explicit send', () => {
   const draft: MobileOrderDraft = {

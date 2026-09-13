@@ -1,7 +1,7 @@
 /** Phone presentation of the real selection/command hosts; no copied game actions. */
 import { t } from '../../localization/runtime';
 import { esc } from './format';
-import type { TapPick } from './tapCycle';
+import type { TapPick } from '../../decisions/tapCycle';
 
 export interface MobileChoice extends TapPick {
   title: string;
