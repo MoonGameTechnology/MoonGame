@@ -10,6 +10,7 @@ import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
 import { build } from 'esbuild';
 import { resolveChromium } from '../scripts/chromium.mjs';
+import { checkMobileStrategy } from './mobileStrategyTest.mjs';
 
 const require = createRequire(import.meta.url);
 const { chromium } = createRequire(require.resolve('@playwright/mcp/package.json'))(
@@ -137,6 +138,7 @@ async function pinch() {
   await pause();
 }
 try {
+  await checkMobileStrategy(browser, `http://127.0.0.1:${server.address().port}`);
   await p.addInitScript(() => localStorage.setItem('vd.locale', 'ru'));
   await p.goto(`http://127.0.0.1:${server.address().port}`);
   await p.locator('#cnew').tap();

@@ -1,0 +1,311 @@
+/* Strategic phone screens share the existing controllers and action gates. */
+body.mobile-ui :is(#tech, #buildwin, #constructor, #market, #diplo) {
+  --dim: #9bb4c1;
+  --cyan-dim: #73a9b7;
+  inset: 0;
+  width: 100%;
+  height: 100dvh;
+  padding: max(6px, env(safe-area-inset-top)) max(6px, env(safe-area-inset-right))
+    max(6px, env(safe-area-inset-bottom)) max(6px, env(safe-area-inset-left));
+  background: #020a13;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+body.mobile-ui
+  :is(#tech, #buildwin, #constructor, #market, #diplo)
+  > :is(.twbox, .cnbox, .mkbox, .dpbox) {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  min-height: 0;
+  border: 1px solid #648d9f66;
+  border-radius: 16px;
+  background: linear-gradient(160deg, #0b202e, #05111e 70%);
+  box-shadow: inset 0 1px #b5e5f51a;
+  overflow: hidden;
+}
+body.mobile-ui :is(#tech, #buildwin, #constructor, #market, #diplo) button {
+  min-height: 44px;
+  min-width: 44px;
+  touch-action: manipulation;
+}
+body.mobile-ui :is(#tech, #buildwin, #constructor, #market, #diplo) :is(input, select) {
+  min-height: 44px;
+  max-width: 100%;
+  font-size: 16px;
+}
+body.mobile-ui
+  :is(#tech, #buildwin, #constructor, #market, #diplo)
+  :is(button, input, select):focus-visible {
+  outline: 2px solid #b7efff;
+  outline-offset: -3px;
+}
+body.mobile-ui :is(#tech, #buildwin, #constructor, #market) :is(.lw-head, .cn-head) {
+  flex: none;
+  min-height: 58px;
+  padding: 7px 12px;
+  gap: 8px;
+}
+body.mobile-ui :is(#tech, #buildwin, #constructor, #market) :is(.lw-head, .cn-head) b {
+  min-width: 0;
+  font-size: 13px;
+  letter-spacing: 1px;
+}
+body.mobile-ui :is(.tw-close, .cn-close, .mk-close, .dp-close) {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  margin-left: auto;
+  font-size: 20px;
+  border-radius: 11px;
+}
+body.mobile-ui :is(#marketbody, #constructorbody, .tt-scroll, .bw-scroll, .dp-list, .dp-feed) {
+  min-height: 0;
+  overscroll-behavior: contain;
+  scroll-padding: 12px;
+}
+
+/* Branches stay visible together; long node titles have their own line. */
+body.mobile-ui #tech .tt-tab {
+  font-size: 12px;
+}
+body.mobile-ui #tech .tt-tab > span {
+  white-space: normal;
+}
+body.mobile-ui #tech .tt-ih {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+body.mobile-ui #tech .tt-ih > b {
+  flex: 1 0 100%;
+  font-size: 13px;
+}
+body.mobile-ui #tech :is(.tt-ifx, .tt-lead) {
+  font-size: 12px;
+  line-height: 1.5;
+}
+body.mobile-ui #tech .tt-ifoot {
+  flex-wrap: wrap;
+}
+body.mobile-ui #tech .tt-take {
+  width: 100%;
+  font-size: 12px;
+}
+body.mobile-ui #tech .tt-mwin {
+  width: calc(100% - 16px);
+  max-height: calc(100% - 16px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 12px;
+  background: #0b202e;
+}
+body.mobile-ui #tech .tt-mx {
+  position: sticky;
+  display: block;
+  top: 0;
+  margin: 0 0 6px auto;
+  background: #0b202e;
+  z-index: 1;
+}
+body.mobile-ui #tech :is(.tt-mdesc, .tt-mstats) {
+  font-size: 12px;
+  line-height: 1.5;
+}
+body.mobile-ui #tech .tt-mbtn {
+  white-space: normal;
+}
+
+/* Production uses one readable column even on a phone held sideways. */
+body.mobile-ui #constructor .cn-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+body.mobile-ui #constructor :is(.cn-fit, .cn-side) {
+  min-width: 0;
+}
+body.mobile-ui #constructor .cn-tabs {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 5px;
+  padding: 8px;
+}
+body.mobile-ui #constructor .cn-tab {
+  padding: 7px 4px;
+  letter-spacing: 0;
+}
+body.mobile-ui #constructor .cn-pal {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+body.mobile-ui #constructor :is(.cn-bay, .cn-hull) {
+  padding: 10px;
+  gap: 9px;
+}
+body.mobile-ui #constructor :is(.cn-bn, .cn-mn, .cn-hn, .cn-bd) {
+  overflow-wrap: anywhere;
+}
+body.mobile-ui #constructor .cn-bay > :nth-child(2) {
+  min-width: 0;
+}
+body.mobile-ui #constructor .cn-step button {
+  width: 44px;
+  height: 44px;
+}
+body.mobile-ui #constructor .cn-plan {
+  flex-basis: 100%;
+  width: 100%;
+}
+body.mobile-ui #constructor .cn-row2 {
+  gap: 10px;
+}
+body.mobile-ui #constructor .cn-build {
+  position: sticky;
+  bottom: 0;
+  background: #143b4b;
+}
+body.mobile-ui #buildwin :is(.bw-row, .bw-top) {
+  min-width: 0;
+}
+
+/* Labels stay with their fields; the submit action spans the form. */
+body.mobile-ui #market .mk-tabs {
+  flex: none;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+body.mobile-ui #market .mk-tab {
+  padding: 8px 5px;
+  font-size: 12px;
+}
+body.mobile-ui #market .mk-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(90px, 1fr);
+  gap: 10px;
+  padding: 12px;
+}
+body.mobile-ui #market .mk-seg {
+  grid-column: 1/-1;
+}
+body.mobile-ui #market .mk-seg button {
+  flex: 1;
+  font-size: 12px;
+}
+body.mobile-ui #market .mk-in {
+  width: 100%;
+}
+body.mobile-ui #market .mk-go {
+  grid-column: 1/-1;
+  width: 100%;
+  margin: 0;
+  font-size: 13px;
+}
+body.mobile-ui #market .mk-lbl {
+  font-size: 12px;
+  line-height: 1.5;
+}
+body.mobile-ui #market .mk-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 10px;
+}
+body.mobile-ui #market .mk-qp {
+  grid-column: 1;
+  overflow-wrap: anywhere;
+}
+body.mobile-ui #market .mk-who {
+  grid-column: 1;
+  grid-row: 2;
+}
+body.mobile-ui #market .mk-btn {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+/* Diplomacy gets a stable header and a full-width conversation on phones. */
+body.mobile-ui #diplo .dp-head {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  flex: none;
+  padding: 6px 10px 10px;
+  gap: 6px;
+}
+body.mobile-ui #diplo .dp-head > b {
+  display: block;
+  grid-column: 1 / span 2;
+  font-size: 12px;
+}
+body.mobile-ui #diplo .dp-close {
+  grid-column: 3;
+  grid-row: 1;
+}
+body.mobile-ui #diplo .dp-tab {
+  grid-row: 2;
+  min-width: 0;
+  padding: 6px 2px;
+  font-size: 11px;
+}
+body.mobile-ui #diplo :is(.dp-sorts, .dp-filters) {
+  flex: none;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overscroll-behavior: contain;
+  padding: 7px 10px;
+}
+body.mobile-ui #diplo :is(.dp-sorts, .dp-filters) > * {
+  flex-shrink: 0;
+}
+body.mobile-ui #diplo .dp-list {
+  flex: 1;
+  padding: 8px;
+}
+body.mobile-ui #diplo .dp-actions {
+  padding: 5px 10px 12px;
+}
+body.mobile-ui #diplo .dp-name {
+  flex-basis: 60%;
+  flex-wrap: wrap;
+}
+body.mobile-ui #diplo .dp-convo {
+  flex: 1;
+  min-height: 0;
+  height: auto;
+  flex-direction: column;
+}
+body.mobile-ui #diplo .dp-cvlist {
+  display: flex;
+  width: 100%;
+  max-height: 76px;
+  overflow-x: auto;
+  border-right: 0;
+  border-bottom: 1px solid var(--line-hi);
+}
+body.mobile-ui #diplo .dp-cv {
+  flex: 0 0 auto;
+  width: auto;
+  max-width: 200px;
+}
+body.mobile-ui #diplo .dp-thread {
+  min-height: 0;
+}
+body.mobile-ui #diplo .dp-compose {
+  flex: none;
+}
+body.mobile-ui #diplo .dp-compose input {
+  width: 0;
+}
+
+@media (max-height: 520px) {
+  body.mobile-ui #constructor .cn-tabs {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  body.mobile-ui #market .mk-tabs {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  body.mobile-ui #tech .tt-tabs {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+  body.mobile-ui #tech .tt-top {
+    padding-top: 4px;
+  }
+}
