@@ -18,7 +18,7 @@ const field = (dx = 0, dy = 0): TerrainField => ({
 });
 function surfaces() {
   const strokes = vi.fn();
-  const created: { width: number; height: number }[] = [];
+  const created: (EventTarget & { width: number; height: number })[] = [];
   const noop = () => {};
   const ctx = {
     globalAlpha: 1,
@@ -34,7 +34,11 @@ function surfaces() {
   };
   vi.stubGlobal('document', {
     createElement: () => {
-      const surface = { width: 0, height: 0, getContext: () => ctx };
+      const surface = Object.assign(new EventTarget(), {
+        width: 0,
+        height: 0,
+        getContext: () => ctx,
+      });
       created.push(surface);
       return surface;
     },
@@ -114,5 +118,35 @@ describe('province raster cache', () => {
     expect(f.created).toHaveLength(0);
     expect(f.drawImage).not.toHaveBeenCalled();
     expect(f.strokes.mock.calls.length).toBeGreaterThan(0);
+  });
+  it('repaints lost/restored pixels even when geometry and dimensions are unchanged', () => {
+    const f = surfaces();
+    const cache = new TerrainRasterCache();
+    cache.draw(f.target, field(), 2);
+    const lost = f.created[0]!;
+    lost.dispatchEvent(new Event('contextlost'));
+    f.strokes.mockClear();
+    cache.draw(f.target, field(), 2);
+    expect(f.strokes).toHaveBeenCalled();
+    expect(f.created).toHaveLength(2);
+    // An old context may finish restoration after a new surface is already cached.
+    lost.dispatchEvent(new Event('contextrestored'));
+    cache.draw(f.target, field(), 2);
+    expect(f.created).toHaveLength(2);
+    f.created[1]!.dispatchEvent(new Event('contextrestored'));
+    cache.draw(f.target, field(), 2);
+    expect(f.created).toHaveLength(3);
+  });
+  it('releases all surfaces on display recovery and prepares fresh pixels on demand', () => {
+    const f = surfaces();
+    const cache = new TerrainRasterCache();
+    cache.prepare(field(), 2);
+    cache.prepare({ ...field(), id: 'second' }, 2);
+    cache.clear();
+    expect(f.created.every((c) => c.width === 0 && c.height === 0)).toBe(true);
+    f.strokes.mockClear();
+    cache.draw(f.target, field(), 2);
+    expect(f.strokes).toHaveBeenCalled();
+    expect(f.created).toHaveLength(3);
   });
 });

@@ -24,6 +24,20 @@ export function rgba(hex: string, a: number): string {
 // blitting it with drawImage + globalAlpha is far cheaper than a per-node createRadialGradient
 // + shadowBlur every frame, so the map glow scales to many provinces.
 const glowCache = new Map<string, HTMLCanvasElement>();
+/** A restored canvas has the same identity/dimensions, but its pixels are gone. */
+function rememberSprite(
+  cache: Map<string, HTMLCanvasElement>,
+  key: string,
+  cv: HTMLCanvasElement,
+): void {
+  const invalidate = (): void => {
+    // A late restore of an evicted surface must not evict its replacement.
+    if (cache.get(key) === cv) cache.delete(key);
+  };
+  cv.addEventListener?.('contextlost', invalidate);
+  cv.addEventListener?.('contextrestored', invalidate);
+  cache.set(key, cv);
+}
 function glowSprite(dpr: number, color: string, radius: number): HTMLCanvasElement {
   const rad = Math.max(4, Math.round(radius));
   const key = `${color}:${rad}:${dpr}`;
@@ -41,7 +55,7 @@ function glowSprite(dpr: number, color: string, radius: number): HTMLCanvasEleme
   grd.addColorStop(1, rgba(color, 0));
   g.fillStyle = grd;
   g.fillRect(0, 0, rad * 2, rad * 2);
-  glowCache.set(key, cv);
+  rememberSprite(glowCache, key, cv);
   return cv;
 }
 
@@ -111,8 +125,17 @@ function sphereSprite(dpr: number, color: string): HTMLCanvasElement {
   if (sphereCache.size >= MAX_SPHERE_ATLASES) {
     sphereCache.delete(sphereCache.keys().next().value!);
   }
-  sphereCache.set(key, cv);
+  rememberSprite(sphereCache, key, cv);
   return cv;
+}
+
+/** A display-context loss may invalidate every offscreen surface in its GPU process. */
+export function clearHolographicSprites(): void {
+  for (const cache of [glowCache, sphereCache]) {
+    const surfaces = [...cache.values()];
+    cache.clear();
+    for (const surface of surfaces) surface.width = surface.height = 0;
+  }
 }
 
 /** Pure vector hologram, cached at device density. Pass a paused/reduced-motion clock
