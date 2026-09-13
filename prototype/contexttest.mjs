@@ -45,10 +45,9 @@ for (const player of [false, true]) {
   const start = built.lastIndexOf('<script>');
   const end = built.lastIndexOf('</script>');
   assert(start >= 0 && end > start);
-  responses.set(
-    '/' + name,
-    built.slice(0, start) + `<script src="/${name}.js"></script>` + built.slice(end + 9),
-  );
+  // Serve the existing markup without its app bundle. Playwright loads the test
+  // bundle through the script API, keeping executable URLs out of HTML assembly.
+  responses.set('/' + name, built.slice(0, start) + built.slice(end + 9));
   responses.set('/' + name + '.js', bundle.outputFiles[0].text);
 }
 const server = createServer((req, res) => {
@@ -101,6 +100,7 @@ try {
         );
     });
     await page.goto(`http://127.0.0.1:${server.address().port}/${profile}`);
+    await page.addScriptTag({ url: `/${profile}.js` });
     for (const id of ['cnew', 'hub-solo', 'sp-go']) await page.locator('#' + id).tap();
     // Complete preparation with the display context unavailable. The loader must
     // remain until a complete frame can actually be presented.
