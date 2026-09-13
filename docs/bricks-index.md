@@ -605,15 +605,16 @@
 | MRG-1 | ✅ | core proto | `docs/backlog.md:13980` | «Слиться по прибытии» — вторая половина |
 | ART-0 | ✅ | core data proto | `docs/backlog.md:14003` | Артиллерия снята из игры целиком |
 | ORB-1 | ✅ | core data proto | `docs/backlog.md:14034` | Орбитальный слой объявлен в |
-| ORB-2 | ✅ | data proto | `docs/backlog.md:14066` | «Изучается технология, строится здание» не |
-| ORB-3 | ✅ | proto | `docs/backlog.md:14094` | Звёздный форт выдавал орбитальное ПКО мимо |
-| CMB-6 | ✅ | core | `docs/backlog.md:14131` | После ничьей третий враждебный флот получает свой |
-| ORD-2 | ✅ | proto | `docs/backlog.md:14161` | Нацеленный ШТУРМ теперь переживает закрытую |
-| FOG-10 | ✅ | proto core | `docs/backlog.md:14181` | Память разведки перестала жить только |
-| FOG-9 | ✅ | core | `docs/backlog.md:14205` | Приостановленная стройка чужого мира была видна |
-| TEST-4 | ✅ | srv | `docs/backlog.md:14215` | topXp падал на живой базе разработчика. |
-| PHONE-STRATEGY | ✅ |  | `docs/backlog.md:14233` | Технологии, постройки, производство, рынок и дипломатия |
-| MAP-PERF | ✅ |  | `docs/backlog.md:14245` | Ускорение движения раскрытой голографической карты и подготовка |
+| ORB-4 | ✅ | core data proto | `docs/backlog.md:14070` | в астероидном поле строилось всё, что угодно: |
+| ORB-2 | ✅ | data proto | `docs/backlog.md:14111` | «Изучается технология, строится здание» не |
+| ORB-3 | ✅ | proto | `docs/backlog.md:14139` | Звёздный форт выдавал орбитальное ПКО мимо |
+| CMB-6 | ✅ | core | `docs/backlog.md:14176` | После ничьей третий враждебный флот получает свой |
+| ORD-2 | ✅ | proto | `docs/backlog.md:14206` | Нацеленный ШТУРМ теперь переживает закрытую |
+| FOG-10 | ✅ | proto core | `docs/backlog.md:14226` | Память разведки перестала жить только |
+| FOG-9 | ✅ | core | `docs/backlog.md:14250` | Приостановленная стройка чужого мира была видна |
+| TEST-4 | ✅ | srv | `docs/backlog.md:14260` | topXp падал на живой базе разработчика. |
+| PHONE-STRATEGY | ✅ |  | `docs/backlog.md:14278` | Технологии, постройки, производство, рынок и дипломатия |
+| MAP-PERF | ✅ |  | `docs/backlog.md:14290` | Ускорение движения раскрытой голографической карты и подготовка |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
@@ -804,12 +805,12 @@
 | M1.1 | ✅ | data | `docs/map-roadmap.md:96` | Схема карты data/maps/.json — |
 | M1.3 | ✅ | core | `docs/map-roadmap.md:115` | Валидация путей: только к соседям — |
 | M2.1 | ✅ | core data | `docs/map-roadmap.md:128` | Виды секторов (kind) в данные — |
-| M2.2 | ✅ | core | `docs/map-roadmap.md:141` | «Захват заходом» как правило ядра — |
-| M2.3 | ✅ | core cli | `docs/map-roadmap.md:152` | Масштаб / вес сектора (планета = меньше) — (интерактивный ресайз — в M3.1) |
-| M3.1 | 🔒 |  | `docs/map-roadmap.md:168` | Редактор карты [tools] |
-| M3.2 | ⏳ |  | `docs/map-roadmap.md:176` | Процедурный пресет → формат карты [tools] |
-| M4.1 | ✅ | cli | `docs/map-roadmap.md:186` | Рендер из данных сектора — /🚧 |
-| M4.2 | ⏳ | docs | `docs/map-roadmap.md:192` | Сверка с метаигрой и отложенным регионом |
+| M2.2 | ✅ | core | `docs/map-roadmap.md:147` | «Захват заходом» как правило ядра — |
+| M2.3 | ✅ | core cli | `docs/map-roadmap.md:158` | Масштаб / вес сектора (планета = меньше) — (интерактивный ресайз — в M3.1) |
+| M3.1 | 🔒 |  | `docs/map-roadmap.md:174` | Редактор карты [tools] |
+| M3.2 | ⏳ |  | `docs/map-roadmap.md:182` | Процедурный пресет → формат карты [tools] |
+| M4.1 | ✅ | cli | `docs/map-roadmap.md:192` | Рендер из данных сектора — /🚧 |
+| M4.2 | ⏳ | docs | `docs/map-roadmap.md:198` | Сверка с метаигрой и отложенным регионом |
 | MM-0.1 | ⏳ | srv | `docs/matchmaking-roadmap.md:27` | Состояния матча: lobby→active→ended→archived |
 | MM-0.2 | ✅ | core proto srv | `docs/matchmaking-roadmap.md:33` | Подключить victoryModule + баннер |
 | MM-1.1 | 🔒 | srv | `docs/matchmaking-roadmap.md:43` | Лобби (создание/присоединение) |

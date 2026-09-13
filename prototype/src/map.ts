@@ -37,23 +37,19 @@ export interface SectorType {
   allowedBuildings?: string[];
 }
 /** The prototype's UI delta per sector kind: display name, `data.sectors` terrain
- *  mapping and map colour, plus an optionally STRICTER build roster than the core's
- *  (asteroid: the UI offers only the starfort even though the core kind is open). */
+ *  mapping and map colour. It carries NO build roster: the roster is a game rule, and a
+ *  rule the client alone knows is not enforced at all. The asteroid's "starfort only"
+ *  lived here for exactly that reason and the server accepted anything on an asteroid
+ *  field — ORB-4 moved it into `data/sectorKinds.json`, where both sides read it. */
 interface SectorTypeUi {
   name: string;
   core: string;
   color: string;
-  allowedBuildings?: string[];
 }
 const SECTOR_TYPE_UI: Record<string, SectorTypeUi> = {
   planet: { name: 'Planet', core: 'empty_space', color: '#5fd0ff' },
   nebula: { name: 'Nebula', core: 'nebula', color: '#8f6dff' },
-  asteroid: {
-    name: 'Asteroid Field',
-    core: 'asteroid_field',
-    color: '#d6a645',
-    allowedBuildings: ['starfort'],
-  },
+  asteroid: { name: 'Asteroid Field', core: 'asteroid_field', color: '#d6a645' },
   empty: { name: 'Empty Space', core: 'empty_space', color: '#46606e' },
   // new terrains — each maps to a core `data.sectors` entry for its speed/HP bonus
   ion_storm: { name: 'Ion Storm', core: 'ion_storm', color: '#6fe3ff' },
@@ -75,7 +71,7 @@ const SECTOR_TYPE_UI: Record<string, SectorTypeUi> = {
 export const SECTOR_TYPES: Record<string, SectorType> = Object.fromEntries(
   Object.entries(SECTOR_TYPE_UI).map(([kind, ui]) => {
     const planet = { kind };
-    const roster = ui.allowedBuildings ?? allowedBuildings(data, planet);
+    const roster = allowedBuildings(data, planet);
     const type: SectorType = {
       name: ui.name,
       core: ui.core,
