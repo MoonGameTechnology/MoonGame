@@ -1727,6 +1727,22 @@ function sectorTypeOf(id: string) {
   const kind = SECTOR_OF[id];
   return kind === undefined ? undefined : SECTOR_TYPES[kind];
 }
+/** Зеркало ворот конструкции ядра (`construction.ts`): вид провинции пускает здание,
+ *  только если на нём вообще можно строить (`buildable`) И его ростер (undefined =
+ *  любое) это здание допускает. Одна копия на все кнопки: три собственных
+ *  `?? BUILDABLE` по коду и были тем, из-за чего клиентское правило разъехалось с
+ *  данными (ORB-4) — кнопка обещала стройку, которую сервер отклонял. */
+function sectorAllowsBuilding(planetId: string, building: string): boolean {
+  const type = sectorTypeOf(planetId);
+  if (type && !type.buildable) return false;
+  return (type?.allowedBuildings ?? BUILDABLE).includes(building);
+}
+/** Есть ли на провинции хоть одно допустимое здание — гейт кнопки «Постройки». */
+function sectorBuildsAnything(planetId: string): boolean {
+  const type = sectorTypeOf(planetId);
+  if (type && !type.buildable) return false;
+  return (type?.allowedBuildings ?? BUILDABLE).length > 0;
+}
 function world(p: { x: number; y: number }): { x: number; y: number } {
   return camWorldToScreen(p, cam, insets(), mapBounds());
 }
@@ -6419,7 +6435,7 @@ function planetPanelHtml(p: Planet): string {
     // Каталог непостроенного больше не живёт плитками в панели — его показывает
     // полноэкранное окно построек. Кнопка есть только там, где строить можно
     // (свой мир И ростер сектора непуст — CMD-VIS: нет приказа — нет кнопки).
-    if (mine && (sectorTypeOf(p.id)?.allowedBuildings ?? BUILDABLE).length > 0) {
+    if (mine && sectorBuildsAnything(p.id)) {
       blds += `<button class="bw-open" data-act="openbuild">▣ ${t('side.build.open')}</button>`;
     }
     cols.push(blds);
@@ -7069,7 +7085,7 @@ function codexBuildBtn(kind: string, id: string, level = 1): string {
       const c = def ? buildingLevel(def, inst.level + 1).cost : undefined;
       return `<button class="cx-build" data-cx-upg="${id}"${code ? ' disabled' : ''}>${t('side.build.upgrade', { c: '' })}${cost(c, myRes())}</button>`;
     }
-    const buildable = (sectorTypeOf(p.id)?.allowedBuildings ?? BUILDABLE).includes(id);
+    const buildable = sectorAllowsBuilding(p.id, id);
     // buildingLocked, а не только «уже стоит»: СТРОЯЩЕЕСЯ здание ещё не в p.buildings
     // (оно попадает туда на construction.complete), и кодекс предлагал «Построить
     // здесь» второй экземпляр одноэкземплярного здания всю стройку первого.
@@ -8166,7 +8182,7 @@ side.addEventListener('contextmenu', (ev) => {
     worldOwner: p?.owner ?? null,
     me: ME,
     sectorAllows:
-      !!p && !!anchorId && (sectorTypeOf(p.id)?.allowedBuildings ?? BUILDABLE).includes(anchorId),
+      !!p && !!anchorId && sectorAllowsBuilding(p.id, anchorId),
     locked: !!p && !!anchorId && !!buildingLocked(p.id, anchorId),
   });
   if (!order || !selPlanet) return;

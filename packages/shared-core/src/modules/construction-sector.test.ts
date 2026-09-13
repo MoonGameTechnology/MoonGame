@@ -25,6 +25,10 @@ const data: GameData = parseGameData({
     void_station: { allowedBuildings: ['shipyard', 'radar'] },
     // A depleted planet only hosts the salvage metal rig — nothing else.
     dead_world: { allowedBuildings: ['metal_station'] },
+    // ORB-4: nothing is raised here, and it says so with the FLAG and no roster. This
+    // is the shape that used to slip through — `buildable` was read by nobody, so a
+    // kind was safe only if it ALSO spelled out `allowedBuildings: []`.
+    nebula: { buildable: false },
     // (no `unzoned` entry — a kind-less node hits the permissive default below)
   },
 });
@@ -52,6 +56,7 @@ function world(): GameState {
       A: node('A', 'asteroid'),
       V: node('V', 'void_station'),
       D: node('D', 'dead_world'),
+      N: node('N', 'nebula'),
       legacy: node('legacy'), // no kind → permissive
     },
   };
@@ -79,6 +84,15 @@ describe('construction — per-province building roster (sectorKinds.allowedBuil
   it('a kind-less node degrades permissively (any building — legacy scenarios unaffected)', () => {
     expect(code(kernel.applyAction(st, build('legacy', 'mine'), ctx))).toBe(true);
     expect(code(kernel.applyAction(st, build('legacy', 'shipyard'), ctx))).toBe(true);
+  });
+
+  it('`buildable: false` alone blocks construction — no empty roster needed (ORB-4)', () => {
+    // The regression this test exists for: the flag was declared in `sectorKinds`, read
+    // only by the map renderer, and enforced nowhere. A kind that says "nothing is built
+    // here" but forgets `allowedBuildings: []` hosted the ENTIRE catalogue.
+    expect(code(kernel.applyAction(st, build('N', 'mine'), ctx))).toBe('E_WRONG_SECTOR');
+    expect(code(kernel.applyAction(st, build('N', 'shipyard'), ctx))).toBe('E_WRONG_SECTOR');
+    expect(code(kernel.applyAction(st, build('N', 'radar'), ctx))).toBe('E_WRONG_SECTOR');
   });
 
   it('a dead world hosts only the salvage metal rig — and no other province type can', () => {
