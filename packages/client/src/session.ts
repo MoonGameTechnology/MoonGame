@@ -241,7 +241,18 @@ export function createSession(base: string, io: SessionIo): NetSession {
       const lists = res.body as MatchLists | null;
       // A 2xx whose body did not parse is NOT "the list is unchanged" (matchQuery, rule 4):
       // leaving the old rows up invites a click on a match that is already gone.
-      if (!lists || !Array.isArray(lists.available)) return { outcome: 'unreachable', lists: null };
+      //
+      // ALL THREE lists are checked, not just `available`. `MatchLists` declares them
+      // required and the browser destructures `active` straight into `.length`, so a body
+      // carrying only `available` used to reach the renderer and throw there — a blank
+      // screen with no message, which is exactly the outcome rule 4 exists to prevent.
+      // Found by the browser harness, whose stub answered with the wrong field name.
+      const wellFormed =
+        !!lists &&
+        Array.isArray(lists.available) &&
+        Array.isArray(lists.active) &&
+        Array.isArray(lists.archived);
+      if (!wellFormed) return { outcome: 'unreachable', lists: null };
       return { outcome: 'ok', lists };
     },
 

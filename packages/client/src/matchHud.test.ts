@@ -15,6 +15,8 @@ import {
   createSelectionModel,
   createStatusBarModel,
   resolveBattleAction,
+  resolveFleetAction,
+  type FleetSelectionModel,
 } from './matchHud';
 
 /** Minimal game-data slice the HUD reads: canonical resource order + unit defs
@@ -711,5 +713,114 @@ describe('resolveBattleAction', () => {
       ok: false,
       code: 'E_CANNOT_RETREAT',
     });
+  });
+});
+
+
+/* ─────────────── приказы панели флота (MIG-7) ─────────────── */
+
+const sel = (over: Partial<FleetSelectionModel> = {}): FleetSelectionModel => ({
+  kind: 'fleet',
+  id: 'f1',
+  owner: 'p1',
+  ownerName: 'Ash',
+  ownerFaction: 'vanguard',
+  mine: true,
+  status: 'stationed',
+  location: 'A',
+  ships: [],
+  inCombat: false,
+  ...over,
+});
+
+describe('модель знает орбитальные факты — иначе кнопкам не на чем стоять', () => {
+  it('орбита и обстрел переносятся из состояния флота', () => {
+    const s = baseState();
+    s.fleets = { f1: fleet({ id: 'f1', owner: 'p1', orbit: 'near', bombarding: true }) };
+    const res = createSelectionModel(s, 'f1', 'p1', DATA);
+    expect(res.ok && res.orbit).toBe('near');
+    expect(res.ok && res.bombarding).toBe(true);
+  });
+
+  it('форс-марш виден только НА СВОЁМ флоте', () => {
+    // Туман уже снимает чужие записи `forcedMarch`, но модель не полагается на это:
+    // ей могут подать нетуманенное состояние (так же перестрахован командующий).
+    const s = baseState();
+    s.fleets = { f1: fleet({ id: 'f1', owner: 'p2' }) };
+    s.forcedMarch = { f1: true };
+    const res = createSelectionModel(s, 'f1', 'p1', DATA);
+    expect(res.ok && res.forcedMarch).toBeUndefined();
+    const mineRes = createSelectionModel({ ...s, fleets: { f1: fleet({ id: 'f1', owner: 'p1' }) } }, 'f1', 'p1', DATA);
+    expect(mineRes.ok && mineRes.forcedMarch).toBe(true);
+  });
+});
+
+describe('resolveFleetAction', () => {
+  it('чужой флот отказывает ТЕМ ЖЕ кодом, что и ядро', () => {
+    // `E_NO_FLEET` намеренно не отличает «нет такого» от «не твой» (A06): иначе
+    // клиент перебором id подтверждал бы существование скрытых туманом флотов.
+    const out = resolveFleetAction({ kind: 'stop' }, sel({ mine: false }));
+    expect(out).toEqual({ ok: false, code: 'E_NO_FLEET' });
+  });
+
+  it('«Остановить» работает только в пути', () => {
+    const moving = sel({ status: 'transit', location: undefined });
+    expect(resolveFleetAction({ kind: 'stop' }, moving)).toEqual({
+      ok: true,
+      steps: [{ type: 'fleet.stop', payload: { fleetId: 'f1' } }],
+    });
+    expect(resolveFleetAction({ kind: 'stop' }, sel())).toEqual({ ok: false, code: 'E_FLEET_BUSY' });
+  });
+
+  it('в бою не останавливают и не обстреливают', () => {
+    for (const action of [{ kind: 'stop' } as const, { kind: 'bombard', on: true } as const])
+      expect(resolveFleetAction(action, sel({ inCombat: true, orbit: 'near' }))).toEqual({
+        ok: false,
+        code: 'E_FLEET_BUSY',
+      });
+  });
+
+  it('форс-марш НЕ требует стоянки — в этом весь его смысл', () => {
+    // Ядро (`forcedMarch.ts`) проверяет только владельца: приказ ускоряет флот В ПУТИ,
+    // и требование «стоять» отменяло бы его целиком.
+    const out = resolveFleetAction({ kind: 'forcemarch', on: true }, sel({ status: 'transit' }));
+    expect(out).toEqual({
+      ok: true,
+      steps: [{ type: 'fleet.forcemarch', payload: { fleetId: 'f1', on: true } }],
+    });
+  });
+
+  it('обстрел ВКЛЮЧАЮТ только с орбиты, а выключают откуда угодно', () => {
+    // Иначе флот, оказавшийся обстреливающим без орбиты, нечем было бы остановить.
+    expect(resolveFleetAction({ kind: 'bombard', on: true }, sel())).toEqual({
+      ok: false,
+      code: 'E_WRONG_ORBIT',
+    });
+    expect(resolveFleetAction({ kind: 'bombard', on: false }, sel({ bombarding: true }))).toEqual({
+      ok: true,
+      steps: [{ type: 'fleet.bombard', payload: { fleetId: 'f1', on: false } }],
+    });
+  });
+
+  it('штурм с орбиты — ОДИН приказ, а не с орбиты — ПАРА', () => {
+    // Правило `decisions/assaultOrder.ts`: разорви пару — ядро ответит `E_WRONG_ORBIT`,
+    // и игрок получит «штурм не начался» без причины.
+    expect(resolveFleetAction({ kind: 'assault' }, sel({ orbit: 'near' }))).toEqual({
+      ok: true,
+      steps: [{ type: 'fleet.assault', payload: { fleetId: 'f1' } }],
+    });
+    expect(resolveFleetAction({ kind: 'assault' }, sel())).toEqual({
+      ok: true,
+      steps: [
+        { type: 'fleet.orbit', payload: { fleetId: 'f1', orbit: 'near' } },
+        { type: 'fleet.assault', payload: { fleetId: 'f1' } },
+      ],
+    });
+  });
+
+  it('годность самого штурма НЕ проверяется здесь — это ответ ядра', () => {
+    // Ни десанта, ни враждебности мира модель не знает и знать не должна: рукописная
+    // копия этих условий отстанет от ядра на первом новом правиле, и отстанет молча.
+    expect(resolveFleetAction({ kind: 'assault' }, sel({ ships: [] })).ok).toBe(true);
   });
 });
