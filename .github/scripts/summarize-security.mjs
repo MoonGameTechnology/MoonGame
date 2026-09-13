@@ -41,6 +41,9 @@ const EXPECTED = [
   // зелень, против которой заведена вся таблица.
   { key: 'smoke-image', name: 'Smoke — собранный образ стартует и отвечает' },
   { key: 'trivy-caddy', name: 'Trivy image — наш образ Caddy (SEC-31)' },
+  // Тот же случай, что `smoke-image` выше, но для второго публикуемого образа: с SEC-40
+  // рантайм-стадия Caddy обновляет пакеты базы, а скан этого не запускает и не проверяет.
+  { key: 'smoke-caddy', name: 'Smoke — образ Caddy стартует и обслуживает' },
   { key: 'trivy-deps', name: 'Trivy image — сторонние образы прода (postgres)' },
   { key: 'kics', name: 'KICS — IaC (Docker Compose прода)' },
   {

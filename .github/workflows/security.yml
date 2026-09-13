@@ -606,6 +606,23 @@ jobs:
           persist-credentials: false
       - name: build — собираем свой Caddy (блокирующий)
         run: docker build -t void-caddy:scan -f deploy/caddy/Dockerfile deploy/caddy
+      # БЛОКИРУЮЩИЙ, по той же причине, что у образа сервера: Trivy читает файловую систему
+      # и никогда не запускает то, что просканировал. Скрипт тот же, что гонит `image.yml`
+      # перед подписью (SEC-35) — но ТАМ он выполняется только на `main`, то есть УЖЕ ПОСЛЕ
+      # мержа. До SEC-40 это было терпимо: в рантайм-стадии менялся ровно один файл, бинарь.
+      # Теперь она ещё и обновляет пакеты базы (`apk upgrade`), а это затрагивает entrypoint,
+      # `curl` пробы здоровья и musl — то есть ровно то, что скан не проверяет. Пусть
+      # сломанная сборка краснеет в своём PR, а не на `main`.
+      - name: smoke — образ Caddy стартует и обслуживает
+        id: smoke
+        run: |
+          set +e
+          .github/scripts/smoke-caddy-image.sh void-caddy:scan
+          rc=$?
+          set -e
+          ok=true; [ "$rc" -eq 0 ] || ok=false
+          echo "{\"key\":\"smoke-caddy\",\"ok\":$ok,\"exit\":$rc}" > status-smoke-caddy.json
+          exit $rc
       - name: trivy image — отчёт по своему Caddy
         id: scan
         continue-on-error: true
@@ -648,6 +665,7 @@ jobs:
             trivy-caddy.sarif
             trivy-caddy.json
             status-trivy-caddy.json
+            status-smoke-caddy.json
           if-no-files-found: warn
       - name: upload to code scanning
         if: always()
