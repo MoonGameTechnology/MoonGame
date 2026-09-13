@@ -9,7 +9,7 @@
  * `main.ts` it defaulted to the module-level `youColor`, which a leaf module must not
  * reach for — call sites pass it, and «твой цвет» stays the host's business).
  */
-import { unitGlyphSvg, ARCHETYPE_PATH } from './unitGlyphs';
+import { unitGlyphSvg } from './unitGlyphs';
 import type { GameData } from '../../packages/shared-core/src/index';
 
 /** Producer buildings echo their resource's glyph (`TECH_CUR` in `format.ts`) — keep
@@ -86,17 +86,9 @@ export function unitIconHtml(
   px = 22,
 ): string {
   const def = data.units[unit];
-  if (def && def.domain !== 'ground') return unitGlyphSvg(def, { color, px });
+  if (def && def.domain !== 'ground') return unitGlyphSvg(def, { unitId: unit, color, px });
   return unitIcon(unit, data);
 }
-
-// Path2D cache of the poster silhouettes for the canvas — the panel takes the same
-// paths through SVG, so the map and the card cannot drift apart in shape.
-const ARCH_PATH2D: Partial<Record<keyof typeof ARCHETYPE_PATH, Path2D>> = {};
-export function archPath2d(arch: keyof typeof ARCHETYPE_PATH): Path2D {
-  return (ARCH_PATH2D[arch] ??= new Path2D(ARCHETYPE_PATH[arch]));
-}
-
 
 // Sovereigns (donate currency): faceted-gem line icon per the mock — worn GOLD with a
 // soft halo (the mock capsule is lavender; the brief keeps the game's gold identity).

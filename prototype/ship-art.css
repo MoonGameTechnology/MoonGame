@@ -1,0 +1,25 @@
+/* Approved realistic portraits in inspection/build surfaces; maps remain vector-only. */
+.ship-art{display:block;position:relative;overflow:hidden;background:#071018;border:1px solid var(--line-hi);border-radius:6px;flex:none;pointer-events:none;}
+.ship-art img{display:block;width:100%;height:100%;object-fit:contain;}
+.ship-art--thumb{width:72px;height:48px;}
+.ship-art--portrait{width:100%;aspect-ratio:3/2;max-height:230px;margin:0 0 12px;}
+#side .asset-row.cat.with-art{display:grid;grid-template-columns:72px minmax(0,1fr);gap:2px 10px;min-height:62px;padding:6px 8px;}
+#side .asset-row.cat.with-art .ship-art{grid-row:1/3;}
+#side .asset-row.cat.with-art b{min-width:0;overflow-wrap:anywhere;align-self:end;}
+#side .asset-row.cat.with-art>.dim{grid-column:2;margin-left:0;white-space:normal;align-self:start;}
+.ptile.with-art{width:112px;}
+.ptile.with-art .ship-art{width:100%;height:62px;}
+.ptile.with-art .pt-n{max-width:100%;}
+.cn-hbtn.with-art{display:flex;flex:1 1 94px;max-width:156px;align-items:center;flex-direction:column;gap:6px;padding:5px 5px 8px;}
+.cn-hbtn.with-art .ship-art{width:100%;height:auto;aspect-ratio:3/2;}
+.cn-hbtn.with-art span:last-child{line-height:1.3;}
+.cn-hull.with-art{display:block;padding:10px;}
+.cn-hull-info{display:flex;align-items:center;gap:13px;min-width:0;}
+.cn-hull-info .cn-hic{flex:none;}
+.cn-hull .ship-art--portrait{border:0;margin-bottom:10px;}
+@media(max-width:520px){
+  .ship-art--portrait{max-height:190px;}
+  .cn-hbtn.with-art{flex-basis:86px;}
+  .cn-hull-info{gap:9px;}
+  .cn-hull .cn-hn{font-size:14px;overflow-wrap:anywhere;}
+}

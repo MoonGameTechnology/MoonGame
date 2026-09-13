@@ -347,6 +347,7 @@ function runMatch(getState: () => GameState, bounds: Bounds, interact?: MatchInt
     try {
       const state = getState();
       renderMap(g, state, cam, vp, bounds, {
+        data: HUD_DATA,
         now: state.time,
         dpr,
         visualTime,

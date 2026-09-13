@@ -26,7 +26,7 @@
  *    никуда нечестно: у неё не будет второго конца. Машины при этом ещё летят, и их
  *    судьбу разберёт ядро на посадке (`shuttle.lost`).
  */
-import type { ShuttleStrike, StrikeBase } from '../../packages/shared-core/src/index';
+import type { ShuttleStrike, StrikeBase, UnitStack } from '../../packages/shared-core/src/index';
 
 /** Точка на карте (мировые координаты). */
 export interface XY {
@@ -50,6 +50,8 @@ export interface StrikeTrail {
   leg: 'out' | 'back';
   /** Сколько бортов идёт — подпись значка. */
   machines: number;
+  /** Own, already visibility-filtered hulls for the shared map silhouette resolver. */
+  units: readonly UnitStack[];
   /** id эскадры: позывной значка строится из него той же функцией, что имя карточки в
    *  порту, — одно соединение зовётся на карте и в панели одинаково. */
   squadronId: string;
@@ -87,6 +89,7 @@ export function strikeTrails(
       at: lerp(from, to, k),
       leg: st.leg,
       machines: st.units.reduce((n: number, u) => n + Math.max(0, u.count), 0),
+      units: st.units,
       squadronId: st.squadronId,
     });
   }
