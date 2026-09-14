@@ -4,8 +4,9 @@
 // SHU-1.1 в гарнизоне не бывает — он в `planet.hangar`. Вкладка была гарантированно
 // пустой, построенные машины исчезали для игрока, и применить их было нечем.
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'node:fs';
 import { data } from './gameData';
-import { fleetHangar, hasHangar, planetHangar, transferOffer } from './hangarPanel';
+import { dockedCarrier, fleetHangar, hasHangar, planetHangar, transferOffer } from './hangarPanel';
 import type { Fleet, Planet } from '../../packages/shared-core/src/index';
 
 const port = (over: Partial<Planet> = {}): Planet => ({
@@ -129,5 +130,74 @@ describe('SHU-3.1 — перегрузка порт ⇄ носитель пре�
       load: false,
       unload: false,
     });
+  });
+});
+
+// Перегрузка ИЗ ПАНЕЛИ МИРА — дефект, найденный в живой игре: у игрока был «Шаттл», а
+// кнопок он не нашёл. Функционально всё работало, но кнопки стояли ТОЛЬКО на панели
+// флота-носителя, а челноки игрок видит и строит во вкладке мира «Эскадра». Место, где
+// лежат машины, и место, где их можно погрузить, оказались разными панелями.
+describe('перегрузка предлагается и со стороны МИРА', () => {
+  const shuttles = [{ id: 'sq:1', units: [{ unit: 'interceptor', count: 2 }] }];
+
+  it('НОСИТЕЛЬ У ЭТОГО МИРА НАХОДИТСЯ — панель мира знает, кому грузить', () => {
+    const f = carrier();
+    expect(dockedCarrier([f], 'A', 'p1', data)?.id).toBe('F');
+  });
+
+  it('ЧУЖОЙ, В ПУТИ, В БОЮ ИЛИ У ДРУГОГО МИРА — не кандидат', () => {
+    expect(dockedCarrier([carrier({ owner: 'p2' })], 'A', 'p1', data)).toBeNull();
+    expect(dockedCarrier([carrier({ location: 'B' })], 'A', 'p1', data)).toBeNull();
+    expect(dockedCarrier([carrier({ battleId: 'b1' })], 'A', 'p1', data)).toBeNull();
+    const flying = carrier({ movement: { from: 'A', to: 'B', departedAt: 0, arrivesAt: 1 } });
+    expect(dockedCarrier([flying], 'A', 'p1', data)).toBeNull();
+  });
+
+  it('КОРАБЛЬ БЕЗ АНГАРА НЕ НОСИТЕЛЬ: обычный флот у мира кнопок не даёт', () => {
+    const plain = carrier({ units: [{ unit: 'cruiser', count: 1 }] });
+    expect(dockedCarrier([plain], 'A', 'p1', data)).toBeNull();
+  });
+
+  it('НОСИТЕЛЕЙ ДВА — КНОПКИ НЕТ: грузить «в какой-нибудь» нельзя', () => {
+    // Цена ошибки здесь выше, чем у выбора звена (`transferPick`): машины уедут с чужим
+    // флотом. Пока выбора списком нет, панель мира молчит, а адресный приказ остаётся
+    // на панели самого носителя — там цель однозначна.
+    const two = [carrier(), carrier({ id: 'F2' })];
+    expect(dockedCarrier(two, 'A', 'p1', data)).toBeNull();
+  });
+
+  it('вместе с `transferOffer` даёт ровно те же кнопки, что и панель флота', () => {
+    const f = carrier();
+    const p = port({ hangar: shuttles });
+    const found = dockedCarrier([f], 'A', 'p1', data)!;
+    const offer = transferOffer(planetHangar(p, data), fleetHangar(found, data), {
+      docked: true,
+      mine: true,
+    });
+    expect(offer).toEqual({ load: true, unload: false });
+  });
+});
+
+// Само ПОДКЛЮЧЕНИЕ вкладки живёт в `main.ts`, у которого юнит-обвязки нет, — поэтому
+// сканом исходника, как в `rankScreen.test.ts`. Именно подключения и не хватало:
+// решение (`transferOffer`) было верным и покрытым, а звать его со стороны мира было
+// некому, и для игрока механики не существовало.
+describe('вкладка мира «Эскадра» подключена к перегрузке', () => {
+  const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
+  const tab = src.slice(src.indexOf("planetTab === 'shuttle'"), src.indexOf("planetTab === 'shuttle'") + 2000);
+
+  it('вкладка спрашивает, есть ли у мира носитель', () => {
+    expect(tab).toContain('dockedCarrier(');
+  });
+
+  it('и рисует те же две кнопки, что панель флота', () => {
+    expect(tab).toContain("btn('wingload'");
+    expect(tab).toContain("btn('wingunload'");
+  });
+
+  it('кнопка адресует ФЛОТ — обработчик `wingload` ждёт id носителя, а не мира', () => {
+    // Адресуй она мир, приказ ушёл бы в никуда: `wingload` резолвит флот по `arg`.
+    expect(tab).toMatch(/btn\('wingload', ship\.id/);
+    expect(tab).toMatch(/btn\('wingunload', ship\.id/);
   });
 });
