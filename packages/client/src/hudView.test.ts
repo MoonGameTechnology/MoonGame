@@ -18,10 +18,11 @@ import {
   selectionHtml,
   statusBarHtml,
   unitPickerHtml,
+  worldHtml,
 } from './hudView';
-import { t } from '../../../localization/core';
+import { t, tData } from '../../../localization/core';
 import { displayUnit } from '../../../decisions/dataNames';
-import type { BattleModel, FleetSelectionModel, StatusBarModel } from './matchHud';
+import type { BattleModel, FleetSelectionModel, StatusBarModel, WorldModel } from './matchHud';
 import type { LoadoutModel } from './loadoutEditor';
 
 const bar: StatusBarModel = {
@@ -277,5 +278,84 @@ describe('приказы в панели состава (MIG-7)', () => {
     // но своего жеста у него быть не должно.
     for (const m of [fleet, { ...fleet, orbit: 'near' as const }, { ...fleet, status: 'transit' as const }])
       expect(selectionHtml(m, 0)).not.toContain('data-act="orbit"');
+  });
+});
+
+describe('панель мира (MIG-8)', () => {
+  const WORLD_DATA = {
+    buildings: { mine_t1: { name: 'Metal Mine' } },
+  } as unknown as Parameters<typeof worldHtml>[1];
+  const w = (over: Partial<WorldModel> = {}): WorldModel => ({
+    kind: 'world',
+    id: 'alpha',
+    owner: 'p1',
+    ownerName: 'Ash',
+    ownerFaction: 'vanguard',
+    mine: true,
+    garrison: [],
+    buildings: [],
+    remembered: false,
+    capital: 'none',
+    hold: 'none',
+    ...over,
+  });
+
+  it('ничей мир назван словом, а не пустым владельцем', () => {
+    expect(worldHtml(w({ owner: null, ownerName: undefined }), WORLD_DATA)).toContain(t('hud.world.nobody'));
+  });
+
+  it('на ЧУЖОМ мире ряда приказов нет вовсе', () => {
+    // Оба приказа — распоряжения владельца; ядро ответит `E_FORBIDDEN`.
+    expect(worldHtml(w({ mine: false }), WORLD_DATA)).not.toContain('class="orders"');
+  });
+
+  it('столица: кнопка или метка, но не обе', () => {
+    const designate = worldHtml(w({ capital: 'designate' }), WORLD_DATA);
+    expect(designate).toContain('data-act="capital"');
+    expect(designate).not.toContain(t('hud.world.capital'));
+    const marked = worldHtml(w({ capital: 'marked' }), WORLD_DATA);
+    expect(marked).toContain(t('hud.world.capital'));
+    expect(marked).not.toContain('data-act="capital"');
+  });
+
+  it('исчерпанный лимит ГАСИТ кнопку, но не прячет её', () => {
+    // Прятать нельзя: игрок должен видеть, что механика есть и упёрлась в лимит.
+    expect(worldHtml(w({ hold: 'set-disabled' }), WORLD_DATA)).toMatch(/data-act="hold"[^>]*disabled/);
+    expect(worldHtml(w({ hold: 'set' }), WORLD_DATA)).not.toMatch(/data-act="hold"[^>]*disabled/);
+  });
+
+  it('без техгейта точки удержания НЕТ ни в каком виде', () => {
+    expect(worldHtml(w({ hold: 'none' }), WORLD_DATA)).not.toContain('data-act="hold"');
+  });
+
+  it('снятая точка шлёт on=0, поставленная — on=1', () => {
+    expect(worldHtml(w({ hold: 'clear' }), WORLD_DATA)).toContain('data-on="0"');
+    expect(worldHtml(w({ hold: 'set' }), WORLD_DATA)).toContain('data-on="1"');
+  });
+
+  it('мир из ПАМЯТИ помечен словами', () => {
+    // Иначе панель выдаёт протухший снимок за наблюдение: гарнизон, которого игрок
+    // не видел, читался бы как текущий.
+    expect(worldHtml(w({ remembered: true }), WORLD_DATA)).toContain(t('hud.world.remembered'));
+    expect(worldHtml(w(), WORLD_DATA)).not.toContain(t('hud.world.remembered'));
+  });
+
+  it('постройка подписана ИМЕНЕМ из каталога, а не сырым id', () => {
+    // Поймано браузерным прогоном: панель показывала `mine_t1` вместо «Рудник».
+    // Правило общее — `decisions/dataNames.buildingName`.
+    const html = worldHtml(w({ buildings: [{ type: 'mine_t1', level: 2 }] }), WORLD_DATA);
+    expect(html).toContain(tData('Metal Mine'));
+    expect(html).not.toContain('mine_t1');
+  });
+
+  it('постройка без записи в каталоге подписывается своим id, а не пропадает', () => {
+    // Запасной путь `buildingName`: неизвестное здание должно быть ВИДНО игроку.
+    expect(worldHtml(w({ buildings: [{ type: 'нечто', level: 1 }] }), WORLD_DATA)).toContain(
+      tData('нечто'),
+    );
+  });
+
+  it('пустой гарнизон сказан словом, а не пропущен молча', () => {
+    expect(worldHtml(w(), WORLD_DATA)).toContain(t('hud.world.no-garrison'));
   });
 });

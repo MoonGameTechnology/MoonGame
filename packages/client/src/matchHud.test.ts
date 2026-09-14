@@ -16,7 +16,10 @@ import {
   createStatusBarModel,
   resolveBattleAction,
   resolveFleetAction,
+  createWorldModel,
+  resolveWorldAction,
   type FleetSelectionModel,
+  type WorldModel,
 } from './matchHud';
 
 /** Minimal game-data slice the HUD reads: canonical resource order + unit defs
@@ -37,7 +40,10 @@ const DATA = {
     outpost: { capturable: true },
     fortress: { capturable: false },
   },
-} as unknown as Pick<GameData, 'resources' | 'units' | 'sectorKinds'>;
+  // Объявлен как ПОЛНЫЙ `GameData`, хотя заполнены только читаемые полями модели срезы:
+  // панель мира спрашивает у ядра `isInhabited`/`stewardUnlocked`, а те принимают весь
+  // `GameData` — с `Pick` фикстура в них не проходит по типу.
+} as unknown as GameData;
 
 function baseState(): GameState {
   const s = createInitialState({ seed: 'hud', version: { data: '1', manifest: '1' } });
@@ -822,5 +828,147 @@ describe('resolveFleetAction', () => {
     // Ни десанта, ни враждебности мира модель не знает и знать не должна: рукописная
     // копия этих условий отстанет от ядра на первом новом правиле, и отстанет молча.
     expect(resolveFleetAction({ kind: 'assault' }, sel({ ships: [] })).ok).toBe(true);
+  });
+});
+
+
+/* ─────────────── панель мира (MIG-8) ─────────────── */
+
+/** Мир в снимке: минимум полей, которые читает панель. */
+function planetIn(state: GameState, over: Partial<Planet> = {}): GameState {
+  state.planets = {
+    A: {
+      id: 'A',
+      owner: 'p1',
+      position: { x: 0, y: 0 },
+      resources: {},
+      buildings: [],
+      garrison: [],
+      traits: [],
+      ...over,
+    },
+  };
+  return state;
+}
+
+const worldModel = (over: Partial<WorldModel> = {}): WorldModel => ({
+  kind: 'world',
+  id: 'A',
+  owner: 'p1',
+  mine: true,
+  garrison: [],
+  buildings: [],
+  remembered: false,
+  capital: 'none',
+  hold: 'none',
+  ...over,
+});
+
+describe('createWorldModel', () => {
+  it('мира нет в снимке — отказ кодом, а не пустая панель', () => {
+    expect(createWorldModel(planetIn(baseState()), 'нет-такого', 'p1', DATA)).toEqual({
+      ok: false,
+      code: 'E_NO_PLANET',
+    });
+  });
+
+  it('ничей мир так и назван, и приказов не предлагает', () => {
+    const res = createWorldModel(planetIn(baseState(), { owner: null }), 'A', 'p1', DATA);
+    expect(res.ok).toBe(true);
+    expect(res.ok && res.owner).toBeNull();
+    expect(res.ok && res.mine).toBe(false);
+    expect(res.ok && res.capital).toBe('none');
+    expect(res.ok && res.hold).toBe('none');
+  });
+
+  it('владелец назван ИМЕНЕМ, а постройки и гарнизон перенесены', () => {
+    const res = createWorldModel(
+      planetIn(baseState(), {
+        buildings: [{ type: 'mine', level: 2, hp: 10 }],
+        garrison: [{ unit: 'sentry', count: 3 }],
+      }),
+      'A',
+      'p2',
+      DATA,
+    );
+    expect(res.ok && res.ownerName).toBe('Носорог-1');
+    expect(res.ok && res.buildings).toEqual([{ type: 'mine', level: 2 }]);
+    expect(res.ok && res.garrison[0]).toMatchObject({ unit: 'sentry', count: 3 });
+  });
+
+  it('память тумана отмечена — иначе панель врёт про гарнизон', () => {
+    // Мир из `remembered` показан СНИМКОМ: гарнизон в нём может быть протухшим, и
+    // нарисовать его как живой значит соврать про то, чего игрок не видел.
+    expect(createWorldModel(planetIn(baseState()), 'A', 'p1', DATA, ['A'])).toMatchObject({
+      remembered: true,
+    });
+    expect(createWorldModel(planetIn(baseState()), 'A', 'p1', DATA)).toMatchObject({
+      remembered: false,
+    });
+  });
+
+  it('обитаемый СВОЙ мир предлагает столицу, а уже назначенный — метку', () => {
+    // Обитаемость спрашивается у ядра (`isInhabited`), а не переписывается здесь.
+    const s = planetIn(baseState());
+    expect(createWorldModel(s, 'A', 'p1', DATA)).toMatchObject({ capital: 'designate' });
+    s.capital = { p1: 'A' };
+    expect(createWorldModel(s, 'A', 'p1', DATA)).toMatchObject({ capital: 'marked' });
+  });
+
+  it('точка удержания за ТЕХГЕЙТОМ: без технологии предложения нет вовсе', () => {
+    // Не серая кнопка, а пусто — приказа ещё не существует (`worldOrders`, правило 4).
+    const s = planetIn(baseState());
+    expect(createWorldModel(s, 'A', 'p1', DATA)).toMatchObject({ hold: 'none' });
+  });
+
+  it('БЕЗ данных оба предложения молчат, а не угадывают', () => {
+    // «Обитаем ли мир» и «открыт ли Хранитель» — вопросы к ДАННЫМ. Без них панель
+    // обязана не предлагать ничего, а не показать кнопку наугад.
+    const res = createWorldModel(planetIn(baseState()), 'A', 'p1');
+    expect(res.ok && res.capital).toBe('none');
+    expect(res.ok && res.hold).toBe('none');
+  });
+});
+
+describe('resolveWorldAction', () => {
+  it('на ЧУЖОМ мире оба приказа запрещены', () => {
+    for (const action of [{ kind: 'capital' } as const, { kind: 'hold', on: true } as const])
+      expect(resolveWorldAction(action, worldModel({ mine: false }))).toEqual({
+        ok: false,
+        code: 'E_FORBIDDEN',
+      });
+  });
+
+  it('столицей назначают только там, где решение это предложило', () => {
+    expect(resolveWorldAction({ kind: 'capital' }, worldModel({ capital: 'designate' }))).toEqual({
+      ok: true,
+      steps: [{ type: 'capital.designate', payload: { planetId: 'A' } }],
+    });
+    // Уже столица — приказ был бы пустым; необитаемый мир ядро отвергнет само.
+    for (const capital of ['marked', 'none'] as const)
+      expect(resolveWorldAction({ kind: 'capital' }, worldModel({ capital })).ok).toBe(false);
+  });
+
+  it('точку СТАВЯТ по месту в лимите, а СНИМАЮТ всегда', () => {
+    // Правило 6 `worldOrders`: иначе игрок, исчерпавший лимит, заперт — ни поставить
+    // новую, ни убрать старую.
+    expect(resolveWorldAction({ kind: 'hold', on: true }, worldModel({ hold: 'set' }))).toEqual({
+      ok: true,
+      steps: [{ type: 'steward.holdpoint', payload: { planetId: 'A', on: true } }],
+    });
+    expect(
+      resolveWorldAction({ kind: 'hold', on: true }, worldModel({ hold: 'set-disabled' })),
+    ).toEqual({ ok: false, code: 'E_LIMIT' });
+    expect(resolveWorldAction({ kind: 'hold', on: false }, worldModel({ hold: 'clear' }))).toEqual({
+      ok: true,
+      steps: [{ type: 'steward.holdpoint', payload: { planetId: 'A', on: false } }],
+    });
+  });
+
+  it('без технологии Хранителя точку не поставить', () => {
+    expect(resolveWorldAction({ kind: 'hold', on: true }, worldModel({ hold: 'none' }))).toEqual({
+      ok: false,
+      code: 'E_STEWARD_LOCKED',
+    });
   });
 });

@@ -18,9 +18,10 @@
  */
 import type { GameData, ShipSlotType } from '@void/shared-core';
 import { t, tData } from '../../../localization/core';
-import { displayUnit } from '../../../decisions/dataNames';
+import { buildingName, displayUnit } from '../../../decisions/dataNames';
 import type {
   BattleModel,
+  WorldModel,
   BattleSideView,
   FleetSelectionModel,
   SelectionStack,
@@ -199,6 +200,74 @@ export function selectionHtml(
     (opts.canBuildHere
       ? `<button class="btn tiny" data-act="yard">${esc(t('hud.build-here'))}</button>`
       : '') +
+    `</div>`
+  );
+}
+
+/* ────────────────────────── World zone — planet panel ────────────────────── */
+
+/**
+ * Панель мира (MIG-8) — то, чего у клиента не было вовсе: тап по миру без своего флота
+ * раньше либо прыгал в верфь, либо не делал НИЧЕГО (чужой и ничей мир были немы).
+ *
+ * Что рисуется и чего намеренно НЕТ:
+ *  · **приказы только на своём мире** — и столица, и точка удержания это распоряжения
+ *    владельца; на чужом ядро ответит `E_FORBIDDEN`;
+ *  · **«Сделать столицей» не предлагается необитаемому миру** — в столице возрождается
+ *    герой, и на пустом камне назначение было бы ловушкой (`worldOrders`, правило 2);
+ *  · **точка удержания за техгейтом** — без технологии Хранителя не серая кнопка, а
+ *    ПУСТО: приказа ещё не существует (правило 4);
+ *  · **лимит гасит кнопку, но снять точку можно всегда** — иначе игрок, исчерпавший
+ *    лимит, заперт (правило 6);
+ *  · **память отмечена словами.** Мир, показанный по снимку тумана, помечается — иначе
+ *    панель врёт про гарнизон, которого игрок не видел.
+ */
+export function worldHtml(
+  m: WorldModel,
+  data: Pick<GameData, 'buildings'>,
+  opts: { canBuildHere?: boolean } = {},
+): string {
+  const who = m.owner
+    ? `${esc(m.ownerName ?? m.owner)}${m.ownerFaction ? ` · ${esc(tData(m.ownerFaction))}` : ''}`
+    : esc(t('hud.world.nobody'));
+  const kinds = [m.planetType, m.sectorKind]
+    .filter((id): id is string => !!id)
+    .map((id) => esc(tData(id)))
+    .join(' · ');
+  const orders: string[] = [];
+  if (m.capital === 'marked') orders.push(`<b class="capital">${esc(t('hud.world.capital'))}</b>`);
+  else if (m.capital === 'designate')
+    orders.push(`<button class="btn tiny" data-act="capital">${esc(t('hud.world.make-capital'))}</button>`);
+  if (m.hold === 'clear')
+    orders.push(`<button class="btn tiny" data-act="hold" data-on="0">${esc(t('hud.world.hold-clear'))}</button>`);
+  else if (m.hold === 'set')
+    orders.push(`<button class="btn tiny" data-act="hold" data-on="1">${esc(t('hud.world.hold-set'))}</button>`);
+  else if (m.hold === 'set-disabled')
+    orders.push(`<button class="btn tiny" data-act="hold" data-on="1" disabled>${esc(t('hud.world.hold-full'))}</button>`);
+  if (opts.canBuildHere)
+    orders.push(`<button class="btn tiny" data-act="yard">${esc(t('hud.build-here'))}</button>`);
+
+  return (
+    `<div class="hud-panel world${m.mine ? ' mine' : ''}">` +
+    `<h3>${esc(m.id)}</h3>` +
+    `<p class="owner">${who}</p>` +
+    (kinds ? `<p class="dim">${kinds}</p>` : '') +
+    (m.remembered ? `<p class="memory">${esc(t('hud.world.remembered'))}</p>` : '') +
+    (m.buildings.length
+      ? `<ul class="stacks">${m.buildings
+          .map(
+            // Имя берётся из КАТАЛОГА, а не из id: правило общее (`decisions/dataNames`),
+            // и без него игрок читает `mine_t1` вместо «Рудник». Поймано браузерным
+            // прогоном — на экране половина построек стояла сырыми идентификаторами.
+            (b) =>
+              `<li>${esc(buildingName(data.buildings[b.type]?.name, b.type))} <b>${b.level}</b></li>`,
+          )
+          .join('')}</ul>`
+      : '') +
+    (m.garrison.length
+      ? stacksHtml(m.garrison)
+      : `<p class="dim">${esc(t('hud.world.no-garrison'))}</p>`) +
+    (orders.length ? `<div class="orders">${orders.join('')}</div>` : '') +
     `</div>`
   );
 }

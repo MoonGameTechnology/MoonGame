@@ -31,9 +31,18 @@ import {
   createBattleModel,
   resolveBattleAction,
   resolveFleetAction,
+  createWorldModel,
+  resolveWorldAction,
 } from './matchHud';
 import { createLoadoutEditor, applyLoadoutAction, resolveLoadoutBuild, type LoadoutModel } from './loadoutEditor';
-import { statusBarHtml, selectionHtml, battleHtml, loadoutHtml, unitPickerHtml } from './hudView';
+import {
+  statusBarHtml,
+  selectionHtml,
+  worldHtml,
+  battleHtml,
+  loadoutHtml,
+  unitPickerHtml,
+} from './hudView';
 
 /** Bind the typed theme tokens to CSS custom properties (docs/main-menu.md §5.4 — one
  *  TS engine → one look). The stylesheet in index.html reads these vars. */
@@ -528,8 +537,12 @@ function connectLive(url: string): void {
   // Что открыто в HUD. Одновременно живёт ОДНА панель: выбор флота, бой или оснащение —
   // на телефоне места под вторую нет, а «что именно я сейчас трогаю» должно быть
   // однозначным.
-  let panel: 'none' | 'fleet' | 'battle' | 'yard' | 'loadout' = 'none';
+  let panel: 'none' | 'fleet' | 'world' | 'battle' | 'yard' | 'loadout' = 'none';
   let battleId: string | null = null;
+  let worldId: string | null = null;
+  /** Список миров, показанных ПО ПАМЯТИ тумана. Едет рядом с состоянием, а не внутри
+   *  него, поэтому хранится отдельно и передаётся модели мира. */
+  let remembered: readonly string[] | undefined;
   let loadout: LoadoutModel | null = null;
   let buildPlanet: string | null = null;
 
@@ -548,6 +561,18 @@ function connectLive(url: string): void {
       if (at && canBuildHere) buildPlanet = at;
       if (sel.ok) body = selectionHtml(sel, live.time, { canBuildHere });
       else panel = 'none'; // флот пропал из вида — панель закрывается сама
+    } else if (panel === 'world' && worldId) {
+      const w = createWorldModel(live, worldId, me, HUD_DATA, remembered);
+      // Верфь — здесь же: на своём мире это естественное место «что тут построить»,
+      // и до MIG-8 тап по такому миру ПРЫГАЛ в верфь, минуя сам мир (то есть столицу
+      // назначить было нечем).
+      if (w.ok) {
+        if (w.mine) buildPlanet = worldId;
+        body = worldHtml(w, HUD_DATA, { canBuildHere: w.mine });
+      } else {
+        panel = 'none';
+        worldId = null;
+      }
     } else if (panel === 'battle' && battleId) {
       const b = createBattleModel(live, battleId, me, HUD_DATA);
       if (b.ok) body = battleHtml(b, live.time);
@@ -595,6 +620,22 @@ function connectLive(url: string): void {
         const kind = target.dataset.act as 'stop' | 'forcemarch' | 'bombard' | 'assault';
         const out = resolveFleetAction(
           kind === 'stop' || kind === 'assault' ? { kind } : { kind, on },
+          model,
+        );
+        if (!out.ok) {
+          setNetStatus(t('client.rejected', { text: refusalText(out.code) }));
+          return;
+        }
+        for (const step of out.steps) client.sendAction(act(me, step.type, step.payload));
+        break;
+      }
+      case 'capital':
+      case 'hold': {
+        if (!worldId) return;
+        const model = createWorldModel(live, worldId, me, HUD_DATA, remembered);
+        if (!model.ok) return;
+        const out = resolveWorldAction(
+          target.dataset.act === 'capital' ? { kind: 'capital' } : { kind: 'hold', on: target.dataset.on === '1' },
           model,
         );
         if (!out.ok) {
@@ -703,6 +744,7 @@ function connectLive(url: string): void {
     },
     onSnapshot: (snap) => {
       live = snap.state;
+      remembered = snap.remembered;
       if (snap.playerId) me = snap.playerId;
       if (!started && snap.lobby && !snap.lobby.started && snap.lobby.host === snap.playerId) {
         started = true;
@@ -758,12 +800,12 @@ function connectLive(url: string): void {
               } else {
                 panel = 'fleet';
               }
-            } else if (live.planets[planetId]?.owner === me) {
-              // Свой мир без моего флота — верфь: что здесь построить.
-              buildPlanet = planetId;
-              panel = 'yard';
             } else {
-              panel = 'none';
+              // Мир без моего флота — панель мира. Раньше свой мир прыгал прямо в
+              // верфь (мимо столицы и точки удержания), а чужой и ничей не отвечали
+              // вовсе: тап уходил в пустоту.
+              worldId = planetId;
+              panel = 'world';
             }
             renderHud();
             hint();

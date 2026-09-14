@@ -20,7 +20,16 @@
  * SH-0.1/0.2 — `shieldHp` pool); a derived power rating / damage-reduction still
  * don't exist in the core (docs/hud-inmatch.md HUD-2 ⏳) and land once they ship.
  */
-import { attackerOf, defenderOf, MS_PER_DAY, previewBattle, previewLossCount } from '@void/shared-core';
+import {
+  attackerOf,
+  defenderOf,
+  isInhabited,
+  MAX_STEWARD_HOLD_POINTS,
+  MS_PER_DAY,
+  previewBattle,
+  previewLossCount,
+  stewardUnlocked,
+} from '@void/shared-core';
 import type {
   BattleId,
   BattlePreviewSide,
@@ -35,6 +44,7 @@ import type {
   UnitStack,
 } from '@void/shared-core';
 import { assaultSteps } from '../../../decisions/assaultOrder';
+import { capitalOffer, holdOffer, type CapitalOffer, type HoldOffer } from '../../../decisions/worldOrders';
 
 /* ─────────────────────────── Zone A — status bar ─────────────────────────── */
 
@@ -415,6 +425,129 @@ export function resolveFleetAction(action: FleetAction, model: FleetSelectionMod
         ? { type: 'fleet.orbit', payload: { fleetId, orbit: 'near' } }
         : { type: 'fleet.assault', payload: { fleetId } },
     ),
+  };
+}
+
+/* ─────────────────────── World zone — the planet panel ───────────────────── */
+
+/** One structure of the world, as the panel lists it. */
+export interface WorldBuildingView {
+  type: string;
+  level: number;
+}
+
+/** Render-ready description of a tapped world. */
+export interface WorldModel {
+  kind: 'world';
+  id: PlanetId;
+  /** Owner, or null for a neutral world — AND for one the viewer has never seen:
+   *  the fog pass blanks an unidentified world to `owner: null` with nothing on it,
+   *  so those two read the same here. `remembered` is what separates a memory from
+   *  a live look; «never seen» stays deliberately indistinguishable from «nobody's». */
+  owner: PlayerId | null;
+  ownerName?: string;
+  ownerFaction?: string;
+  mine: boolean;
+  /** Content ids; the renderer resolves them into words. */
+  planetType?: string;
+  sectorKind?: string;
+  garrison: SelectionStack[];
+  buildings: WorldBuildingView[];
+  /** Shown from FOG MEMORY (the view's `remembered` list) — the garrison and the
+   *  structures are a stale snapshot, not what is there now. The panel must say so:
+   *  drawing a remembered world as a live one lies about a garrison the player never
+   *  saw (`panelSelect.ts`, rule 3). */
+  remembered: boolean;
+  /** What the panel may offer about the capital / the Steward's hold point —
+   *  decided by `decisions/worldOrders.ts`, shared with the prototype. */
+  capital: CapitalOffer;
+  hold: HoldOffer;
+}
+
+export type WorldResult = ({ ok: true } & WorldModel) | { ok: false; code: string };
+
+/** Project the world panel for `planetId` as `viewerId` sees it. `remembered` is the
+ *  view's own list of memory-shown worlds (it rides beside the state, not inside it).
+ *
+ *  `data` is optional and degrades like the selection model: without it the stacks lose
+ *  their `domain`, and BOTH offers fall back to "nothing to offer" — «обитаем ли мир» и
+ *  «открыт ли Хранитель» это вопросы к данным, и угадывать ответ панель не вправе.
+ *  Fail-secure: a planet absent from the snapshot yields `E_NO_PLANET`. */
+export function createWorldModel(
+  state: GameState,
+  planetId: PlanetId,
+  viewerId: PlayerId,
+  data?: GameData,
+  remembered?: readonly string[],
+): WorldResult {
+  const planet = state.planets[planetId];
+  if (!planet) return { ok: false, code: 'E_NO_PLANET' };
+
+  const owner = planet.owner;
+  const mine = owner === viewerId;
+  const player = state.players[viewerId];
+  const points = player?.stewardHoldPoints ?? [];
+  const model: WorldModel = {
+    kind: 'world',
+    id: planet.id,
+    owner,
+    mine,
+    garrison: toStacks(planet.garrison, data),
+    buildings: planet.buildings.map((b) => ({ type: b.type, level: b.level })),
+    remembered: remembered?.includes(planet.id) ?? false,
+    // Оба предложения считает общее решение — второй формулировки условий здесь нет.
+    // «Обитаемость» и техгейт Хранителя спрашиваются у ЯДРА (`isInhabited`,
+    // `stewardUnlocked`), а не переписываются: обе зависят от игровых ДАННЫХ и молча
+    // разъехались бы на первом новом типе мира или новой технологии.
+    capital: capitalOffer(
+      mine,
+      state.capital?.[viewerId] === planet.id,
+      !!data && isInhabited(data, planet),
+    ),
+    hold: holdOffer(
+      mine,
+      !!player && !!data && stewardUnlocked(player, data),
+      points.includes(planet.id),
+      points.length,
+      MAX_STEWARD_HOLD_POINTS,
+    ),
+  };
+
+  const ownerPlayer = owner ? state.players[owner] : undefined;
+  if (ownerPlayer?.name !== undefined) model.ownerName = ownerPlayer.name;
+  if (ownerPlayer?.faction !== undefined) model.ownerFaction = ownerPlayer.faction;
+  if (planet.planetType !== undefined) model.planetType = planet.planetType;
+  if (planet.kind !== undefined) model.sectorKind = planet.kind;
+
+  return { ok: true, ...model };
+}
+
+/** What the world panel's buttons ask for. */
+export type WorldAction = { kind: 'capital' } | { kind: 'hold'; on: boolean };
+
+/** Orders to issue, or a stable reject code (fail-secure) — same shape as the fleet panel. */
+export function resolveWorldAction(action: WorldAction, model: WorldModel): FleetIntent {
+  // Чужой мир не отдаёт ни одного из этих приказов: оба — распоряжения владельца,
+  // и ядро отвечает `E_FORBIDDEN` (в отличие от флота, где код непрозрачен: мир и так
+  // виден на карте, скрывать его существование не от кого).
+  if (!model.mine) return { ok: false, code: 'E_FORBIDDEN' };
+
+  if (action.kind === 'capital') {
+    // Уже столица — приказ был бы пустым; необитаемый мир ядро отвергнет
+    // (`E_NOT_INHABITED`), и кнопки на него панель не рисует.
+    if (model.capital !== 'designate') return { ok: false, code: 'E_NOT_INHABITED' };
+    return { ok: true, steps: [{ type: 'capital.designate', payload: { planetId: model.id } }] };
+  }
+
+  // Точка удержания: ставить можно, пока есть место в лимите; СНИМАТЬ — всегда, иначе
+  // исчерпавший лимит игрок заперт (правило 6 `worldOrders`).
+  if (action.on && model.hold !== 'set') {
+    return { ok: false, code: model.hold === 'set-disabled' ? 'E_LIMIT' : 'E_STEWARD_LOCKED' };
+  }
+  if (!action.on && model.hold !== 'clear') return { ok: false, code: 'E_STEWARD_LOCKED' };
+  return {
+    ok: true,
+    steps: [{ type: 'steward.holdpoint', payload: { planetId: model.id, on: action.on } }],
   };
 }
 
