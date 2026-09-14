@@ -632,10 +632,10 @@
 | ARS-0 | ✅ | docs | `docs/arsenal-roadmap.md:52` | Развилки за владельцем — решено (2026-07-14) |
 | ARS-1 | ✅ | data core | `docs/arsenal-roadmap.md:88` | Схема предмета/чертежа — реализовано |
 | ARS-2 | ✅ | srv | `docs/arsenal-roadmap.md:127` | ArsenalStore + стартовый набор — реализовано |
-| ARS-3 | ✅ | srv | `docs/arsenal-roadmap.md:165` | Снапшот в матч — реализовано |
-| ARS-4 | ✅ | srv | `docs/arsenal-roadmap.md:208` | Источники: дроп по месту + сальваж — реализовано |
-| ARS-5 | ✅ | proto srv | `docs/arsenal-roadmap.md:248` | UI: витрина + фильтр Верфи — реализовано |
-| ARS-6 | ✅ | srv | `docs/arsenal-roadmap.md:295` | Корп-склад + аренда — реализовано |
+| ARS-3 | ✅ | srv | `docs/arsenal-roadmap.md:166` | Снапшот в матч — реализовано |
+| ARS-4 | ✅ | srv | `docs/arsenal-roadmap.md:209` | Источники: дроп по месту + сальваж — реализовано |
+| ARS-5 | ✅ | proto srv | `docs/arsenal-roadmap.md:269` | UI: витрина + фильтр Верфи — реализовано |
+| ARS-6 | ✅ | srv | `docs/arsenal-roadmap.md:316` | Корп-склад + аренда — реализовано |
 | AVA-1 | ✅ | srv core | `docs/ava-lifecycle-roadmap.md:43` | Командная дипломатия на серверном пути [srv/core] — реализовано |
 | AVA-2 | ✅ | srv | `docs/ava-lifecycle-roadmap.md:86` | Очки влияния корпорации |
 | AVA-3 | ✅ | srv | `docs/ava-lifecycle-roadmap.md:118` | Флаги готовности к AvA |
