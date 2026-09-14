@@ -17,6 +17,7 @@
  */
 import { t } from '../../localization/runtime';
 import { esc } from './format';
+import { detach } from './detach';
 
 /** Присутствие ровно в тех формах, которые сервер умеет доказать. */
 export interface FriendPresence {
@@ -175,9 +176,10 @@ export function initFriends(host: FriendsHost): { refresh: () => Promise<void> }
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       });
-      const parsed = (await res.json().catch(() => null)) as
-        | { rows?: unknown; error?: unknown }
-        | null;
+      const parsed = (await res.json().catch(() => null)) as {
+        rows?: unknown;
+        error?: unknown;
+      } | null;
       if (!res.ok) return typeof parsed?.error === 'string' ? parsed.error : 'E_HTTP';
       if (Array.isArray(parsed?.rows)) rows = parsed.rows as FriendRow[];
       return null;
@@ -197,12 +199,15 @@ export function initFriends(host: FriendsHost): { refresh: () => Promise<void> }
     const input = host.root().querySelector('#fr-q') as HTMLInputElement | null;
     const callsign = input?.value.trim() ?? '';
     if (!callsign) return;
-    void (async () => {
-      const err = await call('/friends/request', { callsign });
-      note = err ? failText(err) : t('friends.sent.ok', { who: callsign });
-      if (!err) await call('/friends');
-      paint();
-    })();
+    detach(
+      'друзья: заявка в друзья',
+      (async () => {
+        const err = await call('/friends/request', { callsign });
+        note = err ? failText(err) : t('friends.sent.ok', { who: callsign });
+        if (!err) await call('/friends');
+        paint();
+      })(),
+    );
   });
 
   host.root().addEventListener('click', (ev) => {
@@ -211,12 +216,15 @@ export function initFriends(host: FriendsHost): { refresh: () => Promise<void> }
     const id = btn.dataset.frId;
     const act = btn.dataset.frAct;
     if (!id || (act !== 'accept' && act !== 'drop')) return;
-    void (async () => {
-      const err = await call(`/friends/${encodeURIComponent(id)}/${act}`, {});
-      note = err ? failText(err) : '';
-      await call('/friends'); // перечитываем список целиком: сервер — источник правды
-      paint();
-    })();
+    detach(
+      'друзья: ответ на заявку',
+      (async () => {
+        const err = await call(`/friends/${encodeURIComponent(id)}/${act}`, {});
+        note = err ? failText(err) : '';
+        await call('/friends'); // перечитываем список целиком: сервер — источник правды
+        paint();
+      })(),
+    );
   });
 
   return { refresh };

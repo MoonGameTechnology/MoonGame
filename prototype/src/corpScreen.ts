@@ -20,6 +20,7 @@
 import { t } from '../../localization/runtime';
 import { esc, nfmt } from './format';
 import { readRaw, writeRaw } from './prefs';
+import { detach } from './detach';
 import {
   canManage,
   parseAccountIds,
@@ -300,6 +301,13 @@ export function initCorp(host: CorpHost): {
     }
   }
 
+  /** Приказ кабинета «выстрелил и забыл»: исход назван (RESIL-1), а имя ему даёт сам
+   *  `data-corpact` кнопки — иначе два десятка веток switch'а описывали бы одно и то же
+   *  каждая своим словом, и в консоли они бы не сходились с разметкой. */
+  function corpSend(act: string, path: string, body?: unknown): void {
+    detach(`корпорация: ${act}`, corpIntent(path, body));
+  }
+
   /** Full refresh of the cabinet's live state, then re-render. Cheap enough to
    *  call after every intent (create/apply/accept/kick/…) — the server is the
    *  only source of truth, no local optimistic membership mutation. */
@@ -481,7 +489,9 @@ export function initCorp(host: CorpHost): {
       .join('');
     return (
       `<h4>${t('corp.battles.title')}</h4>` +
-      (rows ? `<div class="cbats">${rows}</div>` : `<p class="chint">${t('corp.battles.none')}</p>`) +
+      (rows
+        ? `<div class="cbats">${rows}</div>`
+        : `<p class="chint">${t('corp.battles.none')}</p>`) +
       `<p class="chint">${t('corp.battles.note')}</p>`
     );
   }
@@ -707,7 +717,7 @@ export function initCorp(host: CorpHost): {
   function openCorp(): void {
     renderCorp(); // paint instantly from whatever's cached in memory…
     host.root().style.display = 'flex';
-    void refreshCorp(); // …then refresh from the server
+    detach('корпорация: обновление кабинета', refreshCorp()); // …then refresh from the server
     host.onIntro('corp');
   }
   /** Ступень Back: сначала закрывается ВИТРИНА, и только потом сам кабинет — иначе
@@ -773,79 +783,91 @@ export function initCorp(host: CorpHost): {
       case 'create': {
         const input = document.getElementById('corpnewname') as HTMLInputElement | null;
         const name = input?.value.trim() ?? '';
-        if (name) void corpIntent('/corps', { name });
+        if (name) corpSend(act, '/corps', { name });
         break;
       }
       case 'apply':
-        void corpIntent(`/corps/${encodeURIComponent(arg)}/apply`);
+        corpSend(act, `/corps/${encodeURIComponent(arg)}/apply`);
         break;
       case 'accept':
-        void corpIntent(`/corps/${encodeURIComponent(corpId)}/accept`, { target: arg });
+        corpSend(act, `/corps/${encodeURIComponent(corpId)}/accept`, { target: arg });
         break;
       case 'decline':
-        void corpIntent(`/corps/${encodeURIComponent(corpId)}/decline`, { target: arg });
+        corpSend(act, `/corps/${encodeURIComponent(corpId)}/decline`, { target: arg });
         break;
       case 'kick':
-        void corpIntent(`/corps/${encodeURIComponent(corpId)}/kick`, { target: arg });
+        corpSend(act, `/corps/${encodeURIComponent(corpId)}/kick`, { target: arg });
         break;
       case 'role':
-        void corpIntent(`/corps/${encodeURIComponent(corpId)}/role`, {
+        corpSend(act, `/corps/${encodeURIComponent(corpId)}/role`, {
           target: arg,
           role: btn?.dataset.corprole,
         });
         break;
       case 'transfer':
-        void corpIntent(`/corps/${encodeURIComponent(corpId)}/transfer`, { target: arg });
+        corpSend(act, `/corps/${encodeURIComponent(corpId)}/transfer`, { target: arg });
         break;
       case 'leave':
-        void corpIntent(`/corps/${encodeURIComponent(corpId)}/leave`);
+        corpSend(act, `/corps/${encodeURIComponent(corpId)}/leave`);
         break;
       case 'disband':
-        void corpIntent(`/corps/${encodeURIComponent(corpId)}/disband`);
+        corpSend(act, `/corps/${encodeURIComponent(corpId)}/disband`);
         break;
       case 'ready-corp':
-        void corpFetch('/ava/ready/corp', { method: 'POST' }).then((r) => {
-          if (r) {
-            corpReadyOptimistic = true;
-            void refreshCorp();
-          }
-        });
+        detach(
+          `корпорация: ${act}`,
+          corpFetch('/ava/ready/corp', { method: 'POST' }).then((r) => {
+            if (r) {
+              corpReadyOptimistic = true;
+              detach('корпорация: обновление кабинета', refreshCorp());
+            }
+          }),
+        );
         break;
       case 'ready-corp-clear':
-        void corpFetch('/ava/ready/corp/clear', { method: 'POST' }).then((r) => {
-          if (r) {
-            corpReadyOptimistic = false;
-            void refreshCorp();
-          }
-        });
+        detach(
+          `корпорация: ${act}`,
+          corpFetch('/ava/ready/corp/clear', { method: 'POST' }).then((r) => {
+            if (r) {
+              corpReadyOptimistic = false;
+              detach('корпорация: обновление кабинета', refreshCorp());
+            }
+          }),
+        );
         break;
       case 'ready-player':
-        void corpFetch('/ava/ready/player', { method: 'POST' }).then((r) => {
-          if (r) {
-            playerReadyOptimistic = true;
-            renderCorp();
-          }
-        });
+        detach(
+          `корпорация: ${act}`,
+          corpFetch('/ava/ready/player', { method: 'POST' }).then((r) => {
+            if (r) {
+              playerReadyOptimistic = true;
+              renderCorp();
+            }
+          }),
+        );
         break;
       case 'ready-player-clear':
-        void corpFetch('/ava/ready/player/clear', { method: 'POST' }).then((r) => {
-          if (r) {
-            playerReadyOptimistic = false;
-            renderCorp();
-          }
-        });
+        detach(
+          `корпорация: ${act}`,
+          corpFetch('/ava/ready/player/clear', { method: 'POST' }).then((r) => {
+            if (r) {
+              playerReadyOptimistic = false;
+              renderCorp();
+            }
+          }),
+        );
         break;
       case 'ava-challenge':
-        void corpIntent('/ava/challenge', { target: arg });
+        corpSend(act, '/ava/challenge', { target: arg });
         break;
       case 'ava-accept':
-        void corpIntent(`/ava/challenge/${encodeURIComponent(arg)}/accept`);
+        corpSend(act, `/ava/challenge/${encodeURIComponent(arg)}/accept`);
         break;
       case 'ava-decline':
-        void corpIntent(`/ava/challenge/${encodeURIComponent(arg)}/decline`);
+        corpSend(act, `/ava/challenge/${encodeURIComponent(arg)}/decline`);
         break;
       case 'ava-join':
-        void corpIntent(`/ava/matchup/${encodeURIComponent(arg)}/join`);
+        corpSend(act, `/ava/matchup/${encodeURIComponent(arg)}/join`);
         break;
       case 'ava-roster-toggle': {
         // arg = matchupId, account = the toggled accountId. Server is wholesale
@@ -855,7 +877,7 @@ export function initCorp(host: CorpHost): {
         const next = current.includes(account)
           ? current.filter((id) => id !== account)
           : [...current, account];
-        void corpIntent(`/ava/matchup/${encodeURIComponent(arg)}/roster`, { players: next });
+        corpSend(act, `/ava/matchup/${encodeURIComponent(arg)}/roster`, { players: next });
         break;
       }
     }

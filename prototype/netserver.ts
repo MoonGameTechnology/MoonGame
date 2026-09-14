@@ -96,7 +96,12 @@ import {
   nickSeatAccounts,
 } from '../packages/server/src/commanderCredit';
 import { detach } from '../packages/server/src/detach';
+import { installFatalHandlers } from '../packages/server/src/fatal';
 const { Pool } = pgPkg;
+
+// RESIL-3 — ДО всего остального. Этот хост важнее близнеца: именно он собирается в
+// `proto-server.mjs`, который и запускает контейнер (`Dockerfile` CMD).
+installFatalHandlers();
 
 // --- M0/M1 playtest log: append room events to a per-run JSONL and feed every one
 // to the MetricsAggregator for the on-exit summary. Pure observation. The M1

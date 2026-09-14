@@ -586,37 +586,37 @@
 | FSPLIT-1 | ✅ | core act proto | `docs/backlog.md:13280` | Отбор при делении адресует СТЕК, а не тип корабля. |
 | FSPLIT-2 | ✅ | core act proto | `docs/backlog.md:13290` | Десант делится вместе с кораблями, по трюму обеих половин. |
 | AIDIFF-1 | ✅ | proto | `docs/backlog.md:13318` | Строка места переключается «выкл → слабый → сильный». |
-| RESIL-1 | ⏳ | proto | `docs/backlog.md:13418` | Фоновые промисы браузерного клиента. |
-| RESIL-2 | ⏳ | proto | `docs/backlog.md:13429` | Цикл подсветки обучающего тура. |
-| RESIL-3 | ⏳ | srv | `docs/backlog.md:13437` | Именованный фатал процесса. |
-| RESIL-4 | ✅ | srv | `docs/backlog.md:13448` | Соак проверяет, что мир не встал. |
-| RESIL-5 | ✅ | srv proto | `docs/backlog.md:13466` | Генеральная репетиция: весь стек разом, и |
-| RESIL-6 | ✅ | srv proto | `docs/backlog.md:13501` | Достоверность генералки: настоящая база, |
-| ADDR-7 | ✅ | sec proto | `docs/backlog.md:13643` | Ссылка на партию не пускает по незнанию: |
-| OPS-2 | ✅ | ops sec | `docs/backlog.md:13681` | Обновление доносит до машины новые ключи |
-| REL-6 | ✅ | srv | `docs/backlog.md:13703` | Возврат на своё место мгновенный: перехват вместо |
-| CMB-4 | ✅ | core | `docs/backlog.md:13718` | Первый раунд боя — на самой встрече, а не через |
-| BLD-1 | ✅ | core proto | `docs/backlog.md:13738` | Очередь строительства: заказы встают в |
-| UI-14 | ✅ | proto | `docs/backlog.md:13778` | Осмотр чужого флота должен быть находимым. |
-| CMB-5 | ✅ | core | `docs/backlog.md:13801` | Вражда началась — стоящие рядом флоты сходятся |
-| ATK-1 | ✅ | proto | `docs/backlog.md:13817` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
-| SHIPART-1 | ✅ | proto cli | `docs/backlog.md:13843` | Реалистичные портреты в постройке и описаниях, |
-| CMB-7 | ✅ | core | `docs/backlog.md:13951` | Перемирие посреди боя не останавливало бой. |
-| RLY-1 | ✅ | proto | `docs/backlog.md:13972` | Сбор построенного: соло и сеть играли по РАЗНЫМ |
-| CARGO-1 | ✅ | core proto | `docs/backlog.md:14004` | Часовая погрузка десанта жила в |
-| MRG-1 | ✅ | core proto | `docs/backlog.md:14052` | «Слиться по прибытии» — вторая половина |
-| ART-0 | ✅ | core data proto | `docs/backlog.md:14075` | Артиллерия снята из игры целиком |
-| ORB-1 | ✅ | core data proto | `docs/backlog.md:14106` | Орбитальный слой объявлен в |
-| ORB-4 | ✅ | core data proto | `docs/backlog.md:14142` | в астероидном поле строилось всё, что угодно: |
-| ORB-2 | ✅ | data proto | `docs/backlog.md:14183` | «Изучается технология, строится здание» не |
-| ORB-3 | ✅ | proto | `docs/backlog.md:14211` | Звёздный форт выдавал орбитальное ПКО мимо |
-| CMB-6 | ✅ | core | `docs/backlog.md:14248` | После ничьей третий враждебный флот получает свой |
-| ORD-2 | ✅ | proto | `docs/backlog.md:14278` | Нацеленный ШТУРМ теперь переживает закрытую |
-| FOG-10 | ✅ | proto core | `docs/backlog.md:14298` | Память разведки перестала жить только |
-| FOG-9 | ✅ | core | `docs/backlog.md:14322` | Приостановленная стройка чужого мира была видна |
-| TEST-4 | ✅ | srv | `docs/backlog.md:14332` | topXp падал на живой базе разработчика. |
-| PHONE-STRATEGY | ✅ |  | `docs/backlog.md:14350` | Технологии, постройки, производство, рынок и дипломатия |
-| MAP-PERF | ✅ |  | `docs/backlog.md:14362` | Ускорение движения раскрытой голографической карты и подготовка |
+| RESIL-1 | ✅ | proto | `docs/backlog.md:13418` | Фоновые промисы браузерного клиента. |
+| RESIL-2 | ✅ | proto | `docs/backlog.md:13445` | Цикл подсветки обучающего тура. |
+| RESIL-3 | ✅ | srv | `docs/backlog.md:13462` | Именованный фатал процесса. |
+| RESIL-4 | ✅ | srv | `docs/backlog.md:13482` | Соак проверяет, что мир не встал. |
+| RESIL-5 | ✅ | srv proto | `docs/backlog.md:13500` | Генеральная репетиция: весь стек разом, и |
+| RESIL-6 | ✅ | srv proto | `docs/backlog.md:13535` | Достоверность генералки: настоящая база, |
+| ADDR-7 | ✅ | sec proto | `docs/backlog.md:13677` | Ссылка на партию не пускает по незнанию: |
+| OPS-2 | ✅ | ops sec | `docs/backlog.md:13715` | Обновление доносит до машины новые ключи |
+| REL-6 | ✅ | srv | `docs/backlog.md:13737` | Возврат на своё место мгновенный: перехват вместо |
+| CMB-4 | ✅ | core | `docs/backlog.md:13752` | Первый раунд боя — на самой встрече, а не через |
+| BLD-1 | ✅ | core proto | `docs/backlog.md:13772` | Очередь строительства: заказы встают в |
+| UI-14 | ✅ | proto | `docs/backlog.md:13812` | Осмотр чужого флота должен быть находимым. |
+| CMB-5 | ✅ | core | `docs/backlog.md:13835` | Вражда началась — стоящие рядом флоты сходятся |
+| ATK-1 | ✅ | proto | `docs/backlog.md:13851` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
+| SHIPART-1 | ✅ | proto cli | `docs/backlog.md:13877` | Реалистичные портреты в постройке и описаниях, |
+| CMB-7 | ✅ | core | `docs/backlog.md:13985` | Перемирие посреди боя не останавливало бой. |
+| RLY-1 | ✅ | proto | `docs/backlog.md:14006` | Сбор построенного: соло и сеть играли по РАЗНЫМ |
+| CARGO-1 | ✅ | core proto | `docs/backlog.md:14038` | Часовая погрузка десанта жила в |
+| MRG-1 | ✅ | core proto | `docs/backlog.md:14086` | «Слиться по прибытии» — вторая половина |
+| ART-0 | ✅ | core data proto | `docs/backlog.md:14109` | Артиллерия снята из игры целиком |
+| ORB-1 | ✅ | core data proto | `docs/backlog.md:14140` | Орбитальный слой объявлен в |
+| ORB-4 | ✅ | core data proto | `docs/backlog.md:14176` | в астероидном поле строилось всё, что угодно: |
+| ORB-2 | ✅ | data proto | `docs/backlog.md:14217` | «Изучается технология, строится здание» не |
+| ORB-3 | ✅ | proto | `docs/backlog.md:14245` | Звёздный форт выдавал орбитальное ПКО мимо |
+| CMB-6 | ✅ | core | `docs/backlog.md:14282` | После ничьей третий враждебный флот получает свой |
+| ORD-2 | ✅ | proto | `docs/backlog.md:14312` | Нацеленный ШТУРМ теперь переживает закрытую |
+| FOG-10 | ✅ | proto core | `docs/backlog.md:14332` | Память разведки перестала жить только |
+| FOG-9 | ✅ | core | `docs/backlog.md:14356` | Приостановленная стройка чужого мира была видна |
+| TEST-4 | ✅ | srv | `docs/backlog.md:14366` | topXp падал на живой базе разработчика. |
+| PHONE-STRATEGY | ✅ |  | `docs/backlog.md:14384` | Технологии, постройки, производство, рынок и дипломатия |
+| MAP-PERF | ✅ |  | `docs/backlog.md:14396` | Ускорение движения раскрытой голографической карты и подготовка |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |

@@ -159,7 +159,7 @@ describe('рейтинги — подключение вкладки к хабу
   const src = readFileSync(new URL('./main.ts', import.meta.url), 'utf8');
 
   it('вход на вкладку «Рейтинги» перечитывает доски с сервера', () => {
-    expect(src).toContain("if (tab === 'rank') void rank.refresh()");
+    expect(src).toContain("if (tab === 'rank') detach('хаб: рейтинг', rank.refresh())");
   });
 
   it('панель вкладки — та же, что в разметке хаба', () => {
