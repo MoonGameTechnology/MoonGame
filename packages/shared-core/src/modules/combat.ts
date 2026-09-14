@@ -1,5 +1,13 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
-import type { Battle, CombatantRef, Fleet, Planet, PlanetId, UnitStack } from '../state/gameState';
+import type {
+  Battle,
+  BattleSide,
+  CombatantRef,
+  Fleet,
+  Planet,
+  PlanetId,
+  UnitStack,
+} from '../state/gameState';
 import type { GameData } from '../data/schemas';
 import { hoursToMs, type Context } from '../action/types';
 import { MS_PER_HOUR } from '../util/time';
@@ -7,6 +15,7 @@ import { requireOwnedIdleFleet } from '../util/fleet';
 import { effectiveStats } from '../util/loadout';
 import { isCapturable } from '../state/sectorKind';
 import { attackerOf, defenderOf } from '../state/battle';
+import { splitVolley } from '../util/volley';
 import {
   applyDamageToSide,
   INTERCEPT_TOL,
@@ -799,32 +808,55 @@ export const combatModule: GameModule = {
         return;
       }
 
-      // Simultaneous round, from the pre-round state: the aggressor strikes with
-      // its attack stat, the defender returns fire with its defense stat only.
-      const dmgToDefender = h.hook<number>(
-        'combat.damage',
-        sideDamage(h.state, attacker.ref, data, 'attack'),
-        {
-          battleId,
-          phase: battle.phase,
-          location: battle.location,
-          attacker: attacker.owner,
-          defender: defender.owner,
-        },
-      );
-      const dmgToAttacker = h.hook<number>(
-        'combat.damage',
-        sideDamage(h.state, defender.ref, data, 'defense'),
-        {
-          battleId,
-          phase: battle.phase,
-          location: battle.location,
-          attacker: defender.owner,
-          defender: attacker.owner,
-        },
-      );
-      applyDamageToSide(h, defender.ref, dmgToDefender, data, battle.location);
-      applyDamageToSide(h, attacker.ref, dmgToAttacker, data, battle.location);
+      // РАУНД НА N СТОРОН (MSB-2, решение владельца §0.0 №1: «урон дробится на всех
+      // врагов»). Одновременный, из ПРЕДРАУНДОВОГО снимка: сперва считаются ВСЕ залпы, и
+      // только потом наносятся. Иначе сторона, обсчитанная первой, била бы по уже
+      // подбитым, и исход зависел бы от порядка обхода списка — то есть от порядка
+      // вступления в бой, который к силе залпа отношения не имеет.
+      //
+      // Роль принадлежит СТОРОНЕ, а не паре (MSB-1): атакующий бьёт `attack`,
+      // обороняющийся отвечает `defense`. При N участниках атакующими могут быть сразу
+      // несколько, и «атакующий ↔ обороняющийся» перестаёт описывать бой целиком.
+      const live = battle.sides.filter((side) => sideAlive(h.state, side.ref));
+      const incoming = new Map<BattleSide, number>();
+      for (const side of live) {
+        // Враги — только ВРАЖДЕБНЫЕ живые стороны. Спрятаться за спину союзника нельзя
+        // (ради этого выбор и сделан), но и бить союзника залп не имеет права.
+        const enemies = live.filter(
+          (other) =>
+            other !== side &&
+            side.owner !== null &&
+            other.owner !== null &&
+            isHostile(h, side.owner, other.owner),
+        );
+        const volley = sideDamage(h.state, side.ref, data, side.role === 'attacker' ? 'attack' : 'defense');
+        for (const [i, share] of splitVolley(volley, enemies).entries()) {
+          const target = enemies[i]!;
+          // Хук зовётся НА ПАРУ (кто бьёт → кого бьёт), а не на весь залп: его
+          // подписчики — местность, укрепления, пассивы фракции и ауры героя — меряют
+          // именно отношение двух конкретных владельцев. Один вызов на всех врагов
+          // сделал бы их вклад неразличимым.
+          const dealt = h.hook<number>('combat.damage', share.damage, {
+            battleId,
+            phase: battle.phase,
+            location: battle.location,
+            attacker: side.owner,
+            defender: target.owner,
+          });
+          incoming.set(target, (incoming.get(target) ?? 0) + dealt);
+        }
+      }
+      for (const [side, dmg] of incoming) {
+        if (dmg > 0) applyDamageToSide(h, side.ref, dmg, data, battle.location);
+      }
+
+      // Полезная нагрузка события — единственная двойственность боя, которая уезжает ПО
+      // ШИНЕ наружу, и у неё есть чужой потребитель: `construction.ts` берёт
+      // `dmgToDefender` и стачивает им постройки штурмуемого мира. Поэтому число это —
+      // СУММА всего, что легло на обороняющегося, а не вклад одного нападающего из пяти:
+      // иначе форт крошился бы по одной пятой урона, и разошлось бы это МОЛЧА.
+      // Пары `attacker`/`defender` тут хватает ровно потому, что обороняющийся в бою
+      // один; полный расклад по сторонам едет рядом, в `sides` (его читает MSB-6).
       h.emit('combat.round', {
         battleId,
         round: battle.round,
@@ -832,11 +864,18 @@ export const combatModule: GameModule = {
         location: battle.location,
         attacker: attacker.owner,
         defender: defender.owner,
-        dmgToAttacker,
-        dmgToDefender,
+        dmgToAttacker: incoming.get(attacker) ?? 0,
+        dmgToDefender: incoming.get(defender) ?? 0,
+        sides: battle.sides.map((side) => ({
+          owner: side.owner,
+          role: side.role,
+          damage: incoming.get(side) ?? 0,
+        })),
       });
 
-      if (sideAlive(h.state, attacker.ref) && sideAlive(h.state, defender.ref)) {
+      // Гибель ЛЮБОЙ стороны закрывает бой (§0.0 №5, «цепочка»): выжившие сцепятся
+      // заново. На двух сторонах это прежнее правило дословно.
+      if (battle.sides.every((side) => sideAlive(h.state, side.ref))) {
         scheduleTick(h, battleId);
       } else {
         finishBattle(h, battle);
