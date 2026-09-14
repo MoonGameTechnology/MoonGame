@@ -38,8 +38,7 @@
     "shipRepair": 0.1,
     "enablesShipConstruction": true,
     "scoreValue": 12,
-    "traits": [],
-    "shuttleBay": 6
+    "traits": []
   },
   "biomass_pit": {
     "name": "Biomass Pit",
@@ -113,8 +112,10 @@
     },
     "buildTimeHours": 5,
     "hp": 25,
+    "produces": {
+      "credits": 5
+    },
     "shipRepair": 0.05,
-    "enablesShipConstruction": true,
     "scoreValue": 4,
     "shuttleBay": 6
   },

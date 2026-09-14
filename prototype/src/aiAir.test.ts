@@ -13,6 +13,7 @@
 // `strike_carrier` и `frigate` намеренно оставлены боту ненужными — см. хвост файла.
 import { describe, expect, it } from 'vitest';
 import { newGame, aiOrders, START_CANDIDATES, kernel, ctx } from './game';
+import { data } from './gameData';
 import type { Action, GameState, Squadron } from '../../packages/shared-core/src/index';
 
 function game2(): GameState {
@@ -58,36 +59,87 @@ describe('AI-BAL-4 — артиллерия', () => {
   });
 });
 
+/** Мир бота с ПОСТРОЕННЫМ портом: с YARD-1 дом несёт верфь, а ангар даёт космопорт. */
+function withPort(s: GameState): GameState {
+  const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
+  home.buildings = [
+    ...home.buildings,
+    { type: 'spaceport', level: 1, hp: data.buildings.spaceport!.hp },
+  ];
+  return s;
+}
+
 describe('AI-BAL-4 / SHU-1.1 — челноки строятся в КОСМОПОРТЕ', () => {
-  // Раньше воротами челноков был завод второго уровня («ангар»), и бот вёл длинную
-  // цепочку завод → апгрейд → крыло. С SHU-1.1 челнок живёт в порту, а порт у бота и
-  // так стоит под корабли — цепочка исчезла вместе с воротами.
-  it('порт есть — сильный бот заказывает челнок', () => {
-    expect(unitsBuilt(aiOrders(rich(game2()), 'p2', 'expand', 'strong'))).toContain('interceptor');
+  // Воротами когда-то был завод второго уровня, потом порт, приезжавший вместе с домом.
+  // С YARD-1 порт — ОТДЕЛЬНОЕ здание, которого на старте нет: ворота вернулись, но
+  // короткие, и бот проходит их сам (цепочка экономики).
+  it('порт построен — сильный бот заказывает челнок', () => {
+    expect(unitsBuilt(aiOrders(withPort(rich(game2())), 'p2', 'expand', 'strong'))).toContain(
+      'interceptor',
+    );
   });
 
   it('ИГРОВОЙ (слабый) бот челноков не заказывает', () => {
-    expect(unitsBuilt(aiOrders(rich(game2()), 'p2', 'expand'))).not.toContain('interceptor');
+    expect(unitsBuilt(aiOrders(withPort(rich(game2())), 'p2', 'expand'))).not.toContain(
+      'interceptor',
+    );
+  });
+
+  /**
+   * YARD-1 — регрессия, которую эта правка и завела бы, не спроси бот ядро.
+   *
+   * До разделения `orderShuttle` опирался на допущение «порт у бота и так есть под
+   * корабли». Допущение стало неверным в тот же коммит, что и разделение, а тест бы
+   * этого не заметил: он смотрел на НАМЕРЕНИЕ бота, а не на ответ ядра. Бот заказывал бы
+   * челноки на мир без ангара и платил отказом `E_NO_PORT` каждый тик весь матч — ровно
+   * тем же способом, каким когда-то упирался в `E_HANGAR_FULL`.
+   */
+  it('ПОРТА НЕТ — заказа челнока нет вовсе, а не отказ ядра каждый тик', () => {
+    const s = rich(game2());
+    const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
+    expect(home.buildings.some((b) => b.type === 'spaceport')).toBe(false); // дом несёт верфь
+    const built = unitsBuilt(aiOrders(s, 'p2', 'expand', 'strong'));
+    expect(built).not.toContain('interceptor');
+    expect(built).not.toContain('bomber');
+  });
+
+  it('ПОРТ БОТ СТРОИТ САМ — иначе челноки выпали бы из измерения целиком', () => {
+    // Порт стоит звеном экономической цепочки: он и торгует, и открывает ангар.
+    const s = rich(game2());
+    const wanted = only(aiOrders(s, 'p2', 'expand', 'strong'), 'building.construct').map(
+      (a) => (a.payload as { building: string }).building,
+    );
+    // Цепочка идёт по одному звену за тик, поэтому проверяется не «сейчас», а «дойдёт»:
+    // с построенным первым звеном порт становится ближайшим заказом.
+    const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
+    home.buildings = [
+      ...home.buildings,
+      { type: 'refinery', level: 1, hp: data.buildings.refinery!.hp },
+    ];
+    const next = only(aiOrders(s, 'p2', 'expand', 'strong'), 'building.construct').map(
+      (a) => (a.payload as { building: string }).building,
+    );
+    expect([...wanted, ...next]).toContain('spaceport');
   });
 });
 
 describe('SHU-3.2 — бот СТРОИТ новый ростер челноков и СЧИТАЕТ ангар', () => {
   it('строит бомбардировщик — челнок против КОРПУСОВ (ROS-1.4)', () => {
-    expect(unitsBuilt(aiOrders(rich(game2()), 'p2', 'expand', 'strong'))).toContain('bomber');
+    expect(unitsBuilt(aiOrders(withPort(rich(game2())), 'p2', 'expand', 'strong'))).toContain('bomber');
   });
 
   it('строит десантный челнок — высадка без флота (ROS-1.5)', () => {
-    expect(unitsBuilt(aiOrders(rich(game2()), 'p2', 'expand', 'strong'))).toContain('landing_shuttle');
+    expect(unitsBuilt(aiOrders(withPort(rich(game2())), 'p2', 'expand', 'strong'))).toContain('landing_shuttle');
   });
 
   it('в мирное время ударные челноки не строит — бить некого', () => {
-    const peace = unitsBuilt(aiOrders(rich(game2(), false), 'p2', 'expand', 'strong'));
+    const peace = unitsBuilt(aiOrders(withPort(rich(game2(), false)), 'p2', 'expand', 'strong'));
     expect(peace).not.toContain('bomber');
     expect(peace).not.toContain('landing_shuttle');
   });
 
   it('ИГРОВОЙ (слабый) бот новых челноков не заказывает', () => {
-    const weak = unitsBuilt(aiOrders(rich(game2()), 'p2', 'expand'));
+    const weak = unitsBuilt(aiOrders(withPort(rich(game2())), 'p2', 'expand'));
     expect(weak).not.toContain('bomber');
     expect(weak).not.toContain('landing_shuttle');
   });
@@ -97,7 +149,7 @@ describe('SHU-3.2 — бот СТРОИТ новый ростер челноко
     // гарнизон, а челнок с SHU-1.1 лежит в `planet.hangar` — ни там, ни там. Поэтому
     // предел не срабатывал НИКОГДА, и бот заказывал челноки каждый тик до упора в
     // `E_HANGAR_FULL`, платя за это отказами весь матч.
-    const s = rich(game2());
+    const s = withPort(rich(game2()));
     const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
     // SHU-4.2: ангар — эскадры, по звену на класс машин (так их и ставит постройка).
     home.hangar = [
@@ -124,6 +176,13 @@ describe('SHU-3.2 — бот ПОДНИМАЕТ челноки: иначе он�
   function armed(over: { hangar?: Squadron[] } = {}): GameState {
     const s = rich(game2());
     const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
+    // КОСМОПОРТ ставится здесь руками: с разделения верфи и порта (YARD-1) дом несёт
+    // только верфь, а ангар — это порт. Без него у мира нет вместимости, и приказы
+    // челноков ядро отбивает `E_NO_PORT` ещё до того, как их успеет проверить тест.
+    home.buildings = [
+      ...home.buildings,
+      { type: 'spaceport', level: 1, hp: data.buildings.spaceport!.hp },
+    ];
     home.hangar = over.hangar ?? [{ id: 'sq:1', units: [{ unit: 'bomber', count: 2 }] }];
     const near = Object.values(s.planets)
       .filter((p) => p.id !== home.id && p.owner === null)

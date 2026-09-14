@@ -44,6 +44,10 @@ export const BUILD_CATEGORIES: ReadonlyArray<{ key: BuildCategory; label: string
  *  здание попадает в свою группу тем полем, которое и есть его назначение. */
 export function buildCategory(def: BuildingDef): BuildCategory {
   const lv1 = buildingLevel(def, 1);
+  // АНГАР решает раньше дохода. С YARD-1 космопорт торгует — и по одному лишь `produces`
+  // уехал бы в «Экономику», где игрок его искать не станет: строят его ради челноков, а
+  // кредиты идут довеском. Признак всё тот же — поле данных, а не имя здания.
+  if ((lv1.shuttleBay ?? 0) > 0) return 'infra';
   if (Object.values(lv1.produces ?? {}).some((n) => (n ?? 0) > 0) || (def.creditsBonus ?? 0) > 0)
     return 'economy';
   // Порог 0.01 — как у карточки кодекса: схема даёт КАЖДОМУ зданию защитный дефолт
@@ -69,6 +73,10 @@ export function buildFx(def: BuildingDef, level: number): string {
   if ((lv.aaDamage ?? 0) > 0) fx.push(t('build.fx.aa', { n: lv.aaDamage ?? 0 }));
   if ((lv.radarRange ?? 0) > 0) fx.push(t('build.fx.radar', { n: lv.radarRange ?? 0 }));
   if (def.enablesShipConstruction) fx.push(t('build.fx.shipyard'));
+  // Вместимость ангара — ЕДИНСТВЕННАЯ причина строить порт, и до YARD-1 её на экране не
+  // было вовсе: строку «строит корабли» здание делило с верфью, а про челноки не
+  // говорило ничего.
+  if ((lv.shuttleBay ?? 0) > 0) fx.push(t('build.fx.hangar', { n: lv.shuttleBay ?? 0 }));
   const keep = resLine(
     Object.fromEntries(Object.entries(lv.upkeep ?? {}).map(([r, n]) => [r, -(n ?? 0)])),
     { sign: true, per: 'h' },
