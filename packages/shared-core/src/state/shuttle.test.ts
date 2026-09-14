@@ -33,6 +33,12 @@ function fleet(units: Array<{ unit: string; count: number }>): Fleet {
   return { id: 'f1', owner: 'p1', location: 'p1', movement: null, units, traits: [] };
 }
 
+let squadronSeq = 0;
+const squadron = (units: Array<{ unit: string; count: number }>) => ({
+  id: `sq:${++squadronSeq}`,
+  units,
+});
+
 const shuttleUnit = Object.keys(data.units).find((u) =>
   data.units[u]!.traits.includes('shuttle'),
 )!;
@@ -70,16 +76,43 @@ describe('fleetHasShuttle (real shipped data)', () => {
   });
 });
 
-describe('sortieSpec (SQ-2.1, reads the wing unit stats off real shipped data)', () => {
-  it('reads maxFuel + rearmRounds off the shuttle-trait ship', () => {
-    const spec = sortieSpec(fleet([{ unit: shuttleUnit, count: 2 }]), data);
+// Топливо базы читается из ЕЁ АНГАРА, а не из состава корабля. Так было не всегда:
+// функция пережила модель, для которой писалась. В старом «крыле» (снято в SHU-2.2)
+// челноки летали КАК ФЛОТ и лежали в `fleet.units` — оттуда она их и брала. С SHU-1.1
+// челнок живёт в `hangar` базы, а в `units` носителя стоит его КОРПУС, у которого
+// никакого `fuel` нет. Читая старое место, функция отвечала «топлива 0» на любой
+// носитель, и панель показывала полный ангар как сухой.
+describe('sortieSpec — топливо базы берётся из ангара', () => {
+  it('читает maxFuel + rearmRounds у машины В АНГАРЕ', () => {
+    const spec = sortieSpec({ hangar: [squadron([{ unit: shuttleUnit, count: 2 }])] }, data);
     expect(spec.maxFuel).toBe(data.units[shuttleUnit]!.stats.fuel);
     expect(spec.rearmRounds).toBe(data.units[shuttleUnit]!.stats.rearmRounds);
-    expect(spec.maxFuel).toBeGreaterThan(0); // the shipped fighter carries fuel
+    expect(spec.maxFuel).toBeGreaterThan(0); // у шипнутого перехватчика топливо есть
   });
 
-  it('is zeros for a fleet with no shuttle aboard', () => {
-    expect(sortieSpec(fleet([{ unit: nonShuttleUnit, count: 3 }]), data)).toEqual({
+  it('НОСИТЕЛЬ ЧИТАЕТСЯ ТАК ЖЕ, КАК ПОРТ: корпус в `units` ответу не мешает', () => {
+    // Приёмка дефекта: у носителя в `units` стоит корпус без `fuel`, а машины — в
+    // ангаре. Пока функция смотрела в `units`, полный трюм читался как пустой бак.
+    const carrier: Fleet & { hangar?: ReturnType<typeof squadron>[] } = {
+      ...fleet([{ unit: nonShuttleUnit, count: 1 }]),
+      hangar: [squadron([{ unit: shuttleUnit, count: 2 }])],
+    };
+    expect(sortieSpec(carrier, data)).toEqual(
+      sortieSpec({ hangar: [squadron([{ unit: shuttleUnit, count: 2 }])] }, data),
+    );
+    expect(sortieSpec(carrier, data).maxFuel).toBeGreaterThan(0);
+  });
+
+  it('ПУСТОЙ И ВЫБИТЫЙ АНГАР — нули, а не догадка по составу корабля', () => {
+    expect(sortieSpec({}, data)).toEqual({ maxFuel: 0, rearmRounds: 0 });
+    expect(sortieSpec({ hangar: [] }, data)).toEqual({ maxFuel: 0, rearmRounds: 0 });
+    expect(sortieSpec({ hangar: [squadron([{ unit: shuttleUnit, count: 0 }])] }, data)).toEqual({
+      maxFuel: 0,
+      rearmRounds: 0,
+    });
+    // Корабль С ЧЕЛНОКАМИ В СОСТАВЕ, но с пустым ангаром — тоже нули: состав больше
+    // не читается вовсе, иначе старое место осталось бы вторым источником правды.
+    expect(sortieSpec(fleet([{ unit: shuttleUnit, count: 2 }]), data)).toEqual({
       maxFuel: 0,
       rearmRounds: 0,
     });

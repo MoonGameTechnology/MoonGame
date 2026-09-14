@@ -20,6 +20,9 @@ const port = (over: Partial<Planet> = {}): Planet => ({
   ...over,
 });
 
+/** Мир с портом — для сверки «носитель читается как порт». */
+const portOf = (): Planet => port();
+
 const carrier = (over: Partial<Fleet> = {}): Fleet => ({
   id: 'F',
   owner: 'p1',
@@ -199,5 +202,44 @@ describe('вкладка мира «Эскадра» подключена к п�
     // Адресуй она мир, приказ ушёл бы в никуда: `wingload` резолвит флот по `arg`.
     expect(tab).toMatch(/btn\('wingload', ship\.id/);
     expect(tab).toMatch(/btn\('wingunload', ship\.id/);
+  });
+});
+
+// ТРЮМ НОСИТЕЛЯ ГОВОРИТ ПРАВДУ — дефект живой игры: «эскадрильи не атакуют с шаттла».
+// Две разные поломки с одним симптомом. Первая: `sortieSpec` читала челноков в
+// `fleet.units` (место мёртвого «крыла», снятого в SHU-2.2), а на носителе там стоит
+// КОРПУС без `fuel` — полный трюм читался сухим, и кнопка удара не оживала никогда.
+// Вторая: панель не знала про «вылет только со стоянки», предлагала «Удар» идущему
+// носителю и получала `E_FLEET_BUSY` уже ПОСЛЕ прицеливания.
+describe('трюм носителя читается как порт и знает про стоянку', () => {
+  const squad = [{ id: 'sq:1', units: [{ unit: 'interceptor', count: 2 }] }];
+  const moving = { from: 'A', to: 'B', departedAt: 0, arrivesAt: 1 };
+
+  it('ПОЛНЫЙ ТРЮМ НЕ СУХОЙ: топливо берётся у машины в ангаре, а не у корпуса', () => {
+    const v = fleetHangar(carrier({ hangar: squad }), data)!;
+    expect(v.blocked).toBeNull();
+    expect(v.sortie?.maxFuel).toBeGreaterThan(0);
+  });
+
+  it('И СОВПАДАЕТ С ПОРТОМ ПРИ ТОМ ЖЕ АНГАРЕ — одно правило, одно чтение', () => {
+    const hold = fleetHangar(carrier({ hangar: squad }), data)!;
+    const port = planetHangar({ ...portOf(), hangar: squad }, data)!;
+    expect(hold.sortie).toEqual(port.sortie);
+    expect(hold.blocked).toBe(port.blocked);
+  });
+
+  it('ИДЁТ — «занят», а не «нет топлива»: ждать заправки бессмысленно', () => {
+    const v = fleetHangar(carrier({ hangar: squad, location: null, movement: moving }), data)!;
+    expect(v.blocked).toBe('busy');
+  });
+
+  it('В БОЮ И БЕЗ УЗЛА — тоже «занят»: те же три условия, что спрашивает ядро', () => {
+    expect(fleetHangar(carrier({ hangar: squad, battleId: 'b1' }), data)!.blocked).toBe('busy');
+    expect(fleetHangar(carrier({ hangar: squad, location: null }), data)!.blocked).toBe('busy');
+  });
+
+  it('ПУСТОЙ ТРЮМ В ПУТИ — «пусто»: поднимать нечего независимо от стоянки', () => {
+    const v = fleetHangar(carrier({ location: null, movement: moving }), data)!;
+    expect(v.blocked).toBe('empty');
   });
 });
