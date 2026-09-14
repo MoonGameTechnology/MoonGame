@@ -8,6 +8,15 @@ export const MAP_IDS = ['nexus', 'frontier-50'] as const;
 export type MapId = (typeof MAP_IDS)[number] | 'frontier-100';
 export const isFrontier = (id: string | undefined): boolean =>
   id === 'frontier-50' || id === 'frontier-100';
+/** Порог победы по карте — ОДНА таблица. Раньше те же числа стояли двумя наборами
+ *  литералов: в пресете и в `scoreLimitFor`. Их читают разные потребители (HUD берёт
+ *  предел через `scoreLimitFor`, победа в матче — из пресета), так что правка одного
+ *  места молча разводила полосу прогресса с настоящим порогом конца партии. */
+const SCORE_LIMITS: Record<MapId, number> = {
+  nexus: 1100,
+  'frontier-50': 7500,
+  'frontier-100': 15000,
+};
 export interface MapPreset {
   id: MapId;
   nodes: MapNode[];
@@ -17,7 +26,16 @@ export interface MapPreset {
 }
 
 const PRESETS = new Map<string, MapPreset>([
-  ['nexus', { id: 'nexus', nodes: MAP, starts: START_CANDIDATES, boundary: [], scoreLimit: 1100 }],
+  [
+    'nexus',
+    {
+      id: 'nexus',
+      nodes: MAP,
+      starts: START_CANDIDATES,
+      boundary: [],
+      scoreLimit: SCORE_LIMITS.nexus,
+    },
+  ],
 ]);
 const nodeId = (i: number): string => `F${i}`;
 
@@ -47,13 +65,14 @@ export function mapPreset(id: string = 'nexus'): MapPreset {
     nodes,
     starts: content.starts.map(nodeId),
     boundary: content.boundary.map(nodeId),
-    scoreLimit: id === 'frontier-50' ? 7500 : 15000,
+    scoreLimit: SCORE_LIMITS[id],
   };
   PRESETS.set(id, preset);
   return preset;
 }
 export function scoreLimitFor(state: Pick<GameState, 'mapId'>): number {
-  return state.mapId === 'frontier-50' ? 7500 : state.mapId === 'frontier-100' ? 15000 : 1100;
+  const id = state.mapId;
+  return (id !== undefined && SCORE_LIMITS[id as MapId]) || SCORE_LIMITS.nexus;
 }
 /** Geometry comes from the authoritative snapshot, including custom scenarios. */
 export function mapNodesFromState(state: GameState): MapNode[] {

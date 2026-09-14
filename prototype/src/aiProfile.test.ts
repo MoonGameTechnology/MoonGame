@@ -95,8 +95,10 @@ describe('профиль бота — сложность соперника', ()
       );
     }
     // Соло-драйвер сам профиль не выбирает — он передаёт тот, что назначен КРЕСЛУ.
-    expect(read('prototype/src/soloDrivers.ts')).toContain(
-      "aiOrders(host.state(), seat, posture, profile ?? 'weak')",
+    // Сверяем аргументы вызова, а не его форматирование: перенос строки в этом вызове
+    // однажды уже уронил тест, ничего не изменив по существу.
+    expect(read('prototype/src/soloDrivers.ts')).toMatch(
+      /aiOrders\(\s*host\.state\(\),\s*seat,\s*posture[^,]*,\s*profile \?\? 'weak'/,
     );
   });
 

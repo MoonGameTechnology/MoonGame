@@ -25,6 +25,9 @@ export class TerritoryGeometryCache {
         clip,
       );
     }
+    // Свежие обёртки НАМЕРЕННО: `territoryCache.test.ts` держит прежний результат и
+    // требует, чтобы следующий вызов его не переписал. Дешёвую половину аллокаций
+    // снимает проекция ниже — там буфер переиспользуется без такого контракта.
     return this.geometry.map((cell) => ({
       ...cell,
       owner: seeds[cell.idx]!.owner,
@@ -34,14 +37,31 @@ export class TerritoryGeometryCache {
 }
 
 /** A uniform camera transform preserves the power diagram (weights scale by k²).
- * Project its vertices, without re-clipping all n² seed pairs during camera motion. */
+ * Project its vertices, without re-clipping all n² seed pairs during camera motion.
+ *
+ * `into` — необязательный буфер выдачи того же размера: с ним ячейки переписываются на
+ * месте и на кадр приходится на 831 объект меньше. Сами вершины всё равно создаются
+ * заново: их массивы уезжают в `provincePolygons` и живут там до следующей перестройки
+ * (хит-тест провинции, подсветка выделенной), поэтому переиспользовать их нельзя. */
 export function projectTerritoryCells(
   cells: TerritoryCell[],
   scale: number,
   offset: { x: number; y: number },
+  into?: TerritoryCell[],
 ): TerritoryCell[] {
-  return cells.map((cell) => ({
-    ...cell,
-    poly: cell.poly.map(([x, y]) => [x * scale + offset.x, y * scale + offset.y]),
-  }));
+  if (!into || into.length !== cells.length) {
+    return cells.map((cell) => ({
+      ...cell,
+      poly: cell.poly.map(([x, y]) => [x * scale + offset.x, y * scale + offset.y]),
+    }));
+  }
+  for (let i = 0; i < cells.length; i++) {
+    const cell = cells[i]!;
+    const slot = into[i]!;
+    slot.idx = cell.idx;
+    slot.owner = cell.owner;
+    slot.kind = cell.kind;
+    slot.poly = cell.poly.map(([x, y]) => [x * scale + offset.x, y * scale + offset.y]);
+  }
+  return into;
 }

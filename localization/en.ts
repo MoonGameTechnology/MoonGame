@@ -19,8 +19,7 @@ export const en: Record<string, string> = {
   "data.pirate-base": "Pirate Base",
   "data.neutral-ai-base": "Neutral AI Base",
   "data.black-hole": "Black Hole",
-  "map.frontier-100": "Frontier",
-  "map.frontier-50": "Frontier",
+  "map.frontier": "Frontier",
   "setup.map.hole": "Black hole · no paths",
   // --- map-loading — initial map preparation ---
   'map-loading.background': 'Preparing the backdrop',

@@ -18,6 +18,7 @@
  */
 import type { Action, Fleet, GameState } from '../../packages/shared-core/src/index';
 import type { AiProfile } from './ai';
+import type { StewardPosture } from './stewardScreen';
 import { StaggeredAi } from './aiScheduler';
 import { aiOrderSlices } from './aiOrderSlices';
 import {
@@ -70,7 +71,8 @@ export interface SoloHost {
 }
 
 export interface SoloDrivers {
-  /** Одна порция ИИ за кадр: расчёт решения или приказ (пара отступление→вылет вместе). */
+  /** Ход ИИ за кадр: одно планирование и порции построенного плана (зависимая пара
+   *  приказов одной сущности — всегда в одной порции). */
   runAI(): void;
   /** Авто-штурм: чужие флоты давят цикл захвата, свои — только с опт-ином. */
   autoEngage(): void;
@@ -97,29 +99,51 @@ export function initSoloDrivers(host: SoloHost): SoloDrivers {
     else host.applyLocal(a);
   };
 
+  /** Потолок порций за кадр. Не потеря: недовыбранные порции остаются в планировщике
+   *  и уходят следующим кадром — потолок только не даёт патологически большому плану
+   *  собраться в один кадр. */
+  const AI_SLICES_PER_FRAME = 32;
+
   function runAI(): void {
     const current = host.state();
     if (current.match.status === 'ended') return;
-    const step = ai.step(
-      current.time,
-      Object.keys(current.players),
-      (seat) => {
-        if (host.state().players[seat]?.status !== 'active') return null;
-        const profile = host.aiSeats().get(seat);
-        if (profile) return `expand:${profile}`;
-        const posture =
-          seat === host.me() ? stewardActive(host.state(), seat, host.state().time) : null;
-        return posture ? `steward:${posture}` : null;
-      },
-      (seat) => {
-        const profile = host.aiSeats().get(seat);
-        const posture = profile ? 'expand' : stewardActive(host.state(), seat, host.state().time);
-        return posture
-          ? aiOrderSlices(aiOrders(host.state(), seat, posture, profile ?? 'weak'))
-          : [];
-      },
-    );
-    for (const action of step.action ?? []) host.applyLocal(action);
+    const policyFor = (seat: string): string | null => {
+      if (host.state().players[seat]?.status !== 'active') return null;
+      const profile = host.aiSeats().get(seat);
+      if (profile) return `expand:${profile}`;
+      const posture =
+        seat === host.me() ? stewardActive(host.state(), seat, host.state().time) : null;
+      return posture ? `steward:${posture}` : null;
+    };
+    // Поза берётся из ТОЙ ЖЕ политики, по которой планировщик гейтит план, а не
+    // выводится заново: `expand:<профиль>` → 'expand', `steward:<поза>` → поза. Иначе
+    // план строится под одну позу, а проверка на устаревание идёт по другой.
+    const planFor = (seat: string, policy: string): Action[][] => {
+      const profile = host.aiSeats().get(seat);
+      const posture = policy.startsWith('steward:') ? policy.slice('steward:'.length) : 'expand';
+      return aiOrderSlices(
+        aiOrders(host.state(), seat, posture as StewardPosture | 'expand', profile ?? 'weak'),
+      );
+    };
+    // Планирование за кадр — ОДНО (оно и стоит дорого, ~2 мс), а порции построенного
+    // плана выбираются в том же кадре. Раньше выдавалась одна порция за кадр, и план,
+    // не выбранный за свой период, просрочивался: сила соперника начинала зависеть от
+    // частоты кадров телефона — против правила строкой выше в `main.ts` («при просадке
+    // FPS мир идёт с той же быстротой»). Семантика просрочки не тронута: она защищает
+    // от приказов, построенных под устаревший мир, — здесь лишь не даём ей срабатывать
+    // из-за медленного устройства.
+    let planned = false;
+    for (let slices = 0; slices < AI_SLICES_PER_FRAME; ) {
+      const step = ai.step(current.time, Object.keys(current.players), policyFor, planFor);
+      if (!step.worked) break;
+      if (!step.action) {
+        if (planned) break; // это уже следующее место — его план построим в следующем кадре
+        planned = true;
+        continue;
+      }
+      for (const action of step.action) host.applyLocal(action);
+      slices += 1;
+    }
   }
 
   function autoEngage(): void {

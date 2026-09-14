@@ -193,6 +193,7 @@ import {
 } from '../../packages/client/src/holoDraw';
 import { drawTerritoryCells } from '../../packages/client/src/territory';
 import { TerritoryGeometryCache, projectTerritoryCells } from '../../packages/client/src/territoryCache';
+import type { TerritoryCell } from '../../packages/client/src/territory';
 import { buildLabel, currentBuild } from './updater';
 import { initApkUpdater } from './apkUpdate';
 import { measureViewport, STARS, NEBULAE } from './viewport';
@@ -4186,6 +4187,9 @@ let bgContent = ''; // viewport + ownership signature (camera-independent)
 let bgCam = { x: 0, y: 0, scale: 1 }; // camera the static layer was last baked at
 let presentedCam: { x: number; y: number; scale: number } | null = null;
 let provincePolygons = new Map<string, ProvincePolygon>();
+/** Буфер спроецированных ячеек — живёт между кадрами, чтобы панорама не создавала по
+ *  объекту на провинцию каждый кадр (вершины всё равно свежие, см. territoryCache). */
+let projectedCells: TerritoryCell[] | undefined;
 let terrainFields: TerrainField[] = [];
 let holographicFrame = { x: 0, y: 0, width: 0, height: 0 };
 let paintedSelection: string | null = null;
@@ -4220,6 +4224,13 @@ function ownersSig(): string {
     MAP.map((n) => n.id),
     knownOwner,
   );
+}
+
+/** Подпись карты в списках партий. Обе карты Фронтира показываются одним именем —
+ *  раньше это был тернарник, скопированный в два места, и два ключа локали с
+ *  ОДИНАКОВЫМ текстом. Третья карта теперь не потребует правок в двух списках. */
+function mapLabel(mapId: string | undefined): string {
+  return isFrontier(mapId) ? t('map.frontier') : (mapId ?? '');
 }
 
 /** Map art is shared by desktop and phone; floating windows remain desktop-only. */
@@ -4315,7 +4326,7 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // Clip cells to the MAP boundary (province bounding box + padding), not the
   // viewport — otherwise the outermost provinces stretch to the screen edge. This
   // gives the map a defined edge that pans/zooms with the camera.
-  const frame = clipRect({ minX: MINX, maxX: MAXX, minY: MINY, maxY: MAXY });
+  const frame = clipRect(mapBounds());
   const tl = world(frame.topLeft);
   const br = world(frame.bottomRight);
   const clip = provinceClip();
@@ -4332,8 +4343,13 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // carries the owner AS THE VIEWER KNOWS IT (knownOwner), so a hidden capture never
   // repaints the map. Ownership reads through precise frontiers and restrained
   // transparent fills, leaving the background visible through the plotting plane.
-  const projected = projectTerritoryCells(provinceGeometry.cells(seeds, clip),
-    fitScale * cam.scale, world({ x: 0, y: 0 }));
+  const projected = projectTerritoryCells(
+    provinceGeometry.cells(seeds, clip),
+    fitScale * cam.scale,
+    world({ x: 0, y: 0 }),
+    projectedCells,
+  );
+  projectedCells = projected;
   const cells = drawTerritoryCells(g, seeds, projected, {
     ownerColor,
     neutralFill: COLOR.null!,
@@ -4383,7 +4399,24 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   if (holographicMapOn()) g.restore();
   g.strokeStyle = 'rgba(90,151,165,0.2)';
   g.lineWidth = 0.7;
-  if (!holographicMapOn()) g.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+  if (!holographicMapOn()) {
+    // На картах Фронтира территория обрезается выпуклым контуром галактики
+    // (`provinceClip`), а рамка рисовалась прежним прямоугольником — между ними
+    // оставалась широкая пустая полоса, и рамка переставала обозначать край доски.
+    // Рисуем то же, чем обрезаем; прочие карты сохраняют прямоугольник.
+    if (galaxyOutline.length) {
+      g.beginPath();
+      galaxyOutline.forEach((pt, i) => {
+        const v = world(pt);
+        if (i === 0) g.moveTo(v.x, v.y);
+        else g.lineTo(v.x, v.y);
+      });
+      g.closePath();
+      g.stroke();
+    } else {
+      g.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+    }
+  }
   if (g === bgx && !bgx.isContextLost?.()) {
     bgContent = content;
     bgCam = { x: cam.x, y: cam.y, scale: cam.scale };
@@ -11926,7 +11959,7 @@ function renderMatches(): void {
       modeLine = `${badge}${esc(tData(mode.modeId))} · `;
     }
     info.innerHTML =
-      `<div class="mname">${esc(m.mapId === 'frontier-50' ? t('map.frontier-50') : m.mapId === 'frontier-100' ? t('map.frontier-100') : m.mapId)} <span class="mid">${esc(m.matchId)}</span></div>` +
+      `<div class="mname">${esc(mapLabel(m.mapId))} <span class="mid">${esc(m.matchId)}</span></div>` +
       `<div class="mmeta">${modeLine}${t('browser.day', { n: m.days })} · ${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
       `${esc(ruleSummary(m.rules))} · ${m.status === 'ended' ? t('browser.finished') : t('browser.running')}${windowLine}</div>`;
     row.appendChild(info);
@@ -11993,7 +12026,7 @@ function renderMyMatches(serverHttp: string): void {
       // Идентификатора в заголовке нет намеренно: он целиком стоит ниже, В АДРЕСЕ —
       // а `m-<uuid>` в заголовке отъедал три строки и вытеснял то, ради чего сюда
       // смотрят (какая партия, какой день, сколько игроков).
-      `<div class="hc-t">${esc(m.mapId === 'frontier-50' ? t('map.frontier-50') : m.mapId === 'frontier-100' ? t('map.frontier-100') : m.mapId)}</div>` +
+      `<div class="hc-t">${esc(mapLabel(m.mapId))}</div>` +
       `<div class="hc-s">${t('browser.day', { n: m.days })} · ` +
       `${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
       `${m.status === 'ended' ? t('browser.finished') : t('browser.running')}</div>` +

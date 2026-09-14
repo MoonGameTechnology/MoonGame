@@ -100,6 +100,7 @@ import {
   nickSeatAccounts,
 } from '../packages/server/src/commanderCredit';
 import { detach } from '../packages/server/src/detach';
+import type { StewardPosture } from './src/stewardScreen';
 import { installFatalHandlers } from '../packages/server/src/fatal';
 const { Pool } = pgPkg;
 
@@ -549,6 +550,9 @@ async function createHostedMatch(id: string, mapId: MapId = 'nexus'): Promise<Ho
   // `driversBusy` guards re-entrancy: on a DURABLE room a driver pass awaits the room's
   // mailbox, so a later (heartbeat) tick must not start a second pass mid-flight.
   let driversBusy = false;
+  // Тик, не сумевший взять `driversBusy`, оставляет долг вместо того, чтобы потерять
+  // свой проход стоячих драйверов; его отрабатывает тот, кто гварду отпустит.
+  let standingDue = false;
   // Stable phases throughout each two-hour cycle; only one decision/order per
   // event-loop slice. The same bounded queue drives solo. The authoritative room
   // still serializes and validates every order, including ones that became stale.
@@ -557,6 +561,11 @@ async function createHostedMatch(id: string, mapId: MapId = 'nexus'): Promise<Ho
   let aiBusy = false;
   let aiStopped = false;
   let aiClockStalled = false;
+  /** Поза из политики планировщика: `${kind}:${posture}` → `posture`. Берём из
+   *  переданного значения, а не выводим заново — иначе план строится под одну позу,
+   *  а планировщик гейтит по другой, и расхождение невидимо. */
+  const postureOf = (policy: string): StewardPosture | 'expand' =>
+    policy.slice(policy.indexOf(':') + 1) as StewardPosture | 'expand';
   const aiPolicy = (seat: string): string | null => {
     if (room.state.players[seat]?.status !== 'active') return null;
     const posture = stewardActive(room.state, seat, room.state.time);
@@ -574,22 +583,32 @@ async function createHostedMatch(id: string, mapId: MapId = 'nexus'): Promise<Ho
           await new Promise<void>((resolve) => setTimeout(resolve, 16));
           continue;
         }
-        // Standing orders cannot interleave a retreat→departure pair while durable
-        // persistence is awaited. Release the same guard after this small slice.
+        // Стоячие драйверы не должны вклиниться ВНУТРЬ зависимой пары, пока ждётся
+        // durable-запись. Гварда берётся на одну маленькую порцию и отпускается сразу.
         driversBusy = true;
         try {
           const step = aiSchedule.step(room.state.time, Object.keys(room.state.players), aiPolicy,
-            (seat) => aiOrderSlices(aiOrders(room.state, seat,
-              stewardActive(room.state, seat, room.state.time) ?? 'expand')));
+            (seat, policy) => aiOrderSlices(aiOrders(room.state, seat, postureOf(policy))));
           if (!step.worked) return;
           const group = step.action ?? [];
-          const policy = group[0] ? aiPolicy(group[0].playerId) : null;
-          for (const action of group) {
-            if (policy === null || aiPolicy(action.playerId) !== policy) break;
-            await room.submitServerAction(action.playerId, action);
+          // Политику спрашиваем ОДИН раз на порцию. Перепроверка перед каждым приказом
+          // рвала ровно ту пару, ради которой порция и существует: `submitServerAction`
+          // ждёт мейлбокс, за это время истекает делегирование Стюарда или возвращается
+          // человек — и флот оставался вышедшим из боя без приказа куда идти. Планировщик
+          // уже сверяет политику с той, под которую план строился (`aiScheduler.step`).
+          if (group.length && aiPolicy(group[0]!.playerId) !== null) {
+            for (const action of group) await room.submitServerAction(action.playerId, action);
           }
         } finally {
           driversBusy = false;
+          // Тик, пришедший в занятое окно, оставил долг — отдаём его, иначе проход
+          // стоячих драйверов пропадёт вместе с этим ударом сердца. Отцепляем так же,
+          // как это делает тик: свой сбой прохода не должен уронить цикл ИИ, а гварду
+          // он возьмёт сам — следующая итерация подождёт её штатно.
+          if (standingDue) {
+            standingDue = false;
+            detach('серверные драйверы (отложенный проход)', runStandingPass());
+          }
         }
         // Yield between BOTH planning and applying: persistence may resolve already,
         // so awaiting submit alone is not an event-loop/render opportunity.
@@ -626,6 +645,23 @@ async function createHostedMatch(id: string, mapId: MapId = 'nexus'): Promise<Ho
     }
   }
 
+  // Один проход стоячих драйверов + истечение заявок на места. Зовут его тик и —
+  // если тик не смог взять гварду — цикл ИИ, отпуская её (см. `standingDue`).
+  async function runStandingPass(): Promise<void> {
+    driversBusy = true;
+    try {
+      await runServerStanding(); // CC-2/CC-4: standing orders (auto-storm / дежурный вылет)
+      // ENTRY-3 (правило 7): вернуть в оборот места, заявленные и не подтверждённые
+      // дольше окна. Тот же вызов, что у канонического сервера (`serverWiring.ts`) —
+      // паритет держится общей функцией, а не двумя похожими циклами.
+      for (const { playerId, action } of expiredSeatClaims(room.state, room.clockScale)) {
+        await room.submitServerAction(playerId, action);
+      }
+    } finally {
+      driversBusy = false;
+    }
+  }
+
   // Raise the shared clock driver for this room. onTick fires AFTER room.tick(): persist
   // the advanced world and — unless the tick stalled or a pass is still in flight — run
   // the empty-seat AI + standing orders. The driver owns the arm/stall/re-arm loop and the
@@ -648,23 +684,18 @@ async function createHostedMatch(id: string, mapId: MapId = 'nexus'): Promise<Ho
       // STALL_LIMIT backs off; here we just avoid feeding it.
       const stalled = !progressed && room.msUntilNextEvent() === 0;
       aiClockStalled = stalled;
-      if (!stalled && !driversBusy) {
-        // Async drivers (durable rooms await the mailbox); the busy flag stops a later
-        // heartbeat from double-running them while a slow persist is still in flight.
-        driversBusy = true;
-        detach('серверные драйверы', (async () => {
-          try {
-            await runServerStanding(); // CC-2/CC-4: standing orders (auto-storm / дежурный вылет)
-            // ENTRY-3 (правило 7): вернуть в оборот места, заявленные и не подтверждённые
-            // дольше окна. Тот же вызов, что у канонического сервера (`serverWiring.ts`) —
-            // паритет держится общей функцией, а не двумя похожими циклами.
-            for (const { playerId, action } of expiredSeatClaims(room.state, room.clockScale)) {
-              await room.submitServerAction(playerId, action);
-            }
-          } finally {
-            driversBusy = false;
-          }
-        })());
+      if (!stalled) {
+        // Гварда защищает от ВТОРОГО прохода поверх летящего (durable-комната ждёт
+        // мейлбокс), но ту же гварду держит цикл ИИ короткими слайсами ~350 раз за
+        // цикл. Пока тик просто проверял её и уходил, каждый удар сердца, попавший в
+        // занятое окно, терял свой проход ЦЕЛИКОМ — вместе с авто-штурмом, дежурным
+        // вылетом, цепочками приказов и истечением заявок на места (ENTRY-3). Теперь
+        // он не пропускает, а ОТКЛАДЫВАЕТ: `standingDue` отработает тот, кто отпустит.
+        if (driversBusy) standingDue = true;
+        else {
+          standingDue = false; // проход идёт ПРЯМО СЕЙЧАС — прежний долг им и погашен
+          detach('серверные драйверы', runStandingPass());
+        }
         detach('распределённые ходы ИИ', runServerAI());
       }
       scheduleSave(); // persist the advanced world

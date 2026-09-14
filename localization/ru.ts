@@ -22,8 +22,7 @@ export const ru: Record<string, string> = {
   "data.pirate-base": "База пиратов",
   "data.neutral-ai-base": "База нейтрального ИИ",
   "data.black-hole": "Чёрная дыра",
-  "map.frontier-100": "Фронтир",
-  "map.frontier-50": "Фронтир",
+  "map.frontier": "Фронтир",
   "setup.map.hole": "Чёрная дыра · путей нет",
   // --- map-loading — initial map preparation ---
   'map-loading.background': 'Подготовка фона',
