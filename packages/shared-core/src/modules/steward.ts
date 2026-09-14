@@ -81,7 +81,11 @@ const STEWARD_ABILITY = 'steward';
  *  — so the gate reads shipped content, degrades gracefully (no such tech in the bundle →
  *  always locked), and stays a pure read of state + game data (no cross-module import;
  *  modules talk only through the bus / shared state). */
-function stewardUnlocked(player: Player, data: GameData): boolean {
+/** Разблокирована ли способность Хранителя хоть одной завершённой технологией.
+ *  Экспортируется, потому что этот же вопрос задаёт ПАНЕЛЬ клиента (предложить ли
+ *  точку удержания): держать там вторую формулировку значило бы завести копию правила,
+ *  которая отстанет от данных на первой же новой технологии. */
+export function stewardUnlocked(player: Player, data: GameData): boolean {
   for (const id of player.technologies?.completed ?? []) {
     if (data.technologies[id]?.unlocks.abilities.includes(STEWARD_ABILITY)) return true;
   }

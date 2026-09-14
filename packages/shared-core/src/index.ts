@@ -476,6 +476,7 @@ export { heroEffectsModule } from './modules/heroEffects';
 export {
   stewardModule,
   stewardActive,
+  stewardUnlocked,
   STEWARD_POSTURES,
   STEWARD_LOSS_LIMIT,
   MAX_STEWARD_LOG,
