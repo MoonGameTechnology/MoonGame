@@ -89,6 +89,12 @@ const PREVIEW_STATS = [
   'shield',
   'speed',
   'cargoCapacity',
+  // The hangar a hull carries. In the yard every ship is the same column of bars, so
+  // without this line the one hull that carries SHUTTLES read exactly like the one that
+  // only carries cargo — and nothing on the screen said which. It needs no special
+  // casing: the rule below (a line shows only where the stat is live) already keeps it
+  // off every other hull.
+  'shuttleBay',
   'radarRange',
 ] as const;
 
@@ -102,6 +108,7 @@ const STAT_LABELS: Record<string, string> = {
   shield: t('loadout.stat.shield'),
   speed: t('loadout.stat.speed'),
   cargoCapacity: t('loadout.stat.cargo'),
+  shuttleBay: t('loadout.stat.bay'),
   radarRange: t('loadout.stat.radar'),
 };
 
