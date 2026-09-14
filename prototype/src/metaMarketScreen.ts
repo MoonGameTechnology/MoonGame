@@ -2,6 +2,7 @@ import type { ArsenalItem } from '../../packages/shared-core/src/index';
 import { t } from '../../localization/runtime';
 import { esc, nfmt } from './format';
 import { arsenalItemName } from './arsenalScreen';
+import { detach } from './detach';
 
 interface Listing {
   id: string;
@@ -75,27 +76,30 @@ export function initMetaMarket(host: MetaMarketHost): { refresh(): Promise<void>
   host.root().addEventListener('click', (ev) => {
     const el = (ev.target as HTMLElement).closest('button') as HTMLButtonElement | null;
     if (!el) return;
-    void (async () => {
-      try {
-        if (el.dataset.mmBuy) await request('/meta-market/buy', { listingId: el.dataset.mmBuy });
-        if (el.dataset.mmCancel)
-          await request('/meta-market/cancel', { listingId: el.dataset.mmCancel });
-        if (el.dataset.mmList) {
-          const input = host
-            .root()
-            .querySelector(
-              `[data-mm-price="${CSS.escape(el.dataset.mmList)}"]`,
-            ) as HTMLInputElement | null;
-          await request('/meta-market/list', {
-            itemId: el.dataset.mmList,
-            price: Number(input?.value),
-          });
+    detach(
+      'аукцион: действие по лоту',
+      (async () => {
+        try {
+          if (el.dataset.mmBuy) await request('/meta-market/buy', { listingId: el.dataset.mmBuy });
+          if (el.dataset.mmCancel)
+            await request('/meta-market/cancel', { listingId: el.dataset.mmCancel });
+          if (el.dataset.mmList) {
+            const input = host
+              .root()
+              .querySelector(
+                `[data-mm-price="${CSS.escape(el.dataset.mmList)}"]`,
+              ) as HTMLInputElement | null;
+            await request('/meta-market/list', {
+              itemId: el.dataset.mmList,
+              price: Number(input?.value),
+            });
+          }
+          await refresh();
+        } catch (e) {
+          host.note(e instanceof Error ? e.message : 'E_NETWORK');
         }
-        await refresh();
-      } catch (e) {
-        host.note(e instanceof Error ? e.message : 'E_NETWORK');
-      }
-    })();
+      })(),
+    );
   });
   return { refresh };
 }

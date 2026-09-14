@@ -41,6 +41,38 @@ interface Overlay {
 
 let overlay: Overlay | null = null;
 
+/**
+ * RESIL-2 · Один кадр живой подсветки: что делать, если `refresh()` бросил.
+ *
+ * `refresh()` ходит в чужой код — селекторы HUD, предикат `when()` шага, отрисовку, — и
+ * до этого кирпича его исключение убивало не тур, а ЦИКЛ: `requestAnimationFrame`
+ * стоял ПОСЛЕ падающего вызова, поэтому следующего кадра уже не было никогда. Оверлей при
+ * этом оставался на экране — и `tap`-шаг продолжал глотать нажатия. Из трёх возможных
+ * исходов (замереть, продолжать, закрыть) происходил худший.
+ *
+ * Выбран третий: **закрыть тур**. Обучение необязательно, а экран игроку нужен — держать
+ * его в заложниках у сломавшейся подсказки нельзя. «Продолжать» означало бы кадр за
+ * кадром ловить то же исключение (шестьдесят строк в консоли в секунду) при неверной
+ * подсветке; «замереть» — тот же захваченный экран, только осознанно.
+ *
+ * Функция отдельная и экспортируется РАДИ ПРОВЕРЯЕМОСТИ: в репозитории нет jsdom, а
+ * правило обязано держаться тестом, а не обещанием. Браузерного здесь ничего нет —
+ * `requestAnimationFrame` приходит третьим аргументом.
+ */
+export function tourFrame(
+  refresh: () => void,
+  onBroken: (err: unknown) => void,
+  again: () => void,
+): void {
+  try {
+    refresh();
+  } catch (err) {
+    onBroken(err);
+    return; // следующий кадр не планируется: тур закрывается, цикл кончился
+  }
+  again();
+}
+
 function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string): HTMLElementTagNameMap[K] {
   const node = document.createElement(tag);
   node.className = cls;
@@ -205,10 +237,27 @@ export function startTour(steps: readonly SpotlightStep[], onEnd?: TourEnd): Run
   o.next.onclick = () => tour.tap();
   o.skip.onclick = () => tour.skip();
 
+  /** Снять тур, что бы ни сломалось, и главное — УБРАТЬ оверлей с экрана (RESIL-2). */
+  const abort = (err: unknown): void => {
+    console.error('[spotlight] кадр подсветки упал — закрываю тур:', err);
+    try {
+      tour.skip(); // штатный путь: позовёт `onEnd` и снимет `running`
+    } catch (stubborn) {
+      console.error('[spotlight] закрыть тур штатно тоже не вышло:', stubborn);
+    } finally {
+      running = false;
+      if (current === tour) current = null;
+      o.root.style.display = 'none'; // экран отпущен даже если движок в непонятном виде
+    }
+  };
+
   const frame = (): void => {
     if (!running) return;
-    tour.refresh();
-    requestAnimationFrame(frame);
+    tourFrame(
+      () => tour.refresh(),
+      abort,
+      () => requestAnimationFrame(frame),
+    );
   };
   tour.start();
   if (running) requestAnimationFrame(frame);
