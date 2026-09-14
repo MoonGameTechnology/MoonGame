@@ -22,6 +22,7 @@
 // покрытию механики, зато был бы правилом ради метрики.
 import { describe, expect, it } from 'vitest';
 import { newGame, aiOrders, START_CANDIDATES } from './game';
+import { data } from './gameData';
 import type { Action, Battle, Fleet, GameState } from '../../packages/shared-core/src/index';
 
 function game2(): GameState {
@@ -37,10 +38,10 @@ const only = (actions: Action[], type: string): Action[] => actions.filter((a) =
 const payloads = <T>(actions: Action[], type: string): T[] =>
   only(actions, type).map((a) => a.payload as T);
 
-/** Домашний мир места (тот, где стоит космопорт). */
+/** Домашний мир места — тот, где стоит ВЕРФЬ (тем же признаком его ищет бот). */
 const homeOf = (s: GameState, seat: string): string =>
   Object.values(s.planets).find(
-    (p) => p.owner === seat && p.buildings.some((b) => b.type === 'spaceport'),
+    (p) => p.owner === seat && p.buildings.some((b) => data.buildings[b.type]?.enablesShipConstruction),
   )!.id;
 
 function fleetAt(

@@ -15,9 +15,10 @@
  *    «0 из 0» — это не факт о мире, а строка ни о чём.
  * 2. **Топливо принадлежит МЕСТУ, а не машине** (SHU-1.2): у порта один счётчик на все
  *    вылеты, поэтому и в панели он один — над составом, а не в каждой строке.
- * 3. **«Готов» — это И топливо, И конец перезарядки, И живые машины.** Три причины
- *    «нельзя лететь» показываются РАЗНЫМИ словами: пустой ангар, перезарядка, нет
- *    топлива. Одна общая заглушка заставляла бы игрока гадать, чего ждать.
+ * 3. **«Готов» — это И топливо, И конец перезарядки, И живые машины, И стоянка.** Четыре
+ *    причины «нельзя лететь» показываются РАЗНЫМИ словами: пустой ангар, носитель не на
+ *    месте, перезарядка, нет топлива. Одна общая заглушка заставляла бы игрока гадать,
+ *    чего ждать.
  * 4. **Перегрузка порт ⇄ носитель предлагается только когда она ПРОЙДЁТ.** Носитель
  *    должен стоять у этого мира, быть свой и иметь свободное место; иначе кнопки нет —
  *    не серой, а нет. Серая кнопка обещала бы действие, которого в этом месте не
@@ -32,6 +33,11 @@
  *    мира молчит, потому что цена ошибки тут выше, чем у выбора звена (`transferPick`):
  *    машины уедут с чужим флотом. Адресный приказ остаётся на панели самого носителя,
  *    где цель однозначна.
+ * 6. **Место называет себя САМО** (`kind`). Форма у порта и трюма одна — это правильно, —
+ *    но подписи разные, а секция в разметке одна на обоих. Пока `kind` не было, она
+ *    печатала «Ангар порта» и «порт перезаряжается» над составом КОРАБЛЯ: игрок читал про
+ *    порт, стоя на идущем «Шаттле». Признак живёт в данных, а не в разметке, потому что
+ *    разметка его не выведет — по составу порт от трюма не отличить.
  */
 import type { GameData, Fleet, Planet, Squadron, UnitStack } from '../../packages/shared-core/src/index';
 import {
@@ -45,11 +51,16 @@ import {
 } from '../../packages/shared-core/src/index';
 
 /** Почему вылет невозможен прямо сейчас — или `null`, если возможен (правило 3). */
-export type HangarBlock = 'empty' | 'rearming' | 'no-fuel' | null;
+export type HangarBlock = 'empty' | 'busy' | 'rearming' | 'no-fuel' | null;
 
 /** Ангар одного места — порта мира или трюма носителя. Форма одна: у ангара везде
  *  один и тот же смысл, и вторая структура развела бы две панели по мелочам. */
 export interface HangarView {
+  /** ЧЕЙ это ангар. Форма у порта и трюма одна (см. ниже), но НАЗЫВАЮТСЯ они по-разному:
+   *  одна и та же секция рисует оба, и заголовок «Ангар порта» на идущем «Шаттле» —
+   *  это строка про порт над составом корабля. Место называет себя само, чтобы разметке
+   *  не приходилось угадывать по косвенным признакам. */
+  kind: 'port' | 'hold';
   /** ЭСКАДРЫ места (SHU-4.2) — то, чем адресуются приказы: вылет, перегрузка, делёж.
    *  Панель со списком соединений придёт в SHU-4.3; пока отсюда берётся id. */
   squadrons: Squadron[];
@@ -70,19 +81,32 @@ export function hasHangar(view: HangarView | null): view is HangarView {
 }
 
 function view(
+  kind: HangarView['kind'],
   host: { hangar?: Squadron[] },
   bay: number,
   sortie: SortieState | undefined,
   maxFuel: number,
+  busy = false,
 ): HangarView | null {
   if (bay <= 0) return null;
   const squadrons = (host.hangar ?? []).filter((sq) => sq.units.some((st) => st.count > 0));
   const stacks = hangarMachines(host).filter((st) => st.count > 0);
   const used = hangarUsed(host);
   const live: SortieState = sortie ?? { fuel: maxFuel, rearming: 0 };
+  // `busy` идёт СРАЗУ за «пусто»: у неподвижной базы его не бывает, а у носителя он
+  // перебивает топливо и перезарядку — ждать их бессмысленно, пока корабль не встал.
   const blocked: HangarBlock =
-    used <= 0 ? 'empty' : live.rearming > 0 ? 'rearming' : canSortie(live) ? null : 'no-fuel';
+    used <= 0
+      ? 'empty'
+      : busy
+        ? 'busy'
+        : live.rearming > 0
+          ? 'rearming'
+          : canSortie(live)
+            ? null
+            : 'no-fuel';
   return {
+    kind,
     squadrons,
     stacks,
     used,
@@ -95,18 +119,38 @@ function view(
 
 /** Ангар КОСМОПОРТА мира. `null` — порта нет, блока в панели быть не должно. */
 export function planetHangar(planet: Planet, data: GameData): HangarView | null {
-  const bay = shuttleBayAt(planet, data);
   // Ёмкость топлива задаёт САМА МАШИНА (`fuel` первой в ангаре) — та же величина, по
-  // которой ядро заводит счётчик порта. Пустой порт показывает состав без топлива:
-  // выводить «0 из 0 вылетов» там, где лететь некому, значит пугать числом ни о чём.
-  const first = hangarMachines(planet).find((st) => st.count > 0);
-  const maxFuel = first ? (data.units[first.unit]?.stats.fuel ?? 0) : 0;
-  return view(planet, bay, planet.sortie, maxFuel);
+  // которой ядро заводит счётчик базы, и та же функция: своя копия этого чтения жила
+  // здесь, пока `sortieSpec` читала старое место (`fleet.units` мёртвого «крыла»).
+  // Пустой порт показывает состав без топлива: выводить «0 из 0 вылетов» там, где
+  // лететь некому, значит пугать числом ни о чём.
+  return view(
+    'port',
+    planet,
+    shuttleBayAt(planet, data),
+    planet.sortie,
+    sortieSpec(planet, data).maxFuel,
+  );
 }
 
-/** Трюм НОСИТЕЛЯ («Шаттл», SHU-2.1). `null` — корабль ангара не несёт. */
+/**
+ * Трюм НОСИТЕЛЯ («Шаттл», SHU-2.1). `null` — корабль ангара не несёт.
+ *
+ * Носитель, в отличие от порта, бывает ЗАНЯТ: ядро пускает вылет только со стоянки
+ * (`requireOwnedIdleFleet` → `E_FLEET_BUSY`) — порт не двигается, и вылет с
+ * разгоняющегося носителя пришлось бы догонять. Правило зеркалится сюда, чтобы кнопка
+ * не обещала приказ, который отобьют ПОСЛЕ прицеливания: три условия те же, что у ядра.
+ */
 export function fleetHangar(fleet: Fleet, data: GameData): HangarView | null {
-  return view(fleet, fleetShuttleBay(fleet, data), fleet.sortie, sortieSpec(fleet, data).maxFuel);
+  const busy = !!fleet.movement || !!fleet.battleId || fleet.location == null;
+  return view(
+    'hold',
+    fleet,
+    fleetShuttleBay(fleet, data),
+    fleet.sortie,
+    sortieSpec(fleet, data).maxFuel,
+    busy,
+  );
 }
 
 /** Что можно перегрузить между портом мира и стоящим у него носителем (правило 4). */

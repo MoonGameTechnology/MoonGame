@@ -17,6 +17,7 @@
 // дальше. Тест на стартовом состоянии проверял бы не разброс, а его отсутствие.
 import { describe, expect, it } from 'vitest';
 import { newGame, aiOrders, START_CANDIDATES } from './game';
+import { data } from './gameData';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 
 const SEEDS = ['sp-0', 'sp-1', 'sp-2', 'sp-3', 'alt-0', 'alt-1', 'alt-2', 'alt-3'];
@@ -42,7 +43,7 @@ function game(seed: string): GameState {
 function midgame(seed: string): GameState {
   const s = game(seed);
   const home = Object.values(s.planets).find(
-    (p) => p.owner === 'p2' && p.buildings.some((b) => b.type === 'spaceport'),
+    (p) => p.owner === 'p2' && p.buildings.some((b) => data.buildings[b.type]?.enablesShipConstruction),
   )!;
   const dist = (p: { position: { x: number; y: number } }): number =>
     Math.hypot(p.position.x - home.position.x, p.position.y - home.position.y);
@@ -107,7 +108,7 @@ describe('BAL-1 — равные цели разводит шум, а не по�
     // среди РАВНЫХ целей выбор зависит от сида — иначе перекос вернётся молча.
     const s = midgame('sp-0');
     const home = Object.values(s.planets).find(
-      (p) => p.owner === 'p2' && p.buildings.some((b) => b.type === 'spaceport'),
+      (p) => p.owner === 'p2' && p.buildings.some((b) => data.buildings[b.type]?.enablesShipConstruction),
     )!;
     // Две одинаково удалённые цели по разные стороны от дома: расстояния равны точно.
     const equidistant: GameState = {

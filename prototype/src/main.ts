@@ -5502,8 +5502,16 @@ function tabButton(tab: PlanetTab, label: string, count: number, desc?: string):
  * ОТКУДА поднимать вылет, не заводя второго состояния.
  */
 function hangarSectionHtml(view: HangarView, owner: string, mine: boolean): string {
+  // Заголовок берётся у САМОГО места (правило 6 в `hangarPanel.ts`): секция одна на порт
+  // и на трюм, и общая подпись «Ангар порта» врала бы про корабль. Оба ключа стоят
+  // литералами — разбор гейта локализации видит в вызове только первый, поэтому выбор
+  // ключа тернарником ВНУТРИ `t()` спрятал бы второй от проверки.
+  const title =
+    view.kind === 'hold'
+      ? t('side.wing.hold', { used: view.used, bay: view.bay })
+      : t('side.wing.hangar', { used: view.used, bay: view.bay });
   const head =
-    `<div class="sec">${t('side.wing.hangar', { used: view.used, bay: view.bay })}</div>` +
+    `<div class="sec">${title}</div>` +
     (view.sortie
       ? `<div class="row dim">${
           view.sortie.rearming > 0
@@ -5515,14 +5523,18 @@ function hangarSectionHtml(view: HangarView, owner: string, mine: boolean): stri
   // пустой ангар, перезарядка и сухой бак — разные ожидания у игрока. Причина у МЕСТА
   // одна на все звенья: топливо принадлежит базе (SHU-1.2), поэтому строка стоит над
   // карточками, а не в каждой.
+  const rearming =
+    view.kind === 'hold' ? t('side.wing.blocked.rearming.hold') : t('side.wing.blocked.rearming');
   const why =
     view.blocked === 'empty'
       ? t('side.wing.blocked.empty')
-      : view.blocked === 'rearming'
-        ? t('side.wing.blocked.rearming')
-        : view.blocked === 'no-fuel'
-          ? t('side.wing.blocked.no-fuel')
-          : '';
+      : view.blocked === 'busy'
+        ? t('side.wing.blocked.busy')
+        : view.blocked === 'rearming'
+          ? rearming
+          : view.blocked === 'no-fuel'
+            ? t('side.wing.blocked.no-fuel')
+            : '';
   const cards = squadronCards(view, { mine, data });
   if (cards.length === 0) {
     return head + `<div class="row dim">${esc(t('side.wing.empty'))}</div>`;
