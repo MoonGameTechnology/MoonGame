@@ -5563,11 +5563,13 @@ function hangarSectionHtml(view: HangarView, owner: string, mine: boolean): stri
   const why =
     view.blocked === 'empty'
       ? t('side.wing.blocked.empty')
-      : view.blocked === 'rearming'
-        ? t('side.wing.blocked.rearming')
-        : view.blocked === 'no-fuel'
-          ? t('side.wing.blocked.no-fuel')
-          : '';
+      : view.blocked === 'busy'
+        ? t('side.wing.blocked.busy')
+        : view.blocked === 'rearming'
+          ? t('side.wing.blocked.rearming')
+          : view.blocked === 'no-fuel'
+            ? t('side.wing.blocked.no-fuel')
+            : '';
   const cards = squadronCards(view, { mine, data });
   if (cards.length === 0) {
     return head + `<div class="row dim">${esc(t('side.wing.empty'))}</div>`;
