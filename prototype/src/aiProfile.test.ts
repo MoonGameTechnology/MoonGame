@@ -96,7 +96,7 @@ describe('профиль бота — сложность соперника', ()
     }
     // Соло-драйвер сам профиль не выбирает — он передаёт тот, что назначен КРЕСЛУ.
     expect(read('prototype/src/soloDrivers.ts')).toContain(
-      "aiOrders(host.state(), ai, 'expand', profile)",
+      "aiOrders(host.state(), seat, posture, profile ?? 'weak')",
     );
   });
 

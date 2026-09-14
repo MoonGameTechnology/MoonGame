@@ -191,11 +191,8 @@ import {
   blitSphere as hdBlitSphere,
   clearHolographicSprites,
 } from '../../packages/client/src/holoDraw';
-import {
-  drawTerritory,
-  computePowerCell,
-  type TerritorySeed,
-} from '../../packages/client/src/territory';
+import { drawTerritoryCells } from '../../packages/client/src/territory';
+import { TerritoryGeometryCache, projectTerritoryCells } from '../../packages/client/src/territoryCache';
 import { buildLabel, currentBuild } from './updater';
 import { initApkUpdater } from './apkUpdate';
 import { measureViewport, STARS, NEBULAE } from './viewport';
@@ -4230,14 +4227,13 @@ function holographicMapOn(): boolean {
   return holographic.active() || (MOBILE && holographyOn());
 }
 
-/** Shared by political cells and capture flashes: one finite edge at every zoom. */
+const provinceGeometry = new TerritoryGeometryCache();
+/** Camera-independent edge. The weight conversion below preserves the existing
+ * screen-space size rule; only viewport/geometry changes need a new tessellation. */
 function provinceClip(): Array<[number, number]> {
-  if (galaxyOutline.length) return galaxyOutline.map((point) => {
-    const at = world(point);
-    return [at.x, at.y];
-  });
+  if (galaxyOutline.length) return galaxyOutline.map(({ x, y }) => [x, y]);
   const frame = clipRect(mapBounds());
-  return clipPolygon(world(frame.topLeft), world(frame.bottomRight));
+  return clipPolygon(frame.topLeft, frame.bottomRight);
 }
 
 /** Rebuild the cached province map when the camera/ownership/viewport moves. */
@@ -4309,11 +4305,12 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // Отбор узлов и вес семени — `provinceMap.ts` (REFM-61): пустой узел не провинция,
   // вес растёт квадратично по масштабу, иначе карта перекраивается при зуме.
   const provinceIds: string[] = [];
-  const seeds = provinceSeeds(MAP, cam.scale, (n) => {
+  const fitScale = camFitTransform(insets(), mapBounds()).scale;
+  const seeds = provinceSeeds(MAP, 1 / fitScale, (n) => {
     const p = s.planets[n.id];
     if (!p) return null;
     provinceIds.push(n.id);
-    return { size: p.size ?? 1, at: world(n), owner: knownOwner(n.id) };
+    return { size: p.size ?? 1, at: n, owner: knownOwner(n.id) };
   });
   // Clip cells to the MAP boundary (province bounding box + padding), not the
   // viewport — otherwise the outermost provinces stretch to the screen edge. This
@@ -4335,7 +4332,9 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // carries the owner AS THE VIEWER KNOWS IT (knownOwner), so a hidden capture never
   // repaints the map. Ownership reads through precise frontiers and restrained
   // transparent fills, leaving the background visible through the plotting plane.
-  const cells = drawTerritory(g, seeds, clip, {
+  const projected = projectTerritoryCells(provinceGeometry.cells(seeds, clip),
+    fitScale * cam.scale, world({ x: 0, y: 0 }));
+  const cells = drawTerritoryCells(g, seeds, projected, {
     ownerColor,
     neutralFill: COLOR.null!,
     kindAccent: (kind) => holographicMapOn() && kind === 'asteroid' ? '#71879d'
@@ -13560,29 +13559,11 @@ function drawGoFlash(now: number): void {
   cx.restore();
 }
 const CAPTURE_FLASH_MS = 1500;
-/** A province that changed hands lights up in its NEW owner's colour: a bright wave
- *  sweeps across the flipped cell from its centre and the frontier ignites, fading
- *  over ~1.5s. The cell polygon is recomputed each frame with the SAME weighted-
- *  Voronoi math the political map bakes (computePowerCell), so the wave lines up
- *  pixel-for-pixel with the fill and tracks pan/zoom. Only runs while a flash is live
- *  (captures are rare), so the O(n) recompute costs nothing on a quiet frame. */
+/** Capture waves use the exact projected polygons just painted by blitStaticLayer.
+ * No per-flash weight clamp or n² geometry pass, including while the camera moves. */
 function drawCaptureFlashes(now: number): void {
   if (captureFlashes.size === 0) return;
-  // ТЕ ЖЕ семена и рамка, что у политической заливки — `provinceMap.ts` (REFM-61,
-  // правило 6): волна обрезается по клетке, и разъедься копия формул хоть на пиксель,
-  // волна потекла бы за границу провинции или не дошла бы до неё. Здесь своя копия и
-  // стояла: `9000 * scale²` и `max(40, ширина × 0.05)` литералами прямо в кадре.
-  // Проекция — этим кадром, чтобы волна ехала вместе с камерой.
-  const idxByNode = new Map<string, number>();
-  let seedIdx = 0;
-  const seeds: TerritorySeed[] = provinceSeeds(MAP, cam.scale, (n) => {
-    const p = s.planets[n.id];
-    if (!p) return null;
-    idxByNode.set(n.id, seedIdx++);
-    return { size: p.size ?? 1, at: world(n), owner: knownOwner(n.id) };
-  });
-  const clip = provinceClip();
-  const trace = (poly: Array<[number, number]>): void => {
+  const trace = (poly: readonly (readonly [number, number])[]): void => {
     cx.beginPath();
     cx.moveTo(poly[0]![0], poly[0]![1]);
     for (let i = 1; i < poly.length; i++) cx.lineTo(poly[i]![0], poly[i]![1]);
@@ -13593,11 +13574,11 @@ function drawCaptureFlashes(now: number): void {
       captureFlashes.delete(node);
       continue;
     }
-    const idx = idxByNode.get(node);
-    if (idx === undefined) continue; // province gone (shouldn't happen mid-flash)
-    const cell = computePowerCell(seeds, clip, idx);
-    if (!cell) continue;
-    const c = { x: seeds[idx]!.x, y: seeds[idx]!.y }; // seeds are already screen-space
+    const poly = provincePolygons.get(node);
+    const planet = s.planets[node];
+    if (!poly || !planet) continue;
+    const cell = { poly };
+    const c = world(planet.position);
     // Кламп прогресса и затухание — `flashFx.ts`: метка кадра rAF может опередить
     // постановку вспышки, а отрицательный радиус роняет cx.arc().
     const k = flashProgress(now, flash.at, CAPTURE_FLASH_MS); // 0 → 1

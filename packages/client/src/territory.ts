@@ -205,9 +205,9 @@ export function computePowerCells(
 /** The single province cell for seed `idx` — the same power-diagram result
  *  `computePowerCells` would give for that index, but clipping only that one seed's
  *  half-planes (O(n), not O(n²)). Returns `null` if the cell is empty (fully
- *  swallowed) or `idx` is out of range. Used for the capture-flash: an animated
- *  overlay traces just the flipped province's border, so it must line up
- *  pixel-for-pixel with the static fill beneath it. */
+ *  swallowed) or `idx` is out of range. Available for sparse geometry queries.
+ *  The prototype's animated capture overlay reuses its already projected cells,
+ *  avoiding even the weight-clamp pass on each animated frame. */
 export function computePowerCell(
   seeds: TerritorySeed[],
   clip: Array<[number, number]>,
@@ -229,7 +229,17 @@ export function drawTerritory(
   clip: Array<[number, number]>,
   palette: TerritoryPalette,
 ): TerritoryCell[] {
-  const cells = computePowerCells(seeds, clip);
+  return drawTerritoryCells(g, seeds, computePowerCells(seeds, clip), palette);
+}
+
+/** Paint already projected cells; callers may cache the camera-independent geometry.
+ * Seeds and cells must carry the same CURRENT viewer-known owners and seed indices. */
+export function drawTerritoryCells(
+  g: CanvasRenderingContext2D,
+  seeds: TerritorySeed[],
+  cells: TerritoryCell[],
+  palette: TerritoryPalette,
+): TerritoryCell[] {
   const trace = (poly: Array<[number, number]>): void => {
     g.beginPath();
     g.moveTo(poly[0]![0], poly[0]![1]);

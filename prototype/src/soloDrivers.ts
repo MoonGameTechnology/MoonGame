@@ -18,6 +18,8 @@
  */
 import type { Action, Fleet, GameState } from '../../packages/shared-core/src/index';
 import type { AiProfile } from './ai';
+import { StaggeredAi } from './aiScheduler';
+import { aiOrderSlices } from './aiOrderSlices';
 import {
   aiOrders,
   assaultFleet,
@@ -68,7 +70,7 @@ export interface SoloHost {
 }
 
 export interface SoloDrivers {
-  /** Ходы ИИ за пустые кресла (и за ваше, пока оно делегировано «Хранителю»). */
+  /** Одна порция ИИ за кадр: расчёт решения или приказ (пара отступление→вылет вместе). */
   runAI(): void;
   /** Авто-штурм: чужие флоты давят цикл захвата, свои — только с опт-ином. */
   autoEngage(): void;
@@ -87,7 +89,7 @@ export interface SoloDrivers {
 export function initSoloDrivers(host: SoloHost): SoloDrivers {
   /** Обречённые пары «орбита → штурм»: id флота → ключ состояния. */
   const probed = new Map<string, string>();
-  let lastAiAt = 0;
+  const ai = new StaggeredAi<Action[]>(AI_STEP_MS);
 
   /** Свой приказ идёт своим путём, чужой — локально: в сети первый уходит на сервер. */
   const issue = (owner: string, a: Action): void => {
@@ -96,23 +98,28 @@ export function initSoloDrivers(host: SoloHost): SoloDrivers {
   };
 
   function runAI(): void {
-    const s = host.state();
-    if (s.time - lastAiAt < AI_STEP_MS) return;
-    lastAiAt = s.time;
-    // Приказы каждого пустого кресла берутся из общего `aiOrders` — той же логики,
-    // которой сетевой сервер ведёт незанятые места.
-    for (const [ai, profile] of host.aiSeats()) {
-      for (const a of aiOrders(host.state(), ai, 'expand', profile)) host.applyLocal(a);
-    }
-    // «Хранитель»: пока ваше место делегировано, локальный ИИ играет и его — на его
-    // осанке (оборона), чтобы делегирование в соло реально держало линию, а не
-    // показывало таймер. Профиль здесь СЛАБЫЙ (дефолт) намеренно: сложность выбирают
-    // соперникам, а не себе — «Хранитель» это ваш автопилот, а не второй игрок.
-    const me = host.me();
-    const posture = stewardActive(host.state(), me, host.state().time);
-    if (posture && !host.aiSeats().has(me)) {
-      for (const a of aiOrders(host.state(), me, posture)) host.applyLocal(a);
-    }
+    const current = host.state();
+    if (current.match.status === 'ended') return;
+    const step = ai.step(
+      current.time,
+      Object.keys(current.players),
+      (seat) => {
+        if (host.state().players[seat]?.status !== 'active') return null;
+        const profile = host.aiSeats().get(seat);
+        if (profile) return `expand:${profile}`;
+        const posture =
+          seat === host.me() ? stewardActive(host.state(), seat, host.state().time) : null;
+        return posture ? `steward:${posture}` : null;
+      },
+      (seat) => {
+        const profile = host.aiSeats().get(seat);
+        const posture = profile ? 'expand' : stewardActive(host.state(), seat, host.state().time);
+        return posture
+          ? aiOrderSlices(aiOrders(host.state(), seat, posture, profile ?? 'weak'))
+          : [];
+      },
+    );
+    for (const action of step.action ?? []) host.applyLocal(action);
   }
 
   function autoEngage(): void {
@@ -215,7 +222,7 @@ export function initSoloDrivers(host: SoloHost): SoloDrivers {
     driveChains,
     drivePatrols,
     reset: () => {
-      lastAiAt = host.state().time;
+      ai.reset(host.state().time);
       probed.clear();
     },
   };
