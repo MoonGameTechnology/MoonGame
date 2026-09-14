@@ -1197,6 +1197,7 @@ export const en: Record<string, string> = {
   'err.internal': 'internal error',
   'err.limit': 'limit reached',
   'err.no-ability': 'unknown ability',
+  'err.no-anchor': 'your fleet must be here — a station is anchored from a ship',
   'err.no-artillery': 'no artillery',
   'err.no-capacity': 'the hold is full',
   'err.no-capital': 'no capital to recall to',
@@ -1219,6 +1220,7 @@ export const en: Record<string, string> = {
   'err.no-troops': 'the world is defended — an assault needs troops aboard',
   'err.not-destructible': 'this world cannot be destroyed',
   'err.not-capturable': 'this sector cannot be captured — there is nothing to hold',
+  'err.not-empty': 'not empty space — a station is anchored on an empty node only',
   'err.not-equipped': 'the hero does not have that ability',
   'err.out-of-range': 'out of range',
   'err.orbit-contested': 'an enemy fleet still holds the orbit — beat it first',
@@ -1804,6 +1806,13 @@ export const en: Record<string, string> = {
   'settings.gfx.motion': 'Layer motion',
   'settings.gfx.motion.hint':
     'breathing of markers, glows and engines; off freezes them without hiding them',
+  'settings.gfx.render-compat': 'Rendering compatibility',
+  'settings.gfx.render-compat.hint':
+    'requests software map rendering; may lower FPS; applies after restart',
+  'settings.gfx.render-compat.pending': 'Change pending restart',
+  'settings.gfx.render-report': 'Rendering report',
+  'settings.gfx.render-report.hint':
+    'technical details for troubleshooting — select and copy the report text',
   'settings.gfx.starfield': 'Star backdrop',
   'settings.gfx.starfield.hint':
     'drifting nebulae and stars in the background — turn off for a flat backdrop',

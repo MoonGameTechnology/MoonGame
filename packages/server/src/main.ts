@@ -48,6 +48,11 @@ import { loadMedalCatalog } from './medalCatalog';
 import { AvaOrchestrator, warDeclarationsFor } from './avaOrchestrator';
 import { MatchKeeper } from './matchFactory';
 import { LazyRoomRegistry } from './roomRegistry';
+import { installFatalHandlers } from './fatal';
+
+// RESIL-3 — ДО всего остального: от сюда и ниже любое падение обязано оставить в логе
+// строку с именем причины, а не молчаливый перезапуск контейнера.
+installFatalHandlers();
 
 /**
  * Runnable server entrypoint on the real simulation core. Hosts MANY matches from one

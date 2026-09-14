@@ -9,7 +9,7 @@ import type {
 import type { BuildingDef, GameData, ResourceBag, UnitDef } from '../data/schemas';
 import { buildingLevel, buildingMaxLevel } from '../data/schemas';
 import { isBombarded } from '../state/orbit';
-import { allowedBuildings } from '../state/sectorKind';
+import { allowedBuildings, isBuildable } from '../state/sectorKind';
 import type { Action } from '../action/types';
 import { hoursToMs, timeScaleOf } from '../action/types';
 import { MS_PER_HOUR } from '../util/time';
@@ -549,10 +549,21 @@ export const constructionModule: GameModule = {
       if (!def) {
         return h.reject('E_UNKNOWN_BUILDING');
       }
-      // Province-type roster: each province type lists the buildings it may host
-      // (`allowedBuildings`). undefined roster (kind-less / unknown / roster-less) = any
-      // building — kind-less scenario worlds keep building exactly as before. An explicit
-      // `[]` means "no construction here" (empty / debris).
+      // Province type decides construction in TWO steps, and both are gates here.
+      //
+      // 1. `buildable` — can anything at all be raised on this province type? Until
+      //    SEC/BLD-… this flag was declared in `sectorKinds` and read by nobody but the
+      //    map renderer, so `buildable: false` blocked nothing: `empty`/`debris_field`
+      //    were safe only because they ALSO carry `allowedBuildings: []`. Same defect
+      //    `orbit` had before ORB-1 turned it into a rule; this is that fix for
+      //    `buildable`. Now a nebula or an ion storm needs no roster to host nothing.
+      if (!isBuildable(h.ctx.data, planet)) {
+        return h.reject('E_WRONG_SECTOR'); // nothing is raised on this province type
+      }
+      // 2. `allowedBuildings` — WHICH structures a buildable province type hosts.
+      //    undefined roster (kind-less / unknown / roster-less) = any building —
+      //    kind-less scenario worlds keep building exactly as before. An explicit
+      //    `[]` means "no construction here" (empty / debris).
       const roster = allowedBuildings(h.ctx.data, planet);
       if (roster !== undefined && !roster.includes(payload.building)) {
         return h.reject('E_WRONG_SECTOR'); // this structure does not fit this province type

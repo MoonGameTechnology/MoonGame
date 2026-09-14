@@ -16,6 +16,7 @@
 import { t } from '../../localization/runtime';
 import { buildLabel, checkForUpdateDetailed, currentBuild } from './updater';
 import type { UpdateCheck, UpdateInfo } from './updater';
+import { detach } from './detach';
 
 /** Минимальный зазор между молчаливыми проверками. */
 export const CHECK_GAP_MS = 15 * 60_000;
@@ -112,13 +113,17 @@ export function initApkUpdater(): void {
     const bar = el('updbar');
     if (bar) bar.style.display = 'none';
   });
-  cupd?.addEventListener('click', () => void runCheck(true, cver));
+  cupd?.addEventListener('click', () =>
+    detach('обновление APK: ручная проверка', runCheck(true, cver)),
+  );
   // The hub carries its own manual check (the returning-player path never shows
   // #connect); diagnostics land in the hub's note line.
   const hubUpd = el('hub-upd');
   if (hubUpd) {
     hubUpd.style.display = '';
-    hubUpd.addEventListener('click', () => void runCheck(true, el('hub-note')));
+    hubUpd.addEventListener('click', () =>
+      detach('обновление APK: ручная проверка из хаба', runCheck(true, el('hub-note'))),
+    );
   }
 
   // Silent re-checks: once at launch, whenever the app returns to the FOREGROUND
@@ -129,7 +134,7 @@ export function initApkUpdater(): void {
     const now = Date.now();
     if (!shouldCheck(now, lastCheckAt, navigator.onLine !== false)) return;
     lastCheckAt = now;
-    void runCheck(false);
+    detach('обновление APK: фоновая проверка', runCheck(false));
   };
   document.addEventListener('visibilitychange', () => {
     if (!document.hidden) maybeCheck();

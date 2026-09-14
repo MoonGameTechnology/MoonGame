@@ -25,6 +25,10 @@ export interface SettingsView {
   /** Appearance is offered only on desktop/tablet viewports. */
   holography?: boolean;
   holographySupported?: boolean;
+  /** Запрошенный режим карты и режим, выбранный при запуске, могут отличаться. */
+  renderCompatibility?: boolean;
+  renderCompatibilityActive?: boolean;
+  renderCompatibilitySupported?: boolean;
   fps: boolean;
   soundOn: boolean;
   /** Громкость звука, 0..1. */
@@ -44,12 +48,16 @@ export const PALETTES: ReadonlyArray<{ id: string; key: string }> = [
 
 const onOff = (v: boolean): string => (v ? t('settings.on') : t('settings.off'));
 const pct = (v: number): number => Math.round(v * 100);
+const renderCompatibilityPending = (view: SettingsView): string =>
+  (view.renderCompatibility ?? false) !== (view.renderCompatibilityActive ?? false)
+    ? t('settings.gfx.render-compat.pending')
+    : '';
 
 /** Строка-тумблер: подпись с пояснением слева, переключатель и его состояние справа. */
-function switchRow(id: string, label: string, hint: string, on: boolean): string {
+function switchRow(id: string, label: string, hint: string, on: boolean, status = ''): string {
   return (
     `<div class="set-row">` +
-    `<div class="set-lbl">${label}<span class="set-sub">${hint}</span></div>` +
+    `<div class="set-lbl">${label}<span class="set-sub">${hint}</span>${status}</div>` +
     `<div class="set-ctl"><label class="set-switch"><input id="set-${id}" type="checkbox"${on ? ' checked' : ''} aria-label="${label}"><span class="sw-track"></span><span class="sw-knob"></span></label>` +
     `<span id="set-${id}-val" class="set-val">${onOff(on)}</span></div>` +
     `</div>`
@@ -71,7 +79,7 @@ function rangeRow(id: string, label: string, hint: string, value: number, aria =
 }
 
 /** Окно настроек целиком. Чистая функция от снимка — ни DOM, ни хранилища. */
-export function settingsBoxHtml(view: SettingsView): string {
+export function settingsBoxHtml(view: SettingsView, renderingReportAvailable = false): string {
   const palettes =
     PALETTES.map(
       (p) =>
@@ -113,6 +121,20 @@ export function settingsBoxHtml(view: SettingsView): string {
     ) +
     switchRow('motion', t('settings.gfx.motion'), t('settings.gfx.motion.hint'), view.motion) +
     switchRow('fps', t('settings.gfx.fps'), t('settings.gfx.fps.hint'), view.fps) +
+    (view.renderCompatibilitySupported
+      ? switchRow(
+          'render-compat',
+          t('settings.gfx.render-compat'),
+          t('settings.gfx.render-compat.hint'),
+          view.renderCompatibility ?? false,
+          `<span id="set-render-compat-pending" class="set-sub" role="status">${renderCompatibilityPending(view)}</span>`,
+        )
+      : '') +
+    (renderingReportAvailable
+      ? `<div class="set-row"><button type="button" class="set-pal" id="set-render-report" aria-expanded="false" aria-controls="set-render-report-panel">${t('settings.gfx.render-report')}</button>` +
+        `<div id="set-render-report-panel" hidden><div class="set-lbl"><span class="set-sub">${t('settings.gfx.render-report.hint')}</span></div>` +
+        `<textarea id="set-render-report-text" class="set-render-report-text" readonly spellcheck="false" rows="8" aria-label="${t('settings.gfx.render-report')}"></textarea></div></div>`
+      : '') +
     // SND-1: секция «Звук» — тумблер синтезированных откликов + громкость.
     `<div class="pc-sec">${t('settings.snd.title')}</div>` +
     switchRow('snd', t('settings.snd.ui'), t('settings.snd.ui.hint'), view.soundOn) +
@@ -134,6 +156,9 @@ export interface SettingsHost {
   setStarfield(v: boolean): void;
   setMotion(v: boolean): void;
   setHolography?(v: boolean): void;
+  setRenderCompatibility?(on: boolean): void;
+  /** Локальный технический отчёт; читается только по запросу игрока. */
+  renderingReport?(): string;
   setFps(v: boolean): void;
   setSound(v: boolean): void;
   setVolume(v: number): void;
@@ -157,7 +182,7 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
 
   function render(): void {
     const v = host.view();
-    host.root().innerHTML = settingsBoxHtml(v);
+    host.root().innerHTML = settingsBoxHtml(v, typeof host.renderingReport === 'function');
 
     // Тумблеры: каждый пишет настройку и тут же обновляет свою подпись — иначе значение
     // рядом с переключателем разъедется с ним до следующей перерисовки.
@@ -177,6 +202,31 @@ export function initSettings(host: SettingsHost): { open: () => void; render: ()
     toggle('fps', host.setFps);
     toggle('snd', host.setSound, (on) => {
       if (on) host.previewSound(); // включил — сразу слышно, ЧТО включил
+    });
+
+    const compatibility = q<HTMLInputElement>('set-render-compat');
+    if (host.setRenderCompatibility) {
+      compatibility?.addEventListener('change', () => {
+        host.setRenderCompatibility?.(compatibility.checked);
+        // Хранилище может отклонить запись: показываем фактически сохранённый выбор.
+        const current = host.view();
+        compatibility.checked = current.renderCompatibility ?? false;
+        label('set-render-compat', onOff(compatibility.checked));
+        const pending = q('set-render-compat-pending');
+        if (pending) pending.textContent = renderCompatibilityPending(current);
+      });
+    }
+
+    const reportButton = q('set-render-report');
+    const reportPanel = q('set-render-report-panel');
+    const reportText = q<HTMLTextAreaElement>('set-render-report-text');
+    reportButton?.addEventListener('click', () => {
+      if (!reportPanel || !reportText) return;
+      const show = reportPanel.hidden;
+      // Сведения о среде остаются текстом, даже если содержат HTML-разметку.
+      if (show) reportText.value = host.renderingReport?.() ?? '';
+      reportPanel.hidden = !show;
+      reportButton.setAttribute('aria-expanded', String(show));
     });
 
     const sweep = q<HTMLInputElement>('set-sweep');

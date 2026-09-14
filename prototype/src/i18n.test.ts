@@ -12,6 +12,7 @@ import { INTROS } from './intros';
 import { FIRST_GOALS } from './firstGoals';
 import { HUD_ORIENTATION_TOUR } from './onboardingTour';
 import { buildFirstMatchTour } from './firstMatchTour';
+import { refusalKeyOf } from '../../decisions/refusalText';
 
 /** Тур первого матча строится из предикатов хоста — для разбора копии они не важны. */
 const TOUR_DEPS_STUB = {
@@ -227,6 +228,31 @@ describe('локализация — ключи', () => {
     for (const f of srcFiles())
       for (const lit of extractCallArgs(read(f), 't'))
         if (KEY_RE.test(lit) && !(lit in ru)) missing.push(`${f}: ${lit}`);
+    expect(missing.sort()).toEqual([]);
+  });
+
+  it('каждый отказ КРЕПОСТИ назван словами в обеих локалях', () => {
+    // `errText()` (`decisions/refusalText.ts`) ВЫВОДИТ ключ из кода отказа, а не берёт
+    // его из таблицы. Плата за это — забытая запись в локали ничего не ломает: игрок
+    // просто видит сам код словами («not empty»). Ровно так и выглядела станция —
+    // перевода не было ни у одного из двух кодов, которые отдаёт только она.
+    // Список кодов не переписан сюда руками, а ЧИТАЕТСЯ из модуля: новый `h.reject()`
+    // в крепости без текста обязан валить гейт, а не ждать, пока его увидят на экране.
+    const codes = new Set(
+      [
+        ...read('packages/shared-core/src/modules/station.ts').matchAll(
+          /reject\('(E_[A-Z0-9_]+)'\)/g,
+        ),
+      ].map((m) => m[1]!),
+    );
+    expect(codes.size).toBeGreaterThan(3); // разбор не должен молча опустеть
+    // Технологический гейт форта живёт не в модуле крепости, а в хуке
+    // `construction.requirement` (`technology.ts`) — им же заперто орбитальное ПКО (ORB-1).
+    codes.add('E_TECH_LOCKED');
+    const missing = [...codes]
+      .map((code) => [code, refusalKeyOf(code)] as const)
+      .filter(([, key]) => !(key in ru) || !(key in en))
+      .map(([code, key]) => `${code} → ${key}`);
     expect(missing.sort()).toEqual([]);
   });
 

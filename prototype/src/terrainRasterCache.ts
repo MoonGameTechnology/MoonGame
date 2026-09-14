@@ -35,7 +35,14 @@ function signature(field: TerrainField, dpr: number): string {
 export class TerrainRasterCache {
   private entries = new Map<string, Entry>();
   private pixels = 0;
-  constructor(private readonly maxPixels = MAX_PIXELS) {}
+  constructor(
+    private readonly maxPixels = MAX_PIXELS,
+    private readonly contextOptions?: CanvasRenderingContext2DSettings,
+  ) {}
+
+  clear(): void {
+    for (const id of this.entries.keys()) this.remove(id);
+  }
 
   private remove(id: string): void {
     const entry = this.entries.get(id);
@@ -65,11 +72,19 @@ export class TerrainRasterCache {
       const surface = document.createElement('canvas');
       surface.width = width;
       surface.height = height;
-      const context = surface.getContext('2d');
+      const context = this.contextOptions
+        ? surface.getContext('2d', this.contextOptions)
+        : surface.getContext('2d');
       if (!context) return;
       context.setTransform(dpr, 0, 0, dpr, (PAD - b.x) * dpr, (PAD - b.y) * dpr);
       drawTerrainField(context, field);
       entry = { key, surface, pixels };
+      const painted = entry;
+      const invalidate = (): void => {
+        painted.key = '';
+      };
+      surface.addEventListener?.('contextlost', invalidate);
+      surface.addEventListener?.('contextrestored', invalidate);
       this.pixels += pixels;
     }
     this.entries.delete(field.id);

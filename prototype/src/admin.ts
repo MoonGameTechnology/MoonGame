@@ -22,6 +22,7 @@
  *    равно нельзя.
  */
 import { t, localizeStaticDom } from '../../localization/runtime';
+import { detach } from './detach';
 
 const el = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
@@ -123,7 +124,8 @@ async function confirmAuthority(): Promise<void> {
   });
   say('admin.ready');
   await loadMatches();
-  if (timer === null) timer = setInterval(() => void loadRoster(), REFRESH_MS);
+  if (timer === null)
+    timer = setInterval(() => detach('пульт: обновление состава', loadRoster()), REFRESH_MS);
 }
 
 function signOut(): void {
@@ -216,7 +218,7 @@ function render(roster: Roster): void {
       button.className = 'kick';
       button.textContent = t('admin.kick');
       const nick = seat.nick;
-      button.onclick = () => void kick(roster.matchId, nick);
+      button.onclick = () => detach('пульт: исключение игрока', kick(roster.matchId, nick));
       act.append(button);
     }
     table.append(tr);
@@ -253,15 +255,15 @@ localizeStaticDom();
 // пароля, и менеджер паролей, который сам заполняет пару и жмёт отправку.
 el<HTMLFormElement>('a-gate').onsubmit = (e: Event): void => {
   e.preventDefault();
-  void signIn();
+  detach('пульт: вход', signIn());
 };
 el('a-signout').onclick = () => signOut();
-el('a-refresh').onclick = () => void loadMatches();
-el<HTMLSelectElement>('a-match').onchange = () => void loadRoster();
+el('a-refresh').onclick = () => detach('пульт: список матчей', loadMatches());
+el<HTMLSelectElement>('a-match').onchange = () => detach('пульт: состав матча', loadRoster());
 
 // Перезагрузка страницы не должна означать повторный вход (правило 2).
 const saved = sessionStorage.getItem(SESSION_KEY);
 if (saved) {
   token = saved;
-  void confirmAuthority();
+  detach('пульт: проверка сохранённого доступа', confirmAuthority());
 }

@@ -2,6 +2,7 @@ import type { UnitStack } from './gameState';
 import type { GameData } from '../data/schemas';
 import { damageUnits, MAX_COMBAT_ROUNDS, stackHull } from '../util/combat';
 import { cappedUnitStat } from '../util/stacks';
+import { volleyShare } from '../util/volley';
 import { effectiveStats } from '../util/loadout';
 import { deepClone } from '../util/clone';
 
@@ -116,8 +117,13 @@ export function previewBattle(
     }
     // Same line cap as the live sideDamage: only the COMBAT_UNIT_CAP strongest
     // units fire, everyone behind them only soaks (parity is test-enforced).
-    const toDefender = cappedUnitStat(a, data, 'attack');
-    const toAttacker = cappedUnitStat(d, data, 'defense');
+    //
+    // И тем же правилом делится залп (MSB-2, `volleyShare`). У дуэли враг ОДИН, поэтому
+    // доля равна залпу и число здесь не меняется — но правило зовётся, а не повторяется
+    // умолчанием. Прогноз, считающий не тем правилом, что бой, обещает игроку другой бой;
+    // сегодня разницы нет, а после первой же правки делёжа была бы, и молча.
+    const toDefender = volleyShare(cappedUnitStat(a, data, 'attack'), 1);
+    const toAttacker = volleyShare(cappedUnitStat(d, data, 'defense'), 1);
     d = damageUnits(d, toDefender, data).survivors;
     // Прогноз обязан щадить артиллерию атакующего ровно так же, как живой бой
     // (ROS-2.1) — иначе игрок увидит один исход, а получит другой.

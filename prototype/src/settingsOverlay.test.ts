@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll } from 'vitest';
-import { setLocale } from '../../localization/runtime';
+import { setLocale, t } from '../../localization/runtime';
 import {
   settingsBoxHtml,
   initSettings,
@@ -30,6 +30,8 @@ const viewOf = (over: Partial<SettingsView> = {}): SettingsView => ({
 /** Окно без DOM: разметка строкой, элементы ищутся по id внутри неё. */
 function fakeWin() {
   let handler: ((ev: unknown) => void) | null = null;
+  let html = '';
+  let renderCount = 0;
   const classes = new Set<string>();
   const nodes = new Map<
     string,
@@ -37,6 +39,8 @@ function fakeWin() {
       checked: boolean;
       value: string;
       textContent: string;
+      hidden: boolean;
+      attributes: Record<string, string>;
       on: Record<string, () => void>;
       dataset: Record<string, string>;
     }
@@ -45,14 +49,26 @@ function fakeWin() {
     checked: false,
     value: '',
     textContent: '',
+    hidden: false,
+    attributes: {} as Record<string, string>,
     on: {} as Record<string, () => void>,
     dataset: {} as Record<string, string>,
     addEventListener(type: string, h: () => void) {
       this.on[type] = h;
     },
+    setAttribute(name: string, value: string) {
+      this.attributes[name] = value;
+    },
   });
   const el = {
-    innerHTML: '',
+    get innerHTML() {
+      return html;
+    },
+    set innerHTML(value: string) {
+      html = value;
+      renderCount++;
+      nodes.clear();
+    },
     classList: {
       add: (c: string) => classes.add(c),
       remove: (c: string) => classes.delete(c),
@@ -64,7 +80,13 @@ function fakeWin() {
     querySelector: (sel: string) => {
       const id = sel.replace(/^#/, '');
       if (!el.innerHTML.includes(`id="${id}"`)) return null;
-      if (!nodes.has(id)) nodes.set(id, make() as never);
+      if (!nodes.has(id)) {
+        const node = make();
+        const position = el.innerHTML.indexOf(`id="${id}"`);
+        const tag = el.innerHTML.slice(position, el.innerHTML.indexOf('>', position));
+        node.hidden = /\shidden(?:\s|$)/.test(tag);
+        nodes.set(id, node);
+      }
       return nodes.get(id) as never;
     },
     querySelectorAll: (sel: string) => {
@@ -83,6 +105,7 @@ function fakeWin() {
   return {
     el: el as unknown as HTMLElement,
     html: () => el.innerHTML,
+    renderCount: () => renderCount,
     shown: () => classes.has('show'),
     node: (id: string) => nodes.get(id),
     fire: (id: string, type = 'change') => nodes.get(id)?.on[type]?.(),
@@ -160,6 +183,43 @@ describe('настройки — разметка', () => {
     );
   });
 
+  it('совместимость отрисовки предлагается только при поддержке', () => {
+    expect(settingsBoxHtml(viewOf())).not.toContain('id="set-render-compat"');
+    expect(
+      settingsBoxHtml(viewOf({ renderCompatibilitySupported: false, renderCompatibility: true })),
+    ).not.toContain('id="set-render-compat"');
+    const html = settingsBoxHtml(viewOf({ renderCompatibilitySupported: true }));
+    expect(html).toContain('id="set-render-compat" type="checkbox"');
+    expect(html).toContain(t('settings.gfx.render-compat'));
+    expect(html).toContain(t('settings.gfx.render-compat.hint'));
+  });
+
+  it.each([
+    [false, false, false],
+    [true, true, false],
+    [true, false, true],
+    [false, true, true],
+  ])('запрошено %s, активно %s: ожидание перезапуска %s', (requested, active, pending) => {
+    const html = settingsBoxHtml(
+      viewOf({
+        renderCompatibilitySupported: true,
+        renderCompatibility: requested,
+        renderCompatibilityActive: active,
+      }),
+    );
+    expect(html.includes('id="set-render-compat" type="checkbox" checked')).toBe(requested);
+    expect(html.includes(t('settings.gfx.render-compat.pending'))).toBe(pending);
+  });
+
+  it('технический отчёт необязателен и свёрнут до нажатия кнопки', () => {
+    expect(settingsBoxHtml(viewOf())).not.toContain('id="set-render-report"');
+    const html = settingsBoxHtml(viewOf(), true);
+    expect(html).toContain('id="set-render-report"');
+    expect(html).toContain('aria-expanded="false" aria-controls="set-render-report-panel"');
+    expect(html).toContain('id="set-render-report-panel" hidden');
+    expect(html).toMatch(/<textarea[^>]*id="set-render-report-text"[^>]*readonly[^>]*><\/textarea>/);
+  });
+
   it('выбранная палитра подсвечена, остальные — нет', () => {
     const html = settingsBoxHtml(viewOf({ palette: 'warm' }));
     expect(html).toContain('class="set-pal on" data-pal="warm"');
@@ -223,6 +283,85 @@ describe('настройки — окно и обработчики', () => {
     w.win.node('set-holography')!.checked = true;
     w.win.fire('set-holography');
     expect(changes).toEqual([false, true]);
+  });
+
+  it('совместимость обновляет сохранённое значение и ожидание без сброса остальных полей', () => {
+    const view = viewOf({
+      renderCompatibilitySupported: true,
+      renderCompatibility: false,
+      renderCompatibilityActive: false,
+    });
+    const changes: boolean[] = [];
+    const w = wired(
+      {
+        setRenderCompatibility: (on) => {
+          changes.push(on);
+          view.renderCompatibility = on;
+        },
+      },
+      view,
+    );
+    w.api.open();
+    const renders = w.win.renderCount();
+    const volume = w.win.node('set-snd-vol')!;
+    volume.value = '65';
+    const toggle = w.win.node('set-render-compat')!;
+    toggle.checked = true;
+    w.win.fire('set-render-compat');
+    expect(changes).toEqual([true]);
+    expect(toggle.checked).toBe(true);
+    expect(w.win.node('set-render-compat-val')?.textContent).toBe(t('settings.on'));
+    expect(w.win.node('set-render-compat-pending')?.textContent).toBe(
+      t('settings.gfx.render-compat.pending'),
+    );
+    toggle.checked = false;
+    w.win.fire('set-render-compat');
+    expect(changes).toEqual([true, false]);
+    expect(w.win.node('set-render-compat-val')?.textContent).toBe(t('settings.off'));
+    expect(w.win.node('set-render-compat-pending')?.textContent).toBe('');
+    expect(w.win.renderCount()).toBe(renders);
+    expect(w.win.node('set-snd-vol')).toBe(volume);
+    expect(volume.value).toBe('65');
+  });
+
+  it('не обещает изменение совместимости, если хозяин не смог сохранить настройку', () => {
+    const w = wired(
+      { setRenderCompatibility: () => undefined },
+      viewOf({ renderCompatibilitySupported: true, renderCompatibility: false }),
+    );
+    w.api.open();
+    w.win.node('set-render-compat')!.checked = true;
+    w.win.fire('set-render-compat');
+    expect(w.win.node('set-render-compat')?.checked).toBe(false);
+    expect(w.win.node('set-render-compat-val')?.textContent).toBe(t('settings.off'));
+    expect(w.win.node('set-render-compat-pending')?.textContent).toBe('');
+  });
+
+  it('отчёт читается по запросу и остаётся текстом даже при HTML в содержимом', () => {
+    const report = '</textarea><img src=x onerror=alert(1)><script>alert(2)</script>';
+    let reads = 0;
+    const w = wired({
+      renderingReport: () => {
+        reads++;
+        return report;
+      },
+    });
+    w.api.open();
+    const renders = w.win.renderCount();
+    expect(reads).toBe(0);
+    expect(w.win.node('set-render-report-panel')?.hidden).toBe(true);
+    expect(w.win.node('set-render-report-text')?.value).toBe('');
+    w.win.fire('set-render-report', 'click');
+    expect(reads).toBe(1);
+    expect(w.win.node('set-render-report-panel')?.hidden).toBe(false);
+    expect(w.win.node('set-render-report')?.attributes['aria-expanded']).toBe('true');
+    expect(w.win.node('set-render-report-text')?.value).toBe(report);
+    expect(w.win.html()).not.toContain(report);
+    w.win.fire('set-render-report', 'click');
+    expect(reads).toBe(1);
+    expect(w.win.node('set-render-report-panel')?.hidden).toBe(true);
+    expect(w.win.node('set-render-report')?.attributes['aria-expanded']).toBe('false');
+    expect(w.win.renderCount()).toBe(renders);
   });
 
   it('включение звука даёт короткий отклик, выключение — нет', () => {

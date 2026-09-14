@@ -121,8 +121,16 @@ export function clampCam(cam: Cam, vp: Viewport, b: Bounds, extra: EdgeSlack = {
   const pR = br.x * cam.scale;
   const pT = tl.y * cam.scale;
   const pB = br.y * cam.scale;
-  const mx = (vp.right - vp.left) * PAN_SLACK;
-  const my = (vp.bottom - vp.top) * PAN_SLACK;
+  // Open the edge slack continuously as the map grows past the fitted axis.
+  // Switching straight from a parked centre to full slack causes a visible jump.
+  const mx = Math.min(
+    (vp.right - vp.left) * PAN_SLACK,
+    Math.max(0, pR - pL - (vp.right - vp.left)) / 2,
+  );
+  const my = Math.min(
+    (vp.bottom - vp.top) * PAN_SLACK,
+    Math.max(0, pB - pT - (vp.bottom - vp.top)) / 2,
+  );
   const eL = extra.left ?? 0;
   const eR = extra.right ?? 0;
   const eT = extra.top ?? 0;
@@ -158,6 +166,28 @@ export function zoomAt(
   const by = (fy - cam.y) / cam.scale;
   const scale = clampScale(cam.scale * factor);
   return clampCam({ scale, x: fx - bx * scale, y: fy - by * scale }, vp, b, extra);
+}
+
+/** A whole two-finger gesture, relative to its starting camera and touch pair.
+ * Clamping intermediate pointer events must never become the next zoom baseline. */
+export function pinchAt(
+  startCam: Cam,
+  start: { dist: number; mid: { x: number; y: number } },
+  current: { dist: number; mid: { x: number; y: number } },
+  vp: Viewport,
+  b: Bounds,
+  extra: EdgeSlack = {},
+): Cam {
+  if (start.dist <= 0) return { ...startCam };
+  const scale = clampScale(startCam.scale * (current.dist / start.dist));
+  const bx = (start.mid.x - startCam.x) / startCam.scale;
+  const by = (start.mid.y - startCam.y) / startCam.scale;
+  return clampCam(
+    { scale, x: current.mid.x - bx * scale, y: current.mid.y - by * scale },
+    vp,
+    b,
+    extra,
+  );
 }
 
 /** Put map-point `p` at the centre of the play area at `scale` (clamped + bounded). */

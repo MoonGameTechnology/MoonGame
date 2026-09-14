@@ -1198,6 +1198,7 @@ export const ru: Record<string, string> = {
   'err.internal': 'внутренняя ошибка',
   'err.limit': 'достигнут предел',
   'err.no-ability': 'неизвестная способность',
+  'err.no-anchor': 'нужен свой флот на месте — станцию ставят с корабля',
   'err.no-artillery': 'нет артиллерии',
   'err.no-capacity': 'трюм полон',
   'err.no-capital': 'нет столицы для отзыва',
@@ -1220,6 +1221,7 @@ export const ru: Record<string, string> = {
   'err.no-troops': 'мир защищён — для штурма нужен десант на борту',
   'err.not-destructible': 'этот мир нельзя уничтожить',
   'err.not-capturable': 'этот сектор нельзя захватить — там нечего занимать',
+  'err.not-empty': 'здесь не пустота — станцию ставят только в пустом узле',
   'err.not-equipped': 'у героя нет этой способности',
   'err.out-of-range': 'вне радиуса действия',
   'err.orbit-contested': 'на орбите ещё держится вражеский флот — сперва разбейте его',
@@ -1800,6 +1802,13 @@ export const ru: Record<string, string> = {
   'settings.gfx.motion': 'Движение слоёв',
   'settings.gfx.motion.hint':
     'дыхание меток, свечений и двигателей; выкл замораживает их, но не прячет',
+  'settings.gfx.render-compat': 'Совместимость отрисовки',
+  'settings.gfx.render-compat.hint':
+    'запрашивает программную отрисовку карты; может снизить FPS; применяется после перезапуска',
+  'settings.gfx.render-compat.pending': 'Изменение ожидает перезапуска',
+  'settings.gfx.render-report': 'Отчёт об отрисовке',
+  'settings.gfx.render-report.hint':
+    'технические сведения для поиска неполадок — выделите и скопируйте текст отчёта',
   'settings.gfx.starfield': 'Звёздный фон',
   'settings.gfx.starfield.hint':
     'дрейфующие туманности и звёзды на фоне — выключите для плоского фона',

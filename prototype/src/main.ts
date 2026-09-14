@@ -179,6 +179,7 @@ import { pveState } from '../../packages/client/src/gameData';
 import {
   worldToScreen as camWorldToScreen,
   zoomAt as camZoomAt,
+  pinchAt as camPinchAt,
   clampCam as camClampCam,
   centerOn as camCenterOn,
   fitTransform as camFitTransform,
@@ -187,6 +188,7 @@ import {
   rgba,
   blitGlow as hdBlitGlow,
   blitSphere as hdBlitSphere,
+  clearHolographicSprites,
 } from '../../packages/client/src/holoDraw';
 import {
   drawTerritory,
@@ -382,7 +384,6 @@ import {
   nearestSegment,
   pickRadius,
   pinchOf,
-  pinchStep,
 } from '../../decisions/pointerPick';
 import {
   afford as coreAfford,
@@ -494,6 +495,7 @@ import {
   fxBreath,
 } from './graphicsPrefs';
 import { initSettings } from './settingsOverlay';
+import { canvasCompatibilityActive, canvasCompatibilityRequested, canvasCompatibilityOptions, setCanvasCompatibility } from './canvasCompatibility';
 import { initHolographicUi, commandWindowHtml } from './holographicUi';
 import { provincePingTarget, provinceForPing } from './provincePingAnchor';
 import { reframePresentation, supportsHolography } from './holographicLayout';
@@ -773,6 +775,7 @@ import { clientPlan, liveSocket, seatKey } from '../../decisions/netClientReuse'
 import { errorTarget, refusalKey } from '../../decisions/errorRoute';
 import { joinLanding } from '../../decisions/joinLanding';
 import { refusalText as errText } from '../../decisions/refusalText';
+import { detach } from './detach';
 import {
   claimIntent,
   matchIdFrom,
@@ -1310,7 +1313,8 @@ let vision: Vision | null = null; // identify + radar sets for this frame
 
 const $ = (id: string) => document.getElementById(id) as HTMLElement;
 const canvas = $('map') as unknown as HTMLCanvasElement;
-const cx = canvas.getContext('2d') as CanvasRenderingContext2D;
+const mapContextOptions = canvasCompatibilityOptions();
+const cx = (mapContextOptions ? canvas.getContext('2d', mapContextOptions) : canvas.getContext('2d')) as CanvasRenderingContext2D;
 const side = $('side');
 // HUD-DOCK: ряд команд (и регулятор скорости) стоят НА листе, поэтому его РЕАЛЬНАЯ
 // высота уезжает в `--sheeth`. Наблюдатель, а не замер в кадре: `offsetHeight` каждый
@@ -1726,6 +1730,22 @@ const SECTOR_OF: Record<string, string> = Object.fromEntries(MAP.map((n) => [n.i
 function sectorTypeOf(id: string) {
   const kind = SECTOR_OF[id];
   return kind === undefined ? undefined : SECTOR_TYPES[kind];
+}
+/** Зеркало ворот конструкции ядра (`construction.ts`): вид провинции пускает здание,
+ *  только если на нём вообще можно строить (`buildable`) И его ростер (undefined =
+ *  любое) это здание допускает. Одна копия на все кнопки: три собственных
+ *  `?? BUILDABLE` по коду и были тем, из-за чего клиентское правило разъехалось с
+ *  данными (ORB-4) — кнопка обещала стройку, которую сервер отклонял. */
+function sectorAllowsBuilding(planetId: string, building: string): boolean {
+  const type = sectorTypeOf(planetId);
+  if (type && !type.buildable) return false;
+  return (type?.allowedBuildings ?? BUILDABLE).includes(building);
+}
+/** Есть ли на провинции хоть одно допустимое здание — гейт кнопки «Постройки». */
+function sectorBuildsAnything(planetId: string): boolean {
+  const type = sectorTypeOf(planetId);
+  if (type && !type.buildable) return false;
+  return (type?.allowedBuildings ?? BUILDABLE).length > 0;
 }
 function world(p: { x: number; y: number }): { x: number; y: number } {
   return camWorldToScreen(p, cam, insets(), mapBounds());
@@ -4132,8 +4152,10 @@ let selectionBox: { x1: number; y1: number; x2: number; y2: number } | null = nu
 // visible canvas, reusing native-resolution province art without snapshotting a
 // freshly mutated full-screen surface on every move.
 const bg = document.createElement('canvas');
-const bgx = bg.getContext('2d') as CanvasRenderingContext2D;
-const terrainRaster = new TerrainRasterCache();
+const bgx = (mapContextOptions ? bg.getContext('2d', mapContextOptions) : bg.getContext('2d')) as CanvasRenderingContext2D;
+const terrainRaster = new TerrainRasterCache(undefined, mapContextOptions);
+const mapContextEvents = { lost: 0, restored: 0 };
+const backgroundContextEvents = { lost: 0, restored: 0 };
 let bgContent = ''; // viewport + ownership signature (camera-independent)
 let bgCam = { x: 0, y: 0, scale: 1 }; // camera the static layer was last baked at
 let presentedCam: { x: number; y: number; scale: number } | null = null;
@@ -4142,6 +4164,20 @@ let terrainFields: TerrainField[] = [];
 let holographicFrame = { x: 0, y: 0, width: 0, height: 0 };
 let paintedSelection: string | null = null;
 let selectionStarted = 0;
+
+/** WebView can restore contexts without changing canvas dimensions or camera state. */
+function invalidateMapSurfaces(): void {
+  bgContent = '';
+  presentedCam = null;
+  terrainRaster.clear();
+  clearHolographicSprites();
+}
+canvas.addEventListener('contextlost', () => { mapContextEvents.lost++; invalidateMapSurfaces(); });
+canvas.addEventListener('contextrestored', () => { mapContextEvents.restored++; invalidateMapSurfaces(); });
+// Offscreen contexts can also be lost independently. Their events do not bubble
+// through document, so observe the actual cached surface.
+bg.addEventListener?.('contextlost', () => { backgroundContextEvents.lost++; bgContent = ''; });
+bg.addEventListener?.('contextrestored', () => { backgroundContextEvents.restored++; bgContent = ''; });
 
 /** The owner of node `id` AS THE VIEWER MAY KNOW IT: live when identified (or fog
  *  off), last-known from memory when only remembered, unknown otherwise. The
@@ -4182,9 +4218,9 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   const width = Math.round(VW * DPR);
   const baked = bgContent ? { signature: bgContent, cam: bgCam, width: bg.width } : null;
   if (g === bgx) {
+    if (bgx.isContextLost?.()) return;
     if (!needsRebake(baked, { signature: content, cam, width })) return;
-    bgContent = content;
-    bgCam = { x: cam.x, y: cam.y, scale: cam.scale };
+    bgContent = ''; // publish the cache signature only after a complete paint
     // Preserve the allocation when only the scene changed.
     if (bg.width !== Math.round(VW * DPR)) bg.width = Math.round(VW * DPR);
     if (bg.height !== Math.round(VH * DPR)) bg.height = Math.round(VH * DPR);
@@ -4310,23 +4346,33 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   g.strokeStyle = 'rgba(90,151,165,0.2)';
   g.lineWidth = 0.7;
   if (!holographicMapOn()) g.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+  if (g === bgx && !bgx.isContextLost?.()) {
+    bgContent = content;
+    bgCam = { x: cam.x, y: cam.y, scale: cam.scale };
+  }
 }
 
 /** Blit the cached static layer (device-pixel 1:1) beneath the live dynamic art. */
 function blitStaticLayer(): void {
   const moving = presentedCam && (presentedCam.x !== cam.x || presentedCam.y !== cam.y || presentedCam.scale !== cam.scale);
-  if (moving) {
+  const pinching = pinchStart !== null;
+  if (moving || pinching || bgx.isContextLost?.()) {
     // Copying a freshly painted full-screen canvas forces its thousands of draw
     // commands to flush before drawImage can snapshot it. Paint directly during
     // motion; province textures remain cached and every exposed edge is current.
     cx.save();
-    buildStaticLayer(cx, presentedCam!.scale !== cam.scale);
+    // A touch stream can leave idle frames between moves. Do not allocate a new
+    // terrain bake at each intermediate scale; settle once when the pinch ends.
+    buildStaticLayer(cx, pinching || (!!presentedCam && presentedCam.scale !== cam.scale));
     cx.restore();
   } else {
     // Once settled, bake once at the final camera; idle frames are one 1:1 blit.
     buildStaticLayer();
     cx.save();
     cx.setTransform(1, 0, 0, 1, 0, 0);
+    // Replace the entire frame even if a backing store disappears between the
+    // validity check and this blit. Source-over would accumulate live glow forever.
+    cx.globalCompositeOperation = 'copy';
     cx.drawImage(bg, 0, 0);
     cx.restore();
   }
@@ -4475,6 +4521,7 @@ function drawRadarRange(now: number): void {
 }
 
 function render(now: number) {
+  if (cx.isContextLost?.()) return;
   cx.setTransform(DPR, 0, 0, DPR, 0, 0); // draw in CSS pixels, crisp on hi-DPI
   // Semantic zoom (LOD): zoomed far out the map turns SCHEMATIC — holo type
   // badges, callout text, fleet pyramids/cargo/counts, orbit rings and battle
@@ -6419,7 +6466,7 @@ function planetPanelHtml(p: Planet): string {
     // Каталог непостроенного больше не живёт плитками в панели — его показывает
     // полноэкранное окно построек. Кнопка есть только там, где строить можно
     // (свой мир И ростер сектора непуст — CMD-VIS: нет приказа — нет кнопки).
-    if (mine && (sectorTypeOf(p.id)?.allowedBuildings ?? BUILDABLE).length > 0) {
+    if (mine && sectorBuildsAnything(p.id)) {
       blds += `<button class="bw-open" data-act="openbuild">▣ ${t('side.build.open')}</button>`;
     }
     cols.push(blds);
@@ -7069,7 +7116,7 @@ function codexBuildBtn(kind: string, id: string, level = 1): string {
       const c = def ? buildingLevel(def, inst.level + 1).cost : undefined;
       return `<button class="cx-build" data-cx-upg="${id}"${code ? ' disabled' : ''}>${t('side.build.upgrade', { c: '' })}${cost(c, myRes())}</button>`;
     }
-    const buildable = (sectorTypeOf(p.id)?.allowedBuildings ?? BUILDABLE).includes(id);
+    const buildable = sectorAllowsBuilding(p.id, id);
     // buildingLocked, а не только «уже стоит»: СТРОЯЩЕЕСЯ здание ещё не в p.buildings
     // (оно попадает туда на construction.complete), и кодекс предлагал «Построить
     // здесь» второй экземпляр одноэкземплярного здания всю стройку первого.
@@ -7298,7 +7345,7 @@ function renderObjDesc(): void {
 let sheetWasOpen = false;
 /** Keep the selected marker above the measured sheet, without following a moving fleet. */
 function revealMobileSelection(): void {
-  if (!MOBILE || !inMatch() || mobileOrderKind() || pickMode || chainMode) return;
+  if (!MOBILE || !inMatch() || mobileOrderKind() || pickMode || chainMode || pointers.size > 0) return;
   const el = document.getElementById('mobile-sheet');
   if (!el || el.hidden) return;
   const fid = panelFleet();
@@ -8166,7 +8213,7 @@ side.addEventListener('contextmenu', (ev) => {
     worldOwner: p?.owner ?? null,
     me: ME,
     sectorAllows:
-      !!p && !!anchorId && (sectorTypeOf(p.id)?.allowedBuildings ?? BUILDABLE).includes(anchorId),
+      !!p && !!anchorId && sectorAllowsBuilding(p.id, anchorId),
     locked: !!p && !!anchorId && !!buildingLocked(p.id, anchorId),
   });
   if (!order || !selPlanet) return;
@@ -8798,11 +8845,21 @@ function cancelLongPress(): void {
   }
   mapHold = release(mapHold); // право съесть отпускание переживает снятие ожидания
 }
-let pinchDist = 0;
-// Середина щипка: два пальца не только МАСШТАБИРУЮТ, но и ВЕЗУТ камеру. Нужно это
-// прежде всего вооружённому приказу: одним пальцем там целятся, и без второго жеста
-// камера оказывалась заперта — цель за краем экрана была недостижима.
-let pinchMid: { x: number; y: number } | null = null;
+// One stable baseline for the entire gesture. Per-pointer incremental zoom loses
+// its anchor when one finger reaches a clamp before the other finger is updated.
+let pinchStart: { cam: typeof cam; at: ReturnType<typeof pinchOf> } | null = null;
+let pinchPending = false;
+function rebasePinch(): void {
+  const [a, b] = [...pointers.values()];
+  pinchStart = a && b ? { cam: { ...cam }, at: pinchOf(a, b) } : null;
+  pinchPending = false;
+}
+function flushPinch(): void {
+  if (!pinchPending || !pinchStart) return;
+  pinchPending = false;
+  const [a, b] = [...pointers.values()];
+  if (a && b) Object.assign(cam, camPinchAt(pinchStart.cam, pinchStart.at, pinchOf(a, b), insets(), mapBounds(), panelSlack()));
+}
 // Был ли в этом жесте второй палец. После щипка нельзя ни выбирать объект,
 // ни ставить цель, ни отправлять приказ в точке отрыва последнего пальца.
 let multiTouched = false;
@@ -8813,6 +8870,7 @@ let boxSelecting = false;
 const ptXY = (ev: { clientX: number; clientY: number }) =>
   fromScreen({ x: ev.clientX, y: ev.clientY }, canvas.getBoundingClientRect(), VW, VH);
 canvas.addEventListener('pointerdown', (ev) => {
+  flushPinch();
   canvas.setPointerCapture?.(ev.pointerId);
   const p = ptXY(ev);
   pointers.set(ev.pointerId, p);
@@ -8871,7 +8929,7 @@ canvas.addEventListener('pointerdown', (ev) => {
         }
       }, MAP_HOLD_MS);
     }
-  } else if (pointers.size === 2) {
+  } else if (pointers.size >= 2) {
     cancelLongPress();
     multiTouched = true;
     // Второй палец ВЕЗЁТ КАМЕРУ (и масштабирует), а не отменяет вооружённый приказ.
@@ -8879,12 +8937,9 @@ canvas.addEventListener('pointerdown', (ev) => {
     // при вооружённом «Курсе» было не сдвинуть вовсе, а цель за краем экрана
     // становилась недостижимой. Отменить приказ по-прежнему можно кнопкой (повторный
     // тап по «Курс») и Back/Escape — обе дороги живы.
-    const [a, b] = [...pointers.values()];
-    if (a && b) {
-      const pinch = pinchOf(a, b);
-      pinchDist = pinch.dist;
-      pinchMid = pinch.mid;
-    }
+    boxSelecting = false;
+    selectionBox = null;
+    rebasePinch();
   }
 });
 canvas.addEventListener('pointermove', (ev) => {
@@ -8906,21 +8961,9 @@ canvas.addEventListener('pointermove', (ev) => {
     confirmRequired: MOBILE,
   });
   if (intent === 'pinch') {
-    const [a, b] = [...pointers.values()];
-    if (a && b) {
-      const cur = pinchOf(a, b);
-      // Масштаб и перенос середины считает `pointerPick.ts` (REFM-33): щипок и
-      // масштабирует, и ВЕЗЁТ камеру — одно другому не мешает.
-      const step = pinchStep(pinchMid ? { dist: pinchDist, mid: pinchMid } : null, cur);
-      if (step.scale !== 1) zoomAt(cur.mid.x, cur.mid.y, step.scale);
-      if (step.dx || step.dy) {
-        cam.x += step.dx;
-        cam.y += step.dy;
-        clampCam();
-      }
-      pinchDist = cur.dist;
-      pinchMid = cur.mid;
-    }
+    // Pointer events arrive separately. Apply their latest pair together at the
+    // next frame, never present the half-updated midpoint between two fingers.
+    pinchPending = true;
   } else if (intent === 'box' && dragStart) {
     selectionBox = { x1: dragStart.x, y1: dragStart.y, x2: p.x, y2: p.y };
   } else if (cameraFollows(intent)) {
@@ -8931,6 +8974,11 @@ canvas.addEventListener('pointermove', (ev) => {
   if (marksDragged(intent, moved)) dragged = true;
 });
 function endPointer(ev: PointerEvent) {
+  if (pointers.has(ev.pointerId) && pinchStart) {
+    pointers.set(ev.pointerId, ptXY(ev));
+    pinchPending = true;
+    flushPinch(); // include the final movement before dropping either finger
+  }
   const single = pointers.size === 1;
   const p = pointers.get(ev.pointerId);
   if (single && boxSelecting && selectionBox) {
@@ -8953,10 +9001,7 @@ function endPointer(ev: PointerEvent) {
     boxSelecting = false;
   }
   pointers.delete(ev.pointerId);
-  if (pointers.size < 2) {
-    pinchDist = 0;
-    pinchMid = null;
-  }
+  rebasePinch();
   cancelLongPress();
   // Созревшее удержание СЪЕДАЕТ это отпускание (правила 4–5): оно уже сделало своё дело,
   // и пропусти мы его дальше — за один жест игрок получил бы ещё и выбор/приказ.
@@ -8978,14 +9023,18 @@ function endPointer(ev: PointerEvent) {
   }
 }
 canvas.addEventListener('pointerup', endPointer);
-canvas.addEventListener('pointercancel', (ev) => {
+function cancelPointer(ev: PointerEvent): void {
+  if (!pointers.has(ev.pointerId)) return;
   cancelLongPress();
   mapHold = IDLE; // жест отменён системой — отпускания не будет, и съедать нечего
   pointers.delete(ev.pointerId);
-  pinchDist = 0;
+  rebasePinch();
+  dragged = true;
   selectionBox = null;
   boxSelecting = false;
-});
+}
+canvas.addEventListener('pointercancel', cancelPointer);
+canvas.addEventListener('lostpointercapture', cancelPointer);
 canvas.addEventListener(
   'wheel',
   (ev) => {
@@ -9371,7 +9420,7 @@ function suggestCallsign(): string {
 function enterBrowse(): void {
   if (!nickInput.value.trim()) nickInput.value = suggestCallsign();
   showStage('browse');
-  void refreshMatches();
+  detach('обозреватель: список партий', refreshMatches());
 }
 // --- meta-shell hub: post-login home + bottom nav (docs/main-menu.md) -------
 // After identity you land on the hub (home + PLAY + bottom nav), not the raw match
@@ -9405,12 +9454,12 @@ function hubTab(tab: string): void {
   currentHubTab = tab;
   // ADDR-4: свои партии — главный экран, а не вкладка обозревателя, поэтому лента
   // переспрашивается при каждом заходе домой (день и число игроков успевают устареть).
-  if (tab === 'home') void refreshMyMatches();
+  if (tab === 'home') detach('хаб: свои партии', refreshMyMatches());
   if (tab === 'meta') renderMetaPanel(); // live numbers every visit (XP may have grown)
-  if (tab === 'friends') void friends.refresh(); // roster + presence are server truth
-  if (tab === 'rank') void rank.refresh(); // places are computed server-side (RANK-1)
-  if (tab === 'arsenal') void arsenal.refresh(); // cache paints now, server refresh trails
-  if (tab === 'auction') void metaMarket.refresh();
+  if (tab === 'friends') detach('хаб: друзья', friends.refresh()); // roster + presence are server truth
+  if (tab === 'rank') detach('хаб: рейтинг', rank.refresh()); // places are computed server-side (RANK-1)
+  if (tab === 'arsenal') detach('хаб: арсенал', arsenal.refresh()); // cache paints now, server refresh trails
+  if (tab === 'auction') detach('хаб: аукцион', metaMarket.refresh());
   for (const [k, pid] of Object.entries(HUB_PANELS))
     $(pid).style.display = k === tab ? 'flex' : 'none';
   for (const b of Array.from(document.querySelectorAll('.hub-tab')))
@@ -9608,7 +9657,7 @@ function openHub(note = ''): void {
   hubTab('home');
   hubNote.textContent = note;
   refreshOnboardOffer(); // ONB-0: first-run offer/nudge for a not-yet-onboarded commander
-  void syncCommanderFromServer(); // account-backed XP → local mirror (accounts mode only)
+  detach('хаб: сверка командира с сервером', syncCommanderFromServer()); // account-backed XP → local mirror (accounts mode only)
 }
 
 $('cnew').addEventListener('click', () => {
@@ -9617,13 +9666,16 @@ $('cnew').addEventListener('click', () => {
   // tap before /auth/status answers must not take the guest branch on an accounts server.
   // With accounts OFF (nick-only server) there is no password to set, so a new commander
   // just gets a suggested callsign and drops into the hub.
-  void authProbe.then(() => {
-    if (authMode === 'accounts') {
-      openRegister();
-      return;
-    }
-    openHub();
-  });
+  detach(
+    'новый командир: ожидание /auth/status',
+    authProbe.then(() => {
+      if (authMode === 'accounts') {
+        openRegister();
+        return;
+      }
+      openHub();
+    }),
+  );
 });
 // «Вход по позывному»: reveal an inline field and enter under a callsign YOU type (vs
 // «Новый командир», which auto-suggests one). The chosen callsign is remembered
@@ -9642,15 +9694,18 @@ function signInByCallsign(): void {
   }
   // Same race guard as «Новый командир»: never pick the guest branch while the
   // /auth/status probe is still in flight.
-  void authProbe.then(() => {
-    if (authMode === 'accounts') {
-      void welcomeSignIn(nick);
-      return;
-    }
-    nickInput.value = nick;
-    localStorage.setItem('void.nick', nick); // remembered — next visit skips the welcome card
-    openHub();
-  });
+  detach(
+    'вход по позывному: ожидание /auth/status',
+    authProbe.then(() => {
+      if (authMode === 'accounts') {
+        detach('вход по позывному: вход', welcomeSignIn(nick));
+        return;
+      }
+      nickInput.value = nick;
+      localStorage.setItem('void.nick', nick); // remembered — next visit skips the welcome card
+      openHub();
+    }),
+  );
 }
 let signingIn = false; // in-flight guard: Enter + click must not double-register
 /** Bytro-style welcome sign-in: register-or-login right on the greeting card, then
@@ -9795,7 +9850,7 @@ async function submitRegister(): Promise<void> {
     signingIn = false;
   }
 }
-$('crgo').addEventListener('click', () => void submitRegister());
+$('crgo').addEventListener('click', () => detach('регистрация: отправка', submitRegister()));
 crNickInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') crMailInput.focus();
 });
@@ -9806,7 +9861,7 @@ crPassInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') crPass2Input.focus();
 });
 crPass2Input.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') void submitRegister();
+  if (e.key === 'Enter') detach('регистрация: отправка', submitRegister());
 });
 $('crback').addEventListener('click', () => {
   showStage('welcome');
@@ -9849,9 +9904,11 @@ $('crrecover').addEventListener('click', () => {
   statusEl.textContent = '';
   crecMailInput.focus();
 });
-$('crecgo').addEventListener('click', () => void submitRecover());
+$('crecgo').addEventListener('click', () =>
+  detach('восстановление пароля: отправка', submitRecover()),
+);
 crecMailInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') void submitRecover();
+  if (e.key === 'Enter') detach('восстановление пароля: отправка', submitRecover());
 });
 $('crecback').addEventListener('click', () => {
   showStage('welcome');
@@ -9904,12 +9961,14 @@ const passwordReset = initPasswordReset({
     }
   },
 });
-$('cresetgo').addEventListener('click', () => void passwordReset.submit());
+$('cresetgo').addEventListener('click', () =>
+  detach('сброс пароля: отправка', passwordReset.submit()),
+);
 cresetPassInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') cresetPass2Input.focus();
 });
 cresetPass2Input.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') void passwordReset.submit();
+  if (e.key === 'Enter') detach('сброс пароля: отправка', passwordReset.submit());
 });
 /** Open the reset stage for a «?reset=<token>» deep-link (called from the first-run gate). */
 function openReset(token: string): void {
@@ -9968,6 +10027,31 @@ for (const tile of Array.from(document.querySelectorAll('#hp-more .hub-tile[data
 // владеет — каждая живёт там, где её читают (графика, цвета сторон, звук, развёртка), а
 // оверлей только показывает снимок и отдаёт изменение обратно.
 const settingsEl = $('settings');
+/** On-demand diagnostics: no pixel readbacks (those alter canvas heuristics),
+ * no match/account state, and no automatic upload. Attributes are requests, not
+ * proof of which raster backend WebView actually selected.
+ */
+function mapRenderingReport(): string {
+  const rect = canvas.getBoundingClientRect();
+  const active = canvasCompatibilityActive();
+  const requested = canvasCompatibilityRequested();
+  return JSON.stringify({
+    schema: 1,
+    build: currentBuild(),
+    userAgent: navigator.userAgent,
+    compatibility: { active, requested, restartPending: active !== requested },
+    viewport: { width: VW, height: VH, devicePixelRatio: window.devicePixelRatio,
+      renderDpr: DPR, visualScale: window.visualViewport?.scale ?? null },
+    canvas: { width: canvas.width, height: canvas.height, cssWidth: rect.width, cssHeight: rect.height,
+      attributes: cx.getContextAttributes?.() ?? null, contextLost: cx.isContextLost?.() ?? null,
+      events: { ...mapContextEvents } },
+    background: { attributes: bgx.getContextAttributes?.() ?? null,
+      contextLost: bgx.isContextLost?.() ?? null, events: { ...backgroundContextEvents } },
+    frameErrors: frameErrs,
+    estimatedFps: Math.round(fpsEma),
+    cameraScale: cam.scale,
+  }, null, 2);
+}
 const settings = initSettings({
   root: () => settingsEl,
   view: () => ({
@@ -9978,6 +10062,9 @@ const settings = initSettings({
     motion: motionOn(),
     holography: holographyOn(),
     holographySupported: MOBILE || supportsHolography(VW, VH, holoCoarsePointer?.matches ?? false),
+    renderCompatibility: canvasCompatibilityRequested(),
+    renderCompatibilityActive: canvasCompatibilityActive(),
+    renderCompatibilitySupported: /Android/i.test(navigator.userAgent),
     fps: showFpsOn(),
     soundOn: snd.enabled(),
     volume: snd.volume(),
@@ -9991,6 +10078,8 @@ const settings = initSettings({
   setStarfield: setStarfield,
   setMotion: setMotion,
   setHolography,
+  setRenderCompatibility: setCanvasCompatibility,
+  renderingReport: mapRenderingReport,
   setFps: setShowFps,
   setSound: (v) => snd.setEnabled(v),
   setVolume: (v) => snd.setVolume(v),
@@ -10059,37 +10148,40 @@ if (bootReset) {
   cameFromLink = true;
   showConnect(true);
   showHub(false);
-  void (async () => {
-    const srv = resolveServer();
-    if (srv) await probeAuthMode(srv.base);
-    // Куда ведёт ссылка — `joinLanding.ts` (ADDR-5): сервер без аккаунтов пускает сразу,
-    // живая сессия ведёт в матч, её отсутствие — на стартовый экран.
-    // NEVER log the record — even a prefix of `cached.token` is a session-JWT leak
-    // into the browser console (and into any screen recording of a playtest).
-    const cached = srv ? sessionRecord(srv.base) : null;
-    const where = joinLanding({
-      identity: authMode,
-      hasSession: !!cached,
-      refused: false,
-    });
-    if (where === 'match') {
-      showStage('browse');
-      connectToMatch(bootJoinId, bootSlot || undefined, bootFaction || undefined, bootScientists);
-      return;
-    }
-    // No session — show the welcome card so the player can register/login,
-    // then welcomeSignIn auto-resumes the join via pendingJoinAfterAuth.
-    pendingJoinAfterAuth.remember(bootJoinId, bootSlot, bootFaction, bootScientists);
-    // ADDR-5. Оверлей ветка держит показанным с самого начала, так что строка здесь —
-    // не «показать», а «не дать погаснуть»: когда-то ветка начиналась со скрытого
-    // оверлея, и карточка входа выставлялась ВНУТРИ него — игрок получал пустой экран.
-    showConnect(true);
-    showStage('welcome');
-    const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
-    wNickInput.value = savedNick || suggestCallsign();
-    wPassRowEl.style.display = 'flex';
-    wPassInput.focus();
-  })();
+  detach(
+    'ссылка-приглашение: посадка',
+    (async () => {
+      const srv = resolveServer();
+      if (srv) await probeAuthMode(srv.base);
+      // Куда ведёт ссылка — `joinLanding.ts` (ADDR-5): сервер без аккаунтов пускает сразу,
+      // живая сессия ведёт в матч, её отсутствие — на стартовый экран.
+      // NEVER log the record — even a prefix of `cached.token` is a session-JWT leak
+      // into the browser console (and into any screen recording of a playtest).
+      const cached = srv ? sessionRecord(srv.base) : null;
+      const where = joinLanding({
+        identity: authMode,
+        hasSession: !!cached,
+        refused: false,
+      });
+      if (where === 'match') {
+        showStage('browse');
+        connectToMatch(bootJoinId, bootSlot || undefined, bootFaction || undefined, bootScientists);
+        return;
+      }
+      // No session — show the welcome card so the player can register/login,
+      // then welcomeSignIn auto-resumes the join via pendingJoinAfterAuth.
+      pendingJoinAfterAuth.remember(bootJoinId, bootSlot, bootFaction, bootScientists);
+      // ADDR-5. Оверлей ветка держит показанным с самого начала, так что строка здесь —
+      // не «показать», а «не дать погаснуть»: когда-то ветка начиналась со скрытого
+      // оверлея, и карточка входа выставлялась ВНУТРИ него — игрок получал пустой экран.
+      showConnect(true);
+      showStage('welcome');
+      const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
+      wNickInput.value = savedNick || suggestCallsign();
+      wPassRowEl.style.display = 'flex';
+      wPassInput.focus();
+    })(),
+  );
 } else {
   // Auth gate at boot (UX fix): show the welcome/login card FIRST, before the
   // hub — like every game's login screen. Previously a cached `void.nick` in
@@ -10101,22 +10193,25 @@ if (bootReset) {
   showConnect(true);
   showHub(false);
   showStage('welcome');
-  void (async () => {
-    const srv = resolveServer();
-    const mode = srv ? await probeAuthMode(srv.base) : authMode;
-    const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
-    if (savedNick) {
-      wNickInput.value = savedNick;
-    } else {
-      wNickInput.value = suggestCallsign();
-    }
-    if (mode === 'accounts') {
-      wPassRowEl.style.display = 'flex';
-      wPassInput.focus();
-    } else {
-      wPassRowEl.style.display = 'none';
-    }
-  })();
+  detach(
+    'стартовый экран: режим входа сервера',
+    (async () => {
+      const srv = resolveServer();
+      const mode = srv ? await probeAuthMode(srv.base) : authMode;
+      const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
+      if (savedNick) {
+        wNickInput.value = savedNick;
+      } else {
+        wNickInput.value = suggestCallsign();
+      }
+      if (mode === 'accounts') {
+        wPassRowEl.style.display = 'flex';
+        wPassInput.focus();
+      } else {
+        wPassRowEl.style.display = 'none';
+      }
+    })(),
+  );
 }
 
 // --- single-player setup overlay --------------------------------------------
@@ -11252,30 +11347,33 @@ function connectToMatch(
     connect();
     return;
   }
-  void (async () => {
-    const srv = resolveServer();
-    const cached = srv ? sessionRecord(srv.base) : null;
-    const next = joinStep({
-      accountsMode: authMode === 'accounts',
-      serverKnown: !!srv,
-      hasSession: !!cached,
-    });
-    if (next.step === 'sign-in') {
-      askSignIn(id, slot, faction, next.password ? srv : null, scientists);
-      return;
-    }
-    const join = await fetchJoinToken(srv!.base, id, cached!.token, slot, faction, scientists);
-    if (!join) {
-      // Токен не выдан: сессии больше нет — вход просрочен, зовём войти заново; сессия на
-      // месте — закрыт сам матч, и карточка входа тут ни при чём (правило 4).
-      if (afterTokenRefused(!!sessionRecord(srv!.base)) === 'sign-in')
-        askSignIn(id, slot, faction, srv, scientists);
-      return;
-    }
-    pendingJoinToken = join.token;
-    claimDone(id);
-    connect();
-  })();
+  detach(
+    'заход в партию: билет и подключение',
+    (async () => {
+      const srv = resolveServer();
+      const cached = srv ? sessionRecord(srv.base) : null;
+      const next = joinStep({
+        accountsMode: authMode === 'accounts',
+        serverKnown: !!srv,
+        hasSession: !!cached,
+      });
+      if (next.step === 'sign-in') {
+        askSignIn(id, slot, faction, next.password ? srv : null, scientists);
+        return;
+      }
+      const join = await fetchJoinToken(srv!.base, id, cached!.token, slot, faction, scientists);
+      if (!join) {
+        // Токен не выдан: сессии больше нет — вход просрочен, зовём войти заново; сессия на
+        // месте — закрыт сам матч, и карточка входа тут ни при чём (правило 4).
+        if (afterTokenRefused(!!sessionRecord(srv!.base)) === 'sign-in')
+          askSignIn(id, slot, faction, srv, scientists);
+        return;
+      }
+      pendingJoinToken = join.token;
+      claimDone(id);
+      connect();
+    })(),
+  );
 }
 
 /**
@@ -11382,25 +11480,28 @@ function startNetSetupPoll(base: string, matchId: string, nick: string): void {
   stopNetSetupPoll();
   netSetupPoll = setInterval(() => {
     if (!netSetup) return stopNetSetupPoll();
-    void (async () => {
-      try {
-        const res = await fetchSeats(base, matchId, nick);
-        if (queryOutcome(res) !== 'ok') return;
-        const body = (await res.json()) as { seats: EntrySeat[] };
-        if (!netSetup) return;
-        netSetup = { matchId, offer: entryOffer(body.seats ?? []) };
-        const fate = reconcileSelection(slotForWorld(setupStart), netSetup.offer.worlds);
-        if (fate.kind === 'lost') {
-          setupStart = '';
+    detach(
+      'сетевой сетап: опрос мест',
+      (async () => {
+        try {
+          const res = await fetchSeats(base, matchId, nick);
+          if (queryOutcome(res) !== 'ok') return;
+          const body = (await res.json()) as { seats: EntrySeat[] };
+          if (!netSetup) return;
+          netSetup = { matchId, offer: entryOffer(body.seats ?? []) };
+          const fate = reconcileSelection(slotForWorld(setupStart), netSetup.offer.worlds);
+          if (fate.kind === 'lost') {
+            setupStart = '';
+            renderSetup();
+            setupHintEl.textContent = t('seatpick.lost');
+            return;
+          }
           renderSetup();
-          setupHintEl.textContent = t('seatpick.lost');
-          return;
+        } catch {
+          /* тихий опрос: связь моргнула — выбор игрока не трогаем */
         }
-        renderSetup();
-      } catch {
-        /* тихий опрос: связь моргнула — выбор игрока не трогаем */
-      }
-    })();
+      })(),
+    );
   }, NET_SETUP_POLL_MS);
 }
 
@@ -11459,7 +11560,7 @@ function openSessionTab(id: string, seated = false): void {
   }
   // REL-7: show the seat/faction picker first (if the server supports it),
   // otherwise fall back to the direct join (no slot).
-  void openSeatPicker(id);
+  detach('вход в партию: выбор места', openSeatPicker(id));
 }
 
 async function refreshMatches(quiet = false): Promise<void> {
@@ -11698,7 +11799,9 @@ function renderMatches(): void {
       const arch = document.createElement('button');
       arch.className = 'mbtn ghost';
       arch.textContent = restore ? t('browser.restore') : t('browser.archive');
-      arch.addEventListener('click', () => void toggleArchive(m.matchId, restore));
+      arch.addEventListener('click', () =>
+        detach('обозреватель: архив партии', toggleArchive(m.matchId, restore)),
+      );
       btns.appendChild(arch);
     }
     row.appendChild(btns);
@@ -11843,7 +11946,7 @@ for (const btn of Array.from(document.querySelectorAll('.mtab'))) {
 }
 
 // "Обновить список" reloads the read-model; per-row "Войти"/"В архив" act on a match.
-$('cgo').addEventListener('click', () => void refreshMatches());
+$('cgo').addEventListener('click', () => detach('обозреватель: список партий', refreshMatches()));
 
 // Player build: the match screen is ONLY the tabs + list (Доступные/Активные/Архив).
 // The callsign comes from the welcome/hub identity step and the server from the page
@@ -11861,14 +11964,16 @@ if (__PLAYER_BUILD__) {
   hide(nickInput.closest('.cfield'));
   hide(srvInput.closest('.cfield'));
   hide($('cgo').closest('.crow'));
-  srvInput.addEventListener('change', () => void refreshMatches());
+  srvInput.addEventListener('change', () =>
+    detach('обозреватель: список партий', refreshMatches()),
+  );
   setInterval(() => {
     // Уместен ли переопрос прямо сейчас — `matchPoll.ts` (REFM-153): тикает только
     // список НА ЭКРАНЕ. Поверх закрытого оверлея (матч / ставка) и на приветственном
     // шаге фоновая неудача написала бы «сервер недоступен» в чужую строку статуса.
     const shown = (n: HTMLElement): boolean => n.style.display !== 'none';
     if (pollTick({ overlay: shown(connectEl), browser: shown(browseEl) }) === 'skip') return;
-    void refreshMatches(true);
+    detach('обозреватель: тихий переопрос списка', refreshMatches(true));
   }, 10_000);
 }
 
@@ -11911,15 +12016,18 @@ function scheduleReconnect(): void {
       return;
     }
     if (plan === 'mint-token' && srv && session) {
-      void (async () => {
-        const join = await fetchJoinToken(srv.base, currentMatchId, session);
-        if (!join) {
-          scheduleReconnect(); // transient (or session expired — status line explains)
-          return;
-        }
-        pendingJoinToken = join.token;
-        connect();
-      })();
+      detach(
+        'переподключение: новый билет',
+        (async () => {
+          const join = await fetchJoinToken(srv.base, currentMatchId, session);
+          if (!join) {
+            scheduleReconnect(); // transient (or session expired — status line explains)
+            return;
+          }
+          pendingJoinToken = join.token;
+          connect();
+        })(),
+      );
       return;
     }
     reconnecting = false; // сессии нет — на экран входа, а не в новый круг попыток
@@ -12261,6 +12369,7 @@ window.addEventListener('keydown', (e) => {
 });
 
 function frame(nowReal: number) {
+  flushPinch();
   const wasHolographic = holographic.active();
   const previousViewport = insets();
   holographic.sync(VW, VH, holoCoarsePointer?.matches ?? false, inMatch());
@@ -12334,7 +12443,7 @@ function frame(nowReal: number) {
     renderSplitDialog();
     holographic.layoutWindows();
     updateMobileHud();
-    if (mapPreparation.active && mapPreparation.ready) {
+    if (mapPreparation.active && mapPreparation.ready && !cx.isContextLost?.()) {
       hideMapLoading(); // reveal only after the first complete frame, never a blank canvas
       maybeStartPendingTour();
     }
