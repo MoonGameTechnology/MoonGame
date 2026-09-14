@@ -142,6 +142,24 @@ describe('список матчей', () => {
     expect(await createSession(BASE, net).matches()).toEqual({ outcome: 'unreachable', lists: null });
   });
 
+  it('ПОЛОВИНА списка — тоже неразобранное тело', async () => {
+    // Нашёл браузерный прогон: его подставной сервер отдал `available` и не отдал
+    // `active`. Сторож проверял только первое поле, тело доезжало до отрисовки, и та
+    // падала на `active.length` — пустой экран без единого слова. Это ровно тот исход,
+    // ради которого правило 4 и написано, поэтому проверяются ВСЕ три списка.
+    for (const half of [
+      { available: [] },
+      { available: [], active: [] },
+      { active: [], archived: [] },
+    ]) {
+      const net = io({ 'GET /matches': ok(half) });
+      expect(await createSession(BASE, net).matches()).toEqual({
+        outcome: 'unreachable',
+        lists: null,
+      });
+    }
+  });
+
   it('несостоявшийся запрос отличается от отказа сервера', async () => {
     // `null` = запрос НЕ СОСТОЯЛСЯ. Отличать это от отказа — единственная разница,
     // на которую игрок может ответить: недоступный сервер стоит переспросить.

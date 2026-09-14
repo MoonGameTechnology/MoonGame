@@ -25,7 +25,13 @@ import { refusalText } from '../../../decisions/refusalText';
 import { act, moveFleet, retreatFleet } from '../../../decisions/actions';
 import type { MatchSummary } from '@void/protocol';
 import { shippedGameData } from './gameData';
-import { createStatusBarModel, createSelectionModel, createBattleModel, resolveBattleAction } from './matchHud';
+import {
+  createStatusBarModel,
+  createSelectionModel,
+  createBattleModel,
+  resolveBattleAction,
+  resolveFleetAction,
+} from './matchHud';
 import { createLoadoutEditor, applyLoadoutAction, resolveLoadoutBuild, type LoadoutModel } from './loadoutEditor';
 import { statusBarHtml, selectionHtml, battleHtml, loadoutHtml, unitPickerHtml } from './hudView';
 
@@ -573,6 +579,29 @@ function connectLive(url: string): void {
           return;
         }
         client.sendAction(retreatFleet(me, out.fleetId));
+        break;
+      }
+      case 'stop':
+      case 'forcemarch':
+      case 'bombard':
+      case 'assault': {
+        // Приказы панели состава. Один тап — не всегда один приказ: штурм не с орбиты
+        // уходит ПАРОЙ (`decisions/assaultOrder.ts`), поэтому резолвер отдаёт СПИСОК,
+        // и порядок в нём значим — ядро применяет приказы в порядке отправки.
+        if (!selectedFleet) return;
+        const model = createSelectionModel(live, selectedFleet, me, HUD_DATA);
+        if (!model.ok) return;
+        const on = target.dataset.on === '1';
+        const kind = target.dataset.act as 'stop' | 'forcemarch' | 'bombard' | 'assault';
+        const out = resolveFleetAction(
+          kind === 'stop' || kind === 'assault' ? { kind } : { kind, on },
+          model,
+        );
+        if (!out.ok) {
+          setNetStatus(t('client.rejected', { text: refusalText(out.code) }));
+          return;
+        }
+        for (const step of out.steps) client.sendAction(act(me, step.type, step.payload));
         break;
       }
       case 'equip':

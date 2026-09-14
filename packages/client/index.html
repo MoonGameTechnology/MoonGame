@@ -314,6 +314,14 @@
         flex-wrap: wrap;
         gap: 4px 12px;
       }
+      /* Ряд приказов флота: переносится по ширине, чтобы на телефоне не уезжал
+         за край панели (side gutter держит сама .hud-panel). */
+      .orders {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin-top: 8px;
+      }
       .sides {
         display: grid;
         grid-template-columns: 1fr 1fr;

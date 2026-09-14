@@ -227,3 +227,55 @@ describe('экранирование', () => {
     expect(statusBarHtml({ ...bar, commander: '<b>x</b>' })).toContain('&lt;b&gt;x&lt;/b&gt;');
   });
 });
+
+describe('приказы в панели состава (MIG-7)', () => {
+  it('у ЧУЖОГО флота приказов нет вовсе — панель остаётся осмотром', () => {
+    expect(selectionHtml({ ...fleet, mine: false }, 0)).not.toContain('class="orders"');
+  });
+
+  it('в бою панель состава приказов не предлагает — там распоряжается панель боя', () => {
+    expect(selectionHtml({ ...fleet, inCombat: true }, 0)).not.toContain('class="orders"');
+  });
+
+  it('«Остановить» появляется только у идущего флота', () => {
+    expect(selectionHtml(fleet, 0)).not.toContain('data-act="stop"');
+    const moving = selectionHtml(
+      { ...fleet, status: 'transit', location: undefined, transit: { from: 'a', to: 'b', destination: 'b', departedAt: 0, arrivesAt: 1 } },
+      0,
+    );
+    expect(moving).toContain('data-act="stop"');
+    expect(moving).toContain(t('hud.order.stop'));
+  });
+
+  it('форс-марш переключается подписью, иначе включённый нечем выключить', () => {
+    expect(selectionHtml(fleet, 0)).toContain(t('hud.order.forcemarch-on'));
+    expect(selectionHtml({ ...fleet, forcedMarch: true }, 0)).toContain(
+      t('hud.order.forcemarch-off'),
+    );
+  });
+
+  it('«Обстрел» предлагается только С ОРБИТЫ, а «прекратить» — когда уже стреляет', () => {
+    // Без орбиты ядро ответит `E_WRONG_ORBIT`: живая кнопка обещала бы несуществующее.
+    expect(selectionHtml(fleet, 0)).not.toContain('data-act="bombard"');
+    expect(selectionHtml({ ...fleet, orbit: 'near' }, 0)).toContain(t('hud.order.bombard-on'));
+    expect(selectionHtml({ ...fleet, orbit: 'near', bombarding: true }, 0)).toContain(
+      t('hud.order.bombard-off'),
+    );
+  });
+
+  it('«Штурм» есть у стоящего флота — годность спрашивают у ядра, а не у панели', () => {
+    // Ни десанта, ни враждебности мира панель не знает: рукописная копия этих условий
+    // отстала бы от ядра молча (`decisions/assaultOrder.ts`, правило 1).
+    expect(selectionHtml(fleet, 0)).toContain('data-act="assault"');
+    expect(selectionHtml({ ...fleet, status: 'transit', location: undefined }, 0)).not.toContain(
+      'data-act="assault"',
+    );
+  });
+
+  it('кнопки «На орбиту» НЕТ — решение владельца, флот встаёт на орбиту сам', () => {
+    // Сторож против возврата: приказ в ядре есть и уходит внутри пары «орбита + штурм»,
+    // но своего жеста у него быть не должно.
+    for (const m of [fleet, { ...fleet, orbit: 'near' as const }, { ...fleet, status: 'transit' as const }])
+      expect(selectionHtml(m, 0)).not.toContain('data-act="orbit"');
+  });
+});
