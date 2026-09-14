@@ -246,6 +246,7 @@ export const en: Record<string, string> = {
   'hint.wing-cancelled': 'strike cancelled',
   'hint.wing-empty': '✖ nothing to launch — the hangar is empty',
   'side.build.open': 'Build',
+  'side.wing.blocked.busy': 'sorties launch from a standstill — the carrier is not parked',
   'side.wing.blocked.empty': 'the hangar is empty — nothing to launch',
   'side.wing.cargo': 'aboard: {n}',
   'side.wing.duty.off': '🛩 Stand duty',

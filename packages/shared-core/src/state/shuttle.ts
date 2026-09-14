@@ -35,15 +35,26 @@ export interface SortieState {
   rearming: number;
 }
 
-/** The wing's max sortie budget + rearm length, read from its shuttle unit's
- *  stats (schema defaults 0). Reads the FIRST shuttle-trait stack of the fleet. */
+/**
+ * Запас вылетов базы и длина перезарядки — по ПЕРВОЙ живой машине В ЕЁ АНГАРЕ
+ * (дефолты схемы — нули).
+ *
+ * Читается именно ангар, и это не мелочь. Функция пережила модель, для которой
+ * писалась: в старом «крыле» (снято целиком в SHU-2.2) челноки летали КАК ФЛОТ и лежали
+ * в `fleet.units` — оттуда она их и брала. С SHU-1.1 челнок живёт в `hangar` базы, а в
+ * `units` носителя стоит его КОРПУС, у которого никакого `fuel` нет. Продолжая смотреть
+ * в старое место, функция отвечала «топлива 0» на ЛЮБОЙ носитель — и панель показывала
+ * полный трюм сухим, а кнопку удара держала мёртвой. Ядро при этом считало верно своей
+ * копией правила (`baseSortieSpec` в модуле челноков), так что расходились не правила,
+ * а два чтения одного правила.
+ *
+ * Хост — любая база: и мир, и носитель. Форма ангара у них одна, поэтому и функция одна.
+ */
 export function sortieSpec(
-  fleet: Fleet,
+  host: { hangar?: Squadron[] },
   data: GameData,
 ): { maxFuel: number; rearmRounds: number } {
-  const st = fleet.units.find(
-    (s) => s.count > 0 && (data.units[s.unit]?.traits.includes('shuttle') ?? false),
-  );
+  const st = hangarMachines(host).find((s) => s.count > 0);
   const u = st ? data.units[st.unit]?.stats : undefined;
   return {
     maxFuel: Math.max(0, Math.floor(u?.fuel ?? 0)),

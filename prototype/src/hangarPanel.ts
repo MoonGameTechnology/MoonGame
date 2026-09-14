@@ -45,7 +45,7 @@ import {
 } from '../../packages/shared-core/src/index';
 
 /** Почему вылет невозможен прямо сейчас — или `null`, если возможен (правило 3). */
-export type HangarBlock = 'empty' | 'rearming' | 'no-fuel' | null;
+export type HangarBlock = 'empty' | 'busy' | 'rearming' | 'no-fuel' | null;
 
 /** Ангар одного места — порта мира или трюма носителя. Форма одна: у ангара везде
  *  один и тот же смысл, и вторая структура развела бы две панели по мелочам. */
@@ -74,14 +74,25 @@ function view(
   bay: number,
   sortie: SortieState | undefined,
   maxFuel: number,
+  busy = false,
 ): HangarView | null {
   if (bay <= 0) return null;
   const squadrons = (host.hangar ?? []).filter((sq) => sq.units.some((st) => st.count > 0));
   const stacks = hangarMachines(host).filter((st) => st.count > 0);
   const used = hangarUsed(host);
   const live: SortieState = sortie ?? { fuel: maxFuel, rearming: 0 };
+  // `busy` идёт СРАЗУ за «пусто»: у неподвижной базы его не бывает, а у носителя он
+  // перебивает топливо и перезарядку — ждать их бессмысленно, пока корабль не встал.
   const blocked: HangarBlock =
-    used <= 0 ? 'empty' : live.rearming > 0 ? 'rearming' : canSortie(live) ? null : 'no-fuel';
+    used <= 0
+      ? 'empty'
+      : busy
+        ? 'busy'
+        : live.rearming > 0
+          ? 'rearming'
+          : canSortie(live)
+            ? null
+            : 'no-fuel';
   return {
     squadrons,
     stacks,
@@ -95,18 +106,31 @@ function view(
 
 /** Ангар КОСМОПОРТА мира. `null` — порта нет, блока в панели быть не должно. */
 export function planetHangar(planet: Planet, data: GameData): HangarView | null {
-  const bay = shuttleBayAt(planet, data);
   // Ёмкость топлива задаёт САМА МАШИНА (`fuel` первой в ангаре) — та же величина, по
-  // которой ядро заводит счётчик порта. Пустой порт показывает состав без топлива:
-  // выводить «0 из 0 вылетов» там, где лететь некому, значит пугать числом ни о чём.
-  const first = hangarMachines(planet).find((st) => st.count > 0);
-  const maxFuel = first ? (data.units[first.unit]?.stats.fuel ?? 0) : 0;
-  return view(planet, bay, planet.sortie, maxFuel);
+  // которой ядро заводит счётчик базы, и та же функция: своя копия этого чтения жила
+  // здесь, пока `sortieSpec` читала старое место (`fleet.units` мёртвого «крыла»).
+  // Пустой порт показывает состав без топлива: выводить «0 из 0 вылетов» там, где
+  // лететь некому, значит пугать числом ни о чём.
+  return view(planet, shuttleBayAt(planet, data), planet.sortie, sortieSpec(planet, data).maxFuel);
 }
 
-/** Трюм НОСИТЕЛЯ («Шаттл», SHU-2.1). `null` — корабль ангара не несёт. */
+/**
+ * Трюм НОСИТЕЛЯ («Шаттл», SHU-2.1). `null` — корабль ангара не несёт.
+ *
+ * Носитель, в отличие от порта, бывает ЗАНЯТ: ядро пускает вылет только со стоянки
+ * (`requireOwnedIdleFleet` → `E_FLEET_BUSY`) — порт не двигается, и вылет с
+ * разгоняющегося носителя пришлось бы догонять. Правило зеркалится сюда, чтобы кнопка
+ * не обещала приказ, который отобьют ПОСЛЕ прицеливания: три условия те же, что у ядра.
+ */
 export function fleetHangar(fleet: Fleet, data: GameData): HangarView | null {
-  return view(fleet, fleetShuttleBay(fleet, data), fleet.sortie, sortieSpec(fleet, data).maxFuel);
+  const busy = !!fleet.movement || !!fleet.battleId || fleet.location == null;
+  return view(
+    fleet,
+    fleetShuttleBay(fleet, data),
+    fleet.sortie,
+    sortieSpec(fleet, data).maxFuel,
+    busy,
+  );
 }
 
 /** Что можно перегрузить между портом мира и стоящим у него носителем (правило 4). */
