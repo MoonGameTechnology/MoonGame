@@ -330,6 +330,20 @@
         gap: 6px;
         margin-top: 8px;
       }
+      /* Окно деления: строки в столбик, счётчик и кнопки в одну линию. */
+      .stacks.col {
+        flex-direction: column;
+        gap: 4px;
+      }
+      .split-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .split-row span {
+        flex: 1;
+        min-width: 0;
+      }
       .sides {
         display: grid;
         grid-template-columns: 1fr 1fr;

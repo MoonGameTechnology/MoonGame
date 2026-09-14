@@ -23,6 +23,7 @@
 import {
   attackerOf,
   defenderOf,
+  effectiveStats,
   isInhabited,
   MAX_STEWARD_HOLD_POINTS,
   MS_PER_DAY,
@@ -45,6 +46,17 @@ import type {
 } from '@void/shared-core';
 import { assaultSteps } from '../../../decisions/assaultOrder';
 import { capitalOffer, holdOffer, type CapitalOffer, type HoldOffer } from '../../../decisions/worldOrders';
+import { mergePlan } from '../../../decisions/mergeOrders';
+import {
+  canConfirmSplit,
+  cargoSplit,
+  normalizeSlotTake,
+  shipTotals,
+  splitSlots,
+  stepTake,
+  type CargoSplit,
+  type SplitSlot,
+} from '../../../decisions/splitPlan';
 
 /* ─────────────────────────── Zone A — status bar ─────────────────────────── */
 
@@ -425,6 +437,187 @@ export function resolveFleetAction(action: FleetAction, model: FleetSelectionMod
         ? { type: 'fleet.orbit', payload: { fleetId, orbit: 'near' } }
         : { type: 'fleet.assault', payload: { fleetId } },
     ),
+  };
+}
+
+/* ───────────────── Fleet panel — split and merge (MIG-9) ─────────────────── */
+
+/** Свои ДРУГИЕ флоты, стоящие там же, — кандидаты в слияние. */
+export interface MergeCandidate {
+  id: FleetId;
+  ships: number;
+}
+
+/**
+ * Кого можно слить в выделенный флот прямо сейчас.
+ *
+ * Только СТОЯЩИЕ вместе: слить разнесённые флоты ядро тоже умеет, но это отложенное
+ * намерение («лети к якорю и слейся по прибытии»), а его нечем показать в панели —
+ * игрок не увидит ни полёта, ни момента слияния. Панель предлагает лишь то, что
+ * случится сразу; `decisions/mergeOrders.ts` знает обе ветки и решает, какая тут.
+ */
+export function mergeCandidates(
+  state: GameState,
+  fleetId: FleetId,
+  viewerId: PlayerId,
+): MergeCandidate[] {
+  const anchor = state.fleets[fleetId];
+  if (!anchor || anchor.owner !== viewerId || !anchor.location || anchor.movement) return [];
+  const out: MergeCandidate[] = [];
+  for (const id of Object.keys(state.fleets).sort()) {
+    const f = state.fleets[id];
+    if (!f || id === fleetId || f.owner !== viewerId) continue;
+    if (f.location !== anchor.location || f.movement || f.battleId) continue;
+    out.push({ id, ships: f.units.reduce((n, st) => n + st.count, 0) });
+  }
+  return out;
+}
+
+/** Слить `moverId` в выделенный флот — или стабильный код отказа (fail-secure). */
+export function resolveMerge(
+  state: GameState,
+  anchorId: FleetId,
+  moverId: FleetId,
+  viewerId: PlayerId,
+): FleetIntent {
+  // План строит общее решение: оно одно знает, что якорь обязан быть своим и живым,
+  // что сам в себя флот не сливается и что разнесённые флоты дают ДРУГУЮ ветку.
+  const plan = mergePlan(
+    Object.fromEntries(
+      Object.entries(state.fleets).map(([id, f]) => [
+        id,
+        f && { owner: f.owner, location: f.location, movingTo: f.movement?.destination ?? null },
+      ]),
+    ),
+    [moverId],
+    anchorId,
+    viewerId,
+  );
+  if (!plan) return { ok: false, code: 'E_NO_FLEET' };
+  const step = plan.steps[0];
+  // Панель предлагает слияние только стоящим вместе, поэтому ветка «лететь к якорю»
+  // сюда доходить не должна: если дошла — состояние изменилось между отрисовкой и
+  // нажатием, и честнее отказать, чем отправить флот в полёт, которого игрок не просил.
+  if (!step || step.kind !== 'now') return { ok: false, code: 'E_FLEET_BUSY' };
+  return {
+    ok: true,
+    steps: [{ type: 'fleet.merge', payload: { from: step.mover, into: anchorId } }],
+  };
+}
+
+/** Строка окна деления: стек флота и сколько из него уводят. */
+export interface SplitRow extends SplitSlot {
+  take: number;
+}
+
+/** Окно «Разделить флот» — живёт поверх ЖИВОГО флота, поэтому пересчитывается целиком. */
+export interface SplitModel {
+  kind: 'split';
+  fleetId: FleetId;
+  rows: SplitRow[];
+  /** Итоги по КОРАБЛЯМ: правила «не ноль и не всё» касаются только их. */
+  takeTotal: number;
+  total: number;
+  cargo: CargoSplit;
+  /** Можно ли подтверждать (корабли делятся честно И десант влезает в обе половины). */
+  canConfirm: boolean;
+}
+
+export type SplitResult = ({ ok: true } & SplitModel) | { ok: false; code: string };
+
+/**
+ * Пересчитать окно деления под текущий флот и текущий отбор.
+ *
+ * Пересчёт ПОЛНЫЙ на каждый шаг счётчика, а не накопление: окно живёт поверх живого
+ * флота, и пока игрок жмёт «+10», состав может измениться боем или стыковкой. Вчерашний
+ * отбор обязан ужаться (`normalizeSlotTake`), а не уехать в отказ на сервере.
+ */
+export function createSplitModel(
+  state: GameState,
+  fleetId: FleetId,
+  viewerId: PlayerId,
+  take: Readonly<Record<string, number>>,
+  data: GameData,
+): SplitResult {
+  const fleet = state.fleets[fleetId];
+  if (!fleet || fleet.owner !== viewerId) return { ok: false, code: 'E_NO_FLEET' };
+  if (fleet.movement || fleet.battleId) return { ok: false, code: 'E_FLEET_BUSY' };
+
+  const slots = splitSlots(fleet.units, fleet.landing ?? []);
+  const normalized = normalizeSlotTake(take, slots);
+  const cargo = cargoSplit(
+    slots,
+    normalized,
+    // Вместимость считается С НАЧИНКОЙ: грузовой модуль — ровно та причина, по которой
+    // два стека одного корпуса везут разное.
+    (unit, modules) => {
+      const def = data.units[unit];
+      if (!def) return 0;
+      return (
+        effectiveStats(def, { ...(modules ? { modules: [...modules] } : {}) }, data).cargoCapacity ??
+        0
+      );
+    },
+    (unit) => data.units[unit]?.stats.cargoSize ?? 1,
+  );
+  const { takeTotal, total } = shipTotals(slots, normalized);
+  return {
+    ok: true,
+    kind: 'split',
+    fleetId,
+    rows: slots.map((slot) => ({ ...slot, take: normalized[slot.key] ?? 0 })),
+    takeTotal,
+    total,
+    cargo,
+    canConfirm: canConfirmSplit(slots, normalized, cargo),
+  };
+}
+
+/** Шаг счётчика в окне деления — арифметику держит `decisions/splitPlan.ts`. */
+export function stepSplitTake(
+  model: SplitModel,
+  key: string,
+  step: 'inc' | 'dec' | 'all',
+  n = 1,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const row of model.rows) {
+    out[row.key] = row.key === key ? stepTake(row.take, row.have, step, n) : row.take;
+  }
+  return out;
+}
+
+/** Подтверждение деления → `fleet.split`, или стабильный код отказа. */
+export function resolveSplit(model: SplitModel): FleetIntent {
+  if (!model.canConfirm) {
+    // Две разные причины, и игроку они говорят разное: «ноль или всё» — поправь отбор,
+    // «трюм не сойдётся» — десант некуда девать.
+    return { ok: false, code: model.cargo.fits ? 'E_BAD_SPLIT' : 'E_NO_CAPACITY' };
+  }
+  const take: { unit: string; modules?: string[]; count: number }[] = [];
+  const takeLanding: { unit: string; count: number }[] = [];
+  for (const row of model.rows) {
+    if (row.take <= 0) continue;
+    if (row.kind === 'ship') {
+      // `modules` адресует КОНКРЕТНЫЙ стек (FSPLIT-1): без поля ядро возьмёт любой,
+      // и «два крейсера» разъедутся с тем, что игрок отметил на экране.
+      take.push({ unit: row.unit, count: row.take, ...(row.modules ? { modules: [...row.modules] } : {}) });
+    } else {
+      takeLanding.push({ unit: row.unit, count: row.take });
+    }
+  }
+  return {
+    ok: true,
+    steps: [
+      {
+        type: 'fleet.split',
+        payload: {
+          fleetId: model.fleetId,
+          take,
+          ...(takeLanding.length > 0 ? { takeLanding } : {}),
+        },
+      },
+    ],
   };
 }
 

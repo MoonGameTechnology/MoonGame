@@ -19,10 +19,18 @@ import {
   statusBarHtml,
   unitPickerHtml,
   worldHtml,
+  splitHtml,
+  mergeHtml,
 } from './hudView';
 import { t, tData } from '../../../localization/core';
 import { displayUnit } from '../../../decisions/dataNames';
-import type { BattleModel, FleetSelectionModel, StatusBarModel, WorldModel } from './matchHud';
+import type {
+  BattleModel,
+  FleetSelectionModel,
+  SplitModel,
+  StatusBarModel,
+  WorldModel,
+} from './matchHud';
 import type { LoadoutModel } from './loadoutEditor';
 
 const bar: StatusBarModel = {
@@ -357,5 +365,65 @@ describe('панель мира (MIG-8)', () => {
 
   it('пустой гарнизон сказан словом, а не пропущен молча', () => {
     expect(worldHtml(w(), WORLD_DATA)).toContain(t('hud.world.no-garrison'));
+  });
+});
+
+describe('деление и слияние (MIG-9)', () => {
+  const sp = (over: Partial<SplitModel> = {}): SplitModel => ({
+    kind: 'split',
+    fleetId: 'f1',
+    rows: [{ key: 'ship:frigate|', unit: 'frigate', have: 3, kind: 'ship', take: 1 }],
+    takeTotal: 1,
+    total: 3,
+    cargo: { takenUsed: 0, takenCapacity: 0, keptUsed: 0, keptCapacity: 0, fits: true },
+    canConfirm: true,
+    ...over,
+  });
+
+  it('«Разделить» гаснет, когда отбор не годится', () => {
+    // Ноль и «всё» — не деление; кнопка, которую сервер отвергнет, тратит ход игрока.
+    expect(splitHtml(sp({ canConfirm: false }))).toMatch(/data-act="split-go"[^>]*disabled/);
+    expect(splitHtml(sp())).not.toMatch(/data-act="split-go"[^>]*disabled/);
+  });
+
+  it('у строки есть все три шага счётчика и её собственный адрес', () => {
+    const html = splitHtml(sp());
+    for (const step of ['dec', 'inc', 'all'])
+      expect(html).toContain(`data-step="${step}"`);
+    expect(html).toContain('data-key="ship:frigate|"');
+  });
+
+  it('из окна ВСЕГДА есть выход, даже когда подтвердить нельзя', () => {
+    expect(splitHtml(sp({ canConfirm: false }))).toContain('data-act="close"');
+  });
+
+  it('трюм показан только когда он есть, и отмечен, когда не сходится', () => {
+    expect(splitHtml(sp())).not.toContain(t('hud.split.hold', { taken: '0/0', kept: '0/0' }));
+    const tight = splitHtml(
+      sp({ cargo: { takenUsed: 3, takenCapacity: 1, keptUsed: 0, keptCapacity: 2, fits: false } }),
+    );
+    expect(tight).toContain('class="memory"'); // тот же приём, что у памяти тумана: это предупреждение
+  });
+
+  it('слияние: кнопки нет, когда сливать не с кем', () => {
+    expect(mergeHtml([])).toBe('');
+    const html = mergeHtml([{ id: 'f2', ships: 4 }]);
+    expect(html).toContain('data-act="merge"');
+    expect(html).toContain('data-fleet="f2"');
+  });
+
+  it('ряд слияния живёт ВНУТРИ панели состава, а не рядом с ней', () => {
+    // Снаружи он ложился поверх статус-бара: кнопка видна, нажать нельзя. Сторож
+    // против возврата — разметка панели обязана закрываться ПОСЛЕ кнопок слияния.
+    const html = selectionHtml(fleet, 0, { merge: [{ id: 'f2', ships: 4 }] });
+    expect(html).toContain('data-act="merge"');
+    expect(html.indexOf('data-act="merge"')).toBeLessThan(html.lastIndexOf('</div>'));
+    expect(html.endsWith('</div>')).toBe(true);
+  });
+
+  it('чужому флоту слияние не предлагают даже со списком кандидатов', () => {
+    expect(
+      selectionHtml({ ...fleet, mine: false }, 0, { merge: [{ id: 'f2', ships: 4 }] }),
+    ).not.toContain('data-act="merge"');
   });
 });

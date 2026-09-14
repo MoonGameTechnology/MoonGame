@@ -33,12 +33,18 @@ import {
   resolveFleetAction,
   createWorldModel,
   resolveWorldAction,
+  createSplitModel,
+  stepSplitTake,
+  resolveSplit,
+  mergeCandidates,
+  resolveMerge,
 } from './matchHud';
 import { createLoadoutEditor, applyLoadoutAction, resolveLoadoutBuild, type LoadoutModel } from './loadoutEditor';
 import {
   statusBarHtml,
   selectionHtml,
   worldHtml,
+  splitHtml,
   battleHtml,
   loadoutHtml,
   unitPickerHtml,
@@ -537,7 +543,9 @@ function connectLive(url: string): void {
   // Что открыто в HUD. Одновременно живёт ОДНА панель: выбор флота, бой или оснащение —
   // на телефоне места под вторую нет, а «что именно я сейчас трогаю» должно быть
   // однозначным.
-  let panel: 'none' | 'fleet' | 'world' | 'battle' | 'yard' | 'loadout' = 'none';
+  let panel: 'none' | 'fleet' | 'world' | 'battle' | 'yard' | 'loadout' | 'split' = 'none';
+  /** Отбор в окне деления: ключ стека → сколько уводим. Живёт, пока окно открыто. */
+  let splitTake: Record<string, number> = {};
   let battleId: string | null = null;
   let worldId: string | null = null;
   /** Список миров, показанных ПО ПАМЯТИ тумана. Едет рядом с состоянием, а не внутри
@@ -559,8 +567,21 @@ function connectLive(url: string): void {
       const at = sel.ok && sel.status === 'stationed' ? sel.location : undefined;
       const canBuildHere = !!at && live.planets[at]?.owner === me;
       if (at && canBuildHere) buildPlanet = at;
-      if (sel.ok) body = selectionHtml(sel, live.time, { canBuildHere });
+      if (sel.ok)
+        body = selectionHtml(sel, live.time, {
+          canBuildHere,
+          merge: sel.mine ? mergeCandidates(live, selectedFleet, me) : [],
+        });
       else panel = 'none'; // флот пропал из вида — панель закрывается сама
+    } else if (panel === 'split' && selectedFleet) {
+      const sp = createSplitModel(live, selectedFleet, me, splitTake, HUD_DATA);
+      // Окно закрывается САМО, если флот пропал, ушёл в путь или влез в бой: делить
+      // нечего, и оставленное окно отправило бы заведомо отвергаемый приказ.
+      if (sp.ok) body = splitHtml(sp);
+      else {
+        panel = 'fleet';
+        splitTake = {};
+      }
     } else if (panel === 'world' && worldId) {
       const w = createWorldModel(live, worldId, me, HUD_DATA, remembered);
       // Верфь — здесь же: на своём мире это естественное место «что тут построить»,
@@ -629,6 +650,46 @@ function connectLive(url: string): void {
         for (const step of out.steps) client.sendAction(act(me, step.type, step.payload));
         break;
       }
+      case 'split': {
+        if (!selectedFleet) return;
+        splitTake = {};
+        panel = 'split';
+        break;
+      }
+      case 'take': {
+        const key = target.dataset.key;
+        const step = target.dataset.step as 'inc' | 'dec' | 'all' | undefined;
+        if (!selectedFleet || !key || !step) return;
+        const sp = createSplitModel(live, selectedFleet, me, splitTake, HUD_DATA);
+        if (!sp.ok) return;
+        splitTake = stepSplitTake(sp, key, step);
+        break;
+      }
+      case 'split-go': {
+        if (!selectedFleet) return;
+        const sp = createSplitModel(live, selectedFleet, me, splitTake, HUD_DATA);
+        if (!sp.ok) return;
+        const out = resolveSplit(sp);
+        if (!out.ok) {
+          setNetStatus(t('client.rejected', { text: refusalText(out.code) }));
+          return;
+        }
+        for (const st of out.steps) client.sendAction(act(me, st.type, st.payload));
+        splitTake = {};
+        panel = 'fleet';
+        break;
+      }
+      case 'merge': {
+        const moverId = target.dataset.fleet;
+        if (!selectedFleet || !moverId) return;
+        const out = resolveMerge(live, selectedFleet, moverId, me);
+        if (!out.ok) {
+          setNetStatus(t('client.rejected', { text: refusalText(out.code) }));
+          return;
+        }
+        for (const st of out.steps) client.sendAction(act(me, st.type, st.payload));
+        break;
+      }
       case 'capital':
       case 'hold': {
         if (!worldId) return;
@@ -695,7 +756,10 @@ function connectLive(url: string): void {
         return;
       }
       case 'close': {
-        panel = 'none';
+        // Из окна деления выход — НАЗАД в панель состава, а не в пустоту: флот всё ещё
+        // выделен, и закрывать вместе с ним заодно и его карточку игрок не просил.
+        panel = panel === 'split' && selectedFleet ? 'fleet' : 'none';
+        splitTake = {};
         loadout = null;
         buildPlanet = null;
         renderHud();
