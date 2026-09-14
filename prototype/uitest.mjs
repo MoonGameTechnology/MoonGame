@@ -216,10 +216,13 @@ const selectMap = (id) => {
   input.value = id;
   for (const handle of (listeners.get(input) ?? {}).change ?? []) handle({ target: input });
 };
-selectMap('frontier-100');
-assert.equal((getEl('setup-home-id').innerHTML.match(/<option /g) ?? []).length, 100);
-assert.equal((getEl('setupmap').innerHTML.match(/data-cand=/g) ?? []).length, 100);
-assert.ok(getEl('setupslots').innerHTML.includes('max="99"'));
+selectMap('frontier-50');
+assert.equal((getEl('setup-home-id').innerHTML.match(/<option /g) ?? []).length, 50);
+assert.equal((getEl('setupmap').innerHTML.match(/data-cand=/g) ?? []).length, 50);
+assert.ok(getEl('setupslots').innerHTML.includes('max="49"'));
+for (const handle of (listeners.get(getEl('setupslots')) ?? {}).change ?? [])
+  handle({ target: { id: 'setup-bot-count', value: '999' } });
+assert.ok(getEl('setupslots').innerHTML.includes('value="49"'));
 for (const handle of (listeners.get(getEl('setupgo')) ?? {}).click ?? []) await handle({});
 assert.equal(getEl('setup').style.display, 'none');
 for (let i = 0; i < 30 && rafCbs.length; i++) {

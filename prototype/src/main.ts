@@ -1,4 +1,4 @@
-import { mapPreset, mapNodesFromState, scoreLimitFor, MAP_IDS, type MapId } from './mapCatalog';
+import { isFrontier, mapPreset, mapNodesFromState, scoreLimitFor, MAP_IDS, type MapId } from './mapCatalog';
 /**
  * Void Dominion — playable prototype, browser UI.
  *
@@ -272,6 +272,7 @@ import { assaultMovers, assaultTargetBlocker, collectBlockers, moveMovers } from
 import { laneEnds, warConfirmPlan } from '../../decisions/warOrders';
 import { bakeSignature, needsRebake, ownersSignature } from './staticLayerCache';
 import { clipPolygon, clipRect, provinceSeeds } from './provinceMap';
+import { frontierOutline } from './frontierOutline';
 import { fleetVisible, nodeView, seesDetails as fogSeesDetails } from './fogView';
 import {
   hasCoverage,
@@ -1275,7 +1276,7 @@ const battleLosses = new Map<string, Record<string, Record<string, number>>>();
 // Single-player setup screen state: per-seat role (seat 0 is always you) + your
 // chosen homeworld. Seats 2-10 toggle 'ai'/'off'; an 'ai' seat spawns a rival.
 const freshSetupSlots = (): SeatRole[] =>
-  SEAT_META.slice(0, setupSeatCount()).map((_, i) => (i === 0 ? 'human' : setupMapId === 'frontier-100' || i === 1 ? 'ai' : 'off'));
+  SEAT_META.slice(0, setupSeatCount()).map((_, i) => (i === 0 ? 'human' : isFrontier(setupMapId) || i === 1 ? 'ai' : 'off'));
 let setupSlots: SeatRole[] = freshSetupSlots();
 // Team battle (2v2 etc.): when on, seats fight in sides — same side ALLIED (win
 // together, no friendly fire), across sides at WAR from the first hour. Seat 0 (you)
@@ -1739,8 +1740,10 @@ const cam = { scale: 1, x: 0, y: 0 };
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 // node sector type by id — drives asteroid-junction rendering + capture-by-arrival
 let SECTOR_OF: Record<string, string> = Object.fromEntries(MAP.map((n) => [n.id, n.sector]));
+let galaxyOutline: Array<{ x: number; y: number }> = [];
 function installMapGeometry(state: GameState): void {
   MAP = mapNodesFromState(state);
+  galaxyOutline = isFrontier(state.mapId) ? frontierOutline(MAP) : [];
   SCORE_LIMIT = scoreLimitFor(state);
   SECTOR_OF = Object.fromEntries(MAP.map((n) => [n.id, n.sector]));
   MINX = Math.min(...MAP.map((n) => n.x));
@@ -1827,7 +1830,7 @@ function defaultView(): void {
   // Кого считать домом и когда приближаться к нему — `openingView.ts` (REFM-56).
   const view = openingView(MOBILE || holographic.active(), pickHome(Object.values(s.planets), ME));
   if (view.kind === 'home') {
-    centerOn(view.at, view.scale * (s.mapId === 'frontier-100' ? 5 : 1));
+    centerOn(view.at, view.scale * (isFrontier(s.mapId) ? 5 : 1));
     return;
   }
   cam.scale = 1;
@@ -4227,6 +4230,16 @@ function holographicMapOn(): boolean {
   return holographic.active() || (MOBILE && holographyOn());
 }
 
+/** Shared by political cells and capture flashes: one finite edge at every zoom. */
+function provinceClip(): Array<[number, number]> {
+  if (galaxyOutline.length) return galaxyOutline.map((point) => {
+    const at = world(point);
+    return [at.x, at.y];
+  });
+  const frame = clipRect(mapBounds());
+  return clipPolygon(world(frame.topLeft), world(frame.bottomRight));
+}
+
 /** Rebuild the cached province map when the camera/ownership/viewport moves. */
 function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, preparing = false): void {
   // Always cover newly exposed edges at the current camera. Only the stationary
@@ -4308,7 +4321,7 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   const frame = clipRect({ minX: MINX, maxX: MAXX, minY: MINY, maxY: MAXY });
   const tl = world(frame.topLeft);
   const br = world(frame.bottomRight);
-  const clip = clipPolygon(tl, br);
+  const clip = provinceClip();
   holographicFrame = { x: tl.x, y: tl.y, width: br.x - tl.x, height: br.y - tl.y };
   if (holographicMapOn()) {
     drawGlassScreen(g, holographicFrame);
@@ -10428,9 +10441,9 @@ function renderSetupSlots(): void {
     `<button class="tmtog pve-btn" data-pvestart="1">🤖 ${t('setup.pve')}</button>` +
     (setupTeams ? `<span class="tmhint">${t('setup.teams.note')}</span>` : '') +
     `</div>`;
-  if (setupMapId === 'frontier-100') {
+  if (isFrontier(setupMapId)) {
     const count = rivalCount(setupSlots);
-    setupSlotsEl.innerHTML = `<label>${t('setup.bots.count')} <input id="setup-bot-count" type="number" min="0" max="99" value="${count}" /></label>`;
+    setupSlotsEl.innerHTML = `<label>${t('setup.bots.count')} <input id="setup-bot-count" type="number" min="0" max="${setupSeatCount() - 1}" value="${count}" /></label>`;
     return;
   }
   const fids = seatFactionIds();
@@ -10470,7 +10483,7 @@ function renderSetup(): void {
   const mapSelect = $('setup-map-id') as HTMLSelectElement;
   mapSelect.value = setupMapId;
   mapSelect.disabled = !!netSetup;
-  $('setup-map-info').textContent = t(setupMapId === 'frontier-100' ? 'setup.map.frontier-info' : 'setup.map.nexus-info');
+  $('setup-map-info').textContent = t(setupMapId === 'frontier-100' ? 'setup.map.frontier-legacy-info' : isFrontier(setupMapId) ? 'setup.map.frontier-info' : 'setup.map.nexus-info');
   const homeSelect = $('setup-home-id') as HTMLSelectElement;
   homeSelect.innerHTML = setupCandidateIds().map((id) => `<option value="${esc(id)}"${worldTaken(id) ? ' disabled' : ''}>${esc(id)}${worldTaken(id) ? ' · ' + esc(t('seatpick.taken')) : ''}</option>`).join('');
   homeSelect.value = setupStart;
@@ -10798,8 +10811,8 @@ $('setup-home-id').addEventListener('change', (ev) => {
 setupSlotsEl.addEventListener('change', (ev) => {
   const input = ev.target as HTMLInputElement;
   if (input.id !== 'setup-bot-count') return;
-  const count = Math.max(0, Math.min(99, Math.floor(Number(input.value) || 0)));
-  setupSlots = Array.from({ length: 100 }, (_, i) => i === 0 ? 'human' : i <= count ? 'ai' : 'off');
+  const count = Math.max(0, Math.min(setupSeatCount() - 1, Math.floor(Number(input.value) || 0)));
+  setupSlots = Array.from({ length: setupSeatCount() }, (_, i) => i === 0 ? 'human' : i <= count ? 'ai' : 'off');
   renderSetup();
 });
 
@@ -11914,7 +11927,7 @@ function renderMatches(): void {
       modeLine = `${badge}${esc(tData(mode.modeId))} · `;
     }
     info.innerHTML =
-      `<div class="mname">${esc(m.mapId === 'frontier-100' ? t('map.frontier-100') : m.mapId)} <span class="mid">${esc(m.matchId)}</span></div>` +
+      `<div class="mname">${esc(m.mapId === 'frontier-50' ? t('map.frontier-50') : m.mapId === 'frontier-100' ? t('map.frontier-100') : m.mapId)} <span class="mid">${esc(m.matchId)}</span></div>` +
       `<div class="mmeta">${modeLine}${t('browser.day', { n: m.days })} · ${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
       `${esc(ruleSummary(m.rules))} · ${m.status === 'ended' ? t('browser.finished') : t('browser.running')}${windowLine}</div>`;
     row.appendChild(info);
@@ -11981,7 +11994,7 @@ function renderMyMatches(serverHttp: string): void {
       // Идентификатора в заголовке нет намеренно: он целиком стоит ниже, В АДРЕСЕ —
       // а `m-<uuid>` в заголовке отъедал три строки и вытеснял то, ради чего сюда
       // смотрят (какая партия, какой день, сколько игроков).
-      `<div class="hc-t">${esc(m.mapId === 'frontier-100' ? t('map.frontier-100') : m.mapId)}</div>` +
+      `<div class="hc-t">${esc(m.mapId === 'frontier-50' ? t('map.frontier-50') : m.mapId === 'frontier-100' ? t('map.frontier-100') : m.mapId)}</div>` +
       `<div class="hc-s">${t('browser.day', { n: m.days })} · ` +
       `${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
       `${m.status === 'ended' ? t('browser.finished') : t('browser.running')}</div>` +
@@ -13568,8 +13581,7 @@ function drawCaptureFlashes(now: number): void {
     idxByNode.set(n.id, seedIdx++);
     return { size: p.size ?? 1, at: world(n), owner: knownOwner(n.id) };
   });
-  const frameB = clipRect({ minX: MINX, maxX: MAXX, minY: MINY, maxY: MAXY });
-  const clip = clipPolygon(world(frameB.topLeft), world(frameB.bottomRight));
+  const clip = provinceClip();
   const trace = (poly: Array<[number, number]>): void => {
     cx.beginPath();
     cx.moveTo(poly[0]![0], poly[0]![1]);

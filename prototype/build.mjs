@@ -3019,7 +3019,7 @@ const page = (js) => `<!doctype html>
           <label for="match-create-map" data-i18n="setup.map"></label>
           <select id="match-create-map" class="inp">
             <option value="nexus" data-i18n="setup.map.nexus"></option>
-            <option value="frontier-100" data-i18n="setup.map.frontier-100"></option>
+            <option value="frontier-50" data-i18n="setup.map.frontier-50"></option>
           </select>
           <button id="match-create-go" type="button" class="mbtn" data-i18n="setup.network.create"></button>
         </div>
@@ -3151,8 +3151,9 @@ const page = (js) => `<!doctype html>
         <p class="ssub" data-i18n="setup.sub"></p>
         <label for="setup-map-id" data-i18n="setup.map"></label>
         <select id="setup-map-id" class="inp">
+          <option value="frontier-100" data-i18n="setup.map.frontier-100" disabled hidden></option>
           <option value="nexus" data-i18n="setup.map.nexus"></option>
-          <option value="frontier-100" data-i18n="setup.map.frontier-100"></option>
+          <option value="frontier-50" data-i18n="setup.map.frontier-50"></option>
         </select>
         <p class="smaphint" id="setup-map-info"></p>
         <label for="setup-home-id" data-i18n="setup.home.list"></label>

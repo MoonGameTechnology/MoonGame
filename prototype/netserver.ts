@@ -1,4 +1,4 @@
-import { MAP_IDS, mapPreset, scoreLimitFor, type MapId } from './src/mapCatalog';
+import { isFrontier, MAP_IDS, mapPreset, scoreLimitFor, type MapId } from './src/mapCatalog';
 import { playablePlayerIds } from '../packages/shared-core/src/state/playableSeats';
 // Serves the prototype's OWN world over WebSocket so two browsers — or two phones
 // running the APK — can play the same session against one authoritative core.
@@ -387,7 +387,7 @@ async function createHostedMatch(id: string, mapId: MapId = 'nexus'): Promise<Ho
   const aiEligibleAt = new Map<string, number>();
 
   const restoredSnap = await matchStore.load(id);
-  const initialState = restoredSnap?.state ?? newGame({ mapId, seats: networkSeats(mapId === 'frontier-100' ? 'ffa' : NETWORK_MODE, mapId) });
+  const initialState = restoredSnap?.state ?? newGame({ mapId, seats: networkSeats(isFrontier(mapId) ? 'ffa' : NETWORK_MODE, mapId) });
   // A NET seat is not a bot: every seat here is claimable by a human, and the
   // server-side AI merely stands in for an empty chair (`humans` is the live truth).
   // Strip the static `ai` branding newGame took from the seat config, or two humans
