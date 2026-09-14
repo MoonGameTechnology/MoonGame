@@ -243,3 +243,28 @@ describe('трюм носителя читается как порт и знае
     expect(v.blocked).toBe('empty');
   });
 });
+
+/**
+ * ЧЕЙ ЭТО АНГАР — часть данных, а не догадка разметки.
+ *
+ * Найдено после SHU-3.1: одна и та же секция рисует и порт мира, и трюм носителя, а
+ * заголовок в ней стоял ОДИН — «Ангар порта». На идущем «Шаттле» игрок читал про порт
+ * строку о корабле; та же подмена была во второй строке — «порт перезаряжается».
+ * Поэтому место называет себя само: `kind` приходит из того, кто построил вид.
+ */
+describe('SHU-3.1 — ангар называет, ЧЕЙ он', () => {
+  it('порт мира — это порт', () => {
+    expect(planetHangar(port(), data)!.kind).toBe('port');
+  });
+
+  it('трюм носителя — это трюм, а не порт', () => {
+    expect(fleetHangar(carrier(), data)!.kind).toBe('hold');
+  });
+
+  it('вид знает своё место в любом состоянии — и пустой, и полный, и в пути', () => {
+    const full = { hangar: [{ id: 'sq:1', units: [{ unit: 'bomber', count: 2 }] }] };
+    expect(fleetHangar(carrier(full), data)!.kind).toBe('hold');
+    expect(fleetHangar(carrier({ ...full, movement: { from: 'A', to: 'B', departedAt: 0, arrivesAt: 1 } }), data)!.kind).toBe('hold');
+    expect(planetHangar(port({ hangar: full.hangar }), data)!.kind).toBe('port');
+  });
+});

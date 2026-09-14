@@ -255,11 +255,13 @@ export const en: Record<string, string> = {
   'side.wing.empty': 'the hangar is empty',
   'side.wing.blocked.no-fuel': 'out of fuel — waiting on the rearm',
   'side.wing.blocked.rearming': 'the port is rearming — a sortie must wait',
+  'side.wing.blocked.rearming.hold': 'the carrier is rearming — a sortie must wait',
   'side.wing.fuel': 'sorties left: {n} of {max}',
   'side.wing.merge': '⛬ Merge',
   'side.wing.merge.into': '⛬ into this',
   'side.wing.merge.pick': 'pick the squadron to merge into',
   'side.wing.hangar': 'Port hangar — {used} of {bay}',
+  'side.wing.hold': 'Carrier hold — {used} of {bay}',
   'side.wing.load': '↑ Aboard',
   'side.wing.no-port': 'no spaceport — no shuttles are based here',
   'side.wing.split': '⊟ Detach one',
@@ -963,6 +965,7 @@ export const en: Record<string, string> = {
 
   // --- loadout — Ship loadout editor (packages/client): stat-preview labels.
   'loadout.stat.attack': 'Attack damage',
+  'loadout.stat.bay': 'Hangar',
   'loadout.stat.cargo': 'Cargo',
   'loadout.stat.defense': 'Defense damage',
   'loadout.stat.hp': 'Hull',

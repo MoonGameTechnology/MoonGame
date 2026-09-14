@@ -633,10 +633,10 @@
 | ARS-0 | ✅ | docs | `docs/arsenal-roadmap.md:52` | Развилки за владельцем — решено (2026-07-14) |
 | ARS-1 | ✅ | data core | `docs/arsenal-roadmap.md:88` | Схема предмета/чертежа — реализовано |
 | ARS-2 | ✅ | srv | `docs/arsenal-roadmap.md:127` | ArsenalStore + стартовый набор — реализовано |
-| ARS-3 | ✅ | srv | `docs/arsenal-roadmap.md:165` | Снапшот в матч — реализовано |
-| ARS-4 | ✅ | srv | `docs/arsenal-roadmap.md:208` | Источники: дроп по месту + сальваж — реализовано |
-| ARS-5 | ✅ | proto srv | `docs/arsenal-roadmap.md:248` | UI: витрина + фильтр Верфи — реализовано |
-| ARS-6 | ✅ | srv | `docs/arsenal-roadmap.md:295` | Корп-склад + аренда — реализовано |
+| ARS-3 | ✅ | srv | `docs/arsenal-roadmap.md:166` | Снапшот в матч — реализовано |
+| ARS-4 | ✅ | srv | `docs/arsenal-roadmap.md:209` | Источники: дроп по месту + сальваж — реализовано |
+| ARS-5 | ✅ | proto srv | `docs/arsenal-roadmap.md:269` | UI: витрина + фильтр Верфи — реализовано |
+| ARS-6 | ✅ | srv | `docs/arsenal-roadmap.md:316` | Корп-склад + аренда — реализовано |
 | AVA-1 | ✅ | srv core | `docs/ava-lifecycle-roadmap.md:43` | Командная дипломатия на серверном пути [srv/core] — реализовано |
 | AVA-2 | ✅ | srv | `docs/ava-lifecycle-roadmap.md:86` | Очки влияния корпорации |
 | AVA-3 | ✅ | srv | `docs/ava-lifecycle-roadmap.md:118` | Флаги готовности к AvA |
@@ -1022,11 +1022,11 @@
 | SHU-2.1 | ✅ | core data | `docs/shuttles-roadmap.md:203` | Носитель как мобильный космопорт |
 | SHU-2.2 | ✅ | core srv proto | `docs/shuttles-roadmap.md:232` | Снос старой машинерии 2026-09-11 |
 | SHU-3.1 | ✅ | proto | `docs/shuttles-roadmap.md:301` | Интерфейс 2026-09-10 |
-| SHU-3.2 | ✅ | proto | `docs/shuttles-roadmap.md:446` | Бот умеет челноки 2026-09-09 |
-| SHU-4.1 | ✅ | proto | `docs/shuttles-roadmap.md:497` | Словарь: эскадра у мира, флот у кораблей 2026-09-10 |
-| SHU-4.2 | ✅ | core data | `docs/shuttles-roadmap.md:539` | Эскадра как соединение ангара 2026-09-10 |
-| SHU-4.3 | ✅ | proto | `docs/shuttles-roadmap.md:599` | Панель мира: эскадры как флоты 2026-09-10 |
-| SHU-4.4 | ✅ | core | `docs/shuttles-roadmap.md:651` | Погоня: удар по движущейся цели 2026-09-13 |
+| SHU-3.2 | ✅ | proto | `docs/shuttles-roadmap.md:463` | Бот умеет челноки 2026-09-09 |
+| SHU-4.1 | ✅ | proto | `docs/shuttles-roadmap.md:514` | Словарь: эскадра у мира, флот у кораблей 2026-09-10 |
+| SHU-4.2 | ✅ | core data | `docs/shuttles-roadmap.md:556` | Эскадра как соединение ангара 2026-09-10 |
+| SHU-4.3 | ✅ | proto | `docs/shuttles-roadmap.md:616` | Панель мира: эскадры как флоты 2026-09-10 |
+| SHU-4.4 | ✅ | core | `docs/shuttles-roadmap.md:668` | Погоня: удар по движущейся цели 2026-09-13 |
 | ST-3.1 | ✅ | core | `docs/steward-roadmap.md:68` | Ядро: доля потерь по прогнозу + трипваер «враг близко» |
 | ST-3.2 | ✅ | srv proto | `docs/steward-roadmap.md:89` | Драйвер: эвакуация под угрозой (поза defend) |
 | ST-3.3 | ✅ | core srv proto | `docs/steward-roadmap.md:116` | Поза «Активная оборона» — контрудар при приемлемых потерях |
