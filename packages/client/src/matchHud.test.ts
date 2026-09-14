@@ -18,6 +18,11 @@ import {
   resolveFleetAction,
   createWorldModel,
   resolveWorldAction,
+  createSplitModel,
+  stepSplitTake,
+  resolveSplit,
+  mergeCandidates,
+  resolveMerge,
   type FleetSelectionModel,
   type WorldModel,
 } from './matchHud';
@@ -40,6 +45,10 @@ const DATA = {
     outpost: { capturable: true },
     fortress: { capturable: false },
   },
+  // Пустой каталог модулей — не украшение: `effectiveStats` читает `data.modules`
+  // всякий раз, когда у стека есть лоадаут (окно деления считает так вместимость трюма),
+  // и без карты падает. В боевых данных она есть по схеме.
+  modules: {},
   // Объявлен как ПОЛНЫЙ `GameData`, хотя заполнены только читаемые полями модели срезы:
   // панель мира спрашивает у ядра `isInhabited`/`stewardUnlocked`, а те принимают весь
   // `GameData` — с `Pick` фикстура в них не проходит по типу.
@@ -970,5 +979,173 @@ describe('resolveWorldAction', () => {
       ok: false,
       code: 'E_STEWARD_LOCKED',
     });
+  });
+});
+
+
+/* ─────────────── деление и слияние (MIG-9) ─────────────── */
+
+/** Флот в снимке с составом; `landing` — десант в трюме. */
+function fleetsIn(state: GameState, fleets: Record<string, Partial<Fleet>>): GameState {
+  state.fleets = Object.fromEntries(
+    Object.entries(fleets).map(([id, f]) => [
+      id,
+      { id, owner: 'p1', location: 'A', movement: null, units: [], traits: [], ...f } as Fleet,
+    ]),
+  );
+  return state;
+}
+
+describe('mergeCandidates', () => {
+  it('только СВОИ, только СТОЯЩИЕ там же и не в бою', () => {
+    const s = fleetsIn(baseState(), {
+      f1: { units: [{ unit: 'frigate', count: 2 }] },
+      f2: { units: [{ unit: 'frigate', count: 1 }] }, // годится
+      f3: { owner: 'p2' }, // чужой
+      f4: { location: 'B' }, // в другом месте
+      f5: { battleId: 'b1' }, // в бою
+      f6: { location: null, movement: { from: 'A', to: 'B', departedAt: 0, arrivesAt: 9 } }, // в пути
+    });
+    expect(mergeCandidates(s, 'f1', 'p1').map((c) => c.id)).toEqual(['f2']);
+  });
+
+  it('сам себя в кандидаты не берёт, и у идущего якоря кандидатов нет', () => {
+    const s = fleetsIn(baseState(), { f1: {}, f2: {} });
+    expect(mergeCandidates(s, 'f1', 'p1').map((c) => c.id)).toEqual(['f2']);
+    const moving = fleetsIn(baseState(), {
+      f1: { location: null, movement: { from: 'A', to: 'B', departedAt: 0, arrivesAt: 9 } },
+      f2: {},
+    });
+    expect(mergeCandidates(moving, 'f1', 'p1')).toEqual([]);
+  });
+});
+
+describe('resolveMerge', () => {
+  it('стоящие вместе сливаются СРАЗУ', () => {
+    const s = fleetsIn(baseState(), { f1: {}, f2: {} });
+    expect(resolveMerge(s, 'f1', 'f2', 'p1')).toEqual({
+      ok: true,
+      steps: [{ type: 'fleet.merge', payload: { from: 'f2', into: 'f1' } }],
+    });
+  });
+
+  it('чужой якорь — отказ, а не молчаливое ничего', () => {
+    const s = fleetsIn(baseState(), { f1: { owner: 'p2' }, f2: {} });
+    expect(resolveMerge(s, 'f1', 'f2', 'p1')).toEqual({ ok: false, code: 'E_NO_FLEET' });
+  });
+
+  it('разнесённые флоты панель НЕ отправляет в полёт', () => {
+    // Решение знает ветку «лети к якорю и слейся по прибытии», но показать её панели
+    // нечем: игрок не увидит ни полёта, ни момента слияния. Честнее отказать.
+    const s = fleetsIn(baseState(), { f1: {}, f2: { location: 'B' } });
+    expect(resolveMerge(s, 'f1', 'f2', 'p1')).toEqual({ ok: false, code: 'E_FLEET_BUSY' });
+  });
+});
+
+describe('createSplitModel', () => {
+  const DUO = { f1: { units: [{ unit: 'frigate', count: 3 }] } };
+
+  it('строка на СТЕК: один корпус с начинкой и без — две разные строки', () => {
+    // Лоадаут — часть личности стека (SM-0.3): «два крейсера» ничего не значит, пока
+    // не сказано КАКИЕ два.
+    const s = fleetsIn(baseState(), {
+      f1: {
+        units: [
+          { unit: 'frigate', count: 2 },
+          { unit: 'frigate', count: 1, modules: ['railgun'] },
+        ],
+      },
+    });
+    const res = createSplitModel(s, 'f1', 'p1', {}, DATA);
+    expect(res.ok && res.rows.length).toBe(2);
+    expect(res.ok && res.rows[1]?.modules).toEqual(['railgun']);
+  });
+
+  it('идущий или дерущийся флот делить НЕЛЬЗЯ', () => {
+    for (const over of [
+      { movement: { from: 'A', to: 'B', departedAt: 0, arrivesAt: 9 }, location: null },
+      { battleId: 'b1' },
+    ])
+      expect(
+        createSplitModel(fleetsIn(baseState(), { f1: { ...DUO.f1, ...over } }), 'f1', 'p1', {}, DATA),
+      ).toEqual({ ok: false, code: 'E_FLEET_BUSY' });
+  });
+
+  it('ноль и «всё» подтвердить нельзя — это не деление', () => {
+    const s = fleetsIn(baseState(), DUO);
+    const key = (createSplitModel(s, 'f1', 'p1', {}, DATA) as { rows: { key: string }[] }).rows[0]!.key;
+    expect(createSplitModel(s, 'f1', 'p1', {}, DATA)).toMatchObject({ canConfirm: false });
+    expect(createSplitModel(s, 'f1', 'p1', { [key]: 3 }, DATA)).toMatchObject({ canConfirm: false });
+    expect(createSplitModel(s, 'f1', 'p1', { [key]: 1 }, DATA)).toMatchObject({ canConfirm: true });
+  });
+
+  it('вчерашний отбор УЖИМАЕТСЯ под живой флот, а не уезжает в отказ', () => {
+    // Окно живёт поверх живого флота: пока игрок жмёт «+10», состав может измениться.
+    const s = fleetsIn(baseState(), { f1: { units: [{ unit: 'frigate', count: 1 }] } });
+    const res = createSplitModel(s, 'f1', 'p1', { 'ship:frigate|': 99 }, DATA);
+    expect(res.ok && res.rows[0]?.take).toBe(1);
+  });
+});
+
+describe('resolveSplit', () => {
+  const modelOf = (state: GameState, take: Record<string, number> = {}) => {
+    const res = createSplitModel(state, 'f1', 'p1', take, DATA);
+    if (!res.ok) throw new Error(res.code);
+    return res;
+  };
+
+  it('отбор превращается в приказ, и модули едут АДРЕСОМ стека', () => {
+    const s = fleetsIn(baseState(), {
+      f1: {
+        units: [
+          { unit: 'frigate', count: 2 },
+          { unit: 'frigate', count: 2, modules: ['railgun'] },
+        ],
+      },
+    });
+    const m = modelOf(s, { 'ship:frigate|railgun': 1 });
+    expect(resolveSplit(m)).toEqual({
+      ok: true,
+      steps: [
+        {
+          type: 'fleet.split',
+          payload: { fleetId: 'f1', take: [{ unit: 'frigate', count: 1, modules: ['railgun'] }] },
+        },
+      ],
+    });
+  });
+
+  it('без десанта поля takeLanding в приказе НЕТ', () => {
+    const m = modelOf(fleetsIn(baseState(), { f1: { units: [{ unit: 'frigate', count: 2 }] } }), {
+      'ship:frigate|': 1,
+    });
+    const out = resolveSplit(m);
+    expect(out.ok && Object.keys(out.steps[0]!.payload)).not.toContain('takeLanding');
+  });
+
+  it('неподтверждаемый отбор даёт РАЗНЫЕ коды: «не делится» и «трюм не сходится»', () => {
+    const m = modelOf(fleetsIn(baseState(), { f1: { units: [{ unit: 'frigate', count: 2 }] } }));
+    expect(resolveSplit(m)).toEqual({ ok: false, code: 'E_BAD_SPLIT' });
+  });
+});
+
+describe('stepSplitTake', () => {
+  it('шаг меняет ТОЛЬКО свою строку и зажимается наличным', () => {
+    const s = fleetsIn(baseState(), {
+      f1: {
+        units: [
+          { unit: 'frigate', count: 2 },
+          { unit: 'corvette', count: 5 },
+        ],
+      },
+    });
+    const res = createSplitModel(s, 'f1', 'p1', {}, DATA);
+    if (!res.ok) throw new Error(res.code);
+    const k0 = res.rows[0]!.key;
+    const k1 = res.rows[1]!.key;
+    expect(stepSplitTake(res, k0, 'all')).toEqual({ [k0]: 2, [k1]: 0 });
+    expect(stepSplitTake(res, k1, 'inc')).toEqual({ [k0]: 0, [k1]: 1 });
+    // «−» с нуля не уводит в минус.
+    expect(stepSplitTake(res, k0, 'dec')).toEqual({ [k0]: 0, [k1]: 0 });
   });
 });
