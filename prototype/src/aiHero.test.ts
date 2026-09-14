@@ -31,10 +31,10 @@ const payloads = <T>(actions: Action[], type: string): T[] =>
 const orders = (s: GameState, profile: 'weak' | 'strong' = 'strong'): Action[] =>
   aiOrders(s, 'p2', 'expand', profile);
 
-/** Домашний мир места (тот, где стоит космопорт). */
+/** Домашний мир места — тот, где стоит ВЕРФЬ (тем же признаком его ищет бот). */
 const homeOf = (s: GameState, seat: string): string =>
   Object.values(s.planets).find(
-    (p) => p.owner === seat && p.buildings.some((b) => b.type === 'spaceport'),
+    (p) => p.owner === seat && p.buildings.some((b) => data.buildings[b.type]?.enablesShipConstruction),
   )!.id;
 
 /** Казна, на которую хватает любого узла дерева и любого фитинга каталога. */

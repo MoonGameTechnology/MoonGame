@@ -240,10 +240,12 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
       // «изучается технология, строится здание» не выполнялось дважды: ни технологии не
       // было, ни постройки не требовалось. Теперь это `orbital_defense_grid`
       // (`data/technologies.json`) плюс обычный `building.construct`.
-      // A starting yard — space-domain hulls need a standing shipyard/spaceport to
-      // build at all (enablesShipConstruction); without one, turn-1 fleet-building
-      // would be impossible.
-      { type: 'spaceport', level: 1, hp: hpOfLevel('spaceport', 1) },
+      // A starting SHIPYARD — space-domain hulls need one standing to be laid down at
+      // all (enablesShipConstruction); without it, turn-1 fleet-building would be
+      // impossible. The SPACEPORT is deliberately NOT here (YARD-1): shuttles are the
+      // other half of the split, and their port is the player's first real choice —
+      // the same reasoning that took the starting AA battery away in ORB-1.
+      { type: 'shipyard', level: 1, hp: hpOfLevel('shipyard', 1) },
     ];
     // Ground defence is what holds a world against capture (an AA battery bleeds a fleet
     // but can't stop a landing — only ground troops do). Seed a starting infantry garrison

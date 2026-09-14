@@ -14,6 +14,7 @@
 // профиля (игровой бот ничего этого не делает) и якорь дома, на котором цепочка стоит.
 import { describe, expect, it } from 'vitest';
 import { newGame, aiOrders, START_CANDIDATES } from './game';
+import { data } from './gameData';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 
 function game2(): GameState {
@@ -39,10 +40,10 @@ const loads = (actions: Action[]): Array<{ unit: string; count: number }> =>
 
 const GROUND = ['militia', 'heavy_infantry', 'special_forces', 'tank'];
 
-/** Домашний мир места (тот, где стоит космопорт). */
+/** Домашний мир места — тот, где стоит ВЕРФЬ (тем же признаком его ищет бот). */
 const homeOf = (s: GameState, seat: string): string =>
   Object.values(s.planets).find(
-    (p) => p.owner === seat && p.buildings.some((b) => b.type === 'spaceport'),
+    (p) => p.owner === seat && p.buildings.some((b) => data.buildings[b.type]?.enablesShipConstruction),
   )!.id;
 
 /** Кладёт мир `patch` в состояние, сохраняя остальные. */

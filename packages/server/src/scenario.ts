@@ -361,10 +361,11 @@ export function createDevMatch(data: GameData, options: DevMatchOptions = {}): M
       DEV_FACTIONS[i % DEV_FACTIONS.length] ?? 'vanguard',
     );
     const home = planet(`home_${id}`, id, x, y, ['nexus'], 'terran');
-    // A starting yard — space-domain hulls need a standing shipyard/spaceport to
-    // build at all (enablesShipConstruction); without one, turn-1 fleet-building
-    // would be impossible in every dev/test match.
-    home.buildings = [{ type: 'spaceport', level: 1, hp: 25 }];
+    // A starting SHIPYARD — space-domain hulls need one standing to be laid down at
+    // all (enablesShipConstruction); without it, turn-1 fleet-building would be
+    // impossible in every dev/test match. The SPACEPORT is deliberately NOT here: it
+    // is the shuttle side of the split, and the player builds it (YARD-1).
+    home.buildings = [{ type: 'shipyard', level: 1, hp: 30 }];
     planets[`home_${id}`] = home;
     fleets[`${id}_1`] = fleet(`${id}_1`, id, `home_${id}`, [
       ['cruiser', 2],

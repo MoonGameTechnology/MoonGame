@@ -60,7 +60,11 @@ describe('AI-BAL-10 — диагноз мёртвого контента', () =>
       ['farm', 'power_plant', 'radar', 'frigate', 'starfort', 'spaceport'],
       ai,
     );
-    expect(split.unbuilt).toEqual(['farm', 'power_plant']);
-    expect(split.offRepertoire).toEqual(['radar', 'frigate', 'starfort', 'spaceport']);
+    // YARD-1: `spaceport` переехал из «нет в репертуаре» в «умеет, но в прогоне не
+    // построил» — раньше порт приезжал вместе с домом, и строить его боту было незачем;
+    // теперь он звено экономической цепочки. Ровно то устаревание, ради которого этот
+    // сторож и заведён: диагноз переписан, а не унаследован.
+    expect(split.unbuilt).toEqual(['farm', 'power_plant', 'spaceport']);
+    expect(split.offRepertoire).toEqual(['radar', 'frigate', 'starfort']);
   });
 });

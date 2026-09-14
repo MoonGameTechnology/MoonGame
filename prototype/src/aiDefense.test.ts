@@ -14,6 +14,7 @@
 // начинал выигрывать гонку ОЧКОВ постройками вместо того, чтобы воевать.
 import { describe, expect, it } from 'vitest';
 import { newGame, aiOrders, START_CANDIDATES } from './game';
+import { data } from './gameData';
 import type { Action, GameState } from '../../packages/shared-core/src/index';
 
 function game2(): GameState {
@@ -35,7 +36,7 @@ const unloads = (actions: Action[]): Array<{ unit: string; count: number }> =>
 
 const homeOf = (s: GameState, seat: string): string =>
   Object.values(s.planets).find(
-    (p) => p.owner === seat && p.buildings.some((b) => b.type === 'spaceport'),
+    (p) => p.owner === seat && p.buildings.some((b) => data.buildings[b.type]?.enablesShipConstruction),
   )!.id;
 
 /** Состояние в состоянии войны + богатая казна: оборона должна быть ПО КАРМАНУ, иначе
