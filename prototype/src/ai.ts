@@ -30,7 +30,7 @@ import {
   type Fleet,
   type UnitStack,
 } from '../../packages/shared-core/src/index';
-import { heroNode } from '../../packages/shared-core/src/state/heroes';
+import { heroByFleet, heroNode } from '../../packages/shared-core/src/state/heroes';
 import { canOrder } from './protoKernel';
 import { provinceScore } from '../../packages/shared-core/src/state/sectorKind';
 import {
@@ -409,11 +409,33 @@ export function aiOrders(
     for (const group of byLoc.values()) {
       if (group.length < 2) continue;
       group.sort((a, b) => shipCount(b) - shipCount(a));
+      const anchor = group[0]!;
+      // Считается НАРАСТАЮЩИМ итогом, а не по состоянию на начало тика: приказы
+      // применяются подряд, и первый же влившийся геройский флот делает якорь
+      // геройским. Снимок пропустил бы второе слияние — оно отбилось бы при уже
+      // поставленном `skipMove`, то есть вернуло бы ту же вечную стоянку.
+      let anchorHasHero = !!heroByFleet(state, anchor.id);
+      let merged = false;
       for (let k = 1; k < group.length; k++) {
-        out.push(mergeFleet(ai, group[k]!.id, group[0]!.id));
-        skipMove.add(group[k]!.id);
+        const from = group[k]!;
+        // ПРАВИЛО «ОДИН ГЕРОЙ НА ФЛОТ» (HERO-10, резолюция владельца «как в HoMM»): ядро
+        // отбивает слияние ДВУХ геройских флотов кодом `E_TWO_HEROES`. Безгеройский к
+        // герою присоединить можно — это обычное усиление, герой в итоге один.
+        //
+        // Бот про это правило не знал, и цена оказалась не косметической (AI-BAL-13): два
+        // геройских флота в одной точке отбивались каждый тик, а `skipMove` ставился им
+        // ВСЁ РАВНО — оба стояли навсегда. Замер при CONV-12b: боёв 12370 → 119, наземных
+        // 7073 → 0. Остановка боевой части игры, а не дрейф баланса.
+        const fromHasHero = !!heroByFleet(state, from.id);
+        if (anchorHasHero && fromHasHero) continue;
+        out.push(mergeFleet(ai, from.id, anchor.id));
+        skipMove.add(from.id);
+        merged = true;
+        if (fromHasHero) anchorHasHero = true; // герой переехал в якорь вместе с флотом
       }
-      skipMove.add(group[0]!.id); // it grows this tick, sorties the next
+      // Ход гасится ТОЛЬКО тому, чьё слияние действительно отправлено: якорь, в который
+      // никто не влился, обязан лететь сам, а не ждать роста, которого не будет.
+      if (merged) skipMove.add(anchor.id); // вырастет сейчас, вылетит на следующем тике
     }
   }
   // ═══ СИЛЬНЫЙ БОТ (AI-BAL-7): ФЛОТ УМЕЕТ ПРОИГРАТЬ БОЙ ═══
