@@ -256,11 +256,13 @@ export const ru: Record<string, string> = {
   'side.wing.empty': 'ангар пуст',
   'side.wing.blocked.no-fuel': 'топливо кончилось — ждём перезарядки',
   'side.wing.blocked.rearming': 'порт перезаряжается — вылет позже',
+  'side.wing.blocked.rearming.hold': 'носитель перезаряжает звенья — вылет позже',
   'side.wing.fuel': 'вылетов осталось: {n} из {max}',
   'side.wing.merge': '⛬ Слить',
   'side.wing.merge.into': '⛬ сюда',
   'side.wing.merge.pick': 'выберите звено, в которое слить',
   'side.wing.hangar': 'Ангар порта — {used} из {bay}',
+  'side.wing.hold': 'Трюм носителя — {used} из {bay}',
   'side.wing.load': '↑ На борт',
   'side.wing.no-port': 'нет космопорта — челноков тут не держат',
   'side.wing.split': '⊟ Отделить борт',
@@ -962,6 +964,7 @@ export const ru: Record<string, string> = {
 
   // --- loadout — Оснащение корабля (packages/client): подписи характеристик в превью.
   'loadout.stat.attack': 'Урон в атаке',
+  'loadout.stat.bay': 'Ангар',
   'loadout.stat.cargo': 'Трюм',
   'loadout.stat.defense': 'Урон в защите',
   'loadout.stat.hp': 'Корпус',
