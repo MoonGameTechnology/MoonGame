@@ -4,6 +4,21 @@
 // untranslated string shows up in Russian rather than as a raw key. The locale
 // guard in prototype/src/i18n.test.ts fails on any key present in ru.ts but not here.
 export const en: Record<string, string> = {
+  "setup.network.create": "Create online game",
+  "setup.network.creating": "Creating…",
+  "setup.network.failed": "Could not create game",
+  "setup.map": "Map",
+  "setup.map.nexus": "Nexus · 10 players",
+  "setup.map.frontier-100": "Frontier · 100 players",
+  "setup.map.frontier-info": "1675 provinces · 2 between starts · 3 to the rim · 12 pirate and 12 neutral bases · isolated black hole",
+  "setup.map.nexus-info": "Classic map for 10 players",
+  "setup.bots.count": "AI opponents",
+  "setup.home.list": "Homeworld",
+  "data.pirate-base": "Pirate Base",
+  "data.neutral-ai-base": "Neutral AI Base",
+  "data.black-hole": "Black Hole",
+  "map.frontier-100": "Frontier",
+  "setup.map.hole": "Black hole · no paths",
   // --- map-loading — initial map preparation ---
   'map-loading.background': 'Preparing the backdrop',
   'map-loading.cancel': 'Main menu',

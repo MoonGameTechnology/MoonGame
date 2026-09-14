@@ -74,7 +74,9 @@ export interface MatchApiDeps {
   /** Seed + persist a new match; returns its id and seat player ids. Optional: when absent
    *  the `POST /matches` route is not registered — a host that only seeds matches out of band
    *  (e.g. the playtest netserver) exposes join without a public create. */
-  createMatch?(): Promise<CreatedMatch>;
+  createMatch?(request?: { mapId?: string }): Promise<CreatedMatch>;
+  /** Explicit allowlist for user-selected maps; absent = default only. */
+  mapIds?: readonly string[];
   /** Resolve `nick` to a seat in `matchId` and mint its join token, or a stable failure:
    *  the match does not exist, every seat is taken, or token auth is not configured.
    *  `accountId` is stamped into the join token when the caller is authenticated.
@@ -136,7 +138,17 @@ export function registerMatchApi(app: FastifyInstance, deps: MatchApiDeps): void
         void reply.code(401);
         return { error: 'E_AUTH' as const };
       }
-      return createMatch();
+      const body = request.body;
+      if (body !== undefined && (body === null || typeof body !== 'object' || Array.isArray(body))) {
+        void reply.code(400);
+        return { error: 'E_BAD_PAYLOAD' as const };
+      }
+      const mapId = (body as { mapId?: unknown } | undefined)?.mapId;
+      if (mapId !== undefined && (typeof mapId !== 'string' || !deps.mapIds?.includes(mapId))) {
+        void reply.code(400);
+        return { error: 'E_UNKNOWN_MAP' as const };
+      }
+      return mapId === undefined ? createMatch() : createMatch({ mapId });
     });
   }
 
@@ -254,6 +266,7 @@ export interface SeatView {
 
 /** A match's seating, as the host knows it — independent of who is asking. */
 export interface SeatLayout {
+  mapId?: string;
   seats: SeatView[];
   /** The simulation is over: no chair here is claimable any more. */
   ended: boolean;
@@ -318,7 +331,7 @@ export function registerSeatsApi(app: FastifyInstance, deps: SeatsApiDeps): void
       void reply.code(403);
       return { error: 'E_FORBIDDEN' as const };
     }
-    return { seats: layout.seats };
+    return { seats: layout.seats, ...(layout.mapId ? { mapId: layout.mapId } : {}) };
   });
 }
 

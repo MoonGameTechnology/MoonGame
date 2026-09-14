@@ -1,3 +1,4 @@
+import { playablePlayerIds } from '../state/playableSeats';
 import type {
   MatchEndReason,
   MatchScore,
@@ -125,7 +126,7 @@ function computeRewards(
   const scale = h.ctx.data.rewards;
   const scores = h.state.match.scores;
   const winningUnit = new Set(winners ?? (winner === null ? [] : [winner]));
-  const ids = Object.keys(h.state.players).sort(
+  const ids = playablePlayerIds(h.state).sort(
     (a, b) => (scores[b]?.total ?? 0) - (scores[a]?.total ?? 0) || (a < b ? -1 : 1),
   );
   const rewards: Record<PlayerId, PlayerReward> = {};
@@ -219,7 +220,16 @@ function evaluateVictory(h: HandlerContext): void {
   const scores = computeScores(h);
   h.state.match.scores = scores;
 
-  const playerIds = Object.keys(h.state.players).sort();
+  // Map inhabitants do not compete for the match, but losing their last base
+  // still eliminates them and disbands their roaming fleets.
+  for (const id of Object.keys(h.state.players).sort()) {
+    const p = h.state.players[id]!;
+    if (!p.npc || p.status !== 'active' || (scores[p.id]?.controlledPlanets ?? 0) > 0) continue;
+    p.status = 'defeated';
+    for (const f of Object.values(h.state.fleets)) if (f.owner === p.id) delete h.state.fleets[f.id];
+    h.emit('player.eliminated', { playerId: p.id, reason: 'no-territory' });
+  }
+  const playerIds = playablePlayerIds(h.state).sort();
   const activeBefore = playerIds.filter(
     (playerId) => h.state.players[playerId]?.status === 'active',
   );
@@ -258,6 +268,18 @@ function evaluateVictory(h: HandlerContext): void {
   }
 
   if (activeBefore.length < 2) {
+    // A solo exploration map can still have hostile inhabitants. They never
+    // receive a PvP victory, but taking the lone commander's last world is a loss.
+    const lone = playerIds.length === 1 ? activeBefore[0] : undefined;
+    if (lone && Object.values(h.state.players).some((p) => p.npc) &&
+        (scores[lone]?.controlledPlanets ?? 0) === 0) {
+      h.state.players[lone]!.status = 'defeated';
+      for (const fleet of Object.values(h.state.fleets)) {
+        if (fleet.owner === lone) delete h.state.fleets[fleet.id];
+      }
+      h.emit('player.eliminated', { playerId: lone, reason: 'no-territory' });
+      endMatch(h, null, 'elimination');
+    }
     return;
   }
 

@@ -1,3 +1,5 @@
+import { MAP_IDS, mapPreset, scoreLimitFor, type MapId } from './src/mapCatalog';
+import { playablePlayerIds } from '../packages/shared-core/src/state/playableSeats';
 // Serves the prototype's OWN world over WebSocket so two browsers — or two phones
 // running the APK — can play the same session against one authoritative core.
 //
@@ -72,7 +74,6 @@ import {
   data,
   networkSeats,
   parseNetworkMatchMode,
-  SCORE_LIMIT,
   aiOrders,
   seatAiDecision,
   stewardActive,
@@ -375,7 +376,7 @@ interface HostedMatch {
   clearTimers(): void;
 }
 
-async function createHostedMatch(id: string): Promise<HostedMatch> {
+async function createHostedMatch(id: string, mapId: MapId = 'nexus'): Promise<HostedMatch> {
   let connected = 0; // live players in THIS match (gates the empty-seat AI)
   // The shared offline scheduler (assigned after `room` below). `observe` re-arms it,
   // so it is declared here — before `observe` — and read with `?.` until it exists.
@@ -386,12 +387,12 @@ async function createHostedMatch(id: string): Promise<HostedMatch> {
   const aiEligibleAt = new Map<string, number>();
 
   const restoredSnap = await matchStore.load(id);
-  const initialState = restoredSnap?.state ?? newGame({ seats: NET_SEATS });
+  const initialState = restoredSnap?.state ?? newGame({ mapId, seats: networkSeats(mapId === 'frontier-100' ? 'ffa' : NETWORK_MODE, mapId) });
   // A NET seat is not a bot: every seat here is claimable by a human, and the
   // server-side AI merely stands in for an empty chair (`humans` is the live truth).
   // Strip the static `ai` branding newGame took from the seat config, or two humans
   // on DEFAULT_SETUP seats could never ally (E_BOT_ALLIANCE against seat p2 forever).
-  for (const seat of Object.values(initialState.players)) delete seat.ai;
+  for (const seat of Object.values(initialState.players)) if (!seat.npc) delete seat.ai;
   // Rehydrate idempotency receipts so a retried action stays deduped across a restart.
   const initialReceipts = await receiptStore.loadAll(id);
 
@@ -477,7 +478,7 @@ async function createHostedMatch(id: string): Promise<HostedMatch> {
     serverOrders: (state, seq) => pveOrders(state, data, { session: id, seq }),
     // The kernel context config must match what the local sim (and the HUD) promise:
     // without it victory falls back to its 600 default while the HUD counts to 450.
-    config: { timeScale: 1, victory: { scoreLimit: SCORE_LIMIT } },
+    config: { timeScale: 1, victory: { scoreLimit: scoreLimitFor(initialState) } },
     initialSeq: restoredSnap?.seq, // resume the action counter — else the optimistic-by-seq
     // store drops post-restart saves until seq climbs back past the stored value
     // Strict commit-before-broadcast: await the durable write of the new snapshot +
@@ -567,7 +568,7 @@ async function createHostedMatch(id: string): Promise<HostedMatch> {
       // delegation commands their own chair (kind 'none').
       const posture = stewardActive(room.state, seat, now);
       const eligibleAt = aiEligibleAt.get(seat);
-      const graceExpired = eligibleAt === undefined || Date.now() >= eligibleAt;
+      const graceExpired = !!room.state.players[seat]?.npc || eligibleAt === undefined || Date.now() >= eligibleAt;
       const decision = seatAiDecision(humans.has(seat), posture, graceExpired);
       if (decision.kind === 'none') continue;
       for (const action of aiOrders(room.state, seat, decision.posture!)) {
@@ -678,11 +679,9 @@ async function createHostedMatch(id: string): Promise<HostedMatch> {
 // разъезжались в том, как называется партия.
 const hosted: HostedMatch[] = [];
 const registry = new MatchRegistry(accountStore);
-/** Метаданные браузера для одной сессии этого хоста. Пока все партии поднимаются по
- *  одному шаблону (одна карта, один режим, одна вместимость) — это и есть BRW-0, и он
- *  ждёт AUD-8; ADDR-1 добавляет только МОМЕНТ рождения и собственный id. */
+/** Метаданные браузера: карта берётся из сохранённого состояния сессии. */
 const browserMeta = (room: MatchRoom): MatchMeta => ({
-  mapId: 'nexus',
+  mapId: room.state.mapId ?? 'nexus',
   rules: { timeScale: TIME_SCALE },
   createdAt: Date.now(),
   startedAt: room.state.time,
@@ -715,9 +714,9 @@ const restoredCount = hosted.filter((h) => h.restored).length;
  */
 const MAX_HOSTED = 64; // потолок сессий в одном процессе: создание ограничено сверху,
 // а не только per-IP лимитом маршрута — иначе память процесса растёт по запросу.
-async function hostNewMatch(): Promise<HostedMatch> {
+async function hostNewMatch(mapId: MapId = 'nexus'): Promise<HostedMatch> {
   if (hosted.length >= MAX_HOSTED) throw new Error('match capacity reached'); // → 500, bounded
-  const h = await createHostedMatch(newMatchId());
+  const h = await createHostedMatch(newMatchId(), mapId);
   hosted.push(h);
   registry.register(h.room, browserMeta(h.room));
   // Свежая партия ложится в стор СРАЗУ, а не при первой активности. Иначе её нет в
@@ -848,8 +847,9 @@ const server = createMultiplayerServer({
         if (!room) return null;
         const taken = new Set((await accountStore.seatedNicks(id)).map((s) => s.playerId));
         return {
+          mapId: room.state.mapId ?? 'nexus',
           ended: room.state.match.status === 'ended',
-          seats: Object.values(room.state.players).map((p) => {
+          seats: Object.values(room.state.players).filter((p) => !p.npc).map((p) => {
             // Find the start planet (owner === playerId, the homeworld).
             const startPlanet = Object.values(room.state.planets).find((pl) => pl.owner === p.id);
             return {
@@ -940,7 +940,7 @@ const server = createMultiplayerServer({
             day: Math.floor(room.state.time / MS_PER_DAY),
             ended: room.state.match.status === 'ended',
             entryOpen: registry.entryOpen(id),
-            seats: Object.values(room.state.players).map((p) => ({
+            seats: Object.values(room.state.players).filter((p) => !p.npc).map((p) => ({
               playerId: p.id,
               name: p.name,
               faction: p.faction,
@@ -963,9 +963,10 @@ const server = createMultiplayerServer({
         // маршрута держат три границы, те же, что у канонического хоста: identity-гейт
         // (`identify` ниже — с AUTH=1 создать может только вошедший), per-IP лимит
         // самого `registerMatchApi` и потолок `MAX_HOSTED` на процесс.
-        createMatch: async () => {
-          const h = await hostNewMatch();
-          return { matchId: h.id, seats: Object.keys(h.room.state.players) };
+        mapIds: MAP_IDS,
+        createMatch: async (request) => {
+          const h = await hostNewMatch(mapPreset(request?.mapId).id);
+          return { matchId: h.id, seats: playablePlayerIds(h.room.state) };
         },
         // Identity = a signature-valid session, RE-CHECKED against the current password: a
         // reset revokes older sessions before they can claim/reclaim a seat (SE-1.x).
@@ -992,14 +993,14 @@ const server = createMultiplayerServer({
             : await accountStore.resolveSeat(
                 id,
                 login,
-                Object.keys(room.state.players),
+                playablePlayerIds(room.state),
                 preferredSlot as PlayerId | undefined,
               );
           const claim = seatClaim({
             resolved,
             preferredFaction,
             // Дома ЭТОГО матча — тот же список, что уходит в `/matches/:id/seats`.
-            knownFactions: [...new Set(Object.values(room.state.players).map((p) => p.faction))],
+            knownFactions: [...new Set(Object.values(room.state.players).filter((p) => !p.npc).map((p) => p.faction))],
           });
           if (!claim.ok) return { error: claim.code };
           // ENTRY-3: заявка идёт ДЕЙСТВИЕМ через редьюсер, а не записью в состояние —

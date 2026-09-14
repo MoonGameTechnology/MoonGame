@@ -7,6 +7,21 @@
 // НЕ добавляй сюда русский текст, который уже лежит в коде строкой — сначала
 // заведи ключ, потом замени строку в коде на t('ключ').
 export const ru: Record<string, string> = {
+  "setup.network.create": "Создать сетевую игру",
+  "setup.network.creating": "Создание…",
+  "setup.network.failed": "Не удалось создать игру",
+  "setup.map": "Карта",
+  "setup.map.nexus": "Нексус · 10 игроков",
+  "setup.map.frontier-100": "Фронтир · 100 игроков",
+  "setup.map.frontier-info": "1675 провинций · 2 между стартами · 3 до края · 12 пиратских и 12 нейтральных баз · чёрная дыра без путей",
+  "setup.map.nexus-info": "Классическая карта на 10 игроков",
+  "setup.bots.count": "Соперники ИИ",
+  "setup.home.list": "Стартовая планета",
+  "data.pirate-base": "База пиратов",
+  "data.neutral-ai-base": "База нейтрального ИИ",
+  "data.black-hole": "Чёрная дыра",
+  "map.frontier-100": "Фронтир",
+  "setup.map.hole": "Чёрная дыра · путей нет",
   // --- map-loading — initial map preparation ---
   'map-loading.background': 'Подготовка фона',
   'map-loading.cancel': 'В главное меню',

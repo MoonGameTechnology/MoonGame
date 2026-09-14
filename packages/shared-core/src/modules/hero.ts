@@ -1,3 +1,4 @@
+import { sectorKindDef } from '../state/sectorKind';
 import { hoursToMs } from '../action/types';
 import type { HeroAbilityDef, HeroPassiveDef, ModuleDef, ShipSlotType } from '../data/schemas';
 import type { GameModule, HandlerContext } from '../kernel/module';
@@ -640,6 +641,7 @@ export const heroModule: GameModule = {
         const origin = h.state.planets[heroNode(h.state, hero)];
         const dest = h.state.planets[target];
         if (!origin || !dest) return h.reject('E_NO_PLANET');
+        if (sectorKindDef(h.ctx.data, origin).traversable === false || sectorKindDef(h.ctx.data, dest).traversable === false) return h.reject('E_WRONG_SECTOR');
         if (distance(origin.position, dest.position) > range) {
           return h.reject('E_OUT_OF_RANGE');
         }

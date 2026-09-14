@@ -54,7 +54,12 @@ export const PAN_SLACK = 0.16;
 
 export const clamp = (v: number, a: number, b: number): number => Math.max(a, Math.min(b, v));
 /** Clamp a zoom factor into the allowed range. */
-export const clampScale = (s: number): number => clamp(s, MIN_SCALE, MAX_SCALE);
+export const clampScale = (s: number, max = MAX_SCALE): number => clamp(s, MIN_SCALE, max);
+/** Large authored boards need the same physical province detail as small maps. */
+export function maxScaleForBounds(b: Bounds): number {
+  const span = Math.max(b.maxX - b.minX, b.maxY - b.minY);
+  return MAX_SCALE * (span > 3000 ? Math.min(8, Math.ceil(span / 1600)) : 1);
+}
 
 /** The whole-map fit (map space → screen at scale 1): a UNIFORM scale (aspect preserved,
  *  so a circle stays a circle) that fits the whole map inside the play area and centres it
@@ -164,7 +169,7 @@ export function zoomAt(
 ): Cam {
   const bx = (fx - cam.x) / cam.scale;
   const by = (fy - cam.y) / cam.scale;
-  const scale = clampScale(cam.scale * factor);
+  const scale = clampScale(cam.scale * factor, maxScaleForBounds(b));
   return clampCam({ scale, x: fx - bx * scale, y: fy - by * scale }, vp, b, extra);
 }
 
@@ -179,7 +184,7 @@ export function pinchAt(
   extra: EdgeSlack = {},
 ): Cam {
   if (start.dist <= 0) return { ...startCam };
-  const scale = clampScale(startCam.scale * (current.dist / start.dist));
+  const scale = clampScale(startCam.scale * (current.dist / start.dist), maxScaleForBounds(b));
   const bx = (start.mid.x - startCam.x) / startCam.scale;
   const by = (start.mid.y - startCam.y) / startCam.scale;
   return clampCam(
@@ -199,7 +204,7 @@ export function centerOn(
   b: Bounds,
   extra: EdgeSlack = {},
 ): Cam {
-  const s = clampScale(scale);
+  const s = clampScale(scale, maxScaleForBounds(b));
   const base = projectBase(p, vp, b);
   return clampCam(
     { scale: s, x: (vp.left + vp.right) / 2 - base.x * s, y: (vp.top + vp.bottom) / 2 - base.y * s },

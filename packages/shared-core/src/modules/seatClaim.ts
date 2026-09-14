@@ -74,7 +74,8 @@ export const seatClaimModule: GameModule = {
       const payload = action.payload as { faction?: unknown; scientists?: unknown };
 
       const player = h.state.players[action.playerId];
-      if (!player) return h.reject('E_UNKNOWN_PLAYER'); // правило 5
+      if (!player) return h.reject('E_UNKNOWN_PLAYER');
+      if (player.npc) return h.reject('E_FORBIDDEN'); // правило 5
       if (player.claimedAt !== undefined) return h.reject('E_SEAT_CLAIMED'); // правило 1
 
       // --- дом (правила 2, 4) ---
@@ -122,6 +123,7 @@ export const seatClaimModule: GameModule = {
     api.onAction('seat.confirm', (action, h: HandlerContext) => {
       const player = h.state.players[action.playerId];
       if (!player) return h.reject('E_UNKNOWN_PLAYER');
+      if (player.npc) return h.reject('E_FORBIDDEN');
       // Подтверждать нечего, если места не заявляли: иначе `seated` можно было бы
       // поставить месту, за которое никто не садился, и оно перестало бы истекать.
       if (player.claimedAt === undefined) return h.reject('E_SEAT_UNCLAIMED');
@@ -134,6 +136,7 @@ export const seatClaimModule: GameModule = {
     api.onAction('seat.release', (action, h: HandlerContext) => {
       const player = h.state.players[action.playerId];
       if (!player) return h.reject('E_UNKNOWN_PLAYER');
+      if (player.npc) return h.reject('E_FORBIDDEN');
       if (player.claimedAt === undefined) return h.reject('E_SEAT_UNCLAIMED');
       // Закреплённое место не отзывается ничем — это и есть смысл правила 6.
       if (player.seated) return h.reject('E_SEAT_SEATED');
@@ -153,6 +156,7 @@ export const seatClaimModule: GameModule = {
     api.onAction('seat.kick', (action, h: HandlerContext) => {
       const player = h.state.players[action.playerId];
       if (!player) return h.reject('E_UNKNOWN_PLAYER');
+      if (player.npc) return h.reject('E_FORBIDDEN');
       // Пустое кресло выкинуть нельзя: это значит, что у администратора на экране
       // устаревший состав, и честнее сказать это, чем отчитаться об успехе.
       if (player.claimedAt === undefined) return h.reject('E_SEAT_UNCLAIMED');

@@ -1,3 +1,4 @@
+import { playablePlayerIds } from '@void/shared-core';
 import { MS_PER_DAY, type GameData, type MatchConfig } from '@void/shared-core';
 import type { MatchKind, MatchLists, MatchSummary } from '@void/protocol';
 import type { MatchRoom } from './matchRoom';
@@ -137,7 +138,7 @@ export class MatchRegistry {
       days: Math.max(0, Math.floor((st.time - (entry.meta.startedAt ?? 0)) / MS_PER_DAY)),
       players: {
         seated: await this.accounts.occupiedSeats(entry.room.id),
-        capacity: Object.keys(st.players).length,
+        capacity: playablePlayerIds(st).length,
       },
       status: st.match.status,
       createdAt: entry.meta.createdAt,

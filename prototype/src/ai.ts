@@ -341,10 +341,12 @@ export function aiOrders(
   profile: AiProfile = 'weak',
 ): Action[] {
   const out: Action[] = [];
-  if (!state.players[ai]) return out; // seat not in play / eliminated
+  if (!state.players[ai] || state.players[ai]!.status === 'defeated') return out; // seat not in play / eliminated
   // The defensive family: both Steward postures HOLD (no expansion, no war
   // declarations); «Активная оборона» merely adds the counterstrike/fire-watch
   // inside the guard-duty tick below.
+  if (state.players[ai]!.npc === 'neutral') posture = 'active_defend';
+  if (state.players[ai]!.npc === 'pirate') posture = 'expand';
   const defensive = posture === 'defend' || posture === 'active_defend';
   // Steward guard duty (ST-3.2/3.3): a delegated defensive seat watches its worlds,
   // evacuates a wing the forecast says it would lose ≥ STEWARD_LOSS_LIMIT of, and —

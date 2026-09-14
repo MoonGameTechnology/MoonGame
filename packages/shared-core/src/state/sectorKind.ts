@@ -14,6 +14,7 @@ import type { Planet } from './gameState';
  *  "ANY building" signal the construction gate reads (NOT `[]`, which means "none"). */
 const DEFAULT_APPEARANCE: SectorKindAppearance = { color: '#46606e', shape: 'city' };
 const DEFAULT_KIND: SectorKindDef = {
+  traversable: undefined,
   scoreValue: 10,
   capturable: true,
   buildable: true,

@@ -1,3 +1,4 @@
+import { mapPreset, scoreLimitFor } from './mapCatalog';
 /**
  * The prototype's kernel assembly point (REFP-21) — the ordered module list, the
  * compiled kernel, the match config (`SCORE_LIMIT`), and the two pure step helpers
@@ -119,9 +120,9 @@ export const kernel = createKernel(MODULES);
 // plus built-up infrastructure — can win the SCORE race first, making the score/building
 // system (scoreValue) meaningful instead of vestigial vs conquest. Tunable single source
 // of truth, also read by the HUD score readout.
-export const SCORE_LIMIT = 1100;
-export function ctx(now: number): Context {
-  return { now, data, config: { timeScale: 1, victory: { scoreLimit: SCORE_LIMIT } } };
+export const SCORE_LIMIT = mapPreset().scoreLimit;
+export function ctx(now: number, state?: Pick<GameState, 'mapId'>): Context {
+  return { now, data, config: { timeScale: 1, victory: { scoreLimit: scoreLimitFor(state ?? {}) } } };
 }
 
 export interface StepOut {
@@ -141,7 +142,7 @@ export function advance(state: GameState, now: number): StepOut {
   let cur = state;
   const events: StepOut['events'] = [];
   for (let i = 0; i < 10; i++) {
-    const r = kernel.advanceTo(cur, ctx(now));
+    const r = kernel.advanceTo(cur, ctx(now, cur));
     if (!r.ok) return { state: cur, events, error: r.code };
     const progressed = r.state.time > cur.time;
     cur = r.state;
@@ -154,7 +155,7 @@ export function advance(state: GameState, now: number): StepOut {
 /** Apply a player order at the current world time (advancing first if needed). */
 export function order(state: GameState, action: Action, now: number): StepOut {
   const advanced = advance(state, now);
-  const r = kernel.applyAction(advanced.state, action, ctx(Math.max(now, advanced.state.time)));
+  const r = kernel.applyAction(advanced.state, action, ctx(Math.max(now, advanced.state.time), advanced.state));
   if (!r.ok) return { state: advanced.state, events: advanced.events, error: r.code };
   return { state: r.state, events: [...advanced.events, ...r.events] };
 }
@@ -190,7 +191,7 @@ export function canOrder(state: GameState, action: Action): string | null {
   const key = `${action.playerId}\u0000${action.type}\u0000${JSON.stringify(action.payload)}`;
   const hit = memo.get(key);
   if (hit !== undefined) return hit;
-  const verdict = kernel.canApply(state, action, ctx(state.time));
+  const verdict = kernel.canApply(state, action, ctx(state.time, state));
   memo.set(key, verdict);
   return verdict;
 }
@@ -210,5 +211,5 @@ const memo = new Map<string, string | null>();
  * по массиву действий стоил бы дороже самой пробы.
  */
 export function canOrderAll(state: GameState, actions: readonly Action[]): string | null {
-  return kernel.canApplyAll(state, actions, ctx(state.time));
+  return kernel.canApplyAll(state, actions, ctx(state.time, state));
 }

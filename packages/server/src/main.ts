@@ -601,7 +601,7 @@ const server = createMultiplayerServer({
                 // No entry window on this host (SES-2.3 lives on the playtest one):
                 // a newcomer can take a freed chair while the match runs and has room.
                 entryOpen: !ended && occupied < MATCH_CAPACITY,
-                seats: Object.values(room.state.players).map((p) => ({
+                seats: Object.values(room.state.players).filter((p) => !p.npc).map((p) => ({
                   playerId: p.id,
                   name: p.name,
                   faction: p.faction,

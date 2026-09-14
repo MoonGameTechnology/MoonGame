@@ -47,6 +47,9 @@ interface SectorTypeUi {
   color: string;
 }
 const SECTOR_TYPE_UI: Record<string, SectorTypeUi> = {
+  pirate_base: { name: 'Pirate Base', core: 'empty_space', color: '#f17457' },
+  neutral_base: { name: 'Neutral AI Base', core: 'empty_space', color: '#b79bea' },
+  black_hole: { name: 'Black Hole', core: 'empty_space', color: '#8764ce' },
   planet: { name: 'Planet', core: 'empty_space', color: '#5fd0ff' },
   nebula: { name: 'Nebula', core: 'nebula', color: '#8f6dff' },
   asteroid: { name: 'Asteroid Field', core: 'asteroid_field', color: '#d6a645' },

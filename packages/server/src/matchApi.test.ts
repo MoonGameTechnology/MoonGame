@@ -32,6 +32,25 @@ describe('SV-2.4 · match API', () => {
     await app.close();
   });
 
+  it('passes only allowlisted maps to creation and rejects bad requests before seeding', async () => {
+    const seen: unknown[] = [];
+    const app = appWith({
+      mapIds: ['nexus', 'frontier-100'],
+      createMatch: (req) => { seen.push(req); return Promise.resolve({ matchId: 'm', seats: [] }); },
+      join: denyJoin,
+    });
+    const valid = await app.inject({ method: 'POST', url: '/matches', payload: { mapId: 'frontier-100' } });
+    expect(valid.statusCode).toBe(200);
+    expect(seen).toEqual([{ mapId: 'frontier-100' }]);
+    for (const mapId of ['missing', '__proto__', 100, null, {}]) {
+      const bad = await app.inject({ method: 'POST', url: '/matches', payload: { mapId } });
+      expect(bad.statusCode).toBe(400);
+      expect(bad.json()).toEqual({ error: 'E_UNKNOWN_MAP' });
+    }
+    expect(seen).toHaveLength(1);
+    await app.close();
+  });
+
   it('GET /matches/:id/join returns a seat + token for a nick', async () => {
     const app = appWith({
       createMatch: () => Promise.resolve({ matchId: 'm-1', seats: [] }),
