@@ -216,6 +216,7 @@ import { isGroundUnit, isWingUnit, planetSummary } from './planetSummary';
 import {
   fleetHangar,
   hasHangar,
+  dockedCarrier,
   planetHangar,
   transferOffer,
   transferPick,
@@ -6441,6 +6442,23 @@ function planetPanelHtml(p: Planet): string {
     const port = planetHangar(p, data);
     if (hasHangar(port)) {
       cols.push(hangarSectionHtml(port, p.id, mine));
+      // ПЕРЕГРУЗКА ПРЕДЛАГАЕТСЯ И ОТСЮДА (правило 5 в `hangarPanel.ts`). Найдено в живой
+      // игре: у игрока был «Шаттл», а кнопок он не нашёл — они стояли только на панели
+      // флота-носителя, тогда как челноки он видит и строит здесь. Приказ тот же
+      // (`wingload`/`wingunload` адресуют ФЛОТ), поэтому обработчик не тронут.
+      const ship = mine ? dockedCarrier(Object.values(s.fleets), p.id, ME, data) : null;
+      const offer = transferOffer(port, ship ? fleetHangar(ship, data) : null, {
+        docked: true, // `dockedCarrier` уже спросил про стоянку, бой и чужой флот
+        mine: true,
+      });
+      if (ship && (offer.load || offer.unload)) {
+        cols.push(
+          `<div class="row">` +
+            (offer.load ? btn('wingload', ship.id, t('side.wing.load'), true) : '') +
+            (offer.unload ? btn('wingunload', ship.id, t('side.wing.unload'), true) : '') +
+            `</div>`,
+        );
+      }
     } else {
       // Порта нет — говорим об этом прямо. Пустой список читался бы как «челноков нет»,
       // хотя их тут негде и держать.
