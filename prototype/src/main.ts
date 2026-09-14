@@ -775,6 +775,7 @@ import { clientPlan, liveSocket, seatKey } from '../../decisions/netClientReuse'
 import { errorTarget, refusalKey } from '../../decisions/errorRoute';
 import { joinLanding } from '../../decisions/joinLanding';
 import { refusalText as errText } from '../../decisions/refusalText';
+import { detach } from './detach';
 import {
   claimIntent,
   matchIdFrom,
@@ -9419,7 +9420,7 @@ function suggestCallsign(): string {
 function enterBrowse(): void {
   if (!nickInput.value.trim()) nickInput.value = suggestCallsign();
   showStage('browse');
-  void refreshMatches();
+  detach('обозреватель: список партий', refreshMatches());
 }
 // --- meta-shell hub: post-login home + bottom nav (docs/main-menu.md) -------
 // After identity you land on the hub (home + PLAY + bottom nav), not the raw match
@@ -9453,12 +9454,12 @@ function hubTab(tab: string): void {
   currentHubTab = tab;
   // ADDR-4: свои партии — главный экран, а не вкладка обозревателя, поэтому лента
   // переспрашивается при каждом заходе домой (день и число игроков успевают устареть).
-  if (tab === 'home') void refreshMyMatches();
+  if (tab === 'home') detach('хаб: свои партии', refreshMyMatches());
   if (tab === 'meta') renderMetaPanel(); // live numbers every visit (XP may have grown)
-  if (tab === 'friends') void friends.refresh(); // roster + presence are server truth
-  if (tab === 'rank') void rank.refresh(); // places are computed server-side (RANK-1)
-  if (tab === 'arsenal') void arsenal.refresh(); // cache paints now, server refresh trails
-  if (tab === 'auction') void metaMarket.refresh();
+  if (tab === 'friends') detach('хаб: друзья', friends.refresh()); // roster + presence are server truth
+  if (tab === 'rank') detach('хаб: рейтинг', rank.refresh()); // places are computed server-side (RANK-1)
+  if (tab === 'arsenal') detach('хаб: арсенал', arsenal.refresh()); // cache paints now, server refresh trails
+  if (tab === 'auction') detach('хаб: аукцион', metaMarket.refresh());
   for (const [k, pid] of Object.entries(HUB_PANELS))
     $(pid).style.display = k === tab ? 'flex' : 'none';
   for (const b of Array.from(document.querySelectorAll('.hub-tab')))
@@ -9656,7 +9657,7 @@ function openHub(note = ''): void {
   hubTab('home');
   hubNote.textContent = note;
   refreshOnboardOffer(); // ONB-0: first-run offer/nudge for a not-yet-onboarded commander
-  void syncCommanderFromServer(); // account-backed XP → local mirror (accounts mode only)
+  detach('хаб: сверка командира с сервером', syncCommanderFromServer()); // account-backed XP → local mirror (accounts mode only)
 }
 
 $('cnew').addEventListener('click', () => {
@@ -9665,13 +9666,16 @@ $('cnew').addEventListener('click', () => {
   // tap before /auth/status answers must not take the guest branch on an accounts server.
   // With accounts OFF (nick-only server) there is no password to set, so a new commander
   // just gets a suggested callsign and drops into the hub.
-  void authProbe.then(() => {
-    if (authMode === 'accounts') {
-      openRegister();
-      return;
-    }
-    openHub();
-  });
+  detach(
+    'новый командир: ожидание /auth/status',
+    authProbe.then(() => {
+      if (authMode === 'accounts') {
+        openRegister();
+        return;
+      }
+      openHub();
+    }),
+  );
 });
 // «Вход по позывному»: reveal an inline field and enter under a callsign YOU type (vs
 // «Новый командир», which auto-suggests one). The chosen callsign is remembered
@@ -9690,15 +9694,18 @@ function signInByCallsign(): void {
   }
   // Same race guard as «Новый командир»: never pick the guest branch while the
   // /auth/status probe is still in flight.
-  void authProbe.then(() => {
-    if (authMode === 'accounts') {
-      void welcomeSignIn(nick);
-      return;
-    }
-    nickInput.value = nick;
-    localStorage.setItem('void.nick', nick); // remembered — next visit skips the welcome card
-    openHub();
-  });
+  detach(
+    'вход по позывному: ожидание /auth/status',
+    authProbe.then(() => {
+      if (authMode === 'accounts') {
+        detach('вход по позывному: вход', welcomeSignIn(nick));
+        return;
+      }
+      nickInput.value = nick;
+      localStorage.setItem('void.nick', nick); // remembered — next visit skips the welcome card
+      openHub();
+    }),
+  );
 }
 let signingIn = false; // in-flight guard: Enter + click must not double-register
 /** Bytro-style welcome sign-in: register-or-login right on the greeting card, then
@@ -9843,7 +9850,7 @@ async function submitRegister(): Promise<void> {
     signingIn = false;
   }
 }
-$('crgo').addEventListener('click', () => void submitRegister());
+$('crgo').addEventListener('click', () => detach('регистрация: отправка', submitRegister()));
 crNickInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') crMailInput.focus();
 });
@@ -9854,7 +9861,7 @@ crPassInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') crPass2Input.focus();
 });
 crPass2Input.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') void submitRegister();
+  if (e.key === 'Enter') detach('регистрация: отправка', submitRegister());
 });
 $('crback').addEventListener('click', () => {
   showStage('welcome');
@@ -9897,9 +9904,11 @@ $('crrecover').addEventListener('click', () => {
   statusEl.textContent = '';
   crecMailInput.focus();
 });
-$('crecgo').addEventListener('click', () => void submitRecover());
+$('crecgo').addEventListener('click', () =>
+  detach('восстановление пароля: отправка', submitRecover()),
+);
 crecMailInput.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') void submitRecover();
+  if (e.key === 'Enter') detach('восстановление пароля: отправка', submitRecover());
 });
 $('crecback').addEventListener('click', () => {
   showStage('welcome');
@@ -9952,12 +9961,14 @@ const passwordReset = initPasswordReset({
     }
   },
 });
-$('cresetgo').addEventListener('click', () => void passwordReset.submit());
+$('cresetgo').addEventListener('click', () =>
+  detach('сброс пароля: отправка', passwordReset.submit()),
+);
 cresetPassInput.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') cresetPass2Input.focus();
 });
 cresetPass2Input.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') void passwordReset.submit();
+  if (e.key === 'Enter') detach('сброс пароля: отправка', passwordReset.submit());
 });
 /** Open the reset stage for a «?reset=<token>» deep-link (called from the first-run gate). */
 function openReset(token: string): void {
@@ -10137,37 +10148,40 @@ if (bootReset) {
   cameFromLink = true;
   showConnect(true);
   showHub(false);
-  void (async () => {
-    const srv = resolveServer();
-    if (srv) await probeAuthMode(srv.base);
-    // Куда ведёт ссылка — `joinLanding.ts` (ADDR-5): сервер без аккаунтов пускает сразу,
-    // живая сессия ведёт в матч, её отсутствие — на стартовый экран.
-    // NEVER log the record — even a prefix of `cached.token` is a session-JWT leak
-    // into the browser console (and into any screen recording of a playtest).
-    const cached = srv ? sessionRecord(srv.base) : null;
-    const where = joinLanding({
-      identity: authMode,
-      hasSession: !!cached,
-      refused: false,
-    });
-    if (where === 'match') {
-      showStage('browse');
-      connectToMatch(bootJoinId, bootSlot || undefined, bootFaction || undefined, bootScientists);
-      return;
-    }
-    // No session — show the welcome card so the player can register/login,
-    // then welcomeSignIn auto-resumes the join via pendingJoinAfterAuth.
-    pendingJoinAfterAuth.remember(bootJoinId, bootSlot, bootFaction, bootScientists);
-    // ADDR-5. Оверлей ветка держит показанным с самого начала, так что строка здесь —
-    // не «показать», а «не дать погаснуть»: когда-то ветка начиналась со скрытого
-    // оверлея, и карточка входа выставлялась ВНУТРИ него — игрок получал пустой экран.
-    showConnect(true);
-    showStage('welcome');
-    const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
-    wNickInput.value = savedNick || suggestCallsign();
-    wPassRowEl.style.display = 'flex';
-    wPassInput.focus();
-  })();
+  detach(
+    'ссылка-приглашение: посадка',
+    (async () => {
+      const srv = resolveServer();
+      if (srv) await probeAuthMode(srv.base);
+      // Куда ведёт ссылка — `joinLanding.ts` (ADDR-5): сервер без аккаунтов пускает сразу,
+      // живая сессия ведёт в матч, её отсутствие — на стартовый экран.
+      // NEVER log the record — even a prefix of `cached.token` is a session-JWT leak
+      // into the browser console (and into any screen recording of a playtest).
+      const cached = srv ? sessionRecord(srv.base) : null;
+      const where = joinLanding({
+        identity: authMode,
+        hasSession: !!cached,
+        refused: false,
+      });
+      if (where === 'match') {
+        showStage('browse');
+        connectToMatch(bootJoinId, bootSlot || undefined, bootFaction || undefined, bootScientists);
+        return;
+      }
+      // No session — show the welcome card so the player can register/login,
+      // then welcomeSignIn auto-resumes the join via pendingJoinAfterAuth.
+      pendingJoinAfterAuth.remember(bootJoinId, bootSlot, bootFaction, bootScientists);
+      // ADDR-5. Оверлей ветка держит показанным с самого начала, так что строка здесь —
+      // не «показать», а «не дать погаснуть»: когда-то ветка начиналась со скрытого
+      // оверлея, и карточка входа выставлялась ВНУТРИ него — игрок получал пустой экран.
+      showConnect(true);
+      showStage('welcome');
+      const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
+      wNickInput.value = savedNick || suggestCallsign();
+      wPassRowEl.style.display = 'flex';
+      wPassInput.focus();
+    })(),
+  );
 } else {
   // Auth gate at boot (UX fix): show the welcome/login card FIRST, before the
   // hub — like every game's login screen. Previously a cached `void.nick` in
@@ -10179,22 +10193,25 @@ if (bootReset) {
   showConnect(true);
   showHub(false);
   showStage('welcome');
-  void (async () => {
-    const srv = resolveServer();
-    const mode = srv ? await probeAuthMode(srv.base) : authMode;
-    const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
-    if (savedNick) {
-      wNickInput.value = savedNick;
-    } else {
-      wNickInput.value = suggestCallsign();
-    }
-    if (mode === 'accounts') {
-      wPassRowEl.style.display = 'flex';
-      wPassInput.focus();
-    } else {
-      wPassRowEl.style.display = 'none';
-    }
-  })();
+  detach(
+    'стартовый экран: режим входа сервера',
+    (async () => {
+      const srv = resolveServer();
+      const mode = srv ? await probeAuthMode(srv.base) : authMode;
+      const savedNick = (localStorage.getItem('void.nick') ?? '').trim();
+      if (savedNick) {
+        wNickInput.value = savedNick;
+      } else {
+        wNickInput.value = suggestCallsign();
+      }
+      if (mode === 'accounts') {
+        wPassRowEl.style.display = 'flex';
+        wPassInput.focus();
+      } else {
+        wPassRowEl.style.display = 'none';
+      }
+    })(),
+  );
 }
 
 // --- single-player setup overlay --------------------------------------------
@@ -11330,30 +11347,33 @@ function connectToMatch(
     connect();
     return;
   }
-  void (async () => {
-    const srv = resolveServer();
-    const cached = srv ? sessionRecord(srv.base) : null;
-    const next = joinStep({
-      accountsMode: authMode === 'accounts',
-      serverKnown: !!srv,
-      hasSession: !!cached,
-    });
-    if (next.step === 'sign-in') {
-      askSignIn(id, slot, faction, next.password ? srv : null, scientists);
-      return;
-    }
-    const join = await fetchJoinToken(srv!.base, id, cached!.token, slot, faction, scientists);
-    if (!join) {
-      // Токен не выдан: сессии больше нет — вход просрочен, зовём войти заново; сессия на
-      // месте — закрыт сам матч, и карточка входа тут ни при чём (правило 4).
-      if (afterTokenRefused(!!sessionRecord(srv!.base)) === 'sign-in')
-        askSignIn(id, slot, faction, srv, scientists);
-      return;
-    }
-    pendingJoinToken = join.token;
-    claimDone(id);
-    connect();
-  })();
+  detach(
+    'заход в партию: билет и подключение',
+    (async () => {
+      const srv = resolveServer();
+      const cached = srv ? sessionRecord(srv.base) : null;
+      const next = joinStep({
+        accountsMode: authMode === 'accounts',
+        serverKnown: !!srv,
+        hasSession: !!cached,
+      });
+      if (next.step === 'sign-in') {
+        askSignIn(id, slot, faction, next.password ? srv : null, scientists);
+        return;
+      }
+      const join = await fetchJoinToken(srv!.base, id, cached!.token, slot, faction, scientists);
+      if (!join) {
+        // Токен не выдан: сессии больше нет — вход просрочен, зовём войти заново; сессия на
+        // месте — закрыт сам матч, и карточка входа тут ни при чём (правило 4).
+        if (afterTokenRefused(!!sessionRecord(srv!.base)) === 'sign-in')
+          askSignIn(id, slot, faction, srv, scientists);
+        return;
+      }
+      pendingJoinToken = join.token;
+      claimDone(id);
+      connect();
+    })(),
+  );
 }
 
 /**
@@ -11460,25 +11480,28 @@ function startNetSetupPoll(base: string, matchId: string, nick: string): void {
   stopNetSetupPoll();
   netSetupPoll = setInterval(() => {
     if (!netSetup) return stopNetSetupPoll();
-    void (async () => {
-      try {
-        const res = await fetchSeats(base, matchId, nick);
-        if (queryOutcome(res) !== 'ok') return;
-        const body = (await res.json()) as { seats: EntrySeat[] };
-        if (!netSetup) return;
-        netSetup = { matchId, offer: entryOffer(body.seats ?? []) };
-        const fate = reconcileSelection(slotForWorld(setupStart), netSetup.offer.worlds);
-        if (fate.kind === 'lost') {
-          setupStart = '';
+    detach(
+      'сетевой сетап: опрос мест',
+      (async () => {
+        try {
+          const res = await fetchSeats(base, matchId, nick);
+          if (queryOutcome(res) !== 'ok') return;
+          const body = (await res.json()) as { seats: EntrySeat[] };
+          if (!netSetup) return;
+          netSetup = { matchId, offer: entryOffer(body.seats ?? []) };
+          const fate = reconcileSelection(slotForWorld(setupStart), netSetup.offer.worlds);
+          if (fate.kind === 'lost') {
+            setupStart = '';
+            renderSetup();
+            setupHintEl.textContent = t('seatpick.lost');
+            return;
+          }
           renderSetup();
-          setupHintEl.textContent = t('seatpick.lost');
-          return;
+        } catch {
+          /* тихий опрос: связь моргнула — выбор игрока не трогаем */
         }
-        renderSetup();
-      } catch {
-        /* тихий опрос: связь моргнула — выбор игрока не трогаем */
-      }
-    })();
+      })(),
+    );
   }, NET_SETUP_POLL_MS);
 }
 
@@ -11537,7 +11560,7 @@ function openSessionTab(id: string, seated = false): void {
   }
   // REL-7: show the seat/faction picker first (if the server supports it),
   // otherwise fall back to the direct join (no slot).
-  void openSeatPicker(id);
+  detach('вход в партию: выбор места', openSeatPicker(id));
 }
 
 async function refreshMatches(quiet = false): Promise<void> {
@@ -11776,7 +11799,9 @@ function renderMatches(): void {
       const arch = document.createElement('button');
       arch.className = 'mbtn ghost';
       arch.textContent = restore ? t('browser.restore') : t('browser.archive');
-      arch.addEventListener('click', () => void toggleArchive(m.matchId, restore));
+      arch.addEventListener('click', () =>
+        detach('обозреватель: архив партии', toggleArchive(m.matchId, restore)),
+      );
       btns.appendChild(arch);
     }
     row.appendChild(btns);
@@ -11921,7 +11946,7 @@ for (const btn of Array.from(document.querySelectorAll('.mtab'))) {
 }
 
 // "Обновить список" reloads the read-model; per-row "Войти"/"В архив" act on a match.
-$('cgo').addEventListener('click', () => void refreshMatches());
+$('cgo').addEventListener('click', () => detach('обозреватель: список партий', refreshMatches()));
 
 // Player build: the match screen is ONLY the tabs + list (Доступные/Активные/Архив).
 // The callsign comes from the welcome/hub identity step and the server from the page
@@ -11939,14 +11964,16 @@ if (__PLAYER_BUILD__) {
   hide(nickInput.closest('.cfield'));
   hide(srvInput.closest('.cfield'));
   hide($('cgo').closest('.crow'));
-  srvInput.addEventListener('change', () => void refreshMatches());
+  srvInput.addEventListener('change', () =>
+    detach('обозреватель: список партий', refreshMatches()),
+  );
   setInterval(() => {
     // Уместен ли переопрос прямо сейчас — `matchPoll.ts` (REFM-153): тикает только
     // список НА ЭКРАНЕ. Поверх закрытого оверлея (матч / ставка) и на приветственном
     // шаге фоновая неудача написала бы «сервер недоступен» в чужую строку статуса.
     const shown = (n: HTMLElement): boolean => n.style.display !== 'none';
     if (pollTick({ overlay: shown(connectEl), browser: shown(browseEl) }) === 'skip') return;
-    void refreshMatches(true);
+    detach('обозреватель: тихий переопрос списка', refreshMatches(true));
   }, 10_000);
 }
 
@@ -11989,15 +12016,18 @@ function scheduleReconnect(): void {
       return;
     }
     if (plan === 'mint-token' && srv && session) {
-      void (async () => {
-        const join = await fetchJoinToken(srv.base, currentMatchId, session);
-        if (!join) {
-          scheduleReconnect(); // transient (or session expired — status line explains)
-          return;
-        }
-        pendingJoinToken = join.token;
-        connect();
-      })();
+      detach(
+        'переподключение: новый билет',
+        (async () => {
+          const join = await fetchJoinToken(srv.base, currentMatchId, session);
+          if (!join) {
+            scheduleReconnect(); // transient (or session expired — status line explains)
+            return;
+          }
+          pendingJoinToken = join.token;
+          connect();
+        })(),
+      );
       return;
     }
     reconnecting = false; // сессии нет — на экран входа, а не в новый круг попыток

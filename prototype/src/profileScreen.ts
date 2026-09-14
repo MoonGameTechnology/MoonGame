@@ -22,6 +22,7 @@ import { esc, kfmt, nfmt } from './format';
 import { SOV_SVG } from './icons';
 import { averagePlace, leagueKey, metaLevel, winRate, type MetaStats } from './meta';
 import { parseMedals } from './corp';
+import { detach } from './detach';
 
 /** One medal as the server reports it: an id plus display text. */
 export interface MedalEntry {
@@ -189,7 +190,7 @@ export function initProfile(host: ProfileHost): { open: () => void; close: () =>
     open: () => {
       paint();
       host.root().classList.add('show');
-      void refresh(); // cache is already on screen; the server refresh trails
+      detach('профиль: обновление с сервера', refresh()); // cache is already on screen; the server refresh trails
     },
     close: () => host.root().classList.remove('show'),
   };

@@ -91,13 +91,15 @@ export default tseslint.config(
     // `ignoreVoid: false` — принципиально: именно `void p` и был той формой, которая
     // выглядит как «я подумал об этом», а на деле просто прячет промис от линтера.
     //
-    // Граница проведена по ПРОЦЕССУ, а не по вкусу: сторожим то, что крутится 24/7 и
-    // падением уносит всех. Браузерный `prototype/src/**` сюда НЕ входит — там отклонение
-    // это запись в консоли вкладки, а не оборванный матч; его уборка отдельная и большая.
+    // Граница по ПРОЦЕССУ здесь была временной и снята в RESIL-1: браузерный
+    // `prototype/src/**` под правилом тоже. Цена там другая — вкладку отклонение не
+    // роняет, — но она есть: тихо проглоченный сбой («нажал, и ничего») разбирается по
+    // пустой консоли. Исход называет `detach()`: серверный — `packages/server/src/detach.ts`
+    // (строка в stderr), браузерный — `prototype/src/detach.ts` (строка в консоли вкладки).
     // Правило типозависимое (`projectService`), поэтому линт этих файлов заметно дороже —
-    // ещё одна причина не расширять список без нужды.
-    files: ['packages/server/src/**/*.ts', 'prototype/netserver.ts'],
-    ignores: ['packages/server/src/**/*.test.ts'],
+    // причина не расширять список дальше без нужды.
+    files: ['packages/server/src/**/*.ts', 'prototype/netserver.ts', 'prototype/src/**/*.ts'],
+    ignores: ['packages/server/src/**/*.test.ts', 'prototype/src/**/*.test.ts'],
     languageOptions: {
       parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
     },
