@@ -1,3 +1,4 @@
+import { playablePlayerIds } from '@void/shared-core';
 import { seatConfirmAction } from './joinSeat';
 import { readFileSync } from 'node:fs';
 import type { IncomingMessage, Server as HttpServer } from 'node:http';
@@ -472,7 +473,7 @@ export function createMultiplayerServer(
               return;
             }
           }
-          const seats = Object.keys(room.state.players) as PlayerId[];
+          const seats = playablePlayerIds(room.state) as PlayerId[];
           const seat = await accountStore.resolveSeat(room.id, nick, seats);
           if (!seat) {
             refuseWithReason(room.id, 'E_MATCH_FULL'); // every side already taken by another nick
@@ -516,7 +517,7 @@ export function createMultiplayerServer(
                 return;
               }
             }
-            const seats = Object.keys(room.state.players) as PlayerId[];
+            const seats = playablePlayerIds(room.state) as PlayerId[];
             const seat = await accountStore.resolveSeat(room.id, nick, seats);
             if (!seat) {
               refuseWithReason(room.id, 'E_MATCH_FULL'); // every side already taken by another nick
@@ -525,7 +526,7 @@ export function createMultiplayerServer(
             playerId = seat.playerId;
           }
         }
-        if (!room.hasPlayer(playerId)) {
+        if (!room.hasPlayer(playerId) || room.state.players[playerId]?.npc) {
           rejectUpgrade(socket, 403);
           return;
         }

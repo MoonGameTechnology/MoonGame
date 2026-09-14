@@ -209,6 +209,31 @@ for (let i = 0; i < 20 && rafCbs.length; i++) {
   frames++;
 }
 
+// Exercise the shipped map selector and launch path, including switching back.
+// This catches stale geometry/capacity references that pure map tests cannot see.
+const selectMap = (id) => {
+  const input = getEl('setup-map-id');
+  input.value = id;
+  for (const handle of (listeners.get(input) ?? {}).change ?? []) handle({ target: input });
+};
+selectMap('frontier-100');
+assert.equal((getEl('setup-home-id').innerHTML.match(/<option /g) ?? []).length, 100);
+assert.equal((getEl('setupmap').innerHTML.match(/data-cand=/g) ?? []).length, 100);
+assert.ok(getEl('setupslots').innerHTML.includes('max="99"'));
+for (const handle of (listeners.get(getEl('setupgo')) ?? {}).click ?? []) await handle({});
+assert.equal(getEl('setup').style.display, 'none');
+for (let i = 0; i < 30 && rafCbs.length; i++) {
+  await rafCbs.shift()(performance.now());
+  frames++;
+}
+selectMap('nexus');
+assert.equal((getEl('setup-home-id').innerHTML.match(/<option /g) ?? []).length, 10);
+for (const handle of (listeners.get(getEl('setupgo')) ?? {}).click ?? []) await handle({});
+for (let i = 0; i < 10 && rafCbs.length; i++) {
+  await rafCbs.shift()(performance.now());
+  frames++;
+}
+
 assert.equal(frameErrors.length, 0, 'the render loop must not silently recover from a broken frame');
 console.error = printError;
 console.log(

@@ -1,3 +1,4 @@
+export { playablePlayerIds } from './state/playableSeats';
 /**
  * @void/shared-core — the deterministic, data-driven simulation core.
  *

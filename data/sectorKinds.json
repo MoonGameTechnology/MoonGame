@@ -5,7 +5,11 @@
     "capturable": true,
     "buildable": true,
     "orbit": true,
-    "appearance": { "color": "#5fd0ff", "label": "planet", "shape": "city" }
+    "appearance": {
+      "color": "#5fd0ff",
+      "label": "planet",
+      "shape": "city"
+    }
   },
   "asteroid": {
     "name": "Asteroid Field",
@@ -13,14 +17,22 @@
     "buildable": true,
     "orbit": false,
     "allowedBuildings": ["starfort"],
-    "appearance": { "color": "#d6a645", "label": "asteroid field", "shape": "junction" }
+    "appearance": {
+      "color": "#d6a645",
+      "label": "asteroid field",
+      "shape": "junction"
+    }
   },
   "nebula": {
     "name": "Nebula",
     "capturable": true,
     "buildable": false,
     "orbit": false,
-    "appearance": { "color": "#8f6dff", "label": "nebula", "shape": "city" }
+    "appearance": {
+      "color": "#8f6dff",
+      "label": "nebula",
+      "shape": "city"
+    }
   },
   "empty": {
     "name": "Empty Space",
@@ -28,7 +40,11 @@
     "buildable": false,
     "orbit": false,
     "allowedBuildings": [],
-    "appearance": { "color": "#46606e", "label": "survey marker", "shape": "marker" }
+    "appearance": {
+      "color": "#46606e",
+      "label": "survey marker",
+      "shape": "marker"
+    }
   },
   "debris_field": {
     "name": "Debris Field",
@@ -36,7 +52,11 @@
     "buildable": false,
     "orbit": false,
     "allowedBuildings": [],
-    "appearance": { "color": "#2f4a59", "label": "debris field", "shape": "junction" }
+    "appearance": {
+      "color": "#2f4a59",
+      "label": "debris field",
+      "shape": "junction"
+    }
   },
   "dead_world": {
     "name": "Dead World",
@@ -45,7 +65,11 @@
     "buildable": true,
     "orbit": false,
     "allowedBuildings": ["metal_station"],
-    "appearance": { "color": "#5a4a4a", "label": "dead world", "shape": "city" }
+    "appearance": {
+      "color": "#5a4a4a",
+      "label": "dead world",
+      "shape": "city"
+    }
   },
   "graveyard": {
     "name": "Derelict Graveyard",
@@ -81,6 +105,64 @@
       "fabricator",
       "orbital_aa"
     ],
-    "appearance": { "color": "#5f8f8c", "label": "void fortress", "shape": "station" }
+    "appearance": {
+      "color": "#5f8f8c",
+      "label": "void fortress",
+      "shape": "station"
+    }
+  },
+  "pirate_base": {
+    "name": "Pirate Base",
+    "capturable": true,
+    "buildable": true,
+    "orbit": true,
+    "allowedBuildings": [
+      "shipyard",
+      "spaceport",
+      "radar",
+      "fort",
+      "power_plant",
+      "fabricator",
+      "orbital_aa"
+    ],
+    "appearance": {
+      "color": "#f17457",
+      "label": "Pirate Base",
+      "shape": "station"
+    }
+  },
+  "neutral_base": {
+    "name": "Neutral AI Base",
+    "capturable": true,
+    "buildable": true,
+    "orbit": true,
+    "allowedBuildings": [
+      "shipyard",
+      "spaceport",
+      "radar",
+      "fort",
+      "power_plant",
+      "fabricator",
+      "orbital_aa"
+    ],
+    "appearance": {
+      "color": "#b79bea",
+      "label": "Neutral AI Base",
+      "shape": "station"
+    }
+  },
+  "black_hole": {
+    "name": "Black Hole",
+    "scoreValue": 0,
+    "capturable": false,
+    "buildable": false,
+    "orbit": false,
+    "allowedBuildings": [],
+    "appearance": {
+      "color": "#8764ce",
+      "label": "Black Hole",
+      "shape": "marker"
+    },
+    "traversable": false
   }
 }

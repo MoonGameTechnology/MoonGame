@@ -94,6 +94,8 @@ export interface Player {
    *  e.g. diplomacy: a coalition (alliance) is between humans only, bots are not
    *  invitable (`diplomacyModule` rejects `E_BOT_ALLIANCE`). */
   ai?: boolean;
+  /** Map inhabitants, never claimable player seats or PvP contenders. */
+  npc?: 'pirate' | 'neutral';
   /** The player's treasury — production accrues here, upkeep/costs drain it. */
   resources: ResourceBag;
   /** Resources whose upkeep went UNPAID at the last settlement (treasury pinned at
@@ -616,6 +618,8 @@ export interface GameVersion {
 }
 
 export interface GameState {
+  /** Authored map identity, persisted and public; absent on legacy saves. */
+  mapId?: string;
   version: GameVersion;
   /** Current simulation time (ms), server-authoritative. */
   time: number;

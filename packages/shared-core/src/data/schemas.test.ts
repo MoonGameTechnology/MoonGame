@@ -27,7 +27,7 @@ function loadShippedBundle(): Record<string, unknown> {
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.22'); // ROS-1.5 завёл десантный челнок
+    expect(data.version).toBe('0.1.23'); // Frontier adds pirate/neutral bases and the isolated black hole
     expect(data.resources).toContain('microelectronics');
     // Подсистема обстрела снята целиком вместе с трейтом `artillery` и корпусом,
     // который его носил: ни того, ни другого в шипнутом каталоге больше нет, и
@@ -71,16 +71,12 @@ describe('game data schema (docs/architecture.md §2)', () => {
     expect(data.units.strike_carrier?.traits).toEqual([]);
     expect(data.units.scout_drone?.stats.cargoCapacity).toBe(0); // default, carries nothing
     expect(data.buildings.orbital_aa?.aaDamage).toBe(12); // anti-ship orbital AA — a defensive building
-    // ORB-1 — ОРБИТАЛЬНЫЙ СЛОЙ НЕСУТ РОВНО ДВА ВИДА УЗЛА: планета и космическая
-    // крепость. Правило владельца («бомбардировать можно только планету и крепость
-    // космическую») живёт ИМЕННО ЗДЕСЬ, в данных: ядро только спрашивает флаг. Новый
-    // вид узла с `orbit: true` — это молчаливое расширение правила, и сторож обязан
-    // на него упасть. Обратите внимание на ДЕФОЛТ схемы (`orbit: true`): вид, забывший
-    // объявить флаг, слой получает, поэтому проверка идёт по разобранным данным.
+    // Planets and station-class bases have an orbital layer. Frontier adds
+    // pirate and neutral stations; the black hole must remain outside this list.
     const withOrbit = Object.keys(data.sectorKinds)
       .filter((k) => data.sectorKinds[k]?.orbit === true)
       .sort();
-    expect(withOrbit).toEqual(['planet', 'void_station']);
+    expect(withOrbit).toEqual(['neutral_base', 'pirate_base', 'planet', 'void_station']);
     // И ПКО им обоим доступно: у крепости роспись построек закрытая, поэтому её
     // отсутствие в списке = крепость без зенитных зубов.
     expect(data.sectorKinds.void_station?.allowedBuildings).toContain('orbital_aa');

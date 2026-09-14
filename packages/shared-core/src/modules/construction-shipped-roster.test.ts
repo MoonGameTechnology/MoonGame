@@ -83,6 +83,9 @@ const EXPECTED: Record<string, string[] | null> = {
   ion_storm: [],
   dense_nebula: [],
   solar_flare: [],
+  black_hole: [],
+  pirate_base: ['shipyard', 'spaceport', 'radar', 'fort', 'power_plant', 'fabricator', 'orbital_aa'],
+  neutral_base: ['shipyard', 'spaceport', 'radar', 'fort', 'power_plant', 'fabricator', 'orbital_aa'],
   void_station: ['shipyard', 'spaceport', 'radar', 'fort', 'power_plant', 'fabricator', 'orbital_aa'],
 };
 

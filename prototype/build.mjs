@@ -1822,6 +1822,11 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #connect .ctitle .dia{width:12px;height:12px;transform:rotate(45deg);background:var(--cyan);box-shadow:0 0 10px var(--cyan);}
 #connect .csub{margin:8px 0 18px;color:var(--dim);font-size:12px;line-height:1.5;}
 #connect .cfield{display:block;margin:0 0 12px;color:var(--dim);font-size:11px;letter-spacing:1px;text-transform:uppercase;}
+#setup .inp,#match-create .inp,#setup-bot-count{display:block;width:100%;margin:6px 0 10px;padding:10px 12px;
+  color:var(--ink);background:#0a1b23;border:1px solid var(--line-hi);border-radius:6px;font:inherit;min-height:44px;}
+#setup .inp:focus-visible,#match-create .inp:focus-visible,#setup-bot-count:focus-visible{outline:2px solid var(--cyan);outline-offset:2px;}
+#setup-bot-count{max-width:140px;}
+#setup-network-create{margin:12px 0;padding:10px 14px;color:var(--cyan);background:#0a1b23;border:1px solid var(--line-hi);border-radius:6px;cursor:pointer;}
 #connect .cfield input,#connect .cfield select{display:block;width:100%;margin-top:5px;padding:11px 12px;
   background:rgba(2,10,14,.9);border:1px solid var(--line-hi);border-radius:7px;color:var(--ink);
   font:13px/1.4 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.3px;}
@@ -3010,6 +3015,14 @@ const page = (js) => `<!doctype html>
             <span class="mfval" id="mf-range"></span>
           </div>
         </div>
+        <div id="match-create" class="mfilter" style="display:none">
+          <label for="match-create-map" data-i18n="setup.map"></label>
+          <select id="match-create-map" class="inp">
+            <option value="nexus" data-i18n="setup.map.nexus"></option>
+            <option value="frontier-100" data-i18n="setup.map.frontier-100"></option>
+          </select>
+          <button id="match-create-go" type="button" class="mbtn" data-i18n="setup.network.create"></button>
+        </div>
         <div id="mlist" class="mlist"></div>
       </div>
       <div id="cstatus" class="cstat"></div>
@@ -3136,6 +3149,14 @@ const page = (js) => `<!doctype html>
     <div id="setup-start" class="spane">
       <div class="scol">
         <p class="ssub" data-i18n="setup.sub"></p>
+        <label for="setup-map-id" data-i18n="setup.map"></label>
+        <select id="setup-map-id" class="inp">
+          <option value="nexus" data-i18n="setup.map.nexus"></option>
+          <option value="frontier-100" data-i18n="setup.map.frontier-100"></option>
+        </select>
+        <p class="smaphint" id="setup-map-info"></p>
+        <label for="setup-home-id" data-i18n="setup.home.list"></label>
+        <select id="setup-home-id" class="inp"></select>
         <svg id="setupmap" class="smap" preserveAspectRatio="xMidYMid meet"></svg>
         <p class="smaphint" id="setuphint" data-i18n="setup.map-hint"></p>
         <div id="setupfactions"></div>
@@ -3143,6 +3164,7 @@ const page = (js) => `<!doctype html>
       </div>
       <div class="scol" id="setup-solo-col">
         <div id="setupslots" class="sslots"></div>
+        <button id="setup-network-create" class="mbtn" type="button" data-i18n="setup.network.create"></button>
         <div class="sspeedlabel" data-i18n="setup.speed.label"></div>
         <p class="sspeedhint" data-i18n="setup.speed.hint"></p>
         <div id="setupspeed" class="sspeed">

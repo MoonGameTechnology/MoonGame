@@ -51,7 +51,8 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   // сговариваются, а NPC-место и так публично (оно сидит за столом). Приватного тут
   // нет — состав будущей волны в поле не лежит, он выводится из контента.
   pve: 'public',
-  version: 'public', // правила матча — общий факт
+  version: 'public',
+  mapId: 'public', // правила матча — общий факт
   time: 'public',
   startedAt: 'public',
   match: 'filtered', // статус/победитель публичны, чужие строки счёта — нет
@@ -96,6 +97,7 @@ const PLAYER_EXPOSURE: Record<keyof Player, 'public' | 'owner-private'> = {
   faction: 'public',
   status: 'public', // выбыл или играет — видно всем
   ai: 'public',
+  npc: 'public',
   // Заявка на место и её подтверждение (ENTRY-3). Публично по существу: занятость
   // мест и так видна в ленте матчей и на экране входа — прятать нечего.
   claimedAt: 'public',
@@ -166,6 +168,7 @@ function maximalState(): GameState {
   });
   return {
     ...base,
+    mapId: 'frontier-100',
     startedAt: 0,
     match: {
       status: 'ongoing',
@@ -183,6 +186,7 @@ function maximalState(): GameState {
         faction: 'x',
         status: 'active',
         ai: false,
+        npc: 'neutral',
         claimedAt: 0,
         seated: true,
         freedAt: 0,
@@ -203,6 +207,7 @@ function maximalState(): GameState {
         faction: 'x',
         status: 'active',
         ai: true,
+        npc: 'pirate',
         claimedAt: 0,
         seated: true,
         freedAt: 0,

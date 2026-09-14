@@ -20,7 +20,8 @@ import {
   type Fleet,
 } from '../../packages/shared-core/src/index';
 import { data } from './gameData';
-import { SECTOR_TYPES, MAP, START_CANDIDATES } from './map';
+import { SECTOR_TYPES, START_CANDIDATES } from './map';
+import { mapPreset, type MapId } from './mapCatalog';
 import { FAVOUR_BASE } from './botFavour';
 import { DEFAULT_HEROES, heroSlots, type HeroGrade, type HeroLoadout } from './heroes';
 import { DEFAULT_SHIP_LOADOUTS, type ShipLoadout } from './ships';
@@ -77,6 +78,7 @@ export interface SeatConfig {
   team?: string;
 }
 export interface SetupConfig {
+  mapId?: MapId;
   seats: SeatConfig[];
   /** RNG seed of the match. Absent → the historical fixed 'prototype-1'. Self-play
    *  (M4) varies it per run — with the fixed seed an identical setup plays out
@@ -169,7 +171,8 @@ export function parseNetworkMatchMode(value: string | undefined): NetworkMatchMo
 }
 
 /** Claimable human chairs for the prototype host. Empty chairs are driven by server AI. */
-export function networkSeats(mode: NetworkMatchMode = 'ffa'): SeatConfig[] {
+export function networkSeats(mode: NetworkMatchMode = 'ffa', mapId: MapId = 'nexus'): SeatConfig[] {
+  const START_CANDIDATES = mapPreset(mapId).starts;
   if (mode === 'pve') {
     // PvE: 2 human players (team A) vs 1 strong AI (team B).
     // Players start near each other in the centre; the AI starts at the edge.
@@ -186,7 +189,7 @@ export function networkSeats(mode: NetworkMatchMode = 'ffa'): SeatConfig[] {
   return startIndexes.map((startIndex, i) => {
     const house = NETWORK_HOUSES[i % NETWORK_HOUSES.length]!;
     const cycle = Math.floor(i / NETWORK_HOUSES.length) + 1;
-    const suffix = cycle === 1 ? '' : cycle === 2 ? ' II' : ' III';
+    const suffix = cycle === 1 ? '' : cycle === 2 ? ' II' : cycle === 3 ? ' III' : ` ${cycle}`;
     return {
       id: `p${i + 1}`,
       name: `${house.name}${suffix}`,
@@ -199,18 +202,19 @@ export function networkSeats(mode: NetworkMatchMode = 'ffa'): SeatConfig[] {
 }
 
 export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
+  const preset = mapPreset(setup.mapId);
   const base = createInitialState({
     seed: setup.seed ?? 'prototype-1',
     version: { data: '0.1.0', manifest: '1' },
   });
   // Every province starts NEUTRAL; the chosen seats below claim + fortify their homeworld.
   const planets: Record<string, Planet> = {};
-  for (const n of MAP) {
+  for (const n of preset.nodes) {
     planets[n.id] = {
       id: n.id,
       owner: null,
       position: { x: n.x, y: n.y },
-      links: n.links,
+      links: [...n.links],
       terrain: SECTOR_TYPES[n.sector]?.core ?? 'empty_space',
       kind: n.sector, // planet / asteroid / nebula / … — drives capturable (sectorKinds)
       // relative territory weight — planets are the small sectors, fields/clouds bigger
@@ -340,15 +344,33 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
   // across teams at WAR (fight from the first hour). A team alliance is seeded state,
   // so it bypasses the `E_BOT_ALLIANCE` declare-gate — an AI teammate is a real ally
   // (the SES-1 victory clique reads the stance, so the coalition forms).
+  // Inhabitants own bases, not player starts. Their fleets and resources follow
+  // the same economic/combat rules as every other faction.
+  for (const n of preset.nodes) {
+    if (n.sector !== 'pirate_base' && n.sector !== 'neutral_base') continue;
+    const npc = n.sector === 'pirate_base' ? 'pirate' : 'neutral';
+    const id = `npc-${n.id}`;
+    players[id] = { ...player(id, npc === 'pirate' ? 'Pirate Base' : 'Neutral AI Base',
+      npc === 'pirate' ? 'crimson' : 'violet',
+      { credits: 500, metal: 500, food: 200, energy: 200, microelectronics: 100 }, true), npc };
+    const home = planets[n.id]!;
+    home.owner = id;
+    home.buildings = ['spaceport', 'radar', 'power_plant', 'fabricator'].map((type) =>
+      ({ type, level: 1, hp: hpOfLevel(type, 1) }));
+    home.garrison = [{ unit: 'heavy_infantry', count: 3 }];
+    fleets[`${id}-1`] = fleet(`${id}-1`, id, n.id, [['cruiser', 3], ['scout', 1]], []);
+  }
   const teamed = setup.seats.some((seat) => seat.team !== undefined);
   const teamOf = new Map(setup.seats.map((seat) => [seat.id, seat.team]));
   const diplomacy: Record<string, DiplomaticStance> = {};
-  const ids = setup.seats.map((seat) => seat.id);
+  const ids = Object.keys(players);
   for (let i = 0; i < ids.length; i++)
     for (let j = i + 1; j < ids.length; j++) {
       const ta = teamOf.get(ids[i]!);
       const tb = teamOf.get(ids[j]!);
-      const stance: DiplomaticStance = !teamed
+      const pirates = players[ids[i]!]!.npc === 'pirate' || players[ids[j]!]!.npc === 'pirate';
+      const neutral = players[ids[i]!]!.npc === 'neutral' || players[ids[j]!]!.npc === 'neutral';
+      const stance: DiplomaticStance = pirates ? 'war' : neutral ? 'peace' : !teamed
         ? 'peace'
         : ta !== undefined && ta === tb
           ? 'alliance'
@@ -358,10 +380,10 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
   // Bots track a favour meter toward every other seat (seeded neutral-friendly). Only a
   // player's aggression lowers it; a bot never wars for expansion (see botDiplomacyModule).
   const approval: Record<string, Record<string, number>> = {};
-  for (const seat of setup.seats) {
+  for (const seat of Object.values(players)) {
     if (!seat.ai) continue;
     approval[seat.id] = {};
-    for (const other of ids) if (other !== seat.id) approval[seat.id]![other] = FAVOUR_BASE;
+    for (const other of ids) if (other !== seat.id) approval[seat.id]![other] = seat.npc === 'pirate' ? 0 : FAVOUR_BASE;
   }
   const heroRoster: Record<string, HeroLoadout[]> = {};
   const shipLoadouts: Record<string, ShipLoadout[]> = {};
@@ -377,6 +399,7 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
   // первой заявке (`??= []`), как и до сведения делало ядро.
   return {
     ...base,
+    mapId: preset.id,
     players,
     planets,
     fleets,

@@ -1,3 +1,4 @@
+import { mapPreset, mapNodesFromState, scoreLimitFor, MAP_IDS, type MapId } from './mapCatalog';
 /**
  * Void Dominion — playable prototype, browser UI.
  *
@@ -13,9 +14,9 @@ import {
   canOrderAll,
   ctx,
   data,
-  MAP,
+  MAP as LEGACY_MAP,
   SECTOR_TYPES,
-  SCORE_LIMIT,
+  SCORE_LIMIT as LEGACY_SCORE_LIMIT,
   HOUR,
   DAY,
   hpOfLevel,
@@ -917,7 +918,7 @@ const DEV_UI = ((): boolean => {
 })();
 // The ten possible commanders, in stable seat order. Seat 1 is always you (human);
 // seats 2-10 are AI or off in the setup screen. Four faction passives cycle across seats.
-const SEAT_META: ReadonlyArray<{ id: string; name: string; faction: string; color: string }> = [
+const SEAT_META: Array<{ id: string; name: string; faction: string; color: string }> = [
   { id: 'p1', name: 'Azure Compact', faction: 'azure', color: COLOR.p1! },
   { id: 'p2', name: 'Crimson Hegemony', faction: 'crimson', color: COLOR.p2! },
   { id: 'p3', name: 'Amber Concord', faction: 'amber', color: COLOR.p3! },
@@ -929,6 +930,18 @@ const SEAT_META: ReadonlyArray<{ id: string; name: string; faction: string; colo
   { id: 'p9', name: 'Azure Compact III', faction: 'azure', color: COLOR.p9! },
   { id: 'p10', name: 'Crimson Hegemony III', faction: 'crimson', color: COLOR.p10! },
 ];
+// Extra seats use the same faction cycle, with stable distinct map colors.
+for (let i = 10; i < 100; i++) {
+  const house = SEAT_META[i % 4]!;
+  const color = '#' + [73, 107, 131].map((k) => (80 + (i * k) % 156).toString(16).padStart(2, '0')).join('');
+  COLOR[`p${i + 1}`] = color;
+  SEAT_META.push({ id: `p${i + 1}`, name: `${house.name} ${Math.floor(i / 4) + 1}`, faction: house.faction, color });
+}
+let MAP = LEGACY_MAP;
+let SCORE_LIMIT = LEGACY_SCORE_LIMIT;
+let setupMapId: MapId = 'nexus';
+const setupPreset = () => mapPreset(setupMapId);
+const setupSeatCount = () => setupPreset().starts.length;
 const GRID = 'rgba(46,150,160,0.07)';
 const LOCK = '#7df0d0'; // selection / targeting reticle accent
 // RANGE-UX: три вида оружия — три РАЗНЫХ цвета, чтобы круги не сливались в кашу, когда
@@ -1261,7 +1274,7 @@ const battleLosses = new Map<string, Record<string, Record<string, number>>>();
 // Single-player setup screen state: per-seat role (seat 0 is always you) + your
 // chosen homeworld. Seats 2-10 toggle 'ai'/'off'; an 'ai' seat spawns a rival.
 const freshSetupSlots = (): SeatRole[] =>
-  SEAT_META.map((_, i) => (i === 0 ? 'human' : i === 1 ? 'ai' : 'off'));
+  SEAT_META.slice(0, setupSeatCount()).map((_, i) => (i === 0 ? 'human' : setupMapId === 'frontier-100' || i === 1 ? 'ai' : 'off'));
 let setupSlots: SeatRole[] = freshSetupSlots();
 // Team battle (2v2 etc.): when on, seats fight in sides — same side ALLIED (win
 // together, no friendly fire), across sides at WAR from the first hour. Seat 0 (you)
@@ -1596,7 +1609,7 @@ function updateThreatAlerts(): void {
   if (!threatScanDue(hourBucket(s.time, HOUR), threatScanAt)) return;
   threatScanAt = hourBucket(s.time, HOUR);
   if (!threatsHeard(s.players[ME]?.status)) return;
-  const c = ctx(s.time);
+  const c = ctx(s.time, s);
   const identified = identifiedNodes(s, ME, data);
   const sightings: ThreatSighting[] = [];
   for (const p of Object.values(s.planets)) {
@@ -1724,7 +1737,18 @@ const mapBounds = () => ({ minX: MINX, minY: MINY, maxX: MAXX, maxY: MAXY });
 const cam = { scale: 1, x: 0, y: 0 };
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 // node sector type by id — drives asteroid-junction rendering + capture-by-arrival
-const SECTOR_OF: Record<string, string> = Object.fromEntries(MAP.map((n) => [n.id, n.sector]));
+let SECTOR_OF: Record<string, string> = Object.fromEntries(MAP.map((n) => [n.id, n.sector]));
+function installMapGeometry(state: GameState): void {
+  MAP = mapNodesFromState(state);
+  SCORE_LIMIT = scoreLimitFor(state);
+  SECTOR_OF = Object.fromEntries(MAP.map((n) => [n.id, n.sector]));
+  MINX = Math.min(...MAP.map((n) => n.x));
+  MAXX = Math.max(...MAP.map((n) => n.x));
+  MINY = Math.min(...MAP.map((n) => n.y));
+  MAXY = Math.max(...MAP.map((n) => n.y));
+  mapNeedsPreparation = true;
+  for (const p of Object.values(state.players)) if (p.npc) COLOR[p.id] = p.npc === 'pirate' ? '#f17457' : '#b79bea';
+}
 /** Sector-type def of a node. SECTOR_OF is total for the generated MAP, but the type
  *  can't promise that for an arbitrary id — fail-soft to undefined (callers `?.`). */
 function sectorTypeOf(id: string) {
@@ -1802,7 +1826,7 @@ function defaultView(): void {
   // Кого считать домом и когда приближаться к нему — `openingView.ts` (REFM-56).
   const view = openingView(MOBILE || holographic.active(), pickHome(Object.values(s.planets), ME));
   if (view.kind === 'home') {
-    centerOn(view.at, view.scale);
+    centerOn(view.at, view.scale * (s.mapId === 'frontier-100' ? 5 : 1));
     return;
   }
   cam.scale = 1;
@@ -2514,8 +2538,9 @@ const myScore = (): number => Math.round(s.match?.scores?.[ME]?.total ?? 0);
 const myWorldCount = (): number => Object.values(s.planets).filter((p) => p.owner === ME).length;
 // ONB-2: start a bot-free solo sandbox and arm the guided first match over its HUD.
 function startGuidedMatch(): void {
+  setupMapId = 'nexus';
   setupSlots = ['human', 'off', 'off', 'off']; // no rivals — a safe, calm sandbox
-  setupStart = START_CANDIDATES[0] ?? MAP[0]!.id; // a deterministic homeworld
+  setupStart = setupPreset().starts[0]!; // a deterministic homeworld
   pendingGuide = () => {
     const startScore = myScore();
     const startWorlds = myWorldCount(); // baseline: home only
@@ -4682,6 +4707,14 @@ function render(now: number) {
     // Variant B: fog hides capturable systems (void cells stay as pure geometry).
     // Какой вид у узла — `fogView.ts` (REFM-62): пустой всегда виден, неопознанный
     // показывается ПАМЯТЬЮ, никогда не виденный — знаком вопроса.
+    if (n.sector === 'black_hole') {
+      cx.save();
+      cx.fillStyle = '#03030a'; cx.strokeStyle = '#8764ce'; cx.lineWidth = 3;
+      cx.beginPath(); cx.arc(c.x, c.y, 20 * ns, 0, TAU); cx.fill(); cx.stroke();
+      cx.beginPath(); cx.ellipse(c.x, c.y, 31 * ns, 10 * ns, -0.3, 0, TAU); cx.stroke();
+      cx.restore();
+      continue;
+    }
     const kn = known(n.id);
     const mem = memory.get(n.id);
     const view = nodeView({ sector: n.sector, identified: kn, remembered: !!mem });
@@ -5043,7 +5076,7 @@ function render(now: number) {
       cx.arc(c.x, c.y, 2, 0, TAU);
       cx.fill();
       cx.restore();
-    } else if (holographicMapOn() && n.sector === 'void_station') {
+    } else if (['void_station', 'pirate_base', 'neutral_base'].includes(n.sector)) {
       // Station volume is a transparent orbital scaffold in the plotting plane.
       cx.save();
       cx.strokeStyle = rgba(col, 0.7);
@@ -6630,7 +6663,7 @@ function isAiSeat(id: string): boolean {
 }
 /** Seats taking part in the match, in the fixed seat order. */
 function diploSeats(): string[] {
-  return SEAT_META.map((m) => m.id).filter((id) => !!s.players[id]);
+  return Object.keys(s.players);
 }
 /** Message stamp. Defaults to `Day N · HH:MM` (game day + game time, mirrors the status
  *  strip); the chat passes toggles to add/drop fields and append the real wall-clock. */
@@ -10267,7 +10300,7 @@ let netSetup: { matchId: string; offer: EntryOffer } | null = null;
 
 /** Стартовые миры, которые сейчас предлагает экран. */
 function setupCandidateIds(): string[] {
-  if (!netSetup) return [...START_CANDIDATES];
+  if (!netSetup) return [...setupPreset().starts];
   return netSetup.offer.worlds.flatMap((w) => (w.planetId ? [w.planetId] : []));
 }
 
@@ -10284,6 +10317,7 @@ function worldTaken(planetId: string): boolean {
 function renderSetupMap(): void {
   // Рамка, трассы без повторов и порядок рисования — в `setupMap.ts` (REFM-45):
   // там же правило «каждое ребро один раз» и «кандидаты рисуются последними».
+  const MAP = setupPreset().nodes;
   const box = mapViewBox(MAP, 60);
   setupMapEl.setAttribute('viewBox', `${box.x} ${box.y} ${box.w} ${box.h}`);
   const order = drawOrder(MAP, setupCandidateIds());
@@ -10292,6 +10326,14 @@ function renderSetupMap(): void {
     svg += `<line x1="${l.from.x}" y1="${l.from.y}" x2="${l.to.x}" y2="${l.to.y}" stroke="#1d3640" stroke-width="3"/>`;
   }
   for (const n of order.plain) {
+    if (n.sector === 'black_hole') {
+      svg += `<circle cx="${n.x}" cy="${n.y}" r="140" fill="#03030a" stroke="#8764ce" stroke-width="20"><title>${esc(t('setup.map.hole'))}</title></circle>`;
+      continue;
+    }
+    if (n.sector === 'pirate_base' || n.sector === 'neutral_base') {
+      svg += `<rect x="${n.x - 20}" y="${n.y - 20}" width="40" height="40" fill="${SECTOR_TYPES[n.sector]!.color}"><title>${esc(tData(SECTOR_TYPES[n.sector]!.name))}</title></rect>`;
+      continue;
+    }
     const planet = n.sector === 'planet';
     svg += `<circle cx="${n.x}" cy="${n.y}" r="${planet ? 16 : 11}" fill="${planet ? '#2c5460' : '#1b2d34'}" stroke="#33555f" stroke-width="2"/>`;
   }
@@ -10322,7 +10364,7 @@ function renderSetupMap(): void {
 function seatFactionIds(): string[] {
   // Раздача и нумерация домов — в `setupSeats.ts` (REFM-44): твой первый, остальные
   // по кругу в стабильном порядке, со второго круга имя получает номер.
-  return seatSeatFactionIds(setupFaction, Object.keys(data.factions), SEAT_META.length);
+  return seatSeatFactionIds(setupFaction, Object.keys(data.factions), setupSeatCount());
 }
 function seatHouseName(fid: string, fallback: string, index: number): string {
   return houseNameFor(
@@ -10368,13 +10410,18 @@ function renderSetupSlots(): void {
     `<button class="tmtog pve-btn" data-pvestart="1">🤖 ${t('setup.pve')}</button>` +
     (setupTeams ? `<span class="tmhint">${t('setup.teams.note')}</span>` : '') +
     `</div>`;
+  if (setupMapId === 'frontier-100') {
+    const count = rivalCount(setupSlots);
+    setupSlotsEl.innerHTML = `<label>${t('setup.bots.count')} <input id="setup-bot-count" type="number" min="0" max="99" value="${count}" /></label>`;
+    return;
+  }
   const fids = seatFactionIds();
   // A/B side chip for a seat (you are locked to A; AI seats toggle side).
   const teamChip = (i: number, locked: boolean): string => {
     const side = setupSeatTeam[i]!;
     return `<button class="tmchip s${side}${locked ? ' lock' : ''}" data-teamseat="${i}"${locked ? ' disabled' : ''}>${side}</button>`;
   };
-  for (let i = 0; i < SEAT_META.length; i++) {
+  for (let i = 0; i < setupSeatCount(); i++) {
     const m = SEAT_META[i]!;
     const role = setupSlots[i]!;
     const house = esc(houseDisplayName(seatHouseName(fids[i]!, m.name, i)));
@@ -10402,6 +10449,13 @@ function renderSetupSlots(): void {
 }
 
 function renderSetup(): void {
+  const mapSelect = $('setup-map-id') as HTMLSelectElement;
+  mapSelect.value = setupMapId;
+  mapSelect.disabled = !!netSetup;
+  $('setup-map-info').textContent = t(setupMapId === 'frontier-100' ? 'setup.map.frontier-info' : 'setup.map.nexus-info');
+  const homeSelect = $('setup-home-id') as HTMLSelectElement;
+  homeSelect.innerHTML = setupCandidateIds().map((id) => `<option value="${esc(id)}"${worldTaken(id) ? ' disabled' : ''}>${esc(id)}${worldTaken(id) ? ' · ' + esc(t('seatpick.taken')) : ''}</option>`).join('');
+  homeSelect.value = setupStart;
   renderSetupMap();
   renderSetupSlots();
   renderSetupCouncil();
@@ -10477,7 +10531,7 @@ function openSetup(from: 'welcome' | 'hub' = 'welcome'): void {
   setupSlots = freshSetupSlots();
   setupTeams = false; // a fresh setup opens on the classic free-for-all
   setupSeatTeam = [...DEFAULT_TEAM_SIDES];
-  setupStart = START_CANDIDATES[0] ?? MAP[0]!.id;
+  setupStart = setupPreset().starts[0]!;
   // Re-consecrate the council each time setup opens, PRE-SEEDED with the recommended
   // newbie pair (командование «Куратор» + генералист «Полимат»): the first permanent
   // choice a new player faces must never be a wall of empty slots + a disabled button —
@@ -10521,7 +10575,7 @@ function buildSetupConfig(): SetupConfig {
   // Кто реально играет и с какого мира стартует — `setupSeats.ts` (REFM-160): место 0
   // всегда твоё, AI-места забирают кандидатов по порядку мимо выключенных, свой мир из
   // кандидатов уже исключён, а закончившиеся кандидаты останавливают раздачу.
-  const seats: SeatConfig[] = assignSeats(SEAT_META.length, setupSlots, setupStart, START_CANDIDATES).map(
+  const seats: SeatConfig[] = assignSeats(setupSeatCount(), setupSlots, setupStart, setupPreset().starts).map(
     ({ index: i, start }) => {
       const m = SEAT_META[i]!;
       return {
@@ -10537,6 +10591,7 @@ function buildSetupConfig(): SetupConfig {
   // Carry the player's division templates + hero roster into the match (deep-cloned),
   // plus the meta-progression grant (snapshot — no live account reads mid-match).
   return {
+    mapId: setupMapId,
     meta: metaGrant(loadMeta()),
     seats,
     ...(setupScientists.length ? { scientists: [...setupScientists] } : {}),
@@ -10580,9 +10635,11 @@ topEl.addEventListener('click', (ev) => {
 function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>): void {
   mapNeedsPreparation = true;
   s = state;
+  installMapGeometry(s);
   syncPlayerNames(s);
   ME = 'p1';
-  AI_PLAYERS = aiPlayers;
+  AI_PLAYERS = new Map(aiPlayers);
+  for (const p of Object.values(s.players)) if (p.npc) AI_PLAYERS.set(p.id, 'weak');
   solo.reset();
   // ONB-2 (found live): a leftover guide from whatever was on screen before (a
   // tutorial the player exited without finishing/skipping, a stale reconnect) must
@@ -10673,6 +10730,61 @@ function startPvEMatch(): void {
   note(t('setup.pve.started'));
 }
 
+let creatingMatch = false;
+function createOnlineMatch(mapId: MapId): void {
+  if (creatingMatch) return;
+  const srv = resolveServer();
+  if (!srv) { note(t('acc.server-down')); return; }
+  const buttons = ['setup-network-create', 'match-create-go'].map((id) => $(id) as HTMLButtonElement);
+  creatingMatch = true;
+  for (const button of buttons) { button.disabled = true; button.textContent = t('setup.network.creating'); }
+  detach('create match', (async () => {
+    try {
+      const pass = tokenFor(localStorage, srv.base, srv.nick);
+      const res = await fetch(`${httpBase(srv.base)}/matches`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...(pass ? { authorization: `Bearer ${pass}` } : {}) },
+        body: JSON.stringify({ mapId }),
+      });
+      if (!res.ok) throw new Error('E_CREATE_MATCH');
+      const body = await res.json() as { matchId: string };
+      await openSeatPicker(body.matchId);
+    } catch { note(t('setup.network.failed')); }
+    finally {
+      creatingMatch = false;
+      for (const button of buttons) { button.disabled = false; button.textContent = t('setup.network.create'); }
+    }
+  })());
+}
+$('setup-network-create').addEventListener('click', () => {
+  if (!netSetup) createOnlineMatch(setupMapId);
+});
+$('match-create-go').addEventListener('click', () => {
+  createOnlineMatch(mapPreset(($('match-create-map') as HTMLSelectElement).value).id);
+});
+$('setup-map-id').addEventListener('change', (ev) => {
+  const id = (ev.target as HTMLSelectElement).value;
+  if (netSetup || !MAP_IDS.some((value) => value === id)) return;
+  setupMapId = mapPreset(id).id;
+  setupSlots = freshSetupSlots();
+  setupTeams = false;
+  setupStart = setupPreset().starts[0]!;
+  renderSetup();
+});
+$('setup-home-id').addEventListener('change', (ev) => {
+  const id = (ev.target as HTMLSelectElement).value;
+  if (!setupCandidateIds().includes(id) || worldTaken(id)) return;
+  setupStart = id;
+  renderSetup();
+});
+setupSlotsEl.addEventListener('change', (ev) => {
+  const input = ev.target as HTMLInputElement;
+  if (input.id !== 'setup-bot-count') return;
+  const count = Math.max(0, Math.min(99, Math.floor(Number(input.value) || 0)));
+  setupSlots = Array.from({ length: 100 }, (_, i) => i === 0 ? 'human' : i <= count ? 'ai' : 'off');
+  renderSetup();
+});
+
 setupMapEl.addEventListener('click', (ev) => {
   const direct = (ev.target as Element).closest('[data-cand]');
   let pick: string | null = direct?.getAttribute('data-cand') ?? null;
@@ -10691,7 +10803,7 @@ setupMapEl.addEventListener('click', (ev) => {
     if (at) {
       const hit = nearestHit(
         setupCandidateIds().flatMap((id) => {
-          const n = MAP.find((m) => m.id === id);
+          const n = setupPreset().nodes.find((m) => m.id === id);
           return n ? [n] : [];
         }),
         (n) => n,
@@ -10852,7 +10964,9 @@ function netClientFor(seat: string): MultiplayerClient {
           }, PERF_SAMPLE_MS);
         }
         const diploShift = socketAdmitted && s !== snap.state && diffNetDiplomacy(s, snap.state);
+        const changedMap = s.mapId !== snap.state.mapId || plan.admit;
         s = snap.state;
+        if (changedMap) installMapGeometry(s);
         syncPlayerNames(s);
         // Radar picture (BF-18): detected-but-unidentified enemy fleets are absent
         // from the fogged state — the server sends them as coarse contacts beside
@@ -10866,6 +10980,7 @@ function netClientFor(seat: string): MultiplayerClient {
         // stance chips and offer affordances (✓ accept / ⏳ pending) paint fresh.
         if (diploShift && diploOpen && diploTab === 'diplo') renderDiplo();
         if (snap.playerId) ME = snap.playerId;
+        if (changedMap && plan.fanfare) defaultView();
         // Desync check (M0): the server tags each snapshot with hashState(view); we
         // hash our just-reconstructed view and compare. Mismatch ⇒ the client and
         // server disagree — the core invariant we most want to catch on a playtest.
@@ -11486,7 +11601,7 @@ function startNetSetupPoll(base: string, matchId: string, nick: string): void {
         try {
           const res = await fetchSeats(base, matchId, nick);
           if (queryOutcome(res) !== 'ok') return;
-          const body = (await res.json()) as { seats: EntrySeat[] };
+          const body = (await res.json()) as { seats: EntrySeat[]; mapId?: MapId };
           if (!netSetup) return;
           netSetup = { matchId, offer: entryOffer(body.seats ?? []) };
           const fate = reconcileSelection(slotForWorld(setupStart), netSetup.offer.worlds);
@@ -11531,10 +11646,11 @@ async function openSeatPicker(matchId: string): Promise<void> {
       показать(seatView('refused'));
       return;
     }
-    const body = (await res.json()) as { seats: EntrySeat[] };
+    const body = (await res.json()) as { seats: EntrySeat[]; mapId?: MapId };
     const offer = entryOffer(body.seats ?? []);
     if (seatpickEl) seatpickEl.style.display = 'none';
     openSetup('hub'); // сбрасывает режим — сетевой ставим сразу после
+    setupMapId = mapPreset(body.mapId).id;
     netSetup = { matchId, offer };
     startNetSetupPoll(srv.base, matchId, srv.nick);
     // Стартовый мир не подставляем: правило 4 `entrySetup.ts` — кнопка заперта, пока
@@ -11685,6 +11801,7 @@ function renderFilterPanel(rows: MatchRow[], f: FilterState): void {
 function renderMatches(): void {
   const el = $('mlist');
   const failed = statusEl.textContent === t('acc.server-down');
+  $('match-create').style.display = matchLists && !failed && activeTab === 'available' ? '' : 'none';
   // Что показать вместо списка — `browserFallback.ts` (REFM-151): никогда не тупик
   // (соло предлагается всегда — это путь без сервера), «сервер не ответил» и «ещё не
   // спрашивали» — разные сообщения, у сборки игрока свои тексты, а строка адреса
@@ -11779,7 +11896,7 @@ function renderMatches(): void {
       modeLine = `${badge}${esc(tData(mode.modeId))} · `;
     }
     info.innerHTML =
-      `<div class="mname">${esc(m.mapId)} <span class="mid">${esc(m.matchId)}</span></div>` +
+      `<div class="mname">${esc(m.mapId === 'frontier-100' ? t('map.frontier-100') : m.mapId)} <span class="mid">${esc(m.matchId)}</span></div>` +
       `<div class="mmeta">${modeLine}${t('browser.day', { n: m.days })} · ${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
       `${esc(ruleSummary(m.rules))} · ${m.status === 'ended' ? t('browser.finished') : t('browser.running')}${windowLine}</div>`;
     row.appendChild(info);
@@ -11846,7 +11963,7 @@ function renderMyMatches(serverHttp: string): void {
       // Идентификатора в заголовке нет намеренно: он целиком стоит ниже, В АДРЕСЕ —
       // а `m-<uuid>` в заголовке отъедал три строки и вытеснял то, ради чего сюда
       // смотрят (какая партия, какой день, сколько игроков).
-      `<div class="hc-t">${esc(m.mapId)}</div>` +
+      `<div class="hc-t">${esc(m.mapId === 'frontier-100' ? t('map.frontier-100') : m.mapId)}</div>` +
       `<div class="hc-s">${t('browser.day', { n: m.days })} · ` +
       `${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
       `${m.status === 'ended' ? t('browser.finished') : t('browser.running')}</div>` +

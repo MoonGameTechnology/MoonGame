@@ -267,6 +267,18 @@ describe('hero — move (redeploy)', () => {
 describe('hero — temp public lane (path.create / expire)', () => {
   const kernel = createKernel([heroModule]);
 
+  it('cannot open a corridor to an isolated province', () => {
+    const st = corridorWorld();
+    st.planets.C!.kind = 'black_hole';
+    const context = ctx(0);
+    context.data = { ...context.data, sectorKinds: { ...context.data.sectorKinds,
+      black_hole: { ...context.data.sectorKinds.planet!, traversable: false },
+    } };
+    const r = kernel.applyAction(st, corridor('C'), context);
+    expect(errCode(r)).toBe('E_WRONG_SECTOR');
+    expect(st.planets.A!.links).not.toContain('C');
+  });
+
   it('opens a routable lane: links both ways, bumps topology, schedules expiry', () => {
     const r = okApply(kernel.applyAction(corridorWorld(), corridor('C'), ctx(0)));
     const s = r.state;

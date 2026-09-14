@@ -498,6 +498,8 @@ export const SectorKindAppearanceSchema = z.object({
  *  (map-roadmap.md M2.1) — add a province type by adding an entry, no code change.
  *  Absent / unknown kind degrades to the permissive defaults below. */
 export const SectorKindDefSchema = z.object({
+  /** False forbids artificial routes into isolated map features. Absent = traversable. */
+  traversable: z.boolean().optional(),
   name: z.string().optional(),
   /** Victory-score base for controlling a province of this kind (GDD §8.1). A
    *  habitable `planet` is the prize (50); every other province type — asteroid,
@@ -509,8 +511,8 @@ export const SectorKindDefSchema = z.object({
   /** Can structures be raised here? */
   buildable: z.boolean().default(true),
   /** Does it have the orbital layer? Only a province WITH one can be shelled from
-   *  above and can answer with orbital AA — in the shipped catalogue exactly two
-   *  kinds carry it: `planet` and `void_station` (the space fortress). Enforced in
+   *  above and can answer with orbital AA — in the shipped catalogue
+   *  planets and station-class bases carry it. Enforced in
    *  the orbital module: the `fleet.bombard` gate (`E_WRONG_SECTOR`), the shared
    *  `isActivelyBombarding` predicate (so damage and the economy freeze cannot
    *  disagree), and the AA/bombardment span itself. NOT a gate on entering orbit:

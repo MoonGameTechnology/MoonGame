@@ -168,3 +168,15 @@ describe('camera — cull', () => {
     expect(inView({ x: 460, y: 400 }, 400, 800, 80)).toBe(true); // within pad
   });
 });
+
+
+it('zooms a large map to province detail while retaining the same focal point', () => {
+  const bounds = { minX: 0, minY: 0, maxX: 10000, maxY: 10000 };
+  const start = { scale: 1, x: 0, y: 0 };
+  const focus = { x: 200, y: 400 };
+  const before = screenToWorld(focus, start, VP, bounds);
+  const zoomed = zoomAt(start, focus.x, focus.y, 30, VP, bounds);
+  expect(zoomed.scale).toBe(30);
+  const after = screenToWorld(focus, zoomed, VP, bounds);
+  expect(near(before.x, after.x) && near(before.y, after.y)).toBe(true);
+});
