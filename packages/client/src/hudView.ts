@@ -127,6 +127,46 @@ export function statusBarHtml(m: StatusBarModel): string {
  * такому миру всегда выбирает флот, а второй тап снимает выбор. Найдено браузерным
  * прогоном: проверка «свой мир открывает верфь» получала панель состава.
  */
+/**
+ * Приказы, которые панель состава предлагает СВОЕМУ флоту (MIG-7).
+ *
+ * Правило то же, что у полос и у «Отступить»: кнопка появляется только когда приказ
+ * в этот момент выполним, потому что живая на вид кнопка, на которую сервер ответит
+ * отказом, стоит игроку хода. Что именно выполнимо, решает `resolveFleetAction` —
+ * здесь только рисование, без второй копии условий.
+ *
+ * Чего здесь НЕТ намеренно:
+ *  · **«На орбиту»** — решение владельца (2026-09-13). Флот встаёт на орбиту сам по
+ *    прибытии, и явная кнопка предлагала бы игроку сделать уже сделанное. Приказ живёт
+ *    в ядре и уходит внутри пары «орбита + штурм», но своего жеста у него нет.
+ *  · **приказы чужому флоту** — их отвергнет ядро (`E_NO_FLEET`), и панель чужого
+ *    флота остаётся тем, чем была: осмотром.
+ *  · **что-либо в бою** — там распоряжается панель боя, и единственное осмысленное
+ *    действие в этот момент одно: отступить.
+ */
+function ordersHtml(m: FleetSelectionModel): string {
+  if (!m.mine || m.inCombat) return '';
+  const btn = (act: string, key: string, on?: boolean): string =>
+    `<button class="btn tiny" data-act="${act}"` +
+    (on === undefined ? '' : ` data-on="${on ? '1' : '0'}"`) +
+    `>${esc(t(key))}</button>`;
+  const parts: string[] = [];
+  if (m.status === 'transit') parts.push(btn('stop', 'hud.order.stop'));
+  // Форс-марш — единственный приказ ряда, которому стоянка не нужна: он ускоряет
+  // флот В ПУТИ. Подпись переключается, иначе включённый марш нечем выключить.
+  parts.push(
+    m.forcedMarch
+      ? btn('forcemarch', 'hud.order.forcemarch-off', false)
+      : btn('forcemarch', 'hud.order.forcemarch-on', true),
+  );
+  if (m.status === 'stationed') {
+    if (m.bombarding) parts.push(btn('bombard', 'hud.order.bombard-off', false));
+    else if (m.orbit === 'near') parts.push(btn('bombard', 'hud.order.bombard-on', true));
+    parts.push(btn('assault', 'hud.order.assault'));
+  }
+  return `<div class="orders">${parts.join('')}</div>`;
+}
+
 export function selectionHtml(
   m: FleetSelectionModel,
   now: number,
@@ -155,6 +195,7 @@ export function selectionHtml(
     (m.hull ? barHtml('hull', m.hull) : '') +
     (m.shield ? barHtml('shield', m.shield) : '') +
     stacksHtml(m.ships) +
+    ordersHtml(m) +
     (opts.canBuildHere
       ? `<button class="btn tiny" data-act="yard">${esc(t('hud.build-here'))}</button>`
       : '') +

@@ -34,6 +34,7 @@ import type {
   ResourceId,
   UnitStack,
 } from '@void/shared-core';
+import { assaultSteps } from '../../../decisions/assaultOrder';
 
 /* ─────────────────────────── Zone A — status bar ─────────────────────────── */
 
@@ -204,6 +205,19 @@ export interface FleetSelectionModel {
   shield?: { current: number; max: number };
   /** Engaged in an active battle (`fleet.battleId` set). */
   inCombat: boolean;
+  /** Holding the single near orbit of the world below (`fleet.orbit`, GDD §7.4).
+   *  Arrival sets it by itself, so this is normally true for a stationed fleet —
+   *  the panel reads it to know whether an assault needs the orbit step paired in
+   *  front of it (`decisions/assaultOrder.ts`). */
+  orbit?: 'near';
+  /** Shelling the world below right now. The panel needs the CURRENT value because
+   *  the order is a toggle (`fleet.bombard { on }`): a button that always sent `true`
+   *  could never stop the shelling. */
+  bombarding?: boolean;
+  /** Marching at +50% speed for hull wear (`state.forcedMarch`). Own fleets only —
+   *  the fog pass already strips other players' entries, and this keeps that true even
+   *  when the model is handed an unfogged state (same defence in depth as the hero). */
+  forcedMarch?: boolean;
 }
 
 /** Selection projection outcome: the fleet model, or a stable error code. */
@@ -317,6 +331,10 @@ export function createSelectionModel(
     model.location = fleet.location;
   }
 
+  if (fleet.orbit === 'near') model.orbit = 'near';
+  if (fleet.bombarding) model.bombarding = true;
+  if (model.mine && state.forcedMarch?.[fleet.id]) model.forcedMarch = true;
+
   const commander = fleetCommander(state, fleet, viewerId);
   if (commander) model.commander = commander;
   if (data) {
@@ -326,6 +344,78 @@ export function createSelectionModel(
   }
 
   return { ok: true, ...model };
+}
+
+/* ──────────────────── Fleet panel — the orders it can issue ───────────────── */
+
+/** What the fleet panel's buttons ask for. */
+export type FleetAction =
+  | { kind: 'stop' }
+  | { kind: 'forcemarch'; on: boolean }
+  | { kind: 'bombard'; on: boolean }
+  | { kind: 'assault' };
+
+/** One order as it goes on the wire — the caller hands `type`/`payload` to the shared
+ *  builder, it does not assemble an envelope itself. A LIST because one request is not
+ *  always one order: an assault from outside orbit is a pair (`decisions/assaultOrder.ts`). */
+export interface FleetStep {
+  type: string;
+  payload: Record<string, unknown>;
+}
+
+/** Orders to issue, or a stable reject code (fail-secure). */
+export type FleetIntent = { ok: true; steps: FleetStep[] } | { ok: false; code: string };
+
+/**
+ * Map a fleet-panel button to the order(s) it issues.
+ *
+ * The codes here are the CORE's own, not invented: someone else's fleet answers
+ * `E_NO_FLEET` (the same opaque code the core gives, so a client cannot probe ids for
+ * fog-hidden fleets), a fleet that is moving or fighting answers `E_FLEET_BUSY`
+ * (`requireOwnedIdleFleet`), and bombardment from outside orbit answers
+ * `E_WRONG_ORBIT`. Refusing here is not a substitute for the server — it saves the
+ * player a wasted tap and says why.
+ *
+ * What is deliberately NOT checked: whether the assault itself is possible (landing
+ * troops aboard, the world hostile and capturable, no other assault running). That
+ * answer belongs to the core and only to the core — `decisions/assaultOrder.ts` rule 1:
+ * a hand-written copy of those conditions falls behind on the first new rule, and falls
+ * behind SILENTLY, leaving the player a button that does nothing.
+ */
+export function resolveFleetAction(action: FleetAction, model: FleetSelectionModel): FleetIntent {
+  if (!model.mine) return { ok: false, code: 'E_NO_FLEET' };
+  const fleetId = model.id;
+
+  if (action.kind === 'forcemarch') {
+    // The one order that does NOT need an idle fleet — and must not, since its whole
+    // point is speed IN TRANSIT (`forcedMarch.ts` checks ownership only).
+    return { ok: true, steps: [{ type: 'fleet.forcemarch', payload: { fleetId, on: action.on } }] };
+  }
+
+  if (action.kind === 'stop') {
+    // Nothing to halt unless it is actually under way; a battle pins it in place.
+    if (model.status !== 'transit' || model.inCombat) return { ok: false, code: 'E_FLEET_BUSY' };
+    return { ok: true, steps: [{ type: 'fleet.stop', payload: { fleetId } }] };
+  }
+
+  // Both remaining orders act on the world below, so the fleet must be sitting at one.
+  if (model.status !== 'stationed' || model.inCombat) return { ok: false, code: 'E_FLEET_BUSY' };
+
+  if (action.kind === 'bombard') {
+    // Only STARTING needs the orbit; stopping is always allowed, so a fleet that somehow
+    // ended up shelling from nowhere can still be told to stop.
+    if (action.on && model.orbit !== 'near') return { ok: false, code: 'E_WRONG_ORBIT' };
+    return { ok: true, steps: [{ type: 'fleet.bombard', payload: { fleetId, on: action.on } }] };
+  }
+
+  return {
+    ok: true,
+    steps: assaultSteps(model.orbit).map((step) =>
+      step === 'orbit-near'
+        ? { type: 'fleet.orbit', payload: { fleetId, orbit: 'near' } }
+        : { type: 'fleet.assault', payload: { fleetId } },
+    ),
+  };
 }
 
 /* ─────────────────────── Combat zone — battle panel ──────────────────────── */
