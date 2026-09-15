@@ -29,16 +29,28 @@
   "shipyard": {
     "name": "Orbital Shipyard",
     "cost": {
-      "metal": 400,
-      "credits": 200
+      "metal": 250,
+      "credits": 120
     },
-    "buildTimeHours": 24,
+    "buildTimeHours": 12,
     "produces": {},
-    "hp": 30,
-    "shipRepair": 0.1,
+    "hp": 25,
+    "shipRepair": 0.05,
     "enablesShipConstruction": true,
-    "scoreValue": 12,
-    "traits": []
+    "scoreValue": 6,
+    "traits": [],
+    "upgrades": [
+      {
+        "cost": {
+          "metal": 150,
+          "credits": 80
+        },
+        "buildTimeHours": 12,
+        "hp": 30,
+        "shipRepair": 0.1,
+        "enablesShipConstruction": true
+      }
+    ]
   },
   "biomass_pit": {
     "name": "Biomass Pit",

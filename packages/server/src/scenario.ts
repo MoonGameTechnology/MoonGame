@@ -50,6 +50,7 @@ import {
   type MatchMap,
   type Planet,
   type Player,
+  buildingLevel,
 } from '@void/shared-core';
 import type { ActionGate } from '@void/action-layer';
 import { MatchRoom, type ActionReceipt, type RoomObservation } from './matchRoom';
@@ -384,7 +385,12 @@ export function createDevMatch(data: GameData, options: DevMatchOptions = {}): M
     // all (enablesShipConstruction); without it, turn-1 fleet-building would be
     // impossible in every dev/test match. The SPACEPORT is deliberately NOT here: it
     // is the shuttle side of the split, and the player builds it (YARD-1).
-    home.buildings = [{ type: 'shipyard', level: 1, hp: 30 }];
+    // HP берётся ИЗ ДАННЫХ, а не вписывается числом: с двумя ярусами верфи (YARD-2)
+    // прочность первого уровня стала другой, и вписанное 30 посеяло бы дом с корпусом
+    // крепче, чем у здания, которое он на самом деле несёт.
+    home.buildings = [
+      { type: 'shipyard', level: 1, hp: buildingLevel(data.buildings.shipyard!, 1).hp },
+    ];
     planets[`home_${id}`] = home;
     fleets[`${id}_1`] = fleet(`${id}_1`, id, `home_${id}`, [
       ['cruiser', 2],
