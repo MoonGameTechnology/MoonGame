@@ -773,26 +773,30 @@ describe('combat — ships keep hull damage; ground rests at full (persistent hu
   });
 });
 
-describe('combat — defender-win re-engages a leftover hostile fleet (bug fix)', () => {
-  it('the surviving DEFENDER auto-engages a fleet that was idling at the node', () => {
+describe('combat — a strong defender beats every hostile fleet at the node', () => {
+  it('both attackers die and the defender ends free (MSB-3: they fight AT ONCE, not in a queue)', () => {
     const kernel = createKernel([...combatFamily, arrivalModule]);
     const st = baseState(
       [
-        fleet('D', 'p2', 'P', [['aggressor', 2]]), // strong defender — wins both fights
-        fleet('A1', 'p1', 'P', [['fighter', 1]]), // arrives first, loses to D
-        fleet('A2', 'p1', 'P', [['fighter', 1]]), // can't engage while D is busy → idles
+        fleet('D', 'p2', 'P', [['aggressor', 2]]), // strong defender — beats both
+        fleet('A1', 'p1', 'P', [['fighter', 1]]),
+        fleet('A2', 'p1', 'P', [['fighter', 1]]),
       ],
       [planet('P', null)],
     );
     const s1 = okApply(kernel.applyAction(st, arrive('A1'), ctx(0))); // A1 vs D starts
     expect(s1.state.fleets.A1?.battleId).toBeTruthy();
     expect(s1.state.fleets.D?.battleId).toBeTruthy();
-    const s2 = okApply(kernel.applyAction(s1.state, arrive('A2'), ctx(0)));
-    expect(s2.state.fleets.A2?.battleId).toBeFalsy(); // no free enemy → A2 idles at P
+    // MSB-3 changed what happens next, and deliberately (owner's decision 2026-09-11):
+    // A2 no longer idles waiting for a free enemy — the node is swept and every hostile
+    // fleet standing on it is pulled into the fight. Standing by stopped being a move.
+    expect(s1.state.fleets.A2?.battleId).toBe(s1.state.fleets.A1?.battleId);
 
-    const r = okAdvance(kernel.advanceTo(s2.state, ctx(12 * HOUR)));
-    expect(r.state.fleets.A1).toBeUndefined(); // first loser gone
-    // A2 was beaten too — which can ONLY happen if the defender re-scanned the node after winning.
+    const r = okAdvance(kernel.advanceTo(s1.state, ctx(12 * HOUR)));
+    expect(r.state.fleets.A1).toBeUndefined(); // both losers gone
+    // A2 dies too. Before MSB-3 this proved the defender re-scanned the node after
+    // winning; now it proves the CHAIN (§0.0 №5): A1's death closes the battle and the
+    // survivors re-engage, so D has to finish A2 in a second fight.
     expect(r.state.fleets.A2).toBeUndefined();
     expect(r.state.fleets.D?.battleId).toBe(null); // D won both, now free
   });
@@ -933,7 +937,7 @@ describe('combat — bug-hunt batch: assault guards, stalemate, ground chain-eng
     expect(rej(kernel.applyAction(first.state, assault('A2'), ctx(0)))).toBe('E_UNDER_ASSAULT');
   });
 
-  it('a hostile fleet PINNED in a battle still contests the orbit (no early landing)', () => {
+  it('no early landing while the orbital fight is undecided (GDD §7.4, two SEQUENTIAL phases)', () => {
     const f2 = fleet('F2', 'p1', 'P', [['fighter', 1]], [['marine', 2]]);
     f2.orbit = 'near';
     const st = baseState(
@@ -946,11 +950,14 @@ describe('combat — bug-hunt batch: assault guards, stalemate, ground chain-eng
     );
     const engaged = okApply(kernel.applyAction(st, arrive('F1'), ctx(0)));
     expect(engaged.state.fleets.F1?.battleId).not.toBeNull(); // orbital battle live
-    // GDD §7.4 — two SEQUENTIAL phases: the landing may not start while the orbital
-    // fight is undecided, even though the defender is battleId-locked.
-    expect(rej(kernel.applyAction(engaged.state, assault('F2'), ctx(0)))).toBe(
-      'E_ORBIT_CONTESTED',
-    );
+    // The GUARD is unchanged — the landing is refused. The CODE changed with MSB-3, and
+    // that is the honest new answer: the troopship is hostile to E and standing in the
+    // contested orbit, so the node sweep pulls it into the fight too. It is refused for
+    // being IN the battle, not for watching one. Consequence worth knowing: a transport
+    // brought before the orbit is won now fights instead of waiting — win the orbit
+    // first, then bring the troops.
+    expect(engaged.state.fleets.F2?.battleId).toBe(engaged.state.fleets.F1?.battleId);
+    expect(rej(kernel.applyAction(engaged.state, assault('F2'), ctx(0)))).toBe('E_FLEET_BUSY');
   });
 
   it('a zero-damage stalemate releases both fleets and does NOT restart the battle', () => {
@@ -1284,10 +1291,9 @@ describe('combat — перемирие останавливает бой (CMB-7
  * (у всех был `battleId`), после развода так и оставался стоять.
  */
 describe('combat — после ничьей третий получает свой бой (CMB-6)', () => {
-  it('пара расходится, а третий враждебный флот на узле сцепляется', () => {
+  it('третий вступает СРАЗУ, а не дожидается, пока пара разойдётся (MSB-3)', () => {
     const kernel = createKernel([...combatFamily, arrivalModule]);
-    // A и B инертны друг против друга (`shield`: атака 0, защита 0) — гарантированная
-    // ничья. C вооружён, но вступить не может: к его прилёту оба уже в бою.
+    // A и B инертны друг против друга (`shield`: атака 0, защита 0), C вооружён.
     const st = baseState(
       [
         fleet('A', 'p1', 'P', [['shield', 1]]),
@@ -1297,17 +1303,22 @@ describe('combat — после ничьей третий получает св�
       [planet('P', null)],
     );
     const engaged = okApply(kernel.applyAction(st, arrive('A'), ctx(0)));
-    expect(Object.keys(engaged.state.battles)).toHaveLength(1);
-    expect(engaged.state.fleets.C?.battleId).toBeFalsy(); // третий только смотрит
-
-    // За предохранителем: ничья разводит пару — и вот теперь третий обязан вступить.
-    const after = okAdvance(kernel.advanceTo(engaged.state, ctx(250 * HOUR)));
-    const ids = Object.keys(after.state.battles);
+    const ids = Object.keys(engaged.state.battles);
     expect(ids).toHaveLength(1);
-    const fresh = after.state.battles[ids[0]!]!;
-    const sides = fresh.sides.map((s) => s.owner).sort();
-    expect(sides).toContain('p3'); // третий — сторона нового боя
-    expect(after.state.fleets.C?.battleId).toBe(ids[0]);
+    // Раньше здесь стояло «третий только смотрит»: он не мог вступить, потому что оба
+    // врага заняты. Решение владельца 2026-09-11 это отменило — выжидание было
+    // доминирующей стратегией (дождись, пока двое обескровят друг друга, и добей).
+    expect(engaged.state.fleets.C?.battleId).toBe(ids[0]);
+    expect(engaged.state.battles[ids[0]!]!.sides.map((x) => x.owner).sort()).toEqual([
+      'p1',
+      'p2',
+      'p3',
+    ]);
+    // И ничьей теперь не будет вовсе: вооружённый третий внутри боя, а не за его краем.
+    const after = okAdvance(kernel.advanceTo(engaged.state, ctx(250 * HOUR)));
+    expect(after.state.fleets.C).toBeDefined();
+    expect(after.state.fleets.A).toBeUndefined();
+    expect(after.state.fleets.B).toBeUndefined();
   });
 
   it('но САМА пара вничью заново не сцепляется — предохранитель цел', () => {
@@ -1340,6 +1351,10 @@ describe('combat — после ничьей третий получает св�
       [planet('P', null)],
     );
     const engaged = okApply(kernel.applyAction(st, arrive('A'), ctx(0)));
+    // MSB-3: C не «ждёт своей очереди» — он в бою с самого начала (решение владельца
+    // 2026-09-11). Проверяемое здесь правило от этого не меняется: гибель B закрывает
+    // бой (§0.0 №5 «цепочка»), и заново сцепляются ВЫЖИВШИЕ — A и C, а не мёртвый B.
+    expect(engaged.state.fleets.C?.battleId).toBe(engaged.state.fleets.A?.battleId);
     const after = okAdvance(kernel.advanceTo(engaged.state, ctx(2 * HOUR)));
     expect(after.state.fleets.B).toBeUndefined(); // проигравший уничтожен
     expect(after.state.fleets.A?.battleId).toBeTruthy(); // победитель сцепился с C
