@@ -12679,7 +12679,9 @@ function frame(nowReal: number) {
     tbScore.textContent = `✦ ${score}/${SCORE_LIMIT}`;
     tbScore.classList.toggle('win', atLimit(need));
     tbDay.textContent = t('browser.day', { n: d });
-    tbEta.textContent = t('hud.next-day', { t: eta });
+    // digits only: the «до след. дня» caption is a static sibling node (#tbetacap),
+    // so a narrow phone can drop the caption and keep the countdown.
+    tbEta.textContent = eta;
     lastTopText = topText;
   }
 

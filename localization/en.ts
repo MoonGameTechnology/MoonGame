@@ -1597,7 +1597,7 @@ export const en: Record<string, string> = {
   'hud.crest.title': 'Your profile',
   'hud.deficit': '⚠ SHORTAGE — consuming buildings run at 50%',
   'hud.goal': 'Goal: ✦ {n} (a world — 50, a province — 10) or eliminate your rivals.',
-  'hud.next-day': '{t} to next day',
+  'hud.next-day.cap': 'to next day',
   'hud.place': '#{p} of {n}',
   'hud.resource.credits': 'Credits',
   'hud.resource.energy': 'Energy',

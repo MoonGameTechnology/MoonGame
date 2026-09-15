@@ -137,10 +137,15 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
 .crest:active{background:rgba(53,214,230,.12);}
 .dia{width:15px;height:15px;transform:rotate(45deg);flex:0 0 auto;border:1.5px solid var(--cyan);
   box-shadow:0 0 9px rgba(53,214,230,.7),inset 0 0 5px rgba(53,214,230,.35);}
-.who{line-height:1.15;min-width:0;}
+/* both identity lines CLIP inside .who. The nick had the ellipsis from the start; the
+   standing did not, and an inline nowrap span in a min-width:0 flex item does not stay
+   inside its box — it spilled right, and the ✦ chip (painted later) covered the half that
+   stuck out. On every phone under ~400px the standing read as garbage under the chip. */
+.who{line-height:1.15;min-width:0;overflow:hidden;}
 .who b{display:block;color:#eafffb;font-weight:700;font-size:13px;letter-spacing:.6px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.who span{color:#8b9c9e;font-size:10px;letter-spacing:.8px;white-space:nowrap;}
+.who span{display:block;color:#8b9c9e;font-size:10px;letter-spacing:.8px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;}
 /* victory chip in the row-1 gap: the ✦ score race the standing is derived from.
    Tap → plain-words breakdown (the .dstat handler on #top). Hidden until it has text. */
 #tbscore{flex:0 1 auto;margin:0 auto;padding:3px 10px;border-radius:11px;cursor:pointer;
@@ -154,6 +159,9 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
   border:1px solid rgba(148,170,173,.28);background:rgba(6,14,16,.5);}
 #daycard b{display:block;color:#8fdbe0;font-size:12px;letter-spacing:1px;}
 #daycard span{color:#8b9c9e;font-size:9px;font-variant-numeric:tabular-nums;letter-spacing:.4px;}
+/* «до след. дня» is a separate node so narrow phones can drop the caption and keep the
+   digits — see the @media (max-width:480px) rule further down. */
+#tbetacap{margin-left:4px;}
 /* the five currencies always fit their row — no scroll. Capsules share the width and
    shrink together (flex:1 1 0; min-width:0) so the row scales down instead of
    overflowing. Each capsule = a bare line-glyph + tabular amount + flow, in the mock's
@@ -1815,6 +1823,17 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
      замер --sheeth годится как есть; 50vh — тот же фолбэк до первого замера */
   body.sheet-open #cmdbar{bottom:calc(var(--sheeth,50vh) + 8px);}
 }
+
+/* Row 1 runs out of room before the rest of the phone layout does: back chevron, crest,
+   nick + standing, ✦ chip and day card ask for ~480px, so under that the nick starts
+   losing letters and the standing gets squeezed out entirely. The one line here that
+   carries no information is «до след. дня» — the day number sits right above the
+   countdown and says what it counts to (docs/hud-inmatch.md §2 draws the phone bar as
+   «День 1 · 23:28»). Dropping it hands ~67px back to the crest, which is what makes the
+   nick and the standing readable again on a 360px phone. */
+@media (max-width:480px){
+  #tbetacap{display:none;}
+}
 /* connect overlay — entry screen (sign in, then join a live session) */
 /* Identity is its OWN page, not an overlay: an OPAQUE full-screen backdrop so the live
    map/skirmish never shows through behind the welcome / registration / browser cards. */
@@ -2819,7 +2838,7 @@ const page = (js) => `<!doctype html>
       <div class="who"><b id="tbname"></b><span id="tbplace"></span></div>
     </div>
     <span id="tbscore" class="dstat"></span>
-    <div id="daycard"><b id="tbday"></b><span id="tbeta"></span></div>
+    <div id="daycard"><b id="tbday"></b><span id="tbeta"></span><span id="tbetacap" data-i18n="hud.next-day.cap"></span></div>
   </div>
   <div id="purse"></div>
 </header>

@@ -1597,7 +1597,7 @@ export const ru: Record<string, string> = {
   'hud.crest.title': 'Ваш профиль',
   'hud.deficit': '⚠ ДЕФИЦИТ — здания-потребители работают на 50%',
   'hud.goal': 'Задача: ✦ {n} (мир — 50, сектор — 10) или уничтожение соперников.',
-  'hud.next-day': '{t} до след. дня',
+  'hud.next-day.cap': 'до след. дня',
   'hud.place': '{p}-е из {n}',
   'hud.resource.credits': 'Кредиты',
   'hud.resource.energy': 'Энергия',
