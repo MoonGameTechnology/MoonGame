@@ -28,6 +28,7 @@
     "perf": "node prototype/perf.mjs",
     "metrics": "node prototype/report.mjs",
     "selfplay": "node prototype/selfplay.mjs",
+    "meritscan": "node prototype/meritscan.mjs",
     "rehearsal": "node prototype/rehearsal.mjs",
     "dev:client": "node testclient/build.mjs",
     "mcp:browser": "node scripts/mcp-browser.mjs",
