@@ -606,24 +606,24 @@
 | CMB-5 | ✅ | core | `docs/backlog.md:14081` | Вражда началась — стоящие рядом флоты сходятся |
 | ATK-1 | ✅ | proto | `docs/backlog.md:14097` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
 | SHIPART-1 | ✅ | proto cli | `docs/backlog.md:14123` | Реалистичные портреты в постройке и описаниях, |
-| YARD-1 | ✅ | data proto srv | `docs/backlog.md:14233` | Корабли строит ВЕРФЬ, челноки — |
-| YARD-2 | ✅ | data | `docs/backlog.md:14267` | У верфи два яруса: дешёвый строит, дорогой |
-| CMB-7 | ✅ | core | `docs/backlog.md:14291` | Перемирие посреди боя не останавливало бой. |
-| RLY-1 | ✅ | proto | `docs/backlog.md:14312` | Сбор построенного: соло и сеть играли по РАЗНЫМ |
-| CARGO-1 | ✅ | core proto | `docs/backlog.md:14344` | Часовая погрузка десанта жила в |
-| MRG-1 | ✅ | core proto | `docs/backlog.md:14392` | «Слиться по прибытии» — вторая половина |
-| ART-0 | ✅ | core data proto | `docs/backlog.md:14415` | Артиллерия снята из игры целиком |
-| ORB-1 | ✅ | core data proto | `docs/backlog.md:14446` | Орбитальный слой объявлен в |
-| ORB-4 | ✅ | core data proto | `docs/backlog.md:14482` | в астероидном поле строилось всё, что угодно: |
-| ORB-2 | ✅ | data proto | `docs/backlog.md:14523` | «Изучается технология, строится здание» не |
-| ORB-3 | ✅ | proto | `docs/backlog.md:14551` | Звёздный форт выдавал орбитальное ПКО мимо |
-| CMB-6 | ✅ | core | `docs/backlog.md:14588` | После ничьей третий враждебный флот получает свой |
-| ORD-2 | ✅ | proto | `docs/backlog.md:14618` | Нацеленный ШТУРМ теперь переживает закрытую |
-| FOG-10 | ✅ | proto core | `docs/backlog.md:14638` | Память разведки перестала жить только |
-| FOG-9 | ✅ | core | `docs/backlog.md:14662` | Приостановленная стройка чужого мира была видна |
-| TEST-4 | ✅ | srv | `docs/backlog.md:14672` | topXp падал на живой базе разработчика. |
-| PHONE-STRATEGY | ✅ |  | `docs/backlog.md:14690` | Технологии, постройки, производство, рынок и дипломатия |
-| MAP-PERF | ✅ |  | `docs/backlog.md:14702` | Ускорение движения раскрытой голографической карты и подготовка |
+| YARD-1 | ✅ | data proto srv | `docs/backlog.md:14234` | Корабли строит ВЕРФЬ, челноки — |
+| YARD-2 | ✅ | data | `docs/backlog.md:14268` | У верфи два яруса: дешёвый строит, дорогой |
+| CMB-7 | ✅ | core | `docs/backlog.md:14292` | Перемирие посреди боя не останавливало бой. |
+| RLY-1 | ✅ | proto | `docs/backlog.md:14313` | Сбор построенного: соло и сеть играли по РАЗНЫМ |
+| CARGO-1 | ✅ | core proto | `docs/backlog.md:14345` | Часовая погрузка десанта жила в |
+| MRG-1 | ✅ | core proto | `docs/backlog.md:14393` | «Слиться по прибытии» — вторая половина |
+| ART-0 | ✅ | core data proto | `docs/backlog.md:14416` | Артиллерия снята из игры целиком |
+| ORB-1 | ✅ | core data proto | `docs/backlog.md:14447` | Орбитальный слой объявлен в |
+| ORB-4 | ✅ | core data proto | `docs/backlog.md:14483` | в астероидном поле строилось всё, что угодно: |
+| ORB-2 | ✅ | data proto | `docs/backlog.md:14524` | «Изучается технология, строится здание» не |
+| ORB-3 | ✅ | proto | `docs/backlog.md:14552` | Звёздный форт выдавал орбитальное ПКО мимо |
+| CMB-6 | ✅ | core | `docs/backlog.md:14589` | После ничьей третий враждебный флот получает свой |
+| ORD-2 | ✅ | proto | `docs/backlog.md:14619` | Нацеленный ШТУРМ теперь переживает закрытую |
+| FOG-10 | ✅ | proto core | `docs/backlog.md:14639` | Память разведки перестала жить только |
+| FOG-9 | ✅ | core | `docs/backlog.md:14663` | Приостановленная стройка чужого мира была видна |
+| TEST-4 | ✅ | srv | `docs/backlog.md:14673` | topXp падал на живой базе разработчика. |
+| PHONE-STRATEGY | ✅ |  | `docs/backlog.md:14691` | Технологии, постройки, производство, рынок и дипломатия |
+| MAP-PERF | ✅ |  | `docs/backlog.md:14703` | Ускорение движения раскрытой голографической карты и подготовка |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
@@ -842,14 +842,14 @@
 | MS-2.2 | 🔒 | core data | `docs/missiles-roadmap.md:68` | Детонация |
 | MS-3.1 | 🔒 | core data | `docs/missiles-roadmap.md:75` | Пусковой/ракеты как предмет + P2W-guardrail |
 | MS-4.1 | 🔒 | cli | `docs/missiles-roadmap.md:83` | Рендер полёта/перехвата/удара |
-| MSB-0 | ✅ | docs | `docs/multiside-combat-roadmap.md:375` | Решение владельца: (а), (б) или (в) |
-| MSB-1 | ✅ | core | `docs/multiside-combat-roadmap.md:380` | Battle стал СПИСКОМ сторон |
-| MSB-2 | ✅ | core | `docs/multiside-combat-roadmap.md:418` | Правило деления урона |
-| MSB-3 | ✅ | core | `docs/multiside-combat-roadmap.md:473` | Вступление в идущий бой |
-| MSB-4 | ✅ | core | `docs/multiside-combat-roadmap.md:543` | Совместный штурм и чей мир |
-| MSB-5 | ✅ | core | `docs/multiside-combat-roadmap.md:610` | Что делает бой при смене владельца стороны |
-| MSB-6 | ✅ | proto cli | `docs/multiside-combat-roadmap.md:647` | Панель боя на N сторон |
-| MSB-7 | ⏳ | core proto | `docs/multiside-combat-roadmap.md:682` | Зенитки и обстрел при N сторонах |
+| MSB-0 | ✅ | docs | `docs/multiside-combat-roadmap.md:388` | Решение владельца: (а), (б) или (в) |
+| MSB-1 | ✅ | core | `docs/multiside-combat-roadmap.md:393` | Battle стал СПИСКОМ сторон |
+| MSB-2 | ✅ | core | `docs/multiside-combat-roadmap.md:431` | Правило деления урона |
+| MSB-3 | ✅ | core | `docs/multiside-combat-roadmap.md:486` | Вступление в идущий бой |
+| MSB-4 | ✅ | core | `docs/multiside-combat-roadmap.md:556` | Совместный штурм и чей мир |
+| MSB-5 | ✅ | core | `docs/multiside-combat-roadmap.md:623` | Что делает бой при смене владельца стороны |
+| MSB-6 | ✅ | proto cli | `docs/multiside-combat-roadmap.md:660` | Панель боя на N сторон |
+| MSB-7 | ✅ | core | `docs/multiside-combat-roadmap.md:695` | Зенитки и обстрел при N сторонах |
 | ONB-0 | ✅ | proto srv | `docs/onboarding-roadmap.md:101` | Состояние первого запуска + воронка [proto/srv] (proto) |
 | ONB-1 | ✅ | proto | `docs/onboarding-roadmap.md:137` | Движок гайд-марок (spotlight) ★ |
 | ONB-2 | ✅ | proto | `docs/onboarding-roadmap.md:188` | Гайдовый первый матч (скриптовая соло-песочница) ★ |
