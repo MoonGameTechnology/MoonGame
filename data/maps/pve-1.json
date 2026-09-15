@@ -9,7 +9,7 @@
       "kind": "planet",
       "planetType": "terran",
       "owner": "p1",
-      "buildings": [{ "type": "mine_t1" }, { "type": "spaceport" }, { "type": "radar" }],
+      "buildings": [{ "type": "mine_t1" }, { "type": "shipyard" }, { "type": "radar" }],
       "garrison": [{ "unit": "militia", "count": 3 }]
     },
     "home_b": {
@@ -17,7 +17,7 @@
       "kind": "planet",
       "planetType": "terran",
       "owner": "p2",
-      "buildings": [{ "type": "mine_t1" }, { "type": "spaceport" }, { "type": "radar" }],
+      "buildings": [{ "type": "mine_t1" }, { "type": "shipyard" }, { "type": "radar" }],
       "garrison": [{ "unit": "militia", "count": 3 }]
     },
     "hive": {
@@ -27,7 +27,7 @@
       "owner": "p3",
       "buildings": [
         { "type": "mine_t2" },
-        { "type": "spaceport" },
+        { "type": "shipyard" },
         { "type": "orbital_aa" },
         { "type": "barracks" },
         { "type": "factory" }

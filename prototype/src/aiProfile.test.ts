@@ -133,7 +133,12 @@ describe('правила победы — фиксированная сесси�
 
   it('харнесы баланса: сессия ограничена и порог очков недостижим', () => {
     const selfplay = read('prototype/selfplay.mjs');
-    expect(selfplay).toContain('const SESSION_DAYS = 14');
+    // BAL-12 сделал окно АРГУМЕНТОМ прогона (часть дерева стоит за 14-м днём:
+    // `ai_stewardship` открыт с `dayGate: 15`). Стеречь тут надо не литерал, а два
+    // свойства: окно по умолчанию прежнее — 14 дней, на которых снят весь накопленный
+    // ряд замеров, — и сессия по-прежнему ОГРАНИЧЕНА, то есть лабораторный конфиг не
+    // превратился в бесконечный прогон.
+    expect(selfplay).toMatch(/const SESSION_DAYS = .*\?\? 14/);
     expect(selfplay).toMatch(/endsAt: SESSION_DAYS \* DAY/);
     expect(selfplay).toContain('scoreLimit: 100_000_000');
     expect(read('prototype/econplaytest.mjs')).toContain('scoreLimit: 100_000_000');

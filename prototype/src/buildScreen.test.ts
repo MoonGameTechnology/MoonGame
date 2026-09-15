@@ -63,7 +63,11 @@ describe('окно построек — строка эффекта', () => {
     expect(buildFx(data.buildings.mine!, 1)).toContain('+12');
     expect(buildFx(data.buildings.refinery!, 1)).toContain('−40'); // upkeep — со знаком минус (BAL-3)
     expect(buildFx(data.buildings.fort!, 1)).toContain('к обороне');
-    expect(buildFx(data.buildings.spaceport!, 1)).toContain('кораблей');
+    // YARD-1: «строит корабли» — примета ВЕРФИ, а у порта своя строка про ангар. До
+    // разделения обе висели на одном здании, и про челноки экран не говорил ничего.
+    expect(buildFx(data.buildings.shipyard!, 1)).toContain('кораблей');
+    expect(buildFx(data.buildings.spaceport!, 1)).toContain('челноки');
+    expect(buildFx(data.buildings.spaceport!, 1)).not.toContain('кораблей');
   });
 
   it('эффект считается ДЛЯ УРОВНЯ: та же шахта на L3 даёт больше', () => {

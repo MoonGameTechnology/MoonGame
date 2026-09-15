@@ -18,6 +18,8 @@ import {
   slotUsage,
   technologyLock,
   hangarMachines,
+  hangarUsed,
+  fleetShuttleBay,
   squadronSize,
   squadronCargoCapacity,
   type GameState,
@@ -27,6 +29,7 @@ import {
   type Hero,
   type StewardPosture,
   type Planet,
+  type Squadron,
   type Fleet,
   type UnitStack,
 } from '../../packages/shared-core/src/index';
@@ -51,6 +54,7 @@ import {
   bombardFleet,
   splitFleet,
   strikeShuttle,
+  loadShuttle,
   loadSquadronTroops,
   spawnHero,
   unlockHeroSkill,
@@ -141,6 +145,12 @@ const SIEGE_CAP = 2;
  *  челнок с SHU-1.1 живёт в `planet.hangar` и во флот не попадает никогда. */
 const SHUTTLE_CAP = 3;
 
+/** Носителей — ОДИН (SHU-2.1, решение владельца 2026-09-15). Он дорог (260 металла) и
+ *  почти безоружен: ценность у него не в бою, а в том, что ангар едет с флотом. Второй
+ *  ничего не добавил бы к вопросу «долетают ли челноки до фронта», зато отнял бы металл
+ *  у линии. Порог поднимут, когда станет что сравнивать. */
+const CARRIER_CAP = 1;
+
 /**
  * Ударный ростер челноков (SHU-3.2) — кого бот СТРОИТ и кого ПОСЫЛАЕТ.
  *
@@ -150,6 +160,13 @@ const SHUTTLE_CAP = 3;
  * у него `attack` 4 против 20 у бомбардировщика (ROS-1.4).
  */
 const STRIKE_SHUTTLES = ['bomber', 'landing_shuttle'] as const;
+
+/** Есть ли у мира ангар: признак — ПОЛЕ ДАННЫХ, а не имя здания, поэтому новый порт
+ *  подхватится сам. `shuttleBayAt` ядра сюда не годится: он считает ВМЕСТИМОСТЬ с учётом
+ *  уровней, а вопрос здесь — «есть ли вообще куда класть». */
+function hasPortAt(planet: Planet): boolean {
+  return planet.buildings.some((b) => b.hp > 0 && (data.buildings[b.type]?.shuttleBay ?? 0) > 0);
+}
 
 /** Груз десантного вылета: наземные войска сверх домашней стражи, в фиксированном
  *  порядке ростера обороны и не больше вместимости. Пусто — вылет не поднимается:
@@ -469,7 +486,10 @@ export function aiOrders(
     const sideUnits = (ref: CombatantRef): UnitStack[] => {
       if (ref.kind === 'garrison') return state.planets[ref.planetId]?.garrison ?? [];
       // ROS-1.5: плацдарм держит мир, а не флот — оценивается так же, как гарнизон.
-      if (ref.kind === 'beachhead') return state.planets[ref.planetId]?.beachhead?.units ?? [];
+      if (ref.kind === 'beachhead')
+        return (
+          state.planets[ref.planetId]?.beachheads?.find((b) => b.owner === ref.owner)?.units ?? []
+        );
       const other = state.fleets[ref.fleetId];
       if (!other) return [];
       return ref.kind === 'landing' ? (other.landing ?? []) : other.units;
@@ -814,7 +834,12 @@ export function aiOrders(
     // ECON-7: fabricator joins the chain — microelectronics gates warships now
     // (cruiser/siege cost micro), so a bot without a fab eventually can't build a
     // fleet. Built once the credit/tax engine is up; keeps micro produced AND spent.
-    for (const b of ['refinery', 'tax_office', 'fabricator'] as const) {
+    // YARD-1: `spaceport` встал в цепочку вторым звеном. Он больше не приезжает даром
+    // вместе с домом (дом несёт ВЕРФЬ), а без него у бота нет ни ангара, ни челноков —
+    // то есть целый пласт боя выпал бы из измерения. Место в цепочке не случайное:
+    // сперва чистые деньги (`refinery`), потом порт, который и торгует, и открывает
+    // ангар, и только затем множитель с микроэлектроникой.
+    for (const b of ['refinery', 'spaceport', 'tax_office', 'fabricator'] as const) {
       if (has(b)) continue;
       if (affordable(b) && !pendingBuild(base.id, b)) out.push(buildBuilding(ai, base.id, b));
       break; // one link at a time — wait out the current one either way
@@ -1045,6 +1070,21 @@ export function aiOrders(
       ) {
         out.push(buildUnit(ai, base.id, 'strike_carrier', 1));
       }
+      // 5. НОСИТЕЛЬ ЧЕЛНОКОВ — «плавучий космопорт» (SHU-2.1). Без него удар челноками
+      //    физически не доезжает до войны: вылет поднимается с БАЗЫ, у челнока радиус
+      //    120–150, а чужие миры так близко к дому не стоят — замер давал ноль вылетов
+      //    при живой постройке машин. Носитель возит ангар с флотом и закрывает именно
+      //    это. Строится только на войне и только когда порт УЖЕ есть: пустой ангар
+      //    возить незачем.
+      if (
+        warFooting &&
+        hasPortAt(base) &&
+        shipsOwned('shuttle_carrier') < CARRIER_CAP &&
+        !pendingUnit(base.id, 'shuttle_carrier') &&
+        affordableUnit('shuttle_carrier', 1)
+      ) {
+        out.push(buildUnit(ai, base.id, 'shuttle_carrier', 1));
+      }
       // ═══ 6. АРТИЛЛЕРИЯ И АВИАЦИЯ (AI-BAL-4) ═══
       // Артиллерия стреляет САМА: `artilleryModule` каждым пролётом времени заставляет
       // свободный стоящий флот с `artillery`-корпусом обстрелять ближайший враждебный
@@ -1092,6 +1132,12 @@ export function aiOrders(
         if (hangarOwned(unit) >= SHUTTLE_CAP) return;
         if (pendingUnit(base.id, unit)) return;
         if (!affordableUnit(unit, 1)) return;
+        // ВОРОТА СПРАШИВАЮТСЯ У ЯДРА, а не подразумеваются. Раньше здесь стояло
+        // допущение «порт у бота и так есть под корабли» — с YARD-1 оно неверно: дом
+        // несёт верфь, а порт бот строит сам (цепочка выше). Заказ без порта ядро
+        // отбивает `E_NO_PORT`, и без этой пробы бот платил бы за него отказом каждый
+        // тик — ровно тем же способом, каким когда-то упирался в `E_HANGAR_FULL`.
+        if (canOrder(state, buildUnit(ai, base.id, unit, 1)) !== null) return;
         out.push(buildUnit(ai, base.id, unit, 1));
       };
       // Перехватчик — ВСЕГДА, и на войне, и в мире: он не оружие нападения, а ПВО
@@ -1114,8 +1160,61 @@ export function aiOrders(
     // в радиусе, тай-брейк по id. Ближайшая, а не «лучшая»: выбор цели — это стратегия,
     // а кирпичу нужно, чтобы механика заработала и попала в измерение.
     if (profile === 'strong' && warFooting) {
-      const port = state.planets[base.id];
-      const hangar = port?.hangar ?? [];
+      // ═══ ПОГРУЗКА НА НОСИТЕЛЬ (SHU-2.1) ═══
+      // Носитель без эскадр — просто дорогой корпус с плохими пушками. Грузим, пока он
+      // СТОИТ у своего мира с портом: ядро возит соединение целиком и только со стоянки.
+      // Один приказ за тик той же формы, что и остальные правила бота.
+      const myCarrier = Object.values(state.fleets)
+        .filter(
+          (f) =>
+            f.owner === ai &&
+            !f.movement &&
+            !f.battleId &&
+            f.location !== null &&
+            fleetShuttleBay(f, data) > 0,
+        )
+        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))[0];
+      if (myCarrier) {
+        const dock = state.planets[myCarrier.location!];
+        const free = fleetShuttleBay(myCarrier, data) - hangarUsed(myCarrier);
+        // Берётся ПЕРВАЯ ударная эскадра порта, влезающая целиком, — тем же правилом,
+        // что и кнопка перегрузки у игрока (`transferPick`): половину ядро отобьёт.
+        const liftable = (dock?.hangar ?? []).find(
+          (sq) =>
+            sq.units.some((st) => STRIKE_SHUTTLES.includes(st.unit as never) && st.count > 0) &&
+            squadronSize(sq) > 0 &&
+            squadronSize(sq) <= free,
+        );
+        if (dock && dock.owner === ai && liftable) {
+          out.push(loadShuttle(ai, myCarrier.id, liftable.id));
+        }
+      }
+      // ═══ ОТКУДА ПОДНИМАТЬ ═══
+      // БАЗ У ВЫЛЕТА ДВЕ, а не одна. Пока бот умел только домашний порт, удар не доезжал
+      // до войны вовсе: радиус челнока 120–150, а чужие миры так близко к дому не стоят —
+      // замер давал ноль вылетов при живой постройке машин. Носитель и есть ответ
+      // («плавучий космопорт», SHU-2.1), поэтому базы перебираются по порядку: сперва
+      // дом, потом носители по id. Порядок фиксированный — от него зависит выбор, а
+      // решение бота обязано быть чистой функцией состояния (инвариант №1).
+      const launchpads: Array<{ base: { planetId: string } | { fleetId: string }; at: { x: number; y: number }; hangar: Squadron[] }> = [];
+      const homePort = state.planets[base.id];
+      if (homePort) {
+        launchpads.push({ base: { planetId: homePort.id }, at: homePort.position, hangar: homePort.hangar ?? [] });
+      }
+      for (const f of Object.values(state.fleets)
+        .filter((fl) => fl.owner === ai && !fl.movement && !fl.battleId && fl.location !== null && (fl.hangar ?? []).length > 0)
+        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
+        const at = state.planets[f.location!]?.position;
+        if (at) launchpads.push({ base: { fleetId: f.id }, at, hangar: f.hangar ?? [] });
+      }
+      // Первая база, у которой И машины, И цель в радиусе. Прежний код смотрел только на
+      // дом и молчал, когда там было нечем или не по кому, — хотя носитель уже стоял у
+      // цели с полным ангаром.
+      const pad = launchpads.find((lp) =>
+        STRIKE_SHUTTLES.some((u) => lp.hangar.some((sq) => sq.units.some((st) => st.unit === u && st.count > 0))),
+      );
+      const port = pad ? { id: base.id, position: pad.at } : undefined;
+      const hangar = pad?.hangar ?? [];
       // Машины перебираются в ФИКСИРОВАННОМ порядке ростера, а не порядком ангара:
       // порядок стеков зависит от истории заказов, и один сид разыгрался бы по-разному.
       // SHU-4.2: летит ЭСКАДРА целиком, поэтому бот ищет не стек, а СОЕДИНЕНИЕ, в
@@ -1170,23 +1269,30 @@ export function aiOrders(
           ),
           (p) => p.position,
         );
+        const from = pad!.base;
         if (count > 0 && foeFleet) {
-          out.push(strikeShuttle(ai, { planetId: port.id }, squad.id, { targetFleetId: foeFleet.id }));
+          out.push(strikeShuttle(ai, from, squad.id, { targetFleetId: foeFleet.id }));
         } else if (count > 0 && foeWorld) {
           // Десантный вылет везёт войска: без груза он долетит и просто погибнет.
           // Берём из гарнизона сверх домашней стражи, тем же порогом, что и погрузка
           // на корабль, — дом пустым не оставляем. С SHU-4.2 груз кладут в трюм
           // ОТДЕЛЬНЫМ приказом, и он идёт ПЕРЕД ударом: два приказа одного тика
           // применяются по порядку, поэтому эскадра взлетает уже гружёной.
+          //
+          // С БОРТА десант не грузится: войска лежат в гарнизоне МИРА, а у носителя его
+          // нет. Поэтому высадка остаётся приказом порта, а носитель поднимает то, чему
+          // груз не нужен, — бомбардировщик. Возить десант носителем можно будет, когда
+          // у бота появится правило «посадить войска на борт заранее».
+          const homeBase = 'planetId' in from ? state.planets[from.planetId] : undefined;
           const troops =
-            ready === 'landing_shuttle'
-              ? troopsForDrop(port, squadronCargoCapacity(squad, data))
+            ready === 'landing_shuttle' && homeBase
+              ? troopsForDrop(homeBase, squadronCargoCapacity(squad, data))
               : undefined;
           if (ready !== 'landing_shuttle') {
-            out.push(strikeShuttle(ai, { planetId: port.id }, squad.id, { targetPlanetId: foeWorld.id }));
+            out.push(strikeShuttle(ai, from, squad.id, { targetPlanetId: foeWorld.id }));
           } else if (troops && troops.length > 0) {
-            out.push(loadSquadronTroops(ai, { planetId: port.id }, squad.id, troops));
-            out.push(strikeShuttle(ai, { planetId: port.id }, squad.id, { targetPlanetId: foeWorld.id }));
+            out.push(loadSquadronTroops(ai, from, squad.id, troops));
+            out.push(strikeShuttle(ai, from, squad.id, { targetPlanetId: foeWorld.id }));
           }
         }
       }

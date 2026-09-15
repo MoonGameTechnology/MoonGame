@@ -21,6 +21,8 @@ import { t, tData } from '../../../localization/core';
 import { buildingName, displayUnit } from '../../../decisions/dataNames';
 import type {
   BattleModel,
+  MergeCandidate,
+  SplitModel,
   WorldModel,
   BattleSideView,
   FleetSelectionModel,
@@ -164,6 +166,10 @@ function ordersHtml(m: FleetSelectionModel): string {
     if (m.bombarding) parts.push(btn('bombard', 'hud.order.bombard-off', false));
     else if (m.orbit === 'near') parts.push(btn('bombard', 'hud.order.bombard-on', true));
     parts.push(btn('assault', 'hud.order.assault'));
+    // Делить можно только то, что делится: одиночный корабль «на две половины» не
+    // разойдётся (в исходном флоте обязан остаться хотя бы один), и кнопка обещала бы
+    // окно, из которого нельзя выйти подтверждением.
+    if (m.ships.reduce((n, st) => n + st.count, 0) > 1) parts.push(btn('split', 'hud.split.open'));
   }
   return `<div class="orders">${parts.join('')}</div>`;
 }
@@ -171,7 +177,7 @@ function ordersHtml(m: FleetSelectionModel): string {
 export function selectionHtml(
   m: FleetSelectionModel,
   now: number,
-  opts: { canBuildHere?: boolean } = {},
+  opts: { canBuildHere?: boolean; merge?: readonly MergeCandidate[] } = {},
 ): string {
   const where =
     m.status === 'transit' && m.transit
@@ -197,9 +203,85 @@ export function selectionHtml(
     (m.shield ? barHtml('shield', m.shield) : '') +
     stacksHtml(m.ships) +
     ordersHtml(m) +
+    (m.mine ? mergeHtml(opts.merge ?? []) : '') +
     (opts.canBuildHere
       ? `<button class="btn tiny" data-act="yard">${esc(t('hud.build-here'))}</button>`
       : '') +
+    `</div>`
+  );
+}
+
+/* ───────────────── Деление и слияние флотов (MIG-9) ─────────────────── */
+
+/**
+ * Окно «Разделить флот».
+ *
+ * Что здесь важно и чего намеренно НЕТ:
+ *  · **строка на СТЕК, а не на тип юнита.** Один и тот же корпус летает и с начинкой, и
+ *    голым, а лоадаут — часть личности стека (SM-0.3): «два крейсера» ничего не значит,
+ *    пока не сказано КАКИЕ два. Поэтому у строки в адресе стоит и набор модулей;
+ *  · **«Подтвердить» гаснет на нуле и на «всём»** — ноль это не деление, а «всё» это
+ *    переименование флота, а не новый флот;
+ *  · **трюм показан у ОБЕИХ половин.** Десант не делится сам: если он не влезает в ту
+ *    часть, куда уходит, подтверждение гаснет, и видно почему.
+ */
+export function splitHtml(m: SplitModel): string {
+  const row = (r: SplitModel['rows'][number]): string => {
+    const name = displayUnit(r.unit);
+    const mods = r.modules?.length ? ` <i>${r.modules.map((x) => esc(tData(x))).join(', ')}</i>` : '';
+    return (
+      `<li class="split-row">` +
+      `<span>${esc(name)}${mods}</span>` +
+      `<b>${r.take}/${r.have}</b>` +
+      `<button class="btn tiny" data-act="take" data-key="${esc(r.key)}" data-step="dec">−</button>` +
+      `<button class="btn tiny" data-act="take" data-key="${esc(r.key)}" data-step="inc">+</button>` +
+      `<button class="btn tiny" data-act="take" data-key="${esc(r.key)}" data-step="all">${esc(t('hud.split.all'))}</button>` +
+      `</li>`
+    );
+  };
+  const hold = (used: number, cap: number): string => `${used}/${cap}`;
+  return (
+    `<div class="hud-panel split">` +
+    `<h3>${esc(t('hud.split.title', { fleet: m.fleetId }))}</h3>` +
+    `<ul class="stacks col">${m.rows.map(row).join('')}</ul>` +
+    `<p class="dim">${esc(t('hud.split.ships', { take: m.takeTotal, total: m.total }))}</p>` +
+    (m.cargo.takenCapacity + m.cargo.keptCapacity > 0
+      ? `<p class="${m.cargo.fits ? 'dim' : 'memory'}">` +
+        esc(
+          t('hud.split.hold', {
+            taken: hold(m.cargo.takenUsed, m.cargo.takenCapacity),
+            kept: hold(m.cargo.keptUsed, m.cargo.keptCapacity),
+          }),
+        ) +
+        `</p>`
+      : '') +
+    `<div class="orders">` +
+    `<button class="btn tiny" data-act="split-go"${m.canConfirm ? '' : ' disabled'}>${esc(t('hud.split.confirm'))}</button>` +
+    `<button class="btn tiny" data-act="close">${esc(t('hud.close'))}</button>` +
+    `</div>` +
+    `</div>`
+  );
+}
+
+/**
+ * Кнопки «слить сюда» — по одной на каждый свой флот, стоящий там же.
+ *
+ * Ряд рисуется ВНУТРИ панели состава, а не рядом с ней. Снаружи он оказывался
+ * самостоятельным ребёнком `#hud` и ложился поверх статус-бара в верхней строке экрана:
+ * кнопка была видна, но нажать её было нельзя — сверху лежал позывной. Поймано
+ * браузерным прогоном (`elementFromPoint` вернул статус-бар).
+ */
+export function mergeHtml(candidates: readonly MergeCandidate[]): string {
+  if (candidates.length === 0) return '';
+  return (
+    `<div class="orders">` +
+    candidates
+      .map(
+        (c) =>
+          `<button class="btn tiny" data-act="merge" data-fleet="${esc(c.id)}">` +
+          `${esc(t('hud.merge.into', { fleet: c.id, n: c.ships }))}</button>`,
+      )
+      .join('') +
     `</div>`
   );
 }

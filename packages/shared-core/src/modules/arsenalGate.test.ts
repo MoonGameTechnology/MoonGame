@@ -26,10 +26,12 @@ const data: GameData = parseGameData({
     cruiser: { faction: 'x', stats: { attack: 5, defense: 5, speed: 5, hp: 40 }, cost: { metal: 10 }, slots: { weapon: 1 } },
     drone: { faction: 'x', stats: { attack: 1, defense: 1, speed: 10, hp: 6 }, cost: { metal: 3 } },
     hero: { faction: 'x', stats: { attack: 5, defense: 5, speed: 5, hp: 100 }, traits: ['hero'], slots: { weapon: 1 } },
+    grunt: { faction: 'x', domain: 'ground', kind: 'infantry', stats: { attack: 2, defense: 2, speed: 1, hp: 10 }, cost: { metal: 2 } },
   },
   factions: {},
   buildings: {
     shipyard: { name: 'Shipyard', cost: {}, buildTimeHours: 0, hp: 20, enablesShipConstruction: true },
+    barracks: { name: 'Barracks', cost: {}, buildTimeHours: 0, hp: 20, enablesInfantryConstruction: true },
   },
   events: {},
   modules: {
@@ -57,7 +59,10 @@ function planet(id: string, owner: string | null): Planet {
     owner,
     position: { x: 0, y: 0 },
     resources: {},
-    buildings: [{ type: 'shipyard', level: 1, hp: 20 }],
+    buildings: [
+      { type: 'shipyard', level: 1, hp: 20 },
+      { type: 'barracks', level: 1, hp: 20 },
+    ],
     garrison: [],
     traits: [],
   };
@@ -90,6 +95,34 @@ const OWNED: PlayerArsenal = { hulls: ['cruiser'], modules: ['railgun'] };
 
 describe('unit.build × arsenal snapshot (ARS-3)', () => {
   const kernel = createKernel([constructionModule]);
+
+  /**
+   * АРСЕНАЛ — ПРО КОРАБЛИ (решение владельца 2026-09-15).
+   *
+   * Гейт не различал домен, и на гейтированном месте (человеческое кресло AvA) нельзя
+   * было построить НИ ОДНОГО наземного юнита: снапшот перечисляет корпуса кораблей, а
+   * пехота и техника в нём не значатся никогда. Кресло получало стартовый гарнизон и
+   * теряло способность его пополнять — то есть захват миров закрывался вовсе, хотя
+   * казармы с заводом стояли и ядро было готово принять заказ.
+   *
+   * Замысел арсенала (`docs/arsenal-roadmap.md`) — «корпуса КОРАБЛЕЙ, модули, фитинги
+   * героев»; наземка в него не входила ни одного дня. Поэтому правило сузилось до
+   * домена, а не список расширился: наземный род войск гейтят ЗДАНИЯ (казармы, завод),
+   * и этого достаточно.
+   */
+  it('НАЗЕМНЫЙ юнит строится мимо снапшота — арсенал про корабли', () => {
+    const st = (): GameState => stateWith([player('p1', OWNED)]);
+    // Корабль вне снапшота по-прежнему отбивается...
+    expect(errCode(kernel.applyAction(st(), build('drone'), ctx()))).toBe('E_NOT_OWNED');
+    // ...а пехоты в снапшоте нет вовсе, и это больше не преграда.
+    okApply(kernel.applyAction(st(), build('grunt'), ctx()));
+  });
+
+  it('здания наземку гейтят по-прежнему — сузился ТОЛЬКО арсенал', () => {
+    const s = stateWith([player('p1', OWNED)]);
+    s.planets.A!.buildings = [{ type: 'shipyard', level: 1, hp: 20 }]; // казарм нет
+    expect(errCode(kernel.applyAction(s, build('grunt'), ctx()))).toBe('E_NO_BARRACKS');
+  });
 
   it('an owned hull with an owned module builds; unowned are E_NOT_OWNED', () => {
     const st = (): GameState => stateWith([player('p1', OWNED)]);

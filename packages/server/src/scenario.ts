@@ -50,6 +50,7 @@ import {
   type MatchMap,
   type Planet,
   type Player,
+  buildingLevel,
 } from '@void/shared-core';
 import type { ActionGate } from '@void/action-layer';
 import { MatchRoom, type ActionReceipt, type RoomObservation } from './matchRoom';
@@ -175,7 +176,26 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '18'; // SHU-4.4: удар ДОГОНЯЕТ движущуюся цель.
+export const MODULE_MANIFEST_VERSION = '20'; // MSB-4: у каждого штурмующего СВОЙ берег.
+// Форма состояния изменилась дважды: `planet.beachhead` (одно поле) стал списком
+// `planet.beachheads`, а ссылка стороны `{kind:'beachhead'}` получила обязательное поле
+// `owner`. Матч на манифесте 19 несёт плацдарм СТАРОЙ формы: новый граф его не увидит
+// вовсе (читается другое имя), то есть идущий штурм молча исчезнет с земли, а ссылка без
+// владельца не найдёт войск и сторона окажется пустой. Отказ загрузки честнее. (До 20:)
+// export const MODULE_MANIFEST_VERSION = '19'; // MSB-3: бой ВТЯГИВАЕТ стоящих рядом.
+// Форма состояния НЕ менялась — и это тот случай, когда бампать всё равно надо. Правило
+// изменилось так, что идущий матч разницу УВИДИТ: флот, стоящий на узле с чужим боем,
+// раньше оставался зрителем сколько угодно долго, а теперь втягивается в бой — и это
+// решение владельца (2026-09-11), а не починка. Матч, сохранённый на манифесте 18, мог
+// встать на паузу ровно в такой расстановке: игрок оставил флот рядом с чужой дракой
+// намеренно, по правилам, которые тогда действовали. Поднять его на новом графе значит
+// отнять сделанный ход задним числом. Отказ загрузки честнее.
+//
+// Соседнее следствие того же кирпича, тоже видимое матчу: закрытие боя теперь отпускает
+// ВСЕ стороны, а не пару. Матч на 18 мог сохраниться с флотом, у которого `battleId`
+// указывает на уже удалённый бой (та самая утечка): новый граф такой флот освободит,
+// старый — нет. (До 19:)
+// export const MODULE_MANIFEST_VERSION = '18'; // SHU-4.4: удар ДОГОНЯЕТ движущуюся цель.
 // Форма состояния изменилась: у `ShuttleStrike` появился живой след погони (`at` —
 // точка последнего пересчёта), а `to` из снимка, снятого на вылете, стал НЫНЕШНИМ
 // прицелом; вылет по флоту больше не назначает себе прибытие, он ведётся собственным
@@ -361,10 +381,16 @@ export function createDevMatch(data: GameData, options: DevMatchOptions = {}): M
       DEV_FACTIONS[i % DEV_FACTIONS.length] ?? 'vanguard',
     );
     const home = planet(`home_${id}`, id, x, y, ['nexus'], 'terran');
-    // A starting yard — space-domain hulls need a standing shipyard/spaceport to
-    // build at all (enablesShipConstruction); without one, turn-1 fleet-building
-    // would be impossible in every dev/test match.
-    home.buildings = [{ type: 'spaceport', level: 1, hp: 25 }];
+    // A starting SHIPYARD — space-domain hulls need one standing to be laid down at
+    // all (enablesShipConstruction); without it, turn-1 fleet-building would be
+    // impossible in every dev/test match. The SPACEPORT is deliberately NOT here: it
+    // is the shuttle side of the split, and the player builds it (YARD-1).
+    // HP берётся ИЗ ДАННЫХ, а не вписывается числом: с двумя ярусами верфи (YARD-2)
+    // прочность первого уровня стала другой, и вписанное 30 посеяло бы дом с корпусом
+    // крепче, чем у здания, которое он на самом деле несёт.
+    home.buildings = [
+      { type: 'shipyard', level: 1, hp: buildingLevel(data.buildings.shipyard!, 1).hp },
+    ];
     planets[`home_${id}`] = home;
     fleets[`${id}_1`] = fleet(`${id}_1`, id, `home_${id}`, [
       ['cruiser', 2],
