@@ -39,6 +39,10 @@ export function addUnits(
 ): void {
   const stack = findHealthyStack(stacks, unit, modules);
   if (stack) {
+    // Свежая постройка, влитая в заслуженный стек, РАЗБАВЛЯЕТ его заслугу (VET-2) —
+    // тем же правилом, что и слияние флотов. Без этого сюда открывалась дыра: долить
+    // сотню корпусов в стек с медалью и получить медаль на всю сотню даром.
+    mergeMerit(stack, { unit, count });
     stack.count += count;
   } else {
     const fresh: UnitStack = { unit, count };
@@ -99,6 +103,11 @@ export function takeFromStacks(
       st.shieldHp -= t.shieldHp;
     }
     if (st.modules && st.modules.length > 0) t.modules = [...st.modules];
+    // Заслуга ветерана (VET-2) КОПИРУЕТСЯ, а не делится: она уже «на юнит», и от того,
+    // сколько кораблей отделили, величина на юнит не зависит. Делить её здесь, как
+    // делится пул `hp`, значило бы наказывать за разделение флота.
+    if (st.damageDealt !== undefined) t.damageDealt = st.damageDealt;
+    if (st.battles !== undefined) t.battles = st.battles;
     st.count -= move;
     taken.push(t);
   }
@@ -128,10 +137,33 @@ export function mergeStacks(base: UnitStack[], add: UnitStack[]): UnitStack[] {
             loadoutKey(o.modules) === loadoutKey(st.modules),
         )
       : undefined;
-    if (match) match.count += st.count;
-    else out.push(clone(st));
+    if (match) {
+      mergeMerit(match, st);
+      match.count += st.count;
+    } else out.push(clone(st));
   }
   return out;
+}
+
+/** Влить заслугу `add` в `base` СРЕДНИМ ПО ВЕСУ (VET-2). Зовётся ДО того, как
+ *  `base.count` вырастет: веса — это исходные составы обеих половин.
+ *
+ *  Разбавление здесь не побочный ущерб, а само правило: долить в заслуженное
+ *  подразделение свежих кораблей значит развести его честь по новым. Игрок выбирает
+ *  между удобством одного большого стека и ветеранством маленького — тот же вопрос,
+ *  что задаёт вся механика медалей.
+ *
+ *  Ни у той, ни у другой половины заслуги нет — поле не заводится вовсе: «медали нет»
+ *  и «медаль нулевой степени» для карточки и выплаты разные вещи. */
+function mergeMerit(base: UnitStack, add: UnitStack): void {
+  const total = base.count + add.count;
+  if (total <= 0) return;
+  for (const field of ['damageDealt', 'battles'] as const) {
+    const a = base[field];
+    const b = add[field];
+    if (a === undefined && b === undefined) continue;
+    base[field] = ((a ?? 0) * base.count + (b ?? 0) * add.count) / total;
+  }
 }
 
 /** Combat line cap (Bytro-style): only this many units per combatant side fire in
@@ -159,7 +191,7 @@ export function cappedUnitStat(
   eligible?: (def: UnitDef) => boolean,
   cap: number = COMBAT_UNIT_CAP,
 ): number {
-  // Сумма — это сложение разбивки, а не второй счёт того же (MED-1). Так исход боя
+  // Сумма — это сложение разбивки, а не второй счёт того же (VET-1). Так исход боя
   // не может разойтись с тем, что записано ветерану в заслугу: расходиться нечему,
   // путь один. Тот же приём, что у `splitVolley` в MSB-2, и по той же причине —
   // расхождение двух копий одного правила ловится тестом только если о нём догадаться.
@@ -177,7 +209,7 @@ export interface StackContribution {
    *  Именно индекс, а не имя юнита: два стека одного корпуса — обычное дело (побитый и
    *  целый не сливаются, `findHealthyStack`; с разной оснасткой — тоже). Разбивка «по
    *  имени» слила бы их в одну строку и приписала весь урон одному носителю, а носитель
-   *  медали (MED-2) — именно стек. */
+   *  медали (VET-2) — именно стек. */
   index: number;
   unit: string;
   /** Сколько юнитов этого стека попало в линию огня (кап мог срезать часть). */

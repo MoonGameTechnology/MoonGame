@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { parseGameData, type GameData } from '../data/schemas';
 import type { GameState, UnitStack } from '../state/gameState';
-import { sideDamage } from './combat';
+import { sideDamageBreakdown } from './combat';
 import {
   cappedUnitStat,
   COMBAT_UNIT_CAP,
@@ -175,14 +175,20 @@ describe('mergeStacks — used by fleet.merge to fold one fleet into another', (
   });
 });
 
-describe('sideDamage rides the cap for every combatant kind', () => {
+describe('sideDamageBreakdown rides the cap for every combatant kind', () => {
   it('caps a fleet, a landing force and a garrison alike', () => {
     const state = {
       fleets: { f1: { units: [stack('gun', 12)], landing: [stack('pea', 14)] } },
       planets: { P: { garrison: [stack('pea', 25)] } },
     } as unknown as GameState;
-    expect(sideDamage(state, { kind: 'fleet', fleetId: 'f1' }, data, 'attack')).toBe(10 * 10);
-    expect(sideDamage(state, { kind: 'landing', fleetId: 'f1' }, data, 'attack')).toBe(10 * 4);
-    expect(sideDamage(state, { kind: 'garrison', planetId: 'P' }, data, 'defense')).toBe(10 * 2);
+    expect(sideDamageBreakdown(state, { kind: 'fleet', fleetId: 'f1' }, data, 'attack').total).toBe(
+      10 * 10,
+    );
+    expect(sideDamageBreakdown(state, { kind: 'landing', fleetId: 'f1' }, data, 'attack').total).toBe(
+      10 * 4,
+    );
+    expect(
+      sideDamageBreakdown(state, { kind: 'garrison', planetId: 'P' }, data, 'defense').total,
+    ).toBe(10 * 2);
   });
 });
