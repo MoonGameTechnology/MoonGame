@@ -521,7 +521,7 @@ function project(
     // выдавал бы и сам факт вторжения, и место, куда игрок не смотрит. В памятном
     // снимке его нет намеренно — плацдарм живёт часы, и «помнить» его значило бы
     // показывать заведомо протухшее.
-    delete planet.beachhead;
+    delete planet.beachheads;
     const snap = memory?.[planet.id];
     if (snap) {
       planet.owner = snap.owner;

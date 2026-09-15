@@ -181,17 +181,32 @@ export function salvageFromEvents(
   const out = new Map<string, number>();
   for (const event of events) {
     if (event.type !== 'battle.resolved') continue;
-    const b = event.payload as { winner?: unknown; location?: unknown };
-    if (typeof b.winner !== 'string' || typeof b.location !== 'string') continue;
+    const b = event.payload as { winner?: unknown; winners?: unknown; location?: unknown };
+    if (typeof b.location !== 'string') continue;
+    // MSB-4: победителей бывает несколько (совместный штурм — гарнизон пал, на земле
+    // стоят два союзных десанта). Тогда `winner` честно null, и читать только его
+    // значило бы МОЛЧА не начислить осколки ни одному из них. `winners` — источник
+    // истины; одиночный `winner` остаётся запасным путём для старых событий.
+    const winners = Array.isArray(b.winners)
+      ? b.winners.filter((w): w is string => typeof w === 'string')
+      : typeof b.winner === 'string'
+        ? [b.winner]
+        : [];
+    if (winners.length === 0) continue;
+    const side = new Set(winners);
     let shards = 0;
     for (const death of events) {
       if (death.type !== 'unit.died') continue;
       const d = death.payload as { unit?: unknown; count?: unknown; at?: unknown; owner?: unknown };
-      if (d.at !== b.location || typeof d.owner !== 'string' || d.owner === b.winner) continue;
+      if (d.at !== b.location || typeof d.owner !== 'string' || side.has(d.owner)) continue;
       if (typeof d.unit !== 'string' || typeof d.count !== 'number') continue;
       shards += (tables.salvage.perUnit?.[d.unit] ?? tables.salvage.default) * d.count;
     }
-    if (shards > 0) out.set(b.winner, (out.get(b.winner) ?? 0) + shards);
+    // ДЕЛЯТСЯ, а не достаются каждому целиком: иначе совместный штурм ЧЕКАНИЛ бы
+    // ресурс — двое получили бы по полной добыче за одни и те же потери противника.
+    // Делёж — та же грамматика, что владелец выбрал для урона (§0.0 №1).
+    const each = Math.floor(shards / winners.length);
+    if (each > 0) for (const w of winners) out.set(w, (out.get(w) ?? 0) + each);
   }
   return out;
 }
