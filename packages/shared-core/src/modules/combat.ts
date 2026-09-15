@@ -112,12 +112,12 @@ function findEnemyFleetAt(
   at: string,
   owner: string,
   excludeId: string,
-  except?: string | null,
+  except?: ReadonlySet<string> | null,
 ): Fleet | null {
   let best: Fleet | null = null;
   for (const id of Object.keys(h.state.fleets)) {
     const f = h.state.fleets[id];
-    if (!f || f.id === excludeId || f.id === except || f.location !== at || f.battleId) {
+    if (!f || f.id === excludeId || except?.has(f.id) || f.location !== at || f.battleId) {
       continue;
     }
     if (!f.units.some((s) => s.count > 0) || !isHostile(h, owner, f.owner)) {
@@ -201,14 +201,102 @@ function startBattle(h: HandlerContext, battle: Battle): void {
  * separate, deliberate act from orbit (`fleet.assault`), so simply arriving
  * never captures — the fleet just holds the orbit (a single orbit, GDD §7.4).
  */
+/**
+ * ВСТУПЛЕНИЕ В ИДУЩИЙ БОЙ (MSB-3) — бой на узле, куда этому флоту есть с кем драться.
+ *
+ * Орбитальный: наземный бой идёт НА ПОВЕРХНОСТИ, и флот, висящий над ней, в него не
+ * вступает — GDD §7.4 держит две ПОСЛЕДОВАТЕЛЬНЫЕ фазы, и смешать их значило бы дать
+ * кораблям стрелять по гарнизону в обход высадки.
+ *
+ * Выбор боя детерминирован сортировкой id: на узле их может оказаться несколько (пары
+ * сцепились независимо до этого кирпича), и от порядка обхода состояния исход зависеть
+ * не имеет права (инвариант #6).
+ */
+function runningBattleFor(h: HandlerContext, at: string, owner: string): Battle | null {
+  for (const id of Object.keys(h.state.battles).sort()) {
+    const b = h.state.battles[id];
+    if (!b || b.location !== at || b.phase !== 'orbital') continue;
+    const hostile = b.sides.some(
+      (side) => side.owner !== null && isHostile(h, owner, side.owner) && sideAlive(h.state, side.ref),
+    );
+    if (hostile) return b;
+  }
+  return null;
+}
+
+/**
+ * Втянуть флот в идущий бой (MSB-3, решение владельца 2026-09-11 «втягивать
+ * АВТОМАТИЧЕСКИ»).
+ *
+ * РОЛЬ новому не назначается заново: правило уже есть и одно на все конструкторы боя —
+ * **кто вступает, тот атакующий; кого нашли — обороняющийся.** Так устроены прибытие,
+ * перехват, штурм и высадка, и отсюда же ответ на неочевидный случай: летящий выручать
+ * союзника вступает АТАКУЮЩИМ, потому что атакует агрессора, и бьёт своим `attack`.
+ * Побочное следствие, на которое опирается MSB-2: обороняющийся в бою остаётся ОДИН,
+ * значит `dmgToDefender` в `combat.round` по-прежнему сумма всего, что в него прилетело.
+ */
+function joinBattle(h: HandlerContext, fleet: Fleet, battle: Battle, at: string): void {
+  pinToNode(fleet, at);
+  fleet.battleId = battle.id;
+  battle.sides.push({
+    ref: { kind: 'fleet', fleetId: fleet.id },
+    owner: fleet.owner,
+    role: 'attacker',
+  });
+  h.emit('battle.joined', {
+    battleId: battle.id,
+    location: at,
+    fleetId: fleet.id,
+    owner: fleet.owner,
+  });
+}
+
+/**
+ * Сцепить всех, кому на этом узле есть с кем драться (MSB-3).
+ *
+ * Выжидание перестаёт быть стратегией: мало втянуть ПРИБЫВШЕГО — надо втянуть и того, кто
+ * уже стоял рядом свободным и ждал, пока двое обескровят друг друга (сценарий S3, ровно
+ * против него кирпич и заводился). Поэтому узел прочёсывается целиком.
+ *
+ * Проход повторяется, пока кого-то втягивает: вступивший может оказаться врагом тому, кто
+ * прошлым проходом врагов в бою не имел. Число проходов ограничено числом свободных флотов
+ * на узле — каждый проход либо втягивает хотя бы одного, либо заканчивает цикл.
+ */
+function pullInBystanders(h: HandlerContext, at: string): void {
+  for (;;) {
+    let joined = false;
+    // Порядок обхода фиксирован сортировкой: кто вступит раньше, не должно зависеть от
+    // порядка создания флотов (инвариант детерминизма #6).
+    for (const id of Object.keys(h.state.fleets).sort()) {
+      const f = h.state.fleets[id];
+      if (!f || f.battleId || f.location !== at) continue;
+      if (!f.units.some((st) => st.count > 0)) continue;
+      const battle = runningBattleFor(h, at, f.owner);
+      if (!battle) continue;
+      joinBattle(h, f, battle, at);
+      joined = true;
+    }
+    if (!joined) return;
+  }
+}
+
 function engageFleets(
   h: HandlerContext,
   fleetId: string,
   at: string,
-  except?: string | null,
+  except?: ReadonlySet<string> | null,
 ): void {
   const fleet = h.state.fleets[fleetId];
   if (!fleet || fleet.battleId) {
+    return;
+  }
+  // MSB-3: идущий бой имеет ПРИОРИТЕТ над новой дуэлью. Иначе пятеро прибывших дали бы
+  // очередь парных боёв вместо одной свалки, и «третий не вмешивается» вернулось бы
+  // чёрным ходом — уже не как решение, а как следствие порядка прибытия.
+  const running = runningBattleFor(h, at, fleet.owner);
+  if (running) {
+    joinBattle(h, fleet, running, at);
+    pullInBystanders(h, at);
     return;
   }
   const enemy = findEnemyFleetAt(h, at, fleet.owner, fleetId, except);
@@ -226,6 +314,7 @@ function engageFleets(
     ],
     round: 0,
   });
+  pullInBystanders(h, at);
 }
 
 /**
@@ -409,13 +498,13 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
   const aAlive = sideAlive(h.state, attacker.ref);
   const dAlive = sideAlive(h.state, defender.ref);
   const stalemate = end !== 'decided';
-  const winner = stalemate
-    ? null
-    : aAlive && !dAlive
-      ? attacker.owner
-      : dAlive && !aAlive
-        ? defender.owner
-        : null;
+  // ПОБЕДИТЕЛЬ НА N СТОРОН (MSB-3). Прежняя таблица истинности спрашивала двоих
+  // («жив атакующий и мёртв обороняющийся → атакующий»), и на трёх сторонах называла
+  // победителем того, кто просто оказался первым в списке, хотя рядом стоял живой враг.
+  // Правило то же самое, произнесённое без двойки: победитель есть, только когда выжил
+  // РОВНО ОДИН. На двух сторонах это дословно прежняя таблица.
+  const aliveSides = battle.sides.filter((side) => sideAlive(h.state, side.ref));
+  const winner = stalemate || aliveSides.length !== 1 ? null : (aliveSides[0]?.owner ?? null);
 
   // The battle is over. GROUND survivors (a planet garrison or a fleet's landing
   // troops) return "at rest": clear their transient combat HP pool (a UnitStack with
@@ -467,8 +556,11 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
     }
   }
 
-  releaseOrDestroyFleet(h, attacker.ref);
-  releaseOrDestroyFleet(h, defender.ref);
+  // Отпускаются ВСЕ стороны, а не пара (MSB-3). Пока сторон было две, `attacker` и
+  // `defender` покрывали список целиком; с втягиванием третьего этот же код оставлял
+  // ему `battleId`, указывающий на удалённый бой, — а такой флот заперт навсегда: он не
+  // ходит, не стреляет и не освобождается, потому что освобождать его больше некому.
+  for (const side of battle.sides) releaseOrDestroyFleet(h, side.ref);
   delete h.state.battles[battle.id];
   h.emit('battle.resolved', {
     battleId: battle.id,
@@ -496,11 +588,15 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
   // только внешние поводы — прибытие, транзит, перехват, смена стойки и вот этот финал
   // боя. После возврата отсюда никто не попытается свести эту пару снова, пока в мире
   // что-нибудь не произойдёт, — а тогда это уже новая встреча, а не перезапуск старой.
-  const exceptId =
-    stalemate && attacker.ref.kind === 'fleet' && defender.ref.kind === 'fleet'
-      ? { [attacker.ref.fleetId]: defender.ref.fleetId,
-          [defender.ref.fleetId]: attacker.ref.fleetId }
-      : {};
+  // Запрет на пересцепление после ничьей — тоже по СПИСКУ (MSB-3): не сходиться заново
+  // ни с кем из этой ничьей, а не только с напарником по паре. Иначе трое, упёршиеся в
+  // предохранитель, тут же начали бы тот же нулевой бой, и `MAX_COMBAT_ROUNDS` потерял
+  // бы смысл — ровно та livelock'а, ради которой сторож CMB-6 и стоит.
+  const stalemated = new Set<string>(
+    stalemate
+      ? battle.sides.flatMap((side) => (side.ref.kind === 'fleet' ? [side.ref.fleetId] : []))
+      : [],
+  );
 
   if (battle.phase === 'orbital') {
     // Whichever fleet SURVIVED holds the node — not just the attacker. The victor
@@ -513,11 +609,10 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
     // с третьим положен каждому выжившему. Обход по отсортированным id: кто окажется
     // нападающим в следующем бою, не должно зависеть от того, кто в прошлом был
     // атакующим (инвариант детерминизма).
-    const survivors = [
-      attacker.ref.kind === 'fleet' && aAlive ? attacker.ref.fleetId : null,
-      defender.ref.kind === 'fleet' && dAlive ? defender.ref.fleetId : null,
-    ]
-      .filter((id): id is string => id !== null)
+    // Выжившие — ВСЕ живые стороны-флоты (MSB-3, §0.0 №5 «цепочка: выжившие сцепляются
+    // заново»). На двух сторонах это прежняя пара дословно.
+    const survivors = aliveSides
+      .flatMap((side) => (side.ref.kind === 'fleet' ? [side.ref.fleetId] : []))
       .sort();
     for (const survivorId of survivors) {
       const f = h.state.fleets[survivorId];
@@ -529,7 +624,7 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
       // engageFleets is battleId-guarded, so this starts at most one new battle —
       // и второй выживший, если первый уже сцепился, увидит его занятым.
       if (f.location !== null) {
-        engageFleets(h, survivorId, battle.location, exceptId[survivorId]);
+        engageFleets(h, survivorId, battle.location, stalemated);
       }
     }
   }
