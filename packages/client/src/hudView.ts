@@ -365,8 +365,9 @@ const SIDE_KIND: Record<BattleSideView['kind'], string> = {
 
 function sideHtml(side: BattleSideView): string {
   return (
-    `<div class="side${side.mine ? ' mine' : ''}">` +
-    `<p class="owner">${esc(side.ownerName)}<i>${esc(t(SIDE_KIND[side.kind]))}</i></p>` +
+    `<div class="side${side.mine ? ' mine' : ''} ${side.role}">` +
+    `<p class="owner">${esc(side.ownerName)}<i>${esc(t(SIDE_KIND[side.kind]))}</i>` +
+    `<em>${esc(t(side.role === 'attacker' ? 'hud.side.attacking' : 'hud.side.defending'))}</em></p>` +
     (side.hull ? barHtml('hull', side.hull) : '') +
     (side.shield ? barHtml('shield', side.shield) : '') +
     stacksHtml(side.units) +
@@ -384,7 +385,10 @@ export function battleHtml(m: BattleModel, now: number): string {
       ? ` · ${esc(t('hud.battle.next', { in: countdown(m.nextRoundAt, now) }))}`
       : '') +
     `</p>` +
-    `<div class="sides">${sideHtml(m.attacker)}${sideHtml(m.defender)}</div>` +
+    // MSB-6: рисуется ВЕСЬ список сторон. На дуэли он ровно `[attacker, defender]`,
+    // поэтому двусторонний бой выглядит как выглядел, а на пяти сторонах появляются
+    // пять строк вместо двух.
+    `<div class="sides">${m.sides.map(sideHtml).join('')}</div>` +
     // Кнопка появляется, только если модель нашла свой орбитальный флот в этом бою:
     // `resolveBattleAction` иначе всё равно откажет (`E_CANNOT_RETREAT`), и показывать
     // заведомо мёртвую кнопку значит обещать игроку действие, которого у него нет.

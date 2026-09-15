@@ -346,6 +346,8 @@ export const en: Record<string, string> = {
   'hud.rank': '{n} of {of}',
   'hud.retreat': 'Retreat',
   'hud.shield': 'shield',
+  'hud.side.attacking': 'attacking',
+  'hud.side.defending': 'defending',
   'hud.side.beachhead': 'beachhead',
   'hud.side.fleet': 'fleet',
   'hud.side.garrison': 'garrison',

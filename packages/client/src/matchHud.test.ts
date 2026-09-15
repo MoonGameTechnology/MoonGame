@@ -481,6 +481,46 @@ describe('createBattleModel', () => {
     return s;
   }
 
+  /** Тот же узел, но штурмующих двое (MSB-3/MSB-4 сделали это достижимым). */
+  function threeSided(): GameState {
+    const s = orbitalScene();
+    s.fleets.f3 = fleet({
+      id: 'f3',
+      owner: 'p3',
+      units: [{ unit: 'frigate', count: 1 }],
+      battleId: 'b1',
+    });
+    s.players.p3 = { id: 'p3', name: 'Третий', faction: 'vanguard', status: 'active', resources: {} };
+    s.battles.b1!.sides.push({
+      ref: { kind: 'fleet', fleetId: 'f3' },
+      owner: 'p3',
+      role: 'attacker' as const,
+    });
+    return s;
+  }
+
+  it('MSB-6: на ДУЭЛИ список сторон — ровно [атакующий, обороняющийся]', () => {
+    const res = createBattleModel(orbitalScene(), 'b1', 'p1', DATA);
+    if (!res.ok) throw new Error('expected ok');
+    // Требование приёмки «вид двустороннего боя не изменился ни на пиксель»: рендер
+    // рисует `sides`, и на дуэли он обязан совпадать со старой парой поле в поле.
+    expect(res.sides).toHaveLength(2);
+    expect(res.sides[0]).toEqual(res.attacker);
+    expect(res.sides[1]).toEqual(res.defender);
+  });
+
+  it('MSB-6: ТРИ стороны — три строки, у каждой своя роль', () => {
+    const res = createBattleModel(threeSided(), 'b1', 'p1', DATA);
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.sides).toHaveLength(3);
+    expect(res.sides.map((x) => x.owner)).toEqual(['p1', 'p2', 'p3']);
+    // Роль принадлежит СТОРОНЕ, а не месту в списке: атакующих здесь двое, и вывести
+    // это из порядка нельзя — панель обязана брать роль у самой стороны.
+    expect(res.sides.map((x) => x.role)).toEqual(['attacker', 'defender', 'attacker']);
+    // Короткий путь остаётся ПЕРВЫМ атакующим, а не «всем штурмом».
+    expect(res.attacker.owner).toBe('p1');
+  });
+
   it('projects an orbital battle: both sides, forces, hull/shield, live round timer', () => {
     const res = createBattleModel(orbitalScene(), 'b1', 'p1', DATA);
     expect(res.ok).toBe(true);

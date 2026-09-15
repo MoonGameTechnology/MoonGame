@@ -6096,9 +6096,14 @@ function fleetPanelHtml(f: Fleet): string {
         }): ${esc(troops)}${bar(sv.hull, '♥')}${bar(sv.shield, '◈')}</div>`;
       };
       h += `<div class="sec">${t('side.battle.title', { phase: bm.phase === 'ground' ? t('side.battle.phase.ground') : t('side.battle.phase.orbit'), r: bm.round })}</div>`;
-      h +=
-        sideRow(bm.attacker, t('side.battle.attacker')) +
-        sideRow(bm.defender, t('side.battle.defender'));
+      // MSB-6: строка на КАЖДУЮ сторону, роль берётся у самой стороны. На дуэли список
+      // ровно `[атакующий, обороняющийся]`, поэтому двусторонний бой выглядит как
+      // выглядел; на пяти сторонах появляются пять строк вместо двух.
+      h += bm.sides
+        .map((sv) =>
+          sideRow(sv, t(sv.role === 'attacker' ? 'side.battle.attacker' : 'side.battle.defender')),
+        )
+        .join('');
       if (bm.nextRoundAt != null)
         h += `<div class="row">${t('side.battle.next-round')} <span class="pn-timer" data-at="${bm.nextRoundAt}">…</span></div>`;
       h += `<div class="row">${btn('retreat', '', t('side.battle.retreat'), bm.retreatFleetId === f.id)}</div>`;

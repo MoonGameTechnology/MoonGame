@@ -139,10 +139,13 @@ export { runReplay } from './replay/replay';
 export type { ReplayLog, ReplayStep, ReplayRejection, ReplayResult } from './replay/replay';
 export {
   previewBattle,
+  previewSides,
   previewLossCount,
   hullPool,
   type BattlePreview,
   type BattlePreviewSide,
+  type MultiBattlePreview,
+  type PreviewSideInput,
 } from './state/previewBattle';
 export {
   COMBAT_WIDTH as GROUND_COMBAT_WIDTH,

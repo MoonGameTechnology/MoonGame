@@ -348,6 +348,8 @@ export const ru: Record<string, string> = {
   'hud.rank': '{n}-е из {of}',
   'hud.retreat': 'Отступить',
   'hud.shield': 'щит',
+  'hud.side.attacking': 'атакует',
+  'hud.side.defending': 'обороняется',
   'hud.side.beachhead': 'плацдарм',
   'hud.side.fleet': 'флот',
   'hud.side.garrison': 'гарнизон',
