@@ -18,6 +18,14 @@ const data: GameData = parseGameData({
       cost: { metal: 220 },
       slots: { weapon: 1, defense: 1, utility: 1 },
     },
+    // The one hull in this fixture that carries a hangar — the preview has to tell it
+    // apart from `cruiser` without anyone naming it in the UI.
+    carrier: {
+      faction: 'x',
+      stats: { attack: 3, defense: 18, speed: 3, hp: 90, shuttleBay: 6 },
+      cost: { metal: 260 },
+      slots: { defense: 1 },
+    },
   },
   factions: {},
   buildings: {},
@@ -70,6 +78,26 @@ describe('loadout editor — model', () => {
       effective: 8,
       delta: 0,
     });
+  });
+
+  // In the yard every hull is a row of the same stat bars, so a hull that carries
+  // SHUTTLES looked exactly like one that does not — the single thing that separates
+  // the carrier from every other ship was the one number the preview never listed.
+  // The rule stays the general one (a line shows only where the stat is live), so
+  // nothing here names a hull by id.
+  it('previews the shuttle bay — and only on a hull that has one', () => {
+    const bay = ok(createLoadoutEditor('carrier', data, rich)).preview.find(
+      (p) => p.stat === 'shuttleBay',
+    );
+    expect(bay).toEqual({
+      stat: 'shuttleBay',
+      label: t('loadout.stat.bay'),
+      base: 6,
+      effective: 6,
+      delta: 0,
+    });
+    const plain = ok(createLoadoutEditor('cruiser', data, rich));
+    expect(plain.preview.find((p) => p.stat === 'shuttleBay')).toBeUndefined();
   });
 
   it('rejects an unknown hull, fail-secure', () => {

@@ -814,7 +814,12 @@ export function aiOrders(
     // ECON-7: fabricator joins the chain — microelectronics gates warships now
     // (cruiser/siege cost micro), so a bot without a fab eventually can't build a
     // fleet. Built once the credit/tax engine is up; keeps micro produced AND spent.
-    for (const b of ['refinery', 'tax_office', 'fabricator'] as const) {
+    // YARD-1: `spaceport` встал в цепочку вторым звеном. Он больше не приезжает даром
+    // вместе с домом (дом несёт ВЕРФЬ), а без него у бота нет ни ангара, ни челноков —
+    // то есть целый пласт боя выпал бы из измерения. Место в цепочке не случайное:
+    // сперва чистые деньги (`refinery`), потом порт, который и торгует, и открывает
+    // ангар, и только затем множитель с микроэлектроникой.
+    for (const b of ['refinery', 'spaceport', 'tax_office', 'fabricator'] as const) {
       if (has(b)) continue;
       if (affordable(b) && !pendingBuild(base.id, b)) out.push(buildBuilding(ai, base.id, b));
       break; // one link at a time — wait out the current one either way
@@ -1092,6 +1097,12 @@ export function aiOrders(
         if (hangarOwned(unit) >= SHUTTLE_CAP) return;
         if (pendingUnit(base.id, unit)) return;
         if (!affordableUnit(unit, 1)) return;
+        // ВОРОТА СПРАШИВАЮТСЯ У ЯДРА, а не подразумеваются. Раньше здесь стояло
+        // допущение «порт у бота и так есть под корабли» — с YARD-1 оно неверно: дом
+        // несёт верфь, а порт бот строит сам (цепочка выше). Заказ без порта ядро
+        // отбивает `E_NO_PORT`, и без этой пробы бот платил бы за него отказом каждый
+        // тик — ровно тем же способом, каким когда-то упирался в `E_HANGAR_FULL`.
+        if (canOrder(state, buildUnit(ai, base.id, unit, 1)) !== null) return;
         out.push(buildUnit(ai, base.id, unit, 1));
       };
       // Перехватчик — ВСЕГДА, и на войне, и в мире: он не оружие нападения, а ПВО
