@@ -1125,19 +1125,19 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #log div::before{content:"> ";color:var(--grn-dim);}
 
 /* technologies + steward + heroes windows (modal, mirror #logwin) */
-#tech,#steward{position:fixed;inset:0;z-index:47;display:none;align-items:center;justify-content:center;padding:16px;
+#tech,#steward,#battlewin{position:fixed;inset:0;z-index:47;display:none;align-items:center;justify-content:center;padding:16px;
   background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
-#tech.show,#steward.show{display:flex;}
+#tech.show,#steward.show,#battlewin.show{display:flex;}
 /* Окно построек — тот же каркас, но НИЖЕ кодекса (z46): тап по строке открывает
    карточку здания, и она обязана лечь ПОВЕРХ окна, а не под ним. */
 #buildwin{position:fixed;inset:0;z-index:45;display:none;align-items:center;justify-content:center;padding:16px;
   background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
 #buildwin.show{display:flex;}
-#tech .twbox,#steward .twbox,#buildwin .twbox{display:flex;flex-direction:column;width:min(460px,94vw);max-height:82vh;overflow:hidden;
+#tech .twbox,#steward .twbox,#battlewin .twbox,#buildwin .twbox{display:flex;flex-direction:column;width:min(460px,94vw);max-height:82vh;overflow:hidden;
   background:var(--glass);border:1px solid var(--cyan);border-radius:10px;
   box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
 .tw-close{width:28px;height:28px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);cursor:pointer;}
-#techbody,#stewardbody,#herobody{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:12px 14px;}
+#techbody,#stewardbody,#battlewinbody,#herobody{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:12px 14px;}
 #buildwinbody{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;padding:0;}
 /* heroes window: roster cards + abilities / skill tree / fittings */
 #herobody .hx-card{border:1px solid var(--line-hi);border-radius:10px;padding:11px 13px;margin-bottom:12px;background:rgba(53,214,230,.04);}
@@ -1247,6 +1247,16 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #herobody .hx-dbtn.danger{background:transparent;border:1px solid #ff5a4d;color:#ff5a4d;}
 #herobody .hx-dbtn:disabled{opacity:.4;cursor:not-allowed;}
 /* Steward («Хранитель») delegate panel */
+#battlewinbody .bw-head{font-size:12px;color:var(--cyan);letter-spacing:.04em;text-transform:uppercase;}
+#battlewinbody .bw-next{font-size:12px;color:var(--dim);margin:4px 0 10px;}
+#battlewinbody .bw-side{padding:9px 11px;border:1px solid var(--line);border-radius:9px;margin-bottom:8px;background:rgba(255,255,255,.02);}
+/* Своя сторона подсвечена рамкой: в свалке на пять сторон «где я» — первый вопрос. */
+#battlewinbody .bw-side.mine{border-color:var(--cyan-dim);background:rgba(53,214,230,.08);}
+#battlewinbody .bw-who{margin:0;font-size:13px;}
+#battlewinbody .bw-who i{font-style:normal;font-size:11px;color:var(--cyan);text-transform:uppercase;letter-spacing:.05em;margin-left:6px;}
+#battlewinbody .bw-force{margin:5px 0 0;font-size:12px;color:var(--dim);}
+#battlewinbody .bw-bar{margin-left:8px;white-space:nowrap;}
+#battlewinbody .bw-empty{font-size:12px;color:var(--dim);}
 #stewardbody .st-status{padding:11px 13px;border:1px solid var(--cyan-dim);border-radius:9px;background:rgba(53,214,230,.08);font-size:12px;color:var(--cyan);line-height:1.55;}
 #stewardbody .st-status.locked{border-color:var(--line);background:rgba(255,255,255,.03);color:var(--dim);}
 #stewardbody .st-status.on{border-color:#7df0d0;background:rgba(125,240,208,.10);color:#9ff0da;}
@@ -2636,7 +2646,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
        HUD уезжал под край окна (игроку кажется, что интерфейс съела панель задач).
        Считаем от живого зума, а не от «полутора». */
     --vph:calc(100dvh / var(--pcz));}
-  #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#scipick,
+  #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#battlewin,#scipick,
   #market,#constructor,#codex,#codexhub,#intro,#recap,#goals,#playercard,
   #settings,#warprompt,#diplo,#splitdlg,#pingmenu,#banner,#endscreen,#connect,#updbar,
   #hub,#emblempick,#corp,#setup,#testmode,#sandbox,
@@ -2862,6 +2872,8 @@ const page = (js) => `<!doctype html>
 <div id="buildwin"><div class="twbox"><div class="lw-head"><b data-i18n="win.build.title"></b><button class="tw-close" data-i18n-aria="card.close">✕</button></div><div id="buildwinbody"></div></div></div>
 <!-- steward («Хранитель») window — content rendered by renderSteward() in main.ts -->
 <div id="steward"><div class="twbox"><div class="lw-head"><b data-i18n="win.steward.title"></b><button class="tw-close" data-i18n-aria="card.close">✕</button></div><div id="stewardbody"></div></div></div>
+<!-- окно боя: открывается тапом по значку боя на карте (battleScreen.ts) -->
+<div id="battlewin"><div class="twbox"><div class="lw-head"><b data-i18n="battle.win.head"></b><button class="tw-close" data-i18n-aria="card.close">✕</button></div><div id="battlewinbody"></div></div></div>
 <!-- heroes: the roster/штаб now lives INSIDE the «Производство» screen (Герои pane) -->
 <!-- scientist council picker (setup-time, before the start-point) — rendered by renderSciPick() -->
 <div id="scipick"><div class="twbox"><div class="lw-head"><b data-i18n="win.scipick.title"></b><button class="sp-cancel" type="button" data-i18n="win.scipick.back"></button></div><div id="scipickbody"></div></div></div>

@@ -848,8 +848,8 @@
 | MSB-3 | ✅ | core | `docs/multiside-combat-roadmap.md:473` | Вступление в идущий бой |
 | MSB-4 | ✅ | core | `docs/multiside-combat-roadmap.md:543` | Совместный штурм и чей мир |
 | MSB-5 | ✅ | core | `docs/multiside-combat-roadmap.md:610` | Что делает бой при смене владельца стороны |
-| MSB-6 | ⏳ | proto cli | `docs/multiside-combat-roadmap.md:647` | Панель боя на N сторон |
-| MSB-7 | ⏳ | core proto | `docs/multiside-combat-roadmap.md:655` | Зенитки и обстрел при N сторонах |
+| MSB-6 | ✅ | proto cli | `docs/multiside-combat-roadmap.md:647` | Панель боя на N сторон |
+| MSB-7 | ⏳ | core proto | `docs/multiside-combat-roadmap.md:682` | Зенитки и обстрел при N сторонах |
 | ONB-0 | ✅ | proto srv | `docs/onboarding-roadmap.md:101` | Состояние первого запуска + воронка [proto/srv] (proto) |
 | ONB-1 | ✅ | proto | `docs/onboarding-roadmap.md:137` | Движок гайд-марок (spotlight) ★ |
 | ONB-2 | ✅ | proto | `docs/onboarding-roadmap.md:188` | Гайдовый первый матч (скриптовая соло-песочница) ★ |
@@ -1052,3 +1052,8 @@
 | TT-4.1 | ⏳ | data core | `docs/tech-tree-roadmap.md:146` | Слот учёного + выбор на старте |
 | TT-4.2 | 🔒 | data core | `docs/tech-tree-roadmap.md:153` | Капстоун: супер-юнит / особое здание (лейт-гейм) |
 | TT-4.3 | 🔒 | data core | `docs/tech-tree-roadmap.md:160` | Учёный «+слот» |
+| MED-1 | ⏳ | core data | `docs/unit-medals-roadmap.md:90` | Медаль за пережитый бой |
+| MED-2 | ⏳ | core | `docs/unit-medals-roadmap.md:98` | Урон разносится по стекам |
+| MED-3 | ⏳ | core data | `docs/unit-medals-roadmap.md:107` | Медаль за нанесённый урон |
+| MED-4 | ⏳ | core data | `docs/unit-medals-roadmap.md:114` | Выплата за сохранённых ветеранов |
+| MED-5 | ⏳ | proto cli | `docs/unit-medals-roadmap.md:122` | Медали в карточке юнита |

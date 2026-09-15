@@ -574,6 +574,8 @@ import {
 // ST-2/ST-3 — «Хранитель»: the window is REFM-7; the read-only helpers below are shared
 // with the threat alert (`stewFmtDur`), the side panel (`stewardTechDone`) and the
 // morning report (`stewMetrics`).
+import { initBattleWindow } from './battleScreen';
+import { battleAtTap } from '../../decisions/battleTap';
 import {
   initSteward,
   stewFmtDur,
@@ -6096,9 +6098,14 @@ function fleetPanelHtml(f: Fleet): string {
         }): ${esc(troops)}${bar(sv.hull, '♥')}${bar(sv.shield, '◈')}</div>`;
       };
       h += `<div class="sec">${t('side.battle.title', { phase: bm.phase === 'ground' ? t('side.battle.phase.ground') : t('side.battle.phase.orbit'), r: bm.round })}</div>`;
-      h +=
-        sideRow(bm.attacker, t('side.battle.attacker')) +
-        sideRow(bm.defender, t('side.battle.defender'));
+      // MSB-6: строка на КАЖДУЮ сторону, роль берётся у самой стороны. На дуэли список
+      // ровно `[атакующий, обороняющийся]`, поэтому двусторонний бой выглядит как
+      // выглядел; на пяти сторонах появляются пять строк вместо двух.
+      h += bm.sides
+        .map((sv) =>
+          sideRow(sv, t(sv.role === 'attacker' ? 'side.battle.attacker' : 'side.battle.defender')),
+        )
+        .join('');
       if (bm.nextRoundAt != null)
         h += `<div class="row">${t('side.battle.next-round')} <span class="pn-timer" data-at="${bm.nextRoundAt}">…</span></div>`;
       h += `<div class="row">${btn('retreat', '', t('side.battle.retreat'), bm.retreatFleetId === f.id)}</div>`;
@@ -8829,6 +8836,27 @@ function selectAt(mx: number, my: number) {
     my,
     rFleet,
   );
+  // ЗНАЧОК БОЯ забирает тап ПОСЛЕДНИМ (`decisions/battleTap.ts`): по кораблю и по миру
+  // тапают, чтобы отдать приказ, и отнять у них тап значило бы менять разбор боя на
+  // потерянный ход. Поэтому сюда приходит только тап, под которым больше ничего нет, —
+  // и тогда кольцо, которое и так показывает фазу и отсчёт, открывает окно с раскладом.
+  const battleHit = battleAtTap(
+    Object.values(s.battles).map((b) => {
+      const anchor = battleAnchor(b);
+      return {
+        id: b.id,
+        at: anchor ? world(anchor) : null,
+        identified: known(b.location),
+      };
+    }),
+    { x: mx, y: my },
+    tapByTouch,
+    fleetIds.length > 0 || n !== null,
+  );
+  if (battleHit) {
+    battleWindow.open(battleHit);
+    return;
+  }
   // Что следует из выбора — `pickApply.ts` (REFM-166): пустой тап это «отменить», и он
   // гасит НЕ только выделение, но и незавершённые намерения (слияние, деление, десант) —
   // иначе они применились бы к следующему выбранному флоту, молча. Выбор мира гасит
@@ -9292,6 +9320,7 @@ const buildWin = initBuildScreen({
 // repaint throttle both hold it.
 const stewWin = $('steward');
 let lastStewAt = 0;
+let lastBattleWinAt = 0;
 let lastBuildAt = 0;
 let lastIntelAt = 0; // throttle for the live intel-window timers (диплом. вкладка «Шпионаж»)
 const steward = initSteward({
@@ -9304,6 +9333,22 @@ const steward = initSteward({
   openTech: () => techTree.open(),
 });
 document.getElementById('rail-steward')?.addEventListener('click', () => steward.open());
+
+// --- окно боя (заказ владельца 2026-09-15) -----------------------------------
+// Значок боя на карте и так показывал фазу и отсчёт до раунда; теперь он ОТКРЫВАЕТСЯ.
+// До этого расклад можно было увидеть единственным путём — выделив свой флот в этом
+// бою, — то есть про чужую схватку рядом узнать было нечем.
+const battleWin = $('battlewin');
+const battleWindow = initBattleWindow({
+  root: () => battleWin,
+  body: () => $('battlewinbody'),
+  state: () => s,
+  me: () => ME,
+  model: (id) => {
+    const m = createBattleModel(s, id, ME, data);
+    return m.ok ? m : null;
+  },
+});
 // Snapshot of my standing at delegation time, diffed on expiry for the morning report.
 let stewSnapshot: StewardMetrics | null = null;
 
@@ -12395,6 +12440,9 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'pingmenu', isOpen: () => pings.menuOpen(), close: () => pings.closeMenu() }, // z47
   { id: 'tech', isOpen: () => techWin.classList.contains('show'), close: () => techWin.classList.remove('show') }, // z47
   { id: 'steward', isOpen: () => stewWin?.classList.contains('show') === true, close: () => stewWin?.classList.remove('show') }, // z47
+  // Окно боя — та же ступень z47, что и «Хранитель»: оно модалка поверх карты, и Back
+  // обязан закрывать именно его, а не выделение под ним.
+  { id: 'battlewin', isOpen: () => shown('battlewin'), close: () => hide('battlewin') }, // z47
   { id: 'market', isOpen: () => marketWin.classList.contains('show'), close: () => marketWin.classList.remove('show') }, // z47
   { id: 'constructor', isOpen: () => constructorWin.classList.contains('show'), close: () => shipyard.close() }, // z47 «Производство»
   { id: 'codex', isOpen: () => codexEl?.classList.contains('show') === true, close: () => codexEl?.classList.remove('show') }, // z46
@@ -12769,6 +12817,12 @@ function frame(nowReal: number) {
   if (repaintDue(steward.isOpen(), nowReal, lastStewAt, PROGRESS_MS)) {
     lastStewAt = nowReal;
     steward.repaint();
+  }
+  // Окно боя живое: раунды идут по расписанию, и состав сторон меняется под рукой.
+  // Тот же троттлинг, что у «Хранителя», — окно перерисовывается, только пока открыто.
+  if (repaintDue(battleWindow.isOpen(), nowReal, lastBattleWinAt, PROGRESS_MS)) {
+    lastBattleWinAt = nowReal;
+    battleWindow.repaint();
   }
   if (repaintDue(intelVisible(diploOpen, diploTab), nowReal, lastIntelAt, INTEL_MS)) {
     lastIntelAt = nowReal;
