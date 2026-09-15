@@ -20,6 +20,7 @@ import {
   type Fleet,
 } from '../../packages/shared-core/src/index';
 import { data } from './gameData';
+import { botCouncil } from './botCouncil';
 import { SECTOR_TYPES, START_CANDIDATES } from './map';
 import { mapPreset, type MapId } from './mapCatalog';
 import { FAVOUR_BASE } from './botFavour';
@@ -203,8 +204,9 @@ export function networkSeats(mode: NetworkMatchMode = 'ffa', mapId: MapId = 'nex
 
 export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
   const preset = mapPreset(setup.mapId);
+  const seed = setup.seed ?? 'prototype-1';
   const base = createInitialState({
-    seed: setup.seed ?? 'prototype-1',
+    seed,
     version: { data: '0.1.0', manifest: '1' },
   });
   // Every province starts NEUTRAL; the chosen seats below claim + fortify their homeworld.
@@ -280,6 +282,15 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
       // technology hooks from the first second — the C3 pre-match seam, reused).
       const grant = (setup.meta?.tech ?? []).filter((id) => data.technologies[id]);
       if (grant.length) players[seat.id]!.technologies = { completed: [...new Set(grant)] };
+    } else {
+      // BAL-12: бот тоже посвящает совет. Без этого `state.players.*.scientists` у
+      // ботового места оставался `undefined`, и `technologyLock` отбивал КАЖДЫЙ
+      // `has_scientist`-узел — в self-play, где ботовые оба места, целый слой дерева не
+      // измерялся ни разу. Уровень первый: рост совета даёт мета-прокачка, а она
+      // принадлежит аккаунту игрока, не боту.
+      players[seat.id]!.scientists = botCouncil(seed, seat.id, Object.keys(data.scientists)).map(
+        (id) => ({ id, level: 1 }),
+      );
     }
     fleets[`${seat.id}-1`] = fleet(
       `${seat.id}-1`,
