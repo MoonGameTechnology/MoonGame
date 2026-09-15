@@ -1,4 +1,5 @@
 import { playablePlayerIds } from '../state/playableSeats';
+import { veteranXp } from '../state/medals';
 import type {
   MatchEndReason,
   MatchScore,
@@ -143,7 +144,11 @@ function computeRewards(
       xp:
         scale.xpParticipation +
         Math.min(scale.xpScoreCap, Math.floor(Math.max(0, total) / scale.xpScoreDivisor)) +
-        (winningUnit.has(id) ? scale.xpWin : 0),
+        (winningUnit.has(id) ? scale.xpWin : 0) +
+        // VET-4: за медали на СОХРАНЁННЫХ юнитах. Слагаемое здесь, а не отдельным путём
+        // выплаты: место и XP игрок читает в одном месте, и второй канал награды пришлось
+        // бы синхронизировать с этим руками.
+        veteranXp(h.state, id, h.ctx.data),
     };
   });
   return rewards;

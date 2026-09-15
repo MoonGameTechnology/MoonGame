@@ -747,6 +747,21 @@ export const RewardsDefSchema = z.object({
   xpScoreCap: z.number().int().nonnegative().default(100),
   /** Win bonus — paid to every member of the winning unit (a coalition wins together). */
   xpWin: z.number().int().nonnegative().default(160),
+  /**
+   * XP за ОДНУ медаль на ОДНОМ уцелевшем юните, по степеням (VET-4): индекс 0 — первая
+   * степень. Решение владельца 6 — «чем выше степень, тем выше награда», поэтому шкала
+   * обязана СТРОГО расти, и это проверяется здесь, а не остаётся договорённостью:
+   * невозрастающая шкала молча отменила бы решение, и заметить это было бы некому.
+   *
+   * Пусто (по умолчанию) — медали не платят вовсе. Это не «выключено на всякий случай»,
+   * а тот же приём, что у `data.medals`: механика снимается данными, без флага в коде.
+   */
+  medalXp: z
+    .array(z.number().int().nonnegative())
+    .default([])
+    .refine((xs) => xs.every((x, i) => i === 0 || x > xs[i - 1]!), {
+      message: 'medalXp обязана строго расти со степенью (решение владельца 6)',
+    }),
 });
 
 /**

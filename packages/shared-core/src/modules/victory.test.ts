@@ -650,6 +650,8 @@ describe('session-end rewards (SES-2 first slice, GDD §3.4)', () => {
       xpScoreDivisor: 10,
       xpScoreCap: 100,
       xpWin: 160,
+      // VET-4: шкала медалей по умолчанию ПУСТА — без данных медали не платят вовсе.
+      medalXp: [],
     });
   });
 
@@ -730,7 +732,7 @@ describe('session-end rewards (SES-2 first slice, GDD §3.4)', () => {
     const kernel = createKernel([victoryModule]);
     const scaled: GameData = {
       ...data,
-      rewards: { xpParticipation: 1, xpScoreDivisor: 1, xpScoreCap: 5, xpWin: 7 },
+      rewards: { xpParticipation: 1, xpScoreDivisor: 1, xpScoreCap: 5, xpWin: 7, medalXp: [] },
     };
     const state: GameState = {
       ...baseState(),

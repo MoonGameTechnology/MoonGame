@@ -1055,5 +1055,5 @@
 | VET-1 | ✅ | core | `docs/unit-medals-roadmap.md:214` | Вклад стека в залп перестаёт выбрасываться |
 | VET-2 | ✅ | core | `docs/unit-medals-roadmap.md:246` | Счётчики ветерана на стеке |
 | VET-3 | ✅ | core data | `docs/unit-medals-roadmap.md:285` | Грейды и пороги |
-| VET-4 | ⏳ | core data | `docs/unit-medals-roadmap.md:311` | Выплата, растущая со степенью |
-| VET-5 | ⏳ | proto cli | `docs/unit-medals-roadmap.md:321` | Медали в карточке юнита |
+| VET-4 | ✅ | core data | `docs/unit-medals-roadmap.md:311` | Выплата, растущая со степенью |
+| VET-5 | ⏳ | proto cli | `docs/unit-medals-roadmap.md:341` | Медали в карточке юнита |

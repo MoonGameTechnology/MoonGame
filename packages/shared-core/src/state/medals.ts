@@ -1,5 +1,5 @@
 import type { GameData } from '../data/schemas';
-import type { UnitStack } from './gameState';
+import type { GameState, PlayerId, UnitStack } from './gameState';
 
 /**
  * МЕДАЛИ ВЕТЕРАНА: два числа со стека → две награды со степенями (VET-3).
@@ -66,4 +66,49 @@ export function medalsOf(stack: UnitStack, data: GameData): MedalAward[] {
     if (grade > 0) awards.push({ line, grade, key: `medal.${line}.${grade}` });
   }
   return awards;
+}
+
+/**
+ * XP ЗА СОХРАНЁННЫХ ВЕТЕРАНОВ игрока `owner` (VET-4).
+ *
+ * Считается по ЖИВЫМ юнитам и только по ним: погибший ветеран не платит, и это не
+ * жестокость, а сам смысл выбора «беречь или тратить». Медаль не даёт силы в бою
+ * (решение владельца 2), поэтому беречь ветерана — чистая ставка на конец матча, и если
+ * бы погибший платил, ставки бы не было вовсе.
+ *
+ * Платится ЗА КАЖДЫЙ юнит стека, а не за стек: медаль носит подразделение, но награда за
+ * сохранение — за сохранённые корабли. Стек из пяти ветеранов стоит впятеро дороже
+ * одного, и разменять четверых, чтобы спасти одного, — осмысленный, но дорогой ход.
+ *
+ * Обходятся ВСЕ носители стеков, а не только флоты: десант в трюме, гарнизон мира и
+ * плацдарм — те же ветераны, и они так же дрались (`creditVolley` пишет заслугу по
+ * стороне боя, кем бы она ни была).
+ */
+export function veteranXp(state: GameState, owner: PlayerId, data: GameData): number {
+  const scale = data.rewards.medalXp;
+  if (scale.length === 0) return 0;
+  let total = 0;
+  const credit = (stacks: readonly UnitStack[]): void => {
+    for (const stack of stacks) {
+      for (const award of medalsOf(stack, data)) {
+        // Умножение на `count` и ЕСТЬ правило «погибший не платит»: убыль уменьшает
+        // выплату ровно на своих, а выбитый подчистую стек платит ноль без всякой
+        // отдельной проверки. Отдельная проверка тут стояла и была снята как мёртвая —
+        // порча (убрать её) не уронила ни одного теста, потому что ронять было нечего.
+        total += (scale[award.grade - 1] ?? 0) * stack.count;
+      }
+    }
+  };
+  for (const fleet of Object.values(state.fleets)) {
+    if (fleet.owner !== owner) continue;
+    credit(fleet.units);
+    credit(fleet.landing ?? []);
+  }
+  for (const planet of Object.values(state.planets)) {
+    if (planet.owner === owner) credit(planet.garrison);
+    for (const beachhead of planet.beachheads ?? []) {
+      if (beachhead.owner === owner) credit(beachhead.units);
+    }
+  }
+  return total;
 }
