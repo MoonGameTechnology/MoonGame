@@ -747,6 +747,39 @@ export const RewardsDefSchema = z.object({
   xpScoreCap: z.number().int().nonnegative().default(100),
   /** Win bonus — paid to every member of the winning unit (a coalition wins together). */
   xpWin: z.number().int().nonnegative().default(160),
+  /**
+   * XP за ОДНУ медаль на ОДНОМ уцелевшем юните, по степеням (VET-4): индекс 0 — первая
+   * степень. Решение владельца 6 — «чем выше степень, тем выше награда», поэтому шкала
+   * обязана СТРОГО расти, и это проверяется здесь, а не остаётся договорённостью:
+   * невозрастающая шкала молча отменила бы решение, и заметить это было бы некому.
+   *
+   * Пусто (по умолчанию) — медали не платят вовсе. Это не «выключено на всякий случай»,
+   * а тот же приём, что у `data.medals`: механика снимается данными, без флага в коде.
+   */
+  medalXp: z
+    .array(z.number().int().nonnegative())
+    .default([])
+    .refine((xs) => xs.every((x, i) => i === 0 || x > xs[i - 1]!), {
+      message: 'medalXp обязана строго расти со степенью (решение владельца 6)',
+    }),
+});
+
+/**
+ * Пороги степеней медали ветерана (VET-3) — data-ручка для `medalsOf` (`state/medals.ts`).
+ *
+ * Одна линия = одна шкала. `grades` — пороги ПО ВОЗРАСТАНИЮ, от первой степени к высшей;
+ * длина массива и есть число степеней у линии. Величина сравнивается с порогом
+ * ВКЛЮЧИТЕЛЬНО (ровно на пороге медаль уже есть), не дотянула до первого — медали НЕТ, и
+ * это не «нулевая степень»: отсутствие медали и низшая медаль по-разному выглядят в
+ * карточке и по-разному платят.
+ *
+ * Числа в `data/medalGrades.json` взяты ЗАМЕРОМ на self-play, а не назначены — см.
+ * `docs/unit-medals-roadmap.md` §0.5. Держать их данными важно ровно потому, что замер
+ * устареет: заслуга считается из состояния, а грейд в состоянии не лежит, поэтому
+ * перебалансировка порогов ничего не мигрирует и действует на идущих матчах.
+ */
+export const MedalLineDefSchema = z.object({
+  grades: z.array(z.number().positive()).min(1),
 });
 
 /** Premium research-boost scale (SES-3, GDD §4.3) — the data knob for
@@ -862,6 +895,9 @@ export const GameDataSchema = z.object({
   // `.prefault({})` pipes the empty object through the nested schema, so its
   // per-field defaults stay the single source of truth (no literal to drift).
   rewards: RewardsDefSchema.prefault({}),
+  /** Шкалы степеней медалей ветерана (VET-3). Пусто = медалей в этой партии нет вовсе:
+   *  механика выключается снятием данных, без единого флага в коде. */
+  medals: z.record(z.string(), MedalLineDefSchema).prefault({}),
   researchBoost: ResearchBoostDefSchema.prefault({}),
   market: MarketDefSchema.prefault({}),
 });

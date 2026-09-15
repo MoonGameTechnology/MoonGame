@@ -1052,8 +1052,8 @@
 | TT-4.1 | ⏳ | data core | `docs/tech-tree-roadmap.md:146` | Слот учёного + выбор на старте |
 | TT-4.2 | 🔒 | data core | `docs/tech-tree-roadmap.md:153` | Капстоун: супер-юнит / особое здание (лейт-гейм) |
 | TT-4.3 | 🔒 | data core | `docs/tech-tree-roadmap.md:160` | Учёный «+слот» |
-| MED-1 | ⏳ | core data | `docs/unit-medals-roadmap.md:90` | Медаль за пережитый бой |
-| MED-2 | ⏳ | core | `docs/unit-medals-roadmap.md:98` | Урон разносится по стекам |
-| MED-3 | ⏳ | core data | `docs/unit-medals-roadmap.md:107` | Медаль за нанесённый урон |
-| MED-4 | ⏳ | core data | `docs/unit-medals-roadmap.md:114` | Выплата за сохранённых ветеранов |
-| MED-5 | ⏳ | proto cli | `docs/unit-medals-roadmap.md:122` | Медали в карточке юнита |
+| VET-1 | ✅ | core | `docs/unit-medals-roadmap.md:214` | Вклад стека в залп перестаёт выбрасываться |
+| VET-2 | ✅ | core | `docs/unit-medals-roadmap.md:246` | Счётчики ветерана на стеке |
+| VET-3 | ✅ | core data | `docs/unit-medals-roadmap.md:285` | Грейды и пороги |
+| VET-4 | ✅ | core data | `docs/unit-medals-roadmap.md:311` | Выплата, растущая со степенью |
+| VET-5 | ✅ | proto cli | `docs/unit-medals-roadmap.md:341` | Медали в карточке юнита |
