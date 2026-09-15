@@ -138,6 +138,14 @@ export { hashJson, hashState } from './state/hash';
 export { runReplay } from './replay/replay';
 export type { ReplayLog, ReplayStep, ReplayRejection, ReplayResult } from './replay/replay';
 export {
+  medalsOf,
+  medalGrade,
+  veteranXp,
+  MEDAL_LINES,
+  type MedalAward,
+  type MedalLine,
+} from './state/medals';
+export {
   previewBattle,
   previewSides,
   previewLossCount,

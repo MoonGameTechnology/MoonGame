@@ -251,6 +251,7 @@ import {
   tokenFor,
   type SessionRec,
 } from '../../decisions/sessionStore';
+import { medalBadges } from '../../decisions/unitMedals';
 import {
   authOutcome,
   shouldRegister,
@@ -5682,7 +5683,7 @@ function squadTroopsInput(squadronId: string): TroopsInput | null {
   return troopsInputForSquadron(found.sq, source, data);
 }
 
-function unitRows(stacks: Array<{ unit: string; count: number }>): string {
+function unitRows(stacks: Array<UnitStack>): string {
   return kitUnitRows(
     stacks,
     (unit) => ({
@@ -5691,6 +5692,9 @@ function unitRows(stacks: Array<{ unit: string; count: number }>): string {
       domain: isGround(unit) ? t('side.unit.ground') : t('side.unit.space'),
     }),
     t('side.none'),
+    // VET-5: медали ветерана. Решение «что показать» — в `/decisions/unitMedals.ts`,
+    // здесь только подстановка живых данных.
+    (st) => medalBadges(st as UnitStack, data),
   );
 }
 /** Localized one-line label for a paused site (shares `ConstructionPayload`'s field
