@@ -469,7 +469,10 @@ export function aiOrders(
     const sideUnits = (ref: CombatantRef): UnitStack[] => {
       if (ref.kind === 'garrison') return state.planets[ref.planetId]?.garrison ?? [];
       // ROS-1.5: плацдарм держит мир, а не флот — оценивается так же, как гарнизон.
-      if (ref.kind === 'beachhead') return state.planets[ref.planetId]?.beachhead?.units ?? [];
+      if (ref.kind === 'beachhead')
+        return (
+          state.planets[ref.planetId]?.beachheads?.find((b) => b.owner === ref.owner)?.units ?? []
+        );
       const other = state.fleets[ref.fleetId];
       if (!other) return [];
       return ref.kind === 'landing' ? (other.landing ?? []) : other.units;
