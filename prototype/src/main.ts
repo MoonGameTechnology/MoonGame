@@ -196,6 +196,7 @@ import {
   computePowerCell,
   type TerritorySeed,
 } from '../../packages/client/src/territory';
+import { TerritoryGeometryCache } from '../../packages/client/src/territoryGeometry';
 import { buildLabel, currentBuild } from './updater';
 import { initApkUpdater } from './apkUpdate';
 import { measureViewport, STARS, NEBULAE } from './viewport';
@@ -4228,6 +4229,10 @@ function holographicMapOn(): boolean {
 }
 
 /** Rebuild the cached province map when the camera/ownership/viewport moves. */
+/** Одна на прототип: геометрия провинций не зависит от того, в какой холст её пишут,
+ *  а статик-слой чередует `bgx` (устоявшийся кадр) и `cx` (кадр в движении). */
+const territoryGeometry = new TerritoryGeometryCache();
+
 function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, preparing = false): void {
   // Always cover newly exposed edges at the current camera. Only the stationary
   // offscreen bake can be reused; the viewer's knowledge remains its invalidator.
@@ -4322,13 +4327,20 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // carries the owner AS THE VIEWER KNOWS IT (knownOwner), so a hidden capture never
   // repaints the map. Ownership reads through precise frontiers and restrained
   // transparent fills, leaving the background visible through the plotting plane.
+  // Тесселяция степенной диаграммы квадратична по числу семян, а статик-слой
+  // перепекается КАЖДЫЙ кадр, пока камера едет, — то есть ровно тогда, когда кадр и так
+  // самый дорогой. Кэш (`territoryGeometry.ts`) снимает подпись с координат,
+  // нормализованных по первой точке клипа и масштабу, поэтому панорама и зум из неё
+  // СОКРАЩАЮТСЯ: форма не изменилась — считается только O(вершин) перепроекция.
+  // Владельца и тип `project` берёт из СВЕЖИХ семян, поэтому кэш не может донести
+  // чужой туман: `knownOwner` остаётся единственным источником видимой принадлежности.
   const cells = drawTerritory(g, seeds, clip, {
     ownerColor,
     neutralFill: COLOR.null!,
     kindAccent: (kind) => holographicMapOn() && kind === 'asteroid' ? '#71879d'
       : holographicMapOn() && kind === 'solar_flare' ? '#b295d8' : SECTOR_TYPES[kind]?.color,
     hideOwnedInner: holographicMapOn(),
-  });
+  }, territoryGeometry.project(seeds, clip, cam.scale));
   provincePolygons = new Map(cells.map((cell) => [provinceIds[cell.idx]!, cell.poly]));
   terrainFields = [];
   if (holographicMapOn()) {
@@ -4358,14 +4370,22 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // сравнением идентификаторов: штрих полупрозрачный, и дважды нарисованная дорога
   // просто светлее соседних — «магистраль», которой в данных нет. Узлы без мира
   // отсеиваются до вызова, поэтому ссылка в никуда не даёт дороги.
+  // Все дороги — ОДИН путь: штрих у них общий (цвет и толщина выставлены выше), поэтому
+  // `beginPath`/`stroke` на каждое ребро были чистой платой за ничто — четыре вызова
+  // холста вместо двух на дорогу. Плюс отсев по рамке: дорога, ОБА конца которой вышли
+  // за один и тот же край экрана, пересечь его не может. Запас в лишний пиксель — на
+  // толщину штриха, чтобы дорога, касающаяся кромки, не пропала.
+  const M = 1 + g.lineWidth;
+  g.beginPath();
   for (const road of lanes(MAP.filter((n) => !!s.planets[n.id]))) {
     const a = world(road.from);
     const b = world(road.to);
-    g.beginPath();
+    if (Math.max(a.x, b.x) < -M || Math.min(a.x, b.x) > VW + M ||
+      Math.max(a.y, b.y) < -M || Math.min(a.y, b.y) > VH + M) continue;
     g.moveTo(a.x, a.y);
     g.lineTo(b.x, b.y);
-    g.stroke();
   }
+  g.stroke();
 
   // map boundary — a faint frame so the edge of the sector reads as intentional
   if (holographicMapOn()) g.restore();
