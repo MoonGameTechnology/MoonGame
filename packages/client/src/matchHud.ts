@@ -798,8 +798,10 @@ function sideView(
     ref.kind === 'garrison'
       ? (state.planets[ref.planetId]?.garrison ?? [])
       : // ROS-1.5: плацдарм держит МИР, а не флот — читается оттуда же, откуда гарнизон.
+        // MSB-4: плацдармов на мире бывает несколько, адресует их владелец в ссылке.
         ref.kind === 'beachhead'
-        ? (state.planets[ref.planetId]?.beachhead?.units ?? [])
+        ? (state.planets[ref.planetId]?.beachheads?.find((b) => b.owner === ref.owner)?.units ??
+          [])
         : ref.kind === 'landing'
           ? (state.fleets[ref.fleetId]?.landing ?? [])
           : (state.fleets[ref.fleetId]?.units ?? []);

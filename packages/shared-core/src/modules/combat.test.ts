@@ -924,7 +924,7 @@ describe('fleet retreat', () => {
 describe('combat — bug-hunt batch: assault guards, stalemate, ground chain-engage, pinned bombarder', () => {
   const kernel = createKernel([...combatFamily, arrivalModule]);
 
-  it('a second assault on a garrison already under a live ground battle is refused', () => {
+  it('a second assault JOINS the live ground battle — still ONE battle per garrison (MSB-4)', () => {
     const a1 = fleet('A1', 'p1', 'P', [['fighter', 1]], [['marine', 2]]);
     const a2 = fleet('A2', 'p1', 'P', [['fighter', 1]], [['marine', 2]]);
     a1.orbit = 'near';
@@ -932,9 +932,15 @@ describe('combat — bug-hunt batch: assault guards, stalemate, ground chain-eng
     const st = baseState([a1, a2], [planet('P', 'p2', 0, 0, [['militia', 5]])]);
     const first = okApply(kernel.applyAction(st, assault('A1'), ctx(0)));
     expect(Object.keys(first.state.battles)).toHaveLength(1);
-    // The old code let this through: both battles SHARED the garrison defender ref
-    // (double return fire, stale second capture, garrison overwrite).
-    expect(rej(kernel.applyAction(first.state, assault('A2'), ctx(0)))).toBe('E_UNDER_ASSAULT');
+    // The refusal was never against a JOINT assault — it was against TWO battles sharing
+    // one garrison defender ref (double return fire, stale second capture, garrison
+    // overwrite). MSB-4 keeps exactly that guard: the second assault joins the SAME
+    // battle as its own side, so the garrison still answers once per round.
+    const second = okApply(kernel.applyAction(first.state, assault('A2'), ctx(0)));
+    expect(Object.keys(second.state.battles)).toHaveLength(1);
+    const ground = Object.values(second.state.battles)[0]!;
+    expect(ground.sides.filter((x) => x.ref.kind === 'garrison')).toHaveLength(1);
+    expect(ground.sides.filter((x) => x.ref.kind === 'landing')).toHaveLength(2);
   });
 
   it('no early landing while the orbital fight is undecided (GDD §7.4, two SEQUENTIAL phases)', () => {

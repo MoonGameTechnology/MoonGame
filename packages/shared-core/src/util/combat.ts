@@ -1,5 +1,5 @@
 import type { HandlerContext } from '../kernel/module';
-import type { CombatantRef, Fleet, GameState, PlanetId, UnitStack } from '../state/gameState';
+import type { CombatantRef, Fleet, GameState, PlanetId, PlayerId, UnitStack } from '../state/gameState';
 import type { GameData, UnitDef } from '../data/schemas';
 import { cappedUnitStat } from './stacks';
 import { effectiveStats } from './loadout';
@@ -101,11 +101,23 @@ export function sideUnits(state: GameState, ref: CombatantRef): UnitStack[] | nu
       return f ? (f.landing ?? []) : null;
     }
     // ROS-1.5: плацдарм — тот же десант, только держит его МИР, а не флот.
+    // MSB-4: плацдармов на мире может быть несколько, и адресует их ВЛАДЕЛЕЦ в ссылке.
     case 'beachhead':
-      return state.planets[ref.planetId]?.beachhead?.units ?? null;
+      return beachheadOf(state, ref.planetId, ref.owner)?.units ?? null;
     case 'garrison':
       return state.planets[ref.planetId]?.garrison ?? null;
   }
+}
+
+/** Плацдарм КОНКРЕТНОГО владельца на мире (MSB-4). Один аксессор на всех читателей:
+ *  список короткий (по числу штурмующих), а искать его руками в семи местах значило бы
+ *  семь раз повторить правило «плацдарм адресуется парой (мир, владелец)». */
+export function beachheadOf(
+  state: GameState,
+  planetId: string,
+  owner: PlayerId,
+): { owner: PlayerId; units: UnitStack[] } | undefined {
+  return state.planets[planetId]?.beachheads?.find((b) => b.owner === owner);
 }
 
 export function setSideUnits(state: GameState, ref: CombatantRef, units: UnitStack[]): void {
@@ -121,7 +133,7 @@ export function setSideUnits(state: GameState, ref: CombatantRef, units: UnitSta
       return;
     }
     case 'beachhead': {
-      const beachhead = state.planets[ref.planetId]?.beachhead;
+      const beachhead = beachheadOf(state, ref.planetId, ref.owner);
       if (beachhead) beachhead.units = units;
       return;
     }
@@ -381,7 +393,7 @@ export function applyDamageToSide(
   // владелец СВОЙ — он не хозяин мира, он на него высадился.
   const owner =
     ref.kind === 'beachhead'
-      ? h.state.planets[ref.planetId]?.beachhead?.owner
+      ? ref.owner
       : ref.kind === 'garrison'
         ? h.state.planets[ref.planetId]?.owner
         : h.state.fleets[ref.fleetId]?.owner;
