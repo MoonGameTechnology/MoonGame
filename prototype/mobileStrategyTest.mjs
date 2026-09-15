@@ -1,4 +1,4 @@
-/* global window, localStorage, innerWidth, innerHeight -- browser */
+/* global window, document, localStorage, innerWidth, innerHeight -- browser */
 import assert from 'node:assert/strict';
 
 /** Real phone layouts and actions through the existing controllers/reducer. */
@@ -54,6 +54,32 @@ export async function checkMobileStrategy(browser, url) {
       selector + ' has no clipped horizontal content',
     );
   };
+  // Row 1 of the command bar (‹ · crest · nick + standing · ✦ chip · day card) asks for
+  // more width than a phone has. It used to overflow instead of shrinking: the standing
+  // slid out of `.who` and the ✦ chip painted over it. Landscape hides `.who` outright,
+  // so the check runs only where the block is actually on screen.
+  const topBarReadable = async () => {
+    const bar = await page.evaluate(() => {
+      const box = (id) => {
+        const r = document.getElementById(id).getBoundingClientRect();
+        return { x: r.x, right: r.right, width: r.width };
+      };
+      const place = document.getElementById('tbplace');
+      return {
+        place: box('tbplace'),
+        score: box('tbscore'),
+        day: box('daycard'),
+        placeShown: place.textContent !== '' && place.getBoundingClientRect().width > 0,
+        placeClipped: place.scrollWidth > place.clientWidth + 1,
+      };
+    });
+    if (!bar.placeShown) return;
+    assert(
+      bar.place.right <= bar.score.x + 1 && bar.score.right <= bar.day.x + 1,
+      'top bar row 1 does not overlap itself: ' + JSON.stringify(bar),
+    );
+    assert(!bar.placeClipped, 'the standing is readable in full: ' + JSON.stringify(bar));
+  };
   const touchTarget = async (selector) => {
     await page.locator(selector).tap({ trial: true });
     await fits(selector);
@@ -70,6 +96,7 @@ export async function checkMobileStrategy(browser, url) {
       ]) {
         await page.setViewportSize(viewport);
         console.log('STRATEGY_LAYOUT', locale, viewport.width, viewport.height);
+        await topBarReadable();
         for (const [id, box, close] of [
           ['tech', '.twbox', '.tw-close'],
           ['constructor', '.cnbox', '.cn-close'],
@@ -159,7 +186,7 @@ export async function checkMobileStrategy(browser, url) {
     assert(desktop.width < 1000 && desktop.height < 790);
     assert.deepEqual(errors, []);
     console.log(
-      'MOBILE_STRATEGY_PASS RU/EN, 320px, landscape, all tabs, dossiers, keyboard-size viewport, market/research actions and desktop restoration',
+      'MOBILE_STRATEGY_PASS RU/EN, 320px, landscape, top bar row 1, all tabs, dossiers, keyboard-size viewport, market/research actions and desktop restoration',
     );
   } catch (error) {
     await page.screenshot({ path: 'prototype/dist/mobile-strategy-failure.png' });
