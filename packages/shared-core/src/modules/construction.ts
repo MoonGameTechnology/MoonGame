@@ -718,7 +718,16 @@ export const constructionModule: GameModule = {
       // ARS-3 ownership gate: a seat with an arsenal SNAPSHOT builds only what it
       // owns — the hull and every module must be listed (fail-secure E_NOT_OWNED).
       // No snapshot on the player ⇒ no restriction (regular/dev matches unchanged).
-      const arsenal = player.arsenal;
+      //
+      // ГЕЙТ СПРАШИВАЕТ ТОЛЬКО ПРО КОРАБЛИ (решение владельца 2026-09-15). Пока он не
+      // различал домен, гейтированное место (человеческое кресло AvA) не могло построить
+      // НИ ОДНОГО наземного юнита: снапшот перечисляет корпуса кораблей, а пехоты и
+      // техники в нём не бывает никогда. Кресло получало стартовый гарнизон и теряло
+      // способность его пополнять — захват миров закрывался целиком, хотя казармы с
+      // заводом стояли. Замысел арсенала (`docs/arsenal-roadmap.md`) — «корпуса КОРАБЛЕЙ,
+      // модули, фитинги героев», и наземка в него не входила ни дня; поэтому сузилось
+      // ПРАВИЛО, а не расширился список. Наземный род войск гейтят ЗДАНИЯ (выше).
+      const arsenal = def.domain === 'ground' ? undefined : player.arsenal;
       if (arsenal && !arsenal.hulls.includes(payload.unit)) {
         return h.reject('E_NOT_OWNED');
       }
