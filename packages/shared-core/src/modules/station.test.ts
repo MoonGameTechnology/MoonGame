@@ -22,9 +22,13 @@ const data: GameData = parseGameData({
   buildings: { radar: { name: 'Radar', radarRange: 300 } },
   events: {},
   sectorKinds: {
+    // `stationable` НЕ задан у местности — значит разрешено (дефолт true): решение
+    // владельца «на всех, кроме тех мест, где уже есть планета».
     empty: { capturable: false, buildable: false, orbit: false },
-    void_station: { capturable: true, buildable: true, orbit: false },
-    planet: { capturable: true, buildable: true, orbit: true },
+    asteroid: { capturable: true, buildable: true, orbit: false },
+    nebula: { capturable: true, buildable: false, orbit: false },
+    void_station: { capturable: true, buildable: true, orbit: false, stationable: false },
+    planet: { capturable: true, buildable: true, orbit: true, stationable: false },
   },
 });
 const ctx = (now = 0): Context => ({ now, data });
@@ -53,59 +57,97 @@ function errCode(r: ApplyResult): string {
   return r.code;
 }
 
-/** p1 has a fleet sitting on an empty node `V`; `P` is a normal (planet) node. */
+/**
+ * Доска под решение владельца 2026-09-15: крепость ставится на ЗАХВАЧЕННОЙ территории,
+ * на всех видах кроме планеты и уже стоящей крепости.
+ *
+ *   V — астероиды, ЗАХВАЧЕНЫ p1      → крепость можно
+ *   N — туманность, захвачена p1     → тоже можно (застраиваемость вида ни при чём)
+ *   P — планета p1                   → нельзя: там уже мир
+ *   X — астероиды ЧУЖИЕ (p2)         → нельзя: не твоя территория
+ *   E — пустота, ничья               → нельзя: незахватываемое ничьим не станет
+ */
 function world(): GameState {
   const base = createInitialState({ seed: 'station', version: { data: '0.1.0', manifest: '1' } });
   return {
     ...base,
     players: { p1: player('p1'), p2: player('p2') },
     planets: {
-      V: node('V', null, 0, 'empty'),
-      P: node('P', 'p2', 200, 'planet'),
+      V: node('V', 'p1', 0, 'asteroid'),
+      N: node('N', 'p1', 100, 'nebula'),
+      P: node('P', 'p1', 200, 'planet'),
+      X: node('X', 'p2', 300, 'asteroid'),
+      E: node('E', null, 400, 'empty'),
     },
-    fleets: { f1: fleet('f1', 'p1', 'V') }, // p1 fleet anchoring the empty node
+    fleets: { f1: fleet('f1', 'p1', 'V') },
   };
 }
 
-describe('station — deploy a void station on empty space', () => {
+describe('station — космическая крепость на захваченной территории', () => {
   const kernel = createKernel([stationModule]);
 
-  it('flips an empty node to an owned, buildable void_station and charges the cost', () => {
+  it('превращает захваченную местность во владение своего вида и берёт плату', () => {
     const r = okApply(kernel.applyAction(world(), deploy('V'), ctx()));
     const v = r.state.planets.V!;
     expect(v.kind).toBe('void_station');
-    expect(v.owner).toBe('p1');
+    expect(v.owner).toBe('p1'); // владелец не менялся — он и ставил
     expect(r.state.players.p1?.resources.metal).toBe(500 - 120); // STATION_COST
     expect(r.events.map((e) => e.type)).toContain('station.deployed');
   });
 
-  it('rejects bad payload, unknown node, a real planet, and an already-deployed station', () => {
+  it('НЕЗАСТРАИВАЕМАЯ местность тоже годится — крепость и есть способ её застроить', () => {
+    // Туманность `buildable: false`: сегодня на ней нельзя возвести ничего, и ровно
+    // поэтому крепость там осмысленна. Если бы правило смотрело на `buildable`, механика
+    // работала бы только там, где и так можно строить, то есть была бы бесполезна.
+    const r = okApply(kernel.applyAction(world(), deploy('N'), ctx()));
+    expect(r.state.planets.N?.kind).toBe('void_station');
+  });
+
+  it('на ПЛАНЕТЕ нельзя: там уже есть мир', () => {
+    expect(errCode(kernel.applyAction(world(), deploy('P'), ctx()))).toBe('E_NOT_STATIONABLE');
+  });
+
+  it('на УЖЕ СТОЯЩЕЙ крепости нельзя — второй раз строить нечего', () => {
+    const owned = okApply(kernel.applyAction(world(), deploy('V'), ctx()));
+    expect(errCode(kernel.applyAction(owned.state, deploy('V'), ctx()))).toBe(
+      'E_NOT_STATIONABLE',
+    );
+  });
+
+  it('на ЧУЖОЙ территории нельзя', () => {
+    expect(errCode(kernel.applyAction(world(), deploy('X'), ctx()))).toBe('E_FORBIDDEN');
+  });
+
+  it('на НИЧЕЙНОЙ территории нельзя — сперва захвати', () => {
+    // Пустота незахватываема, значит своей не станет никогда: правило «на захваченной»
+    // закрывает её само, без отдельного запрета на вид.
+    expect(errCode(kernel.applyAction(world(), deploy('E'), ctx()))).toBe('E_FORBIDDEN');
+  });
+
+  it('ФЛОТ на узле больше НЕ нужен — владение и есть доказательство, что ты там был', () => {
+    const st = world();
+    st.fleets = {};
+    expect(okApply(kernel.applyAction(st, deploy('V'), ctx())).state.planets.V?.kind).toBe(
+      'void_station',
+    );
+  });
+
+  it('отбивает кривую нагрузку и несуществующий узел', () => {
     const st = world();
     expect(errCode(kernel.applyAction(st, deploy(42), ctx()))).toBe('E_BAD_PAYLOAD');
     expect(errCode(kernel.applyAction(st, deploy('ZZ'), ctx()))).toBe('E_NO_PLANET');
-    expect(errCode(kernel.applyAction(st, deploy('P'), ctx()))).toBe('E_NOT_EMPTY'); // a real planet
-    // Re-deploying on the now-`void_station` node is no longer empty → E_NOT_EMPTY.
-    const owned = okApply(kernel.applyAction(st, deploy('V'), ctx()));
-    expect(errCode(kernel.applyAction(owned.state, deploy('V'), ctx()))).toBe('E_NOT_EMPTY');
   });
 
-  it('requires an anchoring fleet present on the node', () => {
-    const st = world();
-    st.fleets = {}; // no fleet to anchor the station
-    expect(errCode(kernel.applyAction(st, deploy('V'), ctx()))).toBe('E_NO_ANCHOR');
-  });
-
-  it('rejects when the treasury cannot cover the cost', () => {
+  it('отбивает, когда казна не тянет', () => {
     const st = world();
     st.players.p1 = player('p1', 50); // < 120
     expect(errCode(kernel.applyAction(st, deploy('V'), ctx()))).toBe('E_INSUFFICIENT');
   });
 
-  it('does not mutate the input state', () => {
+  it('не мутирует входное состояние', () => {
     const st = deepFreeze(world());
     okApply(kernel.applyAction(st, deploy('V'), ctx()));
-    expect(st.planets.V?.kind).toBe('empty');
-    expect(st.planets.V?.owner).toBeNull();
+    expect(st.planets.V?.kind).toBe('asteroid');
   });
 });
 

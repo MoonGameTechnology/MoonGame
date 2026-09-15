@@ -9,14 +9,17 @@
       "color": "#5fd0ff",
       "label": "planet",
       "shape": "city"
-    }
+    },
+    "stationable": false
   },
   "asteroid": {
     "name": "Asteroid Field",
     "capturable": true,
     "buildable": true,
     "orbit": false,
-    "allowedBuildings": ["starfort"],
+    "allowedBuildings": [
+      "starfort"
+    ],
     "appearance": {
       "color": "#d6a645",
       "label": "asteroid field",
@@ -64,7 +67,9 @@
     "capturable": true,
     "buildable": true,
     "orbit": false,
-    "allowedBuildings": ["metal_station"],
+    "allowedBuildings": [
+      "metal_station"
+    ],
     "appearance": {
       "color": "#5a4a4a",
       "label": "dead world",
@@ -109,7 +114,8 @@
       "color": "#5f8f8c",
       "label": "void fortress",
       "shape": "station"
-    }
+    },
+    "stationable": false
   },
   "pirate_base": {
     "name": "Pirate Base",
@@ -129,7 +135,8 @@
       "color": "#f17457",
       "label": "Pirate Base",
       "shape": "station"
-    }
+    },
+    "stationable": false
   },
   "neutral_base": {
     "name": "Neutral AI Base",
@@ -149,7 +156,8 @@
       "color": "#b79bea",
       "label": "Neutral AI Base",
       "shape": "station"
-    }
+    },
+    "stationable": false
   },
   "black_hole": {
     "name": "Black Hole",

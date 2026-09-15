@@ -719,18 +719,18 @@
 | EC-5.2 | 🔒 | data | `docs/economy-roadmap.md:315` | Балансные рычаги через данные (live-ops) |
 | EC-6.1 | 🔒 | srv sec | `docs/economy-roadmap.md:328` | Детекция RMT-паттернов |
 | EC-6.2 | 🔒 | srv docs | `docs/economy-roadmap.md:332` | Модерация торговли и споры |
-| FORT-0.1 | ⏳ | data | `docs/fortress-roadmap.md:103` | Узлы empty в картах канона |
-| FORT-0.2 | ⏳ | proto | `docs/fortress-roadmap.md:111` | Крепость в прототипе: модуль, карта, отрисовка |
-| FORT-1.1 | 🔒 | data | `docs/fortress-roadmap.md:125` | Технический юнит + технология |
-| FORT-1.2 | 🔒 | core | `docs/fortress-roadmap.md:135` | Конверсия расходует техюнит |
-| FORT-1.3 | 🔒 | proto | `docs/fortress-roadmap.md:144` | Вкладка технических юнитов в «Верфи» |
-| FORT-1.4 | ✅ | proto | `docs/fortress-roadmap.md:151` | Недостающие ключи отказов |
-| FORT-2.1 | ⏳ | data | `docs/fortress-roadmap.md:173` | Юнит «Гарнизон» |
-| FORT-2.2 | 🔒 | core data | `docs/fortress-roadmap.md:184` | Форт выдаёт и забирает гарнизон |
-| FORT-2.3 | 🔒 | data core | `docs/fortress-roadmap.md:198` | Потолок гарнизона и фракционный модификатор |
-| FORT-3.1 | ⏳ | data | `docs/fortress-roadmap.md:212` | Уровни orbitalaa |
-| FORT-3.2 | 🔒 | core data | `docs/fortress-roadmap.md:217` | ПВО бьёт авиацию, а не только корабли |
-| FORT-4.1 | 🔒 | core data | `docs/fortress-roadmap.md:231` | Какие ещё узлы конвертируются |
+| FORT-0.1 | 🗑 | data | `docs/fortress-roadmap.md:183` | Узлы empty в картах канона — снято 2026-09-15 |
+| FORT-0.2 | ✅ | core proto | `docs/fortress-roadmap.md:198` | Крепость в прототипе: модуль, правило, кнопка |
+| FORT-1.1 | 🗑 |  | `docs/fortress-roadmap.md:233` | Технический юнит + технология — снято 2026-09-15 |
+| FORT-1.2 | 🗑 |  | `docs/fortress-roadmap.md:248` | Конверсия расходует техюнит — снято 2026-09-15 |
+| FORT-1.3 | 🗑 |  | `docs/fortress-roadmap.md:262` | Вкладка технических юнитов в «Верфи» — снято 2026-09-15 |
+| FORT-1.4 | ✅ | proto | `docs/fortress-roadmap.md:274` | Недостающие ключи отказов |
+| FORT-2.1 | ⏳ | data | `docs/fortress-roadmap.md:296` | Юнит «Гарнизон» |
+| FORT-2.2 | 🔒 | core data | `docs/fortress-roadmap.md:307` | Форт выдаёт и забирает гарнизон |
+| FORT-2.3 | 🔒 | data core | `docs/fortress-roadmap.md:321` | Потолок гарнизона и фракционный модификатор |
+| FORT-3.1 | ⏳ | data | `docs/fortress-roadmap.md:335` | Уровни orbitalaa |
+| FORT-3.2 | 🔒 | core data | `docs/fortress-roadmap.md:340` | ПВО бьёт авиацию, а не только корабли |
+| FORT-4.1 | ✅ | core data | `docs/fortress-roadmap.md:354` | Какие ещё узлы конвертируются |
 | GI-0.1 | ✅ | srv sec | `docs/game-integrity-roadmap.md:41` | Rate-limiting действий |
 | GI-0.2 | ⏳ | srv | `docs/game-integrity-roadmap.md:49` | Per-player очередь (анти-double-spend) |
 | GI-0.3 | ✅ | srv | `docs/game-integrity-roadmap.md:53` | Туман как граница (анти-maphack) (в основном) |
