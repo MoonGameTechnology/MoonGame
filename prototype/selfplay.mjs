@@ -6,6 +6,14 @@
 //   pnpm run selfplay            # 20 matches, base seed "sp"
 //   pnpm run selfplay 200        # 200 matches
 //   pnpm run selfplay 200 tag7   # 200 matches, another seed family
+//   pnpm run selfplay 40 sp 20   # …and a 20-day window instead of the standard 14
+//
+// BAL-12: окно задаётся ЧЕТВЁРТЫМ аргументом, потому что часть дерева стоит за ним.
+// `ai_stewardship` (линия «Хранителя») открыт с `dayGate: 15`, а стандартный прогон
+// длится 14 дней — узел невидим замеру by construction, и «0 исследований» у него
+// означает не слабый контент, а короткое окно. Живая сессия длиннее (`victory.ts`,
+// `SESSION_MAX_DAYS` — 100/60/30 дней по `timeScale`), так что прав тут контент.
+// Стандартные 14 дней НЕ трогаем: на них снят весь накопленный ряд замеров.
 //
 // Fairness controls per match index i: starts swap on i%2, the ORDERED faction pair
 // cycles on (i>>1)%12 — so "win rate by slot", "by faction" and "by start" separate cleanly.
@@ -14,6 +22,7 @@ import { build } from 'esbuild';
 
 const N = Math.max(1, Number(process.argv[2] ?? 20) || 20);
 const BASE_SEED = process.argv[3] ?? 'sp';
+const SESSION_DAYS = Math.max(1, Number(process.argv[4] ?? 14) || 14);
 
 const res = await build({
   entryPoints: ['prototype/src/game.ts'],
@@ -32,6 +41,8 @@ const {
   aiOrders,
   scoreParts,
   splitDeadContent,
+  researchableTechIds,
+  scientistGatedNodes,
   PLAYABLE_FACTIONS,
   HOUR,
   DAY,
@@ -67,14 +78,14 @@ const FACTION_PAIRS = FACTION_IDS.flatMap((a) =>
 // раньше занял территорию, после чего партия просто добегала до порога. Измерение от
 // этого было БИНАРНЫМ: «выиграл/проиграл» и ничего про то, НАСКОЛЬКО.
 //
-// Теперь у каждого матча одинаковая длина — 14 игровых дней, — и в конце ранжирование по
-// очкам (`victory` завершает матч причиной `timeout`, победитель = высший счёт). Это
-// делает сравнимыми условия: одни и те же две недели у всех, разный итоговый счёт.
+// Теперь у каждого матча ОДНА И ТА ЖЕ длина — по умолчанию 14 игровых дней (BAL-12
+// сделал её аргументом прогона, см. шапку), — и в конце ранжирование по очкам (`victory`
+// завершает матч причиной `timeout`, победитель = высший счёт). Сравнимость держится не
+// самим числом 14, а тем, что оно ОДНО на весь батч: разный только итоговый счёт.
 //
 // Как это выражено: досрочные концовки заглушены не отдельным флагом (его в ядре нет), а
 // НЕДОСТИЖИМЫМИ порогами — тем же приёмом, что и в `econplaytest.mjs`. Победа выбыванием
 // остаётся: если сторона потеряла всё, добивать сессию нечего.
-const SESSION_DAYS = 14;
 const CAP = (SESSION_DAYS + 3) * DAY; // harness safety net — `endsAt` срабатывает первым
 const config = {
   timeScale: 1,
@@ -645,8 +656,34 @@ const topTech = [...techTotal.entries()]
   .slice(0, 12)
   .map(([k, v]) => `${k}=${v}`)
   .join(' ');
-const techZeros = Object.keys(data.technologies ?? {}).filter((k) => !techTotal.has(k));
+// BAL-12: знаменатель «не исследовано ни разу» — НАСТОЯЩЕЕ дерево. Псевдоузлы
+// мета-прокачки (`meta_*`) не исследуются, а выдаются как `completed` на старте матча,
+// и пока они стояли в знаменателе, доля мёртвого дерева читалась меньше, чем есть.
+// Правило берётся из общего модуля — то же, которым окно дерева отбирает узлы игроку.
+const treeIds = researchableTechIds(data.technologies ?? {});
+const techZeros = treeIds.filter((k) => !techTotal.has(k));
 const techTotalCount = [...techTotal.values()].reduce((s, v) => s + v, 0);
+// Слой `has_scientist` с причиной каждого нуля: «некому расгейтить» (дыра ростера),
+// «замер до него не доживает» (`dayGate` за окном) и «достижим, но бот не взял».
+const sciRows = scientistGatedNodes(
+  data.technologies ?? {},
+  data.scientists ?? {},
+  techTotal,
+  SESSION_DAYS,
+);
+const sciGateLine = sciRows
+  .map((r) => {
+    const gate = `${r.branch ?? 'любая'}≥${r.minLevel}, с д${r.dayGate}`;
+    const verdict = !r.hasLeader
+      ? 'НЕТ УЧЁНОГО ВЕТКИ — дыра ростера, не баланс'
+      : r.outsideWindow
+        ? `ВНЕ ОКНА (прогон ${SESSION_DAYS}д) — невидим замеру, нерфить по нулю нельзя`
+        : r.researched > 0
+          ? `исследован ${r.researched}`
+          : 'достижим, но не взят ни разу ← вот это про БАЛАНС';
+    return `${r.id} [${gate}] — ${verdict}`;
+  })
+  .join(' · ');
 
 console.log(
   [
@@ -700,8 +737,11 @@ console.log(
       : null,
     `  техи       : ${techTotalCount} исследовано · ${topTech || '—'}`,
     techZeros.length
-      ? `  не исследованы ни разу (${techZeros.length}/${Object.keys(data.technologies ?? {}).length}): ${techZeros.join(' ')}`
+      ? `  не исследованы ни разу (${techZeros.length}/${treeIds.length}): ${techZeros.join(' ')}  ← знаменатель = НАСТОЯЩЕЕ дерево; псевдоузлы мета-прокачки (${Object.keys(data.technologies ?? {}).length - treeIds.length}) в него не входят: они выдаются грантом, а не исследуются (BAL-12)`
       : '  дерево технологий пройдено целиком ✓',
+    sciGateLine
+      ? `  учёные     : ${sciGateLine}  ← BAL-12: совет посвящают и БОТЫ (детерминированно по сиду матча), поэтому слой has_scientist наконец измерим. Окно прогона — 4-й аргумент: «вне окна» снимается прогоном длиннее гейта`
+      : null,
     '━'.repeat(70),
     // AUD-7: всё, что печатается человеку выше, отдаётся и машине. Раньше половина
     // показателей — разброс длины, раскладка исходов, первый бой, usage, мёртвый контент —
@@ -721,6 +761,10 @@ console.log(
         techResearched: techTotalCount,
         techUsage: Object.fromEntries(techTotal),
         deadTech: techZeros,
+        // BAL-12: знаменатель мёртвого дерева и разбор слоя `has_scientist` — машине
+        // тоже, иначе скилл `balance-analysis` снова начнёт парсить прозу (AUD-7).
+        treeSize: treeIds.length,
+        scientistGates: sciRows,
         snowball: decided ? snowballHits / decided : null,
         // BAL-5: разложение отрыва и его динамика.
         marginTerritory: avg(marginTerritory),
