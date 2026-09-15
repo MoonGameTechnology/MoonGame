@@ -290,13 +290,45 @@ body.mobile-ui #mobile-sheet.choosing #cmdbar {
   font-size: 19px;
   color: #87c6d9;
 }
+/* Full-bleed, not a floating card: the phone bar is edge-to-edge and square. A rounded
+   card cost 8px of margin and 1px of border on EACH side, and the corner radius ate the
+   ends of the row on top of that — 18px that row 1 does not have (see the crest/chip/day
+   budget in build.mjs). The base #top already steps its CONTENT inside the notch with
+   padding, so the background reaching the edge is safe; the bottom line and the shadow
+   keep the bar separated from the map. */
 body.mobile-ui #top {
-  margin: 6px max(8px, env(safe-area-inset-right)) 0 max(8px, env(safe-area-inset-left));
+  margin: 0;
   width: auto;
-  border: 1px solid #72a7bc42;
-  border-radius: 14px;
+  border: 0;
+  border-bottom: 1px solid #72a7bc42;
+  border-radius: 0;
   background: linear-gradient(130deg, #0b2130ed, #06131ff2);
   box-shadow: 0 5px 24px #0005;
+}
+/* Same reasoning one level in: the ✦ chip and the day card were boxes inside a box —
+   each paying a border, a radius and its own padding for a separation a single hairline
+   already gives (the resource row below has always been divided that way, and the desktop
+   console de-boxes its day card too). Flat, they read as one continuous bar and hand the
+   crest the pixels the boxes were holding. Both stay tappable: the chip still opens the
+   victory breakdown through the .dstat handler on #top. */
+body.mobile-ui #tbscore {
+  border: 0;
+  border-radius: 0;
+  padding: 0 8px;
+  background: none;
+}
+/* the de-boxed chip carries its own 8px of gap now, so the crest no longer pays a second
+   one on the same seam — that padding goes back to the nick */
+body.mobile-ui .crest {
+  padding-right: 0;
+}
+body.mobile-ui #daycard {
+  margin-left: 0;
+  padding: 0 0 0 10px;
+  border: 0;
+  border-left: 1px solid var(--line);
+  border-radius: 0;
+  background: none;
 }
 body.mobile-ui #topback,
 body.mobile-ui #crestmark {
@@ -323,7 +355,9 @@ body.mobile-ui #purse .res b {
 body.mobile-ui #devline {
   padding-left: 18px;
   padding-right: 18px;
-  top: calc(var(--tbh) + 10px + env(safe-area-inset-top));
+  /* the bar lost its 6px top margin, so the status line follows it up by the same 6px
+     and keeps the gap it had under the card */
+  top: calc(var(--tbh) + 4px + env(safe-area-inset-top));
 }
 body.mobile-ui #railtools {
   max-height: 65dvh;

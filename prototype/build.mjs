@@ -1824,15 +1824,6 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 @media (max-width:480px){
   #tbetacap{display:none;}
 }
-/* 320-360px phones are still ~17px short after that, and the standing is what loses them,
-   so the last pixels come out of PADDING (nothing readable is dropped): tighter crest and
-   ✦ chip, a narrower day card and the day number without its wide letter-spacing. */
-@media (max-width:360px){
-  .crest{padding:0 4px 0 2px;gap:6px;}
-  #tbscore{padding:2px 5px;}
-  #daycard{margin-left:6px;padding:4px 7px;}
-  #daycard b{letter-spacing:.4px;}
-}
 /* connect overlay — entry screen (sign in, then join a live session) */
 /* Identity is its OWN page, not an overlay: an OPAQUE full-screen backdrop so the live
    map/skirmish never shows through behind the welcome / registration / browser cards. */
