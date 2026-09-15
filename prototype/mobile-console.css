@@ -318,9 +318,10 @@ body.mobile-ui #tbscore {
   background: none;
 }
 /* the de-boxed chip carries its own 8px of gap now, so the crest no longer pays a second
-   one on the same seam — that padding goes back to the nick */
+   one on the same seam — that padding goes back to the nick, and the emblem sits straight
+   after the ‹ instead of behind 2px of its own */
 body.mobile-ui .crest {
-  padding-right: 0;
+  padding: 0;
 }
 body.mobile-ui #daycard {
   margin-left: 0;
@@ -330,9 +331,17 @@ body.mobile-ui #daycard {
   border-radius: 0;
   background: none;
 }
-body.mobile-ui #topback,
 body.mobile-ui #crestmark {
   min-width: 40px;
+  min-height: 40px;
+}
+/* The ‹ is an 8px glyph that was sitting in a 40px box: 16px of air to the screen edge and
+   18px more to the emblem, the widest gap in a row that has none to spare. Narrower box,
+   same glyph — 12px a side. The HEIGHT is what keeps it thumb-sized (it fills the 48px row,
+   and the hit area runs to the very screen edge, where a miss has nowhere to land), so the
+   width is the one dimension that can give; the emblem beside it keeps the full 40. */
+body.mobile-ui #topback {
+  width: 32px;
   min-height: 40px;
 }
 body.mobile-ui #purse {
