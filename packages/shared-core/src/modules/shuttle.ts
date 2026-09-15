@@ -60,7 +60,7 @@ import {
   tickRearm,
   trimHangar,
 } from '../state/shuttle';
-import { applyDamageToSide, isAllied, removeIfWiped } from '../util/combat';
+import { applyDamageToSide, beachheadOf, isAllied, removeIfWiped } from '../util/combat';
 import { requireOwnedIdleFleet } from '../util/fleet';
 import { addUnits, cappedUnitStat, findHealthyStack, sumUnitStat } from '../util/stacks';
 import { buildingLevel } from '../data/schemas';
@@ -563,22 +563,33 @@ function landCargo(h: HandlerContext, strike: ShuttleStrike, planet: Planet): vo
       (isAllied(h, owner, planet.owner) || hasMapShare(h.state, owner, planet.owner)));
   let landed = cargo;
   let mode: 'reinforce' | 'capture' | 'beachhead' | 'lost' = 'lost';
+  // MSB-4: свой плацдарм на этом мире и чужие — разные случаи. Свой принимает
+  // подкрепление, чужие больше не запрещают высадку, но запрещают тихий захват пустого
+  // мира: за него уже дерутся.
+  const own = beachheadOf(h.state, planet.id, owner);
+  const others = (planet.beachheads ?? []).some((b) => b.owner !== owner);
 
   if (cargo.length === 0) {
     mode = 'lost';
   } else if (friendly) {
     for (const st of cargo) addUnits(planet.garrison, st.unit, st.count);
     mode = 'reinforce';
-  } else if (planet.beachhead?.owner === owner) {
+  } else if (own) {
     // Свой плацдарм уже на земле — подкрепление в идущий бой. Ссылка стороны адресует
-    // МИР, а не снимок стеков, поэтому подошедшие войска считаются со следующего раунда.
-    for (const st of cargo) addUnits(planet.beachhead.units, st.unit, st.count);
+    // ПАРУ (мир, владелец), а не снимок стеков, поэтому подошедшие войска считаются со
+    // следующего раунда.
+    for (const st of cargo) addUnits(own.units, st.unit, st.count);
     mode = 'beachhead';
-  } else if (planet.beachhead || groundBattleAt(h, planet.id)) {
-    landed = []; // за мир дерётся другой — садиться некуда
   } else if (!isCapturable(h.ctx.data, planet)) {
     landed = []; // пустое пространство не занимают пехотой
-  } else if (!planet.garrison.some((st) => st.count > 0)) {
+  } else if (
+    !planet.garrison.some((st) => st.count > 0) &&
+    !others &&
+    !groundBattleAt(h, planet.id)
+  ) {
+    // Fail-secure: тихо занять мир можно, только если за него НИКТО не дерётся. Чужой
+    // плацдарм или идущий наземный бой (например, высадка с флота) означают, что мир
+    // спорный, — тогда ниже заводится свой берег, а не захват без боя.
     const previous = planet.owner;
     planet.owner = owner;
     planet.garrison = cargo.map((st) => ({ ...st }));
@@ -591,7 +602,11 @@ function landCargo(h: HandlerContext, strike: ShuttleStrike, planet: Planet): vo
     });
     mode = 'capture';
   } else {
-    planet.beachhead = { owner, units: cargo.map((st) => ({ ...st })) };
+    // MSB-4: СВОЙ берег у каждого штурмующего (решение владельца §0.0 №3). Раньше здесь
+    // стоял отказ «за мир дерётся другой — садиться некуда»: плацдарм был один, и второй
+    // десант просто терял груз. Push в конец — порядок списка это порядок ВЫСАДКИ, по
+    // которому §0.0 №4 решает, чей мир.
+    (planet.beachheads ??= []).push({ owner, units: cargo.map((st) => ({ ...st })) });
     // Бой начинает МОДУЛЬ БОЯ, услышав событие: модули не зовут друг друга напрямую
     // (инвариант «только через шину»), и `startBattle` живёт там же, где все остальные
     // правила боя. Нет модуля боя — плацдарм просто стоит, а не падает.

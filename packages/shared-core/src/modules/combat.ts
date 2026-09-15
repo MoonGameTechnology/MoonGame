@@ -350,9 +350,20 @@ function assaultPlanet(h: HandlerContext, fleet: Fleet): string | null {
   // One ground battle per garrison: two concurrent assaults would SHARE the same
   // garrison defender ref — double return fire, a stale second capture, and the
   // second deposit overwriting the first winner's garrison (bug-hunt MAJOR).
+  let joined: Battle | null = null;
   for (const id of Object.keys(h.state.battles).sort()) {
     const b = h.state.battles[id];
-    if (b && b.phase === 'ground' && b.location === at) return 'E_UNDER_ASSAULT';
+    if (b && b.phase === 'ground' && b.location === at) {
+      // MSB-4: второй штурм больше не отбивается — он ВСТУПАЕТ в идущий наземный бой
+      // своей стороной (решение владельца §0.0 №3 «свой плацдарм у каждого»). Прежний
+      // запрет стоял не против совместного штурма, а против ДВУХ БОЁВ за один гарнизон:
+      // они делили бы одну ссылку защитника, и тот отвечал бы дважды за раунд и мог быть
+      // захвачен дважды подряд. Один бой на гарнизон остаётся — просто сторон в нём
+      // больше. Десант адресуется своим флотом, поэтому ссылки не сливаются.
+      if (!(fleet.landing ?? []).some((x) => x.count > 0)) return 'E_NO_TROOPS';
+      joined = b;
+      break;
+    }
   }
   // Contested orbit blocks the landing while ANY hostile fleet holds the node —
   // including one locked in a battle. `findEnemyFleetAt` skips battleId fleets (it
@@ -364,6 +375,15 @@ function assaultPlanet(h: HandlerContext, fleet: Fleet): string | null {
     if (f.units.some((s) => s.count > 0) && isHostile(h, fleet.owner, f.owner)) {
       return 'E_ORBIT_CONTESTED'; // beat the defending fleet first
     }
+  }
+  if (joined) {
+    joined.sides.push({
+      ref: { kind: 'landing', fleetId: fleet.id },
+      owner: fleet.owner,
+      role: 'attacker',
+    });
+    h.emit('battle.joined', { battleId: joined.id, location: at, fleetId: fleet.id, owner: fleet.owner });
+    return null;
   }
   const defended = (planet.garrison ?? []).some((s) => s.count > 0);
   if (defended) {
@@ -545,14 +565,39 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
   // выигравший десант становится гарнизоном, проигравший исчезает вместе с боем.
   // Иначе на карте завелись бы вечные «чужие войска на моей земле», которых в модели
   // нет и заводить которые этот кирпич не стал.
-  if (battle.phase === 'ground' && attacker.ref.kind === 'beachhead') {
+  let resumeAssaultFor: string | null = null;
+  if (battle.phase === 'ground' && battle.sides.some((x) => x.ref.kind === 'beachhead')) {
     const planet = h.state.planets[battle.location];
-    const force = planet?.beachhead;
-    if (planet && force) {
-      if (aAlive && !dAlive && planet.owner === defender.owner) {
-        capturePlanetByBeachhead(h, planet, force, defender.owner);
+    if (planet) {
+      // МИР ПОЛУЧАЕТ ВЛАДЕЛЕЦ САМОГО РАННЕГО ВЫЖИВШЕГО ПЛАЦДАРМА (MSB-4, решение
+      // владельца §0.0 №4 «тому, кто начал штурм»). Порядок списка — порядок высадки,
+      // поэтому «первый» читается прямо из состояния, без счёта вклада и без новых
+      // полей. «ВЫЖИВШЕГО» — это край, которого вопрос не покрывал и который назван
+      // допущением в §0.0 №4: если первый берег выбит, а мир дожал второй, отдавать
+      // мир мёртвому значило бы отдать его тому, кого на земле уже нет.
+      const alive = (planet.beachheads ?? []).filter((b) => b.units.some((st) => st.count > 0));
+      if (!dAlive && alive[0] && planet.owner === defender.owner) {
+        capturePlanetByBeachhead(h, planet, alive[0], defender.owner);
       }
-      delete planet.beachhead;
+      if (!dAlive || alive.length === 0) {
+        // Гарнизон пал (мир взят) либо все берега выбиты — поля после боя не остаётся.
+        // Иначе на карте завелись бы вечные «чужие войска на моей земле», которых в
+        // модели нет: плацдарм ВРЕМЕННЫЙ по определению.
+        delete planet.beachheads;
+      } else {
+        // ГАРНИЗОН ЖИВ, А КТО-ТО НА БЕРЕГУ ЕЩЁ ДЕРЖИТСЯ. Такое стало возможно только с
+        // MSB-4: цепочка (§0.0 №5) закрывает бой на ЛЮБОЙ смерти, и раньше эта смерть
+        // всегда была концом штурма — штурмующий был один. Теперь гибель одного из
+        // десантов не отменяет штурм остальных, поэтому выбитые берега убираются, а
+        // уцелевшие остаются и штурм ПРОДОЛЖАЕТСЯ новым боем. Стереть их здесь значило
+        // бы отнять у живого десанта землю за то, что рядом погиб союзник.
+        planet.beachheads = alive;
+        // Перезапуск штурма объявляется НИЖЕ, после удаления этого боя: обработчик
+        // `beachhead.landed` ищет идущий наземный бой на мире и, увидев ещё не удалённый,
+        // «вступил» бы в бой, который через строку исчезнет, — берег остался бы на земле
+        // без боя вовсе.
+        resumeAssaultFor = alive[0]?.owner ?? null;
+      }
     }
   }
 
@@ -562,11 +607,25 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
   // ходит, не стреляет и не освобождается, потому что освобождать его больше некому.
   for (const side of battle.sides) releaseOrDestroyFleet(h, side.ref);
   delete h.state.battles[battle.id];
+  // Штурм продолжают уцелевшие берега (MSB-4): теперь, когда прежний бой удалён,
+  // обработчик заведёт новый и подтянет в него остальные плацдармы.
+  if (resumeAssaultFor !== null) {
+    h.emit('beachhead.landed', { planetId: battle.location, owner: resumeAssaultFor });
+  }
   h.emit('battle.resolved', {
     battleId: battle.id,
     location: battle.location,
     phase: battle.phase,
     winner,
+    // MSB-4: победителей может быть НЕСКОЛЬКО — совместный штурм кончается тем, что
+    // гарнизон пал, а на земле стоят два союзных десанта. `winner` при этом честно
+    // null (он есть, только когда выжил ровно один), и потребитель, знающий лишь его,
+    // молча не начислит ничего. Поэтому рядом едет полный список: мир по-прежнему
+    // достаётся ПЕРВОМУ (§0.0 №4), а вот трофеи делятся — иначе помощь не окупалась бы
+    // вовсе и совместный штурм не имел бы смысла.
+    winners: stalemate
+      ? []
+      : [...new Set(aliveSides.map((x) => x.owner).filter((o): o is string => o !== null))].sort(),
     rounds: battle.round,
     end,
   });
@@ -769,21 +828,32 @@ export const combatModule: GameModule = {
     api.on('beachhead.landed', (event, h) => {
       const { planetId } = event.payload as { planetId?: string };
       if (typeof planetId !== 'string') return;
+      const owner = (event.payload as { owner?: string }).owner;
       const planet = h.state.planets[planetId];
-      const force = planet?.beachhead;
-      if (!planet || !force) return;
-      // Тот же гейт, что у второго штурма: два боя за один гарнизон делили бы одну
-      // ссылку защитника — двойной ответный огонь и два захвата подряд.
+      if (!planet || typeof owner !== 'string') return;
+      const force = (planet.beachheads ?? []).find((b) => b.owner === owner);
+      if (!force) return;
+      const ref: CombatantRef = { kind: 'beachhead', planetId, owner };
+      // MSB-4: один наземный бой на гарнизон — ПО-ПРЕЖНЕМУ один (две ссылки на один
+      // гарнизон дали бы двойной ответный огонь и два захвата подряд). Но второй десант
+      // теперь не отбивается, а ВСТУПАЕТ в этот бой своей стороной — решение владельца
+      // §0.0 №3 «свой плацдарм у каждого». Роль та же, что у всех вступающих (MSB-3):
+      // атакующий.
       for (const id of Object.keys(h.state.battles).sort()) {
         const b = h.state.battles[id];
-        if (b && b.phase === 'ground' && b.location === planetId) return;
+        if (!b || b.phase !== 'ground' || b.location !== planetId) continue;
+        if (!b.sides.some((x) => x.ref.kind === 'beachhead' && x.ref.owner === owner)) {
+          b.sides.push({ ref, owner, role: 'attacker' });
+          h.emit('battle.joined', { battleId: b.id, location: planetId, owner });
+        }
+        return;
       }
       startBattle(h, {
         id: `battle:${h.state.battleSeq++}`,
         location: planetId,
         phase: 'ground',
         sides: [
-          { ref: { kind: 'beachhead', planetId }, owner: force.owner, role: 'attacker' },
+          { ref, owner: force.owner, role: 'attacker' },
           { ref: { kind: 'garrison', planetId }, owner: planet.owner, role: 'defender' },
         ],
         round: 0,

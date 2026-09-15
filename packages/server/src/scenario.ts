@@ -175,7 +175,13 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '19'; // MSB-3: бой ВТЯГИВАЕТ стоящих рядом.
+export const MODULE_MANIFEST_VERSION = '20'; // MSB-4: у каждого штурмующего СВОЙ берег.
+// Форма состояния изменилась дважды: `planet.beachhead` (одно поле) стал списком
+// `planet.beachheads`, а ссылка стороны `{kind:'beachhead'}` получила обязательное поле
+// `owner`. Матч на манифесте 19 несёт плацдарм СТАРОЙ формы: новый граф его не увидит
+// вовсе (читается другое имя), то есть идущий штурм молча исчезнет с земли, а ссылка без
+// владельца не найдёт войск и сторона окажется пустой. Отказ загрузки честнее. (До 20:)
+// export const MODULE_MANIFEST_VERSION = '19'; // MSB-3: бой ВТЯГИВАЕТ стоящих рядом.
 // Форма состояния НЕ менялась — и это тот случай, когда бампать всё равно надо. Правило
 // изменилось так, что идущий матч разницу УВИДИТ: флот, стоящий на узле с чужим боем,
 // раньше оставался зрителем сколько угодно долго, а теперь втягивается в бой — и это
