@@ -87,11 +87,12 @@ export function blitGlow(
   a: number,
 ): void {
   if (a <= 0.004) return;
+  const alpha = ctx.globalAlpha;
   const spr = glowSprite(dpr, color, r, frequentRead(ctx));
   const rad = Math.max(4, Math.round(r));
-  ctx.globalAlpha = Math.min(1, a);
+  ctx.globalAlpha = alpha * Math.min(1, a);
   ctx.drawImage(spr, x - rad, y - rad, rad * 2, rad * 2);
-  ctx.globalAlpha = 1;
+  ctx.globalAlpha = alpha;
 }
 
 // A 4×4 wireframe atlas per colour/DPR/read setting. Rotation is a source-rectangle choice, not
