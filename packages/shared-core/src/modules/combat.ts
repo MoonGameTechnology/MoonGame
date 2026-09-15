@@ -825,6 +825,49 @@ export const combatModule: GameModule = {
      * правила боя (в том числе «один наземный бой на гарнизон») живут здесь. Нет
      * модуля боя — событие никто не слышит, плацдарм стоит, ядро не падает.
      */
+    /**
+     * ИГРОК ВЫБЫЛ — его стороны уходят из боёв (MSB-5, сценарий S18).
+     *
+     * Выбывание удаляет флоты выбывшего (`victory.ts`), и для морского боя этого
+     * хватало. Но плацдарм держит МИР, а не флот: он оставался на земле живой стороной,
+     * за которой больше никого нет. Такая сторона не может ни победить, ни проиграть
+     * осмысленно — а после MSB-4 она ещё и ЗАХВАТЫВАЛА мир: захват отдаёт его владельцу
+     * самого раннего выжившего берега, и «выживший» проверяется по войскам, а не по
+     * тому, остался ли в партии игрок.
+     *
+     * Убирает это МОДУЛЬ БОЯ, услышав событие, а не модуль победы своей рукой: правила
+     * боя живут здесь, и `victory` не должен знать ни про плацдармы, ни про стороны
+     * (инвариант #3 — только через шину).
+     */
+    api.on('player.eliminated', (event, h) => {
+      const playerId = (event.payload as { playerId?: unknown }).playerId;
+      if (typeof playerId !== 'string') return;
+      for (const planetId of Object.keys(h.state.planets).sort()) {
+        const planet = h.state.planets[planetId];
+        if (!planet?.beachheads) continue;
+        const left = planet.beachheads.filter((b) => b.owner !== playerId);
+        if (left.length === planet.beachheads.length) continue;
+        if (left.length > 0) planet.beachheads = left;
+        else delete planet.beachheads;
+      }
+      for (const id of Object.keys(h.state.battles).sort()) {
+        const battle = h.state.battles[id];
+        if (!battle) continue;
+        const left = battle.sides.filter((side) => side.owner !== playerId);
+        if (left.length === battle.sides.length) continue;
+        // Сторона уходит вместе с игроком, а флот, если он ещё цел, освобождается —
+        // иначе он остался бы с `battleId` на бой, в котором его больше нет.
+        for (const side of battle.sides) {
+          if (side.owner === playerId) releaseOrDestroyFleet(h, side.ref);
+        }
+        battle.sides = left;
+        // Драться стало некому — бой закрывается как перемирие: победителя в нём нет
+        // (выбывание не победа), и цепочка «победитель сцепляется со следующим» здесь
+        // неуместна.
+        if (left.length < 2) finishBattle(h, battle, 'ceasefire');
+      }
+    });
+
     api.on('beachhead.landed', (event, h) => {
       const { planetId } = event.payload as { planetId?: string };
       if (typeof planetId !== 'string') return;
