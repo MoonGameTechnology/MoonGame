@@ -310,3 +310,90 @@ describe('AI-BAL-4 — то, что оставлено боту НЕнужным
     expect(orders).not.toContain('frigate');
   });
 });
+
+/**
+ * НОСИТЕЛЬ У БОТА (решение владельца 2026-09-15).
+ *
+ * Замер показал ноль вылетов при живой постройке челноков, и причина не в ядре: бот
+ * поднимал удар ТОЛЬКО с домашнего порта, а радиус челнока 120–150 — чужих миров так
+ * близко к дому почти не бывает. Война идёт на фронтире, порт стоит дома.
+ *
+ * Носитель и есть задуманный ответ: «плавучий космопорт» (`shuttle_carrier`, ангар 6)
+ * возит эскадры с флотом. Бот учится трём шагам — построить, загрузить, поднять с борта;
+ * возит носитель существующая логика флота, своей ему не заводим.
+ */
+describe('SHU-2.1 — бот и НОСИТЕЛЬ челноков', () => {
+  /** Свой носитель, стоящий у мира `at`. */
+  const carrierAt = (s: GameState, at: string, hangar: Squadron[] = []): void => {
+    s.fleets['p2_carrier'] = {
+      id: 'p2_carrier',
+      owner: 'p2',
+      location: at,
+      movement: null,
+      units: [{ unit: 'shuttle_carrier', count: 1 }],
+      ...(hangar.length ? { hangar } : {}),
+    } as GameState['fleets'][string];
+  };
+
+  it('на войне с портом бот ЗАКАЗЫВАЕТ носитель', () => {
+    const s = withPort(rich(game2()));
+    expect(unitsBuilt(aiOrders(s, 'p2', 'expand', 'strong'))).toContain('shuttle_carrier');
+  });
+
+  it('в мирное время носитель не нужен — возить некуда', () => {
+    const s = withPort(rich(game2(), false));
+    expect(unitsBuilt(aiOrders(s, 'p2', 'expand', 'strong'))).not.toContain('shuttle_carrier');
+  });
+
+  it('носитель у порта с эскадрой — бот ГРУЗИТ её на борт', () => {
+    const s = withPort(rich(game2()));
+    const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
+    home.hangar = [{ id: 'sq:b', units: [{ unit: 'bomber', count: 2 }] }];
+    carrierAt(s, home.id);
+    const loads = only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.load');
+    expect(loads).toHaveLength(1);
+    expect((loads[0]!.payload as { fleetId: string; squadronId: string })).toEqual({
+      fleetId: 'p2_carrier',
+      squadronId: 'sq:b',
+    });
+  });
+
+  it('ПУСТОЙ порт грузить нечем — приказа нет', () => {
+    const s = withPort(rich(game2()));
+    const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
+    carrierAt(s, home.id);
+    expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.load')).toEqual([]);
+  });
+
+  it('С БОРТА НОСИТЕЛЯ УДАР УХОДИТ — ради этого он и заведён', () => {
+    const s = rich(game2());
+    const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
+    // Носитель стоит у ЧУЖОГО мира — там, куда дом не достаёт.
+    const far = Object.values(s.planets)
+      .filter((p) => p.id !== home.id && p.owner === null)
+      .sort(
+        (a, b) =>
+          Math.hypot(b.position.x - home.position.x, b.position.y - home.position.y) -
+          Math.hypot(a.position.x - home.position.x, a.position.y - home.position.y),
+      )[0]!;
+    far.owner = 'p1';
+    carrierAt(s, far.id, [{ id: 'sq:b', units: [{ unit: 'bomber', count: 2 }] }]);
+    const out = only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.strike');
+    expect(out).toHaveLength(1);
+    const p = out[0]!.payload as { fleetId?: string; planetId?: string };
+    expect(p.fleetId).toBe('p2_carrier'); // база вылета — БОРТ, а не дом
+    expect(p.planetId).toBeUndefined();
+    // И приказ проходит ЯДРО, а не только выглядит правильным.
+    expect(kernel.applyAction(s, out[0]!, ctx(s.time)).ok).toBe(true);
+  });
+
+  it('ИДУЩИЙ носитель вылета не поднимает — ядро пускает только со стоянки', () => {
+    const s = rich(game2());
+    const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
+    const far = Object.values(s.planets).find((p) => p.id !== home.id && p.owner === null)!;
+    far.owner = 'p1';
+    carrierAt(s, far.id, [{ id: 'sq:b', units: [{ unit: 'bomber', count: 2 }] }]);
+    s.fleets.p2_carrier!.movement = { from: far.id, to: home.id, departedAt: 0, arrivesAt: 1e9 };
+    expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.strike')).toEqual([]);
+  });
+});

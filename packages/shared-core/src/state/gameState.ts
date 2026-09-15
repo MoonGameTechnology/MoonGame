@@ -368,8 +368,18 @@ export interface Planet {
    *  держит МИР, потому что держать больше некому.
    *
    *  Владелец здесь обязателен: без него после гибели последнего защитника было бы
-   *  непонятно, кому достался мир. Undefined = плацдарма нет. */
-  beachhead?: { owner: PlayerId; units: UnitStack[] };
+   *  непонятно, кому достался мир.
+   *
+   *  MSB-4: это СПИСОК, а не одно поле — решение владельца §0.0 №3 «у каждого
+   *  штурмующего свой плацдарм». Мир за одного хозяина по-прежнему дерётся один, но
+   *  штурмовать его могут сразу несколько, и каждый держит свой берег. **Порядок в
+   *  списке — это порядок ВЫСАДКИ**, и он значащий: по решению §0.0 №4 мир получает
+   *  владелец самого раннего ВЫЖИВШЕГО плацдарма, то есть тот, кто начал штурм. Push в
+   *  порядке действий детерминирован, поэтому «первый» — факт состояния, а не гонка.
+   *  Не заводить сюда сортировку и не переставлять элементы.
+   *
+   *  Undefined или пустой список = плацдармов нет. */
+  beachheads?: Array<{ owner: PlayerId; units: UnitStack[] }>;
   /** Orders waiting their turn on this world (BLD-1; see `QueuedConstruction`).
    *  Undefined/empty = nothing waiting. */
   buildQueue?: QueuedConstruction[];
@@ -535,7 +545,11 @@ export interface Fleet {
 export type CombatantRef =
   | { kind: 'fleet'; fleetId: FleetId }
   | { kind: 'landing'; fleetId: FleetId }
-  | { kind: 'beachhead'; planetId: PlanetId }
+  /** MSB-4: ВЛАДЕЛЕЦ входит в ссылку. Пока плацдарм был один, мира хватало, чтобы его
+   *  назвать; с несколькими десантами на одном мире ссылка без владельца адресовала бы
+   *  их всех разом — стороны боя схлопнулись бы в одну, и совместный штурм считался бы
+   *  как одиночный. */
+  | { kind: 'beachhead'; planetId: PlanetId; owner: PlayerId }
   | { kind: 'garrison'; planetId: PlanetId };
 
 export interface BattleSide {

@@ -272,11 +272,15 @@ describe('ROS-1.5 — высадка (правила 3–6)', () => {
   it('ОБОРОНЯЕМЫЙ ЧУЖОЙ МИР — ПЛАЦДАРМ: наземный бой начинается БЕЗ единого корабля', () => {
     const s = world({ target: { garrison: [['militia', 2]] } });
     const { state } = advance(apply(s, drop()), 2);
-    expect(state.planets.B?.beachhead?.owner).toBe('p1');
-    expect(count(state.planets.B?.beachhead?.units, 'militia')).toBe(4);
+    expect(state.planets.B?.beachheads?.map((b) => b.owner)).toEqual(['p1']);
+    expect(count(state.planets.B?.beachheads?.[0]?.units, 'militia')).toBe(4);
     const battle = Object.values(state.battles)[0];
     expect(battle?.phase).toBe('ground');
-    expect(battle && attackerOf(battle)?.ref).toEqual({ kind: 'beachhead', planetId: 'B' });
+    expect(battle && attackerOf(battle)?.ref).toEqual({
+      kind: 'beachhead',
+      planetId: 'B',
+      owner: 'p1',
+    });
     expect(state.planets.B?.owner).toBe('p2'); // мир ещё не взят — за него дерутся
   });
 
@@ -284,7 +288,7 @@ describe('ROS-1.5 — высадка (правила 3–6)', () => {
     const s = world({ target: { garrison: [['militia', 1]] } });
     const { state } = advance(apply(s, drop()), 40);
     expect(state.planets.B?.owner).toBe('p1');
-    expect(state.planets.B?.beachhead).toBeUndefined();
+    expect(state.planets.B?.beachheads).toBeUndefined();
     expect(count(state.planets.B?.garrison, 'militia')).toBeGreaterThan(0);
     expect(Object.keys(state.battles)).toEqual([]);
   });
@@ -293,7 +297,7 @@ describe('ROS-1.5 — высадка (правила 3–6)', () => {
     const s = world({ target: { garrison: [['guard', 3]] } });
     const { state } = advance(apply(s, drop()), 40);
     expect(state.planets.B?.owner).toBe('p2');
-    expect(state.planets.B?.beachhead).toBeUndefined();
+    expect(state.planets.B?.beachheads).toBeUndefined();
     expect(Object.keys(state.battles)).toEqual([]);
   });
 
@@ -301,7 +305,7 @@ describe('ROS-1.5 — высадка (правила 3–6)', () => {
     const s = world({ target: { owner: 'p1', garrison: [['militia', 1]] } });
     const { state } = advance(apply(s, drop()), 2);
     expect(count(state.planets.B?.garrison, 'militia')).toBe(5);
-    expect(state.planets.B?.beachhead).toBeUndefined();
+    expect(state.planets.B?.beachheads).toBeUndefined();
     expect(Object.keys(state.battles)).toEqual([]);
   });
 });
@@ -312,7 +316,7 @@ describe('ROS-1.5 — зональное ПВО режет груз (прави�
     const s = world({ target: { buildings: ['zonal_aa'] } });
     const { state } = advance(apply(s, drop()), 2);
     expect(state.planets.B?.owner).toBe('p2');
-    expect(state.planets.B?.beachhead).toBeUndefined();
+    expect(state.planets.B?.beachheads).toBeUndefined();
   });
 
   it('уцелевшая половина довозит свою половину груза', () => {
