@@ -41,15 +41,27 @@ Monorepo (pnpm workspaces):
   Capacitor iOS), not React Native — see `docs/cross-platform-roadmap.md` (decision record). Holds
   the `MultiplayerClient` transport adapter plus framework-agnostic view-models + theme tokens
   (`welcomeScreen.ts` — welcome screen; `matchHud.ts` — status bar / fleet selection / battle
-  panel; `theme.ts`); the app shell is a working Vite scaffold (welcome + live map over the
-  shared render kit + `?join=` deep-link speaking `action.v1`) — the full in-match HUD is
-  still ahead, so the players' playable client remains `prototype/`. `mobile/` is the thin
-  Capacitor wrapper (APK).
+  panel; `theme.ts`). **Поток MIG закрыл два прежних пробела** (сверено 2026-09-15): MIG-2 дал
+  пакету собственный вход — `session.ts` делает `POST /auth/login`, обзор партий и занятие
+  места, так что ссылка `?join=` с готовым ws-адресом больше не единственная дверь; MIG-3 дал
+  недостающую половину HUD — `hudView.ts` рисует то, что `matchHud.ts` только описывал
+  (модель проецирует, рендер рисует, и `matchHud` по-прежнему не знает про DOM). Играбельным
+  для игроков остаётся `prototype/`, но разрыв уже не «HUD впереди». `mobile/` — тонкая
+  обёртка Capacitor (APK).
 - `packages/protocol` — the wire contract between server and client, declared ONCE and imported
   by both (NETA2-4). Each side used to hand-write its own copy; a type-only parity test caught
   the drift but could not remove the mirror. The client depends on this package and NOT on
   `@void/server`, so no server code reaches the browser bundle — it imports types only, and the
   runtime half (`parseClientMessage`/`serializeServerMessage`) tree-shakes away.
+- `decisions/` — **корневая папка, НЕ пакет**: чистые решения, общие обоим клиентам
+  (`decisions/README.md`). «Что показать вместо списка», «куда вести игрока после отказа»,
+  «можно ли нажимать кнопку» — чистая функция + типы + тест рядом, ни DOM, ни сети, ни
+  таймеров. Устроена как `/localization`: лежит в корне, оба клиента импортируют
+  относительным путём, настраивать сборку не надо. Сегодня 51 модуль, их читают 23 файла
+  прототипа и 8 файлов `packages/client`. **Заводя клиентское решение, клади его СЮДА,
+  а не внутрь `prototype/src`** — поток REFM вынес больше сотни таких решений внутрь
+  прототипа, и каждое улучшало ровно тот клиент, который планируется заменить. Правила
+  МИРА сюда не кладут: они в `packages/shared-core`.
 - `data/` — game content as JSON. `docs/` — design docs.
 
 ## Commands
