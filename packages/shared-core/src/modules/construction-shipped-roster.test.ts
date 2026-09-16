@@ -83,6 +83,9 @@ const SELF_RESTRICTED = [
   // appears only with the fortress itself, placed by `station.deploy`. Without this the
   // core would be buildable on a planet, which has no roster at all.
   'starfort',
+  // Ангар крепости (owner decision 14): её собственное здание под челноки, `onlyOn`
+  // держит его на крепости и нигде больше.
+  'void_hangar',
 ];
 
 /** Every shipped province type, and what it hosts. `null` = roster-less: anything in the
@@ -105,13 +108,14 @@ const EXPECTED: Record<string, string[] | null> = {
   // after it is destroyed, otherwise conversion would take the node's ore away for good.
   void_station: [
     'shipyard',
-    'spaceport',
+    // `spaceport` уехал отсюда решением 14 — его место занял `void_hangar` ниже.
     'radar',
     'fort',
     'power_plant',
     'fabricator',
     'orbital_aa',
     'metal_station',
+    'void_hangar',
   ],
 };
 

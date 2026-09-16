@@ -46,9 +46,12 @@ const yards = Object.keys(data.buildings).filter((b) => data.buildings[b]!.enabl
 const hangars = Object.keys(data.buildings).filter((b) => (data.buildings[b]!.shuttleBay ?? 0) > 0);
 
 describe('верфь и космопорт — разные здания с разными ролями', () => {
-  it('ровно одно здание строит корабли и ровно одно держит челноки, и это НЕ одно здание', () => {
+  it('корабли строит ОДНО здание, челноки базируют другие — и это НЕ одно и то же здание', () => {
+    // Суть правила — РАЗДЕЛЕНИЕ РОЛЕЙ, а не «ангар в мире один». Решение владельца 14
+    // (FORT-5.7) завело второй ангар намеренно: у крепости своё здание под челноки, а не
+    // наземный космопорт планеты. Список выписан поимённо, чтобы третий не появился молча.
     expect(yards).toEqual(['shipyard']);
-    expect(hangars).toEqual(['spaceport']);
+    expect([...hangars].sort()).toEqual(['spaceport', 'void_hangar']);
     expect(yards.some((b) => hangars.includes(b))).toBe(false);
   });
 

@@ -103,13 +103,13 @@
     "orbit": true,
     "allowedBuildings": [
       "shipyard",
-      "spaceport",
       "radar",
       "fort",
       "power_plant",
       "fabricator",
       "orbital_aa",
-      "metal_station"
+      "metal_station",
+      "void_hangar"
     ],
     "appearance": {
       "color": "#5f8f8c",

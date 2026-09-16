@@ -628,5 +628,23 @@
     "hp": 16,
     "scoreValue": 3,
     "creditsBonus": 0.25
+  },
+  "void_hangar": {
+    "name": "Fortress Hangar",
+    "cost": {
+      "metal": 180,
+      "credits": 70
+    },
+    "buildTimeHours": 5,
+    "hp": 25,
+    "produces": {
+      "credits": 5
+    },
+    "shipRepair": 0.05,
+    "shuttleBay": 6,
+    "scoreValue": 4,
+    "onlyOn": [
+      "void_station"
+    ]
   }
 }
