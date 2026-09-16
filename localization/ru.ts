@@ -260,7 +260,7 @@ export const ru: Record<string, string> = {
   'hint.wing-empty': '✖ поднимать нечего — ангар пуст',
   'side.build.open': 'Построить',
   'side.fortress.raise': 'Возвести крепость',
-  'side.wing.blocked.busy': 'вылет только со стоянки — носитель не на месте',
+  'side.wing.blocked.busy': 'носитель в бою — звеньям не до вылета',
   'side.wing.blocked.empty': 'ангар пуст — поднимать нечего',
   'side.wing.cargo': 'в трюме: {n}',
   'side.wing.duty.off': '🛩 Дежурный вылет',

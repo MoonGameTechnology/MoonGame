@@ -283,3 +283,98 @@ describe('носитель — ангар не переживает свои к�
     expect(aboard(s)).toBe(0);
   });
 });
+
+/**
+ * ВЫЛЕТ С ИДУЩЕГО НОСИТЕЛЯ (решение владельца 2026-09-16).
+ *
+ * До этого база-носитель обязана была СТОЯТЬ: `requireOwnedIdleFleet` отбивал приказ
+ * `E_FLEET_BUSY`, и обоснование в коде звучало так — «порт не двигается, и вылет с
+ * разгоняющегося носителя пришлось бы догонять». Обоснование устарело раньше, чем
+ * сменилось правило: SHU-4.4 научил удар ДОГОНЯТЬ движущуюся цель, а `turnHome` и так
+ * берёт позицию базы ЖИВОЙ («носитель мог сдвинуться, пока челноки летели»). То есть
+ * догонять уже умели — запрещали только взлёт.
+ *
+ * Новое правило: носитель обязан быть СВОИМ и не быть заперт в бою. Движение больше не
+ * помеха — ни по лейну, ни между узлами.
+ */
+describe('SHU-2.1 — вылет с носителя НА ХОДУ', () => {
+  /** Носитель в пути между FWD и FOE: середина перегона, узла под ним нет. */
+  function underway(s: GameState): GameState {
+    const cv = s.fleets.CV!;
+    return {
+      ...s,
+      fleets: {
+        ...s.fleets,
+        CV: {
+          ...cv,
+          location: null,
+          movement: {
+            from: 'FWD',
+            to: 'FOE',
+            departedAt: s.time - 3_600_000,
+            arrivesAt: s.time + 3_600_000,
+          },
+        },
+      },
+    };
+  }
+
+  it('ИДУЩИЙ носитель поднимает вылет — раньше это был E_FLEET_BUSY', () => {
+    const s = underway(deploy(load(world(), 2)));
+    expect(code(s, act('shuttle.strike', { fleetId: 'CV', squadronId: 'sq:1', targetFleetId: 'E1' }))).toBeNull();
+  });
+
+  it('радиус считается от ЖИВОЙ позиции идущего носителя, а не от узла вылета', () => {
+    // На середине перегона FWD(900) → FOE(1000) носитель стоит в 950, то есть в 50 от
+    // цели: радиус 180 покрывает. Стой он у FWD — 100, тоже покрывает; поэтому цель
+    // проверяется иначе: отодвигаем носитель НАЗАД так, чтобы достал только он.
+    const s = deploy(load(world(), 2));
+    const far = {
+      ...s,
+      fleets: {
+        ...s.fleets,
+        CV: {
+          ...s.fleets.CV!,
+          location: null,
+          // Перегон HOME(0) → FOE(1000), пройдено 90%: носитель в 900, до цели 100.
+          movement: { from: 'HOME', to: 'FOE', departedAt: s.time - 9 * 3_600_000, arrivesAt: s.time + 3_600_000 },
+        },
+      },
+    };
+    expect(code(far, act('shuttle.strike', { fleetId: 'CV', squadronId: 'sq:1', targetFleetId: 'E1' }))).toBeNull();
+    // А в самом начале того же перегона (10%: позиция 100, до цели 900) — не достаёт.
+    const early = {
+      ...far,
+      fleets: {
+        ...far.fleets,
+        CV: {
+          ...far.fleets.CV!,
+          movement: { from: 'HOME', to: 'FOE', departedAt: far.time - 3_600_000, arrivesAt: far.time + 9 * 3_600_000 },
+        },
+      },
+    };
+    expect(code(early, act('shuttle.strike', { fleetId: 'CV', squadronId: 'sq:1', targetFleetId: 'E1' }))).toBe('E_OUT_OF_RANGE');
+  });
+
+  it('носитель В БОЮ вылета не поднимает — это правило осталось', () => {
+    const s = underway(deploy(load(world(), 2)));
+    const locked = { ...s, fleets: { ...s.fleets, CV: { ...s.fleets.CV!, battleId: 'b:1' } } };
+    expect(code(locked, act('shuttle.strike', { fleetId: 'CV', squadronId: 'sq:1', targetFleetId: 'E1' }))).toBe('E_FLEET_BUSY');
+  });
+
+  it('ЧУЖОЙ носитель по-прежнему не база', () => {
+    const s = underway(deploy(load(world(), 2)));
+    const theirs = { ...s, fleets: { ...s.fleets, CV: { ...s.fleets.CV!, owner: 'p2' } } };
+    expect(code(theirs, act('shuttle.strike', { fleetId: 'CV', squadronId: 'sq:1', targetFleetId: 'E1' }))).toBe('E_NO_FLEET');
+  });
+
+  it('эскадра ВОЗВРАЩАЕТСЯ на носитель, ушедший дальше за время вылета', () => {
+    let s = underway(deploy(load(world(), 2)));
+    s = apply(s, act('shuttle.strike', { fleetId: 'CV', squadronId: 'sq:1', targetFleetId: 'E1' }));
+    expect(aboard(s)).toBe(1); // одно звено ушло в воздух
+    // Носитель долетает до FOE и встаёт там, пока эскадра в воздухе.
+    s = { ...s, fleets: { ...s.fleets, CV: { ...s.fleets.CV!, location: 'FOE', movement: null } } };
+    s = advance(s, 24);
+    expect(aboard(s)).toBe(2); // вернулись на борт, а не в пустоту
+  });
+});

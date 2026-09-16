@@ -14,6 +14,37 @@ export interface IdleFleet extends Fleet {
  *  could enumerate ids and read the difference to confirm fog-hidden enemy fleets
  *  exist (A06 — reject-code side-channel). `E_FLEET_BUSY` is only reachable for the
  *  caller's own fleet, so it leaks nothing. */
+/**
+ * Флот игрока, НЕ запертый в бою — но, в отличие от `requireOwnedIdleFleet`, волен идти.
+ *
+ * Заведено решением владельца 2026-09-16 под вылет челноков с идущего носителя
+ * (SHU-2.1). Прежнее обоснование запрета — «порт не двигается, и вылет с разгоняющегося
+ * носителя пришлось бы догонять» — устарело раньше, чем сменилось правило: SHU-4.4
+ * научил удар догонять движущуюся цель, а возврат и так считает позицию базы ЖИВОЙ
+ * (`turnHome`). Догонять умели; запрещали только взлёт.
+ *
+ * Бой остаётся преградой, и это не пропуск: флот, запертый в бою, не должен перебирать
+ * содержимое ангара, пока раунды идут, — та же причина, по которой гарнизон под штурмом
+ * не грузится на корабли (`garrisonUnderAssault`).
+ *
+ * `E_NO_FLEET` на чужой и на отсутствующий флот — один и тот же код, как у соседа выше:
+ * иначе клиент перебором id читал бы разницу и подтверждал скрытые туманом флоты (A06).
+ */
+export function requireOwnedUnengagedFleet(
+  h: HandlerContext,
+  fleetId: string,
+  playerId: string,
+): Fleet {
+  const fleet = ownFleet(h.state, fleetId);
+  if (!fleet || fleet.owner !== playerId) {
+    h.reject('E_NO_FLEET');
+  }
+  if (fleet.battleId) {
+    h.reject('E_FLEET_BUSY');
+  }
+  return fleet;
+}
+
 export function requireOwnedIdleFleet(
   h: HandlerContext,
   fleetId: string,

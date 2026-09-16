@@ -387,13 +387,66 @@ describe('SHU-2.1 — бот и НОСИТЕЛЬ челноков', () => {
     expect(kernel.applyAction(s, out[0]!, ctx(s.time)).ok).toBe(true);
   });
 
-  it('ИДУЩИЙ носитель вылета не поднимает — ядро пускает только со стоянки', () => {
+  /**
+   * Этот тест закреплял ПРЕЖНЕЕ правило («ядро пускает только со стоянки»). Владелец снял
+   * его 2026-09-16, поэтому тест переписан под новое, а не удалён: место в наборе то же,
+   * утверждение — обратное. Уходящий от цели носитель выбран нарочно — он показывает, что
+   * решает РАДИУС от живой позиции, а не направление движения.
+   */
+  it('ИДУЩИЙ носитель вылет ПОДНИМАЕТ — стоянка больше не нужна', () => {
     const s = rich(game2());
     const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
     const far = Object.values(s.planets).find((p) => p.id !== home.id && p.owner === null)!;
     far.owner = 'p1';
     carrierAt(s, far.id, [{ id: 'sq:b', units: [{ unit: 'bomber', count: 2 }] }]);
-    s.fleets.p2_carrier!.movement = { from: far.id, to: home.id, departedAt: 0, arrivesAt: 1e9 };
+    s.fleets.p2_carrier!.location = null;
+    s.fleets.p2_carrier!.movement = { from: far.id, to: home.id, departedAt: s.time, arrivesAt: s.time + 1e9 };
+    const out = only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.strike');
+    expect(out).toHaveLength(1);
+    expect((out[0]!.payload as { fleetId?: string }).fleetId).toBe('p2_carrier');
+  });
+});
+
+/**
+ * БОТ БЬЁТ С ХОДА (решение владельца 2026-09-16).
+ *
+ * Ядро сняло требование стоянки для вылета с носителя. Бот шёл следом не ради красоты:
+ * пока он фильтровал базы по неподвижности, новое правило не участвовало в замерах
+ * ВООБЩЕ — носитель едет с кулаком и стоит редко, а значит удар с борта случался бы
+ * только в те такты, когда флот замер.
+ */
+describe('SHU-2.1 — бот поднимает удар с ИДУЩЕГО носителя', () => {
+  /** Носитель p2 в пути к чужому миру, с полным ангаром. */
+  function underwayCarrier(s: GameState, toId: string, fromId: string): void {
+    s.fleets['p2_cv'] = {
+      id: 'p2_cv',
+      owner: 'p2',
+      location: null,
+      movement: { from: fromId, to: toId, departedAt: s.time - 3_600_000, arrivesAt: s.time + 60_000 },
+      units: [{ unit: 'shuttle_carrier', count: 1 }],
+      hangar: [{ id: 'sq:b', units: [{ unit: 'bomber', count: 2 }] }],
+    } as GameState['fleets'][string];
+  }
+
+  it('идущий носитель у цели — удар уходит С БОРТА и проходит ЯДРО', () => {
+    const s = rich(game2());
+    const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
+    const foe = Object.values(s.planets).find((p) => p.id !== home.id && p.owner === null)!;
+    foe.owner = 'p1';
+    underwayCarrier(s, foe.id, home.id);
+    const out = only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.strike');
+    expect(out).toHaveLength(1);
+    expect((out[0]!.payload as { fleetId?: string }).fleetId).toBe('p2_cv');
+    expect(kernel.applyAction(s, out[0]!, ctx(s.time)).ok).toBe(true);
+  });
+
+  it('носитель В БОЮ вылета по-прежнему не поднимает', () => {
+    const s = rich(game2());
+    const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
+    const foe = Object.values(s.planets).find((p) => p.id !== home.id && p.owner === null)!;
+    foe.owner = 'p1';
+    underwayCarrier(s, foe.id, home.id);
+    s.fleets.p2_cv!.battleId = 'b:1';
     expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.strike')).toEqual([]);
   });
 });
