@@ -373,14 +373,123 @@ const indexText = [
   '',
 ].join('\n');
 
-if (process.argv.includes('--write-index')) {
-  writeFileSync(join(ROOT, INDEX_FILE), indexText);
-  console.log(`docs-check: индекс перезаписан — ${indexRows.length} строк → ${slash(INDEX_FILE)}`);
-} else if ((fileSet.has(INDEX_FILE) ? readFileSync(join(ROOT, INDEX_FILE), 'utf8') : null) !== indexText) {
-  problems.push(
-    `${slash(INDEX_FILE)}: индекс кирпичей разошёлся с бэклогом/роадмапами — ` +
-      'перегенерируй: `node scripts/docs-check.mjs --write-index`',
-  );
+// --- 7. индекс документов: какой док про что --------------------------------------
+//
+// ЗАЧЕМ. Индекс кирпичей отвечает «есть ли уже задача про X», но не «где про X написано».
+// README и state.md ведут по десятку ключевых документов; остальные ~88 файлов `docs/`
+// находились по догадке об имени, а чтобы понять, о чём файл, его надо было открыть
+// целиком. Здесь тот же приём, что и выше: индекс собирается из самих документов, и гейт
+// краснеет на расхождении — то есть протухнуть он не может по построению.
+//
+// ОПИСАНИЕ НЕ ПИШЕТСЯ РУКАМИ. Заголовок и первая строка вступления берутся из шапки дока:
+// рукописная аннотация разошлась бы с документом на первой же правке, и индекс начал бы
+// врать увереннее, чем молчал бы его отсутствие (тот же довод, что у индекса кирпичей).
+const DOC_INDEX_FILE = normalize('docs/index.md');
+
+/** Текст в ячейку: без разметки и без `|`, обрезан по КОДОВЫМ точкам (см. brickTitle). */
+const cell = (text, limit) => {
+  const t = (text || '')
+    .replace(/^>+\s*/, '') // шапка-цитата
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, ' ')
+    // Ссылка схлопывается до своего ТЕКСТА: оставь путь — и проверка ссылок выше начнёт
+    // резолвить его относительно docs/index.md, где он не лежит, а гейт покраснеет на
+    // файле, который сам же и сгенерировал.
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, '$1')
+    .replace(/[`*_]/g, '')
+    .replace(/\|/g, '/')
+    .replace(/\s+/g, ' ')
+    .trim();
+  const chars = [...t];
+  return chars.length > limit ? `${chars.slice(0, limit - 1).join('')}…` : t;
+};
+
+/** Шапка документа: H1 и первая содержательная строка под ним. */
+const docHead = (text) => {
+  const lines = text.split('\n');
+  let i = 0;
+  let title = '';
+  for (; i < lines.length; i++) {
+    const m = /^#\s+(.+)$/.exec(lines[i]);
+    if (m) {
+      title = m[1];
+      i++;
+      break;
+    }
+  }
+  let about = '';
+  let inComment = false;
+  for (; i < lines.length; i++) {
+    const l = lines[i].trim();
+    if (!l) continue;
+    if (inComment) {
+      if (l.includes('-->')) inComment = false;
+      continue;
+    }
+    if (l.startsWith('<!--')) {
+      if (!l.includes('-->')) inComment = true;
+      continue;
+    }
+    if (l.startsWith('#')) break; // сразу следующий заголовок — вступления у дока нет
+    about = l;
+    break;
+  }
+  return { title: cell(title, 80), about: cell(about, 160) };
+};
+
+const docsByDir = new Map();
+for (const f of allFiles.filter((f) => f.startsWith('docs' + sep) && f.endsWith('.md')).sort()) {
+  if (f === DOC_INDEX_FILE) continue; // сам себя индекс не описывает
+  const dir = slash(dirname(f));
+  if (!docsByDir.has(dir)) docsByDir.set(dir, []);
+  docsByDir.get(dir).push(f);
+}
+// `docs/` первым, подкаталоги следом по алфавиту — читателю нужен корень, а не reviews.
+const docDirs = [...docsByDir.keys()].sort((a, b) => (a === 'docs' ? -1 : b === 'docs' ? 1 : a.localeCompare(b)));
+
+let docCount = 0;
+const docSections = [];
+for (const dir of docDirs) {
+  docSections.push(`## ${dir}/`, '', '| Документ | Заголовок | Про что |', '| --- | --- | --- |');
+  for (const f of docsByDir.get(dir)) {
+    const { title, about } = docHead(readFileSync(join(ROOT, f), 'utf8'));
+    docCount++;
+    docSections.push(`| \`${slash(f)}\` | ${title} | ${about} |`);
+  }
+  docSections.push('');
+}
+
+const docIndexText = [
+  '# Индекс документов — какой док про что',
+  '',
+  '<!-- ГЕНЕРИРУЕТСЯ scripts/docs-check.mjs. Руками не править: гейт сверяет этот файл с',
+  '     шапками самих документов и краснеет на расхождении. Перегенерировать —',
+  '     node scripts/docs-check.mjs --write-index -->',
+  '',
+  '> **Зачем файл нужен.** «В каком доке искать про X?» — вопрос ПЕРЕД чтением. README и',
+  '> `state.md` ведут по десятку ключевых документов, остальные находились по догадке об',
+  '> имени: чтобы понять, о чём файл, его приходилось открывать целиком.',
+  '',
+  '> **Источник правды — не этот файл.** Заголовок и описание берутся из шапки самого',
+  '> документа: правится док — меняется строка здесь. Обратного пути нет, править индекс',
+  '> руками бессмысленно — гейт вернёт как было.',
+  '',
+  ...docSections,
+].join('\n');
+
+// Оба индекса живут по одному режиму: `--write-index` пишет, обычный прогон сверяет.
+// Второй стандарт на тот же механизм развёл бы их поведение — и один из индексов начал бы
+// протухать молча.
+const INDEXES = [
+  [INDEX_FILE, indexText, `индекс кирпичей разошёлся с бэклогом/роадмапами`, `${indexRows.length} строк`],
+  [DOC_INDEX_FILE, docIndexText, `индекс документов разошёлся с шапками docs/`, `${docCount} документов`],
+];
+for (const [file, text, complaint, size] of INDEXES) {
+  if (process.argv.includes('--write-index')) {
+    writeFileSync(join(ROOT, file), text);
+    console.log(`docs-check: индекс перезаписан — ${size} → ${slash(file)}`);
+  } else if ((fileSet.has(file) ? readFileSync(join(ROOT, file), 'utf8') : null) !== text) {
+    problems.push(`${slash(file)}: ${complaint} — перегенерируй: \`node scripts/docs-check.mjs --write-index\``);
+  }
 }
 
 // --- вердикт ---------------------------------------------------------------------
