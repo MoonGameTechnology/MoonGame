@@ -8,7 +8,12 @@
 //
 //   pnpm run perf              # report, always exit 0 (non-blocking, CI-friendly)
 //   PERF_STRICT=1 pnpm run perf  # exit 1 when a budget is exceeded (local gate)
+//   PERF_MAP=frontier-100 PERF_REVEAL=1 PERF_PAUSE=1 pnpm run perf
+//   PERF_MAP=frontier-100 PERF_VERIFY_LOD=1 pnpm run perf  # render/fog/picking checks
 import { build } from 'esbuild';
+import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { setImmediate } from 'node:timers';
 
 const listeners = new Map(); // el -> {type: [fn]}
 function mkEl(id) {
@@ -32,6 +37,7 @@ function mkEl(id) {
       return this._html ?? '';
     },
     textContent: '',
+    focus() { globalThis.document.activeElement = this; },
     addEventListener(type, fn) {
       const m = listeners.get(this) ?? {};
       (m[type] ??= []).push(fn);
@@ -73,7 +79,7 @@ function mkEl(id) {
       return [];
     },
     getContext() {
-      return ctxProxy;
+      return this._context ??= makeContext(this);
     },
     setPointerCapture() {},
     releasePointerCapture() {},
@@ -82,14 +88,28 @@ function mkEl(id) {
   };
   return el;
 }
-// Chainable stub: every method returns the proxy, so gradient chains etc. work.
-const ctxProxy = new Proxy(
-  {},
-  {
-    get: () => () => ctxProxy,
-    set: () => true,
-  },
-);
+// Typed probes must return their real kind of value. A truthy no-op function from
+// isContextLost() used to skip EVERY paint while the harness reported a fast frame.
+let drawCalls = 0;
+function makeContext(canvas) {
+  const stack = [];
+  const state = { canvas, globalAlpha: 1, lineWidth: 1 };
+  const methods = {
+    isContextLost: () => false,
+    getContextAttributes: () => ({}),
+    measureText: (value) => ({ width: String(value).length * 6 }),
+    createRadialGradient: () => ({ addColorStop() {} }),
+    createLinearGradient: () => ({ addColorStop() {} }),
+    createConicGradient: () => ({ addColorStop() {} }),
+    save: () => stack.push(state.globalAlpha),
+    restore: () => { state.globalAlpha = stack.pop() ?? 1; },
+  };
+  return new Proxy(state, {
+    get: (target, key) => key in target ? target[key] :
+      (methods[key] ??= () => { drawCalls++; }),
+    set: (target, key, value) => { target[key] = value; return true; },
+  });
+}
 
 const els = new Map();
 const getEl = (id) => {
@@ -138,7 +158,9 @@ globalThis.getComputedStyle = () => ({ display: 'block' });
 // Ship archetypes are drawn from cached Path2D objects. The canvas context here is a
 // swallow-everything proxy, so the path only has to be constructible — but it does have
 // to exist, since the cache builds one on the very first rendered frame.
-globalThis.Path2D = class Path2D {};
+globalThis.Path2D = class Path2D {
+  constructor() { return new Proxy(this, { get: () => () => {} }); }
+};
 globalThis.window = {
   innerWidth: 900,
   innerHeight: 600,
@@ -156,8 +178,55 @@ globalThis.requestAnimationFrame = (cb) => {
   return rafCbs.length;
 };
 
+// A benchmark-only bridge; it is absent from both shipped profiles.
+const bridge = `
+let perfPaints = 0;
+let perfSpheres = 0;
+const perfSphere = blitSphere;
+blitSphere = function(...args) { perfSpheres++; perfSphere(...args); };
+const perfRender = render;
+render = function(now) { perfPaints++; perfRender(now); };
+module.exports = {
+  ready: () => !mapPreparation.active || mapPreparation.ready,
+  paints: () => perfPaints,
+  scene: () => ({ nodes: MAP.length, known: MAP.filter(n => known(n.id)).length,
+    holo: holographicMapOn(), scale: cam.scale, paused: speed === 0 }),
+  verifyView: (gap, reveal) => {
+    speed = 0;
+    const before = JSON.stringify(s);
+    const home = Object.values(s.planets).find(p => p.owner === ME);
+    const fleet = Object.values(s.fleets).find(f => f.owner === ME);
+    const scale = gap / (mapNodeSpacing * camFitTransform(insets(), mapBounds()).scale);
+    centerOn(home.position, scale);
+    vision = reveal ? null : computeVision();
+    memory.clear();
+    if (vision) updateMemory(vision.identify);
+    clearSelection(); selPlanet = home.id;
+    render(2000); // warm static layers and atlases at this density
+    perfSpheres = 0;
+    render(2000);
+    const a = fleetAnchor(fleet);
+    selectAt(a.x, a.y); // same map-tap path as pointer/touch input
+    return { lod: currentMapLod(), spheres: perfSpheres, terrain: terrainFields.length,
+      pickedFleet: selFleet === fleet.id || selFleets.has(fleet.id),
+      sensing: sweepOn && sweepArms.length > 0,
+      known: MAP.filter(n => known(n.id)).length,
+      stateUnchanged: JSON.stringify(s) === before };
+  },
+  configure: (id, scale, reveal, pause) => {
+    if (id) {
+      const preset = mapPreset(id);
+      installMatch(newGame({ mapId: preset.id, seats: preset.starts.map((start, i) =>
+        ({ id: 'p' + (i + 1), name: 'P' + (i + 1), faction: SEAT_META[i].faction, start, ai: false })) }), new Map());
+    }
+    if (scale) { cam.scale = scale; cam.x = 0; cam.y = 0; }
+    if (reveal) { sandboxConfig.enabled = true; sandboxConfig.fog = false; }
+    if (pause) speed = 0;
+  }
+};`;
 const res = await build({
-  entryPoints: ['prototype/src/main.ts'],
+  stdin: { contents: readFileSync('prototype/src/main.ts', 'utf8') + bridge,
+    resolveDir: process.cwd() + '/prototype/src', loader: 'ts' },
   bundle: true,
   platform: 'node',
   format: 'cjs',
@@ -171,8 +240,16 @@ const res = await build({
 });
 
 const mod = { exports: {} };
+const frameErrors = [];
+const printError = console.error;
+console.error = (...args) => {
+  if (String(args[0]).startsWith('frame fail')) frameErrors.push(args[1] ?? args[0]);
+  printError(...args);
+};
 const fn = new Function('module', 'exports', 'require', res.outputFiles[0].text);
 fn(mod, mod.exports, () => ({}));
+mod.exports.configure(process.env.PERF_MAP, Number(process.env.PERF_SCALE) || 0,
+  process.env.PERF_REVEAL === '1', process.env.PERF_PAUSE === '1');
 
 // Profile a visible match. The real entry screens are opaque, so their covered
 // canvas must not be mistaken for the renderer workload this harness measures.
@@ -199,10 +276,11 @@ const wheel = (deltaY) =>
 /** Run one frame callback and return its CPU cost in ms (hrtime — the stubbed
  *  performance.now is the game's clock, not the measurement's). */
 function runFrame() {
-  const cb = rafCbs.shift();
-  if (!cb) return null;
+  const callbacks = rafCbs.splice(0);
+  if (!callbacks.length) return null;
   const start = process.hrtime.bigint();
-  cb(performance.now());
+  const now = performance.now();
+  for (const cb of callbacks) cb(now);
   return Number(process.hrtime.bigint() - start) / 1e6;
 }
 
@@ -226,8 +304,41 @@ function stat(costs) {
   return { frames: costs.length, avg, p95, max };
 }
 
+// Finish cooperative map loading (including promise continuations) BEFORE warm-up.
+for (let i = 0; i < 5000; i++) {
+  runFrame();
+  await new Promise(setImmediate);
+  assert.equal(frameErrors.length, 0, 'a recovered frame failure is still a failed benchmark');
+  if (mod.exports.ready() && mod.exports.paints() > 0) break;
+}
+assert(mod.exports.ready() && mod.exports.paints() > 0, 'benchmark must reach the live map');
+console.log('PERF_SCENE ' + JSON.stringify(mod.exports.scene()));
+if (process.env.PERF_VERIFY_LOD === '1') {
+  for (const reveal of [true, false]) {
+    for (const gap of [20, 48, 110, 20]) {
+      const sample = mod.exports.verifyView(gap, reveal);
+      assert(sample.stateUnchanged, 'zoom and drawing must not alter simulation state');
+      assert(sample.pickedFleet, 'the visible fleet anchor must remain selectable at every LOD');
+      assert(sample.sensing, 'schematic mode must retain radar sensing');
+      if (sample.lod.art === 0) {
+        assert.equal(sample.spheres, 0, 'overview must not call the sphere renderer');
+        assert.equal(sample.terrain, 0, 'overview must not prepare or draw terrain');
+      }
+      if (gap === 110) {
+        assert.equal(sample.lod.detail, 1);
+        assert(sample.spheres > 0, 'planet art returns on approach');
+      }
+      if (!reveal) assert(sample.known < mod.exports.scene().nodes, 'zoom must not reveal the map');
+      console.log('LOD_CHECK ' + JSON.stringify({ gap, reveal, ...sample }));
+    }
+  }
+  assert.equal(frameErrors.length, 0);
+  process.exit(0);
+}
 // Warm-up: JIT + the lazily-baked sprites/map layers settle before we measure.
 scenario(30);
+const paintsBefore = mod.exports.paints();
+drawCalls = 0;
 
 const FRAMES = 120;
 const results = {
@@ -250,6 +361,10 @@ const results = {
 // Budgets: the doc's C-category target is frame-time p95 < 20 ms. Interaction
 // scenarios get a little headroom (they add input handling + camera math).
 const BUDGET_P95_MS = { idle: 20, pan: 25, zoom: 25 };
+assert.equal(frameErrors.length, 0, 'the measured frames must not silently fail');
+assert.equal(mod.exports.paints() - paintsBefore, FRAMES * 3, 'every sample must paint the map');
+assert(drawCalls > 0, 'a lost or hidden canvas is not a render benchmark');
+console.error = printError;
 
 let failed = false;
 const lines = ['── perf report (CPU frame cost, headless — no GPU) ──'];
@@ -266,6 +381,7 @@ lines.push('──────────────────────�
 console.log(lines.join('\n'));
 // Machine-readable line for trend tracking (a future M3 collector can grep it).
 console.log('PERF_JSON ' + JSON.stringify(results));
+console.log('PERF_DRAWS ' + drawCalls);
 
 if (failed && process.env.PERF_STRICT === '1') {
   console.error('perf budget exceeded (PERF_STRICT=1) — failing');

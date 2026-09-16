@@ -69,6 +69,14 @@ export { scoreParts, type ScoreParts } from './scoreParts';
 // AI-BAL-10: диагноз мёртвого контента для харнеса замера. Чистая функция (исходник бота
 // приходит строкой), поэтому фасад её реэкспортирует, а `node:fs` остаётся у вызывающего.
 export { splitDeadContent, type DeadContentSplit } from './deadContent';
+// BAL-12: что из дерева технологий прибор замера видит — настоящее дерево против
+// мета-грантов и слой `has_scientist` с причиной каждого нуля.
+export {
+  isGrantOnlyTech,
+  researchableTechIds,
+  scientistGatedNodes,
+  type ScientistGateRow,
+} from './techCoverage';
 export {
   MARKET_COMMISSION,
   isTradable,
@@ -170,6 +178,7 @@ export {
   buildShip,
   cancelConstruction,
   resumeConstruction,
+  deployStation,
   engageFleet,
   researchTech,
   delegateSteward,

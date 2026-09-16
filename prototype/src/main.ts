@@ -27,6 +27,7 @@ import {
   orbitFleet,
   assaultFleet,
   bombardFleet,
+  deployStation,
   engageFleet,
   loadArmy,
   unloadArmy,
@@ -196,6 +197,7 @@ import {
   computePowerCell,
   type TerritorySeed,
 } from '../../packages/client/src/territory';
+import { TerritoryGeometryCache } from '../../packages/client/src/territoryGeometry';
 import { buildLabel, currentBuild } from './updater';
 import { initApkUpdater } from './apkUpdate';
 import { measureViewport, STARS, NEBULAE } from './viewport';
@@ -250,6 +252,8 @@ import {
   tokenFor,
   type SessionRec,
 } from '../../decisions/sessionStore';
+import { medalBadges } from '../../decisions/unitMedals';
+import { fortressRaise } from '../../decisions/fortressRaise';
 import {
   authOutcome,
   shouldRegister,
@@ -574,6 +578,8 @@ import {
 // ST-2/ST-3 — «Хранитель»: the window is REFM-7; the read-only helpers below are shared
 // with the threat alert (`stewFmtDur`), the side panel (`stewardTechDone`) and the
 // morning report (`stewMetrics`).
+import { initBattleWindow } from './battleScreen';
+import { battleAtTap } from '../../decisions/battleTap';
 import {
   initSteward,
   stewFmtDur,
@@ -1757,14 +1763,19 @@ function sectorTypeOf(id: string) {
   return kind === undefined ? undefined : SECTOR_TYPES[kind];
 }
 /** Зеркало ворот конструкции ядра (`construction.ts`): вид провинции пускает здание,
- *  только если на нём вообще можно строить (`buildable`) И его ростер (undefined =
- *  любое) это здание допускает. Одна копия на все кнопки: три собственных
- *  `?? BUILDABLE` по коду и были тем, из-за чего клиентское правило разъехалось с
- *  данными (ORB-4) — кнопка обещала стройку, которую сервер отклонял. */
+ *  только если на нём вообще можно строить (`buildable`), его ростер (undefined =
+ *  любое) это здание допускает И само здание не сузило себя до других видов
+ *  (`onlyOn`). Одна копия на все кнопки: три собственных `?? BUILDABLE` по коду и были
+ *  тем, из-за чего клиентское правило разъехалось с данными (ORB-4) — кнопка обещала
+ *  стройку, которую сервер отклонял. Третья проверка нужна ровно потому, что ростера
+ *  может не быть: у планеты его нет, и без неё кнопка предложила бы добывающую станцию
+ *  там, где редьюсер отвечает `E_WRONG_SECTOR`. */
 function sectorAllowsBuilding(planetId: string, building: string): boolean {
   const type = sectorTypeOf(planetId);
   if (type && !type.buildable) return false;
-  return (type?.allowedBuildings ?? BUILDABLE).includes(building);
+  if (!(type?.allowedBuildings ?? BUILDABLE).includes(building)) return false;
+  const onlyOn = data.buildings[building]?.onlyOn;
+  return onlyOn === undefined || onlyOn.includes(SECTOR_OF[planetId] ?? '');
 }
 /** Есть ли на провинции хоть одно допустимое здание — гейт кнопки «Постройки». */
 function sectorBuildsAnything(planetId: string): boolean {
@@ -4228,6 +4239,10 @@ function holographicMapOn(): boolean {
 }
 
 /** Rebuild the cached province map when the camera/ownership/viewport moves. */
+/** Одна на прототип: геометрия провинций не зависит от того, в какой холст её пишут,
+ *  а статик-слой чередует `bgx` (устоявшийся кадр) и `cx` (кадр в движении). */
+const territoryGeometry = new TerritoryGeometryCache();
+
 function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, preparing = false): void {
   // Always cover newly exposed edges at the current camera. Only the stationary
   // offscreen bake can be reused; the viewer's knowledge remains its invalidator.
@@ -4322,13 +4337,20 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // carries the owner AS THE VIEWER KNOWS IT (knownOwner), so a hidden capture never
   // repaints the map. Ownership reads through precise frontiers and restrained
   // transparent fills, leaving the background visible through the plotting plane.
+  // Тесселяция степенной диаграммы квадратична по числу семян, а статик-слой
+  // перепекается КАЖДЫЙ кадр, пока камера едет, — то есть ровно тогда, когда кадр и так
+  // самый дорогой. Кэш (`territoryGeometry.ts`) снимает подпись с координат,
+  // нормализованных по первой точке клипа и масштабу, поэтому панорама и зум из неё
+  // СОКРАЩАЮТСЯ: форма не изменилась — считается только O(вершин) перепроекция.
+  // Владельца и тип `project` берёт из СВЕЖИХ семян, поэтому кэш не может донести
+  // чужой туман: `knownOwner` остаётся единственным источником видимой принадлежности.
   const cells = drawTerritory(g, seeds, clip, {
     ownerColor,
     neutralFill: COLOR.null!,
     kindAccent: (kind) => holographicMapOn() && kind === 'asteroid' ? '#71879d'
       : holographicMapOn() && kind === 'solar_flare' ? '#b295d8' : SECTOR_TYPES[kind]?.color,
     hideOwnedInner: holographicMapOn(),
-  });
+  }, territoryGeometry.project(seeds, clip, cam.scale));
   provincePolygons = new Map(cells.map((cell) => [provinceIds[cell.idx]!, cell.poly]));
   terrainFields = [];
   if (holographicMapOn()) {
@@ -4358,14 +4380,22 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // сравнением идентификаторов: штрих полупрозрачный, и дважды нарисованная дорога
   // просто светлее соседних — «магистраль», которой в данных нет. Узлы без мира
   // отсеиваются до вызова, поэтому ссылка в никуда не даёт дороги.
+  // Все дороги — ОДИН путь: штрих у них общий (цвет и толщина выставлены выше), поэтому
+  // `beginPath`/`stroke` на каждое ребро были чистой платой за ничто — четыре вызова
+  // холста вместо двух на дорогу. Плюс отсев по рамке: дорога, ОБА конца которой вышли
+  // за один и тот же край экрана, пересечь его не может. Запас в лишний пиксель — на
+  // толщину штриха, чтобы дорога, касающаяся кромки, не пропала.
+  const M = 1 + g.lineWidth;
+  g.beginPath();
   for (const road of lanes(MAP.filter((n) => !!s.planets[n.id]))) {
     const a = world(road.from);
     const b = world(road.to);
-    g.beginPath();
+    if (Math.max(a.x, b.x) < -M || Math.min(a.x, b.x) > VW + M ||
+      Math.max(a.y, b.y) < -M || Math.min(a.y, b.y) > VH + M) continue;
     g.moveTo(a.x, a.y);
     g.lineTo(b.x, b.y);
-    g.stroke();
   }
+  g.stroke();
 
   // map boundary — a faint frame so the edge of the sector reads as intentional
   if (holographicMapOn()) g.restore();
@@ -4804,10 +4834,10 @@ function render(now: number) {
     }
 
     // asteroid-field sector: a lane junction, not a city — scattered rocks + a
-    // fat hub where the lanes meet, no orbits. Captured by simply arriving — unless
-    // a space fortress is raised here, which fortifies it (orbit + AA, must storm).
+    // fat hub where the lanes meet, no orbits. Captured by simply arriving. Raising a
+    // fortress here stops making it an asteroid field at all: `station.deploy` turns the
+    // node into `void_station`, which draws (with its hull bar) in its own branch below.
     if (n.sector === 'asteroid') {
-      const fort = p.buildings.find((b) => b.type === 'starfort');
       blitGlow(col, c.x, c.y, 30, p.owner ? 0.16 : 0.06); // cached glow disc
       cx.save();
       cx.strokeStyle = 'rgba(186,170,140,0.7)';
@@ -4843,44 +4873,17 @@ function render(now: number) {
       cx.beginPath();
       cx.arc(c.x, c.y, 7.5 + 0.6 * ownerPulse, 0, TAU);
       cx.stroke();
-      // Orbital fortress: the station concept's six-spoke vector, with its HP bar.
-      if (fort) {
-        cx.save();
-        cx.strokeStyle = col;
-        cx.lineWidth = 1.6;
-        cx.shadowColor = col;
-        cx.shadowBlur = fxBlur(8);
-        cx.fillStyle = rgba(col, 0.24);
-        cx.translate(c.x - 12, c.y - 12);
-        drawShipShape(cx, 'station', detail > 0.5);
-        cx.restore();
-        const frac = Math.max(0, Math.min(1, fort.hp / hpOfLevel('starfort', fort.level)));
-        cx.fillStyle = 'rgba(2,9,13,.7)';
-        cx.fillRect(c.x - 12, c.y - 22, 24, 3);
-        cx.fillStyle = rgba(frac > 0.35 ? col : '#ff5a4d', 0.9);
-        cx.fillRect(c.x - 12, c.y - 22, 24 * frac, 3);
-      }
-      if (selPlanet === n.id) targetBrackets(c.x, c.y, fort ? 18 : 15, now);
+      if (selPlanet === n.id) targetBrackets(c.x, c.y, 15, now);
       cx.save();
       cx.shadowColor = 'rgba(0,0,0,0.85)';
       cx.shadowBlur = fxBlur(3);
-      if (fort) {
-        // a fortress stays a prominent, special designation (unchanged)
-        cx.fillStyle = p.owner ? col : '#9fc9c4';
-        cx.font = '700 11px ui-monospace,Menlo,monospace';
-        cx.fillText(n.id, c.x + 16, c.y - 1);
-        cx.fillStyle = 'rgba(150,210,205,0.55)';
-        cx.font = '9px ui-monospace,Menlo,monospace';
-        cx.fillText('void fortress ✦', c.x + 16, c.y + 11);
-      } else {
-        // a plain asteroid field is a minor sector — de-emphasised (dim, smaller)
-        cx.fillStyle = p.owner ? rgba(col, 0.72) : 'rgba(150,190,196,0.5)';
-        cx.font = '600 10px ui-monospace,Menlo,monospace';
-        cx.fillText(n.id, c.x + 16, c.y - 1);
-        cx.fillStyle = 'rgba(150,210,205,0.38)';
-        cx.font = '9px ui-monospace,Menlo,monospace';
-        cx.fillText('asteroid field', c.x + 16, c.y + 11);
-      }
+      // An asteroid field is a minor sector — de-emphasised (dim, smaller).
+      cx.fillStyle = p.owner ? rgba(col, 0.72) : 'rgba(150,190,196,0.5)';
+      cx.font = '600 10px ui-monospace,Menlo,monospace';
+      cx.fillText(n.id, c.x + 16, c.y - 1);
+      cx.fillStyle = 'rgba(150,210,205,0.38)';
+      cx.font = '9px ui-monospace,Menlo,monospace';
+      cx.fillText('asteroid field', c.x + 16, c.y + 11);
       cx.restore();
       continue;
     }
@@ -5102,6 +5105,27 @@ function render(now: number) {
       poly(c.x, c.y, R * 0.33, 6, Math.PI / 6);
       cx.stroke();
       cx.restore();
+      // КОРПУС крепости — полоса прочности её ядра (FORT-5.2). Полоса и силуэт стояли в
+      // ветке астероида, пока крепостью было здание на астероидном поле; теперь крепость
+      // это сам узел, и её здоровье принадлежит сюда. Пиратская и нейтральная базы ядра
+      // не несут — у них полосы просто нет.
+      const core = p.buildings.find((b) => b.type === 'starfort');
+      if (core) {
+        cx.save();
+        cx.strokeStyle = col;
+        cx.lineWidth = 1.6;
+        cx.shadowColor = col;
+        cx.shadowBlur = fxBlur(8);
+        cx.fillStyle = rgba(col, 0.24);
+        cx.translate(c.x - 12, c.y - 12);
+        drawShipShape(cx, 'station', detail > 0.5);
+        cx.restore();
+        const frac = Math.max(0, Math.min(1, core.hp / hpOfLevel('starfort', core.level)));
+        cx.fillStyle = 'rgba(2,9,13,.7)';
+        cx.fillRect(c.x - 12, c.y - 22, 24, 3);
+        cx.fillStyle = rgba(frac > 0.35 ? col : '#ff5a4d', 0.9);
+        cx.fillRect(c.x - 12, c.y - 22, 24 * frac, 3);
+      }
     } else {
       // Fallback for any other non-planet type: small hexagon marker
       const kc = sectorTypeOf(n.id)?.color ?? col;
@@ -5660,7 +5684,7 @@ function squadTroopsInput(squadronId: string): TroopsInput | null {
   return troopsInputForSquadron(found.sq, source, data);
 }
 
-function unitRows(stacks: Array<{ unit: string; count: number }>): string {
+function unitRows(stacks: Array<UnitStack>): string {
   return kitUnitRows(
     stacks,
     (unit) => ({
@@ -5669,6 +5693,9 @@ function unitRows(stacks: Array<{ unit: string; count: number }>): string {
       domain: isGround(unit) ? t('side.unit.ground') : t('side.unit.space'),
     }),
     t('side.none'),
+    // VET-5: медали ветерана. Решение «что показать» — в `/decisions/unitMedals.ts`,
+    // здесь только подстановка живых данных.
+    (st) => medalBadges(st as UnitStack, data),
   );
 }
 /** Localized one-line label for a paused site (shares `ConstructionPayload`'s field
@@ -6096,9 +6123,14 @@ function fleetPanelHtml(f: Fleet): string {
         }): ${esc(troops)}${bar(sv.hull, '♥')}${bar(sv.shield, '◈')}</div>`;
       };
       h += `<div class="sec">${t('side.battle.title', { phase: bm.phase === 'ground' ? t('side.battle.phase.ground') : t('side.battle.phase.orbit'), r: bm.round })}</div>`;
-      h +=
-        sideRow(bm.attacker, t('side.battle.attacker')) +
-        sideRow(bm.defender, t('side.battle.defender'));
+      // MSB-6: строка на КАЖДУЮ сторону, роль берётся у самой стороны. На дуэли список
+      // ровно `[атакующий, обороняющийся]`, поэтому двусторонний бой выглядит как
+      // выглядел; на пяти сторонах появляются пять строк вместо двух.
+      h += bm.sides
+        .map((sv) =>
+          sideRow(sv, t(sv.role === 'attacker' ? 'side.battle.attacker' : 'side.battle.defender')),
+        )
+        .join('');
       if (bm.nextRoundAt != null)
         h += `<div class="row">${t('side.battle.next-round')} <span class="pn-timer" data-at="${bm.nextRoundAt}">…</span></div>`;
       h += `<div class="row">${btn('retreat', '', t('side.battle.retreat'), bm.retreatFleetId === f.id)}</div>`;
@@ -6531,6 +6563,17 @@ function planetPanelHtml(p: Planet): string {
     // (свой мир И ростер сектора непуст — CMD-VIS: нет приказа — нет кнопки).
     if (mine && sectorBuildsAnything(p.id)) {
       blds += `<button class="bw-open" data-act="openbuild">▣ ${t('side.build.open')}</button>`;
+    }
+    // FORT-0.2: КОСМИЧЕСКАЯ КРЕПОСТЬ. Правило кнопки — `decisions/fortressRaise.ts`, то же
+    // самое, каким решает редьюсер (сверено тестом по всем раскладам): здесь только
+    // отрисовка. Стоит РЯДОМ с «Постройками», а не вместо: на астероидах и мёртвом мире
+    // осмысленно и то и другое — добывающая станция ИЛИ крепость со своим ростером.
+    const fortress = fortressRaise(p, ME, s.players[ME]?.resources ?? {}, data);
+    if (fortress.show) {
+      const off = fortress.enabled ? '' : ' disabled';
+      blds +=
+        `<button class="bw-open" data-act="fortress"${off}>◈ ${esc(t('side.fortress.raise'))}` +
+        ` <span class="dim">${esc(resLine(fortress.cost) ?? '')}</span></button>`;
     }
     cols.push(blds);
   }
@@ -8074,6 +8117,8 @@ side.addEventListener('click', (ev) => {
     }
   } else if (act === 'openbuild') {
     buildWin.open(selPlanet!);
+  } else if (act === 'fortress') {
+    playerOrder(deployStation(ME, selPlanet!));
   } else if (act === 'build') {
     enqueueBuild(selPlanet!, { kind: 'building', id: arg, count: 1 });
   } else if (act === 'unit') {
@@ -8829,6 +8874,27 @@ function selectAt(mx: number, my: number) {
     my,
     rFleet,
   );
+  // ЗНАЧОК БОЯ забирает тап ПОСЛЕДНИМ (`decisions/battleTap.ts`): по кораблю и по миру
+  // тапают, чтобы отдать приказ, и отнять у них тап значило бы менять разбор боя на
+  // потерянный ход. Поэтому сюда приходит только тап, под которым больше ничего нет, —
+  // и тогда кольцо, которое и так показывает фазу и отсчёт, открывает окно с раскладом.
+  const battleHit = battleAtTap(
+    Object.values(s.battles).map((b) => {
+      const anchor = battleAnchor(b);
+      return {
+        id: b.id,
+        at: anchor ? world(anchor) : null,
+        identified: known(b.location),
+      };
+    }),
+    { x: mx, y: my },
+    tapByTouch,
+    fleetIds.length > 0 || n !== null,
+  );
+  if (battleHit) {
+    battleWindow.open(battleHit);
+    return;
+  }
   // Что следует из выбора — `pickApply.ts` (REFM-166): пустой тап это «отменить», и он
   // гасит НЕ только выделение, но и незавершённые намерения (слияние, деление, десант) —
   // иначе они применились бы к следующему выбранному флоту, молча. Выбор мира гасит
@@ -9292,6 +9358,7 @@ const buildWin = initBuildScreen({
 // repaint throttle both hold it.
 const stewWin = $('steward');
 let lastStewAt = 0;
+let lastBattleWinAt = 0;
 let lastBuildAt = 0;
 let lastIntelAt = 0; // throttle for the live intel-window timers (диплом. вкладка «Шпионаж»)
 const steward = initSteward({
@@ -9304,6 +9371,22 @@ const steward = initSteward({
   openTech: () => techTree.open(),
 });
 document.getElementById('rail-steward')?.addEventListener('click', () => steward.open());
+
+// --- окно боя (заказ владельца 2026-09-15) -----------------------------------
+// Значок боя на карте и так показывал фазу и отсчёт до раунда; теперь он ОТКРЫВАЕТСЯ.
+// До этого расклад можно было увидеть единственным путём — выделив свой флот в этом
+// бою, — то есть про чужую схватку рядом узнать было нечем.
+const battleWin = $('battlewin');
+const battleWindow = initBattleWindow({
+  root: () => battleWin,
+  body: () => $('battlewinbody'),
+  state: () => s,
+  me: () => ME,
+  model: (id) => {
+    const m = createBattleModel(s, id, ME, data);
+    return m.ok ? m : null;
+  },
+});
 // Snapshot of my standing at delegation time, diffed on expiry for the morning report.
 let stewSnapshot: StewardMetrics | null = null;
 
@@ -12395,6 +12478,9 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'pingmenu', isOpen: () => pings.menuOpen(), close: () => pings.closeMenu() }, // z47
   { id: 'tech', isOpen: () => techWin.classList.contains('show'), close: () => techWin.classList.remove('show') }, // z47
   { id: 'steward', isOpen: () => stewWin?.classList.contains('show') === true, close: () => stewWin?.classList.remove('show') }, // z47
+  // Окно боя — та же ступень z47, что и «Хранитель»: оно модалка поверх карты, и Back
+  // обязан закрывать именно его, а не выделение под ним.
+  { id: 'battlewin', isOpen: () => shown('battlewin'), close: () => hide('battlewin') }, // z47
   { id: 'market', isOpen: () => marketWin.classList.contains('show'), close: () => marketWin.classList.remove('show') }, // z47
   { id: 'constructor', isOpen: () => constructorWin.classList.contains('show'), close: () => shipyard.close() }, // z47 «Производство»
   { id: 'codex', isOpen: () => codexEl?.classList.contains('show') === true, close: () => codexEl?.classList.remove('show') }, // z46
@@ -12631,7 +12717,9 @@ function frame(nowReal: number) {
     tbScore.textContent = `✦ ${score}/${SCORE_LIMIT}`;
     tbScore.classList.toggle('win', atLimit(need));
     tbDay.textContent = t('browser.day', { n: d });
-    tbEta.textContent = t('hud.next-day', { t: eta });
+    // digits only: the «до след. дня» caption is a static sibling node (#tbetacap),
+    // so a narrow phone can drop the caption and keep the countdown.
+    tbEta.textContent = eta;
     lastTopText = topText;
   }
 
@@ -12767,6 +12855,12 @@ function frame(nowReal: number) {
   if (repaintDue(steward.isOpen(), nowReal, lastStewAt, PROGRESS_MS)) {
     lastStewAt = nowReal;
     steward.repaint();
+  }
+  // Окно боя живое: раунды идут по расписанию, и состав сторон меняется под рукой.
+  // Тот же троттлинг, что у «Хранителя», — окно перерисовывается, только пока открыто.
+  if (repaintDue(battleWindow.isOpen(), nowReal, lastBattleWinAt, PROGRESS_MS)) {
+    lastBattleWinAt = nowReal;
+    battleWindow.repaint();
   }
   if (repaintDue(intelVisible(diploOpen, diploTab), nowReal, lastIntelAt, INTEL_MS)) {
     lastIntelAt = nowReal;

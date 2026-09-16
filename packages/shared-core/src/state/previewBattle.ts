@@ -87,6 +87,97 @@ function lossesOf(before: readonly UnitStack[], after: UnitStack[]): UnitStack[]
   return out;
 }
 
+/** Одна сторона в многостороннем прогнозе: чем она бьёт и кому враждебна. */
+export interface PreviewSideInput {
+  units: readonly UnitStack[];
+  role: 'attacker' | 'defender';
+  /** Владелец — нужен только чтобы спросить вражду; для безымянной дуэли не нужен. */
+  owner?: string | null;
+}
+
+export interface MultiBattlePreview {
+  /** `stalemate`, если выжили не все… точнее: если выживших не ровно один. */
+  outcome: 'decided' | 'stalemate';
+  roundsEst: number;
+  /** В ТОМ ЖЕ порядке, что и вход. */
+  sides: BattlePreviewSide[];
+}
+
+/**
+ * ПРОГНОЗ НА N СТОРОН (MSB-6) — зеркало такта живого боя, правило в правило.
+ *
+ * Считает то же, что `combat.tick`: предраундовый снимок (сперва ВСЕ залпы, потом весь
+ * урон), кап линии огня на сторону, делёж залпа между всеми враждебными живыми
+ * (`splitVolley`, MSB-2), предохранитель на `MAX_COMBAT_ROUNDS` и конец боя по гибели
+ * ЛЮБОЙ стороны (§0.0 №5 «цепочка»).
+ *
+ * `hostile` спрашивается у вызывающего, потому что вражда живёт в состоянии, а прогноз
+ * чистый: у него нет ни шины, ни дипломатии. Не передали — все против всех (так считает
+ * и ядро без модуля дипломатии, `isHostile` вырождается в «разные владельцы враждебны»).
+ */
+export function previewSides(
+  input: readonly PreviewSideInput[],
+  data: GameData,
+  hostile?: (a: string | null | undefined, b: string | null | undefined) => boolean,
+): MultiBattlePreview {
+  // damageUnits мутирует то, что ему дали, — симуляция идёт по приватным копиям.
+  const live = input.map((s) => deepClone(s.units as UnitStack[]).filter((x) => x.count > 0));
+  const enemies = (i: number): number[] => {
+    const out: number[] = [];
+    for (let j = 0; j < input.length; j++) {
+      if (j === i || !alive(live[j]!)) continue;
+      if (hostile ? hostile(input[i]!.owner, input[j]!.owner) : true) out.push(j);
+    }
+    return out;
+  };
+  let rounds = 0;
+  let stalemate = false;
+  while (live.every((u) => alive(u))) {
+    rounds += 1;
+    // Как и у живого предохранителя: счётчик ПРЕВЫШАЕТ кап, сам раунд не считается.
+    if (rounds > MAX_COMBAT_ROUNDS) {
+      stalemate = true;
+      break;
+    }
+    const incoming = new Array<number>(input.length).fill(0);
+    let anyFired = false;
+    for (let i = 0; i < input.length; i++) {
+      if (!alive(live[i]!)) continue;
+      const foes = enemies(i);
+      if (foes.length === 0) continue;
+      anyFired = true;
+      const volley = cappedUnitStat(
+        live[i]!,
+        data,
+        input[i]!.role === 'attacker' ? 'attack' : 'defense',
+      );
+      const share = volleyShare(volley, foes.length);
+      for (const j of foes) incoming[j]! += share;
+    }
+    // Никто никому не враг — бой не идёт вовсе, и крутить его до предохранителя значило
+    // бы обещать игроку 240 раундов там, где не будет ни одного (живой такт закрывает
+    // такой бой перемирием, CMB-7).
+    if (!anyFired) {
+      stalemate = true;
+      break;
+    }
+    for (let i = 0; i < input.length; i++) {
+      if (incoming[i]! > 0) live[i] = damageUnits(live[i]!, incoming[i]!, data).survivors;
+    }
+  }
+  const survivorCount = live.filter((u) => alive(u)).length;
+  const sideOf = (before: readonly UnitStack[], after: UnitStack[]): BattlePreviewSide => {
+    const total = hullPool(before, data);
+    const fraction = total > 0 ? 1 - hullPool(after, data) / total : 0;
+    return { survivors: after, losses: lossesOf(before, after), damageFraction: fraction };
+  };
+  return {
+    outcome: !stalemate && survivorCount === 1 ? 'decided' : 'stalemate',
+    roundsEst: rounds,
+    sides: input.map((s, i) => sideOf(s.units, live[i]!)),
+  };
+}
+
 /**
  * Forecast a battle between `attacker` (the aggressor: strikes with `attack`)
  * and `defender` (returns fire with `defense`) — fleet vs fleet, or a landing
@@ -98,38 +189,20 @@ export function previewBattle(
   defender: readonly UnitStack[],
   data: GameData,
 ): BattlePreview {
-  // damageUnits mutates the stacks it is given — the sim runs on private clones.
-  let a: UnitStack[] = deepClone(attacker as UnitStack[]).filter((s) => s.count > 0);
-  let d: UnitStack[] = deepClone(defender as UnitStack[]).filter((s) => s.count > 0);
-
-  // Mirror of the combat module's tick loop: pre-round liveness check, round
-  // counter, 240-round stalemate valve, simultaneous damage from the pre-round
-  // snapshot (both totals computed BEFORE either side takes its hits).
-  let rounds = 0;
-  let stalemate = false;
-  while (alive(a) && alive(d)) {
-    rounds += 1;
-    // Same as the live valve: the counter EXCEEDS the cap (battle.resolved reports
-    // 241 for a stalemate), the round itself is not fought.
-    if (rounds > MAX_COMBAT_ROUNDS) {
-      stalemate = true;
-      break;
-    }
-    // Same line cap as the live sideDamage: only the COMBAT_UNIT_CAP strongest
-    // units fire, everyone behind them only soaks (parity is test-enforced).
-    //
-    // И тем же правилом делится залп (MSB-2, `volleyShare`). У дуэли враг ОДИН, поэтому
-    // доля равна залпу и число здесь не меняется — но правило зовётся, а не повторяется
-    // умолчанием. Прогноз, считающий не тем правилом, что бой, обещает игроку другой бой;
-    // сегодня разницы нет, а после первой же правки делёжа была бы, и молча.
-    const toDefender = volleyShare(cappedUnitStat(a, data, 'attack'), 1);
-    const toAttacker = volleyShare(cappedUnitStat(d, data, 'defense'), 1);
-    d = damageUnits(d, toDefender, data).survivors;
-    // Прогноз обязан щадить артиллерию атакующего ровно так же, как живой бой
-    // (ROS-2.1) — иначе игрок увидит один исход, а получит другой.
-    a = damageUnits(a, toAttacker, data).survivors;
-  }
-
+  // Дуэль — ЧАСТНЫЙ СЛУЧАЙ многостороннего расклада, а не отдельный алгоритм (MSB-6).
+  // Двусторонняя петля, стоявшая здесь, повторяла правила боя своими словами; теперь
+  // они произносятся один раз в `previewSides`, и разойтись двум прогнозам негде.
+  const sim = previewSides(
+    [
+      { units: attacker, role: 'attacker' },
+      { units: defender, role: 'defender' },
+    ],
+    data,
+  );
+  const a = sim.sides[0]!.survivors;
+  const d = sim.sides[1]!.survivors;
+  const rounds = sim.roundsEst;
+  const stalemate = sim.outcome === 'stalemate';
   const aAlive = alive(a);
   const dAlive = alive(d);
   const outcome: BattlePreview['outcome'] =

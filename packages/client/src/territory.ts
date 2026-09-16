@@ -228,8 +228,8 @@ export function drawTerritory(
   seeds: TerritorySeed[],
   clip: Array<[number, number]>,
   palette: TerritoryPalette,
+  cells: TerritoryCell[] = computePowerCells(seeds, clip),
 ): TerritoryCell[] {
-  const cells = computePowerCells(seeds, clip);
   const trace = (poly: Array<[number, number]>): void => {
     g.beginPath();
     g.moveTo(poly[0]![0], poly[0]![1]);

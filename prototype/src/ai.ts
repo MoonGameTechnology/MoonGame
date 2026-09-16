@@ -18,8 +18,10 @@ import {
   slotUsage,
   technologyLock,
   hangarMachines,
+  fleetPositionAt,
+  hangarUsed,
+  fleetShuttleBay,
   squadronSize,
-  squadronCargoCapacity,
   type GameState,
   type Action,
   type Battle,
@@ -27,10 +29,14 @@ import {
   type Hero,
   type StewardPosture,
   type Planet,
+  type Squadron,
   type Fleet,
   type UnitStack,
 } from '../../packages/shared-core/src/index';
 import { heroByFleet, heroNode } from '../../packages/shared-core/src/state/heroes';
+// Опознанные узлы считаются ОДИН раз на тик и передаются в `knownGarrison`: покрытие
+// сенсоров — проход по всему флоту, а спрашивают про него десятки миров подряд.
+import { identifiedNodes } from '../../packages/shared-core/src/state/visibility';
 import { canOrder } from './protoKernel';
 import { provinceScore } from '../../packages/shared-core/src/state/sectorKind';
 import {
@@ -51,12 +57,26 @@ import {
   bombardFleet,
   splitFleet,
   strikeShuttle,
+  loadShuttle,
   loadSquadronTroops,
   spawnHero,
   unlockHeroSkill,
   installHeroModule,
   castHeroAbility,
 } from '../../decisions/actions';
+// ПРАВИЛА НАЗЕМНОЙ ВОЙНЫ БОТА (решение владельца 2026-09-16) живут в `/decisions`, а не
+// здесь: «возьму ли я этот мир», «сколько оставить дома» и «что известно о гарнизоне» —
+// чистые решения, которые завтра захочет показать и клиент. Своей копии у бота нет.
+import { confidentGroundWin } from '../../decisions/groundForecast';
+import {
+  garrisonDefense,
+  garrisonFloor,
+  garrisonNeed,
+  pickForGarrison,
+  spareGround,
+} from '../../decisions/garrisonPolicy';
+import { freshIntel, knownGarrison } from '../../decisions/garrisonIntel';
+import { planDrop } from '../../decisions/dropPlan';
 import { botEmbargoes } from './botFavour';
 import { netIncome } from './economy';
 import { SECTOR_TYPES } from './map';
@@ -124,15 +144,14 @@ const GROUND_YARDS = ['barracks', 'factory'] as const;
 
 /** Сколько наземных юнитов сильный бот держит дома: гарнизон + запас на десант. */
 const GROUND_STOCK = 8;
-/** Столько войск НЕ грузится в трюм: иначе дом остаётся пустым и берётся прилётом. */
-const HOME_GUARD = 3;
+/** Сколько ПРИЗОВЫХ миров получают гарнизон за один тик. Не единица (иначе империя
+ *  добирает пол по одному миру за два игровых часа) и не «сколько влезет»: `affordable*`
+ *  меряет казну до ВСЕХ заказов тика, поэтому щедрость обернулась бы пачкой отказов. */
+const GARRISON_ORDERS_PER_TICK = 3;
 /** Верхний предел десантных кораблей — трюм 16 против 5 у крейсера, больше не нужно. */
 const DROPSHIP_CAP = 2;
-/** Сколько артиллерийских корпусов держит сильный бот (AI-BAL-4): дальний огонь — не
- *  замена флоту, а добавка к нему; стеклянная пушка гибнет от первого же сближения. */
-const ARTILLERY_CAP = 2;
-/** Осадных платформ — столько же. Дальнего огня платформа больше не даёт (трейт
- *  `artillery` уехал на одноимённый корпус), но она — единственный корабль ЗАДНЕЙ
+/** Осадных платформ — две. Дальнего огня в игре больше нет вовсе, но платформа —
+ *  единственный корабль ЗАДНЕЙ
  *  линии, а линия без корабля не участвует в раздаче урона: не строй бот платформу —
  *  и замер разбирал бы бой, в котором задней линии просто нет. */
 const SIEGE_CAP = 2;
@@ -140,6 +159,12 @@ const SIEGE_CAP = 2;
  *  с крейсерами за тот же дефицитный ресурс. Считается по АНГАРУ порта, а не по флотам:
  *  челнок с SHU-1.1 живёт в `planet.hangar` и во флот не попадает никогда. */
 const SHUTTLE_CAP = 3;
+
+/** Носителей — ОДИН (SHU-2.1, решение владельца 2026-09-15). Он дорог (260 металла) и
+ *  почти безоружен: ценность у него не в бою, а в том, что ангар едет с флотом. Второй
+ *  ничего не добавил бы к вопросу «долетают ли челноки до фронта», зато отнял бы металл
+ *  у линии. Порог поднимут, когда станет что сравнивать. */
+const CARRIER_CAP = 1;
 
 /**
  * Ударный ростер челноков (SHU-3.2) — кого бот СТРОИТ и кого ПОСЫЛАЕТ.
@@ -151,24 +176,13 @@ const SHUTTLE_CAP = 3;
  */
 const STRIKE_SHUTTLES = ['bomber', 'landing_shuttle'] as const;
 
-/** Груз десантного вылета: наземные войска сверх домашней стражи, в фиксированном
- *  порядке ростера обороны и не больше вместимости. Пусто — вылет не поднимается:
- *  десантный челнок без груза долетит и просто погибнет. */
-function troopsForDrop(port: Planet, capacity: number): Array<{ unit: string; count: number }> {
-  const out: Array<{ unit: string; count: number }> = [];
-  let room = capacity;
-  for (const unit of GROUND_ROSTER) {
-    if (room <= 0) break;
-    const have = port.garrison.reduce((n, st) => n + (st.unit === unit ? st.count : 0), 0);
-    const size = data.units[unit]?.stats.cargoSize ?? 1;
-    const spare = Math.min(have - HOME_GUARD, Math.floor(room / Math.max(1, size)));
-    if (spare > 0) {
-      out.push({ unit, count: spare });
-      room -= spare * size;
-    }
-  }
-  return out;
+/** Есть ли у мира ангар: признак — ПОЛЕ ДАННЫХ, а не имя здания, поэтому новый порт
+ *  подхватится сам. `shuttleBayAt` ядра сюда не годится: он считает ВМЕСТИМОСТЬ с учётом
+ *  уровней, а вопрос здесь — «есть ли вообще куда класть». */
+function hasPortAt(planet: Planet): boolean {
+  return planet.buildings.some((b) => b.hp > 0 && (data.buildings[b.type]?.shuttleBay ?? 0) > 0);
 }
+
 /** Запас казны сверх цены заказа (мера та же, что у построек бота). */
 const ORDER_RESERVE: Record<string, number> = { metal: 60, credits: 60 };
 /**
@@ -359,6 +373,29 @@ export function aiOrders(
    *  выдавал `fleet.bombard` каждый цикл, получая `E_WRONG_SECTOR` до конца матча —
    *  та же вечная стоянка, что описана выше про `E_SAME_LOCATION`. */
   const orbitalLayer = (p: Planet): boolean => SECTOR_TYPES[p.kind ?? '']?.orbit ?? true;
+  /** Ближайшая ЧУЖАЯ цель, которую этот флот, скорее всего, и будет штурмовать. Тем же
+   *  правилом («ближайший захватываемый, тай-брейк по id») ниже выбирается курс, поэтому
+   *  «сколько десанта мне ещё нужно» спрашивается про ту самую цель, а не про абстрактную. */
+  const assaultTargetFor = (fl: Fleet): Planet | undefined => {
+    const at = fl.location ? state.planets[fl.location] : undefined;
+    if (!at) return undefined;
+    return Object.values(state.planets)
+      .filter((p) => p.owner !== ai && capturable(p) && canTraverse(state, ai, p.owner))
+      .sort(
+        (a, b) =>
+          d(at.position, a.position) - d(at.position, b.position) ||
+          (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+      )[0];
+  };
+  /** Свой мир, которому подкрепление нужнее всего и ближе всего. Сортировка по паре
+   *  «расстояние, id» — решение бота обязано быть чистой функцией состояния. */
+  const neediestWorld = (from: { x: number; y: number }): Planet | undefined =>
+    Object.values(state.planets)
+      .filter((p) => p.owner === ai && p.kind === 'planet' && garrisonNeed(p, data) > 0)
+      .sort(
+        (a, b) =>
+          d(from, a.position) - d(from, b.position) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+      )[0];
   const d = (a: { x: number; y: number }, b: { x: number; y: number }): number =>
     Math.hypot(a.x - b.x, a.y - b.y);
   // Send each idle AI fleet toward the nearest capturable world it can reach — only
@@ -469,7 +506,10 @@ export function aiOrders(
     const sideUnits = (ref: CombatantRef): UnitStack[] => {
       if (ref.kind === 'garrison') return state.planets[ref.planetId]?.garrison ?? [];
       // ROS-1.5: плацдарм держит мир, а не флот — оценивается так же, как гарнизон.
-      if (ref.kind === 'beachhead') return state.planets[ref.planetId]?.beachhead?.units ?? [];
+      if (ref.kind === 'beachhead')
+        return (
+          state.planets[ref.planetId]?.beachheads?.find((b) => b.owner === ref.owner)?.units ?? []
+        );
       const other = state.fleets[ref.fleetId];
       if (!other) return [];
       return ref.kind === 'landing' ? (other.landing ?? []) : other.units;
@@ -530,45 +570,96 @@ export function aiOrders(
     // матча. Игровой профиль не тронут: это лаборатория.
     if (profile === 'strong' && base) {
       const here0 = state.planets[f.location];
-      // (а) Погрузка ДОМА и в мирное время: пустой трюм у стены гарнизона означает,
-      //     что флот долетит и встанет. Дома остаётся `HOME_GUARD` — иначе бот
-      //     вывозит собственную оборону и его столицу берут прилётом.
+      // (а) Погрузка ДОМА — ТОЛЬКО ПОД АТАКУ (правило владельца №5, 2026-09-16:
+      //     «загружает наземные юниты только когда целенаправленно нападает на планеты
+      //     врага»). Раньше грузили и в мирное время; довод был «пустой трюм у стены
+      //     гарнизона означает, что флот долетит и встанет». Довод верен, а цена его —
+      //     войска, которые месяцами катаются в трюме и пропадают ВМЕСТЕ с флотом:
+      //     гибель корпусов стирает `fleet.landing` целиком (`combat.ts`, удаление
+      //     флота), отдельного броска у десанта нет. В мирное время брать нечего —
+      //     пустой мир занимается прилётом, и войска ему не нужны.
+      //
+      //     СКОЛЬКО БРАТЬ, решает `spareGround` (правило №6: досуха не вычёрпывать,
+      //     пол растёт с развитостью мира). Отдаёт он УДАРНЫЕ рода, оставляя дома
+      //     оборонительные, — танк полезнее на чужой земле, ополченец на своей.
       //     ПОДЪЁМ ЗАНИМАЕТ ЧАС (CARGO-1), а вылет его ОТМЕНЯЕТ: флот, который
       //     грузится, этот тик СТОИТ дома, иначе улетел бы с пустым трюмом.
-      if (here0 && here0.id === base.id) {
+      if (here0 && here0.id === base.id && warFooting) {
         if ((f.loading ?? []).length > 0) continue; // подъём идёт — ждём его
         let free = liftFree(f);
-        let spare = groundCount(here0) - HOME_GUARD;
         let ordered = false;
-        for (const u of GROUND_ROSTER) {
-          if (free <= 0 || spare <= 0) break;
-          const size = data.units[u]?.stats.cargoSize ?? 1;
-          const have = here0.garrison.reduce((n, st) => n + (st.unit === u ? st.count : 0), 0);
-          const take = Math.min(have, spare, Math.floor(free / size));
+        for (const st of spareGround(here0, data)) {
+          if (free <= 0) break;
+          const size = data.units[st.unit]?.stats.cargoSize ?? 1;
+          const take = Math.min(st.count, Math.floor(free / size));
           if (take > 0) {
-            out.push(loadArmy(ai, f.id, u, take));
+            out.push(loadArmy(ai, f.id, st.unit, take));
             free -= take * size;
-            spare -= take;
             ordered = true;
           }
         }
         if (ordered) continue; // час подъёма — вылет следующим тиком
       }
-      // (а2) ГАРНИЗОН НА ЗАНЯТОМ МИРЕ (AI-BAL-2). Мир без войск берётся ПРИЛЁТОМ —
-      //      `captureOnArrival` не смотрит ни на здания, ни на их оборонный бонус, только
-      //      на `garrison.some(count > 0)`. Отсюда карусель базовой линии: 113 захватов
-      //      прилётом за матч, миры перекидываются без единого выстрела. Флот, стоящий на
-      //      СВОЁМ пустом мире, оставляет одного бойца — дальше этот мир нужно штурмовать.
-      //      По одному: остальной десант нужен самому флоту, иначе он разоружится в дороге.
+      // (а2) ГАРНИЗОН НА ЗАНЯТОМ МИРЕ (AI-BAL-2, доращено подвозом 2026-09-16). Мир без
+      //      войск берётся ПРИЛЁТОМ — `captureOnArrival` не смотрит ни на здания, ни на
+      //      их оборонный бонус, только на `garrison.some(count > 0)`. Отсюда карусель
+      //      базовой линии: 113 захватов прилётом за матч, миры перекидываются без
+      //      единого выстрела.
+      //
+      //      РАНЬШЕ ССАЖИВАЛИ РОВНО ОДНОГО, и довод был «остальной десант нужен самому
+      //      флоту». Довод верен только наполовину: нужен ровно тот десант, которым флот
+      //      РЕАЛЬНО возьмёт свою цель, а всё сверх того он просто возит — и теряет
+      //      вместе с корпусами. Поэтому ссаживается столько, сколько мир не добирает до
+      //      пола (правило владельца №4), но не глубже, чем позволяет уверенность в
+      //      ближайшей цели: ту же `confidentGroundWin` спрашивает и сам штурм, так что
+      //      разойтись эти два ответа не могут.
+      if (here0 && here0.owner === ai && here0.id !== base.id && capturable(here0)) {
+        const need = garrisonNeed(here0, data);
+        const carried = (f.landing ?? []).filter((st) => st.count > 0);
+        if (need > 0 && carried.length > 0) {
+          const target = assaultTargetFor(f);
+          for (const give of pickForGarrison(carried, need, data)) {
+            // Оставшееся обязано взять цель. Нет цели — отдаём без оглядки: возить
+            // десант некуда, а мир без гарнизона перекидывают прилётом.
+            const left = carried.map((st) =>
+              st.unit === give.unit ? { ...st, count: st.count - give.count } : { ...st },
+            );
+            if (target && !confidentGroundWin(left, target.garrison, data)) break;
+            out.push(unloadArmy(ai, f.id, give.unit, give.count));
+          }
+        }
+      }
+      // (а3) ПОДВОЗ ПОДКРЕПЛЕНИЯ — вторая половина правила владельца №4 (2026-09-16).
+      //      Замер показал, что войска у бота ЕСТЬ, они просто лежат не там: за 78
+      //      суточных срезов 179 миров стояли ниже пола на 2432 очка обороны суммарно,
+      //      при излишке 23004 очка на 1619 других миров. Строить на месте умеет не
+      //      каждый — 63 из 179 миров были без казармы вовсе.
+      //
+      //      Грузится ИЗЛИШЕК со своего мира, и только НЕ ДОМА: дома трюм наполняет
+      //      правило (а) под атаку, и два правила на один трюм передрались бы за него.
+      //      Пустой трюм в условии — граница, из-за которой подвоз не может разоружить
+      //      ударную группу: флот с десантом на борту он не трогает вовсе.
       if (
         here0 &&
         here0.owner === ai &&
         here0.id !== base.id &&
-        groundCount(here0) === 0 &&
-        capturable(here0)
+        !(f.landing ?? []).some((st) => st.count > 0) &&
+        (f.loading ?? []).length === 0 &&
+        neediestWorld(here0.position) !== undefined
       ) {
-        const carried = (f.landing ?? []).find((st) => st.count > 0);
-        if (carried) out.push(unloadArmy(ai, f.id, carried.unit, 1));
+        let free = liftFree(f);
+        let ordered = false;
+        for (const st of spareGround(here0, data)) {
+          if (free <= 0) break;
+          const size = data.units[st.unit]?.stats.cargoSize ?? 1;
+          const take = Math.min(st.count, Math.floor(free / size));
+          if (take > 0) {
+            out.push(loadArmy(ai, f.id, st.unit, take));
+            free -= take * size;
+            ordered = true;
+          }
+        }
+        if (ordered) continue; // час подъёма — курс следующим тиком
       }
       // (б) Штурм с орбиты. Правила штурма называет ЯДРО (`assaultPlanet`), здесь
       //     только повод не сыпать заведомо отбиваемым приказом: чужой захватываемый
@@ -587,7 +678,12 @@ export function aiOrders(
         capturable(here0) &&
         canTraverse(state, ai, here0.owner) &&
         (!here0.garrison.some((st) => st.count > 0) ||
-          (f.landing ?? []).some((st) => st.count > 0))
+          // ПРАВИЛО ВЛАДЕЛЬЦА №2 (2026-09-16): штурмовать, только будучи УВЕРЕННЫМ, что
+          // наземные силы возьмут гарнизон. Раньше хватало любого бойца в трюме — и
+          // десант из двух ополченцев ложился под ротой тяжёлой пехоты, не сдвинув
+          // ничего. Гарнизон читается ПРЯМО: флот стоит в ближней орбите, мир опознан,
+          // и разведданные здесь — само наблюдение (правило №1 соблюдено по построению).
+          confidentGroundWin(f.landing ?? [], here0.garrison, data))
       ) {
         out.push(assaultFleet(ai, f.id));
         continue; // берём ЭТОТ мир, а не улетаем к следующему
@@ -636,10 +732,13 @@ export function aiOrders(
       // уходит следующим тиком уже с ним. Без ожидания она улетала бы пустой и до
       // конца матча не могла бы взять ни одного гарнизонного мира.
       if ((f.loading ?? []).length > 0) continue; // подъём идёт — стоим
-      const militia = base.garrison.find((s) => s.unit === 'militia' && s.count > 0);
+      // ПОЛ ГАРНИЗОНА (правило владельца №6) держит и этот путь: пара бойцов эскорта
+      // не должна опустить мир ниже того, что он обязан оставить себе. Двойка здесь —
+      // не доктрина, а минимальный эскорт, и её кап остаётся как был.
+      const spareMilitia = spareGround(base, data).find((s) => s.unit === 'militia');
       const hasLanding = (f.landing ?? []).some((s) => s.count > 0);
-      if (!hasLanding && militia) {
-        out.push(loadArmy(ai, f.id, 'militia', Math.min(2, militia.count)));
+      if (!hasLanding && spareMilitia) {
+        out.push(loadArmy(ai, f.id, 'militia', Math.min(2, spareMilitia.count)));
         continue; // час подъёма — вылет следующим тиком
       }
     }
@@ -721,6 +820,27 @@ export function aiOrders(
         take.push({ unit: st.unit, count: Math.floor(st.count / 2) });
       }
       if (take.length > 0) out.push(splitFleet(ai, f.id, take));
+    }
+    // ═══ КУРС ПОДВОЗА (правило владельца №4, вторая половина) ═══
+    // ЗАВОЗ ПО ДОРОГЕ, а не отдельная экспедиция. Первая версия правила разворачивала
+    // флот, только если он НЕ возьмёт ближайшую цель, — и замер показал, почему этого
+    // мало: гружёный флот стоял на нуждающемся мире 19 раз за 1002 тика, а в пути с
+    // десантом был 1574 раза. Возить было чем и что, но маршруты туда не вели.
+    //
+    // Теперь крюк делается, когда свой голодный мир БЛИЖЕ цели: флот завозит гарнизон
+    // и следующим тиком идёт дальше — цена крюка ограничена тем, что он короче пути,
+    // который флот и так собирался пройти. Второй случай прежний: цель, которую этим
+    // десантом всё равно не взять, перестаёт быть целью.
+    //
+    // Роли «подвоз» нет, и памяти о задании тоже: оба условия выводятся из состояния
+    // КАЖДЫЙ тик, а «хватит ли на цель» спрашивает ту же `confidentGroundWin`, которой
+    // меряет себя сам штурм. Уверенный флот с далёким голодным миром идёт воевать.
+    if (profile === 'strong' && best && (f.landing ?? []).some((st) => st.count > 0)) {
+      const needy = neediestWorld(here.position);
+      if (needy && needy.id !== here.id) {
+        const closer = d(here.position, needy.position) < d(here.position, best.position);
+        if (closer || !confidentGroundWin(f.landing ?? [], best.garrison, data)) best = needy;
+      }
     }
     if (best) out.push(moveFleet(ai, f.id, best.id));
   }
@@ -917,18 +1037,12 @@ export function aiOrders(
     // fleet lifts home-built militia aboard as landing troops (fleet.launch), which
     // is exactly what lets it assault a garrisoned world back.
     if (warFooting) {
-      let garrisonOrders = 0;
-      for (const p of worldsInOrder(state, ai, 'garrison', profile)) {
-        if (garrisonOrders >= 2 || (pl.resources.metal ?? 0) < 90) break;
-        if (p.owner !== ai || p.kind !== 'planet') continue;
-        if (p.garrison.some((s) => s.count > 0)) continue;
-        // Без казармы ядро отобьёт заказ (`E_NO_GROUND_FACILITY`) — раньше этот блок
-        // сыпал такими отказами весь матч (60 за пробный матч). Поведение не меняется:
-        // отсеиваются ровно те приказы, которые всё равно ничего не делали.
-        if (!hasFacilityFor(p, 'militia')) continue;
-        out.push(buildUnit(ai, p.id, 'militia', 2));
-        garrisonOrders += 1;
-      }
+      // ГАРНИЗОН ПРИЗОВЫХ МИРОВ ПЕРЕЕХАЛ ОТСЮДА (2026-09-16). Здесь стояло правило
+      // «на войне занять ПУСТЫЕ призовые миры ополчением», и оно стало вторым живым
+      // ответом на тот же вопрос: пустой мир — частный случай мира ниже ПОЛА, а пол
+      // (правило владельца №4) считается ниже, в блоке призовых миров, и не только на
+      // войне. Две копии разошлись бы на первой же правке — эта уже расходилась капом
+      // (2 против 3) и условием (пусто против недобора).
       // A landing stock at home: strike groups lift militia on sortie (above), so
       // the base keeps a few spare beyond its seeded defenders.
       const baseMilitia = base.garrison
@@ -988,7 +1102,16 @@ export function aiOrders(
         if (groundCount(base) + pendingHome < GROUND_STOCK) {
           // Пока дома нет даже домашней стражи — заказывается ОБОРОНИТЕЛЬНЫЙ род войск;
           // всё сверх неё уедет в трюме, поэтому там нужен ударный.
-          const list = groundCount(base) < HOME_GUARD ? GROUND_DEFENDERS : GROUND_ROSTER;
+          // ПРАВИЛО ВЛАДЕЛЬЦА №4 (2026-09-16): «чем больше развита планета, тем больше
+          // наземных сил на ней». Мера — тот же ПОЛ, что запрещает вычёрпывать гарнизон
+          // (`garrisonFloor`), поэтому «сколько держать» и «сколько можно увезти» не
+          // могут разойтись: это одно число, спрошенное с двух сторон. Пока пол не
+          // набран — заказывается ОБОРОНИТЕЛЬНЫЙ род войск; всё сверх него уедет в
+          // трюме, и там нужен ударный.
+          const list =
+            garrisonDefense(base.garrison, data) < garrisonFloor(base)
+              ? GROUND_DEFENDERS
+              : GROUND_ROSTER;
           const pick = list.find((u) => affordableUnit(u, 2) && hasFacilityFor(base, u));
           if (pick) out.push(buildUnit(ai, base.id, pick, 2));
         }
@@ -996,18 +1119,33 @@ export function aiOrders(
       // 3. Призовые миры: сперва казарма, потом ополчение в пустой гарнизон. Мир с
       //    гарнизоном нельзя забрать прилётом — за него придётся высаживаться, и
       //    ровно этого измерению не хватало.
+      // СТРОЙКА И ГАРНИЗОН — РАЗНЫЕ ОЧЕРЕДИ, и до 2026-09-16 они делили один `break`.
+      // Ветка казармы выходила из ВСЕГО цикла, поэтому за тик бот заказывал ЛИБО одну
+      // казарму, ЛИБО одну пару ополченцев — на всю империю. Первым в обходе то и дело
+      // оказывался мир без казармы (19% своих миров), и тогда ополчение не заказывалось
+      // НИГДЕ. Замер: 1498 заказов казармы против 538 заказов ополчения, при том что
+      // большинство голодных миров (1445 из 2402) казарму уже имели. Стройка осталась
+      // одна за тик, а гарнизон теперь считается своим счётчиком.
+      let barracksOrdered = false;
+      let garrisonOrders = 0;
       for (const p of worldsInOrder(state, ai, 'barracks', profile)) {
         if (p.owner !== ai || p.kind !== 'planet' || p.id === base.id) continue;
         if (!hasFacilityFor(p, 'militia')) {
-          if (pendingBuild(p.id, 'barracks')) continue;
-          if (!affordable('barracks')) break;
+          if (barracksOrdered || pendingBuild(p.id, 'barracks')) continue;
+          if (!affordable('barracks')) continue;
           out.push(buildBuilding(ai, p.id, 'barracks'));
-          break; // одна стройка за тик — как и с шахтой
+          barracksOrdered = true; // одна стройка за тик — как и с шахтой
+          continue; // …но остальным мирам ещё нужен гарнизон
         }
-        if (groundCount(p) > 0 || pendingUnit(p.id, 'militia')) continue;
+        // Тот же ПОЛ (правило №4): голый мир держит двух ополченцев, развитый — больше.
+        // Раньше условием было «гарнизон пуст», и застроенный призовой мир навсегда
+        // оставался при той же паре бойцов, что и голый камень.
+        if (garrisonOrders >= GARRISON_ORDERS_PER_TICK) break;
+        if (garrisonDefense(p.garrison, data) >= garrisonFloor(p) || pendingUnit(p.id, 'militia'))
+          continue;
         if (!affordableUnit('militia', 2)) break;
         out.push(buildUnit(ai, p.id, 'militia', 2));
-        break;
+        garrisonOrders += 1;
       }
       // 5. ОБОРОНА (AI-BAL-2): форт → госпиталь → орбитальное ПКО. Порядок — по тому,
       //    что каждое здание делает для УДЕРЖАНИЯ: форт даёт гарнизону +30% обороны
@@ -1050,20 +1188,28 @@ export function aiOrders(
       ) {
         out.push(buildUnit(ai, base.id, 'strike_carrier', 1));
       }
-      // ═══ 6. АРТИЛЛЕРИЯ И АВИАЦИЯ (AI-BAL-4) ═══
-      // Артиллерия стреляет САМА: `artilleryModule` каждым пролётом времени заставляет
-      // свободный стоящий флот с `artillery`-корпусом обстрелять ближайший враждебный
-      // стоящий флот в радиусе `range` — без приказа, без ответного огня и без входа в
-      // бой. То есть корпус `artillery` не требует от бота ни одной новой команды:
-      // достаточно его ПОСТРОИТЬ, и целый пласт боя (дальний огонь) входит в измерение.
+      // 5. НОСИТЕЛЬ ЧЕЛНОКОВ — «плавучий космопорт» (SHU-2.1). Без него удар челноками
+      //    физически не доезжает до войны: вылет поднимается с БАЗЫ, у челнока радиус
+      //    120–150, а чужие миры так близко к дому не стоят — замер давал ноль вылетов
+      //    при живой постройке машин. Носитель возит ангар с флотом и закрывает именно
+      //    это. Строится только на войне и только когда порт УЖЕ есть: пустой ангар
+      //    возить незачем.
       if (
         warFooting &&
-        shipsOwned('artillery') < ARTILLERY_CAP &&
-        !pendingUnit(base.id, 'artillery') &&
-        affordableUnit('artillery', 1)
+        hasPortAt(base) &&
+        shipsOwned('shuttle_carrier') < CARRIER_CAP &&
+        !pendingUnit(base.id, 'shuttle_carrier') &&
+        affordableUnit('shuttle_carrier', 1)
       ) {
-        out.push(buildUnit(ai, base.id, 'artillery', 1));
+        out.push(buildUnit(ai, base.id, 'shuttle_carrier', 1));
       }
+      // ═══ 6. АВИАЦИЯ И ЗАДНЯЯ ЛИНИЯ (AI-BAL-4) ═══
+      // Правило постройки `artillery` СНЯТО (решение владельца 2026-09-16). Дальний огонь
+      // убран из игры целиком ещё раньше: модуль `artillery` вышел из графа, манифест
+      // поднят до 14 (`scenario.ts`), и корпуса `artillery` нет ни в одном `data/*.json`.
+      // Правило же осталось и заказывало его КАЖДЫЙ тик — ядро отбивало `E_UNKNOWN_UNIT`
+      // молча, 2493 отказа за 8 матчей замера. Линии приёма урона это не касается: они
+      // живы, и заднюю линию держит осадная платформа ниже.
       // Осадная платформа — задняя линия (GDD §7.2). Огня с дистанции она не даёт, но
       // без неё у бота не бывает ЗАДНЕЙ линии вовсе, и раздача урона по линиям меряется
       // лишь наполовину.
@@ -1125,53 +1271,163 @@ export function aiOrders(
     // в радиусе, тай-брейк по id. Ближайшая, а не «лучшая»: выбор цели — это стратегия,
     // а кирпичу нужно, чтобы механика заработала и попала в измерение.
     if (profile === 'strong' && warFooting) {
-      const port = state.planets[base.id];
-      const hangar = port?.hangar ?? [];
-      // Машины перебираются в ФИКСИРОВАННОМ порядке ростера, а не порядком ангара:
-      // порядок стеков зависит от истории заказов, и один сид разыгрался бы по-разному.
-      // SHU-4.2: летит ЭСКАДРА целиком, поэтому бот ищет не стек, а СОЕДИНЕНИЕ, в
-      // котором есть нужная машина. Волну он больше не отмеряет: сколько построено в
-      // звене, столько и уйдёт — делёж ради размера волны потребовал бы знать id,
-      // который ядро выдаст только после применения приказа.
-      const ready = STRIKE_SHUTTLES.find((u) =>
-        hangar.some((sq) => sq.units.some((st) => st.unit === u && st.count > 0)),
-      );
-      const squad = ready
-        ? hangar.find((sq) => sq.units.some((st) => st.unit === ready && st.count > 0))
+      // ═══ ПОГРУЗКА НА НОСИТЕЛЬ (SHU-2.1) ═══
+      // Носитель без эскадр — просто дорогой корпус с плохими пушками. Грузим, пока он
+      // СТОИТ у своего мира с портом: ядро возит соединение целиком и только со стоянки.
+      // Один приказ за тик той же формы, что и остальные правила бота.
+      const myCarrier = Object.values(state.fleets)
+        .filter(
+          (f) =>
+            f.owner === ai &&
+            !f.movement &&
+            !f.battleId &&
+            f.location !== null &&
+            fleetShuttleBay(f, data) > 0,
+        )
+        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))[0];
+      if (myCarrier) {
+        const dock = state.planets[myCarrier.location!];
+        const free = fleetShuttleBay(myCarrier, data) - hangarUsed(myCarrier);
+        // Берётся ПЕРВАЯ ударная эскадра порта, влезающая целиком, — тем же правилом,
+        // что и кнопка перегрузки у игрока (`transferPick`): половину ядро отобьёт.
+        const liftable = (dock?.hangar ?? []).find(
+          (sq) =>
+            sq.units.some((st) => STRIKE_SHUTTLES.includes(st.unit as never) && st.count > 0) &&
+            squadronSize(sq) > 0 &&
+            squadronSize(sq) <= free,
+        );
+        if (dock && dock.owner === ai && liftable) {
+          out.push(loadShuttle(ai, myCarrier.id, liftable.id));
+        }
+      }
+      // ═══ ОТКУДА ПОДНИМАТЬ ═══
+      // БАЗ У ВЫЛЕТА ДВЕ, а не одна. Пока бот умел только домашний порт, удар не доезжал
+      // до войны вовсе: радиус челнока 120–150, а чужие миры так близко к дому не стоят —
+      // замер давал ноль вылетов при живой постройке машин. Носитель и есть ответ
+      // («плавучий космопорт», SHU-2.1), поэтому базы перебираются по порядку: сперва
+      // дом, потом носители по id. Порядок фиксированный — от него зависит выбор, а
+      // решение бота обязано быть чистой функцией состояния (инвариант №1).
+      const launchpads: Array<{ base: { planetId: string } | { fleetId: string }; at: { x: number; y: number }; hangar: Squadron[] }> = [];
+      const homePort = state.planets[base.id];
+      if (homePort) {
+        launchpads.push({ base: { planetId: homePort.id }, at: homePort.position, hangar: homePort.hangar ?? [] });
+      }
+      // СТОЯНКА НОСИТЕЛЮ БОЛЬШЕ НЕ НУЖНА (решение владельца 2026-09-16): ядро пускает
+      // вылет с хода, и бот идёт следом. Пока фильтр требовал неподвижности, новое
+      // правило не участвовало в замерах вообще — носитель едет с кулаком и стоит редко.
+      // Позиция берётся ЖИВОЙ (`fleetPositionAt`, та же функция, по которой считает ядро):
+      // у идущего флота `location` пуст, и узел под ним спрашивать не у чего.
+      for (const f of Object.values(state.fleets)
+        .filter((fl) => fl.owner === ai && !fl.battleId && (fl.hangar ?? []).length > 0)
+        .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
+        const at = fleetPositionAt(state, f, state.time);
+        if (at) launchpads.push({ base: { fleetId: f.id }, at, hangar: f.hangar ?? [] });
+      }
+      // ═══ ЧЕМ ПОДНИМАТЬ: УДАР И ВЫСАДКА — РАЗНЫЕ ПРИКАЗЫ ═══
+      // Раньше машина выбиралась ОДНА на фиксированном ростере `['bomber',
+      // 'landing_shuttle']`, и когда в ангаре лежал только десантный челнок, тик уходил
+      // ВПУСТУЮ: приказа не было вовсе, а отказа, по которому это было бы видно, — тоже.
+      // Замер 8 матчей: 112 десантных машин в ангарах против 45 бомбардировщиков, и НИ
+      // ОДНОЙ высадки с грузом. Теперь у каждой машины свой путь, свой радиус и свои
+      // правила, а бомбардировщик поднимается тогда, когда высадке идти не с чем.
+      const squadsWith = (hangar: Squadron[], unit: string): Squadron[] =>
+        hangar.filter((sq) => sq.units.some((st) => st.unit === unit && st.count > 0));
+      const reachOf = (unit: string): number => data.units[unit]?.stats.strikeRange ?? 0;
+      const nearestBy = <T extends { id: string }>(
+        xs: T[],
+        from: { x: number; y: number },
+        at: (x: T) => { x: number; y: number },
+      ): T | undefined =>
+        xs
+          .slice()
+          .sort(
+            (a, b) =>
+              d(from, at(a)) - d(from, at(b)) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+          )[0];
+
+      // ═══ ВЫСАДКА (правила владельца №1, №2, №3 от 2026-09-16) ═══
+      // №1 — не высаживаться, НЕ ЗНАЯ гарнизона. До этой правки бот читал
+      //      `planet.garrison` напрямую, то есть был всеведущ: пустой гарнизон
+      //      невидимого мира он видел так же уверенно, как свой собственный. Теперь
+      //      источник один — `knownGarrison` (живое наблюдение либо снимок тумана), и
+      //      «не знаю» отличается от «знаю, что пусто».
+      // №2 — мир, над которым УЖЕ стоит свой флот, челноками не берут: там дешевле
+      //      штурм с кораблей, и он в этом же тике выше по коду.
+      // №3 — цель без вражеского флота на орбите; наряд — самая маленькая эскадра,
+      //      которой хватит, с трюмом, набитым лучшими ударными (`planDrop`).
+      const identified = identifiedNodes(state, ai, data);
+      const ownNearOrbit = new Set<string>();
+      for (const fl of Object.values(state.fleets)) {
+        if (fl.owner === ai && fl.orbit === 'near' && fl.location) ownNearOrbit.add(fl.location);
+      }
+      const foeFleetAt = new Set<string>();
+      for (const fl of Object.values(state.fleets)) {
+        if (fl.owner !== ai && fl.location && fl.units.some((st) => st.count > 0)) {
+          foeFleetAt.add(fl.location);
+        }
+      }
+      let sortied = false;
+      const dropPad = launchpads.find((lp) => squadsWith(lp.hangar, 'landing_shuttle').length > 0);
+      if (dropPad) {
+        const from = dropPad.base;
+        // Откуда берётся десант: у мира — ИЗЛИШЕК сверх пола (правило №6), у носителя —
+        // то, что уже едет с ним. Второго источника у носителя нет и не нужно: войска
+        // сажают дома, под операцию (правило №5).
+        const source =
+          'planetId' in from
+            ? spareGround(state.planets[from.planetId] ?? { buildings: [], garrison: [] }, data)
+            : (state.fleets[from.fleetId]?.landing ?? []);
+        const reach = reachOf('landing_shuttle');
+        const target = nearestBy(
+          Object.values(state.planets).filter((p) => {
+            if (p.owner === null || p.owner === ai) return false;
+            if (getStance(state, ai, p.owner) !== 'war') return false;
+            if (!capturable(p)) return false;
+            if (d(dropPad.at, p.position) > reach) return false;
+            if (ownNearOrbit.has(p.id)) return false; // №2: возьмём штурмом, челноки целы
+            if (foeFleetAt.has(p.id)) return false; // №3: под чужим флотом высадка не идёт
+            return freshIntel(knownGarrison(state, ai, p.id, data, identified), state.time);
+          }),
+          dropPad.at,
+          (p) => p.position,
+        );
+        const intel = target ? knownGarrison(state, ai, target.id, data, identified) : null;
+        const plan = target && intel
+          ? planDrop(squadsWith(dropPad.hangar, 'landing_shuttle'), source, intel.units, data)
+          : null;
+        if (target && plan) {
+          // Груз кладут ОТДЕЛЬНЫМ приказом, и он идёт ПЕРЕД вылетом: два приказа одного
+          // тика применяются по порядку, поэтому эскадра взлетает уже гружёной.
+          out.push(loadSquadronTroops(ai, from, plan.squadronId, plan.troops));
+          out.push(strikeShuttle(ai, from, plan.squadronId, { targetPlanetId: target.id }));
+          sortied = true;
+        }
+      }
+
+      // ═══ УДАР БОМБАРДИРОВЩИКОМ ═══
+      // Один вылет за тик: топливо у базы общее, вторым приказом его не растянуть.
+      // Цель — чужой ФЛОТ (бомбардировщик бьёт корпуса) либо чужой МИР, ближайшая в
+      // радиусе, тай-брейк по id: иначе выбор зависел бы от порядка ключей объекта.
+      const bombPad = !sortied
+        ? launchpads.find((lp) => squadsWith(lp.hangar, 'bomber').length > 0)
         : undefined;
-      if (port && ready && squad) {
-        const reach = data.units[ready]?.stats.strikeRange ?? 0;
-        const inReach = (at: { x: number; y: number }): boolean => d(port.position, at) <= reach;
-        // Цель — чужой ФЛОТ (бомбардировщик бьёт корпуса) либо чужой МИР. Оба перебора
-        // отсортированы по расстоянию, затем по id — иначе выбор зависел бы от порядка
-        // ключей объекта (инвариант #1).
-        const byNear = <T extends { id: string }>(
-          xs: T[],
-          at: (x: T) => { x: number; y: number },
-        ): T | undefined =>
-          xs
-            .slice()
-            .sort(
-              (a, b) =>
-                d(port.position, at(a)) - d(port.position, at(b)) ||
-                (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
-            )[0];
-        const count = squadronSize(squad);
-        const foeFleet =
-          ready === 'bomber'
-            ? byNear(
-                Object.values(state.fleets).filter(
-                  (f) =>
-                    f.owner !== ai &&
-                    getStance(state, ai, f.owner) === 'war' &&
-                    f.location !== null &&
-                    f.units.some((st) => st.count > 0) &&
-                    inReach(state.planets[f.location]?.position ?? { x: 1e9, y: 1e9 }),
-                ),
-                (f) => state.planets[f.location!]!.position,
-              )
-            : undefined;
-        const foeWorld = byNear(
+      if (bombPad) {
+        const squad = squadsWith(bombPad.hangar, 'bomber')[0]!;
+        const reach = reachOf('bomber');
+        const inReach = (at: { x: number; y: number }): boolean => d(bombPad.at, at) <= reach;
+        const foeFleet = nearestBy(
+          Object.values(state.fleets).filter(
+            (fl) =>
+              fl.owner !== ai &&
+              getStance(state, ai, fl.owner) === 'war' &&
+              fl.location !== null &&
+              fl.units.some((st) => st.count > 0) &&
+              inReach(state.planets[fl.location]?.position ?? { x: 1e9, y: 1e9 }),
+          ),
+          bombPad.at,
+          (fl) => state.planets[fl.location!]!.position,
+        );
+        const foeWorld = nearestBy(
           Object.values(state.planets).filter(
             (p) =>
               p.owner !== null &&
@@ -1179,26 +1435,13 @@ export function aiOrders(
               getStance(state, ai, p.owner) === 'war' &&
               inReach(p.position),
           ),
+          bombPad.at,
           (p) => p.position,
         );
-        if (count > 0 && foeFleet) {
-          out.push(strikeShuttle(ai, { planetId: port.id }, squad.id, { targetFleetId: foeFleet.id }));
-        } else if (count > 0 && foeWorld) {
-          // Десантный вылет везёт войска: без груза он долетит и просто погибнет.
-          // Берём из гарнизона сверх домашней стражи, тем же порогом, что и погрузка
-          // на корабль, — дом пустым не оставляем. С SHU-4.2 груз кладут в трюм
-          // ОТДЕЛЬНЫМ приказом, и он идёт ПЕРЕД ударом: два приказа одного тика
-          // применяются по порядку, поэтому эскадра взлетает уже гружёной.
-          const troops =
-            ready === 'landing_shuttle'
-              ? troopsForDrop(port, squadronCargoCapacity(squad, data))
-              : undefined;
-          if (ready !== 'landing_shuttle') {
-            out.push(strikeShuttle(ai, { planetId: port.id }, squad.id, { targetPlanetId: foeWorld.id }));
-          } else if (troops && troops.length > 0) {
-            out.push(loadSquadronTroops(ai, { planetId: port.id }, squad.id, troops));
-            out.push(strikeShuttle(ai, { planetId: port.id }, squad.id, { targetPlanetId: foeWorld.id }));
-          }
+        if (foeFleet) {
+          out.push(strikeShuttle(ai, bombPad.base, squad.id, { targetFleetId: foeFleet.id }));
+        } else if (foeWorld) {
+          out.push(strikeShuttle(ai, bombPad.base, squad.id, { targetPlanetId: foeWorld.id }));
         }
       }
     }

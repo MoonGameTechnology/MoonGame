@@ -763,6 +763,10 @@ export interface BattleSideView {
   shield?: { current: number; max: number };
   /** This side belongs to the viewing player. */
   mine: boolean;
+  /** MSB-6: чем эта сторона бьёт — атакующая своим `attack`, обороняющаяся отвечает
+   *  `defense`. Роль принадлежит СТОРОНЕ (MSB-1), поэтому её нельзя вывести из места в
+   *  списке: атакующих может быть сразу несколько. */
+  role: 'attacker' | 'defender';
 }
 
 /** Render-ready description of an active battle — the "combat zone" panel. */
@@ -777,6 +781,13 @@ export interface BattleModel {
   round: number;
   /** Server time (ms) the next hourly round fires — the live countdown. */
   nextRoundAt?: number;
+  /** MSB-6: ВСЕ стороны боя, в порядке вступления. Панель рисует именно этот список —
+   *  на дуэли он ровно `[attacker, defender]`, поэтому вид двустороннего боя не меняется
+   *  ни на пиксель, а на пяти сторонах появляются пять строк вместо двух. */
+  sides: BattleSideView[];
+  /** Первая атакующая и первая обороняющаяся сторона — короткий путь для дуэли и для
+   *  тех читателей, кому расклад целиком не нужен. При нескольких атакующих это именно
+   *  ПЕРВЫЙ атакующий, а не «весь штурм»: полная картина живёт в `sides`. */
   attacker: BattleSideView;
   defender: BattleSideView;
   /** The viewer's own orbital fleet in this battle, if any — the sole action
@@ -789,7 +800,7 @@ export type BattleResult = ({ ok: true } & BattleModel) | { ok: false; code: str
 
 function sideView(
   state: GameState,
-  side: { ref: CombatantRef; owner: PlayerId | null },
+  side: { ref: CombatantRef; owner: PlayerId | null; role: 'attacker' | 'defender' },
   viewerId: PlayerId,
   data?: Pick<GameData, 'units'>,
 ): BattleSideView {
@@ -798,8 +809,10 @@ function sideView(
     ref.kind === 'garrison'
       ? (state.planets[ref.planetId]?.garrison ?? [])
       : // ROS-1.5: плацдарм держит МИР, а не флот — читается оттуда же, откуда гарнизон.
+        // MSB-4: плацдармов на мире бывает несколько, адресует их владелец в ссылке.
         ref.kind === 'beachhead'
-        ? (state.planets[ref.planetId]?.beachhead?.units ?? [])
+        ? (state.planets[ref.planetId]?.beachheads?.find((b) => b.owner === ref.owner)?.units ??
+          [])
         : ref.kind === 'landing'
           ? (state.fleets[ref.fleetId]?.landing ?? [])
           : (state.fleets[ref.fleetId]?.units ?? []);
@@ -812,6 +825,7 @@ function sideView(
     kind: ref.kind,
     units: toStacks(stacks, data),
     mine: owner != null && owner === viewerId,
+    role: side.role,
   };
   if (data) {
     view.hull = hullOf(stacks, data);
@@ -834,13 +848,14 @@ export function createBattleModel(
   if (!battle) {
     return { ok: false, code: 'E_NO_BATTLE' };
   }
-  // MSB-1: стороны приходят из СПИСКА. Сама панель пока двусторонняя — её вид на N
-  // сторон это MSB-6, и здесь он намеренно не меняется ни на пиксель.
+  // MSB-6: панель проецирует ВЕСЬ список сторон. `attacker`/`defender` остаются как
+  // короткий путь (первая сторона каждой роли), но полный расклад — в `sides`.
   const attackerSide = attackerOf(battle);
   const defenderSide = defenderOf(battle);
   if (!attackerSide || !defenderSide) {
     return { ok: false, code: 'E_NO_BATTLE' };
   }
+  const sides = battle.sides.map((side) => sideView(state, side, viewerId, data));
   const attacker = sideView(state, attackerSide, viewerId, data);
   const defender = sideView(state, defenderSide, viewerId, data);
 
@@ -850,6 +865,7 @@ export function createBattleModel(
     location: battle.location,
     phase: battle.phase,
     round: battle.round,
+    sides,
     attacker,
     defender,
   };

@@ -3,9 +3,9 @@
 // Что здесь закрепляется. `siege`, `interceptor`, `strike_carrier`, `frigate`
 // и `hero` показывались «мёртвым контентом» — и каждая позиция оказалась мертва по СВОЕЙ
 // причине, а не по одной общей:
-//   • `siege` — просто не было правила. Артиллерия при этом не требует от бота НИ ОДНОЙ
-//     новой команды: `artilleryModule` сам заставляет свободный стоящий флот обстрелять
-//     ближайшего врага в радиусе. Построить — и целый пласт боя входит в измерение;
+//   • `siege` — просто не было правила. (Рядом жило правило постройки корпуса
+//     `artillery`; дальний огонь из игры убран, корпуса в данных нет, и правило снято
+//     2026-09-16 — оно заказывало несуществующий юнит каждый тик.);
 //   • `interceptor` — был НЕПОСТРОИМ вовсе: ангар открывается вторым уровнем завода,
 //     а гейт читал только базовый def (починено в `construction.ts`);
 //   • `hero` — не мёртв: он ПОСЕЯН во флоте каждого места с первой секунды и воюет, просто
@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 import { newGame, aiOrders, START_CANDIDATES, kernel, ctx } from './game';
 import { data } from './gameData';
 import type { Action, GameState, Squadron } from '../../packages/shared-core/src/index';
+import { identifiedNodes } from '../../packages/shared-core/src/state/visibility';
 
 function game2(): GameState {
   return newGame({
@@ -308,5 +309,300 @@ describe('AI-BAL-4 — то, что оставлено боту НЕнужным
     expect(orders).toContain('strike_carrier');
     expect(orders).not.toContain('shuttle_carrier');
     expect(orders).not.toContain('frigate');
+  });
+});
+
+/**
+ * НОСИТЕЛЬ У БОТА (решение владельца 2026-09-15).
+ *
+ * Замер показал ноль вылетов при живой постройке челноков, и причина не в ядре: бот
+ * поднимал удар ТОЛЬКО с домашнего порта, а радиус челнока 120–150 — чужих миров так
+ * близко к дому почти не бывает. Война идёт на фронтире, порт стоит дома.
+ *
+ * Носитель и есть задуманный ответ: «плавучий космопорт» (`shuttle_carrier`, ангар 6)
+ * возит эскадры с флотом. Бот учится трём шагам — построить, загрузить, поднять с борта;
+ * возит носитель существующая логика флота, своей ему не заводим.
+ */
+describe('SHU-2.1 — бот и НОСИТЕЛЬ челноков', () => {
+  /** Свой носитель, стоящий у мира `at`. */
+  const carrierAt = (s: GameState, at: string, hangar: Squadron[] = []): void => {
+    s.fleets['p2_carrier'] = {
+      id: 'p2_carrier',
+      owner: 'p2',
+      location: at,
+      movement: null,
+      units: [{ unit: 'shuttle_carrier', count: 1 }],
+      ...(hangar.length ? { hangar } : {}),
+    } as GameState['fleets'][string];
+  };
+
+  it('на войне с портом бот ЗАКАЗЫВАЕТ носитель', () => {
+    const s = withPort(rich(game2()));
+    expect(unitsBuilt(aiOrders(s, 'p2', 'expand', 'strong'))).toContain('shuttle_carrier');
+  });
+
+  it('в мирное время носитель не нужен — возить некуда', () => {
+    const s = withPort(rich(game2(), false));
+    expect(unitsBuilt(aiOrders(s, 'p2', 'expand', 'strong'))).not.toContain('shuttle_carrier');
+  });
+
+  it('носитель у порта с эскадрой — бот ГРУЗИТ её на борт', () => {
+    const s = withPort(rich(game2()));
+    const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
+    home.hangar = [{ id: 'sq:b', units: [{ unit: 'bomber', count: 2 }] }];
+    carrierAt(s, home.id);
+    const loads = only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.load');
+    expect(loads).toHaveLength(1);
+    expect((loads[0]!.payload as { fleetId: string; squadronId: string })).toEqual({
+      fleetId: 'p2_carrier',
+      squadronId: 'sq:b',
+    });
+  });
+
+  it('ПУСТОЙ порт грузить нечем — приказа нет', () => {
+    const s = withPort(rich(game2()));
+    const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
+    carrierAt(s, home.id);
+    expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.load')).toEqual([]);
+  });
+
+  it('С БОРТА НОСИТЕЛЯ УДАР УХОДИТ — ради этого он и заведён', () => {
+    const s = rich(game2());
+    const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
+    // Носитель стоит у ЧУЖОГО мира — там, куда дом не достаёт.
+    const far = Object.values(s.planets)
+      .filter((p) => p.id !== home.id && p.owner === null)
+      .sort(
+        (a, b) =>
+          Math.hypot(b.position.x - home.position.x, b.position.y - home.position.y) -
+          Math.hypot(a.position.x - home.position.x, a.position.y - home.position.y),
+      )[0]!;
+    far.owner = 'p1';
+    carrierAt(s, far.id, [{ id: 'sq:b', units: [{ unit: 'bomber', count: 2 }] }]);
+    const out = only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.strike');
+    expect(out).toHaveLength(1);
+    const p = out[0]!.payload as { fleetId?: string; planetId?: string };
+    expect(p.fleetId).toBe('p2_carrier'); // база вылета — БОРТ, а не дом
+    expect(p.planetId).toBeUndefined();
+    // И приказ проходит ЯДРО, а не только выглядит правильным.
+    expect(kernel.applyAction(s, out[0]!, ctx(s.time)).ok).toBe(true);
+  });
+
+  /**
+   * Этот тест закреплял ПРЕЖНЕЕ правило («ядро пускает только со стоянки»). Владелец снял
+   * его 2026-09-16, поэтому тест переписан под новое, а не удалён: место в наборе то же,
+   * утверждение — обратное. Уходящий от цели носитель выбран нарочно — он показывает, что
+   * решает РАДИУС от живой позиции, а не направление движения.
+   */
+  it('ИДУЩИЙ носитель вылет ПОДНИМАЕТ — стоянка больше не нужна', () => {
+    const s = rich(game2());
+    const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
+    const far = Object.values(s.planets).find((p) => p.id !== home.id && p.owner === null)!;
+    far.owner = 'p1';
+    carrierAt(s, far.id, [{ id: 'sq:b', units: [{ unit: 'bomber', count: 2 }] }]);
+    s.fleets.p2_carrier!.location = null;
+    s.fleets.p2_carrier!.movement = { from: far.id, to: home.id, departedAt: s.time, arrivesAt: s.time + 1e9 };
+    const out = only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.strike');
+    expect(out).toHaveLength(1);
+    expect((out[0]!.payload as { fleetId?: string }).fleetId).toBe('p2_carrier');
+  });
+});
+
+/**
+ * БОТ БЬЁТ С ХОДА (решение владельца 2026-09-16).
+ *
+ * Ядро сняло требование стоянки для вылета с носителя. Бот шёл следом не ради красоты:
+ * пока он фильтровал базы по неподвижности, новое правило не участвовало в замерах
+ * ВООБЩЕ — носитель едет с кулаком и стоит редко, а значит удар с борта случался бы
+ * только в те такты, когда флот замер.
+ */
+describe('SHU-2.1 — бот поднимает удар с ИДУЩЕГО носителя', () => {
+  /** Носитель p2 в пути к чужому миру, с полным ангаром. */
+  function underwayCarrier(s: GameState, toId: string, fromId: string): void {
+    s.fleets['p2_cv'] = {
+      id: 'p2_cv',
+      owner: 'p2',
+      location: null,
+      movement: { from: fromId, to: toId, departedAt: s.time - 3_600_000, arrivesAt: s.time + 60_000 },
+      units: [{ unit: 'shuttle_carrier', count: 1 }],
+      hangar: [{ id: 'sq:b', units: [{ unit: 'bomber', count: 2 }] }],
+    } as GameState['fleets'][string];
+  }
+
+  it('идущий носитель у цели — удар уходит С БОРТА и проходит ЯДРО', () => {
+    const s = rich(game2());
+    const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
+    const foe = Object.values(s.planets).find((p) => p.id !== home.id && p.owner === null)!;
+    foe.owner = 'p1';
+    underwayCarrier(s, foe.id, home.id);
+    const out = only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.strike');
+    expect(out).toHaveLength(1);
+    expect((out[0]!.payload as { fleetId?: string }).fleetId).toBe('p2_cv');
+    expect(kernel.applyAction(s, out[0]!, ctx(s.time)).ok).toBe(true);
+  });
+
+  it('носитель В БОЮ вылета по-прежнему не поднимает', () => {
+    const s = rich(game2());
+    const home = Object.values(s.planets).find((p) => p.owner === 'p2')!;
+    const foe = Object.values(s.planets).find((p) => p.id !== home.id && p.owner === null)!;
+    foe.owner = 'p1';
+    underwayCarrier(s, foe.id, home.id);
+    s.fleets.p2_cv!.battleId = 'b:1';
+    expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.strike')).toEqual([]);
+  });
+});
+
+describe('ПРАВИЛА НАЗЕМНОЙ ВОЙНЫ — высадка с носителя (решение владельца 2026-09-16)', () => {
+  const dist = (a: { x: number; y: number }, b: { x: number; y: number }): number =>
+    Math.hypot(a.x - b.x, a.y - b.y);
+
+  /**
+   * Носитель СТОИТ у нейтрального узла, а цель — ДРУГОЙ мир в радиусе высадки (120).
+   *
+   * Насест и цель разные НАМЕРЕННО: флот опознаёт только тот узел, на котором стоит
+   * (`FLEET_IDENTIFY_HOPS = 0`, «радарless fleet is a blind kitten»), а у корпуса
+   * `shuttle_carrier` радара нет вовсе. Прилети носитель НА цель — он видел бы гарнизон
+   * сам, и правило №1 проверять было бы не на чем. Пара ищется по карте, а не
+   * прописывается id: карта живёт своей жизнью, а предусловие теста проверяется тут же.
+   */
+  function staged(): {
+    s: GameState;
+    foe: GameState['planets'][string];
+    perch: GameState['planets'][string];
+  } {
+    const s = rich(game2());
+    const seen = identifiedNodes(s, 'p2', data);
+    const free = Object.values(s.planets)
+      .filter((p) => p.owner === null && !seen.has(p.id))
+      .sort((a, b) => (a.id < b.id ? -1 : 1));
+    let perch: GameState['planets'][string] | undefined;
+    let foe: GameState['planets'][string] | undefined;
+    for (const a of free) {
+      for (const b of free) {
+        if (a.id === b.id || b.kind !== 'planet') continue;
+        if (dist(a.position, b.position) > 115) continue;
+        perch = a;
+        foe = b;
+        break;
+      }
+      if (perch) break;
+    }
+    if (!perch || !foe) throw new Error('на карте не нашлось пары «насест + цель в радиусе»');
+    foe.owner = 'p1';
+    foe.garrison = [{ unit: 'militia', count: 1 }];
+    s.fleets.p2_cv = {
+      id: 'p2_cv',
+      owner: 'p2',
+      location: perch.id,
+      movement: null,
+      units: [{ unit: 'shuttle_carrier', count: 1 }],
+      hangar: [{ id: 'sq:l', units: [{ unit: 'landing_shuttle', count: 3 }] }],
+      landing: [{ unit: 'tank', count: 9 }],
+      traits: [],
+      battleId: null,
+    } as GameState['fleets'][string];
+    // Предусловие теста: цель НЕ опознана — значит правилу №1 есть что запрещать.
+    expect(identifiedNodes(s, 'p2', data).has(foe.id)).toBe(false);
+    return { s, foe, perch };
+  }
+
+  /** Свежие разведданные p2 об этом мире — то, чего требует правило №1. */
+  const withIntel = (
+    s: GameState,
+    id: string,
+    garrison: Array<{ unit: string; count: number }>,
+  ): void => {
+    s.fog = { ...(s.fog ?? {}), p2: { [id]: { owner: 'p1', garrison, buildings: [], at: s.time } } };
+  };
+
+  it('ПРАВИЛО №1 — БЕЗ РАЗВЕДДАННЫХ ВЫСАДКИ НЕТ, даже когда всё на борту', () => {
+    const { s } = staged();
+    expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.loadTroops')).toEqual([]);
+  });
+
+  it('РАЗВЕДДАННЫЕ ЕСТЬ И СИЛ ХВАТАЕТ — высадка уходит и проходит ЯДРО', () => {
+    const { s, foe } = staged();
+    withIntel(s, foe.id, [{ unit: 'militia', count: 1 }]);
+    const orders = aiOrders(s, 'p2', 'expand', 'strong');
+    const load = only(orders, 'shuttle.loadTroops');
+    const strike = only(orders, 'shuttle.strike');
+    expect(load).toHaveLength(1);
+    expect(strike).toHaveLength(1);
+    // Оба приказа адресуют НОСИТЕЛЬ, а не дом: груз едет вместе с ним.
+    expect((load[0]!.payload as { fleetId?: string }).fleetId).toBe('p2_cv');
+    expect((strike[0]!.payload as { targetPlanetId?: string }).targetPlanetId).toBe(foe.id);
+    // Погрузка идёт ПЕРВОЙ, и ядро принимает обе подряд.
+    const loaded = kernel.applyAction(s, load[0]!, ctx(s.time));
+    expect(loaded.ok).toBe(true);
+    if (loaded.ok) expect(kernel.applyAction(loaded.state, strike[0]!, ctx(s.time)).ok).toBe(true);
+  });
+
+  it('ПРОТУХШИЕ РАЗВЕДДАННЫЕ знанием не считаются', () => {
+    const { s, foe } = staged();
+    s.fog = {
+      p2: {
+        [foe.id]: {
+          owner: 'p1',
+          garrison: [{ unit: 'militia', count: 1 }],
+          buildings: [],
+          at: s.time - 48 * 3_600_000,
+        },
+      },
+    };
+    expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.loadTroops')).toEqual([]);
+  });
+
+  it('ГАРНИЗОН НЕ ПО ЗУБАМ — высадки нет: челноки целы, десант жив', () => {
+    const { s, foe } = staged();
+    foe.garrison = [{ unit: 'heavy_infantry', count: 12 }];
+    withIntel(s, foe.id, [{ unit: 'heavy_infantry', count: 12 }]);
+    expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.loadTroops')).toEqual([]);
+  });
+
+  it('ПРАВИЛО №3 — под ВРАЖЕСКИМ ФЛОТОМ высадка не идёт', () => {
+    const { s, foe } = staged();
+    withIntel(s, foe.id, [{ unit: 'militia', count: 1 }]);
+    s.fleets.p1_guard = {
+      id: 'p1_guard',
+      owner: 'p1',
+      location: foe.id,
+      movement: null,
+      units: [{ unit: 'cruiser', count: 2 }],
+      traits: [],
+      battleId: null,
+    } as GameState['fleets'][string];
+    expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.loadTroops')).toEqual([]);
+  });
+
+  it('ПРАВИЛО №2 — над миром уже стоит СВОЙ флот: берём штурмом, челноки не тратим', () => {
+    const { s, foe } = staged();
+    withIntel(s, foe.id, [{ unit: 'militia', count: 1 }]);
+    s.fleets.p2_orbit = {
+      id: 'p2_orbit',
+      owner: 'p2',
+      location: foe.id,
+      movement: null,
+      orbit: 'near',
+      units: [{ unit: 'cruiser', count: 2 }],
+      landing: [{ unit: 'tank', count: 6 }],
+      traits: [],
+      battleId: null,
+    } as GameState['fleets'][string];
+    const orders = aiOrders(s, 'p2', 'expand', 'strong');
+    expect(only(orders, 'shuttle.loadTroops')).toEqual([]);
+    expect(only(orders, 'fleet.assault')).toHaveLength(1);
+  });
+
+  it('ТИК НЕ ПРОПАДАЕТ: высадке идти не с чем — поднимается бомбардировщик', () => {
+    const { s } = staged();
+    // Разведданных нет ⇒ высадки не будет. Раньше на этом приказ терялся ВОВСЕ: машина
+    // выбиралась одна на общем ростере, и ею оказывался десантный челнок.
+    s.fleets.p2_cv!.hangar = [
+      { id: 'sq:l', units: [{ unit: 'landing_shuttle', count: 3 }] },
+      { id: 'sq:b', units: [{ unit: 'bomber', count: 2 }] },
+    ];
+    const strikes = only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.strike');
+    expect(strikes).toHaveLength(1);
+    expect((strikes[0]!.payload as { squadronId: string }).squadronId).toBe('sq:b');
   });
 });

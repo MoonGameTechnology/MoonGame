@@ -10,7 +10,7 @@
  * fleets at their interpolated positions. Node sizes stay constant in screen px.
  */
 import { effectiveStats, fleetPositionAt, type GameData, type GameState, type PlayerId } from '@void/shared-core';
-import { worldToScreen, inView, type Cam, type Viewport, type Bounds } from './camera';
+import { worldToScreen, fitTransform, inView, type Cam, type Viewport, type Bounds } from './camera';
 import { blitGlow, blitSphere, rgba } from './holoDraw';
 import { drawTerritory, type TerritorySeed } from './territory';
 import { theme } from './theme';
@@ -18,6 +18,10 @@ import { drawSpaceBackdrop } from './spaceBackdrop';
 import { drawProvinceSelection } from './provinceSelection';
 import { dominantUnit, glyphHalo, glyphScale, unitArchetype, unitShape, unitSizeClass } from './shipGlyphs';
 import { drawShipShape } from './shipShapes';
+import { mapLod, mapSpacing, drawSchematicNode } from './mapLod';
+import { TerritoryGeometryCache } from './territoryGeometry';
+
+const geometryCaches = new WeakMap<CanvasRenderingContext2D, TerritoryGeometryCache>();
 
 /** Seat colours in join order (cyan / red / amber / violet — the prototype's palette). */
 const OWNER_COLORS = ['#35d6e6', '#ff5a4d', '#ffb43a', '#b07cff'] as const;
@@ -83,6 +87,9 @@ export function renderMap(
   const ownerColor = (o: PlayerId): string => colors.get(o) ?? theme.dim;
   const vw = vp.right;
   const vh = vp.bottom;
+  const planets = Object.values(state.planets);
+  const gap = mapSpacing(planets.map((p) => ({ id: p.id, ...p.position, links: p.links })));
+  const lod = mapLod(gap * fitTransform(vp, bounds).scale * cam.scale);
   g.clearRect(vp.left, vp.top, vw - vp.left, vh - vp.top);
   drawSpaceBackdrop(g, vw, vh, cam.x, cam.y, true);
 
@@ -100,7 +107,6 @@ export function renderMap(
   ];
   const W = 9000 * cam.scale * cam.scale; // size → weight (screen px²), zoom-consistent
   const seeds: TerritorySeed[] = [];
-  const planets = Object.values(state.planets);
   for (const p of planets) {
     const c = worldToScreen(p.position, cam, vp, bounds);
     seeds.push({
@@ -112,11 +118,13 @@ export function renderMap(
     });
   }
   if (seeds.length >= 2) {
+    let geometry = geometryCaches.get(g);
+    if (!geometry) { geometry = new TerritoryGeometryCache(); geometryCaches.set(g, geometry); }
     const cells = drawTerritory(g, seeds, clip, {
       ownerColor,
       neutralFill: NEUTRAL,
       kindAccent: (kind) => KIND_COLOR[kind],
-    });
+    }, geometry.project(seeds, clip, cam.scale));
     const selected = cells.find((cell) => planets[cell.idx]?.id === opts.selected);
     if (selected) drawProvinceSelection(g, selected.poly);
   }
@@ -125,7 +133,8 @@ export function renderMap(
   g.lineWidth = 0.7;
   g.strokeStyle = rgba(theme.cyan, 0.28);
   const drawn = new Set<string>();
-  for (const p of Object.values(state.planets)) {
+  g.beginPath();
+  for (const p of planets) {
     const a = worldToScreen(p.position, cam, vp, bounds);
     for (const nId of p.links ?? []) {
       const key = p.id < nId ? `${p.id}|${nId}` : `${nId}|${p.id}`;
@@ -134,26 +143,40 @@ export function renderMap(
       const n = state.planets[nId];
       if (!n) continue;
       const b = worldToScreen(n.position, cam, vp, bounds);
-      g.beginPath();
+      if (Math.max(a.x, b.x) < vp.left || Math.min(a.x, b.x) > vp.right ||
+        Math.max(a.y, b.y) < vp.top || Math.min(a.y, b.y) > vp.bottom) continue;
       g.moveTo(a.x, a.y);
       g.lineTo(b.x, b.y);
-      g.stroke();
     }
   }
+  g.stroke();
 
   // Planet nodes — a holographic sphere + owner aura + a floating type badge + id label.
   const R = 8;
-  for (const p of Object.values(state.planets)) {
+  for (const p of planets) {
     const c = worldToScreen(p.position, cam, vp, bounds);
     if (!inView(c, vw, vh, 44)) continue;
     const col = p.owner ? ownerColor(p.owner) : NEUTRAL;
-    blitGlow(g, opts.dpr, col, c.x, c.y, R + 14, p.owner ? 0.12 : 0.045);
-    blitSphere(g, opts.dpr, col, c.x, c.y, R, 1, opts.visualTime ?? 0);
+    if (lod.art < 1) {
+      g.save();
+      g.globalAlpha *= 1 - lod.art;
+      drawSchematicNode(g, c, p.kind ?? 'unknown', col, lod.markerRadius);
+      g.restore();
+    }
+    if (lod.art === 0 && p.id !== opts.selected) continue;
+    if (lod.art > 0) {
+      g.save();
+      g.globalAlpha *= lod.art;
+      blitGlow(g, opts.dpr, col, c.x, c.y, R + 14, p.owner ? 0.12 : 0.045);
+      blitSphere(g, opts.dpr, col, c.x, c.y, R, 1, lod.detail > 0 ? opts.visualTime ?? 0 : 0);
+      g.restore();
+    }
     // floating type badge — the sector kind, glowing in its accent colour just above the node
     const icon = KIND_ICON[p.kind ?? ''];
-    if (icon) {
+    if (icon && lod.detail > 0) {
       const kc = KIND_COLOR[p.kind ?? ''] ?? theme.cyan;
       g.save();
+      g.globalAlpha *= lod.detail;
       g.font = '700 12px ui-monospace, monospace';
       g.textAlign = 'center';
       g.textBaseline = 'middle';
@@ -163,11 +186,15 @@ export function renderMap(
       g.fillText(icon, c.x, c.y - R - 12);
       g.restore();
     }
+    if (lod.detail === 0 && p.id !== opts.selected) continue;
+    g.save();
+    g.globalAlpha *= p.id === opts.selected ? 1 : lod.detail;
     g.font = '10px ui-monospace, monospace';
     g.textAlign = 'left';
     g.textBaseline = 'alphabetic';
     g.fillStyle = theme.ink;
     g.fillText(p.id, c.x + R + 6, c.y + 3);
+    g.restore();
   }
 
   // Selection reticle — a bright ring + corner brackets around the picked planet.
@@ -206,7 +233,7 @@ export function renderMap(
     const c = worldToScreen(pt, cam, vp, bounds);
     if (!inView(c, vw, vh, 24)) continue;
     const col = colors.get(f.owner) ?? theme.cyan;
-    blitGlow(g, opts.dpr, col, c.x, c.y, 10, 0.5);
+    if (lod.detail > 0) blitGlow(g, opts.dpr, col, c.x, c.y, 10, 0.5 * lod.detail);
     const dom = dominantUnit(f.units, opts.data);
     const shape = dom && unitShape(dom.def, dom.unit);
     g.save();
@@ -221,18 +248,20 @@ export function renderMap(
       continue;
     }
     const k = glyphScale(unitSizeClass(dom.def.stats.hp));
-    const stack = f.units.find((st) => st.unit === dom.unit && st.count > 0)!;
-    if (glyphHalo(unitArchetype(dom.def), (effectiveStats(dom.def, stack, opts.data).shield ?? 0) > 0)) {
-      g.setLineDash([2.6, 2.8]);
-      g.beginPath();
-      g.arc(0, 0, 12.5 * k + 2, 0, Math.PI * 2);
-      g.stroke();
-      g.setLineDash([]);
+    if (lod.detail > 0) {
+      const stack = f.units.find((st) => st.unit === dom.unit && st.count > 0)!;
+      if (glyphHalo(unitArchetype(dom.def), (effectiveStats(dom.def, stack, opts.data).shield ?? 0) > 0)) {
+        g.setLineDash([2.6, 2.8]);
+        g.beginPath();
+        g.arc(0, 0, 12.5 * k + 2, 0, Math.PI * 2);
+        g.stroke();
+        g.setLineDash([]);
+      }
     }
     g.scale(k, k);
     g.translate(-12, -12);
     g.fillStyle = rgba(col, 0.24);
-    drawShipShape(g, shape, cam.scale >= 0.9);
+    drawShipShape(g, shape, lod.detail > 0.5);
     g.restore();
   }
 }
