@@ -1,8 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { parseMatchMap, safeParseMatchMap } from './mapSchema';
+import { loadGameData } from './loadGameData';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../..');
 
@@ -70,5 +71,58 @@ describe('map schema (map-roadmap.md M1.1)', () => {
       sectors: { a: { position: { x: 0, y: 0 }, garrison: [{ unit: 'militia', count: 0 }] } },
     };
     expect(safeParseMatchMap(bad).success).toBe(false);
+  });
+});
+
+/**
+ * A map's `kind` / `terrain` / `planetType` are free-form strings: an id the bundle does
+ * not know does NOT fail the parse. It degrades — an unknown kind falls back to the
+ * permissive defaults in `sectorKind.ts`, an unknown terrain simply carries no bonus. So
+ * a typo ships as "this province quietly behaves like open space", which is exactly the
+ * kind of defect no one notices. The map schema cannot check this (it has no catalogue);
+ * this sweep can.
+ */
+describe('shipped maps resolve against the shipped catalogue', () => {
+  const data = loadGameData((name) => JSON.parse(readFileSync(path.join(repoRoot, 'data', name), 'utf8')));
+  const files = readdirSync(path.join(repoRoot, 'data', 'maps')).filter((f) => f.endsWith('.json'));
+
+  it('there are shipped maps at all — otherwise the sweep below is green over nothing', () => {
+    expect(files.length).toBeGreaterThan(0);
+  });
+
+  for (const file of files) {
+    it(`${file}: every kind, terrain and planet type is in the bundle`, () => {
+      const map = parseMatchMap(readMap(file));
+      for (const [id, sec] of Object.entries(map.sectors)) {
+        expect([id, sec.kind, sec.kind in data.sectorKinds]).toEqual([id, sec.kind, true]);
+        if (sec.terrain !== undefined)
+          expect([id, sec.terrain, sec.terrain in data.sectors]).toEqual([id, sec.terrain, true]);
+        if (sec.planetType !== undefined)
+          expect([id, sec.planetType, sec.planetType in data.planetTypes]).toEqual([id, sec.planetType, true]);
+      }
+    });
+  }
+
+  /** Catalogue entries nobody places are content that cannot be met in a canonical match.
+   *  The shipped maps used to be three kinds and two terrains wide while the catalogue
+   *  carried eight terrains; this pins the spread so a map edit cannot quietly narrow it
+   *  back. Widening it is a deliberate edit of this list, which is the point. */
+  it('the maps exercise the terrain catalogue, not just nebula and asteroid', () => {
+    const kinds = new Set<string>();
+    const terrains = new Set<string>();
+    for (const file of files) {
+      for (const sec of Object.values(parseMatchMap(readMap(file)).sectors)) {
+        kinds.add(sec.kind);
+        if (sec.terrain !== undefined) terrains.add(sec.terrain);
+      }
+    }
+    expect([...terrains].sort()).toEqual([
+      'asteroid_field',
+      'dense_nebula',
+      'ion_storm',
+      'nebula',
+      'solar_flare_zone',
+    ]);
+    expect([...kinds].sort()).toEqual(['asteroid', 'dense_nebula', 'ion_storm', 'nebula', 'planet']);
   });
 });

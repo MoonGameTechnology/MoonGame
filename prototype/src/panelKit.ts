@@ -1,3 +1,4 @@
+import type { MedalBadge } from '../../decisions/unitMedals';
 /**
  * Кирпичики боковой панели: кнопка, шапка карточки, вкладка, колонки (REFM-35).
  *
@@ -86,21 +87,35 @@ export interface UnitRowView {
  * тыкать в здание, по флоту и земле не получал ничего. Общий контейнер `blist` держит их
  * одним столбиком; `data-codex` — путь к карточке, `data-name` — то, что покажет
  * удержание.
+ *
+ * VET-5: строка несёт ЗНАЧКИ МЕДАЛЕЙ стека, если они есть. Решение «что показать» —
+ * в `/decisions/unitMedals.ts` (глиф, подпись, порядок), сюда приходит уже готовое: этот
+ * файл рисует, а не решает. У стека без заслуги строка не меняется ни на пиксель — «нет
+ * медалей» отдельным сообщением не пишется, потому что это верно для трёх четвертей
+ * списка и место под него отбиралось бы у самого состава.
  */
 export function unitRows(
   stacks: ReadonlyArray<{ unit: string; count: number }>,
   view: (unit: string) => UnitRowView,
   emptyLabel: string,
+  medals?: (stack: { unit: string; count: number }) => ReadonlyArray<MedalBadge>,
 ): string {
   if (!stacks.length) return `<div class="row dim">${esc(emptyLabel)}</div>`;
   const rows = stacks
     .map((st) => {
       const v = view(st.unit);
       const key = `u:${esc(st.unit)}`;
+      const badges = (medals?.(st) ?? [])
+        .map(
+          (m) =>
+            `<span class="umedal g${m.grade}" title="${esc(m.title)}" aria-label="${esc(m.title)}">${m.glyph}</span>`,
+        )
+        .join('');
       return (
         `<button class="asset-row unit" data-codex="${key}" data-desc="${key}" data-name="${esc(v.name)}">` +
         `<span class="bicon">${v.icon}</span>` +
         `<b>${st.count}× ${esc(v.name)}</b>` +
+        badges +
         `<span class="dim">${esc(v.domain)}</span>` +
         `</button>`
       );

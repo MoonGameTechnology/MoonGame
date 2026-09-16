@@ -16,7 +16,7 @@ const bundled = await build({
       export { frontierOutline } from './prototype/src/frontierOutline';
       export { provinceSeeds } from './prototype/src/provinceMap';
       export { computePowerCells } from './packages/client/src/territory';
-      export { TerritoryGeometryCache, projectTerritoryCells } from './packages/client/src/territoryCache';
+      export { TerritoryGeometryCache } from './packages/client/src/territoryGeometry';
       export { fitTransform, worldToScreen } from './packages/client/src/camera';`,
     resolveDir: process.cwd(),
   },
@@ -50,9 +50,7 @@ const bounds = {
   maxY: Math.max(...map.map((n) => n.y)),
 };
 const viewport = { left: 0, right: 390, top: 130, bottom: 740 };
-const fitScale = api.fitTransform(viewport, bounds).scale;
 const outline = api.frontierOutline(map);
-const worldClip = outline.map(({ x, y }) => [x, y]);
 const cache = new api.TerritoryGeometryCache();
 const pan = { uncached: [], cached: [] };
 let vertices = 0;
@@ -75,15 +73,21 @@ for (let frame = 0; frame < 65; frame++) {
   );
   const directMs = performance.now() - start;
   start = performance.now();
-  const seeds = api.provinceSeeds(map, 1 / fitScale, (n) => ({
-    at: n,
+  // Кэшированный путь меряется ЧЕСТНО: семена и клип строятся здесь же, как и в прямом,
+  // — разница между ветками только в том, тесселируется диаграмма заново или ячейки
+  // переносятся перепроекцией O(вершин).
+  const seeds = api.provinceSeeds(map, cam.scale, (n) => ({
+    at: project(n),
     size: initial.planets[n.id].size ?? 1,
     owner: null,
   }));
-  const projected = api.projectTerritoryCells(
-    cache.cells(seeds, worldClip),
-    fitScale * cam.scale,
-    project({ x: 0, y: 0 }),
+  const projected = cache.project(
+    seeds,
+    outline.map((n) => {
+      const p = project(n);
+      return [p.x, p.y];
+    }),
+    cam.scale,
   );
   const cachedMs = performance.now() - start;
   if (frame >= 5) {

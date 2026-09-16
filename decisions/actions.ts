@@ -158,6 +158,11 @@ export const resumeConstruction = (playerId: string, planetId: string, id: numbe
   act(playerId, 'construction.resume', { planetId, id });
 export const engageFleet = (playerId: string, fleetId: string, targetId: string) =>
   act(playerId, 'fleet.engage', { fleetId, targetId });
+/** Возвести КОСМИЧЕСКУЮ КРЕПОСТЬ на своём узле (`stationModule`): местность становится
+ *  владением с орбитой и своим ростером построек. Можно ли — решает `fortressRaise.ts`
+ *  тем же правилом, что и редьюсер. */
+export const deployStation = (playerId: string, planetId: string) =>
+  act(playerId, 'station.deploy', { planetId });
 /** Begin researching a session technology (one active at a time — technologyModule). */
 export const researchTech = (playerId: string, technology: string) =>
   act(playerId, 'technology.research', { technology });

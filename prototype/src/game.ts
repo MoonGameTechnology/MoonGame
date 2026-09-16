@@ -178,6 +178,7 @@ export {
   buildShip,
   cancelConstruction,
   resumeConstruction,
+  deployStation,
   engageFleet,
   researchTech,
   delegateSteward,

@@ -107,6 +107,7 @@ export const LAYER_INVENTORY: ReadonlyMap<string, LayerVerdict> = new Map<string
   ['tech', 'layer'], // дерево технологий, z47
   ['buildwin', 'layer'], // окно построек мира (BUILD-1), z45 — ниже кодекса
   ['steward', 'layer'], // окно «Хранителя», z47 — тот самый ST-4, чинившийся поштучно
+  ['battlewin', 'layer'], // окно боя, z47 — открывается тапом по значку боя на карте
   ['market', 'layer'], // сессионный рынок, z47
   ['constructor', 'layer'], // «Производство» — заказ и оснащение (REFM-13, ROS-3.1), z47
   ['codex', 'layer'], // кодекс объекта, z46

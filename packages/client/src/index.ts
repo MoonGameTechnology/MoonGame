@@ -42,12 +42,10 @@ export {
   computePowerCells,
   computePowerCell,
   drawTerritory,
-  drawTerritoryCells,
   type TerritorySeed,
   type TerritoryCell,
   type TerritoryPalette,
 } from './territory';
-export { TerritoryGeometryCache, projectTerritoryCells } from './territoryCache';
 export {
   createStatusBarModel,
   createSelectionModel,

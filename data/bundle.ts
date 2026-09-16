@@ -40,6 +40,7 @@ import heroSkillTrees from './heroSkillTrees.json';
 import heroGrades from './heroGrades.json';
 import modes from './modes.json';
 import rewards from './rewards.json';
+import medalGrades from './medalGrades.json';
 import market from './market.json';
 
 /** Копия списка фрагментов для сборщика. Экспортирована, чтобы сторож мог сверить её с
@@ -65,6 +66,7 @@ export const FRAGMENTS: Record<string, unknown> = {
   'heroGrades.json': heroGrades,
   'modes.json': modes,
   'rewards.json': rewards,
+  'medalGrades.json': medalGrades,
   'market.json': market,
 };
 

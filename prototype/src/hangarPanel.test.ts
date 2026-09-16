@@ -228,14 +228,23 @@ describe('трюм носителя читается как порт и знае
     expect(hold.blocked).toBe(port.blocked);
   });
 
-  it('ИДЁТ — «занят», а не «нет топлива»: ждать заправки бессмысленно', () => {
+  /**
+   * ИДУЩИЙ НОСИТЕЛЬ ПОДНИМАЕТ ВЫЛЕТ (решение владельца 2026-09-16). Раньше панель гасила
+   * «Удар» на ходу, зеркаля прежнее правило ядра, — и это была ЕДИНСТВЕННАЯ причина серой
+   * кнопки, на которую жаловался владелец. Ядро правило сняло, панель идёт следом: она
+   * зеркалит гейт, а не хранит свою копию.
+   */
+  it('ИДЁТ — кнопка ЖИВАЯ: вылет с хода разрешён', () => {
     const v = fleetHangar(carrier({ hangar: squad, location: null, movement: moving }), data)!;
-    expect(v.blocked).toBe('busy');
+    expect(v.blocked).toBeNull();
   });
 
-  it('В БОЮ И БЕЗ УЗЛА — тоже «занят»: те же три условия, что спрашивает ядро', () => {
+  it('БЕЗ УЗЛА, НО НЕ В БОЮ — тоже живая: стоянка на лейне вылету не помеха', () => {
+    expect(fleetHangar(carrier({ hangar: squad, location: null }), data)!.blocked).toBeNull();
+  });
+
+  it('В БОЮ — «занят»: это единственное, что осталось от прежних трёх условий', () => {
     expect(fleetHangar(carrier({ hangar: squad, battleId: 'b1' }), data)!.blocked).toBe('busy');
-    expect(fleetHangar(carrier({ hangar: squad, location: null }), data)!.blocked).toBe('busy');
   });
 
   it('ПУСТОЙ ТРЮМ В ПУТИ — «пусто»: поднимать нечего независимо от стоянки', () => {

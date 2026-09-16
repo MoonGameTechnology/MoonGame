@@ -25,7 +25,9 @@ import {
   ownFleet,
   posAt,
   sideAlive,
-  sideDamage,
+  creditBattle,
+  creditVolley,
+  sideDamageBreakdown,
   sideUnits,
 } from '../util/combat';
 
@@ -525,6 +527,13 @@ function finishBattle(h: HandlerContext, battle: Battle, end: BattleEnd = 'decid
   // РОВНО ОДИН. На двух сторонах это дословно прежняя таблица.
   const aliveSides = battle.sides.filter((side) => sideAlive(h.state, side.ref));
   const winner = stalemate || aliveSides.length !== 1 ? null : (aliveSides[0]?.owner ?? null);
+
+  // ПЕРЕЖИТОЕ СРАЖЕНИЕ (VET-2) — по ЖИВЫМ сторонам, и ровно раз на бой. Не «победитель»:
+  // ничья и перемирие — тоже пережитый бой, а вот погибший стек своей записи не получает,
+  // потому что получать её уже некому. Здесь же, а не в раунде: «пережил» должно значить
+  // «дожил до конца», иначе счётчик считал бы раунды и длинная драка давала бы выслугу
+  // за один бой.
+  for (const side of aliveSides) creditBattle(h.state, side.ref);
 
   // The battle is over. GROUND survivors (a planet garrison or a fleet's landing
   // troops) return "at rest": clear their transient combat HP pool (a UnitStack with
@@ -1037,7 +1046,16 @@ export const combatModule: GameModule = {
             other.owner !== null &&
             isHostile(h, side.owner, other.owner),
         );
-        const volley = sideDamage(h.state, side.ref, data, side.role === 'attacker' ? 'attack' : 'defense');
+        // Разбивка, а не только сумма (VET-1): те же числа, но видно, какой стек что
+        // положил в залп — из этого VET-2 пишет заслугу ветерана.
+        const shot = sideDamageBreakdown(
+          h.state,
+          side.ref,
+          data,
+          side.role === 'attacker' ? 'attack' : 'defense',
+        );
+        const volley = shot.total;
+        let landed = 0; // сколько РЕАЛЬНО легло на врагов после хука — это и есть заслуга
         for (const [i, share] of splitVolley(volley, enemies).entries()) {
           const target = enemies[i]!;
           // Хук зовётся НА ПАРУ (кто бьёт → кого бьёт), а не на весь залп: его
@@ -1052,7 +1070,11 @@ export const combatModule: GameModule = {
             defender: target.owner,
           });
           incoming.set(target, (incoming.get(target) ?? 0) + dealt);
+          landed += dealt;
         }
+        // Пишется ДО применения урона — по тому же ПРЕДРАУНДОВОМУ снимку, из которого
+        // считался залп. Иначе развеска шла бы по составу, уже подбитому этим раундом.
+        creditVolley(h.state, side.ref, shot, landed);
       }
       for (const [side, dmg] of incoming) {
         if (dmg > 0) applyDamageToSide(h, side.ref, dmg, data, battle.location);

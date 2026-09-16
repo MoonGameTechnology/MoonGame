@@ -50,6 +50,7 @@ import {
   type MatchMap,
   type Planet,
   type Player,
+  buildingLevel,
 } from '@void/shared-core';
 import type { ActionGate } from '@void/action-layer';
 import { MatchRoom, type ActionReceipt, type RoomObservation } from './matchRoom';
@@ -123,9 +124,9 @@ export const DEV_MODULES: GameModule[] = [
   diplomacyModule, // declarations + consent offers + the `diplomacy` capability combat consults
   espionageModule, // SPY-1/2: espionage.spy → окна краденого intel + контрразведка
   // The combat family, split along the bus seams. Order matters (invariant #6):
-  // `orbital` stamps orbit on `fleet.arrived` BEFORE `combat` engages, and runs
-  // its AA/bombard span BEFORE `artillery`'s standoff span — the exact sequence
-  // the old single module had internally.
+  // `orbital` stamps orbit on `fleet.arrived` BEFORE `combat` engages — the exact
+  // sequence the old single module had internally. (The third member of that span,
+  // `artillery`, is gone: standoff fire was removed whole, see manifest 14 below.)
   orbitalModule, // the single near-orbit: stationing, AA fire, bombardment
   combatModule, // melee battles: engage / tick / assault / retreat / capture
   interceptModule, // schedules lane-crossing meetings (resolved by combat)
@@ -175,7 +176,18 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '20'; // MSB-4: у каждого штурмующего СВОЙ берег.
+export const MODULE_MANIFEST_VERSION = '21'; // VET-2: у стека появилась заслуга ветерана.
+// Форма состояния изменилась ДОБАВЛЕНИЕМ: у `UnitStack` два новых необязательных поля —
+// `damageDealt` и `battles` (оба «на юнит»). Старый матч читается без ошибки: полей нет,
+// значит ветеранов нет. Бампаю всё равно, и вот почему это не перестраховка. Счётчики
+// растут ТОЛЬКО в бою, а выплата за них (VET-4) считается по состоянию на конец матча:
+// матч, поднятый с манифеста 20, вошёл бы в неё с нулевой заслугой у всех, кто уже
+// отвоевал свои бои под старыми правилами. Игрок берёг бы ветеранов, которых механика
+// не считает ветеранами. Отказ загрузки честнее, чем молча обнулённая заслуга.
+//
+// Бампается ОДИН раз на всю цепочку медалей: VET-3/4/5 читают эти же два поля и своей
+// формы не добавляют. (До 21:)
+// export const MODULE_MANIFEST_VERSION = '20'; // MSB-4: у каждого штурмующего СВОЙ берег.
 // Форма состояния изменилась дважды: `planet.beachhead` (одно поле) стал списком
 // `planet.beachheads`, а ссылка стороны `{kind:'beachhead'}` получила обязательное поле
 // `owner`. Матч на манифесте 19 несёт плацдарм СТАРОЙ формы: новый граф его не увидит
@@ -384,7 +396,12 @@ export function createDevMatch(data: GameData, options: DevMatchOptions = {}): M
     // all (enablesShipConstruction); without it, turn-1 fleet-building would be
     // impossible in every dev/test match. The SPACEPORT is deliberately NOT here: it
     // is the shuttle side of the split, and the player builds it (YARD-1).
-    home.buildings = [{ type: 'shipyard', level: 1, hp: 30 }];
+    // HP берётся ИЗ ДАННЫХ, а не вписывается числом: с двумя ярусами верфи (YARD-2)
+    // прочность первого уровня стала другой, и вписанное 30 посеяло бы дом с корпусом
+    // крепче, чем у здания, которое он на самом деле несёт.
+    home.buildings = [
+      { type: 'shipyard', level: 1, hp: buildingLevel(data.buildings.shipyard!, 1).hp },
+    ];
     planets[`home_${id}`] = home;
     fleets[`${id}_1`] = fleet(`${id}_1`, id, `home_${id}`, [
       ['cruiser', 2],

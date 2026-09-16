@@ -23,9 +23,9 @@
     "drift": { "position": { "x": 0, "y": -210 }, "kind": "asteroid", "terrain": "asteroid_field" },
     "veil": {
       "position": { "x": 0, "y": 210 },
-      "kind": "nebula",
-      "terrain": "nebula",
-      "planetType": "barren"
+      "kind": "dense_nebula",
+      "terrain": "dense_nebula",
+      "planetType": "gas_giant"
     }
   },
   "paths": [

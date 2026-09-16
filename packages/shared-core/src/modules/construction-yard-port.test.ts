@@ -64,6 +64,46 @@ describe('верфь и космопорт — разные здания с ра
     expect(unitBuildSiteBlocker(only, data.units[someShip]!, data)).toBe('E_NO_SHIPYARD');
   });
 
+  /**
+   * ДВА ЯРУСА ВЕРФИ (решение владельца 2026-09-15). После YARD-1 верфь стала ЕДИНСТВЕННЫМ
+   * способом строить корабли, и её цена — 400 металла / 200 кредитов / 24 ч — оказалась
+   * ценой расширения производства на каждый захваченный мир. При доходе стартового дома
+   * (~24 металла, ~6 кредитов в час) это 2–3 дня плюс сутки стройки при сессии в 14.
+   *
+   * Разложено на ярусы, а не удешевлено: первый ярус уже СТРОИТ КОРАБЛИ и стоит половину,
+   * второй доводит до прежней верфи. Полная верфь стоит РОВНО столько же, сколько стоила,
+   * — изменилось не «сколько», а «можно ли остановиться на половине».
+   */
+  it('первый ярус верфи уже строит корабли и стоит ПОЛОВИНУ', () => {
+    const yard = data.buildings.shipyard!;
+    expect(yard.enablesShipConstruction).toBe(true); // ворота открыты с первого уровня
+    expect(yard.upgrades.length).toBeGreaterThan(0);
+    const up = yard.upgrades[0]!;
+    // Апгрейд не должен ГАСИТЬ способность: `capabilityAt` копит её по уровням, но
+    // молчаливый `false` на втором ярусе прочитался бы как «верфь перестала быть верфью».
+    expect(up.enablesShipConstruction).toBe(true);
+    expect(yard.cost.metal!).toBeLessThan(up.cost.metal! + yard.cost.metal!);
+  });
+
+  it('полная верфь стоит столько же, сколько стоила до разделения на ярусы', () => {
+    const yard = data.buildings.shipyard!;
+    const up = yard.upgrades[0]!;
+    expect({
+      metal: yard.cost.metal! + up.cost.metal!,
+      credits: yard.cost.credits! + up.cost.credits!,
+      hours: yard.buildTimeHours + up.buildTimeHours,
+    }).toEqual({ metal: 400, credits: 200, hours: 24 });
+  });
+
+  it('второй ярус чинит лучше и весит больше очков', () => {
+    const yard = data.buildings.shipyard!;
+    const up = yard.upgrades[0]!;
+    expect(up.shipRepair!).toBeGreaterThan(yard.shipRepair);
+    // Очки считает ЯДРО: `scoreValue` умножается на уровень (см. схему), поэтому
+    // отдельного поля у яруса нет — полная верфь весит вдвое просто потому, что L2.
+    expect(yard.scoreValue * 2).toBe(12);
+  });
+
   it('космопорт приносит кредиты — торговля, а не только ангар', () => {
     const port = data.buildings.spaceport!;
     expect(port.produces?.credits ?? 0).toBeGreaterThan(0);

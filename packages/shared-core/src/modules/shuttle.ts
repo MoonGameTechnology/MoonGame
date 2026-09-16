@@ -61,7 +61,7 @@ import {
   trimHangar,
 } from '../state/shuttle';
 import { applyDamageToSide, beachheadOf, isAllied, removeIfWiped } from '../util/combat';
-import { requireOwnedIdleFleet } from '../util/fleet';
+import { requireOwnedIdleFleet, requireOwnedUnengagedFleet } from '../util/fleet';
 import { addUnits, cappedUnitStat, findHealthyStack, sumUnitStat } from '../util/stacks';
 import { buildingLevel } from '../data/schemas';
 import { timeScaleOf } from '../action/types';
@@ -720,11 +720,16 @@ function baseFromPayload(
     if (planet.owner !== playerId) return h.reject('E_FORBIDDEN');
     return planetBase(planet, h.ctx.data);
   }
-  // Носитель обязан СТОЯТЬ у узла и быть свободен (`E_FLEET_BUSY` — бой, перелёт или
-  // стоянка на лейне): порт не двигается, и вылет с разгоняющегося носителя пришлось
-  // бы догонять — вторая ветка правил в самом горячем месте ядра. Возврату это не
-  // мешает: носитель волен уйти, пока челноки летят.
-  const fleet = requireOwnedIdleFleet(h, p.fleetId as string, playerId);
+  // Носитель обязан быть СВОИМ и не запертым в бою — но НЕ обязан стоять (решение
+  // владельца 2026-09-16). Прежнее правило требовало стоянки, и обоснование звучало так:
+  // «порт не двигается, и вылет с разгоняющегося носителя пришлось бы догонять». Оно
+  // устарело раньше, чем сменилось правило: SHU-4.4 научил удар ДОГОНЯТЬ движущуюся
+  // цель, а возврат и так берёт позицию базы ЖИВОЙ (`turnHome`: «носитель мог сдвинуться,
+  // пока челноки летели»). Догонять уже умели — запрещали ровно взлёт.
+  //
+  // Второй ветки правил это не завело: позицию идущего носителя считает та же
+  // `fleetPositionAt`, что и стоящего, — и радиус вылета, и возврат читают её одинаково.
+  const fleet = requireOwnedUnengagedFleet(h, p.fleetId as string, playerId);
   return fleetBase(fleet, h.state, h.ctx.data, h.ctx.now);
 }
 

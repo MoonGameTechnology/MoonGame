@@ -15,6 +15,7 @@ import { hoursToMs, timeScaleOf } from '../action/types';
 import { MS_PER_HOUR } from '../util/time';
 import { canAfford, payCost, refundCost } from '../util/treasury';
 import { buildProgress } from '../util/construction';
+import { isAllied } from '../util/combat';
 import { addUnits } from '../util/stacks';
 import { basedMachine, hangarUsed, shuttleBayAt } from '../state/shuttle';
 import { effectiveStats, loadoutCost, validateLoadout } from '../util/loadout';
@@ -471,6 +472,32 @@ function ownedPlanet(
 
 // --- building combat helpers -------------------------------------------------
 
+/**
+ * Прикрывают ли постройки мира того, кто сейчас получает урон (решение владельца 5,
+ * fortress-roadmap §0.6): владельца — да, его СОЮЗНИКА — тоже, остальных — нет.
+ *
+ * Предикат ОДИН на оба хука наземной защиты (`defenseBonus` и скидка за число зданий).
+ * Держать его в двух местах значило бы дать им разойтись: ровно это и случилось при
+ * первой правке — союзник начал получать бонус форта, но не однопроцентную скидку, и
+ * игрок увидел бы необъяснимо частичное прикрытие.
+ *
+ * Проверка именно «владелец ИЛИ союзник», а не «не враг»: снять её целиком значило бы
+ * прикрыть и ШТУРМУЮЩЕГО, стоящего на вашей же земле, то есть заставить форт работать на
+ * захватчика. Союзник здесь — ровно `alliance` (см. {@link isAllied}): перемирие и пакт
+ * войсками не делятся, значит и прикрытием не делятся тоже.
+ */
+function fortificationCovers(
+  h: HandlerContext,
+  location: string | undefined,
+  defender: string | undefined,
+): Planet | null {
+  if (!location || defender === undefined) return null;
+  const planet = h.state.planets[location];
+  if (!planet || planet.owner === null) return null;
+  if (planet.owner === defender || isAllied(h, planet.owner, defender)) return planet;
+  return null;
+}
+
 /** Total ground-defense bonus a planet's standing buildings grant its garrison. */
 function totalDefenseBonus(planet: Planet, data: GameData): number {
   let bonus = 0;
@@ -567,6 +594,16 @@ export const constructionModule: GameModule = {
       const roster = allowedBuildings(h.ctx.data, planet);
       if (roster !== undefined && !roster.includes(payload.building)) {
         return h.reject('E_WRONG_SECTOR'); // this structure does not fit this province type
+      }
+      // 3. `onlyOn` — ограничение со стороны САМОГО ЗДАНИЯ (решение владельца 3): «строится
+      //    ТОЛЬКО там-то». Ростером вида этого не выразить: у планеты ростера нет вовсе
+      //    (undefined = любое здание), и запретить ей добывающую станцию можно было бы
+      //    лишь выписав поимённый список всех ОСТАЛЬНЫХ зданий — список, устаревающий на
+      //    первом же новом здании, причём молча. Ворота те же и код отказа тот же: игроку
+      //    важно «сюда нельзя», а не чьё правило сработало.
+      const onlyOn = h.ctx.data.buildings[payload.building]?.onlyOn;
+      if (onlyOn !== undefined && !onlyOn.includes(planet.kind ?? '')) {
+        return h.reject('E_WRONG_SECTOR');
       }
       requireUnlocked(h, action.playerId, 'building', payload.building);
       if (atInstanceCap(h, planet, payload.building)) {
@@ -718,7 +755,16 @@ export const constructionModule: GameModule = {
       // ARS-3 ownership gate: a seat with an arsenal SNAPSHOT builds only what it
       // owns — the hull and every module must be listed (fail-secure E_NOT_OWNED).
       // No snapshot on the player ⇒ no restriction (regular/dev matches unchanged).
-      const arsenal = player.arsenal;
+      //
+      // ГЕЙТ СПРАШИВАЕТ ТОЛЬКО ПРО КОРАБЛИ (решение владельца 2026-09-15). Пока он не
+      // различал домен, гейтированное место (человеческое кресло AvA) не могло построить
+      // НИ ОДНОГО наземного юнита: снапшот перечисляет корпуса кораблей, а пехоты и
+      // техники в нём не бывает никогда. Кресло получало стартовый гарнизон и теряло
+      // способность его пополнять — захват миров закрывался целиком, хотя казармы с
+      // заводом стояли. Замысел арсенала (`docs/arsenal-roadmap.md`) — «корпуса КОРАБЛЕЙ,
+      // модули, фитинги героев», и наземка в него не входила ни дня; поэтому сузилось
+      // ПРАВИЛО, а не расширился список. Наземный род войск гейтят ЗДАНИЯ (выше).
+      const arsenal = def.domain === 'ground' ? undefined : player.arsenal;
       if (arsenal && !arsenal.hulls.includes(payload.unit)) {
         return h.reject('E_NOT_OWNED');
       }
@@ -1033,18 +1079,19 @@ export const constructionModule: GameModule = {
       }
     }
 
-    // Standing buildings toughen the garrison: reduce the damage it takes in the
-    // ground phase by the planet's total defense bonus (the side being damaged
-    // owns the planet ⇒ it is the garrison).
+    // Standing buildings toughen the ground defence: they reduce the damage taken in
+    // the ground phase by the planet's total defense bonus.
+    //
+    // Кого именно прикрывают — `fortificationCovers` (решение владельца 5): владельца и
+    // его союзника. Раньше здесь стояло `planet.owner !== a.defender` → выход, то есть
+    // союзник, приведший войска оборонять ВАШ мир, не получал ничего; расхождение было
+    // тихим, потому что все тесты проверяли владельца, а после MSB-4 обороняющихся на
+    // одном мире может быть несколько.
     api.hook<number>('combat.damage', (dmg, args, h) => {
       const a = args as { phase?: string; location?: string; defender?: string };
-      if (a.phase !== 'ground' || !a.location) {
-        return dmg;
-      }
-      const planet = h.state.planets[a.location];
-      if (!planet || planet.owner !== a.defender) {
-        return dmg;
-      }
+      if (a.phase !== 'ground') return dmg;
+      const planet = fortificationCovers(h, a.location, a.defender);
+      if (!planet) return dmg;
       const bonus = totalDefenseBonus(planet, h.ctx.data);
       return bonus > 0 ? dmg / (1 + bonus) : dmg;
     });
@@ -1058,13 +1105,9 @@ export const constructionModule: GameModule = {
     const GROUND_DAMAGE_REDUCTION_MAX = 0.90;
     api.hook<number>('combat.damage', (dmg, args, h) => {
       const a = args as { phase?: string; location?: string; defender?: string };
-      if (a.phase !== 'ground' || !a.location) {
-        return dmg;
-      }
-      const planet = h.state.planets[a.location];
-      if (!planet || planet.owner !== a.defender) {
-        return dmg;
-      }
+      if (a.phase !== 'ground') return dmg;
+      const planet = fortificationCovers(h, a.location, a.defender);
+      if (!planet) return dmg;
       const standing = planet.buildings.filter((b) => b.hp > 0).length;
       if (standing <= 0) return dmg;
       const reduction = Math.min(standing * GROUND_DAMAGE_REDUCTION_PER_BUILDING, GROUND_DAMAGE_REDUCTION_MAX);
