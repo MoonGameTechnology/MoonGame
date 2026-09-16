@@ -14779,7 +14779,7 @@ BRW-2/3 написаны ровно под это.
 
 ## Блок PVR · PvE как рогалик: одиночный забег (заказ владельца 2026-09-16) `[proto]` `[data]` `[docs]`
 
-> Кирпичи живут в [`pve-roguelike-roadmap.md`](pve-roguelike-roadmap.md) (`PVR-*`), здесь
+> Кирпичи живут в [`sector-zero-roadmap.md`](sector-zero-roadmap.md) (`PVR-*`), здесь
 > только указатель — второй копии статусов не заводим. **Крит-путь: PVR-0.1 → PVR-0.2 →
 > PVR-1.1.**
 >
