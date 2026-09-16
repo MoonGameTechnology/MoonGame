@@ -742,8 +742,8 @@
 | FORT-5.7 | ✅ | data core | `docs/fortress-roadmap.md:818` | Ангар крепости |
 | FORT-5.8 | ✅ | core | `docs/fortress-roadmap.md:839` | Док чинит СОЮЗНИКУ |
 | FORT-5.9 | ✅ | core data | `docs/fortress-roadmap.md:863` | Госпиталь лечит ТРЮМ |
-| FORT-5.10 | ⏳ | core data | `docs/fortress-roadmap.md:882` | Щиты крепости |
-| FORT-5.11 | ✅ | data | `docs/fortress-roadmap.md:891` | Технологии открывают постройки крепости |
+| FORT-5.10 | ⏳ | core data | `docs/fortress-roadmap.md:882` | Щиты крепости — L, развилка ИЗМЕРЕНА 2026-09-16 |
+| FORT-5.11 | ✅ | data | `docs/fortress-roadmap.md:910` | Технологии открывают постройки крепости |
 | GI-0.1 | ✅ | srv sec | `docs/game-integrity-roadmap.md:41` | Rate-limiting действий |
 | GI-0.2 | ⏳ | srv | `docs/game-integrity-roadmap.md:49` | Per-player очередь (анти-double-spend) |
 | GI-0.3 | ✅ | srv | `docs/game-integrity-roadmap.md:53` | Туман как граница (анти-maphack) (в основном) |
