@@ -945,17 +945,17 @@
 | ROS-2.2 | ✅ | core data proto | `docs/roster-roadmap.md:422` | Челнок — сторона боя: ответный урон и зональное ПВО 2026-09-09 |
 | ROS-3.1 | ✅ | proto | `docs/roster-roadmap.md:459` | Экран «Производство»: пять типов, модули, количество, планета 2026-09-09 |
 | ROS-3.2 | ✅ | proto | `docs/roster-roadmap.md:497` | Шаттл — корабль во всём интерфейсе 2026-09-09 |
-| PVR-0.1 | ⏳ | data | `docs/sector-zero-roadmap.md:476` | Карта pve-1 снова строится |
-| PVR-0.2 | ⏳ | proto | `docs/sector-zero-roadmap.md:484` | pveModule в ядре прототипа |
-| PVR-0.3 | ⏳ | proto | `docs/sector-zero-roadmap.md:491` | Сохранение: сперва мета, потом забег |
-| PVR-1.1 | 🔒 | proto | `docs/sector-zero-roadmap.md:512` | Соло-запуск задаёт modeId |
-| PVR-1.2 | 🔒 | proto | `docs/sector-zero-roadmap.md:519` | HUD забега: волна N из M и время до следующей |
-| PVR-1.3 | 🔒 | data | `docs/sector-zero-roadmap.md:525` | Состав волны перестаёт быть одним дроном |
-| PVR-1.4 | 🔒 | proto | `docs/sector-zero-roadmap.md:533` | Выбор между волнами |
-| PVR-2.1 | 🔒 | proto | `docs/sector-zero-roadmap.md:544` | Выбор сложности на запуске забега |
-| PVR-3.1 | ⏳ | docs | `docs/sector-zero-roadmap.md:555` | Резолюция: чем PvE-прокачка НЕ является |
-| PVR-3.2 | 🔒 | proto | `docs/sector-zero-roadmap.md:563` | Хранилище PvE-прогресса |
-| PVR-3.3 | 🔒 | proto | `docs/sector-zero-roadmap.md:570` | Награда за забег |
+| PVR-0.1 | ⏳ | data | `docs/sector-zero-roadmap.md:598` | Карта pve-1 снова строится |
+| PVR-0.2 | ⏳ | proto | `docs/sector-zero-roadmap.md:606` | pveModule в ядре прототипа |
+| PVR-0.3 | ⏳ | proto | `docs/sector-zero-roadmap.md:613` | Сохранение: сперва мета, потом забег |
+| PVR-1.1 | 🔒 | proto | `docs/sector-zero-roadmap.md:634` | Соло-запуск задаёт modeId |
+| PVR-1.2 | 🔒 | proto | `docs/sector-zero-roadmap.md:641` | HUD забега: волна N из M и время до следующей |
+| PVR-1.3 | 🔒 | data | `docs/sector-zero-roadmap.md:647` | Состав волны перестаёт быть одним дроном |
+| PVR-1.4 | 🔒 | proto | `docs/sector-zero-roadmap.md:655` | Выбор между волнами |
+| PVR-2.1 | 🔒 | proto | `docs/sector-zero-roadmap.md:666` | Выбор сложности на запуске забега |
+| PVR-3.1 | ⏳ | docs | `docs/sector-zero-roadmap.md:677` | Резолюция: чем PvE-прокачка НЕ является |
+| PVR-3.2 | 🔒 | proto | `docs/sector-zero-roadmap.md:685` | Хранилище PvE-прогресса |
+| PVR-3.3 | 🔒 | proto | `docs/sector-zero-roadmap.md:692` | Награда за забег |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md:48` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md:55` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md:64` | Сервисные идентичности и scoped-токены |
