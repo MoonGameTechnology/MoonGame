@@ -758,6 +758,7 @@ export const ru: Record<string, string> = {
   'data.orbital-defense-battery': 'Орбитальное ПКО',
   'data.orbital-defense-grid': 'Орбитальная оборонная сеть',
   'data.void-fortification': 'Фортификация пустоты',
+  'data.void-shipworks': 'Верфи пустоты',
   'data.orbital-logistics': 'Орбитальная логистика',
   'data.overclocked-helm': 'Разогнанный шлем',
   'data.overseer': 'Куратор',
@@ -2230,6 +2231,8 @@ export const ru: Record<string, string> = {
   'tech.node.meta-industry-2.desc': 'Мета-прокачка: ещё +5% к производству.',
   'tech.node.meta-industry.desc': 'Мета-прокачка: +5% к производству.',
   'tech.node.microelectronics-fabrication.desc': 'Орбитальные фабрики: +5% к производству.',
+  'tech.node.void-shipworks.desc':
+    'Причальная палуба, топливные цистерны и ремонтные леса прямо на теле крепости. Открывает её собственный ангар — челнокам больше не нужен наземный космопорт.',
   'tech.node.void-fortification.desc':
     'Опорный узел вне планетной системы: несущий каркас, реакторный пояс и причалы, на которых захваченная пустота становится развиваемым владением. Открывает возведение космической крепости.',
   'tech.node.orbital-defense-grid.desc':

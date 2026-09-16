@@ -431,5 +431,25 @@
         "starfort"
       ]
     }
+  },
+  "void_shipworks": {
+    "name": "Void Shipworks",
+    "description": "tech.node.void-shipworks.desc",
+    "branch": "space",
+    "tier": 3,
+    "cost": {
+      "credits": 320,
+      "metal": 240,
+      "microelectronics": 40
+    },
+    "researchTimeHours": 10,
+    "prerequisites": [
+      "void_fortification"
+    ],
+    "unlocks": {
+      "buildings": [
+        "void_hangar"
+      ]
+    }
   }
 }

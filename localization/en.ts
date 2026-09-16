@@ -754,6 +754,7 @@ export const en: Record<string, string> = {
   'data.orbital-defense-battery': 'Orbital Defense Battery',
   'data.orbital-defense-grid': 'Orbital Defense Grid',
   'data.void-fortification': 'Void Fortification',
+  'data.void-shipworks': 'Void Shipworks',
   'data.orbital-logistics': 'Orbital Logistics',
   'data.overclocked-helm': 'Overclocked Helm',
   'data.overseer': 'Overseer',
@@ -2230,6 +2231,8 @@ export const en: Record<string, string> = {
   'tech.node.meta-industry-2.desc': 'Meta-progression: another +5% production.',
   'tech.node.meta-industry.desc': 'Meta-progression: +5% production.',
   'tech.node.microelectronics-fabrication.desc': 'Orbital foundries: +5% production.',
+  'tech.node.void-shipworks.desc':
+    'A berthing deck, fuel cisterns and repair scaffolding built into the fortress itself. Unlocks its own hangar — shuttles no longer need a groundside spaceport.',
   'tech.node.void-fortification.desc':
     'A strongpoint outside any planetary system: load-bearing frame, reactor belt and berths that turn captured emptiness into a holding worth developing. Unlocks the void fortress.',
   'tech.node.orbital-defense-grid.desc':
