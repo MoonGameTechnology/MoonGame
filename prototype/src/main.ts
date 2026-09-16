@@ -1,4 +1,4 @@
-import { mapPreset, mapNodesFromState, scoreLimitFor, MAP_IDS, type MapId } from './mapCatalog';
+import { isFrontier, mapPreset, mapNodesFromState, scoreLimitFor, MAP_IDS, type MapId } from './mapCatalog';
 /**
  * Void Dominion — playable prototype, browser UI.
  *
@@ -192,11 +192,7 @@ import {
   blitSphere as hdBlitSphere,
   clearHolographicSprites,
 } from '../../packages/client/src/holoDraw';
-import {
-  drawTerritory,
-  computePowerCell,
-  type TerritorySeed,
-} from '../../packages/client/src/territory';
+import { drawTerritory } from '../../packages/client/src/territory';
 import { TerritoryGeometryCache } from '../../packages/client/src/territoryGeometry';
 import { buildLabel, currentBuild } from './updater';
 import { initApkUpdater } from './apkUpdate';
@@ -276,6 +272,7 @@ import { assaultMovers, assaultTargetBlocker, collectBlockers, moveMovers } from
 import { laneEnds, warConfirmPlan } from '../../decisions/warOrders';
 import { bakeSignature, needsRebake, ownersSignature } from './staticLayerCache';
 import { clipPolygon, clipRect, provinceSeeds } from './provinceMap';
+import { frontierOutline } from './frontierOutline';
 import { fleetVisible, nodeView, seesDetails as fogSeesDetails } from './fogView';
 import {
   hasCoverage,
@@ -1281,7 +1278,7 @@ const battleLosses = new Map<string, Record<string, Record<string, number>>>();
 // Single-player setup screen state: per-seat role (seat 0 is always you) + your
 // chosen homeworld. Seats 2-10 toggle 'ai'/'off'; an 'ai' seat spawns a rival.
 const freshSetupSlots = (): SeatRole[] =>
-  SEAT_META.slice(0, setupSeatCount()).map((_, i) => (i === 0 ? 'human' : setupMapId === 'frontier-100' || i === 1 ? 'ai' : 'off'));
+  SEAT_META.slice(0, setupSeatCount()).map((_, i) => (i === 0 ? 'human' : isFrontier(setupMapId) || i === 1 ? 'ai' : 'off'));
 let setupSlots: SeatRole[] = freshSetupSlots();
 // Team battle (2v2 etc.): when on, seats fight in sides — same side ALLIED (win
 // together, no friendly fire), across sides at WAR from the first hour. Seat 0 (you)
@@ -1745,8 +1742,10 @@ const cam = { scale: 1, x: 0, y: 0 };
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 // node sector type by id — drives asteroid-junction rendering + capture-by-arrival
 let SECTOR_OF: Record<string, string> = Object.fromEntries(MAP.map((n) => [n.id, n.sector]));
+let galaxyOutline: Array<{ x: number; y: number }> = [];
 function installMapGeometry(state: GameState): void {
   MAP = mapNodesFromState(state);
+  galaxyOutline = isFrontier(state.mapId) ? frontierOutline(MAP) : [];
   SCORE_LIMIT = scoreLimitFor(state);
   SECTOR_OF = Object.fromEntries(MAP.map((n) => [n.id, n.sector]));
   MINX = Math.min(...MAP.map((n) => n.x));
@@ -1838,7 +1837,7 @@ function defaultView(): void {
   // Кого считать домом и когда приближаться к нему — `openingView.ts` (REFM-56).
   const view = openingView(MOBILE || holographic.active(), pickHome(Object.values(s.planets), ME));
   if (view.kind === 'home') {
-    centerOn(view.at, view.scale * (s.mapId === 'frontier-100' ? 5 : 1));
+    centerOn(view.at, view.scale * (isFrontier(s.mapId) ? 5 : 1));
     return;
   }
   cam.scale = 1;
@@ -4233,9 +4232,31 @@ function ownersSig(): string {
   );
 }
 
+/** Подпись карты в списках партий. Обе карты Фронтира показываются одним именем —
+ *  раньше это был тернарник, скопированный в два места, и два ключа локали с
+ *  ОДИНАКОВЫМ текстом. Третья карта теперь не потребует правок в двух списках. */
+function mapLabel(mapId: string | undefined): string {
+  return isFrontier(mapId) ? t('map.frontier') : (mapId ?? '');
+}
+
 /** Map art is shared by desktop and phone; floating windows remain desktop-only. */
 function holographicMapOn(): boolean {
   return holographic.active() || (MOBILE && holographyOn());
+}
+
+/** Чем обрезаются провинции. На картах Фронтира это выпуклый контур галактики, на
+ *  прочих — прежняя рамка по границам карты. Координаты ЭКРАННЫЕ: кэш геометрии
+ *  (`territoryGeometry.ts`) нормализует вход по первой точке клипа и масштабу сам,
+ *  поэтому панорама и зум из его подписи сокращаются, а на выход он отдаёт ячейки в том
+ *  же экранном пространстве, в котором их рисуют и по которым потом бьют хит-тестом. */
+function provinceClip(): Array<[number, number]> {
+  if (galaxyOutline.length)
+    return galaxyOutline.map((pt): [number, number] => {
+      const v = world(pt);
+      return [v.x, v.y];
+    });
+  const frame = clipRect(mapBounds());
+  return clipPolygon(world(frame.topLeft), world(frame.bottomRight));
 }
 
 /** Rebuild the cached province map when the camera/ownership/viewport moves. */
@@ -4320,10 +4341,10 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // Clip cells to the MAP boundary (province bounding box + padding), not the
   // viewport — otherwise the outermost provinces stretch to the screen edge. This
   // gives the map a defined edge that pans/zooms with the camera.
-  const frame = clipRect({ minX: MINX, maxX: MAXX, minY: MINY, maxY: MAXY });
+  const frame = clipRect(mapBounds());
   const tl = world(frame.topLeft);
   const br = world(frame.bottomRight);
-  const clip = clipPolygon(tl, br);
+  const clip = provinceClip();
   holographicFrame = { x: tl.x, y: tl.y, width: br.x - tl.x, height: br.y - tl.y };
   if (holographicMapOn()) {
     drawGlassScreen(g, holographicFrame);
@@ -4401,7 +4422,24 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   if (holographicMapOn()) g.restore();
   g.strokeStyle = 'rgba(90,151,165,0.2)';
   g.lineWidth = 0.7;
-  if (!holographicMapOn()) g.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+  if (!holographicMapOn()) {
+    // На картах Фронтира территория обрезается выпуклым контуром галактики
+    // (`provinceClip`), а рамка рисовалась прежним прямоугольником — между ними
+    // оставалась широкая пустая полоса, и рамка переставала обозначать край доски.
+    // Рисуем то же, чем обрезаем; прочие карты сохраняют прямоугольник.
+    if (galaxyOutline.length) {
+      g.beginPath();
+      galaxyOutline.forEach((pt, i) => {
+        const v = world(pt);
+        if (i === 0) g.moveTo(v.x, v.y);
+        else g.lineTo(v.x, v.y);
+      });
+      g.closePath();
+      g.stroke();
+    } else {
+      g.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+    }
+  }
   if (g === bgx && !bgx.isContextLost?.()) {
     bgContent = content;
     bgCam = { x: cam.x, y: cam.y, scale: cam.scale };
@@ -10523,9 +10561,9 @@ function renderSetupSlots(): void {
     `<button class="tmtog pve-btn" data-pvestart="1">🤖 ${t('setup.pve')}</button>` +
     (setupTeams ? `<span class="tmhint">${t('setup.teams.note')}</span>` : '') +
     `</div>`;
-  if (setupMapId === 'frontier-100') {
+  if (isFrontier(setupMapId)) {
     const count = rivalCount(setupSlots);
-    setupSlotsEl.innerHTML = `<label>${t('setup.bots.count')} <input id="setup-bot-count" type="number" min="0" max="99" value="${count}" /></label>`;
+    setupSlotsEl.innerHTML = `<label>${t('setup.bots.count')} <input id="setup-bot-count" type="number" min="0" max="${setupSeatCount() - 1}" value="${count}" /></label>`;
     return;
   }
   const fids = seatFactionIds();
@@ -10565,7 +10603,7 @@ function renderSetup(): void {
   const mapSelect = $('setup-map-id') as HTMLSelectElement;
   mapSelect.value = setupMapId;
   mapSelect.disabled = !!netSetup;
-  $('setup-map-info').textContent = t(setupMapId === 'frontier-100' ? 'setup.map.frontier-info' : 'setup.map.nexus-info');
+  $('setup-map-info').textContent = t(setupMapId === 'frontier-100' ? 'setup.map.frontier-legacy-info' : isFrontier(setupMapId) ? 'setup.map.frontier-info' : 'setup.map.nexus-info');
   const homeSelect = $('setup-home-id') as HTMLSelectElement;
   homeSelect.innerHTML = setupCandidateIds().map((id) => `<option value="${esc(id)}"${worldTaken(id) ? ' disabled' : ''}>${esc(id)}${worldTaken(id) ? ' · ' + esc(t('seatpick.taken')) : ''}</option>`).join('');
   homeSelect.value = setupStart;
@@ -10893,8 +10931,8 @@ $('setup-home-id').addEventListener('change', (ev) => {
 setupSlotsEl.addEventListener('change', (ev) => {
   const input = ev.target as HTMLInputElement;
   if (input.id !== 'setup-bot-count') return;
-  const count = Math.max(0, Math.min(99, Math.floor(Number(input.value) || 0)));
-  setupSlots = Array.from({ length: 100 }, (_, i) => i === 0 ? 'human' : i <= count ? 'ai' : 'off');
+  const count = Math.max(0, Math.min(setupSeatCount() - 1, Math.floor(Number(input.value) || 0)));
+  setupSlots = Array.from({ length: setupSeatCount() }, (_, i) => i === 0 ? 'human' : i <= count ? 'ai' : 'off');
   renderSetup();
 });
 
@@ -12009,7 +12047,7 @@ function renderMatches(): void {
       modeLine = `${badge}${esc(tData(mode.modeId))} · `;
     }
     info.innerHTML =
-      `<div class="mname">${esc(m.mapId === 'frontier-100' ? t('map.frontier-100') : m.mapId)} <span class="mid">${esc(m.matchId)}</span></div>` +
+      `<div class="mname">${esc(mapLabel(m.mapId))} <span class="mid">${esc(m.matchId)}</span></div>` +
       `<div class="mmeta">${modeLine}${t('browser.day', { n: m.days })} · ${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
       `${esc(ruleSummary(m.rules))} · ${m.status === 'ended' ? t('browser.finished') : t('browser.running')}${windowLine}</div>`;
     row.appendChild(info);
@@ -12076,7 +12114,7 @@ function renderMyMatches(serverHttp: string): void {
       // Идентификатора в заголовке нет намеренно: он целиком стоит ниже, В АДРЕСЕ —
       // а `m-<uuid>` в заголовке отъедал три строки и вытеснял то, ради чего сюда
       // смотрят (какая партия, какой день, сколько игроков).
-      `<div class="hc-t">${esc(m.mapId === 'frontier-100' ? t('map.frontier-100') : m.mapId)}</div>` +
+      `<div class="hc-t">${esc(mapLabel(m.mapId))}</div>` +
       `<div class="hc-s">${t('browser.day', { n: m.days })} · ` +
       `${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
       `${m.status === 'ended' ? t('browser.finished') : t('browser.running')}</div>` +
@@ -13653,30 +13691,11 @@ function drawGoFlash(now: number): void {
   cx.restore();
 }
 const CAPTURE_FLASH_MS = 1500;
-/** A province that changed hands lights up in its NEW owner's colour: a bright wave
- *  sweeps across the flipped cell from its centre and the frontier ignites, fading
- *  over ~1.5s. The cell polygon is recomputed each frame with the SAME weighted-
- *  Voronoi math the political map bakes (computePowerCell), so the wave lines up
- *  pixel-for-pixel with the fill and tracks pan/zoom. Only runs while a flash is live
- *  (captures are rare), so the O(n) recompute costs nothing on a quiet frame. */
+/** Capture waves use the exact projected polygons just painted by blitStaticLayer.
+ * No per-flash weight clamp or n² geometry pass, including while the camera moves. */
 function drawCaptureFlashes(now: number): void {
   if (captureFlashes.size === 0) return;
-  // ТЕ ЖЕ семена и рамка, что у политической заливки — `provinceMap.ts` (REFM-61,
-  // правило 6): волна обрезается по клетке, и разъедься копия формул хоть на пиксель,
-  // волна потекла бы за границу провинции или не дошла бы до неё. Здесь своя копия и
-  // стояла: `9000 * scale²` и `max(40, ширина × 0.05)` литералами прямо в кадре.
-  // Проекция — этим кадром, чтобы волна ехала вместе с камерой.
-  const idxByNode = new Map<string, number>();
-  let seedIdx = 0;
-  const seeds: TerritorySeed[] = provinceSeeds(MAP, cam.scale, (n) => {
-    const p = s.planets[n.id];
-    if (!p) return null;
-    idxByNode.set(n.id, seedIdx++);
-    return { size: p.size ?? 1, at: world(n), owner: knownOwner(n.id) };
-  });
-  const frameB = clipRect({ minX: MINX, maxX: MAXX, minY: MINY, maxY: MAXY });
-  const clip = clipPolygon(world(frameB.topLeft), world(frameB.bottomRight));
-  const trace = (poly: Array<[number, number]>): void => {
+  const trace = (poly: readonly (readonly [number, number])[]): void => {
     cx.beginPath();
     cx.moveTo(poly[0]![0], poly[0]![1]);
     for (let i = 1; i < poly.length; i++) cx.lineTo(poly[i]![0], poly[i]![1]);
@@ -13687,11 +13706,11 @@ function drawCaptureFlashes(now: number): void {
       captureFlashes.delete(node);
       continue;
     }
-    const idx = idxByNode.get(node);
-    if (idx === undefined) continue; // province gone (shouldn't happen mid-flash)
-    const cell = computePowerCell(seeds, clip, idx);
-    if (!cell) continue;
-    const c = { x: seeds[idx]!.x, y: seeds[idx]!.y }; // seeds are already screen-space
+    const poly = provincePolygons.get(node);
+    const planet = s.planets[node];
+    if (!poly || !planet) continue;
+    const cell = { poly };
+    const c = world(planet.position);
     // Кламп прогресса и затухание — `flashFx.ts`: метка кадра rAF может опередить
     // постановку вспышки, а отрицательный радиус роняет cx.arc().
     const k = flashProgress(now, flash.at, CAPTURE_FLASH_MS); // 0 → 1
