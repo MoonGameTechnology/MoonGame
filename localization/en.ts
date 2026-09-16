@@ -1306,6 +1306,7 @@ export const en: Record<string, string> = {
   'err.no-route': 'no route',
   'err.no-ships': 'no ships',
   'err.no-shipyard': 'needs a shipyard',
+  'err.yard-too-small': 'the yard is too small for this hull — it needs a higher slipway',
   'err.no-hangar': 'needs a factory or hangar',
   'err.no-barracks': 'needs barracks',
   'err.no-factory': 'needs a vehicle factory',

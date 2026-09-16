@@ -427,6 +427,28 @@ function hasShipyard(planet: Planet, data: GameData): boolean {
   return hasCapability(planet, data, 'enablesShipConstruction');
 }
 
+/** Какой уровень верфи нужен корпусу этого класса (решение владельца 15). Класс не
+ *  объявлен — корабль довольствуется любой верфью, как было до FORT-5.5. */
+const YARD_LEVEL_FOR: Record<string, number> = { light: 1, medium: 2, heavy: 3 };
+
+/** Самый большой СТАПЕЛЬ узла: максимальный уровень среди живых верфей. Максимум, а не
+ *  сумма: две верфи первого уровня не собирают линкор — нужен один стапель нужного
+ *  размера. (Ср. `shuttleBay`, где вместимость как раз СКЛАДЫВАЕТСЯ: причалов может быть
+ *  много, а стапель для корпуса нужен один.) */
+function yardLevelAt(planet: Planet, data: GameData): number {
+  let best = 0;
+  for (const b of planet.buildings) {
+    if (b.hp <= 0) continue;
+    const def = data.buildings[b.type];
+    // Способность читается через `capabilityAt`, а НЕ через `buildingLevel`: разбор
+    // уровня отдаёт числовые поля, а флаги способностей в него не входят вовсе, и
+    // `buildingLevel(def, 1).enablesShipConstruction` молча равен `undefined`. На этом
+    // первая версия и попалась — лёгкий корпус не проходил на верфи первого уровня.
+    if (def && capabilityAt(def, b.level, 'enablesShipConstruction')) best = Math.max(best, b.level);
+  }
+  return best;
+}
+
 /** Сколько ЕЩЁ челноков примет мир (SHU-1.1): вместимость стоящих портов минус уже
  *  базирующиеся минус уже заказанные и не достроенные.
  *
@@ -823,6 +845,16 @@ export const constructionModule: GameModule = {
       }
       if (!isShuttle && def.domain === 'space' && !hasShipyard(planet, h.ctx.data)) {
         return h.reject('E_NO_SHIPYARD');
+      }
+      // Класс корпуса против размера стапеля (решение владельца 15). Отдельный код от
+      // `E_NO_SHIPYARD`: «верфи нет» и «верфь мала» игроку говорят разное — первое лечится
+      // постройкой, второе прокачкой, и подменять их значило бы отправить его строить
+      // вторую верфь там, где нужна та же, но выше.
+      if (!isShuttle && def.domain === 'space' && def.hullClass) {
+        const need = YARD_LEVEL_FOR[def.hullClass] ?? 1;
+        if (yardLevelAt(planet, h.ctx.data) < need) {
+          return h.reject('E_YARD_TOO_SMALL');
+        }
       }
       // Наземный юнит идёт в СВОЁ здание: пехота в казармы, техника на завод
       // (ROS-1.1). Отказ называет недостающее здание, а не «наземное производство» —

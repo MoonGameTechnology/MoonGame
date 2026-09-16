@@ -19,7 +19,8 @@
     "buildTimeHours": 1,
     "upkeep": {
       "credits": 16
-    }
+    },
+    "hullClass": "light"
   },
   "frigate": {
     "faction": "vanguard",
@@ -43,7 +44,8 @@
     "slots": {
       "defense": 1,
       "utility": 3
-    }
+    },
+    "hullClass": "light"
   },
   "cruiser": {
     "faction": "vanguard",
@@ -69,7 +71,8 @@
       "weapon": 1,
       "defense": 1,
       "utility": 1
-    }
+    },
+    "hullClass": "medium"
   },
   "siege_lance": {
     "faction": "vanguard",
@@ -90,7 +93,8 @@
     "buildTimeHours": 5,
     "upkeep": {
       "credits": 96
-    }
+    },
+    "hullClass": "medium"
   },
   "militia": {
     "faction": "vanguard",
@@ -234,7 +238,8 @@
       "weapon": 1,
       "defense": 1,
       "utility": 1
-    }
+    },
+    "hullClass": "heavy"
   },
   "interceptor": {
     "faction": "vanguard",
@@ -349,7 +354,8 @@
     "slots": {
       "defense": 1,
       "utility": 2
-    }
+    },
+    "hullClass": "heavy"
   },
   "scout": {
     "faction": "blue",
@@ -371,7 +377,8 @@
     "radarRange": 105,
     "slots": {
       "utility": 1
-    }
+    },
+    "hullClass": "light"
   },
   "siege": {
     "faction": "blue",
@@ -397,7 +404,8 @@
     "slots": {
       "weapon": 1,
       "utility": 1
-    }
+    },
+    "hullClass": "heavy"
   },
   "shuttle_carrier": {
     "faction": "blue",
@@ -425,7 +433,8 @@
     "slots": {
       "defense": 2,
       "utility": 1
-    }
+    },
+    "hullClass": "heavy"
   },
   "fortress_guns": {
     "name": "Fortress Guns",

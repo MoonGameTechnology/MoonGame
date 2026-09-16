@@ -49,6 +49,16 @@
         "hp": 30,
         "shipRepair": 0.1,
         "enablesShipConstruction": true
+      },
+      {
+        "cost": {
+          "metal": 320,
+          "credits": 180
+        },
+        "buildTimeHours": 18,
+        "hp": 42,
+        "shipRepair": 0.16,
+        "enablesShipConstruction": true
       }
     ]
   },

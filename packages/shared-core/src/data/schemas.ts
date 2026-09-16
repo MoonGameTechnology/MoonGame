@@ -142,6 +142,17 @@ export const UnitDefSchema = z.object({
    *  sum of count × signature; radar reveals a coarse size bucket, never the
    *  exact composition (fog-of-war — `visibleState`). */
   signature: z.number().nonnegative().default(1),
+  /**
+   * КЛАСС КОРПУСА (решение владельца 15): какого размера стапель нужен кораблю.
+   * `light` → верфь 1 уровня, `medium` → 2, `heavy` → 3.
+   *
+   * До этого поля отличить «небольшой корабль» от линкора было НЕЧЕМ: у наземных есть
+   * род войск (`kind`), а у кораблей не было ничего. Поле необязательное, потому что
+   * касается только строящихся КОРАБЛЕЙ: у наземных свой гейт (казармы/завод), челноки
+   * гейтит ангар, а выдаваемое (`issued`) не заказывают вовсе. Явность там, где поле
+   * значимо, держит сторож в `schemas.test.ts` — как и у рода наземных войск.
+   */
+  hullClass: z.enum(['light', 'medium', 'heavy']).optional(),
   /** Radar reach (Euclidean distance, map units) the unit projects as a radar-ship (0 = none). */
   radarRange: z.number().nonnegative().default(0),
   /** Typed module slots this hull exposes (ship-modules-roadmap.md). A player

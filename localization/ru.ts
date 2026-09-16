@@ -1310,6 +1310,7 @@ export const ru: Record<string, string> = {
   'err.no-route': 'маршрута нет',
   'err.no-ships': 'нет кораблей',
   'err.no-shipyard': 'нужна верфь',
+  'err.yard-too-small': 'верфь мала для такого корпуса — нужен стапель выше',
   'err.no-hangar': 'нужен завод техники или ангар',
   'err.no-barracks': 'нужны казармы',
   'err.no-factory': 'нужен завод техники',

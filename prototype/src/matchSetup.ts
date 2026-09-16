@@ -247,7 +247,9 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
       // impossible. The SPACEPORT is deliberately NOT here (YARD-1): shuttles are the
       // other half of the split, and their port is the player's first real choice —
       // the same reasoning that took the starting AA battery away in ORB-1.
-      { type: 'shipyard', level: 1, hp: hpOfLevel('shipyard', 1) },
+      // Второй уровень, а не первый — см. тот же довод в `packages/server/src/scenario.ts`:
+      // классы корпусов (FORT-5.5) иначе отняли бы у дебюта крейсер.
+      { type: 'shipyard', level: 2, hp: hpOfLevel('shipyard', 2) },
     ];
     // Ground defence is what holds a world against capture (an AA battery bleeds a fleet
     // but can't stop a landing — only ground troops do). Seed a starting infantry garrison
