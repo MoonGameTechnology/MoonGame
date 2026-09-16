@@ -77,13 +77,19 @@ function hosts(kind: string): string[] {
  * restricting itself must be DECIDED into this list, and until it is, the `planet` row
  * below fails — the same "no silent inheritance" the table gives province types.
  */
-const SELF_RESTRICTED = ['metal_station']; // owner decision 3: dead worlds / asteroids / fortresses
+const SELF_RESTRICTED = [
+  'metal_station', // owner decision 3: dead worlds / asteroids / fortresses
+  // The fortress CORE (owner decision 18): `onlyOn: []` — "raised nowhere" by hand. It
+  // appears only with the fortress itself, placed by `station.deploy`. Without this the
+  // core would be buildable on a planet, which has no roster at all.
+  'starfort',
+];
 
 /** Every shipped province type, and what it hosts. `null` = roster-less: anything in the
  *  catalogue that does not restrict itself (see {@link SELF_RESTRICTED}). */
 const EXPECTED: Record<string, string[] | null> = {
   planet: null, // the prize: the only roster-less province
-  asteroid: ['starfort', 'metal_station'], // ore field: a guard post and the rig that mines it
+  asteroid: ['metal_station'], // ore field: the rig that mines it — the fortress core moved out (decision 18)
   nebula: [],
   empty: [],
   debris_field: [],

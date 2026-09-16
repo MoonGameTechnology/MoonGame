@@ -53,7 +53,7 @@ describe('buildStateFromMap (map-roadmap.md M1.2)', () => {
     expect(mine).toBeDefined();
     expect(mine!.hp).toBe(data.buildings.mine_t1!.hp);
     expect(state.planets.drift!.terrain).toBe('asteroid_field');
-    expect(state.planets.veil!.planetType).toBe('barren');
+    expect(state.planets.veil!.planetType).toBe('gas_giant');
   });
 
   it('is deterministic — same map+data → identical state', () => {
