@@ -595,6 +595,16 @@ export const constructionModule: GameModule = {
       if (roster !== undefined && !roster.includes(payload.building)) {
         return h.reject('E_WRONG_SECTOR'); // this structure does not fit this province type
       }
+      // 3. `onlyOn` — ограничение со стороны САМОГО ЗДАНИЯ (решение владельца 3): «строится
+      //    ТОЛЬКО там-то». Ростером вида этого не выразить: у планеты ростера нет вовсе
+      //    (undefined = любое здание), и запретить ей добывающую станцию можно было бы
+      //    лишь выписав поимённый список всех ОСТАЛЬНЫХ зданий — список, устаревающий на
+      //    первом же новом здании, причём молча. Ворота те же и код отказа тот же: игроку
+      //    важно «сюда нельзя», а не чьё правило сработало.
+      const onlyOn = h.ctx.data.buildings[payload.building]?.onlyOn;
+      if (onlyOn !== undefined && !onlyOn.includes(planet.kind ?? '')) {
+        return h.reject('E_WRONG_SECTOR');
+      }
       requireUnlocked(h, action.playerId, 'building', payload.building);
       if (atInstanceCap(h, planet, payload.building)) {
         return h.reject('E_ALREADY_BUILT'); // лимит экземпляров исчерпан (maxPerPlanet)

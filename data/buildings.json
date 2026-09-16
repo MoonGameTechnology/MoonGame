@@ -276,6 +276,11 @@
         },
         "hp": 40
       }
+    ],
+    "onlyOn": [
+      "dead_world",
+      "asteroid",
+      "void_station"
     ]
   },
   "power_plant": {

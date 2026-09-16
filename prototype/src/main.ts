@@ -1763,14 +1763,19 @@ function sectorTypeOf(id: string) {
   return kind === undefined ? undefined : SECTOR_TYPES[kind];
 }
 /** Зеркало ворот конструкции ядра (`construction.ts`): вид провинции пускает здание,
- *  только если на нём вообще можно строить (`buildable`) И его ростер (undefined =
- *  любое) это здание допускает. Одна копия на все кнопки: три собственных
- *  `?? BUILDABLE` по коду и были тем, из-за чего клиентское правило разъехалось с
- *  данными (ORB-4) — кнопка обещала стройку, которую сервер отклонял. */
+ *  только если на нём вообще можно строить (`buildable`), его ростер (undefined =
+ *  любое) это здание допускает И само здание не сузило себя до других видов
+ *  (`onlyOn`). Одна копия на все кнопки: три собственных `?? BUILDABLE` по коду и были
+ *  тем, из-за чего клиентское правило разъехалось с данными (ORB-4) — кнопка обещала
+ *  стройку, которую сервер отклонял. Третья проверка нужна ровно потому, что ростера
+ *  может не быть: у планеты его нет, и без неё кнопка предложила бы добывающую станцию
+ *  там, где редьюсер отвечает `E_WRONG_SECTOR`. */
 function sectorAllowsBuilding(planetId: string, building: string): boolean {
   const type = sectorTypeOf(planetId);
   if (type && !type.buildable) return false;
-  return (type?.allowedBuildings ?? BUILDABLE).includes(building);
+  if (!(type?.allowedBuildings ?? BUILDABLE).includes(building)) return false;
+  const onlyOn = data.buildings[building]?.onlyOn;
+  return onlyOn === undefined || onlyOn.includes(SECTOR_OF[planetId] ?? '');
 }
 /** Есть ли на провинции хоть одно допустимое здание — гейт кнопки «Постройки». */
 function sectorBuildsAnything(planetId: string): boolean {
