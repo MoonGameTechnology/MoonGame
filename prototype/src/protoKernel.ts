@@ -25,6 +25,7 @@ import {
   planetTypeModule,
   constructionModule,
   arsenalSyncModule,
+  stationModule,
   armyModule,
   victoryModule,
   technologyModule,
@@ -70,6 +71,11 @@ export const MODULES: GameModule[] = [
   captureOnArrivalModule, // walk-in capture now a kernel rule (was client-side seizeSector)
   constructionModule,
   arsenalSyncModule, // LARS-1: server-driver refresh of live build-catalog ownership (bypasses gate)
+  // FORT-0.2: КОСМИЧЕСКАЯ КРЕПОСТЬ наконец достижима на хосте, где играют. Модуль давно
+  // был и в ядре, и в серверном `DEV_MODULES`, но не здесь — то есть механика существовала
+  // и при этом не могла сработать НИ РАЗУ. Место то же, что у сервера (сразу за
+  // `arsenalSync`), чтобы два списка читались одинаково.
+  stationModule, // station.deploy: свой узел → крепость, дальше на ней строят
   technologyModule, // session research: branch/day-gated techs → effect bonuses + content unlocks
   // CONV-5: совет учёных наконец влияет на партию, а не только на пилюлю слотов.
   // Врезка в `techTree.ts` рисовала «+1 слот» от Полимата, но модуля, который его

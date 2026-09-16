@@ -27,6 +27,7 @@ import {
   orbitFleet,
   assaultFleet,
   bombardFleet,
+  deployStation,
   engageFleet,
   loadArmy,
   unloadArmy,
@@ -252,6 +253,7 @@ import {
   type SessionRec,
 } from '../../decisions/sessionStore';
 import { medalBadges } from '../../decisions/unitMedals';
+import { fortressRaise } from '../../decisions/fortressRaise';
 import {
   authOutcome,
   shouldRegister,
@@ -6563,6 +6565,17 @@ function planetPanelHtml(p: Planet): string {
     if (mine && sectorBuildsAnything(p.id)) {
       blds += `<button class="bw-open" data-act="openbuild">▣ ${t('side.build.open')}</button>`;
     }
+    // FORT-0.2: КОСМИЧЕСКАЯ КРЕПОСТЬ. Правило кнопки — `decisions/fortressRaise.ts`, то же
+    // самое, каким решает редьюсер (сверено тестом по всем раскладам): здесь только
+    // отрисовка. Стоит РЯДОМ с «Постройками», а не вместо: на астероидах и мёртвом мире
+    // осмысленно и то и другое — добывающая станция ИЛИ крепость со своим ростером.
+    const fortress = fortressRaise(p, ME, s.players[ME]?.resources ?? {}, data);
+    if (fortress.show) {
+      const off = fortress.enabled ? '' : ' disabled';
+      blds +=
+        `<button class="bw-open" data-act="fortress"${off}>◈ ${esc(t('side.fortress.raise'))}` +
+        ` <span class="dim">${esc(resLine(fortress.cost) ?? '')}</span></button>`;
+    }
     cols.push(blds);
   }
   return h + pcols(cols);
@@ -8105,6 +8118,8 @@ side.addEventListener('click', (ev) => {
     }
   } else if (act === 'openbuild') {
     buildWin.open(selPlanet!);
+  } else if (act === 'fortress') {
+    playerOrder(deployStation(ME, selPlanet!));
   } else if (act === 'build') {
     enqueueBuild(selPlanet!, { kind: 'building', id: arg, count: 1 });
   } else if (act === 'unit') {

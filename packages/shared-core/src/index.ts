@@ -73,6 +73,7 @@ export {
   sectorKindDef,
   provinceScore,
   isCapturable,
+  isStationable,
   isBuildable,
   hasOrbit,
   allowedBuildings,
@@ -452,7 +453,7 @@ export {
 } from './modules/technology';
 export { constructionModule, unitBuildSiteBlocker } from './modules/construction';
 export { arsenalSyncModule } from './modules/arsenalSync';
-export { stationModule } from './modules/station';
+export { stationModule, STATION_COST } from './modules/station';
 export { seatClaimModule } from './modules/seatClaim';
 export { technologyModule, technologyLock, conditionMet } from './modules/technology';
 export { scientistModule, scientistSlotBonus } from './modules/scientist';

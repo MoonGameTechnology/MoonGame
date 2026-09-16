@@ -519,6 +519,19 @@ export const SectorKindDefSchema = z.object({
    *  a fleet still arrives, fights and lands anywhere — an asteroid field is
    *  capturable, and assault reads `fleet.orbit`, not this flag. */
   orbit: z.boolean().default(true),
+  /** Можно ли возвести здесь КОСМИЧЕСКУЮ КРЕПОСТЬ (`station.deploy`, fortress-roadmap
+   *  §0.6, решение владельца 2026-09-15: «на захваченной территории, на всех видах кроме
+   *  тех, где уже есть планета»).
+   *
+   *  Дефолт `true` намеренно: правило владельца — это РАЗРЕШЕНИЕ с коротким списком
+   *  исключений, и записывать надо исключения, а не перечислять заново каждую местность.
+   *  Новый вид местности получает крепость сам собой; если он ею быть не должен, автор
+   *  обязан сказать это явно — ровно тот выбор, который дешевле сделать, чем поймать
+   *  глазами на ревью.
+   *
+   *  Незахватываемые виды (`empty`, обломки, чёрная дыра) флага не требуют: крепость
+   *  ставится только на СВОЁМ узле, а своим незахватываемое не станет никогда. */
+  stationable: z.boolean().default(true),
   /** Province-centric build roster: the building ids raisable on this province type.
    *  Absent/undefined = ANY building (the permissive default, so kind-less / roster-less
    *  worlds keep building as before). Explicit `[]` = no construction here (empty /

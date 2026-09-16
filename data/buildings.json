@@ -188,7 +188,8 @@
         },
         "buildTimeHours": 6,
         "hp": 60,
-        "defenseBonus": 0.45
+        "defenseBonus": 0.45,
+        "pointDefense": 12
       },
       {
         "cost": {
@@ -197,9 +198,11 @@
         },
         "buildTimeHours": 8,
         "hp": 85,
-        "defenseBonus": 0.6
+        "defenseBonus": 0.6,
+        "pointDefense": 16
       }
-    ]
+    ],
+    "pointDefense": 8
   },
   "orbital_aa": {
     "name": "Orbital Defense Battery",

@@ -1,34 +1,44 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
-import type { GameState, PlayerId } from '../state/gameState';
 import type { ResourceBag } from '../data/schemas';
 import { canAfford, payCost } from '../util/treasury';
+import { isStationable } from '../state/sectorKind';
 
 /**
- * Void stations (vision rework). Empty space cannot normally be owned or built on
- * (`sectorKinds.empty` is capturable:false / buildable:false), so there is no way to
- * plant infrastructure out in the void — yet that is exactly where a forward radar
- * outpost belongs once ships are near-blind (see `visibility.ts`).
+ * КОСМИЧЕСКАЯ КРЕПОСТЬ (`fortress-roadmap.md` §0.6, решение владельца 2026-09-15).
  *
- * `station.deploy` anchors a station on an EMPTY node from a fleet present there,
- * flipping the node to an ownable, buildable `void_station` kind owned by the player.
- * Normal `building.construct` then raises a `radar` (or a fort, …) on it — "buildings
- * for empty-space provinces". A station is a real, capturable node: leave it
- * undefended and an enemy walks in (capture-on-arrival), like any other holding.
+ * Местность на карте почти вся незастраиваема: на туманности, кладбище, ионном шторме,
+ * плотной туманности и вспышке нельзя возвести НИЧЕГО. Это 90 узлов из 121 на карте
+ * прототипа — декорация с бонусами к скорости и живучести. Крепость — тот шаг, который
+ * превращает захваченную декорацию в развиваемое владение с орбитой и своим ростером
+ * построек: захват делает узел твоим, крепость делает его полезным.
+ *
+ * `station.deploy` переводит СВОЙ узел в вид `void_station`, после чего обычный
+ * `building.construct` поднимает на нём радар, верфь, форт и прочее из ростера вида.
+ * Крепость — настоящее владение: оставил без прикрытия, и враг занимает её прилётом,
+ * как любой другой узел.
+ *
+ * ДВА ПРАВИЛА, И ОБА ПРИШЛИ ОТ ВЛАДЕЛЬЦА, А НЕ ИЗ УДОБСТВА КОДА:
+ *
+ * 1. **Только на ЗАХВАЧЕННОЙ территории.** Прежде требовался флот-якорь на узле; теперь
+ *    доказательством служит само владение — там, где ты не был, узел твоим не стал бы.
+ *    Это заодно закрывает незахватываемые виды (пустота, обломки, чёрная дыра) без
+ *    отдельного запрета: своими они не становятся никогда.
+ * 2. **На всех видах, кроме тех, где уже есть планета** — и кроме уже стоящей крепости.
+ *    Правило живёт В ДАННЫХ (`sectorKinds.stationable`), а не строкой `'planet'` здесь:
+ *    иначе каждый новый вид местности пришлось бы вспоминать руками.
+ *
+ * Прежняя форма требовала узел вида `empty` и технический юнит-конвертер; и то и другое
+ * снято решением владельца, см. §0.6 роадмапа («что эти решения отменяют»).
  *
  * New mechanic = new module + data; the kernel is untouched, state stays pure JSON.
  */
 
-const EMPTY_KIND = 'empty';
 const STATION_KIND = 'void_station';
-/** Up-front cost to anchor a station (a deliberate forward investment, not free land). */
-const STATION_COST: ResourceBag = { metal: 120 };
-
-/** Does `owner` have a non-empty fleet sitting on `nodeId` to anchor the station? */
-function anchorFleetPresent(state: GameState, nodeId: string, owner: PlayerId): boolean {
-  return Object.values(state.fleets).some(
-    (f) => f.owner === owner && f.location === nodeId && f.units.some((u) => u.count > 0),
-  );
-}
+/** Цена крепости. ЭКСПОРТИРУЕТСЯ намеренно: кнопку рисует клиент, и своя копия числа у
+ *  него — это ровно тот способ, которым интерфейс начинает обещать то, что редьюсер
+ *  отклоняет (прецедент ORB-4 записан в `main.ts`: три собственных `?? BUILDABLE` развели
+ *  клиентское правило с данными). Одно число, один дом. */
+export const STATION_COST: ResourceBag = { metal: 120 };
 
 export const stationModule: GameModule = {
   id: 'station',
@@ -39,18 +49,19 @@ export const stationModule: GameModule = {
       if (typeof planetId !== 'string') return h.reject('E_BAD_PAYLOAD');
       const node = h.state.planets[planetId];
       if (!node) return h.reject('E_NO_PLANET');
-      // Only empty space hosts a NEW station; an already-deployed one is no longer
-      // `empty`, and empty nodes are never owned (uncapturable), so this also covers
-      // "already claimed".
-      if (node.kind !== EMPTY_KIND) return h.reject('E_NOT_EMPTY');
       const player = h.state.players[action.playerId];
       if (!player) return h.reject('E_FORBIDDEN'); // not a participant / no treasury
-      if (!anchorFleetPresent(h.state, planetId, action.playerId)) return h.reject('E_NO_ANCHOR');
+      // Правило 1: только СВОЙ узел. Чужой и ничейный отбиваются одним кодом намеренно —
+      // fail-secure: отказ не обязан рассказывать, чей узел на самом деле.
+      if (node.owner !== action.playerId) return h.reject('E_FORBIDDEN');
+      // Правило 2: вид должен принимать крепость. Уже стоящая крепость отбивается тем же
+      // флагом (`void_station.stationable: false`), поэтому «второй раз» — не отдельная
+      // ветка, а тот же запрет.
+      if (!isStationable(h.ctx.data, node)) return h.reject('E_NOT_STATIONABLE');
       if (!canAfford(player.resources, STATION_COST)) return h.reject('E_INSUFFICIENT');
 
       payCost(player.resources, STATION_COST);
       node.kind = STATION_KIND; // ownable + buildable: radar/fort/… via building.construct
-      node.owner = action.playerId;
       h.emit('station.deployed', { planetId, owner: action.playerId });
     });
   },
