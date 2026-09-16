@@ -24,6 +24,14 @@ function loadShippedBundle(): Record<string, unknown> {
   return composeGameDataBundle(readJson);
 }
 
+/** Исходник ворот заказа юнитов — читается СЫРЫМ текстом, как это делает `deadContent`
+ *  для репертуара бота: утверждение о коде берётся из кода, поэтому не может разъехаться
+ *  с ним молча. Нужен сторожу пометки `issued` ниже. */
+const BUILD_GATE_SOURCE = readFileSync(
+  path.join(repoRoot, 'packages/shared-core/src/modules/construction.ts'),
+  'utf8',
+);
+
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
@@ -186,10 +194,26 @@ describe('game data schema (docs/architecture.md §2)', () => {
   it('ни один шипнутый юнит не строится мгновенно (дефолт схемы не подменяет правила)', () => {
     const data = parseGameData(loadShippedBundle());
     const instant = Object.entries(data.units)
-      .filter(([, def]) => def.buildTimeHours <= 0)
+      // ВЫДАВАЕМОЕ сюда не входит, и это не поблажка: `issued` значит, что отряд приходит
+      // вместе со своим сооружением и через `unit.build` не проходит вовсе (ворота там же
+      // его и отбивают). Срока постройки у него нет не по забывчивости — заказывать
+      // нечего. Первый такой — орудия крепости (FORT-5.4).
+      .filter(([, def]) => !def.traits.includes('issued') && def.buildTimeHours <= 0)
       .map(([id]) => id)
       .sort();
     expect(instant, 'buildTimeHours не задан в data/units.json — заказ выполняется мгновенно').toEqual([]);
+  });
+
+  // Обратная половина предыдущего: пометка `issued` снимает сторожа, поэтому сама она
+  // обязана что-то значить в КОДЕ, а не быть словом в json. Иначе достаточно приписать её
+  // юниту — и он тихо выпадет из проверки, оставшись при этом заказываемым.
+  it('пометка `issued` действительно закрывает заказ, а не только освобождает от сторожа', () => {
+    const data = parseGameData(loadShippedBundle());
+    const issued = Object.entries(data.units).filter(([, def]) => def.traits.includes('issued'));
+    expect(issued.length, 'помеченных нет — проверять нечего').toBeGreaterThan(0);
+    for (const [id] of issued) {
+      expect(BUILD_GATE_SOURCE, `${id}: ворота не читают трейт issued`).toContain("includes('issued')");
+    }
   });
 
   // ROS-1.1. Род наземных войск решает, ГДЕ юнит строится: пехота — в казармах,

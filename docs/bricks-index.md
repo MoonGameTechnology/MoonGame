@@ -735,15 +735,15 @@
 | FORT-5.1 | ⏳ | data core | `docs/fortress-roadmap.md:545` | Технологию крепости надо ИЗУЧИТЬ |
 | FORT-5.2 | ✅ | data core | `docs/fortress-roadmap.md:555` | Ядро крепости: starfort дорос до пяти уровней |
 | FORT-5.3 | ⏳ | core data | `docs/fortress-roadmap.md:601` | Слоты построек |
-| FORT-5.4 | ⏳ | core data | `docs/fortress-roadmap.md:614` | Крепость ВСТУПАЕТ В БОЙ |
-| FORT-5.12 | ⏳ | core data | `docs/fortress-roadmap.md:632` | Крепость под ударом: не бомбардируется, и бой глушит работу |
-| FORT-5.5 | ⏳ | data core | `docs/fortress-roadmap.md:655` | Класс корпуса у кораблей |
-| FORT-5.6 | 🔒 | data | `docs/fortress-roadmap.md:664` | Верфь крепости: три уровня |
-| FORT-5.7 | ⏳ | data core | `docs/fortress-roadmap.md:671` | Ангар крепости |
-| FORT-5.8 | ⏳ | core | `docs/fortress-roadmap.md:677` | Док чинит СОЮЗНИКУ |
-| FORT-5.9 | ⏳ | core data | `docs/fortress-roadmap.md:689` | Больница лечит ТРЮМ |
-| FORT-5.10 | ⏳ | core data | `docs/fortress-roadmap.md:699` | Щиты крепости |
-| FORT-5.11 | ⏳ | data | `docs/fortress-roadmap.md:708` | Технологии открывают постройки крепости |
+| FORT-5.4 | ✅ | core data | `docs/fortress-roadmap.md:614` | Крепость ВСТУПАЕТ В БОЙ |
+| FORT-5.12 | ⏳ | core data | `docs/fortress-roadmap.md:666` | Крепость под ударом: не бомбардируется, и бой глушит работу |
+| FORT-5.5 | ⏳ | data core | `docs/fortress-roadmap.md:689` | Класс корпуса у кораблей |
+| FORT-5.6 | 🔒 | data | `docs/fortress-roadmap.md:698` | Верфь крепости: три уровня |
+| FORT-5.7 | ⏳ | data core | `docs/fortress-roadmap.md:705` | Ангар крепости |
+| FORT-5.8 | ⏳ | core | `docs/fortress-roadmap.md:711` | Док чинит СОЮЗНИКУ |
+| FORT-5.9 | ⏳ | core data | `docs/fortress-roadmap.md:723` | Больница лечит ТРЮМ |
+| FORT-5.10 | ⏳ | core data | `docs/fortress-roadmap.md:733` | Щиты крепости |
+| FORT-5.11 | ⏳ | data | `docs/fortress-roadmap.md:742` | Технологии открывают постройки крепости |
 | GI-0.1 | ✅ | srv sec | `docs/game-integrity-roadmap.md:41` | Rate-limiting действий |
 | GI-0.2 | ⏳ | srv | `docs/game-integrity-roadmap.md:49` | Per-player очередь (анти-double-spend) |
 | GI-0.3 | ✅ | srv | `docs/game-integrity-roadmap.md:53` | Туман как граница (анти-maphack) (в основном) |

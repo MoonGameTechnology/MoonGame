@@ -243,7 +243,8 @@
       "defense": 3,
       "speed": 92,
       "hp": 10,
-      "strikeRange": 180, "chaseRadius": 20,
+      "strikeRange": 180,
+      "chaseRadius": 20,
       "fuel": 3,
       "rearmRounds": 2,
       "siegeDamage": 1,
@@ -274,7 +275,8 @@
       "defense": 4,
       "speed": 62,
       "hp": 16,
-      "strikeRange": 150, "chaseRadius": 12,
+      "strikeRange": 150,
+      "chaseRadius": 12,
       "fuel": 2,
       "rearmRounds": 3,
       "siegeDamage": 18,
@@ -424,5 +426,26 @@
       "defense": 2,
       "utility": 1
     }
+  },
+  "fortress_guns": {
+    "name": "Fortress Guns",
+    "faction": "neutral",
+    "domain": "space",
+    "stats": {
+      "attack": 14,
+      "defense": 18,
+      "speed": 0,
+      "hp": 60
+    },
+    "cost": {
+      "metal": 0
+    },
+    "buildTimeHours": 0,
+    "signature": 14,
+    "upkeep": {},
+    "traits": [
+      "immobile",
+      "issued"
+    ]
   }
 }
