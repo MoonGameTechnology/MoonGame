@@ -229,7 +229,33 @@
     "scoreValue": 3,
     "upkeep": {
       "energy": 30
-    }
+    },
+    "upgrades": [
+      {
+        "cost": {
+          "metal": 240,
+          "credits": 110
+        },
+        "buildTimeHours": 8,
+        "hp": 44,
+        "aaDamage": 20,
+        "upkeep": {
+          "energy": 50
+        }
+      },
+      {
+        "cost": {
+          "metal": 380,
+          "credits": 190
+        },
+        "buildTimeHours": 12,
+        "hp": 62,
+        "aaDamage": 30,
+        "upkeep": {
+          "energy": 80
+        }
+      }
+    ]
   },
   "zonal_aa": {
     "name": "Area Defense Battery",
@@ -243,7 +269,33 @@
     "scoreValue": 3,
     "upkeep": {
       "energy": 25
-    }
+    },
+    "upgrades": [
+      {
+        "cost": {
+          "metal": 220,
+          "credits": 90
+        },
+        "buildTimeHours": 7,
+        "hp": 32,
+        "pointDefense": 62,
+        "upkeep": {
+          "energy": 42
+        }
+      },
+      {
+        "cost": {
+          "metal": 350,
+          "credits": 160
+        },
+        "buildTimeHours": 11,
+        "hp": 46,
+        "pointDefense": 88,
+        "upkeep": {
+          "energy": 66
+        }
+      }
+    ]
   },
   "metal_station": {
     "name": "Salvage Metal Rig",
