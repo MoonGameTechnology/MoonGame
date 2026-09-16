@@ -19,7 +19,20 @@ const data: GameData = parseGameData({
   resources: ['metal'],
   units: { cruiser: { faction: 'x', stats: { attack: 5, defense: 5, speed: 6, hp: 40 } } },
   factions: {},
-  buildings: { radar: { name: 'Radar', radarRange: 300 } },
+  buildings: {
+    radar: { name: 'Radar', radarRange: 300 },
+    // Ядро крепости: `station.deploy` ставит его САМ, поэтому без него в каталоге
+    // действие отказывает. `onlyOn: []` — «руками не строится нигде»; прокачка при
+    // этом работает, её ворота ростер и `onlyOn` не спрашивают.
+    starfort: {
+      name: 'Void Fortress',
+      hp: 70,
+      aaDamage: 6,
+      pointDefense: 6,
+      onlyOn: [],
+      upgrades: [{ cost: { metal: 260 }, hp: 110, aaDamage: 9, pointDefense: 9 }],
+    },
+  },
   events: {},
   sectorKinds: {
     // `stationable` НЕ задан у местности — значит разрешено (дефолт true): решение
