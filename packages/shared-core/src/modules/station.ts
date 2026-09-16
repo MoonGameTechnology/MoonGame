@@ -147,6 +147,18 @@ export const stationModule: GameModule = {
       // честнее молчаливой пустышки (инвариант fail-secure).
       const core = h.ctx.data.buildings[CORE_BUILDING];
       if (!core) return h.reject('E_UNKNOWN_BUILDING');
+      // Правило 3: крепость надо ИЗУЧИТЬ (решение владельца 12, FORT-5.1). Спрашиваем
+      // ТОТ ЖЕ хук, которым гейтятся здания, и про то же самое здание — ядро. Своей
+      // проверки «изучена ли технология крепости» тут нет намеренно: правило живёт в
+      // `technology.ts`, а два дома у одного правила — это ровно тот разъезд, которым
+      // болели ворота стройки до ORB-4. Нет модуля технологий — база хука разрешает, и
+      // сценарии без дерева работают как прежде.
+      const unlock = h.hook<{ allowed: boolean; code?: string }>(
+        'construction.requirement',
+        { allowed: true },
+        { playerId: action.playerId, kind: 'building', id: CORE_BUILDING },
+      );
+      if (!unlock.allowed) return h.reject(unlock.code ?? 'E_LOCKED');
 
       payCost(player.resources, STATION_COST);
       node.kind = STATION_KIND; // ownable + buildable: radar/fort/… via building.construct

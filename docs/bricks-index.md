@@ -732,18 +732,18 @@
 | FORT-3.1 | ⏳ | data | `docs/fortress-roadmap.md:502` | Уровни orbitalaa |
 | FORT-3.2 | 🔒 | core data | `docs/fortress-roadmap.md:507` | ПВО бьёт авиацию, а не только корабли |
 | FORT-4.1 | ✅ | core data | `docs/fortress-roadmap.md:521` | Какие ещё узлы конвертируются |
-| FORT-5.1 | ⏳ | data core | `docs/fortress-roadmap.md:545` | Технологию крепости надо ИЗУЧИТЬ |
-| FORT-5.2 | ✅ | data core | `docs/fortress-roadmap.md:555` | Ядро крепости: starfort дорос до пяти уровней |
-| FORT-5.3 | ✅ | core data | `docs/fortress-roadmap.md:601` | Слоты построек |
-| FORT-5.4 | ✅ | core data | `docs/fortress-roadmap.md:628` | Крепость ВСТУПАЕТ В БОЙ |
-| FORT-5.12 | ✅ | core data | `docs/fortress-roadmap.md:680` | Крепость под ударом: не обстреливают, и бой глушит работу |
-| FORT-5.5 | ⏳ | data core | `docs/fortress-roadmap.md:714` | Класс корпуса у кораблей |
-| FORT-5.6 | 🔒 | data | `docs/fortress-roadmap.md:723` | Верфь крепости: три уровня |
-| FORT-5.7 | ⏳ | data core | `docs/fortress-roadmap.md:730` | Ангар крепости |
-| FORT-5.8 | ⏳ | core | `docs/fortress-roadmap.md:736` | Док чинит СОЮЗНИКУ |
-| FORT-5.9 | ⏳ | core data | `docs/fortress-roadmap.md:748` | Больница лечит ТРЮМ |
-| FORT-5.10 | ⏳ | core data | `docs/fortress-roadmap.md:758` | Щиты крепости |
-| FORT-5.11 | ⏳ | data | `docs/fortress-roadmap.md:767` | Технологии открывают постройки крепости |
+| FORT-5.1 | ✅ | data core | `docs/fortress-roadmap.md:545` | Технологию крепости надо ИЗУЧИТЬ |
+| FORT-5.2 | ✅ | data core | `docs/fortress-roadmap.md:575` | Ядро крепости: starfort дорос до пяти уровней |
+| FORT-5.3 | ✅ | core data | `docs/fortress-roadmap.md:621` | Слоты построек |
+| FORT-5.4 | ✅ | core data | `docs/fortress-roadmap.md:648` | Крепость ВСТУПАЕТ В БОЙ |
+| FORT-5.12 | ✅ | core data | `docs/fortress-roadmap.md:700` | Крепость под ударом: не обстреливают, и бой глушит работу |
+| FORT-5.5 | ⏳ | data core | `docs/fortress-roadmap.md:734` | Класс корпуса у кораблей |
+| FORT-5.6 | 🔒 | data | `docs/fortress-roadmap.md:743` | Верфь крепости: три уровня |
+| FORT-5.7 | ⏳ | data core | `docs/fortress-roadmap.md:750` | Ангар крепости |
+| FORT-5.8 | ⏳ | core | `docs/fortress-roadmap.md:756` | Док чинит СОЮЗНИКУ |
+| FORT-5.9 | ⏳ | core data | `docs/fortress-roadmap.md:768` | Больница лечит ТРЮМ |
+| FORT-5.10 | ⏳ | core data | `docs/fortress-roadmap.md:778` | Щиты крепости |
+| FORT-5.11 | ⏳ | data | `docs/fortress-roadmap.md:787` | Технологии открывают постройки крепости |
 | GI-0.1 | ✅ | srv sec | `docs/game-integrity-roadmap.md:41` | Rate-limiting действий |
 | GI-0.2 | ⏳ | srv | `docs/game-integrity-roadmap.md:49` | Per-player очередь (анти-double-spend) |
 | GI-0.3 | ✅ | srv | `docs/game-integrity-roadmap.md:53` | Туман как граница (анти-maphack) (в основном) |
