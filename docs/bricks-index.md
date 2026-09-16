@@ -908,17 +908,17 @@
 | PE-2.2 | ⏳ | srv core | `docs/persistence-roadmap.md:71` | Корректный offline-catch-up |
 | PE-3.1 | ⏳ | srv sec | `docs/persistence-roadmap.md:80` | Зашифрованные бэкапы + PITR + учение restore |
 | PE-3.2 | ⏳ | srv | `docs/persistence-roadmap.md:85` | Переживание рестарта посреди матча |
-| PVR-0.1 | ⏳ | data | `docs/pve-roguelike-roadmap.md:168` | Карта pve-1 снова строится |
-| PVR-0.2 | ⏳ | proto | `docs/pve-roguelike-roadmap.md:176` | pveModule в ядре прототипа |
-| PVR-0.3 | ⏳ | proto | `docs/pve-roguelike-roadmap.md:183` | Забег переживает перезагрузку вкладки |
-| PVR-1.1 | 🔒 | proto | `docs/pve-roguelike-roadmap.md:194` | Соло-запуск задаёт modeId |
-| PVR-1.2 | 🔒 | proto | `docs/pve-roguelike-roadmap.md:201` | HUD забега: волна N из M и время до следующей |
-| PVR-1.3 | 🔒 | data | `docs/pve-roguelike-roadmap.md:207` | Состав волны перестаёт быть одним дроном |
-| PVR-1.4 | 🔒 | proto | `docs/pve-roguelike-roadmap.md:215` | Выбор между волнами |
-| PVR-2.1 | 🔒 | proto | `docs/pve-roguelike-roadmap.md:226` | Выбор сложности на запуске забега |
-| PVR-3.1 | ⏳ | docs | `docs/pve-roguelike-roadmap.md:237` | Резолюция: чем PvE-прокачка НЕ является |
-| PVR-3.2 | 🔒 | proto | `docs/pve-roguelike-roadmap.md:245` | Хранилище PvE-прогресса |
-| PVR-3.3 | 🔒 | proto | `docs/pve-roguelike-roadmap.md:252` | Награда за забег |
+| PVR-0.1 | ⏳ | data | `docs/pve-roguelike-roadmap.md:228` | Карта pve-1 снова строится |
+| PVR-0.2 | ⏳ | proto | `docs/pve-roguelike-roadmap.md:236` | pveModule в ядре прототипа |
+| PVR-0.3 | ⏳ | proto | `docs/pve-roguelike-roadmap.md:243` | Забег переживает перезагрузку вкладки |
+| PVR-1.1 | 🔒 | proto | `docs/pve-roguelike-roadmap.md:261` | Соло-запуск задаёт modeId |
+| PVR-1.2 | 🔒 | proto | `docs/pve-roguelike-roadmap.md:268` | HUD забега: волна N из M и время до следующей |
+| PVR-1.3 | 🔒 | data | `docs/pve-roguelike-roadmap.md:274` | Состав волны перестаёт быть одним дроном |
+| PVR-1.4 | 🔒 | proto | `docs/pve-roguelike-roadmap.md:282` | Выбор между волнами |
+| PVR-2.1 | 🔒 | proto | `docs/pve-roguelike-roadmap.md:293` | Выбор сложности на запуске забега |
+| PVR-3.1 | ⏳ | docs | `docs/pve-roguelike-roadmap.md:304` | Резолюция: чем PvE-прокачка НЕ является |
+| PVR-3.2 | 🔒 | proto | `docs/pve-roguelike-roadmap.md:312` | Хранилище PvE-прогресса |
+| PVR-3.3 | 🔒 | proto | `docs/pve-roguelike-roadmap.md:319` | Награда за забег |
 | PVE-0.1 | ✅ | core data | `docs/pve-team-modes-roadmap.md:81` | GameModeDef zod-схема + modes в GameData |
 | PVE-0.2 | ✅ | core srv | `docs/pve-team-modes-roadmap.md:111` | modeId в MatchConfig + консервация |
 | PVE-0.3 | ✅ | data | `docs/pve-team-modes-roadmap.md:143` | Пресет standard |
