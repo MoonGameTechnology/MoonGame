@@ -17,7 +17,11 @@ const data: GameData = parseGameData({
   resources: ['metal'],
   units: {},
   factions: {},
-  buildings: {},
+  // Ядро крепости обязано быть в каталоге: `station.deploy` ставит его сам и без него
+  // отказывает (крепость вышла бы бестелесной). Каталог без ядра — не «другой баланс», а
+  // сломанные данные, и держать на них паритет кнопки незачем: кнопка моделирует ПРАВИЛА
+  // игры, а целостность каталога стережёт загрузчик.
+  buildings: { starfort: { name: 'Void Fortress', hp: 70, onlyOn: [] } },
   events: {},
   sectorKinds: {
     asteroid: { capturable: true, buildable: true, orbit: false },

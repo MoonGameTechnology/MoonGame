@@ -4834,10 +4834,10 @@ function render(now: number) {
     }
 
     // asteroid-field sector: a lane junction, not a city — scattered rocks + a
-    // fat hub where the lanes meet, no orbits. Captured by simply arriving — unless
-    // a space fortress is raised here, which fortifies it (orbit + AA, must storm).
+    // fat hub where the lanes meet, no orbits. Captured by simply arriving. Raising a
+    // fortress here stops making it an asteroid field at all: `station.deploy` turns the
+    // node into `void_station`, which draws (with its hull bar) in its own branch below.
     if (n.sector === 'asteroid') {
-      const fort = p.buildings.find((b) => b.type === 'starfort');
       blitGlow(col, c.x, c.y, 30, p.owner ? 0.16 : 0.06); // cached glow disc
       cx.save();
       cx.strokeStyle = 'rgba(186,170,140,0.7)';
@@ -4873,44 +4873,17 @@ function render(now: number) {
       cx.beginPath();
       cx.arc(c.x, c.y, 7.5 + 0.6 * ownerPulse, 0, TAU);
       cx.stroke();
-      // Orbital fortress: the station concept's six-spoke vector, with its HP bar.
-      if (fort) {
-        cx.save();
-        cx.strokeStyle = col;
-        cx.lineWidth = 1.6;
-        cx.shadowColor = col;
-        cx.shadowBlur = fxBlur(8);
-        cx.fillStyle = rgba(col, 0.24);
-        cx.translate(c.x - 12, c.y - 12);
-        drawShipShape(cx, 'station', detail > 0.5);
-        cx.restore();
-        const frac = Math.max(0, Math.min(1, fort.hp / hpOfLevel('starfort', fort.level)));
-        cx.fillStyle = 'rgba(2,9,13,.7)';
-        cx.fillRect(c.x - 12, c.y - 22, 24, 3);
-        cx.fillStyle = rgba(frac > 0.35 ? col : '#ff5a4d', 0.9);
-        cx.fillRect(c.x - 12, c.y - 22, 24 * frac, 3);
-      }
-      if (selPlanet === n.id) targetBrackets(c.x, c.y, fort ? 18 : 15, now);
+      if (selPlanet === n.id) targetBrackets(c.x, c.y, 15, now);
       cx.save();
       cx.shadowColor = 'rgba(0,0,0,0.85)';
       cx.shadowBlur = fxBlur(3);
-      if (fort) {
-        // a fortress stays a prominent, special designation (unchanged)
-        cx.fillStyle = p.owner ? col : '#9fc9c4';
-        cx.font = '700 11px ui-monospace,Menlo,monospace';
-        cx.fillText(n.id, c.x + 16, c.y - 1);
-        cx.fillStyle = 'rgba(150,210,205,0.55)';
-        cx.font = '9px ui-monospace,Menlo,monospace';
-        cx.fillText('void fortress ✦', c.x + 16, c.y + 11);
-      } else {
-        // a plain asteroid field is a minor sector — de-emphasised (dim, smaller)
-        cx.fillStyle = p.owner ? rgba(col, 0.72) : 'rgba(150,190,196,0.5)';
-        cx.font = '600 10px ui-monospace,Menlo,monospace';
-        cx.fillText(n.id, c.x + 16, c.y - 1);
-        cx.fillStyle = 'rgba(150,210,205,0.38)';
-        cx.font = '9px ui-monospace,Menlo,monospace';
-        cx.fillText('asteroid field', c.x + 16, c.y + 11);
-      }
+      // An asteroid field is a minor sector — de-emphasised (dim, smaller).
+      cx.fillStyle = p.owner ? rgba(col, 0.72) : 'rgba(150,190,196,0.5)';
+      cx.font = '600 10px ui-monospace,Menlo,monospace';
+      cx.fillText(n.id, c.x + 16, c.y - 1);
+      cx.fillStyle = 'rgba(150,210,205,0.38)';
+      cx.font = '9px ui-monospace,Menlo,monospace';
+      cx.fillText('asteroid field', c.x + 16, c.y + 11);
       cx.restore();
       continue;
     }
@@ -5132,6 +5105,27 @@ function render(now: number) {
       poly(c.x, c.y, R * 0.33, 6, Math.PI / 6);
       cx.stroke();
       cx.restore();
+      // КОРПУС крепости — полоса прочности её ядра (FORT-5.2). Полоса и силуэт стояли в
+      // ветке астероида, пока крепостью было здание на астероидном поле; теперь крепость
+      // это сам узел, и её здоровье принадлежит сюда. Пиратская и нейтральная базы ядра
+      // не несут — у них полосы просто нет.
+      const core = p.buildings.find((b) => b.type === 'starfort');
+      if (core) {
+        cx.save();
+        cx.strokeStyle = col;
+        cx.lineWidth = 1.6;
+        cx.shadowColor = col;
+        cx.shadowBlur = fxBlur(8);
+        cx.fillStyle = rgba(col, 0.24);
+        cx.translate(c.x - 12, c.y - 12);
+        drawShipShape(cx, 'station', detail > 0.5);
+        cx.restore();
+        const frac = Math.max(0, Math.min(1, core.hp / hpOfLevel('starfort', core.level)));
+        cx.fillStyle = 'rgba(2,9,13,.7)';
+        cx.fillRect(c.x - 12, c.y - 22, 24, 3);
+        cx.fillStyle = rgba(frac > 0.35 ? col : '#ff5a4d', 0.9);
+        cx.fillRect(c.x - 12, c.y - 22, 24 * frac, 3);
+      }
     } else {
       // Fallback for any other non-planet type: small hexagon marker
       const kc = sectorTypeOf(n.id)?.color ?? col;
