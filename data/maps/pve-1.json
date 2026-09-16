@@ -38,8 +38,8 @@
       ]
     },
     "drift": { "position": { "x": -150, "y": 100 }, "kind": "asteroid", "terrain": "asteroid_field" },
-    "veil": { "position": { "x": 150, "y": 100 }, "kind": "nebula", "terrain": "nebula" },
-    "ridge": { "position": { "x": 0, "y": 150 }, "kind": "asteroid", "terrain": "asteroid_field" }
+    "veil": { "position": { "x": 150, "y": 100 }, "kind": "dense_nebula", "terrain": "dense_nebula" },
+    "ridge": { "position": { "x": 0, "y": 150 }, "kind": "ion_storm", "terrain": "ion_storm" }
   },
   "paths": [
     ["home_a", "nexus"],
