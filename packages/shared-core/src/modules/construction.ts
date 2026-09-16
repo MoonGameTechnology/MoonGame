@@ -139,6 +139,52 @@ function atInstanceCap(h: HandlerContext, planet: Planet, building: string): boo
   return planet.buildings.filter((b) => b.type === building).length >= cap;
 }
 
+/** Юнит-гарнизон, который выставляет форт (FORT-2.2). Он `issued`: заказать его нельзя,
+ *  он приходит и уходит вместе со зданием. */
+const GARRISON_UNIT = 'garrison';
+
+/** Базовый потолок выданного гарнизона на ПЛАНЕТУ (решение владельца). Фракция двигает
+ *  его через хук `fort.garrisonCap`. */
+const FORT_GARRISON_CAP = 3;
+
+/**
+ * Привести гарнизон, ВЫДАННЫЙ зданиями, в соответствие с ними — один дом на три повода
+ * (постройка, прокачка, разрушение). Тот же приём, которым крепость держит свои орудия
+ * (`syncStationGuns`), и по той же причине: три копии этого правила разошлись бы молча.
+ *
+ * Правило: сколько суммарно объявили живые здания, столько юнитов и стоит. Ноль — стека
+ * нет вовсе. Прокачка ДОБАВЛЯЕТ защитников, но потерь боя не лечит: иначе апгрейд
+ * работал бы мгновенным подкреплением посреди штурма.
+ *
+ * Игроковы войска в том же `garrison` не трогаются: выданные отличимы по id юнита,
+ * заказать который нельзя (`issued`), — поэтому «чей это стек» не надо угадывать.
+ */
+function syncIssuedGarrison(h: HandlerContext, planet: Planet): void {
+  let target = 0;
+  for (const b of planet.buildings) {
+    if (b.hp <= 0) continue;
+    const def = h.ctx.data.buildings[b.type];
+    if (def) target += buildingLevel(def, b.level).issuesGarrison;
+  }
+  // ПОТОЛОК СЧИТАЕТСЯ ПО ПЛАНЕТЕ, а не по зданию (FORT-2.3, решение владельца): иначе
+  // два форта обошли бы его сложением, и «потолок 3» означал бы «3 на каждый форт».
+  // Значение идёт хуком: база живёт здесь, фракция двигает её своей пассивкой, а без
+  // модуля фракций работает база — инвариант «расширение деградирует до дефолта».
+  const cap = h.hook<number>('fort.garrisonCap', FORT_GARRISON_CAP, { planetId: planet.id });
+  target = Math.min(target, Math.max(0, cap));
+  const idx = planet.garrison.findIndex((s) => s.unit === GARRISON_UNIT);
+  if (target <= 0) {
+    if (idx >= 0) planet.garrison.splice(idx, 1);
+    return;
+  }
+  if (idx < 0) {
+    planet.garrison.push({ unit: GARRISON_UNIT, count: target });
+    return;
+  }
+  const stack = planet.garrison[idx]!;
+  if (stack.count < target) stack.count = target;
+}
+
 /**
  * СЛОТЫ ПОСТРОЕК (FORT-5.3, решения владельца 10 и 11): сколько мест несёт узел и
  * сколько уже занято. `null` — лимита нет вовсе.
@@ -616,6 +662,9 @@ function damageBuildings(
     }
   }
   planet.buildings = survivors;
+  // Разрушенное здание уносит выданный им гарнизон: иначе защитники пережили бы то, что
+  // их породило, и мир остался бы «занят» призраками снесённого форта.
+  syncIssuedGarrison(h, planet);
 }
 
 /**
@@ -1134,6 +1183,7 @@ export const constructionModule: GameModule = {
         const hp = def ? buildingLevel(def, 1).hp : 0;
         const uid = `b:${planet.id}:${p.building}:${h.ctx.now}:${p.seq ?? 0}`;
         planet.buildings.push({ uid, type: p.building, level: 1, hp });
+        syncIssuedGarrison(h, planet);
         h.emit('building.constructed', {
           planetId: planet.id,
           building: p.building,
@@ -1153,6 +1203,7 @@ export const constructionModule: GameModule = {
         }
         instance.level = p.level;
         instance.hp = buildingLevel(def, p.level).hp;
+        syncIssuedGarrison(h, planet);
         h.emit('building.upgraded', {
           planetId: planet.id,
           building: p.building,

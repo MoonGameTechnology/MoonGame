@@ -194,6 +194,9 @@ export const FactionPassivesSchema = z.object({
   /** Multiplier on the reach of every radar the player fields (buildings and
    *  ships). Read by the `visibleState` projection (A2), like the tech effect. */
   radarRangeBonus: z.number().default(0),
+  /** Насколько у этой фракции выше ПОТОЛОК выданного гарнизона (FORT-2.3) — в штуках,
+   *  а не долей: потолок считается головами, и множитель дал бы дробных защитников. */
+  fortGarrisonBonus: z.number().default(0),
 });
 
 export const FactionDefSchema = z.object({
@@ -258,6 +261,15 @@ export const BuildingLevelSchema = z.object({
    * местами получит его само.
    */
   buildSlots: z.number().nonnegative().default(0),
+  /**
+   * Сколько ЮНИТОВ ГАРНИЗОНА выставляет этот уровень сооружения (FORT-2.2). Ноль у всех,
+   * кроме форта. Гарнизон — не войско на довольствии, а часть здания: пока здание стоит,
+   * стоит и он, разрушили — ушёл вместе с ним.
+   *
+   * Число, а не флаг: прокачка форта должна ДОБАВЛЯТЬ защитников, и «сколько» обязано
+   * жить в данных рядом с остальными свойствами уровня, а не лестницей в коде.
+   */
+  issuesGarrison: z.number().nonnegative().default(0),
   /** Доля, на которую здание поднимает ВЕСЬ кредитный доход своего мира на этом
    *  уровне (0.25 = +25%). См. одноимённое поле в `BuildingDefSchema`. */
   creditsBonus: z.number().default(0),
@@ -310,6 +322,15 @@ export const BuildingDefSchema = z.object({
    * местами получит его само.
    */
   buildSlots: z.number().nonnegative().default(0),
+  /**
+   * Сколько ЮНИТОВ ГАРНИЗОНА выставляет этот уровень сооружения (FORT-2.2). Ноль у всех,
+   * кроме форта. Гарнизон — не войско на довольствии, а часть здания: пока здание стоит,
+   * стоит и он, разрушили — ушёл вместе с ним.
+   *
+   * Число, а не флаг: прокачка форта должна ДОБАВЛЯТЬ защитников, и «сколько» обязано
+   * жить в данных рядом с остальными свойствами уровня, а не лестницей в коде.
+   */
+  issuesGarrison: z.number().nonnegative().default(0),
   /** Ground-defense bonus the building grants the garrison (0.01 = +1%); a
    *  fortress grants much more, and it grows with level. */
   defenseBonus: z.number().default(0.01),
@@ -1022,8 +1043,8 @@ export type GameData = z.infer<typeof GameDataSchema>;
  *  levels 2..N come from `upgrades`. Out-of-range levels fall back to level 1. */
 export function buildingLevel(def: BuildingDef, level: number): BuildingLevel {
   if (level <= 1) {
-    const { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, buildSlots, creditsBonus, buildSpeedBonus } = def;
-    return { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, buildSlots, creditsBonus, buildSpeedBonus };
+    const { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, buildSlots, issuesGarrison, creditsBonus, buildSpeedBonus } = def;
+    return { cost, buildTimeHours, produces, upkeep, hp, defenseBonus, radarRange, healRate, shipRepair, aaDamage, pointDefense, shuttleBay, buildSlots, issuesGarrison, creditsBonus, buildSpeedBonus };
   }
   return def.upgrades[level - 2] ?? buildingLevel(def, 1);
 }

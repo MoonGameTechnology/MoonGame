@@ -55,6 +55,7 @@ export const UNIT_ICON: Record<string, string> = {
   special_forces: '✱', // the elite few
   tank: '▮', // the heavy armour block
   drop_infantry: '⇓', // сброшенная с орбиты пехота — стрелка вниз, а не ещё один клин
+  garrison: '⊓', // гарнизон форта: не клин и не строй — укрытие, из которого не выходят
 };
 
 /** A small glyph per province KIND, drawn above each province so its type reads at a

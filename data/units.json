@@ -456,5 +456,25 @@
       "immobile",
       "issued"
     ]
+  },
+  "garrison": {
+    "name": "Garrison",
+    "faction": "neutral",
+    "domain": "ground",
+    "kind": "infantry",
+    "stats": {
+      "attack": 3,
+      "defense": 9,
+      "speed": 0,
+      "hp": 26,
+      "cargoSize": 1
+    },
+    "cost": {},
+    "buildTimeHours": 0,
+    "upkeep": {},
+    "traits": [
+      "immobile",
+      "issued"
+    ]
   }
 }

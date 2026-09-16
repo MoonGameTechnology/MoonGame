@@ -251,6 +251,7 @@ export const en: Record<string, string> = {
   'chat.tab.session': 'Session',
   'chat.you': 'You',
   'data.fortress-guns': 'fortress guns',
+  'data.garrison': 'garrison',
   'data.fortress-hangar': 'fortress hangar',
   'data.landing-shuttle': 'landing shuttle',
   'dossier.unit.landing-shuttle.desc': 'Landing shuttle: an unarmed hull with a hold of {c} — it cannot strike ships at all, and the order is refused outright. One-way: it puts down with its cargo and never flies home. An empty enemy world falls at once; a defended one gets a BEACHHEAD that opens a ground battle with no ship in sight; your own worlds get reinforcements. Area defense shreds both the craft and what they carried ({hp} hull, range {r}).',
