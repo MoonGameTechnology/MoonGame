@@ -4,6 +4,8 @@ import {
   GARRISON_FLOOR_BASE,
   garrisonDefense,
   garrisonFloor,
+  garrisonNeed,
+  pickForGarrison,
   planetDevelopment,
   spareGround,
 } from './garrisonPolicy';
@@ -80,5 +82,40 @@ describe('политика гарнизона', () => {
   it('КОРАБЛЬ НЕ ГАРНИЗОН: в счёт обороны земли он не идёт и в десант не уезжает', () => {
     expect(garrisonDefense([{ unit: 'frigate', count: 9 }], data)).toBe(0);
     expect(spareGround(planet([['frigate', 9]]), data)).toEqual([]);
+  });
+});
+
+const st = (unit: string, count: number) => ({ unit, count });
+
+describe('подкрепление гарнизона', () => {
+  it('НУЖДА — это НЕДОБОР до пола, и у сытого мира она ноль', () => {
+    expect(garrisonNeed(planet([['militia', 2]]), data)).toBe(0);
+    expect(garrisonNeed(planet([['militia', 9]]), data)).toBe(0);
+    expect(garrisonNeed(planet([]), data)).toBe(GARRISON_FLOOR_BASE);
+    expect(garrisonNeed(planet([['militia', 1]]), data)).toBe(GARRISON_FLOOR_BASE - 8);
+  });
+
+  it('РАЗВИТОМУ МИРУ НУЖНО БОЛЬШЕ при том же гарнизоне', () => {
+    expect(garrisonNeed(planet([['militia', 2]], [1, 1, 1]), data)).toBeGreaterThan(0);
+  });
+
+  it('ССАЖИВАЮТСЯ ОБОРОНИТЕЛЬНЫЕ — зеркало правила «уезжают ударные»', () => {
+    // Гарнизон живёт `defense`, поэтому на землю идёт тяжёлый пехотинец, а танк
+    // остаётся на борту: он полезнее там, где им будут бить.
+    const out = pickForGarrison([st('tank', 2), st('heavy', 2)], 20, data);
+    expect(out).toEqual([{ unit: 'heavy', count: 1 }]);
+  });
+
+  it('БЕРЁТСЯ РОВНО СТОЛЬКО, СКОЛЬКО ЗАКРОЕТ НУЖДУ, а не весь трюм', () => {
+    expect(pickForGarrison([st('militia', 9)], 16, data)).toEqual([{ unit: 'militia', count: 2 }]);
+  });
+
+  it('НУЖДА БОЛЬШЕ ТРЮМА — отдаётся всё, что есть', () => {
+    expect(pickForGarrison([st('militia', 2)], 999, data)).toEqual([{ unit: 'militia', count: 2 }]);
+  });
+
+  it('НУЖДЫ НЕТ — не ссаживается ничего; КОРАБЛЬ гарнизоном не станет', () => {
+    expect(pickForGarrison([st('militia', 9)], 0, data)).toEqual([]);
+    expect(pickForGarrison([st('frigate', 9)], 99, data)).toEqual([]);
   });
 });

@@ -80,3 +80,53 @@ export function spareGround(
   }
   return out;
 }
+
+/**
+ * Насколько мир НЕ добирает до своего пола, в очках `defense`. Ноль — добирает.
+ *
+ * Обратная сторона {@link spareGround}: один и тот же пол отвечает и «сколько можно
+ * увезти», и «сколько сюда нужно привезти». Две меры разошлись бы на первой же правке,
+ * и бот возил бы войска туда-обратно между двумя мирами.
+ */
+export function garrisonNeed(
+  planet: Pick<Planet, 'buildings' | 'garrison'>,
+  data: GameData,
+): number {
+  return Math.max(0, garrisonFloor(planet) - garrisonDefense(planet.garrison, data));
+}
+
+/**
+ * Кого ссадить из трюма, чтобы закрыть нужду мира, — и не больше.
+ *
+ * ПОРЯДОК ЗЕРКАЛЕН {@link spareGround}: там первыми уезжают лучшие УДАРНЫЕ, здесь
+ * первыми сходят лучшие ОБОРОНИТЕЛЬНЫЕ. Гарнизон живёт статом `defense`, поэтому на
+ * землю идёт тяжёлый пехотинец, а танк остаётся на борту — он полезнее там, где им
+ * будут бить. Тай-брейк по имени: решение бота обязано быть чистой функцией состояния.
+ */
+export function pickForGarrison(
+  carried: readonly UnitStack[],
+  need: number,
+  data: GameData,
+): UnitStack[] {
+  if (need <= 0) return [];
+  const rows = carried
+    .filter((st) => st.count > 0 && data.units[st.unit]?.domain === 'ground')
+    .map((st) => ({
+      unit: st.unit,
+      count: st.count,
+      defense: data.units[st.unit]?.stats.defense ?? 0,
+    }))
+    .filter((row) => row.defense > 0)
+    .sort((a, b) => b.defense - a.defense || (a.unit < b.unit ? -1 : a.unit > b.unit ? 1 : 0));
+  const out: UnitStack[] = [];
+  let left = need;
+  for (const row of rows) {
+    if (left <= 0) break;
+    const take = Math.min(row.count, Math.ceil(left / row.defense));
+    if (take > 0) {
+      out.push({ unit: row.unit, count: take });
+      left -= take * row.defense;
+    }
+  }
+  return out;
+}

@@ -68,7 +68,13 @@ import {
 // здесь: «возьму ли я этот мир», «сколько оставить дома» и «что известно о гарнизоне» —
 // чистые решения, которые завтра захочет показать и клиент. Своей копии у бота нет.
 import { confidentGroundWin } from '../../decisions/groundForecast';
-import { garrisonDefense, garrisonFloor, spareGround } from '../../decisions/garrisonPolicy';
+import {
+  garrisonDefense,
+  garrisonFloor,
+  garrisonNeed,
+  pickForGarrison,
+  spareGround,
+} from '../../decisions/garrisonPolicy';
 import { freshIntel, knownGarrison } from '../../decisions/garrisonIntel';
 import { planDrop } from '../../decisions/dropPlan';
 import { botEmbargoes } from './botFavour';
@@ -138,13 +144,14 @@ const GROUND_YARDS = ['barracks', 'factory'] as const;
 
 /** Сколько наземных юнитов сильный бот держит дома: гарнизон + запас на десант. */
 const GROUND_STOCK = 8;
+/** Сколько ПРИЗОВЫХ миров получают гарнизон за один тик. Не единица (иначе империя
+ *  добирает пол по одному миру за два игровых часа) и не «сколько влезет»: `affordable*`
+ *  меряет казну до ВСЕХ заказов тика, поэтому щедрость обернулась бы пачкой отказов. */
+const GARRISON_ORDERS_PER_TICK = 3;
 /** Верхний предел десантных кораблей — трюм 16 против 5 у крейсера, больше не нужно. */
 const DROPSHIP_CAP = 2;
-/** Сколько артиллерийских корпусов держит сильный бот (AI-BAL-4): дальний огонь — не
- *  замена флоту, а добавка к нему; стеклянная пушка гибнет от первого же сближения. */
-const ARTILLERY_CAP = 2;
-/** Осадных платформ — столько же. Дальнего огня платформа больше не даёт (трейт
- *  `artillery` уехал на одноимённый корпус), но она — единственный корабль ЗАДНЕЙ
+/** Осадных платформ — две. Дальнего огня в игре больше нет вовсе, но платформа —
+ *  единственный корабль ЗАДНЕЙ
  *  линии, а линия без корабля не участвует в раздаче урона: не строй бот платформу —
  *  и замер разбирал бы бой, в котором задней линии просто нет. */
 const SIEGE_CAP = 2;
@@ -366,6 +373,29 @@ export function aiOrders(
    *  выдавал `fleet.bombard` каждый цикл, получая `E_WRONG_SECTOR` до конца матча —
    *  та же вечная стоянка, что описана выше про `E_SAME_LOCATION`. */
   const orbitalLayer = (p: Planet): boolean => SECTOR_TYPES[p.kind ?? '']?.orbit ?? true;
+  /** Ближайшая ЧУЖАЯ цель, которую этот флот, скорее всего, и будет штурмовать. Тем же
+   *  правилом («ближайший захватываемый, тай-брейк по id») ниже выбирается курс, поэтому
+   *  «сколько десанта мне ещё нужно» спрашивается про ту самую цель, а не про абстрактную. */
+  const assaultTargetFor = (fl: Fleet): Planet | undefined => {
+    const at = fl.location ? state.planets[fl.location] : undefined;
+    if (!at) return undefined;
+    return Object.values(state.planets)
+      .filter((p) => p.owner !== ai && capturable(p) && canTraverse(state, ai, p.owner))
+      .sort(
+        (a, b) =>
+          d(at.position, a.position) - d(at.position, b.position) ||
+          (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+      )[0];
+  };
+  /** Свой мир, которому подкрепление нужнее всего и ближе всего. Сортировка по паре
+   *  «расстояние, id» — решение бота обязано быть чистой функцией состояния. */
+  const neediestWorld = (from: { x: number; y: number }): Planet | undefined =>
+    Object.values(state.planets)
+      .filter((p) => p.owner === ai && p.kind === 'planet' && garrisonNeed(p, data) > 0)
+      .sort(
+        (a, b) =>
+          d(from, a.position) - d(from, b.position) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0),
+      )[0];
   const d = (a: { x: number; y: number }, b: { x: number; y: number }): number =>
     Math.hypot(a.x - b.x, a.y - b.y);
   // Send each idle AI fleet toward the nearest capturable world it can reach — only
@@ -570,21 +600,66 @@ export function aiOrders(
         }
         if (ordered) continue; // час подъёма — вылет следующим тиком
       }
-      // (а2) ГАРНИЗОН НА ЗАНЯТОМ МИРЕ (AI-BAL-2). Мир без войск берётся ПРИЛЁТОМ —
-      //      `captureOnArrival` не смотрит ни на здания, ни на их оборонный бонус, только
-      //      на `garrison.some(count > 0)`. Отсюда карусель базовой линии: 113 захватов
-      //      прилётом за матч, миры перекидываются без единого выстрела. Флот, стоящий на
-      //      СВОЁМ пустом мире, оставляет одного бойца — дальше этот мир нужно штурмовать.
-      //      По одному: остальной десант нужен самому флоту, иначе он разоружится в дороге.
+      // (а2) ГАРНИЗОН НА ЗАНЯТОМ МИРЕ (AI-BAL-2, доращено подвозом 2026-09-16). Мир без
+      //      войск берётся ПРИЛЁТОМ — `captureOnArrival` не смотрит ни на здания, ни на
+      //      их оборонный бонус, только на `garrison.some(count > 0)`. Отсюда карусель
+      //      базовой линии: 113 захватов прилётом за матч, миры перекидываются без
+      //      единого выстрела.
+      //
+      //      РАНЬШЕ ССАЖИВАЛИ РОВНО ОДНОГО, и довод был «остальной десант нужен самому
+      //      флоту». Довод верен только наполовину: нужен ровно тот десант, которым флот
+      //      РЕАЛЬНО возьмёт свою цель, а всё сверх того он просто возит — и теряет
+      //      вместе с корпусами. Поэтому ссаживается столько, сколько мир не добирает до
+      //      пола (правило владельца №4), но не глубже, чем позволяет уверенность в
+      //      ближайшей цели: ту же `confidentGroundWin` спрашивает и сам штурм, так что
+      //      разойтись эти два ответа не могут.
+      if (here0 && here0.owner === ai && here0.id !== base.id && capturable(here0)) {
+        const need = garrisonNeed(here0, data);
+        const carried = (f.landing ?? []).filter((st) => st.count > 0);
+        if (need > 0 && carried.length > 0) {
+          const target = assaultTargetFor(f);
+          for (const give of pickForGarrison(carried, need, data)) {
+            // Оставшееся обязано взять цель. Нет цели — отдаём без оглядки: возить
+            // десант некуда, а мир без гарнизона перекидывают прилётом.
+            const left = carried.map((st) =>
+              st.unit === give.unit ? { ...st, count: st.count - give.count } : { ...st },
+            );
+            if (target && !confidentGroundWin(left, target.garrison, data)) break;
+            out.push(unloadArmy(ai, f.id, give.unit, give.count));
+          }
+        }
+      }
+      // (а3) ПОДВОЗ ПОДКРЕПЛЕНИЯ — вторая половина правила владельца №4 (2026-09-16).
+      //      Замер показал, что войска у бота ЕСТЬ, они просто лежат не там: за 78
+      //      суточных срезов 179 миров стояли ниже пола на 2432 очка обороны суммарно,
+      //      при излишке 23004 очка на 1619 других миров. Строить на месте умеет не
+      //      каждый — 63 из 179 миров были без казармы вовсе.
+      //
+      //      Грузится ИЗЛИШЕК со своего мира, и только НЕ ДОМА: дома трюм наполняет
+      //      правило (а) под атаку, и два правила на один трюм передрались бы за него.
+      //      Пустой трюм в условии — граница, из-за которой подвоз не может разоружить
+      //      ударную группу: флот с десантом на борту он не трогает вовсе.
       if (
         here0 &&
         here0.owner === ai &&
         here0.id !== base.id &&
-        groundCount(here0) === 0 &&
-        capturable(here0)
+        !(f.landing ?? []).some((st) => st.count > 0) &&
+        (f.loading ?? []).length === 0 &&
+        neediestWorld(here0.position) !== undefined
       ) {
-        const carried = (f.landing ?? []).find((st) => st.count > 0);
-        if (carried) out.push(unloadArmy(ai, f.id, carried.unit, 1));
+        let free = liftFree(f);
+        let ordered = false;
+        for (const st of spareGround(here0, data)) {
+          if (free <= 0) break;
+          const size = data.units[st.unit]?.stats.cargoSize ?? 1;
+          const take = Math.min(st.count, Math.floor(free / size));
+          if (take > 0) {
+            out.push(loadArmy(ai, f.id, st.unit, take));
+            free -= take * size;
+            ordered = true;
+          }
+        }
+        if (ordered) continue; // час подъёма — курс следующим тиком
       }
       // (б) Штурм с орбиты. Правила штурма называет ЯДРО (`assaultPlanet`), здесь
       //     только повод не сыпать заведомо отбиваемым приказом: чужой захватываемый
@@ -745,6 +820,27 @@ export function aiOrders(
         take.push({ unit: st.unit, count: Math.floor(st.count / 2) });
       }
       if (take.length > 0) out.push(splitFleet(ai, f.id, take));
+    }
+    // ═══ КУРС ПОДВОЗА (правило владельца №4, вторая половина) ═══
+    // ЗАВОЗ ПО ДОРОГЕ, а не отдельная экспедиция. Первая версия правила разворачивала
+    // флот, только если он НЕ возьмёт ближайшую цель, — и замер показал, почему этого
+    // мало: гружёный флот стоял на нуждающемся мире 19 раз за 1002 тика, а в пути с
+    // десантом был 1574 раза. Возить было чем и что, но маршруты туда не вели.
+    //
+    // Теперь крюк делается, когда свой голодный мир БЛИЖЕ цели: флот завозит гарнизон
+    // и следующим тиком идёт дальше — цена крюка ограничена тем, что он короче пути,
+    // который флот и так собирался пройти. Второй случай прежний: цель, которую этим
+    // десантом всё равно не взять, перестаёт быть целью.
+    //
+    // Роли «подвоз» нет, и памяти о задании тоже: оба условия выводятся из состояния
+    // КАЖДЫЙ тик, а «хватит ли на цель» спрашивает ту же `confidentGroundWin`, которой
+    // меряет себя сам штурм. Уверенный флот с далёким голодным миром идёт воевать.
+    if (profile === 'strong' && best && (f.landing ?? []).some((st) => st.count > 0)) {
+      const needy = neediestWorld(here.position);
+      if (needy && needy.id !== here.id) {
+        const closer = d(here.position, needy.position) < d(here.position, best.position);
+        if (closer || !confidentGroundWin(f.landing ?? [], best.garrison, data)) best = needy;
+      }
     }
     if (best) out.push(moveFleet(ai, f.id, best.id));
   }
@@ -941,18 +1037,12 @@ export function aiOrders(
     // fleet lifts home-built militia aboard as landing troops (fleet.launch), which
     // is exactly what lets it assault a garrisoned world back.
     if (warFooting) {
-      let garrisonOrders = 0;
-      for (const p of worldsInOrder(state, ai, 'garrison', profile)) {
-        if (garrisonOrders >= 2 || (pl.resources.metal ?? 0) < 90) break;
-        if (p.owner !== ai || p.kind !== 'planet') continue;
-        if (p.garrison.some((s) => s.count > 0)) continue;
-        // Без казармы ядро отобьёт заказ (`E_NO_GROUND_FACILITY`) — раньше этот блок
-        // сыпал такими отказами весь матч (60 за пробный матч). Поведение не меняется:
-        // отсеиваются ровно те приказы, которые всё равно ничего не делали.
-        if (!hasFacilityFor(p, 'militia')) continue;
-        out.push(buildUnit(ai, p.id, 'militia', 2));
-        garrisonOrders += 1;
-      }
+      // ГАРНИЗОН ПРИЗОВЫХ МИРОВ ПЕРЕЕХАЛ ОТСЮДА (2026-09-16). Здесь стояло правило
+      // «на войне занять ПУСТЫЕ призовые миры ополчением», и оно стало вторым живым
+      // ответом на тот же вопрос: пустой мир — частный случай мира ниже ПОЛА, а пол
+      // (правило владельца №4) считается ниже, в блоке призовых миров, и не только на
+      // войне. Две копии разошлись бы на первой же правке — эта уже расходилась капом
+      // (2 против 3) и условием (пусто против недобора).
       // A landing stock at home: strike groups lift militia on sortie (above), so
       // the base keeps a few spare beyond its seeded defenders.
       const baseMilitia = base.garrison
@@ -1029,22 +1119,33 @@ export function aiOrders(
       // 3. Призовые миры: сперва казарма, потом ополчение в пустой гарнизон. Мир с
       //    гарнизоном нельзя забрать прилётом — за него придётся высаживаться, и
       //    ровно этого измерению не хватало.
+      // СТРОЙКА И ГАРНИЗОН — РАЗНЫЕ ОЧЕРЕДИ, и до 2026-09-16 они делили один `break`.
+      // Ветка казармы выходила из ВСЕГО цикла, поэтому за тик бот заказывал ЛИБО одну
+      // казарму, ЛИБО одну пару ополченцев — на всю империю. Первым в обходе то и дело
+      // оказывался мир без казармы (19% своих миров), и тогда ополчение не заказывалось
+      // НИГДЕ. Замер: 1498 заказов казармы против 538 заказов ополчения, при том что
+      // большинство голодных миров (1445 из 2402) казарму уже имели. Стройка осталась
+      // одна за тик, а гарнизон теперь считается своим счётчиком.
+      let barracksOrdered = false;
+      let garrisonOrders = 0;
       for (const p of worldsInOrder(state, ai, 'barracks', profile)) {
         if (p.owner !== ai || p.kind !== 'planet' || p.id === base.id) continue;
         if (!hasFacilityFor(p, 'militia')) {
-          if (pendingBuild(p.id, 'barracks')) continue;
-          if (!affordable('barracks')) break;
+          if (barracksOrdered || pendingBuild(p.id, 'barracks')) continue;
+          if (!affordable('barracks')) continue;
           out.push(buildBuilding(ai, p.id, 'barracks'));
-          break; // одна стройка за тик — как и с шахтой
+          barracksOrdered = true; // одна стройка за тик — как и с шахтой
+          continue; // …но остальным мирам ещё нужен гарнизон
         }
         // Тот же ПОЛ (правило №4): голый мир держит двух ополченцев, развитый — больше.
         // Раньше условием было «гарнизон пуст», и застроенный призовой мир навсегда
         // оставался при той же паре бойцов, что и голый камень.
+        if (garrisonOrders >= GARRISON_ORDERS_PER_TICK) break;
         if (garrisonDefense(p.garrison, data) >= garrisonFloor(p) || pendingUnit(p.id, 'militia'))
           continue;
         if (!affordableUnit('militia', 2)) break;
         out.push(buildUnit(ai, p.id, 'militia', 2));
-        break;
+        garrisonOrders += 1;
       }
       // 5. ОБОРОНА (AI-BAL-2): форт → госпиталь → орбитальное ПКО. Порядок — по тому,
       //    что каждое здание делает для УДЕРЖАНИЯ: форт даёт гарнизону +30% обороны
@@ -1102,20 +1203,13 @@ export function aiOrders(
       ) {
         out.push(buildUnit(ai, base.id, 'shuttle_carrier', 1));
       }
-      // ═══ 6. АРТИЛЛЕРИЯ И АВИАЦИЯ (AI-BAL-4) ═══
-      // Артиллерия стреляет САМА: `artilleryModule` каждым пролётом времени заставляет
-      // свободный стоящий флот с `artillery`-корпусом обстрелять ближайший враждебный
-      // стоящий флот в радиусе `range` — без приказа, без ответного огня и без входа в
-      // бой. То есть корпус `artillery` не требует от бота ни одной новой команды:
-      // достаточно его ПОСТРОИТЬ, и целый пласт боя (дальний огонь) входит в измерение.
-      if (
-        warFooting &&
-        shipsOwned('artillery') < ARTILLERY_CAP &&
-        !pendingUnit(base.id, 'artillery') &&
-        affordableUnit('artillery', 1)
-      ) {
-        out.push(buildUnit(ai, base.id, 'artillery', 1));
-      }
+      // ═══ 6. АВИАЦИЯ И ЗАДНЯЯ ЛИНИЯ (AI-BAL-4) ═══
+      // Правило постройки `artillery` СНЯТО (решение владельца 2026-09-16). Дальний огонь
+      // убран из игры целиком ещё раньше: модуль `artillery` вышел из графа, манифест
+      // поднят до 14 (`scenario.ts`), и корпуса `artillery` нет ни в одном `data/*.json`.
+      // Правило же осталось и заказывало его КАЖДЫЙ тик — ядро отбивало `E_UNKNOWN_UNIT`
+      // молча, 2493 отказа за 8 матчей замера. Линии приёма урона это не касается: они
+      // живы, и заднюю линию держит осадная платформа ниже.
       // Осадная платформа — задняя линия (GDD §7.2). Огня с дистанции она не даёт, но
       // без неё у бота не бывает ЗАДНЕЙ линии вовсе, и раздача урона по линиям меряется
       // лишь наполовину.
