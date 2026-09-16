@@ -137,6 +137,43 @@ function atInstanceCap(h: HandlerContext, planet: Planet, building: string): boo
   return planet.buildings.filter((b) => b.type === building).length >= cap;
 }
 
+/**
+ * СЛОТЫ ПОСТРОЕК (FORT-5.3, решения владельца 10 и 11): сколько мест несёт узел и
+ * сколько уже занято. `null` — лимита нет вовсе.
+ *
+ * Лимит включается САМИМ НАЛИЧИЕМ мест: пока ни одно стоящее сооружение не объявило
+ * `buildSlots`, узел застраивается как раньше. Поэтому планета и прочие виды не тронуты
+ * — отдельного флага «а тут лимит есть» не понадобилось.
+ *
+ * Сооружение, НЕСУЩЕЕ места, само слота не занимает: корпус крепости держит причалы, а
+ * не стоит в одном из них. Правило по свойству, а не по имени здания, — новое
+ * сооружение с местами получит его само.
+ *
+ * Очередь считается вместе со стоящим, иначе лимит обходится заказом впрок: пять
+ * построек в очередь на крепость первого уровня, и все пять доедут до готовности.
+ */
+function slotsAt(h: HandlerContext, planet: Planet): { capacity: number; used: number } | null {
+  let capacity = 0;
+  let used = 0;
+  for (const b of planet.buildings) {
+    if (b.hp <= 0) continue; // разрушенное не несёт мест и не занимает их
+    const def = h.ctx.data.buildings[b.type];
+    const slots = def ? buildingLevel(def, b.level).buildSlots : 0;
+    if (slots > 0) capacity += slots;
+    else used += 1;
+  }
+  if (capacity <= 0) return null; // мест никто не объявил → лимита нет
+  for (const e of h.state.scheduled) {
+    if (e.type !== 'construction.complete') continue;
+    const p = e.payload as CompletePayload;
+    if (p.kind === 'building' && p.planetId === planet.id) used += 1;
+  }
+  for (const q of planet.buildQueue ?? []) {
+    if (q.kind === 'building') used += 1;
+  }
+  return { capacity, used };
+}
+
 function isQueued(
   h: HandlerContext,
   kind: CompletePayload['kind'],
@@ -620,6 +657,16 @@ export const constructionModule: GameModule = {
       const onlyOn = h.ctx.data.buildings[payload.building]?.onlyOn;
       if (onlyOn !== undefined && !onlyOn.includes(planet.kind ?? '')) {
         return h.reject('E_WRONG_SECTOR');
+      }
+      // 4. `buildSlots` — СКОЛЬКО построек узел вообще вмещает (решения 10 и 11). Своё
+      //    место в порядке ворот: первые три отвечают «что сюда ставят», это — «влезет
+      //    ли ещё одна». Код отказа поэтому другой: «сюда нельзя» и «места кончились»
+      //    игроку говорят разное, и второе лечится прокачкой. Не `E_NO_SLOTS` — тот уже
+      //    занят фиттингами корабля, и его текст («слоты фиттингов заняты») в ответ на
+      //    заказ постройки соврал бы.
+      const slots = slotsAt(h, planet);
+      if (slots && slots.used >= slots.capacity) {
+        return h.reject('E_NO_BUILD_SLOTS');
       }
       requireUnlocked(h, action.playerId, 'building', payload.building);
       if (atInstanceCap(h, planet, payload.building)) {

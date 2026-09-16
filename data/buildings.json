@@ -575,7 +575,8 @@
         "hp": 110,
         "defenseBonus": 0.4,
         "aaDamage": 9,
-        "pointDefense": 9
+        "pointDefense": 9,
+        "buildSlots": 2
       },
       {
         "cost": {
@@ -586,7 +587,8 @@
         "hp": 160,
         "defenseBonus": 0.4,
         "aaDamage": 13,
-        "pointDefense": 12
+        "pointDefense": 12,
+        "buildSlots": 3
       },
       {
         "cost": {
@@ -597,7 +599,8 @@
         "hp": 220,
         "defenseBonus": 0.4,
         "aaDamage": 18,
-        "pointDefense": 16
+        "pointDefense": 16,
+        "buildSlots": 4
       },
       {
         "cost": {
@@ -608,10 +611,12 @@
         "hp": 300,
         "defenseBonus": 0.4,
         "aaDamage": 24,
-        "pointDefense": 20
+        "pointDefense": 20,
+        "buildSlots": 5
       }
     ],
-    "onlyOn": []
+    "onlyOn": [],
+    "buildSlots": 1
   },
   "tax_office": {
     "name": "Tax Office",

@@ -1285,6 +1285,7 @@ export const ru: Record<string, string> = {
   'err.no-artillery': 'нет артиллерии',
   'err.no-building': 'такого здания здесь нет',
   'err.battle-here': 'здесь идёт бой — работы остановлены',
+  'err.no-build-slots': 'мест под постройки больше нет — прокачайте крепость',
   'err.not-buildable': 'это не заказывают — оно приходит вместе с сооружением',
   'err.no-capacity': 'трюм полон',
   'err.no-capital': 'нет столицы для отзыва',
