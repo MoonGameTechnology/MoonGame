@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 import { newGame, aiOrders, START_CANDIDATES, kernel, ctx } from './game';
 import { data } from './gameData';
 import type { Action, GameState, Squadron } from '../../packages/shared-core/src/index';
+import { identifiedNodes } from '../../packages/shared-core/src/state/visibility';
 
 function game2(): GameState {
   return newGame({
@@ -448,5 +449,160 @@ describe('SHU-2.1 — бот поднимает удар с ИДУЩЕГО но�
     underwayCarrier(s, foe.id, home.id);
     s.fleets.p2_cv!.battleId = 'b:1';
     expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.strike')).toEqual([]);
+  });
+});
+
+describe('ПРАВИЛА НАЗЕМНОЙ ВОЙНЫ — высадка с носителя (решение владельца 2026-09-16)', () => {
+  const dist = (a: { x: number; y: number }, b: { x: number; y: number }): number =>
+    Math.hypot(a.x - b.x, a.y - b.y);
+
+  /**
+   * Носитель СТОИТ у нейтрального узла, а цель — ДРУГОЙ мир в радиусе высадки (120).
+   *
+   * Насест и цель разные НАМЕРЕННО: флот опознаёт только тот узел, на котором стоит
+   * (`FLEET_IDENTIFY_HOPS = 0`, «радарless fleet is a blind kitten»), а у корпуса
+   * `shuttle_carrier` радара нет вовсе. Прилети носитель НА цель — он видел бы гарнизон
+   * сам, и правило №1 проверять было бы не на чем. Пара ищется по карте, а не
+   * прописывается id: карта живёт своей жизнью, а предусловие теста проверяется тут же.
+   */
+  function staged(): {
+    s: GameState;
+    foe: GameState['planets'][string];
+    perch: GameState['planets'][string];
+  } {
+    const s = rich(game2());
+    const seen = identifiedNodes(s, 'p2', data);
+    const free = Object.values(s.planets)
+      .filter((p) => p.owner === null && !seen.has(p.id))
+      .sort((a, b) => (a.id < b.id ? -1 : 1));
+    let perch: GameState['planets'][string] | undefined;
+    let foe: GameState['planets'][string] | undefined;
+    for (const a of free) {
+      for (const b of free) {
+        if (a.id === b.id || b.kind !== 'planet') continue;
+        if (dist(a.position, b.position) > 115) continue;
+        perch = a;
+        foe = b;
+        break;
+      }
+      if (perch) break;
+    }
+    if (!perch || !foe) throw new Error('на карте не нашлось пары «насест + цель в радиусе»');
+    foe.owner = 'p1';
+    foe.garrison = [{ unit: 'militia', count: 1 }];
+    s.fleets.p2_cv = {
+      id: 'p2_cv',
+      owner: 'p2',
+      location: perch.id,
+      movement: null,
+      units: [{ unit: 'shuttle_carrier', count: 1 }],
+      hangar: [{ id: 'sq:l', units: [{ unit: 'landing_shuttle', count: 3 }] }],
+      landing: [{ unit: 'tank', count: 9 }],
+      traits: [],
+      battleId: null,
+    } as GameState['fleets'][string];
+    // Предусловие теста: цель НЕ опознана — значит правилу №1 есть что запрещать.
+    expect(identifiedNodes(s, 'p2', data).has(foe.id)).toBe(false);
+    return { s, foe, perch };
+  }
+
+  /** Свежие разведданные p2 об этом мире — то, чего требует правило №1. */
+  const withIntel = (
+    s: GameState,
+    id: string,
+    garrison: Array<{ unit: string; count: number }>,
+  ): void => {
+    s.fog = { ...(s.fog ?? {}), p2: { [id]: { owner: 'p1', garrison, buildings: [], at: s.time } } };
+  };
+
+  it('ПРАВИЛО №1 — БЕЗ РАЗВЕДДАННЫХ ВЫСАДКИ НЕТ, даже когда всё на борту', () => {
+    const { s } = staged();
+    expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.loadTroops')).toEqual([]);
+  });
+
+  it('РАЗВЕДДАННЫЕ ЕСТЬ И СИЛ ХВАТАЕТ — высадка уходит и проходит ЯДРО', () => {
+    const { s, foe } = staged();
+    withIntel(s, foe.id, [{ unit: 'militia', count: 1 }]);
+    const orders = aiOrders(s, 'p2', 'expand', 'strong');
+    const load = only(orders, 'shuttle.loadTroops');
+    const strike = only(orders, 'shuttle.strike');
+    expect(load).toHaveLength(1);
+    expect(strike).toHaveLength(1);
+    // Оба приказа адресуют НОСИТЕЛЬ, а не дом: груз едет вместе с ним.
+    expect((load[0]!.payload as { fleetId?: string }).fleetId).toBe('p2_cv');
+    expect((strike[0]!.payload as { targetPlanetId?: string }).targetPlanetId).toBe(foe.id);
+    // Погрузка идёт ПЕРВОЙ, и ядро принимает обе подряд.
+    const loaded = kernel.applyAction(s, load[0]!, ctx(s.time));
+    expect(loaded.ok).toBe(true);
+    if (loaded.ok) expect(kernel.applyAction(loaded.state, strike[0]!, ctx(s.time)).ok).toBe(true);
+  });
+
+  it('ПРОТУХШИЕ РАЗВЕДДАННЫЕ знанием не считаются', () => {
+    const { s, foe } = staged();
+    s.fog = {
+      p2: {
+        [foe.id]: {
+          owner: 'p1',
+          garrison: [{ unit: 'militia', count: 1 }],
+          buildings: [],
+          at: s.time - 48 * 3_600_000,
+        },
+      },
+    };
+    expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.loadTroops')).toEqual([]);
+  });
+
+  it('ГАРНИЗОН НЕ ПО ЗУБАМ — высадки нет: челноки целы, десант жив', () => {
+    const { s, foe } = staged();
+    foe.garrison = [{ unit: 'heavy_infantry', count: 12 }];
+    withIntel(s, foe.id, [{ unit: 'heavy_infantry', count: 12 }]);
+    expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.loadTroops')).toEqual([]);
+  });
+
+  it('ПРАВИЛО №3 — под ВРАЖЕСКИМ ФЛОТОМ высадка не идёт', () => {
+    const { s, foe } = staged();
+    withIntel(s, foe.id, [{ unit: 'militia', count: 1 }]);
+    s.fleets.p1_guard = {
+      id: 'p1_guard',
+      owner: 'p1',
+      location: foe.id,
+      movement: null,
+      units: [{ unit: 'cruiser', count: 2 }],
+      traits: [],
+      battleId: null,
+    } as GameState['fleets'][string];
+    expect(only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.loadTroops')).toEqual([]);
+  });
+
+  it('ПРАВИЛО №2 — над миром уже стоит СВОЙ флот: берём штурмом, челноки не тратим', () => {
+    const { s, foe } = staged();
+    withIntel(s, foe.id, [{ unit: 'militia', count: 1 }]);
+    s.fleets.p2_orbit = {
+      id: 'p2_orbit',
+      owner: 'p2',
+      location: foe.id,
+      movement: null,
+      orbit: 'near',
+      units: [{ unit: 'cruiser', count: 2 }],
+      landing: [{ unit: 'tank', count: 6 }],
+      traits: [],
+      battleId: null,
+    } as GameState['fleets'][string];
+    const orders = aiOrders(s, 'p2', 'expand', 'strong');
+    expect(only(orders, 'shuttle.loadTroops')).toEqual([]);
+    expect(only(orders, 'fleet.assault')).toHaveLength(1);
+  });
+
+  it('ТИК НЕ ПРОПАДАЕТ: высадке идти не с чем — поднимается бомбардировщик', () => {
+    const { s } = staged();
+    // Разведданных нет ⇒ высадки не будет. Раньше на этом приказ терялся ВОВСЕ: машина
+    // выбиралась одна на общем ростере, и ею оказывался десантный челнок.
+    s.fleets.p2_cv!.hangar = [
+      { id: 'sq:l', units: [{ unit: 'landing_shuttle', count: 3 }] },
+      { id: 'sq:b', units: [{ unit: 'bomber', count: 2 }] },
+    ];
+    const strikes = only(aiOrders(s, 'p2', 'expand', 'strong'), 'shuttle.strike');
+    expect(strikes).toHaveLength(1);
+    expect((strikes[0]!.payload as { squadronId: string }).squadronId).toBe('sq:b');
   });
 });
