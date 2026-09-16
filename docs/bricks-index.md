@@ -592,39 +592,39 @@
 | FSPLIT-1 | ✅ | core act proto | `docs/backlog.md:13537` | Отбор при делении адресует СТЕК, а не тип корабля. |
 | FSPLIT-2 | ✅ | core act proto | `docs/backlog.md:13547` | Десант делится вместе с кораблями, по трюму обеих половин. |
 | AIDIFF-1 | ✅ | proto | `docs/backlog.md:13575` | Строка места переключается «выкл → слабый → сильный». |
-| RESIL-1 | ✅ | proto | `docs/backlog.md:13684` | Фоновые промисы браузерного клиента. |
-| RESIL-2 | ✅ | proto | `docs/backlog.md:13711` | Цикл подсветки обучающего тура. |
-| RESIL-3 | ✅ | srv | `docs/backlog.md:13728` | Именованный фатал процесса. |
-| RESIL-4 | ✅ | srv | `docs/backlog.md:13748` | Соак проверяет, что мир не встал. |
-| RESIL-5 | ✅ | srv proto | `docs/backlog.md:13766` | Генеральная репетиция: весь стек разом, и |
-| RESIL-6 | ✅ | srv proto | `docs/backlog.md:13801` | Достоверность генералки: настоящая база, |
-| ADDR-7 | ✅ | sec proto | `docs/backlog.md:13943` | Ссылка на партию не пускает по незнанию: |
-| OPS-2 | ✅ | ops sec | `docs/backlog.md:13981` | Обновление доносит до машины новые ключи |
-| REL-6 | ✅ | srv | `docs/backlog.md:14003` | Возврат на своё место мгновенный: перехват вместо |
-| CMB-4 | ✅ | core | `docs/backlog.md:14018` | Первый раунд боя — на самой встрече, а не через |
-| BLD-1 | ✅ | core proto | `docs/backlog.md:14038` | Очередь строительства: заказы встают в |
-| UI-14 | ✅ | proto | `docs/backlog.md:14078` | Осмотр чужого флота должен быть находимым. |
-| CMB-5 | ✅ | core | `docs/backlog.md:14101` | Вражда началась — стоящие рядом флоты сходятся |
-| ATK-1 | ✅ | proto | `docs/backlog.md:14117` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
-| SHIPART-1 | ✅ | proto cli | `docs/backlog.md:14143` | Реалистичные портреты в постройке и описаниях, |
-| YARD-1 | ✅ | data proto srv | `docs/backlog.md:14254` | Корабли строит ВЕРФЬ, челноки — |
-| YARD-2 | ✅ | data | `docs/backlog.md:14288` | У верфи два яруса: дешёвый строит, дорогой |
-| CMB-7 | ✅ | core | `docs/backlog.md:14312` | Перемирие посреди боя не останавливало бой. |
-| RLY-1 | ✅ | proto | `docs/backlog.md:14333` | Сбор построенного: соло и сеть играли по РАЗНЫМ |
-| CARGO-1 | ✅ | core proto | `docs/backlog.md:14365` | Часовая погрузка десанта жила в |
-| MRG-1 | ✅ | core proto | `docs/backlog.md:14413` | «Слиться по прибытии» — вторая половина |
-| ART-0 | ✅ | core data proto | `docs/backlog.md:14436` | Артиллерия снята из игры целиком |
-| ORB-1 | ✅ | core data proto | `docs/backlog.md:14467` | Орбитальный слой объявлен в |
-| ORB-4 | ✅ | core data proto | `docs/backlog.md:14503` | в астероидном поле строилось всё, что угодно: |
-| ORB-2 | ✅ | data proto | `docs/backlog.md:14544` | «Изучается технология, строится здание» не |
-| ORB-3 | ✅ | proto | `docs/backlog.md:14572` | Звёздный форт выдавал орбитальное ПКО мимо |
-| CMB-6 | ✅ | core | `docs/backlog.md:14609` | После ничьей третий враждебный флот получает свой |
-| ORD-2 | ✅ | proto | `docs/backlog.md:14639` | Нацеленный ШТУРМ теперь переживает закрытую |
-| FOG-10 | ✅ | proto core | `docs/backlog.md:14659` | Память разведки перестала жить только |
-| FOG-9 | ✅ | core | `docs/backlog.md:14683` | Приостановленная стройка чужого мира была видна |
-| TEST-4 | ✅ | srv | `docs/backlog.md:14693` | topXp падал на живой базе разработчика. |
-| PHONE-STRATEGY | ✅ |  | `docs/backlog.md:14745` | Технологии, постройки, производство, рынок и дипломатия |
-| MAP-PERF | ✅ |  | `docs/backlog.md:14757` | Ускорение движения раскрытой голографической карты и подготовка |
+| RESIL-1 | ✅ | proto | `docs/backlog.md:13714` | Фоновые промисы браузерного клиента. |
+| RESIL-2 | ✅ | proto | `docs/backlog.md:13741` | Цикл подсветки обучающего тура. |
+| RESIL-3 | ✅ | srv | `docs/backlog.md:13758` | Именованный фатал процесса. |
+| RESIL-4 | ✅ | srv | `docs/backlog.md:13778` | Соак проверяет, что мир не встал. |
+| RESIL-5 | ✅ | srv proto | `docs/backlog.md:13796` | Генеральная репетиция: весь стек разом, и |
+| RESIL-6 | ✅ | srv proto | `docs/backlog.md:13831` | Достоверность генералки: настоящая база, |
+| ADDR-7 | ✅ | sec proto | `docs/backlog.md:13973` | Ссылка на партию не пускает по незнанию: |
+| OPS-2 | ✅ | ops sec | `docs/backlog.md:14011` | Обновление доносит до машины новые ключи |
+| REL-6 | ✅ | srv | `docs/backlog.md:14033` | Возврат на своё место мгновенный: перехват вместо |
+| CMB-4 | ✅ | core | `docs/backlog.md:14048` | Первый раунд боя — на самой встрече, а не через |
+| BLD-1 | ✅ | core proto | `docs/backlog.md:14068` | Очередь строительства: заказы встают в |
+| UI-14 | ✅ | proto | `docs/backlog.md:14108` | Осмотр чужого флота должен быть находимым. |
+| CMB-5 | ✅ | core | `docs/backlog.md:14131` | Вражда началась — стоящие рядом флоты сходятся |
+| ATK-1 | ✅ | proto | `docs/backlog.md:14147` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
+| SHIPART-1 | ✅ | proto cli | `docs/backlog.md:14173` | Реалистичные портреты в постройке и описаниях, |
+| YARD-1 | ✅ | data proto srv | `docs/backlog.md:14284` | Корабли строит ВЕРФЬ, челноки — |
+| YARD-2 | ✅ | data | `docs/backlog.md:14318` | У верфи два яруса: дешёвый строит, дорогой |
+| CMB-7 | ✅ | core | `docs/backlog.md:14342` | Перемирие посреди боя не останавливало бой. |
+| RLY-1 | ✅ | proto | `docs/backlog.md:14363` | Сбор построенного: соло и сеть играли по РАЗНЫМ |
+| CARGO-1 | ✅ | core proto | `docs/backlog.md:14395` | Часовая погрузка десанта жила в |
+| MRG-1 | ✅ | core proto | `docs/backlog.md:14443` | «Слиться по прибытии» — вторая половина |
+| ART-0 | ✅ | core data proto | `docs/backlog.md:14466` | Артиллерия снята из игры целиком |
+| ORB-1 | ✅ | core data proto | `docs/backlog.md:14497` | Орбитальный слой объявлен в |
+| ORB-4 | ✅ | core data proto | `docs/backlog.md:14533` | в астероидном поле строилось всё, что угодно: |
+| ORB-2 | ✅ | data proto | `docs/backlog.md:14574` | «Изучается технология, строится здание» не |
+| ORB-3 | ✅ | proto | `docs/backlog.md:14602` | Звёздный форт выдавал орбитальное ПКО мимо |
+| CMB-6 | ✅ | core | `docs/backlog.md:14639` | После ничьей третий враждебный флот получает свой |
+| ORD-2 | ✅ | proto | `docs/backlog.md:14669` | Нацеленный ШТУРМ теперь переживает закрытую |
+| FOG-10 | ✅ | proto core | `docs/backlog.md:14689` | Память разведки перестала жить только |
+| FOG-9 | ✅ | core | `docs/backlog.md:14713` | Приостановленная стройка чужого мира была видна |
+| TEST-4 | ✅ | srv | `docs/backlog.md:14723` | topXp падал на живой базе разработчика. |
+| PHONE-STRATEGY | ✅ |  | `docs/backlog.md:14775` | Технологии, постройки, производство, рынок и дипломатия |
+| MAP-PERF | ✅ |  | `docs/backlog.md:14787` | Ускорение движения раскрытой голографической карты и подготовка |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
@@ -720,29 +720,30 @@
 | EC-5.2 | 🔒 | data | `docs/economy-roadmap.md:315` | Балансные рычаги через данные (live-ops) |
 | EC-6.1 | 🔒 | srv sec | `docs/economy-roadmap.md:328` | Детекция RMT-паттернов |
 | EC-6.2 | 🔒 | srv docs | `docs/economy-roadmap.md:332` | Модерация торговли и споры |
-| FORT-0.1 | 🗑 | data | `docs/fortress-roadmap.md:311` | Узлы empty в картах канона — снято 2026-09-15 |
-| FORT-0.2 | ✅ | core proto | `docs/fortress-roadmap.md:326` | Крепость в прототипе: модуль, правило, кнопка |
-| FORT-1.1 | 🗑 |  | `docs/fortress-roadmap.md:361` | Технический юнит + технология — снято 2026-09-15 |
-| FORT-1.2 | 🗑 |  | `docs/fortress-roadmap.md:376` | Конверсия расходует техюнит — снято 2026-09-15 |
-| FORT-1.3 | 🗑 |  | `docs/fortress-roadmap.md:390` | Вкладка технических юнитов в «Верфи» — снято 2026-09-15 |
-| FORT-1.4 | ✅ | proto | `docs/fortress-roadmap.md:402` | Недостающие ключи отказов |
-| FORT-2.1 | ⏳ | data | `docs/fortress-roadmap.md:424` | Юнит «Гарнизон» |
-| FORT-2.2 | 🔒 | core data | `docs/fortress-roadmap.md:435` | Форт выдаёт и забирает гарнизон |
-| FORT-2.3 | 🔒 | data core | `docs/fortress-roadmap.md:449` | Потолок гарнизона и фракционный модификатор |
-| FORT-3.1 | ⏳ | data | `docs/fortress-roadmap.md:463` | Уровни orbitalaa |
-| FORT-3.2 | 🔒 | core data | `docs/fortress-roadmap.md:468` | ПВО бьёт авиацию, а не только корабли |
-| FORT-4.1 | ✅ | core data | `docs/fortress-roadmap.md:482` | Какие ещё узлы конвертируются |
-| FORT-5.1 | ⏳ | data core | `docs/fortress-roadmap.md:506` | Технологию крепости надо ИЗУЧИТЬ |
-| FORT-5.2 | 🔒 | data core | `docs/fortress-roadmap.md:516` | Ядро крепости: уровни 1–5, HP, стрельба |
-| FORT-5.3 | 🔒 | core data | `docs/fortress-roadmap.md:528` | Слоты построек |
-| FORT-5.4 | 🔒 | core data | `docs/fortress-roadmap.md:540` | Крепость ВСТУПАЕТ В БОЙ |
-| FORT-5.5 | ⏳ | data core | `docs/fortress-roadmap.md:552` | Класс корпуса у кораблей |
-| FORT-5.6 | 🔒 | data | `docs/fortress-roadmap.md:561` | Верфь крепости: три уровня |
-| FORT-5.7 | 🔒 | data core | `docs/fortress-roadmap.md:568` | Ангар крепости |
-| FORT-5.8 | ⏳ | core | `docs/fortress-roadmap.md:574` | Док чинит СОЮЗНИКУ |
-| FORT-5.9 | 🔒 | core data | `docs/fortress-roadmap.md:586` | Больница лечит ТРЮМ |
-| FORT-5.10 | 🔒 | core data | `docs/fortress-roadmap.md:596` | Щиты крепости |
-| FORT-5.11 | 🔒 | data | `docs/fortress-roadmap.md:605` | Технологии открывают постройки крепости |
+| FORT-0.1 | 🗑 | data | `docs/fortress-roadmap.md:350` | Узлы empty в картах канона — снято 2026-09-15 |
+| FORT-0.2 | ✅ | core proto | `docs/fortress-roadmap.md:365` | Крепость в прототипе: модуль, правило, кнопка |
+| FORT-1.1 | 🗑 |  | `docs/fortress-roadmap.md:400` | Технический юнит + технология — снято 2026-09-15 |
+| FORT-1.2 | 🗑 |  | `docs/fortress-roadmap.md:415` | Конверсия расходует техюнит — снято 2026-09-15 |
+| FORT-1.3 | 🗑 |  | `docs/fortress-roadmap.md:429` | Вкладка технических юнитов в «Верфи» — снято 2026-09-15 |
+| FORT-1.4 | ✅ | proto | `docs/fortress-roadmap.md:441` | Недостающие ключи отказов |
+| FORT-2.1 | ⏳ | data | `docs/fortress-roadmap.md:463` | Юнит «Гарнизон» |
+| FORT-2.2 | 🔒 | core data | `docs/fortress-roadmap.md:474` | Форт выдаёт и забирает гарнизон |
+| FORT-2.3 | 🔒 | data core | `docs/fortress-roadmap.md:488` | Потолок гарнизона и фракционный модификатор |
+| FORT-3.1 | ⏳ | data | `docs/fortress-roadmap.md:502` | Уровни orbitalaa |
+| FORT-3.2 | 🔒 | core data | `docs/fortress-roadmap.md:507` | ПВО бьёт авиацию, а не только корабли |
+| FORT-4.1 | ✅ | core data | `docs/fortress-roadmap.md:521` | Какие ещё узлы конвертируются |
+| FORT-5.1 | ⏳ | data core | `docs/fortress-roadmap.md:545` | Технологию крепости надо ИЗУЧИТЬ |
+| FORT-5.2 | ✅ | data core | `docs/fortress-roadmap.md:555` | Ядро крепости: starfort дорос до пяти уровней |
+| FORT-5.3 | ⏳ | core data | `docs/fortress-roadmap.md:601` | Слоты построек |
+| FORT-5.4 | ⏳ | core data | `docs/fortress-roadmap.md:614` | Крепость ВСТУПАЕТ В БОЙ |
+| FORT-5.12 | ⏳ | core data | `docs/fortress-roadmap.md:632` | Крепость под ударом: не бомбардируется, и бой глушит работу |
+| FORT-5.5 | ⏳ | data core | `docs/fortress-roadmap.md:655` | Класс корпуса у кораблей |
+| FORT-5.6 | 🔒 | data | `docs/fortress-roadmap.md:664` | Верфь крепости: три уровня |
+| FORT-5.7 | ⏳ | data core | `docs/fortress-roadmap.md:671` | Ангар крепости |
+| FORT-5.8 | ⏳ | core | `docs/fortress-roadmap.md:677` | Док чинит СОЮЗНИКУ |
+| FORT-5.9 | ⏳ | core data | `docs/fortress-roadmap.md:689` | Больница лечит ТРЮМ |
+| FORT-5.10 | ⏳ | core data | `docs/fortress-roadmap.md:699` | Щиты крепости |
+| FORT-5.11 | ⏳ | data | `docs/fortress-roadmap.md:708` | Технологии открывают постройки крепости |
 | GI-0.1 | ✅ | srv sec | `docs/game-integrity-roadmap.md:41` | Rate-limiting действий |
 | GI-0.2 | ⏳ | srv | `docs/game-integrity-roadmap.md:49` | Per-player очередь (анти-double-spend) |
 | GI-0.3 | ✅ | srv | `docs/game-integrity-roadmap.md:53` | Туман как граница (анти-maphack) (в основном) |
@@ -1046,14 +1047,16 @@
 | SHU-1.2 | ✅ | core proto | `docs/shuttles-roadmap.md:139` | Удар и возврат |
 | SHU-1.3 | ✅ | core data | `docs/shuttles-roadmap.md:167` | Перехват |
 | SHU-2.1 | ✅ | core data | `docs/shuttles-roadmap.md:203` | Носитель как мобильный космопорт |
-| SHU-2.2 | ✅ | core srv proto | `docs/shuttles-roadmap.md:232` | Снос старой машинерии 2026-09-11 |
-| SHU-3.1 | ✅ | proto | `docs/shuttles-roadmap.md:301` | Интерфейс 2026-09-10 |
-| SHU-3.2 | ✅ | proto | `docs/shuttles-roadmap.md:463` | Бот умеет челноки 2026-09-09 |
-| SHU-3.3 | ✅ | proto | `docs/shuttles-roadmap.md:505` | Носитель у бота 2026-09-15 |
-| SHU-4.1 | ✅ | proto | `docs/shuttles-roadmap.md:552` | Словарь: эскадра у мира, флот у кораблей 2026-09-10 |
-| SHU-4.2 | ✅ | core data | `docs/shuttles-roadmap.md:594` | Эскадра как соединение ангара 2026-09-10 |
-| SHU-4.3 | ✅ | proto | `docs/shuttles-roadmap.md:654` | Панель мира: эскадры как флоты 2026-09-10 |
-| SHU-4.4 | ✅ | core | `docs/shuttles-roadmap.md:706` | Погоня: удар по движущейся цели 2026-09-13 |
+| SHU-2.2 | ✅ | core srv proto | `docs/shuttles-roadmap.md:235` | Снос старой машинерии 2026-09-11 |
+| SHU-2.3 | ✅ | core proto | `docs/shuttles-roadmap.md:301` | Вылет с ИДУЩЕГО носителя 2026-09-16 |
+| SHU-3.1 | ✅ | proto | `docs/shuttles-roadmap.md:352` | Интерфейс 2026-09-10 |
+| SHU-3.2 | ✅ | proto | `docs/shuttles-roadmap.md:514` | Бот умеет челноки 2026-09-09 |
+| SHU-3.3 | ✅ | proto | `docs/shuttles-roadmap.md:556` | Носитель у бота 2026-09-15 |
+| SHU-3.4 | ✅ | proto core data | `docs/shuttles-roadmap.md:597` | Наземная война бота: разведка, уверенность, высадка 2026-09-16 |
+| SHU-4.1 | ✅ | proto | `docs/shuttles-roadmap.md:670` | Словарь: эскадра у мира, флот у кораблей 2026-09-10 |
+| SHU-4.2 | ✅ | core data | `docs/shuttles-roadmap.md:712` | Эскадра как соединение ангара 2026-09-10 |
+| SHU-4.3 | ✅ | proto | `docs/shuttles-roadmap.md:772` | Панель мира: эскадры как флоты 2026-09-10 |
+| SHU-4.4 | ✅ | core | `docs/shuttles-roadmap.md:824` | Погоня: удар по движущейся цели 2026-09-13 |
 | ST-3.1 | ✅ | core | `docs/steward-roadmap.md:68` | Ядро: доля потерь по прогнозу + трипваер «враг близко» |
 | ST-3.2 | ✅ | srv proto | `docs/steward-roadmap.md:89` | Драйвер: эвакуация под угрозой (поза defend) |
 | ST-3.3 | ✅ | core srv proto | `docs/steward-roadmap.md:116` | Поза «Активная оборона» — контрудар при приемлемых потерях |
@@ -1080,3 +1083,15 @@
 | VET-3 | ✅ | core data | `docs/unit-medals-roadmap.md:285` | Грейды и пороги |
 | VET-4 | ✅ | core data | `docs/unit-medals-roadmap.md:311` | Выплата, растущая со степенью |
 | VET-5 | ✅ | proto cli | `docs/unit-medals-roadmap.md:341` | Медали в карточке юнита |
+| YAG-0.1 | ⏳ | docs | `docs/yandex-games-roadmap.md:198` | Сверить требования с первоисточником |
+| YAG-1.1 | 🔒 | proto | `docs/yandex-games-roadmap.md:210` | Четвёртая цель сборки: вход без сети |
+| YAG-1.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:218` | Подключение SDK и разметка игры |
+| YAG-1.3 | 🔒 | proto | `docs/yandex-games-roadmap.md:224` | Язык от площадки |
+| YAG-2.1 | 🔒 | proto | `docs/yandex-games-roadmap.md:233` | Компактный дескриптор забега |
+| YAG-2.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:240` | Облачный бэкенд хранилища |
+| YAG-3.1 | 🔒 | proto | `docs/yandex-games-roadmap.md:250` | Полноэкранная реклама между волнами |
+| YAG-3.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:257` | Rewarded: продолжение и переброс выбора |
+| YAG-4.1 | 🔒 | srv | `docs/yandex-games-roadmap.md:267` | Эндпойнт проверки подписи |
+| YAG-4.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:273` | Отключение рекламы как товар |
+| YAG-5.1 | ⏳ | docs | `docs/yandex-games-roadmap.md:283` | Что мерить на живых игроках |
+| YAG-5.2 | 🔒 | docs | `docs/yandex-games-roadmap.md:290` | Карточка игры и подача в модерацию |

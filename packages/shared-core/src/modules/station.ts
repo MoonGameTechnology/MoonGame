@@ -1,5 +1,5 @@
 import type { GameModule, HandlerContext } from '../kernel/module';
-import type { ResourceBag } from '../data/schemas';
+import { buildingLevel, type ResourceBag } from '../data/schemas';
 import { canAfford, payCost } from '../util/treasury';
 import { isStationable } from '../state/sectorKind';
 
@@ -34,6 +34,20 @@ import { isStationable } from '../state/sectorKind';
  */
 
 const STATION_KIND = 'void_station';
+/**
+ * ЯДРО крепости — здание, в котором живёт её уровень (FORT-5.2, решение владельца 18).
+ *
+ * Почему зданием, а не полем узла: уровень, HP и прокачка в этой игре существуют ТОЛЬКО
+ * у `BuildingInstance`; у вида узла их нет и быть не может — вид это ярлык, а не объект.
+ * Здание при этом не новое: владелец решил дорастить `starfort` («Void Fortress»), а не
+ * заводить рядом второе с тем же смыслом.
+ *
+ * Руками его не строят: в каталоге у него `onlyOn: []` — «возводится нигде», тот же
+ * способ сказать «нет», каким `allowedBuildings: []` закрывает застройку вида. Появляется
+ * оно ровно здесь, вместе с крепостью, и растёт обычным `building.upgrade` (тот ростера
+ * и `onlyOn` не спрашивает — проверено, иначе прокачка встала бы вместе с постройкой).
+ */
+const CORE_BUILDING = 'starfort';
 /** Цена крепости. ЭКСПОРТИРУЕТСЯ намеренно: кнопку рисует клиент, и своя копия числа у
  *  него — это ровно тот способ, которым интерфейс начинает обещать то, что редьюсер
  *  отклоняет (прецедент ORB-4 записан в `main.ts`: три собственных `?? BUILDABLE` развели
@@ -60,8 +74,15 @@ export const stationModule: GameModule = {
       if (!isStationable(h.ctx.data, node)) return h.reject('E_NOT_STATIONABLE');
       if (!canAfford(player.resources, STATION_COST)) return h.reject('E_INSUFFICIENT');
 
+      // Ядро обязано быть в каталоге: без него крепость вышла бы бестелесной — без HP,
+      // без стрельбы и без уровня, то есть обещание действия не выполнилось бы. Отказ
+      // честнее молчаливой пустышки (инвариант fail-secure).
+      const core = h.ctx.data.buildings[CORE_BUILDING];
+      if (!core) return h.reject('E_UNKNOWN_BUILDING');
+
       payCost(player.resources, STATION_COST);
       node.kind = STATION_KIND; // ownable + buildable: radar/fort/… via building.construct
+      node.buildings.push({ type: CORE_BUILDING, level: 1, hp: buildingLevel(core, 1).hp });
       h.emit('station.deployed', { planetId, owner: action.playerId });
     });
   },

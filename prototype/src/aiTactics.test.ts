@@ -233,7 +233,24 @@ describe('AI-BAL-7 — осада (`fleet.bombard`)', () => {
   });
 
   it('мир, который МОЖНО взять, берётся, а не осаждается', () => {
-    // Осада не должна подменять собой захват: с десантом в трюме мир штурмуют.
+    // Осада не должна подменять собой захват: с десантом, которому мир по силам, его
+    // штурмуют. «По силам» с решения владельца 2026-09-16 (правило №2) значит прогноз,
+    // а не наличие хоть кого-то в трюме, — поэтому десант здесь настоящий, а не двое
+    // ополченцев, которые до правки отдавали приказ и гибли под гарнизоном.
+    const s = game2();
+    const orders = aiOrders(
+      siegeState(s, { landing: [{ unit: 'tank', count: 8 }] }),
+      'p2',
+      'expand',
+      'strong',
+    );
+    expect(only(orders, 'fleet.assault')).toHaveLength(1);
+    expect(only(orders, 'fleet.bombard')).toHaveLength(0);
+  });
+
+  it('мир, который взять НЕЧЕМ, ОСАЖДАЕТСЯ — слабый десант больше не бросают под гарнизон', () => {
+    // Оборотная сторона того же правила: флот с горсткой ополчения не отдаёт штурм, а
+    // делает то, что может, — бомбит. Раньше он штурмовал и терял десант.
     const s = game2();
     const orders = aiOrders(
       siegeState(s, { landing: [{ unit: 'militia', count: 2 }] }),
@@ -241,8 +258,8 @@ describe('AI-BAL-7 — осада (`fleet.bombard`)', () => {
       'expand',
       'strong',
     );
-    expect(only(orders, 'fleet.assault')).toHaveLength(1);
-    expect(only(orders, 'fleet.bombard')).toHaveLength(0);
+    expect(only(orders, 'fleet.assault')).toHaveLength(0);
+    expect(only(orders, 'fleet.bombard')).toHaveLength(1);
   });
 
   it('ПУСТОЙ гарнизон занимается без десанта — `captureOnArrival` тут уже не сработает', () => {

@@ -258,7 +258,7 @@ export const en: Record<string, string> = {
   'hint.wing-empty': '✖ nothing to launch — the hangar is empty',
   'side.build.open': 'Build',
   'side.fortress.raise': 'Raise fortress',
-  'side.wing.blocked.busy': 'sorties launch from a standstill — the carrier is not parked',
+  'side.wing.blocked.busy': 'the carrier is in battle — no squadron is launching now',
   'side.wing.blocked.empty': 'the hangar is empty — nothing to launch',
   'side.wing.cargo': 'aboard: {n}',
   'side.wing.duty.off': '🛩 Stand duty',
@@ -866,7 +866,7 @@ export const en: Record<string, string> = {
   'dossier.building.refinery':
     'A refining complex turning ore and logistics into liquid credits — {c}¤ per hour. Fuel for imperial bureaucracy, shipyards and mercenary shuttles.',
   'dossier.building.starfort':
-    'A standalone fortress raised in an asteroid field: {d} to defense and {hp} structure HP. Turns a faceless crossroads into a fortified node with orbit and AA.',
+    'The hull of a void fortress — what the node stands and fights with. {hp} structure HP, {aa} against ships and {pd} against shuttles, {d} to ground defense. Grows with the fortress level; it is never built on its own, it arrives with the fortress.',
   'dossier.building.tax-office':
     "An imperial-style tax office: produces nothing itself, but registers the world's population and lifts its credit take by {b}.",
   'dossier.fleet.desc':
