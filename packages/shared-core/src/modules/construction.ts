@@ -9,6 +9,7 @@ import type {
 import type { BuildingDef, GameData, ResourceBag, UnitDef } from '../data/schemas';
 import { buildingLevel, buildingMaxLevel } from '../data/schemas';
 import { isBombarded } from '../state/orbit';
+import { fleetAtOwnDock } from '../util/repair';
 import { battleAt, battleLocations } from '../state/battle';
 import { allowedBuildings, isBuildable } from '../state/sectorKind';
 import type { Action } from '../action/types';
@@ -1286,11 +1287,14 @@ export const constructionModule: GameModule = {
         // сам в драку не втянут. Прежде такой флот спокойно чинился посреди сражения.
         if (fleet.location !== null && fighting.has(fleet.location)) continue;
 
-        // Hull mends only while parked over a FRIENDLY world with a repair yard
-        // (shipyard/spaceport `shipRepair`, shields-roadmap SH-2.1) — no yard, no mend.
+        // Корпус чинится только у ДРУЖЕСТВЕННОГО мира с верфью или космопортом
+        // (`shipRepair`, shields-roadmap SH-2.1) — нет дока, нет починки. «Дружественный»
+        // с FORT-5.8 значит свой ИЛИ союзный: правило одно на все три пути ремонта, и
+        // живёт оно в `fleetAtOwnDock`. Частичный эффект здесь был бы необъяснимым —
+        // ровно так разъезжались два хука наземной защиты форта.
         let hullRate = 0;
         const planet = fleet.location ? h.state.planets[fleet.location] : undefined;
-        if (planet && !fleet.movement && planet.owner === fleet.owner) {
+        if (planet && fleetAtOwnDock(fleet, h.state, data, (a, b) => isAllied(h, a, b))) {
           for (const b of planet.buildings) {
             if (b.hp <= 0) continue;
             const def = data.buildings[b.type];
