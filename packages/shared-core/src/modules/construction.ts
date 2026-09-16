@@ -9,6 +9,7 @@ import type {
 import type { BuildingDef, GameData, ResourceBag, UnitDef } from '../data/schemas';
 import { buildingLevel, buildingMaxLevel } from '../data/schemas';
 import { isBombarded } from '../state/orbit';
+import { battleAt, battleLocations } from '../state/battle';
 import { allowedBuildings, isBuildable } from '../state/sectorKind';
 import type { Action } from '../action/types';
 import { hoursToMs, timeScaleOf } from '../action/types';
@@ -281,9 +282,23 @@ function scheduleQueuePump(h: HandlerContext, planetId: string, lane: BuildLane)
  * Порядок проверок — фикс: полоса занята → нечего решать; заказ протух → выбросить и
  * взяться за следующий; денег нет → ЖДАТЬ (заказ остаётся головой, назначается повтор).
  */
+/**
+ * УЗЕЛ НЕ РАБОТАЕТ — и почему именно. Две разные беды с разными сообщениями игроку:
+ * обстрел с орбиты и бой прямо здесь (решение владельца 17). Один дом на все ворота,
+ * иначе шесть копий этого «или» разойдутся, как уже расходились два хука форта.
+ *
+ * Отдельный код для боя нужен, потому что `E_BOMBARDED` в этом случае СОВРЁТ: игрок
+ * пойдёт искать чужой флот на орбите, а бой идёт у него под окнами.
+ */
+function suppressed(h: HandlerContext, planetId: string): 'E_BOMBARDED' | 'E_BATTLE_HERE' | null {
+  if (isBombarded(h.state, planetId, h.ctx.data)) return 'E_BOMBARDED';
+  if (battleAt(h.state, planetId)) return 'E_BATTLE_HERE';
+  return null;
+}
+
 function startNextQueued(h: HandlerContext, planet: Planet, lane: BuildLane): void {
   if (laneBusy(h, planet.id, lane)) return;
-  if (isBombarded(h.state, planet.id, h.ctx.data)) return; // производство заморожено — не старт, а пауза
+  if (suppressed(h, planet.id)) return; // узел не работает — не старт, а пауза
   for (;;) {
     const queue = planet.buildQueue ?? [];
     const head = queue.find((q) => laneOfKind(q.kind) === lane);
@@ -569,8 +584,9 @@ export const constructionModule: GameModule = {
         return h.reject('E_BAD_PAYLOAD');
       }
       const { planet, player } = ownedPlanet(h, action, payload.planetId);
-      if (isBombarded(h.state, planet.id, h.ctx.data)) {
-        return h.reject('E_BOMBARDED'); // production frozen under bombardment
+      const stopped = suppressed(h, planet.id);
+      if (stopped) {
+        return h.reject(stopped); // узел не работает: обстрел либо бой прямо здесь
       }
       const def = h.ctx.data.buildings[payload.building];
       if (!def) {
@@ -654,8 +670,9 @@ export const constructionModule: GameModule = {
         return h.reject('E_BAD_PAYLOAD');
       }
       const { planet, player } = ownedPlanet(h, action, payload.planetId);
-      if (isBombarded(h.state, planet.id, h.ctx.data)) {
-        return h.reject('E_BOMBARDED');
+      const stopped = suppressed(h, planet.id);
+      if (stopped) {
+        return h.reject(stopped); // узел не работает: обстрел либо бой прямо здесь
       }
       // RULES-2.1: address a SPECIFIC instance by uid when maxPerPlanet > 1.
       // Without uid (old client / maxPerPlanet=1), fall back to find-by-type.
@@ -723,8 +740,9 @@ export const constructionModule: GameModule = {
         return h.reject('E_BAD_PAYLOAD');
       }
       const { planet, player } = ownedPlanet(h, action, payload.planetId);
-      if (isBombarded(h.state, planet.id, h.ctx.data)) {
-        return h.reject('E_BOMBARDED');
+      const stopped = suppressed(h, planet.id);
+      if (stopped) {
+        return h.reject(stopped); // узел не работает: обстрел либо бой прямо здесь
       }
       const def = h.ctx.data.units[payload.unit];
       if (!def) {
@@ -914,8 +932,9 @@ export const constructionModule: GameModule = {
         return h.reject('E_BAD_PAYLOAD');
       }
       const { planet, player } = ownedPlanet(h, action, payload.planetId);
-      if (isBombarded(h.state, planet.id, h.ctx.data)) {
-        return h.reject('E_BOMBARDED');
+      const stopped = suppressed(h, planet.id);
+      if (stopped) {
+        return h.reject(stopped); // узел не работает: обстрел либо бой прямо здесь
       }
       const paused = planet.pausedConstruction ?? [];
       const site = paused.find((s) => s.id === payload.id);
@@ -988,8 +1007,8 @@ export const constructionModule: GameModule = {
       if (!planet || planet.owner !== p.playerId) {
         return; // planet gone or captured mid-build → investment forfeited
       }
-      if (isBombarded(h.state, planet.id, h.ctx.data)) {
-        // production frozen under bombardment → re-defer until it lifts (scale the
+      if (suppressed(h, planet.id)) {
+        // узел не работает (обстрел или бой) → отложить до лучших времён (scale the
         // retry by timeScale like every other duration, so a fast match isn't stuck)
         h.schedule(h.ctx.now + hoursToMs(h.ctx, 1), 'construction.complete', p);
         return;
@@ -1178,17 +1197,14 @@ export const constructionModule: GameModule = {
       const hours = (span / MS_PER_HOUR) * scale;
       const data = h.ctx.data;
 
-      // Planets hosting a live ground assault — their garrisons don't regen
-      // mid-battle (mirrors the ship `battleId` guard in the fleet loop below;
-      // a planet carries no in-battle flag, so derive it from `state.battles`).
-      const groundBattleLocations = new Set<string>();
-      for (const b of Object.values(h.state.battles)) {
-        if (b.phase === 'ground') groundBattleLocations.add(b.location);
-      }
+      // Узлы, где идёт бой ЛЮБОЙ фазы, не лечат гарнизон (решение владельца 17).
+      // Прежде условием был только НАЗЕМНЫЙ бой, и это давало странность: флот врага
+      // режется с крепостью на орбите, а её госпиталь спокойно штопает гарнизон.
+      const fighting = battleLocations(h.state);
 
       for (const planet of Object.values(h.state.planets)) {
         if (planet.owner === null || planet.garrison.length === 0) continue;
-        if (groundBattleLocations.has(planet.id)) continue;
+        if (fighting.has(planet.id)) continue;
         let totalHealRate = 0;
         for (const b of planet.buildings) {
           if (b.hp <= 0) continue; // destroyed building contributes nothing
@@ -1219,6 +1235,9 @@ export const constructionModule: GameModule = {
       const SHIELD_REGEN_DELAY = MS_PER_HOUR; // shields stay down this long after a hit
       for (const fleet of Object.values(h.state.fleets)) {
         if (fleet.battleId) continue; // a fleet in combat regenerates nothing
+        // Решение владельца 17: пока на узле идёт бой, док не чинит — даже флот, который
+        // сам в драку не втянут. Прежде такой флот спокойно чинился посреди сражения.
+        if (fleet.location !== null && fighting.has(fleet.location)) continue;
 
         // Hull mends only while parked over a FRIENDLY world with a repair yard
         // (shipyard/spaceport `shipRepair`, shields-roadmap SH-2.1) — no yard, no mend.

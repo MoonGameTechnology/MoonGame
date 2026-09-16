@@ -116,7 +116,8 @@
       "label": "void fortress",
       "shape": "station"
     },
-    "stationable": false
+    "stationable": false,
+    "bombardable": false
   },
   "pirate_base": {
     "name": "Pirate Base",

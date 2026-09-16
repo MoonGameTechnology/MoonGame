@@ -548,6 +548,16 @@ export const SectorKindDefSchema = z.object({
    *  Незахватываемые виды (`empty`, обломки, чёрная дыра) флага не требуют: крепость
    *  ставится только на СВОЁМ узле, а своим незахватываемое не станет никогда. */
   stationable: z.boolean().default(true),
+  /**
+   * Можно ли обстреливать этот узел с орбиты. По умолчанию да.
+   *
+   * ОТДЕЛЬНЫЙ ФЛАГ, А НЕ «СНЯТЬ ОРБИТУ», и это не перестраховка: обстрел требует у узла
+   * орбитального слоя, но слой нужен узлу и для СОБСТВЕННОЙ зенитки. Снимешь орбиту у
+   * крепости, чтобы её не обстреливали, — она перестанет и отстреливаться. Поэтому
+   * запрет живёт своим полем (решение владельца 16: «бомбардировка невозможна крепости;
+   * прилетевший флот вступает в бой и бьёт по корпусу»).
+   */
+  bombardable: z.boolean().default(true),
   /** Province-centric build roster: the building ids raisable on this province type.
    *  Absent/undefined = ANY building (the permissive default, so kind-less / roster-less
    *  worlds keep building as before). Explicit `[]` = no construction here (empty /
