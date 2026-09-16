@@ -18,7 +18,8 @@
     "buildable": true,
     "orbit": false,
     "allowedBuildings": [
-      "starfort"
+      "starfort",
+      "metal_station"
     ],
     "appearance": {
       "color": "#d6a645",
@@ -108,7 +109,8 @@
       "fort",
       "power_plant",
       "fabricator",
-      "orbital_aa"
+      "orbital_aa",
+      "metal_station"
     ],
     "appearance": {
       "color": "#5f8f8c",

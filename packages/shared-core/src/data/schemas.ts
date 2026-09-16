@@ -276,6 +276,22 @@ export const BuildingDefSchema = z.object({
   defenseBonus: z.number().default(0.01),
   /** Overrides for levels 2..N (index 0 = level 2). maxLevel = 1 + length. */
   upgrades: z.array(BuildingLevelSchema).default([]),
+  /**
+   * Виды провинций, где это здание вообще возводится. Отсутствует — где угодно (роль
+   * играет только ростер вида).
+   *
+   * ЗАЧЕМ ОГРАНИЧЕНИЕ СО СТОРОНЫ ЗДАНИЯ, когда уже есть `sectorKinds.allowedBuildings`.
+   * Ростер вида отвечает на вопрос «что тут можно», и этого достаточно, пока правило
+   * формулируется от МЕСТА. Решение владельца 3 сформулировано от ЗДАНИЯ — «добывающая
+   * станция строится ТОЛЬКО в мёртвых мирах и астероидных полях», — и ростером его не
+   * выразить: у планеты ростера нет вовсе (`undefined` = любое здание), так что запретить
+   * ей станцию можно было бы только выписав ей поимённый список ВСЕХ прочих зданий. Такой
+   * список устаревает на первом же новом здании, причём молча.
+   *
+   * Здесь же правило живёт в одном месте и переживает новые виды местности само: вид, о
+   * котором здание не знает, станцию не получит.
+   */
+  onlyOn: z.array(z.string()).optional(),
   traits: z.array(z.string()).default([]),
   /** Victory-score worth of this building; the victory module multiplies it by
    *  the instance's level, so investing in upgrades raises (and losing the

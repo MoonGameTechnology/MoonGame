@@ -573,57 +573,58 @@
 | MIG-7 | ✅ | cli | `docs/backlog.md:12946` | КНОПКИ: панель состава наконец отдаёт приказы, интентов стало семь. |
 | MIG-8 | ✅ | cli core | `docs/backlog.md:12986` | ПАНЕЛЬ МИРА: тап по миру перестал уходить в пустоту, интентов девять. |
 | MIG-9 | ✅ | cli | `docs/backlog.md:13017` | ДЕЛЕНИЕ и СЛИЯНИЕ флотов: интентов одиннадцать. |
-| AUD-1 | ✅ | cli | `docs/backlog.md:13059` | клиент собирал 11 фрагментов из 18. |
-| AUD-2 | ✅ | srv core | `docs/backlog.md:13079` | фог-роутинг событий не покрыт тестом. |
-| AUD-11 | ✅ | core | `docs/backlog.md:13108` | effect.applied всегда называет адресата. |
-| AUD-15 | ✅ | srv | `docs/backlog.md:13140` | сканер фог-контракта больше не слеп к комментариям. |
-| AUD-3 | ✅ | data | `docs/backlog.md:13163` | 28 непереводимых имён игровых данных вычищены. |
-| AUD-4 | ✅ | proto | `docs/backlog.md:13194` | гейт локализации увидел шипнутый контент. |
-| AUD-14 | ✅ | proto | `docs/backlog.md:13226` | имена домов доезжают до игрока переводом. |
-| AUD-12 | ✅ | proto | `docs/backlog.md:13248` | шапка досье героя больше не показывает игроку сам ключ. |
-| AUD-13 | ✅ | core proto | `docs/backlog.md:13264` | hero.name — отображаемый текст, вшитый в |
-| AUD-5 | ✅ | core | `docs/backlog.md:13308` | экспортирован runUntil(kernel, state, ctx, opts?). |
-| AUD-6 | ✅ | core | `docs/backlog.md:13323` | actionPayloadSchemas и CLIENTACTIONTYPES публичны. |
-| AUD-7 | ✅ | proto | `docs/backlog.md:13331` | SELFPLAYJSON отдаёт всё, что печатает человеку. |
-| AUD-8 | 🗑 | proto | `docs/backlog.md:13339` | сведён в CONV-12 |
-| AUD-9 | ✅ | sec | `docs/backlog.md:13347` | merge-queue выбрасывал PR с CIFAILURE при зелёном коде. |
-| AUD-10 | ✅ | sec | `docs/backlog.md:13375` | зелёный PR не вставал в очередь: у автомержа один шанс, и он |
-| FSPLIT-1 | ✅ | core act proto | `docs/backlog.md:13517` | Отбор при делении адресует СТЕК, а не тип корабля. |
-| FSPLIT-2 | ✅ | core act proto | `docs/backlog.md:13527` | Десант делится вместе с кораблями, по трюму обеих половин. |
-| AIDIFF-1 | ✅ | proto | `docs/backlog.md:13555` | Строка места переключается «выкл → слабый → сильный». |
-| RESIL-1 | ✅ | proto | `docs/backlog.md:13664` | Фоновые промисы браузерного клиента. |
-| RESIL-2 | ✅ | proto | `docs/backlog.md:13691` | Цикл подсветки обучающего тура. |
-| RESIL-3 | ✅ | srv | `docs/backlog.md:13708` | Именованный фатал процесса. |
-| RESIL-4 | ✅ | srv | `docs/backlog.md:13728` | Соак проверяет, что мир не встал. |
-| RESIL-5 | ✅ | srv proto | `docs/backlog.md:13746` | Генеральная репетиция: весь стек разом, и |
-| RESIL-6 | ✅ | srv proto | `docs/backlog.md:13781` | Достоверность генералки: настоящая база, |
-| ADDR-7 | ✅ | sec proto | `docs/backlog.md:13923` | Ссылка на партию не пускает по незнанию: |
-| OPS-2 | ✅ | ops sec | `docs/backlog.md:13961` | Обновление доносит до машины новые ключи |
-| REL-6 | ✅ | srv | `docs/backlog.md:13983` | Возврат на своё место мгновенный: перехват вместо |
-| CMB-4 | ✅ | core | `docs/backlog.md:13998` | Первый раунд боя — на самой встрече, а не через |
-| BLD-1 | ✅ | core proto | `docs/backlog.md:14018` | Очередь строительства: заказы встают в |
-| UI-14 | ✅ | proto | `docs/backlog.md:14058` | Осмотр чужого флота должен быть находимым. |
-| CMB-5 | ✅ | core | `docs/backlog.md:14081` | Вражда началась — стоящие рядом флоты сходятся |
-| ATK-1 | ✅ | proto | `docs/backlog.md:14097` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
-| SHIPART-1 | ✅ | proto cli | `docs/backlog.md:14123` | Реалистичные портреты в постройке и описаниях, |
-| YARD-1 | ✅ | data proto srv | `docs/backlog.md:14234` | Корабли строит ВЕРФЬ, челноки — |
-| YARD-2 | ✅ | data | `docs/backlog.md:14268` | У верфи два яруса: дешёвый строит, дорогой |
-| CMB-7 | ✅ | core | `docs/backlog.md:14292` | Перемирие посреди боя не останавливало бой. |
-| RLY-1 | ✅ | proto | `docs/backlog.md:14313` | Сбор построенного: соло и сеть играли по РАЗНЫМ |
-| CARGO-1 | ✅ | core proto | `docs/backlog.md:14345` | Часовая погрузка десанта жила в |
-| MRG-1 | ✅ | core proto | `docs/backlog.md:14393` | «Слиться по прибытии» — вторая половина |
-| ART-0 | ✅ | core data proto | `docs/backlog.md:14416` | Артиллерия снята из игры целиком |
-| ORB-1 | ✅ | core data proto | `docs/backlog.md:14447` | Орбитальный слой объявлен в |
-| ORB-4 | ✅ | core data proto | `docs/backlog.md:14483` | в астероидном поле строилось всё, что угодно: |
-| ORB-2 | ✅ | data proto | `docs/backlog.md:14524` | «Изучается технология, строится здание» не |
-| ORB-3 | ✅ | proto | `docs/backlog.md:14552` | Звёздный форт выдавал орбитальное ПКО мимо |
-| CMB-6 | ✅ | core | `docs/backlog.md:14589` | После ничьей третий враждебный флот получает свой |
-| ORD-2 | ✅ | proto | `docs/backlog.md:14619` | Нацеленный ШТУРМ теперь переживает закрытую |
-| FOG-10 | ✅ | proto core | `docs/backlog.md:14639` | Память разведки перестала жить только |
-| FOG-9 | ✅ | core | `docs/backlog.md:14663` | Приостановленная стройка чужого мира была видна |
-| TEST-4 | ✅ | srv | `docs/backlog.md:14673` | topXp падал на живой базе разработчика. |
-| PHONE-STRATEGY | ✅ |  | `docs/backlog.md:14691` | Технологии, постройки, производство, рынок и дипломатия |
-| MAP-PERF | ✅ |  | `docs/backlog.md:14703` | Ускорение движения раскрытой голографической карты и подготовка |
+| MIG-10 | ⏳ | cli proto | `docs/backlog.md:13046` | Ворота стройки: зеркало вместо решения. |
+| AUD-1 | ✅ | cli | `docs/backlog.md:13079` | клиент собирал 11 фрагментов из 18. |
+| AUD-2 | ✅ | srv core | `docs/backlog.md:13099` | фог-роутинг событий не покрыт тестом. |
+| AUD-11 | ✅ | core | `docs/backlog.md:13128` | effect.applied всегда называет адресата. |
+| AUD-15 | ✅ | srv | `docs/backlog.md:13160` | сканер фог-контракта больше не слеп к комментариям. |
+| AUD-3 | ✅ | data | `docs/backlog.md:13183` | 28 непереводимых имён игровых данных вычищены. |
+| AUD-4 | ✅ | proto | `docs/backlog.md:13214` | гейт локализации увидел шипнутый контент. |
+| AUD-14 | ✅ | proto | `docs/backlog.md:13246` | имена домов доезжают до игрока переводом. |
+| AUD-12 | ✅ | proto | `docs/backlog.md:13268` | шапка досье героя больше не показывает игроку сам ключ. |
+| AUD-13 | ✅ | core proto | `docs/backlog.md:13284` | hero.name — отображаемый текст, вшитый в |
+| AUD-5 | ✅ | core | `docs/backlog.md:13328` | экспортирован runUntil(kernel, state, ctx, opts?). |
+| AUD-6 | ✅ | core | `docs/backlog.md:13343` | actionPayloadSchemas и CLIENTACTIONTYPES публичны. |
+| AUD-7 | ✅ | proto | `docs/backlog.md:13351` | SELFPLAYJSON отдаёт всё, что печатает человеку. |
+| AUD-8 | 🗑 | proto | `docs/backlog.md:13359` | сведён в CONV-12 |
+| AUD-9 | ✅ | sec | `docs/backlog.md:13367` | merge-queue выбрасывал PR с CIFAILURE при зелёном коде. |
+| AUD-10 | ✅ | sec | `docs/backlog.md:13395` | зелёный PR не вставал в очередь: у автомержа один шанс, и он |
+| FSPLIT-1 | ✅ | core act proto | `docs/backlog.md:13537` | Отбор при делении адресует СТЕК, а не тип корабля. |
+| FSPLIT-2 | ✅ | core act proto | `docs/backlog.md:13547` | Десант делится вместе с кораблями, по трюму обеих половин. |
+| AIDIFF-1 | ✅ | proto | `docs/backlog.md:13575` | Строка места переключается «выкл → слабый → сильный». |
+| RESIL-1 | ✅ | proto | `docs/backlog.md:13684` | Фоновые промисы браузерного клиента. |
+| RESIL-2 | ✅ | proto | `docs/backlog.md:13711` | Цикл подсветки обучающего тура. |
+| RESIL-3 | ✅ | srv | `docs/backlog.md:13728` | Именованный фатал процесса. |
+| RESIL-4 | ✅ | srv | `docs/backlog.md:13748` | Соак проверяет, что мир не встал. |
+| RESIL-5 | ✅ | srv proto | `docs/backlog.md:13766` | Генеральная репетиция: весь стек разом, и |
+| RESIL-6 | ✅ | srv proto | `docs/backlog.md:13801` | Достоверность генералки: настоящая база, |
+| ADDR-7 | ✅ | sec proto | `docs/backlog.md:13943` | Ссылка на партию не пускает по незнанию: |
+| OPS-2 | ✅ | ops sec | `docs/backlog.md:13981` | Обновление доносит до машины новые ключи |
+| REL-6 | ✅ | srv | `docs/backlog.md:14003` | Возврат на своё место мгновенный: перехват вместо |
+| CMB-4 | ✅ | core | `docs/backlog.md:14018` | Первый раунд боя — на самой встрече, а не через |
+| BLD-1 | ✅ | core proto | `docs/backlog.md:14038` | Очередь строительства: заказы встают в |
+| UI-14 | ✅ | proto | `docs/backlog.md:14078` | Осмотр чужого флота должен быть находимым. |
+| CMB-5 | ✅ | core | `docs/backlog.md:14101` | Вражда началась — стоящие рядом флоты сходятся |
+| ATK-1 | ✅ | proto | `docs/backlog.md:14117` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
+| SHIPART-1 | ✅ | proto cli | `docs/backlog.md:14143` | Реалистичные портреты в постройке и описаниях, |
+| YARD-1 | ✅ | data proto srv | `docs/backlog.md:14254` | Корабли строит ВЕРФЬ, челноки — |
+| YARD-2 | ✅ | data | `docs/backlog.md:14288` | У верфи два яруса: дешёвый строит, дорогой |
+| CMB-7 | ✅ | core | `docs/backlog.md:14312` | Перемирие посреди боя не останавливало бой. |
+| RLY-1 | ✅ | proto | `docs/backlog.md:14333` | Сбор построенного: соло и сеть играли по РАЗНЫМ |
+| CARGO-1 | ✅ | core proto | `docs/backlog.md:14365` | Часовая погрузка десанта жила в |
+| MRG-1 | ✅ | core proto | `docs/backlog.md:14413` | «Слиться по прибытии» — вторая половина |
+| ART-0 | ✅ | core data proto | `docs/backlog.md:14436` | Артиллерия снята из игры целиком |
+| ORB-1 | ✅ | core data proto | `docs/backlog.md:14467` | Орбитальный слой объявлен в |
+| ORB-4 | ✅ | core data proto | `docs/backlog.md:14503` | в астероидном поле строилось всё, что угодно: |
+| ORB-2 | ✅ | data proto | `docs/backlog.md:14544` | «Изучается технология, строится здание» не |
+| ORB-3 | ✅ | proto | `docs/backlog.md:14572` | Звёздный форт выдавал орбитальное ПКО мимо |
+| CMB-6 | ✅ | core | `docs/backlog.md:14609` | После ничьей третий враждебный флот получает свой |
+| ORD-2 | ✅ | proto | `docs/backlog.md:14639` | Нацеленный ШТУРМ теперь переживает закрытую |
+| FOG-10 | ✅ | proto core | `docs/backlog.md:14659` | Память разведки перестала жить только |
+| FOG-9 | ✅ | core | `docs/backlog.md:14683` | Приостановленная стройка чужого мира была видна |
+| TEST-4 | ✅ | srv | `docs/backlog.md:14693` | topXp падал на живой базе разработчика. |
+| PHONE-STRATEGY | ✅ |  | `docs/backlog.md:14711` | Технологии, постройки, производство, рынок и дипломатия |
+| MAP-PERF | ✅ |  | `docs/backlog.md:14723` | Ускорение движения раскрытой голографической карты и подготовка |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
@@ -719,18 +720,18 @@
 | EC-5.2 | 🔒 | data | `docs/economy-roadmap.md:315` | Балансные рычаги через данные (live-ops) |
 | EC-6.1 | 🔒 | srv sec | `docs/economy-roadmap.md:328` | Детекция RMT-паттернов |
 | EC-6.2 | 🔒 | srv docs | `docs/economy-roadmap.md:332` | Модерация торговли и споры |
-| FORT-0.1 | 🗑 | data | `docs/fortress-roadmap.md:194` | Узлы empty в картах канона — снято 2026-09-15 |
-| FORT-0.2 | ✅ | core proto | `docs/fortress-roadmap.md:209` | Крепость в прототипе: модуль, правило, кнопка |
-| FORT-1.1 | 🗑 |  | `docs/fortress-roadmap.md:244` | Технический юнит + технология — снято 2026-09-15 |
-| FORT-1.2 | 🗑 |  | `docs/fortress-roadmap.md:259` | Конверсия расходует техюнит — снято 2026-09-15 |
-| FORT-1.3 | 🗑 |  | `docs/fortress-roadmap.md:273` | Вкладка технических юнитов в «Верфи» — снято 2026-09-15 |
-| FORT-1.4 | ✅ | proto | `docs/fortress-roadmap.md:285` | Недостающие ключи отказов |
-| FORT-2.1 | ⏳ | data | `docs/fortress-roadmap.md:307` | Юнит «Гарнизон» |
-| FORT-2.2 | 🔒 | core data | `docs/fortress-roadmap.md:318` | Форт выдаёт и забирает гарнизон |
-| FORT-2.3 | 🔒 | data core | `docs/fortress-roadmap.md:332` | Потолок гарнизона и фракционный модификатор |
-| FORT-3.1 | ⏳ | data | `docs/fortress-roadmap.md:346` | Уровни orbitalaa |
-| FORT-3.2 | 🔒 | core data | `docs/fortress-roadmap.md:351` | ПВО бьёт авиацию, а не только корабли |
-| FORT-4.1 | ✅ | core data | `docs/fortress-roadmap.md:365` | Какие ещё узлы конвертируются |
+| FORT-0.1 | 🗑 | data | `docs/fortress-roadmap.md:223` | Узлы empty в картах канона — снято 2026-09-15 |
+| FORT-0.2 | ✅ | core proto | `docs/fortress-roadmap.md:238` | Крепость в прототипе: модуль, правило, кнопка |
+| FORT-1.1 | 🗑 |  | `docs/fortress-roadmap.md:273` | Технический юнит + технология — снято 2026-09-15 |
+| FORT-1.2 | 🗑 |  | `docs/fortress-roadmap.md:288` | Конверсия расходует техюнит — снято 2026-09-15 |
+| FORT-1.3 | 🗑 |  | `docs/fortress-roadmap.md:302` | Вкладка технических юнитов в «Верфи» — снято 2026-09-15 |
+| FORT-1.4 | ✅ | proto | `docs/fortress-roadmap.md:314` | Недостающие ключи отказов |
+| FORT-2.1 | ⏳ | data | `docs/fortress-roadmap.md:336` | Юнит «Гарнизон» |
+| FORT-2.2 | 🔒 | core data | `docs/fortress-roadmap.md:347` | Форт выдаёт и забирает гарнизон |
+| FORT-2.3 | 🔒 | data core | `docs/fortress-roadmap.md:361` | Потолок гарнизона и фракционный модификатор |
+| FORT-3.1 | ⏳ | data | `docs/fortress-roadmap.md:375` | Уровни orbitalaa |
+| FORT-3.2 | 🔒 | core data | `docs/fortress-roadmap.md:380` | ПВО бьёт авиацию, а не только корабли |
+| FORT-4.1 | ✅ | core data | `docs/fortress-roadmap.md:394` | Какие ещё узлы конвертируются |
 | GI-0.1 | ✅ | srv sec | `docs/game-integrity-roadmap.md:41` | Rate-limiting действий |
 | GI-0.2 | ⏳ | srv | `docs/game-integrity-roadmap.md:49` | Per-player очередь (анти-double-spend) |
 | GI-0.3 | ✅ | srv | `docs/game-integrity-roadmap.md:53` | Туман как граница (анти-maphack) (в основном) |

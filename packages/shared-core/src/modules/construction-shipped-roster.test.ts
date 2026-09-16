@@ -71,10 +71,19 @@ function hosts(kind: string): string[] {
   });
 }
 
-/** Every shipped province type, and what it hosts. `null` = anything in the catalogue. */
+/**
+ * Buildings that name their own ground (`onlyOn`) and are therefore NOT part of what a
+ * roster-less province hosts. Written out, not derived: a building that starts
+ * restricting itself must be DECIDED into this list, and until it is, the `planet` row
+ * below fails — the same "no silent inheritance" the table gives province types.
+ */
+const SELF_RESTRICTED = ['metal_station']; // owner decision 3: dead worlds / asteroids / fortresses
+
+/** Every shipped province type, and what it hosts. `null` = roster-less: anything in the
+ *  catalogue that does not restrict itself (see {@link SELF_RESTRICTED}). */
 const EXPECTED: Record<string, string[] | null> = {
-  planet: null, // the prize: the only province with the full catalogue
-  asteroid: ['starfort'], // ore field — a guard post, not a colony
+  planet: null, // the prize: the only roster-less province
+  asteroid: ['starfort', 'metal_station'], // ore field: a guard post and the rig that mines it
   nebula: [],
   empty: [],
   debris_field: [],
@@ -86,7 +95,18 @@ const EXPECTED: Record<string, string[] | null> = {
   black_hole: [],
   pirate_base: ['shipyard', 'spaceport', 'radar', 'fort', 'power_plant', 'fabricator', 'orbital_aa'],
   neutral_base: ['shipyard', 'spaceport', 'radar', 'fort', 'power_plant', 'fabricator', 'orbital_aa'],
-  void_station: ['shipyard', 'spaceport', 'radar', 'fort', 'power_plant', 'fabricator', 'orbital_aa'],
+  // owner decision 8: a fortress does not exclude mining — the rig can be rebuilt here
+  // after it is destroyed, otherwise conversion would take the node's ore away for good.
+  void_station: [
+    'shipyard',
+    'spaceport',
+    'radar',
+    'fort',
+    'power_plant',
+    'fabricator',
+    'orbital_aa',
+    'metal_station',
+  ],
 };
 
 describe('shipped province types: what each one hosts (ORB-4 golden table)', () => {
@@ -95,10 +115,11 @@ describe('shipped province types: what each one hosts (ORB-4 golden table)', () 
   });
 
   for (const [kind, expected] of Object.entries(EXPECTED)) {
-    it(`${kind} hosts ${expected === null ? 'the whole catalogue' : expected.length + ' building(s)'}`, () => {
+    it(`${kind} hosts ${expected === null ? 'everything that will have it' : expected.length + ' building(s)'}`, () => {
       const actual = hosts(kind);
       if (expected === null) {
-        expect(actual.sort()).toEqual(Object.keys(data.buildings).sort());
+        const anything = Object.keys(data.buildings).filter((b) => !SELF_RESTRICTED.includes(b));
+        expect(actual.sort()).toEqual(anything.sort());
       } else {
         expect(actual.sort()).toEqual([...expected].sort());
       }
