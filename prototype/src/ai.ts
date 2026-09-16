@@ -18,6 +18,7 @@ import {
   slotUsage,
   technologyLock,
   hangarMachines,
+  fleetPositionAt,
   hangarUsed,
   fleetShuttleBay,
   squadronSize,
@@ -1201,10 +1202,15 @@ export function aiOrders(
       if (homePort) {
         launchpads.push({ base: { planetId: homePort.id }, at: homePort.position, hangar: homePort.hangar ?? [] });
       }
+      // СТОЯНКА НОСИТЕЛЮ БОЛЬШЕ НЕ НУЖНА (решение владельца 2026-09-16): ядро пускает
+      // вылет с хода, и бот идёт следом. Пока фильтр требовал неподвижности, новое
+      // правило не участвовало в замерах вообще — носитель едет с кулаком и стоит редко.
+      // Позиция берётся ЖИВОЙ (`fleetPositionAt`, та же функция, по которой считает ядро):
+      // у идущего флота `location` пуст, и узел под ним спрашивать не у чего.
       for (const f of Object.values(state.fleets)
-        .filter((fl) => fl.owner === ai && !fl.movement && !fl.battleId && fl.location !== null && (fl.hangar ?? []).length > 0)
+        .filter((fl) => fl.owner === ai && !fl.battleId && (fl.hangar ?? []).length > 0)
         .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
-        const at = state.planets[f.location!]?.position;
+        const at = fleetPositionAt(state, f, state.time);
         if (at) launchpads.push({ base: { fleetId: f.id }, at, hangar: f.hangar ?? [] });
       }
       // Первая база, у которой И машины, И цель в радиусе. Прежний код смотрел только на
