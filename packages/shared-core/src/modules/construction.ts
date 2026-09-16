@@ -5,6 +5,7 @@ import type {
   PausedConstructionSite,
   Player,
   QueuedConstruction,
+  UnitStack,
 } from '../state/gameState';
 import type { BuildingDef, GameData, ResourceBag, UnitDef } from '../data/schemas';
 import { buildingLevel, buildingMaxLevel } from '../data/schemas';
@@ -1250,9 +1251,38 @@ export const constructionModule: GameModule = {
       // режется с крепостью на орбите, а её госпиталь спокойно штопает гарнизон.
       const fighting = battleLocations(h.state);
 
+      /** Подлечить один стек наземных войск — доля от полного HP за час, как и было. */
+      const mend = (stack: UnitStack, rate: number): void => {
+        const unitDef = data.units[stack.unit];
+        if (!unitDef) return;
+        const fullHp = stack.count * (effectiveStats(unitDef, stack, data).hp ?? 0);
+        const currentHp = stack.hp ?? fullHp;
+        if (currentHp >= fullHp) return;
+        const newHp = Math.min(fullHp, currentHp + rate * hours * fullHp);
+        stack.hp = newHp >= fullHp ? undefined : newHp;
+      };
+
+      // Кого лечит госпиталь, стоящий на узле: гарнизон САМОГО узла и десант в трюме
+      // припаркованных рядом флотов — своих и СОЮЗНЫХ (FORT-5.9, из описания построек
+      // крепости: «когда флот игрока или союзника рядом, лечатся наземные войска в трюме»).
+      // Прежде трюм не лечил никто и нигде: раненый десант оставался раненым навсегда,
+      // если его не высадить.
+      const landingsAt = new Map<string, UnitStack[]>();
+      for (const fleet of Object.values(h.state.fleets)) {
+        if (fleet.movement || fleet.battleId || !fleet.location) continue;
+        const host = h.state.planets[fleet.location];
+        if (!host || host.owner === null) continue;
+        if (host.owner !== fleet.owner && !isAllied(h, fleet.owner, host.owner)) continue;
+        const bucket = landingsAt.get(fleet.location) ?? [];
+        for (const stack of fleet.landing ?? []) bucket.push(stack);
+        if (bucket.length > 0) landingsAt.set(fleet.location, bucket);
+      }
+
       for (const planet of Object.values(h.state.planets)) {
-        if (planet.owner === null || planet.garrison.length === 0) continue;
+        if (planet.owner === null) continue;
         if (fighting.has(planet.id)) continue;
+        const landings = landingsAt.get(planet.id) ?? [];
+        if (planet.garrison.length === 0 && landings.length === 0) continue;
         let totalHealRate = 0;
         for (const b of planet.buildings) {
           if (b.hp <= 0) continue; // destroyed building contributes nothing
@@ -1260,16 +1290,8 @@ export const constructionModule: GameModule = {
           if (def) totalHealRate += buildingLevel(def, b.level).healRate;
         }
         if (totalHealRate <= 0) continue;
-        for (const stack of planet.garrison) {
-          const unitDef = data.units[stack.unit];
-          if (!unitDef) continue;
-          const fullHp = stack.count * (effectiveStats(unitDef, stack, data).hp ?? 0);
-          const currentHp = stack.hp ?? fullHp;
-          if (currentHp >= fullHp) continue;
-          const healed = totalHealRate * hours * fullHp;
-          const newHp = Math.min(fullHp, currentHp + healed);
-          stack.hp = newHp >= fullHp ? undefined : newHp;
-        }
+        for (const stack of planet.garrison) mend(stack, totalHealRate);
+        for (const stack of landings) mend(stack, totalHealRate);
       }
 
       // Ship regen/repair — the two pools mend differently (shields-roadmap §1):

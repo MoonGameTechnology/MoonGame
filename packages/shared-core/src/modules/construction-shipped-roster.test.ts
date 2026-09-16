@@ -116,6 +116,9 @@ const EXPECTED: Record<string, string[] | null> = {
     'orbital_aa',
     'metal_station',
     'void_hangar',
+    // FORT-5.9: госпиталь лечит не только гарнизон узла, но и десант в трюме
+    // припаркованных рядом флотов — своих и союзных.
+    'hospital',
   ],
 };
 
