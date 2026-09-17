@@ -489,6 +489,12 @@ export const TechnologyDefSchema = z.object({
   conditions: z.array(TechnologyConditionSchema).default([]),
   cost: ResourceBagSchema.default({}),
   researchTimeHours: z.number().nonnegative().default(0),
+  /** Узел, который в сессии НЕ исследуется: его только ВЫДАЮТ (мета-прокачка
+   *  командира, усиление забега). Такие узлы бесплатны и мгновенны по самой сути —
+   *  они награда, а не работа, — и без этого флага любой игрок исследовал бы их
+   *  даром в любом матче. Модуль технологий отбивает их `E_GRANT_ONLY`, дерево
+   *  технологий не показывает. */
+  grantOnly: z.boolean().default(false),
   prerequisites: z.array(z.string()).default([]),
   // `.prefault({})` re-runs the nested schema, keeping its per-field defaults
   // the single source of truth instead of a duplicate literal that can drift.
@@ -885,6 +891,13 @@ export const ModePveSchema = z
      *  `pve-failed` could not be reached (PVR-1.6). Scaling with the wave keeps the
      *  landing party proportional to the hulls carrying it. */
     waveLanding: z.array(StartingStackSchema).min(1).optional(),
+    /** Boons the run offers between waves (PVR-1.4) — ids from `data.technologies`.
+     *
+     *  Reuses the seam `metaGrant` proved: a hidden session technology handed out as
+     *  `completed`, whose bonuses ride the ordinary technology hooks. No engine code
+     *  per boon, and a new one is a JSON entry. Absent ⇒ the run offers nothing, which
+     *  is the pre-existing behaviour. */
+    boons: z.array(z.string()).min(1).optional(),
   })
   .strict();
 

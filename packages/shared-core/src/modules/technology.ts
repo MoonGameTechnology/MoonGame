@@ -235,6 +235,12 @@ function startResearch(action: Action, h: HandlerContext): void {
   if (!def) {
     return h.reject('E_UNKNOWN_TECHNOLOGY');
   }
+  // Грант-узел исследовать нельзя НИКОМУ и ни в каком матче: он бесплатен и мгновенен
+  // по своей сути (награда, а не работа), и без этой отсечки «исследовать» его значило
+  // бы взять даром. Прятать из окна мало — окно не единственный отправитель приказа.
+  if (def.grantOnly) {
+    return h.reject('E_GRANT_ONLY');
+  }
   const tech = technologyState(player);
   const active = (tech.active ??= []);
   if (

@@ -14,6 +14,7 @@ import {
   canOrderAll,
   ctx,
   setMatchMode,
+  matchMode,
   data,
   MAP as LEGACY_MAP,
   SECTOR_TYPES,
@@ -259,6 +260,8 @@ import {
 import { medalBadges } from '../../decisions/unitMedals';
 import { fortressRaise } from '../../decisions/fortressRaise';
 import { waveReadout } from '../../decisions/waveReadout';
+import { boonOffer } from '../../decisions/waveBoons';
+import { takeBoon } from '../../decisions/actions';
 import {
   authOutcome,
   shouldRegister,
@@ -488,7 +491,7 @@ import {
 // `initArsenal(hooks)` owns its cache and markup); the pure model is `arsenal.ts`.
 // H4 — конструктор шаблонов дивизий: модель в `formations.ts`, редактор — REFM-8.
 // TT-3.1 — экран дерева технологий (REFM-9); `branchLabel` берёт ещё совет учёных.
-import { initTechTree, branchLabel } from './techTree';
+import { initTechTree, branchLabel, techFx } from './techTree';
 import { initBuildScreen } from './buildScreen';
 import { initSciPick, sciCouncilRowHtml } from './sciPick';
 import { initPasswordReset } from './passwordReset';
@@ -1322,6 +1325,9 @@ let setupSpeed = 10;
 /** Сила Роя в забеге (PVR-2.1). Живёт рядом со `setupSpeed`, потому что это тот же род
  *  настройки: выбор игрока ДО запуска, переживающий перезагрузку. */
 let pveDifficulty: RunDifficulty = DEFAULT_RUN_DIFFICULTY;
+/** Номер волны, на котором игрок нажал «Позже» (PVR-1.4). Долг при этом НЕ сгорает —
+ *  окно просто не лезет поверх боя до следующей волны. `-1` = не откладывали. */
+let boonLaterAtWave = -1;
 let lastPanelHtml = '';
 let lastCmdHtml = '';
 let lastSplitHtml = '';
@@ -10665,6 +10671,24 @@ let setupReturn: 'welcome' | 'hub' = 'welcome';
 // Окно живёт в `sciPick.ts` (REFM-18); здесь только проводка. Список выбранных —
 // `setupScientists` — принадлежит сетапу (его читает старт матча), поэтому ходит хуками.
 const sciWin = $('scipick');
+// Окно усиления между волнами (PVR-1.4).
+const boonWin = $('boonpick');
+const boonPickBody = $('boonpickbody');
+let lastBoonBody = '';
+boonWin.addEventListener('click', (ev) => {
+  const target = ev.target as Element;
+  if (target.closest('[data-boonlater]')) {
+    boonLaterAtWave = s.pve?.waveNumber ?? -1;
+    boonWin.classList.remove('show');
+    return;
+  }
+  const card = target.closest('[data-boon]');
+  if (!card) return;
+  const tech = card.getAttribute('data-boon');
+  // Приказ идёт ОБЫЧНЫМ путём игрока: в сети он уехал бы на сервер, и проверяет его
+  // ядро. Клиент тут не выдаёт технологию, он её просит.
+  if (tech) playerOrder(takeBoon(ME, tech));
+});
 const setupCouncilEl = $('setupcouncil');
 function renderSetupCouncil(): void {
   setupCouncilEl.innerHTML = sciCouncilRowHtml(setupScientists, data);
@@ -12498,6 +12522,15 @@ const BACK_LAYERS: BackLayer[] = [
   // --- модалки поверх всего (z60…z57) ---
   { id: 'corp', isOpen: () => flexed('corp'), close: () => corp.close() }, // z60
   { id: 'scipick', isOpen: () => shown('scipick'), close: () => hide('scipick') }, // z60
+  // Back = «Позже»: долг по усилению НЕ сгорает, окно просто уходит до следующей волны.
+  {
+    id: 'boonpick',
+    isOpen: () => shown('boonpick'),
+    close: () => {
+      boonLaterAtWave = s.pve?.waveNumber ?? -1;
+      hide('boonpick');
+    },
+  }, // z60
   { id: 'emblempick', isOpen: () => shown('emblempick'), close: () => hide('emblempick') }, // z60
   { id: 'settings', isOpen: () => shown('settings'), close: () => hide('settings') }, // z59
   // dev-оверлеи: в плеерной сборке узлов нет, проба просто всегда false
@@ -12668,6 +12701,48 @@ window.addEventListener('keydown', (e) => {
   }
 });
 
+/**
+ * Окно усиления между волнами (PVR-1.4).
+ *
+ * Что предложить, решает `/decisions/waveBoons.ts`; кому и сколько должно — ядро
+ * (`state.pve.boons`), и оно же проверяет выбор. Здесь только показ: собрать карточки,
+ * открыть окно, когда долг появился, и закрыть, когда предлагать нечего.
+ *
+ * Окно НЕ блокирующее: «Позже» прячет его до следующей волны, а долг остаётся. Забег
+ * идёт в реальном времени, и модальное окно поверх подходящего штурма отняло бы у
+ * игрока ровно те секунды, ради которых он это усиление и берёт.
+ */
+function renderBoonPick(): void {
+  const pve = s.pve;
+  const cfg = data.modes[matchMode() ?? '']?.pve;
+  const offer = boonOffer({
+    owed: pve?.boons?.[ME] ?? 0,
+    pool: cfg?.boons ?? [],
+    completed: s.players[ME]?.technologies?.completed ?? [],
+  });
+  const deferred = offer.kind === 'offer' && boonLaterAtWave === (pve?.waveNumber ?? -1);
+  const show = offer.kind === 'offer' && !deferred;
+  boonWin.classList.toggle('show', show);
+  if (!show) return;
+  const cards = offer.choices
+    .map((id) => {
+      const td = data.technologies[id];
+      if (!td) return '';
+      return (
+        `<button class="sp-card" type="button" data-boon="${esc(id)}">` +
+        `<span class="sp-cn">${esc(tData(td.name))}</span>` +
+        `<span class="sp-ci">${techFx(td)}</span>` +
+        `</button>`
+      );
+    })
+    .join('');
+  const body = `<p class="bp-owed">${t('win.boon.owed', { n: offer.owed })}</p><div class="bp-list">${cards}</div>`;
+  if (body !== lastBoonBody) {
+    boonPickBody.innerHTML = body;
+    lastBoonBody = body;
+  }
+}
+
 function frame(nowReal: number) {
   flushPinch();
   const wasHolographic = holographic.active();
@@ -12755,6 +12830,7 @@ function frame(nowReal: number) {
   // PVR-1.2: строка волн стоит рядом с часами, потому что это то же самое измерение —
   // сколько осталось до следующего события мира. В обычной партии `waveReadout` отвечает
   // «нечего», и полоса выглядит ровно как до этого кирпича.
+  renderBoonPick();
   const wave = waveReadout(s.pve, s.time);
   const waveHtml =
     wave.kind === 'none'

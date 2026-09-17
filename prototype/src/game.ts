@@ -48,6 +48,7 @@ export {
   SCORE_LIMIT,
   ctx,
   setMatchMode,
+  matchMode,
   advance,
   order,
   canOrder,

@@ -44,6 +44,8 @@ const data: GameData = parseGameData({
       unlocks: { buildings: ['refinery'] },
       effects: { productionBonus: 0.25 },
     },
+    // Грант-узел: бесплатный и мгновенный по сути (награда, а не работа).
+    gift: { name: 'Gift', grantOnly: true, effects: { productionBonus: 0.5 } },
     logistics: {
       name: 'Logistics',
       branch: 'space',
@@ -457,6 +459,10 @@ describe('technology module — session research tree', () => {
     expect(errCode(kernel.applyAction(st, research('missing'), ctx(0)))).toBe(
       'E_UNKNOWN_TECHNOLOGY',
     );
+    // Грант-узел не исследуется НИКЕМ и ни в каком матче (PVR-1.4). Без этой отсечки он
+    // брался бы даром: стоимости и времени у него нет, а спрятать его из окна мало —
+    // окно не единственный отправитель приказа.
+    expect(errCode(kernel.applyAction(st, research('gift'), ctx(0)))).toBe('E_GRANT_ONLY');
     expect(errCode(kernel.applyAction(st, { ...research('industry'), payload: {} }, ctx(0)))).toBe(
       'E_BAD_PAYLOAD',
     );

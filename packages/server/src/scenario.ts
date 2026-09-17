@@ -176,7 +176,7 @@ export const DEV_MODULES: GameModule[] = [
  *  differ from the ones it started with, and a reducer that now reads `owner` where
  *  the saved order says `seller` is exactly that (CONV-9). Refusing the load is the
  *  cheap, honest outcome; silently misreading the book is not. */
-export const MODULE_MANIFEST_VERSION = '21'; // VET-2: у стека появилась заслуга ветерана.
+export const MODULE_MANIFEST_VERSION = '22'; // PVR-1.4: у `state.pve` появился долг по усилениям.
 // Форма состояния изменилась ДОБАВЛЕНИЕМ: у `UnitStack` два новых необязательных поля —
 // `damageDealt` и `battles` (оба «на юнит»). Старый матч читается без ошибки: полей нет,
 // значит ветеранов нет. Бампаю всё равно, и вот почему это не перестраховка. Счётчики

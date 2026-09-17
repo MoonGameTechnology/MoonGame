@@ -13,6 +13,7 @@ import {
   declareWar,
   delegateSteward,
   designateCapital,
+  takeBoon,
   engageFleet,
   equipHeroAbility,
   forceMarchFleet,
@@ -118,6 +119,7 @@ const CALLS: ReadonlyArray<readonly [string, Action]> = [
   ['marketTake (весь лот)', marketTake(P, 'lot1')],
   ['marketCancel', marketCancel(P, 'lot1')],
   ['designateCapital', designateCapital(P, 'alpha')],
+  ['takeBoon', takeBoon(P, 'boon_gunnery')],
   ['spawnHero', spawnHero(P, 'h1', 'alpha')],
   ['unlockHeroSkill', unlockHeroSkill(P, 'h1', 'node1')],
   ['installHeroModule', installHeroModule(P, 'h1', 'plating')],
@@ -153,8 +155,8 @@ describe('строители приказов против схем гейта',
   });
 
   it('пять приказов каталога не строит НИКТО — у игрока нет способа их отдать', () => {
-    // Не придирка к списку, а честный замер охвата: ядро принимает 53 типа, клиент
-    // умеет выписать 48. Список зафиксирован, чтобы новая дыра не появилась молча, а
+    // Не придирка к списку, а честный замер охвата: ядро принимает 54 типа, клиент
+    // умеет выписать 49. Список зафиксирован, чтобы новая дыра не появилась молча, а
     // закрытая — заставила его сократить.
     const built = new Set(CALLS.map(([, a]) => a.type));
     expect(CLIENT_ACTION_TYPES.filter((t) => !built.has(t)).sort()).toEqual([

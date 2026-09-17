@@ -127,6 +127,32 @@ function declareWarOnEveryone(h: HandlerContext, npcPlayerId: PlayerId): void {
   }
 }
 
+/**
+ * Owe every surviving human seat one boon pick, for the wave that just landed (PVR-1.4).
+ *
+ * The beat is the wave's ARRIVAL, not its destruction, and that is deliberate. "Repelled"
+ * has no crisp moment on this timeline: waves are six hours apart and take far longer to
+ * cross the map, so several are in flight at once, and the seat AI MERGES them — the
+ * fleet that dies is rarely the fleet that spawned, so counting dead `pve:wave:N` ids
+ * would pay out at the mercy of a merge. "You were still standing when the next one
+ * arrived" is the same promise, stated in a way the timeline can actually keep.
+ *
+ * A seat holding no world is skipped: it is losing, not surviving. Iteration is over
+ * sorted ids so a replay owes the same seats in the same order (invariant #1).
+ */
+function oweBoons(h: HandlerContext, pve: NonNullable<GameState['pve']>, cfg: ModePve): void {
+  if (!cfg.boons || cfg.boons.length === 0) return; // режим усилений не объявлял
+  const holds = new Set<PlayerId>();
+  for (const planet of Object.values(h.state.planets)) {
+    if (planet.owner !== null && planet.owner !== pve.npcPlayerId) holds.add(planet.owner);
+  }
+  for (const id of Object.keys(h.state.players).sort()) {
+    if (id === pve.npcPlayerId || !holds.has(id)) continue;
+    pve.boons = pve.boons ?? {};
+    pve.boons[id] = (pve.boons[id] ?? 0) + 1;
+  }
+}
+
 export const pveModule: GameModule = {
   id: 'pve',
   version: '1.0.0',
@@ -188,7 +214,28 @@ export const pveModule: GameModule = {
           wave: pve.waveNumber,
         });
       }
+      oweBoons(h, pve, cfg);
       armNextWave(h, pve, cfg, h.ctx.now);
+    });
+
+    // Забрать усиление. ИНТЕНТ игрока, а не событие: выбор делает человек, и сервер
+    // обязан его проверить (инвариант №5). Всё, что не сошлось, — отказ со стабильным
+    // кодом, а не тихая выдача (инвариант №4).
+    api.onAction('pve.boon', (action, h) => {
+      const cfg = pveOf(h);
+      const pve = h.state.pve;
+      if (!cfg || !pve) return h.reject('E_NOT_PVE');
+      const tech = (action.payload as { tech?: unknown })?.tech;
+      if (typeof tech !== 'string') return h.reject('E_BAD_PAYLOAD');
+      if ((pve.boons?.[action.playerId] ?? 0) <= 0) return h.reject('E_NO_BOON');
+      if (!(cfg.boons ?? []).includes(tech)) return h.reject('E_UNKNOWN_BOON');
+      const player = h.state.players[action.playerId];
+      if (!player) return h.reject('E_FORBIDDEN');
+      const completed = player.technologies?.completed ?? [];
+      if (completed.includes(tech)) return h.reject('E_ALREADY_TAKEN');
+      player.technologies = { ...player.technologies, completed: [...completed, tech] };
+      pve.boons![action.playerId] = (pve.boons![action.playerId] ?? 0) - 1;
+      h.emit('pve.boon.taken', { owner: action.playerId, tech });
     });
   },
 };

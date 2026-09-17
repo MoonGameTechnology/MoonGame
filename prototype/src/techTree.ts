@@ -150,7 +150,7 @@ export function techTreeHtml(
   // self-play report needs the same split for its denominator, and a second hand-written
   // prefix check is exactly how the two would drift apart.
   const techs = Object.fromEntries(
-    Object.entries(data.technologies).filter(([id]) => !isGrantOnlyTech(id)),
+    Object.entries(data.technologies).filter(([id, def]) => !isGrantOnlyTech(id, def)),
   );
   const done = new Set(seat?.technologies?.completed ?? []);
   // Research runs in CONCURRENT slots (core: technologies.active is a list).

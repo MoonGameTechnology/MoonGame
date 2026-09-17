@@ -263,12 +263,16 @@ describe('game data schema (docs/architecture.md §2)', () => {
     // прячет из окна исследований по префиксу. Любая другая бесплатная технология —
     // забытые числа, а не задумка, и увидит её сначала игрок, а не ревьюер.
     const data = parseGameData(loadShippedBundle());
+    // PVR-1.4 заменил ПРЕФИКС на данные: бесплатность теперь извиняет не имя, а флаг
+    // `grantOnly`, и он же реально запирает исследование в ядре (`E_GRANT_ONLY`), а не
+    // только прячет узел из окна. Префиксного исключения больше нет — если `meta_*`
+    // забудут пометить, тест это увидит.
     const free = Object.entries(data.technologies)
       .filter(([, def]) => Object.keys(def.cost).length === 0 && def.researchTimeHours <= 0)
+      .filter(([, def]) => !def.grantOnly)
       .map(([id]) => id)
-      .filter((id) => !id.startsWith('meta_'))
       .sort();
-    expect(free, 'технология бесплатна и мгновенна, но это не мета-грант').toEqual([]);
+    expect(free, 'технология бесплатна и мгновенна, но выдачей не помечена').toEqual([]);
   });
 
   it('ships producers for every economy resource (ECON-3: energy + microelectronics)', () => {
@@ -736,6 +740,32 @@ describe('game modes (PVE-0.1, docs/pve-team-modes-roadmap.md)', () => {
         .map((stack) => `${id}: ${stack.unit}`),
     );
     expect(unknown.sort()).toEqual([]);
+  });
+
+  it('пул усилений забега называет известные технологии (PVR-1.4)', () => {
+    // Опечатка здесь молчалива вдвойне: карточка не нарисуется (имени нет), а действие
+    // отобьётся `E_UNKNOWN_BOON` — игрок увидит выбор, который не выбирается.
+    const data = parseGameData(loadShippedBundle());
+    const unknown = Object.entries(data.modes).flatMap(([id, mode]) =>
+      (mode.pve?.boons ?? [])
+        .filter((tech) => !(tech in data.technologies))
+        .map((tech) => `${id}: ${tech}`),
+    );
+    expect(unknown.sort()).toEqual([]);
+  });
+
+  it('усиление забега не исследуется обычным путём — оно только выдаётся (PVR-1.4)', () => {
+    // Усиление бесплатно и мгновенно: это награда, а не работа. Не будь оно помечено
+    // `grantOnly`, любой игрок исследовал бы его даром в ЛЮБОМ матче — и забег стал бы
+    // способом протащить бонусы в обычную партию.
+    const data = parseGameData(loadShippedBundle());
+    const wrong: string[] = [];
+    for (const mode of Object.values(data.modes)) {
+      for (const tech of mode.pve?.boons ?? []) {
+        if (data.technologies[tech]?.grantOnly !== true) wrong.push(tech);
+      }
+    }
+    expect([...new Set(wrong)].sort()).toEqual([]);
   });
 
   it('десант волны — наземные юниты, а флот волны — космические (PVR-1.6)', () => {

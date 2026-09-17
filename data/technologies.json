@@ -210,39 +210,87 @@
     "conditions": [{ "type": "has_scientist", "branch": "command", "minLevel": 1 }]
   },
   "meta_drill_speed": {
+    "grantOnly": true,
     "name": "Commander Drill: Logistics",
     "description": "tech.node.meta-drill-speed.desc",
     "branch": "command",
     "effects": { "fleetSpeedBonus": 0.05 }
   },
   "meta_drill_combat": {
+    "grantOnly": true,
     "name": "Commander Drill: Gunnery",
     "description": "tech.node.meta-drill-combat.desc",
     "branch": "command",
     "effects": { "combatDamageBonus": 0.05 }
   },
   "meta_drill_radar": {
+    "grantOnly": true,
     "name": "Commander Drill: Recon",
     "description": "tech.node.meta-drill-radar.desc",
     "branch": "command",
     "effects": { "radarRangeBonus": 0.15 }
   },
   "meta_drill_veteran": {
+    "grantOnly": true,
     "name": "Commander Drill: Veterancy",
     "description": "tech.node.meta-drill-veteran.desc",
     "branch": "command",
     "effects": { "fleetSpeedBonus": 0.05, "combatDamageBonus": 0.05 }
   },
   "meta_industry": {
+    "grantOnly": true,
     "name": "Commander Drill: Industry",
     "description": "tech.node.meta-industry.desc",
     "branch": "command",
     "effects": { "productionBonus": 0.05 }
   },
   "meta_industry_2": {
+    "grantOnly": true,
     "name": "Commander Drill: Magnate",
     "description": "tech.node.meta-industry-2.desc",
     "branch": "command",
     "effects": { "productionBonus": 0.05 }
+  },
+  "boon_gunnery": {
+    "grantOnly": true,
+    "name": "Run Boon: Gunnery",
+    "description": "tech.node.boon-gunnery.desc",
+    "branch": "command",
+    "effects": { "combatDamageBonus": 0.15 }
+  },
+  "boon_engines": {
+    "grantOnly": true,
+    "name": "Run Boon: Engines",
+    "description": "tech.node.boon-engines.desc",
+    "branch": "command",
+    "effects": { "fleetSpeedBonus": 0.2 }
+  },
+  "boon_foundry": {
+    "grantOnly": true,
+    "name": "Run Boon: Foundry",
+    "description": "tech.node.boon-foundry.desc",
+    "branch": "command",
+    "effects": { "productionBonus": 0.25 }
+  },
+  "boon_sensors": {
+    "grantOnly": true,
+    "name": "Run Boon: Sensors",
+    "description": "tech.node.boon-sensors.desc",
+    "branch": "command",
+    "effects": { "radarRangeBonus": 0.4 }
+  },
+  "boon_barrage": {
+    "grantOnly": true,
+    "name": "Run Boon: Barrage",
+    "description": "tech.node.boon-barrage.desc",
+    "branch": "command",
+    "effects": { "combatDamageBonus": 0.1, "fleetSpeedBonus": 0.1 }
+  },
+  "boon_logistics": {
+    "grantOnly": true,
+    "name": "Run Boon: Logistics",
+    "description": "tech.node.boon-logistics.desc",
+    "branch": "command",
+    "effects": { "productionBonus": 0.1, "radarRangeBonus": 0.2 }
   }
 }

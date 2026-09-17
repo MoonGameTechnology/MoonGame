@@ -176,6 +176,9 @@ const WIRE_PAYLOADS: Record<string, unknown> = {
   },
   'shuttle.unloadTroops': { planetId: 'C0R1', squadronId: 'missing-squadron' },
   'capital.designate': { planetId: 'home_p1' },
+  // Усиление забега (PVR-1.4). В этом прогоне матч не PvE, поэтому приказ законно
+  // отобьётся `E_NOT_PVE` — каталог проверяет ФОРМУ конверта, а не исполнимость.
+  'pve.boon': { tech: 'boon_gunnery' },
   'steward.delegate': { posture: 'defend', until: 10_000 },
   'steward.recall': {},
   'steward.holdpoint': { planetId: 'home_p1', on: true },
