@@ -1911,7 +1911,9 @@ export const ru: Record<string, string> = {
   'setup.teams.off': 'Командный бой: выкл',
   'setup.teams.on': 'Командный бой: ВКЛ',
   'setup.pve': 'PvE',
-  'setup.pve.started': 'PvE матч начат — объединитесь против ИИ!',
+  'setup.pve.started': 'Забег начат — Рой уже идёт.',
+  'setup.pve.difficulty.weak': 'Рой: обычный',
+  'setup.pve.difficulty.strong': 'Рой: матёрый',
   'setup.title': 'НАСТРОЙКА СХВАТКИ',
 
   // --- settings — Экран настроек: интерфейс, цвета сторон, графика.

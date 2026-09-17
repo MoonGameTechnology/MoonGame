@@ -1910,7 +1910,9 @@ export const en: Record<string, string> = {
   'setup.teams.off': 'Team battle: off',
   'setup.teams.on': 'Team battle: ON',
   'setup.pve': 'PvE',
-  'setup.pve.started': 'PvE match started — team up against the AI!',
+  'setup.pve.started': 'The run has begun — the Swarm is on its way.',
+  'setup.pve.difficulty.weak': 'Swarm: standard',
+  'setup.pve.difficulty.strong': 'Swarm: veteran',
   'setup.title': 'SKIRMISH SETUP',
 
   // --- settings — Экран настроек: интерфейс, цвета сторон, графика.
