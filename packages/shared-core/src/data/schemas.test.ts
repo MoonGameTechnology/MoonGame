@@ -27,7 +27,7 @@ function loadShippedBundle(): Record<string, unknown> {
 describe('game data schema (docs/architecture.md §2)', () => {
   it('validates the shipped data bundle', () => {
     const data = parseGameData(loadShippedBundle());
-    expect(data.version).toBe('0.1.23'); // Frontier adds pirate/neutral bases and the isolated black hole
+    expect(data.version).toBe('0.1.24'); // BAL-13 completes the scientist roster: a leader per tech branch
     expect(data.resources).toContain('microelectronics');
     // Подсистема обстрела снята целиком вместе с трейтом `artillery` и корпусом,
     // который его носил: ни того, ни другого в шипнутом каталоге больше нет, и
@@ -337,6 +337,50 @@ describe('game data schema (docs/architecture.md §2)', () => {
     for (const [id, def] of Object.entries(data.heroSkillTrees)) {
       check(def.cost, `skill node ${id} cost`);
     }
+  });
+
+  it('у каждого гейта `has_scientist{branch}` есть лидер этой ветки (BAL-13)', () => {
+    // Сторож против МЁРТВОГО узла. Гейт `has_scientist { branch }` запирает технологию
+    // на учёного нужной ветки; нет такого учёного в каталоге — узел не может взять
+    // НИКТО, в сессии любой длины, и заметить это по игре нельзя (узел просто всегда
+    // серый). Именно так когда-то родились три капстоуна, которых не исследовал ни
+    // один игрок; гейты с них потом сняли, но защиты от повторения не осталось.
+    //
+    // Проверка идёт от ТЕХНОЛОГИЙ к учёным, а не наоборот: ветка без лидера — это
+    // нормально (пока в ней нет гейченных узлов), а вот гейченный узел без лидера —
+    // всегда баг. `sciPick.test.ts` это поймать не мог: он искал первого учёного с
+    // гейченной веткой и при пустом результате молча выходил.
+    const data = parseGameData(loadShippedBundle());
+    const leaderBranches = new Set(
+      Object.values(data.scientists)
+        .map((sci) => sci.branch)
+        .filter((b): b is NonNullable<typeof b> => b !== undefined),
+    );
+    for (const [id, def] of Object.entries(data.technologies)) {
+      for (const cond of def.conditions) {
+        if (cond.type !== 'has_scientist' || cond.branch === undefined) continue;
+        expect(
+          leaderBranches.has(cond.branch),
+          `technology "${id}" is gated on a ${cond.branch} scientist, but no scientist in the catalog leads that branch — the node is unreachable`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('каждая ветка дерева технологий имеет лидера — совет «2 из N» это развилка (BAL-13)', () => {
+    // Другая половина того же факта, и она про ЗАМЫСЕЛ, а не про мёртвый контент:
+    // совет посвящается ДО старта и внутри матча неизменен, значит он обязан быть
+    // выбором. Пока лидеров было два на пять веток, «взять 2 из 3» развилкой не было —
+    // третий кандидат безветочный, и фокус просто некуда было направить.
+    const data = parseGameData(loadShippedBundle());
+    const branches = new Set(Object.values(data.technologies).map((def) => def.branch));
+    const led = new Set(Object.values(data.scientists).map((sci) => sci.branch));
+    for (const branch of branches) {
+      expect(led.has(branch), `tech branch "${branch}" has no scientist leading it`).toBe(true);
+    }
+    // …и безветочный генералист остаётся: «+слот вместо фокуса» — та самая
+    // альтернативная стоимость, ради которой он и заведён.
+    expect(Object.values(data.scientists).some((sci) => sci.branch === undefined)).toBe(true);
   });
 
   it('builds the fortress up to level 3 (HP and defense both grow)', () => {
