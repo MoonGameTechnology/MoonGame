@@ -251,6 +251,7 @@ import {
 } from '../../decisions/sessionStore';
 import { medalBadges } from '../../decisions/unitMedals';
 import { fortressRaise } from '../../decisions/fortressRaise';
+import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
 import { waveReadout } from '../../decisions/waveReadout';
 import {
   authOutcome,
@@ -970,27 +971,6 @@ const ABILITY_RING = '#b78cff';
 const TAU = Math.PI * 2;
 const TOP = 50; // top-bar height
 const RAIL = 50; // left-rail width
-const BUILDABLE = [
-  'mine',
-  'refinery',
-  'farm',
-  'power_plant',
-  'fabricator',
-  'tax_office',
-  'barracks',
-  'radar',
-  'fort',
-  'orbital_aa',
-  'zonal_aa',
-];
-// ROS-2.2 — `zonal_aa` (зональное ПВО) стоит рядом с ПКО и НЕ дублирует его: ПКО
-// (`aaDamage`) бьёт КОРАБЛИ на орбите, зональное ПВО (`pointDefense`) — ЧЕЛНОКИ, и
-// без него удар челноков по миру безответен. Игрок выбирает, от кого защищаться.
-// `orbital_aa` (орбитальное ПКО — anti-ship near-orbit emplacement) is a defensive BUILDING:
-// the player builds it like a fort. It fires on hostile fleets over the world (core
-// `aaStrengthAt` sums building AA) but does NOT block ground capture — only ground troops
-// do that. Nothing hands it out for free: it is researched (`orbital_defense_grid`)
-// and then built like any other structure — ORB-3.
 // H4-REVERT: наземные юниты вернулись в общий конвейер. Пока их поднимала мобилизация
 // дивизии, этот массив был чисто космическим — и снос дивизий без этой строки оставил
 // бы игрока вовсе без сухопутных войск, то есть без второй фазы захвата мира.
@@ -1762,27 +1742,6 @@ function installMapGeometry(state: GameState): void {
 function sectorTypeOf(id: string) {
   const kind = SECTOR_OF[id];
   return kind === undefined ? undefined : SECTOR_TYPES[kind];
-}
-/** Зеркало ворот конструкции ядра (`construction.ts`): вид провинции пускает здание,
- *  только если на нём вообще можно строить (`buildable`), его ростер (undefined =
- *  любое) это здание допускает И само здание не сузило себя до других видов
- *  (`onlyOn`). Одна копия на все кнопки: три собственных `?? BUILDABLE` по коду и были
- *  тем, из-за чего клиентское правило разъехалось с данными (ORB-4) — кнопка обещала
- *  стройку, которую сервер отклонял. Третья проверка нужна ровно потому, что ростера
- *  может не быть: у планеты его нет, и без неё кнопка предложила бы добывающую станцию
- *  там, где редьюсер отвечает `E_WRONG_SECTOR`. */
-function sectorAllowsBuilding(planetId: string, building: string): boolean {
-  const type = sectorTypeOf(planetId);
-  if (type && !type.buildable) return false;
-  if (!(type?.allowedBuildings ?? BUILDABLE).includes(building)) return false;
-  const onlyOn = data.buildings[building]?.onlyOn;
-  return onlyOn === undefined || onlyOn.includes(SECTOR_OF[planetId] ?? '');
-}
-/** Есть ли на провинции хоть одно допустимое здание — гейт кнопки «Постройки». */
-function sectorBuildsAnything(planetId: string): boolean {
-  const type = sectorTypeOf(planetId);
-  if (type && !type.buildable) return false;
-  return (type?.allowedBuildings ?? BUILDABLE).length > 0;
 }
 function world(p: { x: number; y: number }): { x: number; y: number } {
   return camWorldToScreen(p, cam, insets(), mapBounds());
@@ -6600,8 +6559,8 @@ function planetPanelHtml(p: Planet): string {
     }
     // Каталог непостроенного больше не живёт плитками в панели — его показывает
     // полноэкранное окно построек. Кнопка есть только там, где строить можно
-    // (свой мир И ростер сектора непуст — CMD-VIS: нет приказа — нет кнопки).
-    if (mine && sectorBuildsAnything(p.id)) {
+    // (свой мир И каталог что-то здесь предлагает — CMD-VIS: нет приказа — нет кнопки).
+    if (mine && buildsAnything(p, data)) {
       blds += `<button class="bw-open" data-act="openbuild">▣ ${t('side.build.open')}</button>`;
     }
     // FORT-0.2: КОСМИЧЕСКАЯ КРЕПОСТЬ. Правило кнопки — `decisions/fortressRaise.ts`, то же
@@ -7262,7 +7221,7 @@ function codexBuildBtn(kind: string, id: string, level = 1): string {
       const c = def ? buildingLevel(def, inst.level + 1).cost : undefined;
       return `<button class="cx-build" data-cx-upg="${id}"${code ? ' disabled' : ''}>${t('side.build.upgrade', { c: '' })}${cost(c, myRes())}</button>`;
     }
-    const buildable = sectorAllowsBuilding(p.id, id);
+    const buildable = canBuildHere(p, id, data);
     // buildingLocked, а не только «уже стоит»: СТРОЯЩЕЕСЯ здание ещё не в p.buildings
     // (оно попадает туда на construction.complete), и кодекс предлагал «Построить
     // здесь» второй экземпляр одноэкземплярного здания всю стройку первого.
@@ -8360,8 +8319,7 @@ side.addEventListener('contextmenu', (ev) => {
   const order = quickBuildOrder(tile.dataset.buildorder, {
     worldOwner: p?.owner ?? null,
     me: ME,
-    sectorAllows:
-      !!p && !!anchorId && sectorAllowsBuilding(p.id, anchorId),
+    sectorAllows: !!p && !!anchorId && canBuildHere(p, anchorId, data),
     locked: !!p && !!anchorId && !!buildingLocked(p.id, anchorId),
   });
   if (!order || !selPlanet) return;
