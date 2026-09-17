@@ -77,7 +77,7 @@
 | `docs/roadmap.md` | Технический роадмап | Порядок сборки проекта (инженерная карта, не календарь). |
 | `docs/roster-roadmap.md` | Ростер и оборона — технический roadmap | Заказ владельца 2026-09-09 (одиннадцать пунктов). Разбор одного разговора: чем |
 | `docs/rustore-release-roadmap.md` | RuStore-релиз — технический roadmap | Требования RuStore-модерации × реальное состояние Void Dominion (сверено с кодом |
-| `docs/sector-zero-roadmap.md` | Void Dominion: Sector Zero — технический roadmap продукта | Это роадмап ПРОДУКТА, а не режима. Sector Zero — самостоятельный продукт на общем |
+| `docs/sector-zero-roadmap.md` | Void Dominion: Sector Zero — единый роадмап продукта | Статус: Draft. Это ЕДИНЫЙ дом всего, что относится к продукту Sector Zero: |
 | `docs/secure-environment-roadmap.md` | Безопасное окружение приложения — технический roadmap | Направление: как мы безопасно эксплуатируем — рантайм, инфраструктура, хостинг |
 | `docs/secure-sdlc-roadmap.md` | Цикл безопасной разработки (Secure SDLC) — технический roadmap | Направление: как мы строим безопасно — безопасность, вшитая в процесс и в |
 | `docs/security-a06.md` | OWASP A06:2025 — Insecure Design: модель угроз + план закрытия | A06 — единственная категория Top-10, которую сканеры не ловят (security.yml: |
