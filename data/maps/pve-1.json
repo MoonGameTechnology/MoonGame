@@ -5,7 +5,7 @@
   "sectors": {
     "nexus": { "position": { "x": 0, "y": 0 }, "kind": "nebula", "terrain": "nebula" },
     "home_a": {
-      "position": { "x": -200, "y": -100 },
+      "position": { "x": -230, "y": -190 },
       "kind": "planet",
       "planetType": "terran",
       "owner": "p1",
@@ -13,7 +13,7 @@
       "garrison": [{ "unit": "militia", "count": 3 }]
     },
     "home_b": {
-      "position": { "x": 200, "y": -100 },
+      "position": { "x": 230, "y": -190 },
       "kind": "planet",
       "planetType": "terran",
       "owner": "p2",
@@ -21,7 +21,7 @@
       "garrison": [{ "unit": "militia", "count": 3 }]
     },
     "hive": {
-      "position": { "x": 0, "y": 300 },
+      "position": { "x": 0, "y": 540 },
       "kind": "planet",
       "planetType": "volcanic",
       "owner": "p3",
@@ -37,21 +37,18 @@
         { "unit": "heavy_infantry", "count": 3 }
       ]
     },
-    "drift": { "position": { "x": -150, "y": 100 }, "kind": "asteroid", "terrain": "asteroid_field" },
-    "veil": { "position": { "x": 150, "y": 100 }, "kind": "dense_nebula", "terrain": "dense_nebula" },
-    "ridge": { "position": { "x": 0, "y": 150 }, "kind": "ion_storm", "terrain": "ion_storm" }
+    "drift": { "position": { "x": -240, "y": 160 }, "kind": "asteroid", "terrain": "asteroid_field" },
+    "veil": { "position": { "x": 240, "y": 160 }, "kind": "dense_nebula", "terrain": "dense_nebula" },
+    "ridge": { "position": { "x": 0, "y": 380 }, "kind": "ion_storm", "terrain": "ion_storm" }
   },
   "paths": [
     ["home_a", "nexus"],
     ["home_b", "nexus"],
-    ["nexus", "ridge"],
-    ["ridge", "hive"],
-    ["home_a", "drift"],
-    ["drift", "nexus"],
-    ["home_b", "veil"],
-    ["veil", "nexus"],
+    ["nexus", "drift"],
+    ["nexus", "veil"],
     ["drift", "ridge"],
-    ["veil", "ridge"]
+    ["veil", "ridge"],
+    ["ridge", "hive"]
   ],
   "players": {
     "p1": {
