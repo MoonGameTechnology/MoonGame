@@ -33,7 +33,7 @@
  * a JSON edit, never a code change.
  */
 import type { GameModule, HandlerContext } from '../kernel/module';
-import type { Fleet, GameState, PlayerId } from '../state/gameState';
+import type { Fleet, GameState, PlayerId, UnitStack } from '../state/gameState';
 import type { ModePve } from '../data/schemas';
 import { hoursToMs } from '../action/types';
 import { setStance } from '../state/diplomacy';
@@ -163,16 +163,22 @@ export const pveModule: GameModule = {
       const loadout = cfg.waveFleet ?? h.ctx.data.factions[cfg.npcFaction]?.startingLoadout.fleet;
       if (at !== undefined && loadout && loadout.length > 0) {
         const fleetId = `pve:wave:${pve.waveNumber}`;
+        // Wave N fields N times the declared force — the crudest ramp that is
+        // deterministic and lives entirely in content.
+        const scaled = (stacks: readonly { unit: string; count: number }[]): UnitStack[] =>
+          stacks.map((stack) => ({ unit: stack.unit, count: stack.count * pve.waveNumber }));
+        const landing = scaled(cfg.waveLanding ?? []);
         const fleet: Fleet = {
           id: fleetId,
           owner: pve.npcPlayerId,
           location: at,
           movement: null,
-          // Wave N fields N times the faction's opening force — the crudest ramp that
-          // is deterministic and lives entirely in content.
-          units: loadout.map((stack) => ({ unit: stack.unit, count: stack.count * pve.waveNumber })),
+          units: scaled(loadout),
           traits: [],
           orbit: 'near',
+          // Omitted rather than empty when the mode declares no landing party: a mode
+          // without one keeps producing exactly the fleet shape it produced before.
+          ...(landing.length > 0 ? { landing } : {}),
         };
         h.state.fleets[fleetId] = fleet;
         h.emit('pve.wave.spawned', {

@@ -217,6 +217,53 @@ function victoryUnits(h: HandlerContext, active: readonly PlayerId[]): PlayerId[
   return units;
 }
 
+/**
+ * A player stays in the running only while they hold at least one province. Losing
+ * every planet eliminates them — and their mobile fleets disband (a homeless armada
+ * can't keep fighting). Stricter than mere asset-holding: a fleet-only player is dead,
+ * not a survivor. Nobody holding anything is not a wipe of everyone, so the pass is
+ * skipped when there are no contenders at all.
+ */
+function eliminateLandless(
+  h: HandlerContext,
+  scores: Record<PlayerId, MatchScore>,
+  activeBefore: PlayerId[],
+): void {
+  const contenders = activeBefore.filter(
+    (playerId) => (scores[playerId]?.controlledPlanets ?? 0) > 0,
+  );
+  if (contenders.length === 0) return;
+  for (const playerId of activeBefore) {
+    if (contenders.includes(playerId)) continue;
+    const player = h.state.players[playerId];
+    if (!player) continue;
+    player.status = 'defeated';
+    // Their fleets vanish with their last territory.
+    for (const fleet of Object.values(h.state.fleets)) {
+      if (fleet.owner === playerId) delete h.state.fleets[fleet.id];
+    }
+    h.emit('player.eliminated', { playerId, reason: 'no-territory' });
+  }
+}
+
+/**
+ * The session-length backstop (GDD §3.1/§3.2): at the cap for this speed the match is
+ * force-ranked by score. Not a race — a refusal to hang — so BOTH a PvP match and a
+ * PvE assault end on it; config may override the cap.
+ */
+function endOnSessionCap(
+  h: HandlerContext,
+  scores: Record<PlayerId, MatchScore>,
+  active: PlayerId[],
+): void {
+  const timeScale = h.ctx.config?.timeScale ?? 1;
+  const endsAt =
+    h.ctx.config?.victory?.endsAt ?? (SESSION_MAX_DAYS[timeScale] ?? DEFAULT_SESSION_DAYS) * MS_PER_DAY;
+  if (h.ctx.now >= endsAt) {
+    endMatch(h, highestScore(scores, active), 'timeout');
+  }
+}
+
 function evaluateVictory(h: HandlerContext): void {
   if (h.state.match.status === 'ended') {
     return;
@@ -288,30 +335,28 @@ function evaluateVictory(h: HandlerContext): void {
     return;
   }
 
-  // A player stays in the running only while they hold at least one province.
-  // Losing every planet eliminates them — and their mobile fleets disband (a
-  // homeless armada can't keep fighting). Stricter than mere asset-holding: a
-  // fleet-only player is now dead, not a survivor.
-  const contenders = activeBefore.filter(
-    (playerId) => (scores[playerId]?.controlledPlanets ?? 0) > 0,
-  );
-  if (contenders.length > 0) {
-    for (const playerId of activeBefore) {
-      if (!contenders.includes(playerId)) {
-        const player = h.state.players[playerId];
-        if (player) {
-          player.status = 'defeated';
-          // Their fleets vanish with their last territory.
-          for (const fleet of Object.values(h.state.fleets)) {
-            if (fleet.owner === playerId) delete h.state.fleets[fleet.id];
-          }
-          h.emit('player.eliminated', { playerId, reason: 'no-territory' });
-        }
-      }
-    }
-  }
+  eliminateLandless(h, scores, activeBefore);
 
   const active = playerIds.filter((playerId) => h.state.players[playerId]?.status === 'active');
+
+  // A PvE match has PvE ENDINGS ONLY — the assault decides it, never a land race
+  // between the seats that are defending against it (PVR-1.6). The three races below
+  // all measure one thing, "who owns the most board", and on a PvE map that is not
+  // what the match is about: the neutral middle exists to be fought over WHILE the
+  // waves come, so whoever walks into it first would win the run outright. On the
+  // shipped seven-sector PvE map the base 60% line IS those four neutral sectors, and
+  // the walk reliably outlived the assault — the run ended before a single wave
+  // reached a player. It also makes the `pve-cleared` rule above mean what it says:
+  // storming the hive early used to end the match on the spot through the elimination
+  // race, one line after a comment promising it would not.
+  //
+  // `pve-failed` / `pve-cleared` are the whole verdict. Only the session-cap backstop
+  // still applies, because a run that cannot end is worse than one that ends badly.
+  if (h.state.pve) {
+    endOnSessionCap(h, scores, active);
+    return;
+  }
+
   if (active.length === 1 && activeBefore.length > 1) {
     endMatch(h, active[0] ?? null, 'elimination');
     return;
@@ -374,14 +419,8 @@ function evaluateVictory(h: HandlerContext): void {
     return;
   }
 
-  // Time crisis — the upper-bound backstop: a forced finale ranked by score at the
-  // session-length cap for this speed (GDD §3.1/§3.2). Config may override the cap.
-  const timeScale = h.ctx.config?.timeScale ?? 1;
-  const endsAt =
-    h.ctx.config?.victory?.endsAt ?? (SESSION_MAX_DAYS[timeScale] ?? DEFAULT_SESSION_DAYS) * MS_PER_DAY;
-  if (h.ctx.now >= endsAt) {
-    endMatch(h, highestScore(scores, active), 'timeout');
-  }
+  // Time crisis — the upper-bound backstop: a forced finale ranked by score.
+  endOnSessionCap(h, scores, active);
 }
 
 /**
