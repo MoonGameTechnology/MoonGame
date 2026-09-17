@@ -725,6 +725,19 @@ describe('game modes (PVE-0.1, docs/pve-team-modes-roadmap.md)', () => {
     expect(unknown.sort()).toEqual([]);
   });
 
+  it('every declared wave composition names known units (PVR-1.3 referential integrity)', () => {
+    // Состав волны — такой же контент, как ростер фракции, и ошибка в нём молчалива:
+    // `pveModule` пропускает неизвестный юнит, и волна приходит ТОНЬШЕ заявленной, а
+    // не падает. Опечатку ловить здесь, на загрузке, а не по жалобе на лёгкий забег.
+    const data = parseGameData(loadShippedBundle());
+    const unknown = Object.entries(data.modes).flatMap(([id, mode]) =>
+      (mode.pve?.waveFleet ?? [])
+        .filter((stack) => !(stack.unit in data.units))
+        .map((stack) => `${id}: ${stack.unit}`),
+    );
+    expect(unknown.sort()).toEqual([]);
+  });
+
   it('rejects an unknown team format and a malformed PvE section (fail-closed)', () => {
     expect(withModes({ m: { name: 'M', teamFormat: '6v6' } }).success).toBe(false);
     expect(withModes({ m: { name: 'M', pve: { waves: 0, npcFaction: 'swarm', waveIntervalHours: 6 } } }).success).toBe(
@@ -734,6 +747,13 @@ describe('game modes (PVE-0.1, docs/pve-team-modes-roadmap.md)', () => {
     expect(withModes({ m: { name: 'M', pve: { waves: 5, npcFaction: 'swarm', waveIntervalHours: 0 } } }).success).toBe(
       false,
     );
+    // Пустой состав волны — не «омитнутое поле», а описка, и модуль пропустил бы такую
+    // волну молча: получился бы штурм, который читается настроенным и не приходит.
+    const pve = { waves: 5, npcFaction: 'swarm', waveIntervalHours: 6 };
+    expect(withModes({ m: { name: 'M', pve: { ...pve, waveFleet: [] } } }).success).toBe(false);
+    expect(withModes({ m: { name: 'M', pve: { ...pve, waveFleet: [{ unit: 'x', count: 0 }] } } }).success).toBe(false);
+    expect(withModes({ m: { name: 'M', pve: { ...pve, waveFleet: [{ count: 2 }] } } }).success).toBe(false);
+    expect(withModes({ m: { name: 'M', pve: { ...pve, waveFleet: [{ unit: 'x', count: 2 }] } } }).success).toBe(true);
   });
 
   it('rejects a per-match timestamp in a mode victory preset (content pins rules, not a clock)', () => {

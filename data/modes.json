@@ -17,7 +17,11 @@
     "pve": {
       "waves": 10,
       "npcFaction": "swarm",
-      "waveIntervalHours": 6
+      "waveIntervalHours": 6,
+      "waveFleet": [
+        { "unit": "frigate", "count": 2 },
+        { "unit": "cruiser", "count": 1 }
+      ]
     }
   },
   "duel": {
