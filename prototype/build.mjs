@@ -1435,13 +1435,13 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   color:var(--dim);font:700 10px ui-monospace,monospace;cursor:pointer;}
 .cx-lv.on{color:#04231c;background:linear-gradient(180deg,var(--grn),#4fe0b0);border-color:var(--grn);}
 /* scientist council picker (setup-time, over the start-point screen) */
-#scipick{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:16px;
+#scipick,#boonpick{position:fixed;inset:0;z-index:60;display:none;align-items:center;justify-content:center;padding:16px;
   background:rgba(1,5,9,.74);-webkit-backdrop-filter:blur(3px);backdrop-filter:blur(3px);}
-#scipick.show{display:flex;}
-#scipick .twbox{display:flex;flex-direction:column;width:min(560px,96vw);max-height:88vh;overflow:hidden;
+#scipick.show,#boonpick.show{display:flex;}
+#scipick .twbox,#boonpick .twbox{display:flex;flex-direction:column;width:min(560px,96vw);max-height:88vh;overflow:hidden;
   background:var(--glass);border:1px solid var(--cyan);border-radius:12px;box-shadow:0 0 48px rgba(0,0,0,.7),inset 0 0 0 1px rgba(53,214,230,.06);}
-#scipick .lw-head{display:flex;align-items:center;justify-content:space-between;}
-#scipickbody{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:14px 15px;}
+#scipick .lw-head,#boonpick .lw-head{display:flex;align-items:center;justify-content:space-between;}
+#scipickbody,#boonpickbody{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:14px 15px;}
 .sp-cancel{background:transparent;border:1px solid var(--line-hi);color:var(--dim);border-radius:6px;padding:3px 9px;cursor:pointer;font:inherit;font-size:11px;}
 .sp-cancel:hover{border-color:var(--cyan-dim);color:var(--cyan);}
 .sp-slots{display:grid;grid-template-columns:1fr 1fr;gap:11px;}
@@ -1461,6 +1461,10 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 .sp-warn{margin-top:12px;display:flex;gap:8px;padding:10px 12px;border:1px solid #6a4a17;border-radius:9px;background:rgba(255,180,58,.09);color:#f4d199;font-size:11.5px;line-height:1.5;}
 .sp-h{margin:15px 0 8px;font-size:10.5px;letter-spacing:2px;text-transform:uppercase;color:var(--cyan-dim);}
 .sp-roster{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+/* усиление забега (PVR-1.4): те же карточки, что у совета, в один столбец —
+   выбор здесь делается в бою, и колонка читается быстрее решётки. */
+#boonpickbody .bp-list{display:flex;flex-direction:column;gap:9px;}
+#boonpickbody .bp-owed{color:var(--dim);font-size:11px;margin:0 0 10px;}
 .sp-card{text-align:left;cursor:pointer;border:1px solid var(--line-hi);border-radius:9px;padding:9px 10px;background:rgba(53,214,230,.04);color:var(--ink);font:inherit;display:flex;flex-direction:column;gap:3px;}
 .sp-card:hover:not(:disabled){border-color:var(--cyan);background:rgba(53,214,230,.11);box-shadow:0 0 12px rgba(53,214,230,.16);}
 .sp-card:disabled{opacity:.34;cursor:not-allowed;}
@@ -2675,7 +2679,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
        HUD уезжал под край окна (игроку кажется, что интерфейс съела панель задач).
        Считаем от живого зума, а не от «полутора». */
     --vph:calc(100dvh / var(--pcz));}
-  #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#battlewin,#scipick,
+  #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#battlewin,#scipick,#boonpick,
   #market,#constructor,#codex,#codexhub,#intro,#recap,#goals,#playercard,
   #settings,#warprompt,#diplo,#splitdlg,#pingmenu,#banner,#endscreen,#connect,#updbar,
   #hub,#emblempick,#corp,#setup,#testmode,#sandbox,
@@ -2721,7 +2725,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   #splitdlg .sbox{width:min(440px,62.5vw);max-height:56vh;}
   #logwin .lwbox{width:53.4vw;max-height:46.5vh;}
   #tech .twbox,#steward .twbox,#buildwin .twbox{width:53.4vw;max-height:54.5vh;}
-  #scipick .twbox{width:53.4vw;max-height:58.5vh;}
+  #scipick .twbox,#boonpick .twbox{width:53.4vw;max-height:58.5vh;}
   #market .mkbox{width:53.4vw;max-height:54.5vh;}
   #constructor .cnbox{width:53.4vw;max-height:60vh;}
   #endscreen .es-box{width:min(440px,62.5vw);max-height:61vh;}
@@ -2906,6 +2910,8 @@ const page = (js) => `<!doctype html>
 <!-- heroes: the roster/штаб now lives INSIDE the «Производство» screen (Герои pane) -->
 <!-- scientist council picker (setup-time, before the start-point) — rendered by renderSciPick() -->
 <div id="scipick"><div class="twbox"><div class="lw-head"><b data-i18n="win.scipick.title"></b><button class="sp-cancel" type="button" data-i18n="win.scipick.back"></button></div><div id="scipickbody"></div></div></div>
+<!-- усиление между волнами (PVR-1.4) — рендерится renderBoonPick() в main.ts -->
+<div id="boonpick"><div class="twbox"><div class="lw-head"><b data-i18n="win.boon.title"></b><button class="sp-cancel" type="button" data-boonlater="1" data-i18n="win.boon.later"></button></div><div id="boonpickbody"></div></div></div>
 <!-- division template designer (H4, Stellaris-style) — rendered by renderDivDesign() -->
 <!-- session market — whole box rendered by renderMarket() in main.ts -->
 <div id="market"></div>

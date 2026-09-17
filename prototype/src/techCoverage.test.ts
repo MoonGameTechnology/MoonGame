@@ -18,22 +18,34 @@ import { isGrantOnlyTech, researchableTechIds, scientistGatedNodes } from './tec
 const LEADERS = { overseer: { branch: 'command' }, polymath: {} };
 
 describe('BAL-12 — грант-узлы не входят в дерево сессии', () => {
-  it('мета-грант отделяется от настоящего узла', () => {
+  it('грант-узел отделяется от настоящего — по ФЛАГУ данных, не по имени', () => {
+    expect(isGrantOnlyTech('boon_gunnery', { grantOnly: true })).toBe(true);
+    expect(isGrantOnlyTech('industrial_automation', { grantOnly: false })).toBe(false);
+    // Префикс остаётся запасным ответом там, где определения под рукой нет.
     expect(isGrantOnlyTech('meta_industry')).toBe(true);
     expect(isGrantOnlyTech('industrial_automation')).toBe(false);
   });
 
   it('знаменатель «не исследовано» считается по настоящему дереву', () => {
     expect(researchableTechIds({ meta_industry: {}, signal_corps: {} })).toEqual(['signal_corps']);
+    // …и усиление забега тоже не узел сессии, хотя имя у него другое.
+    expect(researchableTechIds({ boon_gunnery: { grantOnly: true }, signal_corps: {} })).toEqual([
+      'signal_corps',
+    ]);
   });
 
-  it('на ЖИВЫХ данных каждый грант-узел и правда выдаётся мета-деревом', () => {
-    // Сторож против декоративного префикса: `meta_` отделяет узлы от дерева только
-    // потому, что за ними стоит `metaGrant`. Заведись узел с таким именем, который
-    // мета-прокачка НЕ выдаёт, — он молча выпал бы из замера, и отчёт соврал бы в
-    // другую сторону.
-    const granted = new Set(META_TREE.flatMap((n) => n.tech ?? []));
-    const grantOnly = Object.keys(data.technologies).filter(isGrantOnlyTech);
+  it('на ЖИВЫХ данных каждый грант-узел и правда кем-то выдаётся', () => {
+    // Сторож против узла-сироты: `grantOnly` выводит узел из дерева сессии, и если за
+    // ним НИКТО не стоит, он молча выпадает из замера, а взять его нельзя вовсе —
+    // отчёт соврёт, а контент окажется мёртвым. Выдающих двое: мета-дерево командира
+    // (`META_TREE`) и пул усилений забега (`data.modes[*].pve.boons`, PVR-1.4).
+    const granted = new Set([
+      ...META_TREE.flatMap((n) => n.tech ?? []),
+      ...Object.values(data.modes).flatMap((mode) => mode.pve?.boons ?? []),
+    ]);
+    const grantOnly = Object.entries(data.technologies)
+      .filter(([id, def]) => isGrantOnlyTech(id, def))
+      .map(([id]) => id);
     expect(grantOnly.length).toBeGreaterThan(0);
     for (const id of grantOnly) expect(granted).toContain(id);
   });
