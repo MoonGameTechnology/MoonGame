@@ -1,7 +1,7 @@
-import { describe, it, expect } from 'vitest';
-import { SCORE_LIMIT, kernel } from './game';
+import { describe, it, expect, afterEach } from 'vitest';
+import { SCORE_LIMIT, kernel, advance, setMatchMode } from './game';
 import { data } from './gameData';
-import { pveState } from '../../packages/client/src/gameData';
+import { pveState, pveModeId } from '../../packages/client/src/gameData';
 import type { Context } from '../../packages/shared-core/src/index';
 
 // Порог победы по очкам — конфиг матча прототипа (`protoKernel.ts`), а не механика
@@ -41,5 +41,57 @@ describe('pve waves reach the prototype kernel (PVR-0.2)', () => {
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.state.pve).toBeUndefined();
+  });
+});
+
+// PVR-1.1. Модуль в ядре ещё не значит «волны идут»: конфиг соло-матча собирался БЕЗ
+// `modeId`, поэтому `pveModule` не видел секцию `pve` и молчал, стоя в списке. Режим
+// теперь объявляет САМА КАРТА (решение владельца §0.7 `sector-zero-roadmap.md`: поле
+// карты как дефолт, а не новая сущность «сцена»), а прототип пинит его на время матча —
+// ровно как сервер держит его приватным полем комнаты.
+describe('solo launch arms the match mode (PVR-1.1)', () => {
+  const HOUR = 3_600_000;
+  const WAVE_INTERVAL = 6 * HOUR; // data/modes.json → pve_waves.waveIntervalHours
+
+  // Режим принадлежит МАТЧУ, а не процессу: следующий матч не должен унаследовать чужой.
+  afterEach(() => setMatchMode(undefined));
+
+  it('the PvE map declares the mode it is played under', () => {
+    expect(pveModeId()).toBe('pve_waves');
+  });
+
+  it('a PvE launch grows state.pve with a wave schedule', () => {
+    setMatchMode(pveModeId());
+    const r = advance(pveState(data), HOUR);
+    expect(r.error).toBeUndefined();
+    expect(r.state.pve).toBeDefined();
+    expect(r.state.pve!.totalWaves).toBe(10);
+    // Первая волна якорится на НАЧАЛЕ пролёта часов, а не на его конце: матч стартует
+    // в 0, значит она ровно через интервал, сколько бы времени ни промотал хост разом.
+    expect(r.state.pve!.nextWaveAt).toBe(WAVE_INTERVAL);
+    expect(r.state.scheduled.some((e) => e.type === 'pve.wave')).toBe(true);
+  });
+
+  it('the armed mode actually produces a wave, not just a state object', () => {
+    setMatchMode(pveModeId());
+    const before = Object.keys(pveState(data).fleets).length;
+    // Часы гонятся ШАГАМИ, как их гонит хост: первый пролёт заводит расписание, и волна
+    // становится due уже для следующего. Одним скачком через весь интервал она бы не
+    // наступила — повод планируется ВНУТРИ того же пролёта, то есть задним числом.
+    const seeded = advance(pveState(data), HOUR);
+    const r = advance(seeded.state, WAVE_INTERVAL + HOUR);
+    expect(r.error).toBeUndefined();
+    expect(r.state.pve!.waveNumber).toBe(1);
+    expect(Object.keys(r.state.fleets).length).toBeGreaterThan(before);
+  });
+
+  it('an ordinary solo match grows no state.pve', () => {
+    const r = advance(pveState(data), HOUR);
+    expect(r.error).toBeUndefined();
+    expect(r.state.pve).toBeUndefined();
+  });
+
+  it('refuses an unknown mode when the match is armed (fail-secure, not a silent base-rules fallback)', () => {
+    expect(() => setMatchMode('no_such_mode')).toThrow(/E_UNKNOWN_MODE/);
   });
 });

@@ -13,6 +13,7 @@ import {
   canOrder,
   canOrderAll,
   ctx,
+  setMatchMode,
   data,
   MAP as LEGACY_MAP,
   SECTOR_TYPES,
@@ -177,7 +178,7 @@ import {
   createBattleModel,
   type BattleSideView,
 } from '../../packages/client/src/index';
-import { pveState } from '../../packages/client/src/gameData';
+import { pveState, pveModeId } from '../../packages/client/src/gameData';
 import {
   worldToScreen as camWorldToScreen,
   zoomAt as camZoomAt,
@@ -10783,8 +10784,12 @@ topEl.addEventListener('click', (ev) => {
   );
 });
 
-function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>): void {
+function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeId?: string): void {
   mapNeedsPreparation = true;
+  // PVR-1.1: режим вооружается ЗДЕСЬ, до первого хода часов — как у сервера, где он
+  // фиксируется при рождении комнаты. Опущен = обычная партия без режима, и это же
+  // снимает режим предыдущего матча: без сброса PvE-волны утекли бы в следующую соло-игру.
+  setMatchMode(modeId);
   s = state;
   installMapGeometry(s);
   syncPlayerNames(s);
@@ -10875,7 +10880,10 @@ function startPvEMatch(): void {
       .filter((id) => id !== 'p1')
       .map((id) => [id, 'weak' as const]),
   );
-  installMatch(st, aiSeats);
+  // Режим берётся из САМОЙ КАРТЫ, а не зашит здесь: карта объявляет, подо что её играют
+  // (§0.7 sector-zero-roadmap.md). Без этого `pveModule` стоял в ядре и молчал — секции
+  // `pve` он не видел, потому что конфиг ехал без `modeId`.
+  installMatch(st, aiSeats, pveModeId());
   applyTimeSpeed(setupSpeed);
   openSetup('hub'); // close setup screen — returns to hub
   note(t('setup.pve.started'));

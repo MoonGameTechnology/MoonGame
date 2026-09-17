@@ -47,6 +47,7 @@ export {
   kernel,
   SCORE_LIMIT,
   ctx,
+  setMatchMode,
   advance,
   order,
   canOrder,

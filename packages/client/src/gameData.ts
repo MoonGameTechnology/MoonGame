@@ -23,3 +23,10 @@ export function skirmishState(data: GameData): GameState {
 export function pveState(data: GameData): GameState {
   return buildStateFromMap(parseMatchMap(pveMap), data);
 }
+
+/** The mode the PvE map declares itself played under (`data.modes` id), for the host to
+ *  arm the match with. The map carries it so the binding is DATA: the map and the mode
+ *  both existed for a long time and nothing said they belonged together. */
+export function pveModeId(): string | undefined {
+  return parseMatchMap(pveMap).mode;
+}
