@@ -255,8 +255,17 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
     // but can't stop a landing — only ground troops do). Seed a starting infantry garrison
     // so the homeworld isn't a free walk-in. Beyond it, ground forces are built like any
     // other unit and travel as a fleet's cargo (armyModule) — H4-REVERT.
+    // ТРЕТИЙ ополченец — не усиление, а восстановление ПРЕЖНЕГО запаса (FORT-5.5).
+    // С SHU-3.5 пол гарнизона растёт с развитостью мира (`garrisonFloor` =
+    // 16 + 4×сумма уровней зданий), и верфь второго уровня выше подняла развитость
+    // столицы с 3 до 4 — то есть пол с 28 до 32. Прежние 2+1 давали 36 очков обороны,
+    // и над полом оставалось ровно на одного ополченца: этим запасом сильный бот и
+    // поднимал десант первым же вылетом (`spareGround`). После правки верфи запас стал
+    // 4 очка — дешевле самого дешёвого бойца, — и столица перестала отпускать кого бы то
+    // ни было: дебют молча лишился высадки. 44 очка над полом 32 возвращают ровно
+    // прежний зазор в одного ополченца, а не добавляют новый.
     home.garrison = [
-      { unit: 'militia', count: 2 },
+      { unit: 'militia', count: 3 },
       { unit: 'heavy_infantry', count: 1 },
     ];
     players[seat.id] = player(
