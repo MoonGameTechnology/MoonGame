@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import type { GameData } from '../data/schemas';
@@ -393,4 +393,23 @@ describe('AvA pool eligibility (AVA-5) — avaEligible tag + shape derived from 
     expect(state.fleets.fleet_a2!.owner).toBe('a2');
     expect(state.planets.west!.owner).toBeNull(); // side prizes start neutral
   });
+});
+
+describe('every shipped map validates (M1.3)', () => {
+  // A map is content, and content nobody loads rots silently: `pve-1.json` shipped
+  // four criss-crossing lanes for as long as no test ever built it, so the only PvE
+  // door in the prototype died on `E_INVALID_MAP` without a word. This loop is the
+  // guard — a new map joins it by existing.
+  const files = readdirSync(path.join(repoRoot, 'data/maps')).filter((f) => f.endsWith('.json'));
+
+  it('there are shipped maps at all — otherwise the cases below are green on nothing', () => {
+    expect(files.length).toBeGreaterThan(0);
+  });
+
+  for (const file of files) {
+    it(`${file}: valid — known refs, neighbour-only lanes, one connected graph`, () => {
+      const map = parseMatchMap(readJson(`data/maps/${file}`));
+      expect([file, validateMatchMap(map, data)]).toEqual([file, []]);
+    });
+  }
 });

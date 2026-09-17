@@ -230,6 +230,17 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
   box-shadow:inset 0 0 10px rgba(53,214,230,.14),0 0 10px rgba(53,214,230,.12);
   text-shadow:0 0 8px rgba(53,214,230,.5);}
 #crestmark:hover,#crestmark:active{background:rgba(53,214,230,.16);}
+/* PvE wave readout (PVR-1.2) — стоит сразу за часами, потому что это то же измерение:
+   сколько осталось до следующего события мира.
+   КРАСНЫЙ, а не амбер: первая редакция была амберной, и на снимке она оказалась близнецом
+   золотого чипа Суверенов в двух сантиметрах правее — угроза и деньги читались одинаково.
+   Красный (--red) в этой палитре занят опасностью и с золотом не путается.
+   Без пульсации: строка висит весь матч, мигающая угроза на полчаса утомляет и перестаёт
+   читаться как сигнал вообще. */
+#devline .dl-wave{flex:0 0 auto;margin-left:10px;padding:2px 9px;border-radius:11px;
+  color:#ffb3aa;font-weight:700;font-size:12px;line-height:1;letter-spacing:.3px;
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+  background:rgba(255,90,77,.08);border:1px solid rgba(255,90,77,.42);}
 /* donate currency (Суверены ◆, gold) sits UNDER the resource bar on the status line,
    pushed to the right end — so the resource chips get the full top-bar width for numbers. */
 #devline .dl-donate{margin-left:auto;flex:0 0 auto;display:flex;align-items:center;gap:5px;
@@ -1734,6 +1745,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   .res i svg{width:14px;height:14px;}
   .res b{font-size:12px;}
   #devline .dl-donate{font-size:11px;padding:2px 8px;}
+  #devline .dl-wave{font-size:11px;padding:2px 8px;margin-left:8px;}
 
   /* phones: three tabs + ✕ no longer fit beside the window title — the tabs alone
      identify the window, so the «ДИПЛОМАТИЯ» caption yields its room to them */

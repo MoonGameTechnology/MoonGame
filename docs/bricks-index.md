@@ -625,8 +625,8 @@
 | FOG-10 | ✅ | proto core | `docs/backlog.md:14785` | Память разведки перестала жить только |
 | FOG-9 | ✅ | core | `docs/backlog.md:14809` | Приостановленная стройка чужого мира была видна |
 | TEST-4 | ✅ | srv | `docs/backlog.md:14819` | topXp падал на живой базе разработчика. |
-| PHONE-STRATEGY | ✅ |  | `docs/backlog.md:14909` | Технологии, постройки, производство, рынок и дипломатия |
-| MAP-PERF | ✅ |  | `docs/backlog.md:14921` | Ускорение движения раскрытой голографической карты и подготовка |
+| PHONE-STRATEGY | ✅ |  | `docs/backlog.md:14921` | Технологии, постройки, производство, рынок и дипломатия |
+| MAP-PERF | ✅ |  | `docs/backlog.md:14933` | Ускорение движения раскрытой голографической карты и подготовка |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
@@ -945,22 +945,22 @@
 | ROS-2.2 | ✅ | core data proto | `docs/roster-roadmap.md:422` | Челнок — сторона боя: ответный урон и зональное ПВО 2026-09-09 |
 | ROS-3.1 | ✅ | proto | `docs/roster-roadmap.md:459` | Экран «Производство»: пять типов, модули, количество, планета 2026-09-09 |
 | ROS-3.2 | ✅ | proto | `docs/roster-roadmap.md:497` | Шаттл — корабль во всём интерфейсе 2026-09-09 |
-| PVR-0.1 | ⏳ | data | `docs/sector-zero-roadmap.md:842` | Карта pve-1 снова строится |
-| PVR-0.2 | ⏳ | proto | `docs/sector-zero-roadmap.md:850` | pveModule в ядре прототипа |
-| PVR-0.3 | ⏳ | proto | `docs/sector-zero-roadmap.md:857` | Сохранение: сперва мета, потом забег |
-| PVR-1.1 | 🔒 | proto | `docs/sector-zero-roadmap.md:878` | Соло-запуск задаёт modeId |
-| PVR-1.2 | 🔒 | proto | `docs/sector-zero-roadmap.md:885` | HUD забега: волна N из M и время до следующей |
-| PVR-1.3 | 🔒 | data | `docs/sector-zero-roadmap.md:891` | Состав волны перестаёт быть одним дроном |
-| PVR-1.4 | 🔒 | proto | `docs/sector-zero-roadmap.md:899` | Выбор между волнами |
-| PVR-2.1 | 🔒 | proto | `docs/sector-zero-roadmap.md:910` | Выбор сложности на запуске забега |
-| PVR-3.1 | ⏳ | docs | `docs/sector-zero-roadmap.md:921` | Резолюция: чем PvE-прокачка НЕ является |
-| PVR-3.2 | 🔒 | proto | `docs/sector-zero-roadmap.md:929` | Хранилище PvE-прогресса |
-| PVR-3.3 | 🔒 | proto | `docs/sector-zero-roadmap.md:936` | Награда за забег |
-| PVR-4.1 | ⏳ | docs | `docs/sector-zero-roadmap.md:950` | Резолюция: что из §3 входит в первую версию |
-| PVR-4.2 | 🔒 | core | `docs/sector-zero-roadmap.md:958` | Память Роя как состояние |
-| PVR-4.3 | 🔒 | core data | `docs/sector-zero-roadmap.md:967` | Одна читаемая адаптация от сигнала до формы |
-| PVR-4.4 | 🔒 | data | `docs/sector-zero-roadmap.md:975` | Структуры первого набора |
-| PVR-4.5 | 🔒 | proto | `docs/sector-zero-roadmap.md:981` | Журнал адаптаций |
+| PVR-0.1 | ✅ | data | `docs/sector-zero-roadmap.md:879` | Карта pve-1 снова строится |
+| PVR-0.2 | ✅ | proto | `docs/sector-zero-roadmap.md:909` | pveModule в ядре прототипа |
+| PVR-0.3 | ⏳ | proto | `docs/sector-zero-roadmap.md:936` | Сохранение: сперва мета, потом забег |
+| PVR-1.1 | ✅ | proto core data cli | `docs/sector-zero-roadmap.md:957` | Соло-запуск задаёт modeId |
+| PVR-1.2 | ✅ | proto | `docs/sector-zero-roadmap.md:999` | HUD забега: волна N из M и время до следующей |
+| PVR-1.3 | ⏳ | data | `docs/sector-zero-roadmap.md:1031` | Состав волны перестаёт быть одним дроном |
+| PVR-1.4 | ⏳ | proto | `docs/sector-zero-roadmap.md:1039` | Выбор между волнами |
+| PVR-2.1 | ⏳ | proto | `docs/sector-zero-roadmap.md:1050` | Выбор сложности на запуске забега |
+| PVR-3.1 | ⏳ | docs | `docs/sector-zero-roadmap.md:1061` | Резолюция: чем PvE-прокачка НЕ является |
+| PVR-3.2 | 🔒 | proto | `docs/sector-zero-roadmap.md:1069` | Хранилище PvE-прогресса |
+| PVR-3.3 | 🔒 | proto | `docs/sector-zero-roadmap.md:1076` | Награда за забег |
+| PVR-4.1 | ⏳ | docs | `docs/sector-zero-roadmap.md:1090` | Резолюция: что из §3 входит в первую версию |
+| PVR-4.2 | 🔒 | core | `docs/sector-zero-roadmap.md:1098` | Память Роя как состояние |
+| PVR-4.3 | 🔒 | core data | `docs/sector-zero-roadmap.md:1107` | Одна читаемая адаптация от сигнала до формы |
+| PVR-4.4 | 🔒 | data | `docs/sector-zero-roadmap.md:1115` | Структуры первого набора |
+| PVR-4.5 | 🔒 | proto | `docs/sector-zero-roadmap.md:1121` | Журнал адаптаций |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md:48` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md:55` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md:64` | Сервисные идентичности и scoped-токены |
