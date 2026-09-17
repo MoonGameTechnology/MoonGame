@@ -591,42 +591,42 @@
 | AUD-8 | 🗑 | proto | `docs/backlog.md:13439` | сведён в CONV-12 |
 | AUD-9 | ✅ | sec | `docs/backlog.md:13447` | merge-queue выбрасывал PR с CIFAILURE при зелёном коде. |
 | AUD-10 | ✅ | sec | `docs/backlog.md:13475` | зелёный PR не вставал в очередь: у автомержа один шанс, и он |
-| FSPLIT-1 | ✅ | core act proto | `docs/backlog.md:13617` | Отбор при делении адресует СТЕК, а не тип корабля. |
-| FSPLIT-2 | ✅ | core act proto | `docs/backlog.md:13627` | Десант делится вместе с кораблями, по трюму обеих половин. |
-| AIDIFF-1 | ✅ | proto | `docs/backlog.md:13655` | Строка места переключается «выкл → слабый → сильный». |
-| RESIL-1 | ✅ | proto | `docs/backlog.md:13809` | Фоновые промисы браузерного клиента. |
-| RESIL-2 | ✅ | proto | `docs/backlog.md:13836` | Цикл подсветки обучающего тура. |
-| RESIL-3 | ✅ | srv | `docs/backlog.md:13853` | Именованный фатал процесса. |
-| RESIL-4 | ✅ | srv | `docs/backlog.md:13873` | Соак проверяет, что мир не встал. |
-| RESIL-5 | ✅ | srv proto | `docs/backlog.md:13891` | Генеральная репетиция: весь стек разом, и |
-| RESIL-6 | ✅ | srv proto | `docs/backlog.md:13926` | Достоверность генералки: настоящая база, |
-| ADDR-7 | ✅ | sec proto | `docs/backlog.md:14068` | Ссылка на партию не пускает по незнанию: |
-| OPS-2 | ✅ | ops sec | `docs/backlog.md:14106` | Обновление доносит до машины новые ключи |
-| REL-6 | ✅ | srv | `docs/backlog.md:14128` | Возврат на своё место мгновенный: перехват вместо |
-| CMB-4 | ✅ | core | `docs/backlog.md:14143` | Первый раунд боя — на самой встрече, а не через |
-| BLD-1 | ✅ | core proto | `docs/backlog.md:14163` | Очередь строительства: заказы встают в |
-| UI-14 | ✅ | proto | `docs/backlog.md:14203` | Осмотр чужого флота должен быть находимым. |
-| CMB-5 | ✅ | core | `docs/backlog.md:14226` | Вражда началась — стоящие рядом флоты сходятся |
-| ATK-1 | ✅ | proto | `docs/backlog.md:14242` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
-| SHIPART-1 | ✅ | proto cli | `docs/backlog.md:14268` | Реалистичные портреты в постройке и описаниях, |
-| YARD-1 | ✅ | data proto srv | `docs/backlog.md:14379` | Корабли строит ВЕРФЬ, челноки — |
-| YARD-2 | ✅ | data | `docs/backlog.md:14413` | У верфи два яруса: дешёвый строит, дорогой |
-| CMB-7 | ✅ | core | `docs/backlog.md:14437` | Перемирие посреди боя не останавливало бой. |
-| RLY-1 | ✅ | proto | `docs/backlog.md:14458` | Сбор построенного: соло и сеть играли по РАЗНЫМ |
-| CARGO-1 | ✅ | core proto | `docs/backlog.md:14490` | Часовая погрузка десанта жила в |
-| MRG-1 | ✅ | core proto | `docs/backlog.md:14538` | «Слиться по прибытии» — вторая половина |
-| ART-0 | ✅ | core data proto | `docs/backlog.md:14561` | Артиллерия снята из игры целиком |
-| ORB-1 | ✅ | core data proto | `docs/backlog.md:14592` | Орбитальный слой объявлен в |
-| ORB-4 | ✅ | core data proto | `docs/backlog.md:14628` | в астероидном поле строилось всё, что угодно: |
-| ORB-2 | ✅ | data proto | `docs/backlog.md:14669` | «Изучается технология, строится здание» не |
-| ORB-3 | ✅ | proto | `docs/backlog.md:14697` | Звёздный форт выдавал орбитальное ПКО мимо |
-| CMB-6 | ✅ | core | `docs/backlog.md:14734` | После ничьей третий враждебный флот получает свой |
-| ORD-2 | ✅ | proto | `docs/backlog.md:14764` | Нацеленный ШТУРМ теперь переживает закрытую |
-| FOG-10 | ✅ | proto core | `docs/backlog.md:14784` | Память разведки перестала жить только |
-| FOG-9 | ✅ | core | `docs/backlog.md:14808` | Приостановленная стройка чужого мира была видна |
-| TEST-4 | ✅ | srv | `docs/backlog.md:14818` | topXp падал на живой базе разработчика. |
-| PHONE-STRATEGY | ✅ |  | `docs/backlog.md:14836` | Технологии, постройки, производство, рынок и дипломатия |
-| MAP-PERF | ✅ |  | `docs/backlog.md:14848` | Ускорение движения раскрытой голографической карты и подготовка |
+| FSPLIT-1 | ✅ | core act proto | `docs/backlog.md:13618` | Отбор при делении адресует СТЕК, а не тип корабля. |
+| FSPLIT-2 | ✅ | core act proto | `docs/backlog.md:13628` | Десант делится вместе с кораблями, по трюму обеих половин. |
+| AIDIFF-1 | ✅ | proto | `docs/backlog.md:13656` | Строка места переключается «выкл → слабый → сильный». |
+| RESIL-1 | ✅ | proto | `docs/backlog.md:13810` | Фоновые промисы браузерного клиента. |
+| RESIL-2 | ✅ | proto | `docs/backlog.md:13837` | Цикл подсветки обучающего тура. |
+| RESIL-3 | ✅ | srv | `docs/backlog.md:13854` | Именованный фатал процесса. |
+| RESIL-4 | ✅ | srv | `docs/backlog.md:13874` | Соак проверяет, что мир не встал. |
+| RESIL-5 | ✅ | srv proto | `docs/backlog.md:13892` | Генеральная репетиция: весь стек разом, и |
+| RESIL-6 | ✅ | srv proto | `docs/backlog.md:13927` | Достоверность генералки: настоящая база, |
+| ADDR-7 | ✅ | sec proto | `docs/backlog.md:14069` | Ссылка на партию не пускает по незнанию: |
+| OPS-2 | ✅ | ops sec | `docs/backlog.md:14107` | Обновление доносит до машины новые ключи |
+| REL-6 | ✅ | srv | `docs/backlog.md:14129` | Возврат на своё место мгновенный: перехват вместо |
+| CMB-4 | ✅ | core | `docs/backlog.md:14144` | Первый раунд боя — на самой встрече, а не через |
+| BLD-1 | ✅ | core proto | `docs/backlog.md:14164` | Очередь строительства: заказы встают в |
+| UI-14 | ✅ | proto | `docs/backlog.md:14204` | Осмотр чужого флота должен быть находимым. |
+| CMB-5 | ✅ | core | `docs/backlog.md:14227` | Вражда началась — стоящие рядом флоты сходятся |
+| ATK-1 | ✅ | proto | `docs/backlog.md:14243` | Кнопка «Атака» и честный гейт кнопки ШТУРМ. |
+| SHIPART-1 | ✅ | proto cli | `docs/backlog.md:14269` | Реалистичные портреты в постройке и описаниях, |
+| YARD-1 | ✅ | data proto srv | `docs/backlog.md:14380` | Корабли строит ВЕРФЬ, челноки — |
+| YARD-2 | ✅ | data | `docs/backlog.md:14414` | У верфи два яруса: дешёвый строит, дорогой |
+| CMB-7 | ✅ | core | `docs/backlog.md:14438` | Перемирие посреди боя не останавливало бой. |
+| RLY-1 | ✅ | proto | `docs/backlog.md:14459` | Сбор построенного: соло и сеть играли по РАЗНЫМ |
+| CARGO-1 | ✅ | core proto | `docs/backlog.md:14491` | Часовая погрузка десанта жила в |
+| MRG-1 | ✅ | core proto | `docs/backlog.md:14539` | «Слиться по прибытии» — вторая половина |
+| ART-0 | ✅ | core data proto | `docs/backlog.md:14562` | Артиллерия снята из игры целиком |
+| ORB-1 | ✅ | core data proto | `docs/backlog.md:14593` | Орбитальный слой объявлен в |
+| ORB-4 | ✅ | core data proto | `docs/backlog.md:14629` | в астероидном поле строилось всё, что угодно: |
+| ORB-2 | ✅ | data proto | `docs/backlog.md:14670` | «Изучается технология, строится здание» не |
+| ORB-3 | ✅ | proto | `docs/backlog.md:14698` | Звёздный форт выдавал орбитальное ПКО мимо |
+| CMB-6 | ✅ | core | `docs/backlog.md:14735` | После ничьей третий враждебный флот получает свой |
+| ORD-2 | ✅ | proto | `docs/backlog.md:14765` | Нацеленный ШТУРМ теперь переживает закрытую |
+| FOG-10 | ✅ | proto core | `docs/backlog.md:14785` | Память разведки перестала жить только |
+| FOG-9 | ✅ | core | `docs/backlog.md:14809` | Приостановленная стройка чужого мира была видна |
+| TEST-4 | ✅ | srv | `docs/backlog.md:14819` | topXp падал на живой базе разработчика. |
+| PHONE-STRATEGY | ✅ |  | `docs/backlog.md:14909` | Технологии, постройки, производство, рынок и дипломатия |
+| MAP-PERF | ✅ |  | `docs/backlog.md:14921` | Ускорение движения раскрытой голографической карты и подготовка |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
@@ -783,30 +783,30 @@
 | HC-3.2 | ✅ | core data | `docs/hero-collection-roadmap.md:276` | Варп-прыжок: hero.effect.jump 2026-09-07 |
 | HC-3.3 | ✅ | core data | `docs/hero-collection-roadmap.md:293` | Фантомный радарный сигнал 2026-09-07 |
 | HC-3.4 | ⏳ | core data | `docs/hero-collection-roadmap.md:315` | «Опытный командир»: юниты союзника под управление |
-| HPR-0.1 | ✅ | docs | `docs/hero-progression-roadmap.md:364` | Кому принадлежат звёзды: только главному или всем 2026-09-07 |
-| HPR-0.2 | ⏳ | docs data | `docs/hero-progression-roadmap.md:373` | Ресурс прогрессии: что это, откуда берётся, куда уходит |
-| HPR-0.3 | ⏳ | docs data | `docs/hero-progression-roadmap.md:387` | Лестница редкости скилла и её ЦВЕТА |
-| HPR-0.4 | 🔒 | docs sec | `docs/hero-progression-roadmap.md:402` | Заточка скиллов включена в лутбокс-ревью |
-| HPR-1.1 | ⏳ | core data | `docs/hero-progression-roadmap.md:421` | Четвёртая редкость, main вон из лестницы, слоты ОТ РЕДКОСТИ |
-| HPR-1.2 | ✅ | core | `docs/hero-progression-roadmap.md:439` | Ядро применяет бюджет слотов скиллов 2026-09-07 |
-| HPR-1.3 | 🔒 | core data | `docs/hero-progression-roadmap.md:461` | Звёзды: поле, слот и прибавка к статам корабля |
-| HPR-1.4 | 🔒 | proto | `docs/hero-progression-roadmap.md:478` | Витрина редкости и звёзд в штабе героев |
-| HPR-1.5.1 | ✅ | data | `docs/hero-progression-roadmap.md:494` | Корабль героя берёт обычные модули 2026-09-08 |
-| HPR-1.5.2 | ✅ | core | `docs/hero-progression-roadmap.md:509` | Лоадаут корабля живёт на герое 2026-09-08 |
-| HPR-1.5.3 | ✅ | data | `docs/hero-progression-roadmap.md:540` | Два «скилла в обёртке» переезжают в скиллы 2026-09-08 |
-| HPR-1.5.4 | ✅ | core proto | `docs/hero-progression-roadmap.md:554` | Снос hero.fit и вкладки фиттингов 2026-09-08 |
-| HPR-1.6.1 | ⏳ | core data | `docs/hero-progression-roadmap.md:584` | Гейты переоснащения для скиллов И модулей |
-| HPR-1.6.2 | 🔒 | proto | `docs/hero-progression-roadmap.md:621` | Экран переоснащения говорит, ГДЕ и ПОЧЁМ |
-| HPR-2.1 | 🔒 | data core | `docs/hero-progression-roadmap.md:636` | Редкость у СКИЛЛА — поле и лестница |
-| HPR-2.2 | 🔒 | srv data | `docs/hero-progression-roadmap.md:645` | heroskill как вид предмета арсенала |
-| HPR-2.3 | 🔒 | srv | `docs/hero-progression-roadmap.md:652` | Дубликаты: инвентарь умеет считать количество |
-| HPR-2.4 | 🔒 | data srv | `docs/hero-progression-roadmap.md:660` | Скиллы и дубликаты в пуле дропа |
-| HPR-3.1 | 🔒 | data core | `docs/hero-progression-roadmap.md:674` | Уровень скилла: данные и кривая |
-| HPR-3.2 | 🔒 | srv | `docs/hero-progression-roadmap.md:684` | Заточка скилла на движке EC-2.1 |
-| HPR-3.3 | 🔒 | core srv | `docs/hero-progression-roadmap.md:692` | Уровень доезжает в матч через снапшот |
-| HPR-3.4 | 🔒 | srv cli | `docs/hero-progression-roadmap.md:704` | Сток, раскрытие шансов и честный UI |
-| HPR-4.1 | 🔒 | srv data | `docs/hero-progression-roadmap.md:714` | Ресурс звёзд: кран и сток |
-| HPR-4.2 | 🔒 | srv cli | `docs/hero-progression-roadmap.md:719` | Ритуал повышения звезды |
+| HPR-0.1 | ✅ | docs | `docs/hero-progression-roadmap.md:416` | Кому принадлежат звёзды: только главному или всем 2026-09-07 |
+| HPR-0.2 | ⏳ | docs data | `docs/hero-progression-roadmap.md:425` | Ресурс прогрессии: что это, откуда берётся, куда уходит |
+| HPR-0.3 | ⏳ | docs data | `docs/hero-progression-roadmap.md:439` | Лестница редкости скилла и её ЦВЕТА |
+| HPR-0.4 | 🔒 | docs sec | `docs/hero-progression-roadmap.md:454` | Заточка скиллов включена в лутбокс-ревью |
+| HPR-1.1 | ⏳ | core data | `docs/hero-progression-roadmap.md:473` | Четвёртая редкость, main вон из лестницы, слоты ОТ РЕДКОСТИ |
+| HPR-1.2 | ✅ | core | `docs/hero-progression-roadmap.md:491` | Ядро применяет бюджет слотов скиллов 2026-09-07 |
+| HPR-1.3 | 🔒 | core data | `docs/hero-progression-roadmap.md:513` | Звёзды: поле и слот |
+| HPR-1.4 | 🔒 | proto | `docs/hero-progression-roadmap.md:541` | Витрина редкости и звёзд в штабе героев |
+| HPR-1.5.1 | ✅ | data | `docs/hero-progression-roadmap.md:557` | Корабль героя берёт обычные модули 2026-09-08 |
+| HPR-1.5.2 | ✅ | core | `docs/hero-progression-roadmap.md:572` | Лоадаут корабля живёт на герое 2026-09-08 |
+| HPR-1.5.3 | ✅ | data | `docs/hero-progression-roadmap.md:603` | Два «скилла в обёртке» переезжают в скиллы 2026-09-08 |
+| HPR-1.5.4 | ✅ | core proto | `docs/hero-progression-roadmap.md:617` | Снос hero.fit и вкладки фиттингов 2026-09-08 |
+| HPR-1.6.1 | ⏳ | core data | `docs/hero-progression-roadmap.md:647` | Гейты переоснащения для скиллов И модулей |
+| HPR-1.6.2 | 🔒 | proto | `docs/hero-progression-roadmap.md:684` | Экран переоснащения говорит, ГДЕ и ПОЧЁМ |
+| HPR-2.1 | 🔒 | data core | `docs/hero-progression-roadmap.md:699` | Редкость у СКИЛЛА — поле и лестница |
+| HPR-2.2 | 🔒 | srv data | `docs/hero-progression-roadmap.md:708` | heroskill как вид предмета арсенала |
+| HPR-2.3 | 🔒 | srv | `docs/hero-progression-roadmap.md:715` | Дубликаты: инвентарь умеет считать количество |
+| HPR-2.4 | 🔒 | data srv | `docs/hero-progression-roadmap.md:723` | Скиллы и дубликаты в пуле дропа |
+| HPR-3.1 | 🔒 | data core | `docs/hero-progression-roadmap.md:737` | Уровень скилла: данные и кривая |
+| HPR-3.2 | 🔒 | srv | `docs/hero-progression-roadmap.md:747` | Заточка скилла на движке EC-2.1 |
+| HPR-3.3 | 🔒 | core srv | `docs/hero-progression-roadmap.md:755` | Уровень доезжает в матч через снапшот |
+| HPR-3.4 | 🔒 | srv cli | `docs/hero-progression-roadmap.md:767` | Сток, раскрытие шансов и честный UI |
+| HPR-4.1 | 🔒 | srv data | `docs/hero-progression-roadmap.md:777` | Ресурс звёзд: кран и сток |
+| HPR-4.2 | 🔒 | srv cli | `docs/hero-progression-roadmap.md:782` | Ритуал повышения звезды |
 | HTTPS-0.1 | ⏳ | docs | `docs/https-roadmap.md:52` | Зафиксировать «TLS терминирует прокси» как стандарт — S → SE-1.2 |
 | HTTPS-1.1 | ✅ | srv sec | `docs/https-roadmap.md:63` | Доверие прокси: X-Forwarded-Proto/Host + Origin — M → SE-6.1, SE-1.2 |
 | HTTPS-1.2 | ⏳ | srv | `docs/https-roadmap.md:90` | (Опц.) In-process TLS как запасной путь — S → SE-1.2 |
@@ -945,6 +945,22 @@
 | ROS-2.2 | ✅ | core data proto | `docs/roster-roadmap.md:422` | Челнок — сторона боя: ответный урон и зональное ПВО 2026-09-09 |
 | ROS-3.1 | ✅ | proto | `docs/roster-roadmap.md:459` | Экран «Производство»: пять типов, модули, количество, планета 2026-09-09 |
 | ROS-3.2 | ✅ | proto | `docs/roster-roadmap.md:497` | Шаттл — корабль во всём интерфейсе 2026-09-09 |
+| PVR-0.1 | ⏳ | data | `docs/sector-zero-roadmap.md:774` | Карта pve-1 снова строится |
+| PVR-0.2 | ⏳ | proto | `docs/sector-zero-roadmap.md:782` | pveModule в ядре прототипа |
+| PVR-0.3 | ⏳ | proto | `docs/sector-zero-roadmap.md:789` | Сохранение: сперва мета, потом забег |
+| PVR-1.1 | 🔒 | proto | `docs/sector-zero-roadmap.md:810` | Соло-запуск задаёт modeId |
+| PVR-1.2 | 🔒 | proto | `docs/sector-zero-roadmap.md:817` | HUD забега: волна N из M и время до следующей |
+| PVR-1.3 | 🔒 | data | `docs/sector-zero-roadmap.md:823` | Состав волны перестаёт быть одним дроном |
+| PVR-1.4 | 🔒 | proto | `docs/sector-zero-roadmap.md:831` | Выбор между волнами |
+| PVR-2.1 | 🔒 | proto | `docs/sector-zero-roadmap.md:842` | Выбор сложности на запуске забега |
+| PVR-3.1 | ⏳ | docs | `docs/sector-zero-roadmap.md:853` | Резолюция: чем PvE-прокачка НЕ является |
+| PVR-3.2 | 🔒 | proto | `docs/sector-zero-roadmap.md:861` | Хранилище PvE-прогресса |
+| PVR-3.3 | 🔒 | proto | `docs/sector-zero-roadmap.md:868` | Награда за забег |
+| PVR-4.1 | ⏳ | docs | `docs/sector-zero-roadmap.md:882` | Резолюция: что из §3 входит в первую версию |
+| PVR-4.2 | 🔒 | core | `docs/sector-zero-roadmap.md:890` | Память Роя как состояние |
+| PVR-4.3 | 🔒 | core data | `docs/sector-zero-roadmap.md:899` | Одна читаемая адаптация от сигнала до формы |
+| PVR-4.4 | 🔒 | data | `docs/sector-zero-roadmap.md:907` | Структуры первого набора |
+| PVR-4.5 | 🔒 | proto | `docs/sector-zero-roadmap.md:913` | Журнал адаптаций |
 | SE-0.1 | ✅ | srv sec | `docs/secure-environment-roadmap.md:48` | JWT в WebSocket-рукопожатии |
 | SE-0.2 | ✅ | srv | `docs/secure-environment-roadmap.md:55` | Авторизация на соединении и на сообщении |
 | SE-0.3 | ⏳ | sec | `docs/secure-environment-roadmap.md:64` | Сервисные идентичности и scoped-токены |
@@ -1075,3 +1091,19 @@
 | VET-3 | ✅ | core data | `docs/unit-medals-roadmap.md:285` | Грейды и пороги |
 | VET-4 | ✅ | core data | `docs/unit-medals-roadmap.md:311` | Выплата, растущая со степенью |
 | VET-5 | ✅ | proto cli | `docs/unit-medals-roadmap.md:341` | Медали в карточке юнита |
+| YAG-0.1 | ⏳ | docs | `docs/yandex-games-roadmap.md:261` | Сверить требования с первоисточником |
+| YAG-1.1 | 🔒 | proto | `docs/yandex-games-roadmap.md:273` | WebPlatformAdapter и платформенная цель сборки |
+| YAG-1.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:282` | YandexGamesAdapter: инициализация и жизненный цикл |
+| YAG-1.3 | 🔒 | proto | `docs/yandex-games-roadmap.md:288` | Язык от площадки |
+| YAG-2.1 | 🔒 | proto | `docs/yandex-games-roadmap.md:297` | PortableMetaSave: компактный дескриптор забега |
+| YAG-2.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:304` | PlatformSave в адаптере Яндекса |
+| YAG-3.1 | 🔒 | proto | `docs/yandex-games-roadmap.md:314` | PlatformAds в адаптере Яндекса |
+| YAG-3.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:321` | Placements по правилам |
+| YAG-4.1 | 🔒 | srv | `docs/yandex-games-roadmap.md:333` | Эндпойнт проверки подписи |
+| YAG-4.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:339` | PlatformIAP в адаптере Яндекса |
+| YAG-5.1 | 🔒 | proto | `docs/yandex-games-roadmap.md:350` | PlatformAnalytics: словарь событий |
+| YAG-5.2 | 🔒 | docs | `docs/yandex-games-roadmap.md:359` | Карточка игры и подача в модерацию |
+| YAG-6.1 | 🔒 | proto | `docs/yandex-games-roadmap.md:370` | Серверное время вместо системного |
+| YAG-6.2 | 🔒 | proto | `docs/yandex-games-roadmap.md:378` | Пауза площадки: что делает мир |
+| YAG-6.3 | 🔒 | proto | `docs/yandex-games-roadmap.md:387` | Удалённый конфиг баланса |
+| YAG-6.4 | 🔒 | proto | `docs/yandex-games-roadmap.md:395` | Кнопка «назад» и выход |
