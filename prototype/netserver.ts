@@ -23,6 +23,7 @@ import pgPkg from 'pg';
 import {
   MatchRoom,
   MatchRegistry,
+  sessionMeta,
   type MatchMeta,
   newMatchId,
   pveOrders,
@@ -380,7 +381,11 @@ interface HostedMatch {
   clearTimers(): void;
 }
 
-async function createHostedMatch(id: string, mapId: MapId = 'nexus'): Promise<HostedMatch> {
+async function createHostedMatch(
+  id: string,
+  mapId: MapId = 'nexus',
+  modeId?: string,
+): Promise<HostedMatch> {
   let connected = 0; // live players in THIS match (gates the empty-seat AI)
   // The shared offline scheduler (assigned after `room` below). `observe` re-arms it,
   // so it is declared here — before `observe` — and read with `?.` until it exists.
@@ -391,7 +396,18 @@ async function createHostedMatch(id: string, mapId: MapId = 'nexus'): Promise<Ho
   const aiEligibleAt = new Map<string, number>();
 
   const restoredSnap = await matchStore.load(id);
-  const initialState = restoredSnap?.state ?? newGame({ mapId, seats: networkSeats(isFrontier(mapId) ? 'ffa' : NETWORK_MODE, mapId) });
+  const initialState =
+    restoredSnap?.state ??
+    newGame({
+      mapId,
+      ...(modeId !== undefined ? { modeId } : {}),
+      seats: networkSeats(isFrontier(mapId) ? 'ffa' : NETWORK_MODE, mapId),
+    });
+  // Режим берётся ИЗ СОСТОЯНИЯ, а не из аргумента: у восстановленной партии аргумента
+  // нет (её поднимает `bootRoster` по списку из стора), и без этой строки рестарт
+  // молча вернул бы PvE-сессию к базовым правилам — ровно та «подмена правил под
+  // матчем», которую `resolveMatchConfig` отказывается допускать для чужого режима.
+  const sessionModeId = initialState.modeId;
   // A NET seat is not a bot: every seat here is claimable by a human, and the
   // server-side AI merely stands in for an empty chair (`humans` is the live truth).
   // Strip the static `ai` branding newGame took from the seat config, or two humans
@@ -482,7 +498,11 @@ async function createHostedMatch(id: string, mapId: MapId = 'nexus'): Promise<Ho
     serverOrders: (state, seq) => pveOrders(state, data, { session: id, seq }),
     // The kernel context config must match what the local sim (and the HUD) promise:
     // without it victory falls back to its 600 default while the HUD counts to 450.
-    config: { timeScale: 1, victory: { scoreLimit: scoreLimitFor(initialState) } },
+    config: {
+      timeScale: 1,
+      ...(sessionModeId !== undefined ? { modeId: sessionModeId } : {}),
+      victory: { scoreLimit: scoreLimitFor(initialState) },
+    },
     initialSeq: restoredSnap?.seq, // resume the action counter — else the optimistic-by-seq
     // store drops post-restart saves until seq climbs back past the stored value
     // Strict commit-before-broadcast: await the durable write of the new snapshot +
@@ -734,16 +754,22 @@ async function createHostedMatch(id: string, mapId: MapId = 'nexus'): Promise<Ho
 // Само решение — в `matchRoster.ts` рядом с каноническим сервером, чтобы хосты не
 // разъезжались в том, как называется партия.
 const hosted: HostedMatch[] = [];
-const registry = new MatchRegistry(accountStore);
-/** Метаданные браузера: карта берётся из сохранённого состояния сессии. */
-const browserMeta = (room: MatchRoom): MatchMeta => ({
-  mapId: room.state.mapId ?? 'nexus',
-  rules: { timeScale: TIME_SCALE },
-  createdAt: Date.now(),
-  startedAt: room.state.time,
-  entryWindowMs: ENTRY_WINDOW_MS, // SES-2.3: a NEW player may claim a free seat only
-  // within this real-time window from the session's creation (see AI note below).
-});
+// Каталог во ВТОРОМ аргументе — им реестр выводит `kind` строки (`matchKind`: PvE это
+// «у пресета есть секция `pve`»). Без него лента честно молчала бы про вид даже у
+// сессии с режимом: поймано живым прогоном при BRW-0 — `modeId` в строке уже стоял,
+// а `kind` у всех трёх партий приезжал `undefined`.
+const registry = new MatchRegistry(accountStore, data);
+/** Метаданные браузера: карта и режим берутся из САМОЙ сессии (`sessionMeta`, BRW-0) —
+ *  карта из сохранённого состояния, режим из резолвнутого конфига комнаты. Сборка живёт
+ *  в `packages/server`, чтобы у неё был один экземпляр на оба хоста и на тест ленты.
+ *  `entryWindowMs` — SES-2.3: новичок занимает свободное место только внутри этого
+ *  реального окна от создания сессии. */
+const browserMeta = (room: MatchRoom): MatchMeta =>
+  sessionMeta(room, {
+    timeScale: TIME_SCALE,
+    createdAt: Date.now(),
+    entryWindowMs: ENTRY_WINDOW_MS,
+  });
 
 // Список партий на старте приходит из СТОРА, а не из `MATCHES=N`: `bootRoster` поднимает
 // всё, что стор считает живым, и засевает только пустой стор (иначе каждый рестарт
@@ -770,9 +796,9 @@ const restoredCount = hosted.filter((h) => h.restored).length;
  */
 const MAX_HOSTED = 64; // потолок сессий в одном процессе: создание ограничено сверху,
 // а не только per-IP лимитом маршрута — иначе память процесса растёт по запросу.
-async function hostNewMatch(mapId: MapId = 'nexus'): Promise<HostedMatch> {
+async function hostNewMatch(mapId: MapId = 'nexus', modeId?: string): Promise<HostedMatch> {
   if (hosted.length >= MAX_HOSTED) throw new Error('match capacity reached'); // → 500, bounded
-  const h = await createHostedMatch(newMatchId(), mapId);
+  const h = await createHostedMatch(newMatchId(), mapId, modeId);
   hosted.push(h);
   registry.register(h.room, browserMeta(h.room));
   // Свежая партия ложится в стор СРАЗУ, а не при первой активности. Иначе её нет в
@@ -1020,8 +1046,11 @@ const server = createMultiplayerServer({
         // (`identify` ниже — с AUTH=1 создать может только вошедший), per-IP лимит
         // самого `registerMatchApi` и потолок `MAX_HOSTED` на процесс.
         mapIds: MAP_IDS,
+        // BRW-0: режимы берутся ИЗ КАТАЛОГА, а не списком здесь — иначе у хоста завёлся
+        // бы второй перечень режимов, который молча разъедется с `data/modes.json`.
+        modeIds: Object.keys(data.modes),
         createMatch: async (request) => {
-          const h = await hostNewMatch(mapPreset(request?.mapId).id);
+          const h = await hostNewMatch(mapPreset(request?.mapId).id, request?.modeId);
           return { matchId: h.id, seats: playablePlayerIds(h.room.state) };
         },
         // Identity = a signature-valid session, RE-CHECKED against the current password: a
