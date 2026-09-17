@@ -682,6 +682,7 @@ export const ru: Record<string, string> = {
   'data.azure-compact': 'Лазурный пакт',
   'data.barracks': 'Казармы',
   'data.barren': 'Безжизненный',
+  'data.bastion-marshal': 'Маршал бастионов',
   'data.biomass-pit': 'Биомассовый карьер',
   'data.boarding-translocation': 'Абордажная транслокация',
   'data.bomber': 'бомбардировщик',
@@ -761,6 +762,7 @@ export const ru: Record<string, string> = {
   'data.orbital-defense-battery': 'Орбитальное ПКО',
   'data.orbital-defense-grid': 'Орбитальная оборонная сеть',
   'data.orbital-logistics': 'Орбитальная логистика',
+  'data.ordnance-savant': 'Магистр вооружений',
   'data.overclocked-helm': 'Разогнанный шлем',
   'data.overseer': 'Куратор',
   'data.planet': 'Планета',
@@ -833,6 +835,7 @@ export const ru: Record<string, string> = {
   'data.warp-jump': 'Варп-прыжок',
   'data.warhead-miniaturization': 'Миниатюризация боеголовок',
   'data.weak-points': 'Слабые места',
+  'data.wing-commodore': 'Командор крыла',
 
   // --- diplo — Дипломатия: окно, вкладки, фильтр и сортировка ростера, названия отношений.
   'diplo.filter': 'Фильтр',
@@ -1130,10 +1133,16 @@ export const ru: Record<string, string> = {
   'sandbox.wars-ended': 'Войны прекращены: {n} — отношения нейтральные',
 
   // --- sci — Учёные совета: имя и что даёт ветка.
+  'sci.bastion-marshal.desc':
+    'Лидер наземной ветки: укрепления, гарнизонные сети, планетарные бастионы.',
+  'sci.ordnance-savant.desc':
+    'Лидер ракетной ветки: системы наведения, компактные заряды, ковровый залп.',
   'sci.overseer.desc':
     'Лидер ветки командования (C2): доктрины автоматизации и делегирования. Открывает «Протокол Хранитель» — передачу места ИИ на время сна.',
   'sci.polymath.desc': 'Генералист без ветки: +1 слот исследования (2→3) вместо фокуса.',
   'sci.void-admiral.desc': 'Лидер космической ветки: верфи, логистика, осадные доктрины.',
+  'sci.wing-commodore.desc':
+    'Лидер челночной ветки: полётные палубы, векторы удара, программы асов.',
 
   // --- scipick — Совет учёных: кандидаты, фокус ветки, закрепление.
   'scipick.candidates': 'Кандидаты · нажмите, чтобы занять слот',

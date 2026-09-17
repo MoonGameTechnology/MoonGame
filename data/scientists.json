@@ -13,5 +13,20 @@
     "name": "Overseer",
     "description": "sci.overseer.desc",
     "branch": "command"
+  },
+  "bastion_marshal": {
+    "name": "Bastion Marshal",
+    "description": "sci.bastion-marshal.desc",
+    "branch": "ground"
+  },
+  "wing_commodore": {
+    "name": "Wing Commodore",
+    "description": "sci.wing-commodore.desc",
+    "branch": "shuttle"
+  },
+  "ordnance_savant": {
+    "name": "Ordnance Savant",
+    "description": "sci.ordnance-savant.desc",
+    "branch": "missile"
   }
 }
