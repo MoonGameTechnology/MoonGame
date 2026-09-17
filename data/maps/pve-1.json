@@ -17,7 +17,6 @@
       "position": { "x": 230, "y": -190 },
       "kind": "planet",
       "planetType": "terran",
-      "owner": "p2",
       "buildings": [{ "type": "mine_t1" }, { "type": "shipyard" }, { "type": "radar" }],
       "garrison": [{ "unit": "militia", "count": 3 }]
     },
@@ -57,11 +56,6 @@
       "faction": "vanguard",
       "resources": { "credits": 400, "metal": 400 }
     },
-    "p2": {
-      "name": "Amber Concord",
-      "faction": "vanguard",
-      "resources": { "credits": 400, "metal": 400 }
-    },
     "p3": {
       "name": "Swarm Collective",
       "faction": "swarm",
@@ -72,11 +66,6 @@
     "p1_1": {
       "owner": "p1",
       "location": "home_a",
-      "units": [{ "unit": "cruiser", "count": 2 }, { "unit": "scout_drone", "count": 1 }]
-    },
-    "p2_1": {
-      "owner": "p2",
-      "location": "home_b",
       "units": [{ "unit": "cruiser", "count": 2 }, { "unit": "scout_drone", "count": 1 }]
     },
     "p3_1": {

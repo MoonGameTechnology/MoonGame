@@ -31,6 +31,19 @@ describe('pveState — the PvE door', () => {
     expect(state.fleets.p1_1!.location).toBe('home_a');
   });
 
+  it('seats exactly two sides: the player and the Swarm (PVR-1.6)', () => {
+    // Карта возила ВТОРОЕ человеческое место `p2`, а `startPvEMatch()` сажает бота на
+    // всё, кроме `p1` — то есть забег за игрока играл союзный бот: он занимал середину
+    // к 30-му часу и принимал на себя весь штурм. Забег по решению владельца
+    // ОДИНОЧНЫЙ (§0.1/§0.3), поэтому мест ровно два.
+    const state = pveState(data);
+    expect(Object.keys(state.players).sort()).toEqual(['p1', 'p3']);
+    // `home_b` осталась на карте, но НИЧЬЯ: это компактная зона развития сбоку, за
+    // которую игрок платит десантом, а не бесплатный второй дом.
+    expect(state.planets.home_b!.owner).toBeNull();
+    expect(state.planets.home_b!.garrison.length).toBeGreaterThan(0);
+  });
+
   it('lays the sectors out as a funnel: two lanes off the hub, one gate to the hive', () => {
     const state = pveState(data);
     // nexus is where both homes meet and where the two flanks come back together

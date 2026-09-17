@@ -21,6 +21,9 @@
       "waveFleet": [
         { "unit": "frigate", "count": 2 },
         { "unit": "cruiser", "count": 1 }
+      ],
+      "waveLanding": [
+        { "unit": "drop_infantry", "count": 2 }
       ]
     }
   },

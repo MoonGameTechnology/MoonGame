@@ -731,11 +731,28 @@ describe('game modes (PVE-0.1, docs/pve-team-modes-roadmap.md)', () => {
     // не падает. Опечатку ловить здесь, на загрузке, а не по жалобе на лёгкий забег.
     const data = parseGameData(loadShippedBundle());
     const unknown = Object.entries(data.modes).flatMap(([id, mode]) =>
-      (mode.pve?.waveFleet ?? [])
+      [...(mode.pve?.waveFleet ?? []), ...(mode.pve?.waveLanding ?? [])]
         .filter((stack) => !(stack.unit in data.units))
         .map((stack) => `${id}: ${stack.unit}`),
     );
     expect(unknown.sort()).toEqual([]);
+  });
+
+  it('десант волны — наземные юниты, а флот волны — космические (PVR-1.6)', () => {
+    // Перепутанные половины молчаливы: наземник в `waveFleet` не полетит воевать в
+    // орбитальном бою, корабль в `waveLanding` не высадится. Обе ошибки выглядят как
+    // «штурм слабее, чем заявлено», и ловить их на глаз по JSON — безнадёжно.
+    const data = parseGameData(loadShippedBundle());
+    const wrong: string[] = [];
+    for (const [id, mode] of Object.entries(data.modes)) {
+      for (const st of mode.pve?.waveFleet ?? []) {
+        if (data.units[st.unit]?.domain === 'ground') wrong.push(`${id}.waveFleet: ${st.unit}`);
+      }
+      for (const st of mode.pve?.waveLanding ?? []) {
+        if (data.units[st.unit]?.domain !== 'ground') wrong.push(`${id}.waveLanding: ${st.unit}`);
+      }
+    }
+    expect(wrong.sort()).toEqual([]);
   });
 
   it('rejects an unknown team format and a malformed PvE section (fail-closed)', () => {
@@ -754,6 +771,8 @@ describe('game modes (PVE-0.1, docs/pve-team-modes-roadmap.md)', () => {
     expect(withModes({ m: { name: 'M', pve: { ...pve, waveFleet: [{ unit: 'x', count: 0 }] } } }).success).toBe(false);
     expect(withModes({ m: { name: 'M', pve: { ...pve, waveFleet: [{ count: 2 }] } } }).success).toBe(false);
     expect(withModes({ m: { name: 'M', pve: { ...pve, waveFleet: [{ unit: 'x', count: 2 }] } } }).success).toBe(true);
+    expect(withModes({ m: { name: 'M', pve: { ...pve, waveLanding: [] } } }).success).toBe(false);
+    expect(withModes({ m: { name: 'M', pve: { ...pve, waveLanding: [{ unit: 'g', count: 1 }] } } }).success).toBe(true);
   });
 
   it('rejects a per-match timestamp in a mode victory preset (content pins rules, not a clock)', () => {
