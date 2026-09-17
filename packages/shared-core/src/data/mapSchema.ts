@@ -101,6 +101,13 @@ export const MatchMapSchema = z.object({
   avaEligible: z.boolean().default(false),
   /** World time the scenario starts at (default 0). */
   time: z.number().default(0),
+  /** The mode this map DEFAULTS to being played under — an id from `data.modes`,
+   *  resolved by {@link resolveMatchConfig}. It is the map's suggestion, not a lock:
+   *  the host may arm a different mode, and a map without one is played under whatever
+   *  the host picks (the pre-existing behaviour). Exists so that "which rules does this
+   *  map want" is DATA rather than a branch at every call site — a PvE map and the
+   *  `pve_waves` mode used to both exist and never be introduced to each other. */
+  mode: z.string().optional(),
   sectors: z.record(z.string(), MapSectorSchema),
   /** Undirected adjacency: each pair is a two-way path. Order within a pair is
    *  irrelevant; symmetry, no self-loops and the neighbour-only rule are enforced

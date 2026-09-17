@@ -2,6 +2,7 @@
   "id": "pve-1",
   "seed": "pve-1",
   "time": 0,
+  "mode": "pve_waves",
   "sectors": {
     "nexus": { "position": { "x": 0, "y": 0 }, "kind": "nebula", "terrain": "nebula" },
     "home_a": {
