@@ -43,6 +43,7 @@ import {
   fleetOpsModule,
   autoRallyModule,
   marketModule,
+  pveModule,
   type GameModule,
   type GameState,
   type Action,
@@ -85,6 +86,13 @@ export const MODULES: GameModule[] = [
   scientistModule,
   stewardModule, // «Хранитель»: delegate the seat to the AI while you sleep (gated by the Steward tech)
   armyModule,
+  // PVR-0.2: волны Роя наконец достижимы на хосте, где играют. Тот же класс, что FORT-0.2
+  // и FOG-10: модуль был и в ядре, и в серверном `DEV_MODULES`, но не здесь — механика
+  // существовала, была покрыта тестами и не могла сработать НИ РАЗУ. Место то же, что у
+  // сервера (вплотную перед `victory`), потому что `victoryModule` ЧИТАЕТ `state.pve` и
+  // судит кооп-исход (`pve-failed`/`pve-cleared`) первым — встань `pve` после него, и
+  // первая волна попала бы в вердикт только следующим ходом часов.
+  pveModule, // PVE-3: волны NPC, вооружается секцией `pve` режима матча (в PvP инертен)
   victoryModule, // terminal match state from authoritative state (domination / elimination / score / timeout)
   fleetOpsModule, // fleet.launch/merge/split/engage — модуль ЯДРА (CONV-8)
   // CONV-10: авто-сбор построенного (BF-29) переехал В ЯДРО — это последняя
