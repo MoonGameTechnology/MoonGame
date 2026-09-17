@@ -124,9 +124,9 @@ export const DEV_MODULES: GameModule[] = [
   diplomacyModule, // declarations + consent offers + the `diplomacy` capability combat consults
   espionageModule, // SPY-1/2: espionage.spy → окна краденого intel + контрразведка
   // The combat family, split along the bus seams. Order matters (invariant #6):
-  // `orbital` stamps orbit on `fleet.arrived` BEFORE `combat` engages, and runs
-  // its AA/bombard span BEFORE `artillery`'s standoff span — the exact sequence
-  // the old single module had internally.
+  // `orbital` stamps orbit on `fleet.arrived` BEFORE `combat` engages — the exact
+  // sequence the old single module had internally. (The third member of that span,
+  // `artillery`, is gone: standoff fire was removed whole, see manifest 14 below.)
   orbitalModule, // the single near-orbit: stationing, AA fire, bombardment
   combatModule, // melee battles: engage / tick / assault / retreat / capture
   interceptModule, // schedules lane-crossing meetings (resolved by combat)

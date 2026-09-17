@@ -49,31 +49,36 @@ function harness(over: Partial<SoloHost> = {}, seed: GameState = newGame()) {
 /** Сдвинуть часы мира, не трогая ничего другого (драйверы читают только `time`). */
 const at = (s: GameState, time: number): GameState => ({ ...s, time });
 
+// Один игровой момент, много кадров: закончить только уже наступившие ходы.
+const drain = (h: ReturnType<typeof harness>): void => {
+  for (let frame = 0; frame < 100; frame++) h.api.runAI();
+};
+
 describe('соло-драйверы — ходы ИИ', () => {
   it('ИИ ходит не чаще своего шага', () => {
     const h = harness();
     h.setState(at(h.state(), AI_STEP_MS));
-    h.api.runAI();
+    drain(h);
     const after = h.others.length;
     expect(after).toBeGreaterThan(0);
-    h.api.runAI(); // тот же час — второй раз не ходит
+    drain(h); // тот же час — второй раз не ходит
     expect(h.others.length).toBe(after);
   });
 
   it('прошёл шаг — ИИ ходит снова', () => {
     const h = harness();
     h.setState(at(h.state(), AI_STEP_MS));
-    h.api.runAI();
+    drain(h);
     const first = h.others.length;
     h.setState(at(h.state(), AI_STEP_MS * 2 + 1));
-    h.api.runAI();
+    drain(h);
     expect(h.others.length).toBeGreaterThanOrEqual(first);
   });
 
   it('ход ИИ — это НАСТОЯЩИЕ приказы за чужое место, а не пустой прогон', () => {
     const h = harness();
     h.setState(at(h.state(), AI_STEP_MS));
-    h.api.runAI();
+    drain(h);
     expect(h.others.length).toBeGreaterThan(0);
     for (const a of h.others) expect(a.playerId).toBe('p2');
   });
@@ -81,12 +86,11 @@ describe('соло-драйверы — ходы ИИ', () => {
   it('СЛОЖНОСТЬ КРЕСЛА ДОЕЗЖАЕТ ДО БОТА: сильный исследует, слабый — нет (AIDIFF-1)', () => {
     // Разница профилей проверяется тем, чего у слабого нет вовсе (ветка исследований),
     // а не числом приказов: их количество зависит от казны и меняется от правок баланса.
-    const research = (as: Action[]): Action[] =>
-      as.filter((a) => a.type === 'technology.research');
+    const research = (as: Action[]): Action[] => as.filter((a) => a.type === 'technology.research');
     const run = (profile: 'weak' | 'strong'): Action[] => {
       const h = harness({ aiSeats: () => new Map([['p2', profile]]) });
       h.setState(at(h.state(), AI_STEP_MS));
-      h.api.runAI();
+      drain(h);
       return h.others;
     };
     expect(research(run('weak'))).toHaveLength(0);
@@ -114,7 +118,7 @@ describe('соло-драйверы — ходы ИИ', () => {
       three,
     );
     h.setState(at(h.state(), AI_STEP_MS));
-    h.api.runAI();
+    drain(h);
     const by = (id: string): Action[] => h.others.filter((a) => a.playerId === id);
     expect(by('p2').some((a) => a.type === 'technology.research')).toBe(true);
     expect(by('p3').some((a) => a.type === 'technology.research')).toBe(false);
@@ -123,7 +127,7 @@ describe('соло-драйверы — ходы ИИ', () => {
   it('ходы ИИ идут ЛОКАЛЬНЫМ путём, а не как свои приказы', () => {
     const h = harness();
     h.setState(at(h.state(), AI_STEP_MS));
-    h.api.runAI();
+    drain(h);
     expect(h.mine).toEqual([]);
   });
 
@@ -131,7 +135,7 @@ describe('соло-драйверы — ходы ИИ', () => {
     const h = harness();
     h.setState(at(h.state(), 10 * AI_STEP_MS));
     h.api.reset();
-    h.api.runAI();
+    drain(h);
     expect(h.others).toEqual([]);
   });
 
@@ -142,7 +146,7 @@ describe('соло-драйверы — ходы ИИ', () => {
       p1: { posture: 'defend', until: AI_STEP_MS * 100 },
     };
     const h = harness({}, steward);
-    h.api.runAI();
+    drain(h);
     // Приказы за СВОЁ делегированное место идут локально — их выдал не игрок.
     expect(h.mine).toEqual([]);
   });
