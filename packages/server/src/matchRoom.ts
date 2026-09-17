@@ -653,6 +653,14 @@ export class MatchRoom {
     return false;
   }
 
+  /** Режим матча — из УЖЕ резолвнутого конфига (`resolveMatchConfig` отработал в
+   *  конструкторе), а не второй источник правды рядом. Читает его лента браузера
+   *  партий: `MatchMeta.modeId` обязан совпадать с тем, по каким правилам комната
+   *  реально живёт, иначе строка обещает игроку не тот матч (BRW-0). */
+  get modeId(): string | undefined {
+    return this.config?.modeId;
+  }
+
   get state(): GameState {
     return this.stateValue;
   }

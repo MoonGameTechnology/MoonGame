@@ -18,6 +18,7 @@ export { pveOrders, type PveOrdersOptions } from './pveOrchestrator';
 export { newMatchId } from './matchId';
 export {
   MatchRegistry,
+  sessionMeta,
   type MatchMeta,
   type MatchSummary,
   type MatchLists,

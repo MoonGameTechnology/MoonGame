@@ -43,10 +43,13 @@ import {
   fleetOpsModule,
   autoRallyModule,
   marketModule,
+  pveModule,
+  resolveMatchConfig,
   type GameModule,
   type GameState,
   type Action,
   type Context,
+  type MatchConfig,
   type DomainEvent,
 } from '../../packages/shared-core/src/index';
 import { data } from './gameData';
@@ -85,6 +88,13 @@ export const MODULES: GameModule[] = [
   scientistModule,
   stewardModule, // «Хранитель»: delegate the seat to the AI while you sleep (gated by the Steward tech)
   armyModule,
+  // PVR-0.2: волны Роя наконец достижимы на хосте, где играют. Тот же класс, что FORT-0.2
+  // и FOG-10: модуль был и в ядре, и в серверном `DEV_MODULES`, но не здесь — механика
+  // существовала, была покрыта тестами и не могла сработать НИ РАЗУ. Место то же, что у
+  // сервера (вплотную перед `victory`), потому что `victoryModule` ЧИТАЕТ `state.pve` и
+  // судит кооп-исход (`pve-failed`/`pve-cleared`) первым — встань `pve` после него, и
+  // первая волна попала бы в вердикт только следующим ходом часов.
+  pveModule, // PVE-3: волны NPC, вооружается секцией `pve` режима матча (в PvP инертен)
   victoryModule, // terminal match state from authoritative state (domination / elimination / score / timeout)
   fleetOpsModule, // fleet.launch/merge/split/engage — модуль ЯДРА (CONV-8)
   // CONV-10: авто-сбор построенного (BF-29) переехал В ЯДРО — это последняя
@@ -127,8 +137,39 @@ export const kernel = createKernel(MODULES);
 // system (scoreValue) meaningful instead of vestigial vs conquest. Tunable single source
 // of truth, also read by the HUD score readout.
 export const SCORE_LIMIT = mapPreset().scoreLimit;
+
+/**
+ * Режим ТЕКУЩЕГО матча (PVR-1.1). Лежит здесь, а не в `GameState`, потому что
+ * `matchMode.ts` формулирует это прямо: режим потребляется ОДИН раз, при рождении матча,
+ * и «подменить его нечем» — у сервера тот же факт живёт приватным полем комнаты, а у
+ * прототипа комната и есть этот модуль (матч на вкладку всегда один).
+ *
+ * `undefined` — обычная соло-партия: конфиг едет без `modeId`, и модули, вооружаемые
+ * режимом (`pve`), остаются инертными ровно как до этого кирпича.
+ */
+let matchModeId: string | undefined;
+
+/** Вооружить матч режимом (или снять режим, `undefined`). Незнакомый id — ОТКАЗ на месте,
+ *  а не тихий откат к базовым правилам: матч, который считает себя PvE, а исполняется по
+ *  базовым правилам, — это ровно та подмена правил под матчем, которую `matchMode.ts`
+ *  отвергает (fail-secure, инвариант №4). Зовётся при установке матча, до первого хода
+ *  часов, поэтому ниже `ctx` уже может не перепроверять. */
+export function setMatchMode(modeId: string | undefined): void {
+  if (modeId !== undefined && !data.modes[modeId]) throw new Error('E_UNKNOWN_MODE');
+  matchModeId = modeId;
+}
+
 export function ctx(now: number, state?: Pick<GameState, 'mapId'>): Context {
-  return { now, data, config: { timeScale: 1, victory: { scoreLimit: scoreLimitFor(state ?? {}) } } };
+  const config: MatchConfig = {
+    timeScale: 1,
+    victory: { scoreLimit: scoreLimitFor(state ?? {}) },
+    ...(matchModeId !== undefined ? { modeId: matchModeId } : {}),
+  };
+  // Единственный дом правила «режим → правила»: пресет победы режима подстилается ПОД
+  // победу матча, свою копию слоения здесь не заводим. Отказать он может только на
+  // незнакомом режиме, а его отверг `setMatchMode`.
+  const resolved = resolveMatchConfig(data, config);
+  return { now, data, config: resolved.ok ? resolved.config : config };
 }
 
 export interface StepOut {
