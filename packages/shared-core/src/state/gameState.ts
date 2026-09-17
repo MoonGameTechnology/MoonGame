@@ -651,6 +651,18 @@ export interface GameVersion {
 export interface GameState {
   /** Authored map identity, persisted and public; absent on legacy saves. */
   mapId?: string;
+  /** Game mode the match was created with (`data.modes`), pinned at birth like the map
+   *  and persisted for the same reason: the snapshot is the ONLY thing that survives a
+   *  restart, and a mode that lived solely in the host's `MatchConfig` would evaporate
+   *  with the process — the room would come back applying base rules while the state
+   *  still carries `pve` progress. That is exactly the "rules changed under the match"
+   *  failure `resolveMatchConfig` refuses for an unknown mode (BRW-0).
+   *
+   *  The reducer never reads this field: rules come from `ctx.config.modeId`, resolved
+   *  once at room construction. It is the persisted ORIGIN of that config, and the
+   *  match browser's `modeId` — so there is one source, not two. Absent on matches
+   *  created before modes existed, and on any match deliberately run without one. */
+  modeId?: string;
   version: GameVersion;
   /** Current simulation time (ms), server-authoritative. */
   time: number;
