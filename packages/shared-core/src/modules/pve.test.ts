@@ -16,6 +16,7 @@ const data: GameData = parseGameData({
   units: {
     drone: { faction: 'swarm', stats: { attack: 3, defense: 1, speed: 10 } },
     hunter: { faction: 'swarm', stats: { attack: 9, defense: 4, speed: 40 } },
+    spore: { faction: 'swarm', domain: 'ground', stats: { attack: 5, defense: 2, speed: 0 } },
   },
   factions: {
     swarm: { name: 'Swarm', startingLoadout: { fleet: [{ unit: 'drone', count: 2 }] } },
@@ -41,6 +42,7 @@ const data: GameData = parseGameData({
           { unit: 'hunter', count: 2 },
           { unit: 'drone', count: 1 },
         ],
+        waveLanding: [{ unit: 'spore', count: 3 }],
       },
     },
     plain: { name: 'Plain' },
@@ -242,5 +244,27 @@ describe('pveModule — состав волны объявляет режим (P
     // поведению, а не роняет матч и не выдаёт пустую волну.
     const state = ok(advance(8 * MS_PER_HOUR, 'waves', seeded()));
     expect(state.fleets['pve:wave:1']?.units).toEqual([{ unit: 'drone', count: 2 }]);
+  });
+});
+
+describe('pveModule — волна везёт десант (PVR-1.6)', () => {
+  // Без десанта волна могла взять только ПУСТОЙ сектор — приходом. Захват мира с
+  // гарнизоном двухфазный, и вторая фаза требует пехоты, поэтому защищённый дом
+  // игрока был непобедим: штурм вставал на орбите навсегда, а `pve-failed` был
+  // недостижим. Это и делало «забег» невозможным проиграть.
+  const fieldedSeed = (): GameState => ok(advance(MS_PER_HOUR, 'fielded'));
+
+  it('везёт объявленный десант, масштабированный тем же номером волны', () => {
+    const state = ok(advance(20 * MS_PER_HOUR, 'fielded', fieldedSeed()));
+    expect(state.fleets['pve:wave:1']?.landing).toEqual([{ unit: 'spore', count: 3 }]);
+    expect(state.fleets['pve:wave:2']?.landing).toEqual([{ unit: 'spore', count: 6 }]);
+  });
+
+  it('режим без waveLanding даёт флот БЕЗ поля landing, а не с пустым', () => {
+    // Форма флота у режима, который десант не объявлял, обязана остаться прежней:
+    // пустой массив — это уже другое состояние, и он поехал бы в снапшот матча.
+    const state = ok(advance(8 * MS_PER_HOUR, 'waves', seeded()));
+    expect(state.fleets['pve:wave:1']).toBeDefined();
+    expect(state.fleets['pve:wave:1']).not.toHaveProperty('landing');
   });
 });

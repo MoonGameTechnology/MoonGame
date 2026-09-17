@@ -249,6 +249,13 @@ import {
   tokenFor,
   type SessionRec,
 } from '../../decisions/sessionStore';
+import {
+  DEFAULT_RUN_DIFFICULTY,
+  nextRunDifficulty,
+  parseRunDifficulty,
+  runDifficultyKey,
+  type RunDifficulty,
+} from '../../decisions/runDifficulty';
 import { medalBadges } from '../../decisions/unitMedals';
 import { fortressRaise } from '../../decisions/fortressRaise';
 import { buildsAnything, canBuildHere } from '../../decisions/buildGate';
@@ -1292,6 +1299,9 @@ let sandboxHomeId: string | null = null;
 // (and the in-match pace chips) only ever affect the local sim (see `frame()`'s `!NET` guard).
 const SETUP_SPEEDS = [1, 2, 5, 10, 50, 100];
 let setupSpeed = 10;
+/** Сила Роя в забеге (PVR-2.1). Живёт рядом со `setupSpeed`, потому что это тот же род
+ *  настройки: выбор игрока ДО запуска, переживающий перезагрузку. */
+let pveDifficulty: RunDifficulty = DEFAULT_RUN_DIFFICULTY;
 let lastPanelHtml = '';
 let lastCmdHtml = '';
 let lastSplitHtml = '';
@@ -10519,6 +10529,9 @@ function renderSetupSlots(): void {
     `<div class="tmrow"><button class="tmtog${setupTeams ? ' on' : ''}" data-teamtog="1">` +
     `${setupTeams ? '⚔ ' + t('setup.teams.on') : t('setup.teams.off')}</button>` +
     `<button class="tmtog pve-btn" data-pvestart="1">🤖 ${t('setup.pve')}</button>` +
+    // Сложность забега — своя кнопка, а не строка места: место в нём РОВНО ОДНО (Рой),
+    // и выключить его нельзя (PVR-2.1).
+    `<button class="tmtog pve-diff" data-pvediff="1">${t(runDifficultyKey(pveDifficulty))}</button>` +
     (setupTeams ? `<span class="tmhint">${t('setup.teams.note')}</span>` : '') +
     `</div>`;
   if (isFrontier(setupMapId)) {
@@ -10653,6 +10666,8 @@ function openSetup(from: 'welcome' | 'hub' = 'welcome'): void {
   // stays one tap away — the ×1 chip.
   const savedSpeed = Number(localStorage.getItem('void.setupSpeed'));
   setupSpeed = SETUP_SPEEDS.includes(savedSpeed) ? savedSpeed : 10;
+  // Хранилище — внешний вход, поэтому разбор фейл-сейфный: всё непонятное это дефолт.
+  pveDifficulty = parseRunDifficulty(localStorage.getItem('void.pveDifficulty'));
   showConnect(false);
   setupEl.style.display = 'flex';
   $('setup-start').style.display = '';
@@ -10826,18 +10841,17 @@ function startMatch(setup: SetupConfig): void {
   }
 }
 
-/** Start a PvE match: load the PvE map (2 players vs 1 strong AI) via
- *  buildStateFromMap, then install it like a regular match. The AI seat
- *  is determined from the map's player slots. */
+/** Запуск ЗАБЕГА: карта `pve-1` через `buildStateFromMap`, дальше — как обычный матч.
+ *  Мест на ней два: игрок и Рой (забег одиночный, §0.1/§0.3 `sector-zero-roadmap.md`),
+ *  и кто из них бот, говорит сама карта, а не эта функция. */
 function startPvEMatch(): void {
   const st = pveState(data);
-  // AI seats = all players except p1 (the human host). Карта PvE своей строки настройки
-  // не имеет, поэтому её боты остаются прежними, слабыми — выбор сложности живёт на
-  // экране настройки (AIDIFF-1).
+  // Боты — все места, кроме `p1`. Силу им даёт ВЫБОР ИГРОКА рядом с кнопкой запуска
+  // (PVR-2.1): у забега нет строки места, где её меняют в обычной партии.
   const aiSeats = new Map<string, AiProfile>(
     Object.keys(st.players)
       .filter((id) => id !== 'p1')
-      .map((id) => [id, 'weak' as const]),
+      .map((id) => [id, pveDifficulty]),
   );
   // Режим берётся из САМОЙ КАРТЫ, а не зашит здесь: карта объявляет, подо что её играют
   // (§0.7 sector-zero-roadmap.md). Без этого `pveModule` стоял в ядре и молчал — секции
@@ -10952,6 +10966,12 @@ setupFactionsEl.addEventListener('click', (ev) => {
 setupSlotsEl.addEventListener('click', (ev) => {
   if ((ev.target as Element).closest('[data-teamtog]')) {
     setupTeams = !setupTeams;
+    renderSetup();
+    return;
+  }
+  if ((ev.target as Element).closest('[data-pvediff]')) {
+    pveDifficulty = nextRunDifficulty(pveDifficulty);
+    localStorage.setItem('void.pveDifficulty', pveDifficulty);
     renderSetup();
     return;
   }

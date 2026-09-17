@@ -876,6 +876,15 @@ export const ModePveSchema = z
      *  a wave it has nothing to field, so an empty list would ship a mute assault that
      *  reads as configured. Fail-closed at load (A05/A08), like every other catalog. */
     waveFleet: z.array(StartingStackSchema).min(1).optional(),
+    /** Ground troops each wave carries as cargo (unit ids → `data.units`), fielded ×N
+     *  on wave N exactly like {@link ModePve.waveFleet}.
+     *
+     *  Without one a wave can take an EMPTY sector by arrival and nothing else: taking
+     *  a garrisoned world is a two-phase capture, and phase two needs boots. A defended
+     *  homeworld was therefore unloseable — the assault parked in orbit forever and
+     *  `pve-failed` could not be reached (PVR-1.6). Scaling with the wave keeps the
+     *  landing party proportional to the hulls carrying it. */
+    waveLanding: z.array(StartingStackSchema).min(1).optional(),
   })
   .strict();
 
