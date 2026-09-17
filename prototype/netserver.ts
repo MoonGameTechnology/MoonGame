@@ -1,4 +1,7 @@
-import { MAP_IDS, mapPreset, scoreLimitFor, type MapId } from './src/mapCatalog';
+import { isFrontier, MAP_IDS, mapPreset, scoreLimitFor, type MapId } from './src/mapCatalog';
+import { StaggeredAi } from './src/aiScheduler';
+import { aiOrderSlices } from './src/aiOrderSlices';
+import type { Action } from '../packages/shared-core/src/index';
 import { playablePlayerIds } from '../packages/shared-core/src/state/playableSeats';
 // Serves the prototype's OWN world over WebSocket so two browsers — or two phones
 // running the APK — can play the same session against one authoritative core.
@@ -20,6 +23,7 @@ import pgPkg from 'pg';
 import {
   MatchRoom,
   MatchRegistry,
+  sessionMeta,
   type MatchMeta,
   newMatchId,
   pveOrders,
@@ -97,6 +101,7 @@ import {
   nickSeatAccounts,
 } from '../packages/server/src/commanderCredit';
 import { detach } from '../packages/server/src/detach';
+import type { StewardPosture } from './src/stewardScreen';
 import { installFatalHandlers } from '../packages/server/src/fatal';
 const { Pool } = pgPkg;
 
@@ -376,7 +381,11 @@ interface HostedMatch {
   clearTimers(): void;
 }
 
-async function createHostedMatch(id: string, mapId: MapId = 'nexus'): Promise<HostedMatch> {
+async function createHostedMatch(
+  id: string,
+  mapId: MapId = 'nexus',
+  modeId?: string,
+): Promise<HostedMatch> {
   let connected = 0; // live players in THIS match (gates the empty-seat AI)
   // The shared offline scheduler (assigned after `room` below). `observe` re-arms it,
   // so it is declared here — before `observe` — and read with `?.` until it exists.
@@ -387,7 +396,18 @@ async function createHostedMatch(id: string, mapId: MapId = 'nexus'): Promise<Ho
   const aiEligibleAt = new Map<string, number>();
 
   const restoredSnap = await matchStore.load(id);
-  const initialState = restoredSnap?.state ?? newGame({ mapId, seats: networkSeats(mapId === 'frontier-100' ? 'ffa' : NETWORK_MODE, mapId) });
+  const initialState =
+    restoredSnap?.state ??
+    newGame({
+      mapId,
+      ...(modeId !== undefined ? { modeId } : {}),
+      seats: networkSeats(isFrontier(mapId) ? 'ffa' : NETWORK_MODE, mapId),
+    });
+  // Режим берётся ИЗ СОСТОЯНИЯ, а не из аргумента: у восстановленной партии аргумента
+  // нет (её поднимает `bootRoster` по списку из стора), и без этой строки рестарт
+  // молча вернул бы PvE-сессию к базовым правилам — ровно та «подмена правил под
+  // матчем», которую `resolveMatchConfig` отказывается допускать для чужого режима.
+  const sessionModeId = initialState.modeId;
   // A NET seat is not a bot: every seat here is claimable by a human, and the
   // server-side AI merely stands in for an empty chair (`humans` is the live truth).
   // Strip the static `ai` branding newGame took from the seat config, or two humans
@@ -478,7 +498,11 @@ async function createHostedMatch(id: string, mapId: MapId = 'nexus'): Promise<Ho
     serverOrders: (state, seq) => pveOrders(state, data, { session: id, seq }),
     // The kernel context config must match what the local sim (and the HUD) promise:
     // without it victory falls back to its 600 default while the HUD counts to 450.
-    config: { timeScale: 1, victory: { scoreLimit: scoreLimitFor(initialState) } },
+    config: {
+      timeScale: 1,
+      ...(sessionModeId !== undefined ? { modeId: sessionModeId } : {}),
+      victory: { scoreLimit: scoreLimitFor(initialState) },
+    },
     initialSeq: restoredSnap?.seq, // resume the action counter — else the optimistic-by-seq
     // store drops post-restart saves until seq climbs back past the stored value
     // Strict commit-before-broadcast: await the durable write of the new snapshot +
@@ -546,34 +570,72 @@ async function createHostedMatch(id: string, mapId: MapId = 'nexus'): Promise<Ho
   // `driversBusy` guards re-entrancy: on a DURABLE room a driver pass awaits the room's
   // mailbox, so a later (heartbeat) tick must not start a second pass mid-flight.
   let driversBusy = false;
-  // Server-side AI for empty seats: every ~2 game-hours, any match seat with no live
-  // human peer issues the same orders the single-player AI would (shared `aiOrders`),
-  // submitted through the authoritative room. Runs only while the match is started and
-  // someone is connected — otherwise the board just idles on its schedule. This is what
-  // makes "empty multiplayer slots are taken by the AI" true: an unjoined seat plays.
-  let aiLastAt = 0; // game-time of the last AI decision tick
-  // Drivers submit via room.submitServerAction: on a DURABLE room a raw sync submit
-  // would interleave with a commitApply persist await and be silently clobbered
-  // (bug-hunt CRIT) — the server entry serializes through the room's actor mailbox.
+  // Тик, не сумевший взять `driversBusy`, оставляет долг вместо того, чтобы потерять
+  // свой проход стоячих драйверов; его отрабатывает тот, кто гварду отпустит.
+  let standingDue = false;
+  // Stable phases throughout each two-hour cycle; only one decision/order per
+  // event-loop slice. The same bounded queue drives solo. The authoritative room
+  // still serializes and validates every order, including ones that became stale.
+  const aiSchedule = new StaggeredAi<Action[]>(2 * HOUR);
+  aiSchedule.reset(room.state.time);
+  let aiBusy = false;
+  let aiStopped = false;
+  let aiClockStalled = false;
+  /** Поза из политики планировщика: `${kind}:${posture}` → `posture`. Берём из
+   *  переданного значения, а не выводим заново — иначе план строится под одну позу,
+   *  а планировщик гейтит по другой, и расхождение невидимо. */
+  const postureOf = (policy: string): StewardPosture | 'expand' =>
+    policy.slice(policy.indexOf(':') + 1) as StewardPosture | 'expand';
+  const aiPolicy = (seat: string): string | null => {
+    if (room.state.players[seat]?.status !== 'active') return null;
+    const posture = stewardActive(room.state, seat, room.state.time);
+    const eligibleAt = aiEligibleAt.get(seat);
+    const graceExpired = !!room.state.players[seat]?.npc || eligibleAt === undefined || Date.now() >= eligibleAt;
+    const decision = seatAiDecision(humans.has(seat), posture, graceExpired);
+    return decision.kind === 'none' ? null : `${decision.kind}:${decision.posture}`;
+  };
   async function runServerAI(): Promise<void> {
-    if (!room.isStarted || connected === 0) return;
-    const now = room.state.time;
-    if (now - aiLastAt < 2 * HOUR) return;
-    aiLastAt = now;
-    for (const seat of Object.keys(room.state.players)) {
-      // The two server AIs are decided by ONE pure rule (SES-2.2, `seatAiDecision`):
-      // «Хранитель» plays a delegated seat on its posture even while the owner is
-      // connected-but-idle; the «заместитель» (expand bot) takes an ABANDONED seat,
-      // but only once its real-time grace has lapsed. A present human with no
-      // delegation commands their own chair (kind 'none').
-      const posture = stewardActive(room.state, seat, now);
-      const eligibleAt = aiEligibleAt.get(seat);
-      const graceExpired = !!room.state.players[seat]?.npc || eligibleAt === undefined || Date.now() >= eligibleAt;
-      const decision = seatAiDecision(humans.has(seat), posture, graceExpired);
-      if (decision.kind === 'none') continue;
-      for (const action of aiOrders(room.state, seat, decision.posture!)) {
-        await room.submitServerAction(seat, action);
+    if (aiBusy || aiStopped) return;
+    aiBusy = true;
+    try {
+      while (!aiStopped && !aiClockStalled && room.isStarted && connected > 0 && room.state.match.status !== 'ended') {
+        if (driversBusy) {
+          await new Promise<void>((resolve) => setTimeout(resolve, 16));
+          continue;
+        }
+        // Стоячие драйверы не должны вклиниться ВНУТРЬ зависимой пары, пока ждётся
+        // durable-запись. Гварда берётся на одну маленькую порцию и отпускается сразу.
+        driversBusy = true;
+        try {
+          const step = aiSchedule.step(room.state.time, Object.keys(room.state.players), aiPolicy,
+            (seat, policy) => aiOrderSlices(aiOrders(room.state, seat, postureOf(policy))));
+          if (!step.worked) return;
+          const group = step.action ?? [];
+          // Политику спрашиваем ОДИН раз на порцию. Перепроверка перед каждым приказом
+          // рвала ровно ту пару, ради которой порция и существует: `submitServerAction`
+          // ждёт мейлбокс, за это время истекает делегирование Стюарда или возвращается
+          // человек — и флот оставался вышедшим из боя без приказа куда идти. Планировщик
+          // уже сверяет политику с той, под которую план строился (`aiScheduler.step`).
+          if (group.length && aiPolicy(group[0]!.playerId) !== null) {
+            for (const action of group) await room.submitServerAction(action.playerId, action);
+          }
+        } finally {
+          driversBusy = false;
+          // Тик, пришедший в занятое окно, оставил долг — отдаём его, иначе проход
+          // стоячих драйверов пропадёт вместе с этим ударом сердца. Отцепляем так же,
+          // как это делает тик: свой сбой прохода не должен уронить цикл ИИ, а гварду
+          // он возьмёт сам — следующая итерация подождёт её штатно.
+          if (standingDue) {
+            standingDue = false;
+            detach('серверные драйверы (отложенный проход)', runStandingPass());
+          }
+        }
+        // Yield between BOTH planning and applying: persistence may resolve already,
+        // so awaiting submit alone is not an event-loop/render opportunity.
+        await new Promise<void>((resolve) => setTimeout(resolve, 16));
       }
+    } finally {
+      aiBusy = false;
     }
   }
 
@@ -603,6 +665,23 @@ async function createHostedMatch(id: string, mapId: MapId = 'nexus'): Promise<Ho
     }
   }
 
+  // Один проход стоячих драйверов + истечение заявок на места. Зовут его тик и —
+  // если тик не смог взять гварду — цикл ИИ, отпуская её (см. `standingDue`).
+  async function runStandingPass(): Promise<void> {
+    driversBusy = true;
+    try {
+      await runServerStanding(); // CC-2/CC-4: standing orders (auto-storm / дежурный вылет)
+      // ENTRY-3 (правило 7): вернуть в оборот места, заявленные и не подтверждённые
+      // дольше окна. Тот же вызов, что у канонического сервера (`serverWiring.ts`) —
+      // паритет держится общей функцией, а не двумя похожими циклами.
+      for (const { playerId, action } of expiredSeatClaims(room.state, room.clockScale)) {
+        await room.submitServerAction(playerId, action);
+      }
+    } finally {
+      driversBusy = false;
+    }
+  }
+
   // Raise the shared clock driver for this room. onTick fires AFTER room.tick(): persist
   // the advanced world and — unless the tick stalled or a pass is still in flight — run
   // the empty-seat AI + standing orders. The driver owns the arm/stall/re-arm loop and the
@@ -624,24 +703,20 @@ async function createHostedMatch(id: string, mapId: MapId = 'nexus'): Promise<Ho
       // driver and reset its stall guard, which would spin a 0ms wake. The driver's own
       // STALL_LIMIT backs off; here we just avoid feeding it.
       const stalled = !progressed && room.msUntilNextEvent() === 0;
-      if (!stalled && !driversBusy) {
-        // Async drivers (durable rooms await the mailbox); the busy flag stops a later
-        // heartbeat from double-running them while a slow persist is still in flight.
-        driversBusy = true;
-        detach('серверные драйверы', (async () => {
-          try {
-            await runServerAI(); // drive any empty seat once the clock has moved
-            await runServerStanding(); // CC-2/CC-4: standing orders (auto-storm / дежурный вылет)
-            // ENTRY-3 (правило 7): вернуть в оборот места, заявленные и не подтверждённые
-            // дольше окна. Тот же вызов, что у канонического сервера (`serverWiring.ts`) —
-            // паритет держится общей функцией, а не двумя похожими циклами.
-            for (const { playerId, action } of expiredSeatClaims(room.state, room.clockScale)) {
-              await room.submitServerAction(playerId, action);
-            }
-          } finally {
-            driversBusy = false;
-          }
-        })());
+      aiClockStalled = stalled;
+      if (!stalled) {
+        // Гварда защищает от ВТОРОГО прохода поверх летящего (durable-комната ждёт
+        // мейлбокс), но ту же гварду держит цикл ИИ короткими слайсами ~350 раз за
+        // цикл. Пока тик просто проверял её и уходил, каждый удар сердца, попавший в
+        // занятое окно, терял свой проход ЦЕЛИКОМ — вместе с авто-штурмом, дежурным
+        // вылетом, цепочками приказов и истечением заявок на места (ENTRY-3). Теперь
+        // он не пропускает, а ОТКЛАДЫВАЕТ: `standingDue` отработает тот, кто отпустит.
+        if (driversBusy) standingDue = true;
+        else {
+          standingDue = false; // проход идёт ПРЯМО СЕЙЧАС — прежний долг им и погашен
+          detach('серверные драйверы', runStandingPass());
+        }
+        detach('распределённые ходы ИИ', runServerAI());
       }
       scheduleSave(); // persist the advanced world
     },
@@ -658,6 +733,7 @@ async function createHostedMatch(id: string, mapId: MapId = 'nexus'): Promise<Ho
     restored: !!restoredSnap,
     flush: doSave,
     clearTimers(): void {
+      aiStopped = true;
       if (saveTimer) {
         clearTimeout(saveTimer);
         saveTimer = null;
@@ -678,16 +754,22 @@ async function createHostedMatch(id: string, mapId: MapId = 'nexus'): Promise<Ho
 // Само решение — в `matchRoster.ts` рядом с каноническим сервером, чтобы хосты не
 // разъезжались в том, как называется партия.
 const hosted: HostedMatch[] = [];
-const registry = new MatchRegistry(accountStore);
-/** Метаданные браузера: карта берётся из сохранённого состояния сессии. */
-const browserMeta = (room: MatchRoom): MatchMeta => ({
-  mapId: room.state.mapId ?? 'nexus',
-  rules: { timeScale: TIME_SCALE },
-  createdAt: Date.now(),
-  startedAt: room.state.time,
-  entryWindowMs: ENTRY_WINDOW_MS, // SES-2.3: a NEW player may claim a free seat only
-  // within this real-time window from the session's creation (see AI note below).
-});
+// Каталог во ВТОРОМ аргументе — им реестр выводит `kind` строки (`matchKind`: PvE это
+// «у пресета есть секция `pve`»). Без него лента честно молчала бы про вид даже у
+// сессии с режимом: поймано живым прогоном при BRW-0 — `modeId` в строке уже стоял,
+// а `kind` у всех трёх партий приезжал `undefined`.
+const registry = new MatchRegistry(accountStore, data);
+/** Метаданные браузера: карта и режим берутся из САМОЙ сессии (`sessionMeta`, BRW-0) —
+ *  карта из сохранённого состояния, режим из резолвнутого конфига комнаты. Сборка живёт
+ *  в `packages/server`, чтобы у неё был один экземпляр на оба хоста и на тест ленты.
+ *  `entryWindowMs` — SES-2.3: новичок занимает свободное место только внутри этого
+ *  реального окна от создания сессии. */
+const browserMeta = (room: MatchRoom): MatchMeta =>
+  sessionMeta(room, {
+    timeScale: TIME_SCALE,
+    createdAt: Date.now(),
+    entryWindowMs: ENTRY_WINDOW_MS,
+  });
 
 // Список партий на старте приходит из СТОРА, а не из `MATCHES=N`: `bootRoster` поднимает
 // всё, что стор считает живым, и засевает только пустой стор (иначе каждый рестарт
@@ -714,9 +796,9 @@ const restoredCount = hosted.filter((h) => h.restored).length;
  */
 const MAX_HOSTED = 64; // потолок сессий в одном процессе: создание ограничено сверху,
 // а не только per-IP лимитом маршрута — иначе память процесса растёт по запросу.
-async function hostNewMatch(mapId: MapId = 'nexus'): Promise<HostedMatch> {
+async function hostNewMatch(mapId: MapId = 'nexus', modeId?: string): Promise<HostedMatch> {
   if (hosted.length >= MAX_HOSTED) throw new Error('match capacity reached'); // → 500, bounded
-  const h = await createHostedMatch(newMatchId(), mapId);
+  const h = await createHostedMatch(newMatchId(), mapId, modeId);
   hosted.push(h);
   registry.register(h.room, browserMeta(h.room));
   // Свежая партия ложится в стор СРАЗУ, а не при первой активности. Иначе её нет в
@@ -964,8 +1046,11 @@ const server = createMultiplayerServer({
         // (`identify` ниже — с AUTH=1 создать может только вошедший), per-IP лимит
         // самого `registerMatchApi` и потолок `MAX_HOSTED` на процесс.
         mapIds: MAP_IDS,
+        // BRW-0: режимы берутся ИЗ КАТАЛОГА, а не списком здесь — иначе у хоста завёлся
+        // бы второй перечень режимов, который молча разъедется с `data/modes.json`.
+        modeIds: Object.keys(data.modes),
         createMatch: async (request) => {
-          const h = await hostNewMatch(mapPreset(request?.mapId).id);
+          const h = await hostNewMatch(mapPreset(request?.mapId).id, request?.modeId);
           return { matchId: h.id, seats: playablePlayerIds(h.room.state) };
         },
         // Identity = a signature-valid session, RE-CHECKED against the current password: a

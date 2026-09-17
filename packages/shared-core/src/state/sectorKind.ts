@@ -18,6 +18,7 @@ const DEFAULT_KIND: SectorKindDef = {
   scoreValue: 10,
   capturable: true,
   buildable: true,
+  stationable: true,
   orbit: true,
   allowedBuildings: undefined,
   appearance: DEFAULT_APPEARANCE,
@@ -43,6 +44,13 @@ export function isCapturable(data: GameData, planet: Pick<Planet, 'kind'>): bool
 /** Can structures be raised on this sector? */
 export function isBuildable(data: GameData, planet: Pick<Planet, 'kind'>): boolean {
   return sectorKindDef(data, planet).buildable;
+}
+
+/** Можно ли возвести здесь космическую крепость? НЕ то же самое, что {@link isBuildable}:
+ *  крепость и есть способ сделать незастраиваемую местность застраиваемой, поэтому
+ *  туманность (`buildable: false`) её принимает, а планета (`buildable: true`) — нет. */
+export function isStationable(data: GameData, planet: Pick<Planet, 'kind'>): boolean {
+  return sectorKindDef(data, planet).stationable;
 }
 
 /** Does this sector have the orbital layer (fleets can station in orbit)? */

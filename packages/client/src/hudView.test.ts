@@ -125,13 +125,14 @@ describe('панель выделения', () => {
   });
 });
 
-const side = (mine: boolean): BattleModel['attacker'] => ({
+const side = (mine: boolean, role: 'attacker' | 'defender' = 'attacker'): BattleModel['attacker'] => ({
   owner: mine ? 'p1' : 'p2',
   ownerName: mine ? 'Ash' : 'Borz',
   ownerFaction: 'vanguard',
   kind: 'fleet',
   units: [{ unit: 'scout_drone', count: 2 }],
   mine,
+  role,
 });
 
 const battle: BattleModel = {
@@ -140,8 +141,9 @@ const battle: BattleModel = {
   location: 'alpha',
   phase: 'orbital',
   round: 3,
-  attacker: side(true),
-  defender: side(false),
+  sides: [side(true, 'attacker'), side(false, 'defender')],
+  attacker: side(true, 'attacker'),
+  defender: side(false, 'defender'),
 };
 
 describe('панель боя', () => {

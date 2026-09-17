@@ -5,16 +5,16 @@
   "time": 0,
   "sectors": {
     "nexus": { "position": { "x": 0, "y": 0 }, "kind": "nebula", "terrain": "nebula" },
-    "west": { "position": { "x": -230, "y": 0 }, "kind": "planet", "planetType": "barren" },
-    "east": { "position": { "x": 230, "y": 0 }, "kind": "planet", "planetType": "barren" },
+    "west": { "position": { "x": -230, "y": 0 }, "kind": "planet", "terrain": "solar_flare_zone", "planetType": "barren" },
+    "east": { "position": { "x": 230, "y": 0 }, "kind": "planet", "terrain": "solar_flare_zone", "planetType": "barren" },
     "drift": { "position": { "x": 0, "y": -210 }, "kind": "asteroid", "terrain": "asteroid_field" },
-    "veil": { "position": { "x": 0, "y": 210 }, "kind": "nebula", "terrain": "nebula", "planetType": "barren" },
+    "veil": { "position": { "x": 0, "y": 210 }, "kind": "dense_nebula", "terrain": "dense_nebula", "planetType": "gas_giant" },
     "home_a1": {
       "position": { "x": -260, "y": -160 },
       "kind": "planet",
       "planetType": "terran",
       "owner": "slot_a1",
-      "buildings": [{ "type": "mine_t1" }, { "type": "spaceport" }],
+      "buildings": [{ "type": "mine_t1" }, { "type": "shipyard" }],
       "garrison": [{ "unit": "militia", "count": 3 }]
     },
     "home_a2": {
@@ -22,7 +22,7 @@
       "kind": "planet",
       "planetType": "terran",
       "owner": "slot_a2",
-      "buildings": [{ "type": "mine_t1" }, { "type": "spaceport" }],
+      "buildings": [{ "type": "mine_t1" }, { "type": "shipyard" }],
       "garrison": [{ "unit": "militia", "count": 3 }]
     },
     "home_b1": {
@@ -30,7 +30,7 @@
       "kind": "planet",
       "planetType": "terran",
       "owner": "slot_b1",
-      "buildings": [{ "type": "mine_t1" }, { "type": "spaceport" }],
+      "buildings": [{ "type": "mine_t1" }, { "type": "shipyard" }],
       "garrison": [{ "unit": "militia", "count": 3 }]
     },
     "home_b2": {
@@ -38,7 +38,7 @@
       "kind": "planet",
       "planetType": "terran",
       "owner": "slot_b2",
-      "buildings": [{ "type": "mine_t1" }, { "type": "spaceport" }],
+      "buildings": [{ "type": "mine_t1" }, { "type": "shipyard" }],
       "garrison": [{ "unit": "militia", "count": 3 }]
     }
   },

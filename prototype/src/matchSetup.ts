@@ -20,6 +20,7 @@ import {
   type Fleet,
 } from '../../packages/shared-core/src/index';
 import { data } from './gameData';
+import { botCouncil } from './botCouncil';
 import { SECTOR_TYPES, START_CANDIDATES } from './map';
 import { mapPreset, type MapId } from './mapCatalog';
 import { FAVOUR_BASE } from './botFavour';
@@ -79,6 +80,12 @@ export interface SeatConfig {
 }
 export interface SetupConfig {
   mapId?: MapId;
+  /** Режим партии (`data.modes`) — «во что играем»: `standard`, `pve_waves`, `duel`,
+   *  `team_*`. НЕ путать с `NetworkMatchMode` ниже: тот описывает РАССАДКУ («кто за
+   *  столом»), а этот — правила, которые резолвит `resolveMatchConfig`. Пишется в
+   *  состояние, потому что пережить рестарт режим обязан вместе с миром (BRW-0).
+   *  Отсутствует ⇒ партия без режима: базовые правила, и лента честно молчит. */
+  modeId?: string;
   seats: SeatConfig[];
   /** RNG seed of the match. Absent → the historical fixed 'prototype-1'. Self-play
    *  (M4) varies it per run — with the fixed seed an identical setup plays out
@@ -203,8 +210,9 @@ export function networkSeats(mode: NetworkMatchMode = 'ffa', mapId: MapId = 'nex
 
 export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
   const preset = mapPreset(setup.mapId);
+  const seed = setup.seed ?? 'prototype-1';
   const base = createInitialState({
-    seed: setup.seed ?? 'prototype-1',
+    seed,
     version: { data: '0.1.0', manifest: '1' },
   });
   // Every province starts NEUTRAL; the chosen seats below claim + fortify their homeworld.
@@ -240,10 +248,12 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
       // «изучается технология, строится здание» не выполнялось дважды: ни технологии не
       // было, ни постройки не требовалось. Теперь это `orbital_defense_grid`
       // (`data/technologies.json`) плюс обычный `building.construct`.
-      // A starting yard — space-domain hulls need a standing shipyard/spaceport to
-      // build at all (enablesShipConstruction); without one, turn-1 fleet-building
-      // would be impossible.
-      { type: 'spaceport', level: 1, hp: hpOfLevel('spaceport', 1) },
+      // A starting SHIPYARD — space-domain hulls need one standing to be laid down at
+      // all (enablesShipConstruction); without it, turn-1 fleet-building would be
+      // impossible. The SPACEPORT is deliberately NOT here (YARD-1): shuttles are the
+      // other half of the split, and their port is the player's first real choice —
+      // the same reasoning that took the starting AA battery away in ORB-1.
+      { type: 'shipyard', level: 1, hp: hpOfLevel('shipyard', 1) },
     ];
     // Ground defence is what holds a world against capture (an AA battery bleeds a fleet
     // but can't stop a landing — only ground troops do). Seed a starting infantry garrison
@@ -278,6 +288,15 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
       // technology hooks from the first second — the C3 pre-match seam, reused).
       const grant = (setup.meta?.tech ?? []).filter((id) => data.technologies[id]);
       if (grant.length) players[seat.id]!.technologies = { completed: [...new Set(grant)] };
+    } else {
+      // BAL-12: бот тоже посвящает совет. Без этого `state.players.*.scientists` у
+      // ботового места оставался `undefined`, и `technologyLock` отбивал КАЖДЫЙ
+      // `has_scientist`-узел — в self-play, где ботовые оба места, целый слой дерева не
+      // измерялся ни разу. Уровень первый: рост совета даёт мета-прокачка, а она
+      // принадлежит аккаунту игрока, не боту.
+      players[seat.id]!.scientists = botCouncil(seed, seat.id, Object.keys(data.scientists)).map(
+        (id) => ({ id, level: 1 }),
+      );
     }
     fleets[`${seat.id}-1`] = fleet(
       `${seat.id}-1`,
@@ -400,6 +419,9 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
   return {
     ...base,
     mapId: preset.id,
+    // Режим пишется ТОЛЬКО когда он задан: пустое поле в состоянии и отсутствие поля —
+    // разные вещи для ленты браузера, которая молчание читает как «режим неизвестен».
+    ...(setup.modeId !== undefined ? { modeId: setup.modeId } : {}),
     players,
     planets,
     fleets,

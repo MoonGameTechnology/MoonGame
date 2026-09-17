@@ -24,6 +24,7 @@ import { data } from './gameData';
 import { DAY, HOUR } from './time';
 import { esc, cost, displayUnit, fmtEta } from './format';
 import { researchTech } from '../../decisions/actions';
+import { isGrantOnlyTech } from './techCoverage';
 
 const clamp = (v: number, a: number, b: number): number => Math.max(a, Math.min(b, v));
 
@@ -144,10 +145,12 @@ export function techTreeHtml(
   modalId: string | null,
 ): string {
   const seat = state.players[me];
-  // Meta-progression grants (meta_*) are account perks, not researchable session
-  // techs — the tree shows only the real nodes.
+  // Meta-progression grants are account perks, not researchable session techs — the tree
+  // shows only the real nodes. The rule itself lives in `techCoverage.ts` (BAL-12): the
+  // self-play report needs the same split for its denominator, and a second hand-written
+  // prefix check is exactly how the two would drift apart.
   const techs = Object.fromEntries(
-    Object.entries(data.technologies).filter(([id]) => !id.startsWith('meta_')),
+    Object.entries(data.technologies).filter(([id]) => !isGrantOnlyTech(id)),
   );
   const done = new Set(seat?.technologies?.completed ?? []);
   // Research runs in CONCURRENT slots (core: technologies.active is a list).

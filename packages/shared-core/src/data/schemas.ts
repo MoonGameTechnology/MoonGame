@@ -276,6 +276,22 @@ export const BuildingDefSchema = z.object({
   defenseBonus: z.number().default(0.01),
   /** Overrides for levels 2..N (index 0 = level 2). maxLevel = 1 + length. */
   upgrades: z.array(BuildingLevelSchema).default([]),
+  /**
+   * Виды провинций, где это здание вообще возводится. Отсутствует — где угодно (роль
+   * играет только ростер вида).
+   *
+   * ЗАЧЕМ ОГРАНИЧЕНИЕ СО СТОРОНЫ ЗДАНИЯ, когда уже есть `sectorKinds.allowedBuildings`.
+   * Ростер вида отвечает на вопрос «что тут можно», и этого достаточно, пока правило
+   * формулируется от МЕСТА. Решение владельца 3 сформулировано от ЗДАНИЯ — «добывающая
+   * станция строится ТОЛЬКО в мёртвых мирах и астероидных полях», — и ростером его не
+   * выразить: у планеты ростера нет вовсе (`undefined` = любое здание), так что запретить
+   * ей станцию можно было бы только выписав ей поимённый список ВСЕХ прочих зданий. Такой
+   * список устаревает на первом же новом здании, причём молча.
+   *
+   * Здесь же правило живёт в одном месте и переживает новые виды местности само: вид, о
+   * котором здание не знает, станцию не получит.
+   */
+  onlyOn: z.array(z.string()).optional(),
   traits: z.array(z.string()).default([]),
   /** Victory-score worth of this building; the victory module multiplies it by
    *  the instance's level, so investing in upgrades raises (and losing the
@@ -519,6 +535,19 @@ export const SectorKindDefSchema = z.object({
    *  a fleet still arrives, fights and lands anywhere — an asteroid field is
    *  capturable, and assault reads `fleet.orbit`, not this flag. */
   orbit: z.boolean().default(true),
+  /** Можно ли возвести здесь КОСМИЧЕСКУЮ КРЕПОСТЬ (`station.deploy`, fortress-roadmap
+   *  §0.6, решение владельца 2026-09-15: «на захваченной территории, на всех видах кроме
+   *  тех, где уже есть планета»).
+   *
+   *  Дефолт `true` намеренно: правило владельца — это РАЗРЕШЕНИЕ с коротким списком
+   *  исключений, и записывать надо исключения, а не перечислять заново каждую местность.
+   *  Новый вид местности получает крепость сам собой; если он ею быть не должен, автор
+   *  обязан сказать это явно — ровно тот выбор, который дешевле сделать, чем поймать
+   *  глазами на ревью.
+   *
+   *  Незахватываемые виды (`empty`, обломки, чёрная дыра) флага не требуют: крепость
+   *  ставится только на СВОЁМ узле, а своим незахватываемое не станет никогда. */
+  stationable: z.boolean().default(true),
   /** Province-centric build roster: the building ids raisable on this province type.
    *  Absent/undefined = ANY building (the permissive default, so kind-less / roster-less
    *  worlds keep building as before). Explicit `[]` = no construction here (empty /
@@ -747,6 +776,39 @@ export const RewardsDefSchema = z.object({
   xpScoreCap: z.number().int().nonnegative().default(100),
   /** Win bonus — paid to every member of the winning unit (a coalition wins together). */
   xpWin: z.number().int().nonnegative().default(160),
+  /**
+   * XP за ОДНУ медаль на ОДНОМ уцелевшем юните, по степеням (VET-4): индекс 0 — первая
+   * степень. Решение владельца 6 — «чем выше степень, тем выше награда», поэтому шкала
+   * обязана СТРОГО расти, и это проверяется здесь, а не остаётся договорённостью:
+   * невозрастающая шкала молча отменила бы решение, и заметить это было бы некому.
+   *
+   * Пусто (по умолчанию) — медали не платят вовсе. Это не «выключено на всякий случай»,
+   * а тот же приём, что у `data.medals`: механика снимается данными, без флага в коде.
+   */
+  medalXp: z
+    .array(z.number().int().nonnegative())
+    .default([])
+    .refine((xs) => xs.every((x, i) => i === 0 || x > xs[i - 1]!), {
+      message: 'medalXp обязана строго расти со степенью (решение владельца 6)',
+    }),
+});
+
+/**
+ * Пороги степеней медали ветерана (VET-3) — data-ручка для `medalsOf` (`state/medals.ts`).
+ *
+ * Одна линия = одна шкала. `grades` — пороги ПО ВОЗРАСТАНИЮ, от первой степени к высшей;
+ * длина массива и есть число степеней у линии. Величина сравнивается с порогом
+ * ВКЛЮЧИТЕЛЬНО (ровно на пороге медаль уже есть), не дотянула до первого — медали НЕТ, и
+ * это не «нулевая степень»: отсутствие медали и низшая медаль по-разному выглядят в
+ * карточке и по-разному платят.
+ *
+ * Числа в `data/medalGrades.json` взяты ЗАМЕРОМ на self-play, а не назначены — см.
+ * `docs/unit-medals-roadmap.md` §0.5. Держать их данными важно ровно потому, что замер
+ * устареет: заслуга считается из состояния, а грейд в состоянии не лежит, поэтому
+ * перебалансировка порогов ничего не мигрирует и действует на идущих матчах.
+ */
+export const MedalLineDefSchema = z.object({
+  grades: z.array(z.number().positive()).min(1),
 });
 
 /** Premium research-boost scale (SES-3, GDD §4.3) — the data knob for
@@ -862,6 +924,9 @@ export const GameDataSchema = z.object({
   // `.prefault({})` pipes the empty object through the nested schema, so its
   // per-field defaults stay the single source of truth (no literal to drift).
   rewards: RewardsDefSchema.prefault({}),
+  /** Шкалы степеней медалей ветерана (VET-3). Пусто = медалей в этой партии нет вовсе:
+   *  механика выключается снятием данных, без единого флага в коде. */
+  medals: z.record(z.string(), MedalLineDefSchema).prefault({}),
   researchBoost: ResearchBoostDefSchema.prefault({}),
   market: MarketDefSchema.prefault({}),
 });

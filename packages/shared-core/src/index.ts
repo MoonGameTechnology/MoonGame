@@ -73,6 +73,7 @@ export {
   sectorKindDef,
   provinceScore,
   isCapturable,
+  isStationable,
   isBuildable,
   hasOrbit,
   allowedBuildings,
@@ -138,11 +139,22 @@ export { hashJson, hashState } from './state/hash';
 export { runReplay } from './replay/replay';
 export type { ReplayLog, ReplayStep, ReplayRejection, ReplayResult } from './replay/replay';
 export {
+  medalsOf,
+  medalGrade,
+  veteranXp,
+  MEDAL_LINES,
+  type MedalAward,
+  type MedalLine,
+} from './state/medals';
+export {
   previewBattle,
+  previewSides,
   previewLossCount,
   hullPool,
   type BattlePreview,
   type BattlePreviewSide,
+  type MultiBattlePreview,
+  type PreviewSideInput,
 } from './state/previewBattle';
 export {
   COMBAT_WIDTH as GROUND_COMBAT_WIDTH,
@@ -441,7 +453,7 @@ export {
 } from './modules/technology';
 export { constructionModule, unitBuildSiteBlocker } from './modules/construction';
 export { arsenalSyncModule } from './modules/arsenalSync';
-export { stationModule } from './modules/station';
+export { stationModule, STATION_COST } from './modules/station';
 export { seatClaimModule } from './modules/seatClaim';
 export { technologyModule, technologyLock, conditionMet } from './modules/technology';
 export { scientistModule, scientistSlotBonus } from './modules/scientist';

@@ -572,13 +572,20 @@ describe('ROS-0.2 + ROS-3.1 — «Производство»: пять типо�
   });
 
   it('МЕСТО ЗАКАЗА СПРАШИВАЕТСЯ У ЯДРА: без казарм пехоту заказать негде', () => {
-    // Стартовый мир несёт космопорт, но ни казарм, ни завода: корабли и челноки
-    // заказать можно, пехоту и технику — нет. Ровно так же ответит и ядро.
+    // YARD-1: стартовый мир несёт ВЕРФЬ, и только её. Корабль заложить можно; челнок,
+    // пехота и техника ждут своего здания — порта, казарм, завода. Ровно так же ответит
+    // и ядро: экран не держит второй копии этих правил.
     const s = rich();
     expect(buildSites(s, 'p1', 'cruiser').length).toBeGreaterThan(0);
-    expect(buildSites(s, 'p1', 'interceptor').length).toBeGreaterThan(0);
+    expect(buildSites(s, 'p1', 'interceptor')).toEqual([]);
     expect(buildSites(s, 'p1', 'militia')).toEqual([]);
     expect(buildSites(s, 'p1', 'tank')).toEqual([]);
+  });
+
+  it('построил космопорт — появилось место для челноков, но не для пехоты', () => {
+    const s = withBuilding(rich(), 'spaceport');
+    expect(buildSites(s, 'p1', 'interceptor').length).toBe(1);
+    expect(buildSites(s, 'p1', 'militia')).toEqual([]);
   });
 
   it('построил казармы — появилось место для пехоты, но не для техники', () => {

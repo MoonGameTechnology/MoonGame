@@ -98,6 +98,65 @@ describe('construction — per-province building roster (sectorKinds.allowedBuil
   it('a dead world hosts only the salvage metal rig — and no other province type can', () => {
     expect(code(kernel.applyAction(st, build('D', 'metal_station'), ctx))).toBe(true); // dead-world roster ✓
     expect(code(kernel.applyAction(st, build('D', 'mine'), ctx))).toBe('E_WRONG_SECTOR'); // not on its roster
-    expect(code(kernel.applyAction(st, build('P', 'metal_station'), ctx))).toBe('E_WRONG_SECTOR'); // a planet can't
+    // NB: here a planet is stopped by its own roster, which this fixture spells out. The
+    // shipped `planet` has NO roster (= any building), so that half of the rule needs a
+    // second gate — see the `onlyOn` suite below.
+    expect(code(kernel.applyAction(st, build('P', 'metal_station'), ctx))).toBe('E_WRONG_SECTOR');
+  });
+});
+
+/**
+ * `onlyOn` — the same restriction stated from the BUILDING's side (owner decision 3:
+ * "the rig is built ONLY on dead worlds and asteroid fields").
+ *
+ * Why a second gate at all, when a roster already answers "what fits here". A roster
+ * states the rule from the PLACE, and that works until a place has no roster: an absent
+ * `allowedBuildings` means "any building" (the permissive default every kind-less legacy
+ * world relies on). Shipped `planet` is exactly that shape, so forbidding it the rig from
+ * the roster side would mean writing out every OTHER building by name — a list that goes
+ * stale on the next building added, and stales silently.
+ */
+describe('construction — per-building placement (buildings.onlyOn)', () => {
+  const restricted: GameData = parseGameData({
+    version: '0.1.0',
+    resources: ['metal'],
+    units: {},
+    factions: {},
+    buildings: {
+      mine: { name: 'Mine' },
+      // Same shape as the shipped rig: it names its own ground instead of trusting rosters.
+      metal_station: { name: 'Metal Station', onlyOn: ['dead_world', 'void_station'] },
+    },
+    events: {},
+    sectorKinds: {
+      // Roster-less and buildable — the shape that makes the roster gate powerless.
+      planet: {},
+      dead_world: { allowedBuildings: ['metal_station'] },
+      void_station: { allowedBuildings: ['mine', 'metal_station'] },
+    },
+  });
+  const rctx: Context = { now: 0, data: restricted };
+  const kernel = createKernel([constructionModule]);
+  const st: GameState = {
+    ...world(),
+    planets: { P: node('P', 'planet'), D: node('D', 'dead_world'), V: node('V', 'void_station') },
+  };
+
+  it('keeps a restricted building off a roster-less province — the roster cannot', () => {
+    // The control build is the point: an unrestricted building goes up on the very same
+    // node, so the rejection is the rig's own rule and not the terrain saying "nothing here".
+    expect(code(kernel.applyAction(st, build('P', 'metal_station'), rctx))).toBe('E_WRONG_SECTOR');
+    expect(code(kernel.applyAction(st, build('P', 'mine'), rctx))).toBe(true);
+  });
+
+  it('allows it on every kind it names, and both gates must agree', () => {
+    expect(code(kernel.applyAction(st, build('D', 'metal_station'), rctx))).toBe(true);
+    expect(code(kernel.applyAction(st, build('V', 'metal_station'), rctx))).toBe(true);
+  });
+
+  it('a building without `onlyOn` is unaffected — the field is opt-in', () => {
+    // Otherwise adding the field would have quietly re-gated the whole catalogue.
+    expect(restricted.buildings.mine?.onlyOn).toBeUndefined();
+    expect(code(kernel.applyAction(st, build('V', 'mine'), rctx))).toBe(true);
   });
 });

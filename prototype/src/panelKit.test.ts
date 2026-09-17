@@ -107,6 +107,25 @@ describe('панель — строки состава', () => {
     expect(html.match(/asset-row/g)).toHaveLength(2);
   });
 
+  it('VET-5 — медали ветерана видны в строке, и подпись экранируется', () => {
+    const html = unitRows(stacks, view, 'никого', (st) =>
+      st.unit === 'cruiser'
+        ? [{ line: 'valour', grade: 3, glyph: '✦', title: 'Доблесть: <звезда>' }]
+        : [],
+    );
+    expect(html).toContain('✦');
+    expect(html).toContain('class="umedal g3"'); // степень едет классом — цвет её показывает
+    expect(html).toContain('title="Доблесть: &lt;звезда&gt;"'); // подпись экранирована
+    expect(html).toContain('aria-label='); // значок читается скринридером, а не только глазом
+    expect(html.match(/umedal/g)).toHaveLength(1); // у скаута медали нет — строка не тронута
+  });
+
+  it('VET-5 — БЕЗ медалей строка не меняется ни на символ', () => {
+    // Регрессия ровно на то, что медали не имеют права ничего стоить тем трём четвертям
+    // стеков, у которых заслуги нет.
+    expect(unitRows(stacks, view, 'никого', () => [])).toBe(unitRows(stacks, view, 'никого'));
+  });
+
   it('ПУСТОЙ состав говорит словами, а не пустотой', () => {
     const html = unitRows([], view, 'никого');
     expect(html).toContain('никого');

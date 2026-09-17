@@ -157,3 +157,42 @@ describe('pveModule — волны (PVE-3)', () => {
     expect(kernel.advanceTo(frozen, ctx(20 * MS_PER_HOUR, 'waves')).ok).toBe(true);
   });
 });
+
+describe('pveModule — Рой враждебен с первого часа (PVR-1.5)', () => {
+  // Найдено прогоном и подтверждено ревью OBS-02: волны исправно СОЗДАВАЛИСЬ и молча
+  // копились в улье. Карта сажает стороны в `peace` (конвенция free-for-all), а бот
+  // войну первым не объявляет — значит PvE-матч шёл без единого боя. Враждебность
+  // объявляет тот, кто знает, КТО враг: сам модуль, по `npcFaction` режима.
+  it('объявляет войну между NPC и каждым игроком при заведении штурма', () => {
+    const state = seeded();
+    expect(state.diplomacy?.['human|swarm']).toBe('war');
+  });
+
+  it('перебивает мир, засеянный картой: PvE — это не free-for-all', () => {
+    const atPeace: GameState = { ...world(), diplomacy: { 'human|swarm': 'peace' } };
+    const state = ok(advance(MS_PER_HOUR, 'waves', atPeace));
+    expect(state.diplomacy?.['human|swarm']).toBe('war');
+  });
+
+  it('не трогает отношения между СВОИМИ — союз игроков переживает штурм', () => {
+    const coop: GameState = {
+      ...world(),
+      players: {
+        human: player('human', 'vanguard'),
+        ally: player('ally', 'vanguard'),
+        swarm: player('swarm', 'swarm'),
+      },
+      diplomacy: { 'ally|human': 'alliance' },
+    };
+    const state = ok(advance(MS_PER_HOUR, 'waves', coop));
+    expect(state.diplomacy?.['ally|human']).toBe('alliance'); // союз не тронут
+    expect(state.diplomacy?.['ally|swarm']).toBe('war'); // а с Роем воюют оба
+    expect(state.diplomacy?.['human|swarm']).toBe('war');
+  });
+
+  it('в матче без PvE-режима отношений не трогает вовсе', () => {
+    const atPeace: GameState = { ...world(), diplomacy: { 'human|swarm': 'peace' } };
+    const state = ok(advance(MS_PER_HOUR, 'plain', atPeace));
+    expect(state.diplomacy?.['human|swarm']).toBe('peace');
+  });
+});

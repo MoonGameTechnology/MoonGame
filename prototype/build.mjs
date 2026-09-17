@@ -137,10 +137,15 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
 .crest:active{background:rgba(53,214,230,.12);}
 .dia{width:15px;height:15px;transform:rotate(45deg);flex:0 0 auto;border:1.5px solid var(--cyan);
   box-shadow:0 0 9px rgba(53,214,230,.7),inset 0 0 5px rgba(53,214,230,.35);}
-.who{line-height:1.15;min-width:0;}
+/* both identity lines CLIP inside .who. The nick had the ellipsis from the start; the
+   standing did not, and an inline nowrap span in a min-width:0 flex item does not stay
+   inside its box — it spilled right, and the ✦ chip (painted later) covered the half that
+   stuck out. On every phone under ~400px the standing read as garbage under the chip. */
+.who{line-height:1.15;min-width:0;overflow:hidden;}
 .who b{display:block;color:#eafffb;font-weight:700;font-size:13px;letter-spacing:.6px;
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.who span{color:#8b9c9e;font-size:10px;letter-spacing:.8px;white-space:nowrap;}
+.who span{display:block;color:#8b9c9e;font-size:10px;letter-spacing:.8px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;}
 /* victory chip in the row-1 gap: the ✦ score race the standing is derived from.
    Tap → plain-words breakdown (the .dstat handler on #top). Hidden until it has text. */
 #tbscore{flex:0 1 auto;margin:0 auto;padding:3px 10px;border-radius:11px;cursor:pointer;
@@ -154,6 +159,9 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
   border:1px solid rgba(148,170,173,.28);background:rgba(6,14,16,.5);}
 #daycard b{display:block;color:#8fdbe0;font-size:12px;letter-spacing:1px;}
 #daycard span{color:#8b9c9e;font-size:9px;font-variant-numeric:tabular-nums;letter-spacing:.4px;}
+/* «до след. дня» is a separate node so narrow phones can drop the caption and keep the
+   digits — see the @media (max-width:480px) rule further down. */
+#tbetacap{margin-left:4px;}
 /* the five currencies always fit their row — no scroll. Capsules share the width and
    shrink together (flex:1 1 0; min-width:0) so the row scales down instead of
    overflowing. Each capsule = a bare line-glyph + tabular amount + flow, in the mock's
@@ -222,6 +230,17 @@ body.app-startup-failed > :not(#startup-error){display:none!important;}
   box-shadow:inset 0 0 10px rgba(53,214,230,.14),0 0 10px rgba(53,214,230,.12);
   text-shadow:0 0 8px rgba(53,214,230,.5);}
 #crestmark:hover,#crestmark:active{background:rgba(53,214,230,.16);}
+/* PvE wave readout (PVR-1.2) — стоит сразу за часами, потому что это то же измерение:
+   сколько осталось до следующего события мира.
+   КРАСНЫЙ, а не амбер: первая редакция была амберной, и на снимке она оказалась близнецом
+   золотого чипа Суверенов в двух сантиметрах правее — угроза и деньги читались одинаково.
+   Красный (--red) в этой палитре занят опасностью и с золотом не путается.
+   Без пульсации: строка висит весь матч, мигающая угроза на полчаса утомляет и перестаёт
+   читаться как сигнал вообще. */
+#devline .dl-wave{flex:0 0 auto;margin-left:10px;padding:2px 9px;border-radius:11px;
+  color:#ffb3aa;font-weight:700;font-size:12px;line-height:1;letter-spacing:.3px;
+  font-variant-numeric:tabular-nums;white-space:nowrap;
+  background:rgba(255,90,77,.08);border:1px solid rgba(255,90,77,.42);}
 /* donate currency (Суверены ◆, gold) sits UNDER the resource bar on the status line,
    pushed to the right end — so the resource chips get the full top-bar width for numbers. */
 #devline .dl-donate{margin-left:auto;flex:0 0 auto;display:flex;align-items:center;gap:5px;
@@ -1016,6 +1035,17 @@ body.sheet-open #cmdbar{bottom:calc(var(--sheeth,34vh) + 12px);}
 .asset-row b{flex:1 1 auto;min-width:96px;font-size:12px;}
 .asset-row .b{margin-left:auto;}
 .asset-row .prod{color:var(--grn);}
+/* VET-5: значок медали ветерана в строке состава. Один символ на линию — всё, что
+   влезает рядом с иконкой корпуса, числом и именем на телефоне; имя степени уезжает в
+   title. Цвет растёт со степенью, поэтому ветерана видно, не читая подписи: приглушённый
+   циан → белый → янтарь → золото с ореолом. Значок НЕ ловит указатель (pointer-events):
+   строка целиком — кнопка кодекса, и тап по медали обязан открывать ту же карточку, а не
+   проваливаться. */
+.umedal{font-size:11px;line-height:1;flex:0 0 auto;opacity:.92;pointer-events:none;}
+.umedal.g1{color:var(--cyan-dim);}
+.umedal.g2{color:#dfe9ec;}
+.umedal.g3{color:var(--amb);}
+.umedal.g4{color:#ffd76a;text-shadow:0 0 6px rgba(255,215,106,.55);}
 /* Список построенного идёт СТОЛБИКОМ, строка на здание (заказ владельца по скриншоту):
    сетка крупных плиток переносилась на два ряда уже на четырёх постройках, длинные
    имена ломались надвое, и секция съедала пол-листа. Строка — кнопка, поэтому ей нужны
@@ -1117,19 +1147,19 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #log div::before{content:"> ";color:var(--grn-dim);}
 
 /* technologies + steward + heroes windows (modal, mirror #logwin) */
-#tech,#steward{position:fixed;inset:0;z-index:47;display:none;align-items:center;justify-content:center;padding:16px;
+#tech,#steward,#battlewin{position:fixed;inset:0;z-index:47;display:none;align-items:center;justify-content:center;padding:16px;
   background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
-#tech.show,#steward.show{display:flex;}
+#tech.show,#steward.show,#battlewin.show{display:flex;}
 /* Окно построек — тот же каркас, но НИЖЕ кодекса (z46): тап по строке открывает
    карточку здания, и она обязана лечь ПОВЕРХ окна, а не под ним. */
 #buildwin{position:fixed;inset:0;z-index:45;display:none;align-items:center;justify-content:center;padding:16px;
   background:rgba(1,5,9,.55);-webkit-backdrop-filter:blur(2px);backdrop-filter:blur(2px);}
 #buildwin.show{display:flex;}
-#tech .twbox,#steward .twbox,#buildwin .twbox{display:flex;flex-direction:column;width:min(460px,94vw);max-height:82vh;overflow:hidden;
+#tech .twbox,#steward .twbox,#battlewin .twbox,#buildwin .twbox{display:flex;flex-direction:column;width:min(460px,94vw);max-height:82vh;overflow:hidden;
   background:var(--glass);border:1px solid var(--cyan);border-radius:10px;
   box-shadow:0 0 40px rgba(0,0,0,.6),inset 0 0 0 1px rgba(53,214,230,.06);}
 .tw-close{width:28px;height:28px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--dim);cursor:pointer;}
-#techbody,#stewardbody,#herobody{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:12px 14px;}
+#techbody,#stewardbody,#battlewinbody,#herobody{flex:1;min-height:0;overflow:auto;touch-action:pan-y;padding:12px 14px;}
 #buildwinbody{flex:1;min-height:0;overflow:hidden;display:flex;flex-direction:column;padding:0;}
 /* heroes window: roster cards + abilities / skill tree / fittings */
 #herobody .hx-card{border:1px solid var(--line-hi);border-radius:10px;padding:11px 13px;margin-bottom:12px;background:rgba(53,214,230,.04);}
@@ -1239,6 +1269,16 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
 #herobody .hx-dbtn.danger{background:transparent;border:1px solid #ff5a4d;color:#ff5a4d;}
 #herobody .hx-dbtn:disabled{opacity:.4;cursor:not-allowed;}
 /* Steward («Хранитель») delegate panel */
+#battlewinbody .bw-head{font-size:12px;color:var(--cyan);letter-spacing:.04em;text-transform:uppercase;}
+#battlewinbody .bw-next{font-size:12px;color:var(--dim);margin:4px 0 10px;}
+#battlewinbody .bw-side{padding:9px 11px;border:1px solid var(--line);border-radius:9px;margin-bottom:8px;background:rgba(255,255,255,.02);}
+/* Своя сторона подсвечена рамкой: в свалке на пять сторон «где я» — первый вопрос. */
+#battlewinbody .bw-side.mine{border-color:var(--cyan-dim);background:rgba(53,214,230,.08);}
+#battlewinbody .bw-who{margin:0;font-size:13px;}
+#battlewinbody .bw-who i{font-style:normal;font-size:11px;color:var(--cyan);text-transform:uppercase;letter-spacing:.05em;margin-left:6px;}
+#battlewinbody .bw-force{margin:5px 0 0;font-size:12px;color:var(--dim);}
+#battlewinbody .bw-bar{margin-left:8px;white-space:nowrap;}
+#battlewinbody .bw-empty{font-size:12px;color:var(--dim);}
 #stewardbody .st-status{padding:11px 13px;border:1px solid var(--cyan-dim);border-radius:9px;background:rgba(53,214,230,.08);font-size:12px;color:var(--cyan);line-height:1.55;}
 #stewardbody .st-status.locked{border-color:var(--line);background:rgba(255,255,255,.03);color:var(--dim);}
 #stewardbody .st-status.on{border-color:#7df0d0;background:rgba(125,240,208,.10);color:#9ff0da;}
@@ -1705,6 +1745,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   .res i svg{width:14px;height:14px;}
   .res b{font-size:12px;}
   #devline .dl-donate{font-size:11px;padding:2px 8px;}
+  #devline .dl-wave{font-size:11px;padding:2px 8px;margin-left:8px;}
 
   /* phones: three tabs + ✕ no longer fit beside the window title — the tabs alone
      identify the window, so the «ДИПЛОМАТИЯ» caption yields its room to them */
@@ -1804,6 +1845,17 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
   /* телефон: лист выше (max-height:50vh) и уже несёт safe-area в своей высоте, поэтому
      замер --sheeth годится как есть; 50vh — тот же фолбэк до первого замера */
   body.sheet-open #cmdbar{bottom:calc(var(--sheeth,50vh) + 8px);}
+}
+
+/* Row 1 runs out of room before the rest of the phone layout does: back chevron, crest,
+   nick + standing, ✦ chip and day card ask for ~480px, so under that the nick starts
+   losing letters and the standing gets squeezed out entirely. The one line here that
+   carries no information is «до след. дня» — the day number sits right above the
+   countdown and says what it counts to (docs/hud-inmatch.md §2 draws the phone bar as
+   «День 1 · 23:28»). Dropping it hands ~67px back to the crest, which is what makes the
+   nick and the standing readable again on a 360px phone. */
+@media (max-width:480px){
+  #tbetacap{display:none;}
 }
 /* connect overlay — entry screen (sign in, then join a live session) */
 /* Identity is its OWN page, not an overlay: an OPAQUE full-screen backdrop so the live
@@ -2617,7 +2669,7 @@ button.b:disabled{opacity:.32;cursor:not-allowed;color:var(--dim);border-color:v
        HUD уезжал под край окна (игроку кажется, что интерфейс съела панель задач).
        Считаем от живого зума, а не от «полутора». */
     --vph:calc(100dvh / var(--pcz));}
-  #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#scipick,
+  #top,#devline,#toasts,#speedbar,#cmdbar,#rail,#side,#logwin,#tech,#steward,#battlewin,#scipick,
   #market,#constructor,#codex,#codexhub,#intro,#recap,#goals,#playercard,
   #settings,#warprompt,#diplo,#splitdlg,#pingmenu,#banner,#endscreen,#connect,#updbar,
   #hub,#emblempick,#corp,#setup,#testmode,#sandbox,
@@ -2809,7 +2861,7 @@ const page = (js) => `<!doctype html>
       <div class="who"><b id="tbname"></b><span id="tbplace"></span></div>
     </div>
     <span id="tbscore" class="dstat"></span>
-    <div id="daycard"><b id="tbday"></b><span id="tbeta"></span></div>
+    <div id="daycard"><b id="tbday"></b><span id="tbeta"></span><span id="tbetacap" data-i18n="hud.next-day.cap"></span></div>
   </div>
   <div id="purse"></div>
 </header>
@@ -2843,6 +2895,8 @@ const page = (js) => `<!doctype html>
 <div id="buildwin"><div class="twbox"><div class="lw-head"><b data-i18n="win.build.title"></b><button class="tw-close" data-i18n-aria="card.close">✕</button></div><div id="buildwinbody"></div></div></div>
 <!-- steward («Хранитель») window — content rendered by renderSteward() in main.ts -->
 <div id="steward"><div class="twbox"><div class="lw-head"><b data-i18n="win.steward.title"></b><button class="tw-close" data-i18n-aria="card.close">✕</button></div><div id="stewardbody"></div></div></div>
+<!-- окно боя: открывается тапом по значку боя на карте (battleScreen.ts) -->
+<div id="battlewin"><div class="twbox"><div class="lw-head"><b data-i18n="battle.win.head"></b><button class="tw-close" data-i18n-aria="card.close">✕</button></div><div id="battlewinbody"></div></div></div>
 <!-- heroes: the roster/штаб now lives INSIDE the «Производство» screen (Герои pane) -->
 <!-- scientist council picker (setup-time, before the start-point) — rendered by renderSciPick() -->
 <div id="scipick"><div class="twbox"><div class="lw-head"><b data-i18n="win.scipick.title"></b><button class="sp-cancel" type="button" data-i18n="win.scipick.back"></button></div><div id="scipickbody"></div></div></div>
@@ -3019,7 +3073,7 @@ const page = (js) => `<!doctype html>
           <label for="match-create-map" data-i18n="setup.map"></label>
           <select id="match-create-map" class="inp">
             <option value="nexus" data-i18n="setup.map.nexus"></option>
-            <option value="frontier-100" data-i18n="setup.map.frontier-100"></option>
+            <option value="frontier-50" data-i18n="setup.map.frontier-50"></option>
           </select>
           <button id="match-create-go" type="button" class="mbtn" data-i18n="setup.network.create"></button>
         </div>
@@ -3151,8 +3205,9 @@ const page = (js) => `<!doctype html>
         <p class="ssub" data-i18n="setup.sub"></p>
         <label for="setup-map-id" data-i18n="setup.map"></label>
         <select id="setup-map-id" class="inp">
+          <option value="frontier-100" data-i18n="setup.map.frontier-100" disabled hidden></option>
           <option value="nexus" data-i18n="setup.map.nexus"></option>
-          <option value="frontier-100" data-i18n="setup.map.frontier-100"></option>
+          <option value="frontier-50" data-i18n="setup.map.frontier-50"></option>
         </select>
         <p class="smaphint" id="setup-map-info"></p>
         <label for="setup-home-id" data-i18n="setup.home.list"></label>

@@ -29,17 +29,28 @@
   "shipyard": {
     "name": "Orbital Shipyard",
     "cost": {
-      "metal": 400,
-      "credits": 200
+      "metal": 250,
+      "credits": 120
     },
-    "buildTimeHours": 24,
+    "buildTimeHours": 12,
     "produces": {},
-    "hp": 30,
-    "shipRepair": 0.1,
+    "hp": 25,
+    "shipRepair": 0.05,
     "enablesShipConstruction": true,
-    "scoreValue": 12,
+    "scoreValue": 6,
     "traits": [],
-    "shuttleBay": 6
+    "upgrades": [
+      {
+        "cost": {
+          "metal": 150,
+          "credits": 80
+        },
+        "buildTimeHours": 12,
+        "hp": 30,
+        "shipRepair": 0.1,
+        "enablesShipConstruction": true
+      }
+    ]
   },
   "biomass_pit": {
     "name": "Biomass Pit",
@@ -113,8 +124,10 @@
     },
     "buildTimeHours": 5,
     "hp": 25,
+    "produces": {
+      "credits": 5
+    },
     "shipRepair": 0.05,
-    "enablesShipConstruction": true,
     "scoreValue": 4,
     "shuttleBay": 6
   },
@@ -175,7 +188,8 @@
         },
         "buildTimeHours": 6,
         "hp": 60,
-        "defenseBonus": 0.45
+        "defenseBonus": 0.45,
+        "pointDefense": 12
       },
       {
         "cost": {
@@ -184,9 +198,11 @@
         },
         "buildTimeHours": 8,
         "hp": 85,
-        "defenseBonus": 0.6
+        "defenseBonus": 0.6,
+        "pointDefense": 16
       }
-    ]
+    ],
+    "pointDefense": 8
   },
   "orbital_aa": {
     "name": "Orbital Defense Battery",
@@ -260,6 +276,11 @@
         },
         "hp": 40
       }
+    ],
+    "onlyOn": [
+      "dead_world",
+      "asteroid",
+      "void_station"
     ]
   },
   "power_plant": {
@@ -541,7 +562,56 @@
     "buildTimeHours": 6,
     "hp": 70,
     "defenseBonus": 0.4,
-    "scoreValue": 6
+    "aaDamage": 6,
+    "pointDefense": 6,
+    "scoreValue": 6,
+    "upgrades": [
+      {
+        "cost": {
+          "metal": 260,
+          "credits": 110
+        },
+        "buildTimeHours": 8,
+        "hp": 110,
+        "defenseBonus": 0.4,
+        "aaDamage": 9,
+        "pointDefense": 9
+      },
+      {
+        "cost": {
+          "metal": 380,
+          "credits": 180
+        },
+        "buildTimeHours": 10,
+        "hp": 160,
+        "defenseBonus": 0.4,
+        "aaDamage": 13,
+        "pointDefense": 12
+      },
+      {
+        "cost": {
+          "metal": 540,
+          "credits": 270
+        },
+        "buildTimeHours": 13,
+        "hp": 220,
+        "defenseBonus": 0.4,
+        "aaDamage": 18,
+        "pointDefense": 16
+      },
+      {
+        "cost": {
+          "metal": 760,
+          "credits": 400
+        },
+        "buildTimeHours": 16,
+        "hp": 300,
+        "defenseBonus": 0.4,
+        "aaDamage": 24,
+        "pointDefense": 20
+      }
+    ],
+    "onlyOn": []
   },
   "tax_office": {
     "name": "Tax Office",

@@ -181,6 +181,12 @@ const DYNAMIC: Array<{ prefix: string; built_by: string }> = [
   { prefix: 'err.', built_by: 'errText() — из кода отказа ядра: E_NO_CAPACITY → err.no-capacity' },
   { prefix: 'data.', built_by: 'tData() через dataKey() — из имени в data/*.json' },
   { prefix: 'hud.resource.', built_by: 'renderHud() — из id ресурса в chip()' },
+  {
+    prefix: 'medal.',
+    built_by:
+      'medalsOf() в ядре строит `medal.<линия>.<степень>` из данных `data/medalGrades.json`, ' +
+      'medalBadges() в /decisions добавляет `medal.<линия>` для подписи (VET-3/VET-5)',
+  },
 ];
 const isDynamic = (k: string): boolean => DYNAMIC.some((d) => k.startsWith(d.prefix));
 

@@ -6,12 +6,12 @@ import { advance, ctx, kernel, order } from './protoKernel';
 import { data } from './gameData';
 import { mapNodesFromState } from './mapCatalog';
 
-const world = () => newGame({ mapId: 'frontier-100', seats: networkSeats('ffa', 'frontier-100') });
+const world = () => newGame({ mapId: 'frontier-50', seats: networkSeats('ffa', 'frontier-50') });
 
 describe('Frontier inhabitants', () => {
   it('keeps NPCs out of seating, starts pirates at war and neutral bases at peace', () => {
     const s = world();
-    expect(playablePlayerIds(s)).toHaveLength(100);
+    expect(playablePlayerIds(s)).toHaveLength(50);
     for (const p of Object.values(s.players).filter((p) => p.npc)) {
       expect(getStance(s, 'p1', p.id)).toBe(p.npc === 'pirate' ? 'war' : 'peace');
       const result = order(
@@ -52,7 +52,7 @@ describe('Frontier inhabitants', () => {
     });
     expect(result.ok).toBe(true);
     if (!result.ok) return;
-    expect(Object.keys(result.state.match.rewards ?? {})).toHaveLength(100);
+    expect(Object.keys(result.state.match.rewards ?? {})).toHaveLength(50);
     expect(Object.keys(result.state.match.rewards ?? {}).some((id) => s.players[id]!.npc)).toBe(
       false,
     );
@@ -61,14 +61,14 @@ describe('Frontier inhabitants', () => {
   it('restores authored geometry from a fogged network snapshot', () => {
     const s = world();
     const view = visibleState(s, 'p1', data);
-    expect(view.mapId).toBe('frontier-100');
+    expect(view.mapId).toBe('frontier-50');
     const geometry = mapNodesFromState(view);
     expect(geometry.find((p) => p.id === 'F0')).toMatchObject({ sector: 'black_hole', links: [] });
-    expect(geometry.filter((p) => p.sector === 'pirate_base')).toHaveLength(12);
+    expect(geometry.filter((p) => p.sector === 'pirate_base')).toHaveLength(6);
   });
 
   it('allows pirates to defeat a lone player without becoming PvP winners', () => {
-    const s = newGame({ mapId: 'frontier-100', seats: networkSeats('ffa', 'frontier-100').slice(0, 1) });
+    const s = newGame({ mapId: 'frontier-50', seats: networkSeats('ffa', 'frontier-50').slice(0, 1) });
     expect(advance(s, 1).state.match.status).toBe('ongoing');
     for (const p of Object.values(s.planets)) if (p.owner === 'p1') p.owner = null;
     const ended = advance(s, 1);

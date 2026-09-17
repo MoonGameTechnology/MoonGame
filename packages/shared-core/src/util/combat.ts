@@ -1,7 +1,7 @@
 import type { HandlerContext } from '../kernel/module';
-import type { CombatantRef, Fleet, GameState, PlanetId, UnitStack } from '../state/gameState';
+import type { CombatantRef, Fleet, GameState, PlanetId, PlayerId, UnitStack } from '../state/gameState';
 import type { GameData, UnitDef } from '../data/schemas';
-import { cappedUnitStat } from './stacks';
+import { cappedUnitBreakdown, type StackContribution } from './stacks';
 import { effectiveStats } from './loadout';
 import { getStance, type DiplomacyCapability } from '../state/diplomacy';
 
@@ -101,11 +101,23 @@ export function sideUnits(state: GameState, ref: CombatantRef): UnitStack[] | nu
       return f ? (f.landing ?? []) : null;
     }
     // ROS-1.5: плацдарм — тот же десант, только держит его МИР, а не флот.
+    // MSB-4: плацдармов на мире может быть несколько, и адресует их ВЛАДЕЛЕЦ в ссылке.
     case 'beachhead':
-      return state.planets[ref.planetId]?.beachhead?.units ?? null;
+      return beachheadOf(state, ref.planetId, ref.owner)?.units ?? null;
     case 'garrison':
       return state.planets[ref.planetId]?.garrison ?? null;
   }
+}
+
+/** Плацдарм КОНКРЕТНОГО владельца на мире (MSB-4). Один аксессор на всех читателей:
+ *  список короткий (по числу штурмующих), а искать его руками в семи местах значило бы
+ *  семь раз повторить правило «плацдарм адресуется парой (мир, владелец)». */
+export function beachheadOf(
+  state: GameState,
+  planetId: string,
+  owner: PlayerId,
+): { owner: PlayerId; units: UnitStack[] } | undefined {
+  return state.planets[planetId]?.beachheads?.find((b) => b.owner === owner);
 }
 
 export function setSideUnits(state: GameState, ref: CombatantRef, units: UnitStack[]): void {
@@ -121,7 +133,7 @@ export function setSideUnits(state: GameState, ref: CombatantRef, units: UnitSta
       return;
     }
     case 'beachhead': {
-      const beachhead = state.planets[ref.planetId]?.beachhead;
+      const beachhead = beachheadOf(state, ref.planetId, ref.owner);
       if (beachhead) beachhead.units = units;
       return;
     }
@@ -144,15 +156,66 @@ export function sideAlive(state: GameState, ref: CombatantRef): boolean {
  * soaks (Bytro line cap; the receiving hull pools stay whole-stack). The
  * aggressor uses its `attack` stat; a standing fleet that is attacked (the
  * defender) answers with its `defense` stat only — the return-fire mechanic.
+ *
+ * Возвращает залп ВМЕСТЕ с разбивкой по стекам (VET-1): то же число, что и раньше, плюс
+ * вклад каждого стека, который до этого кирпича вычислялся и выбрасывался. Прежний
+ * `sideDamage`, отдававший одну сумму, снят: после VET-2 у него не осталось ни одного
+ * читателя, а держать две двери в одно правило — это ровно тот способ, которым две копии
+ * правила потом расходятся.
  */
-export function sideDamage(
+export function sideDamageBreakdown(
   state: GameState,
   ref: CombatantRef,
   data: GameData,
   stat: 'attack' | 'defense',
-): number {
+): { total: number; rows: StackContribution[] } {
   const units = sideUnits(state, ref);
-  return units ? cappedUnitStat(units, data, stat) : 0;
+  if (!units) return { total: 0, rows: [] };
+  const rows = cappedUnitBreakdown(units, data, stat);
+  let total = 0;
+  for (const row of rows) total += row.damage;
+  return { total, rows };
+}
+
+/**
+ * ЗАПИСАТЬ ЗАСЛУГУ ЗА РАУНД (VET-2): развесить `dealt` — то, что РЕАЛЬНО легло на врагов
+ * после хука и делёжа, — по стекам, которые этот залп и выпустили.
+ *
+ * Развеска по доле в ЗАЛПЕ, а не по числу стволов: стек из двух тяжёлых копий сделал
+ * больше, чем стек из двух катеров, и медаль обязана это различать. Доля берётся от
+ * `volley` (залп ДО хука), а множится на `dealt` (после) — так технология или аура,
+ * усилившая сторону, достаётся всем её стекам пропорционально, а не одному.
+ *
+ * Пишется величина НА ЮНИТ (см. {@link UnitStack.damageDealt}), и только если она
+ * положительна: транспорт, стоявший в линии огня с нулевой пушкой, поля не заводит —
+ * «не стрелял» и «стрелял на ноль» для медали разные вещи.
+ */
+export function creditVolley(
+  state: GameState,
+  ref: CombatantRef,
+  shot: { total: number; rows: StackContribution[] },
+  dealt: number,
+): void {
+  if (shot.total <= 0 || dealt <= 0) return;
+  const units = sideUnits(state, ref);
+  if (!units) return;
+  for (const row of shot.rows) {
+    if (row.damage <= 0) continue;
+    const stack = units[row.index];
+    if (!stack || stack.count <= 0) continue;
+    stack.damageDealt = (stack.damageDealt ?? 0) + (row.damage / shot.total) * dealt / stack.count;
+  }
+}
+
+/** Отметить пережитое сражение (VET-2): +1 каждому ЖИВОМУ стеку стороны. Зовётся один
+ *  раз на закрытие боя, поэтому «пережил» здесь значит именно то, что написано — стек
+ *  дожил до конца, а не «участвовал в раунде». */
+export function creditBattle(state: GameState, ref: CombatantRef): void {
+  const units = sideUnits(state, ref);
+  if (!units) return;
+  for (const stack of units) {
+    if (stack.count > 0) stack.battles = (stack.battles ?? 0) + 1;
+  }
 }
 
 /**
@@ -381,7 +444,7 @@ export function applyDamageToSide(
   // владелец СВОЙ — он не хозяин мира, он на него высадился.
   const owner =
     ref.kind === 'beachhead'
-      ? h.state.planets[ref.planetId]?.beachhead?.owner
+      ? ref.owner
       : ref.kind === 'garrison'
         ? h.state.planets[ref.planetId]?.owner
         : h.state.fleets[ref.fleetId]?.owner;

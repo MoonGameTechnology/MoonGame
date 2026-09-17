@@ -35,19 +35,73 @@ describe('SV-2.4 · match API', () => {
   it('passes only allowlisted maps to creation and rejects bad requests before seeding', async () => {
     const seen: unknown[] = [];
     const app = appWith({
-      mapIds: ['nexus', 'frontier-100'],
+      mapIds: ['nexus', 'frontier-50'],
       createMatch: (req) => { seen.push(req); return Promise.resolve({ matchId: 'm', seats: [] }); },
       join: denyJoin,
     });
-    const valid = await app.inject({ method: 'POST', url: '/matches', payload: { mapId: 'frontier-100' } });
+    const valid = await app.inject({ method: 'POST', url: '/matches', payload: { mapId: 'frontier-50' } });
     expect(valid.statusCode).toBe(200);
-    expect(seen).toEqual([{ mapId: 'frontier-100' }]);
-    for (const mapId of ['missing', '__proto__', 100, null, {}]) {
+    expect(seen).toEqual([{ mapId: 'frontier-50' }]);
+    for (const mapId of ['frontier-100', 'missing', '__proto__', 100, null, {}]) {
       const bad = await app.inject({ method: 'POST', url: '/matches', payload: { mapId } });
       expect(bad.statusCode).toBe(400);
       expect(bad.json()).toEqual({ error: 'E_UNKNOWN_MAP' });
     }
     expect(seen).toHaveLength(1);
+    await app.close();
+  });
+
+  // BRW-0: режим выбирается тем же способом, что и карта, и проверяется ДО посева.
+  // Неизвестный режим обязан отбиться здесь: `resolveMatchConfig` в конструкторе
+  // комнаты бросит `E_UNKNOWN_MODE` уже ПОСЛЕ того, как партия засеяна и уложена в
+  // стор, — вызывающий получил бы 500, а стор недорождённый матч.
+  it('режим проверяется по каталогу и доезжает до создания вместе с картой', async () => {
+    const seen: unknown[] = [];
+    const app = appWith({
+      mapIds: ['nexus'],
+      modeIds: ['standard', 'pve_waves'],
+      createMatch: (req) => {
+        seen.push(req);
+        return Promise.resolve({ matchId: 'm', seats: [] });
+      },
+      join: denyJoin,
+    });
+    const ok = await app.inject({
+      method: 'POST',
+      url: '/matches',
+      payload: { mapId: 'nexus', modeId: 'pve_waves' },
+    });
+    expect(ok.statusCode).toBe(200);
+    expect(seen).toEqual([{ mapId: 'nexus', modeId: 'pve_waves' }]);
+
+    // Режим без карты — законный запрос: карта останется хостовой по умолчанию.
+    await app.inject({ method: 'POST', url: '/matches', payload: { modeId: 'standard' } });
+    expect(seen[1]).toEqual({ modeId: 'standard' });
+
+    for (const modeId of ['no_such_mode', 'PVE_WAVES', '__proto__', 7, null, {}]) {
+      const bad = await app.inject({ method: 'POST', url: '/matches', payload: { modeId } });
+      expect(bad.statusCode).toBe(400);
+      expect(bad.json()).toEqual({ error: 'E_UNKNOWN_MODE' });
+    }
+    expect(seen).toHaveLength(2); // ни один плохой запрос не дошёл до посева
+    await app.close();
+  });
+
+  it('хост без списка режимов не принимает режим вовсе — выбора он не предлагает', async () => {
+    const app = appWith({
+      createMatch: () => Promise.resolve({ matchId: 'm', seats: [] }),
+      join: denyJoin,
+    });
+    const bad = await app.inject({
+      method: 'POST',
+      url: '/matches',
+      payload: { modeId: 'standard' },
+    });
+    expect(bad.statusCode).toBe(400);
+    expect(bad.json()).toEqual({ error: 'E_UNKNOWN_MODE' });
+    // …а запрос без режима по-прежнему проходит: поведение старых клиентов не тронуто.
+    const ok = await app.inject({ method: 'POST', url: '/matches' });
+    expect(ok.statusCode).toBe(200);
     await app.close();
   });
 

@@ -1,4 +1,4 @@
-import { mapPreset, mapNodesFromState, scoreLimitFor, MAP_IDS, type MapId } from './mapCatalog';
+import { isFrontier, mapPreset, mapNodesFromState, scoreLimitFor, MAP_IDS, type MapId } from './mapCatalog';
 /**
  * Void Dominion — playable prototype, browser UI.
  *
@@ -13,6 +13,7 @@ import {
   canOrder,
   canOrderAll,
   ctx,
+  setMatchMode,
   data,
   MAP as LEGACY_MAP,
   SECTOR_TYPES,
@@ -27,6 +28,7 @@ import {
   orbitFleet,
   assaultFleet,
   bombardFleet,
+  deployStation,
   engageFleet,
   loadArmy,
   unloadArmy,
@@ -176,7 +178,7 @@ import {
   createBattleModel,
   type BattleSideView,
 } from '../../packages/client/src/index';
-import { pveState } from '../../packages/client/src/gameData';
+import { pveState, pveModeId } from '../../packages/client/src/gameData';
 import {
   worldToScreen as camWorldToScreen,
   zoomAt as camZoomAt,
@@ -191,11 +193,8 @@ import {
   blitSphere as hdBlitSphere,
   clearHolographicSprites,
 } from '../../packages/client/src/holoDraw';
-import {
-  drawTerritory,
-  computePowerCell,
-  type TerritorySeed,
-} from '../../packages/client/src/territory';
+import { drawTerritory } from '../../packages/client/src/territory';
+import { TerritoryGeometryCache } from '../../packages/client/src/territoryGeometry';
 import { buildLabel, currentBuild } from './updater';
 import { initApkUpdater } from './apkUpdate';
 import { measureViewport, STARS, NEBULAE } from './viewport';
@@ -250,6 +249,9 @@ import {
   tokenFor,
   type SessionRec,
 } from '../../decisions/sessionStore';
+import { medalBadges } from '../../decisions/unitMedals';
+import { fortressRaise } from '../../decisions/fortressRaise';
+import { waveReadout } from '../../decisions/waveReadout';
 import {
   authOutcome,
   shouldRegister,
@@ -272,6 +274,7 @@ import { assaultMovers, assaultTargetBlocker, collectBlockers, moveMovers } from
 import { laneEnds, warConfirmPlan } from '../../decisions/warOrders';
 import { bakeSignature, needsRebake, ownersSignature } from './staticLayerCache';
 import { clipPolygon, clipRect, provinceSeeds } from './provinceMap';
+import { frontierOutline } from './frontierOutline';
 import { fleetVisible, nodeView, seesDetails as fogSeesDetails } from './fogView';
 import {
   hasCoverage,
@@ -574,6 +577,8 @@ import {
 // ST-2/ST-3 — «Хранитель»: the window is REFM-7; the read-only helpers below are shared
 // with the threat alert (`stewFmtDur`), the side panel (`stewardTechDone`) and the
 // morning report (`stewMetrics`).
+import { initBattleWindow } from './battleScreen';
+import { battleAtTap } from '../../decisions/battleTap';
 import {
   initSteward,
   stewFmtDur,
@@ -1275,7 +1280,7 @@ const battleLosses = new Map<string, Record<string, Record<string, number>>>();
 // Single-player setup screen state: per-seat role (seat 0 is always you) + your
 // chosen homeworld. Seats 2-10 toggle 'ai'/'off'; an 'ai' seat spawns a rival.
 const freshSetupSlots = (): SeatRole[] =>
-  SEAT_META.slice(0, setupSeatCount()).map((_, i) => (i === 0 ? 'human' : setupMapId === 'frontier-100' || i === 1 ? 'ai' : 'off'));
+  SEAT_META.slice(0, setupSeatCount()).map((_, i) => (i === 0 ? 'human' : isFrontier(setupMapId) || i === 1 ? 'ai' : 'off'));
 let setupSlots: SeatRole[] = freshSetupSlots();
 // Team battle (2v2 etc.): when on, seats fight in sides — same side ALLIED (win
 // together, no friendly fire), across sides at WAR from the first hour. Seat 0 (you)
@@ -1739,8 +1744,10 @@ const cam = { scale: 1, x: 0, y: 0 };
 const clamp = (v: number, a: number, b: number) => Math.max(a, Math.min(b, v));
 // node sector type by id — drives asteroid-junction rendering + capture-by-arrival
 let SECTOR_OF: Record<string, string> = Object.fromEntries(MAP.map((n) => [n.id, n.sector]));
+let galaxyOutline: Array<{ x: number; y: number }> = [];
 function installMapGeometry(state: GameState): void {
   MAP = mapNodesFromState(state);
+  galaxyOutline = isFrontier(state.mapId) ? frontierOutline(MAP) : [];
   SCORE_LIMIT = scoreLimitFor(state);
   SECTOR_OF = Object.fromEntries(MAP.map((n) => [n.id, n.sector]));
   MINX = Math.min(...MAP.map((n) => n.x));
@@ -1757,14 +1764,19 @@ function sectorTypeOf(id: string) {
   return kind === undefined ? undefined : SECTOR_TYPES[kind];
 }
 /** Зеркало ворот конструкции ядра (`construction.ts`): вид провинции пускает здание,
- *  только если на нём вообще можно строить (`buildable`) И его ростер (undefined =
- *  любое) это здание допускает. Одна копия на все кнопки: три собственных
- *  `?? BUILDABLE` по коду и были тем, из-за чего клиентское правило разъехалось с
- *  данными (ORB-4) — кнопка обещала стройку, которую сервер отклонял. */
+ *  только если на нём вообще можно строить (`buildable`), его ростер (undefined =
+ *  любое) это здание допускает И само здание не сузило себя до других видов
+ *  (`onlyOn`). Одна копия на все кнопки: три собственных `?? BUILDABLE` по коду и были
+ *  тем, из-за чего клиентское правило разъехалось с данными (ORB-4) — кнопка обещала
+ *  стройку, которую сервер отклонял. Третья проверка нужна ровно потому, что ростера
+ *  может не быть: у планеты его нет, и без неё кнопка предложила бы добывающую станцию
+ *  там, где редьюсер отвечает `E_WRONG_SECTOR`. */
 function sectorAllowsBuilding(planetId: string, building: string): boolean {
   const type = sectorTypeOf(planetId);
   if (type && !type.buildable) return false;
-  return (type?.allowedBuildings ?? BUILDABLE).includes(building);
+  if (!(type?.allowedBuildings ?? BUILDABLE).includes(building)) return false;
+  const onlyOn = data.buildings[building]?.onlyOn;
+  return onlyOn === undefined || onlyOn.includes(SECTOR_OF[planetId] ?? '');
 }
 /** Есть ли на провинции хоть одно допустимое здание — гейт кнопки «Постройки». */
 function sectorBuildsAnything(planetId: string): boolean {
@@ -1827,7 +1839,7 @@ function defaultView(): void {
   // Кого считать домом и когда приближаться к нему — `openingView.ts` (REFM-56).
   const view = openingView(MOBILE || holographic.active(), pickHome(Object.values(s.planets), ME));
   if (view.kind === 'home') {
-    centerOn(view.at, view.scale * (s.mapId === 'frontier-100' ? 5 : 1));
+    centerOn(view.at, view.scale * (isFrontier(s.mapId) ? 5 : 1));
     return;
   }
   cam.scale = 1;
@@ -4222,12 +4234,38 @@ function ownersSig(): string {
   );
 }
 
+/** Подпись карты в списках партий. Обе карты Фронтира показываются одним именем —
+ *  раньше это был тернарник, скопированный в два места, и два ключа локали с
+ *  ОДИНАКОВЫМ текстом. Третья карта теперь не потребует правок в двух списках. */
+function mapLabel(mapId: string | undefined): string {
+  return isFrontier(mapId) ? t('map.frontier') : (mapId ?? '');
+}
+
 /** Map art is shared by desktop and phone; floating windows remain desktop-only. */
 function holographicMapOn(): boolean {
   return holographic.active() || (MOBILE && holographyOn());
 }
 
+/** Чем обрезаются провинции. На картах Фронтира это выпуклый контур галактики, на
+ *  прочих — прежняя рамка по границам карты. Координаты ЭКРАННЫЕ: кэш геометрии
+ *  (`territoryGeometry.ts`) нормализует вход по первой точке клипа и масштабу сам,
+ *  поэтому панорама и зум из его подписи сокращаются, а на выход он отдаёт ячейки в том
+ *  же экранном пространстве, в котором их рисуют и по которым потом бьют хит-тестом. */
+function provinceClip(): Array<[number, number]> {
+  if (galaxyOutline.length)
+    return galaxyOutline.map((pt): [number, number] => {
+      const v = world(pt);
+      return [v.x, v.y];
+    });
+  const frame = clipRect(mapBounds());
+  return clipPolygon(world(frame.topLeft), world(frame.bottomRight));
+}
+
 /** Rebuild the cached province map when the camera/ownership/viewport moves. */
+/** Одна на прототип: геометрия провинций не зависит от того, в какой холст её пишут,
+ *  а статик-слой чередует `bgx` (устоявшийся кадр) и `cx` (кадр в движении). */
+const territoryGeometry = new TerritoryGeometryCache();
+
 function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, preparing = false): void {
   // Always cover newly exposed edges at the current camera. Only the stationary
   // offscreen bake can be reused; the viewer's knowledge remains its invalidator.
@@ -4305,10 +4343,10 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // Clip cells to the MAP boundary (province bounding box + padding), not the
   // viewport — otherwise the outermost provinces stretch to the screen edge. This
   // gives the map a defined edge that pans/zooms with the camera.
-  const frame = clipRect({ minX: MINX, maxX: MAXX, minY: MINY, maxY: MAXY });
+  const frame = clipRect(mapBounds());
   const tl = world(frame.topLeft);
   const br = world(frame.bottomRight);
-  const clip = clipPolygon(tl, br);
+  const clip = provinceClip();
   holographicFrame = { x: tl.x, y: tl.y, width: br.x - tl.x, height: br.y - tl.y };
   if (holographicMapOn()) {
     drawGlassScreen(g, holographicFrame);
@@ -4322,13 +4360,20 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // carries the owner AS THE VIEWER KNOWS IT (knownOwner), so a hidden capture never
   // repaints the map. Ownership reads through precise frontiers and restrained
   // transparent fills, leaving the background visible through the plotting plane.
+  // Тесселяция степенной диаграммы квадратична по числу семян, а статик-слой
+  // перепекается КАЖДЫЙ кадр, пока камера едет, — то есть ровно тогда, когда кадр и так
+  // самый дорогой. Кэш (`territoryGeometry.ts`) снимает подпись с координат,
+  // нормализованных по первой точке клипа и масштабу, поэтому панорама и зум из неё
+  // СОКРАЩАЮТСЯ: форма не изменилась — считается только O(вершин) перепроекция.
+  // Владельца и тип `project` берёт из СВЕЖИХ семян, поэтому кэш не может донести
+  // чужой туман: `knownOwner` остаётся единственным источником видимой принадлежности.
   const cells = drawTerritory(g, seeds, clip, {
     ownerColor,
     neutralFill: COLOR.null!,
     kindAccent: (kind) => holographicMapOn() && kind === 'asteroid' ? '#71879d'
       : holographicMapOn() && kind === 'solar_flare' ? '#b295d8' : SECTOR_TYPES[kind]?.color,
     hideOwnedInner: holographicMapOn(),
-  });
+  }, territoryGeometry.project(seeds, clip, cam.scale));
   provincePolygons = new Map(cells.map((cell) => [provinceIds[cell.idx]!, cell.poly]));
   terrainFields = [];
   if (holographicMapOn()) {
@@ -4358,20 +4403,45 @@ function buildStaticLayer(g: CanvasRenderingContext2D = bgx, zooming = false, pr
   // сравнением идентификаторов: штрих полупрозрачный, и дважды нарисованная дорога
   // просто светлее соседних — «магистраль», которой в данных нет. Узлы без мира
   // отсеиваются до вызова, поэтому ссылка в никуда не даёт дороги.
+  // Все дороги — ОДИН путь: штрих у них общий (цвет и толщина выставлены выше), поэтому
+  // `beginPath`/`stroke` на каждое ребро были чистой платой за ничто — четыре вызова
+  // холста вместо двух на дорогу. Плюс отсев по рамке: дорога, ОБА конца которой вышли
+  // за один и тот же край экрана, пересечь его не может. Запас в лишний пиксель — на
+  // толщину штриха, чтобы дорога, касающаяся кромки, не пропала.
+  const M = 1 + g.lineWidth;
+  g.beginPath();
   for (const road of lanes(MAP.filter((n) => !!s.planets[n.id]))) {
     const a = world(road.from);
     const b = world(road.to);
-    g.beginPath();
+    if (Math.max(a.x, b.x) < -M || Math.min(a.x, b.x) > VW + M ||
+      Math.max(a.y, b.y) < -M || Math.min(a.y, b.y) > VH + M) continue;
     g.moveTo(a.x, a.y);
     g.lineTo(b.x, b.y);
-    g.stroke();
   }
+  g.stroke();
 
   // map boundary — a faint frame so the edge of the sector reads as intentional
   if (holographicMapOn()) g.restore();
   g.strokeStyle = 'rgba(90,151,165,0.2)';
   g.lineWidth = 0.7;
-  if (!holographicMapOn()) g.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+  if (!holographicMapOn()) {
+    // На картах Фронтира территория обрезается выпуклым контуром галактики
+    // (`provinceClip`), а рамка рисовалась прежним прямоугольником — между ними
+    // оставалась широкая пустая полоса, и рамка переставала обозначать край доски.
+    // Рисуем то же, чем обрезаем; прочие карты сохраняют прямоугольник.
+    if (galaxyOutline.length) {
+      g.beginPath();
+      galaxyOutline.forEach((pt, i) => {
+        const v = world(pt);
+        if (i === 0) g.moveTo(v.x, v.y);
+        else g.lineTo(v.x, v.y);
+      });
+      g.closePath();
+      g.stroke();
+    } else {
+      g.strokeRect(tl.x, tl.y, br.x - tl.x, br.y - tl.y);
+    }
+  }
   if (g === bgx && !bgx.isContextLost?.()) {
     bgContent = content;
     bgCam = { x: cam.x, y: cam.y, scale: cam.scale };
@@ -4804,10 +4874,10 @@ function render(now: number) {
     }
 
     // asteroid-field sector: a lane junction, not a city — scattered rocks + a
-    // fat hub where the lanes meet, no orbits. Captured by simply arriving — unless
-    // a space fortress is raised here, which fortifies it (orbit + AA, must storm).
+    // fat hub where the lanes meet, no orbits. Captured by simply arriving. Raising a
+    // fortress here stops making it an asteroid field at all: `station.deploy` turns the
+    // node into `void_station`, which draws (with its hull bar) in its own branch below.
     if (n.sector === 'asteroid') {
-      const fort = p.buildings.find((b) => b.type === 'starfort');
       blitGlow(col, c.x, c.y, 30, p.owner ? 0.16 : 0.06); // cached glow disc
       cx.save();
       cx.strokeStyle = 'rgba(186,170,140,0.7)';
@@ -4843,44 +4913,17 @@ function render(now: number) {
       cx.beginPath();
       cx.arc(c.x, c.y, 7.5 + 0.6 * ownerPulse, 0, TAU);
       cx.stroke();
-      // Orbital fortress: the station concept's six-spoke vector, with its HP bar.
-      if (fort) {
-        cx.save();
-        cx.strokeStyle = col;
-        cx.lineWidth = 1.6;
-        cx.shadowColor = col;
-        cx.shadowBlur = fxBlur(8);
-        cx.fillStyle = rgba(col, 0.24);
-        cx.translate(c.x - 12, c.y - 12);
-        drawShipShape(cx, 'station', detail > 0.5);
-        cx.restore();
-        const frac = Math.max(0, Math.min(1, fort.hp / hpOfLevel('starfort', fort.level)));
-        cx.fillStyle = 'rgba(2,9,13,.7)';
-        cx.fillRect(c.x - 12, c.y - 22, 24, 3);
-        cx.fillStyle = rgba(frac > 0.35 ? col : '#ff5a4d', 0.9);
-        cx.fillRect(c.x - 12, c.y - 22, 24 * frac, 3);
-      }
-      if (selPlanet === n.id) targetBrackets(c.x, c.y, fort ? 18 : 15, now);
+      if (selPlanet === n.id) targetBrackets(c.x, c.y, 15, now);
       cx.save();
       cx.shadowColor = 'rgba(0,0,0,0.85)';
       cx.shadowBlur = fxBlur(3);
-      if (fort) {
-        // a fortress stays a prominent, special designation (unchanged)
-        cx.fillStyle = p.owner ? col : '#9fc9c4';
-        cx.font = '700 11px ui-monospace,Menlo,monospace';
-        cx.fillText(n.id, c.x + 16, c.y - 1);
-        cx.fillStyle = 'rgba(150,210,205,0.55)';
-        cx.font = '9px ui-monospace,Menlo,monospace';
-        cx.fillText('void fortress ✦', c.x + 16, c.y + 11);
-      } else {
-        // a plain asteroid field is a minor sector — de-emphasised (dim, smaller)
-        cx.fillStyle = p.owner ? rgba(col, 0.72) : 'rgba(150,190,196,0.5)';
-        cx.font = '600 10px ui-monospace,Menlo,monospace';
-        cx.fillText(n.id, c.x + 16, c.y - 1);
-        cx.fillStyle = 'rgba(150,210,205,0.38)';
-        cx.font = '9px ui-monospace,Menlo,monospace';
-        cx.fillText('asteroid field', c.x + 16, c.y + 11);
-      }
+      // An asteroid field is a minor sector — de-emphasised (dim, smaller).
+      cx.fillStyle = p.owner ? rgba(col, 0.72) : 'rgba(150,190,196,0.5)';
+      cx.font = '600 10px ui-monospace,Menlo,monospace';
+      cx.fillText(n.id, c.x + 16, c.y - 1);
+      cx.fillStyle = 'rgba(150,210,205,0.38)';
+      cx.font = '9px ui-monospace,Menlo,monospace';
+      cx.fillText('asteroid field', c.x + 16, c.y + 11);
       cx.restore();
       continue;
     }
@@ -5102,6 +5145,27 @@ function render(now: number) {
       poly(c.x, c.y, R * 0.33, 6, Math.PI / 6);
       cx.stroke();
       cx.restore();
+      // КОРПУС крепости — полоса прочности её ядра (FORT-5.2). Полоса и силуэт стояли в
+      // ветке астероида, пока крепостью было здание на астероидном поле; теперь крепость
+      // это сам узел, и её здоровье принадлежит сюда. Пиратская и нейтральная базы ядра
+      // не несут — у них полосы просто нет.
+      const core = p.buildings.find((b) => b.type === 'starfort');
+      if (core) {
+        cx.save();
+        cx.strokeStyle = col;
+        cx.lineWidth = 1.6;
+        cx.shadowColor = col;
+        cx.shadowBlur = fxBlur(8);
+        cx.fillStyle = rgba(col, 0.24);
+        cx.translate(c.x - 12, c.y - 12);
+        drawShipShape(cx, 'station', detail > 0.5);
+        cx.restore();
+        const frac = Math.max(0, Math.min(1, core.hp / hpOfLevel('starfort', core.level)));
+        cx.fillStyle = 'rgba(2,9,13,.7)';
+        cx.fillRect(c.x - 12, c.y - 22, 24, 3);
+        cx.fillStyle = rgba(frac > 0.35 ? col : '#ff5a4d', 0.9);
+        cx.fillRect(c.x - 12, c.y - 22, 24 * frac, 3);
+      }
     } else {
       // Fallback for any other non-planet type: small hexagon marker
       const kc = sectorTypeOf(n.id)?.color ?? col;
@@ -5502,8 +5566,16 @@ function tabButton(tab: PlanetTab, label: string, count: number, desc?: string):
  * ОТКУДА поднимать вылет, не заводя второго состояния.
  */
 function hangarSectionHtml(view: HangarView, owner: string, mine: boolean): string {
+  // Заголовок берётся у САМОГО места (правило 6 в `hangarPanel.ts`): секция одна на порт
+  // и на трюм, и общая подпись «Ангар порта» врала бы про корабль. Оба ключа стоят
+  // литералами — разбор гейта локализации видит в вызове только первый, поэтому выбор
+  // ключа тернарником ВНУТРИ `t()` спрятал бы второй от проверки.
+  const title =
+    view.kind === 'hold'
+      ? t('side.wing.hold', { used: view.used, bay: view.bay })
+      : t('side.wing.hangar', { used: view.used, bay: view.bay });
   const head =
-    `<div class="sec">${t('side.wing.hangar', { used: view.used, bay: view.bay })}</div>` +
+    `<div class="sec">${title}</div>` +
     (view.sortie
       ? `<div class="row dim">${
           view.sortie.rearming > 0
@@ -5515,14 +5587,18 @@ function hangarSectionHtml(view: HangarView, owner: string, mine: boolean): stri
   // пустой ангар, перезарядка и сухой бак — разные ожидания у игрока. Причина у МЕСТА
   // одна на все звенья: топливо принадлежит базе (SHU-1.2), поэтому строка стоит над
   // карточками, а не в каждой.
+  const rearming =
+    view.kind === 'hold' ? t('side.wing.blocked.rearming.hold') : t('side.wing.blocked.rearming');
   const why =
     view.blocked === 'empty'
       ? t('side.wing.blocked.empty')
-      : view.blocked === 'rearming'
-        ? t('side.wing.blocked.rearming')
-        : view.blocked === 'no-fuel'
-          ? t('side.wing.blocked.no-fuel')
-          : '';
+      : view.blocked === 'busy'
+        ? t('side.wing.blocked.busy')
+        : view.blocked === 'rearming'
+          ? rearming
+          : view.blocked === 'no-fuel'
+            ? t('side.wing.blocked.no-fuel')
+            : '';
   const cards = squadronCards(view, { mine, data });
   if (cards.length === 0) {
     return head + `<div class="row dim">${esc(t('side.wing.empty'))}</div>`;
@@ -5648,7 +5724,7 @@ function squadTroopsInput(squadronId: string): TroopsInput | null {
   return troopsInputForSquadron(found.sq, source, data);
 }
 
-function unitRows(stacks: Array<{ unit: string; count: number }>): string {
+function unitRows(stacks: Array<UnitStack>): string {
   return kitUnitRows(
     stacks,
     (unit) => ({
@@ -5657,6 +5733,9 @@ function unitRows(stacks: Array<{ unit: string; count: number }>): string {
       domain: isGround(unit) ? t('side.unit.ground') : t('side.unit.space'),
     }),
     t('side.none'),
+    // VET-5: медали ветерана. Решение «что показать» — в `/decisions/unitMedals.ts`,
+    // здесь только подстановка живых данных.
+    (st) => medalBadges(st as UnitStack, data),
   );
 }
 /** Localized one-line label for a paused site (shares `ConstructionPayload`'s field
@@ -6084,9 +6163,14 @@ function fleetPanelHtml(f: Fleet): string {
         }): ${esc(troops)}${bar(sv.hull, '♥')}${bar(sv.shield, '◈')}</div>`;
       };
       h += `<div class="sec">${t('side.battle.title', { phase: bm.phase === 'ground' ? t('side.battle.phase.ground') : t('side.battle.phase.orbit'), r: bm.round })}</div>`;
-      h +=
-        sideRow(bm.attacker, t('side.battle.attacker')) +
-        sideRow(bm.defender, t('side.battle.defender'));
+      // MSB-6: строка на КАЖДУЮ сторону, роль берётся у самой стороны. На дуэли список
+      // ровно `[атакующий, обороняющийся]`, поэтому двусторонний бой выглядит как
+      // выглядел; на пяти сторонах появляются пять строк вместо двух.
+      h += bm.sides
+        .map((sv) =>
+          sideRow(sv, t(sv.role === 'attacker' ? 'side.battle.attacker' : 'side.battle.defender')),
+        )
+        .join('');
       if (bm.nextRoundAt != null)
         h += `<div class="row">${t('side.battle.next-round')} <span class="pn-timer" data-at="${bm.nextRoundAt}">…</span></div>`;
       h += `<div class="row">${btn('retreat', '', t('side.battle.retreat'), bm.retreatFleetId === f.id)}</div>`;
@@ -6519,6 +6603,17 @@ function planetPanelHtml(p: Planet): string {
     // (свой мир И ростер сектора непуст — CMD-VIS: нет приказа — нет кнопки).
     if (mine && sectorBuildsAnything(p.id)) {
       blds += `<button class="bw-open" data-act="openbuild">▣ ${t('side.build.open')}</button>`;
+    }
+    // FORT-0.2: КОСМИЧЕСКАЯ КРЕПОСТЬ. Правило кнопки — `decisions/fortressRaise.ts`, то же
+    // самое, каким решает редьюсер (сверено тестом по всем раскладам): здесь только
+    // отрисовка. Стоит РЯДОМ с «Постройками», а не вместо: на астероидах и мёртвом мире
+    // осмысленно и то и другое — добывающая станция ИЛИ крепость со своим ростером.
+    const fortress = fortressRaise(p, ME, s.players[ME]?.resources ?? {}, data);
+    if (fortress.show) {
+      const off = fortress.enabled ? '' : ' disabled';
+      blds +=
+        `<button class="bw-open" data-act="fortress"${off}>◈ ${esc(t('side.fortress.raise'))}` +
+        ` <span class="dim">${esc(resLine(fortress.cost) ?? '')}</span></button>`;
     }
     cols.push(blds);
   }
@@ -8062,6 +8157,8 @@ side.addEventListener('click', (ev) => {
     }
   } else if (act === 'openbuild') {
     buildWin.open(selPlanet!);
+  } else if (act === 'fortress') {
+    playerOrder(deployStation(ME, selPlanet!));
   } else if (act === 'build') {
     enqueueBuild(selPlanet!, { kind: 'building', id: arg, count: 1 });
   } else if (act === 'unit') {
@@ -8817,6 +8914,27 @@ function selectAt(mx: number, my: number) {
     my,
     rFleet,
   );
+  // ЗНАЧОК БОЯ забирает тап ПОСЛЕДНИМ (`decisions/battleTap.ts`): по кораблю и по миру
+  // тапают, чтобы отдать приказ, и отнять у них тап значило бы менять разбор боя на
+  // потерянный ход. Поэтому сюда приходит только тап, под которым больше ничего нет, —
+  // и тогда кольцо, которое и так показывает фазу и отсчёт, открывает окно с раскладом.
+  const battleHit = battleAtTap(
+    Object.values(s.battles).map((b) => {
+      const anchor = battleAnchor(b);
+      return {
+        id: b.id,
+        at: anchor ? world(anchor) : null,
+        identified: known(b.location),
+      };
+    }),
+    { x: mx, y: my },
+    tapByTouch,
+    fleetIds.length > 0 || n !== null,
+  );
+  if (battleHit) {
+    battleWindow.open(battleHit);
+    return;
+  }
   // Что следует из выбора — `pickApply.ts` (REFM-166): пустой тап это «отменить», и он
   // гасит НЕ только выделение, но и незавершённые намерения (слияние, деление, десант) —
   // иначе они применились бы к следующему выбранному флоту, молча. Выбор мира гасит
@@ -9280,6 +9398,7 @@ const buildWin = initBuildScreen({
 // repaint throttle both hold it.
 const stewWin = $('steward');
 let lastStewAt = 0;
+let lastBattleWinAt = 0;
 let lastBuildAt = 0;
 let lastIntelAt = 0; // throttle for the live intel-window timers (диплом. вкладка «Шпионаж»)
 const steward = initSteward({
@@ -9292,6 +9411,22 @@ const steward = initSteward({
   openTech: () => techTree.open(),
 });
 document.getElementById('rail-steward')?.addEventListener('click', () => steward.open());
+
+// --- окно боя (заказ владельца 2026-09-15) -----------------------------------
+// Значок боя на карте и так показывал фазу и отсчёт до раунда; теперь он ОТКРЫВАЕТСЯ.
+// До этого расклад можно было увидеть единственным путём — выделив свой флот в этом
+// бою, — то есть про чужую схватку рядом узнать было нечем.
+const battleWin = $('battlewin');
+const battleWindow = initBattleWindow({
+  root: () => battleWin,
+  body: () => $('battlewinbody'),
+  state: () => s,
+  me: () => ME,
+  model: (id) => {
+    const m = createBattleModel(s, id, ME, data);
+    return m.ok ? m : null;
+  },
+});
 // Snapshot of my standing at delegation time, diffed on expiry for the morning report.
 let stewSnapshot: StewardMetrics | null = null;
 
@@ -10428,9 +10563,9 @@ function renderSetupSlots(): void {
     `<button class="tmtog pve-btn" data-pvestart="1">🤖 ${t('setup.pve')}</button>` +
     (setupTeams ? `<span class="tmhint">${t('setup.teams.note')}</span>` : '') +
     `</div>`;
-  if (setupMapId === 'frontier-100') {
+  if (isFrontier(setupMapId)) {
     const count = rivalCount(setupSlots);
-    setupSlotsEl.innerHTML = `<label>${t('setup.bots.count')} <input id="setup-bot-count" type="number" min="0" max="99" value="${count}" /></label>`;
+    setupSlotsEl.innerHTML = `<label>${t('setup.bots.count')} <input id="setup-bot-count" type="number" min="0" max="${setupSeatCount() - 1}" value="${count}" /></label>`;
     return;
   }
   const fids = seatFactionIds();
@@ -10470,7 +10605,7 @@ function renderSetup(): void {
   const mapSelect = $('setup-map-id') as HTMLSelectElement;
   mapSelect.value = setupMapId;
   mapSelect.disabled = !!netSetup;
-  $('setup-map-info').textContent = t(setupMapId === 'frontier-100' ? 'setup.map.frontier-info' : 'setup.map.nexus-info');
+  $('setup-map-info').textContent = t(setupMapId === 'frontier-100' ? 'setup.map.frontier-legacy-info' : isFrontier(setupMapId) ? 'setup.map.frontier-info' : 'setup.map.nexus-info');
   const homeSelect = $('setup-home-id') as HTMLSelectElement;
   homeSelect.innerHTML = setupCandidateIds().map((id) => `<option value="${esc(id)}"${worldTaken(id) ? ' disabled' : ''}>${esc(id)}${worldTaken(id) ? ' · ' + esc(t('seatpick.taken')) : ''}</option>`).join('');
   homeSelect.value = setupStart;
@@ -10650,8 +10785,12 @@ topEl.addEventListener('click', (ev) => {
   );
 });
 
-function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>): void {
+function installMatch(state: GameState, aiPlayers: Map<string, AiProfile>, modeId?: string): void {
   mapNeedsPreparation = true;
+  // PVR-1.1: режим вооружается ЗДЕСЬ, до первого хода часов — как у сервера, где он
+  // фиксируется при рождении комнаты. Опущен = обычная партия без режима, и это же
+  // снимает режим предыдущего матча: без сброса PvE-волны утекли бы в следующую соло-игру.
+  setMatchMode(modeId);
   s = state;
   installMapGeometry(s);
   syncPlayerNames(s);
@@ -10742,7 +10881,10 @@ function startPvEMatch(): void {
       .filter((id) => id !== 'p1')
       .map((id) => [id, 'weak' as const]),
   );
-  installMatch(st, aiSeats);
+  // Режим берётся из САМОЙ КАРТЫ, а не зашит здесь: карта объявляет, подо что её играют
+  // (§0.7 sector-zero-roadmap.md). Без этого `pveModule` стоял в ядре и молчал — секции
+  // `pve` он не видел, потому что конфиг ехал без `modeId`.
+  installMatch(st, aiSeats, pveModeId());
   applyTimeSpeed(setupSpeed);
   openSetup('hub'); // close setup screen — returns to hub
   note(t('setup.pve.started'));
@@ -10798,8 +10940,8 @@ $('setup-home-id').addEventListener('change', (ev) => {
 setupSlotsEl.addEventListener('change', (ev) => {
   const input = ev.target as HTMLInputElement;
   if (input.id !== 'setup-bot-count') return;
-  const count = Math.max(0, Math.min(99, Math.floor(Number(input.value) || 0)));
-  setupSlots = Array.from({ length: 100 }, (_, i) => i === 0 ? 'human' : i <= count ? 'ai' : 'off');
+  const count = Math.max(0, Math.min(setupSeatCount() - 1, Math.floor(Number(input.value) || 0)));
+  setupSlots = Array.from({ length: setupSeatCount() }, (_, i) => i === 0 ? 'human' : i <= count ? 'ai' : 'off');
   renderSetup();
 });
 
@@ -11914,7 +12056,7 @@ function renderMatches(): void {
       modeLine = `${badge}${esc(tData(mode.modeId))} · `;
     }
     info.innerHTML =
-      `<div class="mname">${esc(m.mapId === 'frontier-100' ? t('map.frontier-100') : m.mapId)} <span class="mid">${esc(m.matchId)}</span></div>` +
+      `<div class="mname">${esc(mapLabel(m.mapId))} <span class="mid">${esc(m.matchId)}</span></div>` +
       `<div class="mmeta">${modeLine}${t('browser.day', { n: m.days })} · ${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
       `${esc(ruleSummary(m.rules))} · ${m.status === 'ended' ? t('browser.finished') : t('browser.running')}${windowLine}</div>`;
     row.appendChild(info);
@@ -11981,7 +12123,7 @@ function renderMyMatches(serverHttp: string): void {
       // Идентификатора в заголовке нет намеренно: он целиком стоит ниже, В АДРЕСЕ —
       // а `m-<uuid>` в заголовке отъедал три строки и вытеснял то, ради чего сюда
       // смотрят (какая партия, какой день, сколько игроков).
-      `<div class="hc-t">${esc(m.mapId === 'frontier-100' ? t('map.frontier-100') : m.mapId)}</div>` +
+      `<div class="hc-t">${esc(mapLabel(m.mapId))}</div>` +
       `<div class="hc-s">${t('browser.day', { n: m.days })} · ` +
       `${t('browser.players', { s: m.players.seated, c: m.players.capacity })} · ` +
       `${m.status === 'ended' ? t('browser.finished') : t('browser.running')}</div>` +
@@ -12383,6 +12525,9 @@ const BACK_LAYERS: BackLayer[] = [
   { id: 'pingmenu', isOpen: () => pings.menuOpen(), close: () => pings.closeMenu() }, // z47
   { id: 'tech', isOpen: () => techWin.classList.contains('show'), close: () => techWin.classList.remove('show') }, // z47
   { id: 'steward', isOpen: () => stewWin?.classList.contains('show') === true, close: () => stewWin?.classList.remove('show') }, // z47
+  // Окно боя — та же ступень z47, что и «Хранитель»: оно модалка поверх карты, и Back
+  // обязан закрывать именно его, а не выделение под ним.
+  { id: 'battlewin', isOpen: () => shown('battlewin'), close: () => hide('battlewin') }, // z47
   { id: 'market', isOpen: () => marketWin.classList.contains('show'), close: () => marketWin.classList.remove('show') }, // z47
   { id: 'constructor', isOpen: () => constructorWin.classList.contains('show'), close: () => shipyard.close() }, // z47 «Производство»
   { id: 'codex', isOpen: () => codexEl?.classList.contains('show') === true, close: () => codexEl?.classList.remove('show') }, // z46
@@ -12587,8 +12732,18 @@ function frame(nowReal: number) {
   // (Суверены ◆) pushed to the right end — one level down from the resource row.
   // Day + countdown live in the #daycard, victory progress in the #tbscore chip
   // (row 1 of the bar, below). (World/fleet counts stay on the player card.)
+  // PVR-1.2: строка волн стоит рядом с часами, потому что это то же самое измерение —
+  // сколько осталось до следующего события мира. В обычной партии `waveReadout` отвечает
+  // «нечего», и полоса выглядит ровно как до этого кирпича.
+  const wave = waveReadout(s.pve, s.time);
+  const waveHtml =
+    wave.kind === 'none'
+      ? ''
+      : `<span class="dl-wave">${t('hud.wave', { n: wave.kind === 'cleared' ? wave.total : wave.wave, m: wave.total })}` +
+        ` · ${wave.kind === 'cleared' ? t('hud.wave.done') : t('hud.wave.next', { in: countdownHMS(wave.nextInMs) })}</span>`;
   const statusHtml =
     `<span id="clock">${clockHM(s.time)}</span>` +
+    waveHtml +
     `<span class="dl-donate" title="${t('hub.sovereigns')}"><i>${SOV_SVG}</i>${kfmt(SOVEREIGNS)}</span>`;
   if (statusHtml !== lastClockText) {
     devlineEl.innerHTML = statusHtml;
@@ -12619,7 +12774,9 @@ function frame(nowReal: number) {
     tbScore.textContent = `✦ ${score}/${SCORE_LIMIT}`;
     tbScore.classList.toggle('win', atLimit(need));
     tbDay.textContent = t('browser.day', { n: d });
-    tbEta.textContent = t('hud.next-day', { t: eta });
+    // digits only: the «до след. дня» caption is a static sibling node (#tbetacap),
+    // so a narrow phone can drop the caption and keep the countdown.
+    tbEta.textContent = eta;
     lastTopText = topText;
   }
 
@@ -12755,6 +12912,12 @@ function frame(nowReal: number) {
   if (repaintDue(steward.isOpen(), nowReal, lastStewAt, PROGRESS_MS)) {
     lastStewAt = nowReal;
     steward.repaint();
+  }
+  // Окно боя живое: раунды идут по расписанию, и состав сторон меняется под рукой.
+  // Тот же троттлинг, что у «Хранителя», — окно перерисовывается, только пока открыто.
+  if (repaintDue(battleWindow.isOpen(), nowReal, lastBattleWinAt, PROGRESS_MS)) {
+    lastBattleWinAt = nowReal;
+    battleWindow.repaint();
   }
   if (repaintDue(intelVisible(diploOpen, diploTab), nowReal, lastIntelAt, INTEL_MS)) {
     lastIntelAt = nowReal;
@@ -13547,30 +13710,11 @@ function drawGoFlash(now: number): void {
   cx.restore();
 }
 const CAPTURE_FLASH_MS = 1500;
-/** A province that changed hands lights up in its NEW owner's colour: a bright wave
- *  sweeps across the flipped cell from its centre and the frontier ignites, fading
- *  over ~1.5s. The cell polygon is recomputed each frame with the SAME weighted-
- *  Voronoi math the political map bakes (computePowerCell), so the wave lines up
- *  pixel-for-pixel with the fill and tracks pan/zoom. Only runs while a flash is live
- *  (captures are rare), so the O(n) recompute costs nothing on a quiet frame. */
+/** Capture waves use the exact projected polygons just painted by blitStaticLayer.
+ * No per-flash weight clamp or n² geometry pass, including while the camera moves. */
 function drawCaptureFlashes(now: number): void {
   if (captureFlashes.size === 0) return;
-  // ТЕ ЖЕ семена и рамка, что у политической заливки — `provinceMap.ts` (REFM-61,
-  // правило 6): волна обрезается по клетке, и разъедься копия формул хоть на пиксель,
-  // волна потекла бы за границу провинции или не дошла бы до неё. Здесь своя копия и
-  // стояла: `9000 * scale²` и `max(40, ширина × 0.05)` литералами прямо в кадре.
-  // Проекция — этим кадром, чтобы волна ехала вместе с камерой.
-  const idxByNode = new Map<string, number>();
-  let seedIdx = 0;
-  const seeds: TerritorySeed[] = provinceSeeds(MAP, cam.scale, (n) => {
-    const p = s.planets[n.id];
-    if (!p) return null;
-    idxByNode.set(n.id, seedIdx++);
-    return { size: p.size ?? 1, at: world(n), owner: knownOwner(n.id) };
-  });
-  const frameB = clipRect({ minX: MINX, maxX: MAXX, minY: MINY, maxY: MAXY });
-  const clip = clipPolygon(world(frameB.topLeft), world(frameB.bottomRight));
-  const trace = (poly: Array<[number, number]>): void => {
+  const trace = (poly: readonly (readonly [number, number])[]): void => {
     cx.beginPath();
     cx.moveTo(poly[0]![0], poly[0]![1]);
     for (let i = 1; i < poly.length; i++) cx.lineTo(poly[i]![0], poly[i]![1]);
@@ -13581,11 +13725,11 @@ function drawCaptureFlashes(now: number): void {
       captureFlashes.delete(node);
       continue;
     }
-    const idx = idxByNode.get(node);
-    if (idx === undefined) continue; // province gone (shouldn't happen mid-flash)
-    const cell = computePowerCell(seeds, clip, idx);
-    if (!cell) continue;
-    const c = { x: seeds[idx]!.x, y: seeds[idx]!.y }; // seeds are already screen-space
+    const poly = provincePolygons.get(node);
+    const planet = s.planets[node];
+    if (!poly || !planet) continue;
+    const cell = { poly };
+    const c = world(planet.position);
     // Кламп прогресса и затухание — `flashFx.ts`: метка кадра rAF может опередить
     // постановку вспышки, а отрицательный радиус роняет cx.arc().
     const k = flashProgress(now, flash.at, CAPTURE_FLASH_MS); // 0 → 1

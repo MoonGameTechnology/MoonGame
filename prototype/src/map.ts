@@ -63,6 +63,12 @@ const SECTOR_TYPE_UI: Record<string, SectorTypeUi> = {
   debris_field: { name: 'Debris Field', core: 'deep_void', color: '#2f4a59' },
   // dead world — a destroyed planet; re-claimable, only the salvage rig builds here
   dead_world: { name: 'Dead World', core: 'deep_void', color: '#5a4a4a' },
+  // КОСМИЧЕСКАЯ КРЕПОСТЬ (FORT-0.2) — не природный вид, а РУКОТВОРНЫЙ: местность,
+  // которую игрок перевёл в развиваемое владение (`station.deploy`). Цвет намеренно
+  // тёплый и яркий на фоне всей остальной палитры (она холодная — цианы, фиолетовые,
+  // серо-синие): крепость единственная на карте появляется ПО ВОЛЕ игрока, и её надо
+  // отличать от ландшафта с одного взгляда, а не вчитываясь в подпись.
+  void_station: { name: 'Void Fortress', core: 'empty_space', color: '#ffb347' },
 };
 
 /** SECTOR_TYPES = UI delta + gameplay flags DERIVED from `data.sectorKinds` via the

@@ -53,6 +53,11 @@ const GAME_STATE_EXPOSURE: Record<keyof GameState, Exposure> = {
   pve: 'public',
   version: 'public',
   mapId: 'public', // правила матча — общий факт
+  // BRW-0: режим — тот же класс факта, что и карта, и прятать его не от кого. Он уже
+  // публичен ДО входа: строка браузера партий показывает его каждому, кто смотрит ленту
+  // (`MatchSummary.modeId`), — снимать его в проекции значило бы скрыть от игрока за
+  // столом то, что он видел, пока выбирал стол.
+  modeId: 'public',
   time: 'public',
   startedAt: 'public',
   match: 'filtered', // статус/победитель публичны, чужие строки счёта — нет
@@ -169,6 +174,7 @@ function maximalState(): GameState {
   return {
     ...base,
     mapId: 'frontier-100',
+    modeId: 'pve_waves',
     startedAt: 0,
     match: {
       status: 'ongoing',
@@ -234,7 +240,7 @@ function maximalState(): GameState {
         kind: 'CANARY_kind',
         // ROS-1.5: плацдарм на чужом мире за туманом — это И факт вторжения, И место,
         // куда зритель не смотрит. Утечь он не должен ни одним из двух.
-        beachhead: { owner: 'CANARY_invader', units: [{ unit: 'CANARY_unit', count: 2 }] },
+        beachheads: [{ owner: 'CANARY_invader', units: [{ unit: 'CANARY_unit', count: 2 }] }],
       }),
     },
     fleets: {

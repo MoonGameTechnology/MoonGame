@@ -2,5 +2,11 @@
   "xpParticipation": 40,
   "xpScoreDivisor": 10,
   "xpScoreCap": 100,
-  "xpWin": 160
+  "xpWin": 160,
+  "medalXp": [
+    5,
+    15,
+    40,
+    100
+  ]
 }

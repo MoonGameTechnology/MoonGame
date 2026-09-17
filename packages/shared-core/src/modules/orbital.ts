@@ -10,6 +10,7 @@ import { isActivelyBombarding } from '../state/orbit';
 import { hasOrbit } from '../state/sectorKind';
 import { BLACKOUT_MULT } from '../state/visibility';
 import { applyDamageToSide, isHostile, removeIfWiped } from '../util/combat';
+import { splitVolley } from '../util/volley';
 
 /** Fraction of a bombarding fleet's firepower that rains on the planet below. */
 const BOMBARD_FRACTION = 0.5;
@@ -35,17 +36,28 @@ function aaCloseAt(planet: { garrison: UnitStack[] }, data: GameData): number {
   return sumUnitStat(planet.garrison, data, 'aaDamage');
 }
 
-/** Lowest-id hostile, free fleet sitting on the NEAR orbit of `planetId`.
- *  If a pre-built `localFleets` index is supplied it avoids an O(all-fleets) scan. */
-function nearOrbitHostile(
+/** EVERY hostile, free fleet sitting on the NEAR orbit of `planetId`, in a fixed
+ *  `id` order. If a pre-built `localFleets` index is supplied it avoids an
+ *  O(all-fleets) scan.
+ *
+ *  MSB-7: this used to return ONE of them (the lowest id) and the whole volley
+ *  landed on it. `id` order is effectively ARRIVAL order, so the gun punished
+ *  whoever came first: a cheap decoy sent ahead soaked every volley while the
+ *  strike group hung beside it untouched. That is not a balance number, it is an
+ *  exploit, and it only existed above one hostile. The volley now splits over all
+ *  of them (owner decision §0.0 №8), the same rule the melee round runs.
+ *
+ *  The `id` sort therefore no longer picks a victim — it survives only to fix the
+ *  ORDER OF THE TRACERS, so the event stream does not depend on who docked first. */
+function nearOrbitHostiles(
   h: HandlerContext,
   planetId: string,
   owner: string | null,
   localFleets?: readonly Fleet[],
-): Fleet | null {
+): Fleet[] {
   const candidates =
     localFleets ?? Object.values(h.state.fleets).filter((f) => f.location === planetId);
-  let best: Fleet | null = null;
+  const hostiles: Fleet[] = [];
   for (const f of candidates) {
     if (f.orbit !== 'near' || f.battleId) {
       continue;
@@ -53,9 +65,9 @@ function nearOrbitHostile(
     if (!f.units.some((s) => s.count > 0) || owner === null || !isHostile(h, owner, f.owner)) {
       continue;
     }
-    if (best === null || f.id < best.id) best = f;
+    hostiles.push(f);
   }
-  return best;
+  return hostiles.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 }
 
 /** Bombardment firepower a fleet rains on the planet, over at most COMBAT_UNIT_CAP
@@ -136,34 +148,51 @@ function runOrbital(h: HandlerContext, from: number, to: number, hours: number):
         const firstQ = Math.floor(from / quarterMs) + 1;
         const lastQ = Math.floor(to / quarterMs);
         const volley = (damage: number, tier: 'orbital' | 'close'): boolean => {
-          // Re-aim every volley: a target destroyed mid-span frees the next strike
-          // for the next hostile still hanging in orbit.
-          const target = nearOrbitHostile(h, planetId, planet.owner!, localFleets);
-          if (!target) return false;
-          // CORE-DMG-1: flak runs through the SAME extension point as a melee round, so
-          // a technology bonus or faction passive reaches it. `phase` names the near-orbit
-          // layer and is never 'ground', so the fort / planet-type mitigations (which
-          // guard on the ground phase) stay out of the flak exchange.
-          // Scaled BEFORE the announcement: the tracer must carry the number that really
-          // lands, or the client draws one volley and the hull loses another.
-          const dealt = h.hook<number>('combat.damage', damage, {
-            phase: 'orbital',
-            location: planetId,
-            attacker: planet.owner,
-            defender: target.owner,
-          });
-          // Announce BEFORE applying: the client draws the flak burst planet→fleet
-          // even when this very volley destroys the target (H2 — visible AA fire).
-          h.emit('aa.fired', {
-            planetId,
-            owner: planet.owner,
-            fleetId: target.id,
-            by: target.owner,
-            damage: dealt,
-            tier,
-          });
-          applyDamageToSide(h, { kind: 'fleet', fleetId: target.id }, dealt, data, planetId);
-          removeIfWiped(h, target.id);
+          // Re-aim every volley: a target destroyed mid-span frees its share of the
+          // next strike for the hostiles still hanging in orbit.
+          const targets = nearOrbitHostiles(h, planetId, planet.owner!, localFleets);
+          if (targets.length === 0) return false;
+          // MSB-7 — the volley is SPLIT over every hostile in near orbit, by the same
+          // shared rule the melee round runs (`splitVolley`). One gun, one firing
+          // solution, no target selection: the flak cannot be baited onto a decoy,
+          // and with one hostile the split degenerates into the old behaviour exactly.
+          const enemies = targets.map((f) => ({
+            ref: { kind: 'fleet' as const, fleetId: f.id },
+            owner: f.owner,
+          }));
+          for (const [i, share] of splitVolley(damage, enemies).entries()) {
+            const target = targets[i]!;
+            // CORE-DMG-1: flak runs through the SAME extension point as a melee round, so
+            // a technology bonus or faction passive reaches it. `phase` names the near-orbit
+            // layer and is never 'ground', so the fort / planet-type mitigations (which
+            // guard on the ground phase) stay out of the flak exchange.
+            // The hook is called PER SHARE, not once for the whole volley, for the reason
+            // the melee round calls it per pair: its subscribers measure the relation of
+            // two concrete owners, and one call would make their contributions
+            // indistinguishable.
+            // Scaled BEFORE the announcement: the tracer must carry the number that really
+            // lands, or the client draws one volley and the hull loses another.
+            const dealt = h.hook<number>('combat.damage', share.damage, {
+              phase: 'orbital',
+              location: planetId,
+              attacker: planet.owner,
+              defender: target.owner,
+            });
+            // Announce BEFORE applying: the client draws the flak burst planet→fleet
+            // even when this very volley destroys the target (H2 — visible AA fire).
+            // One tracer PER SHARE — a single event for a split volley would draw one
+            // burst where three hulls took damage.
+            h.emit('aa.fired', {
+              planetId,
+              owner: planet.owner,
+              fleetId: target.id,
+              by: target.owner,
+              damage: dealt,
+              tier,
+            });
+            applyDamageToSide(h, share.to, dealt, data, planetId);
+            removeIfWiped(h, target.id);
+          }
           return true;
         };
         outer: for (let q = firstQ; q <= lastQ; q++) {
