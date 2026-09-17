@@ -862,6 +862,20 @@ export const ModePveSchema = z
     npcFaction: z.string(),
     /** Game-hours between waves — a real-time duration, timeScale-scaled like every other. */
     waveIntervalHours: z.number().positive(),
+    /** What ONE wave is made of (unit ids → `data.units`), fielded ×N on wave N.
+     *
+     *  The mode owns this rather than the NPC faction's `startingLoadout.fleet`
+     *  because those are two different questions with one answer only by accident:
+     *  the loadout says what a PLAYER of that faction opens a match with, and the
+     *  Swarm is playable. Tuning the assault through it would re-balance every match
+     *  someone picks the Swarm, and tuning the faction would silently re-balance the
+     *  assault. Omitted ⇒ the wave falls back to the faction's opening force, which
+     *  is the pre-existing behaviour (invariant #3: absent data → base default).
+     *
+     *  Declared EMPTY is rejected rather than treated as "omitted": the module skips
+     *  a wave it has nothing to field, so an empty list would ship a mute assault that
+     *  reads as configured. Fail-closed at load (A05/A08), like every other catalog. */
+    waveFleet: z.array(StartingStackSchema).min(1).optional(),
   })
   .strict();
 

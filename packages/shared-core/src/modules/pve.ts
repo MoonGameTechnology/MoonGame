@@ -23,10 +23,14 @@
  *    module stays inert rather than inventing one.
  *
  * Wave composition is deliberately the crudest thing that is data-driven and
- * deterministic: the NPC faction's own `startingLoadout.fleet`, scaled by the wave
- * number, so wave N is N times the opening force. Every number lives in content
- * (`data/modes.json` — count and spacing; `data/factions.json` — composition), so
- * balancing waves is a JSON edit, never a code change.
+ * deterministic: one declared force, fielded N times over on wave N. The mode's own
+ * `waveFleet` says what that force is; a mode that omits it falls back to the NPC
+ * faction's `startingLoadout.fleet` (the pre-existing behaviour). The fallback is the
+ * compatible default, not the intended knob — `startingLoadout` answers "what does a
+ * PLAYER of this faction open with", and the Swarm is playable, so balancing the
+ * assault through it would re-balance every match someone picks the Swarm (PVR-1.3).
+ * Either way every number lives in content (`data/modes.json`), so balancing waves is
+ * a JSON edit, never a code change.
  */
 import type { GameModule, HandlerContext } from '../kernel/module';
 import type { Fleet, GameState, PlayerId } from '../state/gameState';
@@ -156,7 +160,7 @@ export const pveModule: GameModule = {
       pve.waveNumber += 1;
 
       const at = npcStagingWorld(h.state, pve.npcPlayerId);
-      const loadout = h.ctx.data.factions[cfg.npcFaction]?.startingLoadout.fleet;
+      const loadout = cfg.waveFleet ?? h.ctx.data.factions[cfg.npcFaction]?.startingLoadout.fleet;
       if (at !== undefined && loadout && loadout.length > 0) {
         const fleetId = `pve:wave:${pve.waveNumber}`;
         const fleet: Fleet = {

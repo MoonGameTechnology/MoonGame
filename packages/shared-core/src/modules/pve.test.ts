@@ -13,7 +13,10 @@ import { MS_PER_HOUR } from '../util/time';
 const data: GameData = parseGameData({
   version: '0.1.0',
   resources: ['metal'],
-  units: { drone: { faction: 'swarm', stats: { attack: 3, defense: 1, speed: 10 } } },
+  units: {
+    drone: { faction: 'swarm', stats: { attack: 3, defense: 1, speed: 10 } },
+    hunter: { faction: 'swarm', stats: { attack: 9, defense: 4, speed: 40 } },
+  },
   factions: {
     swarm: { name: 'Swarm', startingLoadout: { fleet: [{ unit: 'drone', count: 2 }] } },
     vanguard: { name: 'Vanguard' },
@@ -25,6 +28,20 @@ const data: GameData = parseGameData({
       name: 'Waves',
       modules: ['pve'],
       pve: { waves: 2, npcFaction: 'swarm', waveIntervalHours: 6 },
+    },
+    // Тот же штурм, но состав волны объявляет САМ режим (PVR-1.3).
+    fielded: {
+      name: 'Fielded',
+      modules: ['pve'],
+      pve: {
+        waves: 2,
+        npcFaction: 'swarm',
+        waveIntervalHours: 6,
+        waveFleet: [
+          { unit: 'hunter', count: 2 },
+          { unit: 'drone', count: 1 },
+        ],
+      },
     },
     plain: { name: 'Plain' },
   },
@@ -194,5 +211,36 @@ describe('pveModule — Рой враждебен с первого часа (PV
     const atPeace: GameState = { ...world(), diplomacy: { 'human|swarm': 'peace' } };
     const state = ok(advance(MS_PER_HOUR, 'plain', atPeace));
     expect(state.diplomacy?.['human|swarm']).toBe('peace');
+  });
+});
+
+describe('pveModule — состав волны объявляет режим (PVR-1.3)', () => {
+  // Волна брала состав из `startingLoadout.fleet` фракции NPC — то есть из ответа на
+  // ДРУГОЙ вопрос: «с чем начинает матч ИГРОК за эту фракцию». Рой играбелен, поэтому
+  // усилить штурм через это поле значило бы переверстать баланс каждой партии, где Рой
+  // взяли в руки, а подкрутить фракцию — молча переверстать штурм.
+  const fieldedSeed = (): GameState => ok(advance(MS_PER_HOUR, 'fielded'));
+
+  it('волна собирается из waveFleet режима, а не из стартового флота фракции', () => {
+    const state = ok(advance(8 * MS_PER_HOUR, 'fielded', fieldedSeed()));
+    expect(state.fleets['pve:wave:1']?.units).toEqual([
+      { unit: 'hunter', count: 2 },
+      { unit: 'drone', count: 1 },
+    ]);
+  });
+
+  it('ramp тот же: волна N — это N объявленных составов', () => {
+    const state = ok(advance(20 * MS_PER_HOUR, 'fielded', fieldedSeed()));
+    expect(state.fleets['pve:wave:2']?.units).toEqual([
+      { unit: 'hunter', count: 4 },
+      { unit: 'drone', count: 2 },
+    ]);
+  });
+
+  it('режим БЕЗ waveFleet по-прежнему берёт стартовый флот фракции (нет данных → база)', () => {
+    // Инвариант №3 в его данных-ипостаси: не объявленное поле откатывает к прежнему
+    // поведению, а не роняет матч и не выдаёт пустую волну.
+    const state = ok(advance(8 * MS_PER_HOUR, 'waves', seeded()));
+    expect(state.fleets['pve:wave:1']?.units).toEqual([{ unit: 'drone', count: 2 }]);
   });
 });
