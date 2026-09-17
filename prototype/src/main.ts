@@ -251,6 +251,7 @@ import {
 } from '../../decisions/sessionStore';
 import { medalBadges } from '../../decisions/unitMedals';
 import { fortressRaise } from '../../decisions/fortressRaise';
+import { waveReadout } from '../../decisions/waveReadout';
 import {
   authOutcome,
   shouldRegister,
@@ -12731,8 +12732,18 @@ function frame(nowReal: number) {
   // (Суверены ◆) pushed to the right end — one level down from the resource row.
   // Day + countdown live in the #daycard, victory progress in the #tbscore chip
   // (row 1 of the bar, below). (World/fleet counts stay on the player card.)
+  // PVR-1.2: строка волн стоит рядом с часами, потому что это то же самое измерение —
+  // сколько осталось до следующего события мира. В обычной партии `waveReadout` отвечает
+  // «нечего», и полоса выглядит ровно как до этого кирпича.
+  const wave = waveReadout(s.pve, s.time);
+  const waveHtml =
+    wave.kind === 'none'
+      ? ''
+      : `<span class="dl-wave">${t('hud.wave', { n: wave.kind === 'cleared' ? wave.total : wave.wave, m: wave.total })}` +
+        ` · ${wave.kind === 'cleared' ? t('hud.wave.done') : t('hud.wave.next', { in: countdownHMS(wave.nextInMs) })}</span>`;
   const statusHtml =
     `<span id="clock">${clockHM(s.time)}</span>` +
+    waveHtml +
     `<span class="dl-donate" title="${t('hub.sovereigns')}"><i>${SOV_SVG}</i>${kfmt(SOVEREIGNS)}</span>`;
   if (statusHtml !== lastClockText) {
     devlineEl.innerHTML = statusHtml;
