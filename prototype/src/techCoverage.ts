@@ -20,15 +20,25 @@
  */
 import type { TechnologyCondition } from '../../packages/shared-core/src/index';
 
-/** Узел, который в сессии исследовать нельзя: его выдаёт мета-прокачка. Признак —
- *  префикс `meta_`, и он не декоративный: тест сверяет каждый такой узел с `META_TREE`. */
-export function isGrantOnlyTech(id: string): boolean {
-  return id.startsWith('meta_');
+/**
+ * Узел, который в сессии исследовать нельзя: его только ВЫДАЮТ — мета-прокачка
+ * командира или усиление забега (PVR-1.4).
+ *
+ * Признак — флаг `grantOnly` в самих данных, а не префикс имени. Префикс `meta_`
+ * остаётся запасным ответом для вызова, у которого определения под рукой нет: он
+ * держал это правило до того, как у правила появился дом, и снимать его отдельно
+ * незачем. Настоящий запор — в ядре (`E_GRANT_ONLY`): прятать узел из окна мало,
+ * окно не единственный отправитель приказа.
+ */
+export function isGrantOnlyTech(id: string, def?: { grantOnly?: boolean }): boolean {
+  return def?.grantOnly === true || id.startsWith('meta_');
 }
 
 /** Настоящее дерево сессии — знаменатель всякой доли «сколько узлов пройдено». */
 export function researchableTechIds(technologies: Readonly<Record<string, unknown>>): string[] {
-  return Object.keys(technologies).filter((id) => !isGrantOnlyTech(id));
+  return Object.entries(technologies)
+    .filter(([id, def]) => !isGrantOnlyTech(id, def as { grantOnly?: boolean }))
+    .map(([id]) => id);
 }
 
 /** Узел, запертый на научного руководителя, и три причины, по которым он может стоять

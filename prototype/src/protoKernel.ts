@@ -159,6 +159,13 @@ export function setMatchMode(modeId: string | undefined): void {
   matchModeId = modeId;
 }
 
+/** Режим, под которым идёт текущий матч (или `undefined` — обычная партия). Читают
+ *  те, кому нужны ЕГО данные, а не правила: окно усиления забега берёт отсюда пул
+ *  (PVR-1.4). Правила по-прежнему разворачивает `ctx` — второго дома у них нет. */
+export function matchMode(): string | undefined {
+  return matchModeId;
+}
+
 export function ctx(now: number, state?: Pick<GameState, 'mapId'>): Context {
   const config: MatchConfig = {
     timeScale: 1,

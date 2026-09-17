@@ -801,6 +801,11 @@ export interface PveState {
   /** World time the next wave is due — an echo of the scheduled event, for the HUD.
    *  Absent once the last wave has landed. */
   nextWaveAt?: number;
+  /** Unspent boon picks per human seat (PVR-1.4): a wave that LANDS while you still
+   *  hold ground owes you one choice. Per seat rather than one shared counter because
+   *  co-op PvE seats each survive for themselves — a shared number would let one
+   *  player spend the other's pick. Absent/0 = nothing owed. */
+  boons?: Record<PlayerId, number>;
 }
 
 /** Which side of the book a standing order sits on (CONV-9). */

@@ -18,6 +18,11 @@ const data: GameData = parseGameData({
     hunter: { faction: 'swarm', stats: { attack: 9, defense: 4, speed: 40 } },
     spore: { faction: 'swarm', domain: 'ground', stats: { attack: 5, defense: 2, speed: 0 } },
   },
+  technologies: {
+    boon_a: { name: 'Boon A', branch: 'command', effects: { combatDamageBonus: 0.1 } },
+    boon_b: { name: 'Boon B', branch: 'command', effects: { fleetSpeedBonus: 0.1 } },
+    other: { name: 'Other', branch: 'command', effects: {} },
+  },
   factions: {
     swarm: { name: 'Swarm', startingLoadout: { fleet: [{ unit: 'drone', count: 2 }] } },
     vanguard: { name: 'Vanguard' },
@@ -43,6 +48,7 @@ const data: GameData = parseGameData({
           { unit: 'drone', count: 1 },
         ],
         waveLanding: [{ unit: 'spore', count: 3 }],
+        boons: ['boon_a', 'boon_b'],
       },
     },
     plain: { name: 'Plain' },
@@ -266,5 +272,89 @@ describe('pveModule — волна везёт десант (PVR-1.6)', () => {
     const state = ok(advance(8 * MS_PER_HOUR, 'waves', seeded()));
     expect(state.fleets['pve:wave:1']).toBeDefined();
     expect(state.fleets['pve:wave:1']).not.toHaveProperty('landing');
+  });
+});
+
+describe('pveModule — усиление между волнами (PVR-1.4)', () => {
+  // То, что делает забег забегом: пережил волну — стал сильнее. Механизм тот же, что
+  // доказал `metaGrant`: скрытая сессионная технология, выданная `completed`, и её
+  // бонусы едут обычными хуками. Нового кода в движке под каждое усиление нет.
+  const fieldedSeed = (): GameState => ok(advance(MS_PER_HOUR, 'fielded'));
+  /** Приказ подаётся в ТЕКУЩЕЕ время мира: час раньше состояния — это уже другая
+   *  проверка ядра, и тест падал бы на ней, а не на усилении. */
+  const take = (from: GameState, tech: string, who = 'human') =>
+    kernel.applyAction(
+      from,
+      { id: 'a1', type: 'pve.boon', playerId: who, payload: { tech }, issuedAt: 0 },
+      ctx(from.time, 'fielded'),
+    );
+
+  it('пришедшая волна даёт выживший стороне один выбор', () => {
+    const state = ok(advance(8 * MS_PER_HOUR, 'fielded', fieldedSeed()));
+    expect(state.pve?.boons).toEqual({ human: 1 });
+  });
+
+  it('долг копится: не зашёл за первым — второй его не съедает', () => {
+    const state = ok(advance(20 * MS_PER_HOUR, 'fielded', fieldedSeed()));
+    expect(state.pve?.boons?.human).toBe(2);
+  });
+
+  it('место без мира выбора не получает — оно проигрывает, а не выживает', () => {
+    const doomed: GameState = { ...world(), planets: { hive: planet('hive', 'swarm') } };
+    const state = ok(advance(8 * MS_PER_HOUR, 'fielded', ok(advance(MS_PER_HOUR, 'fielded', doomed))));
+    expect(state.pve?.boons ?? {}).toEqual({});
+  });
+
+  it('NPC выбора не получает — усиливается игрок, а не Рой', () => {
+    const state = ok(advance(8 * MS_PER_HOUR, 'fielded', fieldedSeed()));
+    expect(state.pve?.boons?.swarm).toBeUndefined();
+  });
+
+  it('режим без пула долгов не заводит вовсе', () => {
+    const state = ok(advance(8 * MS_PER_HOUR, 'waves', seeded()));
+    expect(state.pve?.boons).toBeUndefined();
+  });
+
+  it('выбранное усиление ложится в завершённые и списывает долг', () => {
+    const owed = ok(advance(8 * MS_PER_HOUR, 'fielded', fieldedSeed()));
+    const r = take(owed, 'boon_a');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.state.players.human?.technologies?.completed).toEqual(['boon_a']);
+    expect(r.state.pve?.boons?.human).toBe(0);
+  });
+
+  it('второй раз без долга — отказ, а не тихая выдача', () => {
+    const owed = ok(advance(8 * MS_PER_HOUR, 'fielded', fieldedSeed()));
+    const first = take(owed, 'boon_a');
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    const second = take(first.state, 'boon_b');
+    expect(second).toMatchObject({ ok: false, code: 'E_NO_BOON' });
+  });
+
+  it('технология ВНЕ пула не выдаётся, даже если она есть в каталоге', () => {
+    // Иначе действие превращается в «выдай себе любую науку»: пул режима — это и есть
+    // граница, а не подсказка интерфейса.
+    const owed = ok(advance(8 * MS_PER_HOUR, 'fielded', fieldedSeed()));
+    expect(take(owed, 'other')).toMatchObject({ ok: false, code: 'E_UNKNOWN_BOON' });
+  });
+
+  it('то же усиление дважды — отказ', () => {
+    const owed = ok(advance(20 * MS_PER_HOUR, 'fielded', fieldedSeed())); // долг 2
+    const first = take(owed, 'boon_a');
+    expect(first.ok).toBe(true);
+    if (!first.ok) return;
+    expect(take(first.state, 'boon_a')).toMatchObject({ ok: false, code: 'E_ALREADY_TAKEN' });
+  });
+
+  it('в матче без PvE-режима действие отвергается', () => {
+    const plain = ok(advance(MS_PER_HOUR, 'plain'));
+    const r = kernel.applyAction(
+      plain,
+      { id: 'a1', type: 'pve.boon', playerId: 'human', payload: { tech: 'boon_a' }, issuedAt: 0 },
+      ctx(MS_PER_HOUR, 'plain'),
+    );
+    expect(r).toMatchObject({ ok: false, code: 'E_NOT_PVE' });
   });
 });
