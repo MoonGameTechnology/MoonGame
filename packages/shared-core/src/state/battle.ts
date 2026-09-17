@@ -1,4 +1,4 @@
-import type { Battle, BattleSide } from './gameState';
+import type { Battle, BattleSide, GameState, PlanetId } from './gameState';
 
 /**
  * MSB-1 — ОДИН доступ к сторонам боя на все поверхности.
@@ -37,4 +37,32 @@ export function attackerOf(battle: Battle): BattleSide | undefined {
 /** Обороняющаяся сторона дуэли — зеркало {@link attackerOf}. */
 export function defenderOf(battle: Battle): BattleSide | undefined {
   return sideByRole(battle, 'defender');
+}
+
+
+/**
+ * Идёт ли бой на этом узле — ЛЮБОЙ фазы (решение владельца 17: пока идёт бой, узел не
+ * работает — ни производство, ни лечение, ни ремонт).
+ *
+ * Почему любой, а не только орбитальной: узел, на земле которого режутся десанты, тоже не
+ * доводит заказ до стапеля. Прежде это правило существовало, но было привязано НЕ К ТОМУ:
+ * производство глушила БОМБАРДИРОВКА, лечение гарнизона — только наземный бой, а корабль
+ * не чинился, лишь когда сам был в бою. То есть орбитальный бой у крепости не
+ * останавливал ничего: верфь строила, госпиталь лечил, док чинил стоящий рядом флот.
+ *
+ * Для перебора многих узлов бери {@link battleLocations} — один проход вместо прохода на
+ * каждый узел.
+ */
+export function battleAt(state: GameState, planetId: PlanetId): boolean {
+  for (const b of Object.values(state.battles)) {
+    if (b.location === planetId) return true;
+  }
+  return false;
+}
+
+/** Все узлы, на которых идёт бой, одним проходом. */
+export function battleLocations(state: GameState): Set<PlanetId> {
+  const set = new Set<PlanetId>();
+  for (const b of Object.values(state.battles)) set.add(b.location);
+  return set;
 }

@@ -4,245 +4,452 @@
     "description": "tech.node.industrial-automation.desc",
     "branch": "space",
     "tier": 1,
-    "cost": { "credits": 120, "metal": 80 },
+    "cost": {
+      "credits": 120,
+      "metal": 80
+    },
     "researchTimeHours": 4,
-    "unlocks": { "buildings": ["mine_t2"] },
-    "effects": { "productionBonus": 0.1 }
+    "unlocks": {
+      "buildings": [
+        "mine_t2"
+      ]
+    },
+    "effects": {
+      "productionBonus": 0.1
+    }
   },
   "orbital_logistics": {
     "name": "Orbital Logistics",
     "description": "tech.node.orbital-logistics.desc",
     "branch": "space",
     "tier": 1,
-    "cost": { "credits": 160, "metal": 120 },
+    "cost": {
+      "credits": 160,
+      "metal": 120
+    },
     "researchTimeHours": 6,
-    "effects": { "fleetSpeedBonus": 0.12 }
+    "effects": {
+      "fleetSpeedBonus": 0.12
+    }
   },
   "orbital_defense_grid": {
     "name": "Orbital Defense Grid",
     "description": "tech.node.orbital-defense-grid.desc",
     "branch": "space",
     "tier": 1,
-    "cost": { "credits": 140, "metal": 100 },
+    "cost": {
+      "credits": 140,
+      "metal": 100
+    },
     "researchTimeHours": 5,
-    "unlocks": { "buildings": ["orbital_aa"] }
+    "unlocks": {
+      "buildings": [
+        "orbital_aa"
+      ]
+    }
   },
   "siege_doctrine": {
     "name": "Siege Doctrine",
     "description": "tech.node.siege-doctrine.desc",
     "branch": "space",
     "tier": 2,
-    "cost": { "credits": 260, "metal": 220, "microelectronics": 40 },
+    "cost": {
+      "credits": 260,
+      "metal": 220,
+      "microelectronics": 40
+    },
     "researchTimeHours": 10,
     "dayGate": 3,
-    "prerequisites": ["orbital_logistics"],
-    "unlocks": { "units": ["siege_lance"] },
-    "effects": { "combatDamageBonus": 0.08 }
+    "prerequisites": [
+      "orbital_logistics"
+    ],
+    "unlocks": {
+      "units": [
+        "siege_lance"
+      ]
+    },
+    "effects": {
+      "combatDamageBonus": 0.08
+    }
   },
   "fortified_infrastructure": {
     "name": "Fortified Infrastructure",
     "description": "tech.node.fortified-infrastructure.desc",
     "branch": "ground",
     "tier": 2,
-    "cost": { "credits": 180, "metal": 240 },
+    "cost": {
+      "credits": 180,
+      "metal": 240
+    },
     "researchTimeHours": 8,
     "dayGate": 3,
-    "prerequisites": ["industrial_automation"]
+    "prerequisites": [
+      "industrial_automation"
+    ]
   },
   "microelectronics_fabrication": {
     "name": "Microelectronics Fabrication",
     "description": "tech.node.microelectronics-fabrication.desc",
     "branch": "space",
     "tier": 2,
-    "cost": { "credits": 220, "metal": 180 },
+    "cost": {
+      "credits": 220,
+      "metal": 180
+    },
     "researchTimeHours": 10,
     "dayGate": 2,
-    "prerequisites": ["industrial_automation"],
-    "effects": { "productionBonus": 0.05 }
+    "prerequisites": [
+      "industrial_automation"
+    ],
+    "effects": {
+      "productionBonus": 0.05
+    }
   },
   "deep_survey": {
     "name": "Deep-Space Survey",
     "description": "tech.node.deep-survey.desc",
     "branch": "space",
     "tier": 2,
-    "cost": { "credits": 200, "metal": 140 },
+    "cost": {
+      "credits": 200,
+      "metal": 140
+    },
     "researchTimeHours": 8,
     "dayGate": 2,
-    "prerequisites": ["industrial_automation"],
-    "effects": { "radarRangeBonus": 0.15 }
+    "prerequisites": [
+      "industrial_automation"
+    ],
+    "effects": {
+      "radarRangeBonus": 0.15
+    }
   },
   "void_armadas": {
     "name": "Void Armadas",
     "description": "tech.node.void-armadas.desc",
     "branch": "space",
     "tier": 3,
-    "cost": { "credits": 420, "metal": 300, "microelectronics": 60 },
+    "cost": {
+      "credits": 420,
+      "metal": 300,
+      "microelectronics": 60
+    },
     "researchTimeHours": 16,
     "dayGate": 8,
-    "prerequisites": ["siege_doctrine"],
-    "conditions": [{ "type": "own_sectors", "min": 5 }],
-    "effects": { "combatDamageBonus": 0.06, "fleetSpeedBonus": 0.06 }
+    "prerequisites": [
+      "siege_doctrine"
+    ],
+    "conditions": [
+      {
+        "type": "own_sectors",
+        "min": 5
+      }
+    ],
+    "effects": {
+      "combatDamageBonus": 0.06,
+      "fleetSpeedBonus": 0.06
+    }
   },
   "combined_arms": {
     "name": "Combined Arms",
     "description": "tech.node.combined-arms.desc",
     "branch": "ground",
     "tier": 1,
-    "cost": { "credits": 140, "metal": 100 },
+    "cost": {
+      "credits": 140,
+      "metal": 100
+    },
     "researchTimeHours": 5,
-    "effects": { "combatDamageBonus": 0.05 }
+    "effects": {
+      "combatDamageBonus": 0.05
+    }
   },
   "garrison_networks": {
     "name": "Garrison Networks",
     "description": "tech.node.garrison-networks.desc",
     "branch": "ground",
     "tier": 2,
-    "cost": { "credits": 240, "metal": 200 },
+    "cost": {
+      "credits": 240,
+      "metal": 200
+    },
     "researchTimeHours": 10,
     "dayGate": 5,
-    "prerequisites": ["combined_arms"],
-    "effects": { "productionBonus": 0.05 }
+    "prerequisites": [
+      "combined_arms"
+    ],
+    "effects": {
+      "productionBonus": 0.05
+    }
   },
   "planetary_bastions": {
     "name": "Planetary Bastions",
     "description": "tech.node.planetary-bastions.desc",
     "branch": "ground",
     "tier": 3,
-    "cost": { "credits": 480, "metal": 360, "microelectronics": 40 },
+    "cost": {
+      "credits": 480,
+      "metal": 360,
+      "microelectronics": 40
+    },
     "researchTimeHours": 18,
     "dayGate": 12,
-    "prerequisites": ["fortified_infrastructure"],
-    "effects": { "combatDamageBonus": 0.08 }
+    "prerequisites": [
+      "fortified_infrastructure"
+    ],
+    "effects": {
+      "combatDamageBonus": 0.08
+    }
   },
   "flight_decks": {
     "name": "Flight Decks",
     "description": "tech.node.flight-decks.desc",
     "branch": "shuttle",
     "tier": 1,
-    "cost": { "credits": 160, "metal": 120 },
+    "cost": {
+      "credits": 160,
+      "metal": 120
+    },
     "researchTimeHours": 6,
     "dayGate": 2,
-    "effects": { "fleetSpeedBonus": 0.06 }
+    "effects": {
+      "fleetSpeedBonus": 0.06
+    }
   },
   "strike_vectors": {
     "name": "Strike Vectors",
     "description": "tech.node.strike-vectors.desc",
     "branch": "shuttle",
     "tier": 2,
-    "cost": { "credits": 280, "metal": 220, "microelectronics": 30 },
+    "cost": {
+      "credits": 280,
+      "metal": 220,
+      "microelectronics": 30
+    },
     "researchTimeHours": 12,
     "dayGate": 5,
-    "prerequisites": ["flight_decks"],
-    "effects": { "combatDamageBonus": 0.08 }
+    "prerequisites": [
+      "flight_decks"
+    ],
+    "effects": {
+      "combatDamageBonus": 0.08
+    }
   },
   "ace_programs": {
     "name": "Ace Programs",
     "description": "tech.node.ace-programs.desc",
     "branch": "shuttle",
     "tier": 3,
-    "cost": { "credits": 500, "metal": 380, "microelectronics": 60 },
+    "cost": {
+      "credits": 500,
+      "metal": 380,
+      "microelectronics": 60
+    },
     "researchTimeHours": 20,
     "dayGate": 12,
-    "prerequisites": ["strike_vectors"],
-    "effects": { "combatDamageBonus": 0.06, "fleetSpeedBonus": 0.06 }
+    "prerequisites": [
+      "strike_vectors"
+    ],
+    "effects": {
+      "combatDamageBonus": 0.06,
+      "fleetSpeedBonus": 0.06
+    }
   },
   "guidance_arrays": {
     "name": "Guidance Arrays",
     "description": "tech.node.guidance-arrays.desc",
     "branch": "missile",
     "tier": 1,
-    "cost": { "credits": 150, "metal": 110 },
+    "cost": {
+      "credits": 150,
+      "metal": 110
+    },
     "researchTimeHours": 6,
     "dayGate": 2,
-    "effects": { "radarRangeBonus": 0.1 }
+    "effects": {
+      "radarRangeBonus": 0.1
+    }
   },
   "warhead_miniaturization": {
     "name": "Warhead Miniaturization",
     "description": "tech.node.warhead-miniaturization.desc",
     "branch": "missile",
     "tier": 2,
-    "cost": { "credits": 260, "metal": 240, "microelectronics": 30 },
+    "cost": {
+      "credits": 260,
+      "metal": 240,
+      "microelectronics": 30
+    },
     "researchTimeHours": 12,
     "dayGate": 5,
-    "prerequisites": ["guidance_arrays"],
-    "effects": { "combatDamageBonus": 0.06 }
+    "prerequisites": [
+      "guidance_arrays"
+    ],
+    "effects": {
+      "combatDamageBonus": 0.06
+    }
   },
   "saturation_barrage": {
     "name": "Saturation Barrage",
     "description": "tech.node.saturation-barrage.desc",
     "branch": "missile",
     "tier": 3,
-    "cost": { "credits": 520, "metal": 400, "microelectronics": 80 },
+    "cost": {
+      "credits": 520,
+      "metal": 400,
+      "microelectronics": 80
+    },
     "researchTimeHours": 20,
     "dayGate": 12,
-    "prerequisites": ["warhead_miniaturization"],
-    "effects": { "combatDamageBonus": 0.1 }
+    "prerequisites": [
+      "warhead_miniaturization"
+    ],
+    "effects": {
+      "combatDamageBonus": 0.1
+    }
   },
   "signal_corps": {
     "name": "Signal Corps",
     "description": "tech.node.signal-corps.desc",
     "branch": "command",
     "tier": 1,
-    "cost": { "credits": 130, "metal": 90 },
+    "cost": {
+      "credits": 130,
+      "metal": 90
+    },
     "researchTimeHours": 4,
-    "effects": { "radarRangeBonus": 0.08 }
+    "effects": {
+      "radarRangeBonus": 0.08
+    }
   },
   "logistics_command": {
     "name": "Logistics Command",
     "description": "tech.node.logistics-command.desc",
     "branch": "command",
     "tier": 2,
-    "cost": { "credits": 300, "metal": 220 },
+    "cost": {
+      "credits": 300,
+      "metal": 220
+    },
     "researchTimeHours": 12,
     "dayGate": 5,
-    "prerequisites": ["signal_corps"],
-    "effects": { "productionBonus": 0.05, "fleetSpeedBonus": 0.05 }
+    "prerequisites": [
+      "signal_corps"
+    ],
+    "effects": {
+      "productionBonus": 0.05,
+      "fleetSpeedBonus": 0.05
+    }
   },
   "ai_stewardship": {
     "name": "Steward Protocol",
     "description": "tech.node.ai-stewardship.desc",
     "branch": "command",
     "tier": 3,
-    "cost": { "credits": 400, "metal": 260 },
+    "cost": {
+      "credits": 400,
+      "metal": 260
+    },
     "researchTimeHours": 14,
     "dayGate": 15,
-    "unlocks": { "abilities": ["steward"] },
-    "conditions": [{ "type": "has_scientist", "branch": "command", "minLevel": 1 }]
+    "unlocks": {
+      "abilities": [
+        "steward"
+      ]
+    },
+    "conditions": [
+      {
+        "type": "has_scientist",
+        "branch": "command",
+        "minLevel": 1
+      }
+    ]
   },
   "meta_drill_speed": {
     "name": "Commander Drill: Logistics",
     "description": "tech.node.meta-drill-speed.desc",
     "branch": "command",
-    "effects": { "fleetSpeedBonus": 0.05 }
+    "effects": {
+      "fleetSpeedBonus": 0.05
+    }
   },
   "meta_drill_combat": {
     "name": "Commander Drill: Gunnery",
     "description": "tech.node.meta-drill-combat.desc",
     "branch": "command",
-    "effects": { "combatDamageBonus": 0.05 }
+    "effects": {
+      "combatDamageBonus": 0.05
+    }
   },
   "meta_drill_radar": {
     "name": "Commander Drill: Recon",
     "description": "tech.node.meta-drill-radar.desc",
     "branch": "command",
-    "effects": { "radarRangeBonus": 0.15 }
+    "effects": {
+      "radarRangeBonus": 0.15
+    }
   },
   "meta_drill_veteran": {
     "name": "Commander Drill: Veterancy",
     "description": "tech.node.meta-drill-veteran.desc",
     "branch": "command",
-    "effects": { "fleetSpeedBonus": 0.05, "combatDamageBonus": 0.05 }
+    "effects": {
+      "fleetSpeedBonus": 0.05,
+      "combatDamageBonus": 0.05
+    }
   },
   "meta_industry": {
     "name": "Commander Drill: Industry",
     "description": "tech.node.meta-industry.desc",
     "branch": "command",
-    "effects": { "productionBonus": 0.05 }
+    "effects": {
+      "productionBonus": 0.05
+    }
   },
   "meta_industry_2": {
     "name": "Commander Drill: Magnate",
     "description": "tech.node.meta-industry-2.desc",
     "branch": "command",
-    "effects": { "productionBonus": 0.05 }
+    "effects": {
+      "productionBonus": 0.05
+    }
+  },
+  "void_fortification": {
+    "name": "Void Fortification",
+    "description": "tech.node.void-fortification.desc",
+    "branch": "space",
+    "tier": 2,
+    "cost": {
+      "credits": 260,
+      "metal": 200
+    },
+    "researchTimeHours": 8,
+    "prerequisites": [
+      "orbital_defense_grid"
+    ],
+    "unlocks": {
+      "buildings": [
+        "starfort"
+      ]
+    }
+  },
+  "void_shipworks": {
+    "name": "Void Shipworks",
+    "description": "tech.node.void-shipworks.desc",
+    "branch": "space",
+    "tier": 3,
+    "cost": {
+      "credits": 320,
+      "metal": 240,
+      "microelectronics": 40
+    },
+    "researchTimeHours": 10,
+    "prerequisites": [
+      "void_fortification"
+    ],
+    "unlocks": {
+      "buildings": [
+        "void_hangar"
+      ]
+    }
   }
 }

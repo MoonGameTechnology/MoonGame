@@ -1,5 +1,5 @@
 import { getStance } from './diplomacy';
-import { hasOrbit } from './sectorKind';
+import { hasOrbit, isBombardable } from './sectorKind';
 import type { GameData } from '../data/schemas';
 import type { Fleet, GameState, PlanetId, PlayerId } from './gameState';
 
@@ -39,6 +39,12 @@ export function isActivelyBombarding(
   }
   const planet = state.planets[fleet.location];
   if (planet === undefined || !hasOrbit(data, planet)) {
+    return false;
+  }
+  // Решение владельца 16: крепость не обстреливают — по ней приходят в бой. Проверка
+  // стоит ЗДЕСЬ, в общем предикате, а не у каждого читателя: он же питает и урон, и
+  // заморозку производства, и разойтись они не должны (об этом сказано выше).
+  if (!isBombardable(data, planet)) {
     return false;
   }
   return planet.owner !== null && hostile(fleet.owner, planet.owner);

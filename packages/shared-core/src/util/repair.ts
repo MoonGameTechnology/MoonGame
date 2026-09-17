@@ -41,12 +41,30 @@ export function dockRepairCost(f: Fleet, data: GameData): number {
   return Math.ceil(missingHull(f, data) / REPAIR_HP_PER_METAL);
 }
 
-/** Does this fleet have its own dock: parked (not in transit) over its OWNER's
- *  world, under a live building with `shipRepair > 0` (spaceport/shipyard)? */
-export function fleetAtOwnDock(f: Fleet, state: GameState, data: GameData): boolean {
+/**
+ * Есть ли у флота ДОК: он припаркован (не в пути) над миром, который ему открыт, и там
+ * стоит живое здание с `shipRepair > 0` (верфь или космопорт).
+ *
+ * «Открыт» — свой ИЛИ СОЮЗНЫЙ (FORT-5.8, из описания верфи крепости: «небольшой ремонт
+ * флоту союзника или вашему»). До этого кирпича проверка была `planet.owner === f.owner`,
+ * то есть союзник у вашего дока не чинился, — тот же дефект-класс, что решение 5 нашло у
+ * форта: правило обещало союзников, а код спрашивал владельца.
+ *
+ * Союзность приходит ПАРАМЕТРОМ, а не считается здесь: у ядра она резолвится через
+ * capability `diplomacy` (нужен `HandlerContext`, которого у чистой функции нет), а у
+ * клиента — через стойку. Свести это внутрь значило бы завести второй дом для «кто
+ * союзник»; параметр оставляет дом один. Не передали — поведение ровно прежнее.
+ */
+export function fleetAtOwnDock(
+  f: Fleet,
+  state: GameState,
+  data: GameData,
+  allied: (a: string, b: string) => boolean = () => false,
+): boolean {
   if (f.movement || !f.location) return false;
   const planet = state.planets[f.location];
-  if (!planet || planet.owner !== f.owner) return false;
+  if (!planet || planet.owner === null) return false;
+  if (planet.owner !== f.owner && !allied(f.owner, planet.owner)) return false;
   return planet.buildings.some((b) => {
     if (b.hp <= 0) return false;
     const def = data.buildings[b.type];

@@ -49,6 +49,16 @@
         "hp": 30,
         "shipRepair": 0.1,
         "enablesShipConstruction": true
+      },
+      {
+        "cost": {
+          "metal": 320,
+          "credits": 180
+        },
+        "buildTimeHours": 18,
+        "hp": 42,
+        "shipRepair": 0.16,
+        "enablesShipConstruction": true
       }
     ]
   },
@@ -189,7 +199,8 @@
         "buildTimeHours": 6,
         "hp": 60,
         "defenseBonus": 0.45,
-        "pointDefense": 12
+        "pointDefense": 12,
+        "issuesGarrison": 2
       },
       {
         "cost": {
@@ -199,10 +210,12 @@
         "buildTimeHours": 8,
         "hp": 85,
         "defenseBonus": 0.6,
-        "pointDefense": 16
+        "pointDefense": 16,
+        "issuesGarrison": 3
       }
     ],
-    "pointDefense": 8
+    "pointDefense": 8,
+    "issuesGarrison": 1
   },
   "orbital_aa": {
     "name": "Orbital Defense Battery",
@@ -216,7 +229,33 @@
     "scoreValue": 3,
     "upkeep": {
       "energy": 30
-    }
+    },
+    "upgrades": [
+      {
+        "cost": {
+          "metal": 240,
+          "credits": 110
+        },
+        "buildTimeHours": 8,
+        "hp": 44,
+        "aaDamage": 20,
+        "upkeep": {
+          "energy": 50
+        }
+      },
+      {
+        "cost": {
+          "metal": 380,
+          "credits": 190
+        },
+        "buildTimeHours": 12,
+        "hp": 62,
+        "aaDamage": 30,
+        "upkeep": {
+          "energy": 80
+        }
+      }
+    ]
   },
   "zonal_aa": {
     "name": "Area Defense Battery",
@@ -230,7 +269,33 @@
     "scoreValue": 3,
     "upkeep": {
       "energy": 25
-    }
+    },
+    "upgrades": [
+      {
+        "cost": {
+          "metal": 220,
+          "credits": 90
+        },
+        "buildTimeHours": 7,
+        "hp": 32,
+        "pointDefense": 62,
+        "upkeep": {
+          "energy": 42
+        }
+      },
+      {
+        "cost": {
+          "metal": 350,
+          "credits": 160
+        },
+        "buildTimeHours": 11,
+        "hp": 46,
+        "pointDefense": 88,
+        "upkeep": {
+          "energy": 66
+        }
+      }
+    ]
   },
   "metal_station": {
     "name": "Salvage Metal Rig",
@@ -575,7 +640,8 @@
         "hp": 110,
         "defenseBonus": 0.4,
         "aaDamage": 9,
-        "pointDefense": 9
+        "pointDefense": 9,
+        "buildSlots": 2
       },
       {
         "cost": {
@@ -586,7 +652,8 @@
         "hp": 160,
         "defenseBonus": 0.4,
         "aaDamage": 13,
-        "pointDefense": 12
+        "pointDefense": 12,
+        "buildSlots": 3
       },
       {
         "cost": {
@@ -597,7 +664,8 @@
         "hp": 220,
         "defenseBonus": 0.4,
         "aaDamage": 18,
-        "pointDefense": 16
+        "pointDefense": 16,
+        "buildSlots": 4
       },
       {
         "cost": {
@@ -608,10 +676,12 @@
         "hp": 300,
         "defenseBonus": 0.4,
         "aaDamage": 24,
-        "pointDefense": 20
+        "pointDefense": 20,
+        "buildSlots": 5
       }
     ],
-    "onlyOn": []
+    "onlyOn": [],
+    "buildSlots": 1
   },
   "tax_office": {
     "name": "Tax Office",
@@ -623,5 +693,23 @@
     "hp": 16,
     "scoreValue": 3,
     "creditsBonus": 0.25
+  },
+  "void_hangar": {
+    "name": "Fortress Hangar",
+    "cost": {
+      "metal": 180,
+      "credits": 70
+    },
+    "buildTimeHours": 5,
+    "hp": 25,
+    "produces": {
+      "credits": 5
+    },
+    "shipRepair": 0.05,
+    "shuttleBay": 6,
+    "scoreValue": 4,
+    "onlyOn": [
+      "void_station"
+    ]
   }
 }

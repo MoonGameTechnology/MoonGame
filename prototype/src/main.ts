@@ -6019,7 +6019,14 @@ function fleetPanelHtml(f: Fleet): string {
   // что чинить» одна на два ремонта, а привязка к доку — только у экспресса за металл.
   const repairCost = instantRepairCost(f, data);
   const repairable = canRepair(f.owner === ME, !!f.battleId, repairCost);
-  const atDock = canDockRepair(repairable, fleetAtOwnDock(f, s, data));
+  // FORT-5.8: док открыт своему И СОЮЗНОМУ флоту. Союзность кнопка резолвит стойкой —
+  // capability `diplomacy` живёт в ядре и требует `HandlerContext`, которого у рендера
+  // нет; база самой capability — та же стойка, поэтому ответы сходятся. Правило «что
+  // считается доком» при этом НЕ переписано: зовётся та же функция ядра.
+  const atDock = canDockRepair(
+    repairable,
+    fleetAtOwnDock(f, s, data, (a, b) => getStance(s, a, b) === 'alliance'),
+  );
   if (hull.max > 0) {
     h += `<div class="row hullrow" data-desc="stat:hull"><span class="hico">♥</span><span class="hbar${pct < LIMP_PCT ? ' low' : ''}"><i style="width:${pct}%"></i></span><b>${kfmt(hull.cur)}/${kfmt(hull.max)}</b>${
       atDock

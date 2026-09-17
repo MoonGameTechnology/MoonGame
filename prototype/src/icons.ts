@@ -28,6 +28,7 @@ export const BUILD_ICON: Record<string, string> = {
   orbital_aa: '⌁',
   zonal_aa: '✳', // зональное ПВО: разрыв зенитного снаряда — контрмера ЧЕЛНОКАМ
   spaceport: '⊞', // космопорт: ангар челноков (YARD-1) — корабли закладывает верфь
+  void_hangar: '⊟', // ангар КРЕПОСТИ (FORT-5.7): её собственный причал под челноки
   metal_station: '⛏', // утилизационная станция — металл из обломков
   hospital: '✚', // полевой госпиталь: единственный источник лечения гарнизона
   factory: '⌬', // завод техники: постройка наземной техники и эскадрилий
@@ -54,6 +55,7 @@ export const UNIT_ICON: Record<string, string> = {
   special_forces: '✱', // the elite few
   tank: '▮', // the heavy armour block
   drop_infantry: '⇓', // сброшенная с орбиты пехота — стрелка вниз, а не ещё один клин
+  garrison: '⊓', // гарнизон форта: не клин и не строй — укрытие, из которого не выходят
 };
 
 /** A small glyph per province KIND, drawn above each province so its type reads at a
