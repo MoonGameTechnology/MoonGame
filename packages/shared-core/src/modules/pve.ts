@@ -32,6 +32,7 @@ import type { GameModule, HandlerContext } from '../kernel/module';
 import type { Fleet, GameState, PlayerId } from '../state/gameState';
 import type { ModePve } from '../data/schemas';
 import { hoursToMs } from '../action/types';
+import { setStance } from '../state/diplomacy';
 
 /** The scheduled event a due wave fires. Internal: it has no payload schema, so the
  *  action gate treats it as non-submittable — a player cannot call a wave down. */
@@ -95,6 +96,33 @@ function armNextWave(
   h.schedule(at, WAVE_EVENT, { wave: pve.waveNumber + 1 });
 }
 
+/**
+ * Declare the NPC at war with every other seat (PVR-1.5).
+ *
+ * Without this the mechanic was inert in the only way that matters: waves spawned on
+ * schedule and then SAT in the hive. A map that declares plain players seeds every pair
+ * at `peace` (the free-for-all convention — the engine's bare default is war, but the
+ * loader overrides it), and a bot never opens a war on its own. So a PvE match ran to
+ * its last wave without a single battle, and the player met the assault as a growing
+ * pile of parked fleets.
+ *
+ * Declared HERE because this module is the only place that knows who the enemy is: the
+ * mode names `npcFaction`, `npcSeat` resolves it. Done at seeding, once, so the stance
+ * is set before the first wave is even armed.
+ *
+ * Only pairs INVOLVING the NPC are touched — an alliance between the human seats is
+ * theirs to keep, and co-op PvE is exactly the case where rewriting it would be wrong.
+ */
+function declareWarOnEveryone(h: HandlerContext, npcPlayerId: PlayerId): void {
+  // Ids are compared, not insertion order, so a replay sets the same stances in the
+  // same order (determinism, invariant #1).
+  for (const id of Object.keys(h.state.players).sort()) {
+    if (id === npcPlayerId) continue;
+    setStance(h.state, npcPlayerId, id, 'war');
+    h.emit('diplomacy.changed', { a: npcPlayerId, b: id, stance: 'war' });
+  }
+}
+
 export const pveModule: GameModule = {
   id: 'pve',
   version: '1.0.0',
@@ -111,6 +139,7 @@ export const pveModule: GameModule = {
       if (npcPlayerId === undefined) return; // no seat plays the enemy — stay inert
       const pve = { waveNumber: 0, totalWaves: cfg.waves, npcPlayerId };
       h.state.pve = pve;
+      declareWarOnEveryone(h, npcPlayerId);
       const { from } = event.payload as { from: number };
       armNextWave(h, pve, cfg, from);
       h.emit('pve.started', { owner: npcPlayerId, waves: cfg.waves });
