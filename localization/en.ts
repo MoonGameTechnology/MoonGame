@@ -678,6 +678,7 @@ export const en: Record<string, string> = {
   'data.azure-compact': 'Azure Compact',
   'data.barracks': 'Barracks',
   'data.barren': 'Barren',
+  'data.bastion-marshal': 'Bastion Marshal',
   'data.biomass-pit': 'Biomass Pit',
   'data.boarding-translocation': 'Boarding Translocation',
   'data.bomber': 'bomber',
@@ -757,6 +758,7 @@ export const en: Record<string, string> = {
   'data.orbital-defense-battery': 'Orbital Defense Battery',
   'data.orbital-defense-grid': 'Orbital Defense Grid',
   'data.orbital-logistics': 'Orbital Logistics',
+  'data.ordnance-savant': 'Ordnance Savant',
   'data.overclocked-helm': 'Overclocked Helm',
   'data.overseer': 'Overseer',
   'data.planet': 'Planet',
@@ -829,6 +831,7 @@ export const en: Record<string, string> = {
   'data.warp-jump': 'Warp Jump',
   'data.warhead-miniaturization': 'Warhead Miniaturization',
   'data.weak-points': 'Weak Points',
+  'data.wing-commodore': 'Wing Commodore',
 
   // --- diplo — Дипломатия: окно, вкладки, фильтр и сортировка ростера, названия отношений.
   'diplo.filter': 'Filter',
@@ -1126,10 +1129,16 @@ export const en: Record<string, string> = {
   'sandbox.wars-ended': 'Wars ended: {n} — relations are neutral',
 
   // --- sci — Учёные совета: имя и что даёт ветка.
+  'sci.bastion-marshal.desc':
+    'Leader of the ground branch: fortifications, garrison networks, planetary bastions.',
+  'sci.ordnance-savant.desc':
+    'Leader of the missile branch: guidance arrays, compact warheads, saturation barrage.',
   'sci.overseer.desc':
     'Leader of the command branch (C2): doctrines of automation and delegation. Unlocks the «Steward Protocol» — handing your seat to an AI while you sleep.',
   'sci.polymath.desc': 'A generalist with no branch: +1 research slot (2→3) instead of a focus.',
   'sci.void-admiral.desc': 'Leader of the space branch: shipyards, logistics, siege doctrines.',
+  'sci.wing-commodore.desc':
+    'Leader of the shuttle branch: flight decks, strike vectors, ace programs.',
 
   // --- scipick — Совет учёных: кандидаты, фокус ветки, закрепление.
   'scipick.candidates': 'Candidates · tap to fill a slot',
