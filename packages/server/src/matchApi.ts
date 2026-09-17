@@ -74,9 +74,16 @@ export interface MatchApiDeps {
   /** Seed + persist a new match; returns its id and seat player ids. Optional: when absent
    *  the `POST /matches` route is not registered — a host that only seeds matches out of band
    *  (e.g. the playtest netserver) exposes join without a public create. */
-  createMatch?(request?: { mapId?: string }): Promise<CreatedMatch>;
+  createMatch?(request?: { mapId?: string; modeId?: string }): Promise<CreatedMatch>;
   /** Explicit allowlist for user-selected maps; absent = default only. */
   mapIds?: readonly string[];
+  /** Explicit allowlist for user-selected game modes (`data.modes`); absent = the host
+   *  offers no choice and any `modeId` in the body is refused. Checked HERE rather than
+   *  left to `resolveMatchConfig` in the room: an unknown mode there throws after the
+   *  session was already seeded and persisted, so the caller would get a 500 and the
+   *  store a half-born match. Same shape as `mapIds` — a bad name is a 400, not a
+   *  silent fallback to the default mode (BRW-0). */
+  modeIds?: readonly string[];
   /** Resolve `nick` to a seat in `matchId` and mint its join token, or a stable failure:
    *  the match does not exist, every seat is taken, or token auth is not configured.
    *  `accountId` is stamped into the join token when the caller is authenticated.
@@ -148,7 +155,16 @@ export function registerMatchApi(app: FastifyInstance, deps: MatchApiDeps): void
         void reply.code(400);
         return { error: 'E_UNKNOWN_MAP' as const };
       }
-      return mapId === undefined ? createMatch() : createMatch({ mapId });
+      const modeId = (body as { modeId?: unknown } | undefined)?.modeId;
+      if (modeId !== undefined && (typeof modeId !== 'string' || !deps.modeIds?.includes(modeId))) {
+        void reply.code(400);
+        return { error: 'E_UNKNOWN_MODE' as const };
+      }
+      if (mapId === undefined && modeId === undefined) return createMatch();
+      return createMatch({
+        ...(mapId !== undefined ? { mapId } : {}),
+        ...(modeId !== undefined ? { modeId } : {}),
+      });
     });
   }
 

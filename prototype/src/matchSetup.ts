@@ -80,6 +80,12 @@ export interface SeatConfig {
 }
 export interface SetupConfig {
   mapId?: MapId;
+  /** Режим партии (`data.modes`) — «во что играем»: `standard`, `pve_waves`, `duel`,
+   *  `team_*`. НЕ путать с `NetworkMatchMode` ниже: тот описывает РАССАДКУ («кто за
+   *  столом»), а этот — правила, которые резолвит `resolveMatchConfig`. Пишется в
+   *  состояние, потому что пережить рестарт режим обязан вместе с миром (BRW-0).
+   *  Отсутствует ⇒ партия без режима: базовые правила, и лента честно молчит. */
+  modeId?: string;
   seats: SeatConfig[];
   /** RNG seed of the match. Absent → the historical fixed 'prototype-1'. Self-play
    *  (M4) varies it per run — with the fixed seed an identical setup plays out
@@ -413,6 +419,9 @@ export function newGame(setup: SetupConfig = DEFAULT_SETUP): GameState {
   return {
     ...base,
     mapId: preset.id,
+    // Режим пишется ТОЛЬКО когда он задан: пустое поле в состоянии и отсутствие поля —
+    // разные вещи для ленты браузера, которая молчание читает как «режим неизвестен».
+    ...(setup.modeId !== undefined ? { modeId: setup.modeId } : {}),
     players,
     planets,
     fleets,
