@@ -123,6 +123,16 @@ describe('shipped maps resolve against the shipped catalogue', () => {
       'nebula',
       'solar_flare_zone',
     ]);
-    expect([...kinds].sort()).toEqual(['asteroid', 'dense_nebula', 'ion_storm', 'nebula', 'planet']);
+    // `empty` joined the spread with the Sector Zero fork rebuild: a fork is a point
+    // where lines meet, NOT a province, and `empty` is the catalogue's non-capturable,
+    // non-buildable kind — the only way to say "nothing is here but the junction".
+    expect([...kinds].sort()).toEqual([
+      'asteroid',
+      'dense_nebula',
+      'empty',
+      'ion_storm',
+      'nebula',
+      'planet',
+    ]);
   });
 });
