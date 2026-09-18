@@ -27,9 +27,16 @@ import { distance } from './route';
  * Structural + geometric validation of a map (M1.3). Returns a list of stable
  * issue codes (empty = valid); `buildStateFromMap` rejects on any. Beyond shape
  * (zod already did that), this enforces the **neighbour-only** path rule: a path
- * may join two sectors only if no third sector lies "between" them (closer to
- * both than they are to each other — the relative-neighbourhood criterion). That
- * keeps the graph to immediate neighbours: no long criss-crossing lanes.
+ * may join two sectors only if no third sector lies "between" them — nothing inside
+ * the circle having A—B as its diameter (the Gabriel criterion). That still forbids
+ * long criss-crossing lanes, but it proposes generously: a sector in open space
+ * really does reach everything near it.
+ *
+ * Geometry decides which lanes are POSSIBLE; terrain decides how many of them a
+ * sector actually carries (`SectorTypeDefSchema.maxLinks`, `E_SECTOR_OVERLINKED`).
+ * The two together are why a province is sparse: not because the author drew few
+ * lines, but because that region of space admits few — an asteroid cluster takes a
+ * single approach, open space routes freely. Needs `data` (the budget lives there).
  */
 export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
   const issues: string[] = [];
@@ -78,17 +85,45 @@ export function validateMatchMap(map: MatchMap, data?: GameData): string[] {
       continue;
     }
     seen.add(key);
+    // Gabriel criterion: the lane is legal unless a third sector sits inside the
+    // circle that has A—B as its diameter — i.e. unless something is genuinely IN
+    // THE WAY. Deliberately more permissive than the relative-neighbourhood rule it
+    // replaced (MAP-LINK): geometry is supposed to PROPOSE generously (open space
+    // really does connect to everything nearby) and TERRAIN is what cuts the lanes
+    // back down (`maxLinks` below). Under the old rule geometry alone capped every
+    // node at ~2-3 lanes, so the terrain budget could never bind and "this province
+    // is a dead end" had no in-world cause — it was an accident of coordinates.
+    // Strictly WIDER than the old rule (a Gabriel neighbourhood contains the
+    // relative one), so no previously valid map becomes invalid.
     const pa = map.sectors[a]!.position;
     const pb = map.sectors[b]!.position;
-    const dab = distance(pa, pb);
+    const mid = { x: (pa.x + pb.x) / 2, y: (pa.y + pb.y) / 2 };
+    const radius = distance(pa, pb) / 2;
     const between = ids.some(
-      (c) =>
-        c !== a &&
-        c !== b &&
-        distance(pa, map.sectors[c]!.position) < dab &&
-        distance(pb, map.sectors[c]!.position) < dab,
+      (c) => c !== a && c !== b && distance(mid, map.sectors[c]!.position) < radius,
     );
     if (between) issues.push(`E_PATH_NOT_NEIGHBOR:${key}`);
+  }
+
+  // Link budget (MAP-LINK): terrain decides how many lanes a region can carry.
+  // Geometry above says which sectors CAN see each other; this says how many of
+  // those a world of that terrain actually admits — a dense asteroid cluster takes
+  // one approach and is therefore a dead end, open space routes freely. Counted over
+  // the accepted edges only, so a map already rejected above is not blamed twice.
+  if (data) {
+    const degree = new Map<string, number>();
+    for (const key of seen) {
+      const [a, b] = key.split('|') as [string, string];
+      degree.set(a, (degree.get(a) ?? 0) + 1);
+      degree.set(b, (degree.get(b) ?? 0) + 1);
+    }
+    for (const [id, deg] of [...degree].sort()) {
+      const terrain = map.sectors[id]?.terrain;
+      const budget = terrain ? data.sectors[terrain]?.maxLinks : undefined;
+      if (budget !== undefined && deg > budget) {
+        issues.push(`E_SECTOR_OVERLINKED:${id}:${deg}>${budget}`);
+      }
+    }
   }
 
   // fleets reference an existing sector + a declared player

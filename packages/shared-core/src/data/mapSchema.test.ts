@@ -117,8 +117,10 @@ describe('shipped maps resolve against the shipped catalogue', () => {
       }
     }
     expect([...terrains].sort()).toEqual([
+      'asteroid_cluster',
       'asteroid_field',
       'dense_nebula',
+      'empty_space',
       'ion_storm',
       'nebula',
       'solar_flare_zone',
@@ -128,6 +130,7 @@ describe('shipped maps resolve against the shipped catalogue', () => {
     // non-buildable kind — the only way to say "nothing is here but the junction".
     expect([...kinds].sort()).toEqual([
       'asteroid',
+      'asteroid_cluster',
       'dense_nebula',
       'empty',
       'ion_storm',
