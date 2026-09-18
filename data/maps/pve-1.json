@@ -57,29 +57,17 @@
         }
       ]
     },
-    "gate_north": {
-      "position": {
-        "x": 0,
-        "y": -420
-      },
-      "kind": "empty",
-      "terrain": "empty_space"
-    },
     "drift": {
       "position": {
         "x": -420,
         "y": -120
       },
       "kind": "asteroid",
-      "terrain": "asteroid_field"
-    },
-    "core": {
-      "position": {
-        "x": 0,
-        "y": -120
-      },
-      "kind": "empty",
-      "terrain": "empty_space"
+      "terrain": "asteroid_field",
+      "transit": [
+        ["home_a", "shoal"],
+        ["home_a", "veil"]
+      ]
     },
     "veil": {
       "position": {
@@ -104,18 +92,6 @@
       },
       "kind": "asteroid",
       "terrain": "asteroid_field"
-    },
-    "crossing": {
-      "position": {
-        "x": 0,
-        "y": 200
-      },
-      "kind": "empty",
-      "terrain": "empty_space",
-      "transit": [
-        ["core", "ridge"],
-        ["shoal", "shear"]
-      ]
     },
     "shear": {
       "position": {
@@ -171,24 +147,6 @@
       ]
     }
   },
-  "paths": [
-    ["home_a", "gate_north"],
-    ["home_b", "gate_north"],
-    ["gate_north", "core"],
-    ["home_a", "drift"],
-    ["home_a", "core"],
-    ["home_b", "veil"],
-    ["home_b", "core"],
-    ["drift", "cluster"],
-    ["drift", "shoal"],
-    ["core", "veil"],
-    ["core", "crossing"],
-    ["shoal", "crossing"],
-    ["veil", "shear"],
-    ["crossing", "shear"],
-    ["crossing", "ridge"],
-    ["ridge", "hive"]
-  ],
   "players": {
     "p1": {
       "name": "Azure Compact",

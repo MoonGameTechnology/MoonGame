@@ -18,10 +18,7 @@ describe('pveState — the PvE door', () => {
     const state = pveState(data);
     expect(Object.keys(state.planets).sort()).toEqual([
       'cluster',
-      'core',
-      'crossing',
       'drift',
-      'gate_north',
       'hive',
       'home_a',
       'home_b',
@@ -30,6 +27,9 @@ describe('pveState — the PvE door', () => {
       'shoal',
       'veil',
     ]);
+    // Девять провинций и НИ ОДНОГО пустого путевого узла: соседство выводится из
+    // мозаики (M4.3), а точке схода линий в мозаике места нет — клетки у неё быть
+    // не может, значит и границы тоже (§0 роадмапа карты).
     expect(state.planets.home_a!.owner).toBe('p1'); // the human seat
     expect(state.planets.hive!.owner).toBe('p3');
     expect(state.players.p3!.faction).toBe('swarm');
@@ -50,10 +50,10 @@ describe('pveState — the PvE door', () => {
   });
 
   it('terrain, not coordinates, decides how many lanes a sector carries', () => {
-    // MAP-LINK. Geometry PROPOSES generously (the Gabriel rule offers 24 lanes on this
-    // layout) and TERRAIN cuts it back: half the map sits exactly on its terrain's
-    // budget, which is what makes "this province is a dead end" an in-world fact
-    // rather than an accident of where the author dropped the dots.
+    // MAP-LINK, теперь поверх мозаики (M4.3). Геометрия ПРЕДЛАГАЕТ каждую общую
+    // границу, местность ЗАКРЫВАЕТ лишние: две трети карты сидят ровно на своём
+    // бюджете, и «эта провинция — тупик» остаётся фактом мира, а не следствием того,
+    // куда автор поставил точки.
     const state = pveState(data);
     const planetOf = (id: string): Planet => {
       const p = state.planets[id];
@@ -74,7 +74,34 @@ describe('pveState — the PvE door', () => {
     const atBudget = Object.keys(state.planets)
       .filter((id) => degree(id) === budget(id))
       .sort();
-    expect(atBudget).toEqual(['cluster', 'core', 'drift', 'ridge', 'shear', 'veil']);
+    expect(atBudget).toEqual(['cluster', 'drift', 'ridge', 'shear', 'shoal', 'veil']);
+  });
+
+  it('a border with no lane is SEALED, not absent — the mosaic never lies', () => {
+    // Суть M4.3. Раньше «путей нет» означало, что общая граница молча обещала переход:
+    // мозаику рисовали по координатам, а список путей писали руками, и это были два
+    // графа. Теперь граф ОДИН — `links` и `sealed` вместе дают ровно все границы
+    // клетки, и закрытая граница остаётся границей, которую видно как барьер.
+    const state = pveState(data);
+    // Печать всегда двусторонняя: дверь не бывает закрыта с одной стороны.
+    for (const [id, p] of Object.entries(state.planets))
+      for (const other of p.sealed ?? [])
+        expect([id, other, state.planets[other]?.sealed ?? []]).toEqual([
+          id,
+          other,
+          expect.arrayContaining([id]),
+        ]);
+    // И то, что закрыто, НЕ проходимо: печать — это не украшение поверх открытого пути.
+    for (const [id, p] of Object.entries(state.planets))
+      for (const other of p.sealed ?? []) expect([id, p.links ?? []]).toEqual([id, expect.not.arrayContaining([other])]);
+    // Местность закрыла ровно три границы этой карты, и каждая объяснима: скопление
+    // впускает один подход, ионные штормы не смыкаются друг с другом, гнездо не режет
+    // напрямик в астероидную отмель.
+    const seals = Object.entries(state.planets)
+      .flatMap(([id, p]) => (p.sealed ?? []).map((o) => (id < o ? `${id}|${o}` : `${o}|${id}`)))
+      .filter((k, i, all) => all.indexOf(k) === i)
+      .sort();
+    expect(seals).toEqual(['cluster|drift', 'hive|shoal', 'ridge|shear']);
   });
 
   it('the dense cluster sits INSIDE the asteroid massif but admits one approach', () => {
@@ -84,7 +111,10 @@ describe('pveState — the PvE door', () => {
     // it — yet `asteroid_cluster` carries a single lane, so the one approach has a
     // connected surrounding instead of being a bare dead end (§11, criterion 3).
     const state = pveState(data);
-    expect(state.planets.cluster!.links).toEqual(['drift']);
+    expect(state.planets.cluster!.links).toEqual(['shoal']);
+    // Вторая его граница — с `drift` — существует и ЗАКРЫТА местностью: скопление
+    // впускает один подход, и это видно на карте барьером, а не пустотой.
+    expect(state.planets.cluster!.sealed).toEqual(['drift']);
     expect(data.sectors.asteroid_cluster!.maxLinks).toBe(1);
     for (const neighbour of ['drift', 'shoal'] as const) {
       expect(state.planets[neighbour]!.terrain).toBe('asteroid_field');
@@ -94,43 +124,26 @@ describe('pveState — the PvE door', () => {
     expect(data.sectors.asteroid_cluster!.baseOutput.metal).toBeGreaterThan(0);
   });
 
-  it('two lanes cross at `crossing` without meeting (MAP-TRANSIT)', () => {
-    // Owner's model: parallel paths may pass THROUGH a province. Here the vertical
-    // lane (core ↔ ridge) and the horizontal one (shoal ↔ shear) physically cross at
-    // `crossing` — the coordinates put them on one point — but a fleet running one
-    // cannot peel off onto the other in passing. So the Swarm coming down the spine
-    // cannot cut sideways at the crossroads; it has to go the long way round.
+  it('one corridor runs THROUGH the asteroid belt; sideways it is shut (MAP-TRANSIT)', () => {
+    // Модель владельца: параллельные пути могут проходить СКВОЗЬ провинцию. Раньше это
+    // держал пустой узел `crossing`; узлов больше нет, и транзит переехал туда, где ему
+    // и место — на МЕСТНОСТЬ. Через пояс `drift` идёт один безопасный коридор со
+    // стороны `home_a`: войдя с отмели, выйти можно только к дому, а поперёк пояса
+    // (shoal ↔ veil) прохода нет.
     const state = pveState(data);
-    expect(state.planets.crossing!.transit).toEqual([
-      ['core', 'ridge'],
-      ['shoal', 'shear'],
+    expect(state.planets.drift!.transit).toEqual([
+      ['home_a', 'shoal'],
+      ['home_a', 'veil'],
     ]);
-    expect(planRoute(state, 'hive', 'home_a')).toEqual(['ridge', 'crossing', 'core', 'home_a']);
-    expect(planRoute(state, 'shoal', 'shear')).toEqual(['crossing', 'shear']);
-    // …and the sideways cut is genuinely gone, not merely longer by a hop:
-    expect(planRoute(state, 'hive', 'shoal')).toEqual([
-      'ridge',
-      'crossing',
-      'core',
-      'home_a',
-      'drift',
-      'shoal',
-    ]);
-  });
-
-  it('a junction is NOT a province: it cannot be owned, built on or scored', () => {
-    // «Х даже и не должно быть» (владелец): точка схода линий — не место, которое
-    // занимают. Держим это данными: `kind: empty` в каталоге НЕ захватывается и НЕ
-    // застраивается, поэтому ни игрок, ни бот не сделают из неё территорию.
-    const state = pveState(data);
-    for (const id of ['gate_north', 'core', 'crossing'] as const) {
-      const kind = data.sectorKinds[state.planets[id]!.kind ?? ''];
-      expect(kind?.capturable).toBe(false);
-      expect(kind?.buildable).toBe(false);
-      expect(state.planets[id]!.owner).toBeNull();
-      expect(state.planets[id]!.garrison).toEqual([]);
-      expect(state.planets[id]!.buildings).toEqual([]);
-    }
+    // Обе стороны — соседи по мозаике, то есть транзит ограничивает НАСТОЯЩИЕ пути,
+    // а не указывает в пустоту.
+    expect(state.planets.drift!.links).toEqual(['home_a', 'shoal', 'veil']);
+    // Поперечный срез действительно исчез, а не стал длиннее на шаг:
+    expect(planRoute(state, 'shoal', 'veil')).toEqual(['drift', 'home_a', 'home_b', 'veil']);
+    // …и у Роя теперь два разных подхода к двум домам — короткий восточный и длинный
+    // западный, вместо одной общей спины через перекрёсток.
+    expect(planRoute(state, 'hive', 'home_b')).toEqual(['shear', 'veil', 'home_b']);
+    expect(planRoute(state, 'hive', 'home_a')).toEqual(['ridge', 'shoal', 'drift', 'home_a']);
   });
 });
 
