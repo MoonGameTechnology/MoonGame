@@ -626,8 +626,8 @@
 | FOG-10 | ✅ | proto core | `docs/backlog.md:14914` | Память разведки перестала жить только |
 | FOG-9 | ✅ | core | `docs/backlog.md:14938` | Приостановленная стройка чужого мира была видна |
 | TEST-4 | ✅ | srv | `docs/backlog.md:14948` | topXp падал на живой базе разработчика. |
-| PHONE-STRATEGY | ✅ |  | `docs/backlog.md:15115` | Технологии, постройки, производство, рынок и дипломатия |
-| MAP-PERF | ✅ |  | `docs/backlog.md:15127` | Ускорение движения раскрытой голографической карты и подготовка |
+| PHONE-STRATEGY | ✅ |  | `docs/backlog.md:15126` | Технологии, постройки, производство, рынок и дипломатия |
+| MAP-PERF | ✅ |  | `docs/backlog.md:15138` | Ускорение движения раскрытой голографической карты и подготовка |
 | AC-0.1 | ✅ | srv data | `docs/accounts-roadmap.md:44` | Сущность Account + связь с Player |
 | AC-0.2 | ⏳ | srv | `docs/accounts-roadmap.md:53` | Сессии и refresh |
 | AC-0.3 | 🔒 | srv data | `docs/accounts-roadmap.md:58` | Уровень/опыт аккаунта |
@@ -829,13 +829,14 @@
 | M0.2 | ✅ | core | `docs/map-roadmap.md:78` | Развести sectorType → terrain — |
 | M1.1 | ✅ | data | `docs/map-roadmap.md:96` | Схема карты data/maps/.json — |
 | M1.3 | ✅ | core | `docs/map-roadmap.md:115` | Валидация путей: только к соседям — |
-| M2.1 | ✅ | core data | `docs/map-roadmap.md:128` | Виды секторов (kind) в данные — |
-| M2.2 | ✅ | core | `docs/map-roadmap.md:147` | «Захват заходом» как правило ядра — |
-| M2.3 | ✅ | core cli | `docs/map-roadmap.md:158` | Масштаб / вес сектора (планета = меньше) — (интерактивный ресайз — в M3.1) |
-| M3.1 | 🔒 |  | `docs/map-roadmap.md:174` | Редактор карты [tools] |
-| M3.2 | ⏳ |  | `docs/map-roadmap.md:182` | Процедурный пресет → формат карты [tools] |
-| M4.1 | ✅ | cli | `docs/map-roadmap.md:192` | Рендер из данных сектора — /🚧 |
-| M4.2 | ⏳ | docs | `docs/map-roadmap.md:198` | Сверка с метаигрой и отложенным регионом |
+| M2.1 | ✅ | core data | `docs/map-roadmap.md:130` | Виды секторов (kind) в данные — |
+| M2.2 | ✅ | core | `docs/map-roadmap.md:149` | «Захват заходом» как правило ядра — |
+| M2.3 | ✅ | core cli | `docs/map-roadmap.md:160` | Масштаб / вес сектора (планета = меньше) — (интерактивный ресайз — в M3.1) |
+| M2.4 | ✅ | core data | `docs/map-roadmap.md:172` | Связность — свойство местности, а не координат — |
+| M3.1 | 🔒 |  | `docs/map-roadmap.md:226` | Редактор карты [tools] |
+| M3.2 | ⏳ |  | `docs/map-roadmap.md:234` | Процедурный пресет → формат карты [tools] |
+| M4.1 | ✅ | cli | `docs/map-roadmap.md:244` | Рендер из данных сектора — /🚧 |
+| M4.2 | ⏳ | docs | `docs/map-roadmap.md:250` | Сверка с метаигрой и отложенным регионом |
 | MM-0.1 | ⏳ | srv | `docs/matchmaking-roadmap.md:27` | Состояния матча: lobby→active→ended→archived |
 | MM-0.2 | ✅ | core proto srv | `docs/matchmaking-roadmap.md:33` | Подключить victoryModule + баннер |
 | MM-1.1 | 🔒 | srv | `docs/matchmaking-roadmap.md:43` | Лобби (создание/присоединение) |

@@ -388,6 +388,22 @@ export const SectorTypeDefSchema = z.object({
   /** Victory-score worth of controlling a node in this sector (terrain like an
    *  asteroid field is worth holding even without a habitable planet). */
   scoreValue: z.number().nonnegative().default(0),
+  /** How many lanes the terrain can physically carry (MAP-LINK). Geometry proposes
+   *  the candidates — the relative-neighbourhood rule already says which sectors can
+   *  see each other — and this says how many of them a region of THIS kind actually
+   *  admits: open space routes freely, a dense asteroid cluster admits a single
+   *  approach and is therefore a dead end. Enforced by `validateMatchMap`
+   *  (`E_SECTOR_OVERLINKED`), so a map cannot draw a lane the world would not allow.
+   *  The generous default keeps every pre-existing map legal. */
+  maxLinks: z.number().int().positive().default(8),
+  /** Passive per-hour output an OWNED sector of this terrain yields, mirroring
+   *  `PlanetTypeDefSchema.baseOutput` (a metal-rich asteroid cluster is worth taking
+   *  even though nothing can be built on it). Added by `sectorModule` into the
+   *  `economy.production` bag. Empty {} = the terrain yields nothing by itself. */
+  baseOutput: ResourceBagSchema.default({}),
+  /** Per-resource production multipliers for an owned sector of this terrain, e.g.
+   *  `{ metal: 0.5 }` = +50% metal mined here. Layered like the planet-type twin. */
+  productionByResource: z.record(z.string(), z.number()).default({}),
 });
 
 /**

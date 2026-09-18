@@ -154,3 +154,62 @@ describe('sector module — combat modifiers', () => {
     expect(dmg.toDefender).toBeCloseTo(20 / 1.1);
   });
 });
+
+describe('sector module — terrain yield (MAP-LINK)', () => {
+  // A dense asteroid cluster admits one lane and is slow inside; what makes it worth
+  // taking anyway is what the terrain HOLDS. That prize lives on the same axis as the
+  // penalty, so "why is this dead end worth a fleet" is answered by one catalogue row.
+  const yieldData: GameData = parseGameData({
+    version: '0.1.0',
+    resources: ['metal'],
+    units: {},
+    factions: {},
+    buildings: {},
+    events: {},
+    sectors: {
+      empty_space: { speedBonus: 0.15 },
+      asteroid_cluster: { speedBonus: -0.5, baseOutput: { metal: 14 }, productionByResource: { metal: 0.5 } },
+    },
+  });
+
+  const produced = (terrain: string | undefined, seed: Record<string, number>): number => {
+    const state = createInitialState({ seed: 's', version: { data: '0.1.0', manifest: '1' } });
+    state.planets.rock = planet('rock', 'p1', 0, 0, terrain);
+    let out = 0;
+    const probe: GameModule = {
+      id: 'probe',
+      version: '1.0.0',
+      setup(api) {
+        api.onAction('probe', (_a, h) => {
+          out = h.hook<Record<string, number>>('economy.production', seed, { planetId: 'rock' }).metal ?? 0;
+        });
+      },
+    };
+    const kernel = createKernel([sectorModule, probe]);
+    const probeAction: Action = {
+      id: 's:p1:1',
+      type: 'probe',
+      playerId: 'p1',
+      payload: {},
+      issuedAt: 0,
+    };
+    const res = kernel.applyAction(state, probeAction, { now: 0, data: yieldData });
+    expect(res.ok).toBe(true);
+    return out;
+  };
+
+  it('an owned cluster yields its terrain metal on top of whatever else produces', () => {
+    // nothing else producing: the terrain alone carries it — 14 * (1 + 0.5)
+    expect(produced('asteroid_cluster', {})).toBeCloseTo(21, 6);
+  });
+
+  it('it also multiplies what buildings already mined there', () => {
+    // 10 mined + 14 held = 24, then the terrain's metal multiplier
+    expect(produced('asteroid_cluster', { metal: 10 })).toBeCloseTo(36, 6);
+  });
+
+  it('a terrain that holds nothing passes the bag through untouched', () => {
+    expect(produced('empty_space', { metal: 10 })).toBeCloseTo(10, 6);
+    expect(produced(undefined, { metal: 10 })).toBeCloseTo(10, 6);
+  });
+});

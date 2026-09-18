@@ -413,3 +413,84 @@ describe('every shipped map validates (M1.3)', () => {
     });
   }
 });
+
+describe('validateMatchMap — terrain decides how many lanes a sector carries (MAP-LINK)', () => {
+  /** Four sectors around a centre, close enough that geometry offers every spoke. */
+  const star = (centreTerrain: string): MatchMap =>
+    parseMatchMap({
+      id: 'star',
+      seed: 'star',
+      sectors: {
+        hub: { position: { x: 0, y: 0 }, kind: 'empty', terrain: centreTerrain },
+        n: { position: { x: 0, y: -200 }, kind: 'planet', terrain: 'empty_space' },
+        s: { position: { x: 0, y: 200 }, kind: 'planet', terrain: 'empty_space' },
+        e: { position: { x: 200, y: 0 }, kind: 'planet', terrain: 'empty_space' },
+        w: { position: { x: -200, y: 0 }, kind: 'planet', terrain: 'empty_space' },
+      },
+      paths: [
+        ['hub', 'n'],
+        ['hub', 's'],
+        ['hub', 'e'],
+        ['hub', 'w'],
+      ],
+    });
+
+  it('open space carries all four spokes', () => {
+    // `empty_space` budgets 5 lanes, so the same geometry is legal here.
+    expect(validateMatchMap(star('empty_space'), data)).toEqual([]);
+  });
+
+  it('a dense asteroid cluster carries one, and the map is rejected for drawing four', () => {
+    // This is the whole point: the author did not "draw fewer lines", the WORLD
+    // refuses to carry them. Same coordinates, same paths — only the terrain differs.
+    const issues = validateMatchMap(star('asteroid_cluster'), data);
+    expect(issues).toContain('E_SECTOR_OVERLINKED:hub:4>1');
+  });
+
+  it('an ion storm carries two', () => {
+    expect(validateMatchMap(star('ion_storm'), data)).toContain('E_SECTOR_OVERLINKED:hub:4>2');
+  });
+
+  it('the budget is a ceiling, not a quota — fewer lanes is fine', () => {
+    const map = star('ion_storm');
+    // Drop the two spokes the storm cannot carry, and the sectors they served with
+    // them — an ion storm legally carries two, and a two-lane map is valid.
+    delete map.sectors.e;
+    delete map.sectors.w;
+    map.paths = [
+      ['hub', 'n'],
+      ['hub', 's'],
+    ];
+    expect(validateMatchMap(map, data)).toEqual([]);
+  });
+
+  it('geometry proposes by the Gabriel rule: a lane is legal unless something is IN it', () => {
+    // The relative-neighbourhood rule this replaced capped every node at ~2-3 lanes on
+    // its own, so no terrain budget could ever bind. Gabriel still forbids a lane with
+    // a sector genuinely in the way, but offers the rest — leaving terrain as the real
+    // limiter. `c` sits beside the a—b line, not on it, so a—b stays legal.
+    const beside = parseMatchMap({
+      id: 'beside',
+      seed: 'beside',
+      sectors: {
+        a: { position: { x: -100, y: 0 }, kind: 'planet', terrain: 'empty_space' },
+        b: { position: { x: 100, y: 0 }, kind: 'planet', terrain: 'empty_space' },
+        c: { position: { x: 0, y: 140 }, kind: 'planet', terrain: 'empty_space' },
+      },
+      paths: [
+        ['a', 'b'],
+        ['a', 'c'],
+        ['c', 'b'],
+      ],
+    });
+    expect(validateMatchMap(beside, data)).toEqual([]);
+
+    // Move the same sector ONTO the line and the direct lane dies — a junction on a
+    // line does not add to it, it cuts it (PVR-0.4).
+    const onTheLine = parseMatchMap({
+      ...beside,
+      sectors: { ...beside.sectors, c: { position: { x: 0, y: 0 }, kind: 'planet', terrain: 'empty_space' } },
+    });
+    expect(validateMatchMap(onTheLine, data)).toContain('E_PATH_NOT_NEIGHBOR:a|b');
+  });
+});

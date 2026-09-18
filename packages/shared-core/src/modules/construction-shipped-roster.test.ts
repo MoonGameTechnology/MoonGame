@@ -90,6 +90,9 @@ const SELF_RESTRICTED = [
 const EXPECTED: Record<string, string[] | null> = {
   planet: null, // the prize: the only roster-less province
   asteroid: ['metal_station'], // ore field: the rig that mines it — the fortress core moved out (decision 18)
+  // M2.4: the dense core of an asteroid massif. Same rig as ordinary field — the
+  // density is what makes it slow and rich, not what makes it buildable differently.
+  asteroid_cluster: ['metal_station'],
   nebula: [],
   empty: [],
   debris_field: [],
