@@ -14,7 +14,7 @@ import {
 import { constructionModule } from './construction';
 import { economyModule } from './economy';
 import { movementModule } from './movement';
-import { technologyModule } from './technology';
+import { technologyLock, technologyModule } from './technology';
 
 const HOUR = 3_600_000;
 
@@ -449,6 +449,20 @@ describe('technology module — session research tree', () => {
     expect(done.state.players.p1?.technologies?.active).toEqual([]);
     expect(done.state.players.p1?.technologies?.completed).toEqual(['industry']);
     expect(done.events.some((event) => event.type === 'technology.researched')).toBe(true);
+  });
+
+  it('ВОРОТА ДОСТУПНОСТИ знают про грант-узел, а не только обработчик (BAL-15)', () => {
+    // Регресс, который это ловит: запрет грант-узлов жил ТОЛЬКО в обработчике
+    // `technology.research`, а `technologyLock` — «data-driven availability gate», по
+    // которому все ЧИТАЮЩИЕ потребители спрашивают «что вообще можно взять», — про флаг
+    // не знал. Бот спрашивает именно так (своей копии правил он намеренно не держит),
+    // сортирует кандидатов «дешёвое вперёд» и выдаёт один приказ за шаг; грант-узлы
+    // бесплатны, поэтому вставали первыми, приказ уходил в отказ — и бот не исследовал
+    // НИЧЕГО ни в одном матче. Ворота обязаны отвечать правду: узел недоступен.
+    const st = stateWith({ players: [player('p1', { metal: 999, credits: 999 })] });
+    expect(technologyLock(data.technologies.gift!, st, 'p1', data)).toBe('E_GRANT_ONLY');
+    // …а обычный узел ворота по-прежнему пропускают.
+    expect(technologyLock(data.technologies.industry!, st, 'p1', data)).toBeNull();
   });
 
   it('rejects missing prerequisites, duplicate research, full slots and bad inputs', () => {
